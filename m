@@ -1,57 +1,87 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 22 Aug 2011 15:11:16 +0200
-Subject: [PATCH v9 1/3] MTD : add the common code for GPMI-NAND controller
-	driver
-In-Reply-To: <4E51FAED.7030403@freescale.com>
-References: <1313581828-16625-1-git-send-email-b32955@freescale.com>
-	<1313994423.2644.3.camel@sauron> <4E51FAED.7030403@freescale.com>
-Message-ID: <201108221511.16251.marek.vasut@gmail.com>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Mon, 22 Aug 2011 14:10:09 +0100
+Subject: [PATCH 2/3 v3] ARM Realview PCIX IRQ include file changes
+In-Reply-To: <20110822130507.23830.26191.stgit@e102602-lin.cambridge.arm.com>
+References: <20110822130507.23830.26191.stgit@e102602-lin.cambridge.arm.com>
+Message-ID: <20110822131000.23830.74485.stgit@e102602-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, August 22, 2011 08:45:01 AM Huang Shijie wrote:
-> Hi Artem:
-> > On Mon, 2011-08-22 at 12:34 +0800, Huang Shijie wrote:
-> >>>> +	pr_info("ECC Algorithm          : %s\n", geo->ecc_algorithm);
-> >>>> +	pr_info("ECC Strength           : %u\n", geo->ecc_strength);
-> >>>> +	pr_info("Page Size in Bytes     : %u\n", geo->page_size_in_bytes);
-> >>>> +	pr_info("Metadata Size in Bytes : %u\n",
-> >>>> geo->metadata_size_in_bytes); +	pr_info("ECC Chunk Size in Bytes:
-> >>>> %u\n", geo->ecc_chunk_size_in_bytes); +	pr_info("ECC Chunk Count     
-> >>>>   : %u\n", geo->ecc_chunk_count); +	pr_info("Payload Size in Bytes  :
-> >>>> %u\n", geo->payload_size_in_bytes); +	pr_info("Auxiliary Size in
-> >>>> Bytes: %u\n", geo->auxiliary_size_in_bytes); +	pr_info("Auxiliary
-> >>>> Status Offset: %u\n", geo->auxiliary_status_offset); +	pr_info("Block
-> >>>> Mark Byte Offset : %u\n", geo->block_mark_byte_offset);
-> >>>> +	pr_info("Block Mark Bit Offset  : %u\n",
-> >>>> geo->block_mark_bit_offset); +}
-> >>> 
-> >>> Isn't it too much info for normal users? Should this be pr_debug()
-> >> 
-> >> the log is only printed out when the bug occurs.
-> >> so it's not for normal users.
-> >> 
-> >>> instead? There is another similar place in your code.
-> >> 
-> >> ok, I will change to pr_debug().
-> > 
-> > I did not read the driver code carefully, so did not realize this is
-> > printed only in case of a bug - I thought this is printed on every boot
-> > up. For the bug case it may be OK to use pr_info as well, so I take back
-> > by comment about using pr_debug(), apologies.
-> 
-> thank you all the same :)
+This patch adds the Interrupt definitions for the PCI
+support on the Realview boards.
 
-If this is printed only in case of bug, I agree with Artem.
+Signed-off-by: Colin Tuckley <colin.tuckley@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
 
-Sorry Huang, cheers!
+ arch/arm/mach-realview/include/mach/irqs-pb11mp.h |   11 +++++++++++
+ arch/arm/mach-realview/include/mach/irqs-pba8.h   |    7 ++++++-
+ arch/arm/mach-realview/include/mach/irqs-pbx.h    |    7 ++++++-
+ 3 files changed, 23 insertions(+), 2 deletions(-)
 
-> 
-> Huang Shijie
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pb11mp.h b/arch/arm/mach-realview/include/mach/irqs-pb11mp.h
+index 34e255a..cd3e3e6 100644
+--- a/arch/arm/mach-realview/include/mach/irqs-pb11mp.h
++++ b/arch/arm/mach-realview/include/mach/irqs-pb11mp.h
+@@ -95,6 +95,17 @@
+ #define IRQ_PB11MP_TSPEN	(IRQ_PB11MP_GIC_START + 30)	/* Touchscreen pen */
+ #define IRQ_PB11MP_TSKPAD	(IRQ_PB11MP_GIC_START + 31)	/* Touchscreen keypad */
+ 
++/* These PCI/PCIe IRQ definitions are here as placeholders
++ * The PCI code actually calculates the irq used at runtime */
++#define IRQ_PB11MP_PCI0		(IRQ_PB11MP_GIC_START + 50)
++#define IRQ_PB11MP_PCI1		(IRQ_PB11MP_GIC_START + 51)
++#define IRQ_PB11MP_PCI2		(IRQ_PB11MP_GIC_START + 52)
++#define IRQ_PB11MP_PCI3		(IRQ_PB11MP_GIC_START + 53)
++#define IRQ_PB11MP_PCIE0	(IRQ_PB11MP_GIC_START + 54)
++#define IRQ_PB11MP_PCIE1	(IRQ_PB11MP_GIC_START + 55)
++#define IRQ_PB11MP_PCIE2	(IRQ_PB11MP_GIC_START + 56)
++#define IRQ_PB11MP_PCIE3	(IRQ_PB11MP_GIC_START + 57)
++
+ #define IRQ_PB11MP_SMC		-1
+ #define IRQ_PB11MP_SCTL		-1
+ 
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pba8.h b/arch/arm/mach-realview/include/mach/irqs-pba8.h
+index 4a88a4e..da6d583 100644
+--- a/arch/arm/mach-realview/include/mach/irqs-pba8.h
++++ b/arch/arm/mach-realview/include/mach/irqs-pba8.h
+@@ -61,11 +61,16 @@
+ 
+ #define IRQ_PBA8_PMU		(IRQ_PBA8_GIC_START + 47)	/* Cortex-A8 PMU */
+ 
+-/* ... */
++/* These PCI/PCIe IRQ definitions are here as placeholders
++ * The PCI code actually calculates the irq used at runtime */
+ #define IRQ_PBA8_PCI0		(IRQ_PBA8_GIC_START + 50)
+ #define IRQ_PBA8_PCI1		(IRQ_PBA8_GIC_START + 51)
+ #define IRQ_PBA8_PCI2		(IRQ_PBA8_GIC_START + 52)
+ #define IRQ_PBA8_PCI3		(IRQ_PBA8_GIC_START + 53)
++#define IRQ_PBA8_PCIE0		(IRQ_PBA8_GIC_START + 54)
++#define IRQ_PBA8_PCIE1		(IRQ_PBA8_GIC_START + 55)
++#define IRQ_PBA8_PCIE2		(IRQ_PBA8_GIC_START + 56)
++#define IRQ_PBA8_PCIE3		(IRQ_PBA8_GIC_START + 57)
+ 
+ #define IRQ_PBA8_SMC		-1
+ #define IRQ_PBA8_SCTL		-1
+diff --git a/arch/arm/mach-realview/include/mach/irqs-pbx.h b/arch/arm/mach-realview/include/mach/irqs-pbx.h
+index 206a300..f661702 100644
+--- a/arch/arm/mach-realview/include/mach/irqs-pbx.h
++++ b/arch/arm/mach-realview/include/mach/irqs-pbx.h
+@@ -76,11 +76,16 @@
+ #define IRQ_PBX_PMU_CPU2        (IRQ_PBX_GIC_START + 46)
+ #define IRQ_PBX_PMU_CPU3        (IRQ_PBX_GIC_START + 47)
+ 
+-/* ... */
++/* These PCI/PCIe IRQ definitions are here as placeholders
++ * The PCI code actually calculates the irq used at runtime */
+ #define IRQ_PBX_PCI0		(IRQ_PBX_GIC_START + 50)
+ #define IRQ_PBX_PCI1		(IRQ_PBX_GIC_START + 51)
+ #define IRQ_PBX_PCI2		(IRQ_PBX_GIC_START + 52)
+ #define IRQ_PBX_PCI3		(IRQ_PBX_GIC_START + 53)
++#define IRQ_PBX_PCIE0		(IRQ_PBX_GIC_START + 54)
++#define IRQ_PBX_PCIE1		(IRQ_PBX_GIC_START + 55)
++#define IRQ_PBX_PCIE2		(IRQ_PBX_GIC_START + 56)
++#define IRQ_PBX_PCIE3		(IRQ_PBX_GIC_START + 57)
+ 
+ #define IRQ_PBX_SMC		-1
+ #define IRQ_PBX_SCTL		-1
