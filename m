@@ -1,13 +1,82 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 22 Aug 2011 23:36:29 +0100
-Subject: [PATCH 2/2] ASoC: mxs-sgtl5000: add record function
-In-Reply-To: <1313942566-21433-1-git-send-email-b29396@freescale.com>
-References: <1313942566-21433-1-git-send-email-b29396@freescale.com>
-Message-ID: <20110822223628.GE29473@opensource.wolfsonmicro.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 22 Aug 2011 15:48:40 -0700
+Subject: [PATCH 2/2] omap_twl: Prevent SR to enable for am3517/am3505
+	devices
+In-Reply-To: <FCCFB4CDC6E5564B9182F639FC3560870370A4D96E@dbde02.ent.ti.com>
+	(Abhilash Koyamangalath's message of "Mon, 8 Aug 2011 18:18:40 +0530")
+References: <1312473569-1212-1-git-send-email-abhilash.kv@ti.com>
+	<87hb5w3kq0.fsf@ti.com>
+	<FCCFB4CDC6E5564B9182F639FC3560870370A4D96E@dbde02.ent.ti.com>
+Message-ID: <87obzhgj07.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2011 at 12:02:46AM +0800, Dong Aisheng wrote:
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+"Koyamangalath, Abhilash" <abhilash.kv@ti.com> writes:
 
-Applied, thanks.
+> Kevin Hilman wrote:
+>>Abhilash K V <abhilash.kv@ti.com> writes:
+>> 
+>> > From: Vaibhav Hiremath <hvaibhav@ti.com>
+>> >
+>> > In case of AM3517 & AM3505, Smart Reflex is not applicable so
+>> > we must not enable it. So add check for am3517/05 cpu revision
+>> > in omap3_twl_init() and return -ENODEV if true, else continue.
+>> >
+>> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> > Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+>> > ---
+>> >  arch/arm/mach-omap2/omap_twl.c |    8 ++++++++
+>> >  1 files changed, 8 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm/mach-omap2/omap_twl.c
+>> b/arch/arm/mach-omap2/omap_twl.c
+>> > index 07d6140..92fadcb 100644
+>> > --- a/arch/arm/mach-omap2/omap_twl.c
+>> > +++ b/arch/arm/mach-omap2/omap_twl.c
+>> > @@ -269,6 +269,14 @@ int __init omap3_twl_init(void)
+>> >        if (!cpu_is_omap34xx())
+>> >                return -ENODEV;
+>> > 
+>> > +     /*
+>> > +      * In case of AM3517/AM3505 we should not be going down
+>> > +      * further, since SR is not applicable there.
+>> > +      */
+>> > +     if (cpu_is_omap3505() || cpu_is_omap3517()) {
+>> > +             return -ENODEV;
+>> > +     }
+>> > +
+>> 
+>> Rather than using cpu_is_*, you should add a new "feature" flag for
+>> SmartReflex.  We already have this for things like SGX, IVA, NEON, etc.
+>> See <plat/feature.h>
+> I did not find a feature.h; 
+
+sorry, I meant <plat/cpu.yh>
+
+> did you mean OMAP3_CHECK_FEATURE macro which is used by
+> omap3_check_features(), which gleans for presence of L2CACHE, IVA, SGX, NEON, ISP features
+> from the Control Device Status Register (0x4800 244C) ?
+
+yes, OMAP3_HAS_FEATURE()
+
+> There is no such bit-field to indicate the presence of smart-reflex feature in this register.
+> AFAIK, there is no such global register as well which could indicate this.
+
+There doesn't have to be a register read to indicate this.  See for
+example the HAS_IO_WAKEUP feature.
+
+Kevin
+
+
+> - Abhilash
+>
+>> Kevin
+>> 
+>> 
+>> >        if (cpu_is_omap3630()) {
+>> >                omap3_mpu_volt_info.vp_vddmin =
+>> OMAP3630_VP1_VLIMITTO_VDDMIN;
+>> >                omap3_mpu_volt_info.vp_vddmax =
+>> OMAP3630_VP1_VLIMITTO_VDDMAX; 
+>> 
+>> 
