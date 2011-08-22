@@ -1,42 +1,32 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 22 Aug 2011 16:44:15 -0700
-Subject: [PATCH v2 1/4] gpio/tegra: Remove use of irq_to_gpio
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04AEA24E3D@HQMAIL01.nvidia.com>
-References: <1313095404-27858-1-git-send-email-swarren@nvidia.com>
-	<CAMbhsRRGDAmYv3_EbJ+WVg0C7e3-FFcLCgq4W325ECKX06M6Hg@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04AEA24E3D@HQMAIL01.nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B24A377B@HQMAIL01.nvidia.com>
+From: buytenh@wantstofly.org (Lennert Buytenhek)
+Date: Tue, 23 Aug 2011 01:45:33 +0200
+Subject: plat-orion needs to enable PCIe ports for mv78xx0
+In-Reply-To: <4E4C33D5.3050508@drewtech.com>
+References: <4E4C33D5.3050508@drewtech.com>
+Message-ID: <20110822234533.GA2109@wantstofly.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Friday, August 12, 2011 10:07 AM:
-> Colin Cross wrote at Thursday, August 11, 2011 2:54 PM:
-> > On Thu, Aug 11, 2011 at 1:43 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> > > irq_to_gpio is being removed. Replace the only use of that API by
-> > > the ARM Tegra sub-architecture.
-> > >
-> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > > ---
-> > > This series is the irq_to_gpio patches I posted last week, rebased to ToT,
-> > > plus removing Tegra's custom gpio_to_irq.
-> > >
-> > > This series was tested against next-20110811 on Harmony, by playing audio
-> > > and plugging/unplugging headphones. Headphone detection relies on using a
-> > > GPIO as an IRQ, and hence on gpio_to_irq.
-> >
-> > This whole series looks good to me:
-> > Acked-by: Colin Cross <ccross@android.com>
+On Wed, Aug 17, 2011 at 05:34:13PM -0400, Joey Oravec wrote:
+
+> On the Discovery series chips (mv78xx0), the CPU control and status
+> register at offset 0x20104 contains bits to enable / disable PCI
+> express port0 and port1. Both ports default to disabled.
 > 
-> Grant, Does this series look OK to you? Russell asked me to add it to the
-> ARM patch system once you'd Ack'd it.
-> 
-> Thanks.
+> It looks the PCIe driver and existing board setup files do not set
+> this bit; any boards that use PCIe and are working today might
+> assume that the bootloader has already set the bit to enable these
+> ports. I couldn't find anything in Marvell's documentation about
+> timing, but the bits need to be set a long time before you touch any
+> of the PCIe port registers.
 
-Russell, I've uploaded these to the ARM patch system as 7052..7055.
+(The delay referred to here is the time it takes for the PCIe link
+to establish.)
 
-Note that I didn't wait for Grant's Ack, since Colin Ack'd them, and
-Grant said in another thread that he's being very liberal in allowing
-GPIO rework changes; I hope this is OK!
+I think the kernel should try to enable the PCIe ports if it finds them
+to be disabled, and wait for some time to see if the link(s) come up.
+(And if they don't, or if the ports were up when booting but link(s)
+were down, disable the port(s) again.)
 
--- 
-nvpublic
+I also think the boot loader should enable the PCIe ports as soon as
+possible if devices are known to be connected, to save on booting time.
