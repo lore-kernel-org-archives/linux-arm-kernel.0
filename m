@@ -1,106 +1,64 @@
-From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Mon, 22 Aug 2011 14:10:23 +0100
-Subject: [PATCH 3/3 v3] RM Realview PCIX board file changes
-In-Reply-To: <20110822130507.23830.26191.stgit@e102602-lin.cambridge.arm.com>
-References: <20110822130507.23830.26191.stgit@e102602-lin.cambridge.arm.com>
-Message-ID: <20110822131014.23830.47467.stgit@e102602-lin.cambridge.arm.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 22 Aug 2011 15:11:59 +0200
+Subject: [PATCH v9 1/3] MTD : add the common code for GPMI-NAND controller
+	driver
+In-Reply-To: <201108221511.16251.marek.vasut@gmail.com>
+References: <1313581828-16625-1-git-send-email-b32955@freescale.com>
+	<4E51FAED.7030403@freescale.com>
+	<201108221511.16251.marek.vasut@gmail.com>
+Message-ID: <201108221511.59316.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the PCI support to the board files
-for the Realview Northbridge boards.
+On Monday, August 22, 2011 03:11:16 PM Marek Vasut wrote:
+> On Monday, August 22, 2011 08:45:01 AM Huang Shijie wrote:
+> > Hi Artem:
+> > > On Mon, 2011-08-22 at 12:34 +0800, Huang Shijie wrote:
+> > >>>> +	pr_info("ECC Algorithm          : %s\n", geo->ecc_algorithm);
+> > >>>> +	pr_info("ECC Strength           : %u\n", geo->ecc_strength);
+> > >>>> +	pr_info("Page Size in Bytes     : %u\n", geo->page_size_in_bytes);
+> > >>>> +	pr_info("Metadata Size in Bytes : %u\n",
+> > >>>> geo->metadata_size_in_bytes); +	pr_info("ECC Chunk Size in Bytes:
+> > >>>> %u\n", geo->ecc_chunk_size_in_bytes); +	pr_info("ECC Chunk Count
+> > >>>> 
+> > >>>>   : %u\n", geo->ecc_chunk_count); +	pr_info("Payload Size in Bytes  
+:
+> > >>>> %u\n", geo->payload_size_in_bytes); +	pr_info("Auxiliary Size in
+> > >>>> Bytes: %u\n", geo->auxiliary_size_in_bytes); +	pr_info("Auxiliary
+> > >>>> Status Offset: %u\n", geo->auxiliary_status_offset);
+> > >>>> +	pr_info("Block Mark Byte Offset : %u\n",
+> > >>>> geo->block_mark_byte_offset);
+> > >>>> +	pr_info("Block Mark Bit Offset  : %u\n",
+> > >>>> geo->block_mark_bit_offset); +}
+> > >>> 
+> > >>> Isn't it too much info for normal users? Should this be pr_debug()
+> > >> 
+> > >> the log is only printed out when the bug occurs.
+> > >> so it's not for normal users.
+> > >> 
+> > >>> instead? There is another similar place in your code.
+> > >> 
+> > >> ok, I will change to pr_debug().
+> > > 
+> > > I did not read the driver code carefully, so did not realize this is
+> > > printed only in case of a bug - I thought this is printed on every boot
+> > > up. For the bug case it may be OK to use pr_info as well, so I take
+> > > back by comment about using pr_debug(), apologies.
+> > 
+> > thank you all the same :)
+> 
+> If this is printed only in case of bug, I agree with Artem.
 
-Signed-off-by: Colin Tuckley <colin.tuckley@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
+Maybe though, dev_err() would be more suitable.
 
- arch/arm/mach-realview/realview_pb11mp.c |   18 ++++++++++++++++++
- arch/arm/mach-realview/realview_pba8.c   |   18 ++++++++++++++----
- arch/arm/mach-realview/realview_pbx.c    |   16 +++++++++++++---
- 3 files changed, 45 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index b43644b..17a3340 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -95,6 +95,24 @@ static struct map_desc realview_pb11mp_io_desc[] __initdata = {
- 		.length		= SZ_8K,
- 		.type		= MT_DEVICE,
- 	},
-+#ifdef CONFIG_PCI
-+	{
-+		.virtual	= (unsigned long)PCIX_UNIT_BASE,
-+		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_BASE),
-+		.length		= REALVIEW_PB_PCI_BASE_SIZE,
-+		.type		= MT_DEVICE,
-+	 }, {
-+		.virtual	= (unsigned long)REALVIEW_PCI_IO_VBASE,
-+		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_IO_BASE),
-+		.length		= REALVIEW_PB_PCI_IO_SIZE,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual        = IO_ADDRESS(REALVIEW_ISSP_REG_BASE),
-+		.pfn            = __phys_to_pfn(REALVIEW_ISSP_REG_BASE),
-+		.length         = SZ_4K,
-+		.type           = MT_DEVICE,
-+	},
-+#endif
- #ifdef CONFIG_DEBUG_LL
- 	{
- 		.virtual	= IO_ADDRESS(REALVIEW_PB11MP_UART0_BASE),
-diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
-index 763e8f3..1ed9dd8 100644
---- a/arch/arm/mach-realview/realview_pba8.c
-+++ b/arch/arm/mach-realview/realview_pba8.c
-@@ -79,10 +79,20 @@ static struct map_desc realview_pba8_io_desc[] __initdata = {
- 	},
- #ifdef CONFIG_PCI
- 	{
--		.virtual	= PCIX_UNIT_BASE,
--		.pfn		= __phys_to_pfn(REALVIEW_PBA8_PCI_BASE),
--		.length		= REALVIEW_PBA8_PCI_BASE_SIZE,
--		.type		= MT_DEVICE
-+		.virtual	= (unsigned long)PCIX_UNIT_BASE,
-+		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_BASE),
-+		.length		= REALVIEW_PB_PCI_BASE_SIZE,
-+		.type		= MT_DEVICE,
-+	 }, {
-+		.virtual	= (unsigned long)REALVIEW_PCI_IO_VBASE,
-+		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_IO_BASE),
-+		.length		= REALVIEW_PB_PCI_IO_SIZE,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= IO_ADDRESS(REALVIEW_ISSP_REG_BASE),
-+		.pfn		= __phys_to_pfn(REALVIEW_ISSP_REG_BASE),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
- 	},
- #endif
- #ifdef CONFIG_DEBUG_LL
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index 363b0ab..1d7d191 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -80,9 +80,19 @@ static struct map_desc realview_pbx_io_desc[] __initdata = {
- 	},
- #ifdef CONFIG_PCI
- 	{
--		.virtual	= PCIX_UNIT_BASE,
--		.pfn		= __phys_to_pfn(REALVIEW_PBX_PCI_BASE),
--		.length		= REALVIEW_PBX_PCI_BASE_SIZE,
-+		.virtual	= (unsigned long)PCIX_UNIT_BASE,
-+		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_BASE),
-+		.length		= REALVIEW_PB_PCI_BASE_SIZE,
-+		.type		= MT_DEVICE,
-+	 }, {
-+		.virtual	= (unsigned long)REALVIEW_PCI_IO_VBASE,
-+		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_IO_BASE),
-+		.length		= REALVIEW_PB_PCI_IO_SIZE,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= IO_ADDRESS(REALVIEW_ISSP_REG_BASE),
-+		.pfn		= __phys_to_pfn(REALVIEW_ISSP_REG_BASE),
-+		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
- 	},
- #endif
+> 
+> Sorry Huang, cheers!
+> 
+> > Huang Shijie
+> > 
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
