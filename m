@@ -1,10 +1,9 @@
 From: Baohua.Song@csr.com (Barry Song)
-Date: Mon, 22 Aug 2011 23:15:52 -0700
-Subject: [PATCH v2 4/4] ARM: CSR: add PM suspend/resume entries for
-	SiRFprimaII L2 cache
+Date: Mon, 22 Aug 2011 23:15:50 -0700
+Subject: [PATCH v2 2/4] ARM: CSR: add PM sleep entry for SiRFprimaII
 In-Reply-To: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
 References: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1314080152-30503-5-git-send-email-Baohua.Song@csr.com>
+Message-ID: <1314080152-30503-3-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,116 +12,288 @@ From: Rongjun Ying <rongjun.ying@csr.com>
 Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-prima2/l2x0.c |   82 +++++++++++++++++++++++++++++++-----------
- 1 files changed, 60 insertions(+), 22 deletions(-)
+ -v2:
+ delete redundant ARM mode registers save/restore
+ use generic cpu suspend
+ move l2 cache suspend/resume codes out
+ make memc become a device driver
 
-diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
-index 9cda205..620c586 100644
---- a/arch/arm/mach-prima2/l2x0.c
-+++ b/arch/arm/mach-prima2/l2x0.c
-@@ -18,42 +18,80 @@
- #define L2X0_ADDR_FILTERING_START       0xC00
- #define L2X0_ADDR_FILTERING_END         0xC04
- 
--static struct of_device_id l2x_ids[]  = {
-+static void __iomem *sirfsoc_l2x0_base;
+ arch/arm/mach-prima2/pm.c    |  158 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-prima2/pm.h    |   31 ++++++++
+ arch/arm/mach-prima2/sleep.S |   61 ++++++++++++++++
+ 3 files changed, 250 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/pm.c
+ create mode 100644 arch/arm/mach-prima2/pm.h
+ create mode 100644 arch/arm/mach-prima2/sleep.S
+
+diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
+new file mode 100644
+index 0000000..75167df
+--- /dev/null
++++ b/arch/arm/mach-prima2/pm.c
+@@ -0,0 +1,158 @@
++/*
++ * power management entry for CSR SiRFprimaII
++ *
++ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
 +
-+static struct of_device_id l2x0_ids[]  = {
- 	{ .compatible = "arm,pl310-cache" },
- };
- 
--static int __init sirfsoc_of_l2x_init(void)
-+static void sirfsoc_l2x0_init(void)
- {
--	struct device_node *np;
--	void __iomem *sirfsoc_l2x_base;
--
--	np = of_find_matching_node(NULL, l2x_ids);
--	if (!np)
--		panic("unable to find compatible l2x node in dtb\n");
--
--	sirfsoc_l2x_base = of_iomap(np, 0);
--	if (!sirfsoc_l2x_base)
--		panic("unable to map l2x cpu registers\n");
--
--	of_node_put(np);
--
--	if (!(readl_relaxed(sirfsoc_l2x_base + L2X0_CTRL) & 1)) {
-+	if (!(readl_relaxed(sirfsoc_l2x0_base + L2X0_CTRL) & 1)) {
- 		/*
- 		 * set the physical memory windows L2 cache will cover
- 		 */
- 		writel_relaxed(PLAT_PHYS_OFFSET + 1024 * 1024 * 1024,
--			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_END);
-+			sirfsoc_l2x0_base + L2X0_ADDR_FILTERING_END);
- 		writel_relaxed(PLAT_PHYS_OFFSET | 0x1,
--			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_START);
-+			sirfsoc_l2x0_base + L2X0_ADDR_FILTERING_START);
- 
- 		writel_relaxed(0,
--			sirfsoc_l2x_base + L2X0_TAG_LATENCY_CTRL);
-+			sirfsoc_l2x0_base + L2X0_TAG_LATENCY_CTRL);
- 		writel_relaxed(0,
--			sirfsoc_l2x_base + L2X0_DATA_LATENCY_CTRL);
-+			sirfsoc_l2x0_base + L2X0_DATA_LATENCY_CTRL);
- 	}
--	l2x0_init((void __iomem *)sirfsoc_l2x_base, 0x00040000,
-+	l2x0_init((void __iomem *)sirfsoc_l2x0_base, 0x00040000,
- 		0x00000000);
++#include <linux/kernel.h>
++#include <linux/suspend.h>
++#include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/of_platform.h>
++#include <linux/io.h>
++#include <linux/rtc/sirfsoc_rtciobrg.h>
++#include <asm/suspend.h>
++
++#include "pm.h"
++
++static u32 sirfsoc_pwrc_base;
++void __iomem *sirfsoc_memc_base;
++
++static void sirfsoc_set_wakeup_source(void)
++{
++        u32 pwr_trigger_en_reg;
++        pwr_trigger_en_reg = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
++		SIRFSOC_PWRC_TRIGGER_EN);
++#define X_ON_KEY_B (1 << 0)
++        sirfsoc_rtc_iobrg_writel(pwr_trigger_en_reg | X_ON_KEY_B,
++                        sirfsoc_pwrc_base + SIRFSOC_PWRC_TRIGGER_EN);
 +}
 +
-+static int __init sirfsoc_of_l2x0_init(void)
++static void sirfsoc_set_sleep_mode(u32 mode)
 +{
-+	struct device_node *np;
++        u32 sleep_mode = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
++		SIRFSOC_PWRC_PDN_CTRL);
++        sleep_mode &= ~(SIRFSOC_SLEEP_MODE_MASK << 1);
++        sleep_mode |= ((mode << 1));
++        sirfsoc_rtc_iobrg_writel(sleep_mode, sirfsoc_pwrc_base +
++		SIRFSOC_PWRC_PDN_CTRL);
++}
 +
-+	np = of_find_matching_node(NULL, l2x0_ids);
-+	if (!np)
-+		panic("unable to find compatible l2x node in dtb\n");
++int sirfsoc_pre_suspend_power_off(void)
++{
++	u32 wakeup_entry = virt_to_phys(cpu_resume);
 +
-+	sirfsoc_l2x0_base = of_iomap(np, 0);
-+	if (!sirfsoc_l2x0_base)
-+		panic("unable to map l2x cpu registers\n");
- 
-+	of_node_put(np);
++	sirfsoc_rtc_iobrg_writel(wakeup_entry,
++		SIRFSOC_PWRC_SCRATCH_PAD1);
 +
-+	sirfsoc_l2x0_init();
++	sirfsoc_set_wakeup_source();
++
++	sirfsoc_set_sleep_mode(SIRFSOC_DEEP_SLEEP_MODE);
 +
 +	return 0;
 +}
-+early_initcall(sirfsoc_of_l2x0_init);
 +
-+#ifdef CONFIG_PM
-+#include <linux/syscore_ops.h>
-+
-+static int sirfsoc_l2x0_pm_suspend(void)
++static void sirfsoc_save_register(u32 *ptr)
 +{
-+	writel_relaxed(0xFF, sirfsoc_l2x0_base + L2X0_CLEAN_INV_WAY);
-+	while (readl_relaxed(sirfsoc_l2x0_base + L2X0_CLEAN_INV_WAY))
-+		continue;
-+	writel_relaxed(0x0, sirfsoc_l2x0_base + L2X0_CACHE_SYNC);
-+	writel_relaxed(0x0, sirfsoc_l2x0_base + L2X0_CTRL);
++	/* todo: save necessary system registers here */
++}
++
++static void sirfsoc_restore_regs(u32 *ptr)
++{
++	/* todo: restore saved system registers here */
++}
++
++static int sirfsoc_pm_enter(suspend_state_t state)
++{
++	u32 *saved_regs;
++
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		saved_regs = kmalloc(1024, GFP_ATOMIC);
++		if (!saved_regs)
++			return -ENOMEM;
++
++		sirfsoc_save_register(saved_regs);
++
++		/* go zzz */
++		cpu_suspend(0, sirfsoc_finish_suspend);
++
++		sirfsoc_restore_regs(saved_regs);
++		kfree(saved_regs);
++		break;
++	default:
++		return -EINVAL;
++	}
 +	return 0;
 +}
 +
-+static void sirfsoc_l2x0_pm_resume(void)
-+{
-+	sirfsoc_l2x0_init();
-+}
-+
-+static struct syscore_ops sirfsoc_l2x0_pm_syscore_ops = {
-+	.suspend	= sirfsoc_l2x0_pm_suspend,
-+	.resume		= sirfsoc_l2x0_pm_resume,
++static const struct platform_suspend_ops sirfsoc_pm_ops = {
++	.enter = sirfsoc_pm_enter,
++	.valid = suspend_valid_only_mem,
 +};
 +
-+static int sirfsoc_l2x0_pm_init(void)
++static int __init sirfsoc_pm_init(void)
 +{
-+	register_syscore_ops(&sirfsoc_l2x0_pm_syscore_ops);
- 	return 0;
- }
--early_initcall(sirfsoc_of_l2x_init);
-+late_initcall(sirfsoc_l2x0_pm_init);
++	suspend_set_ops(&sirfsoc_pm_ops);
++	return 0;
++}
++late_initcall(sirfsoc_pm_init);
++
++static struct of_device_id pwrc_ids[] = {
++	{ .compatible = "sirf,prima2-pwrc" },
++};
++
++static int __init sirfsoc_of_pwrc_init(void)
++{
++	struct device_node *np;
++	const __be32    *addrp;
++
++	np = of_find_matching_node(NULL, pwrc_ids);
++	if (!np)
++		panic("unable to find compatible pwrc node in dtb\n");
++
++	addrp = of_get_property(np, "reg", NULL);
++	if (!addrp)
++		panic("unable to find base address of pwrc node in dtb\n");
++
++	sirfsoc_pwrc_base = be32_to_cpup(addrp);
++
++	of_node_put(np);
++
++	return 0;
++}
++postcore_initcall(sirfsoc_of_pwrc_init);
++
++static struct of_device_id memc_ids[] = {
++	{ .compatible = "sirf,prima2-memc" },
++};
++
++static int __devinit sirfsoc_memc_probe(struct platform_device *op)
++{
++	struct device_node *np = op->dev.of_node;
++
++	sirfsoc_memc_base = of_iomap(np, 0);
++	if (!sirfsoc_memc_base)
++		panic("unable to map memc registers\n");
++
++	return 0;
++}
++
++static struct platform_driver sirfsoc_memc_driver = {
++	.probe		= sirfsoc_memc_probe,
++	.driver = {
++		.name = "sirfsoc-memc",
++		.owner = THIS_MODULE,
++		.of_match_table	= memc_ids,
++	},
++};
++
++static int __init sirfsoc_memc_init(void)
++{
++	return platform_driver_register(&sirfsoc_memc_driver);
++}
++postcore_initcall(sirfsoc_memc_init);
+diff --git a/arch/arm/mach-prima2/pm.h b/arch/arm/mach-prima2/pm.h
+new file mode 100644
+index 0000000..fe2028b
+--- /dev/null
++++ b/arch/arm/mach-prima2/pm.h
+@@ -0,0 +1,31 @@
++/*
++ * arch/arm/mach-prima2/pm.h
++ *
++ * Copyright (C) 2011 CSR
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef _MACH_PRIMA2_PM_H_
++#define _MACH_PRIMA2_PM_H_
++
++#define SIRFSOC_PWR_SLEEPFORCE		0x01
++
++#define SIRFSOC_SLEEP_MODE_MASK         0x3
++#define SIRFSOC_DEEP_SLEEP_MODE         0x1
++
++#define SIRFSOC_PWRC_PDN_CTRL           0x0
++#define SIRFSOC_PWRC_PON_OFF            0x4
++#define SIRFSOC_PWRC_TRIGGER_EN         0x8
++#define SIRFSOC_PWRC_PIN_STATUS         0x14
++#define SIRFSOC_PWRC_SCRATCH_PAD1       0x18
++#define SIRFSOC_PWRC_SCRATCH_PAD2       0x1C
++
++#ifndef __ASSEMBLY__
++extern int sirfsoc_finish_suspend(unsigned long);
++#endif
 +
 +#endif
++
+diff --git a/arch/arm/mach-prima2/sleep.S b/arch/arm/mach-prima2/sleep.S
+new file mode 100644
+index 0000000..07f8067
+--- /dev/null
++++ b/arch/arm/mach-prima2/sleep.S
+@@ -0,0 +1,61 @@
++/*
++ * sleep mode for CSR SiRFprimaII
++ *
++ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++#include <linux/linkage.h>
++#include <asm/ptrace.h>
++#include <asm/assembler.h>
++
++#include "pm.h"
++
++#define DENALI_CTL_22_OFF	0x58
++#define DENALI_CTL_112_OFF	0x1c0
++
++	.text
++
++ENTRY(sirfsoc_finish_suspend)
++	@ r5: 	mem controller
++	ldr     r0, =sirfsoc_memc_base
++	ldr	r5, [r0]
++	@ r7: 	rtc iobrg controller
++	ldr     r0, =sirfsoc_rtciobrg_base
++	ldr	r7, [r0]
++
++	@ Read the power control register and set the
++	@ sleep force bit.
++	ldr	r0, =SIRFSOC_PWRC_PDN_CTRL
++	bl	__sirfsoc_rtc_iobrg_readl
++	orr	r0,r0,#SIRFSOC_PWR_SLEEPFORCE
++	ldr	r1, =SIRFSOC_PWRC_PDN_CTRL
++	bl	sirfsoc_rtc_iobrg_pre_writel
++	mov	r1, #0x1
++
++	@ read the MEM ctl register and set the self
++	@ refresh bit
++
++	ldr	r2, [r5, #DENALI_CTL_22_OFF]
++	orr	r2, r2, #0x1
++
++	@ Following code has to run from cache since
++	@ the RAM is going to self refresh mode
++	.align 5
++	str	r2, [r5, #DENALI_CTL_22_OFF]
++
++1:
++	ldr	r4, [r5, #DENALI_CTL_112_OFF]
++	tst	r4, #0x1
++	bne	1b
++
++	@ write SLEEPFORCE through rtc iobridge
++
++	str	r1, [r7]
++	@ wait rtc io bridge sync
++1:
++	ldr	r3, [r7]
++	tst	r3, #0x01
++	bne	1b
++	b .
 -- 
 1.7.1
 
