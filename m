@@ -1,86 +1,109 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Tue, 23 Aug 2011 16:22:17 +0800
-Subject: [PATCH] ARM: mmp: map sram as MT_MEMORY rather than MT_DEVICE
-In-Reply-To: <4E535B66.8070301@marvell.com>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-	<1313377794-26721-2-git-send-email-leoy@marvell.com>
-	<20110822164740.5682541b@queued.net>
-	<CAMPhdO-cttCzdm_gh=KdNqqPYQOgPBNS57DtPduPahpkP2rk0g@mail.gmail.com>
-	<20110822190838.3e03c3ec@debxo>  <4E535B66.8070301@marvell.com>
-Message-ID: <1314087737.4444.22.camel@Lily>
+From: jason.hui@linaro.org (Jason Hui)
+Date: Tue, 23 Aug 2011 16:27:21 +0800
+Subject: [PATCH 2/2] ARM: i.MX5/mm: use static mapping for TZIC
+In-Reply-To: <20110823070522.GI16557@pengutronix.de>
+References: <1314014005-9923-1-git-send-email-jason.hui@linaro.org>
+	<1314014005-9923-3-git-send-email-jason.hui@linaro.org>
+	<20110823070522.GI16557@pengutronix.de>
+Message-ID: <CAFQ4atRS8xkK0eFHbnQAW+9XBve8W0AuV+bAV2eDuYoBHXN9Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-08-23 at 00:48 -0700, Leo Yan wrote:
-> 
-> On 08/23/2011 10:08 AM, Andres Salomon wrote:
-> > On Tue, 23 Aug 2011 08:07:41 +0800
-> > Eric Miao<eric.y.miao@gmail.com>  wrote:
-> >
-> >> On Tue, Aug 23, 2011 at 7:47 AM, Andres Salomon<dilinger@queued.net>
-> >> wrote:
-> >>> The sram code allocates memory with ioremap, which assumes MT_DEVICE
-> >>> for memory protections.  This explodes when we map sram for power
-> >>> management purposes and then attempt to execute it (jump_to_lp_sram)
-> >>> on the OLPC XO-1.75.  Instead, we want to specify MT_MEMORY, which
-> >>> doesn't set the L_PTE_XN bit.
-> >>>
-> >>> Signed-off-by: Andres Salomon<dilinger@queued.net>
-> >>> ---
-> >>>   arch/arm/mach-mmp/sram.c |    4 +++-
-> >>>   1 files changed, 3 insertions(+), 1 deletions(-)
-> >>>
-> >>> Eric, this patch is against the devel branch of your pxa tree.
-> >>>
-> >>> diff --git a/arch/arm/mach-mmp/sram.c b/arch/arm/mach-mmp/sram.c
-> >>> index 4304f95..ca4d3c1 100644
-> >>> --- a/arch/arm/mach-mmp/sram.c
-> >>> +++ b/arch/arm/mach-mmp/sram.c
-> >>> @@ -21,6 +21,7 @@
-> >>>   #include<linux/err.h>
-> >>>   #include<linux/slab.h>
-> >>>   #include<linux/genalloc.h>
-> >>> +#include<asm/mach/map.h>
-> >>>
-> >>>   #include<mach/sram.h>
-> >>>
-> >>> @@ -87,7 +88,8 @@ static int __devinit sram_probe(struct
-> >>> platform_device *pdev)
-> >>>
-> >>>         info->sram_phys   = (phys_addr_t)res->start;
-> >>>         info->sram_size   = resource_size(res);
-> >>> -       info->sram_virt   = ioremap(info->sram_phys,
-> >>> info->sram_size);
-> >>> +       info->sram_virt   = __arm_ioremap(info->sram_phys,
-> >>> info->sram_size,
-> >>> +                                         MT_MEMORY);
-> >>
-> >> I doubt MT_MEMORY is intended for use with __arm_ioremap(). There
-> >> could be other way around to the L_PTE_XN bit.
-> >>
-> >> One other way I'm actually thinking of is to add the SRAM mapping to
-> >> mmp_map_io(). The difference of SRAM offset/size may result the
-> >> separation of mmp_map_io() into {pxa168,pxa910,mmp2}_map_io()
-> >> if necessary.
-> >>
-> >
-> > I guess I don't follow.  I think you're talking about adding it to the
-> > standard_io_desc array, but that would require having it pre-mapped and
-> > knowing the virtual address.  Or were you planning to ioremap it?
-> 
-> I missed the L_PTE_XN bit.
-> The patch is originally for audio sram, so use the ioremap is ok for 
-> that. But for the internal sram we should need the different mapping 
-> property.
-> 
-> so far, the standard_io_desc is shared by pxa168/pxa910/mmp2;
-> we can not add the sram's entry into it for now sram is only dedicated
-> to mmp2; just like Eric's suggestion, we need mmp2_map_io() only for
-> mmp2, and add the sram's entries into the structure.
-> if so, we need transfer the mapped info into the sram module,
-> and sram module just keep the info and do not need remap it again.
-> 
-> so what's your opinion?
+Hi, Uwe,
 
-Could we use resource or platform data to specify sram is used for
-device or memory? If so, it may be helpful to customize.
+2011/8/23 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Jason,
+>
+> On Mon, Aug 22, 2011 at 07:53:25PM +0800, Jason Liu wrote:
+>> We can use static mapping for TZIC to get rid of the
+>> duplicated code for ioremap and the error handling of
+>> ioremap, which will made code more clean and consistent.
+>>
+>> Signed-off-by: Jason Liu <jason.hui@linaro.org>
+>> ---
+>> ?arch/arm/mach-mx5/mm.c ? ? ? ? ? ? ? ?| ? 20 ++++----------------
+>> ?arch/arm/plat-mxc/include/mach/mx51.h | ? ?1 +
+>> ?arch/arm/plat-mxc/include/mach/mx53.h | ? ?1 +
+>> ?3 files changed, 6 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
+>> index f8ebe37..adfe889 100644
+>> --- a/arch/arm/mach-mx5/mm.c
+>> +++ b/arch/arm/mach-mx5/mm.c
+>> @@ -25,6 +25,7 @@
+>> ? * Define the MX51 memory map.
+>> ? */
+>> ?static struct map_desc mx51_io_desc[] __initdata = {
+>> + ? ? imx_map_entry(MX51, TZIC, MT_DEVICE),
+>> ? ? ? imx_map_entry(MX51, IRAM, MT_DEVICE),
+>> ? ? ? imx_map_entry(MX51, DEBUG, MT_DEVICE),
+>> ? ? ? imx_map_entry(MX51, AIPS1, MT_DEVICE),
+>> @@ -36,6 +37,7 @@ static struct map_desc mx51_io_desc[] __initdata = {
+>> ? * Define the MX53 memory map.
+>> ? */
+>> ?static struct map_desc mx53_io_desc[] __initdata = {
+>> + ? ? imx_map_entry(MX53, TZIC, MT_DEVICE),
+>> ? ? ? imx_map_entry(MX53, AIPS1, MT_DEVICE),
+>> ? ? ? imx_map_entry(MX53, SPBA0, MT_DEVICE),
+>> ? ? ? imx_map_entry(MX53, AIPS2, MT_DEVICE),
+>> @@ -100,32 +102,18 @@ void __init imx50_init_early(void)
+>> ?void __init mx51_init_irq(void)
+>> ?{
+>> ? ? ? unsigned long tzic_addr;
+>> - ? ? void __iomem *tzic_virt;
+>>
+>> ? ? ? if (mx51_revision() < IMX_CHIP_REVISION_2_0)
+>> ? ? ? ? ? ? ? tzic_addr = MX51_TZIC_BASE_ADDR_TO1;
+>> ? ? ? else
+>> ? ? ? ? ? ? ? tzic_addr = MX51_TZIC_BASE_ADDR;
+>>
+>> - ? ? tzic_virt = ioremap(tzic_addr, SZ_16K);
+>> - ? ? if (!tzic_virt)
+>> - ? ? ? ? ? ? panic("unable to map TZIC interrupt controller\n");
+>> -
+>> - ? ? tzic_init_irq(tzic_virt);
+>> + ? ? tzic_init_irq(MX51_IO_ADDRESS(tzic_addr));
+> arch/arm/plat-mxc/include/mach/hardware.h has a list of all SoCs with
+> the memory areas mapped that you are expected to update if you add
+> another mapping. If you had done that, you would have noticed that
+> MX51_TZIC_BASE_ADDR (== 0xe0000000) maps to the very same address as
+> MX51_DEBUG_BASE_ADDR (== 0x60000000).
+> So only one of these two can be statically mapped (or the function needs
+> to change).
+
+Yes, right. But I think we can get rid of DEBUG mapping, this is
+useless and no-one
+use it. And I also want to clean up the following def, it is dead code.
+
+-#define MX51_DEBUG_BASE_ADDR           0x60000000
+-#define MX51_DEBUG_SIZE                        SZ_1M
+-
+-#define MX51_ETB_BASE_ADDR             (MX51_DEBUG_BASE_ADDR + 0x01000)
+-#define MX51_ETM_BASE_ADDR             (MX51_DEBUG_BASE_ADDR + 0x02000)
+-#define MX51_TPIU_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x03000)
+-#define MX51_CTI0_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x04000)
+-#define MX51_CTI1_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x05000)
+-#define MX51_CTI2_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x06000)
+-#define MX51_CTI3_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x07000)
+-#define MX51_CORTEX_DBG_BASE_ADDR      (MX51_DEBUG_BASE_ADDR + 0x08000)
+
+>
+> Having said that it would be nice to use a static mapping for TZIC. Do
+> we really need MX51_DEBUG mapped?
+
+IMHO, I think we don't need MX51_DEBUG  mapping.
+
+I will give one v2 patch to include the above comments if you allow.
+
+Thanks for your review.
+
+Jason
+
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>
