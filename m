@@ -1,122 +1,43 @@
-From: claudio@evidence.eu.com (Claudio Scordino)
-Date: Tue, 23 Aug 2011 12:06:43 +0200
-Subject: [PATCH] atmel_serial: RS485: receiving enabled when sending	data
-In-Reply-To: <20110823093035.GB19622@n2100.arm.linux.org.uk>
-References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
-	<4E536536.3030004@evidence.eu.com>
-	<20110823093035.GB19622@n2100.arm.linux.org.uk>
-Message-ID: <4E537BB3.60001@evidence.eu.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Tue, 23 Aug 2011 12:10:31 +0200
+Subject: [PATCH 3/4] mmci: sync DATAEND irq with dma|pio transfer done
+In-Reply-To: <20110705112533.GY8286@n2100.arm.linux.org.uk>
+References: <1309247860-17181-1-git-send-email-linus.walleij@stericsson.com>
+	<20110705112533.GY8286@n2100.arm.linux.org.uk>
+Message-ID: <4E537C97.4020800@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 23/08/2011 11:30, Russell King - ARM Linux ha scritto:
-> On Tue, Aug 23, 2011 at 10:30:46AM +0200, Claudio Scordino wrote:
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index af9b781..5f6c745 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -339,8 +339,9 @@ static void atmel_stop_tx(struct uart_port *port)
->>   	/* Disable interrupts */
->>   	UART_PUT_IDR(port, atmel_port->tx_done_mask);
+Russell King - ARM Linux wrote:
+> On Tue, Jun 28, 2011 at 09:57:40AM +0200, Linus Walleij wrote:
+>> From: Ulf Hansson <ulf.hansson@stericsson.com>
 >>
->> -	if (atmel_port->rs485.flags&  SER_RS485_ENABLED)
->> -		atmel_start_rx(port);
->> +	if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
->> +		!(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX))
->> +			atmel_start_rx(port);
+>> The end of a dma|pio data transfer is synced with the
+>> DATAEND irq. This will prevent the mmci driver from ending
+>> the request before the dma|pio job is completely done.
+>>
+>> For dma we use DMA_PREP_INTERRUPT to register a callback
+>> function which is called when dma driver is done with job.
+>>
+>> To also make sure we prevent hanging forever, waiting for
+>> DATAEND irq or a dma|pio transfer to be done, we setup a timer
+>> when either a DATAEND or dma|pio job is done. Once both
+>> conditions have occured, the timer is cancelled and the data
+>> transfer is completed.
+>>
+>> If a timeout occurs, the data transfer is terminated in a
+>> controlled manner and EAGAIN is returned to the framework.
+>> A timeout value of 50 ms has been found to work well for
+>> our usecases.
 > 
-> However, this is incorrect formatting.  The code following the 'if' ends
-> up being indented by two tabs.
+> What is the framework supposed to do with that error code?  Magic the
+> driver into disabling DMA by some non-existant callback?
 > 
-> This illustrates why the whole idea that tabs should only be used for
-> indenting is wrong.  You end up with either what you have above, or:
-> 
-> 	if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
-> 		!(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX))
-> 		atmel_start_rx(port);
-> 
-> both of which are dire for readability.  The only sane way to do this is
-> to ignore that stupid "indentation by tabs only" thing and do it as the
-> kernel code has _always_ been done over the last 19 years:
-> 
-> 	if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
-> 	!(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX))
-> 		atmel_start_rx(port);
-> 
-> IOW, use spaces to align the wrapped 'if' statement.
-> 
->> +		if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
->> +			!(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX)) {
->> +				/* DMA done, stop TX, start RX for RS485 */
->> +				atmel_start_rx(port);
-> 
-> And here it makes it look like there's a missing brace.
+> Please, stop introducing magic new error codes which have no meaning to
+> the upper levels unless you're also going to add some handling of those
+> error conditions as well.
 > 
 
-I understand. So the right patch should be the following one.
-
-Best regards,
-
-	Claudio
-
-atmel_serial: RS485: receiving enabled when sending data
-
-By default the atmel_serial driver in RS485 mode disables receiving data until
-all data in the send buffer has been sent. This flag allows to receive data
-even whilst sending data.
-
-Signed-off-by: Bernhard Roth <br@pwrnet.de> 
-Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
----
- drivers/tty/serial/atmel_serial.c |    9 ++++++---
- include/linux/serial.h            |    1 +
- 2 files changed, 7 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index af9b781..c7232a9 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -339,7 +339,8 @@ static void atmel_stop_tx(struct uart_port *port)
- 	/* Disable interrupts */
- 	UART_PUT_IDR(port, atmel_port->tx_done_mask);
- 
--	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
-+	if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
-+	    !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
- 		atmel_start_rx(port);
- }
- 
-@@ -356,7 +357,8 @@ static void atmel_start_tx(struct uart_port *port)
- 			   really need this.*/
- 			return;
- 
--		if (atmel_port->rs485.flags & SER_RS485_ENABLED)
-+		if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
-+		    !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
- 			atmel_stop_rx(port);
- 
- 		/* re-enable PDC transmit */
-@@ -680,7 +682,8 @@ static void atmel_tx_dma(struct uart_port *port)
- 		/* Enable interrupts */
- 		UART_PUT_IER(port, atmel_port->tx_done_mask);
- 	} else {
--		if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
-+		if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
-+		    !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX)) {
- 			/* DMA done, stop TX, start RX for RS485 */
- 			atmel_start_rx(port);
- 		}
-diff --git a/include/linux/serial.h b/include/linux/serial.h
-index ef91406..97ff8e2 100644
---- a/include/linux/serial.h
-+++ b/include/linux/serial.h
-@@ -211,6 +211,7 @@ struct serial_rs485 {
- #define SER_RS485_RTS_ON_SEND		(1 << 1)
- #define SER_RS485_RTS_AFTER_SEND	(1 << 2)
- #define SER_RS485_RTS_BEFORE_SEND	(1 << 3)
-+#define SER_RS485_RX_DURING_TX		(1 << 4)
- 	__u32	delay_rts_before_send;	/* Milliseconds */
- 	__u32	delay_rts_after_send;	/* Milliseconds */
- 	__u32	padding[5];		/* Memory is cheap, new structs
--- 
-1.7.1
+The idea was to trigger a resend from the mmc framework, but I noticed 
+that the mmc_blk_issue_rw_rq has been patched quite a lot lately. I will 
+revisit this again to see if it still makes sense.
