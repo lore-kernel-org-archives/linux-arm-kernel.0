@@ -1,54 +1,38 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 23 Aug 2011 11:16:28 -0600
-Subject: [PATCH] ASoC: Tegra: wm8903 machine driver: Drop Ventana support
-Message-ID: <1314119788-23000-1-git-send-email-swarren@nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Aug 2011 18:17:04 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20051.48809.945431.800543@mariner.uk.xensource.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+Message-ID: <CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Board file support for Ventana is not yet mainlined, and probably won't
-ever be given the move to Device-Tree. Consequently, the Ventana entry
-is being removed from arch/arm/tools/mach-types in the next merge window,
-since it was registered over a year ago.
+Ian,
 
-This will also remove function machine_is_ventana(), which is used by
-the ASoC Tegra WM8903 machine driver. This will cause compilation
-failures. Drop Ventana support to resolve this.
+(I'll be on holiday from tomorrow, so not able to follow up until September).
 
-Hopefully, in the not-too-distant future, tegra_wm8903.c will be able to
-configure itself from Device-Tree, and hence we'll be able to re-instate
-Ventana support just by creating a .dts file for the board.
+On 23 August 2011 15:52, Ian Jackson <Ian.Jackson@eu.citrix.com> wrote:
+> We're looking into porting Xen to the ARM A15 architecture. ?In this
+> context, it's necessary to arrange for the Xen hypervisor to be
+> entered from the boot loader in an appropriate processor mode.
 
-Also note that Aebl support is in a similar boat. However, that board
-isn't scheduled for deprecation for at least another 5 months, and
-perhaps we will have completely removed non-Device-Tree support from
-tegra_wm8903.c by then and/or adjusted mach-types policy.
+We had some discussions both with ARM partners and Christoffer and it
+is not clear how we go about initialising the Hyp mode. Most SoC
+vendors would probably just run Linux in non-secure SVC mode and would
+not touch the Hyp mode at all. Linux would issue an SMC to set the
+HVBAR (could do HVC but I expect that there is no secure monitor
+code). Once this is set, assuming that the Hyp MMU is disabled, Linux
+can invoke an HVC and initialise the Hyp mode.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- sound/soc/tegra/tegra_wm8903.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+The problem is that the SMC API is specific to a secure monitor
+implementation. An alternative would be to ask the vendors to get some
+simple Hyp code which would trap access to HVBAR for example and set
+it with that value.
 
-diff --git a/sound/soc/tegra/tegra_wm8903.c b/sound/soc/tegra/tegra_wm8903.c
-index 661373c..be27f1d 100644
---- a/sound/soc/tegra/tegra_wm8903.c
-+++ b/sound/soc/tegra/tegra_wm8903.c
-@@ -319,7 +319,7 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
- 	snd_soc_dapm_force_enable_pin(dapm, "Mic Bias");
- 
- 	/* FIXME: Calculate automatically based on DAPM routes? */
--	if (!machine_is_harmony() && !machine_is_ventana())
-+	if (!machine_is_harmony())
- 		snd_soc_dapm_nc_pin(dapm, "IN1L");
- 	if (!machine_is_seaboard() && !machine_is_aebl())
- 		snd_soc_dapm_nc_pin(dapm, "IN1R");
-@@ -395,7 +395,7 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, card);
- 	snd_soc_card_set_drvdata(card, machine);
- 
--	if (machine_is_harmony() || machine_is_ventana()) {
-+	if (machine_is_harmony()) {
- 		card->dapm_routes = harmony_audio_map;
- 		card->num_dapm_routes = ARRAY_SIZE(harmony_audio_map);
- 	} else if (machine_is_seaboard()) {
--- 
-1.7.0.4
+> So I propose the following approach:
+>
+> ?1. The kernel will advertise via ELF notes what modes it may be
+> ? ?started in. ?The possible modes will be:
+> ? ? ? (i) ? secure monitor mode
+> ? ? ? (ii) ?non-secure hypervisor mode
+> ? ? ? (iii) non-secure kernel mode
