@@ -1,109 +1,154 @@
-From: jason.hui@linaro.org (Jason Hui)
-Date: Tue, 23 Aug 2011 16:27:21 +0800
-Subject: [PATCH 2/2] ARM: i.MX5/mm: use static mapping for TZIC
-In-Reply-To: <20110823070522.GI16557@pengutronix.de>
-References: <1314014005-9923-1-git-send-email-jason.hui@linaro.org>
-	<1314014005-9923-3-git-send-email-jason.hui@linaro.org>
-	<20110823070522.GI16557@pengutronix.de>
-Message-ID: <CAFQ4atRS8xkK0eFHbnQAW+9XBve8W0AuV+bAV2eDuYoBHXN9Og@mail.gmail.com>
+From: claudio@evidence.eu.com (Claudio Scordino)
+Date: Tue, 23 Aug 2011 10:30:46 +0200
+Subject: [PATCH] atmel_serial: RS485: receiving enabled when sending data
+In-Reply-To: <20110822211832.GA8023@kroah.com>
+References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
+Message-ID: <4E536536.3030004@evidence.eu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Uwe,
-
-2011/8/23 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Jason,
->
-> On Mon, Aug 22, 2011 at 07:53:25PM +0800, Jason Liu wrote:
->> We can use static mapping for TZIC to get rid of the
->> duplicated code for ioremap and the error handling of
->> ioremap, which will made code more clean and consistent.
+Il 22/08/2011 23:18, Greg KH ha scritto:
+> On Mon, Aug 15, 2011 at 04:28:15PM +0200, Bernhard Roth wrote:
+>> Hello!
 >>
->> Signed-off-by: Jason Liu <jason.hui@linaro.org>
+>> By default the atmel_serial driver in RS485 mode disables receiving
+>> data until all data in the send buffer has been sent. This flag
+>> allows to receive data even whilst sending data. This is very useful
+>> to
+>>
+>> - check if the data has been sent correctly over the RS485 bus
+>> - assure that no collision happened
+>> - check for short circuits/termination issues on the RS485 bus
+>>
+>> Usually this functionality is realized by hardware, wether
+>> controlling the RX-Enable pin of the RS485 transceiver with RTS
+>> (driver control signal) or pulling it LOW permanently. The present
+>> atmel_serial driver makes this impossible, thus requiring following
+>> patch.
+>>
+>> Usage example:
+>>
+>>      struct serial_rs485     rs485;
+>>
+>>      memset(&rs485, 0, sizeof(rs485));
+>>      rs485.flags = SER_RS485_ENABLED | SER_RS485_RX_DURING_TX;
+>>      ioctl(fd, TIOCSRS485,&rs485);
+>>
+>>
+>>
+>>
+>> atmel_serial: RS485: receiving enabled when sending data
+>>
+>> By default the atmel_serial driver in RS485 mode disables receiving
+>> data until
+>> all data in the send buffer has been sent. This flag allows to receive data
+>> even whilst sending data.
+>>
+>> Signed-off-by: Bernhard Roth<br@pwrnet.de>
+>> Signed-off-by: Claudio Scordino<claudio@evidence.eu.com>
 >> ---
->> ?arch/arm/mach-mx5/mm.c ? ? ? ? ? ? ? ?| ? 20 ++++----------------
->> ?arch/arm/plat-mxc/include/mach/mx51.h | ? ?1 +
->> ?arch/arm/plat-mxc/include/mach/mx53.h | ? ?1 +
->> ?3 files changed, 6 insertions(+), 16 deletions(-)
+>>   drivers/tty/serial/atmel_serial.c |   17 ++++++++++-------
+>>   include/linux/serial.h            |    1 +
+>>   2 files changed, 11 insertions(+), 7 deletions(-)
 >>
->> diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
->> index f8ebe37..adfe889 100644
->> --- a/arch/arm/mach-mx5/mm.c
->> +++ b/arch/arm/mach-mx5/mm.c
->> @@ -25,6 +25,7 @@
->> ? * Define the MX51 memory map.
->> ? */
->> ?static struct map_desc mx51_io_desc[] __initdata = {
->> + ? ? imx_map_entry(MX51, TZIC, MT_DEVICE),
->> ? ? ? imx_map_entry(MX51, IRAM, MT_DEVICE),
->> ? ? ? imx_map_entry(MX51, DEBUG, MT_DEVICE),
->> ? ? ? imx_map_entry(MX51, AIPS1, MT_DEVICE),
->> @@ -36,6 +37,7 @@ static struct map_desc mx51_io_desc[] __initdata = {
->> ? * Define the MX53 memory map.
->> ? */
->> ?static struct map_desc mx53_io_desc[] __initdata = {
->> + ? ? imx_map_entry(MX53, TZIC, MT_DEVICE),
->> ? ? ? imx_map_entry(MX53, AIPS1, MT_DEVICE),
->> ? ? ? imx_map_entry(MX53, SPBA0, MT_DEVICE),
->> ? ? ? imx_map_entry(MX53, AIPS2, MT_DEVICE),
->> @@ -100,32 +102,18 @@ void __init imx50_init_early(void)
->> ?void __init mx51_init_irq(void)
->> ?{
->> ? ? ? unsigned long tzic_addr;
->> - ? ? void __iomem *tzic_virt;
+>> diff --git a/drivers/tty/serial/atmel_serial.c
+>> b/drivers/tty/serial/atmel_serial.c
+>> index af9b781..5f6c745 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -339,8 +339,9 @@ static void atmel_stop_tx(struct uart_port *port)
+>>       /* Disable interrupts */
+>>       UART_PUT_IDR(port, atmel_port->tx_done_mask);
 >>
->> ? ? ? if (mx51_revision() < IMX_CHIP_REVISION_2_0)
->> ? ? ? ? ? ? ? tzic_addr = MX51_TZIC_BASE_ADDR_TO1;
->> ? ? ? else
->> ? ? ? ? ? ? ? tzic_addr = MX51_TZIC_BASE_ADDR;
->>
->> - ? ? tzic_virt = ioremap(tzic_addr, SZ_16K);
->> - ? ? if (!tzic_virt)
->> - ? ? ? ? ? ? panic("unable to map TZIC interrupt controller\n");
->> -
->> - ? ? tzic_init_irq(tzic_virt);
->> + ? ? tzic_init_irq(MX51_IO_ADDRESS(tzic_addr));
-> arch/arm/plat-mxc/include/mach/hardware.h has a list of all SoCs with
-> the memory areas mapped that you are expected to update if you add
-> another mapping. If you had done that, you would have noticed that
-> MX51_TZIC_BASE_ADDR (== 0xe0000000) maps to the very same address as
-> MX51_DEBUG_BASE_ADDR (== 0x60000000).
-> So only one of these two can be statically mapped (or the function needs
-> to change).
+>> -    if (atmel_port->rs485.flags&  SER_RS485_ENABLED)
+>> -        atmel_start_rx(port);
+>> +    if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
+>> +        !(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX))
+>> +            atmel_start_rx(port);
+> 
+> Can you fix your email client to not strip patches of tabs and resend
+> this so that I can apply it?
+> 
+> thanks,
+> 
+> greg k-h
 
-Yes, right. But I think we can get rid of DEBUG mapping, this is
-useless and no-one
-use it. And I also want to clean up the following def, it is dead code.
+Hi Greg,
 
--#define MX51_DEBUG_BASE_ADDR           0x60000000
--#define MX51_DEBUG_SIZE                        SZ_1M
--
--#define MX51_ETB_BASE_ADDR             (MX51_DEBUG_BASE_ADDR + 0x01000)
--#define MX51_ETM_BASE_ADDR             (MX51_DEBUG_BASE_ADDR + 0x02000)
--#define MX51_TPIU_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x03000)
--#define MX51_CTI0_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x04000)
--#define MX51_CTI1_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x05000)
--#define MX51_CTI2_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x06000)
--#define MX51_CTI3_BASE_ADDR            (MX51_DEBUG_BASE_ADDR + 0x07000)
--#define MX51_CORTEX_DBG_BASE_ADDR      (MX51_DEBUG_BASE_ADDR + 0x08000)
+    please find below the patch with the right tabs.
 
->
-> Having said that it would be nice to use a static mapping for TZIC. Do
-> we really need MX51_DEBUG mapped?
+Remind however that the main author of the patch is Bernhard, not me.
 
-IMHO, I think we don't need MX51_DEBUG  mapping.
+Best regards,
 
-I will give one v2 patch to include the above comments if you allow.
+    		Claudio 
 
-Thanks for your review.
+atmel_serial: RS485: receiving enabled when sending data
 
-Jason
+By default the atmel_serial driver in RS485 mode disables receiving data until
+all data in the send buffer has been sent. This flag allows to receive data
+even whilst sending data.
 
->
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
+Signed-off-by: Bernhard Roth <br@pwrnet.de> 
+Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
+---
+ drivers/tty/serial/atmel_serial.c |   17 ++++++++++-------
+ include/linux/serial.h            |    1 +
+ 2 files changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index af9b781..5f6c745 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -339,8 +339,9 @@ static void atmel_stop_tx(struct uart_port *port)
+ 	/* Disable interrupts */
+ 	UART_PUT_IDR(port, atmel_port->tx_done_mask);
+ 
+-	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
+-		atmel_start_rx(port);
++	if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
++		!(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
++			atmel_start_rx(port);
+ }
+ 
+ /*
+@@ -356,8 +357,9 @@ static void atmel_start_tx(struct uart_port *port)
+ 			   really need this.*/
+ 			return;
+ 
+-		if (atmel_port->rs485.flags & SER_RS485_ENABLED)
+-			atmel_stop_rx(port);
++		if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
++			!(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
++				atmel_stop_rx(port);
+ 
+ 		/* re-enable PDC transmit */
+ 		UART_PUT_PTCR(port, ATMEL_PDC_TXTEN);
+@@ -680,9 +682,10 @@ static void atmel_tx_dma(struct uart_port *port)
+ 		/* Enable interrupts */
+ 		UART_PUT_IER(port, atmel_port->tx_done_mask);
+ 	} else {
+-		if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
+-			/* DMA done, stop TX, start RX for RS485 */
+-			atmel_start_rx(port);
++		if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
++			!(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX)) {
++				/* DMA done, stop TX, start RX for RS485 */
++				atmel_start_rx(port);
+ 		}
+ 	}
+ 
+diff --git a/include/linux/serial.h b/include/linux/serial.h
+index ef91406..97ff8e2 100644
+--- a/include/linux/serial.h
++++ b/include/linux/serial.h
+@@ -211,6 +211,7 @@ struct serial_rs485 {
+ #define SER_RS485_RTS_ON_SEND		(1 << 1)
+ #define SER_RS485_RTS_AFTER_SEND	(1 << 2)
+ #define SER_RS485_RTS_BEFORE_SEND	(1 << 3)
++#define SER_RS485_RX_DURING_TX		(1 << 4)
+ 	__u32	delay_rts_before_send;	/* Milliseconds */
+ 	__u32	delay_rts_after_send;	/* Milliseconds */
+ 	__u32	padding[5];		/* Memory is cheap, new structs
+-- 
+1.7.1
