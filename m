@@ -1,51 +1,39 @@
-From: Ian.Jackson@eu.citrix.com (Ian Jackson)
-Date: Tue, 23 Aug 2011 18:57:43 +0100
-Subject: ARM processor mode, kernel startup, Hyp / secure state
-In-Reply-To: <20110823174550.GJ3895@n2100.arm.linux.org.uk>
-References: <20051.48809.945431.800543@mariner.uk.xensource.com>
-	<CA+wbFdcv_BsHaVwoqgF5yx6scXOodHkKjdVtarqJwjy_GFrAJQ@mail.gmail.com>
-	<20051.57581.894859.395981@mariner.uk.xensource.com>
-	<20110823174550.GJ3895@n2100.arm.linux.org.uk>
-Message-ID: <20051.59927.511785.371806@mariner.uk.xensource.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Aug 2011 19:00:59 +0100
+Subject: v6 software reset fails on 1176
+In-Reply-To: <20110823175638.GB2263@gallagher>
+References: <20110823163247.GM2796@pulham.picochip.com>
+	<20110823170955.GF10062@e102144-lin.cambridge.arm.com>
+	<20110823173410.GA2263@gallagher>
+	<20110823174736.GG10062@e102144-lin.cambridge.arm.com>
+	<20110823175638.GB2263@gallagher>
+Message-ID: <20110823180059.GH10062@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
-> On Tue, Aug 23, 2011 at 06:18:37PM +0100, Ian Jackson wrote:
-> > Yes.  But in the future it will do, surely ?  I mean, we're working on
-> > bootloader protocols and this part (to do with startup cpu states and
-> > ownership of the various privilege levels) is only part of it.
+On Tue, Aug 23, 2011 at 06:56:38PM +0100, Jamie Iles wrote:
+> On Tue, Aug 23, 2011 at 06:47:36PM +0100, Will Deacon wrote:
+> > You need to make sure you call cpu_reset by jumping to its *physical*
+> > address. If that happens to alias with the virtual address of the kernel, it
+> > won't currently work but I have a solution to this in my kexec branch.
+> > 
+> > You can do something like:
+> > 
+> > 	typedef void (*phys_reset_t)(unsigned long);
+> > 
+> > 	phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+> > 	phys_reset(0xffff0000);
 > 
-> No - at least not yet, and I don't see any reason why we'd ever want to
-> use raw ELF.
-> 
-> The problem with ELF is that it carries lots of baggage around which
-> platforms just don't need.  Fine if it's on a hard disk and you're
-> booting a desktop, but not for embedded where space tends to be a
-> premium.
+> OK, that makes perfect sense!  I'll give it a go on my hardware tomorrow 
+> when I'm back in the office.
 
-Hrm, yes.
+Great, let me know how you get on! I'll post my kexec series to the list
+again once I've got on top of my current patchsets.
 
-> Plus, I'd point out that _no one_ is talking about boot protocols.  Not
-> outside linaro at any rate.  Which means that they're doing effective
-> closed-door discussion.
+> All of the other mainline users of cpu_reset() just call it directly, so 
+> I guess they need to do the same thing?
 
-I'm not sure whether by "outside linaro" you mean "outside some kind
-of top secret Linaro meetings".  I went to an open meeting of Linaro
-developers touching on exactly these kind of topics, and everything
-was public and there was substantial interest.
+For v6 and v7, yes. For older ARM cores you could actually code for the
+pipeline implementation and things were arguably easier that way.
 
-I'm not a Linaro developer; but I have CC'd their boot-architecture
-list which AIUI is where some of the Linaro folks were thinking of
-discussing boot protocols.
-
-Just to be clear: I don't have a particular axe to grind, except that
-I would like there to be some kind of defined and reasonably stable
-interface, and that obviously we (Xen.org) need that interface to
-support access to Hyp mode (which is something that Linux needs too if
-we are to have a properly supported KVM on ARM).
-
-Are linux-arm-kernel at infradead and boot-architecture at linaro the right
-places to try to have this conversation ?
-
-Ian.
+Will
