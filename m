@@ -1,66 +1,33 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 22 Aug 2011 17:11:54 -0700
-Subject: error: implicit declaration of function 'machine_is_ventana'
-In-Reply-To: <20110823000135.GD3895@n2100.arm.linux.org.uk>
-References: <74CDBE0F657A3D45AFBB94109FB122FF04B24A376A@HQMAIL01.nvidia.com>
-	<20110822234008.GC3895@n2100.arm.linux.org.uk>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B24A377F@HQMAIL01.nvidia.com>
-	<20110823000135.GD3895@n2100.arm.linux.org.uk>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B24A3789@HQMAIL01.nvidia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Aug 2011 10:50:21 +0900
+Subject: [PATCH 1/4] ARM: SAMSUNG: Add support for detecting CPU at	runtime
+In-Reply-To: <20110820080759.GA18827@n2100.arm.linux.org.uk>
+References: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
+	<1313816759-14564-2-git-send-email-kgene.kim@samsung.com>
+	<20110820080759.GA18827@n2100.arm.linux.org.uk>
+Message-ID: <06bd01cc6137$058b1bc0$10a15340$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote at Monday, August 22, 2011 6:02 PM:
-> On Mon, Aug 22, 2011 at 04:49:06PM -0700, Stephen Warren wrote:
-> > Russell King wrote at Monday, August 22, 2011 5:40 PM:
-> > > On Mon, Aug 22, 2011 at 04:11:50PM -0700, Stephen Warren wrote:
-> > > > Russell,
-> > > >
-> > > > Commit 46dcfc806a9f6834e6007449eac175f781058c49 "ARM: Update mach-types"
-> > > > removed the entry for Ventana (2927). In turn, this broke compilation of
-> > > > sound/soc/tegra/tegra_wm8903.c, since that calls machine_is_ventana().
-> > > > It looks like the machine is still registered at
-> > > > http://www.arm.linux.org.uk/developer/machines/. Can you explain what the
-> > > > removal policy is for arch/arm/tools/mach-types?
-...
-> Ah, sorry, I thought you were talking about a platform which was merged
-> into mainline.  This platform is not present in mainline, so accordingly
-> it isn't marked as such in the machine database.
+Russell King - ARM Linux wrote:
 > 
-> Any entry not marked as being present in mainline will be removed after
-> 12 months after it was last touched - which apparantly was 18th June
-> 2010.
+> On Sat, Aug 20, 2011 at 02:05:56PM +0900, Kukjin Kim wrote:
+> > The cpu_is_[name]() can be used to distinguish cpu at runtime.
+> 
+> This really should be soc_is_xxx().  The CPU is stuff like ARM920, ARM926,
+> Cortex-A9 etc.  The SoC is the CPU plus the peripherals.
+> 
+> S3C6410 describes the entire SoC, not just the CPU.
 
-Ah, that I can understand.
+OK and will address comments from you.
 
-> So, the questions are:
-> 1. why do we have driver code merged for a platform which shows no sign
->    of being merged.
+Russell, I'm not sure it is required to change CPU_XXX such as
+CPU_EXYNOS4210 to SOC_XXX in Kconfig.
 
-Well, I or someone probably would have pushed Ventana support into
-mainline within the last few months, since it's pretty similar to Harmony
-and Seaboard which are both already supported. However, I've been holding
-due to the no-new-board-files thing, until Device-Tree gets fully baked,
-and we can then support the board just by adding a simple .dts file.
+Thanks.
 
-> 2. why do we have drivers depending on their platform anyway.
-
-The ASoC subsystem defines a "machine driver", which defines facets of
-the audio system such as which pins on the audio codec are connected to
-the headphone jack. This varies between boards, so the "machine driver"
-picks the appropriate routing table at run-time based on the board that
-the code is running on. Arguably, one could represent all this data in
-board files using platform data, but IIUC, the ASoC maintainers prefer
-to keep it all centralized in the sound directory tree.
-
-I understand from Grant Likely that John Bonesio will be posting a patch
-in the very near future to retrieve all this data from Device Tree, so
-this won't be an issue moving forward, given that Tegra will probably
-switch to Device Tree pretty aggressively.
-
-Still, I suppose we could rip out explicit support for Ventana in the
-sound driver in the interim if you want, rather than adding back the
-Ventana machine definition.
-
--- 
-nvpublic
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
