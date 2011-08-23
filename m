@@ -1,80 +1,172 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Aug 2011 22:30:41 +0100
-Subject: [PATCH v2 4/5] ARM: realview: use Kconfig choice for debug UART
+Date: Tue, 23 Aug 2011 22:30:42 +0100
+Subject: [PATCH v2 5/5] arm/imx: use Kconfig choice for low-level debug UART
 	selection
 In-Reply-To: <1314135042-19908-1-git-send-email-will.deacon@arm.com>
 References: <1314135042-19908-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1314135042-19908-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1314135042-19908-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the DEBUG_LL UART can be selected by a Kconfig choice, simplify
-the #ifdefery in debug-macro.S and add entries to the top-level
-Kconfig.debug instead.
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Now that the DEBUG_LL UART can be selected by a Kconfig choice,
+simplify the #ifdefery in debug-macro.S and add entries to the
+top-level Kconfig.debug instead.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig.debug                            |   16 ++++++++++++++++
- arch/arm/mach-realview/include/mach/debug-macro.S |   17 ++---------------
- 2 files changed, 18 insertions(+), 15 deletions(-)
+ arch/arm/Kconfig.debug                       |   56 ++++++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/debug-macro.S |   12 +-----
+ arch/arm/plat-mxc/include/mach/debug-macro.S |   38 +++---------------
+ 3 files changed, 64 insertions(+), 42 deletions(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 875bd34..007cf85 100644
+index 007cf85..965d59a 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -132,6 +132,22 @@ choice
- 		  The uncompressor code port configuration is now handled
- 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+@@ -99,6 +99,62 @@ choice
+ 		  Saying N will cause the debug messages to appear on the first
+ 		  serial port.
  
-+	config DEBUG_REALVIEW_STD_PORT
-+		bool "RealView Default UART"
-+		depends on ARCH_REALVIEW
++	config DEBUG_IMX1_UART
++		bool "i.MX1 Debug UART"
++		depends on SOC_IMX1
 +		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to the serial port on RealView EB, PB11MP, PBA8
-+		  and PBX platforms.
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX1.
 +
-+	config DEBUG_REALVIEW_PB1176_PORT
-+		bool "RealView PB1176 UART"
-+		depends on MACH_REALVIEW_PB1176
++	config DEBUG_IMX23_UART
++		bool "i.MX23 Debug UART"
++		depends on SOC_IMX23
 +		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to the standard serial port on the RealView
-+		  PB1176 platform.
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX23.
 +
- endchoice
++	config DEBUG_IMX25_UART
++		bool "i.MX25 Debug UART"
++		depends on SOC_IMX25
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX25.
++
++	config DEBUG_IMX21_IMX27_UART
++		bool "i.MX21 and i.MX27 Debug UART"
++		depends on SOC_IMX21 || SOC_IMX27
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX21 or i.MX27.
++
++	config DEBUG_IMX28_UART
++		bool "i.MX28 Debug UART"
++		depends on SOC_IMX28
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX28.
++
++	config DEBUG_IMX31_IMX35_UART
++		bool "i.MX31 and i.MX35 Debug UART"
++		depends on SOC_IMX31 || SOC_IMX35
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX31 or i.MX35.
++
++	config DEBUG_IMX51_UART
++		bool "i.MX51 Debug UART"
++		depends on SOC_IMX51
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX51.
++
++	config DEBUG_IMX50_IMX53_UART
++		bool "i.MX50 and i.MX53 Debug UART"
++		depends on SOC_IMX50 || SOC_IMX53
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on i.MX50 or i.MX53.
++
+ 	config DEBUG_S3C_UART0
+ 		depends on PLAT_SAMSUNG
+ 		bool "Use S3C UART 0 for low-level debug"
+diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
+index 79650a1..6d98704 100644
+--- a/arch/arm/mach-mxs/include/mach/debug-macro.S
++++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
+@@ -14,17 +14,9 @@
+ #include <mach/mx23.h>
+ #include <mach/mx28.h>
  
- config EARLY_PRINTK
-diff --git a/arch/arm/mach-realview/include/mach/debug-macro.S b/arch/arm/mach-realview/include/mach/debug-macro.S
-index 90b687c..0f38722 100644
---- a/arch/arm/mach-realview/include/mach/debug-macro.S
-+++ b/arch/arm/mach-realview/include/mach/debug-macro.S
-@@ -10,23 +10,10 @@
-  * published by the Free Software Foundation.
-  */
- 
--#if defined(CONFIG_MACH_REALVIEW_EB) || \
--    defined(CONFIG_MACH_REALVIEW_PB11MP) || \
--    defined(CONFIG_MACH_REALVIEW_PBA8) || \
--    defined(CONFIG_MACH_REALVIEW_PBX)
--#ifndef DEBUG_LL_UART_OFFSET
-+#ifdef CONFIG_DEBUG_REALVIEW_STD_PORT
- #define DEBUG_LL_UART_OFFSET	0x00009000
--#elif DEBUG_LL_UART_OFFSET != 0x00009000
--#warning "DEBUG_LL_UART_OFFSET already defined to a different value"
+-#ifdef CONFIG_SOC_IMX23
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
 -#endif
++#ifdef CONFIG_DEBUG_IMX23_UART
+ #define UART_PADDR	MX23_DUART_BASE_ADDR
 -#endif
 -
--#ifdef CONFIG_MACH_REALVIEW_PB1176
--#ifndef DEBUG_LL_UART_OFFSET
-+#elif defined(CONFIG_DEBUG_REALVIEW_PB1176_PORT)
- #define DEBUG_LL_UART_OFFSET	0x0010c000
--#elif DEBUG_LL_UART_OFFSET != 0x0010c000
--#warning "DEBUG_LL_UART_OFFSET already defined to a different value"
+-#ifdef CONFIG_SOC_IMX28
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
 -#endif
++#elif defined (CONFIG_DEBUG_IMX28_UART)
+ #define UART_PADDR	MX28_DUART_BASE_ADDR
  #endif
  
- #ifndef DEBUG_LL_UART_OFFSET
+diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+index e4dde91..07cfdbe 100644
+--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
++++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+@@ -12,43 +12,17 @@
+  */
+ #include <mach/hardware.h>
+ 
+-#ifdef CONFIG_SOC_IMX1
++#ifdef CONFIG_DEBUG_IMX1_UART
+ #define UART_PADDR	MX1_UART1_BASE_ADDR
+-#endif
+-
+-#ifdef CONFIG_SOC_IMX25
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX25_UART)
+ #define UART_PADDR	MX25_UART1_BASE_ADDR
+-#endif
+-
+-#if defined(CONFIG_SOC_IMX21) || defined (CONFIG_SOC_IMX27)
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX21_IMX27_UART)
+ #define UART_PADDR	MX2x_UART1_BASE_ADDR
+-#endif
+-
+-#if defined(CONFIG_SOC_IMX31) || defined(CONFIG_SOC_IMX35)
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX31_IMX35_UART)
+ #define UART_PADDR	MX3x_UART1_BASE_ADDR
+-#endif
+-
+-#ifdef CONFIG_SOC_IMX51
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX51_UART)
+ #define UART_PADDR	MX51_UART1_BASE_ADDR
+-#endif
+-
+-/* iMX50/53 have same addresses, but not iMX51 */
+-#if defined(CONFIG_SOC_IMX50) || defined(CONFIG_SOC_IMX53)
+-#ifdef UART_PADDR
+-#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+-#endif
++#elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
+ #define UART_PADDR	MX53_UART1_BASE_ADDR
+ #endif
+ 
 -- 
 1.7.0.4
