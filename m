@@ -1,84 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Aug 2011 08:31:38 +0200
-Subject: [PATCH v2 1/2] ARM: imx: Introduce generic function for
-	displaying silicon revision
-In-Reply-To: <1314037024-9015-1-git-send-email-fabio.estevam@freescale.com>
-References: <1314037024-9015-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110823063138.GE31404@pengutronix.de>
+From: j-keerthy@ti.com (J, KEERTHY)
+Date: Tue, 23 Aug 2011 12:12:49 +0530
+Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
+In-Reply-To: <4E532A28.60103@ti.com>
+References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
+	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
+	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
+	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
+	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
+	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
+	<CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
+	<20110811185408.GB15970@legolas.emea.dhcp.ti.com>
+	<20110811185558.GC15970@legolas.emea.dhcp.ti.com>
+	<4E444B8F.9060908@ti.com> <4E449D65.9000004@ti.com>
+	<874o19gfrr.fsf@ti.com> <4E532A28.60103@ti.com>
+Message-ID: <CAJ6a13ZbstOQ6n76i7+tUEmAvVDpeOOweQUN5irr_AUbcn9S0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Tue, Aug 23, 2011 at 9:48 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+> On 8/23/2011 5:28 AM, Kevin Hilman wrote:
+>>
+>> Rajendra Nayak<rnayak@ti.com> ?writes:
+>>
+>> [...]
+>>
+>>> FWIK, its a one time requirement to set the clock rate to the
+>>> right rate the device can operate in based on what a platform
+>>> supports.
+>>
+>> Except $SUBJECT patch hard-codes the clock rate for all platforms in the
+>> driver.
+>
+> The device has a requirement to operate in a 1Mhz to 2Mhz range. So the
+> driver is using a clk_round_rate() to get the closest rate supported and
+> sets it using a clk_set_rate().
+>
+>>
+>> If the clock rate is to be platform-specific, it should be done in
+>> platform-specific code.
+>
+> I am fine if this needs to be moved to platform-specific code, but I
+> wasn't quite sure this needs to be done in clock framework as was
+> suggested.
 
-On Mon, Aug 22, 2011 at 03:17:03PM -0300, Fabio Estevam wrote:
-> Currently each i.MX processor has its own function for displaying the silicon 
-> revision.
-> 
-> Introduce a generic function for this purpose, so that all i.MX processors can 
-> reuse it.
+The range can be (ex: 1MHz to 2Mhz) can be sent via pdata
+as max and min frequencies and the driver can round the rate
+to get the appropriate rate inside the specified range? Is this approach
+Fine?
 
-Looks good, thanks. Do you care to update the other SoCs aswell?
+>
+>>
+>> Kevin
+>
+>
 
-Sascha
 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> 
-> - Introduce this generic function as suggested by Sascha Hauer.
-> 
-> Sascha,
-> 
-> If these 2 patches are merged, then I will convert the other i.MX processors
-> to use this new method.
-> 
->  arch/arm/plat-mxc/cpu.c                 |   10 ++++++++++
->  arch/arm/plat-mxc/include/mach/common.h |    1 +
->  2 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
-> index 386e0d5..f081ef0 100644
-> --- a/arch/arm/plat-mxc/cpu.c
-> +++ b/arch/arm/plat-mxc/cpu.c
-> @@ -1,5 +1,6 @@
->  
->  #include <linux/module.h>
-> +#include <mach/hardware.h>
->  
->  unsigned int __mxc_cpu_type;
->  EXPORT_SYMBOL(__mxc_cpu_type);
-> @@ -9,3 +10,12 @@ void mxc_set_cpu_type(unsigned int type)
->  	__mxc_cpu_type = type;
->  }
->  
-> +void imx_print_silicon_rev(const char *cpu, int srev)
-> +{
-> +	if (srev == IMX_CHIP_REVISION_UNKNOWN)
-> +		pr_info("CPU identified as %s, unknown revision\n", cpu);
-> +	else
-> +		pr_info("CPU identified as %s, silicon rev %d.%d\n",
-> +				cpu, (srev >> 4) & 0xf, srev & 0xf);
-> +}
-> +EXPORT_SYMBOL(imx_print_silicon_rev);
-> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-> index 91fa263..e427f63 100644
-> --- a/arch/arm/plat-mxc/include/mach/common.h
-> +++ b/arch/arm/plat-mxc/include/mach/common.h
-> @@ -72,4 +72,5 @@ extern void mxc_arch_reset_init(void __iomem *);
->  extern void mx51_efikamx_reset(void);
->  extern int mx53_revision(void);
->  extern int mx53_display_revision(void);
-> +extern void imx_print_silicon_rev(const char *cpu, int srev);
->  #endif
-> -- 
-> 1.7.1
-> 
-> 
-> 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards and Thanks,
+Keerthy
