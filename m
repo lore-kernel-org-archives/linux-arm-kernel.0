@@ -1,33 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Aug 2011 14:09:30 +0100
-Subject: [PATCH v7 03/16] ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead
-	of PGDIR_*
-In-Reply-To: <20110823111533.GH19622@n2100.arm.linux.org.uk>
-References: <1312988619-16804-1-git-send-email-catalin.marinas@arm.com>
-	<1312988619-16804-4-git-send-email-catalin.marinas@arm.com>
-	<20110823111533.GH19622@n2100.arm.linux.org.uk>
-Message-ID: <20110823130930.GA17397@e102109-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 23 Aug 2011 15:09:56 +0200
+Subject: [PATCH 1/6] ARM: imx: Introduce generic function for displaying
+	silicon revision
+In-Reply-To: <1314104864-3725-2-git-send-email-jason.hui@linaro.org>
+References: <1314104864-3725-1-git-send-email-jason.hui@linaro.org>
+	<1314104864-3725-2-git-send-email-jason.hui@linaro.org>
+Message-ID: <20110823130956.GP31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 12:15:33PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Aug 10, 2011 at 04:03:26PM +0100, Catalin Marinas wrote:
-> > @@ -183,7 +183,7 @@ static int __init consistent_init(void)
-> >  		}
-> >  
-> >  		consistent_pte[i++] = pte;
-> > -		base += (1 << PGDIR_SHIFT);
-> > +		base += (1 << PMD_SHIFT);
+On Tue, Aug 23, 2011 at 09:07:39PM +0800, Jason Liu wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Please replace with PMD_SIZE.
+> Currently each i.MX processor has its own function for displaying the silicon
+> revision.
 > 
-> Once combined with the "fixup! ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of PGDIR_*"
-> patch (and once whatever "fixup!" is done) this can be submitted to the
-> patch system.
+> Introduce a generic function for this purpose, so that all i.MX processors can
+> reuse it.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/plat-mxc/cpu.c                 |   10 ++++++++++
+>  arch/arm/plat-mxc/include/mach/common.h |    1 +
+>  2 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
+> index 386e0d5..f081ef0 100644
+> --- a/arch/arm/plat-mxc/cpu.c
+> +++ b/arch/arm/plat-mxc/cpu.c
+> @@ -1,5 +1,6 @@
+>  
+>  #include <linux/module.h>
+> +#include <mach/hardware.h>
+>  
+>  unsigned int __mxc_cpu_type;
+>  EXPORT_SYMBOL(__mxc_cpu_type);
+> @@ -9,3 +10,12 @@ void mxc_set_cpu_type(unsigned int type)
+>  	__mxc_cpu_type = type;
+>  }
+>  
+> +void imx_print_silicon_rev(const char *cpu, int srev)
+> +{
+> +	if (srev == IMX_CHIP_REVISION_UNKNOWN)
+> +		pr_info("CPU identified as %s, unknown revision\n", cpu);
+> +	else
+> +		pr_info("CPU identified as %s, silicon rev %d.%d\n",
+> +				cpu, (srev >> 4) & 0xf, srev & 0xf);
+> +}
+> +EXPORT_SYMBOL(imx_print_silicon_rev);
 
-I send this one (with the folded fix-ups) and the other type casting to
-your patch system (the "fixup!" is generated with git commit --fixup and
-git rebase -i --autosquash does the folding automatically).
+No Need to export this. It is not supposed to be used by modules.
+
+Sascha
+
+> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+> index 4e3d978..318e0da 100644
+> --- a/arch/arm/plat-mxc/include/mach/common.h
+> +++ b/arch/arm/plat-mxc/include/mach/common.h
+> @@ -72,4 +72,5 @@ extern void mxc_arch_reset_init(void __iomem *);
+>  extern void mx51_efikamx_reset(void);
+>  extern int mx53_revision(void);
+>  extern int mx53_display_revision(void);
+> +extern void imx_print_silicon_rev(const char *cpu, int srev);
+>  #endif
+> -- 
+> 1.7.4.1
+> 
+> 
+> 
 
 -- 
-Catalin
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
