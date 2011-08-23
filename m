@@ -1,124 +1,105 @@
-From: jason.hui@linaro.org (Jason Liu)
-Date: Tue, 23 Aug 2011 19:29:34 +0800
-Subject: [PATCH] ARM: i.MX5/mm: use static mapping for TZIC
-Message-ID: <1314098974-8220-1-git-send-email-jason.hui@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 23 Aug 2011 13:56:09 +0200
+Subject: [GIT PULL] i.MX cleanups for next
+Message-ID: <20110823115609.GJ31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can use static mapping for TZIC to get rid of the
-duplicated code for ioremap and the error handling of
-ioremap, which will made code more clean and consistent.
+Hi Arnd,
 
-Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
-v2: Remove the MX51_DEBUG related mapping which is conflict with TZIC.
-    MX51_DEBUG related mapping is dead code, no-one use it.
----
- arch/arm/mach-mx5/mm.c                |   21 ++++-----------------
- arch/arm/plat-mxc/include/mach/mx51.h |   13 +------------
- arch/arm/plat-mxc/include/mach/mx53.h |    1 +
- 3 files changed, 6 insertions(+), 29 deletions(-)
+Please pull the following cleanup patches for next.
 
-diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-index f8ebe37..20dce96 100644
---- a/arch/arm/mach-mx5/mm.c
-+++ b/arch/arm/mach-mx5/mm.c
-@@ -25,8 +25,8 @@
-  * Define the MX51 memory map.
-  */
- static struct map_desc mx51_io_desc[] __initdata = {
-+	imx_map_entry(MX51, TZIC, MT_DEVICE),
- 	imx_map_entry(MX51, IRAM, MT_DEVICE),
--	imx_map_entry(MX51, DEBUG, MT_DEVICE),
- 	imx_map_entry(MX51, AIPS1, MT_DEVICE),
- 	imx_map_entry(MX51, SPBA0, MT_DEVICE),
- 	imx_map_entry(MX51, AIPS2, MT_DEVICE),
-@@ -36,6 +36,7 @@ static struct map_desc mx51_io_desc[] __initdata = {
-  * Define the MX53 memory map.
-  */
- static struct map_desc mx53_io_desc[] __initdata = {
-+	imx_map_entry(MX53, TZIC, MT_DEVICE),
- 	imx_map_entry(MX53, AIPS1, MT_DEVICE),
- 	imx_map_entry(MX53, SPBA0, MT_DEVICE),
- 	imx_map_entry(MX53, AIPS2, MT_DEVICE),
-@@ -100,32 +101,18 @@ void __init imx50_init_early(void)
- void __init mx51_init_irq(void)
- {
- 	unsigned long tzic_addr;
--	void __iomem *tzic_virt;
- 
- 	if (mx51_revision() < IMX_CHIP_REVISION_2_0)
- 		tzic_addr = MX51_TZIC_BASE_ADDR_TO1;
- 	else
- 		tzic_addr = MX51_TZIC_BASE_ADDR;
- 
--	tzic_virt = ioremap(tzic_addr, SZ_16K);
--	if (!tzic_virt)
--		panic("unable to map TZIC interrupt controller\n");
--
--	tzic_init_irq(tzic_virt);
-+	tzic_init_irq(MX51_IO_ADDRESS(tzic_addr));
- }
- 
- void __init mx53_init_irq(void)
- {
--	unsigned long tzic_addr;
--	void __iomem *tzic_virt;
--
--	tzic_addr = MX53_TZIC_BASE_ADDR;
--
--	tzic_virt = ioremap(tzic_addr, SZ_16K);
--	if (!tzic_virt)
--		panic("unable to map TZIC interrupt controller\n");
--
--	tzic_init_irq(tzic_virt);
-+	tzic_init_irq(MX53_IO_ADDRESS(MX53_TZIC_BASE_ADDR));
- }
- 
- void __init mx50_init_irq(void)
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index 9666e31..414b9a8 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -18,18 +18,6 @@
- #define MX51_GPU_CTRL_BASE_ADDR		0x30000000
- #define MX51_IPU_CTRL_BASE_ADDR		0x40000000
- 
--#define MX51_DEBUG_BASE_ADDR		0x60000000
--#define MX51_DEBUG_SIZE			SZ_1M
--
--#define MX51_ETB_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x01000)
--#define MX51_ETM_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x02000)
--#define MX51_TPIU_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x03000)
--#define MX51_CTI0_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x04000)
--#define MX51_CTI1_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x05000)
--#define MX51_CTI2_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x06000)
--#define MX51_CTI3_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x07000)
--#define MX51_CORTEX_DBG_BASE_ADDR	(MX51_DEBUG_BASE_ADDR + 0x08000)
--
- /*
-  * SPBA global module enabled #0
-  */
-@@ -135,6 +123,7 @@
- 
- #define MX51_GPU2D_BASE_ADDR		0xd0000000
- #define MX51_TZIC_BASE_ADDR		0xe0000000
-+#define MX51_TZIC_SIZE                  SZ_16K
- 
- #define MX51_IO_P2V(x)			IMX_IO_P2V(x)
- #define MX51_IO_ADDRESS(x)		IOMEM(MX51_IO_P2V(x))
-diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
-index 5e3c323..fbf2610 100644
---- a/arch/arm/plat-mxc/include/mach/mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/mx53.h
-@@ -9,6 +9,7 @@
- 
- /* TZIC */
- #define MX53_TZIC_BASE_ADDR		0x0FFFC000
-+#define MX53_TZIC_SIZE                  SZ_16K
- 
- /*
-  * AHCI SATA
+Sascha
+
+The following changes since commit 93ee7a9340d64f20295aacc3fb6a22b759323280:
+
+  Linux 3.1-rc2 (2011-08-14 15:09:08 -0700)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-cleanup
+
+Fabio Estevam (2):
+      ARM: mx50: Select IMX_HAVE_PLATFORM_FEC as done on other i.MX devices
+      ARM: mxs: Remove unused header file
+
+Jason Liu (1):
+      imx5: not include the unused head file
+
+Sascha Hauer (2):
+      Merge branch 'imx-cleanup' of git://git.pengutronix.de/git/ukl/linux-2.6 into imx-cleanup
+      Merge branches 'cleanups/assorted', 'cleanups/shawn-cleanup-mxc-gpio', 'cleanups/troy-cleanup-iomux-v3' and 'cleanups/ukl-mx5-dynamically-allocate-devices' into imx-cleanup
+
+Shawn Guo (7):
+      arm/mxc: do not use gpio_to_irq() for static initializers
+      gpio/mxc: add .to_irq for gpio chip
+      arm/mxc: use gpiolib helper for gpio_to_irq
+      gpio/mxc: move irq_to_gpio() into gpio-mxc driver
+      arm/mxc: move IMX_GPIO_NR into mach/hardware.h
+      gpio/mxs: move irq_to_gpio() into gpio-mxs driver
+      arm/mxs: move MXS_GPIO_NR into mach/mxs.h
+
+Troy Kisky (3):
+      ARM: i.MX51: Remove _MX51_PAD_xxx references
+      ARM: i.MX51: clean up iomux-mx51.h
+      ARM: i.MX53: clean up iomux-mx53.h
+
+Uwe Kleine-K?nig (8):
+      ARM: mx5: fix remaining inconsistent names for irqs
+      ARM: mx5: remove unused #includes of devices.h
+      ARM: mx5: dynamically allocate mxc-ehci devices
+      ARM: mx5: dynamically allocate fsl-usb2-udc devices
+      ARM: mx5: dynamically allocate high speed i2c (imx-i2c actually)
+      ARM: imx/mx1ads: dynamically allocate physmap-flash device
+      ARM: imx/armadillo5x0: dynamically allocate physmap-flash device
+      ARM: mxc: drop now unused function mxc_register_device
+
+ arch/arm/mach-imx/mach-armadillo5x0.c             |   18 +-
+ arch/arm/mach-imx/mach-cpuimx35.c                 |    2 +-
+ arch/arm/mach-imx/mach-mx1ads.c                   |   15 +-
+ arch/arm/mach-imx/mach-mx27_3ds.c                 |    2 +-
+ arch/arm/mach-imx/mach-vpr200.c                   |    2 +-
+ arch/arm/mach-mx5/Kconfig                         |   10 +-
+ arch/arm/mach-mx5/Makefile                        |    2 +-
+ arch/arm/mach-mx5/board-cpuimx51.c                |   27 +-
+ arch/arm/mach-mx5/board-cpuimx51sd.c              |   25 +-
+ arch/arm/mach-mx5/board-mx51_3ds.c                |    1 -
+ arch/arm/mach-mx5/board-mx51_babbage.c            |   26 +-
+ arch/arm/mach-mx5/board-mx51_efikamx.c            |    2 -
+ arch/arm/mach-mx5/board-mx51_efikasb.c            |    6 +-
+ arch/arm/mach-mx5/board-mx53_ard.c                |    4 +-
+ arch/arm/mach-mx5/clock-mx51-mx53.c               |    2 +-
+ arch/arm/mach-mx5/devices-imx51.h                 |   13 +
+ arch/arm/mach-mx5/devices.c                       |  120 -
+ arch/arm/mach-mx5/devices.h                       |    5 -
+ arch/arm/mach-mx5/ehci.c                          |    2 +-
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c      |    3 +-
+ arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c      |    6 +-
+ arch/arm/mach-mx5/mm.c                            |    8 +-
+ arch/arm/mach-mx5/mx51_efika.c                    |   17 +-
+ arch/arm/mach-mxs/include/mach/gpio.h             |    4 -
+ arch/arm/mach-mxs/include/mach/mxs.h              |    2 +
+ arch/arm/mach-mxs/mach-mx23evk.c                  |    1 -
+ arch/arm/mach-mxs/mach-mx28evk.c                  |    1 -
+ arch/arm/mach-mxs/mach-stmp378x_devb.c            |    1 -
+ arch/arm/plat-mxc/devices.c                       |   14 -
+ arch/arm/plat-mxc/devices/Kconfig                 |    2 +-
+ arch/arm/plat-mxc/devices/platform-fsl-usb2-udc.c |    5 +
+ arch/arm/plat-mxc/devices/platform-imx-i2c.c      |    6 +
+ arch/arm/plat-mxc/devices/platform-mxc-ehci.c     |    9 +
+ arch/arm/plat-mxc/include/mach/common.h           |    1 -
+ arch/arm/plat-mxc/include/mach/gpio.h             |    9 +-
+ arch/arm/plat-mxc/include/mach/hardware.h         |    6 +
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h       | 2270 +++++---------
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h       | 3530 +++++++--------------
+ arch/arm/plat-mxc/include/mach/iomux-v3.h         |    1 +
+ arch/arm/plat-mxc/include/mach/mx51.h             |  167 +-
+ drivers/gpio/gpio-mxc.c                           |   12 +
+ drivers/gpio/gpio-mxs.c                           |    2 +
+ 42 files changed, 2164 insertions(+), 4197 deletions(-)
+ delete mode 100644 arch/arm/mach-mx5/devices.c
+ delete mode 100644 arch/arm/mach-mx5/devices.h
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
