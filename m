@@ -1,62 +1,23 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 23 Aug 2011 10:15:08 -0700
-Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
-In-Reply-To: <4E532A28.60103@ti.com> (Rajendra Nayak's message of "Tue, 23 Aug
-	2011 09:48:48 +0530")
-References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
-	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
-	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
-	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
-	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
-	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
-	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
-	<CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
-	<20110811185408.GB15970@legolas.emea.dhcp.ti.com>
-	<20110811185558.GC15970@legolas.emea.dhcp.ti.com>
-	<4E444B8F.9060908@ti.com> <4E449D65.9000004@ti.com>
-	<874o19gfrr.fsf@ti.com> <4E532A28.60103@ti.com>
-Message-ID: <87ei0chwwz.fsf@ti.com>
+From: Ian.Jackson@eu.citrix.com (Ian Jackson)
+Date: Tue, 23 Aug 2011 18:15:43 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20051.56441.597373.780997@mariner.uk.xensource.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CA+wbFdcv_BsHaVwoqgF5yx6scXOodHkKjdVtarqJwjy_GFrAJQ@mail.gmail.com>
+	<20051.56441.597373.780997@mariner.uk.xensource.com>
+Message-ID: <20051.57407.858233.386281@mariner.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+I wrote:
+> I haven't checked the decompressor but I don't see why it wouldn't
+> work in hyp mode.  I can try it easily enough.
 
-> On 8/23/2011 5:28 AM, Kevin Hilman wrote:
->> Rajendra Nayak<rnayak@ti.com>  writes:
->>
->> [...]
->>
->>> FWIK, its a one time requirement to set the clock rate to the
->>> right rate the device can operate in based on what a platform
->>> supports.
->>
->> Except $SUBJECT patch hard-codes the clock rate for all platforms in the
->> driver.
->
-> The device has a requirement to operate in a 1Mhz to 2Mhz range. 
+I tried booting linux in non-secure hyp mode [1] and it seemed to work
+just fine.  The kernel decompressed and booted up to trying to mount
+its root fs, just like it does if you start it in secure kernel mode.
 
-You mean the device on OMAP4 has this requirement.   
+Ian.
 
-Will this requirement exist on every platform that uses any version of
-this IP (or future similar IPs)?  I suspect not.
-
-> So the driver is using a clk_round_rate() to get the closest rate
-> supported and sets it using a clk_set_rate().
->
->>
->> If the clock rate is to be platform-specific, it should be done in
->> platform-specific code.
->
-> I am fine if this needs to be moved to platform-specific code, but I
-> wasn't quite sure this needs to be done in clock framework as was
-> suggested.
-
-No, it should't be in clock framework.  But since the frequency range is
-platform-specific, it should be initialized in platform-specific code.
-Having min/max parameters passed by platform data as suggested by
-J. Keerthy is fine.
-
-Probably even better is to have the driver have a default min/max rang
-which can be overridden by platform_data only if needed.
-
-Kevin
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git
+    a104d064b95e4981619c66bb94840ab3cb67c75d
