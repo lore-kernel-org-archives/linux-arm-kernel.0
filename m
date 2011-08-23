@@ -1,76 +1,85 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Aug 2011 15:09:56 +0200
-Subject: [PATCH 1/6] ARM: imx: Introduce generic function for displaying
-	silicon revision
-In-Reply-To: <1314104864-3725-2-git-send-email-jason.hui@linaro.org>
-References: <1314104864-3725-1-git-send-email-jason.hui@linaro.org>
-	<1314104864-3725-2-git-send-email-jason.hui@linaro.org>
-Message-ID: <20110823130956.GP31404@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Tue, 23 Aug 2011 18:42:46 +0530
+Subject: [PATCH v5 11/22] gpio/omap: remove hardcoded offsets in ctxt
+	save/restore
+In-Reply-To: <1312455893-14922-12-git-send-email-tarun.kanti@ti.com>
+References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+	<1312455893-14922-12-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4E53A74E.4030002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 09:07:39PM +0800, Jason Liu wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Currently each i.MX processor has its own function for displaying the silicon
-> revision.
-> 
-> Introduce a generic function for this purpose, so that all i.MX processors can
-> reuse it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
+> It is not required to use hard-coded offsets any more in context save and
+> restore functions and instead use the generic offsets which have been correctly
+> initialized during device registration.
+>
+> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> Signed-off-by: Charulatha V<charu@ti.com>
 > ---
->  arch/arm/plat-mxc/cpu.c                 |   10 ++++++++++
->  arch/arm/plat-mxc/include/mach/common.h |    1 +
->  2 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
-> index 386e0d5..f081ef0 100644
-> --- a/arch/arm/plat-mxc/cpu.c
-> +++ b/arch/arm/plat-mxc/cpu.c
-> @@ -1,5 +1,6 @@
->  
->  #include <linux/module.h>
-> +#include <mach/hardware.h>
->  
->  unsigned int __mxc_cpu_type;
->  EXPORT_SYMBOL(__mxc_cpu_type);
-> @@ -9,3 +10,12 @@ void mxc_set_cpu_type(unsigned int type)
->  	__mxc_cpu_type = type;
->  }
->  
-> +void imx_print_silicon_rev(const char *cpu, int srev)
-> +{
-> +	if (srev == IMX_CHIP_REVISION_UNKNOWN)
-> +		pr_info("CPU identified as %s, unknown revision\n", cpu);
-> +	else
-> +		pr_info("CPU identified as %s, silicon rev %d.%d\n",
-> +				cpu, (srev >> 4) & 0xf, srev & 0xf);
-> +}
-> +EXPORT_SYMBOL(imx_print_silicon_rev);
+$SUB
+/s /ctx  /context please
 
-No Need to export this. It is not supposed to be used by modules.
+>   arch/arm/mach-omap2/gpio.c             |    2 +
+>   arch/arm/plat-omap/include/plat/gpio.h |    1 +
+>   drivers/gpio/gpio-omap.c               |   41 ++++++++++++++-----------------
+>   3 files changed, 22 insertions(+), 22 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+> index 8745c3a..0ee9a55 100644
+> --- a/arch/arm/mach-omap2/gpio.c
+> +++ b/arch/arm/mach-omap2/gpio.c
+> @@ -103,6 +103,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+>   		pdata->regs->irqstatus = OMAP24XX_GPIO_IRQSTATUS1;
+>   		pdata->regs->irqstatus2 = OMAP24XX_GPIO_IRQSTATUS2;
+>   		pdata->regs->irqenable = OMAP24XX_GPIO_IRQENABLE1;
+> +		pdata->regs->irqenable2 = OMAP24XX_GPIO_IRQENABLE2;
+>   		pdata->regs->set_irqenable = OMAP24XX_GPIO_SETIRQENABLE1;
+>   		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
+>   		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
+> @@ -125,6 +126,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+>   		pdata->regs->irqstatus = OMAP4_GPIO_IRQSTATUS0;
+>   		pdata->regs->irqstatus2 = OMAP4_GPIO_IRQSTATUS1;
+>   		pdata->regs->irqenable = OMAP4_GPIO_IRQSTATUSSET0;
+> +		pdata->regs->irqenable2 = OMAP4_GPIO_IRQSTATUSSET1;
+>   		pdata->regs->set_irqenable = OMAP4_GPIO_IRQSTATUSSET0;
+>   		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
+>   		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
+> diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+> index 7d12fe8..0ad4f49 100644
+> --- a/arch/arm/plat-omap/include/plat/gpio.h
+> +++ b/arch/arm/plat-omap/include/plat/gpio.h
+> @@ -184,6 +184,7 @@ struct omap_gpio_reg_offs {
+>   	u16 irqstatus;
+>   	u16 irqstatus2;
+>   	u16 irqenable;
+> +	u16 irqenable2;
+>   	u16 set_irqenable;
+>   	u16 clr_irqenable;
+>   	u16 debounce;
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index be561be..e7c9fe5 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1348,45 +1348,42 @@ void omap2_gpio_resume_after_idle(void)
+>   static void omap_gpio_save_context(struct gpio_bank *bank)
+>   {
+>   	bank->context.irqenable1 =
+> -		__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE1);
+> +			__raw_readl(bank->base + bank->regs->irqenable);
+>   	bank->context.irqenable2 =
+> -		__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE2);
+> +			__raw_readl(bank->base + bank->regs->irqenable2);
+>   	bank->context.wake_en =
+> -		__raw_readl(bank->base + OMAP24XX_GPIO_WAKE_EN);
+> -	bank->context.ctrl = __raw_readl(bank->base + OMAP24XX_GPIO_CTRL);
+> -	bank->context.oe = __raw_readl(bank->base + OMAP24XX_GPIO_OE);
+> +			__raw_readl(bank->base + bank->regs->wkup_status);
+Not related to this patch but saving the status register just useless.
+You should rather save/restore 'wkup_set' register.
 
-Sascha
+Can you please fix this in relevant patch. O.w this patch looks ok to
+me.
 
-> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-> index 4e3d978..318e0da 100644
-> --- a/arch/arm/plat-mxc/include/mach/common.h
-> +++ b/arch/arm/plat-mxc/include/mach/common.h
-> @@ -72,4 +72,5 @@ extern void mxc_arch_reset_init(void __iomem *);
->  extern void mx51_efikamx_reset(void);
->  extern int mx53_revision(void);
->  extern int mx53_display_revision(void);
-> +extern void imx_print_silicon_rev(const char *cpu, int srev);
->  #endif
-> -- 
-> 1.7.4.1
-> 
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Santosh
