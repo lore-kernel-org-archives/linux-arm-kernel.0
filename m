@@ -1,36 +1,25 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 24 Aug 2011 00:13:40 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Aug 2011 23:13:14 +0100
 Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <CAOS58YNUSn2eVLDLzqKmrtL7M5tSetkhZ1ODecLK54NSDnZVAA@mail.gmail.com>
+In-Reply-To: <CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
 References: <20110823151936.GM9232@opensource.wolfsonmicro.com>
 	<201108232351.55432.rjw@sisk.pl>
 	<CAOS58YNUSn2eVLDLzqKmrtL7M5tSetkhZ1ODecLK54NSDnZVAA@mail.gmail.com>
-Message-ID: <201108240013.40705.rjw@sisk.pl>
+	<20110823220056.GK3895@n2100.arm.linux.org.uk>
+	<CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
+Message-ID: <20110823221314.GL3895@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 23, 2011, Tejun Heo wrote:
-> Hello,
+On Wed, Aug 24, 2011 at 12:08:23AM +0200, Tejun Heo wrote:
+> On Wed, Aug 24, 2011 at 12:00 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > How does that solve it? ?IRQs disabled from assembly, which doesn't touch
+> > the preempt counter.
 > 
-> On Tue, Aug 23, 2011 at 11:51 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> >> and the boot runs very slowly.  Reverting the series merged in 56f0be
-> >> appears to resolve the issue,
-> >
-> > In fact, the patch from:
-> >
-> > https://patchwork.kernel.org/patch/1083602/
-> >
-> > is sufficient to make the calltrace go away.
-> 
-> Yes, that's true but the added might_sleep() discovered an actual bug
-> here, so I still think it's better to keep it there.
+> Then test something else, be it the IRQ mask bit or some other context.
 
-Well, I think we _have_ _to_ put it into __refrigerator() at least until
-the ARM issue is fixed (other architectures seem to do similar things, BTW),
-since otherwise this can be reported over and over again.
-
-Let's try to fix the known issues first and _then_ we can move the
-might_sleep() back into try_to_freeze().
-
-Thanks,
-Rafael
+Thereby entirely preventing threads from being frozen?  You're asking
+me to effectively disable suspend/resume on an architecture where it's
+heavily used.  That's not a good idea, and would be an out-right
+regression.
