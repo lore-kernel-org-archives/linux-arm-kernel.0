@@ -1,51 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Aug 2011 10:30:35 +0100
-Subject: [PATCH] atmel_serial: RS485: receiving enabled when sending data
-In-Reply-To: <4E536536.3030004@evidence.eu.com>
-References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
-	<4E536536.3030004@evidence.eu.com>
-Message-ID: <20110823093035.GB19622@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 23 Aug 2011 10:34:53 +0100
+Subject: [PATCHv3 0/9] macb: add support for Cadence GEM
+In-Reply-To: <20110809145940.GP22213@game.jcrosoft.org>
+References: <1312881411-2376-1-git-send-email-jamie@jamieiles.com>
+	<20110809145940.GP22213@game.jcrosoft.org>
+Message-ID: <20110823093453.GJ2796@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 10:30:46AM +0200, Claudio Scordino wrote:
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index af9b781..5f6c745 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -339,8 +339,9 @@ static void atmel_stop_tx(struct uart_port *port)
->  	/* Disable interrupts */
->  	UART_PUT_IDR(port, atmel_port->tx_done_mask);
->  
-> -	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
-> -		atmel_start_rx(port);
-> +	if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
-> +		!(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
-> +			atmel_start_rx(port);
+Hi Jean-Christoph,
 
-However, this is incorrect formatting.  The code following the 'if' ends
-up being indented by two tabs.
+On Tue, Aug 09, 2011 at 04:59:40PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:16 Tue 09 Aug     , Jamie Iles wrote:
+> > This is largely a repost of the series I posted back in March.  The only changes
+> > since then are rebasing onto 3.1-rc1 and changing the gem conditionals from a
+> > boolean in the macb structure to an inline helper as requested by
+> > Jean-Christophe.
+> > 
+> > This has been run-tested on picoxcell and compile tested for all AT91 platforms
+> > but I couldn't get a working cross compiler for avr32.
+> > 
+> > All patches are available in a git branch at
+> > 
+> > 	git://github.com/jamieiles/linux-2.6-ji.git macb-gem
+> > 
+> looks good except few comments
+> 
+> I'll test it later this week
 
-This illustrates why the whole idea that tabs should only be used for
-indenting is wrong.  You end up with either what you have above, or:
+Have you had chance to test this series?  I'd like to get it into Arnd's 
+tree and into next for a bit so we can get it into the next release if 
+possible.
 
-	if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
-		!(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
-		atmel_start_rx(port);
+Thanks,
 
-both of which are dire for readability.  The only sane way to do this is
-to ignore that stupid "indentation by tabs only" thing and do it as the
-kernel code has _always_ been done over the last 19 years:
-
-	if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
-	    !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
-		atmel_start_rx(port);
-
-IOW, use spaces to align the wrapped 'if' statement.
-
-> +		if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
-> +			!(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX)) {
-> +				/* DMA done, stop TX, start RX for RS485 */
-> +				atmel_start_rx(port);
-
-And here it makes it look like there's a missing brace.
+Jamie
