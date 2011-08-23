@@ -1,103 +1,99 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 23 Aug 2011 17:18:06 -0300
-Subject: [PATCH 1/2] ARM: imx: Add PATA resources for other i.MX processors
-Message-ID: <1314130687-27523-1-git-send-email-fabio.estevam@freescale.com>
+Date: Tue, 23 Aug 2011 17:18:07 -0300
+Subject: [PATCH 2/2] ARM: imx: Add PATA clock support
+In-Reply-To: <1314130687-27523-1-git-send-email-fabio.estevam@freescale.com>
+References: <1314130687-27523-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1314130687-27523-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX27/31/35/53 also have PATA block. 
-
-Add PATA resources for them.
+Add PATA clock support for MX27/MX31/MX35/MX53.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
+ arch/arm/mach-imx/clock-imx27.c     |    4 ++--
+ arch/arm/mach-imx/clock-imx31.c     |    4 ++--
+ arch/arm/mach-imx/clock-imx35.c     |    4 ++--
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    1 +
+ 4 files changed, 7 insertions(+), 6 deletions(-)
 
-In order to avoid breaking MX51 PATA support the following patch is needed:
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commitdiff;h=1a1952779b8e92a404dceaecca70ba120bea2d94
-
- arch/arm/plat-mxc/devices/platform-pata_imx.c   |   29 +++++++++++++++++++---
- arch/arm/plat-mxc/include/mach/devices-common.h |    1 +
- arch/arm/plat-mxc/include/mach/mx35.h           |    2 +-
- 3 files changed, 27 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/devices/platform-pata_imx.c b/arch/arm/plat-mxc/devices/platform-pata_imx.c
-index c1cbaf9..b67ad9e 100644
---- a/arch/arm/plat-mxc/devices/platform-pata_imx.c
-+++ b/arch/arm/plat-mxc/devices/platform-pata_imx.c
-@@ -6,24 +6,45 @@
- #include <mach/hardware.h>
- #include <mach/devices-common.h>
- 
--#define imx_pata_imx_data_entry_single(soc)				\
-+#define imx_pata_imx_data_entry_single(soc, _size)			\
- 	{								\
- 		.iobase = soc ## _ATA_BASE_ADDR,			\
--		.irq = soc ## _MXC_INT_ATA,				\
-+		.iosize = _size,					\
-+		.irq = soc ## _INT_ATA,					\
+diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
+index 6912b82..becc92e 100644
+--- a/arch/arm/mach-imx/clock-imx27.c
++++ b/arch/arm/mach-imx/clock-imx27.c
+@@ -583,7 +583,7 @@ DEFINE_CLOCK(emi_clk,      0, PCCR1, 19, NULL, NULL, &ahb_clk);
+ DEFINE_CLOCK(dma_clk1,     0, PCCR1, 20, NULL, NULL, &ahb_clk);
+ DEFINE_CLOCK(csi_clk1,     0, PCCR1, 21, NULL, NULL, &ahb_clk);
+ DEFINE_CLOCK(brom_clk,     0, PCCR1, 22, NULL, NULL, &ahb_clk);
+-DEFINE_CLOCK(ata_clk,      0, PCCR1, 23, NULL, NULL, &ahb_clk);
++DEFINE_CLOCK(pata_clk,      0, PCCR1, 23, NULL, NULL, &ahb_clk);
+ DEFINE_CLOCK(wdog_clk,     0, PCCR1, 24, NULL, NULL, &ipg_clk);
+ DEFINE_CLOCK(usb_clk,      0, PCCR1, 25, get_rate_usb, &usb_clk1, &spll_clk);
+ DEFINE_CLOCK(uart6_clk1,   0, PCCR1, 26, NULL, NULL, &ipg_clk);
+@@ -666,7 +666,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("imx27-fec.0", NULL, fec_clk)
+ 	_REGISTER_CLOCK(NULL, "emi", emi_clk)
+ 	_REGISTER_CLOCK(NULL, "sahara2", sahara2_clk)
+-	_REGISTER_CLOCK(NULL, "ata", ata_clk)
++	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
+ 	_REGISTER_CLOCK(NULL, "mstick", mstick_clk)
+ 	_REGISTER_CLOCK("imx2-wdt.0", NULL, wdog_clk)
+ 	_REGISTER_CLOCK(NULL, "gpio", gpio_clk)
+diff --git a/arch/arm/mach-imx/clock-imx31.c b/arch/arm/mach-imx/clock-imx31.c
+index d973770..58ea0a8 100644
+--- a/arch/arm/mach-imx/clock-imx31.c
++++ b/arch/arm/mach-imx/clock-imx31.c
+@@ -476,7 +476,7 @@ DEFINE_CLOCK(gpt_clk,     0, MXC_CCM_CGR0,  4, NULL, NULL, &perclk_clk);
+ DEFINE_CLOCK(epit1_clk,   0, MXC_CCM_CGR0,  6, NULL, NULL, &perclk_clk);
+ DEFINE_CLOCK(epit2_clk,   1, MXC_CCM_CGR0,  8, NULL, NULL, &perclk_clk);
+ DEFINE_CLOCK(iim_clk,     0, MXC_CCM_CGR0, 10, NULL, NULL, &ipg_clk);
+-DEFINE_CLOCK(ata_clk,     0, MXC_CCM_CGR0, 12, NULL, NULL, &ipg_clk);
++DEFINE_CLOCK(pata_clk,     0, MXC_CCM_CGR0, 12, NULL, NULL, &ipg_clk);
+ DEFINE_CLOCK(sdma_clk1,   0, MXC_CCM_CGR0, 14, NULL, NULL, &ahb_clk);
+ DEFINE_CLOCK(cspi3_clk,   2, MXC_CCM_CGR0, 16, NULL, NULL, &ipg_clk);
+ DEFINE_CLOCK(rng_clk,     0, MXC_CCM_CGR0, 18, NULL, NULL, &ipg_clk);
+@@ -562,7 +562,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("imx-ssi.0", NULL, ssi1_clk)
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+ 	_REGISTER_CLOCK(NULL, "firi", firi_clk)
+-	_REGISTER_CLOCK(NULL, "ata", ata_clk)
++	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
+ 	_REGISTER_CLOCK(NULL, "rtic", rtic_clk)
+ 	_REGISTER_CLOCK(NULL, "rng", rng_clk)
+ 	_REGISTER_CLOCK("imx31-sdma", NULL, sdma_clk1)
+diff --git a/arch/arm/mach-imx/clock-imx35.c b/arch/arm/mach-imx/clock-imx35.c
+index 88b62a0..c39f5c3 100644
+--- a/arch/arm/mach-imx/clock-imx35.c
++++ b/arch/arm/mach-imx/clock-imx35.c
+@@ -354,7 +354,7 @@ static void clk_cgr_disable(struct clk *clk)
  	}
  
-+#ifdef CONFIG_SOC_IMX27
-+const struct imx_pata_imx_data imx27_pata_imx_data __initconst =
-+	imx_pata_imx_data_entry_single(MX27, SZ_4K);
-+#endif /* ifdef CONFIG_SOC_IMX27 */
-+
-+#ifdef CONFIG_SOC_IMX31
-+const struct imx_pata_imx_data imx31_pata_imx_data __initconst =
-+	imx_pata_imx_data_entry_single(MX31, SZ_16K);
-+#endif /* ifdef CONFIG_SOC_IMX31 */
-+
-+#ifdef CONFIG_SOC_IMX35
-+const struct imx_pata_imx_data imx35_pata_imx_data __initconst =
-+	imx_pata_imx_data_entry_single(MX35, SZ_16K);
-+#endif /* ifdef CONFIG_SOC_IMX35 */
-+
- #ifdef CONFIG_SOC_IMX51
- const struct imx_pata_imx_data imx51_pata_imx_data __initconst =
--	imx_pata_imx_data_entry_single(MX51);
-+	imx_pata_imx_data_entry_single(MX51, SZ_16K);
- #endif /* ifdef CONFIG_SOC_IMX51 */
+ DEFINE_CLOCK(asrc_clk,   0, CCM_CGR0,  0, NULL, NULL);
+-DEFINE_CLOCK(ata_clk,    0, CCM_CGR0,  2, get_rate_ipg, NULL);
++DEFINE_CLOCK(pata_clk,    0, CCM_CGR0,  2, get_rate_ipg, NULL);
+ /* DEFINE_CLOCK(audmux_clk, 0, CCM_CGR0,  4, NULL, NULL); */
+ DEFINE_CLOCK(can1_clk,   0, CCM_CGR0,  6, get_rate_ipg, NULL);
+ DEFINE_CLOCK(can2_clk,   1, CCM_CGR0,  8, get_rate_ipg, NULL);
+@@ -447,7 +447,7 @@ static struct clk nfc_clk = {
  
-+#ifdef CONFIG_SOC_IMX53
-+const struct imx_pata_imx_data imx53_pata_imx_data __initconst =
-+	imx_pata_imx_data_entry_single(MX53, SZ_16K);
-+#endif /* ifdef CONFIG_SOC_IMX53 */
-+
- struct platform_device *__init imx_add_pata_imx(
- 		const struct imx_pata_imx_data *data)
- {
- 	struct resource res[] = {
- 		{
- 			.start = data->iobase,
--			.end = data->iobase + SZ_16K - 1,
-+			.end = data->iobase + data->iobase - 1,
- 			.flags = IORESOURCE_MEM,
- 		},
- 		{
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 1b76c67..4cbad45 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -253,6 +253,7 @@ struct platform_device *__init imx_add_mxc_nand(
- 
- struct imx_pata_imx_data {
- 	resource_size_t iobase;
-+	resource_size_t iosize;
- 	resource_size_t irq;
+ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK(NULL, "asrc", asrc_clk)
+-	_REGISTER_CLOCK(NULL, "ata", ata_clk)
++	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
+ 	_REGISTER_CLOCK("flexcan.0", NULL, can1_clk)
+ 	_REGISTER_CLOCK("flexcan.1", NULL, can2_clk)
+ 	_REGISTER_CLOCK("imx35-cspi.0", NULL, cspi1_clk)
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index b653133..3fcb596 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1508,6 +1508,7 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+ 	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
+ 	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
++	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
  };
- struct platform_device *__init imx_add_pata_imx(
-diff --git a/arch/arm/plat-mxc/include/mach/mx35.h b/arch/arm/plat-mxc/include/mach/mx35.h
-index d13dbfe..80965a9 100644
---- a/arch/arm/plat-mxc/include/mach/mx35.h
-+++ b/arch/arm/plat-mxc/include/mach/mx35.h
-@@ -36,7 +36,7 @@
- #define MX35_UART3_BASE_ADDR			(MX35_SPBA0_BASE_ADDR + 0x0c000)
- #define MX35_CSPI2_BASE_ADDR			(MX35_SPBA0_BASE_ADDR + 0x10000)
- #define MX35_SSI2_BASE_ADDR			(MX35_SPBA0_BASE_ADDR + 0x14000)
--#define MX35_ATA_DMA_BASE_ADDR			(MX35_SPBA0_BASE_ADDR + 0x20000)
-+#define MX35_ATA_BASE_ADDR			(MX35_SPBA0_BASE_ADDR + 0x20000)
- #define MX35_MSHC1_BASE_ADDR			(MX35_SPBA0_BASE_ADDR + 0x24000)
- #define MX35_FEC_BASE_ADDR		0x50038000
- #define MX35_SPBA_CTRL_BASE_ADDR		(MX35_SPBA0_BASE_ADDR + 0x3c000)
+ 
+ static void clk_tree_init(void)
 -- 
 1.6.0.4
