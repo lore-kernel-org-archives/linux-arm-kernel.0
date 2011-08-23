@@ -1,52 +1,60 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 23 Aug 2011 11:49:56 -0700
-Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
-In-Reply-To: <CACRpkdY=nVQYnznTU7=_D0n1V1U_xOKH2y75-jKp7k7NzwH8Zw@mail.gmail.com>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-	<201108161509.17157.arnd@arndb.de>
-	<CACRpkdaVx=6AJ5DFjVN1ZYQ++hu9pT6WxD9n+pqmYVaCf1xawg@mail.gmail.com>
-	<201108161637.16620.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF04AEA25368@HQMAIL01.nvidia.com>
-	<CACRpkdY=nVQYnznTU7=_D0n1V1U_xOKH2y75-jKp7k7NzwH8Zw@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B24A38E6@HQMAIL01.nvidia.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 23 Aug 2011 21:03:55 +0200
+Subject: [RFC/PATCH v2 10/13] dt: omap4: panda board: set clock freq for
+	i2c devices
+In-Reply-To: <4E537F6B.4060608@ti.com>
+References: <1314074021-25186-11-git-send-email-manjugk@ti.com>
+	<4E537F6B.4060608@ti.com>
+Message-ID: <4E53F99B.3060308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Tuesday, August 23, 2011 6:51 AM:
-> On Tue, Aug 16, 2011 at 7:12 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> 
-> > One issue here: There isn't always a single gpio/pinmux parent; as a
-> > concrete example, the ALSA/ASoC driver for Tegra+WM8903 uses GPIOs both
-> > from Tegra itself, and from the WM8903 audio codec.
-> 
-> The Ux500 have pinmuxing on the DB8500 and AB8500 - the latter
-> is a PMIC (&misc) connected to the DB8500 via I2C.
-> 
-> In the pincontrol subsystem I'm brewing, each of these will have
-> their own pin controller instance and their own struct gpio_chip as
-> well, so:
-> 
-> DB8500: pinctrl.0, gpio.0
-> AB8500: pinctrl.1, gpio.1
+> From: G, Manjunath Kondaiah<manjugk@ti.com>
+> To: devicetree-discuss at lists.ozlabs.org
+> CC: linux-omap at vger.kernel.org, linux-arm-kernel at lists.infradead.org
+>
+>
+> Update omap4 panda dts file with required clock frequencies
+> for the i2c client devices existing on panda board.
+>
+> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+> ---
+>    arch/arm/boot/dts/omap4-panda.dts |   16 ++++++++++++++++
+>    1 files changed, 16 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap4-panda.dts
+> b/arch/arm/boot/dts/omap4-panda.dts
+> index c28aa95..6b831ca 100644
+> --- a/arch/arm/boot/dts/omap4-panda.dts
+> +++ b/arch/arm/boot/dts/omap4-panda.dts
+> @@ -3,4 +3,20 @@
+>    / {
+>    	model = "TI OMAP4 PandaBoard";
+>    	compatible = "ti,omap4-panda", "ti,omap4430";
+> +
+> +	i2c1 {
+> +		clock-frequency =<400000>;
+> +	};
+> +
+> +	i2c2 {
+> +		clock-frequency =<400000>;
+> +	};
+> +
+> +	i2c3 {
+> +		clock-frequency =<400000>;
+> +	};
+> +
+> +	i2c4 {
+> +		clock-frequency =<400000>;
+> +	};
+>    };
 
-Makes sense to far.
+Are you sure that this patch is setting the expected frequency?
+I see 100kHz in the boot log even with that patch.
 
-> Each GPIO chip may have it's respective pin controller as parent
-> I guess, or they may simply be the same struct device * whatdoIknow.
+I took me some time to find the proper syntax, but in order to reference 
+an existing node, you have to use &i2c1 at the top level of the file. If 
+you check the output of the DTC compiler, you will see the property at 
+the proper node.
 
-I'm not clear on why the GPIO and pinmux would have any kind of parent
-relationship. Perhaps that's how your HW is designed. In Tegra, GPIO
-and pinmux are completely separate HW blocks without much of a defined
-relationship.
-
-I can certainly see both being implemented by the same code if it makes
-sense to do so. On Tegra, I think I'd still lean towards keeping them
-as separate devices, since they have separate register spaces and are
-documented separately etc. However, I can certainly see that other HW
-might have both sets of functionality in one HW block.
-
-> I know this is vaporware, but does this reasoning hold also to
-> the Tegra+WM8903 combo?
-
--- 
-nvpublic
+Benoit
