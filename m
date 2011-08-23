@@ -1,50 +1,68 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 23 Aug 2011 11:33:30 +0800
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <20110822100122.GA2796@pulham.picochip.com>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
-	<20110822055534.GA15301@S2100-06.ap.freescale.net>
-	<20110822100122.GA2796@pulham.picochip.com>
-Message-ID: <20110823033329.GB16416@S2100-06.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Aug 2011 12:42:47 +0900
+Subject: [PATCH 1/4] S3C2443: Move i2s clock definitions to common code
+In-Reply-To: <201108211925.05300.heiko@sntech.de>
+References: <201108201757.56483.heiko@sntech.de>
+	<201108201801.29541.heiko@sntech.de>
+	<20110821171332.GF28546@n2100.arm.linux.org.uk>
+	<201108211925.05300.heiko@sntech.de>
+Message-ID: <06c001cc6146$b9f30be0$2dd923a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jamie,
+Heiko St?bner wrote:
+> 
+> Am Sonntag 21 August 2011, 19:13:32 schrieb Russell King - ARM Linux:
+> > On Sat, Aug 20, 2011 at 06:01:29PM +0200, Heiko St?bner wrote:
+> > > +/* i2s-ref
+> > > + *
+> > > + * i2s bus reference clock, selectable from external, esysclk or
+epllref
+> > > + *
+> > > + * Note, this used to be two clocks, but was compressed into one.
+> > > +*/
+> > > +
+> > > +struct clk *clk_i2s_srclist[] = {
+> > > +	[0] = &clk_i2s_eplldiv.clk,
+> > > +	[1] = &clk_i2s_ext,
+> > > +	[2] = &clk_epllref.clk,
+> > > +	[3] = &clk_epllref.clk,
+> > > +};
+> >
+> > Is there any reason not to make this static (have you run your patch
+> > through checkpatch.pl ?)
+> Yep I did run all of them through checkpatch (after beeing scolded last
+time)
+> and it didn't report anything.
+> 
 
-On Mon, Aug 22, 2011 at 11:01:22AM +0100, Jamie Iles wrote:
-> Hi Shawn,
-> 
-> On Mon, Aug 22, 2011 at 01:55:36PM +0800, Shawn Guo wrote:
-> > On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
-> > > From: Rob Herring <rob.herring@calxeda.com>
-> > > 
-> > > This adds basic support for the Calxeda Highbank platform.
-> > > 
-> > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > > ---
-> > [...]
-> > > diff --git a/arch/arm/mach-highbank/include/mach/entry-macro.S b/arch/arm/mach-highbank/include/mach/entry-macro.S
-> > > new file mode 100644
-> > > index 0000000..56be409
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-highbank/include/mach/entry-macro.S
-> > > @@ -0,0 +1,9 @@
-> > > +#include <asm/hardware/gic.h>
-> > > +#include <asm/hardware/entry-macro-gic.S>
-> > 
-> > It seems that the second file already includes the first one.
-> 
-> It's preferred to use explicit includes.  From 
-> Documentation/SubmitChecklist:
-> 
-> 	1: If you use a facility then #include the file that 
-> 	   defines/declares that facility.  Don't depend on other header 
-> 	   files pulling in ones that you use.
-> 
-We should not include it even with above point, because we do not have
-anything in entry-macro.S requiring gic.h.
+Hmm...as a note, happened following with checkpatch.pl :(
 
--- 
-Regards,
-Shawn
+ERROR: need consistent spacing around '*' (ctx:WxV)
+#35: FILE: arch/arm/mach-s3c2416/clock.c:57:
++               .sources = (struct clk *[]) {
+                                       ^
+
+total: 1 errors, 0 warnings, 38 lines checked
+
+PATCH 34 S3C2416 Add HSSPI clock sourced from EPLL.txt has style problems,
+please review.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+
+> But for this move of code I simply grabbed the code fragments and put them
+> into their new location (i.e. it was this way in mach-s3c2443/clock.c) and
+> should have probably taken a closer look at what I'm moving.
+> 
+> So it seems you are right, it should probably be static as everything else
+is
+> also static.
+> 
+> Heiko
