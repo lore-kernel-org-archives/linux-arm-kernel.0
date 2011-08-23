@@ -1,145 +1,126 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Aug 2011 15:13:47 +0200
-Subject: [PATCH 4/6] ARM: mx31: use generic function for displaying
-	silicon revision
-In-Reply-To: <1314104864-3725-5-git-send-email-jason.hui@linaro.org>
-References: <1314104864-3725-1-git-send-email-jason.hui@linaro.org>
-	<1314104864-3725-5-git-send-email-jason.hui@linaro.org>
-Message-ID: <20110823131347.GQ31404@pengutronix.de>
+From: abhilash.kv@ti.com (Abhilash K V)
+Date: Tue, 23 Aug 2011 18:51:13 +0530
+Subject: [PATCH v2 1/2] AM35x: Using OMAP3 generic hwmods
+Message-ID: <1314105673-17390-1-git-send-email-abhilash.kv@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 09:07:42PM +0800, Jason Liu wrote:
-> Update to use generic function for displaying silicon revision
-> 
-> Signed-off-by: Jason Liu <jason.hui@linaro.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-imx/clock-imx31.c       |    5 +++--
->  arch/arm/mach-imx/cpu-imx31.c         |   21 +++++++++++++--------
->  arch/arm/plat-mxc/include/mach/mx3x.h |   11 ++---------
->  3 files changed, 18 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/clock-imx31.c b/arch/arm/mach-imx/clock-imx31.c
-> index d973770..dd8373e 100644
-> --- a/arch/arm/mach-imx/clock-imx31.c
-> +++ b/arch/arm/mach-imx/clock-imx31.c
-> @@ -610,11 +610,12 @@ int __init mx31_clocks_init(unsigned long fref)
->  
->  	clk_enable(&gpt_clk);
->  	clk_enable(&emi_clk);
-> -	clk_enable(&iim_clk);
->  
->  	clk_enable(&serial_pll_clk);
->  
-> -	mx31_read_cpu_rev();
-> +	clk_enable(&iim_clk);
-> +	imx_print_silicon_rev("i.MX31", mx31_revision());
-> +	clk_disable(&iim_clk);
->  
->  	if (mx31_revision() >= IMX_CHIP_REVISION_2_0) {
->  		reg = __raw_readl(MXC_CCM_PMCR1);
-> diff --git a/arch/arm/mach-imx/cpu-imx31.c b/arch/arm/mach-imx/cpu-imx31.c
-> index a378070..a5b8686 100644
-> --- a/arch/arm/mach-imx/cpu-imx31.c
-> +++ b/arch/arm/mach-imx/cpu-imx31.c
-> @@ -14,15 +14,14 @@
->  #include <mach/hardware.h>
->  #include <mach/iim.h>
->  
-> -unsigned int mx31_cpu_rev;
-> -EXPORT_SYMBOL(mx31_cpu_rev);
-> +static int mx31_cpu_rev = -1;
->  
->  static struct {
->  	u8 srev;
->  	const char *name;
->  	const char *v;
->  	unsigned int rev;
-> -} mx31_cpu_type[] __initdata = {
-> +} mx31_cpu_type[] = {
->  	{ .srev = 0x00, .name = "i.MX31(L)", .v = "1.0",  .rev = IMX_CHIP_REVISION_1_0	},
->  	{ .srev = 0x10, .name = "i.MX31",    .v = "1.1",  .rev = IMX_CHIP_REVISION_1_1	},
->  	{ .srev = 0x11, .name = "i.MX31L",   .v = "1.1",  .rev = IMX_CHIP_REVISION_1_1	},
-> @@ -34,7 +33,7 @@ static struct {
->  	{ .srev = 0x29, .name = "i.MX31L",   .v = "2.0",  .rev = IMX_CHIP_REVISION_2_0	},
->  };
->  
-> -void __init mx31_read_cpu_rev(void)
-> +static int mx31_read_cpu_rev(void)
->  {
->  	u32 i, srev;
->  
-> @@ -47,11 +46,17 @@ void __init mx31_read_cpu_rev(void)
->  				"CPU identified as %s, silicon rev %s\n",
->  				mx31_cpu_type[i].name, mx31_cpu_type[i].v);
+This patch enables AM35x SoCs to use generic OMAP3 hwmods
+(i,e. omap3xxx_hwmods) by allowing board-am3517evm.c to
+disable the modules which are not present in AM3517.
 
-It seems now we print the silicon revision twice, right?
+Reviewed-by: Sanjeev Premi <premi@ti.com>
+Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+---
+ arch/arm/mach-omap2/board-am3517evm.c        |   11 +++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c             |    3 ++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   18 ++++++++++++++++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 +++
+ 4 files changed, 34 insertions(+), 1 deletions(-)
 
-The .v field should be unused now and can be removed.
-
-Also, you can call imx_print_silicon_rev from here and pass the cpu name
-from the array.
-
-Sascha
-
->  
-> -			mx31_cpu_rev = mx31_cpu_type[i].rev;
-> -			return;
-> +			return mx31_cpu_type[i].rev;
->  		}
->  
-> -	mx31_cpu_rev = IMX_CHIP_REVISION_UNKNOWN;
-> +	return IMX_CHIP_REVISION_UNKNOWN;
-> +}
-> +
-> +int mx31_revision(void)
-> +{
-> +	if (mx31_cpu_rev == -1)
-> +		mx31_cpu_rev = mx31_read_cpu_rev();
->  
-> -	printk(KERN_WARNING "Unknown CPU identifier. srev = %02x\n", srev);
-> +	return mx31_cpu_rev;
->  }
-> +EXPORT_SYMBOL(mx31_revision);
-> diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
-> index 388a407..e1850f4 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx3x.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx3x.h
-> @@ -187,15 +187,6 @@
->  /* Mandatory defines used globally */
->  
->  #if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
-> -
-> -extern unsigned int mx31_cpu_rev;
-> -extern void mx31_read_cpu_rev(void);
-> -
-> -static inline int mx31_revision(void)
-> -{
-> -	return mx31_cpu_rev;
-> -}
-> -
->  extern unsigned int mx35_cpu_rev;
->  extern void mx35_read_cpu_rev(void);
->  
-> @@ -203,6 +194,8 @@ static inline int mx35_revision(void)
->  {
->  	return mx35_cpu_rev;
->  }
-> +
-> +extern int mx31_revision(void);
->  #endif
->  
->  #endif /* ifndef __MACH_MX3x_H__ */
-> -- 
-> 1.7.4.1
-> 
-> 
-> 
-
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index f3006c3..8a5f232 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -34,6 +34,7 @@
+ #include <plat/board.h>
+ #include <plat/common.h>
+ #include <plat/usb.h>
++#include <plat/omap_hwmod.h>
+ #include <video/omapdss.h>
+ #include <video/omap-panel-generic-dpi.h>
+ 
+@@ -359,11 +360,21 @@ static struct omap_dss_board_info am3517_evm_dss_data = {
+ 	.default_device	= &am3517_evm_lcd_device,
+ };
+ 
++static char *am3517_unused_hwmods[] = {
++	"iva",
++	"sr1_hwmod",
++	"sr2_hwmod",
++	"mailbox",
++	"usb_otg_hs",
++	NULL,
++};
++
+ /*
+  * Board initialization
+  */
+ static void __init am3517_evm_init_early(void)
+ {
++	omap2_disable_unused_hwmods(am3517_unused_hwmods);
+ 	omap2_init_common_infrastructure();
+ 	omap2_init_common_devices(NULL, NULL);
+ }
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 84cc0bd..bb765b5 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1954,7 +1954,8 @@ int __init omap_hwmod_register(struct omap_hwmod **ohs)
+ 
+ 	i = 0;
+ 	do {
+-		if (!omap_chip_is(ohs[i]->omap_chip))
++		if (!omap_chip_is(ohs[i]->omap_chip)
++			|| (ohs[i]->flags & HWMOD_UNUSED))
+ 			continue;
+ 
+ 		r = _register(ohs[i]);
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 25bf43b..5c282bb 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3281,6 +3281,24 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+ 	NULL,
+ };
+ 
++void __init omap2_disable_unused_hwmods(char *unused_hwmods[])
++{
++	int index;
++
++	for (index = 0; omap3xxx_hwmods[index]; index++) {
++		char **hwmods = unused_hwmods;
++		while (*hwmods) {
++			if (strcmp(omap3xxx_hwmods[index]->name,
++					*hwmods) == 0) {
++				omap3xxx_hwmods[index]->flags
++							= HWMOD_UNUSED;
++				break;
++			}
++			hwmods++;
++		}
++	}
++}
++
+ int __init omap3xxx_hwmod_init(void)
+ {
+ 	return omap_hwmod_register(omap3xxx_hwmods);
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 0e329ca..490a95a 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -398,6 +398,7 @@ struct omap_hwmod_omap4_prcm {
+  *     in order to complete the reset. Optional clocks will be disabled
+  *     again after the reset.
+  * HWMOD_16BIT_REG: Module has 16bit registers
++ * HWMOD_UNUSED: The IP for this module is unused or disabled on current SoC
+  */
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -408,6 +409,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_NO_IDLEST				(1 << 6)
+ #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
+ #define HWMOD_16BIT_REG				(1 << 8)
++#define HWMOD_UNUSED				(1 << 9)
+ 
+ /*
+  * omap_hwmod._int_flags definitions
+@@ -615,5 +617,6 @@ extern int omap2420_hwmod_init(void);
+ extern int omap2430_hwmod_init(void);
+ extern int omap3xxx_hwmod_init(void);
+ extern int omap44xx_hwmod_init(void);
++extern void omap2_disable_unused_hwmods(char *unused_hwmods[]);
+ 
+ #endif
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.1
