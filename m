@@ -1,49 +1,39 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 23 Aug 2011 08:57:59 -0700
-Subject: ARM Sub-Architecture Maintainers workshop at Kernel Summit 2011
-In-Reply-To: <CACxGe6uFpW_RARvnPoO8ogwr_ppwe4S4NmkK3=odeHOCX0=NBA@mail.gmail.com>
-References: <CACxGe6uFpW_RARvnPoO8ogwr_ppwe4S4NmkK3=odeHOCX0=NBA@mail.gmail.com>
-Message-ID: <20110823155759.GA19859@huya.qualcomm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Aug 2011 17:59:19 +0200
+Subject: [PATCH v2 1/4] ARM: CSR: add rtc i/o bridge interface for
+	SiRFprimaII
+In-Reply-To: <20110823095354.GK2796@pulham.picochip.com>
+References: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
+	<CAGsJ_4wpHBYuALijDWpLsmYTiDQddAW1DdE84tY=w4==eiyJhA@mail.gmail.com>
+	<20110823095354.GK2796@pulham.picochip.com>
+Message-ID: <201108231759.20014.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 19, 2011 at 05:02:57PM -0700, Grant Likely wrote:
-> Hi all,
+On Tuesday 23 August 2011, Jamie Iles wrote:
+> On Tue, Aug 23, 2011 at 05:33:39PM +0800, Barry Song wrote:
+> > 2011/8/23 Jamie Iles <jamie@jamieiles.com>:
+> > > On Mon, Aug 22, 2011 at 11:15:49PM -0700, Barry Song wrote:
+> [...]
+> > >> +void sirfsoc_rtc_iobrg_wait_sync(void)
+> > >> +{
+> > >> +     while (readl_relaxed(sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_CTRL))
+> > >> +             continue;
+> > >
+> > > It might be worth using cpu_relax() here as it includes a memory barrier
+> > > that's what many busy wait loops do.
+> > 
+> > yes. generically people add a cpu_relax() in busy wait and that makes
+> > lots of senses. it seems readl_relaxed() can keep the execution
+> > sequence even without the barrier?
 > 
-> It looks like there is definitely enough interest on this, so we're
-> going ahead and scheduling a workshop for the first day of kernel
-> summit.  Space is limited however, so I need to assemble a confirmed
-> attendee list.  It looks like we've got room for about two dozen
-> people.
-> 
-> So, if you are an ARM subarchitecture maintainer (or generally
-> involved with ARM maintainership) and you want to attend, then please
-> email me ASAP.  Attendance confirmation will be first come, first
-> serve.  Here is the list of people that I'm holding a space for
-> because they have already expressed interest.  If you are on this list
-> then please let me know in the next week whether or not you are still
-> able to attend.  Also, if you think of anyone who really needs to be
-> there, but isn't on this list, then email me to nominate them.  I'll
-> add any nominations to this list and contact them individually.
-> 
-> Nicolas Pitre
-> Arnd Bergmann
-> Olof Johansson
-> Eric Miao
-> David Brown
-> Mark Vasut
-> Ohad Ben-Cohen
-> Sascha Hauer
-> Paul Walmsley
-> Pavel Machek
-> Catalin Marinas
+> Well readl_relaxed() uses __raw_readl() which marks the dereference as 
+> volatile, so you should be okay without the cpu_relax() here.  Having 
+> said that, cpu_relax() is a little more explicit, so whatever you think 
+> most appropriate I guess.
 
-I will be able to attend.  Do I just register for ELC-E, or is there
-more involved?
+I agree with Jamie, mostly because using cpu_relax in busy loops is
+a well-known idiom in the kernel. It's more for documentation purposes
+than technically needed here.
 
-Thanks,
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+	Arnd
