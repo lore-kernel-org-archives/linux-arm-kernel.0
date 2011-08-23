@@ -1,54 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Aug 2011 01:07:55 +0100
-Subject: [PATCH] ARM: mmp: map sram as MT_MEMORY rather than MT_DEVICE
-In-Reply-To: <20110822164740.5682541b@queued.net>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-	<1313377794-26721-2-git-send-email-leoy@marvell.com>
-	<20110822164740.5682541b@queued.net>
-Message-ID: <20110823000755.GE3895@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 22 Aug 2011 17:11:54 -0700
+Subject: error: implicit declaration of function 'machine_is_ventana'
+In-Reply-To: <20110823000135.GD3895@n2100.arm.linux.org.uk>
+References: <74CDBE0F657A3D45AFBB94109FB122FF04B24A376A@HQMAIL01.nvidia.com>
+	<20110822234008.GC3895@n2100.arm.linux.org.uk>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B24A377F@HQMAIL01.nvidia.com>
+	<20110823000135.GD3895@n2100.arm.linux.org.uk>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B24A3789@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 22, 2011 at 04:47:40PM -0700, Andres Salomon wrote:
-> The sram code allocates memory with ioremap, which assumes MT_DEVICE
-> for memory protections.  This explodes when we map sram for power
-> management purposes and then attempt to execute it (jump_to_lp_sram)
-> on the OLPC XO-1.75.  Instead, we want to specify MT_MEMORY, which
-> doesn't set the L_PTE_XN bit.
+Russell King wrote at Monday, August 22, 2011 6:02 PM:
+> On Mon, Aug 22, 2011 at 04:49:06PM -0700, Stephen Warren wrote:
+> > Russell King wrote at Monday, August 22, 2011 5:40 PM:
+> > > On Mon, Aug 22, 2011 at 04:11:50PM -0700, Stephen Warren wrote:
+> > > > Russell,
+> > > >
+> > > > Commit 46dcfc806a9f6834e6007449eac175f781058c49 "ARM: Update mach-types"
+> > > > removed the entry for Ventana (2927). In turn, this broke compilation of
+> > > > sound/soc/tegra/tegra_wm8903.c, since that calls machine_is_ventana().
+> > > > It looks like the machine is still registered at
+> > > > http://www.arm.linux.org.uk/developer/machines/. Can you explain what the
+> > > > removal policy is for arch/arm/tools/mach-types?
+...
+> Ah, sorry, I thought you were talking about a platform which was merged
+> into mainline.  This platform is not present in mainline, so accordingly
+> it isn't marked as such in the machine database.
 > 
-> Signed-off-by: Andres Salomon <dilinger@queued.net>
-> ---
->  arch/arm/mach-mmp/sram.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> Eric, this patch is against the devel branch of your pxa tree.
-> 
-> diff --git a/arch/arm/mach-mmp/sram.c b/arch/arm/mach-mmp/sram.c
-> index 4304f95..ca4d3c1 100644
-> --- a/arch/arm/mach-mmp/sram.c
-> +++ b/arch/arm/mach-mmp/sram.c
-> @@ -21,6 +21,7 @@
->  #include <linux/err.h>
->  #include <linux/slab.h>
->  #include <linux/genalloc.h>
-> +#include <asm/mach/map.h>
->  
->  #include <mach/sram.h>
->  
-> @@ -87,7 +88,8 @@ static int __devinit sram_probe(struct platform_device *pdev)
->  
->  	info->sram_phys   = (phys_addr_t)res->start;
->  	info->sram_size   = resource_size(res);
-> -	info->sram_virt   = ioremap(info->sram_phys, info->sram_size);
-> +	info->sram_virt   = __arm_ioremap(info->sram_phys, info->sram_size,
-> +					  MT_MEMORY);
+> Any entry not marked as being present in mainline will be removed after
+> 12 months after it was last touched - which apparantly was 18th June
+> 2010.
 
-Not a good idea fiddling about under the covers like that.  The reason
-that MT_MEMORY is not in asm/io.h is to stop it being used like this -
-MT_MEMORY etc are not meant for general purpose use.
+Ah, that I can understand.
 
-It needs to be looked at properly rather than working behind the APIs,
-and making my life a misery by doing so, preventing me from making
-changes where necessary by this kind of back-door use.
+> So, the questions are:
+> 1. why do we have driver code merged for a platform which shows no sign
+>    of being merged.
 
-I guess we need a new ioremap_xxx() variant to cope with this.
+Well, I or someone probably would have pushed Ventana support into
+mainline within the last few months, since it's pretty similar to Harmony
+and Seaboard which are both already supported. However, I've been holding
+due to the no-new-board-files thing, until Device-Tree gets fully baked,
+and we can then support the board just by adding a simple .dts file.
+
+> 2. why do we have drivers depending on their platform anyway.
+
+The ASoC subsystem defines a "machine driver", which defines facets of
+the audio system such as which pins on the audio codec are connected to
+the headphone jack. This varies between boards, so the "machine driver"
+picks the appropriate routing table at run-time based on the board that
+the code is running on. Arguably, one could represent all this data in
+board files using platform data, but IIUC, the ASoC maintainers prefer
+to keep it all centralized in the sound directory tree.
+
+I understand from Grant Likely that John Bonesio will be posting a patch
+in the very near future to retrieve all this data from Device Tree, so
+this won't be an issue moving forward, given that Tegra will probably
+switch to Device Tree pretty aggressively.
+
+Still, I suppose we could rip out explicit support for Ventana in the
+sound driver in the interim if you want, rather than adding back the
+Ventana machine definition.
+
+-- 
+nvpublic
