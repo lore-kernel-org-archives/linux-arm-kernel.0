@@ -1,112 +1,136 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 23 Aug 2011 20:06:17 +0100
-Subject: ARM processor mode, kernel startup, Hyp / secure state
-In-Reply-To: <20051.56441.597373.780997@mariner.uk.xensource.com>
-References: <20051.48809.945431.800543@mariner.uk.xensource.com>
-	<CA+wbFdcv_BsHaVwoqgF5yx6scXOodHkKjdVtarqJwjy_GFrAJQ@mail.gmail.com>
-	<20051.56441.597373.780997@mariner.uk.xensource.com>
-Message-ID: <CA+wbFde1otouQWm1crQEm3w1X6pJrVOnDmBit9TwKh+b1vW70w@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 23 Aug 2011 21:15:11 +0200
+Subject: Fwd: [RFC/PATCH v2 08/13] dt: omap: i2c: add dt support for i2c1
+	controller
+In-Reply-To: <4E537F53.4030405@ti.com>
+References: <1314074021-25186-9-git-send-email-manjugk@ti.com>
+	<4E537F53.4030405@ti.com>
+Message-ID: <4E53FC3F.9060203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 5:59 PM, Ian Jackson <Ian.Jackson@eu.citrix.com> wrote:
-> Dave Martin writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
->> I think the Secure World / Normal World distinction may be a red
->> herring. ?The kernel currently just stays in whatever world it was
->> started in, and doesn't have support for being the bridge between
->> worlds. ?If the kernel is started in the Normal World, this will be
->> because something else occupies the Secure World, and so Linux
->> won't have direct access to that anyway. ?Conversely, if Linux is
->> started in the Secure World, it can always access the monitor state
->> if this is really desired -- the monitor is at the same level of privilege
->> as the other Secure World privileged modes.
+> The device tree support has been added to i2c1 controller and
+> corresponding i2c initilization in generic board file is cleaned
+> up so that platfom device is registered through dt and omap device
+> and not through board i2c initilization.
+
+A couple of typos in the changelog.
+
+That patch should be in two parts: the driver DT update and the beagle 
+board update.
+
+> These changes will not affect non dt builds and existing functionality
+> is retained.
 >
-> If Linux is booted in the secure world, it will have to switch to the
-> non-secure world at boot if it is to use kvm.
+> Tested with dt and non dt builds and boot tested on beagle board.
+
+Is it crashing at boot time like for panda? In that case a big 
+disclaimer should be in the broken patch changelog as well.
+
+> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+> ---
+>    arch/arm/mach-omap2/board-omap3-dt.c |   14 +++++++-------
+>    drivers/i2c/busses/i2c-omap.c        |   23 ++++++++++++++++++++---
+>    2 files changed, 27 insertions(+), 10 deletions(-)
 >
->> I haven't seen a compelling reason why this would need to change;
->> do you have a particular scenario in mind?
+> diff --git a/arch/arm/mach-omap2/board-omap3-dt.c
+> b/arch/arm/mach-omap2/board-omap3-dt.c
+> index 72c59a4..cd11224 100644
+> --- a/arch/arm/mach-omap2/board-omap3-dt.c
+> +++ b/arch/arm/mach-omap2/board-omap3-dt.c
+> @@ -35,11 +35,11 @@ static struct twl4030_platform_data beagle_twldata = {
+>    	/* platform_data for children goes here */
+>    };
 >
-> The non-secure world doesn't have hyp mode, which is needed by kvm.
-
-You mean "the secure world doesn't have hyp mode"?  Fair point if so;
-I was forgetting this.
-
+> -static int __init omap3_beagle_i2c_init(void)
+> -{
+> -	omap3_pmic_init("twl4030",&beagle_twldata);
+> -	return 0;
+> -}
+> +struct of_dev_auxdata omap3_auxdata_lookup[] __initdata = {
+> +	OF_DEV_AUXDATA_ID_PDSIZE("ti,omap-i2c", 0x48070000, "i2c1", 1,\
+> +				&beagle_twldata, sizeof(beagle_twldata)),
+> +	{}
+> +};
 >
-> So if kvm might be loaded later (and we don't really want to rule that
-> out at boot time unless we can help it) then the kernel needs either
-> ?- to be started in the secure world, to know this, and switch to
-> ? ?the non-secure world while installing appropriate trampoline(s)
-> ?- to be started in hyp mode, and switch to kernel mode while
-> ? ?installing an appropriate trampoline
-
-This feels like the preferable approach -- it makes no sense to require
-the kernel to be started in the Secure World if we want to install
-a hypervisor.
-
-There might be some sense in *requiring* the bootloader to start the kernel
-in the Normal World and in hyp mode if kvm (or other kernel-hosted hypervisor)
-is to be used.  If you weren't booted this way then tough, you can't
-use kvm.
-
-If you allow the kernel to be started in the Secure World, it can switch
-to the Normal World on boot, but this is in practice a complex,
-platform-specific procecure: you need to reprogram protection controllers
-etc. to move all the peripherals and RAM into the Normal World,
-
-Currently, I believe none of the needed code to accomplish this is in
-the kernel, because there's been no prior need for it.  Implemting this
-would potentially require work for every board >= ARMv6Z.
-Bootloader maintainers might argue with that though: general-purpose
-bootloaders probably won't have this code either yet, for the same reasons.
-If there is real secure firmware, it will of course set all this up before
-invoking the bootloader.  But otherwise, _someone_ has to do it...
-
-> ?- something more horrible (eg the bootloader provides the
-> ? ?trampoline; or switch the running system to the non-secure world
-> ? ?when the desire for kvm becomes evident)
-
-I agree with "horrible" :)
-
-In particular, switching to the Normal World after boot is going to be
-extremely horrible given the need to move peripherals and RAM into
-the Normal world while somehow not pulling the floor from under your
-feet...
-
+>    static void __init omap3_init_early(void)
+>    {
+> @@ -61,11 +61,11 @@ static struct of_device_id omap_dt_match_table[]
+> __initdata = {
 >
->> Starting the kernel in Hyp mode may be reasonable in this scenario.
->>
->> I think this is actually backwards-compatible, because in both an
->> uncompressed kernel and a zImage, pretty much the first thing that
->> happens is a switch to SVC mode at present. ?So an older kernel
->> will just transparently end up in SVC mode as if nothing unusual had
->> happened.
+>    static void __init omap3_init(void)
+>    {
+> -	omap3_beagle_i2c_init();
+>    	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+>    	omap_serial_init();
 >
-> Do all relevant existing kernels unconditionally switch to kernel
-> mode at the start ?
-
-In practice, I think so.  Take a look at arch/arm/kernel/head.S and
-arch/arm/boot/compressed/head.S.  Really, it's interrupts which get
-disabled at these entry points -- but prior to ARMv6 it used to be
-simpler to set the mode too since you couldn't force the interrupt
-mask bits using a single MSR instruction without also setting the
-processor mode.
-
-Looking at compressed/head.S, it looks like the CPSR is only touched
-by read-modify-write on the interrupt bits, or not at all.  So this
-code is probably transparent to the initial CPU mode without
-modification.
-
+> -	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+> +	of_platform_populate(NULL, omap_dt_match_table, omap3_auxdata_lookup,
+> +									 NULL);
+>    }
 >
->> The boot procotol would need to define the initial hypervisor state:
->> basically, a dormant identity configuration with all traps and fancy
->> features turned off.
+>    static const char *omap3_dt_match[] __initdata = {
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 2a072ff..9e98014 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -38,6 +38,7 @@
+>    #include<linux/clk.h>
+>    #include<linux/io.h>
+>    #include<linux/of_i2c.h>
+> +#include<linux/of_device.h>
+>    #include<linux/slab.h>
+>    #include<linux/i2c-omap.h>
+>    #include<linux/pm_runtime.h>
+> @@ -972,6 +973,16 @@ static const struct i2c_algorithm omap_i2c_algo = {
+>    	.functionality	= omap_i2c_func,
+>    };
 >
-> Right. ?Helpfully, that is (more or less) the processor reset state.
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id omap_i2c_of_match[] = {
+> +	{.compatible = "ti,omap-i2c", },
+> +	{},
+> +}
+> +MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
+> +#else
+> +#define omap_i2c_of_match NULL
+> +#endif
+> +
+>    static int __devinit
+>    omap_i2c_probe(struct platform_device *pdev)
+>    {
+> @@ -1008,12 +1019,17 @@ omap_i2c_probe(struct platform_device *pdev)
+>    		goto err_release_region;
+>    	}
+>
+> +	speed = 100;	/* Default speed */
+>    	if (pdata != NULL) {
+>    		speed = pdata->clkrate;
+>    		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+> -	} else {
+> -		speed = 100;	/* Default speed */
+> -		dev->set_mpu_wkup_lat = NULL;
+> +#if defined(CONFIG_OF)
+> +	} else if (pdev->dev.of_node) {
+> +		u32 prop;
+> +		if (!of_property_read_u32(pdev->dev.of_node, "clock-frequency",
+> +									&prop))
+> +			speed = prop/100;
 
-Even if it isn't, I think it makes sense to place this requirement on
-the bootloader.
-But you're probably right.
+Did you check the frequency? It should be prop/1000 to get Hz -> kHz 
+conversion. Otherwise the driver will set the i2c speed at 4 MHz.
 
-Cheers
----Dave
+Benoit
+
+> +#endif
+>    	}
+>
+>    	dev->speed = speed;
+> @@ -1178,6 +1194,7 @@ static struct platform_driver omap_i2c_driver = {
+>    		.name	= "omap_i2c",
+>    		.owner	= THIS_MODULE,
+>    		.pm	= OMAP_I2C_PM_OPS,
+> +		.of_match_table = omap_i2c_of_match,
+>    	},
+>    };
+>
