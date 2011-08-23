@@ -1,18 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Aug 2011 18:42:03 +0100
+Date: Tue, 23 Aug 2011 18:45:50 +0100
 Subject: ARM processor mode, kernel startup, Hyp / secure state
-In-Reply-To: <CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
+In-Reply-To: <20051.57581.894859.395981@mariner.uk.xensource.com>
 References: <20051.48809.945431.800543@mariner.uk.xensource.com>
-	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
-Message-ID: <20110823174203.GI3895@n2100.arm.linux.org.uk>
+	<CA+wbFdcv_BsHaVwoqgF5yx6scXOodHkKjdVtarqJwjy_GFrAJQ@mail.gmail.com>
+	<20051.57581.894859.395981@mariner.uk.xensource.com>
+Message-ID: <20110823174550.GJ3895@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 06:17:04PM +0100, Catalin Marinas wrote:
-> Maybe we could allow (b) if SoC vendors don't provide a different API
-> to set the HVBAR. But it means that kernels not aware of this feature
-> would fail.
+On Tue, Aug 23, 2011 at 06:18:37PM +0100, Ian Jackson wrote:
+> Yes.  But in the future it will do, surely ?  I mean, we're working on
+> bootloader protocols and this part (to do with startup cpu states and
+> ownership of the various privilege levels) is only part of it.
 
-Oh, does this mean that ARM Ltd are starting to see the light in having
-a common defined secure API at last - at least a subset - something which
-I've mentioned several times...
+No - at least not yet, and I don't see any reason why we'd ever want to
+use raw ELF.
+
+The problem with ELF is that it carries lots of baggage around which
+platforms just don't need.  Fine if it's on a hard disk and you're
+booting a desktop, but not for embedded where space tends to be a
+premium.
+
+And most of that additional data just isn't required.
+
+Plus, I'd point out that _no one_ is talking about boot protocols.  Not
+outside linaro at any rate.  Which means that they're doing effective
+closed-door discussion.
