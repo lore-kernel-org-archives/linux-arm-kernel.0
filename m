@@ -1,35 +1,122 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 23 Aug 2011 10:53:54 +0100
-Subject: [PATCH v2 1/4] ARM: CSR: add rtc i/o bridge interface for
-	SiRFprimaII
-In-Reply-To: <CAGsJ_4wpHBYuALijDWpLsmYTiDQddAW1DdE84tY=w4==eiyJhA@mail.gmail.com>
-References: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
-	<1314080152-30503-2-git-send-email-Baohua.Song@csr.com>
-	<20110823084819.GG2796@pulham.picochip.com>
-	<CAGsJ_4wpHBYuALijDWpLsmYTiDQddAW1DdE84tY=w4==eiyJhA@mail.gmail.com>
-Message-ID: <20110823095354.GK2796@pulham.picochip.com>
+From: claudio@evidence.eu.com (Claudio Scordino)
+Date: Tue, 23 Aug 2011 12:06:43 +0200
+Subject: [PATCH] atmel_serial: RS485: receiving enabled when sending	data
+In-Reply-To: <20110823093035.GB19622@n2100.arm.linux.org.uk>
+References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
+	<4E536536.3030004@evidence.eu.com>
+	<20110823093035.GB19622@n2100.arm.linux.org.uk>
+Message-ID: <4E537BB3.60001@evidence.eu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 05:33:39PM +0800, Barry Song wrote:
-> 2011/8/23 Jamie Iles <jamie@jamieiles.com>:
-> > On Mon, Aug 22, 2011 at 11:15:49PM -0700, Barry Song wrote:
-[...]
-> >> +void sirfsoc_rtc_iobrg_wait_sync(void)
-> >> +{
-> >> + ? ? while (readl_relaxed(sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_CTRL))
-> >> + ? ? ? ? ? ? continue;
-> >
-> > It might be worth using cpu_relax() here as it includes a memory barrier
-> > that's what many busy wait loops do.
+Il 23/08/2011 11:30, Russell King - ARM Linux ha scritto:
+> On Tue, Aug 23, 2011 at 10:30:46AM +0200, Claudio Scordino wrote:
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index af9b781..5f6c745 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -339,8 +339,9 @@ static void atmel_stop_tx(struct uart_port *port)
+>>   	/* Disable interrupts */
+>>   	UART_PUT_IDR(port, atmel_port->tx_done_mask);
+>>
+>> -	if (atmel_port->rs485.flags&  SER_RS485_ENABLED)
+>> -		atmel_start_rx(port);
+>> +	if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
+>> +		!(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX))
+>> +			atmel_start_rx(port);
 > 
-> yes. generically people add a cpu_relax() in busy wait and that makes
-> lots of senses. it seems readl_relaxed() can keep the execution
-> sequence even without the barrier?
+> However, this is incorrect formatting.  The code following the 'if' ends
+> up being indented by two tabs.
+> 
+> This illustrates why the whole idea that tabs should only be used for
+> indenting is wrong.  You end up with either what you have above, or:
+> 
+> 	if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
+> 		!(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX))
+> 		atmel_start_rx(port);
+> 
+> both of which are dire for readability.  The only sane way to do this is
+> to ignore that stupid "indentation by tabs only" thing and do it as the
+> kernel code has _always_ been done over the last 19 years:
+> 
+> 	if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
+> 	!(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX))
+> 		atmel_start_rx(port);
+> 
+> IOW, use spaces to align the wrapped 'if' statement.
+> 
+>> +		if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
+>> +			!(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX)) {
+>> +				/* DMA done, stop TX, start RX for RS485 */
+>> +				atmel_start_rx(port);
+> 
+> And here it makes it look like there's a missing brace.
+> 
 
-Well readl_relaxed() uses __raw_readl() which marks the dereference as 
-volatile, so you should be okay without the cpu_relax() here.  Having 
-said that, cpu_relax() is a little more explicit, so whatever you think 
-most appropriate I guess.
+I understand. So the right patch should be the following one.
 
-Jamie
+Best regards,
+
+	Claudio
+
+atmel_serial: RS485: receiving enabled when sending data
+
+By default the atmel_serial driver in RS485 mode disables receiving data until
+all data in the send buffer has been sent. This flag allows to receive data
+even whilst sending data.
+
+Signed-off-by: Bernhard Roth <br@pwrnet.de> 
+Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
+---
+ drivers/tty/serial/atmel_serial.c |    9 ++++++---
+ include/linux/serial.h            |    1 +
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index af9b781..c7232a9 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -339,7 +339,8 @@ static void atmel_stop_tx(struct uart_port *port)
+ 	/* Disable interrupts */
+ 	UART_PUT_IDR(port, atmel_port->tx_done_mask);
+ 
+-	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
++	if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
++	    !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
+ 		atmel_start_rx(port);
+ }
+ 
+@@ -356,7 +357,8 @@ static void atmel_start_tx(struct uart_port *port)
+ 			   really need this.*/
+ 			return;
+ 
+-		if (atmel_port->rs485.flags & SER_RS485_ENABLED)
++		if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
++		    !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
+ 			atmel_stop_rx(port);
+ 
+ 		/* re-enable PDC transmit */
+@@ -680,7 +682,8 @@ static void atmel_tx_dma(struct uart_port *port)
+ 		/* Enable interrupts */
+ 		UART_PUT_IER(port, atmel_port->tx_done_mask);
+ 	} else {
+-		if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
++		if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
++		    !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX)) {
+ 			/* DMA done, stop TX, start RX for RS485 */
+ 			atmel_start_rx(port);
+ 		}
+diff --git a/include/linux/serial.h b/include/linux/serial.h
+index ef91406..97ff8e2 100644
+--- a/include/linux/serial.h
++++ b/include/linux/serial.h
+@@ -211,6 +211,7 @@ struct serial_rs485 {
+ #define SER_RS485_RTS_ON_SEND		(1 << 1)
+ #define SER_RS485_RTS_AFTER_SEND	(1 << 2)
+ #define SER_RS485_RTS_BEFORE_SEND	(1 << 3)
++#define SER_RS485_RX_DURING_TX		(1 << 4)
+ 	__u32	delay_rts_before_send;	/* Milliseconds */
+ 	__u32	delay_rts_after_send;	/* Milliseconds */
+ 	__u32	padding[5];		/* Memory is cheap, new structs
+-- 
+1.7.1
