@@ -1,302 +1,46 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 24 Aug 2011 00:24:56 +0200
-Subject: [PATCH 1/2] PM: add runtime PM support to core Primecell driver
-In-Reply-To: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
-References: <20110823101555.GE19622@n2100.arm.linux.org.uk>
-	<E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
-Message-ID: <201108240024.56685.rjw@sisk.pl>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 24 Aug 2011 00:35:18 +0200
+Subject: try_to_freeze() called with IRQs disabled on ARM
+In-Reply-To: <CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
+References: <20110823151936.GM9232@opensource.wolfsonmicro.com>
+	<201108232351.55432.rjw@sisk.pl>
+	<CAOS58YNUSn2eVLDLzqKmrtL7M5tSetkhZ1ODecLK54NSDnZVAA@mail.gmail.com>
+	<20110823220056.GK3895@n2100.arm.linux.org.uk>
+	<CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
+	<20110823221314.GL3895@n2100.arm.linux.org.uk>
+	<CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
+Message-ID: <20110823223518.GI2803@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 23, 2011, Russell King - ARM Linux wrote:
-> Add runtime PM support to the core Primecell driver, following the PCI
-> model of how this is done.
+On Wed, Aug 24, 2011 at 12:17:03AM +0200, Tejun Heo wrote:
+> if (freezing() && IRQ disabled) {
+>       bust on IRQ;
+>       try_to_freeze();
+>       replug IRQ;
+> }
 > 
-> Rather than having every driver fiddle about with enabling runtime PM,
-> that's dealt with in the core and instead, drivers just do a put() in
-> their probe and a balancing get() in their remove function to activate
-> runtime PM for the device.
-> 
-> As we're dealing with enabling runtime PM in the core, fix up spi-pl022
-> as it must not enable and disable runtime PM itself anymore.
-> 
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> But, that can't be right. The current code isn't triggering warning
+> from scheduler code, right? If the above is the case, it should be
+> triggering that. What am I missing?
 
-Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
+I think the refrigerator() code was actually doing that through
+spin_[un]lock_irq(), so it was accidentally masking the problem.  It
+definitely seems to need fixing.
 
-> ---
->  drivers/amba/bus.c      |   57 +++++++++++++++++++++++++++++++--
->  drivers/spi/spi-pl022.c |   80 ++++++++++++++++++++++++++++-------------------
->  2 files changed, 102 insertions(+), 35 deletions(-)
-> 
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index d74926e..84bdaac 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -365,6 +365,40 @@ static int amba_pm_restore_noirq(struct device *dev)
->  
->  #endif /* !CONFIG_HIBERNATE_CALLBACKS */
->  
-> +#ifdef CONFIG_PM_RUNTIME
-> +/*
-> + * Hooks to provide runtime PM of the pclk (bus clock).  It is safe to
-> + * enable/disable the bus clock at runtime PM suspend/resume as this
-> + * does not result in loss of context.  However, disabling vcore power
-> + * would do, so we leave that to the driver.
-> + */
-> +static int amba_pm_runtime_suspend(struct device *dev)
-> +{
-> +	struct amba_device *pcdev = to_amba_device(dev);
-> +	int ret = pm_generic_runtime_suspend(dev);
-> +
-> +	if (ret == 0 && dev->driver)
-> +		clk_disable(pcdev->pclk);
-> +
-> +	return ret;
-> +}
-> +
-> +static int amba_pm_runtime_resume(struct device *dev)
-> +{
-> +	struct amba_device *pcdev = to_amba_device(dev);
-> +	int ret;
-> +
-> +	if (dev->driver) {
-> +		ret = clk_enable(pcdev->pclk);
-> +		/* Failure is probably fatal to the system, but... */
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	return pm_generic_runtime_resume(dev);
-> +}
-> +#endif
-> +
->  #ifdef CONFIG_PM
->  
->  static const struct dev_pm_ops amba_pm = {
-> @@ -383,8 +417,8 @@ static const struct dev_pm_ops amba_pm = {
->  	.poweroff_noirq	= amba_pm_poweroff_noirq,
->  	.restore_noirq	= amba_pm_restore_noirq,
->  	SET_RUNTIME_PM_OPS(
-> -		pm_generic_runtime_suspend,
-> -		pm_generic_runtime_resume,
-> +		amba_pm_runtime_suspend,
-> +		amba_pm_runtime_resume,
->  		pm_generic_runtime_idle
->  	)
->  };
-> @@ -494,10 +528,18 @@ static int amba_probe(struct device *dev)
->  		if (ret)
->  			break;
->  
-> +		pm_runtime_get_noresume(dev);
-> +		pm_runtime_set_active(dev);
-> +		pm_runtime_enable(dev);
-> +
->  		ret = pcdrv->probe(pcdev, id);
->  		if (ret == 0)
->  			break;
->  
-> +		pm_runtime_disable(dev);
-> +		pm_runtime_set_suspended(dev);
-> +		pm_runtime_put_noidle(dev);
-> +
->  		amba_put_disable_pclk(pcdev);
->  		amba_put_disable_vcore(pcdev);
->  	} while (0);
-> @@ -509,7 +551,16 @@ static int amba_remove(struct device *dev)
->  {
->  	struct amba_device *pcdev = to_amba_device(dev);
->  	struct amba_driver *drv = to_amba_driver(dev->driver);
-> -	int ret = drv->remove(pcdev);
-> +	int ret;
-> +
-> +	pm_runtime_get_sync(dev);
-> +	ret = drv->remove(pcdev);
-> +	pm_runtime_put_noidle(dev);
-> +
-> +	/* Undo the runtime PM settings in amba_probe() */
-> +	pm_runtime_disable(dev);
-> +	pm_runtime_set_suspended(dev);
-> +	pm_runtime_put_noidle(dev);
->  
->  	amba_put_disable_pclk(pcdev);
->  	amba_put_disable_vcore(pcdev);
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index 730b4a3..078338f 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -515,9 +515,6 @@ static void giveback(struct pl022 *pl022)
->  	if (msg->complete)
->  		msg->complete(msg->context);
->  	/* This message is completed, so let's turn off the clocks & power */
-> -	clk_disable(pl022->clk);
-> -	amba_pclk_disable(pl022->adev);
-> -	amba_vcore_disable(pl022->adev);
->  	pm_runtime_put(&pl022->adev->dev);
->  }
->  
-> @@ -1545,9 +1542,6 @@ static void pump_messages(struct work_struct *work)
->  	 * (poll/interrupt/DMA)
->  	 */
->  	pm_runtime_get_sync(&pl022->adev->dev);
-> -	amba_vcore_enable(pl022->adev);
-> -	amba_pclk_enable(pl022->adev);
-> -	clk_enable(pl022->clk);
->  	restore_state(pl022);
->  	flush(pl022);
->  
-> @@ -2186,8 +2180,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->  	}
->  	printk(KERN_INFO "pl022: mapped registers from 0x%08x to %p\n",
->  	       adev->res.start, pl022->virtbase);
-> -	pm_runtime_enable(dev);
-> -	pm_runtime_resume(dev);
->  
->  	pl022->clk = clk_get(&adev->dev, NULL);
->  	if (IS_ERR(pl022->clk)) {
-> @@ -2195,7 +2187,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->  		dev_err(&adev->dev, "could not retrieve SSP/SPI bus clock\n");
->  		goto err_no_clk;
->  	}
-> -
->  	/* Disable SSP */
->  	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
->  	       SSP_CR1(pl022->virtbase));
-> @@ -2235,12 +2226,9 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->  		goto err_spi_register;
->  	}
->  	dev_dbg(dev, "probe succeeded\n");
-> -	/*
-> -	 * Disable the silicon block pclk and any voltage domain and just
-> -	 * power it up and clock it when it's needed
-> -	 */
-> -	amba_pclk_disable(adev);
-> -	amba_vcore_disable(adev);
-> +
-> +	/* let runtime pm put suspend */
-> +	pm_runtime_put(dev);
->  	return 0;
->  
->   err_spi_register:
-> @@ -2249,7 +2237,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->  	destroy_queue(pl022);
->  	pl022_dma_remove(pl022);
->  	free_irq(adev->irq[0], pl022);
-> -	pm_runtime_disable(&adev->dev);
->   err_no_irq:
->  	clk_put(pl022->clk);
->   err_no_clk:
-> @@ -2271,6 +2258,12 @@ pl022_remove(struct amba_device *adev)
->  	if (!pl022)
->  		return 0;
->  
-> +	/*
-> +	 * undo pm_runtime_put() in probe.  I assume that we're not
-> +	 * accessing the primecell here.
-> +	 */
-> +	pm_runtime_get_noresume(&adev->dev);
-> +
->  	/* Remove the queue */
->  	if (destroy_queue(pl022) != 0)
->  		dev_err(&adev->dev, "queue remove failed\n");
-> @@ -2288,10 +2281,10 @@ pl022_remove(struct amba_device *adev)
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_PM
-> -static int pl022_suspend(struct amba_device *adev, pm_message_t state)
-> +#ifdef CONFIG_SUSPEND
-> +static int pl011_suspend(struct device *dev)
->  {
-> -	struct pl022 *pl022 = amba_get_drvdata(adev);
-> +	struct pl022 *pl022 = dev_get_drvdata(dev);
->  	int status = 0;
->  
->  	status = stop_queue(pl022);
-> @@ -2300,34 +2293,58 @@ static int pl022_suspend(struct amba_device *adev, pm_message_t state)
->  		return status;
->  	}
->  
-> -	amba_vcore_enable(adev);
-> -	amba_pclk_enable(adev);
-> +	amba_vcore_enable(pl022->adev);
-> +	amba_pclk_enable(pl022->adev);
->  	load_ssp_default_config(pl022);
-> -	amba_pclk_disable(adev);
-> -	amba_vcore_disable(adev);
-> +	amba_pclk_disable(pl022->adev);
-> +	amba_vcore_disable(pl022->adev);
->  	dev_dbg(&adev->dev, "suspended\n");
->  	return 0;
->  }
->  
-> -static int pl022_resume(struct amba_device *adev)
-> +static int pl022_resume(struct device *dev)
->  {
-> -	struct pl022 *pl022 = amba_get_drvdata(adev);
-> +	struct pl022 *pl022 = dev_get_drvdata(dev);
->  	int status = 0;
->  
->  	/* Start the queue running */
->  	status = start_queue(pl022);
->  	if (status)
-> -		dev_err(&adev->dev, "problem starting queue (%d)\n", status);
-> +		dev_err(dev, "problem starting queue (%d)\n", status);
->  	else
-> -		dev_dbg(&adev->dev, "resumed\n");
-> +		dev_dbg(dev, "resumed\n");
->  
->  	return status;
->  }
-> -#else
-> -#define pl022_suspend NULL
-> -#define pl022_resume NULL
->  #endif	/* CONFIG_PM */
->  
-> +#ifdef CONFIG_PM_RUNTIME
-> +static int pl022_runtime_suspend(struct device *dev)
-> +{
-> +	struct pl022 *pl022 = dev_get_drvdata(dev);
-> +
-> +	clk_disable(pl022->clk);
-> +	amba_vcore_disable(pl022->adev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int pl022_runtime_resume(struct device *dev)
-> +{
-> +	struct pl022 *pl022 = dev_get_drvdata(dev);
-> +
-> +	amba_vcore_enable(pl022->adev);
-> +	clk_enable(pl022->clk);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static const struct dev_pm_ops pl022_dev_pm_ops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
-> +	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
-> +};
-> +
->  static struct vendor_data vendor_arm = {
->  	.fifodepth = 8,
->  	.max_bpw = 16,
-> @@ -2407,12 +2424,11 @@ static struct amba_id pl022_ids[] = {
->  static struct amba_driver pl022_driver = {
->  	.drv = {
->  		.name	= "ssp-pl022",
-> +		.pm	= &pl022_dev_pm_ops,
->  	},
->  	.id_table	= pl022_ids,
->  	.probe		= pl022_probe,
->  	.remove		= __devexit_p(pl022_remove),
-> -	.suspend        = pl022_suspend,
-> -	.resume         = pl022_resume,
->  };
->  
->  
-> 
+Anyways, for now, we can do two things,
+
+1. if (freezing()) { irq_save; try_to_freeze(); irq_restore; } w/ BIG
+   FAT UGLY comment.
+
+2. Drop might_sleep() from try_to_freeze().  Moving it to
+   refrigerator() wouldn't help much.  It would just trigger more
+   sporadically during freeze, which is arguably worse than now.
+
+I'd prefer #1 given that it documents the breakage while also
+restoring the IRQ state afterwards FWIW.
+
+Thanks.
+
+-- 
+tejun
