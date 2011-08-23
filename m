@@ -1,50 +1,30 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Aug 2011 16:39:24 +0900
-Subject: [PATCH] ARM: EXYNOS4: Fix wrong pll type for vpll
-In-Reply-To: <1313803628-32050-1-git-send-email-jhbird.choi@samsung.com>
-References: <1313803628-32050-1-git-send-email-jhbird.choi@samsung.com>
-Message-ID: <06c801cc6167$c7c739f0$5755add0$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 23 Aug 2011 09:52:55 +0300
+Subject: [PATCH 1/5] OMAP2xxx: HWMOD: fix DSS opt clocks
+In-Reply-To: <20110821054227.20198.80273.stgit@dusk>
+References: <20110821053355.20198.23847.stgit@dusk>
+	<20110821054227.20198.80273.stgit@dusk>
+Message-ID: <20110823065255.GN4996@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-jhbird.choi at samsung.com wrote:
+* Paul Walmsley <paul@pwsan.com> [110821 08:11]:
+> From: Tomi Valkeinen <tomi.valkeinen@ti.com>
 > 
-> From: Jonghwan Choi <jhbird.choi@samsung.com>
-> 
-> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-> ---
->  arch/arm/mach-exynos4/clock.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
-> index 851dea0..0b39860 100644
-> --- a/arch/arm/mach-exynos4/clock.c
-> +++ b/arch/arm/mach-exynos4/clock.c
-> @@ -1160,7 +1160,7 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
-> 
->  	vpllsrc = clk_get_rate(&clk_vpllsrc.clk);
->  	vpll = s5p_get_pll46xx(vpllsrc, __raw_readl(S5P_VPLL_CON0),
-> -				__raw_readl(S5P_VPLL_CON1), pll_4650);
-> +				__raw_readl(S5P_VPLL_CON1), pll_4650c);
-> 
->  	clk_fout_apll.ops = &exynos4_fout_apll_ops;
->  	clk_fout_mpll.rate = mpll;
-> --
-> 1.7.0
+> Set HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core to allow DSS reset
+> properly.
 
-Hi,
+Can you please add what this fixes so this can be justified as a fix?
+ 
+> Add missing ick opt-clock for rfbi. Rfbi uses the ick to calculate
+> timings.
 
-OK, will apply.
+Here too.
+ 
+> Fix the venc iclk and fclk.
 
-But would be helpful understanding if you could add git message in detail
-like following...
-"The PLL4650C is used for VPLL on EXYNOS4 so should be fixed"...I will add
-this when apply.
+And here.
 
-Thanks.
+Regards,
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Tony
