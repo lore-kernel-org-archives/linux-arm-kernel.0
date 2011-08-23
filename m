@@ -1,68 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Aug 2011 12:42:47 +0900
-Subject: [PATCH 1/4] S3C2443: Move i2s clock definitions to common code
-In-Reply-To: <201108211925.05300.heiko@sntech.de>
-References: <201108201757.56483.heiko@sntech.de>
-	<201108201801.29541.heiko@sntech.de>
-	<20110821171332.GF28546@n2100.arm.linux.org.uk>
-	<201108211925.05300.heiko@sntech.de>
-Message-ID: <06c001cc6146$b9f30be0$2dd923a0$%kim@samsung.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 23 Aug 2011 09:48:48 +0530
+Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
+In-Reply-To: <874o19gfrr.fsf@ti.com>
+References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
+	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
+	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
+	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
+	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
+	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
+	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
+	<CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
+	<20110811185408.GB15970@legolas.emea.dhcp.ti.com>
+	<20110811185558.GC15970@legolas.emea.dhcp.ti.com>
+	<4E444B8F.9060908@ti.com> <4E449D65.9000004@ti.com>
+	<874o19gfrr.fsf@ti.com>
+Message-ID: <4E532A28.60103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> Am Sonntag 21 August 2011, 19:13:32 schrieb Russell King - ARM Linux:
-> > On Sat, Aug 20, 2011 at 06:01:29PM +0200, Heiko St?bner wrote:
-> > > +/* i2s-ref
-> > > + *
-> > > + * i2s bus reference clock, selectable from external, esysclk or
-epllref
-> > > + *
-> > > + * Note, this used to be two clocks, but was compressed into one.
-> > > +*/
-> > > +
-> > > +struct clk *clk_i2s_srclist[] = {
-> > > +	[0] = &clk_i2s_eplldiv.clk,
-> > > +	[1] = &clk_i2s_ext,
-> > > +	[2] = &clk_epllref.clk,
-> > > +	[3] = &clk_epllref.clk,
-> > > +};
-> >
-> > Is there any reason not to make this static (have you run your patch
-> > through checkpatch.pl ?)
-> Yep I did run all of them through checkpatch (after beeing scolded last
-time)
-> and it didn't report anything.
-> 
+On 8/23/2011 5:28 AM, Kevin Hilman wrote:
+> Rajendra Nayak<rnayak@ti.com>  writes:
+>
+> [...]
+>
+>> FWIK, its a one time requirement to set the clock rate to the
+>> right rate the device can operate in based on what a platform
+>> supports.
+>
+> Except $SUBJECT patch hard-codes the clock rate for all platforms in the
+> driver.
 
-Hmm...as a note, happened following with checkpatch.pl :(
+The device has a requirement to operate in a 1Mhz to 2Mhz range. So the
+driver is using a clk_round_rate() to get the closest rate supported and
+sets it using a clk_set_rate().
 
-ERROR: need consistent spacing around '*' (ctx:WxV)
-#35: FILE: arch/arm/mach-s3c2416/clock.c:57:
-+               .sources = (struct clk *[]) {
-                                       ^
+>
+> If the clock rate is to be platform-specific, it should be done in
+> platform-specific code.
 
-total: 1 errors, 0 warnings, 38 lines checked
+I am fine if this needs to be moved to platform-specific code, but I
+wasn't quite sure this needs to be done in clock framework as was
+suggested.
 
-PATCH 34 S3C2416 Add HSSPI clock sourced from EPLL.txt has style problems,
-please review.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-> But for this move of code I simply grabbed the code fragments and put them
-> into their new location (i.e. it was this way in mach-s3c2443/clock.c) and
-> should have probably taken a closer look at what I'm moving.
-> 
-> So it seems you are right, it should probably be static as everything else
-is
-> also static.
-> 
-> Heiko
+>
+> Kevin
