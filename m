@@ -1,58 +1,24 @@
 From: santosh.shilimkar@ti.com (Santosh)
-Date: Tue, 23 Aug 2011 18:23:40 +0530
-Subject: [PATCH v5 05/22] gpio/omap: handle save/restore ctx in GPIO driver
-In-Reply-To: <1312455893-14922-6-git-send-email-tarun.kanti@ti.com>
+Date: Tue, 23 Aug 2011 18:24:59 +0530
+Subject: [PATCH v5 06/22] gpio/omap: make non-wakeup GPIO part of pdata
+In-Reply-To: <1312455893-14922-7-git-send-email-tarun.kanti@ti.com>
 References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
-	<1312455893-14922-6-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4E53A2D4.90109@ti.com>
+	<1312455893-14922-7-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4E53A323.6070401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
 > From: Charulatha V<charu@ti.com>
 >
-> Modify omap_gpio_prepare_for_idle()&  omap_gpio_resume_after_idle() functions
-> to handle save context&  restore context respectively in the OMAP GPIO driver
-> itself instead of calling these functions from pm specific files.
-> For this, in gpio_prepare_for_idle(), call *_get_context_loss_count() and in
-> gpio_resume_after_idle() call it again. If the count is different, do restore
-> context. The workaround_enabled flag is no more required and is removed.
+> Non-wakeup GPIOs are available only in OMAP2. Avoid cpu_is checks by making
+> non_wakeup_gpios as part of pdata.
 >
 > Signed-off-by: Charulatha V<charu@ti.com>
-> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
 > ---
 
-"ctx" ?
-Please change it to 'context' is subject and rest of the code.
+Nice !!
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-
->   arch/arm/mach-omap2/gpio.c             |   12 +++
->   arch/arm/mach-omap2/pm34xx.c           |   14 ----
->   arch/arm/plat-omap/include/plat/gpio.h |    5 +-
->   drivers/gpio/gpio-omap.c               |  131 ++++++++++++++------------------
->   4 files changed, 73 insertions(+), 89 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-> index 95195a8..2e65377 100644
-> --- a/arch/arm/mach-omap2/gpio.c
-> +++ b/arch/arm/mach-omap2/gpio.c
-> @@ -23,6 +23,7 @@
->
->   #include<plat/omap_hwmod.h>
->   #include<plat/omap_device.h>
-> +#include<plat/omap-pm.h>
->
->   #include "powerdomain.h"
->
-> @@ -34,6 +35,16 @@ static struct omap_device_pm_latency omap_gpio_latency[] = {
->   	},
->   };
->
-> +#ifdef CONFIG_PM
-> +static int omap_gpio_get_context_loss(struct device *dev)
-> +{
-> +	return omap_pm_get_dev_context_loss_count(dev);
-> +}
-Do you really need this wrapper. Use the funtion directly instead.
-
-Rest looks fine to me
+Regards
+Santosh
