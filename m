@@ -1,122 +1,44 @@
 From: santosh.shilimkar@ti.com (Santosh)
-Date: Tue, 23 Aug 2011 18:51:27 +0530
-Subject: [PATCH v5 12/22] gpio/omap: cleanup set_gpio_triggering function
-In-Reply-To: <1312455893-14922-13-git-send-email-tarun.kanti@ti.com>
+Date: Tue, 23 Aug 2011 18:56:12 +0530
+Subject: [PATCH v5 13/22] gpio/omap: cleanup omap_gpio_mod_init function
+In-Reply-To: <1312455893-14922-14-git-send-email-tarun.kanti@ti.com>
 References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
-	<1312455893-14922-13-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4E53A957.3010004@ti.com>
+	<1312455893-14922-14-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4E53AA74.5090906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
-> Getting rid of ifdefs within the function by adding register offset intctrl
-> and associating OMAPXXXX_GPIO_INT_CONTROL in respective SoC specific files.
-> Also, use wkup_status register consistently instead of referring to wakeup
-> clear and wakeup set register offsets.
+> With register offsets now defined for respective OMAP versions we can get rid
+> of cpu_class_* checks. This function now has common initialization code for
+> all OMAP versions. Initialization specific to OMAP16xx has been moved within
+> omap16xx_gpio_init().
 >
-> Signed-off-by: Charulatha V<charu@ti.com>
 > Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> Signed-off-by: Charulatha V<charu@ti.com>
 > ---
-Good. Some comments.
-
->   arch/arm/mach-omap1/gpio15xx.c         |    2 +
->   arch/arm/mach-omap1/gpio16xx.c         |    3 +
->   arch/arm/mach-omap1/gpio7xx.c          |    2 +
->   arch/arm/plat-omap/include/plat/gpio.h |    3 +
->   drivers/gpio/gpio-omap.c               |  159 ++++++++-----------------------
->   5 files changed, 51 insertions(+), 118 deletions(-)
+>   arch/arm/mach-omap1/gpio16xx.c |   34 ++++++++++++++++++-
+>   drivers/gpio/gpio-omap.c       |   71 +++++++++++-----------------------------
+>   2 files changed, 52 insertions(+), 53 deletions(-)
 >
-> diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
-> index f8c15ea..2adfece 100644
-> --- a/arch/arm/mach-omap1/gpio15xx.c
-> +++ b/arch/arm/mach-omap1/gpio15xx.c
-> @@ -42,6 +42,7 @@ static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
->   	.irqstatus	= OMAP_MPUIO_GPIO_INT,
->   	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
->   	.irqenable_inv	= true,
-> +	.irqctrl	= OMAP_MPUIO_GPIO_INT_EDGE,
->   };
->
->   static struct __initdata omap_gpio_platform_data omap15xx_mpu_gpio_config = {
-> @@ -83,6 +84,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
->   	.irqstatus	= OMAP1510_GPIO_INT_STATUS,
->   	.irqenable	= OMAP1510_GPIO_INT_MASK,
->   	.irqenable_inv	= true,
-> +	.irqctrl	= OMAP1510_GPIO_INT_CONTROL,
->   };
->
->   static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
-> diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-> index ed9f285..f619805 100644
-> --- a/arch/arm/mach-omap1/gpio16xx.c
-> +++ b/arch/arm/mach-omap1/gpio16xx.c
-> @@ -45,6 +45,7 @@ static struct omap_gpio_reg_offs omap16xx_mpuio_regs = {
->   	.irqstatus	= OMAP_MPUIO_GPIO_INT,
->   	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
->   	.irqenable_inv	= true,
-> +	.irqctrl	= OMAP_MPUIO_GPIO_INT_EDGE,
->   };
->
->   static struct __initdata omap_gpio_platform_data omap16xx_mpu_gpio_config = {
-> @@ -90,6 +91,8 @@ static struct omap_gpio_reg_offs omap16xx_gpio_regs = {
->   	.set_irqenable	= OMAP1610_GPIO_SET_IRQENABLE1,
->   	.clr_irqenable	= OMAP1610_GPIO_CLEAR_IRQENABLE1,
->   	.wkup_status	= OMAP1610_GPIO_WAKEUPENABLE,
-> +	.edgectrl1	= OMAP1610_GPIO_EDGE_CTRL1,
-> +	.edgectrl2	= OMAP1610_GPIO_EDGE_CTRL2,
->   };
->
->   static struct __initdata omap_gpio_platform_data omap16xx_gpio1_config = {
-> diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
-> index 923eaa1..cb083c5 100644
-> --- a/arch/arm/mach-omap1/gpio7xx.c
-> +++ b/arch/arm/mach-omap1/gpio7xx.c
-> @@ -47,6 +47,7 @@ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
->   	.irqstatus	= OMAP_MPUIO_GPIO_INT / 2,
->   	.irqenable	= OMAP_MPUIO_GPIO_MASKIT / 2,
->   	.irqenable_inv	= true,
-> +	.irqctrl	= OMAP_MPUIO_GPIO_INT_EDGE / 2,
-
-Shift operator would have been better here.
 
 [...]
 
 > diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index e7c9fe5..21cb0d4 100644
+> index 21cb0d4..f6855e5 100644
 > --- a/drivers/gpio/gpio-omap.c
 > +++ b/drivers/gpio/gpio-omap.c
 
-[..]
-
-> +			trigger != 0);
-> +
-> +	/* This part needs to be executed always for OMAP34xx */
-> +	if (cpu_is_omap34xx() || (bank->non_wakeup_gpios&  gpio_bit)) {
-Why ? You might want handle this special case with some flag instead.
-
->   		/*
->   		 * Log the edge gpio and manually trigger the IRQ
->   		 * after resume if the input level changes
-> @@ -261,7 +236,6 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
->   		__raw_readl(bank->base + bank->regs->leveldetect0) |
->   		__raw_readl(bank->base + bank->regs->leveldetect1);
->   }
-> -#endif
->
->   #ifdef CONFIG_ARCH_OMAP1
->   /*
-
 [...]
 
-> -#endif
-> -	default:
-> -		goto bad;
-> +
-> +		_gpio_rmw(base, bank->regs->wkup_status, 1<<  gpio, trigger);
-> +
-Avoid this extra line.
-
-Rest of the changes looks good to me.
+> @@ -1074,6 +1036,11 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>   	pm_runtime_enable(bank->dev);
+>   	pm_runtime_get_sync(bank->dev);
+>
+> +	if (bank_is_mpuio(bank)) {
+> +		if (bank->regs->wkup_status)
+> +			mpuio_init(bank);
+The above check looks strange. What are you trying here ?
 
 Regards
 Santosh
