@@ -1,39 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Aug 2011 19:00:59 +0100
-Subject: v6 software reset fails on 1176
-In-Reply-To: <20110823175638.GB2263@gallagher>
-References: <20110823163247.GM2796@pulham.picochip.com>
-	<20110823170955.GF10062@e102144-lin.cambridge.arm.com>
-	<20110823173410.GA2263@gallagher>
-	<20110823174736.GG10062@e102144-lin.cambridge.arm.com>
-	<20110823175638.GB2263@gallagher>
-Message-ID: <20110823180059.GH10062@e102144-lin.cambridge.arm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 23 Aug 2011 12:15:34 -0600
+Subject: [PATCH 2/2] arm/dt: Tegra: Update SDHCI nodes to match bindings
+In-Reply-To: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
+References: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
+Message-ID: <1314123334-23133-2-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 06:56:38PM +0100, Jamie Iles wrote:
-> On Tue, Aug 23, 2011 at 06:47:36PM +0100, Will Deacon wrote:
-> > You need to make sure you call cpu_reset by jumping to its *physical*
-> > address. If that happens to alias with the virtual address of the kernel, it
-> > won't currently work but I have a solution to this in my kexec branch.
-> > 
-> > You can do something like:
-> > 
-> > 	typedef void (*phys_reset_t)(unsigned long);
-> > 
-> > 	phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
-> > 	phys_reset(0xffff0000);
-> 
-> OK, that makes perfect sense!  I'll give it a go on my hardware tomorrow 
-> when I'm back in the office.
+The bindings were recently updated to be more in-line with other SDHCI
+bindings that are already merged.
 
-Great, let me know how you get on! I'll post my kexec series to the list
-again once I've got on top of my current patchsets.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/boot/dts/tegra-harmony.dts  |   12 ++++++------
+ arch/arm/boot/dts/tegra-seaboard.dts |    6 +++---
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-> All of the other mainline users of cpu_reset() just call it directly, so 
-> I guess they need to do the same thing?
-
-For v6 and v7, yes. For older ARM cores you could actually code for the
-pipeline implementation and things were arguably easier that way.
-
-Will
+diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+index 4c05334..e581866 100644
+--- a/arch/arm/boot/dts/tegra-harmony.dts
++++ b/arch/arm/boot/dts/tegra-harmony.dts
+@@ -57,14 +57,14 @@
+ 	};
+ 
+ 	sdhci at c8000200 {
+-		gpios = <&gpio 69 0>, /* cd, gpio PI5 */
+-			<&gpio 57 0>, /* wp, gpio PH1 */
+-			<&gpio 155 0>; /* power, gpio PT3 */
++		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
++		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
++		power-gpios = <&gpio 155 0>; /* gpio PT3 */
+ 	};
+ 
+ 	sdhci at c8000600 {
+-		gpios = <&gpio 58 0>, /* cd, gpio PH2 */
+-			<&gpio 59 0>, /* wp, gpio PH3 */
+-			<&gpio 70 0>; /* power, gpio PI6 */
++		cd-gpios = <&gpio 58 0>; /* gpio PH2 */
++		wp-gpios = <&gpio 59 0>; /* gpio PH3 */
++		power-gpios = <&gpio 70 0>; /* gpio PI6 */
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+index 1940cae..64cedca 100644
+--- a/arch/arm/boot/dts/tegra-seaboard.dts
++++ b/arch/arm/boot/dts/tegra-seaboard.dts
+@@ -21,8 +21,8 @@
+ 	};
+ 
+ 	sdhci at c8000400 {
+-		gpios = <&gpio 69 0>, /* cd, gpio PI5 */
+-			<&gpio 57 0>, /* wp, gpio PH1 */
+-			<&gpio 70 0>; /* power, gpio PI6 */
++		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
++		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
++		power-gpios = <&gpio 70 0>; /* gpio PI6 */
+ 	};
+ };
+-- 
+1.7.0.4
