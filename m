@@ -1,31 +1,46 @@
-From: maxin.john@gmail.com (Maxin B. John)
-Date: Tue, 23 Aug 2011 14:18:24 +0300
-Subject: [PATCH 1/2] arm: mach-bcmring: fix build error in core.c
-Message-ID: <20110823111824.GA2806@maxin>
+From: maxin.john@gmail.com (Maxin B John)
+Date: Tue, 23 Aug 2011 14:21:28 +0300
+Subject: [PATCH 2/2] arm: mach-bcmring: fix build error in dma.c
+Message-ID: <20110823112128.GA2825@maxin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC      arch/arm/mach-bcmring/core.o
-arch/arm/mach-bcmring/core.c: In function 'bcmring_init_timer':
-arch/arm/mach-bcmring/core.c:238: error: implicit declaration of
-function 'sp804_clockevents_register'
-make[1]: *** [arch/arm/mach-bcmring/core.o] Error 1
+ CC      arch/arm/mach-bcmring/dma.o
+arch/arm/mach-bcmring/dma.c: In function 'dma_request_channel_dbg':
+arch/arm/mach-bcmring/dma.c:1022: error: 'TASK_INTERRUPTIBLE'
+undeclared (first use in this function)
+arch/arm/mach-bcmring/dma.c:1022: error: (Each undeclared identifier
+is reported only once
+arch/arm/mach-bcmring/dma.c:1022: error: for each function it appears
+in.)
+arch/arm/mach-bcmring/dma.c:1024: error: implicit declaration of
+function 'schedule'
+arch/arm/mach-bcmring/dma.c:1027: error: implicit declaration of
+function 'signal_pending'
+arch/arm/mach-bcmring/dma.c: In function 'dma_free_channel':
+arch/arm/mach-bcmring/dma.c:1092: error: 'TASK_INTERRUPTIBLE'
+undeclared (first use in this function)
+arch/arm/mach-bcmring/dma.c: In function 'dma_map_add_region':
+arch/arm/mach-bcmring/dma.c:1946: error: dereferencing pointer to
+incomplete type
+arch/arm/mach-bcmring/dma.c:1948: error: dereferencing pointer to
+incomplete type
+arch/arm/mach-bcmring/dma.c:1955: error: dereferencing pointer to
+incomplete type
+make[1]: *** [arch/arm/mach-bcmring/dma.o] Error 1
 make: *** [arch/arm/mach-bcmring] Error 2
-
-Please let me know your comments on this fix:
 
 Signed-off-by: Maxin B. John <maxin.john@gmail.com>
 ---
-diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
-index 43eadbc..430da12 100644
---- a/arch/arm/mach-bcmring/core.c
-+++ b/arch/arm/mach-bcmring/core.c
-@@ -235,7 +235,7 @@ void __init bcmring_init_timer(void)
- 	 */
- 	bcmring_clocksource_init();
+diff --git a/arch/arm/mach-bcmring/dma.c b/arch/arm/mach-bcmring/dma.c
+index 0ca0005..12d1504 100644
+--- a/arch/arm/mach-bcmring/dma.c
++++ b/arch/arm/mach-bcmring/dma.c
+@@ -35,6 +35,7 @@
+ #include <linux/mm.h>
+ #include <linux/pfn.h>
+ #include <linux/atomic.h>
++#include <linux/sched.h>
+ #include <mach/dma.h>
  
--	sp804_clockevents_register(TIMER0_VA_BASE, IRQ_TIMER0, "timer0");
-+	sp804_clockevents_init(TIMER0_VA_BASE, IRQ_TIMER0, "timer0");
- }
- 
- struct sys_timer bcmring_timer = {
+ /* I don't quite understand why dc4 fails when this is set to 1 and DMA is enabled */
