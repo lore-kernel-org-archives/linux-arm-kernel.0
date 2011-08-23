@@ -1,51 +1,80 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Aug 2011 22:30:39 +0100
-Subject: [PATCH v2 2/5] ARM: debug: augment DEBUG_LL Kconfig help to clarify
-	behaviour
+Date: Tue, 23 Aug 2011 22:30:41 +0100
+Subject: [PATCH v2 4/5] ARM: realview: use Kconfig choice for debug UART
+	selection
 In-Reply-To: <1314135042-19908-1-git-send-email-will.deacon@arm.com>
 References: <1314135042-19908-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1314135042-19908-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1314135042-19908-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabled DEBUG_LL hardcodes the UART address into the kernel and results
-in a non-portable kernel image. Since this option is only intended for
-use when debugging early boot failures, supporting multiple platforms
-in such a configuration is not the intended use-case.
+Now that the DEBUG_LL UART can be selected by a Kconfig choice, simplify
+the #ifdefery in debug-macro.S and add entries to the top-level
+Kconfig.debug instead.
 
-This patch documents this limitation in the DEBUG_LL Kconfig help text,
-so that users are aware of the portability restrictions that are associated
-with enabling low-level debugging support.
-
-Reported-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig.debug |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ arch/arm/Kconfig.debug                            |   16 ++++++++++++++++
+ arch/arm/mach-realview/include/mach/debug-macro.S |   17 ++---------------
+ 2 files changed, 18 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 11604c9..60d1846 100644
+index 875bd34..007cf85 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -65,13 +65,18 @@ config DEBUG_USER
+@@ -132,6 +132,22 @@ choice
+ 		  The uncompressor code port configuration is now handled
+ 		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
  
- # These options are only for real kernel hackers who want to get their hands dirty.
- config DEBUG_LL
--	bool "Kernel low-level debugging functions"
-+	bool "Kernel low-level debugging functions (read help!)"
- 	depends on DEBUG_KERNEL
- 	help
- 	  Say Y here to include definitions of printascii, printch, printhex
- 	  in the kernel.  This is helpful if you are debugging code that
- 	  executes before the console is initialized.
- 
-+	  Note that selecting this option will limit the kernel to a single
-+	  UART definition, as specified below. Attempting to boot the kernel
-+	  image on a different platform *will not work*, so this option should
-+	  not be enabled for kernels that are intended to be portable.
++	config DEBUG_REALVIEW_STD_PORT
++		bool "RealView Default UART"
++		depends on ARCH_REALVIEW
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the serial port on RealView EB, PB11MP, PBA8
++		  and PBX platforms.
 +
- choice
- 	prompt "Kernel low-level debugging port"
- 	depends on DEBUG_LL
++	config DEBUG_REALVIEW_PB1176_PORT
++		bool "RealView PB1176 UART"
++		depends on MACH_REALVIEW_PB1176
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the standard serial port on the RealView
++		  PB1176 platform.
++
+ endchoice
+ 
+ config EARLY_PRINTK
+diff --git a/arch/arm/mach-realview/include/mach/debug-macro.S b/arch/arm/mach-realview/include/mach/debug-macro.S
+index 90b687c..0f38722 100644
+--- a/arch/arm/mach-realview/include/mach/debug-macro.S
++++ b/arch/arm/mach-realview/include/mach/debug-macro.S
+@@ -10,23 +10,10 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-#if defined(CONFIG_MACH_REALVIEW_EB) || \
+-    defined(CONFIG_MACH_REALVIEW_PB11MP) || \
+-    defined(CONFIG_MACH_REALVIEW_PBA8) || \
+-    defined(CONFIG_MACH_REALVIEW_PBX)
+-#ifndef DEBUG_LL_UART_OFFSET
++#ifdef CONFIG_DEBUG_REALVIEW_STD_PORT
+ #define DEBUG_LL_UART_OFFSET	0x00009000
+-#elif DEBUG_LL_UART_OFFSET != 0x00009000
+-#warning "DEBUG_LL_UART_OFFSET already defined to a different value"
+-#endif
+-#endif
+-
+-#ifdef CONFIG_MACH_REALVIEW_PB1176
+-#ifndef DEBUG_LL_UART_OFFSET
++#elif defined(CONFIG_DEBUG_REALVIEW_PB1176_PORT)
+ #define DEBUG_LL_UART_OFFSET	0x0010c000
+-#elif DEBUG_LL_UART_OFFSET != 0x0010c000
+-#warning "DEBUG_LL_UART_OFFSET already defined to a different value"
+-#endif
+ #endif
+ 
+ #ifndef DEBUG_LL_UART_OFFSET
 -- 
 1.7.0.4
