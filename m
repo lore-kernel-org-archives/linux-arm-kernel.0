@@ -1,70 +1,32 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 23 Aug 2011 14:38:21 +0200
-Subject: [RFC/PATCH v2 00/13] dt: omap: dt binding with omap_device and
-	support for i2c1
-In-Reply-To: <4E537ECB.1060704@ti.com>
-References: <1314074021-25186-1-git-send-email-manjugk@ti.com>
-	<4E537ECB.1060704@ti.com>
-Message-ID: <4E539F3D.4010602@ti.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Tue, 23 Aug 2011 18:11:10 +0530
+Subject: [PATCH v5 02/22] gpio/omap: use flag to identify wakeup domain
+In-Reply-To: <1312455893-14922-3-git-send-email-tarun.kanti@ti.com>
+References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+	<1312455893-14922-3-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4E539FE6.2090007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manju,
-
-Few "minor" comments about your subjects in this series.
-
-> Patch series reworked from:
-> http://permalink.gmane.org/gmane.linux.ports.arm.omap/61674
-> Also added support for i2c1 controller on omap4 based panda
-> board.
+On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
+> From: Charulatha V<charu@ti.com>
 >
-> Baseline:
-> =========
-> git://git.secretlab.ca/git/linux-2.6.git
-> Branch: devicetree/test
-> The above branch is rebased with v3.1-rc2 mainline.
-> +
-> pdev decoupling patches from kevin hilman
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg53534.html
+> In omap3, save/restore context is implemented for GPIO banks 2-6 as GPIO bank1
+> is in wakeup domain. Instead of identifying bank's power domain by bank id,
+> use 'loses_context' flag which is filled by pwrdm_can_ever_lose_context()
+> during dev_init.
 >
-> The patch series is also available at:
-> https://gitorious.org/devicetree/dt_omap/commits/devicetree/dt_rfcv2
-
-Please provide the git URL + branch and not the link to the web page.
-It will allow to copy paste directly the line and do a git fetch <repo> 
-<branch>.
-
-> Testing:
-> ========
-> Build : dt and not dt build for omap2plus_defconfig
-> Boot: OMAP3530 Beagle Board and OMAP4430 Panda board
+> For getting the powerdomain pointer, omap_hwmod_get_pwrdm() is used.
+> omap_device_get_pwrdm() could not be used as the pwrdm information needs to be
+> filled in pdata, whereas omap_device_get_pwrdm() could be used only after
+> omap_device_build() call.
 >
-> Limitation:
-> ===========
-> The current implementation of omap-device build through
-> device tree supports only single instance of hwmod and
-> multiple instances are not supported.
+> Signed-off-by: Charulatha V<charu@ti.com>
+> ---
+>   arch/arm/mach-omap2/gpio.c             |    6 ++++++
+>   arch/arm/plat-omap/include/plat/gpio.h |    1 +
+>   drivers/gpio/gpio-omap.c               |   13 ++++++-------
+>   3 files changed, 13 insertions(+), 7 deletions(-)
 >
-> G, Manjunath Kondaiah (13):
->     OMAP: omap_device: Add device tree node pointer
->     dt: Add pd_size to AUXDATA structure
->     dt: omap3: add soc file for handling i2c controllers
->     dt: omap3: beagle board: set clock freq for i2c devices
->     dt: omap3: add generic board file for dt support
->     dt: omap3: add omap-device compatible property
->     dt: omap: create platform bus for omap devices
->     dt: omap: i2c: add dt support for i2c1 controller
->     dt: omap4: add soc file for handling i2c controllers
->     dt: omap4: panda board: set clock freq for i2c devices
->     dt: omap4: add generic board file for dt support
->     dt: omap4: enable dt support for i2c1 controller
->     dt: omap: i2c: dt usage model documentation
-
-You should adapt the prefix depending of the subsystem your patch is 
-changing. Most patches are changing files inside mach-omap2 and thus in 
-that case should not be prefix with dt: but rather OMAP2+:
-The dts files modification should then be prefixed with arm/dt or arm/dts.
-
-
-Regards,
-Benoit
+Nice change.
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
