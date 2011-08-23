@@ -1,68 +1,50 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 23 Aug 2011 09:26:21 +0200
-Subject: [PATCH] plat-nomadik: kill off <plat/gpio.h>
-Message-ID: <1314084381-5034-1-git-send-email-linus.walleij@stericsson.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Aug 2011 16:39:24 +0900
+Subject: [PATCH] ARM: EXYNOS4: Fix wrong pll type for vpll
+In-Reply-To: <1313803628-32050-1-git-send-email-jhbird.choi@samsung.com>
+References: <1313803628-32050-1-git-send-email-jhbird.choi@samsung.com>
+Message-ID: <06c801cc6167$c7c739f0$5755add0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+jhbird.choi at samsung.com wrote:
+> 
+> From: Jonghwan Choi <jhbird.choi@samsung.com>
+> 
+> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/clock.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+> index 851dea0..0b39860 100644
+> --- a/arch/arm/mach-exynos4/clock.c
+> +++ b/arch/arm/mach-exynos4/clock.c
+> @@ -1160,7 +1160,7 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
+> 
+>  	vpllsrc = clk_get_rate(&clk_vpllsrc.clk);
+>  	vpll = s5p_get_pll46xx(vpllsrc, __raw_readl(S5P_VPLL_CON0),
+> -				__raw_readl(S5P_VPLL_CON1), pll_4650);
+> +				__raw_readl(S5P_VPLL_CON1), pll_4650c);
+> 
+>  	clk_fout_apll.ops = &exynos4_fout_apll_ops;
+>  	clk_fout_mpll.rate = mpll;
+> --
+> 1.7.0
 
-After recent consolidations the Nomadik <plat/gpio.h> is entirely
-superfluous, so get rid of it.
+Hi,
 
-Reported-by: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-nomadik/include/mach/gpio.h |    2 --
- arch/arm/mach-ux500/include/mach/gpio.h   |    2 --
- arch/arm/plat-nomadik/include/plat/gpio.h |   17 -----------------
- 3 files changed, 0 insertions(+), 21 deletions(-)
- delete mode 100644 arch/arm/plat-nomadik/include/plat/gpio.h
+OK, will apply.
 
-diff --git a/arch/arm/mach-nomadik/include/mach/gpio.h b/arch/arm/mach-nomadik/include/mach/gpio.h
-index 7a81a04..efdde0a 100644
---- a/arch/arm/mach-nomadik/include/mach/gpio.h
-+++ b/arch/arm/mach-nomadik/include/mach/gpio.h
-@@ -1,6 +1,4 @@
- #ifndef __ASM_ARCH_GPIO_H
- #define __ASM_ARCH_GPIO_H
- 
--#include <plat/gpio.h>
--
- #endif /* __ASM_ARCH_GPIO_H */
-diff --git a/arch/arm/mach-ux500/include/mach/gpio.h b/arch/arm/mach-ux500/include/mach/gpio.h
-index 3c4cd31..7389df9 100644
---- a/arch/arm/mach-ux500/include/mach/gpio.h
-+++ b/arch/arm/mach-ux500/include/mach/gpio.h
-@@ -7,6 +7,4 @@
-  */
- #define ARCH_NR_GPIOS	350
- 
--#include <plat/gpio.h>
--
- #endif /* __ASM_ARCH_GPIO_H */
-diff --git a/arch/arm/plat-nomadik/include/plat/gpio.h b/arch/arm/plat-nomadik/include/plat/gpio.h
-deleted file mode 100644
-index 78c0c0f..0000000
---- a/arch/arm/plat-nomadik/include/plat/gpio.h
-+++ /dev/null
-@@ -1,17 +0,0 @@
--/*
-- * Structures and registers for GPIO access in the Nomadik SoC
-- *
-- * Copyright (C) 2008 STMicroelectronics
-- *     Author: Prafulla WADASKAR <prafulla.wadaskar@st.com>
-- * Copyright (C) 2009 Alessandro Rubini <rubini@unipv.it>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#ifndef __ASM_PLAT_GPIO_H
--#define __ASM_PLAT_GPIO_H
--
--#include <linux/kernel.h>
--
--#endif /* __ASM_PLAT_GPIO_H */
--- 
-1.7.3.2
+But would be helpful understanding if you could add git message in detail
+like following...
+"The PLL4650C is used for VPLL on EXYNOS4 so should be fixed"...I will add
+this when apply.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
