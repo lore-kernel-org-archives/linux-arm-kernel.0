@@ -1,139 +1,296 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Aug 2011 10:39:12 +0900
-Subject: [PATCH V2 2/4] ARM: S5P64X0: Use soc_is_s5p64x0() to distinguish cpu
-	at runtime
-In-Reply-To: <1314063552-27416-1-git-send-email-kgene.kim@samsung.com>
-References: <1314063552-27416-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1314063552-27416-2-git-send-email-kgene.kim@samsung.com>
+Date: Tue, 23 Aug 2011 10:39:11 +0900
+Subject: [PATCH V2 1/4] ARM: SAMSUNG: Add support for detecting CPU at runtime
+Message-ID: <1314063552-27416-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The soc_is_[name]() can be used to distinguish cpu at runtime.
+
+This patch was originally from Changhwan Youn <chaos.youn@samsung.com>
+
+Acked-by: Changhwan Youn <chaos.youn@samsung.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
 Changes since v1:
-- soc_is_s5p64x0() is used instead of cpu_is_s5p64x0()
+- soc_is_xxx() is used instead of cpu_is_xxx()
 
- arch/arm/mach-s5p64x0/dev-spi.c  |    8 +++-----
- arch/arm/mach-s5p64x0/dma.c      |    7 ++-----
- arch/arm/mach-s5p64x0/gpiolib.c  |    7 ++-----
- arch/arm/mach-s5p64x0/irq-eint.c |    3 ++-
- 4 files changed, 9 insertions(+), 16 deletions(-)
+ arch/arm/mach-s3c64xx/cpu.c              |   18 +++----
+ arch/arm/plat-s3c24xx/cpu.c              |    8 +--
+ arch/arm/plat-s5p/cpu.c                  |   26 ++++-----
+ arch/arm/plat-samsung/include/plat/cpu.h |   87 +++++++++++++++++++++++++++++-
+ arch/arm/plat-samsung/init.c             |    1 +
+ 5 files changed, 110 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/mach-s5p64x0/dev-spi.c b/arch/arm/mach-s5p64x0/dev-spi.c
-index ac825e8..1fd9c79 100644
---- a/arch/arm/mach-s5p64x0/dev-spi.c
-+++ b/arch/arm/mach-s5p64x0/dev-spi.c
-@@ -21,6 +21,7 @@
- #include <mach/regs-clock.h>
- #include <mach/spi-clocks.h>
+diff --git a/arch/arm/mach-s3c64xx/cpu.c b/arch/arm/mach-s3c64xx/cpu.c
+index 374e45e..7b665f3 100644
+--- a/arch/arm/mach-s3c64xx/cpu.c
++++ b/arch/arm/mach-s3c64xx/cpu.c
+@@ -43,16 +43,16 @@ static const char name_s3c6410[] = "S3C6410";
  
-+#include <plat/cpu.h>
- #include <plat/s3c64xx-spi.h>
- #include <plat/gpio-cfg.h>
+ static struct cpu_table cpu_ids[] __initdata = {
+ 	{
+-		.idcode		= 0x36400000,
+-		.idmask		= 0xfffff000,
++		.idcode		= S3C6400_CPU_ID,
++		.idmask		= S3C64XX_CPU_MASK,
+ 		.map_io		= s3c6400_map_io,
+ 		.init_clocks	= s3c6400_init_clocks,
+ 		.init_uarts	= s3c6400_init_uarts,
+ 		.init		= s3c6400_init,
+ 		.name		= name_s3c6400,
+ 	}, {
+-		.idcode		= 0x36410100,
+-		.idmask		= 0xffffff00,
++		.idcode		= S3C6410_CPU_ID,
++		.idmask		= S3C64XX_CPU_MASK,
+ 		.map_io		= s3c6410_map_io,
+ 		.init_clocks	= s3c6410_init_clocks,
+ 		.init_uarts	= s3c6410_init_uarts,
+@@ -140,22 +140,20 @@ void __init s3c6400_common_init_uarts(struct s3c2410_uartcfg *cfg, int no)
  
-@@ -185,11 +186,8 @@ struct platform_device s5p64x0_device_spi1 = {
- 
- void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
  {
--	unsigned int id;
- 	struct s3c64xx_spi_info *pd;
- 
--	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
+-	unsigned long idcode;
 -
- 	/* Reject invalid configuration */
- 	if (!num_cs || src_clk_nr < 0
- 			|| src_clk_nr > S5P64X0_SPI_SRCCLK_SCLK) {
-@@ -199,7 +197,7 @@ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 	/* initialise the io descriptors we need for initialisation */
+ 	iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc));
+ 	iotable_init(mach_desc, size);
  
- 	switch (cntrlr) {
- 	case 0:
--		if (id == 0x50000)
-+		if (soc_is_s5p6450())
- 			pd = &s5p6450_spi0_pdata;
- 		else
- 			pd = &s5p6440_spi0_pdata;
-@@ -207,7 +205,7 @@ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
- 		s5p64x0_device_spi0.dev.platform_data = pd;
- 		break;
- 	case 1:
--		if (id == 0x50000)
-+		if (soc_is_s5p6450())
- 			pd = &s5p6450_spi1_pdata;
- 		else
- 			pd = &s5p6440_spi1_pdata;
-diff --git a/arch/arm/mach-s5p64x0/dma.c b/arch/arm/mach-s5p64x0/dma.c
-index d7ad944..0e5b3e6 100644
---- a/arch/arm/mach-s5p64x0/dma.c
-+++ b/arch/arm/mach-s5p64x0/dma.c
-@@ -28,6 +28,7 @@
- #include <mach/irqs.h>
- #include <mach/regs-clock.h>
+-	idcode = __raw_readl(S3C_VA_SYS + 0x118);
+-	if (!idcode) {
++	samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0x118);
++	if (!samsung_cpu_id) {
+ 		/* S3C6400 has the ID register in a different place,
+ 		 * and needs a write before it can be read. */
  
-+#include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/s3c-pl330-pdata.h>
+ 		__raw_writel(0x0, S3C_VA_SYS + 0xA1C);
+-		idcode = __raw_readl(S3C_VA_SYS + 0xA1C);
++		samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0xA1C);
+ 	}
  
-@@ -133,11 +134,7 @@ static struct platform_device s5p64x0_device_pdma = {
+-	s3c_init_cpu(idcode, cpu_ids, ARRAY_SIZE(cpu_ids));
++	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+ }
  
- static int __init s5p64x0_dma_init(void)
+ static __init int s3c64xx_sysdev_init(void)
+diff --git a/arch/arm/plat-s3c24xx/cpu.c b/arch/arm/plat-s3c24xx/cpu.c
+index c1fc6c6..ead21a4 100644
+--- a/arch/arm/plat-s3c24xx/cpu.c
++++ b/arch/arm/plat-s3c24xx/cpu.c
+@@ -215,19 +215,17 @@ static void s3c24xx_pm_restart(char mode, const char *cmd)
+ 
+ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
  {
--	unsigned int id;
+-	unsigned long idcode = 0x0;
 -
--	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
--
--	if (id == 0x50000)
-+	if (soc_is_s5p6450())
- 		s5p64x0_device_pdma.dev.platform_data = &s5p6450_pdma_pdata;
- 	else
- 		s5p64x0_device_pdma.dev.platform_data = &s5p6440_pdma_pdata;
-diff --git a/arch/arm/mach-s5p64x0/gpiolib.c b/arch/arm/mach-s5p64x0/gpiolib.c
-index e7fb3b0..700dac6 100644
---- a/arch/arm/mach-s5p64x0/gpiolib.c
-+++ b/arch/arm/mach-s5p64x0/gpiolib.c
-@@ -19,6 +19,7 @@
- #include <mach/regs-gpio.h>
- #include <mach/regs-clock.h>
+ 	/* initialise the io descriptors we need for initialisation */
+ 	iotable_init(mach_desc, size);
+ 	iotable_init(s3c_iodesc, ARRAY_SIZE(s3c_iodesc));
  
-+#include <plat/cpu.h>
- #include <plat/gpio-core.h>
- #include <plat/gpio-cfg.h>
- #include <plat/gpio-cfg-helpers.h>
-@@ -473,14 +474,10 @@ static void __init s5p64x0_gpio_add_rbank_4bit2(struct s3c_gpio_chip *chip,
+ 	if (cpu_architecture() >= CPU_ARCH_ARMv5) {
+-		idcode = s3c24xx_read_idcode_v5();
++		samsung_cpu_id = s3c24xx_read_idcode_v5();
+ 	} else {
+-		idcode = s3c24xx_read_idcode_v4();
++		samsung_cpu_id = s3c24xx_read_idcode_v4();
+ 	}
  
- static int __init s5p64x0_gpiolib_init(void)
+ 	arm_pm_restart = s3c24xx_pm_restart;
+ 
+-	s3c_init_cpu(idcode, cpu_ids, ARRAY_SIZE(cpu_ids));
++	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+ }
+diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
+index bbc2aa7..3ef6734 100644
+--- a/arch/arm/plat-s5p/cpu.c
++++ b/arch/arm/plat-s5p/cpu.c
+@@ -36,40 +36,40 @@ static const char name_exynos4210[] = "EXYNOS4210";
+ 
+ static struct cpu_table cpu_ids[] __initdata = {
+ 	{
+-		.idcode		= 0x56440100,
+-		.idmask		= 0xfffff000,
++		.idcode		= S5P6440_CPU_ID,
++		.idmask		= S5P64XX_CPU_MASK,
+ 		.map_io		= s5p6440_map_io,
+ 		.init_clocks	= s5p6440_init_clocks,
+ 		.init_uarts	= s5p6440_init_uarts,
+ 		.init		= s5p64x0_init,
+ 		.name		= name_s5p6440,
+ 	}, {
+-		.idcode		= 0x36450000,
+-		.idmask		= 0xfffff000,
++		.idcode		= S5P6450_CPU_ID,
++		.idmask		= S5P64XX_CPU_MASK,
+ 		.map_io		= s5p6450_map_io,
+ 		.init_clocks	= s5p6450_init_clocks,
+ 		.init_uarts	= s5p6450_init_uarts,
+ 		.init		= s5p64x0_init,
+ 		.name		= name_s5p6450,
+ 	}, {
+-		.idcode		= 0x43100000,
+-		.idmask		= 0xfffff000,
++		.idcode		= S5PC100_CPU_ID,
++		.idmask		= S5PC100_CPU_MASK,
+ 		.map_io		= s5pc100_map_io,
+ 		.init_clocks	= s5pc100_init_clocks,
+ 		.init_uarts	= s5pc100_init_uarts,
+ 		.init		= s5pc100_init,
+ 		.name		= name_s5pc100,
+ 	}, {
+-		.idcode		= 0x43110000,
+-		.idmask		= 0xfffff000,
++		.idcode		= S5PV210_CPU_ID,
++		.idmask		= S5PV210_CPU_MASK,
+ 		.map_io		= s5pv210_map_io,
+ 		.init_clocks	= s5pv210_init_clocks,
+ 		.init_uarts	= s5pv210_init_uarts,
+ 		.init		= s5pv210_init,
+ 		.name		= name_s5pv210,
+ 	}, {
+-		.idcode		= 0x43210000,
+-		.idmask		= 0xfffe0000,
++		.idcode		= EXYNOS4210_CPU_ID,
++		.idmask		= EXYNOS4_CPU_MASK,
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+ 		.init_uarts	= exynos4_init_uarts,
+@@ -114,13 +114,11 @@ static struct map_desc s5p_iodesc[] __initdata = {
+ void __init s5p_init_io(struct map_desc *mach_desc,
+ 			int size, void __iomem *cpuid_addr)
  {
--	unsigned int chipid;
+-	unsigned long idcode;
 -
--	chipid = __raw_readl(S5P64X0_SYS_ID);
--
- 	s5p64x0_gpiolib_set_cfg(s5p64x0_gpio_cfgs,
- 				ARRAY_SIZE(s5p64x0_gpio_cfgs));
+ 	/* initialize the io descriptors we need for initialization */
+ 	iotable_init(s5p_iodesc, ARRAY_SIZE(s5p_iodesc));
+ 	if (mach_desc)
+ 		iotable_init(mach_desc, size);
  
--	if ((chipid & 0xff000) == 0x50000) {
-+	if (soc_is_s5p6450()) {
- 		samsung_gpiolib_add_2bit_chips(s5p6450_gpio_2bit,
- 					ARRAY_SIZE(s5p6450_gpio_2bit));
+-	idcode = __raw_readl(cpuid_addr);
+-	s3c_init_cpu(idcode, cpu_ids, ARRAY_SIZE(cpu_ids));
++	samsung_cpu_id = __raw_readl(cpuid_addr);
++	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+ }
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index c0a5741..bdf43ad 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -1,9 +1,12 @@
+ /* linux/arch/arm/plat-samsung/include/plat/cpu.h
+  *
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com/
++ *
+  * Copyright (c) 2004-2005 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
+  *
+- * Header file for S3C24XX CPU support
++ * Header file for Samsung CPU support
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -15,6 +18,88 @@
+ #ifndef __SAMSUNG_PLAT_CPU_H
+ #define __SAMSUNG_PLAT_CPU_H
  
-diff --git a/arch/arm/mach-s5p64x0/irq-eint.c b/arch/arm/mach-s5p64x0/irq-eint.c
-index 69ed454..94104c4 100644
---- a/arch/arm/mach-s5p64x0/irq-eint.c
-+++ b/arch/arm/mach-s5p64x0/irq-eint.c
-@@ -17,6 +17,7 @@
- #include <linux/irq.h>
- #include <linux/io.h>
++extern unsigned long samsung_cpu_id;
++
++#define S3C24XX_CPU_ID		0x32400000
++#define S3C24XX_CPU_MASK	0xFFF00000
++
++#define S3C6400_CPU_ID		0x36400000
++#define S3C6410_CPU_ID		0x36410000
++#define S3C64XX_CPU_ID		(S3C6400_CPU_ID & S3C6410_CPU_ID)
++#define S3C64XX_CPU_MASK	0x1FF40000
++
++#define S5P6440_CPU_ID		0x56440000
++#define S5P6450_CPU_ID		0x36450000
++#define S5P64XX_CPU_MASK	0x1FF40000
++
++#define S5PC100_CPU_ID		0x43100000
++#define S5PC100_CPU_MASK	0xFFFFF000
++
++#define S5PV210_CPU_ID		0x43110000
++#define S5PV210_CPU_MASK	0xFFFFF000
++
++#define EXYNOS4210_CPU_ID	0x43210000
++#define EXYNOS4_CPU_MASK	0xFFFE0000
++
++#define IS_SAMSUNG_CPU(name, id, mask)		\
++static inline int is_samsung_##name(void)	\
++{						\
++	return ((samsung_cpu_id & mask) == (id & mask));	\
++}
++
++IS_SAMSUNG_CPU(s3c24xx, S3C24XX_CPU_ID, S3C24XX_CPU_MASK)
++IS_SAMSUNG_CPU(s3c64xx, S3C64XX_CPU_ID, S3C64XX_CPU_MASK)
++IS_SAMSUNG_CPU(s5p6440, S5P6440_CPU_ID, S5P64XX_CPU_MASK)
++IS_SAMSUNG_CPU(s5p6450, S5P6450_CPU_ID, S5P64XX_CPU_MASK)
++IS_SAMSUNG_CPU(s5pc100, S5PC100_CPU_ID, S5PC100_CPU_MASK)
++IS_SAMSUNG_CPU(s5pv210, S5PV210_CPU_ID, S5PV210_CPU_MASK)
++IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
++
++#if defined(CONFIG_CPU_S3C2410) || defined(CONFIG_CPU_S3C2412) || \
++    defined(CONFIG_CPU_S3C2416) || defined(CONFIG_CPU_S3C2440) || \
++    defined(CONFIG_CPU_S3C2442) || defined(CONFIG_CPU_S3C244X) || \
++    defined(CONFIG_CPU_S3C2443)
++# define soc_is_s3c24xx()	is_samsung_s3c24xx()
++#else
++# define soc_is_s3c24xx()	0
++#endif
++
++#if defined(CONFIG_CPU_S3C6400) || defined(CONFIG_CPU_S3C6410)
++# define soc_is_s3c64xx()	is_samsung_s3c64xx()
++#else
++# define soc_is_s3c64xx()	0
++#endif
++
++#if defined(CONFIG_CPU_S5P6440)
++# define soc_is_s5p6440()	is_samsung_s5p6440()
++#else
++# define soc_is_s5p6440()	0
++#endif
++
++#if defined(CONFIG_CPU_S5P6450)
++# define soc_is_s5p6450()	is_samsung_s5p6450()
++#else
++# define soc_is_s5p6450()	0
++#endif
++
++#if defined(CONFIG_CPU_S5PC100)
++# define soc_is_s5pc100()	is_samsung_s5pc100()
++#else
++# define soc_is_s5pc100()	0
++#endif
++
++#if defined(CONFIG_CPU_S5PV210)
++# define soc_is_s5pv210()	is_samsung_s5pv210()
++#else
++# define soc_is_s5pv210()	0
++#endif
++
++#if defined(CONFIG_CPU_EXYNOS4210)
++# define soc_is_exynos4210()	is_samsung_exynos4210()
++#else
++# define soc_is_exynos4210()	0
++#endif
++
+ #define IODESC_ENT(x) { (unsigned long)S3C24XX_VA_##x, __phys_to_pfn(S3C24XX_PA_##x), S3C24XX_SZ_##x, MT_DEVICE }
  
-+#include <plat/cpu.h>
- #include <plat/regs-irqtype.h>
- #include <plat/gpio-cfg.h>
+ #ifndef MHZ
+diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
+index 79d10fc..40b1228 100644
+--- a/arch/arm/plat-samsung/init.c
++++ b/arch/arm/plat-samsung/init.c
+@@ -30,6 +30,7 @@
+ #include <plat/regs-serial.h>
  
-@@ -67,7 +68,7 @@ static int s5p64x0_irq_eint_set_type(struct irq_data *data, unsigned int type)
- 	__raw_writel(ctrl, S5P64X0_EINT0CON0);
+ static struct cpu_table *cpu;
++unsigned long samsung_cpu_id;
  
- 	/* Configure the GPIO pin for 6450 or 6440 based on CPU ID */
--	if (0x50000 == (__raw_readl(S5P64X0_SYS_ID) & 0xFF000))
-+	if (soc_is_s5p6450())
- 		s3c_gpio_cfgpin(S5P6450_GPN(offs), S3C_GPIO_SFN(2));
- 	else
- 		s3c_gpio_cfgpin(S5P6440_GPN(offs), S3C_GPIO_SFN(2));
+ static struct cpu_table * __init s3c_lookup_cpu(unsigned long idcode,
+ 						struct cpu_table *tab,
 -- 
 1.7.1
