@@ -1,30 +1,33 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 23 Aug 2011 13:26:38 -0300
-Subject: [PATCH] ARM: imx: pwm: Add support for MX53
-Message-ID: <1314116798-12755-1-git-send-email-fabio.estevam@freescale.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 23 Aug 2011 17:32:47 +0100
+Subject: v6 software reset fails on 1176
+Message-ID: <20110823163247.GM2796@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of adding the check for MX53 CPU type, use the negative logic and let 
-PWM to be configured for MX53 as well.
+Hi Will,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/pwm.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I'm trying to use the cpu_v6_reset that you added in "ARM: proc: add 
+definition of cpu_reset for ARMv6 and ARMv7 cores", but I've found that 
+on my 1176 platform, it never gets to the branch to the reset vector.  
 
-diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
-index 761c3c9..42d74ea 100644
---- a/arch/arm/plat-mxc/pwm.c
-+++ b/arch/arm/plat-mxc/pwm.c
-@@ -57,7 +57,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
- 		return -EINVAL;
+Removing the ISB allows the branch instruction to be in the pipeline by 
+the time the MMU is disabled, but I'm not sure if this is the correct 
+fix.  Having said that, I don't see how this can work with an ISB in 
+there.
+
+Jamie
+
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 219138d..3b6737a 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -59,8 +59,6 @@ ENTRY(cpu_v6_reset)
+ 	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+ 	bic	r1, r1, #0x1			@ ...............m
+ 	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
+-	mov	r1, #0
+-	mcr	p15, 0, r1, c7, c5, 4		@ ISB
+ 	mov	pc, r0
  
--	if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
-+	if (!(cpu_is_mx1() || cpu_is_mx21())) {
- 		unsigned long long c;
- 		unsigned long period_cycles, duty_cycles, prescale;
- 		u32 cr;
--- 
-1.7.1
+ /*
