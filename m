@@ -1,24 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Aug 2011 11:15:55 +0100
-Subject: [PATCH 0/2] Add runtime PM support to Primecell bus
-Message-ID: <20110823101555.GE19622@n2100.arm.linux.org.uk>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Tue, 23 Aug 2011 11:14:38 +0100
+Subject: [PATCH] atmel_serial: RS485: receiving enabled when sending data
+In-Reply-To: <4E537BB3.60001@evidence.eu.com>
+References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
+	<4E536536.3030004@evidence.eu.com>
+	<20110823093035.GB19622@n2100.arm.linux.org.uk>
+	<4E537BB3.60001@evidence.eu.com>
+Message-ID: <20110823111438.5d6b286d@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add basic runtime PM support to the Primecell bus type, so
-that the bus clock can be managed according to the activities of devices
-attached to it.
+> atmel_serial: RS485: receiving enabled when sending data
+> 
+> By default the atmel_serial driver in RS485 mode disables receiving data until
+> all data in the send buffer has been sent. This flag allows to receive data
+> even whilst sending data.
+> 
+> Signed-off-by: Bernhard Roth <br@pwrnet.de> 
+> Signed-off-by: Claudio Scordino <claudio@evidence.eu.com>
 
-The inspiration of the bus level implementation was taken from PCI,
-originally written by Rafael.
+Acked-by: Alan Cox <alan@linux.intel.com>
 
-Adding the bus level runtime PM support requires removing the runtime PM
-setup/teardown from the SPI driver, hence why the SPI driver features in
-patch 1.
+(although when we have people having a serious meta discussion about four
+ spaces, or a tab or neither rather than functionality I despair)
 
-Patch 2 adds runtime PM support to the MMC interface driver.
-
-Please can I have acks for these two patches.  It's likely that they will
-depend on other ARM work.
-
-Thanks.
+This is sensible functionality and relevant to various interfaces so
+makes sense.
