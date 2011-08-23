@@ -1,39 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Aug 2011 17:59:19 +0200
-Subject: [PATCH v2 1/4] ARM: CSR: add rtc i/o bridge interface for
-	SiRFprimaII
-In-Reply-To: <20110823095354.GK2796@pulham.picochip.com>
-References: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
-	<CAGsJ_4wpHBYuALijDWpLsmYTiDQddAW1DdE84tY=w4==eiyJhA@mail.gmail.com>
-	<20110823095354.GK2796@pulham.picochip.com>
-Message-ID: <201108231759.20014.arnd@arndb.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 23 Aug 2011 21:29:43 +0530
+Subject: [PATCH 2/3] ARM: SAMSUNG: Modify pl330 channel filter function
+In-Reply-To: <20110822215255.GB3895@n2100.arm.linux.org.uk>
+References: <1314050385-9617-1-git-send-email-thomas.abraham@linaro.org>
+	<1314050385-9617-2-git-send-email-thomas.abraham@linaro.org>
+	<1314050385-9617-3-git-send-email-thomas.abraham@linaro.org>
+	<20110822215255.GB3895@n2100.arm.linux.org.uk>
+Message-ID: <CAJuYYwRL0LGA_TAQtfxAZhz4kYgvFnXfb=81s7ohH03dDTK8Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 August 2011, Jamie Iles wrote:
-> On Tue, Aug 23, 2011 at 05:33:39PM +0800, Barry Song wrote:
-> > 2011/8/23 Jamie Iles <jamie@jamieiles.com>:
-> > > On Mon, Aug 22, 2011 at 11:15:49PM -0700, Barry Song wrote:
-> [...]
-> > >> +void sirfsoc_rtc_iobrg_wait_sync(void)
-> > >> +{
-> > >> +     while (readl_relaxed(sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_CTRL))
-> > >> +             continue;
-> > >
-> > > It might be worth using cpu_relax() here as it includes a memory barrier
-> > > that's what many busy wait loops do.
-> > 
-> > yes. generically people add a cpu_relax() in busy wait and that makes
-> > lots of senses. it seems readl_relaxed() can keep the execution
-> > sequence even without the barrier?
-> 
-> Well readl_relaxed() uses __raw_readl() which marks the dereference as 
-> volatile, so you should be okay without the cpu_relax() here.  Having 
-> said that, cpu_relax() is a little more explicit, so whatever you think 
-> most appropriate I guess.
+Hi Russell,
 
-I agree with Jamie, mostly because using cpu_relax in busy loops is
-a well-known idiom in the kernel. It's more for documentation purposes
-than technically needed here.
+On 23 August 2011 03:22, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Aug 23, 2011 at 03:29:44AM +0530, Thomas Abraham wrote:
+>> With the change in dma channels private data information, the pl330
+>> channel filter function is modified to look for a simple u8 value
+>> instead of the now unused 'struct dma_pl330_peri' value.
+>>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>> ?arch/arm/plat-samsung/dma-ops.c | ? ?4 ++--
+>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
+>> index 6e3d9ab..4f1430b 100644
+>> --- a/arch/arm/plat-samsung/dma-ops.c
+>> +++ b/arch/arm/plat-samsung/dma-ops.c
+>> @@ -19,8 +19,8 @@
+>>
+>> ?static inline bool pl330_filter(struct dma_chan *chan, void *param)
+>> ?{
+>> - ? ? struct dma_pl330_peri *peri = chan->private;
+>> - ? ? return peri->peri_id == (unsigned)param;
+>> + ? ? u8 *peri_id = chan->private;
+>> + ? ? return *peri_id == (unsigned)param;
+>> ?}
+>
+> As a word of warning - this will fail horribly if you have mixed DMA
+> engines in the system. ?While we wait for a better scheme, we really
+> need to sort out these filter functions properly and stop poking
+> about in data which may not be what we expect.
+>
+> One solution to that is to move pl330_filter() into drivers/dma/pl330.c
+> and have it check chan->device->dev->driver == &pl330_driver.driver
+> _before_ we start accessing chan->private.
+>
+> That's not a comment against your patch - you're not really changing
+> the brokenness of this function. ?It would be good to see a follow up
+> patch fixing it properly though.
+>
 
-	Arnd
+Ok. I will prepare a patch to move the pl330_filter function into
+drivers/dma/pl330.c and also add the check that you have proposed.
+
+Thanks for your help.
+
+Regards,
+Thomas.
