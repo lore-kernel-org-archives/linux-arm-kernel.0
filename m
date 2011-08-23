@@ -1,303 +1,84 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Mon, 22 Aug 2011 23:15:50 -0700
-Subject: [PATCH v2 2/4] ARM: CSR: add PM sleep entry for SiRFprimaII
-In-Reply-To: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
-References: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1314080152-30503-3-git-send-email-Baohua.Song@csr.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 23 Aug 2011 08:31:38 +0200
+Subject: [PATCH v2 1/2] ARM: imx: Introduce generic function for
+	displaying silicon revision
+In-Reply-To: <1314037024-9015-1-git-send-email-fabio.estevam@freescale.com>
+References: <1314037024-9015-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110823063138.GE31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <rongjun.ying@csr.com>
+Hi Fabio,
 
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- -v2:
- delete redundant ARM mode registers save/restore
- use generic cpu suspend
- move l2 cache suspend/resume codes out
- make memc become a device driver
+On Mon, Aug 22, 2011 at 03:17:03PM -0300, Fabio Estevam wrote:
+> Currently each i.MX processor has its own function for displaying the silicon 
+> revision.
+> 
+> Introduce a generic function for this purpose, so that all i.MX processors can 
+> reuse it.
 
- arch/arm/mach-prima2/pm.c    |  158 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-prima2/pm.h    |   31 ++++++++
- arch/arm/mach-prima2/sleep.S |   61 ++++++++++++++++
- 3 files changed, 250 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-prima2/pm.c
- create mode 100644 arch/arm/mach-prima2/pm.h
- create mode 100644 arch/arm/mach-prima2/sleep.S
+Looks good, thanks. Do you care to update the other SoCs aswell?
 
-diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-new file mode 100644
-index 0000000..75167df
---- /dev/null
-+++ b/arch/arm/mach-prima2/pm.c
-@@ -0,0 +1,158 @@
-+/*
-+ * power management entry for CSR SiRFprimaII
-+ *
-+ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+#include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/of_platform.h>
-+#include <linux/io.h>
-+#include <linux/rtc/sirfsoc_rtciobrg.h>
-+#include <asm/suspend.h>
-+
-+#include "pm.h"
-+
-+static u32 sirfsoc_pwrc_base;
-+void __iomem *sirfsoc_memc_base;
-+
-+static void sirfsoc_set_wakeup_source(void)
-+{
-+        u32 pwr_trigger_en_reg;
-+        pwr_trigger_en_reg = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_TRIGGER_EN);
-+#define X_ON_KEY_B (1 << 0)
-+        sirfsoc_rtc_iobrg_writel(pwr_trigger_en_reg | X_ON_KEY_B,
-+                        sirfsoc_pwrc_base + SIRFSOC_PWRC_TRIGGER_EN);
-+}
-+
-+static void sirfsoc_set_sleep_mode(u32 mode)
-+{
-+        u32 sleep_mode = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_PDN_CTRL);
-+        sleep_mode &= ~(SIRFSOC_SLEEP_MODE_MASK << 1);
-+        sleep_mode |= ((mode << 1));
-+        sirfsoc_rtc_iobrg_writel(sleep_mode, sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_PDN_CTRL);
-+}
-+
-+int sirfsoc_pre_suspend_power_off(void)
-+{
-+	u32 wakeup_entry = virt_to_phys(cpu_resume);
-+
-+	sirfsoc_rtc_iobrg_writel(wakeup_entry,
-+		SIRFSOC_PWRC_SCRATCH_PAD1);
-+
-+	sirfsoc_set_wakeup_source();
-+
-+	sirfsoc_set_sleep_mode(SIRFSOC_DEEP_SLEEP_MODE);
-+
-+	return 0;
-+}
-+
-+static void sirfsoc_save_register(u32 *ptr)
-+{
-+	/* todo: save necessary system registers here */
-+}
-+
-+static void sirfsoc_restore_regs(u32 *ptr)
-+{
-+	/* todo: restore saved system registers here */
-+}
-+
-+static int sirfsoc_pm_enter(suspend_state_t state)
-+{
-+	u32 *saved_regs;
-+
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		saved_regs = kmalloc(1024, GFP_ATOMIC);
-+		if (!saved_regs)
-+			return -ENOMEM;
-+
-+		sirfsoc_save_register(saved_regs);
-+
-+		/* go zzz */
-+		cpu_suspend(0, sirfsoc_finish_suspend);
-+
-+		sirfsoc_restore_regs(saved_regs);
-+		kfree(saved_regs);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static const struct platform_suspend_ops sirfsoc_pm_ops = {
-+	.enter = sirfsoc_pm_enter,
-+	.valid = suspend_valid_only_mem,
-+};
-+
-+static int __init sirfsoc_pm_init(void)
-+{
-+	suspend_set_ops(&sirfsoc_pm_ops);
-+	return 0;
-+}
-+late_initcall(sirfsoc_pm_init);
-+
-+static struct of_device_id pwrc_ids[] = {
-+	{ .compatible = "sirf,prima2-pwrc" },
-+};
-+
-+static int __init sirfsoc_of_pwrc_init(void)
-+{
-+	struct device_node *np;
-+	const __be32    *addrp;
-+
-+	np = of_find_matching_node(NULL, pwrc_ids);
-+	if (!np)
-+		panic("unable to find compatible pwrc node in dtb\n");
-+
-+	addrp = of_get_property(np, "reg", NULL);
-+	if (!addrp)
-+		panic("unable to find base address of pwrc node in dtb\n");
-+
-+	sirfsoc_pwrc_base = be32_to_cpup(addrp);
-+
-+	of_node_put(np);
-+
-+	return 0;
-+}
-+postcore_initcall(sirfsoc_of_pwrc_init);
-+
-+static struct of_device_id memc_ids[] = {
-+	{ .compatible = "sirf,prima2-memc" },
-+};
-+
-+static int __devinit sirfsoc_memc_probe(struct platform_device *op)
-+{
-+	struct device_node *np = op->dev.of_node;
-+
-+	sirfsoc_memc_base = of_iomap(np, 0);
-+	if (!sirfsoc_memc_base)
-+		panic("unable to map memc registers\n");
-+
-+	return 0;
-+}
-+
-+static struct platform_driver sirfsoc_memc_driver = {
-+	.probe		= sirfsoc_memc_probe,
-+	.driver = {
-+		.name = "sirfsoc-memc",
-+		.owner = THIS_MODULE,
-+		.of_match_table	= memc_ids,
-+	},
-+};
-+
-+static int __init sirfsoc_memc_init(void)
-+{
-+	return platform_driver_register(&sirfsoc_memc_driver);
-+}
-+postcore_initcall(sirfsoc_memc_init);
-diff --git a/arch/arm/mach-prima2/pm.h b/arch/arm/mach-prima2/pm.h
-new file mode 100644
-index 0000000..fe2028b
---- /dev/null
-+++ b/arch/arm/mach-prima2/pm.h
-@@ -0,0 +1,31 @@
-+/*
-+ * arch/arm/mach-prima2/pm.h
-+ *
-+ * Copyright (C) 2011 CSR
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef _MACH_PRIMA2_PM_H_
-+#define _MACH_PRIMA2_PM_H_
-+
-+#define SIRFSOC_PWR_SLEEPFORCE		0x01
-+
-+#define SIRFSOC_SLEEP_MODE_MASK         0x3
-+#define SIRFSOC_DEEP_SLEEP_MODE         0x1
-+
-+#define SIRFSOC_PWRC_PDN_CTRL           0x0
-+#define SIRFSOC_PWRC_PON_OFF            0x4
-+#define SIRFSOC_PWRC_TRIGGER_EN         0x8
-+#define SIRFSOC_PWRC_PIN_STATUS         0x14
-+#define SIRFSOC_PWRC_SCRATCH_PAD1       0x18
-+#define SIRFSOC_PWRC_SCRATCH_PAD2       0x1C
-+
-+#ifndef __ASSEMBLY__
-+extern int sirfsoc_finish_suspend(unsigned long);
-+#endif
-+
-+#endif
-+
-diff --git a/arch/arm/mach-prima2/sleep.S b/arch/arm/mach-prima2/sleep.S
-new file mode 100644
-index 0000000..07f8067
---- /dev/null
-+++ b/arch/arm/mach-prima2/sleep.S
-@@ -0,0 +1,61 @@
-+/*
-+ * sleep mode for CSR SiRFprimaII
-+ *
-+ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/ptrace.h>
-+#include <asm/assembler.h>
-+
-+#include "pm.h"
-+
-+#define DENALI_CTL_22_OFF	0x58
-+#define DENALI_CTL_112_OFF	0x1c0
-+
-+	.text
-+
-+ENTRY(sirfsoc_finish_suspend)
-+	@ r5: 	mem controller
-+	ldr     r0, =sirfsoc_memc_base
-+	ldr	r5, [r0]
-+	@ r7: 	rtc iobrg controller
-+	ldr     r0, =sirfsoc_rtciobrg_base
-+	ldr	r7, [r0]
-+
-+	@ Read the power control register and set the
-+	@ sleep force bit.
-+	ldr	r0, =SIRFSOC_PWRC_PDN_CTRL
-+	bl	__sirfsoc_rtc_iobrg_readl
-+	orr	r0,r0,#SIRFSOC_PWR_SLEEPFORCE
-+	ldr	r1, =SIRFSOC_PWRC_PDN_CTRL
-+	bl	sirfsoc_rtc_iobrg_pre_writel
-+	mov	r1, #0x1
-+
-+	@ read the MEM ctl register and set the self
-+	@ refresh bit
-+
-+	ldr	r2, [r5, #DENALI_CTL_22_OFF]
-+	orr	r2, r2, #0x1
-+
-+	@ Following code has to run from cache since
-+	@ the RAM is going to self refresh mode
-+	.align 5
-+	str	r2, [r5, #DENALI_CTL_22_OFF]
-+
-+1:
-+	ldr	r4, [r5, #DENALI_CTL_112_OFF]
-+	tst	r4, #0x1
-+	bne	1b
-+
-+	@ write SLEEPFORCE through rtc iobridge
-+
-+	str	r1, [r7]
-+	@ wait rtc io bridge sync
-+1:
-+	ldr	r3, [r7]
-+	tst	r3, #0x01
-+	bne	1b
-+	b .
+Sascha
+
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> 
+> - Introduce this generic function as suggested by Sascha Hauer.
+> 
+> Sascha,
+> 
+> If these 2 patches are merged, then I will convert the other i.MX processors
+> to use this new method.
+> 
+>  arch/arm/plat-mxc/cpu.c                 |   10 ++++++++++
+>  arch/arm/plat-mxc/include/mach/common.h |    1 +
+>  2 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
+> index 386e0d5..f081ef0 100644
+> --- a/arch/arm/plat-mxc/cpu.c
+> +++ b/arch/arm/plat-mxc/cpu.c
+> @@ -1,5 +1,6 @@
+>  
+>  #include <linux/module.h>
+> +#include <mach/hardware.h>
+>  
+>  unsigned int __mxc_cpu_type;
+>  EXPORT_SYMBOL(__mxc_cpu_type);
+> @@ -9,3 +10,12 @@ void mxc_set_cpu_type(unsigned int type)
+>  	__mxc_cpu_type = type;
+>  }
+>  
+> +void imx_print_silicon_rev(const char *cpu, int srev)
+> +{
+> +	if (srev == IMX_CHIP_REVISION_UNKNOWN)
+> +		pr_info("CPU identified as %s, unknown revision\n", cpu);
+> +	else
+> +		pr_info("CPU identified as %s, silicon rev %d.%d\n",
+> +				cpu, (srev >> 4) & 0xf, srev & 0xf);
+> +}
+> +EXPORT_SYMBOL(imx_print_silicon_rev);
+> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+> index 91fa263..e427f63 100644
+> --- a/arch/arm/plat-mxc/include/mach/common.h
+> +++ b/arch/arm/plat-mxc/include/mach/common.h
+> @@ -72,4 +72,5 @@ extern void mxc_arch_reset_init(void __iomem *);
+>  extern void mx51_efikamx_reset(void);
+>  extern int mx53_revision(void);
+>  extern int mx53_display_revision(void);
+> +extern void imx_print_silicon_rev(const char *cpu, int srev);
+>  #endif
+> -- 
+> 1.7.1
+> 
+> 
+> 
+
 -- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
