@@ -1,37 +1,41 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 24 Aug 2011 00:17:03 +0200
-Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <20110823221314.GL3895@n2100.arm.linux.org.uk>
-References: <20110823151936.GM9232@opensource.wolfsonmicro.com>
-	<201108232351.55432.rjw@sisk.pl>
-	<CAOS58YNUSn2eVLDLzqKmrtL7M5tSetkhZ1ODecLK54NSDnZVAA@mail.gmail.com>
-	<20110823220056.GK3895@n2100.arm.linux.org.uk>
-	<CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
-	<20110823221314.GL3895@n2100.arm.linux.org.uk>
-Message-ID: <CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Aug 2011 23:18:00 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <CA+wbFdcv_BsHaVwoqgF5yx6scXOodHkKjdVtarqJwjy_GFrAJQ@mail.gmail.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CA+wbFdcv_BsHaVwoqgF5yx6scXOodHkKjdVtarqJwjy_GFrAJQ@mail.gmail.com>
+Message-ID: <20110823221800.GA21084@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 12:13 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Thereby entirely preventing threads from being frozen? ?You're asking
-> me to effectively disable suspend/resume on an architecture where it's
-> heavily used. ?That's not a good idea, and would be an out-right
-> regression.
+Dave,
 
-Eh? So, it's supposed to enter refrigerator with IRQ disabled? Then,
-moving might_sleep() inside refrigerator() doesn't help either, does
-it? Then we should be doing is,
+On Tue, Aug 23, 2011 at 05:50:19PM +0100, Dave Martin wrote:
+> On Tue, Aug 23, 2011 at 3:52 PM, Ian Jackson <Ian.Jackson@eu.citrix.com> wrote:
+> > At first I thought that the best thing to do would be to boot the
+> > kernel in any suitable mode, and have the kernel automatically detect
+> > the starting mode. ?I started writing code in linux's head.S to do
+> > this. ?However, detecting whether we are in secure state is very
+> > difficult: it involves deliberately risking an undefined instruction
+> > trap. ?The code for this was getting rather long and involved.
+> 
+> There may be a safe way to do this check -- for example, on ARM1176
+> and Cortex-A8 there is a CP14 debug status/control register that you can
+> read which includes a flag indicating which world you're in.  This isn't part
+> of the architecture though and may be different/not possible on some
+> CPUs.
 
-if (freezing() && IRQ disabled) {
-      bust on IRQ;
-      try_to_freeze();
-      replug IRQ;
-}
+Please don't do this! Accessing the debug registers via the CP14 registers
+is like playing russian roulette with a machine gun, especially when you
+have various hypervisor registers and hardware lock registers to contend
+with. For 3.2, I will be guarding all of the hw_breakpoint init debug
+probing with an undef_hook because I'm sick of blowing my head off when
+systems are configured to keep debug out.
 
-But, that can't be right. The current code isn't triggering warning
-from scheduler code, right? If the above is the case, it should be
-triggering that. What am I missing?
+> All in all, it's better to engineer things so that the check doesn't need to
+> be done at all
 
--- 
-tejun
+Agreed. I think it's better to assume that you can't detect whether you're
+running in secure state or not.
+
+Will
