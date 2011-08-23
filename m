@@ -1,42 +1,26 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 23 Aug 2011 21:45:09 +0200
-Subject: Fwd: [RFC/PATCH v2 09/13] dt: omap4: add soc file for handling
-	i2c controllers
-In-Reply-To: <20110823151841.GB32698@manju-desktop>
-References: <1314074021-25186-10-git-send-email-manjugk@ti.com>
-	<4E537FA7.3050609@ti.com> <4E53AF9F.8070607@ti.com>
-	<20110823151841.GB32698@manju-desktop>
-Message-ID: <4E540345.1090004@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 23 Aug 2011 15:59:10 -0400 (EDT)
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20051.59575.166937.250550@mariner.uk.xensource.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<20110823151421.GK19622@n2100.arm.linux.org.uk>
+	<20051.55874.736418.528404@mariner.uk.xensource.com>
+	<20110823173651.GH3895@n2100.arm.linux.org.uk>
+	<20051.59575.166937.250550@mariner.uk.xensource.com>
+Message-ID: <alpine.LFD.2.00.1108231550280.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/23/2011 5:18 PM, G, Manjunath Kondaiah wrote:
-> On Tue, Aug 23, 2011 at 03:48:15PM +0200, Cousson, Benoit wrote:
->> From: G, Manjunath Kondaiah<manjugk@ti.com>
->>> To: devicetree-discuss at lists.ozlabs.org
->>> CC: linux-omap at vger.kernel.org, linux-arm-kernel at lists.infradead.org
->>>
->>>
->>> Add omap4 soc dts file for handling omap4 soc i2c
->>> controllers existing on l4-core bus.
->>
->> The subject and changelog is not accurate. You are doing at least 3 things:
->> Moving the OMAP4 SoC data from panda board file to a SoC specific
->> omap4.dtsi file.
->> Including the omap4.dtsi into panda.
->> Adding some i2c nodes.
->>
->> You should use at least two or three separated patches to avoid
->> in-accurate subject.
->
-> As these changes are straight forward, I can update patch description with
-> the required information instead of create too many patches.
->
-> If you are too specific on splitting the patches, I am ok with that too.
+On Tue, 23 Aug 2011, Ian Jackson wrote:
 
-I already fixed partially the OMAP4 patches as part of my upcoming OMAP4 
-early devices DT migration. So I'll rebase your series on top of it.
+> If there are kernels intended to run on the secure side, a difficulty
+> arises: if KVM wants to use Hyp mode and the associated features, how
+> is that to be done ?
 
-I'll send you that tomorrow.
+I think that you can safely presume that the secure world is not open to 
+Open Source in practice.  As Russell said, all the actual 
+implementations meant for products out there have the secure mode 
+effectively burried behind ROM code that the SOC vendor controls.
 
-Benoit
+
+Nicolas
