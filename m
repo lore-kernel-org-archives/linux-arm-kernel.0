@@ -1,36 +1,25 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Tue, 23 Aug 2011 16:26:35 +0200
-Subject: [PATCH 0/7] omap: iommu migration, relocation and cleanups
-In-Reply-To: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-Message-ID: <20110823142635.GQ2079@amd.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Tue, 23 Aug 2011 19:57:10 +0530
+Subject: [PATCH v5 16/22] gpio/omap: remove bank->method & METHOD_* macros
+In-Reply-To: <1312455893-14922-17-git-send-email-tarun.kanti@ti.com>
+References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+	<1312455893-14922-17-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4E53B8BE.9030007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 17, 2011 at 07:10:01PM -0400, Ohad Ben-Cohen wrote:
-> 1. Migrate OMAP's iommu driver to the generic IOMMU API, and move it
-> to the dedicated iommu folder.
-> 
-> 2. Fix omap3isp appropriately so it doesn't break.
-> 
-> 3. Adapt OMAP's iovmm appropriately as well, because omap3isp still relies
-> on it. The plan is eventually to remove iovmm and replace it with the
-> upcoming IOMMU-based generic DMA-API. Move iovmm to the iommu folder too;
-> it belongs there more than it belongs in the OMAP folders.
-> 
-> 4. Start cleaning up OMAP's iommu components towards the end goal, where
->     1) omap-iommu no longer exports public API (and instead provides its
->        entire functionality via the generic IOMMU API).
->     2) omap-iovmm is removed.
+On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
+> From: Charulatha V<charu@ti.com>
+>
+> The only bank->type (method) used in the OMAP GPIO driver is MPUIO type as they
+> need to be handled separately. Identify the same using a flag and remove all
+> METHOD_* macros.
+>
+> Signed-off-by: Charulatha V<charu@ti.com>
+> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> ---
+Looks good.
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Besides the locking issue these patches look good to me. Please repost
-when this is solved and I will put it in my tree then.
-
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Regards
+Santosh
