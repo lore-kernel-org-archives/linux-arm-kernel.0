@@ -1,56 +1,53 @@
-From: Ian.Jackson@eu.citrix.com (Ian Jackson)
-Date: Tue, 23 Aug 2011 18:23:32 +0100
-Subject: ARM processor mode, kernel startup, Hyp / secure state
-In-Reply-To: <CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
-References: <20051.48809.945431.800543@mariner.uk.xensource.com>
-	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
-Message-ID: <20051.57876.785018.498967@mariner.uk.xensource.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 23 Aug 2011 18:34:10 +0100
+Subject: v6 software reset fails on 1176
+In-Reply-To: <20110823170955.GF10062@e102144-lin.cambridge.arm.com>
+References: <20110823163247.GM2796@pulham.picochip.com>
+	<20110823170955.GF10062@e102144-lin.cambridge.arm.com>
+Message-ID: <20110823173410.GA2263@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
-> (I'll be on holiday from tomorrow, so not able to follow up until September).
-
-Right.  Let's try to be quick :-).
-
-> We had some discussions both with ARM partners and Christoffer and it
-> is not clear how we go about initialising the Hyp mode. Most SoC
-> vendors would probably just run Linux in non-secure SVC mode and would
-> not touch the Hyp mode at all. Linux would issue an SMC to set the
-> HVBAR (could do HVC but I expect that there is no secure monitor
-> code). Once this is set, assuming that the Hyp MMU is disabled, Linux
-> can invoke an HVC and initialise the Hyp mode.
-
-Well, yes.  Do SoC vendors all expect to own the secure state ?
-
-If so then the answer is perhaps simply that they should boot Linux in
-Hyp mode (and expect Linux to drop to ordinary svc mode).
-
-> The problem is that the SMC API is specific to a secure monitor
-> implementation. An alternative would be to ask the vendors to get some
-> simple Hyp code which would trap access to HVBAR for example and set
-> it with that value.
-
-That's seems to be extending the range of ways in which the firmware
-can make things go wrong, and broadening the interface to the
-firmware.
-
-> From the above, I would just allow (iii). As Dave pointed out, we
-> don't have the ELF information at this point.
-
-If we had a more functional bootloader setup (which AIUI is definitely
-planned) we could do.
-
-> > ? (b) If started in Hyp mode:
-> > ? ? ? * Install a trivial hypervisor vector which unconditionally
-> > ? ? ? ? copies r0 to HVBAR and returns
-> > ? (c) Rest of startup.
+On Tue, Aug 23, 2011 at 06:09:55PM +0100, Will Deacon wrote:
+> On Tue, Aug 23, 2011 at 05:32:47PM +0100, Jamie Iles wrote:
+> > Hi Will,
 > 
-> Maybe we could allow (b) if SoC vendors don't provide a different API
-> to set the HVBAR. But it means that kernels not aware of this feature
-> would fail.
+> Hi Jamie,
+> 
+> > I'm trying to use the cpu_v6_reset that you added in "ARM: proc: add 
+> > definition of cpu_reset for ARMv6 and ARMv7 cores", but I've found that 
+> > on my 1176 platform, it never gets to the branch to the reset vector.  
+> 
+> Ok. How are you calling cpu_v6_reset? If you call it via arch_reset from
+> arm_machine_restart then there should be an identity mapping in place, so
+> you need to ensure that the reset code is called via this mapping in your
+> implementation of arch_reset.
 
-It turns out that at least your kernel boots just fine if started in
-Hyp mode :-).
+Yes, this is being called from the arch_reset hook.
 
-Ian.
+> Unfortunately, the current flat mapping only covers userspace, so it relies
+> on the physical address of the reset code not aliasing with the kernel virtual
+> addresses.
+
+The reset code is in our bootrom (at physical address 0xffff0000).
+
+> I have some (experimental) patches to fix this in my kexec branch:
+> 
+> http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/kexec-mmu-off
+> 
+> > Removing the ISB allows the branch instruction to be in the pipeline by 
+> > the time the MMU is disabled, but I'm not sure if this is the correct 
+> > fix.  Having said that, I don't see how this can work with an ISB in 
+> > there.
+> 
+> With modern CPUs, you can't rely on characteristics of the pipeline to play
+> tricks like this. Instead, you need to ensure that the reset code is
+> executed with a 1:1 mapping.
+
+Hmm, I don't really understand this - the cpu_v6_reset code turns off 
+the MMU, then issues an ISB.  So for as long as cpu_v6_reset is 
+executing in the kernel virtual address space I don't see how it can 
+ever fetch the "mov pc, r0" instruction after the ISB without those 
+instructions living in the 1:1 mapping?
+
+Jamie
