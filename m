@@ -1,142 +1,62 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Aug 2011 22:46:50 +0100
-Subject: [PATCH v4 6/8] ARM: reset: add reset functionality for jumping to a
-	physical address
-In-Reply-To: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1314136012-20533-7-git-send-email-will.deacon@arm.com>
+Date: Tue, 23 Aug 2011 22:46:44 +0100
+Subject: [PATCH v4 0/8] MMU disabling code and kexec fixes
+Message-ID: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tools such as kexec and CPU hotplug require a way to reset the processor
-and branch to some code in physical space. This requires various bits of
-jiggery pokery with the caches and MMU which, when it goes wrong, tends
-to lock up the system.
+Hello,
 
-This patch implements a new function, arm_machine_reset, for
-consolidating this code in one place where it can be used by multiple
-subsystems.
+This is version 4 of the patches originally posted here:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/system.h |    1 +
- arch/arm/kernel/process.c     |   71 +++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 70 insertions(+), 2 deletions(-)
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052157.html
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052559.html
+v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/053252.html
 
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-index 832888d..cd2a3cd 100644
---- a/arch/arm/include/asm/system.h
-+++ b/arch/arm/include/asm/system.h
-@@ -108,6 +108,7 @@ extern int cpu_architecture(void);
- extern void cpu_init(void);
- 
- void arm_machine_restart(char mode, const char *cmd);
-+void arm_machine_reset(unsigned long reset_code_phys);
- extern void (*arm_pm_restart)(char str, const char *cmd);
- 
- #define UDBG_UNDEFINED	(1 << 0)
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 84228ec..cda91a2 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -39,6 +39,7 @@
- #include <asm/system.h>
- #include <asm/thread_notify.h>
- #include <asm/stacktrace.h>
-+#include <asm/pgalloc.h>
- #include <asm/mach/time.h>
- 
- #ifdef CONFIG_CC_STACKPROTECTOR
-@@ -91,6 +92,8 @@ static int __init hlt_setup(char *__unused)
- __setup("nohlt", nohlt_setup);
- __setup("hlt", hlt_setup);
- 
-+static char reboot_mode = 'h';
-+
- void arm_machine_restart(char mode, const char *cmd)
- {
- 	/* Disable interrupts first */
-@@ -127,6 +130,72 @@ void arm_machine_restart(char mode, const char *cmd)
- 	while (1);
- }
- 
-+extern void switch_stack(void (*fn)(void *), void *arg, void *sp);
-+typedef void (*phys_reset_t)(unsigned long);
-+
-+struct arm_machine_reset_args {
-+	unsigned long reset_code_phys;
-+	pgd_t *reboot_tables;
-+};
-+
-+void __arm_machine_reset(void *args)
-+{
-+	struct arm_machine_reset_args reset_args;
-+	unsigned long reset_code_phys;
-+	phys_reset_t phys_reset;
-+
-+	/* Copy our arguments onto the new stack. */
-+	memcpy(&reset_args, args, sizeof(reset_args));
-+	reset_code_phys = reset_args.reset_code_phys;
-+
-+	/* Take out a flat memory mapping. */
-+	setup_mm_for_reboot(reboot_mode, reset_args.reboot_tables);
-+
-+	/* Clean and invalidate caches */
-+	flush_cache_all();
-+
-+	/* Turn off caching */
-+	cpu_proc_fin();
-+
-+	/* Push out any further dirty data, and ensure cache is empty */
-+	flush_cache_all();
-+
-+	/* Switch to the identity mapping. */
-+	phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
-+	phys_reset(reset_code_phys);
-+
-+	/* Should never get here. */
-+	BUG();
-+}
-+
-+void arm_machine_reset(unsigned long reset_code_phys)
-+{
-+	phys_addr_t cpu_reset_end_phys;
-+	void *cpu_reset_end;
-+	struct arm_machine_reset_args reset_args;
-+
-+	cpu_reset_end = (void *)PAGE_ALIGN((unsigned long)cpu_reset);
-+	cpu_reset_end_phys = virt_to_phys(cpu_reset_end);
-+
-+	/* Disable interrupts first. */
-+	local_irq_disable();
-+	local_fiq_disable();
-+
-+	/* Disable the L2. */
-+	outer_disable();
-+
-+	/* Populate the reset args. */
-+	reset_args.reset_code_phys = reset_code_phys;
-+	reset_args.reboot_tables = pgd_alloc(&init_mm);
-+
-+	/* Change to the new stack and continue with the reset. */
-+	switch_stack(__arm_machine_reset, (void *)&reset_args,
-+		     (void *)RESERVE_STACK_PAGE);
-+
-+	/* Should never get here. */
-+	BUG();
-+}
-+
- /*
-  * Function pointers to optional machine specific functions
-  */
-@@ -216,8 +285,6 @@ void cpu_idle(void)
- 	}
- }
- 
--static char reboot_mode = 'h';
--
- int __init reboot_setup(char *str)
- {
- 	reboot_mode = str[0];
--- 
-1.7.0.4
+There are many changes since v3. Notably:
+	- Support for Thumb-2
+	- Based on 3.1-rc3 (now that some of the previous patches have
+	  been merged)
+	- The reserved stack page now sits below swapper and is reserved
+	  by memblock during memory init. This has the advantage of being
+	  at a known physical address for a platform, which will be helpful
+	  for non-hotplug SMP booting.
+
+Currently, SMP kexec relies on platform_cpu_kill (a CPU hotplug callback)
+doing the right thing. I'm working on a generic SMP soft reboot implementation
+but this isn't quite working yet (and my git repo is predictably offline
+at the moment so I can't provide a link to the patches).
+
+All feedback welcome.
+
+Thanks,
+
+Will
+
+
+Will Deacon (8):
+  ARM: proc-v7: disable SCTLR.TE when disabling MMU
+  ARM: kexec: ensure new kernel is entered in ARM state
+  ARM: lib: add switch_stack function for safely changing stack
+  ARM: idmap: add header file for identity mapping functions
+  ARM: reset: allow kernelspace mappings to be flat mapped during reset
+  ARM: reset: add reset functionality for jumping to a physical address
+  ARM: kexec: use arm_machine_reset for branching to the reboot buffer
+  ARM: stop: execute platform callback from cpu_stop code
+
+ arch/arm/Kconfig                  |    2 +-
+ arch/arm/include/asm/idmap.h      |   15 +++++++
+ arch/arm/include/asm/pgtable.h    |    3 -
+ arch/arm/include/asm/system.h     |    1 +
+ arch/arm/kernel/machine_kexec.c   |   14 +------
+ arch/arm/kernel/process.c         |   76 ++++++++++++++++++++++++++++++++++--
+ arch/arm/kernel/relocate_kernel.S |    2 +-
+ arch/arm/kernel/smp.c             |    5 ++
+ arch/arm/lib/Makefile             |    3 +-
+ arch/arm/lib/switch_stack.S       |   44 +++++++++++++++++++++
+ arch/arm/mm/idmap.c               |   43 ++++++++++++++++-----
+ arch/arm/mm/mmu.c                 |   13 +++++-
+ arch/arm/mm/proc-v7.S             |    1 +
+ 13 files changed, 187 insertions(+), 35 deletions(-)
+ create mode 100644 arch/arm/include/asm/idmap.h
+ create mode 100644 arch/arm/lib/switch_stack.S
