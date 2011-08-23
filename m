@@ -1,33 +1,139 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Aug 2011 10:50:21 +0900
-Subject: [PATCH 1/4] ARM: SAMSUNG: Add support for detecting CPU at	runtime
-In-Reply-To: <20110820080759.GA18827@n2100.arm.linux.org.uk>
-References: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
-	<1313816759-14564-2-git-send-email-kgene.kim@samsung.com>
-	<20110820080759.GA18827@n2100.arm.linux.org.uk>
-Message-ID: <06bd01cc6137$058b1bc0$10a15340$%kim@samsung.com>
+Date: Tue, 23 Aug 2011 10:39:12 +0900
+Subject: [PATCH V2 2/4] ARM: S5P64X0: Use soc_is_s5p64x0() to distinguish cpu
+	at runtime
+In-Reply-To: <1314063552-27416-1-git-send-email-kgene.kim@samsung.com>
+References: <1314063552-27416-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1314063552-27416-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> 
-> On Sat, Aug 20, 2011 at 02:05:56PM +0900, Kukjin Kim wrote:
-> > The cpu_is_[name]() can be used to distinguish cpu at runtime.
-> 
-> This really should be soc_is_xxx().  The CPU is stuff like ARM920, ARM926,
-> Cortex-A9 etc.  The SoC is the CPU plus the peripherals.
-> 
-> S3C6410 describes the entire SoC, not just the CPU.
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Changes since v1:
+- soc_is_s5p64x0() is used instead of cpu_is_s5p64x0()
 
-OK and will address comments from you.
+ arch/arm/mach-s5p64x0/dev-spi.c  |    8 +++-----
+ arch/arm/mach-s5p64x0/dma.c      |    7 ++-----
+ arch/arm/mach-s5p64x0/gpiolib.c  |    7 ++-----
+ arch/arm/mach-s5p64x0/irq-eint.c |    3 ++-
+ 4 files changed, 9 insertions(+), 16 deletions(-)
 
-Russell, I'm not sure it is required to change CPU_XXX such as
-CPU_EXYNOS4210 to SOC_XXX in Kconfig.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mach-s5p64x0/dev-spi.c b/arch/arm/mach-s5p64x0/dev-spi.c
+index ac825e8..1fd9c79 100644
+--- a/arch/arm/mach-s5p64x0/dev-spi.c
++++ b/arch/arm/mach-s5p64x0/dev-spi.c
+@@ -21,6 +21,7 @@
+ #include <mach/regs-clock.h>
+ #include <mach/spi-clocks.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/s3c64xx-spi.h>
+ #include <plat/gpio-cfg.h>
+ 
+@@ -185,11 +186,8 @@ struct platform_device s5p64x0_device_spi1 = {
+ 
+ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ {
+-	unsigned int id;
+ 	struct s3c64xx_spi_info *pd;
+ 
+-	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
+-
+ 	/* Reject invalid configuration */
+ 	if (!num_cs || src_clk_nr < 0
+ 			|| src_clk_nr > S5P64X0_SPI_SRCCLK_SCLK) {
+@@ -199,7 +197,7 @@ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 
+ 	switch (cntrlr) {
+ 	case 0:
+-		if (id == 0x50000)
++		if (soc_is_s5p6450())
+ 			pd = &s5p6450_spi0_pdata;
+ 		else
+ 			pd = &s5p6440_spi0_pdata;
+@@ -207,7 +205,7 @@ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
+ 		s5p64x0_device_spi0.dev.platform_data = pd;
+ 		break;
+ 	case 1:
+-		if (id == 0x50000)
++		if (soc_is_s5p6450())
+ 			pd = &s5p6450_spi1_pdata;
+ 		else
+ 			pd = &s5p6440_spi1_pdata;
+diff --git a/arch/arm/mach-s5p64x0/dma.c b/arch/arm/mach-s5p64x0/dma.c
+index d7ad944..0e5b3e6 100644
+--- a/arch/arm/mach-s5p64x0/dma.c
++++ b/arch/arm/mach-s5p64x0/dma.c
+@@ -28,6 +28,7 @@
+ #include <mach/irqs.h>
+ #include <mach/regs-clock.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/devs.h>
+ #include <plat/s3c-pl330-pdata.h>
+ 
+@@ -133,11 +134,7 @@ static struct platform_device s5p64x0_device_pdma = {
+ 
+ static int __init s5p64x0_dma_init(void)
+ {
+-	unsigned int id;
+-
+-	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
+-
+-	if (id == 0x50000)
++	if (soc_is_s5p6450())
+ 		s5p64x0_device_pdma.dev.platform_data = &s5p6450_pdma_pdata;
+ 	else
+ 		s5p64x0_device_pdma.dev.platform_data = &s5p6440_pdma_pdata;
+diff --git a/arch/arm/mach-s5p64x0/gpiolib.c b/arch/arm/mach-s5p64x0/gpiolib.c
+index e7fb3b0..700dac6 100644
+--- a/arch/arm/mach-s5p64x0/gpiolib.c
++++ b/arch/arm/mach-s5p64x0/gpiolib.c
+@@ -19,6 +19,7 @@
+ #include <mach/regs-gpio.h>
+ #include <mach/regs-clock.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/gpio-core.h>
+ #include <plat/gpio-cfg.h>
+ #include <plat/gpio-cfg-helpers.h>
+@@ -473,14 +474,10 @@ static void __init s5p64x0_gpio_add_rbank_4bit2(struct s3c_gpio_chip *chip,
+ 
+ static int __init s5p64x0_gpiolib_init(void)
+ {
+-	unsigned int chipid;
+-
+-	chipid = __raw_readl(S5P64X0_SYS_ID);
+-
+ 	s5p64x0_gpiolib_set_cfg(s5p64x0_gpio_cfgs,
+ 				ARRAY_SIZE(s5p64x0_gpio_cfgs));
+ 
+-	if ((chipid & 0xff000) == 0x50000) {
++	if (soc_is_s5p6450()) {
+ 		samsung_gpiolib_add_2bit_chips(s5p6450_gpio_2bit,
+ 					ARRAY_SIZE(s5p6450_gpio_2bit));
+ 
+diff --git a/arch/arm/mach-s5p64x0/irq-eint.c b/arch/arm/mach-s5p64x0/irq-eint.c
+index 69ed454..94104c4 100644
+--- a/arch/arm/mach-s5p64x0/irq-eint.c
++++ b/arch/arm/mach-s5p64x0/irq-eint.c
+@@ -17,6 +17,7 @@
+ #include <linux/irq.h>
+ #include <linux/io.h>
+ 
++#include <plat/cpu.h>
+ #include <plat/regs-irqtype.h>
+ #include <plat/gpio-cfg.h>
+ 
+@@ -67,7 +68,7 @@ static int s5p64x0_irq_eint_set_type(struct irq_data *data, unsigned int type)
+ 	__raw_writel(ctrl, S5P64X0_EINT0CON0);
+ 
+ 	/* Configure the GPIO pin for 6450 or 6440 based on CPU ID */
+-	if (0x50000 == (__raw_readl(S5P64X0_SYS_ID) & 0xFF000))
++	if (soc_is_s5p6450())
+ 		s3c_gpio_cfgpin(S5P6450_GPN(offs), S3C_GPIO_SFN(2));
+ 	else
+ 		s3c_gpio_cfgpin(S5P6440_GPN(offs), S3C_GPIO_SFN(2));
+-- 
+1.7.1
