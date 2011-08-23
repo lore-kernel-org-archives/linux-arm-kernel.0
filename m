@@ -1,71 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Aug 2011 11:16:39 +0100
-Subject: [PATCH 2/2] PM: add runtime PM support to MMCI
-In-Reply-To: <20110823101555.GE19622@n2100.arm.linux.org.uk>
-References: <20110823101555.GE19622@n2100.arm.linux.org.uk>
-Message-ID: <E1Qvo2B-0000qz-3A@rmk-PC.arm.linux.org.uk>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 23 Aug 2011 12:24:30 +0200
+Subject: Passing camera module type using "camera" argument.
+In-Reply-To: <CACKLOr0bApYaN=T9fZOy98A22S1pBx=V8K+aRB0Q+7LX=gLm9w@mail.gmail.com>
+References: <CACKLOr03ZzpytdYrnk-bJv2A7sbTTa_y_Dj+JspyiYJKgX8wog@mail.gmail.com>
+	<15E409B0-1DC8-4139-8757-6C5593396E36@beagleboard.org>
+	<CACKLOr0bApYaN=T9fZOy98A22S1pBx=V8K+aRB0Q+7LX=gLm9w@mail.gmail.com>
+Message-ID: <201108231224.30837.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add runtime PM support to the MMCI primecell driver, making use of
-the core primecell bus runtime PM support.
+Hi Javier,
 
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/mmc/host/mmci.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+On Tuesday 23 August 2011 12:16:16 javier Martin wrote:
+> On 22 August 2011 18:15, Koen Kooi <koen@beagleboard.org> wrote:
+> > Op 22 aug. 2011, om 08:42 heeft javier Martin het volgende geschreven:
+> > > On 19 August 2011 17:07, Koen Kooi <koen@beagleboard.org> wrote:
+> > > Op 19 aug. 2011 om 14:39 heeft javier Martin het volgende geschreven:
+> > >> Hi,
+> > >> I've been digging into the code of linux-omap kernel in Angstrom for
+> > >> Beagleboard and I've noticed there is an argument called "camera" which
+> > >> can be passed to the kernel. This allows telling the linux kernel what
+> > >> camera module is actually connected to the platform.
+> > >>
+> > >> However, when I look the mainline kernel 3.0 I see those changed have
+> > >> not yet made into it. Is this mechanism accepted by the community?
+> > >
+> > > When I asked a few months ago the consensus was that there currently is
+> > > no better way. DT might solve it, but that's still some time away
+> > >
+> > > So, as I understand, using a command line argument for this purpose is
+> > > the preferred way by the community but, at the same time, they won't
+> > > accept patches that implement this approach.
+> > 
+> > From what I understood a patch doing that wouldn't be rejected, but
+> > Laurent/Tony would have to chime in to confirm that.
+> 
+> Ok,
+> I add to Laurent and Tony to CC to see what is their opinion on this.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 56e9a41..5e142b7 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -29,6 +29,7 @@
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
- #include <linux/amba/mmci.h>
-+#include <linux/pm_runtime.h>
- 
- #include <asm/div64.h>
- #include <asm/io.h>
-@@ -170,6 +171,7 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
- 	 * back into the driver...
- 	 */
- 	spin_unlock(&host->lock);
-+	pm_runtime_put(mmc_dev(host->mmc));
- 	mmc_request_done(host->mmc, mrq);
- 	spin_lock(&host->lock);
- }
-@@ -984,6 +986,8 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 		return;
- 	}
- 
-+	pm_runtime_get_sync(mmc_dev(mmc));
-+
- 	spin_lock_irqsave(&host->lock, flags);
- 
- 	host->mrq = mrq;
-@@ -1327,6 +1331,8 @@ static int __devinit mmci_probe(struct amba_device *dev,
- 
- 	mmci_dma_setup(host);
- 
-+	pm_runtime_put(&dev->dev);
-+
- 	mmc_add_host(mmc);
- 
- 	return 0;
-@@ -1364,6 +1370,12 @@ static int __devexit mmci_remove(struct amba_device *dev)
- 	if (mmc) {
- 		struct mmci_host *host = mmc_priv(mmc);
- 
-+		/*
-+		 * Undo pm_runtime_put() in probe.  We use the _sync
-+		 * version here so that we can access the primecell.
-+		 */
-+		pm_runtime_get_sync(&dev->dev);
-+
- 		mmc_remove_host(mmc);
- 
- 		writel(0, host->base + MMCIMASK0);
+I won't reject a patch that implements this (provided that it's clean enough 
+of course :-)), but I'm really not sure if it's worth it. I think we should 
+work on DT support instead.
+
 -- 
-1.7.4.4
+Regards,
+
+Laurent Pinchart
