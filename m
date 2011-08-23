@@ -1,172 +1,54 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Aug 2011 22:30:42 +0100
-Subject: [PATCH v2 5/5] arm/imx: use Kconfig choice for low-level debug UART
-	selection
-In-Reply-To: <1314135042-19908-1-git-send-email-will.deacon@arm.com>
-References: <1314135042-19908-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1314135042-19908-6-git-send-email-will.deacon@arm.com>
+Date: Tue, 23 Aug 2011 22:46:52 +0100
+Subject: [PATCH v4 8/8] ARM: stop: execute platform callback from cpu_stop code
+In-Reply-To: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
+References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1314136012-20533-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+Sending IPI_CPU_STOP to a CPU causes it to execute a busy cpu_relax
+loop forever. This makes it impossible to kexec successfully on an SMP
+system since the secondary CPUs do not reset.
 
-Now that the DEBUG_LL UART can be selected by a Kconfig choice,
-simplify the #ifdefery in debug-macro.S and add entries to the
-top-level Kconfig.debug instead.
+This patch adds a callback to platform_cpu_kill, defined when
+CONFIG_HOTPLUG_CPU=y, from the ipi_cpu_stop handling code. This function
+currently just returns 1 on all platforms that define it but allows them
+to do something more sophisticated in the future.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig.debug                       |   56 ++++++++++++++++++++++++++
- arch/arm/mach-mxs/include/mach/debug-macro.S |   12 +-----
- arch/arm/plat-mxc/include/mach/debug-macro.S |   38 +++---------------
- 3 files changed, 64 insertions(+), 42 deletions(-)
+ arch/arm/Kconfig      |    2 +-
+ arch/arm/kernel/smp.c |    4 ++++
+ 2 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 007cf85..965d59a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -99,6 +99,62 @@ choice
- 		  Saying N will cause the debug messages to appear on the first
- 		  serial port.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 5ebc5d9..d2e9d42 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1849,7 +1849,7 @@ config XIP_PHYS_ADDR
  
-+	config DEBUG_IMX1_UART
-+		bool "i.MX1 Debug UART"
-+		depends on SOC_IMX1
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX1.
-+
-+	config DEBUG_IMX23_UART
-+		bool "i.MX23 Debug UART"
-+		depends on SOC_IMX23
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX23.
-+
-+	config DEBUG_IMX25_UART
-+		bool "i.MX25 Debug UART"
-+		depends on SOC_IMX25
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX25.
-+
-+	config DEBUG_IMX21_IMX27_UART
-+		bool "i.MX21 and i.MX27 Debug UART"
-+		depends on SOC_IMX21 || SOC_IMX27
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX21 or i.MX27.
-+
-+	config DEBUG_IMX28_UART
-+		bool "i.MX28 Debug UART"
-+		depends on SOC_IMX28
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX28.
-+
-+	config DEBUG_IMX31_IMX35_UART
-+		bool "i.MX31 and i.MX35 Debug UART"
-+		depends on SOC_IMX31 || SOC_IMX35
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX31 or i.MX35.
-+
-+	config DEBUG_IMX51_UART
-+		bool "i.MX51 Debug UART"
-+		depends on SOC_IMX51
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX51.
-+
-+	config DEBUG_IMX50_IMX53_UART
-+		bool "i.MX50 and i.MX53 Debug UART"
-+		depends on SOC_IMX50 || SOC_IMX53
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX50 or i.MX53.
-+
- 	config DEBUG_S3C_UART0
- 		depends on PLAT_SAMSUNG
- 		bool "Use S3C UART 0 for low-level debug"
-diff --git a/arch/arm/mach-mxs/include/mach/debug-macro.S b/arch/arm/mach-mxs/include/mach/debug-macro.S
-index 79650a1..6d98704 100644
---- a/arch/arm/mach-mxs/include/mach/debug-macro.S
-+++ b/arch/arm/mach-mxs/include/mach/debug-macro.S
-@@ -14,17 +14,9 @@
- #include <mach/mx23.h>
- #include <mach/mx28.h>
+ config KEXEC
+ 	bool "Kexec system call (EXPERIMENTAL)"
+-	depends on EXPERIMENTAL
++	depends on EXPERIMENTAL && (!SMP || HOTPLUG_CPU)
+ 	help
+ 	  kexec is a system call that implements the ability to shutdown your
+ 	  current kernel, and to start another kernel.  It is like a reboot
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 96a7956..3f6e8d1 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -559,6 +559,10 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 	local_fiq_disable();
+ 	local_irq_disable();
  
--#ifdef CONFIG_SOC_IMX23
--#ifdef UART_PADDR
--#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
--#endif
-+#ifdef CONFIG_DEBUG_IMX23_UART
- #define UART_PADDR	MX23_DUART_BASE_ADDR
--#endif
--
--#ifdef CONFIG_SOC_IMX28
--#ifdef UART_PADDR
--#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
--#endif
-+#elif defined (CONFIG_DEBUG_IMX28_UART)
- #define UART_PADDR	MX28_DUART_BASE_ADDR
- #endif
- 
-diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-index e4dde91..07cfdbe 100644
---- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-+++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-@@ -12,43 +12,17 @@
-  */
- #include <mach/hardware.h>
- 
--#ifdef CONFIG_SOC_IMX1
-+#ifdef CONFIG_DEBUG_IMX1_UART
- #define UART_PADDR	MX1_UART1_BASE_ADDR
--#endif
--
--#ifdef CONFIG_SOC_IMX25
--#ifdef UART_PADDR
--#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
--#endif
-+#elif defined (CONFIG_DEBUG_IMX25_UART)
- #define UART_PADDR	MX25_UART1_BASE_ADDR
--#endif
--
--#if defined(CONFIG_SOC_IMX21) || defined (CONFIG_SOC_IMX27)
--#ifdef UART_PADDR
--#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
--#endif
-+#elif defined (CONFIG_DEBUG_IMX21_IMX27_UART)
- #define UART_PADDR	MX2x_UART1_BASE_ADDR
--#endif
--
--#if defined(CONFIG_SOC_IMX31) || defined(CONFIG_SOC_IMX35)
--#ifdef UART_PADDR
--#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
--#endif
-+#elif defined (CONFIG_DEBUG_IMX31_IMX35_UART)
- #define UART_PADDR	MX3x_UART1_BASE_ADDR
--#endif
--
--#ifdef CONFIG_SOC_IMX51
--#ifdef UART_PADDR
--#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
--#endif
-+#elif defined (CONFIG_DEBUG_IMX51_UART)
- #define UART_PADDR	MX51_UART1_BASE_ADDR
--#endif
--
--/* iMX50/53 have same addresses, but not iMX51 */
--#if defined(CONFIG_SOC_IMX50) || defined(CONFIG_SOC_IMX53)
--#ifdef UART_PADDR
--#error "CONFIG_DEBUG_LL is incompatible with multiple archs"
--#endif
-+#elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
- #define UART_PADDR	MX53_UART1_BASE_ADDR
- #endif
- 
++#ifdef CONFIG_HOTPLUG_CPU
++	platform_cpu_kill(cpu);
++#endif
++
+ 	while (1)
+ 		cpu_relax();
+ }
 -- 
 1.7.0.4
