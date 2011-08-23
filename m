@@ -1,83 +1,47 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 23 Aug 2011 09:48:19 +0100
-Subject: [PATCH v2 1/4] ARM: CSR: add rtc i/o bridge interface for
-	SiRFprimaII
-In-Reply-To: <1314080152-30503-2-git-send-email-Baohua.Song@csr.com>
+Date: Tue, 23 Aug 2011 09:50:16 +0100
+Subject: [PATCH v2 2/4] ARM: CSR: add PM sleep entry for SiRFprimaII
+In-Reply-To: <1314080152-30503-3-git-send-email-Baohua.Song@csr.com>
 References: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
-	<1314080152-30503-2-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20110823084819.GG2796@pulham.picochip.com>
+	<1314080152-30503-3-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20110823085016.GH2796@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Barry,
+Hi Barry, Rongjun,
 
-On Mon, Aug 22, 2011 at 11:15:49PM -0700, Barry Song wrote:
-> From: Zhiwu Song <zhiwu.song@csr.com>
-> 
-> The module is a bridge between the RTC clock domain and the CPU interface
-> clock domain. ARM access the register of SYSRTC, GPSRTC and PWRC through
-> this module.
-> 
-> Signed-off-by: Zhiwu Song <zhiwu.song@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-
-A couple of minor nits inline (sorry if I didn't pick them up last 
-time).  Feel free to add a:
-
-	Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-
-if you choose to make those changes.
+A couple of minor nits inline.
 
 Jamie
 
+On Mon, Aug 22, 2011 at 11:15:50PM -0700, Barry Song wrote:
+> From: Rongjun Ying <rongjun.ying@csr.com>
+> 
+> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 > ---
 >  -v2:
->  handle feedback from Jamie Iles <jamie@jamieiles.com>
->  make rtciobrg become a device driver
->  make devices behind rtciobrg not be compatible with simple-bus
->  replace EXPORT_SYMBOL by EXPORT_SYMBOL_GPL
+>  delete redundant ARM mode registers save/restore
+>  use generic cpu suspend
+>  move l2 cache suspend/resume codes out
+>  make memc become a device driver
 > 
->  arch/arm/boot/dts/prima2-cb.dts      |    2 +-
->  arch/arm/mach-prima2/Makefile        |    1 +
->  arch/arm/mach-prima2/rtciobrg.c      |  136 ++++++++++++++++++++++++++++++++++
->  include/linux/rtc/sirfsoc_rtciobrg.h |   18 +++++
->  4 files changed, 156 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-prima2/rtciobrg.c
->  create mode 100644 include/linux/rtc/sirfsoc_rtciobrg.h
+>  arch/arm/mach-prima2/pm.c    |  158 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-prima2/pm.h    |   31 ++++++++
+>  arch/arm/mach-prima2/sleep.S |   61 ++++++++++++++++
+>  3 files changed, 250 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-prima2/pm.c
+>  create mode 100644 arch/arm/mach-prima2/pm.h
+>  create mode 100644 arch/arm/mach-prima2/sleep.S
 > 
-> diff --git a/arch/arm/boot/dts/prima2-cb.dts b/arch/arm/boot/dts/prima2-cb.dts
-> index 6fecc88..e5e9bc6 100644
-> --- a/arch/arm/boot/dts/prima2-cb.dts
-> +++ b/arch/arm/boot/dts/prima2-cb.dts
-> @@ -358,7 +358,7 @@
->  		};
->  
->  		rtc-iobg {
-> -			compatible = "sirf,prima2-rtciobg", "simple-bus";
-> +			compatible = "sirf,prima2-rtciobg", "sirf-prima2-rtciobg-bus";
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			reg = <0x80030000 0x10000>;
-> diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-> index 7af7fc0..f49d70b 100644
-> --- a/arch/arm/mach-prima2/Makefile
-> +++ b/arch/arm/mach-prima2/Makefile
-> @@ -3,5 +3,6 @@ obj-y += irq.o
->  obj-y += clock.o
->  obj-y += rstc.o
->  obj-y += prima2.o
-> +obj-y += rtciobrg.o
->  obj-$(CONFIG_DEBUG_LL) += lluart.o
->  obj-$(CONFIG_CACHE_L2X0) += l2x0.o
-> diff --git a/arch/arm/mach-prima2/rtciobrg.c b/arch/arm/mach-prima2/rtciobrg.c
+> diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
 > new file mode 100644
-> index 0000000..1163e2c
+> index 0000000..75167df
 > --- /dev/null
-> +++ b/arch/arm/mach-prima2/rtciobrg.c
-> @@ -0,0 +1,136 @@
+> +++ b/arch/arm/mach-prima2/pm.c
+> @@ -0,0 +1,158 @@
 > +/*
-> + * RTC I/O Bridge interfaces for CSR SiRFprimaII
-> + * ARM access the registers of SYSRTC, GPSRTC and PWRC through this module
+> + * power management entry for CSR SiRFprimaII
 > + *
 > + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
 > + *
@@ -85,167 +49,265 @@ Jamie
 > + */
 > +
 > +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/io.h>
+> +#include <linux/suspend.h>
+> +#include <linux/slab.h>
 > +#include <linux/of.h>
 > +#include <linux/of_address.h>
 > +#include <linux/of_device.h>
 > +#include <linux/of_platform.h>
+> +#include <linux/io.h>
+> +#include <linux/rtc/sirfsoc_rtciobrg.h>
+> +#include <asm/suspend.h>
 > +
-> +#define SIRFSOC_CPUIOBRG_CTRL           0x00
-> +#define SIRFSOC_CPUIOBRG_WRBE           0x04
-> +#define SIRFSOC_CPUIOBRG_ADDR           0x08
-> +#define SIRFSOC_CPUIOBRG_DATA           0x0c
+> +#include "pm.h"
 > +
-> +void __iomem *sirfsoc_rtciobrg_base;
-> +static DEFINE_SPINLOCK(rtciobrg_lock);
+> +static u32 sirfsoc_pwrc_base;
+> +void __iomem *sirfsoc_memc_base;
 > +
-> +void sirfsoc_rtc_iobrg_wait_sync(void)
+> +static void sirfsoc_set_wakeup_source(void)
 > +{
-> +	while (readl_relaxed(sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_CTRL))
-> +		continue;
-
-It might be worth using cpu_relax() here as it includes a memory barrier 
-that's what many busy wait loops do.
-
+> +        u32 pwr_trigger_en_reg;
+> +        pwr_trigger_en_reg = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
+> +		SIRFSOC_PWRC_TRIGGER_EN);
+> +#define X_ON_KEY_B (1 << 0)
+> +        sirfsoc_rtc_iobrg_writel(pwr_trigger_en_reg | X_ON_KEY_B,
+> +                        sirfsoc_pwrc_base + SIRFSOC_PWRC_TRIGGER_EN);
 > +}
 > +
-> +void sirfsoc_rtc_iobrg_besyncing(void)
+> +static void sirfsoc_set_sleep_mode(u32 mode)
 > +{
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&rtciobrg_lock, flags);
-> +
-> +	sirfsoc_rtc_iobrg_wait_sync();
-> +
-> +	spin_unlock_irqrestore(&rtciobrg_lock, flags);
-> +}
-> +EXPORT_SYMBOL_GPL(sirfsoc_rtc_iobrg_besyncing);
-> +
-> +u32 __sirfsoc_rtc_iobrg_readl(u32 addr)
-> +{
-> +	unsigned long val;
-> +
-> +	sirfsoc_rtc_iobrg_wait_sync();
-> +
-> +	writel_relaxed(0x00, sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_WRBE);
-> +	writel_relaxed(addr, sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_ADDR);
-> +	writel_relaxed(0x01, sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_CTRL);
-> +
-> +	sirfsoc_rtc_iobrg_wait_sync();
-> +
-> +	val = readl_relaxed(sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_DATA);
-> +
-> +	return val;
-
-I don't think this needs the temporary 'val', but that's not a big 
-problem.
-
+> +        u32 sleep_mode = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
+> +		SIRFSOC_PWRC_PDN_CTRL);
+> +        sleep_mode &= ~(SIRFSOC_SLEEP_MODE_MASK << 1);
+> +        sleep_mode |= ((mode << 1));
+> +        sirfsoc_rtc_iobrg_writel(sleep_mode, sirfsoc_pwrc_base +
+> +		SIRFSOC_PWRC_PDN_CTRL);
 > +}
 > +
-> +u32 sirfsoc_rtc_iobrg_readl(u32 addr)
+> +int sirfsoc_pre_suspend_power_off(void)
 > +{
-> +	unsigned long flags, val;
+> +	u32 wakeup_entry = virt_to_phys(cpu_resume);
 > +
-> +	spin_lock_irqsave(&rtciobrg_lock, flags);
+> +	sirfsoc_rtc_iobrg_writel(wakeup_entry,
+> +		SIRFSOC_PWRC_SCRATCH_PAD1);
 > +
-> +	val = __sirfsoc_rtc_iobrg_readl(addr);
+> +	sirfsoc_set_wakeup_source();
 > +
-> +	spin_unlock_irqrestore(&rtciobrg_lock, flags);
-> +
-> +	return val;
-> +}
-> +EXPORT_SYMBOL_GPL(sirfsoc_rtc_iobrg_readl);
-> +
-> +void sirfsoc_rtc_iobrg_pre_writel(u32 val, u32 addr)
-> +{
-> +	sirfsoc_rtc_iobrg_wait_sync();
-> +
-> +	writel_relaxed(0xf1, sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_WRBE);
-> +	writel_relaxed(addr, sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_ADDR);
-> +
-> +	writel_relaxed(val, sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_DATA);
-> +}
-> +
-> +void sirfsoc_rtc_iobrg_writel(u32 val, u32 addr)
-> +{
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&rtciobrg_lock, flags);
-> +
-> +	sirfsoc_rtc_iobrg_pre_writel(val, addr);
-> +
-> +	writel_relaxed(0x01, sirfsoc_rtciobrg_base + SIRFSOC_CPUIOBRG_CTRL);
-> +
-> +	sirfsoc_rtc_iobrg_wait_sync();
-> +
-> +	spin_unlock_irqrestore(&rtciobrg_lock, flags);
-> +}
-> +EXPORT_SYMBOL_GPL(sirfsoc_rtc_iobrg_writel);
-> +
-> +static struct of_device_id rtciobrg_ids[] = {
-
-const?
-
-> +	{ .compatible = "sirf,prima2-rtciobg" },
-> +	{}
-> +};
-> +
-> +static int __devinit sirfsoc_rtciobrg_probe(struct platform_device *op)
-> +{
-> +	struct device_node *np = op->dev.of_node;
-> +
-> +	sirfsoc_rtciobrg_base = of_iomap(np, 0);
-> +	if (!sirfsoc_rtciobrg_base)
-> +		panic("unable to map rtc iobrg registers\n");
+> +	sirfsoc_set_sleep_mode(SIRFSOC_DEEP_SLEEP_MODE);
 > +
 > +	return 0;
 > +}
 > +
-> +static struct platform_driver sirfsoc_rtciobrg_driver = {
-> +	.probe		= sirfsoc_rtciobrg_probe,
+> +static void sirfsoc_save_register(u32 *ptr)
+> +{
+> +	/* todo: save necessary system registers here */
+> +}
+> +
+> +static void sirfsoc_restore_regs(u32 *ptr)
+> +{
+> +	/* todo: restore saved system registers here */
+> +}
+> +
+> +static int sirfsoc_pm_enter(suspend_state_t state)
+> +{
+> +	u32 *saved_regs;
+> +
+> +	switch (state) {
+> +	case PM_SUSPEND_MEM:
+> +		saved_regs = kmalloc(1024, GFP_ATOMIC);
+> +		if (!saved_regs)
+> +			return -ENOMEM;
+> +
+> +		sirfsoc_save_register(saved_regs);
+> +
+> +		/* go zzz */
+> +		cpu_suspend(0, sirfsoc_finish_suspend);
+> +
+> +		sirfsoc_restore_regs(saved_regs);
+> +		kfree(saved_regs);
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +	return 0;
+> +}
+> +
+> +static const struct platform_suspend_ops sirfsoc_pm_ops = {
+> +	.enter = sirfsoc_pm_enter,
+> +	.valid = suspend_valid_only_mem,
+> +};
+> +
+> +static int __init sirfsoc_pm_init(void)
+> +{
+> +	suspend_set_ops(&sirfsoc_pm_ops);
+> +	return 0;
+> +}
+> +late_initcall(sirfsoc_pm_init);
+> +
+> +static struct of_device_id pwrc_ids[] = {
+> +	{ .compatible = "sirf,prima2-pwrc" },
+
+Missing a sentinel terminator and const?
+
+> +};
+> +
+> +static int __init sirfsoc_of_pwrc_init(void)
+> +{
+> +	struct device_node *np;
+> +	const __be32    *addrp;
+> +
+> +	np = of_find_matching_node(NULL, pwrc_ids);
+> +	if (!np)
+> +		panic("unable to find compatible pwrc node in dtb\n");
+> +
+> +	addrp = of_get_property(np, "reg", NULL);
+> +	if (!addrp)
+> +		panic("unable to find base address of pwrc node in dtb\n");
+> +
+> +	sirfsoc_pwrc_base = be32_to_cpup(addrp);
+> +
+> +	of_node_put(np);
+> +
+> +	return 0;
+> +}
+> +postcore_initcall(sirfsoc_of_pwrc_init);
+> +
+> +static struct of_device_id memc_ids[] = {
+> +	{ .compatible = "sirf,prima2-memc" },
+
+and here?
+
+> +};
+> +
+> +static int __devinit sirfsoc_memc_probe(struct platform_device *op)
+> +{
+> +	struct device_node *np = op->dev.of_node;
+> +
+> +	sirfsoc_memc_base = of_iomap(np, 0);
+> +	if (!sirfsoc_memc_base)
+> +		panic("unable to map memc registers\n");
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver sirfsoc_memc_driver = {
+> +	.probe		= sirfsoc_memc_probe,
 > +	.driver = {
-> +		.name = "sirfsoc-rtciobrg",
+> +		.name = "sirfsoc-memc",
 > +		.owner = THIS_MODULE,
-> +		.of_match_table	= rtciobrg_ids,
+> +		.of_match_table	= memc_ids,
 > +	},
 > +};
 > +
-> +static int __init sirfsoc_rtciobrg_init(void)
+> +static int __init sirfsoc_memc_init(void)
 > +{
-> +	return platform_driver_register(&sirfsoc_rtciobrg_driver);
+> +	return platform_driver_register(&sirfsoc_memc_driver);
 > +}
-> +postcore_initcall(sirfsoc_rtciobrg_init);
-> +
-> +MODULE_AUTHOR("Zhiwu Song <zhiwu.song@csr.com>, "
-> +		"Barry Song <baohua.song@csr.com>");
-> +MODULE_DESCRIPTION("CSR SiRFprimaII rtc io bridge");
-> +MODULE_LICENSE("GPL");
-> +
-> diff --git a/include/linux/rtc/sirfsoc_rtciobrg.h b/include/linux/rtc/sirfsoc_rtciobrg.h
+> +postcore_initcall(sirfsoc_memc_init);
+> diff --git a/arch/arm/mach-prima2/pm.h b/arch/arm/mach-prima2/pm.h
 > new file mode 100644
-> index 0000000..2c92e1c
+> index 0000000..fe2028b
 > --- /dev/null
-> +++ b/include/linux/rtc/sirfsoc_rtciobrg.h
-> @@ -0,0 +1,18 @@
+> +++ b/arch/arm/mach-prima2/pm.h
+> @@ -0,0 +1,31 @@
 > +/*
-> + * RTC I/O Bridge interfaces for CSR SiRFprimaII
-> + * ARM access the registers of SYSRTC, GPSRTC and PWRC through this module
+> + * arch/arm/mach-prima2/pm.h
+> + *
+> + * Copyright (C) 2011 CSR
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef _MACH_PRIMA2_PM_H_
+> +#define _MACH_PRIMA2_PM_H_
+> +
+> +#define SIRFSOC_PWR_SLEEPFORCE		0x01
+> +
+> +#define SIRFSOC_SLEEP_MODE_MASK         0x3
+> +#define SIRFSOC_DEEP_SLEEP_MODE         0x1
+> +
+> +#define SIRFSOC_PWRC_PDN_CTRL           0x0
+> +#define SIRFSOC_PWRC_PON_OFF            0x4
+> +#define SIRFSOC_PWRC_TRIGGER_EN         0x8
+> +#define SIRFSOC_PWRC_PIN_STATUS         0x14
+> +#define SIRFSOC_PWRC_SCRATCH_PAD1       0x18
+> +#define SIRFSOC_PWRC_SCRATCH_PAD2       0x1C
+> +
+> +#ifndef __ASSEMBLY__
+> +extern int sirfsoc_finish_suspend(unsigned long);
+> +#endif
+> +
+> +#endif
+> +
+> diff --git a/arch/arm/mach-prima2/sleep.S b/arch/arm/mach-prima2/sleep.S
+> new file mode 100644
+> index 0000000..07f8067
+> --- /dev/null
+> +++ b/arch/arm/mach-prima2/sleep.S
+> @@ -0,0 +1,61 @@
+> +/*
+> + * sleep mode for CSR SiRFprimaII
 > + *
 > + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
 > + *
 > + * Licensed under GPLv2 or later.
 > + */
-> +#ifndef _SIRFSOC_RTC_IOBRG_H_
-> +#define _SIRFSOC_RTC_IOBRG_H_
 > +
-> +extern void sirfsoc_rtc_iobrg_besyncing(void);
+> +#include <linux/linkage.h>
+> +#include <asm/ptrace.h>
+> +#include <asm/assembler.h>
 > +
-> +extern u32 sirfsoc_rtc_iobrg_readl(u32 addr);
+> +#include "pm.h"
 > +
-> +extern void sirfsoc_rtc_iobrg_writel(u32 val, u32 addr);
+> +#define DENALI_CTL_22_OFF	0x58
+> +#define DENALI_CTL_112_OFF	0x1c0
 > +
-> +#endif
+> +	.text
+> +
+> +ENTRY(sirfsoc_finish_suspend)
+> +	@ r5: 	mem controller
+> +	ldr     r0, =sirfsoc_memc_base
+> +	ldr	r5, [r0]
+> +	@ r7: 	rtc iobrg controller
+> +	ldr     r0, =sirfsoc_rtciobrg_base
+> +	ldr	r7, [r0]
+> +
+> +	@ Read the power control register and set the
+> +	@ sleep force bit.
+> +	ldr	r0, =SIRFSOC_PWRC_PDN_CTRL
+> +	bl	__sirfsoc_rtc_iobrg_readl
+> +	orr	r0,r0,#SIRFSOC_PWR_SLEEPFORCE
+> +	ldr	r1, =SIRFSOC_PWRC_PDN_CTRL
+> +	bl	sirfsoc_rtc_iobrg_pre_writel
+> +	mov	r1, #0x1
+> +
+> +	@ read the MEM ctl register and set the self
+> +	@ refresh bit
+> +
+> +	ldr	r2, [r5, #DENALI_CTL_22_OFF]
+> +	orr	r2, r2, #0x1
+> +
+> +	@ Following code has to run from cache since
+> +	@ the RAM is going to self refresh mode
+> +	.align 5
+> +	str	r2, [r5, #DENALI_CTL_22_OFF]
+> +
+> +1:
+> +	ldr	r4, [r5, #DENALI_CTL_112_OFF]
+> +	tst	r4, #0x1
+> +	bne	1b
+> +
+> +	@ write SLEEPFORCE through rtc iobridge
+> +
+> +	str	r1, [r7]
+> +	@ wait rtc io bridge sync
+> +1:
+> +	ldr	r3, [r7]
+> +	tst	r3, #0x01
+> +	bne	1b
+> +	b .
 > -- 
 > 1.7.1
 > 
