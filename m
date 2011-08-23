@@ -1,70 +1,73 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Aug 2011 13:56:58 +0200
-Subject: [GIT PULL] i.MX features for next
-Message-ID: <20110823115658.GK31404@pengutronix.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 23 Aug 2011 15:28:11 +0300
+Subject: [PATCH 1/9] OMAP2xxx: HWMOD: Fix DSS reset
+In-Reply-To: <1314102499-30407-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1314102499-30407-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1314102499-30407-2-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+DSS needs all DSS clocks to be enabled to be able to finish reset
+properly. Before v3.1-rc1 the omapdss driver was managing clocks and
+resets correctly. However, when omapdss started using runtime PM at
+v3.1-rc1, the responsibility for the reset moved to HWMOD framework.
 
-Please pull the following feature patches for next.
+HWMOD framework does not currently enable all the DSS clocks when
+resetting the DSS hardware. This hasn't caused any problems so far, but
+we may just have been lucky.
 
-Sascha
+This patch sets HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core in OMAP2xxx
+HWMOD data, fixing the issue.
 
-The following changes since commit 322a8b034003c0d46d39af85bf24fee27b902f48:
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    5 +++++
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    5 +++++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
-  Linux 3.1-rc1 (2011-08-07 18:23:30 -0700)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-for-arnd
-
-Arnaud Patard (3):
-      imx51: add pata device
-      imx51: add pata clock
-      imx: efika: Enable pata.
-
-Dong Aisheng (5):
-      ARM: mxs: add saif clock
-      ARM: mxs: add saif device
-      ARM: mxs: add sgtl5000 i2c device
-      ARM: mxs: add mxs-sgtl5000 device
-      ARM: mxs: correct the using of frac div for saif
-
-Sascha Hauer (1):
-      Merge branches 'features/imx-pata' and 'features/mxs' into imx-features
-
-Wolfram Sang (3):
-      arm: mxs: mx28evk: add fixed regulators for audio
-      arm: mach-mxs: add device for rtc
-      arm: mach-mxs: add rtc to all boards
-
- arch/arm/mach-mx5/Kconfig                         |    1 +
- arch/arm/mach-mx5/clock-mx51-mx53.c               |    5 ++
- arch/arm/mach-mx5/devices-imx51.h                 |    4 +
- arch/arm/mach-mx5/mx51_efika.c                    |    2 +
- arch/arm/mach-mxs/Kconfig                         |    6 ++
- arch/arm/mach-mxs/clock-mx28.c                    |    8 ++-
- arch/arm/mach-mxs/devices-mx23.h                  |    2 +
- arch/arm/mach-mxs/devices-mx28.h                  |    5 ++
- arch/arm/mach-mxs/devices/Kconfig                 |    6 ++
- arch/arm/mach-mxs/devices/Makefile                |    2 +
- arch/arm/mach-mxs/devices/platform-mxs-saif.c     |   60 ++++++++++++++++
- arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c |   51 +++++++++++++
- arch/arm/mach-mxs/include/mach/devices-common.h   |   12 +++
- arch/arm/mach-mxs/mach-mx23evk.c                  |    1 +
- arch/arm/mach-mxs/mach-mx28evk.c                  |   78 +++++++++++++++++++++
- arch/arm/mach-mxs/mach-stmp378x_devb.c            |    1 +
- arch/arm/mach-mxs/mach-tx28.c                     |    1 +
- arch/arm/plat-mxc/devices/Kconfig                 |    3 +
- arch/arm/plat-mxc/devices/Makefile                |    1 +
- arch/arm/plat-mxc/devices/platform-pata_imx.c     |   38 ++++++++++
- arch/arm/plat-mxc/include/mach/devices-common.h   |    7 ++
- 21 files changed, 292 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-mxs-saif.c
- create mode 100644 arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c
- create mode 100644 arch/arm/plat-mxc/devices/platform-pata_imx.c
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index a015c69..8fe373d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -874,12 +874,17 @@ static struct omap_hwmod_ocp_if *omap2420_dss_slaves[] = {
+ };
+ 
+ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
++	/*
++	 * The DSS HW needs all DSS clocks enabled during reset. The dss_core
++	 * driver does not use these clocks.
++	 */
+ 	{ .role = "tv_clk", .clk = "dss_54m_fck" },
+ 	{ .role = "sys_clk", .clk = "dss2_fck" },
+ };
+ 
+ static struct omap_hwmod omap2420_dss_core_hwmod = {
+ 	.name		= "dss_core",
++	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+ 	.class		= &omap2_dss_hwmod_class,
+ 	.main_clk	= "dss1_fck", /* instead of dss_fck */
+ 	.sdma_reqs	= omap2xxx_dss_sdma_chs,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index 16743c7..7a5e7f5 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -940,12 +940,17 @@ static struct omap_hwmod_ocp_if *omap2430_dss_slaves[] = {
+ };
+ 
+ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
++	/*
++	 * The DSS HW needs all DSS clocks enabled during reset. The dss_core
++	 * driver does not use these clocks.
++	 */
+ 	{ .role = "tv_clk", .clk = "dss_54m_fck" },
+ 	{ .role = "sys_clk", .clk = "dss2_fck" },
+ };
+ 
+ static struct omap_hwmod omap2430_dss_core_hwmod = {
+ 	.name		= "dss_core",
++	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+ 	.class		= &omap2_dss_hwmod_class,
+ 	.main_clk	= "dss1_fck", /* instead of dss_fck */
+ 	.sdma_reqs	= omap2xxx_dss_sdma_chs,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.4.1
