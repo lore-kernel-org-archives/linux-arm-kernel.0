@@ -1,89 +1,99 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Aug 2011 22:30:38 +0100
-Subject: [PATCH v2 1/5] ARM: debug: use kconfig choice for selecting DEBUG_LL
-	UART
+Date: Tue, 23 Aug 2011 22:30:40 +0100
+Subject: [PATCH v2 3/5] ARM: plat-samsung: use Kconfig choice for debug UART
+	selection
 In-Reply-To: <1314135042-19908-1-git-send-email-will.deacon@arm.com>
 References: <1314135042-19908-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1314135042-19908-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1314135042-19908-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling CONFIG_DEBUG_LL (which is required for earlyprintk) hardwires
-the debug UART address into the kernel, so that we can print before the
-platform is initialised.
-
-If the user inadvertently selects multiple platforms with DEBUG_LL
-enabled, the UART address may not be correct and will likely cause the
-kernel to hang in the very early stages of boot.
-
-This patch, based on a skeleton from Russell, uses a Kconfig choice for
-selecting the DEBUG_LL UART, therefore allowing the user to make a
-choice about the supported platform when DEBUG_LL is enabled.
+Now that the DEBUG_LL UART can be selected by a Kconfig choice, convert
+the Samsung UART selection to use a set of bools rather than an int.
 
 Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig.debug |   41 ++++++++++++++++++++++++-----------------
- 1 files changed, 24 insertions(+), 17 deletions(-)
+ arch/arm/Kconfig.debug        |   45 ++++++++++++++++++++++++++++++-----------
+ arch/arm/plat-samsung/Kconfig |    7 ++++++
+ 2 files changed, 40 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 81cbe40..11604c9 100644
+index 60d1846..875bd34 100644
 --- a/arch/arm/Kconfig.debug
 +++ b/arch/arm/Kconfig.debug
-@@ -72,6 +72,30 @@ config DEBUG_LL
- 	  in the kernel.  This is helpful if you are debugging code that
- 	  executes before the console is initialized.
+@@ -99,6 +99,39 @@ choice
+ 		  Saying N will cause the debug messages to appear on the first
+ 		  serial port.
  
-+choice
-+	prompt "Kernel low-level debugging port"
-+	depends on DEBUG_LL
-+
-+	config DEBUG_DC21285_PORT
-+		bool "Kernel low-level debugging messages via footbridge serial port"
-+		depends on FOOTBRIDGE
++	config DEBUG_S3C_UART0
++		depends on PLAT_SAMSUNG
++		bool "Use S3C UART 0 for low-level debug"
 +		help
 +		  Say Y here if you want the debug print routines to direct
-+		  their output to the serial port in the DC21285 (Footbridge).
-+		  Saying N will cause the debug messages to appear on the first
-+		  16550 serial port.
++		  their output to UART 0. The port must have been initialised
++		  by the boot-loader before use.
 +
-+	config DEBUG_CLPS711X_UART2
-+		bool "Kernel low-level debugging messages via UART2"
-+		depends on ARCH_CLPS711X
++		  The uncompressor code port configuration is now handled
++		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
++
++	config DEBUG_S3C_UART1
++		depends on PLAT_SAMSUNG
++		bool "Use S3C UART 1 for low-level debug"
 +		help
 +		  Say Y here if you want the debug print routines to direct
-+		  their output to the second serial port on these devices.
-+		  Saying N will cause the debug messages to appear on the first
-+		  serial port.
++		  their output to UART 1. The port must have been initialised
++		  by the boot-loader before use.
 +
-+endchoice
++		  The uncompressor code port configuration is now handled
++		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
 +
++	config DEBUG_S3C_UART2
++		depends on PLAT_SAMSUNG
++		bool "Use S3C UART 2 for low-level debug"
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART 2. The port must have been initialised
++		  by the boot-loader before use.
++
++		  The uncompressor code port configuration is now handled
++		  by CONFIG_S3C_LOWLEVEL_UART_PORT.
++
+ endchoice
+ 
  config EARLY_PRINTK
- 	bool "Early printk"
- 	depends on DEBUG_LL
-@@ -100,23 +124,6 @@ config OC_ETM
+@@ -129,16 +162,4 @@ config OC_ETM
  	  buffer driver that will allow you to collect traces of the
  	  kernel code.
  
--config DEBUG_DC21285_PORT
--	bool "Kernel low-level debugging messages via footbridge serial port"
--	depends on DEBUG_LL && FOOTBRIDGE
+-config DEBUG_S3C_UART
+-	depends on PLAT_SAMSUNG
+-	int "S3C UART to use for low-level debug"
+-	default "0"
 -	help
--	  Say Y here if you want the debug print routines to direct their
--	  output to the serial port in the DC21285 (Footbridge). Saying N
--	  will cause the debug messages to appear on the first 16550
--	  serial port.
+-	  Choice for UART for kernel low-level using S3C UARTS,
+-	  should be between zero and two. The port must have been
+-	  initialised by the boot-loader before use.
 -
--config DEBUG_CLPS711X_UART2
--	bool "Kernel low-level debugging messages via UART2"
--	depends on DEBUG_LL && ARCH_CLPS711X
--	help
--	  Say Y here if you want the debug print routines to direct their
--	  output to the second serial port on these devices.  Saying N will
--	  cause the debug messages to appear on the first serial port.
+-	  The uncompressor code port configuration is now handled
+-	  by CONFIG_S3C_LOWLEVEL_UART_PORT.
 -
- config DEBUG_S3C_UART
- 	depends on PLAT_SAMSUNG
- 	int "S3C UART to use for low-level debug"
+ endmenu
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index b3e1065..49b14b1 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -367,4 +367,11 @@ config SAMSUNG_PD
+ 	help
+ 	  Say Y here if you want to control Power Domain by Runtime PM.
+ 
++config DEBUG_S3C_UART
++	depends on PLAT_SAMSUNG
++	int
++	default "0" if DEBUG_S3C_UART0
++	default "1" if DEBUG_S3C_UART1
++	default "2" if DEBUG_S3C_UART2
++
+ endif
 -- 
 1.7.0.4
