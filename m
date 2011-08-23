@@ -1,38 +1,129 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 23 Aug 2011 16:35:31 +0200
-Subject: [PATCH] at91sam9261: fix typo in t2_clk alias for atmel_tcb.0
-Message-ID: <1314110131-32651-1-git-send-email-plagnioj@jcrosoft.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Tue, 23 Aug 2011 20:41:52 +0530
+Subject: [RFC/PATCH v2 09/13] dt: omap4: add soc file for handling i2c
+	controllers
+In-Reply-To: <4E53639A.10606@ti.com>
+References: <1314074021-25186-1-git-send-email-manjugk@ti.com>
+	<1314074021-25186-10-git-send-email-manjugk@ti.com>
+	<4E53639A.10606@ti.com>
+Message-ID: <20110823151152.GA32698@manju-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Remy Bohmer <linux@bohmer.net>
----
-Hi,
+On Tue, Aug 23, 2011 at 01:53:54PM +0530, Rajendra Nayak wrote:
+> On 8/23/2011 10:33 AM, G, Manjunath Kondaiah wrote:
+> >
+> >Add omap4 soc dts file for handling omap4 soc i2c
+> >controllers existing on l4-core bus.
+> >
+> >Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+> >---
+> >  arch/arm/boot/dts/omap4-panda.dts |    7 +---
+> >  arch/arm/boot/dts/omap4.dtsi      |   68 +++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 69 insertions(+), 6 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/omap4.dtsi
+> >
+> >diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+> >index 58909e9..c28aa95 100644
+> >--- a/arch/arm/boot/dts/omap4-panda.dts
+> >+++ b/arch/arm/boot/dts/omap4-panda.dts
+> >@@ -1,9 +1,4 @@
+> >-/dts-v1/;
+> >-
+> >-/memreserve/ 0x9D000000 0x03000000; /* Frame buffer */
+> >-/memreserve/ 0xB0000000 0x10000000; /* Top 256MB is unaccessable */
+> >-
+> >-/include/ "skeleton.dtsi"
+> >+/include/ "omap4.dtsi"
+> >
+> >  / {
+> >  	model = "TI OMAP4 PandaBoard";
+> >diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> >new file mode 100644
+> >index 0000000..cb055f5
+> >--- /dev/null
+> >+++ b/arch/arm/boot/dts/omap4.dtsi
+> >@@ -0,0 +1,68 @@
+> >+/*
+> >+ * Device Tree Source for OMAP4 SoC
+> >+ *
+> >+ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> >+ *
+> >+ * This file is licensed under the terms of the GNU General Public License
+> >+ * version 2.  This program is licensed "as is" without any warranty of any
+> >+ * kind, whether express or implied.
+> >+ */
+> >+
+> >+/dts-v1/;
+> >+
+> >+/memreserve/ 0x9D000000 0x03000000; /* Frame buffer */
+> >+/memreserve/ 0xB0000000 0x10000000; /* Top 256MB is unaccessable */
+> >+
+> >+/include/ "skeleton.dtsi"
+> >+
+> >+/ {
+> >+	#address-cells =<1>;
+> >+	#size-cells =<1>;
+> >+	model = "ti,omap4";
+> >+
+> >+	aliases {
+> >+		i2c1 =&i2c1;
+> >+		i2c2 =&i2c2;
+> >+		i2c3 =&i2c3;
+> >+		i2c4 =&i2c4;
+> >+	};
+> >+
+> >+	l4-core {
+> >+		compatible = "ti,omap4-l4-core", "sonics,s3220";
+> >+		#address-cells =<1>;
+> >+		#size-cells =<1>;
+> >+		ranges =<0 0x48000000 0x1000000>;
+> >+
+> >+		i2c1: i2c at 70000 {
+> >+			#address-cells =<1>;
+> >+			#size-cells =<0>;
+> 
+> Are these really needed, given there are no child nodes defined?
+> Same with all other instances.
+This will define all the available resources for a given soc and it
+can be disabled by using "status=disabled" in property field.
 
-	I'm in traveling right now
-	please test this patch
+This is ongoing debate whether to have status field or not. 
 
-	this will fix your issue on sam9261
+Grant,
+What is the final alignment on using status field?
 
-Best Regards,
-J.
- arch/arm/mach-at91/at91sam9261.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+-M
 
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index d522b47..6c8e3b5 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -157,7 +157,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
- 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
- 	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
--	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc1_clk),
-+	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
- 	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
- 	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
- 	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
--- 
-1.7.5.4
+> 
+> >+			compatible = "ti,omap-i2c", "ti,omap-device";
+> >+			reg =<0x70000 0x100>;
+> >+			interrupts =<  88>;
+> >+		};
+> >+
+> >+		i2c2: i2c at 72000 {
+> >+			#address-cells =<1>;
+> >+			#size-cells =<0>;
+> >+			compatible = "ti,omap-i2c", "ti,omap-device";
+> >+			reg =<0x72000 0x100>;
+> >+			interrupts =<  89>;
+> >+		};
+> >+
+> >+		i2c3: i2c at 60000 {
+> >+			#address-cells =<1>;
+> >+			#size-cells =<0>;
+> >+			compatible = "ti,omap-i2c", "ti,omap-device";
+> >+			reg =<0x60000 0x100>;
+> >+			interrupts =<  93>;
+> >+		};
+> >+
+> >+		i2c4: i2c at 350000 {
+> >+			#address-cells =<1>;
+> >+			#size-cells =<0>;
+> >+			compatible = "ti,omap-i2c", "ti,omap-device";
+> >+			reg =<0x350000 0x100>;
+> >+			interrupts =<  94>;
+> >+		};
+> >+	};
+> >+};
+> 
