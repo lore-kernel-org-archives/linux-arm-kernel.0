@@ -1,78 +1,90 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 23 Aug 2011 09:05:22 +0200
-Subject: [PATCH 2/2] ARM: i.MX5/mm: use static mapping for TZIC
-In-Reply-To: <1314014005-9923-3-git-send-email-jason.hui@linaro.org>
-References: <1314014005-9923-1-git-send-email-jason.hui@linaro.org>
-	<1314014005-9923-3-git-send-email-jason.hui@linaro.org>
-Message-ID: <20110823070522.GI16557@pengutronix.de>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Tue, 23 Aug 2011 16:08:27 +0900
+Subject: [PATCH v6 04/15] DMA: PL330: Add DMA_CYCLIC capability
+In-Reply-To: <CABb+yY0oQwBTc1zmow+ng+TEJTzRsjB-i1xZdLVwtT+RR6J5RQ@mail.gmail.com>
+References: <1313744097-27289-1-git-send-email-boojin.kim@samsung.com>
+	<1313744097-27289-5-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY2CjmoDEmvC3S0ua3=B++jKz5g2JXGTwhNcAw5MQ06M9A@mail.gmail.com>
+	<002c01cc60c3$77d18210$67748630$%kim@samsung.com>
+	<CABb+yY0oQwBTc1zmow+ng+TEJTzRsjB-i1xZdLVwtT+RR6J5RQ@mail.gmail.com>
+Message-ID: <001001cc6163$74cc62b0$5e652810$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jason,
+Jassi Brar [mailto:jassisinghbrar at gmail.com]
+> Sent: Tuesday, August 23, 2011 2:42 PM
+> To: Boojin Kim
+> Cc: linux-arm-kernel at lists.infradead.org; linux-samsung-
+> soc at vger.kernel.org; Vinod Koul; Kukjin Kim; Dan Williams; Mark Brown;
+> Grant Likely; Russell King
+> Subject: Re: [PATCH v6 04/15] DMA: PL330: Add DMA_CYCLIC capability
+>
+> On Mon, Aug 22, 2011 at 5:33 PM, Boojin Kim <boojin.kim@samsung.com>
+> wrote:
+> >>
+> >> > +static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
+> >> > +               struct dma_chan *chan, dma_addr_t dma_addr, size_t
+> len,
+> >> > +               size_t period_len, enum dma_data_direction
+> direction)
+> >> > +{
+> >> > +       struct dma_pl330_desc *desc;
+> >> > +       struct dma_pl330_chan *pch = to_pchan(chan);
+> >> > +       dma_addr_t dst;
+> >> > +       dma_addr_t src;
+> >> > +
+> >> > +       desc = pl330_get_desc(pch);
+> >> > +       if (!desc) {
+> >> > +               dev_err(pch->dmac->pif.dev, "%s:%d Unable to fetch
+> >> desc\n",
+> >> > +                       __func__, __LINE__);
+> >> > +               return NULL;
+> >> > +       }
+> >> > +
+> >> > +       switch (direction) {
+> >> > +       case DMA_TO_DEVICE:
+> >> > +               desc->rqcfg.src_inc = 1;
+> >> > +               desc->rqcfg.dst_inc = 0;
+> >> > +               src = dma_addr;
+> >> > +               dst = pch->fifo_addr;
+> >> > +               break;
+> >> > +       case DMA_FROM_DEVICE:
+> >> > +               desc->rqcfg.src_inc = 0;
+> >> > +               desc->rqcfg.dst_inc = 1;
+> >> > +               src = pch->fifo_addr;
+> >> > +               dst = dma_addr;
+> >> > +               break;
+> >> > +       default:
+> >> > +               dev_err(pch->dmac->pif.dev, "%s:%d Invalid dma
+> >> direction\n",
+> >> > +               __func__, __LINE__);
+> >> > +               return NULL;
+> >> > +       }
+> >> > +
+> >> > +       desc->rqcfg.brst_size = pch->burst_sz;
+> >> > +       desc->rqcfg.brst_len = 1;
+> >> > +
+> >> > +       if (!pch->cyclic)
+> >> > +               pch->cyclic = CYCLIC_PREP;
+> >> The need for check here seems suspicious.
+> >> Is it really needed? If not, please remove it.
+> > It's required because Cyclic operation is passed from CYCLIC_PREP to
+> > CYCLIC_TRIGGER.
+> I don't see why you need to differentiate between PREP and TRIGGER in
+> cyclic mode. I think, you should simply have 'bool cyclic' instead of
+> enum.
+On cyclic mode, Pl330_tasklet() operation is changed according to the value of 
+'cyclic'.
+In case of CYCLIC_PREP, Pl330_tasklet()operation is same with normal 
+operation.
+In case of CYCLIC_TRIGGER, pl330_tasklet()reloads the done data into 
+work_list.
+So, 'Cyclic' needs two status(CYCLIC_PREP and CYCLIC_TRIGGER) to distinguish 
+the operation on pl330_tasklet().
+The sequence is following.
+device_prep_dma_cyclic() -> set CYCLIC_PREP -> device_issue_pending() -> 
+Pl330_tasklet() with CYCLIC_PREP -> set CYCLIC_TRIGGER -> PL330 IRQ -> 
+Pl330_tasklet() with CYCLIC_TRIGGER.
 
-On Mon, Aug 22, 2011 at 07:53:25PM +0800, Jason Liu wrote:
-> We can use static mapping for TZIC to get rid of the
-> duplicated code for ioremap and the error handling of
-> ioremap, which will made code more clean and consistent.
-> 
-> Signed-off-by: Jason Liu <jason.hui@linaro.org>
-> ---
->  arch/arm/mach-mx5/mm.c                |   20 ++++----------------
->  arch/arm/plat-mxc/include/mach/mx51.h |    1 +
->  arch/arm/plat-mxc/include/mach/mx53.h |    1 +
->  3 files changed, 6 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-> index f8ebe37..adfe889 100644
-> --- a/arch/arm/mach-mx5/mm.c
-> +++ b/arch/arm/mach-mx5/mm.c
-> @@ -25,6 +25,7 @@
->   * Define the MX51 memory map.
->   */
->  static struct map_desc mx51_io_desc[] __initdata = {
-> +	imx_map_entry(MX51, TZIC, MT_DEVICE),
->  	imx_map_entry(MX51, IRAM, MT_DEVICE),
->  	imx_map_entry(MX51, DEBUG, MT_DEVICE),
->  	imx_map_entry(MX51, AIPS1, MT_DEVICE),
-> @@ -36,6 +37,7 @@ static struct map_desc mx51_io_desc[] __initdata = {
->   * Define the MX53 memory map.
->   */
->  static struct map_desc mx53_io_desc[] __initdata = {
-> +	imx_map_entry(MX53, TZIC, MT_DEVICE),
->  	imx_map_entry(MX53, AIPS1, MT_DEVICE),
->  	imx_map_entry(MX53, SPBA0, MT_DEVICE),
->  	imx_map_entry(MX53, AIPS2, MT_DEVICE),
-> @@ -100,32 +102,18 @@ void __init imx50_init_early(void)
->  void __init mx51_init_irq(void)
->  {
->  	unsigned long tzic_addr;
-> -	void __iomem *tzic_virt;
->  
->  	if (mx51_revision() < IMX_CHIP_REVISION_2_0)
->  		tzic_addr = MX51_TZIC_BASE_ADDR_TO1;
->  	else
->  		tzic_addr = MX51_TZIC_BASE_ADDR;
->  
-> -	tzic_virt = ioremap(tzic_addr, SZ_16K);
-> -	if (!tzic_virt)
-> -		panic("unable to map TZIC interrupt controller\n");
-> -
-> -	tzic_init_irq(tzic_virt);
-> +	tzic_init_irq(MX51_IO_ADDRESS(tzic_addr));
-arch/arm/plat-mxc/include/mach/hardware.h has a list of all SoCs with
-the memory areas mapped that you are expected to update if you add
-another mapping. If you had done that, you would have noticed that
-MX51_TZIC_BASE_ADDR (== 0xe0000000) maps to the very same address as
-MX51_DEBUG_BASE_ADDR (== 0x60000000).
-So only one of these two can be statically mapped (or the function needs
-to change).
-
-Having said that it would be nice to use a static mapping for TZIC. Do
-we really need MX51_DEBUG mapped?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+Boojin
