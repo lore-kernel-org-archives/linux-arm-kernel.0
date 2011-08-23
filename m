@@ -1,116 +1,86 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 23 Aug 2011 13:53:54 +0530
-Subject: [RFC/PATCH v2 09/13] dt: omap4: add soc file for handling i2c
-	controllers
-In-Reply-To: <1314074021-25186-10-git-send-email-manjugk@ti.com>
-References: <1314074021-25186-1-git-send-email-manjugk@ti.com>
-	<1314074021-25186-10-git-send-email-manjugk@ti.com>
-Message-ID: <4E53639A.10606@ti.com>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Tue, 23 Aug 2011 16:22:17 +0800
+Subject: [PATCH] ARM: mmp: map sram as MT_MEMORY rather than MT_DEVICE
+In-Reply-To: <4E535B66.8070301@marvell.com>
+References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
+	<1313377794-26721-2-git-send-email-leoy@marvell.com>
+	<20110822164740.5682541b@queued.net>
+	<CAMPhdO-cttCzdm_gh=KdNqqPYQOgPBNS57DtPduPahpkP2rk0g@mail.gmail.com>
+	<20110822190838.3e03c3ec@debxo>  <4E535B66.8070301@marvell.com>
+Message-ID: <1314087737.4444.22.camel@Lily>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/23/2011 10:33 AM, G, Manjunath Kondaiah wrote:
->
-> Add omap4 soc dts file for handling omap4 soc i2c
-> controllers existing on l4-core bus.
->
-> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
-> ---
->   arch/arm/boot/dts/omap4-panda.dts |    7 +---
->   arch/arm/boot/dts/omap4.dtsi      |   68 +++++++++++++++++++++++++++++++++++++
->   2 files changed, 69 insertions(+), 6 deletions(-)
->   create mode 100644 arch/arm/boot/dts/omap4.dtsi
->
-> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-> index 58909e9..c28aa95 100644
-> --- a/arch/arm/boot/dts/omap4-panda.dts
-> +++ b/arch/arm/boot/dts/omap4-panda.dts
-> @@ -1,9 +1,4 @@
-> -/dts-v1/;
-> -
-> -/memreserve/ 0x9D000000 0x03000000; /* Frame buffer */
-> -/memreserve/ 0xB0000000 0x10000000; /* Top 256MB is unaccessable */
-> -
-> -/include/ "skeleton.dtsi"
-> +/include/ "omap4.dtsi"
->
->   / {
->   	model = "TI OMAP4 PandaBoard";
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> new file mode 100644
-> index 0000000..cb055f5
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -0,0 +1,68 @@
-> +/*
-> + * Device Tree Source for OMAP4 SoC
-> + *
-> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/memreserve/ 0x9D000000 0x03000000; /* Frame buffer */
-> +/memreserve/ 0xB0000000 0x10000000; /* Top 256MB is unaccessable */
-> +
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	#address-cells =<1>;
-> +	#size-cells =<1>;
-> +	model = "ti,omap4";
-> +
-> +	aliases {
-> +		i2c1 =&i2c1;
-> +		i2c2 =&i2c2;
-> +		i2c3 =&i2c3;
-> +		i2c4 =&i2c4;
-> +	};
-> +
-> +	l4-core {
-> +		compatible = "ti,omap4-l4-core", "sonics,s3220";
-> +		#address-cells =<1>;
-> +		#size-cells =<1>;
-> +		ranges =<0 0x48000000 0x1000000>;
-> +
-> +		i2c1: i2c at 70000 {
-> +			#address-cells =<1>;
-> +			#size-cells =<0>;
+On Tue, 2011-08-23 at 00:48 -0700, Leo Yan wrote:
+> 
+> On 08/23/2011 10:08 AM, Andres Salomon wrote:
+> > On Tue, 23 Aug 2011 08:07:41 +0800
+> > Eric Miao<eric.y.miao@gmail.com>  wrote:
+> >
+> >> On Tue, Aug 23, 2011 at 7:47 AM, Andres Salomon<dilinger@queued.net>
+> >> wrote:
+> >>> The sram code allocates memory with ioremap, which assumes MT_DEVICE
+> >>> for memory protections.  This explodes when we map sram for power
+> >>> management purposes and then attempt to execute it (jump_to_lp_sram)
+> >>> on the OLPC XO-1.75.  Instead, we want to specify MT_MEMORY, which
+> >>> doesn't set the L_PTE_XN bit.
+> >>>
+> >>> Signed-off-by: Andres Salomon<dilinger@queued.net>
+> >>> ---
+> >>>   arch/arm/mach-mmp/sram.c |    4 +++-
+> >>>   1 files changed, 3 insertions(+), 1 deletions(-)
+> >>>
+> >>> Eric, this patch is against the devel branch of your pxa tree.
+> >>>
+> >>> diff --git a/arch/arm/mach-mmp/sram.c b/arch/arm/mach-mmp/sram.c
+> >>> index 4304f95..ca4d3c1 100644
+> >>> --- a/arch/arm/mach-mmp/sram.c
+> >>> +++ b/arch/arm/mach-mmp/sram.c
+> >>> @@ -21,6 +21,7 @@
+> >>>   #include<linux/err.h>
+> >>>   #include<linux/slab.h>
+> >>>   #include<linux/genalloc.h>
+> >>> +#include<asm/mach/map.h>
+> >>>
+> >>>   #include<mach/sram.h>
+> >>>
+> >>> @@ -87,7 +88,8 @@ static int __devinit sram_probe(struct
+> >>> platform_device *pdev)
+> >>>
+> >>>         info->sram_phys   = (phys_addr_t)res->start;
+> >>>         info->sram_size   = resource_size(res);
+> >>> -       info->sram_virt   = ioremap(info->sram_phys,
+> >>> info->sram_size);
+> >>> +       info->sram_virt   = __arm_ioremap(info->sram_phys,
+> >>> info->sram_size,
+> >>> +                                         MT_MEMORY);
+> >>
+> >> I doubt MT_MEMORY is intended for use with __arm_ioremap(). There
+> >> could be other way around to the L_PTE_XN bit.
+> >>
+> >> One other way I'm actually thinking of is to add the SRAM mapping to
+> >> mmp_map_io(). The difference of SRAM offset/size may result the
+> >> separation of mmp_map_io() into {pxa168,pxa910,mmp2}_map_io()
+> >> if necessary.
+> >>
+> >
+> > I guess I don't follow.  I think you're talking about adding it to the
+> > standard_io_desc array, but that would require having it pre-mapped and
+> > knowing the virtual address.  Or were you planning to ioremap it?
+> 
+> I missed the L_PTE_XN bit.
+> The patch is originally for audio sram, so use the ioremap is ok for 
+> that. But for the internal sram we should need the different mapping 
+> property.
+> 
+> so far, the standard_io_desc is shared by pxa168/pxa910/mmp2;
+> we can not add the sram's entry into it for now sram is only dedicated
+> to mmp2; just like Eric's suggestion, we need mmp2_map_io() only for
+> mmp2, and add the sram's entries into the structure.
+> if so, we need transfer the mapped info into the sram module,
+> and sram module just keep the info and do not need remap it again.
+> 
+> so what's your opinion?
 
-Are these really needed, given there are no child nodes defined?
-Same with all other instances.
-
-> +			compatible = "ti,omap-i2c", "ti,omap-device";
-> +			reg =<0x70000 0x100>;
-> +			interrupts =<  88>;
-> +		};
-> +
-> +		i2c2: i2c at 72000 {
-> +			#address-cells =<1>;
-> +			#size-cells =<0>;
-> +			compatible = "ti,omap-i2c", "ti,omap-device";
-> +			reg =<0x72000 0x100>;
-> +			interrupts =<  89>;
-> +		};
-> +
-> +		i2c3: i2c at 60000 {
-> +			#address-cells =<1>;
-> +			#size-cells =<0>;
-> +			compatible = "ti,omap-i2c", "ti,omap-device";
-> +			reg =<0x60000 0x100>;
-> +			interrupts =<  93>;
-> +		};
-> +
-> +		i2c4: i2c at 350000 {
-> +			#address-cells =<1>;
-> +			#size-cells =<0>;
-> +			compatible = "ti,omap-i2c", "ti,omap-device";
-> +			reg =<0x350000 0x100>;
-> +			interrupts =<  94>;
-> +		};
-> +	};
-> +};
+Could we use resource or platform data to specify sram is used for
+device or memory? If so, it may be helpful to customize.
