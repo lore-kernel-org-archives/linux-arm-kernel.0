@@ -1,72 +1,109 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Tue, 23 Aug 2011 20:17:29 +0530
-Subject: [PATCH v5 05/22] gpio/omap: handle save/restore ctx in GPIO driver
-In-Reply-To: <4E53A2D4.90109@ti.com>
-References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
-	<1312455893-14922-6-git-send-email-tarun.kanti@ti.com>
-	<4E53A2D4.90109@ti.com>
-Message-ID: <4E53BD81.4050606@ti.com>
+From: Ian.Jackson@eu.citrix.com (Ian Jackson)
+Date: Tue, 23 Aug 2011 15:52:25 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+Message-ID: <20051.48809.945431.800543@mariner.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 August 2011 06:23 PM, Santosh wrote:
-> On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
->> From: Charulatha V<charu@ti.com>
->>
->> Modify omap_gpio_prepare_for_idle()& omap_gpio_resume_after_idle()
->> functions
->> to handle save context& restore context respectively in the OMAP GPIO
->> driver
->> itself instead of calling these functions from pm specific files.
->> For this, in gpio_prepare_for_idle(), call *_get_context_loss_count()
->> and in
->> gpio_resume_after_idle() call it again. If the count is different, do
->> restore
->> context. The workaround_enabled flag is no more required and is removed.
->>
->> Signed-off-by: Charulatha V<charu@ti.com>
->> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
->> ---
->
-> "ctx" ?
-> Please change it to 'context' is subject and rest of the code.
->
->
->> arch/arm/mach-omap2/gpio.c | 12 +++
->> arch/arm/mach-omap2/pm34xx.c | 14 ----
->> arch/arm/plat-omap/include/plat/gpio.h | 5 +-
->> drivers/gpio/gpio-omap.c | 131 ++++++++++++++------------------
->> 4 files changed, 73 insertions(+), 89 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
->> index 95195a8..2e65377 100644
->> --- a/arch/arm/mach-omap2/gpio.c
->> +++ b/arch/arm/mach-omap2/gpio.c
->> @@ -23,6 +23,7 @@
->>
->> #include<plat/omap_hwmod.h>
->> #include<plat/omap_device.h>
->> +#include<plat/omap-pm.h>
->>
->> #include "powerdomain.h"
->>
->> @@ -34,6 +35,16 @@ static struct omap_device_pm_latency
->> omap_gpio_latency[] = {
->> },
->> };
->>
->> +#ifdef CONFIG_PM
->> +static int omap_gpio_get_context_loss(struct device *dev)
->> +{
->> + return omap_pm_get_dev_context_loss_count(dev);
->> +}
-> Do you really need this wrapper. Use the funtion directly instead.
->
-> Rest looks fine to me
+We're looking into porting Xen to the ARM A15 architecture.  In this
+context, it's necessary to arrange for the Xen hypervisor to be
+entered from the boot loader in an appropriate processor mode.
 
-One more thing I missed is, the dataout register save/restore
-As per your patches, it's OMAP version dependent to use set_dataout
-vs dataout. Please handle it as part of save/restore code.
+KVM needs to deal with the same problem, of course.  And any future
+Linux kernel feature which uses the Secure State does too.
 
-Regards
-Santosh
+We are currently working with ARM's "Fast Model" of the Cortex A15, a
+software emulator.  We're using it in the mode where you feed it an
+ELF and it loads it into simulated RAM and starts executing at the
+ELF entrypoint.  It does this in the CPU's defined startup mode, which
+is Kernel mode in the Secure state.
+
+It seems that this environment is what the nascent KVM-on-A15
+developers [1] are using too.  There is modified version of the tiny
+boot wrapper (the normal version of which just emulates the proper
+calling API for the kernel); it sets up a trampoline security monitor.
+
+We need to define a correct calling convention for the kernel which is
+compatible with old systems, but which also allows the booted kernel
+(Linux, perhaps KVM-enabled, or indeed a hypervisor like Xen) use of
+all the available facilities.  The correct approach does seem to be to
+have Linux set itself up a trivial trampoline which allows the kernel
+to later regain the elevated privilege.
+
+There are a couple of things with the existing KVM ARM approach with
+the trivial boot wrapper which need to be fixed, though: firstly,
+there should be separate trampolines for hypervisor mode and for
+secure state.  That allows the two features to be used independently.
+Secondly, the trivial trampolines should be part of the kernel proper
+and their lifetime should not extend across the bootloader interface.
+
+At first I thought that the best thing to do would be to boot the
+kernel in any suitable mode, and have the kernel automatically detect
+the starting mode.  I started writing code in linux's head.S to do
+this.  However, detecting whether we are in secure state is very
+difficult: it involves deliberately risking an undefined instruction
+trap.  The code for this was getting rather long and involved.
+
+Also, unconditionally starting a kernel in hypervisor mode seems
+rather unfriendly.  At the moment we unconditionally start it in the
+secure state and indeed in the current setup it seems to run entirely
+in secure state.  It seems to me that the kernel should mostly run in
+non-secure state.
+
+So I propose the following approach:
+
+ 1. The kernel will advertise via ELF notes what modes it may be
+    started in.  The possible modes will be:
+       (i)   secure monitor mode
+       (ii)  non-secure hypervisor mode
+       (iii) non-secure kernel mode
+
+ 2. The bootloader will select the first mode from the three listed
+    above which is supported by both the processor and the kernel to
+    be loaded, and transition the processor to that mode.  If this
+    involves dropping out of secure or hypervisor mode, it will put
+    those modes permanently beyond use.
+
+ 3. The kernel will examine CPSR to determine which of the three
+    possibilities above has happened, and:
+   (a) If started in monitor mode:
+       * Grant access to everything to non-secure state
+       * Set the non-secure copies of the various CP15 registers
+         which don't have a sane value on cpu reset
+       * Install a trivial monitor vector which unconditionally
+         copies r0 to MVBAR and returns
+       * Switch to non-secure Hyp mode (if available) and do (b),
+         or non-secure Kernel mode (if Hyp mode not supported).         
+   (b) If started in Hyp mode:
+       * Install a trivial hypervisor vector which unconditionally
+         copies r0 to HVBAR and returns
+   (c) Rest of startup.
+
+Questions:
+
+ 1. What do people think ?  If this seems plausible I will prepare
+    an RFC patch for Linux and the boot-wrapper.git.
+
+ 2. This cpu startup process must happen very early - before paging
+    is enabled, in any case, so before RAM is really available.
+    However, it produces two bits of information: 1. does the
+    kernel own secure state; 2. does the kernel own hyp mode.
+    Where should this information be stored ?
+
+ 3. Is Linux allowed to assume that the secondary CPUs have the
+    same properties as the boot CPU ?  If not, where do I store the
+    availability of the secure/hyp modes for the secondary cpus ?
+    Perhaps that ought to be in the device tree.
+
+ 4. I'm not very familiar with the KVM on ARM code.  How much would
+    have to be changed to existing KVM on ARM to make it conform to
+    the above scheme ?  In particular it would have to not use SMC to
+    adjust the HVBAR; instead, it would have to take control of HVBAR
+    once per CPU.
+
+Opinions welcome.
+
+Thanks,
+Ian.
+
+[1] http://wiki.ncl.cs.columbia.edu/wiki/KVMARM:Guides:Development_Environment
