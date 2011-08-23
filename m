@@ -1,46 +1,30 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 23 Aug 2011 09:48:48 +0530
-Subject: [RFC PATCH 6/6] hwmon: OMAP4: On die temperature sensor driver
-In-Reply-To: <874o19gfrr.fsf@ti.com>
-References: <1312979122-5896-1-git-send-email-j-keerthy@ti.com>
-	<1312979122-5896-7-git-send-email-j-keerthy@ti.com>
-	<20110810124629.GJ12882@legolas.emea.dhcp.ti.com>
-	<CAJ6a13Z=u=exWUHLotw8jpHMv-hKpE+fvg_1hq7=gtMiuJKxOA@mail.gmail.com>
-	<20110811103658.GG27742@legolas.emea.dhcp.ti.com>
-	<CAJ6a13bxg8po-Csc10LsFH-oES4YOKkqFoTm3kG4XzS=b2boMw@mail.gmail.com>
-	<20110811141248.GK28500@legolas.emea.dhcp.ti.com>
-	<CAJ6a13b7qu3K4YJPTYych_NQxLuuUxZOQg6PPC_=XA+qiwn2RA@mail.gmail.com>
-	<20110811185408.GB15970@legolas.emea.dhcp.ti.com>
-	<20110811185558.GC15970@legolas.emea.dhcp.ti.com>
-	<4E444B8F.9060908@ti.com> <4E449D65.9000004@ti.com>
-	<874o19gfrr.fsf@ti.com>
-Message-ID: <4E532A28.60103@ti.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Tue, 23 Aug 2011 09:52:49 +0530
+Subject: [PATCH 16/18] dmaengine/amba-pl08x: Add support for sg len greater
+	than one for slave transfers
+In-Reply-To: <20110821083306.GA12028@n2100.arm.linux.org.uk>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
+	<20110814083618.GE4986@n2100.arm.linux.org.uk>
+	<4E4CCF7B.8060704@st.com>
+	<20110821083306.GA12028@n2100.arm.linux.org.uk>
+Message-ID: <4E532B19.6000103@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/23/2011 5:28 AM, Kevin Hilman wrote:
-> Rajendra Nayak<rnayak@ti.com>  writes:
->
-> [...]
->
->> FWIK, its a one time requirement to set the clock rate to the
->> right rate the device can operate in based on what a platform
->> supports.
->
-> Except $SUBJECT patch hard-codes the clock rate for all platforms in the
-> driver.
+On 8/21/2011 2:03 PM, Russell King - ARM Linux wrote:
+>> > I am not sure if i get this completely. In memcpy, we still don't support
+>> > more than one sg. We have created a new member in txd, which keeps track of
+>> > data (addresses, len).
+> Yes, but we shouldn't need to translate it into any kind of scatterlist.
+> 
 
-The device has a requirement to operate in a 1Mhz to 2Mhz range. So the
-driver is using a clk_round_rate() to get the closest rate supported and
-sets it using a clk_set_rate().
+Ok. I way out is keeping two separate variables in txd, list for slave transfers,
+and pointer to single element for memcpy. And that looks to be even bad to me.
+Why waste memory, for second variable. Or create union of both.
 
->
-> If the clock rate is to be platform-specific, it should be done in
-> platform-specific code.
+One more thing, we can actually have scatter gather in memcpy too in future. This will be
+helpful then also. But surely that's something not implemented currently.
 
-I am fine if this needs to be moved to platform-specific code, but I
-wasn't quite sure this needs to be done in clock framework as was
-suggested.
-
->
-> Kevin
+-- 
+viresh
