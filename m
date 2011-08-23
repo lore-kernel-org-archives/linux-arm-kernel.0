@@ -1,36 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Aug 2011 14:51:17 +0200
-Subject: [RFC PATCH v2 00/13] arm/tegra: Initialize GPIO & pinmux from DT
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04AEA25368@HQMAIL01.nvidia.com>
-References: <1313440100-17131-1-git-send-email-swarren@nvidia.com>
-	<201108161509.17157.arnd@arndb.de>
-	<CACRpkdaVx=6AJ5DFjVN1ZYQ++hu9pT6WxD9n+pqmYVaCf1xawg@mail.gmail.com>
-	<201108161637.16620.arnd@arndb.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF04AEA25368@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdY=nVQYnznTU7=_D0n1V1U_xOKH2y75-jKp7k7NzwH8Zw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Tue, 23 Aug 2011 18:23:40 +0530
+Subject: [PATCH v5 05/22] gpio/omap: handle save/restore ctx in GPIO driver
+In-Reply-To: <1312455893-14922-6-git-send-email-tarun.kanti@ti.com>
+References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+	<1312455893-14922-6-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4E53A2D4.90109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 7:12 PM, Stephen Warren <swarren@nvidia.com> wrote:
+On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
+> From: Charulatha V<charu@ti.com>
+>
+> Modify omap_gpio_prepare_for_idle()&  omap_gpio_resume_after_idle() functions
+> to handle save context&  restore context respectively in the OMAP GPIO driver
+> itself instead of calling these functions from pm specific files.
+> For this, in gpio_prepare_for_idle(), call *_get_context_loss_count() and in
+> gpio_resume_after_idle() call it again. If the count is different, do restore
+> context. The workaround_enabled flag is no more required and is removed.
+>
+> Signed-off-by: Charulatha V<charu@ti.com>
+> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> ---
 
-> One issue here: There isn't always a single gpio/pinmux parent; as a
-> concrete example, the ALSA/ASoC driver for Tegra+WM8903 uses GPIOs both
-> from Tegra itself, and from the WM8903 audio codec.
+"ctx" ?
+Please change it to 'context' is subject and rest of the code.
 
-The Ux500 have pinmuxing on the DB8500 and AB8500 - the latter
-is a PMIC (&misc) connected to the DB8500 via I2C.
 
-In the pincontrol subsystem I'm brewing, each of these will have
-their own pin controller instance and their own struct gpio_chip as
-well, so:
+>   arch/arm/mach-omap2/gpio.c             |   12 +++
+>   arch/arm/mach-omap2/pm34xx.c           |   14 ----
+>   arch/arm/plat-omap/include/plat/gpio.h |    5 +-
+>   drivers/gpio/gpio-omap.c               |  131 ++++++++++++++------------------
+>   4 files changed, 73 insertions(+), 89 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+> index 95195a8..2e65377 100644
+> --- a/arch/arm/mach-omap2/gpio.c
+> +++ b/arch/arm/mach-omap2/gpio.c
+> @@ -23,6 +23,7 @@
+>
+>   #include<plat/omap_hwmod.h>
+>   #include<plat/omap_device.h>
+> +#include<plat/omap-pm.h>
+>
+>   #include "powerdomain.h"
+>
+> @@ -34,6 +35,16 @@ static struct omap_device_pm_latency omap_gpio_latency[] = {
+>   	},
+>   };
+>
+> +#ifdef CONFIG_PM
+> +static int omap_gpio_get_context_loss(struct device *dev)
+> +{
+> +	return omap_pm_get_dev_context_loss_count(dev);
+> +}
+Do you really need this wrapper. Use the funtion directly instead.
 
-DB8500: pinctrl.0, gpio.0
-AB8500: pinctrl.1, gpio.1
-
-Each GPIO chip may have it's respective pin controller as parent
-I guess, or they may simply be the same struct device * whatdoIknow.
-
-I know this is vaporware, but does this reasoning hold also to
-the Tegra+WM8903 combo?
-
-Linus Walleij
+Rest looks fine to me
