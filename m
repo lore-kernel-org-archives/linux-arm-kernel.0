@@ -1,58 +1,42 @@
-From: lrg@ti.com (Liam Girdwood)
-Date: Tue, 23 Aug 2011 20:26:59 +0100
-Subject: [PATCH] ASoC: Tegra: wm8903 machine driver: Drop Ventana support
-In-Reply-To: <1314119788-23000-1-git-send-email-swarren@nvidia.com>
-References: <1314119788-23000-1-git-send-email-swarren@nvidia.com>
-Message-ID: <4E53FF03.1030100@ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 23 Aug 2011 21:45:09 +0200
+Subject: Fwd: [RFC/PATCH v2 09/13] dt: omap4: add soc file for handling
+	i2c controllers
+In-Reply-To: <20110823151841.GB32698@manju-desktop>
+References: <1314074021-25186-10-git-send-email-manjugk@ti.com>
+	<4E537FA7.3050609@ti.com> <4E53AF9F.8070607@ti.com>
+	<20110823151841.GB32698@manju-desktop>
+Message-ID: <4E540345.1090004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/08/11 18:16, Stephen Warren wrote:
-> Board file support for Ventana is not yet mainlined, and probably won't
-> ever be given the move to Device-Tree. Consequently, the Ventana entry
-> is being removed from arch/arm/tools/mach-types in the next merge window,
-> since it was registered over a year ago.
-> 
-> This will also remove function machine_is_ventana(), which is used by
-> the ASoC Tegra WM8903 machine driver. This will cause compilation
-> failures. Drop Ventana support to resolve this.
-> 
-> Hopefully, in the not-too-distant future, tegra_wm8903.c will be able to
-> configure itself from Device-Tree, and hence we'll be able to re-instate
-> Ventana support just by creating a .dts file for the board.
-> 
-> Also note that Aebl support is in a similar boat. However, that board
-> isn't scheduled for deprecation for at least another 5 months, and
-> perhaps we will have completely removed non-Device-Tree support from
-> tegra_wm8903.c by then and/or adjusted mach-types policy.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+On 8/23/2011 5:18 PM, G, Manjunath Kondaiah wrote:
+> On Tue, Aug 23, 2011 at 03:48:15PM +0200, Cousson, Benoit wrote:
+>> From: G, Manjunath Kondaiah<manjugk@ti.com>
+>>> To: devicetree-discuss at lists.ozlabs.org
+>>> CC: linux-omap at vger.kernel.org, linux-arm-kernel at lists.infradead.org
+>>>
+>>>
+>>> Add omap4 soc dts file for handling omap4 soc i2c
+>>> controllers existing on l4-core bus.
+>>
+>> The subject and changelog is not accurate. You are doing at least 3 things:
+>> Moving the OMAP4 SoC data from panda board file to a SoC specific
+>> omap4.dtsi file.
+>> Including the omap4.dtsi into panda.
+>> Adding some i2c nodes.
+>>
+>> You should use at least two or three separated patches to avoid
+>> in-accurate subject.
+>
+> As these changes are straight forward, I can update patch description with
+> the required information instead of create too many patches.
+>
+> If you are too specific on splitting the patches, I am ok with that too.
 
-Acked-by: Liam Girdwood <lrg@ti.com>
+I already fixed partially the OMAP4 patches as part of my upcoming OMAP4 
+early devices DT migration. So I'll rebase your series on top of it.
 
-> ---
->  sound/soc/tegra/tegra_wm8903.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/sound/soc/tegra/tegra_wm8903.c b/sound/soc/tegra/tegra_wm8903.c
-> index 661373c..be27f1d 100644
-> --- a/sound/soc/tegra/tegra_wm8903.c
-> +++ b/sound/soc/tegra/tegra_wm8903.c
-> @@ -319,7 +319,7 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
->  	snd_soc_dapm_force_enable_pin(dapm, "Mic Bias");
->  
->  	/* FIXME: Calculate automatically based on DAPM routes? */
-> -	if (!machine_is_harmony() && !machine_is_ventana())
-> +	if (!machine_is_harmony())
->  		snd_soc_dapm_nc_pin(dapm, "IN1L");
->  	if (!machine_is_seaboard() && !machine_is_aebl())
->  		snd_soc_dapm_nc_pin(dapm, "IN1R");
-> @@ -395,7 +395,7 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, card);
->  	snd_soc_card_set_drvdata(card, machine);
->  
-> -	if (machine_is_harmony() || machine_is_ventana()) {
-> +	if (machine_is_harmony()) {
->  		card->dapm_routes = harmony_audio_map;
->  		card->num_dapm_routes = ARRAY_SIZE(harmony_audio_map);
->  	} else if (machine_is_seaboard()) {
+I'll send you that tomorrow.
+
+Benoit
