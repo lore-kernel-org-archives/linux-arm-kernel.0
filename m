@@ -1,35 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Aug 2011 18:01:20 +0200
-Subject: [PATCH v2 1/4] ARM: CSR: add rtc i/o bridge interface for
-	SiRFprimaII
-In-Reply-To: <1314080152-30503-2-git-send-email-Baohua.Song@csr.com>
-References: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
-	<1314080152-30503-2-git-send-email-Baohua.Song@csr.com>
-Message-ID: <201108231801.20595.arnd@arndb.de>
+From: wolfgang.betz@st.com (Wolfgang BETZ)
+Date: Tue, 23 Aug 2011 18:12:01 +0200
+Subject: [RFC][PATCH 0/1 v1] Using Thread Notifiers to Add Thread Support
+	for the Context ID Register of ARM v6 & v7 Architectures
+Message-ID: <cover.1314115617.git.wolfgang.betz@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 August 2011, Barry Song wrote:
-> From: Zhiwu Song <zhiwu.song@csr.com>
-> 
-> The module is a bridge between the RTC clock domain and the CPU interface
-> clock domain. ARM access the register of SYSRTC, GPSRTC and PWRC through
-> this module.
-> 
-> Signed-off-by: Zhiwu Song <zhiwu.song@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
+From: Wolfgang Betz <wolfgang.betz@st.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+The Context ID Register, CONTEXTIDR, identifies the current:
+- Process Identifier (PROCID) &
+- Address Space Identifier (ASID).
 
-Looks basically good now. Aside from the trivial things that Jamie
-already pointed out, there is one more that I noticed:
+The value of the whole of this register is called the Context ID and is 
+used by:
+- the ARM debug logic, for Linked and Unlinked Context ID matching
+  (e.g. for breakpoint debug and watchpoint debug events).
+- the trace logic, to identify the current process.
 
-> +
-> +void __iomem *sirfsoc_rtciobrg_base;
-> +static DEFINE_SPINLOCK(rtciobrg_lock);
+The CONTEXTIDR is a 32-bit read/write register whose format is:
+- PROCID, bits [31:8]
+  Process Identifier. This field should be programmed with a unique 
+  value that identifies the current process and is used by the trace logic and 
+  the debug logic to identify the process that is running currently.
+- ASID, bits [7:0]
+  Address Space Identifier. This field must be programmed with the 
+  value of the current ASID and is used by many memory management functions.
 
-sirfsoc_rtciobrg_base should be static as well. No other code can
-properly access it anyway since the lock is static, too.
+This change-set aims at:
+- implementing thread tracing support based on the armv6 & v7 CONTEXTIDR 
+  register while leaving the Linux kernel ASID functionality (semantically)
+  unchanged.
+- focusing on compatibility with tracing tools such as Lauterbach's 
+  TRACE32 tool.
+- the avoidance of platform specific calls in generic code.
+- simplicity, readability, and good performances.
+- being general: i.e. the change-set applies to all armv7/v6 platforms &
+  is in general compilable for all (other) platforms.
 
-	Arnd
+The patch has been jointly developed by 
+Lauterbach GmbH (http://www.lauterbach.com) and 
+STMicroelectronics Srl (http://www.st.com/). 
+Main contributors are:
+- Khaled Jmal <khaled.jmal@lauterbach.com>
+- Rudi Dienstbeck <Rudolf.Dienstbeck@Lauterbach.com>
+- Wolfgang Betz <wolfgang.betz@st.com>
+
+
+Wolfgang Betz (1):
+  Using Thread Notifiers to Add Thread Support for the Context ID
+    Register of ARM v6 & v7 Architectures
+
+ arch/arm/Kconfig.debug             |   12 ++++++
+ arch/arm/include/asm/mmu_context.h |   75 ++++++++++++++++++++++++++++++++----
+ arch/arm/include/asm/proc-fns.h    |    9 ++--
+ arch/arm/kernel/smp.c              |    2 +-
+ arch/arm/mm/context.c              |   54 +++++++++++++++++++++++++-
+ arch/arm/mm/proc-v6.S              |    4 +-
+ arch/arm/mm/proc-v7.S              |    4 +-
+ 7 files changed, 140 insertions(+), 20 deletions(-)
+
+-- 
+1.7.6
