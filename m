@@ -1,62 +1,53 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 23 Aug 2011 22:28:49 +0200
-Subject: [PATCH 1/4] S3C2443: Move i2s clock definitions to common code
-In-Reply-To: <06c001cc6146$b9f30be0$2dd923a0$%kim@samsung.com>
-References: <201108201757.56483.heiko@sntech.de>
-	<201108211925.05300.heiko@sntech.de>
-	<06c001cc6146$b9f30be0$2dd923a0$%kim@samsung.com>
-Message-ID: <201108232228.49647.heiko@sntech.de>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Tue, 23 Aug 2011 19:39:07 +0100
+Subject: [PATCH] i2c: tegra: Check for overflow errors with BUG_ON.
+In-Reply-To: <20110815200349.GA2616@legolas.emea.dhcp.ti.com>
+References: <1313434172-18319-1-git-send-email-dianders@chromium.org>
+	<20110815191745.GA7178@legolas.emea.dhcp.ti.com>
+	<CAD=FV=Xd67iw=GXV9i4O5LKnJd20=BkYyfVuxPgxQ5GZRJEy4A@mail.gmail.com>
+	<20110815200349.GA2616@legolas.emea.dhcp.ti.com>
+Message-ID: <20110823183907.GA24318@freya.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag 23 August 2011, 05:42:47 schrieb Kukjin Kim:
-> Heiko St?bner wrote:
-> > Am Sonntag 21 August 2011, 19:13:32 schrieb Russell King - ARM Linux:
-> > > On Sat, Aug 20, 2011 at 06:01:29PM +0200, Heiko St?bner wrote:
-> > > > +/* i2s-ref
-> > > > + *
-> > > > + * i2s bus reference clock, selectable from external, esysclk or
+On Mon, Aug 15, 2011 at 11:03:50PM +0300, Felipe Balbi wrote:
+> HI,
 > 
-> epllref
-> 
-> > > > + *
-> > > > + * Note, this used to be two clocks, but was compressed into one.
-> > > > +*/
-> > > > +
-> > > > +struct clk *clk_i2s_srclist[] = {
-> > > > +	[0] = &clk_i2s_eplldiv.clk,
-> > > > +	[1] = &clk_i2s_ext,
-> > > > +	[2] = &clk_epllref.clk,
-> > > > +	[3] = &clk_epllref.clk,
-> > > > +};
-> > > 
-> > > Is there any reason not to make this static (have you run your patch
-> > > through checkpatch.pl ?)
+> On Mon, Aug 15, 2011 at 12:52:36PM -0700, Doug Anderson wrote:
+> > Felipe,
 > > 
-> > Yep I did run all of them through checkpatch (after beeing scolded last
+> > On Mon, Aug 15, 2011 at 12:17 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > > so due to a FIFO overflow you lock up the whole system ? Can't you e.g.
+> > > reset the controller and reconfigure it rather than locking up the
+> > > system ?
+> > 
+> > Certainly we could try to be more proactive and reset / retry / return
+> > the error to the client.  However, since the only expected situation
+> > where this BUG_ON should hit is due to a bug in this driver itself
+> > (AKA: i2c clients shouldn't be able to do anything to cause the BUG_ON
+> > to hit), that seems like a lot of added complexity.
 > 
-> time)
+> so at least just pass an error to the client, but hanging the entire
+> system seems a bit too much, dont you think ?
 > 
-> > and it didn't report anything.
+> > Also: if there is an arbitrary software bug that causing an overflow
+> > condition to occur, I'm not sure how stable the system will be.
+> > Specifically, the i2c controller is used (among other things) to talk
+> > to the PMU and adjust voltages in the system.  If we just sent it a
+> > random command, I'd rather report the bug right away so we don't get
+> > hard to find/reproduce failures in other parts of the system.
 > 
-> Hmm...as a note, happened following with checkpatch.pl :(
-> 
-> ERROR: need consistent spacing around '*' (ctx:WxV)
-> #35: FILE: arch/arm/mach-s3c2416/clock.c:57:
-> +               .sources = (struct clk *[]) {
->                                        ^
-> 
-> total: 1 errors, 0 warnings, 38 lines checked
-> 
-> PATCH 34 S3C2416 Add HSSPI clock sourced from EPLL.txt has style problems,
-> please review.
-will do.
+> that's a good point, I still think that e.g. making a cellphone
+> unresponsive until a watchdog reset triggers just because you got a FIFO
+> overflow on the I2C controller is too much.
 
-Today I also saw, that my definition of the hsspi pclk would have caused a 
-conflict with the hsspi sclk definition of s3c2443.
+Yes, I would agree on that. BUG() really should be only used
+for occasions where there's little possiblity the entire system
+can continue to work.
 
-So, as nobody uses the s3c2443's hsspi controller yet, I would also rename it 
-to hsspi-if with the next patch iteration.
+In this case, it seems far more sensible to report this as an
+error and see what can be done to recover the bus and controller
+for the next transaction.
 
-
-Heiko
+-- 
+Ben
