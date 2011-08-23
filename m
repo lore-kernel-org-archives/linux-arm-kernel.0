@@ -1,15 +1,44 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 23 Aug 2011 17:59:53 +0300
-Subject: [PATCH 1/7] omap: iommu: migrate to the generic IOMMU API
-In-Reply-To: <20110823140746.GP2079@amd.com>
-References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
-	<1313622608-30397-2-git-send-email-ohad@wizery.com>
-	<20110823140746.GP2079@amd.com>
-Message-ID: <CAK=WgbZYuuKHUu6P+nfNzPgF4QmoL=T9+yquc=rMXRh4QE9grg@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 23 Aug 2011 16:42:18 +0200
+Subject: ARM Sub-Architecture Maintainers workshop at Kernel Summit 2011
+In-Reply-To: <20110822113916.GY31404@pengutronix.de>
+References: <CACxGe6uFpW_RARvnPoO8ogwr_ppwe4S4NmkK3=odeHOCX0=NBA@mail.gmail.com>
+	<20110822113916.GY31404@pengutronix.de>
+Message-ID: <20110823144218.GI30313@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 5:07 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> Can this be easily converted to a spin_lock?
+On 13:39 Mon 22 Aug     , Sascha Hauer wrote:
+> On Fri, Aug 19, 2011 at 05:02:57PM -0700, Grant Likely wrote:
+> > Hi all,
+> > 
+> > It looks like there is definitely enough interest on this, so we're
+> > going ahead and scheduling a workshop for the first day of kernel
+> > summit.  Space is limited however, so I need to assemble a confirmed
+> > attendee list.  It looks like we've got room for about two dozen
+> > people.
+> > 
+> > So, if you are an ARM subarchitecture maintainer (or generally
+> > involved with ARM maintainership) and you want to attend, then please
+> > email me ASAP.  Attendance confirmation will be first come, first
+> > serve.  Here is the list of people that I'm holding a space for
+> > because they have already expressed interest.  If you are on this list
+> > then please let me know in the next week whether or not you are still
+> > able to attend.  Also, if you think of anyone who really needs to be
+> > there, but isn't on this list, then email me to nominate them.  I'll
+> > add any nominations to this list and contact them individually.
+> > 
+> > Nicolas Pitre
+> > Arnd Bergmann
+> > Olof Johansson
+> > Eric Miao
+> > David Brown
+> > Mark Vasut
+> > Ohad Ben-Cohen
+> > Sascha Hauer
+> 
+> I will attend.
+I'll attend normally
 
-Sure, thanks for reviewing.
+Best Regards,
+J.
