@@ -1,39 +1,122 @@
-From: abhilash.kv@ti.com (Abhilash K V)
-Date: Tue, 23 Aug 2011 18:51:04 +0530
-Subject: [PATCH v2 0/2] AM3517: Booting up
-Message-ID: <1314105664-17347-1-git-send-email-abhilash.kv@ti.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Tue, 23 Aug 2011 18:51:27 +0530
+Subject: [PATCH v5 12/22] gpio/omap: cleanup set_gpio_triggering function
+In-Reply-To: <1312455893-14922-13-git-send-email-tarun.kanti@ti.com>
+References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+	<1312455893-14922-13-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4E53A957.3010004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set gets the kernel booting up on a AM3517 EVM.
-The board is able to boot with ramdisk after this,but the MMC and Ethernet
-drivers are not up yet. Lots of warnings remain which will be addressed in
-subsequent patches.
+On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
+> Getting rid of ifdefs within the function by adding register offset intctrl
+> and associating OMAPXXXX_GPIO_INT_CONTROL in respective SoC specific files.
+> Also, use wkup_status register consistently instead of referring to wakeup
+> clear and wakeup set register offsets.
+>
+> Signed-off-by: Charulatha V<charu@ti.com>
+> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> ---
+Good. Some comments.
 
-The patches are tested on master of tmlind/linux-omap-2.6.git.
-Kernel version is 3.1.0-rc1 and last commit on top of which these patches
-were added is:
+>   arch/arm/mach-omap1/gpio15xx.c         |    2 +
+>   arch/arm/mach-omap1/gpio16xx.c         |    3 +
+>   arch/arm/mach-omap1/gpio7xx.c          |    2 +
+>   arch/arm/plat-omap/include/plat/gpio.h |    3 +
+>   drivers/gpio/gpio-omap.c               |  159 ++++++++-----------------------
+>   5 files changed, 51 insertions(+), 118 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+> index f8c15ea..2adfece 100644
+> --- a/arch/arm/mach-omap1/gpio15xx.c
+> +++ b/arch/arm/mach-omap1/gpio15xx.c
+> @@ -42,6 +42,7 @@ static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
+>   	.irqstatus	= OMAP_MPUIO_GPIO_INT,
+>   	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
+>   	.irqenable_inv	= true,
+> +	.irqctrl	= OMAP_MPUIO_GPIO_INT_EDGE,
+>   };
+>
+>   static struct __initdata omap_gpio_platform_data omap15xx_mpu_gpio_config = {
+> @@ -83,6 +84,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
+>   	.irqstatus	= OMAP1510_GPIO_INT_STATUS,
+>   	.irqenable	= OMAP1510_GPIO_INT_MASK,
+>   	.irqenable_inv	= true,
+> +	.irqctrl	= OMAP1510_GPIO_INT_CONTROL,
+>   };
+>
+>   static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
+> diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
+> index ed9f285..f619805 100644
+> --- a/arch/arm/mach-omap1/gpio16xx.c
+> +++ b/arch/arm/mach-omap1/gpio16xx.c
+> @@ -45,6 +45,7 @@ static struct omap_gpio_reg_offs omap16xx_mpuio_regs = {
+>   	.irqstatus	= OMAP_MPUIO_GPIO_INT,
+>   	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
+>   	.irqenable_inv	= true,
+> +	.irqctrl	= OMAP_MPUIO_GPIO_INT_EDGE,
+>   };
+>
+>   static struct __initdata omap_gpio_platform_data omap16xx_mpu_gpio_config = {
+> @@ -90,6 +91,8 @@ static struct omap_gpio_reg_offs omap16xx_gpio_regs = {
+>   	.set_irqenable	= OMAP1610_GPIO_SET_IRQENABLE1,
+>   	.clr_irqenable	= OMAP1610_GPIO_CLEAR_IRQENABLE1,
+>   	.wkup_status	= OMAP1610_GPIO_WAKEUPENABLE,
+> +	.edgectrl1	= OMAP1610_GPIO_EDGE_CTRL1,
+> +	.edgectrl2	= OMAP1610_GPIO_EDGE_CTRL2,
+>   };
+>
+>   static struct __initdata omap_gpio_platform_data omap16xx_gpio1_config = {
+> diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+> index 923eaa1..cb083c5 100644
+> --- a/arch/arm/mach-omap1/gpio7xx.c
+> +++ b/arch/arm/mach-omap1/gpio7xx.c
+> @@ -47,6 +47,7 @@ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
+>   	.irqstatus	= OMAP_MPUIO_GPIO_INT / 2,
+>   	.irqenable	= OMAP_MPUIO_GPIO_MASKIT / 2,
+>   	.irqenable_inv	= true,
+> +	.irqctrl	= OMAP_MPUIO_GPIO_INT_EDGE / 2,
 
-	d4f02b12e9cf9b443ee07b97245d8e8515d84029:omap: timer:
-	Set dmtimer used as clocksource in autoreload mode
+Shift operator would have been better here.
 
-Cc: Sanjeev Premi <premi@ti.com>
-Cc: Vaibhav Hiremath <hvaibhav@ti.com>
----
-v2: Incorporated Kevin's comments to add SmartReflex as a FEATURE, and use
-    omap3_has_sr() to fall out of omap3_twl_init() for AM35x case.
+[...]
 
-Abhilash K V (1):
-  AM35x: Using OMAP3 generic hwmods
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index e7c9fe5..21cb0d4 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
 
-Vaibhav Hiremath (1):
-  omap_twl: Prevent SR to enable for am3517/am3505 devices
+[..]
 
- arch/arm/mach-omap2/board-am3517evm.c        |   11 +++++++++++
- arch/arm/mach-omap2/id.c                     |    2 +-
- arch/arm/mach-omap2/omap_hwmod.c             |    3 ++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   18 ++++++++++++++++++
- arch/arm/mach-omap2/omap_twl.c               |    8 ++++++++
- arch/arm/plat-omap/include/plat/cpu.h        |    2 ++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 +++
- 7 files changed, 45 insertions(+), 2 deletions(-)
+> +			trigger != 0);
+> +
+> +	/* This part needs to be executed always for OMAP34xx */
+> +	if (cpu_is_omap34xx() || (bank->non_wakeup_gpios&  gpio_bit)) {
+Why ? You might want handle this special case with some flag instead.
+
+>   		/*
+>   		 * Log the edge gpio and manually trigger the IRQ
+>   		 * after resume if the input level changes
+> @@ -261,7 +236,6 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
+>   		__raw_readl(bank->base + bank->regs->leveldetect0) |
+>   		__raw_readl(bank->base + bank->regs->leveldetect1);
+>   }
+> -#endif
+>
+>   #ifdef CONFIG_ARCH_OMAP1
+>   /*
+
+[...]
+
+> -#endif
+> -	default:
+> -		goto bad;
+> +
+> +		_gpio_rmw(base, bank->regs->wkup_status, 1<<  gpio, trigger);
+> +
+Avoid this extra line.
+
+Rest of the changes looks good to me.
+
+Regards
+Santosh
