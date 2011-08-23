@@ -1,30 +1,31 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Tue, 23 Aug 2011 09:52:49 +0530
-Subject: [PATCH 16/18] dmaengine/amba-pl08x: Add support for sg len greater
-	than one for slave transfers
-In-Reply-To: <20110821083306.GA12028@n2100.arm.linux.org.uk>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
-	<20110814083618.GE4986@n2100.arm.linux.org.uk>
-	<4E4CCF7B.8060704@st.com>
-	<20110821083306.GA12028@n2100.arm.linux.org.uk>
-Message-ID: <4E532B19.6000103@st.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 23 Aug 2011 10:25:38 +0530
+Subject: [PATCH] dmaengine: at_hdmac: add device tree probe
+In-Reply-To: <4E4A9BD8.1040302@atmel.com>
+References: <1312549120-22266-1-git-send-email-nicolas.ferre@atmel.com>
+	<20110807040932.GF7667@ponder.secretlab.ca>
+	<4E4A9BD8.1040302@atmel.com>
+Message-ID: <1314075338.22120.3.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/21/2011 2:03 PM, Russell King - ARM Linux wrote:
->> > I am not sure if i get this completely. In memcpy, we still don't support
->> > more than one sg. We have created a new member in txd, which keeps track of
->> > data (addresses, len).
-> Yes, but we shouldn't need to translate it into any kind of scatterlist.
+On Tue, 2011-08-16 at 18:33 +0200, Nicolas Ferre wrote:
+> [..]
 > 
-
-Ok. I way out is keeping two separate variables in txd, list for slave transfers,
-and pointer to single element for memcpy. And that looks to be even bad to me.
-Why waste memory, for second variable. Or create union of both.
-
-One more thing, we can actually have scatter gather in memcpy too in future. This will be
-helpful then also. But surely that's something not implemented currently.
+> Grant, Vinod,
+> 
+> Don't you think it would make sense to generalize nr-channels and maybe
+> also the capabilities properties for other dmaengine drivers?
+> I have seen other dmaengine drivers taking the number of channels from
+> platform data so that would make sense.
+> It would be new dmaengine device tree properties, but on the other hand,
+> I do not know if code can also be centralized for handling of those
+> properties... maybe it is better to let drivers deal with them if
+> required...
+> 
+We already having this discussion and how to change capabilities etc to
+make thing more easy and transparent, See the approaches taken by Jassi
+and Linus W
 
 -- 
-viresh
+~Vinod
