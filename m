@@ -1,80 +1,82 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Tue, 23 Aug 2011 15:48:54 +0800
-Subject: [PATCH] ARM: mmp: map sram as MT_MEMORY rather than MT_DEVICE
-In-Reply-To: <20110822190838.3e03c3ec@debxo>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>	<1313377794-26721-2-git-send-email-leoy@marvell.com>	<20110822164740.5682541b@queued.net>	<CAMPhdO-cttCzdm_gh=KdNqqPYQOgPBNS57DtPduPahpkP2rk0g@mail.gmail.com>
-	<20110822190838.3e03c3ec@debxo>
-Message-ID: <4E535B66.8070301@marvell.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 23 Aug 2011 10:05:06 +0200
+Subject: [PATCH] mach-pnx4008: rename GPIO header
+Message-ID: <1314086706-28705-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Linus Walleij <linus.walleij@linaro.org>
 
+The PNX4008 header file is using the generic gpio and gpiolib
+namespace in <mach/gpio.h> yet the GPIO interface is not generic
+at all so rename it to <mach/gpio-pnx4008.h>
 
-On 08/23/2011 10:08 AM, Andres Salomon wrote:
-> On Tue, 23 Aug 2011 08:07:41 +0800
-> Eric Miao<eric.y.miao@gmail.com>  wrote:
->
->> On Tue, Aug 23, 2011 at 7:47 AM, Andres Salomon<dilinger@queued.net>
->> wrote:
->>> The sram code allocates memory with ioremap, which assumes MT_DEVICE
->>> for memory protections.  This explodes when we map sram for power
->>> management purposes and then attempt to execute it (jump_to_lp_sram)
->>> on the OLPC XO-1.75.  Instead, we want to specify MT_MEMORY, which
->>> doesn't set the L_PTE_XN bit.
->>>
->>> Signed-off-by: Andres Salomon<dilinger@queued.net>
->>> ---
->>>   arch/arm/mach-mmp/sram.c |    4 +++-
->>>   1 files changed, 3 insertions(+), 1 deletions(-)
->>>
->>> Eric, this patch is against the devel branch of your pxa tree.
->>>
->>> diff --git a/arch/arm/mach-mmp/sram.c b/arch/arm/mach-mmp/sram.c
->>> index 4304f95..ca4d3c1 100644
->>> --- a/arch/arm/mach-mmp/sram.c
->>> +++ b/arch/arm/mach-mmp/sram.c
->>> @@ -21,6 +21,7 @@
->>>   #include<linux/err.h>
->>>   #include<linux/slab.h>
->>>   #include<linux/genalloc.h>
->>> +#include<asm/mach/map.h>
->>>
->>>   #include<mach/sram.h>
->>>
->>> @@ -87,7 +88,8 @@ static int __devinit sram_probe(struct
->>> platform_device *pdev)
->>>
->>>         info->sram_phys   = (phys_addr_t)res->start;
->>>         info->sram_size   = resource_size(res);
->>> -       info->sram_virt   = ioremap(info->sram_phys,
->>> info->sram_size);
->>> +       info->sram_virt   = __arm_ioremap(info->sram_phys,
->>> info->sram_size,
->>> +                                         MT_MEMORY);
->>
->> I doubt MT_MEMORY is intended for use with __arm_ioremap(). There
->> could be other way around to the L_PTE_XN bit.
->>
->> One other way I'm actually thinking of is to add the SRAM mapping to
->> mmp_map_io(). The difference of SRAM offset/size may result the
->> separation of mmp_map_io() into {pxa168,pxa910,mmp2}_map_io()
->> if necessary.
->>
->
-> I guess I don't follow.  I think you're talking about adding it to the
-> standard_io_desc array, but that would require having it pre-mapped and
-> knowing the virtual address.  Or were you planning to ioremap it?
+This fixes a build failure in current -next: the includes were
+changed from <mach/gpio.h> to <linux/gpio.h> but since this
+platform isn't using generic gpio <linux/gpio.h> did not include
+<mach/gpio.h> and things broke apart.
 
-I missed the L_PTE_XN bit.
-The patch is originally for audio sram, so use the ioremap is ok for 
-that. But for the internal sram we should need the different mapping 
-property.
+Cc: Vitaly Wool <vitalywool@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-pnx4008/gpio.c                       |    2 +-
+ .../include/mach/{gpio.h => gpio-pnx4008.h}        |    2 +-
+ arch/arm/mach-pnx4008/serial.c                     |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+ rename arch/arm/mach-pnx4008/include/mach/{gpio.h => gpio-pnx4008.h} (99%)
 
-so far, the standard_io_desc is shared by pxa168/pxa910/mmp2;
-we can not add the sram's entry into it for now sram is only dedicated
-to mmp2; just like Eric's suggestion, we need mmp2_map_io() only for
-mmp2, and add the sram's entries into the structure.
-if so, we need transfer the mapped info into the sram module,
-and sram module just keep the info and do not need remap it again.
-
-so what's your opinion?
+diff --git a/arch/arm/mach-pnx4008/gpio.c b/arch/arm/mach-pnx4008/gpio.c
+index eef531b..d3e71d3 100644
+--- a/arch/arm/mach-pnx4008/gpio.c
++++ b/arch/arm/mach-pnx4008/gpio.c
+@@ -13,13 +13,13 @@
+  * is licensed "as is" without any warranty of any kind, whether express
+  * or implied.
+  */
+-#include <linux/gpio.h>
+ #include <linux/types.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/io.h>
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
++#include <mach/gpio-pnx4008.h>
+ 
+ /* register definitions */
+ #define PIO_VA_BASE	IO_ADDRESS(PNX4008_PIO_BASE)
+diff --git a/arch/arm/mach-pnx4008/include/mach/gpio.h b/arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h
+similarity index 99%
+rename from arch/arm/mach-pnx4008/include/mach/gpio.h
+rename to arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h
+index 9591467..41027dd 100644
+--- a/arch/arm/mach-pnx4008/include/mach/gpio.h
++++ b/arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h
+@@ -1,5 +1,5 @@
+ /*
+- * arch/arm/mach-pnx4008/include/mach/gpio.h
++ * arch/arm/mach-pnx4008/include/mach/gpio-pnx4008.h
+  *
+  * PNX4008 GPIO driver - header file
+  *
+diff --git a/arch/arm/mach-pnx4008/serial.c b/arch/arm/mach-pnx4008/serial.c
+index eb29fac..374c138 100644
+--- a/arch/arm/mach-pnx4008/serial.c
++++ b/arch/arm/mach-pnx4008/serial.c
+@@ -9,7 +9,6 @@
+  *  it under the terms of the GNU General Public License version 2 as
+  *  published by the Free Software Foundation.
+  */
+-#include <linux/gpio.h>
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+ #include <linux/io.h>
+@@ -20,6 +19,7 @@
+ #include <linux/serial_core.h>
+ #include <linux/serial_reg.h>
+ 
++#include <mach/gpio-pnx4008.h>
+ #include <mach/clock.h>
+ 
+ #define UART_3		0
+-- 
+1.7.3.2
