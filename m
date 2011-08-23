@@ -1,51 +1,98 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 19 Aug 2011 11:54:31 +0200
-Subject: [PATCH 4/4 v3] ARM: s3c64xx: Add support for synchronous clock operation.
-Message-ID: <mailman.97.1314096054.20020.linux-arm-kernel@lists.infradead.org>
+From: liu.h.jason@gmail.com (Jason Liu)
+Date: Tue, 23 Aug 2011 19:03:30 +0800
+Subject: [PATCH v2 1/2] ARM: imx: Introduce generic function for
+	displaying silicon revision
+In-Reply-To: <20110823063138.GE31404@pengutronix.de>
+References: <1314037024-9015-1-git-send-email-fabio.estevam@freescale.com>
+	<20110823063138.GE31404@pengutronix.de>
+Message-ID: <CAB4PhKcq-ZAotyTr9jHa=z1w8-P-=T4AzDnMg1NhO=MA+WWzag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards based on S3C6410 use synchronous clocking, which means that HCLKx2
-and other system clocks are generated from APLL instead of MPLL.
+Hi, Sascha, Fabio,
 
-This patch adds support for such boards, by calculating hclk2 depending on
-the status of S3C_OTHERS_SYNCMUXSEL bit in S3C64XX_OTHERS regist
+2011/8/23 Sascha Hauer <s.hauer@pengutronix.de>:
+> Hi Fabio,
+>
+> On Mon, Aug 22, 2011 at 03:17:03PM -0300, Fabio Estevam wrote:
+>> Currently each i.MX processor has its own function for displaying the silicon
+>> revision.
+>>
+>> Introduce a generic function for this purpose, so that all i.MX processors can
+>> reuse it.
+>
+> Looks good, thanks. Do you care to update the other SoCs aswell?
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/mach-s3c64xx/clock.c                 |    8 +++++++-
- arch/arm/mach-s3c64xx/include/mach/regs-sys.h |    1 +
- 2 files changed, 8 insertions(+), 1 deletions(-)
+I have already started to updated all other SoCs, I will send out patch soon.
 
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index fdfc4d5..a7dab43 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -780,7 +780,13 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
- 	printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
- 	       apll, mpll, epll);
- 
--	hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-+	if(__raw_readl(S3C64XX_OTHERS) & S3C64XX_OTHERS_SYNCMUXSEL)
-+		/* Synchronous mode */
-+		hclk2 = apll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-+	else
-+		/* Asynchronous mode */
-+		hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-+
- 	hclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK);
- 	pclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_PCLK);
- 
-diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-sys.h b/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
-index 774e0de..b91e020 100644
---- a/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
-@@ -26,5 +26,6 @@
- #define S3C64XX_OTHERS		S3C_SYSREG(0x900)
- 
- #define S3C64XX_OTHERS_USBMASK	(1 << 16)
-+#define S3C64XX_OTHERS_SYNCMUXSEL	(1 << 6)
- 
- #endif /* _PLAT_REGS_SYS_H */
--- 
-1.7.6
+Jason
+>
+> Sascha
+>
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>> Changes since v1:
+>>
+>> - Introduce this generic function as suggested by Sascha Hauer.
+>>
+>> Sascha,
+>>
+>> If these 2 patches are merged, then I will convert the other i.MX processors
+>> to use this new method.
+>>
+>> ?arch/arm/plat-mxc/cpu.c ? ? ? ? ? ? ? ? | ? 10 ++++++++++
+>> ?arch/arm/plat-mxc/include/mach/common.h | ? ?1 +
+>> ?2 files changed, 11 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
+>> index 386e0d5..f081ef0 100644
+>> --- a/arch/arm/plat-mxc/cpu.c
+>> +++ b/arch/arm/plat-mxc/cpu.c
+>> @@ -1,5 +1,6 @@
+>>
+>> ?#include <linux/module.h>
+>> +#include <mach/hardware.h>
+>>
+>> ?unsigned int __mxc_cpu_type;
+>> ?EXPORT_SYMBOL(__mxc_cpu_type);
+>> @@ -9,3 +10,12 @@ void mxc_set_cpu_type(unsigned int type)
+>> ? ? ? __mxc_cpu_type = type;
+>> ?}
+>>
+>> +void imx_print_silicon_rev(const char *cpu, int srev)
+>> +{
+>> + ? ? if (srev == IMX_CHIP_REVISION_UNKNOWN)
+>> + ? ? ? ? ? ? pr_info("CPU identified as %s, unknown revision\n", cpu);
+>> + ? ? else
+>> + ? ? ? ? ? ? pr_info("CPU identified as %s, silicon rev %d.%d\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? cpu, (srev >> 4) & 0xf, srev & 0xf);
+>> +}
+>> +EXPORT_SYMBOL(imx_print_silicon_rev);
+>> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+>> index 91fa263..e427f63 100644
+>> --- a/arch/arm/plat-mxc/include/mach/common.h
+>> +++ b/arch/arm/plat-mxc/include/mach/common.h
+>> @@ -72,4 +72,5 @@ extern void mxc_arch_reset_init(void __iomem *);
+>> ?extern void mx51_efikamx_reset(void);
+>> ?extern int mx53_revision(void);
+>> ?extern int mx53_display_revision(void);
+>> +extern void imx_print_silicon_rev(const char *cpu, int srev);
+>> ?#endif
+>> --
+>> 1.7.1
+>>
+>>
+>>
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
