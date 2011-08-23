@@ -1,36 +1,116 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Aug 2011 10:17:31 +0200
-Subject: [PATCH V3 00/20] dmaengine/amba-pl08x updates
-In-Reply-To: <cover.1312538034.git.viresh.kumar@st.com>
-References: <cover.1312538034.git.viresh.kumar@st.com>
-Message-ID: <CACRpkdY6KW+tv7H==b15xJyeLp9HCqp9ROBhON0A8JnJDUn8Kg@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 23 Aug 2011 13:53:54 +0530
+Subject: [RFC/PATCH v2 09/13] dt: omap4: add soc file for handling i2c
+	controllers
+In-Reply-To: <1314074021-25186-10-git-send-email-manjugk@ti.com>
+References: <1314074021-25186-1-git-send-email-manjugk@ti.com>
+	<1314074021-25186-10-git-send-email-manjugk@ti.com>
+Message-ID: <4E53639A.10606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 5, 2011 at 12:02 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+On 8/23/2011 10:33 AM, G, Manjunath Kondaiah wrote:
+>
+> Add omap4 soc dts file for handling omap4 soc i2c
+> controllers existing on l4-core bus.
+>
+> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
+> ---
+>   arch/arm/boot/dts/omap4-panda.dts |    7 +---
+>   arch/arm/boot/dts/omap4.dtsi      |   68 +++++++++++++++++++++++++++++++++++++
+>   2 files changed, 69 insertions(+), 6 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/omap4.dtsi
+>
+> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+> index 58909e9..c28aa95 100644
+> --- a/arch/arm/boot/dts/omap4-panda.dts
+> +++ b/arch/arm/boot/dts/omap4-panda.dts
+> @@ -1,9 +1,4 @@
+> -/dts-v1/;
+> -
+> -/memreserve/ 0x9D000000 0x03000000; /* Frame buffer */
+> -/memreserve/ 0xB0000000 0x10000000; /* Top 256MB is unaccessable */
+> -
+> -/include/ "skeleton.dtsi"
+> +/include/ "omap4.dtsi"
+>
+>   / {
+>   	model = "TI OMAP4 PandaBoard";
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> new file mode 100644
+> index 0000000..cb055f5
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -0,0 +1,68 @@
+> +/*
+> + * Device Tree Source for OMAP4 SoC
+> + *
+> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +/memreserve/ 0x9D000000 0x03000000; /* Frame buffer */
+> +/memreserve/ 0xB0000000 0x10000000; /* Top 256MB is unaccessable */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	#address-cells =<1>;
+> +	#size-cells =<1>;
+> +	model = "ti,omap4";
+> +
+> +	aliases {
+> +		i2c1 =&i2c1;
+> +		i2c2 =&i2c2;
+> +		i2c3 =&i2c3;
+> +		i2c4 =&i2c4;
+> +	};
+> +
+> +	l4-core {
+> +		compatible = "ti,omap4-l4-core", "sonics,s3220";
+> +		#address-cells =<1>;
+> +		#size-cells =<1>;
+> +		ranges =<0 0x48000000 0x1000000>;
+> +
+> +		i2c1: i2c at 70000 {
+> +			#address-cells =<1>;
+> +			#size-cells =<0>;
 
-> This patchset contains patches for ARM's pl08x DMA controller driver.
-> Main changes introduced by this patchset are:
-> - Formatting fixes
-> - Logical Fixes
-> - Support for Peripheral as flow controller
-> - Support for sg_len to be greater than 1 for slave transfers
-> - Schedule tasklet for error interrupts
-> - remove pl08x_pre_boundary() routine
-> - support for runtime PM
-> - etc
+Are these really needed, given there are no child nodes defined?
+Same with all other instances.
 
-I've now tested this patchset:
-
-patch 3/20 fails to apply cleanly, need rebase on top of Russell's
-fix for dma-mapping.h inclusion. It's a trivial fix.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Vinod could you apply all patches except for 16/18 which has some
-discussion going on, so we get some rotation in -next? The rest of
-Viresh:s patches are really nice stuff to have.
-
-I will test on the PB11MPcore in the next few days.
-
-Yours,
-Linus Walleij
+> +			compatible = "ti,omap-i2c", "ti,omap-device";
+> +			reg =<0x70000 0x100>;
+> +			interrupts =<  88>;
+> +		};
+> +
+> +		i2c2: i2c at 72000 {
+> +			#address-cells =<1>;
+> +			#size-cells =<0>;
+> +			compatible = "ti,omap-i2c", "ti,omap-device";
+> +			reg =<0x72000 0x100>;
+> +			interrupts =<  89>;
+> +		};
+> +
+> +		i2c3: i2c at 60000 {
+> +			#address-cells =<1>;
+> +			#size-cells =<0>;
+> +			compatible = "ti,omap-i2c", "ti,omap-device";
+> +			reg =<0x60000 0x100>;
+> +			interrupts =<  93>;
+> +		};
+> +
+> +		i2c4: i2c at 350000 {
+> +			#address-cells =<1>;
+> +			#size-cells =<0>;
+> +			compatible = "ti,omap-i2c", "ti,omap-device";
+> +			reg =<0x350000 0x100>;
+> +			interrupts =<  94>;
+> +		};
+> +	};
+> +};
