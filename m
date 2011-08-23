@@ -1,124 +1,104 @@
 From: jason.hui@linaro.org (Jason Liu)
-Date: Tue, 23 Aug 2011 21:07:42 +0800
-Subject: [PATCH 4/6] ARM: mx31: use generic function for displaying silicon
-	revision
+Date: Tue, 23 Aug 2011 21:07:41 +0800
+Subject: [PATCH 3/6] ARM: mx27: Print silicon revision on boot
 In-Reply-To: <1314104864-3725-1-git-send-email-jason.hui@linaro.org>
 References: <1314104864-3725-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <1314104864-3725-5-git-send-email-jason.hui@linaro.org>
+Message-ID: <1314104864-3725-4-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update to use generic function for displaying silicon revision
+Silicon revision is useful information to have during kernel boot.
 
+Print the MX27 silicon revision.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/clock-imx31.c       |    5 +++--
- arch/arm/mach-imx/cpu-imx31.c         |   21 +++++++++++++--------
- arch/arm/plat-mxc/include/mach/mx3x.h |   11 ++---------
- 3 files changed, 18 insertions(+), 19 deletions(-)
+Resend: The patch based on Fabio initial patch, I did some change to
+use generic function for displaying silicon revision and also some
+naming change to avoid using the generic name
+---
+ arch/arm/mach-imx/clock-imx27.c |    2 ++
+ arch/arm/mach-imx/cpu-imx27.c   |   28 +++++++++++++---------------
+ 2 files changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clock-imx31.c b/arch/arm/mach-imx/clock-imx31.c
-index d973770..dd8373e 100644
---- a/arch/arm/mach-imx/clock-imx31.c
-+++ b/arch/arm/mach-imx/clock-imx31.c
-@@ -610,11 +610,12 @@ int __init mx31_clocks_init(unsigned long fref)
- 
- 	clk_enable(&gpt_clk);
+diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
+index 6912b82..e6b1beb 100644
+--- a/arch/arm/mach-imx/clock-imx27.c
++++ b/arch/arm/mach-imx/clock-imx27.c
+@@ -751,6 +751,8 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_enable(&gpio_clk);
  	clk_enable(&emi_clk);
--	clk_enable(&iim_clk);
- 
- 	clk_enable(&serial_pll_clk);
- 
--	mx31_read_cpu_rev();
-+	clk_enable(&iim_clk);
-+	imx_print_silicon_rev("i.MX31", mx31_revision());
+ 	clk_enable(&iim_clk);
++	imx_print_silicon_rev("i.MX27", mx27_revision());
 +	clk_disable(&iim_clk);
  
- 	if (mx31_revision() >= IMX_CHIP_REVISION_2_0) {
- 		reg = __raw_readl(MXC_CCM_PMCR1);
-diff --git a/arch/arm/mach-imx/cpu-imx31.c b/arch/arm/mach-imx/cpu-imx31.c
-index a378070..a5b8686 100644
---- a/arch/arm/mach-imx/cpu-imx31.c
-+++ b/arch/arm/mach-imx/cpu-imx31.c
-@@ -14,15 +14,14 @@
+ #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+ 	clk_enable(&uart1_clk);
+diff --git a/arch/arm/mach-imx/cpu-imx27.c b/arch/arm/mach-imx/cpu-imx27.c
+index 3b117be..ff38e15 100644
+--- a/arch/arm/mach-imx/cpu-imx27.c
++++ b/arch/arm/mach-imx/cpu-imx27.c
+@@ -26,12 +26,12 @@
+ 
  #include <mach/hardware.h>
- #include <mach/iim.h>
  
--unsigned int mx31_cpu_rev;
--EXPORT_SYMBOL(mx31_cpu_rev);
-+static int mx31_cpu_rev = -1;
+-static int cpu_silicon_rev = -1;
+-static int cpu_partnumber;
++static int mx27_cpu_rev = -1;
++static int mx27_cpu_partnumber;
  
- static struct {
- 	u8 srev;
- 	const char *name;
- 	const char *v;
- 	unsigned int rev;
--} mx31_cpu_type[] __initdata = {
-+} mx31_cpu_type[] = {
- 	{ .srev = 0x00, .name = "i.MX31(L)", .v = "1.0",  .rev = IMX_CHIP_REVISION_1_0	},
- 	{ .srev = 0x10, .name = "i.MX31",    .v = "1.1",  .rev = IMX_CHIP_REVISION_1_1	},
- 	{ .srev = 0x11, .name = "i.MX31L",   .v = "1.1",  .rev = IMX_CHIP_REVISION_1_1	},
-@@ -34,7 +33,7 @@ static struct {
- 	{ .srev = 0x29, .name = "i.MX31L",   .v = "2.0",  .rev = IMX_CHIP_REVISION_2_0	},
- };
+ #define SYS_CHIP_ID             0x00    /* The offset of CHIP ID register */
  
--void __init mx31_read_cpu_rev(void)
-+static int mx31_read_cpu_rev(void)
+-static void query_silicon_parameter(void)
++static int mx27_read_cpu_rev(void)
  {
- 	u32 i, srev;
+ 	u32 val;
+ 	/*
+@@ -42,20 +42,18 @@ static void query_silicon_parameter(void)
+ 	val = __raw_readl(MX27_IO_ADDRESS(MX27_SYSCTRL_BASE_ADDR
+ 				+ SYS_CHIP_ID));
  
-@@ -47,11 +46,17 @@ void __init mx31_read_cpu_rev(void)
- 				"CPU identified as %s, silicon rev %s\n",
- 				mx31_cpu_type[i].name, mx31_cpu_type[i].v);
- 
--			mx31_cpu_rev = mx31_cpu_type[i].rev;
--			return;
-+			return mx31_cpu_type[i].rev;
- 		}
- 
--	mx31_cpu_rev = IMX_CHIP_REVISION_UNKNOWN;
-+	return IMX_CHIP_REVISION_UNKNOWN;
-+}
++	mx27_cpu_partnumber = (int)((val >> 12) & 0xFFFF);
 +
-+int mx31_revision(void)
-+{
-+	if (mx31_cpu_rev == -1)
-+		mx31_cpu_rev = mx31_read_cpu_rev();
- 
--	printk(KERN_WARNING "Unknown CPU identifier. srev = %02x\n", srev);
-+	return mx31_cpu_rev;
+ 	switch (val >> 28) {
+ 	case 0:
+-		cpu_silicon_rev = IMX_CHIP_REVISION_1_0;
+-		break;
++		return IMX_CHIP_REVISION_1_0;
+ 	case 1:
+-		cpu_silicon_rev = IMX_CHIP_REVISION_2_0;
+-		break;
++		return IMX_CHIP_REVISION_2_0;
+ 	case 2:
+-		cpu_silicon_rev = IMX_CHIP_REVISION_2_1;
+-		break;
++		return IMX_CHIP_REVISION_2_1;
+ 	default:
+-		cpu_silicon_rev = IMX_CHIP_REVISION_UNKNOWN;
++		return IMX_CHIP_REVISION_UNKNOWN;
+ 	}
+-	cpu_partnumber = (int)((val >> 12) & 0xFFFF);
  }
-+EXPORT_SYMBOL(mx31_revision);
-diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
-index 388a407..e1850f4 100644
---- a/arch/arm/plat-mxc/include/mach/mx3x.h
-+++ b/arch/arm/plat-mxc/include/mach/mx3x.h
-@@ -187,15 +187,6 @@
- /* Mandatory defines used globally */
  
- #if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
--
--extern unsigned int mx31_cpu_rev;
--extern void mx31_read_cpu_rev(void);
--
--static inline int mx31_revision(void)
--{
--	return mx31_cpu_rev;
--}
--
- extern unsigned int mx35_cpu_rev;
- extern void mx35_read_cpu_rev(void);
- 
-@@ -203,6 +194,8 @@ static inline int mx35_revision(void)
+ /*
+@@ -65,12 +63,12 @@ static void query_silicon_parameter(void)
+  */
+ int mx27_revision(void)
  {
- 	return mx35_cpu_rev;
- }
-+
-+extern int mx31_revision(void);
- #endif
+-	if (cpu_silicon_rev == -1)
+-		query_silicon_parameter();
++	if (mx27_cpu_rev == -1)
++		mx27_cpu_rev = mx27_read_cpu_rev();
  
- #endif /* ifndef __MACH_MX3x_H__ */
+-	if (cpu_partnumber != 0x8821)
++	if (mx27_cpu_partnumber != 0x8821)
+ 		return -EINVAL;
+ 
+-	return cpu_silicon_rev;
++	return mx27_cpu_rev;
+ }
+ EXPORT_SYMBOL(mx27_revision);
 -- 
 1.7.4.1
