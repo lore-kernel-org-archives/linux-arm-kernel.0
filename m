@@ -1,129 +1,44 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Tue, 23 Aug 2011 20:41:52 +0530
-Subject: [RFC/PATCH v2 09/13] dt: omap4: add soc file for handling i2c
-	controllers
-In-Reply-To: <4E53639A.10606@ti.com>
-References: <1314074021-25186-1-git-send-email-manjugk@ti.com>
-	<1314074021-25186-10-git-send-email-manjugk@ti.com>
-	<4E53639A.10606@ti.com>
-Message-ID: <20110823151152.GA32698@manju-desktop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Aug 2011 16:14:21 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20051.48809.945431.800543@mariner.uk.xensource.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+Message-ID: <20110823151421.GK19622@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 01:53:54PM +0530, Rajendra Nayak wrote:
-> On 8/23/2011 10:33 AM, G, Manjunath Kondaiah wrote:
-> >
-> >Add omap4 soc dts file for handling omap4 soc i2c
-> >controllers existing on l4-core bus.
-> >
-> >Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
-> >---
-> >  arch/arm/boot/dts/omap4-panda.dts |    7 +---
-> >  arch/arm/boot/dts/omap4.dtsi      |   68 +++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 69 insertions(+), 6 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/omap4.dtsi
-> >
-> >diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-> >index 58909e9..c28aa95 100644
-> >--- a/arch/arm/boot/dts/omap4-panda.dts
-> >+++ b/arch/arm/boot/dts/omap4-panda.dts
-> >@@ -1,9 +1,4 @@
-> >-/dts-v1/;
-> >-
-> >-/memreserve/ 0x9D000000 0x03000000; /* Frame buffer */
-> >-/memreserve/ 0xB0000000 0x10000000; /* Top 256MB is unaccessable */
-> >-
-> >-/include/ "skeleton.dtsi"
-> >+/include/ "omap4.dtsi"
-> >
-> >  / {
-> >  	model = "TI OMAP4 PandaBoard";
-> >diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> >new file mode 100644
-> >index 0000000..cb055f5
-> >--- /dev/null
-> >+++ b/arch/arm/boot/dts/omap4.dtsi
-> >@@ -0,0 +1,68 @@
-> >+/*
-> >+ * Device Tree Source for OMAP4 SoC
-> >+ *
-> >+ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> >+ *
-> >+ * This file is licensed under the terms of the GNU General Public License
-> >+ * version 2.  This program is licensed "as is" without any warranty of any
-> >+ * kind, whether express or implied.
-> >+ */
-> >+
-> >+/dts-v1/;
-> >+
-> >+/memreserve/ 0x9D000000 0x03000000; /* Frame buffer */
-> >+/memreserve/ 0xB0000000 0x10000000; /* Top 256MB is unaccessable */
-> >+
-> >+/include/ "skeleton.dtsi"
-> >+
-> >+/ {
-> >+	#address-cells =<1>;
-> >+	#size-cells =<1>;
-> >+	model = "ti,omap4";
-> >+
-> >+	aliases {
-> >+		i2c1 =&i2c1;
-> >+		i2c2 =&i2c2;
-> >+		i2c3 =&i2c3;
-> >+		i2c4 =&i2c4;
-> >+	};
-> >+
-> >+	l4-core {
-> >+		compatible = "ti,omap4-l4-core", "sonics,s3220";
-> >+		#address-cells =<1>;
-> >+		#size-cells =<1>;
-> >+		ranges =<0 0x48000000 0x1000000>;
-> >+
-> >+		i2c1: i2c at 70000 {
-> >+			#address-cells =<1>;
-> >+			#size-cells =<0>;
+On Tue, Aug 23, 2011 at 03:52:25PM +0100, Ian Jackson wrote:
+> We're looking into porting Xen to the ARM A15 architecture.  In this
+> context, it's necessary to arrange for the Xen hypervisor to be
+> entered from the boot loader in an appropriate processor mode.
 > 
-> Are these really needed, given there are no child nodes defined?
-> Same with all other instances.
-This will define all the available resources for a given soc and it
-can be disabled by using "status=disabled" in property field.
+> KVM needs to deal with the same problem, of course.  And any future
+> Linux kernel feature which uses the Secure State does too.
 
-This is ongoing debate whether to have status field or not. 
+We already have kernels which boot in both secure and non-secure mode
+CPUs.  There's very little difference between the two from the core
+ARM support code - except that we have expectations that appropriate
+hardware work-arounds will have already been initialized by the
+secure monitor (as there is no way for the kernel to be able to call
+out to the secure monitor in a platform independent way.)
 
-Grant,
-What is the final alignment on using status field?
+That's unfortunately one of the necessary evils of having the secure
+stuff, which doesn't have any kind of defined API, getting in the way.
 
--M
+So, basically, which side of the secure division the kernel runs on
+depends highly on the platform itself - and as the secure monitor APIs
+are highly platform specific, there's no getting away from that.
 
-> 
-> >+			compatible = "ti,omap-i2c", "ti,omap-device";
-> >+			reg =<0x70000 0x100>;
-> >+			interrupts =<  88>;
-> >+		};
-> >+
-> >+		i2c2: i2c at 72000 {
-> >+			#address-cells =<1>;
-> >+			#size-cells =<0>;
-> >+			compatible = "ti,omap-i2c", "ti,omap-device";
-> >+			reg =<0x72000 0x100>;
-> >+			interrupts =<  89>;
-> >+		};
-> >+
-> >+		i2c3: i2c at 60000 {
-> >+			#address-cells =<1>;
-> >+			#size-cells =<0>;
-> >+			compatible = "ti,omap-i2c", "ti,omap-device";
-> >+			reg =<0x60000 0x100>;
-> >+			interrupts =<  93>;
-> >+		};
-> >+
-> >+		i2c4: i2c at 350000 {
-> >+			#address-cells =<1>;
-> >+			#size-cells =<0>;
-> >+			compatible = "ti,omap-i2c", "ti,omap-device";
-> >+			reg =<0x350000 0x100>;
-> >+			interrupts =<  94>;
-> >+		};
-> >+	};
-> >+};
-> 
+If the kernel does not contain the appropriate platform specific secure
+monitor API then it can't run in non-secure mode (or it can but the
+functionality will be severely limited - no power management, and
+in some cases buggy L2 cache.)  So you wouldn't _want_ to run such a
+kernel if you value your data.
+
+As far as I know, the kernel runs non-secure on all real silicon out in
+the wild.  It's only ARMs evaluation boards and models where the kernel
+runs on the secure side.
+
+Given all that, there's not much point to publishing whether a kernel is
+built for secure side or not.  It's tied extremely closely to the platform
+itself, which is where most of the secure API calls already live.
