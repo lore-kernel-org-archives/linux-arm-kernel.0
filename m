@@ -1,48 +1,62 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 23 Aug 2011 16:24:16 -0400 (EDT)
-Subject: ARM processor mode, kernel startup, Hyp / secure state
-In-Reply-To: <20051.59927.511785.371806@mariner.uk.xensource.com>
-References: <20051.48809.945431.800543@mariner.uk.xensource.com>
-	<CA+wbFdcv_BsHaVwoqgF5yx6scXOodHkKjdVtarqJwjy_GFrAJQ@mail.gmail.com>
-	<20051.57581.894859.395981@mariner.uk.xensource.com>
-	<20110823174550.GJ3895@n2100.arm.linux.org.uk>
-	<20051.59927.511785.371806@mariner.uk.xensource.com>
-Message-ID: <alpine.LFD.2.00.1108231604520.20358@xanadu.home>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 23 Aug 2011 22:28:49 +0200
+Subject: [PATCH 1/4] S3C2443: Move i2s clock definitions to common code
+In-Reply-To: <06c001cc6146$b9f30be0$2dd923a0$%kim@samsung.com>
+References: <201108201757.56483.heiko@sntech.de>
+	<201108211925.05300.heiko@sntech.de>
+	<06c001cc6146$b9f30be0$2dd923a0$%kim@samsung.com>
+Message-ID: <201108232228.49647.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Aug 2011, Ian Jackson wrote:
-> Russell King - ARM Linux writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
-> > Plus, I'd point out that _no one_ is talking about boot protocols.  Not
-> > outside linaro at any rate.  Which means that they're doing effective
-> > closed-door discussion.
+Am Dienstag 23 August 2011, 05:42:47 schrieb Kukjin Kim:
+> Heiko St?bner wrote:
+> > Am Sonntag 21 August 2011, 19:13:32 schrieb Russell King - ARM Linux:
+> > > On Sat, Aug 20, 2011 at 06:01:29PM +0200, Heiko St?bner wrote:
+> > > > +/* i2s-ref
+> > > > + *
+> > > > + * i2s bus reference clock, selectable from external, esysclk or
 > 
-> I'm not sure whether by "outside linaro" you mean "outside some kind
-> of top secret Linaro meetings".  I went to an open meeting of Linaro
-> developers touching on exactly these kind of topics, and everything
-> was public and there was substantial interest.
-
-For the record, this Linaro topic and the progress done is documented here:
-https://blueprints.launchpad.net/linaro/+spec/linaro-kernel-o-bootarchitecture
-
-Nothing (yet) in there that would highly passionate you Russell I'm 
-afraid.  This is probably why you didn't hear of it before.  But the 
-discussion and the mailing list is public and open to anyone interested.
-
-> I'm not a Linaro developer; but I have CC'd their boot-architecture
-> list which AIUI is where some of the Linaro folks were thinking of
-> discussing boot protocols.
+> epllref
 > 
-> Just to be clear: I don't have a particular axe to grind, except that
-> I would like there to be some kind of defined and reasonably stable
-> interface, and that obviously we (Xen.org) need that interface to
-> support access to Hyp mode (which is something that Linux needs too if
-> we are to have a properly supported KVM on ARM).
+> > > > + *
+> > > > + * Note, this used to be two clocks, but was compressed into one.
+> > > > +*/
+> > > > +
+> > > > +struct clk *clk_i2s_srclist[] = {
+> > > > +	[0] = &clk_i2s_eplldiv.clk,
+> > > > +	[1] = &clk_i2s_ext,
+> > > > +	[2] = &clk_epllref.clk,
+> > > > +	[3] = &clk_epllref.clk,
+> > > > +};
+> > > 
+> > > Is there any reason not to make this static (have you run your patch
+> > > through checkpatch.pl ?)
+> > 
+> > Yep I did run all of them through checkpatch (after beeing scolded last
 > 
-> Are linux-arm-kernel at infradead and boot-architecture at linaro the right
-> places to try to have this conversation ?
+> time)
+> 
+> > and it didn't report anything.
+> 
+> Hmm...as a note, happened following with checkpatch.pl :(
+> 
+> ERROR: need consistent spacing around '*' (ctx:WxV)
+> #35: FILE: arch/arm/mach-s3c2416/clock.c:57:
+> +               .sources = (struct clk *[]) {
+>                                        ^
+> 
+> total: 1 errors, 0 warnings, 38 lines checked
+> 
+> PATCH 34 S3C2416 Add HSSPI clock sourced from EPLL.txt has style problems,
+> please review.
+will do.
 
-Absolutely.
+Today I also saw, that my definition of the hsspi pclk would have caused a 
+conflict with the hsspi sclk definition of s3c2443.
+
+So, as nobody uses the s3c2443's hsspi controller yet, I would also rename it 
+to hsspi-if with the next patch iteration.
 
 
-Nicolas
+Heiko
