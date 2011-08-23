@@ -1,96 +1,98 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 23 Aug 2011 08:39:32 -0700
-Subject: [PATCH] atmel_serial: RS485: receiving enabled when sending data
-In-Reply-To: <4E536536.3030004@evidence.eu.com>
-References: <4E492CFF.7040905@pwrnet.de> <20110822211832.GA8023@kroah.com>
-	<4E536536.3030004@evidence.eu.com>
-Message-ID: <20110823153932.GA26081@kroah.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Tue, 23 Aug 2011 21:11:19 +0530
+Subject: [RFC/PATCH v2 00/13] dt: omap: dt binding with omap_device and
+	support for i2c1
+In-Reply-To: <1314074021-25186-1-git-send-email-manjugk@ti.com>
+References: <1314074021-25186-1-git-send-email-manjugk@ti.com>
+Message-ID: <20110823154119.GE32698@manju-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 10:30:46AM +0200, Claudio Scordino wrote:
-> Il 22/08/2011 23:18, Greg KH ha scritto:
-> > On Mon, Aug 15, 2011 at 04:28:15PM +0200, Bernhard Roth wrote:
-> >> Hello!
-> >>
-> >> By default the atmel_serial driver in RS485 mode disables receiving
-> >> data until all data in the send buffer has been sent. This flag
-> >> allows to receive data even whilst sending data. This is very useful
-> >> to
-> >>
-> >> - check if the data has been sent correctly over the RS485 bus
-> >> - assure that no collision happened
-> >> - check for short circuits/termination issues on the RS485 bus
-> >>
-> >> Usually this functionality is realized by hardware, wether
-> >> controlling the RX-Enable pin of the RS485 transceiver with RTS
-> >> (driver control signal) or pulling it LOW permanently. The present
-> >> atmel_serial driver makes this impossible, thus requiring following
-> >> patch.
-> >>
-> >> Usage example:
-> >>
-> >>      struct serial_rs485     rs485;
-> >>
-> >>      memset(&rs485, 0, sizeof(rs485));
-> >>      rs485.flags = SER_RS485_ENABLED | SER_RS485_RX_DURING_TX;
-> >>      ioctl(fd, TIOCSRS485,&rs485);
-> >>
-> >>
-> >>
-> >>
-> >> atmel_serial: RS485: receiving enabled when sending data
-> >>
-> >> By default the atmel_serial driver in RS485 mode disables receiving
-> >> data until
-> >> all data in the send buffer has been sent. This flag allows to receive data
-> >> even whilst sending data.
-> >>
-> >> Signed-off-by: Bernhard Roth<br@pwrnet.de>
-> >> Signed-off-by: Claudio Scordino<claudio@evidence.eu.com>
-> >> ---
-> >>   drivers/tty/serial/atmel_serial.c |   17 ++++++++++-------
-> >>   include/linux/serial.h            |    1 +
-> >>   2 files changed, 11 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/drivers/tty/serial/atmel_serial.c
-> >> b/drivers/tty/serial/atmel_serial.c
-> >> index af9b781..5f6c745 100644
-> >> --- a/drivers/tty/serial/atmel_serial.c
-> >> +++ b/drivers/tty/serial/atmel_serial.c
-> >> @@ -339,8 +339,9 @@ static void atmel_stop_tx(struct uart_port *port)
-> >>       /* Disable interrupts */
-> >>       UART_PUT_IDR(port, atmel_port->tx_done_mask);
-> >>
-> >> -    if (atmel_port->rs485.flags&  SER_RS485_ENABLED)
-> >> -        atmel_start_rx(port);
-> >> +    if ((atmel_port->rs485.flags&  SER_RS485_ENABLED)&&
-> >> +        !(atmel_port->rs485.flags&  SER_RS485_RX_DURING_TX))
-> >> +            atmel_start_rx(port);
-> > 
-> > Can you fix your email client to not strip patches of tabs and resend
-> > this so that I can apply it?
-> > 
-> > thanks,
-> > 
-> > greg k-h
+On Tue, Aug 23, 2011 at 10:03:28AM +0500, G, Manjunath Kondaiah wrote:
 > 
-> Hi Greg,
+> Patch series reworked from:
+> http://permalink.gmane.org/gmane.linux.ports.arm.omap/61674
+> Also added support for i2c1 controller on omap4 based panda
+> board.
 > 
->     please find below the patch with the right tabs.
+> Baseline:
+> =========
+> git://git.secretlab.ca/git/linux-2.6.git
+> Branch: devicetree/test
+> The above branch is rebased with v3.1-rc2 mainline.
+> +
+> pdev decoupling patches from kevin hilman
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg53534.html
 > 
-> Remind however that the main author of the patch is Bernhard, not me.
+> The patch series is also available at:
+> https://gitorious.org/devicetree/dt_omap/commits/devicetree/dt_rfcv2
+> 
+> Testing:
+> ========
+> Build : dt and not dt build for omap2plus_defconfig
+> Boot: OMAP3530 Beagle Board and OMAP4430 Panda board
 
-Then properly send the patch so that this is shown.  Please just add a:
+Correction: This series will support only i2c1 controller and it will not
+handle i2c1 child devices such as twlxxxx pmic. Due to which, twl read/write's
+might fail during boot.
 
-From: foo <foo@foo.org>
+I am facing issues in getting platform_data in i2c child device probe function.
+The issue is reported to grant in patch 08/13 of this series.
 
-as the first line of the patch changelog portion and git will fix things
-up correctly.  Documentation/SubmittingPatches describes this in detail.
+-M
 
-Care to resend your updated version, with this corrected author
-information, so I get it right?
-
-thanks,
-
-greg k-h
+> 
+> Limitation:
+> ===========
+> The current implementation of omap-device build through
+> device tree supports only single instance of hwmod and 
+> multiple instances are not supported.
+> 
+> G, Manjunath Kondaiah (13):
+>   OMAP: omap_device: Add device tree node pointer
+>   dt: Add pd_size to AUXDATA structure
+>   dt: omap3: add soc file for handling i2c controllers
+>   dt: omap3: beagle board: set clock freq for i2c devices
+>   dt: omap3: add generic board file for dt support
+>   dt: omap3: add omap-device compatible property
+>   dt: omap: create platform bus for omap devices
+>   dt: omap: i2c: add dt support for i2c1 controller
+>   dt: omap4: add soc file for handling i2c controllers
+>   dt: omap4: panda board: set clock freq for i2c devices
+>   dt: omap4: add generic board file for dt support
+>   dt: omap4: enable dt support for i2c1 controller
+>   dt: omap: i2c: dt usage model documentation
+> 
+>  Documentation/devicetree/bindings/i2c/omap-i2c.txt |   57 +++++++++++++
+>  arch/arm/boot/dts/omap3-beagle-nunchuck.dts        |   13 +---
+>  arch/arm/boot/dts/omap3-beagle.dts                 |   18 ++++-
+>  arch/arm/boot/dts/omap3.dtsi                       |   62 ++++++++++++++
+>  arch/arm/boot/dts/omap4-panda.dts                  |   25 ++++--
+>  arch/arm/boot/dts/omap4.dtsi                       |   68 ++++++++++++++++
+>  arch/arm/mach-omap2/Kconfig                        |   22 +++++
+>  arch/arm/mach-omap2/Makefile                       |    2 +
+>  arch/arm/mach-omap2/board-omap3-dt.c               |   84 ++++++++++++++++++++
+>  arch/arm/mach-omap2/board-omap3beagle.c            |   13 ---
+>  arch/arm/mach-omap2/board-omap4-dt.c               |   75 +++++++++++++++++
+>  arch/arm/mach-omap2/board-omap4panda.c             |    6 --
+>  arch/arm/mach-omap2/devices.c                      |    2 +-
+>  arch/arm/mach-omap2/mcbsp.c                        |    2 +-
+>  arch/arm/plat-omap/include/plat/omap_device.h      |   11 +++-
+>  arch/arm/plat-omap/omap_device.c                   |   46 ++++++++++-
+>  drivers/i2c/busses/i2c-omap.c                      |   23 +++++-
+>  drivers/of/platform.c                              |   41 ++++++++++
+>  include/linux/of_platform.h                        |    5 +
+>  19 files changed, 526 insertions(+), 49 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
+>  create mode 100644 arch/arm/boot/dts/omap3.dtsi
+>  create mode 100644 arch/arm/boot/dts/omap4.dtsi
+>  create mode 100644 arch/arm/mach-omap2/board-omap3-dt.c
+>  create mode 100644 arch/arm/mach-omap2/board-omap4-dt.c
+> 
+> -- 
+> 1.7.4.1
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
