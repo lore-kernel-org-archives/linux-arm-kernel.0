@@ -1,59 +1,62 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Aug 2011 23:35:53 -0600 (MDT)
-Subject: [GIT PULL] OMAP: clock/powerdomain/clockdomain/hwmod: fixes for 3.1-rc
-Message-ID: <alpine.DEB.2.00.1108222319310.28226@utopia.booyaka.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 23 Aug 2011 11:11:38 +0530
+Subject: [PATCH v6 04/15] DMA: PL330: Add DMA_CYCLIC capability
+In-Reply-To: <002c01cc60c3$77d18210$67748630$%kim@samsung.com>
+References: <1313744097-27289-1-git-send-email-boojin.kim@samsung.com>
+	<1313744097-27289-5-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY2CjmoDEmvC3S0ua3=B++jKz5g2JXGTwhNcAw5MQ06M9A@mail.gmail.com>
+	<002c01cc60c3$77d18210$67748630$%kim@samsung.com>
+Message-ID: <CABb+yY0oQwBTc1zmow+ng+TEJTzRsjB-i1xZdLVwtT+RR6J5RQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
-
-  Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
-
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 prcm-fixes-a-3.1rc
-
-Note that for these changes to boot successfully on 3.1-rc3, the following 
-patch is needed:
-
-  http://marc.info/?l=linux-omap&m=131407622527432&w=2
-
-The changes have been boot-tested on N800, OMAP3530 Beagle, and 
-OMAP4430ES2 Panda.  They've also passed compile tests with a few different 
-configs here.
-
-Paul Walmsley (4):
-      OMAP4: clock: re-enable previous clockdomain enable/disable sequence
-      OMAP4: clock: fix compile warning
-      OMAP3: clock: indicate that gpt12_fck and wdt1_fck are in the WKUP clockdomain
-      Merge branches 'pwrdm_clkdm_fixes_3.1rc', 'omap2_3_hwmod_dss_fixes_3.1rc', 'non_hwmod_compliant_fix_3.1rc', 'omap4_clock_fixes_3.1rc' and 'omap3_clock_fixes_3.1rc' into prcm-fixes-a-3.1rc
-
-Rajendra Nayak (1):
-      OMAP: powerdomains: Make all powerdomain target states as ON at init
-
-Santosh Shilimkar (1):
-      OMAP: clockdomain: Wait for powerdomain to be ON when using clockdomain force wakeup
-
-Tomi Valkeinen (5):
-      OMAP2xxx: HWMOD: fix DSS opt clocks
-      OMAP3: HWMOD: fix DSS opt clocks
-      OMAP4: HWMOD: fix DSS opt clocks
-      OMAP2/3: HWMOD: Add SYSS_HAS_RESET_STATUS for dss
-      OMAP: HWMOD: Unify DSS resets for all OMAPs
-
- arch/arm/mach-omap2/Makefile                       |    5 +--
- arch/arm/mach-omap2/clock3xxx_data.c               |    2 +
- arch/arm/mach-omap2/clock44xx_data.c               |   10 +++++-
- arch/arm/mach-omap2/clockdomain.c                  |    2 +
- arch/arm/mach-omap2/display.c                      |   35 ++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   15 +++++++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   15 +++++++-
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    5 ++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   35 +++++++++++++++++--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   19 ++++-------
- arch/arm/mach-omap2/pm.c                           |    2 -
- arch/arm/mach-omap2/powerdomain.c                  |   25 +++++++++-----
- arch/arm/plat-omap/include/plat/common.h           |    3 ++
- include/video/omapdss.h                            |    7 ----
- 14 files changed, 136 insertions(+), 44 deletions(-)
+On Mon, Aug 22, 2011 at 5:33 PM, Boojin Kim <boojin.kim@samsung.com> wrote:
+>>
+>> > +static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
+>> > + ? ? ? ? ? ? ? struct dma_chan *chan, dma_addr_t dma_addr, size_t len,
+>> > + ? ? ? ? ? ? ? size_t period_len, enum dma_data_direction direction)
+>> > +{
+>> > + ? ? ? struct dma_pl330_desc *desc;
+>> > + ? ? ? struct dma_pl330_chan *pch = to_pchan(chan);
+>> > + ? ? ? dma_addr_t dst;
+>> > + ? ? ? dma_addr_t src;
+>> > +
+>> > + ? ? ? desc = pl330_get_desc(pch);
+>> > + ? ? ? if (!desc) {
+>> > + ? ? ? ? ? ? ? dev_err(pch->dmac->pif.dev, "%s:%d Unable to fetch
+>> desc\n",
+>> > + ? ? ? ? ? ? ? ? ? ? ? __func__, __LINE__);
+>> > + ? ? ? ? ? ? ? return NULL;
+>> > + ? ? ? }
+>> > +
+>> > + ? ? ? switch (direction) {
+>> > + ? ? ? case DMA_TO_DEVICE:
+>> > + ? ? ? ? ? ? ? desc->rqcfg.src_inc = 1;
+>> > + ? ? ? ? ? ? ? desc->rqcfg.dst_inc = 0;
+>> > + ? ? ? ? ? ? ? src = dma_addr;
+>> > + ? ? ? ? ? ? ? dst = pch->fifo_addr;
+>> > + ? ? ? ? ? ? ? break;
+>> > + ? ? ? case DMA_FROM_DEVICE:
+>> > + ? ? ? ? ? ? ? desc->rqcfg.src_inc = 0;
+>> > + ? ? ? ? ? ? ? desc->rqcfg.dst_inc = 1;
+>> > + ? ? ? ? ? ? ? src = pch->fifo_addr;
+>> > + ? ? ? ? ? ? ? dst = dma_addr;
+>> > + ? ? ? ? ? ? ? break;
+>> > + ? ? ? default:
+>> > + ? ? ? ? ? ? ? dev_err(pch->dmac->pif.dev, "%s:%d Invalid dma
+>> direction\n",
+>> > + ? ? ? ? ? ? ? __func__, __LINE__);
+>> > + ? ? ? ? ? ? ? return NULL;
+>> > + ? ? ? }
+>> > +
+>> > + ? ? ? desc->rqcfg.brst_size = pch->burst_sz;
+>> > + ? ? ? desc->rqcfg.brst_len = 1;
+>> > +
+>> > + ? ? ? if (!pch->cyclic)
+>> > + ? ? ? ? ? ? ? pch->cyclic = CYCLIC_PREP;
+>> The need for check here seems suspicious.
+>> Is it really needed? If not, please remove it.
+> It's required because Cyclic operation is passed from CYCLIC_PREP to
+> CYCLIC_TRIGGER.
+I don't see why you need to differentiate between PREP and TRIGGER in
+cyclic mode. I think, you should simply have 'bool cyclic' instead of enum.
