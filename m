@@ -1,46 +1,59 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Tue, 23 Aug 2011 10:50:14 +0530
-Subject: [PATCH 16/18] dmaengine/amba-pl08x: Add support for sg len
-	greater than one for slave transfers
-In-Reply-To: <4E532B19.6000103@st.com>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
-	<20110814083618.GE4986@n2100.arm.linux.org.uk>
-	<4E4CCF7B.8060704@st.com>
-	<20110821083306.GA12028@n2100.arm.linux.org.uk>
-	<4E532B19.6000103@st.com>
-Message-ID: <1314076814.22120.17.camel@vkoul-udesk3>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 22 Aug 2011 23:35:53 -0600 (MDT)
+Subject: [GIT PULL] OMAP: clock/powerdomain/clockdomain/hwmod: fixes for 3.1-rc
+Message-ID: <alpine.DEB.2.00.1108222319310.28226@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-08-23 at 09:52 +0530, Viresh Kumar wrote:
-> On 8/21/2011 2:03 PM, Russell King - ARM Linux wrote:
-> >> > I am not sure if i get this completely. In memcpy, we still don't support
-> >> > more than one sg. We have created a new member in txd, which keeps track of
-> >> > data (addresses, len).
-> > Yes, but we shouldn't need to translate it into any kind of scatterlist.
-> > 
-> 
-> Ok. I way out is keeping two separate variables in txd, list for slave transfers,
-> and pointer to single element for memcpy. And that looks to be even bad to me.
-> Why waste memory, for second variable. Or create union of both.
-> 
-> One more thing, we can actually have scatter gather in memcpy too in future. This will be
-> helpful then also. But surely that's something not implemented currently.
-> 
-There are few points for consideration:
-1) Clients will calls tx_submit() and submit the descriptors, this
-should push your descriptor to queued list
-2) On issue_pending() you need to push the queued descriptors to dmac.
-If your hardware can transfer multiple descriptors, then you should use
-this and push all available descriptors to hardware.
+Hi Tony,
 
-This way you ensure optimal performance and give LLI for memcpy even
-when you think API is not available.
+The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
 
-If there are some use cases where we need scatterlist support for
-memcpy, and if above doesn't satisfy, should be okay to add it.
+  Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
 
+are available in the git repository at:
+  git://git.pwsan.com/linux-2.6 prcm-fixes-a-3.1rc
 
--- 
-~Vinod
+Note that for these changes to boot successfully on 3.1-rc3, the following 
+patch is needed:
+
+  http://marc.info/?l=linux-omap&m=131407622527432&w=2
+
+The changes have been boot-tested on N800, OMAP3530 Beagle, and 
+OMAP4430ES2 Panda.  They've also passed compile tests with a few different 
+configs here.
+
+Paul Walmsley (4):
+      OMAP4: clock: re-enable previous clockdomain enable/disable sequence
+      OMAP4: clock: fix compile warning
+      OMAP3: clock: indicate that gpt12_fck and wdt1_fck are in the WKUP clockdomain
+      Merge branches 'pwrdm_clkdm_fixes_3.1rc', 'omap2_3_hwmod_dss_fixes_3.1rc', 'non_hwmod_compliant_fix_3.1rc', 'omap4_clock_fixes_3.1rc' and 'omap3_clock_fixes_3.1rc' into prcm-fixes-a-3.1rc
+
+Rajendra Nayak (1):
+      OMAP: powerdomains: Make all powerdomain target states as ON at init
+
+Santosh Shilimkar (1):
+      OMAP: clockdomain: Wait for powerdomain to be ON when using clockdomain force wakeup
+
+Tomi Valkeinen (5):
+      OMAP2xxx: HWMOD: fix DSS opt clocks
+      OMAP3: HWMOD: fix DSS opt clocks
+      OMAP4: HWMOD: fix DSS opt clocks
+      OMAP2/3: HWMOD: Add SYSS_HAS_RESET_STATUS for dss
+      OMAP: HWMOD: Unify DSS resets for all OMAPs
+
+ arch/arm/mach-omap2/Makefile                       |    5 +--
+ arch/arm/mach-omap2/clock3xxx_data.c               |    2 +
+ arch/arm/mach-omap2/clock44xx_data.c               |   10 +++++-
+ arch/arm/mach-omap2/clockdomain.c                  |    2 +
+ arch/arm/mach-omap2/display.c                      |   35 ++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   15 +++++++-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   15 +++++++-
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    5 ++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   35 +++++++++++++++++--
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   19 ++++-------
+ arch/arm/mach-omap2/pm.c                           |    2 -
+ arch/arm/mach-omap2/powerdomain.c                  |   25 +++++++++-----
+ arch/arm/plat-omap/include/plat/common.h           |    3 ++
+ include/video/omapdss.h                            |    7 ----
+ 14 files changed, 136 insertions(+), 44 deletions(-)
