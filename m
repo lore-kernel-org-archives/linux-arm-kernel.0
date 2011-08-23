@@ -1,67 +1,58 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 24 Aug 2011 00:45:13 +0530
-Subject: [RFC/PATCH v2 10/13] dt: omap4: panda board: set clock freq for
-	i2c devices
-In-Reply-To: <4E53F99B.3060308@ti.com>
-References: <1314074021-25186-11-git-send-email-manjugk@ti.com>
-	<4E537F6B.4060608@ti.com> <4E53F99B.3060308@ti.com>
-Message-ID: <CAC63_iTiXQUFYwyRshE7gx-MLbV4pHdbwDJCs0nSsL1H5oRwBg@mail.gmail.com>
+From: lrg@ti.com (Liam Girdwood)
+Date: Tue, 23 Aug 2011 20:26:59 +0100
+Subject: [PATCH] ASoC: Tegra: wm8903 machine driver: Drop Ventana support
+In-Reply-To: <1314119788-23000-1-git-send-email-swarren@nvidia.com>
+References: <1314119788-23000-1-git-send-email-swarren@nvidia.com>
+Message-ID: <4E53FF03.1030100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On 23/08/11 18:16, Stephen Warren wrote:
+> Board file support for Ventana is not yet mainlined, and probably won't
+> ever be given the move to Device-Tree. Consequently, the Ventana entry
+> is being removed from arch/arm/tools/mach-types in the next merge window,
+> since it was registered over a year ago.
+> 
+> This will also remove function machine_is_ventana(), which is used by
+> the ASoC Tegra WM8903 machine driver. This will cause compilation
+> failures. Drop Ventana support to resolve this.
+> 
+> Hopefully, in the not-too-distant future, tegra_wm8903.c will be able to
+> configure itself from Device-Tree, and hence we'll be able to re-instate
+> Ventana support just by creating a .dts file for the board.
+> 
+> Also note that Aebl support is in a similar boat. However, that board
+> isn't scheduled for deprecation for at least another 5 months, and
+> perhaps we will have completely removed non-Device-Tree support from
+> tegra_wm8903.c by then and/or adjusted mach-types policy.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-On Wed, Aug 24, 2011 at 12:33 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
->> From: G, Manjunath Kondaiah<manjugk@ti.com>
->> To: devicetree-discuss at lists.ozlabs.org
->> CC: linux-omap at vger.kernel.org, linux-arm-kernel at lists.infradead.org
->>
->>
->> Update omap4 panda dts file with required clock frequencies
->> for the i2c client devices existing on panda board.
->>
->> Signed-off-by: G, Manjunath Kondaiah<manjugk@ti.com>
->> ---
->> ? arch/arm/boot/dts/omap4-panda.dts | ? 16 ++++++++++++++++
->> ? 1 files changed, 16 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap4-panda.dts
->> b/arch/arm/boot/dts/omap4-panda.dts
->> index c28aa95..6b831ca 100644
->> --- a/arch/arm/boot/dts/omap4-panda.dts
->> +++ b/arch/arm/boot/dts/omap4-panda.dts
->> @@ -3,4 +3,20 @@
->> ? / {
->> ? ? ? ?model = "TI OMAP4 PandaBoard";
->> ? ? ? ?compatible = "ti,omap4-panda", "ti,omap4430";
->> +
->> + ? ? ? i2c1 {
->> + ? ? ? ? ? ? ? clock-frequency =<400000>;
->> + ? ? ? };
->> +
->> + ? ? ? i2c2 {
->> + ? ? ? ? ? ? ? clock-frequency =<400000>;
->> + ? ? ? };
->> +
->> + ? ? ? i2c3 {
->> + ? ? ? ? ? ? ? clock-frequency =<400000>;
->> + ? ? ? };
->> +
->> + ? ? ? i2c4 {
->> + ? ? ? ? ? ? ? clock-frequency =<400000>;
->> + ? ? ? };
->> ? };
->
-> Are you sure that this patch is setting the expected frequency?
-> I see 100kHz in the boot log even with that patch.
->
-> I took me some time to find the proper syntax, but in order to reference an
-> existing node, you have to use &i2c1 at the top level of the file. If you
-> check the output of the DTC compiler, you will see the property at the
-> proper node.
+Acked-by: Liam Girdwood <lrg@ti.com>
 
-Thanks for bringing this issue. This was one of query I have asked to grant in
-one of the e-mail threads. Even I noticed that, it used to fetch default speed
-instead of speed assigned in dts file. Let me check with your suggestion.
-
--Manjunath
+> ---
+>  sound/soc/tegra/tegra_wm8903.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/sound/soc/tegra/tegra_wm8903.c b/sound/soc/tegra/tegra_wm8903.c
+> index 661373c..be27f1d 100644
+> --- a/sound/soc/tegra/tegra_wm8903.c
+> +++ b/sound/soc/tegra/tegra_wm8903.c
+> @@ -319,7 +319,7 @@ static int tegra_wm8903_init(struct snd_soc_pcm_runtime *rtd)
+>  	snd_soc_dapm_force_enable_pin(dapm, "Mic Bias");
+>  
+>  	/* FIXME: Calculate automatically based on DAPM routes? */
+> -	if (!machine_is_harmony() && !machine_is_ventana())
+> +	if (!machine_is_harmony())
+>  		snd_soc_dapm_nc_pin(dapm, "IN1L");
+>  	if (!machine_is_seaboard() && !machine_is_aebl())
+>  		snd_soc_dapm_nc_pin(dapm, "IN1R");
+> @@ -395,7 +395,7 @@ static __devinit int tegra_wm8903_driver_probe(struct platform_device *pdev)
+>  	platform_set_drvdata(pdev, card);
+>  	snd_soc_card_set_drvdata(card, machine);
+>  
+> -	if (machine_is_harmony() || machine_is_ventana()) {
+> +	if (machine_is_harmony()) {
+>  		card->dapm_routes = harmony_audio_map;
+>  		card->num_dapm_routes = ARRAY_SIZE(harmony_audio_map);
+>  	} else if (machine_is_seaboard()) {
