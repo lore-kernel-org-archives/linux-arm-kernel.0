@@ -1,43 +1,43 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Tue, 23 Aug 2011 18:32:36 +0530
-Subject: [PATCH v5 08/22] gpio/omap: further cleanup using wakeup_status
-	register
-In-Reply-To: <1312455893-14922-9-git-send-email-tarun.kanti@ti.com>
-References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
-	<1312455893-14922-9-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4E53A4EC.5060107@ti.com>
+From: jason.hui@linaro.org (Jason Liu)
+Date: Tue, 23 Aug 2011 21:07:38 +0800
+Subject: [PATCH 0/6] imx soc revision clean up
+Message-ID: <1314104864-3725-1-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
-> Wakeup istatus register offset initialized according to OMAP versions
-/s/ istatus / status
+The patchset make some clean up for the imx soc revision display by
+- introudce the generic function for displaying silicon revision
+- update the imx SoCs to adopt the same usage
 
-> during device registration. Use this to avoid version checks.
-> Starting with OMAP4, legacy registers should not be used in combination
-> with the updated regsiters. Use wkup_status register consistently for
-> all SoCs wherever applicable.
->
-> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
-> Signed-off-by: Charulatha V<charu@ti.com>
-> ---
->   arch/arm/mach-omap1/gpio16xx.c         |    1 +
->   arch/arm/mach-omap2/gpio.c             |    2 +
->   arch/arm/plat-omap/include/plat/gpio.h |    1 +
->   drivers/gpio/gpio-omap.c               |  109 ++++++--------------------------
->   4 files changed, 24 insertions(+), 89 deletions(-)
->
-> diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-> index df4bb44..ed9f285 100644
-> --- a/arch/arm/mach-omap1/gpio16xx.c
-> +++ b/arch/arm/mach-omap1/gpio16xx.c
-> @@ -89,6 +89,7 @@ static struct omap_gpio_reg_offs omap16xx_gpio_regs = {
->   	.irqenable	= OMAP1610_GPIO_IRQENABLE1,
->   	.set_irqenable	= OMAP1610_GPIO_SET_IRQENABLE1,
->   	.clr_irqenable	= OMAP1610_GPIO_CLEAR_IRQENABLE1,
-> +	.wkup_status	= OMAP1610_GPIO_WAKEUPENABLE,
-The register doesn't seems to be the status register. wkup_en
-is more appropriate.
+The patchset is based on Fabio's initial commit and I did some update
 
-Regards
-Santosh
+Fabio Estevam (1):
+  ARM: imx: Introduce generic function for displaying silicon revision
+
+Jason Liu (5):
+  ARM: mx25: Print silicon revision on boot
+  ARM: mx27: Print silicon revision on boot
+  ARM: mx31: use generic function for displaying silicon revision
+  ARM: mx35: use generic function for displaying silicon revision
+  ARM: mx5: use generic function for displaying silicon revision
+
+ arch/arm/mach-imx/Makefile              |    2 +-
+ arch/arm/mach-imx/clock-imx25.c         |    6 +++
+ arch/arm/mach-imx/clock-imx27.c         |    2 +
+ arch/arm/mach-imx/clock-imx31.c         |    5 +-
+ arch/arm/mach-imx/clock-imx35.c         |    3 +-
+ arch/arm/mach-imx/cpu-imx25.c           |   41 +++++++++++++++++
+ arch/arm/mach-imx/cpu-imx27.c           |   28 +++++------
+ arch/arm/mach-imx/cpu-imx31.c           |   21 +++++---
+ arch/arm/mach-imx/cpu-imx35.c           |   30 ++++++-------
+ arch/arm/mach-mx5/clock-mx51-mx53.c     |    6 +--
+ arch/arm/mach-mx5/cpu.c                 |   74 +++++++------------------------
+ arch/arm/plat-mxc/cpu.c                 |   10 ++++
+ arch/arm/plat-mxc/include/mach/common.h |    1 +
+ arch/arm/plat-mxc/include/mach/mx25.h   |    4 ++
+ arch/arm/plat-mxc/include/mach/mx3x.h   |   18 +-------
+ 15 files changed, 131 insertions(+), 120 deletions(-)
+ create mode 100644 arch/arm/mach-imx/cpu-imx25.c
+
+-- 
+1.7.4.1
