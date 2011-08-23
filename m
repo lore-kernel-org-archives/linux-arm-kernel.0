@@ -1,46 +1,66 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 23 Aug 2011 15:28:10 +0300
-Subject: [PATCH 0/9] OMAP: HWMOD: DSS patches
-Message-ID: <1314102499-30407-1-git-send-email-tomi.valkeinen@ti.com>
+Date: Tue, 23 Aug 2011 15:28:13 +0300
+Subject: [PATCH 3/9] OMAP3: HWMOD: Fix DSS reset
+In-Reply-To: <1314102499-30407-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1314102499-30407-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1314102499-30407-4-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are the previously sent HWMOD patches split into smaller pieces and with
-improved commit messages.
+DSS needs all DSS clocks to be enabled to be able to finish reset
+properly. Before v3.1-rc1 the omapdss driver was managing clocks and
+resets correctly. However, when omapdss started using runtime PM at
+v3.1-rc1, the responsibility for the reset moved to HWMOD framework.
 
-I'm not sure if these are strictly needed to be sent for -rc. The DSS patches
-9ede365aa6f74428a1f69c21ca1cf21213167576 ("HACK: OMAP: DSS2: clk hack for
-OMAP2/3") and df5d3ed23cf73ee0763a8963003bda9b69d9620f ("OMAP: DSS2: HDMI: fix
-hdmi clock name") already circumvent the problems with wrong clocks, and the
-DSS reset problem on OMAP4 hasn't caused any actual runtime problems as far as
-I know.
+HWMOD framework does not currently enable all the DSS clocks when
+resetting the DSS hardware. This hasn't caused any problems so far, but
+we may just have been lucky.
 
-So while it'd be nice to remove the hack from omapdss driver and get rid of the
-reset error print, it's up to you if you want these for -rc.
+dss_core's opt-clocks is also missing dss_96m_fck, which is a DSS clock
+present only on OMAP3430, and thus required on OMAP3430 to finish the
+reset.
 
- Tomi
+This patch sets HWMOD_CONTROL_OPT_CLKS_IN_RESET and adds the dss_96m_fck
+opt-clock for dss_core in OMAP3 HWMOD data, fixing the issue.
 
-Tomi Valkeinen (9):
-  OMAP2xxx: HWMOD: Fix DSS reset
-  OMAP2xxx: HWMOD: fix DSS clock data
-  OMAP3: HWMOD: Fix DSS reset
-  OMAP3: HWMOD: fix DSS clock data
-  OMAP4: HWMOD: remove extra clocks
-  OMAP4: HWMOD: Add HWMOD_CONTROL_OPT_CLKS_IN_RESET for dss_core
-  OMAP4: HWMOD: fix DSS clock data
-  OMAP2/3: HWMOD: Add SYSS_HAS_RESET_STATUS for dss
-  OMAP: HWMOD: Unify DSS resets for OMAPs
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   11 +++++++++--
+ 1 files changed, 9 insertions(+), 2 deletions(-)
 
- arch/arm/mach-omap2/Makefile                       |    5 +--
- arch/arm/mach-omap2/display.c                      |   35 ++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   15 +++++++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   15 +++++++-
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    5 ++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   35 +++++++++++++++++--
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |   18 +++-------
- arch/arm/plat-omap/include/plat/common.h           |    3 ++
- include/video/omapdss.h                            |    7 ----
- 9 files changed, 106 insertions(+), 32 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 25bf43b..484eda3 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1365,13 +1365,19 @@ static struct omap_hwmod_ocp_if *omap3xxx_dss_slaves[] = {
+ };
+ 
+ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
+-	{ .role = "tv_clk", .clk = "dss_tv_fck" },
+-	{ .role = "video_clk", .clk = "dss_96m_fck" },
++	/*
++	 * The DSS HW needs all DSS clocks enabled during reset. The dss_core
++	 * driver does not use these clocks.
++	 */
+ 	{ .role = "sys_clk", .clk = "dss2_alwon_fck" },
++	{ .role = "tv_clk", .clk = "dss_tv_fck" },
++	/* required only on OMAP3430 */
++	{ .role = "tv_dac_clk", .clk = "dss_96m_fck" },
+ };
+ 
+ static struct omap_hwmod omap3430es1_dss_core_hwmod = {
+ 	.name		= "dss_core",
++	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+ 	.class		= &omap2_dss_hwmod_class,
+ 	.main_clk	= "dss1_alwon_fck", /* instead of dss_fck */
+ 	.sdma_reqs	= omap3xxx_dss_sdma_chs,
+@@ -1396,6 +1402,7 @@ static struct omap_hwmod omap3430es1_dss_core_hwmod = {
+ 
+ static struct omap_hwmod omap3xxx_dss_core_hwmod = {
+ 	.name		= "dss_core",
++	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+ 	.class		= &omap2_dss_hwmod_class,
+ 	.main_clk	= "dss1_alwon_fck", /* instead of dss_fck */
+ 	.sdma_reqs	= omap3xxx_dss_sdma_chs,
 -- 
 1.7.4.1
