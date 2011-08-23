@@ -1,52 +1,41 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Tue, 23 Aug 2011 09:59:54 -0700
-Subject: [PATCH 1/2] arm: mach-bcmring: fix build error in core.c
-In-Reply-To: <20110823164514.GG3895@n2100.arm.linux.org.uk>
-References: <20110823111824.GA2806@maxin> <4E53D84F.5060604@broadcom.com>
-	<20110823164514.GG3895@n2100.arm.linux.org.uk>
-Message-ID: <4E53DC8A.3000701@broadcom.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 23 Aug 2011 18:09:55 +0100
+Subject: v6 software reset fails on 1176
+In-Reply-To: <20110823163247.GM2796@pulham.picochip.com>
+References: <20110823163247.GM2796@pulham.picochip.com>
+Message-ID: <20110823170955.GF10062@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/23/2011 9:45 AM, Russell King - ARM Linux wrote:
-> On Tue, Aug 23, 2011 at 09:41:51AM -0700, Jiandong Zheng wrote:
->> On 8/23/2011 4:18 AM, Maxin B. John wrote:
->>> CC      arch/arm/mach-bcmring/core.o
->>> arch/arm/mach-bcmring/core.c: In function 'bcmring_init_timer':
->>> arch/arm/mach-bcmring/core.c:238: error: implicit declaration of
->>> function 'sp804_clockevents_register'
->>> make[1]: *** [arch/arm/mach-bcmring/core.o] Error 1
->>> make: *** [arch/arm/mach-bcmring] Error 2
->>>
->>> Please let me know your comments on this fix:
->>>
->>> Signed-off-by: Maxin B. John<maxin.john@gmail.com>
->>> ---
->>> diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
->>> index 43eadbc..430da12 100644
->>> --- a/arch/arm/mach-bcmring/core.c
->>> +++ b/arch/arm/mach-bcmring/core.c
->>> @@ -235,7 +235,7 @@ void __init bcmring_init_timer(void)
->>>    	 */
->>>    	bcmring_clocksource_init();
->>>
->>> -	sp804_clockevents_register(TIMER0_VA_BASE, IRQ_TIMER0, "timer0");
->>> +	sp804_clockevents_init(TIMER0_VA_BASE, IRQ_TIMER0, "timer0");
->>>    }
->>>
->>>    struct sys_timer bcmring_timer = {
->>>
->> Signed-off-by: Jiandong Zheng<jdzheng@broadcom.com>
->
-> Don't you mean acked-by or reviewed-by?
-I meant I created the same patch and have tested it. But if acked-by or 
-reviewed-by is less confusing, I am OK with it.
+On Tue, Aug 23, 2011 at 05:32:47PM +0100, Jamie Iles wrote:
+> Hi Will,
 
->
->> The same changes was in my comments on May 17 to Russell's serial
->> patches to convert to sp804 clk dev, but seems it got lost.
->
-> Unfortunately... sorry about that.
->
-To avoid this, should I submit every patch to patch system after 
-reviewed through maillist?
+Hi Jamie,
+
+> I'm trying to use the cpu_v6_reset that you added in "ARM: proc: add 
+> definition of cpu_reset for ARMv6 and ARMv7 cores", but I've found that 
+> on my 1176 platform, it never gets to the branch to the reset vector.  
+
+Ok. How are you calling cpu_v6_reset? If you call it via arch_reset from
+arm_machine_restart then there should be an identity mapping in place, so
+you need to ensure that the reset code is called via this mapping in your
+implementation of arch_reset.
+
+Unfortunately, the current flat mapping only covers userspace, so it relies
+on the physical address of the reset code not aliasing with the kernel virtual
+addresses.
+
+I have some (experimental) patches to fix this in my kexec branch:
+
+http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/kexec-mmu-off
+
+> Removing the ISB allows the branch instruction to be in the pipeline by 
+> the time the MMU is disabled, but I'm not sure if this is the correct 
+> fix.  Having said that, I don't see how this can work with an ISB in 
+> there.
+
+With modern CPUs, you can't rely on characteristics of the pipeline to play
+tricks like this. Instead, you need to ensure that the reset code is
+executed with a 1:1 mapping.
+
+Will
