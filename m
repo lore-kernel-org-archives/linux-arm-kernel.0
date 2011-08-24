@@ -1,67 +1,81 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 24 Aug 2011 13:34:31 +0100
-Subject: [PATCH v4 0/8] MMU disabling code and kexec fixes
-In-Reply-To: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20110824123431.GH23757@pulham.picochip.com>
+From: martin.xm.hovang@stericsson.com (Martin HOVANG)
+Date: Wed, 24 Aug 2011 14:37:29 +0200
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <CACRpkdbmqYQsxFRf7V6bDMMMgGnkHVr6JSZDVxX_j3ea+X8_Tg@mail.gmail.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
+	<20110823174203.GI3895@n2100.arm.linux.org.uk>
+	<CACRpkdbmqYQsxFRf7V6bDMMMgGnkHVr6JSZDVxX_j3ea+X8_Tg@mail.gmail.com>
+Message-ID: <E2E6AC6BFAD06343BA2D97432459C1B60385140EAB@EXDCVYMBSTM005.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi,
 
-On Tue, Aug 23, 2011 at 10:46:44PM +0100, Will Deacon wrote:
-> Hello,
-> 
-> This is version 4 of the patches originally posted here:
-> 
-> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052157.html
-> v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052559.html
-> v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/053252.html
-> 
-> There are many changes since v3. Notably:
-> 	- Support for Thumb-2
-> 	- Based on 3.1-rc3 (now that some of the previous patches have
-> 	  been merged)
-> 	- The reserved stack page now sits below swapper and is reserved
-> 	  by memblock during memory init. This has the advantage of being
-> 	  at a known physical address for a platform, which will be helpful
-> 	  for non-hotplug SMP booting.
-> 
-> Currently, SMP kexec relies on platform_cpu_kill (a CPU hotplug callback)
-> doing the right thing. I'm working on a generic SMP soft reboot implementation
-> but this isn't quite working yet (and my git repo is predictably offline
-> at the moment so I can't provide a link to the patches).
+The GlobalPlatform TEE spec do not address this kinds of functions. The Trusted Applications (TAs) defined by this initiative runs in user space and do not have the rights to do poke in hw. An extension of the GP framework to support applications running in the TEE Core (supervisor mode) would be needed. This extension could be what we have running on the 8500 today. Basically we use the same GP Client API (Linux side) with the addition to the secure side OS to access functions running in supervisor mode. I.e. the secure side implementation is extended without creating a conflict or changing the GP Client API in Linux.
 
-I've tried this on picoxcell and reboot with arm_machine_reset() works 
-nicely, but I couldn't get kexec to work (though it didn't work without 
-your patches...).
+Regards
+/Martin
 
-With your patches applied I get the following output on booting the new 
-kernel:
+-----Original Message-----
+From: Linus Walleij [mailto:linus.walleij at linaro.org] 
+Sent: den 24 augusti 2011 13:43
+To: Russell King - ARM Linux
+Cc: Catalin Marinas; boot-architecture at lists.linaro.org; Ian Jackson; linux-arm-kernel at lists.infradead.org; android-virt at lists.cs.columbia.edu; Hakan ENGLUND; Martin HOVANG
+Subject: Re: ARM processor mode, kernel startup, Hyp / secure state
 
-[    0.000000] Initializing cgroup subsys cpu
-[    0.000000] Linux version 3.1.0-rc3+ (jamiei at pulham) (gcc version 4.5.3 20110223 (prerelease) (GCC) ) #40 PREEMPT Wed Aug 24 13:21:06 BST 2011
-[    0.000000] CPU: ARMv6-compatible processor [410fb767] revision 7 (ARMv7), cr=00c5387f
-[    0.000000] CPU: VIPT aliasing data cache, unknown instruction cache
-[    0.000000] Machine: Picochip picoXcell
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Memory policy: ECC disabled, Data cache writeback
-[    0.000000] Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
-[    0.000000]
-[    0.000000] [<c001368c>] (unwind_backtrace+0x0/0xe0) from [<c02c875c>] (panic+0x68/0x1a0)
-[    0.000000] [<c02c875c>] (panic+0x68/0x1a0) from [<c03c5180>] (memblock_alloc_base+0x2c/0x34)
-[    0.000000] [<c03c5180>] (memblock_alloc_base+0x2c/0x34) from [<c03be894>] (early_alloc.clone.1+0x10/0x28)
-[    0.000000] [<c03be894>] (early_alloc.clone.1+0x10/0x28) from [<c03bf2b4>] (paging_init+0x4c4/0x6d0)
-[    0.000000] [<c03bf2b4>] (paging_init+0x4c4/0x6d0) from [<c03bca54>] (setup_arch+0x424/0x780)
-[    0.000000] [<c03bca54>] (setup_arch+0x424/0x780) from [<c03bb510>] (start_kernel+0xac/0x2e4)
-[    0.000000] [<c03bb510>] (start_kernel+0xac/0x2e4) from [<00008040>] (0x8040)
+On Tue, Aug 23, 2011 at 7:42 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Aug 23, 2011 at 06:17:04PM +0100, Catalin Marinas wrote:
+>> Maybe we could allow (b) if SoC vendors don't provide a different API
+>> to set the HVBAR. But it means that kernels not aware of this feature
+>> would fail.
+>
+> Oh, does this mean that ARM Ltd are starting to see the light in having
+> a common defined secure API at last - at least a subset - something which
+> I've mentioned several times...
 
-and the allocation that fails appears to be allocating the vectors page.  
-Without your patches I don't get any output though so it's a definite 
-improvement!
+I've discussed this internally at ST-Ericsson at times.
 
-Note that this is a device tree enabled platform so there is no 
-/proc/atags.  I'm happy to test any related patches on our platform, but 
-kexec isn't something we really use.
+There is something called the Trusted Execution Environment
+(TEE) which is standardized by Global Platform, a consortia
+where ARM are members, as are ST, Ericsson, NXP, Renesas,
+and TI (etc):
+http://www.globalplatform.org/membershipcurrentfull.asp
 
-Jamie
+For Ux500 we have a driver for this API which can be found in
+an out-of-tree git, basically for Ux500 the ROM implements
+the service tunnel, and we call into the ROM to perform them.
+The ROM in turn will issue an SMC to execute the actual
+call to the secure world.
+
+The TEE defines Trusted Applications (TA:s) that can be
+called, they use a GUID identifier on each side as handle.
+I think of it as some exec() call which returns the result in
+a pipe ... (I don't know if this analogy is correct)
+
+Right now these TEE calls are mostly for performing this or
+that cryptographic operation on some buffer of data, keeping
+the secret crypto keys in the secure world. These calls are
+done from userspace with the kernel driver simply
+mediating them.
+
+The basic question to which I have no answer is whether
+TEE is or is not intended to be used for low-level services
+like l2x0 on/off or so. Or if the idea never even crossed the
+minds of the people devising TEE, like say if they were
+having totally different use cases in their mind when they
+cooked it up.
+
+If it was intended for such stuff, we/GlobalPlatform could
+define a few standard "TAs" that all platforms would
+implement, unless it's by nature too heavyweight for that.
+
+Would be fun if someone with insight could fill in on
+this...
+
+[TEE experts, smack my fingers if I got some detail
+wrong in here.]
+
+Yours,
+Linus Walleij
