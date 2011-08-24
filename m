@@ -1,41 +1,48 @@
-From: xhpohanka@gmail.com (Jan Pohanka)
-Date: Wed, 24 Aug 2011 15:45:02 +0200
-Subject: dma buffers for camera
-Message-ID: <op.v0p0hctkyxxkfz@localhost.localdomain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Aug 2011 14:51:09 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20051.57876.785018.498967@mariner.uk.xensource.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
+	<20051.57876.785018.498967@mariner.uk.xensource.com>
+Message-ID: <20110824135109.GP32688@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Ian,
 
-could please anyone explain me a bit situation about using memory buffers  
-for dma for video input devices? Unfortunately I don't understand it at  
-all.
-I want to capture images 1600x1200 from 2 mpix sensor on i.mx27 board.
-I gave 8MB to mx2_camera device with dma_declare_coherent_memory.
+On Tue, Aug 23, 2011 at 06:23:32PM +0100, Ian Jackson wrote:
+> Catalin Marinas writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
+> > (I'll be on holiday from tomorrow, so not able to follow up until September).
+> 
+> Right.  Let's try to be quick :-).
 
-Unfortunately it seems to be not enough. In UYVY format I need 1600x1200x2  
-for one picture, it is cca 3.8MB.
-After some digging I noticed, that dma_alloc_coherent() is called three  
-times and each time with the 3.8MB demand. Once it is directly from  
-mx2_camera driver and two times from videobuf_dma_contig. OK, that is more  
-than 8MB available, but why there are so big memory demands for one  
-picture?
+Ha, you've got enough people interested now that there's no need to rush!
 
-I'm using gstremer for capturing, so it probably requests several buffers  
-with VIDIOC_REQBUFS. Is this behaviour normal, even if there is explicitly  
-noted that I want only one buffer?
+> > We had some discussions both with ARM partners and Christoffer and it
+> > is not clear how we go about initialising the Hyp mode. Most SoC
+> > vendors would probably just run Linux in non-secure SVC mode and would
+> > not touch the Hyp mode at all. Linux would issue an SMC to set the
+> > HVBAR (could do HVC but I expect that there is no secure monitor
+> > code). Once this is set, assuming that the Hyp MMU is disabled, Linux
+> > can invoke an HVC and initialise the Hyp mode.
+> 
+> Well, yes.  Do SoC vendors all expect to own the secure state ?
+> 
+> If so then the answer is perhaps simply that they should boot Linux in
+> Hyp mode (and expect Linux to drop to ordinary svc mode).
 
-gst-launch \
-   v4l2src num-buffers=1 device=/dev/video1 ! \
-   video/x-raw-yuv,format=\(fourcc\)UYVY,width=$WIDTH,height=$HEIGHT ! \
-   jpegenc ! \
-   filesink location=col_image.jpg
+I think it's important to separate the problems of secure boot with the
+problems of installing a hypervisor. Whatever happens in secure world, we can
+expect to be dropped at either HYP mode or non-secure SVC mode. Sure, on a dev
+board you might run directly in the secure world so there's a bit of extra
+work to do to get out of that but then we can just drop into HVC mode and
+forget about it.
 
-
-with best regards
-Jan
-
-
--- 
-Tato zpr?va byla vytvo?ena p?evratn?m po?tovn?m klientem Opery:  
-http://www.opera.com/mail/
+> If we had a more functional bootloader setup (which AIUI is definitely
+> planned) we could do.
+> 
+> > > ? (b) If started in Hyp mode:
+> > > ? ? ? * Install a trivial hypervisor vector which unconditionally
+> > > ? ? ? ? copies r0 to HVBAR and returns
+> > > ? (c) Rest of startup.
