@@ -1,346 +1,145 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 24 Aug 2011 09:19:24 +0200 (CEST)
-Subject: [PATCH] media i.MX27 camera: remove legacy dma support
-In-Reply-To: <1314167073-11058-1-git-send-email-s.hauer@pengutronix.de>
-References: <1314167073-11058-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <Pine.LNX.4.64.1108240843001.8985@axis700.grange>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 24 Aug 2011 15:33:21 +0800
+Subject: [PATCH v10 0/3] add the GPMI controller driver for IMX23/IMX28
+Message-ID: <1314171204-25458-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sure, if it's broken, let's remove it. But there are a couple of points, 
-that we have to fix in this patch. Sorry, a stupid question: has this been 
-tested on i.MX27?
+The patch set is based on Artem's tree:
+	http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
 
-On Wed, 24 Aug 2011, Sascha Hauer wrote:
+The general-purpose media interface(GPMI) controller is a flexible interface
+to up to several NAND flashs.
 
-> The i.MX27 dma support was introduced with the initial commit of
-> this driver and originally created by me. However, I never got
-> this stable due to the racy dma engine and used the EMMA engine
-> instead. As the DMA support is most probably unused and broken in
-> its current state, remove it. This also helps us to get rid of
-> another user of the legacy i.MX DMA support,
-> Also, remove the dependency on ARCH_MX* macros as these are scheduled
-> for removal.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Baruch Siach <baruch@tkos.co.il>
-> Cc: linux-media at vger.kernel.org
-> Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
->  drivers/media/video/Kconfig      |    2 +-
->  drivers/media/video/mx2_camera.c |  183 --------------------------------------
->  2 files changed, 1 insertions(+), 184 deletions(-)
-> 
-> diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-> index f574dc0..27b41b8 100644
-> --- a/drivers/media/video/Kconfig
-> +++ b/drivers/media/video/Kconfig
-> @@ -941,7 +941,7 @@ config VIDEO_MX2_HOSTSUPPORT
->  
->  config VIDEO_MX2
->  	tristate "i.MX27/i.MX25 Camera Sensor Interface driver"
-> -	depends on VIDEO_DEV && SOC_CAMERA && (MACH_MX27 || ARCH_MX25)
-> +	depends on VIDEO_DEV && SOC_CAMERA && ARCH_MXC
->  	select VIDEOBUF_DMA_CONTIG
->  	select VIDEO_MX2_HOSTSUPPORT
->  	---help---
-> diff --git a/drivers/media/video/mx2_camera.c b/drivers/media/video/mx2_camera.c
-> index ec2410c..3b5c8eb 100644
-> --- a/drivers/media/video/mx2_camera.c
-> +++ b/drivers/media/video/mx2_camera.c
-> @@ -38,9 +38,6 @@
->  #include <linux/videodev2.h>
->  
->  #include <mach/mx2_cam.h>
-> -#ifdef CONFIG_MACH_MX27
-> -#include <mach/dma-mx1-mx2.h>
-> -#endif
->  #include <mach/hardware.h>
->  
->  #include <asm/dma.h>
-> @@ -330,41 +327,10 @@ static void mx2_camera_remove_device(struct soc_camera_device *icd)
->  	pcdev->icd = NULL;
->  }
->  
-> -#ifdef CONFIG_MACH_MX27
-> -static void mx27_camera_dma_enable(struct mx2_camera_dev *pcdev)
-> -{
-> -	u32 tmp;
-> -
-> -	imx_dma_enable(pcdev->dma);
-> -
-> -	tmp = readl(pcdev->base_csi + CSICR1);
-> -	tmp |= CSICR1_RF_OR_INTEN;
-> -	writel(tmp, pcdev->base_csi + CSICR1);
-> -}
-> -
-> -static irqreturn_t mx27_camera_irq(int irq_csi, void *data)
-> -{
-> -	struct mx2_camera_dev *pcdev = data;
-> -	u32 status = readl(pcdev->base_csi + CSISR);
-> -
-> -	if (status & CSISR_SOF_INT && pcdev->active) {
-> -		u32 tmp;
-> -
-> -		tmp = readl(pcdev->base_csi + CSICR1);
-> -		writel(tmp | CSICR1_CLR_RXFIFO, pcdev->base_csi + CSICR1);
-> -		mx27_camera_dma_enable(pcdev);
-> -	}
-> -
-> -	writel(CSISR_SOF_INT | CSISR_RFF_OR_INT, pcdev->base_csi + CSISR);
-> -
-> -	return IRQ_HANDLED;
-> -}
-> -#else
->  static irqreturn_t mx27_camera_irq(int irq_csi, void *data)
->  {
->  	return IRQ_NONE;
->  }
+The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
 
-If this is really all, what's needed for i.MX27 ISR, let's remove it 
-completely. But maybe you could explain to me, how it is now supposed to 
-work on i.MX27. In probe() we have
+With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+not.
 
-	irq_handler_t mx2_cam_irq_handler = cpu_is_mx25() ? mx25_camera_irq
-		: mx27_camera_irq;
+This driver is a _pure_ MTD NAND controller driver now.
 
-	...
 
-	err = request_irq(pcdev->irq_csi, mx2_cam_irq_handler, 0,
-			MX2_CAM_DRV_NAME, pcdev);
+The driver depends on another GPMI-NAND device patch set, you can find them at :
+	[1] http://marc.info/?l=linux-arm-kernel&m=131416901319573&w=2
+	[2] http://marc.info/?l=linux-arm-kernel&m=131416912319668&w=2
+	[3] http://marc.info/?l=linux-arm-kernel&m=131416891119504&w=2
+	[4] http://marc.info/?l=linux-arm-kernel&m=131416896219539&w=2
 
-So, after this patch i.MX27 will always have a dummy camera ISR and just 
-use EMMA, right? Then maybe we have to make EMMA resource availability 
-compulsory on those SoCs, and not optional, as now? You'll have to make 
-emma the only possibility on i.MX27, then pcdev->use_emma will disappear, 
-locations like
+Test environment:
+	Using imx23 and imx28 boards for test. 
 
-	if (mx27_camera_emma(pcdev)) {
-		csicr1 |= CSICR1_PRP_IF_EN | CSICR1_FCC |
-			CSICR1_RXFF_LEVEL(0);
-	} else if (cpu_is_mx27())
-		csicr1 |= CSICR1_SOF_INTEN | CSICR1_RXFF_LEVEL(2);
+	imx23 :
+	console=ttyAMA0,115200 mtdparts=gpmi-nfc:20m(boot),-(user)
+	Tested by USB boot and NAND boot.
 
-will need to be fixed.
+        imx28 :
+	#console=ttyAMA0,115200 root=/dev/mmcblk0p3 rw rootwait 
+	Tested by SD card boot mode.
 
-> -#endif /* CONFIG_MACH_MX27 */
->  
->  static void mx25_camera_frame_done(struct mx2_camera_dev *pcdev, int fb,
->  		int state)
-> @@ -547,25 +513,6 @@ static void mx2_videobuf_queue(struct videobuf_queue *vq,
->  
->  	if (mx27_camera_emma(pcdev)) {
->  		goto out;
+v9 --> v10:
+	[0] fix DMA timeout bug by adding custom routine for reset blocks.
+	[1] remove mil{} 
+	[2] add gpmi_hw_ecclayout.
+	[3] add ecc_write_oob() again to prohibit the mtd ioctl : MEMWRITEOOB
+	[4] change pr_info to dev_dbg() or pr_err().
+	[5] merge the all the dump functions into gpmi_dump_info().
+	[6] remove parse_mtd_partitions(), and use mtd_device_parse_register().
+	[7] move the the debug control code from gpmi-nand.h to gpmi-nand.c
+	[8] renames
+	[9] others
 
-You can remove this goto now and instead
+v8 --> v9:
+	[0] remove the ONFI nand code, it will cause the DMA timeout in the ONFI nand.
+	[1] remove sysfs entry.
+	[2] remove kernel command parameter.
+	[3] report to ecclayout that we will use all the page + OOB.
+		remove the ->ecc_write_oob().
+	[4] add our own block_markbad() hook.
+	[5] rename some functions from mil_* to gpmi_*.
+	[6] replace the __raw_readl/__raw_writel to readl/writel.
+	[7] others
 
-> -#ifdef CONFIG_MACH_MX27
-> -	} else if (cpu_is_mx27()) {
-> -		int ret;
-> -
-> -		if (pcdev->active == NULL) {
-> -			ret = imx_dma_setup_single(pcdev->dma,
-> -					videobuf_to_dma_contig(vb), vb->size,
-> -					(u32)pcdev->base_dma + 0x10,
-> -					DMA_MODE_READ);
-> -			if (ret) {
-> -				vb->state = VIDEOBUF_ERROR;
-> -				wake_up(&vb->done);
-> -				goto out;
-> -			}
-> -
-> -			vb->state = VIDEOBUF_ACTIVE;
-> -			pcdev->active = buf;
-> -		}
-> -#endif
->  	} else { /* cpu_is_mx25() */
+v7 --> v8:
+	[0] rename the name from `GPMI-NFC` to `GPMI-NAND`
+	[1] remove the `hal` layer, and change it to function library.
+	[2] Do not use ~0 to initialize the DMA address.
+	[3] fix the issue : several DMA channels share the same IRQ.
+	[4] DMA timeout issue. I use the .config created by `make mxs_defconfig`
+	    and the bug never occur. It seems some other module has impact to the
+	    DMA.
+	    Of course, you should enable the UBIFS,MTD_CHAR and GPMI for
+	    the .config. You can also disable the SPIN-LOCK/MUTEX debug features.
+	[5] add function to print out the GPMI registers.	    
+	[6] others.	    
 
-make this to a real
+v6 --> v7:
+	[0] remove the function wrapping the clock.
+	[1] use the module_param() for debugging.
+	[2] use the new interface of MTD partitions.
+		replace add_mtd_partitions() with mtd_device_register().
+	[3] use pr_info() to print log.
+	[4] add `__devinit` for some functions, etc.
+	[5] add `gpmi_nfc` to control the GPMI-NFC driver's initialization.
+	[6] others.
 
-	if (cpu_is_mx25()) {
-		...
+v5 --> v6:
+	[0] split out the IMX23/IMX28 arch code to separate patches.
+	[1] fix bug : missing empty item in the end of platform_id array.
+	[2] inconsistent identation.
+	[3] others
 
->  		u32 csicr3, dma_inten = 0;
->  
-> @@ -1037,117 +984,6 @@ static int mx2_camera_reqbufs(struct soc_camera_device *icd,
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_MACH_MX27
-> -static void mx27_camera_frame_done(struct mx2_camera_dev *pcdev, int state)
-> -{
-> -	struct videobuf_buffer *vb;
-> -	struct mx2_buffer *buf;
-> -	unsigned long flags;
-> -	int ret;
-> -
-> -	spin_lock_irqsave(&pcdev->lock, flags);
-> -
-> -	if (!pcdev->active) {
-> -		dev_err(pcdev->dev, "%s called with no active buffer!\n",
-> -				__func__);
-> -		goto out;
-> -	}
-> -
-> -	vb = &pcdev->active->vb;
-> -	buf = container_of(vb, struct mx2_buffer, vb);
-> -	WARN_ON(list_empty(&vb->queue));
-> -	dev_dbg(pcdev->dev, "%s (vb=0x%p) 0x%08lx %d\n", __func__,
-> -		vb, vb->baddr, vb->bsize);
-> -
-> -	/* _init is used to debug races, see comment in pxa_camera_reqbufs() */
-> -	list_del_init(&vb->queue);
-> -	vb->state = state;
-> -	do_gettimeofday(&vb->ts);
-> -	vb->field_count++;
-> -
-> -	wake_up(&vb->done);
-> -
-> -	if (list_empty(&pcdev->capture)) {
-> -		pcdev->active = NULL;
-> -		goto out;
-> -	}
-> -
-> -	pcdev->active = list_entry(pcdev->capture.next,
-> -			struct mx2_buffer, vb.queue);
-> -
-> -	vb = &pcdev->active->vb;
-> -	vb->state = VIDEOBUF_ACTIVE;
-> -
-> -	ret = imx_dma_setup_single(pcdev->dma, videobuf_to_dma_contig(vb),
-> -			vb->size, (u32)pcdev->base_dma + 0x10, DMA_MODE_READ);
-> -
-> -	if (ret) {
-> -		vb->state = VIDEOBUF_ERROR;
-> -		pcdev->active = NULL;
-> -		wake_up(&vb->done);
-> -	}
-> -
-> -out:
-> -	spin_unlock_irqrestore(&pcdev->lock, flags);
-> -}
-> -
-> -static void mx27_camera_dma_err_callback(int channel, void *data, int err)
-> -{
-> -	struct mx2_camera_dev *pcdev = data;
-> -
-> -	mx27_camera_frame_done(pcdev, VIDEOBUF_ERROR);
-> -}
-> -
-> -static void mx27_camera_dma_callback(int channel, void *data)
-> -{
-> -	struct mx2_camera_dev *pcdev = data;
-> -
-> -	mx27_camera_frame_done(pcdev, VIDEOBUF_DONE);
-> -}
-> -
-> -#define DMA_REQ_CSI_RX          31 /* FIXME: Add this to a resource */
-> -
-> -static int __devinit mx27_camera_dma_init(struct platform_device *pdev,
-> -		struct mx2_camera_dev *pcdev)
-> -{
-> -	int err;
-> -
-> -	pcdev->dma = imx_dma_request_by_prio("CSI RX DMA", DMA_PRIO_HIGH);
-> -	if (pcdev->dma < 0) {
-> -		dev_err(&pdev->dev, "%s failed to request DMA channel\n",
-> -				__func__);
-> -		return pcdev->dma;
-> -	}
-> -
-> -	err = imx_dma_setup_handlers(pcdev->dma, mx27_camera_dma_callback,
-> -					mx27_camera_dma_err_callback, pcdev);
-> -	if (err) {
-> -		dev_err(&pdev->dev, "%s failed to set DMA callback\n",
-> -				__func__);
-> -		goto err_out;
-> -	}
-> -
-> -	err = imx_dma_config_channel(pcdev->dma,
-> -			IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_FIFO,
-> -			IMX_DMA_MEMSIZE_32 | IMX_DMA_TYPE_LINEAR,
-> -			DMA_REQ_CSI_RX, 1);
-> -	if (err) {
-> -		dev_err(&pdev->dev, "%s failed to config DMA channel\n",
-> -				__func__);
-> -		goto err_out;
-> -	}
-> -
-> -	imx_dma_config_burstlen(pcdev->dma, 64);
-> -
-> -	return 0;
-> -
-> -err_out:
-> -	imx_dma_free(pcdev->dma);
-> -
-> -	return err;
-> -}
-> -#endif /* CONFIG_MACH_MX27 */
-> -
->  static unsigned int mx2_camera_poll(struct file *file, poll_table *pt)
->  {
->  	struct soc_camera_device *icd = file->private_data;
-> @@ -1352,15 +1188,6 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
->  	dev_dbg(&pdev->dev, "Camera clock frequency: %ld\n",
->  			clk_get_rate(pcdev->clk_csi));
->  
-> -	/* Initialize DMA */
-> -#ifdef CONFIG_MACH_MX27
-> -	if (cpu_is_mx27()) {
-> -		err = mx27_camera_dma_init(pdev, pcdev);
-> -		if (err)
-> -			goto exit_clk_put;
-> -	}
-> -#endif /* CONFIG_MACH_MX27 */
-> -
->  	pcdev->res_csi = res_csi;
->  	pcdev->pdata = pdev->dev.platform_data;
->  	if (pcdev->pdata) {
-> @@ -1452,12 +1279,6 @@ exit_iounmap:
->  exit_release:
->  	release_mem_region(res_csi->start, resource_size(res_csi));
->  exit_dma_free:
-> -#ifdef CONFIG_MACH_MX27
-> -	if (cpu_is_mx27())
-> -		imx_dma_free(pcdev->dma);
-> -exit_clk_put:
-> -	clk_put(pcdev->clk_csi);
-> -#endif /* CONFIG_MACH_MX27 */
+v4 --> v5:
+	[0] rename the files.
+	[1] fix PM bug
+	[2] remove the rom_helper code, and move the necessary initialization code
+		to the main file.
+	[3] change the macros from CPU_IS_* to GPMI_IS_*
+	[4] remove the default partition layout init code. revert back the 
+		partition parsing command line code.
+	[5] others
 
-This has been wrong before too, "#endif" should have been one line higher. 
-Now you have to rename labels: exit_dma_free makes no more sense.
+v3 --> v4:
+	[0] use the nand_ids{} as the nand database, drop my own database.
+	[1] remove the patch for DMA enginer, Shawn will submit his own version.
+	[2] use the platform_id to distinguish different Archs.
+	[3] fix the strange coding style.
+	[4] others.
 
-You might want to search through the driver for mx2[57], MX2[57], emma, 
-EMMA.
+v2 --> v3:
+	[0] merge the imx23 and imx28 into one file(including the header file).
+	[1] remove the unuse registers in the headers.
+	[2] fix DMA bugs
+	[3] add bus width field to nand_attr{}
+	[4] others
 
-Also, please, base your patch on 
-git://linuxtv.org/gliakhovetski/v4l-dvb.git mbus-config
-This should be quite easy, changes to mx2-camera are minimal, if any.
+v1 --> v2:
+	[0] merge the common files into the gpmi-nfc-main.c
+	[1] change the code to get the clock.
+	[2] remove the timing in the nand_device_info{}
+	[3] fix DMA errors
+	[4] add the nand_device_info.[ch] to generic code
+	[5] use the chip->onfi_version for the ONFI nand
+	[6] useless init
+	[7] others
 
-Baruch, any comment?
+Huang Shijie (3):
+  MTD : add the common code for GPMI-NAND controller driver
+  MTD : add helper functions library and header files for GPMI NAND
+    driver
+  MTD : add GPMI-NAND driver in the config and Makefile
 
-Thanks
-Guennadi
-
->  exit_kfree:
->  	kfree(pcdev);
->  exit:
-> @@ -1472,10 +1293,6 @@ static int __devexit mx2_camera_remove(struct platform_device *pdev)
->  	struct resource *res;
->  
->  	clk_put(pcdev->clk_csi);
-> -#ifdef CONFIG_MACH_MX27
-> -	if (cpu_is_mx27())
-> -		imx_dma_free(pcdev->dma);
-> -#endif /* CONFIG_MACH_MX27 */
->  	free_irq(pcdev->irq_csi, pcdev);
->  	if (mx27_camera_emma(pcdev))
->  		free_irq(pcdev->irq_emma, pcdev);
-> -- 
-> 1.7.5.4
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ drivers/mtd/nand/Kconfig               |   13 +
+ drivers/mtd/nand/Makefile              |    1 +
+ drivers/mtd/nand/gpmi-nand/Makefile    |    3 +
+ drivers/mtd/nand/gpmi-nand/bch-regs.h  |   84 ++
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 1056 ++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 1674 ++++++++++++++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  274 ++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-regs.h |  168 ++++
+ 8 files changed, 3273 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mtd/nand/gpmi-nand/Makefile
+ create mode 100644 drivers/mtd/nand/gpmi-nand/bch-regs.h
+ create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+ create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+ create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+ create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-regs.h
