@@ -1,36 +1,63 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 24 Aug 2011 16:19:10 +0900
-Subject: [PATCH] ARM: EXYNOS4: Fix return type of local_timer_setup()
-Message-ID: <1314170350-1667-1-git-send-email-kgene.kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 24 Aug 2011 09:36:14 +0200
+Subject: [PATCH] media i.MX27 camera: remove legacy dma support
+In-Reply-To: <Pine.LNX.4.64.1108240843001.8985@axis700.grange>
+References: <1314167073-11058-1-git-send-email-s.hauer@pengutronix.de>
+	<Pine.LNX.4.64.1108240843001.8985@axis700.grange>
+Message-ID: <20110824073614.GU31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to commmit af90f10d ("ARM: 6759/1: smp: Select
-local timers vs broadcast timer support"), the return type
-of local_timer_setup() should be int instead of void.
+Hi Guennadi,
 
-Reported-by: Changhwan Youn <chaos.youn@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-exynos4/mct.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+On Wed, Aug 24, 2011 at 09:19:24AM +0200, Guennadi Liakhovetski wrote:
+> Sure, if it's broken, let's remove it. But there are a couple of points, 
+> that we have to fix in this patch. Sorry, a stupid question: has this been 
+> tested on i.MX27?
 
-diff --git a/arch/arm/mach-exynos4/mct.c b/arch/arm/mach-exynos4/mct.c
-index 1ae059b..f3638fa 100644
---- a/arch/arm/mach-exynos4/mct.c
-+++ b/arch/arm/mach-exynos4/mct.c
-@@ -389,9 +389,11 @@ static void exynos4_mct_tick_init(struct clock_event_device *evt)
- }
- 
- /* Setup the local clock events for a CPU */
--void __cpuinit local_timer_setup(struct clock_event_device *evt)
-+int __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
- 	exynos4_mct_tick_init(evt);
-+
-+	return 0;
- }
- 
- int local_timer_ack(void)
+Nope, I currently do not have mainline board support for this driver.
+Could be a good opportunity to add some...
+
+Your other points are totally valid and I will fix them in the next
+round. Let's first see if someone proves me wrong and says this dma
+support is indeed working.
+
+> > -	return IRQ_HANDLED;
+> > -}
+> > -#else
+> >  static irqreturn_t mx27_camera_irq(int irq_csi, void *data)
+> >  {
+> >  	return IRQ_NONE;
+> >  }
+> 
+> If this is really all, what's needed for i.MX27 ISR, let's remove it 
+> completely. But maybe you could explain to me, how it is now supposed to 
+> work on i.MX27. In probe() we have
+> 
+> 	irq_handler_t mx2_cam_irq_handler = cpu_is_mx25() ? mx25_camera_irq
+> 		: mx27_camera_irq;
+> 
+> 	...
+> 
+> 	err = request_irq(pcdev->irq_csi, mx2_cam_irq_handler, 0,
+> 			MX2_CAM_DRV_NAME, pcdev);
+> 
+> So, after this patch i.MX27 will always have a dummy camera ISR and just 
+> use EMMA, right?
+
+Yes, only the EMMA irq is used, we can remove this one.
+
+> Then maybe we have to make EMMA resource availability 
+> compulsory on those SoCs, and not optional, as now? You'll have to make 
+> emma the only possibility on i.MX27, then pcdev->use_emma will disappear, 
+> locations like
+
+ok.
+
+Sascha
+
 -- 
-1.7.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
