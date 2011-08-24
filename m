@@ -1,29 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 24 Aug 2011 12:10:29 +0200
-Subject: [GIT PULL] at91: fixes for 3.1
-Message-ID: <4E54CE15.1020504@atmel.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 24 Aug 2011 18:11:14 +0800
+Subject: [PATCH] arm: fix compile failure in orion5x/dns323-setup.c
+In-Reply-To: <20110802095604.GA22637@linux-mips.org>
+References: <1312216934-29710-1-git-send-email-paul.gortmaker@windriver.com>
+	<20110802095604.GA22637@linux-mips.org>
+Message-ID: <CAK5ve-L+ZZFD3rQMwp638V+NfrHqth2dAXGEeK+iBzFP-EHOzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Rob,
 
-Can you please pull this "fixes" patch since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
+I guess you can add your Ack to Paul's patch here.
 
-  Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+Arnd, could you please add this patch into your tree, as it's a
+obvious right fixing.
 
-It is available in the git repository at:
-  git://github.com/at91linux/linux-2.6-at91.git at91-fixes
+Thanks,
+-Bryan
 
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      at91: at91sam9261.c: fix typo in t2_clk alias for atmel_tcb.0
-
- arch/arm/mach-at91/at91sam9261.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-It is a single patch but I prefer to send you a 
-pull request as it may integrate better with your
-flow...
-
-Thanks a lot, bye,
--- 
-Nicolas Ferre
+On Tue, Aug 2, 2011 at 5:56 PM, Ralf Baechle <ralf@linux-mips.org> wrote:
+> On Mon, Aug 01, 2011 at 12:42:14PM -0400, Paul Gortmaker wrote:
+>
+>> index a6eddae..c105556 100644
+>> --- a/arch/arm/mach-orion5x/dns323-setup.c
+>> +++ b/arch/arm/mach-orion5x/dns323-setup.c
+>> @@ -77,7 +77,7 @@ static int __init dns323_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+>> ? ? ? /*
+>> ? ? ? ?* Check for devices with hard-wired IRQs.
+>> ? ? ? ?*/
+>> - ? ? irq = orion5x_pci_map_irq(const dev, slot, pin);
+>> + ? ? irq = orion5x_pci_map_irq(dev, slot, pin);
+>
+> Very obviously correct ...
+>
+> Acked-by: Ralf Baechle <ralf@linux-mips.org>
+>
+> ?Ralf
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
