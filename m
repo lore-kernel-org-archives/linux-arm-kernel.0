@@ -1,114 +1,71 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Aug 2011 02:16:14 +0300
-Subject: How to handle named resources with DT?
-In-Reply-To: <87r54a1v0o.fsf@ti.com>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<20110812030218.GP30552@yookeroo.fritz.box>
-	<20110812084106.GC19467@legolas.emea.dhcp.ti.com>
-	<201108121635.42953.arnd@arndb.de> <4E45422D.4050708@ti.com>
-	<CACxGe6s-2EAuvSqzn6yzDvCyVXa8vVVqG2X=1XFrUBnB=jsdxQ@mail.gmail.com>
-	<87r54a1v0o.fsf@ti.com>
-Message-ID: <20110824231613.GC19890@legolas.emea.dhcp.ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 24 Aug 2011 19:27:44 -0400 (EDT)
+Subject: [PATCH 2/2] process: change from __backtrace to dump_stack_regs
+	in show_regs
+In-Reply-To: <a82026b2eff29e255a843f51d7c72ca7.squirrel@www.codeaurora.org>
+References: <1314206507-6487-1-git-send-email-lauraa@codeaurora.org>
+	<1314206507-6487-3-git-send-email-lauraa@codeaurora.org>
+	<alpine.LFD.2.00.1108241434140.20358@xanadu.home>
+	<a82026b2eff29e255a843f51d7c72ca7.squirrel@www.codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1108241853280.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 24 Aug 2011, Laura Abbott wrote:
 
-On Wed, Aug 24, 2011 at 12:15:03PM -0700, Kevin Hilman wrote:
-> Grant Likely <grant.likely@secretlab.ca> writes:
 > 
-> > On Fri, Aug 12, 2011 at 9:09 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> >> On 8/12/2011 4:35 PM, Arnd Bergmann wrote:
->  
-> [...]
-> 
+> On Wed, August 24, 2011 11:57 am, Nicolas Pitre wrote:
+> > On Wed, 24 Aug 2011, Laura Abbott wrote:
+> >
+> >> Currently, show_regs calls __backtrace which does
+> >> nothing if CONIFG_FRAME_POINTER is not set. Switch to
+> >
+> > s/CONIFG/CONFIG/
+> >
+> >> dump_stack_regs to show the backtrace from a given
+> >> set of registers.
 > >>
-> >>> I think it's much easier to change the existing users of _byname over
-> >>> to fixed indexes than to come up with a new scheme that is better.
-> 
-> I disagree.  It's not only about ordering.  More on that below.
-> 
-> >> As you said previously, since we have to support both legacy probing and DT
-> >> for some time, it will be easier for these drivers to rely on the same API.
+> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> >> ---
+> >>  arch/arm/kernel/process.c |    2 +-
+> >>  1 files changed, 1 insertions(+), 1 deletions(-)
 > >>
-> >> Considering that adding that new property is not a huge effort anyway and
-> >> _byname API is a standard API that any driver should be able to use if
-> >> needed, it still worth adding the DT support for named resources for my
-> >> point of view.
+> >> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> >> index 1a347f4..6f11213 100644
+> >> --- a/arch/arm/kernel/process.c
+> >> +++ b/arch/arm/kernel/process.c
+> >> @@ -319,7 +319,7 @@ void show_regs(struct pt_regs * regs)
+> >>  	printk("\n");
+> >>  	printk("Pid: %d, comm: %20s\n", task_pid_nr(current), current->comm);
+> >>  	__show_regs(regs);
+> >> -	__backtrace();
+> >> +	dump_stack_regs(regs);
 > >
-> > The assumption being made here is that the current Linux
-> > implementation detail dictates the binding design, but it does not.
+> > This is not equivalent.  A call to __backtrace() will display a call
+> > trace leading to this show_regs().  Given that you defined
+> > dump_stack_regs(regs) as dump_backtrace(regs, NULL), the trace will
+> > instead contain calls leading up to the point where those regs were
+> > saved.
 > >
-> > Binding authors should certainly look at the Linux implementation for
-> > inspiration, but established DT patterns still prevail if they are
-> > suitable for describing the hardware. In this case the pattern is that
-> > tuples in the reg property are strongly ordered and specified by the
-> > driver binding.
-> >
-> > So, I remain unconvinced that the 'reg' property binding is
-> > insufficient.  
 > 
-> If significant, in-tree usages of the feature for platform_devices is
-> not enough, What are you looking for as convincing arguments? 
-> 
-> > I have no plans to merge support for fetching _byname values from the
-> > device tree.
-> 
-> I find this an unfortunate position to hold to in this climate of
-> consolidation.
-> 
-> One of the goals of consolidation is to have core features handled by
-> core code.  To me this is a classic trade-off.  Either we implement it
-> in core code, or we force all the users (drivers, in this case) to
-> implement it themselves.  IMO, consolidation should be pointing us to
-> solving these kinds of problems in core code, rather than spreading it
-> across a bunch of drivers (and device code where the data lives.)
-> Especially so in this case since there are existing, in-tree users
-> demonstrating the usefulness of _byname.
-> 
-> Not implementing this in core code means all drivers using _byname have
-> to be converted, adding multiple lines of (IMHO ugly) code when it could
-> be implemented cleanly by core code, keeping drivers much more readable.
-> To me, the fact that there would also be an API difference compared to
-> the existing platform_device probing (which will stay for the forseeable
-> future) would be a major eye-sore in the drivers.
-> 
-> In addition, converting all the drivers away from _byname is not just a
-> matter of changing the drivers.  It also means of course you have to
-> make sure that all of the data is in order.  On OMAP, that means
-> reworking and/or regenerating all of the hwmod data to ensure it is in
-> the right order.  Sounds like the kind of churn that would get us
-> flamed.
-> 
-> But that's not all...
-> 
-> It's not just about data ordering.  As already pointed out, use of
-> _byname is also used to differentiate between different
-> versions/capabilities of the IP.  The driver can determine based on the
-> availability of a named resource the capabilities of the device.
-> Forcing resource ordering means some other mechanism also has to be
-> added for detection of the IP version and/or capabilities.
-> 
-> In summary, with the push towards consolidation, we're also trying to
-> have common drivers that support multiple versions of an IP across
-> differnet SoCs with varying capabilities.  Having named resources on the
-> platform_device is an established way of handling this cleanly in the
-> driver without the driver having to check SoC-specific or IP-version
-> specific registers.
+> Do other architectures show the call stack to show_regs? From my reading
+> of other code (x86, ppc) it seems like if show_regs generates a call stack
+> it generates a call stack based off of the saved registers unless I'm
+> drastically misunderstanding the code. Generating a call stack based off
+> of not saved registers seems inconsistent with the rest of show_regs which
+> shows saved state.
 
-on top of all that, for IPs which are used on many SoCs (such as MUSB)
-it's quite silly to force all users to provide resources in a certain
-order. It sounds to me that this will be prone to error in many ways
-until everything is synced up and on the correct order.
+Well, that might be true, and I'm not disputing that.  However this 
+change in behavior wasn't mentioned in your patch log.
 
-Ditching _byname is a very bad idea.
+I'd still recommend making an initial patch the way I outlined so a 
+kernel using unwind tables would produce the same trace results as a 
+kernel with frame pointers always did.  That part is pretty much 
+uncontroversial.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110825/59dcac69/attachment.sig>
+Then it might be good to have a second patch changing the actual trace 
+content, and discussing the merits of such a change in the patch log.  
+This issue should be independent of the backtrace mechanism used.
+
+
+Nicolas
