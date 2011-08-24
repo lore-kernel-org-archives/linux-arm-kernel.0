@@ -1,52 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Aug 2011 18:10:20 +0200
-Subject: [PATCH 3/4] mach-ux500: export System-on-Chip information ux500
-	via sysfs
-In-Reply-To: <1312981422-13294-3-git-send-email-lee.jones@linaro.org>
-References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-	<1312981422-13294-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <201108241810.20753.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Aug 2011 17:13:55 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20053.8733.266040.189343@mariner.uk.xensource.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
+	<20051.57876.785018.498967@mariner.uk.xensource.com>
+	<20110824135109.GP32688@e102144-lin.cambridge.arm.com>
+	<20053.7340.865511.561798@mariner.uk.xensource.com>
+	<20110824160039.GR32688@e102144-lin.cambridge.arm.com>
+	<20053.8733.266040.189343@mariner.uk.xensource.com>
+Message-ID: <20110824161355.GS32688@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 August 2011, Lee Jones wrote:
-> +
-> +static void ux500_get_soc_id(char *buf)
-> +{
-> +       void __iomem *uid_base;
-> +       int i;
-> +       ssize_t sz = 0;
-> +
-> +       if (dbx500_partnumber() == 0x8500) {
-> +               uid_base = __io_address(U8500_BB_UID_BASE);
-> +               for (i = 0; i < U8500_BB_UID_LENGTH; i++) {
-> +                       sz += sprintf(buf + sz, "%08x", readl(uid_base + i * sizeof(u32)));
-> +               }
-> +               return;
-> +       } else {
-> +               /* Don't know where it is located for U5500 */
-> +               sprintf(buf, "N/A");
-> +               return;
-> +       }
-> +}
-> +
+On Wed, Aug 24, 2011 at 05:09:01PM +0100, Ian Jackson wrote:
+> Will Deacon writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
+> > The next step is to define our interface to the HVC trampoline. I think it
+> > would be good if this interface could be reused by vendors who provide their
+> > own hypervisor layer as this would reduce the need for lots of distinct HVC
+> > APIs that essentially all do the same thing. It might be a good idea to
+> > `reserve' a high region of the HVC space for use by Linux rather than index
+> > the calls from 0, for example, which is likely to conflict with other
+> > hypervisor implementations. I think the trampoline only needs a handful of
+> > HVC calls (if that) anyway.
+> > 
+> > What do you reckon?
+> 
+> I think the trampoline needs to have one hypercall: "set HVBAR".
+> (And, implicitly, it needs to be specified that the resulting vectors
+> will run without physical-to-virtual page translation, etc.)  That is
+> sufficient to bootstrap all the rest of the way up - and that other
+> bootstrapping code would have to exist anyway.
 
-This still feels like it's hanging upside-down. You add an SOC node before you know
-what it is, and then attach other device to it.
+I also thought you might want a hypercall that gives you a version number
+(i.e. a way to identify the hypervisor trampoline in case it changes) and we
+might also want something for doing a system reset (for example, if a kernel
+that hasn't installed a hypervisor wants to kexec another kernel image).
 
-Similarly, having a function named 'ux500_soc_sysfs_init' is plain wrong.
+> So I'm imagining that the kvm kernel module would, when loaded,
+> make that "set HVBAR" once on each cpu, replacing the trampoline
+> hypervisor with its own set of hypercall vectors.
 
-You don't initialize sysfs here, but you should be probing a device with a
-driver that happens to have a sysfs interface.
+That's the plan!
 
-All probing of devices in general should start at the root and then trickle
-down as you discover the child devices:
-Each board has its own init_machine() callback that knows the main devices,
-most importantly the SoC and registers them. When the driver for the SoC
-gets loaded, that driver knows what devices are present in the device and
-registers those recursively.
-
-When you get this right, you can also eliminate the ugly machine_is_* checks
-in the board file.
-
-	Arnd
+Will
