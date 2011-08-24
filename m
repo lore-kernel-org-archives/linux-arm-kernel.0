@@ -1,74 +1,81 @@
-From: lrg@ti.com (Liam Girdwood)
-Date: Wed, 24 Aug 2011 17:03:26 +0100
-Subject: [PATCH v2 1/1] ASoC: soc-core: check rate for symmetry only when
-	pcm is active
-In-Reply-To: <1314183728-23627-1-git-send-email-b29396@freescale.com>
-References: <1314183728-23627-1-git-send-email-b29396@freescale.com>
-Message-ID: <4E5520CE.60204@ti.com>
+From: bdefaria@adeneo-embedded.com (Bryan DE FARIA)
+Date: Wed, 24 Aug 2011 18:03:41 +0200
+Subject: [PATCH v2] OMAP3EVM: ehci: Fix EHCI support
+In-Reply-To: <19F8576C6E063C45BE387C64729E739404EC007C71@dbde02.ent.ti.com>
+References: <1314174902-12797-1-git-send-email-bdefaria@adeneo-embedded.com>
+	<19F8576C6E063C45BE387C64729E739404EC007BC0@dbde02.ent.ti.com>
+	<1314189727.2320.16.camel@bryan-HUTIA>
+	<19F8576C6E063C45BE387C64729E739404EC007C71@dbde02.ent.ti.com>
+Message-ID: <1314201821.2320.50.camel@bryan-HUTIA>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/11 12:02, Dong Aisheng wrote:
-> For the playback and record using different dai links,
-> checking !rtd->rate for symmetry may not be accurate because that
-> pcm may be acutually not running and the default new open rate is 0,
-> then the warning message "Not enforcing symmetric_rates" will
-> happen each time with running arecord | aplay.
-> 
-> Now we only check rate for symmetry when the pcm is really active
-> which seems more sensible.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Hi,
 
-Acked-by: Liam Girdwood <lrg@ti.com>
+For the comment what about:
+Set the VAUX2 regulator supply to 1.8V for the HSUSB host interface.
+Tps65950 GPIO2 has to be set to zero in order to enable the EHCI select
+line.
 
-> ---
->  include/sound/soc.h |    1 +
->  sound/soc/soc-pcm.c |    5 +++++
->  2 files changed, 6 insertions(+), 0 deletions(-)
+I see this patch as a fix for the EHCI support, what would you suggest
+for the patch name?
+
+Bryan
+> Hi,
+> > TPS65950 GPIO2 is to choose through u131 if we drive the lines to the
+> > evm mother board or to the expansion connector p18. Should not it be
+> > default to the mother board?
+> It's not enabled by default and that?s why we need to enable it through
+> Tps65950 GPIO2.
 > 
-> diff --git a/include/sound/soc.h b/include/sound/soc.h
-> index 3fe658e..17970fd 100644
-> --- a/include/sound/soc.h
-> +++ b/include/sound/soc.h
-> @@ -851,6 +851,7 @@ struct snd_soc_pcm_runtime  {
->  
->  	/* Symmetry data - only valid if symmetry is being enforced */
->  	unsigned int rate;
-> +	unsigned int active;
->  	long pmdown_time;
->  
->  	/* runtime devices */
-> diff --git a/sound/soc/soc-pcm.c b/sound/soc/soc-pcm.c
-> index 1aee9fc..72a7b34 100644
-> --- a/sound/soc/soc-pcm.c
-> +++ b/sound/soc/soc-pcm.c
-> @@ -39,6 +39,9 @@ static int soc_pcm_apply_symmetry(struct snd_pcm_substream *substream)
->  	    !rtd->dai_link->symmetric_rates)
->  		return 0;
->  
-> +	if (!rtd->active)
-> +		return 0;
-> +
->  	/* This can happen if multiple streams are starting simultaneously -
->  	 * the second can need to get its constraints before the first has
->  	 * picked a rate.  Complain and allow the application to carry on.
-> @@ -209,6 +212,7 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
->  	cpu_dai->active++;
->  	codec_dai->active++;
->  	rtd->codec->active++;
-> +	rtd->active++;
->  	mutex_unlock(&rtd->pcm_mutex);
->  	return 0;
->  
-> @@ -287,6 +291,7 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
->  	cpu_dai->active--;
->  	codec_dai->active--;
->  	codec->active--;
-> +	rtd->active--;
->  
->  	if (!cpu_dai->active && !codec_dai->active)
->  		rtd->rate = 0;
+> Your patch looks fine but the comment and name needs to be changed as
+> There is no clock which gets enabled using gpio2. All the HSUSB clocks
+> Are handled inside driver at drivers/usb/host/ehci-omap.c
+> 
+> Ajay
+> 
+> > The EHCI port on the mother board works with this patch.
+> > 
+> > Bryan
+> > 
+> > > Hi,
+> > > > Set the VAUX2 regulator supply to 1.8V for the HSUSB host
+> > interface.
+> > > > Gpio 2 of the TPS65950 has to be set to zero in order to enable the
+> > > > HSUBS2 clock.
+> > >
+> > > TPS65950 GPIO2 is not to enable HSUSB2 clock but to enable chip u131
+> > > On omap3evm (rev-G) which latches USB, camera and audio lines.
+> > >
+> > > >
+> > > > Signed-off-by: Bryan DE FARIA <bdefaria@adeneo-embedded.com>
+> > > > ---
+> > > >  arch/arm/mach-omap2/board-omap3evm.c |   25
+> > +++++++++++++++++++++++++
+> > > >  1 files changed, 25 insertions(+), 0 deletions(-)
+> > > >
+> > > > diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-
+> > > > omap2/board-omap3evm.c
+> > > > index c452b3f..13a2b71 100644
+> > > > --- a/arch/arm/mach-omap2/board-omap3evm.c
+> > > > +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> > > > @@ -377,6 +377,10 @@ static int omap3evm_twl_gpio_setup(struct
+> > device
+> > > > *dev,
+> > > >  	if (r)
+> > > >  		printk(KERN_ERR "failed to get/set lcd_bkl gpio\n");
+> > > >
+> > > > +	/* gpio + 2 == HSUSB2 Clock Enable */
+> > > > +	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
+> > > > +		gpio_request_one(gpio + 2, GPIOF_OUT_INIT_LOW,
+> > > > "EN_HSUSB2_CLK");
+> > > > +
+> > >
+> > > Did you test EHCI port with this change ?
+> > >
+> > > Ajay
+> > > >  	/* gpio + 7 == DVI Enable */
+> > > >  	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_LOW, "EN_DVI");
+> > > [...]
+> > > rm-kernel
+> 
