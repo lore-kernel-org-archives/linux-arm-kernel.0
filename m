@@ -1,35 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Aug 2011 17:21:52 +0200
+Date: Wed, 24 Aug 2011 17:25:42 +0200
 Subject: [PATCH 4/4] Move top level platform devices in sysfs to
 	/sys/devices/soc/X
-In-Reply-To: <CAKnu2Mrzi=mPsHjPePWxyr6Pt5FvBnzFq432SezvgtV+_Jh3Ng@mail.gmail.com>
+In-Reply-To: <1312981422-13294-4-git-send-email-lee.jones@linaro.org>
 References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-	<20110811152239.GB13745@suse.de>
-	<CAKnu2Mrzi=mPsHjPePWxyr6Pt5FvBnzFq432SezvgtV+_Jh3Ng@mail.gmail.com>
-Message-ID: <201108241721.52908.arnd@arndb.de>
+	<1312981422-13294-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <201108241725.42549.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 11 August 2011, Linus Walleij wrote:
-> 2011/8/11 Greg KH <gregkh@suse.de>:
+On Wednesday 10 August 2011, Lee Jones wrote:
+> At the request of Arnd Bergmann this patch moves all SoC
+> platform devices found in sysfs from /sys/devices/platform to
+> /sys/devices/soc/<SoCNum>/. It is believed as the devices are
+> SoC specific and a /sys/devices/soc node has recently become
+> available, that this would be a more appropriate place to
+> display the data.
 > 
-> > Ok, if you get guarantees from anyone using the in-kernel platform soc
-> > code that this move is acceptable, and you guarantee that no userspace
-> > tools will break, that's fine.  But odds are, you are going to break
-> > something...
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/board-mop500.c   |   19 +++++++++++++++----
+>  arch/arm/mach-ux500/board-u5500.c    |    6 ++++++
+>  arch/arm/mach-ux500/cpu-db5500.c     |    6 ++++++
+>  arch/arm/mach-ux500/cpu-db8500.c     |   12 +++++++++++-
+>  arch/arm/mach-ux500/devices-common.c |   19 +++++++++++++++----
+>  arch/arm/mach-ux500/usb.c            |    4 ++++
+>  6 files changed, 57 insertions(+), 9 deletions(-)
 > 
-> Yeah I know, but I strongly suspect that these userspace tools are
-> created by the same organization that should've consulted me and
-> the rest of the community about it in the first place, so I'll cope with
-> it and write patches as I get flamed.
 
-Right. Greg, note that the u8500 platform is still only partially supported
-upstream, the majority of the necessary device drivers for having a 
-running system is not there and those drivers keep getting changed
-in order to be merged upstream.
+Ok. What does the device tree in /sys/devices look like after this?
 
-Further, with the move of the platform to device tree based probing,
-the position of all devices will change as well, to resemble the physical
-HW layout.
+Does it match the flattened device tree description that you will have?
 
 	Arnd
