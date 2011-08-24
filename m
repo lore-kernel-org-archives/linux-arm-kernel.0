@@ -1,43 +1,65 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 24 Aug 2011 11:19:56 +0100
-Subject: [PATCH v4 3/8] ARM: lib: add switch_stack function for safely
-	changing stack
-In-Reply-To: <alpine.LFD.2.00.1108232102430.20358@xanadu.home>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-	<1314136012-20533-4-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1108232102430.20358@xanadu.home>
-Message-ID: <20110824101956.GE2078@arm.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 24 Aug 2011 10:30:50 +0000
+Subject: [PATCH 1/1] ASoC: soc-core: check rate for symmetry only when
+	pcm is ongoing
+In-Reply-To: <20110824091902.GR9232@opensource.wolfsonmicro.com>
+References: <1314172640-26972-1-git-send-email-b29396@freescale.com>
+	<20110824091902.GR9232@opensource.wolfsonmicro.com>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F772223ECB@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 09:07:29PM -0400, Nicolas Pitre wrote:
-> On Tue, 23 Aug 2011, Will Deacon wrote:
+> -----Original Message-----
+> From: Mark Brown [mailto:broonie at opensource.wolfsonmicro.com]
+> Sent: Wednesday, August 24, 2011 5:19 PM
+> To: Dong Aisheng-B29396
+> Cc: alsa-devel at alsa-project.org; linux-arm-kernel at lists.infradead.org;
+> lrg at ti.com; s.hauer at pengutronix.de; w.sang at pengutronix.de
+> Subject: Re: [PATCH 1/1] ASoC: soc-core: check rate for symmetry only
+> when pcm is ongoing
 > 
-> > When disabling the MMU, it is necessary to take out a 1:1 identity map
-> > of the reset code so that it can safely be executed with and without
-> > the MMU active. To avoid the situation where the physical address of the
-> > reset code aliases with the virtual address of the active stack (which
-> > cannot be included in the 1:1 mapping), it is desirable to change to a
-> > new stack at a location which is less likely to alias.
-> > 
-> > This code adds a new lib function, switch_stack:
-> > 
-> > void switch_stack(void (*fn)(void *), void *arg, void *sp);
-> > 
-> > which changes the stack to point at the sp parameter, before invoking
-> > fn(arg) with the new stack selected.
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> On Wed, Aug 24, 2011 at 03:57:20PM +0800, Dong Aisheng wrote:
 > 
-> For the implementation:
+> > Now we only check rate for symmetry when the pcm is really ongoing
+> > which seems more sensible.
 > 
-> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> However I think switch_stack() is too vague a name for what this 
-> actually does.  Maybe something like call_with_stack(fn, arg, sp) is 
-> more precise.
+> There's a genuine issue here due to the raciness of the ALSA APIs - we're
+> not enforcing constraints and we should be.  If the two programs end up
+> setting incompatible rates we need to handle that.
+Yes, I also noticed that.
+I did not find a proper fix since we may not imagine the execute sequence of
+user level.
+Anyway, this patch is for fixing the wrong warning message.
 
-call_with_stack() soundslike a good name to me.
+> >  	/* Symmetry data - only valid if symmetry is being enforced */
+> >  	unsigned int rate;
+> > +	unsigned int ongoing;
+> 
+> This isn't a clear name, I don't understand it.
+How about change to active?
 
----Dave
+> > @@ -209,6 +212,7 @@ static int soc_pcm_open(struct snd_pcm_substream
+> *substream)
+> >  	cpu_dai->active++;
+> >  	codec_dai->active++;
+> >  	rtd->codec->active++;
+> > +	rtd->ongoing = 1;
+> >  	mutex_unlock(&rtd->pcm_mutex);
+> >  	return 0;
+> >
+> > @@ -322,6 +326,7 @@ static int soc_pcm_close(struct snd_pcm_substream
+> *substream)
+> >  			SND_SOC_DAPM_STREAM_STOP);
+> >  	}
+> >
+> > +	rtd->ongoing = 0;
+> 
+> What happens when the stream in one direction is stopped but not the
+> other?  For example, capture stops but playback continues.
+Yes, that's an issue which I neglected.
+Thanks for the reminder.
+I'm going to use a ref-counter as cpu_dai->active.
+So the code could be like when open pcm, rtd->active++ and when close pcm, rtd->active--.
+
+Regards
+Dong Aisheng 
