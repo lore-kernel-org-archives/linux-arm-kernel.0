@@ -1,68 +1,46 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Aug 2011 14:14:26 +0200
-Subject: [PATCH 2/3] mach-ux500: initialize l2x0 at arch_init time
-In-Reply-To: <CACRpkdZWwwapspVFrZNC8ReURrKVYFUDzdmEL7HiZWOjZ907jQ@mail.gmail.com>
-References: <1314177826-19151-1-git-send-email-linus.walleij@stericsson.com>
-	<4E54CAE8.1060702@ti.com>
-	<CAH9JG2W+KkTZJ67eDqju3jQfc8OZhf0gBzKvhSodpOQS=-q2kQ@mail.gmail.com>
-	<CACRpkdZWwwapspVFrZNC8ReURrKVYFUDzdmEL7HiZWOjZ907jQ@mail.gmail.com>
-Message-ID: <20110824121425.GA31404@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Wed, 24 Aug 2011 17:48:27 +0530
+Subject: [PATCH 2/3] ARM: OMAP: Move omap2_init_common_devices out of
+	init_early
+In-Reply-To: <4E54EA5E.8010603@ti.com>
+References: <20110824115048.2985.24230.stgit@kaulin>
+	<20110824115433.2985.98712.stgit@kaulin> <4E54EA5E.8010603@ti.com>
+Message-ID: <4E54EC13.6040509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wednesday 24 August 2011 05:41 PM, Cousson, Benoit wrote:
+> Hi Tony,
+>
+> On 8/24/2011 1:54 PM, Tony Lindgren wrote:
+>> There's no need to call omap2_init_common_devices from init_early.
+>> It reprograms the memory timings for some boards, so it's better to
+>> do it later so we have a chance to get console messages if something
+>> goes wrong.
+>
+> BTW, I did some comment on that function in my OMAP4 device-tree series,
+> because the name is misleading.
+> That function is just initializing the SDRC controller present in OMAP2
+> & 3. OMAP4 platform should not even call it.
+> In fact, I'm now wondering were the OMAP4 EMIF is configured?
+>
+In the boot-loader at this point of time. EMIF driver should
+make the configuration in kernel which is work in progress.
 
-On Wed, Aug 24, 2011 at 01:59:40PM +0200, Linus Walleij wrote:
-> On Wed, Aug 24, 2011 at 12:12 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> > On Wed, Aug 24, 2011 at 6:56 PM, Santosh <santosh.shilimkar@ti.com> wrote:
-> >> On Wednesday 24 August 2011 02:53 PM, Linus Walleij wrote:
-> >>
-> >> More and more you delay L2 cache enable in boot-process,
-> >> your boot-up time is going to shoot-up.
-> >>
-> >> Have you thought about it. Cache's should be enabled as
-> >> early as possible.
-> >
-> > Right, after change from early_init to arch_init. it takes more time.
-> 
-> Hm no good. I'll drop this.
-> 
-> We've seen that if we try to unlock the I&D l2x0 at the
-> early_initcall() as in [3/3] it will sometimes fail, like it's
-> still locked down afterwards. Calling it from .init_machine()
-> appears to work. So in my dumbness I moved it to
-> arch_initcall() which should be equivalent. Does anyone
-> have some subtle hint or experience on how to get around
-> that one issue, or should I just put in a second
-> arch_initcall() for just the unlocking?
-> 
-> Sascha, I guess Freescale should also move the l2x0 init to
-> early_init() in mach-imx/cache-l2x0.c if possible. Can
-> you try the below on your machine(s)?
+> void __init omap2_init_common_devices(struct omap_sdrc_params *sdrc_cs0,
+> struct omap_sdrc_params *sdrc_cs1)
+> {
+> if (cpu_is_omap24xx() || omap3_has_sdrc()) {
+> omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
+> _omap2_init_reprogram_sdrc();
+> }
+> }
+>
+> I guess it used to do much more than that in the past.
+>
+> Shouldn't we rename it to clarify its purpose?
+>
+I agree.
 
-Sure, what are you interested in? If it works reliably or if works
-faster?
-
-Sascha
-
-> 
-> diff --git a/arch/arm/mach-imx/cache-l2x0.c b/arch/arm/mach-imx/cache-l2x0.c
-> index 69d1322..e5538a4 100644
-> --- a/arch/arm/mach-imx/cache-l2x0.c
-> +++ b/arch/arm/mach-imx/cache-l2x0.c
-> @@ -53,4 +53,4 @@ static int mxc_init_l2x0(void)
-> 
->         return 0;
->  }
-> -arch_initcall(mxc_init_l2x0);
-> +early_initcall(mxc_init_l2x0);
-> 
-> Yours,
-> Linus Walleij
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Santosh
