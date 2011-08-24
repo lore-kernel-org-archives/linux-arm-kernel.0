@@ -1,79 +1,88 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 24 Aug 2011 11:07:32 +0300
-Subject: [PATCH] OMAP3EVM: ehci: Fix EHCI support
-In-Reply-To: <1314112595-14849-1-git-send-email-bdefaria@adeneo-embedded.com>
-References: <1314112595-14849-1-git-send-email-bdefaria@adeneo-embedded.com>
-Message-ID: <4E54B144.8010702@compulab.co.il>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 24 Aug 2011 11:16:25 +0300
+Subject: [PATCH] Fix non-LPAE boot regression.
+In-Reply-To: <201108151531.45469.anarsoul@gmail.com>
+References: <201108131556.27301.anarsoul@gmail.com>
+	<20110815120914.GB21596@e102109-lin.cambridge.arm.com>
+	<201108151531.45469.anarsoul@gmail.com>
+Message-ID: <201108241116.26118.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Once again my mailer played me... sending for the second time... sorry
-
-Hi Bryan,
-
-Please, CC linux-arm-kernel at lists.infradead.org for patches like this.
-One question below
-
-On 08/23/11 18:16, Bryan DE FARIA wrote:
-> Set the VAUX2 regulator supply to 1.8V for the HSUSB host interface.
-> Gpio 2 of the TPS65950 has to be set to zero in order to enable the HSUBS2 clock.
+On Monday 15 August 2011 15:31:44 Vasily Khoruzhick wrote:
+> On Monday 15 August 2011 15:09:14 Catalin Marinas wrote:
+> > Hi Vasily,
+> > 
+> > On Sat, Aug 13, 2011 at 01:58:19PM +0100, Vasily Khoruzhick wrote:
+> > > It was introduced by  407f8b4cb07cbc5c1c7cc386f231224e2524ccea
+> > > ARM: LPAE: MMU setup for the 3-level page table format
+> > > 
+> > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > ---
+> > > 
+> > >  arch/arm/kernel/head.S |    4 ++--
+> > >  1 files changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> > > index 0bdafc4..5add5f5 100644
+> > > --- a/arch/arm/kernel/head.S
+> > > +++ b/arch/arm/kernel/head.S
+> > > 
+> > > @@ -206,7 +206,7 @@ __create_page_tables:
+> > >  1:	orr	r3, r7, r5, lsl #SECTION_SHIFT	@ flags + kernel base
+> > >  
+> > >  	str	r3, [r4, r5, lsl #PMD_ORDER]	@ identity mapping
+> > >  	cmp	r5, r6
+> > > 
+> > > -	addlo	r5, r5, #SECTION_SHIFT >> 20	@ next section
+> > > +	addlo	r5, r5, #1			@ next section
+> > > 
+> > >  	blo	1b
+> > 
+> > That's correct.
+> > 
+> > >  	/*
+> > > 
+> > > @@ -217,7 +217,7 @@ __create_page_tables:
+> > >  	mov	r3, r3, lsr #SECTION_SHIFT
+> > >  	orr	r3, r7, r3, lsl #SECTION_SHIFT
+> > >  	add	r0, r4,  #(KERNEL_START & 0xff000000) >> (SECTION_SHIFT -
+> > >  	PMD_ORDER)
+> > > 
+> > > -	str	r3, [r0, #(KERNEL_START & 0x00e00000) >> (SECTION_SHIFT -
+> > > PMD_ORDER)]! +	str	r3, [r0, #(KERNEL_START & 0x00f00000) >>
+> > > (SECTION_SHIFT - PMD_ORDER)]!
+> > 
+> > The reason for this was that the sections are 2MB with LPAE and a page
+> > table entry is 64-bit wide. We always shift that value by 18 but with
+> > LPAE we don't want to write in the middle of a page table entry if
+> > KERNEL_START is not 2MB aligned.
+> > 
+> > But if KERNEL_START is not 2MB aligned, I think we get the wrong
+> > physical address by 1MB (with the classic page table format).
 > 
-> Signed-off-by: Bryan DE FARIA <bdefaria@adeneo-embedded.com>
-> ---
->  arch/arm/mach-omap2/board-omap3evm.c |   24 ++++++++++++++++++++++++
->  1 files changed, 24 insertions(+), 0 deletions(-)
+> Yep, for my case KERNEL_START is not 2MB aligned (TEXT_OFFSET is 0x00108000). 
+> (CONFIG_PM_H1940 is set)
 > 
-> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-> index c452b3f..ce09e9e 100644
-> --- a/arch/arm/mach-omap2/board-omap3evm.c
-> +++ b/arch/arm/mach-omap2/board-omap3evm.c
-> @@ -377,6 +377,10 @@ static int omap3evm_twl_gpio_setup(struct device *dev,
->  	if (r)
->  		printk(KERN_ERR "failed to get/set lcd_bkl gpio\n");
->  
-> +	/* gpio + 2 == HSUSB2 Clock Enable */
-> +	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
-> +		gpio_request_one(gpio + 2, GPIOF_OUT_INIT_LOW, "EN_HSUSB2_CLK");
-> +
->  	/* gpio + 7 == DVI Enable */
->  	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_LOW, "EN_DVI");
->  
-> @@ -450,6 +454,25 @@ static struct regulator_init_data omap3evm_vio = {
->  	.consumer_supplies	= omap3evm_vio_supply,
->  };
->  
-> +/* VAUX2 for EHCI */
-> +static struct regulator_consumer_supply omap3evm_vaux2_supplies[] = {
-> +	REGULATOR_SUPPLY("hsusb1", "ehci-omap.0"),
-> +};
-> +
-> +static struct regulator_init_data omap3evm_vaux2 = {
-> +	.constraints = {
-> +		.min_uV      		= 1800000,
-> +		.max_uV      		= 1800000,
-> +		.apply_uV    		= true,
-> +		.valid_modes_mask  	= REGULATOR_MODE_NORMAL
-> +					| REGULATOR_MODE_STANDBY,
-> +		.valid_ops_mask  	= REGULATOR_CHANGE_MODE
-> +					| REGULATOR_CHANGE_STATUS,
-> +	},
-> +	.num_consumer_supplies  = ARRAY_SIZE(omap3evm_vaux2_supplies),
-> +	.consumer_supplies   	= omap3evm_vaux2_supplies,
-> +};
-> +
->  #ifdef CONFIG_WL12XX_PLATFORM_DATA
->  
->  #define OMAP3EVM_WLAN_PMENA_GPIO	(150)
-> @@ -645,6 +668,7 @@ static void __init omap3_evm_init(void)
->  	usb_nop_xceiv_register();
->  
->  	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2) {
-> +		omap3evm_twldata.vaux2 = &omap3evm_vaux2;
+> > There are a few alternatives to fixing this:
+> > 
+> > 1. Different KERNEL_START masking for classic or LPAE page tables.
+> > 2. Always force 2MB section and the code above moving the phys addr into
+> >    r3 would need to take this into account.
+> > 
+> > I would go for 1 with some shifting like below:
+> > 
+> > +	str	r3, [r0, #((KERNEL_START & 0x00f00000) >> SECTION_SHIFT) <<
+> > PMD_ORDER]!
+> > 
+> > This should give us 0x00f00000 with classic page tables and 0x00e00000
+> > with LPAE.
+> > 
+> > Thanks.
+> 
+> Ok, I'll test this change when I get home.
 
-Wouldn't it be better to put this inside the omap3_evm_i2c_init() function
-so all the initialization of that type be close to each other
-and done before the omap3_pmic_init() call?
+Works for me on s3c24xx. Sorry for a delay.
 
--- 
-Regards,
-Igor.
+Regards
+Vasily
