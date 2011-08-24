@@ -1,7 +1,8 @@
 From: Baohua.Song@csr.com (Barry Song)
-Date: Tue, 23 Aug 2011 18:30:11 -0700
-Subject: [PATCH 1/2] ARM: L2X0: add explicit cpu_relax() for busy wait loop
-Message-ID: <1314149411-5063-1-git-send-email-Baohua.Song@csr.com>
+Date: Tue, 23 Aug 2011 18:31:26 -0700
+Subject: [PATCH 2/2] ARM: mach-ux500: add explicit cpu_relax() for busy wait
+	loop
+Message-ID: <1314149486-5105-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,22 +12,22 @@ for documentation purposes than technically needed here.
 Cc: Jamie Iles <jamie@jamieiles.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mm/cache-l2x0.c |    2 +-
+ arch/arm/mach-ux500/cpu.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 2ebbc7c..966b3bd 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -37,7 +37,7 @@ static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index 1da23bb..76ee355 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -62,7 +62,7 @@ static inline void ux500_cache_wait(void __iomem *reg, unsigned long mask)
  {
- 	/* wait for cache operation by line or way to complete */
+ 	/* wait for the operation to complete */
  	while (readl_relaxed(reg) & mask)
 -		;
 +		cpu_relax();
  }
  
- #ifdef CONFIG_CACHE_PL310
+ static inline void ux500_cache_sync(void)
 -- 
 1.7.1
 
