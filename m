@@ -1,42 +1,56 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Wed, 24 Aug 2011 11:49:12 +0530
-Subject: [PATCH v5 18/22] gpio/omap: use pm-runtime framework
-In-Reply-To: <4E5477D0.9090301@ti.com>
-References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
-	<1312455893-14922-19-git-send-email-tarun.kanti@ti.com>
-	<4E53BA80.7030200@ti.com> <4E5477D0.9090301@ti.com>
-Message-ID: <4E5497E0.4090004@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 24 Aug 2011 14:24:32 +0800
+Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
+In-Reply-To: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAGsJ_4yCAcu3uiSuDQ13ai8tmnoDkniQymp6M7DGJi84AW4mBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 August 2011 09:32 AM, Rajendra Nayak wrote:
-> On 8/23/2011 8:04 PM, Santosh wrote:
->> + Rajendra and Benoit to comment on optional clock
->> handling.
->>
->> On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
+> +int foo_list(struct pinmux_dev *pmxdev, unsigned selector)
 
-[....]
+pinctrl_dev?
 
->>>
->>> + if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev)< 0))
->>> + dev_err(bank->dev, "%s: GPIO bank %d "
->>> + "pm_runtime_get_sync failed\n",
->>> + __func__, bank->id);
->>> +
->>> for (j = 0; j< hweight_long(bank->dbck_enable_mask); j++)
->>> clk_enable(bank->dbck);
->> Optional clock handling also should been addressed using runtime hooks,
->> isn't it ?
->
-> Whats handled by runtime hooks is the device;s *main* clocks, which are
-> needed for the device to become accessible.
-> Anything else *optional* which the device would need optionally based on
-> the various modes it can operate etc are still controlled by the driver
-> by enabling/disabling them as and when needed using the clock framework.
->
-Thanks Rajendra for clarification. In summary, we continue to use clock
-framework for the optional clock handling from the drivers.
+> +{
+> + ? ? ? if (selector >= ARRAY_SIZE(myfuncs))
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? return 0;
+> +}
+> +
+> +const char *foo_get_fname(struct pinmux_dev *pmxdev, unsigned selector)
 
-Regards
-Santosh
+pinctrl_dev?
+
+> +{
+> + ? ? ? if (selector >= ARRAY_SIZE(myfuncs))
+> + ? ? ? ? ? ? ? return NULL;
+> + ? ? ? return myfuncs[selector].name;
+> +}
+> +
+> +static int foo_get_pins(struct pinmux_dev *pmxdev, unsigned selector,
+> + ? ? ? ? ? ? ? ? ? ? ? unsigned ** const pins, unsigned * const num_pins)
+
+pinctrl_dev?
+
+> +{
+> + ? ? ? if (selector >= ARRAY_SIZE(myfuncs))
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? *pins = myfuncs[selector].pins;
+> + ? ? ? *num_pins = myfuncs[selector].num_pins;
+> + ? ? ? return 0;
+> +}
+> +
+> +int foo_enable(struct pinmux_dev *pmxdev, unsigned selector)
+> +{
+> + ? ? ? if (selector < ARRAY_SIZE(myfuncs))
+> + ? ? ? ? ? ? ? write((read(MUX)|(1<<selector)), MUX)
+> + ? ? ? ? ? ? ? return 0;
+> + ? ? ? }
+> + ? ? ? return -EINVAL;
+> +}
+> +
+> +int foo_disable(struct pinmux_dev *pmxdev, unsigned selector)
+
+pinctrl_dev?
+
+-barry
