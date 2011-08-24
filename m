@@ -1,42 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Wed, 24 Aug 2011 13:56:20 +0530
-Subject: [PATCH] ARM: ux500: send cpufreq notification for all cpus
-In-Reply-To: <1314168245-2373-1-git-send-email-vincent.guittot@linaro.org>
-References: <1314168245-2373-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <4E54B5AC.60608@ti.com>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Wed, 24 Aug 2011 09:32:39 +0100
+Subject: [GIT PULL] I2C: OMAP: major cleanup for v3.2 (was for v3.1)
+In-Reply-To: <87sjorhepe.fsf@ti.com>
+References: <87sjorhepe.fsf@ti.com>
+Message-ID: <20110824083239.GD27653@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 August 2011 12:14 PM, Vincent Guittot wrote:
-> The same clock is used for all cpus so we must notify the frequency change
-> for each one in order to update the configuration of all twd clockevents.
->
-> Signed-off-by: Vincent Guittot<vincent.guittot@linaro.org>
-> ---
->   drivers/cpufreq/db8500-cpufreq.c |    7 ++++---
->   1 files changed, 4 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
-> index 0d8dd1c..4cb5785 100644
-> --- a/drivers/cpufreq/db8500-cpufreq.c
-> +++ b/drivers/cpufreq/db8500-cpufreq.c
-> @@ -76,13 +76,13 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
->
->   	freqs.old = policy->cur;
->   	freqs.new = freq_table[idx].frequency;
-> -	freqs.cpu = policy->cpu;
->
->   	if (freqs.old == freqs.new)
->   		return 0;
->
->   	/* pre-change notification */
-> -	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> +	for_each_online_cpu(freqs.cpu)
-> +		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-Blind notfier on all online CPU's will race. Take a example whete CPU
-is marked online but not yet registered to CPUFREQ. I have seen such a
-race in OMAP and fixed that using the policy->cpus field.
+On Tue, Aug 23, 2011 at 04:48:29PM -0700, Kevin Hilman wrote:
+> Ben,
+> 
+> This series fell through the cracks for v3.1, so I've now rebased it
+> onto v3.1-rc3 and am submitting it for v3.2.  It no longer has any
+> dependencies on OMAP trees, so could you please pull this into your tree
+> for linux-next?   
+> 
+> A few more OMAP I2C series will be coming on top of this one.
 
-Regards
-Santosh
+Thanks, will do that tonight when preparing new -next.
+ 
+> Thanks,
+> 
+> Kevin
+> 
+> 
+> The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
+> 
+>   Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.2/i2c-andy
+> 
+> Andy Green (12):
+>       I2C: OMAP2+: Name registers in I2C IP V2 only accordingly
+>       I2C: OMAP: add rev to omap i2c platform data
+>       I2C: OMAP1: set IP revision in platform data
+>       I2C: OMAP2+: Pass hwmod rev knowledge via platform_data when i2c bus added
+>       I2C: OMAP2+: use platform_data ip revision to select register map
+>       I2C: OMAP2+: Solve array bounds overflow error on i2c idle
+>       I2C: OMAP2+: address confused probed version naming
+>       I2C: OMAP1/OMAP2+: add flags field to omap i2c platform data
+>       I2C: OMAP2+: Pass flags up to omap i2c platform_data as well
+>       I2C: OMAP1: set i2c unit feature implementation flags in platform data
+>       I2C: OMAP2+: Convert omap I2C driver to use feature implementation flags from platform data
+>       I2C: OMAP1/OMAP2+: prepend I2C IP version to probed version shown in dev_info
+> 
+>  arch/arm/plat-omap/i2c.c      |   27 +++++++++++
+>  drivers/i2c/busses/i2c-omap.c |  100 ++++++++++++++++++++++------------------
+>  include/linux/i2c-omap.h      |    2 +
+>  3 files changed, 84 insertions(+), 45 deletions(-)
+
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
