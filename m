@@ -1,43 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 24 Aug 2011 10:25:04 +0200
-Subject: [PATCH] ARM: imx: pwm: Add support for MX53
-In-Reply-To: <1314116798-12755-1-git-send-email-fabio.estevam@freescale.com>
-References: <1314116798-12755-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110824082504.GJ16557@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Wed, 24 Aug 2011 13:56:20 +0530
+Subject: [PATCH] ARM: ux500: send cpufreq notification for all cpus
+In-Reply-To: <1314168245-2373-1-git-send-email-vincent.guittot@linaro.org>
+References: <1314168245-2373-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <4E54B5AC.60608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+On Wednesday 24 August 2011 12:14 PM, Vincent Guittot wrote:
+> The same clock is used for all cpus so we must notify the frequency change
+> for each one in order to update the configuration of all twd clockevents.
+>
+> Signed-off-by: Vincent Guittot<vincent.guittot@linaro.org>
+> ---
+>   drivers/cpufreq/db8500-cpufreq.c |    7 ++++---
+>   1 files changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
+> index 0d8dd1c..4cb5785 100644
+> --- a/drivers/cpufreq/db8500-cpufreq.c
+> +++ b/drivers/cpufreq/db8500-cpufreq.c
+> @@ -76,13 +76,13 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
+>
+>   	freqs.old = policy->cur;
+>   	freqs.new = freq_table[idx].frequency;
+> -	freqs.cpu = policy->cpu;
+>
+>   	if (freqs.old == freqs.new)
+>   		return 0;
+>
+>   	/* pre-change notification */
+> -	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> +	for_each_online_cpu(freqs.cpu)
+> +		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
-On Tue, Aug 23, 2011 at 01:26:38PM -0300, Fabio Estevam wrote:
-> Instead of adding the check for MX53 CPU type, use the negative logic and let 
-> PWM to be configured for MX53 as well.
-I wonder why you prefer negative logic here. It might be shorter, but it
-is also less robust. For example it seems to me you not only added
-support for i.MX53 but also i.MX50.
+Blind notfier on all online CPU's will race. Take a example whete CPU
+is marked online but not yet registered to CPUFREQ. I have seen such a
+race in OMAP and fixed that using the policy->cpus field.
 
-The IMHO best solution would be to use device ids and get rid of
-cpu_is_mx.. completely.
-
-Best regards
-Uwe
->  arch/arm/plat-mxc/pwm.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
-> index 761c3c9..42d74ea 100644
-> --- a/arch/arm/plat-mxc/pwm.c
-> +++ b/arch/arm/plat-mxc/pwm.c
-> @@ -57,7 +57,7 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
->  	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
->  		return -EINVAL;
->  
-> -	if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
-> +	if (!(cpu_is_mx1() || cpu_is_mx21())) {
->  		unsigned long long c;
->  		unsigned long period_cycles, duty_cycles, prescale;
->  		u32 cr;
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards
+Santosh
