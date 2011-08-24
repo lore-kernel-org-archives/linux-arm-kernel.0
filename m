@@ -1,73 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Aug 2011 17:59:38 +0100
-Subject: [PATCH v4 0/8] MMU disabling code and kexec fixes
-In-Reply-To: <alpine.LFD.2.00.1108241035400.20358@xanadu.home>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1108232120590.20358@xanadu.home>
-	<20110824105848.GE32688@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1108241035400.20358@xanadu.home>
-Message-ID: <20110824165938.GT32688@e102144-lin.cambridge.arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 24 Aug 2011 19:05:35 +0200
+Subject: [alsa-devel] [PATCH v2 1/1] ASoC: soc-core: check rate for
+	symmetry only when pcm is active
+In-Reply-To: <4E5520CE.60204@ti.com>
+References: <1314183728-23627-1-git-send-email-b29396@freescale.com>
+	<4E5520CE.60204@ti.com>
+Message-ID: <4E552F5F.9070801@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 03:53:44PM +0100, Nicolas Pitre wrote:
-> On Wed, 24 Aug 2011, Will Deacon wrote:
-> > On Wed, Aug 24, 2011 at 02:25:36AM +0100, Nicolas Pitre wrote:
-> > > Is this really necessary?  Relying on "known physical address" is often 
-> > > going to lead us in situations where that physical address get encoded 
-> > > outside the kernel proper and then we're stuck with it forever.  This 
-> > > would be more "reliable" if the interface would be passed that address 
-> > > and if the page was dynamically allocated/freed.
-> > 
-> > We don't want to allocate this dynamically because we need to avoid the
-> > situation where the virtual address of this page aliases with the physical
-> > address of the reset code. By keeping the page close to the start of
-> > physical memory, we avoid this scenario.
+On 08/24/2011 06:03 PM, Liam Girdwood wrote:
+> On 24/08/11 12:02, Dong Aisheng wrote:
+>> For the playback and record using different dai links,
+>> checking !rtd->rate for symmetry may not be accurate because that
+>> pcm may be acutually not running and the default new open rate is 0,
+>> then the warning message "Not enforcing symmetric_rates" will
+>> happen each time with running arecord | aplay.
+>>
+>> Now we only check rate for symmetry when the pcm is really active
+>> which seems more sensible.
+>>
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> Cc: Liam Girdwood <lrg@ti.com>
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> Well... how probable might this be the case in practice?
+> Acked-by: Liam Girdwood <lrg@ti.com>
 > 
-> And wouldn't this issue easily being worked around simply by allocating 
-> a second page if the first one is found to alias?  Surely the reset code 
-> is much smaller than a page.
 
-Ok, so we can probably get around this corner case by checking for the alias
-and reallocating in the next section (the ID mapping is done at the section
-granularity).
+I don't think the patch in it's current form is a good idea. All it does is
+silencing the warning instead of addressing the real issue. The issue at hand
+here is, that the same DAI is connected to two other DAIs and the thus shared
+between two PCMs. The shared DAI requires symmetric rates. This is something
+that is not covered by the current code, since it assumes that a DAI is not
+shared between different PCMs. So with this patch the warning will be gone, but
+it is still possible that the capture and playback stream of the DAI to be
+configured to run at different rates, which will obviously unwanted behavior.
 
-> > On top of that, I'd like to use the bottom of this page as a holding pen
-> > for secondary CPUs when doing an SMP kexec. In this case, the new kernel
-> > needs to take care not to allocate the page for general use. I suppose we
-> > could fix this with a new ATAG / FDT property but that seems a bit overkill.
-> 
-> Is it?
-
-Well it means re-encoding a DT blob from within the kernel so that we can
-tell the next kernel not to allocate from a given page of physical memory.
-If we already have this infrastructure, then great, but it looks to me like
-it only lives within dtc (as libfdt) at the moment.
-
-> > I was also thinking that it might be useful if bootloaders want to throw all
-> > of the CPUs at the kernel during boot, rather than implementing their own
-> > SMP pen. In this case, they could make use of this reserved page (I was
-> > planning to version the pen implementation).
-> 
-> I get really uncomfortable at the prospect of having more _implicit_ 
-> dependencies between the kernel and bootloaders.  If ever we want to 
-> move things around for whatever reasons in the future then such fixed 
-> legacy addresses might really get in the way.  So I don't see the 
-> passing of that info using an ATAG or a DT node as something not bad at 
-> all.  This becomes just another resource provided to the kernel, like 
-> the ramdisk image, that can be located almost anywhere. And then you 
-> have no backward compatibility issues either as the page validity 
-> becomes explicit.
-
-Ok, point taken on the bootloader interface, I'd just rather have a way to
-make this unreliable to bootloaders without having to re-encode the .dtb in
-the kexec code.
-
-Can you think of any clever tricks so that we only look at this pen when
-we're being kexec'd?
-
-Cheers,
-
-Will
+A more sensible solution would in my opinion be to save the current rate in the
+dai struct itself and not in the pcm struct. Upon opening a stream check for
+cpu and codec DAI whether they require symmetry. If they do and are active
+constraint the rate to DAIs rate. This also ensures that if boths DAIs are
+already active and are running at different rates there will be no valid rate
+for the new stream.
