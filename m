@@ -1,31 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Aug 2011 12:13:28 +0100
-Subject: [PATCH v4 2/8] ARM: kexec: ensure new kernel is entered in ARM
-	state
-In-Reply-To: <alpine.LFD.2.00.1108232126550.20358@xanadu.home>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-	<1314136012-20533-3-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1108232126550.20358@xanadu.home>
-Message-ID: <20110824111327.GI32688@e102144-lin.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 24 Aug 2011 20:13:44 +0900
+Subject: [PATCH 3/4] ARM: SAMSUNG: Add support for handling of cpu revision
+In-Reply-To: <1313816759-14564-4-git-send-email-kgene.kim@samsung.com>
+References: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
+	<1313816759-14564-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <06f301cc624e$e38dbd70$aaa93850$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 02:28:12AM +0100, Nicolas Pitre wrote:
-> On Tue, 23 Aug 2011, Will Deacon wrote:
+Kukjin Kim wrote:
 > 
-> > Commit 540b5738 ("ARM: 6999/1: head, zImage: Always Enter the kernel in
-> > ARM state") mandates that the kernel should be entered in ARM state.
-> > 
-> > If a Thumb-2 kernel kexecs a new kernel image, we need to ensure that
-> > we change state when branching to the new code. This patch replaces a
-> > mov pc, lr with a bx lr so that we transition to ARM state if need be.
+> This patch adds plat-samsung/cpu.c for detecting of cpu id and
+> silicon revision.
 > 
-> This will break kexec support on ARMv4 targets.  No idea if any ARMv4 
-> target uses kexec though.
+> This patch was originally from Changhwan Youn <chaos.youn@samsung.com>
+> 
+> Acked-by: Changhwan Youn <chaos.youn@samsung.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
 
-It's easy enough to sort out though, so I may as well fix the code in case
-anybody wants to try kexec on ARMv4!
+(snip)
 
-Thanks,
+> +void __init s5p_init_cpu(void __iomem *cpuid_addr)
+> +{
+> +	samsung_cpu_id = __raw_readl(cpuid_addr);
+> +	samsung_cpu_rev = samsung_cpu_id & 0xF;
 
-Will
+Oops, should be 0xFF not 0xF.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
