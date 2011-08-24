@@ -1,23 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 24 Aug 2011 18:27:04 +0100
-Subject: [alsa-devel] [PATCH v2 1/1] ASoC: soc-core: check rate for
-	symmetry only when pcm is active
-In-Reply-To: <4E552F5F.9070801@metafoo.de>
-References: <1314183728-23627-1-git-send-email-b29396@freescale.com>
-	<4E5520CE.60204@ti.com> <4E552F5F.9070801@metafoo.de>
-Message-ID: <20110824172703.GF16653@opensource.wolfsonmicro.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 24 Aug 2011 13:30:07 -0400 (EDT)
+Subject: [PATCH v4 0/8] MMU disabling code and kexec fixes
+In-Reply-To: <20110824165938.GT32688@e102144-lin.cambridge.arm.com>
+References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1108232120590.20358@xanadu.home>
+	<20110824105848.GE32688@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1108241035400.20358@xanadu.home>
+	<20110824165938.GT32688@e102144-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.00.1108241323540.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 07:05:35PM +0200, Lars-Peter Clausen wrote:
+On Wed, 24 Aug 2011, Will Deacon wrote:
 
-> A more sensible solution would in my opinion be to save the current rate in the
-> dai struct itself and not in the pcm struct. Upon opening a stream check for
-> cpu and codec DAI whether they require symmetry. If they do and are active
-> constraint the rate to DAIs rate. This also ensures that if boths DAIs are
-> already active and are running at different rates there will be no valid rate
-> for the new stream.
+> On Wed, Aug 24, 2011 at 03:53:44PM +0100, Nicolas Pitre wrote:
+> > On Wed, 24 Aug 2011, Will Deacon wrote:
+> > > On top of that, I'd like to use the bottom of this page as a holding pen
+> > > for secondary CPUs when doing an SMP kexec. In this case, the new kernel
+> > > needs to take care not to allocate the page for general use. I suppose we
+> > > could fix this with a new ATAG / FDT property but that seems a bit overkill.
+> > 
+> > Is it?
+> 
+> Well it means re-encoding a DT blob from within the kernel so that we can
+> tell the next kernel not to allocate from a given page of physical memory.
+> If we already have this infrastructure, then great, but it looks to me like
+> it only lives within dtc (as libfdt) at the moment.
 
-We need to store in all three places I think - the symmetry requirement
-can also come from the link itself.  But generally this is what we're
-actually looking for, yes.
+Hmmm... The kexec user space tools know how to manipulate a device tree 
+for the next kernel, right?  So it's only a matter for it to ask the 
+current kernel what the physical address for that page is and stuff it 
+into the FDT it is preparing already.
+
+
+Nicolas
