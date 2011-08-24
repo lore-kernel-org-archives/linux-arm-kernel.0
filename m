@@ -1,63 +1,20 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Aug 2011 09:36:14 +0200
-Subject: [PATCH] media i.MX27 camera: remove legacy dma support
-In-Reply-To: <Pine.LNX.4.64.1108240843001.8985@axis700.grange>
-References: <1314167073-11058-1-git-send-email-s.hauer@pengutronix.de>
-	<Pine.LNX.4.64.1108240843001.8985@axis700.grange>
-Message-ID: <20110824073614.GU31404@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Aug 2011 09:41:31 +0200
+Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
+In-Reply-To: <CAGsJ_4yCAcu3uiSuDQ13ai8tmnoDkniQymp6M7DGJi84AW4mBg@mail.gmail.com>
+References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+	<CAGsJ_4yCAcu3uiSuDQ13ai8tmnoDkniQymp6M7DGJi84AW4mBg@mail.gmail.com>
+Message-ID: <CACRpkdb=cM7fd033v_mztmKu_nSsoCHE_04cT8q1WfyArUZx4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+On Wed, Aug 24, 2011 at 8:24 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-On Wed, Aug 24, 2011 at 09:19:24AM +0200, Guennadi Liakhovetski wrote:
-> Sure, if it's broken, let's remove it. But there are a couple of points, 
-> that we have to fix in this patch. Sorry, a stupid question: has this been 
-> tested on i.MX27?
+>> +int foo_list(struct pinmux_dev *pmxdev, unsigned selector)
+>
+> pinctrl_dev?
 
-Nope, I currently do not have mainline board support for this driver.
-Could be a good opportunity to add some...
+Thanks Barry, fixed all instances!
 
-Your other points are totally valid and I will fix them in the next
-round. Let's first see if someone proves me wrong and says this dma
-support is indeed working.
-
-> > -	return IRQ_HANDLED;
-> > -}
-> > -#else
-> >  static irqreturn_t mx27_camera_irq(int irq_csi, void *data)
-> >  {
-> >  	return IRQ_NONE;
-> >  }
-> 
-> If this is really all, what's needed for i.MX27 ISR, let's remove it 
-> completely. But maybe you could explain to me, how it is now supposed to 
-> work on i.MX27. In probe() we have
-> 
-> 	irq_handler_t mx2_cam_irq_handler = cpu_is_mx25() ? mx25_camera_irq
-> 		: mx27_camera_irq;
-> 
-> 	...
-> 
-> 	err = request_irq(pcdev->irq_csi, mx2_cam_irq_handler, 0,
-> 			MX2_CAM_DRV_NAME, pcdev);
-> 
-> So, after this patch i.MX27 will always have a dummy camera ISR and just 
-> use EMMA, right?
-
-Yes, only the EMMA irq is used, we can remove this one.
-
-> Then maybe we have to make EMMA resource availability 
-> compulsory on those SoCs, and not optional, as now? You'll have to make 
-> emma the only possibility on i.MX27, then pcdev->use_emma will disappear, 
-> locations like
-
-ok.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
