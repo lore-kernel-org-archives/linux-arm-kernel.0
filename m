@@ -1,95 +1,109 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 24 Aug 2011 15:09:10 +0200
-Subject: [RFC PATCH 04/10] arm/dts: OMAP4: Add mpu, dsp and iva nodes
+Date: Wed, 24 Aug 2011 15:09:11 +0200
+Subject: [RFC PATCH 05/10] documentation/dt: Add mpu, dsp and iva bindings
 In-Reply-To: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
 References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314191356-10963-5-git-send-email-b-cousson@ti.com>
+Message-ID: <1314191356-10963-6-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add nodes for devices used by PM code (mpu, dsp, iva).
-
-Add an empty cpus node as well as recommended in the DT spec.
-
-Remove mpu, dsp, iva devices init if CONFIG_OF is defined.
-Ideally the whole function should be removed. It will be doable as
-soon as the OMAP3 DT support will be added.
+Add documentation for the OMAP4 processors bindings.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Kevin Hilman <khilman@ti.com>
+Cc: Randy Dunlap <rdunlap@xenotime.net>
 ---
- arch/arm/boot/dts/omap4.dtsi |   28 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/pm.c     |    5 ++++-
- 2 files changed, 32 insertions(+), 1 deletions(-)
+ Documentation/devicetree/bindings/arm/omap/dsp.txt |   14 ++++++++
+ Documentation/devicetree/bindings/arm/omap/iva.txt |   18 ++++++++++
+ Documentation/devicetree/bindings/arm/omap/mpu.txt |   35 ++++++++++++++++++++
+ 3 files changed, 67 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/dsp.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/iva.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/mpu.txt
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 928a74c..a3efe76 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -25,11 +25,39 @@
- 	};
- 
- 	/*
-+	 * XXX: The cpus node is mandatory, but since the CPUs are as well part
-+	 * of the mpu subsystem below, it is not clear where the information
-+	 * should be. Maybe here with a phandle inside the mpu?
-+	 */
-+	cpus {
-+	};
+diff --git a/Documentation/devicetree/bindings/arm/omap/dsp.txt b/Documentation/devicetree/bindings/arm/omap/dsp.txt
+new file mode 100644
+index 0000000..8fcd82c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/omap/dsp.txt
+@@ -0,0 +1,14 @@
++* TI - DSP (Digital Signal Processor)
 +
-+	/*
- 	 * The soc node represents the soc top level view. It is uses for IPs
- 	 * that are not memory mapped in the MPU view or for the MPU itself.
- 	 */
- 	soc {
- 		compatible = "ti,omap-infra";
-+		mpu {
-+			compatible = "ti,omap4-mpu";
-+			hwmods = "mpu";
-+			cpu at 0 {
-+				compatible = "arm,cortex-a9";
-+			};
-+			cpu at 1 {
-+				compatible = "arm,cortex-a9";
-+			};
-+		};
++TI DSP included in OMAP SoC
 +
-+		dsp {
-+			compatible = "ti,omap4-c64", "ti,c64";
-+			hwmods = "dsp";
-+		};
++Required properties:
++- compatible : Should be "ti,c64" for OMAP3 & 4
++- hwmods: "dsp"
 +
-+		iva {
-+			compatible = "ti,ivahd", "ti,iva";
-+			hwmods = "iva";
-+		};
- 	};
- 
- 	/*
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 832577a..ba4d187 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -49,15 +49,18 @@ static int _init_omap_device(char *name)
-  */
- static void omap2_init_processor_devices(void)
- {
--	_init_omap_device("mpu");
- 	if (omap3_has_iva())
- 		_init_omap_device("iva");
- 
- 	if (cpu_is_omap44xx()) {
-+#ifndef CONFIG_OF
-+		_init_omap_device("mpu");
- 		_init_omap_device("l3_main_1");
- 		_init_omap_device("dsp");
- 		_init_omap_device("iva");
-+#endif
- 	} else {
-+		_init_omap_device("mpu");
- 		_init_omap_device("l3_main");
- 	}
- }
++Examples:
++
++dsp {
++    compatible = "ti,omap4-c64", "ti,c64";
++    hwmods = "dsp";
++};
+diff --git a/Documentation/devicetree/bindings/arm/omap/iva.txt b/Documentation/devicetree/bindings/arm/omap/iva.txt
+new file mode 100644
+index 0000000..f428e88
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/omap/iva.txt
+@@ -0,0 +1,18 @@
++* TI - IVA (Imaging and Video Accelerator) subsystem
++
++The IVA contain various audio, video or imaging HW accelerator
++depending of the version.
++
++Required properties:
++- compatible : Should be:
++  - "ti,ivahd", "ti,iva" for OMAP4
++  - "ti,iva2", "ti,iva" for OMAP3
++  - "ti,iva1", "ti,iva" for OMAP2
++- hwmods: "iva"
++
++Examples:
++
++iva {
++    compatible = "ti,ivahd", "ti,iva";
++    hwmods = "iva";
++};
+diff --git a/Documentation/devicetree/bindings/arm/omap/mpu.txt b/Documentation/devicetree/bindings/arm/omap/mpu.txt
+new file mode 100644
+index 0000000..eadab5a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/omap/mpu.txt
+@@ -0,0 +1,35 @@
++* TI - MPU (Main Processor Unit) subsystem
++
++The MPU subsystem contain one or several ARM cores
++depending of the version.
++The MPU contain CPUs, GIC, L2 cache and a local PRCM.
++
++Required properties:
++- compatible : Should be "ti,omap4-mpu" for OMAP4
++- hwmods: "mpu"
++
++Examples:
++
++- For an OMAP4 SMP system:
++
++mpu {
++    compatible = "ti,omap4-mpu";
++    hwmods = "mpu";
++    cpu at 0 {
++        compatible = "arm,cortex-a9";
++    };
++    cpu at 1 {
++        compatible = "arm,cortex-a9";
++    };
++};
++
++
++- For an OMAP3 monocore system:
++
++mpu {
++    compatible = "ti,omap3-mpu";
++    hwmods = "mpu";
++    cpu at 0 {
++        compatible = "arm,cortex-a8";
++    };
++};
 -- 
 1.7.0.4
