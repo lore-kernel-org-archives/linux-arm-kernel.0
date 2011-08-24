@@ -1,20 +1,77 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 24 Aug 2011 20:19:07 +0100
-Subject: [alsa-devel] [PATCH v2 1/1] ASoC: soc-core: check rate for
-	symmetry only when pcm is active
-In-Reply-To: <4E5548FF.1030709@metafoo.de>
-References: <1314183728-23627-1-git-send-email-b29396@freescale.com>
-	<4E5520CE.60204@ti.com> <4E552F5F.9070801@metafoo.de>
-	<20110824172703.GF16653@opensource.wolfsonmicro.com>
-	<4E5548FF.1030709@metafoo.de>
-Message-ID: <20110824191906.GA21162@opensource.wolfsonmicro.com>
+From: sean@mess.org (Sean Young)
+Date: Wed, 24 Aug 2011 20:26:40 +0100
+Subject: [PATCH 1/2] Revert "[ARM] eSATA SheevaPlug: correlate MPP to SD CD
+	and SD WP"
+Message-ID: <1314214001-2731-1-git-send-email-sean@mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 08:54:55PM +0200, Lars-Peter Clausen wrote:
+This reverts commit d5b5746bed1023e4a55f96405422d3e51968fa43.
 
-> It should be sufficient to just store the rate for the cpu and codec DAI.
-> Though the rate constraint should be applied if either the DAI or the link
-> wants symmetric rates.
+Neither SD WP nor SD CD are detected after this change on my eSATA
+SheevaPlug.
 
-Yes, for the actual rate storage.
+Signed-off-by: Sean Young <sean@mess.org>
+---
+ arch/arm/mach-kirkwood/sheevaplug-setup.c |   26 ++------------------------
+ 1 files changed, 2 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+index 17de0bf..7ba2a08 100644
+--- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
++++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
+@@ -51,11 +51,6 @@ static struct mvsdio_platform_data sheevaplug_mvsdio_data = {
+ 	/* unfortunately the CD signal has not been connected */
+ };
+ 
+-static struct mvsdio_platform_data sheeva_esata_mvsdio_data = {
+-	.gpio_write_protect = 44, /* MPP44 used as SD write protect */
+-	.gpio_card_detect = 47,	  /* MPP47 used as SD card detect */
+-};
+-
+ static struct gpio_led sheevaplug_led_pins[] = {
+ 	{
+ 		.name			= "plug:red:misc",
+@@ -91,26 +86,13 @@ static unsigned int sheevaplug_mpp_config[] __initdata = {
+ 	0
+ };
+ 
+-static unsigned int sheeva_esata_mpp_config[] __initdata = {
+-	MPP29_GPIO,	/* USB Power Enable */
+-	MPP44_GPIO,	/* SD Write Protect */
+-	MPP47_GPIO,	/* SD Card Detect */
+-	MPP49_GPIO,	/* LED Green */
+-	0
+-};
+-
+ static void __init sheevaplug_init(void)
+ {
+ 	/*
+ 	 * Basic setup. Needs to be called early.
+ 	 */
+ 	kirkwood_init();
+-
+-	/* setup gpio pin select */
+-	if (machine_is_sheeva_esata())
+-		kirkwood_mpp_conf(sheeva_esata_mpp_config);
+-	else
+-		kirkwood_mpp_conf(sheevaplug_mpp_config);
++	kirkwood_mpp_conf(sheevaplug_mpp_config);
+ 
+ 	kirkwood_uart0_init();
+ 	kirkwood_nand_init(ARRAY_AND_SIZE(sheevaplug_nand_parts), 25);
+@@ -126,11 +108,7 @@ static void __init sheevaplug_init(void)
+ 	if (machine_is_sheeva_esata())
+ 		kirkwood_sata_init(&sheeva_esata_sata_data);
+ 
+-	/* enable sd wp and sd cd on plugs with esata */
+-	if (machine_is_sheeva_esata())
+-		kirkwood_sdio_init(&sheeva_esata_mvsdio_data);
+-	else
+-		kirkwood_sdio_init(&sheevaplug_mvsdio_data);
++	kirkwood_sdio_init(&sheevaplug_mvsdio_data);
+ 
+ 	platform_device_register(&sheevaplug_leds);
+ }
+-- 
+1.7.2.5
