@@ -1,37 +1,30 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 24 Aug 2011 12:17:16 +0200
-Subject: [RFC PATCH 3/7] arm/dts: Update OMAP4 Panda to include common
-	omap4.dtsi
+Date: Wed, 24 Aug 2011 12:17:17 +0200
+Subject: [RFC PATCH 4/7] arm/dts: Add support for OMAP4 SDP board
 In-Reply-To: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
 References: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314181040-22807-4-git-send-email-b-cousson@ti.com>
+Message-ID: <1314181040-22807-5-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on the original omap4-panda.dts file from Manju.
-http://www.spinics.net/lists/linux-omap/msg55836.html
-
-Add memory information and a default bootargs to allow
-a boot from RAMDISK.
-
-Add missing header.
-
-Include the common omap4.dtsi.
-
-Add a "ti,omap4" compatible value for OMAP4 based boards.
+Add the SDP/Blaze (Software Development Board) support with
+device tree.
+That file is based on the omap4-panda.dts.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: G, Manjunath Kondaiah <manjugk@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda.dts |   28 +++++++++++++++++++++++-----
- 1 files changed, 23 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/omap4-sdp.dts |   29 +++++++++++++++++++++++++++++
+ 1 files changed, 29 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-sdp.dts
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 58909e9..c702657 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -1,11 +1,29 @@
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+new file mode 100644
+index 0000000..066e28c
+--- /dev/null
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -0,0 +1,29 @@
 +/*
 + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
 + *
@@ -39,18 +32,13 @@ index 58909e9..c702657 100644
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
- /dts-v1/;
- 
--/memreserve/ 0x9D000000 0x03000000; /* Frame buffer */
--/memreserve/ 0xB0000000 0x10000000; /* Top 256MB is unaccessable */
--
--/include/ "skeleton.dtsi"
++/dts-v1/;
++
 +/include/ "omap4.dtsi"
- 
- / {
- 	model = "TI OMAP4 PandaBoard";
--	compatible = "ti,omap4-panda", "ti,omap4430";
-+	compatible = "ti,omap4-panda", "ti,omap4430", "ti,omap4";
++
++/ {
++	model = "TI OMAP4 SDP board";
++	compatible = "ti,omap4-sdp", "ti,omap4430", "ti,omap4";
 +
 +	/*
 +	 * Since the initial device tree board file does not create any
@@ -65,6 +53,6 @@ index 58909e9..c702657 100644
 +		device_type = "memory";
 +		reg = <0x80000000 0x40000000>; /* 1 GB */
 +	};
- };
++};
 -- 
 1.7.0.4
