@@ -1,539 +1,79 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Aug 2011 10:03:07 +0200
-Subject: [PATCH 4/4] ARM i.MX defconfigs: use one defconfig for all ARMv4/v5
-	SoCs
-In-Reply-To: <1314172987-10349-1-git-send-email-s.hauer@pengutronix.de>
-References: <1314172987-10349-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1314172987-10349-5-git-send-email-s.hauer@pengutronix.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 24 Aug 2011 11:07:32 +0300
+Subject: [PATCH] OMAP3EVM: ehci: Fix EHCI support
+In-Reply-To: <1314112595-14849-1-git-send-email-bdefaria@adeneo-embedded.com>
+References: <1314112595-14849-1-git-send-email-bdefaria@adeneo-embedded.com>
+Message-ID: <4E54B144.8010702@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can compile all ARMv4/v5 based i.MX SoCs into a single
-kernel, update the defconfigs accordingly
+Once again my mailer played me... sending for the second time... sorry
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/configs/imx_v4_v5_defconfig |  170 ++++++++++++++++++++++++++++++++++
- arch/arm/configs/mx1_defconfig       |   91 ------------------
- arch/arm/configs/mx21_defconfig      |   97 -------------------
- arch/arm/configs/mx27_defconfig      |  130 --------------------------
- 4 files changed, 170 insertions(+), 318 deletions(-)
- create mode 100644 arch/arm/configs/imx_v4_v5_defconfig
- delete mode 100644 arch/arm/configs/mx1_defconfig
- delete mode 100644 arch/arm/configs/mx21_defconfig
- delete mode 100644 arch/arm/configs/mx27_defconfig
+Hi Bryan,
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-new file mode 100644
-index 0000000..11a4192
---- /dev/null
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -0,0 +1,170 @@
-+CONFIG_EXPERIMENTAL=y
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_POSIX_MQUEUE=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_EXPERT=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_KPROBES=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_MXC=y
-+CONFIG_ARCH_IMX_V4_V5=y
-+CONFIG_ARCH_MX1ADS=y
-+CONFIG_MACH_SCB9328=y
-+CONFIG_MACH_MX21ADS=y
-+CONFIG_MACH_MX25_3DS=y
-+CONFIG_MACH_EUKREA_CPUIMX25=y
-+CONFIG_MACH_MX27ADS=y
-+CONFIG_MACH_PCM038=y
-+CONFIG_MACH_CPUIMX27=y
-+CONFIG_MACH_EUKREA_CPUIMX27_USESDHC2=y
-+CONFIG_MACH_EUKREA_CPUIMX27_USEUART4=y
-+CONFIG_MACH_MX27_3DS=y
-+CONFIG_MACH_IMX27_VISSTRIM_M10=y
-+CONFIG_MACH_IMX27LITE=y
-+CONFIG_MACH_PCA100=y
-+CONFIG_MACH_MXT_TD60=y
-+CONFIG_MACH_IMX27IPCAM=y
-+CONFIG_MXC_IRQ_PRIOR=y
-+CONFIG_MXC_PWM=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_FPE_NWFPE=y
-+CONFIG_FPE_NWFPE_XP=y
-+CONFIG_PM_DEBUG=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+# CONFIG_IPV6 is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_GEOMETRY=y
-+# CONFIG_MTD_MAP_BANK_WIDTH_1 is not set
-+# CONFIG_MTD_MAP_BANK_WIDTH_4 is not set
-+# CONFIG_MTD_CFI_I2 is not set
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_UBI=y
-+CONFIG_MISC_DEVICES=y
-+CONFIG_EEPROM_AT24=y
-+CONFIG_EEPROM_AT25=y
-+CONFIG_NETDEVICES=y
-+CONFIG_NET_ETHERNET=y
-+CONFIG_SMC91X=y
-+CONFIG_DM9000=y
-+CONFIG_SMC911X=y
-+# CONFIG_NETDEV_1000 is not set
-+# CONFIG_NETDEV_10000 is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ADS7846=m
-+# CONFIG_SERIO is not set
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_8250=m
-+CONFIG_SERIAL_IMX=y
-+CONFIG_SERIAL_IMX_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_IMX=y
-+CONFIG_SPI=y
-+CONFIG_SPI_IMX=y
-+CONFIG_W1=y
-+CONFIG_W1_MASTER_MXC=y
-+CONFIG_W1_SLAVE_THERM=y
-+# CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_IMX2_WDT=y
-+CONFIG_MFD_MC13XXX=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_MC13783=y
-+CONFIG_REGULATOR_MC13892=y
-+CONFIG_FB=y
-+CONFIG_FB_IMX=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
-+CONFIG_LCD_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_CLASS_DEVICE=y
-+CONFIG_BACKLIGHT_PWM=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FONTS=y
-+CONFIG_FONT_8x8=y
-+CONFIG_LOGO=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_SPI is not set
-+CONFIG_SND_SOC=y
-+CONFIG_SND_IMX_SOC=y
-+CONFIG_SND_SOC_MX27VIS_AIC32X4=y
-+CONFIG_SND_SOC_PHYCORE_AC97=y
-+CONFIG_SND_SOC_EUKREA_TLV320=y
-+CONFIG_USB_HID=m
-+CONFIG_USB=y
-+# CONFIG_USB_DEVICE_CLASS is not set
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_ULPI=y
-+CONFIG_MMC=y
-+CONFIG_MMC_MXC=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_MC13783=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_BACKLIGHT=y
-+CONFIG_LEDS_TRIGGER_GPIO=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_PCF8563=y
-+CONFIG_RTC_DRV_IMXDI=y
-+CONFIG_RTC_MXC=y
-+CONFIG_DMADEVICES=y
-+CONFIG_IMX_SDMA=y
-+CONFIG_IMX_DMA=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_PROC_PAGE_MONITOR is not set
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_UBIFS_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=m
-+CONFIG_NLS_CODEPAGE_850=m
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_15=m
-+CONFIG_SYSCTL_SYSCALL_CHECK=y
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-diff --git a/arch/arm/configs/mx1_defconfig b/arch/arm/configs/mx1_defconfig
-deleted file mode 100644
-index c9436d0..0000000
---- a/arch/arm/configs/mx1_defconfig
-+++ /dev/null
-@@ -1,91 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_IKCONFIG=y
--CONFIG_IKCONFIG_PROC=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
--CONFIG_EXPERT=y
--CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODULE_FORCE_UNLOAD=y
--CONFIG_MODVERSIONS=y
--# CONFIG_BLK_DEV_BSG is not set
--CONFIG_ARCH_MXC=y
--CONFIG_ARCH_MX1=y
--CONFIG_ARCH_MX1ADS=y
--CONFIG_MACH_SCB9328=y
--CONFIG_MACH_APF9328=y
--CONFIG_MXC_IRQ_PRIOR=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
--CONFIG_PREEMPT=y
--CONFIG_AEABI=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="noinitrd console=ttymxc0,115200 root=/dev/mtdblock2 rw ip=off"
--CONFIG_PM=y
--CONFIG_PM_DEBUG=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_FW_LOADER=m
--CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_CFI=y
--CONFIG_MTD_PHYSMAP=y
--# CONFIG_BLK_DEV is not set
--# CONFIG_MISC_DEVICES is not set
--CONFIG_NETDEVICES=y
--CONFIG_PHYLIB=y
--CONFIG_SMSC_PHY=y
--CONFIG_NET_ETHERNET=y
--CONFIG_DM9000=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
--# CONFIG_INPUT is not set
--# CONFIG_SERIO is not set
--# CONFIG_VT is not set
--CONFIG_SERIAL_IMX=y
--CONFIG_SERIAL_IMX_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_I2C_IMX=y
--CONFIG_W1=y
--CONFIG_W1_MASTER_MXC=y
--CONFIG_W1_SLAVE_THERM=y
--# CONFIG_HWMON is not set
--CONFIG_FB=y
--CONFIG_USB_GADGET=y
--CONFIG_USB_GADGET_IMX=y
--CONFIG_USB_ETH=m
--CONFIG_MMC=y
--CONFIG_MMC_MXC=y
--# CONFIG_DNOTIFY is not set
--CONFIG_INOTIFY=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
--CONFIG_NFS_V4=y
--CONFIG_ROOT_NFS=y
--# CONFIG_ENABLE_WARN_DEPRECATED is not set
--# CONFIG_ENABLE_MUST_CHECK is not set
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--CONFIG_SYSCTL_SYSCALL_CHECK=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
-diff --git a/arch/arm/configs/mx21_defconfig b/arch/arm/configs/mx21_defconfig
-deleted file mode 100644
-index 411f88d..0000000
---- a/arch/arm/configs/mx21_defconfig
-+++ /dev/null
-@@ -1,97 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--# CONFIG_SWAP is not set
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
--# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
--CONFIG_EXPERT=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_MXC=y
--CONFIG_ARCH_MX2=y
--CONFIG_MACH_MX21ADS=y
--CONFIG_MXC_PWM=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
--CONFIG_PREEMPT=y
--CONFIG_AEABI=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_NET=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--CONFIG_IP_PNP_BOOTP=y
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--# CONFIG_FW_LOADER is not set
--CONFIG_MTD=y
--CONFIG_MTD_DEBUG=y
--CONFIG_MTD_DEBUG_VERBOSE=3
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_REDBOOT_PARTS=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_CFI=y
--CONFIG_MTD_CFI_ADV_OPTIONS=y
--CONFIG_MTD_CFI_GEOMETRY=y
--# CONFIG_MTD_MAP_BANK_WIDTH_1 is not set
--CONFIG_MTD_CFI_AMDSTD=y
--CONFIG_MTD_PHYSMAP=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_MXC=y
--CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
--CONFIG_MII=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
--# CONFIG_INPUT_MOUSEDEV is not set
--CONFIG_INPUT_EVDEV=y
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_INPUT_TOUCHSCREEN=y
--# CONFIG_SERIO is not set
--# CONFIG_CONSOLE_TRANSLATIONS is not set
--CONFIG_SERIAL_8250=y
--CONFIG_SERIAL_8250_CONSOLE=y
--CONFIG_SERIAL_8250_NR_UARTS=1
--CONFIG_SERIAL_IMX=y
--CONFIG_SERIAL_IMX_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_I2C_IMX=y
--CONFIG_SPI=y
--# CONFIG_HWMON is not set
--CONFIG_FB=y
--CONFIG_FB_IMX=y
--# CONFIG_VGA_CONSOLE is not set
--CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FONTS=y
--CONFIG_FONT_8x8=y
--CONFIG_LOGO=y
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--CONFIG_MMC=y
--CONFIG_MMC_MXC=y
--# CONFIG_DNOTIFY is not set
--CONFIG_MSDOS_FS=y
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
--CONFIG_ROOT_NFS=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--CONFIG_SYSCTL_SYSCALL_CHECK=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
-diff --git a/arch/arm/configs/mx27_defconfig b/arch/arm/configs/mx27_defconfig
-deleted file mode 100644
-index 9ad4c656..0000000
---- a/arch/arm/configs/mx27_defconfig
-+++ /dev/null
-@@ -1,130 +0,0 @@
--CONFIG_EXPERIMENTAL=y
--# CONFIG_SWAP is not set
--CONFIG_SYSVIPC=y
--CONFIG_POSIX_MQUEUE=y
--CONFIG_LOG_BUF_SHIFT=14
--# CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
--CONFIG_EXPERT=y
--CONFIG_KALLSYMS_EXTRA_PASS=y
--# CONFIG_COMPAT_BRK is not set
--CONFIG_SLAB=y
--CONFIG_PROFILING=y
--CONFIG_OPROFILE=y
--CONFIG_KPROBES=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_MXC=y
--CONFIG_ARCH_MX2=y
--CONFIG_MACH_MX27=y
--CONFIG_MACH_MX27ADS=y
--CONFIG_MACH_PCM038=y
--CONFIG_MACH_CPUIMX27=y
--CONFIG_MACH_EUKREA_CPUIMX27_USESDHC2=y
--CONFIG_MACH_EUKREA_CPUIMX27_USEUART4=y
--CONFIG_MACH_MX27_3DS=y
--CONFIG_MACH_IMX27_VISSTRIM_M10=y
--CONFIG_MACH_IMX27LITE=y
--CONFIG_MACH_PCA100=y
--CONFIG_MACH_MXT_TD60=y
--CONFIG_MXC_IRQ_PRIOR=y
--CONFIG_MXC_PWM=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
--CONFIG_PREEMPT=y
--CONFIG_AEABI=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_FPE_NWFPE=y
--CONFIG_FPE_NWFPE_XP=y
--CONFIG_PM=y
--CONFIG_PM_DEBUG=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_MULTICAST=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_CFI=y
--CONFIG_MTD_CFI_ADV_OPTIONS=y
--CONFIG_MTD_CFI_GEOMETRY=y
--# CONFIG_MTD_MAP_BANK_WIDTH_1 is not set
--# CONFIG_MTD_MAP_BANK_WIDTH_4 is not set
--# CONFIG_MTD_CFI_I2 is not set
--CONFIG_MTD_CFI_INTELEXT=y
--CONFIG_MTD_PHYSMAP=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_MXC=y
--CONFIG_MTD_UBI=y
--CONFIG_EEPROM_AT24=y
--CONFIG_NETDEVICES=y
--CONFIG_NET_ETHERNET=y
--CONFIG_FEC=y
--# CONFIG_NETDEV_1000 is not set
--# CONFIG_NETDEV_10000 is not set
--# CONFIG_INPUT_MOUSEDEV is not set
--CONFIG_INPUT_EVDEV=y
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_TOUCHSCREEN_ADS7846=m
--# CONFIG_SERIO is not set
--CONFIG_SERIAL_8250=m
--CONFIG_SERIAL_IMX=y
--CONFIG_SERIAL_IMX_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_I2C_IMX=y
--CONFIG_SPI=y
--CONFIG_SPI_IMX=y
--CONFIG_W1=y
--CONFIG_W1_MASTER_MXC=y
--CONFIG_W1_SLAVE_THERM=y
--# CONFIG_HWMON is not set
--CONFIG_FB=y
--CONFIG_FB_IMX=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
--CONFIG_FONTS=y
--CONFIG_FONT_8x8=y
--# CONFIG_HID_SUPPORT is not set
--CONFIG_USB=m
--# CONFIG_USB_DEVICE_CLASS is not set
--CONFIG_USB_ULPI=y
--CONFIG_MMC=y
--CONFIG_MMC_MXC=y
--CONFIG_RTC_CLASS=y
--CONFIG_RTC_DRV_PCF8563=y
--# CONFIG_DNOTIFY is not set
--# CONFIG_PROC_PAGE_MONITOR is not set
--CONFIG_TMPFS=y
--CONFIG_JFFS2_FS=y
--CONFIG_UBIFS_FS=y
--CONFIG_NFS_FS=y
--CONFIG_NFS_V3=y
--CONFIG_ROOT_NFS=y
--CONFIG_NLS=y
--CONFIG_NLS_CODEPAGE_437=m
--CONFIG_NLS_CODEPAGE_850=m
--CONFIG_NLS_ISO8859_1=y
--CONFIG_NLS_ISO8859_15=m
--CONFIG_DEBUG_FS=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
--CONFIG_SYSCTL_SYSCALL_CHECK=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
+Please, CC linux-arm-kernel at lists.infradead.org for patches like this.
+One question below
+
+On 08/23/11 18:16, Bryan DE FARIA wrote:
+> Set the VAUX2 regulator supply to 1.8V for the HSUSB host interface.
+> Gpio 2 of the TPS65950 has to be set to zero in order to enable the HSUBS2 clock.
+> 
+> Signed-off-by: Bryan DE FARIA <bdefaria@adeneo-embedded.com>
+> ---
+>  arch/arm/mach-omap2/board-omap3evm.c |   24 ++++++++++++++++++++++++
+>  1 files changed, 24 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+> index c452b3f..ce09e9e 100644
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -377,6 +377,10 @@ static int omap3evm_twl_gpio_setup(struct device *dev,
+>  	if (r)
+>  		printk(KERN_ERR "failed to get/set lcd_bkl gpio\n");
+>  
+> +	/* gpio + 2 == HSUSB2 Clock Enable */
+> +	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
+> +		gpio_request_one(gpio + 2, GPIOF_OUT_INIT_LOW, "EN_HSUSB2_CLK");
+> +
+>  	/* gpio + 7 == DVI Enable */
+>  	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_LOW, "EN_DVI");
+>  
+> @@ -450,6 +454,25 @@ static struct regulator_init_data omap3evm_vio = {
+>  	.consumer_supplies	= omap3evm_vio_supply,
+>  };
+>  
+> +/* VAUX2 for EHCI */
+> +static struct regulator_consumer_supply omap3evm_vaux2_supplies[] = {
+> +	REGULATOR_SUPPLY("hsusb1", "ehci-omap.0"),
+> +};
+> +
+> +static struct regulator_init_data omap3evm_vaux2 = {
+> +	.constraints = {
+> +		.min_uV      		= 1800000,
+> +		.max_uV      		= 1800000,
+> +		.apply_uV    		= true,
+> +		.valid_modes_mask  	= REGULATOR_MODE_NORMAL
+> +					| REGULATOR_MODE_STANDBY,
+> +		.valid_ops_mask  	= REGULATOR_CHANGE_MODE
+> +					| REGULATOR_CHANGE_STATUS,
+> +	},
+> +	.num_consumer_supplies  = ARRAY_SIZE(omap3evm_vaux2_supplies),
+> +	.consumer_supplies   	= omap3evm_vaux2_supplies,
+> +};
+> +
+>  #ifdef CONFIG_WL12XX_PLATFORM_DATA
+>  
+>  #define OMAP3EVM_WLAN_PMENA_GPIO	(150)
+> @@ -645,6 +668,7 @@ static void __init omap3_evm_init(void)
+>  	usb_nop_xceiv_register();
+>  
+>  	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2) {
+> +		omap3evm_twldata.vaux2 = &omap3evm_vaux2;
+
+Wouldn't it be better to put this inside the omap3_evm_i2c_init() function
+so all the initialization of that type be close to each other
+and done before the omap3_pmic_init() call?
+
 -- 
-1.7.5.4
+Regards,
+Igor.
