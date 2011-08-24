@@ -1,58 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Aug 2011 08:41:08 +0200
-Subject: [PATCH 1/5] mmc i.MX: remove individual SoC dependency
-In-Reply-To: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
-References: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1314168072-13822-2-git-send-email-s.hauer@pengutronix.de>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 24 Aug 2011 08:44:05 +0200
+Subject: [PATCH] ARM: ux500: send cpufreq notification for all cpus
+Message-ID: <1314168245-2373-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The individual SoC dependency in Kconfig hardly scales anymore.
-Instead of having such a fine grained dependency just depend
-on ARCH_MXC and risk that the uninformed user has to look in
-the help text to figure out which driver is the correct one.
+The same clock is used for all cpus so we must notify the frequency change
+for each one in order to update the configuration of all twd clockevents.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: linux-mmc at vger.kernel.org
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- drivers/mmc/host/Kconfig |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/cpufreq/db8500-cpufreq.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 8c87096..c226d54 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -131,12 +131,12 @@ config MMC_SDHCI_CNS3XXX
+diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
+index 0d8dd1c..4cb5785 100644
+--- a/drivers/cpufreq/db8500-cpufreq.c
++++ b/drivers/cpufreq/db8500-cpufreq.c
+@@ -76,13 +76,13 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
  
- config MMC_SDHCI_ESDHC_IMX
- 	tristate "SDHCI platform support for the Freescale eSDHC i.MX controller"
--	depends on ARCH_MX25 || ARCH_MX35 || ARCH_MX5
-+	depends on ARCH_MXC
- 	depends on MMC_SDHCI_PLTFM
- 	select MMC_SDHCI_IO_ACCESSORS
- 	help
- 	  This selects the Freescale eSDHC controller support on the platform
--	  bus, found on platforms like mx35/51.
-+	  bus, found on i.MX25, i.MX35 and i.MX5x.
+ 	freqs.old = policy->cur;
+ 	freqs.new = freq_table[idx].frequency;
+-	freqs.cpu = policy->cpu;
  
- 	  If you have a controller with this interface, say Y or M here.
+ 	if (freqs.old == freqs.new)
+ 		return 0;
  
-@@ -326,11 +326,11 @@ config MMC_MSM
- 	  support for SDIO devices.
+ 	/* pre-change notification */
+-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++	for_each_online_cpu(freqs.cpu)
++		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
  
- config MMC_MXC
--	tristate "Freescale i.MX2/3 Multimedia Card Interface support"
--	depends on MACH_MX21 || MACH_MX27 || ARCH_MX31
-+	tristate "Freescale i.MX21/27/31 Multimedia Card Interface support"
-+	depends on ARCH_MXC
- 	help
--	  This selects the Freescale i.MX2/3 Multimedia card Interface.
--	  If you have a i.MX platform with a Multimedia Card slot,
-+	  This selects the Freescale i.MX21, i.MX27 and i.MX31 Multimedia card
-+	  Interface. If you have a i.MX platform with a Multimedia Card slot,
- 	  say Y or M here.
+ 	/* request the PRCM unit for opp change */
+ 	if (prcmu_set_arm_opp(idx2opp[idx])) {
+@@ -91,7 +91,8 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
+ 	}
  
- 	  If unsure, say N.
+ 	/* post change notification */
+-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++	for_each_online_cpu(freqs.cpu)
++		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+ 
+ 	return 0;
+ }
 -- 
-1.7.5.4
+1.7.4.1
