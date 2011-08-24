@@ -1,43 +1,33 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Aug 2011 08:41:11 +0200
-Subject: [PATCH 4/5] USB gadget i.MX1: remove dependency on ARCH_MXC
+Date: Wed, 24 Aug 2011 08:41:12 +0200
+Subject: [PATCH 5/5] media i.MX1 camera: remove dependency on ARCH_MX1
 In-Reply-To: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
 References: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1314168072-13822-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1314168072-13822-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARCH_MX1 scheduled for removal. Instead, depend on ARCH_MXC
-and make clear in the Kconfig text that only i.MX1 has this
-hardware.
+The ARCH_MX1 macro is scheduled for removal. Instead,
+depend on ARCH_MXC. The Kconfig text makes it clear
+on which SoC rhis driver runs on.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/gadget/Kconfig |    9 ++++-----
- 1 files changed, 4 insertions(+), 5 deletions(-)
+ drivers/media/video/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-index 5a084b9..2e4424d 100644
---- a/drivers/usb/gadget/Kconfig
-+++ b/drivers/usb/gadget/Kconfig
-@@ -255,12 +255,11 @@ config USB_S3C_HSOTG
- 	  integrated into the S3C64XX series SoC.
+diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
+index f574dc0..bc5df0e 100644
+--- a/drivers/media/video/Kconfig
++++ b/drivers/media/video/Kconfig
+@@ -883,7 +883,7 @@ config MX1_VIDEO
  
- config USB_IMX
--	tristate "Freescale IMX USB Peripheral Controller"
--	depends on ARCH_MX1
-+	tristate "Freescale i.MX1 USB Peripheral Controller"
-+	depends on ARCH_MXC
- 	help
--	   Freescale's IMX series include an integrated full speed
--	   USB 1.1 device controller.  The controller in the IMX series
--	   is register-compatible.
-+	   Freescale's i.MX1 includes an integrated full speed
-+	   USB 1.1 device controller.
- 
- 	   It has Six fixed-function endpoints, as well as endpoint
- 	   zero (for control transfers).
+ config VIDEO_MX1
+ 	tristate "i.MX1/i.MXL CMOS Sensor Interface driver"
+-	depends on VIDEO_DEV && ARCH_MX1 && SOC_CAMERA
++	depends on VIDEO_DEV && ARCH_MXC && SOC_CAMERA
+ 	select FIQ
+ 	select VIDEOBUF_DMA_CONTIG
+ 	select MX1_VIDEO
 -- 
 1.7.5.4
