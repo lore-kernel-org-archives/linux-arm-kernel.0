@@ -1,37 +1,42 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 24 Aug 2011 14:17:55 +0800
-Subject: [PATCH 2/4 v4] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
-References: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CAGsJ_4w+dkzHbYBehEzgK2+Js=BmAYe2gHKQ1PtYc=ymhovnDQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Wed, 24 Aug 2011 11:49:12 +0530
+Subject: [PATCH v5 18/22] gpio/omap: use pm-runtime framework
+In-Reply-To: <4E5477D0.9090301@ti.com>
+References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+	<1312455893-14922-19-git-send-email-tarun.kanti@ti.com>
+	<4E53BA80.7030200@ti.com> <4E5477D0.9090301@ti.com>
+Message-ID: <4E5497E0.4090004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-This patch can't compile....
-> +
-> +/**
-> + * @dev: a pointer back to containing device
-> + * @virtbase: the offset to the controller in virtual memory
-> + */
-> +struct u300_pmx {
-> + ? ? ? struct device *dev;
-> + ? ? ? struct pinmux_dev *pmx;
+On Wednesday 24 August 2011 09:32 AM, Rajendra Nayak wrote:
+> On 8/23/2011 8:04 PM, Santosh wrote:
+>> + Rajendra and Benoit to comment on optional clock
+>> handling.
+>>
+>> On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
 
-no this structure in head file, now it is pinctrl_desc.
+[....]
 
-> + ? ? ? u32 phybase;
-> + ? ? ? u32 physize;
-> + ? ? ? void __iomem *virtbase;
-> +};
+>>>
+>>> + if (IS_ERR_VALUE(pm_runtime_get_sync(bank->dev)< 0))
+>>> + dev_err(bank->dev, "%s: GPIO bank %d "
+>>> + "pm_runtime_get_sync failed\n",
+>>> + __func__, bank->id);
+>>> +
+>>> for (j = 0; j< hweight_long(bank->dbck_enable_mask); j++)
+>>> clk_enable(bank->dbck);
+>> Optional clock handling also should been addressed using runtime hooks,
+>> isn't it ?
+>
+> Whats handled by runtime hooks is the device;s *main* clocks, which are
+> needed for the device to become accessible.
+> Anything else *optional* which the device would need optionally based on
+> the various modes it can operate etc are still controlled by the driver
+> by enabling/disabling them as and when needed using the clock framework.
+>
+Thanks Rajendra for clarification. In summary, we continue to use clock
+framework for the optional clock handling from the drivers.
 
-> + ? ? ? /* Now register the pin controller and all pins it handles */
-> + ? ? ? upmx->pctl = pinctrl_register(&u300_pmx_desc, &pdev->dev, upmx);
-
-no this field in upmx structure.
-
-> + ? ? ? if (IS_ERR(upmx->pctl)) {
-
-Did you send the wrong version?
-
--barry
+Regards
+Santosh
