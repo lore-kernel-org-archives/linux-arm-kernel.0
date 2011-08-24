@@ -1,206 +1,372 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Aug 2011 10:03:04 +0200
-Subject: [PATCH 1/4] ARM i.MX: allow to compile together ARMv4 and ARMv5 based
-	SoCs
+Date: Wed, 24 Aug 2011 10:03:06 +0200
+Subject: [PATCH 3/4] ARM i.MX5: update defconfig
 In-Reply-To: <1314172987-10349-1-git-send-email-s.hauer@pengutronix.de>
 References: <1314172987-10349-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1314172987-10349-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1314172987-10349-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For this we need CONFIG_AUTO_ZRELADDR and CONFIG_ARM_PATCH_PHYS_VIRT.
+Rename it from mx51_defconfig to mx5_defconfig since the i.MX53
+is now supported aswell. Also, remove the DEBUG_LL and enable
+some more drivers.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/Makefile                       |    4 +--
- arch/arm/mach-imx/Kconfig               |   50 ++++++++++--------------------
- arch/arm/plat-mxc/Kconfig               |   19 ++++--------
- arch/arm/plat-mxc/include/mach/memory.h |   10 +-----
- 4 files changed, 25 insertions(+), 58 deletions(-)
+ arch/arm/configs/mx51_defconfig |  170 ---------------------------------------
+ arch/arm/configs/mx5_defconfig  |  167 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 167 insertions(+), 170 deletions(-)
+ delete mode 100644 arch/arm/configs/mx51_defconfig
+ create mode 100644 arch/arm/configs/mx5_defconfig
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 70c424e..9260c29 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -154,9 +154,7 @@ machine-$(CONFIG_ARCH_LPC32XX)		:= lpc32xx
- machine-$(CONFIG_ARCH_MMP)		:= mmp
- machine-$(CONFIG_ARCH_MSM)		:= msm
- machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
--machine-$(CONFIG_ARCH_MX1)		:= imx
--machine-$(CONFIG_ARCH_MX2)		:= imx
--machine-$(CONFIG_ARCH_MX25)		:= imx
-+machine-$(CONFIG_ARCH_IMX_V4_V5)	:= imx
- machine-$(CONFIG_ARCH_MX3)		:= imx
- machine-$(CONFIG_ARCH_MX5)		:= mx5
- machine-$(CONFIG_ARCH_MXS)		:= mxs
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0519dd7..bdc6345 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -5,6 +5,18 @@ config IMX_HAVE_DMA_V1
- # Some usages assume that having one of them implies not having (e.g.) ARCH_MX2.
- # To easily distinguish good and reviewed from unreviewed usages new (and IMHO
- # more sensible) names are used: SOC_IMX31 and SOC_IMX35
-+config ARCH_MX1
-+	bool
-+
-+config MACH_MX21
-+	bool
-+
-+config ARCH_MX25
-+	bool
-+
-+config MACH_MX27
-+	bool
-+
- config ARCH_MX31
- 	bool
- 
-@@ -13,6 +25,7 @@ config ARCH_MX35
- 
- config SOC_IMX1
- 	bool
-+	select ARCH_MX1
- 	select CPU_ARM920T
- 	select IMX_HAVE_DMA_V1
- 	select IMX_HAVE_IOMUX_V1
-@@ -20,6 +33,7 @@ config SOC_IMX1
- 
- config SOC_IMX21
- 	bool
-+	select MACH_MX21
- 	select CPU_ARM926T
- 	select ARCH_MXC_AUDMUX_V1
- 	select IMX_HAVE_DMA_V1
-@@ -28,6 +42,7 @@ config SOC_IMX21
- 
- config SOC_IMX25
- 	bool
-+	select ARCH_MX25
- 	select CPU_ARM926T
- 	select ARCH_MXC_AUDMUX_V2
- 	select ARCH_MXC_IOMUX_V3
-@@ -35,6 +50,7 @@ config SOC_IMX25
- 
- config SOC_IMX27
- 	bool
-+	select MACH_MX27
- 	select CPU_ARM926T
- 	select ARCH_MXC_AUDMUX_V1
- 	select IMX_HAVE_DMA_V1
-@@ -59,7 +75,7 @@ config SOC_IMX35
- 	select MXC_AVIC
- 
- 
--if ARCH_MX1
-+if ARCH_IMX_V4_V5
- 
- comment "MX1 platforms:"
- config MACH_MXLADS
-@@ -87,30 +103,6 @@ config MACH_APF9328
- 	help
- 	  Say Yes here if you are using the Armadeus APF9328 development board
- 
--endif
--
--if ARCH_MX2
--
--choice
--	prompt "CPUs:"
--	default MACH_MX21
--
--config MACH_MX21
--	bool "i.MX21 support"
--	help
--	  This enables support for Freescale's MX2 based i.MX21 processor.
--
--config MACH_MX27
--	bool "i.MX27 support"
--	help
--	  This enables support for Freescale's MX2 based i.MX27 processor.
--
--endchoice
--
--endif
--
--if MACH_MX21
--
- comment "MX21 platforms:"
- 
- config MACH_MX21ADS
-@@ -124,10 +116,6 @@ config MACH_MX21ADS
- 	  Include support for MX21ADS platform. This includes specific
- 	  configurations for the board and its peripherals.
- 
--endif
--
--if ARCH_MX25
--
- comment "MX25 platforms:"
- 
- config MACH_MX25_3DS
-@@ -174,10 +162,6 @@ config MACH_EUKREA_MBIMXSD25_BASEBOARD
- 
- endchoice
- 
--endif
--
--if MACH_MX27
--
- comment "MX27 platforms:"
- 
- config MACH_MX27ADS
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index a5353fc..0665c1f 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -14,20 +14,13 @@ choice
- 	prompt "Freescale CPU family:"
- 	default ARCH_MX3
- 
--config ARCH_MX1
--	bool "MX1-based"
-+config ARCH_IMX_V4_V5
-+	bool "i.MX1, i.MX21, i.MX25, i.MX27"
-+	select AUTO_ZRELADDR
-+	select ARM_PATCH_PHYS_VIRT
- 	help
--	  This enables support for systems based on the Freescale i.MX1 family
--
--config ARCH_MX2
--	bool "MX2-based"
--	help
--	  This enables support for systems based on the Freescale i.MX2 family
--
--config ARCH_MX25
--	bool "MX25-based"
--	help
--	  This enables support for systems based on the Freescale i.MX25 family
-+	  This enables support for systems based on the Freescale i.MX ARMv4
-+	  and ARMv5 SoCs
- 
- config ARCH_MX3
- 	bool "MX3-based"
-diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
-index 11be5cd..cbe2e3d 100644
---- a/arch/arm/plat-mxc/include/mach/memory.h
-+++ b/arch/arm/plat-mxc/include/mach/memory.h
-@@ -21,15 +21,7 @@
- #define MX53_PHYS_OFFSET	UL(0x70000000)
- 
- #if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
--# if defined CONFIG_ARCH_MX1
--#  define PLAT_PHYS_OFFSET		MX1_PHYS_OFFSET
--# elif defined CONFIG_MACH_MX21
--#  define PLAT_PHYS_OFFSET		MX21_PHYS_OFFSET
--# elif defined CONFIG_ARCH_MX25
--#  define PLAT_PHYS_OFFSET		MX25_PHYS_OFFSET
--# elif defined CONFIG_MACH_MX27
--#  define PLAT_PHYS_OFFSET		MX27_PHYS_OFFSET
--# elif defined CONFIG_ARCH_MX3
-+# if defined CONFIG_ARCH_MX3
- #  define PLAT_PHYS_OFFSET		MX3x_PHYS_OFFSET
- # elif defined CONFIG_ARCH_MX50
- #  define PLAT_PHYS_OFFSET		MX50_PHYS_OFFSET
+diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
+deleted file mode 100644
+index 88c5802..0000000
+--- a/arch/arm/configs/mx51_defconfig
++++ /dev/null
+@@ -1,170 +0,0 @@
+-CONFIG_EXPERIMENTAL=y
+-# CONFIG_LOCALVERSION_AUTO is not set
+-CONFIG_SYSVIPC=y
+-CONFIG_LOG_BUF_SHIFT=18
+-CONFIG_RELAY=y
+-CONFIG_EXPERT=y
+-# CONFIG_SLUB_DEBUG is not set
+-# CONFIG_COMPAT_BRK is not set
+-CONFIG_MODULES=y
+-CONFIG_MODULE_UNLOAD=y
+-CONFIG_MODVERSIONS=y
+-CONFIG_MODULE_SRCVERSION_ALL=y
+-# CONFIG_LBDAF is not set
+-# CONFIG_BLK_DEV_BSG is not set
+-CONFIG_ARCH_MXC=y
+-CONFIG_ARCH_MX51=y
+-CONFIG_MACH_MX51_BABBAGE=y
+-CONFIG_MACH_MX51_3DS=y
+-CONFIG_MACH_EUKREA_CPUIMX51=y
+-CONFIG_NO_HZ=y
+-CONFIG_HIGH_RES_TIMERS=y
+-CONFIG_PREEMPT_VOLUNTARY=y
+-CONFIG_AEABI=y
+-# CONFIG_OABI_COMPAT is not set
+-CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
+-CONFIG_CMDLINE="noinitrd console=ttymxc0,115200 root=/dev/nfs nfsroot=192.168.0.101:/shared/nfs ip=dhcp"
+-CONFIG_VFP=y
+-CONFIG_NEON=y
+-CONFIG_BINFMT_MISC=m
+-CONFIG_PM=y
+-CONFIG_PM_DEBUG=y
+-CONFIG_PM_TEST_SUSPEND=y
+-CONFIG_NET=y
+-CONFIG_PACKET=y
+-CONFIG_UNIX=y
+-CONFIG_INET=y
+-CONFIG_IP_PNP=y
+-CONFIG_IP_PNP_DHCP=y
+-# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+-# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+-# CONFIG_INET_XFRM_MODE_BEET is not set
+-# CONFIG_INET_LRO is not set
+-# CONFIG_IPV6 is not set
+-# CONFIG_WIRELESS is not set
+-# CONFIG_STANDALONE is not set
+-CONFIG_CONNECTOR=y
+-CONFIG_BLK_DEV_LOOP=y
+-CONFIG_BLK_DEV_RAM=y
+-CONFIG_BLK_DEV_RAM_SIZE=65536
+-# CONFIG_MISC_DEVICES is not set
+-CONFIG_SCSI=y
+-# CONFIG_SCSI_PROC_FS is not set
+-CONFIG_BLK_DEV_SD=y
+-CONFIG_SCSI_MULTI_LUN=y
+-CONFIG_SCSI_CONSTANTS=y
+-CONFIG_SCSI_LOGGING=y
+-CONFIG_SCSI_SCAN_ASYNC=y
+-# CONFIG_SCSI_LOWLEVEL is not set
+-CONFIG_ATA=m
+-CONFIG_NETDEVICES=y
+-CONFIG_MARVELL_PHY=y
+-CONFIG_DAVICOM_PHY=y
+-CONFIG_QSEMI_PHY=y
+-CONFIG_LXT_PHY=y
+-CONFIG_CICADA_PHY=y
+-CONFIG_VITESSE_PHY=y
+-CONFIG_SMSC_PHY=y
+-CONFIG_BROADCOM_PHY=y
+-CONFIG_ICPLUS_PHY=y
+-CONFIG_REALTEK_PHY=y
+-CONFIG_NATIONAL_PHY=y
+-CONFIG_STE10XP=y
+-CONFIG_LSI_ET1011C_PHY=y
+-CONFIG_MDIO_BITBANG=y
+-CONFIG_MDIO_GPIO=y
+-CONFIG_NET_ETHERNET=y
+-CONFIG_MII=m
+-CONFIG_FEC=y
+-# CONFIG_NETDEV_1000 is not set
+-# CONFIG_NETDEV_10000 is not set
+-# CONFIG_WLAN is not set
+-CONFIG_INPUT_FF_MEMLESS=m
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+-CONFIG_INPUT_EVDEV=y
+-CONFIG_KEYBOARD_GPIO=y
+-CONFIG_INPUT_EVBUG=m
+-CONFIG_MOUSE_PS2=m
+-CONFIG_MOUSE_PS2_ELANTECH=y
+-CONFIG_SERIO_SERPORT=m
+-CONFIG_VT_HW_CONSOLE_BINDING=y
+-# CONFIG_DEVKMEM is not set
+-CONFIG_SERIAL_IMX=y
+-CONFIG_SERIAL_IMX_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
+-CONFIG_HW_RANDOM=y
+-CONFIG_I2C=y
+-# CONFIG_I2C_COMPAT is not set
+-CONFIG_I2C_CHARDEV=m
+-# CONFIG_I2C_HELPER_AUTO is not set
+-CONFIG_I2C_ALGOBIT=m
+-CONFIG_I2C_ALGOPCF=m
+-CONFIG_I2C_ALGOPCA=m
+-CONFIG_GPIO_SYSFS=y
+-# CONFIG_HWMON is not set
+-# CONFIG_HID_SUPPORT is not set
+-CONFIG_USB=y
+-CONFIG_USB_EHCI_HCD=y
+-CONFIG_USB_EHCI_MXC=y
+-CONFIG_USB_STORAGE=y
+-CONFIG_MMC=y
+-CONFIG_MMC_BLOCK=m
+-CONFIG_MMC_SDHCI=m
+-CONFIG_NEW_LEDS=y
+-CONFIG_LEDS_CLASS=y
+-CONFIG_RTC_CLASS=y
+-CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+-CONFIG_EXT2_FS=y
+-CONFIG_EXT2_FS_XATTR=y
+-CONFIG_EXT2_FS_POSIX_ACL=y
+-CONFIG_EXT2_FS_SECURITY=y
+-CONFIG_EXT3_FS=y
+-CONFIG_EXT3_FS_POSIX_ACL=y
+-CONFIG_EXT3_FS_SECURITY=y
+-CONFIG_EXT4_FS=y
+-CONFIG_EXT4_FS_POSIX_ACL=y
+-CONFIG_EXT4_FS_SECURITY=y
+-CONFIG_QUOTA=y
+-CONFIG_QUOTA_NETLINK_INTERFACE=y
+-# CONFIG_PRINT_QUOTA_WARNING is not set
+-CONFIG_AUTOFS_FS=y
+-CONFIG_AUTOFS4_FS=y
+-CONFIG_FUSE_FS=y
+-CONFIG_ISO9660_FS=m
+-CONFIG_JOLIET=y
+-CONFIG_ZISOFS=y
+-CONFIG_UDF_FS=m
+-CONFIG_MSDOS_FS=m
+-CONFIG_VFAT_FS=y
+-CONFIG_TMPFS=y
+-CONFIG_CONFIGFS_FS=m
+-CONFIG_NFS_FS=y
+-CONFIG_NFS_V3=y
+-CONFIG_NFS_V3_ACL=y
+-CONFIG_NFS_V4=y
+-CONFIG_ROOT_NFS=y
+-CONFIG_NLS_DEFAULT="cp437"
+-CONFIG_NLS_CODEPAGE_437=y
+-CONFIG_NLS_ASCII=y
+-CONFIG_NLS_ISO8859_1=y
+-CONFIG_NLS_ISO8859_15=m
+-CONFIG_NLS_UTF8=y
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_FS=y
+-CONFIG_DEBUG_KERNEL=y
+-# CONFIG_SCHED_DEBUG is not set
+-# CONFIG_DEBUG_BUGVERBOSE is not set
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-# CONFIG_FTRACE is not set
+-# CONFIG_ARM_UNWIND is not set
+-CONFIG_DEBUG_LL=y
+-CONFIG_EARLY_PRINTK=y
+-CONFIG_SECURITYFS=y
+-CONFIG_CRYPTO_DEFLATE=y
+-CONFIG_CRYPTO_LZO=y
+-# CONFIG_CRYPTO_ANSI_CPRNG is not set
+-# CONFIG_CRYPTO_HW is not set
+-CONFIG_CRC_CCITT=m
+-CONFIG_CRC_T10DIF=y
+-CONFIG_CRC7=m
+-CONFIG_LIBCRC32C=m
+diff --git a/arch/arm/configs/mx5_defconfig b/arch/arm/configs/mx5_defconfig
+new file mode 100644
+index 0000000..ede3cc2
+--- /dev/null
++++ b/arch/arm/configs/mx5_defconfig
+@@ -0,0 +1,167 @@
++CONFIG_EXPERIMENTAL=y
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_KERNEL_LZO=y
++CONFIG_SYSVIPC=y
++CONFIG_LOG_BUF_SHIFT=18
++CONFIG_RELAY=y
++CONFIG_EXPERT=y
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_COMPAT_BRK is not set
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_MODULE_SRCVERSION_ALL=y
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++CONFIG_ARCH_MXC=y
++CONFIG_ARCH_MX5=y
++CONFIG_MACH_MX51_BABBAGE=y
++CONFIG_MACH_MX51_3DS=y
++CONFIG_MACH_EUKREA_CPUIMX51=y
++CONFIG_MACH_EUKREA_CPUIMX51SD=y
++CONFIG_MACH_MX51_EFIKAMX=y
++CONFIG_MACH_MX51_EFIKASB=y
++CONFIG_MACH_MX53_EVK=y
++CONFIG_MACH_MX53_SMD=y
++CONFIG_MACH_MX53_LOCO=y
++CONFIG_MACH_MX53_ARD=y
++CONFIG_MXC_PWM=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_PREEMPT_VOLUNTARY=y
++CONFIG_AEABI=y
++# CONFIG_OABI_COMPAT is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
++CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
++CONFIG_VFP=y
++CONFIG_BINFMT_MISC=m
++CONFIG_PM_DEBUG=y
++CONFIG_PM_TEST_SUSPEND=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++CONFIG_CONNECTOR=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=65536
++CONFIG_SCSI=y
++# CONFIG_SCSI_PROC_FS is not set
++CONFIG_BLK_DEV_SD=y
++CONFIG_SCSI_MULTI_LUN=y
++CONFIG_SCSI_CONSTANTS=y
++CONFIG_SCSI_LOGGING=y
++CONFIG_SCSI_SCAN_ASYNC=y
++# CONFIG_SCSI_LOWLEVEL is not set
++CONFIG_ATA=m
++CONFIG_NETDEVICES=y
++CONFIG_MII=m
++CONFIG_NET_ETHERNET=y
++# CONFIG_NETDEV_1000 is not set
++# CONFIG_NETDEV_10000 is not set
++# CONFIG_WLAN is not set
++CONFIG_INPUT_FF_MEMLESS=m
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_INPUT_EVDEV=y
++CONFIG_INPUT_EVBUG=m
++CONFIG_KEYBOARD_GPIO=y
++CONFIG_MOUSE_PS2=m
++CONFIG_MOUSE_PS2_ELANTECH=y
++CONFIG_SERIO_SERPORT=m
++CONFIG_VT_HW_CONSOLE_BINDING=y
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_IMX=y
++CONFIG_SERIAL_IMX_CONSOLE=y
++CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++# CONFIG_I2C_COMPAT is not set
++CONFIG_I2C_CHARDEV=y
++# CONFIG_I2C_HELPER_AUTO is not set
++CONFIG_I2C_ALGOBIT=m
++CONFIG_I2C_ALGOPCF=m
++CONFIG_I2C_ALGOPCA=m
++CONFIG_I2C_IMX=y
++CONFIG_SPI=y
++CONFIG_SPI_IMX=y
++CONFIG_GPIO_SYSFS=y
++# CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_IMX2_WDT=y
++CONFIG_MFD_MC13XXX=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_MC13892=y
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_MXC=y
++CONFIG_USB_STORAGE=y
++CONFIG_MMC=y
++CONFIG_MMC_BLOCK=m
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_ESDHC_IMX=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_INTF_DEV_UIE_EMUL=y
++CONFIG_RTC_MXC=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT2_FS_POSIX_ACL=y
++CONFIG_EXT2_FS_SECURITY=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT3_FS_POSIX_ACL=y
++CONFIG_EXT3_FS_SECURITY=y
++CONFIG_EXT4_FS=y
++CONFIG_EXT4_FS_POSIX_ACL=y
++CONFIG_EXT4_FS_SECURITY=y
++CONFIG_QUOTA=y
++CONFIG_QUOTA_NETLINK_INTERFACE=y
++# CONFIG_PRINT_QUOTA_WARNING is not set
++CONFIG_AUTOFS4_FS=y
++CONFIG_FUSE_FS=y
++CONFIG_ISO9660_FS=m
++CONFIG_JOLIET=y
++CONFIG_ZISOFS=y
++CONFIG_UDF_FS=m
++CONFIG_MSDOS_FS=m
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_CONFIGFS_FS=m
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_DEFAULT="cp437"
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_ISO8859_15=m
++CONFIG_NLS_UTF8=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_FS=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_FTRACE is not set
++# CONFIG_ARM_UNWIND is not set
++CONFIG_SECURITYFS=y
++CONFIG_CRYPTO_DEFLATE=m
++CONFIG_CRYPTO_LZO=m
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++# CONFIG_CRYPTO_HW is not set
++CONFIG_CRC_CCITT=m
++CONFIG_CRC_T10DIF=y
++CONFIG_CRC7=m
++CONFIG_LIBCRC32C=m
 -- 
 1.7.5.4
