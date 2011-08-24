@@ -1,39 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 24 Aug 2011 20:13:56 +0900
-Subject: [PATCH 4/4] ARM: EXYNOS4: Use samsung_rev() to distinguish silicon
-	revision
-In-Reply-To: <1313816759-14564-5-git-send-email-kgene.kim@samsung.com>
-References: <1313816759-14564-1-git-send-email-kgene.kim@samsung.com>
-	<1313816759-14564-5-git-send-email-kgene.kim@samsung.com>
-Message-ID: <06f401cc624e$eaa67390$bff35ab0$%kim@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Aug 2011 12:14:06 +0100
+Subject: [PATCH v4 3/8] ARM: lib: add switch_stack function for safely
+	changing stack
+In-Reply-To: <alpine.LFD.2.00.1108232102430.20358@xanadu.home>
+References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
+	<1314136012-20533-4-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1108232102430.20358@xanadu.home>
+Message-ID: <20110824111406.GJ32688@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+On Wed, Aug 24, 2011 at 02:07:29AM +0100, Nicolas Pitre wrote:
+> On Tue, 23 Aug 2011, Will Deacon wrote:
 > 
-> This patch uses samsung_rev() to support variable silicon revision of
-> EXYNOS4210 so that can support for EXYNOS4210 REV0, REV1.0 and REV1.1.
+> > When disabling the MMU, it is necessary to take out a 1:1 identity map
+> > of the reset code so that it can safely be executed with and without
+> > the MMU active. To avoid the situation where the physical address of the
+> > reset code aliases with the virtual address of the active stack (which
+> > cannot be included in the 1:1 mapping), it is desirable to change to a
+> > new stack at a location which is less likely to alias.
+> > 
+> > This code adds a new lib function, switch_stack:
+> > 
+> > void switch_stack(void (*fn)(void *), void *arg, void *sp);
+> > 
+> > which changes the stack to point at the sp parameter, before invoking
+> > fn(arg) with the new stack selected.
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> Note: Need to change timer setting on REV0.
+> For the implementation:
 > 
-> Acked-by: Changhwan Youn <chaos.youn@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
+> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> However I think switch_stack() is too vague a name for what this 
+> actually does.  Maybe something like call_with_stack(fn, arg, sp) is 
+> more precise.
 
-(snip)
+That's a much better name, thanks.
 
-> +#define EXYNOS4210_REV_1_0	(0x2)
-> +#define EXYNOS4210_REV_1_1	(0x3)
-
-Should be following...
-
-+#define EXYNOS4210_REV_1_0	(0x10)
-+#define EXYNOS4210_REV_1_1	(0x11)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Will
