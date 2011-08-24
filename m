@@ -1,58 +1,47 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 24 Aug 2011 12:17:17 +0200
-Subject: [RFC PATCH 4/7] arm/dts: Add support for OMAP4 SDP board
+Date: Wed, 24 Aug 2011 12:17:18 +0200
+Subject: [RFC PATCH 5/7] OMAP4: board-panda: Remove DT support from regular
+	board
 In-Reply-To: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
 References: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314181040-22807-5-git-send-email-b-cousson@ti.com>
+Message-ID: <1314181040-22807-6-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SDP/Blaze (Software Development Board) support with
-device tree.
-That file is based on the omap4-panda.dts.
+In order to avoid conflict with the new omap4-dt.c board file,
+remove the .dt_compat entry from the pandaboard regular board
+file.
+Any DT work for OMAP4 will have to be done on the generic DT
+board file to avoid breaking the legacy board support until
+DT migration is done.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: G, Manjunath Kondaiah <manjugk@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap4-sdp.dts |   29 +++++++++++++++++++++++++++++
- 1 files changed, 29 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap4-sdp.dts
+ arch/arm/mach-omap2/board-omap4panda.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-new file mode 100644
-index 0000000..066e28c
---- /dev/null
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+/include/ "omap4.dtsi"
-+
-+/ {
-+	model = "TI OMAP4 SDP board";
-+	compatible = "ti,omap4-sdp", "ti,omap4430", "ti,omap4";
-+
-+	/*
-+	 * Since the initial device tree board file does not create any
-+	 * devices (MMC, network...), the only way to boot is to provide a
-+	 * ramdisk.
-+	 */
-+	chosen {
-+		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x40000000>; /* 1 GB */
-+	};
-+};
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 1c583c7..9aaa960 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -581,11 +581,6 @@ static void __init omap4_panda_map_io(void)
+ 	omap44xx_map_common_io();
+ }
+ 
+-static const char *omap4_panda_match[] __initdata = {
+-	"ti,omap4-panda",
+-	NULL,
+-};
+-
+ MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
+ 	/* Maintainer: David Anders - Texas Instruments Inc */
+ 	.boot_params	= 0x80000100,
+@@ -595,5 +590,4 @@ MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
+ 	.init_irq	= gic_init_irq,
+ 	.init_machine	= omap4_panda_init,
+ 	.timer		= &omap4_timer,
+-	.dt_compat	= omap4_panda_match,
+ MACHINE_END
 -- 
 1.7.0.4
