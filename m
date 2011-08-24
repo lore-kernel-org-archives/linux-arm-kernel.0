@@ -1,132 +1,108 @@
 From: jason.hui@linaro.org (Jason Liu)
-Date: Wed, 24 Aug 2011 13:04:33 +0800
-Subject: [[PATCH v2 2/6] ARM: mx25: Print silicon revision on boot
+Date: Wed, 24 Aug 2011 13:04:36 +0800
+Subject: [[PATCH v2 5/6] ARM: mx35: use generic function for displaying
+	silicon revision
 In-Reply-To: <1314162277-2840-1-git-send-email-jason.hui@linaro.org>
 References: <1314162277-2840-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <1314162277-2840-3-git-send-email-jason.hui@linaro.org>
+Message-ID: <1314162277-2840-6-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Silicon revision is useful information to have during kernel boot.
-Print the MX25 silicon revision.
+update to use generic function for displaying silicon revision
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Jason Liu <jason.hui@linaro.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
-
 ---
-Resend: The patch first comes from Fabio, I did some change to use
-the generic function for displaying silicon revision
----
- arch/arm/mach-imx/Makefile            |    2 +-
- arch/arm/mach-imx/clock-imx25.c       |    6 +++++
- arch/arm/mach-imx/cpu-imx25.c         |   41 +++++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/mx25.h |    4 +++
- 4 files changed, 52 insertions(+), 1 deletions(-)
+ arch/arm/mach-imx/clock-imx35.c       |    3 ++-
+ arch/arm/mach-imx/cpu-imx35.c         |   30 ++++++++++++++----------------
+ arch/arm/plat-mxc/include/mach/mx3x.h |    9 +--------
+ 3 files changed, 17 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index e9eb36d..0a5332c 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -3,7 +3,7 @@ obj-$(CONFIG_IMX_HAVE_DMA_V1) += dma-v1.o
- obj-$(CONFIG_ARCH_MX1) += clock-imx1.o mm-imx1.o
- obj-$(CONFIG_MACH_MX21) += clock-imx21.o mm-imx21.o
+diff --git a/arch/arm/mach-imx/clock-imx35.c b/arch/arm/mach-imx/clock-imx35.c
+index 88b62a0..abf30d4 100644
+--- a/arch/arm/mach-imx/clock-imx35.c
++++ b/arch/arm/mach-imx/clock-imx35.c
+@@ -537,7 +537,8 @@ int __init mx35_clocks_init()
+ 	__raw_writel(cgr3, CCM_BASE + CCM_CGR3);
  
--obj-$(CONFIG_ARCH_MX25) += clock-imx25.o mm-imx25.o ehci-imx25.o
-+obj-$(CONFIG_ARCH_MX25) += clock-imx25.o mm-imx25.o ehci-imx25.o cpu-imx25.o
- 
- obj-$(CONFIG_MACH_MX27) += cpu-imx27.o pm-imx27.o
- obj-$(CONFIG_MACH_MX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
-diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
-index e63e235..b0fec74c 100644
---- a/arch/arm/mach-imx/clock-imx25.c
-+++ b/arch/arm/mach-imx/clock-imx25.c
-@@ -263,6 +263,7 @@ DEFINE_CLOCK(audmux_clk, 0, CCM_CGCR1, 0, NULL, NULL, NULL);
- DEFINE_CLOCK(csi_clk,    0, CCM_CGCR1,  4, get_rate_csi, NULL,  &csi_per_clk);
- DEFINE_CLOCK(can1_clk,	 0, CCM_CGCR1,  2, get_rate_ipg, NULL, NULL);
- DEFINE_CLOCK(can2_clk,	 1, CCM_CGCR1,  3, get_rate_ipg, NULL, NULL);
-+DEFINE_CLOCK(iim_clk,    0, CCM_CGCR1, 26, NULL, NULL, NULL);
- 
- #define _REGISTER_CLOCK(d, n, c)	\
- 	{				\
-@@ -310,6 +311,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("flexcan.1", NULL, can2_clk)
- 	/* i.mx25 has the i.mx35 type sdma */
- 	_REGISTER_CLOCK("imx35-sdma", NULL, sdma_clk)
-+	_REGISTER_CLOCK(NULL, "iim", iim_clk)
- };
- 
- int __init mx25_clocks_init(void)
-@@ -334,6 +336,10 @@ int __init mx25_clocks_init(void)
- 	/* Clock source for gpt is ahb_div */
- 	__raw_writel(__raw_readl(CRM_BASE+0x64) & ~(1 << 5), CRM_BASE + 0x64);
- 
-+	clk_enable(&iim_clk);
-+	imx_print_silicon_rev("i.MX25", mx25_revision());
+ 	clk_enable(&iim_clk);
+-	mx35_read_cpu_rev();
++	imx_print_silicon_rev("i.MX35", mx35_revision());
 +	clk_disable(&iim_clk);
-+
- 	mxc_timer_init(&gpt_clk, MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), 54);
  
- 	return 0;
-diff --git a/arch/arm/mach-imx/cpu-imx25.c b/arch/arm/mach-imx/cpu-imx25.c
-new file mode 100644
-index 0000000..6914bcb
---- /dev/null
-+++ b/arch/arm/mach-imx/cpu-imx25.c
-@@ -0,0 +1,41 @@
-+/*
-+ * MX25 CPU type detection
-+ *
-+ * Copyright (c) 2009 Daniel Mack <daniel@caiaq.de>
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#include <linux/module.h>
-+#include <linux/io.h>
-+#include <mach/hardware.h>
-+#include <mach/iim.h>
-+
-+static int mx25_cpu_rev = -1;
-+
-+static int mx25_read_cpu_rev(void)
-+{
-+	u32 rev;
-+
-+	rev = __raw_readl(MX25_IO_ADDRESS(MX25_IIM_BASE_ADDR + MXC_IIMSREV));
-+	switch (rev) {
-+	case 0x00:
+ #ifdef CONFIG_MXC_USE_EPIT
+ 	epit_timer_init(&epit1_clk,
+diff --git a/arch/arm/mach-imx/cpu-imx35.c b/arch/arm/mach-imx/cpu-imx35.c
+index 6637cd8..846e46e 100644
+--- a/arch/arm/mach-imx/cpu-imx35.c
++++ b/arch/arm/mach-imx/cpu-imx35.c
+@@ -13,32 +13,30 @@
+ #include <mach/hardware.h>
+ #include <mach/iim.h>
+ 
+-unsigned int mx35_cpu_rev;
+-EXPORT_SYMBOL(mx35_cpu_rev);
++static int mx35_cpu_rev = -1;
+ 
+-void __init mx35_read_cpu_rev(void)
++static int mx35_read_cpu_rev(void)
+ {
+ 	u32 rev;
+-	char *srev;
+ 
+ 	rev = __raw_readl(MX35_IO_ADDRESS(MX35_IIM_BASE_ADDR + MXC_IIMSREV));
+ 	switch (rev) {
+ 	case 0x00:
+-		mx35_cpu_rev = IMX_CHIP_REVISION_1_0;
+-		srev = "1.0";
+-		break;
 +		return IMX_CHIP_REVISION_1_0;
-+	case 0x01:
-+		return IMX_CHIP_REVISION_1_1;
-+	default:
+ 	case 0x10:
+-		mx35_cpu_rev = IMX_CHIP_REVISION_2_0;
+-		srev = "2.0";
+-		break;
++		return IMX_CHIP_REVISION_2_0;
+ 	case 0x11:
+-		mx35_cpu_rev = IMX_CHIP_REVISION_2_1;
+-		srev = "2.1";
+-		break;
++		return IMX_CHIP_REVISION_2_1;
+ 	default:
+-		mx35_cpu_rev = IMX_CHIP_REVISION_UNKNOWN;
+-		srev = "unknown";
 +		return IMX_CHIP_REVISION_UNKNOWN;
-+	}
+ 	}
 +}
 +
-+int mx25_revision(void)
++int mx35_revision(void)
 +{
-+	if (mx25_cpu_rev == -1)
-+		mx25_cpu_rev = mx25_read_cpu_rev();
-+
-+	return mx25_cpu_rev;
-+}
-+EXPORT_SYMBOL(mx25_revision);
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 087cd7a..8dcab80 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -104,4 +104,8 @@
- #define MX25_DMA_REQ_SSI1_RX0	28
- #define MX25_DMA_REQ_SSI1_TX0	29
++	if (mx35_cpu_rev == -1)
++		mx35_cpu_rev = mx35_read_cpu_rev();
  
-+#ifndef __ASSEMBLY__
-+extern int mx25_revision(void);
-+#endif
-+
- #endif /* ifndef __MACH_MX25_H__ */
+-	printk(KERN_INFO "CPU identified as i.MX35, silicon rev %s\n", srev);
++	return mx35_cpu_rev;
+ }
++EXPORT_SYMBOL(mx35_revision);
+diff --git a/arch/arm/plat-mxc/include/mach/mx3x.h b/arch/arm/plat-mxc/include/mach/mx3x.h
+index e1850f4..30dbf42 100644
+--- a/arch/arm/plat-mxc/include/mach/mx3x.h
++++ b/arch/arm/plat-mxc/include/mach/mx3x.h
+@@ -187,14 +187,7 @@
+ /* Mandatory defines used globally */
+ 
+ #if !defined(__ASSEMBLY__) && !defined(__MXC_BOOT_UNCOMPRESS)
+-extern unsigned int mx35_cpu_rev;
+-extern void mx35_read_cpu_rev(void);
+-
+-static inline int mx35_revision(void)
+-{
+-	return mx35_cpu_rev;
+-}
+-
++extern int mx35_revision(void);
+ extern int mx31_revision(void);
+ #endif
+ 
 -- 
 1.7.4.1
