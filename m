@@ -1,28 +1,37 @@
-From: pj0585@gmail.com (Prasant J)
-Date: Wed, 24 Aug 2011 11:28:24 +0530
-Subject: Issues with atmel-mci when using SDHC (Linux 3.0.3)
-Message-ID: <CAA2DH4vCRny5-ffWWTfw54e15Tzu7FOT-eR03BW5PBhSpWagpQ@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 24 Aug 2011 14:17:55 +0800
+Subject: [PATCH 2/4 v4] pinmux: add a driver for the U300 pinmux
+In-Reply-To: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
+References: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAGsJ_4w+dkzHbYBehEzgK2+Js=BmAYe2gHKQ1PtYc=ymhovnDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
+This patch can't compile....
+> +
+> +/**
+> + * @dev: a pointer back to containing device
+> + * @virtbase: the offset to the controller in virtual memory
+> + */
+> +struct u300_pmx {
+> + ? ? ? struct device *dev;
+> + ? ? ? struct pinmux_dev *pmx;
 
-I'm working on a custom board design based on AT91SAM9G45-EKES. I'm
-using Linux 3.0.3
-My root filesystem (ext3) is on SDHC card (on mmc0) which is being
-used in the non-SPI mode.
-My root partition size is approximately 1.5GB. This works fine.
+no this structure in head file, now it is pinctrl_desc.
 
-I want to increase the size of my root partition (say, to 3GB).
-Whenever I increase the size of the rot filesystem, I get this error
-message while booting:
-mmcblk0: retrying using single block read (printed in the file
-drivers/mmc/host/atmel-mci.c) and booting fails.
+> + ? ? ? u32 phybase;
+> + ? ? ? u32 physize;
+> + ? ? ? void __iomem *virtbase;
+> +};
 
-When I probe, I see that in the data transfer operations return error
--110 (brq.data.error).
+> + ? ? ? /* Now register the pin controller and all pins it handles */
+> + ? ? ? upmx->pctl = pinctrl_register(&u300_pmx_desc, &pdev->dev, upmx);
 
-Is atmel-mci limited to certain partition size? Can anyone point out
-what may be wrong?
+no this field in upmx structure.
 
--Prasant J
+> + ? ? ? if (IS_ERR(upmx->pctl)) {
+
+Did you send the wrong version?
+
+-barry
