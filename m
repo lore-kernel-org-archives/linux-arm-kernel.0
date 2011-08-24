@@ -1,214 +1,50 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 24 Aug 2011 15:41:46 +0100
-Subject: [PATCHv2 3/3] picoxcell: add the DTS for the PC7302 board
-In-Reply-To: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
-References: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1314196906-20709-4-git-send-email-jamie@jamieiles.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 24 Aug 2011 07:44:09 -0700
+Subject: [PATCH v4] OMAP4: hwmod data: I2C: add flag for context restore
+In-Reply-To: <4E54D012.6050708@ti.com> (shubhrajyoti@ti.com's message of "Wed,
+	24 Aug 2011 15:48:58 +0530")
+References: <1310906603-2673-1-git-send-email-shubhrajyoti@ti.com>
+	<4E54D012.6050708@ti.com>
+Message-ID: <87mxeyg98m.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PC7302 board can be populated with either a PC3X2 or PC3X3 device.
-Add DTS files for both variants of the PC7302.
+Shubhrajyoti <shubhrajyoti@ti.com> writes:
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts |   87 ++++++++++++++++++++++++
- arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts |   93 ++++++++++++++++++++++++++
- 2 files changed, 180 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts
- create mode 100644 arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts
+> On Sunday 17 July 2011 06:13 PM, Shubhrajyoti D wrote:
+>> Restore of context is not done for OMAP4. This patch
+>> adds the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE in the OMAP4
+>> hwmod data which activates the restore for OMAP4.
+>> Currently the OMAP4 does not hit device off still the
+>> driver may have support for it.
+> Could this patch be queued as well?
 
-diff --git a/arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts b/arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts
-new file mode 100644
-index 0000000..4c9a7ba
---- /dev/null
-+++ b/arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts
-@@ -0,0 +1,87 @@
-+/*
-+ *  Copyright (C) 2011 Picochip, Jamie Iles
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+/include/ "picoxcell-pc3x2.dtsi"
-+/ {
-+	model = "Picochip PC7302 (PC3X2)";
-+	compatible = "picochip,pc7302-pc3x2", "picochip,pc3x2";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x08000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk loglevel=9 root=ubi0:rootfs rw rootfstype=ubifs ubi.mtd=5,2048";
-+		linux,stdout-path = &uart0;
-+	};
-+
-+	clocks {
-+		ref_clk: clock at 1 {
-+			compatible = "fixed-clock";
-+			clock-outputs = "ref";
-+			clock-frequency = <20000000>;
-+		};
-+	};
-+
-+	rwid-axi {
-+		ebi at 50000000 {
-+			nand: gpio-nand at 2,0 {
-+				compatible = "gpio-control-nand";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <2 0x0000 0x1000>;
-+				bus-clock = <&pclk>, "bus";
-+				gpio-control-nand,io-sync-reg =
-+					<0x00000000 0x80220000>;
-+
-+				gpios = <&banka 1 0	/* rdy */
-+					 &banka 2 0 	/* nce */
-+					 &banka 3 0 	/* ale */
-+					 &banka 4 0 	/* cle */
-+					 0		/* nwp */>;
-+
-+				boot at 100000 {
-+					label = "Boot";
-+					reg = <0x100000 0x80000>;
-+				};
-+
-+				redundant-boot at 200000 {
-+					label = "Redundant Boot";
-+					reg = <0x200000 0x80000>;
-+				};
-+
-+				boot-env at 300000 {
-+					label = "Boot Evironment";
-+					reg = <0x300000 0x20000>;
-+				};
-+
-+				redundant-boot-env at 320000 {
-+					label = "Redundant Boot Environment";
-+					reg = <0x300000 0x20000>;
-+				};
-+
-+				kernel at 380000 {
-+					label = "Kernel";
-+					reg = <0x380000 0x800000>;
-+				};
-+
-+				fs at b80000 {
-+					label = "File System";
-+					reg = <0xb80000 0xf480000>;
-+				};
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts b/arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts
-new file mode 100644
-index 0000000..381eb6a
---- /dev/null
-+++ b/arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts
-@@ -0,0 +1,93 @@
-+/*
-+ *  Copyright (C) 2011 Picochip, Jamie Iles
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dts-v1/;
-+/include/ "picoxcell-pc3x3.dtsi"
-+/ {
-+	model = "Picochip PC7302 (PC3X3)";
-+	compatible = "picochip,pc7302-pc3x3", "picochip,pc3x3";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x08000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk loglevel=9 root=ubi0:rootfs rw rootfstype=ubifs ubi.mtd=5,2048";
-+		linux,stdout-path = &uart0;
-+	};
-+
-+	clocks {
-+		ref_clk: clock at 10 {
-+			compatible = "fixed-clock";
-+			clock-outputs = "ref";
-+			clock-frequency = <20000000>;
-+		};
-+
-+		clkgate: clkgate at 800a0048 {
-+			clock at 4 {
-+				picochip,clk-no-disable;
-+			};
-+		};
-+	};
-+
-+	rwid-axi {
-+		ebi at 50000000 {
-+			nand: gpio-nand at 2,0 {
-+				compatible = "gpio-control-nand";
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <2 0x0000 0x1000>;
-+				bus-clock = <&ebi_clk>, "bus";
-+				gpio-control-nand,io-sync-reg =
-+					<0x00000000 0x80220000>;
-+
-+				gpios = <&banka 1 0	/* rdy */
-+					 &banka 2 0 	/* nce */
-+					 &banka 3 0 	/* ale */
-+					 &banka 4 0 	/* cle */
-+					 0		/* nwp */>;
-+
-+				boot at 100000 {
-+					label = "Boot";
-+					reg = <0x100000 0x80000>;
-+				};
-+
-+				redundant-boot at 200000 {
-+					label = "Redundant Boot";
-+					reg = <0x200000 0x80000>;
-+				};
-+
-+				boot-env at 300000 {
-+					label = "Boot Evironment";
-+					reg = <0x300000 0x20000>;
-+				};
-+
-+				redundant-boot-env at 320000 {
-+					label = "Redundant Boot Environment";
-+					reg = <0x300000 0x20000>;
-+				};
-+
-+				kernel at 380000 {
-+					label = "Kernel";
-+					reg = <0x380000 0x800000>;
-+				};
-+
-+				fs at b80000 {
-+					label = "File System";
-+					reg = <0xb80000 0xf480000>;
-+				};
-+			};
-+		};
-+	};
-+};
--- 
-1.7.4.1
+Paul is the maintainer for the hwmod data.   It is usually helpful to
+ensure the maintainer is specifically added to the To line.
+
+Kevin
+
+>> Reviewed-by: Kevin Hilman<khilman@ti.com>
+>> Signed-off-by: Shubhrajyoti D<shubhrajyoti@ti.com>
+>> ---
+>> Applies on top of patches from Andy Green
+>> http://www.spinics.net/lists/linux-i2c/msg05632.html
+>> Tested on OMAP4430
+>>
+>>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 ++-
+>>   1 files changed, 2 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> index 0fe9556..5e2c748 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>> @@ -2130,7 +2130,8 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
+>>   };
+>>
+>>   static struct omap_i2c_dev_attr i2c_dev_attr = {
+>> -	.flags  = OMAP_I2C_FLAG_BUS_SHIFT_NONE,
+>> +	.flags  = OMAP_I2C_FLAG_BUS_SHIFT_NONE |
+>> +			OMAP_I2C_FLAG_RESET_REGS_POSTIDLE,
+>>   };
+>>
+>>   /* i2c1 */
