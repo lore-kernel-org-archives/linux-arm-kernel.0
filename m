@@ -1,122 +1,59 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 24 Aug 2011 15:09:15 +0200
-Subject: [RFC PATCH 09/10] arm/dts: OMAP4: Add gpio nodes
+Date: Wed, 24 Aug 2011 15:09:16 +0200
+Subject: [RFC PATCH 10/10] documentation/dt: Add OMAP GPIO properties
 In-Reply-To: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
 References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314191356-10963-10-git-send-email-b-cousson@ti.com>
+Message-ID: <1314191356-10963-11-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the 6 GPIOs controller nodes.
-Since the GPIO driver is still under cleanup, a couple of temp
-hacks are needed. They will be removed as soon as the driver will
-be cleaned.
-
-Remove gpio static device initialisation if CONFIG_OF is defined.
+Add documentation for GPIO properties specific to OMAP.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Charulatha V <charu@ti.com>
+Cc: Randy Dunlap <rdunlap@xenotime.net>
 ---
- arch/arm/boot/dts/omap4.dtsi |   69 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/gpio.c   |    2 +
- 2 files changed, 71 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/gpio/gpio-omap.txt         |   33 ++++++++++++++++++++
+ 1 files changed, 33 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 231d7b4..f672927 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -110,5 +110,74 @@
- 			compatible = "ti,omap-spinlock";
- 			hwmods = "spinlock";
- 		};
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+new file mode 100644
+index 0000000..692b1c7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+@@ -0,0 +1,33 @@
++OMAP GPIO controller
 +
-+		gpio1: gpio at 1 {
-+			compatible = "ti,omap4-gpio", "ti,omap-gpio";
-+			hwmods = "gpio1";
-+			/* id should not be needed with a global GPIO parent */
-+			id = <1>;
-+			bank_width = <32>;
-+			debounce;
-+			/* XXX: big hack until the bank_count is removed */
-+			bank_count = <6>;
-+			no_idle_on_suspend;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+		};
++Required properties:
++- compatible:
++  - "ti,omap2-gpio" for OMAP2 and OMAP3 controllers
++  - "ti,omap4-gpio" for OMAP4 controller
++- #gpio-cells : Should be two.
++  - first cell is the pin number
++  - second cell is used to specify optional parameters (unused)
++- gpio-controller : Marks the device node as a GPIO controller.
 +
-+		gpio2: gpio at 2 {
-+			compatible = "ti,omap4-gpio", "ti,omap-gpio";
-+			hwmods = "gpio2";
-+			id = <2>;
-+			bank_width = <32>;
-+			debounce;
-+			no_idle_on_suspend;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+		};
++OMAP specific properties:
++- hwmods: Name of the hwmod associated to the GPIO
++- id: 32 bits to identify the id (1 based index)
++- bank_width: number of pin supported by the controller (16 or 32)
++- debounce: set if the controller support the debouce funtionnality
++- bank_count: number of controller support by the SoC. This is a temporary
++  hack until the bank_count is removed from the driver.
 +
-+		gpio3: gpio at 3 {
-+			compatible = "ti,omap4-gpio", "ti,omap-gpio";
-+			hwmods = "gpio3";
-+			id = <3>;
-+			bank_width = <32>;
-+			debounce;
-+			no_idle_on_suspend;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+		};
 +
-+		gpio4: gpio at 4 {
-+			compatible = "ti,omap4-gpio", "ti,omap-gpio";
-+			hwmods = "gpio4";
-+			id = <4>;
-+			bank_width = <32>;
-+			debounce;
-+			no_idle_on_suspend;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+		};
++Example:
 +
-+		gpio5: gpio at 5 {
-+			compatible = "ti,omap4-gpio", "ti,omap-gpio";
-+			hwmods = "gpio5";
-+			id = <5>;
-+			bank_width = <32>;
-+			debounce;
-+			no_idle_on_suspend;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+		};
++gpio4: gpio4 {
++    compatible = "ti,omap4-gpio", "ti,omap-gpio";
++    hwmods = "gpio4";
++    id = <4>;
++    bank_width = <32>;
++    debounce;
++    no_idle_on_suspend;
++    #gpio-cells = <2>;
++    gpio-controller;
++};
 +
-+		gpio6: gpio at 6 {
-+			compatible = "ti,omap4-gpio", "ti,omap-gpio";
-+			hwmods = "gpio6";
-+			id = <6>;
-+			bank_width = <32>;
-+			debounce;
-+			no_idle_on_suspend;
-+			#gpio-cells = <2>;
-+			gpio-controller;
-+		};
- 	};
- };
-diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index 8cbfbc2..c51e952 100644
---- a/arch/arm/mach-omap2/gpio.c
-+++ b/arch/arm/mach-omap2/gpio.c
-@@ -16,6 +16,7 @@
-  * GNU General Public License for more details.
-  */
- 
-+#ifndef CONFIG_OF
- #include <linux/gpio.h>
- #include <linux/err.h>
- #include <linux/slab.h>
-@@ -126,3 +127,4 @@ static int __init omap2_gpio_init(void)
- 						NULL);
- }
- postcore_initcall(omap2_gpio_init);
-+#endif
 -- 
 1.7.0.4
