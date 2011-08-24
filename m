@@ -1,41 +1,65 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Aug 2011 08:46:39 +0200
-Subject: [PATCH 1/2] ARM i.MX: remove ARCH_MX* macros from Makefile
+Date: Wed, 24 Aug 2011 08:46:40 +0200
+Subject: [PATCH 2/2] ARM i.MX audmux v2: remove unnecessary ifdefs
 In-Reply-To: <1314168400-14889-1-git-send-email-s.hauer@pengutronix.de>
 References: <1314168400-14889-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1314168400-14889-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1314168400-14889-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are scheduled for removal and replaced by CONFIG_SOC_IMX*
-macros where appropriate.
+These were present to be able to compile this file on different
+SoCs. They are not needed anymore.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/Makefile |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/plat-mxc/audmux-v2.c |   18 ++++--------------
+ 1 files changed, 4 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index e9eb36d..db6394a 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -1,12 +1,12 @@
- obj-$(CONFIG_IMX_HAVE_DMA_V1) += dma-v1.o
+diff --git a/arch/arm/plat-mxc/audmux-v2.c b/arch/arm/plat-mxc/audmux-v2.c
+index 175e364..8cced35 100644
+--- a/arch/arm/plat-mxc/audmux-v2.c
++++ b/arch/arm/plat-mxc/audmux-v2.c
+@@ -187,18 +187,11 @@ EXPORT_SYMBOL_GPL(mxc_audmux_v2_configure_port);
+ static int mxc_audmux_v2_init(void)
+ {
+ 	int ret;
+-#if defined(CONFIG_ARCH_MX5)
+ 	if (cpu_is_mx51()) {
+ 		audmux_base = MX51_IO_ADDRESS(MX51_AUDMUX_BASE_ADDR);
+-		ret = 0;
+-		return ret;
+-	}
+-#endif
+-#if defined(CONFIG_ARCH_MX3)
+-	if (cpu_is_mx31())
++	} else if (cpu_is_mx31()) {
+ 		audmux_base = MX31_IO_ADDRESS(MX31_AUDMUX_BASE_ADDR);
+-
+-	else if (cpu_is_mx35()) {
++	} else if (cpu_is_mx35()) {
+ 		audmux_clk = clk_get(NULL, "audmux");
+ 		if (IS_ERR(audmux_clk)) {
+ 			ret = PTR_ERR(audmux_clk);
+@@ -207,10 +200,7 @@ static int mxc_audmux_v2_init(void)
+ 			return ret;
+ 		}
+ 		audmux_base = MX35_IO_ADDRESS(MX35_AUDMUX_BASE_ADDR);
+-	}
+-#endif
+-#if defined(CONFIG_SOC_IMX25)
+-	if (cpu_is_mx25()) {
++	} else if (cpu_is_mx25()) {
+ 		audmux_clk = clk_get(NULL, "audmux");
+ 		if (IS_ERR(audmux_clk)) {
+ 			ret = PTR_ERR(audmux_clk);
+@@ -220,7 +210,7 @@ static int mxc_audmux_v2_init(void)
+ 		}
+ 		audmux_base = MX25_IO_ADDRESS(MX25_AUDMUX_BASE_ADDR);
+ 	}
+-#endif /* if defined(CONFIG_SOC_IMX25) */
++
+ 	audmux_debugfs_init();
  
--obj-$(CONFIG_ARCH_MX1) += clock-imx1.o mm-imx1.o
--obj-$(CONFIG_MACH_MX21) += clock-imx21.o mm-imx21.o
-+obj-$(CONFIG_SOC_IMX1) += clock-imx1.o mm-imx1.o
-+obj-$(CONFIG_SOC_IMX21) += clock-imx21.o mm-imx21.o
- 
--obj-$(CONFIG_ARCH_MX25) += clock-imx25.o mm-imx25.o ehci-imx25.o
-+obj-$(CONFIG_SOC_IMX25) += clock-imx25.o mm-imx25.o ehci-imx25.o
- 
--obj-$(CONFIG_MACH_MX27) += cpu-imx27.o pm-imx27.o
--obj-$(CONFIG_MACH_MX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
-+obj-$(CONFIG_SOC_IMX27) += cpu-imx27.o pm-imx27.o
-+obj-$(CONFIG_SOC_IMX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
- 
- obj-$(CONFIG_SOC_IMX31) += mm-imx31.o cpu-imx31.o clock-imx31.o iomux-imx31.o ehci-imx31.o
- obj-$(CONFIG_SOC_IMX35) += mm-imx35.o cpu-imx35.o clock-imx35.o ehci-imx35.o
+ 	return 0;
 -- 
 1.7.5.4
