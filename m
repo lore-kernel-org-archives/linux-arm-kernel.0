@@ -1,25 +1,23 @@
-From: maxin.john@gmail.com (Maxin B John)
-Date: Wed, 24 Aug 2011 09:28:00 +0300
-Subject: [PATCH 2/2] arm: mach-bcmring: fix build error in dma.c
-In-Reply-To: <4E53D8D4.5080208@broadcom.com>
-References: <20110823112128.GA2825@maxin>
-	<4E53D8D4.5080208@broadcom.com>
-Message-ID: <CAMhs6Yx6DDA4guyiUEQ6K74iouQcqA5rpvo6iY+Qd_Vdi0GhGg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 24 Aug 2011 08:41:07 +0200
+Subject: remove several ARCH_MX* macros
+Message-ID: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 7:44 PM, Jiandong Zheng <jdzheng@broadcom.com> wrote:
-> On 8/23/2011 4:21 AM, Maxin B John wrote:
->>
->> ?CC ? ? ?arch/arm/mach-bcmring/dma.o
->>
-> Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
->
-> I have same fix submitted on May 12, which was supposed to be applied soon
-> but seems it wasn't.
+The ARCH_MX* and MACH_MX* macros a scheduled for removal for
+longer. This series removes several of them in drivers/
 
-Oh.. I wasn't aware of that. Please feel free to ignore this one and
-go ahead with your patch.
+Sascha Hauer (5):
+      mmc i.MX: remove individual SoC dependency
+      dma i.MX: remove individual SOC dependency
+      USB host i.MX21: remove dependency on MACH_MX21
+      USB gadget i.MX1: remove dependency on ARCH_MXC
+      media i.MX1 camera: remove dependency on ARCH_MX1
 
-Regards,
-Maxin
+ drivers/dma/Kconfig         |    6 +++---
+ drivers/media/video/Kconfig |    2 +-
+ drivers/mmc/host/Kconfig    |   12 ++++++------
+ drivers/usb/gadget/Kconfig  |    9 ++++-----
+ drivers/usb/host/Kconfig    |    6 +++---
+ 5 files changed, 17 insertions(+), 18 deletions(-)
