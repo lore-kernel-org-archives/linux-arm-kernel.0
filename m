@@ -1,96 +1,58 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 24 Aug 2011 12:15:03 -0700
-Subject: How to handle named resources with DT?
-In-Reply-To: <CACxGe6s-2EAuvSqzn6yzDvCyVXa8vVVqG2X=1XFrUBnB=jsdxQ@mail.gmail.com>
-	(Grant Likely's message of "Fri, 12 Aug 2011 11:21:43 -0600")
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<20110812030218.GP30552@yookeroo.fritz.box>
-	<20110812084106.GC19467@legolas.emea.dhcp.ti.com>
-	<201108121635.42953.arnd@arndb.de> <4E45422D.4050708@ti.com>
-	<CACxGe6s-2EAuvSqzn6yzDvCyVXa8vVVqG2X=1XFrUBnB=jsdxQ@mail.gmail.com>
-Message-ID: <87r54a1v0o.fsf@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 24 Aug 2011 21:17:54 +0200 (CEST)
+Subject: dma buffers for camera
+In-Reply-To: <op.v0p0hctkyxxkfz@localhost.localdomain>
+References: <op.v0p0hctkyxxkfz@localhost.localdomain>
+Message-ID: <Pine.LNX.4.64.1108242111560.14818@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely <grant.likely@secretlab.ca> writes:
+Hi Jan
 
-> On Fri, Aug 12, 2011 at 9:09 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
->> On 8/12/2011 4:35 PM, Arnd Bergmann wrote:
- 
-[...]
+On Wed, 24 Aug 2011, Jan Pohanka wrote:
 
->>
->>> I think it's much easier to change the existing users of _byname over
->>> to fixed indexes than to come up with a new scheme that is better.
+> Hello,
+> 
+> could please anyone explain me a bit situation about using memory buffers for
+> dma for video input devices? Unfortunately I don't understand it at all.
+> I want to capture images 1600x1200 from 2 mpix sensor on i.mx27 board.
+> I gave 8MB to mx2_camera device with dma_declare_coherent_memory.
+> 
+> Unfortunately it seems to be not enough. In UYVY format I need 1600x1200x2 for
+> one picture, it is cca 3.8MB.
+> After some digging I noticed, that dma_alloc_coherent() is called three times
+> and each time with the 3.8MB demand. Once it is directly from mx2_camera
+> driver and two times from videobuf_dma_contig. OK, that is more than 8MB
+> available, but why there are so big memory demands for one picture?
+> 
+> I'm using gstremer for capturing, so it probably requests several buffers with
+> VIDIOC_REQBUFS. Is this behaviour normal, even if there is explicitly noted
+> that I want only one buffer?
 
-I disagree.  It's not only about ordering.  More on that below.
+The mx2_camera driver is allocating one "discard" buffer of the same size, 
+as regular buffers for cases, when the user is not fast enough to queue 
+new buffers for the running capture. Arguably, this could be aliminated 
+and the last submitted buffer could be re-used until either more buffers 
+are available or the streaming is stopped. Otherwise, it could also be 
+possible to stop capture until buffers are available again. In any case, 
+this is the current driver implementation. As for 2 buffers instead of one 
+for the actual capture, I think, gstreamer defines 2 as a minimum number 
+of buffers, which is actually also required for any streaming chance.
 
->> As you said previously, since we have to support both legacy probing and DT
->> for some time, it will be easier for these drivers to rely on the same API.
->>
->> Considering that adding that new property is not a huge effort anyway and
->> _byname API is a standard API that any driver should be able to use if
->> needed, it still worth adding the DT support for named resources for my
->> point of view.
->
-> The assumption being made here is that the current Linux
-> implementation detail dictates the binding design, but it does not.
->
-> Binding authors should certainly look at the Linux implementation for
-> inspiration, but established DT patterns still prevail if they are
-> suitable for describing the hardware. In this case the pattern is that
-> tuples in the reg property are strongly ordered and specified by the
-> driver binding.
->
-> So, I remain unconvinced that the 'reg' property binding is
-> insufficient.  
+Thanks
+Guennadi
 
-If significant, in-tree usages of the feature for platform_devices is
-not enough, What are you looking for as convincing arguments? 
+> gst-launch \
+>  v4l2src num-buffers=1 device=/dev/video1 ! \
+>  video/x-raw-yuv,format=\(fourcc\)UYVY,width=$WIDTH,height=$HEIGHT ! \
+>  jpegenc ! \
+>  filesink location=col_image.jpg
+> 
+> 
+> with best regards
+> Jan
 
-> I have no plans to merge support for fetching _byname values from the
-> device tree.
-
-I find this an unfortunate position to hold to in this climate of
-consolidation.
-
-One of the goals of consolidation is to have core features handled by
-core code.  To me this is a classic trade-off.  Either we implement it
-in core code, or we force all the users (drivers, in this case) to
-implement it themselves.  IMO, consolidation should be pointing us to
-solving these kinds of problems in core code, rather than spreading it
-across a bunch of drivers (and device code where the data lives.)
-Especially so in this case since there are existing, in-tree users
-demonstrating the usefulness of _byname.
-
-Not implementing this in core code means all drivers using _byname have
-to be converted, adding multiple lines of (IMHO ugly) code when it could
-be implemented cleanly by core code, keeping drivers much more readable.
-To me, the fact that there would also be an API difference compared to
-the existing platform_device probing (which will stay for the forseeable
-future) would be a major eye-sore in the drivers.
-
-In addition, converting all the drivers away from _byname is not just a
-matter of changing the drivers.  It also means of course you have to
-make sure that all of the data is in order.  On OMAP, that means
-reworking and/or regenerating all of the hwmod data to ensure it is in
-the right order.  Sounds like the kind of churn that would get us
-flamed.
-
-But that's not all...
-
-It's not just about data ordering.  As already pointed out, use of
-_byname is also used to differentiate between different
-versions/capabilities of the IP.  The driver can determine based on the
-availability of a named resource the capabilities of the device.
-Forcing resource ordering means some other mechanism also has to be
-added for detection of the IP version and/or capabilities.
-
-In summary, with the push towards consolidation, we're also trying to
-have common drivers that support multiple versions of an IP across
-differnet SoCs with varying capabilities.  Having named resources on the
-platform_device is an established way of handling this cleanly in the
-driver without the driver having to check SoC-specific or IP-version
-specific registers.
-
-Kevin
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
