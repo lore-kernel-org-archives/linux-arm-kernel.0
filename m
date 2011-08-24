@@ -1,41 +1,43 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 24 Aug 2011 08:41:10 +0200
-Subject: [PATCH 3/5] USB host i.MX21: remove dependency on MACH_MX21
+Date: Wed, 24 Aug 2011 08:41:11 +0200
+Subject: [PATCH 4/5] USB gadget i.MX1: remove dependency on ARCH_MXC
 In-Reply-To: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
 References: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1314168072-13822-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1314168072-13822-5-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the MACH_MX* macros are scheduled for removal, so just depend
-on ARCH_MXC instead. The Kconfig text makes it clear on which
-SoC the driver runs on.
+The ARCH_MX1 scheduled for removal. Instead, depend on ARCH_MXC
+and make clear in the Kconfig text that only i.MX1 has this
+hardware.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 Cc: Greg Kroah-Hartman <gregkh@suse.de>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/host/Kconfig |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/usb/gadget/Kconfig |    9 ++++-----
+ 1 files changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index ab085f1..24b5d0f 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -544,11 +544,11 @@ config USB_HWA_HCD
- 	  will be called "hwa-hc".
+diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+index 5a084b9..2e4424d 100644
+--- a/drivers/usb/gadget/Kconfig
++++ b/drivers/usb/gadget/Kconfig
+@@ -255,12 +255,11 @@ config USB_S3C_HSOTG
+ 	  integrated into the S3C64XX series SoC.
  
- config USB_IMX21_HCD
--       tristate "iMX21 HCD support"
--       depends on USB && ARM && MACH_MX21
-+       tristate "i.MX21 HCD support"
-+       depends on USB && ARM && ARCH_MXC
-        help
-          This driver enables support for the on-chip USB host in the
--         iMX21 processor.
-+         i.MX21 processor.
+ config USB_IMX
+-	tristate "Freescale IMX USB Peripheral Controller"
+-	depends on ARCH_MX1
++	tristate "Freescale i.MX1 USB Peripheral Controller"
++	depends on ARCH_MXC
+ 	help
+-	   Freescale's IMX series include an integrated full speed
+-	   USB 1.1 device controller.  The controller in the IMX series
+-	   is register-compatible.
++	   Freescale's i.MX1 includes an integrated full speed
++	   USB 1.1 device controller.
  
-          To compile this driver as a module, choose M here: the
-          module will be called "imx21-hcd".
+ 	   It has Six fixed-function endpoints, as well as endpoint
+ 	   zero (for control transfers).
 -- 
 1.7.5.4
