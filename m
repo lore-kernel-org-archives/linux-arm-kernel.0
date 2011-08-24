@@ -1,45 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Aug 2011 05:20:50 -0700
-Subject: [PATCH 2/3] ARM: OMAP: Move omap2_init_common_devices out of
-	init_early
-In-Reply-To: <4E54EA5E.8010603@ti.com>
-References: <20110824115048.2985.24230.stgit@kaulin>
-	<20110824115433.2985.98712.stgit@kaulin> <4E54EA5E.8010603@ti.com>
-Message-ID: <20110824122049.GA2963@atomide.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 24 Aug 2011 13:27:07 +0100
+Subject: v6 software reset fails on 1176
+In-Reply-To: <20110823180059.GH10062@e102144-lin.cambridge.arm.com>
+References: <20110823163247.GM2796@pulham.picochip.com>
+	<20110823170955.GF10062@e102144-lin.cambridge.arm.com>
+	<20110823173410.GA2263@gallagher>
+	<20110823174736.GG10062@e102144-lin.cambridge.arm.com>
+	<20110823175638.GB2263@gallagher>
+	<20110823180059.GH10062@e102144-lin.cambridge.arm.com>
+Message-ID: <20110824122707.GG23757@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cousson, Benoit <b-cousson@ti.com> [110824 04:38]:
-> Hi Tony,
+On Tue, Aug 23, 2011 at 07:00:59PM +0100, Will Deacon wrote:
+> On Tue, Aug 23, 2011 at 06:56:38PM +0100, Jamie Iles wrote:
+> > On Tue, Aug 23, 2011 at 06:47:36PM +0100, Will Deacon wrote:
+> > > You need to make sure you call cpu_reset by jumping to its *physical*
+> > > address. If that happens to alias with the virtual address of the kernel, it
+> > > won't currently work but I have a solution to this in my kexec branch.
+> > > 
+> > > You can do something like:
+> > > 
+> > > 	typedef void (*phys_reset_t)(unsigned long);
+> > > 
+> > > 	phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+> > > 	phys_reset(0xffff0000);
+> > 
+> > OK, that makes perfect sense!  I'll give it a go on my hardware tomorrow 
+> > when I'm back in the office.
 > 
-> On 8/24/2011 1:54 PM, Tony Lindgren wrote:
-> >There's no need to call omap2_init_common_devices from init_early.
-> >It reprograms the memory timings for some boards, so it's better to
-> >do it later so we have a chance to get console messages if something
-> >goes wrong.
-> 
-> BTW, I did some comment on that function in my OMAP4 device-tree
-> series, because the name is misleading.
-> That function is just initializing the SDRC controller present in
-> OMAP2 & 3. OMAP4 platform should not even call it.
-> In fact, I'm now wondering were the OMAP4 EMIF is configured?
+> Great, let me know how you get on! I'll post my kexec series to the list
+> again once I've got on top of my current patchsets.
 
-Probably nowhere currently?
- 
-> void __init omap2_init_common_devices(struct omap_sdrc_params *sdrc_cs0,
->                                       struct omap_sdrc_params *sdrc_cs1)
-> {
->         if (cpu_is_omap24xx() || omap3_has_sdrc()) {
->                 omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
->                 _omap2_init_reprogram_sdrc();
->         }
-> }
-> 
-> I guess it used to do much more than that in the past.
-> 
-> Shouldn't we rename it to clarify its purpose?
+That works a treat, thanks Will!
 
-Yeah we might as well rename it to omap_init_sdrc since we're
-patching it. Will post an updated patch.
-
-Tony
+Jamie
