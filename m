@@ -1,66 +1,43 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 24 Aug 2011 12:17:20 +0200
-Subject: [RFC PATCH 7/7] documentation/dt: Add OMAP bindings
-In-Reply-To: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
-References: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314181040-22807-8-git-send-email-b-cousson@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 24 Aug 2011 11:19:56 +0100
+Subject: [PATCH v4 3/8] ARM: lib: add switch_stack function for safely
+	changing stack
+In-Reply-To: <alpine.LFD.2.00.1108232102430.20358@xanadu.home>
+References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
+	<1314136012-20533-4-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1108232102430.20358@xanadu.home>
+Message-ID: <20110824101956.GE2078@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a documentation to capture the specifics OMAP bindings
-needed for device-tree support.
+On Tue, Aug 23, 2011 at 09:07:29PM -0400, Nicolas Pitre wrote:
+> On Tue, 23 Aug 2011, Will Deacon wrote:
+> 
+> > When disabling the MMU, it is necessary to take out a 1:1 identity map
+> > of the reset code so that it can safely be executed with and without
+> > the MMU active. To avoid the situation where the physical address of the
+> > reset code aliases with the virtual address of the active stack (which
+> > cannot be included in the 1:1 mapping), it is desirable to change to a
+> > new stack at a location which is less likely to alias.
+> > 
+> > This code adds a new lib function, switch_stack:
+> > 
+> > void switch_stack(void (*fn)(void *), void *arg, void *sp);
+> > 
+> > which changes the stack to point at the sp parameter, before invoking
+> > fn(arg) with the new stack selected.
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> 
+> For the implementation:
+> 
+> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> However I think switch_stack() is too vague a name for what this 
+> actually does.  Maybe something like call_with_stack(fn, arg, sp) is 
+> more precise.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Randy Dunlap <rdunlap@xenotime.net>
-Cc: Grant Likely <grant.likely@secretlab.ca>
----
- .../devicetree/bindings/arm/omap/omap.txt          |   38 ++++++++++++++++++++
- 1 files changed, 38 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/omap/omap.txt
+call_with_stack() soundslike a good name to me.
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-new file mode 100644
-index 0000000..845f9f1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -0,0 +1,38 @@
-+* Texas Instruments OMAP
-+
-+OMAP is currently using a static file per SoC family to describe the
-+IPs present in the SoC.
-+On top of that an omap_device is created to extend the platform_device
-+capabilities and to allow binding with one or several hwmods.
-+The hwmods will contain all the information to build the device:
-+adresse range, irq lines, dma lines, interconnect, PRCM register,
-+clock domain, input clocks.
-+For the moment just point to the existing hwmod, the next step will be
-+to move data from hwmod to device-tree representation.
-+
-+
-+Required properties:
-+- compatible: Every devices present in OMAP SoC should be in the
-+  form: "ti,XXX"
-+- hwmods: list of hwmods attached to a device. Must contain at least
-+  one hwmod.
-+
-+Optional properties:
-+- no_idle_on_suspend: When present, it prevents the PM to idle the module
-+  during suspend.
-+
-+
-+Example:
-+
-+spinlock at 1 {
-+    compatible = "ti,omap-spinlock";
-+    hwmods = "spinlock";
-+};
-+
-+
-+Boards:
-+- OMAP4 SDP : Software Developement Board
-+  compatible = "ti,omap4-sdp", "ti,omap4430"
-+
-+- OMAP4 PandaBoard : Low cost community board
-+  compatible = "ti,omap4-panda", "ti,omap4430"
--- 
-1.7.0.4
+---Dave
