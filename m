@@ -1,74 +1,116 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 24 Aug 2011 15:22:43 +0100
-Subject: [PATCH 1/4] Framework for exporting System-on-Chip information
-	via sysfs
-In-Reply-To: <20110824141935.GK23757@pulham.picochip.com>
-References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-	<20110810132956.GG2680@pulham.picochip.com>
-	<4E5505EA.6050207@linaro.org>
-	<20110824141935.GK23757@pulham.picochip.com>
-Message-ID: <20110824142242.GL23757@pulham.picochip.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 24 Aug 2011 19:55:14 +0530
+Subject: [PATCH 1/3] DMA: PL330: Infer transfer direction from transfer
+	request instead of platform data
+In-Reply-To: <4E54E42D.9060905@gmail.com>
+References: <1314050385-9617-1-git-send-email-thomas.abraham@linaro.org>
+	<1314050385-9617-2-git-send-email-thomas.abraham@linaro.org>
+	<4E54E42D.9060905@gmail.com>
+Message-ID: <CAJuYYwQ6yHb_ixJ87cmt6BiwJ-487iVUG1xWFsdXL2b57Mr2bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 03:19:35PM +0100, Jamie Iles wrote:
-> Hi Lee,
-> 
-> On Wed, Aug 24, 2011 at 03:08:42PM +0100, Lee Jones wrote:
-> [...]
-> > >> +	return ret;
-> > >> +}
-> > >> +
-> > >> +int __init soc_device_register(struct device *soc_parent,
-> > >> +			struct soc_device *soc_dev)
-> > >> +{
-> > >> +	int ret;
-> > >> +
-> > >> +	spin_lock_irq(&register_lock);
-> > >> +
-> > >> +	if (!soc_count) {
-> > >> +		/* Register top-level SoC device '/sys/devices/soc' */
-> > >> +		ret = device_register(&soc_grandparent);
-> > >> +		if (ret)
-> > >> +		{
-> > >> +			spin_unlock_irq(&register_lock);
-> > >> +			return ret;
-> > >> +		}
-> > >> +	}
-> > >> +
-> > >> +	soc_count++;
-> > >> +	soc_parent->parent = &soc_grandparent;
-> > >> +	dev_set_name(soc_parent, "%i", soc_count);
-> > >> +	soc_parent->platform_data = soc_dev;
-> > > 
-> > > I don't think platform_data is the right place for this.  
-> > 
-> > I agree with you, but I was unsure how else to get the data back.
-> > 
-> > > It's not clear
-> > > what soc_parent and soc_dev do here as soc_dev never gets registered.
-> > >
-> > > Should this be:
-> > > 
-> > > 	soc_dev->parent = &soc_grandparent;
-> > > 	dev_set_name(soc_dev, "%i", soc_count);
-> > > 	device_register(soc_dev);
-> > 
-> > AFAIK soc_dev can't be registered. It's just a container which holds
-> > each SoW's information to be exported in the way of const char *'s.
-> 
-> Sorry, that should have been:
-> 
-> 	dev_set_name(&soc_dev->dev, "%i", soc_count);
-> 	device_register(&soc_dev->dev);
-> 
-> You should probably also set soc_dev->dev->release to something that'll 
-> kfree() the device on removal (even though they are unlikely to be 
-> removed).
+Hi Rob,
 
-Also you could take advantage struct device::type and its groups member 
-for adding the common attributes.  This means that the files get added 
-automatically at device_register() so there is no race between the 
-device appearing and the attributes being added.
+On 24 August 2011 17:14, Rob Herring <robherring2@gmail.com> wrote:
+> Thomas,
+>
+> On 08/22/2011 04:59 PM, Thomas Abraham wrote:
+>> The transfer direction for a channel can be inferred from the transfer
+>> request and the need for specifying transfer direction in platfrom data
+>> can be eliminated. So the structure definition 'struct dma_pl330_peri'
+>> is no longer required.
+>>
+>> With the 'struct dma_pl330_peri' removed, the dma controller transfer
+>> capabilities cannot be inferred any longer. Hence, the dma controller
+>> capabilities is specified using platforme data.
+>>
+>> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+>> Cc: Boojin Kim <boojin.kim@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>> ?drivers/dma/pl330.c ? ? ? ?| ? 56 ++++++++------------------------------------
+>> ?include/linux/amba/pl330.h | ? 14 +++--------
+>> ?2 files changed, 14 insertions(+), 56 deletions(-)
+>>
+>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>> index 3a0baac..6592b9a 100644
+>> --- a/drivers/dma/pl330.c
+>> +++ b/drivers/dma/pl330.c
 
-Jamie
+[...]
+
+>> @@ -872,27 +855,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>>
+>> ? ? ? for (i = 0; i < num_chan; i++) {
+>> ? ? ? ? ? ? ? pch = &pdmac->peripherals[i];
+>> - ? ? ? ? ? ? if (pdat) {
+>> - ? ? ? ? ? ? ? ? ? ? struct dma_pl330_peri *peri = &pdat->peri[i];
+>> -
+>> - ? ? ? ? ? ? ? ? ? ? switch (peri->rqtype) {
+>> - ? ? ? ? ? ? ? ? ? ? case MEMTOMEM:
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_cap_set(DMA_MEMCPY, pd->cap_mask);
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> - ? ? ? ? ? ? ? ? ? ? case MEMTODEV:
+>> - ? ? ? ? ? ? ? ? ? ? case DEVTOMEM:
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_cap_set(DMA_SLAVE, pd->cap_mask);
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_cap_set(DMA_CYCLIC, pd->cap_mask);
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> - ? ? ? ? ? ? ? ? ? ? default:
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_err(&adev->dev, "DEVTODEV Not Supported\n");
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? continue;
+>> - ? ? ? ? ? ? ? ? ? ? }
+>> - ? ? ? ? ? ? ? ? ? ? pch->chan.private = peri;
+>> - ? ? ? ? ? ? } else {
+>> - ? ? ? ? ? ? ? ? ? ? dma_cap_set(DMA_MEMCPY, pd->cap_mask);
+>> - ? ? ? ? ? ? ? ? ? ? pch->chan.private = NULL;
+>> - ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? pch->chan.private = (pdat) ? &pdat->peri_id[i] : NULL;
+>
+> Don't need parentheses here.
+
+Ok. I will fix this in the next version of this patchset.
+
+>
+>>
+>> ? ? ? ? ? ? ? INIT_LIST_HEAD(&pch->work_list);
+>> ? ? ? ? ? ? ? spin_lock_init(&pch->lock);
+>> @@ -907,6 +870,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+>> ? ? ? }
+>>
+>> ? ? ? pd->dev = &adev->dev;
+>> + ? ? pd->cap_mask = pdat->cap_mask;
+>
+> You are re-introducing the requirement to have platform data which I
+> just made optional. For mem to mem transfers, there is no reason to have
+> platform data. In my case, we only support mem to mem transfers.
+>
+> How about:
+> pd->cap_mask = pdat ? pdat->cap_mask : DMA_MEMCPY;
+
+All of your changes to make platform data optional is still retained
+in this patch. But, as you said, the above change that I did to get
+the capabilities from pdata would not work when no pdata is supplied
+(as in the case mem-to-mem transfers). Thanks for pointing this out.
+
+This can be fixed as below
+
+if (pdat)
+        pd->cap_mask = pdat->cap_mask;
+else
+        dma_cap_set(DMA_MEMCPY, pd->cap_mask);
+
+>
+> Also, should you be using dma_cap_set here?
+
+Yes. That would be required. I will do these changes and resubmit the
+patch. Thanks for your review.
+
+Regards,
+Thomas.
+
+>
+> Rob
+>
+
+[...]
