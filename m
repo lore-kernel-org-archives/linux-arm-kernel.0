@@ -1,60 +1,95 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 24 Aug 2011 15:09:08 +0200
-Subject: [RFC PATCH 02/10] arm/dts: OMAP4: Add a main ocp entry bound to
-	l3-noc driver
+Date: Wed, 24 Aug 2011 15:09:10 +0200
+Subject: [RFC PATCH 04/10] arm/dts: OMAP4: Add mpu, dsp and iva nodes
 In-Reply-To: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
 References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314191356-10963-3-git-send-email-b-cousson@ti.com>
+Message-ID: <1314191356-10963-5-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Used the main OCP node to add bindings with the l3_noc driver.
-Remove l3_noc static device creation if CONFIG_OF is defined.
+Add nodes for devices used by PM code (mpu, dsp, iva).
+
+Add an empty cpus node as well as recommended in the DT spec.
+
+Remove mpu, dsp, iva devices init if CONFIG_OF is defined.
+Ideally the whole function should be removed. It will be doable as
+soon as the OMAP3 DT support will be added.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi  |    3 ++-
- arch/arm/mach-omap2/devices.c |    2 ++
- 2 files changed, 4 insertions(+), 1 deletions(-)
+ arch/arm/boot/dts/omap4.dtsi |   28 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pm.c     |    5 ++++-
+ 2 files changed, 32 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 97a3ea7..928a74c 100644
+index 928a74c..a3efe76 100644
 --- a/arch/arm/boot/dts/omap4.dtsi
 +++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -64,10 +64,11 @@
- 	 * hierarchy.
+@@ -25,11 +25,39 @@
+ 	};
+ 
+ 	/*
++	 * XXX: The cpus node is mandatory, but since the CPUs are as well part
++	 * of the mpu subsystem below, it is not clear where the information
++	 * should be. Maybe here with a phandle inside the mpu?
++	 */
++	cpus {
++	};
++
++	/*
+ 	 * The soc node represents the soc top level view. It is uses for IPs
+ 	 * that are not memory mapped in the MPU view or for the MPU itself.
  	 */
- 	ocp {
--		compatible = "simple-bus";
-+		compatible = "ti,l3-noc", "arteris,noc", "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
-+		hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+ 	soc {
+ 		compatible = "ti,omap-infra";
++		mpu {
++			compatible = "ti,omap4-mpu";
++			hwmods = "mpu";
++			cpu at 0 {
++				compatible = "arm,cortex-a9";
++			};
++			cpu at 1 {
++				compatible = "arm,cortex-a9";
++			};
++		};
++
++		dsp {
++			compatible = "ti,omap4-c64", "ti,c64";
++			hwmods = "dsp";
++		};
++
++		iva {
++			compatible = "ti,ivahd", "ti,iva";
++			hwmods = "iva";
++		};
+ 	};
  
- 		gic: interrupt-controller at 48241000 {
- 			compatible = "ti,omap4-gic", "arm,gic";
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 2d4a199..5964650 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -70,6 +70,7 @@ static int __init omap3_l3_init(void)
- }
- postcore_initcall(omap3_l3_init);
- 
-+#ifndef CONFIG_OF
- static int __init omap4_l3_init(void)
+ 	/*
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 832577a..ba4d187 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -49,15 +49,18 @@ static int _init_omap_device(char *name)
+  */
+ static void omap2_init_processor_devices(void)
  {
- 	int l, i;
-@@ -100,6 +101,7 @@ static int __init omap4_l3_init(void)
- 	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
- }
- postcore_initcall(omap4_l3_init);
+-	_init_omap_device("mpu");
+ 	if (omap3_has_iva())
+ 		_init_omap_device("iva");
+ 
+ 	if (cpu_is_omap44xx()) {
++#ifndef CONFIG_OF
++		_init_omap_device("mpu");
+ 		_init_omap_device("l3_main_1");
+ 		_init_omap_device("dsp");
+ 		_init_omap_device("iva");
 +#endif
- 
- #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
- 
+ 	} else {
++		_init_omap_device("mpu");
+ 		_init_omap_device("l3_main");
+ 	}
+ }
 -- 
 1.7.0.4
