@@ -1,43 +1,35 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 24 Aug 2011 10:02:18 +0200
-Subject: [PATCH] ARM: ux500: send cpufreq notification for all cpus
-In-Reply-To: <CAH9JG2Wd3Lv6670N6Nsg-AWjYGh4uZsabeqinTOGcpQ4nCKnYw@mail.gmail.com>
-References: <1314168245-2373-1-git-send-email-vincent.guittot@linaro.org>
-	<CACRpkdaONJ+Vdx4JCPfWoqavQahiSgVGv5i=h3+J1kE2V=Q8SA@mail.gmail.com>
-	<CAH9JG2Wd3Lv6670N6Nsg-AWjYGh4uZsabeqinTOGcpQ4nCKnYw@mail.gmail.com>
-Message-ID: <CAKfTPtDDz9N9tsYaD6WwZh6AYLG+MwhbN_rRxKyQfZAfZk_bMg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 24 Aug 2011 10:03:03 +0200
+Subject: i.MX multi SoC patches
+Message-ID: <1314172987-10349-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2011 09:56, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Wed, Aug 24, 2011 at 4:42 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, Aug 24, 2011 at 8:44 AM, Vincent Guittot
->> <vincent.guittot@linaro.org> wrote:
->>
->>> The same clock is used for all cpus so we must notify the frequency change
->>> for each one in order to update the configuration of all twd clockevents.
->
-> BTW, does it same as other ARM cpus?. e.g., exynos4 has same codes as this.
->
-> How to you think it? Need to modify the same way?
->
+This is hopefully the last iteration of the patches for compiling
+all ARMv4/v5 based i.MXs together. CONFIG_ARM_PATCH_PHYS_VIRT
+lost its experimental status and we can still build uImages
+even with CONFIG_AUTO_ZRELADDR enabled. This series selects
+these options and makes a multi SoC image the default.
+Also, we can now build all i.MX5 SoCs into a single image.
+This series also updates the defconfigs.
 
-yes, each ARM platform which uses twd timer should check that the
-notification is sent for each cpu.
+Sascha Hauer (4):
+      ARM i.MX: allow to compile together ARMv4 and ARMv5 based SoCs
+      ARM i.MX: allow to compile together all i.MX5 based SoCs
+      ARM i.MX5: update defconfig
+      ARM i.MX defconfigs: use one defconfig for all ARMv4/v5 SoCs
 
-> Thank you,
-> Kyungmin Park
->>>
->>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> Yours,
->> Linus Walleij
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+ arch/arm/Makefile                                  |    4 +-
+ .../{mx27_defconfig => imx_v4_v5_defconfig}        |   68 +++++++++++---
+ arch/arm/configs/mx1_defconfig                     |   91 ------------------
+ arch/arm/configs/mx21_defconfig                    |   97 --------------------
+ arch/arm/configs/{mx51_defconfig => mx5_defconfig} |   65 ++++++-------
+ arch/arm/mach-imx/Kconfig                          |   50 ++++-------
+ arch/arm/mach-mx5/Kconfig                          |   18 +---
+ arch/arm/plat-mxc/Kconfig                          |   39 ++------
+ arch/arm/plat-mxc/include/mach/memory.h            |   16 +---
+ 9 files changed, 118 insertions(+), 330 deletions(-)
+ rename arch/arm/configs/{mx27_defconfig => imx_v4_v5_defconfig} (69%)
+ delete mode 100644 arch/arm/configs/mx1_defconfig
+ delete mode 100644 arch/arm/configs/mx21_defconfig
+ rename arch/arm/configs/{mx51_defconfig => mx5_defconfig} (81%)
