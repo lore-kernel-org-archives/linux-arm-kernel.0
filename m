@@ -1,45 +1,71 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 24 Aug 2011 19:05:35 +0200
-Subject: [alsa-devel] [PATCH v2 1/1] ASoC: soc-core: check rate for
-	symmetry only when pcm is active
-In-Reply-To: <4E5520CE.60204@ti.com>
-References: <1314183728-23627-1-git-send-email-b29396@freescale.com>
-	<4E5520CE.60204@ti.com>
-Message-ID: <4E552F5F.9070801@metafoo.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 24 Aug 2011 20:08:07 +0300
+Subject: [PATCH v2 0/7] omap: iommu migration, relocation and cleanups
+Message-ID: <1314205694-28935-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/24/2011 06:03 PM, Liam Girdwood wrote:
-> On 24/08/11 12:02, Dong Aisheng wrote:
->> For the playback and record using different dai links,
->> checking !rtd->rate for symmetry may not be accurate because that
->> pcm may be acutually not running and the default new open rate is 0,
->> then the warning message "Not enforcing symmetric_rates" will
->> happen each time with running arecord | aplay.
->>
->> Now we only check rate for symmetry when the pcm is really active
->> which seems more sensible.
->>
->> Signed-off-by: Dong Aisheng <b29396@freescale.com>
->> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> Cc: Liam Girdwood <lrg@ti.com>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Acked-by: Liam Girdwood <lrg@ti.com>
-> 
+1. Migrate OMAP's iommu driver to the generic IOMMU API, and move it
+to the dedicated iommu folder.
 
-I don't think the patch in it's current form is a good idea. All it does is
-silencing the warning instead of addressing the real issue. The issue at hand
-here is, that the same DAI is connected to two other DAIs and the thus shared
-between two PCMs. The shared DAI requires symmetric rates. This is something
-that is not covered by the current code, since it assumes that a DAI is not
-shared between different PCMs. So with this patch the warning will be gone, but
-it is still possible that the capture and playback stream of the DAI to be
-configured to run at different rates, which will obviously unwanted behavior.
+2. Fix omap3isp appropriately so it doesn't break.
 
-A more sensible solution would in my opinion be to save the current rate in the
-dai struct itself and not in the pcm struct. Upon opening a stream check for
-cpu and codec DAI whether they require symmetry. If they do and are active
-constraint the rate to DAIs rate. This also ensures that if boths DAIs are
-already active and are running at different rates there will be no valid rate
-for the new stream.
+3. Adapt OMAP's iovmm appropriately as well, because omap3isp still relies
+on it. The plan is eventually to remove iovmm and replace it with the
+upcoming IOMMU-based generic DMA-API. Move iovmm to the iommu folder too;
+it belongs there more than it belongs in the OMAP folders.
+
+4. Start cleaning up OMAP's iommu components towards the end goal, where
+    1) omap-iommu no longer exports public API (and instead provides its
+       entire functionality via the generic IOMMU API).
+    2) omap-iovmm is removed.
+
+Tested on OMAP3 (with omap3isp) and OMAP4 (with rpmsg/remoteproc).
+
+v1->v2:
+1. Added Laurent's and Hiroshi's Acked-by
+2. iommu: use spinlock instead of mutex so attach/deattach can stay atomic (Joerg)
+3. iovmm: remove obsolete comment (Hiroshi)
+4. iommu: don't rename load_iotlb_entry directly (Hiroshi)
+5. Rebase to 3.1-rc3
+
+rfc->v1:
+1. Migrate iommu, iovmm and omap3isp in a single patch for bisectibility sake.
+2. Apply Laurent Pinchart's comments (thanks Laurent!)
+3. Rebase to 3.1-rc2
+
+Ohad Ben-Cohen (7):
+  omap: iommu: migrate to the generic IOMMU API
+  omap: iommu/iovmm: move to dedicated iommu folder
+  omap: iommu: stop exporting local functions
+  omap: iommu: PREFETCH_IOTLB cleanup
+  omap: iovmm: remove unused functionality
+  omap: iommu: remove unused exported API
+  omap: iommu: omapify 'struct iommu' and exposed API
+
+ arch/arm/mach-omap2/iommu2.c                       |   31 +-
+ arch/arm/plat-omap/Kconfig                         |   12 -
+ arch/arm/plat-omap/Makefile                        |    2 -
+ arch/arm/plat-omap/include/plat/iommu.h            |   77 ++--
+ arch/arm/plat-omap/include/plat/iommu2.h           |    4 +-
+ arch/arm/plat-omap/{ => include/plat}/iopgtable.h  |   20 +-
+ arch/arm/plat-omap/include/plat/iovmm.h            |   30 +-
+ drivers/iommu/Kconfig                              |   18 +
+ drivers/iommu/Makefile                             |    3 +
+ .../iommu/omap-iommu-debug.c                       |   36 +-
+ .../iommu.c => drivers/iommu/omap-iommu.c          |  511 +++++++++++++-------
+ .../iovmm.c => drivers/iommu/omap-iovmm.c          |  338 +++----------
+ drivers/media/video/Kconfig                        |    2 +-
+ drivers/media/video/omap3isp/isp.c                 |   45 ++-
+ drivers/media/video/omap3isp/isp.h                 |    5 +-
+ drivers/media/video/omap3isp/ispccdc.c             |   25 +-
+ drivers/media/video/omap3isp/ispstat.c             |   11 +-
+ drivers/media/video/omap3isp/ispvideo.c            |    4 +-
+ 18 files changed, 612 insertions(+), 562 deletions(-)
+ rename arch/arm/plat-omap/{ => include/plat}/iopgtable.h (82%)
+ rename arch/arm/plat-omap/iommu-debug.c => drivers/iommu/omap-iommu-debug.c (91%)
+ rename arch/arm/plat-omap/iommu.c => drivers/iommu/omap-iommu.c (61%)
+ rename arch/arm/plat-omap/iovmm.c => drivers/iommu/omap-iovmm.c (63%)
+
+-- 
+1.7.4.1
