@@ -1,50 +1,42 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 24 Aug 2011 19:12:10 +0900
-Subject: [PATCH 2/3] mach-ux500: initialize l2x0 at arch_init time
-In-Reply-To: <4E54CAE8.1060702@ti.com>
-References: <1314177826-19151-1-git-send-email-linus.walleij@stericsson.com>
-	<4E54CAE8.1060702@ti.com>
-Message-ID: <CAH9JG2W+KkTZJ67eDqju3jQfc8OZhf0gBzKvhSodpOQS=-q2kQ@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 24 Aug 2011 11:15:07 +0100
+Subject: [PATCH v4 1/8] ARM: proc-v7: disable SCTLR.TE when disabling MMU
+In-Reply-To: <1314136012-20533-2-git-send-email-will.deacon@arm.com>
+References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
+	<1314136012-20533-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20110824101507.GB2078@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 6:56 PM, Santosh <santosh.shilimkar@ti.com> wrote:
-> On Wednesday 24 August 2011 02:53 PM, Linus Walleij wrote:
->>
->> From: Linus Walleij<linus.walleij@linaro.org>
->>
->> mach-imx initialize their l2x0 cach at arch_init time, so
->> why shouldn't we.
->>
-> More and more you delay L2 cache enable in boot-process,
-> your boot-up time is going to shoot-up.
->
-> Have you thought about it. Cache's should be enabled as
-> early as possible.
+On Tue, Aug 23, 2011 at 10:46:45PM +0100, Will Deacon wrote:
+> cpu_v7_reset disables the MMU and then branches to the provided address.
+> On Thumb-2 kernels, we should take care to clear the Thumb Exception
+> enable bit in the System Control Register, otherwise this may wreak
+> havok in the code to which we are branching (for example, an ARM kernel
+> image via kexec).
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/mm/proc-v7.S |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index a30e785..96b872c 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -66,6 +66,7 @@ ENDPROC(cpu_v7_proc_fin)
+>  ENTRY(cpu_v7_reset)
+>  	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+>  	bic	r1, r1, #0x1			@ ...............m
+> + THUMB(	bic	r1, r1, #1 << 30 )		@ Thumb exceptions
 
-Right, after change from early_init to arch_init. it takes more time.
+Can we give the architectural name for the bit here?
 
-Before:
-...
-[    0.046683] L310 cache controller enabled
-[    0.046697] l2x0: 16 ways, CACHE_ID 0x4100c4c5, AUX_CTRL
-0x7e470001, Cache size: 1048576 B
-[    0.096785] CPU1: Booted secondary processor
-[    0.096812] CPU1: Unknown IPI message 0x1
-[    0.116577] Brought up 2 CPUs
-[    0.116591] SMP: Total of 2 processors activated (3181.77 BogoMIPS).
-...
-[    1.602813] Freeing init memory: 124K
+If we must have magic numbers, we can at least minimise the scope for
+confusion.
 
-After:
-[    0.116616] SMP: Total of 2 processors activated (3181.77 BogoMIPS).
-[    0.128712] print_constraints: dummy:
-...
-[    0.135811] L310 cache controller enabled
-[    0.135825] l2x0: 16 ways, CACHE_ID 0x4100c4c5, AUX_CTRL
-0x7e470001, Cache size: 1048576 B
-...
-[    1.688122] Freeing init memory: 124K
+What that,
+Reviewed-by: Dave Martin <dave.martin@linaro.org>
 
-Thank you,
-Kyungmin Park
+Cheers
+---Dave
