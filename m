@@ -1,35 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Aug 2011 17:25:42 +0200
-Subject: [PATCH 4/4] Move top level platform devices in sysfs to
-	/sys/devices/soc/X
-In-Reply-To: <1312981422-13294-4-git-send-email-lee.jones@linaro.org>
-References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-	<1312981422-13294-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <201108241725.42549.arnd@arndb.de>
+From: Ian.Jackson@eu.citrix.com (Ian Jackson)
+Date: Wed, 24 Aug 2011 16:45:48 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20110824135109.GP32688@e102144-lin.cambridge.arm.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
+	<20051.57876.785018.498967@mariner.uk.xensource.com>
+	<20110824135109.GP32688@e102144-lin.cambridge.arm.com>
+Message-ID: <20053.7340.865511.561798@mariner.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 10 August 2011, Lee Jones wrote:
-> At the request of Arnd Bergmann this patch moves all SoC
-> platform devices found in sysfs from /sys/devices/platform to
-> /sys/devices/soc/<SoCNum>/. It is believed as the devices are
-> SoC specific and a /sys/devices/soc node has recently become
-> available, that this would be a more appropriate place to
-> display the data.
+Will Deacon writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
+> From discussions that I've been having with the technical architects at ARM
+> and various bootloader people, it looks like we have two scenarios [this is
+> reiterating a lot of what you've said but I think it's important]:
+
+Right.
+
+>   After the system has taken care of whatever secure initialisation was
+>   required, it moves into HYP mode. At this point there are two things that
+>   can happen:
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/board-mop500.c   |   19 +++++++++++++++----
->  arch/arm/mach-ux500/board-u5500.c    |    6 ++++++
->  arch/arm/mach-ux500/cpu-db5500.c     |    6 ++++++
->  arch/arm/mach-ux500/cpu-db8500.c     |   12 +++++++++++-
->  arch/arm/mach-ux500/devices-common.c |   19 +++++++++++++++----
->  arch/arm/mach-ux500/usb.c            |    4 ++++
->  6 files changed, 57 insertions(+), 9 deletions(-)
-> 
+>   1.0: HYP mode boot loader (uboot, UEFI) runs and installs Linux at the
+>        same privilege level
+>   1.1: Raw Linux boots, and detects HYP mode
+>   1.2: Sets up basic init, with HVC trampoline for installing KVM/Xen later
+>   1.3: Switch to SVC mode
+>   1.4: Continue booting Linux as normal
 
-Ok. What does the device tree in /sys/devices look like after this?
+Since we have discovered that this approach will work fine with
+existing kernels, even ones which are completely unaware of Hyp mode,
+I think this is the right approach.  It can be implemented by boot
+loaders etc. right away.
 
-Does it match the flattened device tree description that you will have?
-
-	Arnd
+Ian.
