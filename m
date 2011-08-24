@@ -1,36 +1,62 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 24 Aug 2011 13:30:07 -0400 (EDT)
-Subject: [PATCH v4 0/8] MMU disabling code and kexec fixes
-In-Reply-To: <20110824165938.GT32688@e102144-lin.cambridge.arm.com>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1108232120590.20358@xanadu.home>
-	<20110824105848.GE32688@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1108241035400.20358@xanadu.home>
-	<20110824165938.GT32688@e102144-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1108241323540.20358@xanadu.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Aug 2011 18:38:36 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20110824170953.GA8883@n2100.arm.linux.org.uk>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
+	<20051.57876.785018.498967@mariner.uk.xensource.com>
+	<20110824135109.GP32688@e102144-lin.cambridge.arm.com>
+	<20110824170953.GA8883@n2100.arm.linux.org.uk>
+Message-ID: <20110824173836.GV32688@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Aug 2011, Will Deacon wrote:
-
-> On Wed, Aug 24, 2011 at 03:53:44PM +0100, Nicolas Pitre wrote:
-> > On Wed, 24 Aug 2011, Will Deacon wrote:
-> > > On top of that, I'd like to use the bottom of this page as a holding pen
-> > > for secondary CPUs when doing an SMP kexec. In this case, the new kernel
-> > > needs to take care not to allocate the page for general use. I suppose we
-> > > could fix this with a new ATAG / FDT property but that seems a bit overkill.
-> > 
-> > Is it?
+On Wed, Aug 24, 2011 at 06:09:53PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Aug 24, 2011 at 02:51:09PM +0100, Will Deacon wrote:
+> > I think it's important to separate the problems of secure boot with the
+> > problems of installing a hypervisor. Whatever happens in secure world, we can
+> > expect to be dropped at either HYP mode or non-secure SVC mode. Sure, on a dev
+> > board you might run directly in the secure world so there's a bit of extra
+> > work to do to get out of that but then we can just drop into HVC mode and
+> > forget about it.
 > 
-> Well it means re-encoding a DT blob from within the kernel so that we can
-> tell the next kernel not to allocate from a given page of physical memory.
-> If we already have this infrastructure, then great, but it looks to me like
-> it only lives within dtc (as libfdt) at the moment.
+> I think you're painting a very simple picture there.
 
-Hmmm... The kexec user space tools know how to manipulate a device tree 
-for the next kernel, right?  So it's only a matter for it to ask the 
-current kernel what the physical address for that page is and stuff it 
-into the FDT it is preparing already.
+Yes, I was trying to avoid derailing the discussion because the secure -
+non-secure transition should be treated separately to the hypervisor stuff.
 
+> If the kernel has been handed over to while in secure mode, that's
+> probably because there is no secure monitor implemented.  If there's
+> no secure monitor implemented, there's no code in place to handle
+> SMC instructions.  To make things worse, if we drop out into non-secure
+> mode, due to the lack of working SMC instructions, we have no way to
+> access the various registers we need to.
+> 
+> So, if the kernel is booted in secure mode and wants to drop into non-
+> secure mode, we need a separate blob of code to install as our own
+> secure monitor to provide these services.
 
-Nicolas
+Indeed. I'm not aware of any open-source monitor implementations and I'm not
+sure whether it's something worth investing effort in.
+
+> > Unlike the fragmented secure monitor API that currently exists across
+> > different platforms, it's really in the interests of the vendor to
+> > standardise on the HYP interface and provide calls to install code, otherwise
+> > they run the risk of producing what is essentially a closed system.
+> 
+> On the other hand, I'm sure vendors are already thinking along those
+> lines - the precident has been set by the secure monitor API mess, so
+> if it can be made to "work" there...
+
+That's partly why I'm trying to keep the two problems separate (but I doubt
+it will make any difference!). That said, I firmly believe that whatever we
+do, we *will* see platforms which install a hypervisor before dropping to
+NS-SVC and booting Linux. We can either give up in these cases (which is
+fine until the hardware becomes available and people want to use it) or we
+can define a simple HVC interface that the kernel can use and hope people
+implement that. If they don't, we'll end up in the same situation where
+we are for the secure stuff but at least we tried. Unlike the SVC mess, you
+can get away with a single (custom) HVC to bootstrap the thing with an
+interface that we understand.
+
+Will
