@@ -1,58 +1,20 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 24 Aug 2011 21:17:54 +0200 (CEST)
-Subject: dma buffers for camera
-In-Reply-To: <op.v0p0hctkyxxkfz@localhost.localdomain>
-References: <op.v0p0hctkyxxkfz@localhost.localdomain>
-Message-ID: <Pine.LNX.4.64.1108242111560.14818@axis700.grange>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 24 Aug 2011 20:19:07 +0100
+Subject: [alsa-devel] [PATCH v2 1/1] ASoC: soc-core: check rate for
+	symmetry only when pcm is active
+In-Reply-To: <4E5548FF.1030709@metafoo.de>
+References: <1314183728-23627-1-git-send-email-b29396@freescale.com>
+	<4E5520CE.60204@ti.com> <4E552F5F.9070801@metafoo.de>
+	<20110824172703.GF16653@opensource.wolfsonmicro.com>
+	<4E5548FF.1030709@metafoo.de>
+Message-ID: <20110824191906.GA21162@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan
+On Wed, Aug 24, 2011 at 08:54:55PM +0200, Lars-Peter Clausen wrote:
 
-On Wed, 24 Aug 2011, Jan Pohanka wrote:
+> It should be sufficient to just store the rate for the cpu and codec DAI.
+> Though the rate constraint should be applied if either the DAI or the link
+> wants symmetric rates.
 
-> Hello,
-> 
-> could please anyone explain me a bit situation about using memory buffers for
-> dma for video input devices? Unfortunately I don't understand it at all.
-> I want to capture images 1600x1200 from 2 mpix sensor on i.mx27 board.
-> I gave 8MB to mx2_camera device with dma_declare_coherent_memory.
-> 
-> Unfortunately it seems to be not enough. In UYVY format I need 1600x1200x2 for
-> one picture, it is cca 3.8MB.
-> After some digging I noticed, that dma_alloc_coherent() is called three times
-> and each time with the 3.8MB demand. Once it is directly from mx2_camera
-> driver and two times from videobuf_dma_contig. OK, that is more than 8MB
-> available, but why there are so big memory demands for one picture?
-> 
-> I'm using gstremer for capturing, so it probably requests several buffers with
-> VIDIOC_REQBUFS. Is this behaviour normal, even if there is explicitly noted
-> that I want only one buffer?
-
-The mx2_camera driver is allocating one "discard" buffer of the same size, 
-as regular buffers for cases, when the user is not fast enough to queue 
-new buffers for the running capture. Arguably, this could be aliminated 
-and the last submitted buffer could be re-used until either more buffers 
-are available or the streaming is stopped. Otherwise, it could also be 
-possible to stop capture until buffers are available again. In any case, 
-this is the current driver implementation. As for 2 buffers instead of one 
-for the actual capture, I think, gstreamer defines 2 as a minimum number 
-of buffers, which is actually also required for any streaming chance.
-
-Thanks
-Guennadi
-
-> gst-launch \
->  v4l2src num-buffers=1 device=/dev/video1 ! \
->  video/x-raw-yuv,format=\(fourcc\)UYVY,width=$WIDTH,height=$HEIGHT ! \
->  jpegenc ! \
->  filesink location=col_image.jpg
-> 
-> 
-> with best regards
-> Jan
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Yes, for the actual rate storage.
