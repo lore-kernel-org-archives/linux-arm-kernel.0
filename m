@@ -1,47 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Aug 2011 17:00:39 +0100
-Subject: ARM processor mode, kernel startup, Hyp / secure state
-In-Reply-To: <20053.7340.865511.561798@mariner.uk.xensource.com>
-References: <20051.48809.945431.800543@mariner.uk.xensource.com>
-	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
-	<20051.57876.785018.498967@mariner.uk.xensource.com>
-	<20110824135109.GP32688@e102144-lin.cambridge.arm.com>
-	<20053.7340.865511.561798@mariner.uk.xensource.com>
-Message-ID: <20110824160039.GR32688@e102144-lin.cambridge.arm.com>
+From: lrg@ti.com (Liam Girdwood)
+Date: Wed, 24 Aug 2011 17:03:26 +0100
+Subject: [PATCH v2 1/1] ASoC: soc-core: check rate for symmetry only when
+	pcm is active
+In-Reply-To: <1314183728-23627-1-git-send-email-b29396@freescale.com>
+References: <1314183728-23627-1-git-send-email-b29396@freescale.com>
+Message-ID: <4E5520CE.60204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 04:45:48PM +0100, Ian Jackson wrote:
-> Will Deacon writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
-> >   After the system has taken care of whatever secure initialisation was
-> >   required, it moves into HYP mode. At this point there are two things that
-> >   can happen:
-> > 
-> >   1.0: HYP mode boot loader (uboot, UEFI) runs and installs Linux at the
-> >        same privilege level
-> >   1.1: Raw Linux boots, and detects HYP mode
-> >   1.2: Sets up basic init, with HVC trampoline for installing KVM/Xen later
-> >   1.3: Switch to SVC mode
-> >   1.4: Continue booting Linux as normal
+On 24/08/11 12:02, Dong Aisheng wrote:
+> For the playback and record using different dai links,
+> checking !rtd->rate for symmetry may not be accurate because that
+> pcm may be acutually not running and the default new open rate is 0,
+> then the warning message "Not enforcing symmetric_rates" will
+> happen each time with running arecord | aplay.
 > 
-> Since we have discovered that this approach will work fine with
-> existing kernels, even ones which are completely unaware of Hyp mode,
-> I think this is the right approach.  It can be implemented by boot
-> loaders etc. right away.
+> Now we only check rate for symmetry when the pcm is really active
+> which seems more sensible.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
 
-It's certainly the simplest method from our point of view, but there is
-still the necessity to support the other situation I described rather than
-retrofit it when hardware that does it turns up [which it will].
+Acked-by: Liam Girdwood <lrg@ti.com>
 
-The next step is to define our interface to the HVC trampoline. I think it
-would be good if this interface could be reused by vendors who provide their
-own hypervisor layer as this would reduce the need for lots of distinct HVC
-APIs that essentially all do the same thing. It might be a good idea to
-`reserve' a high region of the HVC space for use by Linux rather than index
-the calls from 0, for example, which is likely to conflict with other
-hypervisor implementations. I think the trampoline only needs a handful of
-HVC calls (if that) anyway.
-
-What do you reckon?
-
-Will
+> ---
+>  include/sound/soc.h |    1 +
+>  sound/soc/soc-pcm.c |    5 +++++
+>  2 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/sound/soc.h b/include/sound/soc.h
+> index 3fe658e..17970fd 100644
+> --- a/include/sound/soc.h
+> +++ b/include/sound/soc.h
+> @@ -851,6 +851,7 @@ struct snd_soc_pcm_runtime  {
+>  
+>  	/* Symmetry data - only valid if symmetry is being enforced */
+>  	unsigned int rate;
+> +	unsigned int active;
+>  	long pmdown_time;
+>  
+>  	/* runtime devices */
+> diff --git a/sound/soc/soc-pcm.c b/sound/soc/soc-pcm.c
+> index 1aee9fc..72a7b34 100644
+> --- a/sound/soc/soc-pcm.c
+> +++ b/sound/soc/soc-pcm.c
+> @@ -39,6 +39,9 @@ static int soc_pcm_apply_symmetry(struct snd_pcm_substream *substream)
+>  	    !rtd->dai_link->symmetric_rates)
+>  		return 0;
+>  
+> +	if (!rtd->active)
+> +		return 0;
+> +
+>  	/* This can happen if multiple streams are starting simultaneously -
+>  	 * the second can need to get its constraints before the first has
+>  	 * picked a rate.  Complain and allow the application to carry on.
+> @@ -209,6 +212,7 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
+>  	cpu_dai->active++;
+>  	codec_dai->active++;
+>  	rtd->codec->active++;
+> +	rtd->active++;
+>  	mutex_unlock(&rtd->pcm_mutex);
+>  	return 0;
+>  
+> @@ -287,6 +291,7 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
+>  	cpu_dai->active--;
+>  	codec_dai->active--;
+>  	codec->active--;
+> +	rtd->active--;
+>  
+>  	if (!cpu_dai->active && !codec_dai->active)
+>  		rtd->rate = 0;
