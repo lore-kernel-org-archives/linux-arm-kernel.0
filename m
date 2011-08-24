@@ -1,46 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Aug 2011 12:01:50 +0100
-Subject: [PATCH v4 1/8] ARM: proc-v7: disable SCTLR.TE when disabling MMU
-In-Reply-To: <20110824101507.GB2078@arm.com>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-	<1314136012-20533-2-git-send-email-will.deacon@arm.com>
-	<20110824101507.GB2078@arm.com>
-Message-ID: <20110824110149.GF32688@e102144-lin.cambridge.arm.com>
+From: B29396@freescale.com (Dong Aisheng-B29396)
+Date: Wed, 24 Aug 2011 11:08:15 +0000
+Subject: [PATCH 1/2] ASoC: mxs-saif: add record function
+In-Reply-To: <20110822113054.GC2006@pengutronix.de>
+References: <1313942545-21403-1-git-send-email-b29396@freescale.com>
+	<20110822113054.GC2006@pengutronix.de>
+Message-ID: <65EE16ACC360FA4D99C96DC085B3F772223F4A@039-SN1MPN1-001.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 11:15:07AM +0100, Dave Martin wrote:
-> On Tue, Aug 23, 2011 at 10:46:45PM +0100, Will Deacon wrote:
-> > cpu_v7_reset disables the MMU and then branches to the provided address.
-> > On Thumb-2 kernels, we should take care to clear the Thumb Exception
-> > enable bit in the System Control Register, otherwise this may wreak
-> > havok in the code to which we are branching (for example, an ARM kernel
-> > image via kexec).
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/mm/proc-v7.S |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > index a30e785..96b872c 100644
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -66,6 +66,7 @@ ENDPROC(cpu_v7_proc_fin)
-> >  ENTRY(cpu_v7_reset)
-> >  	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
-> >  	bic	r1, r1, #0x1			@ ...............m
-> > + THUMB(	bic	r1, r1, #1 << 30 )		@ Thumb exceptions
+Hi Wolfram,
+
+> -----Original Message-----
+> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
+> Sent: Monday, August 22, 2011 7:31 PM
+> To: Dong Aisheng-B29396
+> Cc: alsa-devel at alsa-project.org; linux-arm-kernel at lists.infradead.org;
+> broonie at opensource.wolfsonmicro.com; lrg at ti.com; s.hauer at pengutronix.de
+> Subject: Re: [PATCH 1/2] ASoC: mxs-saif: add record function
 > 
-> Can we give the architectural name for the bit here?
+> On Mon, Aug 22, 2011 at 12:02:25AM +0800, Dong Aisheng wrote:
+> > 1. add different clkmux mode handling for record.
+> > SAIF can use two instances to implement full duplex (playback &
+> > recording) and record saif may work on EXTMASTER mode that is using
+> > other saif's BITCLK&LRCLK.
+> > The clkmux mode is determined by saif's platform data and machine
+> > specific clkmux setting is done in pdata->init().
+> > 2. support playback and capture simutaneously however the sample rates
+> > can not be different due to hw limitation.
+> >
+> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > Cc: Liam Girdwood <lrg@ti.com>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > Cc: Wolfram Sang <w.sang@pengutronix.de>
+> 
+> Will test and review, but probably not before Wednesday.
+> 
 
-Ok. It's SCTLR.TE so representing it as we do for SCTLR.M looks a bit odd
-unless you use two lines. Perhaps if I just add @ SCTLR.TE (Thumb
-exceptions) ?
+If you want to test, you may need to apply another sgtl5000 patch
+to fix noise issue.
 
-> What that,
-> Reviewed-by: Dave Martin <dave.martin@linaro.org>
+BTW, since MX28EVK only has line-in (no mic-in), i just tested by
+capturing data from line-in and connected the line-in to a PC's
+Headphone output.
 
-Ta,
+Not sure if there might be some issue due to line-in level is a
+little different from headphone out level.
+(Any comments from the person who knows?)
 
-Will
+Anyway, it just sounds well at my side.
+
+The patch for your reference:
+It's just for testing and I'm going to check it with our ic people
+for the root cause.
+
+Regards
+Dong Aisheng
