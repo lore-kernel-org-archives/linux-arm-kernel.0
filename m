@@ -1,38 +1,64 @@
-From: nbowler@elliptictech.com (Nick Bowler)
-Date: Wed, 24 Aug 2011 13:51:55 -0400
-Subject: [PATCH v2] ARM: vexpress: Use wfi macro in platform_do_lowpower.
-In-Reply-To: <20110822135952.GE2796@pulham.picochip.com>
-References: <CAHkRjk6Fq+1b_uM+DFACS1QVd7B6_1XhqRw-27i88U1VyvLk+Q@mail.gmail.com>
-	<1314021259-31710-1-git-send-email-nbowler@elliptictech.com>
-	<20110822135952.GE2796@pulham.picochip.com>
-Message-ID: <20110824175155.GA13380@elliptictech.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 24 Aug 2011 15:28:23 +0200
+Subject: [PATCH 4/6] ARM: imx: use mc13xxx constants instead of mc13783
+In-Reply-To: <1314192505-23499-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20110824132740.GA28197@pengutronix.de>
+	<1314192505-23499-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1314192505-23499-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2011-08-22 14:59 +0100, Jamie Iles wrote:
-> On Mon, Aug 22, 2011 at 09:54:19AM -0400, Nick Bowler wrote:
-> > Current Versatile Express CPU hotplug code includes a hardcoded WFI
-> > instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
-> > mode, this is invalid and causes the machine to hang hard when a CPU
-> > is offlined.
-> > 
-> > Using the wfi macro (which uses the appropriate assembler mnemonic)
-> > causes the correct instruction to be emitted in either case.  As a
-> > consequence of this change, an apparently vestigial "cc" clobber is
-> > dropped from the asm (the macro uses "memory" only).
-> > 
-> > Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
-> > ---
-> 
-> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
-> 
-> if it helps!
+The latter constants are going to be removed in favour of the former
 
-Thanks!
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-imx/mach-mx27_3ds.c |    4 ++--
+ arch/arm/mach-imx/mach-mx31_3ds.c |    2 +-
+ arch/arm/mach-imx/mach-pcm038.c   |    4 ++--
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-Since there seem to be no objections, I'll send this off to Russell's
-tracker.
-
-Cheers,
+diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
+index 6fa6934..3856855 100644
+--- a/arch/arm/mach-imx/mach-mx27_3ds.c
++++ b/arch/arm/mach-imx/mach-mx27_3ds.c
+@@ -293,8 +293,8 @@ static struct mc13xxx_platform_data mc13783_pdata = {
+ 		.num_regulators = ARRAY_SIZE(mx27_3ds_regulators),
+ 
+ 	},
+-	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN |
+-	MC13783_USE_RTC,
++	.flags  = MC13XXX_USE_REGULATOR | MC13XXX_USE_TOUCHSCREEN |
++		MC13XXX_USE_RTC,
+ };
+ 
+ /* SPI */
+diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+index c20be75..aa2ebe6 100644
+--- a/arch/arm/mach-imx/mach-mx31_3ds.c
++++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+@@ -494,7 +494,7 @@ static struct mc13xxx_platform_data mc13783_pdata = {
+ 		.regulators = mx31_3ds_regulators,
+ 		.num_regulators = ARRAY_SIZE(mx31_3ds_regulators),
+ 	},
+-	.flags  = MC13783_USE_REGULATOR | MC13783_USE_TOUCHSCREEN,
++	.flags  = MC13XXX_USE_REGULATOR | MC13XXX_USE_TOUCHSCREEN,
+ };
+ 
+ /* SPI */
+diff --git a/arch/arm/mach-imx/mach-pcm038.c b/arch/arm/mach-imx/mach-pcm038.c
+index 2d6a64b..d033774 100644
+--- a/arch/arm/mach-imx/mach-pcm038.c
++++ b/arch/arm/mach-imx/mach-pcm038.c
+@@ -266,8 +266,8 @@ static struct mc13xxx_platform_data pcm038_pmic = {
+ 		.regulators = pcm038_regulators,
+ 		.num_regulators = ARRAY_SIZE(pcm038_regulators),
+ 	},
+-	.flags = MC13783_USE_ADC | MC13783_USE_REGULATOR |
+-		 MC13783_USE_TOUCHSCREEN,
++	.flags = MC13XXX_USE_ADC | MC13XXX_USE_REGULATOR |
++		 MC13XXX_USE_TOUCHSCREEN,
+ };
+ 
+ static struct spi_board_info pcm038_spi_board_info[] __initdata = {
 -- 
-Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
+1.7.5.4
