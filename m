@@ -1,173 +1,41 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 24 Aug 2011 14:46:02 +0800
-Subject: [PATCH 2/4 v4] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
-References: <1313747646-32294-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CAGsJ_4zwDimvQYSq-6Xck8QvyJjnm=NhyK80tUVNC4ZuLw17+w@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 24 Aug 2011 08:46:39 +0200
+Subject: [PATCH 1/2] ARM i.MX: remove ARCH_MX* macros from Makefile
+In-Reply-To: <1314168400-14889-1-git-send-email-s.hauer@pengutronix.de>
+References: <1314168400-14889-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1314168400-14889-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/**
-> + * @dev: a pointer back to containing device
-> + * @virtbase: the offset to the controller in virtual memory
-> + */
-> +struct u300_pmx {
-> + ? ? ? struct device *dev;
-> + ? ? ? struct pinmux_dev *pmx;
+These are scheduled for removal and replaced by CONFIG_SOC_IMX*
+macros where appropriate.
 
- pinctrl_dev?
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/Makefile |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-> +static int u300_pmx_enable(struct pinmux_dev *pmxdev, unsigned selector)
-
- pinctrl_dev?
-
-> +{
-> + ? ? ? struct u300_pmx *upmx;
-> +
-> + ? ? ? if (selector >= ARRAY_SIZE(u300_pmx_funcs))
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? upmx = pmxdev_get_drvdata(pmxdev);
-> + ? ? ? u300_pmx_endisable(upmx, selector, true);
-> +
-> + ? ? ? return 0;
-> +}
-> +
-> +static void u300_pmx_disable(struct pinmux_dev *pmxdev, unsigned selector)
-
- pinctrl_dev?
-
-> +{
-> + ? ? ? struct u300_pmx *upmx;
-> +
-> + ? ? ? if (selector >= ARRAY_SIZE(u300_pmx_funcs))
-> + ? ? ? ? ? ? ? return;
-> + ? ? ? upmx = pmxdev_get_drvdata(pmxdev);
-
-pctrldev_get_drvdata?
-
-> + ? ? ? u300_pmx_endisable(upmx, selector, false);
-> +}
-> +
-> +static int u300_pmx_list(struct pinmux_dev *pmxdev, unsigned selector)
-
- pinctrl_dev?
-
-> +{
-> + ? ? ? if (selector >= ARRAY_SIZE(u300_pmx_funcs))
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? return 0;
-> +}
-> +
-> +static const char *u300_pmx_get_fname(struct pinmux_dev *pmxdev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned selector)
-
- pinctrl_dev?
-
-> +{
-> + ? ? ? if (selector >= ARRAY_SIZE(u300_pmx_funcs))
-> + ? ? ? ? ? ? ? return NULL;
-> + ? ? ? return u300_pmx_funcs[selector].name;
-> +}
-> +
-> +static int u300_pmx_get_pins(struct pinmux_dev *pmxdev, unsigned selector,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned ** const pins, unsigned * const num_pins)
-
- pinctrl_dev?
-
-> +{
-> + ? ? ? if (selector >= ARRAY_SIZE(u300_pmx_funcs))
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? *pins = (unsigned *) u300_pmx_funcs[selector].pins;
-> + ? ? ? *num_pins = u300_pmx_funcs[selector].num_pins;
-> + ? ? ? return 0;
-> +}
-> +
-> +static void u300_dbg_show(struct pinmux_dev *pmxdev, struct seq_file *s,
-
- pinctrl_dev?
-
-> + ? ? ? ? ? ? ? ? ?unsigned offset)
-> +{
-> + ? ? ? seq_printf(s, " " DRIVER_NAME);
-> +}
-> +
-> +static struct pinmux_ops u300_pmx_ops = {
-> + ? ? ? .list_functions = u300_pmx_list,
-> + ? ? ? .get_function_name = u300_pmx_get_fname,
-> + ? ? ? .get_function_pins = u300_pmx_get_pins,
-> + ? ? ? .enable = u300_pmx_enable,
-> + ? ? ? .disable = u300_pmx_disable,
-> + ? ? ? .dbg_show = u300_dbg_show,
-> +};
-> +
-> +static struct pinmux_desc u300_pmx_desc = {
-> + ? ? ? .name = DRIVER_NAME,
-> + ? ? ? .pins = u300_pads,
-> + ? ? ? .npins = ARRAY_SIZE(u300_pads),
-> + ? ? ? .maxpin = U300_NUM_PADS-1,
-> + ? ? ? .pmxops = &u300_pmx_ops,
-> + ? ? ? .owner = THIS_MODULE,
-> +};
-> +
-> +static int __init u300_pmx_probe(struct platform_device *pdev)
-> +{
-> + ? ? ? int ret;
-> + ? ? ? struct u300_pmx *upmx;
-> + ? ? ? struct resource *res;
-> +
-> + ? ? ? /* Create state holders etc for this driver */
-> + ? ? ? upmx = kzalloc(sizeof(struct u300_pmx), GFP_KERNEL);
-> + ? ? ? if (!upmx)
-> + ? ? ? ? ? ? ? return -ENOMEM;
-> +
-> + ? ? ? upmx->dev = &pdev->dev;
-> +
-> + ? ? ? res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> + ? ? ? if (!res) {
-> + ? ? ? ? ? ? ? ret = -ENOENT;
-> + ? ? ? ? ? ? ? goto out_no_resource;
-> + ? ? ? }
-> + ? ? ? upmx->phybase = res->start;
-> + ? ? ? upmx->physize = resource_size(res);
-> +
-> + ? ? ? if (request_mem_region(upmx->phybase, upmx->physize,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?DRIVER_NAME) == NULL) {
-> + ? ? ? ? ? ? ? ret = -EBUSY;
-> + ? ? ? ? ? ? ? goto out_no_memregion;
-> + ? ? ? }
-> +
-> + ? ? ? upmx->virtbase = ioremap(upmx->phybase, upmx->physize);
-> + ? ? ? if (!upmx->virtbase) {
-> + ? ? ? ? ? ? ? ret = -ENOMEM;
-> + ? ? ? ? ? ? ? goto out_no_remap;
-> + ? ? ? }
-> +
-> + ? ? ? /* Now register the pin controller and all pins it handles */
-> + ? ? ? upmx->pctl = pinctrl_register(&u300_pmx_desc, &pdev->dev, upmx);
-> + ? ? ? if (IS_ERR(upmx->pctl)) {
-> + ? ? ? ? ? ? ? dev_err(&pdev->dev, "could not register U300 pinmux driver\n");
-> + ? ? ? ? ? ? ? ret = PTR_ERR(upmx->pmx);
-> + ? ? ? ? ? ? ? goto out_no_pmx;
-> + ? ? ? }
-> + ? ? ? platform_set_drvdata(pdev, upmx);
-> +
-> + ? ? ? dev_info(&pdev->dev, "initialized U300 pinmux driver\n");
-> +
-> + ? ? ? return 0;
-> +
-> +out_no_pmx:
-> + ? ? ? iounmap(upmx->virtbase);
-> +out_no_remap:
-> + ? ? ? platform_set_drvdata(pdev, NULL);
-
-where have you set drv data to non-NULL?
-
-> +out_no_memregion:
-> + ? ? ? release_mem_region(upmx->phybase, upmx->physize);
-> +out_no_resource:
-> + ? ? ? kfree(upmx);
-> + ? ? ? return ret;
-> +}
-> +
-
--barry
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index e9eb36d..db6394a 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -1,12 +1,12 @@
+ obj-$(CONFIG_IMX_HAVE_DMA_V1) += dma-v1.o
+ 
+-obj-$(CONFIG_ARCH_MX1) += clock-imx1.o mm-imx1.o
+-obj-$(CONFIG_MACH_MX21) += clock-imx21.o mm-imx21.o
++obj-$(CONFIG_SOC_IMX1) += clock-imx1.o mm-imx1.o
++obj-$(CONFIG_SOC_IMX21) += clock-imx21.o mm-imx21.o
+ 
+-obj-$(CONFIG_ARCH_MX25) += clock-imx25.o mm-imx25.o ehci-imx25.o
++obj-$(CONFIG_SOC_IMX25) += clock-imx25.o mm-imx25.o ehci-imx25.o
+ 
+-obj-$(CONFIG_MACH_MX27) += cpu-imx27.o pm-imx27.o
+-obj-$(CONFIG_MACH_MX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
++obj-$(CONFIG_SOC_IMX27) += cpu-imx27.o pm-imx27.o
++obj-$(CONFIG_SOC_IMX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
+ 
+ obj-$(CONFIG_SOC_IMX31) += mm-imx31.o cpu-imx31.o clock-imx31.o iomux-imx31.o ehci-imx31.o
+ obj-$(CONFIG_SOC_IMX35) += mm-imx35.o cpu-imx35.o clock-imx35.o ehci-imx35.o
+-- 
+1.7.5.4
