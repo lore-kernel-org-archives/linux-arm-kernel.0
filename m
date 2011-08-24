@@ -1,58 +1,60 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 24 Aug 2011 15:09:07 +0200
-Subject: [RFC PATCH 01/10] OMAP2+: l3-noc: Add support for device-tree
+Date: Wed, 24 Aug 2011 15:09:08 +0200
+Subject: [RFC PATCH 02/10] arm/dts: OMAP4: Add a main ocp entry bound to
+	l3-noc driver
 In-Reply-To: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
 References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314191356-10963-2-git-send-email-b-cousson@ti.com>
+Message-ID: <1314191356-10963-3-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device-tree support for the l3-noc driver.
-
-Use platform_driver_register to defer the probing at device init
-time.
+Used the main OCP node to add bindings with the l3_noc driver.
+Remove l3_noc static device creation if CONFIG_OF is defined.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
 Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap_l3_noc.c |   16 ++++++++++++++--
- 1 files changed, 14 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap4.dtsi  |    3 ++-
+ arch/arm/mach-omap2/devices.c |    2 ++
+ 2 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_l3_noc.c b/arch/arm/mach-omap2/omap_l3_noc.c
-index 7b9f190..4630703 100644
---- a/arch/arm/mach-omap2/omap_l3_noc.c
-+++ b/arch/arm/mach-omap2/omap_l3_noc.c
-@@ -228,16 +228,28 @@ static int __exit omap4_l3_remove(struct platform_device *pdev)
- 	return 0;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 97a3ea7..928a74c 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -64,10 +64,11 @@
+ 	 * hierarchy.
+ 	 */
+ 	ocp {
+-		compatible = "simple-bus";
++		compatible = "ti,l3-noc", "arteris,noc", "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
++		hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+ 
+ 		gic: interrupt-controller at 48241000 {
+ 			compatible = "ti,omap4-gic", "arm,gic";
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 2d4a199..5964650 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -70,6 +70,7 @@ static int __init omap3_l3_init(void)
  }
+ postcore_initcall(omap3_l3_init);
  
-+#if defined(CONFIG_OF)
-+static const struct of_device_id l3_noc_match[] = {
-+	{.compatible = "arteris,noc", },
-+	{},
-+}
-+MODULE_DEVICE_TABLE(of, l3_noc_match);
-+#else
-+#define l3_noc_match NULL
-+#endif
-+
- static struct platform_driver omap4_l3_driver = {
-+	.probe		= omap4_l3_probe,
- 	.remove		= __exit_p(omap4_l3_remove),
- 	.driver		= {
--	.name		= "omap_l3_noc",
-+		.name		= "omap_l3_noc",
-+		.of_match_table = l3_noc_match,
- 	},
- };
- 
++#ifndef CONFIG_OF
  static int __init omap4_l3_init(void)
  {
--	return platform_driver_probe(&omap4_l3_driver, omap4_l3_probe);
-+	return platform_driver_register(&omap4_l3_driver);
+ 	int l, i;
+@@ -100,6 +101,7 @@ static int __init omap4_l3_init(void)
+ 	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
  }
- postcore_initcall_sync(omap4_l3_init);
+ postcore_initcall(omap4_l3_init);
++#endif
+ 
+ #if defined(CONFIG_VIDEO_OMAP2) || defined(CONFIG_VIDEO_OMAP2_MODULE)
  
 -- 
 1.7.0.4
