@@ -1,44 +1,65 @@
-From: sean@mess.org (Sean Young)
-Date: Wed, 24 Aug 2011 20:26:41 +0100
-Subject: [PATCH 2/2] [ARM] SheevaPlug: Add the blue led
-Message-ID: <1314214001-2731-2-git-send-email-sean@mess.org>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Thu, 25 Aug 2011 01:16:53 +0530
+Subject: [PATCH 0/2] OMAP: Update nr_irqs field in machine descriptors
+Message-ID: <1314215215-18683-1-git-send-email-svenkatr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also wire the green led to the right gpio. This has been tested
-on the standard SheevaPlug and eSATA SheevaPlug.
+As part of an effort to get single ARM kernel binary [1],
+multiple  definitions of NR_IRQS under various platforms
+have to be reconciled and abstracted away from common code.
 
-Signed-off-by: Sean Young <sean@mess.org>
----
- arch/arm/mach-kirkwood/sheevaplug-setup.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
+This patch series takes the small step of populating the 
+machine descriptors with the pre-existing nr_irqs field.
+Eventually, the common irq handler code will only look at this
+field and not the compile time constant.
 
-diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
-index 7ba2a08..47e38fb 100644
---- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
-+++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
-@@ -60,6 +60,12 @@ static struct gpio_led sheevaplug_led_pins[] = {
- 	},
- 	{
- 		.name			= "plug:green:health",
-+		.default_trigger	= "none",
-+		.gpio			= 48,
-+		.active_low		= 1,
-+	},
-+	{
-+		.name			= "plug:blue:health",
- 		.default_trigger	= "default-on",
- 		.gpio			= 49,
- 		.active_low		= 1,
-@@ -82,7 +88,8 @@ static struct platform_device sheevaplug_leds = {
- static unsigned int sheevaplug_mpp_config[] __initdata = {
- 	MPP29_GPIO,	/* USB Power Enable */
- 	MPP46_GPIO,	/* LED Red */
--	MPP49_GPIO,	/* LED */
-+	MPP48_GPIO,	/* LED Green */
-+	MPP49_GPIO,	/* LED Blue */
- 	0
- };
- 
--- 
-1.7.2.5
+[1]: https://blueprints.launchpad.net/ubuntu/+spec/kernel-maverick-arm-single-zimage
+
+Venkatraman S (2):
+  omap2+: Populate nr_irqs field in machine descriptors
+  omap1: Populate nr_irqs field in machine descriptors
+
+ arch/arm/mach-omap1/board-ams-delta.c      |    1 +
+ arch/arm/mach-omap1/board-fsample.c        |    1 +
+ arch/arm/mach-omap1/board-generic.c        |    1 +
+ arch/arm/mach-omap1/board-h2.c             |    1 +
+ arch/arm/mach-omap1/board-h3.c             |    1 +
+ arch/arm/mach-omap1/board-htcherald.c      |    1 +
+ arch/arm/mach-omap1/board-innovator.c      |    1 +
+ arch/arm/mach-omap1/board-nokia770.c       |    1 +
+ arch/arm/mach-omap1/board-osk.c            |    1 +
+ arch/arm/mach-omap1/board-palmte.c         |    1 +
+ arch/arm/mach-omap1/board-palmtt.c         |    1 +
+ arch/arm/mach-omap1/board-palmz71.c        |    1 +
+ arch/arm/mach-omap1/board-perseus2.c       |    1 +
+ arch/arm/mach-omap1/board-sx1.c            |    1 +
+ arch/arm/mach-omap1/board-voiceblue.c      |    1 +
+ arch/arm/mach-omap2/board-2430sdp.c        |    1 +
+ arch/arm/mach-omap2/board-3430sdp.c        |    1 +
+ arch/arm/mach-omap2/board-3630sdp.c        |    1 +
+ arch/arm/mach-omap2/board-4430sdp.c        |    1 +
+ arch/arm/mach-omap2/board-am3517crane.c    |    1 +
+ arch/arm/mach-omap2/board-am3517evm.c      |    1 +
+ arch/arm/mach-omap2/board-apollon.c        |    1 +
+ arch/arm/mach-omap2/board-cm-t35.c         |    2 ++
+ arch/arm/mach-omap2/board-cm-t3517.c       |    1 +
+ arch/arm/mach-omap2/board-devkit8000.c     |    1 +
+ arch/arm/mach-omap2/board-generic.c        |    1 +
+ arch/arm/mach-omap2/board-h4.c             |    1 +
+ arch/arm/mach-omap2/board-igep0020.c       |    2 ++
+ arch/arm/mach-omap2/board-ldp.c            |    1 +
+ arch/arm/mach-omap2/board-n8x0.c           |    3 +++
+ arch/arm/mach-omap2/board-omap3beagle.c    |    1 +
+ arch/arm/mach-omap2/board-omap3evm.c       |    1 +
+ arch/arm/mach-omap2/board-omap3logic.c     |    2 ++
+ arch/arm/mach-omap2/board-omap3pandora.c   |    1 +
+ arch/arm/mach-omap2/board-omap3stalker.c   |    1 +
+ arch/arm/mach-omap2/board-omap3touchbook.c |    1 +
+ arch/arm/mach-omap2/board-omap4panda.c     |    1 +
+ arch/arm/mach-omap2/board-overo.c          |    1 +
+ arch/arm/mach-omap2/board-rm680.c          |    1 +
+ arch/arm/mach-omap2/board-rx51.c           |    1 +
+ arch/arm/mach-omap2/board-ti8168evm.c      |    1 +
+ arch/arm/mach-omap2/board-zoom.c           |    2 ++
+ 42 files changed, 48 insertions(+), 0 deletions(-)
