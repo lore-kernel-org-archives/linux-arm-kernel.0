@@ -1,76 +1,59 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Wed, 24 Aug 2011 19:12:05 +0800
-Subject: [PATCH] mtd: check parts pointer before using it
-In-Reply-To: <20110824110826.GD23757@pulham.picochip.com>
-References: <1314183181-4197-1-git-send-email-jason.hui@linaro.org>
-	<20110824110826.GD23757@pulham.picochip.com>
-Message-ID: <CAB4PhKdjOpSsEKD6RyajEYajaApB2ifKPMLXwBxGb5WxQGJSfg@mail.gmail.com>
+From: robert.aden@crlsweden.com (Robert Aden)
+Date: Wed, 24 Aug 2011 13:12:23 +0200
+Subject: Gumstix: smc91x and CPU frequency scaling hangs system.
+Message-ID: <4E54DC97.8030602@crlsweden.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/24 Jamie Iles <jamie@jamieiles.com>:
-> Hi Jason,
->
-> On Wed, Aug 24, 2011 at 06:53:01PM +0800, Jason Liu wrote:
->> The code has the check for parts but it called after kmemdup,
->> kmemdup(parts, sizeof(*parts) * nr_parts,...)
->> if (!parts)
->> ? ? ? return -ENOMEM
->>
->> In fact, we need check parts before safely using it.
->>
->> Signed-off-by: Jason Liu <jason.hui@linaro.org>
->> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->> Cc: Artem Bityutskiy <artem.bityutskiy@intel.com>
->>
->> ---
->> This patch is based on git://git.infradead.org/users/dedekind/l2-mtd-2.6.git
->> ---
->> ?drivers/mtd/mtdcore.c | ? ?4 +---
->> ?1 files changed, 1 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
->> index 09bdbac..ce59ff5 100644
->> --- a/drivers/mtd/mtdcore.c
->> +++ b/drivers/mtd/mtdcore.c
->> @@ -465,12 +465,10 @@ int mtd_device_parse_register(struct mtd_info *mtd, const char **types,
->> ? ? ? struct mtd_partition *real_parts;
->>
->> ? ? ? err = parse_mtd_partitions(mtd, types, &real_parts, parser_data);
->> - ? ? if (err <= 0 && nr_parts) {
->> + ? ? if (err <= 0 && nr_parts && !parts) {
->
-> I don't think this is right. ?Don't we want to check that parts is !=
-> NULL? ?So
->
-> ? ? ? ?if (err <= 0 && nr_parts && parts)
->
-> instead? ?We don't want to kmemdup() NULL.
 
-My bad,  I type it error. Thanks for it.
+Hi everybody.
 
->
->> ? ? ? ? ? ? ? real_parts = kmemdup(parts, sizeof(*parts) * nr_parts,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?GFP_KERNEL);
->> ? ? ? ? ? ? ? err = nr_parts;
->> - ? ? ? ? ? ? if (!parts)
->> - ? ? ? ? ? ? ? ? ? ? err = -ENOMEM;
->
-> I think this hunk should be changed to:
->
-> ? ? ? ? ? ? ? ?if (!real_parts)
-> ? ? ? ? ? ? ? ? ? ? ? ?err = -ENOMEM;
->
-> and keep the check so that we're checking kmemdup()'s allocation is
-> successful.
+I'm not sure this is the right list to post to, but as the NIC chip 
+seems to be common
+on arm platforms, and the fact that Russell King has written parts of 
+the driver
+I will give it a try. Otherwise, someone perhaps could point me to the 
+right list?
 
-Yes, correct. Thanks,
+I'm using a gumstix verdex pro platform with the netpro-vx add-on board with
+kernel 2.6.32 + the gumstix-verdex pro platform support patches from 
+open-wrt.
+Everything is stable in normal operations.
 
->
-> Jamie
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+However, when enabling the cpu frequency scaling functionality on the 
+platform to
+save power, the system becomes very unstable. The only mode i can safely 
+use is
+the "powersave" mode in which case the CPU always run at it lowest speed.
+
+As soon as i use one of the other modes (conservative, ondemand, or 
+userspace)
+the platform either looses network connectivity, or hangs completely. 
+When only
+the networks stop working i can see a lot of the following i dmesg:
+
+smc_hard_start_xmit: smc91x: bank reg screwed (0x33fe)
+and
+smc_interrupt: smc91x: bank reg screwed (0x33fe)
+
+Sometimes the network comes back up again when the system load settles 
+and the
+cpu throttles back down, sometimes not.
+
+Is there a known issue with the smc91x driver and CPU scaling or am i 
+missing something?
+
+Regards, Robert.
+
+-- 
+Robert Aden, R&D Network Team
+Communication Research Labs Sweden AB
+
+Address: Gr?ndalsv?gen, 392 36 Kalmar, Sweden
+Cellular: +46 (0)70 425 95 77
+E-mail: robert.aden at crlsweden.com
+
+Skype: robert_crl
+www.crlsweden.com
+
+This communication is confidential and is only intended for the use of the individual or entity to which it is directed.  This Email (and any files or other attachments transmitted with it) is intended solely for the use of the addresee(s).  If you are not the intended recipient, please destroy all copies and notify the sender, you should not retain the message or disclose its contents to anyone.
