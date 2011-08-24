@@ -1,40 +1,66 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Wed, 24 Aug 2011 15:48:58 +0530
-Subject: [PATCH v4] OMAP4: hwmod data: I2C: add flag for context restore
-In-Reply-To: <1310906603-2673-1-git-send-email-shubhrajyoti@ti.com>
-References: <1310906603-2673-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <4E54D012.6050708@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 24 Aug 2011 12:17:20 +0200
+Subject: [RFC PATCH 7/7] documentation/dt: Add OMAP bindings
+In-Reply-To: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
+References: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
+Message-ID: <1314181040-22807-8-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 17 July 2011 06:13 PM, Shubhrajyoti D wrote:
-> Restore of context is not done for OMAP4. This patch
-> adds the OMAP_I2C_FLAG_RESET_REGS_POSTIDLE in the OMAP4
-> hwmod data which activates the restore for OMAP4.
-> Currently the OMAP4 does not hit device off still the
-> driver may have support for it.
-Could this patch be queued as well?
-> Reviewed-by: Kevin Hilman<khilman@ti.com>
-> Signed-off-by: Shubhrajyoti D<shubhrajyoti@ti.com>
-> ---
-> Applies on top of patches from Andy Green
-> http://www.spinics.net/lists/linux-i2c/msg05632.html
-> Tested on OMAP4430
->
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    3 ++-
->   1 files changed, 2 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> index 0fe9556..5e2c748 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -2130,7 +2130,8 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
->   };
->
->   static struct omap_i2c_dev_attr i2c_dev_attr = {
-> -	.flags  = OMAP_I2C_FLAG_BUS_SHIFT_NONE,
-> +	.flags  = OMAP_I2C_FLAG_BUS_SHIFT_NONE |
-> +			OMAP_I2C_FLAG_RESET_REGS_POSTIDLE,
->   };
->
->   /* i2c1 */
+Add a documentation to capture the specifics OMAP bindings
+needed for device-tree support.
+
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Randy Dunlap <rdunlap@xenotime.net>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+---
+ .../devicetree/bindings/arm/omap/omap.txt          |   38 ++++++++++++++++++++
+ 1 files changed, 38 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/omap.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+new file mode 100644
+index 0000000..845f9f1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -0,0 +1,38 @@
++* Texas Instruments OMAP
++
++OMAP is currently using a static file per SoC family to describe the
++IPs present in the SoC.
++On top of that an omap_device is created to extend the platform_device
++capabilities and to allow binding with one or several hwmods.
++The hwmods will contain all the information to build the device:
++adresse range, irq lines, dma lines, interconnect, PRCM register,
++clock domain, input clocks.
++For the moment just point to the existing hwmod, the next step will be
++to move data from hwmod to device-tree representation.
++
++
++Required properties:
++- compatible: Every devices present in OMAP SoC should be in the
++  form: "ti,XXX"
++- hwmods: list of hwmods attached to a device. Must contain at least
++  one hwmod.
++
++Optional properties:
++- no_idle_on_suspend: When present, it prevents the PM to idle the module
++  during suspend.
++
++
++Example:
++
++spinlock at 1 {
++    compatible = "ti,omap-spinlock";
++    hwmods = "spinlock";
++};
++
++
++Boards:
++- OMAP4 SDP : Software Developement Board
++  compatible = "ti,omap4-sdp", "ti,omap4430"
++
++- OMAP4 PandaBoard : Low cost community board
++  compatible = "ti,omap4-panda", "ti,omap4430"
+-- 
+1.7.0.4
