@@ -1,48 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Aug 2011 14:51:09 +0100
-Subject: ARM processor mode, kernel startup, Hyp / secure state
-In-Reply-To: <20051.57876.785018.498967@mariner.uk.xensource.com>
-References: <20051.48809.945431.800543@mariner.uk.xensource.com>
-	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
-	<20051.57876.785018.498967@mariner.uk.xensource.com>
-Message-ID: <20110824135109.GP32688@e102144-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Aug 2011 15:08:42 +0100
+Subject: [PATCH 1/4] Framework for exporting System-on-Chip information
+	via sysfs
+In-Reply-To: <20110810132956.GG2680@pulham.picochip.com>
+References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
+	<20110810132956.GG2680@pulham.picochip.com>
+Message-ID: <4E5505EA.6050207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+Hi Jamie,
 
-On Tue, Aug 23, 2011 at 06:23:32PM +0100, Ian Jackson wrote:
-> Catalin Marinas writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
-> > (I'll be on holiday from tomorrow, so not able to follow up until September).
+Thanks for reviewing this for me.
+
+Most of your comments I've adhered to, but I do have a question inline.
+
+>> +	return ret;
+>> +}
+>> +
+>> +int __init soc_device_register(struct device *soc_parent,
+>> +			struct soc_device *soc_dev)
+>> +{
+>> +	int ret;
+>> +
+>> +	spin_lock_irq(&register_lock);
+>> +
+>> +	if (!soc_count) {
+>> +		/* Register top-level SoC device '/sys/devices/soc' */
+>> +		ret = device_register(&soc_grandparent);
+>> +		if (ret)
+>> +		{
+>> +			spin_unlock_irq(&register_lock);
+>> +			return ret;
+>> +		}
+>> +	}
+>> +
+>> +	soc_count++;
+>> +	soc_parent->parent = &soc_grandparent;
+>> +	dev_set_name(soc_parent, "%i", soc_count);
+>> +	soc_parent->platform_data = soc_dev;
 > 
-> Right.  Let's try to be quick :-).
+> I don't think platform_data is the right place for this.  
 
-Ha, you've got enough people interested now that there's no need to rush!
+I agree with you, but I was unsure how else to get the data back.
 
-> > We had some discussions both with ARM partners and Christoffer and it
-> > is not clear how we go about initialising the Hyp mode. Most SoC
-> > vendors would probably just run Linux in non-secure SVC mode and would
-> > not touch the Hyp mode at all. Linux would issue an SMC to set the
-> > HVBAR (could do HVC but I expect that there is no secure monitor
-> > code). Once this is set, assuming that the Hyp MMU is disabled, Linux
-> > can invoke an HVC and initialise the Hyp mode.
+> It's not clear
+> what soc_parent and soc_dev do here as soc_dev never gets registered.
+>
+> Should this be:
 > 
-> Well, yes.  Do SoC vendors all expect to own the secure state ?
-> 
-> If so then the answer is perhaps simply that they should boot Linux in
-> Hyp mode (and expect Linux to drop to ordinary svc mode).
+> 	soc_dev->parent = &soc_grandparent;
+> 	dev_set_name(soc_dev, "%i", soc_count);
+> 	device_register(soc_dev);
 
-I think it's important to separate the problems of secure boot with the
-problems of installing a hypervisor. Whatever happens in secure world, we can
-expect to be dropped at either HYP mode or non-secure SVC mode. Sure, on a dev
-board you might run directly in the secure world so there's a bit of extra
-work to do to get out of that but then we can just drop into HVC mode and
-forget about it.
+AFAIK soc_dev can't be registered. It's just a container which holds
+each SoW's information to be exported in the way of const char *'s.
 
-> If we had a more functional bootloader setup (which AIUI is definitely
-> planned) we could do.
+struct soc_device {
+	struct device dev;
+	const char *machine;
+	const char *family;
+	const char *soc_id;
+	const char *revision;
+};
+
+I don't believe that the "struct device dev;" is required either, but
+this is something I was advised to put in.
+
+Can you think of a better way to store these values other than in
+platform_data then?
+
+> and drop soc_parent and add the files to soc_device?  In soc_info_get(), 
+> you could then do:
 > 
-> > > ? (b) If started in Hyp mode:
-> > > ? ? ? * Install a trivial hypervisor vector which unconditionally
-> > > ? ? ? ? copies r0 to HVBAR and returns
-> > > ? (c) Rest of startup.
+> 	struct soc_device *soc = container_of(dev, struct soc_device, dev);
+> 
+>> +	spin_unlock_irq(&register_lock);
+>> +
+>> +	ret = device_register(soc_parent);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	soc_device_create_files(soc_parent);
+>> +
+>> +	return ret;
+>> +}
+
+Kind regards,
+Lee
