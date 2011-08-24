@@ -1,27 +1,35 @@
-From: armkernel8@gmail.com (Moon Hwa Hong)
-Date: Wed, 24 Aug 2011 23:58:01 +0900
-Subject: MMU enable code in boot/compressed/head.S
-Message-ID: <CAFWwQu8Q2=5AMoG+Y1egWHZS9MYejOq78vrrUJVub2=64e4VSQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Aug 2011 17:21:52 +0200
+Subject: [PATCH 4/4] Move top level platform devices in sysfs to
+	/sys/devices/soc/X
+In-Reply-To: <CAKnu2Mrzi=mPsHjPePWxyr6Pt5FvBnzFq432SezvgtV+_Jh3Ng@mail.gmail.com>
+References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
+	<20110811152239.GB13745@suse.de>
+	<CAKnu2Mrzi=mPsHjPePWxyr6Pt5FvBnzFq432SezvgtV+_Jh3Ng@mail.gmail.com>
+Message-ID: <201108241721.52908.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I started arm linux kernel hacking.
-I can't understand 554 line.
-I think that 554 line is not necessary.
-Because ISB instruction(556 line) makes synchronization between 553 and 557.
-Please advice to me.
+On Thursday 11 August 2011, Linus Walleij wrote:
+> 2011/8/11 Greg KH <gregkh@suse.de>:
+> 
+> > Ok, if you get guarantees from anyone using the in-kernel platform soc
+> > code that this move is acceptable, and you guarantee that no userspace
+> > tools will break, that's fine.  But odds are, you are going to break
+> > something...
+> 
+> Yeah I know, but I strongly suspect that these userspace tools are
+> created by the same organization that should've consulted me and
+> the rest of the community about it in the first place, so I'll cope with
+> it and write patches as I get flamed.
 
+Right. Greg, note that the u8500 platform is still only partially supported
+upstream, the majority of the necessary device drivers for having a 
+running system is not there and those drivers keep getting changed
+in order to be merged upstream.
 
-530 __armv7_mmu_cache_on:
-.
-.
-.
-553         mcr p15, 0, r0, c1, c0, 0   @ load control register
-554         mrc p15, 0, r0, c1, c0, 0   @ and read it back
-555         mov r0, #0
-556         mcr p15, 0, r0, c7, c5, 4   @ ISB
-557         mov pc, r12
+Further, with the move of the platform to device tree based probing,
+the position of all devices will change as well, to resemble the physical
+HW layout.
 
-Have a nice day.
-
-MH Hong.
+	Arnd
