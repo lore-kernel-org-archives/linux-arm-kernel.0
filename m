@@ -1,29 +1,23 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Wed, 24 Aug 2011 10:22:18 -0700
-Subject: [PATCH 2/2] arm: mach-bcmring: fix build error in dma.c
-In-Reply-To: <CAMhs6Yx6DDA4guyiUEQ6K74iouQcqA5rpvo6iY+Qd_Vdi0GhGg@mail.gmail.com>
-References: <20110823112128.GA2825@maxin> <4E53D8D4.5080208@broadcom.com>
-	<CAMhs6Yx6DDA4guyiUEQ6K74iouQcqA5rpvo6iY+Qd_Vdi0GhGg@mail.gmail.com>
-Message-ID: <4E55334A.9030102@broadcom.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 24 Aug 2011 18:27:04 +0100
+Subject: [alsa-devel] [PATCH v2 1/1] ASoC: soc-core: check rate for
+	symmetry only when pcm is active
+In-Reply-To: <4E552F5F.9070801@metafoo.de>
+References: <1314183728-23627-1-git-send-email-b29396@freescale.com>
+	<4E5520CE.60204@ti.com> <4E552F5F.9070801@metafoo.de>
+Message-ID: <20110824172703.GF16653@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/23/2011 11:28 PM, Maxin B John wrote:
-> On Tue, Aug 23, 2011 at 7:44 PM, Jiandong Zheng<jdzheng@broadcom.com>  wrote:
->> On 8/23/2011 4:21 AM, Maxin B John wrote:
->>>
->>>   CC      arch/arm/mach-bcmring/dma.o
->>>
->> Signed-off-by: Jiandong Zheng<jdzheng@broadcom.com>
->>
->> I have same fix submitted on May 12, which was supposed to be applied soon
->> but seems it wasn't.
->
-> Oh.. I wasn't aware of that. Please feel free to ignore this one and
-> go ahead with your patch.
->
-> Regards,
-> Maxin
->
-Seems the previous patch was lost. Let us just go ahead with this one in 
-order to get it fixed sooner.
+On Wed, Aug 24, 2011 at 07:05:35PM +0200, Lars-Peter Clausen wrote:
+
+> A more sensible solution would in my opinion be to save the current rate in the
+> dai struct itself and not in the pcm struct. Upon opening a stream check for
+> cpu and codec DAI whether they require symmetry. If they do and are active
+> constraint the rate to DAIs rate. This also ensures that if boths DAIs are
+> already active and are running at different rates there will be no valid rate
+> for the new stream.
+
+We need to store in all three places I think - the symmetry requirement
+can also come from the link itself.  But generally this is what we're
+actually looking for, yes.
