@@ -1,43 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Aug 2011 18:45:37 +0100
-Subject: [PATCH v4 0/8] MMU disabling code and kexec fixes
-In-Reply-To: <alpine.LFD.2.00.1108241323540.20358@xanadu.home>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1108232120590.20358@xanadu.home>
-	<20110824105848.GE32688@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1108241035400.20358@xanadu.home>
-	<20110824165938.GT32688@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1108241323540.20358@xanadu.home>
-Message-ID: <20110824174537.GW32688@e102144-lin.cambridge.arm.com>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Wed, 24 Aug 2011 13:51:55 -0400
+Subject: [PATCH v2] ARM: vexpress: Use wfi macro in platform_do_lowpower.
+In-Reply-To: <20110822135952.GE2796@pulham.picochip.com>
+References: <CAHkRjk6Fq+1b_uM+DFACS1QVd7B6_1XhqRw-27i88U1VyvLk+Q@mail.gmail.com>
+	<1314021259-31710-1-git-send-email-nbowler@elliptictech.com>
+	<20110822135952.GE2796@pulham.picochip.com>
+Message-ID: <20110824175155.GA13380@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 06:30:07PM +0100, Nicolas Pitre wrote:
-> On Wed, 24 Aug 2011, Will Deacon wrote:
-> 
-> > On Wed, Aug 24, 2011 at 03:53:44PM +0100, Nicolas Pitre wrote:
-> > > On Wed, 24 Aug 2011, Will Deacon wrote:
-> > > > On top of that, I'd like to use the bottom of this page as a holding pen
-> > > > for secondary CPUs when doing an SMP kexec. In this case, the new kernel
-> > > > needs to take care not to allocate the page for general use. I suppose we
-> > > > could fix this with a new ATAG / FDT property but that seems a bit overkill.
-> > > 
-> > > Is it?
+On 2011-08-22 14:59 +0100, Jamie Iles wrote:
+> On Mon, Aug 22, 2011 at 09:54:19AM -0400, Nick Bowler wrote:
+> > Current Versatile Express CPU hotplug code includes a hardcoded WFI
+> > instruction, in ARM encoding.  When the kernel is compiled in Thumb-2
+> > mode, this is invalid and causes the machine to hang hard when a CPU
+> > is offlined.
 > > 
-> > Well it means re-encoding a DT blob from within the kernel so that we can
-> > tell the next kernel not to allocate from a given page of physical memory.
-> > If we already have this infrastructure, then great, but it looks to me like
-> > it only lives within dtc (as libfdt) at the moment.
+> > Using the wfi macro (which uses the appropriate assembler mnemonic)
+> > causes the correct instruction to be emitted in either case.  As a
+> > consequence of this change, an apparently vestigial "cc" clobber is
+> > dropped from the asm (the macro uses "memory" only).
+> > 
+> > Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
+> > ---
 > 
-> Hmmm... The kexec user space tools know how to manipulate a device tree 
-> for the next kernel, right?  So it's only a matter for it to ask the 
-> current kernel what the physical address for that page is and stuff it 
-> into the FDT it is preparing already.
+> Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+> 
+> if it helps!
 
-oo-er, it seems a bit odd telling userspace about that address but it does
-fix the problem. I can't think of a better idea, so I'll start looking for a
-sane interface for passing this address back.
+Thanks!
 
-Thanks for the help,
+Since there seem to be no objections, I'll send this off to Russell's
+tracker.
 
-Will
+Cheers,
+-- 
+Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
