@@ -1,23 +1,29 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Wed, 24 Aug 2011 15:26:56 +0530
-Subject: [PATCH 2/3] mach-ux500: initialize l2x0 at arch_init time
-In-Reply-To: <1314177826-19151-1-git-send-email-linus.walleij@stericsson.com>
-References: <1314177826-19151-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4E54CAE8.1060702@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 24 Aug 2011 12:10:29 +0200
+Subject: [GIT PULL] at91: fixes for 3.1
+Message-ID: <4E54CE15.1020504@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 August 2011 02:53 PM, Linus Walleij wrote:
-> From: Linus Walleij<linus.walleij@linaro.org>
->
-> mach-imx initialize their l2x0 cach at arch_init time, so
-> why shouldn't we.
->
-More and more you delay L2 cache enable in boot-process,
-your boot-up time is going to shoot-up.
+Hi Arnd,
 
-Have you thought about it. Cache's should be enabled as
-early as possible.
+Can you please pull this "fixes" patch since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
 
-Regards
-Ssantosh
+  Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+
+It is available in the git repository at:
+  git://github.com/at91linux/linux-2.6-at91.git at91-fixes
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+      at91: at91sam9261.c: fix typo in t2_clk alias for atmel_tcb.0
+
+ arch/arm/mach-at91/at91sam9261.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+It is a single patch but I prefer to send you a 
+pull request as it may integrate better with your
+flow...
+
+Thanks a lot, bye,
+-- 
+Nicolas Ferre
