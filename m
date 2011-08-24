@@ -1,154 +1,73 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 24 Aug 2011 22:12:03 +0530
-Subject: [RFC: PATCH 4/4] AM335X: Add low level debugging support
-In-Reply-To: <1313058630-32447-5-git-send-email-hvaibhav@ti.com>
-References: <hvaibhav@ti.com>
-	<1313058630-32447-5-git-send-email-hvaibhav@ti.com>
-Message-ID: <19F8576C6E063C45BE387C64729E739404EC007CB7@dbde02.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Aug 2011 17:59:38 +0100
+Subject: [PATCH v4 0/8] MMU disabling code and kexec fixes
+In-Reply-To: <alpine.LFD.2.00.1108241035400.20358@xanadu.home>
+References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1108232120590.20358@xanadu.home>
+	<20110824105848.GE32688@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1108241035400.20358@xanadu.home>
+Message-ID: <20110824165938.GT32688@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hiremath, Vaibhav
-> Sent: Thursday, August 11, 2011 4:01 PM
-> To: linux-omap at vger.kernel.org
-> Cc: tony at atomide.com; Hilman, Kevin; paul at pwsan.com; linux-arm-
-> kernel at lists.infradead.org; Mohammed, Afzal; Hiremath, Vaibhav
-> Subject: [RFC: PATCH 4/4] AM335X: Add low level debugging support
+On Wed, Aug 24, 2011 at 03:53:44PM +0100, Nicolas Pitre wrote:
+> On Wed, 24 Aug 2011, Will Deacon wrote:
+> > On Wed, Aug 24, 2011 at 02:25:36AM +0100, Nicolas Pitre wrote:
+> > > Is this really necessary?  Relying on "known physical address" is often 
+> > > going to lead us in situations where that physical address get encoded 
+> > > outside the kernel proper and then we're stuck with it forever.  This 
+> > > would be more "reliable" if the interface would be passed that address 
+> > > and if the page was dynamically allocated/freed.
+> > 
+> > We don't want to allocate this dynamically because we need to avoid the
+> > situation where the virtual address of this page aliases with the physical
+> > address of the reset code. By keeping the page close to the start of
+> > physical memory, we avoid this scenario.
 > 
-> From: Afzal Mohammed <afzal@ti.com>
+> Well... how probable might this be the case in practice?
 > 
-> Add support for low level debugging on AM335X EVM. Currently only
-> support for UART1 console, which is used on AM335X EVM is added.
-> 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> ---
->  arch/arm/mach-omap2/include/mach/debug-macro.S |   21
-> +++++++++++++++++++++
->  arch/arm/plat-omap/include/plat/serial.h       |    4 ++++
->  arch/arm/plat-omap/include/plat/uncompress.h   |    6 ++++++
->  3 files changed, 31 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S
-> b/arch/arm/mach-omap2/include/mach/debug-macro.S
-> index 309e328..a99ddbd 100644
-> --- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-> +++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-> @@ -78,6 +78,8 @@ omap_uart_lsr:	.word	0
->  		beq	82f			@ configure UART2
->  		cmp	\rp, #TI81XXUART3	@ ti81Xx UART offsets different
->  		beq	83f			@ configure UART3
-> +		cmp	\rp, #AM335XUART1	@ AM335X UART offsets different
-> +		beq	84f			@ configure UART1
->  		cmp	\rp, #ZOOM_UART		@ only on zoom2/3
->  		beq	95f			@ configure ZOOM_UART
-> 
-> @@ -106,6 +108,8 @@ omap_uart_lsr:	.word	0
->  		b	98f
->  83:		mov	\rp, #UART_OFFSET(TI81XX_UART3_BASE)
->  		b	98f
-> +84:		mov	\rp, #UART_OFFSET(AM335X_UART1_BASE)
-[Hiremath, Vaibhav] My bad, the above line results into build failure when you enable DEBUG_LL option,
+> And wouldn't this issue easily being worked around simply by allocating 
+> a second page if the first one is found to alias?  Surely the reset code 
+> is much smaller than a page.
 
-    arch/arm/kernel/debug.S: Assembler messages:
-    arch/arm/kernel/debug.S:138: Error: invalid constant (408) after fixup
-    arch/arm/kernel/debug.S:157: Error: invalid constant (e09000) after fixup
-    arch/arm/kernel/debug.S:173: Error: invalid constant (e09000) after fixup
-    make[1]: *** [arch/arm/kernel/debug.o] Error 1
-    make: *** [arch/arm/kernel] Error 2
+Ok, so we can probably get around this corner case by checking for the alias
+and reallocating in the next section (the ID mapping is done at the section
+granularity).
 
-
-When I submitted the patch, I only tried building it with omap2plus_defconfig and missed to enable DEBUG_LL option. 
-
-I have fixed it with following change,
-
--84:            mov     \rp, #UART_OFFSET(AM335X_UART1_BASE)
-+84:            ldr     \rp, =AM335X_UART1_BASE
-+               and     \rp, \rp, #0x00ffffff
-
-This will get merged in next patch version.
-
-Thanks,
-Vaibhav
-
-
-> +		b	97f
->  95:		ldr	\rp, =ZOOM_UART_BASE
->  		mrc	p15, 0, \rv, c1, c0
->  		tst	\rv, #1			@ MMU enabled?
-> @@ -121,6 +125,23 @@ omap_uart_lsr:	.word	0
->  		b	10b
+> > On top of that, I'd like to use the bottom of this page as a holding pen
+> > for secondary CPUs when doing an SMP kexec. In this case, the new kernel
+> > needs to take care not to allocate the page for general use. I suppose we
+> > could fix this with a new ATAG / FDT property but that seems a bit overkill.
 > 
->  		/* Store both phys and virt address for the uart */
-> +97:		add	\rp, \rp, #0x44000000	@ phys base
-> +		mrc	p15, 0, \rv, c1, c0
-> +		tst	\rv, #1			@ MMU enabled?
-> +		ldreq	\rv, =omap_uart_v2p(omap_uart_phys)	@ MMU disabled
-> +		ldrne	\rv, =omap_uart_phys	@ MMU enabled
-> +		str	\rp, [\rv, #0]
-> +		sub	\rp, \rp, #0x44000000	@ phys base
-> +		add	\rp, \rp, #0xf9000000	@ virt base
-> +		add	\rv, \rv, #4		@ omap_uart_virt
-> +		str	\rp, [\rv, #0]
-> +		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
-> +		add	\rv, \rv, #4		@ omap_uart_lsr
-> +		str	\rp, [\rv, #0]
-> +
-> +		b	10b
-> +
-> +		/* Store both phys and virt address for the uart */
->  98:		add	\rp, \rp, #0x48000000	@ phys base
->  		mrc	p15, 0, \rv, c1, c0
->  		tst	\rv, #1			@ MMU enabled?
-> diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-
-> omap/include/plat/serial.h
-> index 865b13e..d7c1216 100644
-> --- a/arch/arm/plat-omap/include/plat/serial.h
-> +++ b/arch/arm/plat-omap/include/plat/serial.h
-> @@ -59,6 +59,9 @@
->  /* AM3505/3517 UART4 */
->  #define AM35XX_UART4_BASE	0x4809E000	/* Only on AM3505/3517 */
+> Is it?
+
+Well it means re-encoding a DT blob from within the kernel so that we can
+tell the next kernel not to allocate from a given page of physical memory.
+If we already have this infrastructure, then great, but it looks to me like
+it only lives within dtc (as libfdt) at the moment.
+
+> > I was also thinking that it might be useful if bootloaders want to throw all
+> > of the CPUs at the kernel during boot, rather than implementing their own
+> > SMP pen. In this case, they could make use of this reserved page (I was
+> > planning to version the pen implementation).
 > 
-> +/* AM335X serial port */
-> +#define AM335X_UART1_BASE	0x44E09000
-> +
->  /* External port on Zoom2/3 */
->  #define ZOOM_UART_BASE		0x10000000
->  #define ZOOM_UART_VIRT		0xfa400000
-> @@ -92,6 +95,7 @@
->  #define TI81XXUART1		81
->  #define TI81XXUART2		82
->  #define TI81XXUART3		83
-> +#define AM335XUART1		84
->  #define ZOOM_UART		95		/* Only on zoom2/3 */
-> 
->  /* This is only used by 8250.c for omap1510 */
-> diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-
-> omap/include/plat/uncompress.h
-> index 8d052e7..3592ce4 100644
-> --- a/arch/arm/plat-omap/include/plat/uncompress.h
-> +++ b/arch/arm/plat-omap/include/plat/uncompress.h
-> @@ -97,6 +97,10 @@ static inline void flush(void)
->  	_DEBUG_LL_ENTRY(mach, TI81XX_UART##p##_BASE, OMAP_PORT_SHIFT,	\
->  		TI81XXUART##p)
-> 
-> +#define DEBUG_LL_AM335X(p, mach)					\
-> +	_DEBUG_LL_ENTRY(mach, AM335X_UART##p##_BASE, OMAP_PORT_SHIFT,	\
-> +		AM335XUART##p)
-> +
->  static inline void __arch_decomp_setup(unsigned long arch_id)
->  {
->  	int port = 0;
-> @@ -178,6 +182,8 @@ static inline void __arch_decomp_setup(unsigned long
-> arch_id)
->  		/* TI8148 base boards using UART1 */
->  		DEBUG_LL_TI81XX(1, ti8148evm);
-> 
-> +		/* AM335x base boards using UART1 */
-> +		DEBUG_LL_AM335X(1, am335xevm);
->  	} while (0);
->  }
-> 
-> --
-> 1.6.2.4
+> I get really uncomfortable at the prospect of having more _implicit_ 
+> dependencies between the kernel and bootloaders.  If ever we want to 
+> move things around for whatever reasons in the future then such fixed 
+> legacy addresses might really get in the way.  So I don't see the 
+> passing of that info using an ATAG or a DT node as something not bad at 
+> all.  This becomes just another resource provided to the kernel, like 
+> the ramdisk image, that can be located almost anywhere. And then you 
+> have no backward compatibility issues either as the page validity 
+> becomes explicit.
+
+Ok, point taken on the bootloader interface, I'd just rather have a way to
+make this unreliable to bootloaders without having to re-encode the .dtb in
+the kexec code.
+
+Can you think of any clever tricks so that we only look at this pen when
+we're being kexec'd?
+
+Cheers,
+
+Will
