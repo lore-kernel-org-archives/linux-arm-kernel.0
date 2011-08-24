@@ -1,44 +1,43 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Thu, 25 Aug 2011 01:03:55 +0200
-Subject: i.MX multi SoC patches
-In-Reply-To: <1314172987-10349-1-git-send-email-s.hauer@pengutronix.de>
-References: <1314172987-10349-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAODfWeFeaw2+xe01c5fiSr1tYsdM8J8ahZz8t-B7uuD+-P0GCQ@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 25 Aug 2011 01:15:25 +0200
+Subject: try_to_freeze() called with IRQs disabled on ARM
+In-Reply-To: <20110823223518.GI2803@mtj.dyndns.org>
+References: <20110823151936.GM9232@opensource.wolfsonmicro.com>
+	<CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
+	<20110823223518.GI2803@mtj.dyndns.org>
+Message-ID: <201108250115.25987.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
+On Wednesday, August 24, 2011, Tejun Heo wrote:
+> On Wed, Aug 24, 2011 at 12:17:03AM +0200, Tejun Heo wrote:
+> > if (freezing() && IRQ disabled) {
+> >       bust on IRQ;
+> >       try_to_freeze();
+> >       replug IRQ;
+> > }
+> > 
+> > But, that can't be right. The current code isn't triggering warning
+> > from scheduler code, right? If the above is the case, it should be
+> > triggering that. What am I missing?
+> 
+> I think the refrigerator() code was actually doing that through
+> spin_[un]lock_irq(), so it was accidentally masking the problem.  It
+> definitely seems to need fixing.
+> 
+> Anyways, for now, we can do two things,
+> 
+> 1. if (freezing()) { irq_save; try_to_freeze(); irq_restore; } w/ BIG
+>    FAT UGLY comment.
+> 
+> 2. Drop might_sleep() from try_to_freeze().  Moving it to
+>    refrigerator() wouldn't help much.  It would just trigger more
+>    sporadically during freeze, which is arguably worse than now.
+> 
+> I'd prefer #1 given that it documents the breakage while also
+> restoring the IRQ state afterwards FWIW.
 
-2011/8/24 Sascha Hauer <s.hauer@pengutronix.de>:
-> This is hopefully the last iteration of the patches for compiling
-> all ARMv4/v5 based i.MXs together. CONFIG_ARM_PATCH_PHYS_VIRT
-> lost its experimental status and we can still build uImages
-> even with CONFIG_AUTO_ZRELADDR enabled. This series selects
-> these options and makes a multi SoC image the default.
-> Also, we can now build all i.MX5 SoCs into a single image.
-> This series also updates the defconfigs.
+OK, I'm fine with 1.
 
-Thanks very much for doing this work, it is very much appreciated.
-I have not yet been able to test this work at runtime, but I have
-attempted to compile
-your branch 'imx-features' which seems to keep all this work. I have
-noticed a name
-clashing producing the following compile time error:
-
-arch/arm/plat-mxc/devices/platform-pata_imx.c:33: error:
-?MX51_INT_ATA? undeclared here (not in a function)
-
-Lurking a bit in the archive I noticed that Uwe patch
-<http://patchwork.ozlabs.org/patch/106633/> it is assumed, but not applied.
-Attached there is a refreshed patch which applies to your 'imx-features' branch.
-
-With kind regards,
--- 
-?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ARM-mx5-fix-remaining-unconsistent-names-for-irqs-v2.patch
-Type: text/x-patch
-Size: 8976 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110825/506838f5/attachment-0001.bin>
+Thanks,
+Rafael
