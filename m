@@ -1,45 +1,90 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 24 Aug 2011 14:15:54 +0100
-Subject: [PATCH 06/11] clk: Provide a dummy clk_unregister()
+Date: Wed, 24 Aug 2011 14:15:51 +0100
+Subject: [PATCH 03/11] clk: Add fixed-rate clock
 In-Reply-To: <1314191759-16941-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20110824131324.GB16520@opensource.wolfsonmicro.com>
 	<1314191759-16941-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1314191759-16941-6-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1314191759-16941-3-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though unregistration is not actually supported by the clk API it is
-still useful to provide a clk_unregister() so that drivers can implement
-their unregistration code. This saves having to go back later and update
-them once unregistration is possible.
+From: Jeremy Kerr <jeremy.kerr@canonical.com>
 
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- include/linux/clk.h |   15 +++++++++++++++
- 1 files changed, 15 insertions(+), 0 deletions(-)
+ drivers/clk/Kconfig     |    4 ++++
+ drivers/clk/Makefile    |    1 +
+ drivers/clk/clk-fixed.c |   17 +++++++++++++++++
+ include/linux/clk.h     |   14 ++++++++++++++
+ 4 files changed, 36 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/clk-fixed.c
 
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index c53ed59..d8313d7 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -8,3 +8,7 @@ config HAVE_MACH_CLKDEV
+ 
+ config GENERIC_CLK
+ 	bool
++
++config GENERIC_CLK_FIXED
++	bool
++	depends on GENERIC_CLK
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 570d5b9..9a3325a 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -1,3 +1,4 @@
+ 
+ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+ obj-$(CONFIG_GENERIC_CLK)	+= clk.o
++obj-$(CONFIG_GENERIC_CLK_FIXED)	+= clk-fixed.o
+diff --git a/drivers/clk/clk-fixed.c b/drivers/clk/clk-fixed.c
+new file mode 100644
+index 0000000..47a27f9
+--- /dev/null
++++ b/drivers/clk/clk-fixed.c
+@@ -0,0 +1,17 @@
++
++#include <linux/clk.h>
++#include <linux/module.h>
++
++#define to_clk_fixed(c) container_of(c, struct clk_hw_fixed, hw)
++
++static unsigned long clk_fixed_recalc_rate(struct clk_hw *hw)
++{
++	return to_clk_fixed(hw)->rate;
++}
++
++struct clk_hw_ops clk_fixed_ops = {
++	.recalc_rate = clk_fixed_recalc_rate,
++};
++EXPORT_SYMBOL_GPL(clk_fixed_ops);
++
++
 diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 2ca4f66..df5c64f 100644
+index e0969d2..fd62e86 100644
 --- a/include/linux/clk.h
 +++ b/include/linux/clk.h
-@@ -149,6 +149,21 @@ extern struct clk_hw_ops clk_gate_ops;
- struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
- 			 const char *name);
+@@ -110,6 +110,20 @@ int clk_prepare(struct clk *clk);
+  */
+ void clk_unprepare(struct clk *clk);
  
-+/**
-+ * clk_unregister - remove a clock
-+ *
-+ * @clk: clock to unregister
-+ *
-+ * Remove a clock from the clk subsystem.  This is currently not
-+ * implemented but is provided to allow unregistration code to be
-+ * written in drivers ready for use when an implementation is
-+ * provided.
-+ */
-+static inline int clk_unregister(struct clk *clk)
-+{
-+	return -ENOTSUPP;
-+}
++/* Base clock implementations. Platform clock implementations can use these
++ * directly, or 'subclass' as approprate */
++
++#ifdef CONFIG_GENERIC_CLK_FIXED
++
++struct clk_hw_fixed {
++	struct clk_hw	hw;
++	unsigned long	rate;
++};
++
++extern struct clk_hw_ops clk_fixed_ops;
++
++#endif /* CONFIG_GENERIC_CLK_FIXED */
 +
  #else /* !CONFIG_GENERIC_CLK */
  
