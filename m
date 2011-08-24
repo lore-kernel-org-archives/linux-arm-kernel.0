@@ -1,43 +1,45 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 24 Aug 2011 11:23:55 +0200
-Subject: [PATCH 3/3] mach-ux500: unlock I&D l2x0 caches before init
-Message-ID: <1314177835-19186-1-git-send-email-linus.walleij@stericsson.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 24 Aug 2011 10:24:07 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20110823221800.GA21084@e102144-lin.cambridge.arm.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CA+wbFdcv_BsHaVwoqgF5yx6scXOodHkKjdVtarqJwjy_GFrAJQ@mail.gmail.com>
+	<20110823221800.GA21084@e102144-lin.cambridge.arm.com>
+Message-ID: <20110824092407.GA2078@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Tue, Aug 23, 2011 at 11:18:00PM +0100, Will Deacon wrote:
+> Dave,
+> 
+> On Tue, Aug 23, 2011 at 05:50:19PM +0100, Dave Martin wrote:
+> > On Tue, Aug 23, 2011 at 3:52 PM, Ian Jackson <Ian.Jackson@eu.citrix.com> wrote:
+> > > At first I thought that the best thing to do would be to boot the
+> > > kernel in any suitable mode, and have the kernel automatically detect
+> > > the starting mode. ?I started writing code in linux's head.S to do
+> > > this. ?However, detecting whether we are in secure state is very
+> > > difficult: it involves deliberately risking an undefined instruction
+> > > trap. ?The code for this was getting rather long and involved.
+> > 
+> > There may be a safe way to do this check -- for example, on ARM1176
+> > and Cortex-A8 there is a CP14 debug status/control register that you can
+> > read which includes a flag indicating which world you're in.  This isn't part
+> > of the architecture though and may be different/not possible on some
+> > CPUs.
+> 
+> Please don't do this! Accessing the debug registers via the CP14 registers
+> is like playing russian roulette with a machine gun, especially when you
+> have various hypervisor registers and hardware lock registers to contend
+> with. For 3.2, I will be guarding all of the hw_breakpoint init debug
+> probing with an undef_hook because I'm sick of blowing my head off when
+> systems are configured to keep debug out.
 
-Apparently U8500 U-Boot versions may leave the l2x0 locked down
-before executing the kernel. Make sure we unlock it before we
-initialize the l2x0.
+Heh -- I didn't think it was quite that scary, but point taken.
 
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/cache-l2x0.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index aa2d77f..f5c31f1 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -59,6 +59,16 @@ static int ux500_l2x0_init(void)
- 	else
- 		ux500_unknown_soc();
- 
-+	/*
-+	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
-+	 * apparently locks both caches before jumping to the kernel.
-+	 */
-+	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_D) & 0xFF)
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D);
-+
-+	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_I) & 0xFF)
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I);
-+
- 	/* 64KB way size, 8 way associativity, force WA */
- 	l2x0_init(l2x0_base, 0x3e060000, 0xc0000fff);
- 
--- 
-1.7.3.2
+> > All in all, it's better to engineer things so that the check doesn't need to
+> > be done at all
+> 
+> Agreed. I think it's better to assume that you can't detect whether you're
+> running in secure state or not.
+> 
+> Will
