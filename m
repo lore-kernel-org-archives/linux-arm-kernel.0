@@ -1,44 +1,50 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 24 Aug 2011 18:11:14 +0800
-Subject: [PATCH] arm: fix compile failure in orion5x/dns323-setup.c
-In-Reply-To: <20110802095604.GA22637@linux-mips.org>
-References: <1312216934-29710-1-git-send-email-paul.gortmaker@windriver.com>
-	<20110802095604.GA22637@linux-mips.org>
-Message-ID: <CAK5ve-L+ZZFD3rQMwp638V+NfrHqth2dAXGEeK+iBzFP-EHOzg@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 24 Aug 2011 19:12:10 +0900
+Subject: [PATCH 2/3] mach-ux500: initialize l2x0 at arch_init time
+In-Reply-To: <4E54CAE8.1060702@ti.com>
+References: <1314177826-19151-1-git-send-email-linus.walleij@stericsson.com>
+	<4E54CAE8.1060702@ti.com>
+Message-ID: <CAH9JG2W+KkTZJ67eDqju3jQfc8OZhf0gBzKvhSodpOQS=-q2kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On Wed, Aug 24, 2011 at 6:56 PM, Santosh <santosh.shilimkar@ti.com> wrote:
+> On Wednesday 24 August 2011 02:53 PM, Linus Walleij wrote:
+>>
+>> From: Linus Walleij<linus.walleij@linaro.org>
+>>
+>> mach-imx initialize their l2x0 cach at arch_init time, so
+>> why shouldn't we.
+>>
+> More and more you delay L2 cache enable in boot-process,
+> your boot-up time is going to shoot-up.
+>
+> Have you thought about it. Cache's should be enabled as
+> early as possible.
 
-I guess you can add your Ack to Paul's patch here.
+Right, after change from early_init to arch_init. it takes more time.
 
-Arnd, could you please add this patch into your tree, as it's a
-obvious right fixing.
+Before:
+...
+[    0.046683] L310 cache controller enabled
+[    0.046697] l2x0: 16 ways, CACHE_ID 0x4100c4c5, AUX_CTRL
+0x7e470001, Cache size: 1048576 B
+[    0.096785] CPU1: Booted secondary processor
+[    0.096812] CPU1: Unknown IPI message 0x1
+[    0.116577] Brought up 2 CPUs
+[    0.116591] SMP: Total of 2 processors activated (3181.77 BogoMIPS).
+...
+[    1.602813] Freeing init memory: 124K
 
-Thanks,
--Bryan
+After:
+[    0.116616] SMP: Total of 2 processors activated (3181.77 BogoMIPS).
+[    0.128712] print_constraints: dummy:
+...
+[    0.135811] L310 cache controller enabled
+[    0.135825] l2x0: 16 ways, CACHE_ID 0x4100c4c5, AUX_CTRL
+0x7e470001, Cache size: 1048576 B
+...
+[    1.688122] Freeing init memory: 124K
 
-On Tue, Aug 2, 2011 at 5:56 PM, Ralf Baechle <ralf@linux-mips.org> wrote:
-> On Mon, Aug 01, 2011 at 12:42:14PM -0400, Paul Gortmaker wrote:
->
->> index a6eddae..c105556 100644
->> --- a/arch/arm/mach-orion5x/dns323-setup.c
->> +++ b/arch/arm/mach-orion5x/dns323-setup.c
->> @@ -77,7 +77,7 @@ static int __init dns323_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
->> ? ? ? /*
->> ? ? ? ?* Check for devices with hard-wired IRQs.
->> ? ? ? ?*/
->> - ? ? irq = orion5x_pci_map_irq(const dev, slot, pin);
->> + ? ? irq = orion5x_pci_map_irq(dev, slot, pin);
->
-> Very obviously correct ...
->
-> Acked-by: Ralf Baechle <ralf@linux-mips.org>
->
-> ?Ralf
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Thank you,
+Kyungmin Park
