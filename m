@@ -1,24 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 24 Aug 2011 18:05:36 -0300
-Subject: MX53Loco reports half of the total memory
-In-Reply-To: <20110824205415.GN31404@pengutronix.de>
-References: <CAOMZO5C6gaJUD3RTCwGqDhcojx3Thww22c+tsdC4bvTUmiSw6w@mail.gmail.com>
-	<20110824205415.GN31404@pengutronix.de>
-Message-ID: <CAOMZO5BMJN7NMXwWVmzJSV8nRS33Jv78dAv+kO7KcX-h0wjXsg@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 24 Aug 2011 18:37:20 -0300
+Subject: [PATCH] ARM: mx5: Select CONFIG_VMSPLIT_2G option
+Message-ID: <1314221840-6049-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+MX53 is capable of addressing up to 1GB of RAM.
 
-On Wed, Aug 24, 2011 at 5:54 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-...
-> Try compiling the kernel with CONFIG_VMSPLIT_2G. On my board this gives:
+Select CONFIG_VMSPLIT_2G so that the full 1GB can be detected by the kernel.
+and we avoid getting the following message:
 
-Excellent! That did the trick.
+Ignoring RAM at b0000000-cfffffff (vmalloc region overlap)
 
-Would you like me to submit a patch for mx5_defconfig so that CONFIG_VMSPLIT_2G
-is selected by default?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/mx5_defconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Thanks,
-
-Fabio Estevam
+diff --git a/arch/arm/configs/mx5_defconfig b/arch/arm/configs/mx5_defconfig
+index ede3cc2..91fe1fe 100644
+--- a/arch/arm/configs/mx5_defconfig
++++ b/arch/arm/configs/mx5_defconfig
+@@ -28,6 +28,7 @@ CONFIG_MACH_MX53_ARD=y
+ CONFIG_MXC_PWM=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_VMSPLIT_2G=y
+ CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_AEABI=y
+ # CONFIG_OABI_COMPAT is not set
+-- 
+1.6.0.4
