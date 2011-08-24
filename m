@@ -1,35 +1,24 @@
-From: jason.hui@linaro.org (Jason Liu)
-Date: Wed, 24 Aug 2011 20:45:41 +0800
-Subject: [PATCH] ARM: i.MX: initialize l2x0 at early_init time
-Message-ID: <1314189941-16406-1-git-send-email-jason.hui@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 24 Aug 2011 15:46:13 +0300
+Subject: [PATCH 1/7] omap: iommu: migrate to the generic IOMMU API
+In-Reply-To: <CAK=WgbZYuuKHUu6P+nfNzPgF4QmoL=T9+yquc=rMXRh4QE9grg@mail.gmail.com>
+References: <1313622608-30397-1-git-send-email-ohad@wizery.com>
+	<1313622608-30397-2-git-send-email-ohad@wizery.com>
+	<20110823140746.GP2079@amd.com>
+	<CAK=WgbZYuuKHUu6P+nfNzPgF4QmoL=T9+yquc=rMXRh4QE9grg@mail.gmail.com>
+Message-ID: <CAK=WgbZAMbPhDuXZ2NwTTSDv2doT6WBSzCCaD0F02mybNEZyeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This can make the l2 cache work at early time which
-will benefit the boot up time.
+On Tue, Aug 23, 2011 at 5:59 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Tue, Aug 23, 2011 at 5:07 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+>> Can this be easily converted to a spin_lock?
+>
+> Sure, thanks for reviewing.
 
-Tested on i.mx31pdk board, test result shows:
-Before:
-[    0.555716] console [ttymxc0] enabled
+Taking a second look, I don't think it's necessary - the mutex isn't
+used to protect the page table. The page table is protected by a spin
+lock, so map/unmap operations can be called from an atomic context.
 
-After:
-[    0.558755] console [ttymxc0] enabled
-
-Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/cache-l2x0.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-imx/cache-l2x0.c b/arch/arm/mach-imx/cache-l2x0.c
-index 69d1322..e5538a4 100644
---- a/arch/arm/mach-imx/cache-l2x0.c
-+++ b/arch/arm/mach-imx/cache-l2x0.c
-@@ -53,4 +53,4 @@ static int mxc_init_l2x0(void)
- 
- 	return 0;
- }
--arch_initcall(mxc_init_l2x0);
-+early_initcall(mxc_init_l2x0);
--- 
-1.7.4.1
+The mutex is only part of the attach/deattach operations, which are
+already used today in process context, so I guess it's safe.
