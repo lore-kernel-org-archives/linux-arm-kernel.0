@@ -1,78 +1,67 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 24 Aug 2011 10:53:44 -0400 (EDT)
-Subject: [PATCH v4 0/8] MMU disabling code and kexec fixes
-In-Reply-To: <20110824105848.GE32688@e102144-lin.cambridge.arm.com>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1108232120590.20358@xanadu.home>
-	<20110824105848.GE32688@e102144-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1108241035400.20358@xanadu.home>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 24 Aug 2011 12:04:14 -0300
+Subject: [PATCH] ARM: imx: Define functions for registering PATA
+Message-ID: <1314198254-6463-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Aug 2011, Will Deacon wrote:
+Define functions for registering PATA on MX27/MX31/MX35/MX53.
 
-> Hi Nicolas,
-> 
-> Thanks for looking at this lot.
-> 
-> On Wed, Aug 24, 2011 at 02:25:36AM +0100, Nicolas Pitre wrote:
-> > On Tue, 23 Aug 2011, Will Deacon wrote:
-> > 
-> > > Hello,
-> > > 
-> > > This is version 4 of the patches originally posted here:
-> > > 
-> > > v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052157.html
-> > > v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052559.html
-> > > v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/053252.html
-> > > 
-> > > There are many changes since v3. Notably:
-> > > 	- Support for Thumb-2
-> > > 	- Based on 3.1-rc3 (now that some of the previous patches have
-> > > 	  been merged)
-> > > 	- The reserved stack page now sits below swapper and is reserved
-> > > 	  by memblock during memory init. This has the advantage of being
-> > > 	  at a known physical address for a platform, which will be helpful
-> > > 	  for non-hotplug SMP booting.
-> > 
-> > Is this really necessary?  Relying on "known physical address" is often 
-> > going to lead us in situations where that physical address get encoded 
-> > outside the kernel proper and then we're stuck with it forever.  This 
-> > would be more "reliable" if the interface would be passed that address 
-> > and if the page was dynamically allocated/freed.
-> 
-> We don't want to allocate this dynamically because we need to avoid the
-> situation where the virtual address of this page aliases with the physical
-> address of the reset code. By keeping the page close to the start of
-> physical memory, we avoid this scenario.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/devices-imx27.h |    4 ++++
+ arch/arm/mach-imx/devices-imx31.h |    4 ++++
+ arch/arm/mach-imx/devices-imx35.h |    4 ++++
+ arch/arm/mach-mx5/devices-imx53.h |    4 ++++
+ 4 files changed, 16 insertions(+), 0 deletions(-)
 
-Well... how probable might this be the case in practice?
-
-And wouldn't this issue easily being worked around simply by allocating 
-a second page if the first one is found to alias?  Surely the reset code 
-is much smaller than a page.
-
-> On top of that, I'd like to use the bottom of this page as a holding pen
-> for secondary CPUs when doing an SMP kexec. In this case, the new kernel
-> needs to take care not to allocate the page for general use. I suppose we
-> could fix this with a new ATAG / FDT property but that seems a bit overkill.
-
-Is it?
-
-> I was also thinking that it might be useful if bootloaders want to throw all
-> of the CPUs at the kernel during boot, rather than implementing their own
-> SMP pen. In this case, they could make use of this reserved page (I was
-> planning to version the pen implementation).
-
-I get really uncomfortable at the prospect of having more _implicit_ 
-dependencies between the kernel and bootloaders.  If ever we want to 
-move things around for whatever reasons in the future then such fixed 
-legacy addresses might really get in the way.  So I don't see the 
-passing of that info using an ATAG or a DT node as something not bad at 
-all.  This becomes just another resource provided to the kernel, like 
-the ramdisk image, that can be located almost anywhere. And then you 
-have no backward compatibility issues either as the page validity 
-becomes explicit.
-
-
-Nicolas
+diff --git a/arch/arm/mach-imx/devices-imx27.h b/arch/arm/mach-imx/devices-imx27.h
+index 7f97a3c..2f727d7 100644
+--- a/arch/arm/mach-imx/devices-imx27.h
++++ b/arch/arm/mach-imx/devices-imx27.h
+@@ -76,3 +76,7 @@ extern const struct imx_spi_imx_data imx27_cspi_data[];
+ #define imx27_add_spi_imx0(pdata)	imx27_add_cspi(0, pdata)
+ #define imx27_add_spi_imx1(pdata)	imx27_add_cspi(1, pdata)
+ #define imx27_add_spi_imx2(pdata)	imx27_add_cspi(2, pdata)
++
++extern const struct imx_pata_imx_data imx27_pata_imx_data;
++#define imx27_add_pata_imx() \
++	imx_add_pata_imx(&imx27_pata_imx_data)
+diff --git a/arch/arm/mach-imx/devices-imx31.h b/arch/arm/mach-imx/devices-imx31.h
+index dbe940d..488e241 100644
+--- a/arch/arm/mach-imx/devices-imx31.h
++++ b/arch/arm/mach-imx/devices-imx31.h
+@@ -78,3 +78,7 @@ extern const struct imx_spi_imx_data imx31_cspi_data[];
+ #define imx31_add_spi_imx0(pdata)	imx31_add_cspi(0, pdata)
+ #define imx31_add_spi_imx1(pdata)	imx31_add_cspi(1, pdata)
+ #define imx31_add_spi_imx2(pdata)	imx31_add_cspi(2, pdata)
++
++extern const struct imx_pata_imx_data imx31_pata_imx_data;
++#define imx31_add_pata_imx() \
++	imx_add_pata_imx(&imx31_pata_imx_data)
+diff --git a/arch/arm/mach-imx/devices-imx35.h b/arch/arm/mach-imx/devices-imx35.h
+index 234cbd3..7b99ef0 100644
+--- a/arch/arm/mach-imx/devices-imx35.h
++++ b/arch/arm/mach-imx/devices-imx35.h
+@@ -81,3 +81,7 @@ extern const struct imx_spi_imx_data imx35_cspi_data[];
+ 	imx_add_spi_imx(&imx35_cspi_data[id], pdata)
+ #define imx35_add_spi_imx0(pdata)	imx35_add_cspi(0, pdata)
+ #define imx35_add_spi_imx1(pdata)	imx35_add_cspi(1, pdata)
++
++extern const struct imx_pata_imx_data imx35_pata_imx_data;
++#define imx35_add_pata_imx() \
++	imx_add_pata_imx(&imx35_pata_imx_data)
+diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
+index c27fe8b..7ca5d0c 100644
+--- a/arch/arm/mach-mx5/devices-imx53.h
++++ b/arch/arm/mach-mx5/devices-imx53.h
+@@ -40,3 +40,7 @@ extern const struct imx_imx_ssi_data imx53_imx_ssi_data[];
+ extern const struct imx_imx_keypad_data imx53_imx_keypad_data;
+ #define imx53_add_imx_keypad(pdata)	\
+ 	imx_add_imx_keypad(&imx53_imx_keypad_data, pdata)
++
++extern const struct imx_pata_imx_data imx53_pata_imx_data;
++#define imx53_add_pata_imx() \
++	imx_add_pata_imx(&imx53_pata_imx_data)
+-- 
+1.6.0.4
