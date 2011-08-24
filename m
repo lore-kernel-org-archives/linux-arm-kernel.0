@@ -1,225 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 24 Aug 2011 06:44:45 -0500
-Subject: [PATCH 1/3] DMA: PL330: Infer transfer direction from transfer
-	request instead of platform data
-In-Reply-To: <1314050385-9617-2-git-send-email-thomas.abraham@linaro.org>
-References: <1314050385-9617-1-git-send-email-thomas.abraham@linaro.org>
-	<1314050385-9617-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4E54E42D.9060905@gmail.com>
+From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
+Date: Wed, 24 Aug 2011 17:23:04 +0530
+Subject: [PATCH v2] OMAP3EVM: ehci: Fix EHCI support
+In-Reply-To: <1314174902-12797-1-git-send-email-bdefaria@adeneo-embedded.com>
+References: <1314174902-12797-1-git-send-email-bdefaria@adeneo-embedded.com>
+Message-ID: <19F8576C6E063C45BE387C64729E739404EC007BC0@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+Hi,
+> Set the VAUX2 regulator supply to 1.8V for the HSUSB host interface.
+> Gpio 2 of the TPS65950 has to be set to zero in order to enable the
+> HSUBS2 clock.
 
-On 08/22/2011 04:59 PM, Thomas Abraham wrote:
-> The transfer direction for a channel can be inferred from the transfer
-> request and the need for specifying transfer direction in platfrom data
-> can be eliminated. So the structure definition 'struct dma_pl330_peri'
-> is no longer required.
+TPS65950 GPIO2 is not to enable HSUSB2 clock but to enable chip u131
+On omap3evm (rev-G) which latches USB, camera and audio lines.
+
 > 
-> With the 'struct dma_pl330_peri' removed, the dma controller transfer
-> capabilities cannot be inferred any longer. Hence, the dma controller
-> capabilities is specified using platforme data.
-> 
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> Signed-off-by: Bryan DE FARIA <bdefaria@adeneo-embedded.com>
 > ---
->  drivers/dma/pl330.c        |   56 ++++++++------------------------------------
->  include/linux/amba/pl330.h |   14 +++--------
->  2 files changed, 14 insertions(+), 56 deletions(-)
+>  arch/arm/mach-omap2/board-omap3evm.c |   25 +++++++++++++++++++++++++
+>  1 files changed, 25 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 3a0baac..6592b9a 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -507,7 +507,7 @@ pluck_desc(struct dma_pl330_dmac *pdmac)
->  static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
->  {
->  	struct dma_pl330_dmac *pdmac = pch->dmac;
-> -	struct dma_pl330_peri *peri = pch->chan.private;
-> +	u8 *peri_id = pch->chan.private;
->  	struct dma_pl330_desc *desc;
->  
->  	/* Pluck one desc from the pool of DMAC */
-> @@ -531,14 +531,7 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
->  	desc->pchan = pch;
->  	desc->txd.cookie = 0;
->  	async_tx_ack(&desc->txd);
-> -
-> -	if (peri) {
-> -		desc->req.rqtype = peri->rqtype;
-> -		desc->req.peri = pch->chan.chan_id;
-> -	} else {
-> -		desc->req.rqtype = MEMTOMEM;
-> -		desc->req.peri = 0;
-> -	}
-> +	desc->req.peri = (peri_id) ? pch->chan.chan_id : 0;
->  
->  	dma_async_tx_descriptor_init(&desc->txd, &pch->chan);
->  
-> @@ -625,12 +618,14 @@ static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
->  	case DMA_TO_DEVICE:
->  		desc->rqcfg.src_inc = 1;
->  		desc->rqcfg.dst_inc = 0;
-> +		desc->req.rqtype = MEMTODEV;
->  		src = dma_addr;
->  		dst = pch->fifo_addr;
->  		break;
->  	case DMA_FROM_DEVICE:
->  		desc->rqcfg.src_inc = 0;
->  		desc->rqcfg.dst_inc = 1;
-> +		desc->req.rqtype = DEVTOMEM;
->  		src = pch->fifo_addr;
->  		dst = dma_addr;
->  		break;
-> @@ -657,16 +652,12 @@ pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
->  {
->  	struct dma_pl330_desc *desc;
->  	struct dma_pl330_chan *pch = to_pchan(chan);
-> -	struct dma_pl330_peri *peri = chan->private;
->  	struct pl330_info *pi;
->  	int burst;
->  
->  	if (unlikely(!pch || !len))
->  		return NULL;
->  
-> -	if (peri && peri->rqtype != MEMTOMEM)
-> -		return NULL;
-> -
->  	pi = &pch->dmac->pif;
->  
->  	desc = __pl330_prep_dma_memcpy(pch, dst, src, len);
-> @@ -675,6 +666,7 @@ pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
->  
->  	desc->rqcfg.src_inc = 1;
->  	desc->rqcfg.dst_inc = 1;
-> +	desc->req.rqtype = MEMTOMEM;
->  
->  	/* Select max possible burst size */
->  	burst = pi->pcfg.data_bus_width / 8;
-> @@ -703,25 +695,14 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->  {
->  	struct dma_pl330_desc *first, *desc = NULL;
->  	struct dma_pl330_chan *pch = to_pchan(chan);
-> -	struct dma_pl330_peri *peri = chan->private;
->  	struct scatterlist *sg;
->  	unsigned long flags;
->  	int i;
->  	dma_addr_t addr;
->  
-> -	if (unlikely(!pch || !sgl || !sg_len || !peri))
-> +	if (unlikely(!pch || !sgl || !sg_len))
->  		return NULL;
->  
-> -	/* Make sure the direction is consistent */
-> -	if ((direction == DMA_TO_DEVICE &&
-> -				peri->rqtype != MEMTODEV) ||
-> -			(direction == DMA_FROM_DEVICE &&
-> -				peri->rqtype != DEVTOMEM)) {
-> -		dev_err(pch->dmac->pif.dev, "%s:%d Invalid Direction\n",
-> -				__func__, __LINE__);
-> -		return NULL;
-> -	}
-> -
->  	addr = pch->fifo_addr;
->  
->  	first = NULL;
-> @@ -761,11 +742,13 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
->  		if (direction == DMA_TO_DEVICE) {
->  			desc->rqcfg.src_inc = 1;
->  			desc->rqcfg.dst_inc = 0;
-> +			desc->req.rqtype = MEMTODEV;
->  			fill_px(&desc->px,
->  				addr, sg_dma_address(sg), sg_dma_len(sg));
->  		} else {
->  			desc->rqcfg.src_inc = 0;
->  			desc->rqcfg.dst_inc = 1;
-> +			desc->req.rqtype = DEVTOMEM;
->  			fill_px(&desc->px,
->  				sg_dma_address(sg), addr, sg_dma_len(sg));
->  		}
-> @@ -872,27 +855,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  
->  	for (i = 0; i < num_chan; i++) {
->  		pch = &pdmac->peripherals[i];
-> -		if (pdat) {
-> -			struct dma_pl330_peri *peri = &pdat->peri[i];
-> -
-> -			switch (peri->rqtype) {
-> -			case MEMTOMEM:
-> -				dma_cap_set(DMA_MEMCPY, pd->cap_mask);
-> -				break;
-> -			case MEMTODEV:
-> -			case DEVTOMEM:
-> -				dma_cap_set(DMA_SLAVE, pd->cap_mask);
-> -				dma_cap_set(DMA_CYCLIC, pd->cap_mask);
-> -				break;
-> -			default:
-> -				dev_err(&adev->dev, "DEVTODEV Not Supported\n");
-> -				continue;
-> -			}
-> -			pch->chan.private = peri;
-> -		} else {
-> -			dma_cap_set(DMA_MEMCPY, pd->cap_mask);
-> -			pch->chan.private = NULL;
-> -		}
-> +		pch->chan.private = (pdat) ? &pdat->peri_id[i] : NULL;
+> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-
+> omap2/board-omap3evm.c
+> index c452b3f..13a2b71 100644
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -377,6 +377,10 @@ static int omap3evm_twl_gpio_setup(struct device
+> *dev,
+>  	if (r)
+>  		printk(KERN_ERR "failed to get/set lcd_bkl gpio\n");
+> 
+> +	/* gpio + 2 == HSUSB2 Clock Enable */
+> +	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
+> +		gpio_request_one(gpio + 2, GPIOF_OUT_INIT_LOW,
+> "EN_HSUSB2_CLK");
+> +
 
-Don't need parentheses here.
+Did you test EHCI port with this change ?
 
->  
->  		INIT_LIST_HEAD(&pch->work_list);
->  		spin_lock_init(&pch->lock);
-> @@ -907,6 +870,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	}
->  
->  	pd->dev = &adev->dev;
-> +	pd->cap_mask = pdat->cap_mask;
-
-You are re-introducing the requirement to have platform data which I
-just made optional. For mem to mem transfers, there is no reason to have
-platform data. In my case, we only support mem to mem transfers.
-
-How about:
-pd->cap_mask = pdat ? pdat->cap_mask : DMA_MEMCPY;
-
-Also, should you be using dma_cap_set here?
-
-Rob
-
->  
->  	pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
->  	pd->device_free_chan_resources = pl330_free_chan_resources;
-> diff --git a/include/linux/amba/pl330.h b/include/linux/amba/pl330.h
-> index d12f077..0b87300 100644
-> --- a/include/linux/amba/pl330.h
-> +++ b/include/linux/amba/pl330.h
-> @@ -13,15 +13,7 @@
->  #define	__AMBA_PL330_H_
->  
->  #include <asm/hardware/pl330.h>
-> -
-> -struct dma_pl330_peri {
-> -	/*
-> -	 * Peri_Req i/f of the DMAC that is
-> -	 * peripheral could be reached from.
-> -	 */
-> -	u8 peri_id; /* specific dma id */
-> -	enum pl330_reqtype rqtype;
-> -};
-> +#include <linux/dmaengine.h>
->  
->  struct dma_pl330_platdata {
->  	/*
-> @@ -33,7 +25,9 @@ struct dma_pl330_platdata {
->  	 */
->  	u8 nr_valid_peri;
->  	/* Array of valid peripherals */
-> -	struct dma_pl330_peri *peri;
-> +	u8 *peri_id;
-> +	/* Operational capabilities */
-> +	dma_cap_mask_t cap_mask;
->  	/* Bytes to allocate for MC buffer */
->  	unsigned mcbuf_sz;
->  };
+Ajay
+>  	/* gpio + 7 == DVI Enable */
+>  	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_LOW, "EN_DVI");
+[...]
+rm-kernel
