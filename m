@@ -1,50 +1,36 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 23 Aug 2011 21:28:12 -0400 (EDT)
-Subject: [PATCH v4 2/8] ARM: kexec: ensure new kernel is entered in ARM
-	state
-In-Reply-To: <1314136012-20533-3-git-send-email-will.deacon@arm.com>
-References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
-	<1314136012-20533-3-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.LFD.2.00.1108232126550.20358@xanadu.home>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Tue, 23 Aug 2011 18:30:11 -0700
+Subject: [PATCH 1/2] ARM: L2X0: add explicit cpu_relax() for busy wait loop
+Message-ID: <1314149411-5063-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Aug 2011, Will Deacon wrote:
+using cpu_relax in busy loops is a well-known idiom in the kernel. It's more
+for documentation purposes than technically needed here.
 
-> Commit 540b5738 ("ARM: 6999/1: head, zImage: Always Enter the kernel in
-> ARM state") mandates that the kernel should be entered in ARM state.
-> 
-> If a Thumb-2 kernel kexecs a new kernel image, we need to ensure that
-> we change state when branching to the new code. This patch replaces a
-> mov pc, lr with a bx lr so that we transition to ARM state if need be.
+Cc: Jamie Iles <jamie@jamieiles.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/mm/cache-l2x0.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-This will break kexec support on ARMv4 targets.  No idea if any ARMv4 
-target uses kexec though.
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 2ebbc7c..966b3bd 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -37,7 +37,7 @@ static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+ {
+ 	/* wait for cache operation by line or way to complete */
+ 	while (readl_relaxed(reg) & mask)
+-		;
++		cpu_relax();
+ }
+ 
+ #ifdef CONFIG_CACHE_PL310
+-- 
+1.7.1
 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/kernel/relocate_kernel.S |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/relocate_kernel.S b/arch/arm/kernel/relocate_kernel.S
-> index 9cf4cbf..0908633 100644
-> --- a/arch/arm/kernel/relocate_kernel.S
-> +++ b/arch/arm/kernel/relocate_kernel.S
-> @@ -57,7 +57,7 @@ relocate_new_kernel:
->  	mov r0,#0
->  	ldr r1,kexec_mach_type
->  	ldr r2,kexec_boot_atags
-> -	mov pc,lr
-> +	bx lr
->  
->  	.align
->  
-> -- 
-> 1.7.0.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
