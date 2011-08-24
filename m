@@ -1,165 +1,96 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 24 Aug 2011 23:49:01 +0530
-Subject: [RFC: PATCH 1/4] AM335X: Update common omap platform files
-In-Reply-To: <1313058630-32447-2-git-send-email-hvaibhav@ti.com>
-References: <hvaibhav@ti.com>
-	<1313058630-32447-2-git-send-email-hvaibhav@ti.com>
-Message-ID: <19F8576C6E063C45BE387C64729E739404EC007CE3@dbde02.ent.ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 24 Aug 2011 11:29:13 -0700
+Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
+In-Reply-To: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B24A3BC0@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Linus Walleij wrote at Friday, August 19, 2011 3:54 AM:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This creates a subsystem for handling of pin control devices.
+> These are devices that control different aspects of package
+> pins.
 
-> -----Original Message-----
-> From: Hiremath, Vaibhav
-> Sent: Thursday, August 11, 2011 4:00 PM
-> To: linux-omap at vger.kernel.org
-> Cc: tony at atomide.com; Hilman, Kevin; paul at pwsan.com; linux-arm-
-> kernel at lists.infradead.org; Mohammed, Afzal; Hiremath, Vaibhav
-> Subject: [RFC: PATCH 1/4] AM335X: Update common omap platform files
-> 
-> From: Afzal Mohammed <afzal@ti.com>
-> 
-> This patch updates the common platform files with AM335X device
-> support, which is closer to TI81XX family of devices and will be
-> considered variant of TI81XX SoC.
-> 
-> Similar to TI81XX device, AM335X is treated as OMAP3 variant,
-> where the cpu class is considered as OMAP34XX and the type is AM335X.
-> This means, cpu_is_omap34xx(), cpu_is_ti81xx() and
-> cpu_is_am335x() checks return success on AM335X.
-> 
-> The TI81XX kernel config option CONFIG_SOC_OMAPTI8XX is used
-> to include support for AM335X build.
-> 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> ---
->  arch/arm/mach-omap2/Kconfig                   |    2 +-
->  arch/arm/plat-omap/include/plat/clkdev_omap.h |    1 +
->  arch/arm/plat-omap/include/plat/clock.h       |    1 +
->  arch/arm/plat-omap/include/plat/cpu.h         |   14 ++++++++++++++
->  4 files changed, 17 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 4dacb8e..f9f5776 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -75,7 +75,7 @@ config SOC_OMAP3430
->  	select ARCH_OMAP_OTG
-> 
->  config SOC_OMAPTI81XX
-> -	bool "TI81XX support"
-> +	bool "TI81XX/AM335x support"
->  	depends on ARCH_OMAP3
->  	default y
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/clkdev_omap.h
-> b/arch/arm/plat-omap/include/plat/clkdev_omap.h
-> index 3c50ec8..991e72c 100644
-> --- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
-> +++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
-> @@ -41,6 +41,7 @@ struct omap_clk {
->  #define CK_TI816X	(1 << 12)
->  #define CK_446X		(1 << 13)
->  #define CK_TI814X	(1 << 14)
-> +#define CK_AM335X	(1 << 15)	/* AM335x specific clocks */
-> 
-> 
->  #define CK_34XX		(CK_3430ES1 | CK_3430ES2PLUS)
-> diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-
-> omap/include/plat/clock.h
-> index 1c41292..b5d7447 100644
-> --- a/arch/arm/plat-omap/include/plat/clock.h
-> +++ b/arch/arm/plat-omap/include/plat/clock.h
-> @@ -60,6 +60,7 @@ struct clkops {
->  #define RATE_IN_TI816X		(1 << 6)
->  #define RATE_IN_4460		(1 << 7)
->  #define RATE_IN_TI814X		(1 << 8)
-> +#define RATE_IN_AM335X		(1 << 9)
-> 
->  #define RATE_IN_24XX		(RATE_IN_242X | RATE_IN_243X)
->  #define RATE_IN_34XX		(RATE_IN_3430ES1 | RATE_IN_3430ES2PLUS)
-> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-
-> omap/include/plat/cpu.h
-> index f4ebbae..5a831be 100644
-> --- a/arch/arm/plat-omap/include/plat/cpu.h
-> +++ b/arch/arm/plat-omap/include/plat/cpu.h
-> @@ -120,6 +120,12 @@ static inline int is_ti ##subclass (void)		\
->  	return (GET_OMAP_SUBCLASS == (id)) ? 1 : 0;	\
->  }
-> 
-> +#define IS_AM_SUBCLASS(subclass, id)			\
-> +static inline int is_am ##subclass (void)		\
-> +{							\
-> +	return (GET_OMAP_SUBCLASS == (id)) ? 1 : 0;	\
-> +}
-> +
->  IS_OMAP_CLASS(7xx, 0x07)
->  IS_OMAP_CLASS(15xx, 0x15)
->  IS_OMAP_CLASS(16xx, 0x16)
-> @@ -138,6 +144,7 @@ IS_OMAP_SUBCLASS(446x, 0x446)
-> 
->  IS_TI_SUBCLASS(816x, 0x816)
->  IS_TI_SUBCLASS(814x, 0x814)
-> +IS_AM_SUBCLASS(335x, 0x335)
-> 
-[Hiremath, Vaibhav] During validation and testing on actual silicon/board,
-I have realized that, it would not make much sense to follow cpu_is_ti81xx() for AM335x. We may end up polluting code like 
+Sorry to keep harping on about this, but I'm still not convinced the data
+model is correct.
 
-If (cpu_is_ti81xx() && !cpu_is_am335x()) 
+Note: There are two places where a data model is relevant: (a) The API
+exposed to clients of the pinmux API (b) the API between the pinmux API
+core and the pinmux chip implementations. Your patches currently use the
+same data model for both. I believe we can use a different data model for
+the two interfaces. My discussion below talks solely about the interface
+at point (b); I can talk more about (a) later. I'm trying to talk about
+one thing at a time right now to avoid my previous overwhelming emails,
+and gain consensus on one point at a time.
 
-And also, in the future we might see multiple devices coming under AM33xx family. There is some IP's being reused between TI814X and AM335x, so as between OMAPx.
+Here are the two possible models:
 
-So, we should create separate SoC family for AM33xx family of devices, like OMAP4 and TI81xx and stick to only cpu_is_omap34xx(), cpu_is_am33xx() and cpu_is_am335x().
+Model 1 (as implemented in the pin control subsystem):
 
-I will be posting updated version of patch shortly (for review).
+* Each pinmux chip defines a number of functions.
+* Each function describes what functionality is mux'd onto the pins.
+* Each function describes which pins are affected by the function.
 
-Thanks,
-Vaibhav
+Result:
 
->  #define cpu_is_omap7xx()		0
->  #define cpu_is_omap15xx()		0
-> @@ -150,6 +157,7 @@ IS_TI_SUBCLASS(814x, 0x814)
->  #define cpu_is_ti81xx()			0
->  #define cpu_is_ti816x()			0
->  #define cpu_is_ti814x()			0
-> +#define cpu_is_am335x()			0
->  #define cpu_is_omap44xx()		0
->  #define cpu_is_omap443x()		0
->  #define cpu_is_omap446x()		0
-> @@ -358,6 +366,7 @@ IS_OMAP_TYPE(3517, 0x3517)
->  # undef cpu_is_ti81xx
->  # undef cpu_is_ti816x
->  # undef cpu_is_ti814x
-> +# undef cpu_is_am335x
->  # define cpu_is_omap3430()		is_omap3430()
->  # define cpu_is_omap3503()		(cpu_is_omap3430() &&		\
->  						(!omap3_has_iva()) &&	\
-> @@ -376,6 +385,7 @@ IS_OMAP_TYPE(3517, 0x3517)
->  # define cpu_is_ti81xx()		is_ti81xx()
->  # define cpu_is_ti816x()		is_ti816x()
->  # define cpu_is_ti814x()		is_ti814x()
-> +# define cpu_is_am335x()		is_am335x()
->  #endif
-> 
->  # if defined(CONFIG_ARCH_OMAP4)
-> @@ -431,6 +441,9 @@ IS_OMAP_TYPE(3517, 0x3517)
->  #define TI8148_REV_ES2_0	(TI814X_CLASS | (OMAP_REVBITS_01 << 8))
->  #define TI8148_REV_ES2_1	(TI814X_CLASS | (OMAP_REVBITS_02 << 8))
-> 
-> +#define AM335X_CLASS		0x33500034
-> +#define AM335X_REV_ES1_0	AM335X_CLASS
-> +
->  #define OMAP443X_CLASS		0x44300044
->  #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
->  #define OMAP4430_REV_ES2_0	(OMAP443X_CLASS | (0x20 << 8))
-> @@ -471,6 +484,7 @@ IS_OMAP_TYPE(3517, 0x3517)
->  #define CHIP_IS_TI816X			(1 << 14)
->  #define CHIP_IS_OMAP4460ES1_0		(1 << 15)
->  #define CHIP_IS_TI814X			(1 << 16)
-> +#define CHIP_IS_AM335X			(1 << 17)
-> 
->  #define CHIP_IS_OMAP24XX		(CHIP_IS_OMAP2420 | CHIP_IS_OMAP2430)
-> 
-> --
-> 1.6.2.4
+If there are a couple of controllers that can each be mux'd out two
+places, you get four functions:
+
+Function i2c0-0: Controller i2c0 is mux'd onto pins 0 and 1
+Function i2c0-1: Controller i2c0 is mux'd onto pins 2 and 3
+Function spi0-0: Controller spi0 is mux'd onto pins 0 and 1
+Function spi0-1: Controller spi0 is mux'd onto pins 4 and 5
+
+Model 2 (what I'd like to see)
+
+* Each pinmux chip defines a number of functions.
+* Each function describes the functionality that can be mux'd out.
+* Each pinmux chip defines a number of pins.
+* Each pinmux chip defines which functions are legal on which pins.
+
+Result:
+
+With the same controllers and pins above, you get:
+
+Function i2c0
+Function spi0
+Pins 0, 1, 2, 3, 4, 5
+Pins 0, 1 accept functions i2c0, spi0
+Pins 2, 3 accept functions i2c0
+Pins 4, 5 accept functions spi0
+
+We'd still have a single controller-wide namespace for functions, it's
+just that functions are something you mux onto pins, not the combination
+of mux'd functionality and the pins it's been mux'd onto.
+
+Advantages:
+
+* I believe this model is much more directly maps to the way most HW
+works; there's a register for each pin where you write a value to select
+which functionality to mux onto that pin. Assuming that's true, using
+this data model might lead to simpler pinmux chip implementations; they'd
+require fewer mapping tables.
+
+* Given that's the way Tegra HW works at least, the patches I recently
+posted to initialize the Tegra pinmux from device-tree define bindings
+that use this model. I think it's important that such bindings use the
+same data model as the pinmux chip data model. This keeps consistency
+between boot-time initialization and the pinmux chip portion of any
+run-time pinmux modifications.
+
+
+
+As an aside, I see your patches use the pinmux API at driver probe time
+to set up the pinmux, whereas my init-pinmux-driver-from-dt patches do
+a pinmux-controller-wide initialization at probe time. There was some
+discussion in response to earlier patches re: which way was better, and
+I got the impression that the pinmux API was mainly for runtime changes,
+rather than boot-time initial configuration. If that's not the case, then
+I guess we should drop my proposed init-pinmux-driver-from-dt patches and
+put all that code into your pinmux subsystem...
+
+-- 
+nvpublic
