@@ -1,45 +1,72 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 25 Aug 2011 11:03:36 +0200
-Subject: [PATCH 2/3] dmaengine i.MX SDMA: set firmware scripts addresses to
-	negative value initially
+Date: Thu, 25 Aug 2011 11:03:37 +0200
+Subject: [PATCH 3/3] dmaengine i.MX SDMA: use request_firmware_nowait
 In-Reply-To: <1314263017-18099-1-git-send-email-s.hauer@pengutronix.de>
 References: <1314263017-18099-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1314263017-18099-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1314263017-18099-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we do not have a firmare script for a given transfer,
-the setup of this channel must fail. For this the script
-addresses have to be < 0 initially, not 0.
+The firmware blob may not be available when the driver
+probes. Instead of blocking the whole kernel use
+request_firmware_nowait() and continue without firmware.
+The ROM scripts can already be used then if available.
+For the devicetree case the ROM scripts are not available,
+still the probe function should not block. The driver
+will be unusable in this case, but we have no way of
+detecting this properly. The configuration of the dma
+channels will fail, so nothing bad should happen.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/dma/imx-sdma.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ drivers/dma/imx-sdma.c |   23 ++++++++++++++++-------
+ 1 files changed, 16 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index f50c87c..8abf8c1 100644
+index 8abf8c1..b5cc27d 100644
 --- a/drivers/dma/imx-sdma.c
 +++ b/drivers/dma/imx-sdma.c
-@@ -1281,6 +1281,7 @@ static int __init sdma_probe(struct platform_device *pdev)
- 	struct sdma_platform_data *pdata = pdev->dev.platform_data;
- 	int i;
- 	struct sdma_engine *sdma;
-+	s32 *saddr_arr;
+@@ -1143,18 +1143,17 @@ static void sdma_add_scripts(struct sdma_engine *sdma,
+ 			saddr_arr[i] = addr_arr[i];
+ }
  
- 	sdma = kzalloc(sizeof(*sdma), GFP_KERNEL);
- 	if (!sdma)
-@@ -1324,6 +1325,11 @@ static int __init sdma_probe(struct platform_device *pdev)
- 		goto err_alloc;
- 	}
+-static int __init sdma_get_firmware(struct sdma_engine *sdma,
+-		const char *fw_name)
++static void sdma_load_firmware(const struct firmware *fw, void *context)
+ {
+-	const struct firmware *fw;
++	struct sdma_engine *sdma = context;
+ 	const struct sdma_firmware_header *header;
+-	int ret;
+ 	const struct sdma_script_start_addrs *addr;
+ 	unsigned short *ram_code;
  
-+	/* initially no scripts available */
-+	saddr_arr = (s32 *)sdma->script_addrs;
-+	for (i = 0; i < SDMA_SCRIPT_ADDRS_ARRAY_SIZE_V1; i++)
-+		saddr_arr[i] = -EINVAL;
+-	ret = request_firmware(&fw, fw_name, sdma->dev);
+-	if (ret)
+-		return ret;
++	if (!fw) {
++		dev_err(sdma->dev, "firmware not found\n");
++		return;
++	}
+ 
+ 	if (fw->size < sizeof(*header))
+ 		goto err_firmware;
+@@ -1184,6 +1183,16 @@ static int __init sdma_get_firmware(struct sdma_engine *sdma,
+ 
+ err_firmware:
+ 	release_firmware(fw);
++}
 +
- 	if (of_id)
- 		pdev->id_entry = of_id->data;
- 	sdma->devtype = pdev->id_entry->driver_data;
++static int __init sdma_get_firmware(struct sdma_engine *sdma,
++		const char *fw_name)
++{
++	int ret;
++
++	ret = request_firmware_nowait(THIS_MODULE,
++			FW_ACTION_HOTPLUG, fw_name, sdma->dev,
++			GFP_KERNEL, sdma, sdma_load_firmware);
+ 
+ 	return ret;
+ }
 -- 
 1.7.5.4
