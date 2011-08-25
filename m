@@ -1,131 +1,137 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 25 Aug 2011 14:17:36 +0100
-Subject: [PATCH 04/11] clk: Add simple gated clock
-In-Reply-To: <1314191759-16941-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <20110824131324.GB16520@opensource.wolfsonmicro.com>
-	<1314191759-16941-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1314191759-16941-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20110825131736.GE2838@pulham.picochip.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 25 Aug 2011 08:37:08 -0500
+Subject: [RFC PATCH 2/7] arm/dts: Add initial device tree support for
+	OMAP4 SoC
+In-Reply-To: <1314181040-22807-3-git-send-email-b-cousson@ti.com>
+References: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
+	<1314181040-22807-3-git-send-email-b-cousson@ti.com>
+Message-ID: <4E565004.9050806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, Jeremy,
+Benoit,
 
-On Wed, Aug 24, 2011 at 02:15:52PM +0100, Mark Brown wrote:
-> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+On 08/24/2011 05:17 AM, Benoit Cousson wrote:
+> Add initial device-tree support for OMAP4 SoC.
 > 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> This is based on the original panda board patch done by Manju:
+> http://permalink.gmane.org/gmane.linux.ports.arm.omap/60393
+> 
+> Add the generic GIC interrupt-controller from ARM.
+> 
+> Add an empty "soc" node to contain non memory mapped IPs
+> (DSP, MPU, IPU...).
+> 
+> Note: Since reg, irq and dma are provided by hwmod for the
+> moment, these attributes will not be present at all in DTS
+> to highlight the gap. They will be added as soon as dma bindings
+> will be there and drivers will be adapted.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: G, Manjunath Kondaiah <manjugk@ti.com>
+> ---
+>  arch/arm/boot/dts/omap4.dtsi |   80 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 80 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap4.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> new file mode 100644
+> index 0000000..97a3ea7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -0,0 +1,80 @@
+> +/*
+> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/*
+> + * Carveout for multimedia usecases
+> + * It should be the last 48MB of the first 512MB memory part
+> + * In theory, it should not even exist. That zone should be reserved
+> + * dynamically during the .reserve callback.
+> + */
+> +/memreserve/ 0x9d000000 0x03000000;
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "TI OMAP4430";
+> +	compatible = "ti,omap4430", "ti,omap4";
+> +	interrupt-parent = <&gic>;
+> +
+> +	aliases {
+> +	};
+> +
+> +	/*
+> +	 * The soc node represents the soc top level view. It is uses for IPs
+> +	 * that are not memory mapped in the MPU view or for the MPU itself.
+> +	 */
+> +	soc {
+> +		compatible = "ti,omap-infra";
+> +	};
+> +
+> +	/*
+> +	 * XXX: Use a flat representation of the OMAP4 interconnect.
+> +	 * The real OMAP interconnect network is quite complex.
+> +	 *
+> +	 * MPU -+-- MPU_PRIVATE - GIC, L2
+> +	 *      |
+> +	 *      +----------------+----------+
+> +	 *      |                |          |
+> +	 *      +            +- EMIF - DDR  |
+> +	 *      |            |              |
+> +	 *      |            +     +--------+
+> +	 *      |            |     |
+> +	 *      |            +- L4_ABE - AESS, MCBSP, TIMERs...
+> +	 *      |            |
+> +	 *      +- L3_MAIN --+- L4_CORE - IPs...
+> +	 *                   |
+> +	 *                   +- L4_PER - IPs...
+> +	 *                   |
+> +	 *                   +- L4_CFG -+- L4_WKUP - IPs...
+> +	 *                   |          |
+> +	 *                   |          +- IPs...
+> +	 *                   +- IPU ----+
+> +	 *                   |          |
+> +	 *                   +- DSP ----+
+> +	 *                   |          |
+> +	 *                   +- DSS ----+
+> +	 *
+> +	 * Since that will not bring real advantage to represent that in DT for
+> +	 * the moment, just use a fake OCP bus entry to represent the whole bus
+> +	 * hierarchy.
+> +	 */
+> +	ocp {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		gic: interrupt-controller at 48241000 {
+> +			compatible = "ti,omap4-gic", "arm,gic";
 
-I've just ported my (currently out-of-tree) platform to use the common 
-struct clk and it all works nicely (if I add a naive implementation of 
-clk_set_parent()).
+The gic binding is still being hashed out. This needs binding
+documentation and handling of PPIs. I'm planning on posting an updated
+series today with this.
 
-Our platform has gateable clocks where bits in the control register are 
-set to disable the clocks rather than enable them.  I've used the patch 
-below to add support for that.
+"arm,gic" should be dropped or replaced with "arm,cortex-a9-gic".
+Non-specific DT bindings are not well received. Is OMAP4 gic different
+from standard Cortex-A9?
 
-Jamie
+> +			interrupt-controller;
+> +			#interrupt-cells = <1>;
+> +			reg = <0x48241000 0x1000>,
+> +			      <0x48240100 0x0200>;
 
-8<----
+Isn't the cpu interface register space 0x100 bytes long?
 
-Subject: [PATCH] clk: allow gateable clocks to work with both polarities
+Rob
 
-Some devices (picoxcell in particular) have gateable clocks where the
-control register is a set-to-disable register.  Create a new set of
-clock ops that can use struct clk_gate with this register configuration.
-
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- drivers/clk/clk-gate.c |   45 +++++++++++++++++++++++++++++++++++++--------
- include/linux/clk.h    |    3 ++-
- 2 files changed, 39 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index 833e0da..30926e9 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -10,7 +10,7 @@ static unsigned long clk_gate_get_rate(struct clk_hw *clk)
- 	return clk_get_rate(clk_get_parent(clk->clk));
- }
- 
--static int clk_gate_enable(struct clk_hw *clk)
-+static void clk_gate_set_bit(struct clk_hw *clk)
- {
- 	struct clk_gate *gate = to_clk_gate(clk);
- 	u32 reg;
-@@ -18,11 +18,9 @@ static int clk_gate_enable(struct clk_hw *clk)
- 	reg = __raw_readl(gate->reg);
- 	reg |= 1 << gate->bit_idx;
- 	__raw_writel(reg, gate->reg);
--
--	return 0;
- }
- 
--static void clk_gate_disable(struct clk_hw *clk)
-+static void clk_gate_clear_bit(struct clk_hw *clk)
- {
- 	struct clk_gate *gate = to_clk_gate(clk);
- 	u32 reg;
-@@ -32,10 +30,41 @@ static void clk_gate_disable(struct clk_hw *clk)
- 	__raw_writel(reg, gate->reg);
- }
- 
--struct clk_hw_ops clk_gate_ops = {
-+static int clk_gate_enable_set(struct clk_hw *clk)
-+{
-+	clk_gate_set_bit(clk);
-+
-+	return 0;
-+}
-+
-+static void clk_gate_disable_clear(struct clk_hw *clk)
-+{
-+	clk_gate_clear_bit(clk);
-+}
-+
-+struct clk_hw_ops clk_gate_set_enable_ops = {
-+	.recalc_rate = clk_gate_get_rate,
-+	.enable = clk_gate_enable_set,
-+	.disable = clk_gate_disable_clear,
-+};
-+EXPORT_SYMBOL_GPL(clk_gate_set_enable_ops);
-+
-+static int clk_gate_enable_clear(struct clk_hw *clk)
-+{
-+	clk_gate_clear_bit(clk);
-+
-+	return 0;
-+}
-+
-+static void clk_gate_disable_set(struct clk_hw *clk)
-+{
-+	clk_gate_set_bit(clk);
-+}
-+
-+struct clk_hw_ops clk_gate_set_disable_ops = {
- 	.recalc_rate = clk_gate_get_rate,
--	.enable = clk_gate_enable,
--	.disable = clk_gate_disable,
-+	.enable = clk_gate_enable_clear,
-+	.disable = clk_gate_disable_set,
- };
--EXPORT_SYMBOL_GPL(clk_gate_ops);
-+EXPORT_SYMBOL_GPL(clk_gate_set_disable_ops);
- 
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index cb1879b..d30314a 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -132,7 +132,8 @@ struct clk_gate {
- 	u8		bit_idx;
- };
- 
--extern struct clk_hw_ops clk_gate_ops;
-+extern struct clk_hw_ops clk_gate_set_enable_ops;
-+extern struct clk_hw_ops clk_gate_set_disable_ops;
- 
- #endif /* CONFIG_GENERIC_CLK_GATE */
- 
--- 
-1.7.4.1
+> +		};
+> +	};
+> +};
