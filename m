@@ -1,137 +1,158 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 25 Aug 2011 08:37:08 -0500
-Subject: [RFC PATCH 2/7] arm/dts: Add initial device tree support for
-	OMAP4 SoC
-In-Reply-To: <1314181040-22807-3-git-send-email-b-cousson@ti.com>
-References: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
-	<1314181040-22807-3-git-send-email-b-cousson@ti.com>
-Message-ID: <4E565004.9050806@gmail.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Thu, 25 Aug 2011 19:07:58 +0530
+Subject: [PATCH v2 3/3] dmaengine: imx-sdma: add device tree probe support
+In-Reply-To: <1312430234.1536.552.camel@vkoul-udesk3>
+References: <1310723066-567-1-git-send-email-shawn.guo@linaro.org>
+	<1310723066-567-4-git-send-email-shawn.guo@linaro.org>
+	<1312430234.1536.552.camel@vkoul-udesk3>
+Message-ID: <1314279478.1606.35.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+On Thu, 2011-08-04 at 09:27 +0530, Koul, Vinod wrote:
+> On Fri, 2011-07-15 at 17:44 +0800, Shawn Guo wrote:
+> > It adds device tree probe support for imx-sdma driver.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Vinod Koul <vinod.koul@intel.com>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> I need an ack from Grant before I can apply this series
+I don't think I heard back from Grant on this.
+Grant let me know if you are okay with this patch
 
-On 08/24/2011 05:17 AM, Benoit Cousson wrote:
-> Add initial device-tree support for OMAP4 SoC.
+-- 
+~Vinod
+
+> >  .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   17 ++++++++
+> >  drivers/dma/imx-sdma.c                             |   41 ++++++++++++++++++-
+> >  2 files changed, 55 insertions(+), 3 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+> > new file mode 100644
+> > index 0000000..d1e3f44
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+> > @@ -0,0 +1,17 @@
+> > +* Freescale Smart Direct Memory Access (SDMA) Controller for i.MX
+> > +
+> > +Required properties:
+> > +- compatible : Should be "fsl,<chip>-sdma"
+> > +- reg : Should contain SDMA registers location and length
+> > +- interrupts : Should contain SDMA interrupt
+> > +- fsl,sdma-ram-script-name : Should contain the full path of SDMA RAM
+> > +  scripts firmware
+> > +
+> > +Examples:
+> > +
+> > +sdma at 83fb0000 {
+> > +	compatible = "fsl,imx51-sdma", "fsl,imx35-sdma";
+> > +	reg = <0x83fb0000 0x4000>;
+> > +	interrupts = <6>;
+> > +	fsl,sdma-ram-script-name = "sdma-imx51.bin";
+> > +};
+> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> > index 6b839a2..20504f0 100644
+> > --- a/drivers/dma/imx-sdma.c
+> > +++ b/drivers/dma/imx-sdma.c
+> > @@ -32,6 +32,8 @@
+> >  #include <linux/slab.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/dmaengine.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_device.h>
+> >  
+> >  #include <asm/irq.h>
+> >  #include <mach/sdma.h>
+> > @@ -331,6 +333,12 @@ static struct platform_device_id sdma_devtypes[] = {
+> >  	}
+> >  };
+> >  
+> > +static const struct of_device_id sdma_dt_ids[] = {
+> > +	{ .compatible = "fsl,imx31-sdma", .data = &sdma_devtypes[IMX31_SDMA], },
+> > +	{ .compatible = "fsl,imx35-sdma", .data = &sdma_devtypes[IMX35_SDMA], },
+> > +	{ /* sentinel */ }
+> > +};
+> > +
+> >  #define SDMA_H_CONFIG_DSPDMA	(1 << 12) /* indicates if the DSPDMA is used */
+> >  #define SDMA_H_CONFIG_RTD_PINS	(1 << 11) /* indicates if Real-Time Debug pins are enabled */
+> >  #define SDMA_H_CONFIG_ACR	(1 << 4)  /* indicates if AHB freq /core freq = 2 or 1 */
+> > @@ -1249,6 +1257,10 @@ err_dma_alloc:
+> >  
+> >  static int __init sdma_probe(struct platform_device *pdev)
+> >  {
+> > +	const struct of_device_id *of_id =
+> > +			of_match_device(sdma_dt_ids, &pdev->dev);
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	const char *fw_name;
+> >  	int ret;
+> >  	int irq;
+> >  	struct resource *iores;
+> > @@ -1264,7 +1276,7 @@ static int __init sdma_probe(struct platform_device *pdev)
+> >  
+> >  	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >  	irq = platform_get_irq(pdev, 0);
+> > -	if (!iores || irq < 0 || !pdata) {
+> > +	if (!iores || irq < 0) {
+> >  		ret = -EINVAL;
+> >  		goto err_irq;
+> >  	}
+> > @@ -1294,6 +1306,8 @@ static int __init sdma_probe(struct platform_device *pdev)
+> >  	if (!sdma->script_addrs)
+> >  		goto err_alloc;
+> >  
+> > +	if (of_id)
+> > +		pdev->id_entry = of_id->data;
+> >  	sdma->devtype = pdev->id_entry->driver_data;
+> >  
+> >  	dma_cap_set(DMA_SLAVE, sdma->dma_device.cap_mask);
+> > @@ -1324,10 +1338,30 @@ static int __init sdma_probe(struct platform_device *pdev)
+> >  	if (ret)
+> >  		goto err_init;
+> >  
+> > -	if (pdata->script_addrs)
+> > +	if (pdata && pdata->script_addrs)
+> >  		sdma_add_scripts(sdma, pdata->script_addrs);
+> >  
+> > -	sdma_get_firmware(sdma, pdata->fw_name);
+> > +	if (pdata) {
+> > +		sdma_get_firmware(sdma, pdata->fw_name);
+> > +	} else {
+> > +		/*
+> > +		 * Because that device tree does not encode ROM script address,
+> > +		 * the RAM script in firmware is mandatory for device tree
+> > +		 * probe, otherwise it fails.
+> > +		 */
+> > +		ret = of_property_read_string(np, "fsl,sdma-ram-script-name",
+> > +					      &fw_name);
+> > +		if (ret) {
+> > +			dev_err(&pdev->dev, "failed to get firmware name\n");
+> > +			goto err_init;
+> > +		}
+> > +
+> > +		ret = sdma_get_firmware(sdma, fw_name);
+> > +		if (ret) {
+> > +			dev_err(&pdev->dev, "failed to get firmware\n");
+> > +			goto err_init;
+> > +		}
+> > +	}
+> >  
+> >  	sdma->dma_device.dev = &pdev->dev;
+> >  
+> > @@ -1375,6 +1409,7 @@ static int __exit sdma_remove(struct platform_device *pdev)
+> >  static struct platform_driver sdma_driver = {
+> >  	.driver		= {
+> >  		.name	= "imx-sdma",
+> > +		.of_match_table = sdma_dt_ids,
+> >  	},
+> >  	.id_table	= sdma_devtypes,
+> >  	.remove		= __exit_p(sdma_remove),
 > 
-> This is based on the original panda board patch done by Manju:
-> http://permalink.gmane.org/gmane.linux.ports.arm.omap/60393
 > 
-> Add the generic GIC interrupt-controller from ARM.
 > 
-> Add an empty "soc" node to contain non memory mapped IPs
-> (DSP, MPU, IPU...).
 > 
-> Note: Since reg, irq and dma are provided by hwmod for the
-> moment, these attributes will not be present at all in DTS
-> to highlight the gap. They will be added as soon as dma bindings
-> will be there and drivers will be adapted.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: G, Manjunath Kondaiah <manjugk@ti.com>
-> ---
->  arch/arm/boot/dts/omap4.dtsi |   80 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 80 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/omap4.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> new file mode 100644
-> index 0000000..97a3ea7
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -0,0 +1,80 @@
-> +/*
-> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/*
-> + * Carveout for multimedia usecases
-> + * It should be the last 48MB of the first 512MB memory part
-> + * In theory, it should not even exist. That zone should be reserved
-> + * dynamically during the .reserve callback.
-> + */
-> +/memreserve/ 0x9d000000 0x03000000;
-> +
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "TI OMAP4430";
-> +	compatible = "ti,omap4430", "ti,omap4";
-> +	interrupt-parent = <&gic>;
-> +
-> +	aliases {
-> +	};
-> +
-> +	/*
-> +	 * The soc node represents the soc top level view. It is uses for IPs
-> +	 * that are not memory mapped in the MPU view or for the MPU itself.
-> +	 */
-> +	soc {
-> +		compatible = "ti,omap-infra";
-> +	};
-> +
-> +	/*
-> +	 * XXX: Use a flat representation of the OMAP4 interconnect.
-> +	 * The real OMAP interconnect network is quite complex.
-> +	 *
-> +	 * MPU -+-- MPU_PRIVATE - GIC, L2
-> +	 *      |
-> +	 *      +----------------+----------+
-> +	 *      |                |          |
-> +	 *      +            +- EMIF - DDR  |
-> +	 *      |            |              |
-> +	 *      |            +     +--------+
-> +	 *      |            |     |
-> +	 *      |            +- L4_ABE - AESS, MCBSP, TIMERs...
-> +	 *      |            |
-> +	 *      +- L3_MAIN --+- L4_CORE - IPs...
-> +	 *                   |
-> +	 *                   +- L4_PER - IPs...
-> +	 *                   |
-> +	 *                   +- L4_CFG -+- L4_WKUP - IPs...
-> +	 *                   |          |
-> +	 *                   |          +- IPs...
-> +	 *                   +- IPU ----+
-> +	 *                   |          |
-> +	 *                   +- DSP ----+
-> +	 *                   |          |
-> +	 *                   +- DSS ----+
-> +	 *
-> +	 * Since that will not bring real advantage to represent that in DT for
-> +	 * the moment, just use a fake OCP bus entry to represent the whole bus
-> +	 * hierarchy.
-> +	 */
-> +	ocp {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		gic: interrupt-controller at 48241000 {
-> +			compatible = "ti,omap4-gic", "arm,gic";
-
-The gic binding is still being hashed out. This needs binding
-documentation and handling of PPIs. I'm planning on posting an updated
-series today with this.
-
-"arm,gic" should be dropped or replaced with "arm,cortex-a9-gic".
-Non-specific DT bindings are not well received. Is OMAP4 gic different
-from standard Cortex-A9?
-
-> +			interrupt-controller;
-> +			#interrupt-cells = <1>;
-> +			reg = <0x48241000 0x1000>,
-> +			      <0x48240100 0x0200>;
-
-Isn't the cpu interface register space 0x100 bytes long?
-
-Rob
-
-> +		};
-> +	};
-> +};
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
