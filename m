@@ -1,54 +1,93 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Thu, 25 Aug 2011 15:51:56 -0400
-Subject: [PATCH 1/2] ARM: SAMSUNG: Add Window Positioning Support for s3c-fb
-	driver
+Date: Thu, 25 Aug 2011 15:51:57 -0400
+Subject: [PATCH 2/2] video: s3c-fb: Modify s3c-fb driver to support window
+	positioning
 In-Reply-To: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
 References: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1314301917-9938-2-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1314301917-9938-3-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch:
-	--adds a data-structure to hold the current position of windows.
-	--adds an ioctl number to support dynamic positioning the windows.
+This patch modifies the existing s3c-fb driver to provide
+flexibility to the user to reposition the framebuffer windows.
 
 Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/fb.h |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+ drivers/video/s3c-fb.c |   37 ++++++++++++++++++++++++++++++++-----
+ 1 files changed, 32 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
-index bd79c0a..77ed75c 100644
---- a/arch/arm/plat-samsung/include/plat/fb.h
-+++ b/arch/arm/plat-samsung/include/plat/fb.h
-@@ -22,6 +22,18 @@
-  */
- #define S3C_FB_MAX_WIN	(5)
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index 0fda252..41179d7 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -442,6 +442,7 @@ static int s3c_fb_set_par(struct fb_info *info)
+ 	struct fb_var_screeninfo *var = &info->var;
+ 	struct s3c_fb_win *win = info->par;
+ 	struct s3c_fb *sfb = win->parent;
++	struct s3cfb_window_pos *winpos = &win->windata->winpos;
+ 	void __iomem *regs = sfb->regs;
+ 	void __iomem *buf = regs;
+ 	int win_no = win->index;
+@@ -539,12 +540,13 @@ static int s3c_fb_set_par(struct fb_info *info)
  
-+/* struct s3cfb_window_pos
-+ * @win_pos_x: X-coordinate of window from the left.
-+ * @win_pos_y: Y-coordinate of window from the top.
-+ */
-+struct s3cfb_window_pos {
-+	int	win_pos_x;
-+	int	win_pos_y;
-+};
-+
-+/* Custom ioctl */
-+#define S3CFB_WIN_POSITION	_IOW('F', 1, struct s3cfb_window_pos)
-+
- /**
-  * struct s3c_fb_pd_win - per window setup data
-  * @win_mode: The display parameters to initialise (not for window 0)
-@@ -35,6 +47,8 @@ struct s3c_fb_pd_win {
- 	unsigned short		max_bpp;
- 	unsigned short		virtual_x;
- 	unsigned short		virtual_y;
-+
-+	struct s3cfb_window_pos		winpos;
- };
+ 	/* write 'OSD' registers to control position of framebuffer */
  
- /**
+-	data = VIDOSDxA_TOPLEFT_X(0) | VIDOSDxA_TOPLEFT_Y(0);
++	data = VIDOSDxA_TOPLEFT_X(winpos->win_pos_x) |
++	       VIDOSDxA_TOPLEFT_Y(winpos->win_pos_y);
+ 	writel(data, regs + VIDOSD_A(win_no, sfb->variant));
+ 
+-	data = VIDOSDxB_BOTRIGHT_X(s3c_fb_align_word(var->bits_per_pixel,
+-						     var->xres - 1)) |
+-	       VIDOSDxB_BOTRIGHT_Y(var->yres - 1);
++	data = VIDOSDxB_BOTRIGHT_X((s3c_fb_align_word(var->bits_per_pixel,
++	       (winpos->win_pos_x + var->xres - 1)))) |
++	       VIDOSDxB_BOTRIGHT_Y((winpos->win_pos_y + var->yres - 1));
+ 
+ 	writel(data, regs + VIDOSD_B(win_no, sfb->variant));
+ 
+@@ -999,8 +1001,10 @@ static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
+ {
+ 	struct s3c_fb_win *win = info->par;
+ 	struct s3c_fb *sfb = win->parent;
+-	int ret;
++	struct s3cfb_window_pos *winpos = &win->windata->winpos;
++	int ret = 0;
+ 	u32 crtc;
++	u32 data;
+ 
+ 	switch (cmd) {
+ 	case FBIO_WAITFORVSYNC:
+@@ -1011,6 +1015,29 @@ static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
+ 
+ 		ret = s3c_fb_wait_for_vsync(sfb, crtc);
+ 		break;
++	case S3CFB_WIN_POSITION:
++		if (copy_from_user(winpos, (u32 __user *)arg,
++					sizeof(struct s3cfb_window_pos))) {
++			ret = -EFAULT;
++			break;
++		}
++
++		shadow_protect_win(win, 1);
++
++		/* write 'OSD' registers to set position of the window */
++		data = VIDOSDxA_TOPLEFT_X(winpos->win_pos_x) |
++		       VIDOSDxA_TOPLEFT_Y(winpos->win_pos_y);
++		writel(data, sfb->regs + VIDOSD_A(win->index, sfb->variant));
++
++		data = VIDOSDxB_BOTRIGHT_X(
++				s3c_fb_align_word(info->var.bits_per_pixel,
++				(winpos->win_pos_x + info->var.xres - 1)));
++		data |=	VIDOSDxB_BOTRIGHT_Y(winpos->win_pos_y +
++				info->var.yres - 1);
++		writel(data, sfb->regs + VIDOSD_B(win->index, sfb->variant));
++
++		shadow_protect_win(win, 0);
++		break;
+ 	default:
+ 		ret = -ENOTTY;
+ 	}
 -- 
 1.7.0.4
