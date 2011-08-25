@@ -1,48 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Aug 2011 13:25:43 +0100
-Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <20110825121710.GK3286@htj.dyndns.org>
-References: <20110823151936.GM9232@opensource.wolfsonmicro.com>
-	<201108232351.55432.rjw@sisk.pl>
-	<CAOS58YNUSn2eVLDLzqKmrtL7M5tSetkhZ1ODecLK54NSDnZVAA@mail.gmail.com>
-	<20110823220056.GK3895@n2100.arm.linux.org.uk>
-	<CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
-	<20110823221314.GL3895@n2100.arm.linux.org.uk>
-	<CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
-	<20110825121416.GB8883@n2100.arm.linux.org.uk>
-	<20110825121710.GK3286@htj.dyndns.org>
-Message-ID: <20110825122543.GC8883@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 25 Aug 2011 13:32:42 +0100
+Subject: [PATCH] ARM: mm: keep significant bits in pfn_valid
+Message-ID: <1314275562-31797-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 02:17:10PM +0200, Tejun Heo wrote:
-> Hello, Russell.
-> 
-> On Thu, Aug 25, 2011 at 01:14:16PM +0100, Russell King - ARM Linux wrote:
-> > was introduced, every other architecture should have been updated for
-> > that change...  So this call in the ARM signal handling code to
-> > try_to_freeze() should just be deleted as it should've been done five
-> > years ago.
-> 
-> I agree.  I don't think it's necessary there, so for now, let's just
-> delete that call, but get_signal_to_deliver() expects to be called
-> with IRQ enabled so it would still be a good idea to turn on/off IRQs
-> explicitly around it.
+When ARCH_HAS_HOLES_MEMORYMODEL is selected, pfn_valid calls
+memblock_is_memory to test validity of a pfn:
 
-No.  Stop bodging and hiding problems.  Anywhere which does this:
+> memblock_is_memory(pfn << PAGE_SHIFT);
 
-	local_irq_enable();
-	do something
-	local_irq_disable();
+On LPAE systems this cuts off the top bits, as the shift occurs before
+the value is promoted to a phys_addr_t.
 
-is a bug.  Things are called with IRQs disabled for a reason - randomly
-re-enabling IRQs does not "fix" stuff, it merely introduces subtle bugs
-while hiding warnings of those bugs.
+This patch replaces the shift with a call to __pfn_to_phys (which casts
+pfn to phys_addr_t before shifting), preventing the loss of significant
+bits.
 
-Please go back and read my response to Mark at the beginning of this
-thread, where I describe why IRQs are disabled here.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/init.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-The only solution here is to fix the problem properly, and I'm working
-on a patch to fix the problem I highlighted in my earlier response to
-Mark.  Once we have that problem fixed, we can then (more) safely call
-do_signal() with IRQs enabled.
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 91bca35..cc7e2d8 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -298,7 +298,7 @@ static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
+ #ifdef CONFIG_HAVE_ARCH_PFN_VALID
+ int pfn_valid(unsigned long pfn)
+ {
+-	return memblock_is_memory(pfn << PAGE_SHIFT);
++	return memblock_is_memory(__pfn_to_phys(pfn));
+ }
+ EXPORT_SYMBOL(pfn_valid);
+ #endif
+-- 
+1.7.0.4
