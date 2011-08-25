@@ -1,100 +1,41 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 25 Aug 2011 09:17:08 +0800
-Subject: [PATCH 6/6] ARM: highbank: add suspend support
-In-Reply-To: <1313526898-19920-7-git-send-email-robherring2@gmail.com>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-7-git-send-email-robherring2@gmail.com>
-Message-ID: <20110825011706.GA16853@S2100-06.ap.freescale.net>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Thu, 25 Aug 2011 06:43:12 +0530
+Subject: [PATCH 12/15] spi/s3c64xx: Add support DMA engine API
+In-Reply-To: <20110821084633.GD12028@n2100.arm.linux.org.uk>
+References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
+	<1311744697-10264-13-git-send-email-boojin.kim@samsung.com>
+	<CABb+yY3-d0xTO+s0cCPXPW8qGpTH5G2U+bp-0z4Se47eVvJ__w@mail.gmail.com>
+	<CAGOxZ53BRa1=Bnb==jNg_dD0XT2pMSPo=QoHF++LnT6r5kO_Mw@mail.gmail.com>
+	<20110821084633.GD12028@n2100.arm.linux.org.uk>
+Message-ID: <CAGOxZ53i4DitEbQsWm94Nv1aP6M31H3csZDn_4KqzALsSdyDvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 03:34:58PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Add the platform suspend ops for highbank.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/mach-highbank/Makefile |    1 +
->  arch/arm/mach-highbank/pm.c     |   55 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 56 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-highbank/pm.c
-> 
-> diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
-> index b8d5d40..2cd4a1b 100644
-> --- a/arch/arm/mach-highbank/Makefile
-> +++ b/arch/arm/mach-highbank/Makefile
-> @@ -2,3 +2,4 @@ obj-y					:= clock.o highbank.o system.o
->  obj-$(CONFIG_SMP)			+= platsmp.o
->  obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
->  obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
-> +obj-$(CONFIG_PM_SLEEP)			+= pm.o
-> diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
-> new file mode 100644
-> index 0000000..36c88df
-> --- /dev/null
-> +++ b/arch/arm/mach-highbank/pm.c
-> @@ -0,0 +1,55 @@
-> +/*
-> + * Copyright 2011 Calxeda, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/suspend.h>
-> +
-> +#include <asm/proc-fns.h>
-> +#include <asm/smp_scu.h>
-> +#include <asm/suspend.h>
-> +
-> +#include "core.h"
-> +#include "sysregs.h"
-> +
-> +static int highbank_suspend_finish(unsigned long val)
-> +{
-> +	cpu_do_idle();
-> +	return 0;
-> +}
-> +
-> +static int highbank_pm_enter(suspend_state_t state)
-> +{
-> +	writel(HB_PWR_SUSPEND, sregs_base + HB_SREG_A9_PWR_REQ);
-> +	highbank_set_cpu_jump(0, cpu_resume);
-> +
-> +	scu_power_mode(a9_base_addr, SCU_PM_POWEROFF);
-> +	cpu_suspend(0, highbank_suspend_finish);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct platform_suspend_ops highbank_pm_ops = {
-> +	.enter = highbank_pm_enter,
-> +	.valid = suspend_valid_only_mem,
-> +};
-> +
-> +static int highbank_pm_init(void)
-
-__init maybe?
+On Sun, Aug 21, 2011 at 2:16 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Aug 09, 2011 at 09:43:32AM +0530, Alim Akhtar wrote:
+>> Exactly, spi_s3c64xx.c (including Sound driver) can not be used with
+>> pl080 and pl330 (DMAENGINE drivers) as it is.
+>> Recently I was trying to use PL080 DMAENGINE driver, and i was ended
+>> up using some #ifdef in the spi driver.
+>> something like
+>> #ifdef CONFIG_PL080
+>> sdd->tx_dmac.bus_id = dmatx_res->name;
+>> sdd->rx_dmac.bus_id = dmarx_res->name;
+>> #else
+>> sdd->tx_dmac.bus_id = dmatx_res->start;
+>> sdd->tx_dmac.bus_id = dmatx_res->start;
+>> #endif
+>>
+>> This is because, Pl080 handle the channel as a char *(name) and pl330
+>> expect the channel to be enum (a number).
+>
+> The alternative is that you do as the Primecell drivers do (which was
+> designed from the outset to be independent of the specific dmaengine),
+> and pass the DMA filter parameters as pointers via platform data.
+>
+Thanks Russell for your suggestion and pointer.
+I will Look into this alternative solution.
 
 Regards,
-Shawn
-
-> +{
-> +	suspend_set_ops(&highbank_pm_ops);
-> +	return 0;
-> +}
-> +module_init(highbank_pm_init);
-> -- 
-> 1.7.4.1
+Alim
