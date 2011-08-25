@@ -1,66 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Aug 2011 19:52:28 +0100
-Subject: Question on virtual memory layout: lowmem with memory hole
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03B47E2949@dbde02.ent.ti.com>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B03B47E23FC@dbde02.ent.ti.com>
-	<20110825102245.GA10405@n2100.arm.linux.org.uk>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03B47E2949@dbde02.ent.ti.com>
-Message-ID: <20110825185228.GA5029@n2100.arm.linux.org.uk>
+From: maxin.john@gmail.com (Maxin B. John)
+Date: Thu, 25 Aug 2011 22:11:43 +0300
+Subject: [PATCH]arm: nwfpe: '&pointer[0]' to 'pointer' fix
+Message-ID: <20110825191143.GA3149@maxin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2011 at 12:06:20AM +0530, Pedanekar, Hemant wrote:
-> Russell King - ARM Linux wrote on Thursday, August 25, 2011 3:53 PM:
-> 
-> > On Thu, Aug 25, 2011 at 09:35:07AM +0530, Pedanekar, Hemant wrote:
-> >> E.g., on OMAP3 with mem=32M at 0x80000000 mem=8M at 0x87800000
-> >> 
-> >> (CASE 1)
-> >>  Memory: 32MB 8MB = 40MB total
-> >>  Memory: 28408k/28408k available, 12552k reserved, 0K highmem
-> >>  Virtual kernel memory layout:
-> >>      vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> >>      fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-> >>      DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
-> >>      vmalloc : 0xc8800000 - 0xf8000000   ( 760 MB)
-> >>      lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
-> >>      modules : 0xbf000000 - 0xc0000000   (  16 MB)
-> >>        .text : 0xc0008000 - 0xc05ac2c8   (5777 kB)
-> >>        .init : 0xc05ad000 - 0xc05f8780   ( 302 kB)
-> >>        .data : 0xc05fa000 - 0xc06838d0   ( 551 kB)
-> >>         .bss : 0xc06838f4 - 0xc0bd8a14   (5461 kB)
-> >> 
-> >> Is this expected? 88MB space between two 'mem's seems to have lost.
-> > 
-> > Yes.  The memory layout lines gives an overview of the virtual memory
-> > address space _regions_. 
-> > 
-> > What it's saying is that the virtual addresses from 0xc0000000 - 0xc8000000
-> > are used for lowmem.  That may not be fully populated, but that's what
-> > the address range is reserved for.
-> 
-> So, larger the hole, more address space will be unusable - is that correct?
+'&pointer[0]' to 'pointer' fix in arch/arm/nwfpe/fpa11_cpdt.c 
 
-Correct.
-
-> >> This also
-> >> means vmalloc space is lower compared to when a single mem=40M is passed.
-> > 
-> > Huh.  Either your maths is wrong or...
-> > 
-> > Here's case 1:
-> >>      vmalloc : 0xc8800000 - 0xf8000000   ( 760 MB) And case 2:
-> >>      vmalloc : 0xc3000000 - 0xf8000000   ( 848 MB)
-> > 
-> > Looks to me like case 1, vmalloc space is _higher_ not _lower_.  That's
-> > expected because you told the kernel it had more memory in case 1.
-> 
-> Sorry, my mistake - I actually meant "vmalloc space is _smaller_ compared to
-> when a single mem=40M is passed" though the actual physical RAM available is
-> same in both the cases.
-
-Again, that's expected.
-
-We require a 1:1 relationship between virtual and physical addresses for
-efficiency - having non-linear translation means we'd need a lookup table,
-and as these translations are heavily used, that will impact performance.
+Signed-off-by: Maxin B. John <maxin.john@gmail.com>
+---
+diff --git a/arch/arm/nwfpe/fpa11_cpdt.c b/arch/arm/nwfpe/fpa11_cpdt.c
+index d31c49f..6e9eb45 100644
+--- a/arch/arm/nwfpe/fpa11_cpdt.c
++++ b/arch/arm/nwfpe/fpa11_cpdt.c
+@@ -42,11 +42,11 @@ static inline void loadDouble(const unsigned int Fn, const unsigned int __user *
+ 	p = (unsigned int *) &fpa11->fpreg[Fn].fDouble;
+ 	fpa11->fType[Fn] = typeDouble;
+ #ifdef __ARMEB__
+-	get_user(p[0], &pMem[0]);	/* sign & exponent */
++	get_user(p[0], pMem);	/* sign & exponent */
+ 	get_user(p[1], &pMem[1]);
+ #else
+ 	get_user(p[0], &pMem[1]);
+-	get_user(p[1], &pMem[0]);	/* sign & exponent */
++	get_user(p[1], pMem);	/* sign & exponent */
+ #endif
+ }
+ 
+@@ -57,7 +57,7 @@ static inline void loadExtended(const unsigned int Fn, const unsigned int __user
+ 	unsigned int *p;
+ 	p = (unsigned int *) &fpa11->fpreg[Fn].fExtended;
+ 	fpa11->fType[Fn] = typeExtended;
+-	get_user(p[0], &pMem[0]);	/* sign & exponent */
++	get_user(p[0], pMem);	/* sign & exponent */
+ #ifdef __ARMEB__
+ 	get_user(p[1], &pMem[1]);	/* ms bits */
+ 	get_user(p[2], &pMem[2]);	/* ls bits */
+@@ -75,7 +75,7 @@ static inline void loadMultiple(const unsigned int Fn, const unsigned int __user
+ 	unsigned long x;
+ 
+ 	p = (unsigned int *) &(fpa11->fpreg[Fn]);
+-	get_user(x, &pMem[0]);
++	get_user(x, pMem);
+ 	fpa11->fType[Fn] = (x >> 14) & 0x00000003;
+ 
+ 	switch (fpa11->fType[Fn]) {
+@@ -150,10 +150,10 @@ static inline void storeDouble(struct roundingData *roundData, const unsigned in
+ 	}
+ 
+ #ifdef __ARMEB__
+-	put_user(val.i[0], &pMem[0]);	/* msw */
++	put_user(val.i[0], pMem);	/* msw */
+ 	put_user(val.i[1], &pMem[1]);	/* lsw */
+ #else
+-	put_user(val.i[1], &pMem[0]);	/* msw */
++	put_user(val.i[1], pMem);	/* msw */
+ 	put_user(val.i[0], &pMem[1]);	/* lsw */
+ #endif
+ }
+@@ -180,7 +180,7 @@ static inline void storeExtended(const unsigned int Fn, unsigned int __user *pMe
+ 		val.f = fpa11->fpreg[Fn].fExtended;
+ 	}
+ 
+-	put_user(val.i[0], &pMem[0]);	/* sign & exp */
++	put_user(val.i[0], pMem);	/* sign & exp */
+ #ifdef __ARMEB__
+ 	put_user(val.i[1], &pMem[1]);	/* msw */
+ 	put_user(val.i[2], &pMem[2]);
+@@ -205,7 +205,7 @@ static inline void storeMultiple(const unsigned int Fn, unsigned int __user *pMe
+ 		{
+ 			put_user(p[0], &pMem[2]);	/* single */
+ 			put_user(p[1], &pMem[1]);	/* double msw */
+-			put_user(nType << 14, &pMem[0]);
++			put_user(nType << 14, pMem);
+ 		}
+ 		break;
+ 
+@@ -214,7 +214,7 @@ static inline void storeMultiple(const unsigned int Fn, unsigned int __user *pMe
+ 		{
+ 			put_user(p[2], &pMem[1]);	/* msw */
+ 			put_user(p[1], &pMem[2]);
+-			put_user((p[0] & 0x80003fff) | (nType << 14), &pMem[0]);
++			put_user((p[0] & 0x80003fff) | (nType << 14), pMem);
+ 		}
+ 		break;
+ #endif
