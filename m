@@ -1,48 +1,33 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Aug 2011 11:22:45 +0100
-Subject: Question on virtual memory layout: lowmem with memory hole
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03B47E23FC@dbde02.ent.ti.com>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B03B47E23FC@dbde02.ent.ti.com>
-Message-ID: <20110825102245.GA10405@n2100.arm.linux.org.uk>
+Date: Thu, 25 Aug 2011 11:28:24 +0100
+Subject: How to handle named resources with DT?
+In-Reply-To: <20110824231613.GC19890@legolas.emea.dhcp.ti.com>
+References: <20110809205723.GE11568@ponder.secretlab.ca>
+	<20110812030218.GP30552@yookeroo.fritz.box>
+	<20110812084106.GC19467@legolas.emea.dhcp.ti.com>
+	<201108121635.42953.arnd@arndb.de> <4E45422D.4050708@ti.com>
+	<CACxGe6s-2EAuvSqzn6yzDvCyVXa8vVVqG2X=1XFrUBnB=jsdxQ@mail.gmail.com>
+	<87r54a1v0o.fsf@ti.com>
+	<20110824231613.GC19890@legolas.emea.dhcp.ti.com>
+Message-ID: <20110825102824.GB10405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 09:35:07AM +0530, Pedanekar, Hemant wrote:
-> E.g., on OMAP3 with mem=32M at 0x80000000 mem=8M at 0x87800000
+On Thu, Aug 25, 2011 at 02:16:14AM +0300, Felipe Balbi wrote:
+> on top of all that, for IPs which are used on many SoCs (such as MUSB)
+> it's quite silly to force all users to provide resources in a certain
+> order. It sounds to me that this will be prone to error in many ways
+> until everything is synced up and on the correct order.
 > 
-> (CASE 1)
->  Memory: 32MB 8MB = 40MB total
->  Memory: 28408k/28408k available, 12552k reserved, 0K highmem
->  Virtual kernel memory layout:
->      vector  : 0xffff0000 - 0xffff1000   (   4 kB)
->      fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
->      DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
->      vmalloc : 0xc8800000 - 0xf8000000   ( 760 MB)
->      lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
->      modules : 0xbf000000 - 0xc0000000   (  16 MB)
->        .text : 0xc0008000 - 0xc05ac2c8   (5777 kB)
->        .init : 0xc05ad000 - 0xc05f8780   ( 302 kB)
->        .data : 0xc05fa000 - 0xc06838d0   ( 551 kB)
->         .bss : 0xc06838f4 - 0xc0bd8a14   (5461 kB)
-> 
-> Is this expected? 88MB space between two 'mem's seems to have lost.
+> Ditching _byname is a very bad idea.
 
-Yes.  The memory layout lines gives an overview of the virtual memory
-address space _regions_.
+I continue to disagree.  The current _byname is an abonimation and hack
+to try to "fix" this problem.
 
-What it's saying is that the virtual addresses from 0xc0000000 - 0xc8000000
-are used for lowmem.  That may not be fully populated, but that's what
-the address range is reserved for.
+_byname should have been implemented differently - rather than overriding
+the resources name field (which is _normally_ specified to be the device
+or driver name), a new field should have been introduced in struct resource
+to carry the resource sub-name (which is really what it is.)
 
-> This also
-> means vmalloc space is lower compared to when a single mem=40M is passed.
-
-Huh.  Either your maths is wrong or...
-
-Here's case 1:
->      vmalloc : 0xc8800000 - 0xf8000000   ( 760 MB)
-And case 2:
->      vmalloc : 0xc3000000 - 0xf8000000   ( 848 MB)
-
-Looks to me like case 1, vmalloc space is _higher_ not _lower_.  That's
-expected because you told the kernel it had more memory in case 1.
+That would have avoided making /proc/iomem completely illegible with
+multiple devices using this feature.
