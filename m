@@ -1,67 +1,57 @@
-From: bdefaria@adeneo-embedded.com (Bryan DE FARIA)
-Date: Thu, 25 Aug 2011 11:22:49 +0200
-Subject: [PATCH v4] OMAP3EVM: ehci: Fix EHCI support
-Message-ID: <1314264169-32514-1-git-send-email-bdefaria@adeneo-embedded.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 25 Aug 2011 11:31:33 +0200
+Subject: [PATCH] mmc mxcmmc: fix falling back to PIO
+In-Reply-To: <1314263172-18657-1-git-send-email-s.hauer@pengutronix.de>
+References: <1314263172-18657-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110825093133.GA7526@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the VAUX2 regulator supply to 1.8V for the HSUSB host interface.
-Tps65950 GPIO2 has to be set to zero in order to enable the EHCI select line.
+On Thu, Aug 25, 2011 at 11:06:12AM +0200, Sascha Hauer wrote:
+> When we can't configure the dma channel we want to fall
+> back to PIO. We do this by setting host->do_dma to zero.
+> This does not work as do_dma is used to see whether dma
+> can be used for the current transfer. Instead, we have
+> to set host->dma to NULL.
 
-Signed-off-by: Bryan DE FARIA <bdefaria@adeneo-embedded.com>
----
- arch/arm/mach-omap2/board-omap3evm.c |   25 +++++++++++++++++++++++++
- 1 files changed, 25 insertions(+), 0 deletions(-)
+Sorry, forget this patch. We have to set host->do_dma to 0
+also. Will send an updated patch.
 
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index c452b3f..d9e0f10 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -377,6 +377,10 @@ static int omap3evm_twl_gpio_setup(struct device *dev,
- 	if (r)
- 		printk(KERN_ERR "failed to get/set lcd_bkl gpio\n");
- 
-+	/* gpio + 2 == EHCI, camera and audio lines on motherboard Enable*/
-+	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
-+		gpio_request_one(gpio + 2, GPIOF_OUT_INIT_LOW, "EN_MB_LINES");
-+
- 	/* gpio + 7 == DVI Enable */
- 	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_LOW, "EN_DVI");
- 
-@@ -450,6 +454,25 @@ static struct regulator_init_data omap3evm_vio = {
- 	.consumer_supplies	= omap3evm_vio_supply,
- };
- 
-+/* VAUX2 for EHCI */
-+static struct regulator_consumer_supply omap3evm_vaux2_supplies[] = {
-+	REGULATOR_SUPPLY("hsusb1", "ehci-omap.0"),
-+};
-+
-+static struct regulator_init_data omap3evm_vaux2 = {
-+	.constraints = {
-+		.min_uV      		= 1800000,
-+		.max_uV      		= 1800000,
-+		.apply_uV    		= true,
-+		.valid_modes_mask  	= REGULATOR_MODE_NORMAL
-+					| REGULATOR_MODE_STANDBY,
-+		.valid_ops_mask  	= REGULATOR_CHANGE_MODE
-+					| REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies  = ARRAY_SIZE(omap3evm_vaux2_supplies),
-+	.consumer_supplies   	= omap3evm_vaux2_supplies,
-+};
-+
- #ifdef CONFIG_WL12XX_PLATFORM_DATA
- 
- #define OMAP3EVM_WLAN_PMENA_GPIO	(150)
-@@ -510,6 +533,8 @@ static int __init omap3_evm_i2c_init(void)
- 
- 	omap3evm_twldata.vdac->constraints.apply_uV = true;
- 	omap3evm_twldata.vpll2->constraints.apply_uV = true;
-+	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
-+		omap3evm_twldata.vaux2 = &omap3evm_vaux2;
- 
- 	omap3_pmic_init("twl4030", &omap3evm_twldata);
- 	omap_register_i2c_bus(2, 400, NULL, 0);
+Sascha
+
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: linux-mmc at vger.kernel.org
+> ---
+>  drivers/mmc/host/mxcmmc.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
+> index 14aa213..b050b2a 100644
+> --- a/drivers/mmc/host/mxcmmc.c
+> +++ b/drivers/mmc/host/mxcmmc.c
+> @@ -730,7 +730,7 @@ static void mxcmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>  			dev_err(mmc_dev(host->mmc),
+>  				"failed to config DMA channel. Falling back to PIO\n");
+>  			dma_release_channel(host->dma);
+> -			host->do_dma = 0;
+> +			host->dma = NULL;
+>  		}
+>  	}
+>  
+> -- 
+> 1.7.5.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
