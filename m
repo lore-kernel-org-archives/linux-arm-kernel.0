@@ -1,25 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 25 Aug 2011 12:37:15 +0100
-Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <201108232351.55432.rjw@sisk.pl>
-References: <20110823151936.GM9232@opensource.wolfsonmicro.com>
-	<201108232351.55432.rjw@sisk.pl>
-Message-ID: <20110825113715.GA2061@opensource.wolfsonmicro.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 25 Aug 2011 08:52:36 -0300
+Subject: [PATCH] ARM: imx: Remove unused chip revision strings
+Message-ID: <1314273156-14916-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 11:51:55PM +0200, Rafael J. Wysocki wrote:
-> On Tuesday, August 23, 2011, Mark Brown wrote:
+Since commit (167a19d2: ARM: imx: Introduce generic function for displaying silicon revision)
+we no longer need the chip revision strings, so remove them.
 
-> > and the boot runs very slowly.  Reverting the series merged in 56f0be
-> > appears to resolve the issue,
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/plat-mxc/include/mach/mxc.h |   14 --------------
+ 1 files changed, 0 insertions(+), 14 deletions(-)
 
-> In fact, the patch from:
-
-> https://patchwork.kernel.org/patch/1083602/
-
-> is sufficient to make the calltrace go away.
-
-Yes, that works for me too thanks!
-
-Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index 0987923..ea28170 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -50,20 +50,6 @@
+ #define IMX_CHIP_REVISION_3_3		0x33
+ #define IMX_CHIP_REVISION_UNKNOWN	0xff
+ 
+-#define IMX_CHIP_REVISION_1_0_STRING		"1.0"
+-#define IMX_CHIP_REVISION_1_1_STRING		"1.1"
+-#define IMX_CHIP_REVISION_1_2_STRING		"1.2"
+-#define IMX_CHIP_REVISION_1_3_STRING		"1.3"
+-#define IMX_CHIP_REVISION_2_0_STRING		"2.0"
+-#define IMX_CHIP_REVISION_2_1_STRING		"2.1"
+-#define IMX_CHIP_REVISION_2_2_STRING		"2.2"
+-#define IMX_CHIP_REVISION_2_3_STRING		"2.3"
+-#define IMX_CHIP_REVISION_3_0_STRING		"3.0"
+-#define IMX_CHIP_REVISION_3_1_STRING		"3.1"
+-#define IMX_CHIP_REVISION_3_2_STRING		"3.2"
+-#define IMX_CHIP_REVISION_3_3_STRING		"3.3"
+-#define IMX_CHIP_REVISION_UNKNOWN_STRING	"unknown"
+-
+ #ifndef __ASSEMBLY__
+ extern unsigned int __mxc_cpu_type;
+ #endif
+-- 
+1.6.0.4
