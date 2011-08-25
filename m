@@ -1,50 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 24 Aug 2011 21:19:19 -0500
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <20110816221945.GA4066@gallagher>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
-	<20110816221945.GA4066@gallagher>
-Message-ID: <4E55B127.9090103@gmail.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Thu, 25 Aug 2011 11:13:30 +0900
+Subject: To use DMA generic APIs for Samsung DMA
+Message-ID: <1314238425-6480-1-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jamie,
+Changes from V7 are following:
+- [PATCH v7 03/15]: Change commit message
+- [PATCH v7 04/15]: Change the data type of 'cyclic' variable from 'enum'
+  to 'bool'. It removes the redundant status.
+- [PATCH v7 05/15]: Change the build configuration name of samsung DMA from
+  'SAMSUNG_DMA_PL330' to 'SAMSUNG_DMADEV' in order to remove the PL330
+  dependency on it.
 
-On 08/16/2011 05:19 PM, Jamie Iles wrote:
-> Hi Rob,
-> 
-> On Tue, Aug 16, 2011 at 03:34:54PM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> This adds basic support for the Calxeda Highbank platform.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
-> [...]
->> +static void __init highbank_timer_init(void)
->> +{
->> +	int irq;
->> +	struct device_node *np;
->> +	void __iomem *timer_base;
->> +
->> +	/* Map system registers */
->> +	np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
->> +	sregs_base = of_iomap(np, 0);
-> 
-> Should the return values be checked here?  I know that all valid device trees 
-> should have these nodes and valid a reg property, but I don't know if the 
-> error handling needs to be a bit more explicit.  For my platform I have put 
-> these checks and panics() if they fail, but I'm not sure if that's the right 
-> thing!
-> 
-A panic will stop the boot at a point the console is not up unless
-DEBUG_LL is enabled. If you continue, you may be able to continue long
-enough to get a console and then fail when something that depends on
-this is used. For this case, it would be when the clocks are not setup
-correctly (once real clock setup is implemented). As it is now, these
-registers aren't accessed until you do suspend, hotplug, or poweroff.
-
-So probably just a WARN_ON would be better here.
-
-Rob
+[PATCH v7 01/15] DMA: PL330: Add support runtime PM for PL330 DMAC
+[PATCH v7 02/15] DMA: PL330: Update PL330 DMA API driver
+[PATCH v7 03/15] DMA: PL330: Modify device_control()
+[PATCH v7 04/15] DMA: PL330: Add DMA_CYCLIC capability
+[PATCH v7 05/15] ARM: SAMSUNG: Update to use PL330-DMA driver
+[PATCH v7 06/15] ARM: SAMSUNG: Add common DMA operations
+[PATCH v7 07/15] ARM: EXYNOS4: Use generic DMA PL330 driver
+[PATCH v7 08/15] ARM: S5PV210: Use generic DMA PL330 driver
+[PATCH v7 09/15] ARM: S5PC100: Use generic DMA PL330 driver
+[PATCH v7 10/15] ARM: S5P64X0: Use generic DMA PL330 driver
+[PATCH v7 11/15] ARM: SAMSUNG: Remove S3C-PL330-DMA driver
+[PATCH v7 12/15] spi/s3c64xx: Add support DMA engine API
+[PATCH v7 13/15] spi/s3c64xx: Merge dma control code
+[PATCH v7 14/15] ASoC: Samsung: Update DMA interface
+[PATCH v7 15/15] ARM: SAMSUNG: Remove Samsung specific enum type for dma direction
