@@ -1,442 +1,267 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Thu, 25 Aug 2011 11:13:40 +0900
-Subject: [PATCH v7 10/15] ARM: S5P64X0: Use generic DMA PL330 driver
+Date: Thu, 25 Aug 2011 11:13:43 +0900
+Subject: [PATCH v7 13/15] spi/s3c64xx: Merge dma control code
 In-Reply-To: <1314238425-6480-1-git-send-email-boojin.kim@samsung.com>
 References: <1314238425-6480-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1314238425-6480-11-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1314238425-6480-14-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes Samsung S5P64X0 to use DMA PL330 driver
-on DMADEVICE. The S5P64X0 uses DMA generic APIs instead of
-SAMSUNG specific S3C-PL330 APIs.
+This patch modifies to merge the dma control code. Original
+s3c64xx spi driver has each dma control code for rx and tx
+channel. This patch merges these dma control codes into one.
+With this patch, a dma setup function and callback function
+handle for both rx and tx channel.
 
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Acked-by: Vinod Koul <vinod.koul@intel.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s5p64x0/Kconfig            |    4 +-
- arch/arm/mach-s5p64x0/clock-s5p6440.c    |    9 +-
- arch/arm/mach-s5p64x0/clock-s5p6450.c    |    9 +-
- arch/arm/mach-s5p64x0/dma.c              |  273 ++++++++++++++++++++----------
- arch/arm/mach-s5p64x0/include/mach/dma.h |    2 +-
- 5 files changed, 201 insertions(+), 96 deletions(-)
+ drivers/spi/spi-s3c64xx.c |  140 ++++++++++++++++++++++++--------------------
+ 1 files changed, 76 insertions(+), 64 deletions(-)
 
-diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
-index 65c7518..9527ed2 100644
---- a/arch/arm/mach-s5p64x0/Kconfig
-+++ b/arch/arm/mach-s5p64x0/Kconfig
-@@ -9,14 +9,14 @@ if ARCH_S5P64X0
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 24f4903..019a716 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -131,6 +131,12 @@
+ #define RXBUSY    (1<<2)
+ #define TXBUSY    (1<<3)
  
- config CPU_S5P6440
- 	bool
--	select S3C_PL330_DMA
-+	select SAMSUNG_DMADEV
- 	select S5P_HRT
- 	help
- 	  Enable S5P6440 CPU support
- 
- config CPU_S5P6450
- 	bool
--	select S3C_PL330_DMA
-+	select SAMSUNG_DMADEV
- 	select S5P_HRT
- 	help
- 	  Enable S5P6450 CPU support
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-index 0e9cd30..c1f548f 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
-@@ -146,7 +146,7 @@ static struct clk init_clocks_off[] = {
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 8),
- 	}, {
--		.name		= "pdma",
-+		.name		= "dma",
- 		.parent		= &clk_hclk_low.clk,
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 12),
-@@ -499,6 +499,11 @@ static struct clksrc_clk *sysclks[] = {
- 	&clk_pclk_low,
- };
- 
-+static struct clk dummy_apb_pclk = {
-+	.name		= "apb_pclk",
-+	.id		= -1,
++struct s3c64xx_spi_dma_data {
++	unsigned		ch;
++	enum dma_data_direction direction;
++	enum dma_ch	dmach;
 +};
 +
- void __init_or_cpufreq s5p6440_setup_clocks(void)
- {
- 	struct clk *xtal_clk;
-@@ -581,5 +586,7 @@ void __init s5p6440_register_clocks(void)
- 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
- 	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+ /**
+  * struct s3c64xx_spi_driver_data - Runtime info holder for SPI driver.
+  * @clk: Pointer to the spi clock.
+@@ -164,15 +170,13 @@ struct s3c64xx_spi_driver_data {
+ 	struct work_struct              work;
+ 	struct list_head                queue;
+ 	spinlock_t                      lock;
+-	enum dma_ch                     rx_dmach;
+-	enum dma_ch                     tx_dmach;
+ 	unsigned long                   sfr_start;
+ 	struct completion               xfer_completion;
+ 	unsigned                        state;
+ 	unsigned                        cur_mode, cur_bpw;
+ 	unsigned                        cur_speed;
+-	unsigned			rx_ch;
+-	unsigned			tx_ch;
++	struct s3c64xx_spi_dma_data	rx_dma;
++	struct s3c64xx_spi_dma_data	tx_dma;
+ 	struct samsung_dma_ops		*ops;
+ };
  
-+	s3c24xx_register_clock(&dummy_apb_pclk);
-+
- 	s3c_pwmclk_init();
+@@ -229,36 +233,76 @@ static void flush_fifo(struct s3c64xx_spi_driver_data *sdd)
+ 	writel(val, regs + S3C64XX_SPI_CH_CFG);
  }
-diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-index d9dc16c..3d9b609 100644
---- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
-+++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
-@@ -179,7 +179,7 @@ static struct clk init_clocks_off[] = {
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 3),
- 	}, {
--		.name		= "pdma",
-+		.name		= "dma",
- 		.parent		= &clk_hclk_low.clk,
- 		.enable		= s5p64x0_hclk0_ctrl,
- 		.ctrlbit	= (1 << 12),
-@@ -553,6 +553,11 @@ static struct clksrc_clk *sysclks[] = {
- 	&clk_sclk_audio0,
- };
  
-+static struct clk dummy_apb_pclk = {
-+	.name		= "apb_pclk",
-+	.id		= -1,
-+};
-+
- void __init_or_cpufreq s5p6450_setup_clocks(void)
+-static void s3c64xx_spi_dma_rxcb(void *data)
++static void s3c64xx_spi_dmacb(void *data)
  {
- 	struct clk *xtal_clk;
-@@ -632,5 +637,7 @@ void __init s5p6450_register_clocks(void)
- 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
- 	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+-	struct s3c64xx_spi_driver_data *sdd
+-		= (struct s3c64xx_spi_driver_data *)data;
++	struct s3c64xx_spi_driver_data *sdd;
++	struct s3c64xx_spi_dma_data *dma = data;
+ 	unsigned long flags;
  
-+	s3c24xx_register_clock(&dummy_apb_pclk);
++	if (dma->direction == DMA_FROM_DEVICE)
++		sdd = container_of(data,
++			struct s3c64xx_spi_driver_data, rx_dma);
++	else
++		sdd = container_of(data,
++			struct s3c64xx_spi_driver_data, tx_dma);
 +
- 	s3c_pwmclk_init();
+ 	spin_lock_irqsave(&sdd->lock, flags);
+ 
+-	sdd->state &= ~RXBUSY;
+-	/* If the other done */
+-	if (!(sdd->state & TXBUSY))
+-		complete(&sdd->xfer_completion);
++	if (dma->direction == DMA_FROM_DEVICE) {
++		sdd->state &= ~RXBUSY;
++		if (!(sdd->state & TXBUSY))
++			complete(&sdd->xfer_completion);
++	} else {
++		sdd->state &= ~TXBUSY;
++		if (!(sdd->state & RXBUSY))
++			complete(&sdd->xfer_completion);
++	}
+ 
+ 	spin_unlock_irqrestore(&sdd->lock, flags);
  }
-diff --git a/arch/arm/mach-s5p64x0/dma.c b/arch/arm/mach-s5p64x0/dma.c
-index d7ad944..aebf3fc 100644
---- a/arch/arm/mach-s5p64x0/dma.c
-+++ b/arch/arm/mach-s5p64x0/dma.c
-@@ -21,128 +21,219 @@
-  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- */
  
--#include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
-+#include <linux/amba/bus.h>
-+#include <linux/amba/pl330.h>
-+
-+#include <asm/irq.h>
- 
- #include <mach/map.h>
- #include <mach/irqs.h>
- #include <mach/regs-clock.h>
-+#include <mach/dma.h>
- 
- #include <plat/devs.h>
--#include <plat/s3c-pl330-pdata.h>
-+#include <plat/irqs.h>
- 
- static u64 dma_dmamask = DMA_BIT_MASK(32);
- 
--static struct resource s5p64x0_pdma_resource[] = {
--	[0] = {
--		.start	= S5P64X0_PA_PDMA,
--		.end	= S5P64X0_PA_PDMA + SZ_4K,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_DMA0,
--		.end	= IRQ_DMA0,
--		.flags	= IORESOURCE_IRQ,
-+struct dma_pl330_peri s5p6440_pdma_peri[22] = {
-+	{
-+		.peri_id = (u8)DMACH_UART0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_UART1_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART1_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_UART2_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART2_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_UART3_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART3_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = DMACH_MAX,
-+	}, {
-+		.peri_id = DMACH_MAX,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_MAX,
-+	}, {
-+		.peri_id = (u8)DMACH_MAX,
-+	}, {
-+		.peri_id = (u8)DMACH_MAX,
-+	}, {
-+		.peri_id = (u8)DMACH_MAX,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI1_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI1_RX,
-+		.rqtype = DEVTOMEM,
- 	},
- };
- 
--static struct s3c_pl330_platdata s5p6440_pdma_pdata = {
--	.peri = {
--		[0] = DMACH_UART0_RX,
--		[1] = DMACH_UART0_TX,
--		[2] = DMACH_UART1_RX,
--		[3] = DMACH_UART1_TX,
--		[4] = DMACH_UART2_RX,
--		[5] = DMACH_UART2_TX,
--		[6] = DMACH_UART3_RX,
--		[7] = DMACH_UART3_TX,
--		[8] = DMACH_MAX,
--		[9] = DMACH_MAX,
--		[10] = DMACH_PCM0_TX,
--		[11] = DMACH_PCM0_RX,
--		[12] = DMACH_I2S0_TX,
--		[13] = DMACH_I2S0_RX,
--		[14] = DMACH_SPI0_TX,
--		[15] = DMACH_SPI0_RX,
--		[16] = DMACH_MAX,
--		[17] = DMACH_MAX,
--		[18] = DMACH_MAX,
--		[19] = DMACH_MAX,
--		[20] = DMACH_SPI1_TX,
--		[21] = DMACH_SPI1_RX,
--		[22] = DMACH_MAX,
--		[23] = DMACH_MAX,
--		[24] = DMACH_MAX,
--		[25] = DMACH_MAX,
--		[26] = DMACH_MAX,
--		[27] = DMACH_MAX,
--		[28] = DMACH_MAX,
--		[29] = DMACH_PWM,
--		[30] = DMACH_MAX,
--		[31] = DMACH_MAX,
--	},
-+struct dma_pl330_platdata s5p6440_pdma_pdata = {
-+	.nr_valid_peri = ARRAY_SIZE(s5p6440_pdma_peri),
-+	.peri = s5p6440_pdma_peri,
- };
- 
--static struct s3c_pl330_platdata s5p6450_pdma_pdata = {
--	.peri = {
--		[0] = DMACH_UART0_RX,
--		[1] = DMACH_UART0_TX,
--		[2] = DMACH_UART1_RX,
--		[3] = DMACH_UART1_TX,
--		[4] = DMACH_UART2_RX,
--		[5] = DMACH_UART2_TX,
--		[6] = DMACH_UART3_RX,
--		[7] = DMACH_UART3_TX,
--		[8] = DMACH_UART4_RX,
--		[9] = DMACH_UART4_TX,
--		[10] = DMACH_PCM0_TX,
--		[11] = DMACH_PCM0_RX,
--		[12] = DMACH_I2S0_TX,
--		[13] = DMACH_I2S0_RX,
--		[14] = DMACH_SPI0_TX,
--		[15] = DMACH_SPI0_RX,
--		[16] = DMACH_PCM1_TX,
--		[17] = DMACH_PCM1_RX,
--		[18] = DMACH_PCM2_TX,
--		[19] = DMACH_PCM2_RX,
--		[20] = DMACH_SPI1_TX,
--		[21] = DMACH_SPI1_RX,
--		[22] = DMACH_USI_TX,
--		[23] = DMACH_USI_RX,
--		[24] = DMACH_MAX,
--		[25] = DMACH_I2S1_TX,
--		[26] = DMACH_I2S1_RX,
--		[27] = DMACH_I2S2_TX,
--		[28] = DMACH_I2S2_RX,
--		[29] = DMACH_PWM,
--		[30] = DMACH_UART5_RX,
--		[31] = DMACH_UART5_TX,
-+struct dma_pl330_peri s5p6450_pdma_peri[32] = {
-+	{
-+		.peri_id = (u8)DMACH_UART0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_UART1_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART1_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_UART2_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART2_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_UART3_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART3_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_UART4_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART4_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI0_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI0_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM1_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM1_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM2_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_PCM2_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI1_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_SPI1_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_USI_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_USI_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_MAX,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S1_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S1_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S2_TX,
-+		.rqtype = MEMTODEV,
-+	}, {
-+		.peri_id = (u8)DMACH_I2S2_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_PWM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART5_RX,
-+		.rqtype = DEVTOMEM,
-+	}, {
-+		.peri_id = (u8)DMACH_UART5_TX,
-+		.rqtype = MEMTODEV,
- 	},
- };
- 
--static struct platform_device s5p64x0_device_pdma = {
--	.name		= "s3c-pl330",
--	.id		= -1,
--	.num_resources	= ARRAY_SIZE(s5p64x0_pdma_resource),
--	.resource	= s5p64x0_pdma_resource,
--	.dev		= {
-+struct dma_pl330_platdata s5p6450_pdma_pdata = {
-+	.nr_valid_peri = ARRAY_SIZE(s5p6450_pdma_peri),
-+	.peri = s5p6450_pdma_peri,
-+};
-+
-+struct amba_device s5p64x0_device_pdma = {
-+	.dev = {
-+		.init_name = "dma-pl330",
- 		.dma_mask = &dma_dmamask,
- 		.coherent_dma_mask = DMA_BIT_MASK(32),
- 	},
-+	.res = {
-+		.start = S5P64X0_PA_PDMA,
-+		.end = S5P64X0_PA_PDMA + SZ_4K,
-+		.flags = IORESOURCE_MEM,
-+	},
-+	.irq = {IRQ_DMA0, NO_IRQ},
-+	.periphid = 0x00041330,
- };
- 
- static int __init s5p64x0_dma_init(void)
+-static void s3c64xx_spi_dma_txcb(void *data)
++static void prepare_dma(struct s3c64xx_spi_dma_data *dma,
++					unsigned len, dma_addr_t buf)
  {
--	unsigned int id;
+-	struct s3c64xx_spi_driver_data *sdd
+-		= (struct s3c64xx_spi_driver_data *)data;
+-	unsigned long flags;
++	struct s3c64xx_spi_driver_data *sdd;
++	struct samsung_dma_prep_info info;
+ 
+-	spin_lock_irqsave(&sdd->lock, flags);
++	if (dma->direction == DMA_FROM_DEVICE)
++		sdd = container_of((void *)dma,
++			struct s3c64xx_spi_driver_data, rx_dma);
++	else
++		sdd = container_of((void *)dma,
++			struct s3c64xx_spi_driver_data, tx_dma);
+ 
+-	sdd->state &= ~TXBUSY;
+-	/* If the other done */
+-	if (!(sdd->state & RXBUSY))
+-		complete(&sdd->xfer_completion);
++	info.cap = DMA_SLAVE;
++	info.len = len;
++	info.fp = s3c64xx_spi_dmacb;
++	info.fp_param = dma;
++	info.direction = dma->direction;
++	info.buf = buf;
++
++	sdd->ops->prepare(dma->ch, &info);
++	sdd->ops->trigger(dma->ch);
++}
+ 
+-	spin_unlock_irqrestore(&sdd->lock, flags);
++static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
++{
++	struct samsung_dma_info info;
++
++	sdd->ops = samsung_dma_get_ops();
++
++	info.cap = DMA_SLAVE;
++	info.client = &s3c64xx_spi_dma_client;
++	info.width = sdd->cur_bpw / 8;
++
++	info.direction = sdd->rx_dma.direction;
++	info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
++	sdd->rx_dma.ch = sdd->ops->request(sdd->rx_dma.dmach, &info);
++	info.direction =  sdd->tx_dma.direction;
++	info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
++	sdd->tx_dma.ch = sdd->ops->request(sdd->tx_dma.dmach, &info);
++
++	return 1;
+ }
+ 
+ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+@@ -268,7 +312,6 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+ 	struct s3c64xx_spi_info *sci = sdd->cntrlr_info;
+ 	void __iomem *regs = sdd->regs;
+ 	u32 modecfg, chcfg;
+-	struct samsung_dma_prep_info info;
+ 
+ 	modecfg = readl(regs + S3C64XX_SPI_MODE_CFG);
+ 	modecfg &= ~(S3C64XX_SPI_MODE_TXDMA_ON | S3C64XX_SPI_MODE_RXDMA_ON);
+@@ -294,14 +337,7 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+ 		chcfg |= S3C64XX_SPI_CH_TXCH_ON;
+ 		if (dma_mode) {
+ 			modecfg |= S3C64XX_SPI_MODE_TXDMA_ON;
+-			info.cap = DMA_SLAVE;
+-			info.direction = DMA_TO_DEVICE;
+-			info.buf = xfer->tx_dma;
+-			info.len = xfer->len;
+-			info.fp = s3c64xx_spi_dma_txcb;
+-			info.fp_param = sdd;
+-			sdd->ops->prepare(sdd->tx_ch, &info);
+-			sdd->ops->trigger(sdd->tx_ch);
++			prepare_dma(&sdd->tx_dma, xfer->len, xfer->tx_dma);
+ 		} else {
+ 			switch (sdd->cur_bpw) {
+ 			case 32:
+@@ -333,14 +369,7 @@ static void enable_datapath(struct s3c64xx_spi_driver_data *sdd,
+ 			writel(((xfer->len * 8 / sdd->cur_bpw) & 0xffff)
+ 					| S3C64XX_SPI_PACKET_CNT_EN,
+ 					regs + S3C64XX_SPI_PACKET_CNT);
+-			info.cap = DMA_SLAVE;
+-			info.direction = DMA_FROM_DEVICE;
+-			info.buf = xfer->rx_dma;
+-			info.len = xfer->len;
+-			info.fp = s3c64xx_spi_dma_rxcb;
+-			info.fp_param = sdd;
+-			sdd->ops->prepare(sdd->rx_ch, &info);
+-			sdd->ops->trigger(sdd->rx_ch);
++			prepare_dma(&sdd->rx_dma, xfer->len, xfer->rx_dma);
+ 		}
+ 	}
+ 
+@@ -700,10 +729,10 @@ static void handle_msg(struct s3c64xx_spi_driver_data *sdd,
+ 			if (use_dma) {
+ 				if (xfer->tx_buf != NULL
+ 						&& (sdd->state & TXBUSY))
+-					sdd->ops->stop(sdd->tx_ch);
++					sdd->ops->stop(sdd->tx_dma.ch);
+ 				if (xfer->rx_buf != NULL
+ 						&& (sdd->state & RXBUSY))
+-					sdd->ops->stop(sdd->rx_ch);
++					sdd->ops->stop(sdd->rx_dma.ch);
+ 			}
+ 
+ 			goto out;
+@@ -741,25 +770,6 @@ out:
+ 		msg->complete(msg->context);
+ }
+ 
+-static int acquire_dma(struct s3c64xx_spi_driver_data *sdd)
+-{
 -
--	id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
-+	unsigned int id = __raw_readl(S5P64X0_SYS_ID) & 0xFF000;
+-	struct samsung_dma_info info;
+-	sdd->ops = samsung_dma_get_ops();
+-
+-	info.cap = DMA_SLAVE;
+-	info.client = &s3c64xx_spi_dma_client;
+-	info.direction = DMA_FROM_DEVICE;
+-	info.fifo = sdd->sfr_start + S3C64XX_SPI_RX_DATA;
+-	info.width = sdd->cur_bpw / 8;
+-	sdd->rx_ch = sdd->ops->request(sdd->rx_dmach, &info);
+-	info.direction = DMA_TO_DEVICE;
+-	info.fifo = sdd->sfr_start + S3C64XX_SPI_TX_DATA;
+-	sdd->tx_ch = sdd->ops->request(sdd->tx_dmach, &info);
+-
+-	return 1;
+-}
+-
+ static void s3c64xx_spi_work(struct work_struct *work)
+ {
+ 	struct s3c64xx_spi_driver_data *sdd = container_of(work,
+@@ -796,8 +806,8 @@ static void s3c64xx_spi_work(struct work_struct *work)
+ 	spin_unlock_irqrestore(&sdd->lock, flags);
  
- 	if (id == 0x50000)
- 		s5p64x0_device_pdma.dev.platform_data = &s5p6450_pdma_pdata;
- 	else
- 		s5p64x0_device_pdma.dev.platform_data = &s5p6440_pdma_pdata;
+ 	/* Free DMA channels */
+-	sdd->ops->release(sdd->rx_ch, &s3c64xx_spi_dma_client);
+-	sdd->ops->release(sdd->tx_ch, &s3c64xx_spi_dma_client);
++	sdd->ops->release(sdd->rx_dma.ch, &s3c64xx_spi_dma_client);
++	sdd->ops->release(sdd->tx_dma.ch, &s3c64xx_spi_dma_client);
+ }
  
--	platform_device_register(&s5p64x0_device_pdma);
-+	amba_device_register(&s5p64x0_device_pdma, &iomem_resource);
+ static int s3c64xx_spi_transfer(struct spi_device *spi,
+@@ -1014,8 +1024,10 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 	sdd->cntrlr_info = sci;
+ 	sdd->pdev = pdev;
+ 	sdd->sfr_start = mem_res->start;
+-	sdd->tx_dmach = dmatx_res->start;
+-	sdd->rx_dmach = dmarx_res->start;
++	sdd->tx_dma.dmach = dmatx_res->start;
++	sdd->tx_dma.direction = DMA_TO_DEVICE;
++	sdd->rx_dma.dmach = dmarx_res->start;
++	sdd->rx_dma.direction = DMA_FROM_DEVICE;
+ 
+ 	sdd->cur_bpw = 8;
+ 
+@@ -1103,7 +1115,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 					pdev->id, master->num_chipselect);
+ 	dev_dbg(&pdev->dev, "\tIOmem=[0x%x-0x%x]\tDMA=[Rx-%d, Tx-%d]\n",
+ 					mem_res->end, mem_res->start,
+-					sdd->rx_dmach, sdd->tx_dmach);
++					sdd->rx_dma.dmach, sdd->tx_dma.dmach);
  
  	return 0;
- }
-diff --git a/arch/arm/mach-s5p64x0/include/mach/dma.h b/arch/arm/mach-s5p64x0/include/mach/dma.h
-index 1beae2c..5a622af 100644
---- a/arch/arm/mach-s5p64x0/include/mach/dma.h
-+++ b/arch/arm/mach-s5p64x0/include/mach/dma.h
-@@ -20,7 +20,7 @@
- #ifndef __MACH_DMA_H
- #define __MACH_DMA_H
  
--/* This platform uses the common S3C DMA API driver for PL330 */
-+/* This platform uses the common common DMA API driver for PL330 */
- #include <plat/dma-pl330.h>
- 
- #endif /* __MACH_DMA_H */
 -- 
 1.7.1
