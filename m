@@ -1,338 +1,233 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 31 Aug 2011 16:46:47 +0300
-Subject: [PATCH 2/7] iommu/core: split mapping to page sizes as
-Message-ID: <mailman.162.1317571118.20020.linux-arm-kernel@lists.infradead.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 25 Aug 2011 20:31:49 +0530
+Subject: [PATCH v4 1/4] regulator: helper routine to extract regulator_init=
+Message-ID: <mailman.196.1319712196.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-supported by the hardware
+_data
 
-When mapping a memory region, split it to page sizes as supported
-by the iommu hardware. Always prefer bigger pages, when possible,
-in order to reduce the TLB pressure.
+The helper routine is meant to be used by the regulator drivers
+to extract the regulator_init_data structure from the data
+that is passed from device tree.
+'consumer_supplies' which is part of regulator_init_data is not extracted
+as the regulator consumer mappings are passed through DT differently,
+implemented in subsequent patches.
+Similarly the regulator<-->parent/supply mapping is handled in
+subsequent patches.
 
-The logic to do that is now added to the IOMMU core, so neither the iommu
-drivers themselves nor users of the IOMMU API have to duplicate it.
+Also add documentation for regulator bindings to be used to pass
+regulator_init_data struct information from device tree.
 
-This allows a more lenient granularity of mappings; traditionally the
-IOMMU API took 'order' (of a page) as a mapping size, and directly let
-the low level iommu drivers handle the mapping, but now that the IOMMU
-core can split arbitrary memory regions into pages, we can remove this
-limitation, so users don't have to split those regions by themselves.
+Some of the regulator properties which are linux and board specific,
+are left out since its not clear if they can
+be in someway embedded into the kernel or passed in from DT.
+They will be revisited later.
 
-Currently the supported page sizes are advertised once and they then
-remain static. That works well for OMAP and MSM but it would probably
-not fly well with intel's hardware, where the page size capabilities
-seem to have the potential to be different between several DMA
-remapping devices.
-
-As requested, register_iommu() isn't changed yet, so we can convert
-the IOMMU drivers in subsequent patches, and after all the drivers
-are converted, register_iommu will be changed (and the temporary
-register_iommu_pgsize() will be removed).
-
-Mainline users of the IOMMU API (kvm and omap-iovmm) are adopted
-to send the mapping size in bytes instead of in page order.
-
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Joerg Roedel <Joerg.Roedel@amd.com>
-Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
-Cc: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: kvm at vger.kernel.org
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- drivers/iommu/iommu.c      |  138 ++++++++++++++++++++++++++++++++++++++++---
- drivers/iommu/omap-iovmm.c |   12 +---
- include/linux/iommu.h      |    6 +-
- virt/kvm/iommu.c           |    4 +-
- 4 files changed, 137 insertions(+), 23 deletions(-)
+ .../devicetree/bindings/regulator/regulator.txt    |   33 ++++++++
+ drivers/regulator/Kconfig                          |    7 ++
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/of_regulator.c                   |   81 ++++++++++++++++=
+++++
+ include/linux/regulator/of_regulator.h             |   20 +++++
+ 5 files changed, 142 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/regulator/regulator.t=
+xt
+ create mode 100644 drivers/regulator/of_regulator.c
+ create mode 100644 include/linux/regulator/of_regulator.h
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index a7b0862..f23563f 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -16,6 +16,8 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
-  */
-
-+#define pr_fmt(fmt)    "%s: " fmt, __func__
+diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt
+b/Documentation/devicetree/bindings/regulator/regulator.txt
+new file mode 100644
+index 0000000..c488bf3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+@@ -0,0 +1,33 @@
++Voltage/Current Regulators
 +
- #include <linux/kernel.h>
- #include <linux/bug.h>
- #include <linux/types.h>
-@@ -23,15 +25,54 @@
- #include <linux/slab.h>
- #include <linux/errno.h>
- #include <linux/iommu.h>
-+#include <linux/bitmap.h>
-
- static struct iommu_ops *iommu_ops;
-
-+/* bitmap of supported page sizes */
-+static unsigned long iommu_pgsize_bitmap;
++Optional properties:
++- regulator-name: A string used as a descriptive name for regulator output=
+s
++- regulator-min-uV: smallest voltage consumers may set
++- regulator-max-uV: largest voltage consumers may set
++- regulator-uV-offset: Offset applied to voltages to compensate for
+voltage drops
++- regulator-min-uA: smallest current consumers may set
++- regulator-max-uA: largest current consumers may set
++- regulator-always-on: boolean, regulator should never be disabled
++- regulator-boot-on: bootloader/firmware enabled regulator
++- <name>-supply: phandle to the parent supply/regulator node
 +
-+/* size of the smallest supported page (in bytes) */
-+static unsigned int iommu_min_pagesz;
++Example:
 +
-+/**
-+ * register_iommu() - register an IOMMU hardware
-+ * @ops: iommu handlers
-+ * @pgsize_bitmap: bitmap of page sizes supported by the hardware
++	xyzreg: regulator at 0 {
++		regulator-min-uV =3D <1000000>;
++		regulator-max-uV =3D <2500000>;
++		regulator-always-on;
++		vin-supply =3D <&vin>;
++	};
++
++The same binding used by a regulator to reference its
++supply can be used by any consumer to reference its
++regulator/supply
++
++Example of a device node referencing a regulator node,
++
++	devicenode: node at 0x0 {
++		...
++		...
++		<name>-supply =3D <&xyzreg>;
++	};
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index c7fd2c0..8106958 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -64,6 +64,13 @@ config REGULATOR_USERSPACE_CONSUMER
+
+           If unsure, say no.
+
++config OF_REGULATOR
++	bool
++	depends on OF
++	help
++	  OpenFirmware regulator framework helper routines that can
++	  used by regulator drivers to extract data from device tree.
++
+ config REGULATOR_BQ24022
+ 	tristate "TI bq24022 Dual Input 1-Cell Li-Ion Charger IC"
+ 	help
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 040d5aa..e6bc009 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_REGULATOR) +=3D core.o dummy.o
+ obj-$(CONFIG_REGULATOR_FIXED_VOLTAGE) +=3D fixed.o
+ obj-$(CONFIG_REGULATOR_VIRTUAL_CONSUMER) +=3D virtual.o
+ obj-$(CONFIG_REGULATOR_USERSPACE_CONSUMER) +=3D userspace-consumer.o
++obj-$(CONFIG_OF_REGULATOR) +=3D of_regulator.o
+
+ obj-$(CONFIG_REGULATOR_AD5398) +=3D ad5398.o
+ obj-$(CONFIG_REGULATOR_BQ24022) +=3D bq24022.o
+diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regula=
+tor.c
+new file mode 100644
+index 0000000..798faaa
+--- /dev/null
++++ b/drivers/regulator/of_regulator.c
+@@ -0,0 +1,81 @@
++/*
++ * OF helpers for regulator framework
 + *
-+ * Note: this is a temporary function, which will be removed once
-+ * all IOMMU drivers are converted. The only reason it exists is to
-+ * allow splitting the pgsizes changes to several patches in order to ease
-+ * the review.
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ * Rajendra Nayak <rnayak@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + */
-+void register_iommu_pgsize(struct iommu_ops *ops, unsigned long pgsize_bitmap)
++
++#include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/regulator/machine.h>
++
++static void of_get_regulation_constraints(struct device_node *np,
++					struct regulator_init_data **init_data)
 +{
-+	if (iommu_ops || iommu_pgsize_bitmap || !pgsize_bitmap)
-+		BUG();
++	const __be32 *min_uV, *max_uV, *uV_offset;
++	const __be32 *min_uA, *max_uA;
++	struct regulation_constraints *constraints =3D &(*init_data)->constraints=
+;
 +
-+	iommu_ops = ops;
-+	iommu_pgsize_bitmap = pgsize_bitmap;
++	constraints->name =3D of_get_property(np, "regulator-name", NULL);
 +
-+	/* find out the minimum page size only once */
-+	iommu_min_pagesz = 1 << __ffs(pgsize_bitmap);
++	min_uV =3D of_get_property(np, "regulator-min-uV", NULL);
++	if (min_uV)
++		constraints->min_uV =3D be32_to_cpu(*min_uV);
++	max_uV =3D of_get_property(np, "regulator-max-uV", NULL);
++	if (max_uV)
++		constraints->max_uV =3D be32_to_cpu(*max_uV);
++
++	/* Voltage change possible? */
++	if (constraints->min_uV !=3D constraints->max_uV)
++		constraints->valid_ops_mask |=3D REGULATOR_CHANGE_VOLTAGE;
++
++	uV_offset =3D of_get_property(np, "regulator-uV-offset", NULL);
++	if (uV_offset)
++		constraints->uV_offset =3D be32_to_cpu(*uV_offset);
++	min_uA =3D of_get_property(np, "regulator-min-uA", NULL);
++	if (min_uA)
++		constraints->min_uA =3D be32_to_cpu(*min_uA);
++	max_uA =3D of_get_property(np, "regulator-max-uA", NULL);
++	if (max_uA)
++		constraints->max_uA =3D be32_to_cpu(*max_uA);
++
++	/* Current change possible? */
++	if (constraints->min_uA !=3D constraints->max_uA)
++		constraints->valid_ops_mask |=3D REGULATOR_CHANGE_CURRENT;
++
++	if (of_find_property(np, "regulator-boot-on", NULL))
++		constraints->boot_on =3D true;
++
++	if (of_find_property(np, "regulator-always-on", NULL))
++		constraints->always_on =3D true;
++	else /* status change should be possible if not always on. */
++		constraints->valid_ops_mask |=3D REGULATOR_CHANGE_STATUS;
 +}
 +
- void register_iommu(struct iommu_ops *ops)
- {
- 	if (iommu_ops)
- 		BUG();
-
- 	iommu_ops = ops;
++/**
++ * of_get_regulator_init_data - extract regulator_init_data structure info
++ * @dev: device requesting for regulator_init_data
++ *
++ * Populates regulator_init_data structure by extracting data from device
++ * tree node, returns a pointer to the populated struture or NULL if memor=
+y
++ * alloc fails.
++ */
++struct regulator_init_data *of_get_regulator_init_data(struct device *dev)
++{
++	struct regulator_init_data *init_data;
 +
-+	/*
-+	 * set default pgsize values, which retain the existing
-+	 * IOMMU API behavior: drivers will be called to map
-+	 * regions that are sized/aligned to order of 4KiB pages
-+	 */
-+	iommu_pgsize_bitmap = ~0xFFFUL;
++	if (!dev->of_node)
++		return NULL;
 +
-+	/* find out the minimum page size only once */
-+	iommu_min_pagesz = 1 << __ffs(iommu_pgsize_bitmap);
- }
-
- bool iommu_found(void)
-@@ -115,26 +156,103 @@ int iommu_domain_has_cap(struct iommu_domain *domain,
- EXPORT_SYMBOL_GPL(iommu_domain_has_cap);
-
- int iommu_map(struct iommu_domain *domain, unsigned long iova,
--	      phys_addr_t paddr, int gfp_order, int prot)
-+	      phys_addr_t paddr, size_t size, int prot)
- {
--	size_t size;
-+	int ret = 0;
++	init_data =3D devm_kzalloc(dev, sizeof(*init_data), GFP_KERNEL);
++	if (!init_data)
++		return NULL; /* Out of memory? */
 +
-+	/*
-+	 * both the virtual address and the physical one, as well as
-+	 * the size of the mapping, must be aligned (at least) to the
-+	 * size of the smallest page supported by the hardware
-+	 */
-+	if (!IS_ALIGNED(iova | paddr | size, iommu_min_pagesz)) {
-+		pr_err("unaligned: iova 0x%lx pa 0x%lx size 0x%lx min_pagesz "
-+			"0x%x\n", iova, (unsigned long)paddr,
-+			(unsigned long)size, iommu_min_pagesz);
-+		return -EINVAL;
-+	}
-
--	size         = 0x1000UL << gfp_order;
-+	pr_debug("map: iova 0x%lx pa 0x%lx size 0x%lx\n", iova,
-+				(unsigned long)paddr, (unsigned long)size);
-
--	BUG_ON(!IS_ALIGNED(iova | paddr, size));
-+	while (size) {
-+		unsigned long pgsize, addr_merge = iova | paddr;
-+		unsigned int pgsize_idx;
-
--	return iommu_ops->map(domain, iova, paddr, gfp_order, prot);
-+		/* Max page size that still fits into 'size' */
-+		pgsize_idx = __fls(size);
++	of_get_regulation_constraints(dev->of_node, &init_data);
++	return init_data;
++}
+diff --git a/include/linux/regulator/of_regulator.h
+b/include/linux/regulator/of_regulator.h
+new file mode 100644
+index 0000000..621c071
+--- /dev/null
++++ b/include/linux/regulator/of_regulator.h
+@@ -0,0 +1,20 @@
++/*
++ * OpenFirmware regulator support routines
++ *
++ */
 +
-+		/* need to consider alignment requirements ? */
-+		if (likely(addr_merge)) {
-+			/* Max page size allowed by both iova and paddr */
-+			unsigned int align_pgsize_idx = __ffs(addr_merge);
++#ifndef __LINUX_OF_REG_H
++#define __LINUX_OF_REG_H
 +
-+			pgsize_idx = min(pgsize_idx, align_pgsize_idx);
-+		}
++#if defined(CONFIG_OF_REGULATOR)
++extern struct regulator_init_data
++	*of_get_regulator_init_data(struct device *dev);
++#else
++static inline struct regulator_init_data
++	*of_get_regulator_init_data(struct device *dev)
++{
++	return NULL;
++}
++#endif /* CONFIG_OF_REGULATOR */
 +
-+		/* build a mask of acceptable page sizes */
-+		pgsize = (1UL << (pgsize_idx + 1)) - 1;
-+
-+		/* throw away page sizes not supported by the hardware */
-+		pgsize &= iommu_pgsize_bitmap;
-+
-+		/* pick the biggest page */
-+		pgsize_idx = __fls(pgsize);
-+		pgsize = 1UL << pgsize_idx;
-+
-+		/* convert index to page order */
-+		pgsize_idx -= PAGE_SHIFT;
-+
-+		pr_debug("mapping: iova 0x%lx pa 0x%lx order %u\n", iova,
-+					(unsigned long)paddr, pgsize_idx);
-+
-+		ret = iommu_ops->map(domain, iova, paddr, pgsize_idx, prot);
-+		if (ret)
-+			break;
-+
-+		iova += pgsize;
-+		paddr += pgsize;
-+		size -= pgsize;
-+	}
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(iommu_map);
++#endif /* __LINUX_OF_REG_H */
+--=20
+1.7.1
 
--int iommu_unmap(struct iommu_domain *domain, unsigned long iova, int gfp_order)
-+int iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
- {
--	size_t size;
-+	int order, unmapped_size, unmapped_order, total_unmapped = 0;
-+
-+	/*
-+	 * The virtual address, as well as the size of the mapping, must be
-+	 * aligned (at least) to the size of the smallest page supported
-+	 * by the hardware
-+	 */
-+	if (!IS_ALIGNED(iova | size, iommu_min_pagesz)) {
-+		pr_err("unaligned: iova 0x%lx size 0x%lx min_pagesz 0x%x\n",
-+				iova, (unsigned long)size, iommu_min_pagesz);
-+		return -EINVAL;
-+	}
-+
-+	pr_debug("unmap this: iova 0x%lx size 0x%lx\n", iova,
-+							(unsigned long)size);
-+
-+	while (size > total_unmapped) {
-+		order = get_order(size - total_unmapped);
-+
-+		unmapped_order = iommu_ops->unmap(domain, iova, order);
-+		if (unmapped_order < 0)
-+			return unmapped_order;
-+
-+		pr_debug("unmapped: iova 0x%lx order %d\n", iova,
-+							unmapped_order);
-
--	size         = 0x1000UL << gfp_order;
-+		unmapped_size = 0x1000UL << unmapped_order;
-
--	BUG_ON(!IS_ALIGNED(iova, size));
-+		iova += unmapped_size;
-+		total_unmapped += unmapped_size;
-+	}
-
--	return iommu_ops->unmap(domain, iova, gfp_order);
-+	return get_order(total_unmapped);
- }
- EXPORT_SYMBOL_GPL(iommu_unmap);
-diff --git a/drivers/iommu/omap-iovmm.c b/drivers/iommu/omap-iovmm.c
-index e8fdb88..f4dea5a 100644
---- a/drivers/iommu/omap-iovmm.c
-+++ b/drivers/iommu/omap-iovmm.c
-@@ -409,7 +409,6 @@ static int map_iovm_area(struct iommu_domain
-*domain, struct iovm_struct *new,
- 	unsigned int i, j;
- 	struct scatterlist *sg;
- 	u32 da = new->da_start;
--	int order;
-
- 	if (!domain || !sgt)
- 		return -EINVAL;
-@@ -428,12 +427,10 @@ static int map_iovm_area(struct iommu_domain
-*domain, struct iovm_struct *new,
- 		if (bytes_to_iopgsz(bytes) < 0)
- 			goto err_out;
-
--		order = get_order(bytes);
--
- 		pr_debug("%s: [%d] %08x %08x(%x)\n", __func__,
- 			 i, da, pa, bytes);
-
--		err = iommu_map(domain, da, pa, order, flags);
-+		err = iommu_map(domain, da, pa, bytes, flags);
- 		if (err)
- 			goto err_out;
-
-@@ -448,10 +445,9 @@ err_out:
- 		size_t bytes;
-
- 		bytes = sg->length + sg->offset;
--		order = get_order(bytes);
-
- 		/* ignore failures.. we're already handling one */
--		iommu_unmap(domain, da, order);
-+		iommu_unmap(domain, da, bytes);
-
- 		da += bytes;
- 	}
-@@ -474,12 +470,10 @@ static void unmap_iovm_area(struct iommu_domain
-*domain, struct omap_iommu *obj,
- 	start = area->da_start;
- 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
- 		size_t bytes;
--		int order;
-
- 		bytes = sg->length + sg->offset;
--		order = get_order(bytes);
-
--		err = iommu_unmap(domain, start, order);
-+		err = iommu_unmap(domain, start, bytes);
- 		if (err < 0)
- 			break;
-
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 2987199..3b34938 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -61,6 +61,8 @@ struct iommu_ops {
- #ifdef CONFIG_IOMMU_API
-
- extern void register_iommu(struct iommu_ops *ops);
-+extern void register_iommu_pgsize(struct iommu_ops *ops,
-+				unsigned long pgsize_bitmap);
- extern bool iommu_found(void);
- extern struct iommu_domain *iommu_domain_alloc(void);
- extern void iommu_domain_free(struct iommu_domain *domain);
-@@ -69,9 +71,9 @@ extern int iommu_attach_device(struct iommu_domain *domain,
- extern void iommu_detach_device(struct iommu_domain *domain,
- 				struct device *dev);
- extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
--		     phys_addr_t paddr, int gfp_order, int prot);
-+		     phys_addr_t paddr, size_t size, int prot);
- extern int iommu_unmap(struct iommu_domain *domain, unsigned long iova,
--		       int gfp_order);
-+		       size_t size);
- extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain,
- 				      unsigned long iova);
- extern int iommu_domain_has_cap(struct iommu_domain *domain,
-diff --git a/virt/kvm/iommu.c b/virt/kvm/iommu.c
-index 78c80f6..ea142d3 100644
---- a/virt/kvm/iommu.c
-+++ b/virt/kvm/iommu.c
-@@ -111,7 +111,7 @@ int kvm_iommu_map_pages(struct kvm *kvm, struct
-kvm_memory_slot *slot)
-
- 		/* Map into IO address space */
- 		r = iommu_map(domain, gfn_to_gpa(gfn), pfn_to_hpa(pfn),
--			      get_order(page_size), flags);
-+			      page_size, flags);
- 		if (r) {
- 			printk(KERN_ERR "kvm_iommu_map_address:"
- 			       "iommu failed to map pfn=%llx\n", pfn);
-@@ -293,7 +293,7 @@ static void kvm_iommu_put_pages(struct kvm *kvm,
- 		pfn  = phys >> PAGE_SHIFT;
-
- 		/* Unmap address from IO address space */
--		order       = iommu_unmap(domain, gfn_to_gpa(gfn), 0);
-+		order       = iommu_unmap(domain, gfn_to_gpa(gfn), PAGE_SIZE);
- 		unmap_pages = 1ULL << order;
-
- 		/* Unpin all pages we just unmapped to not leak any memory */
--- 
-1.7.4.1
+>
