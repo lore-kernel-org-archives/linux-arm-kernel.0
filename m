@@ -1,28 +1,29 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 25 Aug 2011 13:49:33 +0200
-Subject: [PATCH 0/2] OMAP: Update nr_irqs field in machine descriptors
-In-Reply-To: <1314215215-18683-1-git-send-email-svenkatr@ti.com>
-References: <1314215215-18683-1-git-send-email-svenkatr@ti.com>
-Message-ID: <4E5636CD.4080302@ti.com>
+From: hector.oron@gmail.com (Hector Oron)
+Date: Thu, 25 Aug 2011 12:52:36 +0100
+Subject: i.MX multi SoC patches
+In-Reply-To: <1314272675-22047-1-git-send-email-hector.oron@gmail.com>
+References: <CAODfWeFeaw2+xe01c5fiSr1tYsdM8J8ahZz8t-B7uuD+-P0GCQ@mail.gmail.com>
+	<1314272675-22047-1-git-send-email-hector.oron@gmail.com>
+Message-ID: <CAODfWeGFaa9TnU5yAW0hZxL8dRtDv+FXFwbzwKyTtqOwcctfWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Venkat,
+Hello again,
 
-On 8/24/2011 9:46 PM, S, Venkatraman wrote:
-> As part of an effort to get single ARM kernel binary [1],
-> multiple  definitions of NR_IRQS under various platforms
-> have to be reconciled and abstracted away from common code.
+2011/8/25  <hector.oron@gmail.com>:
+> Hello,
 >
-> This patch series takes the small step of populating the
-> machine descriptors with the pre-existing nr_irqs field.
-> Eventually, the common irq handler code will only look at this
-> field and not the compile time constant.
+> ?This is an attempt to follow Sascha suggestion on the i.MX multi SoC patches thread.
 
-Not related to this patch, but still on that topic. The current NR_IRQS 
-depends as well on board stuff, like for example : the Phoenix 
-IRQs:TWL6030_IRQ_BASE, TWL6040_CODEC_IRQ_BASE.
-Is there a plan to get rid of this static defines?
+Attached patch. My git send-email foo is not good enough.
 
-Thanks,
-Benoit
+Cheers,
+-- 
+?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-mx5-fix-remaining-unconsistent-names-for-irqs.patch
+Type: text/x-patch
+Size: 9788 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110825/2232f2fd/attachment-0001.bin>
