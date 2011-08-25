@@ -1,166 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Aug 2011 16:56:32 +0200
-Subject: [PATCH 3/4] mach-ux500: export System-on-Chip information ux500
-	via sysfs
-In-Reply-To: <4E5613F0.6030205@linaro.org>
-References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-	<201108241810.20753.arnd@arndb.de> <4E5613F0.6030205@linaro.org>
-Message-ID: <201108251656.32459.arnd@arndb.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 25 Aug 2011 07:57:36 -0700
+Subject: [PATCH v3 4/4] ARM: msm: Describe MSM 8660 SURF FPGA registers
+	in DT
+In-Reply-To: <201108251327.13146.arnd@arndb.de>
+References: <1313688345-17699-1-git-send-email-davidb@codeaurora.org>
+	<1313688345-17699-5-git-send-email-davidb@codeaurora.org>
+	<201108251327.13146.arnd@arndb.de>
+Message-ID: <20110825145736.GA31331@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 August 2011, Lee Jones wrote:
-> On 24/08/11 17:10, Arnd Bergmann wrote:
-> > On Wednesday 10 August 2011, Lee Jones wrote:
-> >> +
-> >> +static void ux500_get_soc_id(char *buf)
-> >> +{
-> >> +       void __iomem *uid_base;
-> >> +       int i;
-> >> +       ssize_t sz = 0;
-> >> +
-> >> +       if (dbx500_partnumber() == 0x8500) {
-> >> +               uid_base = __io_address(U8500_BB_UID_BASE);
-> >> +               for (i = 0; i < U8500_BB_UID_LENGTH; i++) {
-> >> +                       sz += sprintf(buf + sz, "%08x", readl(uid_base + i * sizeof(u32)));
-> >> +               }
-> >> +               return;
-> >> +       } else {
-> >> +               /* Don't know where it is located for U5500 */
-> >> +               sprintf(buf, "N/A");
-> >> +               return;
-> >> +       }
-> >> +}
-> >> +
-> > 
-> > This still feels like it's hanging upside-down. You add an SOC node before you know
-> > what it is, and then attach other device to it.
+On Thu, Aug 25, 2011 at 01:27:12PM +0200, Arnd Bergmann wrote:
+> On Thursday 18 August 2011, David Brown wrote:
+> > +static void __init msm8660_surf_fpga_init(void __iomem *fpga_mem)
+> > +{
+> > +       /* Advanced mode */
+> > +       writew(0xFFFF, fpga_mem + 0x15C);
+> > +       /* FPGA_UART_SEL */
+> > +       writew(0, fpga_mem + 0x172);
+> > +       /* FPGA_GPIO_CONFIG_117 */
+> > +       writew(1, fpga_mem + 0xEA);
+> > +       /* FPGA_GPIO_CONFIG_118 */
+> > +       writew(1, fpga_mem + 0xEC);
+> > +       dmb();
+> > +}
 > 
-> Does this comment have anything to do with the code above, or was it
-> quoted just to illustrate that we do find out what the SoC is eventually?
+> Does the dmb() do the right thing here? It seems strange to combine a strictly
+> ordered I/O instruction with another ordering instruction, and I think it would
+> be better to use writew_relaxed for the first one, followed by a 'wmb()'.
 
-I should have been more elaborate here. The problem is that you try to provide
-a generic *soc*id* function for the entire ux500 platform, which already
-supports multiple SoCs and will gain support for further ones. Obviously,
-the ID is a central part of the SoC that will be different for every one,
-making it totally pointless to share the function across multiple SoCs.
+I guess I didn't really think about that, I just kind of kept the
+code.  I'll ask Stepan why he did it that way, and come up with a
+cleaner solution.
 
-Then you go further and inside that function check which soc you actually
-have and *directly* access the registers from some magic address constant.
-We spend a lot of work right now trying to get rid of those constants,
-but a lot of the time we still need them to set up platform_devices on
-platforms that don't yet use device tree probing. However, under no
-circumstances should a random function just take a hardcoded base
-address and do I/O on that.
-
-> If I am understanding you correctly, you mean that we're registering a
-> '/sys/devices/soc/NODE', before we know what kind of SoC we're dealing
-> with and which devices it contains?
+> > +#ifdef CONFIG_OF
+> > +static void __init msm8660_surf_fpga_init_dt(void)
+> > +{
+> > +       struct device_node *node;
+> > +       void __iomem *fpga_mem;
+> > +
+> > +       node = of_find_compatible_node(NULL, NULL, "qcom,msm8660-surf-fpga");
+> > +       if (!node)
+> > +               return;
+> > +
+> > +       fpga_mem = of_iomap(node, 0);
+> > +       of_node_put(node);
+> > +       if (!fpga_mem) {
+> > +               printk(KERN_ERR "%s: Can't map fpga registers\n", __func__);
+> > +               return;
+> > +       }
+> > +
+> > +       msm8660_surf_fpga_init(fpga_mem);
+> > +       iounmap(fpga_mem);
+> > +}
+> > +#endif
 > 
-> If that is the case, I don't believe that this is an issue. If this code
-> has been reached, we know that we're dealing with an SoC, of any type
-> and we decided on a naming convention of 1, 2, 3, ..., thus making prior
-> knowledge of the type of SoC irrelevant.
-> 
-> IMO, as soon as we know we're dealing with an SoC, then
-> '/sys/devices/soc' along with the first node '1' should be registered.
-> Then as we have devices appear, they should be allowed to register
-> themselves as children of that node.
-> 
-> Again, please correct me if I misunderstand you.
+> Is the serial port connected through the FPGA or just configured by it?
 
-The name is indeed irrelevant, although a name such as 'db8500' would
-arguably be more useful than a name of '1'.
+The FPGA controls how the UART pins are connected on the development
+board.  The serial port itself is in the MSM, not the FPGA, and on
+other dev boards this isn't needed for the serial port to work.
 
-Why can't you just put all db8500 specific code into the cpu-db8500.c
-file along with the other code that knows about what a db8500 looks like?
+> In the former case, I think it would be better to make this a proper
+> device driver that binds to the qcom,msm8660-surf-fpga device,
+> configures it and then creates the platform_devices for the child
+> nodes (the serial port, possibly others) by calling
+> of_platform_bus_probe.
 
-> > Similarly, having a function named 'ux500_soc_sysfs_init' is plain wrong.
-> > 
-> > You don't initialize sysfs here, but you should be probing a device with a
-> > driver that happens to have a sysfs interface.
-> 
-> Understood. Would something like 'ux500_export_soc_info_init' be more
-> suitable, or maybe even drop the init? It seems a little long (although
-> fully describes what we're trying to achieve) to me. Perhaps you can
-> provide a more succinct suggestion.
+It might make sense to have the FPGA as a driver.  I believe it was
+done early to make sure that the pins were configured correctly before
+the serial driver came up.  As far as I can tell, the output pin is
+already configured correctly, so this can actually happen completely
+independently, since early usage of the UART is really only for
+console messages.
 
-The problem is the idea that you separate the "info" part from the actual
-"soc" part. What I want to see is a *driver* for the soc that handles all
-aspects of the soc that are unique to the soc but not to specific
-devices inside of the soc.
+I don't think it makes sense for the serial to be a child node, this
+FPGA configuration is more along the lines of pinmux.  Most
+configurations of this SOC don't have or need this fpga.
 
-> > All probing of devices in general should start at the root and then trickle
-> > down as you discover the child devices:
-> > Each board has its own init_machine() callback that knows the main devices,
-> > most importantly the SoC and registers them. When the driver for the SoC
-> > gets loaded, that driver knows what devices are present in the device and
-> > registers those recursively.
-> 
-> I completely agree with you. So how does that differ to what's happening
-> here?
+So, if I made it a separate driver, where would it go?  Since this
+board still has platform device support, I suspect the platform data
+needed to describe this device would end up being larger than the
+driver itself.
 
-You currently have a single mop500_init_machine() function that tries to handle
-multiple very different boards, instead of having one init_machine function
-for each one that is actually different.
+David
 
-> > When you get this right, you can also eliminate the ugly machine_is_* checks
-> > in the board file.
-> 
-> We can?
-
-What you should have here is instead of 
-
->static void __init mop500_init_machine(void)
->{
->        int i2c0_devs;
->
->        /*
->         * The HREFv60 board removed a GPIO expander and routed
->         * all these GPIO pins to the internal GPIO controller
->         * instead.
->         */
->        if (!machine_is_snowball()) {
->                if (machine_is_hrefv60())
->                        mop500_gpio_keys[0].gpio = HREFV60_PROX_SENSE_GPIO;
->                else
->                        mop500_gpio_keys[0].gpio = GPIO_PROX_SENSOR;
->        }
->
->        u8500_init_devices();
->
->        mop500_pins_init();
->        if (machine_is_snowball())
->                platform_add_devices(snowball_platform_devs,
->                                        ARRAY_SIZE(snowball_platform_devs));
->        else
->                platform_add_devices(mop500_platform_devs,
->                                        ARRAY_SIZE(mop500_platform_devs));
-
-just do
-
-static void snowball_init_machine(void)
-{
-	u8500_init_devices();
-	snowball_pins_init();
-	platform_add_devices(snowball_platform_devs,
-                             ARRAY_SIZE(snowball_platform_devs));
-	...
-}
-
-static void hrefv60_init_machine(void)
-{
-	u8500_init_devices();
-	hrefv60_pins_init();
-	platform_add_devices(mop500_platform_devs,
-                             ARRAY_SIZE(mop500_platform_devs));
-	...
-}
-
-Everything related to the soc node should then go into the u8500_init_devices()
-function that already knows how to take care of that soc. The remaining parts
-of the init_machine just deal with the board-specific components, which can
-of course be very similar on related boards, e.g. each of the boards would
-add an ab8500 device to the external bus, if I interpret the source correctly.
-
-	Arnd
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
