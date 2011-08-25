@@ -1,76 +1,65 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 26 Aug 2011 08:33:07 +0900
-Subject: [PATCH 4/4 v3] ARM: s3c64xx: Add support for synchronous clock
-	operation.
-In-Reply-To: <1597277.ZvWPFlKtBI@flatron>
-References: <2499662.GIrUU4Kkuf@flatron> <2171056.Pcz41msqen@flatron>
-	<06be01cc613e$3ecc8840$bc6598c0$%kim@samsung.com>
-	<1597277.ZvWPFlKtBI@flatron>
-Message-ID: <072c01cc637f$582a8600$087f9200$%kim@samsung.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 25 Aug 2011 17:43:31 -0600
+Subject: [PATCH v3 00/13] arm/tegra: Initialize GPIO & pinmux from DT
+Message-ID: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> From 1518d67b93432272312a55c4602040c580f46a0c Mon Sep 17 00:00:00 2001
-> From: Tomasz Figa <tomasz.figa@gmail.com>
-> Date: Fri, 19 Aug 2011 11:54:31 +0200
-> Subject: [PATCH 4/4 v3] ARM: s3c64xx: Add support for synchronous clock
-> operation.
-> 
-> Some boards based on S3C6410 use synchronous clocking, which means that
-> HCLKx2
-> and other system clocks are generated from APLL instead of MPLL.
-> 
-> This patch adds support for such boards, by calculating hclk2 depending on
-> the status of S3C_OTHERS_SYNCMUXSEL bit in S3C64XX_OTHERS regist
-> 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/clock.c                 |    8 +++++++-
->  arch/arm/mach-s3c64xx/include/mach/regs-sys.h |    1 +
->  2 files changed, 8 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-> index fdfc4d5..a7dab43 100644
-> --- a/arch/arm/mach-s3c64xx/clock.c
-> +++ b/arch/arm/mach-s3c64xx/clock.c
-> @@ -780,7 +780,13 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
->  	printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
->  	       apll, mpll, epll);
-> 
-> -	hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-> +	if(__raw_readl(S3C64XX_OTHERS) & S3C64XX_OTHERS_SYNCMUXSEL)
-> +		/* Synchronous mode */
-> +		hclk2 = apll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-> +	else
-> +		/* Asynchronous mode */
-> +		hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
-> +
->  	hclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK);
->  	pclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_PCLK);
-> 
-> diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
-b/arch/arm/mach-
-> s3c64xx/include/mach/regs-sys.h
-> index 774e0de..b91e020 100644
-> --- a/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
-> +++ b/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
-> @@ -26,5 +26,6 @@
->  #define S3C64XX_OTHERS		S3C_SYSREG(0x900)
-> 
->  #define S3C64XX_OTHERS_USBMASK	(1 << 16)
-> +#define S3C64XX_OTHERS_SYNCMUXSEL	(1 << 6)
-> 
->  #endif /* _PLAT_REGS_SYS_H */
-> --
-> 1.7.6
+v3:
+* Build on Jamie Iles' patches to split some of the DT parsing into
+  common code.
+* Renamed some properties to remove "nvidia," from name; they can be
+  generic.
+* Support pins property, to apply DT nodes to multiple pins/groups
+* Some minor error-message changes driven by some of the above.
+* Removed requirement to #ifdef CONFIG_OF
+* Removed AUXDATA table entries in mach-tegra/board-dt.c
 
-OK, applied.
-Thanks.
+TODO:
+* Convert from using strings to using integers for the function and pin
+  names. This relies on the dtc patches I posted yesterday, but should
+  be pretty simple once they're in.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Jamie Iles (1):
+  of: add a generic pinmux helper
+
+Stephen Warren (12):
+  arm/tegra: Prep boards for gpio/pinmux conversion to pdevs
+  docs/dt: Document nvidia,tegra20-gpio's nvidia,enabled-gpios property
+  arm/dt: Tegra: Add nvidia,enabled-gpios property to GPIO controller
+  docs/dt: Document nvidia,tegra20-pinmux binding
+  arm/dt: Tegra: Add pinmux node
+  dt: add empty for_each_child_of_node, of_find_property
+  gpio/tegra: Convert to a platform device
+  gpio/tegra: Add device tree support
+  arm/tegra: Convert pinmux driver to a platform device
+  of: add property iteration helpers
+  arm/tegra: Add device tree support to pinmux driver
+  arm/tegra: board-dt: Remove dependency on non-dt pinmux functions
+
+ .../devicetree/bindings/gpio/gpio_nvidia.txt       |   20 ++
+ .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |  302 ++++++++++++++++++++
+ arch/arm/boot/dts/tegra-harmony.dts                |  258 +++++++++++++++++
+ arch/arm/boot/dts/tegra-seaboard.dts               |  247 ++++++++++++++++
+ arch/arm/boot/dts/tegra20.dtsi                     |    5 +
+ arch/arm/mach-tegra/Makefile                       |    1 -
+ arch/arm/mach-tegra/board-dt.c                     |   10 -
+ arch/arm/mach-tegra/board-harmony-pinmux.c         |    8 +
+ arch/arm/mach-tegra/board-paz00-pinmux.c           |    8 +
+ arch/arm/mach-tegra/board-seaboard-pinmux.c        |    9 +-
+ arch/arm/mach-tegra/board-trimslice-pinmux.c       |    7 +
+ arch/arm/mach-tegra/devices.c                      |   10 +
+ arch/arm/mach-tegra/devices.h                      |    2 +
+ arch/arm/mach-tegra/pinmux.c                       |  280 ++++++++++++++++++
+ drivers/gpio/gpio-tegra.c                          |   48 +++-
+ drivers/of/Kconfig                                 |    5 +
+ drivers/of/Makefile                                |    1 +
+ drivers/of/of_pinmux.c                             |  109 +++++++
+ include/linux/of.h                                 |   10 +
+ include/linux/of_iter_prop.h                       |  135 +++++++++
+ include/linux/of_pinmux.h                          |   74 +++++
+ 21 files changed, 1524 insertions(+), 25 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
+ create mode 100644 drivers/of/of_pinmux.c
+ create mode 100644 include/linux/of_iter_prop.h
+ create mode 100644 include/linux/of_pinmux.h
