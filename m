@@ -1,76 +1,64 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 25 Aug 2011 17:43:38 -0600
-Subject: [PATCH v3 07/13] gpio/tegra: Convert to a platform device
+Date: Thu, 25 Aug 2011 17:43:39 -0600
+Subject: [PATCH v3 08/13] gpio/tegra: Add device tree support
 In-Reply-To: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
 References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1314315824-9687-8-git-send-email-swarren@nvidia.com>
+Message-ID: <1314315824-9687-9-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/gpio/gpio-tegra.c |   25 ++++++++++++++-----------
- 1 files changed, 14 insertions(+), 11 deletions(-)
+ drivers/gpio/gpio-tegra.c |   23 ++++++++++++++++++++++-
+ 1 files changed, 22 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index df64536..4da4839 100644
+index 4da4839..a95b23a 100644
 --- a/drivers/gpio/gpio-tegra.c
 +++ b/drivers/gpio/gpio-tegra.c
-@@ -20,10 +20,10 @@
- #include <linux/init.h>
- #include <linux/irq.h>
- #include <linux/interrupt.h>
+@@ -326,7 +326,6 @@ static struct irq_chip tegra_gpio_irq_chip = {
+ #endif
+ };
+ 
 -
- #include <linux/io.h>
- #include <linux/gpio.h>
- #include <linux/of.h>
-+#include <linux/platform_device.h>
- 
- #include <asm/mach/irq.h>
- 
-@@ -332,7 +332,7 @@ static struct irq_chip tegra_gpio_irq_chip = {
+ /* This lock class tells lockdep that GPIO irqs are in a different
+  * category than their parents, so it won't report false recursion.
   */
- static struct lock_class_key gpio_lock_class;
- 
--static int __init tegra_gpio_init(void)
-+static int __init tegra_gpio_probe(struct platform_device *pdev)
- {
- 	struct tegra_gpio_bank *bank;
- 	int gpio;
-@@ -346,15 +346,6 @@ static int __init tegra_gpio_init(void)
- 		}
+@@ -371,13 +370,35 @@ static int __init tegra_gpio_probe(struct platform_device *pdev)
+ 			spin_lock_init(&bank->lvl_lock[j]);
  	}
  
--#ifdef CONFIG_OF_GPIO
--	/*
--	 * This isn't ideal, but it gets things hooked up until this
--	 * driver is converted into a platform_device
--	 */
--	tegra_gpio_chip.of_node = of_find_compatible_node(NULL, NULL,
--						"nvidia,tegra20-gpio");
--#endif /* CONFIG_OF_GPIO */
--
- 	gpiochip_add(&tegra_gpio_chip);
- 
- 	for (gpio = 0; gpio < TEGRA_NR_GPIOS; gpio++) {
-@@ -383,6 +374,18 @@ static int __init tegra_gpio_init(void)
++	if (pdev->dev.of_node != NULL) {
++		const __be32 *gpios;
++		u32 gpioslen;
++
++		gpios = of_get_property(pdev->dev.of_node,
++					"nvidia,enabled-gpios", &gpioslen);
++		if (gpios != NULL) {
++			gpioslen /= sizeof(*gpios);
++			for (i = 0; i < gpioslen; i++, gpios++) {
++				u32 gpio = be32_to_cpup(gpios);
++				dev_dbg(&pdev->dev, "Enabling GPIO %d\n", gpio);
++				tegra_gpio_enable(gpio);
++			}
++		}
++	}
++
  	return 0;
  }
  
-+static struct platform_driver tegra_gpio_driver = {
-+	.driver		= {
-+		.name	= "tegra-gpio",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe		= tegra_gpio_probe,
++static struct of_device_id tegra_gpio_of_match[] __devinitdata = {
++	{ .compatible = "nvidia,tegra20-gpio", },
++	{ },
 +};
 +
-+static int __init tegra_gpio_init(void)
-+{
-+	return platform_driver_register(&tegra_gpio_driver);
-+}
- postcore_initcall(tegra_gpio_init);
- 
- void __init tegra_gpio_config(struct tegra_gpio_table *table, int num)
+ static struct platform_driver tegra_gpio_driver = {
+ 	.driver		= {
+ 		.name	= "tegra-gpio",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = tegra_gpio_of_match,
+ 	},
+ 	.probe		= tegra_gpio_probe,
+ };
 -- 
 1.7.0.4
