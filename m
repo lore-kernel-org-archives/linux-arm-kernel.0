@@ -1,76 +1,56 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 25 Aug 2011 12:03:39 +0800
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <4E55B748.1000306@gmail.com>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<1313526898-19920-3-git-send-email-robherring2@gmail.com>
-	<201108181734.25397.arnd@arndb.de> <4E5000A1.8060609@gmail.com>
-	<4E55B748.1000306@gmail.com>
-Message-ID: <20110825040338.GB16853@S2100-06.ap.freescale.net>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Thu, 25 Aug 2011 09:35:07 +0530
+Subject: Question on virtual memory layout: lowmem with memory hole
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B47E23FC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 09:45:28PM -0500, Rob Herring wrote:
-> Arnd,
-> 
-> On 08/20/2011 01:44 PM, Rob Herring wrote:
-> > Arnd,
-> > 
-> > On 08/18/2011 10:34 AM, Arnd Bergmann wrote:
-> >> On Tuesday 16 August 2011, Rob Herring wrote:
-> >>
-> >>> +void __iomem *a9_base_addr = ((void __iomem *)(HB_MPIC_VIRT_BASE));
-> >>> +void __iomem *sregs_base;
-> >>> +
-> >>> +static struct map_desc highbank_io_desc[] __initdata = {
-> >>> +	{
-> >>> +		.virtual	= HB_MPIC_VIRT_BASE,
-> >>> +		.pfn		= 0, /* run-time */
-> >>> +		.length		= SZ_4K,
-> >>> +		.type		= MT_DEVICE,
-> >>> +	},
-> >>> +#ifdef CONFIG_DEBUG_LL
-> >>> +	{
-> >>> +		.virtual	= HB_DEBUG_LL_VIRT_BASE,
-> >>> +		.pfn		= __phys_to_pfn(HB_DEBUG_LL_PHYS_BASE),
-> >>> +		.length		= SZ_4K,
-> >>> +		.type		= MT_DEVICE,
-> >>> +	},
-> >>> +#endif
-> >>> +};
-> >>> +
-> >>> +static void __init highbank_map_io(void)
-> >>> +{
-> >>> +	unsigned long base;
-> >>> +
-> >>> +	/* Get SCU base */
-> >>> +	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
-> >>> +
-> >>> +	highbank_io_desc[0].pfn = __phys_to_pfn(base);
-> >>> +	iotable_init(highbank_io_desc, ARRAY_SIZE(highbank_io_desc));
-> >>> +}
-> >>
-> >> I really liked the way that Barry moved the io_desc out to the
-> >> drivers using them, e.g arch/arm/mach-prima2/lluart.c.
-> >>
-> >> Can you do the same thing with your lluart and with the a9_base_addr?
-> >> I guess it can live locally in platsmp.c.
-> > 
-> > Okay.
-> 
-> Looking at this some more, it doesn't work too well. platsmp.c depends
-> on CONFIG_SMP, but the SCU mapping is always needed even for !SMP
-> because the SCU has a power mode register for each core used by the
-> power controller. So putting it in platsmp.c would add ifdefs.
-> 
-It sounds you have a well designed power controller which will shut
-down different CA-9 power domains per SCU power mode settings, e.g.
-it will shut off different set of CA-9 power domains for Dormant and
-Shutdown modes.  Is that the case?
+Hello,
 
-i.MX6Q is different from that case, so I can actually follow Arnd's
-suggestion to keep scu_base locally in platsmp.c.
+While checking with memory hole configuration on OMAP3/TI816X (passing mem=x at y),
+I see that the whole range from memory start till last bank including the hole
+is labelled as 'lowmem' when kernel prints "Virtual kernel memory layout" during
+boot.
 
--- 
-Regards,
-Shawn
+E.g., on OMAP3 with mem=32M at 0x80000000 mem=8M at 0x87800000
+
+(CASE 1)
+ Memory: 32MB 8MB = 40MB total
+ Memory: 28408k/28408k available, 12552k reserved, 0K highmem
+ Virtual kernel memory layout:
+     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+     DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
+     vmalloc : 0xc8800000 - 0xf8000000   ( 760 MB)
+     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+       .text : 0xc0008000 - 0xc05ac2c8   (5777 kB)
+       .init : 0xc05ad000 - 0xc05f8780   ( 302 kB)
+       .data : 0xc05fa000 - 0xc06838d0   ( 551 kB)
+        .bss : 0xc06838f4 - 0xc0bd8a14   (5461 kB)
+
+Is this expected? 88MB space between two 'mem's seems to have lost. This also
+means vmalloc space is lower compared to when a single mem=40M is passed.
+
+E.g., with mem=40M
+
+(CASE 2)
+ Memory: 40MB = 40MB total
+ Memory: 28412k/28412k available, 12548k reserved, 0K highmem
+ Virtual kernel memory layout:
+     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+     DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
+     vmalloc : 0xc3000000 - 0xf8000000   ( 848 MB)
+     lowmem  : 0xc0000000 - 0xc2800000   (  40 MB)
+     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+       .text : 0xc0008000 - 0xc05ac2c8   (5777 kB)
+       .init : 0xc05ad000 - 0xc05f8780   ( 302 kB)
+       .data : 0xc05fa000 - 0xc06838d0   ( 551 kB)
+        .bss : 0xc06838f4 - 0xc0bd8a14   (5461 kB)
+
+Any way we can get virtual layout same in CASE 1 as in CASE 2?
+
+Thanks.
+
+   Hemant
