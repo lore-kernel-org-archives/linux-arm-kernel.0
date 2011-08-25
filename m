@@ -1,50 +1,41 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 25 Aug 2011 08:31:20 +0200
-Subject: [PATCH v2] ARM: ux500: send cpufreq notification for all cpus
-Message-ID: <1314253880-2438-1-git-send-email-vincent.guittot@linaro.org>
+From: yad.naveen@gmail.com (naveen yadav)
+Date: Thu, 25 Aug 2011 12:08:12 +0530
+Subject: Kernel panic in 2.6.35.12 kernel
+In-Reply-To: <CAJ8eaTw=dKUNE8h-HD7RWxXHcTEuxJH4AfcOO44RSF7QdC5arQ@mail.gmail.com>
+References: <CAJ8eaTyeQj5_EAsCFDMmDs3faiVptuccmq3VJLjG-QnYG038=A@mail.gmail.com>
+	<CAJ8eaTw=dKUNE8h-HD7RWxXHcTEuxJH4AfcOO44RSF7QdC5arQ@mail.gmail.com>
+Message-ID: <CAJ8eaTyaiFzAnKB-P9EJT5UxxmpgTpw=Yk_Ee8qJUVKFjfHtKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The same clock is used for all cpus so we must notify the frequency change
-for each one in order to update the configuration of all twd clockevents.
+adding to mm mailing list
 
-change since V1:
-* use policy->cpus instead of cpu_online_mask
-
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- drivers/cpufreq/db8500-cpufreq.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/cpufreq/db8500-cpufreq.c b/drivers/cpufreq/db8500-cpufreq.c
-index 0d8dd1c..b893f9b 100644
---- a/drivers/cpufreq/db8500-cpufreq.c
-+++ b/drivers/cpufreq/db8500-cpufreq.c
-@@ -76,13 +76,13 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
- 
- 	freqs.old = policy->cur;
- 	freqs.new = freq_table[idx].frequency;
--	freqs.cpu = policy->cpu;
- 
- 	if (freqs.old == freqs.new)
- 		return 0;
- 
- 	/* pre-change notification */
--	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+	for_each_cpu(freqs.cpu, policy->cpus)
-+		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
- 
- 	/* request the PRCM unit for opp change */
- 	if (prcmu_set_arm_opp(idx2opp[idx])) {
-@@ -91,7 +91,8 @@ static int db8500_cpufreq_target(struct cpufreq_policy *policy,
- 	}
- 
- 	/* post change notification */
--	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+	for_each_cpu(freqs.cpu, policy->cpus)
-+		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
- 
- 	return 0;
- }
--- 
-1.7.4.1
+On Thu, Aug 25, 2011 at 11:36 AM, naveen yadav <yad.naveen@gmail.com> wrote:
+> I am paste only small crash log due to size problem.
+>
+>
+>
+>
+>> Hi All,
+>>
+>> We are running one malloc testprogram using below script.
+>>
+>> while true
+>> do
+>> ./stress &
+>> sleep 1
+>> done
+>>
+>>
+>>
+>>
+>> After 10-15 min we observe following crash in kernel
+>>
+>>
+>> ?Kernel panic - not syncing: Out of memory and no killable processes...
+>>
+>> attaching log also.
+>>
+>> Thanks
+>>
+>
