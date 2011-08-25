@@ -1,19 +1,81 @@
 From: zhangfei.gao@marvell.com (Zhangfei Gao)
-Date: Thu, 25 Aug 2011 14:26:13 +0800
-Subject: [PATCH v3 0/2] mmc add vsdio to dynamically control sdio power
-Message-ID: <1314253575-2602-1-git-send-email-zhangfei.gao@marvell.com>
+Date: Thu, 25 Aug 2011 14:26:14 +0800
+Subject: [PATCH v3 1/2] mmc: sdio add regulator vsdio
+In-Reply-To: <1314253575-2602-1-git-send-email-zhangfei.gao@marvell.com>
+References: <1314253575-2602-1-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <1314253575-2602-2-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2->v3, change vmmc to vsdio
-In v2, vmmc is reused, however, sd may be impacted if move vmmc to set_ios.
-When no card inserted, CD is high, vmmc will be disabled when detect fail, CD will pull low accordingly, controller may treat as card inserted and re-detect.
+sdio client may be required power on/off dynamically.
+With regulator vsdio, sdio client power on/off could be executed by mmc_power_up/down
 
-Zhangfei Gao (2):
-  mmc: sdio add regulator vsdio
-  ARM: mmp2: support sdio with regulator vsdio
+CC: Ohad Ben-Cohen <ohad@wizery.com>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+---
+ drivers/mmc/host/sdhci.c  |   22 ++++++++++++++++++++++
+ include/linux/mmc/sdhci.h |    2 ++
+ 2 files changed, 24 insertions(+), 0 deletions(-)
 
- arch/arm/mach-mmp/brownstone.c |   60 ++++++++++++++++++++++++++++++++++++++-
- drivers/mmc/host/sdhci.c       |   22 ++++++++++++++
- include/linux/mmc/sdhci.h      |    2 +
- 3 files changed, 82 insertions(+), 2 deletions(-)
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 0e02cc1..e0ef7d3 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1424,6 +1424,18 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ out:
+ 	mmiowb();
+ 	spin_unlock_irqrestore(&host->lock, flags);
++
++	if (host->vsdio) {
++		if (ios->power_mode != host->power_mode_old) {
++			if (ios->power_mode == MMC_POWER_OFF)
++				regulator_disable(host->vsdio);
++
++			if (ios->power_mode == MMC_POWER_UP)
++				regulator_enable(host->vsdio);
++		}
++
++		host->power_mode_old = ios->power_mode;
++	}
+ }
+ 
+ static int check_ro(struct sdhci_host *host)
+@@ -2748,6 +2760,13 @@ int sdhci_add_host(struct sdhci_host *host)
+ 		regulator_enable(host->vmmc);
+ 	}
+ 
++	host->vsdio = regulator_get(mmc_dev(mmc), "vsdio");
++	if (IS_ERR(host->vsdio))
++		host->vsdio = NULL;
++	else
++		printk(KERN_INFO "%s: vsdio regulator found\n",
++			mmc_hostname(mmc));
++
+ 	sdhci_init(host, 0);
+ 
+ #ifdef CONFIG_MMC_DEBUG
+@@ -2839,6 +2858,9 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
+ 		regulator_put(host->vmmc);
+ 	}
+ 
++	if (host->vsdio)
++		regulator_put(host->vsdio);
++
+ 	kfree(host->adma_desc);
+ 	kfree(host->align_buffer);
+ 
+diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
+index 5666f3a..201207a 100644
+--- a/include/linux/mmc/sdhci.h
++++ b/include/linux/mmc/sdhci.h
+@@ -94,6 +94,8 @@ struct sdhci_host {
+ 	const struct sdhci_ops *ops;	/* Low level hw interface */
+ 
+ 	struct regulator *vmmc;	/* Power regulator */
++	struct regulator *vsdio;	/* sdio Power regulator */
++	unsigned char power_mode_old;	/* power supply mode */
+ 
+ 	/* Internal data */
+ 	struct mmc_host *mmc;	/* MMC structure */
+-- 
+1.7.0.4
