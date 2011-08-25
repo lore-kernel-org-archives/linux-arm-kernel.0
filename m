@@ -1,48 +1,77 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 25 Aug 2011 19:38:18 +0200
-Subject: How to handle named resources with DT?
-In-Reply-To: <20110825102824.GB10405@n2100.arm.linux.org.uk>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<20110812030218.GP30552@yookeroo.fritz.box>
-	<20110812084106.GC19467@legolas.emea.dhcp.ti.com>
-	<201108121635.42953.arnd@arndb.de> <4E45422D.4050708@ti.com>
-	<CACxGe6s-2EAuvSqzn6yzDvCyVXa8vVVqG2X=1XFrUBnB=jsdxQ@mail.gmail.com>
-	<87r54a1v0o.fsf@ti.com>
-	<20110824231613.GC19890@legolas.emea.dhcp.ti.com>
-	<20110825102824.GB10405@n2100.arm.linux.org.uk>
-Message-ID: <4E56888A.5020300@ti.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Thu, 25 Aug 2011 23:31:57 +0530
+Subject: [PATCH 3/3] dmaengine i.MX SDMA: use request_firmware_nowait
+In-Reply-To: <1314263017-18099-4-git-send-email-s.hauer@pengutronix.de>
+References: <1314263017-18099-1-git-send-email-s.hauer@pengutronix.de>
+	<1314263017-18099-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1314295317.1606.90.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/25/2011 12:28 PM, Russell King - ARM Linux wrote:
-> On Thu, Aug 25, 2011 at 02:16:14AM +0300, Felipe Balbi wrote:
->> on top of all that, for IPs which are used on many SoCs (such as MUSB)
->> it's quite silly to force all users to provide resources in a certain
->> order. It sounds to me that this will be prone to error in many ways
->> until everything is synced up and on the correct order.
->>
->> Ditching _byname is a very bad idea.
->
-> I continue to disagree.  The current _byname is an abonimation and hack
-> to try to "fix" this problem.
+On Thu, 2011-08-25 at 11:03 +0200, Sascha Hauer wrote:
+> The firmware blob may not be available when the driver
+> probes. Instead of blocking the whole kernel use
+> request_firmware_nowait() and continue without firmware.
+> The ROM scripts can already be used then if available.
+> For the devicetree case the ROM scripts are not available,
+> still the probe function should not block. The driver
+> will be unusable in this case, but we have no way of
+> detecting this properly. The configuration of the dma
+> channels will fail, so nothing bad should happen.
+Shouldn't you track if firmware is loaded properly and in the case it is
+not return error in your prepare functions?
 
-What problem are you considering here?
-
-> _byname should have been implemented differently - rather than overriding
-> the resources name field (which is _normally_ specified to be the device
-> or driver name), a new field should have been introduced in struct resource
-> to carry the resource sub-name (which is really what it is.)
-
-I guess we agree on that, but that just means that the implementation is 
-bad, not that the function is useless or evil.
-
-> That would have avoided making /proc/iomem completely illegible with
-> multiple devices using this feature.
-
-resources are used as well for irq and dma, so that aspect is irrelevant 
-in that case.
-
-Assuming that a new field is added to keep the original semantic ot the 
-name, will you be happy with the _byname API?
-
-Benoit
+--
+~Vinod
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/dma/imx-sdma.c |   23 ++++++++++++++++-------
+>  1 files changed, 16 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> index 8abf8c1..b5cc27d 100644
+> --- a/drivers/dma/imx-sdma.c
+> +++ b/drivers/dma/imx-sdma.c
+> @@ -1143,18 +1143,17 @@ static void sdma_add_scripts(struct sdma_engine *sdma,
+>  			saddr_arr[i] = addr_arr[i];
+>  }
+>  
+> -static int __init sdma_get_firmware(struct sdma_engine *sdma,
+> -		const char *fw_name)
+> +static void sdma_load_firmware(const struct firmware *fw, void *context)
+>  {
+> -	const struct firmware *fw;
+> +	struct sdma_engine *sdma = context;
+>  	const struct sdma_firmware_header *header;
+> -	int ret;
+>  	const struct sdma_script_start_addrs *addr;
+>  	unsigned short *ram_code;
+>  
+> -	ret = request_firmware(&fw, fw_name, sdma->dev);
+> -	if (ret)
+> -		return ret;
+> +	if (!fw) {
+> +		dev_err(sdma->dev, "firmware not found\n");
+> +		return;
+> +	}
+>  
+>  	if (fw->size < sizeof(*header))
+>  		goto err_firmware;
+> @@ -1184,6 +1183,16 @@ static int __init sdma_get_firmware(struct sdma_engine *sdma,
+>  
+>  err_firmware:
+>  	release_firmware(fw);
+> +}
+> +
+> +static int __init sdma_get_firmware(struct sdma_engine *sdma,
+> +		const char *fw_name)
+> +{
+> +	int ret;
+> +
+> +	ret = request_firmware_nowait(THIS_MODULE,
+> +			FW_ACTION_HOTPLUG, fw_name, sdma->dev,
+> +			GFP_KERNEL, sdma, sdma_load_firmware);
+>  
+>  	return ret;
+>  }
