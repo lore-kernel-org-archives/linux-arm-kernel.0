@@ -1,41 +1,76 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 25 Aug 2011 17:43:37 -0600
-Subject: [PATCH v3 06/13] dt: add empty for_each_child_of_node,
-	of_find_property
+Date: Thu, 25 Aug 2011 17:43:38 -0600
+Subject: [PATCH v3 07/13] gpio/tegra: Convert to a platform device
 In-Reply-To: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
 References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1314315824-9687-7-git-send-email-swarren@nvidia.com>
+Message-ID: <1314315824-9687-8-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds a couple empty functions for non-dt build, so that
-drivers migrating to dt can save some '#ifdef CONFIG_OF'.
-
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- include/linux/of.h |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ drivers/gpio/gpio-tegra.c |   25 ++++++++++++++-----------
+ 1 files changed, 14 insertions(+), 11 deletions(-)
 
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 9180dc5..1fc5875 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -242,6 +242,16 @@ static inline bool of_have_populated_dt(void)
- 	return false;
+diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
+index df64536..4da4839 100644
+--- a/drivers/gpio/gpio-tegra.c
++++ b/drivers/gpio/gpio-tegra.c
+@@ -20,10 +20,10 @@
+ #include <linux/init.h>
+ #include <linux/irq.h>
+ #include <linux/interrupt.h>
+-
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ #include <linux/of.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/mach/irq.h>
+ 
+@@ -332,7 +332,7 @@ static struct irq_chip tegra_gpio_irq_chip = {
+  */
+ static struct lock_class_key gpio_lock_class;
+ 
+-static int __init tegra_gpio_init(void)
++static int __init tegra_gpio_probe(struct platform_device *pdev)
+ {
+ 	struct tegra_gpio_bank *bank;
+ 	int gpio;
+@@ -346,15 +346,6 @@ static int __init tegra_gpio_init(void)
+ 		}
+ 	}
+ 
+-#ifdef CONFIG_OF_GPIO
+-	/*
+-	 * This isn't ideal, but it gets things hooked up until this
+-	 * driver is converted into a platform_device
+-	 */
+-	tegra_gpio_chip.of_node = of_find_compatible_node(NULL, NULL,
+-						"nvidia,tegra20-gpio");
+-#endif /* CONFIG_OF_GPIO */
+-
+ 	gpiochip_add(&tegra_gpio_chip);
+ 
+ 	for (gpio = 0; gpio < TEGRA_NR_GPIOS; gpio++) {
+@@ -383,6 +374,18 @@ static int __init tegra_gpio_init(void)
+ 	return 0;
  }
  
-+#define for_each_child_of_node(parent, child) \
-+	while (0)
++static struct platform_driver tegra_gpio_driver = {
++	.driver		= {
++		.name	= "tegra-gpio",
++		.owner	= THIS_MODULE,
++	},
++	.probe		= tegra_gpio_probe,
++};
 +
-+static inline struct property *of_find_property(const struct device_node *np,
-+						const char *name,
-+						int *lenp)
++static int __init tegra_gpio_init(void)
 +{
-+	return NULL;
++	return platform_driver_register(&tegra_gpio_driver);
 +}
-+
- static inline int of_property_read_u32_array(const struct device_node *np,
- 					     const char *propname,
- 					     u32 *out_values, size_t sz)
+ postcore_initcall(tegra_gpio_init);
+ 
+ void __init tegra_gpio_config(struct tegra_gpio_table *table, int num)
 -- 
 1.7.0.4
