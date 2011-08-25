@@ -1,80 +1,40 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 26 Aug 2011 06:58:13 +0800
-Subject: [PATCH v2 2/4] ARM: CSR: add PM sleep entry for SiRFprimaII
-In-Reply-To: <201108251756.54254.arnd@arndb.de>
-References: <1314080152-30503-1-git-send-email-Baohua.Song@csr.com>
-	<CAGsJ_4zA0yaRu3O+cwSKDCORBDr5EVtKSmSGEMxWj90=_+oiNg@mail.gmail.com>
-	<20110825082151.GB17748@S2100-06.ap.freescale.net>
-	<201108251756.54254.arnd@arndb.de>
-Message-ID: <CAGsJ_4x5S16YUDAcgnCDchVW3k5co5mJ0-PcZwdBy_XPjFEx0Q@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 26 Aug 2011 01:07:17 +0200 (CEST)
+Subject: [PATCH 2/2] V4L: mx3-camera: prepare to support multi-size buffers
+In-Reply-To: <201108251857.16865.laurent.pinchart@ideasonboard.com>
+References: <1314211292-10414-1-git-send-email-g.liakhovetski@gmx.de>
+	<Pine.LNX.4.64.1108251838090.17190@axis700.grange>
+	<Pine.LNX.4.64.1108251843350.17190@axis700.grange>
+	<201108251857.16865.laurent.pinchart@ideasonboard.com>
+Message-ID: <Pine.LNX.4.64.1108260100330.17190@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/25 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 25 August 2011, Shawn Guo wrote:
->> > > To me, it seems that the above code snippet can be as simply as the
->> > > following.
->> > >
->> > > ? ? ? ?np = of_find_compatible_node(NULL, NULL, "sirf,prima2-pwrc");
->> > > ? ? ? ?sirfsoc_pwrc_base = of_iomap(np, 0);
->> > > ? ? ? ?if (!sirfsoc_pwrc_base)
->> > > ? ? ? ? ? ? ? ?return -ENOMEM;
->> >
->> > you might want to read earlier thread in v1. PWRC is not in memory space.
->> >
->> Ah, just read. ?Then you at least should be able to use
->> of_property_read_u32().
->
-> I think of_get_address would be even more appropriate, but I could
-> be misreading that function.
+On Thu, 25 Aug 2011, Laurent Pinchart wrote:
 
-might use of_get_address and add some comments to clarify.
+> Hi Guennadi,
+> 
+> On Thursday 25 August 2011 18:46:03 Guennadi Liakhovetski wrote:
+> > Prepare the mx3_camera friver to support the new VIDIOC_CREATE_BUFS and
+> > VIDIOC_PREPARE_BUF ioctl()s. The .queue_setup() vb2 operation must be
+> > able to handle buffer sizes, provided by the caller, and the
+> > .buf_prepare() operation must not use the currently configured frame
+> > format for its operation, which makes it superfluous for this driver.
+> > Its functionality is moved into .buf_queue().
+> 
+> You're moving the ichan->dma_chan.device->device_prep_slave_sg() call from 
+> .buf_prepare() to .buf_queue(). Is that call cheap ? Otherwise it would be 
+> better to keep the .buf_prepare() callback.
 
->
->> > >> +
->> > >> +static int __init sirfsoc_memc_init(void)
->> > >> +{
->> > >> + ? ? return platform_driver_register(&sirfsoc_memc_driver);
->> > >> +}
->> > >> +postcore_initcall(sirfsoc_memc_init);
->> > >
->> > > Doing the same thing - mapping address, why sirfsoc_pwrc_base uses
->> > > a function, while sirfsoc_memc_base needs a platform_driver? ?You
->> > > will have more stuff about memc to add there?
->> >
->> > memc is in memory space, actually simple_bus, then a platform device
->> > has existed for it.
->> > pwrc is now not compitable with simple_bus. it looks like not worth a
->> > platform for the moment too.
->> >
->> It seems a little complicated to register a platform_driver just for
->> getting an address. ?I'm not sure how hard Arnd is on this position.
->> I'm going to send a patch to test it :)
->
-> I think it's a grey area. In general, I always recommend a device
-> driver unless the mapping is absolutely needed at boot time before
-> we bring up the driver subsystem.
-> This enforces an object-oriented mental model about the building
-> blocks: Everything you want to talk to has to export its own functions
-> and we can stack modules on top of other modules. Clearly there are
-> a few cases where this is not possible or only adds complexity without
-> any benefit, but I would like to see the model of having a device
-> driver for each device be the rule, with few exceptions.
->
-> One argument that I can accept for this specific case is that the
-> power management code has to be written in assembly and doesn't
-> really understand the device object model anyway, so we just end
-> up exporting the base address, which is not something that proper
-> drivers are doing. However, as soon as more functionality gets added
-> that uses the memc register space, my preference would increasingly
-> lean towards doing a device driver here.
->
-> ? ? ? ?Arnd
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+But only if (buf->state == CSI_BUF_NEEDS_INIT), i.e., only on the first 
+invocation. In any case, look at idmac_prep_slave_sg() - it is cheap. To 
+do this in .buf_prepare I'd have to store the frame format from the 
+.queue_setup() with a list of indices, to which it applies, and then use 
+it in .buf_prepare()...
 
 Thanks
-barry
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
