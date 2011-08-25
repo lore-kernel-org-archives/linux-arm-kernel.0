@@ -1,93 +1,51 @@
-From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Thu, 25 Aug 2011 15:51:57 -0400
-Subject: [PATCH 2/2] video: s3c-fb: Modify s3c-fb driver to support window
-	positioning
-In-Reply-To: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
-References: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1314301917-9938-3-git-send-email-ajaykumar.rs@samsung.com>
+From: schen@mvista.com (Steve Chen)
+Date: Thu, 25 Aug 2011 08:57:32 -0500
+Subject: Kernel panic in 2.6.35.12 kernel
+In-Reply-To: <CAJ8eaTw=dKUNE8h-HD7RWxXHcTEuxJH4AfcOO44RSF7QdC5arQ@mail.gmail.com>
+References: <CAJ8eaTyeQj5_EAsCFDMmDs3faiVptuccmq3VJLjG-QnYG038=A@mail.gmail.com>
+	<CAJ8eaTw=dKUNE8h-HD7RWxXHcTEuxJH4AfcOO44RSF7QdC5arQ@mail.gmail.com>
+Message-ID: <CAHKQLBH2d-DzzMfP9QOUmz6brT7BfPdwY6JfEUUYxzaTDTo=wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the existing s3c-fb driver to provide
-flexibility to the user to reposition the framebuffer windows.
+On Thu, Aug 25, 2011 at 1:06 AM, naveen yadav <yad.naveen@gmail.com> wrote:
+> I am paste only small crash log due to size problem.
+>
+>
+>
+>
+>> Hi All,
+>>
+>> We are running one malloc testprogram using below script.
+>>
+>> while true
+>> do
+>> ./stress &
+>> sleep 1
+>> done
+>>
+>>
+>>
+>>
+>> After 10-15 min we observe following crash in kernel
+>>
+>>
+>> ?Kernel panic - not syncing: Out of memory and no killable processes...
+>>
+>> attaching log also.
+>>
+>> Thanks
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
 
-Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
----
- drivers/video/s3c-fb.c |   37 ++++++++++++++++++++++++++++++++-----
- 1 files changed, 32 insertions(+), 5 deletions(-)
+Can you share the code in ./stress?
 
-diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
-index 0fda252..41179d7 100644
---- a/drivers/video/s3c-fb.c
-+++ b/drivers/video/s3c-fb.c
-@@ -442,6 +442,7 @@ static int s3c_fb_set_par(struct fb_info *info)
- 	struct fb_var_screeninfo *var = &info->var;
- 	struct s3c_fb_win *win = info->par;
- 	struct s3c_fb *sfb = win->parent;
-+	struct s3cfb_window_pos *winpos = &win->windata->winpos;
- 	void __iomem *regs = sfb->regs;
- 	void __iomem *buf = regs;
- 	int win_no = win->index;
-@@ -539,12 +540,13 @@ static int s3c_fb_set_par(struct fb_info *info)
- 
- 	/* write 'OSD' registers to control position of framebuffer */
- 
--	data = VIDOSDxA_TOPLEFT_X(0) | VIDOSDxA_TOPLEFT_Y(0);
-+	data = VIDOSDxA_TOPLEFT_X(winpos->win_pos_x) |
-+	       VIDOSDxA_TOPLEFT_Y(winpos->win_pos_y);
- 	writel(data, regs + VIDOSD_A(win_no, sfb->variant));
- 
--	data = VIDOSDxB_BOTRIGHT_X(s3c_fb_align_word(var->bits_per_pixel,
--						     var->xres - 1)) |
--	       VIDOSDxB_BOTRIGHT_Y(var->yres - 1);
-+	data = VIDOSDxB_BOTRIGHT_X((s3c_fb_align_word(var->bits_per_pixel,
-+	       (winpos->win_pos_x + var->xres - 1)))) |
-+	       VIDOSDxB_BOTRIGHT_Y((winpos->win_pos_y + var->yres - 1));
- 
- 	writel(data, regs + VIDOSD_B(win_no, sfb->variant));
- 
-@@ -999,8 +1001,10 @@ static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
- {
- 	struct s3c_fb_win *win = info->par;
- 	struct s3c_fb *sfb = win->parent;
--	int ret;
-+	struct s3cfb_window_pos *winpos = &win->windata->winpos;
-+	int ret = 0;
- 	u32 crtc;
-+	u32 data;
- 
- 	switch (cmd) {
- 	case FBIO_WAITFORVSYNC:
-@@ -1011,6 +1015,29 @@ static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
- 
- 		ret = s3c_fb_wait_for_vsync(sfb, crtc);
- 		break;
-+	case S3CFB_WIN_POSITION:
-+		if (copy_from_user(winpos, (u32 __user *)arg,
-+					sizeof(struct s3cfb_window_pos))) {
-+			ret = -EFAULT;
-+			break;
-+		}
-+
-+		shadow_protect_win(win, 1);
-+
-+		/* write 'OSD' registers to set position of the window */
-+		data = VIDOSDxA_TOPLEFT_X(winpos->win_pos_x) |
-+		       VIDOSDxA_TOPLEFT_Y(winpos->win_pos_y);
-+		writel(data, sfb->regs + VIDOSD_A(win->index, sfb->variant));
-+
-+		data = VIDOSDxB_BOTRIGHT_X(
-+				s3c_fb_align_word(info->var.bits_per_pixel,
-+				(winpos->win_pos_x + info->var.xres - 1)));
-+		data |=	VIDOSDxB_BOTRIGHT_Y(winpos->win_pos_y +
-+				info->var.yres - 1);
-+		writel(data, sfb->regs + VIDOSD_B(win->index, sfb->variant));
-+
-+		shadow_protect_win(win, 0);
-+		break;
- 	default:
- 		ret = -ENOTTY;
- 	}
--- 
-1.7.0.4
+Thanks,
+
+Steve
