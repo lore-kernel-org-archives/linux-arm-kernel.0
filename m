@@ -1,50 +1,58 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 25 Aug 2011 14:35:42 +0200
-Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <20110825122543.GC8883@n2100.arm.linux.org.uk>
-References: <20110823151936.GM9232@opensource.wolfsonmicro.com>
-	<201108232351.55432.rjw@sisk.pl>
-	<CAOS58YNUSn2eVLDLzqKmrtL7M5tSetkhZ1ODecLK54NSDnZVAA@mail.gmail.com>
-	<20110823220056.GK3895@n2100.arm.linux.org.uk>
-	<CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
-	<20110823221314.GL3895@n2100.arm.linux.org.uk>
-	<CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
-	<20110825121416.GB8883@n2100.arm.linux.org.uk>
-	<20110825121710.GK3286@htj.dyndns.org>
-	<20110825122543.GC8883@n2100.arm.linux.org.uk>
-Message-ID: <20110825123542.GM3286@htj.dyndns.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Aug 2011 13:50:14 +0100
+Subject: MX53Loco reports half of the total memory
+In-Reply-To: <CAOMZO5A0N6VcTOgWTpqe_mW4ekW1fSY4+=7o8mXSPFeEmjg26w@mail.gmail.com>
+References: <CAOMZO5C6gaJUD3RTCwGqDhcojx3Thww22c+tsdC4bvTUmiSw6w@mail.gmail.com>
+	<20110824205415.GN31404@pengutronix.de>
+	<20110824214311.GA21759@n2100.arm.linux.org.uk>
+	<CAOMZO5A0N6VcTOgWTpqe_mW4ekW1fSY4+=7o8mXSPFeEmjg26w@mail.gmail.com>
+Message-ID: <20110825125014.GD8883@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Aug 25, 2011 at 08:53:49AM -0300, Fabio Estevam wrote:
+> "config HIGHMEM
+> 	bool "High Memory Support"
+> 	depends on MMU
+> 	help
+> 	  The address space of ARM processors is only 4 Gigabytes large
+> 	  and it has to accommodate user address space, kernel address
+> 	  space as well as some memory mapped IO. That means that, if you
+> 	  have a large amount of physical memory and/or IO, not all of the
+> 	  memory can be "permanently mapped" by the kernel. The physical
+> 	  memory that is not permanently mapped is called "high memory".
+> 
+> 	  Depending on the selected kernel/user memory split, minimum
+> 	  vmalloc space and actual amount of RAM, you may not need this
+> 	  option which should result in a slightly faster kernel.
+> 
+> 	  If unsure, say n."
+> 
+> So is it correct to say that CONFIG_VMSPLIT_2G is preferred over
+> CONFIG_HIGHMEM due to the "should result in a slightly faster kernel."
+> statement above?
 
-On Thu, Aug 25, 2011 at 01:25:43PM +0100, Russell King - ARM Linux wrote:
-> No.  Stop bodging and hiding problems.  Anywhere which does this:
-> 
-> 	local_irq_enable();
-> 	do something
-> 	local_irq_disable();
-> 
-> is a bug.  Things are called with IRQs disabled for a reason - randomly
-> re-enabling IRQs does not "fix" stuff, it merely introduces subtle bugs
-> while hiding warnings of those bugs.
-> 
-> Please go back and read my response to Mark at the beginning of this
-> thread, where I describe why IRQs are disabled here.
-> 
-> The only solution here is to fix the problem properly, and I'm working
-> on a patch to fix the problem I highlighted in my earlier response to
-> Mark.  Once we have that problem fixed, we can then (more) safely call
-> do_signal() with IRQs enabled.
+It depends what your userspace is expecting.  There's a few issues to
+consider:
 
-Arrrrrrrrgghhhhhhhhhhhh, why is communication so difficult with you?
-When did I ever suggest that as a proper fix.  ARM is frigging broken
-in that path so don't push it over to PM and just deal with it inside
-ARM arch code.  For now, we need to make the warning go away until
-it's properly fixed so turn off and on IRQ around
-get_signal_to_deliver() and mark it with giant FIXME comment.  How
-many times did I write that?  I don't know how to make that any
-clearer to you.  Gees...
+1. The 3G split is the well established normal split both on ARM and x86.
+2. Userspace is sparsely populated into three or four main regions.
+3. There are some programs which assume that there's 3G of userspace
+   available (some have hard-coded constants for this - notorious
+   examples a garbage collection libraries, though they may have been
+   fixed with the advent of stack placement randomization.)
 
--- 
-tejun
+Reducing the size of userspace squashes the regions together, which may
+limit the amount of memory available to any one process.  You won't see
+that effect from just running a shell or 'cat' etc, but you may find it
+if you have a heavy-weight application wanting to allocate lots of
+memory.
+
+Out of the two, highmem is the overall safer option in this regard because
+it allows you to keep the standard user layout while still having access
+to more physical memory.
+
+It may be slower as a result of the kernel having to map/unmap highmem
+pages during startup, but (again, depending on your userspace behaviour)
+it may make no difference to your userspace once its cached the user
+programs in memory.
