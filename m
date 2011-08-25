@@ -1,26 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Aug 2011 20:15:01 +0100
-Subject: [PATCH]arm: nwfpe: '&pointer[0]' to 'pointer' fix
-In-Reply-To: <20110825191143.GA3149@maxin>
-References: <20110825191143.GA3149@maxin>
-Message-ID: <20110825191501.GA4488@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 25 Aug 2011 13:23:53 -0700
+Subject: [PATCH v5 03/22] gpio/omap: make gpio_context part of gpio_bank
+	structure
+In-Reply-To: <4E53A0EE.5000703@ti.com> (Santosh's message of "Tue, 23 Aug 2011
+	18:15:34 +0530")
+References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+	<1312455893-14922-4-git-send-email-tarun.kanti@ti.com>
+	<4E53A0EE.5000703@ti.com>
+Message-ID: <87sjop5jfq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 10:11:43PM +0300, Maxin B. John wrote:
-> '&pointer[0]' to 'pointer' fix in arch/arm/nwfpe/fpa11_cpdt.c 
+Santosh <santosh.shilimkar@ti.com> writes:
 
-Your reason being?
+> On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
+>> From: Charulatha V<charu@ti.com>
+>>
+>> Currently gpio_context array used to save gpio bank's context, is used only for
+>> OMAP3 architecture. Move gpio_context as part of gpio_bank structure so that it
+>> can be specific to each gpio bank and can be used for any OMAP architecture
+>>
+>> Signed-off-by: Charulatha V<charu@ti.com>
+>> ---
+> Few comments.
+>
 
->  #ifdef __ARMEB__
-> -	get_user(p[0], &pMem[0]);	/* sign & exponent */
-> +	get_user(p[0], pMem);	/* sign & exponent */
->  	get_user(p[1], &pMem[1]);
+[...]
 
-You may notice the original code has some consistency.  Your replacement
-is less consistent.  If you wish to make this change, it should change to:
+>> @@ -1494,33 +1490,31 @@ void omap2_gpio_resume_after_idle(void)
+>>   void omap_gpio_save_context(void)
+>>   {
+>>   	struct gpio_bank *bank;
+>> -	int i = 0;
+>>
+>>   	list_for_each_entry(bank,&omap_gpio_list, node) {
+>> -		i++;
+>>
+>>   		if (!bank->loses_context)
+>>   			continue;
+>>
+>> -		gpio_context[i].irqenable1 =
+>> +		bank->context.irqenable1 =
+>>   			__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE1);
+>> -		gpio_context[i].irqenable2 =
+>> +		bank->context.irqenable2 =
+>>   			__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE2);
+>
+> The context restore procedure should be done carefully. For instance
+> IRQ enabled register should be restored last to avoid any spurious
+> interrupts.
 
-	get_user(p[0], pMem + 0);
-	get_user(p[1], pMem + 1);
+For the sake of clean, easy-to-review patches, this kind of functional
+change should be a separate patch.
 
-to maintain consistency.
+The goal of $SUBJECT patch is simply to move the context struct into the
+bank struct, not change the order of the save restore.
+
+Any changing of the order of save/restore should be in a dedicated patch
+with a descriptive changelog since that is changing behavior of the code.
+
+Kevin
