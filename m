@@ -1,40 +1,51 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 25 Aug 2011 19:36:15 +0530
-Subject: [PATCH V3 00/20] dmaengine/amba-pl08x updates
-In-Reply-To: <CACRpkdY6KW+tv7H==b15xJyeLp9HCqp9ROBhON0A8JnJDUn8Kg@mail.gmail.com>
-References: <cover.1312538034.git.viresh.kumar@st.com>
-	<CACRpkdY6KW+tv7H==b15xJyeLp9HCqp9ROBhON0A8JnJDUn8Kg@mail.gmail.com>
-Message-ID: <1314281175.1606.36.camel@vkoul-udesk3>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 25 Aug 2011 16:12:42 +0200
+Subject: [PATCH 1/1] OMAP: omap_device: only override _noirq methods,
+	not normal suspend/resume
+In-Reply-To: <1314229437-31836-2-git-send-email-khilman@ti.com>
+References: <1314229437-31836-1-git-send-email-khilman@ti.com>
+	<1314229437-31836-2-git-send-email-khilman@ti.com>
+Message-ID: <201108251612.42237.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-08-23 at 10:17 +0200, Linus Walleij wrote:
-> On Fri, Aug 5, 2011 at 12:02 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+On Thursday, August 25, 2011, Kevin Hilman wrote:
+> commit c03f007a8bf0e092caeb6856a5c8a850df10b974 (OMAP: PM:
+> omap_device: add system PM methods for PM domain handling) mistakenly
+> used SET_SYSTEM_SLEEP_PM_OPS() when trying to configure custom methods
+> for the PM domains noirq methods.  Fix that by setting only the
+> suspend_noirq and resume_noirq methods with custom versions.
 > 
-> > This patchset contains patches for ARM's pl08x DMA controller driver.
-> > Main changes introduced by this patchset are:
-> > - Formatting fixes
-> > - Logical Fixes
-> > - Support for Peripheral as flow controller
-> > - Support for sg_len to be greater than 1 for slave transfers
-> > - Schedule tasklet for error interrupts
-> > - remove pl08x_pre_boundary() routine
-> > - support for runtime PM
-> > - etc
+> Note that all other PM domain methods (including the "normal"
+> suspend/resume methods) are populated using USE_PLATFORM_PM_SLEEP_OPS,
+> which configures them all to the default subsystem (platform_bus)
+> methods.
 > 
-> I've now tested this patchset:
-> 
-> patch 3/20 fails to apply cleanly, need rebase on top of Russell's
-> fix for dma-mapping.h inclusion. It's a trivial fix.
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Vinod could you apply all patches except for 16/18 which has some
-> discussion going on, so we get some rotation in -next? The rest of
-> Viresh:s patches are really nice stuff to have.
-> 
-> I will test on the PB11MPcore in the next few days.
-> 
-Thanks, I have applied this patch series to 17/20
+> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 
--- 
-~Vinod
+Applied to linux-pm/pm-fixes, will be pushed for 3.1, thanks!
+
+Rafael
+
+
+> ---
+>  arch/arm/plat-omap/omap_device.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index b6b4097..9a6a538 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -622,7 +622,8 @@ static struct dev_pm_domain omap_device_pm_domain = {
+>  		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
+>  				   _od_runtime_idle)
+>  		USE_PLATFORM_PM_SLEEP_OPS
+> -		SET_SYSTEM_SLEEP_PM_OPS(_od_suspend_noirq, _od_resume_noirq)
+> +		.suspend_noirq = _od_suspend_noirq,
+> +		.resume_noirq = _od_resume_noirq,
+>  	}
+>  };
+>  
+> 
