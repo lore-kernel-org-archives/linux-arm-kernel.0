@@ -1,51 +1,76 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 25 Aug 2011 13:03:24 -0500
-Subject: [PATCH 2/6] ARM: add Highbank core platform support
-In-Reply-To: <201108251802.29251.arnd@arndb.de>
-References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
-	<201108181734.25397.arnd@arndb.de> <4E5000A1.8060609@gmail.com>
-	<201108251802.29251.arnd@arndb.de>
-Message-ID: <4E568E6C.60904@gmail.com>
+From: gbean@codeaurora.org (Gregory Bean)
+Date: Thu, 25 Aug 2011 11:14:04 -0700
+Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
+In-Reply-To: <20110825151210.GC31331@huya.qualcomm.com>
+References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B24A3BC0@HQMAIL01.nvidia.com>
+	<CACRpkdaZfG4hiGf8vug3EGMRMc0c92xbj=L_HAQcS27DAXYc4Q@mail.gmail.com>
+	<20110825151210.GC31331@huya.qualcomm.com>
+Message-ID: <20110825181404.GA19345@gbean-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/25/2011 11:02 AM, Arnd Bergmann wrote:
-> On Saturday 20 August 2011, Rob Herring wrote:
->>>> +#ifndef _MACH_HIGHBANK__SYSREGS_H_
->>>> +#define _MACH_HIGHBANK__SYSREGS_H_
->>>> +
->>>> +extern void __iomem *sregs_base;
->>>> +
->>>> +#define HB_SREG_A9_PWR_REQ          0xf00
->>>> +#define HB_SREG_A9_BOOT_STAT                0xf04
->>>> +#define HB_SREG_A9_BOOT_DATA                0xf08
->>>> +
->>>> +#define HB_PWR_SUSPEND                      0
->>>> +#define HB_PWR_SOFT_RESET           1
->>>> +#define HB_PWR_HARD_RESET           2
->>>> +#define HB_PWR_SHUTDOWN                     3
->>>> +
->>>> +#endif
->>>
->>> Do these really need to be global?
->>>
->>> I think it's better to put the base address and register definitions into a
->>> single file and export functions to be used from elsewhere.
->>
->> Yes, sregs are a random collection of functions, so it's going to be a
->> mixture of various users. Just HB_PWR_* alone are in 2 or 3 different
->> places.
+On Thu, Aug 25, 2011 at 08:12:10AM -0700, David Brown wrote:
+> On Thu, Aug 25, 2011 at 12:12:59PM +0200, Linus Walleij wrote:
 > 
-> Sorry, I'm not following.
+> > mach-msm:
+> > ----------------
+> > 
+> > Hard to tell how this works and what's available, support
+> > seems to be incomplete. Currently it seems to be wired
+> > to do either a dedicated function (like some UART pin)
+> > or GPIO, like each pin can be used for two specific
+> > things, and not phone-exchange type.
 > 
-> Do you mean 'yes, they need to be global' or 'yes, it's better to export
-> the functions'?
+> There are some pins on MSMs that can be connected to different hw
+> blocks, we just haven't gotten the support into the kernel yet.
 > 
+> There are some things where two devices share pins, and you have to
+> choose one or the other.
+> 
+> I believe there are also configurations where something such as the SD
+> controller can either be configured in 8-bit data mode, or in 4-bit
+> data mode, and those 4 pins connected to something else.
+> 
+> Much of the current pin configuration in our product kernel seems to
+> be about current and pull up/down configuration.
+> 
+> I've added Rohit Vaswani, and Greg Bean to this thread who should have
+> a bit better understanding of this.
 
-I meant the former and functions as in h/w functionality, not C functions.
+The MSM pinmux system allows every pin to be independently controlled
+in the following ways:
 
-This will mainly be clock control plus a few other things. Is it really
-desired to add another layer here when these are all just single
-register writes?
+- function selection:  Every pin can be in GPIO mode, or connected to
+  a specific piece of hardware.  The number of choices varies by pin -
+  some pins have only two choices, some have eight.  When a pin is not in
+  GPIO mode, it loses some configurability - for instance, its direction
+  can no longer be set, as that's predetermined by the function selection.
+  Pins can belong to many groups which overlap in all kinds of interesting
+  ways - a pin may be part of this four-bit bus, or that eight-bit bus, or
+  might stand alone for two settings...
 
-Rob
+- drive strength: Each pin can be set to have a different drive strength
+  between 2MA and 16MA, in 2MA steps.
+
+- pull settings: Each pin can be configured with a variety of pull
+  settings: up, down, keeper, no pull.
+
+Additionally, there are complexities involving delivering
+interrupts from GPIOs:
+
+- 'direct-connect' or 'summary' interrupts: pins which are being used as
+  interrupt inputs can be 'summarized' through a single interrupt
+  (requiring an additional pile of register reads to figure out which
+  gpio triggered the interrupt) or as a 'direct-connect' interrupt.
+  There are very few direct-connect lines available, so most gpio
+  interrupts are summarized.
+
+- processor interrupt assignment: Each pin can be assigned to deliver
+  interrupts to a different processor on the board.  This pin might be
+  assigned to the MSM, that pin might go to the DSP, the next might
+  go to the modem, and so on...
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
