@@ -1,24 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 25 Aug 2011 07:22:27 -0300
-Subject: [[PATCH v2 4/6] ARM: mx31: use generic function for displaying
-	silicon revision
-In-Reply-To: <1314162277-2840-5-git-send-email-jason.hui@linaro.org>
-References: <1314162277-2840-1-git-send-email-jason.hui@linaro.org>
-	<1314162277-2840-5-git-send-email-jason.hui@linaro.org>
-Message-ID: <CAOMZO5Co6hjBB+eQ9_9nRnpmiB_jU71RrpQhqQpS4NOpwuBkxQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Aug 2011 11:22:45 +0100
+Subject: Question on virtual memory layout: lowmem with memory hole
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03B47E23FC@dbde02.ent.ti.com>
+References: <2A3DCF3DA181AD40BDE86A3150B27B6B03B47E23FC@dbde02.ent.ti.com>
+Message-ID: <20110825102245.GA10405@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+On Thu, Aug 25, 2011 at 09:35:07AM +0530, Pedanekar, Hemant wrote:
+> E.g., on OMAP3 with mem=32M at 0x80000000 mem=8M at 0x87800000
+> 
+> (CASE 1)
+>  Memory: 32MB 8MB = 40MB total
+>  Memory: 28408k/28408k available, 12552k reserved, 0K highmem
+>  Virtual kernel memory layout:
+>      vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+>      fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+>      DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
+>      vmalloc : 0xc8800000 - 0xf8000000   ( 760 MB)
+>      lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+>      modules : 0xbf000000 - 0xc0000000   (  16 MB)
+>        .text : 0xc0008000 - 0xc05ac2c8   (5777 kB)
+>        .init : 0xc05ad000 - 0xc05f8780   ( 302 kB)
+>        .data : 0xc05fa000 - 0xc06838d0   ( 551 kB)
+>         .bss : 0xc06838f4 - 0xc0bd8a14   (5461 kB)
+> 
+> Is this expected? 88MB space between two 'mem's seems to have lost.
 
-On Wed, Aug 24, 2011 at 2:04 AM, Jason Liu <jason.hui@linaro.org> wrote:
-> Update to use generic function for displaying silicon revision
->
-> Tested on mx31pdk board as print the following information:
-> CPU identified as i.MX31, silicon rev 2.8
+Yes.  The memory layout lines gives an overview of the virtual memory
+address space _regions_.
 
-2.8? There is no MX31 rev 2.8.
+What it's saying is that the virtual addresses from 0xc0000000 - 0xc8000000
+are used for lowmem.  That may not be fully populated, but that's what
+the address range is reserved for.
 
-Regards,
+> This also
+> means vmalloc space is lower compared to when a single mem=40M is passed.
 
-Fabio Estevam
+Huh.  Either your maths is wrong or...
+
+Here's case 1:
+>      vmalloc : 0xc8800000 - 0xf8000000   ( 760 MB)
+And case 2:
+>      vmalloc : 0xc3000000 - 0xf8000000   ( 848 MB)
+
+Looks to me like case 1, vmalloc space is _higher_ not _lower_.  That's
+expected because you told the kernel it had more memory in case 1.
