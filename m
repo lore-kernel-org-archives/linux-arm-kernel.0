@@ -1,51 +1,29 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 25 Aug 2011 16:12:42 +0200
-Subject: [PATCH 1/1] OMAP: omap_device: only override _noirq methods,
-	not normal suspend/resume
-In-Reply-To: <1314229437-31836-2-git-send-email-khilman@ti.com>
-References: <1314229437-31836-1-git-send-email-khilman@ti.com>
-	<1314229437-31836-2-git-send-email-khilman@ti.com>
-Message-ID: <201108251612.42237.rjw@sisk.pl>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 25 Aug 2011 16:16:00 +0200
+Subject: [PATCH] ARM: mx5: fix remaining unconsistent names for irqs
+In-Reply-To: <1314276949-23062-1-git-send-email-hector.oron@gmail.com> (hector
+	oron's message of "Thu, 25 Aug 2011 13:55:49 +0100")
+References: <CAODfWeFeaw2+xe01c5fiSr1tYsdM8J8ahZz8t-B7uuD+-P0GCQ@mail.gmail.com>
+	<1314276949-23062-1-git-send-email-hector.oron@gmail.com>
+Message-ID: <87fwkpa867.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 25, 2011, Kevin Hilman wrote:
-> commit c03f007a8bf0e092caeb6856a5c8a850df10b974 (OMAP: PM:
-> omap_device: add system PM methods for PM domain handling) mistakenly
-> used SET_SYSTEM_SLEEP_PM_OPS() when trying to configure custom methods
-> for the PM domains noirq methods.  Fix that by setting only the
-> suspend_noirq and resume_noirq methods with custom versions.
-> 
-> Note that all other PM domain methods (including the "normal"
-> suspend/resume methods) are populated using USE_PLATFORM_PM_SLEEP_OPS,
-> which configures them all to the default subsystem (platform_bus)
-> methods.
-> 
-> Reported-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+hector.oron at gmail.com writes:
 
-Applied to linux-pm/pm-fixes, will be pushed for 3.1, thanks!
+Hi,
 
-Rafael
+> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> [hector: rebase on current Sascha's 'imx-features' branch]
+> Signed-off-by: Hector Oron <hector.oron@gmail.com>
 
+It's fixing nicely the build of imx-features branch of Sascha's
+tree. Only build tested but I guess seeing that it's fixing the build
+already enough to make it a must have :)
 
-> ---
->  arch/arm/plat-omap/omap_device.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index b6b4097..9a6a538 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -622,7 +622,8 @@ static struct dev_pm_domain omap_device_pm_domain = {
->  		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
->  				   _od_runtime_idle)
->  		USE_PLATFORM_PM_SLEEP_OPS
-> -		SET_SYSTEM_SLEEP_PM_OPS(_od_suspend_noirq, _od_resume_noirq)
-> +		.suspend_noirq = _od_suspend_noirq,
-> +		.resume_noirq = _od_resume_noirq,
->  	}
->  };
->  
-> 
+Tested-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+
+Thanks,
+Arnaud
