@@ -1,61 +1,93 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 25 Aug 2011 17:43:44 -0600
-Subject: [PATCH v3 13/13] arm/tegra: board-dt: Remove dependency on non-dt
-	pinmux functions
-In-Reply-To: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
-References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1314315824-9687-14-git-send-email-swarren@nvidia.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 25 Aug 2011 16:47:37 -0700
+Subject: [PATCH] process: change from __backtrace to dump_stack in show_regs
+Message-ID: <1314316057-8282-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/Makefile   |    1 -
- arch/arm/mach-tegra/board-dt.c |   10 ----------
- 2 files changed, 0 insertions(+), 11 deletions(-)
+Currently, show_regs calls __backtrace which does
+nothing if CONFIG_FRAME_POINTER is not set. Switch to
+dump_stack which handles both CONFIG_FRAME_POINTER and
+CONFIG_ARM_UNWIND correctly.
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index f11b910..bab6544 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -30,7 +30,6 @@ obj-${CONFIG_MACH_SEABOARD}             += board-seaboard.o
- obj-${CONFIG_MACH_SEABOARD}             += board-seaboard-pinmux.o
+__backtrace is now superseded by dump_stack in general
+and show_regs was the last caller so remove __backtrace
+as well.
+
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm/include/asm/system.h |    1 -
+ arch/arm/kernel/armksyms.c    |    3 ---
+ arch/arm/kernel/process.c     |    2 +-
+ arch/arm/lib/backtrace.S      |    6 ------
+ 4 files changed, 1 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 832888d..4fc2edd 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -97,7 +97,6 @@ void hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ #define xchg(ptr,x) \
+ 	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
  
- obj-${CONFIG_MACH_TEGRA_DT}             += board-dt.o
--obj-${CONFIG_MACH_TEGRA_DT}             += board-harmony-pinmux.o
+-extern asmlinkage void __backtrace(void);
+ extern asmlinkage void c_backtrace(unsigned long fp, int pmode);
  
- obj-${CONFIG_MACH_TRIMSLICE}            += board-trimslice.o
- obj-${CONFIG_MACH_TRIMSLICE}            += board-trimslice-pinmux.o
-diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-index 9f47e04..b6b3f28 100644
---- a/arch/arm/mach-tegra/board-dt.c
-+++ b/arch/arm/mach-tegra/board-dt.c
-@@ -41,14 +41,9 @@
- #include <mach/irqs.h>
+ struct mm_struct;
+diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+index aeef960..8e3c6f1 100644
+--- a/arch/arm/kernel/armksyms.c
++++ b/arch/arm/kernel/armksyms.c
+@@ -49,9 +49,6 @@ extern void __aeabi_ulcmp(void);
  
- #include "board.h"
--#include "board-harmony.h"
- #include "clock.h"
- #include "devices.h"
+ extern void fpundefinstr(void);
  
--void harmony_pinmux_init(void);
--void seaboard_pinmux_init(void);
 -
+-EXPORT_SYMBOL(__backtrace);
 -
- struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", TEGRA_SDMMC1_BASE, "sdhci-tegra.0", NULL),
- 	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", TEGRA_SDMMC2_BASE, "sdhci-tegra.1", NULL),
-@@ -91,11 +86,6 @@ static void __init tegra_dt_init(void)
+ 	/* platform dependent support */
+ EXPORT_SYMBOL(__udelay);
+ EXPORT_SYMBOL(__const_udelay);
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 1a347f4..fd08140 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -319,7 +319,7 @@ void show_regs(struct pt_regs * regs)
+ 	printk("\n");
+ 	printk("Pid: %d, comm: %20s\n", task_pid_nr(current), current->comm);
+ 	__show_regs(regs);
+-	__backtrace();
++	dump_stack();
+ }
  
- 	tegra_clk_init_from_table(tegra_dt_clk_init_table);
+ ATOMIC_NOTIFIER_HEAD(thread_notify_head);
+diff --git a/arch/arm/lib/backtrace.S b/arch/arm/lib/backtrace.S
+index a673297..cd07b58 100644
+--- a/arch/arm/lib/backtrace.S
++++ b/arch/arm/lib/backtrace.S
+@@ -22,15 +22,10 @@
+ #define mask	r7
+ #define offset	r8
  
--	if (of_machine_is_compatible("nvidia,harmony"))
--		harmony_pinmux_init();
--	else if (of_machine_is_compatible("nvidia,seaboard"))
--		seaboard_pinmux_init();
+-ENTRY(__backtrace)
+-		mov	r1, #0x10
+-		mov	r0, fp
 -
- 	/*
- 	 * Finished with the static registrations now; fill in the missing
- 	 * devices
+ ENTRY(c_backtrace)
+ 
+ #if !defined(CONFIG_FRAME_POINTER) || !defined(CONFIG_PRINTK)
+ 		mov	pc, lr
+-ENDPROC(__backtrace)
+ ENDPROC(c_backtrace)
+ #else
+ 		stmfd	sp!, {r4 - r8, lr}	@ Save an extra register so we have a location...
+@@ -107,7 +102,6 @@ for_each_frame:	tst	frame, mask		@ Check for address exceptions
+ 		mov	r1, frame
+ 		bl	printk
+ no_frame:	ldmfd	sp!, {r4 - r8, pc}
+-ENDPROC(__backtrace)
+ ENDPROC(c_backtrace)
+ 		
+ 		.pushsection __ex_table,"a"
 -- 
-1.7.0.4
+1.7.3.3
