@@ -1,51 +1,48 @@
-From: schen@mvista.com (Steve Chen)
-Date: Thu, 25 Aug 2011 08:57:32 -0500
-Subject: Kernel panic in 2.6.35.12 kernel
-In-Reply-To: <CAJ8eaTw=dKUNE8h-HD7RWxXHcTEuxJH4AfcOO44RSF7QdC5arQ@mail.gmail.com>
-References: <CAJ8eaTyeQj5_EAsCFDMmDs3faiVptuccmq3VJLjG-QnYG038=A@mail.gmail.com>
-	<CAJ8eaTw=dKUNE8h-HD7RWxXHcTEuxJH4AfcOO44RSF7QdC5arQ@mail.gmail.com>
-Message-ID: <CAHKQLBH2d-DzzMfP9QOUmz6brT7BfPdwY6JfEUUYxzaTDTo=wg@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 25 Aug 2011 15:57:34 +0200
+Subject: [RFC PATCH 2/7] arm/dts: Add initial device tree support for
+	OMAP4 SoC
+In-Reply-To: <4E565004.9050806@gmail.com>
+References: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
+	<1314181040-22807-3-git-send-email-b-cousson@ti.com>
+	<4E565004.9050806@gmail.com>
+Message-ID: <4E5654CE.4000303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 1:06 AM, naveen yadav <yad.naveen@gmail.com> wrote:
-> I am paste only small crash log due to size problem.
->
->
->
->
->> Hi All,
->>
->> We are running one malloc testprogram using below script.
->>
->> while true
->> do
->> ./stress &
->> sleep 1
->> done
->>
->>
->>
->>
->> After 10-15 min we observe following crash in kernel
->>
->>
->> ?Kernel panic - not syncing: Out of memory and no killable processes...
->>
->> attaching log also.
->>
->> Thanks
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+Hi Rob,
 
-Can you share the code in ./stress?
+On 8/25/2011 3:37 PM, Rob Herring wrote:
+> Benoit,
 
-Thanks,
+[...]
 
-Steve
+>> +		gic: interrupt-controller at 48241000 {
+>> +			compatible = "ti,omap4-gic", "arm,gic";
+>
+> The gic binding is still being hashed out. This needs binding
+> documentation and handling of PPIs. I'm planning on posting an updated
+> series today with this.
+>
+> "arm,gic" should be dropped or replaced with "arm,cortex-a9-gic".
+> Non-specific DT bindings are not well received. Is OMAP4 gic different
+> from standard Cortex-A9?
+
+Not at all. We named it like that based on Grant's comment:
+http://permalink.gmane.org/gmane.linux.ports.arm.omap/60393
+
+I'll update it with the new binding.
+
+>> +			interrupt-controller;
+>> +			#interrupt-cells =<1>;
+>> +			reg =<0x48241000 0x1000>,
+>> +			<0x48240100 0x0200>;
+>
+> Isn't the cpu interface register space 0x100 bytes long?
+
+I've just checked the spec, and this is indeed 256 bytes. I'll fix that.
+
+Thanks for the comments.
+
+Regards,
+Benoit
