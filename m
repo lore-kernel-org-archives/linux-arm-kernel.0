@@ -1,87 +1,51 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Thu, 25 Aug 2011 17:01:58 +0200
-Subject: [PATCH v2 2/2] omap_twl: Prevent SR to enable for am3517/am3505
-	devices
-In-Reply-To: <1314105680-17426-1-git-send-email-abhilash.kv@ti.com>
-References: <1314105680-17426-1-git-send-email-abhilash.kv@ti.com>
-Message-ID: <4E5663E6.3040509@parrot.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 25 Aug 2011 17:02:14 +0200
+Subject: [patch 1/1] efika: Configure esdhc cd/wp on efika mx/sb
+In-Reply-To: <20110825143806.625158261@rtp-net.org>
+References: <20110825143806.625158261@rtp-net.org>
+Message-ID: <20110825150214.GZ31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash K V a ?crit :
-> From: Vaibhav Hiremath <hvaibhav@ti.com>
+Hi Arnaud,
+
+On Thu, Aug 25, 2011 at 04:37:57PM +0200, Arnaud Patard wrote:
+> Update sdhc support on efika to make use of the latest mmc fixes.
 > 
-> In case of AM3517 & AM3505, Smart Reflex is not applicable so
-> we must not enable it. So add check for absence of SR feature
-> in omap3_twl_init() and return -ENODEV if absence, else continue.
-
-I believe another check should be done :
-you have the same problem if you run a omap3630 with TPS65023.
-
-The check should take in account the pmu that is used and if it support SR.
-
-
-Matthieu
-
-
 > 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
-> ---
->  arch/arm/mach-omap2/id.c              |    2 +-
->  arch/arm/mach-omap2/omap_twl.c        |    8 ++++++++
->  arch/arm/plat-omap/include/plat/cpu.h |    2 ++
->  3 files changed, 11 insertions(+), 1 deletions(-)
+> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> @@ -451,7 +465,8 @@ static void __init efikasb_board_init(vo
+>  
+>  	mx51_efikasb_board_id();
+>  	mx51_efikasb_usb();
+> -	imx51_add_sdhci_esdhc_imx(1, NULL);
+> +	imx51_add_sdhci_esdhc_imx(0, &sd0_pdata);
+> +	imx51_add_sdhci_esdhc_imx(1, &sd1_pdata);
+>  	mx51_efikasb_display();
+        ^^^^^^^^^^^^^^^^^^^
+
+Looks good, but please rebase this onto a mainline kernel.
+
+>  	platform_device_register(&mx51_efikasb_rfkill_device);
+>  
+> Index: linux-2.6-submit/arch/arm/mach-mx5/mx51_efika.c
+> ===================================================================
+> --- linux-2.6-submit.orig/arch/arm/mach-mx5/mx51_efika.c	2011-06-20 20:36:15.000000000 +0200
+> +++ linux-2.6-submit/arch/arm/mach-mx5/mx51_efika.c	2011-06-21 01:13:07.000000000 +0200
+> @@ -704,7 +704,6 @@ void __init efika_board_common_init(void
+>  	mx51_efika_usb();
+>  	imx51_add_imx2_wdt(0, NULL);
+>  	mx51_efika_i2c();
+> -	imx51_add_sdhci_esdhc_imx(0, NULL);
+>  
+>  	/* FIXME: comes from original code. check this. */
+>  	if (mx51_revision() < IMX_CHIP_REVISION_2_0)
 > 
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 37efb86..da71098 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -202,7 +202,7 @@ static void __init omap3_check_features(void)
->  	if (cpu_is_omap3630())
->  		omap_features |= OMAP3_HAS_192MHZ_CLK;
->  	if (!cpu_is_omap3505() && !cpu_is_omap3517())
-> -		omap_features |= OMAP3_HAS_IO_WAKEUP;
-> +		omap_features |= (OMAP3_HAS_IO_WAKEUP | OMAP3_HAS_SR);
->  
->  	omap_features |= OMAP3_HAS_SDRC;
->  
-> diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-> index 07d6140..47e27b5 100644
-> --- a/arch/arm/mach-omap2/omap_twl.c
-> +++ b/arch/arm/mach-omap2/omap_twl.c
-> @@ -269,6 +269,14 @@ int __init omap3_twl_init(void)
->  	if (!cpu_is_omap34xx())
->  		return -ENODEV;
->  
-> +	/*
-> +	 * In case of AM3517/AM3505 we should not be going down
-> +	 * further, since SR is not applicable there.
-> +	 */
-> +	if (!omap3_has_sr()) {
-> +		return -ENODEV;
-> +	}
-> +
->  	if (cpu_is_omap3630()) {
->  		omap3_mpu_volt_info.vp_vddmin = OMAP3630_VP1_VLIMITTO_VDDMIN;
->  		omap3_mpu_volt_info.vp_vddmax = OMAP3630_VP1_VLIMITTO_VDDMAX;
-> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-> index 67b3d75..294e015 100644
-> --- a/arch/arm/plat-omap/include/plat/cpu.h
-> +++ b/arch/arm/plat-omap/include/plat/cpu.h
-> @@ -491,6 +491,7 @@ extern u32 omap_features;
->  #define OMAP4_HAS_MPU_1GHZ		BIT(8)
->  #define OMAP4_HAS_MPU_1_2GHZ		BIT(9)
->  #define OMAP4_HAS_MPU_1_5GHZ		BIT(10)
-> +#define OMAP3_HAS_SR			BIT(11)
->  
->  
->  #define OMAP3_HAS_FEATURE(feat,flag)			\
-> @@ -507,6 +508,7 @@ OMAP3_HAS_FEATURE(isp, ISP)
->  OMAP3_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
->  OMAP3_HAS_FEATURE(io_wakeup, IO_WAKEUP)
->  OMAP3_HAS_FEATURE(sdrc, SDRC)
-> +OMAP3_HAS_FEATURE(sr, SR)
->  
->  /*
->   * Runtime detection of OMAP4 features
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
