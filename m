@@ -1,41 +1,82 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Thu, 25 Aug 2011 06:43:12 +0530
-Subject: [PATCH 12/15] spi/s3c64xx: Add support DMA engine API
-In-Reply-To: <20110821084633.GD12028@n2100.arm.linux.org.uk>
-References: <1311744697-10264-1-git-send-email-boojin.kim@samsung.com>
-	<1311744697-10264-13-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY3-d0xTO+s0cCPXPW8qGpTH5G2U+bp-0z4Se47eVvJ__w@mail.gmail.com>
-	<CAGOxZ53BRa1=Bnb==jNg_dD0XT2pMSPo=QoHF++LnT6r5kO_Mw@mail.gmail.com>
-	<20110821084633.GD12028@n2100.arm.linux.org.uk>
-Message-ID: <CAGOxZ53i4DitEbQsWm94Nv1aP6M31H3csZDn_4KqzALsSdyDvw@mail.gmail.com>
+From: ajay.gupta@ti.com (Gupta, Ajay Kumar)
+Date: Thu, 25 Aug 2011 07:33:39 +0530
+Subject: [PATCH v3] OMAP3EVM: ehci: Fix EHCI support
+In-Reply-To: <1314203836-3799-1-git-send-email-bdefaria@adeneo-embedded.com>
+References: <1314203836-3799-1-git-send-email-bdefaria@adeneo-embedded.com>
+Message-ID: <19F8576C6E063C45BE387C64729E739404EC007D18@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 21, 2011 at 2:16 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Aug 09, 2011 at 09:43:32AM +0530, Alim Akhtar wrote:
->> Exactly, spi_s3c64xx.c (including Sound driver) can not be used with
->> pl080 and pl330 (DMAENGINE drivers) as it is.
->> Recently I was trying to use PL080 DMAENGINE driver, and i was ended
->> up using some #ifdef in the spi driver.
->> something like
->> #ifdef CONFIG_PL080
->> sdd->tx_dmac.bus_id = dmatx_res->name;
->> sdd->rx_dmac.bus_id = dmarx_res->name;
->> #else
->> sdd->tx_dmac.bus_id = dmatx_res->start;
->> sdd->tx_dmac.bus_id = dmatx_res->start;
->> #endif
->>
->> This is because, Pl080 handle the channel as a char *(name) and pl330
->> expect the channel to be enum (a number).
->
-> The alternative is that you do as the Primecell drivers do (which was
-> designed from the outset to be independent of the specific dmaengine),
-> and pass the DMA filter parameters as pointers via platform data.
->
-Thanks Russell for your suggestion and pointer.
-I will Look into this alternative solution.
+Hi,
+[...]
+>  arch/arm/mach-omap2/board-omap3evm.c |   25 +++++++++++++++++++++++++
+>  1 files changed, 25 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-
+> omap2/board-omap3evm.c
+> index c452b3f..13a2b71 100644
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -377,6 +377,10 @@ static int omap3evm_twl_gpio_setup(struct device
+> *dev,
+>  	if (r)
+>  		printk(KERN_ERR "failed to get/set lcd_bkl gpio\n");
+> 
+> +	/* gpio + 2 == HSUSB2 Clock Enable */
+This comment should be modified. gpio+2 not only enables EHCI but also camera and
+Audio lines.
 
-Regards,
-Alim
+> +	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
+> +		gpio_request_one(gpio + 2, GPIOF_OUT_INIT_LOW,
+> "EN_HSUSB2_CLK");
+This name "EN_HSUSB2_CLK" should also be changed.
+
+Ajay
+
+> +
+>  	/* gpio + 7 == DVI Enable */
+>  	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_LOW, "EN_DVI");
+> 
+> @@ -450,6 +454,25 @@ static struct regulator_init_data omap3evm_vio = {
+>  	.consumer_supplies	= omap3evm_vio_supply,
+>  };
+> 
+> +/* VAUX2 for EHCI */
+> +static struct regulator_consumer_supply omap3evm_vaux2_supplies[] = {
+> +	REGULATOR_SUPPLY("hsusb1", "ehci-omap.0"),
+> +};
+> +
+> +static struct regulator_init_data omap3evm_vaux2 = {
+> +	.constraints = {
+> +		.min_uV      		= 1800000,
+> +		.max_uV      		= 1800000,
+> +		.apply_uV    		= true,
+> +		.valid_modes_mask  	= REGULATOR_MODE_NORMAL
+> +					| REGULATOR_MODE_STANDBY,
+> +		.valid_ops_mask  	= REGULATOR_CHANGE_MODE
+> +					| REGULATOR_CHANGE_STATUS,
+> +	},
+> +	.num_consumer_supplies  = ARRAY_SIZE(omap3evm_vaux2_supplies),
+> +	.consumer_supplies   	= omap3evm_vaux2_supplies,
+> +};
+> +
+>  #ifdef CONFIG_WL12XX_PLATFORM_DATA
+> 
+>  #define OMAP3EVM_WLAN_PMENA_GPIO	(150)
+> @@ -510,6 +533,8 @@ static int __init omap3_evm_i2c_init(void)
+> 
+>  	omap3evm_twldata.vdac->constraints.apply_uV = true;
+>  	omap3evm_twldata.vpll2->constraints.apply_uV = true;
+> +	if (get_omap3_evm_rev() >= OMAP3EVM_BOARD_GEN_2)
+> +		omap3evm_twldata.vaux2 = &omap3evm_vaux2;
+> 
+>  	omap3_pmic_init("twl4030", &omap3evm_twldata);
+>  	omap_register_i2c_bus(2, 400, NULL, 0);
+> --
+> 1.7.4.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
