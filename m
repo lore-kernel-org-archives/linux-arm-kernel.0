@@ -1,29 +1,25 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 25 Aug 2011 14:37:24 +0300
-Subject: [PATCH v8 0/4] add the GPMI-NAND support for imx23/imx28
-In-Reply-To: <1314169643-23425-1-git-send-email-b32955@freescale.com>
-References: <1314169643-23425-1-git-send-email-b32955@freescale.com>
-Message-ID: <1314272249.18988.55.camel@sauron>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 25 Aug 2011 12:37:15 +0100
+Subject: try_to_freeze() called with IRQs disabled on ARM
+In-Reply-To: <201108232351.55432.rjw@sisk.pl>
+References: <20110823151936.GM9232@opensource.wolfsonmicro.com>
+	<201108232351.55432.rjw@sisk.pl>
+Message-ID: <20110825113715.GA2061@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-08-24 at 15:07 +0800, Huang Shijie wrote:
-> The patch set is based on tag v3.1-rc2 of linus's tree.
-> and it can be git-am to Artem's tree:
-> 	http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
-> 
-> The general-purpose media interface(GPMI) controller is a flexible interface
-> to up to several NAND flashs.
-> 
-> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
-> 
-> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
-> not.
+On Tue, Aug 23, 2011 at 11:51:55PM +0200, Rafael J. Wysocki wrote:
+> On Tuesday, August 23, 2011, Mark Brown wrote:
 
-I thought that this series will go in via an imx sub-tree. If you want
-it to go via the mtd tree, we'd need blessing from the imx subtree
-maintainer, I think.
+> > and the boot runs very slowly.  Reverting the series merged in 56f0be
+> > appears to resolve the issue,
 
--- 
-Best Regards,
-Artem Bityutskiy
+> In fact, the patch from:
+
+> https://patchwork.kernel.org/patch/1083602/
+
+> is sufficient to make the calltrace go away.
+
+Yes, that works for me too thanks!
+
+Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
