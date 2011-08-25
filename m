@@ -1,34 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Aug 2011 23:38:08 +0200
-Subject: kernel driver for rs232 serial peripheral
-In-Reply-To: <4E56BE79.4030103@drewtech.com>
-References: <4E56BE79.4030103@drewtech.com>
-Message-ID: <4184628.BPS10NrKVa@wuerfel>
+Date: Thu, 25 Aug 2011 23:44:50 +0200
+Subject: [PATCH 2/6] ARM: add Highbank core platform support
+In-Reply-To: <4E568E6C.60904@gmail.com>
+References: <1313526898-19920-1-git-send-email-robherring2@gmail.com>
+	<201108251802.29251.arnd@arndb.de> <4E568E6C.60904@gmail.com>
+Message-ID: <3676282.cOZ2dSAjhH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 August 2011 17:28:25 Joey Oravec wrote:
-> We make a multi-function chip (rtc, gpio, nvram, etc) for embedded 
-> applications that has an rs232 serial interface. My goal is to write an 
-> MFD kernel driver that speaks serial to this device and implements 
-> interfaces. Other busses like spi and i2c are pretty straightforward in 
-> the kernel but serial feels a lot more complicated. To talk to this 
-> device from the kernel it seems like I need to:
+On Thursday 25 August 2011 13:03:24 Rob Herring wrote:
+> > 
+> > Do you mean 'yes, they need to be global' or 'yes, it's better to export
+> > the functions'?
+> > 
 > 
-> - Call tty_register_ldisc to create a line discipline
-> - Call tty_register_driver and setup a driver
-> - Require userspace to call setserial and change the line discipline
+> I meant the former and functions as in h/w functionality, not C functions.
 > 
-> This might work, but the documentation implies that a line discipline is 
-> for a protocol, not for connecting a device driver to a serial port. Is 
-> there any kind of easier-to-use serial class similar to i2c or spi where 
-> I can just setup a platform device/driver on a specific serial port? Am 
-> I missing an easier solution?
+> This will mainly be clock control plus a few other things. Is it really
+> desired to add another layer here when these are all just single
+> register writes?
 
-I don't think you need to call tty_register_driver, if it's a standard
-serial port, it should already work.
-Also, I believe that there is a way to set the line discipline from
-inside the kernel if you know what is connected. I forgot the details
-but there should be a number of examples in the kernel source.
+It really depends on what the registers do, which I haven't seen. My feeling
+is still that you should have an abstract interface for drivers to use,
+but if the drivers need to do very little, exporting the symbol for the
+base address and using it in inline functions from the header could be
+appropriate.
 
 	Arnd
