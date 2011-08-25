@@ -1,427 +1,81 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 25 Aug 2011 16:08:34 +0200
-Subject: [PATCH v3] at91: merge board usb-a9260 and usb-a9263 together
-In-Reply-To: <I come back to this patch in the process of collecting things
-	that has been left on the mailing-list.>
-References: <I come back to this patch in the process of collecting things
-	that has been left on the mailing-list.>
-Message-ID: <1314281314-28912-1-git-send-email-nicolas.ferre@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Aug 2011 14:04:14 +0100
+Subject: try_to_freeze() called with IRQs disabled on ARM
+In-Reply-To: <20110825123542.GM3286@htj.dyndns.org>
+References: <201108232351.55432.rjw@sisk.pl>
+	<CAOS58YNUSn2eVLDLzqKmrtL7M5tSetkhZ1ODecLK54NSDnZVAA@mail.gmail.com>
+	<20110823220056.GK3895@n2100.arm.linux.org.uk>
+	<CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
+	<20110823221314.GL3895@n2100.arm.linux.org.uk>
+	<CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
+	<20110825121416.GB8883@n2100.arm.linux.org.uk>
+	<20110825121710.GK3286@htj.dyndns.org>
+	<20110825122543.GC8883@n2100.arm.linux.org.uk>
+	<20110825123542.GM3286@htj.dyndns.org>
+Message-ID: <20110825130414.GE8883@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nico Erfurth <ne@erfurth.eu>
+On Thu, Aug 25, 2011 at 02:35:42PM +0200, Tejun Heo wrote:
+> Hello,
+> 
+> On Thu, Aug 25, 2011 at 01:25:43PM +0100, Russell King - ARM Linux wrote:
+> > No.  Stop bodging and hiding problems.  Anywhere which does this:
+> > 
+> > 	local_irq_enable();
+> > 	do something
+> > 	local_irq_disable();
+> > 
+> > is a bug.  Things are called with IRQs disabled for a reason - randomly
+> > re-enabling IRQs does not "fix" stuff, it merely introduces subtle bugs
+> > while hiding warnings of those bugs.
+> > 
+> > Please go back and read my response to Mark at the beginning of this
+> > thread, where I describe why IRQs are disabled here.
+> > 
+> > The only solution here is to fix the problem properly, and I'm working
+> > on a patch to fix the problem I highlighted in my earlier response to
+> > Mark.  Once we have that problem fixed, we can then (more) safely call
+> > do_signal() with IRQs enabled.
+> 
+> Arrrrrrrrgghhhhhhhhhhhh, why is communication so difficult with you?
+> When did I ever suggest that as a proper fix.
 
-Merge boards together as they are barely the same.
+I'm not the problem here - I'm pointing out that your suggestion is just
+going to make things worse not better.  But it seems you can't cope with
+people who criticise your solutions in any way.
 
-Signed-off-by: Nico Erfurth <ne@erfurth.eu>
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-[nicolas.ferre at atmel.com: updated to new machine_desc structure]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
----
-Hi,
+> ARM is frigging broken
+> in that path so don't push it over to PM and just deal with it inside
+> ARM arch code.
 
-I come back to this patch in the process of collecting things that has been
-left on the mailing-list.
-Gregory, can you have a loot at it?
+For fuck sake, who said anything about pushing it over to PM to deal
+with?
 
-v3: update the machine_desc structure to match latest improvements.
-v2: update against new common init
-    we must use it as we can detect the cpu type only after mapping
-    the system controler.
+I'm talking about not putting sticky plasters over the problem, but fixing
+the problem PROPERLY.  I'm sorry if doing a job properly offends you, but
+you have to live with that.
 
- arch/arm/mach-at91/Makefile                        |    4 +-
- arch/arm/mach-at91/board-usb-a9260.c               |  230 --------------------
- .../{board-usb-a9263.c => board-usb-a926x.c}       |   56 +++++-
- 3 files changed, 52 insertions(+), 238 deletions(-)
- delete mode 100644 arch/arm/mach-at91/board-usb-a9260.c
- rename arch/arm/mach-at91/{board-usb-a9263.c => board-usb-a926x.c} (84%)
+I _HATE_ solutions which just paper over problems and make then disappear.
+I've always been firmly in the "if there's a problem, fix the problem
+properly" camp.  You seem to be firmly in the "lets paper over the problem
+and forget about it".
 
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index ecd64792..0b1b379 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -42,7 +42,7 @@ obj-$(CONFIG_MACH_RSI_EWS)	+= board-rsi-ews.o
- obj-$(CONFIG_MACH_AT91SAM9260EK) += board-sam9260ek.o
- obj-$(CONFIG_MACH_CAM60)	+= board-cam60.o
- obj-$(CONFIG_MACH_SAM9_L9260)	+= board-sam9-l9260.o
--obj-$(CONFIG_MACH_USB_A9260)	+= board-usb-a9260.o
-+obj-$(CONFIG_MACH_USB_A9260)	+= board-usb-a926x.o
- obj-$(CONFIG_MACH_QIL_A9260)	+= board-qil-a9260.o
- obj-$(CONFIG_MACH_AFEB9260)	+= board-afeb-9260v1.o
- obj-$(CONFIG_MACH_CPU9260)	+= board-cpu9krea.o
-@@ -54,7 +54,7 @@ obj-$(CONFIG_MACH_AT91SAM9G10EK) += board-sam9261ek.o
- 
- # AT91SAM9263 board-specific support
- obj-$(CONFIG_MACH_AT91SAM9263EK) += board-sam9263ek.o
--obj-$(CONFIG_MACH_USB_A9263)	+= board-usb-a9263.o
-+obj-$(CONFIG_MACH_USB_A9263)	+= board-usb-a926x.o
- obj-$(CONFIG_MACH_NEOCORE926)	+= board-neocore926.o
- 
- # AT91SAM9RL board-specific support
-diff --git a/arch/arm/mach-at91/board-usb-a9260.c b/arch/arm/mach-at91/board-usb-a9260.c
-deleted file mode 100644
-index 8c4c1a0..0000000
---- a/arch/arm/mach-at91/board-usb-a9260.c
-+++ /dev/null
-@@ -1,230 +0,0 @@
--/*
-- * linux/arch/arm/mach-at91/board-usb-a9260.c
-- *
-- *  Copyright (C) 2005 SAN People
-- *  Copyright (C) 2006 Atmel
-- *  Copyright (C) 2007 Calao-systems
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--
--#include <linux/types.h>
--#include <linux/init.h>
--#include <linux/mm.h>
--#include <linux/module.h>
--#include <linux/platform_device.h>
--#include <linux/spi/spi.h>
--#include <linux/gpio_keys.h>
--#include <linux/input.h>
--#include <linux/clk.h>
--
--#include <asm/setup.h>
--#include <asm/mach-types.h>
--#include <asm/irq.h>
--
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <asm/mach/irq.h>
--
--#include <mach/hardware.h>
--#include <mach/board.h>
--#include <mach/gpio.h>
--#include <mach/at91sam9_smc.h>
--#include <mach/at91_shdwc.h>
--
--#include "sam9_smc.h"
--#include "generic.h"
--
--
--static void __init ek_init_early(void)
--{
--	/* Initialize processor: 12.000 MHz crystal */
--	at91_initialize(12000000);
--
--	/* DBGU on ttyS0. (Rx & Tx only) */
--	at91_register_uart(0, 0, 0);
--
--	/* set serial console to ttyS0 (ie, DBGU) */
--	at91_set_serial_console(0);
--}
--
--/*
-- * USB Host port
-- */
--static struct at91_usbh_data __initdata ek_usbh_data = {
--	.ports		= 2,
--};
--
--/*
-- * USB Device port
-- */
--static struct at91_udc_data __initdata ek_udc_data = {
--	.vbus_pin	= AT91_PIN_PC5,
--	.pullup_pin	= 0,		/* pull-up driven by UDC */
--};
--
--/*
-- * MACB Ethernet device
-- */
--static struct at91_eth_data __initdata ek_macb_data = {
--	.phy_irq_pin	= AT91_PIN_PA31,
--	.is_rmii	= 1,
--};
--
--/*
-- * NAND flash
-- */
--static struct mtd_partition __initdata ek_nand_partition[] = {
--	{
--		.name	= "Uboot & Kernel",
--		.offset	= 0,
--		.size	= SZ_16M,
--	},
--	{
--		.name	= "Root FS",
--		.offset	= MTDPART_OFS_NXTBLK,
--		.size	= 120 * SZ_1M,
--	},
--	{
--		.name	= "FS",
--		.offset	= MTDPART_OFS_NXTBLK,
--		.size	= 120 * SZ_1M,
--	}
--};
--
--static struct mtd_partition * __init nand_partitions(int size, int *num_partitions)
--{
--	*num_partitions = ARRAY_SIZE(ek_nand_partition);
--	return ek_nand_partition;
--}
--
--static struct atmel_nand_data __initdata ek_nand_data = {
--	.ale		= 21,
--	.cle		= 22,
--//	.det_pin	= ... not connected
--	.rdy_pin	= AT91_PIN_PC13,
--	.enable_pin	= AT91_PIN_PC14,
--	.partition_info	= nand_partitions,
--};
--
--static struct sam9_smc_config __initdata ek_nand_smc_config = {
--	.ncs_read_setup		= 0,
--	.nrd_setup		= 1,
--	.ncs_write_setup	= 0,
--	.nwe_setup		= 1,
--
--	.ncs_read_pulse		= 3,
--	.nrd_pulse		= 3,
--	.ncs_write_pulse	= 3,
--	.nwe_pulse		= 3,
--
--	.read_cycle		= 5,
--	.write_cycle		= 5,
--
--	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE | AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_DBW_8,
--	.tdf_cycles		= 2,
--};
--
--static void __init ek_add_device_nand(void)
--{
--	/* configure chip-select 3 (NAND) */
--	sam9_smc_configure(3, &ek_nand_smc_config);
--
--	at91_add_device_nand(&ek_nand_data);
--}
--
--/*
-- * GPIO Buttons
-- */
--
--#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
--static struct gpio_keys_button ek_buttons[] = {
--	{	/* USER PUSH BUTTON */
--		.code		= KEY_ENTER,
--		.gpio		= AT91_PIN_PB10,
--		.active_low	= 1,
--		.desc		= "user_pb",
--		.wakeup		= 1,
--	}
--};
--
--static struct gpio_keys_platform_data ek_button_data = {
--	.buttons	= ek_buttons,
--	.nbuttons	= ARRAY_SIZE(ek_buttons),
--};
--
--static struct platform_device ek_button_device = {
--	.name		= "gpio-keys",
--	.id		= -1,
--	.num_resources	= 0,
--	.dev		= {
--		.platform_data	= &ek_button_data,
--	}
--};
--
--static void __init ek_add_device_buttons(void)
--{
--	at91_set_GPIO_periph(AT91_PIN_PB10, 1);	/* user push button, pull up enabled */
--	at91_set_deglitch(AT91_PIN_PB10, 1);
--
--	platform_device_register(&ek_button_device);
--}
--#else
--static void __init ek_add_device_buttons(void) {}
--#endif
--
--/*
-- * LEDs
-- */
--static struct gpio_led ek_leds[] = {
--	{	/* user_led (green) */
--		.name			= "user_led",
--		.gpio			= AT91_PIN_PB21,
--		.active_low		= 0,
--		.default_trigger	= "heartbeat",
--	}
--};
--
--static void __init ek_board_init(void)
--{
--	/* Serial */
--	at91_add_device_serial();
--	/* USB Host */
--	at91_add_device_usbh(&ek_usbh_data);
--	/* USB Device */
--	at91_add_device_udc(&ek_udc_data);
--	/* NAND */
--	ek_add_device_nand();
--	/* I2C */
--	at91_add_device_i2c(NULL, 0);
--	/* Ethernet */
--	at91_add_device_eth(&ek_macb_data);
--	/* Push Buttons */
--	ek_add_device_buttons();
--	/* LEDs */
--	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
--	/* shutdown controller, wakeup button (5 msec low) */
--	at91_sys_write(AT91_SHDW_MR, AT91_SHDW_CPTWK0_(10) | AT91_SHDW_WKMODE0_LOW
--				| AT91_SHDW_RTTWKEN);
--}
--
--MACHINE_START(USB_A9260, "CALAO USB_A9260")
--	/* Maintainer: calao-systems */
--	.timer		= &at91sam926x_timer,
--	.map_io		= at91_map_io,
--	.init_early	= ek_init_early,
--	.init_irq	= at91_init_irq_default,
--	.init_machine	= ek_board_init,
--MACHINE_END
-diff --git a/arch/arm/mach-at91/board-usb-a9263.c b/arch/arm/mach-at91/board-usb-a926x.c
-similarity index 84%
-rename from arch/arm/mach-at91/board-usb-a9263.c
-rename to arch/arm/mach-at91/board-usb-a926x.c
-index 25e7937..e29adab 100644
---- a/arch/arm/mach-at91/board-usb-a9263.c
-+++ b/arch/arm/mach-at91/board-usb-a926x.c
-@@ -1,5 +1,5 @@
- /*
-- * linux/arch/arm/mach-at91/board-usb-a9263.c
-+ * linux/arch/arm/mach-at91/board-usb-a926x.c
-  *
-  *  Copyright (C) 2005 SAN People
-  *  Copyright (C) 2007 Atmel Corporation.
-@@ -74,6 +74,14 @@ static struct at91_udc_data __initdata ek_udc_data = {
- 	.pullup_pin	= 0,		/* pull-up driven by UDC */
- };
- 
-+void ek_add_device_udc(void)
-+{
-+	if (machine_is_usb_a9260())
-+		ek_udc_data.vbus_pin = AT91_PIN_PC5;
-+
-+	at91_add_device_udc(&ek_udc_data);
-+}
-+
- /*
-  * SPI devices.
-  */
-@@ -88,6 +96,12 @@ static struct spi_board_info ek_spi_devices[] = {
- #endif
- };
- 
-+void ek_add_device_spi(void)
-+{
-+	if (machine_is_usb_a9263())
-+		at91_add_device_spi(ek_spi_devices, ARRAY_SIZE(ek_spi_devices));
-+}
-+
- /*
-  * MACB Ethernet device
-  */
-@@ -96,12 +110,20 @@ static struct at91_eth_data __initdata ek_macb_data = {
- 	.is_rmii	= 1,
- };
- 
-+void ek_add_device_eth(void)
-+{
-+	if (machine_is_usb_a9260())
-+		ek_macb_data.phy_irq_pin = AT91_PIN_PA31;
-+
-+	at91_add_device_eth(&ek_macb_data);
-+}
-+
- /*
-  * NAND flash
-  */
- static struct mtd_partition __initdata ek_nand_partition[] = {
- 	{
--		.name	= "Linux Kernel",
-+		.name	= "Uboot & Kernel",
- 		.offset	= 0,
- 		.size	= SZ_16M,
- 	},
-@@ -152,6 +174,11 @@ static struct sam9_smc_config __initdata ek_nand_smc_config = {
- 
- static void __init ek_add_device_nand(void)
- {
-+	if (machine_is_usb_a9260()) {
-+		ek_nand_data.rdy_pin	= AT91_PIN_PC13;
-+		ek_nand_data.enable_pin	= AT91_PIN_PC14;
-+	}
-+
- 	/* configure chip-select 3 (NAND) */
- 	sam9_smc_configure(3, &ek_nand_smc_config);
- 
-@@ -210,6 +237,14 @@ static struct gpio_led ek_leds[] = {
- 	}
- };
- 
-+void ek_add_device_leds(void)
-+{
-+	if (machine_is_usb_a9260())
-+		ek_leds[0].active_low = 0;
-+
-+	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
-+}
-+
- 
- static void __init ek_board_init(void)
- {
-@@ -218,11 +253,11 @@ static void __init ek_board_init(void)
- 	/* USB Host */
- 	at91_add_device_usbh(&ek_usbh_data);
- 	/* USB Device */
--	at91_add_device_udc(&ek_udc_data);
-+	ek_add_device_udc();
- 	/* SPI */
--	at91_add_device_spi(ek_spi_devices, ARRAY_SIZE(ek_spi_devices));
-+	ek_add_device_spi();
- 	/* Ethernet */
--	at91_add_device_eth(&ek_macb_data);
-+	ek_add_device_eth();
- 	/* NAND */
- 	ek_add_device_nand();
- 	/* I2C */
-@@ -230,7 +265,7 @@ static void __init ek_board_init(void)
- 	/* Push Buttons */
- 	ek_add_device_buttons();
- 	/* LEDs */
--	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
-+	ek_add_device_leds();
- 	/* shutdown controller, wakeup button (5 msec low) */
- 	at91_sys_write(AT91_SHDW_MR, AT91_SHDW_CPTWK0_(10) | AT91_SHDW_WKMODE0_LOW
- 				| AT91_SHDW_RTTWKEN);
-@@ -244,3 +279,12 @@ MACHINE_START(USB_A9263, "CALAO USB_A9263")
- 	.init_irq	= at91_init_irq_default,
- 	.init_machine	= ek_board_init,
- MACHINE_END
-+
-+MACHINE_START(USB_A9260, "CALAO USB_A9260")
-+	/* Maintainer: calao-systems */
-+	.timer		= &at91sam926x_timer,
-+	.map_io		= ek_map_io,
-+	.init_early	= ek_init_early,
-+	.init_irq	= at91_init_irq_default,
-+	.init_machine	= ek_board_init,
-+MACHINE_END
--- 
-1.7.3
+> For now, we need to make the warning go away until it's properly fixed
+> so turn off and on IRQ around get_signal_to_deliver() and mark it with
+> giant FIXME comment.
+
+No.  This is where we disagree.  It doesn't warrant that because it is
+possible to fix the problem properly.  While _you_ may not be capable of
+doing that, that's no reason not to seek help to have it fixed.
+
+Given that I've posted a description of the problem, would it not be
+reasonable to assume that I'm working on fixing it?  Strangely enough
+before writing _any_ of the replies to this thread, I have a patch which
+does just that - I just haven't tested it yet apart from a compile test.
+
+> How many times did I write that?  I don't know how to make that any
+> clearer to you.  Gees...
+
+Hahaha.  Thanks for the laugh - because you never actually said that -
+and you're now blaming me for miscommunication?
