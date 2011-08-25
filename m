@@ -1,36 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 25 Aug 2011 16:54:32 +0200
-Subject: [PATCH] ARM: mx5: fix remaining unconsistent names for irqs
-In-Reply-To: <1314276949-23062-1-git-send-email-hector.oron@gmail.com>
-References: <CAODfWeFeaw2+xe01c5fiSr1tYsdM8J8ahZz8t-B7uuD+-P0GCQ@mail.gmail.com>
-	<1314276949-23062-1-git-send-email-hector.oron@gmail.com>
-Message-ID: <20110825145432.GY31404@pengutronix.de>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Thu, 25 Aug 2011 20:25:13 +0530
+Subject: [PATCH 0/2] OMAP: Update nr_irqs field in machine descriptors
+In-Reply-To: <4E5636CD.4080302@ti.com>
+References: <1314215215-18683-1-git-send-email-svenkatr@ti.com>
+	<4E5636CD.4080302@ti.com>
+Message-ID: <CANfBPZ-AAZx9TxO88EgxCtOUsWrsYzbK+M2d6cVSS7Kf-LwS3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 01:55:49PM +0100, hector.oron at gmail.com wrote:
-> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> [hector: rebase on current Sascha's 'imx-features' branch]
-> Signed-off-by: Hector Oron <hector.oron@gmail.com>
-> ---
->  arch/arm/mach-mx5/clock-mx51-mx53.c   |    2 +-
->  arch/arm/mach-mx5/devices.c           |   10 +-
->  arch/arm/mach-mx5/mm.c                |    8 +-
->  arch/arm/plat-mxc/include/mach/mx51.h |  162 ++++++++++++++++----------------
->  4 files changed, 91 insertions(+), 91 deletions(-)
+On Thu, Aug 25, 2011 at 5:19 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> Hi Venkat,
+>
+> On 8/24/2011 9:46 PM, S, Venkatraman wrote:
+>>
+>> As part of an effort to get single ARM kernel binary [1],
+>> multiple ?definitions of NR_IRQS under various platforms
+>> have to be reconciled and abstracted away from common code.
+>>
+>> This patch series takes the small step of populating the
+>> machine descriptors with the pre-existing nr_irqs field.
+>> Eventually, the common irq handler code will only look at this
+>> field and not the compile time constant.
+>
+> Not related to this patch, but still on that topic. The current NR_IRQS
+> depends as well on board stuff, like for example : the Phoenix
+> IRQs:TWL6030_IRQ_BASE, TWL6040_CODEC_IRQ_BASE.
+> Is there a plan to get rid of this static defines?
+>
 
-While merging together my feature branch with the cleanup branch I
-realized that I already have this patch in the original version from
-Uwe. Instead of adding this patch to the features branch I based
-the feature branch on the cleanup branch. Sorry for letting you repost
-this.
+Currently, the goal is to get rid of the singleton nature
+of NR_IRQS. Then it just becomes a property of the
+platform, and the arm common code should not see this define.
+This cleanup has to be done across multiple SoCs, not just OMAP.
 
-Sascha
+After I get to complete some meaningful cleanup of NR_IRQS,
+I can look into the static defines that you mention.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards,
+Venkat.
