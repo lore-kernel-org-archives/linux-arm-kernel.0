@@ -1,29 +1,39 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Thu, 25 Aug 2011 16:16:00 +0200
-Subject: [PATCH] ARM: mx5: fix remaining unconsistent names for irqs
-In-Reply-To: <1314276949-23062-1-git-send-email-hector.oron@gmail.com> (hector
-	oron's message of "Thu, 25 Aug 2011 13:55:49 +0100")
-References: <CAODfWeFeaw2+xe01c5fiSr1tYsdM8J8ahZz8t-B7uuD+-P0GCQ@mail.gmail.com>
-	<1314276949-23062-1-git-send-email-hector.oron@gmail.com>
-Message-ID: <87fwkpa867.fsf@lebrac.rtp-net.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 25 Aug 2011 09:23:00 -0500
+Subject: [GIT PULL] orion5x and footbridge compile fixes for 3.1
+Message-ID: <4E565AC4.7060504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hector.oron at gmail.com writes:
+Arnd,
 
-Hi,
+Please pull for 3.1-rc. Footbridge and orion5x builds are currently
+broken in 3.1 mainly due to my changes in this commit:
 
-> From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> [hector: rebase on current Sascha's 'imx-features' branch]
-> Signed-off-by: Hector Oron <hector.oron@gmail.com>
+commit cc22b4c18540e5e8bf55c7d124044f9317527d3c
+Author: Rob Herring <rob.herring@calxeda.com>
+Date:   Tue Jun 28 21:22:40 2011 -0500
 
-It's fixing nicely the build of imx-features branch of Sascha's
-tree. Only build tested but I guess seeing that it's fixing the build
-already enough to make it a must have :)
+    ARM: set vga memory base at run-time
 
-Tested-by: Arnaud Patard <arnaud.patard@rtp-net.org>
 
-Thanks,
-Arnaud
+The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
+
+  Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+
+are available in the git repository at:
+  git://git.jdl.com/software/linux-3.0.git fixes
+
+Bryan Wu (2):
+      ARM: mach-orion5x: add missing header file <linux/vga.h>
+      ARM: mach-footbridge: add missing header file <video/vga.h>
+
+Paul Gortmaker (1):
+      arm: fix compile failure in orion5x/dns323-setup.c
+
+ arch/arm/mach-footbridge/dc21285.c   |    1 +
+ arch/arm/mach-orion5x/dns323-setup.c |    2 +-
+ arch/arm/mach-orion5x/pci.c          |    1 +
+ 3 files changed, 3 insertions(+), 1 deletions(-)
+
+Rob
