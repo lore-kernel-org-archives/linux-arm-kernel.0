@@ -1,29 +1,21 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Thu, 25 Aug 2011 12:52:36 +0100
-Subject: i.MX multi SoC patches
-In-Reply-To: <1314272675-22047-1-git-send-email-hector.oron@gmail.com>
-References: <CAODfWeFeaw2+xe01c5fiSr1tYsdM8J8ahZz8t-B7uuD+-P0GCQ@mail.gmail.com>
-	<1314272675-22047-1-git-send-email-hector.oron@gmail.com>
-Message-ID: <CAODfWeGFaa9TnU5yAW0hZxL8dRtDv+FXFwbzwKyTtqOwcctfWQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 25 Aug 2011 08:53:49 -0300
+Subject: MX53Loco reports half of the total memory
+In-Reply-To: <20110824214311.GA21759@n2100.arm.linux.org.uk>
+References: <CAOMZO5C6gaJUD3RTCwGqDhcojx3Thww22c+tsdC4bvTUmiSw6w@mail.gmail.com>
+	<20110824205415.GN31404@pengutronix.de>
+	<20110824214311.GA21759@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5A0N6VcTOgWTpqe_mW4ekW1fSY4+=7o8mXSPFeEmjg26w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again,
-
-2011/8/25  <hector.oron@gmail.com>:
-> Hello,
+On Wed, Aug 24, 2011 at 6:43 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+...
+>> > Shouldn't the kernel report the whole 1GB?
+>>
+>> Try compiling the kernel with CONFIG_VMSPLIT_2G. On my board this gives:
 >
-> ?This is an attempt to follow Sascha suggestion on the i.MX multi SoC patches thread.
+> Or enable highmem.
 
-Attached patch. My git send-email foo is not good enough.
-
-Cheers,
--- 
-?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-mx5-fix-remaining-unconsistent-names-for-irqs.patch
-Type: text/x-patch
-Size: 9788 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110825/2232f2fd/attachment-0001.bin>
+Enabling CONFIG_HIGHMEM also made the whole 1GB to be reported.
