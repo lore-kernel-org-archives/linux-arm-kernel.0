@@ -1,123 +1,29 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 25 Aug 2011 18:45:58 +0200 (CEST)
-Subject: [PATCH 1/2] dmaengine: ipu-idmac: add support for the DMA_PAUSE
-	control
-In-Reply-To: <Pine.LNX.4.64.1108251838090.17190@axis700.grange>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 25 Aug 2011 18:57:16 +0200
+Subject: [PATCH 2/2] V4L: mx3-camera: prepare to support multi-size buffers
+In-Reply-To: <Pine.LNX.4.64.1108251843350.17190@axis700.grange>
 References: <1314211292-10414-1-git-send-email-g.liakhovetski@gmx.de>
 	<Pine.LNX.4.64.1108251838090.17190@axis700.grange>
-Message-ID: <Pine.LNX.4.64.1108251841300.17190@axis700.grange>
+	<Pine.LNX.4.64.1108251843350.17190@axis700.grange>
+Message-ID: <201108251857.16865.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To support multi-size buffers in the mx3_camera V4L2 driver we have to be
-able to stop DMA on a channel without releasing descriptors and completely
-halting the hardware. Use the DMA_PAUSE control to implement this mode.
+Hi Guennadi,
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
----
- drivers/dma/ipu/ipu_idmac.c |   65 +++++++++++++++++++++++++++---------------
- 1 files changed, 42 insertions(+), 23 deletions(-)
+On Thursday 25 August 2011 18:46:03 Guennadi Liakhovetski wrote:
+> Prepare the mx3_camera friver to support the new VIDIOC_CREATE_BUFS and
+> VIDIOC_PREPARE_BUF ioctl()s. The .queue_setup() vb2 operation must be
+> able to handle buffer sizes, provided by the caller, and the
+> .buf_prepare() operation must not use the currently configured frame
+> format for its operation, which makes it superfluous for this driver.
+> Its functionality is moved into .buf_queue().
 
-diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
-index c1a125e..42cdf1c 100644
---- a/drivers/dma/ipu/ipu_idmac.c
-+++ b/drivers/dma/ipu/ipu_idmac.c
-@@ -1306,6 +1306,7 @@ static irqreturn_t idmac_interrupt(int irq, void *dev_id)
- 	    ipu_submit_buffer(ichan, descnew, sgnew, ichan->active_buffer) < 0) {
- 		callback = descnew->txd.callback;
- 		callback_param = descnew->txd.callback_param;
-+		list_del_init(&descnew->list);
- 		spin_unlock(&ichan->lock);
- 		if (callback)
- 			callback(callback_param);
-@@ -1427,39 +1428,58 @@ static int __idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
- {
- 	struct idmac_channel *ichan = to_idmac_chan(chan);
- 	struct idmac *idmac = to_idmac(chan->device);
-+	struct ipu *ipu = to_ipu(idmac);
-+	struct list_head *list, *tmp;
- 	unsigned long flags;
- 	int i;
- 
--	/* Only supports DMA_TERMINATE_ALL */
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
-+	switch (cmd) {
-+	case DMA_PAUSE:
-+		spin_lock_irqsave(&ipu->lock, flags);
-+		ipu_ic_disable_task(ipu, chan->chan_id);
- 
--	ipu_disable_channel(idmac, ichan,
--			    ichan->status >= IPU_CHANNEL_ENABLED);
-+		/* Return all descriptors into "prepared" state */
-+		list_for_each_safe(list, tmp, &ichan->queue)
-+			list_del_init(list);
- 
--	tasklet_disable(&to_ipu(idmac)->tasklet);
-+		ichan->sg[0] = NULL;
-+		ichan->sg[1] = NULL;
- 
--	/* ichan->queue is modified in ISR, have to spinlock */
--	spin_lock_irqsave(&ichan->lock, flags);
--	list_splice_init(&ichan->queue, &ichan->free_list);
-+		spin_unlock_irqrestore(&ipu->lock, flags);
- 
--	if (ichan->desc)
--		for (i = 0; i < ichan->n_tx_desc; i++) {
--			struct idmac_tx_desc *desc = ichan->desc + i;
--			if (list_empty(&desc->list))
--				/* Descriptor was prepared, but not submitted */
--				list_add(&desc->list, &ichan->free_list);
-+		ichan->status = IPU_CHANNEL_INITIALIZED;
-+		break;
-+	case DMA_TERMINATE_ALL:
-+		ipu_disable_channel(idmac, ichan,
-+				    ichan->status >= IPU_CHANNEL_ENABLED);
- 
--			async_tx_clear_ack(&desc->txd);
--		}
-+		tasklet_disable(&ipu->tasklet);
- 
--	ichan->sg[0] = NULL;
--	ichan->sg[1] = NULL;
--	spin_unlock_irqrestore(&ichan->lock, flags);
-+		/* ichan->queue is modified in ISR, have to spinlock */
-+		spin_lock_irqsave(&ichan->lock, flags);
-+		list_splice_init(&ichan->queue, &ichan->free_list);
- 
--	tasklet_enable(&to_ipu(idmac)->tasklet);
-+		if (ichan->desc)
-+			for (i = 0; i < ichan->n_tx_desc; i++) {
-+				struct idmac_tx_desc *desc = ichan->desc + i;
-+				if (list_empty(&desc->list))
-+					/* Descriptor was prepared, but not submitted */
-+					list_add(&desc->list, &ichan->free_list);
- 
--	ichan->status = IPU_CHANNEL_INITIALIZED;
-+				async_tx_clear_ack(&desc->txd);
-+			}
-+
-+		ichan->sg[0] = NULL;
-+		ichan->sg[1] = NULL;
-+		spin_unlock_irqrestore(&ichan->lock, flags);
-+
-+		tasklet_enable(&ipu->tasklet);
-+
-+		ichan->status = IPU_CHANNEL_INITIALIZED;
-+		break;
-+	default:
-+		return -ENOSYS;
-+	}
- 
- 	return 0;
- }
-@@ -1662,7 +1682,6 @@ static void __exit ipu_idmac_exit(struct ipu *ipu)
- 		struct idmac_channel *ichan = ipu->channel + i;
- 
- 		idmac_control(&ichan->dma_chan, DMA_TERMINATE_ALL, 0);
--		idmac_prep_slave_sg(&ichan->dma_chan, NULL, 0, DMA_NONE, 0);
- 	}
- 
- 	dma_async_device_unregister(&idmac->dma);
+You're moving the ichan->dma_chan.device->device_prep_slave_sg() call from 
+.buf_prepare() to .buf_queue(). Is that call cheap ? Otherwise it would be 
+better to keep the .buf_prepare() callback.
+
 -- 
-1.7.2.5
+Regards,
+
+Laurent Pinchart
