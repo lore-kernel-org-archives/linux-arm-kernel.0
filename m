@@ -1,52 +1,49 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 25 Aug 2011 12:12:54 +0100
-Subject: [PATCH 06/11] clk: Provide a dummy clk_unregister()
-In-Reply-To: <1314191759-16941-6-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <20110824131324.GB16520@opensource.wolfsonmicro.com>
-	<1314191759-16941-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1314191759-16941-6-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <20110825111254.GD2838@pulham.picochip.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 25 Aug 2011 12:19:03 +0100
+Subject: [PATCH v4 1/8] ARM: proc-v7: disable SCTLR.TE when disabling MMU
+In-Reply-To: <20110824110149.GF32688@e102144-lin.cambridge.arm.com>
+References: <1314136012-20533-1-git-send-email-will.deacon@arm.com>
+	<1314136012-20533-2-git-send-email-will.deacon@arm.com>
+	<20110824101507.GB2078@arm.com>
+	<20110824110149.GF32688@e102144-lin.cambridge.arm.com>
+Message-ID: <20110825111902.GA12556@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Wed, Aug 24, 2011 at 02:15:54PM +0100, Mark Brown wrote:
-> Even though unregistration is not actually supported by the clk API it is
-> still useful to provide a clk_unregister() so that drivers can implement
-> their unregistration code. This saves having to go back later and update
-> them once unregistration is possible.
+On Wed, Aug 24, 2011 at 12:01:50PM +0100, Will Deacon wrote:
+> On Wed, Aug 24, 2011 at 11:15:07AM +0100, Dave Martin wrote:
+> > On Tue, Aug 23, 2011 at 10:46:45PM +0100, Will Deacon wrote:
+> > > cpu_v7_reset disables the MMU and then branches to the provided address.
+> > > On Thumb-2 kernels, we should take care to clear the Thumb Exception
+> > > enable bit in the System Control Register, otherwise this may wreak
+> > > havok in the code to which we are branching (for example, an ARM kernel
+> > > image via kexec).
+> > > 
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  arch/arm/mm/proc-v7.S |    1 +
+> > >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> > > index a30e785..96b872c 100644
+> > > --- a/arch/arm/mm/proc-v7.S
+> > > +++ b/arch/arm/mm/proc-v7.S
+> > > @@ -66,6 +66,7 @@ ENDPROC(cpu_v7_proc_fin)
+> > >  ENTRY(cpu_v7_reset)
+> > >  	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
+> > >  	bic	r1, r1, #0x1			@ ...............m
+> > > + THUMB(	bic	r1, r1, #1 << 30 )		@ Thumb exceptions
+> > 
+> > Can we give the architectural name for the bit here?
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  include/linux/clk.h |   15 +++++++++++++++
->  1 files changed, 15 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 2ca4f66..df5c64f 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -149,6 +149,21 @@ extern struct clk_hw_ops clk_gate_ops;
->  struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
->  			 const char *name);
->  
-> +/**
-> + * clk_unregister - remove a clock
-> + *
-> + * @clk: clock to unregister
-> + *
-> + * Remove a clock from the clk subsystem.  This is currently not
-> + * implemented but is provided to allow unregistration code to be
-> + * written in drivers ready for use when an implementation is
-> + * provided.
-> + */
-> +static inline int clk_unregister(struct clk *clk)
-> +{
-> +	return -ENOTSUPP;
-> +}
+> Ok. It's SCTLR.TE so representing it as we do for SCTLR.M looks a bit odd
+> unless you use two lines. Perhaps if I just add @ SCTLR.TE (Thumb
+> exceptions) ?
 
-ENOTSUPP is only defined in include/linux/errno.h which isn't included 
-here.  I think either linux/errno.h needs to be included or use 
-EOPNOTSUPP?
+That seems fine -- exactly how it looks is not so important as the
+information itself IMHO.
 
-Jamie
+It's a pretty minor nit in any case.
+
+Cheers
+---Dave
