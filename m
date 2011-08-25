@@ -1,36 +1,50 @@
-From: xhpohanka@gmail.com (Jan Pohanka)
-Date: Thu, 25 Aug 2011 14:35:16 +0200
-Subject: dma buffers for camera
-In-Reply-To: <Pine.LNX.4.64.1108242111560.14818@axis700.grange>
-References: <op.v0p0hctkyxxkfz@localhost.localdomain>
-	<Pine.LNX.4.64.1108242111560.14818@axis700.grange>
-Message-ID: <op.v0rrw2nlyxxkfz@localhost.localdomain>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 25 Aug 2011 14:35:42 +0200
+Subject: try_to_freeze() called with IRQs disabled on ARM
+In-Reply-To: <20110825122543.GC8883@n2100.arm.linux.org.uk>
+References: <20110823151936.GM9232@opensource.wolfsonmicro.com>
+	<201108232351.55432.rjw@sisk.pl>
+	<CAOS58YNUSn2eVLDLzqKmrtL7M5tSetkhZ1ODecLK54NSDnZVAA@mail.gmail.com>
+	<20110823220056.GK3895@n2100.arm.linux.org.uk>
+	<CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
+	<20110823221314.GL3895@n2100.arm.linux.org.uk>
+	<CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
+	<20110825121416.GB8883@n2100.arm.linux.org.uk>
+	<20110825121710.GK3286@htj.dyndns.org>
+	<20110825122543.GC8883@n2100.arm.linux.org.uk>
+Message-ID: <20110825123542.GM3286@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+Hello,
 
->
-> The mx2_camera driver is allocating one "discard" buffer of the same  
-> size,
-> as regular buffers for cases, when the user is not fast enough to queue
-> new buffers for the running capture. Arguably, this could be aliminated
-> and the last submitted buffer could be re-used until either more buffers
-> are available or the streaming is stopped. Otherwise, it could also be
-> possible to stop capture until buffers are available again. In any case,
-> this is the current driver implementation. As for 2 buffers instead of  
-> one
-> for the actual capture, I think, gstreamer defines 2 as a minimum number
-> of buffers, which is actually also required for any streaming chance.
->
+On Thu, Aug 25, 2011 at 01:25:43PM +0100, Russell King - ARM Linux wrote:
+> No.  Stop bodging and hiding problems.  Anywhere which does this:
+> 
+> 	local_irq_enable();
+> 	do something
+> 	local_irq_disable();
+> 
+> is a bug.  Things are called with IRQs disabled for a reason - randomly
+> re-enabling IRQs does not "fix" stuff, it merely introduces subtle bugs
+> while hiding warnings of those bugs.
+> 
+> Please go back and read my response to Mark at the beginning of this
+> thread, where I describe why IRQs are disabled here.
+> 
+> The only solution here is to fix the problem properly, and I'm working
+> on a patch to fix the problem I highlighted in my earlier response to
+> Mark.  Once we have that problem fixed, we can then (more) safely call
+> do_signal() with IRQs enabled.
 
-Thank you for clarification...
-
-regards
-Jan
-
-
+Arrrrrrrrgghhhhhhhhhhhh, why is communication so difficult with you?
+When did I ever suggest that as a proper fix.  ARM is frigging broken
+in that path so don't push it over to PM and just deal with it inside
+ARM arch code.  For now, we need to make the warning go away until
+it's properly fixed so turn off and on IRQ around
+get_signal_to_deliver() and mark it with giant FIXME comment.  How
+many times did I write that?  I don't know how to make that any
+clearer to you.  Gees...
 
 -- 
-Tato zpr?va byla vytvo?ena p?evratn?m po?tovn?m klientem Opery:  
-http://www.opera.com/mail/
+tejun
