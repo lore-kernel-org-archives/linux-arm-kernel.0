@@ -1,49 +1,82 @@
-From: Ian.Jackson@eu.citrix.com (Ian Jackson)
-Date: Thu, 25 Aug 2011 11:13:40 +0100
-Subject: ARM processor mode, kernel startup, Hyp / secure state
-In-Reply-To: <20110824161355.GS32688@e102144-lin.cambridge.arm.com>
-References: <20051.48809.945431.800543@mariner.uk.xensource.com>
-	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
-	<20051.57876.785018.498967@mariner.uk.xensource.com>
-	<20110824135109.GP32688@e102144-lin.cambridge.arm.com>
-	<20053.7340.865511.561798@mariner.uk.xensource.com>
-	<20110824160039.GR32688@e102144-lin.cambridge.arm.com>
-	<20053.8733.266040.189343@mariner.uk.xensource.com>
-	<20110824161355.GS32688@e102144-lin.cambridge.arm.com>
-Message-ID: <20054.8276.47930.430789@mariner.uk.xensource.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 25 Aug 2011 12:57:36 +0200
+Subject: [PATCH] arm: mach-imx: enable all uart clocks for DEBUG_LL
+Message-ID: <1314269856-20000-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
-> On Wed, Aug 24, 2011 at 05:09:01PM +0100, Ian Jackson wrote:
-> > I think the trampoline needs to have one hypercall: "set HVBAR".
-> > (And, implicitly, it needs to be specified that the resulting vectors
-> > will run without physical-to-virtual page translation, etc.)  That is
-> > sufficient to bootstrap all the rest of the way up - and that other
-> > bootstrapping code would have to exist anyway.
-> 
-> I also thought you might want a hypercall that gives you a version number
-> (i.e. a way to identify the hypervisor trampoline in case it changes)
+If you want to move the DEBUG_LL uart, simply changing the base address
+in debug-macro.S will not be enough. One needs to enable the correct
+clock during clock init, too, otherwise the kernel remains silent. This
+is too easy to forget, so enable all uart clocks for DEBUG_LL to save
+precious developer time.
 
-Since the hypervisor trampoline was installed by the very same kernel
-which is running, there is no need for any defined interface or
-version numbers.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/clock-imx21.c |    3 +++
+ arch/arm/mach-imx/clock-imx25.c |    4 ++++
+ arch/arm/mach-imx/clock-imx27.c |    5 +++++
+ arch/arm/mach-imx/clock-imx35.c |    2 +-
+ 4 files changed, 13 insertions(+), 1 deletions(-)
 
-> and we might also want something for doing a system reset (for
-> example, if a kernel that hasn't installed a hypervisor wants to
-> kexec another kernel image).
-
-No, if a kernel has installed a hypervisor and wishes to kexec then it
-must start the new kernel in Hyp mode - since that is what we are
-proposing to specify as the cpu mode to use when booting the kernel.
-
-So the outgoing kernel simply switches to Hyp mode, tears down Hyp
-mode's paging (and probably the rest of the paging too), and then
-enters the new kernel in Hyp mode with paging off.  The new kernel
-then installs its own hypervisor trampoline.
-
-If the outgoing kernel hasn't installed a hypervisor it's even easier:
-simply do the usual teardown, and then switch to Hyp mode using its
-existing trampoline and then enter the new kernel.
-
-Ian.
+diff --git a/arch/arm/mach-imx/clock-imx21.c b/arch/arm/mach-imx/clock-imx21.c
+index ee15d8c..e04c264 100644
+--- a/arch/arm/mach-imx/clock-imx21.c
++++ b/arch/arm/mach-imx/clock-imx21.c
+@@ -1231,6 +1231,9 @@ int __init mx21_clocks_init(unsigned long lref, unsigned long href)
+ 
+ #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+ 	clk_enable(&uart_clk[0]);
++	clk_enable(&uart_clk[1]);
++	clk_enable(&uart_clk[2]);
++	clk_enable(&uart_clk[3]);
+ #endif
+ 
+ 	mxc_timer_init(&gpt_clk[0], MX21_IO_ADDRESS(MX21_GPT1_BASE_ADDR),
+diff --git a/arch/arm/mach-imx/clock-imx25.c b/arch/arm/mach-imx/clock-imx25.c
+index e63e235..9c3e655 100644
+--- a/arch/arm/mach-imx/clock-imx25.c
++++ b/arch/arm/mach-imx/clock-imx25.c
+@@ -325,6 +325,10 @@ int __init mx25_clocks_init(void)
+ 	__raw_writel((1 << 5), CRM_BASE + CCM_CGCR2);
+ #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+ 	clk_enable(&uart1_clk);
++	clk_enable(&uart2_clk);
++	clk_enable(&uart3_clk);
++	clk_enable(&uart4_clk);
++	clk_enable(&uart5_clk);
+ #endif
+ 
+ 	/* Clock source for lcdc and csi is upll */
+diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
+index 6912b82..561f88e 100644
+--- a/arch/arm/mach-imx/clock-imx27.c
++++ b/arch/arm/mach-imx/clock-imx27.c
+@@ -754,6 +754,11 @@ int __init mx27_clocks_init(unsigned long fref)
+ 
+ #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+ 	clk_enable(&uart1_clk);
++	clk_enable(&uart2_clk);
++	clk_enable(&uart3_clk);
++	clk_enable(&uart4_clk);
++	clk_enable(&uart5_clk);
++	clk_enable(&uart6_clk);
+ #endif
+ 
+ 	mxc_timer_init(&gpt1_clk, MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR),
+diff --git a/arch/arm/mach-imx/clock-imx35.c b/arch/arm/mach-imx/clock-imx35.c
+index 88b62a0..4957778 100644
+--- a/arch/arm/mach-imx/clock-imx35.c
++++ b/arch/arm/mach-imx/clock-imx35.c
+@@ -510,7 +510,7 @@ int __init mx35_clocks_init()
+ 	unsigned int cgr2 = 3 << 26, cgr3 = 0;
+ 
+ #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
+-	cgr2 |= 3 << 16;
++	cgr2 |= 3 << 16 | 3 << 18 | 3 << 20;
+ #endif
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+-- 
+1.7.5.4
