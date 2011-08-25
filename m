@@ -1,62 +1,79 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Aug 2011 10:51:37 +0100
-Subject: [PATCH 10/10] ARM: perf: add mode exclusion for Cortex-A15 PMU
-In-Reply-To: <4E55BCD9.7050703@codeaurora.org>
-References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
-	<1312823771-9952-11-git-send-email-will.deacon@arm.com>
-	<CAKHPGBZ1eXzhsjFvLt_KTYKsR_OH7rgbeSGedTY5g8dhi90uzQ@mail.gmail.com>
-	<4E55BCD9.7050703@codeaurora.org>
-Message-ID: <20110825095136.GB27143@e102144-lin.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 25 Aug 2011 10:57:22 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20110824170953.GA8883@n2100.arm.linux.org.uk>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
+	<20051.57876.785018.498967@mariner.uk.xensource.com>
+	<20110824135109.GP32688@e102144-lin.cambridge.arm.com>
+	<20110824170953.GA8883@n2100.arm.linux.org.uk>
+Message-ID: <CA+wbFddzhao_Pu=-XLH3py7Bgo6Lr+K=unf4NDoQ5pv0G5-HbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 04:09:13AM +0100, Ashwin Chaugule wrote:
-> Hey Will,
+On Wed, Aug 24, 2011 at 6:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 24, 2011 at 02:51:09PM +0100, Will Deacon wrote:
+>> I think it's important to separate the problems of secure boot with the
+>> problems of installing a hypervisor. Whatever happens in secure world, we can
+>> expect to be dropped at either HYP mode or non-secure SVC mode. Sure, on a dev
+>> board you might run directly in the secure world so there's a bit of extra
+>> work to do to get out of that but then we can just drop into HVC mode and
+>> forget about it.
+>
+> I think you're painting a very simple picture there.
+>
+> If the kernel has been handed over to while in secure mode, that's
+> probably because there is no secure monitor implemented. ?If there's
+> no secure monitor implemented, there's no code in place to handle
+> SMC instructions. ?To make things worse, if we drop out into non-secure
+> mode, due to the lack of working SMC instructions, we have no way to
+> access the various registers we need to.
+>
+> So, if the kernel is booted in secure mode and wants to drop into non-
+> secure mode, we need a separate blob of code to install as our own
+> secure monitor to provide these services.
+>
+>> Unlike the fragmented secure monitor API that currently exists across
+>> different platforms, it's really in the interests of the vendor to
+>> standardise on the HYP interface and provide calls to install code, otherwise
+>> they run the risk of producing what is essentially a closed system.
+>
+> On the other hand, I'm sure vendors are already thinking along those
+> lines - the precident has been set by the secure monitor API mess, so
+> if it can be made to "work" there...
 
-Hi Ashwin,
+A few thoughts from my end...
 
-> > From: Will Deacon <will.deacon@arm.com>
-> > 
-> > The Cortex-A15 PMU implements the PMUv2 specification and therefore
-> > has support for some mode exclusion.
-> > 
-> > This patch adds support for excluding user, kernel and hypervisor counts
-> > from a given event.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> 
-> 
-> --8<---
-> 
-> > +
-> > +/*
-> > + * Event filters for PMUv2
-> > + */
-> > +#define        ARMV7_EXCLUDE_PL1       (1 << 31)
-> > +#define        ARMV7_EXCLUDE_USER      (1 << 30)
-> > +#define        ARMV7_INCLUDE_HYP       (1 << 27)
-> > +
-> 
-> This mode exclusion stuff is confusing me.
+The kernel potentially has a lot of work to do if it is to support
+virtualisation
+when booted in the Secure World, because the kernel needs to switch to
+the Normal World -- security controllers on the bus will need to be reprogrammed
+etc., and the kernel would also need to retain some Secure memory somewhere
+for handling SMC -- i.e., per-SoC code and configuration which just
+doesn't exist
+in the kernel yet.  The kernel does not need a "real" monitor in this
+scenario, but
+it will still need to get back into the Secure World to do certain
+low-level operations
+as we observe on e.g. OMAP.  This is not trivial since SMC causes a change of
+memory space as well as privilege.
 
-I'm not surprised, the wording is pretty hard to follow in the
-documentation.
+This potentially gets quite complex and messy, and the kernel doesn't really
+care; my gut feeling is that we probably don't want to go there --
+it's a fair amount
+of extra code from which we don't really get much benefit.
 
-> For exclude user mode, shouldn't PMXEVTYPER[PL1,U] = 0b11
+So, it could be reasonable to _require_ linux to be started in the Normal
+World if linux will install its own hypervisor, with suitable (possibly minimal)
+SMC and HVC handlers/stubs provided by the bootloader or (more probably)
+firmware.
 
-No - this is a reserved encoding and results in the counters stopping for
-*all* modes!
+Hopefully, those SMC/HVC interfaces will get reasonably standardised,
+but in the meantime a bit of SoC-specific code in linux should be adequate
+to smooth any differences.  Vendors likely have a strong incentive to provide
+adequate and working functionality at these interfaces because failure to do
+so could be a significant market disadvantage.
 
-> With this patch the counters will spin with secure mode activity as well,
-> if exclude user mode is selected ?
-
-Yes, but they won't tick for either secure or non-secure user-mode, which is
-what we want. Note that secure software can stop the counters ticking by
-messing with the SDER.
-
-> /me goes to bother the h/w guys.
-
-Bah, they deserve it :)
-
-Will
+Cheers
+---Dave
