@@ -1,125 +1,72 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 26 Aug 2011 08:33:02 +0900
-Subject: [PATCH 3/5] ARM: EXYNOS4: Add support PM for EXYNOS4212
-In-Reply-To: <CAJ0PZbT1YsiXT9k1FJfOCoU8h_XAYqAX6ECJ_=Q0RjR-D_9yyA@mail.gmail.com>
-References: <1314192352-14911-1-git-send-email-kgene.kim@samsung.com>
-	<1314192352-14911-4-git-send-email-kgene.kim@samsung.com>
-	<CAJ0PZbT1YsiXT9k1FJfOCoU8h_XAYqAX6ECJ_=Q0RjR-D_9yyA@mail.gmail.com>
-Message-ID: <072b01cc637f$558a1190$009e34b0$%kim@samsung.com>
+Date: Fri, 26 Aug 2011 08:33:07 +0900
+Subject: [PATCH 4/4 v3] ARM: s3c64xx: Add support for synchronous clock
+	operation.
+In-Reply-To: <1597277.ZvWPFlKtBI@flatron>
+References: <2499662.GIrUU4Kkuf@flatron> <2171056.Pcz41msqen@flatron>
+	<06be01cc613e$3ecc8840$bc6598c0$%kim@samsung.com>
+	<1597277.ZvWPFlKtBI@flatron>
+Message-ID: <072c01cc637f$582a8600$087f9200$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
+Tomasz Figa wrote:
 > 
-> On Wed, Aug 24, 2011 at 10:25 PM, Kukjin Kim <kgene.kim@samsung.com>
-wrote:
-> > From: Jonghwan Choi <jhbird.choi@samsung.com>
-> >
-> > This patch moves regarding clock stuff of PM into clock
-> > file to support PM on EXYNOS4210 and EXYNOS4212 with one
-> > single kernel image. Because some clock registers are
-> > different on each SoCs.
-> >
-> > Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > ?arch/arm/mach-exynos4/clock-exynos4210.c ? ? ? ?| ? 38 ++++++++++
-> > ?arch/arm/mach-exynos4/clock-exynos4212.c ? ? ? ?| ? 34 +++++++++
-> > ?arch/arm/mach-exynos4/clock.c ? ? ? ? ? ? ? ? ? | ? 89
-> +++++++++++++++++++++++
-> > ?arch/arm/mach-exynos4/include/mach/regs-clock.h | ? ?4 +
-> > ?arch/arm/mach-exynos4/pm.c ? ? ? ? ? ? ? ? ? ? ?| ? 79
-++------------------
-> > ?5 files changed, 172 insertions(+), 72 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos4/clock-exynos4210.c b/arch/arm/mach-
-> exynos4/clock-exynos4210.c
-> > index fe74b91..a4b00b7 100644
-> > --- a/arch/arm/mach-exynos4/clock-exynos4210.c
-> > +++ b/arch/arm/mach-exynos4/clock-exynos4210.c
-> > +static struct sleep_save exynos4210_clock_save[] = {
-> > + ? ? ? SAVE_ITEM(S5P_CLKSRC_IMAGE),
-> > + ? ? ? SAVE_ITEM(S5P_CLKSRC_LCD1),
-> > + ? ? ? SAVE_ITEM(S5P_CLKDIV_IMAGE),
-> > + ? ? ? SAVE_ITEM(S5P_CLKDIV_LCD1),
-> > + ? ? ? SAVE_ITEM(S5P_CLKSRC_MASK_LCD1),
-> > + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_IMAGE_4210),
-> > + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_LCD1),
-> > + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_PERIR_4210),
-> > +};
-> > +
-> > --- a/arch/arm/mach-exynos4/clock-exynos4212.c
-> > +++ b/arch/arm/mach-exynos4/clock-exynos4212.c
-> > +static struct sleep_save exynos4212_clock_save[] = {
-> > + ? ? ? SAVE_ITEM(S5P_CLKSRC_IMAGE),
-> > + ? ? ? SAVE_ITEM(S5P_CLKDIV_IMAGE),
-> > + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_IMAGE_4212),
-> > + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_PERIR_4212),
-> > +};
-> > +
-> > --- a/arch/arm/mach-exynos4/clock.c
-> > +++ b/arch/arm/mach-exynos4/clock.c
-> > +static struct sleep_save exynos4_clock_save[] = {
+> From 1518d67b93432272312a55c4602040c580f46a0c Mon Sep 17 00:00:00 2001
+> From: Tomasz Figa <tomasz.figa@gmail.com>
+> Date: Fri, 19 Aug 2011 11:54:31 +0200
+> Subject: [PATCH 4/4 v3] ARM: s3c64xx: Add support for synchronous clock
+> operation.
 > 
-> Hello,
+> Some boards based on S3C6410 use synchronous clocking, which means that
+> HCLKx2
+> and other system clocks are generated from APLL instead of MPLL.
 > 
-Hi,
-
-> Is there any reason to have the following two
-> SAVE_ITEM(S5P_CLKSRC_IMAGE),
-> SAVE_ITEM(S5P_CLKDIV_IMAGE
-> defined at both clock-exynos4210.c and clock-exynos4212.c, not defined
-> at clock.c once?
+> This patch adds support for such boards, by calculating hclk2 depending on
+> the status of S3C_OTHERS_SYNCMUXSEL bit in S3C64XX_OTHERS regist
 > 
-Yes, I know. I just wanted to keep in mind there is a different
-value(CLKGATE_IP_IMAGE) in regarding IMAGE clocks on each SoCs, and I think
-need it now. Anyway thanks for your pointing out.
-
-> Also, consider using CONFIG_PM_SLEEP rather than CONFIG_PM for
-> suspend/resume ops.
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/clock.c                 |    8 +++++++-
+>  arch/arm/mach-s3c64xx/include/mach/regs-sys.h |    1 +
+>  2 files changed, 8 insertions(+), 1 deletions(-)
 > 
-(Cc'ed Rafael)
+> diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+> index fdfc4d5..a7dab43 100644
+> --- a/arch/arm/mach-s3c64xx/clock.c
+> +++ b/arch/arm/mach-s3c64xx/clock.c
+> @@ -780,7 +780,13 @@ void __init_or_cpufreq s3c6400_setup_clocks(void)
+>  	printk(KERN_INFO "S3C64XX: PLL settings, A=%ld, M=%ld, E=%ld\n",
+>  	       apll, mpll, epll);
+> 
+> -	hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
+> +	if(__raw_readl(S3C64XX_OTHERS) & S3C64XX_OTHERS_SYNCMUXSEL)
+> +		/* Synchronous mode */
+> +		hclk2 = apll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
+> +	else
+> +		/* Asynchronous mode */
+> +		hclk2 = mpll / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK2);
+> +
+>  	hclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_HCLK);
+>  	pclk = hclk2 / GET_DIV(clkdiv0, S3C6400_CLKDIV0_PCLK);
+> 
+> diff --git a/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
+b/arch/arm/mach-
+> s3c64xx/include/mach/regs-sys.h
+> index 774e0de..b91e020 100644
+> --- a/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
+> +++ b/arch/arm/mach-s3c64xx/include/mach/regs-sys.h
+> @@ -26,5 +26,6 @@
+>  #define S3C64XX_OTHERS		S3C_SYSREG(0x900)
+> 
+>  #define S3C64XX_OTHERS_USBMASK	(1 << 16)
+> +#define S3C64XX_OTHERS_SYNCMUXSEL	(1 << 6)
+> 
+>  #endif /* _PLAT_REGS_SYS_H */
+> --
+> 1.7.6
 
-Well, even though CONFIG_PM_SLEEP is used in regarding syscore_ops, in this
-case, using CONFIG_PM looks better.
-
-If ARCH_SUSPEND_POSSIBLE will be selected, then CONFIG_SUSPEND is selected
-and CONFIG_PM_SLEEP is selected in kernel/power/Kconfig and of course,
-ARCH_SUSPEND_POSSIBLE is selected in arch/arm/Kconfig. However above
-everything depends on CONFIG_PM. So I think to use CONFIG_PM is more
-reasonable. In addition, it is more popular in other mainline codes now.
-
-Hi Rafael,
-How do you think about this?
-
-Its original code is below.
----
-#ifdef CONFIG_PM
-static int exynos4210_clock_suspend(void)
-{
-        s3c_pm_do_save(exynos4210_clock_save,
-ARRAY_SIZE(exynos4210_clock_save));
-
-        return 0;
-}
-
-static void exynos4210_clock_resume(void)
-{
-        s3c_pm_do_restore_core(exynos4210_clock_save,
-ARRAY_SIZE(exynos4210_clock_save));
-}
-
-#else
-#define exynos4210_clock_suspend NULL
-#define exynos4210_clock_resume NULL
-#endif
-
-struct syscore_ops exynos4210_clock_syscore_ops = {
-        .suspend        = exynos4210_clock_suspend,
-        .resume         = exynos4210_clock_resume,
-};
----
-
+OK, applied.
 Thanks.
 
 Best regards,
