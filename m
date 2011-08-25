@@ -1,75 +1,31 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Thu, 25 Aug 2011 16:46:46 +0900
-Subject: [PATCH 3/5] ARM: EXYNOS4: Add support PM for EXYNOS4212
-In-Reply-To: <1314192352-14911-4-git-send-email-kgene.kim@samsung.com>
-References: <1314192352-14911-1-git-send-email-kgene.kim@samsung.com>
-	<1314192352-14911-4-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CAJ0PZbT1YsiXT9k1FJfOCoU8h_XAYqAX6ECJ_=Q0RjR-D_9yyA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 25 Aug 2011 09:57:19 +0200
+Subject: [PATCH 0/6] mc13783 cleanup
+In-Reply-To: <201108250905.13168.philippe.retornaz@epfl.ch>
+References: <20110824132740.GA28197@pengutronix.de>
+	<201108250905.13168.philippe.retornaz@epfl.ch>
+Message-ID: <20110825075719.GL16557@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 10:25 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> From: Jonghwan Choi <jhbird.choi@samsung.com>
->
-> This patch moves regarding clock stuff of PM into clock
-> file to support PM on EXYNOS4210 and EXYNOS4212 with one
-> single kernel image. Because some clock registers are
-> different on each SoCs.
->
-> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
-> ?arch/arm/mach-exynos4/clock-exynos4210.c ? ? ? ?| ? 38 ++++++++++
-> ?arch/arm/mach-exynos4/clock-exynos4212.c ? ? ? ?| ? 34 +++++++++
-> ?arch/arm/mach-exynos4/clock.c ? ? ? ? ? ? ? ? ? | ? 89 +++++++++++++++++++++++
-> ?arch/arm/mach-exynos4/include/mach/regs-clock.h | ? ?4 +
-> ?arch/arm/mach-exynos4/pm.c ? ? ? ? ? ? ? ? ? ? ?| ? 79 ++------------------
-> ?5 files changed, 172 insertions(+), 72 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos4/clock-exynos4210.c b/arch/arm/mach-exynos4/clock-exynos4210.c
-> index fe74b91..a4b00b7 100644
-> --- a/arch/arm/mach-exynos4/clock-exynos4210.c
-> +++ b/arch/arm/mach-exynos4/clock-exynos4210.c
-> +static struct sleep_save exynos4210_clock_save[] = {
-> + ? ? ? SAVE_ITEM(S5P_CLKSRC_IMAGE),
-> + ? ? ? SAVE_ITEM(S5P_CLKSRC_LCD1),
-> + ? ? ? SAVE_ITEM(S5P_CLKDIV_IMAGE),
-> + ? ? ? SAVE_ITEM(S5P_CLKDIV_LCD1),
-> + ? ? ? SAVE_ITEM(S5P_CLKSRC_MASK_LCD1),
-> + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_IMAGE_4210),
-> + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_LCD1),
-> + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_PERIR_4210),
-> +};
-> +
-> --- a/arch/arm/mach-exynos4/clock-exynos4212.c
-> +++ b/arch/arm/mach-exynos4/clock-exynos4212.c
-> +static struct sleep_save exynos4212_clock_save[] = {
-> + ? ? ? SAVE_ITEM(S5P_CLKSRC_IMAGE),
-> + ? ? ? SAVE_ITEM(S5P_CLKDIV_IMAGE),
-> + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_IMAGE_4212),
-> + ? ? ? SAVE_ITEM(S5P_CLKGATE_IP_PERIR_4212),
-> +};
-> +
-> --- a/arch/arm/mach-exynos4/clock.c
-> +++ b/arch/arm/mach-exynos4/clock.c
-> +static struct sleep_save exynos4_clock_save[] = {
+On Thu, Aug 25, 2011 at 09:05:12AM +0200, Philippe R?tornaz wrote:
+> Le mercredi 24 ao?t 2011 15:27:40, Uwe Kleine-K?nig a ?crit :
+> > Hello,
+> > 
+> > this series removes the long obsolte mc13783 API after fixing all
+> > remaining users.
+> 
+> I posted a patch last month which was touching this MFD too.
+> We will need to synchronize both patch. 
+Ah right. At one point I remembered your patch set because I wondered
+that ..._USE_REGULATOR is still used.
 
-Hello,
-
-Is there any reason to have the following two
-SAVE_ITEM(S5P_CLKSRC_IMAGE),
-SAVE_ITEM(S5P_CLKDIV_IMAGE
-defined at both clock-exynos4210.c and clock-exynos4212.c, not defined
-at clock.c once?
-
-
-Also, consider using CONFIG_PM_SLEEP rather than CONFIG_PM for
-suspend/resume ops.
-
-
-Cheers!
-MyungJoo
+Assuming all involved people are OK with both patch sets I can do the
+merge of both patch sets.
+ 
+Best regards
+Uwe
 
 -- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab, DMC Business, Samsung Electronics
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
