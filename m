@@ -1,42 +1,62 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 25 Aug 2011 08:52:36 -0300
-Subject: [PATCH] ARM: imx: Remove unused chip revision strings
-Message-ID: <1314273156-14916-1-git-send-email-fabio.estevam@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Aug 2011 12:42:54 +0100
+Subject: ARM processor mode, kernel startup, Hyp / secure state
+In-Reply-To: <20054.8276.47930.430789@mariner.uk.xensource.com>
+References: <20051.48809.945431.800543@mariner.uk.xensource.com>
+	<CAHkRjk6N+OeeHZzS9hOnWKEg+aFUJVwT5Vf_PqO0cHv=2_9CnA@mail.gmail.com>
+	<20051.57876.785018.498967@mariner.uk.xensource.com>
+	<20110824135109.GP32688@e102144-lin.cambridge.arm.com>
+	<20053.7340.865511.561798@mariner.uk.xensource.com>
+	<20110824160039.GR32688@e102144-lin.cambridge.arm.com>
+	<20053.8733.266040.189343@mariner.uk.xensource.com>
+	<20110824161355.GS32688@e102144-lin.cambridge.arm.com>
+	<20054.8276.47930.430789@mariner.uk.xensource.com>
+Message-ID: <20110825114254.GC27143@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit (167a19d2: ARM: imx: Introduce generic function for displaying silicon revision)
-we no longer need the chip revision strings, so remove them.
+On Thu, Aug 25, 2011 at 11:13:40AM +0100, Ian Jackson wrote:
+> Will Deacon writes ("Re: ARM processor mode, kernel startup, Hyp / secure state"):
+> > On Wed, Aug 24, 2011 at 05:09:01PM +0100, Ian Jackson wrote:
+> > > I think the trampoline needs to have one hypercall: "set HVBAR".
+> > > (And, implicitly, it needs to be specified that the resulting vectors
+> > > will run without physical-to-virtual page translation, etc.)  That is
+> > > sufficient to bootstrap all the rest of the way up - and that other
+> > > bootstrapping code would have to exist anyway.
+> > 
+> > I also thought you might want a hypercall that gives you a version number
+> > (i.e. a way to identify the hypervisor trampoline in case it changes)
+> 
+> Since the hypervisor trampoline was installed by the very same kernel
+> which is running, there is no need for any defined interface or
+> version numbers.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/include/mach/mxc.h |   14 --------------
- 1 files changed, 0 insertions(+), 14 deletions(-)
+Sure, but when we are confronted with a hypervisor that we didn't write
+ourselves it might be nice if it looks the same as our Linux trampoline. If
+we don't define this interface, that can never happen. So at the very least,
+let's define the HVC number that we want to use for our single hypercall.
 
-diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
-index 0987923..ea28170 100644
---- a/arch/arm/plat-mxc/include/mach/mxc.h
-+++ b/arch/arm/plat-mxc/include/mach/mxc.h
-@@ -50,20 +50,6 @@
- #define IMX_CHIP_REVISION_3_3		0x33
- #define IMX_CHIP_REVISION_UNKNOWN	0xff
- 
--#define IMX_CHIP_REVISION_1_0_STRING		"1.0"
--#define IMX_CHIP_REVISION_1_1_STRING		"1.1"
--#define IMX_CHIP_REVISION_1_2_STRING		"1.2"
--#define IMX_CHIP_REVISION_1_3_STRING		"1.3"
--#define IMX_CHIP_REVISION_2_0_STRING		"2.0"
--#define IMX_CHIP_REVISION_2_1_STRING		"2.1"
--#define IMX_CHIP_REVISION_2_2_STRING		"2.2"
--#define IMX_CHIP_REVISION_2_3_STRING		"2.3"
--#define IMX_CHIP_REVISION_3_0_STRING		"3.0"
--#define IMX_CHIP_REVISION_3_1_STRING		"3.1"
--#define IMX_CHIP_REVISION_3_2_STRING		"3.2"
--#define IMX_CHIP_REVISION_3_3_STRING		"3.3"
--#define IMX_CHIP_REVISION_UNKNOWN_STRING	"unknown"
--
- #ifndef __ASSEMBLY__
- extern unsigned int __mxc_cpu_type;
- #endif
--- 
-1.6.0.4
+> > and we might also want something for doing a system reset (for
+> > example, if a kernel that hasn't installed a hypervisor wants to
+> > kexec another kernel image).
+> 
+> No, if a kernel has installed a hypervisor and wishes to kexec then it
+> must start the new kernel in Hyp mode - since that is what we are
+> proposing to specify as the cpu mode to use when booting the kernel.
+
+Agreed.
+
+> So the outgoing kernel simply switches to Hyp mode, tears down Hyp
+> mode's paging (and probably the rest of the paging too), and then
+> enters the new kernel in Hyp mode with paging off.  The new kernel
+> then installs its own hypervisor trampoline.
+> 
+> If the outgoing kernel hasn't installed a hypervisor it's even easier:
+> simply do the usual teardown, and then switch to Hyp mode using its
+> existing trampoline and then enter the new kernel.
+
+Thanks for the explanation. I was concerned about losing state across the
+HVC but if it just returns back to you in the higher privilege level then
+that's not a problem.
+
+Will
