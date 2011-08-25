@@ -1,76 +1,52 @@
-From: gbean@codeaurora.org (Gregory Bean)
-Date: Thu, 25 Aug 2011 11:14:04 -0700
-Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
-In-Reply-To: <20110825151210.GC31331@huya.qualcomm.com>
-References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B24A3BC0@HQMAIL01.nvidia.com>
-	<CACRpkdaZfG4hiGf8vug3EGMRMc0c92xbj=L_HAQcS27DAXYc4Q@mail.gmail.com>
-	<20110825151210.GC31331@huya.qualcomm.com>
-Message-ID: <20110825181404.GA19345@gbean-linux.qualcomm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 25 Aug 2011 11:16:25 -0700
+Subject: How to handle named resources with DT?
+References: <20110809205723.GE11568@ponder.secretlab.ca>
+	<20110824231613.GC19890@legolas.emea.dhcp.ti.com>
+	<20110825102824.GB10405@n2100.arm.linux.org.uk>
+	<201108251705.43168.arnd@arndb.de>
+Message-ID: <877h6173wm.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 08:12:10AM -0700, David Brown wrote:
-> On Thu, Aug 25, 2011 at 12:12:59PM +0200, Linus Walleij wrote:
-> 
-> > mach-msm:
-> > ----------------
-> > 
-> > Hard to tell how this works and what's available, support
-> > seems to be incomplete. Currently it seems to be wired
-> > to do either a dedicated function (like some UART pin)
-> > or GPIO, like each pin can be used for two specific
-> > things, and not phone-exchange type.
-> 
-> There are some pins on MSMs that can be connected to different hw
-> blocks, we just haven't gotten the support into the kernel yet.
-> 
-> There are some things where two devices share pins, and you have to
-> choose one or the other.
-> 
-> I believe there are also configurations where something such as the SD
-> controller can either be configured in 8-bit data mode, or in 4-bit
-> data mode, and those 4 pins connected to something else.
-> 
-> Much of the current pin configuration in our product kernel seems to
-> be about current and pull up/down configuration.
-> 
-> I've added Rohit Vaswani, and Greg Bean to this thread who should have
-> a bit better understanding of this.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-The MSM pinmux system allows every pin to be independently controlled
-in the following ways:
+> On Thursday 25 August 2011, Russell King - ARM Linux wrote:
+>> 
+>> On Thu, Aug 25, 2011 at 02:16:14AM +0300, Felipe Balbi wrote:
+>> > on top of all that, for IPs which are used on many SoCs (such as MUSB)
+>> > it's quite silly to force all users to provide resources in a certain
+>> > order. It sounds to me that this will be prone to error in many ways
+>> > until everything is synced up and on the correct order.
+>> > 
+>> > Ditching _byname is a very bad idea.
+>> 
+>> I continue to disagree.  The current _byname is an abonimation and hack
+>> to try to "fix" this problem.
+>> 
+>> _byname should have been implemented differently - rather than overriding
+>> the resources name field (which is normally specified to be the device
+>> or driver name), a new field should have been introduced in struct resource
+>> to carry the resource sub-name (which is really what it is.)
+>> 
+>> That would have avoided making /proc/iomem completely illegible with
+>> multiple devices using this feature.
+>
+> I agree 100%.
 
-- function selection:  Every pin can be in GPIO mode, or connected to
-  a specific piece of hardware.  The number of choices varies by pin -
-  some pins have only two choices, some have eight.  When a pin is not in
-  GPIO mode, it loses some configurability - for instance, its direction
-  can no longer be set, as that's predetermined by the function selection.
-  Pins can belong to many groups which overlap in all kinds of interesting
-  ways - a pin may be part of this four-bit bus, or that eight-bit bus, or
-  might stand alone for two settings...
+Please clarify. 
 
-- drive strength: Each pin can be set to have a different drive strength
-  between 2MA and 16MA, in 2MA steps.
+What I hear Russell saying is a problem with the *implementation* of the
+_byname API.  
 
-- pull settings: Each pin can be configured with a variety of pull
-  settings: up, down, keeper, no pull.
+What I hear you sating is that since DT doesn't support this, we need to
+remove it's usage completely from platform_devices also.
 
-Additionally, there are complexities involving delivering
-interrupts from GPIOs:
+These are two very different approaches.
 
-- 'direct-connect' or 'summary' interrupts: pins which are being used as
-  interrupt inputs can be 'summarized' through a single interrupt
-  (requiring an additional pile of register reads to figure out which
-  gpio triggered the interrupt) or as a 'direct-connect' interrupt.
-  There are very few direct-connect lines available, so most gpio
-  interrupts are summarized.
+Fixing the implementation as Russell suggested seems relatively easy,
+and conceptually similar to adding it to the DT.  Removing _byname all
+together seems like significant work just to avoid adding a feature to
+the DT core.
 
-- processor interrupt assignment: Each pin can be assigned to deliver
-  interrupts to a different processor on the board.  This pin might be
-  assigned to the MSM, that pin might go to the DSP, the next might
-  go to the modem, and so on...
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Kevin
