@@ -1,30 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Aug 2011 19:03:48 +0300
-Subject: [PATCH v2 0/7] omap: iommu migration, relocation and cleanups
-In-Reply-To: <1314205694-28935-1-git-send-email-ohad@wizery.com>
-References: <1314205694-28935-1-git-send-email-ohad@wizery.com>
-Message-ID: <20110825160348.GZ4996@atomide.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 25 Aug 2011 17:55:08 +0200
+Subject: [PATCH v3] at91: merge board usb-a9260 and usb-a9263 together
+In-Reply-To: <1314281314-28912-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1314281314-28912-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20110825155508.GB2284@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [110824 19:36]:
-> 1. Migrate OMAP's iommu driver to the generic IOMMU API, and move it
-> to the dedicated iommu folder.
+On 16:08 Thu 25 Aug     , Nicolas Ferre wrote:
+> From: Nico Erfurth <ne@erfurth.eu>
 > 
-> 2. Fix omap3isp appropriately so it doesn't break.
+> Merge boards together as they are barely the same.
 > 
-> 3. Adapt OMAP's iovmm appropriately as well, because omap3isp still relies
-> on it. The plan is eventually to remove iovmm and replace it with the
-> upcoming IOMMU-based generic DMA-API. Move iovmm to the iommu folder too;
-> it belongs there more than it belongs in the OMAP folders.
+> Signed-off-by: Nico Erfurth <ne@erfurth.eu>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> [nicolas.ferre at atmel.com: updated to new machine_desc structure]
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Gregory Hermant <gregory.hermant@calao-systems.com>
+> ---
+> Hi,
 > 
-> 4. Start cleaning up OMAP's iommu components towards the end goal, where
->     1) omap-iommu no longer exports public API (and instead provides its
->        entire functionality via the generic IOMMU API).
->     2) omap-iovmm is removed.
+> I come back to this patch in the process of collecting things that has been
+> left on the mailing-list.
+> Gregory, can you have a loot at it?
 > 
-> Tested on OMAP3 (with omap3isp) and OMAP4 (with rpmsg/remoteproc).
+> v3: update the machine_desc structure to match latest improvements.
+> v2: update against new common init
+>     we must use it as we can detect the cpu type only after mapping
+>     the system controler.
+I've the hardware now
 
-Glad to see this, thanks for doing this! For all the patches:
+I'll re test it myself
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+I'm adding the usb-a9g20 right now too in the same fime
+
+Best Regards,
+J.
