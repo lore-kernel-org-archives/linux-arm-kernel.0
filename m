@@ -1,48 +1,40 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 25 Aug 2011 15:57:34 +0200
-Subject: [RFC PATCH 2/7] arm/dts: Add initial device tree support for
-	OMAP4 SoC
-In-Reply-To: <4E565004.9050806@gmail.com>
-References: <1314181040-22807-1-git-send-email-b-cousson@ti.com>
-	<1314181040-22807-3-git-send-email-b-cousson@ti.com>
-	<4E565004.9050806@gmail.com>
-Message-ID: <4E5654CE.4000303@ti.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Thu, 25 Aug 2011 19:36:15 +0530
+Subject: [PATCH V3 00/20] dmaengine/amba-pl08x updates
+In-Reply-To: <CACRpkdY6KW+tv7H==b15xJyeLp9HCqp9ROBhON0A8JnJDUn8Kg@mail.gmail.com>
+References: <cover.1312538034.git.viresh.kumar@st.com>
+	<CACRpkdY6KW+tv7H==b15xJyeLp9HCqp9ROBhON0A8JnJDUn8Kg@mail.gmail.com>
+Message-ID: <1314281175.1606.36.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tue, 2011-08-23 at 10:17 +0200, Linus Walleij wrote:
+> On Fri, Aug 5, 2011 at 12:02 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+> 
+> > This patchset contains patches for ARM's pl08x DMA controller driver.
+> > Main changes introduced by this patchset are:
+> > - Formatting fixes
+> > - Logical Fixes
+> > - Support for Peripheral as flow controller
+> > - Support for sg_len to be greater than 1 for slave transfers
+> > - Schedule tasklet for error interrupts
+> > - remove pl08x_pre_boundary() routine
+> > - support for runtime PM
+> > - etc
+> 
+> I've now tested this patchset:
+> 
+> patch 3/20 fails to apply cleanly, need rebase on top of Russell's
+> fix for dma-mapping.h inclusion. It's a trivial fix.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Vinod could you apply all patches except for 16/18 which has some
+> discussion going on, so we get some rotation in -next? The rest of
+> Viresh:s patches are really nice stuff to have.
+> 
+> I will test on the PB11MPcore in the next few days.
+> 
+Thanks, I have applied this patch series to 17/20
 
-On 8/25/2011 3:37 PM, Rob Herring wrote:
-> Benoit,
-
-[...]
-
->> +		gic: interrupt-controller at 48241000 {
->> +			compatible = "ti,omap4-gic", "arm,gic";
->
-> The gic binding is still being hashed out. This needs binding
-> documentation and handling of PPIs. I'm planning on posting an updated
-> series today with this.
->
-> "arm,gic" should be dropped or replaced with "arm,cortex-a9-gic".
-> Non-specific DT bindings are not well received. Is OMAP4 gic different
-> from standard Cortex-A9?
-
-Not at all. We named it like that based on Grant's comment:
-http://permalink.gmane.org/gmane.linux.ports.arm.omap/60393
-
-I'll update it with the new binding.
-
->> +			interrupt-controller;
->> +			#interrupt-cells =<1>;
->> +			reg =<0x48241000 0x1000>,
->> +			<0x48240100 0x0200>;
->
-> Isn't the cpu interface register space 0x100 bytes long?
-
-I've just checked the spec, and this is indeed 256 bytes. I'll fix that.
-
-Thanks for the comments.
-
-Regards,
-Benoit
+-- 
+~Vinod
