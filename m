@@ -1,437 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Aug 2011 15:55:58 +0100
-Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <20110825130907.GO3286@htj.dyndns.org>
-References: <20110823220056.GK3895@n2100.arm.linux.org.uk>
-	<CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
-	<20110823221314.GL3895@n2100.arm.linux.org.uk>
-	<CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
-	<20110825121416.GB8883@n2100.arm.linux.org.uk>
-	<20110825121710.GK3286@htj.dyndns.org>
-	<20110825122543.GC8883@n2100.arm.linux.org.uk>
-	<20110825123542.GM3286@htj.dyndns.org>
-	<20110825130414.GE8883@n2100.arm.linux.org.uk>
-	<20110825130907.GO3286@htj.dyndns.org>
-Message-ID: <20110825145558.GF8883@n2100.arm.linux.org.uk>
+From: matthieu.castet@parrot.com (Matthieu CASTET)
+Date: Thu, 25 Aug 2011 17:01:58 +0200
+Subject: [PATCH v2 2/2] omap_twl: Prevent SR to enable for am3517/am3505
+	devices
+In-Reply-To: <1314105680-17426-1-git-send-email-abhilash.kv@ti.com>
+References: <1314105680-17426-1-git-send-email-abhilash.kv@ti.com>
+Message-ID: <4E5663E6.3040509@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 03:09:07PM +0200, Tejun Heo wrote:
-> Hey, Russell.
+Abhilash K V a ?crit :
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> If you can fix it properly without going through temporary step,
-> that's awesome.  Let's put the arguments behind, okay?
+> In case of AM3517 & AM3505, Smart Reflex is not applicable so
+> we must not enable it. So add check for absence of SR feature
+> in omap3_twl_init() and return -ENODEV if absence, else continue.
 
-Here's the patch.  As the kernel I've run this against doesn't have the
-change to try_to_freeze(), I added a might_sleep() in do_signal() during
-my testing to verify that it fixes Mark's problem (which it does.)
+I believe another check should be done :
+you have the same problem if you run a omap3630 with TPS65023.
 
-I've tested functions returning -ERESTARTSYS, -ERESTARTNOHAND and
--ERESTART_RESTARTBLOCK, all of which seem to behave as expected with
-signals such as SIGCONT (without handler) and SIGALRM (with handler).
-I haven't tested -ERESTARTNOINTR.
+The check should take in account the pmu that is used and if it support SR.
 
-I don't have a test case for the race condition I mentioned (which is
-admittedly pretty difficult to construct, requiring an explicit
-signal, schedule, signal sequence) but this should plug that too.
 
-How do we achieve this?  Effectively the steps in this patch are:
+Matthieu
 
-1. Undo Arnd's fixups to the syscall restart processing (but don't worry,
-   we restore it in step 3).
 
-2. Introduce TIF_SYS_RESTART, which is set when we enter signal handling
-   and the syscall has returned one of the restart codes.  This is used
-   as a flag to indicate that we have some syscall restart processing to
-   do at some point.
-
-3. Clear TIF_SYS_RESTART whenever ptrace is used to set the GP registers
-   (thereby restoring Arnd's fixup for his gdb testsuite problem - it
-   would be good if Arnd could reconfirm that.)
-
-4. When we setup a user handler to run, check TIF_SYS_RESTART and clear it.
-   If it was set, we need to set things up to return -EINTR or restart the
-   syscall as appropriate.  As we've cleared it, no further restart
-   processing will occur.
-
-5. Once we've run all work (signal delivery, and rescheduling events), and
-   we're about to return to userspace, make a final check for TIF_SYS_RESTART.
-   If it's still set, then we're returning to userspace having not setup
-   any user handlers, and we need to restart the syscall.  This is mostly
-   trivial, except for OABI restartblock which requires the user stack to
-   be written.  We have to re-enable IRQs for this write, which means we
-   have to manually re-check for rescheduling events, abort the restart,
-   and try again later.
-
-One of the side effects of reverting Arnd's patch is that we restore the
-strace behaviour which we've had for years on ARM, and can still be seen
-on x86: strace can see the -ERESTART return codes from the kernel syscalls,
-rather than what seems to be the signal number:
-
-Before:
-rt_sigsuspend([] <unfinished ...>
---- SIGIO (I/O possible) ---
-<... rt_sigsuspend resumed> )           = 29
-sigreturn()                             = ? (mask now [])
-
-vs:
-rt_sigsuspend([])                       = ? ERESTARTNOHAND (To be restarted)
---- SIGIO (I/O possible) @ 0 (0) ---
-sigreturn()                             = ? (mask now [])
-
-x86:
-rt_sigsuspend([])                       = ? ERESTARTNOHAND (To be restarted)
---- {si_signo=SIGIO, si_code=SI_USER} (I/O possible) ---
-sigreturn()                             = ? (mask now [])
-
-So, this patch should fix:
-1. The race which I identified in the signal handling code (I think x86
-   and other architectures can suffer from it too.)
-2. The warning from try_to_freeze.
-3. The unanticipated change to strace output.
-
-Arnd, can you test this to make sure your gdb test case still works, and
-Mark, can you test this to make sure it fixes your problem please?
-
-Thanks.
-
- arch/arm/include/asm/thread_info.h |    3 +
- arch/arm/kernel/entry-common.S     |   11 ++
- arch/arm/kernel/ptrace.c           |    2 +
- arch/arm/kernel/signal.c           |  209 ++++++++++++++++++++++++------------
- 4 files changed, 155 insertions(+), 70 deletions(-)
-
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index 7b5cc8d..40df533 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -129,6 +129,7 @@ extern void vfp_flush_hwstate(struct thread_info *);
- /*
-  * thread information flags:
-  *  TIF_SYSCALL_TRACE	- syscall trace active
-+ *  TIF_SYS_RESTART	- syscall restart processing
-  *  TIF_SIGPENDING	- signal pending
-  *  TIF_NEED_RESCHED	- rescheduling necessary
-  *  TIF_NOTIFY_RESUME	- callback before returning to user
-@@ -139,6 +140,7 @@ extern void vfp_flush_hwstate(struct thread_info *);
- #define TIF_NEED_RESCHED	1
- #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
- #define TIF_SYSCALL_TRACE	8
-+#define TIF_SYS_RESTART		9
- #define TIF_POLLING_NRFLAG	16
- #define TIF_USING_IWMMXT	17
- #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
-@@ -147,6 +149,7 @@ extern void vfp_flush_hwstate(struct thread_info *);
- #define TIF_SECCOMP		21
- 
- #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
-+#define _TIF_SYS_RESTART	(1 << TIF_SYS_RESTART)
- #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
- #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
- #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index b2a27b6..e922b85 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -45,6 +45,7 @@ ret_fast_syscall:
- fast_work_pending:
- 	str	r0, [sp, #S_R0+S_OFF]!		@ returned r0
- work_pending:
-+	enable_irq
- 	tst	r1, #_TIF_NEED_RESCHED
- 	bne	work_resched
- 	tst	r1, #_TIF_SIGPENDING|_TIF_NOTIFY_RESUME
-@@ -56,6 +57,13 @@ work_pending:
- 	bl	do_notify_resume
- 	b	ret_slow_syscall		@ Check work again
- 
-+work_syscall_restart:
-+	mov	r0, sp				@ 'regs'
-+	bl	syscall_restart			@ process system call restart
-+	teq	r0, #0				@ if ret=0 -> success, so
-+	beq	ret_restart			@ return to userspace directly
-+	b	ret_slow_syscall		@ otherwise, we have a segfault
-+
- work_resched:
- 	bl	schedule
- /*
-@@ -69,6 +77,9 @@ ENTRY(ret_to_user_from_irq)
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	work_pending
- no_work_pending:
-+	tst	r1, #_TIF_SYS_RESTART
-+	bne	work_syscall_restart
-+ret_restart:
- #if defined(CONFIG_IRQSOFF_TRACER)
- 	asm_trace_hardirqs_on
- #endif
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 2491f3b..ac8c34e 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -177,6 +177,7 @@ put_user_reg(struct task_struct *task, int offset, long data)
- 
- 	if (valid_user_regs(&newregs)) {
- 		regs->uregs[offset] = data;
-+		clear_ti_thread_flag(task_thread_info(task), TIF_SYS_RESTART);
- 		ret = 0;
- 	}
- 
-@@ -604,6 +605,7 @@ static int gpr_set(struct task_struct *target,
- 		return -EINVAL;
- 
- 	*task_pt_regs(target) = newregs;
-+	clear_ti_thread_flag(task_thread_info(target), TIF_SYS_RESTART);
- 	return 0;
- }
- 
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 0340224..42a1521 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -649,6 +649,135 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
- }
- 
- /*
-+ * Syscall restarting codes
-+ *
-+ * -ERESTARTSYS: restart system call if no handler, or if there is a
-+ *	handler but it's marked SA_RESTART.  Otherwise return -EINTR.
-+ * -ERESTARTNOINTR: always restart system call
-+ * -ERESTARTNOHAND: restart system call only if no handler, otherwise
-+ *	return -EINTR if invoking a user signal handler.
-+ * -ERESTART_RESTARTBLOCK: call restart syscall if no handler, otherwise
-+ *	return -EINTR if invoking a user signal handler.
-+ */
-+static void setup_syscall_restart(struct pt_regs *regs)
-+{
-+	regs->ARM_r0 = regs->ARM_ORIG_r0;
-+	regs->ARM_pc -= thumb_mode(regs) ? 2 : 4;
-+}
-+
-+/*
-+ * Depending on the signal settings we may need to revert the decision
-+ * to restart the system call.  But skip this if a debugger has chosen
-+ * to restart at a different PC.
-+ */
-+static void syscall_restart_handler(struct pt_regs *regs, struct k_sigaction *ka)
-+{
-+	if (test_and_clear_thread_flag(TIF_SYS_RESTART)) {
-+		long r0 = regs->ARM_r0;
-+
-+		/*
-+		 * By default, return -EINTR to the user process for any
-+		 * syscall which would otherwise be restarted.
-+		 */
-+		regs->ARM_r0 = -EINTR;
-+
-+		if (r0 == -ERESTARTNOINTR ||
-+		    (r0 == -ERESTARTSYS && !(ka->sa.sa_flags & SA_RESTART)))
-+			setup_syscall_restart(regs);
-+	}
-+}
-+
-+/*
-+ * Handle syscall restarting when there is no user handler in place for
-+ * a delivered signal.  Rather than doing this as part of the normal
-+ * signal processing, we do this on the final return to userspace, after
-+ * we've finished handling signals and checking for schedule events.
-+ *
-+ * This avoids bad behaviour such as:
-+ *  - syscall returns -ERESTARTNOHAND
-+ *  - signal with no handler (so we set things up to restart the syscall)
-+ *  - schedule
-+ *  - signal with handler (eg, SIGALRM)
-+ *  - we call the handler and then restart the syscall
-+ *
-+ * In order to avoid races with TIF_NEED_RESCHED, IRQs must be disabled
-+ * when this function is called and remain disabled until we exit to
-+ * userspace.
-+ */
-+asmlinkage int syscall_restart(struct pt_regs *regs)
-+{
-+	struct thread_info *thread = current_thread_info();
-+
-+	clear_ti_thread_flag(thread, TIF_SYS_RESTART);
-+	
-+	/*
-+	 * Restart the system call.  We haven't setup a signal handler
-+	 * to invoke, and the regset hasn't been usurped by ptrace.
-+	 */
-+	if (regs->ARM_r0 == -ERESTART_RESTARTBLOCK) {
-+		if (thumb_mode(regs)) {
-+			regs->ARM_r7 = __NR_restart_syscall - __NR_SYSCALL_BASE;
-+			regs->ARM_pc -= 2;
-+		} else {
-+#if defined(CONFIG_AEABI) && !defined(CONFIG_OABI_COMPAT)
-+			regs->ARM_r7 = __NR_restart_syscall;
-+			regs->ARM_pc -= 4;
-+#else
-+			u32 sp = regs->ARM_sp - 4;
-+			u32 __user *usp = (u32 __user *)sp;
-+			int ret;
-+
-+			/*
-+			 * For OABI, we need to play some extra games, because
-+			 * we need to write to the users stack, which we can't
-+			 * do reliably from IRQs-disabled context.  Temporarily
-+			 * re-enable IRQs, perform the store, and then plug
-+			 * the resulting race afterwards.
-+			 */
-+			local_irq_enable();
-+			ret = put_user(regs->ARM_pc, usp);
-+			local_irq_disable();
-+
-+			/*
-+			 * Plug the reschedule race - if we need to reschedule,
-+			 * abort the syscall restarting.  We haven't modified
-+			 * anything other than the attempted write to the stack
-+			 * so we can merely retry later.
-+			 */
-+			if (need_resched()) {
-+				set_ti_thread_flag(thread, TIF_SYS_RESTART);
-+				return -EINTR;
-+			}
-+
-+			/*
-+			 * We failed (for some reason) to write to the stack.
-+			 * Terminate the task.
-+			 */
-+			if (ret) {
-+				force_sigsegv(0, current);
-+				return -EFAULT;
-+			}
-+
-+			/*
-+			 * Success, update the stack pointer and point the
-+			 * PC at the restarting code.
-+			 */
-+			regs->ARM_sp = sp;
-+			regs->ARM_pc = KERN_RESTART_CODE;
-+#endif
-+		}
-+	} else {
-+		/*
-+		 * Simple restart - just back up and re-execute the last
-+		 * instruction.
-+		 */
-+		setup_syscall_restart(regs);
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-  * Note that 'init' is a special process: it doesn't get signals it doesn't
-  * want to handle. Thus you cannot kill init even with a SIGKILL even by
-  * mistake.
-@@ -659,7 +788,6 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
-  */
- static void do_signal(struct pt_regs *regs, int syscall)
- {
--	unsigned int retval = 0, continue_addr = 0, restart_addr = 0;
- 	struct k_sigaction ka;
- 	siginfo_t info;
- 	int signr;
-@@ -674,32 +802,16 @@ static void do_signal(struct pt_regs *regs, int syscall)
- 		return;
- 
- 	/*
--	 * If we were from a system call, check for system call restarting...
-+	 * Set the SYS_RESTART flag to indicate that we have some
-+	 * cleanup of the restart state to perform when returning to
-+	 * userspace.
- 	 */
--	if (syscall) {
--		continue_addr = regs->ARM_pc;
--		restart_addr = continue_addr - (thumb_mode(regs) ? 2 : 4);
--		retval = regs->ARM_r0;
--
--		/*
--		 * Prepare for system call restart.  We do this here so that a
--		 * debugger will see the already changed PSW.
--		 */
--		switch (retval) {
--		case -ERESTARTNOHAND:
--		case -ERESTARTSYS:
--		case -ERESTARTNOINTR:
--			regs->ARM_r0 = regs->ARM_ORIG_r0;
--			regs->ARM_pc = restart_addr;
--			break;
--		case -ERESTART_RESTARTBLOCK:
--			regs->ARM_r0 = -EINTR;
--			break;
--		}
--	}
--
--	if (try_to_freeze())
--		goto no_signal;
-+	if (syscall &&
-+	    (regs->ARM_r0 == -ERESTARTSYS ||
-+	     regs->ARM_r0 == -ERESTARTNOINTR ||
-+	     regs->ARM_r0 == -ERESTARTNOHAND ||
-+	     regs->ARM_r0 == -ERESTART_RESTARTBLOCK))
-+		set_thread_flag(TIF_SYS_RESTART);
- 
- 	/*
- 	 * Get the signal to deliver.  When running under ptrace, at this
-@@ -709,19 +821,7 @@ static void do_signal(struct pt_regs *regs, int syscall)
- 	if (signr > 0) {
- 		sigset_t *oldset;
- 
--		/*
--		 * Depending on the signal settings we may need to revert the
--		 * decision to restart the system call.  But skip this if a
--		 * debugger has chosen to restart at a different PC.
--		 */
--		if (regs->ARM_pc == restart_addr) {
--			if (retval == -ERESTARTNOHAND
--			    || (retval == -ERESTARTSYS
--				&& !(ka.sa.sa_flags & SA_RESTART))) {
--				regs->ARM_r0 = -EINTR;
--				regs->ARM_pc = continue_addr;
--			}
--		}
-+		syscall_restart_handler(regs, &ka);
- 
- 		if (test_thread_flag(TIF_RESTORE_SIGMASK))
- 			oldset = &current->saved_sigmask;
-@@ -740,38 +840,7 @@ static void do_signal(struct pt_regs *regs, int syscall)
- 		return;
- 	}
- 
-- no_signal:
- 	if (syscall) {
--		/*
--		 * Handle restarting a different system call.  As above,
--		 * if a debugger has chosen to restart at a different PC,
--		 * ignore the restart.
--		 */
--		if (retval == -ERESTART_RESTARTBLOCK
--		    && regs->ARM_pc == continue_addr) {
--			if (thumb_mode(regs)) {
--				regs->ARM_r7 = __NR_restart_syscall - __NR_SYSCALL_BASE;
--				regs->ARM_pc -= 2;
--			} else {
--#if defined(CONFIG_AEABI) && !defined(CONFIG_OABI_COMPAT)
--				regs->ARM_r7 = __NR_restart_syscall;
--				regs->ARM_pc -= 4;
--#else
--				u32 __user *usp;
--
--				regs->ARM_sp -= 4;
--				usp = (u32 __user *)regs->ARM_sp;
--
--				if (put_user(regs->ARM_pc, usp) == 0) {
--					regs->ARM_pc = KERN_RESTART_CODE;
--				} else {
--					regs->ARM_sp += 4;
--					force_sigsegv(0, current);
--				}
--#endif
--			}
--		}
--
- 		/* If there's no signal to deliver, we just put the saved sigmask
- 		 * back.
- 		 */
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+> ---
+>  arch/arm/mach-omap2/id.c              |    2 +-
+>  arch/arm/mach-omap2/omap_twl.c        |    8 ++++++++
+>  arch/arm/plat-omap/include/plat/cpu.h |    2 ++
+>  3 files changed, 11 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index 37efb86..da71098 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -202,7 +202,7 @@ static void __init omap3_check_features(void)
+>  	if (cpu_is_omap3630())
+>  		omap_features |= OMAP3_HAS_192MHZ_CLK;
+>  	if (!cpu_is_omap3505() && !cpu_is_omap3517())
+> -		omap_features |= OMAP3_HAS_IO_WAKEUP;
+> +		omap_features |= (OMAP3_HAS_IO_WAKEUP | OMAP3_HAS_SR);
+>  
+>  	omap_features |= OMAP3_HAS_SDRC;
+>  
+> diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
+> index 07d6140..47e27b5 100644
+> --- a/arch/arm/mach-omap2/omap_twl.c
+> +++ b/arch/arm/mach-omap2/omap_twl.c
+> @@ -269,6 +269,14 @@ int __init omap3_twl_init(void)
+>  	if (!cpu_is_omap34xx())
+>  		return -ENODEV;
+>  
+> +	/*
+> +	 * In case of AM3517/AM3505 we should not be going down
+> +	 * further, since SR is not applicable there.
+> +	 */
+> +	if (!omap3_has_sr()) {
+> +		return -ENODEV;
+> +	}
+> +
+>  	if (cpu_is_omap3630()) {
+>  		omap3_mpu_volt_info.vp_vddmin = OMAP3630_VP1_VLIMITTO_VDDMIN;
+>  		omap3_mpu_volt_info.vp_vddmax = OMAP3630_VP1_VLIMITTO_VDDMAX;
+> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+> index 67b3d75..294e015 100644
+> --- a/arch/arm/plat-omap/include/plat/cpu.h
+> +++ b/arch/arm/plat-omap/include/plat/cpu.h
+> @@ -491,6 +491,7 @@ extern u32 omap_features;
+>  #define OMAP4_HAS_MPU_1GHZ		BIT(8)
+>  #define OMAP4_HAS_MPU_1_2GHZ		BIT(9)
+>  #define OMAP4_HAS_MPU_1_5GHZ		BIT(10)
+> +#define OMAP3_HAS_SR			BIT(11)
+>  
+>  
+>  #define OMAP3_HAS_FEATURE(feat,flag)			\
+> @@ -507,6 +508,7 @@ OMAP3_HAS_FEATURE(isp, ISP)
+>  OMAP3_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
+>  OMAP3_HAS_FEATURE(io_wakeup, IO_WAKEUP)
+>  OMAP3_HAS_FEATURE(sdrc, SDRC)
+> +OMAP3_HAS_FEATURE(sr, SR)
+>  
+>  /*
+>   * Runtime detection of OMAP4 features
