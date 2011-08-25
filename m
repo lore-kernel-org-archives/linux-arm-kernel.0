@@ -1,70 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 25 Aug 2011 11:50:12 +0200
-Subject: [PATCH 6/6] mx31moboard: Add MC13783 power button support
-In-Reply-To: <1311344232-29902-7-git-send-email-philippe.retornaz@epfl.ch>
-References: <1311344232-29902-1-git-send-email-philippe.retornaz@epfl.ch>
-	<1311344232-29902-2-git-send-email-philippe.retornaz@epfl.ch>
-	<1311344232-29902-3-git-send-email-philippe.retornaz@epfl.ch>
-	<1311344232-29902-4-git-send-email-philippe.retornaz@epfl.ch>
-	<1311344232-29902-5-git-send-email-philippe.retornaz@epfl.ch>
-	<1311344232-29902-6-git-send-email-philippe.retornaz@epfl.ch>
-	<1311344232-29902-7-git-send-email-philippe.retornaz@epfl.ch>
-Message-ID: <20110825095012.GR31404@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Aug 2011 10:51:37 +0100
+Subject: [PATCH 10/10] ARM: perf: add mode exclusion for Cortex-A15 PMU
+In-Reply-To: <4E55BCD9.7050703@codeaurora.org>
+References: <1312823771-9952-1-git-send-email-will.deacon@arm.com>
+	<1312823771-9952-11-git-send-email-will.deacon@arm.com>
+	<CAKHPGBZ1eXzhsjFvLt_KTYKsR_OH7rgbeSGedTY5g8dhi90uzQ@mail.gmail.com>
+	<4E55BCD9.7050703@codeaurora.org>
+Message-ID: <20110825095136.GB27143@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 22, 2011 at 04:17:12PM +0200, Philippe R?tornaz wrote:
-> Add the power-on button on mx31moboard using MC13783 PMIC.
-> 
-> Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
+On Thu, Aug 25, 2011 at 04:09:13AM +0100, Ashwin Chaugule wrote:
+> Hey Will,
 
-Please ping once the rest is merged.
+Hi Ashwin,
 
-Sascha
-
-> ---
->  arch/arm/mach-imx/mach-mx31moboard.c |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-> index 579ca1f..2a43492 100644
-> --- a/arch/arm/mach-imx/mach-mx31moboard.c
-> +++ b/arch/arm/mach-imx/mach-mx31moboard.c
-> @@ -28,6 +28,7 @@
->  #include <linux/spi/spi.h>
->  #include <linux/types.h>
->  #include <linux/memblock.h>
-> +#include <linux/input.h>
->  
->  #include <linux/usb/otg.h>
->  #include <linux/usb/ulpi.h>
-> @@ -264,12 +265,19 @@ static struct mc13783_leds_platform_data moboard_leds = {
->  	.tc2_period = MC13783_LED_PERIOD_10MS,
->  };
->  
-> +static struct mc13783_buttons_platform_data moboard_buttons = {
-> +	.b1on_flags = MC13783_BUTTON_DBNC_750MS | MC13783_BUTTON_ENABLE |
-> +			MC13783_BUTTON_POL_INVERT,
-> +	.b1on_key = KEY_POWER,
-> +};
-> +
->  static struct mc13xxx_platform_data moboard_pmic = {
->  	.regulators = {
->  		.regulators = moboard_regulators,
->  		.num_regulators = ARRAY_SIZE(moboard_regulators),
->  	},
->  	.leds = &moboard_leds,
-> +	.buttons = &moboard_buttons,
->  	.flags = MC13XXX_USE_RTC | MC13XXX_USE_ADC,
->  };
->  
-> -- 
-> 1.6.3.3
+> > From: Will Deacon <will.deacon@arm.com>
+> > 
+> > The Cortex-A15 PMU implements the PMUv2 specification and therefore
+> > has support for some mode exclusion.
+> > 
+> > This patch adds support for excluding user, kernel and hypervisor counts
+> > from a given event.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
 > 
 > 
+> --8<---
+> 
+> > +
+> > +/*
+> > + * Event filters for PMUv2
+> > + */
+> > +#define        ARMV7_EXCLUDE_PL1       (1 << 31)
+> > +#define        ARMV7_EXCLUDE_USER      (1 << 30)
+> > +#define        ARMV7_INCLUDE_HYP       (1 << 27)
+> > +
+> 
+> This mode exclusion stuff is confusing me.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I'm not surprised, the wording is pretty hard to follow in the
+documentation.
+
+> For exclude user mode, shouldn't PMXEVTYPER[PL1,U] = 0b11
+
+No - this is a reserved encoding and results in the counters stopping for
+*all* modes!
+
+> With this patch the counters will spin with secure mode activity as well,
+> if exclude user mode is selected ?
+
+Yes, but they won't tick for either secure or non-secure user-mode, which is
+what we want. Note that secure software can stop the counters ticking by
+messing with the SDER.
+
+> /me goes to bother the h/w guys.
+
+Bah, they deserve it :)
+
+Will
