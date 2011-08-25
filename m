@@ -1,104 +1,146 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Thu, 25 Aug 2011 11:13:33 +0900
-Subject: [PATCH v7 03/15] DMA: PL330: Modify device_control()
+Date: Thu, 25 Aug 2011 11:13:31 +0900
+Subject: [PATCH v7 01/15] DMA: PL330: Add support runtime PM for PL330 DMAC
 In-Reply-To: <1314238425-6480-1-git-send-email-boojin.kim@samsung.com>
 References: <1314238425-6480-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1314238425-6480-4-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1314238425-6480-2-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies device_control() to support both DMA_TERMINATE_ALL
-and DMA_SLAVE_CONFIG command.
-First, modify the flush control for DMA_TERMINATE_ALL command.
-Second, add the slave configuration control for DMA_SLAVE_CONFIG command.
-
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Acked-by: Vinod Koul <vinod.koul@intel.com>
 Cc: Dan Williams <dan.j.williams@intel.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/dma/pl330.c |   56 ++++++++++++++++++++++++++++++++++++++------------
- 1 files changed, 42 insertions(+), 14 deletions(-)
+ drivers/dma/pl330.c |   75 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 73 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index d5829c7..59943ec 100644
+index 00eee59..0b99af1 100644
 --- a/drivers/dma/pl330.c
 +++ b/drivers/dma/pl330.c
-@@ -73,6 +73,7 @@ struct dma_pl330_chan {
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/pl330.h>
++#include <linux/pm_runtime.h>
  
- 	/* For D-to-M and M-to-D channels */
- 	int burst_sz; /* the peripheral fifo width */
-+	int burst_len; /* the number of burst */
- 	dma_addr_t fifo_addr;
+ #define NR_DEFAULT_DESC	16
+ 
+@@ -83,6 +84,8 @@ struct dma_pl330_dmac {
+ 
+ 	/* Peripheral channels connected to this DMAC */
+ 	struct dma_pl330_chan *peripherals; /* keep at end */
++
++	struct clk *clk;
  };
  
-@@ -261,25 +262,52 @@ static int pl330_alloc_chan_resources(struct dma_chan *chan)
- static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned long arg)
- {
- 	struct dma_pl330_chan *pch = to_pchan(chan);
--	struct dma_pl330_desc *desc;
-+	struct dma_pl330_desc *desc, *_dt;
- 	unsigned long flags;
-+	struct dma_pl330_dmac *pdmac = pch->dmac;
-+	struct dma_slave_config *slave_config;
-+	LIST_HEAD(list);
+ struct dma_pl330_desc {
+@@ -696,6 +699,30 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto probe_err1;
+ 	}
  
--	/* Only supports DMA_TERMINATE_ALL */
--	if (cmd != DMA_TERMINATE_ALL)
--		return -ENXIO;
--
--	spin_lock_irqsave(&pch->lock, flags);
--
--	/* FLUSH the PL330 Channel thread */
--	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
-+	switch (cmd) {
-+	case DMA_TERMINATE_ALL:
-+		spin_lock_irqsave(&pch->lock, flags);
- 
--	/* Mark all desc done */
--	list_for_each_entry(desc, &pch->work_list, node)
--		desc->status = DONE;
-+		/* FLUSH the PL330 Channel thread */
-+		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
- 
--	spin_unlock_irqrestore(&pch->lock, flags);
-+		/* Mark all desc done */
-+		list_for_each_entry_safe(desc, _dt, &pch->work_list , node) {
-+			desc->status = DONE;
-+			pch->completed = desc->txd.cookie;
-+			list_move_tail(&desc->node, &list);
-+		}
- 
--	pl330_tasklet((unsigned long) pch);
-+		list_splice_tail_init(&list, &pdmac->desc_pool);
-+		spin_unlock_irqrestore(&pch->lock, flags);
-+		break;
-+	case DMA_SLAVE_CONFIG:
-+		slave_config = (struct dma_slave_config *)arg;
-+
-+		if (slave_config->direction == DMA_TO_DEVICE) {
-+			if (slave_config->dst_addr)
-+				pch->fifo_addr = slave_config->dst_addr;
-+			if (slave_config->dst_addr_width)
-+				pch->burst_sz = __ffs(slave_config->dst_addr_width);
-+			if (slave_config->dst_maxburst)
-+				pch->burst_len = slave_config->dst_maxburst;
-+		} else if (slave_config->direction == DMA_FROM_DEVICE) {
-+			if (slave_config->src_addr)
-+				pch->fifo_addr = slave_config->src_addr;
-+			if (slave_config->src_addr_width)
-+				pch->burst_sz = __ffs(slave_config->src_addr_width);
-+			if (slave_config->src_maxburst)
-+				pch->burst_len = slave_config->src_maxburst;
-+		}
-+		break;
-+	default:
-+		dev_err(pch->dmac->pif.dev, "Not supported command.\n");
-+		return -ENXIO;
++	pdmac->clk = clk_get(&adev->dev, "dma");
++	if (IS_ERR(pdmac->clk)) {
++		dev_err(&adev->dev, "Cannot get operation clock.\n");
++		ret = -EINVAL;
++		goto probe_err1;
 +	}
++
++	amba_set_drvdata(adev, pdmac);
++
++#ifdef CONFIG_PM_RUNTIME
++	/* to use the runtime PM helper functions */
++	pm_runtime_enable(&adev->dev);
++
++	/* enable the power domain */
++	if (pm_runtime_get_sync(&adev->dev)) {
++		dev_err(&adev->dev, "failed to get runtime pm\n");
++		ret = -ENODEV;
++		goto probe_err1;
++	}
++#else
++	/* enable dma clk */
++	clk_enable(pdmac->clk);
++#endif
++
+ 	irq = adev->irq[0];
+ 	ret = request_irq(irq, pl330_irq_handler, 0,
+ 			dev_name(&adev->dev), pi);
+@@ -771,8 +798,6 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto probe_err4;
+ 	}
+ 
+-	amba_set_drvdata(adev, pdmac);
+-
+ 	dev_info(&adev->dev,
+ 		"Loaded driver for PL330 DMAC-%d\n", adev->periphid);
+ 	dev_info(&adev->dev,
+@@ -833,6 +858,13 @@ static int __devexit pl330_remove(struct amba_device *adev)
+ 	res = &adev->res;
+ 	release_mem_region(res->start, resource_size(res));
+ 
++#ifdef CONFIG_PM_RUNTIME
++	pm_runtime_put(&adev->dev);
++	pm_runtime_disable(&adev->dev);
++#else
++	clk_disable(pdmac->clk);
++#endif
++
+ 	kfree(pdmac);
  
  	return 0;
- }
+@@ -846,10 +878,49 @@ static struct amba_id pl330_ids[] = {
+ 	{ 0, 0 },
+ };
+ 
++#ifdef CONFIG_PM_RUNTIME
++static int pl330_runtime_suspend(struct device *dev)
++{
++	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
++
++	if (!pdmac) {
++		dev_err(dev, "failed to get dmac\n");
++		return -ENODEV;
++	}
++
++	clk_disable(pdmac->clk);
++
++	return 0;
++}
++
++static int pl330_runtime_resume(struct device *dev)
++{
++	struct dma_pl330_dmac *pdmac = dev_get_drvdata(dev);
++
++	if (!pdmac) {
++		dev_err(dev, "failed to get dmac\n");
++		return -ENODEV;
++	}
++
++	clk_enable(pdmac->clk);
++
++	return 0;
++}
++#else
++#define pl330_runtime_suspend	NULL
++#define pl330_runtime_resume	NULL
++#endif /* CONFIG_PM_RUNTIME */
++
++static const struct dev_pm_ops pl330_pm_ops = {
++	.runtime_suspend = pl330_runtime_suspend,
++	.runtime_resume = pl330_runtime_resume,
++};
++
+ static struct amba_driver pl330_driver = {
+ 	.drv = {
+ 		.owner = THIS_MODULE,
+ 		.name = "dma-pl330",
++		.pm = &pl330_pm_ops,
+ 	},
+ 	.id_table = pl330_ids,
+ 	.probe = pl330_probe,
 -- 
 1.7.1
