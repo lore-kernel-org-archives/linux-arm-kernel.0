@@ -1,62 +1,44 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 25 Aug 2011 13:23:53 -0700
-Subject: [PATCH v5 03/22] gpio/omap: make gpio_context part of gpio_bank
-	structure
-In-Reply-To: <4E53A0EE.5000703@ti.com> (Santosh's message of "Tue, 23 Aug 2011
-	18:15:34 +0530")
-References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
-	<1312455893-14922-4-git-send-email-tarun.kanti@ti.com>
-	<4E53A0EE.5000703@ti.com>
-Message-ID: <87sjop5jfq.fsf@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Aug 2011 23:02:50 +0200
+Subject: How to handle named resources with DT?
+In-Reply-To: <877h6173wm.fsf@ti.com>
+References: <20110809205723.GE11568@ponder.secretlab.ca>
+	<201108251705.43168.arnd@arndb.de> <877h6173wm.fsf@ti.com>
+Message-ID: <32081673.hbCQs4qpyo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh <santosh.shilimkar@ti.com> writes:
+On Thursday 25 August 2011 11:16:25 Kevin Hilman wrote:
+> Please clarify. 
+> 
+> What I hear Russell saying is a problem with the implementation of the
+> _byname API.  
+> 
+> What I hear you sating is that since DT doesn't support this, we need to
+> remove it's usage completely from platform_devices also.
+> 
+> These are two very different approaches.
+> 
+> Fixing the implementation as Russell suggested seems relatively easy,
+> and conceptually similar to adding it to the DT.  Removing _byname all
+> together seems like significant work just to avoid adding a feature to
+> the DT core.
 
-> On Thursday 04 August 2011 04:34 PM, Tarun Kanti DebBarma wrote:
->> From: Charulatha V<charu@ti.com>
->>
->> Currently gpio_context array used to save gpio bank's context, is used only for
->> OMAP3 architecture. Move gpio_context as part of gpio_bank structure so that it
->> can be specific to each gpio bank and can be used for any OMAP architecture
->>
->> Signed-off-by: Charulatha V<charu@ti.com>
->> ---
-> Few comments.
->
+It's not at all about whether the Linux codein drivers/of supports this
+or not, adding it would be trivial. The point is that it would be
+*wrong* to add it because there already exists a way to identify every
+resource in the device tree and we should not extend that interface
+to have multiple ways to do the same thing just for convenience of
+a few device drivers! One of the important advantages of using the
+IEEE device tree bindings is that we can define device trees that
+are to a large degree compatible with how AIX, Solaris, MacOS, FreeBSD
+and probably many more (lesser known) operating systems probe
+their systems.
 
-[...]
+Changing the resource interface in Linux to have two 'name' fields
+would also be terribly confusing and is not a good interface, it would
+just solve another problem (silly entries in /proc/iomem) that we don't
+need to have in the first place when we do the obvious conversion
+of the drivers to the IEEE standard way of doing this.
 
->> @@ -1494,33 +1490,31 @@ void omap2_gpio_resume_after_idle(void)
->>   void omap_gpio_save_context(void)
->>   {
->>   	struct gpio_bank *bank;
->> -	int i = 0;
->>
->>   	list_for_each_entry(bank,&omap_gpio_list, node) {
->> -		i++;
->>
->>   		if (!bank->loses_context)
->>   			continue;
->>
->> -		gpio_context[i].irqenable1 =
->> +		bank->context.irqenable1 =
->>   			__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE1);
->> -		gpio_context[i].irqenable2 =
->> +		bank->context.irqenable2 =
->>   			__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE2);
->
-> The context restore procedure should be done carefully. For instance
-> IRQ enabled register should be restored last to avoid any spurious
-> interrupts.
-
-For the sake of clean, easy-to-review patches, this kind of functional
-change should be a separate patch.
-
-The goal of $SUBJECT patch is simply to move the context struct into the
-bank struct, not change the order of the save restore.
-
-Any changing of the order of save/restore should be in a dedicated patch
-with a descriptive changelog since that is changing behavior of the code.
-
-Kevin
+	Arnd
