@@ -1,102 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Aug 2011 17:26:32 +0200
-Subject: [PATCH v3 4/4] ARM: msm: Describe MSM 8660 SURF FPGA registers in
-	DT
-In-Reply-To: <20110825145736.GA31331@huya.qualcomm.com>
-References: <1313688345-17699-1-git-send-email-davidb@codeaurora.org>
-	<201108251327.13146.arnd@arndb.de>
-	<20110825145736.GA31331@huya.qualcomm.com>
-Message-ID: <201108251726.32689.arnd@arndb.de>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 25 Aug 2011 11:37:11 -0400
+Subject: [GIT PULL] orion5x and footbridge compile fixes for 3.1
+In-Reply-To: <4E565AC4.7060504@gmail.com>
+References: <4E565AC4.7060504@gmail.com>
+Message-ID: <4E566C27.3020409@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 August 2011, David Brown wrote:
-> On Thu, Aug 25, 2011 at 01:27:12PM +0200, Arnd Bergmann wrote:
-> > On Thursday 18 August 2011, David Brown wrote:
-> > > +static void __init msm8660_surf_fpga_init(void __iomem *fpga_mem)
-> > > +{
-> > > +       /* Advanced mode */
-> > > +       writew(0xFFFF, fpga_mem + 0x15C);
-> > > +       /* FPGA_UART_SEL */
-> > > +       writew(0, fpga_mem + 0x172);
-> > > +       /* FPGA_GPIO_CONFIG_117 */
-> > > +       writew(1, fpga_mem + 0xEA);
-> > > +       /* FPGA_GPIO_CONFIG_118 */
-> > > +       writew(1, fpga_mem + 0xEC);
-> > > +       dmb();
-> > > +}
-> > 
-> > Does the dmb() do the right thing here? It seems strange to combine a strictly
-> > ordered I/O instruction with another ordering instruction, and I think it would
-> > be better to use writew_relaxed for the first one, followed by a 'wmb()'.
+On 11-08-25 10:23 AM, Rob Herring wrote:
+> Arnd,
 > 
-> I guess I didn't really think about that, I just kind of kept the
-> code.  I'll ask Stepan why he did it that way, and come up with a
-> cleaner solution.
-
-Yes, no worries. I saw later that the code already exists in similar form,
-so it is not urgent to change.
-
-> > > +#ifdef CONFIG_OF
-> > > +static void __init msm8660_surf_fpga_init_dt(void)
-> > > +{
-> > > +       struct device_node *node;
-> > > +       void __iomem *fpga_mem;
-> > > +
-> > > +       node = of_find_compatible_node(NULL, NULL, "qcom,msm8660-surf-fpga");
-> > > +       if (!node)
-> > > +               return;
-> > > +
-> > > +       fpga_mem = of_iomap(node, 0);
-> > > +       of_node_put(node);
-> > > +       if (!fpga_mem) {
-> > > +               printk(KERN_ERR "%s: Can't map fpga registers\n", __func__);
-> > > +               return;
-> > > +       }
-> > > +
-> > > +       msm8660_surf_fpga_init(fpga_mem);
-> > > +       iounmap(fpga_mem);
-> > > +}
-> > > +#endif
-> > 
-> > Is the serial port connected through the FPGA or just configured by it?
+> Please pull for 3.1-rc. Footbridge and orion5x builds are currently
+> broken in 3.1 mainly due to my changes in this commit:
 > 
-> The FPGA controls how the UART pins are connected on the development
-> board.  The serial port itself is in the MSM, not the FPGA, and on
-> other dev boards this isn't needed for the serial port to work.
-
-ok.
-
-> > In the former case, I think it would be better to make this a proper
-> > device driver that binds to the qcom,msm8660-surf-fpga device,
-> > configures it and then creates the platform_devices for the child
-> > nodes (the serial port, possibly others) by calling
-> > of_platform_bus_probe.
+> commit cc22b4c18540e5e8bf55c7d124044f9317527d3c
+> Author: Rob Herring <rob.herring@calxeda.com>
+> Date:   Tue Jun 28 21:22:40 2011 -0500
 > 
-> It might make sense to have the FPGA as a driver.  I believe it was
-> done early to make sure that the pins were configured correctly before
-> the serial driver came up.  As far as I can tell, the output pin is
-> already configured correctly, so this can actually happen completely
-> independently, since early usage of the UART is really only for
-> console messages.
+>     ARM: set vga memory base at run-time
 > 
-> I don't think it makes sense for the serial to be a child node, this
-> FPGA configuration is more along the lines of pinmux.  Most
-> configurations of this SOC don't have or need this fpga.
+> 
+> The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
+> 
+>   Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+> 
+> are available in the git repository at:
+>   git://git.jdl.com/software/linux-3.0.git fixes
+> 
+> Bryan Wu (2):
+>       ARM: mach-orion5x: add missing header file <linux/vga.h>
+>       ARM: mach-footbridge: add missing header file <video/vga.h>
 
-Agreed.
+I had similar commits to the two above in the module.h tree
+(in linux-next) since I thought the missing vga.h was fallout
+from the implicit presence of module.h everywhere.
 
-> So, if I made it a separate driver, where would it go?  Since this
-> board still has platform device support, I suspect the platform data
-> needed to describe this device would end up being larger than the
-> driver itself.
+I'll drop all three from linux-next now that they are scheduled
+for pulling into 3.1-rcN.
 
-Excellent question ;-)
+Thanks,
+Paul.
 
-When the driver is really small, I would just leave it in the board
-file for now, although that might not be a good long-term strategy.
-Do we have any similar cases that we can group together with the
-fpga to make a subsystem? Maybe it could be a small driver in the
-pinmux subsystem when that is established.
-
-	Arnd
+> 
+> Paul Gortmaker (1):
+>       arm: fix compile failure in orion5x/dns323-setup.c
+> 
+>  arch/arm/mach-footbridge/dc21285.c   |    1 +
+>  arch/arm/mach-orion5x/dns323-setup.c |    2 +-
+>  arch/arm/mach-orion5x/pci.c          |    1 +
+>  3 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> Rob
