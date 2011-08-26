@@ -1,53 +1,48 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Fri, 26 Aug 2011 23:11:22 +0530
-Subject: Question on virtual memory layout: lowmem with memory hole
-In-Reply-To: <20110825185228.GA5029@n2100.arm.linux.org.uk>
-References: <2A3DCF3DA181AD40BDE86A3150B27B6B03B47E23FC@dbde02.ent.ti.com>
-	<20110825102245.GA10405@n2100.arm.linux.org.uk>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03B47E2949@dbde02.ent.ti.com>
-	<20110825185228.GA5029@n2100.arm.linux.org.uk>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B47E2EA7@dbde02.ent.ti.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Fri, 26 Aug 2011 16:22:01 -0300
+Subject: [PATCH 4/5] ARM: mx53: Allow gpio_keys to wake the system
+In-Reply-To: <1314386521-29351-4-git-send-email-fabio.estevam@freescale.com>
+References: <1314386521-29351-1-git-send-email-fabio.estevam@freescale.com>
+	<1314386521-29351-2-git-send-email-fabio.estevam@freescale.com>
+	<1314386521-29351-3-git-send-email-fabio.estevam@freescale.com>
+	<1314386521-29351-4-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1314386521-29351-5-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote on Friday, August 26, 2011 12:22 AM:
+Allow KEY_HOME on mx53ard and KEY_POWER on mx53loco to generate a wakeup event.
 
-> On Fri, Aug 26, 2011 at 12:06:20AM +0530, Pedanekar, Hemant wrote:
->> Russell King - ARM Linux wrote on Thursday, August 25, 2011 3:53 PM:
->> 
->>> On Thu, Aug 25, 2011 at 09:35:07AM +0530, Pedanekar, Hemant wrote:
->>>> E.g., on OMAP3 with mem=32M at 0x80000000 mem=8M at 0x87800000
->>>> 
-[...]
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx53_ard.c  |    2 +-
+ arch/arm/mach-mx5/board-mx53_loco.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
->> 
->> So, larger the hole, more address space will be unusable - is that correct?
-> 
-> Correct.
-> 
->>>> This also
->>>> means vmalloc space is lower compared to when a single mem=40M is passed.
->>> 
->>> Huh.  Either your maths is wrong or...
->>> 
->>> Here's case 1:
->>>>      vmalloc : 0xc8800000 - 0xf8000000   ( 760 MB) And case 2:
->>>>      vmalloc : 0xc3000000 - 0xf8000000   ( 848 MB)
->>> 
->>> Looks to me like case 1, vmalloc space is _higher_ not _lower_.  That's
->>> expected because you told the kernel it had more memory in case 1.
->> 
->> Sorry, my mistake - I actually meant "vmalloc space is _smaller_ compared
->> to when a single mem=40M is passed" though the actual physical RAM
->> available is same in both the cases.
-> 
-> Again, that's expected.
-> 
-> We require a 1:1 relationship between virtual and physical addresses for
-> efficiency - having non-linear translation means we'd need a lookup table,
-> and as these translations are heavily used, that will impact
-> performance.
-
-Thanks for all the clarifications.
-
-   Hemant
+diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
+index ddc3015..40ea3b7 100644
+--- a/arch/arm/mach-mx5/board-mx53_ard.c
++++ b/arch/arm/mach-mx5/board-mx53_ard.c
+@@ -115,7 +115,7 @@ static iomux_v3_cfg_t mx53_ard_pads[] = {
+ }
+ 
+ static struct gpio_keys_button ard_buttons[] = {
+-	GPIO_BUTTON(ARD_HOME, KEY_HOME, 1, "home", 0),
++	GPIO_BUTTON(ARD_HOME, KEY_HOME, 1, "home", 1),
+ 	GPIO_BUTTON(ARD_BACK, KEY_BACK, 1, "back", 0),
+ 	GPIO_BUTTON(ARD_PROG, KEY_PROGRAM, 1, "program", 0),
+ 	GPIO_BUTTON(ARD_VOLUMEUP, KEY_VOLUMEUP, 1, "volume-up", 0),
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 1bb0b3c..6529bde 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -204,7 +204,7 @@ static iomux_v3_cfg_t mx53_loco_pads[] = {
+ }
+ 
+ static struct gpio_keys_button loco_buttons[] = {
+-	GPIO_BUTTON(MX53_LOCO_POWER, KEY_POWER, 1, "power", 0),
++	GPIO_BUTTON(MX53_LOCO_POWER, KEY_POWER, 1, "power", 1),
+ 	GPIO_BUTTON(MX53_LOCO_UI1, KEY_VOLUMEUP, 1, "volume-up", 0),
+ 	GPIO_BUTTON(MX53_LOCO_UI2, KEY_VOLUMEDOWN, 1, "volume-down", 0),
+ };
+-- 
+1.6.0.4
