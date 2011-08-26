@@ -1,26 +1,17 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Fri, 26 Aug 2011 15:12:10 +0200
-Subject: [PATCH 1/2] plarform-mx2-camera: fix missing header dma-mapping.h
-Message-ID: <1314364331-4526-1-git-send-email-m.grzeschik@pengutronix.de>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 26 Aug 2011 15:13:16 +0200
+Subject: [patch v2 1/1] efika: Configure esdhc cd/wp on efika mx/sb
+In-Reply-To: <20110826124602.561024162@rtp-net.org> (Arnaud Patard's message
+	of "Fri, 26 Aug 2011 14:45:52 +0200")
+References: <20110826124551.073301517@rtp-net.org>
+	<20110826124602.561024162@rtp-net.org>
+Message-ID: <871uw89uz7.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
- arch/arm/plat-mxc/devices/platform-mx2-camera.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> writes:
 
-diff --git a/arch/arm/plat-mxc/devices/platform-mx2-camera.c b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-index b3f4828..a6199d7 100644
---- a/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-+++ b/arch/arm/plat-mxc/devices/platform-mx2-camera.c
-@@ -6,6 +6,7 @@
-  * the terms of the GNU General Public License version 2 as published by the
-  * Free Software Foundation.
-  */
-+#include <linux/dma-mapping.h>
- #include <mach/hardware.h>
- #include <mach/devices-common.h>
- 
--- 
-1.7.5.4
+Please, ignore. Will redo. I made the patch with yesterday's tree but
+with today's imx-features branch of imx tree, it doesn't build anymore.
+
+Arnaud
