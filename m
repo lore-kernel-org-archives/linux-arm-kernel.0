@@ -1,100 +1,167 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Fri, 26 Aug 2011 07:40:31 +0530
-Subject: [PATCH 2/5] ARM: SAMSUNG: Make the sleep code common for S3C64XX
-	and newer SoCs
-In-Reply-To: <073501cc6391$31569f70$9403de50$%kim@samsung.com>
-References: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
-	<1313144787-30666-3-git-send-email-a.kesavan@samsung.com>
-	<073501cc6391$31569f70$9403de50$%kim@samsung.com>
-Message-ID: <CAM4voak5ArO4YW-bfLDoUFtMndV58thnr2Z4oCbPhD3fRPS1Cw@mail.gmail.com>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Thu, 25 Aug 2011 21:33:14 -0500
+Subject: [PATCH 1/2] Adding platform level cpuidle driver for i.MX SoCs.
+Message-ID: <1314325995-29118-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mr Kim,
+Signed-off-by: Robert Lee <rob.lee@linaro.org>
+---
+ arch/arm/plat-mxc/Kconfig   |   10 ++++
+ arch/arm/plat-mxc/Makefile  |    2 +
+ arch/arm/plat-mxc/cpuidle.c |  112 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 124 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/cpuidle.c
 
-Thanks for your comments. Please find my reply below:
-
-Regards,
-Abhilash
-
-On Fri, Aug 26, 2011 at 7:10 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Abhilash Kesavan wrote:
->>
->> The sleep code for S5PV210 and EXYNOS4 is identical; moreover it is quite
->> similar
->> to that for S3C64XX except for some SoC specific debug logic. S5P64X0 and
->> S5PC100,
->> for which support will be added soon, can also use the same procedure.
-> Create a
->> common sleep code in the plat-samsung directory so that it can be re-used.
->>
->> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> ---
->> ?arch/arm/mach-exynos4/Kconfig ?| ? ?1 +
->> ?arch/arm/mach-exynos4/Makefile | ? ?2 +-
->> ?arch/arm/mach-exynos4/sleep.S ?| ? 54 ---------------------------
->> ?arch/arm/mach-s3c64xx/Kconfig ?| ? ?1 +
->> ?arch/arm/mach-s3c64xx/Makefile | ? ?1 -
->> ?arch/arm/mach-s3c64xx/sleep.S ?| ? 72
-> ------------------------------------
->> ?arch/arm/mach-s5pv210/Kconfig ?| ? ?1 +
->> ?arch/arm/mach-s5pv210/Makefile | ? ?2 +-
->> ?arch/arm/mach-s5pv210/sleep.S ?| ? 52 --------------------------
->> ?arch/arm/plat-samsung/Kconfig ?| ? ?7 +++
->> ?arch/arm/plat-samsung/Makefile | ? ?1 +
->> ?arch/arm/plat-samsung/sleep.S ?| ? 80
->> ++++++++++++++++++++++++++++++++++++++++
->> ?12 files changed, 93 insertions(+), 181 deletions(-)
->> ?delete mode 100644 arch/arm/mach-exynos4/sleep.S
->> ?delete mode 100644 arch/arm/mach-s3c64xx/sleep.S
->> ?delete mode 100644 arch/arm/mach-s5pv210/sleep.S
->> ?create mode 100644 arch/arm/plat-samsung/sleep.S
->>
->
-> (snip)
->
->> +ENTRY(s3c_cpu_resume)
->> +#if defined(CONFIG_S3C_PM_DEBUG_LED_SMDK)
->> +
->
-> Hi Abhilash,
->
-> Yes, would be nice if each sleep.S can be handled in plat-samsung for
-> Samsung SoCs.
->
-> Hmm...but the CONFIG_S3C_PM_DEBUG_LED_SMDK can be used on other SoCs for
-> same reason even though it is available only on S3C64XX now. I think, we
-> need to add SoC detecting here.
-Quite right, it is possible to use this for other SoCs. But as of now,
-my patch just intends
-to move all the sleep code to a common place. The S3C64XX sleep code
-has this feature
-and I didn't want to disturb it in anyway, hence it has been added to
-the common file.
-Perhaps, generalizing it for other SoCs can be done later on top of this
->
->> +#undef S3C64XX_VA_GPIO
->> +#define S3C64XX_VA_GPIO (0x0)
->
-> Please let me know why this is needed here.
-The code is trying to access the registers at a stage where the MMU is
-not enabled.
-Hence, the VA_GPIO is being re-defined as 0 reducing S3C64XX_GPIOREG(reg)  to
-reg.
-It has been moved as is from the existing s3c64xx sleep code.
->
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index a5353fc..84672b3 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -122,4 +122,14 @@ config IRAM_ALLOC
+ 	bool
+ 	select GENERIC_ALLOCATOR
+ 
++config ARCH_HAS_CPUIDLE
++	bool
++
++config MXC_CPUIDLE
++	bool
++	depends on ARCH_HAS_CPUIDLE && CPU_IDLE
++	default y
++	help
++	  Internal node to signify that the ARCH has CPUIDLE support.
++
+ endif
+diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+index d53c35f..59f20ac 100644
+--- a/arch/arm/plat-mxc/Makefile
++++ b/arch/arm/plat-mxc/Makefile
+@@ -19,6 +19,8 @@ obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
+ obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
+ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
++obj-$(CONFIG_MXC_CPUIDLE) += cpuidle.o
++
+ ifdef CONFIG_SND_IMX_SOC
+ obj-y += ssi-fiq.o
+ obj-y += ssi-fiq-ksym.o
+diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
+new file mode 100644
+index 0000000..cd637e1
+--- /dev/null
++++ b/arch/arm/plat-mxc/cpuidle.c
+@@ -0,0 +1,112 @@
++/*
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/io.h>
++#include <linux/cpuidle.h>
++#include <asm/proc-fns.h>
++#include <mach/hardware.h>
++#include <mach/system.h>
++#include <mach/cpuidle.h>
++
++
++#ifndef MXC_OVERRIDE_DEFAULT_CPUIDLE_PARAMS
++
++#define MXC_X_MACRO(a, b, c) {c}
++static struct imx_cpuidle_params default_cpuidle_params[] = \
++	MXC_CPUIDLE_TABLE;
++#undef MXC_X_MACRO
++
++static struct imx_cpuidle_params *imx_cpuidle_params = default_cpuidle_params;
++
++#else
++
++static struct imx_cpuidle_params *imx_cpuidle_params;
++
++#endif
++
++
++
++/* in case you want to override the mach level params at the board level */
++void imx_cpuidle_board_params(struct imx_cpuidle_params *cpuidle_params)
++{
++	imx_cpuidle_params = cpuidle_params;
++}
++
++static int imx_enter_idle(struct cpuidle_device *dev,
++			       struct cpuidle_state *state)
++{
++	struct timeval before, after;
++	int idle_time, i;
++
++	/* We only need to pass an index to the mach level so here we
++	 * find the index of the name contained in the cpuidle_state
++	 * to pass. */
++	for (i = 0; i < MXC_NUM_CPUIDLE_STATES && i < CPUIDLE_STATE_MAX; i++)
++		if (state == &dev->states[i])
++			break;
++
++	local_irq_disable();
++	local_fiq_disable();
++
++	do_gettimeofday(&before);
++
++	imx_cpu_do_idle(i);
++
++	do_gettimeofday(&after);
++
++	local_fiq_enable();
++	local_irq_enable();
++
++	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
++			(after.tv_usec - before.tv_usec);
++
++	return idle_time;
++}
++
++static struct cpuidle_driver imx_cpuidle_driver = {
++	.name =         "imx_idle",
++	.owner =        THIS_MODULE,
++};
++
++static DEFINE_PER_CPU(struct cpuidle_device, imx_cpuidle_device);
++
++static int __init imx_cpuidle_init(void)
++{
++	struct cpuidle_device *device;
++	int i;
++
++	#define MXC_X_MACRO(a, b, c) #a
++	char *mxc_cpuidle_state_name[] = MXC_CPUIDLE_TABLE;
++	#undef MXC_X_MACRO
++
++	#define MXC_X_MACRO(a, b, c) b
++	char *mxc_cpuidle_state_desc[] = MXC_CPUIDLE_TABLE;
++	#undef MXC_X_MACRO
++
++	if (imx_cpuidle_params == NULL)
++		return -ENODEV;
++
++	cpuidle_register_driver(&imx_cpuidle_driver);
++
++	device = &per_cpu(imx_cpuidle_device, smp_processor_id());
++	device->state_count = MXC_NUM_CPUIDLE_STATES;
++
++	for (i = 0; i < MXC_NUM_CPUIDLE_STATES && i < CPUIDLE_STATE_MAX; i++) {
++		device->states[i].enter = imx_enter_idle;
++		device->states[i].exit_latency = imx_cpuidle_params[i].latency;
++		device->states[i].flags = CPUIDLE_FLAG_TIME_VALID;
++		strcpy(device->states[i].name, mxc_cpuidle_state_name[i]);
++		strcpy(device->states[i].desc, mxc_cpuidle_state_desc[i]);
++	}
++
++	if (cpuidle_register_device(device)) {
++		printk(KERN_ERR "imx_cpuidle_init: Failed registering\n");
++		return -ENODEV;
++	}
++	return 0;
++}
++
++late_initcall(imx_cpuidle_init);
+-- 
+1.7.1
