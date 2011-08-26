@@ -1,53 +1,84 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 25 Aug 2011 22:04:31 -0700
-Subject: [PATCH v3 00/13] arm/tegra: Initialize GPIO & pinmux from DT
-In-Reply-To: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
-References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
-Message-ID: <CAOesGMiygfaNkPa7uURCiJpC=WDinWhKi07LFgJ+5JoGW_fLKw@mail.gmail.com>
+From: yad.naveen@gmail.com (naveen yadav)
+Date: Fri, 26 Aug 2011 10:38:14 +0530
+Subject: Kernel panic in 2.6.35.12 kernel
+In-Reply-To: <CAHKQLBH2d-DzzMfP9QOUmz6brT7BfPdwY6JfEUUYxzaTDTo=wg@mail.gmail.com>
+References: <CAJ8eaTyeQj5_EAsCFDMmDs3faiVptuccmq3VJLjG-QnYG038=A@mail.gmail.com>
+	<CAJ8eaTw=dKUNE8h-HD7RWxXHcTEuxJH4AfcOO44RSF7QdC5arQ@mail.gmail.com>
+	<CAHKQLBH2d-DzzMfP9QOUmz6brT7BfPdwY6JfEUUYxzaTDTo=wg@mail.gmail.com>
+Message-ID: <CAJ8eaTxmZm6yw1YWhdfaxwuf0mF+sOfX6RUPfcu-qiHYu+D4CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 4:43 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> v3:
-> * Build on Jamie Iles' patches to split some of the DT parsing into
-> ?common code.
-> * Renamed some properties to remove "nvidia," from name; they can be
-> ?generic.
-> * Support pins property, to apply DT nodes to multiple pins/groups
-> * Some minor error-message changes driven by some of the above.
-> * Removed requirement to #ifdef CONFIG_OF
-> * Removed AUXDATA table entries in mach-tegra/board-dt.c
+Hi Steve.
+
+Pls find attached code for stress application. The test code is very
+simple. Just alloc memory.
+we got this issue on embedded Target.
+After analysis we found that most of task(stress_application) is in D
+for uninterruptible sleep.
+application           state
+
+stress                  x
+stress                  D
+stress                  x
+stress                  D
+stress                  x
+stress                  D
+stress                  x
+sleep                   D
+
+Thanks
+
+
+
+
+On Thu, Aug 25, 2011 at 7:27 PM, Steve Chen <schen@mvista.com> wrote:
+> On Thu, Aug 25, 2011 at 1:06 AM, naveen yadav <yad.naveen@gmail.com> wrote:
+>> I am paste only small crash log due to size problem.
+>>
+>>
+>>
+>>
+>>> Hi All,
+>>>
+>>> We are running one malloc testprogram using below script.
+>>>
+>>> while true
+>>> do
+>>> ./stress &
+>>> sleep 1
+>>> done
+>>>
+>>>
+>>>
+>>>
+>>> After 10-15 min we observe following crash in kernel
+>>>
+>>>
+>>> ?Kernel panic - not syncing: Out of memory and no killable processes...
+>>>
+>>> attaching log also.
+>>>
+>>> Thanks
+>>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>
 >
-> TODO:
-> * Convert from using strings to using integers for the function and pin
-> ?names. This relies on the dtc patches I posted yesterday, but should
-> ?be pretty simple once they're in.
+> Can you share the code in ./stress?
 >
-> Jamie Iles (1):
-> ?of: add a generic pinmux helper
+> Thanks,
 >
-> Stephen Warren (12):
-> ?arm/tegra: Prep boards for gpio/pinmux conversion to pdevs
-> ?docs/dt: Document nvidia,tegra20-gpio's nvidia,enabled-gpios property
-> ?arm/dt: Tegra: Add nvidia,enabled-gpios property to GPIO controller
-> ?docs/dt: Document nvidia,tegra20-pinmux binding
-> ?arm/dt: Tegra: Add pinmux node
-> ?dt: add empty for_each_child_of_node, of_find_property
-> ?gpio/tegra: Convert to a platform device
-> ?gpio/tegra: Add device tree support
-> ?arm/tegra: Convert pinmux driver to a platform device
-> ?of: add property iteration helpers
-> ?arm/tegra: Add device tree support to pinmux driver
-> ?arm/tegra: board-dt: Remove dependency on non-dt pinmux functions
-
-
-This is looking pretty sane to me.
-
-Grant, how do you prefer to handle this, since it spans of/dt, gpio
-and tegra code? I can start a topic branch for Arnd to pull in for the
-tegra parts, would you prefer picking up the of helper functions on
-your own or is an ack from you and merge through the arm-soc tree
-easier?
-
-
--Olof
+> Steve
+>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: stress_application.c
+Type: text/x-csrc
+Size: 1425 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110826/5b990e94/attachment.bin>
