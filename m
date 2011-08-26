@@ -1,23 +1,116 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 26 Aug 2011 20:55:56 +0530
-Subject: [PATCH v7 04/15] DMA: PL330: Add DMA_CYCLIC capability
-In-Reply-To: <1314238425-6480-5-git-send-email-boojin.kim@samsung.com>
-References: <1314238425-6480-1-git-send-email-boojin.kim@samsung.com>
-	<1314238425-6480-5-git-send-email-boojin.kim@samsung.com>
-Message-ID: <CABb+yY2MtoxQfaXZs49161zAxuNyS7xXdMa9MNj6LZt03gK0Rg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Fri, 26 Aug 2011 20:57:29 +0530
+Subject: [PATCH v14 REPOST 07/12] OMAP: dmtimer: pm_runtime support
+In-Reply-To: <1310731501-13078-8-git-send-email-tarun.kanti@ti.com>
+References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
+	<1310731501-13078-8-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4E57BB61.2010804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 7:43 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
+On Friday 15 July 2011 05:34 PM, Tarun Kanti DebBarma wrote:
+> Add pm_runtime feature to dmtimer whereby _get_sync() is called within
+> omap_dm_timer_enable(), _put_sync() is called in omap_dm_timer_disable().
+>
+> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> [p-basak2 at ti.com: added pm_runtime logic in probe()]
+> Signed-off-by: Partha Basak<p-basak2@ti.com>
+> Reviewed-by: Varadarajan, Charulatha<charu@ti.com>
+> Acked-by: Cousson, Benoit<b-cousson@ti.com>
+> ---
+>   arch/arm/plat-omap/dmtimer.c              |   31 +++++++---------------------
+>   arch/arm/plat-omap/include/plat/dmtimer.h |    1 -
+>   2 files changed, 8 insertions(+), 24 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+> index 54564e9..0560248 100644
+> --- a/arch/arm/plat-omap/dmtimer.c
+> +++ b/arch/arm/plat-omap/dmtimer.c
+> @@ -38,6 +38,7 @@
+>   #include<linux/io.h>
+>   #include<linux/slab.h>
+>   #include<linux/err.h>
+> +#include<linux/pm_runtime.h>
+>
+>   #include<plat/dmtimer.h>
+>
+> @@ -193,33 +194,13 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_free);
+>
+>   void omap_dm_timer_enable(struct omap_dm_timer *timer)
+>   {
+> -	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
+> -
+> -	if (timer->enabled)
+> -		return;
+> -
+> -	if (!pdata->needs_manual_reset) {
+> -		clk_enable(timer->fclk);
+> -		clk_enable(timer->iclk);
+> -	}
+> -
+> -	timer->enabled = 1;
+> +	pm_runtime_get_sync(&timer->pdev->dev);
+>   }
+>   EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
+>
+>   void omap_dm_timer_disable(struct omap_dm_timer *timer)
+>   {
+> -	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
+> -
+> -	if (!timer->enabled)
+> -		return;
+> -
+> -	if (!pdata->needs_manual_reset) {
+> -		clk_disable(timer->iclk);
+> -		clk_disable(timer->fclk);
+> -	}
+> -
+> -	timer->enabled = 0;
+> +	pm_runtime_put_sync(&timer->pdev->dev);
+Better to use pm_runtime_put_sync_suspend() to make
+it irq safe.
 
-> ?static void pl330_issue_pending(struct dma_chan *chan)
-> ?{
-> - ? ? ? pl330_tasklet((unsigned long) to_pchan(chan));
-> + ? ? ? struct dma_pl330_chan *pch = to_pchan(chan);
+>   }
+>   EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
+>
+> @@ -461,7 +442,7 @@ int omap_dm_timers_active(void)
+>   	struct omap_dm_timer *timer;
+>
+>   	list_for_each_entry(timer,&omap_timer_list, node) {
+> -		if (!timer->enabled)
+> +		if (!timer->reserved)
+>   			continue;
+>
+>   		if (omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG)&
+> @@ -536,6 +517,10 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
+>   	timer->irq = irq->start;
+>   	timer->pdev = pdev;
+>
+> +	/* Skip pm_runtime_enable for OMAP1 */
+> +	if (!pdata->needs_manual_reset)
+> +		pm_runtime_enable(&pdev->dev);
 > +
-> + ? ? ? pl330_tasklet((unsigned long) pch);
-> ?}
-This is a useless churn since v6.
+Here too.
+/s /pm_runtime_enable /pm_runtime_irq_safe
 
-Please fix this and add
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+>   	/* add the timer element to the list */
+>   	spin_lock_irqsave(&dm_timer_lock, flags);
+>   	list_add_tail(&timer->node,&omap_timer_list);
+> diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+> index 90a504a..53d5da6 100644
+> --- a/arch/arm/plat-omap/include/plat/dmtimer.h
+> +++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+> @@ -238,7 +238,6 @@ struct omap_dm_timer {
+>   	void __iomem *io_base;
+>   	unsigned long rate;
+>   	unsigned reserved:1;
+> -	unsigned enabled:1;
+>   	unsigned posted:1;
+>   	u8 func_offset;
+>   	u8 intr_offset;
+
+With above fixed, you can add,
+
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Regards
+Santosh
