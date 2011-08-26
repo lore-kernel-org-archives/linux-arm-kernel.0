@@ -1,43 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Aug 2011 09:57:49 +0200
-Subject: [PATCH 0/4 v4] pin controller subsystem v4
-In-Reply-To: <CAGsJ_4yEXEajH1JyNjnYE0hg13Fgd7bdiMNFs2fp6Ou=h_9N9g@mail.gmail.com>
-References: <1313747619-32222-1-git-send-email-linus.walleij@stericsson.com>
-	<CAGsJ_4z7s-ibmUuR1DA6Jps030dRrnE8M0dUWHoMhMPFtyyY_A@mail.gmail.com>
-	<CACRpkdb4-0TfO-viUoZyW3VoLnVuo2ztHTX=8Hef3_RYWB52vg@mail.gmail.com>
-	<CAGsJ_4yEXEajH1JyNjnYE0hg13Fgd7bdiMNFs2fp6Ou=h_9N9g@mail.gmail.com>
-Message-ID: <CACRpkdba4XM7Wr61pjXnBpgJY=U1F-772_ArfPDhjpRVd1NFUA@mail.gmail.com>
+Date: Fri, 26 Aug 2011 10:03:55 +0200
+Subject: [PATCH 16/18] dmaengine/amba-pl08x: Add support for sg len
+	greater than one for slave transfers
+In-Reply-To: <4E5715CE.2070806@st.com>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
+	<20110814083618.GE4986@n2100.arm.linux.org.uk>
+	<4E4CCF7B.8060704@st.com>
+	<20110821083306.GA12028@n2100.arm.linux.org.uk>
+	<4E532B19.6000103@st.com> <4E5715CE.2070806@st.com>
+Message-ID: <CACRpkdapSvW=eMSoXTOOA2GyhfBLzq2OuyQcDctPxsnVzvr-4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2011 at 3:58 AM, Barry Song <21cnbao@gmail.com> wrote:
+On Fri, Aug 26, 2011 at 5:41 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-> Do you want the pinmux_request_gpio called by the gpiolib driver or by
-> every device driver who uses this gpio?
+> Probably this is the only issue left in this patch. (Sorry if i missed some other points)
+> Please suggest what should i modify here, so that Vinod can go ahead and push pending
+> patches too.
 
-I always thought about the gpiolib driver.
+Patches are individual for that very reason - so they can be applied one by one.
 
-I think Grant told me he wanted drivers with combined GPIO and
-pinmuxing to reside in drivers/pinctrl and expose an additional
-gpiolib interface.
-
-> Do you think the following make sense in gpiolib driver?
-> static int xxx_gpio_request(struct gpio_chip *chip, unsigned offset)
-> {
-> ? ? ? ?int ret = 0;
->
-> ? ? ? ?ret = pinmux_request_gpio(chip->base + offset);
-> ? ? ? ?if (ret)
-> ? ? ? ? ? ? ? ?goto out;
-> ? ? ? ?.....
-> out:
-> ? ? ? ?return ret;
-> }
-
-Looks sane to me. It's a bit unfortunate to have to subtract
-the base and then add it again before passing to pinmux but
-the idea is to drop the global GPIO pinspace down the road
-and then it makes more sense.
+I already suggested to Vinod to merge the other patches as far as possible,
+for certain 1 thru 15 could be merged right off with some minor
+manual fixup. Then we can fix this one patch.
 
 Yours,
 Linus Walleij
