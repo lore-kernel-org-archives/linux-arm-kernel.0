@@ -1,24 +1,27 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 26 Aug 2011 21:04:12 +0530
-Subject: [PATCH v14 REPOST 09/12] OMAP: dmtimer: use mutex instead of
-	spinlock
-In-Reply-To: <1310731501-13078-10-git-send-email-tarun.kanti@ti.com>
-References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
-	<1310731501-13078-10-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4E57BCF4.8030709@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Aug 2011 17:35:55 +0200
+Subject: How to handle named resources with DT?
+In-Reply-To: <20110826130644.GN2308@yookeroo.fritz.box>
+References: <20110809205723.GE11568@ponder.secretlab.ca>
+	<201108261258.32880.arnd@arndb.de>
+	<20110826130644.GN2308@yookeroo.fritz.box>
+Message-ID: <201108261735.55412.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2011 05:34 PM, Tarun Kanti DebBarma wrote:
-> Since the spinlock is not used in any interrupt context we can
-> replace it with mutex instead.
->
-> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
-> ---
-Patch looks good but change log doesn't reflect it.
-Do you want to say that below API's are not used from
-interrupt context, so mutex should be good enough ?
+On Friday 26 August 2011, David Gibson wrote:
+> If you open code it this way then yes, it's silly.  But what about
+> something like this:
+> 
+> static struct of_device_id foodevice_of_match[] __devinitdata = {
+>         { .compatible = "foocorp,foodevice1234",
+>           .resource_names = {"base_regs", "extra_regs", }, },
+>         { .compatible = "foocorp,foodevice1239",
+>           .resource_names = {"base_regs", "extra_regs", "more_regs", }, }, 
+>         { },
+> };
 
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Regards
-Santosh
+Hmm, I hadn't thought of that. This looks quite nice indeed. No objections
+to this from my side.
+
+	Arnd
