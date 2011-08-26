@@ -1,103 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 25 Aug 2011 20:08:56 -0400 (EDT)
-Subject: [PATCH] process: change from __backtrace to dump_stack in
-	show_regs
-In-Reply-To: <1314316057-8282-1-git-send-email-lauraa@codeaurora.org>
-References: <1314316057-8282-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1108252007361.20358@xanadu.home>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 26 Aug 2011 09:00:39 +0900
+Subject: [PATCH] ARM: EXYNOS4: Fix routing timer interrupt to offline CPU
+Message-ID: <1314316839-1242-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Aug 2011, Laura Abbott wrote:
+The commit 5dfc54e087c15f823ee9b6541d2f0f314e69cbed
+("ARM: GIC: avoid routing interrupts to offline CPUs")
+prevents routing interrupts to offline CPUs. But in
+case of timer on EXYNOS4, the irq_set_affinity() method
+is called in percpu_timer_setup() before CPU1 becomes
+online. So this patch fixes routing timer interrupt to
+offline CPU.
 
-> Currently, show_regs calls __backtrace which does
-> nothing if CONFIG_FRAME_POINTER is not set. Switch to
-> dump_stack which handles both CONFIG_FRAME_POINTER and
-> CONFIG_ARM_UNWIND correctly.
-> 
-> __backtrace is now superseded by dump_stack in general
-> and show_regs was the last caller so remove __backtrace
-> as well.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Reported-by: Changhwan Youn <chaos.youn@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+Hi Russell and all,
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+I'm not sure it's safe to call set_cpu_online() here...
 
+ arch/arm/mach-exynos4/platsmp.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-> ---
->  arch/arm/include/asm/system.h |    1 -
->  arch/arm/kernel/armksyms.c    |    3 ---
->  arch/arm/kernel/process.c     |    2 +-
->  arch/arm/lib/backtrace.S      |    6 ------
->  4 files changed, 1 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-> index 832888d..4fc2edd 100644
-> --- a/arch/arm/include/asm/system.h
-> +++ b/arch/arm/include/asm/system.h
-> @@ -97,7 +97,6 @@ void hook_ifault_code(int nr, int (*fn)(unsigned long, unsigned int,
->  #define xchg(ptr,x) \
->  	((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
->  
-> -extern asmlinkage void __backtrace(void);
->  extern asmlinkage void c_backtrace(unsigned long fp, int pmode);
->  
->  struct mm_struct;
-> diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-> index aeef960..8e3c6f1 100644
-> --- a/arch/arm/kernel/armksyms.c
-> +++ b/arch/arm/kernel/armksyms.c
-> @@ -49,9 +49,6 @@ extern void __aeabi_ulcmp(void);
->  
->  extern void fpundefinstr(void);
->  
-> -
-> -EXPORT_SYMBOL(__backtrace);
-> -
->  	/* platform dependent support */
->  EXPORT_SYMBOL(__udelay);
->  EXPORT_SYMBOL(__const_udelay);
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 1a347f4..fd08140 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -319,7 +319,7 @@ void show_regs(struct pt_regs * regs)
->  	printk("\n");
->  	printk("Pid: %d, comm: %20s\n", task_pid_nr(current), current->comm);
->  	__show_regs(regs);
-> -	__backtrace();
-> +	dump_stack();
->  }
->  
->  ATOMIC_NOTIFIER_HEAD(thread_notify_head);
-> diff --git a/arch/arm/lib/backtrace.S b/arch/arm/lib/backtrace.S
-> index a673297..cd07b58 100644
-> --- a/arch/arm/lib/backtrace.S
-> +++ b/arch/arm/lib/backtrace.S
-> @@ -22,15 +22,10 @@
->  #define mask	r7
->  #define offset	r8
->  
-> -ENTRY(__backtrace)
-> -		mov	r1, #0x10
-> -		mov	r0, fp
-> -
->  ENTRY(c_backtrace)
->  
->  #if !defined(CONFIG_FRAME_POINTER) || !defined(CONFIG_PRINTK)
->  		mov	pc, lr
-> -ENDPROC(__backtrace)
->  ENDPROC(c_backtrace)
->  #else
->  		stmfd	sp!, {r4 - r8, lr}	@ Save an extra register so we have a location...
-> @@ -107,7 +102,6 @@ for_each_frame:	tst	frame, mask		@ Check for address exceptions
->  		mov	r1, frame
->  		bl	printk
->  no_frame:	ldmfd	sp!, {r4 - r8, pc}
-> -ENDPROC(__backtrace)
->  ENDPROC(c_backtrace)
->  		
->  		.pushsection __ex_table,"a"
-> -- 
-> 1.7.3.3
-> 
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
+index 96cc651..a3346e3 100644
+--- a/arch/arm/mach-exynos4/platsmp.c
++++ b/arch/arm/mach-exynos4/platsmp.c
+@@ -109,6 +109,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ 	 */
+ 	spin_lock(&boot_lock);
+ 	spin_unlock(&boot_lock);
++
++	set_cpu_online(cpu, true);
+ }
+ 
+ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+-- 
+1.7.1
