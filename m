@@ -1,183 +1,110 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Aug 2011 09:21:35 +0100
-Subject: [PATCH 1/2] Adding platform level cpuidle driver for i.MX SoCs.
-In-Reply-To: <1314325995-29118-1-git-send-email-rob.lee@linaro.org>
-References: <1314325995-29118-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <20110826082135.GC11250@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 26 Aug 2011 10:25:58 +0200
+Subject: [GIT PULL] i.MX cleanups for next
+In-Reply-To: <20110823115609.GJ31404@pengutronix.de>
+References: <20110823115609.GJ31404@pengutronix.de>
+Message-ID: <20110826082558.GC7526@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: [PATCH 1/2] Adding platform level cpuidle driver for i.MX SoCs.
+Arnd,
 
-	"Add platform level cpuidle driver for i.MX SoCs."
+Since you haven't pulled this yet, here is an update:
 
-is more natural to read in the git logs after the patch has been
-committed.
 
-On Thu, Aug 25, 2011 at 09:33:14PM -0500, Robert Lee wrote:
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> ---
->  arch/arm/plat-mxc/Kconfig   |   10 ++++
->  arch/arm/plat-mxc/Makefile  |    2 +
->  arch/arm/plat-mxc/cpuidle.c |  112 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 124 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/cpuidle.c
-> 
-> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> index a5353fc..84672b3 100644
-> --- a/arch/arm/plat-mxc/Kconfig
-> +++ b/arch/arm/plat-mxc/Kconfig
-> @@ -122,4 +122,14 @@ config IRAM_ALLOC
->  	bool
->  	select GENERIC_ALLOCATOR
->  
-> +config ARCH_HAS_CPUIDLE
-> +	bool
-> +
-> +config MXC_CPUIDLE
-> +	bool
-> +	depends on ARCH_HAS_CPUIDLE && CPU_IDLE
-> +	default y
-> +	help
-> +	  Internal node to signify that the ARCH has CPUIDLE support.
-> +
->  endif
-> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-> index d53c35f..59f20ac 100644
-> --- a/arch/arm/plat-mxc/Makefile
-> +++ b/arch/arm/plat-mxc/Makefile
-> @@ -19,6 +19,8 @@ obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
->  obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
->  obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
->  obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
-> +obj-$(CONFIG_MXC_CPUIDLE) += cpuidle.o
-> +
->  ifdef CONFIG_SND_IMX_SOC
->  obj-y += ssi-fiq.o
->  obj-y += ssi-fiq-ksym.o
-> diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
-> new file mode 100644
-> index 0000000..cd637e1
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/cpuidle.c
-> @@ -0,0 +1,112 @@
-> +/*
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/cpuidle.h>
-> +#include <asm/proc-fns.h>
-> +#include <mach/hardware.h>
-> +#include <mach/system.h>
-> +#include <mach/cpuidle.h>
-> +
-> +
-> +#ifndef MXC_OVERRIDE_DEFAULT_CPUIDLE_PARAMS
-> +
-> +#define MXC_X_MACRO(a, b, c) {c}
-> +static struct imx_cpuidle_params default_cpuidle_params[] = \
-> +	MXC_CPUIDLE_TABLE;
-> +#undef MXC_X_MACRO
-> +
-> +static struct imx_cpuidle_params *imx_cpuidle_params = default_cpuidle_params;
-> +
-> +#else
-> +
-> +static struct imx_cpuidle_params *imx_cpuidle_params;
-> +
-> +#endif
-> +
-> +
-> +
-> +/* in case you want to override the mach level params at the board level */
-> +void imx_cpuidle_board_params(struct imx_cpuidle_params *cpuidle_params)
-> +{
-> +	imx_cpuidle_params = cpuidle_params;
-> +}
-> +
-> +static int imx_enter_idle(struct cpuidle_device *dev,
-> +			       struct cpuidle_state *state)
-> +{
-> +	struct timeval before, after;
-> +	int idle_time, i;
-> +
-> +	/* We only need to pass an index to the mach level so here we
-> +	 * find the index of the name contained in the cpuidle_state
-> +	 * to pass. */
-> +	for (i = 0; i < MXC_NUM_CPUIDLE_STATES && i < CPUIDLE_STATE_MAX; i++)
-> +		if (state == &dev->states[i])
-> +			break;
-> +
-> +	local_irq_disable();
-> +	local_fiq_disable();
-> +
-> +	do_gettimeofday(&before);
-> +
-> +	imx_cpu_do_idle(i);
-> +
-> +	do_gettimeofday(&after);
-> +
-> +	local_fiq_enable();
-> +	local_irq_enable();
-> +
-> +	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> +			(after.tv_usec - before.tv_usec);
-> +
-> +	return idle_time;
-> +}
-> +
-> +static struct cpuidle_driver imx_cpuidle_driver = {
-> +	.name =         "imx_idle",
-> +	.owner =        THIS_MODULE,
-> +};
-> +
-> +static DEFINE_PER_CPU(struct cpuidle_device, imx_cpuidle_device);
-> +
-> +static int __init imx_cpuidle_init(void)
-> +{
-> +	struct cpuidle_device *device;
-> +	int i;
-> +
-> +	#define MXC_X_MACRO(a, b, c) #a
-> +	char *mxc_cpuidle_state_name[] = MXC_CPUIDLE_TABLE;
-> +	#undef MXC_X_MACRO
-> +
-> +	#define MXC_X_MACRO(a, b, c) b
-> +	char *mxc_cpuidle_state_desc[] = MXC_CPUIDLE_TABLE;
-> +	#undef MXC_X_MACRO
-> +
-> +	if (imx_cpuidle_params == NULL)
-> +		return -ENODEV;
-> +
-> +	cpuidle_register_driver(&imx_cpuidle_driver);
-> +
-> +	device = &per_cpu(imx_cpuidle_device, smp_processor_id());
-> +	device->state_count = MXC_NUM_CPUIDLE_STATES;
-> +
-> +	for (i = 0; i < MXC_NUM_CPUIDLE_STATES && i < CPUIDLE_STATE_MAX; i++) {
-> +		device->states[i].enter = imx_enter_idle;
-> +		device->states[i].exit_latency = imx_cpuidle_params[i].latency;
-> +		device->states[i].flags = CPUIDLE_FLAG_TIME_VALID;
-> +		strcpy(device->states[i].name, mxc_cpuidle_state_name[i]);
-> +		strcpy(device->states[i].desc, mxc_cpuidle_state_desc[i]);
-> +	}
-> +
-> +	if (cpuidle_register_device(device)) {
-> +		printk(KERN_ERR "imx_cpuidle_init: Failed registering\n");
-> +		return -ENODEV;
-> +	}
-> +	return 0;
-> +}
-> +
-> +late_initcall(imx_cpuidle_init);
-> -- 
-> 1.7.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
+
+  Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-cleanups-for-arnd
+
+Fabio Estevam (2):
+      ARM: mx50: Select IMX_HAVE_PLATFORM_FEC as done on other i.MX devices
+      ARM: mxs: Remove unused header file
+
+Jason Liu (1):
+      imx5: not include the unused head file
+
+Sascha Hauer (4):
+      Merge branch 'imx-cleanup' of git://git.pengutronix.de/git/ukl/linux-2.6 into imx-cleanup
+      ARM i.MX audmux v2: remove unnecessary ifdefs
+      ARM i.MX: remove ARCH_MX* macros from Makefile
+      Merge branches 'cleanups/assorted', 'cleanups/shawn-cleanup-mxc-gpio', 'cleanups/troy-cleanup-iomux-v3' and 'cleanups/ukl-mx5-dynamically-allocate-devices' into imx-cleanups-for-arnd
+
+Shawn Guo (7):
+      arm/mxc: do not use gpio_to_irq() for static initializers
+      gpio/mxc: add .to_irq for gpio chip
+      arm/mxc: use gpiolib helper for gpio_to_irq
+      gpio/mxc: move irq_to_gpio() into gpio-mxc driver
+      arm/mxc: move IMX_GPIO_NR into mach/hardware.h
+      gpio/mxs: move irq_to_gpio() into gpio-mxs driver
+      arm/mxs: move MXS_GPIO_NR into mach/mxs.h
+
+Troy Kisky (3):
+      ARM: i.MX51: Remove _MX51_PAD_xxx references
+      ARM: i.MX51: clean up iomux-mx51.h
+      ARM: i.MX53: clean up iomux-mx53.h
+
+Uwe Kleine-K?nig (8):
+      ARM: mx5: fix remaining inconsistent names for irqs
+      ARM: mx5: remove unused #includes of devices.h
+      ARM: mx5: dynamically allocate mxc-ehci devices
+      ARM: mx5: dynamically allocate fsl-usb2-udc devices
+      ARM: mx5: dynamically allocate high speed i2c (imx-i2c actually)
+      ARM: imx/mx1ads: dynamically allocate physmap-flash device
+      ARM: imx/armadillo5x0: dynamically allocate physmap-flash device
+      ARM: mxc: drop now unused function mxc_register_device
+
+ arch/arm/mach-imx/Makefile                        |   10 +-
+ arch/arm/mach-imx/mach-armadillo5x0.c             |   18 +-
+ arch/arm/mach-imx/mach-cpuimx35.c                 |    2 +-
+ arch/arm/mach-imx/mach-mx1ads.c                   |   15 +-
+ arch/arm/mach-imx/mach-mx27_3ds.c                 |    2 +-
+ arch/arm/mach-imx/mach-vpr200.c                   |    2 +-
+ arch/arm/mach-mx5/Kconfig                         |   10 +-
+ arch/arm/mach-mx5/Makefile                        |    2 +-
+ arch/arm/mach-mx5/board-cpuimx51.c                |   27 +-
+ arch/arm/mach-mx5/board-cpuimx51sd.c              |   25 +-
+ arch/arm/mach-mx5/board-mx51_3ds.c                |    1 -
+ arch/arm/mach-mx5/board-mx51_babbage.c            |   26 +-
+ arch/arm/mach-mx5/board-mx51_efikamx.c            |    2 -
+ arch/arm/mach-mx5/board-mx51_efikasb.c            |    6 +-
+ arch/arm/mach-mx5/board-mx53_ard.c                |    4 +-
+ arch/arm/mach-mx5/clock-mx51-mx53.c               |    2 +-
+ arch/arm/mach-mx5/devices-imx51.h                 |   13 +
+ arch/arm/mach-mx5/devices.c                       |  120 -
+ arch/arm/mach-mx5/devices.h                       |    5 -
+ arch/arm/mach-mx5/ehci.c                          |    2 +-
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c      |    3 +-
+ arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c      |    6 +-
+ arch/arm/mach-mx5/mm.c                            |    8 +-
+ arch/arm/mach-mx5/mx51_efika.c                    |   17 +-
+ arch/arm/mach-mxs/include/mach/gpio.h             |    4 -
+ arch/arm/mach-mxs/include/mach/mxs.h              |    2 +
+ arch/arm/mach-mxs/mach-mx23evk.c                  |    1 -
+ arch/arm/mach-mxs/mach-mx28evk.c                  |    1 -
+ arch/arm/mach-mxs/mach-stmp378x_devb.c            |    1 -
+ arch/arm/plat-mxc/audmux-v2.c                     |   18 +-
+ arch/arm/plat-mxc/devices.c                       |   14 -
+ arch/arm/plat-mxc/devices/Kconfig                 |    2 +-
+ arch/arm/plat-mxc/devices/platform-fsl-usb2-udc.c |    5 +
+ arch/arm/plat-mxc/devices/platform-imx-i2c.c      |    6 +
+ arch/arm/plat-mxc/devices/platform-mxc-ehci.c     |    9 +
+ arch/arm/plat-mxc/include/mach/common.h           |    1 -
+ arch/arm/plat-mxc/include/mach/gpio.h             |    9 +-
+ arch/arm/plat-mxc/include/mach/hardware.h         |    6 +
+ arch/arm/plat-mxc/include/mach/iomux-mx51.h       | 2270 +++++---------
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h       | 3530 +++++++--------------
+ arch/arm/plat-mxc/include/mach/iomux-v3.h         |    1 +
+ arch/arm/plat-mxc/include/mach/mx51.h             |  167 +-
+ drivers/gpio/gpio-mxc.c                           |   12 +
+ drivers/gpio/gpio-mxs.c                           |    2 +
+ 44 files changed, 2173 insertions(+), 4216 deletions(-)
+ delete mode 100644 arch/arm/mach-mx5/devices.c
+ delete mode 100644 arch/arm/mach-mx5/devices.h
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
