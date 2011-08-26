@@ -1,104 +1,187 @@
 From: jason.hui@linaro.org (Jason Liu)
-Date: Fri, 26 Aug 2011 13:35:20 +0800
-Subject: [[PATCH v3 3/6] ARM: mx27: Print silicon revision on boot
+Date: Fri, 26 Aug 2011 13:35:23 +0800
+Subject: [[PATCH v3 6/6] ARM: mx5: use generic function for displaying silicon
+	revision
 In-Reply-To: <1314336923-25162-1-git-send-email-jason.hui@linaro.org>
 References: <1314336923-25162-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <1314336923-25162-4-git-send-email-jason.hui@linaro.org>
+Message-ID: <1314336923-25162-7-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Silicon revision is useful information to have during kernel boot.
+Update to use generic function for displaying silicon revision
 
-Print the MX27 silicon revision.
+Tested on my mx53 loco board:
+CPU identified as i.MX53, silicon rev 2.0
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Test on my mx51 babbage board:
+CPU identified as i.MX51, silicon rev 3.0
+
 Signed-off-by: Jason Liu <jason.hui@linaro.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
-Resend: The patch based on Fabio initial patch, I did some change to
-use generic function for displaying silicon revision and also some
-naming change to avoid using the generic name
+v2: print mx51 To3 correctly
 ---
- arch/arm/mach-imx/clock-imx27.c |    2 ++
- arch/arm/mach-imx/cpu-imx27.c   |   28 +++++++++++++---------------
- 2 files changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    6 +--
+ arch/arm/mach-mx5/cpu.c             |   74 ++++++++---------------------------
+ 2 files changed, 19 insertions(+), 61 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clock-imx27.c b/arch/arm/mach-imx/clock-imx27.c
-index 6912b82..e6b1beb 100644
---- a/arch/arm/mach-imx/clock-imx27.c
-+++ b/arch/arm/mach-imx/clock-imx27.c
-@@ -751,6 +751,8 @@ int __init mx27_clocks_init(unsigned long fref)
- 	clk_enable(&gpio_clk);
- 	clk_enable(&emi_clk);
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index f7bf996..0e23e1d 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1548,9 +1548,8 @@ int __init mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ 	clk_enable(&main_bus_clk);
+ 
  	clk_enable(&iim_clk);
-+	imx_print_silicon_rev("i.MX27", mx27_revision());
-+	clk_disable(&iim_clk);
+-	mx51_revision();
++	imx_print_silicon_rev("i.MX51", mx51_revision());
+ 	clk_disable(&iim_clk);
+-	mx51_display_revision();
  
- #if defined(CONFIG_DEBUG_LL) && !defined(CONFIG_DEBUG_ICEDCC)
- 	clk_enable(&uart1_clk);
-diff --git a/arch/arm/mach-imx/cpu-imx27.c b/arch/arm/mach-imx/cpu-imx27.c
-index 3b117be..ff38e15 100644
---- a/arch/arm/mach-imx/cpu-imx27.c
-+++ b/arch/arm/mach-imx/cpu-imx27.c
-@@ -26,12 +26,12 @@
+ 	/* move usb_phy_clk to 24MHz */
+ 	clk_set_parent(&usb_phy1_clk, &osc_clk);
+@@ -1592,9 +1591,8 @@ int __init mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 	clk_enable(&main_bus_clk);
  
+ 	clk_enable(&iim_clk);
+-	mx53_revision();
++	imx_print_silicon_rev("i.MX53", mx53_revision());
+ 	clk_disable(&iim_clk);
+-	mx53_display_revision();
+ 
+ 	/* Set SDHC parents to be PLL2 */
+ 	clk_set_parent(&esdhc1_clk, &pll2_sw_clk);
+diff --git a/arch/arm/mach-mx5/cpu.c b/arch/arm/mach-mx5/cpu.c
+index 86f87da..5c53282 100644
+--- a/arch/arm/mach-mx5/cpu.c
++++ b/arch/arm/mach-mx5/cpu.c
+@@ -18,7 +18,7 @@
  #include <mach/hardware.h>
+ #include <asm/io.h>
  
 -static int cpu_silicon_rev = -1;
--static int cpu_partnumber;
-+static int mx27_cpu_rev = -1;
-+static int mx27_cpu_partnumber;
++static int mx5_cpu_rev = -1;
  
- #define SYS_CHIP_ID             0x00    /* The offset of CHIP ID register */
+ #define IIM_SREV 0x24
+ #define MX50_HW_ADADIG_DIGPROG	0xB0
+@@ -28,11 +28,14 @@ static int get_mx51_srev(void)
+ 	void __iomem *iim_base = MX51_IO_ADDRESS(MX51_IIM_BASE_ADDR);
+ 	u32 rev = readl(iim_base + IIM_SREV) & 0xff;
  
--static void query_silicon_parameter(void)
-+static int mx27_read_cpu_rev(void)
- {
- 	u32 val;
- 	/*
-@@ -42,20 +42,18 @@ static void query_silicon_parameter(void)
- 	val = __raw_readl(MX27_IO_ADDRESS(MX27_SYSCTRL_BASE_ADDR
- 				+ SYS_CHIP_ID));
- 
-+	mx27_cpu_partnumber = (int)((val >> 12) & 0xFFFF);
-+
- 	switch (val >> 28) {
- 	case 0:
--		cpu_silicon_rev = IMX_CHIP_REVISION_1_0;
--		break;
-+		return IMX_CHIP_REVISION_1_0;
- 	case 1:
--		cpu_silicon_rev = IMX_CHIP_REVISION_2_0;
--		break;
-+		return IMX_CHIP_REVISION_2_0;
- 	case 2:
--		cpu_silicon_rev = IMX_CHIP_REVISION_2_1;
--		break;
-+		return IMX_CHIP_REVISION_2_1;
- 	default:
--		cpu_silicon_rev = IMX_CHIP_REVISION_UNKNOWN;
+-	if (rev == 0x0)
++	switch (rev) {
++	case 0x0:
+ 		return IMX_CHIP_REVISION_2_0;
+-	else if (rev == 0x10)
++	case 0x10:
+ 		return IMX_CHIP_REVISION_3_0;
+-	return 0;
++	default:
 +		return IMX_CHIP_REVISION_UNKNOWN;
- 	}
--	cpu_partnumber = (int)((val >> 12) & 0xFFFF);
++	}
  }
  
  /*
-@@ -65,12 +63,12 @@ static void query_silicon_parameter(void)
-  */
- int mx27_revision(void)
- {
--	if (cpu_silicon_rev == -1)
--		query_silicon_parameter();
-+	if (mx27_cpu_rev == -1)
-+		mx27_cpu_rev = mx27_read_cpu_rev();
- 
--	if (cpu_partnumber != 0x8821)
-+	if (mx27_cpu_partnumber != 0x8821)
+@@ -45,33 +48,13 @@ int mx51_revision(void)
+ 	if (!cpu_is_mx51())
  		return -EINVAL;
  
+-	if (cpu_silicon_rev == -1)
+-		cpu_silicon_rev = get_mx51_srev();
++	if (mx5_cpu_rev == -1)
++		mx5_cpu_rev = get_mx51_srev();
+ 
 -	return cpu_silicon_rev;
-+	return mx27_cpu_rev;
++	return mx5_cpu_rev;
  }
- EXPORT_SYMBOL(mx27_revision);
+ EXPORT_SYMBOL(mx51_revision);
+ 
+-void mx51_display_revision(void)
+-{
+-	int rev;
+-	char *srev;
+-	rev = mx51_revision();
+-
+-	switch (rev) {
+-	case IMX_CHIP_REVISION_2_0:
+-		srev = IMX_CHIP_REVISION_2_0_STRING;
+-		break;
+-	case IMX_CHIP_REVISION_3_0:
+-		srev = IMX_CHIP_REVISION_3_0_STRING;
+-		break;
+-	default:
+-		srev = IMX_CHIP_REVISION_UNKNOWN_STRING;
+-	}
+-	printk(KERN_INFO "CPU identified as i.MX51, silicon rev %s\n", srev);
+-}
+-EXPORT_SYMBOL(mx51_display_revision);
+-
+ #ifdef CONFIG_NEON
+ 
+ /*
+@@ -121,10 +104,10 @@ int mx53_revision(void)
+ 	if (!cpu_is_mx53())
+ 		return -EINVAL;
+ 
+-	if (cpu_silicon_rev == -1)
+-		cpu_silicon_rev = get_mx53_srev();
++	if (mx5_cpu_rev == -1)
++		mx5_cpu_rev = get_mx53_srev();
+ 
+-	return cpu_silicon_rev;
++	return mx5_cpu_rev;
+ }
+ EXPORT_SYMBOL(mx53_revision);
+ 
+@@ -134,7 +117,7 @@ static int get_mx50_srev(void)
+ 	u32 rev;
+ 
+ 	if (!anatop) {
+-		cpu_silicon_rev = -EINVAL;
++		mx5_cpu_rev = -EINVAL;
+ 		return 0;
+ 	}
+ 
+@@ -159,36 +142,13 @@ int mx50_revision(void)
+ 	if (!cpu_is_mx50())
+ 		return -EINVAL;
+ 
+-	if (cpu_silicon_rev == -1)
+-		cpu_silicon_rev = get_mx50_srev();
++	if (mx5_cpu_rev == -1)
++		mx5_cpu_rev = get_mx50_srev();
+ 
+-	return cpu_silicon_rev;
++	return mx5_cpu_rev;
+ }
+ EXPORT_SYMBOL(mx50_revision);
+ 
+-void mx53_display_revision(void)
+-{
+-	int rev;
+-	char *srev;
+-	rev = mx53_revision();
+-
+-	switch (rev) {
+-	case IMX_CHIP_REVISION_1_0:
+-		srev = IMX_CHIP_REVISION_1_0_STRING;
+-		break;
+-	case IMX_CHIP_REVISION_2_0:
+-		srev = IMX_CHIP_REVISION_2_0_STRING;
+-		break;
+-	case IMX_CHIP_REVISION_2_1:
+-		srev = IMX_CHIP_REVISION_2_1_STRING;
+-		break;
+-	default:
+-		srev = IMX_CHIP_REVISION_UNKNOWN_STRING;
+-	}
+-	printk(KERN_INFO "CPU identified as i.MX53, silicon rev %s\n", srev);
+-}
+-EXPORT_SYMBOL(mx53_display_revision);
+-
+ static int __init post_cpu_init(void)
+ {
+ 	unsigned int reg;
 -- 
 1.7.4.1
