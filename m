@@ -1,72 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 26 Aug 2011 10:40:53 +0900
-Subject: [PATCH 2/5] ARM: SAMSUNG: Make the sleep code common for S3C64XX
-	and newer SoCs
-In-Reply-To: <1313144787-30666-3-git-send-email-a.kesavan@samsung.com>
-References: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
-	<1313144787-30666-3-git-send-email-a.kesavan@samsung.com>
-Message-ID: <073501cc6391$31569f70$9403de50$%kim@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 26 Aug 2011 09:58:39 +0800
+Subject: [PATCH 0/4 v4] pin controller subsystem v4
+In-Reply-To: <CACRpkdb4-0TfO-viUoZyW3VoLnVuo2ztHTX=8Hef3_RYWB52vg@mail.gmail.com>
+References: <1313747619-32222-1-git-send-email-linus.walleij@stericsson.com>
+	<CAGsJ_4z7s-ibmUuR1DA6Jps030dRrnE8M0dUWHoMhMPFtyyY_A@mail.gmail.com>
+	<CACRpkdb4-0TfO-viUoZyW3VoLnVuo2ztHTX=8Hef3_RYWB52vg@mail.gmail.com>
+Message-ID: <CAGsJ_4yEXEajH1JyNjnYE0hg13Fgd7bdiMNFs2fp6Ou=h_9N9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan wrote:
-> 
-> The sleep code for S5PV210 and EXYNOS4 is identical; moreover it is quite
-> similar
-> to that for S3C64XX except for some SoC specific debug logic. S5P64X0 and
-> S5PC100,
-> for which support will be added soon, can also use the same procedure.
-Create a
-> common sleep code in the plat-samsung directory so that it can be re-used.
-> 
-> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->  arch/arm/mach-exynos4/Kconfig  |    1 +
->  arch/arm/mach-exynos4/Makefile |    2 +-
->  arch/arm/mach-exynos4/sleep.S  |   54 ---------------------------
->  arch/arm/mach-s3c64xx/Kconfig  |    1 +
->  arch/arm/mach-s3c64xx/Makefile |    1 -
->  arch/arm/mach-s3c64xx/sleep.S  |   72
-------------------------------------
->  arch/arm/mach-s5pv210/Kconfig  |    1 +
->  arch/arm/mach-s5pv210/Makefile |    2 +-
->  arch/arm/mach-s5pv210/sleep.S  |   52 --------------------------
->  arch/arm/plat-samsung/Kconfig  |    7 +++
->  arch/arm/plat-samsung/Makefile |    1 +
->  arch/arm/plat-samsung/sleep.S  |   80
-> ++++++++++++++++++++++++++++++++++++++++
->  12 files changed, 93 insertions(+), 181 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos4/sleep.S
->  delete mode 100644 arch/arm/mach-s3c64xx/sleep.S
->  delete mode 100644 arch/arm/mach-s5pv210/sleep.S
->  create mode 100644 arch/arm/plat-samsung/sleep.S
-> 
+2011/8/22 Linus Walleij <linus.walleij@linaro.org>:
+> On Sun, Aug 21, 2011 at 4:42 PM, Barry Song <21cnbao@gmail.com> wrote:
+>
+>> it seems there is not an actual example that gpio requests pin from
+>> pinctrl yet. i might give one on SiRFprimaII.
+>
+> No good example yet, no.
+>
+> The reason is that for the U300 that I use as guinea pig, the
+> GPIO driver is tangled up in discussions about how to handle
+> the special control mechanics like requesting muxing and
+> biasing pins. Right now it seems easier to rewrite all that
+> to use the new pinctrl subsystem rather than actually trying
+> to work it into the GPIO subsystem first and refactor from
+> there, and that needs quite a bit of upfront work...
 
-(snip)
+Do you want the pinmux_request_gpio called by the gpiolib driver or by
+every device driver who uses this gpio?
+Do you think the following make sense in gpiolib driver?
+static int xxx_gpio_request(struct gpio_chip *chip, unsigned offset)
+{
+        int ret = 0;
 
-> +ENTRY(s3c_cpu_resume)
-> +#if defined(CONFIG_S3C_PM_DEBUG_LED_SMDK)
-> +
-
-Hi Abhilash,
-
-Yes, would be nice if each sleep.S can be handled in plat-samsung for
-Samsung SoCs.
-
-Hmm...but the CONFIG_S3C_PM_DEBUG_LED_SMDK can be used on other SoCs for
-same reason even though it is available only on S3C64XX now. I think, we
-need to add SoC detecting here.
-
-> +#undef S3C64XX_VA_GPIO
-> +#define S3C64XX_VA_GPIO (0x0)
-
-Please let me know why this is needed here.
+        ret = pinmux_request_gpio(chip->base + offset);
+        if (ret)
+                goto out;
+        .....
+out:
+        return ret;
+}
 
 
-Thanks.
+>
+> Linus Walleij
+>
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks
+Barry
