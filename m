@@ -1,47 +1,58 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 26 Aug 2011 10:18:34 +0200
-Subject: [[PATCH v2] ARM: i.MX: initialize l2x0 at early_init time
-In-Reply-To: <1314326654-19128-1-git-send-email-jason.hui@linaro.org>
-References: <1314326654-19128-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <20110826081834.GE31404@pengutronix.de>
+Date: Fri, 26 Aug 2011 10:18:57 +0200
+Subject: [[PATCH v3 0/6] imx soc revision clean up
+In-Reply-To: <1314336923-25162-1-git-send-email-jason.hui@linaro.org>
+References: <1314336923-25162-1-git-send-email-jason.hui@linaro.org>
+Message-ID: <20110826081857.GF31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2011 at 10:44:14AM +0800, Jason Liu wrote:
-> This can make the l2 cache work at early time which
-> will benefit the boot up time.
+On Fri, Aug 26, 2011 at 01:35:17PM +0800, Jason Liu wrote:
+> The patchset make some clean up for the imx soc revision display by
+> - introudce the generic function for displaying silicon revision
+> - update the imx SoCs to adopt the same usage
 > 
-> Tested on i.mx31pdk board, test result shows:
+> The patchset is based on Fabio's initial commit and I did some update
 > 
-> Before: arch_initcall(mxc_init_l2x0);
+> V3:
+> - fix the mx51TO3/mx31 print information
+> V2: Address comments from Sascha
+> - Remove the EXPORT_SYMBOL from imx_print_silicon_rev
+> - Fix the mx31 print twice issue
 > 
-> [    0.558755] console [ttymxc0] enabled
+> Fabio Estevam (1):
+>   ARM: imx: Introduce generic function for displaying silicon revision
 > 
-> After: early_initcall(mxc_init_l2x0);
-> 
-> [    0.555716] console [ttymxc0] enabled
-> 
-> Signed-off-by: Jason Liu <jason.hui@linaro.org>
+> Jason Liu (5):
+>   ARM: mx25: Print silicon revision on boot
+>   ARM: mx27: Print silicon revision on boot
+>   ARM: mx31: use generic function for displaying silicon revision
+>   ARM: mx35: use generic function for displaying silicon revision
+>   ARM: mx5: use generic function for displaying silicon revision
 
 Applied for next.
 
 Sascha
 
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/mach-imx/cache-l2x0.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-imx/cache-l2x0.c b/arch/arm/mach-imx/cache-l2x0.c
-> index 69d1322..e5538a4 100644
-> --- a/arch/arm/mach-imx/cache-l2x0.c
-> +++ b/arch/arm/mach-imx/cache-l2x0.c
-> @@ -53,4 +53,4 @@ static int mxc_init_l2x0(void)
->  
->  	return 0;
->  }
-> -arch_initcall(mxc_init_l2x0);
-> +early_initcall(mxc_init_l2x0);
+>  arch/arm/mach-imx/Makefile              |    2 +-
+>  arch/arm/mach-imx/clock-imx25.c         |    6 +++
+>  arch/arm/mach-imx/clock-imx27.c         |    2 +
+>  arch/arm/mach-imx/clock-imx31.c         |    4 +-
+>  arch/arm/mach-imx/clock-imx35.c         |    3 +-
+>  arch/arm/mach-imx/cpu-imx25.c           |   41 +++++++++++++++++
+>  arch/arm/mach-imx/cpu-imx27.c           |   28 +++++------
+>  arch/arm/mach-imx/cpu-imx31.c           |   48 +++++++++++---------
+>  arch/arm/mach-imx/cpu-imx35.c           |   30 ++++++-------
+>  arch/arm/mach-mx5/clock-mx51-mx53.c     |    6 +--
+>  arch/arm/mach-mx5/cpu.c                 |   74 +++++++------------------------
+>  arch/arm/plat-mxc/cpu.c                 |    9 ++++
+>  arch/arm/plat-mxc/include/mach/common.h |    1 +
+>  arch/arm/plat-mxc/include/mach/mx25.h   |    4 ++
+>  arch/arm/plat-mxc/include/mach/mx3x.h   |   18 +-------
+>  15 files changed, 142 insertions(+), 134 deletions(-)
+>  create mode 100644 arch/arm/mach-imx/cpu-imx25.c
+> 
 > -- 
 > 1.7.4.1
 > 
