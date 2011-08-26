@@ -1,24 +1,36 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 26 Aug 2011 09:10:16 -0700
-Subject: [PATCH] mtd: Replace DEBUG with MTD_DBG
-In-Reply-To: <1314335775-3384-2-git-send-email-tanmay.upadhyay@einfochips.com>
-References: <CAMPhdO_qVn8JaX6orfnHHXjmi8pTQFb1SzMe2RQM9xMdTvimaQ@mail.gmail.com>
-	<1314335775-3384-2-git-send-email-tanmay.upadhyay@einfochips.com>
-Message-ID: <CAN8TOE9ACmLyZFkPp9FJ4j59hSeHtLmUqYv39z3NW70M16muGQ@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 26 Aug 2011 17:16:33 +0100
+Subject: [PATCH v3 11/13] of: add property iteration helpers
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B24A40C8@HQMAIL01.nvidia.com>
+References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
+	<1314315824-9687-12-git-send-email-swarren@nvidia.com>
+	<20110826092632.GB3926@pulham.picochip.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B24A40C8@HQMAIL01.nvidia.com>
+Message-ID: <20110826161633.GB2802@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 10:16 PM, Tanmay Upadhyay
-<tanmay.upadhyay@einfochips.com> wrote:
-> Defining macro 'DEBUG' for debug prints conflicts with other
-> subsystem where defining 'DEBUG' means enable debug code including
-> debug prints and others. So, replaced DEBUG with MTD_DBG for MTD
+On Fri, Aug 26, 2011 at 08:59:44AM -0700, Stephen Warren wrote:
+> Jamie Iles wrote at Friday, August 26, 2011 3:27 AM:
+> > For the !CONFIG_OF case, I *think* that
+> > of_iter_u32_prop and of_iter_string_prop can be empty struct's, but I
+> > wouldn't want to bet money on that!
+> 
+> Empty structs themselves certainly did compile OK, but the code that
+> uses these macros references iter.value directly, and isn't under #ifdef
+> CONFIG_OF, so that field has to exist.
+> 
+> I suppose an alternative would be to add an accessor function:
+> 
+> struct of_iter_string_prop iter;
+> for_each_string_property_value(iter, np, "pins")
+>         printk("Got value %s\n", of_iter_string_value(iter));
+> 
+> which would return NULL/"" when !CONFIG_OF, and hence allow iter.value
+> to be removed too. Do you think that's a good approach? It'd be easy to
+> implement.
 
-DEBUG was killed from MTD recently in the subsystem tree for MTD,
-l2-mtd-2.6.git:
-git://git.infradead.org/users/dedekind/l2-mtd-2.6.git
+I think I prefer what you have now rather than a separate accessor, but 
+I'm happy either way!
 
-The fix *should* be merged in the next merge window, so this patch is
-unnecessary.
-
-Brian
+Jamie
