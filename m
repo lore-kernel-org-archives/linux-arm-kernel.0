@@ -1,17 +1,43 @@
-From: jason.hui@linaro.org (Jason Hui)
-Date: Fri, 26 Aug 2011 13:38:00 +0800
-Subject: [[PATCH v2 0/6] imx soc revision clean up
-In-Reply-To: <20110824163332.GJ31404@pengutronix.de>
-References: <1314162277-2840-1-git-send-email-jason.hui@linaro.org>
-	<20110824163332.GJ31404@pengutronix.de>
-Message-ID: <CAFQ4atRAoRw6g0WAnZL3-h_iS83gG3+GxuaUkywhXvii2snA6A@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 25 Aug 2011 22:40:00 -0700
+Subject: [GIT PULL] [3.2] Please pull tegra boards for 3.2
+In-Reply-To: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
+References: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
+Message-ID: <CAOesGMh+r=GV1vJ9bK8WUmePkJ-BKf7HnTo29+3fnMdwNvmCiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sascha,
+Hi Arnd,
 
-I have one update called V3 for this, could you please pick up this version.
+Please pull the first set of tegra/board patches for 3.2. Same
+contents as last time, but rebased on top of 3.1-rc3:
 
-Thank you very much!
+The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
 
-Jason
+  Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git boards-for-3.2
+
+Marc Dietrich (5):
+      ARM: tegra: paz00: add support serial port on JP1
+      ARM: tegra: paz00: enable rfkill for internal wifi card
+      ARM: tegra: paz00: enable wifi led
+      ARM: tegra: paz00: reorder the SDHCI channel init
+      ARM: tegra: paz00: add clocks required for usb operation
+
+Stephen Warren (4):
+      ARM: Tegra: Harmony: Add USB device
+      ARM: Tegra: Seaboard board updates for audio
+      ARM: Tegra: Seaboard: Add USB devices
+      ARM: Tegra: Force PORT_TEGRA as the UART type
+
+ arch/arm/mach-tegra/board-harmony.c         |    5 +-
+ arch/arm/mach-tegra/board-paz00-pinmux.c    |    3 +
+ arch/arm/mach-tegra/board-paz00.c           |   62 ++++++++++++++++++++-
+ arch/arm/mach-tegra/board-paz00.h           |   16 ++++-
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |    6 +-
+ arch/arm/mach-tegra/board-seaboard.c        |   81 ++++++++++++++++++++++++++-
+ arch/arm/mach-tegra/board-seaboard.h        |   12 +++-
+ arch/arm/mach-tegra/board-trimslice.c       |    3 +-
+ 8 files changed, 173 insertions(+), 15 deletions(-)
