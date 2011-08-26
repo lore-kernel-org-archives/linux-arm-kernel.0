@@ -1,155 +1,123 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 26 Aug 2011 09:27:04 +0200
-Subject: [PATCH 1/2] Adding platform level cpuidle driver for i.MX SoCs.
-In-Reply-To: <1314325995-29118-1-git-send-email-rob.lee@linaro.org>
-References: <1314325995-29118-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <20110826072704.GB31404@pengutronix.de>
+From: kzjeef@gmail.com (Jiejing.Zhang )
+Date: Fri, 26 Aug 2011 15:32:28 +0800
+Subject: [PATCH 4/4] Do not call flush_cache_user_range with mmap_sem held
+In-Reply-To: <1301924629.15819.42.camel@e102109-lin.cambridge.arm.com>
+References: <1292302659-1863-1-git-send-email-john.stultz@linaro.org>
+	<1292302659-1863-5-git-send-email-john.stultz@linaro.org>
+	<20101214093002.GA18425@n2100.arm.linux.org.uk>
+	<AANLkTim1Wspod2LnfVw7atzP921C6o7EiKRVqw9LeqhG@mail.gmail.com>
+	<20101214190503.GB24303@n2100.arm.linux.org.uk>
+	<AANLkTimw839TCrzY0X4n8_AcwwdT1kFxNQNNsFC9SRdb@mail.gmail.com>
+	<BANLkTinmCNi3MgcZo5CJorpoLNxwMwhVOA@mail.gmail.com>
+	<20110404133718.GC22480@n2100.arm.linux.org.uk>
+	<1301924629.15819.42.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <CACrgxGB16ibPARkf8TN4S47vOZwm+W2pBJyEj=e+F0uFK5NjmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 09:33:14PM -0500, Robert Lee wrote:
-> Signed-off-by: Robert Lee <rob.lee@linaro.org>
-> ---
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/cpuidle.c
-> @@ -0,0 +1,112 @@
-> +/*
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/cpuidle.h>
-> +#include <asm/proc-fns.h>
-> +#include <mach/hardware.h>
-> +#include <mach/system.h>
-> +#include <mach/cpuidle.h>
-> +
-> +
-> +#ifndef MXC_OVERRIDE_DEFAULT_CPUIDLE_PARAMS
+Hi Catalin, Russell,
 
-Either there is a possibility to overwrite the cpuidle parameters
-or there is none, but we don't need a define for this. I'm not
-convinced we need this possibility at all though.
+I met this issue on our development board: iMX53 + 2.6.35.2 Kernel,
+this is stack trace when the dead lock happens.
 
-> +
-> +#define MXC_X_MACRO(a, b, c) {c}
-> +static struct imx_cpuidle_params default_cpuidle_params[] = \
-> +	MXC_CPUIDLE_TABLE;
-> +#undef MXC_X_MACRO
+You can see the hung task are dead lock at __read_lock(), after I add
+more debug message and dump the hung task's stack trace.
 
-Hell! This is one of the worst unnecessary preprocessor abuses I've ever
-seen. Do not show this in public again.
+After apply this patch, the hung is gong.
 
-> +
-> +static struct imx_cpuidle_params *imx_cpuidle_params = default_cpuidle_params;
-> +
-> +#else
-> +
-> +static struct imx_cpuidle_params *imx_cpuidle_params;
-> +
-> +#endif
-> +
-> +
-> +
-> +/* in case you want to override the mach level params at the board level */
-> +void imx_cpuidle_board_params(struct imx_cpuidle_params *cpuidle_params)
-> +{
-> +	imx_cpuidle_params = cpuidle_params;
-> +}
-> +
-> +static int imx_enter_idle(struct cpuidle_device *dev,
-> +			       struct cpuidle_state *state)
-> +{
-> +	struct timeval before, after;
-> +	int idle_time, i;
-> +
-> +	/* We only need to pass an index to the mach level so here we
-> +	 * find the index of the name contained in the cpuidle_state
-> +	 * to pass. */
-> +	for (i = 0; i < MXC_NUM_CPUIDLE_STATES && i < CPUIDLE_STATE_MAX; i++)
+This is the hung task's output:
 
-A define for MXC_NUM_CPUIDLE_STATES looks wrong, it is not constant for
-different SoCs.
+Freezing of tasks failed after 20.01 seconds (7 tasks refusing to freeze):
 
-> +		if (state == &dev->states[i])
-> +			break;
-> +
-> +	local_irq_disable();
-> +	local_fiq_disable();
-> +
-> +	do_gettimeofday(&before);
-> +
-> +	imx_cpu_do_idle(i);
+InputDispatch D 80477548     0  2209   2108 0x00080001
+[<80477548>] (schedule+0x2b0/0x334) from [<8047949c>] (__down_read+0x12c/0x140)
+[<8047949c>] (__down_read+0x12c/0x140) from [<800b62a0>]
+access_process_vm+0x3c/0x120)
+[<800b62a0>] (access_process_vm+0x3c/0x120) from [<8010e528>]
+proc_pid_cmdline+0x50/0xcc)
+[<8010e528>] (proc_pid_cmdline+0x50/0xcc) from [<8010fafc>]
+(proc_info_read+0x58/0xc4)
+[<8010fafc>] (proc_info_read+0x58/0xc4) from [<800ce550>] (vfs_read+0xa8/0x150)
+[<800ce550>] (vfs_read+0xa8/0x150) from [<800ce6a4>] (sys_read+0x3c/0x68)
+[<800ce6a4>] (sys_read+0x3c/0x68) from [<8003af80>] (ret_fast_syscall+0x0/0x30)
 
-We are currently working on running a single image on as many SoCs we
-can. Take a step back and imagine what the linker says when it finds
-6 different functions named imx_cpu_do_idle()
+android.brows D 80477548     0  2575   2108 0x00080001
+[<80477548>] (schedule+0x2b0/0x334) from [<80479354>]
+__down_write_nested+0x128/0x13c)
+[<80479354>] (__down_write_nested+0x128/0x13c) from [<800bc62c>]
+(sys_mprotect+0xac/0x1f0)
+[<800bc62c>] (sys_mprotect+0xac/0x1f0) from [<8003af80>]
+(ret_fast_syscall+0x0/0x30)
 
-> +
-> +	do_gettimeofday(&after);
-> +
-> +	local_fiq_enable();
-> +	local_irq_enable();
-> +
-> +	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-> +			(after.tv_usec - before.tv_usec);
-> +
-> +	return idle_time;
-> +}
-> +
-> +static struct cpuidle_driver imx_cpuidle_driver = {
-> +	.name =         "imx_idle",
-> +	.owner =        THIS_MODULE,
-> +};
-> +
-> +static DEFINE_PER_CPU(struct cpuidle_device, imx_cpuidle_device);
-> +
-> +static int __init imx_cpuidle_init(void)
-> +{
-> +	struct cpuidle_device *device;
-> +	int i;
-> +
-> +	#define MXC_X_MACRO(a, b, c) #a
-> +	char *mxc_cpuidle_state_name[] = MXC_CPUIDLE_TABLE;
-> +	#undef MXC_X_MACRO
-> +
-> +	#define MXC_X_MACRO(a, b, c) b
-> +	char *mxc_cpuidle_state_desc[] = MXC_CPUIDLE_TABLE;
-> +	#undef MXC_X_MACRO
-> +
-> +	if (imx_cpuidle_params == NULL)
-> +		return -ENODEV;
-> +
-> +	cpuidle_register_driver(&imx_cpuidle_driver);
-> +
-> +	device = &per_cpu(imx_cpuidle_device, smp_processor_id());
-> +	device->state_count = MXC_NUM_CPUIDLE_STATES;
-> +
-> +	for (i = 0; i < MXC_NUM_CPUIDLE_STATES && i < CPUIDLE_STATE_MAX; i++) {
-> +		device->states[i].enter = imx_enter_idle;
-> +		device->states[i].exit_latency = imx_cpuidle_params[i].latency;
-> +		device->states[i].flags = CPUIDLE_FLAG_TIME_VALID;
-> +		strcpy(device->states[i].name, mxc_cpuidle_state_name[i]);
-> +		strcpy(device->states[i].desc, mxc_cpuidle_state_desc[i]);
-> +	}
-> +
-> +	if (cpuidle_register_device(device)) {
-> +		printk(KERN_ERR "imx_cpuidle_init: Failed registering\n");
-> +		return -ENODEV;
-> +	}
-> +	return 0;
+Binder Thread D 80477548     0  2585   2108 0x00080001
+[<80477548>] (schedule+0x2b0/0x334) from
+[<80479354>](__down_write_nested+0x128/0x13c)
+[<80479354>] (__down_write_nested+0x128/0x13c) from [<800bc0d0>]
+(sys_f+0x70/0xb8)
+[<800bc0d0>] (sys_mmap_pgoff+0x70/0xb8) from [<8003af80>]
+(ret_fast_syscall+0x0/0x30)
 
-This should really be a platform driver.
+WebViewCoreTh D 80477548     0  2606   2108 0x00080001
+[<80477548>] (schedule+0x2b0/0x334) from [<8047949c>] (__down_read+0x12c/0x140)
+[<8047949c>] (__down_read+0x12c/0x140) from [<80040494>]
+(do_page_fault+0x8c/0x1d4)
+[<80040494>] (do_page_fault+0x8c/0x1d4) from [<8003a2c8>]
+(do_DataAbort+0x34/0x94)
+[<8003a2c8>] (do_DataAbort+0x34/0x94) from [<8003aa2c>] (__dabt_svc+0x4c/0x60)
+Exception stack(0xdfffdec0 to 0xdfffdf08)
+dec0: 3ace1000 3ace3000 00000040 0000003f 3ace2020 d4323db4 3ace0020 d4323d80
+dee0: 00000000 dfffc000 fffffa30 68888714 d4444528 dfffdf08 8003e760 800430e8
+df00: 80000013 ffffffff
+[<8003aa2c>] (__dabt_svc+0x4c/0x60) from [<800430e8>]
+(v7_coherent_kern_range+0x18/0x54)
+[<800430e8>] (v7_coherent_kern_range+0x18/0x54) from [<8003e760>]
+(arm_syscall+0x14c/0x230)
+[<8003e760>] (arm_syscall+0x14c/0x230) from [<8003af80>]
+(ret_fast_syscall+0x0/0x30)
+
+WebViewCoreTh D 80477548     0  2610   2108 0x00080001
+[<80477548>] (schedule+0x2b0/0x334) from [<80479354>]
+(__down_write_nested+0x128/0x13c)
+[<80479354>] (__down_write_nested+0x128/0x13c) from [<800bc62c>]
+(sys_mprotect+0xac/0x1f0)
+[<800bc62c>] (sys_mprotect+0xac/0x1f0) from [<8003af80>]
+(ret_fast_syscall+0x0/0x30)
+
+WebViewCoreTh D 80477548     0  2612   2108 0x00080001
+[<80477548>] (schedule+0x2b0/0x334) from [<8047949c>] (__down_read+0x12c/0x140)
+[<8047949c>] (__down_read+0x12c/0x140) from [<80040494>]
+(do_page_fault+0x8c/0x1d4)
+[<80040494>] (do_page_fault+0x8c/0x1d4) from [<8003a234>]
+(do_PrefetchAbort+0x34/0x94)
+[<8003a234>] (do_PrefetchAbort+0x34/0x94) from [<8003af20>]
+(ret_from_exception+0x0/0x10)
+Exception stack(0xdfff3fb0 to 0xdfff3ff8)
+3fa0:                                     39f46b18 39f46b18 6833ee01 39f46b18
+3fc0: 39f46b18 001f7e20 001e2bd8 39f46b18 39f46b28 39f46b30 39f46b10 39f46b60
+3fe0: 00000000 39f46af0 685d27b1 6833ee00 60000030 ffffffff
+ps            D 80477548     0  2625   2623 0x00080001
+[<80477548>] (schedule+0x2b0/0x334) from [<8047949c>] (__down_read+0x12c/0x140)
+[<8047949c>] (__down_read+0x12c/0x140) from [<800b62a0>]
+(access_process_vm+0x3c/0x120)
+[<800b62a0>] (access_process_vm+0x3c/0x120) from [<8010e528>]
+(proc_pid_cmdline+0x50/0xcc)
+[<8010e528>] (proc_pid_cmdline+0x50/0xcc) from [<8010fafc>]
+(proc_info_read+0x58/0xc4)
+[<8010fafc>] (proc_info_read+0x58/0xc4) from [<800ce550>] (vfs_read+0xa8/0x150)
+[<800ce550>] (vfs_read+0xa8/0x150) from [<800ce6a4>] (sys_read+0x3c/0x68)
+[<800ce6a4>] (sys_read+0x3c/0x68) from [<8003af80>] (ret_fast_syscall+0x0/0x30)
+
+Restarting tasks ... done.
+suspend: exit suspend, ret = -16 (2000-01-01 00:48:46.107784876 UTC)
+request_suspend_state: on (3->0) at 174620235627 (2000-01-01
+00:48:46.127113876 UTC)
+mxc_ipu mxc_ipu: Channel already disabled 9
+mxc_ipu mxc_ipu: Channel already uninitialized 9
+XXXX 1024 768 9997 910313298 960 80 20 6 10 16
 
 
-I'm glad I'm on holiday for the next two weeks.
 
-Sascha
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+Best regards,
+Zhang Jiejing
