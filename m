@@ -1,29 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Aug 2011 17:49:31 +0200
-Subject: [GIT PULL] u300 cleanups
-In-Reply-To: <CACRpkdbeFuvL=p8bA9hCK8eUGeM1pLqQO8+5uw-w6iEXaTsung@mail.gmail.com>
-References: <CACRpkdbJ0M_7+s+QkrBzAaNVdx_bNL4Pq7zu30T-yY0TkFu6wQ@mail.gmail.com>
-	<CACRpkdbeFuvL=p8bA9hCK8eUGeM1pLqQO8+5uw-w6iEXaTsung@mail.gmail.com>
-Message-ID: <201108261749.32135.arnd@arndb.de>
+Date: Fri, 26 Aug 2011 17:53:02 +0200
+Subject: [GIT PULL] orion5x and footbridge compile fixes for 3.1
+In-Reply-To: <4E565AC4.7060504@gmail.com>
+References: <4E565AC4.7060504@gmail.com>
+Message-ID: <201108261753.03086.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 August 2011, Linus Walleij wrote:
-> On Wed, Aug 17, 2011 at 1:12 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Thursday 25 August 2011, Rob Herring wrote:
+> Please pull for 3.1-rc. Footbridge and orion5x builds are currently
+> broken in 3.1 mainly due to my changes in this commit:
 > 
-> > could you please pull the u300 cleanups to the arm-soc tree, so they get
-> > some linux-next rotation?
-> > (...)
-> > are available in the git repository at:
-> >  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git u300
+> commit cc22b4c18540e5e8bf55c7d124044f9317527d3c
+> Author: Rob Herring <rob.herring@calxeda.com>
+> Date:   Tue Jun 28 21:22:40 2011 -0500
 > 
-> ping on this - the above now also started to fix build errors in linux-next
-> so would be beneficial to have this included.
+>     ARM: set vga memory base at run-time
+> 
+> 
+> The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
+> 
 
-Pulled now, sorry for the long delay!
+Pulled, thanks!
 
-> 6 files changed, 7 insertions(+), 177 deletions(-)
+BTW, are you planning to get your own git tree in the future or do you keep using
+Jon's git.jdl.com server?
 
-Excellent diffstat!!!
+It should be no problem for you to get hosting on git.kernel.org, there is
+a FAQ somewhere. With the current situation, it's now clear from the changelog
+why I am pulling patches from Jon's server with your Signed-off-by.
 
 	Arnd
