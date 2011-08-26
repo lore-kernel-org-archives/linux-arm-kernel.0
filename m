@@ -1,79 +1,59 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 26 Aug 2011 14:10:13 +0530
-Subject: [PATCH 5/6] ARM: SAMSUNG: Add device tree support for pl330 dma engine
-	wrappers
-In-Reply-To: <1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>
+Date: Fri, 26 Aug 2011 14:10:14 +0530
+Subject: [PATCH 6/6] ARM: EXYNOS4: Limit usage of pl330 device instance to
+	non-dt build
+In-Reply-To: <1314348014-2481-6-git-send-email-thomas.abraham@linaro.org>
 References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
 	<1314348014-2481-2-git-send-email-thomas.abraham@linaro.org>
 	<1314348014-2481-3-git-send-email-thomas.abraham@linaro.org>
 	<1314348014-2481-4-git-send-email-thomas.abraham@linaro.org>
 	<1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1314348014-2481-6-git-send-email-thomas.abraham@linaro.org>
+	<1314348014-2481-6-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1314348014-2481-7-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new dma request id 'DMACH_DT_PROP' is introduced for client drivers
-requesting a dma channel. This request indicates that a device tree
-node property represting the dma channel is available in
-'struct samsung_dma_info'. The dma channel request wrapper uses the
-node property value as the value for the filter parameter.
+The pl330 device instances and associated platform data is required only
+for non-device-tree builds. With device tree, all of this information is
+obtained from the device tree.
 
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/plat-samsung/dma-ops.c                |    9 ++++++++-
- arch/arm/plat-samsung/include/plat/dma-ops.h   |    1 +
- arch/arm/plat-samsung/include/plat/dma-pl330.h |    3 ++-
- 3 files changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/mach-exynos4/Kconfig  |    7 +++++++
+ arch/arm/mach-exynos4/Makefile |    3 ++-
+ 2 files changed, 9 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
-index 8d18425..b1135dd 100644
---- a/arch/arm/plat-samsung/dma-ops.c
-+++ b/arch/arm/plat-samsung/dma-ops.c
-@@ -23,11 +23,18 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
- 	struct dma_chan *chan;
- 	dma_cap_mask_t mask;
- 	struct dma_slave_config slave_config;
-+	void *filter_param;
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index d4d401c..3edbf37 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -21,6 +21,13 @@ config EXYNOS4_MCT
+ 	help
+ 	  Use MCT (Multi Core Timer) as kernel timers
  
- 	dma_cap_zero(mask);
- 	dma_cap_set(info->cap, mask);
++config EXYNOS4_DEV_DMA
++	bool
++	default y if !OF
++	help
++	  Compile in amba device definitions for DMA controller if OF
++	  is not enabled.
++
+ config EXYNOS4_DEV_AHCI
+ 	bool
+ 	help
+diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+index d2bf5bf..a2f33dc 100644
+--- a/arch/arm/mach-exynos4/Makefile
++++ b/arch/arm/mach-exynos4/Makefile
+@@ -13,7 +13,8 @@ obj-				:=
+ # Core support for EXYNOS4 system
  
--	chan = dma_request_channel(mask, pl330_filter, (void *)dma_ch);
-+	/*
-+	 * If a dma channel property of a device node from device tree is
-+	 * specified, use that as the fliter parameter.
-+	 */
-+	filter_param = (dma_ch == DMACH_DT_PROP) ? (void *)info->dt_dmach_prop :
-+				(void *)dma_ch;
-+	chan = dma_request_channel(mask, pl330_filter, filter_param);
+ obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
+-obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o pmu.o
++obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o pmu.o
++obj-$(CONFIG_EXYNOS4_DEV_DMA)	+= dma.o
+ obj-$(CONFIG_PM)		+= pm.o sleep.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
  
- 	if (info->direction == DMA_FROM_DEVICE) {
- 		memset(&slave_config, 0, sizeof(struct dma_slave_config));
-diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
-index 4c1a363..22eafc3 100644
---- a/arch/arm/plat-samsung/include/plat/dma-ops.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
-@@ -31,6 +31,7 @@ struct samsung_dma_info {
- 	enum dma_slave_buswidth width;
- 	dma_addr_t fifo;
- 	struct s3c2410_dma_client *client;
-+	struct property *dt_dmach_prop;
- };
- 
- struct samsung_dma_ops {
-diff --git a/arch/arm/plat-samsung/include/plat/dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-index 2e55e59..c5eaad5 100644
---- a/arch/arm/plat-samsung/include/plat/dma-pl330.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-@@ -21,7 +21,8 @@
-  * use these just as IDs.
-  */
- enum dma_ch {
--	DMACH_UART0_RX,
-+	DMACH_DT_PROP = -1,
-+	DMACH_UART0_RX = 0,
- 	DMACH_UART0_TX,
- 	DMACH_UART1_RX,
- 	DMACH_UART1_TX,
 -- 
 1.6.6.rc2
