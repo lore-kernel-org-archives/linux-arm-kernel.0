@@ -1,116 +1,98 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 26 Aug 2011 22:04:00 +0530
-Subject: [PATCH v14 REPOST 07/12] OMAP: dmtimer: pm_runtime support
-In-Reply-To: <87liug3zw0.fsf@ti.com>
-References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>	<1310731501-13078-8-git-send-email-tarun.kanti@ti.com>	<4E57BB61.2010804@ti.com>
-	<87liug3zw0.fsf@ti.com>
-Message-ID: <4E57CAF8.3030109@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 26 Aug 2011 10:12:08 -0700
+Subject: [PATCH 0/4 v4] pin controller subsystem v4
+In-Reply-To: <CAGsJ_4yEXEajH1JyNjnYE0hg13Fgd7bdiMNFs2fp6Ou=h_9N9g@mail.gmail.com>
+References: <1313747619-32222-1-git-send-email-linus.walleij@stericsson.com>
+	<CAGsJ_4z7s-ibmUuR1DA6Jps030dRrnE8M0dUWHoMhMPFtyyY_A@mail.gmail.com>
+	<CACRpkdb4-0TfO-viUoZyW3VoLnVuo2ztHTX=8Hef3_RYWB52vg@mail.gmail.com>
+	<CAGsJ_4yEXEajH1JyNjnYE0hg13Fgd7bdiMNFs2fp6Ou=h_9N9g@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B24A4113@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 August 2011 09:53 PM, Kevin Hilman wrote:
-> Santosh<santosh.shilimkar@ti.com>  writes:
+Barry Song wrote at Thursday, August 25, 2011 7:59 PM:
+> 2011/8/22 Linus Walleij <linus.walleij@linaro.org>:
+> > On Sun, Aug 21, 2011 at 4:42 PM, Barry Song <21cnbao@gmail.com> wrote:
+> >
+> >> it seems there is not an actual example that gpio requests pin from
+> >> pinctrl yet. i might give one on SiRFprimaII.
+> >
+> > No good example yet, no.
+> >
+> > The reason is that for the U300 that I use as guinea pig, the
+> > GPIO driver is tangled up in discussions about how to handle
+> > the special control mechanics like requesting muxing and
+> > biasing pins. Right now it seems easier to rewrite all that
+> > to use the new pinctrl subsystem rather than actually trying
+> > to work it into the GPIO subsystem first and refactor from
+> > there, and that needs quite a bit of upfront work...
+> 
+> Do you want the pinmux_request_gpio called by the gpiolib driver or by
+> every device driver who uses this gpio?
+> Do you think the following make sense in gpiolib driver?
 >
->> On Friday 15 July 2011 05:34 PM, Tarun Kanti DebBarma wrote:
->>> Add pm_runtime feature to dmtimer whereby _get_sync() is called within
->>> omap_dm_timer_enable(), _put_sync() is called in omap_dm_timer_disable().
->>>
->>> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
->>> [p-basak2 at ti.com: added pm_runtime logic in probe()]
->>> Signed-off-by: Partha Basak<p-basak2@ti.com>
->>> Reviewed-by: Varadarajan, Charulatha<charu@ti.com>
->>> Acked-by: Cousson, Benoit<b-cousson@ti.com>
->>> ---
->>>    arch/arm/plat-omap/dmtimer.c              |   31 +++++++---------------------
->>>    arch/arm/plat-omap/include/plat/dmtimer.h |    1 -
->>>    2 files changed, 8 insertions(+), 24 deletions(-)
->>>
->>> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
->>> index 54564e9..0560248 100644
->>> --- a/arch/arm/plat-omap/dmtimer.c
->>> +++ b/arch/arm/plat-omap/dmtimer.c
->>> @@ -38,6 +38,7 @@
->>>    #include<linux/io.h>
->>>    #include<linux/slab.h>
->>>    #include<linux/err.h>
->>> +#include<linux/pm_runtime.h>
->>>
->>>    #include<plat/dmtimer.h>
->>>
->>> @@ -193,33 +194,13 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_free);
->>>
->>>    void omap_dm_timer_enable(struct omap_dm_timer *timer)
->>>    {
->>> -	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
->>> -
->>> -	if (timer->enabled)
->>> -		return;
->>> -
->>> -	if (!pdata->needs_manual_reset) {
->>> -		clk_enable(timer->fclk);
->>> -		clk_enable(timer->iclk);
->>> -	}
->>> -
->>> -	timer->enabled = 1;
->>> +	pm_runtime_get_sync(&timer->pdev->dev);
->>>    }
->>>    EXPORT_SYMBOL_GPL(omap_dm_timer_enable);
->>>
->>>    void omap_dm_timer_disable(struct omap_dm_timer *timer)
->>>    {
->>> -	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
->>> -
->>> -	if (!timer->enabled)
->>> -		return;
->>> -
->>> -	if (!pdata->needs_manual_reset) {
->>> -		clk_disable(timer->iclk);
->>> -		clk_disable(timer->fclk);
->>> -	}
->>> -
->>> -	timer->enabled = 0;
->>> +	pm_runtime_put_sync(&timer->pdev->dev);
->> Better to use pm_runtime_put_sync_suspend() to make
->> it irq safe.
->
-> Actually, better to just use the async version: pm_runtime_put()
->
-> Why does it need to be IRQ safe?
->
->>>    }
->>>    EXPORT_SYMBOL_GPL(omap_dm_timer_disable);
->>>
->>> @@ -461,7 +442,7 @@ int omap_dm_timers_active(void)
->>>    	struct omap_dm_timer *timer;
->>>
->>>    	list_for_each_entry(timer,&omap_timer_list, node) {
->>> -		if (!timer->enabled)
->>> +		if (!timer->reserved)
->>>    			continue;
->>>
->>>    		if (omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG)&
->>> @@ -536,6 +517,10 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
->>>    	timer->irq = irq->start;
->>>    	timer->pdev = pdev;
->>>
->>> +	/* Skip pm_runtime_enable for OMAP1 */
->>> +	if (!pdata->needs_manual_reset)
->>> +		pm_runtime_enable(&pdev->dev);
->>> +
->> Here too.
->> /s /pm_runtime_enable /pm_runtime_irq_safe
->
-> I think you mean adding _irq_safe, not removing the _enable?
->
-> I disagree with the IRQ-safe part.  Let's avoid using IRQ-safe unless
-> *really* needed, and justified.
->
-The reason may not be satisfactory, bust some the client drivers
-are calling the timer APIs from IRQ context that created regressions
-on internal trees. That's was the only reason behind my comment.
+> static int xxx_gpio_request(struct gpio_chip *chip, unsigned offset)
+> {
+>         int ret = 0;
+> 
+>         ret = pinmux_request_gpio(chip->base + offset);
+>         if (ret)
+>                 goto out;
+>         .....
+> out:
+>         return ret;
+> }
 
-On other hand, none of this client drivers are supported in
-mainline, so my comment from mainline point of is void.
+I would have expected this to work the other way around; "gpio" is just
+another function that can be assigned to a pin.
 
-Regards
-Santosh
+This has the benefit of catering to the following cases:
+
+Below, "SF" == "some special function"
+
+1) Pin is SF or a particular GPIO.
+
+2) Pin is SF or a particular GPIO from GPIO controller A, or a particular
+   GPIO from controller B
+
+3) Pin is SF, or one of a number of user-selectable GPIOs.
+
+Case (1) is covered by the code quoted above from earlier in the thread.
+Cases (2) and (3) can't be covered by that code, and according to comments
+in earlier replies, both actually exist in real HW.
+
+For reference, here's how I'd imagine modeling those three cases in
+pinmux (all based on my earlier comments about the data model I imagine,
+rather than what's currently in the pinmux patches):
+
+1) Have a single function "gpio" that can be applied to any pin that
+supports it. The actual GPIO number that gets mux'd onto the pin differs
+per pin, and is determine by HW design. But logically, we're connecting
+that pin to function "gpio", so we only need one function name for that.
+
+2) Have a function for each GPIO controller that can be attached to a
+pin; "gpioa" or "gpiob". Based on the pin being configured, and which of
+those two GPIO functions is selected, the HW determines the specific GPIO
+number that's assigned to the pin.
+
+3) Where the GPIO ID assigned to pins is user-selectable, have a function
+per GPIO ID; "gpio1", "gpio2", "gpio3", ... "gpio31". This sounds like
+it'd cause a huge explosion in the number of functions; one to represent
+each GPIO ID. However, I suspect this won't be too bad in practice, since
+there's presumably some practical limit to the amount of muxing logic that
+can be applied to each pin in HW, so the set of options won't be too large.
+
+If the set of GPIO IDs that can be assigned to any particular pin is a subset
+of the whole GPIO number space, e.g.:
+
+pina: gpio1, gpio2, gpio3, gpio4
+pinb: gpio2, gpio3, gpio4, gpio5
+pinc: gpio3, gpio4, gpio5, gpio6
+
+... then I imagine HW has already defined an enumerator gpioa, gpiob, gpioc,
+gpiod and a mapping from those to the specific GPIO ID that each means when
+assigned to a given pin, so those gpioa/b/c/d values could be used as the
+function exposed by the pinmux driver.
+
+-- 
+nvpublic
