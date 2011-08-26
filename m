@@ -1,29 +1,37 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri, 26 Aug 2011 15:21:14 +0300
-Subject: [PATCH v2 0/7] omap: iommu migration, relocation and cleanups
-In-Reply-To: <20110826112531.GQ1923@amd.com>
-References: <1314205694-28935-1-git-send-email-ohad@wizery.com>
-	<20110826112531.GQ1923@amd.com>
-Message-ID: <CAK=WgbbvOf-3C8HtoZwV9nDomjPHVsEr+ztcMxf4tV=4KDXZ7g@mail.gmail.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Fri, 26 Aug 2011 14:47:39 +0200
+Subject: [patch 1/1] efika: Configure esdhc cd/wp on efika mx/sb
+In-Reply-To: <20110825150214.GZ31404@pengutronix.de> (Sascha Hauer's message
+	of "Thu, 25 Aug 2011 17:02:14 +0200")
+References: <20110825143806.625158261@rtp-net.org>
+	<20110825150214.GZ31404@pengutronix.de>
+Message-ID: <878vqg9w5w.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2011 at 2:25 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> Applied all to arm/omap, thanks Ohad. I also put a commit on-top which
-> finished the mutex->spin_lock conversion. Looks like one call-place was
-> missed. See attached patch.
->
-> commit 4234541f1a64d9dc6d489cf8f614dc01c62360f6
-> Author: Joerg Roedel <joerg.roedel@amd.com>
-> Date: ? Fri Aug 26 13:20:06 2011 +0200
->
-> ? ?omap: iommu: Fix up mutex->spin_lock conversion of iommu_lock
->
-> ? ?The omap_iommu_set_isr() was still using the mutex functions
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-Thanks, Joerg.
+> Hi Arnaud,
 
-(I am already working on removing omap_iommu_set_isr() and providing
-that functionality via the IOMMU API, so the s/mutex/spinlock/ patch I
-squashed with the original patch set accidentally didn't cover that
-function).
+Hi,
+>
+> On Thu, Aug 25, 2011 at 04:37:57PM +0200, Arnaud Patard wrote:
+>> Update sdhc support on efika to make use of the latest mmc fixes.
+>> 
+>> 
+>> Signed-off-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+>> @@ -451,7 +465,8 @@ static void __init efikasb_board_init(vo
+>>  
+>>  	mx51_efikasb_board_id();
+>>  	mx51_efikasb_usb();
+>> -	imx51_add_sdhci_esdhc_imx(1, NULL);
+>> +	imx51_add_sdhci_esdhc_imx(0, &sd0_pdata);
+>> +	imx51_add_sdhci_esdhc_imx(1, &sd1_pdata);
+>>  	mx51_efikasb_display();
+>         ^^^^^^^^^^^^^^^^^^^
+>
+> Looks good, but please rebase this onto a mainline kernel.
+
+oops, sorry. You'll receive a new version very soon.
+
+Arnaud
