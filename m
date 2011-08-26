@@ -1,25 +1,23 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 26 Aug 2011 20:04:23 +0530
-Subject: [PATCH v14 REPOST 05/12] OMAP: dmtimer: platform driver
-In-Reply-To: <1310731501-13078-6-git-send-email-tarun.kanti@ti.com>
-References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
-	<1310731501-13078-6-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4E57AEEF.3070803@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Aug 2011 16:44:26 +0200
+Subject: try_to_freeze() called with IRQs disabled on ARM
+In-Reply-To: <20110825145558.GF8883@n2100.arm.linux.org.uk>
+References: <20110823220056.GK3895@n2100.arm.linux.org.uk>
+	<20110825130907.GO3286@htj.dyndns.org>
+	<20110825145558.GF8883@n2100.arm.linux.org.uk>
+Message-ID: <201108261644.26329.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2011 05:34 PM, Tarun Kanti DebBarma wrote:
-> Add dmtimer platform driver functions which include:
-> (1) platform driver initialization
-> (2) driver probe function
-> (3) driver remove function
->
-> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
-> Signed-off-by: Thara Gopinath<thara@ti.com>
-> Acked-by: Cousson, Benoit<b-cousson@ti.com>
-> ---
+On Thursday 25 August 2011, Russell King - ARM Linux wrote:
+> 
+> Arnd, can you test this to make sure your gdb test case still works, and
+> Mark, can you test this to make sure it fixes your problem please?
 
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Hi Russell,
 
-Regards
-Santosh
+The patch in question was not actually from me but from Ulrich Weigand,
+so he's probably the right person to test your patch.
+I'm forwarding it in full to Uli for reference.
+
+	Arnd
