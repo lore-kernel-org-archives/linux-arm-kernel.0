@@ -1,25 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Aug 2011 10:36:34 +0200
-Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
-In-Reply-To: <CAGsJ_4yGSJPDiywak=ArMSv6DUKyCRAZ2J1Fxj6ZKgryyMzu8g@mail.gmail.com>
-References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
-	<CAGsJ_4yGSJPDiywak=ArMSv6DUKyCRAZ2J1Fxj6ZKgryyMzu8g@mail.gmail.com>
-Message-ID: <CACRpkdbWQ3Zz5cn3Bt9K3Le6FmFmAqqPEjj8CP_Pt8m9bG4Opg@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 26 Aug 2011 14:10:08 +0530
+Subject: [PATCH 0/6] Add device tree support for PL330 dma controller driver
+Message-ID: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2011 at 5:12 AM, Barry Song <21cnbao@gmail.com> wrote:
+This patchset adds device tree support for PL330 driver and uses it
+to add device tree support for Samsung platforms, specifically Exynos4.
 
-> Tested-by: Barry Song <baohua.song@csr.com>
+First patch moves the pl330_filter function from Samsung specific wrappers
+to pl330 dma driver and also adds a check to ensure that the filter function
+proceeds only if it the dma channel being investigated belongs to pl330
+dma controller instance.
 
-Thanks!
+Second patch adds support to infer the direction of the dma transfer
+using the direction specified with the transfer request instead of
+including this information in the platform data. This simlifies the
+addition of device tree support. Third patch simplifies the platform
+data for Exynos4 pl330 dma controllers. Similar patches simplifying
+the platform data for other Samsung platforms is under development.
 
-> Linus, i'll also send the patch of csr pinmux prototype. you might
-> review and take it as another example except your stericsson U300 and
-> take care while you merge pinmux.
+Fourth patch adds device tree support for pl330 dma controller driver.
+A dma channel is represented using a phandle of the dma controller
+node and the channel id within that controller. Client driver request
+a dma channel using the phandle and channel id pair. Correspondingly,
+the pl330 filter function has been modified to lookup a channel based
+on this value.
 
-OK I'm modifying the data model to suit Stephen and Sachas
-remarks but I might be able to carry your mux driver along too.
+Fifth patch adds device tree support for Samsung's DMA engine wrappers.
+Client drivers retrive the channel property from their device node and
+pass it to the wrappers. The wrapper functions use the property value
+as the filter function parameter. Sixth patch restricts the usage of
+pl330 device and platform data instances to non-dt platforms.
 
-Yours,
-Linus Walleij
+This patchset is based on Linux 3.1-rc3 with following patch sets
+applied.
+
+* To use DMA generic APIs for Samsung DMA - v7 - (15 patches)
+* ARM: Samsung: use dma-pl330 device name for clock (3 patches)
+* ARM: S5P64X0: Add the devname for DMA clock.
+* ARM: SAMSUNG: register the second instance of PL330 DMAC (3 patches)
+
+Thomas Abraham (6):
+  DMA: PL330: move filter function into driver
+  DMA: PL330: Infer transfer direction from transfer request instead of platform data
+  ARM: EXYNOS4: Modify platform data for pl330 driver
+  DMA: PL330: Add device tree support
+  ARM: SAMSUNG: Add device tree support for pl330 dma engine wrappers
+  ARM: EXYNOS4: Limit usage of pl330 device instance to non-dt build
+
+ .../devicetree/bindings/dma/arm-pl330.txt          |   42 ++++
+ arch/arm/mach-exynos4/Kconfig                      |    7 +
+ arch/arm/mach-exynos4/Makefile                     |    3 +-
+ arch/arm/mach-exynos4/dma.c                        |  223 ++++++--------------
+ arch/arm/plat-samsung/dma-ops.c                    |   15 +-
+ arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 +
+ arch/arm/plat-samsung/include/plat/dma-pl330.h     |    3 +-
+ drivers/dma/pl330.c                                |  133 ++++++++----
+ include/linux/amba/pl330.h                         |   15 +-
+ 9 files changed, 216 insertions(+), 226 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
