@@ -1,24 +1,22 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 26 Aug 2011 20:18:18 +0530
-Subject: [PATCH v7 02/15] DMA: PL330: Update PL330 DMA API driver
-In-Reply-To: <1314238425-6480-3-git-send-email-boojin.kim@samsung.com>
-References: <1314238425-6480-1-git-send-email-boojin.kim@samsung.com>
-	<1314238425-6480-3-git-send-email-boojin.kim@samsung.com>
-Message-ID: <CABb+yY36HyU7KrHww5B=R6AptkEcZmZ7UrNd-hg6zu4cNbzuqw@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 26 Aug 2011 16:48:55 +0200
+Subject: I'm on holiday
+Message-ID: <20110826144855.GH31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 7:43 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> This patch updates following 3 items.
-> 1. Removes unneccessary code.
-> 2. Add AMBA, PL330 configuration
-> 3. Change the meaning of 'peri_id' variable
-> ? from PL330 event number to specific dma id by user.
->
-> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Hi All,
 
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+I'm on holiday for the next two weeks and only partly available
+the week after. Uwe also is not available the next week, but
+he will collect patches after this. I'll be back online in the
+middle of september, which should be early enough before the
+merge window rush starts.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
