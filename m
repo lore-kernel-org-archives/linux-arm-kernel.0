@@ -1,132 +1,56 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Fri, 26 Aug 2011 10:51:50 +0530
-Subject: [PATCH 2/2] video: s3c-fb: Modify s3c-fb driver to support window
-	positioning
-In-Reply-To: <14401983.184721314319448396.JavaMail.weblogic@epv6ml01>
-References: <14401983.184721314319448396.JavaMail.weblogic@epv6ml01>
-Message-ID: <CAEC9eQMuqEO1uRnQOjZBFAxtH0qRnKu+Jvjo_xo2P5TJK=UpYg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 25 Aug 2011 22:23:21 -0700
+Subject: Fwd: [GIT PULL] [3.2] Please pull tegra boards for 3.2
+In-Reply-To: <2300535.b0zjAbUTLi@wuerfel>
+References: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
+	<201108161648.58250.arnd@arndb.de>
+	<CAOesGMgZCFF=dWhAm_+Ux-c-aORqo4sJ1DOGirCu3QT-iMcQRQ@mail.gmail.com>
+	<2300535.b0zjAbUTLi@wuerfel>
+Message-ID: <CAOesGMj5P9yLO0My4UB7AEj+9NdmYq8HYwVMd3Uv1NQO6+WP7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingoo,
+On Tue, Aug 16, 2011 at 2:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 16 August 2011 12:30:50 Olof Johansson wrote:
+>> On Tue, Aug 16, 2011 at 7:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >
+>> > The contents all look good, but I'm undecided whether we should have
+>> > branches that are not based on a -rc release. In your case, it's
+>> > halfway between -rc1 and -rc2.
+>> >
+>> > Do others have an opinion? If we decide to take development branches
+>> > only when they are based on a proper -rc, I'll do the simple rebase
+>> > of the patches and push them out, otherwise I'll push them as they are.
+>>
+>> I guess it depends on what you and others prefer -- if you want to
+>> aggregate the branches in arm-soc.git through the development weeks,
+>> or if you prefer to get most of the merge requests when platform
+>> maintainers are getting ready for the merge window and feeding things
+>> up?
+>
+> I definitely want to have the patches as early as possible, but not
+> more than one pull request per branch per week or -rc ideally.
 
-2011/8/26 JinGoo Han <jg1.han@samsung.com>:
-> Hi, Ajay.
->> -----Original Message-----
->> From: Ajay Kumar [mailto:ajaykumar.rs at samsung.com]
->> Sent: Friday, August 26, 2011 4:52 AM
->> To: linux-samsung-soc at vger.kernel.org; linux-fbdev at vger.kernel.org; linux-
->> arm-kernel at lists.infradead.org
->> Cc: FlorianSchandinat at gmx.de; lethal at linux-sh.org; jg1.han at samsung.com;
->> m.szyprowski at samsung.com; ben-linux at fluff.org; banajit.g at samsung.com
->> Subject: [PATCH 2/2] video: s3c-fb: Modify s3c-fb driver to support window
->> positioning
->>
->> This patch modifies the existing s3c-fb driver to provide
->> flexibility to the user to reposition the framebuffer windows.
->>
->> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
->> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
->> ---
->> ?drivers/video/s3c-fb.c | ? 37 ++++++++++++++++++++++++++++++++-----
->> ?1 files changed, 32 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
->> index 0fda252..41179d7 100644
->> --- a/drivers/video/s3c-fb.c
->> +++ b/drivers/video/s3c-fb.c
->> @@ -442,6 +442,7 @@ static int s3c_fb_set_par(struct fb_info *info)
->> ? ? ? struct fb_var_screeninfo *var = &info->var;
->> ? ? ? struct s3c_fb_win *win = info->par;
->> ? ? ? struct s3c_fb *sfb = win->parent;
->> + ? ? struct s3cfb_window_pos *winpos = &win->windata->winpos;
->> ? ? ? void __iomem *regs = sfb->regs;
->> ? ? ? void __iomem *buf = regs;
->> ? ? ? int win_no = win->index;
->> @@ -539,12 +540,13 @@ static int s3c_fb_set_par(struct fb_info *info)
->>
->> ? ? ? /* write 'OSD' registers to control position of framebuffer */
->>
->> - ? ? data = VIDOSDxA_TOPLEFT_X(0) | VIDOSDxA_TOPLEFT_Y(0);
->> + ? ? data = VIDOSDxA_TOPLEFT_X(winpos->win_pos_x) |
->> + ? ? ? ? ? ?VIDOSDxA_TOPLEFT_Y(winpos->win_pos_y);
->> ? ? ? writel(data, regs + VIDOSD_A(win_no, sfb->variant));
->>
->> - ? ? data = VIDOSDxB_BOTRIGHT_X(s3c_fb_align_word(var->bits_per_pixel,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?var->xres - 1)) |
->> - ? ? ? ? ? ?VIDOSDxB_BOTRIGHT_Y(var->yres - 1);
->> + ? ? data = VIDOSDxB_BOTRIGHT_X((s3c_fb_align_word(var->bits_per_pixel,
->> + ? ? ? ? ? ?(winpos->win_pos_x + var->xres - 1)))) |
->> + ? ? ? ? ? ?VIDOSDxB_BOTRIGHT_Y((winpos->win_pos_y + var->yres - 1));
->>
->> ? ? ? writel(data, regs + VIDOSD_B(win_no, sfb->variant));
->>
->> @@ -999,8 +1001,10 @@ static int s3c_fb_ioctl(struct fb_info *info,
->> unsigned int cmd,
->> ?{
->> ? ? ? struct s3c_fb_win *win = info->par;
->> ? ? ? struct s3c_fb *sfb = win->parent;
->> - ? ? int ret;
->> + ? ? struct s3cfb_window_pos *winpos = &win->windata->winpos;
->> + ? ? int ret = 0;
->> ? ? ? u32 crtc;
->> + ? ? u32 data;
->>
->> ? ? ? switch (cmd) {
->> ? ? ? case FBIO_WAITFORVSYNC:
->> @@ -1011,6 +1015,29 @@ static int s3c_fb_ioctl(struct fb_info *info,
->> unsigned int cmd,
->>
->> ? ? ? ? ? ? ? ret = s3c_fb_wait_for_vsync(sfb, crtc);
->> ? ? ? ? ? ? ? break;
->> + ? ? case S3CFB_WIN_POSITION:
->> + ? ? ? ? ? ? if (copy_from_user(winpos, (u32 __user *)arg,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sizeof(struct s3cfb_window_pos))) {
->> + ? ? ? ? ? ? ? ? ? ? ret = -EFAULT;
->> + ? ? ? ? ? ? ? ? ? ? break;
->> + ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? shadow_protect_win(win, 1);
->> +
->> + ? ? ? ? ? ? /* write 'OSD' registers to set position of the window */
->> + ? ? ? ? ? ? data = VIDOSDxA_TOPLEFT_X(winpos->win_pos_x) |
->> + ? ? ? ? ? ? ? ? ? ?VIDOSDxA_TOPLEFT_Y(winpos->win_pos_y);
->> + ? ? ? ? ? ? writel(data, sfb->regs + VIDOSD_A(win->index, sfb->variant));
->> +
->> + ? ? ? ? ? ? data = VIDOSDxB_BOTRIGHT_X(
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? s3c_fb_align_word(info->var.bits_per_pixel,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (winpos->win_pos_x + info->var.xres - 1)));
->> + ? ? ? ? ? ? data |= VIDOSDxB_BOTRIGHT_Y(winpos->win_pos_y +
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? info->var.yres - 1);
->> + ? ? ? ? ? ? writel(data, sfb->regs + VIDOSD_B(win->index, sfb->variant));
->> +
->> + ? ? ? ? ? ? shadow_protect_win(win, 0);
->> + ? ? ? ? ? ? break;
-> Can you move this to separate function?
-> In my opinion, it would be better for readability and consistency.
-> Also, FBIO_WAITFORVSYNC has been implemented in this way.
-> ? ? ? ? ? ? ? ?ret = s3c_fb_wait_for_vsync(sfb, crtc);
-> How about adding a function 's3c_fb_set_window_position' for this as belows?
-> +int s3c_fb_set_window_position(struct fb_info *info,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct s3cfb_window_pos winpos)
+That sounds reasonable.
 
-Thanks for your suggestion.
-I have considered it, and now I have written a separate function for this.
-I will be sending it in V2 version.
-> ? ? ? ? ? ? ? ?........
-> + ? ? ? case S3CFB_WIN_POSITION:
-> + ? ? ? ? ? ? ? if (copy_from_user(winpos, (u32 __user *)arg,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sizeof(struct s3cfb_window_pos))) {
-> + ? ? ? ? ? ? ? ? ? ? ? ret = -EFAULT;
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> + ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? ret = s3c_fb_set_window_position(info, winpos);
-> + ? ? ? ? ? ? ? break;
->> ? ? ? default:
->> ? ? ? ? ? ? ? ret = -ENOTTY;
->> ? ? ? }
->> --
->> 1.7.0.4
+> I would prefer to have all branches that I send to Linus go into the
+> -next through the arm-soc tree as well, not get sent there individually.
 >
->
->
+> Basically, when you consider patches stable and ready for upstream
+> and expect no further changes, I'll pull the patches into arm-soc.git
+> and you can add further patches on top of the branch that I have already
+> pulled (not on an aggregated branch) and I can pull that again. If you
+> have unrelated changes, then I'd prefer them to be on top of an -rc
+> release for the next pull request.
+
+Ok. Sounds like there might be some use for a temporary "work in
+progress" branch for linux-next for patches that are nearly ready to
+go but not quite that needs air time, but not really for anything
+beyond that.
+
+None of the ones in this case apply to this scenario so I'll resend a
+fresh pull request based on -rc3 as soon as the branch rebase has
+propagated out from master.kernel.org.
+
+
+-Olof
