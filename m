@@ -1,36 +1,110 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Aug 2011 15:23:05 +0100
-Subject: [PATCH 4/6] DMA: PL330: Add device tree support
-In-Reply-To: <4E579C9B.7030807@gmail.com>
-References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-2-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-3-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-4-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>
-	<4E579C9B.7030807@gmail.com>
-Message-ID: <20110826142305.GA23469@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Fri, 26 Aug 2011 19:56:25 +0530
+Subject: [PATCH v14 REPOST 03/12] OMAP1: dmtimer: conversion to platform
+	devices
+In-Reply-To: <1310731501-13078-4-git-send-email-tarun.kanti@ti.com>
+References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
+	<1310731501-13078-4-git-send-email-tarun.kanti@ti.com>
+Message-ID: <4E57AD11.7080406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2011 at 08:16:11AM -0500, Rob Herring wrote:
-> Thomas,
-> 
-> On 08/26/2011 03:40 AM, Thomas Abraham wrote:
-> > +  - arm,pl330-peri-reqs: number of actual peripheral requests connected to the
-> > +    dma controller. Maximum value is 32.
-> 
-> Perhaps could be a bitmask for sparsely populated requests. May not
-> matter since phandles will define the connections.
-> 
-> Can be optional and not present means 00 requests (mem-to-mem only).
+On Friday 15 July 2011 05:34 PM, Tarun Kanti DebBarma wrote:
+> From: Thara Gopinath<thara@ti.com>
+>
+> Convert OMAP1 dmtimers into a platform devices and then registers with
+> device model framework so that it can be bound to corresponding driver.
+>
+> Signed-off-by: Thara Gopinath<thara@ti.com>
+> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> Acked-by: Cousson, Benoit<b-cousson@ti.com>
+> ---
+>   arch/arm/mach-omap1/Makefile              |    2 +-
+>   arch/arm/mach-omap1/timer.c               |  174 +++++++++++++++++++++++++++++
+>   arch/arm/plat-omap/dmtimer.c              |   56 ++-------
+>   arch/arm/plat-omap/include/plat/dmtimer.h |    8 ++
+>   4 files changed, 195 insertions(+), 45 deletions(-)
+>   create mode 100644 arch/arm/mach-omap1/timer.c
+>
+> diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
+> index 5b114d1..11c85cd 100644
+> --- a/arch/arm/mach-omap1/Makefile
+> +++ b/arch/arm/mach-omap1/Makefile
+> @@ -4,7 +4,7 @@
+>
+>   # Common support
+>   obj-y := io.o id.o sram.o time.o irq.o mux.o flash.o serial.o devices.o dma.o
+> -obj-y += clock.o clock_data.o opp_data.o reset.o pm_bus.o
+> +obj-y += clock.o clock_data.o opp_data.o reset.o pm_bus.o timer.o
+>
+>   obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
+>
+> diff --git a/arch/arm/mach-omap1/timer.c b/arch/arm/mach-omap1/timer.c
+> new file mode 100644
+> index 0000000..980b23b
+> --- /dev/null
+> +++ b/arch/arm/mach-omap1/timer.c
+> @@ -0,0 +1,174 @@
+> +/**
+> + * OMAP1 Dual-Mode Timers - platform device registration
+> + *
+> + * Contains first level initialization routines which internally
+> + * generates timer device information and registers with linux
+> + * device model. It also has low level function to chnage the timer
+> + * input clock source.
+> + *
+> + * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
+/s/2010 /2011
 
-The number of peripheral requests is readable from configuration register
-zero, so this is discoverable.  Why should we put this information into
-DT if its provided by the hardware?
+> + * Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> + * Thara Gopinath<thara@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include<linux/clk.h>
+> +#include<linux/io.h>
+> +#include<linux/err.h>
+> +#include<linux/slab.h>
+> +#include<linux/platform_device.h>
+> +
+> +#include<mach/irqs.h>
+> +
+> +#include<plat/dmtimer.h>
+> +
+> +#define OMAP1610_GPTIMER1_BASE		0xfffb1400
+> +#define OMAP1610_GPTIMER2_BASE		0xfffb1c00
+> +#define OMAP1610_GPTIMER3_BASE		0xfffb2400
+> +#define OMAP1610_GPTIMER4_BASE		0xfffb2c00
+> +#define OMAP1610_GPTIMER5_BASE		0xfffb3400
+> +#define OMAP1610_GPTIMER6_BASE		0xfffb3c00
+> +#define OMAP1610_GPTIMER7_BASE		0xfffb7400
+> +#define OMAP1610_GPTIMER8_BASE		0xfffbd400
+> +
+> +#define OMAP1_DM_TIMER_COUNT		8
+> +
+> +static int omap1_dm_timer_set_src(struct platform_device *pdev,
+> +				int source)
+> +{
+> +	int n = (pdev->id - 1)<<  1;
+> +	u32 l;
+> +
+> +	l = omap_readl(MOD_CONF_CTRL_1)&  ~(0x03<<  n);
+> +	l |= source<<  n;
+> +	omap_writel(l, MOD_CONF_CTRL_1);
 
-The number of DMA channels available is also configurable by the SoC
-designer, yet you don't specify that in DT.  And there's a whole bunch
-of other configuration options available to the SoC designer, most of
-which are discoverable from the configuration registers.
+Stop using omap_readl/omap_writel. Use standard readl/writel
 
-So, I don't think you should be specifying the number of requests.
+rest looks ok to me.
+
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+
+Regards
+Santosh
