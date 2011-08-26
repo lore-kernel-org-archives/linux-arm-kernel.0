@@ -1,99 +1,131 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 26 Aug 2011 05:01:05 -0600 (MDT)
-Subject: Removing platform_get_resource_byname() (was Re: How to handle named
-	resources with DT?)
-In-Reply-To: <32081673.hbCQs4qpyo@wuerfel>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<201108251705.43168.arnd@arndb.de> <877h6173wm.fsf@ti.com>
-	<32081673.hbCQs4qpyo@wuerfel>
-Message-ID: <alpine.DEB.2.00.1108260342560.9743@utopia.booyaka.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 26 Aug 2011 13:23:58 +0200
+Subject: [RFC PATCH 1/1] ASoC: soc-core: symmetry checking for each DAIs
+	separately
+In-Reply-To: <1314351351-1018-1-git-send-email-b29396@freescale.com>
+References: <1314351351-1018-1-git-send-email-b29396@freescale.com>
+Message-ID: <4E57824E.8000400@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Aug 2011, Arnd Bergmann wrote:
+On 08/26/2011 11:35 AM, Dong Aisheng wrote:
+> [...]
+>  	/* runtime devices */
+> diff --git a/sound/soc/soc-pcm.c b/sound/soc/soc-pcm.c
+> index 1aee9fc..3f7ded7 100644
+> --- a/sound/soc/soc-pcm.c
+> +++ b/sound/soc/soc-pcm.c
+> @@ -32,33 +32,54 @@ static int soc_pcm_apply_symmetry(struct snd_pcm_substream *substream)
+>  	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+>  	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+>  	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+> +	unsigned int race;
+> +	unsigned int force_rate;
+>  	int ret;
+>  
+> +	race = 0;
+> +	force_rate = 0;
+> +
+>  	if (!codec_dai->driver->symmetric_rates &&
+>  	    !cpu_dai->driver->symmetric_rates &&
+>  	    !rtd->dai_link->symmetric_rates)
+>  		return 0;
+>
+> +	if (codec_dai->active && codec_dai->driver->symmetric_rates ||
+> +	     codec_dai->active && rtd->dai_link->symmetric_rates) {
 
-> It's not at all about whether the Linux codein drivers/of supports this
-> or not, adding it would be trivial. The point is that it would be
-> *wrong* to add it because there already exists a way to identify every
-> resource in the device tree and we should not extend that interface
-> to have multiple ways to do the same thing just for convenience of
-> a few device drivers!
+parenthesis, please, when mixing && and || in the same expression. Makes it
+easier to comprehend and protects against accidental mistakes.
 
-The point is that:
+> +		if (codec_dai->rate != 0)
+> +			force_rate = codec_dai->rate;
+> +		else
+> +			race = 1;
+> +	}
+> +
+> +	if (cpu_dai->active && cpu_dai->driver->symmetric_rates ||
+> +	    codec_dai->active && rtd->dai_link->symmetric_rates) {
+> +		if (cpu_dai->rate != 0)
+> +			force_rate = cpu_dai->rate;
+> +		else
+> +			race = 1;
+> +	}
+> +
 
-- there was a reason why platform_get_resource_byname() was added to the 
-  Linux kernel, that at least some people find useful and relevant
-
-- some folks are effectively proposing to remove
-  platform_get_resource_byname() not because it's a bad interface, but 
-  because it would result in changes to the way that DT files are 
-  generated and used
-
-Just as you consider the preservation of platform_get_resource_byname() to 
-be wrong (because it conflicts with DT), some people consider the above 
-rationale to be faulty, because it removes a useful way to abstract 
-drivers from SoC data.
-
-For example, consider that the ordering of device resources, such as IRQ 
-lines or memory regions, in the hardware IP block is arbitrary.  Whomever 
-generates a DT file for that hardware will need to hardcode the driver's 
-assumptions for resource order into the DT generator.  And then hope that 
-the binding assumptions made by that driver are coordinated between all of 
-the other potential DT users out there: other OSes (proprietary or not), 
-bootloaders, etc.
-
-Contrast this with the situation when named resources are used.  The 
-resources are named with a string that represents their use by the 
-hardware IP block.  In this situation, the order in which they appear in 
-the DT file is unimportant.  There need be no extra hacks added to the DT 
-generation code or to the drivers to ensure that they find the correct 
-resource.
-
-Please don't misunderstand: I personally don't consider this specific 
-problem to be a showstopper.  It makes sense to me to improve the DT 
-format to use named resources.  But if the consensus is that the problem 
-is just going to be knowingly pushed on to the poor folks who have to 
-generate DT files, who will have to maintain a bunch of hacks to do so, 
-then, so be it.  But the issue highlights a much larger problem: the 
-apparent level of resistance to improving the DT data format in ways that 
-may affect backwards compatibility.
-
-There are several aspects of DT, and the way that it's used in the kernel, 
-that could be improved -- like, for example, the fact that computer 
-systems for the past several years are not well-represented by a tree of 
-devices.  And if we don't have a strategy for versioning the content and 
-the layout of the device data, as opposed to simply its binary format, 
-then it's unwise to consider it for broader adoption until this exists, 
-IMHO.
-
-> One of the important advantages of using the IEEE device tree bindings 
-> is that we can define device trees that are to a large degree compatible 
-> with how AIX, Solaris, MacOS, FreeBSD and probably many more (lesser 
-> known) operating systems probe their systems.
-
-By that rationale, we should just use ACPI.  It's far more widely deployed 
-than all of those other OSes combined.  (No, I don't think we should use 
-ACPI.)
-
-By the way, MacOS stopped using Device Tree several years ago.
-
-> Changing the resource interface in Linux to have two 'name' fields
-> would also be terribly confusing and is not a good interface
-
-There are other ways of solving that particular problem, other than having 
-two 'name' fields.
-
-> it would just solve another problem (silly entries in /proc/iomem) that 
-> we don't need to have in the first place when we do the obvious 
-> conversion of the drivers to the IEEE standard way of doing this.
-
-Just like MacOS, the IEEE gave up on Device Tree -- in fact, over a decade 
-ago -- so it doesn't make sense to cite them as an authority any more.
-
-My point is not to disrespect DT, which seems like a useful way of moving 
-device data out of the kernel tree; but rather, to try to ensure that 
-we're not locked into a rigid and outdated way of doing things: either 
-technically, or by people's attitudes.
+If both dais are active and require symmetry we should call
+snd_pcm_hw_constraint_minmax for both rates. This will ensure that if both are
+already active and are running at different rates that there will be no valid
+rate for the new pcm stream. Maybe extend this function to take the dai as an
+parameter and call it twice, once for the codec_dai and once for the cpu_dai.
+This would allow to keep the current structure of the function.
 
 
-- Paul
+> +	if (force_rate) {
+> +		dev_dbg(&rtd->dev, "Symmetry forces %dHz rate\n", rtd->rate);
+> +
+> +		ret = snd_pcm_hw_constraint_minmax(substream->runtime,
+> +				SNDRV_PCM_HW_PARAM_RATE,
+> +				force_rate, force_rate);
+> +		if (ret < 0) {
+> +			dev_err(&rtd->dev,
+> +				"Unable to apply rate symmetry constraint: %d\n", ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+>  	/* This can happen if multiple streams are starting simultaneously -
+>  	 * the second can need to get its constraints before the first has
+>  	 * picked a rate.  Complain and allow the application to carry on.
+>  	 */
+> -	if (!rtd->rate) {
+> +	if (race)
+>  		dev_warn(&rtd->dev,
+> -			 "Not enforcing symmetric_rates due to race\n");
+> -		return 0;
+> -	}
+> -
+> -	dev_dbg(&rtd->dev, "Symmetry forces %dHz rate\n", rtd->rate);
+> -
+> -	ret = snd_pcm_hw_constraint_minmax(substream->runtime,
+> -					   SNDRV_PCM_HW_PARAM_RATE,
+> -					   rtd->rate, rtd->rate);
+> -	if (ret < 0) {
+> -		dev_err(&rtd->dev,
+> -			"Unable to apply rate symmetry constraint: %d\n", ret);
+> -		return ret;
+> -	}
+> +			"Not enforcing symmetric_rates due to race\n");
+>  
+>  	return 0;
+>  }
+> @@ -287,9 +308,14 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
+>  	cpu_dai->active--;
+>  	codec_dai->active--;
+>  	codec->active--;
+> +	rtd->active--;
+
+I guess the line above is a leftover from the previous patch.
+
+> +
+> +	/* clear the corresponding DAIs rate when inactive */
+> +	if (!cpu_dai->active)
+> +		cpu_dai->rate = 0;
+>  
+> -	if (!cpu_dai->active && !codec_dai->active)
+> -		rtd->rate = 0;
+> +	if (!codec_dai->active)
+> +		codec_dai->rate = 0;
+>  
+>  	/* Muting the DAC suppresses artifacts caused during digital
+>  	 * shutdown, for example from stopping clocks.
+> @@ -447,7 +473,9 @@ static int soc_pcm_hw_params(struct snd_pcm_substream *substream,
+>  		}
+>  	}
+>  
+> -	rtd->rate = params_rate(params);
+> +	/* store the rate for each DAIs */
+> +	cpu_dai->rate = params_rate(params);
+> +	codec_dai->rate = params_rate(params);
+>  
+>  out:
+>  	mutex_unlock(&rtd->pcm_mutex);
