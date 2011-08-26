@@ -1,34 +1,25 @@
-From: jason.hui@linaro.org (Jason Hui)
-Date: Fri, 26 Aug 2011 13:44:38 +0800
-Subject: [[PATCH v2 4/6] ARM: mx31: use generic function for displaying
-	silicon revision
-In-Reply-To: <CAOMZO5Co6hjBB+eQ9_9nRnpmiB_jU71RrpQhqQpS4NOpwuBkxQ@mail.gmail.com>
-References: <1314162277-2840-1-git-send-email-jason.hui@linaro.org>
-	<1314162277-2840-5-git-send-email-jason.hui@linaro.org>
-	<CAOMZO5Co6hjBB+eQ9_9nRnpmiB_jU71RrpQhqQpS4NOpwuBkxQ@mail.gmail.com>
-Message-ID: <CAFQ4atTgf_MX_Xs0ymnSMY2eR-HbV-dm-8UO59HWL1LhZ2VKzQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Aug 2011 08:00:53 +0200
+Subject: [GIT PULL] Samsung Fixes for v3.1-rc3
+In-Reply-To: <073301cc638d$8c95ae20$a5c10a60$%kim@samsung.com>
+References: <005401cc5e80$d494d410$7dbe7c30$%kim@samsung.com>
+	<073301cc638d$8c95ae20$a5c10a60$%kim@samsung.com>
+Message-ID: <23495754.V4KN876AQp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio,
+On Friday 26 August 2011 10:14:47 Kukjin Kim wrote:
+> 
+> Hi Arnd, any problem?
+> I can't find this yet in your -fixes branch.
+> 
+> As you said before, if there are fixes in -fixes branch, it should be
+> handled faster than others.
+> Maybe missed? Or should I need to send this to Linus directly?...
+> I think, that should be fixed now and there is no dependency with other ARM
+> stuff.
 
-On Thu, Aug 25, 2011 at 6:22 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Jason,
->
-> On Wed, Aug 24, 2011 at 2:04 AM, Jason Liu <jason.hui@linaro.org> wrote:
->> Update to use generic function for displaying silicon revision
->>
->> Tested on mx31pdk board as print the following information:
->> CPU identified as i.MX31, silicon rev 2.8
->
-> 2.8? There is no MX31 rev 2.8.
+Everything is right on your side, I apologize for being slow here.
+I'll try to handle it today.
 
-Fixed it in V3 version. Thanks.
-
-Jason
-
->
-> Regards,
->
-> Fabio Estevam
->
+	Arnd
