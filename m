@@ -1,29 +1,24 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 26 Aug 2011 21:39:29 +0530
-Subject: [PATCH v14 REPOST 09/12] OMAP: dmtimer: use mutex instead of
-	spinlock
-In-Reply-To: <4E57BCF4.8030709@ti.com>
-References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
-	<1310731501-13078-10-git-send-email-tarun.kanti@ti.com>
-	<4E57BCF4.8030709@ti.com>
-Message-ID: <4E57C539.6020201@ti.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 26 Aug 2011 09:10:16 -0700
+Subject: [PATCH] mtd: Replace DEBUG with MTD_DBG
+In-Reply-To: <1314335775-3384-2-git-send-email-tanmay.upadhyay@einfochips.com>
+References: <CAMPhdO_qVn8JaX6orfnHHXjmi8pTQFb1SzMe2RQM9xMdTvimaQ@mail.gmail.com>
+	<1314335775-3384-2-git-send-email-tanmay.upadhyay@einfochips.com>
+Message-ID: <CAN8TOE9ACmLyZFkPp9FJ4j59hSeHtLmUqYv39z3NW70M16muGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 August 2011 09:04 PM, Santosh wrote:
-> On Friday 15 July 2011 05:34 PM, Tarun Kanti DebBarma wrote:
->> Since the spinlock is not used in any interrupt context we can
->> replace it with mutex instead.
->>
->> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
->> ---
-> Patch looks good but change log doesn't reflect it.
-> Do you want to say that below API's are not used from
-> interrupt context, so mutex should be good enough ?
->
-This assumption is really not true. Time APIs can get called
-from IRQ context from client drivers. You can just drop
-this patch.
+On Thu, Aug 25, 2011 at 10:16 PM, Tanmay Upadhyay
+<tanmay.upadhyay@einfochips.com> wrote:
+> Defining macro 'DEBUG' for debug prints conflicts with other
+> subsystem where defining 'DEBUG' means enable debug code including
+> debug prints and others. So, replaced DEBUG with MTD_DBG for MTD
 
-Regards
-Santosh
+DEBUG was killed from MTD recently in the subsystem tree for MTD,
+l2-mtd-2.6.git:
+git://git.infradead.org/users/dedekind/l2-mtd-2.6.git
+
+The fix *should* be merged in the next merge window, so this patch is
+unnecessary.
+
+Brian
