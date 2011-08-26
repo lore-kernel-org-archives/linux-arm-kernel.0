@@ -1,34 +1,30 @@
 From: hatim.rv@samsung.com (Hatim Ali)
-Date: Fri, 26 Aug 2011 12:09:07 +0530
-Subject: [PATCH 2/2] ARM: EXYNOS4: Update consistent DMA size to 8MB
-In-Reply-To: <1314340747-13816-1-git-send-email-hatim.rv@samsung.com>
-References: <1314340747-13816-1-git-send-email-hatim.rv@samsung.com>
-Message-ID: <1314340747-13816-3-git-send-email-hatim.rv@samsung.com>
+Date: Fri, 26 Aug 2011 12:10:34 +0530
+Subject: [PATCH] s5p-tv: Add PM_RUNTIME dependency
+Message-ID: <1314340834-13903-1-git-send-email-hatim.rv@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the consistent DMA allocation to 8MB to support the
-TVOUT driver.
-
-NOTE: Once CMA support is merged into mainline, we will use it for memory
-allocation.
+The TVOUT driver requires PM_RUNTIME support for proper clock
+enabling.
 
 Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
 ---
- arch/arm/mach-exynos4/include/mach/memory.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/media/video/s5p-tv/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/include/mach/memory.h b/arch/arm/mach-exynos4/include/mach/memory.h
-index 374ef2c..33da4bb 100644
---- a/arch/arm/mach-exynos4/include/mach/memory.h
-+++ b/arch/arm/mach-exynos4/include/mach/memory.h
-@@ -14,6 +14,7 @@
- #define __ASM_ARCH_MEMORY_H __FILE__
+diff --git a/drivers/media/video/s5p-tv/Kconfig b/drivers/media/video/s5p-tv/Kconfig
+index 9c37dee..f2a0977 100644
+--- a/drivers/media/video/s5p-tv/Kconfig
++++ b/drivers/media/video/s5p-tv/Kconfig
+@@ -8,7 +8,7 @@
  
- #define PLAT_PHYS_OFFSET		UL(0x40000000)
-+#define CONSISTENT_DMA_SIZE		SZ_8M
- 
- /* Maximum of 256MiB in one bank */
- #define MAX_PHYSMEM_BITS	32
+ config VIDEO_SAMSUNG_S5P_TV
+ 	bool "Samsung TV driver for S5P platform (experimental)"
+-	depends on PLAT_S5P
++	depends on PLAT_S5P && PM_RUNTIME
+ 	depends on EXPERIMENTAL
+ 	default n
+ 	---help---
 -- 
 1.7.2.3
