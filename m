@@ -1,59 +1,29 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Fri, 26 Aug 2011 14:10:14 +0530
-Subject: [PATCH 6/6] ARM: EXYNOS4: Limit usage of pl330 device instance to
-	non-dt build
-In-Reply-To: <1314348014-2481-6-git-send-email-thomas.abraham@linaro.org>
-References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-2-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-3-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-4-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-6-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1314348014-2481-7-git-send-email-thomas.abraham@linaro.org>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Fri, 26 Aug 2011 14:21:01 +0530
+Subject: [PATCH 16/18] dmaengine/amba-pl08x: Add support for sg len greater
+	than one for slave transfers
+In-Reply-To: <CACRpkdapSvW=eMSoXTOOA2GyhfBLzq2OuyQcDctPxsnVzvr-4g@mail.gmail.com>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
+	<20110814083618.GE4986@n2100.arm.linux.org.uk>	<4E4CCF7B.8060704@st.com>
+	<20110821083306.GA12028@n2100.arm.linux.org.uk>	<4E532B19.6000103@st.com>
+	<4E5715CE.2070806@st.com>
+	<CACRpkdapSvW=eMSoXTOOA2GyhfBLzq2OuyQcDctPxsnVzvr-4g@mail.gmail.com>
+Message-ID: <4E575E75.40603@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pl330 device instances and associated platform data is required only
-for non-device-tree builds. With device tree, all of this information is
-obtained from the device tree.
+On 8/26/2011 1:33 PM, Linus Walleij wrote:
+> Patches are individual for that very reason - so they can be applied one by one.
+> 
+> I already suggested to Vinod to merge the other patches as far as possible,
+> for certain 1 thru 15 could be merged right off with some minor
+> manual fixup. Then we can fix this one patch.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos4/Kconfig  |    7 +++++++
- arch/arm/mach-exynos4/Makefile |    3 ++-
- 2 files changed, 9 insertions(+), 1 deletions(-)
+Actually, Vinod has already applied earlier 17 patches. Now only 3 are left, this one
+and two after it.
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index d4d401c..3edbf37 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -21,6 +21,13 @@ config EXYNOS4_MCT
- 	help
- 	  Use MCT (Multi Core Timer) as kernel timers
- 
-+config EXYNOS4_DEV_DMA
-+	bool
-+	default y if !OF
-+	help
-+	  Compile in amba device definitions for DMA controller if OF
-+	  is not enabled.
-+
- config EXYNOS4_DEV_AHCI
- 	bool
- 	help
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index d2bf5bf..a2f33dc 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -13,7 +13,8 @@ obj-				:=
- # Core support for EXYNOS4 system
- 
- obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
--obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o pmu.o
-+obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o pmu.o
-+obj-$(CONFIG_EXYNOS4_DEV_DMA)	+= dma.o
- obj-$(CONFIG_PM)		+= pm.o sleep.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- 
+I just wanted to know, whether i need to do any other modification in this patch or not?
+
 -- 
-1.6.6.rc2
+viresh
