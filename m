@@ -1,167 +1,165 @@
 From: rob.lee@linaro.org (Robert Lee)
-Date: Thu, 25 Aug 2011 21:33:14 -0500
-Subject: [PATCH 1/2] Adding platform level cpuidle driver for i.MX SoCs.
-Message-ID: <1314325995-29118-1-git-send-email-rob.lee@linaro.org>
+Date: Thu, 25 Aug 2011 21:33:15 -0500
+Subject: [PATCH 2/2] Adding support for the plat-mxc cpuidle driver to
+	mach-mx5. Tested on i.MX51 Babbage board with ARM core running
+	at 800Mhz. Idle OS ARM core power before patch = ~400mW. Idle
+	OS ARM core power after patch = ~1.25mW.
+In-Reply-To: <1314325995-29118-1-git-send-email-rob.lee@linaro.org>
+References: <1314325995-29118-1-git-send-email-rob.lee@linaro.org>
+Message-ID: <1314325995-29118-2-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Robert Lee <rob.lee@linaro.org>
 ---
- arch/arm/plat-mxc/Kconfig   |   10 ++++
- arch/arm/plat-mxc/Makefile  |    2 +
- arch/arm/plat-mxc/cpuidle.c |  112 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 124 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/cpuidle.c
+ arch/arm/mach-mx5/Kconfig                |    4 ++
+ arch/arm/mach-mx5/include/mach/cpuidle.h |   45 ++++++++++++++++++++++++++++++
+ arch/arm/mach-mx5/system.c               |   42 ++++++++++++++++++++++++++++
+ 3 files changed, 91 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mx5/include/mach/cpuidle.h
 
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index a5353fc..84672b3 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -122,4 +122,14 @@ config IRAM_ALLOC
- 	bool
- 	select GENERIC_ALLOCATOR
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index b4e7c58..1672cfe 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -19,6 +19,7 @@ config SOC_IMX50
+ 	select ARCH_MXC_IOMUX_V3
+ 	select ARCH_MXC_AUDMUX_V2
+ 	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_CPUIDLE
+ 	select ARCH_MX5
+ 	select ARCH_MX50
  
-+config ARCH_HAS_CPUIDLE
-+	bool
+@@ -30,6 +31,7 @@ config	SOC_IMX51
+ 	select ARCH_MXC_IOMUX_V3
+ 	select ARCH_MXC_AUDMUX_V2
+ 	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_CPUIDLE
+ 	select ARCH_MX5
+ 
+ config	SOC_IMX53
+@@ -38,9 +40,11 @@ config	SOC_IMX53
+ 	select ARM_L1_CACHE_SHIFT_6
+ 	select MXC_TZIC
+ 	select ARCH_MXC_IOMUX_V3
++	select ARCH_HAS_CPUIDLE
+ 	select ARCH_MX5
+ 	select ARCH_MX53
+ 
 +
-+config MXC_CPUIDLE
-+	bool
-+	depends on ARCH_HAS_CPUIDLE && CPU_IDLE
-+	default y
-+	help
-+	  Internal node to signify that the ARCH has CPUIDLE support.
-+
- endif
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index d53c35f..59f20ac 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -19,6 +19,8 @@ obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
- obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
- obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
-+obj-$(CONFIG_MXC_CPUIDLE) += cpuidle.o
-+
- ifdef CONFIG_SND_IMX_SOC
- obj-y += ssi-fiq.o
- obj-y += ssi-fiq-ksym.o
-diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
+ if ARCH_MX50_SUPPORTED
+ #comment "i.MX50 machines:"
+ 
+diff --git a/arch/arm/mach-mx5/include/mach/cpuidle.h b/arch/arm/mach-mx5/include/mach/cpuidle.h
 new file mode 100644
-index 0000000..cd637e1
+index 0000000..6c37963
 --- /dev/null
-+++ b/arch/arm/plat-mxc/cpuidle.c
-@@ -0,0 +1,112 @@
++++ b/arch/arm/mach-mx5/include/mach/cpuidle.h
+@@ -0,0 +1,45 @@
 +/*
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2.  This program is licensed "as is" without any
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/io.h>
-+#include <linux/cpuidle.h>
-+#include <asm/proc-fns.h>
-+#include <mach/hardware.h>
-+#include <mach/system.h>
-+#include <mach/cpuidle.h>
++#ifndef __ARCH_ARM_PLAT_MXC_CPUIDLE_H__
++#define __ARCH_ARM_PLAT_MXC_CPUIDLE_H__
 +
 +
-+#ifndef MXC_OVERRIDE_DEFAULT_CPUIDLE_PARAMS
++/* CPUIDLE state parameters: name, description, exit_latency (us)
++ * exit_latencies were tested using i.MX51 running at 160MHz P-state
++ * for worst case latencies as to not cause a pm_qos violation when
++ * running at lower speeds.
++ */
++#define MXC_CPUIDLE_TABLE {\
++MXC_X_MACRO(POWERED_CLOCKED, "idle cpu clocked, powered.", 12),\
++MXC_X_MACRO(POWERED_NOCLOCK, "idle cpu powered, unclocked.", 14),\
++MXC_X_MACRO(NOPOWER_NOCLOCK, "idle cpu unpowered, unclocked.", 20),\
++MXC_X_MACRO(MXC_NUM_CPUIDLE_STATES, "", -1)}
 +
-+#define MXC_X_MACRO(a, b, c) {c}
-+static struct imx_cpuidle_params default_cpuidle_params[] = \
-+	MXC_CPUIDLE_TABLE;
++#define MXC_X_MACRO(a, b, c) a
++enum MXC_CPUIDLE_STATE_NAME MXC_CPUIDLE_TABLE;
 +#undef MXC_X_MACRO
 +
-+static struct imx_cpuidle_params *imx_cpuidle_params = default_cpuidle_params;
-+
-+#else
-+
-+static struct imx_cpuidle_params *imx_cpuidle_params;
-+
-+#endif
-+
-+
-+
-+/* in case you want to override the mach level params at the board level */
-+void imx_cpuidle_board_params(struct imx_cpuidle_params *cpuidle_params)
-+{
-+	imx_cpuidle_params = cpuidle_params;
-+}
-+
-+static int imx_enter_idle(struct cpuidle_device *dev,
-+			       struct cpuidle_state *state)
-+{
-+	struct timeval before, after;
-+	int idle_time, i;
-+
-+	/* We only need to pass an index to the mach level so here we
-+	 * find the index of the name contained in the cpuidle_state
-+	 * to pass. */
-+	for (i = 0; i < MXC_NUM_CPUIDLE_STATES && i < CPUIDLE_STATE_MAX; i++)
-+		if (state == &dev->states[i])
-+			break;
-+
-+	local_irq_disable();
-+	local_fiq_disable();
-+
-+	do_gettimeofday(&before);
-+
-+	imx_cpu_do_idle(i);
-+
-+	do_gettimeofday(&after);
-+
-+	local_fiq_enable();
-+	local_irq_enable();
-+
-+	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-+			(after.tv_usec - before.tv_usec);
-+
-+	return idle_time;
-+}
-+
-+static struct cpuidle_driver imx_cpuidle_driver = {
-+	.name =         "imx_idle",
-+	.owner =        THIS_MODULE,
++struct imx_cpuidle_params {
++	unsigned int latency;
 +};
 +
-+static DEFINE_PER_CPU(struct cpuidle_device, imx_cpuidle_device);
++void imx_cpu_do_idle(int cpuidle_state_num);
 +
-+static int __init imx_cpuidle_init(void)
++/* if you want to override the mach level params at the board level,
++ * define MXC_OVERRIDE_CPUIDLE_PARAMS and pass your board level paramaters
++ * into the imx_cpuidle_board_params function */
++
++/* #define MXC_OVERRIDE_DEFAULT_CPUIDLE_PARAMS */
++
++#ifdef CONFIG_MXC_CPUIDLE
++extern void imx_cpuidle_board_params(struct imx_cpuidle_params *cpuidle_params);
++#else
++inline void imx_cpuidle_board_params(struct imx_cpuidle_params *cpuidle_params)
++{}
++#endif
++
++#endif /* #ifndef __ARCH_ARM_PLAT_MXC_CPUIDLE_H__ */
+diff --git a/arch/arm/mach-mx5/system.c b/arch/arm/mach-mx5/system.c
+index 76ae8dc..6ff938d 100644
+--- a/arch/arm/mach-mx5/system.c
++++ b/arch/arm/mach-mx5/system.c
+@@ -12,9 +12,16 @@
+  */
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
++#include <linux/clk.h>
++#include <asm/proc-fns.h>
+ #include <mach/hardware.h>
++#include <mach/mxc.h>
++#include <mach/cpuidle.h>
+ #include "crm_regs.h"
+ 
++static int arch_idle_mode = WAIT_UNCLOCKED_POWER_OFF;
++static struct clk *gpc_dvfs_clk;
++
+ /* set cpu low power mode before WFI instruction. This function is called
+   * mx5 because it can be used for mx50, mx51, and mx53.*/
+ void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+@@ -82,3 +89,38 @@ void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+ 		__raw_writel(empgc1, MXC_SRPG_EMPGC1_SRPGCR);
+ 	}
+ }
++
++void imx_cpu_do_idle(int cpuidle_state_num)
 +{
-+	struct cpuidle_device *device;
-+	int i;
 +
-+	#define MXC_X_MACRO(a, b, c) #a
-+	char *mxc_cpuidle_state_name[] = MXC_CPUIDLE_TABLE;
-+	#undef MXC_X_MACRO
++	int local_arch_idle_mode = arch_idle_mode;
 +
-+	#define MXC_X_MACRO(a, b, c) b
-+	char *mxc_cpuidle_state_desc[] = MXC_CPUIDLE_TABLE;
-+	#undef MXC_X_MACRO
++	if (gpc_dvfs_clk == NULL)
++		gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs_clk");
++	/* gpc clock is needed for SRPG */
++	clk_enable(gpc_dvfs_clk);
 +
-+	if (imx_cpuidle_params == NULL)
-+		return -ENODEV;
-+
-+	cpuidle_register_driver(&imx_cpuidle_driver);
-+
-+	device = &per_cpu(imx_cpuidle_device, smp_processor_id());
-+	device->state_count = MXC_NUM_CPUIDLE_STATES;
-+
-+	for (i = 0; i < MXC_NUM_CPUIDLE_STATES && i < CPUIDLE_STATE_MAX; i++) {
-+		device->states[i].enter = imx_enter_idle;
-+		device->states[i].exit_latency = imx_cpuidle_params[i].latency;
-+		device->states[i].flags = CPUIDLE_FLAG_TIME_VALID;
-+		strcpy(device->states[i].name, mxc_cpuidle_state_name[i]);
-+		strcpy(device->states[i].desc, mxc_cpuidle_state_desc[i]);
++	/* convert MXC_CPUIDLE_STATE_NAME to mxc_cpu_pwr_mode. */
++	switch (cpuidle_state_num) {
++	case POWERED_CLOCKED:
++		local_arch_idle_mode = WAIT_CLOCKED;
++		break;
++	case POWERED_NOCLOCK:
++		local_arch_idle_mode = WAIT_UNCLOCKED;
++		break;
++	case NOPOWER_NOCLOCK:
++		local_arch_idle_mode = WAIT_UNCLOCKED_POWER_OFF;
++		break;
++	default:
++		break;
 +	}
++	/* prepare registers for upcoming idle mode */
++	mx5_cpu_lp_set(local_arch_idle_mode);
 +
-+	if (cpuidle_register_device(device)) {
-+		printk(KERN_ERR "imx_cpuidle_init: Failed registering\n");
-+		return -ENODEV;
-+	}
-+	return 0;
++	/* enter wfi state which on i.MX5 can trigger */
++	cpu_do_idle();
++
++	clk_disable(gpc_dvfs_clk);
 +}
 +
-+late_initcall(imx_cpuidle_init);
++
 -- 
 1.7.1
