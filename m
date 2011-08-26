@@ -1,56 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 25 Aug 2011 22:23:21 -0700
-Subject: Fwd: [GIT PULL] [3.2] Please pull tegra boards for 3.2
-In-Reply-To: <2300535.b0zjAbUTLi@wuerfel>
-References: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
-	<201108161648.58250.arnd@arndb.de>
-	<CAOesGMgZCFF=dWhAm_+Ux-c-aORqo4sJ1DOGirCu3QT-iMcQRQ@mail.gmail.com>
-	<2300535.b0zjAbUTLi@wuerfel>
-Message-ID: <CAOesGMj5P9yLO0My4UB7AEj+9NdmYq8HYwVMd3Uv1NQO6+WP7A@mail.gmail.com>
+From: jason.hui@linaro.org (Jason Liu)
+Date: Fri, 26 Aug 2011 13:35:17 +0800
+Subject: [[PATCH v3 0/6] imx soc revision clean up
+Message-ID: <1314336923-25162-1-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2011 at 2:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 16 August 2011 12:30:50 Olof Johansson wrote:
->> On Tue, Aug 16, 2011 at 7:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> >
->> > The contents all look good, but I'm undecided whether we should have
->> > branches that are not based on a -rc release. In your case, it's
->> > halfway between -rc1 and -rc2.
->> >
->> > Do others have an opinion? If we decide to take development branches
->> > only when they are based on a proper -rc, I'll do the simple rebase
->> > of the patches and push them out, otherwise I'll push them as they are.
->>
->> I guess it depends on what you and others prefer -- if you want to
->> aggregate the branches in arm-soc.git through the development weeks,
->> or if you prefer to get most of the merge requests when platform
->> maintainers are getting ready for the merge window and feeding things
->> up?
->
-> I definitely want to have the patches as early as possible, but not
-> more than one pull request per branch per week or -rc ideally.
+The patchset make some clean up for the imx soc revision display by
+- introudce the generic function for displaying silicon revision
+- update the imx SoCs to adopt the same usage
 
-That sounds reasonable.
+The patchset is based on Fabio's initial commit and I did some update
 
-> I would prefer to have all branches that I send to Linus go into the
-> -next through the arm-soc tree as well, not get sent there individually.
->
-> Basically, when you consider patches stable and ready for upstream
-> and expect no further changes, I'll pull the patches into arm-soc.git
-> and you can add further patches on top of the branch that I have already
-> pulled (not on an aggregated branch) and I can pull that again. If you
-> have unrelated changes, then I'd prefer them to be on top of an -rc
-> release for the next pull request.
+V3:
+- fix the mx51TO3/mx31 print information
+V2: Address comments from Sascha
+- Remove the EXPORT_SYMBOL from imx_print_silicon_rev
+- Fix the mx31 print twice issue
 
-Ok. Sounds like there might be some use for a temporary "work in
-progress" branch for linux-next for patches that are nearly ready to
-go but not quite that needs air time, but not really for anything
-beyond that.
+Fabio Estevam (1):
+  ARM: imx: Introduce generic function for displaying silicon revision
 
-None of the ones in this case apply to this scenario so I'll resend a
-fresh pull request based on -rc3 as soon as the branch rebase has
-propagated out from master.kernel.org.
+Jason Liu (5):
+  ARM: mx25: Print silicon revision on boot
+  ARM: mx27: Print silicon revision on boot
+  ARM: mx31: use generic function for displaying silicon revision
+  ARM: mx35: use generic function for displaying silicon revision
+  ARM: mx5: use generic function for displaying silicon revision
 
+ arch/arm/mach-imx/Makefile              |    2 +-
+ arch/arm/mach-imx/clock-imx25.c         |    6 +++
+ arch/arm/mach-imx/clock-imx27.c         |    2 +
+ arch/arm/mach-imx/clock-imx31.c         |    4 +-
+ arch/arm/mach-imx/clock-imx35.c         |    3 +-
+ arch/arm/mach-imx/cpu-imx25.c           |   41 +++++++++++++++++
+ arch/arm/mach-imx/cpu-imx27.c           |   28 +++++------
+ arch/arm/mach-imx/cpu-imx31.c           |   48 +++++++++++---------
+ arch/arm/mach-imx/cpu-imx35.c           |   30 ++++++-------
+ arch/arm/mach-mx5/clock-mx51-mx53.c     |    6 +--
+ arch/arm/mach-mx5/cpu.c                 |   74 +++++++------------------------
+ arch/arm/plat-mxc/cpu.c                 |    9 ++++
+ arch/arm/plat-mxc/include/mach/common.h |    1 +
+ arch/arm/plat-mxc/include/mach/mx25.h   |    4 ++
+ arch/arm/plat-mxc/include/mach/mx3x.h   |   18 +-------
+ 15 files changed, 142 insertions(+), 134 deletions(-)
+ create mode 100644 arch/arm/mach-imx/cpu-imx25.c
 
--Olof
+-- 
+1.7.4.1
