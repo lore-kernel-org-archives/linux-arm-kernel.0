@@ -1,15 +1,13 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 26 Aug 2011 10:25:58 +0200
-Subject: [GIT PULL] i.MX cleanups for next
-In-Reply-To: <20110823115609.GJ31404@pengutronix.de>
-References: <20110823115609.GJ31404@pengutronix.de>
-Message-ID: <20110826082558.GC7526@pengutronix.de>
+Date: Fri, 26 Aug 2011 10:26:44 +0200
+Subject: [GIT PULL] i.MX features for next
+In-Reply-To: <20110823115658.GK31404@pengutronix.de>
+References: <20110823115658.GK31404@pengutronix.de>
+Message-ID: <20110826082644.GD7526@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
-
-Since you haven't pulled this yet, here is an update:
+Also updated:
 
 
 The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
@@ -17,92 +15,110 @@ The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
   Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
 
 are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git imx-cleanups-for-arnd
+  git://git.pengutronix.de/git/imx/linux-2.6.git imx-features-for-arnd
 
-Fabio Estevam (2):
-      ARM: mx50: Select IMX_HAVE_PLATFORM_FEC as done on other i.MX devices
-      ARM: mxs: Remove unused header file
+Arnaud Patard (3):
+      imx51: add pata device
+      imx51: add pata clock
+      imx: efika: Enable pata.
 
-Jason Liu (1):
-      imx5: not include the unused head file
+Dong Aisheng (5):
+      ARM: mxs: add saif clock
+      ARM: mxs: add saif device
+      ARM: mxs: add sgtl5000 i2c device
+      ARM: mxs: add mxs-sgtl5000 device
+      ARM: mxs: correct the using of frac div for saif
 
-Sascha Hauer (4):
-      Merge branch 'imx-cleanup' of git://git.pengutronix.de/git/ukl/linux-2.6 into imx-cleanup
-      ARM i.MX audmux v2: remove unnecessary ifdefs
-      ARM i.MX: remove ARCH_MX* macros from Makefile
-      Merge branches 'cleanups/assorted', 'cleanups/shawn-cleanup-mxc-gpio', 'cleanups/troy-cleanup-iomux-v3' and 'cleanups/ukl-mx5-dynamically-allocate-devices' into imx-cleanups-for-arnd
+Fabio Estevam (7):
+      ARM: imx: pwm: Add support for MX53
+      ARM: imx: Add PATA resources for other i.MX processors
+      ARM: imx: Add PATA clock support
+      ARM: imx: Define functions for registering PATA
+      ARM: mx53_loco: Add support for the accelerometer
+      ARM: imx: Introduce generic function for displaying silicon revision
+      ARM: mach-imx/mx25_3ds: Add FlexCAN support
 
-Shawn Guo (7):
-      arm/mxc: do not use gpio_to_irq() for static initializers
-      gpio/mxc: add .to_irq for gpio chip
-      arm/mxc: use gpiolib helper for gpio_to_irq
-      gpio/mxc: move irq_to_gpio() into gpio-mxc driver
-      arm/mxc: move IMX_GPIO_NR into mach/hardware.h
-      gpio/mxs: move irq_to_gpio() into gpio-mxs driver
-      arm/mxs: move MXS_GPIO_NR into mach/mxs.h
+Jason Liu (6):
+      ARM: mx25: Print silicon revision on boot
+      ARM: mx27: Print silicon revision on boot
+      ARM: mx31: use generic function for displaying silicon revision
+      ARM: mx35: use generic function for displaying silicon revision
+      ARM: mx5: use generic function for displaying silicon revision
+      ARM: i.MX: initialize l2x0 at early_init time
 
-Troy Kisky (3):
-      ARM: i.MX51: Remove _MX51_PAD_xxx references
-      ARM: i.MX51: clean up iomux-mx51.h
-      ARM: i.MX53: clean up iomux-mx53.h
+Sascha Hauer (5):
+      ARM i.MX: allow to compile together ARMv4 and ARMv5 based SoCs
+      ARM i.MX: allow to compile together all i.MX5 based SoCs
+      ARM i.MX5: update defconfig
+      ARM i.MX defconfigs: use one defconfig for all ARMv4/v5 SoCs
+      Merge branches 'features/assorted', 'features/imx-cpurev', 'features/imx-pata', 'features/multisoc' and 'features/mxs' into imx-features-for-arnd
 
-Uwe Kleine-K?nig (8):
-      ARM: mx5: fix remaining inconsistent names for irqs
-      ARM: mx5: remove unused #includes of devices.h
-      ARM: mx5: dynamically allocate mxc-ehci devices
-      ARM: mx5: dynamically allocate fsl-usb2-udc devices
-      ARM: mx5: dynamically allocate high speed i2c (imx-i2c actually)
-      ARM: imx/mx1ads: dynamically allocate physmap-flash device
-      ARM: imx/armadillo5x0: dynamically allocate physmap-flash device
-      ARM: mxc: drop now unused function mxc_register_device
+Wolfram Sang (3):
+      arm: mxs: mx28evk: add fixed regulators for audio
+      arm: mach-mxs: add device for rtc
+      arm: mach-mxs: add rtc to all boards
 
- arch/arm/mach-imx/Makefile                        |   10 +-
- arch/arm/mach-imx/mach-armadillo5x0.c             |   18 +-
- arch/arm/mach-imx/mach-cpuimx35.c                 |    2 +-
- arch/arm/mach-imx/mach-mx1ads.c                   |   15 +-
- arch/arm/mach-imx/mach-mx27_3ds.c                 |    2 +-
- arch/arm/mach-imx/mach-vpr200.c                   |    2 +-
- arch/arm/mach-mx5/Kconfig                         |   10 +-
- arch/arm/mach-mx5/Makefile                        |    2 +-
- arch/arm/mach-mx5/board-cpuimx51.c                |   27 +-
- arch/arm/mach-mx5/board-cpuimx51sd.c              |   25 +-
- arch/arm/mach-mx5/board-mx51_3ds.c                |    1 -
- arch/arm/mach-mx5/board-mx51_babbage.c            |   26 +-
- arch/arm/mach-mx5/board-mx51_efikamx.c            |    2 -
- arch/arm/mach-mx5/board-mx51_efikasb.c            |    6 +-
- arch/arm/mach-mx5/board-mx53_ard.c                |    4 +-
- arch/arm/mach-mx5/clock-mx51-mx53.c               |    2 +-
- arch/arm/mach-mx5/devices-imx51.h                 |   13 +
- arch/arm/mach-mx5/devices.c                       |  120 -
- arch/arm/mach-mx5/devices.h                       |    5 -
- arch/arm/mach-mx5/ehci.c                          |    2 +-
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c      |    3 +-
- arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c      |    6 +-
- arch/arm/mach-mx5/mm.c                            |    8 +-
- arch/arm/mach-mx5/mx51_efika.c                    |   17 +-
- arch/arm/mach-mxs/include/mach/gpio.h             |    4 -
- arch/arm/mach-mxs/include/mach/mxs.h              |    2 +
- arch/arm/mach-mxs/mach-mx23evk.c                  |    1 -
- arch/arm/mach-mxs/mach-mx28evk.c                  |    1 -
- arch/arm/mach-mxs/mach-stmp378x_devb.c            |    1 -
- arch/arm/plat-mxc/audmux-v2.c                     |   18 +-
- arch/arm/plat-mxc/devices.c                       |   14 -
- arch/arm/plat-mxc/devices/Kconfig                 |    2 +-
- arch/arm/plat-mxc/devices/platform-fsl-usb2-udc.c |    5 +
- arch/arm/plat-mxc/devices/platform-imx-i2c.c      |    6 +
- arch/arm/plat-mxc/devices/platform-mxc-ehci.c     |    9 +
- arch/arm/plat-mxc/include/mach/common.h           |    1 -
- arch/arm/plat-mxc/include/mach/gpio.h             |    9 +-
- arch/arm/plat-mxc/include/mach/hardware.h         |    6 +
- arch/arm/plat-mxc/include/mach/iomux-mx51.h       | 2270 +++++---------
- arch/arm/plat-mxc/include/mach/iomux-mx53.h       | 3530 +++++++--------------
- arch/arm/plat-mxc/include/mach/iomux-v3.h         |    1 +
- arch/arm/plat-mxc/include/mach/mx51.h             |  167 +-
- drivers/gpio/gpio-mxc.c                           |   12 +
- drivers/gpio/gpio-mxs.c                           |    2 +
- 44 files changed, 2173 insertions(+), 4216 deletions(-)
- delete mode 100644 arch/arm/mach-mx5/devices.c
- delete mode 100644 arch/arm/mach-mx5/devices.h
+ arch/arm/Makefile                                  |    4 +-
+ .../{mx27_defconfig => imx_v4_v5_defconfig}        |   68 +++++++++++---
+ arch/arm/configs/mx1_defconfig                     |   91 ------------------
+ arch/arm/configs/mx21_defconfig                    |   97 --------------------
+ arch/arm/configs/{mx51_defconfig => mx5_defconfig} |   60 ++++++++-----
+ arch/arm/mach-imx/Kconfig                          |   51 ++++-------
+ arch/arm/mach-imx/Makefile                         |    2 +-
+ arch/arm/mach-imx/cache-l2x0.c                     |    2 +-
+ arch/arm/mach-imx/clock-imx25.c                    |    6 +
+ arch/arm/mach-imx/clock-imx27.c                    |    6 +-
+ arch/arm/mach-imx/clock-imx31.c                    |    8 +-
+ arch/arm/mach-imx/clock-imx35.c                    |    7 +-
+ arch/arm/mach-imx/cpu-imx25.c                      |   41 ++++++++
+ arch/arm/mach-imx/cpu-imx27.c                      |   28 +++---
+ arch/arm/mach-imx/cpu-imx31.c                      |   49 ++++++-----
+ arch/arm/mach-imx/cpu-imx35.c                      |   30 +++---
+ arch/arm/mach-imx/devices-imx27.h                  |    4 +
+ arch/arm/mach-imx/devices-imx31.h                  |    4 +
+ arch/arm/mach-imx/devices-imx35.h                  |    4 +
+ arch/arm/mach-imx/mach-mx25_3ds.c                  |   10 ++
+ arch/arm/mach-mx5/Kconfig                          |   19 +---
+ arch/arm/mach-mx5/board-mx53_loco.c                |   20 ++++
+ arch/arm/mach-mx5/clock-mx51-mx53.c                |   12 ++-
+ arch/arm/mach-mx5/cpu.c                            |   74 ++++------------
+ arch/arm/mach-mx5/devices-imx51.h                  |    4 +
+ arch/arm/mach-mx5/devices-imx53.h                  |    4 +
+ arch/arm/mach-mx5/mx51_efika.c                     |    2 +
+ arch/arm/mach-mxs/Kconfig                          |    6 +
+ arch/arm/mach-mxs/clock-mx28.c                     |    8 +-
+ arch/arm/mach-mxs/devices-mx23.h                   |    2 +
+ arch/arm/mach-mxs/devices-mx28.h                   |    5 +
+ arch/arm/mach-mxs/devices/Kconfig                  |    6 +
+ arch/arm/mach-mxs/devices/Makefile                 |    2 +
+ arch/arm/mach-mxs/devices/platform-mxs-saif.c      |   60 ++++++++++++
+ arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c  |   51 ++++++++++
+ arch/arm/mach-mxs/include/mach/devices-common.h    |   12 +++
+ arch/arm/mach-mxs/mach-mx23evk.c                   |    1 +
+ arch/arm/mach-mxs/mach-mx28evk.c                   |   78 ++++++++++++++++
+ arch/arm/mach-mxs/mach-stmp378x_devb.c             |    1 +
+ arch/arm/mach-mxs/mach-tx28.c                      |    1 +
+ arch/arm/plat-mxc/Kconfig                          |   39 ++------
+ arch/arm/plat-mxc/cpu.c                            |    9 ++
+ arch/arm/plat-mxc/devices/Kconfig                  |    3 +
+ arch/arm/plat-mxc/devices/Makefile                 |    1 +
+ arch/arm/plat-mxc/devices/platform-pata_imx.c      |   59 ++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h            |    1 +
+ arch/arm/plat-mxc/include/mach/devices-common.h    |    8 ++
+ arch/arm/plat-mxc/include/mach/memory.h            |   16 +---
+ arch/arm/plat-mxc/include/mach/mx25.h              |    4 +
+ arch/arm/plat-mxc/include/mach/mx35.h              |    2 +-
+ arch/arm/plat-mxc/include/mach/mx3x.h              |   18 +---
+ arch/arm/plat-mxc/pwm.c                            |    2 +-
+ 52 files changed, 638 insertions(+), 464 deletions(-)
+ rename arch/arm/configs/{mx27_defconfig => imx_v4_v5_defconfig} (69%)
+ delete mode 100644 arch/arm/configs/mx1_defconfig
+ delete mode 100644 arch/arm/configs/mx21_defconfig
+ rename arch/arm/configs/{mx51_defconfig => mx5_defconfig} (82%)
+ create mode 100644 arch/arm/mach-imx/cpu-imx25.c
+ create mode 100644 arch/arm/mach-mxs/devices/platform-mxs-saif.c
+ create mode 100644 arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c
+ create mode 100644 arch/arm/plat-mxc/devices/platform-pata_imx.c
 -- 
 Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
