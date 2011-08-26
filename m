@@ -1,151 +1,45 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 26 Aug 2011 21:34:33 +0530
-Subject: [PATCH v14 REPOST 12/12] OMAP: dmtimer: Off mode support
-In-Reply-To: <1310731501-13078-13-git-send-email-tarun.kanti@ti.com>
-References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
-	<1310731501-13078-13-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4E57C411.3050906@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 26 Aug 2011 11:05:44 -0500
+Subject: [GIT PULL] orion5x and footbridge compile fixes for 3.1
+In-Reply-To: <201108261753.03086.arnd@arndb.de>
+References: <4E565AC4.7060504@gmail.com> <201108261753.03086.arnd@arndb.de>
+Message-ID: <4E57C458.9020805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2011 05:35 PM, Tarun Kanti DebBarma wrote:
-> Clock is enabled only when timer is started and disabled when the the timer
-> is stopped. Therefore before accessing registers in functions clock is enabled
-> and then disabled back at the end of access.
-> Context save and restore functions are called as needed based upon whether the
-> context is lost or not.
->
-> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
-> ---
->   arch/arm/mach-omap2/timer.c               |   17 +++++
->   arch/arm/plat-omap/dmtimer.c              |   97 +++++++++++++++++++++++++++--
->   arch/arm/plat-omap/include/plat/dmtimer.h |    9 +++
->   3 files changed, 118 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 9d47300..d1c6219 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -44,6 +44,9 @@
->   #include<plat/common.h>
->   #include<plat/omap_hwmod.h>
->   #include<plat/omap_device.h>
-> +#include<plat/omap-pm.h>
-> +
-> +#include "powerdomain.h"
->
->   /* Parent clocks, eventually these will come from the clock framework */
->
-> @@ -409,6 +412,16 @@ static int omap2_dm_timer_set_src(struct platform_device *pdev, int source)
->   	return ret;
->   }
->
-> +#ifdef CONFIG_PM
-> +static int omap_timer_get_context_loss(struct device *dev)
-> +{
-> +	return omap_pm_get_dev_context_loss_count(dev);
-> +}
-> +
-> +#else
-> +#define omap_gpio_get_context_loss NULL
-> +#endif
-> +
->   struct omap_device_pm_latency omap2_dmtimer_latency[] = {
->   	{
->   		.deactivate_func = omap_device_idle_hwmods,
-> @@ -437,6 +450,7 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
->   	struct dmtimer_platform_data *pdata;
->   	struct omap_device *od;
->   	struct omap_timer_capability_dev_attr *timer_dev_attr;
-> +	struct powerdomain *pwrdm;
->
->   	pr_debug("%s: %s\n", __func__, oh->name);
->
-> @@ -466,6 +480,9 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
->
->   	pdata->set_timer_src = omap2_dm_timer_set_src;
->   	pdata->timer_ip_type = oh->class->rev;
-> +	pwrdm = omap_hwmod_get_pwrdm(oh);
-> +	pdata->loses_context = pwrdm_can_ever_lose_context(pwrdm);
-> +	pdata->get_context_loss_count = omap_timer_get_context_loss;
->
->   	od = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
->   			omap2_dmtimer_latency,
-> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-> index cdef48b..db14d7f 100644
-> --- a/arch/arm/plat-omap/dmtimer.c
-> +++ b/arch/arm/plat-omap/dmtimer.c
-> @@ -151,12 +151,14 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
->
->   static void omap_dm_timer_reset(struct omap_dm_timer *timer)
->   {
-> +	omap_dm_timer_enable(timer);
->   	if (timer->pdev->id != 1) {
->   		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
->   		omap_dm_timer_wait_for_reset(timer);
->   	}
->
->   	__omap_dm_timer_reset(timer->io_base, 0, 0, timer->func_offset);
-> +	omap_dm_timer_disable(timer);
->   	timer->posted = 1;
->   }
->
-> @@ -171,14 +173,13 @@ void omap_dm_timer_prepare(struct omap_dm_timer *timer)
->   		return;
->   	}
->
-> -	omap_dm_timer_enable(timer);
-> -
->   	if (pdata->needs_manual_reset)
->   		omap_dm_timer_reset(timer);
->
->   	omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
->
->   	timer->posted = 1;
-> +	timer->context_changed = true;
-You should protect these variables from races.
+Arnd,
 
->   }
->
->   struct omap_dm_timer *omap_dm_timer_request(void)
-> @@ -230,7 +231,6 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_request_specific);
->
->   void omap_dm_timer_free(struct omap_dm_timer *timer)
->   {
-> -	omap_dm_timer_disable(timer);
->   	clk_put(timer->fclk);
->
->   	WARN_ON(!timer->reserved);
-> @@ -311,6 +311,11 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_modify_idlect_mask);
->
->   void omap_dm_timer_trigger(struct omap_dm_timer *timer)
->   {
-> +	if (unlikely(!timer->reserved)) {
-> +		pr_err("%s: timer%d not enabled.\n", __func__, timer->id);
-> +		return;
-> +	}
-> +
->   	omap_dm_timer_write_reg(timer, OMAP_TIMER_TRIGGER_REG, 0);
->   }
->   EXPORT_SYMBOL_GPL(omap_dm_timer_trigger);
-> @@ -319,6 +324,20 @@ void omap_dm_timer_start(struct omap_dm_timer *timer)
->   {
->   	u32 l;
->
-> +	omap_dm_timer_enable(timer);
-> +
-> +	if (timer->loses_context) {
-> +		u32 ctx_loss_cnt_after;
-> +
-> +		ctx_loss_cnt_after =
-> +			timer->get_context_loss_count(&timer->pdev->dev);
-> +		if ((ctx_loss_cnt_after != timer->ctx_loss_count)&&
-> +					timer->context_saved) {
-> +			omap_timer_restore_context(timer);
-> +			timer->context_saved = false;
-Ditto. It applies to rest of the patch.
+On 08/26/2011 10:53 AM, Arnd Bergmann wrote:
+> On Thursday 25 August 2011, Rob Herring wrote:
+>> Please pull for 3.1-rc. Footbridge and orion5x builds are currently
+>> broken in 3.1 mainly due to my changes in this commit:
+>>
+>> commit cc22b4c18540e5e8bf55c7d124044f9317527d3c
+>> Author: Rob Herring <rob.herring@calxeda.com>
+>> Date:   Tue Jun 28 21:22:40 2011 -0500
+>>
+>>     ARM: set vga memory base at run-time
+>>
+>>
+>> The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
+>>
+> 
+> Pulled, thanks!
+> 
+> BTW, are you planning to get your own git tree in the future or do you keep using
+> Jon's git.jdl.com server?
 
-Rest look ok.
+It is mine basically, just on Jon's domain. But yes, it's on the IT guys
+todo list... Jon was just the quickest path.
 
-Regards
-Santosh
+> 
+> It should be no problem for you to get hosting on git.kernel.org, there is
+> a FAQ somewhere. With the current situation, it's now clear from the changelog
+> why I am pulling patches from Jon's server with your Signed-off-by.
+> 
+Why would 3 Marvell patches from me be strange... :)
+It wasn't really clear to me whether you were going to pick them off the
+list and were aware of all 3 patches, so I just decided to make it easy
+for you.
+
+Rob
