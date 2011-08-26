@@ -1,33 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 26 Aug 2011 09:32:52 +0100
-Subject: Fwd: [GIT PULL] [3.2] Please pull tegra boards for 3.2
-In-Reply-To: <CAOesGMj5P9yLO0My4UB7AEj+9NdmYq8HYwVMd3Uv1NQO6+WP7A@mail.gmail.com>
-References: <CAOesGMjHN-pvVfMN0o3AD238m8wEiRS-D4ArjV_2VAGTuwPfBw@mail.gmail.com>
-	<201108161648.58250.arnd@arndb.de>
-	<CAOesGMgZCFF=dWhAm_+Ux-c-aORqo4sJ1DOGirCu3QT-iMcQRQ@mail.gmail.com>
-	<2300535.b0zjAbUTLi@wuerfel>
-	<CAOesGMj5P9yLO0My4UB7AEj+9NdmYq8HYwVMd3Uv1NQO6+WP7A@mail.gmail.com>
-Message-ID: <20110826083252.GE11250@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 26 Aug 2011 10:35:02 +0200
+Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B24A3EDB@HQMAIL01.nvidia.com>
+References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B24A3BC0@HQMAIL01.nvidia.com>
+	<CACRpkdaZfG4hiGf8vug3EGMRMc0c92xbj=L_HAQcS27DAXYc4Q@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B24A3EDB@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdbBBaNFETLLcxeCFZoLbdMok7uRi_o-HcbpYdMtRiGFcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 10:23:21PM -0700, Olof Johansson wrote:
-> Ok. Sounds like there might be some use for a temporary "work in
-> progress" branch for linux-next for patches that are nearly ready to
-> go but not quite that needs air time, but not really for anything
-> beyond that.
+On Thu, Aug 25, 2011 at 9:13 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Linus Walleij wrote at Thursday, August 25, 2011 4:13 AM:
+>
+>> So this is radically different in that it requires the pin control
+>> system to assume basically that any one pin can be used for
+>> any one function.
+>
+> I think that's the wrong conclusion; 1:many isn't the same as 1:all/any.
+> The data model might be structured to allow that, but in practice most
+> HW allows 1:some_subset, not 1:all/any. I think this was well-covered in
+> some other recent responses in this thread.
 
-Bad idea.
+OK what I was mainly after was if the data model should
+be structured to accept phone-exchange type muxing. If it
+does and such a hardware appears - I mean a hardware where
+any pin can be muxed anywhere, and given the second point
+you make that the pinmux subsystem should expose all possible
+combinations, it will lead to a situation where the driver
+needs to expose all permutations i.e. (n over k) combinations
+per function where n is the number of available pins and k
+is the number of pins used by any one function. That would
+just explode...
 
-linux-next's policy is that everything in linux-next should be ready
-for mainline - not nearly ready.
+So if we assume that such a hardware does not exist but
+the number of permutations of functions will always be limited,
+it makes much more sense.
 
-Linus is threatening at the next merge window to ignore pull requests
-from maintainers, and just pull the entire linux-next tree into his at
-the beginning.  Anything in linux-next which is "work in progress" will
-therefore find its way immediately into mainline in whatever state it's
-in.
+I'll encode this theoretical assumption in
+Documentation/pinctrl.txt as I go along.
 
-So, everyone needs to ensure that linux-next only contains code that's
-100% ready for merging during the next merge window.  Everything else
-should not be in linux-next.
+>> So the data model I'm assuming is:
+>>
+>> - Pins has a 1..* relation to functions
+>> - Functions in general have a 1..1 relation to pins,
+>> - Device drivers in general have a 1..1 relation to
+>> ? functions
+>> - Functions with 1..* relation to pins is uncommon
+>> ? as is 1..* realtions between device drivers and
+>> ? functions.
+>>
+>> The latter is the crucial point where I think we have
+>> different assumptions.
+>
+> As a few other replies pointed out, a number of chips do allow the at
+> least some logical functions to be mux'd onto different pins. Tegra
+> certainly isn't unique in this.
+
+Yeah I get this now... and it's a handful of alternatives for a
+few functions, sorry for being such a slow learner.
+
+>> If it holds, it leads to the fact that a pinmux driver
+>> will present a few functions for say i2s0 usually only
+>> one, maybe two, three, never hundreds.
+>
+> Certainly I'd assume the number of pins/groups that a given function
+> could be mux'd out onto is small, say 1-3. But, certainly not limited
+> to just 1 in many cases.
+
+Sure, we're on the same page. So I now need to find a
+way to expose a few different localities per function from
+the system and all the way to the map, and drop the string
+naming system so instead of using spi0-0, spi0-1, spi0-2
+I use some tuple like {"spi0", 0}, {"spi0", 1}, {"spi0", 2}
+and I call the latter integer something like "locality" or
+"position".
+
+> Just a note: There are Tegra-based boards in wide use (in fact, boards
+> for which some support is in mainline) that make active use of switching
+> the routing of a HW function between different pins at run-time.
+> Specifically, switching 1 I2C controller between 2 busses on the board.
+>
+> In fact, soon after the pinmux system is upstream, I hope we (NVIDIA) will
+> be writing and submitting an I2C bus mux driver based on that. In our
+> downstream kernels, we do this as custom code in the I2C host driver, but
+> I want to move it out into a separate driver that anyone can use.
+
+This is pretty cool and a usecase that I was thinking about. It'll
+be fun!
+
+Yours,
+Linus Walleij
