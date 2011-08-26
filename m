@@ -1,25 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Aug 2011 08:00:53 +0200
-Subject: [GIT PULL] Samsung Fixes for v3.1-rc3
-In-Reply-To: <073301cc638d$8c95ae20$a5c10a60$%kim@samsung.com>
-References: <005401cc5e80$d494d410$7dbe7c30$%kim@samsung.com>
-	<073301cc638d$8c95ae20$a5c10a60$%kim@samsung.com>
-Message-ID: <23495754.V4KN876AQp@wuerfel>
+From: hatim.rv@samsung.com (Hatim Ali)
+Date: Fri, 26 Aug 2011 12:09:05 +0530
+Subject: [PATCH 0/2] Add TVOUT support for SMDKV310
+Message-ID: <1314340747-13816-1-git-send-email-hatim.rv@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 August 2011 10:14:47 Kukjin Kim wrote:
-> 
-> Hi Arnd, any problem?
-> I can't find this yet in your -fixes branch.
-> 
-> As you said before, if there are fixes in -fixes branch, it should be
-> handled faster than others.
-> Maybe missed? Or should I need to send this to Linus directly?...
-> I think, that should be fixed now and there is no dependency with other ARM
-> stuff.
+This patchset adds TVOUT support for SMDKV310 board.
 
-Everything is right on your side, I apologize for being slow here.
-I'll try to handle it today.
+These patches are based on Tomasz Stanislawski's patchset
+"Updated s5p-tv platform definitions"
+(http://www.spinics.net/lists/linux-samsung-soc/msg06138.html)
+and "add support for HDMIPHY dedicated controller"
+(http://www.spinics.net/lists/linux-i2c/msg05932.html)
+on for-next branch of kgene's tree
+(git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git)
 
-	Arnd
+The TVOUT driver has a dependency on PM_RUNTIME. So you need to
+enable the PM_RUNTIME support in "Power Management" option in
+menuconfig.
+
+These patches have been tested for 720x480 and 1280x720 resolutions
+on SMDKV310 EVT1.
+
+The SDO functionality has not been tested because it has a
+dependency on PMIC support. Once PMIC support is added,
+SDO can also be tested.
+
+NOTE: Patch 2 is for testing TVOUT driver on SMDKV310 till CMA
+support gets merged.
+
+Hatim Ali (2):
+  ARM: EXYNOS4: Add TVOUT support for SMDKV310
+  ARM: EXYNOS4: Update consistent DMA size to 8MB
+
+ arch/arm/mach-exynos4/Kconfig               |    2 ++
+ arch/arm/mach-exynos4/include/mach/memory.h |    1 +
+ arch/arm/mach-exynos4/mach-smdkv310.c       |    5 +++++
+ 3 files changed, 8 insertions(+), 0 deletions(-)
+
+--
+1.7.2.3
