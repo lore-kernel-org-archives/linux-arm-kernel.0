@@ -1,27 +1,23 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 26 Aug 2011 20:51:33 +0530
-Subject: [PATCH v14 REPOST 02/12] OMAP4: hwmod data: add dmtimer version
-	information
-In-Reply-To: <1310731501-13078-3-git-send-email-tarun.kanti@ti.com>
-References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
-	<1310731501-13078-3-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4E57B9FD.7010301@ti.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 26 Aug 2011 20:55:56 +0530
+Subject: [PATCH v7 04/15] DMA: PL330: Add DMA_CYCLIC capability
+In-Reply-To: <1314238425-6480-5-git-send-email-boojin.kim@samsung.com>
+References: <1314238425-6480-1-git-send-email-boojin.kim@samsung.com>
+	<1314238425-6480-5-git-send-email-boojin.kim@samsung.com>
+Message-ID: <CABb+yY2MtoxQfaXZs49161zAxuNyS7xXdMa9MNj6LZt03gK0Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2011 05:34 PM, Tarun Kanti DebBarma wrote:
-> OMAP4 has two groups of timers: version 1 timers are 1, 2, 10,
-> while the rest of the timers, 3-9, 11 are version 2 timers.
-> The version information is required by the driver so that they
-> could be handled correctly by it.
->
-> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com>
-> Acked-by: Cousson, Benoit<b-cousson@ti.com>
-> Cc: Cousson, Benoit<b-cousson@ti.com>
-> ---
-Since Benoit has already acked it, you can remove the CC.
+On Thu, Aug 25, 2011 at 7:43 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
 
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ?static void pl330_issue_pending(struct dma_chan *chan)
+> ?{
+> - ? ? ? pl330_tasklet((unsigned long) to_pchan(chan));
+> + ? ? ? struct dma_pl330_chan *pch = to_pchan(chan);
+> +
+> + ? ? ? pl330_tasklet((unsigned long) pch);
+> ?}
+This is a useless churn since v6.
 
-Regards
-Santosh
+Please fix this and add
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
