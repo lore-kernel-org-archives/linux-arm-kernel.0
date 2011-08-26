@@ -1,26 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 26 Aug 2011 19:45:22 +0530
-Subject: [PATCH v14 REPOST 01/12] OMAP2+: dmtimer: add device names to
-	flck nodes
-In-Reply-To: <1310731501-13078-2-git-send-email-tarun.kanti@ti.com>
-References: <1310731501-13078-1-git-send-email-tarun.kanti@ti.com>
-	<1310731501-13078-2-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4E57AA7A.6060106@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 26 Aug 2011 15:23:05 +0100
+Subject: [PATCH 4/6] DMA: PL330: Add device tree support
+In-Reply-To: <4E579C9B.7030807@gmail.com>
+References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
+	<1314348014-2481-2-git-send-email-thomas.abraham@linaro.org>
+	<1314348014-2481-3-git-send-email-thomas.abraham@linaro.org>
+	<1314348014-2481-4-git-send-email-thomas.abraham@linaro.org>
+	<1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>
+	<4E579C9B.7030807@gmail.com>
+Message-ID: <20110826142305.GA23469@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 July 2011 05:34 PM, Tarun Kanti DebBarma wrote:
-> Add device name to OMAP2 dmtimer fclk nodes so that the fclk nodes can be
-> retrieved by doing a clk_get with the corresponding device pointers or
-> device names.
->
-> Signed-off-by: Tarun Kanti DebBarma<tarun.kanti@ti.com
-> Signed-off-by: Thara Gopinath<thara@ti.com>
-> Acked-by: Cousson, Benoit<b-cousson@ti.com>
-> ---
+On Fri, Aug 26, 2011 at 08:16:11AM -0500, Rob Herring wrote:
+> Thomas,
+> 
+> On 08/26/2011 03:40 AM, Thomas Abraham wrote:
+> > +  - arm,pl330-peri-reqs: number of actual peripheral requests connected to the
+> > +    dma controller. Maximum value is 32.
+> 
+> Perhaps could be a bitmask for sparsely populated requests. May not
+> matter since phandles will define the connections.
+> 
+> Can be optional and not present means 00 requests (mem-to-mem only).
 
-Looks good to me.
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+The number of peripheral requests is readable from configuration register
+zero, so this is discoverable.  Why should we put this information into
+DT if its provided by the hardware?
 
-Regards
-Santosh
+The number of DMA channels available is also configurable by the SoC
+designer, yet you don't specify that in DT.  And there's a whole bunch
+of other configuration options available to the SoC designer, most of
+which are discoverable from the configuration registers.
+
+So, I don't think you should be specifying the number of requests.
