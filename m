@@ -1,49 +1,63 @@
 From: jason.hui@linaro.org (Jason Liu)
-Date: Fri, 26 Aug 2011 13:35:17 +0800
-Subject: [[PATCH v3 0/6] imx soc revision clean up
-Message-ID: <1314336923-25162-1-git-send-email-jason.hui@linaro.org>
+Date: Fri, 26 Aug 2011 13:35:18 +0800
+Subject: [[PATCH v3 1/6] ARM: imx: Introduce generic function for displaying
+	silicon revision
+In-Reply-To: <1314336923-25162-1-git-send-email-jason.hui@linaro.org>
+References: <1314336923-25162-1-git-send-email-jason.hui@linaro.org>
+Message-ID: <1314336923-25162-2-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patchset make some clean up for the imx soc revision display by
-- introudce the generic function for displaying silicon revision
-- update the imx SoCs to adopt the same usage
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-The patchset is based on Fabio's initial commit and I did some update
+Currently each i.MX processor has its own function for displaying the silicon
+revision.
 
-V3:
-- fix the mx51TO3/mx31 print information
-V2: Address comments from Sascha
-- Remove the EXPORT_SYMBOL from imx_print_silicon_rev
-- Fix the mx31 print twice issue
+Introduce a generic function for this purpose, so that all i.MX processors can
+reuse it.
 
-Fabio Estevam (1):
-  ARM: imx: Introduce generic function for displaying silicon revision
-
-Jason Liu (5):
-  ARM: mx25: Print silicon revision on boot
-  ARM: mx27: Print silicon revision on boot
-  ARM: mx31: use generic function for displaying silicon revision
-  ARM: mx35: use generic function for displaying silicon revision
-  ARM: mx5: use generic function for displaying silicon revision
-
- arch/arm/mach-imx/Makefile              |    2 +-
- arch/arm/mach-imx/clock-imx25.c         |    6 +++
- arch/arm/mach-imx/clock-imx27.c         |    2 +
- arch/arm/mach-imx/clock-imx31.c         |    4 +-
- arch/arm/mach-imx/clock-imx35.c         |    3 +-
- arch/arm/mach-imx/cpu-imx25.c           |   41 +++++++++++++++++
- arch/arm/mach-imx/cpu-imx27.c           |   28 +++++------
- arch/arm/mach-imx/cpu-imx31.c           |   48 +++++++++++---------
- arch/arm/mach-imx/cpu-imx35.c           |   30 ++++++-------
- arch/arm/mach-mx5/clock-mx51-mx53.c     |    6 +--
- arch/arm/mach-mx5/cpu.c                 |   74 +++++++------------------------
- arch/arm/plat-mxc/cpu.c                 |    9 ++++
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Jason Liu <jason.hui@linaro.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+---
+V2: remove EXPORT_SYMBOL
+---
+ arch/arm/plat-mxc/cpu.c                 |    9 +++++++++
  arch/arm/plat-mxc/include/mach/common.h |    1 +
- arch/arm/plat-mxc/include/mach/mx25.h   |    4 ++
- arch/arm/plat-mxc/include/mach/mx3x.h   |   18 +-------
- 15 files changed, 142 insertions(+), 134 deletions(-)
- create mode 100644 arch/arm/mach-imx/cpu-imx25.c
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/plat-mxc/cpu.c b/arch/arm/plat-mxc/cpu.c
+index 386e0d5..f5b7e0f 100644
+--- a/arch/arm/plat-mxc/cpu.c
++++ b/arch/arm/plat-mxc/cpu.c
+@@ -1,5 +1,6 @@
+ 
+ #include <linux/module.h>
++#include <mach/hardware.h>
+ 
+ unsigned int __mxc_cpu_type;
+ EXPORT_SYMBOL(__mxc_cpu_type);
+@@ -9,3 +10,11 @@ void mxc_set_cpu_type(unsigned int type)
+ 	__mxc_cpu_type = type;
+ }
+ 
++void imx_print_silicon_rev(const char *cpu, int srev)
++{
++	if (srev == IMX_CHIP_REVISION_UNKNOWN)
++		pr_info("CPU identified as %s, unknown revision\n", cpu);
++	else
++		pr_info("CPU identified as %s, silicon rev %d.%d\n",
++				cpu, (srev >> 4) & 0xf, srev & 0xf);
++}
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 4e3d978..318e0da 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -72,4 +72,5 @@ extern void mxc_arch_reset_init(void __iomem *);
+ extern void mx51_efikamx_reset(void);
+ extern int mx53_revision(void);
+ extern int mx53_display_revision(void);
++extern void imx_print_silicon_rev(const char *cpu, int srev);
+ #endif
 -- 
 1.7.4.1
