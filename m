@@ -1,40 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 26 Aug 2011 09:00:39 +0900
-Subject: [PATCH] ARM: EXYNOS4: Fix routing timer interrupt to offline CPU
-Message-ID: <1314316839-1242-1-git-send-email-kgene.kim@samsung.com>
+From: armkernel8@gmail.com (Moon Hwa Hong)
+Date: Fri, 26 Aug 2011 09:31:25 +0900
+Subject: ARMv7 MMU and cache enabling code in boot/compressed/head.S
+Message-ID: <CAFWwQu_-HirBTsyFpG8EKs6Su9r=O4Wi8=L3b-O4OdMKDC0f8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 5dfc54e087c15f823ee9b6541d2f0f314e69cbed
-("ARM: GIC: avoid routing interrupts to offline CPUs")
-prevents routing interrupts to offline CPUs. But in
-case of timer on EXYNOS4, the irq_set_affinity() method
-is called in percpu_timer_setup() before CPU1 becomes
-online. So this patch fixes routing timer interrupt to
-offline CPU.
+Hi!
 
-Reported-by: Changhwan Youn <chaos.youn@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
-Hi Russell and all,
+I started arm linux kernel hacking.
+I can't understand 554 line.
+I think that 554 line is not necessary.
+Because ISB instruction(556 line) makes synchronization between 553 and 557.
+Please advice to me.
 
-I'm not sure it's safe to call set_cpu_online() here...
 
- arch/arm/mach-exynos4/platsmp.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+530 __armv7_mmu_cache_on:
+.
+.
+.
+553         mcr p15, 0, r0, c1, c0, 0   @ load control register
+554         mrc p15, 0, r0, c1, c0, 0   @ and read it back
+555         mov r0, #0
+556         mcr p15, 0, r0, c7, c5, 4   @ ISB
+557         mov pc, r12
 
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-index 96cc651..a3346e3 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -109,6 +109,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
- 	 */
- 	spin_lock(&boot_lock);
- 	spin_unlock(&boot_lock);
-+
-+	set_cpu_online(cpu, true);
- }
- 
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
--- 
-1.7.1
+Have a nice day.
+
+MH Hong.
