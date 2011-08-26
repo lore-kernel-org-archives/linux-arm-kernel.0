@@ -1,47 +1,53 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 25 Aug 2011 22:03:03 -0700
-Subject: [PATCH v3 4/4] ARM: msm: Describe MSM 8660 SURF FPGA registers
-	in DT
-In-Reply-To: <201108251726.32689.arnd@arndb.de>
-References: <1313688345-17699-1-git-send-email-davidb@codeaurora.org>
-	<201108251327.13146.arnd@arndb.de>
-	<20110825145736.GA31331@huya.qualcomm.com>
-	<201108251726.32689.arnd@arndb.de>
-Message-ID: <20110826050303.GA23472@huya.qualcomm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 25 Aug 2011 22:04:31 -0700
+Subject: [PATCH v3 00/13] arm/tegra: Initialize GPIO & pinmux from DT
+In-Reply-To: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
+References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
+Message-ID: <CAOesGMiygfaNkPa7uURCiJpC=WDinWhKi07LFgJ+5JoGW_fLKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > So, if I made it a separate driver, where would it go?  Since this
-> > board still has platform device support, I suspect the platform data
-> > needed to describe this device would end up being larger than the
-> > driver itself.
-> 
-> Excellent question ;-)
-> 
-> When the driver is really small, I would just leave it in the board
-> file for now, although that might not be a good long-term strategy.
-> Do we have any similar cases that we can group together with the
-> fpga to make a subsystem? Maybe it could be a small driver in the
-> pinmux subsystem when that is established.
+On Thu, Aug 25, 2011 at 4:43 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> v3:
+> * Build on Jamie Iles' patches to split some of the DT parsing into
+> ?common code.
+> * Renamed some properties to remove "nvidia," from name; they can be
+> ?generic.
+> * Support pins property, to apply DT nodes to multiple pins/groups
+> * Some minor error-message changes driven by some of the above.
+> * Removed requirement to #ifdef CONFIG_OF
+> * Removed AUXDATA table entries in mach-tegra/board-dt.c
+>
+> TODO:
+> * Convert from using strings to using integers for the function and pin
+> ?names. This relies on the dtc patches I posted yesterday, but should
+> ?be pretty simple once they're in.
+>
+> Jamie Iles (1):
+> ?of: add a generic pinmux helper
+>
+> Stephen Warren (12):
+> ?arm/tegra: Prep boards for gpio/pinmux conversion to pdevs
+> ?docs/dt: Document nvidia,tegra20-gpio's nvidia,enabled-gpios property
+> ?arm/dt: Tegra: Add nvidia,enabled-gpios property to GPIO controller
+> ?docs/dt: Document nvidia,tegra20-pinmux binding
+> ?arm/dt: Tegra: Add pinmux node
+> ?dt: add empty for_each_child_of_node, of_find_property
+> ?gpio/tegra: Convert to a platform device
+> ?gpio/tegra: Add device tree support
+> ?arm/tegra: Convert pinmux driver to a platform device
+> ?of: add property iteration helpers
+> ?arm/tegra: Add device tree support to pinmux driver
+> ?arm/tegra: board-dt: Remove dependency on non-dt pinmux functions
 
-At this point, I think I'm just going to leave this FPGA
-initialization out.  It seems that newer versions of the bootloader
-have made the FPGA entirely inaccessible.  This has the unfortunate
-consequence of making the UART unusable on the MSM8660 SURF.  I'll see
-if I can get this fixed at a bootloader level, or come up with another
-solution.
 
-So, meanwhile, I'll include the other patches, which work fine on the
-MSM 8660 Fluid target, and I'll just make an additional dsb file for
-this.  Patch soon...
+This is looking pretty sane to me.
 
-The FLUID has the advantage of being a device that is technically
-available to people (although a bit pricey)
+Grant, how do you prefer to handle this, since it spans of/dt, gpio
+and tegra code? I can start a topic branch for Arnd to pull in for the
+tegra parts, would you prefer picking up the of helper functions on
+your own or is an ack from you and merge through the arm-soc tree
+easier?
 
-  http://www.bsquare.com/snapdragon-mobile-development-platform.aspx
 
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+-Olof
