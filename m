@@ -1,62 +1,31 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sat, 27 Aug 2011 20:31:25 +0400
-Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
-In-Reply-To: <1314456515-16419-1-git-send-email-ming.lei@canonical.com>
-References: <1314456515-16419-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <4E591BDD.10600@ru.mvista.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 27 Aug 2011 22:17:20 +0530
+Subject: [PATCH] ARM: vfp: Fix the comment to make it consistent with the code.
+Message-ID: <1314463640-17346-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Function vfp_force_reload() clears vfp_current_hw_state, so
+update the comment accordingly.
 
-On 27-08-2011 18:48, ming.lei at canonical.com wrote:
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+cc: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/vfp/vfpmodule.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> From: Ming Lei<ming.lei@canonical.com>
-
-> This patch fixs one performance bug on ARM Cortex A9 dual core platform,
-> which has been reported on quite a few ARM machines(OMAP4, Tegra 2, snowball...),
-> see details from link of https://bugs.launchpad.net/bugs/709245.
-
-> In fact, one mb() on ARM is enough to flush L2 cache, but
-> 'dummy->hw_token = token;' after mb() is added just for obeying
-> correct mb() usage.
-
-> The patch has been tested ok on OMAP4 panda A1 board, the performance
-> of 'dd' over usb mass storage can be increased from 4~5MB/sec to
-> 14~16MB/sec after applying this patch.
-
-> Signed-off-by: Ming Lei<ming.lei@canonical.com>
-> ---
->   drivers/usb/host/ehci-q.c |   14 ++++++++++++++
->   1 files changed, 14 insertions(+), 0 deletions(-)
-
-> diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
-> index 0917e3a..65b5021 100644
-> --- a/drivers/usb/host/ehci-q.c
-> +++ b/drivers/usb/host/ehci-q.c
-> @@ -1082,6 +1082,20 @@ static struct ehci_qh *qh_append_tds (
->   			wmb ();
->   			dummy->hw_token = token;
->
-> +			/* The mb() below is added to make sure that
-> +			 * 'token' can be writen into qtd, so that ehci
-> +			 * HC can see the up-to-date qtd descriptor. On
-> +			 * some archs(at least on ARM Cortex A9 dual core),
-> +			 * writing into coherenet memory doesn't mean the
-> +			 * value written can reach physical memory
-> +			 * immediately, and the value may be buffered
-> +			 * inside L2 cache. 'dummy->hw_token = token;'
-
-    You meant 'token = dummy->hw_token;'?
-
-> +			 * after mb() is added for obeying correct mb()
-> +			 * usage.
-> +			 * */
-> +			mb();
-> +			token = dummy->hw_token;
-> +
->   			urb->hcpriv = qh_get (qh);
->   		}
->   	}
-
-WBR, Sergei
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index fe4b60b..0cbd5a0 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -69,7 +69,7 @@ static bool vfp_state_in_hw(unsigned int cpu, struct thread_info *thread)
+ /*
+  * Force a reload of the VFP context from the thread structure.  We do
+  * this by ensuring that access to the VFP hardware is disabled, and
+- * clear last_VFP_context.  Must be called from non-preemptible context.
++ * clear vfp_current_hw_state.  Must be called from non-preemptible context.
+  */
+ static void vfp_force_reload(unsigned int cpu, struct thread_info *thread)
+ {
+-- 
+1.7.4.1
