@@ -1,47 +1,39 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Sat, 27 Aug 2011 12:12:43 +0100
-Subject: [PATCH] ARM: kprobes: Fix jprobe registration on Thumb kernels
-Message-ID: <1314443563-16389-1-git-send-email-tixy@yxit.co.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 27 Aug 2011 13:14:26 +0200
+Subject: [GIT PULL] i.MX cleanups for next
+In-Reply-To: <201108261923.26398.arnd@arndb.de>
+References: <20110823115609.GJ31404@pengutronix.de>
+	<20110826082558.GC7526@pengutronix.de>
+	<201108261923.26398.arnd@arndb.de>
+Message-ID: <20110827111426.GJ31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Medhurst <tixy@yxit.co.uk>
+On Fri, Aug 26, 2011 at 07:23:26PM +0200, Arnd Bergmann wrote:
+> On Friday 26 August 2011, Sascha Hauer wrote:
+> > Shawn Guo (7):
+> >       arm/mxc: do not use gpio_to_irq() for static initializers
+> >       gpio/mxc: add .to_irq for gpio chip
+> >       arm/mxc: use gpiolib helper for gpio_to_irq
+> >       gpio/mxc: move irq_to_gpio() into gpio-mxc driver
+> >       arm/mxc: move IMX_GPIO_NR into mach/hardware.h
+> >       gpio/mxs: move irq_to_gpio() into gpio-mxs driver
+> >       arm/mxs: move MXS_GPIO_NR into mach/mxs.h
+> 
+> I got conflicts between these patches and the gpio cleanups in Russell's
+> gpio branch. For now, I have reverted Shawn's patches so that we
+> can get build coverage of the rest in linux-next without annoying
+> Stephen too much.
 
-When jprobes are registered, the generic kprobes code verifies that the
-address given for the probe's handler corresponds to a symbol in the
-kernel. For thumb kernels, this address has bit zero set to indicate its
-thumb-ness and so is rejected as being offset by one byte from the
-symbol address.
+I don't know the situation exactly at the moment, but I remember that
+Shawn originally sent the patches based on rmks patchset. I reworked
+them to fit onto mainline to be able to apply them and decided that
+the conflicts were easy enough to solve upstream.
 
-Fortunately, on some architectures, the jprobes handler is specified
-using a struct rather than a plain function pointer; so a mechanism is
-provided for arch code to define a translation function called
-arch_deref_entry_point(). We can use this on Thumb kernels to remove bit
-zero of the handler address and fix our problem.
+Sascha
 
-Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
----
- arch/arm/kernel/kprobes.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 129c116..9c88bcd 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -497,6 +497,14 @@ void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
- 	regs->ARM_lr = (unsigned long)&kretprobe_trampoline;
- }
- 
-+#ifdef CONFIG_THUMB2_KERNEL
-+unsigned long arch_deref_entry_point(void *entry)
-+{
-+	/* Remove any thumb flag from the function pointer. */
-+	return (unsigned long)entry & ~1lu;
-+}
-+#endif
-+
- int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
- {
- 	struct jprobe *jp = container_of(p, struct jprobe, kp);
 -- 
-1.7.2.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
