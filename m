@@ -1,39 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 27 Aug 2011 20:39:22 +0200
-Subject: [PATCH 1/5] ARM: mx5: Allow CCM definitions to work on MX51 and
-	MX53
-In-Reply-To: <CAOMZO5DcLj+bVchVrk9+K+xvzjD7sZpvMjmM0W0-o_qbzFnd5A@mail.gmail.com>
-References: <1314386521-29351-1-git-send-email-fabio.estevam@freescale.com>
-	<20110827111943.GK31404@pengutronix.de>
-	<CAOMZO5DcLj+bVchVrk9+K+xvzjD7sZpvMjmM0W0-o_qbzFnd5A@mail.gmail.com>
-Message-ID: <20110827183922.GL31404@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 27 Aug 2011 13:31:05 -0600 (MDT)
+Subject: How to handle named resources with DT?
+In-Reply-To: <5595208.OB5dBohxQP@wuerfel>
+References: <20110809205723.GE11568@ponder.secretlab.ca>
+	<201108261741.29850.arnd@arndb.de>
+	<20110827143736.GA10182@yookeroo.fritz.box>
+	<5595208.OB5dBohxQP@wuerfel>
+Message-ID: <alpine.DEB.2.00.1108271306500.23968@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 27, 2011 at 12:17:47PM -0300, Fabio Estevam wrote:
-> On Sat, Aug 27, 2011 at 8:19 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Fri, Aug 26, 2011 at 04:21:57PM -0300, Fabio Estevam wrote:
-> >> Allow CCM (Clock Control Module) definitions to work on MX51 and MX53
-> >> by checking the cpu type in run-time and using the appropriate register bases.
-> >
-> > They already work on i.MX51 and i.MX53. They have different physical
-> > addresses, but have (more or less accidently...) the same virtual
-> > address.
-> 
-> Without this patch I get a kernel crash on MX53 at
-> arch/arm/mach-mx5/system.c , when trying to read
-> the following registers CCM registers:
+On Sat, 27 Aug 2011, Arnd Bergmann wrote:
 
-The CCM base address is AIPS1 + x whereas the ARM base address is
-AIPS2 + x. Maybe only the AIPS1 base addresses are the same.
-Anyway, I would prefer having the registers defines as offsets to
-a base and not as absolute addresses. Looking back it was a mistake
-merging this. Having the registers as offsets is much more flexible.
+> Right, and I guess we can simply ignore DMA and ioport resources because 
+> they are extremely rare, right?
 
-Sascha
+DMA resources are quite widely used.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+For example, looking at the SoCs with some publicly-available 
+documentation, the Motorola i.MX51 reference manual lists 47 SDMA request 
+lines across about 17 different IP block types[1], and to pick a 
+representative OMAP, the OMAP3430 technical reference manual lists 77 SDMA 
+request lines, used by at least 9 different IP block types[2].
+
+Also, many IP blocks have multiple DMA resources.  For example, the above 
+references list UART, MCSPI, PATA, I2C, FIRI, MCBSP, SSI, CTI, CSPI, 
+eCSPI, EMI, eSDHC, SPI, and DSS.
+
+
+- Paul
+
+1. Table 3-3, "SDMA Event Mapping".  _MCIMX51 Multimedia Applications 
+   Processor Reference Manual (MCIMX51RM) Rev. 1 2/2010_.  Available from
+   http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=i.MX515&fpsp=1&tab=Documentation_Tab
+
+2. This is simply one example from the OMAP3430 TRM, but similar tables
+   are available for OMAP2420, 2430, 3430, 3630, 4430, 4460, 4470, etc.
+   Table 9-3, "SDMA Request Mapping". _OMAP34xx Multimedia Device Silicon 
+   Revision 3.1.x Version J (SWPU223J)_ (public version).  Available from 
+   http://focus.ti.com/general/docs/wtbu/wtbudocumentcenter.tsp?templateId=6123&navigationId=12667
