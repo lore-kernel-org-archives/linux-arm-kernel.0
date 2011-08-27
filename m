@@ -1,46 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 27 Aug 2011 20:13:59 +0200
-Subject: How to handle named resources with DT?
-In-Reply-To: <20110827143736.GA10182@yookeroo.fritz.box>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<201108261741.29850.arnd@arndb.de>
-	<20110827143736.GA10182@yookeroo.fritz.box>
-Message-ID: <5595208.OB5dBohxQP@wuerfel>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 27 Aug 2011 20:39:22 +0200
+Subject: [PATCH 1/5] ARM: mx5: Allow CCM definitions to work on MX51 and
+	MX53
+In-Reply-To: <CAOMZO5DcLj+bVchVrk9+K+xvzjD7sZpvMjmM0W0-o_qbzFnd5A@mail.gmail.com>
+References: <1314386521-29351-1-git-send-email-fabio.estevam@freescale.com>
+	<20110827111943.GK31404@pengutronix.de>
+	<CAOMZO5DcLj+bVchVrk9+K+xvzjD7sZpvMjmM0W0-o_qbzFnd5A@mail.gmail.com>
+Message-ID: <20110827183922.GL31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 28 August 2011 00:37:36 David Gibson wrote:
-> On Fri, Aug 26, 2011 at 05:41:29PM +0200, Arnd Bergmann wrote:
-> > On Friday 26 August 2011, Arnd Bergmann wrote:
-> > > On Friday 26 August 2011, David Gibson wrote:
-> > > > If you open code it this way then yes, it's silly.  But what about
-> > > > something like this:
-> > > > 
-> > > > static struct of_device_id foodevice_of_match[] __devinitdata = {
-> > > >         { .compatible = "foocorp,foodevice1234",
-> > > >           .resource_names = {"base_regs", "extra_regs", }, },
-> > > >         { .compatible = "foocorp,foodevice1239",
-> > > >           .resource_names = {"base_regs", "extra_regs", "more_regs", }, }, 
-> > > >         { },
-> > > > };
-> > > 
-> > > Hmm, I hadn't thought of that. This looks quite nice indeed. No objections
-> > > to this from my side.
-> > > 
-> > 
-> > Ah well, one objection on second thought:
-> > 
-> > This assumes that there is just one type of resource, but named resources
-> > may be used for iomem, ioport and irq resources. If you have multiple
-> > IRQs and multiple IOMEM resources, I don't see how the index in the 
-> > resource_names array can be used for both of them.
+On Sat, Aug 27, 2011 at 12:17:47PM -0300, Fabio Estevam wrote:
+> On Sat, Aug 27, 2011 at 8:19 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Fri, Aug 26, 2011 at 04:21:57PM -0300, Fabio Estevam wrote:
+> >> Allow CCM (Clock Control Module) definitions to work on MX51 and MX53
+> >> by checking the cpu type in run-time and using the appropriate register bases.
+> >
+> > They already work on i.MX51 and i.MX53. They have different physical
+> > addresses, but have (more or less accidently...) the same virtual
+> > address.
 > 
-> Details, shmetails, so you have both 'reg_names' and 'interrupt_names'.
+> Without this patch I get a kernel crash on MX53 at
+> arch/arm/mach-mx5/system.c , when trying to read
+> the following registers CCM registers:
 
-Right, and I guess we can simply ignore DMA and ioport resources because they
-are extremely rare, right?
+The CCM base address is AIPS1 + x whereas the ARM base address is
+AIPS2 + x. Maybe only the AIPS1 base addresses are the same.
+Anyway, I would prefer having the registers defines as offsets to
+a base and not as absolute addresses. Looking back it was a mistake
+merging this. Having the registers as offsets is much more flexible.
 
-One more detail: IIRC struct of_device_id is exported to module_init_tools
-for purposes of autoloading, so changing the structure breaks user space.
+Sascha
 
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
