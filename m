@@ -1,60 +1,41 @@
-From: greg@kroah.com (Greg KH)
-Date: Sat, 27 Aug 2011 08:13:17 -0700
-Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
-In-Reply-To: <1314456515-16419-1-git-send-email-ming.lei@canonical.com>
-References: <1314456515-16419-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <20110827151317.GA10013@kroah.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 27 Aug 2011 12:17:47 -0300
+Subject: [PATCH 1/5] ARM: mx5: Allow CCM definitions to work on MX51 and
+	MX53
+In-Reply-To: <20110827111943.GK31404@pengutronix.de>
+References: <1314386521-29351-1-git-send-email-fabio.estevam@freescale.com>
+	<20110827111943.GK31404@pengutronix.de>
+Message-ID: <CAOMZO5DcLj+bVchVrk9+K+xvzjD7sZpvMjmM0W0-o_qbzFnd5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 27, 2011 at 10:48:35PM +0800, ming.lei at canonical.com wrote:
-> From: Ming Lei <ming.lei@canonical.com>
-> 
-> This patch fixs one performance bug on ARM Cortex A9 dual core platform,
-> which has been reported on quite a few ARM machines(OMAP4, Tegra 2, snowball...),
-> see details from link of https://bugs.launchpad.net/bugs/709245.
-> 
-> In fact, one mb() on ARM is enough to flush L2 cache, but
-> 'dummy->hw_token = token;' after mb() is added just for obeying
-> correct mb() usage.
+On Sat, Aug 27, 2011 at 8:19 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Fri, Aug 26, 2011 at 04:21:57PM -0300, Fabio Estevam wrote:
+>> Allow CCM (Clock Control Module) definitions to work on MX51 and MX53
+>> by checking the cpu type in run-time and using the appropriate register bases.
+>
+> They already work on i.MX51 and i.MX53. They have different physical
+> addresses, but have (more or less accidently...) the same virtual
+> address.
 
-Really?  A mb() should not be flushing any caches, it's just a memory
-barrier.  Or is ARM somehow "special" in this way?
+Without this patch I get a kernel crash on MX53 at
+arch/arm/mach-mx5/system.c , when trying to read
+the following registers CCM registers:
 
-> The patch has been tested ok on OMAP4 panda A1 board, the performance
-> of 'dd' over usb mass storage can be increased from 4~5MB/sec to
-> 14~16MB/sec after applying this patch.
+void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode)
+{
+	u32 plat_lpc, arm_srpgcr, ccm_clpcr;
+	u32 empgc0, empgc1;
+	int stop_mode = 0;
 
-That's impressive, but I don't think this is really the proper way to do
-this...
+	/* always allow platform to issue a deep sleep mode request */
+	plat_lpc = __raw_readl(MXC_CORTEXA8_PLAT_LPC) &
+	    ~(MXC_CORTEXA8_PLAT_LPC_DSM);
+	ccm_clpcr = __raw_readl(MXC_CCM_CLPCR) & ~(MXC_CCM_CLPCR_LPM_MASK);
+	arm_srpgcr = __raw_readl(MXC_SRPG_ARM_SRPGCR) & ~(MXC_SRPGCR_PCR);
+	empgc0 = __raw_readl(MXC_SRPG_EMPGC0_SRPGCR) & ~(MXC_SRPGCR_PCR);
+	empgc1 = __raw_readl(MXC_SRPG_EMPGC1_SRPGCR) & ~(MXC_SRPGCR_PCR);
 
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
-> ---
->  drivers/usb/host/ehci-q.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
-> index 0917e3a..65b5021 100644
-> --- a/drivers/usb/host/ehci-q.c
-> +++ b/drivers/usb/host/ehci-q.c
-> @@ -1082,6 +1082,20 @@ static struct ehci_qh *qh_append_tds (
->  			wmb ();
->  			dummy->hw_token = token;
->  
-> +			/* The mb() below is added to make sure that
-> +			 * 'token' can be writen into qtd, so that ehci
-> +			 * HC can see the up-to-date qtd descriptor. On
-> +			 * some archs(at least on ARM Cortex A9 dual core),
-> +			 * writing into coherenet memory doesn't mean the
-> +			 * value written can reach physical memory
-> +			 * immediately, and the value may be buffered
-> +			 * inside L2 cache. 'dummy->hw_token = token;'
-> +			 * after mb() is added for obeying correct mb()
-> +			 * usage.
-> +			 * */
-> +			mb();
-> +			token = dummy->hw_token;
+Regards,
 
-Your comment does not match the code, so something is wrong here.
-
-greg k-h
+Fabio Estevam
