@@ -1,29 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 27 Aug 2011 14:00:16 -0600 (MDT)
-Subject: How to handle named resources with DT?
-In-Reply-To: <201108261258.32880.arnd@arndb.de>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<877h6173wm.fsf@ti.com> <20110826041200.GD2308@yookeroo.fritz.box>
-	<201108261258.32880.arnd@arndb.de>
-Message-ID: <alpine.DEB.2.00.1108271252100.23968@utopia.booyaka.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 27 Aug 2011 16:11:11 -0400 (EDT)
+Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
+In-Reply-To: <CACVXFVNrck4u3d7EaRwuwSVO9J-_0jDQ07U0PCw55FZUxsCszA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1108271607150.21403-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Aug 2011, Arnd Bergmann wrote:
+On Sun, 28 Aug 2011, Ming Lei wrote:
 
-> I don't think anyone was talking about converting driver /to/ the
-> _byname method
+> Looks like there is still another similar problem in qh_link_async():
+> the last wmb
+> should be changed into mb, because HC will read 'head->hw->hw_next' from qh
+> descriptor and this pointer in qh is read only for HC. But this problem can't be
+> observed on ARM, since wmb on ARM is same with mb.
 
-For drivers that use multiple resources of the same type, converting those 
-to use platform_get_resource_byname() does indeed seem appropriate.
+It doesn't matter what the HC does -- the wmb() instruction is executed
+by the CPU, not the HC.  The point of that instruction is to make sure 
+that the
 
-By the way, the same IP block design can exist on platforms with different 
-device data formats.  For example, the PowerVR SGX core[1] is present on 
-many ARM SoCs and on Intel Poulsbo designs.  The Poulsbo systems are 
-presumably using ACPI/SFI *SDT tables.  So it seems unwise to couple 
-drivers to any specific external device data format.
+	qh->hw->hw_next = head->hw->hw_next;
 
+line (and all the preceding lines as well) is ordered before the
 
-- Paul
+	head->hw->hw_next = dma;
+3C
+line.  Since both of these lines are writes, not reads, it suffices to 
+use wmb() rather than mb().
 
-1. One example: http://en.wikipedia.org/wiki/PowerVR#Series5_.28SGX.29
+Alan Stern
