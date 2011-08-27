@@ -1,30 +1,61 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 27 Aug 2011 16:11:11 -0400 (EDT)
+Date: Sat, 27 Aug 2011 16:06:30 -0400 (EDT)
 Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
-In-Reply-To: <CACVXFVNrck4u3d7EaRwuwSVO9J-_0jDQ07U0PCw55FZUxsCszA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1108271607150.21403-100000@netrider.rowland.org>
+In-Reply-To: <CACVXFVNz_ic_PPM_vNn1Dz85A2z94kRFso4rcqrvJfuLSqRSCg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1108271548110.21403-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, 28 Aug 2011, Ming Lei wrote:
 
-> Looks like there is still another similar problem in qh_link_async():
-> the last wmb
-> should be changed into mb, because HC will read 'head->hw->hw_next' from qh
-> descriptor and this pointer in qh is read only for HC. But this problem can't be
-> observed on ARM, since wmb on ARM is same with mb.
+> I read the doc again, :-), and it mentions few about mb/wmb/rmb, I think
+> my above description is still not correct. Generally speaking, mb only
+> means there is a order between two accesses.
+> 
+> Now I think only one mb() after 'dummy->hw_token = token;' is enough:
+> HC will read the up-to-date value of qtd->hw_token after mb() is executed
+> because of the effect of the mb(), which should be guaranteed by mb.
 
-It doesn't matter what the HC does -- the wmb() instruction is executed
-by the CPU, not the HC.  The point of that instruction is to make sure 
-that the
+I've been following this whole discussion.  I didn't understand the
+idea behind the original patch, and I don't understand this.  What
+reason is there for adding a memory barrier after the "dummy->hw_token
+= token" line?  Such a barrier would not accomplish anything useful,
+because there are no later memory accesses which need to be ordered
+with respect to that line.
 
-	qh->hw->hw_next = head->hw->hw_next;
+(By the way, Santosh appears to be right about the earlier wmb() in
+this routine.  As far as I can see, it isn't needed.  David Brownell
+probably wrote it just as a precaution.)
 
-line (and all the preceding lines as well) is ordered before the
+> > I mean others, please read the the last 3 lines of the comment and
+> > compare that to the code lines you added.
+> 
+> I see now, the comment of the last 3 lines is wrong, should be
+> 
+>                         * inside L2 cache. 'token = dummy->hw_token'
+>                          * after mb() is added for obeying correct mb()
+>                          * usage.
+> 
+> But the 'token = dummy->hw_token' after mb() isn't needed any
+> more as described above,  is it?
 
-	head->hw->hw_next = dma;
-3C
-line.  Since both of these lines are writes, not reads, it suffices to 
-use wmb() rather than mb().
+I don't see why it was ever needed at all.  The compiler will realize
+that token is a dead variable at that point in the routine and will
+optimize the new line away.
+
+> The patch can make ehci HC see the up-to-date qtd, so make usb transaction
+> executed correctly. If a qtd->token is not updated, maybe IOC is not set or set very
+> late, so interrupt can't be triggered in time, also mistaken 'total bytes to transfer'
+> can make HC work badly.
+
+This doesn't make any sense.  qtd becomes the new dummy; by the time
+the HC sees qtd the only important bit set in qtd->hw_token is the HALT
+bit.
+
+> In fact, I have traced the problem and found ehci irq is often delayed by ehci HC.
+> also sometimes ehci irq is lost, so I start to trace ehci driver and find the problem here.
+
+I don't think you have identified the underlying cause correctly.  
+Something else must be responsible.
 
 Alan Stern
