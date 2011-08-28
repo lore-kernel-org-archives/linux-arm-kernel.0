@@ -1,65 +1,34 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 28 Aug 2011 20:10:43 +0200
-Subject: [PATCH v2 3/4] S3C2416: Add HSSPI clock sourced from EPLL
-In-Reply-To: <201108282006.31667.heiko@sntech.de>
-References: <201108282006.31667.heiko@sntech.de>
-Message-ID: <201108282010.44152.heiko@sntech.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 28 Aug 2011 14:11:19 -0400
+Subject: [PATCH] mmc: sdhci-s3c: Fix mmc card I/O problem
+In-Reply-To: <1314350898-26372-1-git-send-email-girish.shivananjappa@linaro.org>
+	(Girish K. S.'s message of "Fri, 26 Aug 2011 14:58:18 +0530")
+References: <1314350898-26372-1-git-send-email-girish.shivananjappa@linaro.org>
+Message-ID: <m2obz9xv7c.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This clock is special to the S3C2416/2450 SoCs.
+Hi,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- Changes since v1: move hsspi sources array
- arch/arm/mach-s3c2416/clock.c |   28 ++++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
+On Fri, Aug 26 2011, Girish K S wrote:
+> This patch fixes the problem in sdhci-s3c host driver for
+> Samsung Soc's. During the card identification stage the
+> mmc core driver enumerates for the best bus width in combination
+> with the highest available data rate. It starts enumerating from
+> the highest bus width (8) to lowest bus width (1).
+>
+> In case of few MMC cards the 4-bit bus enumeration fails and tries
+> the 1-bit bus enumeration. When switched to 1-bit bus mode the host driver
+> has to clear the previous bus width setting and apply the new setting.
+>
+> The current patch will clear the previous bus mode and apply the new
+> mode setting.
+>
+> Signed-off-by: Girish K S <girish.shivananjappa@linaro.org>
 
-diff --git a/arch/arm/mach-s3c2416/clock.c b/arch/arm/mach-s3c2416/clock.c
-index 21a5e81..196fb37 100644
---- a/arch/arm/mach-s3c2416/clock.c
-+++ b/arch/arm/mach-s3c2416/clock.c
-@@ -38,6 +38,32 @@ static unsigned int armdiv[8] = {
- 	[7] = 8,
- };
- 
-+static struct clksrc_clk hsspi_eplldiv = {
-+	.clk = {
-+		.name	= "hsspi-eplldiv",
-+		.parent	= &clk_esysclk.clk,
-+		.ctrlbit = (1 << 14),
-+		.enable = s3c2443_clkcon_enable_s,
-+	},
-+	.reg_div = { .reg = S3C2443_CLKDIV1, .size = 2, .shift = 24 },
-+};
-+
-+static struct clk *hsspi_sources[] = {
-+	[0] = &hsspi_eplldiv.clk,
-+	[1] = NULL, /* to fix */
-+};
-+
-+static struct clksrc_clk hsspi_mux = {
-+	.clk	= {
-+		.name	= "hsspi-if",
-+	},
-+	.sources = &(struct clksrc_sources) {
-+		.sources = hsspi_sources,
-+		.nr_sources = ARRAY_SIZE(hsspi_sources),
-+	},
-+	.reg_src = { .reg = S3C2443_CLKSRC, .size = 1, .shift = 18 },
-+};
-+
- static struct clksrc_clk hsmmc_div[] = {
- 	[0] = {
- 		.clk = {
-@@ -114,6 +140,8 @@ void __init_or_cpufreq s3c2416_setup_clocks(void)
- 
- 
- static struct clksrc_clk *clksrcs[] __initdata = {
-+	&hsspi_eplldiv,
-+	&hsspi_mux,
- 	&hsmmc_div[0],
- 	&hsmmc_div[1],
- 	&hsmmc_mux[0],
+Thanks, pushed to mmc-next for 3.1 with a stable@ tag.
+
+- Chris.
 -- 
-1.7.2.3
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
