@@ -1,31 +1,46 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 28 Aug 2011 00:12:54 -0600 (MDT)
-Subject: [PATCH 0/9] OMAP: HWMOD: DSS patches
-In-Reply-To: <1314102499-30407-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1314102499-30407-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <alpine.DEB.2.00.1108280010070.23968@utopia.booyaka.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 28 Aug 2011 08:08:20 +0200
+Subject: [PATCHv3 0/9] macb: add support for Cadence GEM
+In-Reply-To: <20110823093453.GJ2796@pulham.picochip.com>
+References: <1312881411-2376-1-git-send-email-jamie@jamieiles.com>
+	<20110809145940.GP22213@game.jcrosoft.org>
+	<20110823093453.GJ2796@pulham.picochip.com>
+Message-ID: <20110828060820.GB20128@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
-
-thanks for cleaning up the commit messages and reposting these so quickly.
-
-On Tue, 23 Aug 2011, Tomi Valkeinen wrote:
-
-> These are the previously sent HWMOD patches split into smaller pieces and with
-> improved commit messages.
+On 10:34 Tue 23 Aug     , Jamie Iles wrote:
+> Hi Jean-Christoph,
 > 
-> I'm not sure if these are strictly needed to be sent for -rc. The DSS patches
-> 9ede365aa6f74428a1f69c21ca1cf21213167576 ("HACK: OMAP: DSS2: clk hack for
-> OMAP2/3") and df5d3ed23cf73ee0763a8963003bda9b69d9620f ("OMAP: DSS2: HDMI: fix
-> hdmi clock name") already circumvent the problems with wrong clocks, and the
-> DSS reset problem on OMAP4 hasn't caused any actual runtime problems as far as
-> I know.
+> On Tue, Aug 09, 2011 at 04:59:40PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 10:16 Tue 09 Aug     , Jamie Iles wrote:
+> > > This is largely a repost of the series I posted back in March.  The only changes
+> > > since then are rebasing onto 3.1-rc1 and changing the gem conditionals from a
+> > > boolean in the macb structure to an inline helper as requested by
+> > > Jean-Christophe.
+> > > 
+> > > This has been run-tested on picoxcell and compile tested for all AT91 platforms
+> > > but I couldn't get a working cross compiler for avr32.
+> > > 
+> > > All patches are available in a git branch at
+> > > 
+> > > 	git://github.com/jamieiles/linux-2.6-ji.git macb-gem
+> > > 
+> > looks good except few comments
+> > 
+> > I'll test it later this week
+> 
+> Have you had chance to test this series?  I'd like to get it into Arnd's 
+> tree and into next for a bit so we can get it into the next release if 
+> possible.
 
-Sounds like we should wait until 3.2 for these.  The series has been 
-queued for 3.2 in the branch 'hwmod_dss_fixes_3.2' of the 
-git://git.pwsan.com/linux-2.6 repository.
+I'm back from travelling
 
+I've test it on usb-a9g20 with boot over nfs
 
-- Paul
+work
+
+Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+Best Regards,
+J.
