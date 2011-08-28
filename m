@@ -1,34 +1,50 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sun, 28 Aug 2011 14:11:19 -0400
-Subject: [PATCH] mmc: sdhci-s3c: Fix mmc card I/O problem
-In-Reply-To: <1314350898-26372-1-git-send-email-girish.shivananjappa@linaro.org>
-	(Girish K. S.'s message of "Fri, 26 Aug 2011 14:58:18 +0530")
-References: <1314350898-26372-1-git-send-email-girish.shivananjappa@linaro.org>
-Message-ID: <m2obz9xv7c.fsf@bob.laptop.org>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sun, 28 Aug 2011 20:11:59 +0200
+Subject: [PATCH v2 4/4] S3C2443: Add hsspi-clock from pclk and rename unused
+	S3C2443 hsspi sclk
+In-Reply-To: <201108282006.31667.heiko@sntech.de>
+References: <201108282006.31667.heiko@sntech.de>
+Message-ID: <201108282011.59948.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This clock is common to S3C2443/2416/2450.
 
-On Fri, Aug 26 2011, Girish K S wrote:
-> This patch fixes the problem in sdhci-s3c host driver for
-> Samsung Soc's. During the card identification stage the
-> mmc core driver enumerates for the best bus width in combination
-> with the highest available data rate. It starts enumerating from
-> the highest bus width (8) to lowest bus width (1).
->
-> In case of few MMC cards the 4-bit bus enumeration fails and tries
-> the 1-bit bus enumeration. When switched to 1-bit bus mode the host driver
-> has to clear the previous bus width setting and apply the new setting.
->
-> The current patch will clear the previous bus mode and apply the new
-> mode setting.
->
-> Signed-off-by: Girish K S <girish.shivananjappa@linaro.org>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ Changes since v1: rename s3c2443 hsspi sclk (until now unused)
+ arch/arm/mach-s3c2443/clock.c         |    2 +-
+ arch/arm/plat-s3c24xx/s3c2443-clock.c |    5 +++++
+ 2 files changed, 6 insertions(+), 1 deletions(-)
 
-Thanks, pushed to mmc-next for 3.1 with a stable@ tag.
-
-- Chris.
+diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
+index 966bde5..6b9ae46 100644
+--- a/arch/arm/mach-s3c2443/clock.c
++++ b/arch/arm/mach-s3c2443/clock.c
+@@ -169,7 +169,7 @@ static struct clksrc_clk clk_arm = {
+ 
+ static struct clksrc_clk clk_hsspi = {
+ 	.clk	= {
+-		.name		= "hsspi",
++		.name		= "hsspi-if",
+ 		.parent		= &clk_esysclk.clk,
+ 		.ctrlbit	= S3C2443_SCLKCON_HSSPICLK,
+ 		.enable		= s3c2443_clkcon_enable_s,
+diff --git a/arch/arm/plat-s3c24xx/s3c2443-clock.c b/arch/arm/plat-s3c24xx/s3c2443-clock.c
+index 8132939..2e8492c 100644
+--- a/arch/arm/plat-s3c24xx/s3c2443-clock.c
++++ b/arch/arm/plat-s3c24xx/s3c2443-clock.c
+@@ -259,6 +259,11 @@ static struct clk init_clocks_off[] = {
+ 		.enable		= s3c2443_clkcon_enable_p,
+ 		.ctrlbit	= S3C2443_PCLKCON_IIS,
+ 	}, {
++		.name		= "hsspi",
++		.parent		= &clk_p,
++		.enable		= s3c2443_clkcon_enable_p,
++		.ctrlbit	= S3C2443_PCLKCON_HSSPI,
++	}, {
+ 		.name		= "adc",
+ 		.parent		= &clk_p,
+ 		.enable		= s3c2443_clkcon_enable_p,
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.2.3
