@@ -1,43 +1,62 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 28 Aug 2011 21:43:06 +0300
-Subject: [PATCH] media i.MX27 camera: remove legacy dma support
-In-Reply-To: <Pine.LNX.4.64.1108240843001.8985@axis700.grange>
-References: <1314167073-11058-1-git-send-email-s.hauer@pengutronix.de>
-	<Pine.LNX.4.64.1108240843001.8985@axis700.grange>
-Message-ID: <20110828184306.GA9157@tarshish>
+From: peterhuewe@gmx.de (Peter Huewe)
+Date: Sun, 28 Aug 2011 21:26:59 +0200
+Subject: [PATCH] spi: Fix builderror in spi-pl022.c
+In-Reply-To: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
+References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
+Message-ID: <1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+This patch fixes a build error, introduced by commit (67fc8b9f, "PM: add
+runtime PM support to core Primecell driver") which unfortunately was a little
+bit incomplete and did contain a typo (11 instead of 22).
+I'm not sure how this patch could have been tested back then, if it
+doesn't even compile ;)
 
-On Wed, Aug 24, 2011 at 09:19:24AM +0200, Guennadi Liakhovetski wrote:
-[snip]
-> On Wed, 24 Aug 2011, Sascha Hauer wrote:
-> > The i.MX27 dma support was introduced with the initial commit of
-> > this driver and originally created by me. However, I never got
-> > this stable due to the racy dma engine and used the EMMA engine
-> > instead. As the DMA support is most probably unused and broken in
-> > its current state, remove it. This also helps us to get rid of
-> > another user of the legacy i.MX DMA support,
-> > Also, remove the dependency on ARCH_MX* macros as these are scheduled
-> > for removal.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Baruch Siach <baruch@tkos.co.il>
-> > Cc: linux-media at vger.kernel.org
-> > Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > ---
+The build failure was:
+drivers/spi/spi-pl022.c:2292: error: 'adev' undeclared (first use in
+this function)
+drivers/spi/spi-pl022.c:2344: error: 'pl022_suspend' undeclared here
+(not in a function)
 
-[snip]
+The build failure appears e.g. for the u8500 and realview defconfig.
 
-> Baruch, any comment?
+LinuxVersion: linux next-20110826
 
-No comment so far. Thanks for your continued maintenance. I wish I could do 
-the videobuf2 migration of this driver.
+Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+---
+ drivers/spi/spi-pl022.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-baruch
-
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 078338f..3520cf9 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2282,14 +2282,14 @@ pl022_remove(struct amba_device *adev)
+ }
+ 
+ #ifdef CONFIG_SUSPEND
+-static int pl011_suspend(struct device *dev)
++static int pl022_suspend(struct device *dev)
+ {
+ 	struct pl022 *pl022 = dev_get_drvdata(dev);
+ 	int status = 0;
+ 
+ 	status = stop_queue(pl022);
+ 	if (status) {
+-		dev_warn(&adev->dev, "suspend cannot stop queue\n");
++		dev_warn(dev, "suspend cannot stop queue\n");
+ 		return status;
+ 	}
+ 
+@@ -2298,7 +2298,7 @@ static int pl011_suspend(struct device *dev)
+ 	load_ssp_default_config(pl022);
+ 	amba_pclk_disable(pl022->adev);
+ 	amba_vcore_disable(pl022->adev);
+-	dev_dbg(&adev->dev, "suspended\n");
++	dev_dbg(dev, "suspended\n");
+ 	return 0;
+ }
+ 
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.7.3.4
