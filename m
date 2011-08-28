@@ -1,22 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 28 Aug 2011 21:06:48 +0100
-Subject: [PATCH] spi: Fix builderror in spi-pl022.c
-In-Reply-To: <1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
-References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
-	<1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
-Message-ID: <20110828200648.GC13379@n2100.arm.linux.org.uk>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Mon, 29 Aug 2011 00:08:43 +0200
+Subject: [PATCH] mmc: omap_hsmmc: DMA unmap only once in case of MMC error
+Message-ID: <1314569323-6886-1-git-send-email-per.forlin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 28, 2011 at 09:26:59PM +0200, Peter Huewe wrote:
-> This patch fixes a build error, introduced by commit (67fc8b9f, "PM: add
-> runtime PM support to core Primecell driver") which unfortunately was a little
-> bit incomplete and did contain a typo (11 instead of 22).
-> I'm not sure how this patch could have been tested back then, if it
-> doesn't even compile ;)
+Reported by Russell King:
+------------
+mmcblk0: error -84 transferring data, sector 149201, nr 64,
+cmd response 0x900, card status 0xb00
+mmcblk0: retrying using single block read
 
-Maybe it was tested on configs without CONFIG_SUSPEND enabled - which
-is highly likely since my ARM development boards don't support S2RAM.
+WARNING: at /home/rmk/git/linux-2.6-rmk/lib/dma-debug.c:811 check_unmap
+omap_hsmmc omap_hsmmc.0: DMA-API: device driver tries to free DMA memory
+it has not allocated [device address=0x0000000080933000] [size=20480 bytes]
+-------------
 
-That's the problem with ifdef'ing code.  It makes it impossible to
-ensure that it's properly tested.
+In case of an error dma_unmap() is issued in omap_hsmmc_dma_cleanup()
+and then again in omap_hsmmc_post_req(). Resolve this by clearing the
+host_cookie to indicate there is no DMA mapped memory to unmap.
+
+Signed-off-by: Per Forlin <per.forlin@linaro.org>
+---
+Bug fix on 3.1-rc3
+
+ drivers/mmc/host/omap_hsmmc.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 21e4a79..31d9817 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1011,6 +1011,7 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
+ 			host->data->sg_len,
+ 			omap_hsmmc_get_dma_dir(host, host->data));
+ 		omap_free_dma(dma_ch);
++		host->data->host_cookie = 0;
+ 	}
+ 	host->data = NULL;
+ }
+@@ -1576,8 +1577,10 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
+ 	struct mmc_data *data = mrq->data;
+ 
+ 	if (host->use_dma) {
+-		dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+-			     omap_hsmmc_get_dma_dir(host, data));
++		if (data->host_cookie)
++			dma_unmap_sg(mmc_dev(host->mmc), data->sg,
++				     data->sg_len,
++				     omap_hsmmc_get_dma_dir(host, data));
+ 		data->host_cookie = 0;
+ 	}
+ }
+-- 
+1.7.4.1
