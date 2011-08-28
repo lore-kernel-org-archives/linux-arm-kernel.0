@@ -1,29 +1,43 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sun, 28 Aug 2011 13:51:28 -0400
-Subject: [PATCH 1/5] mmc i.MX: remove individual SoC dependency
-In-Reply-To: <1314168072-13822-2-git-send-email-s.hauer@pengutronix.de>
-	(Sascha Hauer's message of "Wed, 24 Aug 2011 08:41:08 +0200")
-References: <1314168072-13822-1-git-send-email-s.hauer@pengutronix.de>
-	<1314168072-13822-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <m21uw5zaov.fsf@bob.laptop.org>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sun, 28 Aug 2011 20:06:31 +0200
+Subject: [PATCH v2 0/4] S3C2416: Enable IIS and HSSPI clocks
+Message-ID: <201108282006.31667.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+S3C2416/2450 (probably S3C2443 too) can use the newer style
+kernel-drivers made for S3C64xx and above for their I2S and
+HS-SPI controllers.
 
-On Wed, Aug 24 2011, Sascha Hauer wrote:
-> The individual SoC dependency in Kconfig hardly scales anymore.
-> Instead of having such a fine grained dependency just depend
-> on ARCH_MXC and risk that the uninformed user has to look in
-> the help text to figure out which driver is the correct one.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Chris Ball <cjb@laptop.org>
-> Cc: linux-mmc at vger.kernel.org
+So as a first step in this direction, these patches add their
+respective clocks.
 
-Looks good, thanks -- applied to mmc-next for 3.2.
+The I2S clocks were simply moved from S3C2443 to s3c2443-clock.c
+as they are identical on all 3 platforms.
 
-- Chris.
+The same is true for the HSSPI pclk which is added to s3c2443-clock.c,
+as it was not defined at all yet.
+
+The HSSPI sclk is different between 2443 and 2416 and is therefore
+added to mach-s3c2416/clock.c
+
+Changes since v1:
+ fix missing static
+ cleanup hsspi clk-sources
+ remove collision between hsspi pclk and sclk on s3c2443
+
+Heiko Stuebner (4):
+  S3C2443: Move i2s clock definitions to common code
+  S3C2443: Define constant for HSSPI pclk
+  S3C2416: Add HSSPI clock sourced from EPLL
+  S3C2443: Add hsspi-clock from pclk and rename unused S3C2443 hsspi
+    sclk
+
+ .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
+ arch/arm/mach-s3c2416/clock.c                      |   28 ++++++++++
+ arch/arm/mach-s3c2443/clock.c                      |   55 +------------------
+ arch/arm/plat-s3c24xx/s3c2443-clock.c              |   58 ++++++++++++++++++++
+ 4 files changed, 88 insertions(+), 54 deletions(-)
+
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+1.7.2.3
