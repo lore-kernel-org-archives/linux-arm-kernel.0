@@ -1,30 +1,65 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 28 Aug 2011 20:09:37 +0200
-Subject: [PATCH 2/4] S3C2443: Define constant for HSSPI pclk
+Date: Sun, 28 Aug 2011 20:10:43 +0200
+Subject: [PATCH v2 3/4] S3C2416: Add HSSPI clock sourced from EPLL
 In-Reply-To: <201108282006.31667.heiko@sntech.de>
 References: <201108282006.31667.heiko@sntech.de>
-Message-ID: <201108282009.37874.heiko@sntech.de>
+Message-ID: <201108282010.44152.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's the same clock for 2443/2416/2450.
+This clock is special to the S3C2416/2450 SoCs.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ Changes since v1: move hsspi sources array
+ arch/arm/mach-s3c2416/clock.c |   28 ++++++++++++++++++++++++++++
+ 1 files changed, 28 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
-index 5e06c72..df6434f 100644
---- a/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
-+++ b/arch/arm/mach-s3c2410/include/mach/regs-s3c2443-clock.h
-@@ -102,6 +102,7 @@
- #define S3C2443_PCLKCON_UART3		(1<<3)
- #define S3C2443_PCLKCON_IIC		(1<<4)
- #define S3C2443_PCLKCON_SDI		(1<<5)
-+#define S3C2443_PCLKCON_HSSPI		(1<<6)
- #define S3C2443_PCLKCON_ADC		(1<<7)
- #define S3C2443_PCLKCON_AC97		(1<<8)
- #define S3C2443_PCLKCON_IIS		(1<<9)
+diff --git a/arch/arm/mach-s3c2416/clock.c b/arch/arm/mach-s3c2416/clock.c
+index 21a5e81..196fb37 100644
+--- a/arch/arm/mach-s3c2416/clock.c
++++ b/arch/arm/mach-s3c2416/clock.c
+@@ -38,6 +38,32 @@ static unsigned int armdiv[8] = {
+ 	[7] = 8,
+ };
+ 
++static struct clksrc_clk hsspi_eplldiv = {
++	.clk = {
++		.name	= "hsspi-eplldiv",
++		.parent	= &clk_esysclk.clk,
++		.ctrlbit = (1 << 14),
++		.enable = s3c2443_clkcon_enable_s,
++	},
++	.reg_div = { .reg = S3C2443_CLKDIV1, .size = 2, .shift = 24 },
++};
++
++static struct clk *hsspi_sources[] = {
++	[0] = &hsspi_eplldiv.clk,
++	[1] = NULL, /* to fix */
++};
++
++static struct clksrc_clk hsspi_mux = {
++	.clk	= {
++		.name	= "hsspi-if",
++	},
++	.sources = &(struct clksrc_sources) {
++		.sources = hsspi_sources,
++		.nr_sources = ARRAY_SIZE(hsspi_sources),
++	},
++	.reg_src = { .reg = S3C2443_CLKSRC, .size = 1, .shift = 18 },
++};
++
+ static struct clksrc_clk hsmmc_div[] = {
+ 	[0] = {
+ 		.clk = {
+@@ -114,6 +140,8 @@ void __init_or_cpufreq s3c2416_setup_clocks(void)
+ 
+ 
+ static struct clksrc_clk *clksrcs[] __initdata = {
++	&hsspi_eplldiv,
++	&hsspi_mux,
+ 	&hsmmc_div[0],
+ 	&hsmmc_div[1],
+ 	&hsmmc_mux[0],
 -- 
 1.7.2.3
