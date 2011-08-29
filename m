@@ -1,33 +1,80 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Mon, 29 Aug 2011 19:55:51 +0530
-Subject: [PATCH v7 02/15] DMA: PL330: Update PL330 DMA API driver
-In-Reply-To: <1314627754.1606.145.camel@vkoul-udesk3>
-References: <1314238425-6480-1-git-send-email-boojin.kim@samsung.com>
-	<1314238425-6480-3-git-send-email-boojin.kim@samsung.com>
-	<1314626141.1606.139.camel@vkoul-udesk3>
-	<1314627754.1606.145.camel@vkoul-udesk3>
-Message-ID: <1314627951.1606.151.camel@vkoul-udesk3>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Mon, 29 Aug 2011 19:59:37 +0530
+Subject: [RFC PATCH] arm: fiq: convert enable/disable_fiq to inline functions
+Message-ID: <1314628177-3193-1-git-send-email-svenkatr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-08-29 at 19:52 +0530, Vinod Koul wrote:
-> On Mon, 2011-08-29 at 19:25 +0530, Vinod Koul wrote:
-> > On Thu, 2011-08-25 at 11:13 +0900, Boojin Kim wrote:
-> > > This patch updates following 3 items.
-> > > @@ -69,6 +70,10 @@ struct dma_pl330_chan {
-> > >  	 * NULL if the channel is available to be acquired.
-> > >  	 */
-> > >  	void *pl330_chid;
-> > > +
-> > > +	/* For D-to-M and M-to-D channels */
-> > > +	int burst_sz; /* the peripheral fifo width */
-> > > +	dma_addr_t fifo_addr;
-> > >  };
-> > Why should you store peripheral address and burst size in channel
-> > structure. You should take these from the API and dma_slave_structure
-> Ignore my comment for burst size, but is valid for peripheral address
-Never mind this one as well, I need some more coffee...
+FIQ_START is an platform specific constant used in the
+implementation of enable_fiq and disable_fiq.
+Converting then to inline functions enables different
+architectures which use the FIQ module to exist in a single
+zImage with different values of FIQ_START.
 
+Signed-off-by: Venkatraman S <svenkatr@ti.com>
+---
+ arch/arm/include/asm/fiq.h |   13 +++++++++++--
+ arch/arm/kernel/fiq.c      |   11 -----------
+ 2 files changed, 11 insertions(+), 13 deletions(-)
 
+diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+index d493d0b..e84a8cc 100644
+--- a/arch/arm/include/asm/fiq.h
++++ b/arch/arm/include/asm/fiq.h
+@@ -17,6 +17,7 @@
+ #define __ASM_FIQ_H
+ 
+ #include <asm/ptrace.h>
++#include <asm/irq.h>
+ 
+ struct fiq_handler {
+ 	struct fiq_handler *next;
+@@ -36,8 +37,16 @@ struct fiq_handler {
+ extern int claim_fiq(struct fiq_handler *f);
+ extern void release_fiq(struct fiq_handler *f);
+ extern void set_fiq_handler(void *start, unsigned int length);
+-extern void enable_fiq(int fiq);
+-extern void disable_fiq(int fiq);
++
++static inline void enable_fiq(int fiq)
++{
++	enable_irq(fiq + FIQ_START);
++}
++
++static inline void disable_fiq(int fiq)
++{
++	disable_irq(fiq + FIQ_START);
++}
+ 
+ /* helpers defined in fiqasm.S: */
+ extern void __set_fiq_regs(unsigned long const *regs);
+diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+index 4c164ec..49e5355 100644
+--- a/arch/arm/kernel/fiq.c
++++ b/arch/arm/kernel/fiq.c
+@@ -122,23 +122,12 @@ void release_fiq(struct fiq_handler *f)
+ 	while (current_fiq->fiq_op(current_fiq->dev_id, 0));
+ }
+ 
+-void enable_fiq(int fiq)
+-{
+-	enable_irq(fiq + FIQ_START);
+-}
+-
+-void disable_fiq(int fiq)
+-{
+-	disable_irq(fiq + FIQ_START);
+-}
+ 
+ EXPORT_SYMBOL(set_fiq_handler);
+ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
+ EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
+ EXPORT_SYMBOL(claim_fiq);
+ EXPORT_SYMBOL(release_fiq);
+-EXPORT_SYMBOL(enable_fiq);
+-EXPORT_SYMBOL(disable_fiq);
+ 
+ void __init init_FIQ(void)
+ {
 -- 
-~Vinod
+1.7.1
