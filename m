@@ -1,45 +1,32 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Tue, 30 Aug 2011 02:10:58 +0800
-Subject: [PATCH v4 00/18] Introduce a led trigger for CPU activity and
-	consolidate LED driver in ARM
-In-Reply-To: <20110829151333.GA17887@n2100.arm.linux.org.uk>
-References: <1314349415-889-1-git-send-email-bryan.wu@canonical.com>
-	<CACRpkda6-8dxSbF12N-Q32cOpogu-ZZmTApnvNBa03iOcEeqaQ@mail.gmail.com>
-	<CAK5ve-JM=01vTqSi59R6ASyGU_2fVXzKtjNh42LKeF2HF3NzSA@mail.gmail.com>
-	<20110829151333.GA17887@n2100.arm.linux.org.uk>
-Message-ID: <CAK5ve-+dEc8ie-pFp8e99rrqxAgWeiW3t30JO_sEBqd3BXeZkg@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 29 Aug 2011 11:15:16 -0700
+Subject: [PATCH 0/5] OMAP: voltage cleanup part E: TWL6030 PMIC fixes
+Message-ID: <1314641721-5172-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 11:13 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Aug 29, 2011 at 09:18:29PM +0800, Bryan Wu wrote:
->> On Mon, Aug 29, 2011 at 7:00 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> > On Fri, Aug 26, 2011 at 11:03 AM, Bryan Wu <bryan.wu@canonical.com> wrote:
->> >
->> >> Based on Linus Walleij's ARM LED consolidation work, this patchset introduce a
->> >> new generic led trigger for CPU not only for ARM but also for others.
->> >
->> > I think Russell was pretty clear that he saw problems inside the "new LEDs"
->> > subsystem (drivers/leds) that need be fixed before we migrate this support
->> > to use the LED class devices.
->> >
->> > Can you see if you can address his comment on the earlier realview patch,
->> > i.e. this:
->> > http://marc.info/?l=linux-arm-kernel&m=131237280009775&w=2
->> >
->>
->> Yeah, I replied that email with a patch to select LEDS_CLASS when
->> CONFIG_NEW_LEDS=y.
->
-> I don't see any point to that:
->
+This series focuses on cleanups and fixes in support of the TWL6030 PMIC.
 
-Actually, what I really want to propose is to kill this option and
-build in leds-class.c when CONFIG_NEW_LEDS=y, since most of functions
-of leds-class.c are widely used by others.
+Available in the pm-wip/voltdm_e branch of my linux-omap-pm tree
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
 
-And you know, to select it as default is a simple workaround.
+Applies on v3.1-rc3 + the part A, B, C & D series.
 
-Thanks,
--Bryan
+Kevin
+
+
+
+Nishanth Menon (3):
+  OMAP4: PM: TWL6030: fix uv to voltage for >0x39
+  OMAP4: PM: TWL6030: address 0V conversions
+  OMAP4: PM: TWL6030: add cmd register
+
+Patrick Titiano (2):
+  OMAP4: PM: TWL6030: fix voltage conversion formula
+  OMAP4: PM: TWL6030: fix ON/RET/OFF voltages
+
+ arch/arm/mach-omap2/omap_twl.c |   55 +++++++++++++++++++++++++--------------
+ 1 files changed, 35 insertions(+), 20 deletions(-)
+
+-- 
+1.7.6
