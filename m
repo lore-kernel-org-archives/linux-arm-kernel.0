@@ -1,74 +1,145 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 10:58:11 -0700
-Subject: [PATCH 11/12] OMAP3+: VP: remove unused omap_vp_get_curr_volt()
+Date: Mon, 29 Aug 2011 10:58:12 -0700
+Subject: [PATCH 12/12] OMAP3+: VP: combine setting init voltage into common
+	function
 In-Reply-To: <1314640692-3386-1-git-send-email-khilman@ti.com>
 References: <1314640692-3386-1-git-send-email-khilman@ti.com>
-Message-ID: <1314640692-3386-12-git-send-email-khilman@ti.com>
+Message-ID: <1314640692-3386-13-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+combine VPCONFIG init voltage setup into common function and use from
+both vp_enable and from vp_forceupdate_scale().
+
+NOTE: this patch changes the sequence of when the initVDD bit is
+cleared.  The bit is now cleared immediately after it was written.
+Since only the rising edge of this bit has any affect according to the
+TRM, the exact timing of clearing of this bit should not have any
+effect.
+
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/vp.c |   34 ----------------------------------
- arch/arm/mach-omap2/vp.h |    1 -
- 2 files changed, 0 insertions(+), 35 deletions(-)
+ arch/arm/mach-omap2/vp.c |   58 +++++++++++++++-------------------------------
+ 1 files changed, 19 insertions(+), 39 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index 29698ac..24020ea 100644
+index 24020ea..66bd700 100644
 --- a/arch/arm/mach-omap2/vp.c
 +++ b/arch/arm/mach-omap2/vp.c
-@@ -209,40 +209,6 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
+@@ -9,31 +9,18 @@
+ #include "prm-regbits-44xx.h"
+ #include "prm44xx.h"
+ 
+-static void vp_latch_vsel(struct voltagedomain *voltdm)
++static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
+ {
+ 	struct omap_vp_instance *vp = voltdm->vp;
+ 	u32 vpconfig;
+-	unsigned long uvdc;
+ 	char vsel;
+ 
+-	uvdc = omap_voltage_get_nom_volt(voltdm);
+-	if (!uvdc) {
+-		pr_warning("%s: unable to find current voltage for vdd_%s\n",
+-			__func__, voltdm->name);
+-		return;
+-	}
+-
+-	if (!voltdm->pmic || !voltdm->pmic->uv_to_vsel) {
+-		pr_warning("%s: PMIC function to convert voltage in uV to"
+-			" vsel not registered\n", __func__);
+-		return;
+-	}
+-
+-	vsel = voltdm->pmic->uv_to_vsel(uvdc);
++	vsel = voltdm->pmic->uv_to_vsel(volt);
+ 
+ 	vpconfig = voltdm->read(vp->vpconfig);
+ 	vpconfig &= ~(vp->common->vpconfig_initvoltage_mask |
+-			vp->common->vpconfig_initvdd);
++		      vp->common->vpconfig_forceupdate |
++		      vp->common->vpconfig_initvdd);
+ 	vpconfig |= vsel << __ffs(vp->common->vpconfig_initvoltage_mask);
+ 	voltdm->write(vpconfig, vp->vpconfig);
+ 
+@@ -43,6 +30,8 @@ static void vp_latch_vsel(struct voltagedomain *voltdm)
+ 
+ 	/* Clear initVDD copy trigger bit */
+ 	voltdm->write(vpconfig, vp->vpconfig);
++
++	return vpconfig;
  }
  
- /**
-- * omap_vp_get_curr_volt() - API to get the current vp voltage.
-- * @voltdm:	pointer to the VDD.
-- *
-- * This API returns the current voltage for the specified voltage processor
-- */
--unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
--{
--	struct omap_vp_instance *vp = voltdm->vp;
--	u8 curr_vsel;
+ /* Generic voltage init functions */
+@@ -149,22 +138,11 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
+ 		return -ETIMEDOUT;
+ 	}
+ 
+-	/* Configure for VP-Force Update */
+-	vpconfig = voltdm->read(vp->vpconfig);
+-	vpconfig &= ~(vp->common->vpconfig_initvdd |
+-			vp->common->vpconfig_forceupdate |
+-			vp->common->vpconfig_initvoltage_mask);
+-	vpconfig |= ((target_vsel <<
+-		      __ffs(vp->common->vpconfig_initvoltage_mask)));
+-	voltdm->write(vpconfig, vp->vpconfig);
 -
--	if (!voltdm || IS_ERR(voltdm)) {
--		pr_warning("%s: VDD specified does not exist!\n", __func__);
--		return 0;
--	}
--
--	if (!voltdm->read) {
--		pr_err("%s: No read API for reading vdd_%s regs\n",
--			__func__, voltdm->name);
--		return 0;
--	}
--
--	curr_vsel = (voltdm->read(vp->voltage) & vp->common->vpvoltage_mask)
--		>> __ffs(vp->common->vpvoltage_mask);
--
--	if (!voltdm->pmic || !voltdm->pmic->vsel_to_uv) {
--		pr_warning("%s: PMIC function to convert vsel to voltage"
--			"in uV not registerd\n", __func__);
--		return 0;
--	}
--
--	return voltdm->pmic->vsel_to_uv(curr_vsel);
--}
--
--/**
-  * omap_vp_enable() - API to enable a particular VP
-  * @voltdm:	pointer to the VDD whose VP is to be enabled.
-  *
-diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
-index f78752b..d9bc4f1 100644
---- a/arch/arm/mach-omap2/vp.h
-+++ b/arch/arm/mach-omap2/vp.h
-@@ -119,7 +119,6 @@ extern struct omap_vp_instance omap4_vp_core;
- void omap_vp_init(struct voltagedomain *voltdm);
- void omap_vp_enable(struct voltagedomain *voltdm);
- void omap_vp_disable(struct voltagedomain *voltdm);
--unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm);
- int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
- 			      unsigned long target_volt);
- int omap_vp_update_errorgain(struct voltagedomain *voltdm,
+-	/* Trigger initVDD value copy to voltage processor */
+-	vpconfig |= vp->common->vpconfig_initvdd;
+-	voltdm->write(vpconfig, vp->vpconfig);
++	vpconfig = _vp_set_init_voltage(voltdm, target_volt);
+ 
+ 	/* Force update of voltage */
+-	vpconfig |= vp->common->vpconfig_forceupdate;
+-	voltdm->write(vpconfig, vp->vpconfig);
++	voltdm->write(vpconfig | vp->common->vpconfig_forceupdate,
++		      voltdm->vp->vpconfig);
+ 
+ 	/*
+ 	 * Wait for TransactionDone. Typical latency is <200us.
+@@ -197,12 +175,7 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
+ 			"to clear the TRANXDONE status\n",
+ 			__func__, voltdm->name);
+ 
+-	vpconfig = voltdm->read(vp->vpconfig);
+-	/* Clear initVDD copy trigger bit */
+-	vpconfig &= ~vp->common->vpconfig_initvdd;
+-	voltdm->write(vpconfig, vp->vpconfig);
+ 	/* Clear force bit */
+-	vpconfig &= ~vp->common->vpconfig_forceupdate;
+ 	voltdm->write(vpconfig, vp->vpconfig);
+ 
+ 	return 0;
+@@ -218,7 +191,7 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
+ void omap_vp_enable(struct voltagedomain *voltdm)
+ {
+ 	struct omap_vp_instance *vp;
+-	u32 vpconfig;
++	u32 vpconfig, volt;
+ 
+ 	if (!voltdm || IS_ERR(voltdm)) {
+ 		pr_warning("%s: VDD specified does not exist!\n", __func__);
+@@ -236,12 +209,19 @@ void omap_vp_enable(struct voltagedomain *voltdm)
+ 	if (vp->enabled)
+ 		return;
+ 
+-	vp_latch_vsel(voltdm);
++	volt = voltdm_get_voltage(voltdm);
++	if (!volt) {
++		pr_warning("%s: unable to find current voltage for %s\n",
++			   __func__, voltdm->name);
++		return;
++	}
++
++	vpconfig = _vp_set_init_voltage(voltdm, volt);
+ 
+ 	/* Enable VP */
+-	vpconfig = voltdm->read(vp->vpconfig);
+ 	vpconfig |= vp->common->vpconfig_vpenable;
+ 	voltdm->write(vpconfig, vp->vpconfig);
++
+ 	vp->enabled = true;
+ }
+ 
 -- 
 1.7.6
