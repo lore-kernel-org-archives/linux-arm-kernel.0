@@ -1,108 +1,107 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Mon, 29 Aug 2011 16:31:51 +0800
-Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
-	different features
-In-Reply-To: <1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
-References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
-	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
-Message-ID: <CAMPhdO8S6nNPDJ_3LkGLmrutdHvZF3J_n_8uGaksFxbdnU695g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 Aug 2011 10:33:52 +0200
+Subject: [PATCH 0/4 v4] pin controller subsystem v4
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B24A4113@HQMAIL01.nvidia.com>
+References: <1313747619-32222-1-git-send-email-linus.walleij@stericsson.com>
+	<CAGsJ_4z7s-ibmUuR1DA6Jps030dRrnE8M0dUWHoMhMPFtyyY_A@mail.gmail.com>
+	<CACRpkdb4-0TfO-viUoZyW3VoLnVuo2ztHTX=8Hef3_RYWB52vg@mail.gmail.com>
+	<CAGsJ_4yEXEajH1JyNjnYE0hg13Fgd7bdiMNFs2fp6Ou=h_9N9g@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B24A4113@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdY93J-dSx+TM+RpQgSx09Mq-d3mwe-Scd_6GUhccMo-kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 3:18 PM, Richard Zhu <richard.zhu@linaro.org> wrote:
-> On imx53 AHCI, soft reset fails with IPMS set when PMP
-> is enabled but SATA HDD/ODD is connected to SATA port,
-> do soft reset again to port 0.
-> So the 'ahci_pmp_retry_srst_ops' is required when imx53
-> ahci is present.
+On Fri, Aug 26, 2011 at 7:12 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> [Barry]
+>> static int xxx_gpio_request(struct gpio_chip *chip, unsigned offset)
+>> {
+>> ? ? ? ? int ret = 0;
+>>
+>> ? ? ? ? ret = pinmux_request_gpio(chip->base + offset);
+>> ? ? ? ? if (ret)
+>> ? ? ? ? ? ? ? ? goto out;
+>> ? ? ? ? .....
+>> out:
+>> ? ? ? ? return ret;
+>> }
 >
-> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+> I would have expected this to work the other way around; "gpio" is just
+> another function that can be assigned to a pin.
 
-Looks good to me, I like this way very much.
+That's basically how it work internally, what I noticed is that GPIO
+requests seem to come in single pins (not groups) so there is
+a special function to request a pin by passing in the number from
+the GPIO pinspace and this optionally propagates all the way
+to the driver if there is a quick way to request this pin to be
+muxed in as GPIO.
 
-Acked-by: Eric Miao <eric.miao@linaro.org>
+> 1) Pin is SF or a particular GPIO.
+>
+> 2) Pin is SF or a particular GPIO from GPIO controller A, or a particular
+> ? GPIO from controller B
+>
+> 3) Pin is SF, or one of a number of user-selectable GPIOs.
+>
+> Case (1) is covered by the code quoted above from earlier in the thread.
+> Cases (2) and (3) can't be covered by that code, and according to comments
+> in earlier replies, both actually exist in real HW.
 
+I think we can handle this quite well conceptually, but I don't
+know if we have the proper interaction with the drivers yet,
+so let's rinse and repeat a bit here.
 
-> ---
-> ?drivers/ata/ahci_platform.c | ? 44 +++++++++++++++++++++++++++++++++++++-----
-> ?1 files changed, 38 insertions(+), 6 deletions(-)
+I'll post v5 today with your proposed changes
+(if you recognize them...)
+
+> 1) Have a single function "gpio" that can be applied to any pin that
+> supports it. The actual GPIO number that gets mux'd onto the pin differs
+> per pin, and is determine by HW design. But logically, we're connecting
+> that pin to function "gpio", so we only need one function name for that.
+
+Actually I think the new code can do this, one function "gpio" with
+multiple what I call "positions", so "gpio" can be on pin {1, 5, 95, ..}
+
+> 2) Have a function for each GPIO controller that can be attached to a
+> pin; "gpioa" or "gpiob". Based on the pin being configured, and which of
+> those two GPIO functions is selected, the HW determines the specific GPIO
+> number that's assigned to the pin.
+
+Should also work now with functions and positions per function
+I hope.
+
+> 3) Where the GPIO ID assigned to pins is user-selectable, have a function
+> per GPIO ID; "gpio1", "gpio2", "gpio3", ... "gpio31". This sounds like
+> it'd cause a huge explosion in the number of functions; one to represent
+> each GPIO ID. However, I suspect this won't be too bad in practice, since
+> there's presumably some practical limit to the amount of muxing logic that
+> can be applied to each pin in HW, so the set of options won't be too large.
+
+What happens right now is that the pinmux core system names the
+pin as taken by "gpioN" where N is the number from the GPIOlib number
+space.
+
+However that is just a name, not a function, and we have this special
+callback to the driver to mux in a single pin for GPIO.
+
+So what I need to do to support this is to support machine mappings for
+the GPIOs as function with positions which currently not available.
+
+Lemme see what I can do about that in v6.
+
+> If the set of GPIO IDs that can be assigned to any particular pin is a subset
+> of the whole GPIO number space, e.g.:
 >
-> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> index 6fef1fa..f32c91e 100644
-> --- a/drivers/ata/ahci_platform.c
-> +++ b/drivers/ata/ahci_platform.c
-> @@ -23,6 +23,41 @@
-> ?#include <linux/ahci_platform.h>
-> ?#include "ahci.h"
+> pina: gpio1, gpio2, gpio3, gpio4
+> pinb: gpio2, gpio3, gpio4, gpio5
+> pinc: gpio3, gpio4, gpio5, gpio6
 >
-> +enum ahci_type {
-> + ? ? ? AHCI, ? ? ? ? ? /* standard platform ahci */
-> + ? ? ? IMX53_AHCI, ? ? /* ahci on i.mx53 */
-> +};
-> +
-> +static struct platform_device_id ahci_devtype[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name = "ahci",
-> + ? ? ? ? ? ? ? .driver_data = AHCI,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .name = "imx53-ahci",
-> + ? ? ? ? ? ? ? .driver_data = IMX53_AHCI,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? /* sentinel */
-> + ? ? ? }
-> +};
-> +MODULE_DEVICE_TABLE(platform, ahci_devtype);
-> +
-> +
-> +static const struct ata_port_info ahci_port_info[] = {
-> + ? ? ? /* by features */
-> + ? ? ? [AHCI] = {
-> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= AHCI_FLAG_COMMON,
-> + ? ? ? ? ? ? ? .pio_mask ? ? ? = ATA_PIO4,
-> + ? ? ? ? ? ? ? .udma_mask ? ? ?= ATA_UDMA6,
-> + ? ? ? ? ? ? ? .port_ops ? ? ? = &ahci_ops,
-> + ? ? ? },
-> + ? ? ? [IMX53_AHCI] = {
-> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= AHCI_FLAG_COMMON,
-> + ? ? ? ? ? ? ? .pio_mask ? ? ? = ATA_PIO4,
-> + ? ? ? ? ? ? ? .udma_mask ? ? ?= ATA_UDMA6,
-> + ? ? ? ? ? ? ? .port_ops ? ? ? = &ahci_pmp_retry_srst_ops,
-> + ? ? ? },
-> +};
-> +
-> ?static struct scsi_host_template ahci_platform_sht = {
-> ? ? ? ?AHCI_SHT("ahci_platform"),
-> ?};
-> @@ -31,12 +66,8 @@ static int __init ahci_probe(struct platform_device *pdev)
-> ?{
-> ? ? ? ?struct device *dev = &pdev->dev;
-> ? ? ? ?struct ahci_platform_data *pdata = dev->platform_data;
-> - ? ? ? struct ata_port_info pi = {
-> - ? ? ? ? ? ? ? .flags ? ? ? ? ?= AHCI_FLAG_COMMON,
-> - ? ? ? ? ? ? ? .pio_mask ? ? ? = ATA_PIO4,
-> - ? ? ? ? ? ? ? .udma_mask ? ? ?= ATA_UDMA6,
-> - ? ? ? ? ? ? ? .port_ops ? ? ? = &ahci_ops,
-> - ? ? ? };
-> + ? ? ? struct platform_device_id *id_entry = platform_get_device_id(pdev);
-> + ? ? ? struct ata_port_info pi = ahci_port_info[id_entry->driver_data];
-> ? ? ? ?const struct ata_port_info *ppi[] = { &pi, NULL };
-> ? ? ? ?struct ahci_host_priv *hpriv;
-> ? ? ? ?struct ata_host *host;
-> @@ -177,6 +208,7 @@ static struct platform_driver ahci_driver = {
-> ? ? ? ? ? ? ? ?.name = "ahci",
-> ? ? ? ? ? ? ? ?.owner = THIS_MODULE,
-> ? ? ? ?},
-> + ? ? ? .id_table ? ? ? = ahci_devtype,
-> ?};
->
-> ?static int __init ahci_init(void)
-> --
-> 1.7.1
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> ... then I imagine HW has already defined an enumerator gpioa, gpiob, gpioc,
+> gpiod and a mapping from those to the specific GPIO ID that each means when
+> assigned to a given pin, so those gpioa/b/c/d values could be used as the
+> function exposed by the pinmux driver.
+
+Yep should be possible to make it work that way. Just need a way
+to map that for the machine.
+
+Yours,
+Linus Walleij
