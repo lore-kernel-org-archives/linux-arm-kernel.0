@@ -1,150 +1,85 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 29 Aug 2011 19:12:58 +0800
-Subject: [PATCH v11 0/3]  add the GPMI controller driver for IMX23/IMX28
-Message-ID: <1314616381-11615-1-git-send-email-b32955@freescale.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 29 Aug 2011 13:02:16 +0200
+Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
+	different features
+In-Reply-To: <CAMPhdO8k-boE0p0J_60VrS3LBdNaJRfJ6z_HCHLiRbQtESOJFw@mail.gmail.com>
+References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
+	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
+	<20110829083649.GB24524@pengutronix.de>
+	<CAMPhdO-vuExLKVSmsr_kR1HnHfEBPp_Ae7pgs=XaVYiKGFRo-A@mail.gmail.com>
+	<20110829093746.GE24524@pengutronix.de>
+	<CAMPhdO8k-boE0p0J_60VrS3LBdNaJRfJ6z_HCHLiRbQtESOJFw@mail.gmail.com>
+Message-ID: <20110829110216.GI24524@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch set is based on Artem's tree:
-	http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
+On Mon, Aug 29, 2011 at 05:54:23PM +0800, Eric Miao wrote:
+> On Mon, Aug 29, 2011 at 5:37 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> > On Mon, Aug 29, 2011 at 04:51:46PM +0800, Eric Miao wrote:
+> >> On Mon, Aug 29, 2011 at 4:36 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> >> > On Mon, Aug 29, 2011 at 03:18:55PM +0800, Richard Zhu wrote:
+> >> >> On imx53 AHCI, soft reset fails with IPMS set when PMP
+> >> >> is enabled but SATA HDD/ODD is connected to SATA port,
+> >> >> do soft reset again to port 0.
+> >> >> So the 'ahci_pmp_retry_srst_ops' is required when imx53
+> >> >> ahci is present.
+> >> >>
+> >> >> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+> >> >> ---
+> >> >> ?drivers/ata/ahci_platform.c | ? 44 +++++++++++++++++++++++++++++++++++++-----
+> >> >> ?1 files changed, 38 insertions(+), 6 deletions(-)
+> >> >>
+> >> >> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> >> >> index 6fef1fa..f32c91e 100644
+> >> >> --- a/drivers/ata/ahci_platform.c
+> >> >> +++ b/drivers/ata/ahci_platform.c
+> >> >> @@ -23,6 +23,41 @@
+> >> >> ?#include <linux/ahci_platform.h>
+> >> >> ?#include "ahci.h"
+> >> >>
+> >> >> +enum ahci_type {
+> >> >> + ? ? AHCI, ? ? ? ? ? /* standard platform ahci */
+> >> >> + ? ? IMX53_AHCI, ? ? /* ahci on i.mx53 */
+> >> >
+> >> > How about making all the IMX*-naming more generic because other SoC might need
+> >> > this somewhen, too?
+> >>
+> >> From a practical point of view, we can start with what we know already.
+> >> As the SATA controller on "other SoC" so far, we don't know yet if they
+> >> show the same issue (which we have to use ahci_pmp_retry_srst_ops).
+> >>
+> >> So Wolfram, how about we consider a generic one once more controllers
+> >> are being added?
+> >
+> > If we do so later, and we then also change the platform_device_id to something
+> > generic, we then also have to change all users, too. Is it so bad to change
+> > IMX53_AHCI (and imx53-ahci and alike) to something like "ahci-pmp-retry-srst"
+> > (or similar) now?
+> 
+> There are other fields in ata_port_info which might be different between
+> boards. Using a SoC specific name as an index to an array of ata_port_info
+> will be more flexible, as is adopted in drivers/ata/ahci.c - the PCI driver.
 
-The general-purpose media interface(GPMI) controller is a flexible interface
-to up to several NAND flashs.
+Well, that file also has generic fixups:
 
-The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
+       [board_ahci_ign_iferr] =
+...
 
-With the help of BCH, the GPMI controller can choose to do the hardware ECC or
-not.
+which is what I had in mind thinking that the flaw was not too imx53 specific.
+If you think I am wrong, then be it. I mainly wanted to avoid the fixups which
+might be needed later.
 
-This driver is a _pure_ MTD NAND controller driver now.
+Regards,
 
+   Wolfram
 
-The driver depends on another GPMI-NAND device patch set, you can find them at :
-	[1] http://marc.info/?l=linux-arm-kernel&m=131416901319573&w=2
-	[2] http://marc.info/?l=linux-arm-kernel&m=131416912319668&w=2
-	[3] http://marc.info/?l=linux-arm-kernel&m=131416891119504&w=2
-	[4] http://marc.info/?l=linux-arm-kernel&m=131416896219539&w=2
-
-Test environment:
-	Using imx23 and imx28 boards for test. 
-
-	imx23 :
-	console=ttyAMA0,115200 mtdparts=gpmi-nfc:20m(boot),-(user)
-	Tested by USB boot and NAND boot.
-
-        imx28 :
-	#console=ttyAMA0,115200 root=/dev/mmcblk0p3 rw rootwait 
-	Tested by SD card boot mode.
-
-v10 --> v11:
-	[0] tiny fixes.
-	[1] optimize the calculation of BCH's geometry.
-	[2] renames
-
-v9 --> v10:
-	[0] fix DMA timeout bug by adding custom routine for reset blocks.
-	[1] remove mil{} 
-	[2] add gpmi_hw_ecclayout.
-	[3] add ecc_write_oob() again to prohibit the mtd ioctl : MEMWRITEOOB
-	[4] change pr_info to dev_dbg() or pr_err().
-	[5] merge the all the dump functions into gpmi_dump_info().
-	[6] remove parse_mtd_partitions(), and use mtd_device_parse_register().
-	[7] move the the debug control code from gpmi-nand.h to gpmi-nand.c
-	[8] renames
-	[9] others
-
-v8 --> v9:
-	[0] remove the ONFI nand code, it will cause the DMA timeout in the ONFI nand.
-	[1] remove sysfs entry.
-	[2] remove kernel command parameter.
-	[3] report to ecclayout that we will use all the page + OOB.
-		remove the ->ecc_write_oob().
-	[4] add our own block_markbad() hook.
-	[5] rename some functions from mil_* to gpmi_*.
-	[6] replace the __raw_readl/__raw_writel to readl/writel.
-	[7] others
-
-v7 --> v8:
-	[0] rename the name from `GPMI-NFC` to `GPMI-NAND`
-	[1] remove the `hal` layer, and change it to function library.
-	[2] Do not use ~0 to initialize the DMA address.
-	[3] fix the issue : several DMA channels share the same IRQ.
-	[4] DMA timeout issue. I use the .config created by `make mxs_defconfig`
-	    and the bug never occur. It seems some other module has impact to the
-	    DMA.
-	    Of course, you should enable the UBIFS,MTD_CHAR and GPMI for
-	    the .config. You can also disable the SPIN-LOCK/MUTEX debug features.
-	[5] add function to print out the GPMI registers.	    
-	[6] others.	    
-
-v6 --> v7:
-	[0] remove the function wrapping the clock.
-	[1] use the module_param() for debugging.
-	[2] use the new interface of MTD partitions.
-		replace add_mtd_partitions() with mtd_device_register().
-	[3] use pr_info() to print log.
-	[4] add `__devinit` for some functions, etc.
-	[5] add `gpmi_nfc` to control the GPMI-NFC driver's initialization.
-	[6] others.
-
-v5 --> v6:
-	[0] split out the IMX23/IMX28 arch code to separate patches.
-	[1] fix bug : missing empty item in the end of platform_id array.
-	[2] inconsistent identation.
-	[3] others
-
-v4 --> v5:
-	[0] rename the files.
-	[1] fix PM bug
-	[2] remove the rom_helper code, and move the necessary initialization code
-		to the main file.
-	[3] change the macros from CPU_IS_* to GPMI_IS_*
-	[4] remove the default partition layout init code. revert back the 
-		partition parsing command line code.
-	[5] others
-
-v3 --> v4:
-	[0] use the nand_ids{} as the nand database, drop my own database.
-	[1] remove the patch for DMA enginer, Shawn will submit his own version.
-	[2] use the platform_id to distinguish different Archs.
-	[3] fix the strange coding style.
-	[4] others.
-
-v2 --> v3:
-	[0] merge the imx23 and imx28 into one file(including the header file).
-	[1] remove the unuse registers in the headers.
-	[2] fix DMA bugs
-	[3] add bus width field to nand_attr{}
-	[4] others
-
-v1 --> v2:
-	[0] merge the common files into the gpmi-nfc-main.c
-	[1] change the code to get the clock.
-	[2] remove the timing in the nand_device_info{}
-	[3] fix DMA errors
-	[4] add the nand_device_info.[ch] to generic code
-	[5] use the chip->onfi_version for the ONFI nand
-	[6] useless init
-	[7] others
-
-Huang Shijie (3):
-  MTD : add the common code for GPMI-NAND controller driver
-  MTD : add helper functions library and header files for GPMI NAND
-    driver
-  MTD : add GPMI-NAND driver in the config and Makefile
-
- drivers/mtd/nand/Kconfig               |   13 +
- drivers/mtd/nand/Makefile              |    1 +
- drivers/mtd/nand/gpmi-nand/Makefile    |    3 +
- drivers/mtd/nand/gpmi-nand/bch-regs.h  |   84 ++
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 1057 +++++++++++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 1636 ++++++++++++++++++++++++++++++++
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  273 ++++++
- drivers/mtd/nand/gpmi-nand/gpmi-regs.h |  172 ++++
- 8 files changed, 3239 insertions(+), 0 deletions(-)
- create mode 100644 drivers/mtd/nand/gpmi-nand/Makefile
- create mode 100644 drivers/mtd/nand/gpmi-nand/bch-regs.h
- create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-lib.c
- create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-nand.c
- create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-nand.h
- create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-regs.h
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110829/a13976b0/attachment.sig>
