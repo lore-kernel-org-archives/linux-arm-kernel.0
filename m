@@ -1,29 +1,46 @@
-From: jason.hui@linaro.org (Jason Liu)
-Date: Mon, 29 Aug 2011 21:13:44 +0800
-Subject: [PATCH] ARM: mx25: Add the missing IIM base definition
-Message-ID: <1314623624-9999-1-git-send-email-jason.hui@linaro.org>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 29 Aug 2011 21:18:29 +0800
+Subject: [PATCH v4 00/18] Introduce a led trigger for CPU activity and
+	consolidate LED driver in ARM
+In-Reply-To: <CACRpkda6-8dxSbF12N-Q32cOpogu-ZZmTApnvNBa03iOcEeqaQ@mail.gmail.com>
+References: <1314349415-889-1-git-send-email-bryan.wu@canonical.com>
+	<CACRpkda6-8dxSbF12N-Q32cOpogu-ZZmTApnvNBa03iOcEeqaQ@mail.gmail.com>
+Message-ID: <CAK5ve-JM=01vTqSi59R6ASyGU_2fVXzKtjNh42LKeF2HF3NzSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fix the mx25 building issue of no IIM base definition
+On Mon, Aug 29, 2011 at 7:00 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Aug 26, 2011 at 11:03 AM, Bryan Wu <bryan.wu@canonical.com> wrote:
+>
+>> Based on Linus Walleij's ARM LED consolidation work, this patchset introduce a
+>> new generic led trigger for CPU not only for ARM but also for others.
+>
+> I think Russell was pretty clear that he saw problems inside the "new LEDs"
+> subsystem (drivers/leds) that need be fixed before we migrate this support
+> to use the LED class devices.
+>
+> Can you see if you can address his comment on the earlier realview patch,
+> i.e. this:
+> http://marc.info/?l=linux-arm-kernel&m=131237280009775&w=2
+>
 
-Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/plat-mxc/include/mach/mx25.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Yeah, I replied that email with a patch to select LEDS_CLASS when
+CONFIG_NEW_LEDS=y.
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx25.h b/arch/arm/plat-mxc/include/mach/mx25.h
-index 8dcab80..ccebf5b 100644
---- a/arch/arm/plat-mxc/include/mach/mx25.h
-+++ b/arch/arm/plat-mxc/include/mach/mx25.h
-@@ -41,6 +41,7 @@
- #define MX25_SSI2_BASE_ADDR		0x50014000
- #define MX25_SSI1_BASE_ADDR		0x50034000
- #define MX25_NFC_BASE_ADDR		0xbb000000
-+#define MX25_IIM_BASE_ADDR		0x53ff0000
- #define MX25_DRYICE_BASE_ADDR		0x53ffc000
- #define MX25_ESDHC1_BASE_ADDR		0x53fb4000
- #define MX25_ESDHC2_BASE_ADDR		0x53fb8000
+But you know, there is no comments about that.
+
+> rpurdie: your comments on the state of the LEDs class?
+>
+> If I get time I will attempt to fix it, no clue when that will be though.
+>
+
+Thanks a lot, I think our ledtrig-cpu patches are quite good for
+merging, although Russell has some concern about leds subsystem.
+
+Regards,
 -- 
-1.7.4.1
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
