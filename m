@@ -1,39 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Aug 2011 14:15:38 +0200
-Subject: [PATCH] pinmux: add a driver for the CSR SiRFprimaII pinmux
-In-Reply-To: <CAGsJ_4xXMx7_G2ADJF-s4Xws4k4XqBnE3eysokd66ogdb=jbOA@mail.gmail.com>
-References: <1314329782-17238-1-git-send-email-Baohua.Song@csr.com>
-	<CACRpkdYmmY8ycBUL70ERawumSMdZEORYsmMBxBxZxchcfMS7EA@mail.gmail.com>
-	<CAGsJ_4xXMx7_G2ADJF-s4Xws4k4XqBnE3eysokd66ogdb=jbOA@mail.gmail.com>
-Message-ID: <CACRpkdb=V2MSyQy+9KXYCRE2O0sttF9XNTp4Jiug4Z-Cqs6nWQ@mail.gmail.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 29 Aug 2011 17:48:11 +0530
+Subject: [PATCH v5 01/22] gpio/omap: remove dependency on gpio_bank_count
+In-Reply-To: <4E539E95.2080807@ti.com>
+References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
+	<1312455893-14922-2-git-send-email-tarun.kanti@ti.com>
+	<4E539E95.2080807@ti.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0384F03245@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 1:58 PM, Barry Song <21cnbao@gmail.com> wrote:
->> > +static const struct sirfsoc_muxmask lcd_16bits_sirfsoc_muxmask[] = {
->> > + ? ? ? {
->> > + ? ? ? ? ? ? ? .group = 3,
->> > + ? ? ? ? ? ? ? .mask = 0x7FFFF,
->>
->> These things look a bit magic...
->
-> register seems to be magic by itself. this is register set mask of
-> group 3 for LCD. group in the structure is also an offset of register
-> layout.
-
-No big deal anyway.
-
-What some people like myself do is make #defines for most
-things:
-
-#define SIRFSOC_LCD_GROUP_OFFSET 3
-#define SIRFSOC_LCD_GROUP_MASK 0x7FFFF
-#define SIRFSOC_LCD_ENABLE BIT(5)
-
-sometimes I even define shifts for masks etc.
-
-But a comment inline explaining the magic bits is just as
-fine with me.
-
-Yours,
-Linus Walleij
+[...]
+> >   void omap2_gpio_prepare_for_idle(int off_mode)
+> >   {
+> > -	int i, c = 0;
+> > -	int min = 0;
+> > -
+> > -	if (cpu_is_omap34xx())
+> > -		min = 1;
+> > +	int c = 0;
+> > +	struct gpio_bank *bank;
+> >
+> > -	for (i = min; i<  gpio_bank_count; i++) {
+> > -		struct gpio_bank *bank =&gpio_bank[i];
+> > +	list_for_each_entry(bank,&omap_gpio_list, node) {
+> >   		u32 l1 = 0, l2 = 0;
+> >   		int j;
+> >
+> > +		/* TODO: Do not use cpu_is_omap34xx */
+> 
+> Is this addressed in subsequent patches ?
+Yes.
+--
+Tarun
+> 
+> > +		if ((cpu_is_omap34xx())&&  (bank->id == 0))
+> > +			continue;
+> > +
+> 
+> Rest of the changes looks good to me.
+> After you answer above, you can add my,
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Regards
+> Santosh
