@@ -1,45 +1,55 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Mon, 29 Aug 2011 17:48:11 +0530
-Subject: [PATCH v5 01/22] gpio/omap: remove dependency on gpio_bank_count
-In-Reply-To: <4E539E95.2080807@ti.com>
-References: <1312455893-14922-1-git-send-email-tarun.kanti@ti.com>
-	<1312455893-14922-2-git-send-email-tarun.kanti@ti.com>
-	<4E539E95.2080807@ti.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB0384F03245@dbde02.ent.ti.com>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Mon, 29 Aug 2011 20:25:30 +0800
+Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
+	different features
+In-Reply-To: <20110829121214.GA15484@oksana.dev.rtsoft.ru>
+References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
+	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
+	<20110829121214.GA15484@oksana.dev.rtsoft.ru>
+Message-ID: <CAMPhdO_XsrGTiiKpALVU7tZiAO_C5d_9XKoVjL_BHwpcqzXcFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-> >   void omap2_gpio_prepare_for_idle(int off_mode)
-> >   {
-> > -	int i, c = 0;
-> > -	int min = 0;
-> > -
-> > -	if (cpu_is_omap34xx())
-> > -		min = 1;
-> > +	int c = 0;
-> > +	struct gpio_bank *bank;
-> >
-> > -	for (i = min; i<  gpio_bank_count; i++) {
-> > -		struct gpio_bank *bank =&gpio_bank[i];
-> > +	list_for_each_entry(bank,&omap_gpio_list, node) {
-> >   		u32 l1 = 0, l2 = 0;
-> >   		int j;
-> >
-> > +		/* TODO: Do not use cpu_is_omap34xx */
-> 
-> Is this addressed in subsequent patches ?
-Yes.
---
-Tarun
-> 
-> > +		if ((cpu_is_omap34xx())&&  (bank->id == 0))
-> > +			continue;
-> > +
-> 
-> Rest of the changes looks good to me.
-> After you answer above, you can add my,
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> Regards
-> Santosh
+On Mon, Aug 29, 2011 at 8:12 PM, Anton Vorontsov <cbouatmailru@gmail.com> wrote:
+> Hello,
+>
+> On Mon, Aug 29, 2011 at 03:18:55PM +0800, Richard Zhu wrote:
+>> On imx53 AHCI, soft reset fails with IPMS set when PMP
+>> is enabled but SATA HDD/ODD is connected to SATA port,
+>> do soft reset again to port 0.
+>> So the 'ahci_pmp_retry_srst_ops' is required when imx53
+>> ahci is present.
+>>
+>> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+>> ---
+> [...]
+>> ? ? ? struct device *dev = &pdev->dev;
+>> ? ? ? struct ahci_platform_data *pdata = dev->platform_data;
+>> - ? ? struct ata_port_info pi = {
+>> - ? ? ? ? ? ? .flags ? ? ? ? ?= AHCI_FLAG_COMMON,
+>> - ? ? ? ? ? ? .pio_mask ? ? ? = ATA_PIO4,
+>> - ? ? ? ? ? ? .udma_mask ? ? ?= ATA_UDMA6,
+>> - ? ? ? ? ? ? .port_ops ? ? ? = &ahci_ops,
+>> - ? ? };
+>> + ? ? struct platform_device_id *id_entry = platform_get_device_id(pdev);
+>> + ? ? struct ata_port_info pi = ahci_port_info[id_entry->driver_data];
+>
+> Why not pass port info via platform_data? It seems to be platform
+> specific nowadays, so leave the default as is, but let the platforms
+> pass their own port info through platform_data.
+
+That's also a very clean way. However I have the concern that it might
+end up with many duplicate entries.
+
+>
+> Thanks,
+>
+> --
+> Anton Vorontsov
+> Email: cbouatmailru at gmail.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
