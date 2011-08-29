@@ -1,141 +1,164 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 10:35:42 -0700
-Subject: [PATCH 09/22] OMAP2: add voltage domains and connect to powerdomains
+Date: Mon, 29 Aug 2011 10:35:43 -0700
+Subject: [PATCH 10/22] OMAP3: powerdomain data: add voltage domains
 In-Reply-To: <1314639355-12713-1-git-send-email-khilman@ti.com>
 References: <1314639355-12713-1-git-send-email-khilman@ti.com>
-Message-ID: <1314639355-12713-10-git-send-email-khilman@ti.com>
+Message-ID: <1314639355-12713-11-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create basic voltagedomains for OMAP2 and associate OMAP2 powerdomains
-with the newly created voltage domains.
+Add voltage domain name to indicate which voltagedomain each
+powerdomain is in.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/Makefile                  |    3 +-
- arch/arm/mach-omap2/io.c                      |    2 +
- arch/arm/mach-omap2/powerdomains2xxx_data.c   |    4 +++
- arch/arm/mach-omap2/voltage.h                 |    1 +
- arch/arm/mach-omap2/voltagedomains2xxx_data.c |   32 +++++++++++++++++++++++++
- 5 files changed, 41 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-omap2/voltagedomains2xxx_data.c
+ arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c |    2 ++
+ arch/arm/mach-omap2/powerdomains3xxx_data.c      |   16 ++++++++++++++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index f343365..1b6cecd 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -91,7 +91,8 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
- # OMAP voltage domains
- ifeq ($(CONFIG_PM),y)
- voltagedomain-common			:= voltage.o
--obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common)
-+obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common) \
-+					   voltagedomains2xxx_data.o
- obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
- 					   voltagedomains3xxx_data.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common) \
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 9f5a846..4c8a5de 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -342,10 +342,12 @@ void __init omap2_init_common_infrastructure(void)
- 	u8 postsetup_state;
- 
- 	if (cpu_is_omap242x()) {
-+		omap2xxx_voltagedomains_init();
- 		omap2xxx_powerdomains_init();
- 		omap2xxx_clockdomains_init();
- 		omap2420_hwmod_init();
- 	} else if (cpu_is_omap243x()) {
-+		omap2xxx_voltagedomains_init();
- 		omap2xxx_powerdomains_init();
- 		omap2xxx_clockdomains_init();
- 		omap2430_hwmod_init();
-diff --git a/arch/arm/mach-omap2/powerdomains2xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_data.c
-index cc389fb..274f64c 100644
---- a/arch/arm/mach-omap2/powerdomains2xxx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains2xxx_data.c
-@@ -38,6 +38,7 @@ static struct powerdomain dsp_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,
- 	},
-+	.voltdm           = { .name = "core" },
- };
- 
- static struct powerdomain mpu_24xx_pwrdm = {
-@@ -53,6 +54,7 @@ static struct powerdomain mpu_24xx_pwrdm = {
- 	.pwrsts_mem_on	  = {
- 		[0] = PWRSTS_ON,
- 	},
-+	.voltdm           = { .name = "core" },
- };
- 
- static struct powerdomain core_24xx_pwrdm = {
-@@ -71,6 +73,7 @@ static struct powerdomain core_24xx_pwrdm = {
- 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
- 		[2] = PWRSTS_OFF_RET_ON, /* MEM3ONSTATE */
- 	},
-+	.voltdm           = { .name = "core" },
- };
- 
- 
-@@ -95,6 +98,7 @@ static struct powerdomain mdm_pwrdm = {
+diff --git a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
+index 4210c33..2242c8e 100644
+--- a/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c
+@@ -70,6 +70,7 @@ struct powerdomain gfx_omap2_pwrdm = {
  	.pwrsts_mem_on	  = {
  		[0] = PWRSTS_ON,  /* MEMONSTATE */
  	},
 +	.voltdm           = { .name = "core" },
  };
  
- #endif     /* CONFIG_SOC_OMAP2430 */
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index 25cfb5c..cacd76e 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -180,6 +180,7 @@ static inline int omap_voltage_late_init(void)
- }
- #endif
+ struct powerdomain wkup_omap2_pwrdm = {
+@@ -77,4 +78,5 @@ struct powerdomain wkup_omap2_pwrdm = {
+ 	.prcm_offs	= WKUP_MOD,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP24XX | CHIP_IS_OMAP3430),
+ 	.pwrsts		= PWRSTS_ON,
++	.voltdm         = { .name = "wakeup" },
+ };
+diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+index 469a920..1f37c0c 100644
+--- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+@@ -52,6 +52,7 @@ static struct powerdomain iva2_pwrdm = {
+ 		[2] = PWRSTS_OFF_ON,
+ 		[3] = PWRSTS_ON,
+ 	},
++	.voltdm           = { .name = "mpu_iva" },
+ };
  
-+extern void omap2xxx_voltagedomains_init(void);
- extern void omap3xxx_voltagedomains_init(void);
- extern void omap44xx_voltagedomains_init(void);
+ static struct powerdomain mpu_3xxx_pwrdm = {
+@@ -68,6 +69,7 @@ static struct powerdomain mpu_3xxx_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_OFF_ON,
+ 	},
++	.voltdm           = { .name = "mpu_iva" },
+ };
  
-diff --git a/arch/arm/mach-omap2/voltagedomains2xxx_data.c b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
-new file mode 100644
-index 0000000..69ff261
---- /dev/null
-+++ b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
-@@ -0,0 +1,32 @@
-+/*
-+ * OMAP3 voltage domain data
-+ *
-+ * Copyright (C) 2007, 2010 Texas Instruments, Inc.
-+
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+
-+#include "voltage.h"
-+
-+static struct voltagedomain omap2_voltdm_core = {
-+	.name = "core",
-+};
-+
-+static struct voltagedomain omap2_voltdm_wkup = {
-+	.name = "wakeup",
-+};
-+
-+static struct voltagedomain *voltagedomains_omap2[] __initdata = {
-+	&omap2_voltdm_core,
-+	&omap2_voltdm_wkup,
-+	NULL,
-+};
-+
-+void __init omap2xxx_voltagedomains_init(void)
-+{
-+	voltdm_init(voltagedomains_omap2);
-+}
+ /*
+@@ -98,6 +100,7 @@ static struct powerdomain core_3xxx_pre_es3_1_pwrdm = {
+ 		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
+ 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain core_3xxx_es3_1_pwrdm = {
+@@ -121,6 +124,7 @@ static struct powerdomain core_3xxx_es3_1_pwrdm = {
+ 		[0] = PWRSTS_OFF_RET_ON, /* MEM1ONSTATE */
+ 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain dss_pwrdm = {
+@@ -136,6 +140,7 @@ static struct powerdomain dss_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ /*
+@@ -157,6 +162,7 @@ static struct powerdomain sgx_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain cam_pwrdm = {
+@@ -172,6 +178,7 @@ static struct powerdomain cam_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain per_pwrdm = {
+@@ -187,12 +194,14 @@ static struct powerdomain per_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain emu_pwrdm = {
+ 	.name		= "emu_pwrdm",
+ 	.prcm_offs	= OMAP3430_EMU_MOD,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain neon_pwrdm = {
+@@ -201,6 +210,7 @@ static struct powerdomain neon_pwrdm = {
+ 	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+ 	.pwrsts		  = PWRSTS_OFF_RET_ON,
+ 	.pwrsts_logic_ret = PWRSTS_RET,
++	.voltdm           = { .name = "mpu_iva" },
+ };
+ 
+ static struct powerdomain usbhost_pwrdm = {
+@@ -223,36 +233,42 @@ static struct powerdomain usbhost_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain dpll1_pwrdm = {
+ 	.name		= "dpll1_pwrdm",
+ 	.prcm_offs	= MPU_MOD,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++	.voltdm           = { .name = "mpu_iva" },
+ };
+ 
+ static struct powerdomain dpll2_pwrdm = {
+ 	.name		= "dpll2_pwrdm",
+ 	.prcm_offs	= OMAP3430_IVA2_MOD,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++	.voltdm           = { .name = "mpu_iva" },
+ };
+ 
+ static struct powerdomain dpll3_pwrdm = {
+ 	.name		= "dpll3_pwrdm",
+ 	.prcm_offs	= PLL_MOD,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain dpll4_pwrdm = {
+ 	.name		= "dpll4_pwrdm",
+ 	.prcm_offs	= PLL_MOD,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain dpll5_pwrdm = {
+ 	.name		= "dpll5_pwrdm",
+ 	.prcm_offs	= PLL_MOD,
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_GE_OMAP3430ES2),
++	.voltdm           = { .name = "core" },
+ };
+ 
+ /* As powerdomains are added or removed above, this list must also be changed */
 -- 
 1.7.6
