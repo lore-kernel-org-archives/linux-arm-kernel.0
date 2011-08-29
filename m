@@ -1,137 +1,43 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 29 Aug 2011 19:58:53 +0800
-Subject: [PATCH] pinmux: add a driver for the CSR SiRFprimaII pinmux
-In-Reply-To: <CACRpkdYmmY8ycBUL70ERawumSMdZEORYsmMBxBxZxchcfMS7EA@mail.gmail.com>
-References: <1314329782-17238-1-git-send-email-Baohua.Song@csr.com>
-	<CACRpkdYmmY8ycBUL70ERawumSMdZEORYsmMBxBxZxchcfMS7EA@mail.gmail.com>
-Message-ID: <CAGsJ_4xXMx7_G2ADJF-s4Xws4k4XqBnE3eysokd66ogdb=jbOA@mail.gmail.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Mon, 29 Aug 2011 16:12:14 +0400
+Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
+	different features
+In-Reply-To: <1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
+References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
+	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
+Message-ID: <20110829121214.GA15484@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-Thanks !
+Hello,
 
-2011/8/29 Linus Walleij <linus.walleij@linaro.org>
->
-> On Fri, Aug 26, 2011 at 5:36 AM, Barry Song <Baohua.Song@csr.com> wrote:
->
-> > Though there are still many discussions about data model and device/function
-> > mapping, pinmux core is basically usable to CSR SiRFprimaII for the moment.
-> >
-> > This patch is another example to use Linus W's pinmux framework.
-> >
-> > Tests by this example show basic pinmux APIs like pinmux_get, pinmux_enable,
-> > pinmux_disable and pinmux_put are able to work in Linus W's patch v4.
->
-> Thanks a lot Barry, if you rebase this to the v5 patch set I can probably
-> carry it as part of my set.
+On Mon, Aug 29, 2011 at 03:18:55PM +0800, Richard Zhu wrote:
+> On imx53 AHCI, soft reset fails with IPMS set when PMP
+> is enabled but SATA HDD/ODD is connected to SATA port,
+> do soft reset again to port 0.
+> So the 'ahci_pmp_retry_srst_ops' is required when imx53
+> ahci is present.
+> 
+> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+> ---
+[...]
+>  	struct device *dev = &pdev->dev;
+>  	struct ahci_platform_data *pdata = dev->platform_data;
+> -	struct ata_port_info pi = {
+> -		.flags		= AHCI_FLAG_COMMON,
+> -		.pio_mask	= ATA_PIO4,
+> -		.udma_mask	= ATA_UDMA6,
+> -		.port_ops	= &ahci_ops,
+> -	};
+> +	struct platform_device_id *id_entry = platform_get_device_id(pdev);
+> +	struct ata_port_info pi = ahci_port_info[id_entry->driver_data];
 
-i'll rebase it to your v5 and make some tests.
+Why not pass port info via platform_data? It seems to be platform
+specific nowadays, so leave the default as is, but let the platforms
+pass their own port info through platform_data.
 
->
-> > diff --git a/drivers/pinctrl/pinmux-sirf.c b/drivers/pinctrl/pinmux-sirf.c
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/of_platform.h>
->
-> It's especially nice to see these DT-bindings!
->
-> > +static const struct sirfsoc_muxmask lcd_16bits_sirfsoc_muxmask[] = {
-> > + ? ? ? {
-> > + ? ? ? ? ? ? ? .group = 3,
-> > + ? ? ? ? ? ? ? .mask = 0x7FFFF,
->
-> These things look a bit magic...
+Thanks,
 
-register seems to be magic by itself. this is register set mask of
-group 3 for LCD. group in the structure is also an offset of register
-layout.
-
->
-> Maybe: #define SIRFSOC_PMX_ALLBITS 0x7FFFF
-
-0x7fff is only for all LCD. maybe "#define SIRFSOC_LCD_GROUP3_MASK
-0x7FFFF". that seems ugly too :-)
-
-> (Just a suggestion)
->
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .group = 2,
-> > + ? ? ? ? ? ? ? .mask = 1 << 31,
->
-> This too.
->
-> To make it clearer:
->
-> #include <linux/bitops.h>
->
-> .mask = BIT(31),
-
-agree
-
->
-> > + ? ? ? },
-> > +};
-> > +
-> > +static const struct sirfsoc_padmux lcd_16bits_padmux = {
-> > + ? ? ? .muxmask_counts = ARRAY_SIZE(lcd_16bits_sirfsoc_muxmask),
-> > + ? ? ? .muxmask = lcd_16bits_sirfsoc_muxmask,
-> > + ? ? ? .funcmask = 1 << 4,
-> > + ? ? ? .funcval = 0 << 4,
->
-> BIT(1)
-
-agree
-
-> BIT(0)
->
-> > +};
-> > +
-> > +static const unsigned lcd_16bits_pins[] = { 95, 96, 97, 98, 99, 100, 101, 102, 103, 104,
-> > + ? ? ? 105, 106, 107, 108, 109, 110, 111, 112, 113, 114 };
-> > +
-> > +static const struct sirfsoc_muxmask lcd_18bits_muxmask[] = {
-> > + ? ? ? {
-> > + ? ? ? ? ? ? ? .group = 3,
-> > + ? ? ? ? ? ? ? .mask = 0x7FFFF,
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .group = 2,
-> > + ? ? ? ? ? ? ? .mask = 1 << 31,
->
-> BIT(31)
->
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .group = 0,
-> > + ? ? ? ? ? ? ? .mask = (1 << 16) | (1 << 17),
->
-> BIT(16)|BIT(17)
->
-> (etc)
->
-agree
-
-> > +static int sirfsoc_pinmux_enable(struct pinctrl_dev *pmxdev, unsigned selector)
->
-> These will have an optional "position" parameter now, which you can
-> ignore for this simple driver. (Compare U300 pinmux v5).
-
-ok.
-
->
-> > +{
-> > + ? ? ? struct sirfsoc_pmx *upmx;
->
-> I think "upmx" = U300 padmux :-D
->
-> Maybe rename it something like spmx or so, globally...
-
-could be.
-
-
->
-> Yours,
-> Linus Walleij
->
-
--barry
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
