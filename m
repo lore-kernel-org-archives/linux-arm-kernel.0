@@ -1,59 +1,92 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Mon, 29 Aug 2011 17:54:23 +0800
-Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
-	different features
-In-Reply-To: <20110829093746.GE24524@pengutronix.de>
-References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
-	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
-	<20110829083649.GB24524@pengutronix.de>
-	<CAMPhdO-vuExLKVSmsr_kR1HnHfEBPp_Ae7pgs=XaVYiKGFRo-A@mail.gmail.com>
-	<20110829093746.GE24524@pengutronix.de>
-Message-ID: <CAMPhdO8k-boE0p0J_60VrS3LBdNaJRfJ6z_HCHLiRbQtESOJFw@mail.gmail.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Mon, 29 Aug 2011 11:07:27 +0100
+Subject: Thumb symbol lookup. Was [PATCH] ARM: kprobes: Fix jprobe
+	registration on Thumb kernels
+In-Reply-To: <1314443563-16389-1-git-send-email-tixy@yxit.co.uk>
+References: <1314443563-16389-1-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1314612447.2632.75.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 5:37 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> On Mon, Aug 29, 2011 at 04:51:46PM +0800, Eric Miao wrote:
->> On Mon, Aug 29, 2011 at 4:36 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
->> > On Mon, Aug 29, 2011 at 03:18:55PM +0800, Richard Zhu wrote:
->> >> On imx53 AHCI, soft reset fails with IPMS set when PMP
->> >> is enabled but SATA HDD/ODD is connected to SATA port,
->> >> do soft reset again to port 0.
->> >> So the 'ahci_pmp_retry_srst_ops' is required when imx53
->> >> ahci is present.
->> >>
->> >> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
->> >> ---
->> >> ?drivers/ata/ahci_platform.c | ? 44 +++++++++++++++++++++++++++++++++++++-----
->> >> ?1 files changed, 38 insertions(+), 6 deletions(-)
->> >>
->> >> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
->> >> index 6fef1fa..f32c91e 100644
->> >> --- a/drivers/ata/ahci_platform.c
->> >> +++ b/drivers/ata/ahci_platform.c
->> >> @@ -23,6 +23,41 @@
->> >> ?#include <linux/ahci_platform.h>
->> >> ?#include "ahci.h"
->> >>
->> >> +enum ahci_type {
->> >> + ? ? AHCI, ? ? ? ? ? /* standard platform ahci */
->> >> + ? ? IMX53_AHCI, ? ? /* ahci on i.mx53 */
->> >
->> > How about making all the IMX*-naming more generic because other SoC might need
->> > this somewhen, too?
->>
->> From a practical point of view, we can start with what we know already.
->> As the SATA controller on "other SoC" so far, we don't know yet if they
->> show the same issue (which we have to use ahci_pmp_retry_srst_ops).
->>
->> So Wolfram, how about we consider a generic one once more controllers
->> are being added?
->
-> If we do so later, and we then also change the platform_device_id to something
-> generic, we then also have to change all users, too. Is it so bad to change
-> IMX53_AHCI (and imx53-ahci and alike) to something like "ahci-pmp-retry-srst"
-> (or similar) now?
+On Sat, 2011-08-27 at 12:12 +0100, Tixy wrote:
+> From: Jon Medhurst <tixy@yxit.co.uk>
+> 
+> When jprobes are registered, the generic kprobes code verifies that the
+> address given for the probe's handler corresponds to a symbol in the
+> kernel. For thumb kernels, this address has bit zero set to indicate its
+> thumb-ness and so is rejected as being offset by one byte from the
+> symbol address.
+> 
+> Fortunately, on some architectures, the jprobes handler is specified
+> using a struct rather than a plain function pointer; so a mechanism is
+> provided for arch code to define a translation function called
+> arch_deref_entry_point(). We can use this on Thumb kernels to remove bit
+> zero of the handler address and fix our problem.
+> 
+> Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+> ---
+>  arch/arm/kernel/kprobes.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
+> index 129c116..9c88bcd 100644
+> --- a/arch/arm/kernel/kprobes.c
+> +++ b/arch/arm/kernel/kprobes.c
+> @@ -497,6 +497,14 @@ void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
+>  	regs->ARM_lr = (unsigned long)&kretprobe_trampoline;
+>  }
+>  
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +unsigned long arch_deref_entry_point(void *entry)
+> +{
+> +	/* Remove any thumb flag from the function pointer. */
+> +	return (unsigned long)entry & ~1lu;
+> +}
+> +#endif
+> +
+>  int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
+>  {
+>  	struct jprobe *jp = container_of(p, struct jprobe, kp);
 
-There are other fields in ata_port_info which might be different between
-boards. Using a SoC specific name as an index to an array of ata_port_info
-will be more flexible, as is adopted in drivers/ata/ahci.c - the PCI driver.
+I just discovered that this fix only works when the handler is builtin,
+if it is in a module then the symbol lookup for (fn_ptr&~1) gives the
+result that the address is in the previous function.
+
+This occurs because for built-in symbols, get_symbol_pos() is used and
+this sees thumb functions as starting at an even address. For symbols in
+modules, get_ksymbol() is used and this sees thumb functions starting at
+odd addresses.
+
+This begs the question, what is the correct behaviour when looking up an
+address in a Thumb function? Using this example
+
+void __naked foo()
+{
+	__asm__ __volatile__ (
+		"nop.n"
+		"bx lr"
+	);
+}
+
+if the first nop is at address 0x100 then &foo would be 0x101.
+
+If we treat the function as starting at 0x100, then looking up &foo will
+return a answer saying the address starts one byte from the start of
+foo.
+
+If we treat the function as starting at 0x101, then looking up address
+of the nop (0x100) will return a result indicating that the address
+isn't in foo.
+
+Neither of these seem to be right, though the former may be more
+'right'. Perhaps the best solution is to just ignore bit zero in both
+symbol addresses and in addresses passed into APIs. That way, in our
+example looking up both &foo and 0x100 will say the address is zero
+bytes from the start of symbol foo, and that the "bx lr" is 2 bytes.
+ 
+If this solution is desirable, I'm not sure how we'd go about
+implementing it, as all the symbol lookup seems to be in generic kernel
+code.
+
+-- 
+Tixy
