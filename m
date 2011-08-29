@@ -1,141 +1,16 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Aug 2011 13:09:19 +0200
-Subject: [PATCH v3 10/13] of: add a generic pinmux helper
-In-Reply-To: <1314315824-9687-11-git-send-email-swarren@nvidia.com>
-References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
-	<1314315824-9687-11-git-send-email-swarren@nvidia.com>
-Message-ID: <CACRpkdaTiWEtgjVOhUKeXhpiESvrWyz97p5j_PHe3MvEM4UaCw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Aug 2011 13:13:15 +0200
+Subject: [PATCH] mach-ux500: Remove most of the ugly machine_is_u8500()
+	calls
+In-Reply-To: <1314374047-2824-1-git-send-email-lee.jones@linaro.org>
+References: <1314374047-2824-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <201108291313.15626.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2011 at 1:43 AM, Stephen Warren <swarren@nvidia.com> wrote:
+On Friday 26 August 2011, Lee Jones wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> diff --git a/drivers/of/of_pinmux.c b/drivers/of/of_pinmux.c
+Very nice,
 
-> +int of_pinmux_parse(const struct of_pinmux_ctrl *ctrl,
-> + ? ? ? ? ? ? ? ? ? struct of_pinmux_cfg *cfg)
-
-OK...
-
-> +{
-> + ? ? ? struct device_node *np;
-> +
-> + ? ? ? if (!ctrl || !ctrl->dev || !ctrl->node || !ctrl->configure)
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> + ? ? ? for_each_child_of_node(ctrl->node, np) {
-> + ? ? ? ? ? ? ? int ret;
-> + ? ? ? ? ? ? ? bool hadpins = 0;
-> + ? ? ? ? ? ? ? struct of_iter_string_prop iter;
-> +
-> + ? ? ? ? ? ? ? cfg->node = np;
-> +
-> + ? ? ? ? ? ? ? ret = of_property_read_string(np, "function",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cfg->function);
-> + ? ? ? ? ? ? ? if (ret < 0) {
-> + ? ? ? ? ? ? ? ? ? ? ? dev_err(ctrl->dev, "no function for node %s\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? np->name);
-> + ? ? ? ? ? ? ? ? ? ? ? continue;
-> + ? ? ? ? ? ? ? }
-
-I buy this part.
-
-> +
-> + ? ? ? ? ? ? ? cfg->flags &= 0;
-> +
-> + ? ? ? ? ? ? ? if (of_find_property(np, "pull-up", NULL))
-> + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_PULL_UP;
-> + ? ? ? ? ? ? ? if (of_find_property(np, "pull-down", NULL))
-> + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_PULL_DOWN;
-> +
-> + ? ? ? ? ? ? ? if ((cfg->flags & OF_PINMUX_PULL_MASK) ==
-> + ? ? ? ? ? ? ? ? ? OF_PINMUX_PULL_MASK) {
-> + ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev, "node %s has both "
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"pull-up and pull-down properties - "
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"defaulting to no pull\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?np->name);
-> + ? ? ? ? ? ? ? ? ? ? ? cfg->flags &= ~OF_PINMUX_PULL_MASK;
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? if (of_find_property(np, "tristate", NULL))
-> + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_TRISTATE;
-
-But what does this stuff has to do with pinmux?
-
-I call this "pin biasing" and it has very little to do with muxing.
-
-If a broader, generic term is to be used, I'd prefer "pin control"
-which sort of nails the thing.
-
-> + ? ? ? ? ? ? ? for_each_string_property_value(iter, np, "pins") {
-> + ? ? ? ? ? ? ? ? ? ? ? hadpins = 1;
-> +
-> + ? ? ? ? ? ? ? ? ? ? ? cfg->pin = iter.value;
-> +
-> + ? ? ? ? ? ? ? ? ? ? ? dev_dbg(ctrl->dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "configure pin %s func=%s flags=0x%lx\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cfg->pin, cfg->function, cfg->flags);
-> + ? ? ? ? ? ? ? ? ? ? ? if (ctrl->configure(ctrl, cfg))
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"failed to configure pin %s\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?cfg->pin);
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? if (!hadpins)
-> + ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev, "no pins for node %s\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?np->name);
-> + ? ? ? }
-> +
-> + ? ? ? return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_pinmux_parse);
-
-Renamed of_pinctrl_parse I'm happier with it.
-
-> +/**
-> + * struct of_pinmux_cfg - configuration state for a single pinmux entry.
-> + *
-> + * @function: the name of the function that the pinmux entry should be
-> + * ? ? configured to.
-> + * @pin: the device_node of the pinmux entry that should be configured.
-> + * ? ? Platform specific properties that aren't in the generic binding may be
-> + * ? ? obtained from this device node.
-> + * @flags: flags for common pinmux options such as pull and tristate.
-
-I don't think these things has anything to do with pinmux at all.
-
-But with the struct renamed of_pinctrl_cfg I'm again happier.
-
-> + */
-> +struct of_pinmux_cfg {
-> + ? ? ? struct device_node ? ? ?*node;
-> + ? ? ? const char ? ? ? ? ? ? ?*pin;
-> + ? ? ? const char ? ? ? ? ? ? ?*function;
-> + ? ? ? unsigned long ? ? ? ? ? flags;
-> +};
-
-The current pinctrl patch set would probably want an unsigned
-"position" attribute too. (If we should build on that.)
-
-> +/**
-> + * struct of_pinmux_ctrl - platform specific pinmux control state.
-> + *
-> + * @pinmux: the pinmux device node. ?All child nodes are required to be the
-> + * ? ? pinmux entry definitions. ?Depending on the platform, this may either be
-> + * ? ? a single pin or a group of pins where they can be set to a common
-> + * ? ? function.
-> + * @configure: platform specific callback to configure the pinmux entry.
-> + */
-> +struct of_pinmux_ctrl {
-> + ? ? ? struct device ? ? ?*dev;
-> + ? ? ? struct device_node *node;
-> + ? ? ? int ? ? ? ? ? ? ? ?(*parse)(const struct of_pinmux_ctrl *ctrl,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct of_pinmux_cfg *cfg);
-> + ? ? ? int ? ? ? ? ? ? ? ?(*configure)(const struct of_pinmux_ctrl *ctrl,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const struct of_pinmux_cfg *cfg);
-> +};
-
-s/pinmux/pinctrl/g
-
-Yours,
-Linus Walleij
+Acked-by: Arnd Bergmann <arnd@arndb.de>
