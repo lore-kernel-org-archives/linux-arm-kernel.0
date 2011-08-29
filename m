@@ -1,670 +1,379 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 10:35:47 -0700
-Subject: [PATCH 14/22] OMAP2+: voltage: split voltage controller (VC) code
-	into dedicated layer
+Date: Mon, 29 Aug 2011 10:35:52 -0700
+Subject: [PATCH 19/22] OMAP2+: add PRM VP functions for checking/clearing VP
+	TX done status
 In-Reply-To: <1314639355-12713-1-git-send-email-khilman@ti.com>
 References: <1314639355-12713-1-git-send-email-khilman@ti.com>
-Message-ID: <1314639355-12713-15-git-send-email-khilman@ti.com>
+Message-ID: <1314639355-12713-20-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As part of the voltage layer cleanup, split out VC specific code into
-a dedicated VC layer.  This patch primarily just moves VC code from
-voltage.c into vc.c, and adds prototypes to vc.h.
+Add SoC specific PRM VP helper functions for checking and clearing
+the VP transaction done status.
 
-No functional changes.
-
-For readability, each function was given a local 'vc' pointer:
-
-    struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
-
-and a global replace of s/vdd->vc_data/vc/ was done.
-
-Also vc_init was renamed to vc_init_channel to reflect that this is
-per-VC channel initializtion.
+Longer term, these events should be handled by the forthcoming PRCM
+interrupt handler.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/Makefile  |    2 +-
- arch/arm/mach-omap2/vc.c      |  276 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/vc.h      |   12 ++
- arch/arm/mach-omap2/voltage.c |  264 +--------------------------------------
- 4 files changed, 293 insertions(+), 261 deletions(-)
- create mode 100644 arch/arm/mach-omap2/vc.c
+ arch/arm/mach-omap2/prm2xxx_3xxx.c |   41 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h |    4 +++
+ arch/arm/mach-omap2/prm44xx.c      |   49 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/prm44xx.h      |    4 +++
+ arch/arm/mach-omap2/vp.h           |   33 ++++++++++++++---------
+ arch/arm/mach-omap2/vp3xxx_data.c  |   19 ++++++-------
+ arch/arm/mach-omap2/vp44xx_data.c  |   25 ++++++-----------
+ 7 files changed, 136 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 1b6cecd..ecbf361 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -90,7 +90,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index 051213f..58c5c87 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -20,6 +20,8 @@
+ #include <plat/cpu.h>
+ #include <plat/prcm.h>
  
- # OMAP voltage domains
- ifeq ($(CONFIG_PM),y)
--voltagedomain-common			:= voltage.o
-+voltagedomain-common			:= voltage.o vc.o
- obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common) \
- 					   voltagedomains2xxx_data.o
- obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-new file mode 100644
-index 0000000..98f5a4b
---- /dev/null
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -0,0 +1,276 @@
-+#include <linux/kernel.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
++#include "vp.h"
 +
-+#include <plat/cpu.h>
-+
-+#include "voltage.h"
-+#include "vc.h"
-+#include "prm-regbits-34xx.h"
-+#include "prm-regbits-44xx.h"
-+#include "prm44xx.h"
-+
-+/* Voltage scale and accessory APIs */
-+int omap_vc_pre_scale(struct voltagedomain *voltdm,
-+		      unsigned long target_volt,
-+		      u8 *target_vsel, u8 *current_vsel)
-+{
-+	struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
-+	struct omap_vdd_info *vdd = voltdm->vdd;
-+	struct omap_volt_data *volt_data;
-+	const struct omap_vc_common_data *vc_common;
-+	const struct omap_vp_common_data *vp_common;
-+	u32 vc_cmdval, vp_errgain_val;
-+
-+	vc_common = vc->vc_common;
-+	vp_common = vdd->vp_data->vp_common;
-+
-+	/* Check if sufficient pmic info is available for this vdd */
-+	if (!vdd->pmic_info) {
-+		pr_err("%s: Insufficient pmic info to scale the vdd_%s\n",
-+			__func__, voltdm->name);
-+		return -EINVAL;
-+	}
-+
-+	if (!vdd->pmic_info->uv_to_vsel) {
-+		pr_err("%s: PMIC function to convert voltage in uV to"
-+			"vsel not registered. Hence unable to scale voltage"
-+			"for vdd_%s\n", __func__, voltdm->name);
-+		return -ENODATA;
-+	}
-+
-+	if (!vdd->read_reg || !vdd->write_reg) {
-+		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
-+			__func__, voltdm->name);
-+		return -EINVAL;
-+	}
-+
-+	/* Get volt_data corresponding to target_volt */
-+	volt_data = omap_voltage_get_voltdata(voltdm, target_volt);
-+	if (IS_ERR(volt_data))
-+		volt_data = NULL;
-+
-+	*target_vsel = vdd->pmic_info->uv_to_vsel(target_volt);
-+	*current_vsel = vdd->read_reg(vdd->vp_data->vp_common->prm_mod, vdd->vp_data->voltage);
-+
-+	/* Setting the ON voltage to the new target voltage */
-+	vc_cmdval = vdd->read_reg(vc->vc_common->prm_mod, vc->cmdval_reg);
-+	vc_cmdval &= ~vc_common->cmd_on_mask;
-+	vc_cmdval |= (*target_vsel << vc_common->cmd_on_shift);
-+	vdd->write_reg(vc_cmdval, vc->vc_common->prm_mod, vc->cmdval_reg);
-+
-+	/* Setting vp errorgain based on the voltage */
-+	if (volt_data) {
-+		vp_errgain_val = vdd->read_reg(vdd->vp_data->vp_common->prm_mod,
-+					       vdd->vp_data->vpconfig);
-+		vdd->vp_rt_data.vpconfig_errorgain = volt_data->vp_errgain;
-+		vp_errgain_val &= ~vp_common->vpconfig_errorgain_mask;
-+		vp_errgain_val |= vdd->vp_rt_data.vpconfig_errorgain <<
-+			vp_common->vpconfig_errorgain_shift;
-+		vdd->write_reg(vp_errgain_val, vdd->vp_data->vp_common->prm_mod,
-+			       vdd->vp_data->vpconfig);
-+	}
-+
-+	return 0;
-+}
-+
-+void omap_vc_post_scale(struct voltagedomain *voltdm,
-+			unsigned long target_volt,
-+			u8 target_vsel, u8 current_vsel)
-+{
-+	struct omap_vdd_info *vdd = voltdm->vdd;
-+	u32 smps_steps = 0, smps_delay = 0;
-+
-+	smps_steps = abs(target_vsel - current_vsel);
-+	/* SMPS slew rate / step size. 2us added as buffer. */
-+	smps_delay = ((smps_steps * vdd->pmic_info->step_size) /
-+			vdd->pmic_info->slew_rate) + 2;
-+	udelay(smps_delay);
-+
-+	vdd->curr_volt = target_volt;
-+}
-+
-+/* vc_bypass_scale_voltage - VC bypass method of voltage scaling */
-+int omap_vc_bypass_scale_voltage(struct voltagedomain *voltdm,
-+				 unsigned long target_volt)
-+{
-+	struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
-+	struct omap_vdd_info *vdd = voltdm->vdd;
-+	u32 loop_cnt = 0, retries_cnt = 0;
-+	u32 vc_valid, vc_bypass_val_reg, vc_bypass_value;
-+	u8 target_vsel, current_vsel;
-+	int ret;
-+
-+	ret = omap_vc_pre_scale(voltdm, target_volt, &target_vsel, &current_vsel);
-+	if (ret)
-+		return ret;
-+
-+	vc_valid = vc->vc_common->valid;
-+	vc_bypass_val_reg = vc->vc_common->bypass_val_reg;
-+	vc_bypass_value = (target_vsel << vc->vc_common->data_shift) |
-+			(vdd->pmic_info->pmic_reg <<
-+			vc->vc_common->regaddr_shift) |
-+			(vdd->pmic_info->i2c_slave_addr <<
-+			vc->vc_common->slaveaddr_shift);
-+
-+	vdd->write_reg(vc_bypass_value, vc->vc_common->prm_mod, vc_bypass_val_reg);
-+	vdd->write_reg(vc_bypass_value | vc_valid, vc->vc_common->prm_mod,
-+		       vc_bypass_val_reg);
-+
-+	vc_bypass_value = vdd->read_reg(vc->vc_common->prm_mod, vc_bypass_val_reg);
-+	/*
-+	 * Loop till the bypass command is acknowledged from the SMPS.
-+	 * NOTE: This is legacy code. The loop count and retry count needs
-+	 * to be revisited.
-+	 */
-+	while (!(vc_bypass_value & vc_valid)) {
-+		loop_cnt++;
-+
-+		if (retries_cnt > 10) {
-+			pr_warning("%s: Retry count exceeded\n", __func__);
-+			return -ETIMEDOUT;
-+		}
-+
-+		if (loop_cnt > 50) {
-+			retries_cnt++;
-+			loop_cnt = 0;
-+			udelay(10);
-+		}
-+		vc_bypass_value = vdd->read_reg(vc->vc_common->prm_mod,
-+						vc_bypass_val_reg);
-+	}
-+
-+	omap_vc_post_scale(voltdm, target_volt, target_vsel, current_vsel);
-+	return 0;
-+}
-+
-+static void __init omap3_vfsm_init(struct voltagedomain *voltdm)
-+{
-+	struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
-+	struct omap_vdd_info *vdd = voltdm->vdd;
-+
-+	/*
-+	 * Voltage Manager FSM parameters init
-+	 * XXX This data should be passed in from the board file
-+	 */
-+	vdd->write_reg(OMAP3_CLKSETUP, vc->vc_common->prm_mod, OMAP3_PRM_CLKSETUP_OFFSET);
-+	vdd->write_reg(OMAP3_VOLTOFFSET, vc->vc_common->prm_mod,
-+		       OMAP3_PRM_VOLTOFFSET_OFFSET);
-+	vdd->write_reg(OMAP3_VOLTSETUP2, vc->vc_common->prm_mod,
-+		       OMAP3_PRM_VOLTSETUP2_OFFSET);
-+}
-+
-+static void __init omap3_vc_init_channel(struct voltagedomain *voltdm)
-+{
-+	struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
-+	struct omap_vdd_info *vdd = voltdm->vdd;
-+	static bool is_initialized;
-+	u8 on_vsel, onlp_vsel, ret_vsel, off_vsel;
-+	u32 vc_val;
-+
-+	if (is_initialized)
-+		return;
-+
-+	/* Set up the on, inactive, retention and off voltage */
-+	on_vsel = vdd->pmic_info->uv_to_vsel(vdd->pmic_info->on_volt);
-+	onlp_vsel = vdd->pmic_info->uv_to_vsel(vdd->pmic_info->onlp_volt);
-+	ret_vsel = vdd->pmic_info->uv_to_vsel(vdd->pmic_info->ret_volt);
-+	off_vsel = vdd->pmic_info->uv_to_vsel(vdd->pmic_info->off_volt);
-+	vc_val	= ((on_vsel << vc->vc_common->cmd_on_shift) |
-+		(onlp_vsel << vc->vc_common->cmd_onlp_shift) |
-+		(ret_vsel << vc->vc_common->cmd_ret_shift) |
-+		(off_vsel << vc->vc_common->cmd_off_shift));
-+	vdd->write_reg(vc_val, vc->vc_common->prm_mod, vc->cmdval_reg);
-+
-+	/*
-+	 * Generic VC parameters init
-+	 * XXX This data should be abstracted out
-+	 */
-+	vdd->write_reg(OMAP3430_CMD1_MASK | OMAP3430_RAV1_MASK, vc->vc_common->prm_mod,
-+			OMAP3_PRM_VC_CH_CONF_OFFSET);
-+	vdd->write_reg(OMAP3430_MCODE_SHIFT | OMAP3430_HSEN_MASK, vc->vc_common->prm_mod,
-+			OMAP3_PRM_VC_I2C_CFG_OFFSET);
-+
-+	omap3_vfsm_init(voltdm);
-+
-+	is_initialized = true;
-+}
-+
-+
-+/* OMAP4 specific voltage init functions */
-+static void __init omap4_vc_init_channel(struct voltagedomain *voltdm)
-+{
-+	struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
-+	struct omap_vdd_info *vdd = voltdm->vdd;
-+	static bool is_initialized;
-+	u32 vc_val;
-+
-+	if (is_initialized)
-+		return;
-+
-+	/* TODO: Configure setup times and CMD_VAL values*/
-+
-+	/*
-+	 * Generic VC parameters init
-+	 * XXX This data should be abstracted out
-+	 */
-+	vc_val = (OMAP4430_RAV_VDD_MPU_L_MASK | OMAP4430_CMD_VDD_MPU_L_MASK |
-+		  OMAP4430_RAV_VDD_IVA_L_MASK | OMAP4430_CMD_VDD_IVA_L_MASK |
-+		  OMAP4430_RAV_VDD_CORE_L_MASK | OMAP4430_CMD_VDD_CORE_L_MASK);
-+	vdd->write_reg(vc_val, vc->vc_common->prm_mod, OMAP4_PRM_VC_CFG_CHANNEL_OFFSET);
-+
-+	/* XXX These are magic numbers and do not belong! */
-+	vc_val = (0x60 << OMAP4430_SCLL_SHIFT | 0x26 << OMAP4430_SCLH_SHIFT);
-+	vdd->write_reg(vc_val, vc->vc_common->prm_mod, OMAP4_PRM_VC_CFG_I2C_CLK_OFFSET);
-+
-+	is_initialized = true;
-+}
-+
-+void __init omap_vc_init_channel(struct voltagedomain *voltdm)
-+{
-+	struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
-+	struct omap_vdd_info *vdd = voltdm->vdd;
-+	u32 vc_val;
-+
-+	if (!vdd->pmic_info || !vdd->pmic_info->uv_to_vsel) {
-+		pr_err("%s: PMIC info requried to configure vc for"
-+			"vdd_%s not populated.Hence cannot initialize vc\n",
-+			__func__, voltdm->name);
-+		return;
-+	}
-+
-+	if (!vdd->read_reg || !vdd->write_reg) {
-+		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
-+			__func__, voltdm->name);
-+		return;
-+	}
-+
-+	/* Set up the SMPS_SA(i2c slave address in VC */
-+	vc_val = vdd->read_reg(vc->vc_common->prm_mod,
-+			       vc->vc_common->smps_sa_reg);
-+	vc_val &= ~vc->smps_sa_mask;
-+	vc_val |= vdd->pmic_info->i2c_slave_addr << vc->smps_sa_shift;
-+	vdd->write_reg(vc_val, vc->vc_common->prm_mod,
-+		       vc->vc_common->smps_sa_reg);
-+
-+	/* Setup the VOLRA(pmic reg addr) in VC */
-+	vc_val = vdd->read_reg(vc->vc_common->prm_mod,
-+			       vc->vc_common->smps_volra_reg);
-+	vc_val &= ~vc->smps_volra_mask;
-+	vc_val |= vdd->pmic_info->pmic_reg << vc->smps_volra_shift;
-+	vdd->write_reg(vc_val, vc->vc_common->prm_mod,
-+		       vc->vc_common->smps_volra_reg);
-+
-+	/* Configure the setup times */
-+	vc_val = vdd->read_reg(vc->vc_common->prm_mod, vdd->vfsm->voltsetup_reg);
-+	vc_val &= ~vdd->vfsm->voltsetup_mask;
-+	vc_val |= vdd->pmic_info->volt_setup_time <<
-+			vdd->vfsm->voltsetup_shift;
-+	vdd->write_reg(vc_val, vc->vc_common->prm_mod, vdd->vfsm->voltsetup_reg);
-+
-+	if (cpu_is_omap34xx())
-+		omap3_vc_init_channel(voltdm);
-+	else if (cpu_is_omap44xx())
-+		omap4_vc_init_channel(voltdm);
-+}
-+
-diff --git a/arch/arm/mach-omap2/vc.h b/arch/arm/mach-omap2/vc.h
-index f7338af..d0bf348 100644
---- a/arch/arm/mach-omap2/vc.h
-+++ b/arch/arm/mach-omap2/vc.h
-@@ -19,6 +19,8 @@
+ #include "prm2xxx_3xxx.h"
+ #include "cm2xxx_3xxx.h"
+ #include "prm-regbits-24xx.h"
+@@ -156,3 +158,42 @@ int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift)
  
- #include <linux/kernel.h>
- 
-+struct voltagedomain;
+ 	return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
+ }
 +
- /**
-  * struct omap_vc_common_data - per-VC register/bitfield data
-  * @cmd_on_mask: ON bitmask in PRM_VC_CMD_VAL* register
-@@ -81,5 +83,15 @@ extern struct omap_vc_instance_data omap4_vc_mpu_data;
- extern struct omap_vc_instance_data omap4_vc_iva_data;
- extern struct omap_vc_instance_data omap4_vc_core_data;
- 
-+void omap_vc_init_channel(struct voltagedomain *voltdm);
-+int omap_vc_pre_scale(struct voltagedomain *voltdm,
-+		      unsigned long target_volt,
-+		      u8 *target_vsel, u8 *current_vsel);
-+void omap_vc_post_scale(struct voltagedomain *voltdm,
-+			unsigned long target_volt,
-+			u8 target_vsel, u8 current_vsel);
-+int omap_vc_bypass_scale_voltage(struct voltagedomain *voltdm,
-+				 unsigned long target_volt);
++/* PRM VP */
 +
++/*
++ * struct omap3_vp - OMAP3 VP register access description.
++ * @tranxdone_status: VP_TRANXDONE_ST bitmask in PRM_IRQSTATUS_MPU reg
++ */
++struct omap3_vp {
++	u32 tranxdone_status;
++};
++
++struct omap3_vp omap3_vp[] = {
++	[OMAP3_VP_VDD_MPU_ID] = {
++		.tranxdone_status = OMAP3430_VP1_TRANXDONE_ST_MASK,
++	},
++	[OMAP3_VP_VDD_CORE_ID] = {
++		.tranxdone_status = OMAP3430_VP2_TRANXDONE_ST_MASK,
++	},
++};
++
++#define MAX_VP_ID ARRAY_SIZE(omap3_vp);
++
++u32 omap3_prm_vp_check_txdone(u8 vp_id)
++{
++	struct omap3_vp *vp = &omap3_vp[vp_id];
++	u32 irqstatus;
++
++	irqstatus = omap2_prm_read_mod_reg(OCP_MOD,
++					   OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
++	return irqstatus & vp->tranxdone_status;
++}
++
++void omap3_prm_vp_clear_txdone(u8 vp_id)
++{
++	struct omap3_vp *vp = &omap3_vp[vp_id];
++
++	omap2_prm_write_mod_reg(vp->tranxdone_status,
++				OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
++}
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index a1fc62a..5112526 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -303,6 +303,10 @@ extern int omap2_prm_is_hardreset_asserted(s16 prm_mod, u8 shift);
+ extern int omap2_prm_assert_hardreset(s16 prm_mod, u8 shift);
+ extern int omap2_prm_deassert_hardreset(s16 prm_mod, u8 rst_shift, u8 st_shift);
+ 
++/* OMAP3-specific VP functions */
++u32 omap3_prm_vp_check_txdone(u8 vp_id);
++void omap3_prm_vp_clear_txdone(u8 vp_id);
++
+ #endif	/* CONFIG_ARCH_OMAP4 */
  #endif
  
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 1e5c122..6ba6e49 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -293,136 +293,6 @@ static void __init vdd_debugfs_init(struct voltagedomain *voltdm)
- 				&nom_volt_debug_fops);
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index 0016555..390e32c 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -21,6 +21,7 @@
+ #include <plat/cpu.h>
+ #include <plat/prcm.h>
+ 
++#include "vp.h"
+ #include "prm44xx.h"
+ #include "prm-regbits-44xx.h"
+ 
+@@ -50,3 +51,51 @@ u32 omap4_prm_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 reg)
+ 
+ 	return v;
  }
++
++/* PRM VP */
++
++/*
++ * struct omap4_vp - OMAP4 VP register access description.
++ * @irqstatus_mpu: offset to IRQSTATUS_MPU register for VP
++ * @tranxdone_status: VP_TRANXDONE_ST bitmask in PRM_IRQSTATUS_MPU reg
++ */
++struct omap4_vp {
++	u32 irqstatus_mpu;
++	u32 tranxdone_status;
++};
++
++static struct omap4_vp omap4_vp[] = {
++	[OMAP4_VP_VDD_MPU_ID] = {
++		.irqstatus_mpu = OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET,
++		.tranxdone_status = OMAP4430_VP_MPU_TRANXDONE_ST_MASK,
++	},
++	[OMAP4_VP_VDD_IVA_ID] = {
++		.irqstatus_mpu = OMAP4_PRM_IRQSTATUS_MPU_OFFSET,
++		.tranxdone_status = OMAP4430_VP_IVA_TRANXDONE_ST_MASK,
++	},
++	[OMAP4_VP_VDD_CORE_ID] = {
++		.irqstatus_mpu = OMAP4_PRM_IRQSTATUS_MPU_OFFSET,
++		.tranxdone_status = OMAP4430_VP_CORE_TRANXDONE_ST_MASK,
++	},
++};
++
++u32 omap4_prm_vp_check_txdone(u8 vp_id)
++{
++	struct omap4_vp *vp = &omap4_vp[vp_id];
++	u32 irqstatus;
++
++	irqstatus = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
++						OMAP4430_PRM_OCP_SOCKET_INST,
++						vp->irqstatus_mpu);
++	return irqstatus & vp->tranxdone_status;
++}
++
++void omap4_prm_vp_clear_txdone(u8 vp_id)
++{
++	struct omap4_vp *vp = &omap4_vp[vp_id];
++
++	omap4_prminst_write_inst_reg(vp->tranxdone_status,
++				     OMAP4430_PRM_PARTITION,
++				     OMAP4430_PRM_OCP_SOCKET_INST,
++				     vp->irqstatus_mpu);
++};
+diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+index 7dfa379..b28c87d 100644
+--- a/arch/arm/mach-omap2/prm44xx.h
++++ b/arch/arm/mach-omap2/prm44xx.h
+@@ -751,6 +751,10 @@ extern u32 omap4_prm_read_inst_reg(s16 inst, u16 idx);
+ extern void omap4_prm_write_inst_reg(u32 val, s16 inst, u16 idx);
+ extern u32 omap4_prm_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
  
--/* Voltage scale and accessory APIs */
--static int _pre_volt_scale(struct voltagedomain *voltdm,
--		unsigned long target_volt, u8 *target_vsel, u8 *current_vsel)
--{
--	struct omap_vdd_info *vdd = voltdm->vdd;
--	struct omap_volt_data *volt_data;
--	const struct omap_vc_common_data *vc_common;
--	const struct omap_vp_common_data *vp_common;
--	u32 vc_cmdval, vp_errgain_val;
--
--	vc_common = vdd->vc_data->vc_common;
--	vp_common = vdd->vp_data->vp_common;
--
--	/* Check if suffiecient pmic info is available for this vdd */
--	if (!vdd->pmic_info) {
--		pr_err("%s: Insufficient pmic info to scale the vdd_%s\n",
--			__func__, voltdm->name);
--		return -EINVAL;
--	}
--
--	if (!vdd->pmic_info->uv_to_vsel) {
--		pr_err("%s: PMIC function to convert voltage in uV to"
--			"vsel not registered. Hence unable to scale voltage"
--			"for vdd_%s\n", __func__, voltdm->name);
--		return -ENODATA;
--	}
--
--	if (!vdd->read_reg || !vdd->write_reg) {
--		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
--			__func__, voltdm->name);
--		return -EINVAL;
--	}
--
--	/* Get volt_data corresponding to target_volt */
--	volt_data = omap_voltage_get_voltdata(voltdm, target_volt);
--	if (IS_ERR(volt_data))
--		volt_data = NULL;
--
--	*target_vsel = vdd->pmic_info->uv_to_vsel(target_volt);
--	*current_vsel = vdd->read_reg(vdd->vp_data->vp_common->prm_mod, vdd->vp_data->voltage);
--
--	/* Setting the ON voltage to the new target voltage */
--	vc_cmdval = vdd->read_reg(vdd->vc_data->vc_common->prm_mod, vdd->vc_data->cmdval_reg);
--	vc_cmdval &= ~vc_common->cmd_on_mask;
--	vc_cmdval |= (*target_vsel << vc_common->cmd_on_shift);
--	vdd->write_reg(vc_cmdval, vdd->vc_data->vc_common->prm_mod, vdd->vc_data->cmdval_reg);
--
--	/* Setting vp errorgain based on the voltage */
--	if (volt_data) {
--		vp_errgain_val = vdd->read_reg(vdd->vp_data->vp_common->prm_mod,
--					       vdd->vp_data->vpconfig);
--		vdd->vp_rt_data.vpconfig_errorgain = volt_data->vp_errgain;
--		vp_errgain_val &= ~vp_common->vpconfig_errorgain_mask;
--		vp_errgain_val |= vdd->vp_rt_data.vpconfig_errorgain <<
--			vp_common->vpconfig_errorgain_shift;
--		vdd->write_reg(vp_errgain_val, vdd->vp_data->vp_common->prm_mod,
--			       vdd->vp_data->vpconfig);
--	}
--
--	return 0;
--}
--
--static void _post_volt_scale(struct voltagedomain *voltdm,
--		unsigned long target_volt, u8 target_vsel, u8 current_vsel)
--{
--	struct omap_vdd_info *vdd = voltdm->vdd;
--	u32 smps_steps = 0, smps_delay = 0;
--
--	smps_steps = abs(target_vsel - current_vsel);
--	/* SMPS slew rate / step size. 2us added as buffer. */
--	smps_delay = ((smps_steps * vdd->pmic_info->step_size) /
--			vdd->pmic_info->slew_rate) + 2;
--	udelay(smps_delay);
--
--	vdd->curr_volt = target_volt;
--}
--
--/* vc_bypass_scale_voltage - VC bypass method of voltage scaling */
--static int vc_bypass_scale_voltage(struct voltagedomain *voltdm,
--		unsigned long target_volt)
--{
--	struct omap_vdd_info *vdd = voltdm->vdd;
--	u32 loop_cnt = 0, retries_cnt = 0;
--	u32 vc_valid, vc_bypass_val_reg, vc_bypass_value;
--	u8 target_vsel, current_vsel;
--	int ret;
--
--	ret = _pre_volt_scale(voltdm, target_volt, &target_vsel, &current_vsel);
--	if (ret)
--		return ret;
--
--	vc_valid = vdd->vc_data->vc_common->valid;
--	vc_bypass_val_reg = vdd->vc_data->vc_common->bypass_val_reg;
--	vc_bypass_value = (target_vsel << vdd->vc_data->vc_common->data_shift) |
--			(vdd->pmic_info->pmic_reg <<
--			vdd->vc_data->vc_common->regaddr_shift) |
--			(vdd->pmic_info->i2c_slave_addr <<
--			vdd->vc_data->vc_common->slaveaddr_shift);
--
--	vdd->write_reg(vc_bypass_value, vdd->vc_data->vc_common->prm_mod, vc_bypass_val_reg);
--	vdd->write_reg(vc_bypass_value | vc_valid, vdd->vc_data->vc_common->prm_mod,
--		       vc_bypass_val_reg);
--
--	vc_bypass_value = vdd->read_reg(vdd->vc_data->vc_common->prm_mod, vc_bypass_val_reg);
--	/*
--	 * Loop till the bypass command is acknowledged from the SMPS.
--	 * NOTE: This is legacy code. The loop count and retry count needs
--	 * to be revisited.
--	 */
--	while (!(vc_bypass_value & vc_valid)) {
--		loop_cnt++;
--
--		if (retries_cnt > 10) {
--			pr_warning("%s: Retry count exceeded\n", __func__);
--			return -ETIMEDOUT;
--		}
--
--		if (loop_cnt > 50) {
--			retries_cnt++;
--			loop_cnt = 0;
--			udelay(10);
--		}
--		vc_bypass_value = vdd->read_reg(vdd->vc_data->vc_common->prm_mod,
--						vc_bypass_val_reg);
--	}
--
--	_post_volt_scale(voltdm, target_volt, target_vsel, current_vsel);
--	return 0;
--}
--
- /* VP force update method of voltage scaling */
- static int vp_forceupdate_scale_voltage(struct voltagedomain *voltdm,
- 		unsigned long target_volt)
-@@ -432,7 +302,7 @@ static int vp_forceupdate_scale_voltage(struct voltagedomain *voltdm,
- 	u8 target_vsel, current_vsel;
- 	int ret, timeout = 0;
++/* OMAP4-specific VP functions */
++u32 omap4_prm_vp_check_txdone(u8 vp_id);
++void omap4_prm_vp_clear_txdone(u8 vp_id);
++
+ # endif
  
--	ret = _pre_volt_scale(voltdm, target_volt, &target_vsel, &current_vsel);
-+	ret = omap_vc_pre_scale(voltdm, target_volt, &target_vsel, &current_vsel);
- 	if (ret)
- 		return ret;
+ #endif
+diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
+index 025cf16..2c9cd76 100644
+--- a/arch/arm/mach-omap2/vp.h
++++ b/arch/arm/mach-omap2/vp.h
+@@ -21,10 +21,28 @@
  
-@@ -485,7 +355,7 @@ static int vp_forceupdate_scale_voltage(struct voltagedomain *voltdm,
- 			"TRANXDONE never got set after the voltage update\n",
- 			__func__, voltdm->name);
+ struct voltagedomain;
  
--	_post_volt_scale(voltdm, target_volt, target_vsel, current_vsel);
-+	omap_vc_post_scale(voltdm, target_volt, target_vsel, current_vsel);
++/*
++ * Voltage Processor (VP) identifiers
++ */
++#define OMAP3_VP_VDD_MPU_ID 0
++#define OMAP3_VP_VDD_CORE_ID 1
++#define OMAP4_VP_VDD_CORE_ID 0
++#define OMAP4_VP_VDD_IVA_ID 1
++#define OMAP4_VP_VDD_MPU_ID 2
++
+ /* XXX document */
+ #define VP_IDLE_TIMEOUT		200
+ #define VP_TRANXDONE_TIMEOUT	300
  
- 	/*
- 	 * Disable TransactionDone interrupt , clear all status, clear
-@@ -517,132 +387,6 @@ static int vp_forceupdate_scale_voltage(struct voltagedomain *voltdm,
- 	return 0;
- }
++/**
++ * struct omap_vp_ops - per-VP operations
++ * @check_txdone: check for VP transaction done
++ * @clear_txdone: clear VP transaction done status
++ */
++struct omap_vp_ops {
++	u32 (*check_txdone)(u8 vp_id);
++	void (*clear_txdone)(u8 vp_id);
++};
  
--static void __init omap3_vfsm_init(struct voltagedomain *voltdm)
--{
--	struct omap_vdd_info *vdd = voltdm->vdd;
+ /**
+  * struct omap_vp_common_data - register data common to all VDDs
+@@ -68,24 +86,13 @@ struct omap_vp_common_data {
+ 	u8 vlimitto_vddmin_shift;
+ 	u8 vlimitto_vddmax_shift;
+ 	u8 vlimitto_timeout_shift;
+-};
+ 
+-/**
+- * struct omap_vp_prm_irqst_data - PRM_IRQSTATUS_MPU.VP_TRANXDONE_ST data
+- * @tranxdone_status: VP_TRANXDONE_ST bitmask in PRM_IRQSTATUS_MPU reg
+- *
+- * XXX Note that on OMAP3, VP_TRANXDONE interrupt may not work due to a
+- *     hardware bug
+- * XXX This structure is probably not needed
+- */
+-struct omap_vp_prm_irqst_data {
+-	u32 tranxdone_status;
++	const struct omap_vp_ops *ops;
+ };
+ 
+ /**
+  * struct omap_vp_instance_data - VP register offsets (per-VDD)
+  * @vp_common: pointer to struct omap_vp_common_data * for this SoC
+- * @prm_irqst_data: pointer to struct omap_vp_prm_irqst_data for this VDD
+  * @vpconfig: PRM_VP*_CONFIG reg offset from PRM start
+  * @vstepmin: PRM_VP*_VSTEPMIN reg offset from PRM start
+  * @vlimitto: PRM_VP*_VLIMITTO reg offset from PRM start
+@@ -96,13 +103,13 @@ struct omap_vp_prm_irqst_data {
+  */
+ struct omap_vp_instance_data {
+ 	const struct omap_vp_common_data *vp_common;
+-	const struct omap_vp_prm_irqst_data *prm_irqst_data;
+ 	u8 vpconfig;
+ 	u8 vstepmin;
+ 	u8 vstepmax;
+ 	u8 vlimitto;
+ 	u8 vstatus;
+ 	u8 voltage;
++	u8 id;
+ };
+ 
+ /**
+diff --git a/arch/arm/mach-omap2/vp3xxx_data.c b/arch/arm/mach-omap2/vp3xxx_data.c
+index a8ea045..0372c1a 100644
+--- a/arch/arm/mach-omap2/vp3xxx_data.c
++++ b/arch/arm/mach-omap2/vp3xxx_data.c
+@@ -25,6 +25,12 @@
+ #include "voltage.h"
+ 
+ #include "vp.h"
++#include "prm2xxx_3xxx.h"
++
++static const struct omap_vp_ops omap3_vp_ops = {
++	.check_txdone = omap3_prm_vp_check_txdone,
++	.clear_txdone = omap3_prm_vp_clear_txdone,
++};
+ 
+ /*
+  * VP data common to 34xx/36xx chips
+@@ -48,13 +54,11 @@ static const struct omap_vp_common_data omap3_vp_common = {
+ 	.vlimitto_vddmin_shift = OMAP3430_VDDMIN_SHIFT,
+ 	.vlimitto_vddmax_shift = OMAP3430_VDDMAX_SHIFT,
+ 	.vlimitto_timeout_shift = OMAP3430_TIMEOUT_SHIFT,
+-};
 -
--	/*
--	 * Voltage Manager FSM parameters init
--	 * XXX This data should be passed in from the board file
--	 */
--	vdd->write_reg(OMAP3_CLKSETUP, vdd->vc_data->vc_common->prm_mod, OMAP3_PRM_CLKSETUP_OFFSET);
--	vdd->write_reg(OMAP3_VOLTOFFSET, vdd->vc_data->vc_common->prm_mod,
--		       OMAP3_PRM_VOLTOFFSET_OFFSET);
--	vdd->write_reg(OMAP3_VOLTSETUP2, vdd->vc_data->vc_common->prm_mod,
--		       OMAP3_PRM_VOLTSETUP2_OFFSET);
--}
+-static const struct omap_vp_prm_irqst_data omap3_vp1_prm_irqst_data = {
+-	.tranxdone_status = OMAP3430_VP1_TRANXDONE_ST_MASK,
++	.ops = &omap3_vp_ops,
+ };
+ 
+ struct omap_vp_instance_data omap3_vp1_data = {
++	.id = OMAP3_VP_VDD_MPU_ID,
+ 	.vp_common = &omap3_vp_common,
+ 	.vpconfig = OMAP3_PRM_VP1_CONFIG_OFFSET,
+ 	.vstepmin = OMAP3_PRM_VP1_VSTEPMIN_OFFSET,
+@@ -62,14 +66,10 @@ struct omap_vp_instance_data omap3_vp1_data = {
+ 	.vlimitto = OMAP3_PRM_VP1_VLIMITTO_OFFSET,
+ 	.vstatus = OMAP3_PRM_VP1_STATUS_OFFSET,
+ 	.voltage = OMAP3_PRM_VP1_VOLTAGE_OFFSET,
+-	.prm_irqst_data = &omap3_vp1_prm_irqst_data,
+-};
 -
--static void __init omap3_vc_init(struct voltagedomain *voltdm)
--{
--	struct omap_vdd_info *vdd = voltdm->vdd;
--	static bool is_initialized;
--	u8 on_vsel, onlp_vsel, ret_vsel, off_vsel;
--	u32 vc_val;
+-static const struct omap_vp_prm_irqst_data omap3_vp2_prm_irqst_data = {
+-	.tranxdone_status = OMAP3430_VP2_TRANXDONE_ST_MASK,
+ };
+ 
+ struct omap_vp_instance_data omap3_vp2_data = {
++	.id = OMAP3_VP_VDD_CORE_ID,
+ 	.vp_common = &omap3_vp_common,
+ 	.vpconfig = OMAP3_PRM_VP2_CONFIG_OFFSET,
+ 	.vstepmin = OMAP3_PRM_VP2_VSTEPMIN_OFFSET,
+@@ -77,5 +77,4 @@ struct omap_vp_instance_data omap3_vp2_data = {
+ 	.vlimitto = OMAP3_PRM_VP2_VLIMITTO_OFFSET,
+ 	.vstatus = OMAP3_PRM_VP2_STATUS_OFFSET,
+ 	.voltage = OMAP3_PRM_VP2_VOLTAGE_OFFSET,
+-	.prm_irqst_data = &omap3_vp2_prm_irqst_data,
+ };
+diff --git a/arch/arm/mach-omap2/vp44xx_data.c b/arch/arm/mach-omap2/vp44xx_data.c
+index 0957c24..738ba04 100644
+--- a/arch/arm/mach-omap2/vp44xx_data.c
++++ b/arch/arm/mach-omap2/vp44xx_data.c
+@@ -27,6 +27,11 @@
+ 
+ #include "vp.h"
+ 
++static const struct omap_vp_ops omap4_vp_ops = {
++	.check_txdone = omap4_prm_vp_check_txdone,
++	.clear_txdone = omap4_prm_vp_clear_txdone,
++};
++
+ /*
+  * VP data common to 44xx chips
+  * XXX This stuff presumably belongs in the vp44xx.c or vp.c file.
+@@ -49,13 +54,11 @@ static const struct omap_vp_common_data omap4_vp_common = {
+ 	.vlimitto_vddmin_shift = OMAP4430_VDDMIN_SHIFT,
+ 	.vlimitto_vddmax_shift = OMAP4430_VDDMAX_SHIFT,
+ 	.vlimitto_timeout_shift = OMAP4430_TIMEOUT_SHIFT,
+-};
 -
--	if (is_initialized)
--		return;
+-static const struct omap_vp_prm_irqst_data omap4_vp_mpu_prm_irqst_data = {
+-	.tranxdone_status = OMAP4430_VP_MPU_TRANXDONE_ST_MASK,
++	.ops = &omap4_vp_ops,
+ };
+ 
+ struct omap_vp_instance_data omap4_vp_mpu_data = {
++	.id = OMAP4_VP_VDD_MPU_ID,
+ 	.vp_common = &omap4_vp_common,
+ 	.vpconfig = OMAP4_PRM_VP_MPU_CONFIG_OFFSET,
+ 	.vstepmin = OMAP4_PRM_VP_MPU_VSTEPMIN_OFFSET,
+@@ -63,14 +66,10 @@ struct omap_vp_instance_data omap4_vp_mpu_data = {
+ 	.vlimitto = OMAP4_PRM_VP_MPU_VLIMITTO_OFFSET,
+ 	.vstatus = OMAP4_PRM_VP_MPU_STATUS_OFFSET,
+ 	.voltage = OMAP4_PRM_VP_MPU_VOLTAGE_OFFSET,
+-	.prm_irqst_data = &omap4_vp_mpu_prm_irqst_data,
+-};
 -
--	/* Set up the on, inactive, retention and off voltage */
--	on_vsel = vdd->pmic_info->uv_to_vsel(vdd->pmic_info->on_volt);
--	onlp_vsel = vdd->pmic_info->uv_to_vsel(vdd->pmic_info->onlp_volt);
--	ret_vsel = vdd->pmic_info->uv_to_vsel(vdd->pmic_info->ret_volt);
--	off_vsel = vdd->pmic_info->uv_to_vsel(vdd->pmic_info->off_volt);
--	vc_val	= ((on_vsel << vdd->vc_data->vc_common->cmd_on_shift) |
--		(onlp_vsel << vdd->vc_data->vc_common->cmd_onlp_shift) |
--		(ret_vsel << vdd->vc_data->vc_common->cmd_ret_shift) |
--		(off_vsel << vdd->vc_data->vc_common->cmd_off_shift));
--	vdd->write_reg(vc_val, vdd->vc_data->vc_common->prm_mod, vdd->vc_data->cmdval_reg);
+-static const struct omap_vp_prm_irqst_data omap4_vp_iva_prm_irqst_data = {
+-	.tranxdone_status = OMAP4430_VP_IVA_TRANXDONE_ST_MASK,
+ };
+ 
+ struct omap_vp_instance_data omap4_vp_iva_data = {
++	.id = OMAP4_VP_VDD_IVA_ID,
+ 	.vp_common = &omap4_vp_common,
+ 	.vpconfig = OMAP4_PRM_VP_IVA_CONFIG_OFFSET,
+ 	.vstepmin = OMAP4_PRM_VP_IVA_VSTEPMIN_OFFSET,
+@@ -78,14 +77,10 @@ struct omap_vp_instance_data omap4_vp_iva_data = {
+ 	.vlimitto = OMAP4_PRM_VP_IVA_VLIMITTO_OFFSET,
+ 	.vstatus = OMAP4_PRM_VP_IVA_STATUS_OFFSET,
+ 	.voltage = OMAP4_PRM_VP_IVA_VOLTAGE_OFFSET,
+-	.prm_irqst_data = &omap4_vp_iva_prm_irqst_data,
+-};
 -
--	/*
--	 * Generic VC parameters init
--	 * XXX This data should be abstracted out
--	 */
--	vdd->write_reg(OMAP3430_CMD1_MASK | OMAP3430_RAV1_MASK, vdd->vc_data->vc_common->prm_mod,
--			OMAP3_PRM_VC_CH_CONF_OFFSET);
--	vdd->write_reg(OMAP3430_MCODE_SHIFT | OMAP3430_HSEN_MASK, vdd->vc_data->vc_common->prm_mod,
--			OMAP3_PRM_VC_I2C_CFG_OFFSET);
+-static const struct omap_vp_prm_irqst_data omap4_vp_core_prm_irqst_data = {
+-	.tranxdone_status = OMAP4430_VP_CORE_TRANXDONE_ST_MASK,
+ };
+ 
+ struct omap_vp_instance_data omap4_vp_core_data = {
++	.id = OMAP4_VP_VDD_CORE_ID,
+ 	.vp_common = &omap4_vp_common,
+ 	.vpconfig = OMAP4_PRM_VP_CORE_CONFIG_OFFSET,
+ 	.vstepmin = OMAP4_PRM_VP_CORE_VSTEPMIN_OFFSET,
+@@ -93,6 +88,4 @@ struct omap_vp_instance_data omap4_vp_core_data = {
+ 	.vlimitto = OMAP4_PRM_VP_CORE_VLIMITTO_OFFSET,
+ 	.vstatus = OMAP4_PRM_VP_CORE_STATUS_OFFSET,
+ 	.voltage = OMAP4_PRM_VP_CORE_VOLTAGE_OFFSET,
+-	.prm_irqst_data = &omap4_vp_core_prm_irqst_data,
+ };
 -
--	omap3_vfsm_init(voltdm);
--
--	is_initialized = true;
--}
--
--
--/* OMAP4 specific voltage init functions */
--static void __init omap4_vc_init(struct voltagedomain *voltdm)
--{
--	struct omap_vdd_info *vdd = voltdm->vdd;
--	static bool is_initialized;
--	u32 vc_val;
--
--	if (is_initialized)
--		return;
--
--	/* TODO: Configure setup times and CMD_VAL values*/
--
--	/*
--	 * Generic VC parameters init
--	 * XXX This data should be abstracted out
--	 */
--	vc_val = (OMAP4430_RAV_VDD_MPU_L_MASK | OMAP4430_CMD_VDD_MPU_L_MASK |
--		  OMAP4430_RAV_VDD_IVA_L_MASK | OMAP4430_CMD_VDD_IVA_L_MASK |
--		  OMAP4430_RAV_VDD_CORE_L_MASK | OMAP4430_CMD_VDD_CORE_L_MASK);
--	vdd->write_reg(vc_val, vdd->vc_data->vc_common->prm_mod, OMAP4_PRM_VC_CFG_CHANNEL_OFFSET);
--
--	/* XXX These are magic numbers and do not belong! */
--	vc_val = (0x60 << OMAP4430_SCLL_SHIFT | 0x26 << OMAP4430_SCLH_SHIFT);
--	vdd->write_reg(vc_val, vdd->vc_data->vc_common->prm_mod, OMAP4_PRM_VC_CFG_I2C_CLK_OFFSET);
--
--	is_initialized = true;
--}
--
--static void __init omap_vc_init(struct voltagedomain *voltdm)
--{
--	struct omap_vdd_info *vdd = voltdm->vdd;
--	u32 vc_val;
--
--	if (!vdd->pmic_info || !vdd->pmic_info->uv_to_vsel) {
--		pr_err("%s: PMIC info requried to configure vc for"
--			"vdd_%s not populated.Hence cannot initialize vc\n",
--			__func__, voltdm->name);
--		return;
--	}
--
--	if (!vdd->read_reg || !vdd->write_reg) {
--		pr_err("%s: No read/write API for accessing vdd_%s regs\n",
--			__func__, voltdm->name);
--		return;
--	}
--
--	/* Set up the SMPS_SA(i2c slave address in VC */
--	vc_val = vdd->read_reg(vdd->vc_data->vc_common->prm_mod,
--			       vdd->vc_data->vc_common->smps_sa_reg);
--	vc_val &= ~vdd->vc_data->smps_sa_mask;
--	vc_val |= vdd->pmic_info->i2c_slave_addr << vdd->vc_data->smps_sa_shift;
--	vdd->write_reg(vc_val, vdd->vc_data->vc_common->prm_mod,
--		       vdd->vc_data->vc_common->smps_sa_reg);
--
--	/* Setup the VOLRA(pmic reg addr) in VC */
--	vc_val = vdd->read_reg(vdd->vc_data->vc_common->prm_mod,
--			       vdd->vc_data->vc_common->smps_volra_reg);
--	vc_val &= ~vdd->vc_data->smps_volra_mask;
--	vc_val |= vdd->pmic_info->pmic_reg << vdd->vc_data->smps_volra_shift;
--	vdd->write_reg(vc_val, vdd->vc_data->vc_common->prm_mod,
--		       vdd->vc_data->vc_common->smps_volra_reg);
--
--	/* Configure the setup times */
--	vc_val = vdd->read_reg(vdd->vc_data->vc_common->prm_mod, vdd->vfsm->voltsetup_reg);
--	vc_val &= ~vdd->vfsm->voltsetup_mask;
--	vc_val |= vdd->pmic_info->volt_setup_time <<
--			vdd->vfsm->voltsetup_shift;
--	vdd->write_reg(vc_val, vdd->vc_data->vc_common->prm_mod, vdd->vfsm->voltsetup_reg);
--
--	if (cpu_is_omap34xx())
--		omap3_vc_init(voltdm);
--	else if (cpu_is_omap44xx())
--		omap4_vc_init(voltdm);
--}
--
- static int __init omap_vdd_data_configure(struct voltagedomain *voltdm)
- {
- 	struct omap_vdd_info *vdd = voltdm->vdd;
-@@ -1025,7 +769,7 @@ void omap_change_voltscale_method(struct voltagedomain *voltdm,
- 		vdd->volt_scale = vp_forceupdate_scale_voltage;
- 		return;
- 	case VOLTSCALE_VCBYPASS:
--		vdd->volt_scale = vc_bypass_scale_voltage;
-+		vdd->volt_scale = omap_vc_bypass_scale_voltage;
- 		return;
- 	default:
- 		pr_warning("%s: Trying to change the method of voltage scaling"
-@@ -1061,7 +805,7 @@ int __init omap_voltage_late_init(void)
- 		if (voltdm->vdd) {
- 			if (omap_vdd_data_configure(voltdm))
- 				continue;
--			omap_vc_init(voltdm);
-+			omap_vc_init_channel(voltdm);
- 			vp_init(voltdm);
- 			vdd_debugfs_init(voltdm);
- 		}
 -- 
 1.7.6
