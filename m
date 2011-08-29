@@ -1,46 +1,68 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Mon, 29 Aug 2011 15:04:29 +0530
-Subject: [PATCHv6 2/3] OMAP: I2C: Remove the reset in the init path
-In-Reply-To: <87pqjrydih.fsf@ti.com>
-References: <1312524035-5549-1-git-send-email-shubhrajyoti@ti.com>	<1312524035-5549-2-git-send-email-shubhrajyoti@ti.com>
-	<87pqjrydih.fsf@ti.com>
-Message-ID: <4E5B5D25.3000903@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Mon, 29 Aug 2011 11:37:46 +0200
+Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
+	different features
+In-Reply-To: <CAMPhdO-vuExLKVSmsr_kR1HnHfEBPp_Ae7pgs=XaVYiKGFRo-A@mail.gmail.com>
+References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
+	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
+	<20110829083649.GB24524@pengutronix.de>
+	<CAMPhdO-vuExLKVSmsr_kR1HnHfEBPp_Ae7pgs=XaVYiKGFRo-A@mail.gmail.com>
+Message-ID: <20110829093746.GE24524@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 August 2011 04:41 AM, Kevin Hilman wrote:
-> Shubhrajyoti D<shubhrajyoti@ti.com>  writes:
->
->> -  The reset in the driver at init is not needed anymore as the
->>     hwmod framework takes care of reseting it.
->> -  Reset is removed from omap_i2c_init, which was called
->>     not only during probe, but also after time out and error handling.
->>     device_reset were added in those places to effect the reset.
->> -  Earlier the hwmod SYSC settings were over-written in the driver.
->>     Removing the same and letting the hwmod take care of the settings.
->> -  Clean up the SYSS_RESETDONE_MASK macro as it is no longer needed.
->> -  Clean up the SYSCONFIG SYSC bit defination macros.
->> -  Fix the typos in wakeup.
->>
->> Signed-off-by: Shubhrajyoti D<shubhrajyoti@ti.com>
-> I asked this in an earlier version, but here it is again.
->
-> Are you sure a full IP reset is needed on the timeout and error
-> conditions and not just the module-level one done by:
->
-> 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->
->          [ and later... ]
->
-> 	/* Take the I2C module out of reset: */
-> 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
->
-> I kind of suspect that the IP rese was done because the omap_i2c_init()
-> function was callled under the timeout/error conditions, but that a full
-> IP SW reset is a bit heavy handed.
-My idea is that case of lockup  in error path it could be helpful.
+On Mon, Aug 29, 2011 at 04:51:46PM +0800, Eric Miao wrote:
+> On Mon, Aug 29, 2011 at 4:36 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+> > On Mon, Aug 29, 2011 at 03:18:55PM +0800, Richard Zhu wrote:
+> >> On imx53 AHCI, soft reset fails with IPMS set when PMP
+> >> is enabled but SATA HDD/ODD is connected to SATA port,
+> >> do soft reset again to port 0.
+> >> So the 'ahci_pmp_retry_srst_ops' is required when imx53
+> >> ahci is present.
+> >>
+> >> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+> >> ---
+> >> ?drivers/ata/ahci_platform.c | ? 44 +++++++++++++++++++++++++++++++++++++-----
+> >> ?1 files changed, 38 insertions(+), 6 deletions(-)
+> >>
+> >> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> >> index 6fef1fa..f32c91e 100644
+> >> --- a/drivers/ata/ahci_platform.c
+> >> +++ b/drivers/ata/ahci_platform.c
+> >> @@ -23,6 +23,41 @@
+> >> ?#include <linux/ahci_platform.h>
+> >> ?#include "ahci.h"
+> >>
+> >> +enum ahci_type {
+> >> + ? ? AHCI, ? ? ? ? ? /* standard platform ahci */
+> >> + ? ? IMX53_AHCI, ? ? /* ahci on i.mx53 */
+> >
+> > How about making all the IMX*-naming more generic because other SoC might need
+> > this somewhen, too?
+> 
+> From a practical point of view, we can start with what we know already.
+> As the SATA controller on "other SoC" so far, we don't know yet if they
+> show the same issue (which we have to use ahci_pmp_retry_srst_ops).
+> 
+> So Wolfram, how about we consider a generic one once more controllers
+> are being added?
 
-We internally had a discussion on this
-https://gforge01.dal.design.ti.com/gf/project/opbu_mail_arcv/mailman/?action=ListThreads&mailman_id=218&_forum_action=ForumMessageBrowse&thread_id=12483
+If we do so later, and we then also change the platform_device_id to something
+generic, we then also have to change all users, too. Is it so bad to change
+IMX53_AHCI (and imx53-ahci and alike) to something like "ahci-pmp-retry-srst"
+(or similar) now?
 
-> Kevin
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110829/16cc5b08/attachment.sig>
