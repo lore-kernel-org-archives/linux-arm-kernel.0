@@ -1,40 +1,150 @@
-From: rpurdie@rpsys.net (Richard Purdie)
-Date: Mon, 29 Aug 2011 22:34:58 +0100
-Subject: [PATCH] leds: kill CONFIG_LEDS_CLASS option
-In-Reply-To: <alpine.LFD.2.00.1108291630020.20358@xanadu.home>
-References: <1314647628-21707-1-git-send-email-bryan.wu@canonical.com>
-	<alpine.LFD.2.00.1108291630020.20358@xanadu.home>
-Message-ID: <1314653699.5939.299.camel@rex>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 29 Aug 2011 14:46:00 -0700
+Subject: [PATCH v3 10/13] of: add a generic pinmux helper
+In-Reply-To: <CACRpkdaTiWEtgjVOhUKeXhpiESvrWyz97p5j_PHe3MvEM4UaCw@mail.gmail.com>
+References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
+	<1314315824-9687-11-git-send-email-swarren@nvidia.com>
+	<CACRpkdaTiWEtgjVOhUKeXhpiESvrWyz97p5j_PHe3MvEM4UaCw@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B3279BEB@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-08-29 at 16:34 -0400, Nicolas Pitre wrote:
-> On Tue, 30 Aug 2011, Bryan Wu wrote:
+Linus Walleij wrote at Monday, August 29, 2011 5:09 AM:
+> On Fri, Aug 26, 2011 at 1:43 AM, Stephen Warren <swarren@nvidia.com> wrote:
 > 
-> > Almost all the new leds driver and trigger driver are depends on
-> > CONFIG_LED_CLASS, so there is no such user with CONFIG_NEW_LEDS=y
-> > and CONFIG_LED_CLASS=n. Moreover, lots of API functions in led-class.c
-> > are very common and should be built-in when CONFIG_NEW_LEDS=y.
-> > 
-> > Obviously, CONFIG_LEDS_CLASS is pointless. This patch kills it and
-> > also updates defconfigs which contains CONFIG_LEDS_CLASS.
-> > 
-> > Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
-> > ---
+> > diff --git a/drivers/of/of_pinmux.c b/drivers/of/of_pinmux.c
+> 
+> > +int of_pinmux_parse(const struct of_pinmux_ctrl *ctrl,
+> > + ? ? ? ? ? ? ? ? ? struct of_pinmux_cfg *cfg)
+> 
+> OK...
+> 
+> > +{
+> > + ? ? ? struct device_node *np;
+> > +
+> > + ? ? ? if (!ctrl || !ctrl->dev || !ctrl->node || !ctrl->configure)
+> > + ? ? ? ? ? ? ? return -EINVAL;
+> > +
+> > + ? ? ? for_each_child_of_node(ctrl->node, np) {
+> > + ? ? ? ? ? ? ? int ret;
+> > + ? ? ? ? ? ? ? bool hadpins = 0;
+> > + ? ? ? ? ? ? ? struct of_iter_string_prop iter;
+> > +
+> > + ? ? ? ? ? ? ? cfg->node = np;
+> > +
+> > + ? ? ? ? ? ? ? ret = of_property_read_string(np, "function",
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cfg->function);
+> > + ? ? ? ? ? ? ? if (ret < 0) {
+> > + ? ? ? ? ? ? ? ? ? ? ? dev_err(ctrl->dev, "no function for node %s\n",
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? np->name);
+> > + ? ? ? ? ? ? ? ? ? ? ? continue;
+> > + ? ? ? ? ? ? ? }
+> 
+> I buy this part.
+> 
+> > +
+> > + ? ? ? ? ? ? ? cfg->flags &= 0;
+> > +
+> > + ? ? ? ? ? ? ? if (of_find_property(np, "pull-up", NULL))
+> > + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_PULL_UP;
+> > + ? ? ? ? ? ? ? if (of_find_property(np, "pull-down", NULL))
+> > + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_PULL_DOWN;
+> > +
+> > + ? ? ? ? ? ? ? if ((cfg->flags & OF_PINMUX_PULL_MASK) ==
+> > + ? ? ? ? ? ? ? ? ? OF_PINMUX_PULL_MASK) {
+> > + ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev, "node %s has both "
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"pull-up and pull-down properties - "
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"defaulting to no pull\n",
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?np->name);
+> > + ? ? ? ? ? ? ? ? ? ? ? cfg->flags &= ~OF_PINMUX_PULL_MASK;
+> > + ? ? ? ? ? ? ? }
+> > +
+> > + ? ? ? ? ? ? ? if (of_find_property(np, "tristate", NULL))
+> > + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_TRISTATE;
+> 
+> But what does this stuff has to do with pinmux?
+> 
+> I call this "pin biasing" and it has very little to do with muxing.
+> 
+> If a broader, generic term is to be used, I'd prefer "pin control"
+> which sort of nails the thing.
+> 
+> > + ? ? ? ? ? ? ? for_each_string_property_value(iter, np, "pins") {
+> > + ? ? ? ? ? ? ? ? ? ? ? hadpins = 1;
+> > +
+> > + ? ? ? ? ? ? ? ? ? ? ? cfg->pin = iter.value;
+> > +
+> > + ? ? ? ? ? ? ? ? ? ? ? dev_dbg(ctrl->dev,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "configure pin %s func=%s flags=0x%lx\n",
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cfg->pin, cfg->function, cfg->flags);
+> > + ? ? ? ? ? ? ? ? ? ? ? if (ctrl->configure(ctrl, cfg))
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"failed to configure pin %s\n",
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?cfg->pin);
+> > + ? ? ? ? ? ? ? }
+> > +
+> > + ? ? ? ? ? ? ? if (!hadpins)
+> > + ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev, "no pins for node %s\n",
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?np->name);
+> > + ? ? ? }
+> > +
+> > + ? ? ? return 0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(of_pinmux_parse);
+> 
+> Renamed of_pinctrl_parse I'm happier with it.
 
-Looking at the code I'm a little concerned to see the direction this is
-going. There was originally a reason that there were two options, it was
-related to being able to compile as much of the LED code as a module as
-possible.
+Well, it's not just that; the struct contains the function field to
+select for each pingroup, so it's not just pinctrl either.
 
-It looks like commit 5ada28bf76752e33dce3d807bf0dfbe6d1b943ad changed
-the tristate to a bool at which point the separate option obviously
-becomes pointless.
+> > +/**
+> > + * struct of_pinmux_cfg - configuration state for a single pinmux entry.
+> > + *
+> > + * @function: the name of the function that the pinmux entry should be
+> > + * ? ? configured to.
+> > + * @pin: the device_node of the pinmux entry that should be configured.
+> > + * ? ? Platform specific properties that aren't in the generic binding may be
+> > + * ? ? obtained from this device node.
+> > + * @flags: flags for common pinmux options such as pull and tristate.
+> 
+> I don't think these things has anything to do with pinmux at all.
+> 
+> But with the struct renamed of_pinctrl_cfg I'm again happier.
+> 
+> > + */
+> > +struct of_pinmux_cfg {
+> > + ? ? ? struct device_node ? ? ?*node;
+> > + ? ? ? const char ? ? ? ? ? ? ?*pin;
+> > + ? ? ? const char ? ? ? ? ? ? ?*function;
+> > + ? ? ? unsigned long ? ? ? ? ? flags;
+> > +};
+> 
+> The current pinctrl patch set would probably want an unsigned
+> "position" attribute too. (If we should build on that.)
 
-Rather than accept the current direction and force everything builtin,
-I'd much rather this code became modular capable again. There is no good
-reason we should be forced to build everything into a kernel.
+This does beg the question I asked previously:
 
-Cheers,
+The intent of this patch was to provide a way for devicetree to set the
+complete initial state of the pinmux, in a SoC-specific fashion, without
+interaction with the pinmux API.
 
-Richard
+However, I'm guessing you see the pinmux driver as not touching HW at
+boot at all, and never programming anything except in response to a
+driver calling pinmux_get()/pinmux_enable()?
+
+In the former case, this code and related bindings wouldn't be influenced
+by the pinmux API at all (and indeed arguably never should be, since DT
+is supposed to be oriented purely at HW, and not influenced by driver
+design). This approach might make the pinmux API mostly relevant only
+for drivers that actively change between configurations at run-time, and
+not for drivers that don't need dynamic muxing.
+
+However, in the latter case, this code should be part of the pinmux core,
+and my patches to Tegra's pinmux driver dropped. It'd be difficult to
+define a pinmux binding that wasn't influenced by the pinmux API's needs
+in this case.
+
+So, that's probably something we have to resolve first.
+
+-- 
+nvpublic
