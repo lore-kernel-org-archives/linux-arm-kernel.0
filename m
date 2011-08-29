@@ -1,43 +1,42 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 11:15:19 -0700
-Subject: [PATCH 3/5] OMAP4: PM: TWL6030: address 0V conversions
+Date: Mon, 29 Aug 2011 11:15:18 -0700
+Subject: [PATCH 2/5] OMAP4: PM: TWL6030: fix uv to voltage for >0x39
 In-Reply-To: <1314641721-5172-1-git-send-email-khilman@ti.com>
 References: <1314641721-5172-1-git-send-email-khilman@ti.com>
-Message-ID: <1314641721-5172-4-git-send-email-khilman@ti.com>
+Message-ID: <1314641721-5172-3-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-0V conversions should be mapped to 0 as it is meant to denote
-off voltages.
+using 1.35V as a check is not correct, we know that beyond 0x39,
+voltages are non linear - hence use the conversion iff uV greater
+than that for 0x39. For example, with  709mV as the smps offset,
+the max linear is actually 1.41V(0x39vsel)!
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/omap_twl.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_twl.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-index 5def7c2..b30adf3 100644
+index a66bf6b..5def7c2 100644
 --- a/arch/arm/mach-omap2/omap_twl.c
 +++ b/arch/arm/mach-omap2/omap_twl.c
-@@ -95,6 +95,8 @@ static unsigned long twl6030_vsel_to_uv(const u8 vsel)
- 		is_offset_valid = true;
- 	}
+@@ -134,8 +134,13 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
+ 	 * hardcoding only for 1.35 V which is used for 1GH OPP for
+ 	 * OMAP4430.
+ 	 */
+-	if (uv == 1350000)
++	if (uv > twl6030_vsel_to_uv(0x39)) {
++		if (uv == 1350000)
++			return 0x3A;
++		pr_err("%s:OUT OF RANGE! non mapped vsel for %ld Vs max %ld\n",
++			__func__, uv, twl6030_vsel_to_uv(0x39));
+ 		return 0x3A;
++	}
  
-+	if (!vsel)
-+		return 0;
- 	/*
- 	 * There is no specific formula for voltage to vsel
- 	 * conversion above 1.3V. There are special hardcoded
-@@ -127,6 +129,8 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
- 		is_offset_valid = true;
- 	}
- 
-+	if (!uv)
-+		return 0x00;
- 	/*
- 	 * There is no specific formula for voltage to vsel
- 	 * conversion above 1.3V. There are special hardcoded
+ 	if (smps_offset & 0x8)
+ 		return DIV_ROUND_UP(uv - 709000, 12660) + 1;
 -- 
 1.7.6
