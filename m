@@ -1,39 +1,41 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Mon, 29 Aug 2011 16:51:46 +0800
-Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
-	different features
-In-Reply-To: <20110829083649.GB24524@pengutronix.de>
-References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
-	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
-	<20110829083649.GB24524@pengutronix.de>
-Message-ID: <CAMPhdO-vuExLKVSmsr_kR1HnHfEBPp_Ae7pgs=XaVYiKGFRo-A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Aug 2011 09:52:09 +0100
+Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
+In-Reply-To: <Pine.LNX.4.44L0.1108282137270.10614-100000@netrider.rowland.org>
+References: <20110828233648.GA14560@n2100.arm.linux.org.uk>
+	<Pine.LNX.4.44L0.1108282137270.10614-100000@netrider.rowland.org>
+Message-ID: <20110829085209.GB26917@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 4:36 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> On Mon, Aug 29, 2011 at 03:18:55PM +0800, Richard Zhu wrote:
->> On imx53 AHCI, soft reset fails with IPMS set when PMP
->> is enabled but SATA HDD/ODD is connected to SATA port,
->> do soft reset again to port 0.
->> So the 'ahci_pmp_retry_srst_ops' is required when imx53
->> ahci is present.
->>
->> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
->> ---
->> ?drivers/ata/ahci_platform.c | ? 44 +++++++++++++++++++++++++++++++++++++-----
->> ?1 files changed, 38 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
->> index 6fef1fa..f32c91e 100644
->> --- a/drivers/ata/ahci_platform.c
->> +++ b/drivers/ata/ahci_platform.c
->> @@ -23,6 +23,41 @@
->> ?#include <linux/ahci_platform.h>
->> ?#include "ahci.h"
->>
->> +enum ahci_type {
->> + ? ? AHCI, ? ? ? ? ? /* standard platform ahci */
->> + ? ? IMX53_AHCI, ? ? /* ahci on i.mx53 */
->
-> How about making all the IMX*-naming more generic because other SoC might need
-> this somewhen, too?
+On Sun, Aug 28, 2011 at 09:51:10PM -0400, Alan Stern wrote:
+> Hmmm.  Although the semantics of the various mb() macros were
+> originally defined only for inter-CPU synchronization, I believe they
+> are also supposed to work for guaranteeing the order of accesses to
+> DMA-coherent memory.  If that's not the case with ARM, something is
+> seriously wrong.  (Maybe I'm wrong about this, but if I am then there's
+> currently _no_ way for the kernel to order DMA-coherent accesses on
+> ARM.)
+
+That is the case with ARM - mb() and wmb() does everything that's
+required.  rmb() is weaker than the other two.
+
+> You know better than I do what is needed to resolve the ordering issue.  
+> However, contrary to what the original patch description said, this
+> isn't entirely a matter of making the write visible to the host
+> controller: No doubt in time the write will eventually become visible
+> anyway.  It's a matter of making the write become visible reasonably
+> quickly and in the correct order with respect to other writes.
+
+I'm not entirely sure what the problem is - I think its about a write
+by the CPU to dma coherent memory being delayed and not being visible
+to the HC in a timely manner.  Either mb() or wmb() placed after the
+write on ARM will do that - and ARM has no requirement to do a read-
+back after the barrier.
+
+> Is this extra L2-cache "poke" needed for proper ordering, or is it 
+> needed merely to flush the write out to memory in a timely manner?
+
+Both, though primerily it's about ensuring correct ordering.  A side
+effect of it is that it will flush all pending writes in L2 before
+completing.
