@@ -1,85 +1,141 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 29 Aug 2011 13:02:16 +0200
-Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
-	different features
-In-Reply-To: <CAMPhdO8k-boE0p0J_60VrS3LBdNaJRfJ6z_HCHLiRbQtESOJFw@mail.gmail.com>
-References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
-	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
-	<20110829083649.GB24524@pengutronix.de>
-	<CAMPhdO-vuExLKVSmsr_kR1HnHfEBPp_Ae7pgs=XaVYiKGFRo-A@mail.gmail.com>
-	<20110829093746.GE24524@pengutronix.de>
-	<CAMPhdO8k-boE0p0J_60VrS3LBdNaJRfJ6z_HCHLiRbQtESOJFw@mail.gmail.com>
-Message-ID: <20110829110216.GI24524@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 Aug 2011 13:09:19 +0200
+Subject: [PATCH v3 10/13] of: add a generic pinmux helper
+In-Reply-To: <1314315824-9687-11-git-send-email-swarren@nvidia.com>
+References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
+	<1314315824-9687-11-git-send-email-swarren@nvidia.com>
+Message-ID: <CACRpkdaTiWEtgjVOhUKeXhpiESvrWyz97p5j_PHe3MvEM4UaCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 05:54:23PM +0800, Eric Miao wrote:
-> On Mon, Aug 29, 2011 at 5:37 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> > On Mon, Aug 29, 2011 at 04:51:46PM +0800, Eric Miao wrote:
-> >> On Mon, Aug 29, 2011 at 4:36 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> >> > On Mon, Aug 29, 2011 at 03:18:55PM +0800, Richard Zhu wrote:
-> >> >> On imx53 AHCI, soft reset fails with IPMS set when PMP
-> >> >> is enabled but SATA HDD/ODD is connected to SATA port,
-> >> >> do soft reset again to port 0.
-> >> >> So the 'ahci_pmp_retry_srst_ops' is required when imx53
-> >> >> ahci is present.
-> >> >>
-> >> >> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
-> >> >> ---
-> >> >> ?drivers/ata/ahci_platform.c | ? 44 +++++++++++++++++++++++++++++++++++++-----
-> >> >> ?1 files changed, 38 insertions(+), 6 deletions(-)
-> >> >>
-> >> >> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> >> >> index 6fef1fa..f32c91e 100644
-> >> >> --- a/drivers/ata/ahci_platform.c
-> >> >> +++ b/drivers/ata/ahci_platform.c
-> >> >> @@ -23,6 +23,41 @@
-> >> >> ?#include <linux/ahci_platform.h>
-> >> >> ?#include "ahci.h"
-> >> >>
-> >> >> +enum ahci_type {
-> >> >> + ? ? AHCI, ? ? ? ? ? /* standard platform ahci */
-> >> >> + ? ? IMX53_AHCI, ? ? /* ahci on i.mx53 */
-> >> >
-> >> > How about making all the IMX*-naming more generic because other SoC might need
-> >> > this somewhen, too?
-> >>
-> >> From a practical point of view, we can start with what we know already.
-> >> As the SATA controller on "other SoC" so far, we don't know yet if they
-> >> show the same issue (which we have to use ahci_pmp_retry_srst_ops).
-> >>
-> >> So Wolfram, how about we consider a generic one once more controllers
-> >> are being added?
-> >
-> > If we do so later, and we then also change the platform_device_id to something
-> > generic, we then also have to change all users, too. Is it so bad to change
-> > IMX53_AHCI (and imx53-ahci and alike) to something like "ahci-pmp-retry-srst"
-> > (or similar) now?
-> 
-> There are other fields in ata_port_info which might be different between
-> boards. Using a SoC specific name as an index to an array of ata_port_info
-> will be more flexible, as is adopted in drivers/ata/ahci.c - the PCI driver.
+On Fri, Aug 26, 2011 at 1:43 AM, Stephen Warren <swarren@nvidia.com> wrote:
 
-Well, that file also has generic fixups:
+> diff --git a/drivers/of/of_pinmux.c b/drivers/of/of_pinmux.c
 
-       [board_ahci_ign_iferr] =
-...
+> +int of_pinmux_parse(const struct of_pinmux_ctrl *ctrl,
+> + ? ? ? ? ? ? ? ? ? struct of_pinmux_cfg *cfg)
 
-which is what I had in mind thinking that the flaw was not too imx53 specific.
-If you think I am wrong, then be it. I mainly wanted to avoid the fixups which
-might be needed later.
+OK...
 
-Regards,
+> +{
+> + ? ? ? struct device_node *np;
+> +
+> + ? ? ? if (!ctrl || !ctrl->dev || !ctrl->node || !ctrl->configure)
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? for_each_child_of_node(ctrl->node, np) {
+> + ? ? ? ? ? ? ? int ret;
+> + ? ? ? ? ? ? ? bool hadpins = 0;
+> + ? ? ? ? ? ? ? struct of_iter_string_prop iter;
+> +
+> + ? ? ? ? ? ? ? cfg->node = np;
+> +
+> + ? ? ? ? ? ? ? ret = of_property_read_string(np, "function",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cfg->function);
+> + ? ? ? ? ? ? ? if (ret < 0) {
+> + ? ? ? ? ? ? ? ? ? ? ? dev_err(ctrl->dev, "no function for node %s\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? np->name);
+> + ? ? ? ? ? ? ? ? ? ? ? continue;
+> + ? ? ? ? ? ? ? }
 
-   Wolfram
+I buy this part.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110829/a13976b0/attachment.sig>
+> +
+> + ? ? ? ? ? ? ? cfg->flags &= 0;
+> +
+> + ? ? ? ? ? ? ? if (of_find_property(np, "pull-up", NULL))
+> + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_PULL_UP;
+> + ? ? ? ? ? ? ? if (of_find_property(np, "pull-down", NULL))
+> + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_PULL_DOWN;
+> +
+> + ? ? ? ? ? ? ? if ((cfg->flags & OF_PINMUX_PULL_MASK) ==
+> + ? ? ? ? ? ? ? ? ? OF_PINMUX_PULL_MASK) {
+> + ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev, "node %s has both "
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"pull-up and pull-down properties - "
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"defaulting to no pull\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?np->name);
+> + ? ? ? ? ? ? ? ? ? ? ? cfg->flags &= ~OF_PINMUX_PULL_MASK;
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? if (of_find_property(np, "tristate", NULL))
+> + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_TRISTATE;
+
+But what does this stuff has to do with pinmux?
+
+I call this "pin biasing" and it has very little to do with muxing.
+
+If a broader, generic term is to be used, I'd prefer "pin control"
+which sort of nails the thing.
+
+> + ? ? ? ? ? ? ? for_each_string_property_value(iter, np, "pins") {
+> + ? ? ? ? ? ? ? ? ? ? ? hadpins = 1;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? cfg->pin = iter.value;
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? dev_dbg(ctrl->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "configure pin %s func=%s flags=0x%lx\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cfg->pin, cfg->function, cfg->flags);
+> + ? ? ? ? ? ? ? ? ? ? ? if (ctrl->configure(ctrl, cfg))
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"failed to configure pin %s\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?cfg->pin);
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? if (!hadpins)
+> + ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev, "no pins for node %s\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?np->name);
+> + ? ? ? }
+> +
+> + ? ? ? return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(of_pinmux_parse);
+
+Renamed of_pinctrl_parse I'm happier with it.
+
+> +/**
+> + * struct of_pinmux_cfg - configuration state for a single pinmux entry.
+> + *
+> + * @function: the name of the function that the pinmux entry should be
+> + * ? ? configured to.
+> + * @pin: the device_node of the pinmux entry that should be configured.
+> + * ? ? Platform specific properties that aren't in the generic binding may be
+> + * ? ? obtained from this device node.
+> + * @flags: flags for common pinmux options such as pull and tristate.
+
+I don't think these things has anything to do with pinmux at all.
+
+But with the struct renamed of_pinctrl_cfg I'm again happier.
+
+> + */
+> +struct of_pinmux_cfg {
+> + ? ? ? struct device_node ? ? ?*node;
+> + ? ? ? const char ? ? ? ? ? ? ?*pin;
+> + ? ? ? const char ? ? ? ? ? ? ?*function;
+> + ? ? ? unsigned long ? ? ? ? ? flags;
+> +};
+
+The current pinctrl patch set would probably want an unsigned
+"position" attribute too. (If we should build on that.)
+
+> +/**
+> + * struct of_pinmux_ctrl - platform specific pinmux control state.
+> + *
+> + * @pinmux: the pinmux device node. ?All child nodes are required to be the
+> + * ? ? pinmux entry definitions. ?Depending on the platform, this may either be
+> + * ? ? a single pin or a group of pins where they can be set to a common
+> + * ? ? function.
+> + * @configure: platform specific callback to configure the pinmux entry.
+> + */
+> +struct of_pinmux_ctrl {
+> + ? ? ? struct device ? ? ?*dev;
+> + ? ? ? struct device_node *node;
+> + ? ? ? int ? ? ? ? ? ? ? ?(*parse)(const struct of_pinmux_ctrl *ctrl,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct of_pinmux_cfg *cfg);
+> + ? ? ? int ? ? ? ? ? ? ? ?(*configure)(const struct of_pinmux_ctrl *ctrl,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? const struct of_pinmux_cfg *cfg);
+> +};
+
+s/pinmux/pinctrl/g
+
+Yours,
+Linus Walleij
