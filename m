@@ -1,42 +1,92 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 28 Aug 2011 19:57:35 -0600 (MDT)
-Subject: How to handle named resources with DT?
-In-Reply-To: <alpine.DEB.2.00.1108281100150.23968@utopia.booyaka.com>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<201108261741.29850.arnd@arndb.de>
-	<20110827143736.GA10182@yookeroo.fritz.box>
-	<5595208.OB5dBohxQP@wuerfel>
-	<20110828083934.GA4254@yookeroo.fritz.box>
-	<alpine.DEB.2.00.1108281100150.23968@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1108281952400.18667@utopia.booyaka.com>
+From: richard.zhu@linaro.org (Richard Zhu)
+Date: Mon, 29 Aug 2011 15:18:55 +0800
+Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to different
+	features
+In-Reply-To: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
+References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
+Message-ID: <1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On imx53 AHCI, soft reset fails with IPMS set when PMP
+is enabled but SATA HDD/ODD is connected to SATA port,
+do soft reset again to port 0.
+So the 'ahci_pmp_retry_srst_ops' is required when imx53
+ahci is present.
 
-one case that I forgot to mention:
+Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+---
+ drivers/ata/ahci_platform.c |   44 +++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 38 insertions(+), 6 deletions(-)
 
-On Sun, 28 Aug 2011, Paul Walmsley wrote:
-
-> Several upstream device drivers get their DMA request line IDs from the 
-> device data format[14][15][16].  But more drivers should be doing this 
-> than currently are[17]:
-> 
-> - the device driver author may have hardcoded the DMA request line ID, 
->   assuming it would never change
-> 
-> - DMA could be broken on the device due to hardware bugs, so it is unused
-> 
-> - the driver author may just never have gotten around to implementing DMA, 
->   or was reassigned to another project, or couldn't figure it out
-> 
-> - the device may have its own internal DMA controller logic, so support 
->   for an external DMA controller was simply never added
-
-- the driver may be using software-initiated DMA, which doesn't use a 
-  DMA request line, nor does it rely on the device to start or stop DMA.
-  Instead, the CPU reprograms the DMA controller when the driver receives 
-  an interrupt
-
-
-- Paul
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 6fef1fa..f32c91e 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -23,6 +23,41 @@
+ #include <linux/ahci_platform.h>
+ #include "ahci.h"
+ 
++enum ahci_type {
++	AHCI,		/* standard platform ahci */
++	IMX53_AHCI,	/* ahci on i.mx53 */
++};
++
++static struct platform_device_id ahci_devtype[] = {
++	{
++		.name = "ahci",
++		.driver_data = AHCI,
++	}, {
++		.name = "imx53-ahci",
++		.driver_data = IMX53_AHCI,
++	}, {
++		/* sentinel */
++	}
++};
++MODULE_DEVICE_TABLE(platform, ahci_devtype);
++
++
++static const struct ata_port_info ahci_port_info[] = {
++	/* by features */
++	[AHCI] = {
++		.flags		= AHCI_FLAG_COMMON,
++		.pio_mask	= ATA_PIO4,
++		.udma_mask	= ATA_UDMA6,
++		.port_ops	= &ahci_ops,
++	},
++	[IMX53_AHCI] = {
++		.flags		= AHCI_FLAG_COMMON,
++		.pio_mask	= ATA_PIO4,
++		.udma_mask	= ATA_UDMA6,
++		.port_ops	= &ahci_pmp_retry_srst_ops,
++	},
++};
++
+ static struct scsi_host_template ahci_platform_sht = {
+ 	AHCI_SHT("ahci_platform"),
+ };
+@@ -31,12 +66,8 @@ static int __init ahci_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct ahci_platform_data *pdata = dev->platform_data;
+-	struct ata_port_info pi = {
+-		.flags		= AHCI_FLAG_COMMON,
+-		.pio_mask	= ATA_PIO4,
+-		.udma_mask	= ATA_UDMA6,
+-		.port_ops	= &ahci_ops,
+-	};
++	struct platform_device_id *id_entry = platform_get_device_id(pdev);
++	struct ata_port_info pi = ahci_port_info[id_entry->driver_data];
+ 	const struct ata_port_info *ppi[] = { &pi, NULL };
+ 	struct ahci_host_priv *hpriv;
+ 	struct ata_host *host;
+@@ -177,6 +208,7 @@ static struct platform_driver ahci_driver = {
+ 		.name = "ahci",
+ 		.owner = THIS_MODULE,
+ 	},
++	.id_table	= ahci_devtype,
+ };
+ 
+ static int __init ahci_init(void)
+-- 
+1.7.1
