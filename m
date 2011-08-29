@@ -1,47 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Aug 2011 10:40:03 +0200
-Subject: [PATCH 1/4 v4] drivers: create a pin control subsystem
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B24A412A@HQMAIL01.nvidia.com>
-References: <1313747630-32258-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B24A3BC0@HQMAIL01.nvidia.com>
-	<CACRpkdaZfG4hiGf8vug3EGMRMc0c92xbj=L_HAQcS27DAXYc4Q@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B24A3EDB@HQMAIL01.nvidia.com>
-	<CACRpkdbBBaNFETLLcxeCFZoLbdMok7uRi_o-HcbpYdMtRiGFcw@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B24A412A@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdahBjE5cyz5i44BNPi-q=+v+HM1hmgCWszuOFNq6xedSQ@mail.gmail.com>
+Date: Mon, 29 Aug 2011 10:41:39 +0200
+Subject: [PATCH] spi: Fix builderror in spi-pl022.c
+In-Reply-To: <1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
+References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
+	<1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
+Message-ID: <CACRpkdavhLpsfFwHy3jnHO3o9EC+e6=dt1joMGQD_e3O=HTT-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2011 at 7:33 PM, Stephen Warren <swarren@nvidia.com> wrote:
+On Sun, Aug 28, 2011 at 9:26 PM, Peter Huewe <peterhuewe@gmx.de> wrote:
 
-> However, we'd then need a extra table defining what each locality meant:
+> This patch fixes a build error, introduced by commit (67fc8b9f, "PM: add
+> runtime PM support to core Primecell driver") which unfortunately was a little
+> bit incomplete and did contain a typo (11 instead of 22).
+> I'm not sure how this patch could have been tested back then, if it
+> doesn't even compile ;)
 >
-> function locality list_of_pins_in_function_at_locality
-> -------- -------- ------------------------------------
-> i2c0 ? ? 0 ? ? ? ?0, 1
-> i2c0 ? ? 1 ? ? ? ?2, 3
-> (hard-coded into pinmux driver implementation)
+> The build failure was:
+> drivers/spi/spi-pl022.c:2292: error: 'adev' undeclared (first use in
+> this function)
+> drivers/spi/spi-pl022.c:2344: error: 'pl022_suspend' undeclared here
+> (not in a function)
+>
+> The build failure appears e.g. for the u8500 and realview defconfig.
+>
+> LinuxVersion: linux next-20110826
+>
+> Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
 
-I *think* this is what I have implemented in the v5 patch set,
-have a look.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> It seems slightly more complex to me to have these two separate tables,
-> rather than just iterating over n entries in a single mapping table.
-
-I can deal with it....
-
-> Still, I suppose this an implementation detail. I guess I also need to
-> think a little more about how both those models would work with Tegra,
-> where special functions are selected at a granularity of pin groups,
-> yet GPIO is selected at a granularity of a single pin. Perhaps that
-> final table I wrote above (mapping locality to pin list) might also help
-> represent Tegra's pin-group- rather than pin-level muxing capabilities...
-
-I have made the assumption that we want to handle groups
-of pins, so a certain function in a certain position represents what
-the device want to request.
-
-Well, let's look at the code...
-
-Thanks,
+Thanks!
 Linus Walleij
