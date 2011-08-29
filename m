@@ -1,55 +1,50 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Mon, 29 Aug 2011 20:25:30 +0800
-Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
-	different features
-In-Reply-To: <20110829121214.GA15484@oksana.dev.rtsoft.ru>
-References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
-	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
-	<20110829121214.GA15484@oksana.dev.rtsoft.ru>
-Message-ID: <CAMPhdO_XsrGTiiKpALVU7tZiAO_C5d_9XKoVjL_BHwpcqzXcFg@mail.gmail.com>
+From: tixy@yxit.co.uk (Tixy)
+Date: Mon, 29 Aug 2011 13:34:09 +0100
+Subject: [PATCH 10/10] ARM: kprobes: Add introductory comment to test code
+In-Reply-To: <1314621249-958-1-git-send-email-tixy@yxit.co.uk>
+References: <1314621249-958-1-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1314621249-958-11-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 8:12 PM, Anton Vorontsov <cbouatmailru@gmail.com> wrote:
-> Hello,
->
-> On Mon, Aug 29, 2011 at 03:18:55PM +0800, Richard Zhu wrote:
->> On imx53 AHCI, soft reset fails with IPMS set when PMP
->> is enabled but SATA HDD/ODD is connected to SATA port,
->> do soft reset again to port 0.
->> So the 'ahci_pmp_retry_srst_ops' is required when imx53
->> ahci is present.
->>
->> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
->> ---
-> [...]
->> ? ? ? struct device *dev = &pdev->dev;
->> ? ? ? struct ahci_platform_data *pdata = dev->platform_data;
->> - ? ? struct ata_port_info pi = {
->> - ? ? ? ? ? ? .flags ? ? ? ? ?= AHCI_FLAG_COMMON,
->> - ? ? ? ? ? ? .pio_mask ? ? ? = ATA_PIO4,
->> - ? ? ? ? ? ? .udma_mask ? ? ?= ATA_UDMA6,
->> - ? ? ? ? ? ? .port_ops ? ? ? = &ahci_ops,
->> - ? ? };
->> + ? ? struct platform_device_id *id_entry = platform_get_device_id(pdev);
->> + ? ? struct ata_port_info pi = ahci_port_info[id_entry->driver_data];
->
-> Why not pass port info via platform_data? It seems to be platform
-> specific nowadays, so leave the default as is, but let the platforms
-> pass their own port info through platform_data.
+From: Jon Medhurst <tixy@yxit.co.uk>
 
-That's also a very clean way. However I have the concern that it might
-end up with many duplicate entries.
+Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
+---
+ arch/arm/kernel/kprobes-test.c |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
 
->
-> Thanks,
->
-> --
-> Anton Vorontsov
-> Email: cbouatmailru at gmail.com
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
+index ec41ead..96cf18a 100644
+--- a/arch/arm/kernel/kprobes-test.c
++++ b/arch/arm/kernel/kprobes-test.c
+@@ -9,6 +9,27 @@
+  */
+ 
+ /*
++ * This file contains test code for ARM kprobes.
++ *
++ * The top level function run_all_tests() executes tests for all of the
++ * supported instruction sets: ARM, 16-bit Thumb, and 32-bit Thumb. These tests
++ * fall into two categories; run_api_tests() checks basic functionality of the
++ * kprobes API, and run_test_cases() is a comprehensive test for kprobes
++ * instruction decoding and simulation.
++ *
++ * run_test_cases() first checks the kprobes decoding table for self consistency
++ * (using table_test()) then executes a series of test cases for each of the CPU
++ * instruction forms. coverage_start() and coverage_end() are used to verify
++ * that these test cases cover all of the possible combinations of instructions
++ * described by the kprobes decoding tables.
++ *
++ * The individual test cases are in kprobes-test-arm.c and kprobes-test-thumb.c
++ * which use the macros defined in kprobes-test.h. The rest of this
++ * documentation will describe the operation of the framework used by these
++ * test cases.
++ */
++
++/*
+  * TESTING METHODOLOGY
+  * -------------------
+  *
+-- 
+1.7.2.5
