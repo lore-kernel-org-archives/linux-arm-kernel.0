@@ -1,58 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Aug 2011 16:13:33 +0100
-Subject: [PATCH v4 00/18] Introduce a led trigger for CPU activity and
-	consolidate LED driver in ARM
-In-Reply-To: <CAK5ve-JM=01vTqSi59R6ASyGU_2fVXzKtjNh42LKeF2HF3NzSA@mail.gmail.com>
-References: <1314349415-889-1-git-send-email-bryan.wu@canonical.com>
-	<CACRpkda6-8dxSbF12N-Q32cOpogu-ZZmTApnvNBa03iOcEeqaQ@mail.gmail.com>
-	<CAK5ve-JM=01vTqSi59R6ASyGU_2fVXzKtjNh42LKeF2HF3NzSA@mail.gmail.com>
-Message-ID: <20110829151333.GA17887@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 29 Aug 2011 11:14:18 -0400 (EDT)
+Subject: [RFC PATCH] arm: fiq: convert enable/disable_fiq to inline
+	functions
+In-Reply-To: <1314628177-3193-1-git-send-email-svenkatr@ti.com>
+References: <1314628177-3193-1-git-send-email-svenkatr@ti.com>
+Message-ID: <alpine.LFD.2.00.1108291112010.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 09:18:29PM +0800, Bryan Wu wrote:
-> On Mon, Aug 29, 2011 at 7:00 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Fri, Aug 26, 2011 at 11:03 AM, Bryan Wu <bryan.wu@canonical.com> wrote:
-> >
-> >> Based on Linus Walleij's ARM LED consolidation work, this patchset introduce a
-> >> new generic led trigger for CPU not only for ARM but also for others.
-> >
-> > I think Russell was pretty clear that he saw problems inside the "new LEDs"
-> > subsystem (drivers/leds) that need be fixed before we migrate this support
-> > to use the LED class devices.
-> >
-> > Can you see if you can address his comment on the earlier realview patch,
-> > i.e. this:
-> > http://marc.info/?l=linux-arm-kernel&m=131237280009775&w=2
-> >
+On Mon, 29 Aug 2011, Venkatraman S wrote:
+
+> FIQ_START is an platform specific constant used in the
+> implementation of enable_fiq and disable_fiq.
+> Converting then to inline functions enables different
+> architectures which use the FIQ module to exist in a single
+> zImage with different values of FIQ_START.
 > 
-> Yeah, I replied that email with a patch to select LEDS_CLASS when
-> CONFIG_NEW_LEDS=y.
+> Signed-off-by: Venkatraman S <svenkatr@ti.com>
 
-I don't see any point to that:
+I fail to see how this patch inproves things. The asm/fiq.h file is just 
+as global as kernel/fiq.c is.
 
-menuconfig NEW_LEDS
-        bool "LED Support"
-	select LEDS_CLASS
 
-if NEW_LEDS
-
-config LEDS_CLASS
-        bool "LED Class Support"
-        help
-          This option enables the led sysfs class in /sys/class/leds.  You'll
-          need this to do anything useful with LEDs.  If unsure, say N.
-
-So, with that select there, you either have NEW_LEDS=y LEDS_CLASS=y
-or NEW_LEDS=n LEDS_CLASS=n.  To put it another way, you can't select
-LEDS_CLASS when NEW_LEDS=n, and you can't deselect LEDS_CLASS when
-NEW_LEDS=y.
-
-So, either the LEDS_CLASS option is completely pointless, which means
-it should be killed off, or LEDS_CLASS needs to be fixed so that it
-actually does what it says in its help text and controls whether we
-have a LEDS sysfs class _without_ affecting the ability to have
-triggers setup by platform code.
-
-What it can't do is stay as-is, because it's clearly broken and the
-options help texts don't match reality.
+> ---
+>  arch/arm/include/asm/fiq.h |   13 +++++++++++--
+>  arch/arm/kernel/fiq.c      |   11 -----------
+>  2 files changed, 11 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/fiq.h b/arch/arm/include/asm/fiq.h
+> index d493d0b..e84a8cc 100644
+> --- a/arch/arm/include/asm/fiq.h
+> +++ b/arch/arm/include/asm/fiq.h
+> @@ -17,6 +17,7 @@
+>  #define __ASM_FIQ_H
+>  
+>  #include <asm/ptrace.h>
+> +#include <asm/irq.h>
+>  
+>  struct fiq_handler {
+>  	struct fiq_handler *next;
+> @@ -36,8 +37,16 @@ struct fiq_handler {
+>  extern int claim_fiq(struct fiq_handler *f);
+>  extern void release_fiq(struct fiq_handler *f);
+>  extern void set_fiq_handler(void *start, unsigned int length);
+> -extern void enable_fiq(int fiq);
+> -extern void disable_fiq(int fiq);
+> +
+> +static inline void enable_fiq(int fiq)
+> +{
+> +	enable_irq(fiq + FIQ_START);
+> +}
+> +
+> +static inline void disable_fiq(int fiq)
+> +{
+> +	disable_irq(fiq + FIQ_START);
+> +}
+>  
+>  /* helpers defined in fiqasm.S: */
+>  extern void __set_fiq_regs(unsigned long const *regs);
+> diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
+> index 4c164ec..49e5355 100644
+> --- a/arch/arm/kernel/fiq.c
+> +++ b/arch/arm/kernel/fiq.c
+> @@ -122,23 +122,12 @@ void release_fiq(struct fiq_handler *f)
+>  	while (current_fiq->fiq_op(current_fiq->dev_id, 0));
+>  }
+>  
+> -void enable_fiq(int fiq)
+> -{
+> -	enable_irq(fiq + FIQ_START);
+> -}
+> -
+> -void disable_fiq(int fiq)
+> -{
+> -	disable_irq(fiq + FIQ_START);
+> -}
+>  
+>  EXPORT_SYMBOL(set_fiq_handler);
+>  EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
+>  EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
+>  EXPORT_SYMBOL(claim_fiq);
+>  EXPORT_SYMBOL(release_fiq);
+> -EXPORT_SYMBOL(enable_fiq);
+> -EXPORT_SYMBOL(disable_fiq);
+>  
+>  void __init init_FIQ(void)
+>  {
+> -- 
+> 1.7.1
+> 
