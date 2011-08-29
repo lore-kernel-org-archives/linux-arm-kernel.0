@@ -1,44 +1,58 @@
-From: daiane.angolini@freescale.com (Daiane Angolini)
-Date: Mon, 29 Aug 2011 13:38:26 -0300
-Subject: [PATCH] ARM: mx53_ard: Add support for the accelerometer
-Message-ID: <1314635906-18962-1-git-send-email-daiane.angolini@freescale.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 29 Aug 2011 12:33:43 -0400 (EDT)
+Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
+In-Reply-To: <CACVXFVNFXh33tsvkM=jdnc8OocVhjkzpt6LK59zKa9L2F7HxpQ@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1108291218040.2525-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mx53_ard has a MMA8451 accelerometer connected to i2c2.
+On Mon, 29 Aug 2011, Ming Lei wrote:
 
-Add support for it.
+> Suppose HC can see the old value in hw_token, which has the ACTIVE bit clear.
+> 
+> The qtd transaction will not be executed until the new token is
+> flushed into memory.
+> From view of CPU, the irq is still be delayed because ioc irq is generated
+> after the qtd transaction is executed when new token is flushed into
+> memory. The delay
+> depends on how long the token will be flushed into memory.
 
-Signed-off-by: Daiane Angolini <daiane.angolini@freescale.com>
----
- arch/arm/mach-mx5/board-mx53_ard.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+That's right.
 
-diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
-index ddc3015..b6dc812 100644
---- a/arch/arm/mach-mx5/board-mx53_ard.c
-+++ b/arch/arm/mach-mx5/board-mx53_ard.c
-@@ -161,6 +161,12 @@ static const struct esdhc_platform_data mx53_ard_sd1_data __initconst = {
- 	.wp_gpio = ARD_SD1_WP,
- };
- 
-+static struct i2c_board_info mx53ard_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("mma8450", 0x1C),
-+	},
-+};
-+
- static struct imxi2c_platform_data mx53_ard_i2c2_data = {
- 	.bitrate = 50000,
- };
-@@ -231,6 +237,8 @@ static void __init mx53_ard_board_init(void)
- 
- 	imx53_add_sdhci_esdhc_imx(0, &mx53_ard_sd1_data);
- 	imx53_add_imx2_wdt(0, NULL);
-+	i2c_register_board_info(2, mx53ard_i2c_devices,
-+				ARRAY_SIZE(mx53ard_i2c_devices));
- 	imx53_add_imx_i2c(1, &mx53_ard_i2c2_data);
- 	imx53_add_imx_i2c(2, &mx53_ard_i2c3_data);
- 	imx_add_gpio_keys(&ard_button_data);
--- 
-1.7.1
+> From my observation, the delay is commonly over 5ms for CSW, sometimes the delay
+> is more than 20ms, so caused the bad performance.
+
+No wonder!  Do you see the same sort of performance degradation when 
+using shared memory to communicate between two CPUs?
+
+Regardless, this is not quite the same as what you were talking about
+earlier.  You specifically mentioned
+
+	... so ehci may fetch a inconsistent qtd and execute it, then
+	mistaken IOC or "total bytes to transfer" are read by EHCI and
+	cause delayed irq or lost irq.
+
+Bad performance is different from inconsistencies and lost IRQs.
+
+> Also I am not sure if EHCI can read the old hw_token correctly in this kind of
+> inconsistent memory state.
+
+The memory state is NOT inconsistent!  It is consistent at all times, 
+both before and after the new hw_token value is stored.  The memory 
+state is just slow to update, that's all.  This is a speed issue, not a 
+correctness issue.
+
+Nevertheless, it remains true that you want to add a memory barrier
+instruction simply in order to speed up a cache writeback, not to force
+any sort of ordering.  This needs to be explained carefully in the code
+(not just in the patch description!) and it needs to be done in a way
+that won't affect other architectures.
+
+Also, as you mentioned before, you may want to do the same thing in 
+qh_link_async() just after the
+
+	head->hw->hw_next = dma;
+
+line.  Delays in flushing that write would also slow down performance.
+
+Alan Stern
