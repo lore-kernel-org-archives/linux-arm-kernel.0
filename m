@@ -1,34 +1,118 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Aug 2011 14:43:48 +0200
-Subject: [PATCH 1/3] gpio/nomadik: remove pull-pinconfig and add SPI2
-In-Reply-To: <1312913020-7508-1-git-send-email-linus.walleij@stericsson.com>
-References: <1312913020-7508-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CACRpkdZngg7mazP2XqdvyPXBRZs519a_R12Vss5K3oQhtMhv1w@mail.gmail.com>
+From: hvaibhav@ti.com (hvaibhav at ti.com)
+Date: Mon, 29 Aug 2011 18:16:15 +0530
+Subject: [RFC PATCH-V2 3/4] AM335X: Create board support and enable build for
+	AM335XEVM
+In-Reply-To: <hvaibhav@ti.com>
+References: <hvaibhav@ti.com>
+Message-ID: <1314621976-25750-4-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 9, 2011 at 8:03 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
+From: Afzal Mohammed <afzal@ti.com>
 
-> From: Fredrik Svensson <fredrik.xk.svensson@stericsson.com>
->
-> Remove PIN_CFG_PULL in pincfg.h for plat-nomadik, PIN_CFG_INPUT
-> already takes care of this. Added support for SPI2.
->
-> Signed-off-by: Fredrik Svensson <fredrik.xk.svensson@stericsson.com>
-> Signed-off-by: Daniel Willerud <daniel.willerud@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ?arch/arm/mach-ux500/pins-db8500.h ? ? ? ? ? | ?142 ++++++++++++++-------------
-> ?arch/arm/plat-nomadik/include/plat/pincfg.h | ? ?5 -
-> ?2 files changed, 73 insertions(+), 74 deletions(-)
+This patch adds minimal support and build configuration for
+AM335X EVM.
 
-Since this one is only touching ux500 I'm picking it to the ux500-core
-tree now, with new subject "mach-ux500: remove pull-pinconfig and add SPI2.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
+ arch/arm/mach-omap2/Kconfig           |    5 +++
+ arch/arm/mach-omap2/Makefile          |    2 +
+ arch/arm/mach-omap2/board-am335xevm.c |   57 +++++++++++++++++++++++++++++++++
+ 3 files changed, 64 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-am335xevm.c
 
-Makes for less conflicts anyway.
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index f437e70..b41aee4 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -326,6 +326,11 @@ config MACH_TI8148EVM
+ 	depends on SOC_OMAPTI81XX
+ 	default y
 
-Still would like 2/3 and 3/3 to go into the gpio tree, knock knock :-)
++config MACH_AM335XEVM
++	bool "AM335X Evaluation Module"
++	depends on SOC_OMAPTI81XX
++	default y
++
+ config MACH_OMAP_4430SDP
+ 	bool "OMAP 4430 SDP board"
+ 	default y
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 8bcb2b2..88e6a6f 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -239,6 +239,8 @@ obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
+ obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o
+ obj-$(CONFIG_MACH_TI8168EVM)		+= board-ti8168evm.o
+ obj-$(CONFIG_MACH_TI8148EVM)		+= board-ti8148evm.o
++obj-$(CONFIG_MACH_AM335XEVM)		+= board-am335xevm.o
++
+ # Platform specific device init code
 
-Yours,
-Linus Walleij
+ omap-flash-$(CONFIG_MTD_NAND_OMAP2)	:= board-flash.o
+diff --git a/arch/arm/mach-omap2/board-am335xevm.c b/arch/arm/mach-omap2/board-am335xevm.c
+new file mode 100644
+index 0000000..e3f5c4e
+--- /dev/null
++++ b/arch/arm/mach-omap2/board-am335xevm.c
+@@ -0,0 +1,57 @@
++/*
++ * Code for AM335X EVM.
++ *
++ * Copyright (C) 2011 Texas Instruments, Inc. - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include <mach/hardware.h>
++#include <asm/mach-types.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include <plat/irqs.h>
++#include <plat/board.h>
++#include <plat/common.h>
++
++static struct omap_board_config_kernel am335x_evm_config[] __initdata = {
++};
++
++static void __init am335x_init_early(void)
++{
++	omap2_init_common_infrastructure();
++}
++
++static void __init am335x_evm_init(void)
++{
++	omap_serial_init();
++	omap_sdrc_init(NULL, NULL);
++	omap_board_config = am335x_evm_config;
++	omap_board_config_size = ARRAY_SIZE(am335x_evm_config);
++}
++
++static void __init am335x_evm_map_io(void)
++{
++	omap2_set_globals_am33xx();
++	omapam33xx_map_common_io();
++}
++
++MACHINE_START(AM335XEVM, "am335xevm")
++	/* Maintainer: Texas Instruments */
++	.boot_params	= 0x80000100,
++	.map_io		= am335x_evm_map_io,
++	.init_early	= am335x_init_early,
++	.init_irq	= ti81xx_init_irq,
++	.timer		= &omap3_timer,
++	.init_machine	= am335x_evm_init,
++MACHINE_END
+--
+1.6.2.4
