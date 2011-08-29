@@ -1,145 +1,110 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 11:10:43 -0700
-Subject: [PATCH 1/7] OMAP3+: voltage: rename scale and reset functions using
-	voltdm_ prefix
+Date: Mon, 29 Aug 2011 11:10:44 -0700
+Subject: [PATCH 2/7] OMAP3+: voltage: move/rename curr_volt from vdd_info into
+	struct voltagedomain
 In-Reply-To: <1314641449-5089-1-git-send-email-khilman@ti.com>
 References: <1314641449-5089-1-git-send-email-khilman@ti.com>
-Message-ID: <1314641449-5089-2-git-send-email-khilman@ti.com>
+Message-ID: <1314641449-5089-3-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename voltage scaling related functions to use voltdm_ prefix intead
-of omap_voltage_, and cleanup kerneldoc comments in the process.
+Track current nominal voltage as part of struct voltagedomain instead
+of omap_vdd_info, which will soon be removed.
 
-s/omap_voltage_scale_vdd/voltdm_scale/
-s/omap_voltage_reset/voltdm_reset/
-
-Also, in voltdm_reset() s/target_uvdc/target_volt/ to be consistent with
-naming throughout the file.
+Also renames field from curr_volt to nominal_volt.
 
 No functional changes.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/pm.c                 |    2 +-
- arch/arm/mach-omap2/smartreflex-class3.c |    2 +-
- arch/arm/mach-omap2/voltage.c            |   29 ++++++++++++++---------------
- arch/arm/mach-omap2/voltage.h            |    5 ++---
- 4 files changed, 18 insertions(+), 20 deletions(-)
+ arch/arm/mach-omap2/vc.c      |    5 ++---
+ arch/arm/mach-omap2/voltage.c |    6 +-----
+ arch/arm/mach-omap2/voltage.h |    4 ++--
+ 3 files changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index f81340e..659e400 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -214,7 +214,7 @@ static int __init omap2_set_init_voltage(char *vdd_name, char *clk_name,
- 		goto exit;
+diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+index 38ba13b..130df29 100644
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -119,7 +119,7 @@ int omap_vc_pre_scale(struct voltagedomain *voltdm,
  	}
  
--	omap_voltage_scale_vdd(voltdm, bootup_volt);
-+	voltdm_scale(voltdm, bootup_volt);
- 	return 0;
+ 	*target_vsel = voltdm->pmic->uv_to_vsel(target_volt);
+-	*current_vsel = voltdm->pmic->uv_to_vsel(vdd->curr_volt);
++	*current_vsel = voltdm->pmic->uv_to_vsel(voltdm->nominal_volt);
  
- exit:
-diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
-index f438cf4..4eac1bc 100644
---- a/arch/arm/mach-omap2/smartreflex-class3.c
-+++ b/arch/arm/mach-omap2/smartreflex-class3.c
-@@ -32,7 +32,7 @@ static int sr_class3_disable(struct voltagedomain *voltdm, int is_volt_reset)
- 	omap_vp_disable(voltdm);
- 	sr_disable(voltdm);
- 	if (is_volt_reset)
--		omap_voltage_reset(voltdm);
-+		voltdm_reset(voltdm);
+ 	/* Setting the ON voltage to the new target voltage */
+ 	vc_cmdval = voltdm->read(vc->cmdval_reg);
+@@ -136,7 +136,6 @@ void omap_vc_post_scale(struct voltagedomain *voltdm,
+ 			unsigned long target_volt,
+ 			u8 target_vsel, u8 current_vsel)
+ {
+-	struct omap_vdd_info *vdd = voltdm->vdd;
+ 	u32 smps_steps = 0, smps_delay = 0;
  
- 	return 0;
+ 	smps_steps = abs(target_vsel - current_vsel);
+@@ -145,7 +144,7 @@ void omap_vc_post_scale(struct voltagedomain *voltdm,
+ 			voltdm->pmic->slew_rate) + 2;
+ 	udelay(smps_delay);
+ 
+-	vdd->curr_volt = target_volt;
++	voltdm->nominal_volt = target_volt;
  }
+ 
+ /* vc_bypass_scale - VC bypass method of voltage scaling */
 diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 32f0873..4afb368 100644
+index 4afb368..1b39e68 100644
 --- a/arch/arm/mach-omap2/voltage.c
 +++ b/arch/arm/mach-omap2/voltage.c
-@@ -94,16 +94,15 @@ unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
- }
- 
- /**
-- * omap_voltage_scale_vdd() - API to scale voltage of a particular
-- *				voltage domain.
-- * @voltdm:	pointer to the VDD which is to be scaled.
-- * @target_volt:	The target voltage of the voltage domain
-+ * voltdm_scale() - API to scale voltage of a particular voltage domain.
-+ * @voltdm: pointer to the voltage domain which is to be scaled.
-+ * @target_volt: The target voltage of the voltage domain
-  *
-  * This API should be called by the kernel to do the voltage scaling
-- * for a particular voltage domain during dvfs or any other situation.
-+ * for a particular voltage domain during DVFS.
+@@ -81,16 +81,12 @@ ovdc_out:
   */
--int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
--		unsigned long target_volt)
-+int voltdm_scale(struct voltagedomain *voltdm,
-+		 unsigned long target_volt)
+ unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
  {
+-	struct omap_vdd_info *vdd;
+-
  	if (!voltdm || IS_ERR(voltdm)) {
  		pr_warning("%s: VDD specified does not exist!\n", __func__);
-@@ -120,31 +119,31 @@ int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
- }
- 
- /**
-- * omap_voltage_reset() - Resets the voltage of a particular voltage domain
-- *			to that of the current OPP.
-- * @voltdm:	pointer to the VDD whose voltage is to be reset.
-+ * voltdm_reset() - Resets the voltage of a particular voltage domain
-+ *		    to that of the current OPP.
-+ * @voltdm: pointer to the voltage domain whose voltage is to be reset.
-  *
-  * This API finds out the correct voltage the voltage domain is supposed
-  * to be at and resets the voltage to that level. Should be used especially
-  * while disabling any voltage compensation modules.
-  */
--void omap_voltage_reset(struct voltagedomain *voltdm)
-+void voltdm_reset(struct voltagedomain *voltdm)
- {
--	unsigned long target_uvdc;
-+	unsigned long target_volt;
- 
- 	if (!voltdm || IS_ERR(voltdm)) {
- 		pr_warning("%s: VDD specified does not exist!\n", __func__);
- 		return;
+ 		return 0;
  	}
  
--	target_uvdc = omap_voltage_get_nom_volt(voltdm);
--	if (!target_uvdc) {
-+	target_volt = omap_voltage_get_nom_volt(voltdm);
-+	if (!target_volt) {
- 		pr_err("%s: unable to find current voltage for vdd_%s\n",
- 			__func__, voltdm->name);
- 		return;
- 	}
- 
--	omap_voltage_scale_vdd(voltdm, target_uvdc);
-+	voltdm_scale(voltdm, target_volt);
+-	vdd = voltdm->vdd;
+-
+-	return vdd->curr_volt;
++	return voltdm->nominal_volt;
  }
  
  /**
 diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index d2a0c24..e3efbf9 100644
+index e3efbf9..3e32eda 100644
 --- a/arch/arm/mach-omap2/voltage.h
 +++ b/arch/arm/mach-omap2/voltage.h
-@@ -151,9 +151,6 @@ struct omap_vdd_info {
- 	u32 curr_volt;
+@@ -61,6 +61,7 @@ struct omap_vfsm_instance {
+  * @vdd: to be removed
+  * @pwrdms: powerdomains in this voltagedomain
+  * @scale: function used to scale the voltage of the voltagedomain
++ * @nominal_volt: current nominal voltage for this voltage domain
+  */
+ struct voltagedomain {
+ 	char *name;
+@@ -84,6 +85,7 @@ struct voltagedomain {
+ 
+ 	int (*scale) (struct voltagedomain *voltdm,
+ 		      unsigned long target_volt);
++	u32 nominal_volt;
+ 
+ 	struct omap_vdd_info *vdd;
+ };
+@@ -144,11 +146,9 @@ struct omap_voltdm_pmic {
+  *
+  * @volt_data		: voltage table having the distinct voltages supported
+  *			  by the domain and other associated per voltage data.
+- * @curr_volt		: current voltage for this vdd.
+  */
+ struct omap_vdd_info {
+ 	struct omap_volt_data *volt_data;
+-	u32 curr_volt;
  };
  
--int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
--		unsigned long target_volt);
--void omap_voltage_reset(struct voltagedomain *voltdm);
  void omap_voltage_get_volttable(struct voltagedomain *voltdm,
- 		struct omap_volt_data **volt_data);
- struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
-@@ -191,4 +188,6 @@ int voltdm_for_each(int (*fn)(struct voltagedomain *voltdm, void *user),
- int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
- 			  int (*fn)(struct voltagedomain *voltdm,
- 				    struct powerdomain *pwrdm));
-+int voltdm_scale(struct voltagedomain *voltdm, unsigned long target_volt);
-+void voltdm_reset(struct voltagedomain *voltdm);
- #endif
 -- 
 1.7.6
