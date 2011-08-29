@@ -1,96 +1,55 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 10:35:40 -0700
-Subject: [PATCH 07/22] OMAP3+: voltage: add scalable flag to voltagedomain
+Date: Mon, 29 Aug 2011 10:35:41 -0700
+Subject: [PATCH 08/22] OMAP2+: powerdomain: add voltagedomain to struct
+	powerdomain
 In-Reply-To: <1314639355-12713-1-git-send-email-khilman@ti.com>
 References: <1314639355-12713-1-git-send-email-khilman@ti.com>
-Message-ID: <1314639355-12713-8-git-send-email-khilman@ti.com>
+Message-ID: <1314639355-12713-9-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a 'bool scalable' flag to the struct powerdomain and set it for
-the scalable domains on OMAP3 and OMAP4.
+Each powerdomain is associated with a voltage domain.  Add an entry to
+struct powerdomain where the enclosing voltagedomain can be
+referenced.
+
+Modeled after similar relationship between clockdomains and powerdomains.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/voltage.c                 |    3 +++
- arch/arm/mach-omap2/voltage.h                 |    2 ++
- arch/arm/mach-omap2/voltagedomains3xxx_data.c |    2 ++
- arch/arm/mach-omap2/voltagedomains44xx_data.c |    3 +++
- 4 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/powerdomain.h |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 4f0361a..48a2593 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -1054,6 +1054,9 @@ int __init omap_voltage_late_init(void)
- 		pr_err("%s: Unable to create voltage debugfs main dir\n",
- 			__func__);
- 	list_for_each_entry(voltdm, &voltdm_list, node) {
-+		if (!voltdm->scalable)
-+			continue;
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index d23d979..9ce920d 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -24,6 +24,8 @@
+ 
+ #include <plat/cpu.h>
+ 
++#include "voltage.h"
 +
- 		if (voltdm->vdd) {
- 			if (omap_vdd_data_configure(voltdm))
- 				continue;
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index 5440298..25cfb5c 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -53,11 +53,13 @@ struct omap_vfsm_instance_data {
+ /* Powerdomain basic power states */
+ #define PWRDM_POWER_OFF		0x0
+ #define PWRDM_POWER_RET		0x1
+@@ -78,6 +80,7 @@ struct powerdomain;
  /**
-  * struct voltagedomain - omap voltage domain global structure.
-  * @name: Name of the voltage domain which can be used as a unique identifier.
-+ * @scalable: Whether or not this voltage domain is scalable
-  * @node: list_head linking all voltage domains
-  * @vdd: to be removed
+  * struct powerdomain - OMAP powerdomain
+  * @name: Powerdomain name
++ * @voltdm: voltagedomain containing this powerdomain
+  * @omap_chip: represents the OMAP chip types containing this pwrdm
+  * @prcm_offs: the address offset from CM_BASE/PRM_BASE
+  * @prcm_partition: (OMAP4 only) the PRCM partition ID containing @prcm_offs
+@@ -98,6 +101,10 @@ struct powerdomain;
   */
- struct voltagedomain {
- 	char *name;
-+	bool scalable;
- 	struct list_head node;
- 	struct omap_vdd_info *vdd;
- };
-diff --git a/arch/arm/mach-omap2/voltagedomains3xxx_data.c b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-index 42d0b11..d7e1052 100644
---- a/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-@@ -61,11 +61,13 @@ static struct omap_vdd_info omap3_vdd2_info = {
- 
- static struct voltagedomain omap3_voltdm_mpu = {
- 	.name = "mpu_iva",
-+	.scalable = true,
- 	.vdd = &omap3_vdd1_info,
- };
- 
- static struct voltagedomain omap3_voltdm_core = {
- 	.name = "core",
-+	.scalable = true,
- 	.vdd = &omap3_vdd2_info,
- };
- 
-diff --git a/arch/arm/mach-omap2/voltagedomains44xx_data.c b/arch/arm/mach-omap2/voltagedomains44xx_data.c
-index 245fdf9..95e1ce5 100644
---- a/arch/arm/mach-omap2/voltagedomains44xx_data.c
-+++ b/arch/arm/mach-omap2/voltagedomains44xx_data.c
-@@ -70,16 +70,19 @@ static struct omap_vdd_info omap4_vdd_core_info = {
- 
- static struct voltagedomain omap4_voltdm_mpu = {
- 	.name = "mpu",
-+	.scalable = true,
- 	.vdd = &omap4_vdd_mpu_info,
- };
- 
- static struct voltagedomain omap4_voltdm_iva = {
- 	.name = "iva",
-+	.scalable = true,
- 	.vdd = &omap4_vdd_iva_info,
- };
- 
- static struct voltagedomain omap4_voltdm_core = {
- 	.name = "core",
-+	.scalable = true,
- 	.vdd = &omap4_vdd_core_info,
- };
- 
+ struct powerdomain {
+ 	const char *name;
++	union {
++		const char *name;
++		struct voltagedomain *ptr;
++	} voltdm;
+ 	const struct omap_chip_id omap_chip;
+ 	const s16 prcm_offs;
+ 	const u8 pwrsts;
 -- 
 1.7.6
