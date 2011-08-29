@@ -1,30 +1,47 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Mon, 29 Aug 2011 20:11:15 +0530
-Subject: i.MX SDMA patches
-In-Reply-To: <1314263017-18099-1-git-send-email-s.hauer@pengutronix.de>
-References: <1314263017-18099-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1314628875.1606.152.camel@vkoul-udesk3>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 29 Aug 2011 11:03:06 -0400 (EDT)
+Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
+In-Reply-To: <CACVXFVOvw6bSfcOYR2RWJO=k1WLgSCUygmSwZmtRDdM_tZNWEA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1108291046540.2525-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-08-25 at 11:03 +0200, Sascha Hauer wrote:
-> The following series has some i.MX SDMA fixes. The first two
-> should go into -rc, the third either in -rc or next. It fixes
-> that the driver blocks in probe() when the driver is compiled
-> into the kernel but the firmware is not. From this point of
-> view it should go in -rc, but on the other hand it's no straight
-> forward fix.
-> 
-> Sascha
-> 
-> Sascha Hauer (3):
->       dmaengine i.MX SDMA: lock channel 0
->       dmaengine i.MX SDMA: set firmware scripts addresses to negative value initially
->       dmaengine i.MX SDMA: use request_firmware_nowait
-> 
->  drivers/dma/imx-sdma.c |   47 ++++++++++++++++++++++++++++++++++++++---------
->  1 files changed, 38 insertions(+), 9 deletions(-)
-Applied, Thanks
+On Mon, 29 Aug 2011, Ming Lei wrote:
 
--- 
-~Vinod
+> IMO, the dummy has been linked into queue pointed by qh->hw->hw_qtd_next,
+> so EHCI will fetch dummy qtd and execute the transaction and will not have
+> any delay on the transaction.
+> 
+> Let me explain the problem again: On ARM, the wmb() before
+> 'dummy->hw_token = token;'
+> will flush l2 write buffer into memory and all parts of 'dummy' except
+> for hw_token field
+> have reached into memory already, but dummy->hw_token will stay at l2
+> write buffer
+> and not reach into memory at this time, so ehci may fetch a
+> inconsistent qtd and execute it,
+> then mistaken IOC or "total bytes to transfer"  are read by EHCI and
+> cause delayed irq
+> or lost irq.
+
+No.  Even if the HC reads dummy before dummy->hw_token has been written
+out to memory from the L2 cache, it will not see any inconsistencies.  
+It will see the old value in hw_token, which has the ACTIVE bit clear.  
+Therefore it will not try to execute the qTD but will move on to the
+next QH.  See what the fourth paragraph in section 4.10.2 of the EHCI 
+spec says about the case where a qTD's ACTIVE bit is set to 0.
+
+Some EHCI implementations have a quirk, in which they perform the 
+overlay even when ACTIVE is clear.  But even these implementations 
+won't try to execute the qTD, because the old value of dummy->hw_token 
+also has the HALT bit set.
+
+> It is not only a reasoning or guess, and I have traced this kind of
+> fact certainly.
+
+If your controller behaves as you suggest then it is buggy.  And in
+that case, adding another memory barrier won't fix it.  There is still
+the possibility that the HC will read dummy during the brief time after
+the existing wmb() and before the CPU has written dummy->hw_token.
+
+Alan Stern
