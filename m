@@ -1,218 +1,86 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 10:58:03 -0700
-Subject: [PATCH 03/12] OMAP3+: VP: struct omap_vp_common: replace shift with
-	__ffs(mask)
+Date: Mon, 29 Aug 2011 10:58:09 -0700
+Subject: [PATCH 09/12] OMAP: VP: Explicitly mask VPVOLTAGE field
 In-Reply-To: <1314640692-3386-1-git-send-email-khilman@ti.com>
 References: <1314640692-3386-1-git-send-email-khilman@ti.com>
-Message-ID: <1314640692-3386-4-git-send-email-khilman@ti.com>
+Message-ID: <1314640692-3386-10-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In struct omap_vp_common, the shift value can be derived from the mask
-value by using __ffs(), so remove the shift value for the various
-VPCONFIG bitfields, and use __ffs() in the code for the shift value.
+From: Todd Poynor <toddpoynor@google.com>
 
-While here, rename field names in kerneldoc comment to match actual
-field names in structure.  Also, cleanup indendentaion for other VP
-register accesses in omap_vp_init().
+Reading the VPVOLTAGE field of PRM_VP_*_VOLTAGE registers currently
+relies on a u32 -> u8 conversion to mask off the FORCEUPDATEWAIT field
+in the upper bits.  Make this explicit using the mask symbol
+already defined, added as a new field in struct omap_vp_common.
 
-No functional changes.
-
+Signed-off-by: Todd Poynor <toddpoynor@google.com>
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/vc.c          |    2 +-
- arch/arm/mach-omap2/voltage.c     |    2 +-
- arch/arm/mach-omap2/vp.c          |   29 ++++++++++++++---------------
- arch/arm/mach-omap2/vp.h          |   34 ++++++++++++++--------------------
- arch/arm/mach-omap2/vp3xxx_data.c |    4 +---
- arch/arm/mach-omap2/vp44xx_data.c |    4 +---
- 6 files changed, 32 insertions(+), 43 deletions(-)
+ arch/arm/mach-omap2/vp.c          |    3 ++-
+ arch/arm/mach-omap2/vp.h          |    2 ++
+ arch/arm/mach-omap2/vp3xxx_data.c |    2 ++
+ arch/arm/mach-omap2/vp44xx_data.c |    1 +
+ 4 files changed, 7 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index d0f87cc..d615a0d 100644
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -140,7 +140,7 @@ int omap_vc_pre_scale(struct voltagedomain *voltdm,
- 		vdd->vp_rt_data.vpconfig_errorgain = volt_data->vp_errgain;
- 		vp_errgain_val &= voltdm->vp->common->vpconfig_errorgain_mask;
- 		vp_errgain_val |= vdd->vp_rt_data.vpconfig_errorgain <<
--			voltdm->vp->common->vpconfig_errorgain_shift;
-+			__ffs(voltdm->vp->common->vpconfig_errorgain_mask);
- 		voltdm->write(vp_errgain_val, voltdm->vp->vpconfig);
- 	}
- 
-diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index eaa5f93..5b16fd1 100644
---- a/arch/arm/mach-omap2/voltage.c
-+++ b/arch/arm/mach-omap2/voltage.c
-@@ -82,7 +82,7 @@ static int __init _config_common_vdd_data(struct voltagedomain *voltdm)
- 
- 	vdd->vp_rt_data.vpconfig_erroroffset =
- 		(voltdm->pmic->vp_erroroffset <<
--		 voltdm->vp->common->vpconfig_erroroffset_shift);
-+		 __ffs(voltdm->vp->common->vpconfig_erroroffset_mask));
- 
- 	timeout_val = (sys_clk_speed * voltdm->pmic->vp_timeout_us) / 1000;
- 	vdd->vp_rt_data.vlimitto_timeout = timeout_val;
 diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index c9a315f..297d094 100644
+index e7d38f6..3807620 100644
 --- a/arch/arm/mach-omap2/vp.c
 +++ b/arch/arm/mach-omap2/vp.c
-@@ -34,8 +34,7 @@ static void vp_latch_vsel(struct voltagedomain *voltdm)
- 	vpconfig = voltdm->read(vp->vpconfig);
- 	vpconfig &= ~(vp->common->vpconfig_initvoltage_mask |
- 			vp->common->vpconfig_initvdd);
--	vpconfig |= vsel << vp->common->vpconfig_initvoltage_shift;
--
-+	vpconfig |= vsel << __ffs(vp->common->vpconfig_initvoltage_mask);
- 	voltdm->write(vpconfig, vp->vpconfig);
+@@ -227,7 +227,8 @@ unsigned long omap_vp_get_curr_volt(struct voltagedomain *voltdm)
+ 		return 0;
+ 	}
  
- 	/* Trigger initVDD value copy to voltage processor */
-@@ -61,28 +60,28 @@ void __init omap_vp_init(struct voltagedomain *voltdm)
+-	curr_vsel = voltdm->read(vp->voltage);
++	curr_vsel = (voltdm->read(vp->voltage) & vp->common->vpvoltage_mask)
++		>> __ffs(vp->common->vpvoltage_mask);
  
- 	vp_val = vdd->vp_rt_data.vpconfig_erroroffset |
- 		(vdd->vp_rt_data.vpconfig_errorgain <<
--		vp->common->vpconfig_errorgain_shift) |
-+		 __ffs(vp->common->vpconfig_errorgain_mask)) |
- 		vp->common->vpconfig_timeouten;
- 	voltdm->write(vp_val, vp->vpconfig);
- 
- 	vp_val = ((vdd->vp_rt_data.vstepmin_smpswaittimemin <<
--		vp->common->vstepmin_smpswaittimemin_shift) |
--		(vdd->vp_rt_data.vstepmin_stepmin <<
--		vp->common->vstepmin_stepmin_shift));
-+		   vp->common->vstepmin_smpswaittimemin_shift) |
-+		  (vdd->vp_rt_data.vstepmin_stepmin <<
-+		   vp->common->vstepmin_stepmin_shift));
- 	voltdm->write(vp_val, vp->vstepmin);
- 
- 	vp_val = ((vdd->vp_rt_data.vstepmax_smpswaittimemax <<
--		vp->common->vstepmax_smpswaittimemax_shift) |
--		(vdd->vp_rt_data.vstepmax_stepmax <<
--		vp->common->vstepmax_stepmax_shift));
-+		   vp->common->vstepmax_smpswaittimemax_shift) |
-+		  (vdd->vp_rt_data.vstepmax_stepmax <<
-+		   vp->common->vstepmax_stepmax_shift));
- 	voltdm->write(vp_val, vp->vstepmax);
- 
- 	vp_val = ((vdd->vp_rt_data.vlimitto_vddmax <<
--		vp->common->vlimitto_vddmax_shift) |
--		(vdd->vp_rt_data.vlimitto_vddmin <<
--		vp->common->vlimitto_vddmin_shift) |
--		(vdd->vp_rt_data.vlimitto_timeout <<
--		vp->common->vlimitto_timeout_shift));
-+		   vp->common->vlimitto_vddmax_shift) |
-+		  (vdd->vp_rt_data.vlimitto_vddmin <<
-+		   vp->common->vlimitto_vddmin_shift) |
-+		  (vdd->vp_rt_data.vlimitto_timeout <<
-+		   vp->common->vlimitto_timeout_shift));
- 	voltdm->write(vp_val, vp->vlimitto);
- }
- 
-@@ -121,7 +120,7 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
- 			vp->common->vpconfig_forceupdate |
- 			vp->common->vpconfig_initvoltage_mask);
- 	vpconfig |= ((target_vsel <<
--			vp->common->vpconfig_initvoltage_shift));
-+		      __ffs(vp->common->vpconfig_initvoltage_mask)));
- 	voltdm->write(vpconfig, vp->vpconfig);
- 
- 	/* Trigger initVDD value copy to voltage processor */
+ 	if (!voltdm->pmic || !voltdm->pmic->vsel_to_uv) {
+ 		pr_warning("%s: PMIC function to convert vsel to voltage"
 diff --git a/arch/arm/mach-omap2/vp.h b/arch/arm/mach-omap2/vp.h
-index 1d63960..2afe11d 100644
+index 0d63267..f78752b 100644
 --- a/arch/arm/mach-omap2/vp.h
 +++ b/arch/arm/mach-omap2/vp.h
-@@ -46,37 +46,32 @@ struct omap_vp_ops {
- 
- /**
-  * struct omap_vp_common - register data common to all VDDs
-+ * @vpconfig_erroroffset_mask: ERROROFFSET bitmask in the PRM_VP*_CONFIG reg
-  * @vpconfig_errorgain_mask: ERRORGAIN bitmask in the PRM_VP*_CONFIG reg
-  * @vpconfig_initvoltage_mask: INITVOLTAGE bitmask in the PRM_VP*_CONFIG reg
-- * @vpconfig_timeouten_mask: TIMEOUT bitmask in the PRM_VP*_CONFIG reg
-+ * @vpconfig_timeouten: TIMEOUT bitmask in the PRM_VP*_CONFIG reg
-  * @vpconfig_initvdd: INITVDD bitmask in the PRM_VP*_CONFIG reg
-  * @vpconfig_forceupdate: FORCEUPDATE bitmask in the PRM_VP*_CONFIG reg
-  * @vpconfig_vpenable: VPENABLE bitmask in the PRM_VP*_CONFIG reg
-  * @vpconfig_erroroffset_shift: ERROROFFSET field shift in PRM_VP*_CONFIG reg
-  * @vpconfig_errorgain_shift: ERRORGAIN field shift in PRM_VP*_CONFIG reg
-  * @vpconfig_initvoltage_shift: INITVOLTAGE field shift in PRM_VP*_CONFIG reg
-- * @vpconfig_stepmin_shift: VSTEPMIN field shift in the PRM_VP*_VSTEPMIN reg
-- * @vpconfig_smpswaittimemin_shift: SMPSWAITTIMEMIN field shift in PRM_VP*_VSTEPMIN reg
-- * @vpconfig_stepmax_shift: VSTEPMAX field shift in the PRM_VP*_VSTEPMAX reg
-- * @vpconfig_smpswaittimemax_shift: SMPSWAITTIMEMAX field shift in PRM_VP*_VSTEPMAX reg
-- * @vpconfig_vlimitto_vddmin_shift: VDDMIN field shift in PRM_VP*_VLIMITTO reg
-- * @vpconfig_vlimitto_vddmax_shift: VDDMAX field shift in PRM_VP*_VLIMITTO reg
-- * @vpconfig_vlimitto_timeout_shift: TIMEOUT field shift in PRM_VP*_VLIMITTO reg
-- *
-- * XXX It it not necessary to have both a mask and a shift for the same
-- *     bitfield - remove one
-- * XXX Many of these fields are wrongly named -- e.g., vpconfig_smps* -- fix!
-+ * @vstepmin_stepmin_shift: VSTEPMIN field shift in the PRM_VP*_VSTEPMIN reg
-+ * @vstepmin_smpswaittimemin_shift: SMPSWAITTIMEMIN field shift in PRM_VP*_VSTEPMIN reg
-+ * @vstepmax_stepmax_shift: VSTEPMAX field shift in the PRM_VP*_VSTEPMAX reg
-+ * @vstepmax_smpswaittimemax_shift: SMPSWAITTIMEMAX field shift in PRM_VP*_VSTEPMAX reg
-+ * @vlimitto_vddmin_shift: VDDMIN field shift in PRM_VP*_VLIMITTO reg
-+ * @vlimitto_vddmax_shift: VDDMAX field shift in PRM_VP*_VLIMITTO reg
-+ * @vlimitto_timeout_shift: TIMEOUT field shift in PRM_VP*_VLIMITTO reg
+@@ -63,6 +63,7 @@ struct omap_vp_ops {
+  * @vlimitto_vddmin_shift: VDDMIN field shift in PRM_VP*_VLIMITTO reg
+  * @vlimitto_vddmax_shift: VDDMAX field shift in PRM_VP*_VLIMITTO reg
+  * @vlimitto_timeout_shift: TIMEOUT field shift in PRM_VP*_VLIMITTO reg
++ * @vpvoltage_mask: VPVOLTAGE field mask in PRM_VP*_VOLTAGE reg
   */
  struct omap_vp_common {
-+	u32 vpconfig_erroroffset_mask;
- 	u32 vpconfig_errorgain_mask;
- 	u32 vpconfig_initvoltage_mask;
--	u32 vpconfig_timeouten;
--	u32 vpconfig_initvdd;
--	u32 vpconfig_forceupdate;
--	u32 vpconfig_vpenable;
--	u8 vpconfig_erroroffset_shift;
--	u8 vpconfig_errorgain_shift;
--	u8 vpconfig_initvoltage_shift;
-+	u8 vpconfig_timeouten;
-+	u8 vpconfig_initvdd;
-+	u8 vpconfig_forceupdate;
-+	u8 vpconfig_vpenable;
- 	u8 vstepmin_stepmin_shift;
- 	u8 vstepmin_smpswaittimemin_shift;
- 	u8 vstepmax_stepmax_shift;
-@@ -127,7 +122,6 @@ struct omap_vp_instance {
-  * XXX Is this structure really needed?  Why not just program the
-  * device directly?  They are in PRM space, therefore in the WKUP
-  * powerdomain, so register contents should not be lost in off-mode.
-- * XXX Some of these fields are incorrectly named, e.g., vstep*
-  */
- struct omap_vp_runtime_data {
- 	u32 vpconfig_erroroffset;
+ 	u32 vpconfig_erroroffset_mask;
+@@ -79,6 +80,7 @@ struct omap_vp_common {
+ 	u8 vlimitto_vddmin_shift;
+ 	u8 vlimitto_vddmax_shift;
+ 	u8 vlimitto_timeout_shift;
++	u8 vpvoltage_mask;
+ 
+ 	const struct omap_vp_ops *ops;
+ };
 diff --git a/arch/arm/mach-omap2/vp3xxx_data.c b/arch/arm/mach-omap2/vp3xxx_data.c
-index 79c3df9..d429c44 100644
+index d429c44..260c554 100644
 --- a/arch/arm/mach-omap2/vp3xxx_data.c
 +++ b/arch/arm/mach-omap2/vp3xxx_data.c
-@@ -37,10 +37,8 @@ static const struct omap_vp_ops omap3_vp_ops = {
-  * XXX This stuff presumably belongs in the vp3xxx.c or vp.c file.
-  */
- static const struct omap_vp_common omap3_vp_common = {
--	.vpconfig_erroroffset_shift = OMAP3430_ERROROFFSET_SHIFT,
-+	.vpconfig_erroroffset_mask = OMAP3430_ERROROFFSET_MASK,
- 	.vpconfig_errorgain_mask = OMAP3430_ERRORGAIN_MASK,
--	.vpconfig_errorgain_shift = OMAP3430_ERRORGAIN_SHIFT,
--	.vpconfig_initvoltage_shift = OMAP3430_INITVOLTAGE_SHIFT,
- 	.vpconfig_initvoltage_mask = OMAP3430_INITVOLTAGE_MASK,
- 	.vpconfig_timeouten = OMAP3430_TIMEOUTEN_MASK,
- 	.vpconfig_initvdd = OMAP3430_INITVDD_MASK,
+@@ -51,6 +51,8 @@ static const struct omap_vp_common omap3_vp_common = {
+ 	.vlimitto_vddmin_shift = OMAP3430_VDDMIN_SHIFT,
+ 	.vlimitto_vddmax_shift = OMAP3430_VDDMAX_SHIFT,
+ 	.vlimitto_timeout_shift = OMAP3430_TIMEOUT_SHIFT,
++	.vpvoltage_mask = OMAP3430_VPVOLTAGE_MASK,
++
+ 	.ops = &omap3_vp_ops,
+ };
+ 
 diff --git a/arch/arm/mach-omap2/vp44xx_data.c b/arch/arm/mach-omap2/vp44xx_data.c
-index 8f75cd9..0daf2a4 100644
+index 0daf2a4..b4e7704 100644
 --- a/arch/arm/mach-omap2/vp44xx_data.c
 +++ b/arch/arm/mach-omap2/vp44xx_data.c
-@@ -37,10 +37,8 @@ static const struct omap_vp_ops omap4_vp_ops = {
-  * XXX This stuff presumably belongs in the vp44xx.c or vp.c file.
-  */
- static const struct omap_vp_common omap4_vp_common = {
--	.vpconfig_erroroffset_shift = OMAP4430_ERROROFFSET_SHIFT,
-+	.vpconfig_erroroffset_mask = OMAP4430_ERROROFFSET_MASK,
- 	.vpconfig_errorgain_mask = OMAP4430_ERRORGAIN_MASK,
--	.vpconfig_errorgain_shift = OMAP4430_ERRORGAIN_SHIFT,
--	.vpconfig_initvoltage_shift = OMAP4430_INITVOLTAGE_SHIFT,
- 	.vpconfig_initvoltage_mask = OMAP4430_INITVOLTAGE_MASK,
- 	.vpconfig_timeouten = OMAP4430_TIMEOUTEN_MASK,
- 	.vpconfig_initvdd = OMAP4430_INITVDD_MASK,
+@@ -51,6 +51,7 @@ static const struct omap_vp_common omap4_vp_common = {
+ 	.vlimitto_vddmin_shift = OMAP4430_VDDMIN_SHIFT,
+ 	.vlimitto_vddmax_shift = OMAP4430_VDDMAX_SHIFT,
+ 	.vlimitto_timeout_shift = OMAP4430_TIMEOUT_SHIFT,
++	.vpvoltage_mask = OMAP4430_VPVOLTAGE_MASK,
+ 	.ops = &omap4_vp_ops,
+ };
+ 
 -- 
 1.7.6
