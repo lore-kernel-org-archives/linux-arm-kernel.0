@@ -1,47 +1,58 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 29 Aug 2011 11:03:06 -0400 (EDT)
-Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
-In-Reply-To: <CACVXFVOvw6bSfcOYR2RWJO=k1WLgSCUygmSwZmtRDdM_tZNWEA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1108291046540.2525-100000@iolanthe.rowland.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Aug 2011 16:13:33 +0100
+Subject: [PATCH v4 00/18] Introduce a led trigger for CPU activity and
+	consolidate LED driver in ARM
+In-Reply-To: <CAK5ve-JM=01vTqSi59R6ASyGU_2fVXzKtjNh42LKeF2HF3NzSA@mail.gmail.com>
+References: <1314349415-889-1-git-send-email-bryan.wu@canonical.com>
+	<CACRpkda6-8dxSbF12N-Q32cOpogu-ZZmTApnvNBa03iOcEeqaQ@mail.gmail.com>
+	<CAK5ve-JM=01vTqSi59R6ASyGU_2fVXzKtjNh42LKeF2HF3NzSA@mail.gmail.com>
+Message-ID: <20110829151333.GA17887@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Aug 2011, Ming Lei wrote:
-
-> IMO, the dummy has been linked into queue pointed by qh->hw->hw_qtd_next,
-> so EHCI will fetch dummy qtd and execute the transaction and will not have
-> any delay on the transaction.
+On Mon, Aug 29, 2011 at 09:18:29PM +0800, Bryan Wu wrote:
+> On Mon, Aug 29, 2011 at 7:00 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Fri, Aug 26, 2011 at 11:03 AM, Bryan Wu <bryan.wu@canonical.com> wrote:
+> >
+> >> Based on Linus Walleij's ARM LED consolidation work, this patchset introduce a
+> >> new generic led trigger for CPU not only for ARM but also for others.
+> >
+> > I think Russell was pretty clear that he saw problems inside the "new LEDs"
+> > subsystem (drivers/leds) that need be fixed before we migrate this support
+> > to use the LED class devices.
+> >
+> > Can you see if you can address his comment on the earlier realview patch,
+> > i.e. this:
+> > http://marc.info/?l=linux-arm-kernel&m=131237280009775&w=2
+> >
 > 
-> Let me explain the problem again: On ARM, the wmb() before
-> 'dummy->hw_token = token;'
-> will flush l2 write buffer into memory and all parts of 'dummy' except
-> for hw_token field
-> have reached into memory already, but dummy->hw_token will stay at l2
-> write buffer
-> and not reach into memory at this time, so ehci may fetch a
-> inconsistent qtd and execute it,
-> then mistaken IOC or "total bytes to transfer"  are read by EHCI and
-> cause delayed irq
-> or lost irq.
+> Yeah, I replied that email with a patch to select LEDS_CLASS when
+> CONFIG_NEW_LEDS=y.
 
-No.  Even if the HC reads dummy before dummy->hw_token has been written
-out to memory from the L2 cache, it will not see any inconsistencies.  
-It will see the old value in hw_token, which has the ACTIVE bit clear.  
-Therefore it will not try to execute the qTD but will move on to the
-next QH.  See what the fourth paragraph in section 4.10.2 of the EHCI 
-spec says about the case where a qTD's ACTIVE bit is set to 0.
+I don't see any point to that:
 
-Some EHCI implementations have a quirk, in which they perform the 
-overlay even when ACTIVE is clear.  But even these implementations 
-won't try to execute the qTD, because the old value of dummy->hw_token 
-also has the HALT bit set.
+menuconfig NEW_LEDS
+        bool "LED Support"
+	select LEDS_CLASS
 
-> It is not only a reasoning or guess, and I have traced this kind of
-> fact certainly.
+if NEW_LEDS
 
-If your controller behaves as you suggest then it is buggy.  And in
-that case, adding another memory barrier won't fix it.  There is still
-the possibility that the HC will read dummy during the brief time after
-the existing wmb() and before the CPU has written dummy->hw_token.
+config LEDS_CLASS
+        bool "LED Class Support"
+        help
+          This option enables the led sysfs class in /sys/class/leds.  You'll
+          need this to do anything useful with LEDs.  If unsure, say N.
 
-Alan Stern
+So, with that select there, you either have NEW_LEDS=y LEDS_CLASS=y
+or NEW_LEDS=n LEDS_CLASS=n.  To put it another way, you can't select
+LEDS_CLASS when NEW_LEDS=n, and you can't deselect LEDS_CLASS when
+NEW_LEDS=y.
+
+So, either the LEDS_CLASS option is completely pointless, which means
+it should be killed off, or LEDS_CLASS needs to be fixed so that it
+actually does what it says in its help text and controls whether we
+have a LEDS sysfs class _without_ affecting the ability to have
+triggers setup by platform code.
+
+What it can't do is stay as-is, because it's clearly broken and the
+options help texts don't match reality.
