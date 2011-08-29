@@ -1,34 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Aug 2011 10:41:39 +0200
-Subject: [PATCH] spi: Fix builderror in spi-pl022.c
-In-Reply-To: <1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
-References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
-	<1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
-Message-ID: <CACRpkdavhLpsfFwHy3jnHO3o9EC+e6=dt1joMGQD_e3O=HTT-A@mail.gmail.com>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Mon, 29 Aug 2011 16:47:08 +0800
+Subject: [PATCH V6 3/5] MX53 Enable the AHCI SATA on MX53 ARD board
+In-Reply-To: <1314602339-18392-3-git-send-email-richard.zhu@linaro.org>
+References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
+	<1314602339-18392-3-git-send-email-richard.zhu@linaro.org>
+Message-ID: <CAMPhdO944uQtpBfq12h1yHeXNzkTFiscPfZ6PbuMy6g2u0SDOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 28, 2011 at 9:26 PM, Peter Huewe <peterhuewe@gmx.de> wrote:
+On Mon, Aug 29, 2011 at 3:18 PM, Richard Zhu <richard.zhu@linaro.org> wrote:
+> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+> ---
+> ?arch/arm/mach-mx5/board-mx53_ard.c | ? ?7 +++++++
+> ?1 files changed, 7 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
+> index 76a67c4..d265cee 100644
+> --- a/arch/arm/mach-mx5/board-mx53_ard.c
+> +++ b/arch/arm/mach-mx5/board-mx53_ard.c
+> @@ -27,6 +27,7 @@
+> ?#include <mach/common.h>
+> ?#include <mach/hardware.h>
+> ?#include <mach/iomux-mx53.h>
+> +#include <mach/ahci_sata.h>
+>
+> ?#include <asm/mach-types.h>
+> ?#include <asm/mach/arch.h>
+> @@ -220,6 +221,11 @@ static struct platform_device *devices[] __initdata = {
+> ? ? ? ?&ard_smsc_lan9220_device,
+> ?};
+>
+> +static struct ahci_platform_data sata_data = {
+> + ? ? ? .init = sata_init,
+> + ? ? ? .exit = sata_exit,
+> +};
+> +
 
-> This patch fixes a build error, introduced by commit (67fc8b9f, "PM: add
-> runtime PM support to core Primecell driver") which unfortunately was a little
-> bit incomplete and did contain a typo (11 instead of 22).
-> I'm not sure how this patch could have been tested back then, if it
-> doesn't even compile ;)
->
-> The build failure was:
-> drivers/spi/spi-pl022.c:2292: error: 'adev' undeclared (first use in
-> this function)
-> drivers/spi/spi-pl022.c:2344: error: 'pl022_suspend' undeclared here
-> (not in a function)
->
-> The build failure appears e.g. for the u8500 and realview defconfig.
->
-> LinuxVersion: linux next-20110826
->
-> Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+As this platform data is same across most of these boards, I'd suggest we
+keep a common/default platform_data in
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+arch/arm/plat-mxc/devices/platform-imx-ahci.c
 
-Thanks!
-Linus Walleij
+And pass NULL in these board files, making use of the above default one.
+For those boards with exceptions (e.g. special operations like GPIO to
+enable/disable something at init/exit), one can still have platform data
+and pass the pointer.
+
+> ?static void __init mx53_ard_board_init(void)
+> ?{
+> ? ? ? ?imx53_soc_init();
+> @@ -234,6 +240,7 @@ static void __init mx53_ard_board_init(void)
+> ? ? ? ?imx53_add_imx_i2c(1, &mx53_ard_i2c2_data);
+> ? ? ? ?imx53_add_imx_i2c(2, &mx53_ard_i2c3_data);
+> ? ? ? ?imx_add_gpio_keys(&ard_button_data);
+> + ? ? ? imx53_add_ahci_imx(0, &sata_data);
+> ?}
+>
+> ?static void __init mx53_ard_timer_init(void)
+> --
+> 1.7.1
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
