@@ -1,150 +1,24 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 29 Aug 2011 14:46:00 -0700
-Subject: [PATCH v3 10/13] of: add a generic pinmux helper
-In-Reply-To: <CACRpkdaTiWEtgjVOhUKeXhpiESvrWyz97p5j_PHe3MvEM4UaCw@mail.gmail.com>
-References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
-	<1314315824-9687-11-git-send-email-swarren@nvidia.com>
-	<CACRpkdaTiWEtgjVOhUKeXhpiESvrWyz97p5j_PHe3MvEM4UaCw@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B3279BEB@HQMAIL01.nvidia.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 29 Aug 2011 22:54:04 +0100
+Subject: How to handle named resources with DT?
+In-Reply-To: <alpine.DEB.2.00.1108271444240.23968@utopia.booyaka.com>
+References: <20110809205723.GE11568@ponder.secretlab.ca>
+	<877h6173wm.fsf@ti.com> <20110826041200.GD2308@yookeroo.fritz.box>
+	<201108261258.32880.arnd@arndb.de>
+	<20110826130644.GN2308@yookeroo.fritz.box>
+	<alpine.DEB.2.00.1108271444240.23968@utopia.booyaka.com>
+Message-ID: <20110829215404.GA26846@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Monday, August 29, 2011 5:09 AM:
-> On Fri, Aug 26, 2011 at 1:43 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> 
-> > diff --git a/drivers/of/of_pinmux.c b/drivers/of/of_pinmux.c
-> 
-> > +int of_pinmux_parse(const struct of_pinmux_ctrl *ctrl,
-> > + ? ? ? ? ? ? ? ? ? struct of_pinmux_cfg *cfg)
-> 
-> OK...
-> 
-> > +{
-> > + ? ? ? struct device_node *np;
-> > +
-> > + ? ? ? if (!ctrl || !ctrl->dev || !ctrl->node || !ctrl->configure)
-> > + ? ? ? ? ? ? ? return -EINVAL;
-> > +
-> > + ? ? ? for_each_child_of_node(ctrl->node, np) {
-> > + ? ? ? ? ? ? ? int ret;
-> > + ? ? ? ? ? ? ? bool hadpins = 0;
-> > + ? ? ? ? ? ? ? struct of_iter_string_prop iter;
-> > +
-> > + ? ? ? ? ? ? ? cfg->node = np;
-> > +
-> > + ? ? ? ? ? ? ? ret = of_property_read_string(np, "function",
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cfg->function);
-> > + ? ? ? ? ? ? ? if (ret < 0) {
-> > + ? ? ? ? ? ? ? ? ? ? ? dev_err(ctrl->dev, "no function for node %s\n",
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? np->name);
-> > + ? ? ? ? ? ? ? ? ? ? ? continue;
-> > + ? ? ? ? ? ? ? }
-> 
-> I buy this part.
-> 
-> > +
-> > + ? ? ? ? ? ? ? cfg->flags &= 0;
-> > +
-> > + ? ? ? ? ? ? ? if (of_find_property(np, "pull-up", NULL))
-> > + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_PULL_UP;
-> > + ? ? ? ? ? ? ? if (of_find_property(np, "pull-down", NULL))
-> > + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_PULL_DOWN;
-> > +
-> > + ? ? ? ? ? ? ? if ((cfg->flags & OF_PINMUX_PULL_MASK) ==
-> > + ? ? ? ? ? ? ? ? ? OF_PINMUX_PULL_MASK) {
-> > + ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev, "node %s has both "
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"pull-up and pull-down properties - "
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"defaulting to no pull\n",
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?np->name);
-> > + ? ? ? ? ? ? ? ? ? ? ? cfg->flags &= ~OF_PINMUX_PULL_MASK;
-> > + ? ? ? ? ? ? ? }
-> > +
-> > + ? ? ? ? ? ? ? if (of_find_property(np, "tristate", NULL))
-> > + ? ? ? ? ? ? ? ? ? ? ? cfg->flags |= OF_PINMUX_TRISTATE;
-> 
-> But what does this stuff has to do with pinmux?
-> 
-> I call this "pin biasing" and it has very little to do with muxing.
-> 
-> If a broader, generic term is to be used, I'd prefer "pin control"
-> which sort of nails the thing.
-> 
-> > + ? ? ? ? ? ? ? for_each_string_property_value(iter, np, "pins") {
-> > + ? ? ? ? ? ? ? ? ? ? ? hadpins = 1;
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? cfg->pin = iter.value;
-> > +
-> > + ? ? ? ? ? ? ? ? ? ? ? dev_dbg(ctrl->dev,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "configure pin %s func=%s flags=0x%lx\n",
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cfg->pin, cfg->function, cfg->flags);
-> > + ? ? ? ? ? ? ? ? ? ? ? if (ctrl->configure(ctrl, cfg))
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev,
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"failed to configure pin %s\n",
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?cfg->pin);
-> > + ? ? ? ? ? ? ? }
-> > +
-> > + ? ? ? ? ? ? ? if (!hadpins)
-> > + ? ? ? ? ? ? ? ? ? ? ? dev_warn(ctrl->dev, "no pins for node %s\n",
-> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?np->name);
-> > + ? ? ? }
-> > +
-> > + ? ? ? return 0;
-> > +}
-> > +EXPORT_SYMBOL_GPL(of_pinmux_parse);
-> 
-> Renamed of_pinctrl_parse I'm happier with it.
+On Sat, Aug 27, 2011 at 03:47:55PM -0600, Paul Walmsley wrote:
 
-Well, it's not just that; the struct contains the function field to
-select for each pingroup, so it's not just pinctrl either.
+> Certainly, from a kernel development perspective, one can decide to just 
+> dump this kind of DT generation problem back on the hardware vendors.  
+> But it seems more efficient and less error-prone to simply remove both 
+> mapping tables, and to export names directly from the IP block data into 
+> the device data format.
 
-> > +/**
-> > + * struct of_pinmux_cfg - configuration state for a single pinmux entry.
-> > + *
-> > + * @function: the name of the function that the pinmux entry should be
-> > + * ? ? configured to.
-> > + * @pin: the device_node of the pinmux entry that should be configured.
-> > + * ? ? Platform specific properties that aren't in the generic binding may be
-> > + * ? ? obtained from this device node.
-> > + * @flags: flags for common pinmux options such as pull and tristate.
-> 
-> I don't think these things has anything to do with pinmux at all.
-> 
-> But with the struct renamed of_pinctrl_cfg I'm again happier.
-> 
-> > + */
-> > +struct of_pinmux_cfg {
-> > + ? ? ? struct device_node ? ? ?*node;
-> > + ? ? ? const char ? ? ? ? ? ? ?*pin;
-> > + ? ? ? const char ? ? ? ? ? ? ?*function;
-> > + ? ? ? unsigned long ? ? ? ? ? flags;
-> > +};
-> 
-> The current pinctrl patch set would probably want an unsigned
-> "position" attribute too. (If we should build on that.)
-
-This does beg the question I asked previously:
-
-The intent of this patch was to provide a way for devicetree to set the
-complete initial state of the pinmux, in a SoC-specific fashion, without
-interaction with the pinmux API.
-
-However, I'm guessing you see the pinmux driver as not touching HW at
-boot at all, and never programming anything except in response to a
-driver calling pinmux_get()/pinmux_enable()?
-
-In the former case, this code and related bindings wouldn't be influenced
-by the pinmux API at all (and indeed arguably never should be, since DT
-is supposed to be oriented purely at HW, and not influenced by driver
-design). This approach might make the pinmux API mostly relevant only
-for drivers that actively change between configurations at run-time, and
-not for drivers that don't need dynamic muxing.
-
-However, in the latter case, this code should be part of the pinmux core,
-and my patches to Tegra's pinmux driver dropped. It'd be difficult to
-define a pinmux binding that wasn't influenced by the pinmux API's needs
-in this case.
-
-So, that's probably something we have to resolve first.
-
--- 
-nvpublic
+That seems sensible, though we'd probably want to keep the option to
+remap in there at least on the generation side in case some integrators
+end up renaming the ports on the IP block for some reason.
