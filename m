@@ -1,188 +1,147 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 10:49:44 -0700
-Subject: [PATCH 02/10] OMAP3+: VC: cleanup PMIC register address configuration
-In-Reply-To: <1314640192-2518-1-git-send-email-khilman@ti.com>
-References: <1314640192-2518-1-git-send-email-khilman@ti.com>
-Message-ID: <1314640192-2518-3-git-send-email-khilman@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 29 Aug 2011 19:50:13 +0200 (CEST)
+Subject: [PATCH 1/2] dmaengine: ipu-idmac: add support for the DMA_PAUSE
+	control
+In-Reply-To: <1314631285.1606.154.camel@vkoul-udesk3>
+References: <1314211292-10414-1-git-send-email-g.liakhovetski@gmx.de>
+	<Pine.LNX.4.64.1108251838090.17190@axis700.grange>
+	<Pine.LNX.4.64.1108251841300.17190@axis700.grange>
+	<1314631285.1606.154.camel@vkoul-udesk3>
+Message-ID: <Pine.LNX.4.64.1108291948310.5065@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- support both voltage register address and command register address
-  for each VC channel
-- add fields for voltage register address (volra) and command register
-  address (cmdra) to struct omap_vc_channel
-- use VC/VP register access read/modify/write helper
-- remove volra_shift field (use __ffs(mask) for shift value)
-- I2C addresses 10-bit, change size to u16
+On Mon, 29 Aug 2011, Vinod Koul wrote:
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
+> On Thu, 2011-08-25 at 18:45 +0200, Guennadi Liakhovetski wrote:
+> > To support multi-size buffers in the mx3_camera V4L2 driver we have to be
+> > able to stop DMA on a channel without releasing descriptors and completely
+> > halting the hardware. Use the DMA_PAUSE control to implement this mode.
+> > 
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> Acked-by Vinod Koul <vinod.koul@linux.intel.com>
+> 
+> Do you want this to go thru slave-dma or media tree?
+
+With your above ack I can pull it together with the final form of patch 
+2/2, when it's ready, via media tree. 
+
+Thanks
+Guennadi
+
+> 
+> -- 
+> ~Vinod
+> > ---
+> >  drivers/dma/ipu/ipu_idmac.c |   65 +++++++++++++++++++++++++++---------------
+> >  1 files changed, 42 insertions(+), 23 deletions(-)
+> > 
+> > diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
+> > index c1a125e..42cdf1c 100644
+> > --- a/drivers/dma/ipu/ipu_idmac.c
+> > +++ b/drivers/dma/ipu/ipu_idmac.c
+> > @@ -1306,6 +1306,7 @@ static irqreturn_t idmac_interrupt(int irq, void *dev_id)
+> >  	    ipu_submit_buffer(ichan, descnew, sgnew, ichan->active_buffer) < 0) {
+> >  		callback = descnew->txd.callback;
+> >  		callback_param = descnew->txd.callback_param;
+> > +		list_del_init(&descnew->list);
+> >  		spin_unlock(&ichan->lock);
+> >  		if (callback)
+> >  			callback(callback_param);
+> > @@ -1427,39 +1428,58 @@ static int __idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+> >  {
+> >  	struct idmac_channel *ichan = to_idmac_chan(chan);
+> >  	struct idmac *idmac = to_idmac(chan->device);
+> > +	struct ipu *ipu = to_ipu(idmac);
+> > +	struct list_head *list, *tmp;
+> >  	unsigned long flags;
+> >  	int i;
+> >  
+> > -	/* Only supports DMA_TERMINATE_ALL */
+> > -	if (cmd != DMA_TERMINATE_ALL)
+> > -		return -ENXIO;
+> > +	switch (cmd) {
+> > +	case DMA_PAUSE:
+> > +		spin_lock_irqsave(&ipu->lock, flags);
+> > +		ipu_ic_disable_task(ipu, chan->chan_id);
+> >  
+> > -	ipu_disable_channel(idmac, ichan,
+> > -			    ichan->status >= IPU_CHANNEL_ENABLED);
+> > +		/* Return all descriptors into "prepared" state */
+> > +		list_for_each_safe(list, tmp, &ichan->queue)
+> > +			list_del_init(list);
+> >  
+> > -	tasklet_disable(&to_ipu(idmac)->tasklet);
+> > +		ichan->sg[0] = NULL;
+> > +		ichan->sg[1] = NULL;
+> >  
+> > -	/* ichan->queue is modified in ISR, have to spinlock */
+> > -	spin_lock_irqsave(&ichan->lock, flags);
+> > -	list_splice_init(&ichan->queue, &ichan->free_list);
+> > +		spin_unlock_irqrestore(&ipu->lock, flags);
+> >  
+> > -	if (ichan->desc)
+> > -		for (i = 0; i < ichan->n_tx_desc; i++) {
+> > -			struct idmac_tx_desc *desc = ichan->desc + i;
+> > -			if (list_empty(&desc->list))
+> > -				/* Descriptor was prepared, but not submitted */
+> > -				list_add(&desc->list, &ichan->free_list);
+> > +		ichan->status = IPU_CHANNEL_INITIALIZED;
+> > +		break;
+> > +	case DMA_TERMINATE_ALL:
+> > +		ipu_disable_channel(idmac, ichan,
+> > +				    ichan->status >= IPU_CHANNEL_ENABLED);
+> >  
+> > -			async_tx_clear_ack(&desc->txd);
+> > -		}
+> > +		tasklet_disable(&ipu->tasklet);
+> >  
+> > -	ichan->sg[0] = NULL;
+> > -	ichan->sg[1] = NULL;
+> > -	spin_unlock_irqrestore(&ichan->lock, flags);
+> > +		/* ichan->queue is modified in ISR, have to spinlock */
+> > +		spin_lock_irqsave(&ichan->lock, flags);
+> > +		list_splice_init(&ichan->queue, &ichan->free_list);
+> >  
+> > -	tasklet_enable(&to_ipu(idmac)->tasklet);
+> > +		if (ichan->desc)
+> > +			for (i = 0; i < ichan->n_tx_desc; i++) {
+> > +				struct idmac_tx_desc *desc = ichan->desc + i;
+> > +				if (list_empty(&desc->list))
+> > +					/* Descriptor was prepared, but not submitted */
+> > +					list_add(&desc->list, &ichan->free_list);
+> >  
+> > -	ichan->status = IPU_CHANNEL_INITIALIZED;
+> > +				async_tx_clear_ack(&desc->txd);
+> > +			}
+> > +
+> > +		ichan->sg[0] = NULL;
+> > +		ichan->sg[1] = NULL;
+> > +		spin_unlock_irqrestore(&ichan->lock, flags);
+> > +
+> > +		tasklet_enable(&ipu->tasklet);
+> > +
+> > +		ichan->status = IPU_CHANNEL_INITIALIZED;
+> > +		break;
+> > +	default:
+> > +		return -ENOSYS;
+> > +	}
+> >  
+> >  	return 0;
+> >  }
+> > @@ -1662,7 +1682,6 @@ static void __exit ipu_idmac_exit(struct ipu *ipu)
+> >  		struct idmac_channel *ichan = ipu->channel + i;
+> >  
+> >  		idmac_control(&ichan->dma_chan, DMA_TERMINATE_ALL, 0);
+> > -		idmac_prep_slave_sg(&ichan->dma_chan, NULL, 0, DMA_NONE, 0);
+> >  	}
+> >  
+> >  	dma_async_device_unregister(&idmac->dma);
+> 
+> 
+> 
+
 ---
- arch/arm/mach-omap2/vc.c          |   17 ++++++++++++-----
- arch/arm/mach-omap2/vc.h          |    9 ++++-----
- arch/arm/mach-omap2/vc3xxx_data.c |    5 +++--
- arch/arm/mach-omap2/vc44xx_data.c |    7 ++++---
- arch/arm/mach-omap2/voltage.h     |    4 ++--
- 5 files changed, 25 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-index ca6165d..50b1f7c 100644
---- a/arch/arm/mach-omap2/vc.c
-+++ b/arch/arm/mach-omap2/vc.c
-@@ -234,17 +234,24 @@ void __init omap_vc_init_channel(struct voltagedomain *voltdm)
- 
- 	/* get PMIC/board specific settings */
- 	vc->i2c_slave_addr = vdd->pmic_info->i2c_slave_addr;
-+	vc->volt_reg_addr = vdd->pmic_info->volt_reg_addr;
-+	vc->cmd_reg_addr = vdd->pmic_info->cmd_reg_addr;
- 
- 	/* Configure the i2c slave address for this VC */
- 	voltdm->rmw(vc->smps_sa_mask,
- 		    vc->i2c_slave_addr << __ffs(vc->smps_sa_mask),
- 		    vc->common->smps_sa_reg);
- 
--	/* Setup the VOLRA(pmic reg addr) in VC */
--	vc_val = voltdm->read(vc->common->smps_volra_reg);
--	vc_val &= ~vc->smps_volra_mask;
--	vc_val |= vdd->pmic_info->volt_reg_addr << vc->smps_volra_shift;
--	voltdm->write(vc_val, vc->common->smps_volra_reg);
-+	/*
-+	 * Configure the PMIC register addresses.
-+	 */
-+	voltdm->rmw(vc->smps_volra_mask,
-+		    vc->volt_reg_addr << __ffs(vc->smps_volra_mask),
-+		    vc->common->smps_volra_reg);
-+	if (vc->cmd_reg_addr)
-+		voltdm->rmw(vc->smps_cmdra_mask,
-+			    vc->cmd_reg_addr << __ffs(vc->smps_cmdra_mask),
-+			    vc->common->smps_cmdra_reg);
- 
- 	/* Configure the setup times */
- 	vc_val = voltdm->read(vdd->vfsm->voltsetup_reg);
-diff --git a/arch/arm/mach-omap2/vc.h b/arch/arm/mach-omap2/vc.h
-index 165fc74..f3b0551 100644
---- a/arch/arm/mach-omap2/vc.h
-+++ b/arch/arm/mach-omap2/vc.h
-@@ -44,6 +44,7 @@ struct omap_vc_common {
- 	u32 valid;
- 	u8 smps_sa_reg;
- 	u8 smps_volra_reg;
-+	u8 smps_cmdra_reg;
- 	u8 bypass_val_reg;
- 	u8 data_shift;
- 	u8 slaveaddr_shift;
-@@ -59,21 +60,19 @@ struct omap_vc_common {
-  * @common: pointer to VC common data for this platform
-  * @smps_sa_mask: i2c slave address bitmask in the PRM_VC_SMPS_SA register
-  * @smps_volra_mask: VOLRA* bitmask in the PRM_VC_VOL_RA register
-- * @smps_volra_shift: VOLRA* field shift in the PRM_VC_VOL_RA register
-- *
-- * XXX It is not necessary to have both a *_mask and a *_shift -
-- *     remove one
-  */
- struct omap_vc_channel {
- 	/* channel state */
- 	u16 i2c_slave_addr;
-+	u16 volt_reg_addr;
-+	u16 cmd_reg_addr;
- 
- 	/* register access data */
- 	const struct omap_vc_common *common;
- 	u32 smps_sa_mask;
- 	u32 smps_volra_mask;
-+	u32 smps_cmdra_mask;
- 	u8 cmdval_reg;
--	u8 smps_volra_shift;
- };
- 
- extern struct omap_vc_channel omap3_vc_mpu;
-diff --git a/arch/arm/mach-omap2/vc3xxx_data.c b/arch/arm/mach-omap2/vc3xxx_data.c
-index 86be50c..df8bd5e 100644
---- a/arch/arm/mach-omap2/vc3xxx_data.c
-+++ b/arch/arm/mach-omap2/vc3xxx_data.c
-@@ -32,6 +32,7 @@
- static struct omap_vc_common omap3_vc_common = {
- 	.smps_sa_reg	 = OMAP3_PRM_VC_SMPS_SA_OFFSET,
- 	.smps_volra_reg	 = OMAP3_PRM_VC_SMPS_VOL_RA_OFFSET,
-+	.smps_cmdra_reg	 = OMAP3_PRM_VC_SMPS_CMD_RA_OFFSET,
- 	.bypass_val_reg	 = OMAP3_PRM_VC_BYPASS_VAL_OFFSET,
- 	.data_shift	 = OMAP3430_DATA_SHIFT,
- 	.slaveaddr_shift = OMAP3430_SLAVEADDR_SHIFT,
-@@ -48,14 +49,14 @@ struct omap_vc_channel omap3_vc_mpu = {
- 	.common = &omap3_vc_common,
- 	.cmdval_reg = OMAP3_PRM_VC_CMD_VAL_0_OFFSET,
- 	.smps_sa_mask = OMAP3430_PRM_VC_SMPS_SA_SA0_MASK,
--	.smps_volra_shift = OMAP3430_VOLRA0_SHIFT,
- 	.smps_volra_mask = OMAP3430_VOLRA0_MASK,
-+	.smps_cmdra_mask = OMAP3430_CMDRA0_MASK,
- };
- 
- struct omap_vc_channel omap3_vc_core = {
- 	.common = &omap3_vc_common,
- 	.cmdval_reg = OMAP3_PRM_VC_CMD_VAL_1_OFFSET,
- 	.smps_sa_mask = OMAP3430_PRM_VC_SMPS_SA_SA1_MASK,
--	.smps_volra_shift = OMAP3430_VOLRA1_SHIFT,
- 	.smps_volra_mask = OMAP3430_VOLRA1_MASK,
-+	.smps_cmdra_mask = OMAP3430_CMDRA1_MASK,
- };
-diff --git a/arch/arm/mach-omap2/vc44xx_data.c b/arch/arm/mach-omap2/vc44xx_data.c
-index af922b4..5d104ff 100644
---- a/arch/arm/mach-omap2/vc44xx_data.c
-+++ b/arch/arm/mach-omap2/vc44xx_data.c
-@@ -33,6 +33,7 @@
- static const struct omap_vc_common omap4_vc_common = {
- 	.smps_sa_reg = OMAP4_PRM_VC_SMPS_SA_OFFSET,
- 	.smps_volra_reg = OMAP4_PRM_VC_VAL_SMPS_RA_VOL_OFFSET,
-+	.smps_cmdra_reg = OMAP4_PRM_VC_VAL_SMPS_RA_CMD_OFFSET,
- 	.bypass_val_reg = OMAP4_PRM_VC_VAL_BYPASS_OFFSET,
- 	.data_shift = OMAP4430_DATA_SHIFT,
- 	.slaveaddr_shift = OMAP4430_SLAVEADDR_SHIFT,
-@@ -50,23 +51,23 @@ struct omap_vc_channel omap4_vc_mpu = {
- 	.common = &omap4_vc_common,
- 	.cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_MPU_L_OFFSET,
- 	.smps_sa_mask = OMAP4430_SA_VDD_MPU_L_PRM_VC_SMPS_SA_MASK,
--	.smps_volra_shift = OMAP4430_VOLRA_VDD_MPU_L_SHIFT,
- 	.smps_volra_mask = OMAP4430_VOLRA_VDD_MPU_L_MASK,
-+	.smps_cmdra_mask = OMAP4430_CMDRA_VDD_MPU_L_MASK,
- };
- 
- struct omap_vc_channel omap4_vc_iva = {
- 	.common = &omap4_vc_common,
- 	.cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_IVA_L_OFFSET,
- 	.smps_sa_mask = OMAP4430_SA_VDD_IVA_L_PRM_VC_SMPS_SA_MASK,
--	.smps_volra_shift = OMAP4430_VOLRA_VDD_IVA_L_SHIFT,
- 	.smps_volra_mask = OMAP4430_VOLRA_VDD_IVA_L_MASK,
-+	.smps_cmdra_mask = OMAP4430_CMDRA_VDD_IVA_L_MASK,
- };
- 
- struct omap_vc_channel omap4_vc_core = {
- 	.common = &omap4_vc_common,
- 	.cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_CORE_L_OFFSET,
- 	.smps_sa_mask = OMAP4430_SA_VDD_CORE_L_0_6_MASK,
--	.smps_volra_shift = OMAP4430_VOLRA_VDD_CORE_L_SHIFT,
- 	.smps_volra_mask = OMAP4430_VOLRA_VDD_CORE_L_MASK,
-+	.smps_cmdra_mask = OMAP4430_CMDRA_VDD_CORE_L_MASK,
- };
- 
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index 639e85c..3129d64 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -111,14 +111,14 @@ struct omap_volt_pmic_info {
- 	u32 off_volt;
- 	u16 volt_setup_time;
- 	u16 i2c_slave_addr;
-+	u16 volt_reg_addr;
-+	u16 cmd_reg_addr;
- 	u8 vp_erroroffset;
- 	u8 vp_vstepmin;
- 	u8 vp_vstepmax;
- 	u8 vp_vddmin;
- 	u8 vp_vddmax;
- 	u8 vp_timeout_us;
--	u8 volt_reg_addr;
--	u8 cmd_reg_addr;
- 	unsigned long (*vsel_to_uv) (const u8 vsel);
- 	u8 (*uv_to_vsel) (unsigned long uV);
- };
--- 
-1.7.6
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
