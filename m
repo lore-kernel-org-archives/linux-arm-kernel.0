@@ -1,55 +1,141 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 10:35:41 -0700
-Subject: [PATCH 08/22] OMAP2+: powerdomain: add voltagedomain to struct
-	powerdomain
+Date: Mon, 29 Aug 2011 10:35:42 -0700
+Subject: [PATCH 09/22] OMAP2: add voltage domains and connect to powerdomains
 In-Reply-To: <1314639355-12713-1-git-send-email-khilman@ti.com>
 References: <1314639355-12713-1-git-send-email-khilman@ti.com>
-Message-ID: <1314639355-12713-9-git-send-email-khilman@ti.com>
+Message-ID: <1314639355-12713-10-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each powerdomain is associated with a voltage domain.  Add an entry to
-struct powerdomain where the enclosing voltagedomain can be
-referenced.
-
-Modeled after similar relationship between clockdomains and powerdomains.
+Create basic voltagedomains for OMAP2 and associate OMAP2 powerdomains
+with the newly created voltage domains.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/powerdomain.h |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/Makefile                  |    3 +-
+ arch/arm/mach-omap2/io.c                      |    2 +
+ arch/arm/mach-omap2/powerdomains2xxx_data.c   |    4 +++
+ arch/arm/mach-omap2/voltage.h                 |    1 +
+ arch/arm/mach-omap2/voltagedomains2xxx_data.c |   32 +++++++++++++++++++++++++
+ 5 files changed, 41 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/voltagedomains2xxx_data.c
 
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index d23d979..9ce920d 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -24,6 +24,8 @@
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index f343365..1b6cecd 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -91,7 +91,8 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
+ # OMAP voltage domains
+ ifeq ($(CONFIG_PM),y)
+ voltagedomain-common			:= voltage.o
+-obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common)
++obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common) \
++					   voltagedomains2xxx_data.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
+ 					   voltagedomains3xxx_data.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common) \
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 9f5a846..4c8a5de 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -342,10 +342,12 @@ void __init omap2_init_common_infrastructure(void)
+ 	u8 postsetup_state;
  
- #include <plat/cpu.h>
+ 	if (cpu_is_omap242x()) {
++		omap2xxx_voltagedomains_init();
+ 		omap2xxx_powerdomains_init();
+ 		omap2xxx_clockdomains_init();
+ 		omap2420_hwmod_init();
+ 	} else if (cpu_is_omap243x()) {
++		omap2xxx_voltagedomains_init();
+ 		omap2xxx_powerdomains_init();
+ 		omap2xxx_clockdomains_init();
+ 		omap2430_hwmod_init();
+diff --git a/arch/arm/mach-omap2/powerdomains2xxx_data.c b/arch/arm/mach-omap2/powerdomains2xxx_data.c
+index cc389fb..274f64c 100644
+--- a/arch/arm/mach-omap2/powerdomains2xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains2xxx_data.c
+@@ -38,6 +38,7 @@ static struct powerdomain dsp_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,
+ 	},
++	.voltdm           = { .name = "core" },
+ };
  
+ static struct powerdomain mpu_24xx_pwrdm = {
+@@ -53,6 +54,7 @@ static struct powerdomain mpu_24xx_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ static struct powerdomain core_24xx_pwrdm = {
+@@ -71,6 +73,7 @@ static struct powerdomain core_24xx_pwrdm = {
+ 		[1] = PWRSTS_OFF_RET_ON, /* MEM2ONSTATE */
+ 		[2] = PWRSTS_OFF_RET_ON, /* MEM3ONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ 
+@@ -95,6 +98,7 @@ static struct powerdomain mdm_pwrdm = {
+ 	.pwrsts_mem_on	  = {
+ 		[0] = PWRSTS_ON,  /* MEMONSTATE */
+ 	},
++	.voltdm           = { .name = "core" },
+ };
+ 
+ #endif     /* CONFIG_SOC_OMAP2430 */
+diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
+index 25cfb5c..cacd76e 100644
+--- a/arch/arm/mach-omap2/voltage.h
++++ b/arch/arm/mach-omap2/voltage.h
+@@ -180,6 +180,7 @@ static inline int omap_voltage_late_init(void)
+ }
+ #endif
+ 
++extern void omap2xxx_voltagedomains_init(void);
+ extern void omap3xxx_voltagedomains_init(void);
+ extern void omap44xx_voltagedomains_init(void);
+ 
+diff --git a/arch/arm/mach-omap2/voltagedomains2xxx_data.c b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
+new file mode 100644
+index 0000000..69ff261
+--- /dev/null
++++ b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
+@@ -0,0 +1,32 @@
++/*
++ * OMAP3 voltage domain data
++ *
++ * Copyright (C) 2007, 2010 Texas Instruments, Inc.
++
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++
 +#include "voltage.h"
 +
- /* Powerdomain basic power states */
- #define PWRDM_POWER_OFF		0x0
- #define PWRDM_POWER_RET		0x1
-@@ -78,6 +80,7 @@ struct powerdomain;
- /**
-  * struct powerdomain - OMAP powerdomain
-  * @name: Powerdomain name
-+ * @voltdm: voltagedomain containing this powerdomain
-  * @omap_chip: represents the OMAP chip types containing this pwrdm
-  * @prcm_offs: the address offset from CM_BASE/PRM_BASE
-  * @prcm_partition: (OMAP4 only) the PRCM partition ID containing @prcm_offs
-@@ -98,6 +101,10 @@ struct powerdomain;
-  */
- struct powerdomain {
- 	const char *name;
-+	union {
-+		const char *name;
-+		struct voltagedomain *ptr;
-+	} voltdm;
- 	const struct omap_chip_id omap_chip;
- 	const s16 prcm_offs;
- 	const u8 pwrsts;
++static struct voltagedomain omap2_voltdm_core = {
++	.name = "core",
++};
++
++static struct voltagedomain omap2_voltdm_wkup = {
++	.name = "wakeup",
++};
++
++static struct voltagedomain *voltagedomains_omap2[] __initdata = {
++	&omap2_voltdm_core,
++	&omap2_voltdm_wkup,
++	NULL,
++};
++
++void __init omap2xxx_voltagedomains_init(void)
++{
++	voltdm_init(voltagedomains_omap2);
++}
 -- 
 1.7.6
