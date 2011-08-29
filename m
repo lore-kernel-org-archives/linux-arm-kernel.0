@@ -1,95 +1,53 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 11:10:46 -0700
-Subject: [PATCH 4/7] OMAP3+: voltage: rename omap_voltage_get_nom_volt ->
-	voltdm_get_voltage
+Date: Mon, 29 Aug 2011 11:10:47 -0700
+Subject: [PATCH 5/7] OMAP3+: voltage: update nominal voltage in voltdm_scale()
+	not VC post-scale
 In-Reply-To: <1314641449-5089-1-git-send-email-khilman@ti.com>
 References: <1314641449-5089-1-git-send-email-khilman@ti.com>
-Message-ID: <1314641449-5089-5-git-send-email-khilman@ti.com>
+Message-ID: <1314641449-5089-6-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use preferred voltdm_ naming for getting current nominal voltage.
-
-No functional changes.
+Currently, the nominal voltage is updated in the VC post-scale function
+which is common to both scaling methods.  However, this has readabiliy
+problems as this update is not where it might be expected.  Instead, move
+the updated into voltdm_scale() upon a successful return of voltdm->scale()
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex-class3.c |    2 +-
- arch/arm/mach-omap2/voltage.c            |   14 ++++++++------
- arch/arm/mach-omap2/voltage.h            |    2 +-
- 3 files changed, 10 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/vc.c      |    2 --
+ arch/arm/mach-omap2/voltage.c |    6 +++++-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/smartreflex-class3.c b/arch/arm/mach-omap2/smartreflex-class3.c
-index 4eac1bc..53d9d0a 100644
---- a/arch/arm/mach-omap2/smartreflex-class3.c
-+++ b/arch/arm/mach-omap2/smartreflex-class3.c
-@@ -15,7 +15,7 @@
+diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+index 130df29..1c2bb9c 100644
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -143,8 +143,6 @@ void omap_vc_post_scale(struct voltagedomain *voltdm,
+ 	smps_delay = ((smps_steps * voltdm->pmic->step_size) /
+ 			voltdm->pmic->slew_rate) + 2;
+ 	udelay(smps_delay);
+-
+-	voltdm->nominal_volt = target_volt;
+ }
  
- static int sr_class3_enable(struct voltagedomain *voltdm)
- {
--	unsigned long volt = omap_voltage_get_nom_volt(voltdm);
-+	unsigned long volt = voltdm_get_voltage(voltdm);
- 
- 	if (!volt) {
- 		pr_warning("%s: Curr voltage unknown. Cannot enable sr_%s\n",
+ /* vc_bypass_scale - VC bypass method of voltage scaling */
 diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
-index 2ba276f..441c2d9 100644
+index 441c2d9..64070ac 100644
 --- a/arch/arm/mach-omap2/voltage.c
 +++ b/arch/arm/mach-omap2/voltage.c
-@@ -45,13 +45,13 @@ static LIST_HEAD(voltdm_list);
- 
- /* Public functions */
- /**
-- * omap_voltage_get_nom_volt() - Gets the current non-auto-compensated voltage
-- * @voltdm:	pointer to the VDD for which current voltage info is needed
-+ * voltdm_get_voltage() - Gets the current non-auto-compensated voltage
-+ * @voltdm:	pointer to the voltdm for which current voltage info is needed
-  *
-- * API to get the current non-auto-compensated voltage for a VDD.
-- * Returns 0 in case of error else returns the current voltage for the VDD.
-+ * API to get the current non-auto-compensated voltage for a voltage domain.
-+ * Returns 0 in case of error else returns the current voltage.
-  */
--unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
-+unsigned long voltdm_get_voltage(struct voltagedomain *voltdm)
- {
- 	if (!voltdm || IS_ERR(voltdm)) {
- 		pr_warning("%s: VDD specified does not exist!\n", __func__);
-@@ -72,6 +72,8 @@ unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
- int voltdm_scale(struct voltagedomain *voltdm,
- 		 unsigned long target_volt)
- {
-+	int ret;
-+
- 	if (!voltdm || IS_ERR(voltdm)) {
- 		pr_warning("%s: VDD specified does not exist!\n", __func__);
- 		return -EINVAL;
-@@ -104,7 +106,7 @@ void voltdm_reset(struct voltagedomain *voltdm)
- 		return;
+@@ -85,7 +85,11 @@ int voltdm_scale(struct voltagedomain *voltdm,
+ 		return -ENODATA;
  	}
  
--	target_volt = omap_voltage_get_nom_volt(voltdm);
-+	target_volt = voltdm_get_voltage(voltdm);
- 	if (!target_volt) {
- 		pr_err("%s: unable to find current voltage for vdd_%s\n",
- 			__func__, voltdm->name);
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index 68b1ed5..b4c6259 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -143,7 +143,6 @@ void omap_voltage_get_volttable(struct voltagedomain *voltdm,
- 		struct omap_volt_data **volt_data);
- struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
- 		unsigned long volt);
--unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm);
- #ifdef CONFIG_PM
- int omap_voltage_register_pmic(struct voltagedomain *voltdm,
- 			       struct omap_voltdm_pmic *pmic);
-@@ -178,4 +177,5 @@ int voltdm_for_each_pwrdm(struct voltagedomain *voltdm,
- 				    struct powerdomain *pwrdm));
- int voltdm_scale(struct voltagedomain *voltdm, unsigned long target_volt);
- void voltdm_reset(struct voltagedomain *voltdm);
-+unsigned long voltdm_get_voltage(struct voltagedomain *voltdm);
- #endif
+-	return voltdm->scale(voltdm, target_volt);
++	ret = voltdm->scale(voltdm, target_volt);
++	if (!ret)
++		voltdm->nominal_volt = target_volt;
++
++	return ret;
+ }
+ 
+ /**
 -- 
 1.7.6
