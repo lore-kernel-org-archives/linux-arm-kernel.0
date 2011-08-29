@@ -1,90 +1,17 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 11:15:17 -0700
-Subject: [PATCH 1/5] OMAP4: PM: TWL6030: fix voltage conversion formula
-In-Reply-To: <1314641721-5172-1-git-send-email-khilman@ti.com>
-References: <1314641721-5172-1-git-send-email-khilman@ti.com>
-Message-ID: <1314641721-5172-2-git-send-email-khilman@ti.com>
+Date: Mon, 29 Aug 2011 11:20:22 -0700
+Subject: [PATCH 03/13] ARM: gpio: omap: convert drivers to use asm/gpio.h
+	rather than mach/gpio.h
+In-Reply-To: <E1QqhJQ-0003a8-T9@rmk-PC.arm.linux.org.uk> (Russell King's
+	message of "Tue, 09 Aug 2011 09:05:20 +0100")
+References: <20110809080411.GA1831@n2100.arm.linux.org.uk>
+	<E1QqhJQ-0003a8-T9@rmk-PC.arm.linux.org.uk>
+Message-ID: <87k49wt6zd.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrick Titiano <p-titiano@ti.com>
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-omap_twl_vsel_to_uv() and omap_twl_uv_to_vsel() functions used to convert
-voltages to TWL6030 SMPS commands (a.k.a "vsel") implement incorrect conversion
-formula.
-It uses legacy OMAP3 formula, but OMAP4 Power IC has different offset and
-voltage step:
- - Voltage Step is now 12.66mV (instead of 12.5mV)
- - Offset is either 607.7mV or 709mV depending on TWL6030 chip revision
-   (instead of 600mV)
-This leads to setting voltages potentially higher than expected, and so
-potentially some (limited) power overconsumption.
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-For reference, see formula and tables in section 8.5.2.3
-"Output Voltage Selection (Standard Mode / Extended Mode with or without offset)"
- in TWL6030 functional specifications document.
-
-[nm at ti.com: ported to voltdm_c]
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Patrick Titiano <p-titiano@ti.com>
----
- arch/arm/mach-omap2/omap_twl.c |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-index 6b247d1..a66bf6b 100644
---- a/arch/arm/mach-omap2/omap_twl.c
-+++ b/arch/arm/mach-omap2/omap_twl.c
-@@ -106,9 +106,9 @@ static unsigned long twl6030_vsel_to_uv(const u8 vsel)
- 		return 1350000;
- 
- 	if (smps_offset & 0x8)
--		return ((((vsel - 1) * 125) + 7000)) * 100;
-+		return ((((vsel - 1) * 1266) + 70900)) * 10;
- 	else
--		return ((((vsel - 1) * 125) + 6000)) * 100;
-+		return ((((vsel - 1) * 1266) + 60770)) * 10;
- }
- 
- static u8 twl6030_uv_to_vsel(unsigned long uv)
-@@ -138,9 +138,9 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
- 		return 0x3A;
- 
- 	if (smps_offset & 0x8)
--		return DIV_ROUND_UP(uv - 700000, 12500) + 1;
-+		return DIV_ROUND_UP(uv - 709000, 12660) + 1;
- 	else
--		return DIV_ROUND_UP(uv - 600000, 12500) + 1;
-+		return DIV_ROUND_UP(uv - 607700, 12660) + 1;
- }
- 
- static struct omap_voltdm_pmic omap3_mpu_pmic = {
-@@ -187,7 +187,7 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
- 
- static struct omap_voltdm_pmic omap4_mpu_pmic = {
- 	.slew_rate		= 4000,
--	.step_size		= 12500,
-+	.step_size		= 12660,
- 	.on_volt		= 1350000,
- 	.onlp_volt		= 1350000,
- 	.ret_volt		= 837500,
-@@ -208,7 +208,7 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
- 
- static struct omap_voltdm_pmic omap4_iva_pmic = {
- 	.slew_rate		= 4000,
--	.step_size		= 12500,
-+	.step_size		= 12660,
- 	.on_volt		= 1100000,
- 	.onlp_volt		= 1100000,
- 	.ret_volt		= 837500,
-@@ -229,7 +229,7 @@ static struct omap_voltdm_pmic omap4_iva_pmic = {
- 
- static struct omap_voltdm_pmic omap4_core_pmic = {
- 	.slew_rate		= 4000,
--	.step_size		= 12500,
-+	.step_size		= 12660,
- 	.on_volt		= 1100000,
- 	.onlp_volt		= 1100000,
- 	.ret_volt		= 837500,
--- 
-1.7.6
+Acked-by: Kevin Hilman <khilman@ti.com>
