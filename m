@@ -1,145 +1,50 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 10:58:12 -0700
-Subject: [PATCH 12/12] OMAP3+: VP: combine setting init voltage into common
-	function
-In-Reply-To: <1314640692-3386-1-git-send-email-khilman@ti.com>
-References: <1314640692-3386-1-git-send-email-khilman@ti.com>
-Message-ID: <1314640692-3386-13-git-send-email-khilman@ti.com>
+Date: Mon, 29 Aug 2011 11:10:42 -0700
+Subject: [PATCH 0/7] OMAP: voltage cleanup part D: voltage domain
+Message-ID: <1314641449-5089-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-combine VPCONFIG init voltage setup into common function and use from
-both vp_enable and from vp_forceupdate_scale().
+This series focuses on cleanup of the remaining voltage domain layer
+(non-VC/VP code)
 
-NOTE: this patch changes the sequence of when the initVDD bit is
-cleared.  The bit is now cleared immediately after it was written.
-Since only the rising edge of this bit has any affect according to the
-TRM, the exact timing of clearing of this bit should not have any
-effect.
+Available in the pm-wip/voltdm_d branch of my linux-omap-pm tree
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/vp.c |   58 +++++++++++++++-------------------------------
- 1 files changed, 19 insertions(+), 39 deletions(-)
+Applies on v3.1-rc3 + the part A, B & C series.
 
-diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
-index 24020ea..66bd700 100644
---- a/arch/arm/mach-omap2/vp.c
-+++ b/arch/arm/mach-omap2/vp.c
-@@ -9,31 +9,18 @@
- #include "prm-regbits-44xx.h"
- #include "prm44xx.h"
- 
--static void vp_latch_vsel(struct voltagedomain *voltdm)
-+static u32 _vp_set_init_voltage(struct voltagedomain *voltdm, u32 volt)
- {
- 	struct omap_vp_instance *vp = voltdm->vp;
- 	u32 vpconfig;
--	unsigned long uvdc;
- 	char vsel;
- 
--	uvdc = omap_voltage_get_nom_volt(voltdm);
--	if (!uvdc) {
--		pr_warning("%s: unable to find current voltage for vdd_%s\n",
--			__func__, voltdm->name);
--		return;
--	}
--
--	if (!voltdm->pmic || !voltdm->pmic->uv_to_vsel) {
--		pr_warning("%s: PMIC function to convert voltage in uV to"
--			" vsel not registered\n", __func__);
--		return;
--	}
--
--	vsel = voltdm->pmic->uv_to_vsel(uvdc);
-+	vsel = voltdm->pmic->uv_to_vsel(volt);
- 
- 	vpconfig = voltdm->read(vp->vpconfig);
- 	vpconfig &= ~(vp->common->vpconfig_initvoltage_mask |
--			vp->common->vpconfig_initvdd);
-+		      vp->common->vpconfig_forceupdate |
-+		      vp->common->vpconfig_initvdd);
- 	vpconfig |= vsel << __ffs(vp->common->vpconfig_initvoltage_mask);
- 	voltdm->write(vpconfig, vp->vpconfig);
- 
-@@ -43,6 +30,8 @@ static void vp_latch_vsel(struct voltagedomain *voltdm)
- 
- 	/* Clear initVDD copy trigger bit */
- 	voltdm->write(vpconfig, vp->vpconfig);
-+
-+	return vpconfig;
- }
- 
- /* Generic voltage init functions */
-@@ -149,22 +138,11 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
- 		return -ETIMEDOUT;
- 	}
- 
--	/* Configure for VP-Force Update */
--	vpconfig = voltdm->read(vp->vpconfig);
--	vpconfig &= ~(vp->common->vpconfig_initvdd |
--			vp->common->vpconfig_forceupdate |
--			vp->common->vpconfig_initvoltage_mask);
--	vpconfig |= ((target_vsel <<
--		      __ffs(vp->common->vpconfig_initvoltage_mask)));
--	voltdm->write(vpconfig, vp->vpconfig);
--
--	/* Trigger initVDD value copy to voltage processor */
--	vpconfig |= vp->common->vpconfig_initvdd;
--	voltdm->write(vpconfig, vp->vpconfig);
-+	vpconfig = _vp_set_init_voltage(voltdm, target_volt);
- 
- 	/* Force update of voltage */
--	vpconfig |= vp->common->vpconfig_forceupdate;
--	voltdm->write(vpconfig, vp->vpconfig);
-+	voltdm->write(vpconfig | vp->common->vpconfig_forceupdate,
-+		      voltdm->vp->vpconfig);
- 
- 	/*
- 	 * Wait for TransactionDone. Typical latency is <200us.
-@@ -197,12 +175,7 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
- 			"to clear the TRANXDONE status\n",
- 			__func__, voltdm->name);
- 
--	vpconfig = voltdm->read(vp->vpconfig);
--	/* Clear initVDD copy trigger bit */
--	vpconfig &= ~vp->common->vpconfig_initvdd;
--	voltdm->write(vpconfig, vp->vpconfig);
- 	/* Clear force bit */
--	vpconfig &= ~vp->common->vpconfig_forceupdate;
- 	voltdm->write(vpconfig, vp->vpconfig);
- 
- 	return 0;
-@@ -218,7 +191,7 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
- void omap_vp_enable(struct voltagedomain *voltdm)
- {
- 	struct omap_vp_instance *vp;
--	u32 vpconfig;
-+	u32 vpconfig, volt;
- 
- 	if (!voltdm || IS_ERR(voltdm)) {
- 		pr_warning("%s: VDD specified does not exist!\n", __func__);
-@@ -236,12 +209,19 @@ void omap_vp_enable(struct voltagedomain *voltdm)
- 	if (vp->enabled)
- 		return;
- 
--	vp_latch_vsel(voltdm);
-+	volt = voltdm_get_voltage(voltdm);
-+	if (!volt) {
-+		pr_warning("%s: unable to find current voltage for %s\n",
-+			   __func__, voltdm->name);
-+		return;
-+	}
-+
-+	vpconfig = _vp_set_init_voltage(voltdm, volt);
- 
- 	/* Enable VP */
--	vpconfig = voltdm->read(vp->vpconfig);
- 	vpconfig |= vp->common->vpconfig_vpenable;
- 	voltdm->write(vpconfig, vp->vpconfig);
-+
- 	vp->enabled = true;
- }
- 
+Kevin
+
+
+
+Kevin Hilman (6):
+  OMAP3+: voltage: rename scale and reset functions using voltdm_
+    prefix
+  OMAP3+: voltage: move/rename curr_volt from vdd_info into struct
+    voltagedomain
+  OMAP3+: voltdm: final removal of omap_vdd_info
+  OMAP3+: voltage: rename omap_voltage_get_nom_volt ->
+    voltdm_get_voltage
+  OMAP3+: voltage: update nominal voltage in voltdm_scale() not VC
+    post-scale
+  OMAP2+: VC: more registers are per-channel starting with OMAP5
+
+Tero Kristo (1):
+  omap: voltage: add a stub header file for external/regulator use
+
+ arch/arm/mach-omap2/pm.c                      |    2 +-
+ arch/arm/mach-omap2/smartreflex-class3.c      |    4 +-
+ arch/arm/mach-omap2/vc.c                      |   13 +--
+ arch/arm/mach-omap2/vc.h                      |   14 ++--
+ arch/arm/mach-omap2/vc3xxx_data.c             |   12 ++-
+ arch/arm/mach-omap2/vc44xx_data.c             |   16 +++-
+ arch/arm/mach-omap2/voltage.c                 |  107 ++++++++----------------
+ arch/arm/mach-omap2/voltage.h                 |   25 ++-----
+ arch/arm/mach-omap2/voltagedomains3xxx_data.c |   14 +---
+ arch/arm/mach-omap2/voltagedomains44xx_data.c |   15 +---
+ arch/arm/plat-omap/include/plat/voltage.h     |   20 +++++
+ 11 files changed, 104 insertions(+), 138 deletions(-)
+ create mode 100644 arch/arm/plat-omap/include/plat/voltage.h
+
 -- 
 1.7.6
