@@ -1,20 +1,44 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 29 Aug 2011 12:24:48 -0400
-Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
-In-Reply-To: <CACVXFVNTGsaw2jLosqrTOdnZX399VfE7dWuVYvLcN50_bsa+tQ@mail.gmail.com>
-References: <20110829085209.GB26917@n2100.arm.linux.org.uk>
-	<Pine.LNX.4.44L0.1108290951250.2525-100000@iolanthe.rowland.org>
-	<CACVXFVNTGsaw2jLosqrTOdnZX399VfE7dWuVYvLcN50_bsa+tQ@mail.gmail.com>
-Message-ID: <1314635090.2344.53.camel@deneb.redhat.com>
+From: daiane.angolini@freescale.com (Daiane Angolini)
+Date: Mon, 29 Aug 2011 13:38:26 -0300
+Subject: [PATCH] ARM: mx53_ard: Add support for the accelerometer
+Message-ID: <1314635906-18962-1-git-send-email-daiane.angolini@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-08-29 at 23:55 +0800, Ming Lei wrote:
-> If writing to coherent memory can't reach physical memory immediately on
-> other ARCHs,  the problem can still happen on these ARCHs. But I am
-> not sure if there are these kind of ARCHs except for ARM.
+mx53_ard has a MMA8451 accelerometer connected to i2c2.
 
-If there is write buffering which prevents outside bus masters from
-seeing the data, can we really call it coherent memory?
+Add support for it.
 
---Mark
+Signed-off-by: Daiane Angolini <daiane.angolini@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx53_ard.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
+index ddc3015..b6dc812 100644
+--- a/arch/arm/mach-mx5/board-mx53_ard.c
++++ b/arch/arm/mach-mx5/board-mx53_ard.c
+@@ -161,6 +161,12 @@ static const struct esdhc_platform_data mx53_ard_sd1_data __initconst = {
+ 	.wp_gpio = ARD_SD1_WP,
+ };
+ 
++static struct i2c_board_info mx53ard_i2c_devices[] = {
++	{
++		I2C_BOARD_INFO("mma8450", 0x1C),
++	},
++};
++
+ static struct imxi2c_platform_data mx53_ard_i2c2_data = {
+ 	.bitrate = 50000,
+ };
+@@ -231,6 +237,8 @@ static void __init mx53_ard_board_init(void)
+ 
+ 	imx53_add_sdhci_esdhc_imx(0, &mx53_ard_sd1_data);
+ 	imx53_add_imx2_wdt(0, NULL);
++	i2c_register_board_info(2, mx53ard_i2c_devices,
++				ARRAY_SIZE(mx53ard_i2c_devices));
+ 	imx53_add_imx_i2c(1, &mx53_ard_i2c2_data);
+ 	imx53_add_imx_i2c(2, &mx53_ard_i2c3_data);
+ 	imx_add_gpio_keys(&ard_button_data);
+-- 
+1.7.1
