@@ -1,42 +1,76 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 11:15:18 -0700
-Subject: [PATCH 2/5] OMAP4: PM: TWL6030: fix uv to voltage for >0x39
+Date: Mon, 29 Aug 2011 11:15:20 -0700
+Subject: [PATCH 4/5] OMAP4: PM: TWL6030: fix ON/RET/OFF voltages
 In-Reply-To: <1314641721-5172-1-git-send-email-khilman@ti.com>
 References: <1314641721-5172-1-git-send-email-khilman@ti.com>
-Message-ID: <1314641721-5172-3-git-send-email-khilman@ti.com>
+Message-ID: <1314641721-5172-5-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+From: Patrick Titiano <p-titiano@ti.com>
 
-using 1.35V as a check is not correct, we know that beyond 0x39,
-voltages are non linear - hence use the conversion iff uV greater
-than that for 0x39. For example, with  709mV as the smps offset,
-the max linear is actually 1.41V(0x39vsel)!
+According to latest OMAP4430 Data Manual v0.4 dated March 2011:
+ - Retention voltage shall be set to 0.83V. See tables 2.2, 2.4 and 2.6 in DM.
+   This allows saving a little more power in retention states.
+ - OPP100 IVA nominal voltage is 1.188V. See table 2.4 in DM.
+   This allows saving a little power when CPU wakes up until Smart-Reflex is
+   not yet resumed.
 
+[nm at ti.com: ported to voltdm_c]
 Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Patrick Titiano <p-titiano@ti.com>
 ---
- arch/arm/mach-omap2/omap_twl.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap_twl.c |   24 ++++++++++++------------
+ 1 files changed, 12 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
-index a66bf6b..5def7c2 100644
+index b30adf3..4bc99fb 100644
 --- a/arch/arm/mach-omap2/omap_twl.c
 +++ b/arch/arm/mach-omap2/omap_twl.c
-@@ -134,8 +134,13 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
- 	 * hardcoding only for 1.35 V which is used for 1GH OPP for
- 	 * OMAP4430.
- 	 */
--	if (uv == 1350000)
-+	if (uv > twl6030_vsel_to_uv(0x39)) {
-+		if (uv == 1350000)
-+			return 0x3A;
-+		pr_err("%s:OUT OF RANGE! non mapped vsel for %ld Vs max %ld\n",
-+			__func__, uv, twl6030_vsel_to_uv(0x39));
- 		return 0x3A;
-+	}
- 
- 	if (smps_offset & 0x8)
- 		return DIV_ROUND_UP(uv - 709000, 12660) + 1;
+@@ -197,10 +197,10 @@ static struct omap_voltdm_pmic omap3_core_pmic = {
+ static struct omap_voltdm_pmic omap4_mpu_pmic = {
+ 	.slew_rate		= 4000,
+ 	.step_size		= 12660,
+-	.on_volt		= 1350000,
+-	.onlp_volt		= 1350000,
+-	.ret_volt		= 837500,
+-	.off_volt		= 600000,
++	.on_volt		= 1375000,
++	.onlp_volt		= 1375000,
++	.ret_volt		= 830000,
++	.off_volt		= 0,
+ 	.volt_setup_time	= 0,
+ 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+ 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
+@@ -218,10 +218,10 @@ static struct omap_voltdm_pmic omap4_mpu_pmic = {
+ static struct omap_voltdm_pmic omap4_iva_pmic = {
+ 	.slew_rate		= 4000,
+ 	.step_size		= 12660,
+-	.on_volt		= 1100000,
+-	.onlp_volt		= 1100000,
+-	.ret_volt		= 837500,
+-	.off_volt		= 600000,
++	.on_volt		= 1188000,
++	.onlp_volt		= 1188000,
++	.ret_volt		= 830000,
++	.off_volt		= 0,
+ 	.volt_setup_time	= 0,
+ 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+ 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
+@@ -239,10 +239,10 @@ static struct omap_voltdm_pmic omap4_iva_pmic = {
+ static struct omap_voltdm_pmic omap4_core_pmic = {
+ 	.slew_rate		= 4000,
+ 	.step_size		= 12660,
+-	.on_volt		= 1100000,
+-	.onlp_volt		= 1100000,
+-	.ret_volt		= 837500,
+-	.off_volt		= 600000,
++	.on_volt		= 1200000,
++	.onlp_volt		= 1200000,
++	.ret_volt		= 830000,
++	.off_volt		= 0,
+ 	.volt_setup_time	= 0,
+ 	.vp_erroroffset		= OMAP4_VP_CONFIG_ERROROFFSET,
+ 	.vp_vstepmin		= OMAP4_VP_VSTEPMIN_VSTEPMIN,
 -- 
 1.7.6
