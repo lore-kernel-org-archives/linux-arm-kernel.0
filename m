@@ -1,32 +1,43 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 29 Aug 2011 11:15:16 -0700
-Subject: [PATCH 0/5] OMAP: voltage cleanup part E: TWL6030 PMIC fixes
-Message-ID: <1314641721-5172-1-git-send-email-khilman@ti.com>
+Date: Mon, 29 Aug 2011 11:15:19 -0700
+Subject: [PATCH 3/5] OMAP4: PM: TWL6030: address 0V conversions
+In-Reply-To: <1314641721-5172-1-git-send-email-khilman@ti.com>
+References: <1314641721-5172-1-git-send-email-khilman@ti.com>
+Message-ID: <1314641721-5172-4-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series focuses on cleanups and fixes in support of the TWL6030 PMIC.
+From: Nishanth Menon <nm@ti.com>
 
-Available in the pm-wip/voltdm_e branch of my linux-omap-pm tree
-git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+0V conversions should be mapped to 0 as it is meant to denote
+off voltages.
 
-Applies on v3.1-rc3 + the part A, B, C & D series.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap2/omap_twl.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Kevin
-
-
-
-Nishanth Menon (3):
-  OMAP4: PM: TWL6030: fix uv to voltage for >0x39
-  OMAP4: PM: TWL6030: address 0V conversions
-  OMAP4: PM: TWL6030: add cmd register
-
-Patrick Titiano (2):
-  OMAP4: PM: TWL6030: fix voltage conversion formula
-  OMAP4: PM: TWL6030: fix ON/RET/OFF voltages
-
- arch/arm/mach-omap2/omap_twl.c |   55 +++++++++++++++++++++++++--------------
- 1 files changed, 35 insertions(+), 20 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/omap_twl.c b/arch/arm/mach-omap2/omap_twl.c
+index 5def7c2..b30adf3 100644
+--- a/arch/arm/mach-omap2/omap_twl.c
++++ b/arch/arm/mach-omap2/omap_twl.c
+@@ -95,6 +95,8 @@ static unsigned long twl6030_vsel_to_uv(const u8 vsel)
+ 		is_offset_valid = true;
+ 	}
+ 
++	if (!vsel)
++		return 0;
+ 	/*
+ 	 * There is no specific formula for voltage to vsel
+ 	 * conversion above 1.3V. There are special hardcoded
+@@ -127,6 +129,8 @@ static u8 twl6030_uv_to_vsel(unsigned long uv)
+ 		is_offset_valid = true;
+ 	}
+ 
++	if (!uv)
++		return 0x00;
+ 	/*
+ 	 * There is no specific formula for voltage to vsel
+ 	 * conversion above 1.3V. There are special hardcoded
 -- 
 1.7.6
