@@ -1,129 +1,31 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Mon, 29 Aug 2011 20:51:25 +0530
-Subject: [PATCH 1/2] dmaengine: ipu-idmac: add support for the
-	DMA_PAUSE control
-In-Reply-To: <Pine.LNX.4.64.1108251841300.17190@axis700.grange>
-References: <1314211292-10414-1-git-send-email-g.liakhovetski@gmx.de>
-	<Pine.LNX.4.64.1108251838090.17190@axis700.grange>
-	<Pine.LNX.4.64.1108251841300.17190@axis700.grange>
-Message-ID: <1314631285.1606.154.camel@vkoul-udesk3>
+From: davej@redhat.com (Dave Jones)
+Date: Mon, 29 Aug 2011 11:28:24 -0400
+Subject: [PATCH v2] ARM: ux500: send cpufreq notification for all cpus
+In-Reply-To: <CACRpkdakub21x+hco4+EBwLmiH9ZJsYQujsL=3m0H7g2LMFkEQ@mail.gmail.com>
+References: <1314253880-2438-1-git-send-email-vincent.guittot@linaro.org>
+	<CACRpkdakub21x+hco4+EBwLmiH9ZJsYQujsL=3m0H7g2LMFkEQ@mail.gmail.com>
+Message-ID: <20110829152824.GA2027@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-08-25 at 18:45 +0200, Guennadi Liakhovetski wrote:
-> To support multi-size buffers in the mx3_camera V4L2 driver we have to be
-> able to stop DMA on a channel without releasing descriptors and completely
-> halting the hardware. Use the DMA_PAUSE control to implement this mode.
-> 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-Acked-by Vinod Koul <vinod.koul@linux.intel.com>
+On Mon, Aug 29, 2011 at 11:44:31AM +0200, Linus Walleij wrote:
+ > On Thu, Aug 25, 2011 at 8:31 AM, Vincent Guittot
+ > <vincent.guittot@linaro.org> wrote:
+ > 
+ > > The same clock is used for all cpus so we must notify the frequency change
+ > > for each one in order to update the configuration of all twd clockevents.
+ > >
+ > > change since V1:
+ > > * use policy->cpus instead of cpu_online_mask
+ > >
+ > > Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+ > 
+ > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+ > 
+ > Dave, are you picking this up?
 
-Do you want this to go thru slave-dma or media tree?
+yeah, I have it queued. I'll get to it today.
 
--- 
-~Vinod
-> ---
->  drivers/dma/ipu/ipu_idmac.c |   65 +++++++++++++++++++++++++++---------------
->  1 files changed, 42 insertions(+), 23 deletions(-)
-> 
-> diff --git a/drivers/dma/ipu/ipu_idmac.c b/drivers/dma/ipu/ipu_idmac.c
-> index c1a125e..42cdf1c 100644
-> --- a/drivers/dma/ipu/ipu_idmac.c
-> +++ b/drivers/dma/ipu/ipu_idmac.c
-> @@ -1306,6 +1306,7 @@ static irqreturn_t idmac_interrupt(int irq, void *dev_id)
->  	    ipu_submit_buffer(ichan, descnew, sgnew, ichan->active_buffer) < 0) {
->  		callback = descnew->txd.callback;
->  		callback_param = descnew->txd.callback_param;
-> +		list_del_init(&descnew->list);
->  		spin_unlock(&ichan->lock);
->  		if (callback)
->  			callback(callback_param);
-> @@ -1427,39 +1428,58 @@ static int __idmac_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  {
->  	struct idmac_channel *ichan = to_idmac_chan(chan);
->  	struct idmac *idmac = to_idmac(chan->device);
-> +	struct ipu *ipu = to_ipu(idmac);
-> +	struct list_head *list, *tmp;
->  	unsigned long flags;
->  	int i;
->  
-> -	/* Only supports DMA_TERMINATE_ALL */
-> -	if (cmd != DMA_TERMINATE_ALL)
-> -		return -ENXIO;
-> +	switch (cmd) {
-> +	case DMA_PAUSE:
-> +		spin_lock_irqsave(&ipu->lock, flags);
-> +		ipu_ic_disable_task(ipu, chan->chan_id);
->  
-> -	ipu_disable_channel(idmac, ichan,
-> -			    ichan->status >= IPU_CHANNEL_ENABLED);
-> +		/* Return all descriptors into "prepared" state */
-> +		list_for_each_safe(list, tmp, &ichan->queue)
-> +			list_del_init(list);
->  
-> -	tasklet_disable(&to_ipu(idmac)->tasklet);
-> +		ichan->sg[0] = NULL;
-> +		ichan->sg[1] = NULL;
->  
-> -	/* ichan->queue is modified in ISR, have to spinlock */
-> -	spin_lock_irqsave(&ichan->lock, flags);
-> -	list_splice_init(&ichan->queue, &ichan->free_list);
-> +		spin_unlock_irqrestore(&ipu->lock, flags);
->  
-> -	if (ichan->desc)
-> -		for (i = 0; i < ichan->n_tx_desc; i++) {
-> -			struct idmac_tx_desc *desc = ichan->desc + i;
-> -			if (list_empty(&desc->list))
-> -				/* Descriptor was prepared, but not submitted */
-> -				list_add(&desc->list, &ichan->free_list);
-> +		ichan->status = IPU_CHANNEL_INITIALIZED;
-> +		break;
-> +	case DMA_TERMINATE_ALL:
-> +		ipu_disable_channel(idmac, ichan,
-> +				    ichan->status >= IPU_CHANNEL_ENABLED);
->  
-> -			async_tx_clear_ack(&desc->txd);
-> -		}
-> +		tasklet_disable(&ipu->tasklet);
->  
-> -	ichan->sg[0] = NULL;
-> -	ichan->sg[1] = NULL;
-> -	spin_unlock_irqrestore(&ichan->lock, flags);
-> +		/* ichan->queue is modified in ISR, have to spinlock */
-> +		spin_lock_irqsave(&ichan->lock, flags);
-> +		list_splice_init(&ichan->queue, &ichan->free_list);
->  
-> -	tasklet_enable(&to_ipu(idmac)->tasklet);
-> +		if (ichan->desc)
-> +			for (i = 0; i < ichan->n_tx_desc; i++) {
-> +				struct idmac_tx_desc *desc = ichan->desc + i;
-> +				if (list_empty(&desc->list))
-> +					/* Descriptor was prepared, but not submitted */
-> +					list_add(&desc->list, &ichan->free_list);
->  
-> -	ichan->status = IPU_CHANNEL_INITIALIZED;
-> +				async_tx_clear_ack(&desc->txd);
-> +			}
-> +
-> +		ichan->sg[0] = NULL;
-> +		ichan->sg[1] = NULL;
-> +		spin_unlock_irqrestore(&ichan->lock, flags);
-> +
-> +		tasklet_enable(&ipu->tasklet);
-> +
-> +		ichan->status = IPU_CHANNEL_INITIALIZED;
-> +		break;
-> +	default:
-> +		return -ENOSYS;
-> +	}
->  
->  	return 0;
->  }
-> @@ -1662,7 +1682,6 @@ static void __exit ipu_idmac_exit(struct ipu *ipu)
->  		struct idmac_channel *ichan = ipu->channel + i;
->  
->  		idmac_control(&ichan->dma_chan, DMA_TERMINATE_ALL, 0);
-> -		idmac_prep_slave_sg(&ichan->dma_chan, NULL, 0, DMA_NONE, 0);
->  	}
->  
->  	dma_async_device_unregister(&idmac->dma);
+thanks,
+
+	Dave
