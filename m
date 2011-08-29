@@ -1,63 +1,76 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 29 Aug 2011 12:33:41 -0400 (EDT)
-Subject: [RFC PATCH] arm: fiq: convert enable/disable_fiq to inline
-	functions
-In-Reply-To: <CANfBPZ-MbHP8zAqmi3m6=PjSkvBeWO=H18B+ALZToeHrQdbcfw@mail.gmail.com>
-References: <1314628177-3193-1-git-send-email-svenkatr@ti.com>
-	<alpine.LFD.2.00.1108291112010.20358@xanadu.home>
-	<CANfBPZ-MbHP8zAqmi3m6=PjSkvBeWO=H18B+ALZToeHrQdbcfw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1108291224580.20358@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 29 Aug 2011 10:13:58 -0700
+Subject: [PATCH 00/22] OMAP: voltage cleanup part A
+Message-ID: <1314638060-4689-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Aug 2011, S, Venkatraman wrote:
+This is the first phase of the OMAP voltage layer cleanup.  The
+primary goal is to cleanup/reorganize data structures to facilitate
+splitting apart the voltage processor (VP) and voltage controller (VC)
+into separate layers.
 
-> On Mon, Aug 29, 2011 at 8:44 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Mon, 29 Aug 2011, Venkatraman S wrote:
-> >
-> >> FIQ_START is an platform specific constant used in the
-> >> implementation of enable_fiq and disable_fiq.
-> >> Converting then to inline functions enables different
-> >> architectures which use the FIQ module to exist in a single
-> >> zImage with different values of FIQ_START.
-> >>
-> >> Signed-off-by: Venkatraman S <svenkatr@ti.com>
-> >
-> > I fail to see how this patch inproves things. The asm/fiq.h file is just
-> > as global as kernel/fiq.c is.
-> >
-> 
-> Argh!! I intended this to be a macro like this
-> #define enable_fiq(x)  enable_irq((x) + FIQ_START)
-> so that the constant is needed only at places where it is expanded.
-> 
-> This way different platforms can have their local irqs.h supply the constant,
-> where the macros are used.
-> 
-> Somehow I thought inline functions are more readable and assumed the
-> same macro'ish behaviour.
-> 
-> Will a macro variant of this be more useful ?
+Benoit Cousson (1):
+  OMAP4: powerdomain data: add voltage domains
 
-Well... I think that, given that this FIQ_START is not widely 
-used/defined anyway, it would probably make sense to simply get rid of 
-it and fold its value directly in the actual FIQ definition being used, 
-directly in irqs.h.  For example, arch/arm/mach-rpc/include/mach/irqs.h 
-could look like:
+Kevin Hilman (21):
+  OMAP2+: hwmod: remove unused voltagedomain pointer
+  OMAP2+: voltage: move PRCM mod offets into VC/VP structures
+  OMAP2+: voltage: move prm_irqst_reg from VP into voltage domain
+  OMAP2+: voltage: start towards a new voltagedomain layer
+  OMAP3: voltage: rename "mpu" voltagedomain to "mpu_iva"
+  OMAP3: voltagedomain data: add wakeup domain
+  OMAP3+: voltage: add scalable flag to voltagedomain
+  OMAP2+: powerdomain: add voltagedomain to struct powerdomain
+  OMAP2: add voltage domains and connect to powerdomains
+  OMAP3: powerdomain data: add voltage domains
+  OMAP2+: powerdomain: add voltage domain lookup during register
+  OMAP2+: voltage: keep track of powerdomains in each voltagedomain
+  OMAP2+: voltage: split voltage controller (VC) code into dedicated
+    layer
+  OMAP2+: voltage: move VC into struct voltagedomain, misc. renames
+  OMAP2+: voltage: enable VC bypass scale method when VC is initialized
+  OMAP2+: voltage: split out voltage processor (VP) code into new layer
+  OMAP2+: VC: support PMICs with separate voltage and command registers
+  OMAP2+: add PRM VP functions for checking/clearing VP TX done status
+  OMAP3+ VP: replace transaction done check/clear with VP ops
+  OMAP2+: PRM: add register access functions for VC/VP
+  OMAP3+: voltage: convert to PRM register access functions
 
-#define FIQ_START               64
+ arch/arm/mach-omap2/Makefile                     |    5 +-
+ arch/arm/mach-omap2/io.c                         |    5 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c       |    4 +-
+ arch/arm/mach-omap2/omap_twl.c                   |   20 +-
+ arch/arm/mach-omap2/pm.c                         |    4 +-
+ arch/arm/mach-omap2/powerdomain.c                |   23 +
+ arch/arm/mach-omap2/powerdomain.h                |   10 +
+ arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c |    2 +
+ arch/arm/mach-omap2/powerdomains2xxx_data.c      |    4 +
+ arch/arm/mach-omap2/powerdomains3xxx_data.c      |   16 +
+ arch/arm/mach-omap2/powerdomains44xx_data.c      |   16 +
+ arch/arm/mach-omap2/prm2xxx_3xxx.c               |   56 ++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h               |   12 +
+ arch/arm/mach-omap2/prm44xx.c                    |   71 ++
+ arch/arm/mach-omap2/prm44xx.h                    |   12 +
+ arch/arm/mach-omap2/sr_device.c                  |    2 +-
+ arch/arm/mach-omap2/vc.c                         |  259 +++++++
+ arch/arm/mach-omap2/vc.h                         |   34 +-
+ arch/arm/mach-omap2/vc3xxx_data.c                |   10 +-
+ arch/arm/mach-omap2/vc44xx_data.c                |   14 +-
+ arch/arm/mach-omap2/voltage.c                    |  889 +++++-----------------
+ arch/arm/mach-omap2/voltage.h                    |   61 +-
+ arch/arm/mach-omap2/voltagedomains2xxx_data.c    |   32 +
+ arch/arm/mach-omap2/voltagedomains3xxx_data.c    |   53 +-
+ arch/arm/mach-omap2/voltagedomains44xx_data.c    |   69 +-
+ arch/arm/mach-omap2/vp.c                         |  367 +++++++++
+ arch/arm/mach-omap2/vp.h                         |   45 +-
+ arch/arm/mach-omap2/vp3xxx_data.c                |   21 +-
+ arch/arm/mach-omap2/vp44xx_data.c                |   28 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h     |    1 -
+ 30 files changed, 1281 insertions(+), 864 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/vc.c
+ create mode 100644 arch/arm/mach-omap2/voltagedomains2xxx_data.c
+ create mode 100644 arch/arm/mach-omap2/vp.c
 
-#define FIQ_FLOPPYDATA          (FIQ_START + 0)
-#define FIQ_ECONET              (FIQ_START + 2)
-#define FIQ_SERIALPORT          (FIQ_START + 4)
-#define FIQ_EXPANSIONCARD       (FIQ_START + 6)
-#define FIQ_FORCE               (FIQ_START + 7)
-
-And then FIQ_START wouldn't have to be used anywhere else.
-
-But looking at the whole source tree I still fail to see the usefulness 
-of this FIQ_START symbol, meaning that it could perhaps simply be 
-removed outright.
-
-
-Nicolas
+-- 
+1.7.6
