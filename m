@@ -1,117 +1,165 @@
 From: hvaibhav@ti.com (hvaibhav at ti.com)
-Date: Mon, 29 Aug 2011 18:16:16 +0530
-Subject: [RFC PATCH-V2 4/4] AM335X: Add low level debugging support
+Date: Mon, 29 Aug 2011 18:16:13 +0530
+Subject: [RFC PATCH-V2 1/4] AM335X: Update common omap platform files
 In-Reply-To: <hvaibhav@ti.com>
 References: <hvaibhav@ti.com>
-Message-ID: <1314621976-25750-5-git-send-email-hvaibhav@ti.com>
+Message-ID: <1314621976-25750-2-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Afzal Mohammed <afzal@ti.com>
 
-Add support for low level debugging on AM335X EVM. Currently only
-support for UART1 console, which is used on AM335X EVM is added.
+This patch updates the common platform files with AM335X device
+support.
+
+The approach taken in this patch is,
+AM33XX device will be considered as OMAP3 variant, and a separate
+SoC class created for AM33XX family of devices with a subclass type
+for AM335X device which is newly added device in the family.
+
+This means, cpu_is_omap34xx(), cpu_is_am33xx() and cpu_is_am335x()
+checks will return success on AM335X.
+A kernel config option CONFIG_SOC_OMAPAM33XX is added under OMAP3
+to include support for AM33XX build.
 
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/include/mach/debug-macro.S |   22 ++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/serial.h       |    4 ++++
- arch/arm/plat-omap/include/plat/uncompress.h   |    6 ++++++
- 3 files changed, 32 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/Kconfig                   |    5 +++++
+ arch/arm/plat-omap/include/plat/clkdev_omap.h |    1 +
+ arch/arm/plat-omap/include/plat/clock.h       |    1 +
+ arch/arm/plat-omap/include/plat/cpu.h         |   23 +++++++++++++++++++++++
+ 4 files changed, 30 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
-index 309e328..5bdfd0b 100644
---- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-@@ -78,6 +78,8 @@ omap_uart_lsr:	.word	0
- 		beq	82f			@ configure UART2
- 		cmp	\rp, #TI81XXUART3	@ ti81Xx UART offsets different
- 		beq	83f			@ configure UART3
-+		cmp	\rp, #AM335XUART1	@ AM335X UART offsets different
-+		beq	84f			@ configure UART1
- 		cmp	\rp, #ZOOM_UART		@ only on zoom2/3
- 		beq	95f			@ configure ZOOM_UART
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index cc4f213..f437e70 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -78,6 +78,11 @@ config SOC_OMAPTI81XX
+ 	depends on ARCH_OMAP3
+ 	default y
 
-@@ -106,6 +108,9 @@ omap_uart_lsr:	.word	0
- 		b	98f
- 83:		mov	\rp, #UART_OFFSET(TI81XX_UART3_BASE)
- 		b	98f
-+84:		ldr	\rp, =AM335X_UART1_BASE
-+		and	\rp, \rp, #0x00ffffff
-+		b	97f
- 95:		ldr	\rp, =ZOOM_UART_BASE
- 		mrc	p15, 0, \rv, c1, c0
- 		tst	\rv, #1			@ MMU enabled?
-@@ -121,6 +126,23 @@ omap_uart_lsr:	.word	0
- 		b	10b
-
- 		/* Store both phys and virt address for the uart */
-+97:		add	\rp, \rp, #0x44000000	@ phys base
-+		mrc	p15, 0, \rv, c1, c0
-+		tst	\rv, #1			@ MMU enabled?
-+		ldreq	\rv, =omap_uart_v2p(omap_uart_phys)	@ MMU disabled
-+		ldrne	\rv, =omap_uart_phys	@ MMU enabled
-+		str	\rp, [\rv, #0]
-+		sub	\rp, \rp, #0x44000000	@ phys base
-+		add	\rp, \rp, #0xf9000000	@ virt base
-+		add	\rv, \rv, #4		@ omap_uart_virt
-+		str	\rp, [\rv, #0]
-+		mov	\rp, #(UART_LSR << OMAP_PORT_SHIFT)
-+		add	\rv, \rv, #4		@ omap_uart_lsr
-+		str	\rp, [\rv, #0]
++config SOC_OMAPAM33XX
++	bool "AM33XX support"
++	depends on ARCH_OMAP3
++	default y
 +
-+		b	10b
-+
-+		/* Store both phys and virt address for the uart */
- 98:		add	\rp, \rp, #0x48000000	@ phys base
- 		mrc	p15, 0, \rv, c1, c0
- 		tst	\rv, #1			@ MMU enabled?
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index 865b13e..d7c1216 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -59,6 +59,9 @@
- /* AM3505/3517 UART4 */
- #define AM35XX_UART4_BASE	0x4809E000	/* Only on AM3505/3517 */
+ config OMAP_PACKAGE_ZAF
+        bool
 
-+/* AM335X serial port */
-+#define AM335X_UART1_BASE	0x44E09000
-+
- /* External port on Zoom2/3 */
- #define ZOOM_UART_BASE		0x10000000
- #define ZOOM_UART_VIRT		0xfa400000
-@@ -92,6 +95,7 @@
- #define TI81XXUART1		81
- #define TI81XXUART2		82
- #define TI81XXUART3		83
-+#define AM335XUART1		84
- #define ZOOM_UART		95		/* Only on zoom2/3 */
+diff --git a/arch/arm/plat-omap/include/plat/clkdev_omap.h b/arch/arm/plat-omap/include/plat/clkdev_omap.h
+index 3c50ec8..991e72c 100644
+--- a/arch/arm/plat-omap/include/plat/clkdev_omap.h
++++ b/arch/arm/plat-omap/include/plat/clkdev_omap.h
+@@ -41,6 +41,7 @@ struct omap_clk {
+ #define CK_TI816X	(1 << 12)
+ #define CK_446X		(1 << 13)
+ #define CK_TI814X	(1 << 14)
++#define CK_AM335X	(1 << 15)	/* AM335x specific clocks */
 
- /* This is only used by 8250.c for omap1510 */
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index 8d052e7..3592ce4 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -97,6 +97,10 @@ static inline void flush(void)
- 	_DEBUG_LL_ENTRY(mach, TI81XX_UART##p##_BASE, OMAP_PORT_SHIFT,	\
- 		TI81XXUART##p)
 
-+#define DEBUG_LL_AM335X(p, mach)					\
-+	_DEBUG_LL_ENTRY(mach, AM335X_UART##p##_BASE, OMAP_PORT_SHIFT,	\
-+		AM335XUART##p)
-+
- static inline void __arch_decomp_setup(unsigned long arch_id)
- {
- 	int port = 0;
-@@ -178,6 +182,8 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		/* TI8148 base boards using UART1 */
- 		DEBUG_LL_TI81XX(1, ti8148evm);
+ #define CK_34XX		(CK_3430ES1 | CK_3430ES2PLUS)
+diff --git a/arch/arm/plat-omap/include/plat/clock.h b/arch/arm/plat-omap/include/plat/clock.h
+index 1c41292..b5d7447 100644
+--- a/arch/arm/plat-omap/include/plat/clock.h
++++ b/arch/arm/plat-omap/include/plat/clock.h
+@@ -60,6 +60,7 @@ struct clkops {
+ #define RATE_IN_TI816X		(1 << 6)
+ #define RATE_IN_4460		(1 << 7)
+ #define RATE_IN_TI814X		(1 << 8)
++#define RATE_IN_AM335X		(1 << 9)
 
-+		/* AM335x base boards using UART1 */
-+		DEBUG_LL_AM335X(1, am335xevm);
- 	} while (0);
+ #define RATE_IN_24XX		(RATE_IN_242X | RATE_IN_243X)
+ #define RATE_IN_34XX		(RATE_IN_3430ES1 | RATE_IN_3430ES2PLUS)
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index f4ebbae..4f04ae0 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -106,6 +106,12 @@ static inline int is_ti ##class (void)		\
+ 	return (GET_TI_CLASS == (id)) ? 1 : 0;	\
  }
+
++#define IS_AM_CLASS(class, id)			\
++static inline int is_am ##class (void)		\
++{							\
++	return (GET_TI_CLASS == (id)) ? 1 : 0;	\
++}
++
+ #define GET_OMAP_SUBCLASS	((omap_rev() >> 20) & 0x0fff)
+
+ #define IS_OMAP_SUBCLASS(subclass, id)			\
+@@ -120,6 +126,12 @@ static inline int is_ti ##subclass (void)		\
+ 	return (GET_OMAP_SUBCLASS == (id)) ? 1 : 0;	\
+ }
+
++#define IS_AM_SUBCLASS(subclass, id)			\
++static inline int is_am ##subclass (void)		\
++{							\
++	return (GET_OMAP_SUBCLASS == (id)) ? 1 : 0;	\
++}
++
+ IS_OMAP_CLASS(7xx, 0x07)
+ IS_OMAP_CLASS(15xx, 0x15)
+ IS_OMAP_CLASS(16xx, 0x16)
+@@ -128,6 +140,7 @@ IS_OMAP_CLASS(34xx, 0x34)
+ IS_OMAP_CLASS(44xx, 0x44)
+
+ IS_TI_CLASS(81xx, 0x81)
++IS_AM_CLASS(33xx, 0x33)
+
+ IS_OMAP_SUBCLASS(242x, 0x242)
+ IS_OMAP_SUBCLASS(243x, 0x243)
+@@ -138,6 +151,7 @@ IS_OMAP_SUBCLASS(446x, 0x446)
+
+ IS_TI_SUBCLASS(816x, 0x816)
+ IS_TI_SUBCLASS(814x, 0x814)
++IS_AM_SUBCLASS(335x, 0x335)
+
+ #define cpu_is_omap7xx()		0
+ #define cpu_is_omap15xx()		0
+@@ -150,6 +164,7 @@ IS_TI_SUBCLASS(814x, 0x814)
+ #define cpu_is_ti81xx()			0
+ #define cpu_is_ti816x()			0
+ #define cpu_is_ti814x()			0
++#define cpu_is_am335x()			0
+ #define cpu_is_omap44xx()		0
+ #define cpu_is_omap443x()		0
+ #define cpu_is_omap446x()		0
+@@ -358,6 +373,8 @@ IS_OMAP_TYPE(3517, 0x3517)
+ # undef cpu_is_ti81xx
+ # undef cpu_is_ti816x
+ # undef cpu_is_ti814x
++# undef cpu_is_am33xx
++# undef cpu_is_am335x
+ # define cpu_is_omap3430()		is_omap3430()
+ # define cpu_is_omap3503()		(cpu_is_omap3430() &&		\
+ 						(!omap3_has_iva()) &&	\
+@@ -376,6 +393,8 @@ IS_OMAP_TYPE(3517, 0x3517)
+ # define cpu_is_ti81xx()		is_ti81xx()
+ # define cpu_is_ti816x()		is_ti816x()
+ # define cpu_is_ti814x()		is_ti814x()
++# define cpu_is_am33xx()		is_am33xx()
++# define cpu_is_am335x()		is_am335x()
+ #endif
+
+ # if defined(CONFIG_ARCH_OMAP4)
+@@ -431,6 +450,9 @@ IS_OMAP_TYPE(3517, 0x3517)
+ #define TI8148_REV_ES2_0	(TI814X_CLASS | (OMAP_REVBITS_01 << 8))
+ #define TI8148_REV_ES2_1	(TI814X_CLASS | (OMAP_REVBITS_02 << 8))
+
++#define AM335X_CLASS		0x33500034
++#define AM335X_REV_ES1_0	AM335X_CLASS
++
+ #define OMAP443X_CLASS		0x44300044
+ #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
+ #define OMAP4430_REV_ES2_0	(OMAP443X_CLASS | (0x20 << 8))
+@@ -471,6 +493,7 @@ IS_OMAP_TYPE(3517, 0x3517)
+ #define CHIP_IS_TI816X			(1 << 14)
+ #define CHIP_IS_OMAP4460ES1_0		(1 << 15)
+ #define CHIP_IS_TI814X			(1 << 16)
++#define CHIP_IS_AM335X			(1 << 17)
+
+ #define CHIP_IS_OMAP24XX		(CHIP_IS_OMAP2420 | CHIP_IS_OMAP2430)
 
 --
 1.6.2.4
