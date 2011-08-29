@@ -1,58 +1,63 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 29 Aug 2011 12:33:43 -0400 (EDT)
-Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
-In-Reply-To: <CACVXFVNFXh33tsvkM=jdnc8OocVhjkzpt6LK59zKa9L2F7HxpQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1108291218040.2525-100000@iolanthe.rowland.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 29 Aug 2011 12:33:41 -0400 (EDT)
+Subject: [RFC PATCH] arm: fiq: convert enable/disable_fiq to inline
+	functions
+In-Reply-To: <CANfBPZ-MbHP8zAqmi3m6=PjSkvBeWO=H18B+ALZToeHrQdbcfw@mail.gmail.com>
+References: <1314628177-3193-1-git-send-email-svenkatr@ti.com>
+	<alpine.LFD.2.00.1108291112010.20358@xanadu.home>
+	<CANfBPZ-MbHP8zAqmi3m6=PjSkvBeWO=H18B+ALZToeHrQdbcfw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1108291224580.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Aug 2011, Ming Lei wrote:
+On Mon, 29 Aug 2011, S, Venkatraman wrote:
 
-> Suppose HC can see the old value in hw_token, which has the ACTIVE bit clear.
+> On Mon, Aug 29, 2011 at 8:44 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Mon, 29 Aug 2011, Venkatraman S wrote:
+> >
+> >> FIQ_START is an platform specific constant used in the
+> >> implementation of enable_fiq and disable_fiq.
+> >> Converting then to inline functions enables different
+> >> architectures which use the FIQ module to exist in a single
+> >> zImage with different values of FIQ_START.
+> >>
+> >> Signed-off-by: Venkatraman S <svenkatr@ti.com>
+> >
+> > I fail to see how this patch inproves things. The asm/fiq.h file is just
+> > as global as kernel/fiq.c is.
+> >
 > 
-> The qtd transaction will not be executed until the new token is
-> flushed into memory.
-> From view of CPU, the irq is still be delayed because ioc irq is generated
-> after the qtd transaction is executed when new token is flushed into
-> memory. The delay
-> depends on how long the token will be flushed into memory.
+> Argh!! I intended this to be a macro like this
+> #define enable_fiq(x)  enable_irq((x) + FIQ_START)
+> so that the constant is needed only at places where it is expanded.
+> 
+> This way different platforms can have their local irqs.h supply the constant,
+> where the macros are used.
+> 
+> Somehow I thought inline functions are more readable and assumed the
+> same macro'ish behaviour.
+> 
+> Will a macro variant of this be more useful ?
 
-That's right.
+Well... I think that, given that this FIQ_START is not widely 
+used/defined anyway, it would probably make sense to simply get rid of 
+it and fold its value directly in the actual FIQ definition being used, 
+directly in irqs.h.  For example, arch/arm/mach-rpc/include/mach/irqs.h 
+could look like:
 
-> From my observation, the delay is commonly over 5ms for CSW, sometimes the delay
-> is more than 20ms, so caused the bad performance.
+#define FIQ_START               64
 
-No wonder!  Do you see the same sort of performance degradation when 
-using shared memory to communicate between two CPUs?
+#define FIQ_FLOPPYDATA          (FIQ_START + 0)
+#define FIQ_ECONET              (FIQ_START + 2)
+#define FIQ_SERIALPORT          (FIQ_START + 4)
+#define FIQ_EXPANSIONCARD       (FIQ_START + 6)
+#define FIQ_FORCE               (FIQ_START + 7)
 
-Regardless, this is not quite the same as what you were talking about
-earlier.  You specifically mentioned
+And then FIQ_START wouldn't have to be used anywhere else.
 
-	... so ehci may fetch a inconsistent qtd and execute it, then
-	mistaken IOC or "total bytes to transfer" are read by EHCI and
-	cause delayed irq or lost irq.
+But looking at the whole source tree I still fail to see the usefulness 
+of this FIQ_START symbol, meaning that it could perhaps simply be 
+removed outright.
 
-Bad performance is different from inconsistencies and lost IRQs.
 
-> Also I am not sure if EHCI can read the old hw_token correctly in this kind of
-> inconsistent memory state.
-
-The memory state is NOT inconsistent!  It is consistent at all times, 
-both before and after the new hw_token value is stored.  The memory 
-state is just slow to update, that's all.  This is a speed issue, not a 
-correctness issue.
-
-Nevertheless, it remains true that you want to add a memory barrier
-instruction simply in order to speed up a cache writeback, not to force
-any sort of ordering.  This needs to be explained carefully in the code
-(not just in the patch description!) and it needs to be done in a way
-that won't affect other architectures.
-
-Also, as you mentioned before, you may want to do the same thing in 
-qh_link_async() just after the
-
-	head->hw->hw_next = dma;
-
-line.  Delays in flushing that write would also slow down performance.
-
-Alan Stern
+Nicolas
