@@ -1,48 +1,34 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 30 Aug 2011 13:17:17 -0600
-Subject: [PATCH 3/3] arm/dt: Tegra: Add support-bit to SDHCI nodes
-In-Reply-To: <1314731837-6985-1-git-send-email-swarren@nvidia.com>
-References: <1314731837-6985-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1314731837-6985-3-git-send-email-swarren@nvidia.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 30 Aug 2011 15:17:22 -0400
+Subject: [Ksummit-2011-discuss] Update: ARM Sub-Architecture Maintainers
+	workshop at Kernel Summit 2011
+In-Reply-To: <20110830134444.GA1355@ponder.secretlab.ca> (Grant Likely's
+	message of "Tue, 30 Aug 2011 07:44:44 -0600")
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+	<4E5C82DB.4060908@compulab.co.il>
+	<20110830134444.GA1355@ponder.secretlab.ca>
+Message-ID: <m2liuaso8t.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Seaboard's internal eMMC, this makes the difference between a
-5.5MB/s and 10.2MB/s transfer rate. On Harmony, there wasn't any
-measurable difference on my cheap/slow ~2MB/s card.
+Hi Grant,
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-This depends on patch 1 in this series. I assume Grant or Arnd will apply
-them both to whatever branch usually takes .dts updates.
+On Tue, Aug 30 2011, Grant Likely wrote:
+> Sorry, I missed your name.  I'll add you to the list.  I haven't
+> created any rules about who can attend and who cannot other than first
+> come, first served, and I'm capping it at 24 people which is already
+> getting a little large for good discussion to happen.  I also reserve
+> the right to make exceptions to the above when needed, but I prefer
+> not to.
 
- arch/arm/boot/dts/tegra-harmony.dts  |    1 +
- arch/arm/boot/dts/tegra-seaboard.dts |    4 ++++
- 2 files changed, 5 insertions(+), 0 deletions(-)
+I'd be happy to participate if it's not taking space away from anyone
+with more regular interaction with arch maintainership; I'm interested
+in most of the items on the agenda as they relate to OLPC and MMC, and
+in spending more time helping out.
 
-diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
-index e581866..0e225b8 100644
---- a/arch/arm/boot/dts/tegra-harmony.dts
-+++ b/arch/arm/boot/dts/tegra-harmony.dts
-@@ -66,5 +66,6 @@
- 		cd-gpios = <&gpio 58 0>; /* gpio PH2 */
- 		wp-gpios = <&gpio 59 0>; /* gpio PH3 */
- 		power-gpios = <&gpio 70 0>; /* gpio PI6 */
-+		support-8bit;
- 	};
- };
-diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
-index 64cedca..a72299b 100644
---- a/arch/arm/boot/dts/tegra-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra-seaboard.dts
-@@ -25,4 +25,8 @@
- 		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
- 		power-gpios = <&gpio 70 0>; /* gpio PI6 */
- 	};
-+
-+	sdhci at c8000600 {
-+		support-8bit;
-+	};
- };
+Thanks,
+
+- Chris.
 -- 
-1.7.0.4
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
