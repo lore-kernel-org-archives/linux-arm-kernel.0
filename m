@@ -1,28 +1,61 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 30 Aug 2011 12:46:35 -0600 (MDT)
-Subject: [RFC PATCH v2 0/6] TI81XX: Add clock and hwmod data
-In-Reply-To: <1314119594-22647-1-git-send-email-hemantp@ti.com>
-References: <1314119594-22647-1-git-send-email-hemantp@ti.com>
-Message-ID: <alpine.DEB.2.00.1108301246170.26173@utopia.booyaka.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 30 Aug 2011 13:17:15 -0600
+Subject: [PATCH 1/3] arm/dt: Tegra: Update SDHCI nodes to match bindings
+Message-ID: <1314731837-6985-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Aug 2011, Hemant Pedanekar wrote:
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Olof Johansson <olof@lixom.net>
+---
+This is a repost of http://www.spinics.net/lists/linux-tegra/msg02117.html
+I'm including it here since it's not in linux-next yet, and patch 3 depends
+on it.
 
-> This patch set is the v2 of TI816X clock and hwmods patches sent earlier.
-> 
-> The clock data is currently added only for TI816X, while minimal hwmod data
-> common for TI816X and TI814X is added.
-> 
-> This patch set depends on following patches:
-> 	TI81XX: Prepare for addition of TI814X support
-> 	TI814X: Add cpu type macros and detection support
-> 	TI814X: Create board support and enable build for TI8148 EVM
-> 
-> Please note that CHIP_IS_TI816X/CHIP_IS_TI814X are still being used and I will
-> send update once SoC list usage is available.	
+ arch/arm/boot/dts/tegra-harmony.dts  |   12 ++++++------
+ arch/arm/boot/dts/tegra-seaboard.dts |    6 +++---
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-Thanks - am working away on these patches & hope to have them out soon.
-
-
-- Paul
+diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+index 4c05334..e581866 100644
+--- a/arch/arm/boot/dts/tegra-harmony.dts
++++ b/arch/arm/boot/dts/tegra-harmony.dts
+@@ -57,14 +57,14 @@
+ 	};
+ 
+ 	sdhci at c8000200 {
+-		gpios = <&gpio 69 0>, /* cd, gpio PI5 */
+-			<&gpio 57 0>, /* wp, gpio PH1 */
+-			<&gpio 155 0>; /* power, gpio PT3 */
++		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
++		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
++		power-gpios = <&gpio 155 0>; /* gpio PT3 */
+ 	};
+ 
+ 	sdhci at c8000600 {
+-		gpios = <&gpio 58 0>, /* cd, gpio PH2 */
+-			<&gpio 59 0>, /* wp, gpio PH3 */
+-			<&gpio 70 0>; /* power, gpio PI6 */
++		cd-gpios = <&gpio 58 0>; /* gpio PH2 */
++		wp-gpios = <&gpio 59 0>; /* gpio PH3 */
++		power-gpios = <&gpio 70 0>; /* gpio PI6 */
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+index 1940cae..64cedca 100644
+--- a/arch/arm/boot/dts/tegra-seaboard.dts
++++ b/arch/arm/boot/dts/tegra-seaboard.dts
+@@ -21,8 +21,8 @@
+ 	};
+ 
+ 	sdhci at c8000400 {
+-		gpios = <&gpio 69 0>, /* cd, gpio PI5 */
+-			<&gpio 57 0>, /* wp, gpio PH1 */
+-			<&gpio 70 0>; /* power, gpio PI6 */
++		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
++		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
++		power-gpios = <&gpio 70 0>; /* gpio PI6 */
+ 	};
+ };
+-- 
+1.7.0.4
