@@ -1,37 +1,96 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 30 Aug 2011 09:01:37 -0700
-Subject: [PATCH 1/2] sdhci/tegra: Add Device Tree probing support
-In-Reply-To: <20110830034035.GC19294@S2100-06.ap.freescale.net>
-References: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
-	<20110830034035.GC19294@S2100-06.ap.freescale.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B3279D3F@HQMAIL01.nvidia.com>
+From: ming.lei@canonical.com (ming.lei at canonical.com)
+Date: Wed, 31 Aug 2011 00:03:13 +0800
+Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
+Message-ID: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote at Monday, August 29, 2011 9:41 PM:
-> On Tue, Aug 23, 2011 at 12:15:33PM -0600, Stephen Warren wrote:
-> > From: Grant Likely <grant.likely@secretlab.ca>
-> >
-> > Add hooks to read gpio configuration out of the device tree node.
-...
-> > diff --git a/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt b/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
-...
-> > +* NVIDIA Tegra Secure Digital Host Controller
-> > +
-> > +This controller on Tegra family SoCs provides an interface for MMC, SD,
-> > +and SDIO types of memory cards.
-> > +
-> > +Required properties:
-> > +- compatible : Should be "nvidia,<chip>-sdhci"
-> > +- reg : Should contain eSDHC registers location and length
-> > +- interrupts : Should contain eSDHC interrupt
-> 
-> You may want to replace eSDHC with something Tegra specific.
+From: Ming Lei <ming.lei@canonical.com>
 
-True. The patch is already submitted. Do you think it's worth posting one
-just to fix that; it still seems pretty clear what's required?
+This patch introduces the helper of ehci_sync_mem to flush
+qtd/qh into memory immediately on some ARM, so that HC can
+see the up-to-date qtd/qh descriptor asap.
 
-Thanks.
+This patch fixs one performance bug on ARM Cortex A9 dual core
+platform, which has been reported on quite a few ARM machines
+(OMAP4, Tegra 2, snowball...), see details from link of
+https://bugs.launchpad.net/bugs/709245.
 
+The patch has been tested ok on OMAP4 panda A1 board, and the
+performance of 'dd' over usb mass storage can be increased from
+4~5MB/sec to 14~16MB/sec after applying this patch.
+
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
+---
+ drivers/usb/host/ehci-q.c |   18 ++++++++++++++++++
+ drivers/usb/host/ehci.h   |   17 +++++++++++++++++
+ 2 files changed, 35 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
+index 0917e3a..2719879 100644
+--- a/drivers/usb/host/ehci-q.c
++++ b/drivers/usb/host/ehci-q.c
+@@ -995,6 +995,12 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
+ 	head->qh_next.qh = qh;
+ 	head->hw->hw_next = dma;
+ 
++	/*
++	 * flush qh descriptor into memory immediately,
++	 * see comments in qh_append_tds.
++	 * */
++	ehci_sync_mem();
++
+ 	qh_get(qh);
+ 	qh->xacterrs = 0;
+ 	qh->qh_state = QH_STATE_LINKED;
+@@ -1082,6 +1088,18 @@ static struct ehci_qh *qh_append_tds (
+ 			wmb ();
+ 			dummy->hw_token = token;
+ 
++			/*
++			 * Writing to dma coherent buffer on ARM may
++			 * be delayed to reach memory, so HC may not see
++			 * hw_token of dummy qtd in time, which can cause
++			 * the qtd transaction to be executed very late,
++			 * and degrade performance a lot. ehci_sync_mem
++			 * is added to flush 'token' immediatelly into
++			 * memory, so that ehci can execute the transaction
++			 * ASAP.
++			 * */
++			ehci_sync_mem();
++
+ 			urb->hcpriv = qh_get (qh);
+ 		}
+ 	}
+diff --git a/drivers/usb/host/ehci.h b/drivers/usb/host/ehci.h
+index cc7d337..313d9d6 100644
+--- a/drivers/usb/host/ehci.h
++++ b/drivers/usb/host/ehci.h
+@@ -738,6 +738,23 @@ static inline u32 hc32_to_cpup (const struct ehci_hcd *ehci, const __hc32 *x)
+ 
+ #endif
+ 
++/*
++ * Writing to dma coherent memory on ARM may be delayed via L2
++ * writing buffer, so introduce the helper which can flush L2 writing
++ * buffer into memory immediately, especially used to flush ehci
++ * descriptor to memory.
++ * */
++#ifdef	CONFIG_ARM_DMA_MEM_BUFFERABLE
++static inline void ehci_sync_mem()
++{
++	mb();
++}
++#else
++static inline void ehci_sync_mem()
++{
++}
++#endif
++
+ /*-------------------------------------------------------------------------*/
+ 
+ #ifndef DEBUG
 -- 
-nvpublic
+1.7.4.1
