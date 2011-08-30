@@ -1,30 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Aug 2011 17:15:07 +0200
-Subject: [PATCH] ARM: msm: defconfigs for Qualcomm dev boards
-In-Reply-To: <1314664573-18432-1-git-send-email-davidb@codeaurora.org>
-References: <1314664573-18432-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <201108301715.07450.arnd@arndb.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 30 Aug 2011 23:27:26 +0800
+Subject: [PATCH] arm: mach-imx: enable all uart clocks for DEBUG_LL
+In-Reply-To: <20110830145606.GB19359@S2100-06.ap.freescale.net>
+References: <1314269856-20000-1-git-send-email-w.sang@pengutronix.de>
+	<20110830145606.GB19359@S2100-06.ap.freescale.net>
+Message-ID: <20110830152725.GC19359@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 August 2011, David Brown wrote:
-> Add default configs for the development boards for several Qualcomm
-> MSM-family chips.
+On Tue, Aug 30, 2011 at 10:56:07PM +0800, Shawn Guo wrote:
+> On Thu, Aug 25, 2011 at 12:57:36PM +0200, Wolfram Sang wrote:
+> > If you want to move the DEBUG_LL uart, simply changing the base address
+> > in debug-macro.S will not be enough. One needs to enable the correct
+> > clock during clock init, too, otherwise the kernel remains silent. This
+> > is too easy to forget, so enable all uart clocks for DEBUG_LL to save
+> > precious developer time.
+> > 
+> I guess the patch is not welcomed from the power management POV.
+> Shouldn't bootloader have enabled the clock for debug uart anyway?
 > 
-> Signed-off-by: David Brown <davidb@codeaurora.org>
-> ---
-> These are my current defconfigs for these targets.  I'd like to get
-> these into next so that the targets can get build tested.  I'm not
-> sure if we want to push them to mainline, since devicetree would
-> theoretically eliminate the need for all of them.
+Hmm, bootloader should be the only one who can enable the clock for
+DEBUG_LL uart, as DEBUG_LL could be used at the very early point of
+kernel booting.
 
-I think it's reasonable to have them in mainline while the device
-tree support on MSM is still incomplete, but I can also just
-stick them in to a branch that I don't submit to mainline
-if you prefer to have them only in linux-next.
-
-Russell, if you want to keep the defconfig files under your
-ownership, that's also fine with me. In that case:
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-	Arnd
+-- 
+Regards,
+Shawn
