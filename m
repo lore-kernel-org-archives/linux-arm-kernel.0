@@ -1,28 +1,64 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 30 Aug 2011 23:27:26 +0800
-Subject: [PATCH] arm: mach-imx: enable all uart clocks for DEBUG_LL
-In-Reply-To: <20110830145606.GB19359@S2100-06.ap.freescale.net>
-References: <1314269856-20000-1-git-send-email-w.sang@pengutronix.de>
-	<20110830145606.GB19359@S2100-06.ap.freescale.net>
-Message-ID: <20110830152725.GC19359@S2100-06.ap.freescale.net>
+Date: Tue, 30 Aug 2011 23:47:18 +0800
+Subject: [PATCH 2/3] ARM: GIC: add gic_reinit() function to help ARM resume
+In-Reply-To: <4E5CFB13.8060008@gmail.com>
+References: <1314690017-17590-1-git-send-email-shawn.guo@linaro.org>
+	<1314690017-17590-3-git-send-email-shawn.guo@linaro.org>
+	<4E5CFB13.8060008@gmail.com>
+Message-ID: <20110830154717.GD19359@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2011 at 10:56:07PM +0800, Shawn Guo wrote:
-> On Thu, Aug 25, 2011 at 12:57:36PM +0200, Wolfram Sang wrote:
-> > If you want to move the DEBUG_LL uart, simply changing the base address
-> > in debug-macro.S will not be enough. One needs to enable the correct
-> > clock during clock init, too, otherwise the kernel remains silent. This
-> > is too easy to forget, so enable all uart clocks for DEBUG_LL to save
-> > precious developer time.
-> > 
-> I guess the patch is not welcomed from the power management POV.
-> Shouldn't bootloader have enabled the clock for debug uart anyway?
+On Tue, Aug 30, 2011 at 10:00:35AM -0500, Rob Herring wrote:
+> Shawn,
 > 
-Hmm, bootloader should be the only one who can enable the clock for
-DEBUG_LL uart, as DEBUG_LL could be used at the very early point of
-kernel booting.
+> On 08/30/2011 02:40 AM, Shawn Guo wrote:
+> > If ARM core gets powered off during suspend, GIC controller has to be
+> > reinitialized by resume procedure.  This patch adds a helper function
+> > for resume procedure to reinitialize GIC.
+> 
+> Is re-initializing rather than save/restore registers the right thing to
+> do here? Won't you lose things like edge or level triggered settings?
+> It's always been fuzzy to what should be done with interrupt masks in
+> suspend. Is every driver expected to disable and re-enable their
+> interrupts or this should be maintained thru a suspend cycle?
+> 
+Good point.  As one of the series, I easily went for the re-initializing
+approach here, plus it is pretty easy to go.  With your reminding, I
+agree that for interrupt controller save/restore registers might be the
+right thing to do.
 
--- 
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  arch/arm/common/gic.c               |   15 +++++++++++++--
+> >  arch/arm/include/asm/hardware/gic.h |    1 +
+> >  2 files changed, 14 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> > index 666b278..bf0f6d8 100644
+> > --- a/arch/arm/common/gic.c
+> > +++ b/arch/arm/common/gic.c
+> > @@ -255,7 +255,7 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+> >  	irq_set_chained_handler(irq, gic_handle_cascade_irq);
+> >  }
+> >  
+> > -static void __init gic_dist_init(struct gic_chip_data *gic,
+> > +static void gic_dist_init(struct gic_chip_data *gic,
+> >  	unsigned int irq_start)
+> >  {
+> >  	unsigned int gic_irqs, irq_limit, i;
+> > @@ -326,7 +326,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+> >  	writel_relaxed(1, base + GIC_DIST_CTRL);
+> >  }
+> >  
+> > -static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
+> > +static void gic_cpu_init(struct gic_chip_data *gic)
+> 
+> I don't think you need to change this. With hotplug, this section will
+> be kept.
+> 
+You are right.  I missed that it's a __cpuinit.
+
 Regards,
 Shawn
