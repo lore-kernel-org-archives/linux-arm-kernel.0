@@ -1,31 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 30 Aug 2011 21:58:03 +0100
-Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <20110825145558.GF8883@n2100.arm.linux.org.uk>
-References: <CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
-	<20110823221314.GL3895@n2100.arm.linux.org.uk>
-	<CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
-	<20110825121416.GB8883@n2100.arm.linux.org.uk>
-	<20110825121710.GK3286@htj.dyndns.org>
-	<20110825122543.GC8883@n2100.arm.linux.org.uk>
-	<20110825123542.GM3286@htj.dyndns.org>
-	<20110825130414.GE8883@n2100.arm.linux.org.uk>
-	<20110825130907.GO3286@htj.dyndns.org>
-	<20110825145558.GF8883@n2100.arm.linux.org.uk>
-Message-ID: <20110830205802.GT2061@opensource.wolfsonmicro.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 30 Aug 2011 17:05:31 -0400 (EDT)
+Subject: [PATCH] musb_debugfs.c: remove unneeded includes on ARM
+Message-ID: <alpine.LFD.2.00.1108301659540.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 25, 2011 at 03:55:58PM +0100, Russell King - ARM Linux wrote:
+Nothing actually requires that <mach/hardware.h>, <mach/memory.h> nor
+<asm/mach-types.h> be included here.
 
-> Here's the patch.  As the kernel I've run this against doesn't have the
-> change to try_to_freeze(), I added a might_sleep() in do_signal() during
-> my testing to verify that it fixes Mark's problem (which it does.)
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-> Mark, can you test this to make sure it fixes your problem please?
+---
 
-Yes, it resolves the problem for me - thanks!
+I'd need appropriate ACK's as this is part of a cleanup series actually 
+removing <mach/memory.h>.  If those includes are not useless as I think 
+they are, an alternative solution will need to be found.
+Thanks.
 
-Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-
-Sorry about the delay, was away for the bank holiday weekend.
+diff --git a/drivers/usb/musb/musb_debugfs.c b/drivers/usb/musb/musb_debugfs.c
+index b0176e4..61f4ee4 100644
+--- a/drivers/usb/musb/musb_debugfs.c
++++ b/drivers/usb/musb/musb_debugfs.c
+@@ -41,12 +41,6 @@
+ #include <linux/debugfs.h>
+ #include <linux/seq_file.h>
+ 
+-#ifdef	CONFIG_ARM
+-#include <mach/hardware.h>
+-#include <mach/memory.h>
+-#include <asm/mach-types.h>
+-#endif
+-
+ #include <asm/uaccess.h>
+ 
+ #include "musb_core.h"
