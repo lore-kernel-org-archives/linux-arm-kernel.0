@@ -1,24 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 29 Aug 2011 22:54:04 +0100
-Subject: How to handle named resources with DT?
-In-Reply-To: <alpine.DEB.2.00.1108271444240.23968@utopia.booyaka.com>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<877h6173wm.fsf@ti.com> <20110826041200.GD2308@yookeroo.fritz.box>
-	<201108261258.32880.arnd@arndb.de>
-	<20110826130644.GN2308@yookeroo.fritz.box>
-	<alpine.DEB.2.00.1108271444240.23968@utopia.booyaka.com>
-Message-ID: <20110829215404.GA26846@sirena.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 29 Aug 2011 17:13:04 -0700
+Subject: [PATCH 3/3] TI814X: Create board support and enable build for
+	TI8148 EVM
+In-Reply-To: <1312479903-22909-1-git-send-email-hemantp@ti.com> (Hemant
+	Pedanekar's message of "Thu, 4 Aug 2011 23:15:03 +0530")
+References: <1312479903-22909-1-git-send-email-hemantp@ti.com>
+Message-ID: <878vqbpxin.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 27, 2011 at 03:47:55PM -0600, Paul Walmsley wrote:
+Hemant Pedanekar <hemantp@ti.com> writes:
 
-> Certainly, from a kernel development perspective, one can decide to just 
-> dump this kind of DT generation problem back on the hardware vendors.  
-> But it seems more efficient and less error-prone to simply remove both 
-> mapping tables, and to export names directly from the IP block data into 
-> the device data format.
+> This patch adds minimal support and build configuration for TI8148 EVM. Also
+> adds support for low level debugging on UART1 console on the EVM.
+>
+> Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
 
-That seems sensible, though we'd probably want to keep the option to
-remap in there at least on the generation side in case some integrators
-end up renaming the ports on the IP block for some reason.
+[...]
+
+> +static void __init ti8148_init_early(void)
+> +{
+> +	omap2_init_common_infrastructure();
+> +	omap2_init_common_devices(NULL, NULL);
+
+Note that this function no longer exists in mainline.
+
+Kevin
