@@ -1,108 +1,68 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Tue, 30 Aug 2011 12:29:12 +1000
-Subject: How to handle named resources with DT?
-In-Reply-To: <4E57A9FB.5030404@ti.com>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<877h6173wm.fsf@ti.com> <20110826041200.GD2308@yookeroo.fritz.box>
-	<201108261258.32880.arnd@arndb.de> <4E57A9FB.5030404@ti.com>
-Message-ID: <20110830022912.GE4254@yookeroo.fritz.box>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 30 Aug 2011 11:26:33 +0800
+Subject: [RFC PATCH 0/3] Yet another GIC OF binding series
+In-Reply-To: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
+References: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20110830032633.GB19294@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 26, 2011 at 04:13:15PM +0200, Cousson, Benoit wrote:
-> On 8/26/2011 12:58 PM, Arnd Bergmann wrote:
-> >On Friday 26 August 2011, David Gibson wrote:
-> >>Seriously, how many times do I have to say it?
+On Tue, Aug 09, 2011 at 03:16:57PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> [...]
+> Grant,
 > 
-> >>Insisting that the names come from the DT is to mistakenly think of
-> >>the DT as an extension of the kernel's internal interfaces, instead of
-> >>as the external and OS neutral data structure it actually is.
+> Here's yet another patch series for GIC binding and init. 
 > 
-> You are wrongly interpreting the consequence: a smart Linux guy
-> added a _byname API, without seeing the real cause: most HW
-> resources have a name to identify them and not a number.
+> You keep saying we should have a common DT function scanning for interrupt
+> controller nodes and calling their initialization functions. But that will
+> not work until we have dynamic assignment of linux irq numbers. So either
+> everyone should just stop trying to do DT bindings for GIC/VIC until that
+> is in place, or we need an interim solution.
 
-No, I'm really not.
+Yes, we need a way out.  I based my i.MX6Q series on this patch set.
+With the v2 of "ARM: gic: add OF based initialization" in,
 
-> >Agreed, that was my main point anyway: Getting the name from the
-> >device tree would be a huge mistake.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
+
+Regards,
+Shawn
+
+> This is another attempt at
+> the latter. I reworked gic_of_init intending for it to be the interrupt
+> controller specific initialization function that DT interrupt controller
+> scanning code would call. For now, it is just called by the platform code.
+> The platform initialization looks something like this:
 > 
-> No, it would not. In fact, storing name in DT is even much more
-> aligned with the goal of DT for my point of view, since it is
-> supposed to describe the HW without any assumption about the OS
-> usage. DT data are supposed to be driven by the HW specs.
-
-So, I actually agree that in the long term getting resource names in
-the DT would be a generally good thing.
-
-But doing so is a *huge* change in one of the very core semantics of
-all the DT bindings.  It's not something that should be done lightly
-or quickly.  It absolutely should not be tied to how this is handled
-on the Linux side.  Therefore *for now* it is much better to have glue
-which binds existing DT practice to the new Linux interface; then
-thinking about this from the DT point of view can be a long term
-project.
-
-> The ordering you are relying on for the moment is purely arbitrary
-> and do not have any signification for the HW point of view. Just
-> have a look at a HW spec and you will see that most signals have a
-> *name*, not a number, to identify them.
-
-Sure, but assigning that arbitrary order is well-established practice
-for device DT bindings.
-
-> Without that, you have to add some unnecessary and error prone
-> processing to the original information:
-> - Encode an information that is there originally (resource name from
-> the HW spec) into a arbitrary number without any meaning: Why tx_irq
-> should be before the rx_irq and after the err_irq???
-> - Remove the original name to confuse people.
-> - Expect the driver to use a number that does not come from the HW
-> spec but from a DT binding text file to figure out what resource it
-> has to use.
-
-No, I don't expect that bit - see the discussion of how we can glue
-the DT order to names inside the kernel.
-
-> - Pray that the driver guy didn't wrongly interpret the irq #2138469
-> to be the tx_irq instead of the rx_irq.
-
-Um, this is an order, not an arbitrary int number.  So try irq #2.
-Maybe #3 or #4 on a really complicated device.
-
-> If you extend a little bit the scope of the discussion and start
-> considering that clocks, voltage rails, reset lines are as well a
-> resources for the IP point of view, do you really think that using a
-> number to identify a clock or a voltage will really make sense?
-> Guess what? The current clock binding is using clock name...
-
-Yes.  There's a big difference between creating a new binding to use
-names, and creating a new practice in the core DT semantics used by
-every single existing binding.
-
-> In order to have a consistent way of using resources in DT, it makes
-> sense to have the ability to provide a name for any kind of
-> resources.
-> BTW, adding a name should not prevent people to use the legacy by
-> index method.
+> struct of_intc_desc desc;
+> memset(&desc, 0, sizeof(desc));
+> desc.controller = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+> gic_of_init(&desc);
+> 
+> I've addressed your previous comments and in particular initializing more
+> than 1 GIC is supported now.
+> 
+> Rob
+> 
+> Rob Herring (3):
+>   dt: irq: add interrupt controller descriptor struct
+>   ARM: gic: allow irq_start to be 0
+>   ARM: gic: add OF based initialization
+> 
+>  Documentation/devicetree/bindings/arm/gic.txt |   28 +++++++++++++++++++
+>  arch/arm/common/gic.c                         |   36 ++++++++++++++++++++++++-
+>  arch/arm/include/asm/hardware/gic.h           |    2 +
+>  include/linux/of_irq.h                        |    6 ++++
+>  4 files changed, 71 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+> 
+> -- 
+> 1.7.4.1
 > 
 > 
-> Moreover, anybody deserve to have a name... Otherwise we will end up
-> with situation like that:
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> resource #6: Who are you?
-> resource #2: The new #2.
-> resource #6: Who is #1?
-> resource #2: You are #6.
-> resource #6: I am not a number, I am a free resource.
-
-Allusions to TV programs do not an argument make, no matter how
-interesting and influential they might have been.
-
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
