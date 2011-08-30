@@ -1,65 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 30 Aug 2011 12:51:11 -0700
-Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
-	Summit 2011
-In-Reply-To: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-Message-ID: <CAOesGMjDc=H0zxRsKGycZgWE9pA_pSYSBdGhiPGjN7FNE_9paA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 30 Aug 2011 21:58:03 +0100
+Subject: try_to_freeze() called with IRQs disabled on ARM
+In-Reply-To: <20110825145558.GF8883@n2100.arm.linux.org.uk>
+References: <CAOS58YNuCbaOsWBfmjSUsXsArZ5ng6c0B30yswFbRAWkho6L6Q@mail.gmail.com>
+	<20110823221314.GL3895@n2100.arm.linux.org.uk>
+	<CAOS58YNtQEuke=Ko9J2oNGMECjabzxj=Nrg1o64X1JC3YRmJuw@mail.gmail.com>
+	<20110825121416.GB8883@n2100.arm.linux.org.uk>
+	<20110825121710.GK3286@htj.dyndns.org>
+	<20110825122543.GC8883@n2100.arm.linux.org.uk>
+	<20110825123542.GM3286@htj.dyndns.org>
+	<20110825130414.GE8883@n2100.arm.linux.org.uk>
+	<20110825130907.GO3286@htj.dyndns.org>
+	<20110825145558.GF8883@n2100.arm.linux.org.uk>
+Message-ID: <20110830205802.GT2061@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 11:00 PM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> Updated attendee list:
-> Confirmed:
-> 1) Nicolas Pitre - arm-soc tree maintainer
-> 2) Arnd Bergmann - arm-soc tree maintainer
-> 3) Olof Johansson - tegra maintainer
-> 4) David Brown
-> 5) Marek Vasut - Various pxa boards maintainer
-> 6) Ohad Ben-Cohen
-> 7) Sascha Hauer
-> 8) Paul Walmsley
-> 9) Catalin Marinas
-> 10) Kukjin Kim - Samsung SoC maintainer
-> 11) Kyungmin Park - Samsung SoC maintainer
-> 12) Mark Brown - ASoC maintainer
-> 13) Grant Likely
->
-> Waiting for confirmation:
-> 14) Pavel Machek
-> 15) Eric Miao - pxa/mmp maintainer
-> 16) Haojian Zhuang - pxa/mmp maintainer
-> 17) Nicolas Ferre - Atmel maintainer
-> 18) Will Deacon - ARM engineer
->
-> Nominates, but haven't responded personally:
-> 19) Russell King
-> 20) Lennert Buytenhek
-> 21) Marc Zyngier
-> 22) Linus Walleji
->
-> We're pretty close to filling up. ?Is there anyone else I should include?
+On Thu, Aug 25, 2011 at 03:55:58PM +0100, Russell King - ARM Linux wrote:
 
-I've asked Stephen Warren from Nvidia to attend if he can --
-especially given the pinmux topics below.
+> Here's the patch.  As the kernel I've run this against doesn't have the
+> change to try_to_freeze(), I added a might_sleep() in do_signal() during
+> my testing to verify that it fixes Mark's problem (which it does.)
 
--Olof
+> Mark, can you test this to make sure it fixes your problem please?
 
->
-> Agenda proposals (Thanks to Nicolas and Olof):
-> - DT bindings for GPIO and pin mux
-> - the pin mux subsystem from linusw (especially if it is still RFC by
-> ?then)
-> - progress with the single zImage work
-> - presentation/status of the DMA and memory management work wrt CMA
-> ?(some SOC specific hacks should go away once this is available)
-> - DT porting progress
-> - boot architecture status
-> - Report from Arnd on experiences from first arm-soc merge window
-> ?- what worked well and where's room for improvement?
-> ?- Any particular SoC workflow that should be tuned to make his life easier?
-> ?- Where are the gaps where he needs help right now?
-> ?- How did it work out for the SoC maintainers?
->
-> Still accepting more proposals. ?Send me the topics you are burning to discuss.
+Yes, it resolves the problem for me - thanks!
+
+Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+
+Sorry about the delay, was away for the bank holiday weekend.
