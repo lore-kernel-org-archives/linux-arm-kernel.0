@@ -1,54 +1,30 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 30 Aug 2011 15:26:28 -0700
-Subject: [PATCH 1/3] AM35x: voltage: Basic initialization
-In-Reply-To: <1313754573-11498-2-git-send-email-abhilash.kv@ti.com> (Abhilash
-	K. V.'s message of "Fri, 19 Aug 2011 17:19:31 +0530")
-References: <1313754573-11498-1-git-send-email-abhilash.kv@ti.com>
-	<1313754573-11498-2-git-send-email-abhilash.kv@ti.com>
-Message-ID: <87aaaqmt7v.fsf@ti.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 30 Aug 2011 15:51:39 -0700
+Subject: [GIT PULL] msm: initial devicetree support
+Message-ID: <20110830225139.GA7093@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash K V <abhilash.kv@ti.com> writes:
+The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
 
-> From: Sanjeev Premi <premi@ti.com>
->
-> This patch adds the basic initialization of voltage layer
-> for AM35x. Since AM35x doesn't support voltage scaling,
-> Many functions have been defined to plug into existing
-> voltage layer.
->
-> Signed-off-by: Sanjeev Premi <premi@ti.com>
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+  Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
 
-[...]
+are available in the git repository at:
+  git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-dt
 
-> diff --git a/arch/arm/mach-omap2/voltagedomains3xxx_data.c b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-> index def230f..b45d145 100644
-> --- a/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-> +++ b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-> @@ -67,6 +67,38 @@ static struct omap_vdd_info *omap3_vdd_info[] = {
->  	&omap3_vdd2_info,
->  };
->  
-> +/*
-> + * AM35x VDD structures
-> + *
-> + * In AM35x there neither scalable voltage domain nor any hook-up with
-> + * voltage controller/processor. However, when trying to re-use the hwmod
-> + * database for OMAP3, definition of "core" voltage domain is necessary.
-> + * Else, changes in hwmod data structures grow spirally.
-> + *
-> + * As a workaround, "core" voltage domain is defined below. The definition
-> + * doesn't lead to any side-effects.
+David Brown (3):
+      msm_serial: Use relative resources for iomem
+      msm_serial: Add devicetree support
+      ARM: msm: Add devicetree support for msm8660-surf
 
-Except the side-effect of a bunch of unused data, and nop functions that
-just clutter things up in a not-very-maintainable way.
+ .../devicetree/bindings/tty/serial/msm_serial.txt  |   27 +++++++++
+ arch/arm/boot/dts/msm8660-surf.dts                 |   24 ++++++++
+ arch/arm/mach-msm/board-msm8x60.c                  |   58 +++++++++++++++++---
+ drivers/tty/serial/msm_serial.c                    |   30 +++++++----
+ 4 files changed, 122 insertions(+), 17 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/tty/serial/msm_serial.txt
+ create mode 100644 arch/arm/boot/dts/msm8660-surf.dts
 
-For SoCs without scalable voltage domains, we need to fix the underlying
-problems in the core code for how to cleanly re-use hwmods.
-
-Fortunately, this core code cleanup is now in progress, so it shouldn't
-be long now where we can do this cleanly.
-
-Kevin
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
