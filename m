@@ -1,47 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Aug 2011 14:56:39 +0100
-Subject: [PATCH v3] ARM: sched_clock: allow sched_clock to be selected at
-	runtime
-Message-ID: <1314712599-12234-1-git-send-email-marc.zyngier@arm.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 30 Aug 2011 22:02:35 +0800
+Subject: [PATCH] usb: ehci: fix update qtd->token in qh_append_tds
+In-Reply-To: <Pine.LNX.4.44L0.1108291218040.2525-100000@iolanthe.rowland.org>
+References: <CACVXFVNFXh33tsvkM=jdnc8OocVhjkzpt6LK59zKa9L2F7HxpQ@mail.gmail.com>
+	<Pine.LNX.4.44L0.1108291218040.2525-100000@iolanthe.rowland.org>
+Message-ID: <CACVXFVPDuq5tDsFVaGo5gWJVJ+g3MqK1O5+bUD7_d086_1xKZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sched_clock() is yet another blocker on the road to the single
-image. This patch implements an idea by Russell King:
+Hi Alan,
 
-http://www.spinics.net/lists/linux-omap/msg49561.html
+Thanks for your comment.
 
-Instead of asking the platform to implement both sched_clock()
-itself and the rollover callback, simply register a read()
-function, and let the ARM code care about sched_clock() itself,
-the conversion to ns and the rollover. sched_clock() uses
-this read() function as an indirection to the platform code.
+On Tue, Aug 30, 2011 at 12:33 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> Nevertheless, it remains true that you want to add a memory barrier
+> instruction simply in order to speed up a cache writeback, not to force
+> any sort of ordering. ?This needs to be explained carefully in the code
+> (not just in the patch description!) and it needs to be done in a way
+> that won't affect other architectures.
 
-This allow some simplifications and possibly some footprint gain
-when multiple platforms are compiled in. Among the drawbacks,
-the removal of the *_fixed_sched_clock optimization which could
-negatively impact some platforms (sa1100, tegra, versatile
-and omap).
+OK, will do it.
 
-Tested on 11MPCore, OMAP4 and Tegra.
+> Also, as you mentioned before, you may want to do the same thing in
+> qh_link_async() just after the
+>
+> ? ? ? ?head->hw->hw_next = dma;
+>
+> line. ?Delays in flushing that write would also slow down performance.
 
-Cc: Imre Kaloz <kaloz@openwrt.org>
-Cc: Krzysztof Halasa <khc@pm.waw.pl>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Colin Cross <ccross@android.com>
-Cc: Erik Gilling <konkers@android.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Linus Walleij <linus.walleij@stericsson.com>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: STEricsson <STEricsson_nomadik_linux@list.st.com>
-Cc: Lennert Buytenhek <kernel@wantstofly.org>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Tested-by: Jamie Iles <jamie@jamieiles.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-Based on 3.1-rc4.
+Will do it too.
+
+
+thanks,
+--
+Ming Lei
