@@ -1,26 +1,60 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Tue, 30 Aug 2011 14:35:27 +0800
-Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
-	different features
-In-Reply-To: <CAJNCFVJKvO+W0ogn-3GOsR8ygtn5KWtqTc2sw6HuNB2-x7ZviA@mail.gmail.com>
-References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
-	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
-	<20110829121214.GA15484@oksana.dev.rtsoft.ru>
-	<CAMPhdO_XsrGTiiKpALVU7tZiAO_C5d_9XKoVjL_BHwpcqzXcFg@mail.gmail.com>
-	<CAJNCFVJKvO+W0ogn-3GOsR8ygtn5KWtqTc2sw6HuNB2-x7ZviA@mail.gmail.com>
-Message-ID: <CAMPhdO-c48EG4JzX+bY-1C57e+MU7wzeC-tGQA10fiq=nW-fMw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 30 Aug 2011 01:06:30 -0600 (MDT)
+Subject: [GIT PULL v2] OMAP: clock/powerdomain/clockdomain/hwmod: fixes
+	for 3.1-rc
+In-Reply-To: <alpine.DEB.2.00.1108230105180.28226@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1108222319310.28226@utopia.booyaka.com>
+	<alpine.DEB.2.00.1108230105180.28226@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1108300104010.26173@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2011 at 2:21 PM, Richard Zhu <richard.zhu@linaro.org> wrote:
-> Hi:
-> Pass port info from the platform data is a good idea.
-> About the codes duplication in the board level, I think that we can
-> re-use the default ?port info on most boards, when the ata_port_info
-> is null in the platform data struct.
-> We can leave the ahci_platform.c without any modifications in this way.
->
-> How do you guys think about?
+Hi Tony,
 
-+1. Richard, please let's first go that way, so to have minimum impact to
-ahci_platform.c
+On Tue, 23 Aug 2011, Paul Walmsley wrote:
+
+> The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
+> 
+>   Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
+> 
+> are available in the git repository at:
+>   git://git.pwsan.com/linux-2.6 prcm-fixes-a-3.1rc
+
+Just checking up on this.  Any issues with this branch?
+
+> I've dropped Tomi's patches until the changelogs for those are fixed.
+
+Tomi's patches have been queued for 3.2, by the way.
+
+> Note that for these changes to boot successfully on 3.1-rc3, the following 
+> patch is needed:
+> 
+>   http://marc.info/?l=linux-omap&m=131407622527432&w=2
+
+And Linus has resolved this problem for 3.1-rc4 with commit 
+69dd3d8e29e294caaf63eb5e8a72d250279f9e5f ("Revert "irq: Always set 
+IRQF_ONESHOT if no primary handler is specified"").
+
+> 
+> Paul Walmsley (4):
+>       OMAP4: clock: re-enable previous clockdomain enable/disable sequence
+>       OMAP4: clock: fix compile warning
+>       OMAP3: clock: indicate that gpt12_fck and wdt1_fck are in the WKUP clockdomain
+>       Merge branches 'pwrdm_clkdm_fixes_3.1rc', 'non_hwmod_compliant_fix_3.1rc', 'omap4_clock_fixes_3.1rc' and 'omap3_clock_fixes_3.1rc' into prcm-fixes-a-3.1rc
+> 
+> Rajendra Nayak (1):
+>       OMAP: powerdomains: Make all powerdomain target states as ON at init
+> 
+> Santosh Shilimkar (1):
+>       OMAP: clockdomain: Wait for powerdomain to be ON when using clockdomain force wakeup
+> 
+>  arch/arm/mach-omap2/clock3xxx_data.c |    2 ++
+>  arch/arm/mach-omap2/clock44xx_data.c |   10 +++++++++-
+>  arch/arm/mach-omap2/clockdomain.c    |    2 ++
+>  arch/arm/mach-omap2/pm.c             |    2 --
+>  arch/arm/mach-omap2/powerdomain.c    |   25 ++++++++++++++++---------
+>  5 files changed, 29 insertions(+), 12 deletions(-)
+> 
+
+
+- Paul
