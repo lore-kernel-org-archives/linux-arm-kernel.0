@@ -1,47 +1,27 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 31 Aug 2011 07:11:07 +0800
-Subject: [PATCH 1/3] ARM: cache-l2x0: make the reinitialization possible
-In-Reply-To: <20110830145240.GA19359@S2100-06.ap.freescale.net>
-References: <1314690017-17590-1-git-send-email-shawn.guo@linaro.org>
-	<1314690017-17590-2-git-send-email-shawn.guo@linaro.org>
-	<CAGsJ_4xavZXTa2Z+isORODjK_HoFpSJ5ZMRrd38metiZzYDBeA@mail.gmail.com>
-	<20110830145240.GA19359@S2100-06.ap.freescale.net>
-Message-ID: <CAGsJ_4wn7zd1Q_s+bq2308W09MHLX5AJevVqsdJd=o4eiGrhNg@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 30 Aug 2011 16:42:08 -0700
+Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
+	Summit 2011
+In-Reply-To: <CAOesGMjDc=H0zxRsKGycZgWE9pA_pSYSBdGhiPGjN7FNE_9paA@mail.gmail.com>
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+	<CAOesGMjDc=H0zxRsKGycZgWE9pA_pSYSBdGhiPGjN7FNE_9paA@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B3279F0A@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/30 Shawn Guo <shawn.guo@freescale.com>:
-> On Tue, Aug 30, 2011 at 10:08:59PM +0800, Barry Song wrote:
->> 2011/8/30 Shawn Guo <shawn.guo@linaro.org>:
->> > If ARM core gets powered off during suspend, L2 cache controller
->> > has to be reinitialized by resume procedure.
->> >
->> > The patch removes __init annotation from a few initialization
->> > functions to make the reinitialization possible. ?For example,
->> > platform resume function can call l2x0_of_init() to get L2 cache
->> > back to work.
->>
->> i think it is good. and i have sent a similar patch before:
->>
->> http://www.spinics.net/lists/arm-kernel/msg137372.html
->> [PATCH v2 3/4] ARM: L2X0: move l2x0_init out of .init section
->>
-> Since prima2 supports DT, you may also want to call l2x0_of_init()
-> instead of l2x0_init(). ?l2x0_of_init() will parse configuration from
-> DT and sets up tag RAM control for you.
+Olof Johansson wrote at Tuesday, August 30, 2011 1:51 PM:
+> On Mon, Aug 29, 2011 at 11:00 PM, Grant Likely
+> <grant.likely@secretlab.ca> wrote:
+> > Updated attendee list:
+...
+> > We're pretty close to filling up. ?Is there anyone else I should include?
+> 
+> I've asked Stephen Warren from Nvidia to attend if he can --
+> especially given the pinmux topics below.
 
-i know that. and rob's patch did some suppport to prima2 and we were
-in the loop of that patch and i have acked it if you read the mail.
-i sent the patch againest the Linus's tree.
+Yes, I'm able to attend if there's a slot left.
 
->
-> --
-> Regards,
-> Shawn
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Thanks.
+
+-- 
+nvpublic
