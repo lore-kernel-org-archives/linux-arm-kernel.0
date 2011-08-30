@@ -1,51 +1,21 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 30 Aug 2011 18:26:42 +0100
-Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
-In-Reply-To: <1314722311.2344.64.camel@deneb.redhat.com>
-References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
-	<1314722311.2344.64.camel@deneb.redhat.com>
-Message-ID: <20110830172642.GE3464@e102144-lin.cambridge.arm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 30 Aug 2011 11:46:07 -0600
+Subject: [PATCH REPOST 0/3] i2c: tegra: Outstanding patches
+Message-ID: <1314726370-8193-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2011 at 05:38:30PM +0100, Mark Salter wrote:
-> On Wed, 2011-08-31 at 00:03 +0800, ming.lei at canonical.com wrote:
-> > +/*
-> > + * Writing to dma coherent memory on ARM may be delayed via L2
-> > + * writing buffer, so introduce the helper which can flush L2 writing
-> > + * buffer into memory immediately, especially used to flush ehci
-> > + * descriptor to memory.
-> > + * */
-> > +#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
-> > +static inline void ehci_sync_mem()
-> > +{
-> > +       mb();
-> > +}
-> > +#else
-> > +static inline void ehci_sync_mem()
-> > +{
-> > +}
-> > +#endif
-> > +
-> 
-> I'm wondering if this doesn't really belong in the DMA API for any
-> future architectures that can't avoid prolonged write buffering to DMA
-> coherent memory. IIUC, ARM mitigates this for most drivers by including
-> an implicit write buffer flush in the mmio write routines. This takes
-> care of the drivers which write to a mmio device register after writing
-> something to shared DMA memory. IIUC, this doesn't help ehci because the
-> host controller is polling to see what the cpu writes to the shared
-> memory. Other hardware which polls shared memory like that will likely
-> have the same problem and could use buffer drain helpers as well.
+For convenience, here's a repost of the outstanding patches for the Tegra
+I2C driver.
 
-Right. In this case the buffering is happening at L2 which becomes
-noticeable when measuring performance. We also buffer stores at the
-CPU (regardless of memory type) but because these tend to become visible
-fairly quickly, there isn't a comparable performance problem.
+Doug Anderson (1):
+  i2c: tegra: fix possible race condition after tx
 
-Given that I would expect other architectures to buffer writes at the CPU,
-would it not be worth having an API for flushing to L3 (devices)? It seems
-like this would be a useful addition to the coherent DMA API on platforms
-that handle coherency with non-cacheable memory attributes.
+John Bonesio (1):
+  i2c: Tegra: Add of_match_table
 
-Will
+Mike Rapoport (1):
+  i2c: i2c-tegra: add I2C_FUNC_SMBUS_EMUL
+
+ drivers/i2c/busses/i2c-tegra.c |   60 ++++++++++++++++++++++++++++++----------
+ 1 files changed, 45 insertions(+), 15 deletions(-)
