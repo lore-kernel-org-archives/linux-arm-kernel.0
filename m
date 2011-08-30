@@ -1,54 +1,21 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 30 Aug 2011 16:00:39 -0700
-Subject: [PATCH 3/4] pm34xx: Warning FIX related to ambiguous else loop
-In-Reply-To: <1313754927-11992-4-git-send-email-abhilash.kv@ti.com> (Abhilash
-	K. V.'s message of "Fri, 19 Aug 2011 17:25:26 +0530")
-References: <1313754927-11992-1-git-send-email-abhilash.kv@ti.com>
-	<1313754927-11992-2-git-send-email-abhilash.kv@ti.com>
-	<1313754927-11992-3-git-send-email-abhilash.kv@ti.com>
-	<1313754927-11992-4-git-send-email-abhilash.kv@ti.com>
-Message-ID: <87bov6ld2g.fsf@ti.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 31 Aug 2011 01:10:18 +0200
+Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
+	Summit 2011
+In-Reply-To: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+Message-ID: <20110830231018.GA26019@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash K V <abhilash.kv@ti.com> writes:
+Hi!
 
-> From: Vaibhav Hiremath <hvaibhav@ti.com>
->
-> Fixes below warning -
->
-> arch/arm/mach-omap2/pm34xx.c:1041: warning:
->         suggest explicit braces to avoid ambiguous 'else
+> Waiting for confirmation:
+> 14) Pavel Machek
 
-This warning was introduced in [1/4], so I'd suggest just folding this
-fix into the original patch.
+Yes, I'd like to come. "Random zaurus hacker"? :-).
+								Pavel
 
-Kevin
-
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
-> ---
->  arch/arm/mach-omap2/pm34xx.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 12af5b9..ab3822b 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -856,7 +856,7 @@ void omap_push_sram_idle(void)
->  	else
->  		_omap_sram_idle = omap_sram_push(omap34xx_cpu_suspend,
->  					omap34xx_cpu_suspend_sz);
-> -	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
-> +	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
->  		if (cpu_is_omap3505() || cpu_is_omap3517())
->  			_omap_save_secure_sram = omap_sram_push(
->  					omap3517_save_secure_ram_context,
-> @@ -865,6 +865,7 @@ void omap_push_sram_idle(void)
->  			_omap_save_secure_sram = omap_sram_push(
->  					save_secure_ram_context,
->  					save_secure_ram_context_sz);
-> +	}
->  }
->  
->  static void __init pm_errata_configure(void)
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
