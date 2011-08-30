@@ -1,279 +1,179 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 30 Aug 2011 08:19:58 -0500
-Subject: [PATCH 4/6] DMA: PL330: Add device tree support
-In-Reply-To: <CAJuYYwR5GqqKjbMngQqorLuka4XN0jin5s6O66orTtSQg5eKRw@mail.gmail.com>
-References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>	<1314348014-2481-2-git-send-email-thomas.abraham@linaro.org>	<1314348014-2481-3-git-send-email-thomas.abraham@linaro.org>	<1314348014-2481-4-git-send-email-thomas.abraham@linaro.org>	<1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>	<4E579C9B.7030807@gmail.com>
-	<CAJuYYwR5GqqKjbMngQqorLuka4XN0jin5s6O66orTtSQg5eKRw@mail.gmail.com>
-Message-ID: <4E5CE37E.1050104@gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 30 Aug 2011 15:31:55 +0200
+Subject: [RFC PATCH 3/3] OMAP: omap_device: Add a method to build an
+	omap_device from a DT node
+In-Reply-To: <1314037343-19783-4-git-send-email-b-cousson@ti.com>
+References: <1314037343-19783-1-git-send-email-b-cousson@ti.com>
+	<1314037343-19783-4-git-send-email-b-cousson@ti.com>
+Message-ID: <4E5CE64B.5080500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+Kevin,
 
-On 08/30/2011 07:18 AM, Thomas Abraham wrote:
-> Hi Rob,
-> 
-> On 26 August 2011 18:46, Rob Herring <robherring2@gmail.com
-> <mailto:robherring2@gmail.com>> wrote:
-> 
->     Thomas,
-> 
->     On 08/26/2011 03:40 AM, Thomas Abraham wrote:
->     > For PL330 dma controllers instantiated from device tree, the channel
->     > lookup is based on phandle of the dma controller and dma request id
->     > specified by the client node. During probe, the private data of each
->     > channel of the controller is set to point to the device node of the
->     > dma controller. The 'chan_id' of the each channel is used as the
->     > dma request id.
->     >
->     > Client driver requesting dma channels specify the phandle of the
->     > dma controller and the request id. The pl330 filter function
->     > converts the phandle to the device node pointer and matches that
->     > with channel's private data. If a match is found, the request id
->     > from the client node and the 'chan_id' of the channel is matched.
->     > A channel is found if both the values match.
->     >
->     > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org
->     <mailto:thomas.abraham@linaro.org>>
->     > ---
->     >  .../devicetree/bindings/dma/arm-pl330.txt          |   42
->     +++++++++++++
->     >  drivers/dma/pl330.c                                |   63
->     +++++++++++++++++++-
->     >  2 files changed, 103 insertions(+), 2 deletions(-)
->     >  create mode 100644
->     Documentation/devicetree/bindings/dma/arm-pl330.txt
->     >
->     > diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt
->     b/Documentation/devicetree/bindings/dma/arm-pl330.txt
->     > new file mode 100644
->     > index 0000000..46a8307
->     > --- /dev/null
->     > +++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
->     > @@ -0,0 +1,42 @@
->     > +* ARM PrimeCell PL330 DMA Controller
->     > +
->     > +The ARM PrimeCell PL330 DMA controller can move blocks of memory
->     contents
->     > +between memory and peripherals or memory to memory.
->     > +
->     > +Required properties:
->     > +  - compatible: should one or more of the following
->     > +    - arm,pl330-pdma - For controllers that support mem-to-dev
->     and dev-to-mem
->     > +      transfers.
->     > +    - arm,pl330-mdma - For controllers that support mem-to-mem
->     transfers only.
-> 
->     And if they support both? I would think all controllers can support
->     mem-to-mem. If so, the distinction can be made with the number of
->     requests.
-> 
-> 
-> If a controller supports both types of transfer, the device node should
-> not claim compatibility for "arm,pl330-pdma" or "arm,pl330-mdma".
-> Compatible should be "arm,primecell".
+Some self-review...
 
-No, every Primecell peripheral has "arm,primecell", so it is not
-specific enough for a driver to use.
+On 8/22/2011 8:22 PM, Cousson, Benoit wrote:
+> Add a notifier called during device_add phase. If a of_node is present,
+> retrieve the hwmod entry in order to populate propely the omap_device
 
-Is there a case that a controller with peripheral requests cannot
-support mem-to-mem transfers? I don't think there is. You could decide
-you don't want to for other reasons like you don't have enough free
-channels, but that's really a s/w decision, not a h/w description.
+typo
 
->  
-> 
->     > +    - arm,primecell - should be included for all pl330 dma
->     controller nodes.
->     > +
->     > +  - reg: physical base address of the controller and length of
->     memory mapped
->     > +    region.
->     > +
->     > +  - interrupts: interrupt number to the cpu.
->     > +
->     > +  - arm,primecell-periphid: should be 0x00041330.
-> 
->     Should be optional. It's only needed when the h/w value is wrong. This
->     is already documented in primecell.txt.
-> 
-> 
-> Ok. This will be made optional.
->  
-> 
-> 
->     > +
->     > +  - arm,pl330-peri-reqs: number of actual peripheral requests
->     connected to the
->     > +    dma controller. Maximum value is 32.
-> 
->     Perhaps could be a bitmask for sparsely populated requests. May not
->     matter since phandles will define the connections.
-> 
->     Can be optional and not present means 00 requests (mem-to-mem only).
-> 
-> 
-> As suggested by Russell, this property will be removed and its value
-> will be read from the configuration register.
->  
+> structure.
+> For the moment the resource from the device-tree are overloaded.
+> DT does not support named resource yet, and thus, most driver
+> will not work without that information.
+>
+> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> Cc: Kevin Hilman<khilman@ti.com>
+> ---
+>   arch/arm/plat-omap/omap_device.c |  102 ++++++++++++++++++++++++++++++++++++++
+>   1 files changed, 102 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index 70361f8..0ae9e7f 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -85,6 +85,8 @@
+>   #include<linux/clk.h>
+>   #include<linux/clkdev.h>
+>   #include<linux/pm_runtime.h>
+> +#include<linux/of_platform.h>
 
-Good. Reading a value of 0 requests can still be used to determine the
-controller is mem-to-mem only.
+This is not the proper include and will break non-DT build.
+It should be that one:
 
-> 
->     > +
->     > +Example: (from Samsung's Exynos4 processor dtsi file)
->     > +
->     > +     pdma0: pdma at 12680000 {
->     > +             compatible = "arm,pl330-pdma", "arm,primecell";
->     > +             reg = <0x12680000 0x1000>;
->     > +             interrupts = <99>;
->     > +             arm,primecell-periphid = <0x00041330>;
->     > +             arm,pl330-peri-reqs = <30>;
->     > +     };
->     > +
->     > +Client drivers (device nodes requiring dma transfers from
->     dev-to-mem or
->     > +mem-to-dev) should specify the DMA channel numbers using a
->     two-value pair
->     > +as shown below.
->     > +
->     > +  [property name]  = <[phandle of the dma controller] [dma
->     request id]>;
->     > +
->     > +      where 'dma request id' is the dma request number which is
->     connected
->     > +      to the client controller.
->     > +
->     > +  Example:  tx-dma-channel = <&pdma0 12>;
-> 
->     I like this approach. I looked at this some and some PPC platforms do a
->     node for each channel/request, but this is much more simple and similar
->     to clock binding approach.
-> 
->     You need to define the property name. Probably just "dma-channel" is
->     enough. For peripherals with more than 1, just list them out like when
->     you have more than 1 interrupt. The order should be defined as part of
->     that device's binding (i.e. 1st channel is tx and 2nd channel is rx).
-> 
-> 
-> I am little hesitant to do this the way you suggested. A controller
-> could have dma request lines connected to multiple dma controllers. So
-> the phandle could be different for each dma channel. Also, the client
-> drivers specify the property value for each dma channel requested (the
-> property value gets assigned to chan->private and then used by the
-> filter function to lookup the dma channel). So changing it the way you
-> have suggested would make things complex.
->  
++#include<linux/of.h>
 
-Perhaps you could make private point to the array entry rather than the
-property.
+I'll fix the series and re-send.
 
-But I don't have s strong opinion either way.
-
-> 
->     > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
->     > index 9732995..984dc18 100644
->     > --- a/drivers/dma/pl330.c
->     > +++ b/drivers/dma/pl330.c
->     > @@ -19,6 +19,7 @@
->     >  #include <linux/amba/pl330.h>
->     >  #include <linux/pm_runtime.h>
->     >  #include <linux/scatterlist.h>
->     > +#include <linux/of.h>
->     >
->     >  #define NR_DEFAULT_DESC      16
->     >
->     > @@ -277,6 +278,20 @@ bool pl330_filter(struct dma_chan *chan, void
->     *param)
->     >       if (chan->device->dev->driver != &pl330_driver.drv)
->     >               return false;
->     >
->     > +#ifdef CONFIG_OF
->     > +     if (chan->device->dev->of_node) {
->     > +             const __be32 *prop_value;
->     > +             phandle phandle;
->     > +             struct device_node *node;
->     > +
->     > +             prop_value = ((struct property *)param)->value;
->     > +             phandle = be32_to_cpup(prop_value++);
->     > +             node = of_find_node_by_phandle(phandle);
->     > +             return ((chan->private == node) &&
->     > +                             (chan->chan_id ==
->     be32_to_cpup(prop_value)));
->     > +     }
->     > +#endif
->     > +
->     >       peri_id = chan->private;
->     >       return *peri_id == (unsigned)param;
->     >  }
->     > @@ -777,6 +792,40 @@ static irqreturn_t pl330_irq_handler(int irq,
->     void *data)
->     >               return IRQ_NONE;
->     >  }
->     >
->     > +#ifdef CONFIG_OF
->     > +static struct dma_pl330_platdata *pl330_parse_dt(struct device *dev)
->     > +{
->     > +     struct dma_pl330_platdata *pdat;
->     > +     const void *value;
->     > +
->     > +     pdat = devm_kzalloc(dev, sizeof(*pdat), GFP_KERNEL);
->     > +     if (!pdat)
->     > +             return NULL;
-> 
->     Ideally, we will get rid of platform_data completely in the future, so I
->     don't think filling it in from DT is the right approach.
-> 
-> 
-> Ok. I will drop the usage of platform data.
->  
-> 
->     > +
->     > +     value = of_get_property(dev->of_node, "arm,pl330-peri-reqs",
->     NULL);
->     > +     if (value)
->     > +             pdat->nr_valid_peri = be32_to_cpup(value);
-> 
->     Can't you use the u32 helper function here?
-> 
-> 
-> This will go away now since the number of peripherals connected will be
-> read from the configuration register.
->  
-> 
->     > +
->     > +     if (of_device_is_compatible(dev->of_node, "arm,pl330-pdma")) {
->     > +             dma_cap_set(DMA_SLAVE, pdat->cap_mask);
->     > +             dma_cap_set(DMA_CYCLIC, pdat->cap_mask);
->     > +     } else if (of_device_is_compatible(dev->of_node,
->     "arm,pl330-mdma")) {
->     > +             dma_cap_set(DMA_MEMCPY, pdat->cap_mask);
->     > +     } else if (of_device_is_compatible(dev->of_node,
->     "arm,primecell")) {
-> 
->     I don't think the driver should look at this property. This is really
->     just for the bus code.
-> 
-> 
-> The dma capabilities are derived from the compatible value by the
-> driver. Sorry, I do not understand your suggestion for this.
->  
-
-"arm,primecell" is purely for identifying peripherals with the Primecell
-ID registers and in turn used to create amba_device instances. You
-cannot imply that it is a DMA controller.
-
-Rob
+Benoit
 
 
-> Thanks for your help.
-> 
-> Regards,
-> Thomas.
-> 
-> 
->     Rob
-> 
-> 
+> +#include<linux/notifier.h>
+>
+>   #include<plat/omap_device.h>
+>   #include<plat/omap_hwmod.h>
+> @@ -94,6 +96,8 @@
+>   #define USE_WAKEUP_LAT			0
+>   #define IGNORE_WAKEUP_LAT		1
+>
+> +#define MAX_HWMOD_NAME_SIZE		32
+> +
+>   static int omap_device_register(struct platform_device *pdev);
+>   static int omap_early_device_register(struct platform_device *pdev);
+>   static struct omap_device *omap_device_alloc(struct platform_device *pdev,
+> @@ -354,6 +358,100 @@ static int _dt_get_property(const char *prop, int len, int index, char *output,
+>   	return -ENODEV;
+>   }
+>
+> +static struct dev_pm_domain omap_device_pm_domain;
+> +
+> +/**
+> + * omap_device_build_from_dt - build an omap_device with multiple hwmods
+> + * @pdev_name: name of the platform_device driver to use
+> + * @pdev_id: this platform_device's connection ID
+> + * @oh: ptr to the single omap_hwmod that backs this omap_device
+> + * @pdata: platform_data ptr to associate with the platform_device
+> + * @pdata_len: amount of memory pointed to by @pdata
+> + * @pm_lats: pointer to a omap_device_pm_latency array for this device
+> + * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
+> + * @is_early_device: should the device be registered as an early device or not
+> + *
+> + * Function for building an omap_device already registered from device-tree
+> + *
+> + * Returns 0 or PTR_ERR() on error.
+> + */
+> +static int omap_device_build_from_dt(struct platform_device *pdev)
+> +{
+> +	struct omap_hwmod **hwmods;
+> +	struct omap_device *od;
+> +	struct omap_hwmod *oh;
+> +	char oh_name[MAX_HWMOD_NAME_SIZE];
+> +	const char *prop;
+> +	int oh_cnt, i, prop_len;
+> +	int ret = 0;
+> +
+> +	prop = of_get_property(pdev->dev.of_node, "hwmods",&prop_len);
+> +	oh_cnt = _dt_count_property_string(prop, prop_len);
+> +	if (!oh_cnt || IS_ERR_VALUE(oh_cnt)) {
+> +		dev_warn(&pdev->dev, "No 'hwmods' to build omap_device\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	hwmods = kzalloc(sizeof(struct omap_hwmod *) * oh_cnt, GFP_KERNEL);
+> +	if (!hwmods) {
+> +		ret = -ENOMEM;
+> +		goto odbfd_exit;
+> +	}
+> +
+> +	for (i = 0; i<  oh_cnt; i++) {
+> +		_dt_get_property(prop, prop_len, i, oh_name,
+> +				 MAX_HWMOD_NAME_SIZE);
+> +
+> +		oh = omap_hwmod_lookup(oh_name);
+> +		if (!oh) {
+> +			dev_err(&pdev->dev, "Cannot lookup hwmod '%s'\n",
+> +				oh_name);
+> +			ret = -EINVAL;
+> +			goto odbfd_exit1;
+> +		}
+> +		hwmods[i] = oh;
+> +	}
+> +
+> +	od = omap_device_alloc(pdev, hwmods, oh_cnt, NULL, 0);
+> +	if (!od) {
+> +		dev_err(&pdev->dev, "Cannot allocate omap_device for :%s\n",
+> +			oh_name);
+> +		ret = PTR_ERR(od);
+> +		goto odbfd_exit1;
+> +	}
+> +
+> +	if (of_get_property(pdev->dev.of_node, "no_idle_on_suspend", NULL))
+> +		omap_device_disable_idle_on_suspend(pdev);
+> +
+> +	pdev->dev.pm_domain =&omap_device_pm_domain;
+> +
+> +odbfd_exit1:
+> +	kfree(hwmods);
+> +odbfd_exit:
+> +	return ret;
+> +}
+> +
+> +static int _omap_device_notifier_call(struct notifier_block *nb,
+> +				      unsigned long event, void *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +
+> +	switch (event) {
+> +	case BUS_NOTIFY_ADD_DEVICE:
+> +		if (pdev->dev.of_node) {
+> +			dev_dbg(&pdev->dev, "add_device with DT bindings\n");
+> +			omap_device_build_from_dt(pdev);
+> +		}
+> +		break;
+> +
+> +	case BUS_NOTIFY_DEL_DEVICE:
+> +		dev_dbg(&pdev->dev, "del_device\n");
+> +		break;
+> +	}
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+>
+>   /* Public functions for use by core code */
+>
+> @@ -1064,8 +1162,12 @@ struct device omap_device_parent = {
+>   	.parent         =&platform_bus,
+>   };
+>
+> +static struct notifier_block platform_nb;
+> +
+>   static int __init omap_device_init(void)
+>   {
+> +	platform_nb.notifier_call = _omap_device_notifier_call;
+> +	bus_register_notifier(&platform_bus_type,&platform_nb);
+>   	return device_register(&omap_device_parent);
+>   }
+>   core_initcall(omap_device_init);
