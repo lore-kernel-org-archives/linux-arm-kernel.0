@@ -1,48 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 30 Aug 2011 22:30:41 +0100
-Subject: [PATCH] ARM: S3C64XX: Fix clkdev device names for I2C clocks
-Message-ID: <1314739841-13522-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 30 Aug 2011 15:26:28 -0700
+Subject: [PATCH 1/3] AM35x: voltage: Basic initialization
+In-Reply-To: <1313754573-11498-2-git-send-email-abhilash.kv@ti.com> (Abhilash
+	K. V.'s message of "Fri, 19 Aug 2011 17:19:31 +0530")
+References: <1313754573-11498-1-git-send-email-abhilash.kv@ti.com>
+	<1313754573-11498-2-git-send-email-abhilash.kv@ti.com>
+Message-ID: <87aaaqmt7v.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the S3C64xx CPUs were converted to clkdev mappings were added for the
-I2C controllers on them but there's a couple of issues with these mappings:
+Abhilash K V <abhilash.kv@ti.com> writes:
 
-- We're randomly using a device name for controller 1 but not controller 0
-  which is odd.
-- The controller type for controller 1 is s3c2440, not s3c2410 which is
-  what the device is actually registered as so dev_name() based lookups
-  fail.
+> From: Sanjeev Premi <premi@ti.com>
+>
+> This patch adds the basic initialization of voltage layer
+> for AM35x. Since AM35x doesn't support voltage scaling,
+> Many functions have been defined to plug into existing
+> voltage layer.
+>
+> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
 
-The end result is that only controller 0 has a good mapping, though for
-some reason this did used to work.
+[...]
 
-Something in recent -next appears to have triggered this but I can't for
-the life of me figure out how it ever worked.
+> diff --git a/arch/arm/mach-omap2/voltagedomains3xxx_data.c b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
+> index def230f..b45d145 100644
+> --- a/arch/arm/mach-omap2/voltagedomains3xxx_data.c
+> +++ b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
+> @@ -67,6 +67,38 @@ static struct omap_vdd_info *omap3_vdd_info[] = {
+>  	&omap3_vdd2_info,
+>  };
+>  
+> +/*
+> + * AM35x VDD structures
+> + *
+> + * In AM35x there neither scalable voltage domain nor any hook-up with
+> + * voltage controller/processor. However, when trying to re-use the hwmod
+> + * database for OMAP3, definition of "core" voltage domain is necessary.
+> + * Else, changes in hwmod data structures grow spirally.
+> + *
+> + * As a workaround, "core" voltage domain is defined below. The definition
+> + * doesn't lead to any side-effects.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/clock.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+Except the side-effect of a bunch of unused data, and nop functions that
+just clutter things up in a not-very-maintainable way.
 
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index 872e683..3f2bb26 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -138,12 +138,13 @@ static struct clk init_clocks_off[] = {
- 		.ctrlbit	= S3C_CLKCON_PCLK_TSADC,
- 	}, {
- 		.name		= "i2c",
-+		.devname	= "s3c2440-i2c.0",
- 		.parent		= &clk_p,
- 		.enable		= s3c64xx_pclk_ctrl,
- 		.ctrlbit	= S3C_CLKCON_PCLK_IIC,
- 	}, {
- 		.name		= "i2c",
--		.devname	= "s3c2440-i2c.1",
-+		.devname	= "s3c2410-i2c.1",
- 		.parent		= &clk_p,
- 		.enable		= s3c64xx_pclk_ctrl,
- 		.ctrlbit	= S3C6410_CLKCON_PCLK_I2C1,
--- 
-1.7.5.4
+For SoCs without scalable voltage domains, we need to fix the underlying
+problems in the core code for how to cleanly re-use hwmods.
+
+Fortunately, this core code cleanup is now in progress, so it shouldn't
+be long now where we can do this cleanly.
+
+Kevin
