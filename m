@@ -1,9 +1,10 @@
 From: eric.miao@linaro.org (Eric Miao)
-Date: Tue, 30 Aug 2011 17:14:17 +0800
-Subject: [PATCH 1/2] ARM imx53: add pwm devices support
-In-Reply-To: <1314690756-19982-1-git-send-email-jason.chen@freescale.com>
+Date: Tue, 30 Aug 2011 17:17:49 +0800
+Subject: [PATCH 2/2] ARM: mx53/loco: add pwm backlight device
+In-Reply-To: <1314690756-19982-2-git-send-email-jason.chen@freescale.com>
 References: <1314690756-19982-1-git-send-email-jason.chen@freescale.com>
-Message-ID: <CAMPhdO-fmjHUg02ZLOaMC3o5-WyO=FrKwcrenkZPn6wHU8bgZg@mail.gmail.com>
+	<1314690756-19982-2-git-send-email-jason.chen@freescale.com>
+Message-ID: <CAMPhdO8OPAMGR03RwSB=Cu51EiyQ9NWgCWqTW9zh01esjWXU6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,84 +13,72 @@ On Tue, Aug 30, 2011 at 3:52 PM,  <jason.chen@freescale.com> wrote:
 >
 > Signed-off-by: Jason Chen <b02280@freescale.com>
 > Signed-off-by: Jason Chen <jason.chen@linaro.org>
-
-Looks good to me. Sascha, any comments?
-
-Acked-by: Eric Miao <eric.miao@linaro.org>
-
 > ---
-> ?arch/arm/mach-mx5/clock-mx51-mx53.c ? ? ? ? ?| ? ?2 ++
-> ?arch/arm/mach-mx5/devices-imx53.h ? ? ? ? ? ?| ? ?4 ++++
-> ?arch/arm/plat-mxc/devices/platform-mxc_pwm.c | ? ?9 +++++++++
-> ?arch/arm/plat-mxc/pwm.c ? ? ? ? ? ? ? ? ? ? ?| ? ?3 ++-
-> ?4 files changed, 17 insertions(+), 1 deletions(-)
+> ?arch/arm/mach-mx5/Kconfig ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-mx5/board-mx53_loco.c | ? 11 +++++++++++
+> ?arch/arm/mach-mx5/devices-imx53.h ? | ? ?4 ++++
+> ?3 files changed, 16 insertions(+), 0 deletions(-)
 >
-> diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> index f7bf996..f5f116f 100644
-> --- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-> +++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-> @@ -1507,6 +1507,8 @@ static struct clk_lookup mx53_lookups[] = {
-> ? ? ? ?_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
-> ? ? ? ?_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
-> ? ? ? ?_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
-> + ? ? ? _REGISTER_CLOCK("mxc_pwm.0", NULL, pwm1_clk)
-> + ? ? ? _REGISTER_CLOCK("mxc_pwm.1", NULL, pwm2_clk)
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> index b4e7c58..1463cd3 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -202,6 +202,7 @@ config MACH_MX53_LOCO
+> ? ? ? ?select IMX_HAVE_PLATFORM_IMX2_WDT
+> ? ? ? ?select IMX_HAVE_PLATFORM_IMX_I2C
+> ? ? ? ?select IMX_HAVE_PLATFORM_IMX_UART
+> + ? ? ? select IMX_HAVE_PLATFORM_MXC_PWM
+> ? ? ? ?select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+> ? ? ? ?select IMX_HAVE_PLATFORM_GPIO_KEYS
+> ? ? ? ?select LEDS_GPIO_REGISTER
+> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+> index 4e1d51d..e2d916d 100644
+> --- a/arch/arm/mach-mx5/board-mx53_loco.c
+> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
+> @@ -22,6 +22,7 @@
+> ?#include <linux/clk.h>
+> ?#include <linux/delay.h>
+> ?#include <linux/gpio.h>
+> +#include <linux/pwm_backlight.h>
+>
+> ?#include <mach/common.h>
+> ?#include <mach/hardware.h>
+> @@ -257,6 +258,13 @@ static const struct gpio_led_platform_data mx53loco_leds_data __initconst = {
+> ? ? ? ?.num_leds ? ? ? = ARRAY_SIZE(mx53loco_leds),
 > ?};
 >
-> ?static void clk_tree_init(void)
+> +static struct platform_pwm_backlight_data loco_pwm_backlight_data = {
+> + ? ? ? .pwm_id = 1,
+> + ? ? ? .max_brightness = 255,
+> + ? ? ? .dft_brightness = 128,
+> + ? ? ? .pwm_period_ns = 50000,
+> +};
+> +
+> ?static void __init mx53_loco_board_init(void)
+> ?{
+> ? ? ? ?imx53_soc_init();
+> @@ -273,6 +281,9 @@ static void __init mx53_loco_board_init(void)
+> ? ? ? ?imx53_add_sdhci_esdhc_imx(2, &mx53_loco_sd3_data);
+> ? ? ? ?imx_add_gpio_keys(&loco_button_data);
+> ? ? ? ?gpio_led_register_device(-1, &mx53loco_leds_data);
+> +
+> + ? ? ? imx53_add_mxc_pwm(1);
+> + ? ? ? imx53_add_mxc_pwm_backlight(0, &loco_pwm_backlight_data);
+> ?}
+>
+> ?static void __init mx53_loco_timer_init(void)
 > diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
-> index c27fe8b..258e68f 100644
+> index 258e68f..2aa8ef8 100644
 > --- a/arch/arm/mach-mx5/devices-imx53.h
 > +++ b/arch/arm/mach-mx5/devices-imx53.h
-> @@ -40,3 +40,7 @@ extern const struct imx_imx_ssi_data imx53_imx_ssi_data[];
-> ?extern const struct imx_imx_keypad_data imx53_imx_keypad_data;
-> ?#define imx53_add_imx_keypad(pdata) ? ?\
-> ? ? ? ?imx_add_imx_keypad(&imx53_imx_keypad_data, pdata)
+> @@ -44,3 +44,7 @@ extern const struct imx_imx_keypad_data imx53_imx_keypad_data;
+> ?extern const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst;
+> ?#define imx53_add_mxc_pwm(id) ?\
+> ? ? ? ?imx_add_mxc_pwm(&imx53_mxc_pwm_data[id])
 > +
-> +extern const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst;
-> +#define imx53_add_mxc_pwm(id) ?\
-> + ? ? ? imx_add_mxc_pwm(&imx53_mxc_pwm_data[id])
-> diff --git a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-> index b0c4ae2..18cfd07 100644
-> --- a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-> +++ b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-> @@ -49,6 +49,15 @@ const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst = {
-> ?};
-> ?#endif /* ifdef CONFIG_SOC_IMX51 */
->
-> +#ifdef CONFIG_SOC_IMX53
-> +const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst = {
-> +#define imx53_mxc_pwm_data_entry(_id, _hwid) ? ? ? ? ? ? ? ? ? ? ? ? ? \
-> + ? ? ? imx_mxc_pwm_data_entry(MX53, _id, _hwid, SZ_16K)
-> + ? ? ? imx53_mxc_pwm_data_entry(0, 1),
-> + ? ? ? imx53_mxc_pwm_data_entry(1, 2),
-> +};
-> +#endif /* ifdef CONFIG_SOC_IMX53 */
-> +
-> ?struct platform_device *__init imx_add_mxc_pwm(
-> ? ? ? ? ? ? ? ?const struct imx_mxc_pwm_data *data)
-> ?{
-> diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
-> index 761c3c9..5dda436 100644
-> --- a/arch/arm/plat-mxc/pwm.c
-> +++ b/arch/arm/plat-mxc/pwm.c
-> @@ -57,7 +57,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-> ? ? ? ?if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> - ? ? ? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
-> + ? ? ? if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()
-> + ? ? ? ? ? ? ? || cpu_is_mx53()) {
-> ? ? ? ? ? ? ? ?unsigned long long c;
-> ? ? ? ? ? ? ? ?unsigned long period_cycles, duty_cycles, prescale;
-> ? ? ? ? ? ? ? ?u32 cr;
-> --
-> 1.7.4.1
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> +#define imx53_add_mxc_pwm_backlight(id, pdata) ? ? ? ? ? ? ? ? \
+> + ? ? ? platform_device_register_resndata(NULL, "pwm-backlight",\
+> + ? ? ? ? ? ? ? ? ? ? ? id, NULL, 0, pdata, sizeof(*pdata));
+
+This could be made more generic like imx_add_pwm_backlight()? So
+that other boards can make use of the same API as well.
