@@ -1,46 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Aug 2011 17:18:32 +0100
-Subject: [PATCH v2] ARM: sched_clock: allow sched_clock to be selected
-	at runtime
-In-Reply-To: <alpine.LFD.2.00.1108151931410.20358@xanadu.home>
-References: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
-	<alpine.LFD.2.00.1108151931410.20358@xanadu.home>
-Message-ID: <20110830161832.GC26905@n2100.arm.linux.org.uk>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 30 Aug 2011 12:38:30 -0400
+Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
+In-Reply-To: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
+References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <1314722311.2344.64.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 15, 2011 at 08:00:45PM -0400, Nicolas Pitre wrote:
-> On Thu, 11 Aug 2011, Marc Zyngier wrote:
-> > +unsigned long long notrace sched_clock(void)
-> > +{
-> > +	if (read_sched_clock) {
-> > +		u32 cyc = read_sched_clock();
-> > +		return cyc_to_sched_clock(&cd, cyc, sched_clock_mask);
-> > +	}
-> > +
-> > +	return (unsigned long long)(jiffies - INITIAL_JIFFIES)
-> > +					* (NSEC_PER_SEC / HZ);
-> > +}
-> 
-> This bothers me that this function has to include a conditional which 
-> will _always_ be evaluated as true except during early boot.  Why not 
-> simply initializing read_sched_clock with a jiffy_shed_clock function 
-> instead, and let it be overriden during boot?  This way the actual 
-> sched_clock() code will be more straight forward.
+On Wed, 2011-08-31 at 00:03 +0800, ming.lei at canonical.com wrote:
+> +/*
+> + * Writing to dma coherent memory on ARM may be delayed via L2
+> + * writing buffer, so introduce the helper which can flush L2 writing
+> + * buffer into memory immediately, especially used to flush ehci
+> + * descriptor to memory.
+> + * */
+> +#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+> +static inline void ehci_sync_mem()
+> +{
+> +       mb();
+> +}
+> +#else
+> +static inline void ehci_sync_mem()
+> +{
+> +}
+> +#endif
+> +
 
-It's also utterly pointless.
+I'm wondering if this doesn't really belong in the DMA API for any
+future architectures that can't avoid prolonged write buffering to DMA
+coherent memory. IIUC, ARM mitigates this for most drivers by including
+an implicit write buffer flush in the mmio write routines. This takes
+care of the drivers which write to a mmio device register after writing
+something to shared DMA memory. IIUC, this doesn't help ehci because the
+host controller is polling to see what the cpu writes to the shared
+memory. Other hardware which polls shared memory like that will likely
+have the same problem and could use buffer drain helpers as well.
 
-The point being is that `jiffies' is a constant during early boot,
-because it needs timers and interrupts to be setup and running
-(specifically the clock event subsystem) before it starts incrementing.
-Chances are that's the case up until _after_ the point where
-sched_clock should have already been initialized.
-
-Plus, doing this switching in this way may result in a step in the
-value of sched_clock() - possibly after sched_clock() has been used
-to initialize the scheduler.
-
-So, I don't see this as a proper solution to the problem.  It's an
-attempt to "solve" one problem while creating other problems.  Let's
-not do that - lets always aim to _reduce_ the number of problems
-overall.
+--Mark
