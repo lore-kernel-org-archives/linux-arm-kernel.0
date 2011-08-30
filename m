@@ -1,37 +1,28 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 30 Aug 2011 12:27:24 +0300
-Subject: How to handle named resources with DT?
-In-Reply-To: <20110830022912.GE4254@yookeroo.fritz.box>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<877h6173wm.fsf@ti.com> <20110826041200.GD2308@yookeroo.fritz.box>
-	<201108261258.32880.arnd@arndb.de> <4E57A9FB.5030404@ti.com>
-	<20110830022912.GE4254@yookeroo.fritz.box>
-Message-ID: <20110830092722.GG23907@legolas.emea.dhcp.ti.com>
+From: richard.zhu@linaro.org (Richard Zhu)
+Date: Tue, 30 Aug 2011 17:56:09 +0800
+Subject: [PATCH V7 4/5] MX53 Enable the AHCI SATA on MX53 LOCO board
+In-Reply-To: <1314698171-7937-1-git-send-email-richard.zhu@linaro.org>
+References: <1314698171-7937-1-git-send-email-richard.zhu@linaro.org>
+Message-ID: <1314698171-7937-4-git-send-email-richard.zhu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+---
+ arch/arm/mach-mx5/board-mx53_loco.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-On Tue, Aug 30, 2011 at 12:29:12PM +1000, David Gibson wrote:
-> So, I actually agree that in the long term getting resource names in
-> the DT would be a generally good thing.
-> 
-> But doing so is a *huge* change in one of the very core semantics of
-> all the DT bindings.  It's not something that should be done lightly
-> or quickly.  It absolutely should not be tied to how this is handled
-
-the longer you take to change, the more complex will it be to change.
-The longer we spend discussing the validity of _byname(), more
-boards/archs/whatnot will be converted to DT without _byname() and after
-a certain amount of them are converted, noone will be willing to change
-and validate everything again.
-
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 4e1d51d..76a7af7 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -273,6 +273,7 @@ static void __init mx53_loco_board_init(void)
+ 	imx53_add_sdhci_esdhc_imx(2, &mx53_loco_sd3_data);
+ 	imx_add_gpio_keys(&loco_button_data);
+ 	gpio_led_register_device(-1, &mx53loco_leds_data);
++	imx53_add_ahci_imx(0, NULL);
+ }
+ 
+ static void __init mx53_loco_timer_init(void)
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110830/7f00a399/attachment.sig>
+1.7.1
