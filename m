@@ -1,126 +1,79 @@
-From: marvin24@gmx.de (Marc Dietich)
-Date: Tue, 30 Aug 2011 09:52:01 +0200
-Subject: [PATCH 1/2] sdhci/tegra: Add Device Tree probing support
-In-Reply-To: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
-References: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
-Message-ID: <201108300952.02418.marvin24@gmx.de>
+From: jason.chen@freescale.com (jason.chen at freescale.com)
+Date: Tue, 30 Aug 2011 15:52:35 +0800
+Subject: [PATCH 1/2] ARM imx53: add pwm devices support
+Message-ID: <1314690756-19982-1-git-send-email-jason.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Jason Chen <b02280@freescale.com>
 
-just a small question,
+Signed-off-by: Jason Chen <b02280@freescale.com>
+Signed-off-by: Jason Chen <jason.chen@linaro.org>
+---
+ arch/arm/mach-mx5/clock-mx51-mx53.c          |    2 ++
+ arch/arm/mach-mx5/devices-imx53.h            |    4 ++++
+ arch/arm/plat-mxc/devices/platform-mxc_pwm.c |    9 +++++++++
+ arch/arm/plat-mxc/pwm.c                      |    3 ++-
+ 4 files changed, 17 insertions(+), 1 deletions(-)
 
-> From: Grant Likely <grant.likely@secretlab.ca>
-
-[...]
-
-> diff --git a/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
-> b/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt new file mode
-> 100644
-> index 0000000..c87f667
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
-> @@ -0,0 +1,25 @@
-> +* NVIDIA Tegra Secure Digital Host Controller
-> +
-> +This controller on Tegra family SoCs provides an interface for MMC, SD,
-> +and SDIO types of memory cards.
-> +
-> +Required properties:
-> +- compatible : Should be "nvidia,<chip>-sdhci"
-> +- reg : Should contain eSDHC registers location and length
-> +- interrupts : Should contain eSDHC interrupt
-> +
-> +Optional properties:
-> +- cd-gpios : Specify GPIOs for card detection
-> +- wp-gpios : Specify GPIOs for write protection
-> +- power-gpios : Specify GPIOs for power control
-> +
-> +Example:
-> +
-> +sdhci at c8000200 {
-> +	compatible = "nvidia,tegra20-sdhci";
-> +	reg = <0xc8000200 0x200>;
-> +	interrupts = <47>;
-> +	cd-gpios = <&gpio 69 0>; /* gpio PI5 */
-> +	wp-gpios = <&gpio 57 0>; /* gpio PH1 */
-> +	power-gpios = <&gpio 155 0>; /* gpio PT3 */
-> +};
-> diff --git a/drivers/mmc/host/sdhci-tegra.c
-> b/drivers/mmc/host/sdhci-tegra.c index a5a9a97..9ab18d6 100644
-> --- a/drivers/mmc/host/sdhci-tegra.c
-> +++ b/drivers/mmc/host/sdhci-tegra.c
-> @@ -17,6 +17,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/clk.h>
->  #include <linux/io.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/gpio.h>
->  #include <linux/mmc/card.h>
->  #include <linux/mmc/host.h>
-> @@ -74,10 +75,8 @@ static void tegra_sdhci_writel(struct sdhci_host *host,
-> u32 val, int reg)
-> 
->  static unsigned int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
->  {
-> -	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
-> -	struct tegra_sdhci_platform_data *plat;
-> -
-> -	plat = pdev->dev.platform_data;
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
-> +	struct tegra_sdhci_platform_data *plat = pltfm_host->priv;
-> 
->  	if (!gpio_is_valid(plat->wp_gpio))
->  		return -1;
-> @@ -95,12 +94,10 @@ static irqreturn_t carddetect_irq(int irq, void *data)
-> 
->  static int tegra_sdhci_8bit(struct sdhci_host *host, int bus_width)
->  {
-> -	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
-> -	struct tegra_sdhci_platform_data *plat;
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct tegra_sdhci_platform_data *plat = pltfm_host->priv;
->  	u32 ctrl;
-> 
-> -	plat = pdev->dev.platform_data;
-> -
->  	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
->  	if (plat->is_8bit && bus_width == MMC_BUS_WIDTH_8) {
->  		ctrl &= ~SDHCI_CTRL_4BITBUS;
-
-what about 8 bit support? 
-
-> @@ -132,6 +129,34 @@ static struct sdhci_pltfm_data sdhci_tegra_pdata = {
->  	.ops  = &tegra_sdhci_ops,
->  };
-> 
-> +static const struct of_device_id sdhci_tegra_dt_match[] __devinitdata = {
-> +	{ .compatible = "nvidia,tegra20-sdhci", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, sdhci_dt_ids);
-> +
-> +static struct tegra_sdhci_platform_data * __devinit
-> sdhci_tegra_dt_parse_pdata( +						struct platform_device *pdev)
-> +{
-> +	struct tegra_sdhci_platform_data *plat;
-> +	struct device_node *np = pdev->dev.of_node;
-> +
-> +	if (!np)
-> +		return NULL;
-> +
-> +	plat = devm_kzalloc(&pdev->dev, sizeof(*plat), GFP_KERNEL);
-> +	if (!plat) {
-> +		dev_err(&pdev->dev, "Can't allocate platform data\n");
-> +		return NULL;
-> +	}
-> +
-> +	plat->cd_gpio = of_get_named_gpio(np, "cd-gpios", 0);
-> +	plat->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
-> +	plat->power_gpio = of_get_named_gpio(np, "power-gpios", 0);
-> +
-> +	return plat;
-> +}
-
-[...]
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index f7bf996..f5f116f 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1507,6 +1507,8 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+ 	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
+ 	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
++	_REGISTER_CLOCK("mxc_pwm.0", NULL, pwm1_clk)
++	_REGISTER_CLOCK("mxc_pwm.1", NULL, pwm2_clk)
+ };
+ 
+ static void clk_tree_init(void)
+diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
+index c27fe8b..258e68f 100644
+--- a/arch/arm/mach-mx5/devices-imx53.h
++++ b/arch/arm/mach-mx5/devices-imx53.h
+@@ -40,3 +40,7 @@ extern const struct imx_imx_ssi_data imx53_imx_ssi_data[];
+ extern const struct imx_imx_keypad_data imx53_imx_keypad_data;
+ #define imx53_add_imx_keypad(pdata)	\
+ 	imx_add_imx_keypad(&imx53_imx_keypad_data, pdata)
++
++extern const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst;
++#define imx53_add_mxc_pwm(id)	\
++	imx_add_mxc_pwm(&imx53_mxc_pwm_data[id])
+diff --git a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
+index b0c4ae2..18cfd07 100644
+--- a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
++++ b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
+@@ -49,6 +49,15 @@ const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst = {
+ };
+ #endif /* ifdef CONFIG_SOC_IMX51 */
+ 
++#ifdef CONFIG_SOC_IMX53
++const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst = {
++#define imx53_mxc_pwm_data_entry(_id, _hwid)				\
++	imx_mxc_pwm_data_entry(MX53, _id, _hwid, SZ_16K)
++	imx53_mxc_pwm_data_entry(0, 1),
++	imx53_mxc_pwm_data_entry(1, 2),
++};
++#endif /* ifdef CONFIG_SOC_IMX53 */
++
+ struct platform_device *__init imx_add_mxc_pwm(
+ 		const struct imx_mxc_pwm_data *data)
+ {
+diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
+index 761c3c9..5dda436 100644
+--- a/arch/arm/plat-mxc/pwm.c
++++ b/arch/arm/plat-mxc/pwm.c
+@@ -57,7 +57,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
+ 		return -EINVAL;
+ 
+-	if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
++	if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()
++		|| cpu_is_mx53()) {
+ 		unsigned long long c;
+ 		unsigned long period_cycles, duty_cycles, prescale;
+ 		u32 cr;
+-- 
+1.7.4.1
