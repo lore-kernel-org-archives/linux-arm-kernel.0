@@ -1,34 +1,126 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 30 Aug 2011 15:40:17 +0800
-Subject: [PATCH 3/3] ARM: smp_scu: remove __init annotation from scu_enable()
-In-Reply-To: <1314690017-17590-1-git-send-email-shawn.guo@linaro.org>
-References: <1314690017-17590-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1314690017-17590-4-git-send-email-shawn.guo@linaro.org>
+From: marvin24@gmx.de (Marc Dietich)
+Date: Tue, 30 Aug 2011 09:52:01 +0200
+Subject: [PATCH 1/2] sdhci/tegra: Add Device Tree probing support
+In-Reply-To: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
+References: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
+Message-ID: <201108300952.02418.marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When Cortex-A9 MPCore resumes from Dormant or Shutdown modes,
-SCU needs to be re-enabled.  This patch removes __init annotation
-from function scu_enable(), so that platform resume procedure can
-call it to re-enable SCU.
+Hi,
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/kernel/smp_scu.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+just a small question,
 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 79ed5e7..5b6d536 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -33,7 +33,7 @@ unsigned int __init scu_get_core_count(void __iomem *scu_base)
- /*
-  * Enable the SCU
-  */
--void __init scu_enable(void __iomem *scu_base)
-+void scu_enable(void __iomem *scu_base)
- {
- 	u32 scu_ctrl;
- 
--- 
-1.7.4.1
+> From: Grant Likely <grant.likely@secretlab.ca>
+
+[...]
+
+> diff --git a/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
+> b/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt new file mode
+> 100644
+> index 0000000..c87f667
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
+> @@ -0,0 +1,25 @@
+> +* NVIDIA Tegra Secure Digital Host Controller
+> +
+> +This controller on Tegra family SoCs provides an interface for MMC, SD,
+> +and SDIO types of memory cards.
+> +
+> +Required properties:
+> +- compatible : Should be "nvidia,<chip>-sdhci"
+> +- reg : Should contain eSDHC registers location and length
+> +- interrupts : Should contain eSDHC interrupt
+> +
+> +Optional properties:
+> +- cd-gpios : Specify GPIOs for card detection
+> +- wp-gpios : Specify GPIOs for write protection
+> +- power-gpios : Specify GPIOs for power control
+> +
+> +Example:
+> +
+> +sdhci at c8000200 {
+> +	compatible = "nvidia,tegra20-sdhci";
+> +	reg = <0xc8000200 0x200>;
+> +	interrupts = <47>;
+> +	cd-gpios = <&gpio 69 0>; /* gpio PI5 */
+> +	wp-gpios = <&gpio 57 0>; /* gpio PH1 */
+> +	power-gpios = <&gpio 155 0>; /* gpio PT3 */
+> +};
+> diff --git a/drivers/mmc/host/sdhci-tegra.c
+> b/drivers/mmc/host/sdhci-tegra.c index a5a9a97..9ab18d6 100644
+> --- a/drivers/mmc/host/sdhci-tegra.c
+> +++ b/drivers/mmc/host/sdhci-tegra.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+> +#include <linux/of_gpio.h>
+>  #include <linux/gpio.h>
+>  #include <linux/mmc/card.h>
+>  #include <linux/mmc/host.h>
+> @@ -74,10 +75,8 @@ static void tegra_sdhci_writel(struct sdhci_host *host,
+> u32 val, int reg)
+> 
+>  static unsigned int tegra_sdhci_get_ro(struct sdhci_host *sdhci)
+>  {
+> -	struct platform_device *pdev = to_platform_device(mmc_dev(sdhci->mmc));
+> -	struct tegra_sdhci_platform_data *plat;
+> -
+> -	plat = pdev->dev.platform_data;
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(sdhci);
+> +	struct tegra_sdhci_platform_data *plat = pltfm_host->priv;
+> 
+>  	if (!gpio_is_valid(plat->wp_gpio))
+>  		return -1;
+> @@ -95,12 +94,10 @@ static irqreturn_t carddetect_irq(int irq, void *data)
+> 
+>  static int tegra_sdhci_8bit(struct sdhci_host *host, int bus_width)
+>  {
+> -	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+> -	struct tegra_sdhci_platform_data *plat;
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct tegra_sdhci_platform_data *plat = pltfm_host->priv;
+>  	u32 ctrl;
+> 
+> -	plat = pdev->dev.platform_data;
+> -
+>  	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+>  	if (plat->is_8bit && bus_width == MMC_BUS_WIDTH_8) {
+>  		ctrl &= ~SDHCI_CTRL_4BITBUS;
+
+what about 8 bit support? 
+
+> @@ -132,6 +129,34 @@ static struct sdhci_pltfm_data sdhci_tegra_pdata = {
+>  	.ops  = &tegra_sdhci_ops,
+>  };
+> 
+> +static const struct of_device_id sdhci_tegra_dt_match[] __devinitdata = {
+> +	{ .compatible = "nvidia,tegra20-sdhci", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, sdhci_dt_ids);
+> +
+> +static struct tegra_sdhci_platform_data * __devinit
+> sdhci_tegra_dt_parse_pdata( +						struct platform_device *pdev)
+> +{
+> +	struct tegra_sdhci_platform_data *plat;
+> +	struct device_node *np = pdev->dev.of_node;
+> +
+> +	if (!np)
+> +		return NULL;
+> +
+> +	plat = devm_kzalloc(&pdev->dev, sizeof(*plat), GFP_KERNEL);
+> +	if (!plat) {
+> +		dev_err(&pdev->dev, "Can't allocate platform data\n");
+> +		return NULL;
+> +	}
+> +
+> +	plat->cd_gpio = of_get_named_gpio(np, "cd-gpios", 0);
+> +	plat->wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
+> +	plat->power_gpio = of_get_named_gpio(np, "power-gpios", 0);
+> +
+> +	return plat;
+> +}
+
+[...]
