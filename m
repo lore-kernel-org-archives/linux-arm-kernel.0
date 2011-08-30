@@ -1,81 +1,112 @@
-From: jason.chen@freescale.com (jason.chen at freescale.com)
-Date: Tue, 30 Aug 2011 15:52:36 +0800
-Subject: [PATCH 2/2] ARM: mx53/loco: add pwm backlight device
-In-Reply-To: <1314690756-19982-1-git-send-email-jason.chen@freescale.com>
-References: <1314690756-19982-1-git-send-email-jason.chen@freescale.com>
-Message-ID: <1314690756-19982-2-git-send-email-jason.chen@freescale.com>
+From: richard.zhu@linaro.org (Richard Zhu)
+Date: Tue, 30 Aug 2011 16:54:21 +0800
+Subject: [PATCH V6 2/5] ahci_plt Add the board_ids and pi refer to
+	different features
+In-Reply-To: <CAJNCFVKPUW95F0Wt9eVWs0+ne1pdXreYi6uSKH2TkR+Qt_sm4A@mail.gmail.com>
+References: <1314602339-18392-1-git-send-email-richard.zhu@linaro.org>
+	<1314602339-18392-2-git-send-email-richard.zhu@linaro.org>
+	<20110829121214.GA15484@oksana.dev.rtsoft.ru>
+	<CAMPhdO_XsrGTiiKpALVU7tZiAO_C5d_9XKoVjL_BHwpcqzXcFg@mail.gmail.com>
+	<CAJNCFVJKvO+W0ogn-3GOsR8ygtn5KWtqTc2sw6HuNB2-x7ZviA@mail.gmail.com>
+	<CAJNCFVKPUW95F0Wt9eVWs0+ne1pdXreYi6uSKH2TkR+Qt_sm4A@mail.gmail.com>
+Message-ID: <CAJNCFVJk0ZeMpSxa=wo1ByV64mip7=Gpscym1LLz2rHC0QvaLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jason Chen <b02280@freescale.com>
+Hi:
+Maybe we have to come back to take wolfram's suggestion.
+Remove the mx53 specification in the ahci_type, and replace it by
+ the generic one AHCI_PMP_RTY_SRST
+Then the other ahci controller that needs the same PMP retry soft
+reset SW work-around can reuse the
+ata_port_info.
 
-Signed-off-by: Jason Chen <b02280@freescale.com>
-Signed-off-by: Jason Chen <jason.chen@linaro.org>
----
- arch/arm/mach-mx5/Kconfig           |    1 +
- arch/arm/mach-mx5/board-mx53_loco.c |   11 +++++++++++
- arch/arm/mach-mx5/devices-imx53.h   |    4 ++++
- 3 files changed, 16 insertions(+), 0 deletions(-)
+Hi Eric:
+How about to use the generic ahci_type AHCI_PMP_RTY_SRST to replace
+the IMX53_AHCI firstly?
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index b4e7c58..1463cd3 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -202,6 +202,7 @@ config MACH_MX53_LOCO
- 	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_UART
-+	select IMX_HAVE_PLATFORM_MXC_PWM
- 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
- 	select IMX_HAVE_PLATFORM_GPIO_KEYS
- 	select LEDS_GPIO_REGISTER
-diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-index 4e1d51d..e2d916d 100644
---- a/arch/arm/mach-mx5/board-mx53_loco.c
-+++ b/arch/arm/mach-mx5/board-mx53_loco.c
-@@ -22,6 +22,7 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
-+#include <linux/pwm_backlight.h>
- 
- #include <mach/common.h>
- #include <mach/hardware.h>
-@@ -257,6 +258,13 @@ static const struct gpio_led_platform_data mx53loco_leds_data __initconst = {
- 	.num_leds	= ARRAY_SIZE(mx53loco_leds),
- };
- 
-+static struct platform_pwm_backlight_data loco_pwm_backlight_data = {
-+	.pwm_id = 1,
-+	.max_brightness = 255,
-+	.dft_brightness = 128,
-+	.pwm_period_ns = 50000,
-+};
-+
- static void __init mx53_loco_board_init(void)
- {
- 	imx53_soc_init();
-@@ -273,6 +281,9 @@ static void __init mx53_loco_board_init(void)
- 	imx53_add_sdhci_esdhc_imx(2, &mx53_loco_sd3_data);
- 	imx_add_gpio_keys(&loco_button_data);
- 	gpio_led_register_device(-1, &mx53loco_leds_data);
-+
-+	imx53_add_mxc_pwm(1);
-+	imx53_add_mxc_pwm_backlight(0, &loco_pwm_backlight_data);
- }
- 
- static void __init mx53_loco_timer_init(void)
-diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
-index 258e68f..2aa8ef8 100644
---- a/arch/arm/mach-mx5/devices-imx53.h
-+++ b/arch/arm/mach-mx5/devices-imx53.h
-@@ -44,3 +44,7 @@ extern const struct imx_imx_keypad_data imx53_imx_keypad_data;
- extern const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst;
- #define imx53_add_mxc_pwm(id)	\
- 	imx_add_mxc_pwm(&imx53_mxc_pwm_data[id])
-+
-+#define imx53_add_mxc_pwm_backlight(id, pdata)			\
-+	platform_device_register_resndata(NULL, "pwm-backlight",\
-+			id, NULL, 0, pdata, sizeof(*pdata));
--- 
-1.7.4.1
+The specified ahci_type can be added if the ahci controller needs some
+different configurations refer to
+the definitions in the AHCI_PMP_RTY_SRST's ata_port_info.
+
+In this way, we can re-use the codes as much as possible.
+
+Best Regards
+Richard Zhu
+
+On 30 August 2011 15:07, Richard Zhu <richard.zhu@linaro.org> wrote:
+> Hi:
+> One more concern, the .../drivers/ata/ahci.h file should be moved to
+> .../include/linux/ folder.
+> Because that the kinds of macros used in the ata_port_info and the
+> ahci_pmp_retry_srst_ops are
+> all defined in the .../drivers/ata/ahci.h file.
+> Otherwise, the ata_port_info can't be defined in the board related
+> platform data.
+>
+> How we can handle this case?
+>
+> Best Regard
+> Richard Zhu
+>
+> On 30 August 2011 14:21, Richard Zhu <richard.zhu@linaro.org> wrote:
+>> Hi:
+>> Pass port info from the platform data is a good idea.
+>> About the codes duplication in the board level, I think that we can
+>> re-use the default ?port info on most boards, when the ata_port_info
+>> is null in the platform data struct.
+>> We can leave the ahci_platform.c without any modifications in this way.
+>>
+>> How do you guys think about?
+>>
+>> Best Regard
+>> Richard Zhu
+>>
+>>
+>> On 29 August 2011 20:25, Eric Miao <eric.miao@linaro.org> wrote:
+>>> On Mon, Aug 29, 2011 at 8:12 PM, Anton Vorontsov <cbouatmailru@gmail.com> wrote:
+>>>> Hello,
+>>>>
+>>>> On Mon, Aug 29, 2011 at 03:18:55PM +0800, Richard Zhu wrote:
+>>>>> On imx53 AHCI, soft reset fails with IPMS set when PMP
+>>>>> is enabled but SATA HDD/ODD is connected to SATA port,
+>>>>> do soft reset again to port 0.
+>>>>> So the 'ahci_pmp_retry_srst_ops' is required when imx53
+>>>>> ahci is present.
+>>>>>
+>>>>> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+>>>>> ---
+>>>> [...]
+>>>>> ? ? ? struct device *dev = &pdev->dev;
+>>>>> ? ? ? struct ahci_platform_data *pdata = dev->platform_data;
+>>>>> - ? ? struct ata_port_info pi = {
+>>>>> - ? ? ? ? ? ? .flags ? ? ? ? ?= AHCI_FLAG_COMMON,
+>>>>> - ? ? ? ? ? ? .pio_mask ? ? ? = ATA_PIO4,
+>>>>> - ? ? ? ? ? ? .udma_mask ? ? ?= ATA_UDMA6,
+>>>>> - ? ? ? ? ? ? .port_ops ? ? ? = &ahci_ops,
+>>>>> - ? ? };
+>>>>> + ? ? struct platform_device_id *id_entry = platform_get_device_id(pdev);
+>>>>> + ? ? struct ata_port_info pi = ahci_port_info[id_entry->driver_data];
+>>>>
+>>>> Why not pass port info via platform_data? It seems to be platform
+>>>> specific nowadays, so leave the default as is, but let the platforms
+>>>> pass their own port info through platform_data.
+>>>
+>>> That's also a very clean way. However I have the concern that it might
+>>> end up with many duplicate entries.
+>>>
+>>>>
+>>>> Thanks,
+>>>>
+>>>> --
+>>>> Anton Vorontsov
+>>>> Email: cbouatmailru at gmail.com
+>>>>
+>>>> _______________________________________________
+>>>> linux-arm-kernel mailing list
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>>
+>>>
+>>
+>
