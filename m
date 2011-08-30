@@ -1,53 +1,31 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 30 Aug 2011 11:40:36 +0800
-Subject: [PATCH 1/2] sdhci/tegra: Add Device Tree probing support
-In-Reply-To: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
-References: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20110830034035.GC19294@S2100-06.ap.freescale.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 30 Aug 2011 00:32:23 -0400 (EDT)
+Subject: [RFC] Kbuild: allow code re-use across different directories
+In-Reply-To: <CACqU3MVrSV-Qp7mC4iN_viMHz=2-cGPaqNY04eokYkVoE_pSuw@mail.gmail.com>
+References: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
+	<CACqU3MVrSV-Qp7mC4iN_viMHz=2-cGPaqNY04eokYkVoE_pSuw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1108300028470.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 23, 2011 at 12:15:33PM -0600, Stephen Warren wrote:
-> From: Grant Likely <grant.likely@secretlab.ca>
-> 
-> Add hooks to read gpio configuration out of the device tree node.
-> 
-> [grant.likely: Rewrite of original patch from John Bonesio]
-> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> [swarren: Fixed tegra_sdhci_get_ro() to retrieve pdata correctly]
-> [swarren: Reworked to avoid #ifdef CONFIG_OF]
-> [swarren: Reworked binding based on fsl-imx-esdhc.txt]
-> [swarren: Documented binding]
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Theoretically, these two patches should be merged in order in one place,
-> since the 2nd logically depends on the first. However, it's really just
-> a documentation dependency, so I think it's fine to merge them into the
-> MMC and DT trees separately and let them meet in linux-next.
-> 
->  .../devicetree/bindings/mmc/nvidia-sdhci.txt       |   25 ++++++++++
->  drivers/mmc/host/sdhci-tegra.c                     |   51 +++++++++++++++----
->  2 files changed, 65 insertions(+), 11 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt b/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
-> new file mode 100644
-> index 0000000..c87f667
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
-> @@ -0,0 +1,25 @@
-> +* NVIDIA Tegra Secure Digital Host Controller
-> +
-> +This controller on Tegra family SoCs provides an interface for MMC, SD,
-> +and SDIO types of memory cards.
-> +
-> +Required properties:
-> +- compatible : Should be "nvidia,<chip>-sdhci"
-> +- reg : Should contain eSDHC registers location and length
-> +- interrupts : Should contain eSDHC interrupt
+On Mon, 29 Aug 2011, Arnaud Lacombe wrote:
 
-You may want to replace eSDHC with something Tegra specific.
+> On Fri, Aug 19, 2011 at 8:37 PM, Arnaud Lacombe <lacombar@gmail.com> wrote:
+> > With the attached patch, we would do:
+> >
+> > arch/foo/boot/Makefile:
+> > LDFLAGS_fancy.o := -DPANTS=30
+> > obj-y += fancy.o
+> > vpath-y += $(srctree)/arch/foo/lib
+> >
+> > and let GNU make do the job.
+> >
+> Nicolas, I guess you were the one who was interested for a generic way
+> to do such code re-use, did you had any chance to test the quoted
+> patch ?
 
--- 
-Regards,
-Shawn
+I actually missed the original post (I wasn't in CC) so I didn't test it. 
+Will try to do so ASAP.
+
+
+Nicolas
