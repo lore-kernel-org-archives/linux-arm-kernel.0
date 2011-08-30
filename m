@@ -1,118 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 31 Aug 2011 08:48:16 +0900
-Subject: [PATCH 3/5] ARM: EXYNOS4: Add support PM for EXYNOS4212
-In-Reply-To: <201108262236.57830.rjw@sisk.pl>
-References: <1314192352-14911-1-git-send-email-kgene.kim@samsung.com>
-	<CAJ0PZbT1YsiXT9k1FJfOCoU8h_XAYqAX6ECJ_=Q0RjR-D_9yyA@mail.gmail.com>
-	<072b01cc637f$558a1190$009e34b0$%kim@samsung.com>
-	<201108262236.57830.rjw@sisk.pl>
-Message-ID: <00bf01cc676f$4a926280$dfb72780$%kim@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 31 Aug 2011 07:48:37 +0800
+Subject: [PATCH 1/3] ARM: cache-l2x0: make the reinitialization possible
+In-Reply-To: <CAGsJ_4wn7zd1Q_s+bq2308W09MHLX5AJevVqsdJd=o4eiGrhNg@mail.gmail.com>
+References: <1314690017-17590-1-git-send-email-shawn.guo@linaro.org>
+	<1314690017-17590-2-git-send-email-shawn.guo@linaro.org>
+	<CAGsJ_4xavZXTa2Z+isORODjK_HoFpSJ5ZMRrd38metiZzYDBeA@mail.gmail.com>
+	<20110830145240.GA19359@S2100-06.ap.freescale.net>
+	<CAGsJ_4wn7zd1Q_s+bq2308W09MHLX5AJevVqsdJd=o4eiGrhNg@mail.gmail.com>
+Message-ID: <CAGsJ_4w1+7X1PP1xwQOD5eD9VsOemP=nvnAVvGUnGiqdNGUYHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael J. Wysocki wrote:
-> 
-> On Friday, August 26, 2011, Kukjin Kim wrote:
-> > MyungJoo Ham wrote:
-> > >
-> > > On Wed, Aug 24, 2011 at 10:25 PM, Kukjin Kim <kgene.kim@samsung.com>
-> > wrote:
-> > > > From: Jonghwan Choi <jhbird.choi@samsung.com>
-> > > >
-> > > > This patch moves regarding clock stuff of PM into clock
-> > > > file to support PM on EXYNOS4210 and EXYNOS4212 with one
-> > > > single kernel image. Because some clock registers are
-> > > > different on each SoCs.
-> > > >
-> > > > Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-> > > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > > > ---
-> > > >  arch/arm/mach-exynos4/clock-exynos4210.c        |   38 ++++++++++
-> > > >  arch/arm/mach-exynos4/clock-exynos4212.c        |   34 +++++++++
-> > > >  arch/arm/mach-exynos4/clock.c                   |   89
-> > > +++++++++++++++++++++++
-> > > >  arch/arm/mach-exynos4/include/mach/regs-clock.h |    4 +
-> > > >  arch/arm/mach-exynos4/pm.c                      |   79
-> > ++------------------
-> > > >  5 files changed, 172 insertions(+), 72 deletions(-)
-> > > >
-> > > > diff --git a/arch/arm/mach-exynos4/clock-exynos4210.c
-b/arch/arm/mach-
-> > > exynos4/clock-exynos4210.c
-> > > > index fe74b91..a4b00b7 100644
-> > > > --- a/arch/arm/mach-exynos4/clock-exynos4210.c
-> > > > +++ b/arch/arm/mach-exynos4/clock-exynos4210.c
-> > > > +static struct sleep_save exynos4210_clock_save[] = {
-> > > > +       SAVE_ITEM(S5P_CLKSRC_IMAGE),
-> > > > +       SAVE_ITEM(S5P_CLKSRC_LCD1),
-> > > > +       SAVE_ITEM(S5P_CLKDIV_IMAGE),
-> > > > +       SAVE_ITEM(S5P_CLKDIV_LCD1),
-> > > > +       SAVE_ITEM(S5P_CLKSRC_MASK_LCD1),
-> > > > +       SAVE_ITEM(S5P_CLKGATE_IP_IMAGE_4210),
-> > > > +       SAVE_ITEM(S5P_CLKGATE_IP_LCD1),
-> > > > +       SAVE_ITEM(S5P_CLKGATE_IP_PERIR_4210),
-> > > > +};
-> > > > +
-> > > > --- a/arch/arm/mach-exynos4/clock-exynos4212.c
-> > > > +++ b/arch/arm/mach-exynos4/clock-exynos4212.c
-> > > > +static struct sleep_save exynos4212_clock_save[] = {
-> > > > +       SAVE_ITEM(S5P_CLKSRC_IMAGE),
-> > > > +       SAVE_ITEM(S5P_CLKDIV_IMAGE),
-> > > > +       SAVE_ITEM(S5P_CLKGATE_IP_IMAGE_4212),
-> > > > +       SAVE_ITEM(S5P_CLKGATE_IP_PERIR_4212),
-> > > > +};
-> > > > +
-> > > > --- a/arch/arm/mach-exynos4/clock.c
-> > > > +++ b/arch/arm/mach-exynos4/clock.c
-> > > > +static struct sleep_save exynos4_clock_save[] = {
-> > >
-> > > Hello,
-> > >
-> > Hi,
-> >
-> > > Is there any reason to have the following two
-> > > SAVE_ITEM(S5P_CLKSRC_IMAGE),
-> > > SAVE_ITEM(S5P_CLKDIV_IMAGE
-> > > defined at both clock-exynos4210.c and clock-exynos4212.c, not defined
-> > > at clock.c once?
-> > >
-> > Yes, I know. I just wanted to keep in mind there is a different
-> > value(CLKGATE_IP_IMAGE) in regarding IMAGE clocks on each SoCs, and I
-> think
-> > need it now. Anyway thanks for your pointing out.
-> >
-> > > Also, consider using CONFIG_PM_SLEEP rather than CONFIG_PM for
-> > > suspend/resume ops.
-> > >
-> > (Cc'ed Rafael)
-> >
-> > Well, even though CONFIG_PM_SLEEP is used in regarding syscore_ops, in
-this
-> > case, using CONFIG_PM looks better.
-> >
-> > If ARCH_SUSPEND_POSSIBLE will be selected, then CONFIG_SUSPEND is
-> selected
-> > and CONFIG_PM_SLEEP is selected in kernel/power/Kconfig and of course,
-> > ARCH_SUSPEND_POSSIBLE is selected in arch/arm/Kconfig. However above
-> > everything depends on CONFIG_PM. So I think to use CONFIG_PM is more
-> > reasonable. In addition, it is more popular in other mainline codes now.
-> >
-> > Hi Rafael,
-> > How do you think about this?
-> 
-> If you make syscore_ops depend on CONFIG_PM, they will be built but not
-> used when CONFIG_PM_RUNTIME is set and CONFIG_PM_SLEEP is unset.  If
-> you
-> think that's acceptable, I guess you can do it (although you may get a
-> few "defined but not used" warnings in that case, which don't look nice).
-> 
-Hmm...ok, I understand you mean CONFIG_PM_SLEEP is better in this case to
-reduce useless warnings. Will use CONFIG_PM_SLEEP.
+2011/8/31 Barry Song <21cnbao@gmail.com>:
+> 2011/8/30 Shawn Guo <shawn.guo@freescale.com>:
+>> On Tue, Aug 30, 2011 at 10:08:59PM +0800, Barry Song wrote:
+>>> 2011/8/30 Shawn Guo <shawn.guo@linaro.org>:
+>>> > If ARM core gets powered off during suspend, L2 cache controller
+>>> > has to be reinitialized by resume procedure.
+>>> >
+>>> > The patch removes __init annotation from a few initialization
+>>> > functions to make the reinitialization possible. ?For example,
+>>> > platform resume function can call l2x0_of_init() to get L2 cache
+>>> > back to work.
+>>>
+>>> i think it is good. and i have sent a similar patch before:
+>>>
+>>> http://www.spinics.net/lists/arm-kernel/msg137372.html
+>>> [PATCH v2 3/4] ARM: L2X0: move l2x0_init out of .init section
+>>>
+>> Since prima2 supports DT, you may also want to call l2x0_of_init()
+>> instead of l2x0_init(). ?l2x0_of_init() will parse configuration from
+>> DT and sets up tag RAM control for you.
+>
+> i know that. and rob's patch did some suppport to prima2 and we were
+> in the loop of that patch and i have acked it if you read the mail.
+> i sent the patch againest the Linus's tree.
 
-Rafael and MyungJoo, Thanks.
+you might find two earlier threads about l2x0 re-init as well:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Colin Cross:
+[PATCH] ARM: mm: cache-l2x0: Add support for re-enabling l2x0
+
+Barry Song:
+[RFC] ARM: l2x0: suspend/resume entries
+
+let's wait for some feedback from Russell.
+
+>
+>>
+>> --
+>> Regards,
+>> Shawn
+-barry
