@@ -1,43 +1,46 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 30 Aug 2011 09:17:31 -0700
-Subject: [PATCH 1/2] sdhci/tegra: Add Device Tree probing support
-In-Reply-To: <201108300952.02418.marvin24@gmx.de>
-References: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
-	<201108300952.02418.marvin24@gmx.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B3279D49@HQMAIL01.nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Aug 2011 17:18:32 +0100
+Subject: [PATCH v2] ARM: sched_clock: allow sched_clock to be selected
+	at runtime
+In-Reply-To: <alpine.LFD.2.00.1108151931410.20358@xanadu.home>
+References: <1313078531-25610-1-git-send-email-marc.zyngier@arm.com>
+	<alpine.LFD.2.00.1108151931410.20358@xanadu.home>
+Message-ID: <20110830161832.GC26905@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Dietich wrote at Tuesday, August 30, 2011 1:52 AM:
-...
-> > diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
-...
-> > @@ -95,12 +94,10 @@ static irqreturn_t carddetect_irq(int irq, void *data)
-> >
-> >  static int tegra_sdhci_8bit(struct sdhci_host *host, int bus_width)
-> >  {
-> > -	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
-> > -	struct tegra_sdhci_platform_data *plat;
-> > +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> > +	struct tegra_sdhci_platform_data *plat = pltfm_host->priv;
-> >  	u32 ctrl;
-> >
-> > -	plat = pdev->dev.platform_data;
-> > -
-> >  	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
-> >  	if (plat->is_8bit && bus_width == MMC_BUS_WIDTH_8) {
-> >  		ctrl &= ~SDHCI_CTRL_4BITBUS;
+On Mon, Aug 15, 2011 at 08:00:45PM -0400, Nicolas Pitre wrote:
+> On Thu, 11 Aug 2011, Marc Zyngier wrote:
+> > +unsigned long long notrace sched_clock(void)
+> > +{
+> > +	if (read_sched_clock) {
+> > +		u32 cyc = read_sched_clock();
+> > +		return cyc_to_sched_clock(&cd, cyc, sched_clock_mask);
+> > +	}
+> > +
+> > +	return (unsigned long long)(jiffies - INITIAL_JIFFIES)
+> > +					* (NSEC_PER_SEC / HZ);
+> > +}
 > 
-> what about 8 bit support?
+> This bothers me that this function has to include a conditional which 
+> will _always_ be evaluated as true except during early boot.  Why not 
+> simply initializing read_sched_clock with a jiffy_shed_clock function 
+> instead, and let it be overriden during boot?  This way the actual 
+> sched_clock() code will be more straight forward.
 
-I didn't understand the question at first; I assume you're asking about
-8-bit support in the device-tree binding/parsing.
+It's also utterly pointless.
 
-Yes, that's a missing feature, and I should add it. Thanks for pointing
-that out.
+The point being is that `jiffies' is a constant during early boot,
+because it needs timers and interrupts to be setup and running
+(specifically the clock event subsystem) before it starts incrementing.
+Chances are that's the case up until _after_ the point where
+sched_clock should have already been initialized.
 
-(I'll also fix the binding docs issue that Shawn pointed out while I'm
-at it).
+Plus, doing this switching in this way may result in a step in the
+value of sched_clock() - possibly after sched_clock() has been used
+to initialize the scheduler.
 
--- 
-nvpublic
+So, I don't see this as a proper solution to the problem.  It's an
+attempt to "solve" one problem while creating other problems.  Let's
+not do that - lets always aim to _reduce_ the number of problems
+overall.
