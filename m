@@ -1,13 +1,14 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 30 Aug 2011 13:15:42 -0400 (EDT)
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 30 Aug 2011 18:26:42 +0100
 Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
 In-Reply-To: <1314722311.2344.64.camel@deneb.redhat.com>
-Message-ID: <Pine.LNX.4.44L0.1108301312020.2109-100000@iolanthe.rowland.org>
+References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
+	<1314722311.2344.64.camel@deneb.redhat.com>
+Message-ID: <20110830172642.GE3464@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Aug 2011, Mark Salter wrote:
-
+On Tue, Aug 30, 2011 at 05:38:30PM +0100, Mark Salter wrote:
 > On Wed, 2011-08-31 at 00:03 +0800, ming.lei at canonical.com wrote:
 > > +/*
 > > + * Writing to dma coherent memory on ARM may be delayed via L2
@@ -37,10 +38,14 @@ On Tue, 30 Aug 2011, Mark Salter wrote:
 > memory. Other hardware which polls shared memory like that will likely
 > have the same problem and could use buffer drain helpers as well.
 
-This would be a good thing to define centrally.  Would you like to 
-post an RFC on LKML?
+Right. In this case the buffering is happening at L2 which becomes
+noticeable when measuring performance. We also buffer stores at the
+CPU (regardless of memory type) but because these tend to become visible
+fairly quickly, there isn't a comparable performance problem.
 
-Do you know of any other examples of hardware that polls shared DMA 
-memory?
+Given that I would expect other architectures to buffer writes at the CPU,
+would it not be worth having an API for flushing to L3 (devices)? It seems
+like this would be a useful addition to the coherent DMA API on platforms
+that handle coherency with non-cacheable memory attributes.
 
-Alan Stern
+Will
