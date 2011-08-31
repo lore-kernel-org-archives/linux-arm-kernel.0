@@ -1,50 +1,33 @@
 From: msalter@redhat.com (Mark Salter)
-Date: Wed, 31 Aug 2011 17:26:37 -0400
-Subject: [PATCH 02/24] fixed generic page.h for non-zero PAGE_OFFSET
+Date: Wed, 31 Aug 2011 17:26:36 -0400
+Subject: [PATCH 01/24] fix default __strnlen_user macro
 In-Reply-To: <1314826019-22330-1-git-send-email-msalter@redhat.com>
 References: <1314826019-22330-1-git-send-email-msalter@redhat.com>
-Message-ID: <1314826019-22330-3-git-send-email-msalter@redhat.com>
+Message-ID: <1314826019-22330-2-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-asm-generic/page.h had several problems when used with a non-zero PAGE_OFFSET.
-This patch adds a default ARCH_PFN_OFFSET and fixes the __va, __pa, and
-pfn_valid macros to work with non-zero PAGE_OFFSETs.
+The existing __strnlen_user macro simply resolved to strnlen. However, the
+count returned by strnlen_user should include the NULL byte. This patch
+fixes the __strnlen_user macro to include the NULL byte in the count.
 
 Signed-off-by: Mark Salter <msalter@redhat.com>
 ---
- include/asm-generic/page.h |   10 +++++++---
- 1 files changed, 7 insertions(+), 3 deletions(-)
+ include/asm-generic/uaccess.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
-index 75fec18..f376db2 100644
---- a/include/asm-generic/page.h
-+++ b/include/asm-generic/page.h
-@@ -71,10 +71,14 @@ extern unsigned long memory_end;
- #define PAGE_OFFSET		(0)
+diff --git a/include/asm-generic/uaccess.h b/include/asm-generic/uaccess.h
+index ac68c99..1d0fdf8 100644
+--- a/include/asm-generic/uaccess.h
++++ b/include/asm-generic/uaccess.h
+@@ -289,7 +289,7 @@ strncpy_from_user(char *dst, const char __user *src, long count)
+  * Return 0 on exception, a value greater than N if too long
+  */
+ #ifndef __strnlen_user
+-#define __strnlen_user strnlen
++#define __strnlen_user(s, n) (strnlen((s), (n)) + 1)
  #endif
  
-+#ifndef ARCH_PFN_OFFSET
-+#define ARCH_PFN_OFFSET		(PAGE_OFFSET >> PAGE_SHIFT)
-+#endif
-+
- #ifndef __ASSEMBLY__
- 
--#define __va(x) ((void *)((unsigned long)(x) + PAGE_OFFSET))
--#define __pa(x) ((unsigned long) (x) - PAGE_OFFSET)
-+#define __va(x) ((void *)((unsigned long) (x)))
-+#define __pa(x) ((unsigned long) (x))
- 
- #define virt_to_pfn(kaddr)	(__pa(kaddr) >> PAGE_SHIFT)
- #define pfn_to_virt(pfn)	__va((pfn) << PAGE_SHIFT)
-@@ -86,7 +90,7 @@ extern unsigned long memory_end;
- #define page_to_phys(page)      ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
- #endif
- 
--#define pfn_valid(pfn)		((pfn) < max_mapnr)
-+#define pfn_valid(pfn)		((pfn) >= ARCH_PFN_OFFSET && ((pfn) - ARCH_PFN_OFFSET) < max_mapnr)
- 
- #define	virt_addr_valid(kaddr)	(((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
- 				((void *)(kaddr) < (void *)memory_end))
+ static inline long strnlen_user(const char __user *src, long n)
 -- 
 1.7.6
