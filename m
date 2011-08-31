@@ -1,28 +1,80 @@
 From: richard.zhu@linaro.org (Richard Zhu)
-Date: Wed, 31 Aug 2011 11:50:34 +0800
-Subject: [PATCH V7 4/5] MX53 Enable the AHCI SATA on MX53 LOCO board
+Date: Wed, 31 Aug 2011 11:50:35 +0800
+Subject: [PATCH V7 5/5] MX53 Enable the AHCI SATA on MX53 SMD board
 In-Reply-To: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
 References: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
-Message-ID: <1314762635-3923-5-git-send-email-richard.zhu@linaro.org>
+Message-ID: <1314762635-3923-6-git-send-email-richard.zhu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
 ---
- arch/arm/mach-mx5/board-mx53_loco.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-mx5/board-mx53_smd.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-index 4e1d51d..76a7af7 100644
---- a/arch/arm/mach-mx5/board-mx53_loco.c
-+++ b/arch/arm/mach-mx5/board-mx53_loco.c
-@@ -273,6 +273,7 @@ static void __init mx53_loco_board_init(void)
- 	imx53_add_sdhci_esdhc_imx(2, &mx53_loco_sd3_data);
- 	imx_add_gpio_keys(&loco_button_data);
- 	gpio_led_register_device(-1, &mx53loco_leds_data);
-+	imx53_add_ahci_imx(0, NULL);
+diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
+index bc02894..3005c7c 100644
+--- a/arch/arm/mach-mx5/board-mx53_smd.c
++++ b/arch/arm/mach-mx5/board-mx53_smd.c
+@@ -26,6 +26,7 @@
+ #include <mach/common.h>
+ #include <mach/hardware.h>
+ #include <mach/iomux-mx53.h>
++#include <mach/ahci_sata.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -35,6 +36,7 @@
+ #include "devices-imx53.h"
+ 
+ #define SMD_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
++#define MX53_SMD_SATA_PWR_EN    IMX_GPIO_NR(3, 3)
+ 
+ static iomux_v3_cfg_t mx53_smd_pads[] = {
+ 	MX53_PAD_CSI0_DAT10__UART1_TXD_MUX,
+@@ -111,6 +113,35 @@ static const struct imxi2c_platform_data mx53_smd_i2c_data __initconst = {
+ 	.bitrate = 100000,
+ };
+ 
++static int mx53_smd_sata_init(struct device *dev, void __iomem *addr)
++{
++	int ret;
++
++	/* Enable SATA PWR */
++	ret = gpio_request(MX53_SMD_SATA_PWR_EN, "ahci-sata-pwr");
++	if (ret) {
++		printk(KERN_ERR "failed to get SATA_PWR_EN: %d\n", ret);
++		return ret;
++	}
++	gpio_direction_output(MX53_SMD_SATA_PWR_EN, 1);
++
++	return sata_init(dev, addr);
++}
++
++void mx53_smd_sata_exit(struct device *dev)
++{
++	sata_exit(dev);
++
++	/* Disable SATA PWR */
++	gpio_direction_output(MX53_SMD_SATA_PWR_EN, 0);
++	gpio_free(MX53_SMD_SATA_PWR_EN);
++}
++
++static struct ahci_platform_data sata_data = {
++	.init = mx53_smd_sata_init,
++	.exit = mx53_smd_sata_exit,
++};
++
+ static void __init mx53_smd_board_init(void)
+ {
+ 	imx53_soc_init();
+@@ -125,6 +156,7 @@ static void __init mx53_smd_board_init(void)
+ 	imx53_add_sdhci_esdhc_imx(0, NULL);
+ 	imx53_add_sdhci_esdhc_imx(1, NULL);
+ 	imx53_add_sdhci_esdhc_imx(2, NULL);
++	imx53_add_ahci_imx(0, &sata_data);
  }
  
- static void __init mx53_loco_timer_init(void)
+ static void __init mx53_smd_timer_init(void)
 -- 
 1.7.1
