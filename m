@@ -1,47 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 31 Aug 2011 16:15:06 +0100
-Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel Summit
-	2011
-In-Reply-To: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-Message-ID: <4E5E4FFA.4040103@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 31 Aug 2011 16:21:37 +0100
+Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
+In-Reply-To: <1314798215.2344.76.camel@deneb.redhat.com>
+References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
+	<1314722311.2344.64.camel@deneb.redhat.com>
+	<20110830172642.GE3464@e102144-lin.cambridge.arm.com>
+	<20110830174859.GA23098@kroah.com>
+	<20110830175432.GG3464@e102144-lin.cambridge.arm.com>
+	<5484D075-A7DA-41B7-B8FA-9B6D72A23723@freescale.com>
+	<20110831084922.GA8777@e102144-lin.cambridge.arm.com>
+	<1314798215.2344.76.camel@deneb.redhat.com>
+Message-ID: <20110831152137.GG8777@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/11 07:00, Grant Likely wrote:
-> Updated attendee list:
-> Confirmed:
-> 1) Nicolas Pitre - arm-soc tree maintainer
-> 2) Arnd Bergmann - arm-soc tree maintainer
-> 3) Olof Johansson - tegra maintainer
-> 4) David Brown
-> 5) Marek Vasut - Various pxa boards maintainer
-> 6) Ohad Ben-Cohen
-> 7) Sascha Hauer
-> 8) Paul Walmsley
-> 9) Catalin Marinas
-> 10) Kukjin Kim - Samsung SoC maintainer
-> 11) Kyungmin Park - Samsung SoC maintainer
-> 12) Mark Brown - ASoC maintainer
-> 13) Grant Likely
+On Wed, Aug 31, 2011 at 02:43:33PM +0100, Mark Salter wrote:
+> On Wed, 2011-08-31 at 09:49 +0100, Will Deacon wrote:
+> > On Wed, Aug 31, 2011 at 01:23:47AM +0100, Chen Peter-B29397 wrote:
+> > > One question: why this write buffer issue did not happen at UP ARM V7 platform, whose dma buffer
+> > > also uncache, but bufferable?
+> > 
+> > Which CPU was on this platform?
 > 
-> Waiting for confirmation:
-> 14) Pavel Machek
-> 15) Eric Miao - pxa/mmp maintainer
-> 16) Haojian Zhuang - pxa/mmp maintainer
-> 17) Nicolas Ferre - Atmel maintainer
-> 18) Will Deacon - ARM engineer
+> Using a 3.1.0-rc4+ kernel on a Pandaboard, and running 'hdparm -t' on a
+> usb disk drive, I see ~5.8MB/s read speed. Same kernel, but passing
+> nosmp on the commandline, I see 20.3MB/s.
 > 
-> Nominates, but haven't responded personally:
-> 19) Russell King
-> 20) Lennert Buytenhek
-> 21) Marc Zyngier
-> 22) Linus Walleji
+> Can someone explain why nosmp would make such a difference?
 
-Just got the approval, so I will attend.
+Oh gawd, that's horrible. I have a feeling it's probably a separate issue
+though, caused by:
 
-See you all there !
+omap_modify_auxcoreboot0(0x200, 0xfffffdff);
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+in boot_secondary for OMAP. Unfortunately I have no idea what that line is
+doing because it ends up talking to the secure monitor.
+
+Will
