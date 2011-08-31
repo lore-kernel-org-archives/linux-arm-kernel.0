@@ -1,35 +1,88 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 30 Aug 2011 20:23:21 -0400 (EDT)
-Subject: [GIT PULL] msm: devboard defconfigs
-In-Reply-To: <20110830225213.GB7093@huya.qualcomm.com>
-References: <20110830225213.GB7093@huya.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1108302021530.20358@xanadu.home>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Wed, 31 Aug 2011 00:23:47 +0000
+Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
+In-Reply-To: <20110830175432.GG3464@e102144-lin.cambridge.arm.com>
+References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
+	<1314722311.2344.64.camel@deneb.redhat.com>
+	<20110830172642.GE3464@e102144-lin.cambridge.arm.com>
+	<20110830174859.GA23098@kroah.com>
+	<20110830175432.GG3464@e102144-lin.cambridge.arm.com>
+Message-ID: <5484D075-A7DA-41B7-B8FA-9B6D72A23723@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Aug 2011, David Brown wrote:
-
-> Unless Russell objects, and prefers these to be in his tree, I'm fine
-> with having these in a branch for linux-next that isn't merged
-> upstream for now.
-> 
-> The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
-> 
->   Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
-> 
-> are available in the git repository at:
->   git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-defconfig
-> 
-> David Brown (1):
->       ARM: msm: defconfigs for Qualcomm dev boards
-> 
->  arch/arm/configs/msm7x30_defconfig |   68 +++++++++
->  arch/arm/configs/msm8660_defconfig |   96 +++++++++++++
->  arch/arm/configs/msm8960_defconfig |  265 ++++++++++++++++++++++++++++++++++++
->  arch/arm/configs/qsd8x50_defconfig |   82 +++++++++++
-
-What prevents you from merging them together?
-Can't you build a single kernel binary with support for allMSM targets?
 
 
-Nicolas
+On Aug 31, 2011, at 1:54 AM, Will Deacon wrote:
+
+> On Tue, Aug 30, 2011 at 06:48:59PM +0100, Greg KH wrote:
+>> On Tue, Aug 30, 2011 at 06:26:42PM +0100, Will Deacon wrote:
+>>> On Tue, Aug 30, 2011 at 05:38:30PM +0100, Mark Salter wrote:
+>>>> On Wed, 2011-08-31 at 00:03 +0800, ming.lei at canonical.com wrote:
+>>>>> +/*
+>>>>> + * Writing to dma coherent memory on ARM may be delayed via L2
+>>>>> + * writing buffer, so introduce the helper which can flush L2 writing
+>>>>> + * buffer into memory immediately, especially used to flush ehci
+>>>>> + * descriptor to memory.
+>>>>> + * */
+>>>>> +#ifdef CONFIG_ARM_DMA_MEM_BUFFERABLE
+>>>>> +static inline void ehci_sync_mem()
+>>>>> +{
+>>>>> +       mb();
+>>>>> +}
+>>>>> +#else
+>>>>> +static inline void ehci_sync_mem()
+>>>>> +{
+>>>>> +}
+>>>>> +#endif
+>>>>> +
+>>>> 
+>>>> I'm wondering if this doesn't really belong in the DMA API for any
+>>>> future architectures that can't avoid prolonged write buffering to DMA
+>>>> coherent memory. IIUC, ARM mitigates this for most drivers by including
+>>>> an implicit write buffer flush in the mmio write routines. This takes
+>>>> care of the drivers which write to a mmio device register after writing
+>>>> something to shared DMA memory. IIUC, this doesn't help ehci because the
+>>>> host controller is polling to see what the cpu writes to the shared
+>>>> memory. Other hardware which polls shared memory like that will likely
+>>>> have the same problem and could use buffer drain helpers as well.
+>>> 
+>>> Right. In this case the buffering is happening at L2 which becomes
+>>> noticeable when measuring performance. We also buffer stores at the
+>>> CPU (regardless of memory type) but because these tend to become visible
+>>> fairly quickly, there isn't a comparable performance problem.
+>>> 
+>>> Given that I would expect other architectures to buffer writes at the CPU,
+>>> would it not be worth having an API for flushing to L3 (devices)? It seems
+>>> like this would be a useful addition to the coherent DMA API on platforms
+>>> that handle coherency with non-cacheable memory attributes.
+>> 
+>> I agree, this seems to be a "new" type of barrier that is needed, as the
+>> code comment above seems to go against what the kernel memory barrier
+>> documentation says about what a memory barrier really does on the
+>> hardware.
+> 
+> Although this doesn't have anything to do with ordering; it's all to do with
+> immediacy so I think we should try to avoiding using the term `barrier'. If
+> this can be made part of the coherent DMA API, that might be the best place
+> for it (I can't think of any other areas this is needed given that the
+> streaming DMA API and I/O accessors already deal with it).
+I am agree with you. I met the same issue at both usb device driver (adding next dTD pointer which
+the current one is handling) and usb host driver (performance issue this thread have discussed) at
+Freescale i.MX6Q platform (4 Cores, ARM SMP).
+So, now I need to add two barriers at two different drivers.
+
+One question: why this write buffer issue did not happen at UP ARM V7 platform, whose dma buffer
+also uncache, but bufferable?
+
+> 
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+Best Regard,
+Peter Chen
+ 
