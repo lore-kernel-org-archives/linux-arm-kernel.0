@@ -1,36 +1,42 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 31 Aug 2011 10:31:58 +0800
-Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
-	Summit 2011
-In-Reply-To: <201108310329.39586.marek.vasut@gmail.com>
-References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-	<20110830231018.GA26019@elf.ucw.cz>
-	<201108310329.39586.marek.vasut@gmail.com>
-Message-ID: <CAK5ve-KfP8y8Lm+z0jCRP1Z08oDPiq1WM1cCcB7+ddS32iTunA@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 31 Aug 2011 10:49:30 +0800
+Subject: [PATCH 1/2] sdhci/tegra: Add Device Tree probing support
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B3279D3F@HQMAIL01.nvidia.com>
+References: <1314123334-23133-1-git-send-email-swarren@nvidia.com>
+	<20110830034035.GC19294@S2100-06.ap.freescale.net>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B3279D3F@HQMAIL01.nvidia.com>
+Message-ID: <20110831024929.GA19795@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2011 at 9:29 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> On Wednesday, August 31, 2011 01:10:18 AM Pavel Machek wrote:
->> Hi!
->>
->> > Waiting for confirmation:
->> > 14) Pavel Machek
->>
->> Yes, I'd like to come. "Random zaurus hacker"? :-).
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Pavel
->
-> Still, I don't understand why it's titled "at Kernel Summit 2011". Shouldn't
-> that be "ELCE" or "LinuxCon" ?
->
+On Tue, Aug 30, 2011 at 09:01:37AM -0700, Stephen Warren wrote:
+> Shawn Guo wrote at Monday, August 29, 2011 9:41 PM:
+> > On Tue, Aug 23, 2011 at 12:15:33PM -0600, Stephen Warren wrote:
+> > > From: Grant Likely <grant.likely@secretlab.ca>
+> > >
+> > > Add hooks to read gpio configuration out of the device tree node.
+> ...
+> > > diff --git a/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt b/Documentation/devicetree/bindings/mmc/nvidia-sdhci.txt
+> ...
+> > > +* NVIDIA Tegra Secure Digital Host Controller
+> > > +
+> > > +This controller on Tegra family SoCs provides an interface for MMC, SD,
+> > > +and SDIO types of memory cards.
+> > > +
+> > > +Required properties:
+> > > +- compatible : Should be "nvidia,<chip>-sdhci"
+> > > +- reg : Should contain eSDHC registers location and length
+> > > +- interrupts : Should contain eSDHC interrupt
+> > 
+> > You may want to replace eSDHC with something Tegra specific.
+> 
+> True. The patch is already submitted. Do you think it's worth posting one
+> just to fix that;
 
-ELC-E 2011 and Kernel summit 2011 will happen in the same week and in
-the same place of Prague.
+It's totally your call.
 
-Thanks,
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+Regards,
+Shawn
+
+> it still seems pretty clear what's required?
+> 
