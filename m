@@ -1,21 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 31 Aug 2011 09:49:22 +0100
-Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
-In-Reply-To: <5484D075-A7DA-41B7-B8FA-9B6D72A23723@freescale.com>
-References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
-	<1314722311.2344.64.camel@deneb.redhat.com>
-	<20110830172642.GE3464@e102144-lin.cambridge.arm.com>
-	<20110830174859.GA23098@kroah.com>
-	<20110830175432.GG3464@e102144-lin.cambridge.arm.com>
-	<5484D075-A7DA-41B7-B8FA-9B6D72A23723@freescale.com>
-Message-ID: <20110831084922.GA8777@e102144-lin.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 31 Aug 2011 11:57:27 +0300
+Subject: [PATCH] musb_debugfs.c: remove unneeded includes on ARM
+In-Reply-To: <alpine.LFD.2.00.1108301659540.20358@xanadu.home>
+References: <alpine.LFD.2.00.1108301659540.20358@xanadu.home>
+Message-ID: <20110831085726.GB28519@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2011 at 01:23:47AM +0100, Chen Peter-B29397 wrote:
-> One question: why this write buffer issue did not happen at UP ARM V7 platform, whose dma buffer
-> also uncache, but bufferable?
+On Tue, Aug 30, 2011 at 05:05:31PM -0400, Nicolas Pitre wrote:
+> Nothing actually requires that <mach/hardware.h>, <mach/memory.h> nor
+> <asm/mach-types.h> be included here.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Which CPU was on this platform?
+Here you go:
 
-Will
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+> I'd need appropriate ACK's as this is part of a cleanup series actually 
+> removing <mach/memory.h>.  If those includes are not useless as I think 
+> they are, an alternative solution will need to be found.
+> Thanks.
+
+thanks for doing this, there's still lots to cleanup on that driver and
+whatever help is greatly apreciated.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110831/1f9e932c/attachment.sig>
