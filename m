@@ -1,51 +1,158 @@
-From: richard.zhu@linaro.org (Richard Zhu)
-Date: Wed, 31 Aug 2011 15:16:22 +0800
-Subject: [PATCH V7 0/5] imx53 ahci driver v7
-In-Reply-To: <87obz683zl.fsf@lebrac.rtp-net.org>
-References: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
-	<87obz683zl.fsf@lebrac.rtp-net.org>
-Message-ID: <CAJNCFVLzmOGsXw5tpQjSkKH7foLx+LMYF=qoJ_tvo9YoO6KxGQ@mail.gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 31 Aug 2011 16:33:30 +0900
+Subject: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
+In-Reply-To: <20110831020652.GA16547@dumpdata.com>
+References: <1314359274-21585-1-git-send-email-inki.dae@samsung.com>
+	<CAF6AEGu3ss-rJC28H1rm2GWLm1bAZnHLftXfMLJQNeqjBt3umQ@mail.gmail.com>
+	<20110831020652.GA16547@dumpdata.com>
+Message-ID: <001101cc67b0$47b63410$d7229c30$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud:
-These serial patches are same to the v7 patch sent yesterday.
-Just add the cover-letter description, and the acked, tested info in
-the commit msg.
+Hello, Konrad Rzeszutek Wilk.
 
-Best Regards
-Richard Zhu
+> -----Original Message-----
+> From: Konrad Rzeszutek Wilk [mailto:konrad.wilk at oracle.com]
+> Sent: Wednesday, August 31, 2011 11:07 AM
+> To: Rob Clark
+> Cc: Inki Dae; sw0312.kim at samsung.com; linux-kernel at vger.kernel.org; dri-
+> devel at lists.freedesktop.org; kyungmin.park at samsung.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC
+> EXYNOS4210.
+> 
+> > > + ? ? ? entry->vaddr = dma_alloc_writecombine(dev->dev, entry->size,
+> > > + ? ? ? ? ? ? ? ? ? ? ? (dma_addr_t *)&entry->paddr, GFP_KERNEL);
+> > > + ? ? ? if (!entry->paddr) {
+> > > + ? ? ? ? ? ? ? DRM_ERROR("failed to allocate buffer.\n");
+> > > + ? ? ? ? ? ? ? return -ENOMEM;
+> > > + ? ? ? }
+> > > +
+> > > + ? ? ? DRM_DEBUG_KMS("allocated : vaddr(0x%x), paddr(0x%x),
+> size(0x%x)\n",
+> > > + ? ? ? ? ? ? ? ? ? ? ? (unsigned int)entry->vaddr, entry->paddr,
+entry-
+> >size);
+> > > +
+> > > + ? ? ? return 0;
+> > > +}
+> > > +
+> > [snip]
+> >
+> > > diff --git a/drivers/gpu/drm/samsung/samsung_drm_buf.h
+> b/drivers/gpu/drm/samsung/samsung_drm_buf.h
+> > > new file mode 100644
+> > > index 0000000..d6a7e95
+> > > --- /dev/null
+> > > +++ b/drivers/gpu/drm/samsung/samsung_drm_buf.h
+> > [snip]
+> > > +/**
+> > > + * samsung drm buffer entry structure.
+> > > + *
+> > > + * @paddr: physical address of allocated memory.
+> > > + * @vaddr: kernel virtual address of allocated memory.
+> > > + * @size: size of allocated memory.
+> > > + */
+> > > +struct samsung_drm_buf_entry {
+> > > + ? ? ? unsigned int paddr;
+> 
+> This could be made 'dma_addr_t' and then you can drop all of the
+> casts to (dma_addr_t *).
+> 
 
-On 31 August 2011 14:55, Arnaud Patard <arnaud.patard@rtp-net.org> wrote:
-> Richard Zhu <richard.zhu@linaro.org> writes:
->
-> Hi,
->
->> *** BLURB HERE ***
->> This is the seventh iteration of the imx53 ahci patch. Changes between
->> v5 and v7 are described in the following description.
->>
->> ChangeLog v5->v6:
->> ?- Move the most ahci initialization codes from the board related files
->> ?to the common ahci_sata file.
->>
->> ?- Add the imx53 ahci's own ata_port_info definition in ahci_platform
->> ?driver, since the 'ahci_pmp_retry_srst_ops' is required when imx53
->> ?ahci is present.
->>
->> ChangeLog v6->v7:
->> ?- Define the default imx53 ahci platform data, reduce the modificatons
->> ?on the board related files.
->>
->> ?- Handle the sata_pwr_en pin obviously on smd board.
->>
-> Sorry to disturb you with silly questions, but a v7 has already been
-> sent yesterday [1]. Is this patchset the same as yesterday or did you
-> modify some parts ?
->
-> Thanks,
-> Arnaud
->
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/063195.html
->
+Ok, I will correct it right now. thank you.
+
+> .. snip..
+> > > +static int samsung_drm_connector_get_modes(struct drm_connector
+> *connector)
+> 
+> Why not make the return be 'unsigned int'?
+> 
+
+Yes, I think so, but please, see drm_connector_helper_funcs structure of
+drm_crtc_helper.h. get_modes callback has int type as return.
+
+> .. snip..
+> > > +/* get detection status of display device. */
+> > > +static enum drm_connector_status
+> > > +samsung_drm_connector_detect(struct drm_connector *connector, bool
+> force)
+> > > +{
+> > > + ? ? ? struct samsung_drm_connector *samsung_connector =
+> > > + ? ? ? ? ? ? ? to_samsung_connector(connector);
+> > > + ? ? ? struct samsung_drm_display *display =
+> > > + ? ? ? ? ? ? ? samsung_drm_get_manager(samsung_connector->encoder)-
+> >display;
+> > > + ? ? ? unsigned int ret = connector_status_unknown;
+> 
+> Not 'enum drm_connector_status ret = connector_status_unknown' ?
+> 
+
+Oh, you are right, I will fix up it. thank you.
+
+> > > +
+> > > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > > +
+> > > + ? ? ? if (display && display->is_connected) {
+> > > + ? ? ? ? ? ? ? if (display->is_connected())
+> > > + ? ? ? ? ? ? ? ? ? ? ? ret = connector_status_connected;
+> > > + ? ? ? ? ? ? ? else
+> > > + ? ? ? ? ? ? ? ? ? ? ? ret = connector_status_disconnected;
+> > > + ? ? ? }
+> > > +
+> > > + ? ? ? return ret;
+> > > +}
+> 
+> .. snip..
+> > > +static void samsung_drm_fb_destroy(struct drm_framebuffer *fb)
+> > > +{
+> > > + ? ? ? struct samsung_drm_fb *samsung_fb = to_samsung_fb(fb);
+> > > + ? ? ? int ret;
+> 
+> Get rid of 'ret'
+
+It seems that it doesn't need 'ret' but it needs to check 'ret' because of
+drm_gem_handle_delete().
+
+> > > +
+> > > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > > +
+> > > + ? ? ? drm_framebuffer_cleanup(fb);
+> > > +
+> > > + ? ? ? if (samsung_fb->is_default) {
+> > > + ? ? ? ? ? ? ? ret = drm_gem_handle_delete(samsung_fb->file_priv,
+> > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? samsung_fb->gem_handle);
+> >
+> > why not keep the gem buffer ptr, and do something like:
+> >
+> >   drm_gem_object_unreference_unlocked(samsung_fb->bo)..
+> >
+> > this way, you get the right behavior if someone somewhere else took a
+> > ref to the gem buffer object?  And it avoids needing to keep the
+> > file_priv ptr in the fb (which seems a bit strange)
+> >
+> >
+> > > + ? ? ? ? ? ? ? if (ret < 0)
+> > > + ? ? ? ? ? ? ? ? ? ? ? DRM_ERROR("failed to delete
+drm_gem_handle.\n");
+> 
+> And just do the check on the function return value here. You are not using
+> the 'ret' for anything.
+
+Yes, right. it just prints out error message because drm_gem_handle_delete
+function which is mainline function doesn't leave any error message. anyway
+using 'ret' is not clear. so I will remove 'ret' and check
+drm_gem_handle_delete function directly instead to print out error message.
+
+> > > + ? ? ? }
+> > > +
+> > > + ? ? ? kfree(samsung_fb);
+> > > +}
+> > > +
+> > [snip]
+> 
+> Hm, so I stopped here - just realized that I am missing some of the code
+> and I should look at the original patch..
+
+Thank you for your comments. it's been very useful. please give me your
+comments and advices anytime then I will be pleased.
