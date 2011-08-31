@@ -1,40 +1,33 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 31 Aug 2011 11:33:24 +0100
-Subject: [PATCH 1/2] ARM: S3C6410: Use device names for both I2C clocks
-Message-ID: <1314786805-15684-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Wed, 31 Aug 2011 11:33:25 +0100
+Subject: [PATCH 2/2] ARM: SAMSUNG: Fix mask for S3C64xx CPU IDs
+In-Reply-To: <1314786805-15684-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1314786805-15684-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1314786805-15684-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the S3C64xx CPUs were converted to clkdev mappings were added for the
-I2C controllers on them. On S3C6410 a device name is specified for I2C
-controller 1 but not for controller 0 which makes the code less robust as
-we'll falsely return the clock for controller 0 if there's an error in the
-request for controller 1.
-
-Improve things by registering a device name for controller 0 as well. Due
-to the fact that we change the numbering for controller 0 depending on if
-we've registered controller 1 this requires an ifdef to choose the name.
+The difference in CPU ID between S3C6400 and S3C6410 is a single bit and
+that bit wasn't included in the mask causing the S3C6410 to be misdetected
+as a S3C6400.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/clock.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/plat-samsung/include/plat/cpu.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index 872e683..eb5fc6f 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -138,6 +138,11 @@ static struct clk init_clocks_off[] = {
- 		.ctrlbit	= S3C_CLKCON_PCLK_TSADC,
- 	}, {
- 		.name		= "i2c",
-+#ifdef CONFIG_S3C_DEV_I2C1
-+		.devname        = "s3c2440-i2c.0",
-+#else
-+		.devname	= "s3c2440-i2c",
-+#endif
- 		.parent		= &clk_p,
- 		.enable		= s3c64xx_pclk_ctrl,
- 		.ctrlbit	= S3C_CLKCON_PCLK_IIC,
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index aa1f69b..4d36130 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -26,7 +26,7 @@ extern unsigned long samsung_cpu_id;
+ #define S3C6400_CPU_ID		0x36400000
+ #define S3C6410_CPU_ID		0x36410000
+ #define S3C64XX_CPU_ID		(S3C6400_CPU_ID & S3C6410_CPU_ID)
+-#define S3C64XX_CPU_MASK	0x1FF40000
++#define S3C64XX_CPU_MASK	0x1FFF0000
+ 
+ #define S5P6440_CPU_ID		0x56440000
+ #define S5P6450_CPU_ID		0x36450000
 -- 
 1.7.5.4
