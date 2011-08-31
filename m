@@ -1,48 +1,39 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 31 Aug 2011 04:59:38 +0200
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 31 Aug 2011 11:07:44 +0800
 Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
 	Summit 2011
-In-Reply-To: <CAK5ve-K=XV2PnBsiG5E4O2pE0SR5AERhg9v6k05Z-0MgBq_HdQ@mail.gmail.com>
+In-Reply-To: <201108310458.25668.marek.vasut@gmail.com>
 References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-	<CAK5ve-K=XV2PnBsiG5E4O2pE0SR5AERhg9v6k05Z-0MgBq_HdQ@mail.gmail.com>
-Message-ID: <201108310459.39083.marek.vasut@gmail.com>
+	<201108310329.39586.marek.vasut@gmail.com>
+	<CAK5ve-KfP8y8Lm+z0jCRP1Z08oDPiq1WM1cCcB7+ddS32iTunA@mail.gmail.com>
+	<201108310458.25668.marek.vasut@gmail.com>
+Message-ID: <CAK5ve-KiLjFUcxzuU5w++YeANcksY_aRvZVGQmLtKdHiOO3UaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 31, 2011 04:57:58 AM Bryan Wu wrote:
-> On Tue, Aug 30, 2011 at 2:00 PM, Grant Likely <grant.likely@secretlab.ca> 
-wrote:
-> > Updated attendee list:
-> > Confirmed:
-> > 1) Nicolas Pitre - arm-soc tree maintainer
-> > 2) Arnd Bergmann - arm-soc tree maintainer
-> > 3) Olof Johansson - tegra maintainer
-> > 4) David Brown
-> > 5) Marek Vasut - Various pxa boards maintainer
-> > 6) Ohad Ben-Cohen
-> > 7) Sascha Hauer
-> > 8) Paul Walmsley
-> > 9) Catalin Marinas
-> > 10) Kukjin Kim - Samsung SoC maintainer
-> > 11) Kyungmin Park - Samsung SoC maintainer
-> > 12) Mark Brown - ASoC maintainer
-> > 13) Grant Likely
-> > 
-> > Waiting for confirmation:
-> > 14) Pavel Machek
-> > 15) Eric Miao - pxa/mmp maintainer
-> 
-> I guess Eric won't come, since he and I have to attend UDS in US just
-> the week after ELC-E and KS.
+On Wed, Aug 31, 2011 at 10:58 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> On Wednesday, August 31, 2011 04:31:58 AM Bryan Wu wrote:
+>> On Wed, Aug 31, 2011 at 9:29 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+>> > On Wednesday, August 31, 2011 01:10:18 AM Pavel Machek wrote:
+>> >> Hi!
+>> >>
+>> >> > Waiting for confirmation:
+>> >> > 14) Pavel Machek
+>> >>
+>> >> Yes, I'd like to come. "Random zaurus hacker"? :-).
+>> >> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Pavel
+>> >
+>> > Still, I don't understand why it's titled "at Kernel Summit 2011".
+>> > Shouldn't that be "ELCE" or "LinuxCon" ?
+>>
+>> ELC-E 2011 and Kernel summit 2011 will happen in the same week and in
+>> the same place of Prague.
+>
+> Ok, anyway, me and Pavel Machek are both local so I guess we can even crash for
+> some beer in the evening.
+>
 
-Won't Eric be on both? I think I heard something like that, but it might be a 
-fuzzy information ;-)
+Very nice beer, dinner and castle tour last time. Thanks man.
 
-Cheers
-
-> 
-> I suggest Barry Song (CSR SoC maintainer) to join the party and share
-> some information to us when he come back to Shanghai.
-> 
-> Thanks,
-> -Bryan
+Have fun this time.
+-Bryan
