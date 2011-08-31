@@ -1,46 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 31 Aug 2011 13:27:27 +0200
-Subject: [PATCH] iommu: omap_iovmm: support non page-aligned buffers in
-	iommu_vmap
-In-Reply-To: <CAK=Wgbb06Z0_8OKFf6MKjYe+SJN16Mh9PA6z_T+cpSpB9EKHFw@mail.gmail.com>
-References: <1314646569-16738-1-git-send-email-ohad@wizery.com>
-	<CAK=Wgbb06Z0_8OKFf6MKjYe+SJN16Mh9PA6z_T+cpSpB9EKHFw@mail.gmail.com>
-Message-ID: <201108311327.28843.laurent.pinchart@ideasonboard.com>
+From: rpurdie@rpsys.net (Richard Purdie)
+Date: Wed, 31 Aug 2011 12:49:01 +0100
+Subject: [PATCH] leds: kill CONFIG_LEDS_CLASS option
+In-Reply-To: <CAK5ve-+J3hzVB=_b0AOJ-Q1LYewahVraMti=y=6AaQy3+iy+rg@mail.gmail.com>
+References: <1314647628-21707-1-git-send-email-bryan.wu@canonical.com>
+	<alpine.LFD.2.00.1108291630020.20358@xanadu.home>
+	<1314653699.5939.299.camel@rex>
+	<CAK5ve-+J3hzVB=_b0AOJ-Q1LYewahVraMti=y=6AaQy3+iy+rg@mail.gmail.com>
+Message-ID: <1314791341.5939.464.camel@rex>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
-
-On Wednesday 31 August 2011 12:52:08 Ohad Ben-Cohen wrote:
-> On Mon, Aug 29, 2011 at 10:36 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> > From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > 
-> > omap_iovmm requires page-aligned buffers, and that sometimes causes
-> > omap3isp failures (i.e. whenever the buffer passed from userspace is not
-> > page-aligned).
-> > 
-> > Remove this limitation by rounding the address of the first page entry
-> > down, and adding the offset back to the device address.
+On Wed, 2011-08-31 at 10:45 +0800, Bryan Wu wrote:
+> On Tue, Aug 30, 2011 at 5:34 AM, Richard Purdie <rpurdie@rpsys.net> wrote:
+> > On Mon, 2011-08-29 at 16:34 -0400, Nicolas Pitre wrote:
+> >> On Tue, 30 Aug 2011, Bryan Wu wrote:
+> >>
+> >> > Almost all the new leds driver and trigger driver are depends on
+> >> > CONFIG_LED_CLASS, so there is no such user with CONFIG_NEW_LEDS=y
+> >> > and CONFIG_LED_CLASS=n. Moreover, lots of API functions in led-class.c
+> >> > are very common and should be built-in when CONFIG_NEW_LEDS=y.
+> >> >
+> >> > Obviously, CONFIG_LEDS_CLASS is pointless. This patch kills it and
+> >> > also updates defconfigs which contains CONFIG_LEDS_CLASS.
+> >> >
+> >> > Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+> >> > ---
+> >
+> > Looking at the code I'm a little concerned to see the direction this is
+> > going. There was originally a reason that there were two options, it was
+> > related to being able to compile as much of the LED code as a module as
+> > possible.
+> >
 > 
-> I'm having second thoughts about this.
+> I quite understand the original reason for 2 options, but I failed to
+> see any user of CONFIG_NEW_LEDS=y and CONFIG_LEDS_CLASS=n.
+
+Right, the intent was to support CONFIG_NEW_LEDS=y and
+CONFIG_LEDS_CLASS=m and I believe that still should be possible.
+
+> > It looks like commit 5ada28bf76752e33dce3d807bf0dfbe6d1b943ad changed
+> > the tristate to a bool at which point the separate option obviously
+> > becomes pointless.
 > 
-> Obviously it works for omap3isp and its users because the buffer gets
-> mapped and everyone is happy.
+> Exactly, this patch added some function API which are used very widely
+> as default LEDS driver behavior in some drivers.
+
+Looking at that commit, its adds the code to leds-class.c and shouldn't
+have needed to change the tristate to a bool. I know we discussed that
+at the time and I think that part might have been unnecessary and just
+accidentally committed. It could well be we can just revert that piece
+of the patch.
+
+> > Rather than accept the current direction and force everything builtin,
+> > I'd much rather this code became modular capable again. There is no good
+> > reason we should be forced to build everything into a kernel.
+> >
 > 
-> But I'm not sure this is a valid IOMMU interface that the kernel
-> should have, because effectively we're now mapping physical memory
-> which nobody asked us to, and which might contain sensitive stuff we
-> don't want to give the device (e.g. a remote processor which might be
-> running rogue code) access to.
-> 
-> Thoughts ?
+> OK, cool. I'd like to help and could you please also give some
+> comments about my ledtrig-cpu driver in this patchset?
 
-That can indeed be an issue, depending on whether we consider the device as 
-trusted or not. This decision can't obviously be taken by the IOMMU layer.
+I looked at that code and in summary, I like it.
 
-Do you think it would be better to move this code to the OMAP3 ISP driver ?
+My main concerns are just around being able to build things as modules
+and that cpu trigger effectively forces all of led triggers as being
+built in. It would be possible to avoid that by having a function
+pointer for the cpu activity function and only calling it when its not
+NULL. The module removal would need to be a little careful but it
+shouldn't be that difficult.
 
--- 
-Regards,
+Cheers,
 
-Laurent Pinchart
+Richard
