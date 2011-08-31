@@ -1,54 +1,45 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 31 Aug 2011 06:01:37 +0200
-Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
-	Summit 2011
-In-Reply-To: <CAK5ve-++-fw+eAqG2g9LTGjhOdtsg=cm2m09xMnW42i+Y+bmQQ@mail.gmail.com>
-References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-	<201108310459.39083.marek.vasut@gmail.com>
-	<CAK5ve-++-fw+eAqG2g9LTGjhOdtsg=cm2m09xMnW42i+Y+bmQQ@mail.gmail.com>
-Message-ID: <201108310601.38053.marek.vasut@gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 30 Aug 2011 21:25:32 -0700
+Subject: [GIT PULL] msm: devboard defconfigs
+In-Reply-To: <alpine.LFD.2.00.1108302021530.20358@xanadu.home>
+References: <20110830225213.GB7093@huya.qualcomm.com>
+	<alpine.LFD.2.00.1108302021530.20358@xanadu.home>
+Message-ID: <20110831042532.GA14892@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 31, 2011 05:08:48 AM Bryan Wu wrote:
-> On Wed, Aug 31, 2011 at 10:59 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> > On Wednesday, August 31, 2011 04:57:58 AM Bryan Wu wrote:
-> >> On Tue, Aug 30, 2011 at 2:00 PM, Grant Likely
-> >> <grant.likely@secretlab.ca>
-> > 
-> > wrote:
-> >> > Updated attendee list:
-> >> > Confirmed:
-> >> > 1) Nicolas Pitre - arm-soc tree maintainer
-> >> > 2) Arnd Bergmann - arm-soc tree maintainer
-> >> > 3) Olof Johansson - tegra maintainer
-> >> > 4) David Brown
-> >> > 5) Marek Vasut - Various pxa boards maintainer
-> >> > 6) Ohad Ben-Cohen
-> >> > 7) Sascha Hauer
-> >> > 8) Paul Walmsley
-> >> > 9) Catalin Marinas
-> >> > 10) Kukjin Kim - Samsung SoC maintainer
-> >> > 11) Kyungmin Park - Samsung SoC maintainer
-> >> > 12) Mark Brown - ASoC maintainer
-> >> > 13) Grant Likely
-> >> > 
-> >> > Waiting for confirmation:
-> >> > 14) Pavel Machek
-> >> > 15) Eric Miao - pxa/mmp maintainer
-> >> 
-> >> I guess Eric won't come, since he and I have to attend UDS in US just
-> >> the week after ELC-E and KS.
-> > 
-> > Won't Eric be on both? I think I heard something like that, but it might
-> > be a fuzzy information ;-)
+On Tue, Aug 30, 2011 at 08:23:21PM -0400, Nicolas Pitre wrote:
+> On Tue, 30 Aug 2011, David Brown wrote:
 > 
-> Yeah, we booked the same flights from Shanghai to US. So I think he
-> won't come this time.
-
-Well that sucks really ... say Hi to him from me at least ;-) Enjoy the UDS too 
-:-)
-
-Cheers
+> > Unless Russell objects, and prefers these to be in his tree, I'm fine
+> > with having these in a branch for linux-next that isn't merged
+> > upstream for now.
+> > 
+> > The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
+> > 
+> >   Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
+> > 
+> > are available in the git repository at:
+> >   git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-defconfig
+> > 
+> > David Brown (1):
+> >       ARM: msm: defconfigs for Qualcomm dev boards
+> > 
+> >  arch/arm/configs/msm7x30_defconfig |   68 +++++++++
+> >  arch/arm/configs/msm8660_defconfig |   96 +++++++++++++
+> >  arch/arm/configs/msm8960_defconfig |  265 ++++++++++++++++++++++++++++++++++++
+> >  arch/arm/configs/qsd8x50_defconfig |   82 +++++++++++
 > 
-> -Bryan
+> What prevents you from merging them together?
+> Can't you build a single kernel binary with support for allMSM targets?
+
+Not yet, still a good bunch of things that need to happen before that
+can be done.  I'm not even sure it's going to be possible before
+device tree, since the memory block where I read to determine which
+CPU I'm on differs from platform to platform.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
