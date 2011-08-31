@@ -1,320 +1,50 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Tue, 30 Aug 2011 20:26:54 -0700
-Subject: [PATCH v3 2/4] ARM: CSR: add PM sleep entry for SiRFprimaII
-Message-ID: <1314761214-8794-1-git-send-email-Baohua.Song@csr.com>
+From: richard.zhu@linaro.org (Richard Zhu)
+Date: Wed, 31 Aug 2011 11:50:30 +0800
+Subject: [PATCH V7 0/5] imx53 ahci driver v7
+Message-ID: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <rongjun.ying@csr.com>
+*** BLURB HERE ***
+This is the seventh iteration of the imx53 ahci patch. Changes between
+v5 and v7 are described in the following description.
 
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- -v3:
- fix minor issues pointed out by Jamie Iles and Shawn Guo;
- replace of_get_property() by of_property_read_u32() as pointed out by
- Shawn Guo;
- add some comments to describle while pwrc doesn't use of_iomap;
- add some comments to describle asm codes will access sirfsoc_memc_base
+ChangeLog v5->v6:
+ - Move the most ahci initialization codes from the board related files
+ to the common ahci_sata file.
 
- arch/arm/mach-prima2/Makefile |    1 +
- arch/arm/mach-prima2/pm.c     |  166 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-prima2/pm.h     |   31 ++++++++
- arch/arm/mach-prima2/sleep.S  |   61 +++++++++++++++
- 4 files changed, 259 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-prima2/pm.c
- create mode 100644 arch/arm/mach-prima2/pm.h
- create mode 100644 arch/arm/mach-prima2/sleep.S
+ - Add the imx53 ahci's own ata_port_info definition in ahci_platform
+ driver, since the 'ahci_pmp_retry_srst_ops' is required when imx53
+ ahci is present.
 
-diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-index f49d70b..13dd160 100644
---- a/arch/arm/mach-prima2/Makefile
-+++ b/arch/arm/mach-prima2/Makefile
-@@ -6,3 +6,4 @@ obj-y += prima2.o
- obj-y += rtciobrg.o
- obj-$(CONFIG_DEBUG_LL) += lluart.o
- obj-$(CONFIG_CACHE_L2X0) += l2x0.o
-+obj-$(CONFIG_SUSPEND) += pm.o sleep.o
-diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-new file mode 100644
-index 0000000..aef316f
---- /dev/null
-+++ b/arch/arm/mach-prima2/pm.c
-@@ -0,0 +1,166 @@
-+/*
-+ * power management entry for CSR SiRFprimaII
-+ *
-+ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+#include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/of_platform.h>
-+#include <linux/io.h>
-+#include <linux/rtc/sirfsoc_rtciobrg.h>
-+#include <asm/suspend.h>
-+
-+#include "pm.h"
-+
-+static u32 sirfsoc_pwrc_base;
-+/*
-+ * suspend asm codes will access this address to make DRAM become self-refresh
-+ */
-+void __iomem *sirfsoc_memc_base;
-+
-+static void sirfsoc_set_wakeup_source(void)
-+{
-+        u32 pwr_trigger_en_reg;
-+        pwr_trigger_en_reg = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_TRIGGER_EN);
-+#define X_ON_KEY_B (1 << 0)
-+        sirfsoc_rtc_iobrg_writel(pwr_trigger_en_reg | X_ON_KEY_B,
-+                        sirfsoc_pwrc_base + SIRFSOC_PWRC_TRIGGER_EN);
-+}
-+
-+static void sirfsoc_set_sleep_mode(u32 mode)
-+{
-+        u32 sleep_mode = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_PDN_CTRL);
-+        sleep_mode &= ~(SIRFSOC_SLEEP_MODE_MASK << 1);
-+        sleep_mode |= mode << 1;
-+        sirfsoc_rtc_iobrg_writel(sleep_mode, sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_PDN_CTRL);
-+}
-+
-+static int sirfsoc_pre_suspend_power_off(void)
-+{
-+	u32 wakeup_entry = virt_to_phys(cpu_resume);
-+
-+	sirfsoc_rtc_iobrg_writel(wakeup_entry,
-+		SIRFSOC_PWRC_SCRATCH_PAD1);
-+
-+	sirfsoc_set_wakeup_source();
-+
-+	sirfsoc_set_sleep_mode(SIRFSOC_DEEP_SLEEP_MODE);
-+
-+	return 0;
-+}
-+
-+static void sirfsoc_save_register(u32 *ptr)
-+{
-+	/* todo: save necessary system registers here */
-+}
-+
-+static void sirfsoc_restore_regs(u32 *ptr)
-+{
-+	/* todo: restore saved system registers here */
-+}
-+
-+static int sirfsoc_pm_enter(suspend_state_t state)
-+{
-+	u32 *saved_regs;
-+
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		saved_regs = kmalloc(1024, GFP_ATOMIC);
-+		if (!saved_regs)
-+			return -ENOMEM;
-+
-+		sirfsoc_save_register(saved_regs);
-+
-+		sirfsoc_pre_suspend_power_off();
-+
-+		/* go zzz */
-+		cpu_suspend(0, sirfsoc_finish_suspend);
-+
-+		sirfsoc_restore_regs(saved_regs);
-+		kfree(saved_regs);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+	return 0;
-+}
-+
-+static const struct platform_suspend_ops sirfsoc_pm_ops = {
-+	.enter = sirfsoc_pm_enter,
-+	.valid = suspend_valid_only_mem,
-+};
-+
-+static int __init sirfsoc_pm_init(void)
-+{
-+	suspend_set_ops(&sirfsoc_pm_ops);
-+	return 0;
-+}
-+late_initcall(sirfsoc_pm_init);
-+
-+static const struct of_device_id pwrc_ids[] = {
-+	{ .compatible = "sirf,prima2-pwrc" },
-+	{}
-+};
-+
-+static int __init sirfsoc_of_pwrc_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, pwrc_ids);
-+	if (!np)
-+		panic("unable to find compatible pwrc node in dtb\n");
-+
-+	/*
-+	 * pwrc behind rtciobrg is not located in memory space
-+	 * though the property is named reg. reg only means base
-+	 * offset for pwrc. then of_iomap is not suitable here.
-+	 */
-+	if (of_property_read_u32(np, "reg", &sirfsoc_pwrc_base))
-+		panic("unable to find base address of pwrc node in dtb\n");
-+
-+	of_node_put(np);
-+
-+	return 0;
-+}
-+postcore_initcall(sirfsoc_of_pwrc_init);
-+
-+static const struct of_device_id memc_ids[] = {
-+	{ .compatible = "sirf,prima2-memc" },
-+	{}
-+};
-+
-+static int __devinit sirfsoc_memc_probe(struct platform_device *op)
-+{
-+	struct device_node *np = op->dev.of_node;
-+
-+	sirfsoc_memc_base = of_iomap(np, 0);
-+	if (!sirfsoc_memc_base)
-+		panic("unable to map memc registers\n");
-+
-+	return 0;
-+}
-+
-+static struct platform_driver sirfsoc_memc_driver = {
-+	.probe		= sirfsoc_memc_probe,
-+	.driver = {
-+		.name = "sirfsoc-memc",
-+		.owner = THIS_MODULE,
-+		.of_match_table	= memc_ids,
-+	},
-+};
-+
-+static int __init sirfsoc_memc_init(void)
-+{
-+	return platform_driver_register(&sirfsoc_memc_driver);
-+}
-+postcore_initcall(sirfsoc_memc_init);
-diff --git a/arch/arm/mach-prima2/pm.h b/arch/arm/mach-prima2/pm.h
-new file mode 100644
-index 0000000..aa2b428
---- /dev/null
-+++ b/arch/arm/mach-prima2/pm.h
-@@ -0,0 +1,31 @@
-+/*
-+ * arch/arm/mach-prima2/pm.h
-+ *
-+ * Copyright (C) 2011 CSR
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef _MACH_PRIMA2_PM_H_
-+#define _MACH_PRIMA2_PM_H_
-+
-+#define SIRFSOC_PWR_SLEEPFORCE		0x01
-+
-+#define SIRFSOC_SLEEP_MODE_MASK         0x3
-+#define SIRFSOC_DEEP_SLEEP_MODE         0x1
-+
-+#define SIRFSOC_PWRC_PDN_CTRL           0x0
-+#define SIRFSOC_PWRC_PON_OFF            0x4
-+#define SIRFSOC_PWRC_TRIGGER_EN         0x8
-+#define SIRFSOC_PWRC_PIN_STATUS         0x14
-+#define SIRFSOC_PWRC_SCRATCH_PAD1       0x18
-+#define SIRFSOC_PWRC_SCRATCH_PAD2       0x1C
-+
-+#ifndef __ASSEMBLY__
-+extern int sirfsoc_finish_suspend(unsigned long);
-+#endif
-+
-+#endif
-+
-diff --git a/arch/arm/mach-prima2/sleep.S b/arch/arm/mach-prima2/sleep.S
-new file mode 100644
-index 0000000..07f8067
---- /dev/null
-+++ b/arch/arm/mach-prima2/sleep.S
-@@ -0,0 +1,61 @@
-+/*
-+ * sleep mode for CSR SiRFprimaII
-+ *
-+ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/ptrace.h>
-+#include <asm/assembler.h>
-+
-+#include "pm.h"
-+
-+#define DENALI_CTL_22_OFF	0x58
-+#define DENALI_CTL_112_OFF	0x1c0
-+
-+	.text
-+
-+ENTRY(sirfsoc_finish_suspend)
-+	@ r5: 	mem controller
-+	ldr     r0, =sirfsoc_memc_base
-+	ldr	r5, [r0]
-+	@ r7: 	rtc iobrg controller
-+	ldr     r0, =sirfsoc_rtciobrg_base
-+	ldr	r7, [r0]
-+
-+	@ Read the power control register and set the
-+	@ sleep force bit.
-+	ldr	r0, =SIRFSOC_PWRC_PDN_CTRL
-+	bl	__sirfsoc_rtc_iobrg_readl
-+	orr	r0,r0,#SIRFSOC_PWR_SLEEPFORCE
-+	ldr	r1, =SIRFSOC_PWRC_PDN_CTRL
-+	bl	sirfsoc_rtc_iobrg_pre_writel
-+	mov	r1, #0x1
-+
-+	@ read the MEM ctl register and set the self
-+	@ refresh bit
-+
-+	ldr	r2, [r5, #DENALI_CTL_22_OFF]
-+	orr	r2, r2, #0x1
-+
-+	@ Following code has to run from cache since
-+	@ the RAM is going to self refresh mode
-+	.align 5
-+	str	r2, [r5, #DENALI_CTL_22_OFF]
-+
-+1:
-+	ldr	r4, [r5, #DENALI_CTL_112_OFF]
-+	tst	r4, #0x1
-+	bne	1b
-+
-+	@ write SLEEPFORCE through rtc iobridge
-+
-+	str	r1, [r7]
-+	@ wait rtc io bridge sync
-+1:
-+	ldr	r3, [r7]
-+	tst	r3, #0x01
-+	bne	1b
-+	b .
--- 
-1.7.1
+ChangeLog v6->v7:
+ - Define the default imx53 ahci platform data, reduce the modificatons
+ on the board related files.
+
+ - Handle the sata_pwr_en pin obviously on smd board.
 
 
+Richard Zhu (5):
+  AHCI Add the AHCI SATA feature on the MX53 platforms
+  ahci_plt Add the board_ids and pi refer to different features
+  MX53 Enable the AHCI SATA on MX53 ARD board
+  MX53 Enable the AHCI SATA on MX53 LOCO board
+  MX53 Enable the AHCI SATA on MX53 SMD board
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+ arch/arm/mach-mx5/board-mx53_ard.c              |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c             |    1 +
+ arch/arm/mach-mx5/board-mx53_smd.c              |   32 +++++++
+ arch/arm/mach-mx5/clock-mx51-mx53.c             |   19 ++++
+ arch/arm/mach-mx5/devices-imx53.h               |    4 +
+ arch/arm/plat-mxc/Makefile                      |    1 +
+ arch/arm/plat-mxc/ahci_sata.c                   |  104 +++++++++++++++++++++++
+ arch/arm/plat-mxc/devices/Kconfig               |    4 +
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-ahci-imx.c   |   66 ++++++++++++++
+ arch/arm/plat-mxc/include/mach/ahci_sata.h      |   33 +++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h |   10 ++
+ drivers/ata/ahci_platform.c                     |   44 ++++++++--
+ 13 files changed, 314 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/ahci_sata.c
+ create mode 100644 arch/arm/plat-mxc/devices/platform-ahci-imx.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/ahci_sata.h
