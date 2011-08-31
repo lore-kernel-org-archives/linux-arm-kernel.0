@@ -1,38 +1,40 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 31 Aug 2011 11:25:30 +0100
-Subject: [PATCH] ARM: S3C64XX: Fix clkdev device names for I2C clocks
-In-Reply-To: <CAJuYYwQikeoPbDX5DV4Y_HzOz2t04otLEUMye8CPpGLvhjwhyw@mail.gmail.com>
-References: <1314739841-13522-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<CAH9JG2UEZVQ+5AJbbtXQhuVzvDp_8-wJdNgOjwHs14Zj7_KP+g@mail.gmail.com>
-	<20110831002133.GA1164@opensource.wolfsonmicro.com>
-	<CAJuYYwQikeoPbDX5DV4Y_HzOz2t04otLEUMye8CPpGLvhjwhyw@mail.gmail.com>
-Message-ID: <20110831102530.GV2061@opensource.wolfsonmicro.com>
+Date: Wed, 31 Aug 2011 11:33:24 +0100
+Subject: [PATCH 1/2] ARM: S3C6410: Use device names for both I2C clocks
+Message-ID: <1314786805-15684-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2011 at 01:44:20PM +0530, Thomas Abraham wrote:
+When the S3C64xx CPUs were converted to clkdev mappings were added for the
+I2C controllers on them. On S3C6410 a device name is specified for I2C
+controller 1 but not for controller 0 which makes the code less robust as
+we'll falsely return the clock for controller 0 if there's an error in the
+request for controller 1.
 
-> There are two instances of clock with name i2c registered for s3c64xx.
-> One has a devname and the other does not. So this continued to work.
-> The i2c0 clock instance did not get a devname because its instance id
-> was -1 (prior to clkdev support).
+Improve things by registering a device name for controller 0 as well. Due
+to the fact that we change the numbering for controller 0 depending on if
+we've registered controller 1 this requires an ifdef to choose the name.
 
-Not having devname will *work* - the problem is that it'll work too
-often and return the wrong clock whenever anything goes wrong.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/clock.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-> If a devname is added to i2c0 clock instance for s3c64xx, it should be
-> set to "s3c2440-i2c". If the devname is set to "s3c2440-i2c.0", then
-> CONFIG_S3C_DEV_I2C1 will have to defined for s3c64xx, otherwise, as
-> per arch/arm/plat-samsung/dev-i2c0.c, the platform device id for i2c0
-> instance will be -1 and the clock lookup for i2c0 will fail.
-
-All of which is just asking for fragility; the ifdefs for renumbering
-the device are really unhelpful here - the system always has two I2C
-controllers and the numbering is going to change depending on which
-boards are built in so you can break things by enabling support for a
-second board.
-
-Frankly I'm not convinced that all this dancing about with explicitly
-selecting which devices to enable is worth it; the space savings are
-extremely small and the complexity regularly causes issues that just
-shouldn't exist.
+diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+index 872e683..eb5fc6f 100644
+--- a/arch/arm/mach-s3c64xx/clock.c
++++ b/arch/arm/mach-s3c64xx/clock.c
+@@ -138,6 +138,11 @@ static struct clk init_clocks_off[] = {
+ 		.ctrlbit	= S3C_CLKCON_PCLK_TSADC,
+ 	}, {
+ 		.name		= "i2c",
++#ifdef CONFIG_S3C_DEV_I2C1
++		.devname        = "s3c2440-i2c.0",
++#else
++		.devname	= "s3c2440-i2c",
++#endif
+ 		.parent		= &clk_p,
+ 		.enable		= s3c64xx_pclk_ctrl,
+ 		.ctrlbit	= S3C_CLKCON_PCLK_IIC,
+-- 
+1.7.5.4
