@@ -1,89 +1,46 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 31 Aug 2011 22:06:15 +0800
-Subject: [PATCH v3 1/2] mmc: sdio add regulator vsdio
-In-Reply-To: <1314253575-2602-2-git-send-email-zhangfei.gao@marvell.com>
-References: <1314253575-2602-1-git-send-email-zhangfei.gao@marvell.com>
-	<1314253575-2602-2-git-send-email-zhangfei.gao@marvell.com>
-Message-ID: <CAMPhdO9r8wyyU9uW7NTyOR2e2kOJG0rqgUow3krg9GpiZmab_g@mail.gmail.com>
+From: tom.leiming@gmail.com (tom.leiming at gmail.com)
+Date: Wed, 31 Aug 2011 22:48:06 +0800
+Subject: [PATCH] arm: gic: fix gic_set_affinity
+Message-ID: <1314802086-26133-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zhangfei,
+From: Ming Lei <tom.leiming@gmail.com>
 
-My understanding is that the card in the slot would be either MMC _or_
-SDIO and why do we need another regulator for the power on/off?
+Current gic_set_affinity doesn't support to route irq to all cpu,
+so fix it.
 
-On Thu, Aug 25, 2011 at 2:26 PM, Zhangfei Gao <zhangfei.gao@marvell.com> wrote:
-> sdio client may be required power on/off dynamically.
-> With regulator vsdio, sdio client power on/off could be executed by mmc_power_up/down
->
-> CC: Ohad Ben-Cohen <ohad@wizery.com>
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
-> ---
-> ?drivers/mmc/host/sdhci.c ?| ? 22 , > ?include/linux/mmc/sdhci.h | ? ?2 ++
-> ?2 files changed, 24 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 0e02cc1..e0ef7d3 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1424,6 +1424,18 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-> ?out:
-> ? ? ? ?mmiowb();
-> ? ? ? ?spin_unlock_irqrestore(&host->lock, flags);
-> +
-> + ? ? ? if (host->vsdio) {
-> + ? ? ? ? ? ? ? if (ios->power_mode != host->power_mode_old) {
-> + ? ? ? ? ? ? ? ? ? ? ? if (ios->power_mode == MMC_POWER_OFF)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? regulator_disable(host->vsdio);
-> +
-> + ? ? ? ? ? ? ? ? ? ? ? if (ios->power_mode == MMC_POWER_UP)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? regulator_enable(host->vsdio);
-> + ? ? ? ? ? ? ? }
-> +
-> + ? ? ? ? ? ? ? host->power_mode_old = ios->power_mode;
-> + ? ? ? }
-> ?}
->
-> ?static int check_ro(struct sdhci_host *host)
-> @@ -2748,6 +2760,13 @@ int sdhci_add_host(struct sdhci_host *host)
-> ? ? ? ? ? ? ? ?regulator_enable(host->vmmc);
-> ? ? ? ?}
->
-> + ? ? ? host->vsdio = regulator_get(mmc_dev(mmc), "vsdio");
-> + ? ? ? if (IS_ERR(host->vsdio))
-> + ? ? ? ? ? ? ? host->vsdio = NULL;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? printk(KERN_INFO "%s: vsdio regulator found\n",
-> + ? ? ? ? ? ? ? ? ? ? ? mmc_hostname(mmc));
-> +
-> ? ? ? ?sdhci_init(host, 0);
->
-> ?#ifdef CONFIG_MMC_DEBUG
-> @@ -2839,6 +2858,9 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
-> ? ? ? ? ? ? ? ?regulator_put(host->vmmc);
-> ? ? ? ?}
->
-> + ? ? ? if (host->vsdio)
-> + ? ? ? ? ? ? ? regulator_put(host->vsdio);
-> +
-> ? ? ? ?kfree(host->adma_desc);
-> ? ? ? ?kfree(host->align_buffer);
->
-> diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
-> index 5666f3a..201207a 100644
-> --- a/include/linux/mmc/sdhci.h
-> +++ b/include/linux/mmc/sdhci.h
-> @@ -94,6 +94,8 @@ struct sdhci_host {
-> ? ? ? ?const struct sdhci_ops *ops; ? ?/* Low level hw interface */
->
-> ? ? ? ?struct regulator *vmmc; /* Power regulator */
-> + ? ? ? struct regulator *vsdio; ? ? ? ?/* sdio Power regulator */
-> + ? ? ? unsigned char power_mode_old; ? /* power supply mode */
->
-> ? ? ? ?/* Internal data */
-> ? ? ? ?struct mmc_host *mmc; ? /* MMC structure */
-> --
-> 1.7.0.4
->
->
+Also remove the unnecessary check for 'cpu' since cpu_online_mask
+is already ADDed to produce correct one.
+
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+---
+ arch/arm/common/gic.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 3227ca9..20890f4 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -173,14 +173,14 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ {
+ 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
+ 	unsigned int shift = (d->irq % 4) * 8;
+-	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+-	u32 val, mask, bit;
++	unsigned int cpu;
++	u32 val, mask, bit, cpuset = 0;
+ 
+-	if (cpu >= 8 || cpu >= nr_cpu_ids)
+-		return -EINVAL;
++	for_each_cpu_and(cpu, mask_val, cpu_online_mask)
++		cpuset |= 1 << cpu;
+ 
+ 	mask = 0xff << shift;
+-	bit = 1 << (cpu + shift);
++	bit = cpuset << shift;
+ 
+ 	spin_lock(&irq_controller_lock);
+ 	val = readl_relaxed(reg) & ~mask;
+-- 
+1.7.4.1
