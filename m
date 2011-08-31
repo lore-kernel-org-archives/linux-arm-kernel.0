@@ -1,55 +1,104 @@
 From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Wed, 31 Aug 2011 18:22:47 +0300
-Subject: [PATCH 00/14] McBSP cleanup and generalization
-Message-ID: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
+Date: Wed, 31 Aug 2011 18:22:48 +0300
+Subject: [PATCH 01/14] omap: mcbsp: Remove omap device API
+In-Reply-To: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
+References: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <1314804181-17260-2-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+From: Jarkko Nikula <jhnikula@gmail.com>
 
-Updates and continuation to my McBSP cleanup RFC set I sent before vacation
-period. Motivation here is to get rid off all is_omap and CONFIG_ARCH stuff
-and to make code a step more generic (and for preparing to move code out
-under arch/arm/).
+struct omap_device *od is only set with find_omap_device_by_dev but not used
+otherwise so remove them and references to omap device API.
 
-I hope this version doesn't break OMAP1. I suppose it should work now as
-the register and dma addresses are calculated from common register numbers
-and not by mangling from OMAP2+ register offsets (Thanks for
-Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> for the idea).
+Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+---
+ arch/arm/plat-omap/mcbsp.c |   27 ---------------------------
+ 1 files changed, 0 insertions(+), 27 deletions(-)
 
-Also MCBSP_CONFIG_TYPEx defines are not used to replace is_omap tests in
-plat/mcbsp.c in this version but by using a feature flags (Thanks for
-Charulatha V <charu@ti.com> for the idea).
-
-Note that patch 01/14 has from address to my disabled google account. This
-is since the patch is already committed in to
-for_3.2/omap_device branch of Kevin's git tree.
-
-Jarkko Nikula (14):
-  omap: mcbsp: Remove omap device API
-  omap: mcbsp: Remove unused variables from platform data
-  omap: mcbsp: Move out omap_mcbsp_register_board_cfg from
-    plat-omap/devices.c
-  omap: mcbsp: Implement generic register access
-  omap: mcbsp: Make wakeup control generic
-  omap: mcbsp: Make tranceiver configuration control register access
-    generic
-  omap: mcbsp: Make threshold based transfer code generic
-  omap: mcbsp: Use per instance register cache size
-  omap: mcbsp: Move sidetone clock management to mach-omap2/mcbsp.c
-  omap: mcbsp: Cleanup sidetone control initialization and make it
-    generic
-  omap: mcbsp: Update mcbsp.h include dependencies
-  omap: mcbsp: Move address definitions to arch/arm/mach-omap1/mcbsp.c
-  omap: mcbsp: Start generalize omap2_mcbsp_set_clks_src
-  omap: mcbsp: Start generalize signal muxing functions
-
- arch/arm/mach-omap1/mcbsp.c             |   45 ++++
- arch/arm/mach-omap2/mcbsp.c             |  103 ++++++---
- arch/arm/plat-omap/devices.c            |   46 ----
- arch/arm/plat-omap/include/plat/mcbsp.h |  208 ++++++------------
- arch/arm/plat-omap/mcbsp.c              |  385 +++++++++++++------------------
- 5 files changed, 342 insertions(+), 445 deletions(-)
-
+diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
+index 6c62af1..4b233e8 100644
+--- a/arch/arm/plat-omap/mcbsp.c
++++ b/arch/arm/plat-omap/mcbsp.c
+@@ -24,7 +24,6 @@
+ #include <linux/slab.h>
+ 
+ #include <plat/mcbsp.h>
+-#include <plat/omap_device.h>
+ #include <linux/pm_runtime.h>
+ 
+ /* XXX These "sideways" includes are a sign that something is wrong */
+@@ -258,19 +257,9 @@ int omap_mcbsp_dma_reg_params(unsigned int id, unsigned int stream)
+ EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
+ 
+ #ifdef CONFIG_ARCH_OMAP3
+-static struct omap_device *find_omap_device_by_dev(struct device *dev)
+-{
+-	struct platform_device *pdev = container_of(dev,
+-					struct platform_device, dev);
+-	return container_of(pdev, struct omap_device, pdev);
+-}
+-
+ static void omap_st_on(struct omap_mcbsp *mcbsp)
+ {
+ 	unsigned int w;
+-	struct omap_device *od;
+-
+-	od = find_omap_device_by_dev(mcbsp->dev);
+ 
+ 	/*
+ 	 * Sidetone uses McBSP ICLK - which must not idle when sidetones
+@@ -292,9 +281,6 @@ static void omap_st_on(struct omap_mcbsp *mcbsp)
+ static void omap_st_off(struct omap_mcbsp *mcbsp)
+ {
+ 	unsigned int w;
+-	struct omap_device *od;
+-
+-	od = find_omap_device_by_dev(mcbsp->dev);
+ 
+ 	w = MCBSP_ST_READ(mcbsp, SSELCR);
+ 	MCBSP_ST_WRITE(mcbsp, SSELCR, w & ~(ST_SIDETONEEN));
+@@ -310,9 +296,6 @@ static void omap_st_off(struct omap_mcbsp *mcbsp)
+ static void omap_st_fir_write(struct omap_mcbsp *mcbsp, s16 *fir)
+ {
+ 	u16 val, i;
+-	struct omap_device *od;
+-
+-	od = find_omap_device_by_dev(mcbsp->dev);
+ 
+ 	val = MCBSP_ST_READ(mcbsp, SSELCR);
+ 
+@@ -340,9 +323,6 @@ static void omap_st_chgain(struct omap_mcbsp *mcbsp)
+ {
+ 	u16 w;
+ 	struct omap_mcbsp_st_data *st_data = mcbsp->st_data;
+-	struct omap_device *od;
+-
+-	od = find_omap_device_by_dev(mcbsp->dev);
+ 
+ 	w = MCBSP_ST_READ(mcbsp, SSELCR);
+ 
+@@ -685,9 +665,6 @@ EXPORT_SYMBOL(omap_mcbsp_get_dma_op_mode);
+ 
+ static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
+ {
+-	struct omap_device *od;
+-
+-	od = find_omap_device_by_dev(mcbsp->dev);
+ 	/*
+ 	 * Enable wakup behavior, smart idle and all wakeups
+ 	 * REVISIT: some wakeups may be unnecessary
+@@ -699,10 +676,6 @@ static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
+ 
+ static inline void omap34xx_mcbsp_free(struct omap_mcbsp *mcbsp)
+ {
+-	struct omap_device *od;
+-
+-	od = find_omap_device_by_dev(mcbsp->dev);
+-
+ 	/*
+ 	 * Disable wakup behavior, smart idle and all wakeups
+ 	 */
 -- 
 1.7.5.4
