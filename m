@@ -1,163 +1,127 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Wed, 31 Aug 2011 18:23:01 +0300
-Subject: [PATCH 14/14] omap: mcbsp: Start generalize signal muxing functions
-In-Reply-To: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
-References: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <1314804181-17260-15-git-send-email-jarkko.nikula@bitmer.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 31 Aug 2011 21:16:17 +0530
+Subject: [PATCH 4/6] DMA: PL330: Add device tree support
+In-Reply-To: <4E5E2E36.1070006@gmail.com>
+References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
+	<1314348014-2481-2-git-send-email-thomas.abraham@linaro.org>
+	<1314348014-2481-3-git-send-email-thomas.abraham@linaro.org>
+	<1314348014-2481-4-git-send-email-thomas.abraham@linaro.org>
+	<1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>
+	<4E579C9B.7030807@gmail.com>
+	<CAJuYYwR5GqqKjbMngQqorLuka4XN0jin5s6O66orTtSQg5eKRw@mail.gmail.com>
+	<4E5CE37E.1050104@gmail.com>
+	<CAJuYYwT5HGy9b06AyrLJv5hFCFf_YRA4md9N=m+cwcJNTqRDWg@mail.gmail.com>
+	<4E5E2E36.1070006@gmail.com>
+Message-ID: <CAJuYYwQ17MPD=hTYUxES5touFfd73W1unbtWfu_XqPR48t3P0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This generalizes the omap2_mcbsp1_mux_clkr_src and omap2_mcbsp1_mux_fsr_src
-implementation between generic McBSP and OMAP2 specific McBSP code. These
-functions are used to select source for CLKR and FSR signals on OMAP2+.
+Hi Rob,
 
-Start generalizing the code by implementing an optional mux_signal function
-pointer in platform data that will implement the actual muxing and which is
-called now from omap2_mcbsp1_mux_clkr_src and omap2_mcbsp1_mux_fsr_src.
-These functions are to be removed later and cleanup the API so that
-mux_signal gets its arguments directly from client code.
+On 31 August 2011 18:21, Rob Herring <robherring2@gmail.com> wrote:
+> Thomas,
 
-Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
----
- arch/arm/mach-omap2/mcbsp.c             |   43 +++++++++++++++++-------------
- arch/arm/plat-omap/include/plat/mcbsp.h |    1 +
- arch/arm/plat-omap/mcbsp.c              |   36 ++++++++++++++++++++------
- 3 files changed, 53 insertions(+), 27 deletions(-)
+[...]
 
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index 8a534b9..9c3c51e 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -34,33 +34,36 @@
- #include "cm2xxx_3xxx.h"
- #include "cm-regbits-34xx.h"
- 
--/* McBSP internal signal muxing functions */
--
--void omap2_mcbsp1_mux_clkr_src(u8 mux)
-+/* McBSP internal signal muxing function */
-+static int omap2_mcbsp1_mux_rx_clk(struct device *dev, const char *signal,
-+				   const char *src)
- {
- 	u32 v;
- 
- 	v = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
--	if (mux == CLKR_SRC_CLKR)
--		v &= ~OMAP2_MCBSP1_CLKR_MASK;
--	else if (mux == CLKR_SRC_CLKX)
--		v |= OMAP2_MCBSP1_CLKR_MASK;
--	omap_ctrl_writel(v, OMAP2_CONTROL_DEVCONF0);
--}
--EXPORT_SYMBOL(omap2_mcbsp1_mux_clkr_src);
- 
--void omap2_mcbsp1_mux_fsr_src(u8 mux)
--{
--	u32 v;
-+	if (!strcmp(signal, "clkr")) {
-+		if (!strcmp(src, "clkr"))
-+			v &= ~OMAP2_MCBSP1_CLKR_MASK;
-+		else if (!strcmp(src, "clkx"))
-+			v |= OMAP2_MCBSP1_CLKR_MASK;
-+		else
-+			return -EINVAL;
-+	} else if (!strcmp(signal, "fsr")) {
-+		if (!strcmp(src, "fsr"))
-+			v &= ~OMAP2_MCBSP1_FSR_MASK;
-+		else if (!strcmp(src, "fsx"))
-+			v |= OMAP2_MCBSP1_FSR_MASK;
-+		else
-+			return -EINVAL;
-+	} else {
-+		return -EINVAL;
-+	}
- 
--	v = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
--	if (mux == FSR_SRC_FSR)
--		v &= ~OMAP2_MCBSP1_FSR_MASK;
--	else if (mux == FSR_SRC_FSX)
--		v |= OMAP2_MCBSP1_FSR_MASK;
- 	omap_ctrl_writel(v, OMAP2_CONTROL_DEVCONF0);
-+
-+	return 0;
- }
--EXPORT_SYMBOL(omap2_mcbsp1_mux_fsr_src);
- 
- /* McBSP CLKS source switching function */
- static int omap2_mcbsp_set_clk_src(struct device *dev, struct clk *clk,
-@@ -181,6 +184,8 @@ static int omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 		return PTR_ERR(od);
- 	}
- 	pdata->set_clk_src = omap2_mcbsp_set_clk_src;
-+	if (id == 1)
-+		pdata->mux_signal = omap2_mcbsp1_mux_rx_clk;
- 	omap_mcbsp_count++;
- 	return 0;
- }
-diff --git a/arch/arm/plat-omap/include/plat/mcbsp.h b/arch/arm/plat-omap/include/plat/mcbsp.h
-index c8ebfc9..8fa74e2 100644
---- a/arch/arm/plat-omap/include/plat/mcbsp.h
-+++ b/arch/arm/plat-omap/include/plat/mcbsp.h
-@@ -309,6 +309,7 @@ struct omap_mcbsp_platform_data {
- 	bool has_ccr; /* Transceiver has configuration control registers */
- 	int (*enable_st_clock)(unsigned int, bool);
- 	int (*set_clk_src)(struct device *dev, struct clk *clk, const char *src);
-+	int (*mux_signal)(struct device *dev, const char *signal, const char *src);
- };
- 
- struct omap_mcbsp_st_data {
-diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-index 38b67d9..4b15cd7 100644
---- a/arch/arm/plat-omap/mcbsp.c
-+++ b/arch/arm/plat-omap/mcbsp.c
-@@ -922,21 +922,41 @@ int omap2_mcbsp_set_clks_src(u8 id, u8 fck_src_id)
- }
- EXPORT_SYMBOL(omap2_mcbsp_set_clks_src);
- 
--#ifndef CONFIG_ARCH_OMAP2PLUS
- void omap2_mcbsp1_mux_clkr_src(u8 mux)
- {
--	WARN(1, "%s: should never be called on an OMAP1-only kernel\n",
--	     __func__);
--	return;
-+	struct omap_mcbsp *mcbsp;
-+	const char *src;
-+
-+	if (mux == CLKR_SRC_CLKR)
-+		src = "clkr";
-+	else if (mux == CLKR_SRC_CLKX)
-+		src = "clkx";
-+	else
-+		return;
-+
-+	mcbsp = id_to_mcbsp_ptr(0);
-+	if (mcbsp->pdata->mux_signal)
-+		mcbsp->pdata->mux_signal(mcbsp->dev, "clkr", src);
- }
-+EXPORT_SYMBOL(omap2_mcbsp1_mux_clkr_src);
- 
- void omap2_mcbsp1_mux_fsr_src(u8 mux)
- {
--	WARN(1, "%s: should never be called on an OMAP1-only kernel\n",
--	     __func__);
--	return;
-+	struct omap_mcbsp *mcbsp;
-+	const char *src;
-+
-+	if (mux == FSR_SRC_FSR)
-+		src = "fsr";
-+	else if (mux == FSR_SRC_FSX)
-+		src = "fsx";
-+	else
-+		return;
-+
-+	mcbsp = id_to_mcbsp_ptr(0);
-+	if (mcbsp->pdata->mux_signal)
-+		mcbsp->pdata->mux_signal(mcbsp->dev, "fsr", src);
- }
--#endif
-+EXPORT_SYMBOL(omap2_mcbsp1_mux_fsr_src);
- 
- #define max_thres(m)			(mcbsp->pdata->buffer_size)
- #define valid_threshold(m, val)		((val) <= max_thres(m))
--- 
-1.7.5.4
+>> For PL330 dma controllers instantiated from device tree, the channel
+>> lookup is based on phandle of the dma controller and dma request id
+>> specified by the client node. During probe, the private data of each
+>> channel of the controller is set to point to the device node of the
+>> dma controller. The 'chan_id' of the each channel is used as the
+>> dma request id.
+>>
+>> Client driver requesting dma channels specify the phandle of the
+>> dma controller and the request id. The pl330 filter function
+>> converts the phandle to the device node pointer and matches that
+>> with channel's private data. If a match is found, the request id
+>> from the client node and the 'chan_id' of the channel is matched.
+>> A channel is found if both the values match.
+>>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>> ?.../devicetree/bindings/dma/arm-pl330.txt ? ? ? ? ?| ? 29 ++++++++++++++++
+>> ?drivers/dma/pl330.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 35 +++++++++++++++++---
+>> ?2 files changed, 59 insertions(+), 5 deletions(-)
+>> ?create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt
+>> b/Documentation/devicetree/bindings/dma/arm-pl330.txt
+>> new file mode 100644
+>> index 0000000..89f4b9c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
+>> @@ -0,0 +1,29 @@
+>> +* ARM PrimeCell PL330 DMA Controller
+>> +
+>> +The ARM PrimeCell PL330 DMA controller can move blocks of memory contents
+>> +between memory and peripherals or memory to memory.
+>> +
+>> +Required properties:
+>> + ?- compatible: should be "arm,primecell".
+>
+> Sorry, I guess I wasn't clear. This has to be "arm,primecell" plus
+> something else. In this case, "arm,pl330". If the IP is modified from
+> standard ARM version (like ST likes to do), then something like
+> "samsung,pl330" would be appropriate.
+>
+> This is not actually used by the kernel at the moment, but could if
+> modified versions of pl330 show up.
+
+of_platform_bus_create() checks for  "arm,primecell" compatible value
+to instantiate a amba device from device tree. The peripheral_id is
+also noted in the amba device instance. The amba drivers register with
+a with a peripheral_id and peripheral_id is used match amba device
+with a driver.
+
+In cases of modified version of the same IP, the peripheral_id would
+be different. So, "arm,primecell" would just be enough for now. Any
+other compatible value would anyway go unused. I did use
+"arm,primecell-pdma" and "arm-primecell-mdma" to derive the dma_cap
+value. But, as per your comments, I dropped it.
+
+So, for now, I will just list "arm,primecell" as required compatible
+value. Please let me know if "arm,pl330" would be required here.
+
+>
+>> + ?- reg: physical base address of the controller and length of memory mapped
+>> + ? ?region.
+>> + ?- interrupts: interrupt number to the cpu.
+>> +
+>> +Example: (from Samsung's Exynos4 processor dtsi file)
+>> +
+>> + ? ? pdma0: pdma at 12680000 {
+>> + ? ? ? ? ? ? compatible = "arm,primecell";
+>> + ? ? ? ? ? ? reg = <0x12680000 0x1000>;
+>> + ? ? ? ? ? ? interrupts = <99>;
+>> + ? ? };
+>> +
+>> +Client drivers (device nodes requiring dma transfers from dev-to-mem or
+>> +mem-to-dev) should specify the DMA channel numbers using a two-value pair
+>> +as shown below.
+>> +
+>> + ?[property name] ?= <[phandle of the dma controller] [dma request id]>;
+>
+> At least fix the "-dma-channel" part of the name. It not clear if that's
+> the case or just an example.
+>
+> [name]-dma-channel = <[phandle of the dma controller] [dma request id]>;
+
+The name of the property that specifies the dma channel to use is
+decided by the client device node. It is not enforced by the dma
+device node. So, there will be no specific requirement stated in the
+documentation for pl330 device node.
+
+>
+>
+> The rest looks good.
+
+Thanks for your review and comments.
+
+Regards,
+Thomas.
+
+>
+> Rob
+>
+
+[...]
