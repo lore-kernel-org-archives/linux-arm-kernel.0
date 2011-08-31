@@ -1,62 +1,47 @@
-From: lrg@ti.com (Liam Girdwood)
-Date: Wed, 31 Aug 2011 11:52:53 +0100
-Subject: [alsa-devel] [RFC v2 PATCH 1/1] ASoC: soc-core: symmetry checking
-	for each DAIs separately
-In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F77222AE40@039-SN1MPN1-001.039d.mgd.msft.net>
-References: <1314609314-22162-1-git-send-email-b29396@freescale.com>
-	<CAOZdJXXzMgET+gDknrRBv_yFENrzJe+oFPN7_o7RisBLUhw0Rw@mail.gmail.com>
-	<65EE16ACC360FA4D99C96DC085B3F77222AE40@039-SN1MPN1-001.039d.mgd.msft.net>
-Message-ID: <4E5E1285.8020508@ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 31 Aug 2011 19:04:21 +0800
+Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
+	platforms
+In-Reply-To: <87k49t99u4.fsf@lebrac.rtp-net.org>
+References: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
+	<1314762635-3923-2-git-send-email-richard.zhu@linaro.org>
+	<87k49t99u4.fsf@lebrac.rtp-net.org>
+Message-ID: <27DACB75-EF61-4A32-B11C-E1044B0FB0B2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/11 03:54, Dong Aisheng-B29396 wrote:
->> -----Original Message-----
->> From: Tabi Timur-B04825
->> Sent: Tuesday, August 30, 2011 4:35 AM
->> To: Dong Aisheng-B29396
->> Cc: alsa-devel at alsa-project.org; lars at metafoo.de; s.hauer at pengutronix.de;
->> broonie at opensource.wolfsonmicro.com; w.sang at pengutronix.de; lrg at ti.com;
->> linux-arm-kernel at lists.infradead.org
->> Subject: Re: [alsa-devel] [RFC v2 PATCH 1/1] ASoC: soc-core: symmetry
->> checking for each DAIs separately
->>
->> On Mon, Aug 29, 2011 at 4:15 AM, Dong Aisheng <b29396@freescale.com>
->> wrote:
->>> The orginal code does not cover the case that one DAI such as codec
->>> may be shared between other two DAIs(CPU).
->>
->> Can you give me an example of how this can occur?
->>
+Hi Arnaud,
+
+You can just use Linus tree v3.1-rc4 as the base for this.
+
+Sent from my iPhone
+
+On Aug 31, 2011, at 6:03 PM, Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org> wrote:
+
+> Richard Zhu <richard.zhu@linaro.org> writes:
+> Hi,
 > 
-> Pls check the following case used in mx28evk.
-> static struct snd_soc_dai_link mxs_sgtl5000_dai[] = {
->         {
->                 .name           = "HiFi Tx",
->                 .stream_name    = "HiFi Playback",
->                 .codec_dai_name = "sgtl5000",
->                 .codec_name     = "sgtl5000.0-000a",
->                 .cpu_dai_name   = "mxs-saif.0",
->                 .platform_name  = "mxs-pcm-audio.0",
->                 .ops            = &mxs_sgtl5000_hifi_ops,
->         }, {
->                 .name           = "HiFi Rx",
->                 .stream_name    = "HiFi Capture",
->                 .codec_dai_name = "sgtl5000",
->                 .codec_name     = "sgtl5000.0-000a",
->                 .cpu_dai_name   = "mxs-saif.1",
->                 .platform_name  = "mxs-pcm-audio.1",
->                 .ops            = &mxs_sgtl5000_hifi_ops,
->         },
-> };
-> You can also refer to:
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/129789/focus=129839
 > 
-
-Timur, iirc your driver has some special symmetry requirement (maybe something todo with having 2 DAIs) ?
-
-I assume this is OK for you too ?
-
-Acked-by: Liam Girdwood <lrg@ti.com>
-
-Liam 
+>> @@ -1503,6 +1519,9 @@ static struct clk_lookup mx53_lookups[] = {
+>>    _REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+>>    _REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
+>>    _REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
+>> +    _REGISTER_CLOCK("imx53-ahci.0", "ahci", sata_clk)
+>> +    _REGISTER_CLOCK("imx53-ahci.0", "ahci_phy", ahci_phy_clk)
+>> +    _REGISTER_CLOCK("imx53-ahci.0", "ahci_dma", ahci_dma_clk)
+>> };
+>> 
+>> static void clk_tree_init(void)
+> 
+> Which tree has been used for this patch ? For instance, on current
+> imx-features branch of Sascha's tree, there's a pata_imx clock defined
+> here (see [1]). Should I try to apply it on top of some other branch ?
+> 
+> Arnaud
+> 
+> [1] http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commit;h=03b20b07be130e44faf29f787c66ce5cce5afb2a
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
