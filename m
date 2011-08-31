@@ -1,48 +1,113 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 31 Aug 2011 13:44:20 +0530
-Subject: [PATCH] ARM: S3C64XX: Fix clkdev device names for I2C clocks
-In-Reply-To: <20110831002133.GA1164@opensource.wolfsonmicro.com>
-References: <1314739841-13522-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<CAH9JG2UEZVQ+5AJbbtXQhuVzvDp_8-wJdNgOjwHs14Zj7_KP+g@mail.gmail.com>
-	<20110831002133.GA1164@opensource.wolfsonmicro.com>
-Message-ID: <CAJuYYwQikeoPbDX5DV4Y_HzOz2t04otLEUMye8CPpGLvhjwhyw@mail.gmail.com>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Wed, 31 Aug 2011 16:28:58 +0800
+Subject: [PATCH V7 2/5] ahci_plt Add the board_ids and pi refer to
+	different features
+In-Reply-To: <1314762635-3923-3-git-send-email-richard.zhu@linaro.org>
+References: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
+	<1314762635-3923-3-git-send-email-richard.zhu@linaro.org>
+Message-ID: <CAMPhdO9Tvp9HeXYe=C8hHavAKSm2wO7ObKbv5n9PTeC4gQPJBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 August 2011 05:51, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Aug 31, 2011 at 08:48:03AM +0900, Kyungmin Park wrote:
+On Wed, Aug 31, 2011 at 11:50 AM, Richard Zhu <richard.zhu@linaro.org> wrote:
+> On imx53 AHCI, soft reset fails with IPMS set when PMP
+> is enabled but SATA HDD/ODD is connected to SATA port,
+> do soft reset again to port 0.
+> So the 'ahci_pmp_retry_srst_ops' is required when imx53
+> ahci is present.
 >
->> It's not matched with your description. and also not matched with
->> codes at "arch/arm/mach-s3c64xx/s3c6410.c"
+> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+> Acked-by: Eric Miao <eric.miao@linaro.org>
+> ---
+> ?drivers/ata/ahci_platform.c | ? 44 +++++++++++++++++++++++++++++++++++++-----
+> ?1 files changed, 38 insertions(+), 6 deletions(-)
 >
->> ? ? ? ?/* the i2c devices are directly compatible with s3c2440 */
->> ? ? ? ? s3c_i2c0_setname("s3c2440-i2c");
->> ? ? ? ? s3c_i2c1_setname("s3c2440-i2c");
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index 6fef1fa..c03277d 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -23,6 +23,41 @@
+> ?#include <linux/ahci_platform.h>
+> ?#include "ahci.h"
 >
-> Oh, FFS. ?That's what's broken - the names that are actually appearing
-> in the system are the names that the devices have in the relevant
-> dev-i2c?.c files and obviously there's no reason one would expect to
-> find code like the above since it's just a little abstruse to rewrite
-> the devices like that.
->
-> Looking at the code I bet what broke it is the CPU revision
-> identification changes - it's now responsible for making sure the fixups
-> are run. ?Either it's not matching correctly or it's running too late to
-> make the fixup before the device is registered.
->
-> Though the first part of the issue (the fact that I2C0 isn't using a
-> device name and I2C1 is) remains an issue.
+> +enum ahci_type {
+> + ? ? ? AHCI, ? ? ? ? ? /* standard platform ahci */
+> + ? ? ? IMX53_AHCI, ? ? /* ahci on i.mx53 */
+> +};
+> +
+> +static struct platform_device_id ahci_devtype[] = {
+> + ? ? ? {
+> + ? ? ? ? ? ? ? .name = "ahci",
+> + ? ? ? ? ? ? ? .driver_data = AHCI,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .name = "imx53-ahci",
+> + ? ? ? ? ? ? ? .driver_data = IMX53_AHCI,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? /* sentinel */
+> + ? ? ? }
+> +};
+> +MODULE_DEVICE_TABLE(platform, ahci_devtype);
+> +
 
-There are two instances of clock with name i2c registered for s3c64xx.
-One has a devname and the other does not. So this continued to work.
-The i2c0 clock instance did not get a devname because its instance id
-was -1 (prior to clkdev support).
+I still prefer this way as this is most flexible. We'll see how we can better
+organize this along with newly added ahci controllers.
 
-If a devname is added to i2c0 clock instance for s3c64xx, it should be
-set to "s3c2440-i2c". If the devname is set to "s3c2440-i2c.0", then
-CONFIG_S3C_DEV_I2C1 will have to defined for s3c64xx, otherwise, as
-per arch/arm/plat-samsung/dev-i2c0.c, the platform device id for i2c0
-instance will be -1 and the clock lookup for i2c0 will fail.
+Jeff,
 
-Regards,
-Thomas.
+Can you take this patch through? Or if you are good with this, we can
+also push this one along with the other  patches to go through sascha's
+imx tree.
+
+> +
+> +static const struct ata_port_info ahci_port_info[] = {
+> + ? ? ? /* by features */
+> + ? ? ? [AHCI] = {
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= AHCI_FLAG_COMMON,
+> + ? ? ? ? ? ? ? .pio_mask ? ? ? = ATA_PIO4,
+> + ? ? ? ? ? ? ? .udma_mask ? ? ?= ATA_UDMA6,
+> + ? ? ? ? ? ? ? .port_ops ? ? ? = &ahci_ops,
+> + ? ? ? },
+> + ? ? ? [IMX53_AHCI] = {
+> + ? ? ? ? ? ? ? .flags ? ? ? ? ?= AHCI_FLAG_COMMON,
+> + ? ? ? ? ? ? ? .pio_mask ? ? ? = ATA_PIO4,
+> + ? ? ? ? ? ? ? .udma_mask ? ? ?= ATA_UDMA6,
+> + ? ? ? ? ? ? ? .port_ops ? ? ? = &ahci_pmp_retry_srst_ops,
+> + ? ? ? },
+> +};
+> +
+> ?static struct scsi_host_template ahci_platform_sht = {
+> ? ? ? ?AHCI_SHT("ahci_platform"),
+> ?};
+> @@ -31,12 +66,8 @@ static int __init ahci_probe(struct platform_device *pdev)
+> ?{
+> ? ? ? ?struct device *dev = &pdev->dev;
+> ? ? ? ?struct ahci_platform_data *pdata = dev->platform_data;
+> - ? ? ? struct ata_port_info pi = {
+> - ? ? ? ? ? ? ? .flags ? ? ? ? ?= AHCI_FLAG_COMMON,
+> - ? ? ? ? ? ? ? .pio_mask ? ? ? = ATA_PIO4,
+> - ? ? ? ? ? ? ? .udma_mask ? ? ?= ATA_UDMA6,
+> - ? ? ? ? ? ? ? .port_ops ? ? ? = &ahci_ops,
+> - ? ? ? };
+> + ? ? ? const struct platform_device_id *id = platform_get_device_id(pdev);
+> + ? ? ? struct ata_port_info pi = ahci_port_info[id->driver_data];
+> ? ? ? ?const struct ata_port_info *ppi[] = { &pi, NULL };
+> ? ? ? ?struct ahci_host_priv *hpriv;
+> ? ? ? ?struct ata_host *host;
+> @@ -177,6 +208,7 @@ static struct platform_driver ahci_driver = {
+> ? ? ? ? ? ? ? ?.name = "ahci",
+> ? ? ? ? ? ? ? ?.owner = THIS_MODULE,
+> ? ? ? ?},
+> + ? ? ? .id_table ? ? ? = ahci_devtype,
+> ?};
+>
+> ?static int __init ahci_init(void)
+> --
+> 1.7.1
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
