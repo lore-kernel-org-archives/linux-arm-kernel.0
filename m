@@ -1,30 +1,36 @@
-From: jy0922.shim@samsung.com (Joonyoung Shim)
-Date: Wed, 31 Aug 2011 11:28:28 +0900
-Subject: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
-In-Reply-To: <CAF6AEGu3ss-rJC28H1rm2GWLm1bAZnHLftXfMLJQNeqjBt3umQ@mail.gmail.com>
-References: <1314359274-21585-1-git-send-email-inki.dae@samsung.com>
-	<CAF6AEGu3ss-rJC28H1rm2GWLm1bAZnHLftXfMLJQNeqjBt3umQ@mail.gmail.com>
-Message-ID: <4E5D9C4C.1090808@samsung.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 31 Aug 2011 10:31:58 +0800
+Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
+	Summit 2011
+In-Reply-To: <201108310329.39586.marek.vasut@gmail.com>
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+	<20110830231018.GA26019@elf.ucw.cz>
+	<201108310329.39586.marek.vasut@gmail.com>
+Message-ID: <CAK5ve-KfP8y8Lm+z0jCRP1Z08oDPiq1WM1cCcB7+ddS32iTunA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +static void samsung_drm_connector_destroy(struct drm_connector *connector)
->> +{
->> +       struct samsung_drm_connector *samsung_connector =
->> +               to_samsung_connector(connector);
->> +
->> +       DRM_DEBUG_KMS("%s\n", __FILE__);
->> +
->> +       drm_sysfs_connector_remove(connector);
->> +       drm_connector_cleanup(connector);
->> +       connector->dev->mode_config.num_connector--;
+On Wed, Aug 31, 2011 at 9:29 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> On Wednesday, August 31, 2011 01:10:18 AM Pavel Machek wrote:
+>> Hi!
+>>
+>> > Waiting for confirmation:
+>> > 14) Pavel Machek
+>>
+>> Yes, I'd like to come. "Random zaurus hacker"? :-).
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? Pavel
 >
-> I wonder if num_connector-- should be in drm_connector_cleanup()..
+> Still, I don't understand why it's titled "at Kernel Summit 2011". Shouldn't
+> that be "ELCE" or "LinuxCon" ?
 >
 
-Right, num_connector and num_encoder of mode_config should be decreased
-in the cleanup functions, but currently drm driver is missing it.
+ELC-E 2011 and Kernel summit 2011 will happen in the same week and in
+the same place of Prague.
 
-I sent the patch.
-
-Thanks.
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
