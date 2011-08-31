@@ -1,24 +1,52 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 31 Aug 2011 03:29:39 +0200
-Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
-	Summit 2011
-In-Reply-To: <20110830231018.GA26019@elf.ucw.cz>
-References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-	<20110830231018.GA26019@elf.ucw.cz>
-Message-ID: <201108310329.39586.marek.vasut@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 30 Aug 2011 19:30:57 -0600 (MDT)
+Subject: Arm device tree wonder
+In-Reply-To: <1314734987.11994.YahooMailNeo@web132211.mail.ird.yahoo.com>
+References: <1314734987.11994.YahooMailNeo@web132211.mail.ird.yahoo.com>
+Message-ID: <alpine.DEB.2.00.1108301910390.26173@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, August 31, 2011 01:10:18 AM Pavel Machek wrote:
-> Hi!
-> 
-> > Waiting for confirmation:
-> > 14) Pavel Machek
-> 
-> Yes, I'd like to come. "Random zaurus hacker"? :-).
-> 								Pavel
+On Tue, 30 Aug 2011, Pierre Beaumon wrote:
 
-Still, I don't understand why it's titled "at Kernel Summit 2011". Shouldn't 
-that be "ELCE" or "LinuxCon" ?
+> Also I believe one big arm problem is a lack of common infrastructure 
+> that lead to code duplication. Some machine try to do too much things. 
+> omap2 (mach-omap2 + plat-omap) is about 80 KSLOC over 400KSLOC (76 mach 
+> + plat directories). That 8 times bigger than the average 
+> ((80/2)/(400/76))! There are either common stuff that should be shared, 
+> or some stuff should be moved in drivers.
 
-Cheers
+Here are some additional data points you might consider adding to your 
+analysis:
+
+- Consider taking into account what percentage of those lines are for 
+  SoC-specific device data files.  Where should those files be moved, 
+  before a DT (or other data format) conversion?
+
+- Consider comparing the number of on-chip devices supported by the core 
+  OMAP code to the number of devices supported by the average SoC core 
+  code, in mainline.
+
+- Consider accounting for the extra code and data needed for fine-grained 
+  power management, compared to the average SoC core code, assuming the
+  SoC supports it.
+
+- Consider taking into account the number of OMAP variants supported by 
+  the core OMAP code (at least thirty, not counting silicon revision 
+  differences, which can be significant) compared to the average SoC.
+
+- Consider comparing the number of boards supported by the core OMAP code
+  to the number supported by the average SoC code.  To what other shared
+  directory or drivers/ subdirectory should these files be moved to,
+  before a DT conversion?
+
+To be sure, there's a fair amount of OMAP core code that should be moved 
+out to drivers.  My guess is about 10-15% of the current total.  Work 
+along those lines is proceeding.  If you're offering to help, we could use 
+it.
+
+But I don't think that the way to deal with the remaining 85-90% of the 
+core code and data is quite as simple as your rough summary suggests.
+
+
+- Paul
