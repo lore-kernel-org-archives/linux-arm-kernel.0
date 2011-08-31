@@ -1,46 +1,22 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 31 Aug 2011 20:16:18 +0300
-Subject: [PATCH] iommu: omap_iovmm: support non page-aligned buffers in
-	iommu_vmap
-In-Reply-To: <201108311856.26969.laurent.pinchart@ideasonboard.com>
-References: <1314646569-16738-1-git-send-email-ohad@wizery.com>
-	<CAK=Wgbb06Z0_8OKFf6MKjYe+SJN16Mh9PA6z_T+cpSpB9EKHFw@mail.gmail.com>
-	<20110831130642.GQ12940@amd.com>
-	<201108311856.26969.laurent.pinchart@ideasonboard.com>
-Message-ID: <CAK=WgbZeOaMduf6xDb2j6OzbDBC4c8Qd2q0zfYf-VeG6Tbcwhw@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 31 Aug 2011 10:36:57 -0700
+Subject: [PATCH 3/3] arm/dt: Tegra: Add support-bit to SDHCI nodes
+In-Reply-To: <1314731837-6985-3-git-send-email-swarren@nvidia.com>
+References: <1314731837-6985-1-git-send-email-swarren@nvidia.com>
+	<1314731837-6985-3-git-send-email-swarren@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B327A03A@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent, Joerg,
+Stephen Warren wrote at Tuesday, August 30, 2011 1:17 PM:
+> For Seaboard's internal eMMC, this makes the difference between a
+> 5.5MB/s and 10.2MB/s transfer rate. On Harmony, there wasn't any
+> measurable difference on my cheap/slow ~2MB/s card.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-On Wed, Aug 31, 2011 at 7:56 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Wednesday 31 August 2011 15:06:42 Roedel, Joerg wrote:
->> Do you mean the parts of the pages you map to the device that are not in
->> the requested range (basically everything before offset and all after
->> size)?
->> This issue exists in other iommu drivers as well. It is inherent to how
->> the dma-api is defined and how the iommu hardware works.
->> The dma-api can work on byte granularity while the hardware usually only
->> works on page granularity.
->
-> True, but if we implement address rounding transparently in the IOMMU layer
-> Ohad's concern can be valid, depending on whether the device is trusted. If we
-> decide to push address rounding to the drivers that decision can be made on a
-> per-device basis. However, drivers are usually not aware of what granularity
-> the IOMMU works on, so that wouldn't be straightforward and clean.
+Grant, when applying this patch, could you possibly fix the typo in the
+patch subject; s/support-bit/support-8bit/. Thanks!
 
-I think the confusion lies in the fact that omap's iovmm should be
-treated as the DMA-API (which will soon replace it altogether anyway)
-and not as an IOMMU driver, and in that sense, Laurent's patch does
-sound reasonable.
-
-However, one needs to keep this in mind (e.g. map only page-aligned
-buffers ?) when using the upcoming iommu-based DMA-API with untrusted
-devices (such as remote processors running arbitrary code). It is
-completely wrong to allow these devices access to random physical
-memory regions. We might want to come up with a way to prevent this
-from happening...
-
-Thanks,
-Ohad.
+-- 
+nvpublic
