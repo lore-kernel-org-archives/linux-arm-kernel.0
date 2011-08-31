@@ -1,78 +1,169 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Wed, 31 Aug 2011 19:12:38 +0530
-Subject: [PATCH v6 22/25] gpio/omap: save and restore debounce registers
+Date: Wed, 31 Aug 2011 19:12:19 +0530
+Subject: [PATCH v6 03/25] gpio/omap: make gpio_context part of gpio_bank
+	structure
 In-Reply-To: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
 References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1314798161-19523-23-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1314798161-19523-4-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishant Menon <nm@ti.com>
+From: Charulatha V <charu@ti.com>
 
-GPIO debounce registers need to be saved and restored for proper functioning
-of driver. To save the registers, we cannot cut the clock before the save,
-hence move the clk disable after the save.
+Currently gpio_context array used to save gpio bank's context, is used only for
+OMAP3 architecture. Move gpio_context as part of gpio_bank structure so that it
+can be specific to each gpio bank and can be used for any OMAP architecture
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Signed-off-by: Charulatha V <charu@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |   22 +++++++++++++++++++---
- 1 files changed, 19 insertions(+), 3 deletions(-)
+ drivers/gpio/gpio-omap.c |   76 ++++++++++++++++++++-------------------------
+ 1 files changed, 34 insertions(+), 42 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index dc382f6..67e08e9 100644
+index 9a160d4..e83109c 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -41,6 +41,8 @@ struct gpio_regs {
- 	u32 risingdetect;
- 	u32 fallingdetect;
- 	u32 dataout;
-+	u32 debounce;
-+	u32 debounce_en;
+@@ -30,6 +30,19 @@
+ 
+ static LIST_HEAD(omap_gpio_list);
+ 
++struct gpio_regs {
++	u32 irqenable1;
++	u32 irqenable2;
++	u32 wake_en;
++	u32 ctrl;
++	u32 oe;
++	u32 leveldetect0;
++	u32 leveldetect1;
++	u32 risingdetect;
++	u32 fallingdetect;
++	u32 dataout;
++};
++
+ struct gpio_bank {
+ 	struct list_head node;
+ 	unsigned long pbase;
+@@ -43,7 +56,7 @@ struct gpio_bank {
+ #endif
+ 	u32 non_wakeup_gpios;
+ 	u32 enabled_non_wakeup_gpios;
+-
++	struct gpio_regs context;
+ 	u32 saved_datain;
+ 	u32 saved_fallingdetect;
+ 	u32 saved_risingdetect;
+@@ -66,23 +79,6 @@ struct gpio_bank {
+ 	struct omap_gpio_reg_offs *regs;
  };
  
- struct gpio_bank {
-@@ -1158,9 +1160,6 @@ static int omap_gpio_runtime_suspend(struct device *dev)
- 	u32 l1 = 0, l2 = 0;
- 	int j;
- 
--	for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
--		clk_disable(bank->dbck);
+-#ifdef CONFIG_ARCH_OMAP3
+-struct omap3_gpio_regs {
+-	u32 irqenable1;
+-	u32 irqenable2;
+-	u32 wake_en;
+-	u32 ctrl;
+-	u32 oe;
+-	u32 leveldetect0;
+-	u32 leveldetect1;
+-	u32 risingdetect;
+-	u32 fallingdetect;
+-	u32 dataout;
+-};
 -
- 	if (!bank->mod_usage)
- 		return 0;
+-static struct omap3_gpio_regs gpio_context[OMAP34XX_NR_GPIOS];
+-#endif
+-
+ #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
+ #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
  
-@@ -1192,6 +1191,16 @@ update_gpio_context_count:
- 		bank->context_loss_count =
- 				bank->get_context_loss_count(bank->dev);
+@@ -1490,33 +1486,31 @@ void omap2_gpio_resume_after_idle(void)
+ void omap_gpio_save_context(void)
+ {
+ 	struct gpio_bank *bank;
+-	int i = 0;
  
-+	if (bank->dbck_enable_mask) {
-+		bank->context.debounce = __raw_readl(bank->base +
-+						bank->regs->debounce);
-+		bank->context.debounce_en = __raw_readl(bank->base +
-+						bank->regs->debounce_en);
-+	}
-+
-+	for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
-+		clk_disable(bank->dbck);
-+
- 	return 0;
+ 	list_for_each_entry(bank, &omap_gpio_list, node) {
+-		i++;
+ 
+ 		if (!bank->loses_context)
+ 			continue;
+ 
+-		gpio_context[i].irqenable1 =
++		bank->context.irqenable1 =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE1);
+-		gpio_context[i].irqenable2 =
++		bank->context.irqenable2 =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE2);
+-		gpio_context[i].wake_en =
++		bank->context.wake_en =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_WAKE_EN);
+-		gpio_context[i].ctrl =
++		bank->context.ctrl =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_CTRL);
+-		gpio_context[i].oe =
++		bank->context.oe =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_OE);
+-		gpio_context[i].leveldetect0 =
++		bank->context.leveldetect0 =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_LEVELDETECT0);
+-		gpio_context[i].leveldetect1 =
++		bank->context.leveldetect1 =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_LEVELDETECT1);
+-		gpio_context[i].risingdetect =
++		bank->context.risingdetect =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_RISINGDETECT);
+-		gpio_context[i].fallingdetect =
++		bank->context.fallingdetect =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_FALLINGDETECT);
+-		gpio_context[i].dataout =
++		bank->context.dataout =
+ 			__raw_readl(bank->base + OMAP24XX_GPIO_DATAOUT);
+ 	}
  }
+@@ -1524,33 +1518,31 @@ void omap_gpio_save_context(void)
+ void omap_gpio_restore_context(void)
+ {
+ 	struct gpio_bank *bank;
+-	int i = 0;
  
-@@ -1331,6 +1340,13 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- 	__raw_writel(bank->context.fallingdetect,
- 				bank->base + bank->regs->fallingdetect);
- 	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
-+
-+	if (bank->dbck_enable_mask) {
-+		__raw_writel(bank->context.debounce, bank->base +
-+					bank->regs->debounce);
-+		__raw_writel(bank->context.debounce_en,
-+					bank->base + bank->regs->debounce_en);
-+	}
+ 	list_for_each_entry(bank, &omap_gpio_list, node) {
+-		i++;
+ 
+ 		if (!bank->loses_context)
+ 			continue;
+ 
+-		__raw_writel(gpio_context[i].irqenable1,
++		__raw_writel(bank->context.irqenable1,
+ 				bank->base + OMAP24XX_GPIO_IRQENABLE1);
+-		__raw_writel(gpio_context[i].irqenable2,
++		__raw_writel(bank->context.irqenable2,
+ 				bank->base + OMAP24XX_GPIO_IRQENABLE2);
+-		__raw_writel(gpio_context[i].wake_en,
++		__raw_writel(bank->context.wake_en,
+ 				bank->base + OMAP24XX_GPIO_WAKE_EN);
+-		__raw_writel(gpio_context[i].ctrl,
++		__raw_writel(bank->context.ctrl,
+ 				bank->base + OMAP24XX_GPIO_CTRL);
+-		__raw_writel(gpio_context[i].oe,
++		__raw_writel(bank->context.oe,
+ 				bank->base + OMAP24XX_GPIO_OE);
+-		__raw_writel(gpio_context[i].leveldetect0,
++		__raw_writel(bank->context.leveldetect0,
+ 				bank->base + OMAP24XX_GPIO_LEVELDETECT0);
+-		__raw_writel(gpio_context[i].leveldetect1,
++		__raw_writel(bank->context.leveldetect1,
+ 				bank->base + OMAP24XX_GPIO_LEVELDETECT1);
+-		__raw_writel(gpio_context[i].risingdetect,
++		__raw_writel(bank->context.risingdetect,
+ 				bank->base + OMAP24XX_GPIO_RISINGDETECT);
+-		__raw_writel(gpio_context[i].fallingdetect,
++		__raw_writel(bank->context.fallingdetect,
+ 				bank->base + OMAP24XX_GPIO_FALLINGDETECT);
+-		__raw_writel(gpio_context[i].dataout,
++		__raw_writel(bank->context.dataout,
+ 				bank->base + OMAP24XX_GPIO_DATAOUT);
+ 	}
  }
- #else
- #define omap_gpio_runtime_suspend NULL
 -- 
 1.7.0.4
