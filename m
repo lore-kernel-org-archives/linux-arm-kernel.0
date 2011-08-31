@@ -1,353 +1,1052 @@
 From: msalter@redhat.com (Mark Salter)
-Date: Wed, 31 Aug 2011 17:26:45 -0400
-Subject: [PATCH 10/24] C6X: time management
+Date: Wed, 31 Aug 2011 17:26:41 -0400
+Subject: [PATCH 06/24] C6X: devicetree
 In-Reply-To: <1314826019-22330-1-git-send-email-msalter@redhat.com>
 References: <1314826019-22330-1-git-send-email-msalter@redhat.com>
-Message-ID: <1314826019-22330-11-git-send-email-msalter@redhat.com>
+Message-ID: <1314826019-22330-7-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The C6X architecture includes a 64-bit free running core clock counter which
-is used as the clocksource. The SoCs have a number of 64-bit programmable
-timers. One of these is used as the clockevent timer.
+This is the basic devicetree support for C6X. Currently, four boards are
+supported. Each one uses a different SoC part. Two of the four supported
+SoCs are multicore. One with 3 cores and the other with 6 cores. There is
+no coherency between the core-level caches, so SMP is not an option. It is
+possible to run separate kernel instances on the various cores. There is
+currently no C6X bootloader support for device trees so we build in the
+DTB for now.
+
+There are some interesting twists to the hardware which are of note for device
+tree support. Each core has its own interrupt controller which is controlled
+by special purpose core registers. This core controller provides 12 general
+purpose prioritized interrupt sources. Each core is contained within a
+hardware "module" which provides L1 and L2 caches, power control, and another
+interrupt controller which cascades into the core interrupt controller. These
+core module functions are controlled by memory mapped registers. The addresses
+for these registers are the same for each core. That is, when coreN accesses
+a module-level MMIO register at a given address, it accesses the register for
+coreN even though other cores would use the same address to access the register
+in the module containing those cores. Other hardware modules (timers, enet, etc)
+which are memory mapped can be accessed by all cores.
+
+The timers need some further explanation for multicore SoCs. Even though all
+timer control registers are visible to all cores, interrupt routing or other
+considerations may make a given timer more suitable for use by a core than
+some other timer. Because of this and the desire to have the same image run
+on more than one core, the timer nodes have a "ti,core-mask" property which
+is used by the driver to scan for a suitable timer to use.
 
 Signed-off-by: Mark Salter <msalter@redhat.com>
+Cc: devicetree-discuss at lists.ozlabs.org
 ---
- arch/c6x/include/asm/timex.h |   41 +++++++++
- arch/c6x/kernel/time.c       |   64 ++++++++++++++
- arch/c6x/platforms/timer64.c |  191 ++++++++++++++++++++++++++++++++++++++++++
- arch/c6x/platforms/timer64.h |    6 ++
- 4 files changed, 302 insertions(+), 0 deletions(-)
- create mode 100644 arch/c6x/include/asm/timex.h
- create mode 100644 arch/c6x/kernel/time.c
- create mode 100644 arch/c6x/platforms/timer64.c
- create mode 100644 arch/c6x/platforms/timer64.h
+ arch/c6x/boot/dts/dsk6455.dts  |  128 +++++++++++++++
+ arch/c6x/boot/dts/evmc6457.dts |  106 +++++++++++++
+ arch/c6x/boot/dts/evmc6472.dts |  176 +++++++++++++++++++++
+ arch/c6x/boot/dts/evmc6474.dts |  133 ++++++++++++++++
+ arch/c6x/boot/install-dtb.c    |  333 ++++++++++++++++++++++++++++++++++++++++
+ arch/c6x/kernel/devicetree.c   |   53 +++++++
+ arch/c6x/platforms/platform.c  |   23 +++
+ 7 files changed, 952 insertions(+), 0 deletions(-)
+ create mode 100644 arch/c6x/boot/dts/dsk6455.dts
+ create mode 100644 arch/c6x/boot/dts/evmc6457.dts
+ create mode 100644 arch/c6x/boot/dts/evmc6472.dts
+ create mode 100644 arch/c6x/boot/dts/evmc6474.dts
+ create mode 100644 arch/c6x/boot/install-dtb.c
+ create mode 100644 arch/c6x/kernel/devicetree.c
+ create mode 100644 arch/c6x/platforms/platform.c
 
-diff --git a/arch/c6x/include/asm/timex.h b/arch/c6x/include/asm/timex.h
+diff --git a/arch/c6x/boot/dts/dsk6455.dts b/arch/c6x/boot/dts/dsk6455.dts
 new file mode 100644
-index 0000000..0741648
+index 0000000..ef703aa
 --- /dev/null
-+++ b/arch/c6x/include/asm/timex.h
-@@ -0,0 +1,41 @@
++++ b/arch/c6x/boot/dts/dsk6455.dts
+@@ -0,0 +1,128 @@
 +/*
-+ *  Port on Texas Instruments TMS320C6x architecture
++ * arch/c6x/boot/dts/dsk6455.dts
 + *
-+ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
-+ *  Author: Aurelien Jacquiot (aurelien.jacquiot at jaluna.com)
++ * DSK6455 Evaluation Platform For TMS320C6455
++ * Copyright (C) 2011 Texas Instruments Incorporated
 + *
-+ *  Modified for 2.6.34: Mark Salter <msalter@redhat.com>
++ * Author: Mark Salter <msalter@redhat.com>
 + *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
-+#ifndef _ASM_C6X_TIMEX_H
-+#define _ASM_C6X_TIMEX_H
-+
-+/*
-+ * This should be close enough...
-+ */
-+#define CLOCK_TICK_RATE ((1000 * 1000000UL) / 6)
-+
-+/* 64-bit timestamp */
-+typedef unsigned long long cycles_t;
-+
-+extern cycles_t cacheflush_time;
-+
-+static inline cycles_t get_cycles(void)
-+{
-+	unsigned l, h;
-+
-+	asm volatile (" dint\n"
-+		      " mvc .s2 TSCL,%0\n"
-+		      " mvc .s2 TSCH,%1\n"
-+		      " rint\n"
-+		      : "=b"(l), "=b"(h));
-+	return ((cycles_t)h << 32) | l;
-+}
-+
-+extern int init_tsc_clocksource(void);
-+extern int init_timer64_clocksource(void);
-+
-+#endif /* _ASM_C6X_TIMEX_H */
-diff --git a/arch/c6x/kernel/time.c b/arch/c6x/kernel/time.c
-new file mode 100644
-index 0000000..5f0868f
---- /dev/null
-+++ b/arch/c6x/kernel/time.c
-@@ -0,0 +1,64 @@
-+/*
-+ *  Port on Texas Instruments TMS320C6x architecture
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
 + *
-+ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
-+ *  Author: Aurelien Jacquiot (aurelien.jacquiot@jaluna.com)
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/clocksource.h>
-+#include <linux/errno.h>
-+#include <linux/sched.h>
-+#include <linux/param.h>
-+#include <linux/string.h>
-+#include <linux/mm.h>
-+#include <linux/interrupt.h>
-+#include <linux/timex.h>
-+#include <linux/profile.h>
++/dts-v1/;
 +
-+#include <asm/soc.h>
++/ {
++	model = "Spectrum Digital DSK6455";
++	compatible = "spectrum-digital,dsk6455";
 +
-+static u32 sched_clock_multiplier;
-+#define SCHED_CLOCK_SHIFT 16
++	#address-cells = <1>;
++	#size-cells = <1>;
 +
-+static cycle_t tsc_read(struct clocksource *cs)
-+{
-+	return get_cycles();
-+}
++	chosen {
++		bootargs = "root=/dev/nfs ip=dhcp rw";
++	};
 +
-+static struct clocksource clocksource_tsc = {
-+	.name		= "timestamp",
-+	.rating		= 300,
-+	.read		= tsc_read,
-+	.mask		= CLOCKSOURCE_MASK(64),
-+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++	memory {
++		device_type = "memory";
++		reg = <0xE0000000 0x08000000>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			model = "ti,c64x+";
++			reg = <0>;
++		};
++	};
++
++	/*
++	 * Core priority interrupt controller
++	 */
++	core_pic: interrupt-controller at 0 {
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		compatible = "ti,c64x+core-pic";
++	};
++
++	soc at 00000000 {
++		compatible = "ti,tms320c6455";
++		device_type = "soc";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		#interrupt-cells = <1>;
++		ranges;
++		reg = <0x02a80000 0xc>;
++
++		clock-frequency = <50000000>;
++
++		/*
++		 * Megamodule interrupt controller
++		 */
++		megamod_pic: interrupt-controller at 1800000 {
++		       interrupt-controller;
++		       #interrupt-cells = <1>;
++		       reg = <0x1800000 0x1000>;
++		       interrupt-parent = <&core_pic>;
++		       interrupts = < 12 13 14 15 >;
++		       ti,priority-map = < 0xffff 0xffff 0xffff 0xffff
++					   0xffff 0xffff 0xffff 0xffff
++					   0xffff 0xffff 0xffff 0xffff
++					   0 1 2 3 >;
++		       compatible = "ti,c64x+megamod-pic";
++		};
++
++		cache-controller at 1840000 {
++			compatible = "ti,c64x+cache";
++			reg = <0x01840000 0x8400>;
++		};
++
++		emifa at 70000000 {
++			compatible = "ti,c64x+emifa", "simple-bus";
++			#address-cells = <2>;
++			#size-cells = <1>;
++			reg = <0x70000000 0x100>;
++			ranges = <0x2 0x0 0xa0000000 0x00000008
++			          0x3 0x0 0xb0000000 0x00400000
++				  0x4 0x0 0xc0000000 0x10000000
++				  0x5 0x0 0xD0000000 0x10000000>;
++
++			ti,emifa-burst-priority = <255>;
++			ti,emifa-ce-config = <0x00240120
++					      0x00240120
++					      0x00240122
++					      0x00240122>;
++
++			flash at 3,0 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "cfi-flash";
++				reg = <0x3 0x0 0x400000>;
++				bank-width = <1>;
++				device-width = <1>;
++				partition at 0 {
++					reg = <0x0 0x400000>;
++					label = "NOR";
++				};
++			};
++		};
++
++		timer1: timer at 2980000 {
++			compatible = "ti,c64x+timer64";
++			reg = <0x2980000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 69 >;
++		};
++
++		device-state-controller at 2ac0000 {
++			compatible = "ti,tms320c6455-dscr";
++			reg = <0x02ac0000 0x80>;
++		};
++	};
 +};
-+
-+/*
-+ * scheduler clock - returns current time in nanoseconds.
-+ */
-+u64 sched_clock(void)
-+{
-+	u64 tsc = get_cycles();
-+
-+	return (tsc * sched_clock_multiplier) >> SCHED_CLOCK_SHIFT;
-+}
-+
-+void time_init(void)
-+{
-+	u64 tmp = (u64)NSEC_PER_SEC << SCHED_CLOCK_SHIFT;
-+
-+	do_div(tmp, c6x_core_freq);
-+	sched_clock_multiplier = tmp;
-+
-+	clocksource_register_hz(&clocksource_tsc, c6x_core_freq);
-+
-+	/* write anything into TSCL to enable counting */
-+	set_creg(TSCL, 0);
-+
-+	soc_time_init();
-+}
-diff --git a/arch/c6x/platforms/timer64.c b/arch/c6x/platforms/timer64.c
+diff --git a/arch/c6x/boot/dts/evmc6457.dts b/arch/c6x/boot/dts/evmc6457.dts
 new file mode 100644
-index 0000000..d74ac4a
+index 0000000..f17ff9e
 --- /dev/null
-+++ b/arch/c6x/platforms/timer64.c
-@@ -0,0 +1,191 @@
++++ b/arch/c6x/boot/dts/evmc6457.dts
+@@ -0,0 +1,106 @@
 +/*
-+ *  Copyright (C) 2010, 2011 Texas Instruments Incorporated
-+ *  Contributed by: Mark Salter (msalter@redhat.com)
++ * arch/c6x/boot/dts/evmc6457.dts
 + *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
++ * EVMC6457 Evaluation Platform For TMS320C6457
++ *
++ * Copyright (C) 2011 Texas Instruments Incorporated
++ *
++ * Author: Mark Salter <msalter@redhat.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
 + */
 +
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <asm/soc.h>
-+#include "timer64.h"
++/dts-v1/;
 +
-+struct timer_regs {
-+	u32	reserved0;
-+	u32	emumgt;
-+	u32	reserved1;
-+	u32	reserved2;
-+	u32	cntlo;
-+	u32	cnthi;
-+	u32	prdlo;
-+	u32	prdhi;
-+	u32	tcr;
-+	u32	tgcr;
-+	u32	wdtcr;
++/ {
++	model = "eInfochips EVMC6457";
++	compatible = "einfochips,evmc6457";
++
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	chosen {
++		bootargs = "root=/dev/nfs ip=dhcp rw";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0xE0000000 0x10000000>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			model = "ti,c64x+";
++			reg = <0>;
++		};
++	};
++
++	/*
++	 * Core priority interrupt controller
++	 */
++	core_pic: interrupt-controller at 0 {
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		compatible = "ti,c64x+core-pic";
++	};
++
++	soc at 00000000 {
++		compatible = "ti,tms320c6457";
++		device_type = "soc";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		#interrupt-cells = <1>;
++		ranges;
++
++		clock-frequency = <60000000>;
++
++		/*
++		 * Megamodule interrupt controller
++		 */
++		megamod_pic: interrupt-controller at 1800000 {
++		       interrupt-controller;
++		       #interrupt-cells = <1>;
++		       reg = <0x1800000 0x1000>;
++		       interrupt-parent = <&core_pic>;
++		       interrupts = < 12 13 14 15 >;
++		       ti,priority-map = < 0xffff 0xffff 0xffff 0xffff
++					   0xffff 0xffff 0xffff 0xffff
++					   0xffff 0xffff 0xffff 0xffff
++					   0 1 2 3 >;
++		       compatible = "ti,c64x+megamod-pic";
++		};
++
++		cache-controller at 1840000 {
++			compatible = "ti,c64x+cache";
++			reg = <0x01840000 0x8400>;
++		};
++
++		timer0: timer at 2940000 {
++			compatible = "ti,c64x+timer64";
++			reg = <0x2940000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 67 >;
++		};
++
++		device-state-controller at 2880800 {
++			compatible = "ti,tms320c6457-dscr";
++			reg = <0x02880800 0x400>;
++		};
++
++		power-sleep-controller at 2ac0000 {
++			compatible = "ti,c64x+psc";
++			reg = <0x02ac0000 0x1000>;
++			ti,number-psc-domains = <5>;
++			ti,number-psc-modules = <11>;
++			ti,module-domain-map = <0 0 0 0 0 0 0 1 2 3 4>;
++		};
++	};
 +};
-+
-+static struct timer_regs __iomem *timer;
-+
-+static struct clock_event_device t64_clockevent_device;
-+
-+#define TCR_TSTATLO	     0x001
-+#define TCR_INVOUTPLO	     0x002
-+#define TCR_INVINPLO	     0x004
-+#define TCR_CPLO	     0x008
-+#define TCR_ENAMODELO_ONCE   0x040
-+#define TCR_ENAMODELO_CONT   0x080
-+#define TCR_ENAMODELO_MASK   0x0c0
-+#define TCR_PWIDLO_MASK      0x030
-+#define TCR_CLKSRCLO	     0x100
-+#define TCR_TIENLO	     0x200
-+#define TCR_TSTATHI	     (0x001 << 16)
-+#define TCR_INVOUTPHI	     (0x002 << 16)
-+#define TCR_CPHI	     (0x008 << 16)
-+#define TCR_PWIDHI_MASK      (0x030 << 16)
-+#define TCR_ENAMODEHI_ONCE   (0x040 << 16)
-+#define TCR_ENAMODEHI_CONT   (0x080 << 16)
-+#define TCR_ENAMODEHI_MASK   (0x0c0 << 16)
-+
-+#define TGCR_TIMLORS	     0x001
-+#define TGCR_TIMHIRS	     0x002
-+#define TGCR_TIMMODE_UD32    0x004
-+#define TGCR_TIMMODE_WDT64   0x008
-+#define TGCR_TIMMODE_CD32    0x00c
-+#define TGCR_TIMMODE_MASK    0x00c
-+#define TGCR_PSCHI_MASK      (0x00f << 8)
-+#define TGCR_TDDRHI_MASK     (0x00f << 12)
-+
+diff --git a/arch/c6x/boot/dts/evmc6472.dts b/arch/c6x/boot/dts/evmc6472.dts
+new file mode 100644
+index 0000000..9c5a3da
+--- /dev/null
++++ b/arch/c6x/boot/dts/evmc6472.dts
+@@ -0,0 +1,176 @@
 +/*
-+ * Timer clocks are divided down from the CPU clock
-+ * The divisor is in the EMUMGTCLKSPD register
++ * arch/c6x/boot/dts/evmc6472.dts
++ *
++ * EVMC6472 Evaluation Platform For TMS320C6472
++ *
++ * Copyright (C) 2011 Texas Instruments Incorporated
++ *
++ * Author: Mark Salter <msalter@redhat.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
 + */
-+#define TIMER_DIVISOR \
-+	((soc_readl(&timer->emumgt) & (0xf << 16)) >> 16)
 +
-+#define timer_period(f, d)	      (((f) * 1000000) / ((d) * HZ))
-+#define ticks2usecs(f, d, x)	      (((x) * (d)) / (f))
++/dts-v1/;
 +
++/ {
++	model = "eInfochips EVMC6472";
++	compatible = "einfochips,evmc6472";
 +
-+static int next_event(unsigned long delta,
-+		      struct clock_event_device *evt)
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	chosen {
++		bootargs = "root=/dev/nfs ip=dhcp rw";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0xE0000000 0x10000000>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			reg = <0>;
++			model = "ti,c64x+";
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			reg = <1>;
++			model = "ti,c64x+";
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			reg = <2>;
++			model = "ti,c64x+";
++		};
++		cpu at 3 {
++			device_type = "cpu";
++			reg = <3>;
++			model = "ti,c64x+";
++		};
++		cpu at 4 {
++			device_type = "cpu";
++			reg = <4>;
++			model = "ti,c64x+";
++		};
++		cpu at 5 {
++			device_type = "cpu";
++			reg = <5>;
++			model = "ti,c64x+";
++		};
++	};
++
++	/*
++	 * Core priority interrupt controller
++	 */
++	core_pic: interrupt-controller at 0 {
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		compatible = "ti,c64x+core-pic";
++	};
++
++	soc at 00000000 {
++		compatible = "ti,tms320c6472";
++		device_type = "soc";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		#interrupt-cells = <1>;
++		ranges;
++
++		clock-frequency = <25000000>;
++
++		/*
++		 * Megamodule interrupt controller
++		 */
++		megamod_pic: interrupt-controller at 1800000 {
++		       interrupt-controller;
++		       #interrupt-cells = <1>;
++		       reg = <0x1800000 0x1000>;
++		       interrupt-parent = <&core_pic>;
++		       interrupts = < 12 13 14 15 >;
++		       ti,priority-map = < 0xffff 0xffff 0xffff 0xffff
++					   0xffff 0xffff 0xffff 0xffff
++					   0xffff 0xffff 0xffff 0xffff
++					   0 1 2 3 >;
++		       compatible = "ti,c64x+megamod-pic";
++		};
++
++		cache-controller at 1840000 {
++			compatible = "ti,c64x+cache";
++			reg = <0x01840000 0x8400>;
++		};
++
++		timer0: timer at 25e0000 {
++			compatible = "ti,c64x+timer64";
++			ti,core-mask = < 0x01 >;
++			reg = <0x25e0000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 16 >;
++		};
++
++		timer1: timer at 25f0000 {
++			compatible = "ti,c64x+timer64";
++			ti,core-mask = < 0x02 >;
++			reg = <0x25f0000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 16 >;
++		};
++
++		timer2: timer at 2600000 {
++			compatible = "ti,c64x+timer64";
++			ti,core-mask = < 0x04 >;
++			reg = <0x2600000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 16 >;
++		};
++
++		timer3: timer at 2610000 {
++			compatible = "ti,c64x+timer64";
++			ti,core-mask = < 0x08 >;
++			reg = <0x2610000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 16 >;
++		};
++
++		timer4: timer at 2620000 {
++			compatible = "ti,c64x+timer64";
++			ti,core-mask = < 0x10 >;
++			reg = <0x2620000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 16 >;
++		};
++
++		timer5: timer at 2630000 {
++			compatible = "ti,c64x+timer64";
++			ti,core-mask = < 0x20 >;
++			reg = <0x2630000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 16 >;
++		};
++
++		device-state-controller at 2a80000 {
++			compatible = "ti,tms320c6472-dscr";
++			reg = <0x02a80000 0x1000>;
++		};
++
++		boot-controller at 2ab0000 {
++			compatible = "ti,tms320c6472-boot-controller";
++			reg = <0x02ab0000 0x8000>;
++		};
++
++		power-sleep-controller at 2ae0000 {
++			compatible = "ti,c64x+psc";
++			reg = <0x02ae0000 0x1000>;
++			ti,number-psc-domains = <1>;
++			ti,number-psc-modules = <14>;
++		};
++	};
++};
+diff --git a/arch/c6x/boot/dts/evmc6474.dts b/arch/c6x/boot/dts/evmc6474.dts
+new file mode 100644
+index 0000000..48f791b
+--- /dev/null
++++ b/arch/c6x/boot/dts/evmc6474.dts
+@@ -0,0 +1,133 @@
++/*
++ * arch/c6x/boot/dts/evmc6474.dts
++ *
++ * EVMC6474 Evaluation Platform For TMS320C6474
++ *
++ * Copyright (C) 2011 Texas Instruments Incorporated
++ *
++ * Author: Mark Salter <msalter@redhat.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ */
++
++/dts-v1/;
++
++/ {
++	model = "Spectrum Digital EVMC6474";
++	compatible = "spectrum-digital,evmc6474";
++
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	chosen {
++		bootargs = "root=/dev/nfs ip=dhcp rw";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x08000000>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			reg = <0>;
++			model = "ti,c64x+";
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			reg = <1>;
++			model = "ti,c64x+";
++		};
++		cpu at 2 {
++			device_type = "cpu";
++			reg = <2>;
++			model = "ti,c64x+";
++		};
++	};
++
++	/*
++	 * Core priority interrupt controller
++	 */
++	core_pic: interrupt-controller at 0 {
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		compatible = "ti,c64x+core-pic";
++	};
++
++	soc at 00000000 {
++		compatible = "ti,tms320c6474";
++		device_type = "soc";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		#interrupt-cells = <1>;
++		ranges;
++
++		clock-frequency = <50000000>;
++
++		/*
++		 * Megamodule interrupt controller
++		 */
++		megamod_pic: interrupt-controller at 1800000 {
++		       interrupt-controller;
++		       #interrupt-cells = <1>;
++		       reg = <0x1800000 0x1000>;
++		       interrupt-parent = <&core_pic>;
++		       interrupts = < 12 13 14 15 >;
++		       ti,priority-map = < 0xffff 0xffff 0xffff 0xffff
++					   0xffff 0xffff 0xffff 0xffff
++					   0xffff 0xffff 0xffff 0xffff
++					   0 1 2 3 >;
++		       compatible = "ti,c64x+megamod-pic";
++		};
++
++		cache-controller at 1840000 {
++			compatible = "ti,c64x+cache";
++			reg = <0x01840000 0x8400>;
++		};
++
++		timer3: timer at 2940000 {
++			compatible = "ti,c64x+timer64";
++			ti,core-mask = < 0x04 >;
++			reg = <0x2940000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 39 >;
++		};
++
++		timer4: timer at 2950000 {
++			compatible = "ti,c64x+timer64";
++			ti,core-mask = < 0x02 >;
++			reg = <0x2950000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 41 >;
++		};
++
++		timer5: timer at 2960000 {
++			compatible = "ti,c64x+timer64";
++			ti,core-mask = < 0x01 >;
++			reg = <0x2960000 0x40>;
++			interrupt-parent = <&megamod_pic>;
++			interrupts = < 43 >;
++		};
++
++		device-state-controller at 2880800 {
++			compatible = "ti,tms320c6474-dscr";
++			reg = <0x02880800 0x400>;
++		};
++
++		power-sleep-controller at 2ac0000 {
++			compatible = "ti,c64x+psc";
++			reg = <0x02ac0000 0x1000>;
++			ti,number-psc-domains = <8>;
++			ti,number-psc-modules = <11>;
++			ti,module-domain-map = <0 0 0 0 0 0 1 2 3 4 5>;
++		};
++	};
++};
+diff --git a/arch/c6x/boot/install-dtb.c b/arch/c6x/boot/install-dtb.c
+new file mode 100644
+index 0000000..fa979ce
+--- /dev/null
++++ b/arch/c6x/boot/install-dtb.c
+@@ -0,0 +1,333 @@
++/*
++ * Program to hack in a DTB to an ELF file having a placeholder
++ * section named __fst_blob.
++ *
++ * This allows for building multiple images with builtin DTBs
++ * using a single vmlinux image. This is only necessary until
++ * bootloader support exists.
++ *
++ * Copyright 2011 Texas Instruments Incorporated
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ *
++ * Usage: install-dtb <image.dtb> <kernel.elf>
++ */
++
++#include <stdio.h>
++#include <unistd.h>
++#include <stdlib.h>
++#include <string.h>
++#include <ctype.h>
++#include <errno.h>
++#include <endian.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <sys/mman.h>
++#include <fcntl.h>
++#include <getopt.h>
++#include <elf.h>
++
++#ifndef EM_TI_C6000
++#define EM_TI_C6000	140	/* TI C6X DSPs */
++#endif
++
++static void usage(void)
 +{
-+	soc_writel(soc_readl(&timer->tcr) & ~TCR_ENAMODELO_MASK, &timer->tcr);
-+	soc_writel(delta - 1, &timer->prdlo);
-+	soc_writel(0, &timer->cntlo);
-+	soc_writel(soc_readl(&timer->tcr) | TCR_ENAMODELO_ONCE, &timer->tcr);
++	fprintf(stderr, "\n");
++	fprintf(stderr, "Usage: update-dtb <dtb-file> <kernel-elf-file> [ <outputfile> ] \n");
++	fprintf(stderr, "\n");
++	exit(1);
++}
 +
++static u_int32_t swab32(u_int32_t n)
++{
++	return (n >> 24) | ((n >> 8) & 0xff00) |
++		((n & 0xff00) << 8) | (n << 24);
++}
++
++static u_int16_t swab16(u_int16_t n)
++{
++	return (n >> 8) | (n << 8);
++}
++
++static int do_swab;
++
++#define ELFWORD(x) ({ do_swab ? swab32(x) : (x); })
++#define ELFHALF(x) ({ do_swab ? swab16(x) : (x); })
++
++static int elf_read(int fd, off_t offset, void *buf, ssize_t nbytes)
++{
++	ssize_t to_read, n;
++
++	if (lseek(fd, offset, SEEK_SET) < 0)
++		return errno;
++
++	to_read = nbytes;
++	while (to_read > 0) {
++		n = read(fd, buf, to_read);
++		if (n < 0)
++			return errno;
++		if (n == 0)
++			return -EINVAL;
++		buf += n;
++		to_read -= n;
++	}
 +	return 0;
 +}
 +
-+static void set_clock_mode(enum clock_event_mode mode,
-+			   struct clock_event_device *evt)
++static int elf_write(int fd, off_t offset, void *buf, ssize_t nbytes)
 +{
++	ssize_t to_write, n;
++
++	if (lseek(fd, offset, SEEK_SET) < 0)
++		return errno;
++
++	to_write = nbytes;
++	while (to_write > 0) {
++		n = write(fd, buf, to_write);
++		if (n < 0)
++			return errno;
++		if (n == 0)
++			return -EINVAL;
++		buf += n;
++		to_write -= n;
++	}
++	return 0;
 +}
 +
-+static void event_handler(struct clock_event_device *dev)
++Elf32_Ehdr ehdr;
++Elf32_Shdr *shdrs;
++char *shstrtab;
++Elf32_Sym *syms;
++char *strtab;
++
++static Elf32_Shdr *find_section_by_name(const char *name, int must_have)
 +{
++	int i;
++	for (i = 1; i < ELFHALF(ehdr.e_shnum); i++) {
++		if (!strcmp(name, shstrtab + shdrs[i].sh_name))
++			return &shdrs[i];
++	}
++	if (must_have) {
++		fprintf(stderr, "Can't find %s section!\n", name);
++		exit(1);
++	}
++	return NULL;
 +}
 +
-+static irqreturn_t timer_interrupt(int irq, void *dev_id)
++/* read in a copy of a section */
++static void *copy_section(int fd, Elf32_Shdr *sh, const char *name)
 +{
-+	struct clock_event_device *cd = &t64_clockevent_device;
++	int err;
++	void *buf;
 +
-+	cd->event_handler(cd);
-+
-+	return IRQ_HANDLED;
++	buf = malloc(sh->sh_size);
++	if (buf == NULL) {
++		fprintf(stderr, "Out of memory!\n");
++		exit(1);
++	}
++	err = elf_read(fd, sh->sh_offset, buf, sh->sh_size);
++	if (err) {
++		fprintf(stderr, "Can't read %s section: %s\n",
++			name, strerror(err));
++		exit(1);
++	}
++	return buf;
 +}
 +
-+
-+void __init timer64_init(void)
++int main(int argc, char *argv[])
 +{
-+	struct clock_event_device *cd = &t64_clockevent_device;
-+	struct device_node *np, *node = NULL;
-+	const __be32 *p;
-+	int coremask_len;
-+	u64 temp;
-+	u32 val, shift;
++	int i, dtb_fd, out_fd = -1, kernel_fd, err;
++	off_t dtb_size, kern_size;
++	size_t n;
++	void *dtb_map, *kern_map, *buf;
++	Elf32_Shdr *sh;
++	char *outfilename = NULL;
 +
-+	for_each_compatible_node(np, NULL, "ti,c64x+timer64") {
-+		p = of_get_property(np, "ti,core-mask", &coremask_len);
-+		if (p && coremask_len == sizeof(*p)) {
-+			val = be32_to_cpup(p);
-+			if (val & (1 << get_coreid())) {
-+				node = np;
-+				break;
-+			}
-+		} else {
-+			node = np;
-+			break;
++	if (argc == 4) {
++		outfilename = argv[3];
++		--argc;
++	}
++
++	if (argc != 3)
++		usage();
++
++	dtb_fd = open(argv[1], O_RDONLY);
++	if (dtb_fd < 0) {
++		fprintf(stderr, "Can't open %s: %s\n",
++			argv[1], strerror(errno));
++		exit(1);
++	}
++
++	if (outfilename) {
++		out_fd = creat(outfilename, 0775);
++		if (out_fd < 0) {
++			fprintf(stderr, "Can't create %s: %s\n",
++				outfilename, strerror(errno));
++			exit(1);
 +		}
++		kernel_fd = open(argv[2], O_RDONLY);
++	} else
++		kernel_fd = open(argv[2], O_RDWR);
++	if (kernel_fd < 0) {
++		fprintf(stderr, "Can't open %s: %s\n",
++			argv[2], strerror(errno));
++		exit(1);
 +	}
-+	if (!node) {
-+		pr_debug("Cannot find ti,c64x+timer64 timer.\n");
-+		return;
++
++	err = elf_read(kernel_fd, 0, &ehdr, sizeof(ehdr));
++	if (err) {
++		fprintf(stderr, "Can't read ELF header: %s\n", strerror(err));
++		exit(1);
 +	}
-+	np = node;
 +
-+	timer = of_iomap(np, 0);
-+	if (!timer) {
-+		pr_debug("%s: Cannot map timer registers.\n", np->full_name);
-+		of_node_put(np);
-+		return;
++	if (strncmp((char *)ehdr.e_ident, "\177ELF", 4) != 0) {
++		fprintf(stderr, "Bad ELF ident!\n");
++		exit(1);
 +	}
-+	pr_debug("%s: Timer registers=%p.\n", np->full_name, timer);
 +
-+	/* disable timer, reset count */
-+	soc_writel(soc_readl(&timer->tcr) & ~TCR_ENAMODELO_MASK, &timer->tcr);
-+	soc_writel(0, &timer->prdlo);
++#if __BYTE_ORDER == __LITTLE_ENDIAN
++	if (ehdr.e_ident[EI_DATA] == ELFDATA2MSB)
++		do_swab = 1;
++#else
++	if (ehdr.e_ident[EI_DATA] == ELFDATA2LSB)
++		do_swab = 1;
++#endif
 +
-+	/* use internal clock and 1 cycle pulse width */
-+	val = soc_readl(&timer->tcr);
-+	soc_writel(val & ~(TCR_CLKSRCLO | TCR_PWIDLO_MASK), &timer->tcr);
-+
-+	/* dual 32-bit unchained mode */
-+	val = soc_readl(&timer->tgcr) & ~TGCR_TIMMODE_MASK;
-+	soc_writel(val, &timer->tgcr);
-+	soc_writel(val | (TGCR_TIMLORS | TGCR_TIMMODE_UD32), &timer->tgcr);
-+
-+	cd->irq	= irq_of_parse_and_map(np, 0);
-+	pr_debug("%s: Timer irq=%d.\n", np->full_name, cd->irq);
-+
-+	cd->name	= "TIMER64_EVT32_TIMER";
-+	cd->features	= CLOCK_EVT_FEAT_ONESHOT;
-+
-+	/* Calculate the min / max delta */
-+	/* Find a shift value */
-+	for (shift = 32; shift > 0; shift--) {
-+		temp = (u64)(c6x_core_freq / TIMER_DIVISOR);
-+		temp <<=  shift;
-+
-+		do_div(temp, NSEC_PER_SEC);
-+		if ((temp >> 32) == 0)
-+			break;
++	if (ELFHALF(ehdr.e_machine) != EM_TI_C6000) {
++		fprintf(stderr, "Bad ELF machine!\n");
++		exit(1);
 +	}
-+	cd->shift = shift;
-+	cd->mult = (u32) temp;
 +
-+	cd->max_delta_ns	= clockevent_delta2ns(0x7fffffff, cd);
-+	cd->min_delta_ns	= clockevent_delta2ns(250, cd);
++	if (ELFHALF(ehdr.e_shentsize) != sizeof(Elf32_Shdr)) {
++		fprintf(stderr, "Bad ELF header (e_shentsize = %d)!\n",
++			ELFHALF(ehdr.e_shentsize));
++		exit(1);
++	}
 +
-+	cd->rating		= 200;
-+	cd->set_mode		= set_clock_mode;
-+	cd->event_handler	= event_handler;
-+	cd->set_next_event	= next_event;
-+	cd->cpumask		= cpumask_of(smp_processor_id());
++	/* kernel should have _way_ fewer sections */
++	if (ELFHALF(ehdr.e_shnum) > 100) {
++		fprintf(stderr, "Bad ELF header (e_shnum = %d)!\n",
++			ELFHALF(ehdr.e_shnum));
++		exit(1);
++	}
 +
-+	clockevents_register_device(cd);
++	/* get section headers */
++	n = ELFHALF(ehdr.e_shnum) * ELFHALF(ehdr.e_shentsize);
++	shdrs = malloc(n);
++	if (shdrs == NULL) {
++		fprintf(stderr, "Out of memory!\n");
++		exit(1);
++	}
++	err = elf_read(kernel_fd, ELFWORD(ehdr.e_shoff), shdrs, n);
++	if (err) {
++		fprintf(stderr, "Can't read section headers: %s\n",
++			strerror(err));
++		exit(1);
++	}
++	if (do_swab)
++		for (i = 1; i < ELFHALF(ehdr.e_shnum); i++) {
++			sh = &shdrs[i];
++			sh->sh_name = swab32(sh->sh_name);
++			sh->sh_type = swab32(sh->sh_type);
++			sh->sh_flags = swab32(sh->sh_flags);
++			sh->sh_addr = swab32(sh->sh_addr);
++			sh->sh_offset = swab32(sh->sh_offset);
++			sh->sh_size = swab32(sh->sh_size);
++			sh->sh_link = swab32(sh->sh_link);
++			sh->sh_info = swab32(sh->sh_info);
++			sh->sh_addralign = swab32(sh->sh_addralign);
++			sh->sh_entsize = swab32(sh->sh_entsize);
++		}
++	/* get shdr strings so we can search for section headers by name */
++	shstrtab = copy_section(kernel_fd, &shdrs[ELFHALF(ehdr.e_shstrndx)],
++				".shstrtab");
 +
-+	/* Set handler */
-+	if (cd->irq != NO_IRQ)
-+		request_irq(cd->irq, timer_interrupt,
-+			    IRQF_DISABLED | IRQF_TIMER, "timer", NULL);
++	/* read in symtab and associated strings */
++	sh = find_section_by_name("__fdt_blob", 1);
 +
-+	of_node_put(np);
-+	return;
++	dtb_size = lseek(dtb_fd, 0, SEEK_END);
++	if (dtb_size == -1 || lseek(dtb_fd, 0, SEEK_SET) == -1) {
++		fprintf(stderr, "Unable to seek %s: %s\n",
++			argv[1], strerror(err));
++		exit(1);
++	}
++
++	if (dtb_size > sh->sh_size) {
++		fprintf(stderr, "dtb too large (%d) to fit in section (%d).\n",
++			(int)dtb_size, sh->sh_size);
++		exit(1);
++	}
++
++	dtb_map = mmap(NULL, dtb_size, PROT_READ, MAP_PRIVATE, dtb_fd, 0);
++	if (dtb_map == MAP_FAILED) {
++		fprintf(stderr, "Failed to map %s: %s\n",
++			argv[1], strerror(err));
++		exit(1);
++	}
++
++	buf = malloc(sh->sh_size);
++	if (buf == NULL) {
++		fprintf(stderr, "Failed to malloc %d bytes!\n", sh->sh_size);
++		exit(1);
++	}
++	memset(buf, 0, sh->sh_size);
++	memcpy(buf, dtb_map, dtb_size);
++
++	if (!outfilename) {
++		/* write the dtb */
++		err = elf_write(kernel_fd, sh->sh_offset, buf, sh->sh_size);
++		if (err) {
++			fprintf(stderr, "Unable to write DTB: %s\n",
++				strerror(err));
++			exit(1);
++		}
++	} else {
++		kern_size = lseek(kernel_fd, 0, SEEK_END);
++		if (kern_size == -1 || lseek(dtb_fd, 0, SEEK_SET) == -1) {
++			fprintf(stderr, "Unable to seek %s: %s\n",
++				argv[2], strerror(err));
++			exit(1);
++		}
++
++		kern_map = mmap(NULL, kern_size, PROT_READ, MAP_PRIVATE, kernel_fd, 0);
++		if (kern_map == MAP_FAILED) {
++			fprintf(stderr, "Failed to map %s: %s\n",
++				argv[2], strerror(err));
++			exit(1);
++		}
++
++		/* write output file in three parts */
++
++		err = elf_write(out_fd, 0, kern_map, sh->sh_offset);
++		if (err) {
++			fprintf(stderr, "Error writing to %s: %s\n",
++				outfilename, strerror(err));
++			exit(1);
++		}
++
++		err = elf_write(out_fd, sh->sh_offset, buf, sh->sh_size);
++		if (err) {
++			fprintf(stderr, "Error writing to %s: %s\n",
++				outfilename, strerror(err));
++			exit(1);
++		}
++
++		err = elf_write(out_fd, sh->sh_offset + sh->sh_size,
++				kern_map + sh->sh_offset + sh->sh_size,
++				kern_size - (sh->sh_offset + sh->sh_size));
++		if (err) {
++			fprintf(stderr, "Error writing to %s: %s\n",
++				outfilename, strerror(err));
++			exit(1);
++		}
++
++		close(out_fd);
++	}
++	close(kernel_fd);
++	close(dtb_fd);
++	return 0;
 +}
-diff --git a/arch/c6x/platforms/timer64.h b/arch/c6x/platforms/timer64.h
+diff --git a/arch/c6x/kernel/devicetree.c b/arch/c6x/kernel/devicetree.c
 new file mode 100644
-index 0000000..11f53d6
+index 0000000..bdb56f0
 --- /dev/null
-+++ b/arch/c6x/platforms/timer64.h
-@@ -0,0 +1,6 @@
-+#ifndef _C6X_TIMER64_PIC_H
-+#define _C6X_TIMER64_PIC_H
++++ b/arch/c6x/kernel/devicetree.c
+@@ -0,0 +1,53 @@
++/*
++ *  Architecture specific OF callbacks.
++ *
++ *  Copyright (C) 2011 Texas Instruments Incorporated
++ *  Author: Mark Salter <msalter@redhat.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ *
++ */
++#include <linux/init.h>
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++#include <linux/initrd.h>
++#include <linux/memblock.h>
 +
-+extern void __init timer64_init(void);
++void __init early_init_devtree(void *params)
++{
++	/* Setup flat device-tree pointer */
++	initial_boot_params = params;
 +
-+#endif /* _C6X_TIMER64_PIC_H */
++	/* Retrieve various informations from the /chosen node of the
++	 * device-tree, including the platform type, initrd location and
++	 * size and more ...
++	 */
++	of_scan_flat_dt(early_init_dt_scan_chosen, c6x_command_line);
++
++	/* Scan memory nodes and rebuild MEMBLOCKs */
++	of_scan_flat_dt(early_init_dt_scan_root, NULL);
++	of_scan_flat_dt(early_init_dt_scan_memory, NULL);
++}
++
++
++#ifdef CONFIG_BLK_DEV_INITRD
++void __init early_init_dt_setup_initrd_arch(unsigned long start,
++		unsigned long end)
++{
++	initrd_start = (unsigned long)__va(start);
++	initrd_end = (unsigned long)__va(end);
++	initrd_below_start_ok = 1;
++}
++#endif
++
++void __init early_init_dt_add_memory_arch(u64 base, u64 size)
++{
++	c6x_add_memory(base, size);
++}
++
++void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
++{
++	return __va(memblock_alloc(size, align));
++}
+diff --git a/arch/c6x/platforms/platform.c b/arch/c6x/platforms/platform.c
+new file mode 100644
+index 0000000..83fbedd
+--- /dev/null
++++ b/arch/c6x/platforms/platform.c
+@@ -0,0 +1,23 @@
++/*
++ * Copyright 2011 Texas Instruments Incorporated
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2. This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include <linux/init.h>
++#include <linux/of_platform.h>
++
++static struct of_device_id c6x_bus_ids[] __initdata = {
++	{ .type = "soc", },
++	{ .compatible = "simple-bus", },
++	{}
++};
++
++static int __init c6x_device_probe(void)
++{
++	of_platform_bus_probe(NULL, c6x_bus_ids, NULL);
++	return 0;
++}
++device_initcall(c6x_device_probe);
 -- 
 1.7.6
