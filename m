@@ -1,446 +1,799 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 31 Aug 2011 12:16:48 +0530
-Subject: [PATCH 4/6] DMA: PL330: Add device tree support
-In-Reply-To: <4E5CE37E.1050104@gmail.com>
-References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-2-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-3-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-4-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>
-	<4E579C9B.7030807@gmail.com>
-	<CAJuYYwR5GqqKjbMngQqorLuka4XN0jin5s6O66orTtSQg5eKRw@mail.gmail.com>
-	<4E5CE37E.1050104@gmail.com>
-Message-ID: <CAJuYYwT5HGy9b06AyrLJv5hFCFf_YRA4md9N=m+cwcJNTqRDWg@mail.gmail.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 31 Aug 2011 15:51:44 +0900
+Subject: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
+In-Reply-To: <CAF6AEGu3ss-rJC28H1rm2GWLm1bAZnHLftXfMLJQNeqjBt3umQ@mail.gmail.com>
+References: <1314359274-21585-1-git-send-email-inki.dae@samsung.com>
+	<CAF6AEGu3ss-rJC28H1rm2GWLm1bAZnHLftXfMLJQNeqjBt3umQ@mail.gmail.com>
+Message-ID: <001001cc67aa$72760460$57620d20$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hello, Rob.
+Below is my answers and questions. and could you please include me as CC
+when you post your driver?
 
-On 30 August 2011 18:49, Rob Herring <robherring2@gmail.com> wrote:
-> Thomas,
->
-> On 08/30/2011 07:18 AM, Thomas Abraham wrote:
->> Hi Rob,
->>
->> On 26 August 2011 18:46, Rob Herring <robherring2@gmail.com
->> <mailto:robherring2@gmail.com>> wrote:
->>
->> ? ? Thomas,
->>
->> ? ? On 08/26/2011 03:40 AM, Thomas Abraham wrote:
->> ? ? > For PL330 dma controllers instantiated from device tree, the channel
->> ? ? > lookup is based on phandle of the dma controller and dma request id
->> ? ? > specified by the client node. During probe, the private data of each
->> ? ? > channel of the controller is set to point to the device node of the
->> ? ? > dma controller. The 'chan_id' of the each channel is used as the
->> ? ? > dma request id.
->> ? ? >
->> ? ? > Client driver requesting dma channels specify the phandle of the
->> ? ? > dma controller and the request id. The pl330 filter function
->> ? ? > converts the phandle to the device node pointer and matches that
->> ? ? > with channel's private data. If a match is found, the request id
->> ? ? > from the client node and the 'chan_id' of the channel is matched.
->> ? ? > A channel is found if both the values match.
->> ? ? >
->> ? ? > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org
->> ? ? <mailto:thomas.abraham@linaro.org>>
->> ? ? > ---
->> ? ? > ?.../devicetree/bindings/dma/arm-pl330.txt ? ? ? ? ?| ? 42
->> ? ? +++++++++++++
->> ? ? > ?drivers/dma/pl330.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 63
->> ? ? +++++++++++++++++++-
->> ? ? > ?2 files changed, 103 insertions(+), 2 deletions(-)
->> ? ? > ?create mode 100644
->> ? ? Documentation/devicetree/bindings/dma/arm-pl330.txt
->> ? ? >
->> ? ? > diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt
->> ? ? b/Documentation/devicetree/bindings/dma/arm-pl330.txt
->> ? ? > new file mode 100644
->> ? ? > index 0000000..46a8307
->> ? ? > --- /dev/null
->> ? ? > +++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
->> ? ? > @@ -0,0 +1,42 @@
->> ? ? > +* ARM PrimeCell PL330 DMA Controller
->> ? ? > +
->> ? ? > +The ARM PrimeCell PL330 DMA controller can move blocks of memory
->> ? ? contents
->> ? ? > +between memory and peripherals or memory to memory.
->> ? ? > +
->> ? ? > +Required properties:
->> ? ? > + ?- compatible: should one or more of the following
->> ? ? > + ? ?- arm,pl330-pdma - For controllers that support mem-to-dev
->> ? ? and dev-to-mem
->> ? ? > + ? ? ?transfers.
->> ? ? > + ? ?- arm,pl330-mdma - For controllers that support mem-to-mem
->> ? ? transfers only.
->>
->> ? ? And if they support both? I would think all controllers can support
->> ? ? mem-to-mem. If so, the distinction can be made with the number of
->> ? ? requests.
->>
->>
->> If a controller supports both types of transfer, the device node should
->> not claim compatibility for "arm,pl330-pdma" or "arm,pl330-mdma".
->> Compatible should be "arm,primecell".
->
-> No, every Primecell peripheral has "arm,primecell", so it is not
-> specific enough for a driver to use.
->
-> Is there a case that a controller with peripheral requests cannot
-> support mem-to-mem transfers? I don't think there is. You could decide
-> you don't want to for other reasons like you don't have enough free
-> channels, but that's really a s/w decision, not a h/w description.
+Thank you.
 
-Ok. The driver has now been changed in a way that DMA_MEMCPY
-capability is assigned by default to a pl330 dma controller. The
-DMA_SLAVE and DMA_CYCLIC capability are assigned if the controller
-supports peripheral request interface. For mem-to-mem transfer channel
-requests, the filter function specified for the request should check
-for the right match.
+> -----Original Message-----
+> From: Rob Clark [mailto:robdclark at gmail.com]
+> Sent: Wednesday, August 31, 2011 10:58 AM
+> To: Inki Dae
+> Cc: airlied at linux.ie; dri-devel at lists.freedesktop.org;
+> sw0312.kim at samsung.com; linux-kernel at vger.kernel.org;
+> kyungmin.park at samsung.com; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC
+> EXYNOS4210.
+> 
+> Hi Inki,
+> 
+> Sorry for slightly overdue review.. it took a little while to go
+> through the whole thing
+> 
 
->
->>
->>
->> ? ? > + ? ?- arm,primecell - should be included for all pl330 dma
->> ? ? controller nodes.
->> ? ? > +
->> ? ? > + ?- reg: physical base address of the controller and length of
->> ? ? memory mapped
->> ? ? > + ? ?region.
->> ? ? > +
->> ? ? > + ?- interrupts: interrupt number to the cpu.
->> ? ? > +
->> ? ? > + ?- arm,primecell-periphid: should be 0x00041330.
->>
->> ? ? Should be optional. It's only needed when the h/w value is wrong. This
->> ? ? is already documented in primecell.txt.
->>
->>
->> Ok. This will be made optional.
->>
->>
->>
->> ? ? > +
->> ? ? > + ?- arm,pl330-peri-reqs: number of actual peripheral requests
->> ? ? connected to the
->> ? ? > + ? ?dma controller. Maximum value is 32.
->>
->> ? ? Perhaps could be a bitmask for sparsely populated requests. May not
->> ? ? matter since phandles will define the connections.
->>
->> ? ? Can be optional and not present means 00 requests (mem-to-mem only).
->>
->>
->> As suggested by Russell, this property will be removed and its value
->> will be read from the configuration register.
->>
->
-> Good. Reading a value of 0 requests can still be used to determine the
-> controller is mem-to-mem only.
->
->>
->> ? ? > +
->> ? ? > +Example: (from Samsung's Exynos4 processor dtsi file)
->> ? ? > +
->> ? ? > + ? ? pdma0: pdma at 12680000 {
->> ? ? > + ? ? ? ? ? ? compatible = "arm,pl330-pdma", "arm,primecell";
->> ? ? > + ? ? ? ? ? ? reg = <0x12680000 0x1000>;
->> ? ? > + ? ? ? ? ? ? interrupts = <99>;
->> ? ? > + ? ? ? ? ? ? arm,primecell-periphid = <0x00041330>;
->> ? ? > + ? ? ? ? ? ? arm,pl330-peri-reqs = <30>;
->> ? ? > + ? ? };
->> ? ? > +
->> ? ? > +Client drivers (device nodes requiring dma transfers from
->> ? ? dev-to-mem or
->> ? ? > +mem-to-dev) should specify the DMA channel numbers using a
->> ? ? two-value pair
->> ? ? > +as shown below.
->> ? ? > +
->> ? ? > + ?[property name] ?= <[phandle of the dma controller] [dma
->> ? ? request id]>;
->> ? ? > +
->> ? ? > + ? ? ?where 'dma request id' is the dma request number which is
->> ? ? connected
->> ? ? > + ? ? ?to the client controller.
->> ? ? > +
->> ? ? > + ?Example: ?tx-dma-channel = <&pdma0 12>;
->>
->> ? ? I like this approach. I looked at this some and some PPC platforms do a
->> ? ? node for each channel/request, but this is much more simple and similar
->> ? ? to clock binding approach.
->>
->> ? ? You need to define the property name. Probably just "dma-channel" is
->> ? ? enough. For peripherals with more than 1, just list them out like when
->> ? ? you have more than 1 interrupt. The order should be defined as part of
->> ? ? that device's binding (i.e. 1st channel is tx and 2nd channel is rx).
->>
->>
->> I am little hesitant to do this the way you suggested. A controller
->> could have dma request lines connected to multiple dma controllers. So
->> the phandle could be different for each dma channel. Also, the client
->> drivers specify the property value for each dma channel requested (the
->> property value gets assigned to chan->private and then used by the
->> filter function to lookup the dma channel). So changing it the way you
->> have suggested would make things complex.
->>
->
-> Perhaps you could make private point to the array entry rather than the
-> property.
->
-> But I don't have s strong opinion either way.
+I  will be always pleased you to give me your advices and comments anytime.
+:)
 
-There could be cases where tx could be polled and rx uses dma transfer
-and such this could vary across platforms. This would make parsing the
-property value a little complex and so I still perfer to use property
-for each dma channel required in the client device nodes.
+> comments in-line below
+> 
+> 
+> On Fri, Aug 26, 2011 at 6:47 AM, Inki Dae <inki.dae@samsung.com> wrote:
+> > This patch is a DRM Driver for Samsung SoC Exynos4210 and now enables
+> only FIMD yet
+> > but we will add HDMI support also in the future.
+> >
+> > this patch is based on git repository below:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/airlied/drm-2.6.git,
+> > branch name: drm-next
+> > commit-id: bcc65fd8e929a9d9d34d814d6efc1d2793546922
+> >
+> > you can refer to our working repository below:
+> > http://git.infradead.org/users/kmpark/linux-2.6-samsung
+> > branch name: samsung-drm
+> >
+> > We tried to re-use lowlevel codes of the FIMD driver(s3c-fb.c
+> > based on Linux framebuffer) but couldn't so because lowlevel codes
+> > of s3c-fb.c are included internally and so FIMD module of this driver
+> has
+> > its own lowlevel codes.
+> >
+> > We used GEM framework for buffer management and DMA APIs(dma_alloc_*)
+> > for buffer allocation. by using DMA API, we could use CMA later.
+> >
+> > Refer to this link for CMA(Continuous Memory Allocator):
+> > http://lkml.org/lkml/2011/7/20/45
+> >
+> > this driver supports only physically continuous memory(non-iommu).
+> >
+> > Links to previous versions of the patchset:
+> > v1: < https://lwn.net/Articles/454380/ >
+> > v2: < http://www.spinics.net/lists/kernel/msg1224275.html >
+> >
+> > Changelog v2:
+> > DRM: add DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl command.
+> >
+> > ? ? this feature maps user address space to physical memory region
+> > ? ? once user application requests DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl.
+> >
+> > DRM: code clean and add exception codes.
+> >
+> > Changelog v3:
+> > DRM: Support multiple irq.
+> >
+> > ? ? FIMD and HDMI have their own irq handler but DRM Framework can
+> regiter only one irq handler
+> > ? ? this patch supports mutiple irq for Samsung SoC.
+> >
+> > DRM: Consider modularization.
+> >
+> > ? ? each DRM, FIMD could be built as a module.
+> >
+> > DRM: Have indenpendent crtc object.
+> >
+> > ? ? crtc isn't specific to SoC Platform so this patch gets a crtc to be
+> used as common object.
+> > ? ? created crtc could be attached to any encoder object.
+> >
+> > DRM: code clean and add exception codes.
+> >
+> > Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> > Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> > Signed-off-by: SeungWoo Kim <sw0312.kim@samsung.com>
+> > Signed-off-by: kyungmin.park <kyungmin.park@samsung.com>
+> > ---
+> [snip]
+> > diff --git a/drivers/gpu/drm/samsung/samsung_drm_buf.c
+> b/drivers/gpu/drm/samsung/samsung_drm_buf.c
+> > new file mode 100644
+> > index 0000000..563d07e
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/samsung/samsung_drm_buf.c
+> [snip]
+> > +static int lowlevel_buffer_allocate(struct drm_device *dev,
+> > + ? ? ? ? ? ? ? struct samsung_drm_buf_entry *entry)
+> > +{
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> 
+> very minor point, but DRM_DEBUG_KMS() already includes the function
+> name.. not sure if __FILE__ is needed everywhere
+> 
+> > +
+> > + ? ? ? entry->vaddr = dma_alloc_writecombine(dev->dev, entry->size,
+> > + ? ? ? ? ? ? ? ? ? ? ? (dma_addr_t *)&entry->paddr, GFP_KERNEL);
+> > + ? ? ? if (!entry->paddr) {
+> > + ? ? ? ? ? ? ? DRM_ERROR("failed to allocate buffer.\n");
+> > + ? ? ? ? ? ? ? return -ENOMEM;
+> > + ? ? ? }
+> > +
+> > + ? ? ? DRM_DEBUG_KMS("allocated : vaddr(0x%x), paddr(0x%x),
+> size(0x%x)\n",
+> > + ? ? ? ? ? ? ? ? ? ? ? (unsigned int)entry->vaddr, entry->paddr, entry-
+> >size);
+> > +
+> > + ? ? ? return 0;
+> > +}
+> > +
+> [snip]
+> 
+> > diff --git a/drivers/gpu/drm/samsung/samsung_drm_buf.h
+> b/drivers/gpu/drm/samsung/samsung_drm_buf.h
+> > new file mode 100644
+> > index 0000000..d6a7e95
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/samsung/samsung_drm_buf.h
+> [snip]
+> > +/**
+> > + * samsung drm buffer entry structure.
+> > + *
+> > + * @paddr: physical address of allocated memory.
+> > + * @vaddr: kernel virtual address of allocated memory.
+> > + * @size: size of allocated memory.
+> > + */
+> > +struct samsung_drm_buf_entry {
+> > + ? ? ? unsigned int paddr;
+> > + ? ? ? void __iomem *vaddr;
+> > + ? ? ? unsigned int size;
+> > +};
+> 
+> any reason not to combine this w/ samsung_drm_gem_obj to avoid extra
+> levels of indirection?  (This would let you collapse some of the
+> buffer allocation/deletion fxns into one level too.)
+> 
+I wanted it separates buffer allocator from gem but now seeing it, it
+doesn't need to do so as you pointed out. I will combine it to
+samsung_drm_gem_obj. thank you.
 
->
->>
->> ? ? > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
->> ? ? > index 9732995..984dc18 100644
->> ? ? > --- a/drivers/dma/pl330.c
->> ? ? > +++ b/drivers/dma/pl330.c
->> ? ? > @@ -19,6 +19,7 @@
->> ? ? > ?#include <linux/amba/pl330.h>
->> ? ? > ?#include <linux/pm_runtime.h>
->> ? ? > ?#include <linux/scatterlist.h>
->> ? ? > +#include <linux/of.h>
->> ? ? >
->> ? ? > ?#define NR_DEFAULT_DESC ? ? ?16
->> ? ? >
->> ? ? > @@ -277,6 +278,20 @@ bool pl330_filter(struct dma_chan *chan, void
->> ? ? *param)
->> ? ? > ? ? ? if (chan->device->dev->driver != &pl330_driver.drv)
->> ? ? > ? ? ? ? ? ? ? return false;
->> ? ? >
->> ? ? > +#ifdef CONFIG_OF
->> ? ? > + ? ? if (chan->device->dev->of_node) {
->> ? ? > + ? ? ? ? ? ? const __be32 *prop_value;
->> ? ? > + ? ? ? ? ? ? phandle phandle;
->> ? ? > + ? ? ? ? ? ? struct device_node *node;
->> ? ? > +
->> ? ? > + ? ? ? ? ? ? prop_value = ((struct property *)param)->value;
->> ? ? > + ? ? ? ? ? ? phandle = be32_to_cpup(prop_value++);
->> ? ? > + ? ? ? ? ? ? node = of_find_node_by_phandle(phandle);
->> ? ? > + ? ? ? ? ? ? return ((chan->private == node) &&
->> ? ? > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (chan->chan_id ==
->> ? ? be32_to_cpup(prop_value)));
->> ? ? > + ? ? }
->> ? ? > +#endif
->> ? ? > +
->> ? ? > ? ? ? peri_id = chan->private;
->> ? ? > ? ? ? return *peri_id == (unsigned)param;
->> ? ? > ?}
->> ? ? > @@ -777,6 +792,40 @@ static irqreturn_t pl330_irq_handler(int irq,
->> ? ? void *data)
->> ? ? > ? ? ? ? ? ? ? return IRQ_NONE;
->> ? ? > ?}
->> ? ? >
->> ? ? > +#ifdef CONFIG_OF
->> ? ? > +static struct dma_pl330_platdata *pl330_parse_dt(struct device *dev)
->> ? ? > +{
->> ? ? > + ? ? struct dma_pl330_platdata *pdat;
->> ? ? > + ? ? const void *value;
->> ? ? > +
->> ? ? > + ? ? pdat = devm_kzalloc(dev, sizeof(*pdat), GFP_KERNEL);
->> ? ? > + ? ? if (!pdat)
->> ? ? > + ? ? ? ? ? ? return NULL;
->>
->> ? ? Ideally, we will get rid of platform_data completely in the future, so I
->> ? ? don't think filling it in from DT is the right approach.
->>
->>
->> Ok. I will drop the usage of platform data.
->>
->>
->> ? ? > +
->> ? ? > + ? ? value = of_get_property(dev->of_node, "arm,pl330-peri-reqs",
->> ? ? NULL);
->> ? ? > + ? ? if (value)
->> ? ? > + ? ? ? ? ? ? pdat->nr_valid_peri = be32_to_cpup(value);
->>
->> ? ? Can't you use the u32 helper function here?
->>
->>
->> This will go away now since the number of peripherals connected will be
->> read from the configuration register.
->>
->>
->> ? ? > +
->> ? ? > + ? ? if (of_device_is_compatible(dev->of_node, "arm,pl330-pdma")) {
->> ? ? > + ? ? ? ? ? ? dma_cap_set(DMA_SLAVE, pdat->cap_mask);
->> ? ? > + ? ? ? ? ? ? dma_cap_set(DMA_CYCLIC, pdat->cap_mask);
->> ? ? > + ? ? } else if (of_device_is_compatible(dev->of_node,
->> ? ? "arm,pl330-mdma")) {
->> ? ? > + ? ? ? ? ? ? dma_cap_set(DMA_MEMCPY, pdat->cap_mask);
->> ? ? > + ? ? } else if (of_device_is_compatible(dev->of_node,
->> ? ? "arm,primecell")) {
->>
->> ? ? I don't think the driver should look at this property. This is really
->> ? ? just for the bus code.
->>
->>
->> The dma capabilities are derived from the compatible value by the
->> driver. Sorry, I do not understand your suggestion for this.
->>
->
-> "arm,primecell" is purely for identifying peripherals with the Primecell
-> ID registers and in turn used to create amba_device instances. You
-> cannot imply that it is a DMA controller.
+> > +
+> > +/**
+> > + * samsung drm buffer structure.
+> > + *
+> > + * @entry: pointer to samsung drm buffer entry object.
+> > + * @flags: it means memory type to be alloated or cache attributes.
+> > + * @handle: pointer to specific buffer object.
+> > + * @id: unique id to specific buffer object.
+> > + *
+> > + * ps. this object would be transfered to user as kms_bo.handle so
+> > + * ? ? user can access to memory through kms_bo.handle.
+> > + */
+> > +struct samsung_drm_gem_obj {
+> > + ? ? ? struct drm_gem_object base;
+> > + ? ? ? struct samsung_drm_buf_entry *entry;
+> > + ? ? ? unsigned int flags;
+> > +
+> > + ? ? ? unsigned int handle;
+> > + ? ? ? unsigned int id;
+> > +};
+> > +
+> > +/* create new buffer object and memory region and add the object to
+> list. */
+> > +struct samsung_drm_gem_obj *samsung_drm_buf_new(struct drm_device *dev,
+> > + ? ? ? ? ? ? ? unsigned int size);
+> > +
+> > +/* allocate physical memory and add its object to list. */
+> > +struct samsung_drm_gem_obj *samsung_drm_buf_create(struct drm_device
+> *dev,
+> > + ? ? ? ? ? ? ? unsigned int size);
+> > +
+> > +/* remove allocated physical memory. */
+> > +int samsung_drm_buf_destroy(struct drm_device *dev,
+> > + ? ? ? ? ? ? ? struct samsung_drm_gem_obj *in_obj);
+> > +
+> > +/* find object added to list. */
+> > +struct samsung_drm_gem_obj *samsung_drm_buffer_find(struct drm_device
+> *dev,
+> > + ? ? ? ? ? ? ? struct samsung_drm_gem_obj *in_obj, unsigned int paddr);
+> 
+> this doesn't appear to be used anywhere
+> 
+Oh, it?s my mistake. I will remove it. thank you.
 
-This has been changed as you suggested. Could you have a look at the
-updated patch listed below?
+> > +
+> > +#endif
+> > diff --git a/drivers/gpu/drm/samsung/samsung_drm_connector.c
+> b/drivers/gpu/drm/samsung/samsung_drm_connector.c
+> > new file mode 100644
+> > index 0000000..987a629
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/samsung/samsung_drm_connector.c
+> [snip]
+> > +
+> > +/* convert samsung_video_timings to drm_display_mode */
+> > +static inline void
+> > +convert_to_display_mode(struct fb_videomode *timing,
+> > + ? ? ? ? ? ? ? ? ? ? ? struct drm_display_mode *mode)
+> 
+> I sort of prefer copy functions to copy right to left, Ie.
+> 
+> convert_foo(a, b)
+> 
+> copies from b to a.. somehow this feels more natural.  (Think a = b,
+> the receiving arg is on the left.. same as w/ memcpy()).  Same applies
+> w/ the inverse of this fxn.
+> 
+Ok, I will modify it like your saying. Thank you.
 
+> > +{
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > +
+> > + ? ? ? mode->clock = timing->pixclock / 1000;
+> > +
+> > + ? ? ? mode->hdisplay = timing->xres;
+> > + ? ? ? mode->hsync_start = mode->hdisplay + timing->left_margin;
+> > + ? ? ? mode->hsync_end = mode->hsync_start + timing->hsync_len;
+> > + ? ? ? mode->htotal = mode->hsync_end + timing->right_margin;
+> > +
+> > + ? ? ? mode->vdisplay = timing->yres;
+> > + ? ? ? mode->vsync_start = mode->vdisplay + timing->upper_margin;
+> > + ? ? ? mode->vsync_end = mode->vsync_start + timing->vsync_len;
+> > + ? ? ? mode->vtotal = mode->vsync_end + timing->lower_margin;
+> > +}
+> > +
+> > +/* convert drm_display_mode to samsung_video_timings */
+> > +static inline void
+> > +convert_to_video_timing(struct drm_display_mode *mode,
+> > + ? ? ? ? ? ? ? ? ? ? ? struct fb_videomode *timing)
+> > +{
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > +
+> > + ? ? ? timing->pixclock = mode->clock * 1000;
+> > +
+> > + ? ? ? timing->xres = mode->hdisplay;
+> > + ? ? ? timing->left_margin = mode->hsync_start - mode->hdisplay;
+> > + ? ? ? timing->hsync_len = mode->hsync_end - mode->hsync_start;
+> > + ? ? ? timing->right_margin = mode->htotal - mode->hsync_end;
+> > +
+> > + ? ? ? timing->yres = mode->vdisplay;
+> > + ? ? ? timing->upper_margin = mode->vsync_start - mode->vdisplay;
+> > + ? ? ? timing->vsync_len = mode->vsync_end - mode->vsync_start;
+> > + ? ? ? timing->lower_margin = mode->vtotal - mode->vsync_end;
+> > +}
+> > +
+> > +static int samsung_drm_connector_get_modes(struct drm_connector
+> *connector)
+> > +{
+> > + ? ? ? struct samsung_drm_connector *samsung_connector =
+> > + ? ? ? ? ? ? ? to_samsung_connector(connector);
+> > + ? ? ? struct samsung_drm_display *display =
+> > + ? ? ? ? ? ? ? samsung_drm_get_manager(samsung_connector->encoder)-
+> >display;
+> > + ? ? ? unsigned int count;
+> > +
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > +
+> > + ? ? ? if (display && display->get_edid) {
+> > + ? ? ? ? ? ? ? void *edid = kzalloc(MAX_EDID, GFP_KERNEL);
+> > + ? ? ? ? ? ? ? if (!edid) {
+> > + ? ? ? ? ? ? ? ? ? ? ? DRM_ERROR("failed to allocate edid\n");
+> > + ? ? ? ? ? ? ? ? ? ? ? return 0;
+> > + ? ? ? ? ? ? ? }
+> > +
+> > + ? ? ? ? ? ? ? display->get_edid(connector, edid, MAX_EDID);
+> > +
+> > + ? ? ? ? ? ? ? drm_mode_connector_update_edid_property(connector,
+edid);
+> > + ? ? ? ? ? ? ? count = drm_add_edid_modes(connector, edid);
+> > +
+> > + ? ? ? ? ? ? ? kfree(connector->display_info.raw_edid);
+> > + ? ? ? ? ? ? ? connector->display_info.raw_edid = edid;
+> > + ? ? ? } else {
+> > + ? ? ? ? ? ? ? struct drm_display_mode *mode =
+drm_mode_create(connector-
+> >dev);
+> > + ? ? ? ? ? ? ? struct fb_videomode *timing;
+> > +
+> > + ? ? ? ? ? ? ? if (display && display->get_timing)
+> > + ? ? ? ? ? ? ? ? ? ? ? timing = display->get_timing();
+> 
+> also seems a bit weird to not do: display->get_timings(display)..
+> 
+> maybe you don't have the case of multiple instances of the same
+> display time.. but maybe someday you need that.  (Maybe this is just
+> an artifact of how the API of your current lower layer driver is.. but
+> maybe now is a good time to think about those APIs)
+> 
 
-For PL330 dma controllers instantiated from device tree, the channel
-lookup is based on phandle of the dma controller and dma request id
-specified by the client node. During probe, the private data of each
-channel of the controller is set to point to the device node of the
-dma controller. The 'chan_id' of the each channel is used as the
-dma request id.
+display is static object set by hardware specific driver such as display
+controller or hdmi. each hardware specific driver has their own display
+object statically. You can refer to the definition in samsung_drm_fimd.c.
+and I understood a encoder and a connector is 1:1 relationship, when any
+hardware specific driver is probed, they would be created with a manager
+that includes their own display object as pointer. Could you please give me
+more comments why display object should be considered for multiple
+instances? I am afraid there is any part I don't care.
 
-Client driver requesting dma channels specify the phandle of the
-dma controller and the request id. The pl330 filter function
-converts the phandle to the device node pointer and matches that
-with channel's private data. If a match is found, the request id
-from the client node and the 'chan_id' of the channel is matched.
-A channel is found if both the values match.
+thank you.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- .../devicetree/bindings/dma/arm-pl330.txt          |   29 ++++++++++++++++
- drivers/dma/pl330.c                                |   35 +++++++++++++++++---
- 2 files changed, 59 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
+> Same comment about not passing the display instance ptr to some of the
+> other display fxn ptrs elsewhere in the code.
+> 
+> > + ? ? ? ? ? ? ? else
+> > + ? ? ? ? ? ? ? ? ? ? ? return 0;
+> > +
+> > + ? ? ? ? ? ? ? convert_to_display_mode(timing, mode);
+> > +
+> > + ? ? ? ? ? ? ? mode->type = DRM_MODE_TYPE_DRIVER |
+> DRM_MODE_TYPE_PREFERRED;
+> > + ? ? ? ? ? ? ? drm_mode_set_name(mode);
+> > + ? ? ? ? ? ? ? drm_mode_probed_add(connector, mode);
+> > +
+> > + ? ? ? ? ? ? ? count = 1;
+> > + ? ? ? }
+> > +
+> > + ? ? ? return count;
+> > +}
+> > +
+> > +static int samsung_drm_connector_mode_valid(struct drm_connector
+> *connector,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct drm_display_mode
+*mode)
+> > +{
+> > + ? ? ? struct samsung_drm_connector *samsung_connector =
+> > + ? ? ? ? ? ? ? to_samsung_connector(connector);
+> > + ? ? ? struct samsung_drm_display *display =
+> > + ? ? ? ? ? ? ? samsung_drm_get_manager(samsung_connector->encoder)-
+> >display;
+> > + ? ? ? struct fb_videomode timing;
+> > + ? ? ? int ret = MODE_BAD;
+> > +
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > +
+> > + ? ? ? convert_to_video_timing(mode, &timing);
+> > +
+> > + ? ? ? if (display && display->check_timing)
+> > + ? ? ? ? ? ? ? if (!display->check_timing((void *)&timing))
+> > + ? ? ? ? ? ? ? ? ? ? ? ret = MODE_OK;
+> > +
+> > + ? ? ? return ret;
+> > +}
+> > +
+> > +struct drm_encoder *samsung_drm_best_encoder(struct drm_connector
+> *connector)
+> > +{
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > + ? ? ? return to_samsung_connector(connector)->encoder;
+> > +}
+> > +
+> > +static struct drm_connector_helper_funcs samsung_connector_helper_funcs
+> = {
+> > + ? ? ? .get_modes ? ? ?= samsung_drm_connector_get_modes,
+> > + ? ? ? .mode_valid ? ? = samsung_drm_connector_mode_valid,
+> > + ? ? ? .best_encoder ? = samsung_drm_best_encoder,
+> > +};
+> > +
+> > +/* get detection status of display device. */
+> > +static enum drm_connector_status
+> > +samsung_drm_connector_detect(struct drm_connector *connector, bool
+> force)
+> > +{
+> > + ? ? ? struct samsung_drm_connector *samsung_connector =
+> > + ? ? ? ? ? ? ? to_samsung_connector(connector);
+> > + ? ? ? struct samsung_drm_display *display =
+> > + ? ? ? ? ? ? ? samsung_drm_get_manager(samsung_connector->encoder)-
+> >display;
+> > + ? ? ? unsigned int ret = connector_status_unknown;
+> > +
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > +
+> > + ? ? ? if (display && display->is_connected) {
+> > + ? ? ? ? ? ? ? if (display->is_connected())
+> > + ? ? ? ? ? ? ? ? ? ? ? ret = connector_status_connected;
+> > + ? ? ? ? ? ? ? else
+> > + ? ? ? ? ? ? ? ? ? ? ? ret = connector_status_disconnected;
+> > + ? ? ? }
+> > +
+> > + ? ? ? return ret;
+> > +}
+> > +
+> > +static void samsung_drm_connector_destroy(struct drm_connector
+> *connector)
+> > +{
+> > + ? ? ? struct samsung_drm_connector *samsung_connector =
+> > + ? ? ? ? ? ? ? to_samsung_connector(connector);
+> > +
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > +
+> > + ? ? ? drm_sysfs_connector_remove(connector);
+> > + ? ? ? drm_connector_cleanup(connector);
+> > + ? ? ? connector->dev->mode_config.num_connector--;
+> 
+> I wonder if num_connector-- should be in drm_connector_cleanup()..
+> 
+> I missed this in OMAP driver, but it seems that none of the other drm
+> drivers are directly decrementing this.. and it would seem more
+> symmetric for it to be in drm_connector_cleanup().  But would be
 
-diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt
-b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-new file mode 100644
-index 0000000..89f4b9c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-@@ -0,0 +1,29 @@
-+* ARM PrimeCell PL330 DMA Controller
-+
-+The ARM PrimeCell PL330 DMA controller can move blocks of memory contents
-+between memory and peripherals or memory to memory.
-+
-+Required properties:
-+  - compatible: should be "arm,primecell".
-+  - reg: physical base address of the controller and length of memory mapped
-+    region.
-+  - interrupts: interrupt number to the cpu.
-+
-+Example: (from Samsung's Exynos4 processor dtsi file)
-+
-+	pdma0: pdma at 12680000 {
-+		compatible = "arm,primecell";
-+		reg = <0x12680000 0x1000>;
-+		interrupts = <99>;
-+	};
-+
-+Client drivers (device nodes requiring dma transfers from dev-to-mem or
-+mem-to-dev) should specify the DMA channel numbers using a two-value pair
-+as shown below.
-+
-+  [property name]  = <[phandle of the dma controller] [dma request id]>;
-+
-+      where 'dma request id' is the dma request number which is connected
-+      to the client controller.
-+
-+  Example:  tx-dma-channel = <&pdma0 12>;
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 9732995..0c55de4 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -19,6 +19,7 @@
- #include <linux/amba/pl330.h>
- #include <linux/pm_runtime.h>
- #include <linux/scatterlist.h>
-+#include <linux/of.h>
+For this, it was already commented by Joonyoun Shim.
 
- #define NR_DEFAULT_DESC	16
+> interesting to see what others think.  (I guess no one has really
+> dealt w/ dynamic creation/deletion of connectors yet?)
+> 
 
-@@ -277,6 +278,20 @@ bool pl330_filter(struct dma_chan *chan, void *param)
- 	if (chan->device->dev->driver != &pl330_driver.drv)
- 		return false;
+I think our driver creates encoder and connector dynamically. please, see
+samsung_drm_subdrv_probe() of samsung_drm_core.c. hardware specific drivers
+such as display controller and hdmi are registered to
+samsung_drm_subdrv_list and when drm driver is probed, once subdrv->probe
+callback is called, a encoder and a connector would be created dynamically.
+if there is any missing point, feel free to give me your comments please.
 
-+#ifdef CONFIG_OF
-+	if (chan->device->dev->of_node) {
-+		const __be32 *prop_value;
-+		phandle phandle;
-+		struct device_node *node;
-+
-+		prop_value = ((struct property *)param)->value;
-+		phandle = be32_to_cpup(prop_value++);
-+		node = of_find_node_by_phandle(phandle);
-+		return ((chan->private == node) &&
-+				(chan->chan_id == be32_to_cpup(prop_value)));
-+	}
-+#endif
-+
- 	peri_id = chan->private;
- 	return *peri_id == (unsigned)param;
- }
-@@ -857,12 +872,17 @@ pl330_probe(struct amba_device *adev, const
-struct amba_id *id)
- 	INIT_LIST_HEAD(&pd->channels);
+Thank you.
 
- 	/* Initialize channel parameters */
--	num_chan = max(pdat ? pdat->nr_valid_peri : 0, (u8)pi->pcfg.num_chan);
-+	num_chan = max(pdat ? pdat->nr_valid_peri : (u8)pi->pcfg.num_peri,
-+			(u8)pi->pcfg.num_chan);
- 	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
+> > + ? ? ? kfree(samsung_connector);
+> > +}
+> > +
+> [snip]
+> > diff --git a/drivers/gpu/drm/samsung/samsung_drm_crtc.c
+> b/drivers/gpu/drm/samsung/samsung_drm_crtc.c
+> > new file mode 100644
+> > index 0000000..1c5a70a
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/samsung/samsung_drm_crtc.c
+> [snip]
+> > +
+> > +struct samsung_drm_crtc {
+> > + ? ? ? struct drm_crtc ? ? ? ? ? ? ? ? drm_crtc;
+> > + ? ? ? struct samsung_drm_overlay ? ? ?overlay;
+> 
+> 
+> I guess you are looking fwd to drm_plane support too :-)
+> 
+> 
+> > + ? ? ? unsigned int ? ? ? ? ? ? ? ? ? ?pipe;
+> > +};
+> > +
+> [snip]
+> > diff --git a/drivers/gpu/drm/samsung/samsung_drm_fb.c
+> b/drivers/gpu/drm/samsung/samsung_drm_fb.c
+> > new file mode 100644
+> > index 0000000..42096eb
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/samsung/samsung_drm_fb.c
+> > @@ -0,0 +1,248 @@
+> > +/*
+> > + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+> > + * Authors:
+> > + * ? ? Inki Dae <inki.dae@samsung.com>
+> > + * ? ? Joonyoung Shim <jy0922.shim@samsung.com>
+> > + * ? ? SeungWoo Kim <sw0312.kim@samsung.com>
+> > + *
+> > + * Permission is hereby granted, free of charge, to any person
+> obtaining a
+> > + * copy of this software and associated documentation files (the
+> "Software"),
+> > + * to deal in the Software without restriction, including without
+> limitation
+> > + * the rights to use, copy, modify, merge, publish, distribute,
+> sublicense,
+> > + * and/or sell copies of the Software, and to permit persons to whom
+> the
+> > + * Software is furnished to do so, subject to the following conditions:
+> > + *
+> > + * The above copyright notice and this permission notice (including the
+> next
+> > + * paragraph) shall be included in all copies or substantial portions
+> of the
+> > + * Software.
+> > + *
+> > + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> EXPRESS OR
+> > + * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+> MERCHANTABILITY,
+> > + * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. ?IN NO EVENT
+> SHALL
+> > + * VA LINUX SYSTEMS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM,
+> DAMAGES OR
+> > + * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE,
+> > + * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+> OR
+> > + * OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> > +
+> > +#include "drmP.h"
+> > +#include "drm_crtc.h"
+> > +#include "drm_crtc_helper.h"
+> > +
+> > +#include "samsung_drm_fb.h"
+> > +#include "samsung_drm_buf.h"
+> > +#include "samsung_drm_gem.h"
+> > +
+> > +#define to_samsung_fb(x) ? ? ? container_of(x, struct samsung_drm_fb,
+fb)
+> > +
+> > +struct samsung_drm_fb {
+> > + ? ? ? struct drm_framebuffer ? ? ? ? ?fb;
+> > + ? ? ? struct drm_file ? ? ? ? ? ? ? ? *file_priv;
+> > + ? ? ? struct samsung_drm_gem_obj ? ? ?*samsung_gem_obj;
+> > + ? ? ? unsigned int ? ? ? ? ? ? ? ? ? ?is_default;
+> > +
+> > + ? ? ? /* samsung gem object handle. */
+> > + ? ? ? unsigned int ? ? ? ? ? ? ? ? ? ?gem_handle;
+> > + ? ? ? /* unique id to buffer object. */
+> > + ? ? ? unsigned int ? ? ? ? ? ? ? ? ? ?id;
+> > +
+> > + ? ? ? unsigned int ? ? ? ? ? ? ? ? ? ?fb_size;
+> > + ? ? ? unsigned long ? ? ? ? ? ? ? ? ? paddr;
+> > + ? ? ? void __iomem ? ? ? ? ? ? ? ? ? ?*vaddr;
+> > +};
+> > +
+> > +static void samsung_drm_fb_destroy(struct drm_framebuffer *fb)
+> > +{
+> > + ? ? ? struct samsung_drm_fb *samsung_fb = to_samsung_fb(fb);
+> > + ? ? ? int ret;
+> > +
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > +
+> > + ? ? ? drm_framebuffer_cleanup(fb);
+> > +
+> > + ? ? ? if (samsung_fb->is_default) {
+> > + ? ? ? ? ? ? ? ret = drm_gem_handle_delete(samsung_fb->file_priv,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? samsung_fb->gem_handle);
+> 
+> why not keep the gem buffer ptr, and do something like:
+> 
+>   drm_gem_object_unreference_unlocked(samsung_fb->bo)..
+> 
+> this way, you get the right behavior if someone somewhere else took a
+> ref to the gem buffer object?  And it avoids needing to keep the
+> file_priv ptr in the fb (which seems a bit strange)
+> 
+> 
+Yes, at booting time, one gem object is created. this is for linux
+framebuffer and used as default buffer. register_framebuffer function is
+called one time at booting time by drm driver. but when this driver is built
+as modules, this gem object should be released with rmmod modules. and the
+reason fb has file point is that drm_gem_handle_delete requests it to
+release a gem object. our driver considered modularization also. If there is
+any point I missed, give me any comment please. Thank you.
 
- 	for (i = 0; i < num_chan; i++) {
- 		pch = &pdmac->peripherals[i];
--		pch->chan.private = pdat ? &pdat->peri_id[i] : NULL;
-+		if (!adev->dev.of_node)
-+			pch->chan.private = pdat ? &pdat->peri_id[i] : NULL;
-+		else
-+			pch->chan.private = adev->dev.of_node;
-+
- 		INIT_LIST_HEAD(&pch->work_list);
- 		spin_lock_init(&pch->lock);
- 		pch->pl330_chid = NULL;
-@@ -876,11 +896,16 @@ pl330_probe(struct amba_device *adev, const
-struct amba_id *id)
- 	}
+> > + ? ? ? ? ? ? ? if (ret < 0)
+> > + ? ? ? ? ? ? ? ? ? ? ? DRM_ERROR("failed to delete drm_gem_handle.\n");
+> > + ? ? ? }
+> > +
+> > + ? ? ? kfree(samsung_fb);
+> > +}
+> > +
+> [snip]
+> > diff --git a/drivers/gpu/drm/samsung/samsung_drm_gem.c
+> b/drivers/gpu/drm/samsung/samsung_drm_gem.c
+> > new file mode 100644
+> > index 0000000..1e167a6
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/samsung/samsung_drm_gem.c
+> [snip]
+> > +
+> > +static unsigned int get_gem_mmap_offset(struct drm_gem_object *obj)
+> > +{
+> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+> > +
+> > + ? ? ? return (unsigned int)obj->map_list.hash.key << PAGE_SHIFT;
+> > +}
+> 
+> fwiw, candidate to move to drm_gem helper fxn (I have same in my
+> driver.. but this wasn't included in my earlier patch to add a couple
+> common drm_gem helper fxns like create/free_mmap_offset)
+> 
 
- 	pd->dev = &adev->dev;
--	if (pdat)
-+	if (pdat) {
- 		pd->cap_mask = pdat->cap_mask;
--	else
-+	} else {
- 		dma_cap_set(DMA_MEMCPY, pd->cap_mask);
--
-+		if (pi->pcfg.num_peri) {
-+			dma_cap_set(DMA_SLAVE, pd->cap_mask);
-+			dma_cap_set(DMA_CYCLIC, pd->cap_mask);
-+		}	
-+	}
-+	
- 	pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
- 	pd->device_free_chan_resources = pl330_free_chan_resources;
- 	pd->device_prep_dma_memcpy = pl330_prep_dma_memcpy;
--- 
-1.6.6.rc2
+I referred to your code. :) and I wish this code is moved to mainline to be
+used commonly.
 
+> > +
+> > +/**
+> > + * samsung_drm_gem_create_mmap_offset - create a fake mmap offset for
+> an object
+> > + * @obj: obj in question
+> > + *
+> > + * GEM memory mapping works by handing back to userspace a fake mmap
+> offset
+> > + * it can use in a subsequent mmap(2) call. ?The DRM core code then
+> looks
+> > + * up the object based on the offset and sets up the various memory
+> mapping
+> > + * structures.
+> > + *
+> > + * This routine allocates and attaches a fake offset for @obj.
+> > + */
+> > +static int
+> > +samsung_drm_gem_create_mmap_offset(struct drm_gem_object *obj)
+> 
+> some of these other fxns you might at least want to include a comment
+> to replace w/ drm_gem helpers once that patch lands.. your's would be
+> the 4th driver w/ nearly identical code (well, if you can count
+> non-mainline drivers) ;-)
+> 
+Ok, I know you had posted this patch to be used commonly. but it isn't
+applied to dri git. If applied, I will change it to common fxn but for now I
+will add a comment.
+> > +{
+> > + ? ? ? struct drm_device *dev = obj->dev;
+> > + ? ? ? struct drm_gem_mm *mm = dev->mm_private;
+> > + ? ? ? struct drm_map_list *list;
+> > + ? ? ? struct drm_local_map *map;
+> > + ? ? ? int ret = 0;
+> > +
+> > + ? ? ? /* Set the object up for mmap'ing */
+> > + ? ? ? list = &obj->map_list;
+> > + ? ? ? list->map = kzalloc(sizeof(struct drm_map_list), GFP_KERNEL);
+> > + ? ? ? if (!list->map)
+> > + ? ? ? ? ? ? ? return -ENOMEM;
+> > +
+> > + ? ? ? map = list->map;
+> > + ? ? ? map->type = _DRM_GEM;
+> > + ? ? ? map->size = obj->size;
+> > + ? ? ? map->handle = obj;
+> > +
+> > + ? ? ? /* Get a DRM GEM mmap offset allocated... */
+> > + ? ? ? list->file_offset_node = drm_mm_search_free(&mm->offset_manager,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? obj->size /
+PAGE_SIZE,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, 0);
+> > + ? ? ? if (!list->file_offset_node) {
+> > + ? ? ? ? ? ? ? DRM_ERROR("failed to allocate offset for bo %d\n",
+> > + ? ? ? ? ? ? ? ? ? ? ? ? obj->name);
+> > + ? ? ? ? ? ? ? ret = -ENOSPC;
+> > + ? ? ? ? ? ? ? goto out_free_list;
+> > + ? ? ? }
+> > +
+> > + ? ? ? list->file_offset_node =
+drm_mm_get_block(list->file_offset_node,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? obj->size / PAGE_SIZE,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0);
+> > + ? ? ? if (!list->file_offset_node) {
+> > + ? ? ? ? ? ? ? ret = -ENOMEM;
+> > + ? ? ? ? ? ? ? goto out_free_list;
+> > + ? ? ? }
+> > +
+> > + ? ? ? list->hash.key = list->file_offset_node->start;
+> > + ? ? ? ret = drm_ht_insert_item(&mm->offset_hash, &list->hash);
+> > + ? ? ? if (ret) {
+> > + ? ? ? ? ? ? ? DRM_ERROR("failed to add to map hash\n");
+> > + ? ? ? ? ? ? ? goto out_free_mm;
+> > + ? ? ? }
+> > +
+> > + ? ? ? return 0;
+> > +
+> > +out_free_mm:
+> > + ? ? ? drm_mm_put_block(list->file_offset_node);
+> > +out_free_list:
+> > + ? ? ? kfree(list->map);
+> > + ? ? ? list->map = NULL;
+> > +
+> > + ? ? ? return ret;
+> > +}
+> > +
+> > +static void
+> > +samsung_drm_gem_free_mmap_offset(struct drm_gem_object *obj)
+> > +{
+> > + ? ? ? struct drm_device *dev = obj->dev;
+> > + ? ? ? struct drm_gem_mm *mm = dev->mm_private;
+> > + ? ? ? struct drm_map_list *list = &obj->map_list;
+> > +
+> > + ? ? ? drm_ht_remove_item(&mm->offset_hash, &list->hash);
+> > + ? ? ? drm_mm_put_block(list->file_offset_node);
+> > + ? ? ? kfree(list->map);
+> > + ? ? ? list->map = NULL;
+> > +}
+> [snip]
+> > +struct samsung_drm_gem_obj *
+> > + ? ? ? ? ? ? ? find_samsung_drm_gem_object(struct drm_file *file_priv,
+> > + ? ? ? ? ? ? ? ? ? ? ? struct drm_device *dev, unsigned int handle)
+> > +{
+> > + ? ? ? struct drm_gem_object *gem_obj;
+> > +
+> > + ? ? ? gem_obj = drm_gem_object_lookup(dev, file_priv, handle);
+> > + ? ? ? if (!gem_obj) {
+> > + ? ? ? ? ? ? ? DRM_LOG_KMS("a invalid gem object not registered to
+> lookup.\n");
+> > + ? ? ? ? ? ? ? return NULL;
+> > + ? ? ? }
+> > +
+> > + ? ? ? /**
+> > + ? ? ? ?* unreference refcount of the gem object.
+> > + ? ? ? ?* at drm_gem_object_lookup(), the gem object was referenced.
+> > + ? ? ? ?*/
+> > + ? ? ? drm_gem_object_unreference(gem_obj);
+> 
+> this doesn't seem right, to drop the reference before you use the
+> buffer elsewhere..
+> 
+No, see drm_gem_object_lookup fxn. at this function, if there is a object
+found then drm_gem_object_reference is called to increase refcount of this
+object. if there is any missing point, give me any comment please. thank
+you.
 
+> > + ? ? ? return to_samsung_gem_obj(gem_obj);
+> > +}
+> > +
+> [snip]
+> > diff --git a/include/drm/samsung_drm.h b/include/drm/samsung_drm.h
+> > new file mode 100644
+> > index 0000000..05dc460
+> > --- /dev/null
+> > +++ b/include/drm/samsung_drm.h
+> [snip]
+> > +/**
+> > + * User-desired buffer creation information structure.
+> > + *
+> > + * @usr_addr: an address allocated by user process and this address
+> > + * ? ? would be mmapped to physical region by fault handler.
+> > + * @size: requested size for the object.
+> > + * ? ? - this size value would be page-aligned internally.
+> > + * @flags: user request for setting memory type or cache attributes.
+> > + * @handle: returned handle for the object.
+> > + */
+> > +struct drm_samsung_gem_create {
+> > + ? ? ? unsigned int usr_addr;
+> 
+> usr_addr seems dangerous.. and unused?  Maybe can be removed?
+> 
+Actually, usr_addr isn't used anywhere, so I removed it already and Dave
+pointed out it before.
 
->
-> Rob
->
->
->> Thanks for your help.
->>
->> Regards,
->> Thomas.
->>
->>
->> ? ? Rob
->>
->>
->
->
+> also, I sort of prefer using stdint types for userspace<->kernel ioctl
+> structs.
+> 
+Ok, I will use stdint types for it. thank you.
+
+> > + ? ? ? unsigned int size;
+> > + ? ? ? unsigned int flags;
+> > +
+> > + ? ? ? unsigned int handle;
+> > +};
+> > +
+> > +/**
+> > + * A structure for getting buffer offset.
+> > + *
+> > + * @handle: a pointer to gem object created.
+> > + * @offset: relatived offset value of the memory region allocated.
+> > + * ? ? - this value should be set by user.
+> > + */
+> > +struct drm_samsung_gem_map_off {
+> > + ? ? ? unsigned int handle;
+> > + ? ? ? uint64_t offset;
+> > +};
+> > +
+> > +/**
+> > + * A structure for mapping buffer.
+> > + *
+> > + * @handle: a pointer to gem object created.
+> > + * @offset: relatived offset value of the memory region allocated.
+> > + * ? ? - this value should be set by user.
+> > + * @size: memory size to be mapped.
+> > + * @mapped: user virtual address to be mapped.
+> > + */
+> > +struct drm_samsung_gem_mmap {
+> > + ? ? ? unsigned int handle;
+> > + ? ? ? uint64_t offset;
+> > + ? ? ? unsigned int size;
+> > +
+> > + ? ? ? unsigned int mapped;
+> 
+> I guess this should be obtained by passing offset back to mmap() syscall
+No, as I gave you the words about it before, the offset means physical
+memory offset to be mapped to user space. and mapped has user virtual
+address from do_mmap.
+refer to previous answer please: <
+http://www.spinics.net/lists/dri-devel/msg13880.html >
+> 
+> BR,
+> -R
+
+Thank you for your comments and advices again. it's been very useful.  :)
