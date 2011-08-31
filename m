@@ -1,29 +1,37 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 31 Aug 2011 09:43:33 -0400
-Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
-In-Reply-To: <20110831084922.GA8777@e102144-lin.cambridge.arm.com>
-References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
-	<1314722311.2344.64.camel@deneb.redhat.com>
-	<20110830172642.GE3464@e102144-lin.cambridge.arm.com>
-	<20110830174859.GA23098@kroah.com>
-	<20110830175432.GG3464@e102144-lin.cambridge.arm.com>
-	<5484D075-A7DA-41B7-B8FA-9B6D72A23723@freescale.com>
-	<20110831084922.GA8777@e102144-lin.cambridge.arm.com>
-Message-ID: <1314798215.2344.76.camel@deneb.redhat.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 31 Aug 2011 22:05:28 +0800
+Subject: i.MX multi SoC patches
+In-Reply-To: <CAODfWeFnsQZBsBXpJLVknzvqcythZjDMyfe8sb9Pdw_uK-iB2g@mail.gmail.com>
+References: <1314172987-10349-1-git-send-email-s.hauer@pengutronix.de>
+	<CAODfWeFnsQZBsBXpJLVknzvqcythZjDMyfe8sb9Pdw_uK-iB2g@mail.gmail.com>
+Message-ID: <20110831140527.GA3723@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-08-31 at 09:49 +0100, Will Deacon wrote:
-> On Wed, Aug 31, 2011 at 01:23:47AM +0100, Chen Peter-B29397 wrote:
-> > One question: why this write buffer issue did not happen at UP ARM V7 platform, whose dma buffer
-> > also uncache, but bufferable?
+On Wed, Aug 31, 2011 at 02:02:58PM +0100, Hector Oron wrote:
+> Hello,
 > 
-> Which CPU was on this platform?
+> 
+> 2011/8/24 Sascha Hauer <s.hauer@pengutronix.de>:
+> > This is hopefully the last iteration of the patches for compiling
+> > all ARMv4/v5 based i.MXs together. CONFIG_ARM_PATCH_PHYS_VIRT
+> > lost its experimental status and we can still build uImages
+> > even with CONFIG_AUTO_ZRELADDR enabled. This series selects
+> > these options and makes a multi SoC image the default.
+> > Also, we can now build all i.MX5 SoCs into a single image.
+> > This series also updates the defconfigs.
+> 
+> On a mx53 loco board I have rebased Richard's patchset for SATA and
+> got it running, but I see this on mapping on iomem, board is more or
+> less working but I was unsure if this is something significant or just
+> some ugly cosmetic names for mx53 (i.e. imx21-uart.0, imx31-gpio, ..)
+> 
+This is expected.  The platform_device_id had been used to kill
+cpu_is_mxXX() stuff from drivers.  And we decided to use soc prefix
+to define IP block version in platform_device_id table, because
+hardware does not define revisions, and soc is stable enough to
+identify specific IP block version.
 
-Using a 3.1.0-rc4+ kernel on a Pandaboard, and running 'hdparm -t' on a
-usb disk drive, I see ~5.8MB/s read speed. Same kernel, but passing
-nosmp on the commandline, I see 20.3MB/s.
-
-Can someone explain why nosmp would make such a difference?
-
---Mark
+-- 
+Regards,
+Shawn
