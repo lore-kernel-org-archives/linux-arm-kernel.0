@@ -1,127 +1,195 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 31 Aug 2011 21:16:17 +0530
-Subject: [PATCH 4/6] DMA: PL330: Add device tree support
-In-Reply-To: <4E5E2E36.1070006@gmail.com>
-References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-2-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-3-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-4-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>
-	<4E579C9B.7030807@gmail.com>
-	<CAJuYYwR5GqqKjbMngQqorLuka4XN0jin5s6O66orTtSQg5eKRw@mail.gmail.com>
-	<4E5CE37E.1050104@gmail.com>
-	<CAJuYYwT5HGy9b06AyrLJv5hFCFf_YRA4md9N=m+cwcJNTqRDWg@mail.gmail.com>
-	<4E5E2E36.1070006@gmail.com>
-Message-ID: <CAJuYYwQ17MPD=hTYUxES5touFfd73W1unbtWfu_XqPR48t3P0w@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 31 Aug 2011 11:02:07 -0500
+Subject: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
+In-Reply-To: <001001cc67aa$72760460$57620d20$%dae@samsung.com>
+References: <1314359274-21585-1-git-send-email-inki.dae@samsung.com>
+	<CAF6AEGu3ss-rJC28H1rm2GWLm1bAZnHLftXfMLJQNeqjBt3umQ@mail.gmail.com>
+	<001001cc67aa$72760460$57620d20$%dae@samsung.com>
+Message-ID: <CAF6AEGsqbFcS_QwihrjpVLQK1Y+h1iJSyu+GFV0Govp3XHYbOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, Aug 31, 2011 at 1:51 AM, Inki Dae <inki.dae@samsung.com> wrote:
+> Hello, Rob.
+> Below is my answers and questions. and could you please include me as CC
+> when you post your driver?
 
-On 31 August 2011 18:21, Rob Herring <robherring2@gmail.com> wrote:
-> Thomas,
+sure thing
 
-[...]
 
->> For PL330 dma controllers instantiated from device tree, the channel
->> lookup is based on phandle of the dma controller and dma request id
->> specified by the client node. During probe, the private data of each
->> channel of the controller is set to point to the device node of the
->> dma controller. The 'chan_id' of the each channel is used as the
->> dma request id.
+>> > +static int samsung_drm_connector_get_modes(struct drm_connector
+>> *connector)
+>> > +{
+>> > + ? ? ? struct samsung_drm_connector *samsung_connector =
+>> > + ? ? ? ? ? ? ? to_samsung_connector(connector);
+>> > + ? ? ? struct samsung_drm_display *display =
+>> > + ? ? ? ? ? ? ? samsung_drm_get_manager(samsung_connector->encoder)-
+>> >display;
+>> > + ? ? ? unsigned int count;
+>> > +
+>> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+>> > +
+>> > + ? ? ? if (display && display->get_edid) {
+>> > + ? ? ? ? ? ? ? void *edid = kzalloc(MAX_EDID, GFP_KERNEL);
+>> > + ? ? ? ? ? ? ? if (!edid) {
+>> > + ? ? ? ? ? ? ? ? ? ? ? DRM_ERROR("failed to allocate edid\n");
+>> > + ? ? ? ? ? ? ? ? ? ? ? return 0;
+>> > + ? ? ? ? ? ? ? }
+>> > +
+>> > + ? ? ? ? ? ? ? display->get_edid(connector, edid, MAX_EDID);
+>> > +
+>> > + ? ? ? ? ? ? ? drm_mode_connector_update_edid_property(connector,
+> edid);
+>> > + ? ? ? ? ? ? ? count = drm_add_edid_modes(connector, edid);
+>> > +
+>> > + ? ? ? ? ? ? ? kfree(connector->display_info.raw_edid);
+>> > + ? ? ? ? ? ? ? connector->display_info.raw_edid = edid;
+>> > + ? ? ? } else {
+>> > + ? ? ? ? ? ? ? struct drm_display_mode *mode =
+> drm_mode_create(connector-
+>> >dev);
+>> > + ? ? ? ? ? ? ? struct fb_videomode *timing;
+>> > +
+>> > + ? ? ? ? ? ? ? if (display && display->get_timing)
+>> > + ? ? ? ? ? ? ? ? ? ? ? timing = display->get_timing();
 >>
->> Client driver requesting dma channels specify the phandle of the
->> dma controller and the request id. The pl330 filter function
->> converts the phandle to the device node pointer and matches that
->> with channel's private data. If a match is found, the request id
->> from the client node and the 'chan_id' of the channel is matched.
->> A channel is found if both the values match.
+>> also seems a bit weird to not do: display->get_timings(display)..
 >>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->> ?.../devicetree/bindings/dma/arm-pl330.txt ? ? ? ? ?| ? 29 ++++++++++++++++
->> ?drivers/dma/pl330.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 35 +++++++++++++++++---
->> ?2 files changed, 59 insertions(+), 5 deletions(-)
->> ?create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
+>> maybe you don't have the case of multiple instances of the same
+>> display time.. but maybe someday you need that. ?(Maybe this is just
+>> an artifact of how the API of your current lower layer driver is.. but
+>> maybe now is a good time to think about those APIs)
 >>
->> diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt
->> b/Documentation/devicetree/bindings/dma/arm-pl330.txt
->> new file mode 100644
->> index 0000000..89f4b9c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
->> @@ -0,0 +1,29 @@
->> +* ARM PrimeCell PL330 DMA Controller
->> +
->> +The ARM PrimeCell PL330 DMA controller can move blocks of memory contents
->> +between memory and peripherals or memory to memory.
->> +
->> +Required properties:
->> + ?- compatible: should be "arm,primecell".
 >
-> Sorry, I guess I wasn't clear. This has to be "arm,primecell" plus
-> something else. In this case, "arm,pl330". If the IP is modified from
-> standard ARM version (like ST likes to do), then something like
-> "samsung,pl330" would be appropriate.
+> display is static object set by hardware specific driver such as display
+> controller or hdmi. each hardware specific driver has their own display
+> object statically. You can refer to the definition in samsung_drm_fimd.c.
+> and I understood a encoder and a connector is 1:1 relationship, when any
+> hardware specific driver is probed, they would be created with a manager
+> that includes their own display object as pointer. Could you please give me
+> more comments why display object should be considered for multiple
+> instances? I am afraid there is any part I don't care.
 >
-> This is not actually used by the kernel at the moment, but could if
-> modified versions of pl330 show up.
+> thank you.
 
-of_platform_bus_create() checks for  "arm,primecell" compatible value
-to instantiate a amba device from device tree. The peripheral_id is
-also noted in the amba device instance. The amba drivers register with
-a with a peripheral_id and peripheral_id is used match amba device
-with a driver.
+Just thinking hypothetically.. what if some future device had two hdmi
+controllers.  Then you'd want two instances of the same display
+object.
 
-In cases of modified version of the same IP, the peripheral_id would
-be different. So, "arm,primecell" would just be enough for now. Any
-other compatible value would anyway go unused. I did use
-"arm,primecell-pdma" and "arm-primecell-mdma" to derive the dma_cap
-value. But, as per your comments, I dropped it.
+Although it seems this API is just internal to the DRM driver (which I
+had not realized earlier), so it should be pretty easy to change later
+if needed.
 
-So, for now, I will just list "arm,primecell" as required compatible
-value. Please let me know if "arm,pl330" would be required here.
 
+>> > +static void samsung_drm_connector_destroy(struct drm_connector
+>> *connector)
+>> > +{
+>> > + ? ? ? struct samsung_drm_connector *samsung_connector =
+>> > + ? ? ? ? ? ? ? to_samsung_connector(connector);
+>> > +
+>> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+>> > +
+>> > + ? ? ? drm_sysfs_connector_remove(connector);
+>> > + ? ? ? drm_connector_cleanup(connector);
+>> > + ? ? ? connector->dev->mode_config.num_connector--;
+>>
+>> I wonder if num_connector-- should be in drm_connector_cleanup()..
+>>
+>> I missed this in OMAP driver, but it seems that none of the other drm
+>> drivers are directly decrementing this.. and it would seem more
+>> symmetric for it to be in drm_connector_cleanup(). ?But would be
 >
->> + ?- reg: physical base address of the controller and length of memory mapped
->> + ? ?region.
->> + ?- interrupts: interrupt number to the cpu.
->> +
->> +Example: (from Samsung's Exynos4 processor dtsi file)
->> +
->> + ? ? pdma0: pdma at 12680000 {
->> + ? ? ? ? ? ? compatible = "arm,primecell";
->> + ? ? ? ? ? ? reg = <0x12680000 0x1000>;
->> + ? ? ? ? ? ? interrupts = <99>;
->> + ? ? };
->> +
->> +Client drivers (device nodes requiring dma transfers from dev-to-mem or
->> +mem-to-dev) should specify the DMA channel numbers using a two-value pair
->> +as shown below.
->> +
->> + ?[property name] ?= <[phandle of the dma controller] [dma request id]>;
->
-> At least fix the "-dma-channel" part of the name. It not clear if that's
-> the case or just an example.
->
-> [name]-dma-channel = <[phandle of the dma controller] [dma request id]>;
+> For this, it was already commented by Joonyoun Shim.
 
-The name of the property that specifies the dma channel to use is
-decided by the client device node. It is not enforced by the dma
-device node. So, there will be no specific requirement stated in the
-documentation for pl330 device node.
+And it seems (which I hadn't noticed earlier) already merged :-)
 
->
->
-> The rest looks good.
+So I think this (and similar bit in encoder destructor) can be removed
 
-Thanks for your review and comments.
 
-Regards,
-Thomas.
+>> > +static void samsung_drm_fb_destroy(struct drm_framebuffer *fb)
+>> > +{
+>> > + ? ? ? struct samsung_drm_fb *samsung_fb = to_samsung_fb(fb);
+>> > + ? ? ? int ret;
+>> > +
+>> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+>> > +
+>> > + ? ? ? drm_framebuffer_cleanup(fb);
+>> > +
+>> > + ? ? ? if (samsung_fb->is_default) {
+>> > + ? ? ? ? ? ? ? ret = drm_gem_handle_delete(samsung_fb->file_priv,
+>> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? samsung_fb->gem_handle);
+>>
+>> why not keep the gem buffer ptr, and do something like:
+>>
+>> ? drm_gem_object_unreference_unlocked(samsung_fb->bo)..
+>>
+>> this way, you get the right behavior if someone somewhere else took a
+>> ref to the gem buffer object? ?And it avoids needing to keep the
+>> file_priv ptr in the fb (which seems a bit strange)
+>>
+>>
+> Yes, at booting time, one gem object is created. this is for linux
+> framebuffer and used as default buffer. register_framebuffer function is
+> called one time at booting time by drm driver. but when this driver is built
+> as modules, this gem object should be released with rmmod modules. and the
+> reason fb has file point is that drm_gem_handle_delete requests it to
+> release a gem object. our driver considered modularization also. If there is
+> any point I missed, give me any comment please. Thank you.
 
->
-> Rob
->
+Oh, I missed the point that drm_gem_handle_delete() is calling
+drm_gem_object_unreference_unlocked().
 
-[...]
+But this still seems a bit odd, but I guess the difference is you are
+keeping the buffer handle, rather than the 'struct drm_gem_object'
+ptr.  I'm not sure if there is a point to keeping track of the buffer
+in handle form on the kernel side.  If instead you just keep a GEM
+object ptr, you can just drm_gem_object_unreference{_unlocked}() when
+you are done with it without having to special-case is_default stuff.
+
+>> > +struct samsung_drm_gem_obj *
+>> > + ? ? ? ? ? ? ? find_samsung_drm_gem_object(struct drm_file *file_priv,
+>> > + ? ? ? ? ? ? ? ? ? ? ? struct drm_device *dev, unsigned int handle)
+>> > +{
+>> > + ? ? ? struct drm_gem_object *gem_obj;
+>> > +
+>> > + ? ? ? gem_obj = drm_gem_object_lookup(dev, file_priv, handle);
+>> > + ? ? ? if (!gem_obj) {
+>> > + ? ? ? ? ? ? ? DRM_LOG_KMS("a invalid gem object not registered to
+>> lookup.\n");
+>> > + ? ? ? ? ? ? ? return NULL;
+>> > + ? ? ? }
+>> > +
+>> > + ? ? ? /**
+>> > + ? ? ? ?* unreference refcount of the gem object.
+>> > + ? ? ? ?* at drm_gem_object_lookup(), the gem object was referenced.
+>> > + ? ? ? ?*/
+>> > + ? ? ? drm_gem_object_unreference(gem_obj);
+>>
+>> this doesn't seem right, to drop the reference before you use the
+>> buffer elsewhere..
+>>
+> No, see drm_gem_object_lookup fxn. at this function, if there is a object
+> found then drm_gem_object_reference is called to increase refcount of this
+> object. if there is any missing point, give me any comment please. thank
+> you.
+
+
+Right, but I think there is a reason it takes a reference... so that
+the object doesn't get free'd from under your feet.  So pattern
+should, I think, be:
+
+  obj = lookup(...);
+  ... do stuff w/ obj ...
+  unreference(obj)
+
+so the caller who is using the looked up obj should unref it when done
+
+Instead, you have:
+
+  obj = lookup(...);
+  unreference(obj);
+  ... do stuff w/ obj ...
+
+
+BR,
+-R
