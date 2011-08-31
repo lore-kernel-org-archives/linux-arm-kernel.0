@@ -1,513 +1,202 @@
 From: msalter@redhat.com (Mark Salter)
-Date: Wed, 31 Aug 2011 17:26:44 -0400
-Subject: [PATCH 09/24] C6X: signal management
+Date: Wed, 31 Aug 2011 17:26:47 -0400
+Subject: [PATCH 12/24] C6X: syscalls
 In-Reply-To: <1314826019-22330-1-git-send-email-msalter@redhat.com>
 References: <1314826019-22330-1-git-send-email-msalter@redhat.com>
-Message-ID: <1314826019-22330-10-git-send-email-msalter@redhat.com>
+Message-ID: <1314826019-22330-13-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Mark Salter <msalter@redhat.com>
 ---
- arch/c6x/include/asm/sigcontext.h |   80 ++++++++
- arch/c6x/include/asm/signal.h     |   17 ++
- arch/c6x/kernel/signal.c          |  377 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 474 insertions(+), 0 deletions(-)
- create mode 100644 arch/c6x/include/asm/sigcontext.h
- create mode 100644 arch/c6x/include/asm/signal.h
- create mode 100644 arch/c6x/kernel/signal.c
+ arch/c6x/include/asm/syscalls.h |   55 ++++++++++++++++++++++++++
+ arch/c6x/include/asm/unistd.h   |   26 ++++++++++++
+ arch/c6x/kernel/sys_c6x.c       |   82 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 163 insertions(+), 0 deletions(-)
+ create mode 100644 arch/c6x/include/asm/syscalls.h
+ create mode 100644 arch/c6x/include/asm/unistd.h
+ create mode 100644 arch/c6x/kernel/sys_c6x.c
 
-diff --git a/arch/c6x/include/asm/sigcontext.h b/arch/c6x/include/asm/sigcontext.h
+diff --git a/arch/c6x/include/asm/syscalls.h b/arch/c6x/include/asm/syscalls.h
 new file mode 100644
-index 0000000..eb702f3
+index 0000000..aed53da
 --- /dev/null
-+++ b/arch/c6x/include/asm/sigcontext.h
-@@ -0,0 +1,80 @@
++++ b/arch/c6x/include/asm/syscalls.h
+@@ -0,0 +1,55 @@
 +/*
-+ *  Port on Texas Instruments TMS320C6x architecture
++ * Copyright (C) 2011 Texas Instruments Incorporated
++ * Author: Mark Salter <msalter@redhat.com>
 + *
-+ *  Copyright (C) 2004, 2009 Texas Instruments Incorporated
-+ *  Author: Aurelien Jacquiot (aurelien.jacquiot at jaluna.com)
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation, version 2.
 + *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
++ * NON INFRINGEMENT.  See the GNU General Public License for
++ * more details.
 + */
-+#ifndef _ASM_C6X_SIGCONTEXT_H
-+#define _ASM_C6X_SIGCONTEXT_H
 +
++#ifndef __ASM_C6X_SYSCALLS_H
++#define __ASM_C6X_SYSCALLS_H
 +
-+struct sigcontext {
-+	unsigned long  sc_mask;		/* old sigmask */
-+	unsigned long  sc_sp;		/* old user stack pointer */
-+
-+	unsigned long  sc_a4;
-+	unsigned long  sc_b4;
-+	unsigned long  sc_a6;
-+	unsigned long  sc_b6;
-+	unsigned long  sc_a8;
-+	unsigned long  sc_b8;
-+
-+	unsigned long  sc_a0;
-+	unsigned long  sc_a1;
-+	unsigned long  sc_a2;
-+	unsigned long  sc_a3;
-+	unsigned long  sc_a5;
-+	unsigned long  sc_a7;
-+	unsigned long  sc_a9;
-+
-+	unsigned long  sc_b0;
-+	unsigned long  sc_b1;
-+	unsigned long  sc_b2;
-+	unsigned long  sc_b3;
-+	unsigned long  sc_b5;
-+	unsigned long  sc_b7;
-+	unsigned long  sc_b9;
-+
-+	unsigned long  sc_a16;
-+	unsigned long  sc_a17;
-+	unsigned long  sc_a18;
-+	unsigned long  sc_a19;
-+	unsigned long  sc_a20;
-+	unsigned long  sc_a21;
-+	unsigned long  sc_a22;
-+	unsigned long  sc_a23;
-+	unsigned long  sc_a24;
-+	unsigned long  sc_a25;
-+	unsigned long  sc_a26;
-+	unsigned long  sc_a27;
-+	unsigned long  sc_a28;
-+	unsigned long  sc_a29;
-+	unsigned long  sc_a30;
-+	unsigned long  sc_a31;
-+
-+	unsigned long  sc_b16;
-+	unsigned long  sc_b17;
-+	unsigned long  sc_b18;
-+	unsigned long  sc_b19;
-+	unsigned long  sc_b20;
-+	unsigned long  sc_b21;
-+	unsigned long  sc_b22;
-+	unsigned long  sc_b23;
-+	unsigned long  sc_b24;
-+	unsigned long  sc_b25;
-+	unsigned long  sc_b26;
-+	unsigned long  sc_b27;
-+	unsigned long  sc_b28;
-+	unsigned long  sc_b29;
-+	unsigned long  sc_b30;
-+	unsigned long  sc_b31;
-+
-+	unsigned long  sc_csr;
-+	unsigned long  sc_pc;
-+};
-+
-+#endif /* _ASM_C6X_SIGCONTEXT_H */
-diff --git a/arch/c6x/include/asm/signal.h b/arch/c6x/include/asm/signal.h
-new file mode 100644
-index 0000000..f1cd870
---- /dev/null
-+++ b/arch/c6x/include/asm/signal.h
-@@ -0,0 +1,17 @@
-+#ifndef _ASM_C6X_SIGNAL_H
-+#define _ASM_C6X_SIGNAL_H
-+
-+#include <asm-generic/signal.h>
-+
-+#ifndef __ASSEMBLY__
++#include <linux/compiler.h>
 +#include <linux/linkage.h>
++#include <linux/types.h>
++
++/* The array of function pointers for syscalls. */
++extern void *sys_call_table[];
++
++/* The following are trampolines in entry.S to handle 64-bit arguments */
++extern long sys_pread_c6x(unsigned int fd, char __user *buf,
++			  size_t count, off_t pos_low, off_t pos_high);
++extern long sys_pwrite_c6x(unsigned int fd, const char __user *buf,
++			   size_t count, off_t pos_low, off_t pos_high);
++extern long sys_truncate64_c6x(const char __user *path,
++			       off_t length_low, off_t length_high);
++extern long sys_ftruncate64_c6x(unsigned int fd,
++			       off_t length_low, off_t length_high);
++extern long sys_fadvise64_c6x(int fd, u32 offset_lo, u32 offset_hi,
++			      u32 len, int advice);
++extern long sys_fadvise64_64_c6x(int fd, u32 offset_lo, u32 offset_hi,
++				u32 len_lo, u32 len_hi, int advice);
++extern long sys_fallocate_c6x(int fd, int mode,
++			      u32 offset_lo, u32 offset_hi,
++			      u32 len_lo, u32 len_hi);
++extern int sys_cache_sync(unsigned long s, unsigned long e);
 +
 +struct pt_regs;
 +
-+extern asmlinkage int do_rt_sigreturn(struct pt_regs *regs);
-+extern asmlinkage void do_notify_resume(struct pt_regs *regs,
-+					u32 thread_info_flags,
-+					int syscall);
-+#endif
++extern asmlinkage long sys_c6x_clone(struct pt_regs *regs);
++extern asmlinkage long sys_c6x_execve(const char __user *name,
++				      const char __user *const __user *argv,
++				      const char __user *const __user *envp,
++				      struct pt_regs *regs);
 +
-+#endif /* _ASM_C6X_SIGNAL_H */
-diff --git a/arch/c6x/kernel/signal.c b/arch/c6x/kernel/signal.c
++
++#include <asm-generic/syscalls.h>
++
++#endif /* __ASM_C6X_SYSCALLS_H */
+diff --git a/arch/c6x/include/asm/unistd.h b/arch/c6x/include/asm/unistd.h
 new file mode 100644
-index 0000000..89cfabd
+index 0000000..6d54ea4
 --- /dev/null
-+++ b/arch/c6x/kernel/signal.c
-@@ -0,0 +1,377 @@
++++ b/arch/c6x/include/asm/unistd.h
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (C) 2011 Texas Instruments Incorporated
++ *
++ * Based on arch/tile version.
++ *
++ *   This program is free software; you can redistribute it and/or
++ *   modify it under the terms of the GNU General Public License
++ *   as published by the Free Software Foundation, version 2.
++ *
++ *   This program is distributed in the hope that it will be useful, but
++ *   WITHOUT ANY WARRANTY; without even the implied warranty of
++ *   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
++ *   NON INFRINGEMENT.	See the GNU General Public License for
++ *   more details.
++ */
++#if !defined(_ASM_C6X_UNISTD_H) || defined(__SYSCALL)
++#define _ASM_C6X_UNISTD_H
++
++/* Use the standard ABI for syscalls. */
++#include <asm-generic/unistd.h>
++
++/* C6X-specific syscalls. */
++#define __NR_cache_sync	(__NR_arch_specific_syscall + 0)
++__SYSCALL(__NR_cache_sync, sys_cache_sync)
++
++#endif /* _ASM_C6X_UNISTD_H */
+diff --git a/arch/c6x/kernel/sys_c6x.c b/arch/c6x/kernel/sys_c6x.c
+new file mode 100644
+index 0000000..057fb87
+--- /dev/null
++++ b/arch/c6x/kernel/sys_c6x.c
+@@ -0,0 +1,82 @@
 +/*
 + *  Port on Texas Instruments TMS320C6x architecture
 + *
-+ *  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
++ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
 + *  Author: Aurelien Jacquiot (aurelien.jacquiot at jaluna.com)
-+ *
-+ *  Updated for 2.6.34: Mark Salter <msalter@redhat.com>
 + *
 + *  This program is free software; you can redistribute it and/or modify
 + *  it under the terms of the GNU General Public License version 2 as
 + *  published by the Free Software Foundation.
 + */
-+
-+#include <linux/kernel.h>
-+#include <linux/uaccess.h>
 +#include <linux/syscalls.h>
-+#include <linux/tracehook.h>
++#include <linux/uaccess.h>
 +
-+#include <asm/ucontext.h>
-+#include <asm/cacheflush.h>
++#include <asm/syscalls.h>
 +
++#ifdef CONFIG_ACCESS_CHECK
++int _access_ok(unsigned long addr, unsigned long size)
++{
++	if (!size)
++		return 1;
 +
-+#define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
++	if (!addr || addr > (0xffffffffUL - (size - 1)))
++		goto _bad_access;
++
++	if (segment_eq(get_fs(), KERNEL_DS))
++		return 1;
++
++	if (memory_start <= addr && (addr + size - 1) < memory_end)
++		return 1;
++
++_bad_access:
++	pr_debug("Bad access attempt: pid[%d] addr[%08lx] size[0x%lx]\n",
++		 current->pid, addr, size);
++	return 0;
++}
++EXPORT_SYMBOL(_access_ok);
++#endif
++
++/* sys_cache_sync -- sync caches over given range */
++asmlinkage int sys_cache_sync(unsigned long s, unsigned long e)
++{
++	L1D_cache_block_writeback_invalidate(s, e);
++	L1P_cache_block_invalidate(s, e);
++
++	return 0;
++}
++
++asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
++			 unsigned long prot, unsigned long flags,
++			 unsigned long fd, off_t offset)
++{
++	if (offset & ~PAGE_MASK)
++		return -EINVAL;
++	return sys_mmap_pgoff(addr, len, prot, flags, fd, offset >> PAGE_SHIFT);
++}
++
++/* Provide the actual syscall number to call mapping. */
++#undef __SYSCALL
++#define __SYSCALL(nr, call) [nr] = (call),
 +
 +/*
-+ * Do a signal return, undo the signal stack.
++ * Use trampolines
 + */
++#define sys_pread64		sys_pread_c6x
++#define sys_pwrite64		sys_pwrite_c6x
++#define sys_truncate64		sys_truncate64_c6x
++#define sys_ftruncate64		sys_ftruncate64_c6x
++#define sys_fadvise64		sys_fadvise64_c6x
++#define sys_fadvise64_64	sys_fadvise64_64_c6x
++#define sys_fallocate		sys_fallocate_c6x
 +
-+#define RETCODE_SIZE (9 << 2)	/* 9 instructions = 36 bytes */
++/* Use sys_mmap_pgoff directly */
++#define sys_mmap2 sys_mmap_pgoff
 +
-+struct rt_sigframe {
-+	struct siginfo __user *pinfo;
-+	void __user *puc;
-+	struct siginfo info;
-+	struct ucontext uc;
-+	unsigned long retcode[RETCODE_SIZE >> 2];
++/*
++ * Note that we can't include <linux/unistd.h> here since the header
++ * guard will defeat us; <asm/unistd.h> checks for __SYSCALL as well.
++ */
++void *sys_call_table[__NR_syscalls] = {
++	[0 ... __NR_syscalls-1] = sys_ni_syscall,
++#include <asm/unistd.h>
 +};
-+
-+static int restore_sigcontext(struct pt_regs *regs,
-+			      struct sigcontext __user *sc)
-+{
-+	int err = 0;
-+
-+	/* The access_ok check was done by caller, so use __get_user here */
-+#define COPY(x)  (err |= __get_user(regs->x, &sc->sc_##x))
-+
-+	COPY(sp); COPY(a4); COPY(b4); COPY(a6); COPY(b6); COPY(a8); COPY(b8);
-+	COPY(a0); COPY(a1); COPY(a2); COPY(a3); COPY(a5); COPY(a7); COPY(a9);
-+	COPY(b0); COPY(b1); COPY(b2); COPY(b3); COPY(b5); COPY(b7); COPY(b9);
-+
-+	COPY(a16); COPY(a17); COPY(a18); COPY(a19);
-+	COPY(a20); COPY(a21); COPY(a22); COPY(a23);
-+	COPY(a24); COPY(a25); COPY(a26); COPY(a27);
-+	COPY(a28); COPY(a29); COPY(a30); COPY(a31);
-+	COPY(b16); COPY(b17); COPY(b18); COPY(b19);
-+	COPY(b20); COPY(b21); COPY(b22); COPY(b23);
-+	COPY(b24); COPY(b25); COPY(b26); COPY(b27);
-+	COPY(b28); COPY(b29); COPY(b30); COPY(b31);
-+
-+	COPY(csr); COPY(pc);
-+
-+#undef COPY
-+
-+	return err;
-+}
-+
-+asmlinkage int do_rt_sigreturn(struct pt_regs *regs)
-+{
-+	struct rt_sigframe __user *frame;
-+	sigset_t set;
-+
-+	/*
-+	 * Since we stacked the signal on a dword boundary,
-+	 * 'sp' should be dword aligned here.  If it's
-+	 * not, then the user is trying to mess with us.
-+	 */
-+	if (regs->sp & 7)
-+		goto badframe;
-+
-+	frame = (struct rt_sigframe __user *) ((unsigned long) regs->sp + 8);
-+
-+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
-+		goto badframe;
-+	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
-+		goto badframe;
-+
-+	sigdelsetmask(&set, ~_BLOCKABLE);
-+	spin_lock_irq(&current->sighand->siglock);
-+	current->blocked = set;
-+	recalc_sigpending();
-+	spin_unlock_irq(&current->sighand->siglock);
-+
-+	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
-+		goto badframe;
-+
-+	return regs->a4;
-+
-+badframe:
-+	force_sig(SIGSEGV, current);
-+	return 0;
-+}
-+
-+static int setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
-+			    unsigned long mask)
-+{
-+	int err = 0;
-+
-+	err |= __put_user(mask, &sc->sc_mask);
-+
-+	/* The access_ok check was done by caller, so use __put_user here */
-+#define COPY(x) (err |= __put_user(regs->x, &sc->sc_##x))
-+
-+	COPY(sp); COPY(a4); COPY(b4); COPY(a6); COPY(b6); COPY(a8); COPY(b8);
-+	COPY(a0); COPY(a1); COPY(a2); COPY(a3); COPY(a5); COPY(a7); COPY(a9);
-+	COPY(b0); COPY(b1); COPY(b2); COPY(b3); COPY(b5); COPY(b7); COPY(b9);
-+
-+	COPY(a16); COPY(a17); COPY(a18); COPY(a19);
-+	COPY(a20); COPY(a21); COPY(a22); COPY(a23);
-+	COPY(a24); COPY(a25); COPY(a26); COPY(a27);
-+	COPY(a28); COPY(a29); COPY(a30); COPY(a31);
-+	COPY(b16); COPY(b17); COPY(b18); COPY(b19);
-+	COPY(b20); COPY(b21); COPY(b22); COPY(b23);
-+	COPY(b24); COPY(b25); COPY(b26); COPY(b27);
-+	COPY(b28); COPY(b29); COPY(b30); COPY(b31);
-+
-+	COPY(csr); COPY(pc);
-+
-+#undef COPY
-+
-+	return err;
-+}
-+
-+static inline void __user *get_sigframe(struct k_sigaction *ka,
-+					struct pt_regs *regs,
-+					unsigned long framesize)
-+{
-+	unsigned long sp = regs->sp;
-+
-+	/*
-+	 * This is the X/Open sanctioned signal stack switching.
-+	 */
-+	if ((ka->sa.sa_flags & SA_ONSTACK) && sas_ss_flags(sp) == 0)
-+		sp = current->sas_ss_sp + current->sas_ss_size;
-+
-+	/*
-+	 * No matter what happens, 'sp' must be dword
-+	 * aligned. Otherwise, nasty things will happen
-+	 */
-+	return (void __user *)((sp - framesize) & ~7);
-+}
-+
-+static int setup_rt_frame(int signr, struct k_sigaction *ka, siginfo_t *info,
-+			   sigset_t *set, struct pt_regs *regs)
-+{
-+	struct rt_sigframe __user *frame;
-+	unsigned long __user *retcode;
-+	int err = 0;
-+
-+	frame = get_sigframe(ka, regs, sizeof(*frame));
-+
-+	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
-+		goto segv_and_exit;
-+
-+	err |= __put_user(&frame->info, &frame->pinfo);
-+	err |= __put_user(&frame->uc, &frame->puc);
-+	err |= copy_siginfo_to_user(&frame->info, info);
-+
-+	/* Clear all the bits of the ucontext we don't use.  */
-+	err |= __clear_user(&frame->uc, offsetof(struct ucontext, uc_mcontext));
-+
-+	err |= setup_sigcontext(&frame->uc.uc_mcontext,	regs, set->sig[0]);
-+	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
-+
-+	/* Set up to return from userspace */
-+	retcode = (unsigned long __user *) &frame->retcode;
-+
-+	/* The access_ok check was done above, so use __put_user here */
-+#define COPY(x) (err |= __put_user(x, retcode++))
-+
-+	COPY(0x0000002AUL | (__NR_rt_sigreturn << 7));
-+				/* MVK __NR_rt_sigreturn,B0 */
-+	COPY(0x10000000UL);	/* SWE */
-+	COPY(0x00006000UL);	/* NOP 4 */
-+	COPY(0x00006000UL);	/* NOP 4 */
-+	COPY(0x00006000UL);	/* NOP 4 */
-+	COPY(0x00006000UL);	/* NOP 4 */
-+	COPY(0x00006000UL);	/* NOP 4 */
-+	COPY(0x00006000UL);	/* NOP 4 */
-+	COPY(0x00006000UL);	/* NOP 4 */
-+
-+#undef COPY
-+
-+	if (err)
-+		goto segv_and_exit;
-+
-+	flush_icache_range((unsigned long) &frame->retcode,
-+			   (unsigned long) &frame->retcode + RETCODE_SIZE);
-+
-+	retcode = (unsigned long __user *) &frame->retcode;
-+
-+	/* Change user context to branch to signal handler */
-+	regs->sp = (unsigned long) frame - 8;
-+	regs->b3 = (unsigned long) retcode;
-+	regs->pc = (unsigned long) ka->sa.sa_handler;
-+
-+	/* Give the signal number to the handler */
-+	regs->a4 = signr;
-+
-+	/*
-+	 * For realtime signals we must also set the second and third
-+	 * arguments for the signal handler.
-+	 *   -- Peter Maydell <pmaydell@chiark.greenend.org.uk> 2000-12-06
-+	 */
-+	regs->b4 = (unsigned long)&frame->info;
-+	regs->a6 = (unsigned long)&frame->uc;
-+
-+	return 0;
-+
-+segv_and_exit:
-+	force_sig(SIGSEGV, current);
-+	return -EFAULT;
-+}
-+
-+static inline void
-+handle_restart(struct pt_regs *regs, struct k_sigaction *ka, int has_handler)
-+{
-+	switch (regs->a4) {
-+	case -ERESTARTNOHAND:
-+		if (!has_handler)
-+			goto do_restart;
-+		regs->a4 = -EINTR;
-+		break;
-+
-+	case -ERESTARTSYS:
-+		if (has_handler && !(ka->sa.sa_flags & SA_RESTART)) {
-+			regs->a4 = -EINTR;
-+			break;
-+		}
-+	/* fallthrough */
-+	case -ERESTARTNOINTR:
-+do_restart:
-+		regs->a4 = regs->orig_a4;
-+		regs->pc -= 4;
-+		break;
-+	}
-+}
-+
-+/*
-+ * handle the actual delivery of a signal to userspace
-+ */
-+static int handle_signal(int sig,
-+			 siginfo_t *info, struct k_sigaction *ka,
-+			 sigset_t *oldset, struct pt_regs *regs,
-+			 int syscall)
-+{
-+	int ret;
-+
-+	/* Are we from a system call? */
-+	if (syscall) {
-+		/* If so, check system call restarting.. */
-+		switch (regs->a4) {
-+		case -ERESTART_RESTARTBLOCK:
-+		case -ERESTARTNOHAND:
-+			regs->a4 = -EINTR;
-+			break;
-+
-+		case -ERESTARTSYS:
-+			if (!(ka->sa.sa_flags & SA_RESTART)) {
-+				regs->a4 = -EINTR;
-+				break;
-+			}
-+
-+			/* fallthrough */
-+		case -ERESTARTNOINTR:
-+			regs->a4 = regs->orig_a4;
-+			regs->pc -= 4;
-+		}
-+	}
-+
-+	/* Set up the stack frame */
-+	ret = setup_rt_frame(sig, ka, info, oldset, regs);
-+	if (ret == 0) {
-+		spin_lock_irq(&current->sighand->siglock);
-+		sigorsets(&current->blocked, &current->blocked,
-+			  &ka->sa.sa_mask);
-+		if (!(ka->sa.sa_flags & SA_NODEFER))
-+			sigaddset(&current->blocked, sig);
-+		recalc_sigpending();
-+		spin_unlock_irq(&current->sighand->siglock);
-+	}
-+
-+	return ret;
-+}
-+
-+/*
-+ * handle a potential signal
-+ */
-+static void do_signal(struct pt_regs *regs, int syscall)
-+{
-+	struct k_sigaction ka;
-+	siginfo_t info;
-+	sigset_t *oldset;
-+	int signr;
-+
-+	/* we want the common case to go fast, which is why we may in certain
-+	 * cases get here from kernel mode */
-+	if (!user_mode(regs))
-+		return;
-+
-+	if (test_thread_flag(TIF_RESTORE_SIGMASK))
-+		oldset = &current->saved_sigmask;
-+	else
-+		oldset = &current->blocked;
-+
-+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
-+	if (signr > 0) {
-+		if (handle_signal(signr, &info, &ka, oldset,
-+				  regs, syscall) == 0) {
-+			/* a signal was successfully delivered; the saved
-+			 * sigmask will have been stored in the signal frame,
-+			 * and will be restored by sigreturn, so we can simply
-+			 * clear the TIF_RESTORE_SIGMASK flag */
-+			if (test_thread_flag(TIF_RESTORE_SIGMASK))
-+				clear_thread_flag(TIF_RESTORE_SIGMASK);
-+
-+			tracehook_signal_handler(signr, &info, &ka, regs, 0);
-+		}
-+
-+		return;
-+	}
-+
-+	/* did we come from a system call? */
-+	if (syscall) {
-+		/* restart the system call - no handlers present */
-+		switch (regs->a4) {
-+		case -ERESTARTNOHAND:
-+		case -ERESTARTSYS:
-+		case -ERESTARTNOINTR:
-+			regs->a4 = regs->orig_a4;
-+			regs->pc -= 4;
-+			break;
-+
-+		case -ERESTART_RESTARTBLOCK:
-+			regs->a4 = regs->orig_a4;
-+			regs->b0 = __NR_restart_syscall;
-+			regs->pc -= 4;
-+			break;
-+		}
-+	}
-+
-+	/* if there's no signal to deliver, we just put the saved sigmask
-+	 * back */
-+	if (test_thread_flag(TIF_RESTORE_SIGMASK)) {
-+		clear_thread_flag(TIF_RESTORE_SIGMASK);
-+		sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
-+	}
-+}
-+
-+/*
-+ * notification of userspace execution resumption
-+ * - triggered by current->work.notify_resume
-+ */
-+asmlinkage void do_notify_resume(struct pt_regs *regs, u32 thread_info_flags,
-+				 int syscall)
-+{
-+	/* deal with pending signal delivery */
-+	if (thread_info_flags & ((1 << TIF_SIGPENDING) |
-+				 (1 << TIF_RESTORE_SIGMASK)))
-+		do_signal(regs, syscall);
-+
-+	if (thread_info_flags & (1 << TIF_NOTIFY_RESUME)) {
-+		clear_thread_flag(TIF_NOTIFY_RESUME);
-+		tracehook_notify_resume(regs);
-+		if (current->replacement_session_keyring)
-+			key_replace_session_keyring();
-+	}
-+}
 -- 
 1.7.6
