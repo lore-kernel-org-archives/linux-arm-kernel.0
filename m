@@ -1,158 +1,48 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 31 Aug 2011 16:33:30 +0900
-Subject: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
-In-Reply-To: <20110831020652.GA16547@dumpdata.com>
-References: <1314359274-21585-1-git-send-email-inki.dae@samsung.com>
-	<CAF6AEGu3ss-rJC28H1rm2GWLm1bAZnHLftXfMLJQNeqjBt3umQ@mail.gmail.com>
-	<20110831020652.GA16547@dumpdata.com>
-Message-ID: <001101cc67b0$47b63410$d7229c30$%dae@samsung.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 31 Aug 2011 13:44:20 +0530
+Subject: [PATCH] ARM: S3C64XX: Fix clkdev device names for I2C clocks
+In-Reply-To: <20110831002133.GA1164@opensource.wolfsonmicro.com>
+References: <1314739841-13522-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<CAH9JG2UEZVQ+5AJbbtXQhuVzvDp_8-wJdNgOjwHs14Zj7_KP+g@mail.gmail.com>
+	<20110831002133.GA1164@opensource.wolfsonmicro.com>
+Message-ID: <CAJuYYwQikeoPbDX5DV4Y_HzOz2t04otLEUMye8CPpGLvhjwhyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Konrad Rzeszutek Wilk.
+On 31 August 2011 05:51, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Wed, Aug 31, 2011 at 08:48:03AM +0900, Kyungmin Park wrote:
+>
+>> It's not matched with your description. and also not matched with
+>> codes at "arch/arm/mach-s3c64xx/s3c6410.c"
+>
+>> ? ? ? ?/* the i2c devices are directly compatible with s3c2440 */
+>> ? ? ? ? s3c_i2c0_setname("s3c2440-i2c");
+>> ? ? ? ? s3c_i2c1_setname("s3c2440-i2c");
+>
+> Oh, FFS. ?That's what's broken - the names that are actually appearing
+> in the system are the names that the devices have in the relevant
+> dev-i2c?.c files and obviously there's no reason one would expect to
+> find code like the above since it's just a little abstruse to rewrite
+> the devices like that.
+>
+> Looking at the code I bet what broke it is the CPU revision
+> identification changes - it's now responsible for making sure the fixups
+> are run. ?Either it's not matching correctly or it's running too late to
+> make the fixup before the device is registered.
+>
+> Though the first part of the issue (the fact that I2C0 isn't using a
+> device name and I2C1 is) remains an issue.
 
-> -----Original Message-----
-> From: Konrad Rzeszutek Wilk [mailto:konrad.wilk at oracle.com]
-> Sent: Wednesday, August 31, 2011 11:07 AM
-> To: Rob Clark
-> Cc: Inki Dae; sw0312.kim at samsung.com; linux-kernel at vger.kernel.org; dri-
-> devel at lists.freedesktop.org; kyungmin.park at samsung.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC
-> EXYNOS4210.
-> 
-> > > + ? ? ? entry->vaddr = dma_alloc_writecombine(dev->dev, entry->size,
-> > > + ? ? ? ? ? ? ? ? ? ? ? (dma_addr_t *)&entry->paddr, GFP_KERNEL);
-> > > + ? ? ? if (!entry->paddr) {
-> > > + ? ? ? ? ? ? ? DRM_ERROR("failed to allocate buffer.\n");
-> > > + ? ? ? ? ? ? ? return -ENOMEM;
-> > > + ? ? ? }
-> > > +
-> > > + ? ? ? DRM_DEBUG_KMS("allocated : vaddr(0x%x), paddr(0x%x),
-> size(0x%x)\n",
-> > > + ? ? ? ? ? ? ? ? ? ? ? (unsigned int)entry->vaddr, entry->paddr,
-entry-
-> >size);
-> > > +
-> > > + ? ? ? return 0;
-> > > +}
-> > > +
-> > [snip]
-> >
-> > > diff --git a/drivers/gpu/drm/samsung/samsung_drm_buf.h
-> b/drivers/gpu/drm/samsung/samsung_drm_buf.h
-> > > new file mode 100644
-> > > index 0000000..d6a7e95
-> > > --- /dev/null
-> > > +++ b/drivers/gpu/drm/samsung/samsung_drm_buf.h
-> > [snip]
-> > > +/**
-> > > + * samsung drm buffer entry structure.
-> > > + *
-> > > + * @paddr: physical address of allocated memory.
-> > > + * @vaddr: kernel virtual address of allocated memory.
-> > > + * @size: size of allocated memory.
-> > > + */
-> > > +struct samsung_drm_buf_entry {
-> > > + ? ? ? unsigned int paddr;
-> 
-> This could be made 'dma_addr_t' and then you can drop all of the
-> casts to (dma_addr_t *).
-> 
+There are two instances of clock with name i2c registered for s3c64xx.
+One has a devname and the other does not. So this continued to work.
+The i2c0 clock instance did not get a devname because its instance id
+was -1 (prior to clkdev support).
 
-Ok, I will correct it right now. thank you.
+If a devname is added to i2c0 clock instance for s3c64xx, it should be
+set to "s3c2440-i2c". If the devname is set to "s3c2440-i2c.0", then
+CONFIG_S3C_DEV_I2C1 will have to defined for s3c64xx, otherwise, as
+per arch/arm/plat-samsung/dev-i2c0.c, the platform device id for i2c0
+instance will be -1 and the clock lookup for i2c0 will fail.
 
-> .. snip..
-> > > +static int samsung_drm_connector_get_modes(struct drm_connector
-> *connector)
-> 
-> Why not make the return be 'unsigned int'?
-> 
-
-Yes, I think so, but please, see drm_connector_helper_funcs structure of
-drm_crtc_helper.h. get_modes callback has int type as return.
-
-> .. snip..
-> > > +/* get detection status of display device. */
-> > > +static enum drm_connector_status
-> > > +samsung_drm_connector_detect(struct drm_connector *connector, bool
-> force)
-> > > +{
-> > > + ? ? ? struct samsung_drm_connector *samsung_connector =
-> > > + ? ? ? ? ? ? ? to_samsung_connector(connector);
-> > > + ? ? ? struct samsung_drm_display *display =
-> > > + ? ? ? ? ? ? ? samsung_drm_get_manager(samsung_connector->encoder)-
-> >display;
-> > > + ? ? ? unsigned int ret = connector_status_unknown;
-> 
-> Not 'enum drm_connector_status ret = connector_status_unknown' ?
-> 
-
-Oh, you are right, I will fix up it. thank you.
-
-> > > +
-> > > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
-> > > +
-> > > + ? ? ? if (display && display->is_connected) {
-> > > + ? ? ? ? ? ? ? if (display->is_connected())
-> > > + ? ? ? ? ? ? ? ? ? ? ? ret = connector_status_connected;
-> > > + ? ? ? ? ? ? ? else
-> > > + ? ? ? ? ? ? ? ? ? ? ? ret = connector_status_disconnected;
-> > > + ? ? ? }
-> > > +
-> > > + ? ? ? return ret;
-> > > +}
-> 
-> .. snip..
-> > > +static void samsung_drm_fb_destroy(struct drm_framebuffer *fb)
-> > > +{
-> > > + ? ? ? struct samsung_drm_fb *samsung_fb = to_samsung_fb(fb);
-> > > + ? ? ? int ret;
-> 
-> Get rid of 'ret'
-
-It seems that it doesn't need 'ret' but it needs to check 'ret' because of
-drm_gem_handle_delete().
-
-> > > +
-> > > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
-> > > +
-> > > + ? ? ? drm_framebuffer_cleanup(fb);
-> > > +
-> > > + ? ? ? if (samsung_fb->is_default) {
-> > > + ? ? ? ? ? ? ? ret = drm_gem_handle_delete(samsung_fb->file_priv,
-> > > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? samsung_fb->gem_handle);
-> >
-> > why not keep the gem buffer ptr, and do something like:
-> >
-> >   drm_gem_object_unreference_unlocked(samsung_fb->bo)..
-> >
-> > this way, you get the right behavior if someone somewhere else took a
-> > ref to the gem buffer object?  And it avoids needing to keep the
-> > file_priv ptr in the fb (which seems a bit strange)
-> >
-> >
-> > > + ? ? ? ? ? ? ? if (ret < 0)
-> > > + ? ? ? ? ? ? ? ? ? ? ? DRM_ERROR("failed to delete
-drm_gem_handle.\n");
-> 
-> And just do the check on the function return value here. You are not using
-> the 'ret' for anything.
-
-Yes, right. it just prints out error message because drm_gem_handle_delete
-function which is mainline function doesn't leave any error message. anyway
-using 'ret' is not clear. so I will remove 'ret' and check
-drm_gem_handle_delete function directly instead to print out error message.
-
-> > > + ? ? ? }
-> > > +
-> > > + ? ? ? kfree(samsung_fb);
-> > > +}
-> > > +
-> > [snip]
-> 
-> Hm, so I stopped here - just realized that I am missing some of the code
-> and I should look at the original patch..
-
-Thank you for your comments. it's been very useful. please give me your
-comments and advices anytime then I will be pleased.
+Regards,
+Thomas.
