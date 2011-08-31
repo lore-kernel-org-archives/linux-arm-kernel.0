@@ -1,72 +1,55 @@
 From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Wed, 31 Aug 2011 18:22:55 +0300
-Subject: [PATCH 08/14] omap: mcbsp: Use per instance register cache size
-In-Reply-To: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
-References: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <1314804181-17260-9-git-send-email-jarkko.nikula@bitmer.com>
+Date: Wed, 31 Aug 2011 18:22:47 +0300
+Subject: [PATCH 00/14] McBSP cleanup and generalization
+Message-ID: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rationale here is to remove one global variable and to make possible to have
-variable size McBSP register maps inside SoC.
+Hi
 
-Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
----
- arch/arm/plat-omap/include/plat/mcbsp.h |    3 ++-
- arch/arm/plat-omap/mcbsp.c              |    6 +++---
- 2 files changed, 5 insertions(+), 4 deletions(-)
+Updates and continuation to my McBSP cleanup RFC set I sent before vacation
+period. Motivation here is to get rid off all is_omap and CONFIG_ARCH stuff
+and to make code a step more generic (and for preparing to move code out
+under arch/arm/).
 
-diff --git a/arch/arm/plat-omap/include/plat/mcbsp.h b/arch/arm/plat-omap/include/plat/mcbsp.h
-index 0fad63c..648344a 100644
---- a/arch/arm/plat-omap/include/plat/mcbsp.h
-+++ b/arch/arm/plat-omap/include/plat/mcbsp.h
-@@ -359,6 +359,7 @@ struct omap_mcbsp {
- 	u16 max_tx_thres;
- 	u16 max_rx_thres;
- 	void *reg_cache;
-+	int reg_cache_size;
- };
- 
- /**
-@@ -370,7 +371,7 @@ struct omap_mcbsp_dev_attr {
- };
- 
- extern struct omap_mcbsp **mcbsp_ptr;
--extern int omap_mcbsp_count, omap_mcbsp_cache_size;
-+extern int omap_mcbsp_count;
- 
- #define omap_mcbsp_check_valid_id(id)	(id < omap_mcbsp_count)
- #define id_to_mcbsp_ptr(id)		mcbsp_ptr[id];
-diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-index 234ab16..3ad536e 100644
---- a/arch/arm/plat-omap/mcbsp.c
-+++ b/arch/arm/plat-omap/mcbsp.c
-@@ -31,7 +31,7 @@
- #include "../mach-omap2/cm-regbits-34xx.h"
- 
- struct omap_mcbsp **mcbsp_ptr;
--int omap_mcbsp_count, omap_mcbsp_cache_size;
-+int omap_mcbsp_count;
- 
- static void omap_mcbsp_write(struct omap_mcbsp *mcbsp, u16 reg, u32 val)
- {
-@@ -678,7 +678,7 @@ int omap_mcbsp_request(unsigned int id)
- 	}
- 	mcbsp = id_to_mcbsp_ptr(id);
- 
--	reg_cache = kzalloc(omap_mcbsp_cache_size, GFP_KERNEL);
-+	reg_cache = kzalloc(mcbsp->reg_cache_size, GFP_KERNEL);
- 	if (!reg_cache) {
- 		return -ENOMEM;
- 	}
-@@ -1225,7 +1225,7 @@ static int __devinit omap_mcbsp_probe(struct platform_device *pdev)
- 		}
- 	}
- 	mcbsp->phys_base = res->start;
--	omap_mcbsp_cache_size = resource_size(res);
-+	mcbsp->reg_cache_size = resource_size(res);
- 	mcbsp->io_base = ioremap(res->start, resource_size(res));
- 	if (!mcbsp->io_base) {
- 		ret = -ENOMEM;
+I hope this version doesn't break OMAP1. I suppose it should work now as
+the register and dma addresses are calculated from common register numbers
+and not by mangling from OMAP2+ register offsets (Thanks for
+Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> for the idea).
+
+Also MCBSP_CONFIG_TYPEx defines are not used to replace is_omap tests in
+plat/mcbsp.c in this version but by using a feature flags (Thanks for
+Charulatha V <charu@ti.com> for the idea).
+
+Note that patch 01/14 has from address to my disabled google account. This
+is since the patch is already committed in to
+for_3.2/omap_device branch of Kevin's git tree.
+
+Jarkko Nikula (14):
+  omap: mcbsp: Remove omap device API
+  omap: mcbsp: Remove unused variables from platform data
+  omap: mcbsp: Move out omap_mcbsp_register_board_cfg from
+    plat-omap/devices.c
+  omap: mcbsp: Implement generic register access
+  omap: mcbsp: Make wakeup control generic
+  omap: mcbsp: Make tranceiver configuration control register access
+    generic
+  omap: mcbsp: Make threshold based transfer code generic
+  omap: mcbsp: Use per instance register cache size
+  omap: mcbsp: Move sidetone clock management to mach-omap2/mcbsp.c
+  omap: mcbsp: Cleanup sidetone control initialization and make it
+    generic
+  omap: mcbsp: Update mcbsp.h include dependencies
+  omap: mcbsp: Move address definitions to arch/arm/mach-omap1/mcbsp.c
+  omap: mcbsp: Start generalize omap2_mcbsp_set_clks_src
+  omap: mcbsp: Start generalize signal muxing functions
+
+ arch/arm/mach-omap1/mcbsp.c             |   45 ++++
+ arch/arm/mach-omap2/mcbsp.c             |  103 ++++++---
+ arch/arm/plat-omap/devices.c            |   46 ----
+ arch/arm/plat-omap/include/plat/mcbsp.h |  208 ++++++------------
+ arch/arm/plat-omap/mcbsp.c              |  385 +++++++++++++------------------
+ 5 files changed, 342 insertions(+), 445 deletions(-)
+
 -- 
 1.7.5.4
