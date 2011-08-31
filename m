@@ -1,51 +1,47 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Wed, 31 Aug 2011 12:32:29 +1000
-Subject: How to handle named resources with DT?
-In-Reply-To: <20110830092722.GG23907@legolas.emea.dhcp.ti.com>
-References: <20110809205723.GE11568@ponder.secretlab.ca>
-	<877h6173wm.fsf@ti.com> <20110826041200.GD2308@yookeroo.fritz.box>
-	<201108261258.32880.arnd@arndb.de> <4E57A9FB.5030404@ti.com>
-	<20110830022912.GE4254@yookeroo.fritz.box>
-	<20110830092722.GG23907@legolas.emea.dhcp.ti.com>
-Message-ID: <20110831023229.GF11906@yookeroo.fritz.box>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed, 31 Aug 2011 11:08:48 +0800
+Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
+	Summit 2011
+In-Reply-To: <201108310459.39083.marek.vasut@gmail.com>
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+	<CAK5ve-K=XV2PnBsiG5E4O2pE0SR5AERhg9v6k05Z-0MgBq_HdQ@mail.gmail.com>
+	<201108310459.39083.marek.vasut@gmail.com>
+Message-ID: <CAK5ve-++-fw+eAqG2g9LTGjhOdtsg=cm2m09xMnW42i+Y+bmQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2011 at 12:27:24PM +0300, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Aug 30, 2011 at 12:29:12PM +1000, David Gibson wrote:
-> > So, I actually agree that in the long term getting resource names in
-> > the DT would be a generally good thing.
-> > 
-> > But doing so is a *huge* change in one of the very core semantics of
-> > all the DT bindings.  It's not something that should be done lightly
-> > or quickly.  It absolutely should not be tied to how this is handled
-> 
-> the longer you take to change, the more complex will it be to
-> change.
+On Wed, Aug 31, 2011 at 10:59 AM, Marek Vasut <marek.vasut@gmail.com> wrote:
+> On Wednesday, August 31, 2011 04:57:58 AM Bryan Wu wrote:
+>> On Tue, Aug 30, 2011 at 2:00 PM, Grant Likely <grant.likely@secretlab.ca>
+> wrote:
+>> > Updated attendee list:
+>> > Confirmed:
+>> > 1) Nicolas Pitre - arm-soc tree maintainer
+>> > 2) Arnd Bergmann - arm-soc tree maintainer
+>> > 3) Olof Johansson - tegra maintainer
+>> > 4) David Brown
+>> > 5) Marek Vasut - Various pxa boards maintainer
+>> > 6) Ohad Ben-Cohen
+>> > 7) Sascha Hauer
+>> > 8) Paul Walmsley
+>> > 9) Catalin Marinas
+>> > 10) Kukjin Kim - Samsung SoC maintainer
+>> > 11) Kyungmin Park - Samsung SoC maintainer
+>> > 12) Mark Brown - ASoC maintainer
+>> > 13) Grant Likely
+>> >
+>> > Waiting for confirmation:
+>> > 14) Pavel Machek
+>> > 15) Eric Miao - pxa/mmp maintainer
+>>
+>> I guess Eric won't come, since he and I have to attend UDS in US just
+>> the week after ELC-E and KS.
+>
+> Won't Eric be on both? I think I heard something like that, but it might be a
+> fuzzy information ;-)
+>
 
-No, not really.
+Yeah, we booked the same flights from Shanghai to US. So I think he
+won't come this time.
 
-> The longer we spend discussing the validity of _byname(), more
-> boards/archs/whatnot will be converted to DT without _byname() and after
-> a certain amount of them are converted, noone will be willing to change
-> and validate everything again.
-
-I'm not discussing the validity of _byname (Russell King is, but
-that's not an argument I have a position of).  What I'm saying is that
-the kernel internal use of byname, and named resources in the DT are
-different things which should be approached independently.
-
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110831/04e80fbe/attachment.sig>
+-Bryan
