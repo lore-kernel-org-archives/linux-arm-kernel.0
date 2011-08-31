@@ -1,34 +1,38 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 31 Aug 2011 12:03:31 +0200
-Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
-	platforms
-In-Reply-To: <1314762635-3923-2-git-send-email-richard.zhu@linaro.org>
-	(Richard Zhu's message of "Wed, 31 Aug 2011 11:50:31 +0800")
-References: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
-	<1314762635-3923-2-git-send-email-richard.zhu@linaro.org>
-Message-ID: <87k49t99u4.fsf@lebrac.rtp-net.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 31 Aug 2011 11:25:30 +0100
+Subject: [PATCH] ARM: S3C64XX: Fix clkdev device names for I2C clocks
+In-Reply-To: <CAJuYYwQikeoPbDX5DV4Y_HzOz2t04otLEUMye8CPpGLvhjwhyw@mail.gmail.com>
+References: <1314739841-13522-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<CAH9JG2UEZVQ+5AJbbtXQhuVzvDp_8-wJdNgOjwHs14Zj7_KP+g@mail.gmail.com>
+	<20110831002133.GA1164@opensource.wolfsonmicro.com>
+	<CAJuYYwQikeoPbDX5DV4Y_HzOz2t04otLEUMye8CPpGLvhjwhyw@mail.gmail.com>
+Message-ID: <20110831102530.GV2061@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Zhu <richard.zhu@linaro.org> writes:
-Hi,
+On Wed, Aug 31, 2011 at 01:44:20PM +0530, Thomas Abraham wrote:
 
+> There are two instances of clock with name i2c registered for s3c64xx.
+> One has a devname and the other does not. So this continued to work.
+> The i2c0 clock instance did not get a devname because its instance id
+> was -1 (prior to clkdev support).
 
-> @@ -1503,6 +1519,9 @@ static struct clk_lookup mx53_lookups[] = {
->  	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
->  	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
->  	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
-> +	_REGISTER_CLOCK("imx53-ahci.0", "ahci", sata_clk)
-> +	_REGISTER_CLOCK("imx53-ahci.0", "ahci_phy", ahci_phy_clk)
-> +	_REGISTER_CLOCK("imx53-ahci.0", "ahci_dma", ahci_dma_clk)
->  };
->  
->  static void clk_tree_init(void)
+Not having devname will *work* - the problem is that it'll work too
+often and return the wrong clock whenever anything goes wrong.
 
-Which tree has been used for this patch ? For instance, on current
-imx-features branch of Sascha's tree, there's a pata_imx clock defined
-here (see [1]). Should I try to apply it on top of some other branch ?
+> If a devname is added to i2c0 clock instance for s3c64xx, it should be
+> set to "s3c2440-i2c". If the devname is set to "s3c2440-i2c.0", then
+> CONFIG_S3C_DEV_I2C1 will have to defined for s3c64xx, otherwise, as
+> per arch/arm/plat-samsung/dev-i2c0.c, the platform device id for i2c0
+> instance will be -1 and the clock lookup for i2c0 will fail.
 
-Arnaud
+All of which is just asking for fragility; the ifdefs for renumbering
+the device are really unhelpful here - the system always has two I2C
+controllers and the numbering is going to change depending on which
+boards are built in so you can break things by enabling support for a
+second board.
 
-[1] http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commit;h=03b20b07be130e44faf29f787c66ce5cce5afb2a
+Frankly I'm not convinced that all this dancing about with explicitly
+selecting which devices to enable is worth it; the space savings are
+extremely small and the complexity regularly causes issues that just
+shouldn't exist.
