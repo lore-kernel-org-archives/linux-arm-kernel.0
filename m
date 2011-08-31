@@ -1,311 +1,634 @@
 From: msalter@redhat.com (Mark Salter)
-Date: Wed, 31 Aug 2011 17:26:35 -0400
-Subject: [PATCH v2 00/24] C6X: New architecture patch set
-Message-ID: <1314826019-22330-1-git-send-email-msalter@redhat.com>
+Date: Wed, 31 Aug 2011 17:26:43 -0400
+Subject: [PATCH 08/24] C6X: process management
+In-Reply-To: <1314826019-22330-1-git-send-email-msalter@redhat.com>
+References: <1314826019-22330-1-git-send-email-msalter@redhat.com>
+Message-ID: <1314826019-22330-9-git-send-email-msalter@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is v2 of the C6X architecture patch series.
-
-Changes from the previous patchset are:
-
- * Replaced 64-by-64 divides (two places) with do_div
-
- * Parse device tree for base address of some miscellaneous SoC registers.
-   The clkdev code still has a hard-coded address but that will go away when
-   device tree clock bindings are settled.
-
- * Tweaked the DTS files to more closely match the actual hardware.
-
- * Removed all board-specific files by making better use of device tree.
-
- * Removed CONFIG_NR_IRQS and replaced with hard-coded number which is large
-   enough for all supported SoCs with room to spare.
-
- * Removed GENERIC_FIND_* references.
-
- * Cleaned up Makefiles and Kconfig files.
-
- * Removed VMLINUX_SYMBOL usage in linker script (not needed for C6X).
-
- * Cleaned up show_cpuinfo.
-
- * Added __HEAD to head.S
-
- * Use generic asm/dma.h
-
- * Added cpu_relax() to busy wait loops in cache code.
-
- * Dropped unneeded module support routines (handled in generic code)
-
- * Cleaned up DMA support.
-
- * Removed deprecated syscalls.
-
- * Removed PTRACE_PEEKUSR and PTRACE_POKEUSR.
-
- * Cleaned up sparse warnings.
-
-This latest patchset is available in the 'upstream-v2' branch of the git repo
-at:
-
-       git at linux-c6x.org:/git/projects/linux-c6x-upstreaming
-
-Mark Salter (24):
-  fix default __strnlen_user macro
-  fixed generic page.h for non-zero PAGE_OFFSET
-  add ELF machine define for TI C6X DSPs
-  C6X: build infrastructure
-  C6X: early boot code
-  C6X: devicetree
-  C6X: memory management and DMA support
-  C6X: process management
-  C6X: signal management
-  C6X: time management
-  C6X: interrupt handling
-  C6X: syscalls
-  C6X: traps
-  C6X: clocks
-  C6X: cache control
-  C6X: loadable module support
-  C6X: ptrace support
-  C6X: headers
-  C6X: library code
-  C6X: general SoC support
-  C6X: specific SoC support
-  C6X: EMIF - External Memory Interface
-  C6X: Power and Sleep Controller
-  C6X: MAINTAINERS
-
- MAINTAINERS                         |    8 +
- arch/c6x/Kconfig                    |  179 ++++++++
- arch/c6x/Makefile                   |   56 +++
- arch/c6x/boot/Makefile              |   22 +
- arch/c6x/boot/dts/dsk6455.dts       |  128 ++++++
- arch/c6x/boot/dts/evmc6457.dts      |  106 +++++
- arch/c6x/boot/dts/evmc6472.dts      |  176 ++++++++
- arch/c6x/boot/dts/evmc6474.dts      |  133 ++++++
- arch/c6x/boot/install-dtb.c         |  333 +++++++++++++++
- arch/c6x/configs/dsk6455_defconfig  |   43 ++
- arch/c6x/configs/evmc6457_defconfig |   40 ++
- arch/c6x/configs/evmc6472_defconfig |   41 ++
- arch/c6x/configs/evmc6474_defconfig |   41 ++
- arch/c6x/include/asm/Kbuild         |   55 +++
- arch/c6x/include/asm/asm-offsets.h  |    1 +
- arch/c6x/include/asm/bitops.h       |  105 +++++
- arch/c6x/include/asm/byteorder.h    |   12 +
- arch/c6x/include/asm/cache.h        |   90 ++++
- arch/c6x/include/asm/cacheflush.h   |   65 +++
- arch/c6x/include/asm/checksum.h     |  115 +++++
- arch/c6x/include/asm/clkdev.h       |   22 +
- arch/c6x/include/asm/clock.h        |  148 +++++++
- arch/c6x/include/asm/delay.h        |   67 +++
- arch/c6x/include/asm/dma-mapping.h  |   91 ++++
- arch/c6x/include/asm/elf.h          |  113 +++++
- arch/c6x/include/asm/ftrace.h       |    6 +
- arch/c6x/include/asm/hardirq.h      |   20 +
- arch/c6x/include/asm/irq.h          |  302 +++++++++++++
- arch/c6x/include/asm/irqflags.h     |   72 ++++
- arch/c6x/include/asm/linkage.h      |   30 ++
- arch/c6x/include/asm/memblock.h     |    4 +
- arch/c6x/include/asm/mmu.h          |   18 +
- arch/c6x/include/asm/module.h       |   33 ++
- arch/c6x/include/asm/mutex.h        |    6 +
- arch/c6x/include/asm/page.h         |   11 +
- arch/c6x/include/asm/pgtable.h      |   81 ++++
- arch/c6x/include/asm/processor.h    |  132 ++++++
- arch/c6x/include/asm/procinfo.h     |   28 ++
- arch/c6x/include/asm/prom.h         |    1 +
- arch/c6x/include/asm/ptrace.h       |  181 ++++++++
- arch/c6x/include/asm/sections.h     |   12 +
- arch/c6x/include/asm/setup.h        |   29 ++
- arch/c6x/include/asm/sigcontext.h   |   80 ++++
- arch/c6x/include/asm/signal.h       |   17 +
- arch/c6x/include/asm/soc.h          |  126 ++++++
- arch/c6x/include/asm/string.h       |   21 +
- arch/c6x/include/asm/syscalls.h     |   55 +++
- arch/c6x/include/asm/system.h       |  197 +++++++++
- arch/c6x/include/asm/thread_info.h  |  121 ++++++
- arch/c6x/include/asm/timex.h        |   41 ++
- arch/c6x/include/asm/tlb.h          |    8 +
- arch/c6x/include/asm/traps.h        |   39 ++
- arch/c6x/include/asm/uaccess.h      |  107 +++++
- arch/c6x/include/asm/unaligned.h    |  288 +++++++++++++
- arch/c6x/include/asm/unistd.h       |   26 ++
- arch/c6x/kernel/Makefile            |   12 +
- arch/c6x/kernel/asm-offsets.c       |  123 ++++++
- arch/c6x/kernel/c6x_ksyms.c         |   68 +++
- arch/c6x/kernel/devicetree.c        |   53 +++
- arch/c6x/kernel/dma.c               |  168 ++++++++
- arch/c6x/kernel/entry.S             |  803 +++++++++++++++++++++++++++++++++++
- arch/c6x/kernel/head.S              |   84 ++++
- arch/c6x/kernel/irq.c               |  732 +++++++++++++++++++++++++++++++
- arch/c6x/kernel/module.c            |  196 +++++++++
- arch/c6x/kernel/process.c           |  260 +++++++++++
- arch/c6x/kernel/ptrace.c            |  207 +++++++++
- arch/c6x/kernel/setup.c             |  488 +++++++++++++++++++++
- arch/c6x/kernel/signal.c            |  377 ++++++++++++++++
- arch/c6x/kernel/soc.c               |  168 ++++++++
- arch/c6x/kernel/switch_to.S         |   74 ++++
- arch/c6x/kernel/sys_c6x.c           |   82 ++++
- arch/c6x/kernel/time.c              |   64 +++
- arch/c6x/kernel/traps.c             |  423 ++++++++++++++++++
- arch/c6x/kernel/vectors.S           |   81 ++++
- arch/c6x/kernel/vmlinux.lds.S       |  170 ++++++++
- arch/c6x/lib/Makefile               |    8 +
- arch/c6x/lib/csum_64plus.S          |  404 ++++++++++++++++++
- arch/c6x/lib/divi.S                 |   53 +++
- arch/c6x/lib/divremi.S              |   46 ++
- arch/c6x/lib/divremu.S              |   87 ++++
- arch/c6x/lib/divu.S                 |   98 +++++
- arch/c6x/lib/llshl.S                |   37 ++
- arch/c6x/lib/llshr.S                |   38 ++
- arch/c6x/lib/llshru.S               |   38 ++
- arch/c6x/lib/memcpy_64plus.S        |   46 ++
- arch/c6x/lib/mpyll.S                |   49 +++
- arch/c6x/lib/negll.S                |   31 ++
- arch/c6x/lib/pop_rts.S              |   32 ++
- arch/c6x/lib/push_rts.S             |   31 ++
- arch/c6x/lib/remi.S                 |   64 +++
- arch/c6x/lib/remu.S                 |   82 ++++
- arch/c6x/lib/strasgi.S              |   89 ++++
- arch/c6x/lib/strasgi_64plus.S       |   39 ++
- arch/c6x/mm/Makefile                |    5 +
- arch/c6x/mm/dma-coherent.c          |  142 ++++++
- arch/c6x/mm/init.c                  |  112 +++++
- arch/c6x/platforms/Kconfig          |   45 ++
- arch/c6x/platforms/Makefile         |   13 +
- arch/c6x/platforms/cache.c          |  445 +++++++++++++++++++
- arch/c6x/platforms/emif.c           |   77 ++++
- arch/c6x/platforms/megamod-pic.c    |  336 +++++++++++++++
- arch/c6x/platforms/megamod-pic.h    |    9 +
- arch/c6x/platforms/platform.c       |   23 +
- arch/c6x/platforms/pll.c            |  471 ++++++++++++++++++++
- arch/c6x/platforms/plldata.c        |  151 +++++++
- arch/c6x/platforms/psc.c            |  181 ++++++++
- arch/c6x/platforms/psc.h            |   25 ++
- arch/c6x/platforms/soc-6455.c       |  389 +++++++++++++++++
- arch/c6x/platforms/soc-6457.c       |  187 ++++++++
- arch/c6x/platforms/soc-6472.c       |  428 +++++++++++++++++++
- arch/c6x/platforms/soc-6474.c       |  244 +++++++++++
- arch/c6x/platforms/timer64.c        |  191 +++++++++
- arch/c6x/platforms/timer64.h        |    6 +
- include/asm-generic/page.h          |   10 +-
- include/asm-generic/uaccess.h       |    2 +-
- include/linux/elf-em.h              |    1 +
- 116 files changed, 13676 insertions(+), 4 deletions(-)
- create mode 100644 arch/c6x/Kconfig
- create mode 100644 arch/c6x/Makefile
- create mode 100644 arch/c6x/boot/Makefile
- create mode 100644 arch/c6x/boot/dts/dsk6455.dts
- create mode 100644 arch/c6x/boot/dts/evmc6457.dts
- create mode 100644 arch/c6x/boot/dts/evmc6472.dts
- create mode 100644 arch/c6x/boot/dts/evmc6474.dts
- create mode 100644 arch/c6x/boot/install-dtb.c
- create mode 100644 arch/c6x/configs/dsk6455_defconfig
- create mode 100644 arch/c6x/configs/evmc6457_defconfig
- create mode 100644 arch/c6x/configs/evmc6472_defconfig
- create mode 100644 arch/c6x/configs/evmc6474_defconfig
- create mode 100644 arch/c6x/include/asm/Kbuild
- create mode 100644 arch/c6x/include/asm/asm-offsets.h
- create mode 100644 arch/c6x/include/asm/bitops.h
- create mode 100644 arch/c6x/include/asm/byteorder.h
- create mode 100644 arch/c6x/include/asm/cache.h
- create mode 100644 arch/c6x/include/asm/cacheflush.h
- create mode 100644 arch/c6x/include/asm/checksum.h
- create mode 100644 arch/c6x/include/asm/clkdev.h
- create mode 100644 arch/c6x/include/asm/clock.h
- create mode 100644 arch/c6x/include/asm/delay.h
- create mode 100644 arch/c6x/include/asm/dma-mapping.h
- create mode 100644 arch/c6x/include/asm/elf.h
- create mode 100644 arch/c6x/include/asm/ftrace.h
- create mode 100644 arch/c6x/include/asm/hardirq.h
- create mode 100644 arch/c6x/include/asm/irq.h
- create mode 100644 arch/c6x/include/asm/irqflags.h
- create mode 100644 arch/c6x/include/asm/linkage.h
- create mode 100644 arch/c6x/include/asm/memblock.h
- create mode 100644 arch/c6x/include/asm/mmu.h
- create mode 100644 arch/c6x/include/asm/module.h
- create mode 100644 arch/c6x/include/asm/mutex.h
- create mode 100644 arch/c6x/include/asm/page.h
- create mode 100644 arch/c6x/include/asm/pgtable.h
+Signed-off-by: Mark Salter <msalter@redhat.com>
+---
+ arch/c6x/include/asm/processor.h   |  132 ++++++++++++++++++
+ arch/c6x/include/asm/thread_info.h |  121 +++++++++++++++++
+ arch/c6x/kernel/process.c          |  260 ++++++++++++++++++++++++++++++++++++
+ arch/c6x/kernel/switch_to.S        |   74 ++++++++++
+ 4 files changed, 587 insertions(+), 0 deletions(-)
  create mode 100644 arch/c6x/include/asm/processor.h
- create mode 100644 arch/c6x/include/asm/procinfo.h
- create mode 100644 arch/c6x/include/asm/prom.h
- create mode 100644 arch/c6x/include/asm/ptrace.h
- create mode 100644 arch/c6x/include/asm/sections.h
- create mode 100644 arch/c6x/include/asm/setup.h
- create mode 100644 arch/c6x/include/asm/sigcontext.h
- create mode 100644 arch/c6x/include/asm/signal.h
- create mode 100644 arch/c6x/include/asm/soc.h
- create mode 100644 arch/c6x/include/asm/string.h
- create mode 100644 arch/c6x/include/asm/syscalls.h
- create mode 100644 arch/c6x/include/asm/system.h
  create mode 100644 arch/c6x/include/asm/thread_info.h
- create mode 100644 arch/c6x/include/asm/timex.h
- create mode 100644 arch/c6x/include/asm/tlb.h
- create mode 100644 arch/c6x/include/asm/traps.h
- create mode 100644 arch/c6x/include/asm/uaccess.h
- create mode 100644 arch/c6x/include/asm/unaligned.h
- create mode 100644 arch/c6x/include/asm/unistd.h
- create mode 100644 arch/c6x/kernel/Makefile
- create mode 100644 arch/c6x/kernel/asm-offsets.c
- create mode 100644 arch/c6x/kernel/c6x_ksyms.c
- create mode 100644 arch/c6x/kernel/devicetree.c
- create mode 100644 arch/c6x/kernel/dma.c
- create mode 100644 arch/c6x/kernel/entry.S
- create mode 100644 arch/c6x/kernel/head.S
- create mode 100644 arch/c6x/kernel/irq.c
- create mode 100644 arch/c6x/kernel/module.c
  create mode 100644 arch/c6x/kernel/process.c
- create mode 100644 arch/c6x/kernel/ptrace.c
- create mode 100644 arch/c6x/kernel/setup.c
- create mode 100644 arch/c6x/kernel/signal.c
- create mode 100644 arch/c6x/kernel/soc.c
  create mode 100644 arch/c6x/kernel/switch_to.S
- create mode 100644 arch/c6x/kernel/sys_c6x.c
- create mode 100644 arch/c6x/kernel/time.c
- create mode 100644 arch/c6x/kernel/traps.c
- create mode 100644 arch/c6x/kernel/vectors.S
- create mode 100644 arch/c6x/kernel/vmlinux.lds.S
- create mode 100644 arch/c6x/lib/Makefile
- create mode 100644 arch/c6x/lib/csum_64plus.S
- create mode 100644 arch/c6x/lib/divi.S
- create mode 100644 arch/c6x/lib/divremi.S
- create mode 100644 arch/c6x/lib/divremu.S
- create mode 100644 arch/c6x/lib/divu.S
- create mode 100644 arch/c6x/lib/llshl.S
- create mode 100644 arch/c6x/lib/llshr.S
- create mode 100644 arch/c6x/lib/llshru.S
- create mode 100644 arch/c6x/lib/memcpy_64plus.S
- create mode 100644 arch/c6x/lib/mpyll.S
- create mode 100644 arch/c6x/lib/negll.S
- create mode 100644 arch/c6x/lib/pop_rts.S
- create mode 100644 arch/c6x/lib/push_rts.S
- create mode 100644 arch/c6x/lib/remi.S
- create mode 100644 arch/c6x/lib/remu.S
- create mode 100644 arch/c6x/lib/strasgi.S
- create mode 100644 arch/c6x/lib/strasgi_64plus.S
- create mode 100644 arch/c6x/mm/Makefile
- create mode 100644 arch/c6x/mm/dma-coherent.c
- create mode 100644 arch/c6x/mm/init.c
- create mode 100644 arch/c6x/platforms/Kconfig
- create mode 100644 arch/c6x/platforms/Makefile
- create mode 100644 arch/c6x/platforms/cache.c
- create mode 100644 arch/c6x/platforms/emif.c
- create mode 100644 arch/c6x/platforms/megamod-pic.c
- create mode 100644 arch/c6x/platforms/megamod-pic.h
- create mode 100644 arch/c6x/platforms/platform.c
- create mode 100644 arch/c6x/platforms/pll.c
- create mode 100644 arch/c6x/platforms/plldata.c
- create mode 100644 arch/c6x/platforms/psc.c
- create mode 100644 arch/c6x/platforms/psc.h
- create mode 100644 arch/c6x/platforms/soc-6455.c
- create mode 100644 arch/c6x/platforms/soc-6457.c
- create mode 100644 arch/c6x/platforms/soc-6472.c
- create mode 100644 arch/c6x/platforms/soc-6474.c
- create mode 100644 arch/c6x/platforms/timer64.c
- create mode 100644 arch/c6x/platforms/timer64.h
 
+diff --git a/arch/c6x/include/asm/processor.h b/arch/c6x/include/asm/processor.h
+new file mode 100644
+index 0000000..8154c4e
+--- /dev/null
++++ b/arch/c6x/include/asm/processor.h
+@@ -0,0 +1,132 @@
++/*
++ *  Port on Texas Instruments TMS320C6x architecture
++ *
++ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
++ *  Author: Aurelien Jacquiot (aurelien.jacquiot at jaluna.com)
++ *
++ *  Updated for 2.6.34: Mark Salter <msalter@redhat.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++#ifndef _ASM_C6X_PROCESSOR_H
++#define _ASM_C6X_PROCESSOR_H
++
++#include <asm/ptrace.h>
++#include <asm/page.h>
++#include <asm/current.h>
++
++/*
++ * Default implementation of macro that returns current
++ * instruction pointer ("program counter").
++ */
++#define current_text_addr()			\
++({						\
++	void *__pc;				\
++	asm("mvc .S2 pce1,%0\n" : "=b"(__pc));	\
++	__pc;					\
++})
++
++/*
++ * User space process size. This is mostly meaningless for NOMMU
++ * but some C6X processors may have RAM addresses up to 0xFFFFFFFF.
++ * Since calls like mmap() can return an address or an error, we
++ * have to allow room for error returns when code does something
++ * like:
++ *
++ *       addr = do_mmap(...)
++ *       if ((unsigned long)addr >= TASK_SIZE)
++ *            ... its an error code, not an address ...
++ *
++ * Here, we allow for 4096 error codes which means we really can't
++ * use the last 4K page on systems with RAM extending all the way
++ * to the end of the 32-bit address space.
++ */
++#define TASK_SIZE	0xFFFFF000
++
++/*
++ * This decides where the kernel will search for a free chunk of vm
++ * space during mmap's. We won't be using it
++ */
++#define TASK_UNMAPPED_BASE	0
++
++struct thread_struct {
++	unsigned long long b15_14;
++	unsigned long long a15_14;
++	unsigned long long b13_12;
++	unsigned long long a13_12;
++	unsigned long long b11_10;
++	unsigned long long a11_10;
++	unsigned long long ricl_icl;
++	unsigned long  usp;		/* user stack pointer */
++	unsigned long  pc;		/* kernel pc */
++	unsigned long  wchan;
++};
++
++#define INIT_THREAD					\
++{							\
++	.usp = 0,					\
++	.wchan = 0,					\
++}
++
++#define INIT_MMAP { \
++	&init_mm, 0, 0, NULL, PAGE_SHARED, VM_READ | VM_WRITE | VM_EXEC, 1, \
++	NULL, NULL }
++
++#define task_pt_regs(task) \
++	((struct pt_regs *)(THREAD_START_SP + task_stack_page(task)) - 1)
++
++#define alloc_kernel_stack()	__get_free_page(GFP_KERNEL)
++#define free_kernel_stack(page) free_page((page))
++
++
++/* Forward declaration, a strange C thing */
++struct task_struct;
++
++extern void start_thread(struct pt_regs *regs, unsigned int pc,
++			 unsigned long usp);
++
++/* Free all resources held by a thread. */
++static inline void release_thread(struct task_struct *dead_task)
++{
++}
++
++/* Prepare to copy thread state - unlazy all lazy status */
++#define prepare_to_copy(tsk)	do { } while (0)
++
++extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
++
++#define copy_segments(tsk, mm)		do { } while (0)
++#define release_segments(mm)		do { } while (0)
++
++/*
++ * saved PC of a blocked thread.
++ */
++#define thread_saved_pc(tsk) (task_pt_regs(tsk)->pc)
++
++/*
++ * saved kernel SP and DP of a blocked thread.
++ */
++#ifdef _BIG_ENDIAN
++#define thread_saved_ksp(tsk) \
++	(*(unsigned long *)&(tsk)->thread.b15_14)
++#define thread_saved_dp(tsk) \
++	(*(((unsigned long *)&(tsk)->thread.b15_14) + 1))
++#else
++#define thread_saved_ksp(tsk) \
++	(*(((unsigned long *)&(tsk)->thread.b15_14) + 1))
++#define thread_saved_dp(tsk) \
++	(*(unsigned long *)&(tsk)->thread.b15_14)
++#endif
++
++extern unsigned long get_wchan(struct task_struct *p);
++
++#define KSTK_EIP(tsk)	(task_pt_regs(task)->pc)
++#define	KSTK_ESP(tsk)	(task_pt_regs(task)->sp)
++
++#define cpu_relax()		do { } while (0)
++
++extern const struct seq_operations cpuinfo_op;
++
++#endif /* ASM_C6X_PROCESSOR_H */
+diff --git a/arch/c6x/include/asm/thread_info.h b/arch/c6x/include/asm/thread_info.h
+new file mode 100644
+index 0000000..fd99148
+--- /dev/null
++++ b/arch/c6x/include/asm/thread_info.h
+@@ -0,0 +1,121 @@
++/*
++ *  Port on Texas Instruments TMS320C6x architecture
++ *
++ *  Copyright (C) 2004, 2009, 2010, 2011 Texas Instruments Incorporated
++ *  Author: Aurelien Jacquiot (aurelien.jacquiot at jaluna.com)
++ *
++ *  Updated for 2.6.3x: Mark Salter <msalter@redhat.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++#ifndef _ASM_C6X_THREAD_INFO_H
++#define _ASM_C6X_THREAD_INFO_H
++
++#ifdef __KERNEL__
++
++#include <asm/page.h>
++
++#ifdef CONFIG_4KSTACKS
++#define THREAD_SIZE		4096
++#define THREAD_SHIFT		12
++#define THREAD_ORDER		0
++#else
++#define THREAD_SIZE		8192
++#define THREAD_SHIFT		13
++#define THREAD_ORDER		1
++#endif
++
++#define THREAD_START_SP		(THREAD_SIZE - 8)
++
++#ifndef __ASSEMBLY__
++
++typedef struct {
++	unsigned long seg;
++} mm_segment_t;
++
++/*
++ * low level task data.
++ */
++struct thread_info {
++	struct task_struct	*task;		/* main task structure */
++	struct exec_domain	*exec_domain;	/* execution domain */
++	unsigned long		flags;		/* low level flags */
++	int			cpu;		/* cpu we're on */
++	int			preempt_count;	/* 0 = preemptable, <0 = BUG */
++	mm_segment_t		addr_limit;	/* thread address space */
++	struct restart_block	restart_block;
++};
++
++/*
++ * macros/functions for gaining access to the thread information structure
++ *
++ * preempt_count needs to be 1 initially, until the scheduler is functional.
++ */
++#define INIT_THREAD_INFO(tsk)			\
++{						\
++	.task		= &tsk,			\
++	.exec_domain	= &default_exec_domain,	\
++	.flags		= 0,			\
++	.cpu		= 0,			\
++	.preempt_count	= INIT_PREEMPT_COUNT,	\
++	.addr_limit	= KERNEL_DS,		\
++	.restart_block	= {			\
++		.fn = do_no_restart_syscall,	\
++	},					\
++}
++
++#define init_thread_info	(init_thread_union.thread_info)
++#define init_stack		(init_thread_union.stack)
++
++/* get the thread information struct of current task */
++static inline __attribute__((const))
++struct thread_info *current_thread_info(void)
++{
++	struct thread_info *ti;
++	asm volatile (" clr   .s2 B15,0,%1,%0\n"
++		      : "=b" (ti)
++		      : "Iu5" (THREAD_SHIFT - 1));
++	return ti;
++}
++
++#define __HAVE_ARCH_THREAD_INFO_ALLOCATOR
++
++/* thread information allocation */
++#ifdef CONFIG_DEBUG_STACK_USAGE
++#define THREAD_FLAGS (GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO)
++#else
++#define THREAD_FLAGS (GFP_KERNEL | __GFP_NOTRACK)
++#endif
++
++#define alloc_thread_info_node(tsk, node)	\
++	((struct thread_info *)__get_free_pages(THREAD_FLAGS, THREAD_ORDER))
++
++#define free_thread_info(ti)	free_pages((unsigned long) (ti), THREAD_ORDER)
++#define get_thread_info(ti)	get_task_struct((ti)->task)
++#define put_thread_info(ti)	put_task_struct((ti)->task)
++#endif /* __ASSEMBLY__ */
++
++#define	PREEMPT_ACTIVE	0x10000000
++
++/*
++ * thread information flag bit numbers
++ * - pending work-to-be-done flags are in LSW
++ * - other flags in MSW
++ */
++#define TIF_SYSCALL_TRACE	0	/* syscall trace active */
++#define TIF_NOTIFY_RESUME	1	/* resumption notification requested */
++#define TIF_SIGPENDING		2	/* signal pending */
++#define TIF_NEED_RESCHED	3	/* rescheduling necessary */
++#define TIF_RESTORE_SIGMASK	4	/* restore signal mask in do_signal() */
++
++#define TIF_POLLING_NRFLAG	16	/* true if polling TIF_NEED_RESCHED */
++#define TIF_MEMDIE		17	/* OOM killer killed process */
++
++#define TIF_WORK_MASK		0x00007FFE /* work on irq/exception return */
++#define TIF_ALLWORK_MASK	0x00007FFF /* work on any return to u-space */
++
++#endif /* __KERNEL__ */
++
++#endif /* _ASM_C6X_THREAD_INFO_H */
+diff --git a/arch/c6x/kernel/process.c b/arch/c6x/kernel/process.c
+new file mode 100644
+index 0000000..d7bc66f
+--- /dev/null
++++ b/arch/c6x/kernel/process.c
+@@ -0,0 +1,260 @@
++/*
++ *  Port on Texas Instruments TMS320C6x architecture
++ *
++ *  Copyright (C) 2004, 2006, 2009, 2010, 2011 Texas Instruments Incorporated
++ *  Author: Aurelien Jacquiot (aurelien.jacquiot at jaluna.com)
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ *
++ */
++#include <linux/module.h>
++#include <linux/unistd.h>
++#include <linux/ptrace.h>
++#include <linux/init_task.h>
++#include <linux/tick.h>
++#include <linux/mqueue.h>
++#include <linux/syscalls.h>
++#include <linux/reboot.h>
++
++#include <asm/syscalls.h>
++
++/* hooks for board specific support */
++void	(*c6x_restart)(void);
++void	(*c6x_halt)(void);
++void	(*c6x_power_off)(void);
++
++extern asmlinkage void ret_from_fork(void);
++
++static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
++static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
++
++/*
++ * Initial thread structure.
++ */
++union thread_union init_thread_union __init_task_data =	{
++	INIT_THREAD_INFO(init_task)
++};
++
++/*
++ * Initial task structure.
++ */
++struct task_struct init_task = INIT_TASK(init_task);
++EXPORT_SYMBOL(init_task);
++
++/*
++ * power off function, if any
++ */
++void (*pm_power_off)(void);
++EXPORT_SYMBOL(pm_power_off);
++
++/*
++ * power management idle function, if any..
++ */
++void (*pm_idle)(void);
++EXPORT_SYMBOL(pm_idle);
++
++static void default_idle(void)
++{
++	asm volatile ("IDLE\n");
++}
++
++/*
++ * The idle loop for C64x
++ */
++void cpu_idle(void)
++{
++	/* endless idle loop with no priority at all */
++	while (1) {
++		tick_nohz_stop_sched_tick(1);
++		while (!need_resched()) {
++			void (*idle)(void);
++
++			smp_rmb();
++			idle = pm_idle;
++			if (!idle)
++				idle = default_idle;
++			idle();
++		}
++		tick_nohz_restart_sched_tick();
++
++		preempt_enable_no_resched();
++		schedule();
++		preempt_disable();
++	}
++}
++
++static void halt_loop(void)
++{
++	printk(KERN_EMERG "System Halted, OK to turn off power\n");
++	local_irq_disable();
++	while (1)
++		default_idle();
++}
++
++void machine_restart(char *__unused)
++{
++	if (c6x_restart)
++		c6x_restart();
++	halt_loop();
++}
++
++void machine_halt(void)
++{
++	if (c6x_halt)
++		c6x_halt();
++	halt_loop();
++}
++
++void machine_power_off(void)
++{
++	if (c6x_power_off)
++		c6x_power_off();
++	halt_loop();
++}
++
++static void kernel_thread_helper(int dummy, void *arg, int (*fn)(void *))
++{
++	do_exit(fn(arg));
++}
++
++/*
++ * Create a kernel thread
++ */
++int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
++{
++	struct pt_regs regs;
++
++	/*
++	 * copy_thread sets a4 to zero (child return from fork)
++	 * so we can't just set things up to directly return to
++	 * fn.
++	 */
++	memset(&regs, 0, sizeof(regs));
++	regs.b4 = (unsigned long) arg;
++	regs.a6 = (unsigned long) fn;
++	regs.pc = (unsigned long) kernel_thread_helper;
++	local_save_flags(regs.csr);
++	regs.csr |= 1;
++	regs.tsr = 5; /* Set GEE and GIE in TSR */
++
++	/* Ok, create the new process.. */
++	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, -1, &regs,
++		       0, NULL, NULL);
++}
++EXPORT_SYMBOL(kernel_thread);
++
++void flush_thread(void)
++{
++}
++
++void exit_thread(void)
++{
++}
++
++SYSCALL_DEFINE1(c6x_clone, struct pt_regs *, regs)
++{
++	unsigned long clone_flags;
++	unsigned long newsp;
++
++	/* syscall puts clone_flags in A4 and usp in B4 */
++	clone_flags = regs->orig_a4;
++	if (regs->b4)
++		newsp = regs->b4;
++	else
++		newsp = regs->sp;
++
++	return do_fork(clone_flags, newsp, regs, 0, (int __user *)regs->a6,
++		       (int __user *)regs->b6);
++}
++
++/*
++ * Do necessary setup to start up a newly executed thread.
++ */
++void start_thread(struct pt_regs *regs, unsigned int pc, unsigned long usp)
++{
++	/*
++	 * The binfmt loader will setup a "full" stack, but the C6X
++	 * operates an "empty" stack. So we adjust the usp so that
++	 * argc doesn't get destroyed if an interrupt is taken before
++	 * it is read from the stack.
++	 *
++	 * NB: Library startup code needs to match this.
++	 */
++	usp -= 8;
++
++	set_fs(USER_DS);
++	regs->pc  = pc;
++	regs->sp  = usp;
++	regs->tsr |= 0x40; /* set user mode */
++	current->thread.usp = usp;
++}
++
++/*
++ * Copy a new thread context in its stack.
++ */
++int copy_thread(unsigned long clone_flags, unsigned long usp,
++		unsigned long ustk_size,
++		struct task_struct *p, struct pt_regs *regs)
++{
++	struct pt_regs *childregs;
++
++	childregs = task_pt_regs(p);
++
++	*childregs = *regs;
++	childregs->a4 = 0;
++
++	if (usp == -1)
++		/* case of  __kernel_thread: we return to supervisor space */
++		childregs->sp = (unsigned long)(childregs + 1);
++	else
++		/* Otherwise use the given stack */
++		childregs->sp = usp;
++
++	/* Set usp/ksp */
++	p->thread.usp = childregs->sp;
++	/* switch_to uses stack to save/restore 14 callee-saved regs */
++	thread_saved_ksp(p) = (unsigned long)childregs - 8;
++	p->thread.pc = (unsigned int) ret_from_fork;
++	p->thread.wchan	= (unsigned long) ret_from_fork;
++#ifdef __DSBT__
++	{
++		unsigned long dp;
++
++		asm volatile ("mv .S2 b14,%0\n" : "=b"(dp));
++
++		thread_saved_dp(p) = dp;
++		if (usp == -1)
++			childregs->dp = dp;
++	}
++#endif
++	return 0;
++}
++
++/*
++ * c6x_execve() executes a new program.
++ */
++SYSCALL_DEFINE4(c6x_execve, const char __user *, name,
++		const char __user *const __user *, argv,
++		const char __user *const __user *, envp,
++		struct pt_regs *, regs)
++{
++	int error;
++	char *filename;
++
++	filename = getname(name);
++	error = PTR_ERR(filename);
++	if (IS_ERR(filename))
++		goto out;
++
++	error = do_execve(filename, argv, envp, regs);
++	putname(filename);
++out:
++	return error;
++}
++
++unsigned long get_wchan(struct task_struct *p)
++{
++	return p->thread.wchan;
++}
+diff --git a/arch/c6x/kernel/switch_to.S b/arch/c6x/kernel/switch_to.S
+new file mode 100644
+index 0000000..09177ed
+--- /dev/null
++++ b/arch/c6x/kernel/switch_to.S
+@@ -0,0 +1,74 @@
++/*
++ *  Copyright (C) 2011 Texas Instruments Incorporated
++ *  Author: Mark Salter (msalter at redhat.com)
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++#include <asm/asm-offsets.h>
++
++#define SP	B15
++
++	/*
++	 * void __switch_to(struct thread_info *prev,
++	 *      	    struct thread_info *next,
++	 *		    struct task_struct *tsk) ;
++	 */
++ENTRY(__switch_to)
++	LDDW	.D2T2	*+B4(THREAD_B15_14),B7:B6
++ ||	MV	.L2X	A4,B5	; prev
++ ||	MV	.L1X	B4,A5	; next
++ ||	MVC	.S2	RILC,B1
++
++	STW	.D2T2	B3,*+B5(THREAD_PC)
++ ||	STDW	.D1T1	A13:A12,*+A4(THREAD_A13_12)
++ ||	MVC	.S2	ILC,B0
++
++	LDW	.D2T2	*+B4(THREAD_PC),B3
++ ||	LDDW	.D1T1	*+A5(THREAD_A13_12),A13:A12
++
++	STDW	.D1T1	A11:A10,*+A4(THREAD_A11_10)
++ ||	STDW	.D2T2	B1:B0,*+B5(THREAD_RICL_ICL)
++#ifndef __DSBT__
++ ||	MVKL	.S2	current_ksp,B1
++#endif
++
++	STDW	.D2T2	B15:B14,*+B5(THREAD_B15_14)
++ ||	STDW	.D1T1	A15:A14,*+A4(THREAD_A15_14)
++#ifndef __DSBT__
++ ||	MVKH	.S2	current_ksp,B1
++#endif
++
++	;; Switch to next SP
++	MV	.S2	B7,SP
++#ifdef __DSBT__
++ ||	STW	.D2T2	B7,*+B14(current_ksp)
++#else
++ ||	STW	.D2T2	B7,*B1
++ ||	MV	.L2	B6,B14
++#endif
++ ||	LDDW	.D1T1	*+A5(THREAD_RICL_ICL),A1:A0
++
++	STDW	.D2T2	B11:B10,*+B5(THREAD_B11_10)
++ ||	LDDW	.D1T1	*+A5(THREAD_A15_14),A15:A14
++
++	STDW	.D2T2	B13:B12,*+B5(THREAD_B13_12)
++ ||	LDDW	.D1T1	*+A5(THREAD_A11_10),A11:A10
++
++	B	.S2	B3		; return in next E1
++ ||	LDDW	.D2T2	*+B4(THREAD_B13_12),B13:B12
++
++	LDDW	.D2T2	*+B4(THREAD_B11_10),B11:B10
++	NOP
++
++	MV	.L2X	A0,B0
++ ||	MV	.S1	A6,A4
++
++	MVC	.S2	B0,ILC
++ ||	MV	.L2X	A1,B1
++
++	MVC	.S2	B1,RILC
++ENDPROC(__switch_to)
 -- 
 1.7.6
