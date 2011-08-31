@@ -1,79 +1,50 @@
-From: jason.chen@freescale.com (jason.chen at freescale.com)
-Date: Wed, 31 Aug 2011 10:02:12 +0800
-Subject: [PATCH-V3 1/2] ARM imx53: add pwm devices support
-Message-ID: <1314756133-12676-1-git-send-email-jason.chen@freescale.com>
+From: richard.zhu@linaro.org (Richard Zhu)
+Date: Wed, 31 Aug 2011 10:08:22 +0800
+Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
+	platforms
+In-Reply-To: <CAODfWeEm8bkySXxb1qopbH1VMu-V+33k5x+0+qjABzesT0amOA@mail.gmail.com>
+References: <1314698171-7937-1-git-send-email-richard.zhu@linaro.org>
+	<CAODfWeEm8bkySXxb1qopbH1VMu-V+33k5x+0+qjABzesT0amOA@mail.gmail.com>
+Message-ID: <CAJNCFV+XFGEba1J2dXDa4YVwqduAPV5y=5JYEXAZ0uv+S60vvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jason Chen <b02280@freescale.com>
+Hi Wolfram:
+Thanks for your suggestions.
+Accepted.
 
-Signed-off-by: Jason Chen <b02280@freescale.com>
-Signed-off-by: Jason Chen <jason.chen@linaro.org>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c          |    2 ++
- arch/arm/mach-mx5/devices-imx53.h            |    4 ++++
- arch/arm/plat-mxc/devices/platform-mxc_pwm.c |    9 +++++++++
- arch/arm/plat-mxc/pwm.c                      |    3 ++-
- 4 files changed, 17 insertions(+), 1 deletions(-)
+Hi Hector:
+Thanks for your help to tests these patches.
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index f7bf996..f5f116f 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1507,6 +1507,8 @@ static struct clk_lookup mx53_lookups[] = {
- 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
- 	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
- 	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
-+	_REGISTER_CLOCK("mxc_pwm.0", NULL, pwm1_clk)
-+	_REGISTER_CLOCK("mxc_pwm.1", NULL, pwm2_clk)
- };
- 
- static void clk_tree_init(void)
-diff --git a/arch/arm/mach-mx5/devices-imx53.h b/arch/arm/mach-mx5/devices-imx53.h
-index c27fe8b..258e68f 100644
---- a/arch/arm/mach-mx5/devices-imx53.h
-+++ b/arch/arm/mach-mx5/devices-imx53.h
-@@ -40,3 +40,7 @@ extern const struct imx_imx_ssi_data imx53_imx_ssi_data[];
- extern const struct imx_imx_keypad_data imx53_imx_keypad_data;
- #define imx53_add_imx_keypad(pdata)	\
- 	imx_add_imx_keypad(&imx53_imx_keypad_data, pdata)
-+
-+extern const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst;
-+#define imx53_add_mxc_pwm(id)	\
-+	imx_add_mxc_pwm(&imx53_mxc_pwm_data[id])
-diff --git a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-index b0c4ae2..18cfd07 100644
---- a/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-+++ b/arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-@@ -49,6 +49,15 @@ const struct imx_mxc_pwm_data imx51_mxc_pwm_data[] __initconst = {
- };
- #endif /* ifdef CONFIG_SOC_IMX51 */
- 
-+#ifdef CONFIG_SOC_IMX53
-+const struct imx_mxc_pwm_data imx53_mxc_pwm_data[] __initconst = {
-+#define imx53_mxc_pwm_data_entry(_id, _hwid)				\
-+	imx_mxc_pwm_data_entry(MX53, _id, _hwid, SZ_16K)
-+	imx53_mxc_pwm_data_entry(0, 1),
-+	imx53_mxc_pwm_data_entry(1, 2),
-+};
-+#endif /* ifdef CONFIG_SOC_IMX53 */
-+
- struct platform_device *__init imx_add_mxc_pwm(
- 		const struct imx_mxc_pwm_data *data)
- {
-diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
-index 761c3c9..5dda436 100644
---- a/arch/arm/plat-mxc/pwm.c
-+++ b/arch/arm/plat-mxc/pwm.c
-@@ -57,7 +57,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 	if (pwm == NULL || period_ns == 0 || duty_ns > period_ns)
- 		return -EINVAL;
- 
--	if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()) {
-+	if (cpu_is_mx27() || cpu_is_mx3() || cpu_is_mx25() || cpu_is_mx51()
-+		|| cpu_is_mx53()) {
- 		unsigned long long c;
- 		unsigned long period_cycles, duty_cycles, prescale;
- 		u32 cr;
--- 
-1.7.4.1
+Best Regards
+Richard Zhu
+
+On 30 August 2011 18:43, Hector Oron <hector.oron@gmail.com> wrote:
+> Hello,
+>
+> 2011/8/30 Richard Zhu <richard.zhu@linaro.org>:
+>> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+>> ---
+>> ?arch/arm/mach-mx5/clock-mx51-mx53.c ? ? ? ? ? ? | ? 19 ++++
+>> ?arch/arm/mach-mx5/devices-imx53.h ? ? ? ? ? ? ? | ? ?4 +
+>> ?arch/arm/plat-mxc/Makefile ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
+>> ?arch/arm/plat-mxc/ahci_sata.c ? ? ? ? ? ? ? ? ? | ?104 +++++++++++++++++++++++
+>> ?arch/arm/plat-mxc/devices/Kconfig ? ? ? ? ? ? ? | ? ?4 +
+>> ?arch/arm/plat-mxc/devices/Makefile ? ? ? ? ? ? ?| ? ?1 +
+>> ?arch/arm/plat-mxc/devices/platform-ahci-imx.c ? | ? 66 ++++++++++++++
+>> ?arch/arm/plat-mxc/include/mach/ahci_sata.h ? ? ?| ? 33 +++++++
+>> ?arch/arm/plat-mxc/include/mach/devices-common.h | ? 10 ++
+>> ?9 files changed, 242 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/plat-mxc/ahci_sata.c
+>> ?create mode 100644 arch/arm/plat-mxc/devices/platform-ahci-imx.c
+>> ?create mode 100644 arch/arm/plat-mxc/include/mach/ahci_sata.h
+>
+> The good news are that I have tested this patch series on i.MX53 LOCO
+> board and it seems to work fine here. Thanks.
+>
+>
+> Tested-By: Hector Oron Martinez <hector.oron@gmail.com>
+>
+> --
+> ?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
+>
