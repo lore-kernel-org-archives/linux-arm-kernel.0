@@ -1,55 +1,34 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 31 Aug 2011 17:45:20 +0800
-Subject: [PATCH 1/4 v5] drivers: create a pin control subsystem v5
-In-Reply-To: <1314609001-28052-1-git-send-email-linus.walleij@stericsson.com>
-References: <1314609001-28052-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CAGsJ_4yc+chiSh0wf_5sZk-Eh0vm-HSDZv+gFQi86LhCAUXTvw@mail.gmail.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Wed, 31 Aug 2011 12:03:31 +0200
+Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
+	platforms
+In-Reply-To: <1314762635-3923-2-git-send-email-richard.zhu@linaro.org>
+	(Richard Zhu's message of "Wed, 31 Aug 2011 11:50:31 +0800")
+References: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
+	<1314762635-3923-2-git-send-email-richard.zhu@linaro.org>
+Message-ID: <87k49t99u4.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +Interaction with the GPIO subsystem
-> +===================================
-> +
-> +The GPIO drivers may want to perform operations of various types on the
-> same
-> +physical pins that are also registered as GPIO pins.
-> +
-> +Since the pin controller subsystem have its pinspace local to the pin
-> +controller we need a mapping so that the pin control subsystem can figure
-> out
-> +which pin controller handles control of a certain GPIO pin. Since a single
-> +pin controller may be muxing several GPIO ranges (typically SoCs that have
-> +one set of pins but internally several GPIO silicon blocks, each modeled as
-> +a struct gpio_chip) any number of GPIO ranges can be added to a pin
-> controller
-> +instance like this:
-> +
-> +struct gpio_chip chip_a;
-> +struct gpio_chip chip_b;
-> +
-> +static struct pinctrl_gpio_range gpio_range_a = {
-> +	.name = "chip a",
-> +	.id = 0,
-> +	.base = 32,
-> +	.npins = 16,
-> +	.gc = &chip_a;
-> +};
-> +
-> +static struct pinctrl_gpio_range gpio_range_a = {
-> +	.name = "chip b",
-> +	.id = 0,
-> +	.base = 48,
-> +	.npins = 8,
-> +	.gc = &chip_b;
-> +};
-> +
-> +
-> +{
-> +	struct pinctrl_dev *pctl;
-> +	...
-> +	pinctrl_add_gpio_range(pctl, &gpio_range_a);
-> +	pinctrl_add_gpio_range(pctl, &gpio_range_b);
+Richard Zhu <richard.zhu@linaro.org> writes:
+Hi,
 
-people might like a pinctrl_add_gpio_range*s* too.
 
--barry
+> @@ -1503,6 +1519,9 @@ static struct clk_lookup mx53_lookups[] = {
+>  	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+>  	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
+>  	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
+> +	_REGISTER_CLOCK("imx53-ahci.0", "ahci", sata_clk)
+> +	_REGISTER_CLOCK("imx53-ahci.0", "ahci_phy", ahci_phy_clk)
+> +	_REGISTER_CLOCK("imx53-ahci.0", "ahci_dma", ahci_dma_clk)
+>  };
+>  
+>  static void clk_tree_init(void)
+
+Which tree has been used for this patch ? For instance, on current
+imx-features branch of Sascha's tree, there's a pata_imx clock defined
+here (see [1]). Should I try to apply it on top of some other branch ?
+
+Arnaud
+
+[1] http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commit;h=03b20b07be130e44faf29f787c66ce5cce5afb2a
