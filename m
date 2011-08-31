@@ -1,57 +1,32 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 31 Aug 2011 08:55:13 +0900
-Subject: [PATCH] ARM: S3C64XX: Hook up some additional supplies on
-	Cragganmore
-In-Reply-To: <1314386205-3399-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1314386205-3399-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <00c001cc6770$431ffe30$c95ffa90$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 31 Aug 2011 01:21:33 +0100
+Subject: [PATCH] ARM: S3C64XX: Fix clkdev device names for I2C clocks
+In-Reply-To: <CAH9JG2UEZVQ+5AJbbtXQhuVzvDp_8-wJdNgOjwHs14Zj7_KP+g@mail.gmail.com>
+References: <1314739841-13522-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<CAH9JG2UEZVQ+5AJbbtXQhuVzvDp_8-wJdNgOjwHs14Zj7_KP+g@mail.gmail.com>
+Message-ID: <20110831002133.GA1164@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> For further modules.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-crag6410.c |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410.c
-> index db2c468..174dd0c 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -292,6 +292,8 @@ static struct platform_device speyside_wm8962_device =
-{
->  static struct regulator_consumer_supply wallvdd_consumers[] = {
->  	REGULATOR_SUPPLY("SPKVDD1", "1-001a"),
->  	REGULATOR_SUPPLY("SPKVDD2", "1-001a"),
-> +	REGULATOR_SUPPLY("SPKVDDL", "1-001a"),
-> +	REGULATOR_SUPPLY("SPKVDDR", "1-001a"),
->  };
-> 
->  static struct regulator_init_data wallvdd_data = {
-> @@ -573,6 +575,9 @@ static struct regulator_init_data pvdd_1v2 __initdata
-= {
->  static struct regulator_consumer_supply pvdd_1v8_consumers[] __initdata =
-{
->  	REGULATOR_SUPPLY("PLLVDD", "1-001a"),
->  	REGULATOR_SUPPLY("DBVDD", "1-001a"),
-> +	REGULATOR_SUPPLY("DBVDD1", "1-001a"),
-> +	REGULATOR_SUPPLY("DBVDD2", "1-001a"),
-> +	REGULATOR_SUPPLY("DBVDD3", "1-001a"),
->  	REGULATOR_SUPPLY("CPVDD", "1-001a"),
->  	REGULATOR_SUPPLY("AVDD2", "1-001a"),
->  	REGULATOR_SUPPLY("DCVDD", "1-001a"),
-> --
-> 1.7.5.4
+On Wed, Aug 31, 2011 at 08:48:03AM +0900, Kyungmin Park wrote:
 
-OK, Applied.
-Thanks.
+> It's not matched with your description. and also not matched with
+> codes at "arch/arm/mach-s3c64xx/s3c6410.c"
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+>        /* the i2c devices are directly compatible with s3c2440 */
+>         s3c_i2c0_setname("s3c2440-i2c");
+>         s3c_i2c1_setname("s3c2440-i2c");
+
+Oh, FFS.  That's what's broken - the names that are actually appearing
+in the system are the names that the devices have in the relevant
+dev-i2c?.c files and obviously there's no reason one would expect to
+find code like the above since it's just a little abstruse to rewrite
+the devices like that.
+
+Looking at the code I bet what broke it is the CPU revision
+identification changes - it's now responsible for making sure the fixups
+are run.  Either it's not matching correctly or it's running too late to
+make the fixup before the device is registered.
+
+Though the first part of the issue (the fact that I2C0 isn't using a
+device name and I2C1 is) remains an issue.
