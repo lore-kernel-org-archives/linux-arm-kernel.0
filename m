@@ -1,104 +1,95 @@
 From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Wed, 31 Aug 2011 18:22:48 +0300
-Subject: [PATCH 01/14] omap: mcbsp: Remove omap device API
+Date: Wed, 31 Aug 2011 18:22:53 +0300
+Subject: [PATCH 06/14] omap: mcbsp: Make tranceiver configuration control
+	register access generic
 In-Reply-To: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
 References: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <1314804181-17260-2-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <1314804181-17260-7-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jarkko Nikula <jhnikula@gmail.com>
+McBSP transmit and receive configuration control registers must be set up
+for OMAP2430 and later. Replace is_omap tests in generic code with a new
+feature flag has_ccr in platform data so that there is no need to change
+code for any upcoming OMAP version.
 
-struct omap_device *od is only set with find_omap_device_by_dev but not used
-otherwise so remove them and references to omap device API.
-
-Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 ---
- arch/arm/plat-omap/mcbsp.c |   27 ---------------------------
- 1 files changed, 0 insertions(+), 27 deletions(-)
+ arch/arm/mach-omap2/mcbsp.c             |    6 ++++--
+ arch/arm/plat-omap/include/plat/mcbsp.h |    1 +
+ arch/arm/plat-omap/mcbsp.c              |    8 ++++----
+ 3 files changed, 9 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+index 628497e..3c42adb 100644
+--- a/arch/arm/mach-omap2/mcbsp.c
++++ b/arch/arm/mach-omap2/mcbsp.c
+@@ -127,10 +127,12 @@ static int omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
+ 	}
+ 
+ 	pdata->reg_step = 4;
+-	if (oh->class->rev < MCBSP_CONFIG_TYPE2)
++	if (oh->class->rev < MCBSP_CONFIG_TYPE2) {
+ 		pdata->reg_size = 2;
+-	else
++	} else {
+ 		pdata->reg_size = 4;
++		pdata->has_ccr = true;
++	}
+ 
+ 	if (oh->class->rev == MCBSP_CONFIG_TYPE3) {
+ 		if (id == 2)
+diff --git a/arch/arm/plat-omap/include/plat/mcbsp.h b/arch/arm/plat-omap/include/plat/mcbsp.h
+index ac48d83..eed20ef 100644
+--- a/arch/arm/plat-omap/include/plat/mcbsp.h
++++ b/arch/arm/plat-omap/include/plat/mcbsp.h
+@@ -320,6 +320,7 @@ struct omap_mcbsp_platform_data {
+ 
+ 	/* McBSP platform and instance specific features */
+ 	bool has_wakeup; /* Wakeup capability */
++	bool has_ccr; /* Transceiver has configuration control registers */
+ };
+ 
+ struct omap_mcbsp_st_data {
 diff --git a/arch/arm/plat-omap/mcbsp.c b/arch/arm/plat-omap/mcbsp.c
-index 6c62af1..4b233e8 100644
+index 0338ad0..97bcbfa 100644
 --- a/arch/arm/plat-omap/mcbsp.c
 +++ b/arch/arm/plat-omap/mcbsp.c
-@@ -24,7 +24,6 @@
- #include <linux/slab.h>
+@@ -184,7 +184,7 @@ void omap_mcbsp_config(unsigned int id, const struct omap_mcbsp_reg_cfg *config)
+ 	MCBSP_WRITE(mcbsp, MCR2, config->mcr2);
+ 	MCBSP_WRITE(mcbsp, MCR1, config->mcr1);
+ 	MCBSP_WRITE(mcbsp, PCR0, config->pcr0);
+-	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx()) {
++	if (mcbsp->pdata->has_ccr) {
+ 		MCBSP_WRITE(mcbsp, XCCR, config->xccr);
+ 		MCBSP_WRITE(mcbsp, RCCR, config->rccr);
+ 	}
+@@ -848,7 +848,7 @@ void omap_mcbsp_start(unsigned int id, int tx, int rx)
+ 		MCBSP_WRITE(mcbsp, SPCR2, w | (1 << 7));
+ 	}
  
- #include <plat/mcbsp.h>
--#include <plat/omap_device.h>
- #include <linux/pm_runtime.h>
+-	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx()) {
++	if (mcbsp->pdata->has_ccr) {
+ 		/* Release the transmitter and receiver */
+ 		w = MCBSP_READ_CACHE(mcbsp, XCCR);
+ 		w &= ~(tx ? XDISABLE : 0);
+@@ -878,7 +878,7 @@ void omap_mcbsp_stop(unsigned int id, int tx, int rx)
  
- /* XXX These "sideways" includes are a sign that something is wrong */
-@@ -258,19 +257,9 @@ int omap_mcbsp_dma_reg_params(unsigned int id, unsigned int stream)
- EXPORT_SYMBOL(omap_mcbsp_dma_reg_params);
+ 	/* Reset transmitter */
+ 	tx &= 1;
+-	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx()) {
++	if (mcbsp->pdata->has_ccr) {
+ 		w = MCBSP_READ_CACHE(mcbsp, XCCR);
+ 		w |= (tx ? XDISABLE : 0);
+ 		MCBSP_WRITE(mcbsp, XCCR, w);
+@@ -888,7 +888,7 @@ void omap_mcbsp_stop(unsigned int id, int tx, int rx)
  
- #ifdef CONFIG_ARCH_OMAP3
--static struct omap_device *find_omap_device_by_dev(struct device *dev)
--{
--	struct platform_device *pdev = container_of(dev,
--					struct platform_device, dev);
--	return container_of(pdev, struct omap_device, pdev);
--}
--
- static void omap_st_on(struct omap_mcbsp *mcbsp)
- {
- 	unsigned int w;
--	struct omap_device *od;
--
--	od = find_omap_device_by_dev(mcbsp->dev);
- 
- 	/*
- 	 * Sidetone uses McBSP ICLK - which must not idle when sidetones
-@@ -292,9 +281,6 @@ static void omap_st_on(struct omap_mcbsp *mcbsp)
- static void omap_st_off(struct omap_mcbsp *mcbsp)
- {
- 	unsigned int w;
--	struct omap_device *od;
--
--	od = find_omap_device_by_dev(mcbsp->dev);
- 
- 	w = MCBSP_ST_READ(mcbsp, SSELCR);
- 	MCBSP_ST_WRITE(mcbsp, SSELCR, w & ~(ST_SIDETONEEN));
-@@ -310,9 +296,6 @@ static void omap_st_off(struct omap_mcbsp *mcbsp)
- static void omap_st_fir_write(struct omap_mcbsp *mcbsp, s16 *fir)
- {
- 	u16 val, i;
--	struct omap_device *od;
--
--	od = find_omap_device_by_dev(mcbsp->dev);
- 
- 	val = MCBSP_ST_READ(mcbsp, SSELCR);
- 
-@@ -340,9 +323,6 @@ static void omap_st_chgain(struct omap_mcbsp *mcbsp)
- {
- 	u16 w;
- 	struct omap_mcbsp_st_data *st_data = mcbsp->st_data;
--	struct omap_device *od;
--
--	od = find_omap_device_by_dev(mcbsp->dev);
- 
- 	w = MCBSP_ST_READ(mcbsp, SSELCR);
- 
-@@ -685,9 +665,6 @@ EXPORT_SYMBOL(omap_mcbsp_get_dma_op_mode);
- 
- static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
- {
--	struct omap_device *od;
--
--	od = find_omap_device_by_dev(mcbsp->dev);
- 	/*
- 	 * Enable wakup behavior, smart idle and all wakeups
- 	 * REVISIT: some wakeups may be unnecessary
-@@ -699,10 +676,6 @@ static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
- 
- static inline void omap34xx_mcbsp_free(struct omap_mcbsp *mcbsp)
- {
--	struct omap_device *od;
--
--	od = find_omap_device_by_dev(mcbsp->dev);
--
- 	/*
- 	 * Disable wakup behavior, smart idle and all wakeups
- 	 */
+ 	/* Reset receiver */
+ 	rx &= 1;
+-	if (cpu_is_omap2430() || cpu_is_omap34xx() || cpu_is_omap44xx()) {
++	if (mcbsp->pdata->has_ccr) {
+ 		w = MCBSP_READ_CACHE(mcbsp, RCCR);
+ 		w |= (rx ? RDISABLE : 0);
+ 		MCBSP_WRITE(mcbsp, RCCR, w);
 -- 
 1.7.5.4
