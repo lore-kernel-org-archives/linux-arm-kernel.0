@@ -1,37 +1,89 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 31 Aug 2011 22:05:28 +0800
-Subject: i.MX multi SoC patches
-In-Reply-To: <CAODfWeFnsQZBsBXpJLVknzvqcythZjDMyfe8sb9Pdw_uK-iB2g@mail.gmail.com>
-References: <1314172987-10349-1-git-send-email-s.hauer@pengutronix.de>
-	<CAODfWeFnsQZBsBXpJLVknzvqcythZjDMyfe8sb9Pdw_uK-iB2g@mail.gmail.com>
-Message-ID: <20110831140527.GA3723@S2100-06.ap.freescale.net>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 31 Aug 2011 22:06:15 +0800
+Subject: [PATCH v3 1/2] mmc: sdio add regulator vsdio
+In-Reply-To: <1314253575-2602-2-git-send-email-zhangfei.gao@marvell.com>
+References: <1314253575-2602-1-git-send-email-zhangfei.gao@marvell.com>
+	<1314253575-2602-2-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <CAMPhdO9r8wyyU9uW7NTyOR2e2kOJG0rqgUow3krg9GpiZmab_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2011 at 02:02:58PM +0100, Hector Oron wrote:
-> Hello,
-> 
-> 
-> 2011/8/24 Sascha Hauer <s.hauer@pengutronix.de>:
-> > This is hopefully the last iteration of the patches for compiling
-> > all ARMv4/v5 based i.MXs together. CONFIG_ARM_PATCH_PHYS_VIRT
-> > lost its experimental status and we can still build uImages
-> > even with CONFIG_AUTO_ZRELADDR enabled. This series selects
-> > these options and makes a multi SoC image the default.
-> > Also, we can now build all i.MX5 SoCs into a single image.
-> > This series also updates the defconfigs.
-> 
-> On a mx53 loco board I have rebased Richard's patchset for SATA and
-> got it running, but I see this on mapping on iomem, board is more or
-> less working but I was unsure if this is something significant or just
-> some ugly cosmetic names for mx53 (i.e. imx21-uart.0, imx31-gpio, ..)
-> 
-This is expected.  The platform_device_id had been used to kill
-cpu_is_mxXX() stuff from drivers.  And we decided to use soc prefix
-to define IP block version in platform_device_id table, because
-hardware does not define revisions, and soc is stable enough to
-identify specific IP block version.
+Zhangfei,
 
--- 
-Regards,
-Shawn
+My understanding is that the card in the slot would be either MMC _or_
+SDIO and why do we need another regulator for the power on/off?
+
+On Thu, Aug 25, 2011 at 2:26 PM, Zhangfei Gao <zhangfei.gao@marvell.com> wrote:
+> sdio client may be required power on/off dynamically.
+> With regulator vsdio, sdio client power on/off could be executed by mmc_power_up/down
+>
+> CC: Ohad Ben-Cohen <ohad@wizery.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+> ---
+> ?drivers/mmc/host/sdhci.c ?| ? 22 , > ?include/linux/mmc/sdhci.h | ? ?2 ++
+> ?2 files changed, 24 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 0e02cc1..e0ef7d3 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1424,6 +1424,18 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+> ?out:
+> ? ? ? ?mmiowb();
+> ? ? ? ?spin_unlock_irqrestore(&host->lock, flags);
+> +
+> + ? ? ? if (host->vsdio) {
+> + ? ? ? ? ? ? ? if (ios->power_mode != host->power_mode_old) {
+> + ? ? ? ? ? ? ? ? ? ? ? if (ios->power_mode == MMC_POWER_OFF)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? regulator_disable(host->vsdio);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? if (ios->power_mode == MMC_POWER_UP)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? regulator_enable(host->vsdio);
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? host->power_mode_old = ios->power_mode;
+> + ? ? ? }
+> ?}
+>
+> ?static int check_ro(struct sdhci_host *host)
+> @@ -2748,6 +2760,13 @@ int sdhci_add_host(struct sdhci_host *host)
+> ? ? ? ? ? ? ? ?regulator_enable(host->vmmc);
+> ? ? ? ?}
+>
+> + ? ? ? host->vsdio = regulator_get(mmc_dev(mmc), "vsdio");
+> + ? ? ? if (IS_ERR(host->vsdio))
+> + ? ? ? ? ? ? ? host->vsdio = NULL;
+> + ? ? ? else
+> + ? ? ? ? ? ? ? printk(KERN_INFO "%s: vsdio regulator found\n",
+> + ? ? ? ? ? ? ? ? ? ? ? mmc_hostname(mmc));
+> +
+> ? ? ? ?sdhci_init(host, 0);
+>
+> ?#ifdef CONFIG_MMC_DEBUG
+> @@ -2839,6 +2858,9 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
+> ? ? ? ? ? ? ? ?regulator_put(host->vmmc);
+> ? ? ? ?}
+>
+> + ? ? ? if (host->vsdio)
+> + ? ? ? ? ? ? ? regulator_put(host->vsdio);
+> +
+> ? ? ? ?kfree(host->adma_desc);
+> ? ? ? ?kfree(host->align_buffer);
+>
+> diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
+> index 5666f3a..201207a 100644
+> --- a/include/linux/mmc/sdhci.h
+> +++ b/include/linux/mmc/sdhci.h
+> @@ -94,6 +94,8 @@ struct sdhci_host {
+> ? ? ? ?const struct sdhci_ops *ops; ? ?/* Low level hw interface */
+>
+> ? ? ? ?struct regulator *vmmc; /* Power regulator */
+> + ? ? ? struct regulator *vsdio; ? ? ? ?/* sdio Power regulator */
+> + ? ? ? unsigned char power_mode_old; ? /* power supply mode */
+>
+> ? ? ? ?/* Internal data */
+> ? ? ? ?struct mmc_host *mmc; ? /* MMC structure */
+> --
+> 1.7.0.4
+>
+>
