@@ -1,60 +1,98 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 1 Sep 2011 14:33:01 -0700
-Subject: [PATCH 2/4 v6] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <1314869552-5531-1-git-send-email-linus.walleij@stericsson.com>
-References: <1314869552-5531-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B327A40C@HQMAIL01.nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 01 Sep 2011 16:39:06 -0500
+Subject: [PATCH v2 7/7] ARM: highbank: add suspend support
+In-Reply-To: <20110901122239.GA5147@S2100-06.ap.freescale.net>
+References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
+	<1314841446-11006-8-git-send-email-robherring2@gmail.com>
+	<20110901122239.GA5147@S2100-06.ap.freescale.net>
+Message-ID: <4E5FFB7A.2020808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Thursday, September 01, 2011 3:33 AM:
-> This adds a driver for the U300 pinmux portions of the system
-> controller "SYSCON". It also serves as an example of how to use
-> the pinmux subsystem. This driver also houses the platform data
-> for the only supported platform.
+Shawn,
 
-> diff --git a/drivers/pinctrl/pinmux-u300.c b/drivers/pinctrl/pinmux-u300.c
+On 09/01/2011 07:22 AM, Shawn Guo wrote:
+> On Wed, Aug 31, 2011 at 08:44:06PM -0500, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Add the platform suspend ops for highbank.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>> Changes in v2:
+>>  - s/a9_base_addr/scu_base_addr/
+>>  - use sysregs helper functions
+>>  - add __init to highbank_pm_init
+>>
+>>  arch/arm/mach-highbank/Makefile |    1 +
+>>  arch/arm/mach-highbank/pm.c     |   55 +++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 56 insertions(+), 0 deletions(-)
+>>  create mode 100644 arch/arm/mach-highbank/pm.c
+>>
+>> diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
+>> index df30b0d..daeb3d8 100644
+>> --- a/arch/arm/mach-highbank/Makefile
+>> +++ b/arch/arm/mach-highbank/Makefile
+>> @@ -3,3 +3,4 @@ obj-$(CONFIG_DEBUG_LL)			+= lluart.o
+>>  obj-$(CONFIG_SMP)			+= platsmp.o
+>>  obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+>>  obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+>> +obj-$(CONFIG_PM_SLEEP)			+= pm.o
+>> diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
+>> new file mode 100644
+>> index 0000000..33b3beb
+>> --- /dev/null
+>> +++ b/arch/arm/mach-highbank/pm.c
+>> @@ -0,0 +1,55 @@
+>> +/*
+>> + * Copyright 2011 Calxeda, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/init.h>
+>> +#include <linux/io.h>
+>> +#include <linux/suspend.h>
+>> +
+>> +#include <asm/proc-fns.h>
+>> +#include <asm/smp_scu.h>
+>> +#include <asm/suspend.h>
+>> +
+>> +#include "core.h"
+>> +#include "sysregs.h"
+>> +
+>> +static int highbank_suspend_finish(unsigned long val)
+>> +{
+>> +	cpu_do_idle();
+>> +	return 0;
+>> +}
+>> +
+>> +static int highbank_pm_enter(suspend_state_t state)
+>> +{
+>> +	hignbank_set_pwr_suspend();
+>> +	highbank_set_cpu_jump(0, cpu_resume);
+>> +
+>> +	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
+>> +	cpu_suspend(0, highbank_suspend_finish);
+>> +
+> Rob,
+> 
+> Just out of curiosity, how can you resume back without taking care of
+> GIC, L2 and SCU which will lose power during suspend?
+> 
 
-> +/*
-> + * We define explicit indexes of the groups since these will be
-> + * referenced in the pinmuxes below.
-> + */
-> +#define POWERGRP_INDEX 0
-> +#define UART0GRP_INDEX 1
-> +#define MMC0GRP_INDEX 2
-> +#define SPI0GRP_INDEX 3
-> +
-> +static const struct u300_pin_group u300_pin_groups[] = {
-> +	[POWERGRP_INDEX] = {
-> +		.name = "powergrp",
-> +		.pins = power_pins,
-> +		.num_pins = ARRAY_SIZE(power_pins),
-> +	},
-...
-> +/**
-> + * struct u300_pmx_func - describes U300 pinmux functions
-> + * @name: the name of this specific function
-> + * @groups: corresponding pin groups
-> + * @onmask: bits to set to enable this when doing pin muxing
-> + */
-> +struct u300_pmx_func {
-> +	const char *name;
-> +	const unsigned groups[1];
-> +	const struct u300_pmx_mask *mask;
-> +};
-> +
-> +static const struct u300_pmx_func u300_pmx_functions[] = {
-> +	{
-> +		.name = "power",
-> +		.groups = { POWERGRP_INDEX },
-> +		/* Mask is N/A */
-> +	},
+They are not powergated yet, so it's really just wfi ATM. The L2 and SCU
+will be re-initialized by boot code. The GIC will need some save and
+restore.
 
-Hmmm. That's a lot of _INDEX defines that'd need to be set up, at least
-to fully represent a chip like Tegra. Can the pinmux core be modified
-such that the group list is an array of names (char*) rather than the
-actual numeric IDs of the groups? Still, perhaps we could use the enum
-we already have for this, so perhaps it isn't a big deal...
-
--- 
-nvpublic
+Rob
