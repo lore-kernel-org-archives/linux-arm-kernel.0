@@ -1,64 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 1 Sep 2011 18:31:49 +0100
-Subject: [PATCH 0/3] RFC: addition to DMA API
-In-Reply-To: <20110901160429.GA15814@n2100.arm.linux.org.uk>
-References: <CACVXFVOT9FZexiZhuJtvyFP8qOPYUKg0JqGarBJgT4R8SN7p5Q@mail.gmail.com>
-	<Pine.LNX.4.44L0.1109011127080.1896-100000@iolanthe.rowland.org>
-	<20110901160429.GA15814@n2100.arm.linux.org.uk>
-Message-ID: <20110901173149.GE2803@e102144-lin.cambridge.arm.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 1 Sep 2011 19:34:11 +0200
+Subject: [RFC/PATCH v2 08/13] dt: omap: i2c: add dt support for i2c1
+	controller
+In-Reply-To: <20110823154649.GF32698@manju-desktop>
+References: <1314074021-25186-1-git-send-email-manjugk@ti.com>
+	<1314074021-25186-9-git-send-email-manjugk@ti.com>
+	<20110823154649.GF32698@manju-desktop>
+Message-ID: <4E5FC213.3080407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Manju,
 
-On Thu, Sep 01, 2011 at 05:04:29PM +0100, Russell King - ARM Linux wrote:
-> DMA coherent memory on ARM is implemented on ARMv5 and below by using
-> 'noncacheable nonbufferable' memory.  There is no weak memory model to
-> worry about, and this memory type is seen as 'strongly ordered' - the
-> CPU stalls until the read or write has completed.  So no problem there.
-> 
-> On ARMv6 and above, the attributes change:
-> 
-> 1. Memory type: [Normal, Device, Strongly ordered]
->    All mappings of a physical address space are absolutely required to be
->    of the same memory type, otherwise the result is unpredictable.  There
->    is no mitigation against this.
-> 
-> 2. For "normal memory", a variety of options are available to adjust the
->    hints to the cache and memory subsystem - the options here are
->    [Non-cacheable, write-back write alloc, write-through non-write alloc,
->     write-back, non-write alloc.]
-> 
->    Strictly to the ARM ARM, all mappings must, again, have the same
->    attributes to avoid unpredictable behaviour.  There is a _temporary_
->    architectural relaxation of this requirement provided certain conditions
->    are met - which may become permanent.
+On 8/23/2011 5:46 PM, G, Manjunath Kondaiah wrote:
+> Hi Grant,
 
-This looks set to appear in revision C of the ARM ARM.
+[...]
 
-> It _is_ possible that "unpredictable" means that we may hit cache lines in
-> the [VP]IPT cache via the non-cacheable mapping which have been created
-> by speculative loads via the cacheable mapping - and this is something
-> that has been worrying me for a long time.
+> This function calls of_i2c_register_devices which attaches all the required
+> parameters reg, irq, archdata etc into i2c adapter. But it will not attach
+> platform_data which results empty pdata pointer in i2c child devices.
+>
+> Is this done purposefully?
 
-Whilst this can happen, this will only cause problems for reads performed
-by the CPU (as these may hit a line speculatively loaded via the cacheable
-alias). Setting bit 22 in the auxillary control register gets arounds this:
+I think so, but anyway, we'd rather spend some time on doing a proper DT 
+implementation than hacking more the AUXDATA temporary solution.
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6529/1
+I've just sent a reworked version of that series with a pure 
+dt-no-auxdata-hack approach.
 
-Given that I believe our coherent DMA memory is `cacheable, bufferable, do
-not allocate' in terms of AXI attributes, then writes will go straight to
-the write buffer on the PL310.
-
-> So, in summary what I'm saying is that _in theory_ our DMA coherent memory
-> on ARMv6+ should have nothing more than write buffering to contend with,
-> but that doesn't stop this being the first real concrete report proving
-> that what I've been going on about regarding the architectural requirements
-> over the last few years is actually very real and valid.
-
-I don't think what we're seeing in this case is caused by mismatched memory
-attributes, especially as passing `nosmp' on the command-line makes the
-performance issue disappear.
-
-Will
+Regards,
+Benoit
