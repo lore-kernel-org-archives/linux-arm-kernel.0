@@ -1,36 +1,30 @@
-From: B19295@freescale.com (Lin Tony-B19295)
-Date: Thu, 1 Sep 2011 07:46:37 +0000
-Subject: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting clock
-	from 100ms to 1ms
-In-Reply-To: <20110901055522.GB22652@pengutronix.de>
-References: <1314856275-12131-1-git-send-email-tony.lin@freescale.com>
-	<20110901055522.GB22652@pengutronix.de>
-Message-ID: <97D3A72708D04647A5AC84A04996E5B519DDC6@039-SN1MPN1-002.039d.mgd.msft.net>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 1 Sep 2011 08:58:15 +0100
+Subject: [PATCHv2 3/3] picoxcell: add the DTS for the PC7302 board
+In-Reply-To: <CAGsJ_4wp8aSJ2Kug2FkAznbVA9ifLfHt95P8+9bUijKAqJj5kA@mail.gmail.com>
+References: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
+	<1314196906-20709-4-git-send-email-jamie@jamieiles.com>
+	<CAGsJ_4wp8aSJ2Kug2FkAznbVA9ifLfHt95P8+9bUijKAqJj5kA@mail.gmail.com>
+Message-ID: <20110901075815.GA2585@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
-> Sent: Thursday, September 01, 2011 1:55 PM
-> To: Lin Tony-B19295
-> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> cjb at laptop.org
-> Subject: Re: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting
-> clock from 100ms to 1ms
+On Thu, Sep 01, 2011 at 02:36:17PM +0800, Barry Song wrote:
+> 2011/8/24 Jamie Iles <jamie@jamieiles.com>:
+[...]
+> > + ? ? ? clocks {
+> > + ? ? ? ? ? ? ? ref_clk: clock at 10 {
+> > + ? ? ? ? ? ? ? ? ? ? ? compatible = "fixed-clock";
+> > + ? ? ? ? ? ? ? ? ? ? ? clock-outputs = "ref";
+> > + ? ? ? ? ? ? ? ? ? ? ? clock-frequency = <20000000>;
+> > + ? ? ? ? ? ? ? };
 > 
-> On Thu, Sep 01, 2011 at 01:51:15PM +0800, Tony Lin wrote:
-> > 1ms is enough for hardware to change the clock to stable.
-> > 100ms is too long.
-> 
-> How do you know that? Can you be sure for PowerPC as well? Have you
-> researched why the original author of the code has chosen that value? If
-> so, please update your commit message with such infos.
-> 
-I got this confirmation by IC simulation, but sorry I just noticed that's also used for PPC.
-I can update the information after got confirmation from author. 
+> ok. find it. is its name just "ref_clk"? could it be a pll/osc or some
+> meaningful name?
 
-> --
-> Pengutronix e.K.                           | Wolfram Sang
-> |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/
-> |
+Well it's the board reference clock.  Typically this is a crystal, but 
+can also be an accurate, external reference or a VCTCXO so it didn't 
+feel right to encode that into the name for the SoC DTSI.  I guess it 
+could be called board_clk if that makes things easier though.
+
+Jamie
