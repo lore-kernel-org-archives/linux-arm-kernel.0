@@ -1,36 +1,24 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 01 Sep 2011 10:50:24 -0700
-Subject: [PATCH 1/1] OMAP: omap_device: only override _noirq methods,
-	not normal suspend/resume
-In-Reply-To: <201109011800.55516.arnd@arndb.de> (Arnd Bergmann's message of
-	"Thu, 1 Sep 2011 18:00:55 +0200")
-References: <1314229437-31836-1-git-send-email-khilman@ti.com>
-	<1314229437-31836-2-git-send-email-khilman@ti.com>
-	<201109011800.55516.arnd@arndb.de>
-Message-ID: <8762lcf8yn.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Sep 2011 19:07:53 +0100
+Subject: [PATCH 0/3] RFC: addition to DMA API
+In-Reply-To: <20110901173149.GE2803@e102144-lin.cambridge.arm.com>
+References: <CACVXFVOT9FZexiZhuJtvyFP8qOPYUKg0JqGarBJgT4R8SN7p5Q@mail.gmail.com>
+	<Pine.LNX.4.44L0.1109011127080.1896-100000@iolanthe.rowland.org>
+	<20110901160429.GA15814@n2100.arm.linux.org.uk>
+	<20110901173149.GE2803@e102144-lin.cambridge.arm.com>
+Message-ID: <20110901180753.GB15814@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Thu, Sep 01, 2011 at 06:31:49PM +0100, Will Deacon wrote:
+> Given that I believe our coherent DMA memory is `cacheable, bufferable, do
+> not allocate' in terms of AXI attributes, then writes will go straight to
+> the write buffer on the PL310.
 
-> On Thursday 25 August 2011, Kevin Hilman wrote:
->> --- a/arch/arm/plat-omap/omap_device.c
->> +++ b/arch/arm/plat-omap/omap_device.c
->> @@ -622,7 +622,8 @@ static struct dev_pm_domain omap_device_pm_domain = {
->>                 SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
->>                                    _od_runtime_idle)
->>                 USE_PLATFORM_PM_SLEEP_OPS
->> -               SET_SYSTEM_SLEEP_PM_OPS(_od_suspend_noirq, _od_resume_noirq)
->> +               .suspend_noirq = _od_suspend_noirq,
->> +               .resume_noirq = _od_resume_noirq,
->>         }
->>  };
->
-> This breaks if CONFIG_SUSPEND is not set and the _od_suspend_noirq/_od_resume_noirq
-> functions are not defined.
+It's TEXCB=001, which due to the PRRR and NMRR registers is memory type
+10, inner policy 00 outer policy 00, which translated means (as I said)
+"Normal memory", "non-cacheable" at both the inner and outer levels.
 
-Indeed.
-
-Will post a fix shortly.
-
-Kevin
+How that gets translated to AXI attributes is outside the scope of the
+ARM ARM, it's probably in some mega secret AXI document somewhere which
+I don't have access to.
