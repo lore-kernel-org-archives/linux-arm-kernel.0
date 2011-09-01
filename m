@@ -1,78 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 01 Sep 2011 13:48:38 +0100
-Subject: [PATCH 01/11] ARM: pm: CPU specific code should not overwrite r1
-	(v:p offset)
-In-Reply-To: <20110901124752.GE29729@n2100.arm.linux.org.uk>
-References: <20110901124752.GE29729@n2100.arm.linux.org.uk>
-Message-ID: <E1Qz6hC-00078B-Pm@rmk-PC.arm.linux.org.uk>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Thu, 01 Sep 2011 13:04:30 +0000
+Subject: [PATCH RESEND] video: nuc900fb: remove include of mach/clkdev.h
+In-Reply-To: <1314836018.2208.3.camel@phoenix>
+References: <1314836018.2208.3.camel@phoenix>
+Message-ID: <4E5F82DE.2060207@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-r1 stores the v:p offset from the CPU invariant resume code, and is
-expected to be preserved by the CPU specific code.  Overwriting it is
-not a good idea.
+On 09/01/2011 12:13 AM, Axel Lin wrote:
+> Since commit aa3831cf9d29cfeaebd8c2169378b74111364487
+> "ARM: Consolidate the clkdev header files",
+> the header file arch/arm/mach-nuc93x/include/mach/clkdev.h is removed.
+> 
+> This patch fixes below build error:
+> 
+> drivers/video/nuc900fb.c:42:25: error: mach/clkdev.h: No such file or directory
+> make[2]: *** [drivers/video/nuc900fb.o] Error 1
+> make[1]: *** [drivers/video] Error 2
+> make: *** [drivers] Error 2
+> 
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
 
-We've managed to get away with it on sa1100 platforms because most
-happen to have PHYS_OFFSET == PAGE_OFFSET, but that may not be the
-case depending on kernel configuration.  So fix this latent bug.
+Applied.
+I'm wondering whether this build regression was unavoidable...
 
-This fixes xsc3 as well which was saving and restoring this register
-independently.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/proc-sa1100.S |   10 +++++-----
- arch/arm/mm/proc-xsc3.S   |    6 +++---
- 2 files changed, 8 insertions(+), 8 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/mm/proc-sa1100.S b/arch/arm/mm/proc-sa1100.S
-index 07219c2..69e7f2e 100644
---- a/arch/arm/mm/proc-sa1100.S
-+++ b/arch/arm/mm/proc-sa1100.S
-@@ -182,11 +182,11 @@ ENDPROC(cpu_sa1100_do_suspend)
- 
- ENTRY(cpu_sa1100_do_resume)
- 	ldmia	r0, {r4 - r7}			@ load cp regs
--	mov	r1, #0
--	mcr	p15, 0, r1, c8, c7, 0		@ flush I+D TLBs
--	mcr	p15, 0, r1, c7, c7, 0		@ flush I&D cache
--	mcr	p15, 0, r1, c9, c0, 0		@ invalidate RB
--	mcr	p15, 0, r1, c9, c0, 5		@ allow user space to use RB
-+	mov	ip, #0
-+	mcr	p15, 0, ip, c8, c7, 0		@ flush I+D TLBs
-+	mcr	p15, 0, ip, c7, c7, 0		@ flush I&D cache
-+	mcr	p15, 0, ip, c9, c0, 0		@ invalidate RB
-+	mcr	p15, 0, ip, c9, c0, 5		@ allow user space to use RB
- 
- 	mcr	p15, 0, r4, c3, c0, 0		@ domain ID
- 	mcr	p15, 0, r5, c2, c0, 0		@ translation table base addr
-diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
-index 28c72a2..755e1bf 100644
---- a/arch/arm/mm/proc-xsc3.S
-+++ b/arch/arm/mm/proc-xsc3.S
-@@ -406,7 +406,7 @@ ENTRY(cpu_xsc3_set_pte_ext)
- 	.align
- 
- .globl	cpu_xsc3_suspend_size
--.equ	cpu_xsc3_suspend_size, 4 * 8
-+.equ	cpu_xsc3_suspend_size, 4 * 7
- #ifdef CONFIG_PM_SLEEP
- ENTRY(cpu_xsc3_do_suspend)
- 	stmfd	sp!, {r4 - r10, lr}
-@@ -418,12 +418,12 @@ ENTRY(cpu_xsc3_do_suspend)
- 	mrc	p15, 0, r9, c1, c0, 1	@ auxiliary control reg
- 	mrc 	p15, 0, r10, c1, c0, 0	@ control reg
- 	bic	r4, r4, #2		@ clear frequency change bit
--	stmia	r0, {r1, r4 - r10}	@ store v:p offset + cp regs
-+	stmia	r0, {r4 - r10}		@ store cp regs
- 	ldmia	sp!, {r4 - r10, pc}
- ENDPROC(cpu_xsc3_do_suspend)
- 
- ENTRY(cpu_xsc3_do_resume)
--	ldmia	r0, {r1, r4 - r10}	@ load v:p offset + cp regs
-+	ldmia	r0, {r4 - r10}		@ load cp regs
- 	mov	ip, #0
- 	mcr	p15, 0, ip, c7, c7, 0	@ invalidate I & D caches, BTB
- 	mcr	p15, 0, ip, c7, c10, 4	@ drain write (&fill) buffer
--- 
-1.7.4.4
+Florian Tobias Schandinat
+
+
+> ---
+>  drivers/video/nuc900fb.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+> index 0fff5978..37dd850 100644
+> --- a/drivers/video/nuc900fb.c
+> +++ b/drivers/video/nuc900fb.c
+> @@ -39,7 +39,6 @@
+>  #include <mach/regs-clock.h>
+>  #include <mach/regs-ldm.h>
+>  #include <mach/fb.h>
+> -#include <mach/clkdev.h>
+>  
+>  #include "nuc900fb.h"
+>  
