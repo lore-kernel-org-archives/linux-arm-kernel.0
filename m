@@ -1,47 +1,37 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Thu, 01 Sep 2011 09:30:06 +1000
-Subject: [PATCH 01/24] fix default __strnlen_user macro
-In-Reply-To: <1314826019-22330-2-git-send-email-msalter@redhat.com>
-References: <1314826019-22330-1-git-send-email-msalter@redhat.com>
-	<1314826019-22330-2-git-send-email-msalter@redhat.com>
-Message-ID: <4E5EC3FE.10307@gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Thu, 01 Sep 2011 08:13:38 +0800
+Subject: [PATCH RESEND] video: nuc900fb: remove include of mach/clkdev.h
+Message-ID: <1314836018.2208.3.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/11 07:26, Mark Salter wrote:
-> The existing __strnlen_user macro simply resolved to strnlen. However, the
-> count returned by strnlen_user should include the NULL byte. This patch
-> fixes the __strnlen_user macro to include the NULL byte in the count.
->
-> Signed-off-by: Mark Salter<msalter@redhat.com>
-> ---
->   include/asm-generic/uaccess.h |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/include/asm-generic/uaccess.h b/include/asm-generic/uaccess.h
-> index ac68c99..1d0fdf8 100644
-> --- a/include/asm-generic/uaccess.h
-> +++ b/include/asm-generic/uaccess.h
-> @@ -289,7 +289,7 @@ strncpy_from_user(char *dst, const char __user *src, long count)
->    * Return 0 on exception, a value greater than N if too long
->    */
->   #ifndef __strnlen_user
-> -#define __strnlen_user strnlen
-> +#define __strnlen_user(s, n) (strnlen((s), (n)) + 1)
->   #endif
+Since commit aa3831cf9d29cfeaebd8c2169378b74111364487
+"ARM: Consolidate the clkdev header files",
+the header file arch/arm/mach-nuc93x/include/mach/clkdev.h is removed.
 
-I don't think this is correct because if you hit maxlen you will add one 
-to it. e.g. __strnlen_user("abcd\0", 3) would return 4 instead of 3.
+This patch fixes below build error:
 
-It should probably be something like this:
+drivers/video/nuc900fb.c:42:25: error: mach/clkdev.h: No such file or directory
+make[2]: *** [drivers/video/nuc900fb.o] Error 1
+make[1]: *** [drivers/video] Error 2
+make: *** [drivers] Error 2
 
-#define __strnlen_user(s, n) ({		\
-	size_t k = strnlen(s, n);	\
-	k<  n ? k + 1 : n; })
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ drivers/video/nuc900fb.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-
-I wonder if this change will break anything since it has been incorrect 
-(according to the comment in uaccess.h@least) for a while. Why does 
-__strnlen_user have different semantics to strnlen anway?
-
-~Ryan
+diff --git a/drivers/video/nuc900fb.c b/drivers/video/nuc900fb.c
+index 0fff5978..37dd850 100644
+--- a/drivers/video/nuc900fb.c
++++ b/drivers/video/nuc900fb.c
+@@ -39,7 +39,6 @@
+ #include <mach/regs-clock.h>
+ #include <mach/regs-ldm.h>
+ #include <mach/fb.h>
+-#include <mach/clkdev.h>
+ 
+ #include "nuc900fb.h"
+ 
+-- 
+1.7.4.1
