@@ -1,74 +1,83 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 01 Sep 2011 09:28:29 -0700
-Subject: [PATCH 0/7] OMAP: omap_device cleanup before device-tree
-	integration
-References: <1314026347-21623-1-git-send-email-b-cousson@ti.com>
-Message-ID: <87sjogjkgi.fsf@ti.com>
+From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
+Date: Thu, 01 Sep 2011 16:45:18 +0000
+Subject: [PATCH 0/2] video: s3c-fb: Add window positioning support
+In-Reply-To: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <4E5FB69E.2060907@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit Cousson <b-cousson@ti.com> writes:
+Hi all,
 
-> Hi Kevin,
->
-> Here are a couple of cleanups on top of your for_3.2/omap_device series
-> rebased on top of 3.1-rc2 to get your pm-fixes.
+On 08/25/2011 07:51 PM, Ajay Kumar wrote:
+> Just as a note, there are many drivers like mx3fb.c, au1200fb.c and OMAP
+> seem to be doing window/plane positioning in their driver code.
+> Is it possible to have this window positioning support at a common place?
 
-OK, my for_3.2/omap_device is now based on v3.1-rc4 which has my
-pm-fixes merged.
+Good point. Congratulations for figuring out that I like to standardize things.
+But I think your suggestion is far from being enough to be useful for userspace
+(which is our goal so that applications can be reused along drivers and don't
+need to know about individual drivers).
 
-> The goal is to help building core devices using device-tree by removing
-> direct reference to the device inside PM.
+So let me at first summarize how I understand you implemented those things after
+having a brief look at some of the drivers:
+Windows are rectangular screen areas whose pixel data come from other locations.
+The other locations are accessible via other framebuffer devices (e.g. fb1). So
+in this area the data of fb1 is shown and not the data of fb0 that would be
+normally shown.
 
-Great.
+So in addition to your proposed positioning I think we should also have the
+following to give userspace a useful set of functionality:
 
-> For that, I took and rebased the two patches done by Nishanth to use hwmod
-> to identify the device from the generic IP name.
+- a way to discover how the screen is composited (how many windows are there,
+how they are stacked and how to access those)
 
-OK, I had some minor comments on those.
+- a way to enable/disable windows (make them (in)visible)
 
-> The currently "unused" omap_device_pm_latency is moved inside the
-> omap_device core code to avoid the duplication.
+- reporting and selecting how the window content can be mixed with the root
+screen (overwrite, source or destination color keying)
 
-And these two I've pulled into my for_3.2/omap_device branch.
-(not yet pushed because main kernel.org server is down.)
+- things like window size and color format could be handled by the usual fb API
+used on the window. However there might be restrictions which cause them to be
+not 100% API compatible (for example when changing the color format if the
+windows are required to have the same format as the root screen)
 
-Kevin
+- do we need to worry about hardware (up/down) scaling of the window content?
 
-> patches are available here:
-> git://gitorious.org/omap-pm/linux.git for_3.2/omap_device_cleanup
->
-> It is tested on OMAP4 SDP and Panda only. I don't even have the Beagle
-> to test the beagle patch :-(
->
-> Regards,
-> Benoit
->
->
-> Benoit Cousson (5):
->   OMAP3: beagle-board: Use the omap_hwmod_name_get_dev API
->   OMAP2+: pm: Use hwmod name instead of dev pointer
->   OMAP2+: pm: Remove static devices variable for mpu, dsp, iva and l3 PM
->   OMAP: omap_device: Create a default omap_device_pm_latency
->   OMAP2+: devices: Remove all omap_device_pm_latency structures
->
-> Nishanth Menon (2):
->   OMAP: PM: omap_device: add omap_hwmod_name_get_odev
->   OMAP: PM: omap_device: add few quick access functions
->
->  arch/arm/mach-omap2/board-omap3beagle.c       |    4 +-
->  arch/arm/mach-omap2/devices.c                 |   46 ++---------------
->  arch/arm/mach-omap2/display.c                 |   11 +----
->  arch/arm/mach-omap2/dma.c                     |   11 +----
->  arch/arm/mach-omap2/gpio.c                    |   12 +----
->  arch/arm/mach-omap2/hsmmc.c                   |   18 +------
->  arch/arm/mach-omap2/hwspinlock.c              |   12 +----
->  arch/arm/mach-omap2/mcbsp.c                   |   11 +----
->  arch/arm/mach-omap2/pm.c                      |   69 ++++++++-----------------
->  arch/arm/mach-omap2/serial.c                  |   25 +---------
->  arch/arm/mach-omap2/sr_device.c               |   11 +----
->  arch/arm/mach-omap2/usb-musb.c                |   11 +----
->  arch/arm/plat-omap/i2c.c                      |   10 +---
->  arch/arm/plat-omap/include/plat/omap_device.h |   16 ++++++
->  arch/arm/plat-omap/omap_device.c              |   49 +++++++++++++++++-
->  15 files changed, 101 insertions(+), 215 deletions(-)
+
+So is that what you need for a standardized window implementation?
+Any additional things that were useful/needed in this context?
+Would you consider adding support for this API in your drivers? (as
+standardizing wouldn't be useful if nobody would implement it)
+
+
+Best regards,
+
+Florian Tobias Schandinat
+
+
+> 
+> For instance, we can have a common struture and ioctl number in 
+> include/linux/fb.h as below:
+> 
+> 	#define FBIOPOS_OVERLAY_WIN    _IOW('F', 0x21, struct fb_overlay_win_pos)
+> 
+> 	struct fb_overlay_win_pos {
+> 		__u32 win_pos_x;  /* x-offset of window from LCD(0,0) */
+> 		__u32 win_pos_y;  /* y-offset of window from LCD(0,0) */
+> 	};
+> 
+> where LCD(0,0) means the first pixel of the LCD screen.
+> Individual drivers can have implementation for this ioctl.
+> 
+> To Kukjin Kim,
+>   [PATCH 1/2] ARM: SAMSUNG: Add Window Positioning Support for s3c-fb driver
+> 
+> To Paul Mundt, Florian Tobias Schandinat
+>   [PATCH 2/2] video: s3c-fb: Modify s3c-fb driver to support window positioning
+> 
+>  arch/arm/plat-samsung/include/plat/fb.h |   14 +++++++++++
+>  drivers/video/s3c-fb.c                  |   37 ++++++++++++++++++++++++++----
+>  2 files changed, 46 insertions(+), 5 deletions(-)
+> 
+> 
