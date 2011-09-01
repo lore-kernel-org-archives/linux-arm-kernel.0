@@ -1,45 +1,74 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 1 Sep 2011 19:25:05 +0200
-Subject: [PATCH 0/7] OMAP3: Add basic DT support + i2c + twl
-Message-ID: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
+Date: Thu, 1 Sep 2011 19:25:06 +0200
+Subject: [PATCH 1/7] arm/dts: Add initial device-tree support for OMAP3 SoC
+In-Reply-To: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
+References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
+Message-ID: <1314897912-18178-2-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant, Tony,
+Add initial OMAP3 soc file with empty ocp bus.
 
-This is second part of the rework of the original series done by Manju:
-http://www.spinics.net/lists/linux-omap/msg55827.html
+Based on initial patch from Manju:
+http://www.spinics.net/lists/linux-omap/msg55830.html
 
-It introduces the OMAP3 DT support incrementaly like it was done for OMAP4.
-
-Patches are based on for_3.2/5_omap_dt_i2c_twl + devicetree/test
-and are available here:
-git://gitorious.org/omap-pm/linux.git for_3.2/6_omap3_dt_base
-
-Tested on Beagle XM.
-
-Comments are welcome.
-
-Regards,
-Benoit
-
-
-Benoit Cousson (7):
-  arm/dts: Add initial device-tree support for OMAP3 SoC
-  arm/dts: OMAP3: Add mpu and iva nodes
-  arm/dts: OMAP3: Add i2c controllers nodes
-  arm/dts: omap3-beagle: Include the generic omap3.dtsi
-  arm/dts: omap3-beagle: Add twl4030 and EEPROM i2c devices
-  OMAP3: board-dt: Add generic board file for DT support
-  OMAP3: beagleboard: Remove DT support from regular board
-
- arch/arm/boot/dts/omap3-beagle.dts      |   68 +++++++++++++++++++++-
- arch/arm/boot/dts/omap3.dtsi            |   95 +++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/Kconfig             |   10 +++
- arch/arm/mach-omap2/Makefile            |    1 +
- arch/arm/mach-omap2/board-omap3-dt.c    |   74 ++++++++++++++++++++++++
- arch/arm/mach-omap2/board-omap3beagle.c |   13 ----
- arch/arm/mach-omap2/pm.c                |    6 +-
- 7 files changed, 250 insertions(+), 17 deletions(-)
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: G, Manjunath Kondaiah <manjugk@ti.com>
+---
+ arch/arm/boot/dts/omap3.dtsi |   44 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm/boot/dts/omap3.dtsi
- create mode 100644 arch/arm/mach-omap2/board-omap3-dt.c
+
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+new file mode 100644
+index 0000000..1b27925
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -0,0 +1,44 @@
++/*
++ * Device Tree Source for OMAP3 SoC
++ *
++ * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/include/ "skeleton.dtsi"
++
++/ {
++	compatible = "ti,omap3430", "ti,omap3";
++
++	/*
++	 * The soc node represents the soc top level view. It is uses for IPs
++	 * that are not memory mapped in the MPU view or for the MPU itself.
++	 */
++	soc {
++		compatible = "ti,omap-infra";
++	};
++
++	/*
++	 * XXX: Use a flat representation of the OMAP3 interconnect.
++	 * The real OMAP interconnect network is quite complex.
++	 * Since that will not bring real advantage to represent that in DT for
++	 * the moment, just use a fake OCP bus entry to represent the whole bus
++	 * hierarchy.
++	 */
++	ocp {
++		compatible = "ti,l3-smx", "arteris,smx", "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		hwmods = "l3_main";
++
++		intc: interrupt-controller at 1 {
++			compatible = "ti,omap3-intc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++	};
++};
+-- 
+1.7.0.4
