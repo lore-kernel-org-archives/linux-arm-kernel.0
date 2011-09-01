@@ -1,82 +1,82 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 01 Sep 2011 07:55:14 -0700
-Subject: [PATCH 2/7] OMAP: PM: omap_device: add few quick access functions
-In-Reply-To: <4E5F72A2.6000002@ti.com> (Benoit Cousson's message of "Thu, 1
-	Sep 2011 13:55:14 +0200")
-References: <1314026347-21623-1-git-send-email-b-cousson@ti.com>
-	<1314026347-21623-3-git-send-email-b-cousson@ti.com>
-	<87r5418bkz.fsf@ti.com> <4E5F72A2.6000002@ti.com>
-Message-ID: <87aaaol3cd.fsf@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 1 Sep 2011 11:22:51 -0400 (EDT)
+Subject: [PATCH 0/3] RFC: addition to DMA API
+In-Reply-To: <CACVXFVOYaxGDZrwkHYc+h=tFhpYp+g95KZrDjg+bPH_N-9BT_g@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1109011113210.1896-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Cousson, Benoit" <b-cousson@ti.com> writes:
+On Thu, 1 Sep 2011, Ming Lei wrote:
 
-> On 9/1/2011 12:23 AM, Hilman, Kevin wrote:
->> Benoit Cousson<b-cousson@ti.com>  writes:
->>
->>> From: Nishanth Menon<nm@ti.com>
->>>
->>> Provide a quick set of access functions:
->>> a) Convert omap_device to platform_device - This is the flip of
->>>     to_omap_device for equivalent usage
->>> b) Convert omap_device to device pointer - This is useful for
->>>     most devices that need to go through standard linux functions that
->>>     take device pointer.
->>> c) Convert hwmod to device pointer - This wrapper provides ability for
->>>     drivers to convert directly from hwmod name back to device pointer
->>>     without having to handle this on a driver by driver basis
->>>
->>> Signed-off-by: Nishanth Menon<nm@ti.com>
->>> [b-cousson at ti.com: Adapt it to the new pdev pointer inside od]
->>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->>> ---
->>>   arch/arm/plat-omap/include/plat/omap_device.h |   15 +++++++++++++++
->>>   1 files changed, 15 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
->>> index bdc2804..903f329 100644
->>> --- a/arch/arm/plat-omap/include/plat/omap_device.h
->>> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
->>> @@ -152,6 +152,21 @@ static inline struct omap_device *to_omap_device(struct platform_device *pdev)
->>>   	return pdev ? pdev->archdata.od : NULL;
->>>   }
->>>
->>> +/* Convert omap_device to platform device pointer */
->>> +#define omap_device_get_pdev(x) ((x)->pdev)
->>> +/* Convert omap_device to device pointer */
->>> +#define omap_device_get_dev(x) (&omap_device_get_pdev(x)->dev)
->>
->> I don't see these used elsewhere, and I don't think they're needed...
->
-> Well, there are used once... just below, and that's all.
->
->>> +/* Convert omap_hwmod name to device pointer */
->>> +static inline struct device *omap_hwmod_name_get_dev(const char *oh_name)
->>> +{
->>> +	struct omap_device *od;
->>> +	od = omap_hwmod_name_get_odev(oh_name);
->>> +	if (IS_ERR_OR_NULL(od))
->>> +		return ERR_PTR(od ? PTR_ERR(od) : -ENODEV);
->>> +	return omap_device_get_dev(od);
->>> +}
->>> +
->
-> I will let Nishant comment, but I guess the idea was that an
-> omap_device API should handle omap_device pointer, and then access to
-> pdev or dev is done using these helpers.
->
-> Assuming that now omap_device API should preferably use pdev, we can
-> remove one step of indirection and thus get rid of the helpers, since
-> they are not used anywhere else.
->
+> I agree all about above, but what I described is from another view.
+> I post out the example before explaining my idea further:
+> 
+> 
+> 	CPU			device	
+> 	A=1;
+> 	wmb
+> 	B=2;
+> 					read B
+> 					read A
+> 
+> one wmb is used to order 'A=1' and 'B=2', which will make the two write
+> operations reach to physical memory as the order: 'A=1' first, 'B=2' second.
+> Then the device can observe the two write events as the order above,
+> so if device has seen 'B==2', then device will surely see 'A==1'.
+> 
+> Suppose writing to A is operation to update dma descriptor, the above example
+> can make device always see a atomic update of descriptor, can't it?
 
-Yes please.
+Suppose A and B are _both_ part of the dma descriptor.  The device 
+might see A==1 and B==0, if the memory accesses occur like this:
 
-I've made most of the omap_device API now use pdev pointers already in
-my series.
+	CPU		device
+	---		------
+	A = 1;
+	wmb();
+			read B
+			read A
+	B = 2;
 
-Thanks,
+When this happens, the device will observe a non-atomic update of the 
+descriptor.  There's no way to prevent this.
 
+> My idea is that the memory access patterns are to be considered for
+> writer of device driver. For example, many memory access patterns on
+> EHCI hardware are described in detail.  Of course, device driver should
+> make full use of the background info, below is a example from ehci driver:
+> 
+> qh_link_async():
+> 
+> 	/*prepare qh descriptor*/
+> 	qh->qh_next = head->qh_next;
+> 	qh->hw->hw_next = head->hw->hw_next;
+> 	wmb ();
+> 
+> 	/*link the qh descriptor into hardware queue*/
+> 	head->qh_next.qh = qh;
+> 	head->hw->hw_next = dma;
+> 
+> so once EHCI fetches a qh with the address of 'dma', it will always see
+> consistent content of qh descriptor, which could not be updated partially.
 
-Kevin
+Yes, of course.  That's what memory barriers are intended for, to make 
+sure that writes occur in the correct order.  Without the wmb(), the 
+CPU might decide to write out the value of head->hw->hw_next before 
+writing out the value of qh->hw->hw_next.  Then the device might see an 
+inconsistent set of values.
+
+None of this has anything to do with the write flushes you want to add.
+
+> >> 2, most of such cases can be handled correctly by mb/wmb/rmb barriers.
+> >
+> > No, they can't. ?See the third point above.
+> 
+> The example above has demoed that barriers can do it, hasn't it?
+
+The memory barrier in your qh_link_async() example can make sure that
+the device always sees consistent data.  It doesn't guarantee that the
+write to head->hw->hw_next will be flushed to memory in a reasonably 
+short time, which is the problem you are trying to solve.
+
+Alan Stern
