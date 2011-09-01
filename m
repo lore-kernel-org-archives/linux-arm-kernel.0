@@ -1,53 +1,67 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 1 Sep 2011 12:48:19 -0400 (EDT)
-Subject: [PATCH 0/3] RFC: addition to DMA API
-In-Reply-To: <CACVXFVOSCS-J8iXcRpCN9TD41pWqcJOiPahtGjBmPpXBLozZyA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1109011244340.1896-100000@iolanthe.rowland.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 1 Sep 2011 19:21:16 +0200
+Subject: [PATCH 00/13] OMAP4: Add DT support for i2c and twl6030
+Message-ID: <1314897689-17791-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Sep 2011, Ming Lei wrote:
+Hi Grant, Tony,
 
-> > Suppose A and B are _both_ part of the dma descriptor. ?The device
-> > might see A==1 and B==0, if the memory accesses occur like this:
-> >
-> > ? ? ? ?CPU ? ? ? ? ? ? device
-> > ? ? ? ?--- ? ? ? ? ? ? ------
-> > ? ? ? ?A = 1;
-> > ? ? ? ?wmb();
-> > ? ? ? ? ? ? ? ? ? ? ? ?read B
-> > ? ? ? ? ? ? ? ? ? ? ? ?read A
-> > ? ? ? ?B = 2;
-> >
-> > When this happens, the device will observe a non-atomic update of the
-> > descriptor. ?There's no way to prevent this.
-> 
-> If device doesn't find that B is 2, it will not fetch descriptor of A,
-> and will observe
-> a atomic update, which is just EHCI does for many cases(such as 4.10.2).
+This is a rework of the original series done by Manju:
+http://www.spinics.net/lists/linux-omap/msg55827.html
 
-You didn't read what I wrote above.  Suppose A and B are _both_ part of 
-the same descriptor, like hw_token and hw_qtd_next.
+It fixes the main issue of the previous series that was not booting at all
+due to the lack of twl support. That fix is mandatory to allow further
+work on the regulators DT bindings.
+In order to have a minimal i2c support, both i2c and twl must be added
+at the same time.
+Please note than some patches can be reshuffle with the previous OMAP4
+series to avoid the intermediate step with static i2c initialization.
+
+That series is as well using the hwmods binding introduced in my previous
+series.
+The OMAP3/beagle support will be added in an other series.
+
+A couple of basic i2c devices are added for panda and sdp board.
+
+Patches are based on for_3.2/4_omap4_dt_early_devices + devicetree/test
+and are available here:
+git://gitorious.org/omap-pm/linux.git for_3.2/5_omap_dt_i2c_twl
+
+Tested on PandaBoard and sdp4430.
+
+Comments are welcome.
+
+Regards,
+Benoit
 
 
-> > The memory barrier in your qh_link_async() example can make sure that
-> > the device always sees consistent data. ?It doesn't guarantee that the
-> > write to head->hw->hw_next will be flushed to memory in a reasonably
-> > short time, which is the problem you are trying to solve.
-> 
-> Yes, up to now, it is the only case in which the flush can address to,
-> and in which kind of cases device will poll DMA coherent memory contiguously,
-> I am not sure if there are other devices except for EHCI(maybe have uhci/ohci).
+Benoit Cousson (10):
+  irq: Add stub for none DT build in irqdomain.h
+  mfd: twl-core: Add initial DT support for twl4030/twl6030
+  documentation/dt: Add TWL4030 and TWL6030 bindings
+  arm/dts: OMAP4: Add i2c controller nodes
+  arm/dts: omap4-sdp: Set clock freq for i2c controllers
+  arm/dts: omap4-sdp: Add twl6030 node
+  arm/dts: omap4-panda: Add twl6030 node
+  OMAP4: board-dt: Remove static i2c init
+  arm/dts: omap4-sdp: Add i2c3 & i2c4 devices
+  arm/dts: omap4-panda: Add EEPROM entry in i2c3
 
-Yes: UHCI, OHCI, EHCI, and XHCI all poll memory constantly.
+G, Manjunath Kondaiah (3):
+  i2c: OMAP: Add DT support for i2c controller
+  documentation/dt: Add OMAP i2c bindings documentation
+  arm/dts: omap4-panda: Set clock freq for i2c controllers
 
-> If there are many such kind of devices, the flush operation introduced will
-> make sense.
-> 
-> As far as I know, for most of devices, dma operation of bus master is triggered
-> by writing into mmio register instead of writing into coherent memory, and the
-> flush is not required in this case surely.
-
-That's right.  It is needed only when the device polls automatically.
-
-Alan Stern
+ Documentation/devicetree/bindings/i2c/omap-i2c.txt |   30 ++++++
+ .../devicetree/bindings/mfd/twl-familly.txt        |   47 +++++++++
+ arch/arm/boot/dts/omap4-panda.dts                  |   48 ++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts                    |   66 +++++++++++++
+ arch/arm/boot/dts/omap4.dtsi                       |   32 +++++++
+ arch/arm/mach-omap2/board-omap4-dt.c               |   15 ---
+ drivers/i2c/busses/i2c-omap.c                      |   23 ++++-
+ drivers/mfd/twl-core.c                             |   99 +++++++++++++++++++-
+ include/linux/irqdomain.h                          |    2 +
+ 9 files changed, 340 insertions(+), 22 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/i2c/omap-i2c.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/twl-familly.txt
