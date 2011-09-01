@@ -1,35 +1,43 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu,  1 Sep 2011 11:12:02 -0700
-Subject: [PATCH] OMAP: omap_device: fix !CONFIG_SUSPEND case in _noirq handlers
-Message-ID: <1314900722-10252-1-git-send-email-khilman@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 01 Sep 2011 20:17:09 +0200
+Subject: [PATCH 2/7] arm/dts: OMAP3: Add mpu and iva nodes
+In-Reply-To: <1314897912-18178-3-git-send-email-b-cousson@ti.com>
+References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
+	<1314897912-18178-3-git-send-email-b-cousson@ti.com>
+Message-ID: <1377915.IaVE5xAurc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The suspend/resume _noirq handlers were #ifdef'd out in the
-!CONFIG_SUSPEND case, but were still assigned to the dev_pm_ops
-struct.  Fix by defining them to NULL in the !CONFIG_SUSPEND case.
+On Thursday 01 September 2011 19:25:07 Benoit Cousson wrote:
+> 
+>         /*
+> +        * XXX: The cpus node is mandatory, but since the CPUs are as well part
+> +        * of the mpu subsystem below, it is not clear where the information
+> +        * should be. Maybe here with a phandle inside the mpu?
+> +        */
+> +       cpus {
+> +       };
+> +
+> +       /*
+>          * The soc node represents the soc top level view. It is uses for IPs
+>          * that are not memory mapped in the MPU view or for the MPU itself.
+>          */
+>         soc {
+>                 compatible = "ti,omap-infra";
+> +               mpu {
+> +                       compatible = "ti,omap3-mpu";
+> +                       hwmods = "mpu";
+> +                       cpu at 0 {
+> +                               compatible = "arm,cortex-a8";
+> +                       };
+> +               };
+> +
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Applies to v3.1-rc4.
+I would always put the cpu nodes in the top-level, even if that's
+a slight misrepresentation of the truth. The point is basically
+that CPU nodes are special (you cannot have device drivers for them)
+and that the device tree is basically laid out from the perspective
+of the CPU, which may be different from the perspective that a
+hardware designer has.
 
- arch/arm/plat-omap/omap_device.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 9a6a538..02609ee 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -615,6 +615,9 @@ static int _od_resume_noirq(struct device *dev)
- 
- 	return pm_generic_resume_noirq(dev);
- }
-+#else
-+#define _od_suspend_noirq NULL
-+#define _od_resume_noirq NULL
- #endif
- 
- static struct dev_pm_domain omap_device_pm_domain = {
--- 
-1.7.6
+	Arnd
