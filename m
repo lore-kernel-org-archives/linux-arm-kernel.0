@@ -1,59 +1,84 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 01 Sep 2011 11:26:52 +0900
-Subject: [PATCH 1/5] ARM: Samsung: PWM: Allow to differentiate SoCs based
-	on platform device name.
-In-Reply-To: <CA+Ln22Gak4engAmccbodi2PbYH1PwQ1KuACd9thX_8W5Cr544Q@mail.gmail.com>
-References: <1731819.jJi37IsjvJ@flatron> <4002702.FticUbImag@flatron>
-	<20110831124432.GF14976@sirena.org.uk>
-	<CA+Ln22Gak4engAmccbodi2PbYH1PwQ1KuACd9thX_8W5Cr544Q@mail.gmail.com>
-Message-ID: <001d01cc684e$9c49ecd0$d4ddc670$%kim@samsung.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Thu, 1 Sep 2011 10:33:47 +0800
+Subject: [PATCH 3/3] add dma_coherent_write_sync calls to USB EHCI driver
+In-Reply-To: <1314826214-22428-4-git-send-email-msalter@redhat.com>
+References: <1314826214-22428-1-git-send-email-msalter@redhat.com>
+	<1314826214-22428-4-git-send-email-msalter@redhat.com>
+Message-ID: <CACVXFVPZYj8-rCxCV6rVjSB=aa2P5vd3-jBqU1403je+fatcjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> 2011/8/31 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> > On Wed, Aug 31, 2011 at 02:34:15PM +0200, Tomasz Figa wrote:
-> >
-> >> This patch is a prerequisite to adding generic time support for
-S3C64xx.
-> >> It makes possible to differentiate SoCs, required to exclude timers 3
-and 4
-> >> from PWM driver only on S3C64xx.
-> >
-> > Now we have the cpu_is_foo() support for Samsung CPUs can we use that
-> > instead?
-> >
-> 
-> Well, I thought about it, but I based my patches on latest stable sources
-and
-> cpu_is_s3c64xx wasn't there yet. Should I rebase them to Linus' tree?
-> 
-> I'm not yet fully used to submitting patches here, so things like choosing
-the
-> base for patches are sometimes a bit confusing to me and I couldn't find
-any
-> guide. Should fixes be based on stable tree and new features implemented
-on
-> top of current Linus' tree? Could you give me some advice on this?
+Hi,
 
-Hi Tomasz,
+On Thu, Sep 1, 2011 at 5:30 AM, Mark Salter <msalter@redhat.com> wrote:
+> The EHCI driver polls DMA coherent memory for control data written by the
+> driver. On some architectures, such as ARMv7, the writes from the driver
+> may get delayed in a write buffer even though it is written to DMA coherent
+> memory. This delay led to serious performance issues on an ARMv7 based
+> platform using a USB disk drive. Before using this patch, 'hdparm -t' showed
+> a read speed of 5.7MB/s. After applying this patch, hdparm showed 23.5MB/s.
+>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+> ?drivers/usb/host/ehci-q.c | ? ?7 ++++++-
+> ?1 files changed, 6 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/usb/host/ehci-q.c b/drivers/usb/host/ehci-q.c
+> index 0917e3a..75d9838 100644
+> --- a/drivers/usb/host/ehci-q.c
+> +++ b/drivers/usb/host/ehci-q.c
+> @@ -114,6 +114,7 @@ qh_update (struct ehci_hcd *ehci, struct ehci_qh *qh, struct ehci_qtd *qtd)
+> ? ? ? ?/* HC must see latest qtd and qh data before we clear ACTIVE+HALT */
+> ? ? ? ?wmb ();
+> ? ? ? ?hw->hw_token &= cpu_to_hc32(ehci, QTD_TOGGLE | QTD_STS_PING);
+> + ? ? ? dma_coherent_write_sync();
 
-You can use "soc_is_s3c64xx()" based on Samsung -next tree.
-git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-for-next
+It is not needed at all, just before the qh is linked into hw queue,
+there is one
+wmb to handle sync of qh correctly. Even the wmb can be removed as the patch
+I have posted out in usb mail list.
 
-In addition, would be better to me if you could work about Samsung stuff
-based on it.
+> ?}
+>
+> ?/* if it weren't for a common silicon quirk (writing the dummy into the qh
+> @@ -404,6 +405,7 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?wmb();
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?hw->hw_token = cpu_to_hc32(ehci,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?token);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_coherent_write_sync();
 
-As a note, your previous patches are in there :)
+It is in a cold path, and if adding the helper or not does not matter.
 
-If any problems, please let me know...
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?goto retry_xacterr;
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?stopped = 1;
+> @@ -753,8 +755,10 @@ qh_urb_transaction (
+> ? ? ? ?}
+>
+> ? ? ? ?/* by default, enable interrupt on urb completion */
+> - ? ? ? if (likely (!(urb->transfer_flags & URB_NO_INTERRUPT)))
+> + ? ? ? if (likely(!(urb->transfer_flags & URB_NO_INTERRUPT))) {
+> ? ? ? ? ? ? ? ?qtd->hw_token |= cpu_to_hc32(ehci, QTD_IOC);
+> + ? ? ? ? ? ? ? dma_coherent_write_sync();
 
-Thanks.
+It is not needed at all, the wmb in qh_append_tds will handle sync of
+qtd correctly.
 
-Best regards,
-Kgene.
+> + ? ? ? }
+> ? ? ? ?return head;
+>
+> ?cleanup:
+> @@ -1081,6 +1085,7 @@ static struct ehci_qh *qh_append_tds (
+> ? ? ? ? ? ? ? ? ? ? ? ?/* let the hc process these next qtds */
+> ? ? ? ? ? ? ? ? ? ? ? ?wmb ();
+> ? ? ? ? ? ? ? ? ? ? ? ?dummy->hw_token = token;
+> + ? ? ? ? ? ? ? ? ? ? ? dma_coherent_write_sync();
+
+It is the only one which does make sense up to now, see discussion in
+
+      http://marc.info/?t=131472029700001&r=1&w=2
+      http://marc.info/?t=131445642100002&r=1&w=2
+
+thanks,
 --
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Ming Lei
