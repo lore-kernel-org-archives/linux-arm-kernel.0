@@ -1,57 +1,128 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Thu, 1 Sep 2011 13:10:48 +0800
-Subject: [PATCH] arm: gic: fix gic_set_affinity
-In-Reply-To: <20110831190448.GA29729@n2100.arm.linux.org.uk>
-References: <1314802086-26133-1-git-send-email-tom.leiming@gmail.com>
-	<20110831190448.GA29729@n2100.arm.linux.org.uk>
-Message-ID: <CACVXFVO0pAJv8WkZ6K2N1NysBcdN+9ceErE0xxQFLnYXtorsvw@mail.gmail.com>
+From: girish.shivananjappa@linaro.org (Girish K S)
+Date: Thu, 1 Sep 2011 10:45:43 +0530
+Subject: [PATCH] mmc: core: eMMC4.5 Add the timeout for switch
+In-Reply-To: <CAGxe1ZFZehTs+xt3a5zWwiJ+=GBLy8VGPHMF7GUnpcF_wKeQKw@mail.gmail.com>
+References: <1314699770-17120-1-git-send-email-girish.shivananjappa@linaro.org>
+	<001601cc684c$ce571b00$6b055100$%kim@samsung.com>
+	<CAGxe1ZFZehTs+xt3a5zWwiJ+=GBLy8VGPHMF7GUnpcF_wKeQKw@mail.gmail.com>
+Message-ID: <CAGxe1ZFVbhEL1_Ozw049u+HF06jyDfkp5-ZxEX22kkkAJJAEhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Mr Kukjin,
+          I checked this link
+"http://www.spinics.net/lists/linux-mmc/msg09770.html"
+given by you,but this link has the patch only to extract the timeout
+value from the
+extended CSD register of the eMMC 4.5 device. Whereas if you review my patch
+you can actually see the implementation of the timeout handling in the
+mmc_switch
+function in the mmc_ops.c
 
-On Thu, Sep 1, 2011 at 3:04 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Aug 31, 2011 at 10:48:06PM +0800, tom.leiming at gmail.com wrote:
->> Current gic_set_affinity doesn't support to route irq to all cpu,
->> so fix it.
+Sorry my previous mails were with ricj text enabled.
+Thanks and regards
+Girish K S
+
+
+On 1 September 2011 09:20, Girish K S <girish.shivananjappa@linaro.org> wrote:
+> hi kukjin,
+> but I cannot see its handling in the mmc_ops.c file which also updates the
+> switch function.
+> regards
+> girish
 >
-> That is correct - we don't support routing an IRQ to _all_ CPUs because
-> that's silly - by doing so you end up with a galloping hurd problem. ?As
-> soon as such an interrupt is triggered, it will be delivered to all CPUs,
-> and all CPUs will be woken up. ?All CPUs will then enter the kernel, and
-
-Yes, the irq will make 'WFI' exit from all CPUs, which will be wake up, but
-the irq is only routed into one of CPUs for irq handling. Looks like WFI is
-stupid designed, :-) Buf for the CPU waken up by irq handled on other
-CPU, it will run wfi and sleep immediately.
-
-> one will win the spinlock race. ?The remainder will spin on the lock while
-> the winner sorts out what to do.
-
-I have added a trace point in the entry of arch_irq_handler_default, and
-observed one irq is only routed into one of CPUs, so only one CPU will
-handle the irq even if gic is set to route an IRQ to _all_ CPUs.
-
->
-> That is inefficient and needlessly causes other CPUs to wake up. ?The
-> point of the current code is that we route IRQs to exactly one CPU at a
-> time to avoid that problem.
-
-Maybe the current implementation should allow user to route IRQ to all
-CPUs, and no cause to just forbid it, but the default_smp_affinity can be
-set as only routing to one of CPUs.
-
->
->> Also remove the unnecessary check for 'cpu' since cpu_online_mask
->> is already ADDed to produce correct one.
->
-> Not everywhere - take a look at migrate_one_irq() in arch/arm/kernel/irq.c,
-> where we want to change the current routing but without actually changing
-> the user set affinity.
->
-
-
-thanks,
--- 
-Ming Lei
+> On Thursday, 1 September 2011, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> Girish K S wrote:
+>>>
+>>> This patch adds the code to handle the default timeout
+>>> for switch command.
+>>> For eMMC 4.5 devices if timeout is not specified for the switch
+>>> command while accessing a specific field,then the default timeout
+>>> shall be used to timeout. Specification says there is no timeout
+>>> defined while accessing BKOPS_START, SANITIZE_START, FLUSH_CACHE
+>>> field(so these fields are excluded).
+>>>
+>>> Signed-off-by: Girish K S <girish.shivananjappa@linaro.org>
+>>> ---
+>>> ?drivers/mmc/core/mmc.c ? ? | ? ?5 +++++
+>>> ?drivers/mmc/core/mmc_ops.c | ? ?8 ++++++++
+>>> ?include/linux/mmc/card.h ? | ? ?1 +
+>>> ?include/linux/mmc/mmc.h ? ?| ? ?4 ++++
+>>> ?4 files changed, 18 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>>> index 5700b1c..5b9fb6a 100644
+>>> --- a/drivers/mmc/core/mmc.c
+>>> +++ b/drivers/mmc/core/mmc.c
+>>> @@ -405,6 +405,11 @@ static int mmc_read_ext_csd(struct mmc_card *card,
+>>> u8
+>>> *ext_csd)
+>>> ? ? ? if (card->ext_csd.rev >= 5)
+>>> ? ? ? ? ? ? ? card->ext_csd.rel_param =
+>>> ext_csd[EXT_CSD_WR_REL_PARAM];
+>>>
+>>> + ? ? if (card->ext_csd.rev > 5) {
+>>> + ? ? ? ? ? ? /* (eMMC 4.5)timeout is expressed in units of 10 ms*/
+>>> + ? ? ? ? ? ? card->ext_csd.cmd6_timeout =
+>>> ext_csd[EXT_CSD_CMD6_TIME]*10;
+>>> + ? ? }
+>>> +
+>>> ? ? ? if (ext_csd[EXT_CSD_ERASED_MEM_CONT])
+>>> ? ? ? ? ? ? ? card->erased_byte = 0xFF;
+>>> ? ? ? else
+>>> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+>>> index 770c3d0..c4d82f4 100644
+>>> --- a/drivers/mmc/core/mmc_ops.c
+>>> +++ b/drivers/mmc/core/mmc_ops.c
+>>> @@ -394,6 +394,14 @@ int mmc_switch(struct mmc_card *card, u8 set, u8
+>> index,
+>>> u8 value,
+>>> ? ? ? cmd.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
+>>> ? ? ? cmd.cmd_timeout_ms = timeout_ms;
+>>>
+>>> + ? ? /* timeout is not defined for below command indexes (eMMC 4.5) */
+>>> + ? ? if ((timeout_ms == 0) ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &&
+>>> + ? ? ? ? ? ? (card->ext_csd->rev > 5) ? ? ? ? ? ? ? ? ? ? ? ?&&
+>>> + ? ? ? ? ? ? (index != EXT_CSD_BKOPS_START) ? ? ? ? ?&&
+>>> + ? ? ? ? ? ? (index != EXT_CSD_SANITIZE_START) ? ? ? &&
+>>> + ? ? ? ? ? ? (index != EXT_CSD_FLUSH_CACHE))
+>>> + ? ? ? ? ? ? ? ? ? ? cmd.cmd_timeout_ms = card->ext_csd->cmd6_timeout;
+>>> +
+>>> ? ? ? err = mmc_wait_for_cmd(card->host, &cmd, MMC_CMD_RETRIES);
+>>> ? ? ? if (err)
+>>> ? ? ? ? ? ? ? return err;
+>>> diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+>>> index b460fc2..ef88412 100644
+>>> --- a/include/linux/mmc/card.h
+>>> +++ b/include/linux/mmc/card.h
+>>> @@ -50,6 +50,7 @@ struct mmc_ext_csd {
+>>> ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?rel_sectors;
+>>> ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?rel_param;
+>>> ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?part_config;
+>>> + ? ? u8 ? ? ? ? ? ? ? ? ? ? ?cmd6_timeout; ? /* timeout in ms */
+>>> ? ? ? unsigned int ? ? ? ? ? ?part_time; ? ? ? ? ? ? ?/* Units: ms */
+>>> ? ? ? unsigned int ? ? ? ? ? ?sa_timeout; ? ? ? ? ? ? /* Units: 100ns */
+>>> ? ? ? unsigned int ? ? ? ? ? ?hs_max_dtr;
+>>> diff --git a/include/linux/mmc/mmc.h b/include/linux/mmc/mmc.h
+>>> index 5a794cb..a23f836 100644
+>>> --- a/include/linux/mmc/mmc.h
+>>> +++ b/include/linux/mmc/mmc.hHi Girish,
+>>
+>> (Cc'ed Seungwon Jeon)
+>>
+>> As I know, Seungwon Jeon has been submitted same/similar patch before
+>> this.
+>> http://www.spinics.net/lists/linux-mmc/msg09770.html
+>>
+>> Chris,
+>> I cannot find your review on that...
+>>
+>> Thanks.
+>>
+>> Best regards,
+>> Kgene.
+>> --
+>> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+>> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>>
+>>
