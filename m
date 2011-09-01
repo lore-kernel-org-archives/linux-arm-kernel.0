@@ -1,63 +1,36 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 01 Sep 2011 09:20:54 -0500
-Subject: [PATCH] mach-ux500: unlock I&D l2x0 caches before init
-In-Reply-To: <1314870093-5758-1-git-send-email-linus.walleij@stericsson.com>
-References: <1314870093-5758-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4E5F94C6.7020609@gmail.com>
+From: gregkh@suse.de (Greg KH)
+Date: Thu, 1 Sep 2011 07:24:25 -0700
+Subject: [PATCH 3/4] mach-ux500: export System-on-Chip information ux500
+	via sysfs
+In-Reply-To: <4E5F2D07.2060109@linaro.org>
+References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
+	<1312981422-13294-3-git-send-email-lee.jones@linaro.org>
+	<20110810150346.GE7938@suse.de> <4E5F2D07.2060109@linaro.org>
+Message-ID: <20110901142425.GA5728@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
-
-On 09/01/2011 04:41 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Sep 01, 2011 at 07:58:15AM +0100, Lee Jones wrote:
+> On 10/08/11 16:03, Greg KH wrote:
+> > On Wed, Aug 10, 2011 at 02:03:41PM +0100, Lee Jones wrote:
+> >> Here we make use of the new drivers/base/soc driver to export
+> >> vital SoC information out to userspace via sysfs. This patch
+> >> provides a data structure of strings to populate the base
+> >> nodes found in:
+> >>
+> >> /sys/devices/soc/[1|2|3|...]/[family|machine|revision|soc_id].
+> >>
+> >> It also adds one more node as requested by ST-Ericsson.
+> > 
+> > What is that node, and why was it requested and where is it documented?
 > 
-> Apparently U8500 U-Boot versions may leave the l2x0 locked down
-> before executing the kernel. Make sure we unlock it before we
-> initialize the l2x0. This fixes a performance problem reported
-> by Jan Rinze.
-> 
+> I can answer the first two questions, but where would you like it
+> documented? Is the commit message suitable, or would you like another
+> Document text file created/appended to?
 
-Just when you think a bootloader wouldn't muck with something like this...
+All user apis are documented in Documentation/ABI/, so files need to be
+added there if you are adding/changing/deleting sysfs files.
 
-I'll ask the obvious question: As this is u-boot, can't this be fixed in
-u-boot?
+thanks,
 
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Rabin Vincent <rabin.vincent@stericsson.com>
-> Cc: Adrian Bunk <adrian.bunk@movial.com>
-> Reported-by: Jan Rinze <janrinze@gmail.com>
-> Tested-by: Robert Marklund <robert.marklund@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/mach-ux500/cache-l2x0.c |   15 +++++++++++++++
->  1 files changed, 15 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-> index 9d09e4d..96ef556 100644
-> --- a/arch/arm/mach-ux500/cache-l2x0.c
-> +++ b/arch/arm/mach-ux500/cache-l2x0.c
-> @@ -70,3 +70,18 @@ static int ux500_l2x0_init(void)
->  }
->  
->  early_initcall(ux500_l2x0_init);
-> +
-> +static int ux500_l2x0_unlock(void)
-> +{
-> +	/*
-> +	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
-> +	 * apparently locks both caches before jumping to the kernel.
-> +	 */
-> +	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_D) & 0xFF)
-> +		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D);
-> +
-> +	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_I) & 0xFF)
-> +		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I);
-
-Do you really need to read the register first?
-
-Can't this just be done unconditionally in l2x0_init for everyone. I
-doubt anyone wants to lock down ways. You would need to adjust for
-16-way support.
-
-Rob
+greg k-h
