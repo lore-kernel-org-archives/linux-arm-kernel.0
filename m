@@ -1,59 +1,41 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 01 Sep 2011 14:34:42 +0530
-Subject: [PATCH v2 6/6] ARM: EXYNOS4: Limit usage of pl330 device instance to
-	non-dt build
-In-Reply-To: <1314867882-11755-6-git-send-email-thomas.abraham@linaro.org>
-References: <1314867882-11755-1-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-2-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-3-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-4-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-5-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-6-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1314867882-11755-7-git-send-email-thomas.abraham@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 1 Sep 2011 10:11:11 +0100
+Subject: [PATCH 0/3] RFC: addition to DMA API
+In-Reply-To: <1314826214-22428-1-git-send-email-msalter@redhat.com>
+References: <1314826214-22428-1-git-send-email-msalter@redhat.com>
+Message-ID: <20110901091111.GB30417@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pl330 device instances and associated platform data is required only
-for non-device-tree builds. With device tree, all of this information is
-obtained from the device tree.
+Hi Mark,
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-exynos4/Kconfig  |    7 +++++++
- arch/arm/mach-exynos4/Makefile |    3 ++-
- 2 files changed, 9 insertions(+), 1 deletions(-)
+On Wed, Aug 31, 2011 at 10:30:11PM +0100, Mark Salter wrote:
+> This patch set arose out of a discussion on linux-arm concerning a
+> performance problem with USB on some ARMv7 based platforms. The
+> problem was tracked down by ming.lei at canonical.com and found to be
+> the result of CPU writes to DMA-coherent memory being delayed in a
+> write buffer between the CPU and memory. One proposed patch fixed
+> only the immediate problem with the USB EHCI driver, but several
+> folks thought a more general approach was needed, so I put this series
+> of patches together as a starting point for wider discussion outside
+> the ARM specific list.
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index d4d401c..3edbf37 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -21,6 +21,13 @@ config EXYNOS4_MCT
- 	help
- 	  Use MCT (Multi Core Timer) as kernel timers
- 
-+config EXYNOS4_DEV_DMA
-+	bool
-+	default y if !OF
-+	help
-+	  Compile in amba device definitions for DMA controller if OF
-+	  is not enabled.
-+
- config EXYNOS4_DEV_AHCI
- 	bool
- 	help
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index d2bf5bf..a2f33dc 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -13,7 +13,8 @@ obj-				:=
- # Core support for EXYNOS4 system
- 
- obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
--obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o pmu.o
-+obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o pmu.o
-+obj-$(CONFIG_EXYNOS4_DEV_DMA)	+= dma.o
- obj-$(CONFIG_PM)		+= pm.o sleep.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- 
--- 
-1.6.6.rc2
+[...]
+
+Whilst I'm in favour of this because it seems to be solving a real problem
+(especially on OMAP4), I think we should get to the bottom of the issue
+before augmenting the coherent DMA API. We currently have the following
+unanswered questions:
+
+(1) Why does a nosmp kernel not suffer from this problem?
+
+(2) Why do *some* Tegra platforms seem to suffer whilst others do not?
+
+(3) Can this problem be solved by configuring the hardware appropriately?
+
+If (3) is true, then we might be better off solving it that way, although
+I'd be interested to see if flushing CPU write buffers makes a difference to
+I/O performance on other architectures using non-cacheable memory for
+coherent DMA.
+
+Will
