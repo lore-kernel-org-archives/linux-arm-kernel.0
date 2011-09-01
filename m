@@ -1,28 +1,34 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Thu, 01 Sep 2011 08:36:34 -0400
-Subject: [PATCH 1/3] add dma_coherent_write_sync to DMA API
-In-Reply-To: <CAHXqBFJ6tEkn+iW3ZBAiWu5Sx9y9MQdnJt5Gfnv5Xc3UB78uLw@mail.gmail.com>
-References: <1314826214-22428-1-git-send-email-msalter@redhat.com>
-	<1314826214-22428-2-git-send-email-msalter@redhat.com>
-	<CAHXqBFJ6tEkn+iW3ZBAiWu5Sx9y9MQdnJt5Gfnv5Xc3UB78uLw@mail.gmail.com>
-Message-ID: <1314880595.1439.13.camel@deneb.redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 1 Sep 2011 13:47:52 +0100
+Subject: [PATCH 00/11] Add L2 cache cleaning to generic CPU suspend
+Message-ID: <20110901124752.GE29729@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-09-01 at 11:57 +0200, Micha? Miros?aw wrote:
-> BTW, if there's no time limit on write buffers flushing, or if write
-> buffers can cause reordering of the writes, then the memory accesses
-> need to be managed just like non-DMA-coherent memory. So what differs
-> then in DMA-coherent vs non-DMA-coherent mappings then?
+Some systems (such as OMAP) preserve the L2 cache across a suspend/
+resume cycle.  This means they do not perform L2 cache maintanence
+in their suspend finisher function.
 
-My understanding is that ordering is preserved, but an ARM guy should
-probably verify that.
+However, the side effect is that the saved CPU state is not readable
+by the resume code because it is sitting in the L2 cache.
 
-IIUC, the write buffers could hold data indefinitely. As a practical
-matter other writes needing to go out to memory will force buffered
-data out eventually. Again, this is my understanding which may be
-faulty. My feeling is that this extended write buffering makes it
-hard to call the dma memory fully coherent, but other limitations on
-ARMv7 make the buffering hard to avoid.
+This patch series adds L2 cache cleaning to the generic CPU suspend/
+resume support code, making it possible to use this on systems with
+L2 cache enabled without having to clean/invalidate the entire L2
+cache.
 
---Mark
+We also add a separate page table, allocated at boot time, for the
+resume process to use so we don't have to fiddle about with tweaking
+entries in the current processes page table.  Moreover, the current
+processes page table may be in use by another CPU in the system if
+these paths are used from cpuidle or hotplug, so changing the page
+table is technically unsound.
+
+Overall, this makes it possible for OMAP4 systems to use this code.
+
+The first four patches in this set are already merged into Linus' tree
+as bug fixes, and are included here for completeness given that the
+kernel.org infrastructure is currently offline.
+
+This has (so far) only been tested on OMAP4.  Further testing on OMAP3
+and Assabet will follow.
