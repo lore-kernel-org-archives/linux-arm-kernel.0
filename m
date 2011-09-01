@@ -1,54 +1,74 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 1 Sep 2011 21:54:41 +0530
-Subject: [PATCH] ARM: mach-davinci: Select PHYLIB for ARCH_DAVINCI_DM644x
-In-Reply-To: <1313903348.25059.3.camel@phoenix>
-References: <1313903348.25059.3.camel@phoenix>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930257268D10@dbde02.ent.ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 01 Sep 2011 09:28:29 -0700
+Subject: [PATCH 0/7] OMAP: omap_device cleanup before device-tree
+	integration
+References: <1314026347-21623-1-git-send-email-b-cousson@ti.com>
+Message-ID: <87sjogjkgi.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Axel,
+Benoit Cousson <b-cousson@ti.com> writes:
 
-On Sun, Aug 21, 2011 at 10:39:08, Axel Lin wrote:
-> We call phy_register_fixup_for_uid in davinci_evm_init, thus we need 
-> select PHYLIB to fix below build error: (with "make davinci_all_defconfig")
+> Hi Kevin,
+>
+> Here are a couple of cleanups on top of your for_3.2/omap_device series
+> rebased on top of 3.1-rc2 to get your pm-fixes.
 
-This shouldn't happen with davinci_all_defconfig as it
-selects PHYLIB (this doesn't undermine the need for a fix).
+OK, my for_3.2/omap_device is now based on v3.1-rc4 which has my
+pm-fixes merged.
 
-> 
->   LD      .tmp_vmlinux1
-> arch/arm/mach-davinci/built-in.o: In function `davinci_phy_fixup':
-> pm.c:(.text+0x35b8): undefined reference to `mdiobus_read'
-> pm.c:(.text+0x35d4): undefined reference to `mdiobus_write'
-> arch/arm/mach-davinci/built-in.o: In function `davinci_evm_init':
-> pm.c:(.init.text+0x237c): undefined reference to `phy_register_fixup_for_uid'
-> make: *** [.tmp_vmlinux1] Error 1
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> ---
->  arch/arm/mach-davinci/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-> index c0deaca..029ec46b 100644
-> --- a/arch/arm/mach-davinci/Kconfig
-> +++ b/arch/arm/mach-davinci/Kconfig
-> @@ -18,6 +18,7 @@ config ARCH_DAVINCI_DM644x
->  	bool "DaVinci 644x based system"
->  	select AINTC
->  	select ARCH_DAVINCI_DMx
-> +	select PHYLIB
+> The goal is to help building core devices using device-tree by removing
+> direct reference to the device inside PM.
 
-Selecting PHYLIB for the SoC isn't right because
-only the EVM is affected by this issue.
+Great.
 
-Also, instead of selecting PHYLIB, a better fix
-would be to define the fixup function within
-#ifdef PHYLIB and have an empty fixup registration
-function in case PHYLIB is not defined (which
-should happen only when EMAC driver is not configured
-in which case a fixup is not required anyway).
+> For that, I took and rebased the two patches done by Nishanth to use hwmod
+> to identify the device from the generic IP name.
 
-Thanks,
-Sekhar
+OK, I had some minor comments on those.
+
+> The currently "unused" omap_device_pm_latency is moved inside the
+> omap_device core code to avoid the duplication.
+
+And these two I've pulled into my for_3.2/omap_device branch.
+(not yet pushed because main kernel.org server is down.)
+
+Kevin
+
+> patches are available here:
+> git://gitorious.org/omap-pm/linux.git for_3.2/omap_device_cleanup
+>
+> It is tested on OMAP4 SDP and Panda only. I don't even have the Beagle
+> to test the beagle patch :-(
+>
+> Regards,
+> Benoit
+>
+>
+> Benoit Cousson (5):
+>   OMAP3: beagle-board: Use the omap_hwmod_name_get_dev API
+>   OMAP2+: pm: Use hwmod name instead of dev pointer
+>   OMAP2+: pm: Remove static devices variable for mpu, dsp, iva and l3 PM
+>   OMAP: omap_device: Create a default omap_device_pm_latency
+>   OMAP2+: devices: Remove all omap_device_pm_latency structures
+>
+> Nishanth Menon (2):
+>   OMAP: PM: omap_device: add omap_hwmod_name_get_odev
+>   OMAP: PM: omap_device: add few quick access functions
+>
+>  arch/arm/mach-omap2/board-omap3beagle.c       |    4 +-
+>  arch/arm/mach-omap2/devices.c                 |   46 ++---------------
+>  arch/arm/mach-omap2/display.c                 |   11 +----
+>  arch/arm/mach-omap2/dma.c                     |   11 +----
+>  arch/arm/mach-omap2/gpio.c                    |   12 +----
+>  arch/arm/mach-omap2/hsmmc.c                   |   18 +------
+>  arch/arm/mach-omap2/hwspinlock.c              |   12 +----
+>  arch/arm/mach-omap2/mcbsp.c                   |   11 +----
+>  arch/arm/mach-omap2/pm.c                      |   69 ++++++++-----------------
+>  arch/arm/mach-omap2/serial.c                  |   25 +---------
+>  arch/arm/mach-omap2/sr_device.c               |   11 +----
+>  arch/arm/mach-omap2/usb-musb.c                |   11 +----
+>  arch/arm/plat-omap/i2c.c                      |   10 +---
+>  arch/arm/plat-omap/include/plat/omap_device.h |   16 ++++++
+>  arch/arm/plat-omap/omap_device.c              |   49 +++++++++++++++++-
+>  15 files changed, 101 insertions(+), 215 deletions(-)
