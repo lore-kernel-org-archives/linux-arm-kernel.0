@@ -1,40 +1,49 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Thu, 1 Sep 2011 11:35:18 +0200
-Subject: [PATCH] iommu: omap_iovmm: support non page-aligned buffers in
-	iommu_vmap
-In-Reply-To: <201108311856.26969.laurent.pinchart@ideasonboard.com>
-References: <1314646569-16738-1-git-send-email-ohad@wizery.com>
-	<CAK=Wgbb06Z0_8OKFf6MKjYe+SJN16Mh9PA6z_T+cpSpB9EKHFw@mail.gmail.com>
-	<20110831130642.GQ12940@amd.com>
-	<201108311856.26969.laurent.pinchart@ideasonboard.com>
-Message-ID: <20110901093518.GC15287@amd.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 1 Sep 2011 11:41:33 +0200
+Subject: [PATCH] mach-ux500: unlock I&D l2x0 caches before init
+Message-ID: <1314870093-5758-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2011 at 12:56:26PM -0400, Laurent Pinchart wrote:
-> True, but if we implement address rounding transparently in the IOMMU layer 
-> Ohad's concern can be valid, depending on whether the device is trusted. If we 
-> decide to push address rounding to the drivers that decision can be made on a 
-> per-device basis. However, drivers are usually not aware of what granularity 
-> the IOMMU works on, so that wouldn't be straightforward and clean.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Drivers usually just use the DMA-API, so they can not assume at all that
-any protection happens. The problem also can't be really solved without
-changing/breaking the DMA-API. It is defined to work on byte granularity
-while the hardware only works with pages.
+Apparently U8500 U-Boot versions may leave the l2x0 locked down
+before executing the kernel. Make sure we unlock it before we
+initialize the l2x0. This fixes a performance problem reported
+by Jan Rinze.
 
-The only way to work around this it to implement the driver in a way so
-that they only map page-aligned buffers where the size is also a
-multiple of a page-size.
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Rabin Vincent <rabin.vincent@stericsson.com>
+Cc: Adrian Bunk <adrian.bunk@movial.com>
+Reported-by: Jan Rinze <janrinze@gmail.com>
+Tested-by: Robert Marklund <robert.marklund@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/cache-l2x0.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-In this case you can assume the page-size you are working on because you
-already assume in the driver that an iommu is in use.
-
-	Joerg
-
+diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
+index 9d09e4d..96ef556 100644
+--- a/arch/arm/mach-ux500/cache-l2x0.c
++++ b/arch/arm/mach-ux500/cache-l2x0.c
+@@ -70,3 +70,18 @@ static int ux500_l2x0_init(void)
+ }
+ 
+ early_initcall(ux500_l2x0_init);
++
++static int ux500_l2x0_unlock(void)
++{
++	/*
++	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
++	 * apparently locks both caches before jumping to the kernel.
++	 */
++	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_D) & 0xFF)
++		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D);
++
++	if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_I) & 0xFF)
++		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I);
++}
++
++arch_initcall(ux500_l2x0_unlock);
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+1.7.3.2
