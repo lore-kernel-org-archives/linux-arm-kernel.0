@@ -1,60 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Sep 2011 13:12:07 +0200
-Subject: [PATCH v2] pinmux: add a driver for the CSR SiRFprimaII pinmux
-In-Reply-To: <1314843744-2910-1-git-send-email-Baohua.Song@csr.com>
-References: <1314843744-2910-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
+From: marvin24@gmx.de (Marc Dietich)
+Date: Thu, 1 Sep 2011 13:13:41 +0200
+Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
+In-Reply-To: <4E5F5FA9.3010305@arm.com>
+References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
+	<201108311855.27711.marc.dietrich@ap.physik.uni-giessen.de>
+	<4E5F5FA9.3010305@arm.com>
+Message-ID: <201109011313.42547.marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2011 at 4:22 AM, Barry Song <Baohua.Song@csr.com> wrote:
+> Hi Marc,
 
-> ?-v2:
-> ?rebase to Linus W's v5 patch(v5 is still in discussion);
-> ?add complete pinmux list table;
-> ?add gpio ranges;
-> ?replace mask magic number by bitops;
-> ?rename upmx to spmx
+^dito,
 
-No further comments on this, but now I went in and rewrote
-pinmuxing a bit so that pin groups are a separate concept from
-pinmux (which just refers to a group). Please have a look at
-the U300 driver and see if you can accomodate the changes.
+> On 31/08/11 17:55, Marc Dietrich wrote:
+> > Am Mittwoch 31 August 2011, 18:12:48 schrieb Marc Zyngier:
+> >> [...]
+> >> Oddly enough, this patch doesn't do anything on my Tegra setup. In both
+> >> cases, I get around 17MB/s from a crap SD card plugged in a USB reader.
+> >> 
+> >> This leads me to suspect that this issue is very much OMAP4 specific.
+> >> Can anyone verify this theory on other some A9 platforms?
+> > 
+> > That's odd. On my Tegra2 (on ac100) it boosts the transfer rate from 7 to
+> > 17 MB/s.
+> 
+> I'm using a Harmony board. Could you share your kernel version, .config
+> and dmesg?
+> 
+> Thanks,
+> 
+> 	M.
 
-Sorry for the flow of respins but I'm really liking the stuff that
-has come out as a result of Stephen's feedback. Having
-separate groups and functions may look a bit crufty on
-simple pinmuxes but I'm pretty convinced it'll be a win
-for the subsystem when moving to more complex drivers.
+I use the chromiumos tree (for chromiumos 2.6.38 kernel: 
+http://git.chromium.org/chromiumos/third_party/kernel-next.git) with some 
+additions to make it run on the AC100. This modified tree is on 
+git://gitorious.org/~marvin24/ac100/marvin24s-kernel.git. The config is 
+paz00_defconfig and a dmesg you can get e.g. from http://pastebin.com/9uVfDWma
+(it's not very current, but it should be sufficient).
 
-> +static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .name = "lcd_16bits",
-> + ? ? ? ? ? ? ? .pins = lcd_16bits_pins,
-> + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(lcd_16bits_pins),
-> + ? ? ? ? ? ? ? .padmux = &lcd_16bits_padmux,
-> + ? ? ? }, {
-> + ? ? ? ? ? ? ? .name = "lcd_18bits",
-> + ? ? ? ? ? ? ? .pins = lcd_18bits_pins,
-> + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(lcd_18bits_pins),
-> + ? ? ? ? ? ? ? .padmux = &lcd_18bits_padmux,
-> + ? ? ? }, {
+I'll add Stephen Warren from NVIDIA to the CC list. He has more HW to test on. 
 
-You can probably simplify this and other things with
-preprocessor macros if you want to, like:
+Btw, this is the patch I used: http://gitorious.org/~marvin24/ac100/marvin24s-
+kernel/commit/cce8d9e25d009a45c219a6ad0b9ac4e27d034ab0
 
-#define SIRF_FUNC_ENTRY(a) \
-{ .name = "##a##", .pins = ##a##_pins, .num_pins =
-ARRAY_SIZE(##a##_pins), .padmux = &##a##_padmux }
-
-Then just:
-
-static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
-    SIRF_FUNC_ENTRY(lcd_16bits),
-
-
-The macro syntax is probably wrong, the preprocessor always
-craze me out, but you get the idea.
-
-Thanks,
-Linus Walleij
+	Marc
