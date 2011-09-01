@@ -1,232 +1,280 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 01 Sep 2011 14:34:38 +0530
-Subject: [PATCH v2 2/6] DMA: PL330: Infer transfer direction from transfer
-	request instead of platform data
-In-Reply-To: <1314867882-11755-2-git-send-email-thomas.abraham@linaro.org>
+Date: Thu, 01 Sep 2011 14:34:39 +0530
+Subject: [PATCH v2 3/6] ARM: EXYNOS4: Modify platform data for pl330 driver
+In-Reply-To: <1314867882-11755-3-git-send-email-thomas.abraham@linaro.org>
 References: <1314867882-11755-1-git-send-email-thomas.abraham@linaro.org>
 	<1314867882-11755-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1314867882-11755-3-git-send-email-thomas.abraham@linaro.org>
+	<1314867882-11755-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1314867882-11755-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The transfer direction for a channel can be inferred from the transfer
-request and the need for specifying transfer direction in platfrom data
-can be eliminated. So the structure definition 'struct dma_pl330_peri'
-is no longer required.
-
-The channel's private data is set to point to a channel id specified in
-the platform data (instead of an instance of type 'struct dma_pl330_peri').
-The filter function is correspondingly modified to match the channel id.
-
-With the 'struct dma_pl330_peri' removed from platform data, the dma
-controller transfer capabilities cannot be inferred any more. Hence,
-the dma controller capabilities is specified using platform data.
+With the 'struct dma_pl330_peri' removed, the platfrom data for dma
+driver can be simplified to a simple list of peripheral request ids.
 
 Cc: Jassi Brar <jassisinghbrar@gmail.com>
 Cc: Boojin Kim <boojin.kim@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
 ---
- drivers/dma/pl330.c        |   65 +++++++++++---------------------------------
- include/linux/amba/pl330.h |   13 ++-------
- 2 files changed, 19 insertions(+), 59 deletions(-)
+ arch/arm/mach-exynos4/dma.c |  223 ++++++++++++-------------------------------
+ 1 files changed, 62 insertions(+), 161 deletions(-)
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 7df2516..9732995 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -272,13 +272,13 @@ static void dma_pl330_rqcb(void *token, enum pl330_op_err err)
+diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
+index 9667c61..c3c0d17 100644
+--- a/arch/arm/mach-exynos4/dma.c
++++ b/arch/arm/mach-exynos4/dma.c
+@@ -35,95 +35,40 @@
  
- bool pl330_filter(struct dma_chan *chan, void *param)
- {
--	struct dma_pl330_peri *peri;
-+	u8 *peri_id;
+ static u64 dma_dmamask = DMA_BIT_MASK(32);
  
- 	if (chan->device->dev->driver != &pl330_driver.drv)
- 		return false;
- 
--	peri = chan->private;
--	return peri->peri_id == (unsigned)param;
-+	peri_id = chan->private;
-+	return *peri_id == (unsigned)param;
- }
- EXPORT_SYMBOL(pl330_filter);
- 
-@@ -514,7 +514,7 @@ pluck_desc(struct dma_pl330_dmac *pdmac)
- static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
- {
- 	struct dma_pl330_dmac *pdmac = pch->dmac;
--	struct dma_pl330_peri *peri = pch->chan.private;
-+	u8 *peri_id = pch->chan.private;
- 	struct dma_pl330_desc *desc;
- 
- 	/* Pluck one desc from the pool of DMAC */
-@@ -539,13 +539,7 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
- 	desc->txd.cookie = 0;
- 	async_tx_ack(&desc->txd);
- 
--	if (peri) {
--		desc->req.rqtype = peri->rqtype;
--		desc->req.peri = pch->chan.chan_id;
--	} else {
--		desc->req.rqtype = MEMTOMEM;
--		desc->req.peri = 0;
--	}
-+	desc->req.peri = peri_id ? pch->chan.chan_id : 0;
- 
- 	dma_async_tx_descriptor_init(&desc->txd, &pch->chan);
- 
-@@ -632,12 +626,14 @@ static struct dma_async_tx_descriptor *pl330_prep_dma_cyclic(
- 	case DMA_TO_DEVICE:
- 		desc->rqcfg.src_inc = 1;
- 		desc->rqcfg.dst_inc = 0;
-+		desc->req.rqtype = MEMTODEV;
- 		src = dma_addr;
- 		dst = pch->fifo_addr;
- 		break;
- 	case DMA_FROM_DEVICE:
- 		desc->rqcfg.src_inc = 0;
- 		desc->rqcfg.dst_inc = 1;
-+		desc->req.rqtype = DEVTOMEM;
- 		src = pch->fifo_addr;
- 		dst = dma_addr;
- 		break;
-@@ -663,16 +659,12 @@ pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
- {
- 	struct dma_pl330_desc *desc;
- 	struct dma_pl330_chan *pch = to_pchan(chan);
--	struct dma_pl330_peri *peri = chan->private;
- 	struct pl330_info *pi;
- 	int burst;
- 
- 	if (unlikely(!pch || !len))
- 		return NULL;
- 
--	if (peri && peri->rqtype != MEMTOMEM)
--		return NULL;
--
- 	pi = &pch->dmac->pif;
- 
- 	desc = __pl330_prep_dma_memcpy(pch, dst, src, len);
-@@ -681,6 +673,7 @@ pl330_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dst,
- 
- 	desc->rqcfg.src_inc = 1;
- 	desc->rqcfg.dst_inc = 1;
-+	desc->req.rqtype = MEMTOMEM;
- 
- 	/* Select max possible burst size */
- 	burst = pi->pcfg.data_bus_width / 8;
-@@ -709,24 +702,13 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- {
- 	struct dma_pl330_desc *first, *desc = NULL;
- 	struct dma_pl330_chan *pch = to_pchan(chan);
--	struct dma_pl330_peri *peri = chan->private;
- 	struct scatterlist *sg;
- 	unsigned long flags;
- 	int i;
- 	dma_addr_t addr;
- 
--	if (unlikely(!pch || !sgl || !sg_len || !peri))
--		return NULL;
--
--	/* Make sure the direction is consistent */
--	if ((direction == DMA_TO_DEVICE &&
--				peri->rqtype != MEMTODEV) ||
--			(direction == DMA_FROM_DEVICE &&
--				peri->rqtype != DEVTOMEM)) {
--		dev_err(pch->dmac->pif.dev, "%s:%d Invalid Direction\n",
--				__func__, __LINE__);
-+	if (unlikely(!pch || !sgl || !sg_len))
- 		return NULL;
--	}
- 
- 	addr = pch->fifo_addr;
- 
-@@ -767,11 +749,13 @@ pl330_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		if (direction == DMA_TO_DEVICE) {
- 			desc->rqcfg.src_inc = 1;
- 			desc->rqcfg.dst_inc = 0;
-+			desc->req.rqtype = MEMTODEV;
- 			fill_px(&desc->px,
- 				addr, sg_dma_address(sg), sg_dma_len(sg));
- 		} else {
- 			desc->rqcfg.src_inc = 0;
- 			desc->rqcfg.dst_inc = 1;
-+			desc->req.rqtype = DEVTOMEM;
- 			fill_px(&desc->px,
- 				sg_dma_address(sg), addr, sg_dma_len(sg));
- 		}
-@@ -878,28 +862,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	for (i = 0; i < num_chan; i++) {
- 		pch = &pdmac->peripherals[i];
--		if (pdat) {
--			struct dma_pl330_peri *peri = &pdat->peri[i];
--
--			switch (peri->rqtype) {
--			case MEMTOMEM:
--				dma_cap_set(DMA_MEMCPY, pd->cap_mask);
--				break;
--			case MEMTODEV:
--			case DEVTOMEM:
--				dma_cap_set(DMA_SLAVE, pd->cap_mask);
--				dma_cap_set(DMA_CYCLIC, pd->cap_mask);
--				break;
--			default:
--				dev_err(&adev->dev, "DEVTODEV Not Supported\n");
--				continue;
--			}
--			pch->chan.private = peri;
--		} else {
--			dma_cap_set(DMA_MEMCPY, pd->cap_mask);
--			pch->chan.private = NULL;
--		}
--
-+		pch->chan.private = pdat ? &pdat->peri_id[i] : NULL;
- 		INIT_LIST_HEAD(&pch->work_list);
- 		spin_lock_init(&pch->lock);
- 		pch->pl330_chid = NULL;
-@@ -913,6 +876,10 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	}
- 
- 	pd->dev = &adev->dev;
-+	if (pdat)
-+		pd->cap_mask = pdat->cap_mask;
-+	else
-+		dma_cap_set(DMA_MEMCPY, pd->cap_mask);
- 
- 	pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
- 	pd->device_free_chan_resources = pl330_free_chan_resources;
-diff --git a/include/linux/amba/pl330.h b/include/linux/amba/pl330.h
-index 6db72da..12e023c 100644
---- a/include/linux/amba/pl330.h
-+++ b/include/linux/amba/pl330.h
-@@ -15,15 +15,6 @@
- #include <linux/dmaengine.h>
- #include <asm/hardware/pl330.h>
- 
--struct dma_pl330_peri {
--	/*
--	 * Peri_Req i/f of the DMAC that is
--	 * peripheral could be reached from.
--	 */
--	u8 peri_id; /* specific dma id */
--	enum pl330_reqtype rqtype;
--};
--
- struct dma_pl330_platdata {
- 	/*
- 	 * Number of valid peripherals connected to DMAC.
-@@ -34,7 +25,9 @@ struct dma_pl330_platdata {
- 	 */
- 	u8 nr_valid_peri;
- 	/* Array of valid peripherals */
--	struct dma_pl330_peri *peri;
-+	u8 *peri_id;
-+	/* Operational capabilities */
-+	dma_cap_mask_t cap_mask;
- 	/* Bytes to allocate for MC buffer */
- 	unsigned mcbuf_sz;
+-struct dma_pl330_peri pdma0_peri[28] = {
+-	{
+-		.peri_id = (u8)DMACH_PCM0_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_PCM0_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_PCM2_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_PCM2_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_MSM_REQ0,
+-	}, {
+-		.peri_id = (u8)DMACH_MSM_REQ2,
+-	}, {
+-		.peri_id = (u8)DMACH_SPI0_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_SPI0_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_SPI2_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_SPI2_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_I2S0S_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_I2S0_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_I2S0_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_UART0_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_UART0_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_UART2_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_UART2_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_UART4_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_UART4_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS0_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS0_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS2_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS2_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS4_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS4_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_AC97_MICIN,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_AC97_PCMIN,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_AC97_PCMOUT,
+-		.rqtype = MEMTODEV,
+-	},
++u8 pdma0_peri[] = {
++	DMACH_PCM0_RX,
++	DMACH_PCM0_TX,
++	DMACH_PCM2_RX,
++	DMACH_PCM2_TX,
++	DMACH_MSM_REQ0,
++	DMACH_MSM_REQ2,
++	DMACH_SPI0_RX,
++	DMACH_SPI0_TX,
++	DMACH_SPI2_RX,
++	DMACH_SPI2_TX,
++	DMACH_I2S0S_TX,
++	DMACH_I2S0_RX,
++	DMACH_I2S0_TX,
++	DMACH_UART0_RX,
++	DMACH_UART0_TX,
++	DMACH_UART2_RX,
++	DMACH_UART2_TX,
++	DMACH_UART4_RX,
++	DMACH_UART4_TX,
++	DMACH_SLIMBUS0_RX,
++	DMACH_SLIMBUS0_TX,
++	DMACH_SLIMBUS2_RX,
++	DMACH_SLIMBUS2_TX,
++	DMACH_SLIMBUS4_RX,
++	DMACH_SLIMBUS4_TX,
++	DMACH_AC97_MICIN,
++	DMACH_AC97_PCMIN,
++	DMACH_AC97_PCMOUT,
  };
+ 
+ struct dma_pl330_platdata exynos4_pdma0_pdata = {
+ 	.nr_valid_peri = ARRAY_SIZE(pdma0_peri),
+-	.peri = pdma0_peri,
++	.peri_id = pdma0_peri,
+ };
+ 
+ struct amba_device exynos4_device_pdma0 = {
+@@ -142,86 +87,37 @@ struct amba_device exynos4_device_pdma0 = {
+ 	.periphid = 0x00041330,
+ };
+ 
+-struct dma_pl330_peri pdma1_peri[25] = {
+-	{
+-		.peri_id = (u8)DMACH_PCM0_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_PCM0_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_PCM1_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_PCM1_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_MSM_REQ1,
+-	}, {
+-		.peri_id = (u8)DMACH_MSM_REQ3,
+-	}, {
+-		.peri_id = (u8)DMACH_SPI1_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_SPI1_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_I2S0S_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_I2S0_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_I2S0_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_I2S1_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_I2S1_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_UART0_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_UART0_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_UART1_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_UART1_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_UART3_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_UART3_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS1_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS1_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS3_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS3_TX,
+-		.rqtype = MEMTODEV,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS5_RX,
+-		.rqtype = DEVTOMEM,
+-	}, {
+-		.peri_id = (u8)DMACH_SLIMBUS5_TX,
+-		.rqtype = MEMTODEV,
+-	},
++u8 pdma1_peri[] = {
++	DMACH_PCM0_RX,
++	DMACH_PCM0_TX,
++	DMACH_PCM1_RX,
++	DMACH_PCM1_TX,
++	DMACH_MSM_REQ1,
++	DMACH_MSM_REQ3,
++	DMACH_SPI1_RX,
++	DMACH_SPI1_TX,
++	DMACH_I2S0S_TX,
++	DMACH_I2S0_RX,
++	DMACH_I2S0_TX,
++	DMACH_I2S1_RX,
++	DMACH_I2S1_TX,
++	DMACH_UART0_RX,
++	DMACH_UART0_TX,
++	DMACH_UART1_RX,
++	DMACH_UART1_TX,
++	DMACH_UART3_RX,
++	DMACH_UART3_TX,
++	DMACH_SLIMBUS1_RX,
++	DMACH_SLIMBUS1_TX,
++	DMACH_SLIMBUS3_RX,
++	DMACH_SLIMBUS3_TX,
++	DMACH_SLIMBUS5_RX,
++	DMACH_SLIMBUS5_TX,
+ };
+ 
+ struct dma_pl330_platdata exynos4_pdma1_pdata = {
+ 	.nr_valid_peri = ARRAY_SIZE(pdma1_peri),
+-	.peri = pdma1_peri,
++	.peri_id = pdma1_peri,
+ };
+ 
+ struct amba_device exynos4_device_pdma1 = {
+@@ -242,7 +138,12 @@ struct amba_device exynos4_device_pdma1 = {
+ 
+ static int __init exynos4_dma_init(void)
+ {
++	dma_cap_set(DMA_SLAVE, exynos4_pdma0_pdata.cap_mask);
++	dma_cap_set(DMA_CYCLIC, exynos4_pdma0_pdata.cap_mask);
+ 	amba_device_register(&exynos4_device_pdma0, &iomem_resource);
++
++	dma_cap_set(DMA_SLAVE, exynos4_pdma1_pdata.cap_mask);
++	dma_cap_set(DMA_CYCLIC, exynos4_pdma1_pdata.cap_mask);
+ 	amba_device_register(&exynos4_device_pdma1, &iomem_resource);
+ 
+ 	return 0;
 -- 
 1.6.6.rc2
