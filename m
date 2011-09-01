@@ -1,93 +1,123 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Thu, 1 Sep 2011 10:09:17 +0800
-Subject: [PATCH 0/3] RFC: addition to DMA API
-In-Reply-To: <1314826214-22428-1-git-send-email-msalter@redhat.com>
-References: <1314826214-22428-1-git-send-email-msalter@redhat.com>
-Message-ID: <CACVXFVPN7SCk8z=vatphyM=PhZDAwtyDidALYPeVkuJ_zxpBvA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 01 Sep 2011 11:13:55 +0900
+Subject: [PATCH] mmc: core: eMMC4.5 Add the timeout for switch
+In-Reply-To: <1314699770-17120-1-git-send-email-girish.shivananjappa@linaro.org>
+References: <1314699770-17120-1-git-send-email-girish.shivananjappa@linaro.org>
+Message-ID: <001601cc684c$ce571b00$6b055100$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Sep 1, 2011 at 5:30 AM, Mark Salter <msalter@redhat.com> wrote:
-> This patch set arose out of a discussion on linux-arm concerning a
-> performance problem with USB on some ARMv7 based platforms. The
-> problem was tracked down by ming.lei at canonical.com and found to be
-> the result of CPU writes to DMA-coherent memory being delayed in a
-> write buffer between the CPU and memory. One proposed patch fixed
-> only the immediate problem with the USB EHCI driver, but several
-> folks thought a more general approach was needed, so I put this series
-> of patches together as a starting point for wider discussion outside
-> the ARM specific list.
-
-After some further thoughts, I think it is not a good idea to introduce a
-general DMA API to handle this case, see below:
-
-1. The side-effect of new API is that it will make descriptors of dma in a
-partial update, such as qtd in the ehci case, even ehci can handle this
-successful, but it is really not good to make DMA bus master see a
-partial update of descriptor, and I am not  sure that other kind of bus masters
-can handle this correctly, which may introduce other problems. A proper memory
-barrier will always make dma master see a atomic update of dma descriptors,
-which should be the preferred way to take by device driver.
-
-2, most of such cases can be handled correctly by mb/wmb/rmb barriers.
-The ehci case I reported is in the one of the most tricky code path in
-ehci driver,
-and it should be a special case, and up to now, we only have found this case
-can't be handled by memory barriers. Is there other cases which can't be handled
-correctly by mb/wmb/rmb? If so, please point it out.
-
-3, The new DMA API for the purpose to be introduced is much easier to
-understand, and much easier to use than memory barrier, so it is very
-possible to make device driver guys misuse or abuse it instead of using
-memory barrier first to handle the case.
-
->
-> The original problem seen was that USB storage performance was unusually
-> poor on some ARMv7 based platforms. With my particular setup, I was
-> seeing hdparm -t report ~5.6MB/s on an SMP Cortex-A9 based platform
-> where the same disk driver would get ~21MB/s on a Cortex-A8 based system.
-> My understanding from subsequent discussion is that the A9 cores have
-> a write buffer between the CPU and memory which could buffer data for a
-> prolonged period even in the case of DMA coherent mappings. The ARM
-> architecture code largely mitigates this by doing a write buffer flush
-> as part of the MMIO functions used to write to device registers. This
-> avoids problems in almost all drivers because most need to write to a
-> device register to tell the device when something is written in the
-> shared DMA coherent memory. In the case of USB, an EHCI host controller
-> will poll certain DMA coherent memory locations for information coming
-> from the CPU. In that case, the write buffering negatively affects
-> performance.
->
-> This series of patches adds a new function to the DMA API to deal with
-> ARMv7 and any future architectures which have write buffering even for
-> DMA coherent memory. The proposed dma_coherent_write_sync() function
-> will allow those few drivers which need it to force out write buffer
-> data in a timely way to avoid performace issues.
->
-> Mark Salter (3):
-> ?add dma_coherent_write_sync to DMA API
-> ?define ARM-specific dma_coherent_write_sync
-> ?add dma_coherent_write_sync calls to USB EHCI driver
->
-> ?Documentation/DMA-API-HOWTO.txt ? ?| ? 15 +++++++++++++++
-> ?Documentation/DMA-API.txt ? ? ? ? ?| ? 12 ++++++++++++
-> ?arch/arm/include/asm/dma-mapping.h | ? 10 ++++++++++
-> ?drivers/usb/host/ehci-q.c ? ? ? ? ?| ? ?7 ++++++-
-> ?include/linux/dma-mapping.h ? ? ? ?| ? ?6 ++++++
-> ?5 files changed, 49 insertions(+), 1 deletions(-)
->
+Girish K S wrote:
+> 
+> This patch adds the code to handle the default timeout
+> for switch command.
+> For eMMC 4.5 devices if timeout is not specified for the switch
+> command while accessing a specific field,then the default timeout
+> shall be used to timeout. Specification says there is no timeout
+> defined while accessing BKOPS_START, SANITIZE_START, FLUSH_CACHE
+> field(so these fields are excluded).
+> 
+> Signed-off-by: Girish K S <girish.shivananjappa@linaro.org>
+> ---
+>  drivers/mmc/core/mmc.c     |    5 +++++
+>  drivers/mmc/core/mmc_ops.c |    8 ++++++++
+>  include/linux/mmc/card.h   |    1 +
+>  include/linux/mmc/mmc.h    |    4 ++++
+>  4 files changed, 18 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index 5700b1c..5b9fb6a 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -405,6 +405,11 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8
+> *ext_csd)
+>  	if (card->ext_csd.rev >= 5)
+>  		card->ext_csd.rel_param =
+> ext_csd[EXT_CSD_WR_REL_PARAM];
+> 
+> +	if (card->ext_csd.rev > 5) {
+> +		/* (eMMC 4.5)timeout is expressed in units of 10 ms*/
+> +		card->ext_csd.cmd6_timeout =
+> ext_csd[EXT_CSD_CMD6_TIME]*10;
+> +	}
+> +
+>  	if (ext_csd[EXT_CSD_ERASED_MEM_CONT])
+>  		card->erased_byte = 0xFF;
+>  	else
+> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
+> index 770c3d0..c4d82f4 100644
+> --- a/drivers/mmc/core/mmc_ops.c
+> +++ b/drivers/mmc/core/mmc_ops.c
+> @@ -394,6 +394,14 @@ int mmc_switch(struct mmc_card *card, u8 set, u8
+index,
+> u8 value,
+>  	cmd.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
+>  	cmd.cmd_timeout_ms = timeout_ms;
+> 
+> +	/* timeout is not defined for below command indexes (eMMC 4.5) */
+> +	if ((timeout_ms == 0)					&&
+> +		(card->ext_csd->rev > 5)			&&
+> +		(index != EXT_CSD_BKOPS_START)		&&
+> +		(index != EXT_CSD_SANITIZE_START)	&&
+> +		(index != EXT_CSD_FLUSH_CACHE))
+> +			cmd.cmd_timeout_ms = card->ext_csd->cmd6_timeout;
+> +
+>  	err = mmc_wait_for_cmd(card->host, &cmd, MMC_CMD_RETRIES);
+>  	if (err)
+>  		return err;
+> diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+> index b460fc2..ef88412 100644
+> --- a/include/linux/mmc/card.h
+> +++ b/include/linux/mmc/card.h
+> @@ -50,6 +50,7 @@ struct mmc_ext_csd {
+>  	u8			rel_sectors;
+>  	u8			rel_param;
+>  	u8			part_config;
+> +	u8			cmd6_timeout;	/* timeout in ms */
+>  	unsigned int		part_time;		/* Units: ms */
+>  	unsigned int		sa_timeout;		/* Units: 100ns */
+>  	unsigned int		hs_max_dtr;
+> diff --git a/include/linux/mmc/mmc.h b/include/linux/mmc/mmc.h
+> index 5a794cb..a23f836 100644
+> --- a/include/linux/mmc/mmc.h
+> +++ b/include/linux/mmc/mmc.h
+> @@ -270,8 +270,11 @@ struct _mmc_csd {
+>   * EXT_CSD fields
+>   */
+> 
+> +#define EXT_CSD_FLUSH_CACHE		32	/* R/W */
+>  #define EXT_CSD_PARTITION_ATTRIBUTE	156	/* R/W */
+>  #define EXT_CSD_PARTITION_SUPPORT	160	/* RO */
+> +#define EXT_CSD_BKOPS_START		164	/* R/W */
+> +#define EXT_CSD_SANITIZE_START		165	/* R/W */
+>  #define EXT_CSD_WR_REL_PARAM		166	/* RO */
+>  #define EXT_CSD_ERASE_GROUP_DEF		175	/* R/W */
+>  #define EXT_CSD_PART_CONFIG		179	/* R/W */
+> @@ -293,6 +296,7 @@ struct _mmc_csd {
+>  #define EXT_CSD_SEC_ERASE_MULT		230	/* RO */
+>  #define EXT_CSD_SEC_FEATURE_SUPPORT	231	/* RO */
+>  #define EXT_CSD_TRIM_MULT		232	/* RO */
+> +#define EXT_CSD_CMD6_TIME		248	/* RO */
+> 
+>  /*
+>   * EXT_CSD field definitions
 > --
-> 1.7.6
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+> 1.7.1
 
-thanks,
+Hi Girish,
+
+(Cc'ed Seungwon Jeon)
+
+As I know, Seungwon Jeon has been submitted same/similar patch before this.
+http://www.spinics.net/lists/linux-mmc/msg09770.html
+
+Chris,
+I cannot find your review on that...
+
+Thanks.
+
+Best regards,
+Kgene.
 --
-Ming Lei
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
