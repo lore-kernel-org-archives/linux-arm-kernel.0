@@ -1,60 +1,35 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 1 Sep 2011 15:59:33 +0200
-Subject: [PATCH] iommu: omap_iovmm: support non page-aligned buffers in
-	iommu_vmap
-In-Reply-To: <CAK=WgbaOSaKcxmsG2L3G3g+bORvtq4nyzCg9yhA=tTLhsYmh3w@mail.gmail.com>
-References: <1314646569-16738-1-git-send-email-ohad@wizery.com>
-	<CAK=Wgbb06Z0_8OKFf6MKjYe+SJN16Mh9PA6z_T+cpSpB9EKHFw@mail.gmail.com>
-	<CAK=WgbaOSaKcxmsG2L3G3g+bORvtq4nyzCg9yhA=tTLhsYmh3w@mail.gmail.com>
-Message-ID: <201109011559.33491.laurent.pinchart@ideasonboard.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 01 Sep 2011 13:51:59 +0100
+Subject: [PATCH 11/11] ARM: pm: add L2 cache cleaning for suspend
+In-Reply-To: <20110901124752.GE29729@n2100.arm.linux.org.uk>
+References: <20110901124752.GE29729@n2100.arm.linux.org.uk>
+Message-ID: <E1Qz6kR-00078p-Vs@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+We need to ensure that state is pushed out from the L2 cache when
+suspending so that the resume paths can access their data before the
+MMU and caches have been re-initialized.  Add the necessary calls to
+__cpu_suspend_save().
 
-On Thursday 01 September 2011 13:47:26 Ohad Ben-Cohen wrote:
-> On Wed, Aug 31, 2011 at 1:52 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> > From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > 
-> > omap_iovmm requires page-aligned buffers, and that sometimes causes
-> > omap3isp failures (i.e. whenever the buffer passed from userspace is not
-> > page-aligned).
-> > 
-> > Remove this limitation by rounding the address of the first page entry
-> > down, and adding the offset back to the device address.
-> 
-> Seems like the unmap paths were skipped (need to adjust the sizes in
-> the unmap path too).
-> 
-> Laurent, if it looks good to you, I'll just squash it to the original
-> patch and repost:
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/suspend.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-It looks good to me. I haven't tested it though.
-
-> diff --git a/drivers/iommu/omap-iovmm.c b/drivers/iommu/omap-iovmm.c
-> index d28a256..39bdb92 100644
-> --- a/drivers/iommu/omap-iovmm.c
-> +++ b/drivers/iommu/omap-iovmm.c
-> @@ -447,7 +447,7 @@ err_out:
->         for_each_sg(sgt->sgl, sg, i, j) {
->                 size_t bytes;
-> 
-> -               bytes = sg->length;
-> +               bytes = sg->length + sg->offset;
->                 order = get_order(bytes);
-> 
->                 /* ignore failures.. we're already handling one */
-> @@ -476,7 +476,7 @@ static void unmap_iovm_area(struct iommu_domain
-> *domain, str size_t bytes;
->                 int order;
-> 
-> -               bytes = sg->length;
-> +               bytes = sg->length + sg->offset;
->                 order = get_order(bytes);
-> 
->                 err = iommu_unmap(domain, start, order);
-
+diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+index c78a88f..4c95410 100644
+--- a/arch/arm/kernel/suspend.c
++++ b/arch/arm/kernel/suspend.c
+@@ -28,6 +28,9 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+ 	cpu_do_suspend(ptr);
+ 
+ 	flush_cache_all();
++	outer_clean_range(*save_ptr, *save_ptr + ptrsz);
++	outer_clean_range(virt_to_phys(save_ptr),
++			  virt_to_phys(save_ptr) + sizeof(*save_ptr));
+ }
+ 
+ /*
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.4.4
