@@ -1,60 +1,92 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 01 Sep 2011 13:18:32 +0200
-Subject: [PATCH 1/5] ARM: Samsung: PWM: Allow to differentiate SoCs based
-	on platform device name.
-In-Reply-To: <CAH9JG2UiuaCyOk24hC=240ptQa8CKCVkXHaQzNt=YcnyQksnOA@mail.gmail.com>
-References: <1731819.jJi37IsjvJ@flatron>
-	<001d01cc684e$9c49ecd0$d4ddc670$%kim@samsung.com>
-	<CAH9JG2UiuaCyOk24hC=240ptQa8CKCVkXHaQzNt=YcnyQksnOA@mail.gmail.com>
-Message-ID: <1645899.rJz3R6pebo@flatron>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Sep 2011 13:30:51 +0200
+Subject: [PATCH v3 10/13] of: add a generic pinmux helper
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B3279BEB@HQMAIL01.nvidia.com>
+References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
+	<1314315824-9687-11-git-send-email-swarren@nvidia.com>
+	<CACRpkdaTiWEtgjVOhUKeXhpiESvrWyz97p5j_PHe3MvEM4UaCw@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B3279BEB@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdaEQaM31SkuSEOzkA8neyF21CcDOc1yQQc3NqOXVSmB=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 of September 2011 at 12:33:10, Kyungmin Park wrote:
-> On Thu, Sep 1, 2011 at 11:26 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > Tomasz Figa wrote:
-> >>
-> >> 2011/8/31 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> >> > On Wed, Aug 31, 2011 at 02:34:15PM +0200, Tomasz Figa wrote:
-> >> >
-> >> >> This patch is a prerequisite to adding generic time support for
-> > S3C64xx.
-> >> >> It makes possible to differentiate SoCs, required to exclude timers 3
-> > and 4
-> >> >> from PWM driver only on S3C64xx.
-> >> >
-> >> > Now we have the cpu_is_foo() support for Samsung CPUs can we use that
-> >> > instead?
-> >>
-> >> [snip]
-> >
-> > Hi Tomasz,
-> >
-> > You can use "soc_is_s3c64xx()" based on Samsung -next tree.
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > for-next
-> 
-> +static struct platform_device_id s3c_pwm_driver_ids[] = {
-> +       {
-> +               .name           = "s3c24xx-pwm",
-> +               .driver_data    = TYPE_GENERIC,
-> +       }, {
-> +               .name           = "s3c64xx-pwm",
-> +               .driver_data    = TYPE_S3C64XX,
-> +       },
-> +};
-> +MODULE_DEVICE_TABLE(platform, s3c_pwm_driver_ids);
-> 
-> doesn't it right way?
-> do you want to use the soc_is_* at device?
-> 
+On Mon, Aug 29, 2011 at 11:46 PM, Stephen Warren <swarren@nvidia.com> wrote:
 
-Well, now we have three alternatives:
-- to leave it as is (i.e. changing platform device names)
-- to use cpu_is_* (does it ever exist for S3C64xx or soc_is_s3c64xx is its equivalent?)
-- to use soc_is_* 
+>> > +EXPORT_SYMBOL_GPL(of_pinmux_parse);
+>>
+>> Renamed of_pinctrl_parse I'm happier with it.
+>
+> Well, it's not just that; the struct contains the function field to
+> select for each pingroup, so it's not just pinctrl either.
 
-Waiting for more comments then.
+OK as of my thinking in the v6 pin control patch set groups
+are an abstract concept that is part of pin control and pin
+definitions (does not need to be used for muxing, could be
+anything you want to do with pins) so that sorts it out I guess?
 
-Best regards,
-Tom
+So in line with that terminology I think this should be
+named pinctrl.
+
+>> The current pinctrl patch set would probably want an unsigned
+>> "position" attribute too. (If we should build on that.)
+>
+> This does beg the question I asked previously:
+>
+> The intent of this patch was to provide a way for devicetree to set the
+> complete initial state of the pinmux, in a SoC-specific fashion, without
+> interaction with the pinmux API.
+>
+> However, I'm guessing you see the pinmux driver as not touching HW at
+> boot at all, and never programming anything except in response to a
+> driver calling pinmux_get()/pinmux_enable()?
+
+Since the pin control driver is (supposedly) the only driver that knows
+about the register range dealing with muxing, all kind of fiddling
+with these registers that are *necessary* on boot (e.g. to get the
+thing up in a known state) need to be in the pincontrol driver.
+
+So it may touch hardware on boot, i.e. write default values,
+even though one may argue that the boot loader should have
+taken care about such things, it's now always the case in
+practice.
+
+> In the former case, this code and related bindings wouldn't be influenced
+> by the pinmux API at all (and indeed arguably never should be, since DT
+> is supposed to be oriented purely at HW, and not influenced by driver
+> design). This approach might make the pinmux API mostly relevant only
+> for drivers that actively change between configurations at run-time, and
+> not for drivers that don't need dynamic muxing.
+
+Platforms that do not need dynamic muxing should be using it
+if they need to configure default states of the pins at boot I think.
+
+> However, in the latter case, this code should be part of the pinmux core,
+> and my patches to Tegra's pinmux driver dropped. It'd be difficult to
+> define a pinmux binding that wasn't influenced by the pinmux API's needs
+> in this case.
+
+Well that depends on what you want to do.
+
+The patch subject seems to suggest that all SoCs should use this,
+not just the Tegra driver. If it had the subject "of: add a tegra
+pinmux helper" and functions named of_tegra_pinmux_parse() and
+so on I wouldn't have any objections whatsoever.
+
+If however you want to create a DT binding that should be used by
+anyone (as indicated by the subject) it must use abstract concepts of
+some kind and then I have opinions on how to name things and
+some idea that I'd like them to correspond to what the pin control
+subsystem will call things.
+
+For example not call things dealing with biasing as part of
+something called "pinmux", since in the pin controller
+subsystem I'm envisioning I'm striving to separation of
+concerns to the point where biasing and muxing are
+completely orthogonal concepts, though they might be
+using the same abstract concept of pin groups...
+
+I don't know if I'm getting across properly, I'm trying
+my best.
+
+Thanks,
+Linus Walleij
