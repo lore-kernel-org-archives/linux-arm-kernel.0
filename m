@@ -1,51 +1,75 @@
-From: joshc@linux.com (Josh Cartwright)
-Date: Wed, 31 Aug 2011 21:59:13 -0500
-Subject: [PATCH 1/3] add dma_coherent_write_sync to DMA API
-In-Reply-To: <1314826214-22428-2-git-send-email-msalter@redhat.com>
-References: <1314826214-22428-1-git-send-email-msalter@redhat.com>
-	<1314826214-22428-2-git-send-email-msalter@redhat.com>
-Message-ID: <20110901025913.GA5460@kryptos.austin.rr.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 31 Aug 2011 23:09:19 -0400 (EDT)
+Subject: [PATCH 0/3] RFC: addition to DMA API
+In-Reply-To: <CACVXFVPN7SCk8z=vatphyM=PhZDAwtyDidALYPeVkuJ_zxpBvA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1108312255060.27371-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2011 at 05:30:12PM -0400, Mark Salter wrote:
-> On ARMv6/7 DMA-coherent memory is bufferable which means that CPU writes to
-> coherent memory may still be held in a write buffer for a significant amount
-> of time. This is largely mitigated by having the MMIO write functions force
-> a write buffer flush before doing the actual write to the MMIO register. This
-> forces out previous CPU writes to coherent memory for drivers which write to
-> a register to inform the device that something was written to memory. However,
-> this does not mitigate the problem for devices which poll the DMA memory for
-> changes written by the CPU. One such case was found by ming.lei at canonical.com
-> in the USB EHCI driver. The EHCI host controller relies at least partly on
-> polling DMA coherent memory for information from the driver.
-> 
-> This patch adds a dma_coherent_write_sync() function to the DMA API which
-> drivers can use to explicitly force out data which may otherwise be held up
-> in a write buffer. It is a no-op unless and architecture provides its own
-> version or the function and sets ARCH_HAS_DMA_COHERENT_WRITE_SYNC.
-> 
-> Signed-off-by: Mark Salter <msalter@redhat.com>
-> ---
->  Documentation/DMA-API-HOWTO.txt |   15 +++++++++++++++
->  Documentation/DMA-API.txt       |   12 ++++++++++++
->  include/linux/dma-mapping.h     |    6 ++++++
->  3 files changed, 33 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/DMA-API-HOWTO.txt b/Documentation/DMA-API-HOWTO.txt
-> index a0b6250..8c22b8b 100644
-> --- a/Documentation/DMA-API-HOWTO.txt
-> +++ b/Documentation/DMA-API-HOWTO.txt
-> @@ -400,6 +400,21 @@ Make sure you've called dma_pool_free for all memory allocated
->  from a pool before you destroy the pool. This function may not
->  be called in interrupt context.
->  
-> +Some architectures which supporting DMA coherent memory may still have write
-> +buffering between the CPU and DMA memory. This buffering may delay CPU writes
-> +from reaching coherent memory in a timely manner. These delays in turn can
-> +lead lead to dramatic performance issues in certain cases. An architecture
+On Thu, 1 Sep 2011, Ming Lei wrote:
 
-'lead lead' -> 'lead'
+> Hi,
+> 
+> On Thu, Sep 1, 2011 at 5:30 AM, Mark Salter <msalter@redhat.com> wrote:
+> > This patch set arose out of a discussion on linux-arm concerning a
+> > performance problem with USB on some ARMv7 based platforms. The
+> > problem was tracked down by ming.lei at canonical.com and found to be
+> > the result of CPU writes to DMA-coherent memory being delayed in a
+> > write buffer between the CPU and memory. One proposed patch fixed
+> > only the immediate problem with the USB EHCI driver, but several
+> > folks thought a more general approach was needed, so I put this series
+> > of patches together as a starting point for wider discussion outside
+> > the ARM specific list.
+> 
+> After some further thoughts, I think it is not a good idea to introduce a
+> general DMA API to handle this case, see below:
+> 
+> 1. The side-effect of new API is that it will make descriptors of dma in a
+> partial update, such as qtd in the ehci case, even ehci can handle this
+> successful, but it is really not good to make DMA bus master see a
+> partial update of descriptor, and I am not  sure that other kind of bus masters
+> can handle this correctly, which may introduce other problems. A proper memory
+> barrier will always make dma master see a atomic update of dma descriptors,
+> which should be the preferred way to take by device driver.
 
--- 
-                                       joshc
+No, this is completely wrong.
+
+Firstly, you are forgetting about other architectures, ones in which
+writes to coherent memory aren't buffered.  On those architectures
+there's no way to prevent the DMA bus master from seeing an
+intermediate state of the data structures.  Therefore the driver has to
+be written so that even when this happens, everything will work
+correctly.
+
+Secondly, even when write flushes are used, you can't guarantee that
+the DMA bus master will see an atomic update.  It might turn out that
+the hardware occasionally flushes some writes very quickly, before the
+data-structure updates are complete.
+
+Thirdly, you are mixing up memory barriers with write flushes.  The
+barriers are used to make sure that writes are done in the correct
+order, whereas the flushes are used to make sure that writes are done
+reasonably quickly.  One has nothing to do with the other, even if by
+coincidence on ARM a memory barrier causes a write flush.  On other
+architectures this might not be true.
+
+> 2, most of such cases can be handled correctly by mb/wmb/rmb barriers.
+
+No, they can't.  See the third point above.
+
+> The ehci case I reported is in the one of the most tricky code path in
+> ehci driver,
+> and it should be a special case, and up to now, we only have found this case
+> can't be handled by memory barriers. Is there other cases which can't be handled
+> correctly by mb/wmb/rmb? If so, please point it out.
+> 
+> 3, The new DMA API for the purpose to be introduced is much easier to
+> understand, and much easier to use than memory barrier, so it is very
+> possible to make device driver guys misuse or abuse it instead of using
+> memory barrier first to handle the case.
+
+That criticism could apply to almost any new feature.  We shouldn't be 
+afraid to adopt something new merely because it's so easy to use that 
+it might be misused.
+
+Alan Stern
