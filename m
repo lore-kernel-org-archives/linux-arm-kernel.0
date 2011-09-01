@@ -1,118 +1,54 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 01 Sep 2011 11:13:55 +0900
-Subject: [PATCH] mmc: core: eMMC4.5 Add the timeout for switch
-In-Reply-To: <1314699770-17120-1-git-send-email-girish.shivananjappa@linaro.org>
-References: <1314699770-17120-1-git-send-email-girish.shivananjappa@linaro.org>
-Message-ID: <001601cc684c$ce571b00$6b055100$%kim@samsung.com>
+Date: Thu, 01 Sep 2011 11:26:52 +0900
+Subject: [PATCH 1/5] ARM: Samsung: PWM: Allow to differentiate SoCs based
+	on platform device name.
+In-Reply-To: <CA+Ln22Gak4engAmccbodi2PbYH1PwQ1KuACd9thX_8W5Cr544Q@mail.gmail.com>
+References: <1731819.jJi37IsjvJ@flatron> <4002702.FticUbImag@flatron>
+	<20110831124432.GF14976@sirena.org.uk>
+	<CA+Ln22Gak4engAmccbodi2PbYH1PwQ1KuACd9thX_8W5Cr544Q@mail.gmail.com>
+Message-ID: <001d01cc684e$9c49ecd0$d4ddc670$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Girish K S wrote:
+Tomasz Figa wrote:
 > 
-> This patch adds the code to handle the default timeout
-> for switch command.
-> For eMMC 4.5 devices if timeout is not specified for the switch
-> command while accessing a specific field,then the default timeout
-> shall be used to timeout. Specification says there is no timeout
-> defined while accessing BKOPS_START, SANITIZE_START, FLUSH_CACHE
-> field(so these fields are excluded).
+> 2011/8/31 Mark Brown <broonie@opensource.wolfsonmicro.com>:
+> > On Wed, Aug 31, 2011 at 02:34:15PM +0200, Tomasz Figa wrote:
+> >
+> >> This patch is a prerequisite to adding generic time support for
+S3C64xx.
+> >> It makes possible to differentiate SoCs, required to exclude timers 3
+and 4
+> >> from PWM driver only on S3C64xx.
+> >
+> > Now we have the cpu_is_foo() support for Samsung CPUs can we use that
+> > instead?
+> >
 > 
-> Signed-off-by: Girish K S <girish.shivananjappa@linaro.org>
-> ---
->  drivers/mmc/core/mmc.c     |    5 +++++
->  drivers/mmc/core/mmc_ops.c |    8 ++++++++
->  include/linux/mmc/card.h   |    1 +
->  include/linux/mmc/mmc.h    |    4 ++++
->  4 files changed, 18 insertions(+), 0 deletions(-)
+> Well, I thought about it, but I based my patches on latest stable sources
+and
+> cpu_is_s3c64xx wasn't there yet. Should I rebase them to Linus' tree?
 > 
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 5700b1c..5b9fb6a 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -405,6 +405,11 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8
-> *ext_csd)
->  	if (card->ext_csd.rev >= 5)
->  		card->ext_csd.rel_param =
-> ext_csd[EXT_CSD_WR_REL_PARAM];
-> 
-> +	if (card->ext_csd.rev > 5) {
-> +		/* (eMMC 4.5)timeout is expressed in units of 10 ms*/
-> +		card->ext_csd.cmd6_timeout =
-> ext_csd[EXT_CSD_CMD6_TIME]*10;
-> +	}
-> +
->  	if (ext_csd[EXT_CSD_ERASED_MEM_CONT])
->  		card->erased_byte = 0xFF;
->  	else
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index 770c3d0..c4d82f4 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -394,6 +394,14 @@ int mmc_switch(struct mmc_card *card, u8 set, u8
-index,
-> u8 value,
->  	cmd.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
->  	cmd.cmd_timeout_ms = timeout_ms;
-> 
-> +	/* timeout is not defined for below command indexes (eMMC 4.5) */
-> +	if ((timeout_ms == 0)					&&
-> +		(card->ext_csd->rev > 5)			&&
-> +		(index != EXT_CSD_BKOPS_START)		&&
-> +		(index != EXT_CSD_SANITIZE_START)	&&
-> +		(index != EXT_CSD_FLUSH_CACHE))
-> +			cmd.cmd_timeout_ms = card->ext_csd->cmd6_timeout;
-> +
->  	err = mmc_wait_for_cmd(card->host, &cmd, MMC_CMD_RETRIES);
->  	if (err)
->  		return err;
-> diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
-> index b460fc2..ef88412 100644
-> --- a/include/linux/mmc/card.h
-> +++ b/include/linux/mmc/card.h
-> @@ -50,6 +50,7 @@ struct mmc_ext_csd {
->  	u8			rel_sectors;
->  	u8			rel_param;
->  	u8			part_config;
-> +	u8			cmd6_timeout;	/* timeout in ms */
->  	unsigned int		part_time;		/* Units: ms */
->  	unsigned int		sa_timeout;		/* Units: 100ns */
->  	unsigned int		hs_max_dtr;
-> diff --git a/include/linux/mmc/mmc.h b/include/linux/mmc/mmc.h
-> index 5a794cb..a23f836 100644
-> --- a/include/linux/mmc/mmc.h
-> +++ b/include/linux/mmc/mmc.h
-> @@ -270,8 +270,11 @@ struct _mmc_csd {
->   * EXT_CSD fields
->   */
-> 
-> +#define EXT_CSD_FLUSH_CACHE		32	/* R/W */
->  #define EXT_CSD_PARTITION_ATTRIBUTE	156	/* R/W */
->  #define EXT_CSD_PARTITION_SUPPORT	160	/* RO */
-> +#define EXT_CSD_BKOPS_START		164	/* R/W */
-> +#define EXT_CSD_SANITIZE_START		165	/* R/W */
->  #define EXT_CSD_WR_REL_PARAM		166	/* RO */
->  #define EXT_CSD_ERASE_GROUP_DEF		175	/* R/W */
->  #define EXT_CSD_PART_CONFIG		179	/* R/W */
-> @@ -293,6 +296,7 @@ struct _mmc_csd {
->  #define EXT_CSD_SEC_ERASE_MULT		230	/* RO */
->  #define EXT_CSD_SEC_FEATURE_SUPPORT	231	/* RO */
->  #define EXT_CSD_TRIM_MULT		232	/* RO */
-> +#define EXT_CSD_CMD6_TIME		248	/* RO */
-> 
->  /*
->   * EXT_CSD field definitions
-> --
-> 1.7.1
+> I'm not yet fully used to submitting patches here, so things like choosing
+the
+> base for patches are sometimes a bit confusing to me and I couldn't find
+any
+> guide. Should fixes be based on stable tree and new features implemented
+on
+> top of current Linus' tree? Could you give me some advice on this?
 
-Hi Girish,
+Hi Tomasz,
 
-(Cc'ed Seungwon Jeon)
+You can use "soc_is_s3c64xx()" based on Samsung -next tree.
+git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+for-next
 
-As I know, Seungwon Jeon has been submitted same/similar patch before this.
-http://www.spinics.net/lists/linux-mmc/msg09770.html
+In addition, would be better to me if you could work about Samsung stuff
+based on it.
 
-Chris,
-I cannot find your review on that...
+As a note, your previous patches are in there :)
+
+If any problems, please let me know...
 
 Thanks.
 
