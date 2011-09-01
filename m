@@ -1,24 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Sep 2011 19:07:53 +0100
-Subject: [PATCH 0/3] RFC: addition to DMA API
-In-Reply-To: <20110901173149.GE2803@e102144-lin.cambridge.arm.com>
-References: <CACVXFVOT9FZexiZhuJtvyFP8qOPYUKg0JqGarBJgT4R8SN7p5Q@mail.gmail.com>
-	<Pine.LNX.4.44L0.1109011127080.1896-100000@iolanthe.rowland.org>
-	<20110901160429.GA15814@n2100.arm.linux.org.uk>
-	<20110901173149.GE2803@e102144-lin.cambridge.arm.com>
-Message-ID: <20110901180753.GB15814@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu,  1 Sep 2011 11:12:02 -0700
+Subject: [PATCH] OMAP: omap_device: fix !CONFIG_SUSPEND case in _noirq handlers
+Message-ID: <1314900722-10252-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2011 at 06:31:49PM +0100, Will Deacon wrote:
-> Given that I believe our coherent DMA memory is `cacheable, bufferable, do
-> not allocate' in terms of AXI attributes, then writes will go straight to
-> the write buffer on the PL310.
+The suspend/resume _noirq handlers were #ifdef'd out in the
+!CONFIG_SUSPEND case, but were still assigned to the dev_pm_ops
+struct.  Fix by defining them to NULL in the !CONFIG_SUSPEND case.
 
-It's TEXCB=001, which due to the PRRR and NMRR registers is memory type
-10, inner policy 00 outer policy 00, which translated means (as I said)
-"Normal memory", "non-cacheable" at both the inner and outer levels.
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Applies to v3.1-rc4.
 
-How that gets translated to AXI attributes is outside the scope of the
-ARM ARM, it's probably in some mega secret AXI document somewhere which
-I don't have access to.
+ arch/arm/plat-omap/omap_device.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 9a6a538..02609ee 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -615,6 +615,9 @@ static int _od_resume_noirq(struct device *dev)
+ 
+ 	return pm_generic_resume_noirq(dev);
+ }
++#else
++#define _od_suspend_noirq NULL
++#define _od_resume_noirq NULL
+ #endif
+ 
+ static struct dev_pm_domain omap_device_pm_domain = {
+-- 
+1.7.6
