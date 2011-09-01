@@ -1,82 +1,116 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 1 Sep 2011 11:22:51 -0400 (EDT)
-Subject: [PATCH 0/3] RFC: addition to DMA API
-In-Reply-To: <CACVXFVOYaxGDZrwkHYc+h=tFhpYp+g95KZrDjg+bPH_N-9BT_g@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1109011113210.1896-100000@iolanthe.rowland.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 1 Sep 2011 23:33:43 +0800
+Subject: [PATCH 00/11] Add L2 cache cleaning to generic CPU suspend
+In-Reply-To: <20110901124752.GE29729@n2100.arm.linux.org.uk>
+References: <20110901124752.GE29729@n2100.arm.linux.org.uk>
+Message-ID: <20110901153342.GB5147@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 1 Sep 2011, Ming Lei wrote:
+Hi Russell,
 
-> I agree all about above, but what I described is from another view.
-> I post out the example before explaining my idea further:
+On Thu, Sep 01, 2011 at 01:47:52PM +0100, Russell King - ARM Linux wrote:
+> Some systems (such as OMAP) preserve the L2 cache across a suspend/
+> resume cycle.  This means they do not perform L2 cache maintanence
+> in their suspend finisher function.
 > 
+> However, the side effect is that the saved CPU state is not readable
+> by the resume code because it is sitting in the L2 cache.
 > 
-> 	CPU			device	
-> 	A=1;
-> 	wmb
-> 	B=2;
-> 					read B
-> 					read A
+> This patch series adds L2 cache cleaning to the generic CPU suspend/
+> resume support code, making it possible to use this on systems with
+> L2 cache enabled without having to clean/invalidate the entire L2
+> cache.
 > 
-> one wmb is used to order 'A=1' and 'B=2', which will make the two write
-> operations reach to physical memory as the order: 'A=1' first, 'B=2' second.
-> Then the device can observe the two write events as the order above,
-> so if device has seen 'B==2', then device will surely see 'A==1'.
-> 
-> Suppose writing to A is operation to update dma descriptor, the above example
-> can make device always see a atomic update of descriptor, can't it?
+This is also the case on i.MX6Q, which L2 cache is retained during a
+suspend/resume cycle.  Currently, I have to call into the following
+before calling generic cpu_suspend() to clean/invalidate the entire
+L2 cache.
 
-Suppose A and B are _both_ part of the dma descriptor.  The device 
-might see A==1 and B==0, if the memory accesses occur like this:
+	outer_flush_all();
+	outer_disable();
 
-	CPU		device
-	---		------
-	A = 1;
-	wmb();
-			read B
-			read A
-	B = 2;
+But there is a wired thing on using generic cpu_resume().  I have to
+invalidate L1 before calling into cpu_resume() like below.
 
-When this happens, the device will observe a non-atomic update of the 
-descriptor.  There's no way to prevent this.
+ENTRY(imx6q_cpu_resume)
+        bl      v7_invalidate_l1
+        b       cpu_resume
+ENDPROC(imx6q_cpu_resume)
 
-> My idea is that the memory access patterns are to be considered for
-> writer of device driver. For example, many memory access patterns on
-> EHCI hardware are described in detail.  Of course, device driver should
-> make full use of the background info, below is a example from ehci driver:
-> 
-> qh_link_async():
-> 
-> 	/*prepare qh descriptor*/
-> 	qh->qh_next = head->qh_next;
-> 	qh->hw->hw_next = head->hw->hw_next;
-> 	wmb ();
-> 
-> 	/*link the qh descriptor into hardware queue*/
-> 	head->qh_next.qh = qh;
-> 	head->hw->hw_next = dma;
-> 
-> so once EHCI fetches a qh with the address of 'dma', it will always see
-> consistent content of qh descriptor, which could not be updated partially.
+ENTRY(imx6q_secondary_startup)
+        bl      v7_invalidate_l1
+        b       secondary_startup
+ENDPROC(imx6q_secondary_startup)
 
-Yes, of course.  That's what memory barriers are intended for, to make 
-sure that writes occur in the correct order.  Without the wmb(), the 
-CPU might decide to write out the value of head->hw->hw_next before 
-writing out the value of qh->hw->hw_next.  Then the device might see an 
-inconsistent set of values.
+The v7_invalidate_l1() is the function copied from mach-tegra/headsmp.S,
+which has to be called before calling secondary_startup to boot
+secondary cores (same situation between Tegra and i.MX6Q).
 
-None of this has anything to do with the write flushes you want to add.
+/*
+ * Tegra specific entry point for secondary CPUs.
+ *   The secondary kernel init calls v7_flush_dcache_all before it enables
+ *   the L1; however, the L1 comes out of reset in an undefined state, so
+ *   the clean + invalidate performed by v7_flush_dcache_all causes a bunch
+ *   of cache lines with uninitialized data and uninitialized tags to get
+ *   written out to memory, which does really unpleasant things to the main
+ *   processor.  We fix this by performing an invalidate, rather than a
+ *   clean + invalidate, before jumping into the kernel.
+ */
+ENTRY(v7_invalidate_l1)
+        mov     r0, #0
+        mcr     p15, 2, r0, c0, c0, 0
+        mrc     p15, 1, r0, c0, c0, 0
 
-> >> 2, most of such cases can be handled correctly by mb/wmb/rmb barriers.
-> >
-> > No, they can't. ?See the third point above.
-> 
-> The example above has demoed that barriers can do it, hasn't it?
+        ldr     r1, =0x7fff
+        and     r2, r1, r0, lsr #13
 
-The memory barrier in your qh_link_async() example can make sure that
-the device always sees consistent data.  It doesn't guarantee that the
-write to head->hw->hw_next will be flushed to memory in a reasonably 
-short time, which is the problem you are trying to solve.
+        ldr     r1, =0x3ff
 
-Alan Stern
+        and     r3, r1, r0, lsr #3  @ NumWays - 1
+        add     r2, r2, #1          @ NumSets
+
+        and     r0, r0, #0x7
+        add     r0, r0, #4          @ SetShift
+
+        clz     r1, r3              @ WayShift
+        add     r4, r3, #1          @ NumWays
+1:      sub     r2, r2, #1          @ NumSets--
+        mov     r3, r4              @ Temp = NumWays
+2:      subs    r3, r3, #1          @ Temp--
+        mov     r5, r3, lsl r1
+        mov     r6, r2, lsl r0
+        orr     r5, r5, r6          @ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
+        mcr     p15, 0, r5, c7, c6, 2
+        bgt     2b
+        cmp     r2, #0
+        bgt     1b
+        dsb
+        isb
+        mov     pc, lr
+ENDPROC(v7_invalidate_l1)
+ 
+Before applying this patch series, I have something like below actually
+working.
+
+
+	outer_flush_all();
+	outer_disable();
+	imx_set_cpu_jump(0, imx6q_cpu_resume);
+	/* Zzz ... */
+	cpu_suspend(0, imx6q_suspend_finish);
+
+I expect with you patches applied, I can still have it work with simply
+removing those two lines outer cache codes.  But unfortunately, I'm
+running into Oops when resuming back.  And I also have Oops with
+imx_set_cpu_jump(0, cpu_resume) which means skipping the
+v7_invalidate_l1() and calling generic cpu_resume() only.
+
+I know the key point of the whole thing is that we need to invalidate
+L1 before either booting secondary cores or resuming the primary core
+on i.MX6Q.  But I really need some help to understand why, and the
+best solution to that.
+
+-- 
+Regards,
+Shawn
