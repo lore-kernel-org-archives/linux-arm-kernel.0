@@ -1,22 +1,28 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 1 Sep 2011 13:32:06 +0100
-Subject: [PATCH 1/5] ARM: Samsung: PWM: Allow to differentiate SoCs based
-	on platform device name.
-In-Reply-To: <1645899.rJz3R6pebo@flatron>
-References: <1731819.jJi37IsjvJ@flatron>
-	<001d01cc684e$9c49ecd0$d4ddc670$%kim@samsung.com>
-	<CAH9JG2UiuaCyOk24hC=240ptQa8CKCVkXHaQzNt=YcnyQksnOA@mail.gmail.com>
-	<1645899.rJz3R6pebo@flatron>
-Message-ID: <20110901123205.GB2061@opensource.wolfsonmicro.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 01 Sep 2011 08:36:34 -0400
+Subject: [PATCH 1/3] add dma_coherent_write_sync to DMA API
+In-Reply-To: <CAHXqBFJ6tEkn+iW3ZBAiWu5Sx9y9MQdnJt5Gfnv5Xc3UB78uLw@mail.gmail.com>
+References: <1314826214-22428-1-git-send-email-msalter@redhat.com>
+	<1314826214-22428-2-git-send-email-msalter@redhat.com>
+	<CAHXqBFJ6tEkn+iW3ZBAiWu5Sx9y9MQdnJt5Gfnv5Xc3UB78uLw@mail.gmail.com>
+Message-ID: <1314880595.1439.13.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2011 at 01:18:32PM +0200, Tomasz Figa wrote:
-> On Thursday 01 of September 2011 at 12:33:10, Kyungmin Park wrote:
+On Thu, 2011-09-01 at 11:57 +0200, Micha? Miros?aw wrote:
+> BTW, if there's no time limit on write buffers flushing, or if write
+> buffers can cause reordering of the writes, then the memory accesses
+> need to be managed just like non-DMA-coherent memory. So what differs
+> then in DMA-coherent vs non-DMA-coherent mappings then?
 
-> Well, now we have three alternatives:
-> - to leave it as is (i.e. changing platform device names)
-> - to use cpu_is_* (does it ever exist for S3C64xx or soc_is_s3c64xx is its equivalent?)
-> - to use soc_is_* 
+My understanding is that ordering is preserved, but an ARM guy should
+probably verify that.
 
-soc_is is the same thing.
+IIUC, the write buffers could hold data indefinitely. As a practical
+matter other writes needing to go out to memory will force buffered
+data out eventually. Again, this is my understanding which may be
+faulty. My feeling is that this extended write buffering makes it
+hard to call the dma memory fully coherent, but other limitations on
+ARMv7 make the buffering hard to avoid.
+
+--Mark
