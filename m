@@ -1,33 +1,36 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 1 Sep 2011 19:34:11 +0200
-Subject: [RFC/PATCH v2 08/13] dt: omap: i2c: add dt support for i2c1
-	controller
-In-Reply-To: <20110823154649.GF32698@manju-desktop>
-References: <1314074021-25186-1-git-send-email-manjugk@ti.com>
-	<1314074021-25186-9-git-send-email-manjugk@ti.com>
-	<20110823154649.GF32698@manju-desktop>
-Message-ID: <4E5FC213.3080407@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 01 Sep 2011 10:50:24 -0700
+Subject: [PATCH 1/1] OMAP: omap_device: only override _noirq methods,
+	not normal suspend/resume
+In-Reply-To: <201109011800.55516.arnd@arndb.de> (Arnd Bergmann's message of
+	"Thu, 1 Sep 2011 18:00:55 +0200")
+References: <1314229437-31836-1-git-send-email-khilman@ti.com>
+	<1314229437-31836-2-git-send-email-khilman@ti.com>
+	<201109011800.55516.arnd@arndb.de>
+Message-ID: <8762lcf8yn.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manju,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On 8/23/2011 5:46 PM, G, Manjunath Kondaiah wrote:
-> Hi Grant,
-
-[...]
-
-> This function calls of_i2c_register_devices which attaches all the required
-> parameters reg, irq, archdata etc into i2c adapter. But it will not attach
-> platform_data which results empty pdata pointer in i2c child devices.
+> On Thursday 25 August 2011, Kevin Hilman wrote:
+>> --- a/arch/arm/plat-omap/omap_device.c
+>> +++ b/arch/arm/plat-omap/omap_device.c
+>> @@ -622,7 +622,8 @@ static struct dev_pm_domain omap_device_pm_domain = {
+>>                 SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
+>>                                    _od_runtime_idle)
+>>                 USE_PLATFORM_PM_SLEEP_OPS
+>> -               SET_SYSTEM_SLEEP_PM_OPS(_od_suspend_noirq, _od_resume_noirq)
+>> +               .suspend_noirq = _od_suspend_noirq,
+>> +               .resume_noirq = _od_resume_noirq,
+>>         }
+>>  };
 >
-> Is this done purposefully?
+> This breaks if CONFIG_SUSPEND is not set and the _od_suspend_noirq/_od_resume_noirq
+> functions are not defined.
 
-I think so, but anyway, we'd rather spend some time on doing a proper DT 
-implementation than hacking more the AUXDATA temporary solution.
+Indeed.
 
-I've just sent a reworked version of that series with a pure 
-dt-no-auxdata-hack approach.
+Will post a fix shortly.
 
-Regards,
-Benoit
+Kevin
