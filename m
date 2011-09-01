@@ -1,150 +1,199 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 01 Sep 2011 07:14:27 -0500
-Subject: [PATCH v2 4/6] DMA: PL330: Add device tree support
-In-Reply-To: <1314867882-11755-5-git-send-email-thomas.abraham@linaro.org>
-References: <1314867882-11755-1-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-2-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-3-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-4-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-5-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4E5F7723.8090909@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  1 Sep 2011 13:27:19 +0100
+Subject: [PATCH 1/5] Framework for exporting System-on-Chip information via
+	sysfs
+Message-ID: <1314880043-22517-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/01/2011 04:04 AM, Thomas Abraham wrote:
-> For PL330 dma controllers instantiated from device tree, the channel
-> lookup is based on phandle of the dma controller and dma request id
-> specified by the client node. During probe, the private data of each
-> channel of the controller is set to point to the device node of the
-> dma controller. The 'chan_id' of the each channel is used as the
-> dma request id.
-> 
-> Client driver requesting dma channels specify the phandle of the
-> dma controller and the request id. The pl330 filter function
-> converts the phandle to the device node pointer and matches that
-> with channel's private data. If a match is found, the request id
-> from the client node and the 'chan_id' of the channel is matched.
-> A channel is found if both the values match.
-> 
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+This patch introduces a new driver to drivers/base. The
+driver provides a means to export vital SoC data out to
+userspace via sysfs. Standard information applicable to all
+SoCs are exported to:
 
-Looks good.
+/sys/devices/soc/[1|2|3|...]/[family|machine|revision|soc_id].
 
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+It is possible to create SoC specific items via the
+soc device, which is returned post-registration, although
+this should be discouraged.
 
-> ---
->  .../devicetree/bindings/dma/arm-pl330.txt          |   29 ++++++++++++++++
->  drivers/dma/pl330.c                                |   35 +++++++++++++++++---
->  2 files changed, 59 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-> new file mode 100644
-> index 0000000..69e6c02
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-> @@ -0,0 +1,29 @@
-> +* ARM PrimeCell PL330 DMA Controller
-> +
-> +The ARM PrimeCell PL330 DMA controller can move blocks of memory contents
-> +between memory and peripherals or memory to memory.
-> +
-> +Required properties:
-> +  - compatible: should include both "arm,pl330" and "arm,primecell".
-> +  - reg: physical base address of the controller and length of memory mapped
-> +    region.
-> +  - interrupts: interrupt number to the cpu.
-> +
-> +Example: (from Samsung's Exynos4 processor dtsi file)
-> +
-> +	pdma0: pdma at 12680000 {
-> +		compatible = "arm,pl330", "arm,primecell";
-> +		reg = <0x12680000 0x1000>;
-> +		interrupts = <99>;
-> +	};
-> +
-> +Client drivers (device nodes requiring dma transfers from dev-to-mem or
-> +mem-to-dev) should specify the DMA channel numbers using a two-value pair
-> +as shown below.
-> +
-> +  [property name]  = <[phandle of the dma controller] [dma request id]>;
-> +
-> +      where 'dma request id' is the dma request number which is connected
-> +      to the client controller.
-> +
-> +  Example:  tx-dma-channel = <&pdma0 12>;
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 9732995..0c55de4 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -19,6 +19,7 @@
->  #include <linux/amba/pl330.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/scatterlist.h>
-> +#include <linux/of.h>
->  
->  #define NR_DEFAULT_DESC	16
->  
-> @@ -277,6 +278,20 @@ bool pl330_filter(struct dma_chan *chan, void *param)
->  	if (chan->device->dev->driver != &pl330_driver.drv)
->  		return false;
->  
-> +#ifdef CONFIG_OF
-> +	if (chan->device->dev->of_node) {
-> +		const __be32 *prop_value;
-> +		phandle phandle;
-> +		struct device_node *node;
-> +
-> +		prop_value = ((struct property *)param)->value;
-> +		phandle = be32_to_cpup(prop_value++);
-> +		node = of_find_node_by_phandle(phandle);
-> +		return ((chan->private == node) &&
-> +				(chan->chan_id == be32_to_cpup(prop_value)));
-> +	}
-> +#endif
-> +
->  	peri_id = chan->private;
->  	return *peri_id == (unsigned)param;
->  }
-> @@ -857,12 +872,17 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	INIT_LIST_HEAD(&pd->channels);
->  
->  	/* Initialize channel parameters */
-> -	num_chan = max(pdat ? pdat->nr_valid_peri : 0, (u8)pi->pcfg.num_chan);
-> +	num_chan = max(pdat ? pdat->nr_valid_peri : (u8)pi->pcfg.num_peri,
-> +			(u8)pi->pcfg.num_chan);
->  	pdmac->peripherals = kzalloc(num_chan * sizeof(*pch), GFP_KERNEL);
->  
->  	for (i = 0; i < num_chan; i++) {
->  		pch = &pdmac->peripherals[i];
-> -		pch->chan.private = pdat ? &pdat->peri_id[i] : NULL;
-> +		if (!adev->dev.of_node)
-> +			pch->chan.private = pdat ? &pdat->peri_id[i] : NULL;
-> +		else
-> +			pch->chan.private = adev->dev.of_node;
-> +
->  		INIT_LIST_HEAD(&pch->work_list);
->  		spin_lock_init(&pch->lock);
->  		pch->pl330_chid = NULL;
-> @@ -876,11 +896,16 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  	}
->  
->  	pd->dev = &adev->dev;
-> -	if (pdat)
-> +	if (pdat) {
->  		pd->cap_mask = pdat->cap_mask;
-> -	else
-> +	} else {
->  		dma_cap_set(DMA_MEMCPY, pd->cap_mask);
-> -
-> +		if (pi->pcfg.num_peri) {
-> +			dma_cap_set(DMA_SLAVE, pd->cap_mask);
-> +			dma_cap_set(DMA_CYCLIC, pd->cap_mask);
-> +		}
-> +	}
-> +
->  	pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
->  	pd->device_free_chan_resources = pl330_free_chan_resources;
->  	pd->device_prep_dma_memcpy = pl330_prep_dma_memcpy;
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/base/Kconfig    |    3 +
+ drivers/base/Makefile   |    1 +
+ drivers/base/soc.c      |  103 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/sys_soc.h |   27 ++++++++++++
+ 4 files changed, 134 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/base/soc.c
+ create mode 100644 include/linux/sys_soc.h
+
+diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+index 21cf46f..95f10c5 100644
+--- a/drivers/base/Kconfig
++++ b/drivers/base/Kconfig
+@@ -172,6 +172,9 @@ config SYS_HYPERVISOR
+ 	bool
+ 	default n
+ 
++config SYS_SOC
++	bool
++
+ source "drivers/base/regmap/Kconfig"
+ 
+ endmenu
+diff --git a/drivers/base/Makefile b/drivers/base/Makefile
+index 99a375a..a67a1e7 100644
+--- a/drivers/base/Makefile
++++ b/drivers/base/Makefile
+@@ -18,6 +18,7 @@ obj-$(CONFIG_MODULES)	+= module.o
+ endif
+ obj-$(CONFIG_SYS_HYPERVISOR) += hypervisor.o
+ obj-$(CONFIG_REGMAP)	+= regmap/
++obj-$(CONFIG_SYS_SOC) += soc.o
+ 
+ ccflags-$(CONFIG_DEBUG_DRIVER) := -DDEBUG
+ 
+diff --git a/drivers/base/soc.c b/drivers/base/soc.c
+new file mode 100644
+index 0000000..e9d908b
+--- /dev/null
++++ b/drivers/base/soc.c
+@@ -0,0 +1,103 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2011
++ *
++ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++
++#include <linux/sysfs.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/stat.h>
++#include <linux/slab.h>
++#include <linux/sys_soc.h>
++
++static DEFINE_SPINLOCK(register_lock);
++static int soc_count = 0;
++
++static struct device soc_grandparent = {
++	.init_name = "soc",
++};
++
++static ssize_t soc_info_get(struct device *dev,
++			struct device_attribute *attr,
++			char *buf)
++{
++	struct soc_device *soc_dev = container_of(dev, struct soc_device, dev);
++
++	if (!strcmp(attr->attr.name, "machine"))
++		return sprintf(buf, "%s\n", soc_dev->machine);
++	if (!strcmp(attr->attr.name, "family"))
++		return sprintf(buf, "%s\n", soc_dev->family);
++	if (!strcmp(attr->attr.name, "revision"))
++		return sprintf(buf, "%s\n", soc_dev->revision);
++	if (!strcmp(attr->attr.name, "soc_id")) {
++		if (soc_dev->pfn_soc_id)
++			return sprintf(buf, "%s\n", soc_dev->pfn_soc_id());
++		else return sprintf(buf, "N/A \n");
++	}
++
++	return -EINVAL;
++}
++
++struct device_attribute soc_attrs[] = {
++	__ATTR(machine,  S_IRUGO, soc_info_get,  NULL),
++	__ATTR(family,   S_IRUGO, soc_info_get,  NULL),
++	__ATTR(soc_id,   S_IRUGO, soc_info_get,  NULL),
++	__ATTR(revision, S_IRUGO, soc_info_get,  NULL),
++	__ATTR_NULL,
++};
++
++static void soc_device_remove_files(struct device *soc, int i)
++{
++	while (i > 0)
++		device_remove_file(soc, &soc_attrs[--i]);
++}
++
++static int __init soc_device_create_files(struct device *dev)
++{
++	int ret = 0;
++	int i   = 0;
++
++	while (soc_attrs[i].attr.name != NULL) {
++		ret = device_create_file(dev, &soc_attrs[i++]);
++		if (ret)
++			goto out;
++	}
++	return ret;
++
++out:
++	soc_device_remove_files(dev, --i);
++	return ret;
++}
++
++int __init soc_device_register(struct device *dev)
++{
++	struct soc_device *soc_dev = container_of(dev, struct soc_device, dev);
++	int ret;
++
++	spin_lock_irq(&register_lock);
++
++	if (!soc_count) {
++		/* Register top-level SoC device '/sys/devices/soc' */
++		ret = device_register(&soc_grandparent);
++		if (ret) {
++			spin_unlock_irq(&register_lock);
++			return ret;
++		}
++	}
++
++	soc_count++;
++	dev->parent = &soc_grandparent;
++	dev_set_name(dev, "%i_%s", soc_count, soc_dev->machine);
++
++	spin_unlock_irq(&register_lock);
++
++	ret = device_register(dev);
++	if (ret)
++		return ret;
++
++	soc_device_create_files(dev);
++
++	return ret;
++}
+diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
+new file mode 100644
+index 0000000..811d7fe
+--- /dev/null
++++ b/include/linux/sys_soc.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2011
++ * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++#ifndef __SYS_SOC_H
++#define __SYS_SOC_H
++
++#include <linux/kobject.h>
++#include <linux/device.h>
++#include <linux/platform_device.h>
++
++struct soc_device {
++	struct device dev;
++	const char *machine;
++	const char *family;
++	const char *revision;
++	const char *(*pfn_soc_id)(void);
++};
++
++/**
++ * soc_device_register - register SoC as a device
++ * @dev: Parent node '/sys/devices/soc/X'
++ */
++int soc_device_register(struct device *dev);
++
++#endif /* __SYS_SOC_H */
+-- 
+1.7.4.1
