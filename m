@@ -1,64 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Sep 2011 16:34:51 +0100
-Subject: [PATCH 00/11] Add L2 cache cleaning to generic CPU suspend
-In-Reply-To: <20110901153342.GB5147@S2100-06.ap.freescale.net>
-References: <20110901124752.GE29729@n2100.arm.linux.org.uk>
-	<20110901153342.GB5147@S2100-06.ap.freescale.net>
-Message-ID: <20110901153451.GA16024@n2100.arm.linux.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 1 Sep 2011 11:42:23 -0400 (EDT)
+Subject: [PATCH 0/3] RFC: addition to DMA API
+In-Reply-To: <CACVXFVOT9FZexiZhuJtvyFP8qOPYUKg0JqGarBJgT4R8SN7p5Q@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1109011127080.1896-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2011 at 11:33:43PM +0800, Shawn Guo wrote:
-> This is also the case on i.MX6Q, which L2 cache is retained during a
-> suspend/resume cycle.  Currently, I have to call into the following
-> before calling generic cpu_suspend() to clean/invalidate the entire
-> L2 cache.
-> 
-> 	outer_flush_all();
-> 	outer_disable();
-> 
-> But there is a wired thing on using generic cpu_resume().  I have to
-> invalidate L1 before calling into cpu_resume() like below.
-> 
-> ENTRY(imx6q_cpu_resume)
->         bl      v7_invalidate_l1
->         b       cpu_resume
-> ENDPROC(imx6q_cpu_resume)
-> 
-> ENTRY(imx6q_secondary_startup)
->         bl      v7_invalidate_l1
->         b       secondary_startup
-> ENDPROC(imx6q_secondary_startup)
-> 
-> The v7_invalidate_l1() is the function copied from mach-tegra/headsmp.S,
-> which has to be called before calling secondary_startup to boot
-> secondary cores (same situation between Tegra and i.MX6Q).
+On Thu, 1 Sep 2011, Ming Lei wrote:
 
-Presumably that's because your L1 cache contains randomized data with
-random validity (and presumably random dirtyness) at boot time - something
-which unfortunately the ARM ARM permits.  I don't think we can go to the
-extent of dealing with this in the generic code as it would unnecessarily
-perturb those implementations which either the boot loader has already
-sorted out that issue, or which don't have the issue at all.
+> First, most of barriers have made this kind of flush not necessary, as
+> explained int the example above.
 
-> Before applying this patch series, I have something like below actually
-> working.
-> 
-> 
-> 	outer_flush_all();
-> 	outer_disable();
-> 	imx_set_cpu_jump(0, imx6q_cpu_resume);
-> 	/* Zzz ... */
-> 	cpu_suspend(0, imx6q_suspend_finish);
-> 
-> I expect with you patches applied, I can still have it work with simply
-> removing those two lines outer cache codes.
+You don't seem to understand the difference between memory barriers and 
+write flushes.  Neither makes the other unnecessary -- they do 
+different things.
 
-That should be the case.
+Now, there is good reason to question why write flushes should be 
+needed at all.  According to the definition in 
+Documentation/DMA-API.txt (the document doesn't distinguish between 
+coherent memory and consistent memory):
 
-> But unfortunately, I'm
-> running into Oops when resuming back.  And I also have Oops with
-> imx_set_cpu_jump(0, cpu_resume) which means skipping the
-> v7_invalidate_l1() and calling generic cpu_resume() only.
+  Consistent memory is memory for which a write by either the device or
+  the processor can immediately be read by the processor or device
+  without having to worry about caching effects.  (You may however need
+  to make sure to flush the processor's write buffers before telling
+  devices to read that memory.)
 
-Do you have a copy of the oops?
+As far as I can tell, we are talking about a cache flush rather than a 
+processor write buffer flush.  If that's so, it would appear that the 
+memory in question is not truly coherent.
+
+>  Even for ehci driver, the flush to be
+> added is only __one__ special case, so could you list other cases in
+> which the flush operation is a must and memory barrier can't do it?
+
+There are other places in ehci-hcd where write flushes would help
+improve performance or correctness, although the one in qh_append_tds()  
+is probably the most critical.  One such place is in qh_link_async();
+others are in qh_link_periodic(), qh_unlink_periodic(), itd_link_urb(),
+and sitd_link_urb().
+
+And there are similar places in the other USB host controller drivers.
+
+> If one can understand dma master access order on shared memory
+> in the context, it is not difficult to use memory barrier to avoid the
+> flush operation.
+
+That simply is not true.  If it were, you would not have needed to 
+submit your original patch.
+
+> Second, as I said before, the flush operation is very easy to cause dma
+> descriptor updated in partial, as qtd descriptor updated in the ehci case.
+
+No, not if memory barriers are used correctly.
+
+> It is one of the side effects of the flush to be introduced.  Fortunately, EHCI
+> can handle this correctly, but can other hardwares always handle this correctly?
+
+If they can't, they are already broken.  Adding write flushes won't 
+make them any worse.
+
+Alan Stern
