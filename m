@@ -1,37 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 01 Sep 2011 21:14:07 +0200
-Subject: [PATCH 00/13] OMAP4: Add DT support for i2c and twl6030
-In-Reply-To: <1314897689-17791-1-git-send-email-b-cousson@ti.com>
-References: <1314897689-17791-1-git-send-email-b-cousson@ti.com>
-Message-ID: <2756178.9Ir4cpMAU8@wuerfel>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 01 Sep 2011 15:14:18 -0400
+Subject: [PATCH 0/3] RFC: addition to DMA API
+In-Reply-To: <20110901173149.GE2803@e102144-lin.cambridge.arm.com>
+References: <CACVXFVOT9FZexiZhuJtvyFP8qOPYUKg0JqGarBJgT4R8SN7p5Q@mail.gmail.com>
+	<Pine.LNX.4.44L0.1109011127080.1896-100000@iolanthe.rowland.org>
+	<20110901160429.GA15814@n2100.arm.linux.org.uk>
+	<20110901173149.GE2803@e102144-lin.cambridge.arm.com>
+Message-ID: <1314904459.1439.24.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 September 2011 19:21:16 Benoit Cousson wrote:
-> This is a rework of the original series done by Manju:
-> http://www.spinics.net/lists/linux-omap/msg55827.html
-> 
-> It fixes the main issue of the previous series that was not booting at all
-> due to the lack of twl support. That fix is mandatory to allow further
-> work on the regulators DT bindings.
-> In order to have a minimal i2c support, both i2c and twl must be added
-> at the same time.
-> Please note than some patches can be reshuffle with the previous OMAP4
-> series to avoid the intermediate step with static i2c initialization.
-> 
-> That series is as well using the hwmods binding introduced in my previous
-> series.
-> The OMAP3/beagle support will be added in an other series.
-> 
-> A couple of basic i2c devices are added for panda and sdp board.
-> 
-> Patches are based on for_3.2/4_omap4_dt_early_devices + devicetree/test
-> and are available here:
-> git://gitorious.org/omap-pm/linux.git for_3.2/5_omap_dt_i2c_twl
-> 
-> Tested on PandaBoard and sdp4430.
+On Thu, 2011-09-01 at 18:31 +0100, Will Deacon wrote:
+> I don't think what we're seeing in this case is caused by mismatched memory
+> attributes, especially as passing `nosmp' on the command-line makes the
+> performance issue disappear.
 
-I think this is great stuff. I missed the original series, but
-it's definitely good to see progress on this!
+I'm coming to think we are dealing with two different problems.
 
-	Arnd
+We have the original problem where adding the write buffer flush
+to EHCI gives a 4x performance boost to USB. Also adding nosmp to
+the cmdline gives pretty much the same boost. This is looking like
+something other than just data getting held up in a write buffer.
+
+On the other hand, on a nosmp kernel, I get about 3-4% performance
+boost for hdparm -t using the write buffer flush patch vs. without
+it.
+
+So, regardless of what turns out to be the actual cause of the 4x
+problem, it may still be worthwhile to have the explicit write
+buffer sync API if we can't avoid using buffered mappings for DMA.
+
+--Mark
