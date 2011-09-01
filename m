@@ -1,64 +1,36 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Thu, 01 Sep 2011 08:15:46 +0100
-Subject: [PATCH 01/10] ARM: kprobes: Add config option for selecting
-	the ARM kprobes tests
-In-Reply-To: <alpine.LFD.2.00.1108311836240.20358@xanadu.home>
-References: <1314621249-958-1-git-send-email-tixy@yxit.co.uk>
-	<1314621249-958-2-git-send-email-tixy@yxit.co.uk>
-	<alpine.LFD.2.00.1108291431300.20358@xanadu.home>
-	<1314688610.2371.12.camel@computer2>
-	<alpine.LFD.2.00.1108311836240.20358@xanadu.home>
-Message-ID: <1314861346.20321.40.camel@computer2>
+From: B19295@freescale.com (Lin Tony-B19295)
+Date: Thu, 1 Sep 2011 07:46:37 +0000
+Subject: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting clock
+	from 100ms to 1ms
+In-Reply-To: <20110901055522.GB22652@pengutronix.de>
+References: <1314856275-12131-1-git-send-email-tony.lin@freescale.com>
+	<20110901055522.GB22652@pengutronix.de>
+Message-ID: <97D3A72708D04647A5AC84A04996E5B519DDC6@039-SN1MPN1-002.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-08-31 at 18:47 -0400, Nicolas Pitre wrote:
-> On Tue, 30 Aug 2011, Tixy wrote:
-[...]
-> > When ARM_KPROBES_TEST_MODULE is configured for a stand-alone module,
-> > rather than built-in, then
-> > 
-> > #ifdef CONFIG_ARM_KPROBES_TEST_MODULE
-> > 
-> > is false.
+> -----Original Message-----
+> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
+> Sent: Thursday, September 01, 2011 1:55 PM
+> To: Lin Tony-B19295
+> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> cjb at laptop.org
+> Subject: Re: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting
+> clock from 100ms to 1ms
 > 
-> OK... It seems that, when you have a tristate config symbol FOOBAR, if 
-> CONFIG_FOOBAR=y then the CONFIG_FOOBAR preprocessor symbol is defined.  
-> If you have CONFIG_FOOBAR=m then the CONFIG_FOOBAR_MODULE preprocessor 
-> symbol is defined.
+> On Thu, Sep 01, 2011 at 01:51:15PM +0800, Tony Lin wrote:
+> > 1ms is enough for hardware to change the clock to stable.
+> > 100ms is too long.
+> 
+> How do you know that? Can you be sure for PowerPC as well? Have you
+> researched why the original author of the code has chosen that value? If
+> so, please update your commit message with such infos.
+> 
+I got this confirmation by IC simulation, but sorry I just noticed that's also used for PPC.
+I can update the information after got confirmation from author. 
 
-That's useful to know.
-
-> In your example above you would end up with 
-> CONFIG_ARM_KPROBES_TEST_MODULE_MODULE being defined.
-> 
-> > I found other examples where people seemed to have gotten around this 
-> > by selecting a second config symbol and copied that. E.g. 
-> > FTRACE_STARTUP_TEST selects FTRACE_SELFTEST which is then used in 
-> > #ifdef statements.
-> > 
-> > Is there a better way? If not, I should explain this anyway in the
-> > changelog.
-> 
-> What I'd suggest is that you have:
-> 
-> config ARM_KPROBES_TEST
-> 	tristate ...
-> 
-> And then you may use this in the code:
-> 
-> #ifdef CONFIG_ARM_KPROBES_TEST_MODULE
-> EXPORT_SYMBOL_GPL(...);
-> #endif
-> 
-> so those symbols are only exported when necessary.
-
-Yep, that works and is a lot cleaner, thanks.
-
-I've also made the extern declarations for these exported symbols
-unconditional in kprobes-test.h. It didn't seem worth trying to #ifdef
-them to only exist when the test code is configured (like I was trying
-to do in "[PATCH 06/10] ARM: kprobes: Add exports for test code").
-
--- 
-Tixy
+> --
+> Pengutronix e.K.                           | Wolfram Sang
+> |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/
+> |
