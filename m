@@ -1,48 +1,65 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 1 Sep 2011 19:21:24 +0200
-Subject: [PATCH 08/13] arm/dts: omap4-panda: Set clock freq for i2c controllers
+Date: Thu, 1 Sep 2011 19:21:25 +0200
+Subject: [PATCH 09/13] arm/dts: omap4-sdp: Add twl6030 node
 In-Reply-To: <1314897689-17791-1-git-send-email-b-cousson@ti.com>
 References: <1314897689-17791-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314897689-17791-9-git-send-email-b-cousson@ti.com>
+Message-ID: <1314897689-17791-10-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: G, Manjunath Kondaiah <manjugk@ti.com>
+Add the twl6030 node inside the i2c1 controller node.
+Add the RTC submodule inside the twl node.
 
-Update pandaboard dts file with required clock frequencies
-for the i2c client devices existing on pandaboard.
+This is just the minimal support needed to boot OMAP4 boards
+without any crash.
+The support for all the features included in this MFD will be added
+later.
 
-Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-[b-cousson at ti.com: Fix the wrong use of reference and
-wrong clock value]
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
 ---
- arch/arm/boot/dts/omap4-panda.dts |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap4-sdp.dts |   25 +++++++++++++++++++++++--
+ 1 files changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index c702657..63ecf34 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -27,3 +27,19 @@
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index ed85b35..d03f2e7 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -26,12 +26,33 @@
+ 		device_type = "memory";
  		reg = <0x80000000 0x40000000>; /* 1 GB */
  	};
+-
+-
  };
+ 
+ &i2c1 {
+ 	clock-frequency = <400000>;
 +
-+&i2c1 {
-+	clock-frequency = <400000>;
-+};
++	/*
++	 * Integrated Power Management Chip
++	 * http://www.ti.com/lit/ds/symlink/twl6030.pdf
++	 */
++	twl at 48 {
++		compatible = "ti,twl6030";
++		reg = <0x48>;
++		interrupts = <39>; /* IRQ_SYS_1N cascaded to gic */
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		interrupt-parent = <&gic>;
++		/* twl is a MFD, so it will contain a bunch of sub-ips */
++		#address-cells = <1>;
++		#size-cells = <0>;
++		ranges = <0 0x48>;
 +
-+&i2c2 {
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+};
-+
-+&i2c4 {
-+	clock-frequency = <400000>;
-+};
++		twl_rtc {
++			compatible = "ti,twl_rtc";
++			interrupts = <11>;
++			reg = <0>;
++		};
++	};
+ };
+ 
+ &i2c2 {
 -- 
 1.7.0.4
