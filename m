@@ -1,73 +1,49 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 1 Sep 2011 19:35:47 +0800
-Subject: [PATCH v2] pinmux: add a driver for the CSR SiRFprimaII pinmux
-In-Reply-To: <CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
-References: <1314843744-2910-1-git-send-email-Baohua.Song@csr.com>
-	<CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
-Message-ID: <CAGsJ_4yeudp+5J-D6RQ4G4HP9fKjfqLrPuu-OQezQcqBF=ycXw@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 1 Sep 2011 14:47:26 +0300
+Subject: [PATCH] iommu: omap_iovmm: support non page-aligned buffers in
+	iommu_vmap
+In-Reply-To: <CAK=Wgbb06Z0_8OKFf6MKjYe+SJN16Mh9PA6z_T+cpSpB9EKHFw@mail.gmail.com>
+References: <1314646569-16738-1-git-send-email-ohad@wizery.com>
+	<CAK=Wgbb06Z0_8OKFf6MKjYe+SJN16Mh9PA6z_T+cpSpB9EKHFw@mail.gmail.com>
+Message-ID: <CAK=WgbaOSaKcxmsG2L3G3g+bORvtq4nyzCg9yhA=tTLhsYmh3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/1 Linus Walleij <linus.walleij@linaro.org>
+On Wed, Aug 31, 2011 at 1:52 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 >
-> On Thu, Sep 1, 2011 at 4:22 AM, Barry Song <Baohua.Song@csr.com> wrote:
+> omap_iovmm requires page-aligned buffers, and that sometimes causes
+> omap3isp failures (i.e. whenever the buffer passed from userspace is not
+> page-aligned).
 >
-> > ?-v2:
-> > ?rebase to Linus W's v5 patch(v5 is still in discussion);
-> > ?add complete pinmux list table;
-> > ?add gpio ranges;
-> > ?replace mask magic number by bitops;
-> > ?rename upmx to spmx
->
-> No further comments on this, but now I went in and rewrote
-> pinmuxing a bit so that pin groups are a separate concept from
-> pinmux (which just refers to a group). Please have a look at
-> the U300 driver and see if you can accomodate the changes.
->
-> Sorry for the flow of respins but I'm really liking the stuff that
-> has come out as a result of Stephen's feedback. Having
-> separate groups and functions may look a bit crufty on
-> simple pinmuxes but I'm pretty convinced it'll be a win
-> for the subsystem when moving to more complex drivers.
->
+> Remove this limitation by rounding the address of the first page entry
+> down, and adding the offset back to the device address.
 
-never mind. it is not too difficult for me to rebase the patch. and
-i'm happy to see the great job of you and Stephen.
+Seems like the unmap paths were skipped (need to adjust the sizes in
+the unmap path too).
 
-> > +static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
-> > + ? ? ? {
-> > + ? ? ? ? ? ? ? .name = "lcd_16bits",
-> > + ? ? ? ? ? ? ? .pins = lcd_16bits_pins,
-> > + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(lcd_16bits_pins),
-> > + ? ? ? ? ? ? ? .padmux = &lcd_16bits_padmux,
-> > + ? ? ? }, {
-> > + ? ? ? ? ? ? ? .name = "lcd_18bits",
-> > + ? ? ? ? ? ? ? .pins = lcd_18bits_pins,
-> > + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(lcd_18bits_pins),
-> > + ? ? ? ? ? ? ? .padmux = &lcd_18bits_padmux,
-> > + ? ? ? }, {
->
-> You can probably simplify this and other things with
-> preprocessor macros if you want to, like:
->
-> #define SIRF_FUNC_ENTRY(a) \
-> { .name = "##a##", .pins = ##a##_pins, .num_pins =
-> ARRAY_SIZE(##a##_pins), .padmux = &##a##_padmux }
->
-> Then just:
->
-> static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
-> ? ?SIRF_FUNC_ENTRY(lcd_16bits),
->
->
-> The macro syntax is probably wrong, the preprocessor always
-> craze me out, but you get the idea.
+Laurent, if it looks good to you, I'll just squash it to the original
+patch and repost:
 
-i think it is a good idea.
+diff --git a/drivers/iommu/omap-iovmm.c b/drivers/iommu/omap-iovmm.c
+index d28a256..39bdb92 100644
+--- a/drivers/iommu/omap-iovmm.c
++++ b/drivers/iommu/omap-iovmm.c
+@@ -447,7 +447,7 @@ err_out:
+        for_each_sg(sgt->sgl, sg, i, j) {
+                size_t bytes;
 
->
-> Thanks,
-> Linus Walleij
->
-Thanks
-barry
+-               bytes = sg->length;
++               bytes = sg->length + sg->offset;
+                order = get_order(bytes);
+
+                /* ignore failures.. we're already handling one */
+@@ -476,7 +476,7 @@ static void unmap_iovm_area(struct iommu_domain *domain, str
+                size_t bytes;
+                int order;
+
+-               bytes = sg->length;
++               bytes = sg->length + sg->offset;
+                order = get_order(bytes);
+
+                err = iommu_unmap(domain, start, order);
