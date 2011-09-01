@@ -1,80 +1,64 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 1 Sep 2011 19:25:12 +0200
-Subject: [PATCH 7/7] OMAP3: beagleboard: Remove DT support from regular board
-In-Reply-To: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
-References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314897912-18178-8-git-send-email-b-cousson@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 1 Sep 2011 18:31:49 +0100
+Subject: [PATCH 0/3] RFC: addition to DMA API
+In-Reply-To: <20110901160429.GA15814@n2100.arm.linux.org.uk>
+References: <CACVXFVOT9FZexiZhuJtvyFP8qOPYUKg0JqGarBJgT4R8SN7p5Q@mail.gmail.com>
+	<Pine.LNX.4.44L0.1109011127080.1896-100000@iolanthe.rowland.org>
+	<20110901160429.GA15814@n2100.arm.linux.org.uk>
+Message-ID: <20110901173149.GE2803@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to avoid conflict with the new board-omap3-dt.c file,
-remove the .dt_compat entry from the beagle regular board
-file.
+Hi Russell,
 
-Any DT work for OMAP3 will have to be done on the generic DT
-board file to avoid breaking the legacy board support until
-DT migration is done.
+On Thu, Sep 01, 2011 at 05:04:29PM +0100, Russell King - ARM Linux wrote:
+> DMA coherent memory on ARM is implemented on ARMv5 and below by using
+> 'noncacheable nonbufferable' memory.  There is no weak memory model to
+> worry about, and this memory type is seen as 'strongly ordered' - the
+> CPU stalls until the read or write has completed.  So no problem there.
+> 
+> On ARMv6 and above, the attributes change:
+> 
+> 1. Memory type: [Normal, Device, Strongly ordered]
+>    All mappings of a physical address space are absolutely required to be
+>    of the same memory type, otherwise the result is unpredictable.  There
+>    is no mitigation against this.
+> 
+> 2. For "normal memory", a variety of options are available to adjust the
+>    hints to the cache and memory subsystem - the options here are
+>    [Non-cacheable, write-back write alloc, write-through non-write alloc,
+>     write-back, non-write alloc.]
+> 
+>    Strictly to the ARM ARM, all mappings must, again, have the same
+>    attributes to avoid unpredictable behaviour.  There is a _temporary_
+>    architectural relaxation of this requirement provided certain conditions
+>    are met - which may become permanent.
 
-Based on orginal patch fropm Manju:
-http://www.spinics.net/lists/linux-omap/msg55832.html
+This looks set to appear in revision C of the ARM ARM.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Signed-off-by: G, Manjunath Kondaiah <manjugk@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-omap3beagle.c |   13 -------------
- 1 files changed, 0 insertions(+), 13 deletions(-)
+> It _is_ possible that "unpredictable" means that we may hit cache lines in
+> the [VP]IPT cache via the non-cacheable mapping which have been created
+> by speculative loads via the cacheable mapping - and this is something
+> that has been worrying me for a long time.
 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index a7923ca..2c358a2 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -19,7 +19,6 @@
- #include <linux/err.h>
- #include <linux/clk.h>
- #include <linux/io.h>
--#include <linux/of_platform.h>
- #include <linux/leds.h>
- #include <linux/gpio.h>
- #include <linux/input.h>
-@@ -388,9 +387,7 @@ static int __init omap3_beagle_i2c_init(void)
- 	/* Bus 3 is attached to the DVI port where devices like the pico DLP
- 	 * projector don't work reliably with 400kHz */
- 	omap_register_i2c_bus(3, 100, beagle_i2c_eeprom, ARRAY_SIZE(beagle_i2c_eeprom));
--#ifdef CONFIG_OF
- 	omap_register_i2c_bus(2, 100, NULL, 0);
--#endif /* CONFIG_OF */
- 	return 0;
- }
- 
-@@ -528,10 +525,6 @@ static void __init beagle_opp_init(void)
- 
- static void __init omap3_beagle_init(void)
- {
--#ifdef CONFIG_OF
--	of_platform_prepare(NULL, NULL);
--#endif /* CONFIG_OF */
--
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
- 	omap3_beagle_init_rev();
- 	omap3_beagle_i2c_init();
-@@ -563,11 +556,6 @@ static void __init omap3_beagle_init(void)
- 	beagle_opp_init();
- }
- 
--static const char *omap3_beagle_dt_match[] __initdata = {
--	"ti,omap3-beagle",
--	NULL
--};
--
- MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
- 	/* Maintainer: Syed Mohammed Khasim - http://beagleboard.org */
- 	.boot_params	= 0x80000100,
-@@ -577,5 +565,4 @@ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
- 	.init_irq	= omap3_beagle_init_irq,
- 	.init_machine	= omap3_beagle_init,
- 	.timer		= &omap3_secure_timer,
--	.dt_compat	= omap3_beagle_dt_match,
- MACHINE_END
--- 
-1.7.0.4
+Whilst this can happen, this will only cause problems for reads performed
+by the CPU (as these may hit a line speculatively loaded via the cacheable
+alias). Setting bit 22 in the auxillary control register gets arounds this:
+
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6529/1
+
+Given that I believe our coherent DMA memory is `cacheable, bufferable, do
+not allocate' in terms of AXI attributes, then writes will go straight to
+the write buffer on the PL310.
+
+> So, in summary what I'm saying is that _in theory_ our DMA coherent memory
+> on ARMv6+ should have nothing more than write buffering to contend with,
+> but that doesn't stop this being the first real concrete report proving
+> that what I've been going on about regarding the architectural requirements
+> over the last few years is actually very real and valid.
+
+I don't think what we're seeing in this case is caused by mismatched memory
+attributes, especially as passing `nosmp' on the command-line makes the
+performance issue disappear.
+
+Will
