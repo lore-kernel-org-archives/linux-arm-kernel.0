@@ -1,28 +1,64 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 01 Sep 2011 07:58:15 +0100
-Subject: [PATCH 3/4] mach-ux500: export System-on-Chip information ux500
-	via sysfs
-In-Reply-To: <20110810150346.GE7938@suse.de>
-References: <1312981422-13294-1-git-send-email-lee.jones@linaro.org>
-	<1312981422-13294-3-git-send-email-lee.jones@linaro.org>
-	<20110810150346.GE7938@suse.de>
-Message-ID: <4E5F2D07.2060109@linaro.org>
+From: tixy@yxit.co.uk (Tixy)
+Date: Thu, 01 Sep 2011 08:15:46 +0100
+Subject: [PATCH 01/10] ARM: kprobes: Add config option for selecting
+	the ARM kprobes tests
+In-Reply-To: <alpine.LFD.2.00.1108311836240.20358@xanadu.home>
+References: <1314621249-958-1-git-send-email-tixy@yxit.co.uk>
+	<1314621249-958-2-git-send-email-tixy@yxit.co.uk>
+	<alpine.LFD.2.00.1108291431300.20358@xanadu.home>
+	<1314688610.2371.12.camel@computer2>
+	<alpine.LFD.2.00.1108311836240.20358@xanadu.home>
+Message-ID: <1314861346.20321.40.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/11 16:03, Greg KH wrote:
-> On Wed, Aug 10, 2011 at 02:03:41PM +0100, Lee Jones wrote:
->> Here we make use of the new drivers/base/soc driver to export
->> vital SoC information out to userspace via sysfs. This patch
->> provides a data structure of strings to populate the base
->> nodes found in:
->>
->> /sys/devices/soc/[1|2|3|...]/[family|machine|revision|soc_id].
->>
->> It also adds one more node as requested by ST-Ericsson.
+On Wed, 2011-08-31 at 18:47 -0400, Nicolas Pitre wrote:
+> On Tue, 30 Aug 2011, Tixy wrote:
+[...]
+> > When ARM_KPROBES_TEST_MODULE is configured for a stand-alone module,
+> > rather than built-in, then
+> > 
+> > #ifdef CONFIG_ARM_KPROBES_TEST_MODULE
+> > 
+> > is false.
 > 
-> What is that node, and why was it requested and where is it documented?
+> OK... It seems that, when you have a tristate config symbol FOOBAR, if 
+> CONFIG_FOOBAR=y then the CONFIG_FOOBAR preprocessor symbol is defined.  
+> If you have CONFIG_FOOBAR=m then the CONFIG_FOOBAR_MODULE preprocessor 
+> symbol is defined.
 
-I can answer the first two questions, but where would you like it
-documented? Is the commit message suitable, or would you like another
-Document text file created/appended to?
+That's useful to know.
+
+> In your example above you would end up with 
+> CONFIG_ARM_KPROBES_TEST_MODULE_MODULE being defined.
+> 
+> > I found other examples where people seemed to have gotten around this 
+> > by selecting a second config symbol and copied that. E.g. 
+> > FTRACE_STARTUP_TEST selects FTRACE_SELFTEST which is then used in 
+> > #ifdef statements.
+> > 
+> > Is there a better way? If not, I should explain this anyway in the
+> > changelog.
+> 
+> What I'd suggest is that you have:
+> 
+> config ARM_KPROBES_TEST
+> 	tristate ...
+> 
+> And then you may use this in the code:
+> 
+> #ifdef CONFIG_ARM_KPROBES_TEST_MODULE
+> EXPORT_SYMBOL_GPL(...);
+> #endif
+> 
+> so those symbols are only exported when necessary.
+
+Yep, that works and is a lot cleaner, thanks.
+
+I've also made the extern declarations for these exported symbols
+unconditional in kprobes-test.h. It didn't seem worth trying to #ifdef
+them to only exist when the test code is configured (like I was trying
+to do in "[PATCH 06/10] ARM: kprobes: Add exports for test code").
+
+-- 
+Tixy
