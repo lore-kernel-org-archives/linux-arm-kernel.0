@@ -1,185 +1,57 @@
-From: leoy@marvell.com (Leo Yan)
-Date: Mon,  1 Aug 2011 10:59:07 +0800
-Subject: [PATCH 2/2] ARM: mmp: add audio sram allocator
-In-Reply-To: <1312167547-26740-1-git-send-email-leoy@marvell.com>
-References: <1312167547-26740-1-git-send-email-leoy@marvell.com>
-Message-ID: <1312167547-26740-3-git-send-email-leoy@marvell.com>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 1 Sep 2011 13:10:48 +0800
+Subject: [PATCH] arm: gic: fix gic_set_affinity
+In-Reply-To: <20110831190448.GA29729@n2100.arm.linux.org.uk>
+References: <1314802086-26133-1-git-send-email-tom.leiming@gmail.com>
+	<20110831190448.GA29729@n2100.arm.linux.org.uk>
+Message-ID: <CACVXFVO0pAJv8WkZ6K2N1NysBcdN+9ceErE0xxQFLnYXtorsvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the audio sram allocator with genalloc,
-so that can dynamically allocate the buffer
-to pcm devices as need.
+Hi,
 
-Signed-off-by: Leo Yan <leoy@marvell.com>
----
- arch/arm/Kconfig                            |    1 +
- arch/arm/mach-mmp/Makefile                  |    2 +-
- arch/arm/mach-mmp/audio_sram.c              |   99 +++++++++++++++++++++++++++
- arch/arm/mach-mmp/include/mach/audio_sram.h |   24 +++++++
- 4 files changed, 125 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-mmp/audio_sram.c
- create mode 100644 arch/arm/mach-mmp/include/mach/audio_sram.h
+On Thu, Sep 1, 2011 at 3:04 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Aug 31, 2011 at 10:48:06PM +0800, tom.leiming at gmail.com wrote:
+>> Current gic_set_affinity doesn't support to route irq to all cpu,
+>> so fix it.
+>
+> That is correct - we don't support routing an IRQ to _all_ CPUs because
+> that's silly - by doing so you end up with a galloping hurd problem. ?As
+> soon as such an interrupt is triggered, it will be delivered to all CPUs,
+> and all CPUs will be woken up. ?All CPUs will then enter the kernel, and
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3eacf57..480e1524 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -546,6 +546,7 @@ config ARCH_MMP
- 	select TICK_ONESHOT
- 	select PLAT_PXA
- 	select SPARSE_IRQ
-+	select GENERIC_ALLOCATOR
- 	help
- 	  Support for Marvell's PXA168/PXA910(MMP) and MMP2 processor line.
- 
-diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
-index b0ac942..290182b 100644
---- a/arch/arm/mach-mmp/Makefile
-+++ b/arch/arm/mach-mmp/Makefile
-@@ -7,7 +7,7 @@ obj-y				+= common.o clock.o devices.o time.o
- # SoC support
- obj-$(CONFIG_CPU_PXA168)	+= pxa168.o irq-pxa168.o
- obj-$(CONFIG_CPU_PXA910)	+= pxa910.o irq-pxa168.o
--obj-$(CONFIG_CPU_MMP2)		+= mmp2.o irq-mmp2.o
-+obj-$(CONFIG_CPU_MMP2)		+= mmp2.o irq-mmp2.o audio_sram.o
- 
- # board support
- obj-$(CONFIG_MACH_ASPENITE)	+= aspenite.o
-diff --git a/arch/arm/mach-mmp/audio_sram.c b/arch/arm/mach-mmp/audio_sram.c
-new file mode 100644
-index 0000000..73c7dc5
---- /dev/null
-+++ b/arch/arm/mach-mmp/audio_sram.c
-@@ -0,0 +1,99 @@
-+/*
-+ *  linux/arch/arm/mach-mmp/audio_sram.c
-+ *
-+ *  based on mach-davinci/sram.c - DaVinci simple SRAM allocator
-+ *
-+ *  Copyright (c) 2011 Marvell Semiconductors Inc.
-+ *  All Rights Reserved
-+ *
-+ *  Add for mmp audio sram support - Leo Yan <leoy@marvell.com>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+#include <linux/genalloc.h>
-+
-+#include <mach/audio_sram.h>
-+
-+static phys_addr_t audio_sram_phys;
-+static void __iomem *audio_sram_virt;
-+static u32 audio_sram_size;
-+
-+struct gen_pool *mmp_audio_sram_gpool;
-+EXPORT_SYMBOL_GPL(mmp_audio_sram_gpool);
-+
-+static int __devinit audio_sram_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	int ret = 0;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (res == NULL) {
-+		dev_err(&pdev->dev, "no memory resource defined\n");
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+	audio_sram_phys = (phys_addr_t)res->start;
-+	audio_sram_size = res->end - res->start + 1;
-+	audio_sram_virt = ioremap(audio_sram_phys, audio_sram_size);
-+
-+	if (!audio_sram_size)
-+		return 0;
-+
-+	mmp_audio_sram_gpool =
-+		gen_pool_create(ilog2(AUDIO_SRAM_GRANULARITY), -1);
-+	if (!mmp_audio_sram_gpool) {
-+		dev_err(&pdev->dev, "create pool failed\n");
-+		ret = -ENOMEM;
-+		goto create_pool_err;
-+	}
-+
-+	ret = gen_pool_add_virt(mmp_audio_sram_gpool,
-+				(unsigned long)audio_sram_virt,
-+				audio_sram_phys, audio_sram_size, -1);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "add new chunk failed\n");
-+		ret = -ENOMEM;
-+		goto add_chunk_err;
-+	}
-+
-+	return 0;
-+
-+add_chunk_err:
-+	gen_pool_destroy(mmp_audio_sram_gpool);
-+create_pool_err:
-+	iounmap(audio_sram_virt);
-+out:
-+	return ret;
-+}
-+
-+static int __devexit audio_sram_remove(struct platform_device *pdev)
-+{
-+	gen_pool_destroy(mmp_audio_sram_gpool);
-+	iounmap(audio_sram_virt);
-+	return 0;
-+}
-+
-+static struct platform_driver audio_sram_driver = {
-+	.probe		= audio_sram_probe,
-+	.remove		= audio_sram_remove,
-+	.driver		= {
-+		.name	= "mmp-audio-sram",
-+	},
-+};
-+
-+static int __init audio_sram_init(void)
-+{
-+	return platform_driver_register(&audio_sram_driver);
-+}
-+core_initcall(audio_sram_init);
-+
-+MODULE_LICENSE("GPL");
-diff --git a/arch/arm/mach-mmp/include/mach/audio_sram.h b/arch/arm/mach-mmp/include/mach/audio_sram.h
-new file mode 100644
-index 0000000..27124d5
---- /dev/null
-+++ b/arch/arm/mach-mmp/include/mach/audio_sram.h
-@@ -0,0 +1,24 @@
-+/*
-+ *  linux/arch/arm/mach-mmp/include/mach/audio_sram.h
-+ *
-+ *  Audio SRAM Memory Management
-+ *
-+ *  Copyright (c) 2011 Marvell Semiconductors Inc.
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ *
-+ */
-+
-+#ifndef __ASM_ARCH_AUDIO_SRAM_H
-+#define __ASM_ARCH_AUDIO_SRAM_H
-+
-+#include <linux/genalloc.h>
-+
-+/* ARBITRARY:  SRAM allocations are multiples of this 2^N size */
-+#define AUDIO_SRAM_GRANULARITY	512
-+
-+extern struct gen_pool *mmp_audio_sram_gpool;
-+
-+#endif /* __ASM_ARCH_AUDIO_SRAM_H */
+Yes, the irq will make 'WFI' exit from all CPUs, which will be wake up, but
+the irq is only routed into one of CPUs for irq handling. Looks like WFI is
+stupid designed, :-) Buf for the CPU waken up by irq handled on other
+CPU, it will run wfi and sleep immediately.
+
+> one will win the spinlock race. ?The remainder will spin on the lock while
+> the winner sorts out what to do.
+
+I have added a trace point in the entry of arch_irq_handler_default, and
+observed one irq is only routed into one of CPUs, so only one CPU will
+handle the irq even if gic is set to route an IRQ to _all_ CPUs.
+
+>
+> That is inefficient and needlessly causes other CPUs to wake up. ?The
+> point of the current code is that we route IRQs to exactly one CPU at a
+> time to avoid that problem.
+
+Maybe the current implementation should allow user to route IRQ to all
+CPUs, and no cause to just forbid it, but the default_smp_affinity can be
+set as only routing to one of CPUs.
+
+>
+>> Also remove the unnecessary check for 'cpu' since cpu_online_mask
+>> is already ADDed to produce correct one.
+>
+> Not everywhere - take a look at migrate_one_irq() in arch/arm/kernel/irq.c,
+> where we want to change the current routing but without actually changing
+> the user set affinity.
+>
+
+
+thanks,
 -- 
-1.7.4.1
+Ming Lei
