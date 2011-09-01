@@ -1,43 +1,43 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 31 Aug 2011 20:44:05 -0500
-Subject: [PATCH v2 6/7] ARM: highbank: Add cpu hotplug support
+Date: Wed, 31 Aug 2011 20:44:06 -0500
+Subject: [PATCH v2 7/7] ARM: highbank: add suspend support
 In-Reply-To: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
 References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1314841446-11006-7-git-send-email-robherring2@gmail.com>
+Message-ID: <1314841446-11006-8-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Bogomolni <martin@calxeda.com>
+From: Rob Herring <rob.herring@calxeda.com>
 
-This adds cpu hotplug for highbank. On highbank, a core is always reset and
-boots up the same path as a cold boot.
+Add the platform suspend ops for highbank.
 
-Signed-off-by: Martin Bogomolni <martin@calxeda.com>
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
 Changes in v2:
  - s/a9_base_addr/scu_base_addr/
- 
- arch/arm/mach-highbank/Makefile  |    1 +
- arch/arm/mach-highbank/hotplug.c |   56 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 57 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-highbank/hotplug.c
+ - use sysregs helper functions
+ - add __init to highbank_pm_init
+
+ arch/arm/mach-highbank/Makefile |    1 +
+ arch/arm/mach-highbank/pm.c     |   55 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-highbank/pm.c
 
 diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
-index 311c0e8e..df30b0d 100644
+index df30b0d..daeb3d8 100644
 --- a/arch/arm/mach-highbank/Makefile
 +++ b/arch/arm/mach-highbank/Makefile
-@@ -2,3 +2,4 @@ obj-y					:= clock.o highbank.o system.o
- obj-$(CONFIG_DEBUG_LL)			+= lluart.o
+@@ -3,3 +3,4 @@ obj-$(CONFIG_DEBUG_LL)			+= lluart.o
  obj-$(CONFIG_SMP)			+= platsmp.o
  obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
-+obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
-diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
++obj-$(CONFIG_PM_SLEEP)			+= pm.o
+diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
 new file mode 100644
-index 0000000..977cebb
+index 0000000..33b3beb
 --- /dev/null
-+++ b/arch/arm/mach-highbank/hotplug.c
-@@ -0,0 +1,56 @@
++++ b/arch/arm/mach-highbank/pm.c
+@@ -0,0 +1,55 @@
 +/*
 + * Copyright 2011 Calxeda, Inc.
 + *
@@ -53,46 +53,45 @@ index 0000000..977cebb
 + * You should have received a copy of the GNU General Public License along with
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
 +
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/suspend.h>
++
++#include <asm/proc-fns.h>
 +#include <asm/smp_scu.h>
-+#include <asm/cacheflush.h>
++#include <asm/suspend.h>
 +
 +#include "core.h"
++#include "sysregs.h"
 +
-+extern void secondary_startup(void);
-+
-+int platform_cpu_kill(unsigned int cpu)
++static int highbank_suspend_finish(unsigned long val)
 +{
-+	return 1;
-+}
-+
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ */
-+void platform_cpu_die(unsigned int cpu)
-+{
-+	flush_cache_all();
-+
-+	highbank_set_cpu_jump(cpu, secondary_startup);
-+	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
-+
 +	cpu_do_idle();
-+
-+	/* We should never return from idle */
-+	panic("highbank: cpu %d unexpectedly exit from shutdown\n", cpu);
++	return 0;
 +}
 +
-+int platform_cpu_disable(unsigned int cpu)
++static int highbank_pm_enter(suspend_state_t state)
 +{
-+	/*
-+	 * CPU0 should not be shut down via hotplug.  cpu_idle can WFI
-+	 * or a proper shutdown or hibernate should be used.
-+	 */
-+	return cpu == 0 ? -EPERM : 0;
++	hignbank_set_pwr_suspend();
++	highbank_set_cpu_jump(0, cpu_resume);
++
++	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
++	cpu_suspend(0, highbank_suspend_finish);
++
++	return 0;
 +}
++
++static const struct platform_suspend_ops highbank_pm_ops = {
++	.enter = highbank_pm_enter,
++	.valid = suspend_valid_only_mem,
++};
++
++static int __init highbank_pm_init(void)
++{
++	suspend_set_ops(&highbank_pm_ops);
++	return 0;
++}
++module_init(highbank_pm_init);
 -- 
 1.7.4.1
