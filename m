@@ -1,76 +1,23 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 1 Sep 2011 13:55:14 +0200
-Subject: [PATCH 2/7] OMAP: PM: omap_device: add few quick access functions
-In-Reply-To: <87r5418bkz.fsf@ti.com>
-References: <1314026347-21623-1-git-send-email-b-cousson@ti.com>
-	<1314026347-21623-3-git-send-email-b-cousson@ti.com>
-	<87r5418bkz.fsf@ti.com>
-Message-ID: <4E5F72A2.6000002@ti.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 1 Sep 2011 17:27:28 +0530
+Subject: [PATCH] arm: mach-davinci: use kzalloc()
+In-Reply-To: <1312629976.5589.128.camel@localhost.localdomain>
+References: <1312629976.5589.128.camel@localhost.localdomain>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930257268CA8@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/1/2011 12:23 AM, Hilman, Kevin wrote:
-> Benoit Cousson<b-cousson@ti.com>  writes:
->
->> From: Nishanth Menon<nm@ti.com>
->>
->> Provide a quick set of access functions:
->> a) Convert omap_device to platform_device - This is the flip of
->>     to_omap_device for equivalent usage
->> b) Convert omap_device to device pointer - This is useful for
->>     most devices that need to go through standard linux functions that
->>     take device pointer.
->> c) Convert hwmod to device pointer - This wrapper provides ability for
->>     drivers to convert directly from hwmod name back to device pointer
->>     without having to handle this on a driver by driver basis
->>
->> Signed-off-by: Nishanth Menon<nm@ti.com>
->> [b-cousson at ti.com: Adapt it to the new pdev pointer inside od]
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> ---
->>   arch/arm/plat-omap/include/plat/omap_device.h |   15 +++++++++++++++
->>   1 files changed, 15 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
->> index bdc2804..903f329 100644
->> --- a/arch/arm/plat-omap/include/plat/omap_device.h
->> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
->> @@ -152,6 +152,21 @@ static inline struct omap_device *to_omap_device(struct platform_device *pdev)
->>   	return pdev ? pdev->archdata.od : NULL;
->>   }
->>
->> +/* Convert omap_device to platform device pointer */
->> +#define omap_device_get_pdev(x) ((x)->pdev)
->> +/* Convert omap_device to device pointer */
->> +#define omap_device_get_dev(x) (&omap_device_get_pdev(x)->dev)
->
-> I don't see these used elsewhere, and I don't think they're needed...
+On Sat, Aug 06, 2011 at 16:56:13, Thomas Meyer wrote:
+> From: Thomas Meyer <thomas@m3y3r.de>
+> 
+>  Use kzalloc rather than kmalloc followed by memset with 0
 
-Well, there are used once... just below, and that's all.
+Queuing this for v3.2. While applying, I changed the
+subject to:
 
->> +/* Convert omap_hwmod name to device pointer */
->> +static inline struct device *omap_hwmod_name_get_dev(const char *oh_name)
->> +{
->> +	struct omap_device *od;
->> +	od = omap_hwmod_name_get_odev(oh_name);
->> +	if (IS_ERR_OR_NULL(od))
->> +		return ERR_PTR(od ? PTR_ERR(od) : -ENODEV);
->> +	return omap_device_get_dev(od);
->> +}
->> +
+"ARM: davinci: edma: use kzalloc()"
 
-I will let Nishant comment, but I guess the idea was that an omap_device 
-API should handle omap_device pointer, and then access to pdev or dev is 
-done using these helpers.
-
-Assuming that now omap_device API should preferably use pdev, we can 
-remove one step of indirection and thus get rid of the helpers, since 
-they are not used anywhere else.
-
-> After comments on patch 1 are addressed, the
->
->        pdev = omap_hwmod_name_get_pdev(oh_name)
->        return&pdev->dev;
+to be more consistent with other patch headlines.
 
 Thanks,
-Benoit
+Sekhar
