@@ -1,154 +1,92 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Sep 2011 11:13:03 +0200
-Subject: [PATCH 1/4 v5] drivers: create a pin control subsystem v5
-In-Reply-To: <CACRpkdaWbgiaJvvjDgBWFTpC6P=XcG6fm+L8rnjv9rxDxgs_YQ@mail.gmail.com>
-References: <1314609001-28052-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B3279BD7@HQMAIL01.nvidia.com>
-	<CACRpkdaWbgiaJvvjDgBWFTpC6P=XcG6fm+L8rnjv9rxDxgs_YQ@mail.gmail.com>
-Message-ID: <CACRpkda4PRd_WUPrnEBVADbHnmSOgVB=WCXvVR4dFMektyQ2tQ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 1 Sep 2011 11:31:22 +0200
+Subject: [PATCH 0/4] pin controller subsystem v6
+Message-ID: <1314869482-5445-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Damn gmail punished me when writing the reply, sent by mistake :-(
+From: Linus Walleij <linus.walleij@linaro.org>
 
-And I intended to post v6 first.
+This is the sixth iteration of the controller subsystem, most
+changes are described in the first patch, copied here for reference:
 
-These parts were being typed as I screwed up:
+ChangeLog v5->v6:
 
-On Thu, Sep 1, 2011 at 10:59 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+- Create an abstract pin group concept that can sort pins into
+  named and enumerated groups no matter what the use of these
+  groups may be, one possible usecase is a group of pins being
+  muxed in or so. The intention is however to also use these
+  groups for other pin control activities.
 
-> function and group names shall match what is
-> presented from the pin controller driver.
->
-> You can thing of this as SQL:
->
-> SELECT ctrl_dev_name,
-> TOP 1
-> ?FROM MAPS
-> ?WHERE dev_name = device_name
-> ?AND ctrl_dev_name = ctrl_dev_name
-> ?AND function = function
-> ?AND group = group
+- Make it compulsory for pinmux functions to associate with
+  at least one group, so the abstract pin group concept is used
+  to define the groups of pins affected by a pinmux function.
+  The pinmux driver interface has been altered so as to enforce
+  a function to list applicable groups per function.
 
-I don't know the exact SQL syntax anymore, thing
-is that it selects one matching row only.
+- Provide an optional .group entry in the pinmux machine map
+  so the map can select beteween different available groups
+  to be used with a certain function.
 
->> mmc0 ? ?8-bit A ? ? ? ? mmc0
->> mmc0 ? ?8-bit B ? ? ? ? mmc0
->> mmc0 ? ?8-bit C ? ? ? ? mmc0
->
-> I assume you mean that semantically this shall
-> be a 1..* relation, so that if I say:
->
-> pmx = pinmux_get(&dev, "8-bit");
->
-> Then all pins in the union {A, B, C} shall be
-> allocated and enabled/disabled simultaneously.
->
-> so it'd be like the database equivalent:
+- Consequent changes all over the place so that e.g. debugfs
+  present reasonable information about the world.
 
-What I wanted to illustrate here is that the database
-return multiple matching rows.
+- Drop the per-pin mux (*config) function in the pinmux_ops
+  struct - I was afraid that this would start to be used for
+  things totally unrelated to muxing, we can introduce that to
+  the generic struct pinctrl_ops if needed. I want to keep
+  muxing orthogonal to other pin control subjects and not mix
+  these things up.
 
-Anyway, I'm onto that.
+Linus Walleij (4):
+  drivers: create a pin control subsystem v6
+  pinmux: add a driver for the U300 pinmux
+  amba: request muxing for PrimeCell devices
+  mach-u300: activate pinmux driver, delete old padmux driver
 
-I will need Arnds or similars advice on it so we don't
-grow a lib/mysql into the kernel with this kind of
-schemes and get slammed for overcomplicating
-things when trying to merge the beast.
+ Documentation/ABI/testing/sysfs-class-pinmux |   11 +
+ Documentation/pinctrl.txt                    |  876 ++++++++++++++++++++++++
+ MAINTAINERS                                  |    5 +
+ arch/arm/mach-u300/Kconfig                   |    2 +
+ arch/arm/mach-u300/Makefile                  |    2 +-
+ arch/arm/mach-u300/core.c                    |   38 +-
+ arch/arm/mach-u300/include/mach/syscon.h     |  136 ----
+ arch/arm/mach-u300/mmc.c                     |   16 -
+ arch/arm/mach-u300/padmux.c                  |  367 ----------
+ arch/arm/mach-u300/padmux.h                  |   39 --
+ arch/arm/mach-u300/regulator.c               |   16 +
+ arch/arm/mach-u300/spi.c                     |   20 -
+ drivers/Kconfig                              |    4 +
+ drivers/Makefile                             |    2 +
+ drivers/amba/bus.c                           |   49 ++-
+ drivers/pinctrl/Kconfig                      |   36 +
+ drivers/pinctrl/Makefile                     |    7 +
+ drivers/pinctrl/core.c                       |  599 +++++++++++++++++
+ drivers/pinctrl/core.h                       |   24 +
+ drivers/pinctrl/pinmux-u300.c                |  931 ++++++++++++++++++++++++++
+ drivers/pinctrl/pinmux-u300.h                |  141 ++++
+ drivers/pinctrl/pinmux.c                     |  822 +++++++++++++++++++++++
+ drivers/pinctrl/pinmux.h                     |    4 +
+ include/linux/amba/bus.h                     |    2 +
+ include/linux/pinctrl/machine.h              |   73 ++
+ include/linux/pinctrl/pinctrl.h              |  172 +++++
+ include/linux/pinctrl/pinmux.h               |  124 ++++
+ 27 files changed, 3935 insertions(+), 583 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-class-pinmux
+ create mode 100644 Documentation/pinctrl.txt
+ delete mode 100644 arch/arm/mach-u300/padmux.c
+ delete mode 100644 arch/arm/mach-u300/padmux.h
+ create mode 100644 drivers/pinctrl/Kconfig
+ create mode 100644 drivers/pinctrl/Makefile
+ create mode 100644 drivers/pinctrl/core.c
+ create mode 100644 drivers/pinctrl/core.h
+ create mode 100644 drivers/pinctrl/pinmux-u300.c
+ create mode 100644 drivers/pinctrl/pinmux-u300.h
+ create mode 100644 drivers/pinctrl/pinmux.c
+ create mode 100644 drivers/pinctrl/pinmux.h
+ create mode 100644 include/linux/pinctrl/machine.h
+ create mode 100644 include/linux/pinctrl/pinctrl.h
+ create mode 100644 include/linux/pinctrl/pinmux.h
 
-So I'm still a bit reluctant about this part  :-/
-
-> Then the pinmux_map maps usually one but sometimes
-> more of these {function, position} tuples to the device.
-
-{ function, group } it is.
-
-> And, you also request the currently not implemented
-> extenstion that a mux can match multiple map entries.
->
-> I'll fix.
-
-Or rather, I'll try.
-
->> 2) "Positions" are defined per "function", rather than as a global concept.
->>
->> This leads to positions having meaningless integer names. As such,
->> constructing the mapping table will be error-prone; who could remember
->> that position 0 is a 2-bit bus using a certain set of pins, yet position
->> 1 is an 8-bit bus using a different set of pins? I suppose textual names
->> might help here. However, by replacing the concept of positions with
->> multiple explicit entries in the mapping table (as in my example above),
->> that problem is solved; we name the pins (or pingroups) to which we apply
->> the driver-level function in each entry, thus it's more self-documenting.
->
-> Again I can replace position integers with strings if that is what
-> you want?
-
-Forget this, part of earlier reply.
-
-positions are replaced with groups, which have names.
-
->> Driver-supplied data 4)
->>
->> Table of legal functions per pin/pingroup; each entry containing:
->> * Name of pin or pingroup
->
-> OK I have this now, e.g. inspect the file
-> <debugfs>/pinctrl.0/groups
-
-Should be pingroups, and output was correct in the first letter.
-
->> Board-supplied data 1)
->>
->> Mapping table, each entry containing:
->> * Driver name/pointer
->> * Name of function seen by driver
->> * Pin/pingroup name to configure
->> * Name of driver function to apply to pin/pingroup
-
-This I think is what we have now.
-
->> Note that I assume there may be multiple rows for any combination of the
->> first two fields in this table, and that all will be operated on by a
->> single pinmux_get()/pinmux_enable() call.
-
-We don't have these multiple rows yet. But I'll try
-to implement that.
-
->> Some enhancements in the above list of tables over previous times that I've
->> talked about this:
->>
->> * Created a separate optional table for a list of pingroups, thus not
->> burdening SoCs other than Tegra with the pingroup concept.
-
-Nah I made it compulsory for pinmux drivers to define their
-affected group of pins using an associated abstract pin group.
-Makes more sense to me and makes for code reuse if the
-groups are used for other things.
-
->> * Allow either a pin or pingroup name in the driver's "table of legal
->> functions per pin" and the "mapping table"; core can simply look through
->> the pingroup table if present, then fall back to looking in pin table,
->> when determining what a pin/pingroup name means.
-
-Simplified by mandating to use groups. I hope.
-A pin table would be equivalent to a group anyway,
-just not having its own data structure.
-
->> * I assume that entries in the "table of pins" or "table of pingroups"
->> might have no corresponding entries in " Table of legal functions per
->> pin"; in this case, those pin/pingroup names would only be useful for
->> pinmux_config() to operate on.
-
-I made it compulsory to associate at least one group of
-pins to each function, easier to grasp.
-
->> P.S. I'll be on vacation 9/2-9/17. I'm not sure if I'll have any form of
->> network access during this time or not. You may not see many more pinmux
->> comments from me during that time.
-
-No problem, I have all life to sort this out.
-
-Thanks,
-Linus Walleij
+-- 
+1.7.3.2
