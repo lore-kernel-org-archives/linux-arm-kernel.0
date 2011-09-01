@@ -1,47 +1,66 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 1 Sep 2011 14:33:21 +0530
-Subject: [PATCH 4/6] DMA: PL330: Add device tree support
-In-Reply-To: <4E5E5B73.20603@gmail.com>
-References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-2-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-3-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-4-git-send-email-thomas.abraham@linaro.org>
-	<1314348014-2481-5-git-send-email-thomas.abraham@linaro.org>
-	<4E579C9B.7030807@gmail.com>
-	<CAJuYYwR5GqqKjbMngQqorLuka4XN0jin5s6O66orTtSQg5eKRw@mail.gmail.com>
-	<4E5CE37E.1050104@gmail.com>
-	<CAJuYYwT5HGy9b06AyrLJv5hFCFf_YRA4md9N=m+cwcJNTqRDWg@mail.gmail.com>
-	<4E5E2E36.1070006@gmail.com>
-	<CAJuYYwQ17MPD=hTYUxES5touFfd73W1unbtWfu_XqPR48t3P0w@mail.gmail.com>
-	<4E5E5B73.20603@gmail.com>
-Message-ID: <CAJuYYwS5ish3okCNfseF_LhWkc2CPmAJMqNkDsdBKQxmwhndKg@mail.gmail.com>
+Date: Thu, 01 Sep 2011 14:34:36 +0530
+Subject: [PATCH v2 0/6] Add device tree support for PL330 dma controller driver
+Message-ID: <1314867882-11755-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This patchset adds device tree support for PL330 driver and uses it
+to add device tree support for Samsung platforms, specifically Exynos4.
 
-On 31 August 2011 21:34, Rob Herring <robherring2@gmail.com> wrote:
-> Thomas,
+First patch moves the pl330_filter function from Samsung specific wrappers
+to pl330 dma driver and also adds a check to ensure that the filter function
+proceeds only if it the dma channel being investigated belongs to pl330
+dma controller instance.
 
-[...]
+Second patch adds support to infer the direction of the dma transfer
+using the direction specified with the transfer request instead of
+including this information in the platform data. This simlifies the
+addition of device tree support. Third patch simplifies the platform
+data for Exynos4 pl330 dma controllers. Similar patches simplifying
+the platform data for other Samsung platforms is under development.
 
->
-> As it says in Documentation/devicetree/bindings/arm/primecell.txt, you
-> should have "arm,primecell" and a value for the specific peripheral. It
-> should be in order of most specific to least specific.
->
-> What Linux uses currently from the binding is a bit irrelevant. The
-> binding is supposed to be future proof. An OS could choose to not use
-> the primecell ID at all and only match with compatible string.
+Fourth patch adds device tree support for pl330 dma controller driver.
+A dma channel is represented using a phandle of the dma controller
+node and the channel id within that controller. Client driver request
+a dma channel using the phandle and channel id pair. Correspondingly,
+the pl330 filter function has been modified to lookup a channel based
+on this value.
 
-Thanks for pointing this out. "arm,pl330" has been added as another
-mandatory compatible string for the pl330 device node.
+Fifth patch adds device tree support for Samsung's DMA engine wrappers.
+Client drivers retrive the channel property from their device node and
+pass it to the wrappers. The wrapper functions use the property value
+as the filter function parameter. Sixth patch restricts the usage of
+pl330 device and platform data instances to non-dt platforms.
 
-Regards,
-Thomas.
+This patchset is based on Linux 3.1-rc3 with the following patch sets.
 
->
-> Rob
->
+* To use DMA generic APIs for Samsung DMA - v7 - (15 patches)
+* ARM: Samsung: use dma-pl330 device name for clock (3 patches)
+* ARM: S5P64X0: Add the devname for DMA clock.
+* ARM: SAMSUNG: register the second instance of PL330 DMAC (3 patches)
 
-[...]
+Changes since v1:
+- Removed "arm,pl330-pdma" and "arm,pl330-mdma" compatible values.
+- Removed "arm,primecell-periphid" and "arm,pl330-peri-reqs"
+  property requirements.
+
+Thomas Abraham (6):
+  DMA: PL330: move filter function into driver
+  DMA: PL330: Infer transfer direction from transfer request instead of platform data
+  ARM: EXYNOS4: Modify platform data for pl330 driver
+  DMA: PL330: Add device tree support
+  ARM: SAMSUNG: Add device tree support for pl330 dma engine wrappers
+  ARM: EXYNOS4: Limit usage of pl330 device instance to non-dt build
+
+ .../devicetree/bindings/dma/arm-pl330.txt          |   29 +++
+ arch/arm/mach-exynos4/Kconfig                      |    7 +
+ arch/arm/mach-exynos4/Makefile                     |    3 +-
+ arch/arm/mach-exynos4/dma.c                        |  223 ++++++--------------
+ arch/arm/plat-samsung/dma-ops.c                    |   15 +-
+ arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 +
+ arch/arm/plat-samsung/include/plat/dma-pl330.h     |    3 +-
+ drivers/dma/pl330.c                                |  101 +++++----
+ include/linux/amba/pl330.h                         |   15 +-
+ 9 files changed, 170 insertions(+), 227 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
