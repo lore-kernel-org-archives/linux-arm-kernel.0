@@ -1,32 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 01 Sep 2011 11:34:17 +0100
-Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
-In-Reply-To: <201108311855.27711.marc.dietrich@ap.physik.uni-giessen.de>
-References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>	<1314804471.2344.79.camel@deneb.redhat.com>	<4E5E5D80.6080409@arm.com>
-	<201108311855.27711.marc.dietrich@ap.physik.uni-giessen.de>
-Message-ID: <4E5F5FA9.3010305@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Sep 2011 12:56:05 +0200
+Subject: [PATCH V2 0/6] spi/spi-pl022 fixes
+In-Reply-To: <4E5F58BB.4020205@st.com>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+	<4E5F58BB.4020205@st.com>
+Message-ID: <CACRpkdYeq9in+U_tyvb=yVuX2t5TnkUSsO+BozUGVJwZVh+4Ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 31/08/11 17:55, Marc Dietrich wrote:
-> Am Mittwoch 31 August 2011, 18:12:48 schrieb Marc Zyngier:
->> [...]
->> Oddly enough, this patch doesn't do anything on my Tegra setup. In both
->> cases, I get around 17MB/s from a crap SD card plugged in a USB reader.
+On Thu, Sep 1, 2011 at 12:04 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
+> On 8/10/2011 2:20 PM, Viresh KUMAR wrote:
 >>
->> This leads me to suspect that this issue is very much OMAP4 specific.
->> Can anyone verify this theory on other some A9 platforms?
-> 
-> That's odd. On my Tegra2 (on ac100) it boosts the transfer rate from 7 to 
-> 17 MB/s. 
+>> This patchset mainly covers following fixes:
+>> - formatting related issues
+>> - Passing GFP_ATOMIC for sg allocation from tasklet
+>> - Fixing calculate_effective_freq() routine
+>> - Allocate/free DMA channels as and when required.
+>>
+>
+> Grant,
+>
+> Did you already pushed this patchset?
+> There are few concerns on PATCH 6/6 and i am not sure if there are any decisions
+> on it.
+> @Linus: What do you say?
 
-I'm using a Harmony board. Could you share your kernel version, .config
-and dmesg?
+I agree. Acked-by: Linus Walleij <linus.walleij@linaro.org> for
+all except 6/6, it's probably just as possible to keep the channel handle
+taken in the driver if we modify the affected DMA driver instead.
+This would be better for performance I think.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Linus Walleij
