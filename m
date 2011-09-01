@@ -1,92 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Sep 2011 13:30:51 +0200
-Subject: [PATCH v3 10/13] of: add a generic pinmux helper
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B3279BEB@HQMAIL01.nvidia.com>
-References: <1314315824-9687-1-git-send-email-swarren@nvidia.com>
-	<1314315824-9687-11-git-send-email-swarren@nvidia.com>
-	<CACRpkdaTiWEtgjVOhUKeXhpiESvrWyz97p5j_PHe3MvEM4UaCw@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B3279BEB@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdaEQaM31SkuSEOzkA8neyF21CcDOc1yQQc3NqOXVSmB=g@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 1 Sep 2011 19:35:47 +0800
+Subject: [PATCH v2] pinmux: add a driver for the CSR SiRFprimaII pinmux
+In-Reply-To: <CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
+References: <1314843744-2910-1-git-send-email-Baohua.Song@csr.com>
+	<CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
+Message-ID: <CAGsJ_4yeudp+5J-D6RQ4G4HP9fKjfqLrPuu-OQezQcqBF=ycXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 11:46 PM, Stephen Warren <swarren@nvidia.com> wrote:
-
->> > +EXPORT_SYMBOL_GPL(of_pinmux_parse);
->>
->> Renamed of_pinctrl_parse I'm happier with it.
+2011/9/1 Linus Walleij <linus.walleij@linaro.org>
 >
-> Well, it's not just that; the struct contains the function field to
-> select for each pingroup, so it's not just pinctrl either.
-
-OK as of my thinking in the v6 pin control patch set groups
-are an abstract concept that is part of pin control and pin
-definitions (does not need to be used for muxing, could be
-anything you want to do with pins) so that sorts it out I guess?
-
-So in line with that terminology I think this should be
-named pinctrl.
-
->> The current pinctrl patch set would probably want an unsigned
->> "position" attribute too. (If we should build on that.)
+> On Thu, Sep 1, 2011 at 4:22 AM, Barry Song <Baohua.Song@csr.com> wrote:
 >
-> This does beg the question I asked previously:
+> > ?-v2:
+> > ?rebase to Linus W's v5 patch(v5 is still in discussion);
+> > ?add complete pinmux list table;
+> > ?add gpio ranges;
+> > ?replace mask magic number by bitops;
+> > ?rename upmx to spmx
 >
-> The intent of this patch was to provide a way for devicetree to set the
-> complete initial state of the pinmux, in a SoC-specific fashion, without
-> interaction with the pinmux API.
+> No further comments on this, but now I went in and rewrote
+> pinmuxing a bit so that pin groups are a separate concept from
+> pinmux (which just refers to a group). Please have a look at
+> the U300 driver and see if you can accomodate the changes.
 >
-> However, I'm guessing you see the pinmux driver as not touching HW at
-> boot at all, and never programming anything except in response to a
-> driver calling pinmux_get()/pinmux_enable()?
+> Sorry for the flow of respins but I'm really liking the stuff that
+> has come out as a result of Stephen's feedback. Having
+> separate groups and functions may look a bit crufty on
+> simple pinmuxes but I'm pretty convinced it'll be a win
+> for the subsystem when moving to more complex drivers.
+>
 
-Since the pin control driver is (supposedly) the only driver that knows
-about the register range dealing with muxing, all kind of fiddling
-with these registers that are *necessary* on boot (e.g. to get the
-thing up in a known state) need to be in the pincontrol driver.
+never mind. it is not too difficult for me to rebase the patch. and
+i'm happy to see the great job of you and Stephen.
 
-So it may touch hardware on boot, i.e. write default values,
-even though one may argue that the boot loader should have
-taken care about such things, it's now always the case in
-practice.
+> > +static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
+> > + ? ? ? {
+> > + ? ? ? ? ? ? ? .name = "lcd_16bits",
+> > + ? ? ? ? ? ? ? .pins = lcd_16bits_pins,
+> > + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(lcd_16bits_pins),
+> > + ? ? ? ? ? ? ? .padmux = &lcd_16bits_padmux,
+> > + ? ? ? }, {
+> > + ? ? ? ? ? ? ? .name = "lcd_18bits",
+> > + ? ? ? ? ? ? ? .pins = lcd_18bits_pins,
+> > + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(lcd_18bits_pins),
+> > + ? ? ? ? ? ? ? .padmux = &lcd_18bits_padmux,
+> > + ? ? ? }, {
+>
+> You can probably simplify this and other things with
+> preprocessor macros if you want to, like:
+>
+> #define SIRF_FUNC_ENTRY(a) \
+> { .name = "##a##", .pins = ##a##_pins, .num_pins =
+> ARRAY_SIZE(##a##_pins), .padmux = &##a##_padmux }
+>
+> Then just:
+>
+> static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
+> ? ?SIRF_FUNC_ENTRY(lcd_16bits),
+>
+>
+> The macro syntax is probably wrong, the preprocessor always
+> craze me out, but you get the idea.
 
-> In the former case, this code and related bindings wouldn't be influenced
-> by the pinmux API at all (and indeed arguably never should be, since DT
-> is supposed to be oriented purely at HW, and not influenced by driver
-> design). This approach might make the pinmux API mostly relevant only
-> for drivers that actively change between configurations at run-time, and
-> not for drivers that don't need dynamic muxing.
+i think it is a good idea.
 
-Platforms that do not need dynamic muxing should be using it
-if they need to configure default states of the pins at boot I think.
-
-> However, in the latter case, this code should be part of the pinmux core,
-> and my patches to Tegra's pinmux driver dropped. It'd be difficult to
-> define a pinmux binding that wasn't influenced by the pinmux API's needs
-> in this case.
-
-Well that depends on what you want to do.
-
-The patch subject seems to suggest that all SoCs should use this,
-not just the Tegra driver. If it had the subject "of: add a tegra
-pinmux helper" and functions named of_tegra_pinmux_parse() and
-so on I wouldn't have any objections whatsoever.
-
-If however you want to create a DT binding that should be used by
-anyone (as indicated by the subject) it must use abstract concepts of
-some kind and then I have opinions on how to name things and
-some idea that I'd like them to correspond to what the pin control
-subsystem will call things.
-
-For example not call things dealing with biasing as part of
-something called "pinmux", since in the pin controller
-subsystem I'm envisioning I'm striving to separation of
-concerns to the point where biasing and muxing are
-completely orthogonal concepts, though they might be
-using the same abstract concept of pin groups...
-
-I don't know if I'm getting across properly, I'm trying
-my best.
-
-Thanks,
-Linus Walleij
+>
+> Thanks,
+> Linus Walleij
+>
+Thanks
+barry
