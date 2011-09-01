@@ -1,103 +1,28 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Thu, 1 Sep 2011 23:56:16 +0800
-Subject: [PATCH 0/3] RFC: addition to DMA API
-In-Reply-To: <Pine.LNX.4.44L0.1109011113210.1896-100000@iolanthe.rowland.org>
-References: <CACVXFVOYaxGDZrwkHYc+h=tFhpYp+g95KZrDjg+bPH_N-9BT_g@mail.gmail.com>
-	<Pine.LNX.4.44L0.1109011113210.1896-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVOSCS-J8iXcRpCN9TD41pWqcJOiPahtGjBmPpXBLozZyA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 1 Sep 2011 18:00:55 +0200
+Subject: [PATCH 1/1] OMAP: omap_device: only override _noirq methods,
+	not normal suspend/resume
+In-Reply-To: <1314229437-31836-2-git-send-email-khilman@ti.com>
+References: <1314229437-31836-1-git-send-email-khilman@ti.com>
+	<1314229437-31836-2-git-send-email-khilman@ti.com>
+Message-ID: <201109011800.55516.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2011 at 11:22 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 1 Sep 2011, Ming Lei wrote:
->
->> I agree all about above, but what I described is from another view.
->> I post out the example before explaining my idea further:
->>
->>
->> ? ? ? CPU ? ? ? ? ? ? ? ? ? ? device
->> ? ? ? A=1;
->> ? ? ? wmb
->> ? ? ? B=2;
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? read B
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? read A
->>
->> one wmb is used to order 'A=1' and 'B=2', which will make the two write
->> operations reach to physical memory as the order: 'A=1' first, 'B=2' second.
->> Then the device can observe the two write events as the order above,
->> so if device has seen 'B==2', then device will surely see 'A==1'.
->>
->> Suppose writing to A is operation to update dma descriptor, the above example
->> can make device always see a atomic update of descriptor, can't it?
->
-> Suppose A and B are _both_ part of the dma descriptor. ?The device
-> might see A==1 and B==0, if the memory accesses occur like this:
->
-> ? ? ? ?CPU ? ? ? ? ? ? device
-> ? ? ? ?--- ? ? ? ? ? ? ------
-> ? ? ? ?A = 1;
-> ? ? ? ?wmb();
-> ? ? ? ? ? ? ? ? ? ? ? ?read B
-> ? ? ? ? ? ? ? ? ? ? ? ?read A
-> ? ? ? ?B = 2;
->
-> When this happens, the device will observe a non-atomic update of the
-> descriptor. ?There's no way to prevent this.
+On Thursday 25 August 2011, Kevin Hilman wrote:
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -622,7 +622,8 @@ static struct dev_pm_domain omap_device_pm_domain = {
+>                 SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
+>                                    _od_runtime_idle)
+>                 USE_PLATFORM_PM_SLEEP_OPS
+> -               SET_SYSTEM_SLEEP_PM_OPS(_od_suspend_noirq, _od_resume_noirq)
+> +               .suspend_noirq = _od_suspend_noirq,
+> +               .resume_noirq = _od_resume_noirq,
+>         }
+>  };
 
-If device doesn't find that B is 2, it will not fetch descriptor of A,
-and will observe
-a atomic update, which is just EHCI does for many cases(such as 4.10.2).
+This breaks if CONFIG_SUSPEND is not set and the _od_suspend_noirq/_od_resume_noirq
+functions are not defined.
 
->
->> My idea is that the memory access patterns are to be considered for
->> writer of device driver. For example, many memory access patterns on
->> EHCI hardware are described in detail. ?Of course, device driver should
->> make full use of the background info, below is a example from ehci driver:
->>
->> qh_link_async():
->>
->> ? ? ? /*prepare qh descriptor*/
->> ? ? ? qh->qh_next = head->qh_next;
->> ? ? ? qh->hw->hw_next = head->hw->hw_next;
->> ? ? ? wmb ();
->>
->> ? ? ? /*link the qh descriptor into hardware queue*/
->> ? ? ? head->qh_next.qh = qh;
->> ? ? ? head->hw->hw_next = dma;
->>
->> so once EHCI fetches a qh with the address of 'dma', it will always see
->> consistent content of qh descriptor, which could not be updated partially.
->
-> Yes, of course. ?That's what memory barriers are intended for, to make
-> sure that writes occur in the correct order. ?Without the wmb(), the
-> CPU might decide to write out the value of head->hw->hw_next before
-> writing out the value of qh->hw->hw_next. ?Then the device might see an
-> inconsistent set of values.
->
-> None of this has anything to do with the write flushes you want to add.
->
->> >> 2, most of such cases can be handled correctly by mb/wmb/rmb barriers.
->> >
->> > No, they can't. ?See the third point above.
->>
->> The example above has demoed that barriers can do it, hasn't it?
->
-> The memory barrier in your qh_link_async() example can make sure that
-> the device always sees consistent data. ?It doesn't guarantee that the
-> write to head->hw->hw_next will be flushed to memory in a reasonably
-> short time, which is the problem you are trying to solve.
-
-Yes, up to now, it is the only case in which the flush can address to,
-and in which kind of cases device will poll DMA coherent memory contiguously,
-I am not sure if there are other devices except for EHCI(maybe have uhci/ohci).
-If there are many such kind of devices, the flush operation introduced will
-make sense.
-
-As far as I know, for most of devices, dma operation of bus master is triggered
-by writing into mmio register instead of writing into coherent memory, and the
-flush is not required in this case surely.
-
-
-thanks,
---
-Ming Lei
+	Arnd
