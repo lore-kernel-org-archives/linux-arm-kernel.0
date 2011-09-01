@@ -1,31 +1,28 @@
-From: tony.lin@freescale.com (Tony Lin)
-Date: Thu, 1 Sep 2011 13:51:15 +0800
-Subject: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting clock from
-	100ms to 1ms
-Message-ID: <1314856275-12131-1-git-send-email-tony.lin@freescale.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 1 Sep 2011 07:55:22 +0200
+Subject: [PATCH 1/1] mmc: sdhci-esdhc: Change delay after setting clock
+	from 100ms to 1ms
+In-Reply-To: <1314856275-12131-1-git-send-email-tony.lin@freescale.com>
+References: <1314856275-12131-1-git-send-email-tony.lin@freescale.com>
+Message-ID: <20110901055522.GB22652@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1ms is enough for hardware to change the clock to stable.
-100ms is too long.
+On Thu, Sep 01, 2011 at 01:51:15PM +0800, Tony Lin wrote:
+> 1ms is enough for hardware to change the clock to stable.
+> 100ms is too long.
 
-Signed-off-by: Tony Lin <tony.lin@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+How do you know that? Can you be sure for PowerPC as well? Have you researched
+why the original author of the code has chosen that value? If so, please update
+your commit message with such infos.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-index c3b08f1..b97b2f5 100644
---- a/drivers/mmc/host/sdhci-esdhc.h
-+++ b/drivers/mmc/host/sdhci-esdhc.h
-@@ -73,7 +73,7 @@ static inline void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
- 		| (div << ESDHC_DIVIDER_SHIFT)
- 		| (pre_div << ESDHC_PREDIV_SHIFT));
- 	sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
--	mdelay(100);
-+	mdelay(1);
- out:
- 	host->clock = clock;
- }
 -- 
-1.7.0.4
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110901/5ae74122/attachment.sig>
