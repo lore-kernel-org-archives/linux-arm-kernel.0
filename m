@@ -1,98 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 01 Sep 2011 16:39:06 -0500
-Subject: [PATCH v2 7/7] ARM: highbank: add suspend support
-In-Reply-To: <20110901122239.GA5147@S2100-06.ap.freescale.net>
-References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
-	<1314841446-11006-8-git-send-email-robherring2@gmail.com>
-	<20110901122239.GA5147@S2100-06.ap.freescale.net>
-Message-ID: <4E5FFB7A.2020808@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Sep 2011 23:51:05 +0200
+Subject: [PATCH] mach-ux500: unlock I&D l2x0 caches before init
+In-Reply-To: <4E5F94C6.7020609@gmail.com>
+References: <1314870093-5758-1-git-send-email-linus.walleij@stericsson.com>
+	<4E5F94C6.7020609@gmail.com>
+Message-ID: <CAKnu2Mrvf_CuTp0M2xn4jk_Q=cFwU+5_hMRUD4aX9tMRmPq=Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+2011/9/1 Rob Herring <robherring2@gmail.com>:
+> [Me]
+>> Apparently U8500 U-Boot versions may leave the l2x0 locked down
+>> before executing the kernel. Make sure we unlock it before we
+>> initialize the l2x0. This fixes a performance problem reported
+>> by Jan Rinze.
+>
+> Just when you think a bootloader wouldn't muck with something like this...
+>
+> I'll ask the obvious question: As this is u-boot, can't this be fixed in
+> u-boot?
 
-On 09/01/2011 07:22 AM, Shawn Guo wrote:
-> On Wed, Aug 31, 2011 at 08:44:06PM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> Add the platform suspend ops for highbank.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
->> Changes in v2:
->>  - s/a9_base_addr/scu_base_addr/
->>  - use sysregs helper functions
->>  - add __init to highbank_pm_init
->>
->>  arch/arm/mach-highbank/Makefile |    1 +
->>  arch/arm/mach-highbank/pm.c     |   55 +++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 56 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm/mach-highbank/pm.c
->>
->> diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
->> index df30b0d..daeb3d8 100644
->> --- a/arch/arm/mach-highbank/Makefile
->> +++ b/arch/arm/mach-highbank/Makefile
->> @@ -3,3 +3,4 @@ obj-$(CONFIG_DEBUG_LL)			+= lluart.o
->>  obj-$(CONFIG_SMP)			+= platsmp.o
->>  obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
->>  obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
->> +obj-$(CONFIG_PM_SLEEP)			+= pm.o
->> diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
->> new file mode 100644
->> index 0000000..33b3beb
->> --- /dev/null
->> +++ b/arch/arm/mach-highbank/pm.c
->> @@ -0,0 +1,55 @@
->> +/*
->> + * Copyright 2011 Calxeda, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/init.h>
->> +#include <linux/io.h>
->> +#include <linux/suspend.h>
->> +
->> +#include <asm/proc-fns.h>
->> +#include <asm/smp_scu.h>
->> +#include <asm/suspend.h>
->> +
->> +#include "core.h"
->> +#include "sysregs.h"
->> +
->> +static int highbank_suspend_finish(unsigned long val)
->> +{
->> +	cpu_do_idle();
->> +	return 0;
->> +}
->> +
->> +static int highbank_pm_enter(suspend_state_t state)
->> +{
->> +	hignbank_set_pwr_suspend();
->> +	highbank_set_cpu_jump(0, cpu_resume);
->> +
->> +	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
->> +	cpu_suspend(0, highbank_suspend_finish);
->> +
-> Rob,
-> 
-> Just out of curiosity, how can you resume back without taking care of
-> GIC, L2 and SCU which will lose power during suspend?
-> 
+As in so many other countless examples found on the ARM
+mailing list, this is sadly yet another case where there are
+deployed U-boot images all over the planet doing this, and
+people don't like to change them.
 
-They are not powergated yet, so it's really just wfi ATM. The L2 and SCU
-will be re-initialized by boot code. The GIC will need some save and
-restore.
+>> + ? ? /*
+>> + ? ? ?* Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
+>> + ? ? ?* apparently locks both caches before jumping to the kernel.
+>> + ? ? ?*/
+>> + ? ? if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_D) & 0xFF)
+>> + ? ? ? ? ? ? writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D);
+>> +
+>> + ? ? if (readl_relaxed(l2x0_base + L2X0_LOCKDOWN_WAY_I) & 0xFF)
+>> + ? ? ? ? ? ? writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I);
+>
+> Do you really need to read the register first?
+>
+> Can't this just be done unconditionally in l2x0_init for everyone. I
+> doubt anyone wants to lock down ways. You would need to adjust for
+> 16-way support.
 
-Rob
+Good question.
+
+Catalin, how do you feel about disabling D&I locks in l2x0_init()?
+
+Yours,
+Linus Walleij
