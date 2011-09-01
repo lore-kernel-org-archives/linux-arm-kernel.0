@@ -1,662 +1,1321 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 31 Aug 2011 20:44:02 -0500
-Subject: [PATCH v2 3/7] ARM: add Highbank core platform support
-In-Reply-To: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
-References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1314841446-11006-4-git-send-email-robherring2@gmail.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Wed, 31 Aug 2011 19:22:24 -0700
+Subject: [PATCH v2] pinmux: add a driver for the CSR SiRFprimaII pinmux
+Message-ID: <1314843744-2910-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+From: Rongjun Ying <rongjun.ying@csr.com>
 
-This adds basic support for the Calxeda Highbank platform.
-
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
-Changes in v2:
- - s/a9_base_addr/scu_base_addr/
- - Move DEBUG_LL io mapping to lluart.c
- - Convert direct sysregs accesses to inline helper functions
- - drop gpio interrupt mapping for now
- - Remove IO_SPACE_LIMIT and fix warnings from inb, outb, etc. due parameter
-   being unused in __io
- - sort Kconfig select entries
- - Add WARN_ON for ioremap failures
- - drop unneeded include from entry-macro.S
- - remove #ifdef around l2x0_of_init
- - Add "/* empty */" to empty headers
- 
- arch/arm/Kconfig                                  |   16 +++
- arch/arm/Makefile                                 |    1 +
- arch/arm/mach-highbank/Makefile                   |    2 +
- arch/arm/mach-highbank/Makefile.boot              |    1 +
- arch/arm/mach-highbank/clock.c                    |   62 +++++++++
- arch/arm/mach-highbank/core.h                     |    9 ++
- arch/arm/mach-highbank/highbank.c                 |  150 +++++++++++++++++++++
- arch/arm/mach-highbank/include/mach/debug-macro.S |   19 +++
- arch/arm/mach-highbank/include/mach/entry-macro.S |    7 +
- arch/arm/mach-highbank/include/mach/gpio.h        |    1 +
- arch/arm/mach-highbank/include/mach/io.h          |    7 +
- arch/arm/mach-highbank/include/mach/irqs.h        |    6 +
- arch/arm/mach-highbank/include/mach/memory.h      |    1 +
- arch/arm/mach-highbank/include/mach/system.h      |   26 ++++
- arch/arm/mach-highbank/include/mach/timex.h       |    6 +
- arch/arm/mach-highbank/include/mach/uncompress.h  |    9 ++
- arch/arm/mach-highbank/include/mach/vmalloc.h     |    6 +
- arch/arm/mach-highbank/lluart.c                   |   34 +++++
- arch/arm/mach-highbank/sysregs.h                  |   52 +++++++
- arch/arm/mach-highbank/system.c                   |   33 +++++
- arch/arm/mm/Kconfig                               |    2 +-
- 21 files changed, 449 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/mach-highbank/Makefile
- create mode 100644 arch/arm/mach-highbank/Makefile.boot
- create mode 100644 arch/arm/mach-highbank/clock.c
- create mode 100644 arch/arm/mach-highbank/core.h
- create mode 100644 arch/arm/mach-highbank/highbank.c
- create mode 100644 arch/arm/mach-highbank/include/mach/debug-macro.S
- create mode 100644 arch/arm/mach-highbank/include/mach/entry-macro.S
- create mode 100644 arch/arm/mach-highbank/include/mach/gpio.h
- create mode 100644 arch/arm/mach-highbank/include/mach/io.h
- create mode 100644 arch/arm/mach-highbank/include/mach/irqs.h
- create mode 100644 arch/arm/mach-highbank/include/mach/memory.h
- create mode 100644 arch/arm/mach-highbank/include/mach/system.h
- create mode 100644 arch/arm/mach-highbank/include/mach/timex.h
- create mode 100644 arch/arm/mach-highbank/include/mach/uncompress.h
- create mode 100644 arch/arm/mach-highbank/include/mach/vmalloc.h
- create mode 100644 arch/arm/mach-highbank/lluart.c
- create mode 100644 arch/arm/mach-highbank/sysregs.h
- create mode 100644 arch/arm/mach-highbank/system.c
+ -v2:
+ rebase to Linus W's v5 patch(v5 is still in discussion);
+ add complete pinmux list table;
+ add gpio ranges;
+ replace mask magic number by bitops;
+ rename upmx to spmx
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 63cbd86..9019a56 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -314,6 +314,22 @@ config ARCH_BCMRING
+ drivers/pinctrl/Kconfig       |    7 +
+ drivers/pinctrl/Makefile      |    1 +
+ drivers/pinctrl/pinmux-sirf.c | 1255 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 1263 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/pinctrl/pinmux-sirf.c
+
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index fdeca2f..023fcba 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -26,6 +26,13 @@ config DEBUG_PINCTRL
  	help
- 	  Support for Broadcom's BCMRing platform.
+ 	  Say Y here to add some extra checks and diagnostics to PINCTRL calls.
  
-+config ARCH_HIGHBANK
-+	bool "Calxeda Highbank-based"
-+	select ARCH_WANT_OPTIONAL_GPIOLIB
-+	select ARM_AMBA
-+	select ARM_GIC
-+	select ARM_PATCH_PHYS_VIRT
-+	select ARM_TIMER_SP804
-+	select AUTO_ZRELADDR
-+	select CLKDEV_LOOKUP
-+	select CPU_V7
-+	select GENERIC_CLOCKEVENTS
-+	select HAVE_ARM_SCU
-+	select USE_OF
++config PINMUX_SIRF
++	bool "CSR SiRFprimaII pinmux driver"
++	depends on ARCH_PRIMA2
++	select PINMUX
 +	help
-+	  Support for the Calxeda Highbank SoC based boards.
++	  Say Y here to enable the SiRFprimaII pinmux driver
 +
- config ARCH_CLPS711X
- 	bool "Cirrus Logic CLPS711x/EP721x-based"
- 	select CPU_ARM720T
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 5665c2a..98c3c22 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -144,6 +144,7 @@ machine-$(CONFIG_ARCH_EBSA110)		:= ebsa110
- machine-$(CONFIG_ARCH_EP93XX)		:= ep93xx
- machine-$(CONFIG_ARCH_GEMINI)		:= gemini
- machine-$(CONFIG_ARCH_H720X)		:= h720x
-+machine-$(CONFIG_ARCH_HIGHBANK)		:= highbank
- machine-$(CONFIG_ARCH_INTEGRATOR)	:= integrator
- machine-$(CONFIG_ARCH_IOP13XX)		:= iop13xx
- machine-$(CONFIG_ARCH_IOP32X)		:= iop32x
-diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
+ config PINMUX_U300
+ 	bool "U300 pinmux driver"
+ 	depends on ARCH_U300
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index 63d4241..bdc548a 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -4,4 +4,5 @@ ccflags-$(CONFIG_DEBUG_PINMUX)	+= -DDEBUG
+ 
+ obj-$(CONFIG_PINCTRL)		+= core.o
+ obj-$(CONFIG_PINMUX)		+= pinmux.o
++obj-$(CONFIG_PINMUX_SIRF)	+= pinmux-sirf.o
+ obj-$(CONFIG_PINMUX_U300)	+= pinmux-u300.o
+diff --git a/drivers/pinctrl/pinmux-sirf.c b/drivers/pinctrl/pinmux-sirf.c
 new file mode 100644
-index 0000000..11d4010
+index 0000000..ce1f082
 --- /dev/null
-+++ b/arch/arm/mach-highbank/Makefile
-@@ -0,0 +1,2 @@
-+obj-y					:= clock.o highbank.o system.o
-+obj-$(CONFIG_DEBUG_LL)			+= lluart.o
-diff --git a/arch/arm/mach-highbank/Makefile.boot b/arch/arm/mach-highbank/Makefile.boot
-new file mode 100644
-index 0000000..dae9661
---- /dev/null
-+++ b/arch/arm/mach-highbank/Makefile.boot
-@@ -0,0 +1 @@
-+zreladdr-y	:= 0x00008000
-diff --git a/arch/arm/mach-highbank/clock.c b/arch/arm/mach-highbank/clock.c
-new file mode 100644
-index 0000000..c25a2ae
---- /dev/null
-+++ b/arch/arm/mach-highbank/clock.c
-@@ -0,0 +1,62 @@
++++ b/drivers/pinctrl/pinmux-sirf.c
+@@ -0,0 +1,1255 @@
 +/*
-+ * Copyright 2011 Calxeda, Inc.
++ * pinmux driver for CSR SiRFprimaII
 + *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
++ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
 + *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+
-+struct clk {
-+	unsigned long rate;
-+};
-+
-+int clk_enable(struct clk *clk)
-+{
-+	return 0;
-+}
-+
-+void clk_disable(struct clk *clk)
-+{}
-+
-+unsigned long clk_get_rate(struct clk *clk)
-+{
-+	return clk->rate;
-+}
-+
-+long clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	return clk->rate;
-+}
-+
-+int clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	return 0;
-+}
-+
-+static struct clk eclk = { .rate = 200000000 };
-+static struct clk pclk = { .rate = 150000000 };
-+
-+static struct clk_lookup lookups[] = {
-+	{ .clk = &pclk, .con_id = "apb_pclk", },
-+	{ .clk = &pclk, .dev_id = "sp804", },
-+	{ .clk = &eclk, .dev_id = "ffe0e000.sdhci", },
-+	{ .clk = &pclk, .dev_id = "fff36000.serial", },
-+};
-+
-+void __init highbank_clocks_init(void)
-+{
-+	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+}
-diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
-new file mode 100644
-index 0000000..9df3fc7
---- /dev/null
-+++ b/arch/arm/mach-highbank/core.h
-@@ -0,0 +1,9 @@
-+extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
-+extern void highbank_clocks_init(void);
-+extern void __iomem *scu_base_addr;
-+#ifdef CONFIG_DEBUG_LL
-+extern void highbank_lluart_map_io(void);
-+#else
-+static inline void highbank_lluart_map_io(void) {}
-+#endif
-+
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-new file mode 100644
-index 0000000..fb257e0
---- /dev/null
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -0,0 +1,150 @@
-+/*
-+ * Copyright 2010-2011 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/unified.h>
-+#include <asm/smp_scu.h>
-+#include <asm/hardware/arm_timer.h>
-+#include <asm/hardware/timer-sp.h>
-+#include <asm/hardware/gic.h>
-+#include <asm/hardware/cache-l2x0.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/time.h>
-+#include <mach/irqs.h>
-+
-+#include "core.h"
-+#include "sysregs.h"
-+
-+void __iomem *sregs_base;
-+
-+#define HB_SCU_VIRT_BASE	0xfee00000
-+void __iomem *scu_base_addr = ((void __iomem *)(HB_SCU_VIRT_BASE));
-+
-+static struct map_desc scu_io_desc __initdata = {
-+	.virtual	= HB_SCU_VIRT_BASE,
-+	.pfn		= 0, /* run-time */
-+	.length		= SZ_4K,
-+	.type		= MT_DEVICE,
-+};
-+
-+static void __init highbank_scu_map_io(void)
-+{
-+	unsigned long base;
-+
-+	/* Get SCU base */
-+	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
-+
-+	scu_io_desc.pfn = __phys_to_pfn(base);
-+	iotable_init(&scu_io_desc, 1);
-+}
-+
-+static void __init highbank_map_io(void)
-+{
-+	highbank_scu_map_io();
-+	highbank_lluart_map_io();
-+}
-+
-+#define HB_JUMP_TABLE_PHYS(cpu)		(0x40 + (0x10 * (cpu)))
-+#define HB_JUMP_TABLE_VIRT(cpu)		phys_to_virt(HB_JUMP_TABLE_PHYS(cpu))
-+
-+void highbank_set_cpu_jump(int cpu, void *jump_addr)
-+{
-+	writel(BSYM(virt_to_phys(jump_addr)), HB_JUMP_TABLE_VIRT(cpu));
-+	__cpuc_flush_dcache_area(HB_JUMP_TABLE_VIRT(cpu), 16);
-+	outer_clean_range(HB_JUMP_TABLE_PHYS(cpu),
-+			  HB_JUMP_TABLE_PHYS(cpu) + 15);
-+}
-+
-+void highbank_init_irq(void)
-+{
-+	struct device_node *node;
-+	struct of_intc_desc desc;
-+
-+	memset(&desc, 0, sizeof(desc));
-+	desc.controller = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
-+	gic_of_init(&desc);
-+	node = desc.controller;
-+	for_each_child_of_node(node, desc.controller)
-+		gic_of_ppi_init(&desc);
-+
-+	l2x0_of_init(0, ~0UL);
-+}
-+
-+static void __init highbank_timer_init(void)
-+{
-+	int irq;
-+	struct device_node *np;
-+	void __iomem *timer_base;
-+
-+	/* Map system registers */
-+	np = of_find_compatible_node(NULL, NULL, "calxeda,hb-sregs");
-+	sregs_base = of_iomap(np, 0);
-+	WARN_ON(!sregs_base);
-+
-+	np = of_find_compatible_node(NULL, NULL, "arm,sp804");
-+	timer_base = of_iomap(np, 0);
-+	WARN_ON(!timer_base);
-+	irq = irq_of_parse_and_map(np, 0);
-+
-+	highbank_clocks_init();
-+
-+	sp804_clocksource_init(timer_base + 0x20, "timer1");
-+	sp804_clockevents_init(timer_base, irq, "timer0");
-+}
-+
-+static struct sys_timer highbank_timer = {
-+	.init = highbank_timer_init,
-+};
-+
-+static void highbank_power_off(void)
-+{
-+	hignbank_set_pwr_shutdown();
-+	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
-+
-+	while (1)
-+		cpu_do_idle();
-+}
-+
-+static void __init highbank_init(void)
-+{
-+	pm_power_off = highbank_power_off;
-+
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char *highbank_match[] __initconst = {
-+	"calxeda,highbank",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(HIGHBANK, "Highbank")
-+	.map_io		= highbank_map_io,
-+	.init_irq	= highbank_init_irq,
-+	.nr_irqs	= NR_IRQS,
-+	.timer		= &highbank_timer,
-+	.init_machine	= highbank_init,
-+	.dt_compat	= highbank_match,
-+MACHINE_END
-diff --git a/arch/arm/mach-highbank/include/mach/debug-macro.S b/arch/arm/mach-highbank/include/mach/debug-macro.S
-new file mode 100644
-index 0000000..2f3e344
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/debug-macro.S
-@@ -0,0 +1,19 @@
-+/*
-+ * Debugging macro include header
-+ *
-+ *  Copyright (C) 1994-1999 Russell King
-+ *  Moved from linux/arch/arm/kernel/debug.S by Ben Dooks
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Licensed under GPLv2 or later.
 + */
 +
-+		.macro	addruart,rp,rv
-+		movw	\rv, #0x6000
-+		movt	\rv, #0xfee3
-+		movw	\rp, #0x6000
-+		movt	\rp, #0xfff3
-+		.endm
-+
-+#include <asm/hardware/debug-pl01x.S>
-diff --git a/arch/arm/mach-highbank/include/mach/entry-macro.S b/arch/arm/mach-highbank/include/mach/entry-macro.S
-new file mode 100644
-index 0000000..73c1129
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/entry-macro.S
-@@ -0,0 +1,7 @@
-+#include <asm/hardware/entry-macro-gic.S>
-+
-+	.macro	disable_fiq
-+	.endm
-+
-+	.macro	arch_ret_to_user, tmp1, tmp2
-+	.endm
-diff --git a/arch/arm/mach-highbank/include/mach/gpio.h b/arch/arm/mach-highbank/include/mach/gpio.h
-new file mode 100644
-index 0000000..40a8c17
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/gpio.h
-@@ -0,0 +1 @@
-+/* empty */
-diff --git a/arch/arm/mach-highbank/include/mach/io.h b/arch/arm/mach-highbank/include/mach/io.h
-new file mode 100644
-index 0000000..70cfa3b
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/io.h
-@@ -0,0 +1,7 @@
-+#ifndef __MACH_IO_H
-+#define __MACH_IO_H
-+
-+#define __io(a)		({ (void)(a); __typesafe_io(0); })
-+#define __mem_pci(a)	(a)
-+
-+#endif
-diff --git a/arch/arm/mach-highbank/include/mach/irqs.h b/arch/arm/mach-highbank/include/mach/irqs.h
-new file mode 100644
-index 0000000..9746aab
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/irqs.h
-@@ -0,0 +1,6 @@
-+#ifndef __MACH_IRQS_H
-+#define __MACH_IRQS_H
-+
-+#define NR_IRQS			192
-+
-+#endif
-diff --git a/arch/arm/mach-highbank/include/mach/memory.h b/arch/arm/mach-highbank/include/mach/memory.h
-new file mode 100644
-index 0000000..40a8c17
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/memory.h
-@@ -0,0 +1 @@
-+/* empty */
-diff --git a/arch/arm/mach-highbank/include/mach/system.h b/arch/arm/mach-highbank/include/mach/system.h
-new file mode 100644
-index 0000000..7e81922
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/system.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright 2010-2011 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __MACH_SYSTEM_H
-+#define __MACH_SYSTEM_H
-+
-+static inline void arch_idle(void)
-+{
-+	cpu_do_idle();
-+}
-+
-+extern void arch_reset(char mode, const char *cmd);
-+
-+#endif
-diff --git a/arch/arm/mach-highbank/include/mach/timex.h b/arch/arm/mach-highbank/include/mach/timex.h
-new file mode 100644
-index 0000000..88dac7a
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/timex.h
-@@ -0,0 +1,6 @@
-+#ifndef __MACH_TIMEX_H
-+#define __MACH_TIMEX_H
-+
-+#define CLOCK_TICK_RATE		1000000
-+
-+#endif
-diff --git a/arch/arm/mach-highbank/include/mach/uncompress.h b/arch/arm/mach-highbank/include/mach/uncompress.h
-new file mode 100644
-index 0000000..bbe20e6
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/uncompress.h
-@@ -0,0 +1,9 @@
-+#ifndef __MACH_UNCOMPRESS_H
-+#define __MACH_UNCOMPRESS_H
-+
-+#define putc(c)
-+#define flush()
-+#define arch_decomp_setup()
-+#define arch_decomp_wdog()
-+
-+#endif
-diff --git a/arch/arm/mach-highbank/include/mach/vmalloc.h b/arch/arm/mach-highbank/include/mach/vmalloc.h
-new file mode 100644
-index 0000000..1a3e398
---- /dev/null
-+++ b/arch/arm/mach-highbank/include/mach/vmalloc.h
-@@ -0,0 +1,6 @@
-+#ifndef __MACH_VMALLOC_H
-+#define __MACH_VMALLOC_H
-+
-+#define VMALLOC_END		0xFEE00000UL
-+
-+#endif
-diff --git a/arch/arm/mach-highbank/lluart.c b/arch/arm/mach-highbank/lluart.c
-new file mode 100644
-index 0000000..3715750
---- /dev/null
-+++ b/arch/arm/mach-highbank/lluart.c
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright 2011 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
 +#include <linux/init.h>
-+#include <asm/page.h>
-+#include <asm/sizes.h>
-+#include <asm/mach/map.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/pinctrl/pinmux.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/of_platform.h>
++#include <linux/bitops.h>
 +
-+#define HB_DEBUG_LL_PHYS_BASE	0xfff36000
-+#define HB_DEBUG_LL_VIRT_BASE	0xfee36000
++#define DRIVER_NAME "pinmux-sirf"
 +
-+static struct map_desc lluart_io_desc __initdata = {
-+	.virtual	= HB_DEBUG_LL_VIRT_BASE,
-+	.pfn		= __phys_to_pfn(HB_DEBUG_LL_PHYS_BASE),
-+	.length		= SZ_4K,
-+	.type		= MT_DEVICE,
++#define SIRFSOC_NUM_PADS    622
++#define SIRFSOC_GPIO_PAD_EN(g) ((g)*0x100 + 0x84)
++#define SIRFSOC_RSC_PIN_MUX 0x4
++
++/*
++ * pad list for the pinmux subsystem
++ * refer to CS-131858-DC-6A.xls
++ */
++const struct pinctrl_pin_desc __refdata sirfsoc_pads[] = {
++	PINCTRL_PIN(4, "pwm0"),
++	PINCTRL_PIN(5, "pwm1"),
++	PINCTRL_PIN(6, "pwm2"),
++	PINCTRL_PIN(7, "pwm3"),
++	PINCTRL_PIN(8, "warm_rst_b"),
++	PINCTRL_PIN(9, "odo_0"),
++	PINCTRL_PIN(10, "odo_1"),
++	PINCTRL_PIN(11, "dr_dir"),
++	PINCTRL_PIN(13, "scl_1"),
++	PINCTRL_PIN(15, "sda_1"),
++	PINCTRL_PIN(16, "x_ldd[16]"),
++	PINCTRL_PIN(17, "x_ldd[17]"),
++	PINCTRL_PIN(18, "x_ldd[18]"),
++	PINCTRL_PIN(19, "x_ldd[19]"),
++	PINCTRL_PIN(20, "x_ldd[20]"),
++	PINCTRL_PIN(21, "x_ldd[21]"),
++	PINCTRL_PIN(22, "x_ldd[22]"),
++	PINCTRL_PIN(23, "x_ldd[23], lcdrom_frdy"),
++	PINCTRL_PIN(24, "gps_sgn"),
++	PINCTRL_PIN(25, "gps_mag"),
++	PINCTRL_PIN(26, "gps_clk"),
++	PINCTRL_PIN(27,	"sd_cd_b_1"),
++	PINCTRL_PIN(28, "sd_vcc_on_1"),
++	PINCTRL_PIN(29, "sd_wp_b_1"),
++	PINCTRL_PIN(30, "sd_clk_3"),
++	PINCTRL_PIN(31, "sd_cmd_3"),
++
++	PINCTRL_PIN(32, "x_sd_dat_3[0]"),
++	PINCTRL_PIN(33, "x_sd_dat_3[1]"),
++	PINCTRL_PIN(34, "x_sd_dat_3[2]"),
++	PINCTRL_PIN(35, "x_sd_dat_3[3]"),
++	PINCTRL_PIN(36, "x_sd_clk_4"),
++	PINCTRL_PIN(37, "x_sd_cmd_4"),
++	PINCTRL_PIN(38, "x_sd_dat_4[0]"),
++	PINCTRL_PIN(39, "x_sd_dat_4[1]"),
++	PINCTRL_PIN(40, "x_sd_dat_4[2]"),
++	PINCTRL_PIN(41, "x_sd_dat_4[3]"),
++	PINCTRL_PIN(42, "x_cko_1"),
++	PINCTRL_PIN(43, "x_ac97_bit_clk"),
++	PINCTRL_PIN(44, "x_ac97_dout"),
++	PINCTRL_PIN(45, "x_ac97_din"),
++	PINCTRL_PIN(46, "x_ac97_sync"),
++	PINCTRL_PIN(47, "x_txd_1"),
++	PINCTRL_PIN(48, "x_txd_2"),
++	PINCTRL_PIN(49, "x_rxd_1"),
++	PINCTRL_PIN(50, "x_rxd_2"),
++	PINCTRL_PIN(51, "x_usclk_0"),
++	PINCTRL_PIN(52, "x_utxd_0"),
++	PINCTRL_PIN(53, "x_urxd_0"),
++	PINCTRL_PIN(54, "x_utfs_0"),
++	PINCTRL_PIN(55, "x_urfs_0"),
++	PINCTRL_PIN(56, "x_usclk_1"),
++	PINCTRL_PIN(57, "x_utxd_1"),
++	PINCTRL_PIN(58, "x_urxd_1"),
++	PINCTRL_PIN(59, "x_utfs_1"),
++	PINCTRL_PIN(60, "x_urfs_1"),
++	PINCTRL_PIN(61, "x_usclk_2"),
++	PINCTRL_PIN(62, "x_utxd_2"),
++	PINCTRL_PIN(63, "x_urxd_2"),
++
++	PINCTRL_PIN(64, "x_utfs_2"),
++	PINCTRL_PIN(65, "x_urfs_2"),
++	PINCTRL_PIN(66, "x_df_we_b"),
++	PINCTRL_PIN(67, "x_df_re_b"),
++	PINCTRL_PIN(68, "x_txd_0"),
++	PINCTRL_PIN(69, "x_rxd_0"),
++	PINCTRL_PIN(78, "x_cko_0"),
++	PINCTRL_PIN(79, "x_vip_pxd[7]"),
++	PINCTRL_PIN(80, "x_vip_pxd[6]"),
++	PINCTRL_PIN(81, "x_vip_pxd[5]"),
++	PINCTRL_PIN(82, "x_vip_pxd[4]"),
++	PINCTRL_PIN(83, "x_vip_pxd[3]"),
++	PINCTRL_PIN(84, "x_vip_pxd[2]"),
++	PINCTRL_PIN(85, "x_vip_pxd[1]"),
++	PINCTRL_PIN(86, "x_vip_pxd[0]"),
++	PINCTRL_PIN(87, "x_vip_vsync"),
++	PINCTRL_PIN(88, "x_vip_hsync"),
++	PINCTRL_PIN(89, "x_vip_pxclk"),
++	PINCTRL_PIN(90, "x_sda_0"),
++	PINCTRL_PIN(91, "x_scl_0"),
++	PINCTRL_PIN(92, "x_df_ry_by"),
++	PINCTRL_PIN(93, "x_df_cs_b[1]"),
++	PINCTRL_PIN(94, "x_df_cs_b[0]"),
++	PINCTRL_PIN(95, "x_l_pclk"),
++
++	PINCTRL_PIN(96, "x_l_lck"),
++	PINCTRL_PIN(97, "x_l_fck"),
++	PINCTRL_PIN(98, "x_l_de"),
++	PINCTRL_PIN(99, "x_ldd[0]"),
++	PINCTRL_PIN(100, "x_ldd[1]"),
++	PINCTRL_PIN(101, "x_ldd[2]"),
++	PINCTRL_PIN(102, "x_ldd[3]"),
++	PINCTRL_PIN(103, "x_ldd[4]"),
++	PINCTRL_PIN(104, "x_ldd[5]"),
++	PINCTRL_PIN(105, "x_ldd[6]"),
++	PINCTRL_PIN(106, "x_ldd[7]"),
++	PINCTRL_PIN(107, "x_ldd[8]"),
++	PINCTRL_PIN(108, "x_ldd[9]"),
++	PINCTRL_PIN(109, "x_ldd[10]"),
++	PINCTRL_PIN(110, "x_ldd[11]"),
++	PINCTRL_PIN(111, "x_ldd[12]"),
++	PINCTRL_PIN(112, "x_ldd[13]"),
++	PINCTRL_PIN(113, "x_ldd[14]"),
++	PINCTRL_PIN(114, "x_ldd[15]"),
 +};
 +
-+void __init highbank_lluart_map_io(void)
-+{
-+	iotable_init(&lluart_io_desc, 1);
-+}
-diff --git a/arch/arm/mach-highbank/sysregs.h b/arch/arm/mach-highbank/sysregs.h
-new file mode 100644
-index 0000000..0e91338
---- /dev/null
-+++ b/arch/arm/mach-highbank/sysregs.h
-@@ -0,0 +1,52 @@
-+/*
-+ * Copyright 2011 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
++/**
++ * @dev: a pointer back to containing device
++ * @virtbase: the offset to the controller in virtual memory
 + */
-+#ifndef _MACH_HIGHBANK__SYSREGS_H_
-+#define _MACH_HIGHBANK__SYSREGS_H_
++struct sirfsoc_pmx {
++	struct device *dev;
++	struct pinctrl_dev *pmx;
++	void __iomem *gpio_virtbase;
++	void __iomem *rsc_virtbase;
++};
 +
-+#include <linux/io.h>
++/* SIRFSOC_GPIO_PAD_EN set */
++struct sirfsoc_muxmask {
++	unsigned long group;
++	unsigned long mask;
++};
 +
-+extern void __iomem *sregs_base;
++struct sirfsoc_padmux {
++	unsigned long muxmask_counts;
++	const struct sirfsoc_muxmask *muxmask;
++	/* RSC_PIN_MUX set */
++	unsigned long funcmask;
++	unsigned long funcval;
++};
 +
-+#define HB_SREG_A9_PWR_REQ		0xf00
-+#define HB_SREG_A9_BOOT_STAT		0xf04
-+#define HB_SREG_A9_BOOT_DATA		0xf08
-+
-+#define HB_PWR_SUSPEND			0
-+#define HB_PWR_SOFT_RESET		1
-+#define HB_PWR_HARD_RESET		2
-+#define HB_PWR_SHUTDOWN			3
-+
-+static inline void hignbank_set_pwr_suspend(void)
-+{
-+	writel(HB_PWR_SUSPEND, sregs_base + HB_SREG_A9_PWR_REQ);
-+}
-+
-+static inline void hignbank_set_pwr_shutdown(void)
-+{
-+	writel(HB_PWR_SHUTDOWN, sregs_base + HB_SREG_A9_PWR_REQ);
-+}
-+
-+static inline void hignbank_set_pwr_soft_reset(void)
-+{
-+	writel(HB_PWR_SOFT_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
-+}
-+
-+static inline void hignbank_set_pwr_hard_reset(void)
-+{
-+	writel(HB_PWR_HARD_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
-+}
-+
-+#endif
-diff --git a/arch/arm/mach-highbank/system.c b/arch/arm/mach-highbank/system.c
-new file mode 100644
-index 0000000..53f0c4c
---- /dev/null
-+++ b/arch/arm/mach-highbank/system.c
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright 2011 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
++/**
++ * struct sirfsoc_pinmux_func - describes a SIRFSOC pinmux function
++ * @name: the name of this specific function
++ * @pins: an array of discrete physical pins used in this mapping, taken
++ *	from the global pin enumeration space
++ * @num_pins: the number of pins in this mapping array, i.e. the number of
++ *	elements in .pins so we can iterate over that array
++ * @padmux: registers set for required pad mux
 + */
-+#include <linux/io.h>
-+#include <asm/smp_scu.h>
-+#include <asm/proc-fns.h>
++struct sirfsoc_pinmux_func {
++	const char *name;
++	const unsigned int *pins;
++	const unsigned num_pins;
++	const struct sirfsoc_padmux *padmux;
++};
 +
-+#include "core.h"
-+#include "sysregs.h"
++static const struct sirfsoc_muxmask lcd_16bits_sirfsoc_muxmask[] = {
++	{
++		.group = 3,
++		.mask = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) | BIT(6) | BIT(7) | BIT(8) |
++			BIT(9) | BIT(10) | BIT(11) | BIT(12) | BIT(13) | BIT(14) | BIT(15) | BIT(16) |
++			BIT(17) | BIT(18),
++	}, {
++		.group = 2,
++		.mask = BIT(31),
++	},
++};
 +
-+void arch_reset(char mode, const char *cmd)
++static const struct sirfsoc_padmux lcd_16bits_padmux = {
++	.muxmask_counts = ARRAY_SIZE(lcd_16bits_sirfsoc_muxmask),
++	.muxmask = lcd_16bits_sirfsoc_muxmask,
++	.funcmask = BIT(4),
++	.funcval = 0,
++};
++
++static const unsigned lcd_16bits_pins[] = { 95, 96, 97, 98, 99, 100, 101, 102, 103, 104,
++	105, 106, 107, 108, 109, 110, 111, 112, 113, 114 };
++
++static const struct sirfsoc_muxmask lcd_18bits_muxmask[] = {
++	{
++		.group = 3,
++		.mask = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) | BIT(6) | BIT(7) | BIT(8) |
++			BIT(9) | BIT(10) | BIT(11) | BIT(12) | BIT(13) | BIT(14) | BIT(15) | BIT(16) |
++			BIT(17) | BIT(18),
++	}, {
++		.group = 2,
++		.mask = BIT(31),
++	}, {
++		.group = 0,
++		.mask = BIT(16) | BIT(17),
++	},
++};
++
++static const struct sirfsoc_padmux lcd_18bits_padmux = {
++	.muxmask_counts = ARRAY_SIZE(lcd_18bits_muxmask),
++	.muxmask = lcd_18bits_muxmask,
++	.funcmask = BIT(4),
++	.funcval = 0,
++};
++
++static const unsigned lcd_18bits_pins[] = { 16, 17, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104,
++	105, 106, 107, 108, 109, 110, 111, 112, 113, 114};
++
++static const struct sirfsoc_muxmask lcd_24bits_muxmask[] = {
++	{
++		.group = 3,
++		.mask = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) | BIT(6) | BIT(7) | BIT(8) |
++			BIT(9) | BIT(10) | BIT(11) | BIT(12) | BIT(13) | BIT(14) | BIT(15) | BIT(16) |
++			BIT(17) | BIT(18),
++	}, {
++		.group = 2,
++		.mask = BIT(31),
++	}, {
++		.group = 0,
++		.mask = BIT(16) | BIT(17) | BIT(18) | BIT(19) | BIT(20) | BIT(21) | BIT(22) | BIT(23),
++	},
++};
++
++static const struct sirfsoc_padmux lcd_24bits_padmux = {
++	.muxmask_counts = ARRAY_SIZE(lcd_24bits_muxmask),
++	.muxmask = lcd_24bits_muxmask,
++	.funcmask = BIT(4),
++	.funcval = 0,
++};
++
++static const unsigned lcd_24bits_pins[] = { 16, 17, 18, 19, 20, 21, 22, 23, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104,
++	105, 106, 107, 108, 109, 110, 111, 112, 113, 114 };
++
++static const struct sirfsoc_muxmask lcdrom_muxmask[] = {
++	{
++		.group = 3,
++		.mask = BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) | BIT(6) | BIT(7) | BIT(8) |
++			BIT(9) | BIT(10) | BIT(11) | BIT(12) | BIT(13) | BIT(14) | BIT(15) | BIT(16) |
++			BIT(17) | BIT(18),
++	}, {
++		.group = 2,
++		.mask = BIT(31),
++	}, {
++		.group = 0,
++		.mask = BIT(23),
++	},
++};
++
++static const struct sirfsoc_padmux lcdrom_padmux = {
++	.muxmask_counts = ARRAY_SIZE(lcdrom_muxmask),
++	.muxmask = lcdrom_muxmask,
++	.funcmask = BIT(4),
++	.funcval = BIT(4),
++};
++
++static const unsigned lcdrom_pins[] = { 23, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104,
++	105, 106, 107, 108, 109, 110, 111, 112, 113, 114 };
++
++static const struct sirfsoc_muxmask uart0_muxmask[] = {
++	{
++		.group = 2,
++		.mask = BIT(4) | BIT(5),
++	}, {
++		.group = 1,
++		.mask = BIT(23) | BIT(28),
++	},
++};
++
++static const struct sirfsoc_padmux uart0_padmux = {
++	.muxmask_counts = ARRAY_SIZE(uart0_muxmask),
++	.muxmask = uart0_muxmask,
++	.funcmask = BIT(9),
++	.funcval = BIT(9),
++};
++
++static const unsigned uart0_pins[] = { 55, 60, 68, 69 };
++
++static const struct sirfsoc_muxmask uart0_nostreamctrl_muxmask[] = {
++	{
++		.group = 2,
++		.mask = BIT(4) | BIT(5),
++	},
++};
++
++static const struct sirfsoc_padmux uart0_nostreamctrl_padmux = {
++	.muxmask_counts = ARRAY_SIZE(uart0_nostreamctrl_muxmask),
++	.muxmask = uart0_nostreamctrl_muxmask,
++};
++
++static const unsigned uart0_nostreamctrl_pins[] = { 68, 39 };
++
++static const struct sirfsoc_muxmask uart1_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(15) | BIT(17),
++	},
++};
++
++static const struct sirfsoc_padmux uart1_padmux = {
++	.muxmask_counts = ARRAY_SIZE(uart1_muxmask),
++	.muxmask = uart1_muxmask,
++};
++
++static const unsigned uart1_pins[] = { 47, 49 };
++
++static const struct sirfsoc_muxmask uart2_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(16) | BIT(18) | BIT(24) | BIT(27),
++	},
++};
++
++static const struct sirfsoc_padmux uart2_padmux = {
++	.muxmask_counts = ARRAY_SIZE(uart2_muxmask),
++	.muxmask = uart2_muxmask,
++	.funcmask = BIT(10),
++	.funcval = BIT(10),
++};
++
++static const unsigned uart2_pins[] = { 48, 50, 56, 59 };
++
++static const struct sirfsoc_muxmask uart2_nostreamctrl_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(16) | BIT(18),
++	},
++};
++
++static const struct sirfsoc_padmux uart2_nostreamctrl_padmux = {
++	.muxmask_counts = ARRAY_SIZE(uart2_nostreamctrl_muxmask),
++	.muxmask = uart2_nostreamctrl_muxmask,
++};
++
++static const unsigned uart2_nostreamctrl_pins[] = { 48, 50 };
++
++static const struct sirfsoc_muxmask sdmmc3_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(30) | BIT(31),
++	}, {
++		.group = 1,
++		.mask = BIT(0) | BIT(1) | BIT(2) | BIT(3),
++	},
++};
++
++static const struct sirfsoc_padmux sdmmc3_padmux = {
++	.muxmask_counts = ARRAY_SIZE(sdmmc3_muxmask),
++	.muxmask = sdmmc3_muxmask,
++	.funcmask = BIT(7),
++	.funcval = 0,
++};
++
++static const unsigned sdmmc3_pins[] = { 30, 31, 32, 33, 34, 35 };
++
++static const struct sirfsoc_muxmask spi0_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(0) | BIT(1) | BIT(2) | BIT(3),
++	},
++};
++
++static const struct sirfsoc_padmux spi0_padmux = {
++	.muxmask_counts = ARRAY_SIZE(spi0_muxmask),
++	.muxmask = spi0_muxmask,
++	.funcmask = BIT(7),
++	.funcval = BIT(7),
++};
++
++static const unsigned spi0_pins[] = { 32, 33, 34, 35 };
++
++static const struct sirfsoc_muxmask sdmmc4_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(4) | BIT(5) | BIT(6) | BIT(7) | BIT(8) | BIT(9),
++	},
++};
++
++static const struct sirfsoc_padmux sdmmc4_padmux = {
++	.muxmask_counts = ARRAY_SIZE(sdmmc4_muxmask),
++	.muxmask = sdmmc4_muxmask,
++};
++
++static const unsigned sdmmc4_pins[] = { 36, 37, 38, 39, 40, 41 };
++
++static const struct sirfsoc_muxmask cko1_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(10),
++	},
++};
++
++static const struct sirfsoc_padmux cko1_padmux = {
++	.muxmask_counts = ARRAY_SIZE(cko1_muxmask),
++	.muxmask = cko1_muxmask,
++	.funcmask = BIT(3),
++	.funcval = 0,
++};
++
++static const unsigned cko1_pins[] = { 42 };
++
++static const struct sirfsoc_muxmask i2s_muxmask[] = {
++	{
++		.group = 1,
++		.mask =
++			BIT(10) | BIT(11) | BIT(12) | BIT(13) | BIT(14) | BIT(19)
++				| BIT(23) | BIT(28),
++	},
++};
++
++static const struct sirfsoc_padmux i2s_padmux = {
++	.muxmask_counts = ARRAY_SIZE(i2s_muxmask),
++	.muxmask = i2s_muxmask,
++	.funcmask = BIT(3) | BIT(9),
++	.funcval = BIT(3),
++};
++
++static const unsigned i2s_pins[] = { 42, 43, 44, 45, 46, 51, 55, 60 };
++
++static const struct sirfsoc_muxmask ac97_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(11) | BIT(12) | BIT(13) | BIT(14),
++	},
++};
++
++static const struct sirfsoc_padmux ac97_padmux = {
++	.muxmask_counts = ARRAY_SIZE(ac97_muxmask),
++	.muxmask = ac97_muxmask,
++	.funcmask = BIT(8),
++	.funcval = 0,
++};
++
++static const unsigned ac97_pins[] = { 33, 34, 35, 36 };
++
++static const struct sirfsoc_muxmask spi1_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(11) | BIT(12) | BIT(13) | BIT(14),
++	},
++};
++
++static const struct sirfsoc_padmux spi1_padmux = {
++	.muxmask_counts = ARRAY_SIZE(spi1_muxmask),
++	.muxmask = spi1_muxmask,
++	.funcmask = BIT(8),
++	.funcval = BIT(8),
++};
++
++static const unsigned spi1_pins[] = { 33, 34, 35, 36 };
++
++static const struct sirfsoc_muxmask sdmmc1_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(27) | BIT(28) | BIT(29),
++	},
++};
++
++static const struct sirfsoc_padmux sdmmc1_padmux = {
++	.muxmask_counts = ARRAY_SIZE(sdmmc1_muxmask),
++	.muxmask = sdmmc1_muxmask,
++};
++
++static const unsigned sdmmc1_pins[] = { 27, 28, 29 };
++
++static const struct sirfsoc_muxmask gps_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(24) | BIT(25) | BIT(26),
++	},
++};
++
++static const struct sirfsoc_padmux gps_padmux = {
++	.muxmask_counts = ARRAY_SIZE(gps_muxmask),
++	.muxmask = gps_muxmask,
++	.funcmask = BIT(12) | BIT(13) | BIT(14),
++	.funcval = BIT(12),
++};
++
++static const unsigned gps_pins[] = { 24, 25, 26 };
++
++static const struct sirfsoc_muxmask sdmmc5_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(24) | BIT(25) | BIT(26),
++	}, {
++		.group = 1,
++		.mask = BIT(29),
++	}, {
++		.group = 2,
++		.mask = BIT(0) | BIT(1),
++	},
++};
++
++static const struct sirfsoc_padmux sdmmc5_padmux = {
++	.muxmask_counts = ARRAY_SIZE(sdmmc5_muxmask),
++	.muxmask = sdmmc5_muxmask,
++	.funcmask = BIT(13) | BIT(14),
++	.funcval = BIT(13) | BIT(14),
++};
++
++static const unsigned sdmmc5_pins[] = { 24, 25, 26, 61, 64, 65 };
++
++static const struct sirfsoc_muxmask usp0_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(19) | BIT(20) | BIT(21) | BIT(22) | BIT(23),
++	},
++};
++
++static const struct sirfsoc_padmux usp0_padmux = {
++	.muxmask_counts = ARRAY_SIZE(usp0_muxmask),
++	.muxmask = usp0_muxmask,
++	.funcmask = BIT(1) | BIT(2) | BIT(6) | BIT(9),
++	.funcval = 0,
++};
++
++static const unsigned usp0_pins[] = { 51, 52, 53, 54, 55 };
++
++static const struct sirfsoc_muxmask usp1_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(24) | BIT(25) | BIT(26) | BIT(27) | BIT(28),
++	},
++};
++
++static const struct sirfsoc_padmux usp1_padmux = {
++	.muxmask_counts = ARRAY_SIZE(usp1_muxmask),
++	.muxmask = usp1_muxmask,
++	.funcmask = BIT(1) | BIT(9) | BIT(10) | BIT(11),
++	.funcval = 0,
++};
++
++static const unsigned usp1_pins[] = { 56, 57, 58, 59, 60 };
++
++static const struct sirfsoc_muxmask usp2_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(29) | BIT(30) | BIT(31),
++	}, {
++		.group = 2,
++		.mask = BIT(0) | BIT(1),
++	},
++};
++
++static const struct sirfsoc_padmux usp2_padmux = {
++	.muxmask_counts = ARRAY_SIZE(usp2_muxmask),
++	.muxmask = usp2_muxmask,
++	.funcmask = BIT(13) | BIT(14),
++	.funcval = 0,
++};
++
++static const unsigned usp2_pins[] = { 61, 62, 63, 64, 65 };
++
++static const struct sirfsoc_muxmask nand_muxmask[] = {
++	{
++		.group = 2,
++		.mask = BIT(2) | BIT(3) | BIT(28) | BIT(29) | BIT(30),
++	},
++};
++
++static const struct sirfsoc_padmux nand_padmux = {
++	.muxmask_counts = ARRAY_SIZE(nand_muxmask),
++	.muxmask = nand_muxmask,
++	.funcmask = BIT(5),
++	.funcval = 0,
++};
++
++static const unsigned nand_pins[] = { 64, 65, 92, 93, 94 };
++
++static const struct sirfsoc_padmux sdmmc0_padmux = {
++	.muxmask_counts = 0,
++	.funcmask = BIT(5),
++	.funcval = 0,
++};
++
++static const unsigned sdmmc0_pins[] = { };
++
++static const struct sirfsoc_muxmask sdmmc2_muxmask[] = {
++	{
++		.group = 2,
++		.mask = BIT(2) | BIT(3),
++	},
++};
++
++static const struct sirfsoc_padmux sdmmc2_padmux = {
++	.muxmask_counts = ARRAY_SIZE(sdmmc2_muxmask),
++	.muxmask = sdmmc2_muxmask,
++	.funcmask = BIT(5),
++	.funcval = BIT(5),
++};
++
++static const unsigned sdmmc2_pins[] = { 66, 67 };
++
++static const struct sirfsoc_muxmask cko0_muxmask[] = {
++	{
++		.group = 2,
++		.mask = BIT(14),
++	},
++};
++
++static const struct sirfsoc_padmux cko0_padmux = {
++	.muxmask_counts = ARRAY_SIZE(cko0_muxmask),
++	.muxmask = cko0_muxmask,
++};
++
++static const unsigned cko0_pins[] = { 78 };
++
++static const struct sirfsoc_muxmask vip_muxmask[] = {
++	{
++		.group = 2,
++		.mask = BIT(15) | BIT(16) | BIT(17) | BIT(18) | BIT(19)
++			| BIT(20) | BIT(21) | BIT(22) | BIT(23) | BIT(24) |
++			BIT(25),
++	},
++};
++
++static const struct sirfsoc_padmux vip_padmux = {
++	.muxmask_counts = ARRAY_SIZE(vip_muxmask),
++	.muxmask = vip_muxmask,
++	.funcmask = BIT(0),
++	.funcval = 0,
++};
++
++static const unsigned vip_pins[] = { 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89 };
++
++static const struct sirfsoc_muxmask i2c0_muxmask[] = {
++	{
++		.group = 2,
++		.mask = BIT(26) | BIT(27),
++	},
++};
++
++static const struct sirfsoc_padmux i2c0_padmux = {
++	.muxmask_counts = ARRAY_SIZE(i2c0_muxmask),
++	.muxmask = i2c0_muxmask,
++};
++
++static const unsigned i2c0_pins[] = { 90, 91 };
++
++static const struct sirfsoc_muxmask i2c1_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(13) | BIT(15),
++	},
++};
++
++static const struct sirfsoc_padmux i2c1_padmux = {
++	.muxmask_counts = ARRAY_SIZE(i2c1_muxmask),
++	.muxmask = i2c1_muxmask,
++};
++
++static const unsigned i2c1_pins[] = { 13, 15 };
++
++static const struct sirfsoc_muxmask viprom_muxmask[] = {
++	{
++		.group = 2,
++		.mask = BIT(15) | BIT(16) | BIT(17) | BIT(18) | BIT(19)
++			| BIT(20) | BIT(21) | BIT(22) | BIT(23) | BIT(24) |
++			BIT(25),
++	}, {
++		.group = 0,
++		.mask = BIT(12),
++	},
++};
++
++static const struct sirfsoc_padmux viprom_padmux = {
++	.muxmask_counts = ARRAY_SIZE(viprom_muxmask),
++	.muxmask = viprom_muxmask,
++	.funcmask = BIT(0),
++	.funcval = BIT(0),
++};
++
++static const unsigned viprom_pins[] = { 12, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89 };
++
++static const struct sirfsoc_muxmask pwm0_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(4),
++	},
++};
++
++static const struct sirfsoc_padmux pwm0_padmux = {
++	.muxmask_counts = ARRAY_SIZE(pwm0_muxmask),
++	.muxmask = pwm0_muxmask,
++	.funcmask = BIT(12),
++	.funcval = 0,
++};
++
++static const unsigned pwm0_pins[] = { 4 };
++
++static const struct sirfsoc_muxmask pwm1_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(5),
++	},
++};
++
++static const struct sirfsoc_padmux pwm1_padmux = {
++	.muxmask_counts = ARRAY_SIZE(pwm1_muxmask),
++	.muxmask = pwm1_muxmask,
++};
++
++static const unsigned pwm1_pins[] = { 5 };
++
++static const struct sirfsoc_muxmask pwm2_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(6),
++	},
++};
++
++static const struct sirfsoc_padmux pwm2_padmux = {
++	.muxmask_counts = ARRAY_SIZE(pwm2_muxmask),
++	.muxmask = pwm2_muxmask,
++};
++
++static const unsigned pwm2_pins[] = { 6 };
++
++static const struct sirfsoc_muxmask pwm3_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(7),
++	},
++};
++
++static const struct sirfsoc_padmux pwm3_padmux = {
++	.muxmask_counts = ARRAY_SIZE(pwm3_muxmask),
++	.muxmask = pwm3_muxmask,
++};
++
++static const unsigned pwm3_pins[] = { 7 };
++
++static const struct sirfsoc_muxmask warm_rst_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(8),
++	},
++};
++
++static const struct sirfsoc_padmux warm_rst_padmux = {
++	.muxmask_counts = ARRAY_SIZE(warm_rst_muxmask),
++	.muxmask = warm_rst_muxmask,
++};
++
++static const unsigned warm_rst_pins[] = { 8 };
++
++static const struct sirfsoc_muxmask usb0_utmi_drvbus_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(22),
++	},
++};
++static const struct sirfsoc_padmux usb0_utmi_drvbus_padmux = {
++	.muxmask_counts = ARRAY_SIZE(usb0_utmi_drvbus_muxmask),
++	.muxmask = usb0_utmi_drvbus_muxmask,
++	.funcmask = BIT(6),
++	.funcval = BIT(6), /* refer to PAD_UTMI_DRVVBUS0_ENABLE */
++};
++
++static const unsigned usb0_utmi_drvbus_pins[] = { 54 };
++
++static const struct sirfsoc_muxmask usb1_utmi_drvbus_muxmask[] = {
++	{
++		.group = 1,
++		.mask = BIT(27),
++	},
++};
++
++static const struct sirfsoc_padmux usb1_utmi_drvbus_padmux = {
++	.muxmask_counts = ARRAY_SIZE(usb1_utmi_drvbus_muxmask),
++	.muxmask = usb1_utmi_drvbus_muxmask,
++	.funcmask = BIT(11),
++	.funcval = BIT(11), /* refer to PAD_UTMI_DRVVBUS1_ENABLE */
++};
++
++static const unsigned usb1_utmi_drvbus_pins[] = { 59 };
++
++static const struct sirfsoc_muxmask pulse_count_muxmask[] = {
++	{
++		.group = 0,
++		.mask = BIT(9) | BIT(10) | BIT(11),
++	},
++};
++
++static const struct sirfsoc_padmux pulse_count_padmux = {
++	.muxmask_counts = ARRAY_SIZE(pulse_count_muxmask),
++	.muxmask = pulse_count_muxmask,
++};
++
++static const unsigned pulse_count_pins[] = { 9, 10, 11 };
++
++static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
++	{
++		.name = "lcd_16bits",
++		.pins = lcd_16bits_pins,
++		.num_pins = ARRAY_SIZE(lcd_16bits_pins),
++		.padmux = &lcd_16bits_padmux,
++	}, {
++		.name = "lcd_18bits",
++		.pins = lcd_18bits_pins,
++		.num_pins = ARRAY_SIZE(lcd_18bits_pins),
++		.padmux = &lcd_18bits_padmux,
++	}, {
++		.name = "lcd_24bits",
++		.pins = lcd_24bits_pins,
++		.num_pins = ARRAY_SIZE(lcd_24bits_pins),
++		.padmux = &lcd_24bits_padmux,
++	}, {
++		.name = "lcdrom",
++		.pins = lcdrom_pins,
++		.num_pins = ARRAY_SIZE(lcdrom_pins),
++		.padmux = &lcdrom_padmux,
++	}, {
++		.name = "uart0",
++		.pins = uart0_pins,
++		.num_pins = ARRAY_SIZE(uart0_pins),
++		.padmux = &uart0_padmux,
++	}, {
++		.name = "uart1",
++		.pins = uart1_pins,
++		.num_pins = ARRAY_SIZE(uart1_pins),
++		.padmux = &uart1_padmux,
++	}, {
++		.name = "uart2",
++		.pins = uart2_pins,
++		.num_pins = ARRAY_SIZE(uart2_pins),
++		.padmux = &uart2_padmux,
++	}, {
++		.name = "uart2_nostreamctrl",
++		.pins = uart2_nostreamctrl_pins,
++		.num_pins = ARRAY_SIZE(uart2_nostreamctrl_pins),
++		.padmux = &uart2_nostreamctrl_padmux,
++	}, {
++		.name = "usp0",
++		.pins = usp0_pins,
++		.num_pins = ARRAY_SIZE(usp0_pins),
++		.padmux = &usp0_padmux,
++	}, {
++		.name = "usp1",
++		.pins = usp1_pins,
++		.num_pins = ARRAY_SIZE(usp1_pins),
++		.padmux = &usp1_padmux,
++	}, {
++		.name = "usp2",
++		.pins = usp2_pins,
++		.num_pins = ARRAY_SIZE(usp2_pins),
++		.padmux = &usp2_padmux,
++	}, {
++		.name = "i2c0",
++		.pins = i2c0_pins,
++		.num_pins = ARRAY_SIZE(i2c0_pins),
++		.padmux = &i2c0_padmux,
++	}, {
++		.name = "i2c1",
++		.pins = i2c1_pins,
++		.num_pins = ARRAY_SIZE(i2c1_pins),
++		.padmux = &i2c1_padmux,
++	}, {
++		.name = "pwm0",
++		.pins = pwm0_pins,
++		.num_pins = ARRAY_SIZE(pwm0_pins),
++		.padmux = &pwm0_padmux,
++	}, {
++		.name = "pwm1",
++		.pins = pwm1_pins,
++		.num_pins = ARRAY_SIZE(pwm1_pins),
++		.padmux = &pwm1_padmux,
++	}, {
++		.name = "pwm2",
++		.pins = pwm2_pins,
++		.num_pins = ARRAY_SIZE(pwm2_pins),
++		.padmux = &pwm2_padmux,
++	}, {
++		.name = "pwm3",
++		.pins = pwm3_pins,
++		.num_pins = ARRAY_SIZE(pwm3_pins),
++		.padmux = &pwm3_padmux,
++	}, {
++		.name = "vip",
++		.pins = vip_pins,
++		.num_pins = ARRAY_SIZE(vip_pins),
++		.padmux = &vip_padmux,
++	}, {
++		.name = "viprom",
++		.pins = viprom_pins,
++		.num_pins = ARRAY_SIZE(viprom_pins),
++		.padmux = &viprom_padmux,
++	}, {
++		.name = "warm_rst",
++		.pins = warm_rst_pins,
++		.num_pins = ARRAY_SIZE(warm_rst_pins),
++		.padmux = &warm_rst_padmux,
++	}, {
++		.name = "cko0",
++		.pins = cko0_pins,
++		.num_pins = ARRAY_SIZE(cko0_pins),
++		.padmux = &cko0_padmux,
++	}, {
++		.name = "cko1",
++		.pins = cko1_pins,
++		.num_pins = ARRAY_SIZE(cko1_pins),
++		.padmux = &cko1_padmux,
++	}, {
++		.name = "sdmmc0",
++		.pins = sdmmc0_pins,
++		.num_pins = ARRAY_SIZE(sdmmc0_pins),
++		.padmux = &sdmmc0_padmux,
++	}, {
++		.name = "sdmmc1",
++		.pins = sdmmc1_pins,
++		.num_pins = ARRAY_SIZE(sdmmc1_pins),
++		.padmux = &sdmmc1_padmux,
++	}, {
++		.name = "sdmmc2",
++		.pins = sdmmc2_pins,
++		.num_pins = ARRAY_SIZE(sdmmc2_pins),
++		.padmux = &sdmmc2_padmux,
++	}, {
++		.name = "sdmmc3",
++		.pins = sdmmc3_pins,
++		.num_pins = ARRAY_SIZE(sdmmc3_pins),
++		.padmux = &sdmmc3_padmux,
++	}, {
++		.name = "sdmmc4",
++		.pins = sdmmc4_pins,
++		.num_pins = ARRAY_SIZE(sdmmc4_pins),
++		.padmux = &sdmmc4_padmux,
++	}, {
++		.name = "sdmmc5",
++		.pins = sdmmc5_pins,
++		.num_pins = ARRAY_SIZE(sdmmc5_pins),
++		.padmux = &sdmmc5_padmux,
++	}, {
++		.name = "usb0_utmi_drvbus",
++		.pins = usb0_utmi_drvbus_pins,
++		.num_pins = ARRAY_SIZE(usb0_utmi_drvbus_pins),
++		.padmux = &usb0_utmi_drvbus_padmux,
++	}, {
++		.name = "usb1_utmi_drvbus",
++		.pins = usb1_utmi_drvbus_pins,
++		.num_pins = ARRAY_SIZE(usb1_utmi_drvbus_pins),
++		.padmux = &usb1_utmi_drvbus_padmux,
++	}, {
++		.name = "pulse_count",
++		.pins = pulse_count_pins,
++		.num_pins = ARRAY_SIZE(pulse_count_pins),
++		.padmux = &pulse_count_padmux,
++	}, {
++		.name = "i2s",
++		.pins = i2s_pins,
++		.num_pins = ARRAY_SIZE(i2s_pins),
++		.padmux = &i2s_padmux,
++	}, {
++		.name = "ac97",
++		.pins = ac97_pins,
++		.num_pins = ARRAY_SIZE(ac97_pins),
++		.padmux = &ac97_padmux,
++	}, {
++		.name = "nand",
++		.pins = nand_pins,
++		.num_pins = ARRAY_SIZE(nand_pins),
++		.padmux = &nand_padmux,
++	}, {
++		.name = "spi0",
++		.pins = spi0_pins,
++		.num_pins = ARRAY_SIZE(spi0_pins),
++		.padmux = &spi0_padmux,
++	}, {
++		.name = "spi1",
++		.pins = spi1_pins,
++		.num_pins = ARRAY_SIZE(spi1_pins),
++		.padmux = &spi1_padmux,
++	}, {
++		.name = "gps",
++		.pins = gps_pins,
++		.num_pins = ARRAY_SIZE(gps_pins),
++		.padmux = &gps_padmux,
++	},
++};
++
++static void sirfsoc_pinmux_endisable(struct sirfsoc_pmx *spmx, unsigned selector,
++	bool enable)
 +{
-+	if (mode == 'h')
-+		hignbank_set_pwr_hard_reset();
-+	else
-+		hignbank_set_pwr_soft_reset();
++	int i;
++	const struct sirfsoc_padmux *mux = sirfsoc_pinmux_funcs[selector].padmux;
++	const struct sirfsoc_muxmask *mask = mux->muxmask;
 +
-+	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
-+	cpu_do_idle();
++	for (i = 0; i < mux->muxmask_counts; i++) {
++		u32 muxval;
++		muxval = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(mask[i].group));
++		if (enable)
++			muxval = muxval & ~mask[i].mask;
++		else
++			muxval = muxval | mask[i].mask;
++		writel(muxval, spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(mask[i].group));
++	}
++
++	if (mux->funcmask && enable) {
++		u32 func_en_val;
++		func_en_val =
++			readl(spmx->rsc_virtbase + SIRFSOC_RSC_PIN_MUX);
++		func_en_val =
++			(func_en_val & ~mux->funcmask) | (mux->
++				funcval);
++		writel(func_en_val, spmx->rsc_virtbase + SIRFSOC_RSC_PIN_MUX);
++	}
 +}
 +
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 88633fe..7d5fff7 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -822,7 +822,7 @@ config CACHE_L2X0
- 		   REALVIEW_EB_A9MP || SOC_IMX35 || SOC_IMX31 || MACH_REALVIEW_PBX || \
- 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
- 		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
--		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX
-+		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_HIGHBANK
- 	default y
- 	select OUTER_CACHE
- 	select OUTER_CACHE_SYNC
++static int sirfsoc_pinmux_enable(struct pinctrl_dev *pmxdev, unsigned selector,
++	unsigned position)
++{
++	struct sirfsoc_pmx *spmx;
++
++	if (selector >= ARRAY_SIZE(sirfsoc_pinmux_funcs))
++		return -EINVAL;
++	spmx = pctldev_get_drvdata(pmxdev);
++	sirfsoc_pinmux_endisable(spmx, selector, true);
++
++	return 0;
++}
++
++static void sirfsoc_pinmux_disable(struct pinctrl_dev *pmxdev, unsigned selector,
++	unsigned position)
++{
++	struct sirfsoc_pmx *spmx;
++
++	if (selector >= ARRAY_SIZE(sirfsoc_pinmux_funcs))
++		return;
++	spmx = pctldev_get_drvdata(pmxdev);
++	sirfsoc_pinmux_endisable(spmx, selector, false);
++}
++
++static int sirfsoc_pinmux_list_funcs(struct pinctrl_dev *pmxdev, unsigned selector)
++{
++	if (selector >= ARRAY_SIZE(sirfsoc_pinmux_funcs))
++		return -EINVAL;
++	return 0;
++}
++
++static int sirfsoc_pmx_list_positions(struct pinctrl_dev *pctldev,
++	unsigned selector,
++	unsigned position)
++{
++	/* Only one selectable position per selector in this driver */
++	if (position != 0)
++		return -EINVAL;
++	return 0;
++}
++
++static const char *sirfsoc_pinmux_get_fname(struct pinctrl_dev *pmxdev,
++	unsigned selector)
++{
++	if (selector >= ARRAY_SIZE(sirfsoc_pinmux_funcs))
++		return NULL;
++	return sirfsoc_pinmux_funcs[selector].name;
++}
++
++static int sirfsoc_pinmux_get_pins(struct pinctrl_dev *pmxdev, unsigned selector,
++	unsigned position, unsigned ** const pins, unsigned * const num_pins)
++{
++	if (position != 0)
++		return -EINVAL;
++
++	if (selector >= ARRAY_SIZE(sirfsoc_pinmux_funcs))
++		return -EINVAL;
++
++	*pins = (unsigned *) sirfsoc_pinmux_funcs[selector].pins;
++	*num_pins = sirfsoc_pinmux_funcs[selector].num_pins;
++	return 0;
++}
++
++static void sirfsoc_dbg_show(struct pinctrl_dev *pmxdev, struct seq_file *s,
++	unsigned offset)
++{
++	seq_printf(s, " " DRIVER_NAME);
++}
++
++static int sirfsoc_pinmux_request_gpio(struct pinctrl_dev *pmxdev,
++	struct pinctrl_gpio_range *range, unsigned offset)
++{
++	struct sirfsoc_pmx *spmx;
++
++	int group = range->id;
++
++	u32 muxval;
++
++	spmx = pctldev_get_drvdata(pmxdev);
++
++	muxval = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(group));
++	muxval = muxval | (1 << offset);
++	writel(muxval, spmx->gpio_virtbase + SIRFSOC_GPIO_PAD_EN(group));
++
++	return 0;
++}
++
++static struct pinmux_ops sirfsoc_pinmux_ops = {
++	.list_functions = sirfsoc_pinmux_list_funcs,
++	.list_positions = sirfsoc_pmx_list_positions,
++	.get_function_name = sirfsoc_pinmux_get_fname,
++	.get_function_pins = sirfsoc_pinmux_get_pins,
++	.enable = sirfsoc_pinmux_enable,
++	.disable = sirfsoc_pinmux_disable,
++	.dbg_show = sirfsoc_dbg_show,
++	.gpio_request_enable = sirfsoc_pinmux_request_gpio,
++};
++
++static struct pinctrl_desc sirfsoc_pinmux_desc = {
++	.name = DRIVER_NAME,
++	.pins = sirfsoc_pads,
++	.npins = ARRAY_SIZE(sirfsoc_pads),
++	.maxpin = SIRFSOC_NUM_PADS - 1,
++	.pmxops = &sirfsoc_pinmux_ops,
++	.owner = THIS_MODULE,
++};
++
++/*
++ * Todo: bind irq_chip to every pinctrl_gpio_range
++ */
++static struct pinctrl_gpio_range sirfsoc_gpio_ranges[] = {
++	{
++		.name = "sirfsoc-gpio*",
++		.id = 0,
++		.base = 0,
++		.npins = 32,
++	}, {
++		.name = "sirfsoc-gpio*",
++		.id = 1,
++		.base = 32,
++		.npins = 32,
++	}, {
++		.name = "sirfsoc-gpio*",
++		.id = 2,
++		.base = 64,
++		.npins = 32,
++	}, {
++		.name = "sirfsoc-gpio*",
++		.id = 3,
++		.base = 96,
++		.npins = 19,
++	},
++};
++
++static void __iomem *sirfsoc_rsc_of_iomap(void)
++{
++	const struct of_device_id rsc_ids[]  = {
++		{ .compatible = "sirf,prima2-rsc" },
++		{}
++	};
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, rsc_ids);
++	if (!np)
++		panic("unable to find compatible rsc node in dtb\n");
++
++	return of_iomap(np, 0);
++}
++
++static int __devinit sirfsoc_pinmux_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct sirfsoc_pmx *spmx;
++	struct device_node *np = pdev->dev.of_node;
++	int i;
++
++	/* Create state holders etc for this driver */
++	spmx = kzalloc(sizeof(struct sirfsoc_pmx), GFP_KERNEL);
++	if (!spmx)
++		return -ENOMEM;
++
++	spmx->dev = &pdev->dev;
++
++	platform_set_drvdata(pdev, spmx);
++
++	spmx->gpio_virtbase = of_iomap(np, 0);
++	if (!spmx->gpio_virtbase) {
++		ret = -ENOMEM;
++		dev_err(&pdev->dev, "can't map gpio registers\n");
++		goto out_no_gpio_remap;
++	}
++
++	spmx->rsc_virtbase = sirfsoc_rsc_of_iomap();
++	if (!spmx->rsc_virtbase) {
++		ret = -ENOMEM;
++		dev_err(&pdev->dev, "can't map rsc registers\n");
++		goto out_no_rsc_remap;
++	}
++
++	/* Now register the pin controller and all pins it handles */
++	spmx->pmx = pinctrl_register(&sirfsoc_pinmux_desc, &pdev->dev, spmx);
++	if (IS_ERR(spmx->pmx)) {
++		dev_err(&pdev->dev, "could not register SIRFSOC pinmux driver\n");
++		ret = PTR_ERR(spmx->pmx);
++		goto out_no_pmx;
++	}
++
++	for (i = 0; i < ARRAY_SIZE(sirfsoc_gpio_ranges); i++)
++		pinctrl_add_gpio_range(spmx->pmx, &sirfsoc_gpio_ranges[i]);
++
++	dev_info(&pdev->dev, "initialized SIRFSOC pinmux driver\n");
++
++	return 0;
++
++out_no_pmx:
++	iounmap(spmx->rsc_virtbase);
++out_no_rsc_remap:
++	iounmap(spmx->gpio_virtbase);
++out_no_gpio_remap:
++	platform_set_drvdata(pdev, NULL);
++	kfree(spmx);
++	return ret;
++}
++
++static const struct of_device_id pinmux_ids[]  = {
++	{ .compatible = "sirf,prima2-gpio-pinmux" },
++	{}
++};
++
++static struct platform_driver sirfsoc_pinmux_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++		.owner = THIS_MODULE,
++		.of_match_table = pinmux_ids,
++	},
++	.probe = sirfsoc_pinmux_probe,
++};
++
++static int __init sirfsoc_pinmux_init(void)
++{
++	return platform_driver_register(&sirfsoc_pinmux_driver);
++}
++arch_initcall(sirfsoc_pinmux_init);
++
++MODULE_AUTHOR("Rongjun Ying <rongjun.ying@csr.com>, "
++	"Barry Song <baohua.song@csr.com>");
++MODULE_DESCRIPTION("SIRFSOC pin control driver");
++MODULE_LICENSE("GPL");
 -- 
-1.7.4.1
+1.7.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
