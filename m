@@ -1,63 +1,126 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 1 Sep 2011 11:36:20 +0800
-Subject: [PATCH 1/7] ARM: l2x0: add empty l2x0_of_init
-In-Reply-To: <1314841446-11006-2-git-send-email-robherring2@gmail.com>
-References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
-	<1314841446-11006-2-git-send-email-robherring2@gmail.com>
-Message-ID: <CAGsJ_4zS8qA-rD+NQzUo58J8pT+-4uhrCdHCKgkCJxX30KY3Ag@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Thu, 1 Sep 2011 11:41:46 +0800
+Subject: [PATCH 0/3] RFC: addition to DMA API
+In-Reply-To: <Pine.LNX.4.44L0.1108312255060.27371-100000@netrider.rowland.org>
+References: <CACVXFVPN7SCk8z=vatphyM=PhZDAwtyDidALYPeVkuJ_zxpBvA@mail.gmail.com>
+	<Pine.LNX.4.44L0.1108312255060.27371-100000@netrider.rowland.org>
+Message-ID: <CACVXFVOYaxGDZrwkHYc+h=tFhpYp+g95KZrDjg+bPH_N-9BT_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/1 Rob Herring <robherring2@gmail.com>:
-> From: Rob Herring <rob.herring@calxeda.com>
+Hi,
+
+On Thu, Sep 1, 2011 at 11:09 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 1 Sep 2011, Ming Lei wrote:
 >
-> Add empty version of l2x0_of_init for when CONFIG_CACHE_L2X0 is not selected.
+>> Hi,
+>>
+>> On Thu, Sep 1, 2011 at 5:30 AM, Mark Salter <msalter@redhat.com> wrote:
+>> > This patch set arose out of a discussion on linux-arm concerning a
+>> > performance problem with USB on some ARMv7 based platforms. The
+>> > problem was tracked down by ming.lei at canonical.com and found to be
+>> > the result of CPU writes to DMA-coherent memory being delayed in a
+>> > write buffer between the CPU and memory. One proposed patch fixed
+>> > only the immediate problem with the USB EHCI driver, but several
+>> > folks thought a more general approach was needed, so I put this series
+>> > of patches together as a starting point for wider discussion outside
+>> > the ARM specific list.
+>>
+>> After some further thoughts, I think it is not a good idea to introduce a
+>> general DMA API to handle this case, see below:
+>>
+>> 1. The side-effect of new API is that it will make descriptors of dma in a
+>> partial update, such as qtd in the ehci case, even ehci can handle this
+>> successful, but it is really not good to make DMA bus master see a
+>> partial update of descriptor, and I am not ?sure that other kind of bus masters
+>> can handle this correctly, which may introduce other problems. A proper memory
+>> barrier will always make dma master see a atomic update of dma descriptors,
+>> which should be the preferred way to take by device driver.
 >
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-
-Acked-by: Barry Song <21cnbao@gmail.com>
-
-it seems most people use
-"
-#ifdef CONFIG_CACHE_L2X0
-...
-l2x0 related codes
-...
-#endif
-"
-or
-"
-obj-$(CONFIG_CACHE_L2X0) += xxx-l2x0.o
-"
-
-to avoid l2x0 related codes compiled and linked into kernel.
-
-but this patch provides another option. it is not bad too.
-
-> ---
-> ?arch/arm/include/asm/hardware/cache-l2x0.h | ? ?7 +++++++
-> ?1 files changed, 7 insertions(+), 0 deletions(-)
+> No, this is completely wrong.
 >
-> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-> index 4a6004a..967a808 100644
-> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
-> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-> @@ -90,7 +90,14 @@
+> Firstly, you are forgetting about other architectures, ones in which
+> writes to coherent memory aren't buffered. ?On those architectures
+> there's no way to prevent the DMA bus master from seeing an
+> intermediate state of the data structures. ?Therefore the driver has to
+> be written so that even when this happens, everything will work
+> correctly.
 >
-> ?#ifndef __ASSEMBLY__
-> ?extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
-> +#if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
-> ?extern int l2x0_of_init(__u32 aux_val, __u32 aux_mask);
-> +#else
-> +static int l2x0_of_init(__u32 aux_val, __u32 aux_mask)
-> +{
-> + ? ? ? return -ENODEV;
-> +}
-> ?#endif
-> +#endif /* __ASSEMBLY__ */
+> Secondly, even when write flushes are used, you can't guarantee that
+> the DMA bus master will see an atomic update. ?It might turn out that
+> the hardware occasionally flushes some writes very quickly, before the
+> data-structure updates are complete.
 >
-> ?#endif
-> --
-> 1.7.4.1
+> Thirdly, you are mixing up memory barriers with write flushes. ?The
+> barriers are used to make sure that writes are done in the correct
+> order, whereas the flushes are used to make sure that writes are done
+> reasonably quickly. ?One has nothing to do with the other, even if by
+> coincidence on ARM a memory barrier causes a write flush. ?On other
+> architectures this might not be true.
 
--barry
+I agree all about above, but what I described is from another view.
+I post out the example before explaining my idea further:
+
+
+	CPU			device	
+	A=1;
+	wmb
+	B=2;
+					read B
+					read A
+
+one wmb is used to order 'A=1' and 'B=2', which will make the two write
+operations reach to physical memory as the order: 'A=1' first, 'B=2' second.
+Then the device can observe the two write events as the order above,
+so if device has seen 'B==2', then device will surely see 'A==1'.
+
+Suppose writing to A is operation to update dma descriptor, the above example
+can make device always see a atomic update of descriptor, can't it?
+
+My idea is that the memory access patterns are to be considered for
+writer of device driver. For example, many memory access patterns on
+EHCI hardware are described in detail.  Of course, device driver should
+make full use of the background info, below is a example from ehci driver:
+
+qh_link_async():
+
+	/*prepare qh descriptor*/
+	qh->qh_next = head->qh_next;
+	qh->hw->hw_next = head->hw->hw_next;
+	wmb ();
+
+	/*link the qh descriptor into hardware queue*/
+	head->qh_next.qh = qh;
+	head->hw->hw_next = dma;
+
+so once EHCI fetches a qh with the address of 'dma', it will always see
+consistent content of qh descriptor, which could not be updated partially.
+
+>
+>> 2, most of such cases can be handled correctly by mb/wmb/rmb barriers.
+>
+> No, they can't. ?See the third point above.
+
+The example above has demoed that barriers can do it, hasn't it?
+
+>
+>> The ehci case I reported is in the one of the most tricky code path in
+>> ehci driver,
+>> and it should be a special case, and up to now, we only have found this case
+>> can't be handled by memory barriers. Is there other cases which can't be handled
+>> correctly by mb/wmb/rmb? If so, please point it out.
+>>
+>> 3, The new DMA API for the purpose to be introduced is much easier to
+>> understand, and much easier to use than memory barrier, so it is very
+>> possible to make device driver guys misuse or abuse it instead of using
+>> memory barrier first to handle the case.
+>
+> That criticism could apply to almost any new feature. ?We shouldn't be
+> afraid to adopt something new merely because it's so easy to use that
+> it might be misused.
+
+This point depends on the #1 and #2.
+
+thanks,
+--
+Ming Lei
