@@ -1,25 +1,38 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 1 Sep 2011 17:29:08 +0530
-Subject: [PATCH v4] ARM: davinci: AM18x: Add wl1271/wlan support
-In-Reply-To: <1312444283-25581-1-git-send-email-ido@wizery.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024DF05D8E@dbde02.ent.ti.com>
-	<1312444283-25581-1-git-send-email-ido@wizery.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930257268CA9@dbde02.ent.ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 1 Sep 2011 13:59:13 +0200
+Subject: [PATCH 7/7] OMAP2+: devices: Remove all omap_device_pm_latency
+	structures
+In-Reply-To: <87sjoh6wnj.fsf@ti.com>
+References: <1314026347-21623-1-git-send-email-b-cousson@ti.com>
+	<1314026347-21623-8-git-send-email-b-cousson@ti.com>
+	<87sjoh6wnj.fsf@ti.com>
+Message-ID: <4E5F7391.7060602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2011 at 13:21:23, Ido Yariv wrote:
-> The wl1271 daughter card for AM18x EVMs is a combo wireless connectivity
-> add-on card, based on the LS Research TiWi module with Texas
-> Instruments' wl1271 solution.
-> It is a 4-wire, 1.8V, embedded SDIO WLAN device with an external IRQ
-> line and is power-controlled by a GPIO-based fixed regulator.
-> 
-> Add support for the WLAN capabilities of this expansion board.
-> 
-> Signed-off-by: Ido Yariv <ido@wizery.com>
+On 9/1/2011 12:31 AM, Hilman, Kevin wrote:
+> Benoit Cousson<b-cousson@ti.com>  writes:
+>
+>> Remove all these duplicated structures since a default one is now
+>> available.
+>>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Kevin Hilman<khilman@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/devices.c    |   46 +++----------------------------------
+>>   arch/arm/mach-omap2/display.c    |   11 +--------
+>>   arch/arm/mach-omap2/dma.c        |   11 +--------
+>>   arch/arm/mach-omap2/gpio.c       |   12 +---------
+>>   arch/arm/mach-omap2/hsmmc.c      |   18 +--------------
+>>   arch/arm/mach-omap2/hwspinlock.c |   12 +---------
+>>   arch/arm/mach-omap2/mcbsp.c      |   11 +--------
+>>   arch/arm/mach-omap2/serial.c     |   25 +-------------------
+>>   arch/arm/mach-omap2/sr_device.c  |   11 +--------
+>>   arch/arm/mach-omap2/usb-musb.c   |   11 +--------
+>>   arch/arm/plat-omap/i2c.c         |   10 +-------
+>>   11 files changed, 14 insertions(+), 164 deletions(-)
+>
+> Nice!  queuing this for v3.2 (branch: for_3.2/omap_device)
 
-Applied, thanks.
-
-Regards,
-Sekhar
+Thanks,
+Benoit
