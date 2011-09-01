@@ -1,14 +1,13 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 1 Sep 2011 19:21:25 +0200
-Subject: [PATCH 09/13] arm/dts: omap4-sdp: Add twl6030 node
+Date: Thu, 1 Sep 2011 19:21:26 +0200
+Subject: [PATCH 10/13] arm/dts: omap4-panda: Add twl6030 node
 In-Reply-To: <1314897689-17791-1-git-send-email-b-cousson@ti.com>
 References: <1314897689-17791-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1314897689-17791-10-git-send-email-b-cousson@ti.com>
+Message-ID: <1314897689-17791-11-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the twl6030 node inside the i2c1 controller node.
-Add the RTC submodule inside the twl node.
+Add the twl6030 node in i2c1 controller.
 
 This is just the minimal support needed to boot OMAP4 boards
 without any crash.
@@ -18,20 +17,14 @@ later.
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 ---
- arch/arm/boot/dts/omap4-sdp.dts |   25 +++++++++++++++++++++++--
- 1 files changed, 23 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap4-panda.dts |   23 +++++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index ed85b35..d03f2e7 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -26,12 +26,33 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
--
--
- };
+diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+index 63ecf34..5c1c2a7 100644
+--- a/arch/arm/boot/dts/omap4-panda.dts
++++ b/arch/arm/boot/dts/omap4-panda.dts
+@@ -30,6 +30,29 @@
  
  &i2c1 {
  	clock-frequency = <400000>;
