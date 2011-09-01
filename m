@@ -1,83 +1,53 @@
-From: FlorianSchandinat@gmx.de (Florian Tobias Schandinat)
-Date: Thu, 01 Sep 2011 16:45:18 +0000
-Subject: [PATCH 0/2] video: s3c-fb: Add window positioning support
-In-Reply-To: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
-References: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <4E5FB69E.2060907@gmx.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 1 Sep 2011 12:48:19 -0400 (EDT)
+Subject: [PATCH 0/3] RFC: addition to DMA API
+In-Reply-To: <CACVXFVOSCS-J8iXcRpCN9TD41pWqcJOiPahtGjBmPpXBLozZyA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1109011244340.1896-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, 1 Sep 2011, Ming Lei wrote:
 
-On 08/25/2011 07:51 PM, Ajay Kumar wrote:
-> Just as a note, there are many drivers like mx3fb.c, au1200fb.c and OMAP
-> seem to be doing window/plane positioning in their driver code.
-> Is it possible to have this window positioning support at a common place?
-
-Good point. Congratulations for figuring out that I like to standardize things.
-But I think your suggestion is far from being enough to be useful for userspace
-(which is our goal so that applications can be reused along drivers and don't
-need to know about individual drivers).
-
-So let me at first summarize how I understand you implemented those things after
-having a brief look at some of the drivers:
-Windows are rectangular screen areas whose pixel data come from other locations.
-The other locations are accessible via other framebuffer devices (e.g. fb1). So
-in this area the data of fb1 is shown and not the data of fb0 that would be
-normally shown.
-
-So in addition to your proposed positioning I think we should also have the
-following to give userspace a useful set of functionality:
-
-- a way to discover how the screen is composited (how many windows are there,
-how they are stacked and how to access those)
-
-- a way to enable/disable windows (make them (in)visible)
-
-- reporting and selecting how the window content can be mixed with the root
-screen (overwrite, source or destination color keying)
-
-- things like window size and color format could be handled by the usual fb API
-used on the window. However there might be restrictions which cause them to be
-not 100% API compatible (for example when changing the color format if the
-windows are required to have the same format as the root screen)
-
-- do we need to worry about hardware (up/down) scaling of the window content?
-
-
-So is that what you need for a standardized window implementation?
-Any additional things that were useful/needed in this context?
-Would you consider adding support for this API in your drivers? (as
-standardizing wouldn't be useful if nobody would implement it)
-
-
-Best regards,
-
-Florian Tobias Schandinat
-
-
+> > Suppose A and B are _both_ part of the dma descriptor. ?The device
+> > might see A==1 and B==0, if the memory accesses occur like this:
+> >
+> > ? ? ? ?CPU ? ? ? ? ? ? device
+> > ? ? ? ?--- ? ? ? ? ? ? ------
+> > ? ? ? ?A = 1;
+> > ? ? ? ?wmb();
+> > ? ? ? ? ? ? ? ? ? ? ? ?read B
+> > ? ? ? ? ? ? ? ? ? ? ? ?read A
+> > ? ? ? ?B = 2;
+> >
+> > When this happens, the device will observe a non-atomic update of the
+> > descriptor. ?There's no way to prevent this.
 > 
-> For instance, we can have a common struture and ioctl number in 
-> include/linux/fb.h as below:
+> If device doesn't find that B is 2, it will not fetch descriptor of A,
+> and will observe
+> a atomic update, which is just EHCI does for many cases(such as 4.10.2).
+
+You didn't read what I wrote above.  Suppose A and B are _both_ part of 
+the same descriptor, like hw_token and hw_qtd_next.
+
+
+> > The memory barrier in your qh_link_async() example can make sure that
+> > the device always sees consistent data. ?It doesn't guarantee that the
+> > write to head->hw->hw_next will be flushed to memory in a reasonably
+> > short time, which is the problem you are trying to solve.
 > 
-> 	#define FBIOPOS_OVERLAY_WIN    _IOW('F', 0x21, struct fb_overlay_win_pos)
+> Yes, up to now, it is the only case in which the flush can address to,
+> and in which kind of cases device will poll DMA coherent memory contiguously,
+> I am not sure if there are other devices except for EHCI(maybe have uhci/ohci).
+
+Yes: UHCI, OHCI, EHCI, and XHCI all poll memory constantly.
+
+> If there are many such kind of devices, the flush operation introduced will
+> make sense.
 > 
-> 	struct fb_overlay_win_pos {
-> 		__u32 win_pos_x;  /* x-offset of window from LCD(0,0) */
-> 		__u32 win_pos_y;  /* y-offset of window from LCD(0,0) */
-> 	};
-> 
-> where LCD(0,0) means the first pixel of the LCD screen.
-> Individual drivers can have implementation for this ioctl.
-> 
-> To Kukjin Kim,
->   [PATCH 1/2] ARM: SAMSUNG: Add Window Positioning Support for s3c-fb driver
-> 
-> To Paul Mundt, Florian Tobias Schandinat
->   [PATCH 2/2] video: s3c-fb: Modify s3c-fb driver to support window positioning
-> 
->  arch/arm/plat-samsung/include/plat/fb.h |   14 +++++++++++
->  drivers/video/s3c-fb.c                  |   37 ++++++++++++++++++++++++++----
->  2 files changed, 46 insertions(+), 5 deletions(-)
-> 
-> 
+> As far as I know, for most of devices, dma operation of bus master is triggered
+> by writing into mmio register instead of writing into coherent memory, and the
+> flush is not required in this case surely.
+
+That's right.  It is needed only when the device polls automatically.
+
+Alan Stern
