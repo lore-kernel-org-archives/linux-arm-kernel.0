@@ -1,38 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Sep 2011 18:28:50 +0100
-Subject: [PATCH] af_packet: flush complete kernel cache in packet_sendmsg
-In-Reply-To: <1314971179.3092.159.camel@deadeye>
-References: <20110505141107.GC30443@orbit.nwl.cc>
-	<1314961686-30870-1-git-send-email-phil.sutter@viprinet.com>
-	<1314971179.3092.159.camel@deadeye>
-Message-ID: <20110902172850.GB6619@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri,  2 Sep 2011 20:32:29 +0300
+Subject: [PATCH/RFC 0/7] iommu: fixes & extensions
+Message-ID: <1314984756-4400-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2011 at 02:46:17PM +0100, Ben Hutchings wrote:
-> On Fri, 2011-09-02 at 13:08 +0200, Phil Sutter wrote:
-> > This flushes the cache before and after accessing the mmapped packet
-> > buffer. It seems like the call to flush_dcache_page from inside
-> > __packet_get_status is not enough on Kirkwood (or ARM in general).
-> > ---
-> > I know this is far from an optimal solution, but it's in fact the only working
-> > one I found.
-> [...]
-> 
-> This is ridiculous.  If flush_dcache_page() isn't doing everything it
-> should, you need to fix that.
+5 first patches are relatively small iommu fixes/cleanups.
 
-It does do everything it should - which is to perform maintanence on
-page cache pages.  It flushes the kernel mapping of the page.  It
-also flushes the userspace mappings of the page which it finds by
-walking the mmap list via the associated struct page.  It does not
-touch vmalloc mappings because it has no way to know whether they
-exist or not.
+2 last patches are proposals for core iommu extensions:
+- Add fault report mechanism, needed for recovery of remote processors
+  trying to access unmapped addresses.
+- Add splitting of memory regions to pages in the iommu core itself
+  (according to hardware capabilities as advertised by the iommu drivers).
+  This is needed to prevent duplication of this logic by
+  the iommu users/drivers themselves.
 
-It doesn't do so much for anonymous pages - to do so would only
-duplicate what flush_anon_page() does at the very same callsites.
-Plus the mmap list isn't available for such pages so there's no
-way to find out what userspace addresses to flush.
+The patches are based on Joerg's arm/omap branch.
 
-If the AF_PACKET buffers are created from anonymous pages and it's
-using flush_dcache_page(), it's using the wrong interface.
+Tested with OMAP3 (omap3isp) + OMAP4 (rpmsg/remoteproc).
+
+Laurent Pinchart (1):
+  iommu/omap-iovmm: support non page-aligned buffers in iommu_vmap
+
+Ohad Ben-Cohen (6):
+  iommu/omap: cleanup: remove a redundant 'return' statement
+  iommu/core: use the existing IS_ALIGNED macro
+  iommu/omap: ->unmap() should return order of unmapped page
+  iommu/msm: ->unmap() should return order of unmapped page
+  iommu/core: add fault reporting
+  iommu/core: split mapping to page sizes as supported by the hardware
+
+ arch/arm/plat-omap/include/plat/iommu.h |    3 +-
+ drivers/iommu/iommu.c                   |  142 +++++++++++++++++++++++++++----
+ drivers/iommu/msm_iommu.c               |   15 +++-
+ drivers/iommu/omap-iommu.c              |   56 +++---------
+ drivers/iommu/omap-iovmm.c              |   50 +++++++-----
+ drivers/media/video/omap3isp/isp.c      |    2 +-
+ include/linux/iommu.h                   |   67 ++++++++++++++-
+ virt/kvm/iommu.c                        |    6 +-
+ 8 files changed, 251 insertions(+), 90 deletions(-)
+
+-- 
+1.7.4.1
