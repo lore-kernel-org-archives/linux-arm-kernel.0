@@ -1,51 +1,35 @@
-From: phil.sutter@viprinet.com (Phil Sutter)
-Date: Fri, 2 Sep 2011 15:59:55 +0200
-Subject: [PATCH] af_packet: flush complete kernel cache in packet_sendmsg
-In-Reply-To: <1314971179.3092.159.camel@deadeye>
+From: loke.chetan@gmail.com (chetan loke)
+Date: Fri, 2 Sep 2011 10:00:16 -0400
+Subject: FW: [PATCH] af_packet: flush complete kernel cache in
+	packet_sendmsg
+In-Reply-To: <D3F292ADF945FB49B35E96C94C2061B90A239361@nsmail.netscout.com>
 References: <20110505141107.GC30443@orbit.nwl.cc>
 	<1314961686-30870-1-git-send-email-phil.sutter@viprinet.com>
-	<1314971179.3092.159.camel@deadeye>
-Message-ID: <20110902135954.GA29025@philter>
+	<D3F292ADF945FB49B35E96C94C2061B90A239361@nsmail.netscout.com>
+Message-ID: <CAAsGZS6Tt9FLXfanH1+DgKt_9gR_YPJ8kX_pryhnzWTQVkNkNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2011 at 02:46:17PM +0100, Ben Hutchings wrote:
-> On Fri, 2011-09-02 at 13:08 +0200, Phil Sutter wrote:
-> > This flushes the cache before and after accessing the mmapped packet
-> > buffer. It seems like the call to flush_dcache_page from inside
-> > __packet_get_status is not enough on Kirkwood (or ARM in general).
-> > ---
-> > I know this is far from an optimal solution, but it's in fact the only working
-> > one I found.
-> [...]
-> 
-> This is ridiculous.  If flush_dcache_page() isn't doing everything it
-> should, you need to fix that.
+>
+> This flushes the cache before and after accessing the mmapped packet
+> buffer. It seems like the call to flush_dcache_page from inside
+> __packet_get_status is not enough on Kirkwood (or ARM in general).
 
-You're absolutely correct. But in fact this problem goes way too deep
-for me to find it's cause. And since my time is finite, I doubt this
-will change in the near future. So I asked for help, a pointer in
-whatever direction or anything I could try to help further analyzing -
-without any response (unless I missed it, in which case I apologize).
 
-Please don't get me wrong. I have no intend in this patch becoming
-mainline, just want to give others with the same problem a starting
-point.
 
-Greetings, Phil
--- 
-Viprinet GmbH
-Mainzer Str. 43
-55411 Bingen am Rhein
-Germany
+> + ? ? ? kw_extra_cache_flush();
+> + ? ? ? rc = po->tx_ring.pg_vec ? tpacket_snd(po, msg) :
+> + ? ? ? ? ? ? ? ? ? ? ? packet_snd(sock, msg, len);
+> + ? ? ? kw_extra_cache_flush();
+> + ? ? ? return rc;
+> ?}
 
-Zentrale:     +49-6721-49030-0
-Durchwahl:    +49-6721-49030-134
-Fax:          +49-6721-49030-209
+If a workaround is needed for mmap, then why not change tpacket_snd?
 
-phil.sutter at viprinet.com
-http://www.viprinet.com
+Also, is this workaround actually working for all the cases? Because
+packet_get_status is not being touched in your patch.
 
-Sitz der Gesellschaft: Bingen am Rhein
-Handelsregister: Amtsgericht Mainz HRB40380
-Gesch?ftsf?hrer: Simon Kissel
+Also, I don't see any changes for the Rx-path. Is that working ok?
+
+
+Chetan Loke
