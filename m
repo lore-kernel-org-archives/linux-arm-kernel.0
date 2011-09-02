@@ -1,41 +1,35 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri,  2 Sep 2011 20:22:58 +0100
-Subject: [PATCH] ARM: S3C64XX: Register Lowland audio device on Cragganmore
-Message-ID: <1314991378-28351-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 2 Sep 2011 12:28:29 -0700
+Subject: IRQF_TRIGGER_LOW and ARM GIC
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B327A657@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Lowland system is a combination of the Cragganmore CPU module and the
-Tomatin and Kilchomin audio modules on Glenfarclas.
+Russell, Colin,
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-crag6410.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+The Tegra Harmony board contains a TPS6586x chip, which has an active-low
+interrupt output. This is then fed to Tegra's PMC's PWR_INT pin, which can
+be programmed to accept active-low or active-high interrupt signals. This
+then feeds into a GIC interrupt.
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 174dd0c..917acf7 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -284,6 +284,11 @@ static struct platform_device speyside_device = {
- 	.id		= -1,
- };
- 
-+static struct platform_device lowland_device = {
-+	.name		= "lowland",
-+	.id		= -1,
-+};
-+
- static struct platform_device speyside_wm8962_device = {
- 	.name		= "speyside-wm8962",
- 	.id		= -1,
-@@ -341,6 +346,7 @@ static struct platform_device *crag6410_devices[] __initdata = {
- 	&crag6410_backlight_device,
- 	&speyside_device,
- 	&speyside_wm8962_device,
-+	&lowland_device,
- 	&wallvdd_device,
- };
- 
+The problem is that the PMC appears to default to expecting the attached
+signal to be active-high not active-low.
+
+At a driver level, it seems that IRQF_TRIGGER_LEVEL_LOW should be passed
+to request_threaded_irq() to solve this. However, gic.c:gic_set_type()
+prohibits IRQ_TYPE_* except LEVEL_HIGH and EDGE_RISING.
+
+I'm not quite sure how to solve this; should gic_set_type() be modified
+to remove the restriction if gic_arch_extn.irq_set_type is present, and
+assume that gic_arch_extn.irq_set_type will handle converting the input
+signal from LEVEL_LOW to LEVEL_HIGH or EDGE_FALLING to EDGE_RISING?
+
+In at least some non-mainline kernels, this has been solved by having
+individual board files poke PMC registers to invert the signal to the
+gic's expected LEVEL_HIGH. However, I assume that's not a good solution
+for mainline.
+
+Thanks.
+
 -- 
-1.7.5.4
+nvpublic
