@@ -1,55 +1,46 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Fri,  2 Sep 2011 14:50:15 +0200
-Subject: [PATCH] ARM: remove missing cns3xxx includes
-Message-ID: <1314967815-32377-1-git-send-email-kaloz@openwrt.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 02 Sep 2011 13:56:03 +0100
+Subject: [PATCH v3] ARM: sched_clock: allow sched_clock to be selected
+	at runtime
+In-Reply-To: <20110902124945.GX3548@atomide.com>
+References: <1314712599-12234-1-git-send-email-marc.zyngier@arm.com>
+	<20110902124945.GX3548@atomide.com>
+Message-ID: <4E60D263.60702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit c9d95fbe59e426eed7f16e7cac812e46ac4772d0 deleted cns3xxx' hardware.h,
-but didn't remove references for it, so do it now.
+Hi Tony,
 
-Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
----
- arch/arm/mach-cns3xxx/include/mach/entry-macro.S |    1 -
- arch/arm/mach-cns3xxx/include/mach/system.h      |    1 -
- arch/arm/mach-cns3xxx/include/mach/uncompress.h  |    1 -
- 3 files changed, 0 insertions(+), 3 deletions(-)
+On 02/09/11 13:49, Tony Lindgren wrote:
+> * Marc Zyngier <marc.zyngier@arm.com> [110830 16:29]:
+>> sched_clock() is yet another blocker on the road to the single
+>> image. This patch implements an idea by Russell King:
+>>
+>> http://www.spinics.net/lists/linux-omap/msg49561.html
+>>
+>> Instead of asking the platform to implement both sched_clock()
+>> itself and the rollover callback, simply register a read()
+>> function, and let the ARM code care about sched_clock() itself,
+>> the conversion to ns and the rollover. sched_clock() uses
+>> this read() function as an indirection to the platform code.
+>>
+>> This allow some simplifications and possibly some footprint gain
+>> when multiple platforms are compiled in. Among the drawbacks,
+>> the removal of the *_fixed_sched_clock optimization which could
+>> negatively impact some platforms (sa1100, tegra, versatile
+>> and omap).
+>>
+>> Tested on 11MPCore, OMAP4 and Tegra.
+> 
+> Great, seems to boot just fine with printk_time :)
+> 
+> I gave it a quick boot test on omap16xx, 2420, 3430,
+> 3630 and 4430:
+> 
+> Tested-by: Tony Lindgren <tony@atomide.com>
 
-diff --git a/arch/arm/mach-cns3xxx/include/mach/entry-macro.S b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
-index 6bd83ed..d87bfc3 100644
---- a/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
-+++ b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
-@@ -8,7 +8,6 @@
-  * published by the Free Software Foundation.
-  */
- 
--#include <mach/hardware.h>
- #include <asm/hardware/entry-macro-gic.S>
- 
- 		.macro	disable_fiq
-diff --git a/arch/arm/mach-cns3xxx/include/mach/system.h b/arch/arm/mach-cns3xxx/include/mach/system.h
-index 58bb03a..4f16c9b 100644
---- a/arch/arm/mach-cns3xxx/include/mach/system.h
-+++ b/arch/arm/mach-cns3xxx/include/mach/system.h
-@@ -13,7 +13,6 @@
- 
- #include <linux/io.h>
- #include <asm/proc-fns.h>
--#include <mach/hardware.h>
- 
- static inline void arch_idle(void)
- {
-diff --git a/arch/arm/mach-cns3xxx/include/mach/uncompress.h b/arch/arm/mach-cns3xxx/include/mach/uncompress.h
-index de8ead9..a91b605 100644
---- a/arch/arm/mach-cns3xxx/include/mach/uncompress.h
-+++ b/arch/arm/mach-cns3xxx/include/mach/uncompress.h
-@@ -8,7 +8,6 @@
-  */
- 
- #include <asm/mach-types.h>
--#include <mach/hardware.h>
- #include <mach/cns3xxx.h>
- 
- #define AMBA_UART_DR(base)	(*(volatile unsigned char *)((base) + 0x00))
+Thanks for testing!.
+
+	M.
 -- 
-1.7.1
+Jazz is not dead. It just smells funny...
