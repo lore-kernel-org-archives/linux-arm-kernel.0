@@ -1,98 +1,128 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 2 Sep 2011 19:32:54 +0200
-Subject: [PATCH 1/5] Framework for exporting System-on-Chip information
-	via sysfs
-In-Reply-To: <20110902162440.GA5331@suse.de>
-References: <1314880043-22517-1-git-send-email-lee.jones@linaro.org>
-	<201109021602.14782.arnd@arndb.de> <20110902162440.GA5331@suse.de>
-Message-ID: <201109021932.54615.arnd@arndb.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri,  2 Sep 2011 20:32:30 +0300
+Subject: [PATCH 1/7] iommu/omap-iovmm: support non page-aligned buffers in
+	iommu_vmap
+In-Reply-To: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+Message-ID: <1314984756-4400-2-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 September 2011, Greg KH wrote:
-> On Fri, Sep 02, 2011 at 04:02:14PM +0200, Arnd Bergmann wrote:
-> > On Friday 02 September 2011, Greg KH wrote:
-> > > > diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
-> > > > new file mode 100644
-> > > > index 0000000..811d7fe
-> > > > --- /dev/null
-> > > > +++ b/include/linux/sys_soc.h
-> > > > @@ -0,0 +1,27 @@
-> > > > +/*
-> > > > + * Copyright (C) ST-Ericsson SA 2011
-> > > > + * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
-> > > > + * License terms:  GNU General Public License (GPL), version 2
-> > > > + */
-> > > > +#ifndef __SYS_SOC_H
-> > > > +#define __SYS_SOC_H
-> > > > +
-> > > > +#include <linux/kobject.h>
-> > > > +#include <linux/device.h>
-> > > > +#include <linux/platform_device.h>
-> > > > +
-> > > > +struct soc_device {
-> > > > +	struct device dev;
-> > > > +	const char *machine;
-> > > > +	const char *family;
-> > > > +	const char *revision;
-> > > > +	const char *(*pfn_soc_id)(void);
-> > > > +};
-> > > 
-> > > Nice structure, but why do you export it, you aren't using it anywhere,
-> > > nor should you be...
-> > 
-> > This gets filled by the soc-specific code with information that is exported
-> > through the common callbacks, so it needs to be visible to the platforms.
-> 
-> But this api doesn't allow that to happen, so use it to create the data
-> in the first place somehow, this is really confusing as-is.
+From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Yes, that is true. I hadn't noticed the 'struct device' in the above
-structure. What really needs to happen is the platform code to fill
-out a structure with all the attribute data and to pass that into
-the soc common code as constant data which then gets added to the
-device data.
+omap_iovmm requires page-aligned buffers, and that sometimes causes
+omap3isp failures (i.e. whenever the buffer passed from userspace is not
+page-aligned).
 
-> > I think the ideal solution would be to make the soc layer a
-> > class that can be set when initially adding the device (one way
-> > or another) and that adds the standard attributes. Since you don't
-> > really like classes any more, another option would be to just
-> > have a function call that adds an attribute group to the soc node,
-> > but then it's not easy to find which devices are actually soc
-> > root nodes.
-> 
-> Then make it a bus, like it should be, which would solve all of this,
-> right?
+Remove this limitation by rounding the address of the first page entry
+down, and adding the offset back to the device address.
 
-I'm not sure if we're talking about the same thing. Do you mean
-adding an artifical device (like a class_device) under the soc
-device node and have that be of soc_bus type? Or do you mean
-putting the entire soc with all its platform_device children
-on the soc_bus?
+Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+[ohad at wizery.com: rebased, but tested only with aligned buffers]
+[ohad at wizery.com: slightly edited the commit log]
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ drivers/iommu/omap-iovmm.c |   36 ++++++++++++++++++++++++++----------
+ 1 files changed, 26 insertions(+), 10 deletions(-)
 
-In the former case, it's a somewhat ugly representation. It
-would be really nice for the soc to be just one device, not
-one device to hang all the children off and another one to
-provide a user-space interface.
-
-In the latter case, we would have to rewrite the way we probe
-SoCs from the device tree so that the root node of the soc
-becomes a soc_bus device instead of a platform_bus device.
-
-> > > Oh wait, you forgot to have a function to remove anything created with
-> > > the above call, that seems really broken and wrong.
-> > 
-> > There is no way to remove a soc from the system, just like there
-> > is no complementary function to pcibios_scan_root that removes
-> > the PCI root bridge.
-> 
-> And no one is ever going to remove the module that created the SOC
-> device in the first place?  It just really bothers me to see creation
-> code but no removal code, as it feels wrong somehow :)
-
-SoC code fundamentally cannot be a module, since the soc contains
-all the basic stuff like irq controller, clocksource etc. If it didn't
-have those, it would not be a system-on-a-chip but rather some random
-multifunction device you hang off some bus.
-
-	Arnd
+diff --git a/drivers/iommu/omap-iovmm.c b/drivers/iommu/omap-iovmm.c
+index 5e7f97d..39bdb92 100644
+--- a/drivers/iommu/omap-iovmm.c
++++ b/drivers/iommu/omap-iovmm.c
+@@ -27,6 +27,15 @@
+ 
+ static struct kmem_cache *iovm_area_cachep;
+ 
++/* return the offset of the first scatterlist entry in a sg table */
++static unsigned int sgtable_offset(const struct sg_table *sgt)
++{
++	if (!sgt || !sgt->nents)
++		return 0;
++
++	return sgt->sgl->offset;
++}
++
+ /* return total bytes of sg buffers */
+ static size_t sgtable_len(const struct sg_table *sgt)
+ {
+@@ -39,11 +48,17 @@ static size_t sgtable_len(const struct sg_table *sgt)
+ 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
+ 		size_t bytes;
+ 
+-		bytes = sg->length;
++		bytes = sg->length + sg->offset;
+ 
+ 		if (!iopgsz_ok(bytes)) {
+-			pr_err("%s: sg[%d] not iommu pagesize(%x)\n",
+-			       __func__, i, bytes);
++			pr_err("%s: sg[%d] not iommu pagesize(%u %u)\n",
++			       __func__, i, bytes, sg->offset);
++			return 0;
++		}
++
++		if (i && sg->offset) {
++			pr_err("%s: sg[%d] offset not allowed in internal "
++					"entries\n", __func__, i);
+ 			return 0;
+ 		}
+ 
+@@ -164,8 +179,8 @@ static void *vmap_sg(const struct sg_table *sgt)
+ 		u32 pa;
+ 		int err;
+ 
+-		pa = sg_phys(sg);
+-		bytes = sg->length;
++		pa = sg_phys(sg) - sg->offset;
++		bytes = sg->length + sg->offset;
+ 
+ 		BUG_ON(bytes != PAGE_SIZE);
+ 
+@@ -405,8 +420,8 @@ static int map_iovm_area(struct iommu_domain *domain, struct iovm_struct *new,
+ 		u32 pa;
+ 		size_t bytes;
+ 
+-		pa = sg_phys(sg);
+-		bytes = sg->length;
++		pa = sg_phys(sg) - sg->offset;
++		bytes = sg->length + sg->offset;
+ 
+ 		flags &= ~IOVMF_PGSZ_MASK;
+ 
+@@ -432,7 +447,7 @@ err_out:
+ 	for_each_sg(sgt->sgl, sg, i, j) {
+ 		size_t bytes;
+ 
+-		bytes = sg->length;
++		bytes = sg->length + sg->offset;
+ 		order = get_order(bytes);
+ 
+ 		/* ignore failures.. we're already handling one */
+@@ -461,7 +476,7 @@ static void unmap_iovm_area(struct iommu_domain *domain, struct omap_iommu *obj,
+ 		size_t bytes;
+ 		int order;
+ 
+-		bytes = sg->length;
++		bytes = sg->length + sg->offset;
+ 		order = get_order(bytes);
+ 
+ 		err = iommu_unmap(domain, start, order);
+@@ -600,7 +615,7 @@ u32 omap_iommu_vmap(struct iommu_domain *domain, struct omap_iommu *obj, u32 da,
+ 	if (IS_ERR_VALUE(da))
+ 		vunmap_sg(va);
+ 
+-	return da;
++	return da + sgtable_offset(sgt);
+ }
+ EXPORT_SYMBOL_GPL(omap_iommu_vmap);
+ 
+@@ -620,6 +635,7 @@ omap_iommu_vunmap(struct iommu_domain *domain, struct omap_iommu *obj, u32 da)
+ 	 * 'sgt' is allocated before 'omap_iommu_vmalloc()' is called.
+ 	 * Just returns 'sgt' to the caller to free
+ 	 */
++	da &= PAGE_MASK;
+ 	sgt = unmap_vm_area(domain, obj, da, vunmap_sg,
+ 					IOVMF_DISCONT | IOVMF_MMIO);
+ 	if (!sgt)
+-- 
+1.7.4.1
