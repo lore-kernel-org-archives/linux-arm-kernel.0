@@ -1,135 +1,199 @@
-From: gregkh@suse.de (Greg KH)
-Date: Fri, 2 Sep 2011 09:24:40 -0700
-Subject: [PATCH 1/5] Framework for exporting System-on-Chip information
-	via sysfs
-In-Reply-To: <201109021602.14782.arnd@arndb.de>
-References: <1314880043-22517-1-git-send-email-lee.jones@linaro.org>
-	<20110901233403.GA28176@suse.de> <201109021602.14782.arnd@arndb.de>
-Message-ID: <20110902162440.GA5331@suse.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 2 Sep 2011 09:33:56 -0700
+Subject: [PATCH 1/4 v6] drivers: create a pin control subsystem v6
+In-Reply-To: <CACRpkdYBaWq3BuXNvMtgaS1nMzU-vArRB9_y5WE3Zqp9idaOuA@mail.gmail.com>
+References: <1314869536-5495-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B327A3FD@HQMAIL01.nvidia.com>
+	<CACRpkdYBaWq3BuXNvMtgaS1nMzU-vArRB9_y5WE3Zqp9idaOuA@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B327A58F@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2011 at 04:02:14PM +0200, Arnd Bergmann wrote:
-> On Friday 02 September 2011, Greg KH wrote:
-> > On Thu, Sep 01, 2011 at 01:27:19PM +0100, Lee Jones wrote:
-> > > +
-> > > +int __init soc_device_register(struct device *dev)
-> > 
-> > Don't pass a struct device in here, why are you making the caller create
-> > the device?  This is the function that should create it for you?
+Linus Walleij wrote at Friday, September 02, 2011 6:59 AM:
+> > I would imagine treating GPIOs as just another function. I'll repeat
+> > some text I wrote previously (https://lkml.org/lkml/2011/8/26/298) about
+> > how I see this working:
+> >
+> >>SW For reference, here's how I'd imagine modeling those three cases in
+> >>SW pinmux (all based on my earlier comments about the data model I imagine,
+> >>SW rather than what's currently in the pinmux patches):
+> >
+> >>SW 1) Have a single function "gpio" that can be applied to any pin that
+> >>SW supports it. The actual GPIO number that gets mux'd onto the pin differs
+> >>SW per pin, and is determine by HW design. But logically, we're connecting
+> >>SW that pin to function "gpio", so we only need one function name for that.
+> >
+> > So here, the only issue is that if "GPIO" can be assigned per pin, we'd
+> > need to define a pingroup per pin, even if we had a set of other groups
+> > for muxing. (And a pin would have to be in its per-pin pingroup, and
+> > mux group, which goes back to my very first comment above.) I suppose this
+> > might end up being a lot of pingroups. However, this is all data, and
+> > it seems like having large data is better than having large code? Still,
+> > these per-pin groups might end up existing for other functionality like
+> > biasing anyway, depending on HW.
 > 
-> Well, when we have device tree based probing, the soc device might already
-> have been created by of_bus_probe(), so we just want to pass it to the
-> soc core code in order to create the common interfaces. 
+> Hm I have a hard time figuring out how that code would look...
+> I'm worried that the drivers could get pretty hard to read.
 
-No, you want to pass the PARENT pointer in here that this new SOC device
-will hang off of.  You can't expect to pass in any old random struct
-device and expect it to make any kind of sense at all.
+For a simple chip that allowed everything to be configured at a pin level
+rather than pingroup level:
 
-> It's probably not right that soc_device_register actually calls
-> device_register, because when you have a device that you pass in,
-> it will already be registered.
+Functions:
+spi
+i2c
+gpio
 
-And where would it be registered?  No, please don't do this, again, have
-this code create the struct device because it is responsible for it.
-That's the way the rest of the kernel works, please don't try to create
-new models to confuse everyone even more than is needed :)
+pins:
+A1
+A2
+A3
+A4
 
-> > > diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
-> > > new file mode 100644
-> > > index 0000000..811d7fe
-> > > --- /dev/null
-> > > +++ b/include/linux/sys_soc.h
-> > > @@ -0,0 +1,27 @@
-> > > +/*
-> > > + * Copyright (C) ST-Ericsson SA 2011
-> > > + * Author: Lee Jones <lee.jones@linaro.org> for ST-Ericsson.
-> > > + * License terms:  GNU General Public License (GPL), version 2
-> > > + */
-> > > +#ifndef __SYS_SOC_H
-> > > +#define __SYS_SOC_H
-> > > +
-> > > +#include <linux/kobject.h>
-> > > +#include <linux/device.h>
-> > > +#include <linux/platform_device.h>
-> > > +
-> > > +struct soc_device {
-> > > +	struct device dev;
-> > > +	const char *machine;
-> > > +	const char *family;
-> > > +	const char *revision;
-> > > +	const char *(*pfn_soc_id)(void);
-> > > +};
-> > 
-> > Nice structure, but why do you export it, you aren't using it anywhere,
-> > nor should you be...
+Groups, with pin list and legal functions:
+A1: A1: gpio spi
+A2: A2: gpio spi
+A3: A3: gpio i2c
+A4: A4: gpio i2c
+
+For a chip that allowed muxing to be configured at a group level, but
+GPIOs to be configured at a pin level:
+
+Functions:
+spi
+i2c
+gpio
+
+pins:
+A1
+A2
+A3
+A4
+
+Groups, with legal functions:
+A1: A1: gpio
+A2: A2: gpio
+A3: A3: gpio
+A4: A4: gpio
+GROUPA: A1, A2: spi
+GROUPB: A3, A4: i2c
+
+...
+> Right now I have resorted to the diplomatic solution of actually
+> supporting both.
 > 
-> This gets filled by the soc-specific code with information that is exported
-> through the common callbacks, so it needs to be visible to the platforms.
-
-But this api doesn't allow that to happen, so use it to create the data
-in the first place somehow, this is really confusing as-is.
-
-> > > +
-> > > +/**
-> > > + * soc_device_register - register SoC as a device
-> > > + * @dev: Parent node '/sys/devices/soc/X'
-> > > + */
-> > > +int soc_device_register(struct device *dev);
-> > 
-> > This whole api needs to be rethunk, please, it's really wrong.
-> > 
-> > What you want is a way to create a soc device, by calling a function,
-> > not be responsible for creating it, then call the soc core, and then
-> > somehow, removing it.
+> pinmux_request_gpio() will request a gpio pin named
+> "gpioN" where N is the global GPIO number.
 > 
-> Yes, it's definitely still not where it ought to be, and we've been
-> discussing this for ages. It all started out as a way to find out
-> information about the system, and I suggested to better make that
-> information part of the interface for the soc node that is required
-> anyway, rather than making up a purely fictional device.
+> This fragment from pinmux.c sort of specifies it:
 > 
-> Now, we need this to cover two scenarios:
+>         if (gpio && ops->gpio_request_enable)
+>                 /* This requests and enables a single GPIO pin */
+>                 status = ops->gpio_request_enable(pctldev, gpio_range, pin);
+>         else if (ops->request)
+>                 status = ops->request(pctldev, pin);
+>         else
+>                 status = 0;
 > 
-> 1. The classic setup without device tree where the soc node is
->    created by platform code. This would work great by just calling
->    a function that creates the device and lets the soc code add
->    the children according to compile-time tables of child devices.
+> So if the driver doesn't implement the quick ->gpio_request_enable()
+> the second else-clause will attempt to get the function "gpioN".
 > 
-> 2. Probing from OF device-tree, where the linux device tree is populated
->    by walking the devices found in the flat device tree description.
->    This doesn't really fit your suggestion, nor does it fit Lee's
->    patch really, because it would require reparenting the soc node
->    into /sys/devices/soc and registering it again after it's already
->    registered.
+> So if the driver just wants to present a single function per pin instead,
+> it can readily do so, but it must still specify which GPIO ranges it
+> supports.
 
-No it would not, both of these work just fine like we handle with all
-other subsystems.  You pass in the parent, and if it is not present, the
-device will show up under /sys/devices/virtual/ just fine.  Please don't
-create new type of things here.
+Ah, OK.
 
-> I think the ideal solution would be to make the soc layer a
-> class that can be set when initially adding the device (one way
-> or another) and that adds the standard attributes. Since you don't
-> really like classes any more, another option would be to just
-> have a function call that adds an attribute group to the soc node,
-> but then it's not easy to find which devices are actually soc
-> root nodes.
+The only issue I see with that is that is there end up being a whole ton
+of functions named "gpio0", "gpio1", ..., "gpio125" etc. Do those functions
+have to be listed in the table of functions exported by the driver, or does
+the core expect to pass these "created" function names to the driver without
+their previously existing?
 
-Then make it a bus, like it should be, which would solve all of this,
-right?
+Whereas if you do a function-per-gpio-controller, or function-per-gpio-
+that- can-be-configured-on-the-pin, you limit the number of function
+names that are required.
 
-> > Oh wait, you forgot to have a function to remove anything created with
-> > the above call, that seems really broken and wrong.
+> >> diff --git a/include/linux/pinctrl/pinmux.h b/include/linux/pinctrl/pinmux.h
+> >
+> >> +/**
+> >> + * struct pinmux_ops - pinmux operations, to be implemented by pin controller
+> >> + * drivers that support pinmuxing
+> >> + * @request: called by the core to see if a certain pin can be made available
+> >> + * ? available for muxing. This is called by the core to acquire the pins
+> >> + * ? before selecting any actual mux setting across a function. The driver
+> >> + * ? is allowed to answer "no" by returning a negative error code
+> >> + * @free: the reverse function of the request() callback, frees a pin after
+> >> + * ? being requested
+> >
+> > Shouldn't request/free be for a pingroup, not a pin, since that's what
+> > functions are assigned to? Also, the function should be passed, since
+> > some restrictions these functions might need to check for might depend
+> > on what the pin/group will be used for.
 > 
-> There is no way to remove a soc from the system, just like there
-> is no complementary function to pcibios_scan_root that removes
-> the PCI root bridge.
+> This is not for checking anything on function or group level.
+> It's exclusively for things that need to be on a per-pin level, so any
+> pin can deny being selected for muxing at any time.
+> 
+> So what you're saying is that you need a function to check
+> also on group level as part of the pinmux_get() sematics?
+> 
+> We can add that and have two optional checks: @request_pin()
+> on pin level and say @request_function_and_group() on the
+> group+function level, would that work for your scenarios?
 
-And no one is ever going to remove the module that created the SOC
-device in the first place?  It just really bothers me to see creation
-code but no removal code, as it feels wrong somehow :)
+Well, that's a move in the right direction, but not quite everything I'd
+like.
 
-thanks,
+The basic issue is that a single logical function (I2C controller 0) can
+be mux'd out onto more than one pingroup. However, the HW requires that
+at /any given time/ it only be mux'd out onto a single pingroup.
 
-greg k-h
+To fully enforce this, the request() function needs to know what the
+complete state will be after the entire (set of) mapping entries is
+processed.
+
+When the core can only process 1 mapping entry at a time, this is trivial,
+since there's only 1 change relative to current HW to process in request().
+
+However, when the core can process n mapping entries for a single client
+request, you end up with:
+
+* Initial HW state is programmed
+
+* request() called once for the first mapping entry. This can only validate
+that this one request is valid against current HW state; it can't validate
+this call's new setting against any settings passed to future request() calls.
+
+* Similarly, the second request() call can only validate that one change
+against HW; it can't validate this call against the change requested in
+an earlier call, or against any later calls.
+
+The only way I can see this being implementable is:
+
+a) Add request_start() and request_end() functions, so the driver can
+copy HW state to SW state in request_start(), and modify this cached
+state in each request() call, and hence has access to all state changes
+to-date in each request() call. Then, request_end() to finalize the
+whole set of changes.
+
+Or:
+
+b) request() passes an array of changes at once, instead of many calls
+each requesting a single .change
+
+This is certainly a tough problem. The current Tegra pinmux driver doesn't
+actually make any attempt to enforce this, so perhaps it's not worth
+worrying about; we just assume people write sensible mapping tables.
+
+> > When the core is modified to support applying n entries in the mapping
+> > table for each pinmux_get() call, how will request/free be aware of the
+> > partial pending state?
+> 
+> That is like answering how code I haven't yet written will
+> look like... The easiest answer is to implement it I think,
+> then you can check if it looks sane.
+
+:-)
+
+-- 
+nvpublic
