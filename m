@@ -1,47 +1,51 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri,  2 Sep 2011 19:37:23 +0100
-Subject: [PATCH] ARM: S3C64XX: Add devices for Kilchoman audio module on
-	Cragganmore
-Message-ID: <1314988643-24557-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 2 Sep 2011 20:21:37 +0200
+Subject: [PATCH] at91: add Atmel ISI and ov2640 support on m10/g45 board.
+In-Reply-To: <1314960609-23396-1-git-send-email-josh.wu@atmel.com>
+References: <1314960609-23396-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20110902182137.GL20128@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kilchoman audio module carries a WM5100 audio CODEC and WM9081 speaker
-amplifier.
+>  
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+> @@ -194,6 +197,95 @@ static void __init ek_add_device_nand(void)
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+>  
+> +/*
+> + *  ISI
+> + */
+> +#if defined(CONFIG_VIDEO_ATMEL_ISI) || defined(CONFIG_VIDEO_ATMEL_ISI_MODULE)
+> +static struct isi_platform_data __initdata isi_data = {
+> +	.frate		= ISI_CFG1_FRATE_CAPTURE_ALL,
+> +	.has_emb_sync	= 0,
+> +	.emb_crc_sync = 0,
+> +	.hsync_act_low = 0,
+> +	.vsync_act_low = 0,
+> +	.pclk_act_falling = 0,
+> +	/* to use codec and preview path simultaneously */
+> +	.isi_full_mode = 1,
+> +	.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10,
+> +};
+> +
+> +static void __init isi_set_clk(void)
+> +{
+> +	struct clk *pck1;
+> +	struct clk *plla;
+> +
+> +	pck1 = clk_get(NULL, "pck1");
+> +	plla = clk_get(NULL, "plla");
+> +
+> +	clk_set_parent(pck1, plla);
+> +	clk_set_rate(pck1, 25000000);
+> +	clk_enable(pck1);
+you must not enable the clock always
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |   11 ++++++++++-
- 1 files changed, 10 insertions(+), 1 deletions(-)
+you must enable it just when you need it
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index c0fe002..7c5ddb6 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -117,6 +117,14 @@ static const struct i2c_board_info wm1254_devs[] = {
- 	  .platform_data = &wm9081_pdata, },
- };
- 
-+static const struct i2c_board_info wm1255_devs[] = {
-+	{ I2C_BOARD_INFO("wm5100", 0x1a),
-+	  .irq = GLENFARCLAS_PMIC_IRQ_BASE + WM831X_IRQ_GPIO_2,
-+	},
-+	{ I2C_BOARD_INFO("wm9081", 0x6c),
-+	  .platform_data = &wm9081_pdata, },
-+};
-+
- static const struct i2c_board_info wm1259_devs[] = {
- 	{ I2C_BOARD_INFO("wm8962", 0x1a),
- 	  .platform_data = &wm8962_pdata,
-@@ -145,7 +153,8 @@ static __devinitdata const struct {
- 	  .i2c_devs = wm1254_devs, .num_i2c_devs = ARRAY_SIZE(wm1254_devs) },
- 	{ .id = 0x3a, .name = "1259-EV1 Tobermory",
- 	  .i2c_devs = wm1259_devs, .num_i2c_devs = ARRAY_SIZE(wm1259_devs) },
--	{ .id = 0x3b, .name = "1255-EV1 Kilchoman" },
-+	{ .id = 0x3b, .name = "1255-EV1 Kilchoman",
-+	  .i2c_devs = wm1255_devs, .num_i2c_devs = ARRAY_SIZE(wm1255_devs) },
- 	{ .id = 0x3c, .name = "1273-EV1 Longmorn" },
- };
- 
--- 
-1.7.5.4
+and manage the clock at the board level really so so
+
+Best Regards,
+J.
