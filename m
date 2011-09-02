@@ -1,48 +1,72 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 2 Sep 2011 10:59:54 +0200
-Subject: [PATCH 7/7] OMAP3: beagleboard: Remove DT support from regular
-	board
-In-Reply-To: <20110902081246.GQ3548@atomide.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Sep 2011 11:09:44 +0300
+Subject: [PATCH 6/7] OMAP3: board-dt: Add generic board file for DT support
+In-Reply-To: <1314897912-18178-7-git-send-email-b-cousson@ti.com>
 References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
-	<1314897912-18178-8-git-send-email-b-cousson@ti.com>
-	<20110902081246.GQ3548@atomide.com>
-Message-ID: <4E609B0A.1020804@ti.com>
+	<1314897912-18178-7-git-send-email-b-cousson@ti.com>
+Message-ID: <20110902080944.GP3548@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2011 10:12 AM, Tony Lindgren wrote:
-> * Benoit Cousson<b-cousson@ti.com>  [110901 19:52]:
->> In order to avoid conflict with the new board-omap3-dt.c file,
->> remove the .dt_compat entry from the beagle regular board
->> file.
->>
->> Any DT work for OMAP3 will have to be done on the generic DT
->> board file to avoid breaking the legacy board support until
->> DT migration is done.
->
-> In general we should not keep duplicate old non-DT data around
-> now that we have the DT append support. Instead we should just
-> require the .dts file appended to zImage for all mach-omap2
-> machines. Otherwise we'll end up with double bloat :)
+Hi,
 
-Mmm, I'm not sure to get your point. We are not duplicating, since a 
-pure DT generic board will not have anything except a 
-of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
-And the regular board files will keep initializing devices statically.
-The drivers will then for the moment support both pdata and DT method to 
-get board parameters.
+* Benoit Cousson <b-cousson@ti.com> [110901 19:52]:
+> Create an OMAP3 generic board to start the DT migration.
 
-> So it's OK to have the DT entries in board files so drivers
-> that get converted will work with them.
+I don't think this needs to be SoC specific, we can add multiple
+DT_MACHINE_START entries into a single file. So it should be
+just board-omap-dt.c.
+ 
+> +#include "mux.h"
+> +#include "common-board-devices.h"
+> +#include "sdram-micron-mt46h32m32lf-6.h"
+> +
+> +
+> +static void __init omap3_init_early(void)
+> +{
+> +	omap2_init_common_infrastructure();
+> +	omap2_init_common_devices(mt46h32m32lf6_sdrc_params,
+> +				  mt46h32m32lf6_sdrc_params);
+> +}
 
-Well, it will be a little bit more tricky, because having DT in current 
-board files will be a mess with a bunch of #ifdef CONFIG_OF, and adding 
-DT compatible inside each boards will prevent the pure generic DT one to 
-work. In that case we will duplicate the DT migration in every legacy 
-boards files...
+This has changed, see the cleanup branch. Also, let's just leave
+out the sdram timings for now as we can work with bootloader
+timings until those come from DT too.
 
-That's why the current strategy is to keep the current board files 
-non-DT aware and add the DT support only to the generic DT board file.
+> +static void __init omap3_init(void)
+> +{
+> +	struct device_node *node;
+> +
+> +	node = of_find_matching_node(NULL, omap_dt_intc_match);
+> +	if (node)
+> +		irq_domain_add_simple(node, 0);
+> +
+> +	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+> +	omap_serial_init();
+> +
+> +	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+> +}
+> +
+> +static const char *omap3_dt_match[] __initdata = {
+> +	"ti,omap3",
+> +	NULL
+> +};
+
+Most likely we just need SoC specific init functions in this file
+now until the mux data comes from DT also.
+
+> +DT_MACHINE_START(OMAP3_DT, "TI OMAP3 (Flattened Device Tree)")
+> +	.reserve	= omap_reserve,
+> +	.map_io		= omap3_map_io,
+> +	.init_early	= omap3_init_early,
+> +	.init_irq	= omap3_init_irq,
+> +	.init_machine	= omap3_init,
+> +	.timer		= &omap3_timer,
+> +	.dt_compat	= omap3_dt_match,
+> +MACHINE_END
+
+Here omap3_init_early is now generic in the cleanup branch.
 
 Regards,
-Benoit
+
+Tony
