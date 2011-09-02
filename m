@@ -1,62 +1,48 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 2 Sep 2011 10:29:52 +0100
-Subject: [PATCH 1/5] Framework for exporting System-on-Chip information
-	via sysfs
-In-Reply-To: <4E609784.3080507@linaro.org>
-References: <1314880043-22517-1-git-send-email-lee.jones@linaro.org>
-	<20110901233403.GA28176@suse.de> <4E609784.3080507@linaro.org>
-Message-ID: <20110902092952.GA28500@pulham.picochip.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 2 Sep 2011 11:34:32 +0200
+Subject: [PATCH 6/7] OMAP3: board-dt: Add generic board file for DT support
+In-Reply-To: <20110902092153.GB30263@n2100.arm.linux.org.uk>
+References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
+	<1314897912-18178-7-git-send-email-b-cousson@ti.com>
+	<20110902080944.GP3548@atomide.com> <4E609800.9090402@ti.com>
+	<20110902090824.GA30263@n2100.arm.linux.org.uk>
+	<4E609E1F.4050607@ti.com>
+	<20110902092153.GB30263@n2100.arm.linux.org.uk>
+Message-ID: <4E60A328.3010202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2011 at 09:44:52AM +0100, Lee Jones wrote:
-> On 02/09/11 00:34, Greg KH wrote:
-> > On Thu, Sep 01, 2011 at 01:27:19PM +0100, Lee Jones wrote:
-> >> +static ssize_t soc_info_get(struct device *dev,
-> >> +			struct device_attribute *attr,
-> >> +			char *buf)
-> >> +{
-> >> +	struct soc_device *soc_dev = container_of(dev, struct soc_device, dev);
-> >> +
-> >> +	if (!strcmp(attr->attr.name, "machine"))
-> >> +		return sprintf(buf, "%s\n", soc_dev->machine);
-> >> +	if (!strcmp(attr->attr.name, "family"))
-> >> +		return sprintf(buf, "%s\n", soc_dev->family);
-> >> +	if (!strcmp(attr->attr.name, "revision"))
-> >> +		return sprintf(buf, "%s\n", soc_dev->revision);
-> >> +	if (!strcmp(attr->attr.name, "soc_id")) {
-> >> +		if (soc_dev->pfn_soc_id)
-> >> +			return sprintf(buf, "%s\n", soc_dev->pfn_soc_id());
-> >> +		else return sprintf(buf, "N/A \n");
-> > 
-> > Move this line
-> > 
-> >> +	}
-> >> +
-> >> +	return -EINVAL;
-> > 
-> > To here?
-> > 
-> 
-> I initially had invalid requests return a useful message, but I was told
-> to remove it and return -EINVAL instead:
-> 
-> "Just return -EINVAL or similar here to propogate the error to the user."
-> 
-> Jamie, what say you?
+On 9/2/2011 11:21 AM, Russell King - ARM Linux wrote:
+> On Fri, Sep 02, 2011 at 11:13:03AM +0200, Cousson, Benoit wrote:
+>> On 9/2/2011 11:08 AM, Russell King - ARM Linux wrote:
+>>> On Fri, Sep 02, 2011 at 10:46:56AM +0200, Cousson, Benoit wrote:
+>>>> Now, that kernel.org is back, I'll pull you branches :-).
+>>>
+>>> Umm.  Are you sure?  What are you checking - that some kernel.org
+>>> servers are reachable or that master.kernel.org is reachable (it
+>>> isn't.)
+>>
+>> I was not about to fetch
+>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
+>> yesterday, but it works today.
+>
+> git.kernel.org != master.kernel.org.
+>
+> git.kernel.org is an alias for a set of servers which are selected
+> depending on your geographical location, whereas master.kernel.org
+> a single machine to which we upload our trees and which has been down
+> since Wednesday.  I don't believe master.kernel.org is part of the
+> public serving infrastructure (it certainly never used to be.)
 
-Well if there isn't an ID for the SoC, then I think it's better for a 
-read() to return an error rather than have to parse for a special string 
-like "N/A ".  So rather than returning that string, perhaps something 
-like:
+Interesting, thanks for the explanations.
 
-	if (!strcmp(attr->attr.name, "soc_id")) {
-		if (!soc_dev->pfn_soc_id)
-			return -ENOENT;
-		return sprintf(buf, "%s\n", soc_dev->pfn_soc_id());
-	}
+> So, I suspect your non-reachability of git.kernel.org yesterday was
+> due to some other problem.
 
-or if you don't think this is an error, default to an id of "0" so that 
-it can be parsed by tools?
+OK, maybe. The good point is that now it works :-)
 
-Jamie
+The bad point is that Kevin cannot push his updated branches, so I still 
+do not have the latest :-(
+
+Thanks,
+Benoit
