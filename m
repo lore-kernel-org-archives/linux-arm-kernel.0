@@ -1,40 +1,38 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 2 Sep 2011 17:35:05 +0200
-Subject: [RFC PATCH 3/3] OMAP: omap_device: Add a method to build an
-	omap_device from a DT node
-In-Reply-To: <87pqjj4yrs.fsf@ti.com>
-References: <1314037343-19783-1-git-send-email-b-cousson@ti.com>
-	<1314037343-19783-4-git-send-email-b-cousson@ti.com>
-	<87pqjj4yrs.fsf@ti.com>
-Message-ID: <4E60F7A9.8000903@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 2 Sep 2011 08:34:43 -0700
+Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B327A55C@HQMAIL01.nvidia.com>
+References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
+	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
+	<alpine.LFD.2.02.1109021027360.2723@ionos>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B327A55C@HQMAIL01.nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B327A55E@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/2/2011 1:40 AM, Hilman, Kevin wrote:
-> Benoit Cousson<b-cousson@ti.com>  writes:
->
->> Add a notifier called during device_add phase. If a of_node is present,
->> retrieve the hwmod entry in order to populate propely the omap_device
->> structure.
->> For the moment the resource from the device-tree are overloaded.
->> DT does not support named resource yet, and thus, most driver
->> will not work without that information.
->>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Kevin Hilman<khilman@ti.com>
->
-> Nice, minor comment below...
+Stephen Warren wrote at Friday, September 02, 2011 9:25 AM:
+> Thomas Gleixner wrote at Friday, September 02, 2011 2:37 AM:
+> > On Thu, 4 Aug 2011, Stephen Warren wrote:
+> >
+> > > Many IRQs are associated with GPIO pins. When the pin is used as an IRQ,
+> > > it can't be used as anything else; it should be requested. Enhance the
+> > > core interrupt code to call gpio_request() and gpio_direction_input() for
+> > > any IRQ that is also a GPIO. This prevents duplication of these calls in
+> > > each driver that uses an IRQ.
+> >
+> > This is very much the wrong approach. If you think it through then the
+> > irq setup code might end up with tons of other subsystem specific
+> > setup thingies, e.g. PCI .....
+> >
+> > The right thing to do is to add a irq_configure() function pointer to
+> > the irq chip and provide a common function for gpios in gpiolib, which
+> > is then used by the particular GPIO irq chip implementation.
+> 
+> Sorry, could you expand on this some more.
 
-[...]
+Uggh. Sorry; just ignore this response; I got it confused with the responses
+to my proposed I2C changes. I've long-since dropped the patch that you
+responded to.
 
->> +	case BUS_NOTIFY_DEL_DEVICE:
->> +		dev_dbg(&pdev->dev, "del_device\n");
->
-> Need a delete/cleanup here.
->
-> Looks like all all it needs to do is call omap_device_delete()?
-
-Indeed, I was too lazy to add it.
-
-Thanks,
-Benoit
+-- 
+nvpublic
