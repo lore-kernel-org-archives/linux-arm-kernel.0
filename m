@@ -1,39 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Sep 2011 13:53:26 +0300
-Subject: [PATCH V2 00/16] omap_hsmmc patches
-In-Reply-To: <CANOLnOPGay+jQaeBAVD5-B3WQaWMSiPFirvhrPkeS0_ZgmX-BQ@mail.gmail.com>
-References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
-	<CANOLnONWmYn4FpuF-UAKQR4rAA6LOgWdMfu2bMN46nna6rOxAw@mail.gmail.com>
-	<m2k4bm2nwl.fsf@bob.laptop.org>
-	<CANOLnOPGay+jQaeBAVD5-B3WQaWMSiPFirvhrPkeS0_ZgmX-BQ@mail.gmail.com>
-Message-ID: <20110902105325.GT3548@atomide.com>
+From: phil.sutter@viprinet.com (Phil Sutter)
+Date: Fri,  2 Sep 2011 13:08:06 +0200
+Subject: [PATCH] af_packet: flush complete kernel cache in packet_sendmsg
+In-Reply-To: <20110505141107.GC30443@orbit.nwl.cc>
+References: <20110505141107.GC30443@orbit.nwl.cc>
+Message-ID: <1314961686-30870-1-git-send-email-phil.sutter@viprinet.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [110715 12:27]:
-> On Wed, Jul 13, 2011 at 6:36 PM, Chris Ball <cjb@laptop.org> wrote:
-> > Hi,
-> >
-> > On Wed, Jul 13 2011, Grazvydas Ignotas wrote:
-> >> it seems this series got lost in time, at least patches 01, 02, 03,
-> >> 04, 05, 06, 07, 08, 12 look like valid standalone fixes and
-> >> improvements to me, they don't touch other trees and still apply
-> >> cleanly, so would be good to have.
-> >
-> > Yeah. ?I didn't merge them because Tony still has unanswered comments on
-> > the OMAP side of the patches, and they're submitted as a single patchset.
-> >
-> > I've applied {2, 3, 5, 6, 7, 8, 12} to mmc-next for 3.1 now. ?1 doesn't
-> > apply because the function doesn't exist anymore. ?4 doesn't apply
-> > because iclk doesn't exist anymore.
-> >
-> > If someone wants to look at rebasing the rest of these against mmc-next
-> > and resubmitting, I think that'd be useful.
-> 
-> Thanks! 1 and 4 seem to be unneeded any more (I was trying them on
-> linux-next, not noticing it was not updated for a while), and others
-> have comments pending, so it's all done.
+This flushes the cache before and after accessing the mmapped packet
+buffer. It seems like the call to flush_dcache_page from inside
+__packet_get_status is not enough on Kirkwood (or ARM in general).
+---
+I know this is far from an optimal solution, but it's in fact the only working
+one I found. And it shouldn't interfere with unaffected target systems. So
+anyone relying on a working TX_RING on Kirkwood may refer to this patch. Any
+ARM/cache/Marvell/Kirkwood experts out there feel free to improve this.
+---
+ net/packet/af_packet.c |   24 ++++++++++++++++++++----
+ 1 files changed, 20 insertions(+), 4 deletions(-)
 
-So I guess that means I don't need to look at anything, right?
-
-Tony
+diff --git a/net/packet/af_packet.c b/net/packet/af_packet.c
+index 243946d..d7b5c2e 100644
+--- a/net/packet/af_packet.c
++++ b/net/packet/af_packet.c
+@@ -87,6 +87,14 @@
+ #include <net/inet_common.h>
+ #endif
+ 
++/* whether we need additional cacheflushing between user- and kernel-space */
++#ifdef CONFIG_ARCH_KIRKWOOD
++#  define ENABLE_CACHEPROB_WORKAROUND
++#  define kw_extra_cache_flush()	flush_cache_all()
++#else
++#  define kw_extra_cache_flush()	/* nothing */
++#endif
++
+ /*
+    Assumptions:
+    - if device has no dev->hard_header routine, it adds and removes ll header
+@@ -1239,10 +1247,13 @@ static int packet_sendmsg(struct kiocb *iocb, struct socket *sock,
+ {
+ 	struct sock *sk = sock->sk;
+ 	struct packet_sock *po = pkt_sk(sk);
+-	if (po->tx_ring.pg_vec)
+-		return tpacket_snd(po, msg);
+-	else
+-		return packet_snd(sock, msg, len);
++	int rc;
++
++	kw_extra_cache_flush();
++	rc = po->tx_ring.pg_vec ? tpacket_snd(po, msg) :
++			packet_snd(sock, msg, len);
++	kw_extra_cache_flush();
++	return rc;
+ }
+ 
+ /*
+@@ -2622,6 +2633,11 @@ static int __init packet_init(void)
+ 	sock_register(&packet_family_ops);
+ 	register_pernet_subsys(&packet_net_ops);
+ 	register_netdevice_notifier(&packet_netdev_notifier);
++
++#ifdef ENABLE_CACHEPROB_WORKAROUND
++	printk(KERN_INFO "af_packet: cache coherency workaround for kirkwood is active!\n");
++#endif
++
+ out:
+ 	return rc;
+ }
+-- 
+1.7.3.4
