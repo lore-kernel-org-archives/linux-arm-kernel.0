@@ -1,35 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Sep 2011 10:11:48 +0200
-Subject: [PATCH 2/4 v6] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B327A40C@HQMAIL01.nvidia.com>
-References: <1314869552-5531-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B327A40C@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdZ1kNbtOqw=X1mmM-bA+Gg2BbmO5_CT0sSQtBCK_WdwYw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Sep 2011 11:12:46 +0300
+Subject: [PATCH 7/7] OMAP3: beagleboard: Remove DT support from regular
+	board
+In-Reply-To: <1314897912-18178-8-git-send-email-b-cousson@ti.com>
+References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
+	<1314897912-18178-8-git-send-email-b-cousson@ti.com>
+Message-ID: <20110902081246.GQ3548@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2011 at 11:33 PM, Stephen Warren <swarren@nvidia.com> wrote:
+* Benoit Cousson <b-cousson@ti.com> [110901 19:52]:
+> In order to avoid conflict with the new board-omap3-dt.c file,
+> remove the .dt_compat entry from the beagle regular board
+> file.
+> 
+> Any DT work for OMAP3 will have to be done on the generic DT
+> board file to avoid breaking the legacy board support until
+> DT migration is done.
 
->> +static const struct u300_pmx_func u300_pmx_functions[] = {
->> + ? ? {
->> + ? ? ? ? ? ? .name = "power",
->> + ? ? ? ? ? ? .groups = { POWERGRP_INDEX },
->> + ? ? ? ? ? ? /* Mask is N/A */
->> + ? ? },
->
-> Hmmm. That's a lot of _INDEX defines that'd need to be set up, at least
-> to fully represent a chip like Tegra. Can the pinmux core be modified
-> such that the group list is an array of names (char*) rather than the
-> actual numeric IDs of the groups? Still, perhaps we could use the enum
-> we already have for this, so perhaps it isn't a big deal...
+In general we should not keep duplicate old non-DT data around
+now that we have the DT append support. Instead we should just
+require the .dts file appended to zImage for all mach-omap2
+machines. Otherwise we'll end up with double bloat :)
 
-Well I could think about a lot of ways to do this, but it's basically up
-to the driver, the U300 is just some simple example of what you can
-do, it's just trying to satisfy the API.
+So it's OK to have the DT entries in board files so drivers
+that get converted will work with them.
 
-Maybe as part of writing the nVidia driver you find a clever
-mechanism for doing this, if it's looking generally useful at that
-point then let's move it to the core I'd say.
-
-Thanks,
-Linus Walleij
+Tony
