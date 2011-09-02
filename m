@@ -1,35 +1,28 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 2 Sep 2011 12:28:29 -0700
-Subject: IRQF_TRIGGER_LOW and ARM GIC
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B327A657@HQMAIL01.nvidia.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 02 Sep 2011 15:47:12 -0700
+Subject: [PATCH 00/14] McBSP cleanup and generalization
+In-Reply-To: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
+	(Jarkko Nikula's message of "Wed, 31 Aug 2011 18:22:47 +0300")
+References: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <87k49q7ea7.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, Colin,
+Hi Jarkko,
 
-The Tegra Harmony board contains a TPS6586x chip, which has an active-low
-interrupt output. This is then fed to Tegra's PMC's PWR_INT pin, which can
-be programmed to accept active-low or active-high interrupt signals. This
-then feeds into a GIC interrupt.
+Jarkko Nikula <jarkko.nikula@bitmer.com> writes:
 
-The problem is that the PMC appears to default to expecting the attached
-signal to be active-high not active-low.
+[...]
 
-At a driver level, it seems that IRQF_TRIGGER_LEVEL_LOW should be passed
-to request_threaded_irq() to solve this. However, gic.c:gic_set_type()
-prohibits IRQ_TYPE_* except LEVEL_HIGH and EDGE_RISING.
+> Note that patch 01/14 has from address to my disabled google account. This
+> is since the patch is already committed in to
+> for_3.2/omap_device branch of Kevin's git tree.
 
-I'm not quite sure how to solve this; should gic_set_type() be modified
-to remove the restriction if gic_arch_extn.irq_set_type is present, and
-assume that gic_arch_extn.irq_set_type will handle converting the input
-signal from LEVEL_LOW to LEVEL_HIGH or EDGE_FALLING to EDGE_RISING?
+The current version of my branch is not the final, as it needs to be
+rebased against v3.1-rc4, so no worries about the email address.
 
-In at least some non-mainline kernels, this has been solved by having
-individual board files poke PMC registers to invert the signal to the
-gic's expected LEVEL_HIGH. However, I assume that's not a good solution
-for mainline.
+I've updated it my version of the patch in my local branch with this
+email address, and will push it out whenever master.kernel.org is back
+online.
 
-Thanks.
-
--- 
-nvpublic
+Kevin
