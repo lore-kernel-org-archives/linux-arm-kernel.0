@@ -1,9 +1,10 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 01 Sep 2011 22:59:09 -0400
-Subject: [PATCH 2/6] ARM: plat-omap: make OMAP_UART_INFO into a relative offset
+Date: Thu, 01 Sep 2011 22:59:12 -0400
+Subject: [PATCH 5/6] ARM: mach-davinci: make DAVINCI_UART_INFO into a relative
+	offset
 In-Reply-To: <1314932353-24813-1-git-send-email-nico@fluxnic.net>
 References: <1314932353-24813-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1314932353-24813-3-git-send-email-nico@fluxnic.net>
+Message-ID: <1314932353-24813-6-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,93 +13,79 @@ UART code.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-omap1/include/mach/debug-macro.S |    8 +++-----
- arch/arm/mach-omap2/include/mach/debug-macro.S |    9 ++++-----
- arch/arm/plat-omap/include/plat/serial.h       |    6 +++---
- arch/arm/plat-omap/include/plat/uncompress.h   |    8 +++++++-
- 4 files changed, 17 insertions(+), 14 deletions(-)
+ arch/arm/mach-davinci/include/mach/debug-macro.S |   21 ++++++++++-----------
+ arch/arm/mach-davinci/include/mach/serial.h      |    3 ++-
+ arch/arm/mach-davinci/include/mach/uncompress.h  |    7 ++++++-
+ 3 files changed, 18 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/include/mach/debug-macro.S b/arch/arm/mach-omap1/include/mach/debug-macro.S
-index f944ae8..6a17118 100644
---- a/arch/arm/mach-omap1/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
-@@ -46,11 +46,9 @@ omap_uart_virt:	.word	0x0
- 		bne	99f			@ already configured
+diff --git a/arch/arm/mach-davinci/include/mach/debug-macro.S b/arch/arm/mach-davinci/include/mach/debug-macro.S
+index 3cf4c1b..45fff2c 100644
+--- a/arch/arm/mach-davinci/include/mach/debug-macro.S
++++ b/arch/arm/mach-davinci/include/mach/debug-macro.S
+@@ -50,21 +50,20 @@ davinci_uart_virt:	.word	0
+ 		mrc	p15, 0, \rp, c1, c0
+ 		tst	\rp, #1			@ MMU enabled?
  
- 		/* Check the debug UART configuration set in uncompress.h */
--		mrc	p15, 0, \rp, c1, c0
--		tst	\rp, #1			@ MMU enabled?
--		ldreq	\rp, =OMAP_UART_INFO	@ MMU not enabled
--		ldrne	\rp, =omap_uart_p2v(OMAP_UART_INFO)	@ MMU enabled
--		ldr	\rp, [\rp, #0]
+-		/* Copy uart phys address from decompressor uart info */
 +		and	\rp, pc, #0xff000000
-+		ldr	\rv, =OMAP_UART_INFO_OFS
-+		ldr	\rp, [\rp, \rv]
- 
- 		/* Select the UART to use based on the UART1 scratchpad value */
- 10:		cmp	\rp, #0			@ no port configured?
-diff --git a/arch/arm/mach-omap2/include/mach/debug-macro.S b/arch/arm/mach-omap2/include/mach/debug-macro.S
-index fbd23ec..745e2ff 100644
---- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-@@ -49,11 +49,10 @@ omap_uart_lsr:	.word	0
- 		bne	99f			@ already configured
- 
- 		/* Check the debug UART configuration set in uncompress.h */
--		mrc	p15, 0, \rp, c1, c0
--		tst	\rp, #1			@ MMU enabled?
--		ldreq	\rp, =OMAP_UART_INFO	@ MMU not enabled
--		ldrne	\rp, =omap_uart_p2v(OMAP_UART_INFO)	@ MMU enabled
++		ldr	\rv, =DAVINCI_UART_INFO_OFS
++		add	\rp, \rp, \rv
++
+ 		ldreq	\rv, =davinci_uart_v2p(davinci_uart_phys)
+ 		ldrne	\rv, =davinci_uart_phys
+-		ldreq	\rp, =DAVINCI_UART_INFO
+-		ldrne	\rp, =davinci_uart_p2v(DAVINCI_UART_INFO)
 -		ldr	\rp, [\rp, #0]
-+		mov	\rp, pc
-+		ldr	\rv, =OMAP_UART_INFO_OFS
-+		and	\rp, \rp, #0xff000000
-+		ldr	\rp, [\rp, \rv]
+-		str	\rp, [\rv]
++
++		/* Copy uart phys address from decompressor uart info */
++		ldr	\tmp, [\rp, #0]
++		str	\tmp, [\rv, #0]
  
- 		/* Select the UART to use based on the UART1 scratchpad value */
- 		cmp	\rp, #0			@ no port configured?
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index de3b10c..1ab9fd6 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -16,8 +16,8 @@
- #include <linux/init.h>
+ 		/* Copy uart virt address from decompressor uart info */
+-		ldreq	\rv, =davinci_uart_v2p(davinci_uart_virt)
+-		ldrne	\rv, =davinci_uart_virt
+-		ldreq	\rp, =DAVINCI_UART_INFO
+-		ldrne	\rp, =davinci_uart_p2v(DAVINCI_UART_INFO)
+-		ldr	\rp, [\rp, #4]
+-		str	\rp, [\rv]
++		ldr	\tmp, [\rp, #4]
++		str	\tmp, [\rv, #4]
  
- /*
-- * Memory entry used for the DEBUG_LL UART configuration. See also
-- * uncompress.h and debug-macro.S.
-+ * Memory entry used for the DEBUG_LL UART configuration, relative to
-+ * start of RAM. See also uncompress.h and debug-macro.S.
+ 		b	10b
+ 99:
+diff --git a/arch/arm/mach-davinci/include/mach/serial.h b/arch/arm/mach-davinci/include/mach/serial.h
+index c9e6ce1..e347d88 100644
+--- a/arch/arm/mach-davinci/include/mach/serial.h
++++ b/arch/arm/mach-davinci/include/mach/serial.h
+@@ -21,8 +21,9 @@
+  * macros in debug-macro.S.
   *
-  * Note that using a memory location for storing the UART configuration
-  * has at least two limitations:
-@@ -27,7 +27,7 @@
-  * 2. We assume printascii is called at least once before paging_init,
-  *    and addruart has a chance to read OMAP_UART_INFO
+  * This area sits just below the page tables (see arch/arm/kernel/head.S).
++ * We define it as a relative offset from start of usable RAM.
   */
--#define OMAP_UART_INFO		(PLAT_PHYS_OFFSET + 0x3ffc)
-+#define OMAP_UART_INFO_OFS	0x3ffc
+-#define DAVINCI_UART_INFO	(PLAT_PHYS_OFFSET + 0x3ff8)
++#define DAVINCI_UART_INFO_OFS	0x3ff8
  
- /* OMAP1 serial ports */
- #define OMAP1_UART1_BASE	0xfffb0000
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index a067484..71763db 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -36,7 +36,13 @@ int uart_shift;
-  */
- static void set_omap_uart_info(unsigned char port)
+ #define DAVINCI_UART0_BASE	(IO_PHYS + 0x20000)
+ #define DAVINCI_UART1_BASE	(IO_PHYS + 0x20400)
+diff --git a/arch/arm/mach-davinci/include/mach/uncompress.h b/arch/arm/mach-davinci/include/mach/uncompress.h
+index 78d8068..9dc7cf9 100644
+--- a/arch/arm/mach-davinci/include/mach/uncompress.h
++++ b/arch/arm/mach-davinci/include/mach/uncompress.h
+@@ -43,7 +43,12 @@ static inline void flush(void)
+ 
+ static inline void set_uart_info(u32 phys, void * __iomem virt)
  {
--	*(volatile u32 *)OMAP_UART_INFO = port;
-+	/* 
-+	 * Get address of some.bss variable and round it down 
+-	u32 *uart_info = (u32 *)(DAVINCI_UART_INFO);
++	/*
++	 * Get address of some.bss variable and round it down
 +	 * a la CONFIG_AUTO_ZRELADDR.
 +	 */
-+	u32 ram_start = (u32)&uart_shift & 0xf8000000;
-+	u32 *uart_info = (u32 *)(ram_start + OMAP_UART_INFO_OFS);
-+	*uart_info = port;
- }
++	u32 ram_start = (u32)&uart & 0xf8000000;
++	u32 *uart_info = (u32 *)(ram_start + DAVINCI_UART_INFO_OFS);
  
- static void putc(int c)
+ 	uart = (u32 *)phys;
+ 	uart_info[0] = phys;
 -- 
 1.7.4
