@@ -1,35 +1,95 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Fri, 2 Sep 2011 16:44:48 +0200
-Subject: [RFC v2 PATCH 1/1] ASoC: soc-core: symmetry checking for each
-	DAIs separately
-In-Reply-To: <1314609314-22162-1-git-send-email-b29396@freescale.com>
-References: <1314609314-22162-1-git-send-email-b29396@freescale.com>
-Message-ID: <20110902144448.GH1901@pengutronix.de>
+From: Ulrich.Weigand@de.ibm.com (Ulrich Weigand)
+Date: Fri, 2 Sep 2011 16:47:35 +0200
+Subject: try_to_freeze() called with IRQs disabled on ARM
+In-Reply-To: <20110901140000.GF29729@n2100.arm.linux.org.uk>
+References: <20110823220056.GK3895@n2100.arm.linux.org.uk>
+	<20110825130907.GO3286@htj.dyndns.org>
+	<20110825145558.GF8883@n2100.arm.linux.org.uk>
+	<201108261644.26329.arnd@arndb.de>
+	<OF2C5ADB6A.65B1BE36-ONC12578FE.00493A67-C12578FE.004B3315@de.ibm.com>
+	<20110901140000.GF29729@n2100.arm.linux.org.uk>
+Message-ID: <OF69A57AB0.CF22689A-ONC12578FF.004EDD71-C12578FF.005142FF@de.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 05:15:14PM +0800, Dong Aisheng wrote:
-> The orginal code does not cover the case that one DAI such as codec
-> may be shared between other two DAIs(CPU).
-> When do symmetry checking, altough the codec DAI requires symmetry,
-> the two CPU DAIs may still be configured to run on different rates.
-> 
-> We change to check each DAI's state separately instead of only checking
-> the dai link to prevent this issue.
-> 
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote on 09/01/2011
+04:00:00 PM:
+> On Thu, Sep 01, 2011 at 03:41:22PM +0200, Ulrich Weigand wrote:
+> > One way to fix this might be to make the TIF_SYS_RESTART flag
+> > itself visible to ptrace, so the GDB could save/restore it
+> > along with the rest of the register set; this would be similar
+> > to how that problem is handled on other platforms.  However,
+> > there doesn't appear to be an obvious place for the flag in
+> > the ptrace register set ...
+>
+> Thanks for looking at this.
+>
+> I don't think we can augment the ptrace register set - that would be a
+> major API change which would immediately break lots of userspace,
+> causing user stack overflows and such like.
 
-Removes the race warning for me:
+Well, it wouldn't need to go into the default register set (REGSET_GPR),
+but could be in a new register set.  This shouldn't change anything for
+existing applications, but GDB could probe for support for the new
+regset and use it if present.
 
-Tested-by: Wolfram Sang <w.sang@pengutronix.de>
+> I can't see a way out of this - and given the seriousness of the kernel
+> side issue (causing kernel warnings), and that your change altered the
+> strace behaviour (an unintended user-visible change) I think we're going
+> to have to live with the gdb testcase failing until we can come up with
+> a better fix for it.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110902/a8f9e3d3/attachment.sig>
+The change you suggest, with the addition of making the flag available
+to the debugger in a new register set, should be fine for GDB.
+
+I agree that the race you pointed out in the initial mail to this thread
+needs to be fixed; an in fact, it seems that this race is also present
+on s390 ...  In discussions with Martin, we were wondering however
+whether the fix you suggest does actually fully plug the race:
+
+Assume the scenario you initally describe, where a first signal is
+ignored and leads to system call restart.  With your latest patch,
+you call into syscall_restart which sets everything up to restart
+the call (with interrupts disabled).  Then, you go back to user space,
+with PC pointing to the SVC that is to be restarted.  Now assume that
+some interrupt is pending at this point.  At the switch to user
+space, interrupts will be enabled.  Can it now happen that this
+pending interrupt is recognized *before* the SVC is executed?
+(Maybe the hardware doesn't allow that on ARM ... it definitely
+*is* possible on s390, though.)
+
+If so, can this not then lead to the exact same race you initially
+described (the interrupt causing some other task to be scheduled,
+and then an second signal to be delivered to the task about to
+restart the SVC)?
+
+I guess one way to fix this would be to not actually go back to
+user space for system call restart at all, but instead just short-
+cut this in entry.S and simply go right back to the system call
+entry path.  As a side benefit, this could eliminate the need to
+create a stack frame for the OABI RESTARTBLOCK case ...  (This is
+what we do on s390 b.t.w., where there is a similar issue with the
+system call number being an immediate argument to the SVC
+instruction.)
+
+> I also wonder what the validity of this behaviour is - there are cases
+> where you can't do what gdb's trying to do - eg, with a syscall using
+> a restart block (-ERESTART_RESTARTBLOCK) because the restart information
+> could be wiped out by a new syscall performed by the function gdb wants
+> to run.  Or when the program receives a signal for it to handle while
+> running that function.
+
+Yes, performing an inferior call during a system call that restarts
+using RESTARTBLOCK is broken.  This is a problem on all architectures,
+and has been ever since the RESTARTBLOCK mechanism was introduced ...
+
+To really fix this case would probably require some way for the
+debugger to save and restore the restore_block saved state.  This
+is not quite trivial, since it would expose that state to user space,
+effectively creating a new ABI (and probably requiring sanity checks
+to ensure a valid state is restored).  This probably cannot be fixed
+by one architecture for itself, but would need support from common
+kernel code.
+
+Bye,
+Ulrich
