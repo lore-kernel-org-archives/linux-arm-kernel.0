@@ -1,62 +1,41 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri,  2 Sep 2011 20:32:33 +0300
-Subject: [PATCH 4/7] iommu/omap: ->unmap() should return order of unmapped page
+Date: Fri,  2 Sep 2011 20:32:34 +0300
+Subject: [PATCH 5/7] iommu/msm: ->unmap() should return order of unmapped page
 In-Reply-To: <1314984756-4400-1-git-send-email-ohad@wizery.com>
 References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-Message-ID: <1314984756-4400-5-git-send-email-ohad@wizery.com>
+Message-ID: <1314984756-4400-6-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Users of the IOMMU API (kvm specifically) assume that iommu_unmap()
-returns the order of the unmapped page.
+returns the order of the unmapped page (on success).
 
-Fix omap_iommu_unmap() to do so and adopt omap-iovmm accordingly.
+Fix msm_iommu_unmap() accordingly.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
+Cc: David Brown <davidb@codeaurora.org>
 ---
- drivers/iommu/omap-iommu.c |   13 ++++---------
- drivers/iommu/omap-iovmm.c |    2 +-
- 2 files changed, 5 insertions(+), 10 deletions(-)
+ drivers/iommu/msm_iommu.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index 4311bc3..bd5f606 100644
---- a/drivers/iommu/omap-iommu.c
-+++ b/drivers/iommu/omap-iommu.c
-@@ -1081,18 +1081,13 @@ static int omap_iommu_unmap(struct iommu_domain *domain, unsigned long da,
- 	struct omap_iommu_domain *omap_domain = domain->priv;
- 	struct omap_iommu *oiommu = omap_domain->iommu_dev;
- 	struct device *dev = oiommu->dev;
--	size_t bytes = PAGE_SIZE << order;
--	size_t ret;
-+	size_t unmap_size;
+diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+index 1a584e0..d1733f6 100644
+--- a/drivers/iommu/msm_iommu.c
++++ b/drivers/iommu/msm_iommu.c
+@@ -543,6 +543,13 @@ static int msm_iommu_unmap(struct iommu_domain *domain, unsigned long va,
+ 	}
  
--	dev_dbg(dev, "unmapping da 0x%lx size 0x%x\n", da, bytes);
-+	dev_dbg(dev, "unmapping da 0x%lx order %d\n", da, order);
- 
--	ret = iopgtable_clear_entry(oiommu, da);
--	if (ret != bytes) {
--		dev_err(dev, "entry @ 0x%lx was %d; not %d\n", da, ret, bytes);
--		return -EINVAL;
--	}
-+	unmap_size = iopgtable_clear_entry(oiommu, da);
- 
--	return 0;
-+	return unmap_size ? get_order(unmap_size) : -EINVAL;
- }
- 
- static int
-diff --git a/drivers/iommu/omap-iovmm.c b/drivers/iommu/omap-iovmm.c
-index 39bdb92..e8fdb88 100644
---- a/drivers/iommu/omap-iovmm.c
-+++ b/drivers/iommu/omap-iovmm.c
-@@ -480,7 +480,7 @@ static void unmap_iovm_area(struct iommu_domain *domain, struct omap_iommu *obj,
- 		order = get_order(bytes);
- 
- 		err = iommu_unmap(domain, start, order);
--		if (err)
-+		if (err < 0)
- 			break;
- 
- 		dev_dbg(obj->dev, "%s: unmap %08x(%x) %08x\n",
+ 	ret = __flush_iotlb(domain);
++
++	/*
++	 * the IOMMU API requires us to return the order of the unmapped
++	 * page (on success).
++	 */
++	if (!ret)
++		ret = order;
+ fail:
+ 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
+ 	return ret;
 -- 
 1.7.4.1
