@@ -1,96 +1,107 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 2 Sep 2011 10:46:56 +0200
-Subject: [PATCH 6/7] OMAP3: board-dt: Add generic board file for DT support
-In-Reply-To: <20110902080944.GP3548@atomide.com>
-References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
-	<1314897912-18178-7-git-send-email-b-cousson@ti.com>
-	<20110902080944.GP3548@atomide.com>
-Message-ID: <4E609800.9090402@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 2 Sep 2011 10:47:04 +0200 (CEST)
+Subject: [RFC PATCH] genirq: set pending flag for disabled level interrupt
+In-Reply-To: <1312820566-5842-1-git-send-email-adharmap@codeaurora.org>
+References: <1312820566-5842-1-git-send-email-adharmap@codeaurora.org>
+Message-ID: <alpine.LFD.2.02.1109021046240.2723@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
 
-On 9/2/2011 10:09 AM, Tony Lindgren wrote:
-> Hi,
->
-> * Benoit Cousson<b-cousson@ti.com>  [110901 19:52]:
->> Create an OMAP3 generic board to start the DT migration.
->
-> I don't think this needs to be SoC specific, we can add multiple
-> DT_MACHINE_START entries into a single file. So it should be
-> just board-omap-dt.c.
+On Mon, 8 Aug 2011, Abhijeet Dharmapurikar wrote:
 
-I do agree, it should not, I made that comment into the 
-board-omap4-dt.c, but for the moment we still have dedicated OMAP 
-specifics stuff at board level, like the map_io.
+> For hardware which has no wakeup source configuration facility, it needs
+> its wakeup interrupts unmasked.
+> If a wakeup edge interrupt triggered while the system was suspending the
+> edge flow handler marks it pending and masks the interrupt. The kernel
+> checks pending flag on wakeup interrupts and aborts suspend if one is set.
+> 
+> If a wakeup level interrupt triggered while the system was suspending the
+> level flow handler masks the interrupt without setting the pending flag.
+> Suspend won't be aborted. This is fine as it is expected that a level
+> triggered interrupt will stay triggered and cause the system to resume.
+> This however doesn't work on chips that don't have wakeup configuration
+> in hardware because such chips need that interrupt unmasked for causing
+> a resume.
+> 
+> Address that shortcoming by making the level flow handler set the pending
+> flag if a wakeup interrupt controlled by such a chip is triggered while
+> it is suspended.
 
-I have an other series that make the map_io DT aware to get rid of that, 
-but it still not finalized.
+And how is that supposed to work ?
 
-My goal was have a single DT_MACHINE_START for every OMAPs.
-But, meanwhile, if you prefer one file with many board descriptors, 
-that's fine.
-
->> +#include "mux.h"
->> +#include "common-board-devices.h"
->> +#include "sdram-micron-mt46h32m32lf-6.h"
->> +
->> +
->> +static void __init omap3_init_early(void)
->> +{
->> +	omap2_init_common_infrastructure();
->> +	omap2_init_common_devices(mt46h32m32lf6_sdrc_params,
->> +				  mt46h32m32lf6_sdrc_params);
->> +}
->
-> This has changed, see the cleanup branch. Also, let's just leave
-> out the sdram timings for now as we can work with bootloader
-> timings until those come from DT too.
-
-Yep, I know, but since that series is based on my previous series that 
-is based on mainline rc-3, I missed these.
-
-Now, that kernel.org is back, I'll pull you branches :-).
-
-Which one do you recommend in that case, master or cleanup?
-
->> +static void __init omap3_init(void)
->> +{
->> +	struct device_node *node;
->> +
->> +	node = of_find_matching_node(NULL, omap_dt_intc_match);
->> +	if (node)
->> +		irq_domain_add_simple(node, 0);
->> +
->> +	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
->> +	omap_serial_init();
->> +
->> +	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
->> +}
->> +
->> +static const char *omap3_dt_match[] __initdata = {
->> +	"ti,omap3",
->> +	NULL
->> +};
->
-> Most likely we just need SoC specific init functions in this file
-> now until the mux data comes from DT also.
-
-OK, I can get rid of mux stuff then.
-
->> +DT_MACHINE_START(OMAP3_DT, "TI OMAP3 (Flattened Device Tree)")
->> +	.reserve	= omap_reserve,
->> +	.map_io		= omap3_map_io,
->> +	.init_early	= omap3_init_early,
->> +	.init_irq	= omap3_init_irq,
->> +	.init_machine	= omap3_init,
->> +	.timer		=&omap3_timer,
->> +	.dt_compat	= omap3_dt_match,
->> +MACHINE_END
->
-> Here omap3_init_early is now generic in the cleanup branch.
-
-Cool, I'll update the whole series, including the OMAP4 ones.
-
-Benoit
+check_irq_resend()
+{
+        if (irq_settings_is_level(desc))
+                return;
+...
+ 
+> Signed-off-by: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> ---
+> If a level interrupt irq triggered right while the system was doing
+> suspend_noirqs, the level flow handler will mask that interrupt and when the
+> system went in to power collapse the interrupt controller did not wakeup the
+> phone. The interrupt controller needs an interrupt triggered and masked to
+> wakeup the phone - it does not have any wakeup interrupt configuration.
+> The solution presented here is to mark that level triggered
+> wakeup interrupt pending for chips with IRQCHIP_MASK_ON_SUSPEND. This will cause
+> check_wakeup_irqs to abort suspend.
+> Other solution would be to unmask such level interrupt in check_wakeup_irqs()
+> but that seemed like I was expanding and complicating check_wakeup_irqs()
+> duties - let me know if you think otherwise. 
+> Note that we cannot unmask the interrupt in the level flow handler, that will
+> cause an interrupt storm.
+> 
+>  include/linux/irq.h |    4 +++-
+>  kernel/irq/chip.c   |   16 +++++++++++++++-
+>  2 files changed, 18 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> index 87a06f3..0019385 100644
+> --- a/include/linux/irq.h
+> +++ b/include/linux/irq.h
+> @@ -332,7 +332,9 @@ struct irq_chip {
+>   *
+>   * IRQCHIP_SET_TYPE_MASKED:	Mask before calling chip.irq_set_type()
+>   * IRQCHIP_EOI_IF_HANDLED:	Only issue irq_eoi() when irq was handled
+> - * IRQCHIP_MASK_ON_SUSPEND:	Mask non wake irqs in the suspend path
+> + * IRQCHIP_MASK_ON_SUSPEND:	Mask non wake irqs in the suspend path,
+> + *				mark wakeup level interrupts pending
+> + *				if suspended and triggered
+>   * IRQCHIP_ONOFFLINE_ENABLED:	Only call irq_on/off_line callbacks
+>   *				when irq enabled
+>   */
+> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+> index d5a3009..0199871 100644
+> --- a/kernel/irq/chip.c
+> +++ b/kernel/irq/chip.c
+> @@ -339,9 +339,23 @@ handle_level_irq(unsigned int irq, struct irq_desc *desc)
+>  	 * If its disabled or no action available
+>  	 * keep it masked and get out of here
+>  	 */
+> -	if (unlikely(!desc->action || irqd_irq_disabled(&desc->irq_data)))
+> +	if (unlikely(!desc->action))
+>  		goto out_unlock;
+>  
+> +	if (irqd_irq_disabled(&desc->irq_data)) {
+> +		/*
+> +		 * Hardware which has no wakeup source configuration facility,
+> +		 * needs its wakeup interrupts unmasked and triggered to cause
+> +		 * a wakeup. Since the interrupt will be masked, mark it pending
+> +		 * if it were suspended so that suspend will be aborted later.
+> +		 */
+> +		if (desc->istate & IRQS_SUSPENDED &&
+> +		    irqd_is_wakeup_set(&desc->irq_data) &&
+> +		    irq_desc_get_chip(desc)->flags & IRQCHIP_MASK_ON_SUSPEND)
+> +			desc->istate |= IRQS_PENDING;
+> +		goto out_unlock;
+> +	}
+> +
+>  	handle_irq_event(desc);
+>  
+>  	if (!irqd_irq_disabled(&desc->irq_data) && !(desc->istate & IRQS_ONESHOT))
+> -- 
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> 
+> 
