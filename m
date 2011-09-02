@@ -1,99 +1,65 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 01 Sep 2011 22:59:13 -0400
-Subject: [PATCH 6/6] ARM: mach-davinci: clean up debug-macro.S
-In-Reply-To: <1314932353-24813-1-git-send-email-nico@fluxnic.net>
-References: <1314932353-24813-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1314932353-24813-7-git-send-email-nico@fluxnic.net>
+From: bill4carson@gmail.com (carson bill)
+Date: Fri, 2 Sep 2011 11:01:04 +0800
+Subject: KVM ARM interrupt virtualization
+Message-ID: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This achieves two goals:
+Hi, all
 
-1) Get rid of davinci_uart_v2p() and davinci_uart_p2v() which were the
-   last users of PLAT_PHYS_OFFSET.
+I am trying to put interrupt virtualization support into KVM ARM
+implementation by Christoffer.
 
-2) Remove the probing of the M bit in the CP15 control reg and make
-   the access to the .data variables completely position independent.
+The approach is like this:
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/mach-davinci/include/mach/debug-macro.S |   39 +++++++++------------
- 1 files changed, 17 insertions(+), 22 deletions(-)
+   Distributor emulation stays in Qemu, whenever Guest OS touch
+   Distributor iomem, this action is handled by Qemu as it is.
 
-diff --git a/arch/arm/mach-davinci/include/mach/debug-macro.S b/arch/arm/mach-davinci/include/mach/debug-macro.S
-index 45fff2c..2055bcb 100644
---- a/arch/arm/mach-davinci/include/mach/debug-macro.S
-+++ b/arch/arm/mach-davinci/include/mach/debug-macro.S
-@@ -18,15 +18,10 @@
- 
- #include <linux/serial_reg.h>
- 
--#include <asm/memory.h>
--
- #include <mach/serial.h>
- 
- #define UART_SHIFT	2
- 
--#define davinci_uart_v2p(x)	((x) - PAGE_OFFSET + PLAT_PHYS_OFFSET)
--#define davinci_uart_p2v(x)	((x) - PLAT_PHYS_OFFSET + PAGE_OFFSET)
--
- 		.pushsection .data
- davinci_uart_phys:	.word	0
- davinci_uart_virt:	.word	0
-@@ -35,37 +30,37 @@ davinci_uart_virt:	.word	0
- 		.macro addruart, rp, rv, tmp
- 
- 		/* Use davinci_uart_phys/virt if already configured */
--10:		mrc	p15, 0, \rp, c1, c0
--		tst	\rp, #1			@ MMU enabled?
--		ldreq	\rp, =davinci_uart_v2p(davinci_uart_phys)
--		ldrne	\rp, =davinci_uart_phys
--		add	\rv, \rp, #4		@ davinci_uart_virt
--		ldr	\rp, [\rp, #0]
--		ldr	\rv, [\rv, #0]
-+10:		adr	\rp, 11f		@ get effective addr of 11f
-+		ldr	\rv, [\rp]		@ get absolute addr of 11f
-+		sub	\rv, \rv, \rp		@ offset between the two
-+		ldr	\rp, [\rp, #4]		@ abs addr of omap_uart_phys
-+		sub	\tmp, \rp, \rv		@ make it effective
-+		ldr	\rp, [\tmp, #0]		@ davinci_uart_phys
-+		ldr	\rv, [\tmp, #4]		@ davinci_uart_virt
- 		cmp	\rp, #0			@ is port configured?
- 		cmpne	\rv, #0
- 		bne	99f			@ already configured
- 
- 		/* Check the debug UART address set in uncompress.h */
--		mrc	p15, 0, \rp, c1, c0
--		tst	\rp, #1			@ MMU enabled?
--
- 		and	\rp, pc, #0xff000000
- 		ldr	\rv, =DAVINCI_UART_INFO_OFS
- 		add	\rp, \rp, \rv
- 
--		ldreq	\rv, =davinci_uart_v2p(davinci_uart_phys)
--		ldrne	\rv, =davinci_uart_phys
--
- 		/* Copy uart phys address from decompressor uart info */
--		ldr	\tmp, [\rp, #0]
--		str	\tmp, [\rv, #0]
-+		ldr	\rv, [\rp, #0]
-+		str	\rv, [\tmp, #0]
- 
- 		/* Copy uart virt address from decompressor uart info */
--		ldr	\tmp, [\rp, #4]
--		str	\tmp, [\rv, #4]
-+		ldr	\rv, [\rp, #4]
-+		str	\rv, [\tmp, #4]
- 
- 		b	10b
-+
-+		.align
-+11:		.word	.
-+		.word	davinci_uart_phys
-+		.ltorg
-+
- 99:
- 		.endm
- 
--- 
-1.7.4
+   Each time a device in Qemu call 'gic_update' to inject an
+   interrupt, the emulated Distributor figure out the 'best_irq'.
+   With the help of GIC virtulization, this "best_irq" can be routed
+   to virtual cpu interface which Guest OS has directly access into.
+
+   Of course, when Guest OS query which interrupt fired, it need not
+   trapped out into Qemu anymore.
+
+
+
+How to do this:
+   For now, I didn't take SMP into consideration.
+
+   a: create identical mapping from GPA->HPA to allow Guest OS access
+      its own cpu interface register.
+
+   b: tell hypovisor the 'best_irq'
+      struct kvm_irq_level->level upper bits could be used to represent
+      this 'best_irq', and goes into hypovisor through KVM_IRQ_LINE IOCTL
+
+   once inside kernel, 'kvm_arch_vm_ioctl_irq_line' fetch the 'best_irq'
+   and by updating list register, route this interrupt into Guest OS
+   virtual cpu interface.
+
+
+Problem:
+    I did the experiment, and found the biggest obstoble on the way
+    is creating the mapping.
+
+    arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
+    #define CT_CA9X4_MPIC       (0x1e000000)
+    #define A9_MPCORE_SCU       (CT_CA9X4_MPIC + 0x0000)
+    #define A9_MPCORE_GIC_CPU   (CT_CA9X4_MPIC + 0x0100)
+    #define A9_MPCORE_GIT       (CT_CA9X4_MPIC + 0x0200)
+    #define A9_MPCORE_TWD       (CT_CA9X4_MPIC + 0x0600)
+    #define A9_MPCORE_GIC_DIST  (CT_CA9X4_MPIC + 0x1000)
+
+    If I create an identical mapping at A9_MPCORE_GIC_CPU, all the iomem
+    from CT_CA9X4_MPIC ~ CT_CA9X4_MPIC + 0x1000 could be access for
+    Guest OS, which means access to SCU/GIT/TWD will not been trapped
+    any more.
+
+
+Any comments and suggestions would be truly welcome.
+
+
+
+bill
