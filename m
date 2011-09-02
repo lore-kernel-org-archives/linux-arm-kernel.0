@@ -1,61 +1,62 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri,  2 Sep 2011 20:32:32 +0300
-Subject: [PATCH 3/7] iommu/core: use the existing IS_ALIGNED macro
+Date: Fri,  2 Sep 2011 20:32:33 +0300
+Subject: [PATCH 4/7] iommu/omap: ->unmap() should return order of unmapped page
 In-Reply-To: <1314984756-4400-1-git-send-email-ohad@wizery.com>
 References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-Message-ID: <1314984756-4400-4-git-send-email-ohad@wizery.com>
+Message-ID: <1314984756-4400-5-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace iommu's alignment checks with the existing IS_ALIGNED macro,
-to drop a few lines of code and utilize IS_ALIGNED's type safety.
+Users of the IOMMU API (kvm specifically) assume that iommu_unmap()
+returns the order of the unmapped page.
+
+Fix omap_iommu_unmap() to do so and adopt omap-iovmm accordingly.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- drivers/iommu/iommu.c |    9 +++------
- 1 files changed, 3 insertions(+), 6 deletions(-)
+ drivers/iommu/omap-iommu.c |   13 ++++---------
+ drivers/iommu/omap-iovmm.c |    2 +-
+ 2 files changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 6e6b6a1..e61a9ba 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -16,6 +16,7 @@
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
-  */
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index 4311bc3..bd5f606 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -1081,18 +1081,13 @@ static int omap_iommu_unmap(struct iommu_domain *domain, unsigned long da,
+ 	struct omap_iommu_domain *omap_domain = domain->priv;
+ 	struct omap_iommu *oiommu = omap_domain->iommu_dev;
+ 	struct device *dev = oiommu->dev;
+-	size_t bytes = PAGE_SIZE << order;
+-	size_t ret;
++	size_t unmap_size;
  
-+#include <linux/kernel.h>
- #include <linux/bug.h>
- #include <linux/types.h>
- #include <linux/module.h>
-@@ -97,13 +98,11 @@ EXPORT_SYMBOL_GPL(iommu_domain_has_cap);
- int iommu_map(struct iommu_domain *domain, unsigned long iova,
- 	      phys_addr_t paddr, int gfp_order, int prot)
- {
--	unsigned long invalid_mask;
- 	size_t size;
+-	dev_dbg(dev, "unmapping da 0x%lx size 0x%x\n", da, bytes);
++	dev_dbg(dev, "unmapping da 0x%lx order %d\n", da, order);
  
- 	size         = 0x1000UL << gfp_order;
--	invalid_mask = size - 1;
+-	ret = iopgtable_clear_entry(oiommu, da);
+-	if (ret != bytes) {
+-		dev_err(dev, "entry @ 0x%lx was %d; not %d\n", da, ret, bytes);
+-		return -EINVAL;
+-	}
++	unmap_size = iopgtable_clear_entry(oiommu, da);
  
--	BUG_ON((iova | paddr) & invalid_mask);
-+	BUG_ON(!IS_ALIGNED(iova | paddr, size));
- 
- 	return iommu_ops->map(domain, iova, paddr, gfp_order, prot);
+-	return 0;
++	return unmap_size ? get_order(unmap_size) : -EINVAL;
  }
-@@ -111,13 +110,11 @@ EXPORT_SYMBOL_GPL(iommu_map);
  
- int iommu_unmap(struct iommu_domain *domain, unsigned long iova, int gfp_order)
- {
--	unsigned long invalid_mask;
- 	size_t size;
+ static int
+diff --git a/drivers/iommu/omap-iovmm.c b/drivers/iommu/omap-iovmm.c
+index 39bdb92..e8fdb88 100644
+--- a/drivers/iommu/omap-iovmm.c
++++ b/drivers/iommu/omap-iovmm.c
+@@ -480,7 +480,7 @@ static void unmap_iovm_area(struct iommu_domain *domain, struct omap_iommu *obj,
+ 		order = get_order(bytes);
  
- 	size         = 0x1000UL << gfp_order;
--	invalid_mask = size - 1;
+ 		err = iommu_unmap(domain, start, order);
+-		if (err)
++		if (err < 0)
+ 			break;
  
--	BUG_ON(iova & invalid_mask);
-+	BUG_ON(!IS_ALIGNED(iova, size));
- 
- 	return iommu_ops->unmap(domain, iova, gfp_order);
- }
+ 		dev_dbg(obj->dev, "%s: unmap %08x(%x) %08x\n",
 -- 
 1.7.4.1
