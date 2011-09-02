@@ -1,246 +1,463 @@
 From: boojin.kim@samsung.com (Boojin Kim)
-Date: Fri,  2 Sep 2011 09:44:44 +0900
-Subject: [PATCH v8 16/16] ARM: SAMSUNG: Remove Samsung specific enum type for
-	dma direction
+Date: Fri,  2 Sep 2011 09:44:38 +0900
+Subject: [PATCH v8 10/16] ARM: S5PC100: Use generic DMA PL330 driver
 In-Reply-To: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
 References: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
-Message-ID: <1314924284-25554-17-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1314924284-25554-11-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the samsung specific enum type 's3c2410_dmasrc'
-and uses 'dma_data_direction' instead.
+This patch makes Samsung S5PC100 to use DMA PL330 driver
+on DMADEVICE. The S5PC100 uses DMA generic APIs instead of
+SAMSUNG specific S3C-PL330 APIs.
 
 Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Acked-by: Vinod Koul <vinod.koul@intel.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c2410/include/mach/dma.h         |    2 +-
- arch/arm/mach-s3c2412/dma.c                      |    4 ++--
- arch/arm/mach-s3c64xx/dma.c                      |   10 +++++-----
- arch/arm/mach-s3c64xx/include/mach/dma.h         |    2 +-
- arch/arm/plat-s3c24xx/dma.c                      |   10 +++++-----
- arch/arm/plat-samsung/include/plat/dma-s3c24xx.h |    2 +-
- arch/arm/plat-samsung/include/plat/dma.h         |    9 +++------
- arch/arm/plat-samsung/s3c-dma-ops.c              |    5 +----
- drivers/mmc/host/s3cmci.c                        |    6 +++---
- 9 files changed, 22 insertions(+), 28 deletions(-)
+ arch/arm/mach-s5pc100/Kconfig            |    2 +-
+ arch/arm/mach-s5pc100/clock.c            |   11 +-
+ arch/arm/mach-s5pc100/dma.c              |  323 +++++++++++++++++++----------
+ arch/arm/mach-s5pc100/include/mach/dma.h |    2 +-
+ 4 files changed, 222 insertions(+), 116 deletions(-)
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/dma.h b/arch/arm/mach-s3c2410/include/mach/dma.h
-index 4e485ba..ae8e482 100644
---- a/arch/arm/mach-s3c2410/include/mach/dma.h
-+++ b/arch/arm/mach-s3c2410/include/mach/dma.h
-@@ -174,7 +174,7 @@ struct s3c2410_dma_chan {
- 	struct s3c2410_dma_client *client;
+diff --git a/arch/arm/mach-s5pc100/Kconfig b/arch/arm/mach-s5pc100/Kconfig
+index e8a33c4..e538a4c 100644
+--- a/arch/arm/mach-s5pc100/Kconfig
++++ b/arch/arm/mach-s5pc100/Kconfig
+@@ -10,7 +10,7 @@ if ARCH_S5PC100
+ config CPU_S5PC100
+ 	bool
+ 	select S5P_EXT_INT
+-	select S3C_PL330_DMA
++	select SAMSUNG_DMADEV
+ 	help
+ 	  Enable S5PC100 CPU support
  
- 	/* channel configuration */
--	enum s3c2410_dmasrc	 source;
-+	enum dma_data_direction	 source;
- 	enum dma_ch		 req_ch;
- 	unsigned long		 dev_addr;
- 	unsigned long		 load_timeout;
-diff --git a/arch/arm/mach-s3c2412/dma.c b/arch/arm/mach-s3c2412/dma.c
-index 7abecfc..b4fc3ba 100644
---- a/arch/arm/mach-s3c2412/dma.c
-+++ b/arch/arm/mach-s3c2412/dma.c
-@@ -148,11 +148,11 @@ static struct s3c24xx_dma_map __initdata s3c2412_dma_mappings[] = {
- 
- static void s3c2412_dma_direction(struct s3c2410_dma_chan *chan,
- 				  struct s3c24xx_dma_map *map,
--				  enum s3c2410_dmasrc dir)
-+				  enum dma_data_direction dir)
- {
- 	unsigned long chsel;
- 
--	if (dir == S3C2410_DMASRC_HW)
-+	if (dir == DMA_FROM_DEVICE)
- 		chsel = map->channels_rx[0];
- 	else
- 		chsel = map->channels[0];
-diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
-index 204bfaf..67c97fa 100644
---- a/arch/arm/mach-s3c64xx/dma.c
-+++ b/arch/arm/mach-s3c64xx/dma.c
-@@ -147,14 +147,14 @@ static void s3c64xx_dma_fill_lli(struct s3c2410_dma_chan *chan,
- 	u32 control0, control1;
- 
- 	switch (chan->source) {
--	case S3C2410_DMASRC_HW:
-+	case DMA_FROM_DEVICE:
- 		src = chan->dev_addr;
- 		dst = data;
- 		control0 = PL080_CONTROL_SRC_AHB2;
- 		control0 |= PL080_CONTROL_DST_INCR;
- 		break;
- 
--	case S3C2410_DMASRC_MEM:
-+	case DMA_TO_DEVICE:
- 		src = data;
- 		dst = chan->dev_addr;
- 		control0 = PL080_CONTROL_DST_AHB2;
-@@ -416,7 +416,7 @@ EXPORT_SYMBOL(s3c2410_dma_enqueue);
- 
- 
- int s3c2410_dma_devconfig(enum dma_ch channel,
--			  enum s3c2410_dmasrc source,
-+			  enum dma_data_direction source,
- 			  unsigned long devaddr)
- {
- 	struct s3c2410_dma_chan *chan = s3c_dma_lookup_channel(channel);
-@@ -437,11 +437,11 @@ int s3c2410_dma_devconfig(enum dma_ch channel,
- 	pr_debug("%s: peripheral %d\n", __func__, peripheral);
- 
- 	switch (source) {
--	case S3C2410_DMASRC_HW:
-+	case DMA_FROM_DEVICE:
- 		config = 2 << PL080_CONFIG_FLOW_CONTROL_SHIFT;
- 		config |= peripheral << PL080_CONFIG_SRC_SEL_SHIFT;
- 		break;
--	case S3C2410_DMASRC_MEM:
-+	case DMA_TO_DEVICE:
- 		config = 1 << PL080_CONFIG_FLOW_CONTROL_SHIFT;
- 		config |= peripheral << PL080_CONFIG_DST_SEL_SHIFT;
- 		break;
-diff --git a/arch/arm/mach-s3c64xx/include/mach/dma.h b/arch/arm/mach-s3c64xx/include/mach/dma.h
-index 74fdf25..fe1a98c 100644
---- a/arch/arm/mach-s3c64xx/include/mach/dma.h
-+++ b/arch/arm/mach-s3c64xx/include/mach/dma.h
-@@ -99,7 +99,7 @@ struct s3c2410_dma_chan {
- 	unsigned char		 peripheral;
- 
- 	unsigned int		 flags;
--	enum s3c2410_dmasrc	 source;
-+	enum dma_data_direction	 source;
- 
- 
- 	dma_addr_t		dev_addr;
-diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-index 539bd0e..53754bc 100644
---- a/arch/arm/plat-s3c24xx/dma.c
-+++ b/arch/arm/plat-s3c24xx/dma.c
-@@ -1094,14 +1094,14 @@ EXPORT_SYMBOL(s3c2410_dma_config);
-  *
-  * configure the dma source/destination hardware type and address
-  *
-- * source:    S3C2410_DMASRC_HW: source is hardware
-- *            S3C2410_DMASRC_MEM: source is memory
-+ * source:    DMA_FROM_DEVICE: source is hardware
-+ *            DMA_TO_DEVICE: source is memory
-  *
-  * devaddr:   physical address of the source
- */
- 
- int s3c2410_dma_devconfig(enum dma_ch channel,
--			  enum s3c2410_dmasrc source,
-+			  enum dma_data_direction source,
- 			  unsigned long devaddr)
- {
- 	struct s3c2410_dma_chan *chan = s3c_dma_lookup_channel(channel);
-@@ -1131,7 +1131,7 @@ int s3c2410_dma_devconfig(enum dma_ch channel,
- 	 hwcfg |= S3C2410_DISRCC_INC;
- 
- 	switch (source) {
--	case S3C2410_DMASRC_HW:
-+	case DMA_FROM_DEVICE:
- 		/* source is hardware */
- 		pr_debug("%s: hw source, devaddr=%08lx, hwcfg=%d\n",
- 			 __func__, devaddr, hwcfg);
-@@ -1142,7 +1142,7 @@ int s3c2410_dma_devconfig(enum dma_ch channel,
- 		chan->addr_reg = dma_regaddr(chan, S3C2410_DMA_DIDST);
- 		break;
- 
--	case S3C2410_DMASRC_MEM:
-+	case DMA_TO_DEVICE:
- 		/* source is memory */
- 		pr_debug("%s: mem source, devaddr=%08lx, hwcfg=%d\n",
- 			 __func__, devaddr, hwcfg);
-diff --git a/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h b/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
-index 336d5ac..1982829 100644
---- a/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-s3c24xx.h
-@@ -47,7 +47,7 @@ struct s3c24xx_dma_selection {
- 
- 	void	(*direction)(struct s3c2410_dma_chan *chan,
- 			     struct s3c24xx_dma_map *map,
--			     enum s3c2410_dmasrc dir);
-+			     enum dma_data_direction dir);
+diff --git a/arch/arm/mach-s5pc100/clock.c b/arch/arm/mach-s5pc100/clock.c
+index ff5cbb3..6527c05 100644
+--- a/arch/arm/mach-s5pc100/clock.c
++++ b/arch/arm/mach-s5pc100/clock.c
+@@ -33,6 +33,11 @@ static struct clk s5p_clk_otgphy = {
+ 	.name		= "otg_phy",
  };
  
- extern int s3c24xx_dma_init_map(struct s3c24xx_dma_selection *sel);
-diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-samsung/include/plat/dma.h
-index 3610760..b906112 100644
---- a/arch/arm/plat-samsung/include/plat/dma.h
-+++ b/arch/arm/plat-samsung/include/plat/dma.h
-@@ -10,17 +10,14 @@
-  * published by the Free Software Foundation.
- */
- 
-+#include <linux/dma-mapping.h>
++static struct clk dummy_apb_pclk = {
++	.name		= "apb_pclk",
++	.id		= -1,
++};
 +
- enum s3c2410_dma_buffresult {
- 	S3C2410_RES_OK,
- 	S3C2410_RES_ERR,
- 	S3C2410_RES_ABORT
+ static struct clk *clk_src_mout_href_list[] = {
+ 	[0] = &s5p_clk_27m,
+ 	[1] = &clk_fin_hpll,
+@@ -454,13 +459,13 @@ static struct clk init_clocks_off[] = {
+ 		.enable		= s5pc100_d1_0_ctrl,
+ 		.ctrlbit	= (1 << 2),
+ 	}, {
+-		.name		= "pdma",
++		.name		= "dma",
+ 		.devname	= "s3c-pl330.1",
+ 		.parent		= &clk_div_d1_bus.clk,
+ 		.enable		= s5pc100_d1_0_ctrl,
+ 		.ctrlbit	= (1 << 1),
+ 	}, {
+-		.name		= "pdma",
++		.name		= "dma",
+ 		.devname	= "s3c-pl330.0",
+ 		.parent		= &clk_div_d1_bus.clk,
+ 		.enable		= s5pc100_d1_0_ctrl,
+@@ -1276,5 +1281,7 @@ void __init s5pc100_register_clocks(void)
+ 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+ 	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+ 
++	s3c24xx_register_clock(&dummy_apb_pclk);
++
+ 	s3c_pwmclk_init();
+ }
+diff --git a/arch/arm/mach-s5pc100/dma.c b/arch/arm/mach-s5pc100/dma.c
+index bf4cd0f..ef803e9 100644
+--- a/arch/arm/mach-s5pc100/dma.c
++++ b/arch/arm/mach-s5pc100/dma.c
+@@ -1,4 +1,8 @@
+-/*
++/* linux/arch/arm/mach-s5pc100/dma.c
++ *
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
+  * Copyright (C) 2010 Samsung Electronics Co. Ltd.
+  *	Jaswinder Singh <jassi.brar@samsung.com>
+  *
+@@ -17,150 +21,245 @@
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
+ 
+-#include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
++#include <linux/amba/bus.h>
++#include <linux/amba/pl330.h>
+ 
++#include <asm/irq.h>
+ #include <plat/devs.h>
++#include <plat/irqs.h>
+ 
+ #include <mach/map.h>
+ #include <mach/irqs.h>
+-
+-#include <plat/s3c-pl330-pdata.h>
++#include <mach/dma.h>
+ 
+ static u64 dma_dmamask = DMA_BIT_MASK(32);
+ 
+-static struct resource s5pc100_pdma0_resource[] = {
+-	[0] = {
+-		.start  = S5PC100_PA_PDMA0,
+-		.end    = S5PC100_PA_PDMA0 + SZ_4K,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= IRQ_PDMA0,
+-		.end	= IRQ_PDMA0,
+-		.flags	= IORESOURCE_IRQ,
++struct dma_pl330_peri pdma0_peri[30] = {
++	{
++		.peri_id = (u8)DMACH_UART0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART3_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART3_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = DMACH_IRDA,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S0S_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SPI0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SPI0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SPI1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SPI1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SPI2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SPI2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_AC97_MICIN,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_AC97_PCMIN,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_AC97_PCMOUT,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_EXTERNAL,
++	}, {
++		.peri_id = (u8)DMACH_PWM,
++	}, {
++		.peri_id = (u8)DMACH_SPDIF,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_HSI_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_HSI_TX,
++		.rqtype = MEMTODEV,
+ 	},
  };
  
--enum s3c2410_dmasrc {
--	S3C2410_DMASRC_HW,		/* source is memory */
--	S3C2410_DMASRC_MEM		/* source is hardware */
+-static struct s3c_pl330_platdata s5pc100_pdma0_pdata = {
+-	.peri = {
+-		[0] = DMACH_UART0_RX,
+-		[1] = DMACH_UART0_TX,
+-		[2] = DMACH_UART1_RX,
+-		[3] = DMACH_UART1_TX,
+-		[4] = DMACH_UART2_RX,
+-		[5] = DMACH_UART2_TX,
+-		[6] = DMACH_UART3_RX,
+-		[7] = DMACH_UART3_TX,
+-		[8] = DMACH_IRDA,
+-		[9] = DMACH_I2S0_RX,
+-		[10] = DMACH_I2S0_TX,
+-		[11] = DMACH_I2S0S_TX,
+-		[12] = DMACH_I2S1_RX,
+-		[13] = DMACH_I2S1_TX,
+-		[14] = DMACH_I2S2_RX,
+-		[15] = DMACH_I2S2_TX,
+-		[16] = DMACH_SPI0_RX,
+-		[17] = DMACH_SPI0_TX,
+-		[18] = DMACH_SPI1_RX,
+-		[19] = DMACH_SPI1_TX,
+-		[20] = DMACH_SPI2_RX,
+-		[21] = DMACH_SPI2_TX,
+-		[22] = DMACH_AC97_MICIN,
+-		[23] = DMACH_AC97_PCMIN,
+-		[24] = DMACH_AC97_PCMOUT,
+-		[25] = DMACH_EXTERNAL,
+-		[26] = DMACH_PWM,
+-		[27] = DMACH_SPDIF,
+-		[28] = DMACH_HSI_RX,
+-		[29] = DMACH_HSI_TX,
+-		[30] = DMACH_MAX,
+-		[31] = DMACH_MAX,
+-	},
++struct dma_pl330_platdata s5pc100_pdma0_pdata = {
++	.nr_valid_peri = ARRAY_SIZE(pdma0_peri),
++	.peri = pdma0_peri,
+ };
+ 
+-static struct platform_device s5pc100_device_pdma0 = {
+-	.name		= "s3c-pl330",
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(s5pc100_pdma0_resource),
+-	.resource	= s5pc100_pdma0_resource,
+-	.dev		= {
++struct amba_device s5pc100_device_pdma0 = {
++	.dev = {
++		.init_name = "dma-pl330.0",
+ 		.dma_mask = &dma_dmamask,
+ 		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 		.platform_data = &s5pc100_pdma0_pdata,
+ 	},
 -};
 -
- /* enum s3c2410_chan_op
-  *
-  * operation codes passed to the DMA code by the user, and also used
-@@ -112,7 +109,7 @@ extern int s3c2410_dma_config(enum dma_ch channel, int xferunit);
- */
+-static struct resource s5pc100_pdma1_resource[] = {
+-	[0] = {
+-		.start  = S5PC100_PA_PDMA1,
+-		.end    = S5PC100_PA_PDMA1 + SZ_4K,
++	.res = {
++		.start = S5PC100_PA_PDMA0,
++		.end = S5PC100_PA_PDMA0 + SZ_4K,
+ 		.flags = IORESOURCE_MEM,
+ 	},
+-	[1] = {
+-		.start	= IRQ_PDMA1,
+-		.end	= IRQ_PDMA1,
+-		.flags	= IORESOURCE_IRQ,
+-	},
++	.irq = {IRQ_PDMA0, NO_IRQ},
++	.periphid = 0x00041330,
+ };
  
- extern int s3c2410_dma_devconfig(enum dma_ch channel,
--		enum s3c2410_dmasrc source, unsigned long devaddr);
-+		enum dma_data_direction source, unsigned long devaddr);
+-static struct s3c_pl330_platdata s5pc100_pdma1_pdata = {
+-	.peri = {
+-		[0] = DMACH_UART0_RX,
+-		[1] = DMACH_UART0_TX,
+-		[2] = DMACH_UART1_RX,
+-		[3] = DMACH_UART1_TX,
+-		[4] = DMACH_UART2_RX,
+-		[5] = DMACH_UART2_TX,
+-		[6] = DMACH_UART3_RX,
+-		[7] = DMACH_UART3_TX,
+-		[8] = DMACH_IRDA,
+-		[9] = DMACH_I2S0_RX,
+-		[10] = DMACH_I2S0_TX,
+-		[11] = DMACH_I2S0S_TX,
+-		[12] = DMACH_I2S1_RX,
+-		[13] = DMACH_I2S1_TX,
+-		[14] = DMACH_I2S2_RX,
+-		[15] = DMACH_I2S2_TX,
+-		[16] = DMACH_SPI0_RX,
+-		[17] = DMACH_SPI0_TX,
+-		[18] = DMACH_SPI1_RX,
+-		[19] = DMACH_SPI1_TX,
+-		[20] = DMACH_SPI2_RX,
+-		[21] = DMACH_SPI2_TX,
+-		[22] = DMACH_PCM0_RX,
+-		[23] = DMACH_PCM0_TX,
+-		[24] = DMACH_PCM1_RX,
+-		[25] = DMACH_PCM1_TX,
+-		[26] = DMACH_MSM_REQ0,
+-		[27] = DMACH_MSM_REQ1,
+-		[28] = DMACH_MSM_REQ2,
+-		[29] = DMACH_MSM_REQ3,
+-		[30] = DMACH_MAX,
+-		[31] = DMACH_MAX,
++struct dma_pl330_peri pdma1_peri[30] = {
++	{
++		.peri_id = (u8)DMACH_UART0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_UART3_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_UART3_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = DMACH_IRDA,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S0S_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_I2S2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_I2S2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SPI0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SPI0_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SPI1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SPI1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_SPI2_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_SPI2_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_PCM0_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_PCM1_RX,
++		.rqtype = DEVTOMEM,
++	}, {
++		.peri_id = (u8)DMACH_PCM1_TX,
++		.rqtype = MEMTODEV,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ0,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ1,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ2,
++	}, {
++		.peri_id = (u8)DMACH_MSM_REQ3,
+ 	},
+ };
  
- /* s3c2410_dma_getposition
-  *
-diff --git a/arch/arm/plat-samsung/s3c-dma-ops.c b/arch/arm/plat-samsung/s3c-dma-ops.c
-index 33ab324..582333c 100644
---- a/arch/arm/plat-samsung/s3c-dma-ops.c
-+++ b/arch/arm/plat-samsung/s3c-dma-ops.c
-@@ -48,10 +48,7 @@ static unsigned s3c_dma_request(enum dma_ch dma_ch,
- 	data->ch = dma_ch;
- 	list_add_tail(&data->node, &dma_list);
+-static struct platform_device s5pc100_device_pdma1 = {
+-	.name		= "s3c-pl330",
+-	.id		= 1,
+-	.num_resources	= ARRAY_SIZE(s5pc100_pdma1_resource),
+-	.resource	= s5pc100_pdma1_resource,
+-	.dev		= {
++struct dma_pl330_platdata s5pc100_pdma1_pdata = {
++	.nr_valid_peri = ARRAY_SIZE(pdma1_peri),
++	.peri = pdma1_peri,
++};
++
++struct amba_device s5pc100_device_pdma1 = {
++	.dev = {
++		.init_name = "dma-pl330.1",
+ 		.dma_mask = &dma_dmamask,
+ 		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 		.platform_data = &s5pc100_pdma1_pdata,
+ 	},
+-};
+-
+-static struct platform_device *s5pc100_dmacs[] __initdata = {
+-	&s5pc100_device_pdma0,
+-	&s5pc100_device_pdma1,
++	.res = {
++		.start = S5PC100_PA_PDMA1,
++		.end = S5PC100_PA_PDMA1 + SZ_4K,
++		.flags = IORESOURCE_MEM,
++	},
++	.irq = {IRQ_PDMA1, NO_IRQ},
++	.periphid = 0x00041330,
+ };
  
--	if (info->direction == DMA_FROM_DEVICE)
--		s3c2410_dma_devconfig(dma_ch, S3C2410_DMASRC_HW, info->fifo);
--	else
--		s3c2410_dma_devconfig(dma_ch, S3C2410_DMASRC_MEM, info->fifo);
-+	s3c2410_dma_devconfig(dma_ch, info->direction, info->fifo);
- 
- 	if (info->cap == DMA_CYCLIC)
- 		s3c2410_dma_setflags(dma_ch, S3C2410_DMAF_CIRCULAR);
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index a04f87d..03cfdab 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -913,9 +913,9 @@ request_done:
- }
- 
- static void s3cmci_dma_setup(struct s3cmci_host *host,
--			     enum s3c2410_dmasrc source)
-+			     enum dma_data_direction source)
+ static int __init s5pc100_dma_init(void)
  {
--	static enum s3c2410_dmasrc last_source = -1;
-+	static enum dma_data_direction last_source = -1;
- 	static int setup_ok;
+-	platform_add_devices(s5pc100_dmacs, ARRAY_SIZE(s5pc100_dmacs));
++	amba_device_register(&s5pc100_device_pdma0, &iomem_resource);
  
- 	if (last_source == source)
-@@ -1087,7 +1087,7 @@ static int s3cmci_prepare_dma(struct s3cmci_host *host, struct mmc_data *data)
+ 	return 0;
+ }
+diff --git a/arch/arm/mach-s5pc100/include/mach/dma.h b/arch/arm/mach-s5pc100/include/mach/dma.h
+index 1beae2c..201842a 100644
+--- a/arch/arm/mach-s5pc100/include/mach/dma.h
++++ b/arch/arm/mach-s5pc100/include/mach/dma.h
+@@ -20,7 +20,7 @@
+ #ifndef __MACH_DMA_H
+ #define __MACH_DMA_H
  
- 	BUG_ON((data->flags & BOTH_DIR) == BOTH_DIR);
+-/* This platform uses the common S3C DMA API driver for PL330 */
++/* This platform uses the common DMA API driver for PL330 */
+ #include <plat/dma-pl330.h>
  
--	s3cmci_dma_setup(host, rw ? S3C2410_DMASRC_MEM : S3C2410_DMASRC_HW);
-+	s3cmci_dma_setup(host, rw ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
- 	s3c2410_dma_ctrl(host->dma, S3C2410_DMAOP_FLUSH);
- 
- 	dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+ #endif /* __MACH_DMA_H */
 -- 
 1.7.1
