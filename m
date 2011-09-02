@@ -1,39 +1,38 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Sep 2011 18:22:59 +0100
-Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <OF69A57AB0.CF22689A-ONC12578FF.004EDD71-C12578FF.005142FF@de.ibm.com>
-References: <20110823220056.GK3895@n2100.arm.linux.org.uk>
-	<20110825130907.GO3286@htj.dyndns.org>
-	<20110825145558.GF8883@n2100.arm.linux.org.uk>
-	<201108261644.26329.arnd@arndb.de>
-	<OF2C5ADB6A.65B1BE36-ONC12578FE.00493A67-C12578FE.004B3315@de.ibm.com>
-	<20110901140000.GF29729@n2100.arm.linux.org.uk>
-	<OF69A57AB0.CF22689A-ONC12578FF.004EDD71-C12578FF.005142FF@de.ibm.com>
-Message-ID: <20110902172259.GA6619@n2100.arm.linux.org.uk>
+Date: Fri, 2 Sep 2011 18:28:50 +0100
+Subject: [PATCH] af_packet: flush complete kernel cache in packet_sendmsg
+In-Reply-To: <1314971179.3092.159.camel@deadeye>
+References: <20110505141107.GC30443@orbit.nwl.cc>
+	<1314961686-30870-1-git-send-email-phil.sutter@viprinet.com>
+	<1314971179.3092.159.camel@deadeye>
+Message-ID: <20110902172850.GB6619@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2011 at 04:47:35PM +0200, Ulrich Weigand wrote:
-> Assume the scenario you initally describe, where a first signal is
-> ignored and leads to system call restart.  With your latest patch,
-> you call into syscall_restart which sets everything up to restart
-> the call (with interrupts disabled).
+On Fri, Sep 02, 2011 at 02:46:17PM +0100, Ben Hutchings wrote:
+> On Fri, 2011-09-02 at 13:08 +0200, Phil Sutter wrote:
+> > This flushes the cache before and after accessing the mmapped packet
+> > buffer. It seems like the call to flush_dcache_page from inside
+> > __packet_get_status is not enough on Kirkwood (or ARM in general).
+> > ---
+> > I know this is far from an optimal solution, but it's in fact the only working
+> > one I found.
+> [...]
+> 
+> This is ridiculous.  If flush_dcache_page() isn't doing everything it
+> should, you need to fix that.
 
-I don't think SIG_IGN signals even set the TIF work flag, so they
-never even cause a call into do_signal().  Therefore, as far as
-syscalls go, attempting to send a process (eg) a SIGINT which its
-handler is set to SIG_IGN results in the process not even being
-notified about the attempt - we won't even wake up while the
-syscall is sleeping.
+It does do everything it should - which is to perform maintanence on
+page cache pages.  It flushes the kernel mapping of the page.  It
+also flushes the userspace mappings of the page which it finds by
+walking the mmap list via the associated struct page.  It does not
+touch vmalloc mappings because it has no way to know whether they
+exist or not.
 
-> To really fix this case would probably require some way for the
-> debugger to save and restore the restore_block saved state.  This
-> is not quite trivial, since it would expose that state to user space,
-> effectively creating a new ABI (and probably requiring sanity checks
-> to ensure a valid state is restored).  This probably cannot be fixed
-> by one architecture for itself, but would need support from common
-> kernel code.
+It doesn't do so much for anonymous pages - to do so would only
+duplicate what flush_anon_page() does at the very same callsites.
+Plus the mmap list isn't available for such pages so there's no
+way to find out what userspace addresses to flush.
 
-Such state would have to be crytographically signed or kept entirely
-within the kernel, as it would otherwise mean that you could redirect
-the kernel PC to anywhere...
+If the AF_PACKET buffers are created from anonymous pages and it's
+using flush_dcache_page(), it's using the wrong interface.
