@@ -1,53 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 2 Sep 2011 16:22:50 +0200
-Subject: [PATCH 5/5] mach-ux500: add a SoC ID (serial) callback for the
-	u8500
-In-Reply-To: <1314880043-22517-5-git-send-email-lee.jones@linaro.org>
-References: <1314880043-22517-1-git-send-email-lee.jones@linaro.org>
-	<1314880043-22517-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <201109021622.50591.arnd@arndb.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 2 Sep 2011 16:25:14 +0200
+Subject: [PATCH v2 0/6] OMAP: omap_device cleanup before device-tree
+	integration
+Message-ID: <1314973520-3585-1-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 September 2011, Lee Jones wrote:
-> +static const char *db8500_get_soc_id(void)
-> +{
-> +       void __iomem *uid_base;
-> +       char buf[1024];
-> +       ssize_t sz = 0;
-> +       int i;
-> +
-> +       uid_base = __io_address(U8500_BB_UID_BASE);
-> +       for (i = 0; i < U8500_BB_UID_LENGTH; i++) {
-> +               sz += sprintf(buf + sz, "%08x", readl(uid_base + i * sizeof(u32)));
-> +       }
-> +       return kasprintf(GFP_KERNEL, "%s", buf);
-> +}
+Hi Kevin,
 
-You will get a warning from the stack checker here, about putting a 1024 byte string
-on the stack. Also, I still think it's bad to just access the U8500_BB_UID_BASE
-from a compile-time constant. Since this gets called from a function that knows
-the base address of the DB8500 register area, better pass the device in there
-so that you end up with something like
+Here are a couple of cleanups on top of your (old) for_3.2/omap_device branch
+rebased on top of -rc4 + Tony's cleanup patches.
 
-static void __devinit db8500_read_soc_id(struct db8500_dev *dev)
-{
-	u32 __iomem *uid = dev->base + U8500_BB_UID_OFFSET;
-	snprintf(dev->soc_id, sizeof (dev->soc_id), "%08x%08x%08x%08x%08x",
-		readl(uid[0]), readl(uid[1]), readl(uid[2]), readl(uid[3]), readl(uid[4]));
-}
+Since I cannot pull your latest version, I repost the whole series.
 
-The style you use here is preexisting in the db8500 code, but you should
-not keep adding more of that crap. All the code like
+patches are available here:
+git://gitorious.org/omap-pm/linux.git for_3.2/1_omap_device_cleanup
 
-#define db8500_add_i2c0(pdata) \
-        dbx500_add_i2c(0, U8500_I2C0_BASE, IRQ_DB8500_I2C0, pdata)
-#define db8500_add_i2c1(pdata) \
-        dbx500_add_i2c(1, U8500_I2C1_BASE, IRQ_DB8500_I2C1, pdata)
+It is tested on OMAP4 SDP, Panda and Beagle-xM (Yeah, I found one...).
 
-should never really have been there. What you want to do for this is
-to call this from the code that initializes the db8500 controller, and
-pass the board specific pdata into the db8500 init function, along
-with the i2c client data.
+Regards,
+Benoit
 
-	Arnd
+
+Changes since v1: http://www.spinics.net/lists/linux-omap/msg55801.html
+ - Update the 2 patches from Nishanth based on Kevin's comment and merge
+   them into one patch.
+
+
+Benoit Cousson (5):
+  OMAP3: beagle-board: Use the omap_hwmod_name_get_dev API
+  OMAP2+: pm: Use hwmod name instead of dev pointer
+  OMAP2+: pm: Remove static devices variable for mpu, dsp, iva and l3 PM
+  OMAP: omap_device: Create a default omap_device_pm_latency
+  OMAP2+: devices: Remove all omap_device_pm_latency structures
+
+Nishanth Menon (1):
+  OMAP: omap_device: Add omap_hwmod_name_get_dev
+
+ arch/arm/mach-omap2/board-omap3beagle.c       |    4 +-
+ arch/arm/mach-omap2/devices.c                 |   46 ++---------------
+ arch/arm/mach-omap2/display.c                 |   11 +----
+ arch/arm/mach-omap2/dma.c                     |   11 +----
+ arch/arm/mach-omap2/gpio.c                    |   12 +----
+ arch/arm/mach-omap2/hsmmc.c                   |   18 +------
+ arch/arm/mach-omap2/hwspinlock.c              |   12 +----
+ arch/arm/mach-omap2/mcbsp.c                   |   11 +----
+ arch/arm/mach-omap2/pm.c                      |   69 ++++++++-----------------
+ arch/arm/mach-omap2/serial.c                  |   25 +---------
+ arch/arm/mach-omap2/sr_device.c               |   11 +----
+ arch/arm/mach-omap2/usb-musb.c                |   11 +----
+ arch/arm/plat-omap/i2c.c                      |   10 +---
+ arch/arm/plat-omap/include/plat/omap_device.h |   10 ++++
+ arch/arm/plat-omap/omap_device.c              |   49 +++++++++++++++++-
+ 15 files changed, 95 insertions(+), 215 deletions(-)
