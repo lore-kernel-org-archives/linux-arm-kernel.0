@@ -1,51 +1,66 @@
-From: marvin24@gmx.de (Marc Dietich)
-Date: Fri, 2 Sep 2011 13:13:37 +0200
-Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B327A383@HQMAIL01.nvidia.com>
-References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
-	<201109011313.42547.marvin24@gmx.de>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B327A383@HQMAIL01.nvidia.com>
-Message-ID: <201109021313.38224.marvin24@gmx.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 2 Sep 2011 13:43:48 +0200
+Subject: [PATCH 6/7] OMAP3: board-dt: Add generic board file for DT support
+In-Reply-To: <20110902104330.GR3548@atomide.com>
+References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
+	<1314897912-18178-7-git-send-email-b-cousson@ti.com>
+	<20110902080944.GP3548@atomide.com> <4E609800.9090402@ti.com>
+	<20110902104330.GR3548@atomide.com>
+Message-ID: <4E60C174.50604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-just another measurement point
+On 9/2/2011 12:43 PM, Tony Lindgren wrote:
+> * Cousson, Benoit<b-cousson@ti.com>  [110902 11:13]:
+>> Hi Tony,
+>>
+>> On 9/2/2011 10:09 AM, Tony Lindgren wrote:
+>>> Hi,
+>>>
+>>> * Benoit Cousson<b-cousson@ti.com>   [110901 19:52]:
+>>>> Create an OMAP3 generic board to start the DT migration.
+>>>
+>>> I don't think this needs to be SoC specific, we can add multiple
+>>> DT_MACHINE_START entries into a single file. So it should be
+>>> just board-omap-dt.c.
+>>
+>> I do agree, it should not, I made that comment into the
+>> board-omap4-dt.c, but for the moment we still have dedicated OMAP
+>> specifics stuff at board level, like the map_io.
+> 
+> Well map_io can also be set in DT_MACHINE_START. For most part
+> it already is generic like omap3_map_io and omap4_map_io.
+> So that should not stop anything.
 
-> Stephen Warren wrote at Thursday:
->
-> Here are the results I found:
-> 
-> Harmony:
-> Tegra USB3 -> SMSC9514 hub: NOT affected
-> (Unplugging LAN cable, or disabling SMSC9514 LAN driver doesn't change
-> this)
-> 
-> Seaboard (springbank; clamshell):
-> Tegra USB1 -> no hub: Affected
-> 
-> Seaboard (seaboard non-clamshell):
-> Tegra USB1 -> no hub: Affected
-> Tegra USB3 -> no hub: Affected
-> 
-> TrimSlice:
-> Tegra USB3 -> unknown hub: Affected
+OK, I think I was trying to be a little bit more extreme, meaning only one omap_map_io for every OMAPs.
+Then, inside omap_map_io we can use the DT compatible information to retrieve the proper OMAPs revision and thus use the proper init table.
 
-PAZ00:
-ULPI -> SMCS 2512: Affected
-Tegra USB3 -> SMSC 2514: Affected
+Whereas in your case you are still relying on the various DT_MACHINE entries to detect which OMAP revision is used.
 
-The patch also cures high latencies/packet drops on wifi connected to ULPI via 
-the 2512 hub. The pen drive was connected to USB3/2514.
+It looks to me that relying on several DT_MACHINE_START to identify a SoC version is a little bit more a hack. 
+I will let the device-tree experts answering that question :-)
+For my point of view, using DT compatible in the various place where the OMAP revision is important, might allow a finer granularity.
 
-> This implies there's something different about Harmony.
+>> I have an other series that make the map_io DT aware to get rid of
+>> that, but it still not finalized.
 > 
-> Is the USB hub a clue? Seaboard doesn't have one, and although I don't
-> know what model TrimSlice uses, I assume it's different since I know
-> TrimSlice's Ethernet is not the same as Harmony's.
+> Hmm maybe take a look again? We've already sorted out quite a bit
+> of the init stuff over past few merge windows. If there's still
+> something blocking that, let's clear it out ASAP.
+
+Now that I understand your approach, it is fine. Please find below an example of what I was trying to achieve, and why that point was an issue.
+The clear advantage of your method is that not further effort will be require for this part. At least for the moment.
+
+>> My goal was have a single DT_MACHINE_START for every OMAPs.
+>> But, meanwhile, if you prefer one file with many board descriptors,
+>> that's fine.
 > 
-> I don't see anything in board-harmony.c vs. board-seaboard.c that'd affect
-> anything USB-related.
-> 
-> Perhaps there's some kind of bootloader or BCT difference. However, my
-> Harmony and both Seaboards both use (a very old) U-Boot and BCT from
-> ChromeOS, so I don't imagine there's actually much difference there.
+> Yes that's better. We should only need a separate DT_MACHINE_START
+> for major SoC variants.
+
+OK, I'll try that.
+
+Thanks,
+Benoit
+
+---
