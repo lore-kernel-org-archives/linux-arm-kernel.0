@@ -1,45 +1,18 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 2 Sep 2011 18:48:12 +0100
-Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <OFA88E54BC.55310B1A-ONC12578FF.00607E64-C12578FF.00611957@de.ibm.com>
-References: <20110823220056.GK3895@n2100.arm.linux.org.uk>
-	<20110825130907.GO3286@htj.dyndns.org>
-	<20110825145558.GF8883@n2100.arm.linux.org.uk>
-	<201108261644.26329.arnd@arndb.de>
-	<OF2C5ADB6A.65B1BE36-ONC12578FE.00493A67-C12578FE.004B3315@de.ibm.com>
-	<20110901140000.GF29729@n2100.arm.linux.org.uk>
-	<OF69A57AB0.CF22689A-ONC12578FF.004EDD71-C12578FF.005142FF@de.ibm.com>
-	<20110902172259.GA6619@n2100.arm.linux.org.uk>
-	<OFA88E54BC.55310B1A-ONC12578FF.00607E64-C12578FF.00611957@de.ibm.com>
-Message-ID: <20110902174812.GD6619@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 02 Sep 2011 11:06:52 -0700
+Subject: testing-board branch: rebase to RMK's devel-stable?
+Message-ID: <87vcta7r9f.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2011 at 07:40:34PM +0200, Ulrich Weigand wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote on 09/02/2011
-> 07:22:59 PM:
-> > On Fri, Sep 02, 2011 at 04:47:35PM +0200, Ulrich Weigand wrote:
-> > > Assume the scenario you initally describe, where a first signal is
-> > > ignored and leads to system call restart.  With your latest patch,
-> > > you call into syscall_restart which sets everything up to restart
-> > > the call (with interrupts disabled).
-> >
-> > I don't think SIG_IGN signals even set the TIF work flag, so they
-> > never even cause a call into do_signal().  Therefore, as far as
-> > syscalls go, attempting to send a process (eg) a SIGINT which its
-> > handler is set to SIG_IGN results in the process not even being
-> > notified about the attempt - we won't even wake up while the
-> > syscall is sleeping.
-> 
-> I don't see why SIG_IGN signals shouldn't set the TIF work flag;
-> the decision whether to ignore a signal is only made once we've
-> got to get_signal_to_deliver.
+Hi Tony,
 
-Yes, having looked deeper, you seem to be right - but only if the thread
-is being ptraced.  If it's not being ptraced, ignored signals don't
-make it that far.
+Your testing-board branch currently has a couple new boards that are
+missing the boot_params to atag_offset conversion (patch below.)
 
-And yes, we can end up processing the interrupt before the SVC is
-executed, which is still a hole.  So we need to avoid doing the
-restart in userspace - which might actually make things easier.
-I'll take a look into that over the weekend.
+There's a patch below to fix this, but maybe it's better to just rebase
+your testing-board branch onto Russell's devel-stable branch (where he's
+merged the seris from Nico) so any board stuff we add is sure to do it
+correctly.
+
+Kevin
