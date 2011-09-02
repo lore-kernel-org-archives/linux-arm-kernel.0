@@ -1,95 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 2 Sep 2011 10:07:47 +0200
-Subject: [PATCH 1/4 v5] drivers: create a pin control subsystem v5
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B327A3A0@HQMAIL01.nvidia.com>
-References: <1314609001-28052-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B3279BD7@HQMAIL01.nvidia.com>
-	<CACRpkdaWbgiaJvvjDgBWFTpC6P=XcG6fm+L8rnjv9rxDxgs_YQ@mail.gmail.com>
-	<CACRpkda4PRd_WUPrnEBVADbHnmSOgVB=WCXvVR4dFMektyQ2tQ@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B327A3A0@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdYj+4tPgBQWd6MhWJStkdSmorGDBUr68LtsWwnpfTo_5w@mail.gmail.com>
+Date: Fri, 2 Sep 2011 10:11:48 +0200
+Subject: [PATCH 2/4 v6] pinmux: add a driver for the U300 pinmux
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B327A40C@HQMAIL01.nvidia.com>
+References: <1314869552-5531-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B327A40C@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdZ1kNbtOqw=X1mmM-bA+Gg2BbmO5_CT0sSQtBCK_WdwYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2011 at 9:43 PM, Stephen Warren <swarren@nvidia.com> wrote:
+On Thu, Sep 1, 2011 at 11:33 PM, Stephen Warren <swarren@nvidia.com> wrote:
 
-> Looking forward a little, I expect that different SoCs have such a
-> different set of biasing/driver-strength/... options that actually having
-> some formalized semantic representation of what those options are doesn't
-> make sense; all we need is a standard API to set the values for a given
-> pin or pingroup;
+>> +static const struct u300_pmx_func u300_pmx_functions[] = {
+>> + ? ? {
+>> + ? ? ? ? ? ? .name = "power",
+>> + ? ? ? ? ? ? .groups = { POWERGRP_INDEX },
+>> + ? ? ? ? ? ? /* Mask is N/A */
+>> + ? ? },
+>
+> Hmmm. That's a lot of _INDEX defines that'd need to be set up, at least
+> to fully represent a chip like Tegra. Can the pinmux core be modified
+> such that the group list is an array of names (char*) rather than the
+> actual numeric IDs of the groups? Still, perhaps we could use the enum
+> we already have for this, so perhaps it isn't a big deal...
 
-I'm still thinking about this thing, when I (and others) wer trying to
-shoehorn this kind of stuff into the GPIO layer I actually started to
-enumerate the different things you could do with a pin, beginning
-like this:
+Well I could think about a lot of ways to do this, but it's basically up
+to the driver, the U300 is just some simple example of what you can
+do, it's just trying to satisfy the API.
 
-+/*
-+ * Bias modes for GPIOs - if you have more biases, add them here or provide
-+ * custom enumerators for your driver if you find they are not generally
-+ * useful.
-+ *
-+ * GPIO_CONFIG_BIAS_UNKNOWN: this bias mode is not known to us
-+ * GPIO_CONFIG_BIAS_FLOAT: no specific bias, the GPIO will float or state
-+ *     is not controlled by software
-+ * GPIO_CONFIG_BIAS_PULL_UP: the GPIO will be pulled up (usually with high
-+ *     impedance to VDD)
-+ * GPIO_CONFIG_BIAS_PULL_DOWN: the GPIO will be pulled down (usually with high
-+ *     impedance to GROUND)
-+ * GPIO_BIAS_HIGH: the GPIO will be wired high, connected to VDD
-+ * GPIO_BIAS_GROUND: the GPIO will be grounded, connected to GROUND
-+ */
-+#define GPIO_CONFIG_BIAS_UNKNOWN       0x1000
-+#define GPIO_CONFIG_BIAS_FLOAT         0x1001
-+#define GPIO_CONFIG_BIAS_PULL_UP       0x1002
-+#define GPIO_CONFIG_BIAS_PULL_DOWN     0x1003
-+#define GPIO_CONFIG_BIAS_HIGH          0x1004
-+#define GPIO_CONFIG_BIAS_GROUND        0x1005
-+
-+/*
-+ * Drive modes for GPIOs (output) - if you have more custom modes either
-+ * add them here or keep them to your driver if you think they are not
-+ * generally useful.
-+ *
-+ * GPIO_CONFIG_DRIVE_UNKNOWN: we don't know the drive mode of this GPIO, for
-+ *     example since it is controlled by hardware or the information is not
-+ *     accessible but we need a meaningful enumerator in e.g. initialization
-+ *     code
-+ * GPIO_CONFIG_DRIVE_PUSH_PULL: the GPIO will be driven actively high and
-+ *     low, this is the most typical case and is typically achieved with two
-+ *     active transistors on the output
-+ * GPIO_CONFIG_DRIVE_OPEN_DRAIN: the GPIO will be driven with open drain (open
-+ *     collector) which means it is usually wired with other output ports
-+ *     which are then pulled up with an external resistor
-+ * GPIO_CONFIG_DRIVE_OPEN_SOURCE: the GPIO will be driven with open drain
-+ *     (open emitter) which is the same as open drain mutatis mutandis but
-+ *     pulled to ground
-+ * GPIO_CONFIG_DRIVE_OFF: the GPIO pin is set to inactive mode, off
-+ */
-+#define GPIO_CONFIG_DRIVE_UNKNOWN      0x2010
-+#define GPIO_CONFIG_DRIVE_PUSH_PULL    0x2011
-+#define GPIO_CONFIG_DRIVE_OPEN_DRAIN   0x2012
-+#define GPIO_CONFIG_DRIVE_OPEN_SOURCE  0x2013
-+#define GPIO_CONFIG_DRIVE_OFF          0x2014
+Maybe as part of writing the nVidia driver you find a clever
+mechanism for doing this, if it's looking generally useful at that
+point then let's move it to the core I'd say.
 
-The basic assumption is that there are not that infinitely many
-things you may want to do with a pin after all.
-
-I can already think about interesting enumerators for
-GPIO_CONFIG_INPUT_SCHMITT_TRIGGER
-GPIO_CONFIG_INPUT_LOAD_CAPACITANCE
-etc. But not unenumerable things.
-
-The upside of this scheme is that we might have some handle on
-trying to consolidate common functionality between drivers,
-also to sort of consolidate the knowledge of what you can
-do with pins in one place, even if you can't share any code.
-
-For a stupid example the generic debugfs files could give you a list
-of all pins in any system and what bias mode they're in, no
-matter what platform we're dealing with, which would give the
-some kind of cosy consensus for developers that platforms
-are not that different after all.
-
-Yours,
+Thanks,
 Linus Walleij
