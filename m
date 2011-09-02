@@ -1,96 +1,59 @@
-From: loke.chetan@gmail.com (chetan loke)
-Date: Fri, 2 Sep 2011 12:49:47 -0400
-Subject: FW: [PATCH] af_packet: flush complete kernel cache in
-	packet_sendmsg
-In-Reply-To: <20110902153147.GB29025@philter>
-References: <20110505141107.GC30443@orbit.nwl.cc>
-	<1314961686-30870-1-git-send-email-phil.sutter@viprinet.com>
-	<D3F292ADF945FB49B35E96C94C2061B90A239361@nsmail.netscout.com>
-	<CAAsGZS6Tt9FLXfanH1+DgKt_9gR_YPJ8kX_pryhnzWTQVkNkNw@mail.gmail.com>
-	<20110902153147.GB29025@philter>
-Message-ID: <CAAsGZS6Qiyc6nhgyVLrphSLW6vf16=hbGVWJ+CFw6rfZQsdiFQ@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 2 Sep 2011 10:07:11 -0700
+Subject: [PATCH] usb: ehci: make HC see up-to-date qh/qtd descriptor ASAP
+In-Reply-To: <4E60A702.1060504@arm.com>
+References: <1314720193-26577-1-git-send-email-ming.lei@canonical.com>
+	<201108311855.27711.marc.dietrich@ap.physik.uni-giessen.de>
+	<4E5F5FA9.3010305@arm.com> <201109011313.42547.marvin24@gmx.de>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B327A383@HQMAIL01.nvidia.com>
+	<4E60A702.1060504@arm.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B327A5C1@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 2, 2011 at 11:31 AM, Phil Sutter <phil.sutter@viprinet.com> wrote:
+Marc Zyngier wrote at Friday, September 02, 2011 3:51 AM:
+> On 01/09/11 20:08, Stephen Warren wrote:
+> > Marc Dietich wrote at Thursday, September 01, 2011 5:14 AM:
+> >> I'll add Stephen Warren from NVIDIA to the CC list. He has more HW to test on.
+> >
+> > Here are the results I found:
+> >
+> > Harmony:
+> > Tegra USB3 -> SMSC9514 hub: NOT affected
+> > (Unplugging LAN cable, or disabling SMSC9514 LAN driver doesn't change this)
+...
+> I just noticed something else. Harmony is fast *most of the time*. In
+> about one in 3 reboots, I get the slow behavior. When USB is fast, I
+> also have I2C interrupts "screaming":
+> 
+>  85:     294321          0       GIC  tegra-i2c
+> 116:          0          0       GIC  tegra-i2c
+> 118:      98542          0       GIC  tps6586x
+> 
+> This is a couple of seconds after boot.
+> 
+> When USB is slow, I see the following:
+> [    0.385270] tps6586x 3-0034: Chip ID read failed: -121
+> [    0.390584] tps6586x: probe of 3-0034 failed with error -5
+> 
+> ... and I2C interrupt is quiet.
+> 
+> The I2C interrupt handler calls writel(), which does a cache sync. That
+> would explain the "fast" behavior of Harmony.
+> 
+> Do you see the same this on your board?
 
-> So far we haven't noticed problems in that direction. I just tried some
-> explicit test: having tcpdump print local timestamps (not the pcap-ones)
-> on every received packet, activating icmp_echo_ignore_all and pinging
-> the host on a dedicated line. I expected to sometimes see a second
-> difference between the two timestamps, as like with sending from time to
-> time a packet should get "lost" in the cache, and then occur to
-> userspace after the next one arrived. Maybe my test is broken, or RX is
-> indeed unaffected.
->
+Yes, I re-ran the test a few more times and see those exact same symptoms.
 
-You will need high traffic rate. If interested, you could try
-pktgen(with varying packet-load). Keep the packet-payload under 1500
-bytes (don't send jumbo frames) unless you have the following fix:
-commit cc9f01b246ca8e4fa245991840b8076394f86707
+In a case with the screaming I2C interrupts and fast USB, I then did:
 
-Your Tx path is working because flush_cache_call gets triggered before
-flush_dcache_page. On the Rx path, since you don't have that
-workaround, you will eventually(it's just a matter of time) see this
-problem.
+echo 3-0034 > /sys/bus/i2c/drivers/tps6586x/unbind
+(I got a kernel BUG and bash crashed here, but just logged back in)
 
-Or, delete your patch and try this workaround (in
-__packet_get/set_status) and you may be able to cover both Tx and Rx
-paths.
+which caused the I2C interrupt handler to stop, then re-ran the test.
+I then saw the slow USB speed.
 
+So, now I think *all* platforms(boards) are affected, right?
 
-diff --git a/net/packet/af_packet.c b/net/packet/af_packet.c
-index 2ea3d63..35d71dc 100644
---- a/net/packet/af_packet.c
-+++ b/net/packet/af_packet.c
-@@ -412,11 +412,19 @@ static void __packet_set_status(struct
-packet_sock *po, void *frame, int status)
-        switch (po->tp_version) {
-        case TPACKET_V1:
-                h.h1->tp_status = status;
--               flush_dcache_page(pgv_to_page(&h.h1->tp_status));
-+               #ifndef ENABLE_CACHEPROB_WORKAROUND
-+                       flush_dcache_page(pgv_to_page(&h.h1->tp_status));
-+               #else
-+                       kw_extra_cache_flush();
-+               endif
-                break;
-        case TPACKET_V2:
-                h.h2->tp_status = status;
--               flush_dcache_page(pgv_to_page(&h.h2->tp_status));
-+               #ifndef ENABLE_CACHEPROB_WORKAROUND
-+                       flush_dcache_page(pgv_to_page(&h.h2->tp_status));
-+               #else
-+                       kw_extra_cache_flush();
-+               #endif
-                break;
-        case TPACKET_V3:
-        default:
-@@ -437,13 +445,19 @@ static int __packet_get_status(struct
-packet_sock *po, void *frame)
-
-        smp_rmb();
-
-+       kw_extra_cache_flush();
-+
-        h.raw = frame;
-        switch (po->tp_version) {
-        case TPACKET_V1:
--               flush_dcache_page(pgv_to_page(&h.h1->tp_status));
-+               #ifndef ENABLE_CACHEPROB_WORKAROUND
-+                       flush_dcache_page(pgv_to_page(&h.h1->tp_status));
-+               #endif
-                return h.h1->tp_status;
-        case TPACKET_V2:
--               flush_dcache_page(pgv_to_page(&h.h2->tp_status));
-+               #ifndef ENABLE_CACHEPROB_WORKAROUND
-+                       flush_dcache_page(pgv_to_page(&h.h2->tp_status));
-+               #endif
-                return h.h2->tp_status;
-        case TPACKET_V3:
-        default:
-
-
-> Greetings and thanks for the hints, Phil
-
-Chetan Loke
+-- 
+nvpublic
