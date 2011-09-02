@@ -1,42 +1,33 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Fri, 2 Sep 2011 08:52:12 +0530
-Subject: [RFC/PATCH v2 08/13] dt: omap: i2c: add dt support for i2c1
-	controller
-In-Reply-To: <4E5FC213.3080407@ti.com>
-References: <1314074021-25186-1-git-send-email-manjugk@ti.com>
-	<1314074021-25186-9-git-send-email-manjugk@ti.com>
-	<20110823154649.GF32698@manju-desktop> <4E5FC213.3080407@ti.com>
-Message-ID: <20110902032212.GC6465@manju-desktop>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 01 Sep 2011 23:34:25 -0400 (EDT)
+Subject: [GIT PULL] CPU mapping platform updates for 3.2
+In-Reply-To: <20110901211107.GB5209@e102144-lin.cambridge.arm.com>
+References: <20110901211107.GB5209@e102144-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.00.1109012331010.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Thu, 1 Sep 2011, Will Deacon wrote:
 
-On Thu, Sep 01, 2011 at 07:34:11PM +0200, Cousson, Benoit wrote:
-> Hi Manju,
+> Hi Arnd,
 > 
-> On 8/23/2011 5:46 PM, G, Manjunath Kondaiah wrote:
-> >Hi Grant,
+> Please pull the following CPU mapping patches for 3.2. Russell has merged
+> the core changes into his for-next branch, so this pull is based against
+> that (following the merging discussion we had previously). I can rebase
+> onto next/master if you prefer.
 > 
-> [...]
+> Cheers,
 > 
-> >This function calls of_i2c_register_devices which attaches all the required
-> >parameters reg, irq, archdata etc into i2c adapter. But it will not attach
-> >platform_data which results empty pdata pointer in i2c child devices.
-> >
-> >Is this done purposefully?
+> Will
 > 
-> I think so, but anyway, we'd rather spend some time on doing a
-> proper DT implementation than hacking more the AUXDATA temporary
-> solution.
 > 
-> I've just sent a reworked version of that series with a pure
-> dt-no-auxdata-hack approach.
+> The following changes since commit 3ad29450aa243a318fae5d50bdc918760436bb02:
+> 
+>   Merge branch 'devel-stable' into for-next (2011-08-28 10:41:19 +0100)
 
-Thanks for initiating aux data cleanup series. Let us syncup on further changes
-and follow up so that we can have this feature with v3.2 merge window.
+No, please don't use that as a base.  This commit is likely to vanish 
+the next time RMK reconstructs his for-next branch.  You should instead 
+base those patches on the actual branch tip that RMK merged from you.
 
-Grant, Can you have a look and provide feedback on all the patches which are
-done for omap dt work.
 
--M
+Nicolas
