@@ -1,71 +1,253 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 2 Sep 2011 08:59:58 +0800
-Subject: [PATCH 0/3] RFC: addition to DMA API
-In-Reply-To: <Pine.LNX.4.44L0.1109011244340.1896-100000@iolanthe.rowland.org>
-References: <CACVXFVOSCS-J8iXcRpCN9TD41pWqcJOiPahtGjBmPpXBLozZyA@mail.gmail.com>
-	<Pine.LNX.4.44L0.1109011244340.1896-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVO6PhfgH_90B7AvWxSReCeJJ8D+jpgrk065MPHok7jzhA@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 2 Sep 2011 10:02:43 +0900
+Subject: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
+In-Reply-To: <003501cc68a7$e8935aa0$b9ba0fe0$%dae@samsung.com>
+References: <1314359274-21585-1-git-send-email-inki.dae@samsung.com>
+	<CAF6AEGu3ss-rJC28H1rm2GWLm1bAZnHLftXfMLJQNeqjBt3umQ@mail.gmail.com>
+	<001001cc67aa$72760460$57620d20$%dae@samsung.com>
+	<CAF6AEGsqbFcS_QwihrjpVLQK1Y+h1iJSyu+GFV0Govp3XHYbOw@mail.gmail.com>
+	<003501cc68a7$e8935aa0$b9ba0fe0$%dae@samsung.com>
+Message-ID: <CAH9JG2Xh6oWOOg85KEf+Di4aVS4Zd_O3LfaWKZ1ig7A6pffgEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Sep 2, 2011 at 12:48 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 1 Sep 2011, Ming Lei wrote:
+On Thu, Sep 1, 2011 at 10:06 PM, Inki Dae <inki.dae@samsung.com> wrote:
+> Hello Rob.
+> Below is my comments. thank you.
 >
->> > Suppose A and B are _both_ part of the dma descriptor. ?The device
->> > might see A==1 and B==0, if the memory accesses occur like this:
->> >
->> > ? ? ? ?CPU ? ? ? ? ? ? device
->> > ? ? ? ?--- ? ? ? ? ? ? ------
->> > ? ? ? ?A = 1;
->> > ? ? ? ?wmb();
->> > ? ? ? ? ? ? ? ? ? ? ? ?read B
->> > ? ? ? ? ? ? ? ? ? ? ? ?read A
->> > ? ? ? ?B = 2;
->> >
->> > When this happens, the device will observe a non-atomic update of the
->> > descriptor. ?There's no way to prevent this.
+>> -----Original Message-----
+>> From: Rob Clark [mailto:robdclark at gmail.com]
+>> Sent: Thursday, September 01, 2011 1:02 AM
+>> To: Inki Dae
+>> Cc: airlied at linux.ie; dri-devel at lists.freedesktop.org;
+>> sw0312.kim at samsung.com; linux-kernel at vger.kernel.org;
+>> kyungmin.park at samsung.com; linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC
+>> EXYNOS4210.
 >>
->> If device doesn't find that B is 2, it will not fetch descriptor of A,
->> and will observe
->> a atomic update, which is just EHCI does for many cases(such as 4.10.2).
->
-> You didn't read what I wrote above. ?Suppose A and B are _both_ part of
-> the same descriptor, like hw_token and hw_qtd_next.
-
-I think the case(keep writing order between parts in a same dma descriptor)
-is only in constant dma-poll master case, just like ehci/uhci.
-
-General case is that memory barrier is required before linking one dma
-descriptor into hardware queue but after the dma descriptor is prepared.
-
->
->> > The memory barrier in your qh_link_async() example can make sure that
->> > the device always sees consistent data. ?It doesn't guarantee that the
->> > write to head->hw->hw_next will be flushed to memory in a reasonably
->> > short time, which is the problem you are trying to solve.
+>> On Wed, Aug 31, 2011 at 1:51 AM, Inki Dae <inki.dae@samsung.com> wrote:
+>> > Hello, Rob.
+>> > Below is my answers and questions. and could you please include me as CC
+>> > when you post your driver?
 >>
->> Yes, up to now, it is the only case in which the flush can address to,
->> and in which kind of cases device will poll DMA coherent memory contiguously,
->> I am not sure if there are other devices except for EHCI(maybe have uhci/ohci).
+>> sure thing
+>>
+>>
+>> >> > +static int samsung_drm_connector_get_modes(struct drm_connector
+>> >> *connector)
+>> >> > +{
+>> >> > + ? ? ? struct samsung_drm_connector *samsung_connector =
+>> >> > + ? ? ? ? ? ? ? to_samsung_connector(connector);
+>> >> > + ? ? ? struct samsung_drm_display *display =
+>> >> > + ? ? ? ? ? ? ? samsung_drm_get_manager(samsung_connector->encoder)-
+>> >> >display;
+>> >> > + ? ? ? unsigned int count;
+>> >> > +
+>> >> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+>> >> > +
+>> >> > + ? ? ? if (display && display->get_edid) {
+>> >> > + ? ? ? ? ? ? ? void *edid = kzalloc(MAX_EDID, GFP_KERNEL);
+>> >> > + ? ? ? ? ? ? ? if (!edid) {
+>> >> > + ? ? ? ? ? ? ? ? ? ? ? DRM_ERROR("failed to allocate edid\n");
+>> >> > + ? ? ? ? ? ? ? ? ? ? ? return 0;
+>> >> > + ? ? ? ? ? ? ? }
+>> >> > +
+>> >> > + ? ? ? ? ? ? ? display->get_edid(connector, edid, MAX_EDID);
+>> >> > +
+>> >> > + ? ? ? ? ? ? ? drm_mode_connector_update_edid_property(connector,
+>> > edid);
+>> >> > + ? ? ? ? ? ? ? count = drm_add_edid_modes(connector, edid);
+>> >> > +
+>> >> > + ? ? ? ? ? ? ? kfree(connector->display_info.raw_edid);
+>> >> > + ? ? ? ? ? ? ? connector->display_info.raw_edid = edid;
+>> >> > + ? ? ? } else {
+>> >> > + ? ? ? ? ? ? ? struct drm_display_mode *mode =
+>> > drm_mode_create(connector-
+>> >> >dev);
+>> >> > + ? ? ? ? ? ? ? struct fb_videomode *timing;
+>> >> > +
+>> >> > + ? ? ? ? ? ? ? if (display && display->get_timing)
+>> >> > + ? ? ? ? ? ? ? ? ? ? ? timing = display->get_timing();
+>> >>
+>> >> also seems a bit weird to not do: display->get_timings(display)..
+>> >>
+>> >> maybe you don't have the case of multiple instances of the same
+>> >> display time.. but maybe someday you need that. ?(Maybe this is just
+>> >> an artifact of how the API of your current lower layer driver is.. but
+>> >> maybe now is a good time to think about those APIs)
+>> >>
+>> >
+>> > display is static object set by hardware specific driver such as display
+>> > controller or hdmi. each hardware specific driver has their own display
+>> > object statically. You can refer to the definition in
+> samsung_drm_fimd.c.
+>> > and I understood a encoder and a connector is 1:1 relationship, when any
+>> > hardware specific driver is probed, they would be created with a manager
+>> > that includes their own display object as pointer. Could you please give
+>> me
+>> > more comments why display object should be considered for multiple
+>> > instances? I am afraid there is any part I don't care.
+>> >
+>> > thank you.
+>>
+>> Just thinking hypothetically.. what if some future device had two hdmi
+>> controllers. ?Then you'd want two instances of the same display
+>> object.
+>>
+>> Although it seems this API is just internal to the DRM driver (which I
+>> had not realized earlier), so it should be pretty easy to change later
+>> if needed.
+>>
 >
-> Yes: UHCI, OHCI, EHCI, and XHCI all poll memory constantly.
+> You are right. I guess we should consider multiple instances to display
+> object because the Exynos hardware has two display controllers and also each
+> display controller needs one display panel with sharing same driver. thank
+> you for your pointing. :)
 
-In fact, the flush may be not required for ohci and xhci case, since there is
-already one mmio register writing at the end of .enqueue path in ohci/xhci
-driver.(just a glance at the code of ohci/xhci, please correct if I am wrong)
+Two HDMI and two FIMD is different. even though exynos4 supports the
+two display controller. it has only one HDMI port and now there's no
+device to use it. Of course if new device uses it. it will support it.
+I mena currently make it simple and make it TODO list.
 
-For UHCI, looks like it has not been used on ARM, so maybe can ignore it.
-UHCI is to support a slow usb 1.1 transfer, so I am wondering if the flush
-can produce a obvious performance boost.
-
-So looks like the flush only makes sense on EHCI.
-
-If the above is not wrong, is it really needed to introduce a general DMA API
-only for EHCI?
-
-
-thanks,
---
-Ming Lei
+Thank you,
+Kyungmin Park
+>
+>>
+>> >> > +static void samsung_drm_connector_destroy(struct drm_connector
+>> >> *connector)
+>> >> > +{
+>> >> > + ? ? ? struct samsung_drm_connector *samsung_connector =
+>> >> > + ? ? ? ? ? ? ? to_samsung_connector(connector);
+>> >> > +
+>> >> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+>> >> > +
+>> >> > + ? ? ? drm_sysfs_connector_remove(connector);
+>> >> > + ? ? ? drm_connector_cleanup(connector);
+>> >> > + ? ? ? connector->dev->mode_config.num_connector--;
+>> >>
+>> >> I wonder if num_connector-- should be in drm_connector_cleanup()..
+>> >>
+>> >> I missed this in OMAP driver, but it seems that none of the other drm
+>> >> drivers are directly decrementing this.. and it would seem more
+>> >> symmetric for it to be in drm_connector_cleanup(). ?But would be
+>> >
+>> > For this, it was already commented by Joonyoun Shim.
+>>
+>> And it seems (which I hadn't noticed earlier) already merged :-)
+>>
+>> So I think this (and similar bit in encoder destructor) can be removed
+>>
+>>
+>> >> > +static void samsung_drm_fb_destroy(struct drm_framebuffer *fb)
+>> >> > +{
+>> >> > + ? ? ? struct samsung_drm_fb *samsung_fb = to_samsung_fb(fb);
+>> >> > + ? ? ? int ret;
+>> >> > +
+>> >> > + ? ? ? DRM_DEBUG_KMS("%s\n", __FILE__);
+>> >> > +
+>> >> > + ? ? ? drm_framebuffer_cleanup(fb);
+>> >> > +
+>> >> > + ? ? ? if (samsung_fb->is_default) {
+>> >> > + ? ? ? ? ? ? ? ret = drm_gem_handle_delete(samsung_fb->file_priv,
+>> >> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? samsung_fb->gem_handle);
+>> >>
+>> >> why not keep the gem buffer ptr, and do something like:
+>> >>
+>> >> ? drm_gem_object_unreference_unlocked(samsung_fb->bo)..
+>> >>
+>> >> this way, you get the right behavior if someone somewhere else took a
+>> >> ref to the gem buffer object? ?And it avoids needing to keep the
+>> >> file_priv ptr in the fb (which seems a bit strange)
+>> >>
+>> >>
+>> > Yes, at booting time, one gem object is created. this is for linux
+>> > framebuffer and used as default buffer. register_framebuffer function is
+>> > called one time at booting time by drm driver. but when this driver is
+>> built
+>> > as modules, this gem object should be released with rmmod modules. and
+>> the
+>> > reason fb has file point is that drm_gem_handle_delete requests it to
+>> > release a gem object. our driver considered modularization also. If
+>> there is
+>> > any point I missed, give me any comment please. Thank you.
+>>
+>> Oh, I missed the point that drm_gem_handle_delete() is calling
+>> drm_gem_object_unreference_unlocked().
+>>
+>> But this still seems a bit odd, but I guess the difference is you are
+>> keeping the buffer handle, rather than the 'struct drm_gem_object'
+>> ptr. ?I'm not sure if there is a point to keeping track of the buffer
+>> in handle form on the kernel side. ?If instead you just keep a GEM
+>> object ptr, you can just drm_gem_object_unreference{_unlocked}() when
+>> you are done with it without having to special-case is_default stuff.
+>
+> Ah, I found a problem through you. default framebuffer never has a gem
+> handle but only a buffer object. and as you mentioned, that isn't clear to
+> me also. I will consider better way. Thank you.
+>
+>>
+>> >> > +struct samsung_drm_gem_obj *
+>> >> > + ? ? ? ? ? ? ? find_samsung_drm_gem_object(struct drm_file
+> *file_priv,
+>> >> > + ? ? ? ? ? ? ? ? ? ? ? struct drm_device *dev, unsigned int handle)
+>> >> > +{
+>> >> > + ? ? ? struct drm_gem_object *gem_obj;
+>> >> > +
+>> >> > + ? ? ? gem_obj = drm_gem_object_lookup(dev, file_priv, handle);
+>> >> > + ? ? ? if (!gem_obj) {
+>> >> > + ? ? ? ? ? ? ? DRM_LOG_KMS("a invalid gem object not registered to
+>> >> lookup.\n");
+>> >> > + ? ? ? ? ? ? ? return NULL;
+>> >> > + ? ? ? }
+>> >> > +
+>> >> > + ? ? ? /**
+>> >> > + ? ? ? ?* unreference refcount of the gem object.
+>> >> > + ? ? ? ?* at drm_gem_object_lookup(), the gem object was referenced.
+>> >> > + ? ? ? ?*/
+>> >> > + ? ? ? drm_gem_object_unreference(gem_obj);
+>> >>
+>> >> this doesn't seem right, to drop the reference before you use the
+>> >> buffer elsewhere..
+>> >>
+>> > No, see drm_gem_object_lookup fxn. at this function, if there is a
+>> object
+>> > found then drm_gem_object_reference is called to increase refcount of
+>> this
+>> > object. if there is any missing point, give me any comment please. thank
+>> > you.
+>>
+>>
+>> Right, but I think there is a reason it takes a reference... so that
+>> the object doesn't get free'd from under your feet. ?So pattern
+>> should, I think, be:
+>>
+>> ? obj = lookup(...);
+>> ? ... do stuff w/ obj ...
+>> ? unreference(obj)
+>>
+>> so the caller who is using the looked up obj should unref it when done
+>>
+>> Instead, you have:
+>>
+>> ? obj = lookup(...);
+>> ? unreference(obj);
+>> ? ... do stuff w/ obj ...
+>>
+>>
+>
+> Generally right, but in this case, it is just used to get specific gem
+> object through find_samsung_drm_gem_object() so doesn't reference this gem
+> object anywhere.
+> therefore reference and unreference should be done within
+> find_samsung_drm_gem_object(). if there is any point I missed then let me
+> know please. thank you.
+>
+>> BR,
+>> -R
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
