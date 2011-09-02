@@ -1,33 +1,41 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 2 Sep 2011 14:58:54 -0400 (EDT)
-Subject: testing-board branch: rebase to RMK's devel-stable?
-In-Reply-To: <alpine.LFD.2.00.1109021446300.20358@xanadu.home>
-References: <87vcta7r9f.fsf@ti.com>
-	<alpine.LFD.2.00.1109021446300.20358@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1109021448120.20358@xanadu.home>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri,  2 Sep 2011 20:22:58 +0100
+Subject: [PATCH] ARM: S3C64XX: Register Lowland audio device on Cragganmore
+Message-ID: <1314991378-28351-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2 Sep 2011, Nicolas Pitre wrote:
+The Lowland system is a combination of the Cragganmore CPU module and the
+Tomatin and Kilchomin audio modules on Glenfarclas.
 
-> On Fri, 2 Sep 2011, Kevin Hilman wrote:
-> 
-> > Hi Tony,
-> > 
-> > Your testing-board branch currently has a couple new boards that are
-> > missing the boot_params to atag_offset conversion (patch below.)
-> > 
-> > There's a patch below to fix this, but maybe it's better to just rebase
-> > your testing-board branch onto Russell's devel-stable branch (where he's
-> > merged the seris from Nico) so any board stuff we add is sure to do it
-> > correctly.
-> 
-> I would suggest that too.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-Better yet, if your bootloader does pass the address of the ATAG list 
-via r2 already (contemporary u-Boot versions do) then the 
-boot_params/atag_offset entry is redundant and can simply be dropped 
-upfront.
-
-
-Nicolas
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 174dd0c..917acf7 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -284,6 +284,11 @@ static struct platform_device speyside_device = {
+ 	.id		= -1,
+ };
+ 
++static struct platform_device lowland_device = {
++	.name		= "lowland",
++	.id		= -1,
++};
++
+ static struct platform_device speyside_wm8962_device = {
+ 	.name		= "speyside-wm8962",
+ 	.id		= -1,
+@@ -341,6 +346,7 @@ static struct platform_device *crag6410_devices[] __initdata = {
+ 	&crag6410_backlight_device,
+ 	&speyside_device,
+ 	&speyside_wm8962_device,
++	&lowland_device,
+ 	&wallvdd_device,
+ };
+ 
+-- 
+1.7.5.4
