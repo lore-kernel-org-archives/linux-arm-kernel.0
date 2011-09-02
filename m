@@ -1,44 +1,37 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Fri,  2 Sep 2011 20:32:29 +0300
-Subject: [PATCH/RFC 0/7] iommu: fixes & extensions
-Message-ID: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+Date: Fri,  2 Sep 2011 20:32:31 +0300
+Subject: [PATCH 2/7] iommu/omap: cleanup: remove a redundant statement
+In-Reply-To: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+Message-ID: <1314984756-4400-3-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-5 first patches are relatively small iommu fixes/cleanups.
+Tiny cleanup that removes a redundant 'return' statement.
 
-2 last patches are proposals for core iommu extensions:
-- Add fault report mechanism, needed for recovery of remote processors
-  trying to access unmapped addresses.
-- Add splitting of memory regions to pages in the iommu core itself
-  (according to hardware capabilities as advertised by the iommu drivers).
-  This is needed to prevent duplication of this logic by
-  the iommu users/drivers themselves.
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ drivers/iommu/omap-iommu.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
-The patches are based on Joerg's arm/omap branch.
-
-Tested with OMAP3 (omap3isp) + OMAP4 (rpmsg/remoteproc).
-
-Laurent Pinchart (1):
-  iommu/omap-iovmm: support non page-aligned buffers in iommu_vmap
-
-Ohad Ben-Cohen (6):
-  iommu/omap: cleanup: remove a redundant 'return' statement
-  iommu/core: use the existing IS_ALIGNED macro
-  iommu/omap: ->unmap() should return order of unmapped page
-  iommu/msm: ->unmap() should return order of unmapped page
-  iommu/core: add fault reporting
-  iommu/core: split mapping to page sizes as supported by the hardware
-
- arch/arm/plat-omap/include/plat/iommu.h |    3 +-
- drivers/iommu/iommu.c                   |  142 +++++++++++++++++++++++++++----
- drivers/iommu/msm_iommu.c               |   15 +++-
- drivers/iommu/omap-iommu.c              |   56 +++---------
- drivers/iommu/omap-iovmm.c              |   50 +++++++-----
- drivers/media/video/omap3isp/isp.c      |    2 +-
- include/linux/iommu.h                   |   67 ++++++++++++++-
- virt/kvm/iommu.c                        |    6 +-
- 8 files changed, 251 insertions(+), 90 deletions(-)
-
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index 90744af..4311bc3 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -1069,12 +1069,10 @@ static int omap_iommu_map(struct iommu_domain *domain, unsigned long da,
+ 	iotlb_init_entry(&e, da, pa, flags);
+ 
+ 	ret = omap_iopgtable_store_entry(oiommu, &e);
+-	if (ret) {
++	if (ret)
+ 		dev_err(dev, "omap_iopgtable_store_entry failed: %d\n", ret);
+-		return ret;
+-	}
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ static int omap_iommu_unmap(struct iommu_domain *domain, unsigned long da,
 -- 
 1.7.4.1
