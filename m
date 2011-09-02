@@ -1,29 +1,92 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Sep 2011 11:12:46 +0300
-Subject: [PATCH 7/7] OMAP3: beagleboard: Remove DT support from regular
-	board
-In-Reply-To: <1314897912-18178-8-git-send-email-b-cousson@ti.com>
-References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
-	<1314897912-18178-8-git-send-email-b-cousson@ti.com>
-Message-ID: <20110902081246.GQ3548@atomide.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Fri,  2 Sep 2011 09:44:31 +0900
+Subject: [PATCH v8 03/16] DMA: PL330: Support DMA_SLAVE_CONFIG command
+In-Reply-To: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
+References: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
+Message-ID: <1314924284-25554-4-git-send-email-boojin.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [110901 19:52]:
-> In order to avoid conflict with the new board-omap3-dt.c file,
-> remove the .dt_compat entry from the beagle regular board
-> file.
-> 
-> Any DT work for OMAP3 will have to be done on the generic DT
-> board file to avoid breaking the legacy board support until
-> DT migration is done.
+Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/dma/pl330.c |   49 +++++++++++++++++++++++++++++++++++++------------
+ 1 files changed, 37 insertions(+), 12 deletions(-)
 
-In general we should not keep duplicate old non-DT data around
-now that we have the DT append support. Instead we should just
-require the .dts file appended to zImage for all mach-omap2
-machines. Otherwise we'll end up with double bloat :)
-
-So it's OK to have the DT entries in board files so drivers
-that get converted will work with them.
-
-Tony
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index d5829c7..e7f9d1d 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -73,6 +73,7 @@ struct dma_pl330_chan {
+ 
+ 	/* For D-to-M and M-to-D channels */
+ 	int burst_sz; /* the peripheral fifo width */
++	int burst_len; /* the number of burst */
+ 	dma_addr_t fifo_addr;
+ };
+ 
+@@ -263,23 +264,47 @@ static int pl330_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd, unsigned
+ 	struct dma_pl330_chan *pch = to_pchan(chan);
+ 	struct dma_pl330_desc *desc;
+ 	unsigned long flags;
++	struct dma_pl330_dmac *pdmac = pch->dmac;
++	struct dma_slave_config *slave_config;
+ 
+-	/* Only supports DMA_TERMINATE_ALL */
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENXIO;
++	switch (cmd) {
++	case DMA_TERMINATE_ALL:
++		spin_lock_irqsave(&pch->lock, flags);
+ 
+-	spin_lock_irqsave(&pch->lock, flags);
++		/* FLUSH the PL330 Channel thread */
++		pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+ 
+-	/* FLUSH the PL330 Channel thread */
+-	pl330_chan_ctrl(pch->pl330_chid, PL330_OP_FLUSH);
+-
+-	/* Mark all desc done */
+-	list_for_each_entry(desc, &pch->work_list, node)
+-		desc->status = DONE;
++		/* Mark all desc done */
++		list_for_each_entry(desc, &pch->work_list, node)
++			desc->status = DONE;
+ 
+-	spin_unlock_irqrestore(&pch->lock, flags);
++		spin_unlock_irqrestore(&pch->lock, flags);
+ 
+-	pl330_tasklet((unsigned long) pch);
++		pl330_tasklet((unsigned long) pch);
++		break;
++	case DMA_SLAVE_CONFIG:
++		slave_config = (struct dma_slave_config *)arg;
++
++		if (slave_config->direction == DMA_TO_DEVICE) {
++			if (slave_config->dst_addr)
++				pch->fifo_addr = slave_config->dst_addr;
++			if (slave_config->dst_addr_width)
++				pch->burst_sz = __ffs(slave_config->dst_addr_width);
++			if (slave_config->dst_maxburst)
++				pch->burst_len = slave_config->dst_maxburst;
++		} else if (slave_config->direction == DMA_FROM_DEVICE) {
++			if (slave_config->src_addr)
++				pch->fifo_addr = slave_config->src_addr;
++			if (slave_config->src_addr_width)
++				pch->burst_sz = __ffs(slave_config->src_addr_width);
++			if (slave_config->src_maxburst)
++				pch->burst_len = slave_config->src_maxburst;
++		}
++		break;
++	default:
++		dev_err(pch->dmac->pif.dev, "Not supported command.\n");
++		return -ENXIO;
++	}
+ 
+ 	return 0;
+ }
+-- 
+1.7.1
