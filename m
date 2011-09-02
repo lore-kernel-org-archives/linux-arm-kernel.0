@@ -1,80 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Sep 2011 16:08:39 +0300
-Subject: [PATCH 7/7] OMAP3: beagleboard: Remove DT support from regular
-	board
-In-Reply-To: <4E60CD78.9030602@ti.com>
-References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
-	<1314897912-18178-8-git-send-email-b-cousson@ti.com>
-	<20110902081246.GQ3548@atomide.com> <4E609B0A.1020804@ti.com>
-	<20110902104850.GS3548@atomide.com> <4E60CD78.9030602@ti.com>
-Message-ID: <20110902130838.GY3548@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 02 Sep 2011 09:13:09 -0400 (EDT)
+Subject: [GIT PULL] CPU mapping platform updates for 3.2
+In-Reply-To: <20110902083817.GA11728@e102144-lin.cambridge.arm.com>
+References: <20110901211107.GB5209@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1109012331010.20358@xanadu.home>
+	<20110902083817.GA11728@e102144-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.00.1109020908250.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cousson, Benoit <b-cousson@ti.com> [110902 15:02]:
-> On 9/2/2011 12:48 PM, Tony Lindgren wrote:
+On Fri, 2 Sep 2011, Will Deacon wrote:
+
+> Hi Nicolas,
 > 
-> I'm not sure it is that simple. We have 20+ OMAP3+ boards supported
-> so far. Dropping pdata when a driver is adapted means that all these
-> boards should be properly adapted to DT and tested... (board-XXX.dts
-> + board-XXX.c).
-> That's a huge effort for my point of view. Whereas keeping the
-> legacy pdata method will allow progressing on the boart-dt only
-> without breaking any legacy boards. It will allow the board
-> manufacturers to potentially do the DTS file for their own system
-> using then the generic board-dt.c file.
-
-Yeah but we've seen how badly "we'll clean it up later" approach
-works :(
-
-Unfortunately that path means nobody comes back to clean-up
-anything after the party is over and all that work falls on the
-maintainers.
-
-So the one driver at a time conversion approach is better.
- 
-> That being said, keeping the legacy pdata code in some driver along
-> with the DT is a big pain as well:-(
-
-Yup and duplicate data will lead to nasty bugs and support issues.
-
-> >It's easier just to require DT append for all the boards. In most
-> >cases it's just a trivial include of the common dts file for now.
+> On Fri, Sep 02, 2011 at 04:34:25AM +0100, Nicolas Pitre wrote:
+> > On Thu, 1 Sep 2011, Will Deacon wrote:
+> > 
+> > > Hi Arnd,
+> > > 
+> > > Please pull the following CPU mapping patches for 3.2. Russell has merged
+> > > the core changes into his for-next branch, so this pull is based against
+> > > that (following the merging discussion we had previously). I can rebase
+> > > onto next/master if you prefer.
+> > > 
+> > > Cheers,
+> > > 
+> > > Will
+> > > 
+> > > 
+> > > The following changes since commit 3ad29450aa243a318fae5d50bdc918760436bb02:
+> > > 
+> > >   Merge branch 'devel-stable' into for-next (2011-08-28 10:41:19 +0100)
+> > 
+> > No, please don't use that as a base.  This commit is likely to vanish 
+> > the next time RMK reconstructs his for-next branch.  You should instead 
+> > base those patches on the actual branch tip that RMK merged from you.
 > 
-> That part is easy indeed, this is hacking every board-XXX.c and
-> testing them that will be tricky. This is as well the board
-> specifics settings that are tricky not the generic OMAP stuff. We do
-> have to set GPIOs, pin mux, regulator bindings, audio codec stuff...
-
-Right but for most part it's just removing the data. The board
-specific things are usually number of MMC data lines, number of
-USB transceiver data lines, GPIO to enable etc. Pretty trivial
-stuff that the board maintainers can test.
- 
-> >When we convert something to DT, there's no point going back.
+> D'oh, I thought this might happen. The problem I have is that my core
+> patches depend on one from Vincent Guittot ("ARM: 7011/1: Add ARM cpu
+> topology definition"), so I ended up sending my changes via Russell's patch
+> system.
 > 
-> Agree on that, in theory, I'm just wondering how practical it will
-> be to progress on every board at the same time.
+> How about I cherry pick Vincent's patch and my core changes out of next and
+> use that as a base (on top of -rc4)?
 
-That should not be too bad for most part. For example, the board-*.c
-files all just call  omap_register_i2c_bus with the controllers.
-So not much there to convert, just add the controllers to board
-.dts files and remove from board-*.c files.
- 
-> I guess we do need some advice from the DT gurus on that as well.
-> 
-> It looks to me that both approaches are painful and will require
-> some efforts.
+I would instead suggest that you simply use commit c2b9ab71c6 as your 
+base.  It is more likely to remain stable, unlike the top commit in the 
+for-next branch.
 
-Yes, but if we don't drop the pdata then we'll be in half-converted
-state eternally.
+Cherry-picking needed commits would work, but they would end up being 
+duplicated in two different branches in the final Git history.  Git can 
+cope with that of course, but this is usually something we try to avoid 
+as this could create some confusion for people.
 
-> It is too bad that nobody did a
-> devicetree-migration-o-matic-for-lazy-developer.py script to handle
-> that...
 
-The conversion for some drivers can be scripted for sure :)
-
-Regards,
-
-Tony
+Nicolas
