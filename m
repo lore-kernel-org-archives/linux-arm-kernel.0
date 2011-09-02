@@ -1,44 +1,85 @@
 From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 1 Sep 2011 20:08:14 -0500
+Date: Thu, 1 Sep 2011 20:18:04 -0500
 Subject: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
-In-Reply-To: <CAH9JG2Xh6oWOOg85KEf+Di4aVS4Zd_O3LfaWKZ1ig7A6pffgEA@mail.gmail.com>
+In-Reply-To: <003501cc68a7$e8935aa0$b9ba0fe0$%dae@samsung.com>
 References: <1314359274-21585-1-git-send-email-inki.dae@samsung.com>
 	<CAF6AEGu3ss-rJC28H1rm2GWLm1bAZnHLftXfMLJQNeqjBt3umQ@mail.gmail.com>
 	<001001cc67aa$72760460$57620d20$%dae@samsung.com>
 	<CAF6AEGsqbFcS_QwihrjpVLQK1Y+h1iJSyu+GFV0Govp3XHYbOw@mail.gmail.com>
 	<003501cc68a7$e8935aa0$b9ba0fe0$%dae@samsung.com>
-	<CAH9JG2Xh6oWOOg85KEf+Di4aVS4Zd_O3LfaWKZ1ig7A6pffgEA@mail.gmail.com>
-Message-ID: <CAF6AEGuSpsZ_LFWOk2fSR5=cqmFMf7iH+y_En5hpu+7iF4EecQ@mail.gmail.com>
+Message-ID: <CAF6AEGuZb1nhMJwc+k-cwPTPLHTiO1PkHcpGN899Yq3pEMUwkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 1, 2011 at 8:02 PM, Kyungmin Park <kmpark@infradead.org> wrote:
->>> Just thinking hypothetically.. what if some future device had two hdmi
->>> controllers. ?Then you'd want two instances of the same display
->>> object.
->>>
->>> Although it seems this API is just internal to the DRM driver (which I
->>> had not realized earlier), so it should be pretty easy to change later
->>> if needed.
->>>
+On Thu, Sep 1, 2011 at 8:06 AM, Inki Dae <inki.dae@samsung.com> wrote:
+>> >> > +struct samsung_drm_gem_obj *
+>> >> > + ? ? ? ? ? ? ? find_samsung_drm_gem_object(struct drm_file
+> *file_priv,
+>> >> > + ? ? ? ? ? ? ? ? ? ? ? struct drm_device *dev, unsigned int handle)
+>> >> > +{
+>> >> > + ? ? ? struct drm_gem_object *gem_obj;
+>> >> > +
+>> >> > + ? ? ? gem_obj = drm_gem_object_lookup(dev, file_priv, handle);
+>> >> > + ? ? ? if (!gem_obj) {
+>> >> > + ? ? ? ? ? ? ? DRM_LOG_KMS("a invalid gem object not registered to
+>> >> lookup.\n");
+>> >> > + ? ? ? ? ? ? ? return NULL;
+>> >> > + ? ? ? }
+>> >> > +
+>> >> > + ? ? ? /**
+>> >> > + ? ? ? ?* unreference refcount of the gem object.
+>> >> > + ? ? ? ?* at drm_gem_object_lookup(), the gem object was referenced.
+>> >> > + ? ? ? ?*/
+>> >> > + ? ? ? drm_gem_object_unreference(gem_obj);
+>> >>
+>> >> this doesn't seem right, to drop the reference before you use the
+>> >> buffer elsewhere..
+>> >>
+>> > No, see drm_gem_object_lookup fxn. at this function, if there is a
+>> object
+>> > found then drm_gem_object_reference is called to increase refcount of
+>> this
+>> > object. if there is any missing point, give me any comment please. thank
+>> > you.
 >>
->> You are right. I guess we should consider multiple instances to display
->> object because the Exynos hardware has two display controllers and also each
->> display controller needs one display panel with sharing same driver. thank
->> you for your pointing. :)
+>>
+>> Right, but I think there is a reason it takes a reference... so that
+>> the object doesn't get free'd from under your feet. ?So pattern
+>> should, I think, be:
+>>
+>> ? obj = lookup(...);
+>> ? ... do stuff w/ obj ...
+>> ? unreference(obj)
+>>
+>> so the caller who is using the looked up obj should unref it when done
+>>
+>> Instead, you have:
+>>
+>> ? obj = lookup(...);
+>> ? unreference(obj);
+>> ? ... do stuff w/ obj ...
+>>
+>>
 >
-> Two HDMI and two FIMD is different. even though exynos4 supports the
-> two display controller. it has only one HDMI port and now there's no
-> device to use it. Of course if new device uses it. it will support it.
-> I mena currently make it simple and make it TODO list.
+> Generally right, but in this case, it is just used to get specific gem
+> object through find_samsung_drm_gem_object() so doesn't reference this gem
+> object anywhere.
+> therefore reference and unreference should be done within
+> find_samsung_drm_gem_object(). if there is any point I missed then let me
+> know please. thank you.
+>
 
-yeah.. since it is just an API internal to the driver, and not
-external (as I initially mistakenly thought), I don't think it is an
-immediate issue.  It should be easy enough to change later if you, for
-example, later had hw w/ two HDMI ports.
+Still, it seems like find_samsung_drm_gem_object() is encouraging the
+wrong usage-pattern, even if it works fine today because you know
+somewhere else is holding a reference to the object.  Later if you
+expand your use of GEM objects, this fxn might come back to bite you.
+There is a good reason that drm_gem_object_lookup() takes a reference
+to the object, and it feels wrong to intentionally subvert that.
+
+(I'm perfectly willing to be overridden on the subject.. there are
+plenty of folks on this list who have been doing the GEM thing longer
+than I have.  But it just seems better to use APIs like
+drm_gem_object_lookup() the way they were intended.)
 
 BR,
 -R
-
-> Thank you,
-> Kyungmin Park
