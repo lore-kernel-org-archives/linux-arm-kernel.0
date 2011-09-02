@@ -1,225 +1,50 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 2 Sep 2011 17:22:46 +0200
-Subject: [RFC PATCH 1/3] OMAP: omap_device: Add omap_device_[alloc|delete]
-	for DT integration
-In-Reply-To: <87liu8dsjj.fsf@ti.com>
-References: <1314037343-19783-1-git-send-email-b-cousson@ti.com>
-	<1314037343-19783-2-git-send-email-b-cousson@ti.com>
-	<87liu8dsjj.fsf@ti.com>
-Message-ID: <4E60F4C6.2050802@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 2 Sep 2011 08:24:38 -0700
+Subject: [PATCH 1/3] irq: If an IRQ is a GPIO, request and configure it
+In-Reply-To: <alpine.LFD.2.02.1109021027360.2723@ionos>
+References: <1312498820-2275-1-git-send-email-swarren@nvidia.com>
+	<1312498820-2275-2-git-send-email-swarren@nvidia.com>
+	<alpine.LFD.2.02.1109021027360.2723@ionos>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B327A55C@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/1/2011 8:30 PM, Hilman, Kevin wrote:
-> Benoit Cousson<b-cousson@ti.com>  writes:
+Thomas Gleixner wrote at Friday, September 02, 2011 2:37 AM:
+> On Thu, 4 Aug 2011, Stephen Warren wrote:
 > 
->> Split the omap_device_build_ss into two smaller functions
->> that will allow to populate a platform_device already alocated by
->> device-tree.
->> The functionality of the omap_device_build_ss is still the same, but
->> the omap_device_alloc will be usable with devices already built by
->> device-tree.
+> > Many IRQs are associated with GPIO pins. When the pin is used as an IRQ,
+> > it can't be used as anything else; it should be requested. Enhance the
+> > core interrupt code to call gpio_request() and gpio_direction_input() for
+> > any IRQ that is also a GPIO. This prevents duplication of these calls in
+> > each driver that uses an IRQ.
 > 
-> Very nice, I started down this path in the original series, but didn't
-> finish.
-> Some minor comments below...
+> This is very much the wrong approach. If you think it through then the
+> irq setup code might end up with tons of other subsystem specific
+> setup thingies, e.g. PCI .....
 > 
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Kevin Hilman<khilman@ti.com>
->> ---
->>   arch/arm/plat-omap/omap_device.c |  168 ++++++++++++++++++++++++++------------
->>   1 files changed, 114 insertions(+), 54 deletions(-)
->>
->> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
->> index f2149be..752d72a 100644
->> --- a/arch/arm/plat-omap/omap_device.c
->> +++ b/arch/arm/plat-omap/omap_device.c
->> @@ -96,6 +96,11 @@
->>
->>   static int omap_device_register(struct platform_device *pdev);
->>   static int omap_early_device_register(struct platform_device *pdev);
->> +static struct omap_device *omap_device_alloc(struct platform_device *pdev,
->> +				      struct omap_hwmod **ohs, int oh_cnt,
->> +				      struct omap_device_pm_latency *pm_lats,
->> +				      int pm_lats_cnt);
->> +
->>
->>   static struct omap_device_pm_latency omap_default_latency[] = {
->>   	{
->> @@ -397,6 +402,105 @@ static int omap_device_fill_resources(struct omap_device *od,
->>   }
->>
->>   /**
->> + * omap_device_alloc - allocate an omap_device
->> + * @pdev: platform_device that will be represent this omap_device
->> + * @oh: ptr to the single omap_hwmod that backs this omap_device
->> + * @pdata: platform_data ptr to associate with the platform_device
->> + * @pdata_len: amount of memory pointed to by @pdata
->> + * @pm_lats: pointer to a omap_device_pm_latency array for this device
->> + * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
->> + *
->> + * Convenience function for allocating an omap_device structure and filling
->> + * hwmods, resources and pm_latency attributes.
->> + *
->> + * Returns an struct omap_device pointer or ERR_PTR() on error;
->> + */
->> +static struct omap_device *omap_device_alloc(struct platform_device *pdev,
->> +					struct omap_hwmod **ohs, int oh_cnt,
->> +					struct omap_device_pm_latency *pm_lats,
->> +					int pm_lats_cnt)
->> +{
->> +	int ret = -ENOMEM;
->> +	struct omap_device *od;
->> +	struct resource *res = NULL;
->> +	int i, res_count;
->> +	struct omap_hwmod **hwmods;
->> +
->> +	od = kzalloc(sizeof(struct omap_device), GFP_KERNEL);
->> +	if (!od) {
->> +		ret = -ENOMEM;
->> +		goto oda_exit1;
->> +	}
->> +	od->hwmods_cnt = oh_cnt;
->> +
->> +	hwmods = kzalloc(sizeof(struct omap_hwmod *) * oh_cnt,
->> +			 GFP_KERNEL);
->> +	if (!hwmods)
->> +		goto oda_exit2;
->> +
->> +	memcpy(hwmods, ohs, sizeof(struct omap_hwmod *) * oh_cnt);
->> +	od->hwmods = hwmods;
->> +	od->pdev = pdev;
->> +
->> +	if (pdev->num_resources&&  pdev->resource)
->> +		dev_warn(&pdev->dev, "%s(): ressources already allocated %d\n",
-> 
-> typo: ressources (occurs again below)
+> The right thing to do is to add a irq_configure() function pointer to
+> the irq chip and provide a common function for gpios in gpiolib, which
+> is then used by the particular GPIO irq chip implementation.
 
-It is not a real typo, it is a French word :-)
- 
-> also, this check/warn should probably go after the 'HACK' comment below.
+Sorry, could you expand on this some more.
 
-yep.
+The whole point of these patches is that it's impossible to convert from
+IRQ number to GPIO number.
 
-> 
->> +			__func__, pdev->num_resources);
->> +	/*
->> +	 * HACK: Idealy the resources from DT should match, and hwmod
-> 
-> s/Idealy/Ideally/
+Some drivers use just an IRQ, and don't care if it's a GPIO. They work
+fine currently.
 
-OK, for that one, I do not have the French word excuse...
+Some drivers use just a GPIO; that's not relevant to these patches.
 
-> 
->> +	 * should just add the missing ones. Since the name is not
->> +	 * properly populated by DT, stick to hwmod resources only.
-> 
-> I think this limitation is fine until we come to resolution in the named
-> resources debate.
+Some drivers use something that's both an IRQ and a GPIO. Historically,
+this has worked by passing the IRQ to the driver, and then the driver
+calling irq_to_gpio() to get the GPIO ID. Since irq_to_gpio() is being
+removed, this is no longer possible. The whole point of the removal was
+that it's not possible in general to convert from IRQ to GPIO, so I'm not
+sure exactly what you're proposing irq_configure() or gpiolib do to
+centralize this?
 
-Indeed :-)
+Thanks for any insight.
 
->> +	 */
->> +	res_count = omap_device_count_resources(od);
->> +	if (res_count>  0) {
->> +		dev_dbg(&pdev->dev, "%s(): ressources allocated from hwmod %d\n",
->> +			__func__, res_count);
->> +		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
->> +		if (!res)
->> +			goto oda_exit3;
->> +
->> +		omap_device_fill_resources(od, res);
->> +
->> +		ret = platform_device_add_resources(pdev, res, res_count);
->> +		kfree(res);
->> +
->> +		if (ret)
->> +			goto oda_exit3;
->> +	}
->> +
->> +	if (pm_lats) {
->> +		od->pm_lats = pm_lats;
->> +		od->pm_lats_cnt = pm_lats_cnt;
->> +	} else {
->> +		od->pm_lats = omap_default_latency;
->> +		od->pm_lats_cnt = ARRAY_SIZE(omap_default_latency);
->> +	}
->> +
->> +	pdev->archdata.od = od;
->> +
->> +	for (i = 0; i<  oh_cnt; i++) {
->> +		hwmods[i]->od = od;
->> +		_add_hwmod_clocks_clkdev(od, hwmods[i]);
->> +	}
->> +
->> +	return od;
->> +
->> +oda_exit3:
->> +	kfree(hwmods);
->> +oda_exit2:
->> +	kfree(od);
->> +oda_exit1:
->> +	dev_err(&pdev->dev, "omap_device: build failed (%d)\n", ret);
->> +
->> +	return ERR_PTR(ret);
->> +}
->> +
->> +void omap_device_delete(struct omap_device *od)
->> +{
->> +	kfree(od->hwmods);
->> +	kfree(od);
-> 
-> maybe set pdev->archdata.od = NULL too.
-
-OK.
-
->> +}
->> +
->> +/**
->>    * omap_device_build - build and register an omap_device with one omap_hwmod
->>    * @pdev_name: name of the platform_device driver to use
->>    * @pdev_id: this platform_device's connection ID
->> @@ -455,9 +559,6 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
->>   	int ret = -ENOMEM;
->>   	struct platform_device *pdev;
->>   	struct omap_device *od;
->> -	struct resource *res = NULL;
->> -	int i, res_count;
->> -	struct omap_hwmod **hwmods;
->>
->>   	if (!ohs || oh_cnt == 0 || !pdev_name)
->>   		return ERR_PTR(-EINVAL);
->> @@ -471,72 +572,31 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
->>   		goto odbs_exit;
->>   	}
->>
->> -	pr_debug("omap_device: %s: building with %d hwmods\n", pdev_name,
->> -		 oh_cnt);
->> +	/* Set the dev_name early to allow dev_xxx in omap_device_alloc */
->> +	if (pdev->id != -1)
->> +		dev_set_name(&pdev->dev, "%s.%d", pdev->name,  pdev->id);
->> +	else
->> +		dev_set_name(&pdev->dev, "%s", pdev->name);
-> 
-> Minor: I think setting dev->init_name is more appropriate here, and
-> should have the same effect.
-
-The slight difference is that if I do that:
-pdev->dev.init_name = kasprintf(GFP_KERNEL, "%s.%d", pdev->name, pdev->id);
-
-I will have to free it myself, because device_add is doing only that:
-
-        if (dev->init_name) {
-                dev_set_name(dev, "%s", dev->init_name);
-                dev->init_name = NULL;
-        }
-
-Whereas dev_set_name is doing it for me.
-
-So it will add one more line later. Does it worth it?
-
-The init_name seems to be used only to provide a static const name most of the time, hence the lack of kfree.
-
-
-Thanks for the comments,
-Benoit
+-- 
+nvpublic
