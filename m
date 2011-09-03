@@ -1,269 +1,88 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 3 Sep 2011 20:09:13 +0530
-Subject: [PATCH v2 3/5] ARM: gic: Use cpu pm notifiers to save gic state
+Date: Sat, 3 Sep 2011 20:09:14 +0530
+Subject: [PATCH v2 4/5] ARM: vfp: Use cpu pm notifiers to save vfp state
 In-Reply-To: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1315060755-4613-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1315060755-4613-5-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Colin Cross <ccross@android.com>
 
-When the cpu is powered down in a low power mode, the gic cpu
-interface may be reset, and when the cpu cluster is powered
-down, the gic distributor may also be reset.
+When the cpu is powered down in a low power mode, the vfp
+registers may be reset.
 
 This patch uses CPU_PM_ENTER and CPU_PM_EXIT notifiers to save
-and restore the gic cpu interface registers, and the
-CPU_CLUSTER_PM_ENTER and CPU_CLUSTER_PM_EXIT notifiers to save
-and restore the gic distributor registers.
+and restore the cpu's vfp registers.
 
-Original-author: Gary King <gking@nvidia.com>
 Signed-off-by: Colin Cross <ccross@android.com>
-[santosh.shilimkar at ti.com: Rebased against 3.1-rc4, removed gic dist. disable]
+[santosh.shilimkar at ti.com: Rebased against 3.1-rc4, resolved the conflicts]
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/common/gic.c               |  187 +++++++++++++++++++++++++++++++++++
- arch/arm/include/asm/hardware/gic.h |    8 ++
- 2 files changed, 195 insertions(+), 0 deletions(-)
+ arch/arm/vfp/vfpmodule.c |   29 +++++++++++++++++++++--------
+ 1 files changed, 21 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 3227ca9..66c7c48 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -26,6 +26,7 @@
- #include <linux/kernel.h>
- #include <linux/list.h>
- #include <linux/smp.h>
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 79bcb43..fe4b60b 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -11,6 +11,7 @@
+ #include <linux/module.h>
+ #include <linux/types.h>
+ #include <linux/cpu.h>
 +#include <linux/cpu_pm.h>
- #include <linux/cpumask.h>
- #include <linux/io.h>
- 
-@@ -276,6 +277,8 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
- 	if (gic_irqs > 1020)
- 		gic_irqs = 1020;
- 
-+	gic->gic_irqs = gic_irqs;
-+
- 	/*
- 	 * Set all global interrupts to be level triggered, active low.
- 	 */
-@@ -343,6 +346,189 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
- 	writel_relaxed(1, base + GIC_CPU_CTRL);
+ #include <linux/kernel.h>
+ #include <linux/notifier.h>
+ #include <linux/signal.h>
+@@ -436,9 +437,7 @@ static void vfp_enable(void *unused)
+ 	set_copro_access(access | CPACC_FULL(10) | CPACC_FULL(11));
  }
  
+-#ifdef CONFIG_PM
+-#include <linux/syscore_ops.h>
+-
 +#ifdef CONFIG_CPU_PM
-+/*
-+ * Saves the GIC distributor registers during suspend or idle.  Must be called
-+ * with interrupts disabled but before powering down the GIC.  After calling
-+ * this function, no interrupts will be delivered by the GIC, and another
-+ * platform-specific wakeup source must be enabled.
-+ */
-+static void gic_dist_save(unsigned int gic_nr)
+ static int vfp_pm_suspend(void)
+ {
+ 	struct thread_info *ti = current_thread_info();
+@@ -468,19 +467,33 @@ static void vfp_pm_resume(void)
+ 	fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+ }
+ 
+-static struct syscore_ops vfp_pm_syscore_ops = {
+-	.suspend	= vfp_pm_suspend,
+-	.resume		= vfp_pm_resume,
++static int vfp_cpu_pm_notifier(struct notifier_block *self, unsigned long cmd,
++	void *v)
 +{
-+	unsigned int gic_irqs;
-+	void __iomem *dist_base;
-+	int i;
-+
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	gic_irqs = gic_data[gic_nr].gic_irqs;
-+	dist_base = gic_data[gic_nr].dist_base;
-+
-+	if (!dist_base)
-+		return;
-+
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 16); i++)
-+		gic_data[gic_nr].saved_spi_conf[i] =
-+			readl_relaxed(dist_base + GIC_DIST_CONFIG + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 4); i++)
-+		gic_data[gic_nr].saved_spi_target[i] =
-+			readl_relaxed(dist_base + GIC_DIST_TARGET + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
-+		gic_data[gic_nr].saved_spi_enable[i] =
-+			readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
-+}
-+
-+/*
-+ * Restores the GIC distributor registers during resume or when coming out of
-+ * idle.  Must be called before enabling interrupts.  If a level interrupt
-+ * that occured while the GIC was suspended is still present, it will be
-+ * handled normally, but any edge interrupts that occured will not be seen by
-+ * the GIC and need to be handled by the platform-specific wakeup source.
-+ */
-+static void gic_dist_restore(unsigned int gic_nr)
-+{
-+	unsigned int gic_irqs;
-+	unsigned int i;
-+	void __iomem *dist_base;
-+
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	gic_irqs = gic_data[gic_nr].gic_irqs;
-+	dist_base = gic_data[gic_nr].dist_base;
-+
-+	if (!dist_base)
-+		return;
-+
-+	writel_relaxed(0, dist_base + GIC_DIST_CTRL);
-+
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 16); i++)
-+		writel_relaxed(gic_data[gic_nr].saved_spi_conf[i],
-+			dist_base + GIC_DIST_CONFIG + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 4); i++)
-+		writel_relaxed(0xa0a0a0a0,
-+			dist_base + GIC_DIST_PRI + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 4); i++)
-+		writel_relaxed(gic_data[gic_nr].saved_spi_target[i],
-+			dist_base + GIC_DIST_TARGET + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
-+		writel_relaxed(gic_data[gic_nr].saved_spi_enable[i],
-+			dist_base + GIC_DIST_ENABLE_SET + i * 4);
-+
-+	writel_relaxed(1, dist_base + GIC_DIST_CTRL);
-+}
-+
-+static void gic_cpu_save(unsigned int gic_nr)
-+{
-+	int i;
-+	u32 *ptr;
-+	void __iomem *dist_base;
-+	void __iomem *cpu_base;
-+
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	dist_base = gic_data[gic_nr].dist_base;
-+	cpu_base = gic_data[gic_nr].cpu_base;
-+
-+	if (!dist_base || !cpu_base)
-+		return;
-+
-+	ptr = __this_cpu_ptr(gic_data[gic_nr].saved_ppi_enable);
-+	for (i = 0; i < DIV_ROUND_UP(32, 32); i++)
-+		ptr[i] = readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
-+
-+	ptr = __this_cpu_ptr(gic_data[gic_nr].saved_ppi_conf);
-+	for (i = 0; i < DIV_ROUND_UP(32, 16); i++)
-+		ptr[i] = readl_relaxed(dist_base + GIC_DIST_CONFIG + i * 4);
-+
-+}
-+
-+static void gic_cpu_restore(unsigned int gic_nr)
-+{
-+	int i;
-+	u32 *ptr;
-+	void __iomem *dist_base;
-+	void __iomem *cpu_base;
-+
-+	if (gic_nr >= MAX_GIC_NR)
-+		BUG();
-+
-+	dist_base = gic_data[gic_nr].dist_base;
-+	cpu_base = gic_data[gic_nr].cpu_base;
-+
-+	if (!dist_base || !cpu_base)
-+		return;
-+
-+	ptr = __this_cpu_ptr(gic_data[gic_nr].saved_ppi_enable);
-+	for (i = 0; i < DIV_ROUND_UP(32, 32); i++)
-+		writel_relaxed(ptr[i], dist_base + GIC_DIST_ENABLE_SET + i * 4);
-+
-+	ptr = __this_cpu_ptr(gic_data[gic_nr].saved_ppi_conf);
-+	for (i = 0; i < DIV_ROUND_UP(32, 16); i++)
-+		writel_relaxed(ptr[i], dist_base + GIC_DIST_CONFIG + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(32, 4); i++)
-+		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
-+
-+	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
-+	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-+}
-+
-+static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
-+{
-+	int i;
-+
-+	for (i = 0; i < MAX_GIC_NR; i++) {
-+		switch (cmd) {
-+		case CPU_PM_ENTER:
-+			gic_cpu_save(i);
-+			break;
-+		case CPU_PM_ENTER_FAILED:
-+		case CPU_PM_EXIT:
-+			gic_cpu_restore(i);
-+			break;
-+		case CPU_CLUSTER_PM_ENTER:
-+			gic_dist_save(i);
-+			break;
-+		case CPU_CLUSTER_PM_ENTER_FAILED:
-+		case CPU_CLUSTER_PM_EXIT:
-+			gic_dist_restore(i);
-+			break;
-+		}
++	switch (cmd) {
++	case CPU_PM_ENTER:
++		vfp_pm_suspend();
++		break;
++	case CPU_PM_ENTER_FAILED:
++	case CPU_PM_EXIT:
++		vfp_pm_resume();
++		break;
 +	}
-+
 +	return NOTIFY_OK;
 +}
 +
-+static struct notifier_block gic_notifier_block = {
-+	.notifier_call = gic_notifier,
-+};
-+
-+static void __init gic_pm_init(struct gic_chip_data *gic)
-+{
-+	gic->saved_ppi_enable = __alloc_percpu(DIV_ROUND_UP(32, 32) * 4,
-+		sizeof(u32));
-+	BUG_ON(!gic->saved_ppi_enable);
-+
-+	gic->saved_ppi_conf = __alloc_percpu(DIV_ROUND_UP(32, 16) * 4,
-+		sizeof(u32));
-+	BUG_ON(!gic->saved_ppi_conf);
-+
-+	cpu_pm_register_notifier(&gic_notifier_block);
-+}
-+#else
-+static void __init gic_pm_init(struct gic_chip_data *gic)
-+{
-+}
-+#endif
-+
- void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
- 	void __iomem *dist_base, void __iomem *cpu_base)
- {
-@@ -360,6 +546,7 @@ void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
++static struct notifier_block vfp_cpu_pm_notifier_block = {
++	.notifier_call = vfp_cpu_pm_notifier,
+ };
  
- 	gic_dist_init(gic, irq_start);
- 	gic_cpu_init(gic);
-+	gic_pm_init(gic);
+ static void vfp_pm_init(void)
+ {
+-	register_syscore_ops(&vfp_pm_syscore_ops);
++	cpu_pm_register_notifier(&vfp_cpu_pm_notifier_block);
  }
  
- void __cpuinit gic_secondary_init(unsigned int gic_nr)
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index 435d3f8..c562705 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -46,6 +46,14 @@ struct gic_chip_data {
- 	unsigned int irq_offset;
- 	void __iomem *dist_base;
- 	void __iomem *cpu_base;
-+#ifdef CONFIG_CPU_PM
-+	u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
-+	u32 saved_spi_conf[DIV_ROUND_UP(1020, 16)];
-+	u32 saved_spi_target[DIV_ROUND_UP(1020, 4)];
-+	u32 __percpu *saved_ppi_enable;
-+	u32 __percpu *saved_ppi_conf;
-+#endif
-+	unsigned int gic_irqs;
- };
- #endif
+ #else
+ static inline void vfp_pm_init(void) { }
+-#endif /* CONFIG_PM */
++#endif /* CONFIG_CPU_PM */
  
+ /*
+  * Ensure that the VFP state stored in 'thread->vfpstate' is up to date
 -- 
 1.7.4.1
