@@ -1,57 +1,35 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 3 Sep 2011 19:04:31 +0530
-Subject: [RFC PATCH 0/3] Yet another GIC OF binding series
-In-Reply-To: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
-References: <1312921020-6820-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CAJuYYwT9ZB-4O9fnMT_svFY=X4bBZhs0U6=Zp-cCaWhxLgpmAQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 3 Sep 2011 20:09:15 +0530
+Subject: [PATCH v2 5/5] ARM: gic: Allow gic arch extensions to provide irqchip
+	flags
+In-Reply-To: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1315060755-4613-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 August 2011 01:46, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Grant,
->
-> Here's yet another patch series for GIC binding and init.
->
-> You keep saying we should have a common DT function scanning for interrupt
-> controller nodes and calling their initialization functions. But that will
-> not work until we have dynamic assignment of linux irq numbers. So either
-> everyone should just stop trying to do DT bindings for GIC/VIC until that
-> is in place, or we need an interim solution. This is another attempt at
-> the latter. I reworked gic_of_init intending for it to be the interrupt
-> controller specific initialization function that DT interrupt controller
-> scanning code would call. For now, it is just called by the platform code.
-> The platform initialization looks something like this:
->
-> struct of_intc_desc desc;
-> memset(&desc, 0, sizeof(desc));
-> desc.controller = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
-> gic_of_init(&desc);
->
-> I've addressed your previous comments and in particular initializing more
-> than 1 GIC is supported now.
+From: Colin Cross <ccross@android.com>
 
-Works fine for Exynos4.
+Tegra can benefit from the IRQCHIP_MASK_ON_SUSPEND flag, allow it
+to be passed to the gic irq chip.
 
-Tested-by: Thomas Abraham <thomas.abraham@linaro.org>
+Signed-off-by: Colin Cross <ccross@android.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/common/gic.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
->
-> Rob
->
-> Rob Herring (3):
-> ?dt: irq: add interrupt controller descriptor struct
-> ?ARM: gic: allow irq_start to be 0
-> ?ARM: gic: add OF based initialization
->
-> ?Documentation/devicetree/bindings/arm/gic.txt | ? 28 +++++++++++++++++++
-> ?arch/arm/common/gic.c ? ? ? ? ? ? ? ? ? ? ? ? | ? 36 ++++++++++++++++++++++++-
-> ?arch/arm/include/asm/hardware/gic.h ? ? ? ? ? | ? ?2 +
-> ?include/linux/of_irq.h ? ? ? ? ? ? ? ? ? ? ? ?| ? ?6 ++++
-> ?4 files changed, 71 insertions(+), 1 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
->
-> --
-> 1.7.4.1
->
->
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 66c7c48..734db99 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -544,6 +544,7 @@ void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
+ 	if (gic_nr == 0)
+ 		gic_cpu_base_addr = cpu_base;
+ 
++	gic_chip.flags |= gic_arch_extn.flags;
+ 	gic_dist_init(gic, irq_start);
+ 	gic_cpu_init(gic);
+ 	gic_pm_init(gic);
+-- 
+1.7.4.1
