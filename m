@@ -1,44 +1,59 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 4 Sep 2011 11:01:12 +0200
-Subject: [PATCH] ARM: l2x0: make sure I&D are not locked down on init
-Message-ID: <1315126872-3290-1-git-send-email-linus.walleij@stericsson.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sun, 04 Sep 2011 15:10:44 +0530
+Subject: [PATCH] arm: exynos4: fix incorrect pad configuration for keypad row
+	lines
+Message-ID: <1315129244-26489-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+The keypad controller requires a external pull-up for all the keypad
+row lines. Fix the incorrect pad configuration for keypad controller
+row lines by enabling the pad pull-up for the all row lines of the
+keypad controller.
 
-Fighting unfixed U-Boots and other beasts that may the cache in
-a locked-down state when starting the kernel, we make sure to
-disable all cache lock-down when initializing the l2x0 so we
-are in a known state.
-
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
-Cc: Adrian Bunk <adrian.bunk@movial.com>
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Reported-by: Jan Rinze <janrinze@gmail.com>
-Tested-by: Robert Marklund <robert.marklund@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mm/cache-l2x0.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+SMDKV310 board does not have pull-up resistors populated for the keypad
+row lines (unlike the smdk boards for the previous Samsung SoC's). So
+the pad pull-up for all keypad row lines should be enabled for
+smdkv310 board.
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 44c0867..b03c835 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -338,6 +338,10 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
- 		writel_relaxed(1, l2x0_base + L2X0_CTRL);
+The default requirement for the keypad controller is to enable the
+pull-up for all the keypad row lines. If a exynos4 based board has
+on-board pull-up's populated for keypad row lines, this patch would
+cause no harm. And in such cases, if internal pad pull-up is to be
+disabled (to reduce some power consumption), an alternative gpio
+configuration function can be supplied that does not enable the
+internal pad pull-up.
+---
+ arch/arm/mach-exynos4/setup-keypad.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-exynos4/setup-keypad.c b/arch/arm/mach-exynos4/setup-keypad.c
+index 1ee0ebf..7862bfb 100644
+--- a/arch/arm/mach-exynos4/setup-keypad.c
++++ b/arch/arm/mach-exynos4/setup-keypad.c
+@@ -19,15 +19,16 @@ void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols)
+ 
+ 	if (rows > 8) {
+ 		/* Set all the necessary GPX2 pins: KP_ROW[0~7] */
+-		s3c_gpio_cfgrange_nopull(EXYNOS4_GPX2(0), 8, S3C_GPIO_SFN(3));
++		s3c_gpio_cfgall_range(EXYNOS4_GPX2(0), 8, S3C_GPIO_SFN(3),
++					S3C_GPIO_PULL_UP);
+ 
+ 		/* Set all the necessary GPX3 pins: KP_ROW[8~] */
+-		s3c_gpio_cfgrange_nopull(EXYNOS4_GPX3(0), (rows - 8),
+-					 S3C_GPIO_SFN(3));
++		s3c_gpio_cfgall_range(EXYNOS4_GPX3(0), (rows - 8),
++					 S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
+ 	} else {
+ 		/* Set all the necessary GPX2 pins: KP_ROW[x] */
+-		s3c_gpio_cfgrange_nopull(EXYNOS4_GPX2(0), rows,
+-					 S3C_GPIO_SFN(3));
++		s3c_gpio_cfgall_range(EXYNOS4_GPX2(0), rows, S3C_GPIO_SFN(3),
++					S3C_GPIO_PULL_UP);
  	}
  
-+	/* Make sure that I&D is not locked down when starting */
-+	writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D);
-+	writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I);
-+
- 	outer_cache.inv_range = l2x0_inv_range;
- 	outer_cache.clean_range = l2x0_clean_range;
- 	outer_cache.flush_range = l2x0_flush_range;
+ 	/* Set all the necessary GPX1 pins to special-function 3: KP_COL[x] */
 -- 
-1.7.3.2
+1.6.6.rc2
