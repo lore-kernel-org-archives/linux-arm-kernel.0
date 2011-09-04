@@ -1,46 +1,50 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sun, 4 Sep 2011 16:07:47 +0530
-Subject: [PATCH] arm: exynos4: fix incorrect pad configuration for keypad
-	row lines
-In-Reply-To: <20110904105301.01b82323@lxorguk.ukuu.org.uk>
-References: <1315129244-26489-1-git-send-email-thomas.abraham@linaro.org>
-	<20110904105301.01b82323@lxorguk.ukuu.org.uk>
-Message-ID: <CAJuYYwT1jXs4pYHnww=T5G_92=OU=08ef8UnJWjvz33Ted9wnQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sun, 4 Sep 2011 13:09:25 +0100
+Subject: [PATCH] ARM: l2x0: make sure I&D are not locked down on init
+In-Reply-To: <4E634F59.1010207@ti.com>
+References: <1315126872-3290-1-git-send-email-linus.walleij@stericsson.com>
+	<4E634F59.1010207@ti.com>
+Message-ID: <20110904120925.GB17180@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+Hi Santosh,
 
-On 4 September 2011 15:23, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
->> SMDKV310 board does not have pull-up resistors populated for the keypad
->> row lines (unlike the smdk boards for the previous Samsung SoC's). So
->> the pad pull-up for all keypad row lines should be enabled for
->> smdkv310 board.
->
-> So does this change the behaviour of existing boards, and if so isn't it
-> the SMDKV310 that hould be providing the alternate gpio configuration
-> function ?
+On Sun, Sep 04, 2011 at 11:13:45AM +0100, Santosh wrote:
+> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h 
+> b/arch/arm/include/asm/hardware/cache-l2x0.h
+> index 16bd480..e04e947 100644
+> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+> @@ -45,8 +45,10 @@
+>   #define L2X0_CLEAN_INV_LINE_PA		0x7F0
+>   #define L2X0_CLEAN_INV_LINE_IDX		0x7F8
+>   #define L2X0_CLEAN_INV_WAY		0x7FC
+> -#define L2X0_LOCKDOWN_WAY_D		0x900
+> -#define L2X0_LOCKDOWN_WAY_I		0x904
+> +#define L2X0_LOCKDOWN_WAY_D0		0x900
+> +#define L2X0_LOCKDOWN_WAY_D1		0x908
+> +#define L2X0_LOCKDOWN_WAY_I0		0x904
+> +#define L2X0_LOCKDOWN_WAY_I1		0x90C
 
-Among the boards based on the Exynos4 SoC, only the smdk boards use
-the keypad controller for connecting the keys on the board. All other
-boards either use gpio keys or use some other mechanism for keyboard
-input. So this patch is applicable to only the existing exynos4 soc
-based smdk boards.
+Maybe you could macroify these to take the CPU number as an argument?
 
-A pull-up for all the row lines is the default requirement of the
-keypad controller. So, in this patch, the default gpio and pad
-configuration function for keypad controller enables the internal pad
-pull-up. If a upcoming board based on exynos4 does populate pull-up
-for row lines on the board of the keypad, this patch would still not
-break anything. If required, such boards could provide another gpio
-and pad configuration function that disables the internal pull-up.
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 44c0867..f95b269 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -322,6 +322,12 @@ void __init l2x0_init(void __iomem *base, __u32 
+> aux_val, __u32 aux_mask)
+>   	way_size = 1 << (way_size + 3);
+>   	l2x0_size = ways * way_size * SZ_1K;
+> 
+> +	/* Clear the I and D lock-down way registers */
+> +	writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D0);
+> +	writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D1);
+> +	writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I0);
+> +	writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I1);
 
-This patch modifies only the exynos4 keypad gpio/pad configuration
-setup function. All previous Samsung SoC's are not affected by this
-patch.
+Then you could write this as a for loop from 0 to 7 for the PL310. For
+L210/220 I think there's just a single register pair.
 
-Thanks,
-Thomas.
-
->
->
+Will
