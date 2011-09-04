@@ -1,32 +1,30 @@
 From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon,  5 Sep 2011 00:30:15 +0200
-Subject: [PATCH 1/2] s3c24xx_gpiolib_init: only register available gpio banks
-Message-ID: <1315175415-11608-1-git-send-email-jacmet@sunsite.dk>
+Date: Mon,  5 Sep 2011 00:30:23 +0200
+Subject: [PATCH 2/2] s3c2410/gpio-nr.h: fix S3C_GPIO_SPACE #error message to
+	match reality
+Message-ID: <1315175423-11653-1-git-send-email-jacmet@sunsite.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only register gpio banks provided by SoC instead of the maximum possible
-to lessen confusion, get rid of a warning from gpiolib and stop it from
-eating into the extra gpios for configs with S3C24XX_GPIO_EXTRA != 0.
+S3C_GPIO_SPACE cannont be NON-zero, not zero.
 
 Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
 ---
- arch/arm/plat-s3c24xx/gpiolib.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2410/include/mach/gpio-nrs.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-s3c24xx/gpiolib.c b/arch/arm/plat-s3c24xx/gpiolib.c
-index 243b641..6360ae7 100644
---- a/arch/arm/plat-s3c24xx/gpiolib.c
-+++ b/arch/arm/plat-s3c24xx/gpiolib.c
-@@ -217,6 +217,9 @@ static __init int s3c24xx_gpiolib_init(void)
- 	int gpn;
+diff --git a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
+index 4f7bf32..019ea86 100644
+--- a/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
++++ b/arch/arm/mach-s3c2410/include/mach/gpio-nrs.h
+@@ -53,7 +53,7 @@
+ #define S3C2410_GPIO_M_NR	(32)	/* technically 2. */
  
- 	for (gpn = 0; gpn < ARRAY_SIZE(s3c24xx_gpios); gpn++, chip++) {
-+		if (chip->chip.base >= S3C_GPIO_END)
-+			break;
-+
- 		if (!chip->config)
- 			chip->config = &s3c24xx_gpiocfg_default;
+ #if CONFIG_S3C_GPIO_SPACE != 0
+-#error CONFIG_S3C_GPIO_SPACE cannot be zero at the moment
++#error CONFIG_S3C_GPIO_SPACE cannot be nonzero at the moment
+ #endif
  
+ #define S3C2410_GPIO_NEXT(__gpio) \
 -- 
 1.7.5.4
