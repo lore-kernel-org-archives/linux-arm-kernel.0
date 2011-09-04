@@ -1,45 +1,32 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Sat, 03 Sep 2011 22:06:38 +0530
-Subject: [PATCH 00/11] Add L2 cache cleaning to generic CPU suspend
-In-Reply-To: <20110901124752.GE29729@n2100.arm.linux.org.uk>
-References: <20110901124752.GE29729@n2100.arm.linux.org.uk>
-Message-ID: <4E625796.1020109@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 3 Sep 2011 18:30:01 -0600 (MDT)
+Subject: 3rd Update: ARM Sub-Architecture Maintainers workshop at Kernel
+	Summit 2011
+In-Reply-To: <CACxGe6seVx4ZeHd97TCRiqv43rKHQ2bWz4=382GZS0vR5RMLYw@mail.gmail.com>
+References: <CACxGe6vaa0qk-3bDaSzm5h4aA5+oh9Vf3w87Jrx+1iekj0pweQ@mail.gmail.com>
+	<CACxGe6seVx4ZeHd97TCRiqv43rKHQ2bWz4=382GZS0vR5RMLYw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1109031825160.9023@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 September 2011 06:17 PM, Russell King - ARM Linux wrote:
-> Some systems (such as OMAP) preserve the L2 cache across a suspend/
-> resume cycle.  This means they do not perform L2 cache maintanence
-> in their suspend finisher function.
->
-> However, the side effect is that the saved CPU state is not readable
-> by the resume code because it is sitting in the L2 cache.
->
-> This patch series adds L2 cache cleaning to the generic CPU suspend/
-> resume support code, making it possible to use this on systems with
-> L2 cache enabled without having to clean/invalidate the entire L2
-> cache.
->
-> We also add a separate page table, allocated at boot time, for the
-> resume process to use so we don't have to fiddle about with tweaking
-> entries in the current processes page table.  Moreover, the current
-> processes page table may be in use by another CPU in the system if
-> these paths are used from cpuidle or hotplug, so changing the page
-> table is technically unsound.
->
-> Overall, this makes it possible for OMAP4 systems to use this code.
->
-> The first four patches in this set are already merged into Linus' tree
-> as bug fixes, and are included here for completeness given that the
-> kernel.org infrastructure is currently offline.
->
-> This has (so far) only been tested on OMAP4.  Further testing on OMAP3
-> and Assabet will follow.
+Hi,
 
-Thanks a lot Russell for this series. I have tested the entire series
-with OMAP4 S2R and CPUIDLE and it works great.
+I'm not sure to what extent these short descriptions matter, but:
 
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Sat, 3 Sep 2011, Grant Likely wrote:
 
-Regards
-Santosh
+> Waiting list
+> 25) Igor Grinberg - OMAP engineer
+
+Igor actually works for CompuLab, which is a board manufacturer that 
+contributes to upstream quite a bit.  He's not OMAP-specific - he works
+on PXA stuff also, and either he or some of his colleagues have worked on 
+Tegra platforms too. 
+
+http://git.kernel.org/?p=linux%2Fkernel%2Fgit%2Ftorvalds%2Flinux-2.6.git&a=search&h=HEAD&st=author&s=Igor+Grinberg
+
+The motivation behind nominating him was to have representation from 
+people with cross-SoC experience.
+
+
+- Paul
