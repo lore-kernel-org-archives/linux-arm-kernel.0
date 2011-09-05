@@ -1,56 +1,143 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 05 Sep 2011 19:28:06 +0900
-Subject: [PATCH] ARM: S3C64XX: Register Lowland audio device on Cragganmore
-In-Reply-To: <1314991378-28351-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1314991378-28351-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <002a01cc6bb6$802cc7a0$808656e0$%kim@samsung.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon,  5 Sep 2011 18:29:53 +0800
+Subject: [PATCH] [media] at91: add code to initialize and manage the ISI_MCK
+	for Atmel ISI driver.
+Message-ID: <1315218593-10822-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> The Lowland system is a combination of the Cragganmore CPU module and the
-> Tomatin and Kilchomin audio modules on Glenfarclas.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  arch/arm/mach-s3c64xx/mach-crag6410.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410.c
-> index 174dd0c..917acf7 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> @@ -284,6 +284,11 @@ static struct platform_device speyside_device = {
->  	.id		= -1,
->  };
-> 
-> +static struct platform_device lowland_device = {
-> +	.name		= "lowland",
-> +	.id		= -1,
-> +};
-> +
->  static struct platform_device speyside_wm8962_device = {
->  	.name		= "speyside-wm8962",
->  	.id		= -1,
-> @@ -341,6 +346,7 @@ static struct platform_device *crag6410_devices[]
-> __initdata = {
->  	&crag6410_backlight_device,
->  	&speyside_device,
->  	&speyside_wm8962_device,
-> +	&lowland_device,
->  	&wallvdd_device,
->  };
-> 
-> --
-> 1.7.5.4
+This patch enable the configuration for ISI_MCK, which is provided by programmable clock.
 
-OK, Applied.
-Thanks.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ drivers/media/video/atmel-isi.c |   56 ++++++++++++++++++++++++++++++++++++++-
+ include/media/atmel-isi.h       |    4 +++
+ 2 files changed, 59 insertions(+), 1 deletions(-)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
+index 7b89f00..8bb59a8 100644
+--- a/drivers/media/video/atmel-isi.c
++++ b/drivers/media/video/atmel-isi.c
+@@ -90,7 +90,10 @@ struct atmel_isi {
+ 	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
+ 
+ 	struct completion		complete;
++	/* ISI peripherial clock */
+ 	struct clk			*pclk;
++	/* ISI_MCK, provided by PCK */
++	struct clk			*mck;
+ 	unsigned int			irq;
+ 
+ 	struct isi_platform_data	*pdata;
+@@ -763,6 +766,10 @@ static int isi_camera_add_device(struct soc_camera_device *icd)
+ 	if (ret)
+ 		return ret;
+ 
++	ret = clk_enable(isi->mck);
++	if (ret)
++		return ret;
++
+ 	isi->icd = icd;
+ 	dev_dbg(icd->parent, "Atmel ISI Camera driver attached to camera %d\n",
+ 		 icd->devnum);
+@@ -776,6 +783,7 @@ static void isi_camera_remove_device(struct soc_camera_device *icd)
+ 
+ 	BUG_ON(icd != isi->icd);
+ 
++	clk_disable(isi->mck);
+ 	clk_disable(isi->pclk);
+ 	isi->icd = NULL;
+ 
+@@ -882,6 +890,46 @@ static struct soc_camera_host_ops isi_soc_camera_host_ops = {
+ };
+ 
+ /* -----------------------------------------------------------------------*/
++static int initialize_mck(struct atmel_isi *isi,
++			struct isi_platform_data *pdata)
++{
++	int ret;
++	struct clk *pck_parent;
++
++	if (!strlen(pdata->pck_name) || !strlen(pdata->pck_parent_name))
++		return -EINVAL;
++
++	/* ISI_MCK is provided by PCK clock */
++	isi->mck = clk_get(NULL, pdata->pck_name);
++	if (IS_ERR(isi->mck)) {
++		printk(KERN_ERR "Failed to get PCK: %s\n", pdata->pck_name);
++		return PTR_ERR(isi->mck);
++	}
++
++	pck_parent = clk_get(NULL, pdata->pck_parent_name);
++	if (IS_ERR(pck_parent)) {
++		ret = PTR_ERR(pck_parent);
++		printk(KERN_ERR "Failed to get PCK parent: %s\n",
++				pdata->pck_parent_name);
++		goto err_init_mck;
++	}
++
++	ret = clk_set_parent(isi->mck, pck_parent);
++	clk_put(pck_parent);
++	if (ret)
++		goto err_init_mck;
++
++	ret = clk_set_rate(isi->mck, pdata->isi_mck_hz);
++	if (ret < 0)
++		goto err_init_mck;
++
++	return 0;
++
++err_init_mck:
++	clk_put(isi->mck);
++	return ret;
++}
++
+ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+ {
+ 	struct soc_camera_host *soc_host = to_soc_camera_host(&pdev->dev);
+@@ -897,6 +945,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+ 			isi->fb_descriptors_phys);
+ 
+ 	iounmap(isi->regs);
++	clk_put(isi->mck);
+ 	clk_put(isi->pclk);
+ 	kfree(isi);
+ 
+@@ -915,7 +964,8 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+ 	struct isi_platform_data *pdata;
+ 
+ 	pdata = dev->platform_data;
+-	if (!pdata || !pdata->data_width_flags) {
++	if (!pdata || !pdata->data_width_flags || !pdata->isi_mck_hz
++			|| !pdata->pck_name || !pdata->pck_parent_name) {
+ 		dev_err(&pdev->dev,
+ 			"No config available for Atmel ISI\n");
+ 		return -EINVAL;
+@@ -944,6 +994,10 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+ 	INIT_LIST_HEAD(&isi->video_buffer_list);
+ 	INIT_LIST_HEAD(&isi->dma_desc_head);
+ 
++	ret = initialize_mck(isi, pdata);
++	if (ret)
++		goto err_alloc_descriptors;
++
+ 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
+ 				sizeof(struct fbd) * MAX_BUFFER_NUM,
+ 				&isi->fb_descriptors_phys,
+diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
+index 26cece5..dcbb822 100644
+--- a/include/media/atmel-isi.h
++++ b/include/media/atmel-isi.h
+@@ -114,6 +114,10 @@ struct isi_platform_data {
+ 	u32 data_width_flags;
+ 	/* Using for ISI_CFG1 */
+ 	u32 frate;
++	/* Using for ISI_MCK, provided by PCK */
++	u32 isi_mck_hz;
++	const char *pck_name;
++	const char *pck_parent_name;
+ };
+ 
+ #endif /* __ATMEL_ISI_H__ */
+-- 
+1.6.3.3
