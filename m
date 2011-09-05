@@ -1,27 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 5 Sep 2011 17:08:03 +0100
-Subject: A question about the abbreviation of the Cache Size Selection
-	Register
-In-Reply-To: <CADrkgW+UunPGqfmUdNUxjxiWJzv93JSMjn0g8o=AM_Con6S4gg@mail.gmail.com>
-References: <CADrkgW+UunPGqfmUdNUxjxiWJzv93JSMjn0g8o=AM_Con6S4gg@mail.gmail.com>
-Message-ID: <20110905160803.GH3269@e102109-lin.cambridge.arm.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Mon, 5 Sep 2011 17:22:26 +0100
+Subject: [PATCH] arm: ixp4xx, u300: Select ARCH_REQUIRE_GPIOLIB, not
+	GENERIC_GPIO
+In-Reply-To: <CACRpkdaACXxzhQ4m3+4tzTGrXubFF6jPkO9uG0kqVzvm+ORYwQ@mail.gmail.com>
+References: <1315192383.3092.260.camel@deadeye>
+	<CACRpkdaACXxzhQ4m3+4tzTGrXubFF6jPkO9uG0kqVzvm+ORYwQ@mail.gmail.com>
+Message-ID: <20110905162226.GI2802@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 04, 2011 at 07:52:51PM +0100, IL HAN wrote:
-> arch/arm/boot/compressed/head.S
-> mcr p15, 2, r10, c0, c0, 0  @ select current cache level in cssr
->  
-> In the comment, It says cssr as the Cache Size Selection Register.
-> But, according to the ARM Architecture Manuals, the abbreviation of the Cache
-> Size Selection Register is CSSELR.
-> That's confusing.
-> Actually, both of abbreviations are used officially?
+On Mon, Sep 05, 2011 at 02:41:30PM +0200, Linus Walleij wrote:
+> On Mon, Sep 5, 2011 at 5:12 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
+> 
+> > @@ -830,7 +830,7 @@ config ARCH_U300
+> > ? ? ? ?select GENERIC_CLOCKEVENTS
+> > ? ? ? ?select CLKDEV_LOOKUP
+> > ? ? ? ?select HAVE_MACH_CLKDEV
+> > - ? ? ? select GENERIC_GPIO
+> > + ? ? ? select ARCH_REQUIRE_GPIOLIB
+> > ? ? ? ?help
+> > ? ? ? ? ?Support for ST-Ericsson U300 series mobile platforms.
+> 
+> Please don't do that, it really is no gpiolib implementation.
+> 
+> In the archives you can find patches I already submitted switching
+> the U300 GPIO over to use gpiolib.
+[...]
+ 
+OK.  But it doesn't seem to work without gpiolib either:
 
-The official name is CSSELR. The CSSR name may have been present is some
-draft revisions of the documentation and they made their way into the
-mainline kernel. I'm not to bothered about this but feel free to send a
-patch if you want the correct names.
+ CC [M]  drivers/input/touchscreen/ads7846.o                                                                                                                                                                                                                                                                             
+drivers/input/touchscreen/ads7846.c: In function 'ads7846_setup_pendown':                                                                                                                              
+drivers/input/touchscreen/ads7846.c:970:3: error: implicit declaration of function 'gpio_request_one' 
+
+Ben.
 
 -- 
-Catalin
+Ben Hutchings
+We get into the habit of living before acquiring the habit of thinking.
+                                                              - Albert Camus
