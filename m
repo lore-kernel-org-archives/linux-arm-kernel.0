@@ -1,61 +1,155 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Mon, 5 Sep 2011 14:27:08 +0300
-Subject: [PATCH] OMAP2+: hwmod: remove OMAP_CHIP*
-In-Reply-To: <alpine.DEB.2.00.1109042042250.9056@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1109042042250.9056@utopia.booyaka.com>
-Message-ID: <CANOLnOOkz2ZkhPSafTLxUUH2bSVoRrYA44-C1+yku8naYaRz3w@mail.gmail.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Mon, 5 Sep 2011 17:39:14 +0530
+Subject: [PATCH 6/7] OMAP3: board-dt: Add generic board file for DT support
+In-Reply-To: <1314897912-18178-7-git-send-email-b-cousson@ti.com>
+References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
+	<1314897912-18178-7-git-send-email-b-cousson@ti.com>
+Message-ID: <20110905120914.GA25418@manju-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 5, 2011 at 5:43 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index 84cc0bd..d7138070 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-<snip>
+Minor comments:
 
->
-> ?int __init omap3xxx_hwmod_init(void)
-> ?{
-> - ? ? ? return omap_hwmod_register(omap3xxx_hwmods);
-> + ? ? ? int r;
-> + ? ? ? struct omap_hwmod **h = NULL;
+On Thu, Sep 01, 2011 at 07:25:11PM +0200, Benoit Cousson wrote:
+> Create an OMAP3 generic board to start the DT migration.
+> 
+> This file is doing the minimal initialization needed to boot
+> properly on a RAMDISK filesystem.
+> 
+> As soon as the OMAP3 specifics will be removed, that board will
+> be converted to an even more generic board-dt.c that will support
+> every OMAP2+ platforms.
+> 
+> Based on original patch from Manju:
+> http://www.spinics.net/lists/linux-omap/msg55832.html
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: G, Manjunath Kondaiah <manjugk@ti.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig          |   10 +++++
+>  arch/arm/mach-omap2/Makefile         |    1 +
+>  arch/arm/mach-omap2/board-omap3-dt.c |   74 ++++++++++++++++++++++++++++++++++
+>  3 files changed, 85 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/board-omap3-dt.c
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 5d501d2..82f0df2 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -305,6 +305,16 @@ config MACH_OMAP_3630SDP
+>  	default y
+>  	select OMAP_PACKAGE_CBP
+>  
+> +config MACH_OMAP3_DT
+> +	bool "Generic OMAP3 board (FDT support)"
+> +	depends on ARCH_OMAP3
+> +	select OMAP_PACKAGE_CBB
+> +	select USE_OF
+> +	help
+> +	  Support for generic TI OMAP3 boards using Flattened Device Tree.
+> +	  Say Y here to enable OMAP3 device tree support
+> +	  More information at Documentation/devicetree
 > +
-> + ? ? ? /* Register hwmods common to all OMAP3 */
-> + ? ? ? r = omap_hwmod_register(omap3xxx_hwmods);
-> + ? ? ? if (!r)
-> + ? ? ? ? ? ? ? return r;
+>  config MACH_TI8168EVM
+>  	bool "TI8168 Evaluation Module"
+>  	depends on SOC_OMAPTI816X
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 6ab9116..5144c17 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -197,6 +197,7 @@ obj-$(CONFIG_MACH_OVERO)		+= board-overo.o
+>  obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o
+>  obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o
+>  obj-$(CONFIG_MACH_OMAP_3430SDP)		+= board-3430sdp.o
+> +obj-$(CONFIG_MACH_OMAP3_DT)		+= board-omap3-dt.o
+>  obj-$(CONFIG_MACH_NOKIA_N8X0)		+= board-n8x0.o
+>  obj-$(CONFIG_MACH_NOKIA_RM680)		+= board-rm680.o \
+>  					   sdram-nokia.o
+> diff --git a/arch/arm/mach-omap2/board-omap3-dt.c b/arch/arm/mach-omap2/board-omap3-dt.c
+> new file mode 100644
+> index 0000000..6eb56c6
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/board-omap3-dt.c
+> @@ -0,0 +1,74 @@
+> +/*
+> + * OMAP3 Device tree boards support
+> + *
+> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 > +
-> + ? ? ? /*
-> + ? ? ? ?* Register hwmods common to individual OMAP3 families, all
-> + ? ? ? ?* silicon revisions (e.g., 34xx, or AM3505/3517, or 36xx)
-> + ? ? ? ?* All possible revisions should be included in this conditional.
-> + ? ? ? ?*/
-> + ? ? ? if (omap_rev() == OMAP3430_REV_ES1_0 ||
-> + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES2_0 ||
-> + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES2_1 ||
-> + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_0 ||
-> + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_1 ||
-> + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_1_2) {
-> + ? ? ? ? ? ? ? h = omap34xx_hwmods;
-> + ? ? ? } else if (omap_rev() & OMAP3505_REV(0)) {
-> + ? ? ? ? ? ? ? h = am35xx_hwmods;
+> +#include <linux/irqdomain.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/i2c/twl.h>
+this header is redundant
+> +
+> +#include <asm/mach/arch.h>
+> +#include <plat/common.h>
+> +
+> +#include "mux.h"
+> +#include "common-board-devices.h"
+> +#include "sdram-micron-mt46h32m32lf-6.h"
+> +
+> +
+extra blank line
 
-This check will be always true I think?
-
-Why not just use cpu_is_omap3xxx() for these tests, since it does same
-omap_rev() call but only once per family?
-
-> + ? ? ? } else if (omap_rev() == OMAP3630_REV_ES1_0 ||
-> + ? ? ? ? ? ? ? ? ?omap_rev() == OMAP3630_REV_ES1_1 ||
-> + ? ? ? ? ? ? ? ? ?omap_rev() == OMAP3630_REV_ES1_2) {
-> + ? ? ? ? ? ? ? h = omap36xx_hwmods;
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? WARN(1, "OMAP3 hwmod family init: unknown chip type\n");
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? };
+-M
+> +static void __init omap3_init_early(void)
+> +{
+> +	omap2_init_common_infrastructure();
+> +	omap2_init_common_devices(mt46h32m32lf6_sdrc_params,
+> +				  mt46h32m32lf6_sdrc_params);
+> +}
 > +
-> + ? ? ? r = omap_hwmod_register(h);
-> + ? ? ? if (!r)
-> + ? ? ? ? ? ? ? return r;
+> +#ifdef CONFIG_OMAP_MUX
+> +static struct omap_board_mux board_mux[] __initdata = {
+> +	{ .reg_offset = OMAP_MUX_TERMINATOR },
+> +};
+> +#endif
 > +
+> +static struct of_device_id omap_dt_match_table[] __initdata = {
+> +	{ .compatible = "simple-bus", },
+> +	{ .compatible = "ti,omap-infra", },
+> +	{}
+> +};
+> +
+> +static struct of_device_id omap_dt_intc_match[] __initdata = {
+> +	{ .compatible = "ti,omap3-intc", },
+> +	{}
+> +};
+> +
+> +static void __init omap3_init(void)
+> +{
+> +	struct device_node *node;
+> +
+> +	node = of_find_matching_node(NULL, omap_dt_intc_match);
+> +	if (node)
+> +		irq_domain_add_simple(node, 0);
+> +
+> +	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+> +	omap_serial_init();
+> +
+> +	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+> +}
+> +
+> +static const char *omap3_dt_match[] __initdata = {
+> +	"ti,omap3",
+> +	NULL
+> +};
+> +
+> +DT_MACHINE_START(OMAP3_DT, "TI OMAP3 (Flattened Device Tree)")
+> +	.reserve	= omap_reserve,
+> +	.map_io		= omap3_map_io,
+> +	.init_early	= omap3_init_early,
+> +	.init_irq	= omap3_init_irq,
+> +	.init_machine	= omap3_init,
+> +	.timer		= &omap3_timer,
+> +	.dt_compat	= omap3_dt_match,
+> +MACHINE_END
+> -- 
+> 1.7.0.4
+> 
