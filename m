@@ -1,56 +1,75 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Mon, 05 Sep 2011 04:12:56 +0100
-Subject: [PATCH] arm: ixp4xx, u300: Select ARCH_REQUIRE_GPIOLIB, not
-	GENERIC_GPIO
-Message-ID: <1315192383.3092.260.camel@deadeye>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 04 Sep 2011 23:00:46 -0500
+Subject: [PATCH] mach-integrator: fix VGA base regression
+In-Reply-To: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
+References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4E64496E.1090000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO implementations for these two machines depend on gpiolib,
-so they must not select GENERIC_GPIO directly.
+Linus,
 
-Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
----
-This hould fix the build failure seen here:
-https://buildd.debian.org/status/fetch.php?pkg=linux-2.6&arch=armel&ver=3.1.0%7Erc4-1%7Eexperimental.1&stamp=1315007168
+On 09/04/2011 04:40 PM, Linus Walleij wrote:
+> The changes introduced in commit
+> cc22b4c18540e5e8bf55c7d124044f9317527d3c
+> "ARM: set vga memory base at run-time"
+> 
+> Makes the Integrator/AP freeze completely. I appears that
+> this is due to the VGA base address being assigned at PCI
+> init time, while this base is needed earlier than that.
+> Moving the initialization of the base address to the
+> .map_io function solves this problem.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> ---
+>  arch/arm/mach-integrator/integrator_ap.c |    2 ++
+>  arch/arm/mach-integrator/pci_v3.c        |    2 --
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+> index 2fbbdd5..4d88fc4 100644
+> --- a/arch/arm/mach-integrator/integrator_ap.c
+> +++ b/arch/arm/mach-integrator/integrator_ap.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+>  #include <linux/mtd/physmap.h>
+> +#include <video/vga.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/platform.h>
+> @@ -154,6 +155,7 @@ static struct map_desc ap_io_desc[] __initdata = {
+>  static void __init ap_map_io(void)
+>  {
+>  	iotable_init(ap_io_desc, ARRAY_SIZE(ap_io_desc));
+> +	vga_base = PCI_MEMORY_VADDR;
+>  }
+>  
+>  #define INTEGRATOR_SC_VALID_INT	0x003fffff
+> diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+> index dd56bfb..11b86e5 100644
+> --- a/arch/arm/mach-integrator/pci_v3.c
+> +++ b/arch/arm/mach-integrator/pci_v3.c
+> @@ -27,7 +27,6 @@
+>  #include <linux/spinlock.h>
+>  #include <linux/init.h>
+>  #include <linux/io.h>
+> -#include <video/vga.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/platform.h>
+> @@ -505,7 +504,6 @@ void __init pci_v3_preinit(void)
+>  
+>  	pcibios_min_io = 0x6000;
+>  	pcibios_min_mem = 0x00100000;
+> -	vga_base = PCI_MEMORY_VADDR;
+>  
+>  	/*
+>  	 * Hook in our fault handler for PCI errors
 
-However, I have not yet tested it.
+Should the VGA memory really be accessed before PCI host is initialized?
 
-Ben.
-
- arch/arm/Kconfig |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f23712d..a1dbc4b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -477,7 +477,7 @@ config ARCH_IXP4XX
- 	depends on MMU
- 	select CLKSRC_MMIO
- 	select CPU_XSCALE
--	select GENERIC_GPIO
-+	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_SCHED_CLOCK
- 	select MIGHT_HAVE_PCI
-@@ -830,7 +830,7 @@ config ARCH_U300
- 	select GENERIC_CLOCKEVENTS
- 	select CLKDEV_LOOKUP
- 	select HAVE_MACH_CLKDEV
--	select GENERIC_GPIO
-+	select ARCH_REQUIRE_GPIOLIB
- 	help
- 	  Support for ST-Ericsson U300 series mobile platforms.
- 
--- 
-1.7.5.4
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 828 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110905/ab978c83/attachment.sig>
+Rob
