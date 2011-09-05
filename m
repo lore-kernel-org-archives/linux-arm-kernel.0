@@ -1,39 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Mon, 05 Sep 2011 16:21:25 +0530
-Subject: [PATCH 05/25] OMAP4: Use WARN_ON() instead of BUG_ON() with
-	graceful exit
-In-Reply-To: <20110905104755.GC6918@n2100.arm.linux.org.uk>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-6-git-send-email-santosh.shilimkar@ti.com>
-	<4E64A040.4000801@ru.mvista.com> <4E64A77A.10400@ti.com>
-	<20110905104755.GC6918@n2100.arm.linux.org.uk>
-Message-ID: <4E64A9AD.7030206@ti.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 5 Sep 2011 12:43:52 +0200
+Subject: [PATCH 6/7] common: dma-mapping: change alloc/free_coherent
+	method to more generic alloc/free_attrs
+In-Reply-To: <1314971599-14428-7-git-send-email-m.szyprowski@samsung.com>
+References: <1314971599-14428-1-git-send-email-m.szyprowski@samsung.com>
+	<1314971599-14428-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20110905104352.GD5203@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 September 2011 04:17 PM, Russell King - ARM Linux wrote:
-> On Mon, Sep 05, 2011 at 04:12:02PM +0530, Santosh wrote:
->> On Monday 05 September 2011 03:41 PM, Sergei Shtylyov wrote:
+On Fri, Sep 02, 2011 at 03:53:18PM +0200, Marek Szyprowski wrote:
+>  struct dma_map_ops {
+> -	void* (*alloc_coherent)(struct device *dev, size_t size,
+> -				dma_addr_t *dma_handle, gfp_t gfp);
+> -	void (*free_coherent)(struct device *dev, size_t size,
+> -			      void *vaddr, dma_addr_t dma_handle);
+> +	void* (*alloc)(struct device *dev, size_t size,
+> +				dma_addr_t *dma_handle, gfp_t gfp,
+> +				struct dma_attrs *attrs);
+> +	void (*free)(struct device *dev, size_t size,
+> +			      void *vaddr, dma_addr_t dma_handle,
+> +			      struct dma_attrs *attrs);
+> +	int (*mmap)(struct device *, struct vm_area_struct *,
+> +			  void *, dma_addr_t, size_t, struct dma_attrs *attrs);
+> +
+>  	dma_addr_t (*map_page)(struct device *dev, struct page *page,
+>  			       unsigned long offset, size_t size,
+>  			       enum dma_data_direction dir,
+> -- 
+> 1.7.1.569.g6f426
 
-[..]
+This needs conversion of all drivers implementing dma_map_ops or you
+will break a lot of architectures. A better approach is to keep
+*_coherent and implement alloc/free/mmap side-by-side until all drivers
+are converted.
+Also I miss some documentation about the new call-backs.
 
->>>> /* Static mapping, never released */
->>>> l2cache_base = ioremap(OMAP44XX_L2CACHE_BASE, SZ_4K);
->>>> - BUG_ON(!l2cache_base);
->>>> + if (WARN_ON(!l2cache_base))
->>>> + return -ENODEV;
->>>
->>> Rather ENOMEM...
->>>
->> Nope. Even though it's related to memory, it's
->> a memory controller so DEV is right.
->
-> No it's not.  The most likely reason ioremap() fails is because:
->
-> 1. it's run out of memory for the metadata or page tables.
-> 2. you passed it an invalid memory type (unlikely, you're using ioremap
->     which uses a fixed known good type).
-> 3. the address was>4GB but was not section aligned (also unlikely).
->
-> Therefore, the error code should be "out of memory" not "no such device".
-Got it. Will fix that.
+	Joerg
