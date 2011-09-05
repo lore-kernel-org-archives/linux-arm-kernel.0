@@ -1,37 +1,63 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Sep 2011 10:53:31 +0200
-Subject: 3rd Update: ARM Sub-Architecture Maintainers workshop at Kernel
-	Summit 2011
-In-Reply-To: <alpine.DEB.2.00.1109031824330.9023@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1109031824330.9023@utopia.booyaka.com>
-Message-ID: <4E648E0B.7050601@ti.com>
+From: Josh.wu@atmel.com (Wu, Josh)
+Date: Mon, 5 Sep 2011 16:55:16 +0800
+Subject: [PATCH] at91: add Atmel ISI and ov2640 support on m10/g45 board.
+In-Reply-To: <20110902182137.GL20128@game.jcrosoft.org>
+References: <1314960609-23396-1-git-send-email-josh.wu@atmel.com>
+	<20110902182137.GL20128@game.jcrosoft.org>
+Message-ID: <4C79549CB6F772498162A641D92D532802A0995F@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
 
-> Date: Sat, 3 Sep 2011 18:09:17 -0600
-> From: Grant Likely<grant.likely@secretlab.ca>
->
-> Updated attendee list. I'm out of the office camping this weekend, but I
-> wanted to get this out asap. If you are on the confirmed list then go ahead
-> and book travel. I'll be sending each of you a registration web page URL and
-> further instructions next week.
->
-> We may still up the number of delegates later, but we're only committing to
-> 24 at the moment.
->
-> g.
 
-[...]
+On 09/03/2011 2:22 AM Jean-Christophe PLAGNIOL-VILLARD wrote: 
 
-> Nominated, but haven't responded personally:
-> - Russell King - some random arm dude
-> - Lennert Buytenhek - Marvel SoC maintainer
-> - Linus Walleij - ST-Ericsson SoC maintainer
-> - Beno?t Cousson - OMAP engineer
+>>  
+>>  #include <asm/setup.h>
+>>  #include <asm/mach-types.h>
+>> @@ -194,6 +197,95 @@ static void __init ek_add_device_nand(void)
+>>  	at91_add_device_nand(&ek_nand_data);
+>>  }
+>>  
+>> +/*
+>> + *  ISI
+>> + */
+>> +#if defined(CONFIG_VIDEO_ATMEL_ISI) || defined(CONFIG_VIDEO_ATMEL_ISI_MODULE)
+>> +static struct isi_platform_data __initdata isi_data = {
+>> +	.frate		= ISI_CFG1_FRATE_CAPTURE_ALL,
+>> +	.has_emb_sync	= 0,
+>> +	.emb_crc_sync = 0,
+>> +	.hsync_act_low = 0,
+>> +	.vsync_act_low = 0,
+>> +	.pclk_act_falling = 0,
+>> +	/* to use codec and preview path simultaneously */
+>> +	.isi_full_mode = 1,
+>> +	.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10,
+>> +};
+>> +
+>> +static void __init isi_set_clk(void)
+>> +{
+>> +	struct clk *pck1;
+>> +	struct clk *plla;
+>> +
+>> +	pck1 = clk_get(NULL, "pck1");
+>> +	plla = clk_get(NULL, "plla");
+>> +
+>> +	clk_set_parent(pck1, plla);
+>> +	clk_set_rate(pck1, 25000000);
+>> +	clk_enable(pck1);
 
-Yes, if possible, I'd like to attend.
+> you must not enable the clock always
 
-Thanks,
-Benoit
+> you must enable it just when you need it
+
+> and manage the clock at the board level really so so
+
+I see, I will move such clock code to atmel_isi.c driver and add clock name, clock frequence to isi_platform_data structure in next version.
+
+Thanks.
+Best Regards,
+Josh Wu
+
+> Best Regards,
+> J.
