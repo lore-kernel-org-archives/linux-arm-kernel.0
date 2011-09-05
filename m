@@ -1,143 +1,36 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon,  5 Sep 2011 18:29:53 +0800
-Subject: [PATCH] [media] at91: add code to initialize and manage the ISI_MCK
-	for Atmel ISI driver.
-Message-ID: <1315218593-10822-1-git-send-email-josh.wu@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Sep 2011 03:31:35 -0700
+Subject: testing-board branch: rebase to RMK's devel-stable?
+In-Reply-To: <alpine.LFD.2.00.1109021448120.20358@xanadu.home>
+References: <87vcta7r9f.fsf@ti.com>
+	<alpine.LFD.2.00.1109021446300.20358@xanadu.home>
+	<alpine.LFD.2.00.1109021448120.20358@xanadu.home>
+Message-ID: <20110905103135.GF1903@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enable the configuration for ISI_MCK, which is provided by programmable clock.
+* Nicolas Pitre <nicolas.pitre@linaro.org> [110902 11:25]:
+> On Fri, 2 Sep 2011, Nicolas Pitre wrote:
+> 
+> > On Fri, 2 Sep 2011, Kevin Hilman wrote:
+> > 
+> > > Hi Tony,
+> > > 
+> > > Your testing-board branch currently has a couple new boards that are
+> > > missing the boot_params to atag_offset conversion (patch below.)
+> > > 
+> > > There's a patch below to fix this, but maybe it's better to just rebase
+> > > your testing-board branch onto Russell's devel-stable branch (where he's
+> > > merged the seris from Nico) so any board stuff we add is sure to do it
+> > > correctly.
+> > 
+> > I would suggest that too.
+> 
+> Better yet, if your bootloader does pass the address of the ATAG list 
+> via r2 already (contemporary u-Boot versions do) then the 
+> boot_params/atag_offset entry is redundant and can simply be dropped 
+> upfront.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/media/video/atmel-isi.c |   56 ++++++++++++++++++++++++++++++++++++++-
- include/media/atmel-isi.h       |    4 +++
- 2 files changed, 59 insertions(+), 1 deletions(-)
+Yes we should be able to drop it then.
 
-diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
-index 7b89f00..8bb59a8 100644
---- a/drivers/media/video/atmel-isi.c
-+++ b/drivers/media/video/atmel-isi.c
-@@ -90,7 +90,10 @@ struct atmel_isi {
- 	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
- 
- 	struct completion		complete;
-+	/* ISI peripherial clock */
- 	struct clk			*pclk;
-+	/* ISI_MCK, provided by PCK */
-+	struct clk			*mck;
- 	unsigned int			irq;
- 
- 	struct isi_platform_data	*pdata;
-@@ -763,6 +766,10 @@ static int isi_camera_add_device(struct soc_camera_device *icd)
- 	if (ret)
- 		return ret;
- 
-+	ret = clk_enable(isi->mck);
-+	if (ret)
-+		return ret;
-+
- 	isi->icd = icd;
- 	dev_dbg(icd->parent, "Atmel ISI Camera driver attached to camera %d\n",
- 		 icd->devnum);
-@@ -776,6 +783,7 @@ static void isi_camera_remove_device(struct soc_camera_device *icd)
- 
- 	BUG_ON(icd != isi->icd);
- 
-+	clk_disable(isi->mck);
- 	clk_disable(isi->pclk);
- 	isi->icd = NULL;
- 
-@@ -882,6 +890,46 @@ static struct soc_camera_host_ops isi_soc_camera_host_ops = {
- };
- 
- /* -----------------------------------------------------------------------*/
-+static int initialize_mck(struct atmel_isi *isi,
-+			struct isi_platform_data *pdata)
-+{
-+	int ret;
-+	struct clk *pck_parent;
-+
-+	if (!strlen(pdata->pck_name) || !strlen(pdata->pck_parent_name))
-+		return -EINVAL;
-+
-+	/* ISI_MCK is provided by PCK clock */
-+	isi->mck = clk_get(NULL, pdata->pck_name);
-+	if (IS_ERR(isi->mck)) {
-+		printk(KERN_ERR "Failed to get PCK: %s\n", pdata->pck_name);
-+		return PTR_ERR(isi->mck);
-+	}
-+
-+	pck_parent = clk_get(NULL, pdata->pck_parent_name);
-+	if (IS_ERR(pck_parent)) {
-+		ret = PTR_ERR(pck_parent);
-+		printk(KERN_ERR "Failed to get PCK parent: %s\n",
-+				pdata->pck_parent_name);
-+		goto err_init_mck;
-+	}
-+
-+	ret = clk_set_parent(isi->mck, pck_parent);
-+	clk_put(pck_parent);
-+	if (ret)
-+		goto err_init_mck;
-+
-+	ret = clk_set_rate(isi->mck, pdata->isi_mck_hz);
-+	if (ret < 0)
-+		goto err_init_mck;
-+
-+	return 0;
-+
-+err_init_mck:
-+	clk_put(isi->mck);
-+	return ret;
-+}
-+
- static int __devexit atmel_isi_remove(struct platform_device *pdev)
- {
- 	struct soc_camera_host *soc_host = to_soc_camera_host(&pdev->dev);
-@@ -897,6 +945,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
- 			isi->fb_descriptors_phys);
- 
- 	iounmap(isi->regs);
-+	clk_put(isi->mck);
- 	clk_put(isi->pclk);
- 	kfree(isi);
- 
-@@ -915,7 +964,8 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 	struct isi_platform_data *pdata;
- 
- 	pdata = dev->platform_data;
--	if (!pdata || !pdata->data_width_flags) {
-+	if (!pdata || !pdata->data_width_flags || !pdata->isi_mck_hz
-+			|| !pdata->pck_name || !pdata->pck_parent_name) {
- 		dev_err(&pdev->dev,
- 			"No config available for Atmel ISI\n");
- 		return -EINVAL;
-@@ -944,6 +994,10 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
- 	INIT_LIST_HEAD(&isi->video_buffer_list);
- 	INIT_LIST_HEAD(&isi->dma_desc_head);
- 
-+	ret = initialize_mck(isi, pdata);
-+	if (ret)
-+		goto err_alloc_descriptors;
-+
- 	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
- 				sizeof(struct fbd) * MAX_BUFFER_NUM,
- 				&isi->fb_descriptors_phys,
-diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
-index 26cece5..dcbb822 100644
---- a/include/media/atmel-isi.h
-+++ b/include/media/atmel-isi.h
-@@ -114,6 +114,10 @@ struct isi_platform_data {
- 	u32 data_width_flags;
- 	/* Using for ISI_CFG1 */
- 	u32 frate;
-+	/* Using for ISI_MCK, provided by PCK */
-+	u32 isi_mck_hz;
-+	const char *pck_name;
-+	const char *pck_parent_name;
- };
- 
- #endif /* __ATMEL_ISI_H__ */
--- 
-1.6.3.3
+Tony
