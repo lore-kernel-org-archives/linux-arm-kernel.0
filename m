@@ -1,57 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Sep 2011 18:19:47 +0300
-Subject: [PATCH] OMAP2+: hwmod: remove OMAP_CHIP*
-In-Reply-To: <CANOLnOOkz2ZkhPSafTLxUUH2bSVoRrYA44-C1+yku8naYaRz3w@mail.gmail.com>
-References: <alpine.DEB.2.00.1109042042250.9056@utopia.booyaka.com>
-	<CANOLnOOkz2ZkhPSafTLxUUH2bSVoRrYA44-C1+yku8naYaRz3w@mail.gmail.com>
-Message-ID: <20110905151947.GA3548@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 05 Sep 2011 10:30:44 -0500
+Subject: [PATCH] mach-integrator: fix VGA base regression
+In-Reply-To: <CACRpkdYw4WCJ+kBm_FBH=H-vPKBUsb9DFToK0MN4F8t5T8Tc9g@mail.gmail.com>
+References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
+	<4E64496E.1090000@gmail.com>
+	<CACRpkdYw4WCJ+kBm_FBH=H-vPKBUsb9DFToK0MN4F8t5T8Tc9g@mail.gmail.com>
+Message-ID: <4E64EB24.7010800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [110905 13:54]:
-> On Mon, Sep 5, 2011 at 5:43 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> > diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> > index 84cc0bd..d7138070 100644
-> > --- a/arch/arm/mach-omap2/omap_hwmod.c
-> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> <snip>
+On 09/05/2011 01:46 AM, Linus Walleij wrote:
+> On Mon, Sep 5, 2011 at 6:00 AM, Rob Herring <robherring2@gmail.com> wrote:
 > 
-> >
-> > ?int __init omap3xxx_hwmod_init(void)
-> > ?{
-> > - ? ? ? return omap_hwmod_register(omap3xxx_hwmods);
-> > + ? ? ? int r;
-> > + ? ? ? struct omap_hwmod **h = NULL;
-> > +
-> > + ? ? ? /* Register hwmods common to all OMAP3 */
-> > + ? ? ? r = omap_hwmod_register(omap3xxx_hwmods);
-> > + ? ? ? if (!r)
-> > + ? ? ? ? ? ? ? return r;
-> > +
-> > + ? ? ? /*
-> > + ? ? ? ?* Register hwmods common to individual OMAP3 families, all
-> > + ? ? ? ?* silicon revisions (e.g., 34xx, or AM3505/3517, or 36xx)
-> > + ? ? ? ?* All possible revisions should be included in this conditional.
-> > + ? ? ? ?*/
-> > + ? ? ? if (omap_rev() == OMAP3430_REV_ES1_0 ||
-> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES2_0 ||
-> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES2_1 ||
-> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_0 ||
-> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_1 ||
-> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_1_2) {
-> > + ? ? ? ? ? ? ? h = omap34xx_hwmods;
-> > + ? ? ? } else if (omap_rev() & OMAP3505_REV(0)) {
-> > + ? ? ? ? ? ? ? h = am35xx_hwmods;
+>>> @@ -154,6 +155,7 @@ static struct map_desc ap_io_desc[] __initdata = {
+>>>  static void __init ap_map_io(void)
+>>>  {
+>>>       iotable_init(ap_io_desc, ARRAY_SIZE(ap_io_desc));
+>>> +     vga_base = PCI_MEMORY_VADDR;
+>>>  }
+>>> @@ -505,7 +504,6 @@ void __init pci_v3_preinit(void)
+>>>
+>>>       pcibios_min_io = 0x6000;
+>>>       pcibios_min_mem = 0x00100000;
+>>> -     vga_base = PCI_MEMORY_VADDR;
+>>>
+>>>       /*
+>>>        * Hook in our fault handler for PCI errors
+>>
+>> Should the VGA memory really be accessed before PCI host is initialized?
 > 
-> This check will be always true I think?
+> I don' know, I don't know one bit about how PCI works and should
+> work, you tell me :-)
 > 
-> Why not just use cpu_is_omap3xxx() for these tests, since it does same
-> omap_rev() call but only once per family?
 
-For SoC family based ES revision and GP/HS detection
-we should set up minimal macros. Ideally we would not
-need cpu_is_omapxxxx during early_init at all.
+I guess it's normal (from init/main.c):
 
-Regards,
+        /*
+         * HACK ALERT! This is early. We're enabling the console before
+         * we've done PCI setups etc, and console_init() must be aware of
+         * this. But we do want output early, in case something goes wrong.
+         */
 
-Tony
+> What I know is that without this patch the 3.1 rc does not boot on
+> Integrator.
+> 
+> Do you prefer that I revert your commit and wait with this thing
+> until we figured out why it breaks the Integrator instead?
+
+Well, it's really no difference with your patch or reverting mine in
+terms of init order. I'd rather not have to add back hardware.h as a
+required mach header.
+
+So FWIW:
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
+Rob
