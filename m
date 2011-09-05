@@ -1,47 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Sep 2011 02:51:49 -0700
-Subject: [PATCH 3/6] ARM: mach-omap1: clean up debug-macro.S
-In-Reply-To: <20110905094928.GC1903@atomide.com>
-References: <1314932353-24813-1-git-send-email-nico@fluxnic.net>
-	<1314932353-24813-4-git-send-email-nico@fluxnic.net>
-	<20110905094928.GC1903@atomide.com>
-Message-ID: <20110905095149.GE1903@atomide.com>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Mon, 5 Sep 2011 12:00:53 +0200
+Subject: [RFC 6/7] iommu/core: add fault reporting
+In-Reply-To: <1314984756-4400-7-git-send-email-ohad@wizery.com>
+References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+	<1314984756-4400-7-git-send-email-ohad@wizery.com>
+Message-ID: <20110905100053.GP16691@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110905 02:16]:
-> * Nicolas Pitre <nico@fluxnic.net> [110901 19:26]:
-> > --- a/arch/arm/mach-omap1/include/mach/debug-macro.S
-> > +++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
-> > @@ -34,13 +29,13 @@ omap_uart_virt:	.word	0x0
-> >  		.macro	addruart, rp, rv, tmp
-> >  
-> >  		/* Use omap_uart_phys/virt if already configured */
-> > -9:		mrc	p15, 0, \rp, c1, c0
-> > -		tst	\rp, #1			@ MMU enabled?
-> > -		ldreq	\rp, =omap_uart_v2p(omap_uart_phys)	@ MMU disabled
-> > -		ldrne	\rp, =omap_uart_phys	@ MMU enabled
-> > -		add	\rv, \rp, #4		@ omap_uart_virt
-> > -		ldr	\rp, [\rp, #0]
-> > -		ldr	\rv, [\rv, #0]
-> > +9:		adr	\rp, 11f		@ get effective addr of 11f
-> > +		ldr	\rv, [\rp]		@ get absolute addr of 11f
-> > +		sub	\rv, \rv, \rp		@ offset between the two
-> > +		ldr	\rp, [\rp, #4]		@ abs addr of omap_uart_phys
-> > +		sub	\tmp, \rp, \rv		@ make it effective
-> > +		ldr	\rp, [\tmp, #0]		@ omap_uart_phys
-> > +		ldr	\rv, [\tmp, #4]		@ omap_uart_virt
-> >  		cmp	\rp, #0			@ is port configured?
-> >  		cmpne	\rv, #0
-> >  		bne	99f			@ already configured
-> 
-> The 11f above will fail for omap1 as we already have 11 defined there
-> for omap1 uart1. The prepare patch I posted as 2.5/6 fixes that issue.
-> This will also allow further clean-up to combine omap1 and omap2+
-> debug-macro.S.
-> 
-> Below is updated version of your patch to use 99f instead of 11f.
+On Fri, Sep 02, 2011 at 01:32:35PM -0400, Ohad Ben-Cohen wrote:
+> -struct iommu_domain *iommu_domain_alloc(void)
+> +/**
+> + * iommu_domain_alloc() - allocate and initialize a new iommu domain
+> + * @handler: an optional pointer to a fault handler, or NULL if not needed
+> + *
+> + * Returns the new domain, or NULL on error.
+> + */
+> +struct iommu_domain *iommu_domain_alloc(iommu_fault_handler_t handler)
 
-Other than that change, this too:
+Please add a seperate function for setting the fault-handler. It is
+optional, so no need to be a value of the alloc-function.
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+> +/**
+> + * enum iommu_fault_types - iommu fault types
+> + *
+> + * @IOMMU_ERROR: Unrecoverable error
+> + * @IOMMU_TLBMISS: TLB miss while the page table walker is disabled
+> + * @IOMMU_NOPTE: TLB miss and no PTE for the requested address
+> + */
+> +enum iommu_fault_types {
+> +	IOMMU_ERROR,
+> +	IOMMU_TLBMISS,
+> +	IOMMU_NOPTE,
+> +};
+
+Can you elaborate a bit on what the user of the api will do different
+between IOMMU_TLBMISS and IOMMU_NOPTE?
+My feeling is that those differences should be handled internally in the
+IOMMU driver, but probably I miss a use-case.
+Also, we need some flags to distinguish between the type of the fault
+(read, write, ...).
+
+	Joerg
+
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
