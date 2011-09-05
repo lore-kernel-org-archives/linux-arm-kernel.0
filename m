@@ -1,66 +1,35 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 05 Sep 2011 15:24:04 -0400 (EDT)
-Subject: [PATCH 2/6] ARM: plat-omap: make OMAP_UART_INFO into a relative
-	offset
-In-Reply-To: <20110905094414.GA1903@atomide.com>
-References: <1314932353-24813-1-git-send-email-nico@fluxnic.net>
-	<1314932353-24813-3-git-send-email-nico@fluxnic.net>
-	<20110905094414.GA1903@atomide.com>
-Message-ID: <alpine.LFD.2.00.1109051522590.20358@xanadu.home>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Mon, 05 Sep 2011 21:25:46 +0200
+Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
+	platforms
+In-Reply-To: <CAODfWeEueF45_yvPV5Zxbva6K2gEfKZbY2qoqySYFPZWnSgLsg@mail.gmail.com>
+	(Hector Oron's message of "Wed, 31 Aug 2011 13:57:06 +0100")
+References: <1314698171-7937-1-git-send-email-richard.zhu@linaro.org>
+	<CAODfWeEm8bkySXxb1qopbH1VMu-V+33k5x+0+qjABzesT0amOA@mail.gmail.com>
+	<CAJNCFV+XFGEba1J2dXDa4YVwqduAPV5y=5JYEXAZ0uv+S60vvw@mail.gmail.com>
+	<CAODfWeEueF45_yvPV5Zxbva6K2gEfKZbY2qoqySYFPZWnSgLsg@mail.gmail.com>
+Message-ID: <877h5m7pvp.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Sep 2011, Tony Lindgren wrote:
+Hector Oron <hector.oron@gmail.com> writes:
 
-> * Nicolas Pitre <nico@fluxnic.net> [110901 19:27]:
-> > --- a/arch/arm/mach-omap1/include/mach/debug-macro.S
-> > +++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
-> > @@ -46,11 +46,9 @@ omap_uart_virt:	.word	0x0
-> >  		bne	99f			@ already configured
-> >  
-> >  		/* Check the debug UART configuration set in uncompress.h */
-> > -		mrc	p15, 0, \rp, c1, c0
-> > -		tst	\rp, #1			@ MMU enabled?
-> > -		ldreq	\rp, =OMAP_UART_INFO	@ MMU not enabled
-> > -		ldrne	\rp, =omap_uart_p2v(OMAP_UART_INFO)	@ MMU enabled
-> > -		ldr	\rp, [\rp, #0]
-> > +		and	\rp, pc, #0xff000000
-> > +		ldr	\rv, =OMAP_UART_INFO_OFS
-> > +		ldr	\rp, [\rp, \rv]
-> >  
-> >  		/* Select the UART to use based on the UART1 scratchpad value */
-> >  10:		cmp	\rp, #0			@ no port configured?
-> > --- a/arch/arm/mach-omap2/include/mach/debug-macro.S
-> > +++ b/arch/arm/mach-omap2/include/mach/debug-macro.S
-> > @@ -49,11 +49,10 @@ omap_uart_lsr:	.word	0
-> >  		bne	99f			@ already configured
-> >  
-> >  		/* Check the debug UART configuration set in uncompress.h */
-> > -		mrc	p15, 0, \rp, c1, c0
-> > -		tst	\rp, #1			@ MMU enabled?
-> > -		ldreq	\rp, =OMAP_UART_INFO	@ MMU not enabled
-> > -		ldrne	\rp, =omap_uart_p2v(OMAP_UART_INFO)	@ MMU enabled
-> > -		ldr	\rp, [\rp, #0]
-> > +		mov	\rp, pc
-> > +		ldr	\rv, =OMAP_UART_INFO_OFS
-> > +		and	\rp, \rp, #0xff000000
-> > +		ldr	\rp, [\rp, \rv]
-> >  
-> >  		/* Select the UART to use based on the UART1 scratchpad value */
-> >  		cmp	\rp, #0			@ no port configured?
-> 
-> Any reason to not make it the same for omap1 and omap2+?
-> 
-> It seems to work both ways, but the omap1 version is one line less
-> of code :)
+> Hello,
 
-Because of Thumb2.  The shorter version is not available with Thumb2.
+Hi,
 
-> Other than that:
-> 
-> Tested-by: Tony Lindgren <tony@atomide.com>
+>
+> 2011/8/31 Richard Zhu <richard.zhu@linaro.org>:
+>> Hi Hector:
+>> Thanks for your help to tests these patches.
+>
+> Note I rebased this patches against 'imx-features' branch on Sascha's tree.
+> I am noticing some obscure (to me) messages from kernel:
 
-Thanks.
+Currently testing with probably same checkout of imx-features branch
+with a sata 3.5" drive. Running badblocks in non destructive write mode
+and so far, so good (it's slow but it may comes from my drive).
 
+Did you test if there was a bad cable or faulty drive PSU ?
 
-Nicolas
+Arnaud
