@@ -1,75 +1,86 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 04 Sep 2011 23:00:46 -0500
-Subject: [PATCH] mach-integrator: fix VGA base regression
-In-Reply-To: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
-References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4E64496E.1090000@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 05 Sep 2011 14:16:00 +0900
+Subject: [PATCH 1/2] mmc: sdhci-s3c: add default controller configuration
+In-Reply-To: <1314976702-19284-2-git-send-email-thomas.abraham@linaro.org>
+References: <1314976702-19284-1-git-send-email-thomas.abraham@linaro.org>
+	<1314976702-19284-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <001701cc6b8a$e6a78960$b3f69c20$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
-
-On 09/04/2011 04:40 PM, Linus Walleij wrote:
-> The changes introduced in commit
-> cc22b4c18540e5e8bf55c7d124044f9317527d3c
-> "ARM: set vga memory base at run-time"
+Thomas Abraham wrote:
 > 
-> Makes the Integrator/AP freeze completely. I appears that
-> this is due to the VGA base address being assigned at PCI
-> init time, while this base is needed earlier than that.
-> Moving the initialization of the base address to the
-> .map_io function solves this problem.
+> The default controller configuration which was previously setup by
+> platform helper functions is moved into the driver.
 > 
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 > ---
->  arch/arm/mach-integrator/integrator_ap.c |    2 ++
->  arch/arm/mach-integrator/pci_v3.c        |    2 --
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  drivers/mmc/host/sdhci-s3c.c |   28 +++++++++++++++++-----------
+>  1 files changed, 17 insertions(+), 11 deletions(-)
 > 
-> diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-> index 2fbbdd5..4d88fc4 100644
-> --- a/arch/arm/mach-integrator/integrator_ap.c
-> +++ b/arch/arm/mach-integrator/integrator_ap.c
-> @@ -32,6 +32,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/mtd/physmap.h>
-> +#include <video/vga.h>
->  
->  #include <mach/hardware.h>
->  #include <mach/platform.h>
-> @@ -154,6 +155,7 @@ static struct map_desc ap_io_desc[] __initdata = {
->  static void __init ap_map_io(void)
->  {
->  	iotable_init(ap_io_desc, ARRAY_SIZE(ap_io_desc));
-> +	vga_base = PCI_MEMORY_VADDR;
+> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+> index 2bd7bf4..d891682 100644
+> --- a/drivers/mmc/host/sdhci-s3c.c
+> +++ b/drivers/mmc/host/sdhci-s3c.c
+> @@ -203,17 +203,23 @@ static void sdhci_s3c_set_clock(struct sdhci_host
+*host,
+> unsigned int clock)
+>  		writel(ctrl, host->ioaddr + S3C_SDHCI_CONTROL2);
+>  	}
+> 
+> -	/* reconfigure the hardware for new clock rate */
+> -
+> -	{
+> -		struct mmc_ios ios;
+> -
+> -		ios.clock = clock;
+> -
+> -		if (ourhost->pdata->cfg_card)
+> -			(ourhost->pdata->cfg_card)(ourhost->pdev, host-
+> >ioaddr,
+> -						   &ios, NULL);
+> -	}
+> +	/* reprogram default hardware configuration */
+> +	writel(S3C64XX_SDHCI_CONTROL4_DRIVE_9mA,
+> +		host->ioaddr + S3C64XX_SDHCI_CONTROL4);
+
+Since there are above codes on only S5PC100 and S5PV210, I'm not sure above
+is needed on other Samsung SoCs.
+
+I need to sort out checking.
+
+> +
+> +	ctrl = readl(host->ioaddr + S3C_SDHCI_CONTROL2);
+
++	ctrl &= S3C_SDHCI_CTRL2_SELBASECLK_MASK; ?
+
+> +	ctrl |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
+> +		  S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
+> +		  S3C_SDHCI_CTRL2_ENFBCLKRX |
+> +		  S3C_SDHCI_CTRL2_DFCNT_NONE |
+> +		  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
+> +	writel(ctrl, host->ioaddr + S3C_SDHCI_CONTROL2);
+> +
+> +	/* reconfigure the controller for new clock rate */
+> +	ctrl = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
+> +	if (clock < 25 * 1000000)
+> +		ctrl |= (S3C_SDHCI_CTRL3_FCSEL3 |
+> S3C_SDHCI_CTRL3_FCSEL2);
+> +	writel(ctrl, host->ioaddr + S3C_SDHCI_CONTROL3);
 >  }
->  
->  #define INTEGRATOR_SC_VALID_INT	0x003fffff
-> diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-> index dd56bfb..11b86e5 100644
-> --- a/arch/arm/mach-integrator/pci_v3.c
-> +++ b/arch/arm/mach-integrator/pci_v3.c
-> @@ -27,7 +27,6 @@
->  #include <linux/spinlock.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
-> -#include <video/vga.h>
->  
->  #include <mach/hardware.h>
->  #include <mach/platform.h>
-> @@ -505,7 +504,6 @@ void __init pci_v3_preinit(void)
->  
->  	pcibios_min_io = 0x6000;
->  	pcibios_min_mem = 0x00100000;
-> -	vga_base = PCI_MEMORY_VADDR;
->  
->  	/*
->  	 * Hook in our fault handler for PCI errors
+> 
+>  /**
+> --
 
-Should the VGA memory really be accessed before PCI host is initialized?
+Basically, it's good to move common codes and to remove that. But I'm not
+sure we don't _really_ need to keep SoC specific control function such as
+cfg_card().
 
-Rob
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
