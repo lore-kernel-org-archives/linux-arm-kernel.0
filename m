@@ -1,89 +1,32 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 5 Sep 2011 09:18:48 +0200
-Subject: [PATCH v2] ARM: l2x0: make sure I&D are not locked down on init
-Message-ID: <1315207128-11197-1-git-send-email-linus.walleij@stericsson.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 5 Sep 2011 13:28:13 +0530
+Subject: [PATCH 1/2] mmc: sdhci-s3c: add default controller configuration
+In-Reply-To: <4E64265D.9090206@samsung.com>
+References: <1314976702-19284-1-git-send-email-thomas.abraham@linaro.org>
+	<1314976702-19284-2-git-send-email-thomas.abraham@linaro.org>
+	<4E64265D.9090206@samsung.com>
+Message-ID: <CAJuYYwQ-tCFnL9ti5rtuGuqYkT+g7MEqdD1EpXOiC71zxeJbyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi Jaehoon,
 
-Fighting unfixed U-Boots and other beasts that may the cache in
-a locked-down state when starting the kernel, we make sure to
-disable all cache lock-down when initializing the l2x0 so we
-are in a known state.
+On 5 September 2011 07:01, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi Thomas.
+>
+> I have some question. This patch looks good.
+> Some names are used S3C_SDHCI_xxxx. but some names are used S3C64XX_SDHCI_xxxx.
+> Do you know what differ them?
 
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
-Cc: Adrian Bunk <adrian.bunk@movial.com>
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Reported-by: Jan Rinze <janrinze@gmail.com>
-Tested-by: Robert Marklund <robert.marklund@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/include/asm/hardware/cache-l2x0.h |    9 +++++++--
- arch/arm/mm/cache-l2x0.c                   |   21 +++++++++++++++++++++
- 2 files changed, 28 insertions(+), 2 deletions(-)
+I am not sure why there are S3C_SDHCI_xxx and S3C64XX_SDHCI_xxx
+macros. This patch reused the existing macros from regs-sdhci.h file.
+It should be possible to rename S3C64XX_SDHCI_xxx to S3C_SDHCI_xxx.
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 16bd480..9e2fd18 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -45,8 +45,13 @@
- #define L2X0_CLEAN_INV_LINE_PA		0x7F0
- #define L2X0_CLEAN_INV_LINE_IDX		0x7F8
- #define L2X0_CLEAN_INV_WAY		0x7FC
--#define L2X0_LOCKDOWN_WAY_D		0x900
--#define L2X0_LOCKDOWN_WAY_I		0x904
-+/*
-+ * The lockdown registers repeat 8 times for L310, the L210 has only one
-+ * D and one I lockdown register at 0x0900 and 0x0904.
-+ */
-+#define L2X0_LOCKDOWN_WAY_D_BASE	0x900
-+#define L2X0_LOCKDOWN_WAY_I_BASE	0x904
-+#define L2X0_LOCKDOWN_STRIDE		0x08
- #define L2X0_TEST_OPERATION		0xF00
- #define L2X0_LINE_DATA			0xF10
- #define L2X0_LINE_TAG			0xF30
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 44c0867..9ecfdb5 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -277,6 +277,25 @@ static void l2x0_disable(void)
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
-+static void __init l2x0_unlock(__u32 cache_id)
-+{
-+	int lockregs;
-+	int i;
-+
-+	if (cache_id == L2X0_CACHE_ID_PART_L310)
-+		lockregs = 8;
-+	else
-+		/* L210 and unknown types */
-+		lockregs = 1;
-+
-+	for (i = 0; i < lockregs; i++) {
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+	}
-+}
-+
- void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
- {
- 	__u32 aux;
-@@ -328,6 +347,8 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
- 	 * accessing the below registers will fault.
- 	 */
- 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
-+		/* Make sure that I&D is not locked down when starting */
-+		l2x0_unlock(cache_id);
- 
- 		/* l2x0 controller is disabled */
- 		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
--- 
-1.7.3.2
+Thanks,
+Thomas.
+
+>
+> Thanks,
+> Jaehoon Chung
+>
+[...]
