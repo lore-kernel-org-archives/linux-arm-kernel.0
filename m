@@ -1,74 +1,32 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 5 Sep 2011 10:12:50 +0200
-Subject: [PATCH v2] mach-ux500: unlock I&D l2x0 caches before init
-Message-ID: <1315210370-15448-1-git-send-email-linus.walleij@stericsson.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Mon, 05 Sep 2011 13:45:09 +0530
+Subject: [PATCH v2] ARM: l2x0: make sure I&D are not locked down on init
+In-Reply-To: <1315207128-11197-1-git-send-email-linus.walleij@stericsson.com>
+References: <1315207128-11197-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <4E64850D.8030107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Monday 05 September 2011 12:48 PM, Linus Walleij wrote:
+> From: Linus Walleij<linus.walleij@linaro.org>
+>
+> Fighting unfixed U-Boots and other beasts that may the cache in
+> a locked-down state when starting the kernel, we make sure to
+> disable all cache lock-down when initializing the l2x0 so we
+> are in a known state.
+>
+> Cc: Srinidhi Kasagar<srinidhi.kasagar@stericsson.com>
+> Cc: Rabin Vincent<rabin.vincent@stericsson.com>
+> Cc: Adrian Bunk<adrian.bunk@movial.com>
+> Cc: Rob Herring<robherring2@gmail.com>
+> Cc: Catalin Marinas<catalin.marinas@arm.com>
+> Cc: Will Deacon<will.deacon@arm.com>
+> Reported-by: Jan Rinze<janrinze@gmail.com>
+> Tested-by: Robert Marklund<robert.marklund@stericsson.com>
+> Signed-off-by: Linus Walleij<linus.walleij@linaro.org>
+> ---
+Looks good to me.
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Apparently U8500 U-Boot versions may leave the l2x0 locked down
-before executing the kernel. Make sure we unlock it before we
-initialize the l2x0. This fixes a performance problem reported
-by Jan Rinze.
-
-The l2x0 core has been modified to unlock the l2x0 by default,
-but it will not touch the locking registers if the l2x0 was
-already enabled, as on the ux500, so we need this quirk to
-make sure it is properly turned off.
-
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
-Cc: Adrian Bunk <adrian.bunk@movial.com>
-Reported-by: Jan Rinze <janrinze@gmail.com>
-Tested-by: Robert Marklund <robert.marklund@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/cache-l2x0.c |   25 ++++++++++++++++++++++++-
- 1 files changed, 24 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index 9d09e4d..122ddde 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -50,7 +50,27 @@ static void ux500_l2x0_inv_all(void)
- 	ux500_cache_sync();
- }
- 
--static int ux500_l2x0_init(void)
-+static int __init ux500_l2x0_unlock(void)
-+{
-+	int i;
-+
-+	/*
-+	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
-+	 * apparently locks both caches before jumping to the kernel. The
-+	 * l2x0 core will not touch the unlock registers if the l2x0 is
-+	 * already enabled, so we do it right here instead. The PL310 has
-+	 * 8 sets of registers, one per possible CPU.
-+	 */
-+	for (i = 0; i < 8; i++) {
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+	}
-+	return 0;
-+}
-+
-+static int __init ux500_l2x0_init(void)
- {
- 	if (cpu_is_u5500())
- 		l2x0_base = __io_address(U5500_L2CC_BASE);
-@@ -59,6 +79,9 @@ static int ux500_l2x0_init(void)
- 	else
- 		ux500_unknown_soc();
- 
-+	/* Unlock before init */
-+	ux500_l2x0_unlock();
-+
- 	/* 64KB way size, 8 way associativity, force WA */
- 	l2x0_init(l2x0_base, 0x3e060000, 0xc0000fff);
- 
--- 
-1.7.3.2
+Regards
+Santosh
