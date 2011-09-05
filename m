@@ -1,75 +1,57 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 5 Sep 2011 17:17:52 +0200
-Subject: [PATCH v11 1/3] MTD : add the common code for GPMI-NAND
-	controller driver
-In-Reply-To: <1314616381-11615-2-git-send-email-b32955@freescale.com>
-References: <1314616381-11615-1-git-send-email-b32955@freescale.com>
-	<1314616381-11615-2-git-send-email-b32955@freescale.com>
-Message-ID: <20110905151752.GA10987@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Sep 2011 18:19:47 +0300
+Subject: [PATCH] OMAP2+: hwmod: remove OMAP_CHIP*
+In-Reply-To: <CANOLnOOkz2ZkhPSafTLxUUH2bSVoRrYA44-C1+yku8naYaRz3w@mail.gmail.com>
+References: <alpine.DEB.2.00.1109042042250.9056@utopia.booyaka.com>
+	<CANOLnOOkz2ZkhPSafTLxUUH2bSVoRrYA44-C1+yku8naYaRz3w@mail.gmail.com>
+Message-ID: <20110905151947.GA3548@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 07:12:59PM +0800, Huang Shijie wrote:
-> These files contain the common code for the GPMI-NAND driver.
+* Grazvydas Ignotas <notasas@gmail.com> [110905 13:54]:
+> On Mon, Sep 5, 2011 at 5:43 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> > index 84cc0bd..d7138070 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> <snip>
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> Acked-by: Marek Vasut <marek.vasut@gmail.com>
-> Tested-by: Koen Beel <koen.beel@barco.com>
+> >
+> > ?int __init omap3xxx_hwmod_init(void)
+> > ?{
+> > - ? ? ? return omap_hwmod_register(omap3xxx_hwmods);
+> > + ? ? ? int r;
+> > + ? ? ? struct omap_hwmod **h = NULL;
+> > +
+> > + ? ? ? /* Register hwmods common to all OMAP3 */
+> > + ? ? ? r = omap_hwmod_register(omap3xxx_hwmods);
+> > + ? ? ? if (!r)
+> > + ? ? ? ? ? ? ? return r;
+> > +
+> > + ? ? ? /*
+> > + ? ? ? ?* Register hwmods common to individual OMAP3 families, all
+> > + ? ? ? ?* silicon revisions (e.g., 34xx, or AM3505/3517, or 36xx)
+> > + ? ? ? ?* All possible revisions should be included in this conditional.
+> > + ? ? ? ?*/
+> > + ? ? ? if (omap_rev() == OMAP3430_REV_ES1_0 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES2_0 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES2_1 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_0 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_1 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_1_2) {
+> > + ? ? ? ? ? ? ? h = omap34xx_hwmods;
+> > + ? ? ? } else if (omap_rev() & OMAP3505_REV(0)) {
+> > + ? ? ? ? ? ? ? h = am35xx_hwmods;
+> 
+> This check will be always true I think?
+> 
+> Why not just use cpu_is_omap3xxx() for these tests, since it does same
+> omap_rev() call but only once per family?
 
-...
-
-> +static int __devinit
-> +acquire_register_block(struct gpmi_nand_data *this, const char *res_name)
-> +{
-> +	struct platform_device *pdev = this->pdev;
-> +	struct resources *res = &this->resources;
-> +	struct resource *r;
-> +	void *p;
-> +
-> +	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, res_name);
-> +	if (!r) {
-> +		pr_err("Can't get resource for %s\n", res_name);
-> +		return -ENXIO;
-> +	}
-> +
-> +	p = ioremap(r->start, resource_size(r));
-> +	if (!p) {
-> +		pr_err("Can't remap %s\n", res_name);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	if (res_name == GPMI_NAND_GPMI_REGS_ADDR_RES_NAME)
-> +		res->gpmi_regs = p;
-> +	else if (res_name == GPMI_NAND_BCH_REGS_ADDR_RES_NAME)
-> +		res->bch_regs = p;
-
-Am I the only one getting warnings here?
-
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'acquire_register_block':
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:345:15: warning: comparison with string literal results in unspecified behavior
-drivers/mtd/nand/gpmi-nand/gpmi-nand.c:347:20: warning: comparison with string literal results in unspecified behavior
-
-Really worth fixing IMHO...
-
-> +	else
-> +		BUG();
-
-dev_err + ENODEV?
-
-Might be worth checking the other BUG()-occurences as well if they really need
-to halt the kernel.
+For SoC family based ES revision and GP/HS detection
+we should set up minimal macros. Ideally we would not
+need cpu_is_omapxxxx during early_init at all.
 
 Regards,
 
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110905/1b9a6723/attachment.sig>
+Tony
