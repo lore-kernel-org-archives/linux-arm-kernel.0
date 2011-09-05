@@ -1,50 +1,51 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 5 Sep 2011 15:46:55 +0530
-Subject: [PATCH 0/6] Add device tree support for PL330 dma controller
-	driver
-In-Reply-To: <001a01cc6b8b$21708470$64518d50$%kim@samsung.com>
-References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
-	<1314638947.1606.157.camel@vkoul-udesk3>
-	<001a01cc6b8b$21708470$64518d50$%kim@samsung.com>
-Message-ID: <CAJuYYwR65Y4V2S4Moz1rw=EJV44kky96K+Dqd7VwP_JvK9YDsg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 05 Sep 2011 19:20:40 +0900
+Subject: [PATCH 2/2] ARM: SAMSUNG: Fix mask for S3C64xx CPU IDs
+In-Reply-To: <1314786805-15684-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1314786805-15684-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1314786805-15684-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <002601cc6bb5$76ae78a0$640b69e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mr. Kim,
-
-On 5 September 2011 10:47, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Vinod Koul wrote:
->>
->> On Fri, 2011-08-26 at 14:10 +0530, Thomas Abraham wrote:
->> > This patchset adds device tree support for PL330 driver and uses it
->> > to add device tree support for Samsung platforms, specifically Exynos4.
->> The DMA patches looks good to me. Do you want this to go thru slave-dma
->> tree or somewhere else.
->> I will need acks on 3, 5 and 6th patch to carry them.
->>
->
-> Looks good to me on 3 and 5th patch, I think, 6th patch is needed to update, please refer to my comments on there.
->
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->
-> As you know, Boojin Kim submitted 8th patch last Friday. So would be nice to me if you could rebase Thomas' patch based on her updated patch set and apply all series into your slave-dma.git samsung_dma branch I think it?s easy because v8 changes are small then I will merge it into my -next to prevent useless conflicts.
->
-
-I will test the pl330 device tree patches with Boonjin's pl330 driver
-update patches and resubmit if there are any changes. Thank you for
-your ack.
-
-Thanks,
-Thomas.
-
-> If any problems, please let me know.
->
-> Thanks.
->
-> Best regards,
-> Kgene.
+Mark Brown wrote:
+> 
+> The difference in CPU ID between S3C6400 and S3C6410 is a single bit and
+> that bit wasn't included in the mask causing the S3C6410 to be misdetected
+> as a S3C6400.
+> 
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> ---
+>  arch/arm/plat-samsung/include/plat/cpu.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-
+> samsung/include/plat/cpu.h
+> index aa1f69b..4d36130 100644
+> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+> @@ -26,7 +26,7 @@ extern unsigned long samsung_cpu_id;
+>  #define S3C6400_CPU_ID		0x36400000
+>  #define S3C6410_CPU_ID		0x36410000
+>  #define S3C64XX_CPU_ID		(S3C6400_CPU_ID &
+> S3C6410_CPU_ID)
+> -#define S3C64XX_CPU_MASK	0x1FF40000
+> +#define S3C64XX_CPU_MASK	0x1FFF0000
+> 
+>  #define S5P6440_CPU_ID		0x56440000
+>  #define S5P6450_CPU_ID		0x36450000
 > --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+> 1.7.5.4
+
+Oops, I don't know how it has wrong value :(
+I think, in this case, it's better 0xFFFFF000 rather than 0x1FFF0000.
+
+If any problems, please let me know.
+
+Will apply, thanks :)
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
