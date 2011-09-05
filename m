@@ -1,41 +1,45 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Mon, 5 Sep 2011 17:22:26 +0100
-Subject: [PATCH] arm: ixp4xx, u300: Select ARCH_REQUIRE_GPIOLIB, not
-	GENERIC_GPIO
-In-Reply-To: <CACRpkdaACXxzhQ4m3+4tzTGrXubFF6jPkO9uG0kqVzvm+ORYwQ@mail.gmail.com>
-References: <1315192383.3092.260.camel@deadeye>
-	<CACRpkdaACXxzhQ4m3+4tzTGrXubFF6jPkO9uG0kqVzvm+ORYwQ@mail.gmail.com>
-Message-ID: <20110905162226.GI2802@decadent.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 Sep 2011 19:23:50 +0200
+Subject: [PATCH 2/7] arm/dts: OMAP3: Add mpu and iva nodes
+In-Reply-To: <4E64E527.4040409@ti.com>
+References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
+	<1377915.IaVE5xAurc@wuerfel> <4E64E527.4040409@ti.com>
+Message-ID: <201109051923.51084.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2011 at 02:41:30PM +0200, Linus Walleij wrote:
-> On Mon, Sep 5, 2011 at 5:12 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
+On Monday 05 September 2011, Cousson, Benoit wrote:
+> Yeah, I saw that in the "cpus" node documentation. My point here is that 
+> I do need to represent the MPU subsystem that will contain the cpus. And 
+> thus the Cortex is inside the MPU subsystem.
 > 
-> > @@ -830,7 +830,7 @@ config ARCH_U300
-> > ? ? ? ?select GENERIC_CLOCKEVENTS
-> > ? ? ? ?select CLKDEV_LOOKUP
-> > ? ? ? ?select HAVE_MACH_CLKDEV
-> > - ? ? ? select GENERIC_GPIO
-> > + ? ? ? select ARCH_REQUIRE_GPIOLIB
-> > ? ? ? ?help
-> > ? ? ? ? ?Support for ST-Ericsson U300 series mobile platforms.
+> I can potentially keep the CPUs inside the cpus node, and just represent 
+> the mpu node inside the soc, with potentially some phandle to the real 
+> cpu nodes.
 > 
-> Please don't do that, it really is no gpiolib implementation.
+> Something like that:
 > 
-> In the archives you can find patches I already submitted switching
-> the U300 GPIO over to use gpiolib.
-[...]
- 
-OK.  But it doesn't seem to work without gpiolib either:
+> cpus {
+>         cpu0: cpu at 0 {
+>                         compatible = "arm,cortex-a8";
+>         };
+> };
+> 
+> [...]
+> 
+> soc {
+>         compatible = "ti,omap-infra";
+>         mpu {
+>                 compatible = "ti,omap3-mpu";
+>                 hwmods = "mpu";
+>                 cpu at 0 {
+>                         phandle = <&cpu0>;
+>                         [...]
+>                 };
+>         };
+> };
 
- CC [M]  drivers/input/touchscreen/ads7846.o                                                                                                                                                                                                                                                                             
-drivers/input/touchscreen/ads7846.c: In function 'ads7846_setup_pendown':                                                                                                                              
-drivers/input/touchscreen/ads7846.c:970:3: error: implicit declaration of function 'gpio_request_one' 
+Yes, that looks good. I wouldn't name the attribute "phandle" if I could
+think of anything better (which I can't at the moment).
 
-Ben.
-
--- 
-Ben Hutchings
-We get into the habit of living before acquiring the habit of thinking.
-                                                              - Albert Camus
+	Arnd
