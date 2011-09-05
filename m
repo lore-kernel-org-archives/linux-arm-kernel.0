@@ -1,155 +1,55 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Mon, 5 Sep 2011 17:39:14 +0530
-Subject: [PATCH 6/7] OMAP3: board-dt: Add generic board file for DT support
-In-Reply-To: <1314897912-18178-7-git-send-email-b-cousson@ti.com>
-References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
-	<1314897912-18178-7-git-send-email-b-cousson@ti.com>
-Message-ID: <20110905120914.GA25418@manju-desktop>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Mon, 05 Sep 2011 14:18:21 +0200
+Subject: [PATCH] arm: ixp4xx, u300: Select ARCH_REQUIRE_GPIOLIB,
+	not GENERIC_GPIO
+In-Reply-To: <20110905104133.GH6619@n2100.arm.linux.org.uk> (Russell King's
+	message of "Mon, 5 Sep 2011 11:41:33 +0100")
+References: <1315192383.3092.260.camel@deadeye>
+	<87r53v7a3d.fsf@lebrac.rtp-net.org>
+	<20110905104133.GH6619@n2100.arm.linux.org.uk>
+Message-ID: <87mxej6v3m.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minor comments:
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-On Thu, Sep 01, 2011 at 07:25:11PM +0200, Benoit Cousson wrote:
-> Create an OMAP3 generic board to start the DT migration.
-> 
-> This file is doing the minimal initialization needed to boot
-> properly on a RAMDISK filesystem.
-> 
-> As soon as the OMAP3 specifics will be removed, that board will
-> be converted to an even more generic board-dt.c that will support
-> every OMAP2+ platforms.
-> 
-> Based on original patch from Manju:
-> http://www.spinics.net/lists/linux-omap/msg55832.html
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: G, Manjunath Kondaiah <manjugk@ti.com>
-> ---
->  arch/arm/mach-omap2/Kconfig          |   10 +++++
->  arch/arm/mach-omap2/Makefile         |    1 +
->  arch/arm/mach-omap2/board-omap3-dt.c |   74 ++++++++++++++++++++++++++++++++++
->  3 files changed, 85 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/board-omap3-dt.c
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 5d501d2..82f0df2 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -305,6 +305,16 @@ config MACH_OMAP_3630SDP
->  	default y
->  	select OMAP_PACKAGE_CBP
->  
-> +config MACH_OMAP3_DT
-> +	bool "Generic OMAP3 board (FDT support)"
-> +	depends on ARCH_OMAP3
-> +	select OMAP_PACKAGE_CBB
-> +	select USE_OF
-> +	help
-> +	  Support for generic TI OMAP3 boards using Flattened Device Tree.
-> +	  Say Y here to enable OMAP3 device tree support
-> +	  More information at Documentation/devicetree
-> +
->  config MACH_TI8168EVM
->  	bool "TI8168 Evaluation Module"
->  	depends on SOC_OMAPTI816X
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 6ab9116..5144c17 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -197,6 +197,7 @@ obj-$(CONFIG_MACH_OVERO)		+= board-overo.o
->  obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o
->  obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o
->  obj-$(CONFIG_MACH_OMAP_3430SDP)		+= board-3430sdp.o
-> +obj-$(CONFIG_MACH_OMAP3_DT)		+= board-omap3-dt.o
->  obj-$(CONFIG_MACH_NOKIA_N8X0)		+= board-n8x0.o
->  obj-$(CONFIG_MACH_NOKIA_RM680)		+= board-rm680.o \
->  					   sdram-nokia.o
-> diff --git a/arch/arm/mach-omap2/board-omap3-dt.c b/arch/arm/mach-omap2/board-omap3-dt.c
-> new file mode 100644
-> index 0000000..6eb56c6
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/board-omap3-dt.c
-> @@ -0,0 +1,74 @@
-> +/*
-> + * OMAP3 Device tree boards support
-> + *
-> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/irqdomain.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/i2c/twl.h>
-this header is redundant
-> +
-> +#include <asm/mach/arch.h>
-> +#include <plat/common.h>
-> +
-> +#include "mux.h"
-> +#include "common-board-devices.h"
-> +#include "sdram-micron-mt46h32m32lf-6.h"
-> +
-> +
-extra blank line
+Hi,
 
--M
-> +static void __init omap3_init_early(void)
-> +{
-> +	omap2_init_common_infrastructure();
-> +	omap2_init_common_devices(mt46h32m32lf6_sdrc_params,
-> +				  mt46h32m32lf6_sdrc_params);
-> +}
-> +
-> +#ifdef CONFIG_OMAP_MUX
-> +static struct omap_board_mux board_mux[] __initdata = {
-> +	{ .reg_offset = OMAP_MUX_TERMINATOR },
-> +};
-> +#endif
-> +
-> +static struct of_device_id omap_dt_match_table[] __initdata = {
-> +	{ .compatible = "simple-bus", },
-> +	{ .compatible = "ti,omap-infra", },
-> +	{}
-> +};
-> +
-> +static struct of_device_id omap_dt_intc_match[] __initdata = {
-> +	{ .compatible = "ti,omap3-intc", },
-> +	{}
-> +};
-> +
-> +static void __init omap3_init(void)
-> +{
-> +	struct device_node *node;
-> +
-> +	node = of_find_matching_node(NULL, omap_dt_intc_match);
-> +	if (node)
-> +		irq_domain_add_simple(node, 0);
-> +
-> +	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-> +	omap_serial_init();
-> +
-> +	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
-> +}
-> +
-> +static const char *omap3_dt_match[] __initdata = {
-> +	"ti,omap3",
-> +	NULL
-> +};
-> +
-> +DT_MACHINE_START(OMAP3_DT, "TI OMAP3 (Flattened Device Tree)")
-> +	.reserve	= omap_reserve,
-> +	.map_io		= omap3_map_io,
-> +	.init_early	= omap3_init_early,
-> +	.init_irq	= omap3_init_irq,
-> +	.init_machine	= omap3_init,
-> +	.timer		= &omap3_timer,
-> +	.dt_compat	= omap3_dt_match,
-> +MACHINE_END
-> -- 
-> 1.7.0.4
-> 
+> On Mon, Sep 05, 2011 at 08:54:30AM +0200, Arnaud Patard wrote:
+>> The problem here is that gpio_request_one has been added to the ads7846
+>> driver but gpio_request_one is not defined in GENERIC_GPIO case (I
+>> guess that other (arm and non-arm) platforms may hit similar troubles
+>> with gpio_request_one. One quick fix would be to add a gpio_request_one
+>> function say in asm-generic/gpio.h. One other fix would be to define
+>> gpio_request_one and gpio_request_array in each
+>> machine/platform/... specific header. Don't know what's the best
+>> solution.
+>
+> It looks like gpio_request_one() and gpio_request_array() have been added
+> at the wrong level in the GPIO support code.
+>
+> There's two levels to the GPIO support code:
+>
+> 1. GENERIC_GPIO - for platforms which use the gpio_* interfaces.
+> 2. GPIOLIB - for platforms which want the gpio library for handling multiple
+>    GPIO controllers.
+>
+> There is nothing GPIOLIB specific to the gpio_request_*() interfaces, so
+> to put them in gpiolib.c and include/asm-generic/gpio.h seems rather silly.
+>
+> On the other hand, for the single ARM kernel project, we do need everyone
+> to move to GPIOLIB so that the GPIO calls can be bound appropriately at
+> runtime - which means this problem goes away.  So probably the right
+> solution is for IXP4xx etc to move over completely to gpiolib.
+
+I thought about it but I considered it was too late to do that. I don't
+think that moving to gpiolib u300/ixp4xx in -rc is a good idea. imho
+doing it for next kernel is better but this won't solve the build
+failure. Of course, you can tell me I'm plain wrong and I'll look at
+converting them to gpiolib asap. Then we'll need some testers as I don't
+have neither u300 nor ixp4xx systems.
+
+Also, moving u300/ixp4xx to gpiolib will solve the issue for ARM but I
+fear that other architectures may be affected by similar trouble.
+
+Arnaud
