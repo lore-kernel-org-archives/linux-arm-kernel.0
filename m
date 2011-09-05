@@ -1,36 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 05 Sep 2011 14:17:39 +0900
-Subject: [PATCH 0/6] Add device tree support for PL330 dma controller
-	driver
-In-Reply-To: <1314638947.1606.157.camel@vkoul-udesk3>
-References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
-	<1314638947.1606.157.camel@vkoul-udesk3>
-Message-ID: <001a01cc6b8b$21708470$64518d50$%kim@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Sep 2011 08:46:08 +0200
+Subject: [PATCH] mach-integrator: fix VGA base regression
+In-Reply-To: <4E64496E.1090000@gmail.com>
+References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
+	<4E64496E.1090000@gmail.com>
+Message-ID: <CACRpkdYw4WCJ+kBm_FBH=H-vPKBUsb9DFToK0MN4F8t5T8Tc9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul wrote:
-> 
-> On Fri, 2011-08-26 at 14:10 +0530, Thomas Abraham wrote:
-> > This patchset adds device tree support for PL330 driver and uses it
-> > to add device tree support for Samsung platforms, specifically Exynos4.
-> The DMA patches looks good to me. Do you want this to go thru slave-dma
-> tree or somewhere else.
-> I will need acks on 3, 5 and 6th patch to carry them.
-> 
+On Mon, Sep 5, 2011 at 6:00 AM, Rob Herring <robherring2@gmail.com> wrote:
 
-Looks good to me on 3 and 5th patch, I think, 6th patch is needed to update, please refer to my comments on there.
+>> @@ -154,6 +155,7 @@ static struct map_desc ap_io_desc[] __initdata = {
+>> ?static void __init ap_map_io(void)
+>> ?{
+>> ? ? ? iotable_init(ap_io_desc, ARRAY_SIZE(ap_io_desc));
+>> + ? ? vga_base = PCI_MEMORY_VADDR;
+>> ?}
+>> @@ -505,7 +504,6 @@ void __init pci_v3_preinit(void)
+>>
+>> ? ? ? pcibios_min_io = 0x6000;
+>> ? ? ? pcibios_min_mem = 0x00100000;
+>> - ? ? vga_base = PCI_MEMORY_VADDR;
+>>
+>> ? ? ? /*
+>> ? ? ? ?* Hook in our fault handler for PCI errors
+>
+> Should the VGA memory really be accessed before PCI host is initialized?
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+I don' know, I don't know one bit about how PCI works and should
+work, you tell me :-)
 
-As you know, Boojin Kim submitted 8th patch last Friday. So would be nice to me if you could rebase Thomas' patch based on her updated patch set and apply all series into your slave-dma.git samsung_dma branch I think it?s easy because v8 changes are small then I will merge it into my -next to prevent useless conflicts.
+What I know is that without this patch the 3.1 rc does not boot on
+Integrator.
 
-If any problems, please let me know.
+Do you prefer that I revert your commit and wait with this thing
+until we figured out why it breaks the Integrator instead?
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Yours,
+Linus Walleij
