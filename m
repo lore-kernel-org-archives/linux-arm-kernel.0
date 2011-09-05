@@ -1,39 +1,32 @@
 From: Baohua.Song@csr.com (Barry Song)
-Date: Sun, 4 Sep 2011 22:15:18 -0700
-Subject: [PATCH 3/3] ARM: CSR: IRQ: add simple irq_domain so that hw irq can
-	map to Linux
-In-Reply-To: <1315199718-10102-1-git-send-email-Baohua.Song@csr.com>
-References: <1315199718-10102-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1315199718-10102-3-git-send-email-Baohua.Song@csr.com>
+Date: Sun, 4 Sep 2011 22:15:16 -0700
+Subject: [PATCH 1/3] ARM: CSR: add lost Resource Sharing Control(RSC) node in
+	dts
+Message-ID: <1315199718-10102-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-prima2/irq.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/prima2-cb.dts |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
-index c3404cb..d888b8d 100644
---- a/arch/arm/mach-prima2/irq.c
-+++ b/arch/arm/mach-prima2/irq.c
-@@ -13,6 +13,7 @@
- #include <asm/mach/irq.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/irqdomain.h>
- 
- #define SIRFSOC_INT_RISC_MASK0          0x0018
- #define SIRFSOC_INT_RISC_MASK1          0x001C
-@@ -65,6 +66,8 @@ void __init sirfsoc_of_irq_init(void)
- 	if (!sirfsoc_intc_base)
- 		panic("unable to map intc cpu registers\n");
- 
-+	irq_domain_add_simple(np, 0);
+diff --git a/arch/arm/boot/dts/prima2-cb.dts b/arch/arm/boot/dts/prima2-cb.dts
+index 6fecc88..a0a423d 100644
+--- a/arch/arm/boot/dts/prima2-cb.dts
++++ b/arch/arm/boot/dts/prima2-cb.dts
+@@ -67,6 +67,11 @@
+ 				compatible = "sirf,prima2-rstc";
+ 				reg = <0x88010000 0x1000>;
+ 			};
 +
- 	of_node_put(np);
++			rsc-controller at 88020000 {
++				compatible = "sirf,prima2-rsc";
++				reg = <0x88020000 0x1000>;
++			};
+ 		};
  
- 	sirfsoc_irq_init();
+ 		mem-iobg {
 -- 
 1.7.1
 
