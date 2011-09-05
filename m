@@ -1,38 +1,89 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Mon, 05 Sep 2011 08:54:30 +0200
-Subject: [PATCH] arm: ixp4xx, u300: Select ARCH_REQUIRE_GPIOLIB,
-	not GENERIC_GPIO
-In-Reply-To: <1315192383.3092.260.camel@deadeye> (Ben Hutchings's message of
-	"Mon, 05 Sep 2011 04:12:56 +0100")
-References: <1315192383.3092.260.camel@deadeye>
-Message-ID: <87r53v7a3d.fsf@lebrac.rtp-net.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 5 Sep 2011 09:18:48 +0200
+Subject: [PATCH v2] ARM: l2x0: make sure I&D are not locked down on init
+Message-ID: <1315207128-11197-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ben Hutchings <ben@decadent.org.uk> writes:
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Hi,
+Fighting unfixed U-Boots and other beasts that may the cache in
+a locked-down state when starting the kernel, we make sure to
+disable all cache lock-down when initializing the l2x0 so we
+are in a known state.
 
-> The GPIO implementations for these two machines depend on gpiolib,
-> so they must not select GENERIC_GPIO directly.
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Rabin Vincent <rabin.vincent@stericsson.com>
+Cc: Adrian Bunk <adrian.bunk@movial.com>
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Reported-by: Jan Rinze <janrinze@gmail.com>
+Tested-by: Robert Marklund <robert.marklund@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/include/asm/hardware/cache-l2x0.h |    9 +++++++--
+ arch/arm/mm/cache-l2x0.c                   |   21 +++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 2 deletions(-)
 
-They're not calling gpiochip_add afaik so they should really only select
-GENERIC_GPIO.
-
->
-> Signed-off-by: Ben Hutchings <ben@decadent.org.uk>
-> ---
-> This hould fix the build failure seen here:
-> https://buildd.debian.org/status/fetch.php?pkg=linux-2.6&arch=armel&ver=3.1.0%7Erc4-1%7Eexperimental.1&stamp=1315007168
-
-The problem here is that gpio_request_one has been added to the ads7846
-driver but gpio_request_one is not defined in GENERIC_GPIO case (I
-guess that other (arm and non-arm) platforms may hit similar troubles
-with gpio_request_one. One quick fix would be to add a gpio_request_one
-function say in asm-generic/gpio.h. One other fix would be to define
-gpio_request_one and gpio_request_array in each
-machine/platform/... specific header. Don't know what's the best
-solution.
-
-
-Arnaud
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 16bd480..9e2fd18 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -45,8 +45,13 @@
+ #define L2X0_CLEAN_INV_LINE_PA		0x7F0
+ #define L2X0_CLEAN_INV_LINE_IDX		0x7F8
+ #define L2X0_CLEAN_INV_WAY		0x7FC
+-#define L2X0_LOCKDOWN_WAY_D		0x900
+-#define L2X0_LOCKDOWN_WAY_I		0x904
++/*
++ * The lockdown registers repeat 8 times for L310, the L210 has only one
++ * D and one I lockdown register at 0x0900 and 0x0904.
++ */
++#define L2X0_LOCKDOWN_WAY_D_BASE	0x900
++#define L2X0_LOCKDOWN_WAY_I_BASE	0x904
++#define L2X0_LOCKDOWN_STRIDE		0x08
+ #define L2X0_TEST_OPERATION		0xF00
+ #define L2X0_LINE_DATA			0xF10
+ #define L2X0_LINE_TAG			0xF30
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 44c0867..9ecfdb5 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -277,6 +277,25 @@ static void l2x0_disable(void)
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
++static void __init l2x0_unlock(__u32 cache_id)
++{
++	int lockregs;
++	int i;
++
++	if (cache_id == L2X0_CACHE_ID_PART_L310)
++		lockregs = 8;
++	else
++		/* L210 and unknown types */
++		lockregs = 1;
++
++	for (i = 0; i < lockregs; i++) {
++		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE +
++			       i * L2X0_LOCKDOWN_STRIDE);
++		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE +
++			       i * L2X0_LOCKDOWN_STRIDE);
++	}
++}
++
+ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ {
+ 	__u32 aux;
+@@ -328,6 +347,8 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 	 * accessing the below registers will fault.
+ 	 */
+ 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
++		/* Make sure that I&D is not locked down when starting */
++		l2x0_unlock(cache_id);
+ 
+ 		/* l2x0 controller is disabled */
+ 		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
+-- 
+1.7.3.2
