@@ -1,39 +1,36 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Sun, 4 Sep 2011 22:15:17 -0700
-Subject: [PATCH 2/3] ARM: CSR: extend the compatibility of gpio controller to
-	pinmux in dts
-In-Reply-To: <1315199718-10102-1-git-send-email-Baohua.Song@csr.com>
-References: <1315199718-10102-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1315199718-10102-2-git-send-email-Baohua.Song@csr.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 05 Sep 2011 14:17:39 +0900
+Subject: [PATCH 0/6] Add device tree support for PL330 dma controller
+	driver
+In-Reply-To: <1314638947.1606.157.camel@vkoul-udesk3>
+References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
+	<1314638947.1606.157.camel@vkoul-udesk3>
+Message-ID: <001a01cc6b8b$21708470$64518d50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio controller handles the switch of gpio and pinmux. And drivers/pinctrl/pinmux-sirf.c
-will contain both gpio and pinmux.
+Vinod Koul wrote:
+> 
+> On Fri, 2011-08-26 at 14:10 +0530, Thomas Abraham wrote:
+> > This patchset adds device tree support for PL330 driver and uses it
+> > to add device tree support for Samsung platforms, specifically Exynos4.
+> The DMA patches looks good to me. Do you want this to go thru slave-dma
+> tree or somewhere else.
+> I will need acks on 3, 5 and 6th patch to carry them.
+> 
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/boot/dts/prima2-cb.dts |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Looks good to me on 3 and 5th patch, I think, 6th patch is needed to update, please refer to my comments on there.
 
-diff --git a/arch/arm/boot/dts/prima2-cb.dts b/arch/arm/boot/dts/prima2-cb.dts
-index a0a423d..af86931 100644
---- a/arch/arm/boot/dts/prima2-cb.dts
-+++ b/arch/arm/boot/dts/prima2-cb.dts
-@@ -279,7 +279,7 @@
- 			gpio: gpio-controller at b0120000 {
- 				#gpio-cells = <2>;
- 				#interrupt-cells = <2>;
--				compatible = "sirf,prima2-gpio";
-+				compatible = "sirf,prima2-gpio-pinmux";
- 				reg = <0xb0120000 0x10000>;
- 				gpio-controller;
- 				interrupt-controller;
--- 
-1.7.1
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
+As you know, Boojin Kim submitted 8th patch last Friday. So would be nice to me if you could rebase Thomas' patch based on her updated patch set and apply all series into your slave-dma.git samsung_dma branch I think it?s easy because v8 changes are small then I will merge it into my -next to prevent useless conflicts.
 
+If any problems, please let me know.
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
