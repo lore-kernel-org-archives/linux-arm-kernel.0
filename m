@@ -1,58 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 05 Sep 2011 10:30:44 -0500
-Subject: [PATCH] mach-integrator: fix VGA base regression
-In-Reply-To: <CACRpkdYw4WCJ+kBm_FBH=H-vPKBUsb9DFToK0MN4F8t5T8Tc9g@mail.gmail.com>
-References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
-	<4E64496E.1090000@gmail.com>
-	<CACRpkdYw4WCJ+kBm_FBH=H-vPKBUsb9DFToK0MN4F8t5T8Tc9g@mail.gmail.com>
-Message-ID: <4E64EB24.7010800@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Sep 2011 08:43:36 -0700
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <alpine.LFD.2.00.1106131640370.2142@xanadu.home>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<BANLkTik_hH9tZ5MMbOYzhZwLFTFQyJyfRg@mail.gmail.com>
+	<alpine.LFD.2.00.1106131640370.2142@xanadu.home>
+Message-ID: <20110905154335.GH1903@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2011 01:46 AM, Linus Walleij wrote:
-> On Mon, Sep 5, 2011 at 6:00 AM, Rob Herring <robherring2@gmail.com> wrote:
+* Nicolas Pitre <nicolas.pitre@linaro.org> [110613 13:41]:
+> On Sun, 12 Jun 2011, Grant Likely wrote:
 > 
->>> @@ -154,6 +155,7 @@ static struct map_desc ap_io_desc[] __initdata = {
->>>  static void __init ap_map_io(void)
->>>  {
->>>       iotable_init(ap_io_desc, ARRAY_SIZE(ap_io_desc));
->>> +     vga_base = PCI_MEMORY_VADDR;
->>>  }
->>> @@ -505,7 +504,6 @@ void __init pci_v3_preinit(void)
->>>
->>>       pcibios_min_io = 0x6000;
->>>       pcibios_min_mem = 0x00100000;
->>> -     vga_base = PCI_MEMORY_VADDR;
->>>
->>>       /*
->>>        * Hook in our fault handler for PCI errors
->>
->> Should the VGA memory really be accessed before PCI host is initialized?
+> > On Sun, Jun 12, 2011 at 12:06 AM, Nicolas Pitre
+> > <nicolas.pitre@linaro.org> wrote:
+> > > This is a resend of those patches with fixups after the latest changes
+> > > in mainline.
+> > >
+> > > [PATCH 1/3] ARM: zImage: ensure it is always a multiple of 64 bits in size
+> > > This one is new and trivial.
+> > >
+> > > [PATCH 2/3] ARM: zImage: Allow the appending of a device tree binary
+> > > Mostly John Bonesio's version with some adjustments and cleanups.
+> > >
+> > > [PATCH 3/3] ARM: zImage: make sure appended DTB doesn't get overwritten by kernel .bss
+> > > New, simpler alternative to Tony Lindgren's version.
+> > 
+> > I've gone ahead and added the series to devicetree/test for anyone who
+> > want to play with it.
 > 
-> I don' know, I don't know one bit about how PCI works and should
-> work, you tell me :-)
+> I've published those patches with all the latest fixes and ACKs here:
 > 
+> 	git://git.linaro.org/people/nico/linux.git zImage_DTB_append
 
-I guess it's normal (from init/main.c):
+Ping, any news on getting these merged?
 
-        /*
-         * HACK ALERT! This is early. We're enabling the console before
-         * we've done PCI setups etc, and console_init() must be aware of
-         * this. But we do want output early, in case something goes wrong.
-         */
-
-> What I know is that without this patch the 3.1 rc does not boot on
-> Integrator.
-> 
-> Do you prefer that I revert your commit and wait with this thing
-> until we figured out why it breaks the Integrator instead?
-
-Well, it's really no difference with your patch or reverting mine in
-terms of init order. I'd rather not have to add back hardware.h as a
-required mach header.
-
-So FWIW:
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-Rob
+Tony
