@@ -1,58 +1,90 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 5 Sep 2011 15:43:08 +0530
-Subject: [PATCH 2/2] arm: samsung: remove sdhci default configuration
-	setup platform helper
-In-Reply-To: <001801cc6b8a$e953bda0$bbfb38e0$%kim@samsung.com>
-References: <1314976702-19284-1-git-send-email-thomas.abraham@linaro.org>
-	<1314976702-19284-2-git-send-email-thomas.abraham@linaro.org>
-	<1314976702-19284-3-git-send-email-thomas.abraham@linaro.org>
-	<001801cc6b8a$e953bda0$bbfb38e0$%kim@samsung.com>
-Message-ID: <CAJuYYwT1tW0XEiwWWpX08OorZw2q2Wce2r0fUvxLmWC8uq6uhQ@mail.gmail.com>
+Date: Mon, 5 Sep 2011 15:44:36 +0530
+Subject: [PATCH v2 6/6] ARM: EXYNOS4: Limit usage of pl330 device instance
+	to non-dt build
+In-Reply-To: <001901cc6b8b$0f450730$2dcf1590$%kim@samsung.com>
+References: <1314867882-11755-1-git-send-email-thomas.abraham@linaro.org>
+	<1314867882-11755-2-git-send-email-thomas.abraham@linaro.org>
+	<1314867882-11755-3-git-send-email-thomas.abraham@linaro.org>
+	<1314867882-11755-4-git-send-email-thomas.abraham@linaro.org>
+	<1314867882-11755-5-git-send-email-thomas.abraham@linaro.org>
+	<1314867882-11755-6-git-send-email-thomas.abraham@linaro.org>
+	<1314867882-11755-7-git-send-email-thomas.abraham@linaro.org>
+	<001901cc6b8b$0f450730$2dcf1590$%kim@samsung.com>
+Message-ID: <CAJuYYwQ5eC-OXQv9t1hw6WOs1oJfYQLvzy8nwe5JZS=pBwy5ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Mr. Kim,
 
-On 5 September 2011 10:46, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Thomas Abraham wrote:
+On 5 September 2011 10:47, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> -----Original Message-----
+>> From: Thomas Abraham [mailto:thomas.abraham at linaro.org]
+>> Sent: Thursday, September 01, 2011 6:05 PM
+>> To: devicetree-discuss at lists.ozlabs.org
+>> Cc: grant.likely at secretlab.ca; linux-arm-kernel at lists.infradead.org;
+> linux-samsung-
+>> soc at vger.kernel.org; kgene.kim at samsung.com; robherring2 at gmail.com;
+>> vinod.koul at intel.com; patches at linaro.org; jassisinghbrar at gmail.com;
+>> boojin.kim at samsung.com
+>> Subject: [PATCH v2 6/6] ARM: EXYNOS4: Limit usage of pl330 device instance
+> to
+>> non-dt build
 >>
->> The sdhci platform helper function that sets up the default controller
->> configuration is removed for all Samsung platforms since such default
->> controller configuration can be handled by the driver.
+>> The pl330 device instances and associated platform data is required only
+>> for non-device-tree builds. With device tree, all of this information is
+>> obtained from the device tree.
 >>
->> Cc: Ben Dooks <ben-linux@fluff.org>
 >> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 >> ---
->> ?arch/arm/mach-exynos4/setup-sdhci.c ? ? ? ?| ? 47 -----------------------
->> ?arch/arm/mach-s3c2416/setup-sdhci.c ? ? ? ?| ? 37 ------------------
->> ?arch/arm/mach-s3c64xx/setup-sdhci.c ? ? ? ?| ? 48 -----------------------
->> ?arch/arm/mach-s5pc100/setup-sdhci.c ? ? ? ?| ? 42 --------------------
->> ?arch/arm/mach-s5pv210/setup-sdhci.c ? ? ? ?| ? 41 --------------------
->> ?arch/arm/plat-samsung/dev-hsmmc.c ? ? ? ? ?| ? ?2 -
->> ?arch/arm/plat-samsung/dev-hsmmc1.c ? ? ? ? | ? ?2 -
->> ?arch/arm/plat-samsung/dev-hsmmc2.c ? ? ? ? | ? ?2 -
->> ?arch/arm/plat-samsung/dev-hsmmc3.c ? ? ? ? | ? ?2 -
->> ?arch/arm/plat-samsung/include/plat/sdhci.h | ? 57
-> ----------------------------
->> ?10 files changed, 0 insertions(+), 280 deletions(-)
+>> ?arch/arm/mach-exynos4/Kconfig ?| ? ?7 +++++++
+>> ?arch/arm/mach-exynos4/Makefile | ? ?3 ++-
+>> ?2 files changed, 9 insertions(+), 1 deletions(-)
 >>
-
-[...]
-
+>> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+>> index d4d401c..3edbf37 100644
+>> --- a/arch/arm/mach-exynos4/Kconfig
+>> +++ b/arch/arm/mach-exynos4/Kconfig
+>> @@ -21,6 +21,13 @@ config EXYNOS4_MCT
+>> ? ? ? help
+>> ? ? ? ? Use MCT (Multi Core Timer) as kernel timers
+>>
+>> +config EXYNOS4_DEV_DMA
+>> + ? ? bool
+>> + ? ? default y if !OF
+>> + ? ? help
+>> + ? ? ? Compile in amba device definitions for DMA controller if OF
+>> + ? ? ? is not enabled.
+>> +
+>> ?config EXYNOS4_DEV_AHCI
+>> ? ? ? bool
+>> ? ? ? help
+>> diff --git a/arch/arm/mach-exynos4/Makefile
+> b/arch/arm/mach-exynos4/Makefile
+>> index d2bf5bf..a2f33dc 100644
+>> --- a/arch/arm/mach-exynos4/Makefile
+>> +++ b/arch/arm/mach-exynos4/Makefile
+>> @@ -13,7 +13,8 @@ obj- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?:=
+>> ?# Core support for EXYNOS4 system
+>>
+>> ?obj-$(CONFIG_CPU_EXYNOS4210) += cpu.o init.o clock.o irq-combiner.o
+>> -obj-$(CONFIG_CPU_EXYNOS4210) += setup-i2c0.o irq-eint.o dma.o
+>> pmu.o
+>> +obj-$(CONFIG_CPU_EXYNOS4210) += setup-i2c0.o irq-eint.o pmu.o
+>> +obj-$(CONFIG_EXYNOS4_DEV_DMA) ? ? ? ?+= dma.o
 >
-> Hi Thomas,
+> Do we need _really_ EXYNOS4_DEV_DMA here?
+> How about to use like following?
 >
-> The arch/arm/plat-samsung/dev-hsmmcX.c files have been changed due to commit
-> 61e62fcb ("ARM: SAMSUNG: Consolidate common function to set SDHCI plat
-> data"). So if possible please make your patch based on latest my for-next :)
+> +obj-$(!CONFIG_OF) ? ? ? ? ? ? ?+= dma.o
 
-Sure. I will base these patches on your for-next, test and resubmit.
+Thanks for the suggestion. I will try it and resubmit the patch.
 
 Thanks,
 Thomas.
 
 >
-> If any problems, please let me know.
+> If any problems, let me know.
 >
 > Thanks.
 >
@@ -61,5 +93,12 @@ Thomas.
 > --
 > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 > SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
+>> ?obj-$(CONFIG_PM) ? ? ? ? ? ? += pm.o sleep.o
+>> ?obj-$(CONFIG_CPU_IDLE) ? ? ? ? ? ? ? += cpuidle.o
+>>
+>> --
+>> 1.6.6.rc2
 >
 >
