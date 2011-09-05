@@ -1,61 +1,52 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 05 Sep 2011 19:28:02 +0900
-Subject: [PATCH] ARM: S3C64XX: Add devices for Kilchoman audio module on
-	Cragganmore
-In-Reply-To: <1314988643-24557-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1314988643-24557-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <002901cc6bb6$7dca6da0$795f48e0$%kim@samsung.com>
+Date: Mon, 05 Sep 2011 19:28:06 +0900
+Subject: [PATCH] ARM: S3C64XX: Register Lowland audio device on Cragganmore
+In-Reply-To: <1314991378-28351-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1314991378-28351-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <002a01cc6bb6$802cc7a0$808656e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Mark Brown wrote:
 > 
-> The Kilchoman audio module carries a WM5100 audio CODEC and WM9081
-> speaker
-> amplifier.
+> The Lowland system is a combination of the Cragganmore CPU module and the
+> Tomatin and Kilchomin audio modules on Glenfarclas.
 > 
 > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  arch/arm/mach-s3c64xx/mach-crag6410-module.c |   11 ++++++++++-
->  1 files changed, 10 insertions(+), 1 deletions(-)
+>  arch/arm/mach-s3c64xx/mach-crag6410.c |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-
-> s3c64xx/mach-crag6410-module.c
-> index c0fe002..7c5ddb6 100644
-> --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-> @@ -117,6 +117,14 @@ static const struct i2c_board_info wm1254_devs[] = {
->  	  .platform_data = &wm9081_pdata, },
+> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
+> s3c64xx/mach-crag6410.c
+> index 174dd0c..917acf7 100644
+> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> @@ -284,6 +284,11 @@ static struct platform_device speyside_device = {
+>  	.id		= -1,
 >  };
 > 
-> +static const struct i2c_board_info wm1255_devs[] = {
-> +	{ I2C_BOARD_INFO("wm5100", 0x1a),
-> +	  .irq = GLENFARCLAS_PMIC_IRQ_BASE + WM831X_IRQ_GPIO_2,
-> +	},
-> +	{ I2C_BOARD_INFO("wm9081", 0x6c),
-> +	  .platform_data = &wm9081_pdata, },
+> +static struct platform_device lowland_device = {
+> +	.name		= "lowland",
+> +	.id		= -1,
 > +};
 > +
->  static const struct i2c_board_info wm1259_devs[] = {
->  	{ I2C_BOARD_INFO("wm8962", 0x1a),
->  	  .platform_data = &wm8962_pdata,
-> @@ -145,7 +153,8 @@ static __devinitdata const struct {
->  	  .i2c_devs = wm1254_devs, .num_i2c_devs =
-> ARRAY_SIZE(wm1254_devs) },
->  	{ .id = 0x3a, .name = "1259-EV1 Tobermory",
->  	  .i2c_devs = wm1259_devs, .num_i2c_devs =
-> ARRAY_SIZE(wm1259_devs) },
-> -	{ .id = 0x3b, .name = "1255-EV1 Kilchoman" },
-> +	{ .id = 0x3b, .name = "1255-EV1 Kilchoman",
-> +	  .i2c_devs = wm1255_devs, .num_i2c_devs =
-> ARRAY_SIZE(wm1255_devs) },
->  	{ .id = 0x3c, .name = "1273-EV1 Longmorn" },
+>  static struct platform_device speyside_wm8962_device = {
+>  	.name		= "speyside-wm8962",
+>  	.id		= -1,
+> @@ -341,6 +346,7 @@ static struct platform_device *crag6410_devices[]
+> __initdata = {
+>  	&crag6410_backlight_device,
+>  	&speyside_device,
+>  	&speyside_wm8962_device,
+> +	&lowland_device,
+>  	&wallvdd_device,
 >  };
 > 
 > --
 > 1.7.5.4
 
-Applied.
+OK, Applied.
 Thanks.
 
 Best regards,
