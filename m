@@ -1,48 +1,45 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 05 Sep 2011 19:20:40 +0900
-Subject: [PATCH 2/2] ARM: SAMSUNG: Fix mask for S3C64xx CPU IDs
-In-Reply-To: <1314786805-15684-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1314786805-15684-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1314786805-15684-2-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <002601cc6bb5$76ae78a0$640b69e0$%kim@samsung.com>
+Date: Mon, 05 Sep 2011 19:22:02 +0900
+Subject: [PATCH] ARM: S5P64X0: Fix mask value for S5P64X0 CPU IDs
+In-Reply-To: <1314972141-14387-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1314972141-14387-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <002701cc6bb5$a7615c10$f6241430$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Ajay Kumar wrote:
 > 
-> The difference in CPU ID between S3C6400 and S3C6410 is a single bit and
-> that bit wasn't included in the mask causing the S3C6410 to be misdetected
-> as a S3C6400.
+> The current value for S5P64XX_CPU_MASK does not include the necessary
+> bits, which causes detection failure.
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 > ---
 >  arch/arm/plat-samsung/include/plat/cpu.h |    2 +-
 >  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
 > diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-
 > samsung/include/plat/cpu.h
-> index aa1f69b..4d36130 100644
+> index aa1f69b..897d161 100644
 > --- a/arch/arm/plat-samsung/include/plat/cpu.h
 > +++ b/arch/arm/plat-samsung/include/plat/cpu.h
-> @@ -26,7 +26,7 @@ extern unsigned long samsung_cpu_id;
->  #define S3C6400_CPU_ID		0x36400000
->  #define S3C6410_CPU_ID		0x36410000
->  #define S3C64XX_CPU_ID		(S3C6400_CPU_ID &
-> S3C6410_CPU_ID)
-> -#define S3C64XX_CPU_MASK	0x1FF40000
-> +#define S3C64XX_CPU_MASK	0x1FFF0000
+> @@ -30,7 +30,7 @@ extern unsigned long samsung_cpu_id;
 > 
 >  #define S5P6440_CPU_ID		0x56440000
 >  #define S5P6450_CPU_ID		0x36450000
+> -#define S5P64XX_CPU_MASK	0x1FF40000
+> +#define S5P64XX_CPU_MASK	0x7FFF0000
+> 
+>  #define S5PC100_CPU_ID		0x43100000
+>  #define S5PC100_CPU_MASK	0xFFFFF000
 > --
-> 1.7.5.4
+> 1.7.2.3
 
-Oops, I don't know how it has wrong value :(
-I think, in this case, it's better 0xFFFFF000 rather than 0x1FFF0000.
+Yes, you're right.
+But in this case, 0xFFFFF000 is better than 0x7FFF0000.
 
-If any problems, please let me know.
+If any problems with above value, please let me know.
 
-Will apply, thanks :)
+Will apply, thanks.
 
 Best regards,
 Kgene.
