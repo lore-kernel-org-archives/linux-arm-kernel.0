@@ -1,81 +1,30 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Sep 2011 17:05:11 +0200
-Subject: [PATCH 2/7] arm/dts: OMAP3: Add mpu and iva nodes
-In-Reply-To: <1377915.IaVE5xAurc@wuerfel>
-References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
-	<1314897912-18178-3-git-send-email-b-cousson@ti.com>
-	<1377915.IaVE5xAurc@wuerfel>
-Message-ID: <4E64E527.4040409@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 Sep 2011 17:06:46 +0200
+Subject: [PATCH 1/3 v3] ARM Realview PCIX map include file changes
+In-Reply-To: <201109051635.59927.arnd@arndb.de>
+References: <20110822130507.23830.26191.stgit@e102602-lin.cambridge.arm.com>
+	<20110822130942.23830.4767.stgit@e102602-lin.cambridge.arm.com>
+	<201109051635.59927.arnd@arndb.de>
+Message-ID: <201109051706.46409.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Monday 05 September 2011, Arnd Bergmann wrote:
+> > diff --git a/arch/arm/mach-realview/include/mach/io.h b/arch/arm/mach-realview/include/mach/io.h
+> > index f05bcdf..aa97d18 100644
+> > --- a/arch/arm/mach-realview/include/mach/io.h
+> > +++ b/arch/arm/mach-realview/include/mach/io.h
+> > @@ -20,9 +20,25 @@
+> >  #ifndef __ASM_ARM_ARCH_IO_H
+> >  #define __ASM_ARM_ARCH_IO_H
+> >  
+> > +#include <asm/mach-types.h>
+> > +#include <mach/hardware.h>
+> > +
+> >  #define IO_SPACE_LIMIT 0xffffffff
+> 
+> The IO_SPACE_LIMIT should match the REALVIEW_PB_PCI_IO_BASE above.
+> 
+This obviously should be REALVIEW_PB_PCI_IO_SIZE.
 
-On 9/1/2011 8:17 PM, Arnd Bergmann wrote:
-> On Thursday 01 September 2011 19:25:07 Benoit Cousson wrote:
->>
->>          /*
->> +        * XXX: The cpus node is mandatory, but since the CPUs are as well part
->> +        * of the mpu subsystem below, it is not clear where the information
->> +        * should be. Maybe here with a phandle inside the mpu?
->> +        */
->> +       cpus {
->> +       };
->> +
->> +       /*
->>           * The soc node represents the soc top level view. It is uses for IPs
->>           * that are not memory mapped in the MPU view or for the MPU itself.
->>           */
->>          soc {
->>                  compatible = "ti,omap-infra";
->> +               mpu {
->> +                       compatible = "ti,omap3-mpu";
->> +                       hwmods = "mpu";
->> +                       cpu at 0 {
->> +                               compatible = "arm,cortex-a8";
->> +                       };
->> +               };
->> +
->
-> I would always put the cpu nodes in the top-level, even if that's
-> a slight misrepresentation of the truth. The point is basically
-> that CPU nodes are special (you cannot have device drivers for them)
-> and that the device tree is basically laid out from the perspective
-> of the CPU, which may be different from the perspective that a
-> hardware designer has.
-
-Yeah, I saw that in the "cpus" node documentation. My point here is that 
-I do need to represent the MPU subsystem that will contain the cpus. And 
-thus the Cortex is inside the MPU subsystem.
-
-I can potentially keep the CPUs inside the cpus node, and just represent 
-the mpu node inside the soc, with potentially some phandle to the real 
-cpu nodes.
-
-Something like that:
-
-cpus {
-	cpu0: cpu at 0 {
-			compatible = "arm,cortex-a8";
-	};
-};
-
-[...]
-
-soc {
-	compatible = "ti,omap-infra";
-	mpu {
-		compatible = "ti,omap3-mpu";
-		hwmods = "mpu";
-		cpu at 0 {
-			phandle = <&cpu0>;
-			[...]
-		};
-	};
-};
-
-
-Does that look better?
-
-Thanks,
-Benoit
+	Arnd
