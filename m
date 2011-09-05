@@ -1,45 +1,62 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 05 Sep 2011 19:22:02 +0900
-Subject: [PATCH] ARM: S5P64X0: Fix mask value for S5P64X0 CPU IDs
-In-Reply-To: <1314972141-14387-1-git-send-email-ajaykumar.rs@samsung.com>
-References: <1314972141-14387-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <002701cc6bb5$a7615c10$f6241430$%kim@samsung.com>
+Date: Mon, 05 Sep 2011 19:28:02 +0900
+Subject: [PATCH] ARM: S3C64XX: Add devices for Kilchoman audio module on
+	Cragganmore
+In-Reply-To: <1314988643-24557-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1314988643-24557-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <002901cc6bb6$7dca6da0$795f48e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ajay Kumar wrote:
+Mark Brown wrote:
 > 
-> The current value for S5P64XX_CPU_MASK does not include the necessary
-> bits, which causes detection failure.
+> The Kilchoman audio module carries a WM5100 audio CODEC and WM9081
+> speaker
+> amplifier.
 > 
-> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  arch/arm/plat-samsung/include/plat/cpu.h |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/mach-s3c64xx/mach-crag6410-module.c |   11 ++++++++++-
+>  1 files changed, 10 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-
-> samsung/include/plat/cpu.h
-> index aa1f69b..897d161 100644
-> --- a/arch/arm/plat-samsung/include/plat/cpu.h
-> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
-> @@ -30,7 +30,7 @@ extern unsigned long samsung_cpu_id;
+> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-
+> s3c64xx/mach-crag6410-module.c
+> index c0fe002..7c5ddb6 100644
+> --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+> +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+> @@ -117,6 +117,14 @@ static const struct i2c_board_info wm1254_devs[] = {
+>  	  .platform_data = &wm9081_pdata, },
+>  };
 > 
->  #define S5P6440_CPU_ID		0x56440000
->  #define S5P6450_CPU_ID		0x36450000
-> -#define S5P64XX_CPU_MASK	0x1FF40000
-> +#define S5P64XX_CPU_MASK	0x7FFF0000
+> +static const struct i2c_board_info wm1255_devs[] = {
+> +	{ I2C_BOARD_INFO("wm5100", 0x1a),
+> +	  .irq = GLENFARCLAS_PMIC_IRQ_BASE + WM831X_IRQ_GPIO_2,
+> +	},
+> +	{ I2C_BOARD_INFO("wm9081", 0x6c),
+> +	  .platform_data = &wm9081_pdata, },
+> +};
+> +
+>  static const struct i2c_board_info wm1259_devs[] = {
+>  	{ I2C_BOARD_INFO("wm8962", 0x1a),
+>  	  .platform_data = &wm8962_pdata,
+> @@ -145,7 +153,8 @@ static __devinitdata const struct {
+>  	  .i2c_devs = wm1254_devs, .num_i2c_devs =
+> ARRAY_SIZE(wm1254_devs) },
+>  	{ .id = 0x3a, .name = "1259-EV1 Tobermory",
+>  	  .i2c_devs = wm1259_devs, .num_i2c_devs =
+> ARRAY_SIZE(wm1259_devs) },
+> -	{ .id = 0x3b, .name = "1255-EV1 Kilchoman" },
+> +	{ .id = 0x3b, .name = "1255-EV1 Kilchoman",
+> +	  .i2c_devs = wm1255_devs, .num_i2c_devs =
+> ARRAY_SIZE(wm1255_devs) },
+>  	{ .id = 0x3c, .name = "1273-EV1 Longmorn" },
+>  };
 > 
->  #define S5PC100_CPU_ID		0x43100000
->  #define S5PC100_CPU_MASK	0xFFFFF000
 > --
-> 1.7.2.3
+> 1.7.5.4
 
-Yes, you're right.
-But in this case, 0xFFFFF000 is better than 0x7FFF0000.
-
-If any problems with above value, please let me know.
-
-Will apply, thanks.
+Applied.
+Thanks.
 
 Best regards,
 Kgene.
