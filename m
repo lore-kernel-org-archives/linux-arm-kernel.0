@@ -1,39 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 5 Sep 2011 14:41:30 +0200
-Subject: [PATCH] arm: ixp4xx, u300: Select ARCH_REQUIRE_GPIOLIB,
-	not GENERIC_GPIO
-In-Reply-To: <1315192383.3092.260.camel@deadeye>
-References: <1315192383.3092.260.camel@deadeye>
-Message-ID: <CACRpkdaACXxzhQ4m3+4tzTGrXubFF6jPkO9uG0kqVzvm+ORYwQ@mail.gmail.com>
+Date: Mon, 5 Sep 2011 14:45:00 +0200
+Subject: [PATCH] spi: Fix builderror in spi-pl022.c
+In-Reply-To: <1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
+References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
+	<1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
+Message-ID: <CACRpkdb=Bt2j4iMV5NJHmPG8wDi6__CRD6kn_KOoaQ1R6uwrWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 5, 2011 at 5:12 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
+On Sun, Aug 28, 2011 at 9:26 PM, Peter Huewe <peterhuewe@gmx.de> wrote:
 
-> @@ -830,7 +830,7 @@ config ARCH_U300
-> ? ? ? ?select GENERIC_CLOCKEVENTS
-> ? ? ? ?select CLKDEV_LOOKUP
-> ? ? ? ?select HAVE_MACH_CLKDEV
-> - ? ? ? select GENERIC_GPIO
-> + ? ? ? select ARCH_REQUIRE_GPIOLIB
-> ? ? ? ?help
-> ? ? ? ? ?Support for ST-Ericsson U300 series mobile platforms.
+> This patch fixes a build error, introduced by commit (67fc8b9f, "PM: add
+> runtime PM support to core Primecell driver") which unfortunately was a little
+> bit incomplete and did contain a typo (11 instead of 22).
+> I'm not sure how this patch could have been tested back then, if it
+> doesn't even compile ;)
 
-Please don't do that, it really is no gpiolib implementation.
-
-In the archives you can find patches I already submitted switching
-the U300 GPIO over to use gpiolib.
-
-However it fell to the ground due to the shortage of a mechanism
-in gpiolib to configure pin bias. I could try to hack around it but
-it would still be a hack :-(
-
-I sent several patches trying to adress that issue, none have been
-accepted.
-
-So instead I venture into inventing the pin control subsystem which
-is intended to handle complex controllers like these. It is at
-version 7 right now.
+Grant can you please apply this patch? Right now linux-next is
+breaking because of this missing patch...
 
 Thanks,
 Linus Walleij
