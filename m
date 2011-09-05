@@ -1,163 +1,35 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Mon,  5 Sep 2011 14:49:51 +0200
-Subject: [RFC/PATCH] ARM: ixp4xx gpiolib support
-In-Reply-To: <20110905104133.GH6619@n2100.arm.linux.org.uk>
-References: <20110905104133.GH6619@n2100.arm.linux.org.uk>
-Message-ID: <1315226991-3835-1-git-send-email-kaloz@openwrt.org>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Mon, 05 Sep 2011 18:44:52 +0530
+Subject: [PATCH 0/6] Add device tree support for PL330 dma controller
+	driver
+In-Reply-To: <CAJuYYwQCdWjEzAeO-Gm2GTKO3_ocSOx8sZeBQP-7Y=GbHf=5vQ@mail.gmail.com>
+References: <1314348014-2481-1-git-send-email-thomas.abraham@linaro.org>
+	<1314638947.1606.157.camel@vkoul-udesk3>
+	<CAJuYYwQCdWjEzAeO-Gm2GTKO3_ocSOx8sZeBQP-7Y=GbHf=5vQ@mail.gmail.com>
+Message-ID: <1315228492.26251.76.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds gpiolib support for the IXP4xx platform
+On Tue, 2011-08-30 at 17:58 +0530, Thomas Abraham wrote:
+> Hi Vinod,
+> 
+> On 29 August 2011 22:59, Vinod Koul <vinod.koul@linux.intel.com> wrote:
+> > On Fri, 2011-08-26 at 14:10 +0530, Thomas Abraham wrote:
+> >> This patchset adds device tree support for PL330 driver and uses it
+> >> to add device tree support for Samsung platforms, specifically Exynos4.
+> > The DMA patches looks good to me. Do you want this to go thru slave-dma
+> > tree or somewhere else.
+> > I will need acks on 3, 5 and 6th patch to carry them.
+> 
+> There are couple of changes required in patch 4/6 of this series. I
+> will do that and resubmit.
+> 
+> Since these patches are based on Boojin's pl330 driver update patches,
+> it would be easier to take the same route which Boojin's patches will
+> take. I will try to get acks' for the patches that you have listed.
+> 
+And I think these might need to be rebased based on Boojin's latest
+version
 
-Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
----
- arch/arm/Kconfig                         |    2 +-
- arch/arm/mach-ixp4xx/common.c            |   39 +++++++++++++++++++++++++
- arch/arm/mach-ixp4xx/include/mach/gpio.h |   46 ++++++++++--------------------
- 3 files changed, 55 insertions(+), 32 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3269576..e793a75 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -481,7 +481,7 @@ config ARCH_IXP4XX
- 	depends on MMU
- 	select CLKSRC_MMIO
- 	select CPU_XSCALE
--	select GENERIC_GPIO
-+	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_SCHED_CLOCK
- 	select MIGHT_HAVE_PCI
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 0777257..7603456 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -36,6 +36,7 @@
- #include <asm/page.h>
- #include <asm/irq.h>
- #include <asm/sched_clock.h>
-+#include <asm/gpio.h>
- 
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
-@@ -375,12 +376,50 @@ static struct platform_device *ixp46x_devices[] __initdata = {
- unsigned long ixp4xx_exp_bus_size;
- EXPORT_SYMBOL(ixp4xx_exp_bus_size);
- 
-+static int ixp4xx_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
-+{
-+	gpio_line_config(gpio, IXP4XX_GPIO_IN);
-+	return 0;
-+}
-+
-+static int ixp4xx_gpio_direction_output(struct gpio_chip *chip, unsigned gpio, int level)
-+{
-+	gpio_line_set(gpio, level);
-+	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
-+	return 0;
-+}
-+
-+static int ixp4xx_gpio_get_value(struct gpio_chip *chip, unsigned gpio)
-+{
-+	int value;
-+
-+	gpio_line_get(gpio, &value);
-+	return value;
-+}
-+
-+static void ixp4xx_gpio_set_value(struct gpio_chip *chip, unsigned gpio, int value)
-+{
-+	gpio_line_set(gpio, value);
-+}
-+
-+static struct gpio_chip ixp4xx_gpio_chip = {
-+	.label			= "IXP4XX_GPIO_CHIP",
-+	.direction_input	= ixp4xx_gpio_direction_input,
-+	.direction_output	= ixp4xx_gpio_direction_output,
-+	.get			= ixp4xx_gpio_get_value,
-+	.set			= ixp4xx_gpio_set_value,
-+	.base			= 0,
-+	.ngpio			= 16,
-+};
-+
- void __init ixp4xx_sys_init(void)
- {
- 	ixp4xx_exp_bus_size = SZ_16M;
- 
- 	platform_add_devices(ixp4xx_devices, ARRAY_SIZE(ixp4xx_devices));
- 
-+	gpiochip_add(&ixp4xx_gpio_chip);
-+
- 	if (cpu_is_ixp46x()) {
- 		int region;
- 
-diff --git a/arch/arm/mach-ixp4xx/include/mach/gpio.h b/arch/arm/mach-ixp4xx/include/mach/gpio.h
-index a5f87de..86f3596 100644
---- a/arch/arm/mach-ixp4xx/include/mach/gpio.h
-+++ b/arch/arm/mach-ixp4xx/include/mach/gpio.h
-@@ -27,47 +27,31 @@
- 
- #include <linux/kernel.h>
- #include <mach/hardware.h>
-+#include <asm-generic/gpio.h>			/* cansleep wrappers */
- 
--static inline int gpio_request(unsigned gpio, const char *label)
--{
--	return 0;
--}
--
--static inline void gpio_free(unsigned gpio)
--{
--	might_sleep();
--
--	return;
--}
--
--static inline int gpio_direction_input(unsigned gpio)
--{
--	gpio_line_config(gpio, IXP4XX_GPIO_IN);
--	return 0;
--}
--
--static inline int gpio_direction_output(unsigned gpio, int level)
--{
--	gpio_line_set(gpio, level);
--	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
--	return 0;
--}
-+#define NR_BUILTIN_GPIO 16
- 
- static inline int gpio_get_value(unsigned gpio)
- {
--	int value;
--
--	gpio_line_get(gpio, &value);
--
--	return value;
-+	if (gpio < NR_BUILTIN_GPIO)
-+	{
-+		int value;
-+		gpio_line_get(gpio, &value);
-+		return value;
-+	}
-+	else
-+		return __gpio_get_value(gpio);
- }
- 
- static inline void gpio_set_value(unsigned gpio, int value)
- {
--	gpio_line_set(gpio, value);
-+	if (gpio < NR_BUILTIN_GPIO)
-+		gpio_line_set(gpio, value);
-+	else
-+		__gpio_set_value(gpio, value);
- }
- 
--#include <asm-generic/gpio.h>			/* cansleep wrappers */
-+#define gpio_cansleep __gpio_cansleep
- 
- extern int gpio_to_irq(int gpio);
- extern int irq_to_gpio(unsigned int irq);
 -- 
-1.7.1
+~Vinod
