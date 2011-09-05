@@ -1,52 +1,38 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Mon, 5 Sep 2011 12:00:53 +0200
-Subject: [RFC 6/7] iommu/core: add fault reporting
-In-Reply-To: <1314984756-4400-7-git-send-email-ohad@wizery.com>
-References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-	<1314984756-4400-7-git-send-email-ohad@wizery.com>
-Message-ID: <20110905100053.GP16691@amd.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 05 Sep 2011 14:08:12 +0400
+Subject: [PATCH 22/25] OMAP4: PM: Add power domain statistics support
+In-Reply-To: <1315144466-9395-23-git-send-email-santosh.shilimkar@ti.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-23-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <4E649F8C.4090800@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 02, 2011 at 01:32:35PM -0400, Ohad Ben-Cohen wrote:
-> -struct iommu_domain *iommu_domain_alloc(void)
-> +/**
-> + * iommu_domain_alloc() - allocate and initialize a new iommu domain
-> + * @handler: an optional pointer to a fault handler, or NULL if not needed
-> + *
-> + * Returns the new domain, or NULL on error.
-> + */
-> +struct iommu_domain *iommu_domain_alloc(iommu_fault_handler_t handler)
+Hello.
 
-Please add a seperate function for setting the fault-handler. It is
-optional, so no need to be a value of the alloc-function.
+On 04-09-2011 17:54, Santosh Shilimkar wrote:
 
-> +/**
-> + * enum iommu_fault_types - iommu fault types
-> + *
-> + * @IOMMU_ERROR: Unrecoverable error
-> + * @IOMMU_TLBMISS: TLB miss while the page table walker is disabled
-> + * @IOMMU_NOPTE: TLB miss and no PTE for the requested address
-> + */
-> +enum iommu_fault_types {
-> +	IOMMU_ERROR,
-> +	IOMMU_TLBMISS,
-> +	IOMMU_NOPTE,
-> +};
+> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> Cc: Kevin Hilman<khilman@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap-mpuss-lowpower.c |    5 +++++
+>   1 files changed, 5 insertions(+), 0 deletions(-)
 
-Can you elaborate a bit on what the user of the api will do different
-between IOMMU_TLBMISS and IOMMU_NOPTE?
-My feeling is that those differences should be handled internally in the
-IOMMU driver, but probably I miss a use-case.
-Also, we need some flags to distinguish between the type of the fault
-(read, write, ...).
+> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> index 4dd9d0f..0bc7610 100644
+> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+[...]
+> @@ -270,6 +272,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
+>   	scu_pwrst_prepare(cpu, power_state);
+>   	l2x0_pwrst_prepare(cpu, save_state);
+>
+> +
 
-	Joerg
+    Stray newline?
 
+>   	/*
+>   	 * Call low level function  with targeted CPU id
+>   	 * and its low power state.
 
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+WBR, Sergei
