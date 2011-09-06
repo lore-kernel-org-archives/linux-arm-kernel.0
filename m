@@ -1,29 +1,33 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 06 Sep 2011 15:18:49 -0700
-Subject: [PATCH 0/6] OMAP/Davinci debug UART code cleanup
-In-Reply-To: Nicolas Pitre's message of "Thu Sep 1 22\:59\:07 EDT 2011"
-Message-ID: <87fwk91fhy.fsf@ti.com>
+Date: Tue, 06 Sep 2011 15:31:18 -0700
+Subject: [GIT PULL] I2C: OMAP: misc. cleanup for v3.2
+In-Reply-To: <871uwbhdoj.fsf@ti.com>
+References: <871uwbhdoj.fsf@ti.com>
+Message-ID: <4E669F36.2070008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nico,
+Hi Ben,
 
-Nicolas Pitre <nico@fluxnic.net> writes:
-
-> Let's remove some of the most offending parts of this code.
+On 08/23/2011 05:10 PM, Kevin Hilman wrote:
+> Ben,
 >
-> [PATCH 1/6] ARM: add an extra temp register to the addruart low level debugging macro
-> [PATCH 2/6] ARM: plat-omap: make OMAP_UART_INFO into a relative offset
-> [PATCH 3/6] ARM: mach-omap1: clean up debug-macro.S
-> [PATCH 4/6] ARM: mach-omap2: clean up debug-macro.S
-> [PATCH 5/6] ARM: mach-davinci: make DAVINCI_UART_INFO into a relative offset
-> [PATCH 6/6] ARM: mach-davinci: clean up debug-macro.S
+> Here's one more I2C cleanup series for v3.2.
+>
+> It applies on top of my for_3.2/i2c-fixes branch just submitted.
+>
+> Please pull into your tree for linux-next.
 
-Reviewed-by: Kevin Hilman <khilman@ti.com>
+I see you pulled the other two, can you pull this one as well?
 
-Also boot tested with CONFIG_DEBUG_LL on davinci/dm355 so for patches 1,
-5 & 6, feel free to add:
+Since master.kernel.org is still down, I pushed a (backup) copy of these 
+branches to my gitorious repo[1].  It should pull cleanly into what 
+you've already pulled since this branch is based on my for_3.2/i2c-fixes 
+which you've already pulled.
 
-Tested-by: Kevin Hilman <khilman@ti.com>
+Thanks,
 
 Kevin
+
+
+[1] git://gitorious.org/khilman/linux-omap-pm.git
