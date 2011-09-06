@@ -1,42 +1,44 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 6 Sep 2011 23:10:09 +0530
-Subject: [PATCH] DaVinci: correct MDSTAT_STATE_MASK
-In-Reply-To: <4E66251C.2020804@mvista.com>
-References: <201107081924.57577.sshtylyov@ru.mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DDC1083@dbde02.ent.ti.com>
-	<4E66251C.2020804@mvista.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB5930257372AA8@dbde02.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2011 20:28:39 +0200
+Subject: [PATCH 0/6] add initial imx6q support
+In-Reply-To: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <2043782.jegSLqAsTH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Tuesday 06 September 2011 17:58:34 Shawn Guo wrote:
+> This patch series adds the initial support for imx6q, which is a
+> Cortex-A9 MPCore (4 cores) SoC.
+> 
+> It's based on v3.1-rc4 with the patches below applied.
+> 
+>  * [PATCH v2 0/5] Convert DEBUG_LL UART selection to a Kconfig choice
+>    http://thread.gmane.org/gmane.linux.ports.arm.kernel/129702
+> 
+>  * [PATCH v4 2/2] ARM: l2x0: Add OF based initialization
+>    http://article.gmane.org/gmane.linux.kernel/1164401
+> 
+>  * [PATCH 1/7] ARM: l2x0: add empty l2x0_of_init
+>    http://article.gmane.org/gmane.linux.ports.arm.kernel/130878
+> 
+>  * [RFC PATCH 0/3] Yet another GIC OF binding series
+>    http://thread.gmane.org/gmane.linux.drivers.devicetree/7226
+> 
+> For suspend/resume support, it needs the following extra patches
+> applied.
+> 
+>  * [PATCH v2 0/2] make reinitialization of ARM core components possible
+>    http://thread.gmane.org/gmane.linux.ports.arm.kernel/131356
+> 
+>  * [PATCH v2 0/5] CPU PM notifiers
+>    http://thread.gmane.org/gmane.linux.ports.arm.kernel/131212/focus=131353
 
-On Tue, Sep 06, 2011 at 19:20:20, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 07/27/2011 08:18 PM, Nori, Sekhar wrote:
-> 
-> >> MDSTAT.STATE occupies bits 0..5 according to all available documentation, so fix
-> >> the #define MDSTAT_STATE_MASK at last. Using the wrong value seems to have been
-> >> harmless though...
-> 
-> >> This was noticed by me back in 2009 but I didn't follow up with the patch back
-> >> then... :-/
-> 
-> >> Signed-off-by: Sergei Shtylyov<sshtylyov@ru.mvista.com>
-> 
-> > I applied this with two changes.
-> 
-> > Changed the headline to "ARM: davinci: correct MDSTAT_STATE_MASK"
-> > to get the standardization requested by Arnd.
-> 
-> > Also dropped the second paragraph of the commit text since it
-> > doesn't really belong to the permanent history ;)
-> 
->     You have queued it for 3.2, right?
+Hi Shawn,
 
-No, actually planning to send for v3.1. Have been delayed a bit
-due to my recent travel.
+We've talked about it before, but I don't remember the outcome. Can you
+explain (and add to the above text) a short explanation of why this is
+in the mach-imx directory, rather than the mach-mx5 (which probably is
+closer to mx6 than mx3 is) or a new mach-mx6?
 
-Thanks,
-Sekhar
+	Arnd
