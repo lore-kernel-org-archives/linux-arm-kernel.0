@@ -1,37 +1,22 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 06 Sep 2011 17:50:20 +0400
-Subject: [PATCH] DaVinci: correct MDSTAT_STATE_MASK
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024DDC1083@dbde02.ent.ti.com>
-References: <201107081924.57577.sshtylyov@ru.mvista.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024DDC1083@dbde02.ent.ti.com>
-Message-ID: <4E66251C.2020804@mvista.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 06 Sep 2011 19:25:15 +0530
+Subject: [PATCH 0/2] Add device tree support for Samsung's keypad controller
+	driver
+Message-ID: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This patchset adds device tree support for samsung's keypad controller driver.
+First patch adds a new config option to be used by device tree enabled platforms
+for selecting the samsung's keypad controller driver. The second patch adds device
+tree support for the keypad driver.
 
-On 07/27/2011 08:18 PM, Nori, Sekhar wrote:
+Thomas Abraham (2):
+  input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD config option
+  input: samsung-keypad: Add device tree support
 
->> MDSTAT.STATE occupies bits 0..5 according to all available documentation, so fix
->> the #define MDSTAT_STATE_MASK at last. Using the wrong value seems to have been
->> harmless though...
-
->> This was noticed by me back in 2009 but I didn't follow up with the patch back
->> then... :-/
-
->> Signed-off-by: Sergei Shtylyov<sshtylyov@ru.mvista.com>
-
-> I applied this with two changes.
-
-> Changed the headline to "ARM: davinci: correct MDSTAT_STATE_MASK"
-> to get the standardization requested by Arnd.
-
-> Also dropped the second paragraph of the commit text since it
-> doesn't really belong to the permanent history ;)
-
-    You have queued it for 3.2, right?
-
-> Thanks,
-> Sekhar
-
-WBR, Sergei
+ .../devicetree/bindings/input/samsung-keypad.txt   |   88 +++++++++++
+ drivers/input/keyboard/Kconfig                     |    9 +-
+ drivers/input/keyboard/samsung-keypad.c            |  161 +++++++++++++++++++-
+ 3 files changed, 254 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/samsung-keypad.txt
