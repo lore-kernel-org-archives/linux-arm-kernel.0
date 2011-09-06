@@ -1,35 +1,38 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Wed, 7 Sep 2011 00:15:20 +0100
-Subject: [PATCH REPOST 0/3] i2c: tegra: Outstanding patches
-In-Reply-To: <1314726370-8193-1-git-send-email-swarren@nvidia.com>
-References: <1314726370-8193-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20110906231520.GB25655@freya.fluff.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 06 Sep 2011 16:25:25 -0700
+Subject: [PATCH v6 00/25] gpio/omap: driver cleanup and fixes
+In-Reply-To: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com> (Tarun
+	Kanti DebBarma's message of "Wed, 31 Aug 2011 19:12:16 +0530")
+References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <87bouxz21m.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2011 at 11:46:07AM -0600, Stephen Warren wrote:
-> For convenience, here's a repost of the outstanding patches for the Tegra
-> I2C driver.
+Hi Tarun,
 
-applied all of them.
+Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 
-in future, it would be helpful to have just i2c-tegra on the
-front of the subject. fixed these up and put them in pull req
-to linus
- 
-> Doug Anderson (1):
->   i2c: tegra: fix possible race condition after tx
-> 
-> John Bonesio (1):
->   i2c: Tegra: Add of_match_table
-> 
-> Mike Rapoport (1):
->   i2c: i2c-tegra: add I2C_FUNC_SMBUS_EMUL
-> 
->  drivers/i2c/busses/i2c-tegra.c |   60 ++++++++++++++++++++++++++++++----------
->  1 files changed, 45 insertions(+), 15 deletions(-)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+> The cleanup include getting rid of cpu_is_* checks wherever possible,
+> use of gpio_bank list instead of static array, use of unique platform
+> specific value associated data member to OMAP platforms to avoid
+> cpu_is_* checks. The series also include PM runtime support.*
+
+I tested this series on top of v3.1-rc4 using a 3430/n900 platform.
+
+During suspend the PER powerdomain does not hit the targetted power
+state.  Also, in idle PER never hits retention.
+
+As with previous versions of this series, it appears to be related to
+debounce clocks being left enabled.  On my n900, I removed debounce from
+all the GPIO keys pads and PER was then able to hit retention during
+suspend and idle.
+
+Please be sure to test on a platform that is using debounce, or modify
+the board file for one of the platforms your testing so that at least
+one of the GPIOs has debounce enabled so you are verifying the debounce
+clock gating during suspend and idle.
+
+Thanks,
+
+Kevin
