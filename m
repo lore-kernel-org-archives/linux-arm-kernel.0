@@ -1,165 +1,111 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Tue, 06 Sep 2011 08:49:26 +0200
-Subject: [RFC/PATCH] ARM: ixp4xx gpiolib support
-In-Reply-To: <1315226991-3835-1-git-send-email-kaloz@openwrt.org> (Imre
-	Kaloz's message of "Mon, 5 Sep 2011 14:49:51 +0200")
-References: <20110905104133.GH6619@n2100.arm.linux.org.uk>
-	<1315226991-3835-1-git-send-email-kaloz@openwrt.org>
-Message-ID: <871uvu6u89.fsf@lebrac.rtp-net.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 6 Sep 2011 08:53:43 +0200
+Subject: [PATCH v4] mach-realview: expose PB1176 ROM using physmap and map_rom
+Message-ID: <1315292023-4125-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Imre Kaloz <kaloz@openwrt.org> writes:
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Hi,
+This exposes the PB1176 ROM if you compile in the MTD physmap
+mapping and also the map_rom chiptype.
 
-I can't test it but it looks good. Just small nitpicks. See below.
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+---
+ arch/arm/mach-realview/include/mach/board-pb1176.h |    1 +
+ arch/arm/mach-realview/realview_pb1176.c           |   45 ++++++++++++++++----
+ 2 files changed, 38 insertions(+), 8 deletions(-)
 
-> This patch adds gpiolib support for the IXP4xx platform
->
-> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
-> ---
->  arch/arm/Kconfig                         |    2 +-
->  arch/arm/mach-ixp4xx/common.c            |   39 +++++++++++++++++++++++++
->  arch/arm/mach-ixp4xx/include/mach/gpio.h |   46 ++++++++++--------------------
->  3 files changed, 55 insertions(+), 32 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 3269576..e793a75 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -481,7 +481,7 @@ config ARCH_IXP4XX
->  	depends on MMU
->  	select CLKSRC_MMIO
->  	select CPU_XSCALE
-> -	select GENERIC_GPIO
-> +	select ARCH_REQUIRE_GPIOLIB
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_SCHED_CLOCK
->  	select MIGHT_HAVE_PCI
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index 0777257..7603456 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -36,6 +36,7 @@
->  #include <asm/page.h>
->  #include <asm/irq.h>
->  #include <asm/sched_clock.h>
-> +#include <asm/gpio.h>
->  
->  #include <asm/mach/map.h>
->  #include <asm/mach/irq.h>
-> @@ -375,12 +376,50 @@ static struct platform_device *ixp46x_devices[] __initdata = {
->  unsigned long ixp4xx_exp_bus_size;
->  EXPORT_SYMBOL(ixp4xx_exp_bus_size);
->  
-> +static int ixp4xx_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
-> +{
-> +	gpio_line_config(gpio, IXP4XX_GPIO_IN);
-> +	return 0;
-> +}
-> +
-> +static int ixp4xx_gpio_direction_output(struct gpio_chip *chip, unsigned gpio, int level)
-> +{
-> +	gpio_line_set(gpio, level);
-> +	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
-> +	return 0;
-> +}
-> +
-> +static int ixp4xx_gpio_get_value(struct gpio_chip *chip, unsigned gpio)
-> +{
-> +	int value;
-> +
-> +	gpio_line_get(gpio, &value);
-> +	return value;
-> +}
-> +
-> +static void ixp4xx_gpio_set_value(struct gpio_chip *chip, unsigned gpio, int value)
-> +{
-> +	gpio_line_set(gpio, value);
-> +}
-> +
-> +static struct gpio_chip ixp4xx_gpio_chip = {
-> +	.label			= "IXP4XX_GPIO_CHIP",
-> +	.direction_input	= ixp4xx_gpio_direction_input,
-> +	.direction_output	= ixp4xx_gpio_direction_output,
-> +	.get			= ixp4xx_gpio_get_value,
-> +	.set			= ixp4xx_gpio_set_value,
-> +	.base			= 0,
-> +	.ngpio			= 16,
-
-Use NR_BUILTIN_GPIO instead of 16 ?
-
-> +};
-> +
->  void __init ixp4xx_sys_init(void)
->  {
->  	ixp4xx_exp_bus_size = SZ_16M;
->  
->  	platform_add_devices(ixp4xx_devices, ARRAY_SIZE(ixp4xx_devices));
->  
-> +	gpiochip_add(&ixp4xx_gpio_chip);
-> +
->  	if (cpu_is_ixp46x()) {
->  		int region;
->  
-> diff --git a/arch/arm/mach-ixp4xx/include/mach/gpio.h b/arch/arm/mach-ixp4xx/include/mach/gpio.h
-> index a5f87de..86f3596 100644
-> --- a/arch/arm/mach-ixp4xx/include/mach/gpio.h
-> +++ b/arch/arm/mach-ixp4xx/include/mach/gpio.h
-> @@ -27,47 +27,31 @@
->  
->  #include <linux/kernel.h>
->  #include <mach/hardware.h>
-> +#include <asm-generic/gpio.h>			/* cansleep wrappers */
->  
-> -static inline int gpio_request(unsigned gpio, const char *label)
-> -{
-> -	return 0;
-> -}
-> -
-> -static inline void gpio_free(unsigned gpio)
-> -{
-> -	might_sleep();
-> -
-> -	return;
-> -}
-> -
-> -static inline int gpio_direction_input(unsigned gpio)
-> -{
-> -	gpio_line_config(gpio, IXP4XX_GPIO_IN);
-> -	return 0;
-> -}
-> -
-> -static inline int gpio_direction_output(unsigned gpio, int level)
-> -{
-> -	gpio_line_set(gpio, level);
-> -	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
-> -	return 0;
-> -}
-> +#define NR_BUILTIN_GPIO 16
->  
->  static inline int gpio_get_value(unsigned gpio)
->  {
-> -	int value;
-> -
-> -	gpio_line_get(gpio, &value);
-> -
-> -	return value;
-> +	if (gpio < NR_BUILTIN_GPIO)
-> +	{
-> +		int value;
-> +		gpio_line_get(gpio, &value);
-> +		return value;
-> +	}
-> +	else
-> +		return __gpio_get_value(gpio);
-
-Please use 
-       if () {
-       } else
-I would also put the 'int value' declaration outside the if ().
-
-
-Thanks,
-Arnaud
+diff --git a/arch/arm/mach-realview/include/mach/board-pb1176.h b/arch/arm/mach-realview/include/mach/board-pb1176.h
+index 002ab5d..2a15fef 100644
+--- a/arch/arm/mach-realview/include/mach/board-pb1176.h
++++ b/arch/arm/mach-realview/include/mach/board-pb1176.h
+@@ -70,6 +70,7 @@
+ 
+ #define REALVIEW_DC1176_GIC_CPU_BASE		0x10120000 /* GIC CPU interface, on devchip */
+ #define REALVIEW_DC1176_GIC_DIST_BASE		0x10121000 /* GIC distributor, on devchip */
++#define REALVIEW_DC1176_ROM_BASE		0x10200000 /* 16KiB NRAM preudo-ROM, on devchip */
+ #define REALVIEW_PB1176_GIC_CPU_BASE		0x10040000 /* GIC CPU interface, on FPGA */
+ #define REALVIEW_PB1176_GIC_DIST_BASE		0x10041000 /* GIC distributor, on FPGA */
+ #define REALVIEW_PB1176_L220_BASE		0x10110000 /* L220 registers */
+diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
+index ad5671a..dfbaeca 100644
+--- a/arch/arm/mach-realview/realview_pb1176.c
++++ b/arch/arm/mach-realview/realview_pb1176.c
+@@ -26,6 +26,8 @@
+ #include <linux/amba/pl061.h>
+ #include <linux/amba/mmci.h>
+ #include <linux/amba/pl022.h>
++#include <linux/mtd/physmap.h>
++#include <linux/mtd/partitions.h>
+ #include <linux/io.h>
+ 
+ #include <mach/hardware.h>
+@@ -204,22 +206,48 @@ static struct amba_device *amba_devs[] __initdata = {
+  * RealView PB1176 platform devices
+  */
+ static struct resource realview_pb1176_flash_resources[] = {
+-	[0] = {
++	{
+ 		.start		= REALVIEW_PB1176_FLASH_BASE,
+ 		.end		= REALVIEW_PB1176_FLASH_BASE + REALVIEW_PB1176_FLASH_SIZE - 1,
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+-	[1] = {
++#ifdef CONFIG_REALVIEW_PB1176_SECURE_FLASH
++	{
+ 		.start		= REALVIEW_PB1176_SEC_FLASH_BASE,
+ 		.end		= REALVIEW_PB1176_SEC_FLASH_BASE + REALVIEW_PB1176_SEC_FLASH_SIZE - 1,
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+-};
+-#ifdef CONFIG_REALVIEW_PB1176_SECURE_FLASH
+-#define PB1176_FLASH_BLOCKS	2
+-#else
+-#define PB1176_FLASH_BLOCKS	1
+ #endif
++};
++
++static struct physmap_flash_data pb1176_rom_pdata = {
++	.probe_type	= "map_rom",
++	.width		= 4,
++	.nr_parts	= 0,
++};
++
++static struct resource pb1176_rom_resources[] = {
++	/*
++	 * This exposes the PB1176 DevChip ROM as an MTD ROM mapping.
++	 * The reference manual states that this is actually a pseudo-ROM
++	 * programmed in NVRAM.
++	 */
++	{
++		.start		= REALVIEW_DC1176_ROM_BASE,
++		.end		= REALVIEW_DC1176_ROM_BASE + SZ_16K - 1,
++		.flags		= IORESOURCE_MEM,
++	}
++};
++
++static struct platform_device pb1176_rom_device = {
++	.name		= "physmap-flash",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(pb1176_rom_resources),
++	.resource	= pb1176_rom_resources,
++	.dev = {
++		.platform_data = &pb1176_rom_pdata,
++	},
++};
+ 
+ static struct resource realview_pb1176_smsc911x_resources[] = {
+ 	[0] = {
+@@ -338,7 +366,8 @@ static void __init realview_pb1176_init(void)
+ #endif
+ 
+ 	realview_flash_register(realview_pb1176_flash_resources,
+-				PB1176_FLASH_BLOCKS);
++				ARRAY_SIZE(realview_pb1176_flash_resources));
++	platform_device_register(&pb1176_rom_device);
+ 	realview_eth_register(NULL, realview_pb1176_smsc911x_resources);
+ 	platform_device_register(&realview_i2c_device);
+ 	realview_usb_register(realview_pb1176_isp1761_resources);
+-- 
+1.7.3.2
