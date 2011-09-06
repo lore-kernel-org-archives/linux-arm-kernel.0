@@ -1,79 +1,191 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue,  6 Sep 2011 17:58:37 +0800
-Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
+Date: Tue,  6 Sep 2011 17:58:38 +0800
+Subject: [PATCH 4/6] arm/imx6q: add smp and cpu hotplug support
 In-Reply-To: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
 References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1315303120-24203-5-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds a number of core drivers support for imx6q, including clock,
-General Power Controller (gpc), Multi Mode DDR Controller(mmdc) and
-System Reset Controller (src).
+It adds smp and cpu hotplug support for imx6q.
 
-Signed-off-by: Ranjani Vaidyanathan <ra5478@freescale.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/Kconfig       |   13 +
- arch/arm/mach-imx/Makefile      |    4 +
- arch/arm/mach-imx/clock-imx6q.c | 1990 +++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-imx/gpc.c         |  110 +++
- arch/arm/mach-imx/mmdc.c        |   71 ++
- arch/arm/mach-imx/src.c         |   52 +
- 6 files changed, 2240 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-imx/clock-imx6q.c
- create mode 100644 arch/arm/mach-imx/gpc.c
- create mode 100644 arch/arm/mach-imx/mmdc.c
- create mode 100644 arch/arm/mach-imx/src.c
+ arch/arm/mach-imx/Kconfig               |    1 +
+ arch/arm/mach-imx/Makefile              |    4 ++
+ arch/arm/mach-imx/head-v7.S             |   75 +++++++++++++++++++++++++++
+ arch/arm/mach-imx/hotplug.c             |   44 ++++++++++++++++
+ arch/arm/mach-imx/localtimer.c          |   64 +++++++++++++++++++++++
+ arch/arm/mach-imx/platsmp.c             |   86 +++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h |    3 +
+ 7 files changed, 277 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-imx/head-v7.S
+ create mode 100644 arch/arm/mach-imx/hotplug.c
+ create mode 100644 arch/arm/mach-imx/localtimer.c
+ create mode 100644 arch/arm/mach-imx/platsmp.c
 
 diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 4cf5178..30f2868 100644
+index 30f2868..13e0301 100644
 --- a/arch/arm/mach-imx/Kconfig
 +++ b/arch/arm/mach-imx/Kconfig
-@@ -1,5 +1,15 @@
- config IMX_HAVE_DMA_V1
- 	bool
-+
-+config HAVE_IMX_GPC
-+	bool
-+
-+config HAVE_IMX_MMDC
-+	bool
-+
-+config HAVE_IMX_SRC
-+	bool
-+
- #
- # ARCH_MX31 and ARCH_MX35 are left for compatibility
- # Some usages assume that having one of them implies not having (e.g.) ARCH_MX2.
-@@ -62,6 +72,9 @@ config SOC_IMX6Q
+@@ -72,6 +72,7 @@ config SOC_IMX6Q
  	bool
  	select ARM_GIC
  	select CPU_V7
-+	select HAVE_IMX_GPC
-+	select HAVE_IMX_MMDC
-+	select HAVE_IMX_SRC
- 
- if ARCH_MX1
- 
++	select HAVE_ARM_SCU
+ 	select HAVE_IMX_GPC
+ 	select HAVE_IMX_MMDC
+ 	select HAVE_IMX_SRC
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 96ecc96..8c21fda 100644
+index 8c21fda..d46b2e7 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -63,3 +63,7 @@ obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD) += eukrea_mbimxsd35-baseboard.o
- obj-$(CONFIG_MACH_VPR200) += mach-vpr200.o
- 
- obj-$(CONFIG_DEBUG_LL) += lluart.o
-+obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
-+obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
-+obj-$(CONFIG_HAVE_IMX_SRC) += src.o
-+obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o
-diff --git a/arch/arm/mach-imx/clock-imx6q.c b/arch/arm/mach-imx/clock-imx6q.c
+@@ -66,4 +66,8 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
+ obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
+ obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
+ obj-$(CONFIG_HAVE_IMX_SRC) += src.o
++obj-$(CONFIG_CPU_V7) += head-v7.o
++obj-$(CONFIG_SMP) += platsmp.o
++obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
++obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
+ obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o
+diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
 new file mode 100644
-index 0000000..7d1bb10
+index 0000000..001ff9e
 --- /dev/null
-+++ b/arch/arm/mach-imx/clock-imx6q.c
-@@ -0,0 +1,1990 @@
++++ b/arch/arm/mach-imx/head-v7.S
+@@ -0,0 +1,75 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/linkage.h>
++#include <linux/init.h>
++
++	.section ".text.head", "ax"
++	__CPUINIT
++
++/*
++ * The secondary kernel init calls v7_flush_dcache_all before it enables
++ * the L1; however, the L1 comes out of reset in an undefined state, so
++ * the clean + invalidate performed by v7_flush_dcache_all causes a bunch
++ * of cache lines with uninitialized data and uninitialized tags to get
++ * written out to memory, which does really unpleasant things to the main
++ * processor.  We fix this by performing an invalidate, rather than a
++ * clean + invalidate, before jumping into the kernel.
++ *
++ * This funciton is cloned from arch/arm/mach-tegra/headsmp.S, and needs
++ * to be called for both secondary cores startup and primary core resume
++ * procedures.  Ideally, it should be moved into arch/arm/mm/cache-v7.S.
++ */
++ENTRY(v7_invalidate_l1)
++	mov	r0, #0
++	mcr	p15, 2, r0, c0, c0, 0
++	mrc	p15, 1, r0, c0, c0, 0
++
++	ldr	r1, =0x7fff
++	and	r2, r1, r0, lsr #13
++
++	ldr	r1, =0x3ff
++
++	and	r3, r1, r0, lsr #3	@ NumWays - 1
++	add	r2, r2, #1		@ NumSets
++
++	and	r0, r0, #0x7
++	add	r0, r0, #4	@ SetShift
++
++	clz	r1, r3		@ WayShift
++	add	r4, r3, #1	@ NumWays
++1:	sub	r2, r2, #1	@ NumSets--
++	mov	r3, r4		@ Temp = NumWays
++2:	subs	r3, r3, #1	@ Temp--
++	mov	r5, r3, lsl r1
++	mov	r6, r2, lsl r0
++	orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
++	mcr	p15, 0, r5, c7, c6, 2
++	bgt	2b
++	cmp	r2, #0
++	bgt	1b
++	dsb
++	isb
++	mov	pc, lr
++ENDPROC(v7_invalidate_l1)
++
++ENTRY(v7_cpu_resume)
++	bl	v7_invalidate_l1
++	b	cpu_resume
++ENDPROC(v7_cpu_resume)
++
++#ifdef CONFIG_SMP
++ENTRY(v7_secondary_startup)
++	bl	v7_invalidate_l1
++	b	secondary_startup
++ENDPROC(v7_secondary_startup)
++#endif
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+new file mode 100644
+index 0000000..89493ab
+--- /dev/null
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -0,0 +1,44 @@
++/*
++ * Copyright 2011 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later@the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <linux/errno.h>
++#include <asm/cacheflush.h>
++#include <mach/common.h>
++
++int platform_cpu_kill(unsigned int cpu)
++{
++	return 1;
++}
++
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++void platform_cpu_die(unsigned int cpu)
++{
++	flush_cache_all();
++	imx_enable_cpu(cpu, false);
++	cpu_do_idle();
++
++	/* We should never return from idle */
++	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
++}
++
++int platform_cpu_disable(unsigned int cpu)
++{
++	/*
++	 * we don't allow CPU 0 to be shutdown (it is still too special
++	 * e.g. clock tick interrupts)
++	 */
++	return cpu == 0 ? -EPERM : 0;
++}
+diff --git a/arch/arm/mach-imx/localtimer.c b/arch/arm/mach-imx/localtimer.c
+new file mode 100644
+index 0000000..2b0f351
+--- /dev/null
++++ b/arch/arm/mach-imx/localtimer.c
+@@ -0,0 +1,64 @@
 +/*
 + * Copyright 2011 Freescale Semiconductor, Inc.
 + * Copyright 2011 Linaro Ltd.
@@ -87,2105 +199,63 @@ index 0000000..7d1bb10
 + */
 +
 +#include <linux/init.h>
-+#include <linux/types.h>
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
++#include <linux/clockchips.h>
 +#include <linux/of_address.h>
 +#include <linux/of_irq.h>
-+#include <asm/div64.h>
-+#include <asm/mach/map.h>
-+#include <mach/clock.h>
-+#include <mach/common.h>
-+#include <mach/hardware.h>
-+
-+#define PLL_BASE		IOMEM(MX6Q_ANATOP_BASE_VADDR)
-+#define PLL1_SYS		(PLL_BASE + 0x000)
-+#define PLL2_BUS		(PLL_BASE + 0x030)
-+#define PLL3_USB_OTG		(PLL_BASE + 0x010)
-+#define PLL4_AUDIO		(PLL_BASE + 0x070)
-+#define PLL5_VIDEO		(PLL_BASE + 0x0a0)
-+#define PLL6_MLB		(PLL_BASE + 0x0d0)
-+#define PLL7_USB_HOST		(PLL_BASE + 0x020)
-+#define PLL8_ENET		(PLL_BASE + 0x0e0)
-+#define PFD_480			(PLL_BASE + 0x0f0)
-+#define PFD_528			(PLL_BASE + 0x100)
-+#define PLL_NUM_OFFSET		0x010
-+#define PLL_DENOM_OFFSET	0x020
-+
-+#define PFD0			7
-+#define PFD1			15
-+#define PFD2			23
-+#define PFD3			31
-+#define PFD_FRAC_MASK		0x3f
-+
-+#define BM_PLL_BYPASS			(0x1 << 16)
-+#define BM_PLL_ENABLE			(0x1 << 13)
-+#define BM_PLL_POWER_DOWN		(0x1 << 12)
-+#define BM_PLL_LOCK			(0x1 << 31)
-+#define BP_PLL_SYS_DIV_SELECT		0
-+#define BM_PLL_SYS_DIV_SELECT		(0x7f << 0)
-+#define BP_PLL_BUS_DIV_SELECT		0
-+#define BM_PLL_BUS_DIV_SELECT		(0x1 << 0)
-+#define BP_PLL_USB_DIV_SELECT		0
-+#define BM_PLL_USB_DIV_SELECT		(0x3 << 0)
-+#define BP_PLL_AV_DIV_SELECT		0
-+#define BM_PLL_AV_DIV_SELECT		(0x7f << 0)
-+#define BP_PLL_ENET_DIV_SELECT		0
-+#define BM_PLL_ENET_DIV_SELECT		(0x3 << 0)
-+#define BM_PLL_ENET_EN_PCIE		(0x1 << 19)
-+#define BM_PLL_ENET_EN_SATA		(0x1 << 20)
-+
-+#define CCM_BASE	IOMEM(MX6Q_CCM_BASE_VADDR)
-+#define CCR		(CCM_BASE + 0x00)
-+#define CCDR		(CCM_BASE + 0x04)
-+#define CSR		(CCM_BASE + 0x08)
-+#define CCSR		(CCM_BASE + 0x0c)
-+#define CACRR		(CCM_BASE + 0x10)
-+#define CBCDR		(CCM_BASE + 0x14)
-+#define CBCMR		(CCM_BASE + 0x18)
-+#define CSCMR1		(CCM_BASE + 0x1c)
-+#define CSCMR2		(CCM_BASE + 0x20)
-+#define CSCDR1		(CCM_BASE + 0x24)
-+#define CS1CDR		(CCM_BASE + 0x28)
-+#define CS2CDR		(CCM_BASE + 0x2c)
-+#define CDCDR		(CCM_BASE + 0x30)
-+#define CHSCCDR		(CCM_BASE + 0x34)
-+#define CSCDR2		(CCM_BASE + 0x38)
-+#define CSCDR3		(CCM_BASE + 0x3c)
-+#define CSCDR4		(CCM_BASE + 0x40)
-+#define CWDR		(CCM_BASE + 0x44)
-+#define CDHIPR		(CCM_BASE + 0x48)
-+#define CDCR		(CCM_BASE + 0x4c)
-+#define CTOR		(CCM_BASE + 0x50)
-+#define CLPCR		(CCM_BASE + 0x54)
-+#define CISR		(CCM_BASE + 0x58)
-+#define CIMR		(CCM_BASE + 0x5c)
-+#define CCOSR		(CCM_BASE + 0x60)
-+#define CGPR		(CCM_BASE + 0x64)
-+#define CCGR0		(CCM_BASE + 0x68)
-+#define CCGR1		(CCM_BASE + 0x6c)
-+#define CCGR2		(CCM_BASE + 0x70)
-+#define CCGR3		(CCM_BASE + 0x74)
-+#define CCGR4		(CCM_BASE + 0x78)
-+#define CCGR5		(CCM_BASE + 0x7c)
-+#define CCGR6		(CCM_BASE + 0x80)
-+#define CCGR7		(CCM_BASE + 0x84)
-+#define CMEOR		(CCM_BASE + 0x88)
-+
-+#define CG0		0
-+#define CG1		2
-+#define CG2		4
-+#define CG3		6
-+#define CG4		8
-+#define CG5		10
-+#define CG6		12
-+#define CG7		14
-+#define CG8		16
-+#define CG9		18
-+#define CG10		20
-+#define CG11		22
-+#define CG12		24
-+#define CG13		26
-+#define CG14		28
-+#define CG15		30
-+
-+#define BM_CCSR_PLL1_SW_SEL		(0x1 << 2)
-+#define BM_CCSR_STEP_SEL		(0x1 << 8)
-+
-+#define BP_CACRR_ARM_PODF		0
-+#define BM_CACRR_ARM_PODF		(0x7 << 0)
-+
-+#define BP_CBCDR_PERIPH2_CLK2_PODF	0
-+#define BM_CBCDR_PERIPH2_CLK2_PODF	(0x7 << 0)
-+#define BP_CBCDR_MMDC_CH1_AXI_PODF	3
-+#define BM_CBCDR_MMDC_CH1_AXI_PODF	(0x7 << 3)
-+#define BP_CBCDR_AXI_SEL		6
-+#define BM_CBCDR_AXI_SEL		(0x3 << 6)
-+#define BP_CBCDR_IPG_PODF		8
-+#define BM_CBCDR_IPG_PODF		(0x3 << 8)
-+#define BP_CBCDR_AHB_PODF		10
-+#define BM_CBCDR_AHB_PODF		(0x7 << 10)
-+#define BP_CBCDR_AXI_PODF		16
-+#define BM_CBCDR_AXI_PODF		(0x7 << 16)
-+#define BP_CBCDR_MMDC_CH0_AXI_PODF	19
-+#define BM_CBCDR_MMDC_CH0_AXI_PODF	(0x7 << 19)
-+#define BP_CBCDR_PERIPH_CLK_SEL		25
-+#define BM_CBCDR_PERIPH_CLK_SEL		(0x1 << 25)
-+#define BP_CBCDR_PERIPH2_CLK_SEL	26
-+#define BM_CBCDR_PERIPH2_CLK_SEL	(0x1 << 26)
-+#define BP_CBCDR_PERIPH_CLK2_PODF	27
-+#define BM_CBCDR_PERIPH_CLK2_PODF	(0x7 << 27)
-+
-+#define BP_CBCMR_GPU2D_AXI_SEL		0
-+#define BM_CBCMR_GPU2D_AXI_SEL		(0x1 << 0)
-+#define BP_CBCMR_GPU3D_AXI_SEL		1
-+#define BM_CBCMR_GPU3D_AXI_SEL		(0x1 << 1)
-+#define BP_CBCMR_GPU3D_CORE_SEL		4
-+#define BM_CBCMR_GPU3D_CORE_SEL		(0x3 << 4)
-+#define BP_CBCMR_GPU3D_SHADER_SEL	8
-+#define BM_CBCMR_GPU3D_SHADER_SEL	(0x3 << 8)
-+#define BP_CBCMR_PCIE_AXI_SEL		10
-+#define BM_CBCMR_PCIE_AXI_SEL		(0x1 << 10)
-+#define BP_CBCMR_VDO_AXI_SEL		11
-+#define BM_CBCMR_VDO_AXI_SEL		(0x1 << 11)
-+#define BP_CBCMR_PERIPH_CLK2_SEL	12
-+#define BM_CBCMR_PERIPH_CLK2_SEL	(0x3 << 12)
-+#define BP_CBCMR_VPU_AXI_SEL		14
-+#define BM_CBCMR_VPU_AXI_SEL		(0x3 << 14)
-+#define BP_CBCMR_GPU2D_CORE_SEL		16
-+#define BM_CBCMR_GPU2D_CORE_SEL		(0x3 << 16)
-+#define BP_CBCMR_PRE_PERIPH_CLK_SEL	18
-+#define BM_CBCMR_PRE_PERIPH_CLK_SEL	(0x3 << 18)
-+#define BP_CBCMR_PERIPH2_CLK2_SEL	20
-+#define BM_CBCMR_PERIPH2_CLK2_SEL	(0x1 << 20)
-+#define BP_CBCMR_PRE_PERIPH2_CLK_SEL	21
-+#define BM_CBCMR_PRE_PERIPH2_CLK_SEL	(0x3 << 21)
-+#define BP_CBCMR_GPU2D_CORE_PODF	23
-+#define BM_CBCMR_GPU2D_CORE_PODF	(0x7 << 23)
-+#define BP_CBCMR_GPU3D_CORE_PODF	26
-+#define BM_CBCMR_GPU3D_CORE_PODF	(0x7 << 26)
-+#define BP_CBCMR_GPU3D_SHADER_PODF	29
-+#define BM_CBCMR_GPU3D_SHADER_PODF	(0x7 << 29)
-+
-+#define BP_CSCMR1_PERCLK_PODF		0
-+#define BM_CSCMR1_PERCLK_PODF		(0x3f << 0)
-+#define BP_CSCMR1_SSI1_SEL		10
-+#define BM_CSCMR1_SSI1_SEL		(0x3 << 10)
-+#define BP_CSCMR1_SSI2_SEL		12
-+#define BM_CSCMR1_SSI2_SEL		(0x3 << 12)
-+#define BP_CSCMR1_SSI3_SEL		14
-+#define BM_CSCMR1_SSI3_SEL		(0x3 << 14)
-+#define BP_CSCMR1_USDHC1_SEL		16
-+#define BM_CSCMR1_USDHC1_SEL		(0x1 << 16)
-+#define BP_CSCMR1_USDHC2_SEL		17
-+#define BM_CSCMR1_USDHC2_SEL		(0x1 << 17)
-+#define BP_CSCMR1_USDHC3_SEL		18
-+#define BM_CSCMR1_USDHC3_SEL		(0x1 << 18)
-+#define BP_CSCMR1_USDHC4_SEL		19
-+#define BM_CSCMR1_USDHC4_SEL		(0x1 << 19)
-+#define BP_CSCMR1_EMI_PODF		20
-+#define BM_CSCMR1_EMI_PODF		(0x7 << 20)
-+#define BP_CSCMR1_EMI_SLOW_PODF		23
-+#define BM_CSCMR1_EMI_SLOW_PODF		(0x7 << 23)
-+#define BP_CSCMR1_EMI_SEL		27
-+#define BM_CSCMR1_EMI_SEL		(0x3 << 27)
-+#define BP_CSCMR1_EMI_SLOW_SEL		29
-+#define BM_CSCMR1_EMI_SLOW_SEL		(0x3 << 29)
-+
-+#define BP_CSCMR2_CAN_PODF		2
-+#define BM_CSCMR2_CAN_PODF		(0x3f << 2)
-+#define BM_CSCMR2_LDB_DI0_IPU_DIV	(0x1 << 10)
-+#define BM_CSCMR2_LDB_DI1_IPU_DIV	(0x1 << 11)
-+#define BP_CSCMR2_ESAI_SEL		19
-+#define BM_CSCMR2_ESAI_SEL		(0x3 << 19)
-+
-+#define BP_CSCDR1_UART_PODF		0
-+#define BM_CSCDR1_UART_PODF		(0x3f << 0)
-+#define BP_CSCDR1_USDHC1_PODF		11
-+#define BM_CSCDR1_USDHC1_PODF		(0x7 << 11)
-+#define BP_CSCDR1_USDHC2_PODF		16
-+#define BM_CSCDR1_USDHC2_PODF		(0x7 << 16)
-+#define BP_CSCDR1_USDHC3_PODF		19
-+#define BM_CSCDR1_USDHC3_PODF		(0x7 << 19)
-+#define BP_CSCDR1_USDHC4_PODF		22
-+#define BM_CSCDR1_USDHC4_PODF		(0x7 << 22)
-+#define BP_CSCDR1_VPU_AXI_PODF		25
-+#define BM_CSCDR1_VPU_AXI_PODF		(0x7 << 25)
-+
-+#define BP_CS1CDR_SSI1_PODF		0
-+#define BM_CS1CDR_SSI1_PODF		(0x3f << 0)
-+#define BP_CS1CDR_SSI1_PRED		6
-+#define BM_CS1CDR_SSI1_PRED		(0x7 << 6)
-+#define BP_CS1CDR_ESAI_PRED		9
-+#define BM_CS1CDR_ESAI_PRED		(0x7 << 9)
-+#define BP_CS1CDR_SSI3_PODF		16
-+#define BM_CS1CDR_SSI3_PODF		(0x3f << 16)
-+#define BP_CS1CDR_SSI3_PRED		22
-+#define BM_CS1CDR_SSI3_PRED		(0x7 << 22)
-+#define BP_CS1CDR_ESAI_PODF		25
-+#define BM_CS1CDR_ESAI_PODF		(0x7 << 25)
-+
-+#define BP_CS2CDR_SSI2_PODF		0
-+#define BM_CS2CDR_SSI2_PODF		(0x3f << 0)
-+#define BP_CS2CDR_SSI2_PRED		6
-+#define BM_CS2CDR_SSI2_PRED		(0x7 << 6)
-+#define BP_CS2CDR_LDB_DI0_SEL		9
-+#define BM_CS2CDR_LDB_DI0_SEL		(0x7 << 9)
-+#define BP_CS2CDR_LDB_DI1_SEL		12
-+#define BM_CS2CDR_LDB_DI1_SEL		(0x7 << 12)
-+#define BP_CS2CDR_ENFC_SEL		16
-+#define BM_CS2CDR_ENFC_SEL		(0x3 << 16)
-+#define BP_CS2CDR_ENFC_PRED		18
-+#define BM_CS2CDR_ENFC_PRED		(0x7 << 18)
-+#define BP_CS2CDR_ENFC_PODF		21
-+#define BM_CS2CDR_ENFC_PODF		(0x3f << 21)
-+
-+#define BP_CDCDR_ASRC_SERIAL_SEL	7
-+#define BM_CDCDR_ASRC_SERIAL_SEL	(0x3 << 7)
-+#define BP_CDCDR_ASRC_SERIAL_PODF	9
-+#define BM_CDCDR_ASRC_SERIAL_PODF	(0x7 << 9)
-+#define BP_CDCDR_ASRC_SERIAL_PRED	12
-+#define BM_CDCDR_ASRC_SERIAL_PRED	(0x7 << 12)
-+#define BP_CDCDR_SPDIF_SEL		20
-+#define BM_CDCDR_SPDIF_SEL		(0x3 << 20)
-+#define BP_CDCDR_SPDIF_PODF		22
-+#define BM_CDCDR_SPDIF_PODF		(0x7 << 22)
-+#define BP_CDCDR_SPDIF_PRED		25
-+#define BM_CDCDR_SPDIF_PRED		(0x7 << 25)
-+#define BP_CDCDR_HSI_TX_PODF		29
-+#define BM_CDCDR_HSI_TX_PODF		(0x7 << 29)
-+#define BP_CDCDR_HSI_TX_SEL		28
-+#define BM_CDCDR_HSI_TX_SEL		(0x1 << 28)
-+
-+#define BP_CHSCCDR_IPU1_DI0_SEL		0
-+#define BM_CHSCCDR_IPU1_DI0_SEL		(0x7 << 0)
-+#define BP_CHSCCDR_IPU1_DI0_PRE_PODF	3
-+#define BM_CHSCCDR_IPU1_DI0_PRE_PODF	(0x7 << 3)
-+#define BP_CHSCCDR_IPU1_DI0_PRE_SEL	6
-+#define BM_CHSCCDR_IPU1_DI0_PRE_SEL	(0x7 << 6)
-+#define BP_CHSCCDR_IPU1_DI1_SEL		9
-+#define BM_CHSCCDR_IPU1_DI1_SEL		(0x7 << 9)
-+#define BP_CHSCCDR_IPU1_DI1_PRE_PODF	12
-+#define BM_CHSCCDR_IPU1_DI1_PRE_PODF	(0x7 << 12)
-+#define BP_CHSCCDR_IPU1_DI1_PRE_SEL	15
-+#define BM_CHSCCDR_IPU1_DI1_PRE_SEL	(0x7 << 15)
-+
-+#define BP_CSCDR2_IPU2_DI0_SEL		0
-+#define BM_CSCDR2_IPU2_DI0_SEL		(0x7)
-+#define BP_CSCDR2_IPU2_DI0_PRE_PODF	3
-+#define BM_CSCDR2_IPU2_DI0_PRE_PODF	(0x7 << 3)
-+#define BP_CSCDR2_IPU2_DI0_PRE_SEL	6
-+#define BM_CSCDR2_IPU2_DI0_PRE_SEL	(0x7 << 6)
-+#define BP_CSCDR2_IPU2_DI1_SEL		9
-+#define BM_CSCDR2_IPU2_DI1_SEL		(0x7 << 9)
-+#define BP_CSCDR2_IPU2_DI1_PRE_PODF	12
-+#define BM_CSCDR2_IPU2_DI1_PRE_PODF	(0x7 << 12)
-+#define BP_CSCDR2_IPU2_DI1_PRE_SEL	15
-+#define BM_CSCDR2_IPU2_DI1_PRE_SEL	(0x7 << 15)
-+#define BP_CSCDR2_ECSPI_CLK_PODF	19
-+#define BM_CSCDR2_ECSPI_CLK_PODF	(0x3f << 19)
-+
-+#define BP_CSCDR3_IPU1_HSP_SEL		9
-+#define BM_CSCDR3_IPU1_HSP_SEL		(0x3 << 9)
-+#define BP_CSCDR3_IPU1_HSP_PODF		11
-+#define BM_CSCDR3_IPU1_HSP_PODF		(0x7 << 11)
-+#define BP_CSCDR3_IPU2_HSP_SEL		14
-+#define BM_CSCDR3_IPU2_HSP_SEL		(0x3 << 14)
-+#define BP_CSCDR3_IPU2_HSP_PODF		16
-+#define BM_CSCDR3_IPU2_HSP_PODF		(0x7 << 16)
-+
-+#define BM_CDHIPR_AXI_PODF_BUSY		(0x1 << 0)
-+#define BM_CDHIPR_AHB_PODF_BUSY		(0x1 << 1)
-+#define BM_CDHIPR_MMDC_CH1_PODF_BUSY	(0x1 << 2)
-+#define BM_CDHIPR_PERIPH2_SEL_BUSY	(0x1 << 3)
-+#define BM_CDHIPR_MMDC_CH0_PODF_BUSY	(0x1 << 4)
-+#define BM_CDHIPR_PERIPH_SEL_BUSY	(0x1 << 5)
-+#define BM_CDHIPR_ARM_PODF_BUSY		(0x1 << 16)
-+
-+#define BP_CLPCR_LPM			0
-+#define BM_CLPCR_LPM			(0x3 << 0)
-+#define BM_CLPCR_BYPASS_PMIC_READY	(0x1 << 2)
-+#define BM_CLPCR_ARM_CLK_DIS_ON_LPM	(0x1 << 5)
-+#define BM_CLPCR_SBYOS			(0x1 << 6)
-+#define BM_CLPCR_DIS_REF_OSC		(0x1 << 7)
-+#define BM_CLPCR_VSTBY			(0x1 << 8)
-+#define BP_CLPCR_STBY_COUNT		9
-+#define BM_CLPCR_STBY_COUNT		(0x3 << 9)
-+#define BM_CLPCR_COSC_PWRDOWN		(0x1 << 11)
-+#define BM_CLPCR_WB_PER_AT_LPM		(0x1 << 16)
-+#define BM_CLPCR_WB_CORE_AT_LPM		(0x1 << 17)
-+#define BM_CLPCR_BYP_MMDC_CH0_LPM_HS	(0x1 << 19)
-+#define BM_CLPCR_BYP_MMDC_CH1_LPM_HS	(0x1 << 21)
-+#define BM_CLPCR_MASK_CORE0_WFI		(0x1 << 22)
-+#define BM_CLPCR_MASK_CORE1_WFI		(0x1 << 23)
-+#define BM_CLPCR_MASK_CORE2_WFI		(0x1 << 24)
-+#define BM_CLPCR_MASK_CORE3_WFI		(0x1 << 25)
-+#define BM_CLPCR_MASK_SCU_IDLE		(0x1 << 26)
-+#define BM_CLPCR_MASK_L2CC_IDLE		(0x1 << 27)
-+
-+#define FREQ_480M	480000000
-+#define FREQ_528M	528000000
-+#define FREQ_594M	594000000
-+#define FREQ_650M	650000000
-+#define FREQ_1300M	1300000000
-+
-+static struct clk pll1_sys;
-+static struct clk pll2_bus;
-+static struct clk pll3_usb_otg;
-+static struct clk pll4_audio;
-+static struct clk pll5_video;
-+static struct clk pll6_mlb;
-+static struct clk pll7_usb_host;
-+static struct clk pll8_enet;
-+static struct clk apbh_dma_clk;
-+static struct clk arm_clk;
-+static struct clk ipg_clk;
-+static struct clk ahb_clk;
-+static struct clk axi_clk;
-+static struct clk mmdc_ch0_axi_clk;
-+static struct clk mmdc_ch1_axi_clk;
-+static struct clk periph_clk;
-+static struct clk periph_pre_clk;
-+static struct clk periph_clk2_clk;
-+static struct clk periph2_clk;
-+static struct clk periph2_pre_clk;
-+static struct clk periph2_clk2_clk;
-+static struct clk gpu2d_core_clk;
-+static struct clk gpu3d_core_clk;
-+static struct clk gpu3d_shader_clk;
-+static struct clk ipg_perclk;
-+static struct clk emi_clk;
-+static struct clk emi_slow_clk;
-+static struct clk can1_clk;
-+static struct clk uart_clk;
-+static struct clk usdhc1_clk;
-+static struct clk usdhc2_clk;
-+static struct clk usdhc3_clk;
-+static struct clk usdhc4_clk;
-+static struct clk vpu_clk;
-+static struct clk hsi_tx_clk;
-+static struct clk ipu1_di0_pre_clk;
-+static struct clk ipu1_di1_pre_clk;
-+static struct clk ipu2_di0_pre_clk;
-+static struct clk ipu2_di1_pre_clk;
-+static struct clk ipu1_clk;
-+static struct clk ipu2_clk;
-+static struct clk ssi1_clk;
-+static struct clk ssi3_clk;
-+static struct clk esai_clk;
-+static struct clk ssi2_clk;
-+static struct clk spdif_clk;
-+static struct clk asrc_serial_clk;
-+static struct clk gpu2d_axi_clk;
-+static struct clk gpu3d_axi_clk;
-+static struct clk pcie_clk;
-+static struct clk vdo_axi_clk;
-+static struct clk ldb_di0_clk;
-+static struct clk ldb_di1_clk;
-+static struct clk ipu1_di0_clk;
-+static struct clk ipu1_di1_clk;
-+static struct clk ipu2_di0_clk;
-+static struct clk ipu2_di1_clk;
-+static struct clk enfc_clk;
-+static struct clk dummy_clk = {};
-+
-+static unsigned long external_high_reference;
-+static unsigned long external_low_reference;
-+static unsigned long oscillator_reference;
-+static unsigned long ckih2_reference;
-+
-+static unsigned long get_high_reference_clock_rate(struct clk *clk)
-+{
-+	return external_high_reference;
-+}
-+
-+static unsigned long get_low_reference_clock_rate(struct clk *clk)
-+{
-+	return external_low_reference;
-+}
-+
-+static unsigned long get_oscillator_reference_clock_rate(struct clk *clk)
-+{
-+	return oscillator_reference;
-+}
-+
-+static unsigned long get_ckih2_reference_clock_rate(struct clk *clk)
-+{
-+	return ckih2_reference;
-+}
-+
-+static struct clk ckih_clk = {
-+	.get_rate = get_high_reference_clock_rate,
-+};
-+
-+static struct clk ckih2_clk = {
-+	.get_rate = get_ckih2_reference_clock_rate,
-+};
-+
-+static struct clk osc_clk = {
-+	.get_rate = get_oscillator_reference_clock_rate,
-+};
-+
-+static struct clk ckil_clk = {
-+	.get_rate = get_low_reference_clock_rate,
-+};
-+
-+static inline void __iomem *pll_get_reg_addr(struct clk *pll)
-+{
-+	if (pll == &pll1_sys)
-+		return PLL1_SYS;
-+	else if (pll == &pll2_bus)
-+		return PLL2_BUS;
-+	else if (pll == &pll3_usb_otg)
-+		return PLL3_USB_OTG;
-+	else if (pll == &pll4_audio)
-+		return PLL4_AUDIO;
-+	else if (pll == &pll5_video)
-+		return PLL5_VIDEO;
-+	else if (pll == &pll6_mlb)
-+		return PLL6_MLB;
-+	else if (pll == &pll7_usb_host)
-+		return PLL7_USB_HOST;
-+	else if (pll == &pll8_enet)
-+		return PLL8_ENET;
-+	else
-+		BUG();
-+
-+	return NULL;
-+}
-+
-+static int pll_enable(struct clk *clk)
-+{
-+	int timeout = 0x100000;
-+	void __iomem *reg;
-+	u32 val;
-+
-+	reg = pll_get_reg_addr(clk);
-+	val = __raw_readl(reg);
-+	val &= ~BM_PLL_BYPASS;
-+	val &= ~BM_PLL_POWER_DOWN;
-+	/* 480MHz PLLs have the opposite definition for power bit */
-+	if (clk == &pll3_usb_otg || clk == &pll7_usb_host)
-+		val |= BM_PLL_POWER_DOWN;
-+	__raw_writel(val, reg);
-+
-+	/* Wait for PLL to lock */
-+	while (!(__raw_readl(reg) & BM_PLL_LOCK) && --timeout)
-+		cpu_relax();
-+
-+	if (unlikely(!timeout))
-+		return -EBUSY;
-+
-+	/* Enable the PLL output now */
-+	val = __raw_readl(reg);
-+	val |= BM_PLL_ENABLE;
-+	__raw_writel(val, reg);
-+
-+	return 0;
-+}
-+
-+static void pll_disable(struct clk *clk)
-+{
-+	void __iomem *reg;
-+	u32 val;
-+
-+	reg = pll_get_reg_addr(clk);
-+	val = __raw_readl(reg);
-+	val &= ~BM_PLL_ENABLE;
-+	val |= BM_PLL_BYPASS;
-+	val |= BM_PLL_POWER_DOWN;
-+	if (clk == &pll3_usb_otg || clk == &pll7_usb_host)
-+		val &= ~BM_PLL_POWER_DOWN;
-+	__raw_writel(val, reg);
-+}
-+
-+static unsigned long pll1_sys_get_rate(struct clk *clk)
-+{
-+	u32 div = (__raw_readl(PLL1_SYS) & BM_PLL_SYS_DIV_SELECT) >>
-+		  BP_PLL_SYS_DIV_SELECT;
-+
-+	return clk_get_rate(clk->parent) * div / 2;
-+}
-+
-+static int pll1_sys_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	u32 val, div;
-+
-+	if (rate < FREQ_650M || rate > FREQ_1300M)
-+		return -EINVAL;
-+
-+	div = rate * 2 / clk_get_rate(clk->parent);
-+	val = __raw_readl(PLL1_SYS);
-+	val &= ~BM_PLL_SYS_DIV_SELECT;
-+	val |= div << BP_PLL_SYS_DIV_SELECT;
-+	__raw_writel(val, PLL1_SYS);
-+
-+	return 0;
-+}
-+
-+static unsigned long pll8_enet_get_rate(struct clk *clk)
-+{
-+	u32 div = (__raw_readl(PLL8_ENET) & BM_PLL_ENET_DIV_SELECT) >>
-+		  BP_PLL_ENET_DIV_SELECT;
-+
-+	return 500000000 / (div + 1);
-+}
-+
-+static int pll8_enet_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	u32 val, div;
-+
-+	switch (rate) {
-+	case 25000000:
-+		div = 0;
-+		break;
-+	case 50000000:
-+		div = 1;
-+		break;
-+	case 100000000:
-+		div = 2;
-+		break;
-+	case 125000000:
-+		div = 3;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	val = __raw_readl(PLL8_ENET);
-+	val &= ~BM_PLL_ENET_DIV_SELECT;
-+	val |= div << BP_PLL_ENET_DIV_SELECT;
-+	__raw_writel(val, PLL8_ENET);
-+
-+	return 0;
-+}
-+
-+static unsigned long pll_av_get_rate(struct clk *clk)
-+{
-+	void __iomem *reg = (clk == &pll4_audio) ? PLL4_AUDIO : PLL5_VIDEO;
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+	u32 mfn = __raw_readl(reg + PLL_NUM_OFFSET);
-+	u32 mfd = __raw_readl(reg + PLL_DENOM_OFFSET);
-+	u32 div = (__raw_readl(reg) & BM_PLL_AV_DIV_SELECT) >>
-+		  BP_PLL_AV_DIV_SELECT;
-+
-+	return (parent_rate * div) + ((parent_rate / mfd) * mfn);
-+}
-+
-+static int pll_av_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	void __iomem *reg = (clk == &pll4_audio) ? PLL4_AUDIO : PLL5_VIDEO;
-+	unsigned int parent_rate = clk_get_rate(clk->parent);
-+	u32 val, div;
-+	u32 mfn, mfd = 1000000;
-+	s64 temp64;
-+
-+	if (rate < FREQ_650M || rate > FREQ_1300M)
-+		return -EINVAL;
-+
-+	div = rate / parent_rate;
-+	temp64 = (u64) (rate - div * parent_rate);
-+	temp64 *= mfd;
-+	do_div(temp64, parent_rate);
-+	mfn = temp64;
-+
-+	val = __raw_readl(reg);
-+	val &= ~BM_PLL_AV_DIV_SELECT;
-+	val |= div << BP_PLL_AV_DIV_SELECT;
-+	__raw_writel(val, reg);
-+	__raw_writel(mfn, reg + PLL_NUM_OFFSET);
-+	__raw_writel(mfd, reg + PLL_DENOM_OFFSET);
-+
-+	return 0;
-+}
-+
-+static void __iomem *pll_get_div_reg_bit(struct clk *clk, u32 *bp, u32 *bm)
-+{
-+	void __iomem *reg;
-+
-+	if (clk == &pll2_bus) {
-+		reg = PLL2_BUS;
-+		*bp = BP_PLL_BUS_DIV_SELECT;
-+		*bm = BM_PLL_BUS_DIV_SELECT;
-+	} else if (clk == &pll3_usb_otg) {
-+		reg = PLL3_USB_OTG;
-+		*bp = BP_PLL_USB_DIV_SELECT;
-+		*bm = BM_PLL_USB_DIV_SELECT;
-+	} else if (clk == &pll7_usb_host) {
-+		reg = PLL7_USB_HOST;
-+		*bp = BP_PLL_USB_DIV_SELECT;
-+		*bm = BM_PLL_USB_DIV_SELECT;
-+	} else {
-+		BUG();
-+	}
-+
-+	return reg;
-+}
-+
-+static unsigned long pll_get_rate(struct clk *clk)
-+{
-+	void __iomem *reg;
-+	u32 div, bp, bm;
-+
-+	reg = pll_get_div_reg_bit(clk, &bp, &bm);
-+	div = (__raw_readl(reg) & bm) >> bp;
-+
-+	return (div == 1) ? clk_get_rate(clk->parent) * 22 :
-+			    clk_get_rate(clk->parent) * 20;
-+}
-+
-+static int pll_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	void __iomem *reg;
-+	u32 val, div, bp, bm;
-+
-+	if (rate == FREQ_528M)
-+		div = 1;
-+	else if (rate == FREQ_480M)
-+		div = 0;
-+	else
-+		return -EINVAL;
-+
-+	reg = pll_get_div_reg_bit(clk, &bp, &bm);
-+	val = __raw_readl(reg);
-+	val &= ~bm;
-+	val |= div << bp;
-+	__raw_writel(val, reg);
-+
-+	return 0;
-+}
-+
-+#define pll2_bus_get_rate	pll_get_rate
-+#define pll2_bus_set_rate	pll_set_rate
-+#define pll3_usb_otg_get_rate	pll_get_rate
-+#define pll3_usb_otg_set_rate	pll_set_rate
-+#define pll7_usb_host_get_rate	pll_get_rate
-+#define pll7_usb_host_set_rate	pll_set_rate
-+#define pll4_audio_get_rate	pll_av_get_rate
-+#define pll4_audio_set_rate	pll_av_set_rate
-+#define pll5_video_get_rate	pll_av_get_rate
-+#define pll5_video_set_rate	pll_av_set_rate
-+#define pll6_mlb_get_rate	NULL
-+#define pll6_mlb_set_rate	NULL
-+
-+#define DEF_PLL(name)					\
-+	static struct clk name = {			\
-+		.enable		= pll_enable,		\
-+		.disable	= pll_disable,		\
-+		.get_rate	= name##_get_rate,	\
-+		.set_rate	= name##_set_rate,	\
-+		.parent		= &osc_clk,		\
-+	}
-+
-+DEF_PLL(pll1_sys);
-+DEF_PLL(pll2_bus);
-+DEF_PLL(pll3_usb_otg);
-+DEF_PLL(pll4_audio);
-+DEF_PLL(pll5_video);
-+DEF_PLL(pll6_mlb);
-+DEF_PLL(pll7_usb_host);
-+DEF_PLL(pll8_enet);
-+
-+static unsigned long pfd_get_rate(struct clk *clk)
-+{
-+	u64 tmp = (u64) clk_get_rate(clk->parent) * 18;
-+	u32 frac, bp_frac;
-+
-+	if (apbh_dma_clk.usecount == 0)
-+		apbh_dma_clk.enable(&apbh_dma_clk);
-+
-+	bp_frac = clk->enable_shift - 7;
-+	frac = __raw_readl(clk->enable_reg) >> bp_frac & PFD_FRAC_MASK;
-+	do_div(tmp, frac);
-+
-+	return tmp;
-+}
-+
-+static int pfd_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	u32 val, frac, bp_frac;
-+	u64 tmp = (u64) clk_get_rate(clk->parent) * 18;
-+
-+	if (apbh_dma_clk.usecount == 0)
-+		apbh_dma_clk.enable(&apbh_dma_clk);
-+
-+	/*
-+	 * Round up the divider so that we don't set a rate
-+	 * higher than what is requested
-+	 */
-+	tmp += rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+	frac = (frac < 12) ? 12 : frac;
-+	frac = (frac > 35) ? 35 : frac;
-+
-+	/*
-+	 * The frac field always starts from 7 bits lower
-+	 * position of enable bit
-+	 */
-+	bp_frac = clk->enable_shift - 7;
-+	val = __raw_readl(clk->enable_reg);
-+	val &= ~(PFD_FRAC_MASK << bp_frac);
-+	val |= frac << bp_frac;
-+	__raw_writel(val, clk->enable_reg);
-+
-+	tmp = (u64) clk_get_rate(clk->parent) * 18;
-+	do_div(tmp, frac);
-+
-+	if (apbh_dma_clk.usecount == 0)
-+		apbh_dma_clk.disable(&apbh_dma_clk);
-+
-+	return 0;
-+}
-+
-+static unsigned long pfd_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	u32 frac;
-+	u64 tmp;
-+
-+	tmp = (u64) clk_get_rate(clk->parent) * 18;
-+	tmp += rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+	frac = (frac < 12) ? 12 : frac;
-+	frac = (frac > 35) ? 35 : frac;
-+	tmp = (u64) clk_get_rate(clk->parent) * 18;
-+	do_div(tmp, frac);
-+
-+	return tmp;
-+}
-+
-+static int pfd_enable(struct clk *clk)
-+{
-+	u32 val;
-+
-+	if (apbh_dma_clk.usecount == 0)
-+		apbh_dma_clk.enable(&apbh_dma_clk);
-+
-+	val = __raw_readl(clk->enable_reg);
-+	val &= ~(1 << clk->enable_shift);
-+	__raw_writel(val, clk->enable_reg);
-+
-+	if (apbh_dma_clk.usecount == 0)
-+		apbh_dma_clk.disable(&apbh_dma_clk);
-+
-+	return 0;
-+}
-+
-+static void pfd_disable(struct clk *clk)
-+{
-+	u32 val;
-+
-+	if (apbh_dma_clk.usecount == 0)
-+		apbh_dma_clk.enable(&apbh_dma_clk);
-+
-+	val = __raw_readl(clk->enable_reg);
-+	val |= 1 << clk->enable_shift;
-+	__raw_writel(val, clk->enable_reg);
-+
-+	if (apbh_dma_clk.usecount == 0)
-+		apbh_dma_clk.disable(&apbh_dma_clk);
-+}
-+
-+#define DEF_PFD(name, er, es, p)			\
-+	static struct clk name = {			\
-+		.enable_reg	= er,			\
-+		.enable_shift	= es,			\
-+		.enable		= pfd_enable,		\
-+		.disable	= pfd_disable,		\
-+		.get_rate	= pfd_get_rate,		\
-+		.set_rate	= pfd_set_rate,		\
-+		.round_rate	= pfd_round_rate,	\
-+		.parent		= p,			\
-+	}
-+
-+DEF_PFD(pll2_pfd_352m, PFD_528, PFD0, &pll2_bus);
-+DEF_PFD(pll2_pfd_594m, PFD_528, PFD1, &pll2_bus);
-+DEF_PFD(pll2_pfd_400m, PFD_528, PFD2, &pll2_bus);
-+DEF_PFD(pll3_pfd_720m, PFD_480, PFD0, &pll3_usb_otg);
-+DEF_PFD(pll3_pfd_540m, PFD_480, PFD1, &pll3_usb_otg);
-+DEF_PFD(pll3_pfd_508m, PFD_480, PFD2, &pll3_usb_otg);
-+DEF_PFD(pll3_pfd_454m, PFD_480, PFD3, &pll3_usb_otg);
-+
-+static unsigned long pll2_200m_get_rate(struct clk *clk)
-+{
-+	return clk_get_rate(clk->parent) / 2;
-+}
-+
-+static struct clk pll2_200m = {
-+	.parent = &pll2_pfd_400m,
-+	.get_rate = pll2_200m_get_rate,
-+};
-+
-+static unsigned long pll3_120m_get_rate(struct clk *clk)
-+{
-+	return clk_get_rate(clk->parent) / 4;
-+}
-+
-+static struct clk pll3_120m = {
-+	.parent = &pll3_usb_otg,
-+	.get_rate = pll3_120m_get_rate,
-+};
-+
-+static unsigned long pll3_80m_get_rate(struct clk *clk)
-+{
-+	return clk_get_rate(clk->parent) / 6;
-+}
-+
-+static struct clk pll3_80m = {
-+	.parent = &pll3_usb_otg,
-+	.get_rate = pll3_80m_get_rate,
-+};
-+
-+static unsigned long pll3_60m_get_rate(struct clk *clk)
-+{
-+	return clk_get_rate(clk->parent) / 8;
-+}
-+
-+static struct clk pll3_60m = {
-+	.parent = &pll3_usb_otg,
-+	.get_rate = pll3_60m_get_rate,
-+};
-+
-+static int pll1_sw_clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	u32 val = __raw_readl(CCSR);
-+
-+	if (parent == &pll1_sys) {
-+		val &= ~BM_CCSR_PLL1_SW_SEL;
-+		val &= ~BM_CCSR_STEP_SEL;
-+	} else if (parent == &osc_clk) {
-+		val |= BM_CCSR_PLL1_SW_SEL;
-+		val &= ~BM_CCSR_STEP_SEL;
-+	} else if (parent == &pll2_pfd_400m) {
-+		val |= BM_CCSR_PLL1_SW_SEL;
-+		val |= BM_CCSR_STEP_SEL;
-+	} else {
-+		return -EINVAL;
-+	}
-+
-+	__raw_writel(val, CCSR);
-+
-+	return 0;
-+}
-+
-+static struct clk pll1_sw_clk = {
-+	.parent = &pll1_sys,
-+	.set_parent = pll1_sw_clk_set_parent,
-+};
-+
-+static void calc_pred_podf_dividers(u32 div, u32 *pred, u32 *podf)
-+{
-+	u32 min_pred, temp_pred, old_err, err;
-+
-+	if (div >= 512) {
-+		*pred = 8;
-+		*podf = 64;
-+	} else if (div >= 8) {
-+		min_pred = (div - 1) / 64 + 1;
-+		old_err = 8;
-+		for (temp_pred = 8; temp_pred >= min_pred; temp_pred--) {
-+			err = div % temp_pred;
-+			if (err == 0) {
-+				*pred = temp_pred;
-+				break;
-+			}
-+			err = temp_pred - err;
-+			if (err < old_err) {
-+				old_err = err;
-+				*pred = temp_pred;
-+			}
-+		}
-+		*podf = (div + *pred - 1) / *pred;
-+	} else if (div < 8) {
-+		*pred = div;
-+		*podf = 1;
-+	}
-+}
-+
-+static int _clk_enable(struct clk *clk)
-+{
-+	u32 reg;
-+	reg = __raw_readl(clk->enable_reg);
-+	reg |= 0x3 << clk->enable_shift;
-+	__raw_writel(reg, clk->enable_reg);
-+
-+	return 0;
-+}
-+
-+static void _clk_disable(struct clk *clk)
-+{
-+	u32 reg;
-+	reg = __raw_readl(clk->enable_reg);
-+	reg &= ~(0x3 << clk->enable_shift);
-+	__raw_writel(reg, clk->enable_reg);
-+}
-+
-+struct divider {
-+	struct clk *clk;
-+	void __iomem *reg;
-+	u32 bp_pred;
-+	u32 bm_pred;
-+	u32 bp_podf;
-+	u32 bm_podf;
-+};
-+
-+#define DEF_CLK_DIV1(d, c, r, b)				\
-+	static struct divider d = {				\
-+		.clk = c,					\
-+		.reg = r,					\
-+		.bp_podf = BP_##r##_##b##_PODF,			\
-+		.bm_podf = BM_##r##_##b##_PODF,			\
-+	}
-+
-+DEF_CLK_DIV1(arm_div,		&arm_clk,		CACRR,	ARM);
-+DEF_CLK_DIV1(ipg_div,		&ipg_clk,		CBCDR,	IPG);
-+DEF_CLK_DIV1(ahb_div,		&ahb_clk,		CBCDR,	AHB);
-+DEF_CLK_DIV1(axi_div,		&axi_clk,		CBCDR,	AXI);
-+DEF_CLK_DIV1(mmdc_ch0_axi_div,	&mmdc_ch0_axi_clk,	CBCDR,	MMDC_CH0_AXI);
-+DEF_CLK_DIV1(mmdc_ch1_axi_div,	&mmdc_ch1_axi_clk,	CBCDR,	MMDC_CH1_AXI);
-+DEF_CLK_DIV1(periph_clk2_div,	&periph_clk2_clk,	CBCDR,	PERIPH_CLK2);
-+DEF_CLK_DIV1(periph2_clk2_div,	&periph2_clk2_clk,	CBCDR,	PERIPH2_CLK2);
-+DEF_CLK_DIV1(gpu2d_core_div,	&gpu2d_core_clk,	CBCMR,	GPU2D_CORE);
-+DEF_CLK_DIV1(gpu3d_core_div,	&gpu3d_core_clk,	CBCMR,	GPU3D_CORE);
-+DEF_CLK_DIV1(gpu3d_shader_div,	&gpu3d_shader_clk,	CBCMR,	GPU3D_SHADER);
-+DEF_CLK_DIV1(ipg_perclk_div,	&ipg_perclk,		CSCMR1,	PERCLK);
-+DEF_CLK_DIV1(emi_div,		&emi_clk,		CSCMR1,	EMI);
-+DEF_CLK_DIV1(emi_slow_div,	&emi_slow_clk,		CSCMR1,	EMI_SLOW);
-+DEF_CLK_DIV1(can_div,		&can1_clk,		CSCMR2,	CAN);
-+DEF_CLK_DIV1(uart_div,		&uart_clk,		CSCDR1,	UART);
-+DEF_CLK_DIV1(usdhc1_div,	&usdhc1_clk,		CSCDR1,	USDHC1);
-+DEF_CLK_DIV1(usdhc2_div,	&usdhc2_clk,		CSCDR1,	USDHC2);
-+DEF_CLK_DIV1(usdhc3_div,	&usdhc3_clk,		CSCDR1,	USDHC3);
-+DEF_CLK_DIV1(usdhc4_div,	&usdhc4_clk,		CSCDR1,	USDHC4);
-+DEF_CLK_DIV1(vpu_div,		&vpu_clk,		CSCDR1,	VPU_AXI);
-+DEF_CLK_DIV1(hsi_tx_div,	&hsi_tx_clk,		CDCDR,	HSI_TX);
-+DEF_CLK_DIV1(ipu1_di0_pre_div,	&ipu1_di0_pre_clk,	CHSCCDR, IPU1_DI0_PRE);
-+DEF_CLK_DIV1(ipu1_di1_pre_div,	&ipu1_di1_pre_clk,	CHSCCDR, IPU1_DI1_PRE);
-+DEF_CLK_DIV1(ipu2_di0_pre_div,	&ipu2_di0_pre_clk,	CSCDR2,	IPU2_DI0_PRE);
-+DEF_CLK_DIV1(ipu2_di1_pre_div,	&ipu2_di1_pre_clk,	CSCDR2,	IPU2_DI1_PRE);
-+DEF_CLK_DIV1(ipu1_div,		&ipu1_clk,		CSCDR3,	IPU1_HSP);
-+DEF_CLK_DIV1(ipu2_div,		&ipu2_clk,		CSCDR3,	IPU2_HSP);
-+
-+#define DEF_CLK_DIV2(d, c, r, b)				\
-+	static struct divider d = {				\
-+		.clk = c,					\
-+		.reg = r,					\
-+		.bp_pred = BP_##r##_##b##_PRED,			\
-+		.bm_pred = BM_##r##_##b##_PRED,			\
-+		.bp_podf = BP_##r##_##b##_PODF,			\
-+		.bm_podf = BM_##r##_##b##_PODF,			\
-+	}
-+
-+DEF_CLK_DIV2(ssi1_div,		&ssi1_clk,		CS1CDR,	SSI1);
-+DEF_CLK_DIV2(ssi3_div,		&ssi3_clk,		CS1CDR,	SSI3);
-+DEF_CLK_DIV2(esai_div,		&esai_clk,		CS1CDR,	ESAI);
-+DEF_CLK_DIV2(ssi2_div,		&ssi2_clk,		CS2CDR,	SSI2);
-+DEF_CLK_DIV2(enfc_div,		&enfc_clk,		CS2CDR,	ENFC);
-+DEF_CLK_DIV2(spdif_div,		&spdif_clk,		CDCDR,	SPDIF);
-+DEF_CLK_DIV2(asrc_serial_div,	&asrc_serial_clk,	CDCDR,	ASRC_SERIAL);
-+
-+static struct divider *dividers[] = {
-+	&arm_div,
-+	&ipg_div,
-+	&ahb_div,
-+	&axi_div,
-+	&mmdc_ch0_axi_div,
-+	&mmdc_ch1_axi_div,
-+	&periph_clk2_div,
-+	&periph2_clk2_div,
-+	&gpu2d_core_div,
-+	&gpu3d_core_div,
-+	&gpu3d_shader_div,
-+	&ipg_perclk_div,
-+	&emi_div,
-+	&emi_slow_div,
-+	&can_div,
-+	&uart_div,
-+	&usdhc1_div,
-+	&usdhc2_div,
-+	&usdhc3_div,
-+	&usdhc4_div,
-+	&vpu_div,
-+	&hsi_tx_div,
-+	&ipu1_di0_pre_div,
-+	&ipu1_di1_pre_div,
-+	&ipu2_di0_pre_div,
-+	&ipu2_di1_pre_div,
-+	&ipu1_div,
-+	&ipu2_div,
-+	&ssi1_div,
-+	&ssi3_div,
-+	&esai_div,
-+	&ssi2_div,
-+	&enfc_div,
-+	&spdif_div,
-+	&asrc_serial_div,
-+};
-+
-+static unsigned long ldb_di_clk_get_rate(struct clk *clk)
-+{
-+	u32 val = __raw_readl(CSCMR2);
-+
-+	val &= (clk == &ldb_di0_clk) ? BM_CSCMR2_LDB_DI0_IPU_DIV :
-+				       BM_CSCMR2_LDB_DI1_IPU_DIV;
-+	if (val)
-+		return clk_get_rate(clk->parent) / 7;
-+	else
-+		return clk_get_rate(clk->parent) * 2 / 7;
-+}
-+
-+static int ldb_di_clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+	u32 val = __raw_readl(CSCMR2);
-+
-+	if (rate * 7 <= parent_rate + parent_rate / 20)
-+		val |= BM_CSCMR2_LDB_DI0_IPU_DIV;
-+	else
-+		val &= ~BM_CSCMR2_LDB_DI0_IPU_DIV;
-+
-+	__raw_writel(val, CSCMR2);
-+
-+	return 0;
-+}
-+
-+static unsigned long ldb_di_clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+
-+	if (rate * 7 <= parent_rate + parent_rate / 20)
-+		return parent_rate / 7;
-+	else
-+		return 2 * parent_rate / 7;
-+}
-+
-+static unsigned long _clk_get_rate(struct clk *clk)
-+{
-+	struct divider *d;
-+	u32 val, pred, podf;
-+	int i, num;
-+
-+	if (clk == &ldb_di0_clk || clk == &ldb_di1_clk)
-+		return ldb_di_clk_get_rate(clk);
-+
-+	num = ARRAY_SIZE(dividers);
-+	for (i = 0; i < num; i++)
-+		if (dividers[i]->clk == clk) {
-+			d = dividers[i];
-+			break;
-+		}
-+	if (i == num)
-+		return clk_get_rate(clk->parent);
-+
-+	val = __raw_readl(d->reg);
-+	pred = ((val & d->bm_pred) >> d->bp_pred) + 1;
-+	podf = ((val & d->bm_podf) >> d->bp_podf) + 1;
-+
-+	return clk_get_rate(clk->parent) / (pred * podf);
-+}
-+
-+static int clk_busy_wait(struct clk *clk)
-+{
-+	int timeout = 0x100000;
-+	u32 bm;
-+
-+	if (clk == &axi_clk)
-+		bm = BM_CDHIPR_AXI_PODF_BUSY;
-+	else if (clk == &ahb_clk)
-+		bm = BM_CDHIPR_AHB_PODF_BUSY;
-+	else if (clk == &mmdc_ch0_axi_clk)
-+		bm = BM_CDHIPR_MMDC_CH0_PODF_BUSY;
-+	else if (clk == &periph_clk)
-+		bm = BM_CDHIPR_PERIPH_SEL_BUSY;
-+	else if (clk == &arm_clk)
-+		bm = BM_CDHIPR_ARM_PODF_BUSY;
-+	else
-+		return -EINVAL;
-+
-+	while ((__raw_readl(CDHIPR) & bm) && --timeout)
-+		cpu_relax();
-+
-+	if (unlikely(!timeout))
-+		return -EBUSY;
-+
-+	return 0;
-+}
-+
-+static int _clk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+	struct divider *d;
-+	u32 val, div, max_div, pred = 0, podf;
-+	int i, num;
-+
-+	if (clk == &ldb_di0_clk || clk == &ldb_di1_clk)
-+		return ldb_di_clk_set_rate(clk, rate);
-+
-+	num = ARRAY_SIZE(dividers);
-+	for (i = 0; i < num; i++)
-+		if (dividers[i]->clk == clk) {
-+			d = dividers[i];
-+			break;
-+		}
-+	if (i == num)
-+		return -EINVAL;
-+
-+	max_div = ((d->bm_pred >> d->bp_pred) + 1) *
-+		  ((d->bm_pred >> d->bp_pred) + 1);
-+
-+	div = parent_rate / rate;
-+	if (div == 0)
-+		div++;
-+
-+	if ((parent_rate / div != rate) || div > max_div)
-+		return -EINVAL;
-+
-+	if (d->bm_pred) {
-+		calc_pred_podf_dividers(div, &pred, &podf);
-+	} else {
-+		pred = 1;
-+		podf = div;
-+	}
-+
-+	val = __raw_readl(d->reg);
-+	val &= ~(d->bm_pred | d->bm_podf);
-+	val |= (pred - 1) << d->bp_pred | (podf - 1) << d->bp_podf;
-+	__raw_writel(val, d->reg);
-+
-+	if (clk == &axi_clk || clk == &ahb_clk ||
-+	    clk == &mmdc_ch0_axi_clk || clk == &arm_clk)
-+		return clk_busy_wait(clk);
-+
-+	return 0;
-+}
-+
-+static unsigned long _clk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long parent_rate = clk_get_rate(clk->parent);
-+	u32 div = parent_rate / rate;
-+	u32 div_max, pred = 0, podf;
-+	struct divider *d;
-+	int i, num;
-+
-+	if (clk == &ldb_di0_clk || clk == &ldb_di1_clk)
-+		return ldb_di_clk_round_rate(clk, rate);
-+
-+	num = ARRAY_SIZE(dividers);
-+	for (i = 0; i < num; i++)
-+		if (dividers[i]->clk == clk) {
-+			d = dividers[i];
-+			break;
-+		}
-+	if (i == num)
-+		return -EINVAL;
-+
-+	if (div == 0 || parent_rate % rate)
-+		div++;
-+
-+	if (d->bm_pred) {
-+		calc_pred_podf_dividers(div, &pred, &podf);
-+		div = pred * podf;
-+	} else {
-+		div_max = (d->bm_podf >> d->bp_podf) + 1;
-+		if (div > div_max)
-+			div = div_max;
-+	}
-+
-+	return parent_rate / div;
-+}
-+
-+struct multiplexer {
-+	struct clk *clk;
-+	void __iomem *reg;
-+	u32 bp;
-+	u32 bm;
-+	int pnum;
-+	struct clk *parents[];
-+};
-+
-+static struct multiplexer axi_mux = {
-+	.clk = &axi_clk,
-+	.reg = CBCDR,
-+	.bp = BP_CBCDR_AXI_SEL,
-+	.bm = BM_CBCDR_AXI_SEL,
-+	.parents = {
-+		&periph_clk,
-+		&pll2_pfd_400m,
-+		&pll3_pfd_540m,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer periph_mux = {
-+	.clk = &periph_clk,
-+	.reg = CBCDR,
-+	.bp = BP_CBCDR_PERIPH_CLK_SEL,
-+	.bm = BM_CBCDR_PERIPH_CLK_SEL,
-+	.parents = {
-+		&periph_pre_clk,
-+		&periph_clk2_clk,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer periph_pre_mux = {
-+	.clk = &periph_pre_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_PRE_PERIPH_CLK_SEL,
-+	.bm = BM_CBCMR_PRE_PERIPH_CLK_SEL,
-+	.parents = {
-+		&pll2_bus,
-+		&pll2_pfd_400m,
-+		&pll2_pfd_352m,
-+		&pll2_200m,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer periph_clk2_mux = {
-+	.clk = &periph_clk2_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_PERIPH_CLK2_SEL,
-+	.bm = BM_CBCMR_PERIPH_CLK2_SEL,
-+	.parents = {
-+		&pll3_usb_otg,
-+		&osc_clk,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer periph2_mux = {
-+	.clk = &periph2_clk,
-+	.reg = CBCDR,
-+	.bp = BP_CBCDR_PERIPH2_CLK_SEL,
-+	.bm = BM_CBCDR_PERIPH2_CLK_SEL,
-+	.parents = {
-+		&periph2_pre_clk,
-+		&periph2_clk2_clk,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer periph2_pre_mux = {
-+	.clk = &periph2_pre_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_PRE_PERIPH2_CLK_SEL,
-+	.bm = BM_CBCMR_PRE_PERIPH2_CLK_SEL,
-+	.parents = {
-+		&pll2_bus,
-+		&pll2_pfd_400m,
-+		&pll2_pfd_352m,
-+		&pll2_200m,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer periph2_clk2_mux = {
-+	.clk = &periph2_clk2_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_PERIPH2_CLK2_SEL,
-+	.bm = BM_CBCMR_PERIPH2_CLK2_SEL,
-+	.parents = {
-+		&pll3_usb_otg,
-+		&osc_clk,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer gpu2d_axi_mux = {
-+	.clk = &gpu2d_axi_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_GPU2D_AXI_SEL,
-+	.bm = BM_CBCMR_GPU2D_AXI_SEL,
-+	.parents = {
-+		&axi_clk,
-+		&ahb_clk,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer gpu3d_axi_mux = {
-+	.clk = &gpu3d_axi_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_GPU3D_AXI_SEL,
-+	.bm = BM_CBCMR_GPU3D_AXI_SEL,
-+	.parents = {
-+		&axi_clk,
-+		&ahb_clk,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer gpu3d_core_mux = {
-+	.clk = &gpu3d_core_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_GPU3D_CORE_SEL,
-+	.bm = BM_CBCMR_GPU3D_CORE_SEL,
-+	.parents = {
-+		&mmdc_ch0_axi_clk,
-+		&pll3_usb_otg,
-+		&pll2_pfd_594m,
-+		&pll2_pfd_400m,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer gpu3d_shader_mux = {
-+	.clk = &gpu3d_shader_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_GPU3D_SHADER_SEL,
-+	.bm = BM_CBCMR_GPU3D_SHADER_SEL,
-+	.parents = {
-+		&mmdc_ch0_axi_clk,
-+		&pll3_usb_otg,
-+		&pll2_pfd_594m,
-+		&pll3_pfd_720m,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer pcie_axi_mux = {
-+	.clk = &pcie_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_PCIE_AXI_SEL,
-+	.bm = BM_CBCMR_PCIE_AXI_SEL,
-+	.parents = {
-+		&axi_clk,
-+		&ahb_clk,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer vdo_axi_mux = {
-+	.clk = &vdo_axi_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_VDO_AXI_SEL,
-+	.bm = BM_CBCMR_VDO_AXI_SEL,
-+	.parents = {
-+		&axi_clk,
-+		&ahb_clk,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer vpu_axi_mux = {
-+	.clk = &vpu_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_VPU_AXI_SEL,
-+	.bm = BM_CBCMR_VPU_AXI_SEL,
-+	.parents = {
-+		&axi_clk,
-+		&pll2_pfd_400m,
-+		&pll2_pfd_352m,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer gpu2d_core_mux = {
-+	.clk = &gpu2d_core_clk,
-+	.reg = CBCMR,
-+	.bp = BP_CBCMR_GPU2D_CORE_SEL,
-+	.bm = BM_CBCMR_GPU2D_CORE_SEL,
-+	.parents = {
-+		&axi_clk,
-+		&pll3_usb_otg,
-+		&pll2_pfd_352m,
-+		&pll2_pfd_400m,
-+		NULL
-+	},
-+};
-+
-+#define DEF_SSI_MUX(id)							\
-+	static struct multiplexer ssi##id##_mux = {			\
-+		.clk = &ssi##id##_clk,					\
-+		.reg = CSCMR1,						\
-+		.bp = BP_CSCMR1_SSI##id##_SEL,				\
-+		.bm = BM_CSCMR1_SSI##id##_SEL,				\
-+		.parents = {						\
-+			&pll3_pfd_508m,					\
-+			&pll3_pfd_454m,					\
-+			&pll4_audio,					\
-+			NULL						\
-+		},							\
-+	}
-+
-+DEF_SSI_MUX(1);
-+DEF_SSI_MUX(2);
-+DEF_SSI_MUX(3);
-+
-+#define DEF_USDHC_MUX(id)						\
-+	static struct multiplexer usdhc##id##_mux = {			\
-+		.clk = &usdhc##id##_clk,				\
-+		.reg = CSCMR1,						\
-+		.bp = BP_CSCMR1_USDHC##id##_SEL,			\
-+		.bm = BM_CSCMR1_USDHC##id##_SEL,			\
-+		.parents = {						\
-+			&pll2_pfd_400m,					\
-+			&pll2_pfd_352m,					\
-+			NULL						\
-+		},							\
-+	}
-+
-+DEF_USDHC_MUX(1);
-+DEF_USDHC_MUX(2);
-+DEF_USDHC_MUX(3);
-+DEF_USDHC_MUX(4);
-+
-+static struct multiplexer emi_mux = {
-+	.clk = &emi_clk,
-+	.reg = CSCMR1,
-+	.bp = BP_CSCMR1_EMI_SEL,
-+	.bm = BM_CSCMR1_EMI_SEL,
-+	.parents = {
-+		&axi_clk,
-+		&pll3_usb_otg,
-+		&pll2_pfd_400m,
-+		&pll2_pfd_352m,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer emi_slow_mux = {
-+	.clk = &emi_slow_clk,
-+	.reg = CSCMR1,
-+	.bp = BP_CSCMR1_EMI_SLOW_SEL,
-+	.bm = BM_CSCMR1_EMI_SLOW_SEL,
-+	.parents = {
-+		&axi_clk,
-+		&pll3_usb_otg,
-+		&pll2_pfd_400m,
-+		&pll2_pfd_352m,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer esai_mux = {
-+	.clk = &esai_clk,
-+	.reg = CSCMR2,
-+	.bp = BP_CSCMR2_ESAI_SEL,
-+	.bm = BM_CSCMR2_ESAI_SEL,
-+	.parents = {
-+		&pll4_audio,
-+		&pll3_pfd_508m,
-+		&pll3_pfd_454m,
-+		&pll3_usb_otg,
-+		NULL
-+	},
-+};
-+
-+#define DEF_LDB_DI_MUX(id)						\
-+	static struct multiplexer ldb_di##id##_mux = {			\
-+		.clk = &ldb_di##id##_clk,				\
-+		.reg = CS2CDR,						\
-+		.bp = BP_CS2CDR_LDB_DI##id##_SEL,			\
-+		.bm = BM_CS2CDR_LDB_DI##id##_SEL,			\
-+		.parents = {						\
-+			&pll5_video,					\
-+			&pll2_pfd_352m,					\
-+			&pll2_pfd_400m,					\
-+			&pll3_pfd_540m,					\
-+			&pll3_usb_otg,					\
-+			NULL						\
-+		},							\
-+	}
-+
-+DEF_LDB_DI_MUX(0);
-+DEF_LDB_DI_MUX(1);
-+
-+static struct multiplexer enfc_mux = {
-+	.clk = &enfc_clk,
-+	.reg = CS2CDR,
-+	.bp = BP_CS2CDR_ENFC_SEL,
-+	.bm = BM_CS2CDR_ENFC_SEL,
-+	.parents = {
-+		&pll2_pfd_352m,
-+		&pll2_bus,
-+		&pll3_usb_otg,
-+		&pll2_pfd_400m,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer spdif_mux = {
-+	.clk = &spdif_clk,
-+	.reg = CDCDR,
-+	.bp = BP_CDCDR_SPDIF_SEL,
-+	.bm = BM_CDCDR_SPDIF_SEL,
-+	.parents = {
-+		&pll4_audio,
-+		&pll3_pfd_508m,
-+		&pll3_pfd_454m,
-+		&pll3_usb_otg,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer asrc_serial_mux = {
-+	.clk = &asrc_serial_clk,
-+	.reg = CDCDR,
-+	.bp = BP_CDCDR_ASRC_SERIAL_SEL,
-+	.bm = BM_CDCDR_ASRC_SERIAL_SEL,
-+	.parents = {
-+		&pll4_audio,
-+		&pll3_pfd_508m,
-+		&pll3_pfd_454m,
-+		&pll3_usb_otg,
-+		NULL
-+	},
-+};
-+
-+static struct multiplexer hsi_tx_mux = {
-+	.clk = &hsi_tx_clk,
-+	.reg = CDCDR,
-+	.bp = BP_CDCDR_HSI_TX_SEL,
-+	.bm = BM_CDCDR_HSI_TX_SEL,
-+	.parents = {
-+		&pll3_120m,
-+		&pll2_pfd_400m,
-+		NULL
-+	},
-+};
-+
-+#define DEF_IPU_DI_PRE_MUX(r, i, d)					\
-+	static struct multiplexer ipu##i##_di##d##_pre_mux = {		\
-+		.clk = &ipu##i##_di##d##_pre_clk,			\
-+		.reg = r,						\
-+		.bp = BP_##r##_IPU##i##_DI##d##_PRE_SEL,		\
-+		.bm = BM_##r##_IPU##i##_DI##d##_PRE_SEL,		\
-+		.parents = {						\
-+			&mmdc_ch0_axi_clk,				\
-+			&pll3_usb_otg,					\
-+			&pll5_video,					\
-+			&pll2_pfd_352m,					\
-+			&pll2_pfd_400m,					\
-+			&pll3_pfd_540m,					\
-+			NULL						\
-+		},							\
-+	}
-+
-+DEF_IPU_DI_PRE_MUX(CHSCCDR, 1, 0);
-+DEF_IPU_DI_PRE_MUX(CHSCCDR, 1, 1);
-+DEF_IPU_DI_PRE_MUX(CSCDR2, 2, 0);
-+DEF_IPU_DI_PRE_MUX(CSCDR2, 2, 1);
-+
-+#define DEF_IPU_DI_MUX(r, i, d)						\
-+	static struct multiplexer ipu##i##_di##d##_mux = {		\
-+		.clk = &ipu##i##_di##d##_clk,				\
-+		.reg = r,						\
-+		.bp = BP_##r##_IPU##i##_DI##d##_SEL,			\
-+		.bm = BM_##r##_IPU##i##_DI##d##_SEL,			\
-+		.parents = {						\
-+			&ipu##i##_di##d##_pre_clk,			\
-+			&dummy_clk,					\
-+			&dummy_clk,					\
-+			&ldb_di0_clk,					\
-+			&ldb_di1_clk,					\
-+			NULL						\
-+		},							\
-+	}
-+
-+DEF_IPU_DI_MUX(CHSCCDR, 1, 0);
-+DEF_IPU_DI_MUX(CHSCCDR, 1, 1);
-+DEF_IPU_DI_MUX(CSCDR2, 2, 0);
-+DEF_IPU_DI_MUX(CSCDR2, 2, 1);
-+
-+#define DEF_IPU_MUX(id)							\
-+	static struct multiplexer ipu##id##_mux = {			\
-+		.clk = &ipu##id##_clk,					\
-+		.reg = CSCDR3,						\
-+		.bp = BP_CSCDR3_IPU##id##_HSP_SEL,			\
-+		.bm = BM_CSCDR3_IPU##id##_HSP_SEL,			\
-+		.parents = {						\
-+			&mmdc_ch0_axi_clk,				\
-+			&pll2_pfd_400m,					\
-+			&pll3_120m,					\
-+			&pll3_pfd_540m,					\
-+			NULL						\
-+		},							\
-+	}
-+
-+DEF_IPU_MUX(1);
-+DEF_IPU_MUX(2);
-+
-+static struct multiplexer *multiplexers[] = {
-+	&axi_mux,
-+	&periph_mux,
-+	&periph_pre_mux,
-+	&periph_clk2_mux,
-+	&periph2_mux,
-+	&periph2_pre_mux,
-+	&periph2_clk2_mux,
-+	&gpu2d_axi_mux,
-+	&gpu3d_axi_mux,
-+	&gpu3d_core_mux,
-+	&gpu3d_shader_mux,
-+	&pcie_axi_mux,
-+	&vdo_axi_mux,
-+	&vpu_axi_mux,
-+	&gpu2d_core_mux,
-+	&ssi1_mux,
-+	&ssi2_mux,
-+	&ssi3_mux,
-+	&usdhc1_mux,
-+	&usdhc2_mux,
-+	&usdhc3_mux,
-+	&usdhc4_mux,
-+	&emi_mux,
-+	&emi_slow_mux,
-+	&esai_mux,
-+	&ldb_di0_mux,
-+	&ldb_di1_mux,
-+	&enfc_mux,
-+	&spdif_mux,
-+	&asrc_serial_mux,
-+	&hsi_tx_mux,
-+	&ipu1_di0_pre_mux,
-+	&ipu1_di0_mux,
-+	&ipu1_di1_pre_mux,
-+	&ipu1_di1_mux,
-+	&ipu2_di0_pre_mux,
-+	&ipu2_di0_mux,
-+	&ipu2_di1_pre_mux,
-+	&ipu2_di1_mux,
-+	&ipu1_mux,
-+	&ipu2_mux,
-+};
-+
-+static int _clk_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	struct multiplexer *m;
-+	int i, num;
-+	u32 val;
-+
-+	num = ARRAY_SIZE(multiplexers);
-+	for (i = 0; i < num; i++)
-+		if (multiplexers[i]->clk == clk) {
-+			m = multiplexers[i];
-+			break;
-+		}
-+	if (i == num)
-+		return -EINVAL;
-+
-+	i = 0;
-+	while (m->parents[i]) {
-+		if (parent == m->parents[i])
-+			break;
-+		i++;
-+	}
-+	if (!m->parents[i])
-+		return -EINVAL;
-+
-+	val = __raw_readl(m->reg);
-+	val &= ~m->bm;
-+	val |= i << m->bp;
-+	__raw_writel(val, m->reg);
-+
-+	if (clk == &periph_clk)
-+		return clk_busy_wait(clk);
-+
-+	return 0;
-+}
-+
-+#define DEF_NG_CLK(name, p)				\
-+	static struct clk name = {			\
-+		.get_rate	= _clk_get_rate,	\
-+		.set_rate	= _clk_set_rate,	\
-+		.round_rate	= _clk_round_rate,	\
-+		.set_parent	= _clk_set_parent,	\
-+		.parent		= p,			\
-+	}
-+
-+DEF_NG_CLK(periph_clk2_clk,	&osc_clk);
-+DEF_NG_CLK(periph_pre_clk,	&pll2_bus);
-+DEF_NG_CLK(periph_clk,		&periph_pre_clk);
-+DEF_NG_CLK(periph2_clk2_clk,	&osc_clk);
-+DEF_NG_CLK(periph2_pre_clk,	&pll2_bus);
-+DEF_NG_CLK(periph2_clk,		&periph2_pre_clk);
-+DEF_NG_CLK(axi_clk,		&periph_clk);
-+DEF_NG_CLK(emi_clk,		&axi_clk);
-+DEF_NG_CLK(arm_clk,		&pll1_sw_clk);
-+DEF_NG_CLK(ahb_clk,		&periph_clk);
-+DEF_NG_CLK(ipg_clk,		&ahb_clk);
-+DEF_NG_CLK(ipg_perclk,		&ipg_clk);
-+DEF_NG_CLK(ipu1_di0_pre_clk,	&pll3_pfd_540m);
-+DEF_NG_CLK(ipu1_di1_pre_clk,	&pll3_pfd_540m);
-+DEF_NG_CLK(ipu2_di0_pre_clk,	&pll3_pfd_540m);
-+DEF_NG_CLK(ipu2_di1_pre_clk,	&pll3_pfd_540m);
-+DEF_NG_CLK(asrc_serial_clk,	&pll3_usb_otg);
-+
-+#define DEF_CLK(name, er, es, p, s)			\
-+	static struct clk name = {			\
-+		.enable_reg	= er,			\
-+		.enable_shift	= es,			\
-+		.enable		= _clk_enable,		\
-+		.disable	= _clk_disable,		\
-+		.get_rate	= _clk_get_rate,	\
-+		.set_rate	= _clk_set_rate,	\
-+		.round_rate	= _clk_round_rate,	\
-+		.set_parent	= _clk_set_parent,	\
-+		.parent		= p,			\
-+		.secondary	= s,			\
-+	}
-+
-+DEF_CLK(aips_tz1_clk,	  CCGR0, CG0,  &ahb_clk,	  NULL);
-+DEF_CLK(aips_tz2_clk,	  CCGR0, CG1,  &ahb_clk,	  NULL);
-+DEF_CLK(apbh_dma_clk,	  CCGR0, CG2,  &ahb_clk,	  NULL);
-+DEF_CLK(asrc_clk,	  CCGR0, CG3,  &pll4_audio,	  NULL);
-+DEF_CLK(can1_serial_clk,  CCGR0, CG8,  &pll3_usb_otg,	  NULL);
-+DEF_CLK(can1_clk,	  CCGR0, CG7,  &pll3_usb_otg,	  &can1_serial_clk);
-+DEF_CLK(can2_serial_clk,  CCGR0, CG10, &pll3_usb_otg,	  NULL);
-+DEF_CLK(can2_clk,	  CCGR0, CG9,  &pll3_usb_otg,	  &can2_serial_clk);
-+DEF_CLK(ecspi1_clk,	  CCGR1, CG0,  &pll3_60m,	  NULL);
-+DEF_CLK(ecspi2_clk,	  CCGR1, CG1,  &pll3_60m,	  NULL);
-+DEF_CLK(ecspi3_clk,	  CCGR1, CG2,  &pll3_60m,	  NULL);
-+DEF_CLK(ecspi4_clk,	  CCGR1, CG3,  &pll3_60m,	  NULL);
-+DEF_CLK(ecspi5_clk,	  CCGR1, CG4,  &pll3_60m,	  NULL);
-+DEF_CLK(enet_clk,	  CCGR1, CG5,  &pll8_enet,	  NULL);
-+DEF_CLK(esai_clk,	  CCGR1, CG8,  &pll3_usb_otg,	  NULL);
-+DEF_CLK(gpt_serial_clk,	  CCGR1, CG11, &ipg_perclk,	  NULL);
-+DEF_CLK(gpt_clk,	  CCGR1, CG10, &ipg_perclk,	  &gpt_serial_clk);
-+DEF_CLK(gpu2d_core_clk,	  CCGR1, CG12, &pll2_pfd_352m,	  &gpu2d_axi_clk);
-+DEF_CLK(gpu3d_core_clk,	  CCGR1, CG13, &pll2_pfd_594m,	  &gpu3d_axi_clk);
-+DEF_CLK(gpu3d_shader_clk, CCGR1, CG13, &pll3_pfd_720m,	  &gpu3d_axi_clk);
-+DEF_CLK(hdmi_iahb_clk,	  CCGR2, CG0,  &ahb_clk,	  NULL);
-+DEF_CLK(hdmi_isfr_clk,	  CCGR2, CG2,  &pll3_pfd_540m,	  &hdmi_iahb_clk);
-+DEF_CLK(i2c1_clk,	  CCGR2, CG3,  &ipg_perclk,	  NULL);
-+DEF_CLK(i2c2_clk,	  CCGR2, CG4,  &ipg_perclk,	  NULL);
-+DEF_CLK(i2c3_clk,	  CCGR2, CG5,  &ipg_perclk,	  NULL);
-+DEF_CLK(iim_clk,	  CCGR2, CG6,  &ipg_clk,	  NULL);
-+DEF_CLK(enfc_clk,	  CCGR2, CG7,  &pll2_pfd_352m,	  NULL);
-+DEF_CLK(ipu1_clk,	  CCGR3, CG0,  &mmdc_ch0_axi_clk, NULL);
-+DEF_CLK(ipu1_di0_clk,	  CCGR3, CG1,  &ipu1_di0_pre_clk, NULL);
-+DEF_CLK(ipu1_di1_clk,	  CCGR3, CG2,  &ipu1_di1_pre_clk, NULL);
-+DEF_CLK(ipu2_clk,	  CCGR3, CG3,  &mmdc_ch0_axi_clk, NULL);
-+DEF_CLK(ipu2_di0_clk,	  CCGR3, CG4,  &ipu2_di0_pre_clk, NULL);
-+DEF_CLK(ipu2_di1_clk,	  CCGR3, CG5,  &ipu2_di1_pre_clk, NULL);
-+DEF_CLK(ldb_di0_clk,	  CCGR3, CG6,  &pll3_pfd_540m,	  NULL);
-+DEF_CLK(ldb_di1_clk,	  CCGR3, CG7,  &pll3_pfd_540m,	  NULL);
-+DEF_CLK(hsi_tx_clk,	  CCGR3, CG8,  &pll2_pfd_400m,	  NULL);
-+DEF_CLK(mlb_clk,	  CCGR3, CG9,  &pll6_mlb,	  NULL);
-+DEF_CLK(mmdc_ch0_ipg_clk, CCGR3, CG12, &ipg_clk,	  NULL);
-+DEF_CLK(mmdc_ch0_axi_clk, CCGR3, CG10, &periph_clk,	  &mmdc_ch0_ipg_clk);
-+DEF_CLK(mmdc_ch1_ipg_clk, CCGR3, CG13, &ipg_clk,	  NULL);
-+DEF_CLK(mmdc_ch1_axi_clk, CCGR3, CG11, &periph2_clk,	  &mmdc_ch1_ipg_clk);
-+DEF_CLK(openvg_axi_clk,   CCGR3, CG13, &axi_clk,	  NULL);
-+DEF_CLK(pwm1_clk,	  CCGR4, CG8,  &ipg_perclk,	  NULL);
-+DEF_CLK(pwm2_clk,	  CCGR4, CG9,  &ipg_perclk,	  NULL);
-+DEF_CLK(pwm3_clk,	  CCGR4, CG10, &ipg_perclk,	  NULL);
-+DEF_CLK(pwm4_clk,	  CCGR4, CG11, &ipg_perclk,	  NULL);
-+DEF_CLK(gpmi_bch_apb_clk, CCGR4, CG12, &usdhc3_clk,	  NULL);
-+DEF_CLK(gpmi_bch_clk,	  CCGR4, CG13, &usdhc4_clk,	  &gpmi_bch_apb_clk);
-+DEF_CLK(gpmi_apb_clk,	  CCGR4, CG15, &usdhc3_clk,	  &gpmi_bch_clk);
-+DEF_CLK(gpmi_io_clk,	  CCGR4, CG14, &enfc_clk,	  &gpmi_apb_clk);
-+DEF_CLK(sdma_clk,	  CCGR5, CG3,  &ahb_clk,	  NULL);
-+DEF_CLK(spba_clk,	  CCGR5, CG6,  &ipg_clk,	  NULL);
-+DEF_CLK(spdif_clk,	  CCGR5, CG7,  &pll3_usb_otg,	  &spba_clk);
-+DEF_CLK(ssi1_clk,	  CCGR5, CG9,  &pll3_pfd_508m,	  NULL);
-+DEF_CLK(ssi2_clk,	  CCGR5, CG10, &pll3_pfd_508m,	  NULL);
-+DEF_CLK(ssi3_clk,	  CCGR5, CG11, &pll3_pfd_508m,	  NULL);
-+DEF_CLK(uart_serial_clk,  CCGR5, CG13, &pll3_usb_otg,	  NULL);
-+DEF_CLK(uart_clk,	  CCGR5, CG12, &pll3_80m,	  &uart_serial_clk);
-+DEF_CLK(usboh3_clk,	  CCGR6, CG0,  &ipg_clk,	  NULL);
-+DEF_CLK(usdhc1_clk,	  CCGR6, CG1,  &pll2_pfd_400m,	  NULL);
-+DEF_CLK(usdhc2_clk,	  CCGR6, CG2,  &pll2_pfd_400m,	  NULL);
-+DEF_CLK(usdhc3_clk,	  CCGR6, CG3,  &pll2_pfd_400m,	  NULL);
-+DEF_CLK(usdhc4_clk,	  CCGR6, CG4,  &pll2_pfd_400m,	  NULL);
-+DEF_CLK(emi_slow_clk,	  CCGR6, CG5,  &axi_clk,	  NULL);
-+DEF_CLK(vdo_axi_clk,	  CCGR6, CG6,  &axi_clk,	  NULL);
-+DEF_CLK(vpu_clk,	  CCGR6, CG7,  &axi_clk,	  NULL);
-+
-+static int pcie_clk_enable(struct clk *clk)
-+{
-+	u32 val;
-+
-+	val = __raw_readl(PLL8_ENET);
-+	val |= BM_PLL_ENET_EN_PCIE;
-+	__raw_writel(val, PLL8_ENET);
-+
-+	return _clk_enable(clk);
-+}
-+
-+static void pcie_clk_disable(struct clk *clk)
-+{
-+	u32 val;
-+
-+	_clk_disable(clk);
-+
-+	val = __raw_readl(PLL8_ENET);
-+	val &= BM_PLL_ENET_EN_PCIE;
-+	__raw_writel(val, PLL8_ENET);
-+}
-+
-+static struct clk pcie_clk = {
-+	.enable_reg = CCGR4,
-+	.enable_shift = CG0,
-+	.enable = pcie_clk_enable,
-+	.disable = pcie_clk_disable,
-+	.set_parent = _clk_set_parent,
-+	.parent = &axi_clk,
-+	.secondary = &pll8_enet,
-+};
-+
-+static int sata_clk_enable(struct clk *clk)
-+{
-+	u32 val;
-+
-+	val = __raw_readl(PLL8_ENET);
-+	val |= BM_PLL_ENET_EN_SATA;
-+	__raw_writel(val, PLL8_ENET);
-+
-+	return _clk_enable(clk);
-+}
-+
-+static void sata_clk_disable(struct clk *clk)
-+{
-+	u32 val;
-+
-+	_clk_disable(clk);
-+
-+	val = __raw_readl(PLL8_ENET);
-+	val &= BM_PLL_ENET_EN_SATA;
-+	__raw_writel(val, PLL8_ENET);
-+}
-+
-+static struct clk sata_clk = {
-+	.enable_reg = CCGR5,
-+	.enable_shift = CG2,
-+	.enable = sata_clk_enable,
-+	.disable = sata_clk_disable,
-+	.parent = &ipg_clk,
-+	.secondary = &pll8_enet,
-+};
-+
-+#define _REGISTER_CLOCK(d, n, c) \
-+	{ \
-+		.dev_id = d, \
-+		.con_id = n, \
-+		.clk = &c, \
-+	}
-+
-+static struct clk_lookup lookups[] = {
-+	_REGISTER_CLOCK("2020000.uart", NULL, uart_clk),
-+	_REGISTER_CLOCK("21e8000.uart", NULL, uart_clk),
-+	_REGISTER_CLOCK("21ec000.uart", NULL, uart_clk),
-+	_REGISTER_CLOCK("21f0000.uart", NULL, uart_clk),
-+	_REGISTER_CLOCK("21f4000.uart", NULL, uart_clk),
-+	_REGISTER_CLOCK("2188000.enet", NULL, enet_clk),
-+	_REGISTER_CLOCK("21a0000.i2c", NULL, i2c1_clk),
-+	_REGISTER_CLOCK("21a4000.i2c", NULL, i2c2_clk),
-+	_REGISTER_CLOCK("21a8000.i2c", NULL, i2c3_clk),
-+	_REGISTER_CLOCK("2008000.ecspi", NULL, ecspi1_clk),
-+	_REGISTER_CLOCK("200c000.ecspi", NULL, ecspi2_clk),
-+	_REGISTER_CLOCK("2010000.ecspi", NULL, ecspi3_clk),
-+	_REGISTER_CLOCK("2014000.ecspi", NULL, ecspi4_clk),
-+	_REGISTER_CLOCK("2018000.ecspi", NULL, ecspi5_clk),
-+	_REGISTER_CLOCK("20ec000.sdma", NULL, sdma_clk),
-+	_REGISTER_CLOCK("20bc000.wdog", NULL, dummy_clk),
-+	_REGISTER_CLOCK("20c0000.wdog", NULL, dummy_clk),
-+	_REGISTER_CLOCK(NULL, "ckih", ckih_clk),
-+	_REGISTER_CLOCK(NULL, "ckih2_clk", ckih2_clk),
-+	_REGISTER_CLOCK(NULL, "ckil_clk", ckil_clk),
-+	_REGISTER_CLOCK(NULL, "aips_tz1_clk", aips_tz1_clk),
-+	_REGISTER_CLOCK(NULL, "aips_tz2_clk", aips_tz2_clk),
-+	_REGISTER_CLOCK(NULL, "asrc_clk", asrc_clk),
-+	_REGISTER_CLOCK(NULL, "can2_clk", can2_clk),
-+	_REGISTER_CLOCK(NULL, "hdmi_isfr_clk", hdmi_isfr_clk),
-+	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk),
-+	_REGISTER_CLOCK(NULL, "mlb_clk", mlb_clk),
-+	_REGISTER_CLOCK(NULL, "openvg_axi_clk", openvg_axi_clk),
-+	_REGISTER_CLOCK(NULL, "pwm1_clk", pwm1_clk),
-+	_REGISTER_CLOCK(NULL, "pwm2_clk", pwm2_clk),
-+	_REGISTER_CLOCK(NULL, "pwm3_clk", pwm3_clk),
-+	_REGISTER_CLOCK(NULL, "pwm4_clk", pwm4_clk),
-+	_REGISTER_CLOCK(NULL, "gpmi_io_clk", gpmi_io_clk),
-+	_REGISTER_CLOCK(NULL, "usboh3_clk", usboh3_clk),
-+	_REGISTER_CLOCK(NULL, "sata_clk", sata_clk),
-+};
-+
-+static void __init imx6q_ccm_low_power_init(void)
-+{
-+	u32 val;
-+
-+	/* only keep necessary clocks on */
-+	__raw_writel(0x3 << CG0  | 0x3 << CG1  | 0x3 << CG2,	CCGR0);
-+	__raw_writel(0x3 << CG8  | 0x3 << CG9  | 0x3 << CG10,	CCGR2);
-+	__raw_writel(0x3 << CG10 | 0x3 << CG12,			CCGR3);
-+	__raw_writel(0x3 << CG4  | 0x3 << CG6  | 0x3 << CG7,	CCGR4);
-+	__raw_writel(0x3 << CG0,				CCGR5);
-+	__raw_writel(0,						CCGR6);
-+	__raw_writel(0,						CCGR7);
-+
-+	clk_enable(&uart_clk);
-+	clk_enable(&mmdc_ch0_axi_clk);
-+
-+	/* setup for STOP mode */
-+	val = __raw_readl(CLPCR);
-+	val &= ~(BM_CLPCR_LPM | BM_CLPCR_STBY_COUNT);
-+	val |= 0x2 << BP_CLPCR_LPM | 0x3 << BP_CLPCR_STBY_COUNT;
-+	val |= BM_CLPCR_VSTBY;
-+	val |= BM_CLPCR_SBYOS;
-+	val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
-+	__raw_writel(val, CLPCR);
-+}
-+
-+static struct map_desc imx6q_clock_desc[] = {
-+	{
-+		.virtual	= MX6Q_CCM_BASE_VADDR,
-+		.pfn		= __phys_to_pfn(MX6Q_CCM_BASE_ADDR),
-+		.length		= SZ_16K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= MX6Q_ANATOP_BASE_VADDR,
-+		.pfn		= __phys_to_pfn(MX6Q_ANATOP_BASE_ADDR),
-+		.length		= SZ_4K,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+int __init mx6q_clocks_init(unsigned long ckil, unsigned long osc,
-+			    unsigned long ckih1, unsigned long ckih2)
-+{
-+	struct device_node *np;
-+	void __iomem *base;
-+	int i, irq;
-+
-+	iotable_init(imx6q_clock_desc, ARRAY_SIZE(imx6q_clock_desc));
-+
-+	external_low_reference = ckil;
-+	external_high_reference = ckih1;
-+	ckih2_reference = ckih2;
-+	oscillator_reference = osc;
-+
-+	for (i = 0; i < ARRAY_SIZE(lookups); i++)
-+		clkdev_add(&lookups[i]);
-+
-+	imx6q_ccm_low_power_init();
-+
-+	clk_set_rate(&pll4_audio, FREQ_650M);
-+	clk_set_rate(&pll5_video, FREQ_650M);
-+	clk_set_parent(&ipu1_di0_clk, &ipu1_di0_pre_clk);
-+	clk_set_parent(&ipu1_di0_pre_clk, &pll5_video);
-+	clk_set_parent(&gpu3d_shader_clk, &pll2_pfd_594m);
-+	clk_set_rate(&gpu3d_shader_clk, FREQ_594M);
-+	clk_set_parent(&gpu3d_core_clk, &mmdc_ch0_axi_clk);
-+	clk_set_rate(&gpu3d_core_clk, FREQ_528M);
-+	clk_set_parent(&asrc_serial_clk, &pll3_usb_otg);
-+	clk_set_rate(&asrc_serial_clk, 1500000);
-+	clk_set_rate(&enfc_clk, 11000000);
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpt");
-+	base = of_iomap(np, 0);
-+	WARN_ON(!base);
-+	irq = irq_of_parse_and_map(np, 0);
-+	mxc_timer_init(&gpt_clk, base, irq);
-+
-+	return 0;
-+}
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-new file mode 100644
-index 0000000..acf0ef7
---- /dev/null
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -0,0 +1,110 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later@the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
++#include <asm/smp_twd.h>
 +#include <asm/hardware/gic.h>
 +
-+#define GPC_IMR1		0x008
-+#define GPC_PGC_CPU_PDN		0x2a0
++static u32 twd_saved_regs[4];
++static int twd_irq;
 +
-+#define IMR_NUM			4
-+
-+static void __iomem *gpc_base;
-+static u32 gpc_wake_irqs[IMR_NUM];
-+static u32 gpc_saved_imrs[IMR_NUM];
-+
-+void imx_gpc_pre_suspend(void)
++/*
++ * Resuming from ARM Dormant/Shutdown mode, the boot procedure will
++ * re-setup local timer for secondary cores.  For primary core, it
++ * has to take care of itself with the following pair of functions
++ * during suspend/resume.
++ */
++void imx_local_timer_pre_suspend(void)
 +{
-+	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
-+	int i;
-+
-+	for (i = 0; i < IMR_NUM; i++) {
-+		gpc_saved_imrs[i] = __raw_readl(reg_imr1 + i * 4);
-+		__raw_writel(~gpc_wake_irqs[i], reg_imr1 + i * 4);
-+	}
-+
-+	/* Tell GPC to power off ARM core when suspend */
-+	__raw_writel(0x1, gpc_base + GPC_PGC_CPU_PDN);
++	twd_saved_regs[0] = __raw_readl(twd_base + TWD_TIMER_LOAD);
++	twd_saved_regs[1] = __raw_readl(twd_base + TWD_TIMER_COUNTER);
++	twd_saved_regs[2] = __raw_readl(twd_base + TWD_TIMER_CONTROL);
++	twd_saved_regs[3] = __raw_readl(twd_base + TWD_TIMER_INTSTAT);
 +}
 +
-+void imx_gpc_post_resume(void)
++void imx_local_timer_post_resume(void)
 +{
-+	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
-+	int i;
++	__raw_writel(twd_saved_regs[0], twd_base + TWD_TIMER_LOAD);
++	__raw_writel(twd_saved_regs[1], twd_base + TWD_TIMER_COUNTER);
++	__raw_writel(twd_saved_regs[2], twd_base + TWD_TIMER_CONTROL);
++	__raw_writel(twd_saved_regs[3], twd_base + TWD_TIMER_INTSTAT);
 +
-+	for (i = 0; i < IMR_NUM; i++)
-+		__raw_writel(gpc_saved_imrs[i], reg_imr1 + i * 4);
++	gic_enable_ppi(twd_irq);
 +}
 +
-+static int imx_gpc_irq_set_wake(struct irq_data *d, unsigned int on)
-+{
-+	unsigned int idx = d->irq / 32 - 1;
-+	u32 mask;
-+
-+	/* Sanity check for SPI irq */
-+	if (d->irq < 32)
-+		return -EINVAL;
-+
-+	mask = 1 << d->irq % 32;
-+	gpc_wake_irqs[idx] = on ? gpc_wake_irqs[idx] | mask :
-+				  gpc_wake_irqs[idx] & ~mask;
-+
-+	return 0;
-+}
-+
-+static void imx_gpc_irq_unmask(struct irq_data *d)
-+{
-+	void __iomem *reg;
-+	u32 val;
-+
-+	/* Sanity check for SPI irq */
-+	if (d->irq < 32)
-+		return;
-+
-+	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
-+	val = __raw_readl(reg);
-+	val &= ~(1 << d->irq % 32);
-+	__raw_writel(val, reg);
-+}
-+
-+static void imx_gpc_irq_mask(struct irq_data *d)
-+{
-+	void __iomem *reg;
-+	u32 val;
-+
-+	/* Sanity check for SPI irq */
-+	if (d->irq < 32)
-+		return;
-+
-+	reg = gpc_base + GPC_IMR1 + (d->irq / 32 - 1) * 4;
-+	val = __raw_readl(reg);
-+	val |= 1 << (d->irq % 32);
-+	__raw_writel(val, reg);
-+}
-+
-+void __init imx_gpc_init(void)
++/*
++ * Setup the local clock events for a CPU.
++ */
++int __cpuinit local_timer_setup(struct clock_event_device *evt)
 +{
 +	struct device_node *np;
 +
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
-+	gpc_base = of_iomap(np, 0);
-+	WARN_ON(!gpc_base);
++	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
++	if (!twd_base) {
++		twd_base = of_iomap(np, 0);
++		WARN_ON(!twd_base);
++	}
++	twd_irq = irq_of_parse_and_map(np, 0);
++	evt->irq = twd_irq;
++	twd_timer_setup(evt);
 +
-+	/* Register GPC as the secondary interrupt controller behind GIC */
-+	gic_arch_extn.irq_mask = imx_gpc_irq_mask;
-+	gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
-+	gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
++	return 0;
 +}
-diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
 new file mode 100644
-index 0000000..8d6b540
+index 0000000..2352caf
 --- /dev/null
-+++ b/arch/arm/mach-imx/mmdc.c
-@@ -0,0 +1,71 @@
++++ b/arch/arm/mach-imx/platsmp.c
+@@ -0,0 +1,86 @@
 +/*
 + * Copyright 2011 Freescale Semiconductor, Inc.
 + * Copyright 2011 Linaro Ltd.
@@ -2199,121 +269,90 @@ index 0000000..8d6b540
 + */
 +
 +#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
++#include <linux/smp.h>
++#include <asm/page.h>
++#include <asm/smp_scu.h>
++#include <asm/hardware/gic.h>
++#include <asm/mach/map.h>
++#include <mach/common.h>
 +
-+#define MMDC_MAPSR		0x404
-+#define BP_MMDC_MAPSR_PSD	0
-+#define BP_MMDC_MAPSR_PSS	4
++extern void v7_secondary_startup(void);
 +
-+static int __devinit imx_mmdc_probe(struct platform_device *pdev)
++#define IMX_SCU_VIRT_BASE	0xf4a00000
++
++static void __iomem *scu_base = ((void __iomem *)(IMX_SCU_VIRT_BASE));
++
++static struct map_desc scu_io_desc __initdata = {
++	.virtual	= IMX_SCU_VIRT_BASE,
++	.pfn		= 0, /* run-time */
++	.length		= SZ_4K,
++	.type		= MT_DEVICE,
++};
++
++void __init imx_scu_map_io(void)
 +{
-+	struct device_node *np = pdev->dev.of_node;
-+	void __iomem *mmdc_base, *reg;
-+	u32 val;
-+	int timeout = 0x400;
++	unsigned long base;
 +
-+	mmdc_base = of_iomap(np, 0);
-+	WARN_ON(!mmdc_base);
++	/* Get SCU base */
++	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
 +
-+	reg = mmdc_base + MMDC_MAPSR;
++	scu_io_desc.pfn = __phys_to_pfn(base);
++	iotable_init(&scu_io_desc, 1);
++}
 +
-+	/* Enable automatic power saving */
-+	val = readl(reg);
-+	val &= ~(1 << BP_MMDC_MAPSR_PSD);
-+	writel(val, reg);
++void __cpuinit platform_secondary_init(unsigned int cpu)
++{
++	/*
++	 * if any interrupts are already enabled for the primary
++	 * core (e.g. timer irq), then they will not have been enabled
++	 * for us: do so
++	 */
++	gic_secondary_init(0);
++}
 +
-+	/* Ensure it's successfully enabled */
-+	while (!(readl(reg) & 1 << BP_MMDC_MAPSR_PSS) && --timeout)
-+		cpu_relax();
-+
-+	if (unlikely(!timeout)) {
-+		pr_warn("%s: failed to enable automatic power saving\n",
-+			__func__);
-+		return -EBUSY;
-+	}
-+
++int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	imx_set_cpu_jump(cpu, v7_secondary_startup);
++	imx_enable_cpu(cpu, true);
 +	return 0;
 +}
 +
-+static struct of_device_id imx_mmdc_dt_ids[] = {
-+	{ .compatible = "fsl,imx6q-mmdc", },
-+	{ /* sentinel */ }
-+};
-+
-+static struct platform_driver imx_mmdc_driver = {
-+	.driver		= {
-+		.name	= "imx-mmdc",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = imx_mmdc_dt_ids,
-+	},
-+	.probe		= imx_mmdc_probe,
-+};
-+
-+static int __init imx_mmdc_init(void)
-+{
-+	return platform_driver_register(&imx_mmdc_driver);
-+}
-+postcore_initcall(imx_mmdc_init);
-diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-new file mode 100644
-index 0000000..95fdd65
---- /dev/null
-+++ b/arch/arm/mach-imx/src.c
-@@ -0,0 +1,52 @@
 +/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later@the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
++ * Initialise the CPU possible map early - this describes the CPUs
++ * which may be present or become present in the system.
 + */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <asm/unified.h>
-+
-+#define SRC_SCR				0x000
-+#define SRC_GPR1			0x020
-+#define BP_SRC_SCR_CORE1_RST		14
-+#define BP_SRC_SCR_CORE1_ENABLE		22
-+
-+static void __iomem *src_base;
-+
-+void imx_enable_cpu(int cpu, bool enable)
++void __init smp_init_cpus(void)
 +{
-+	u32 mask, val;
++	int i, ncores;
 +
-+	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
-+	val = __raw_readl(src_base + SRC_SCR);
-+	val = enable ? val | mask : val & ~mask;
-+	__raw_writel(val, src_base + SRC_SCR);
++	ncores = scu_get_core_count(scu_base);
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++
++	set_smp_cross_call(gic_raise_softirq);
 +}
 +
-+void imx_set_cpu_jump(int cpu, void *jump_addr)
++void imx_smp_prepare(void)
 +{
-+	__raw_writel(BSYM(virt_to_phys(jump_addr)),
-+		     src_base + SRC_GPR1 + cpu * 8);
++	scu_enable(scu_base);
 +}
 +
-+static int __init imx_src_init(void)
++void __init platform_smp_prepare_cpus(unsigned int max_cpus)
 +{
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-src");
-+	src_base = of_iomap(np, 0);
-+	WARN_ON(!src_base);
-+
-+	return 0;
++	imx_smp_prepare();
 +}
-+early_initcall(imx_src_init);
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 4e3d978..73da910 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -72,4 +72,7 @@ extern void mxc_arch_reset_init(void __iomem *);
+ extern void mx51_efikamx_reset(void);
+ extern int mx53_revision(void);
+ extern int mx53_display_revision(void);
++
++extern void imx_enable_cpu(int cpu, bool enable);
++extern void imx_set_cpu_jump(int cpu, void *jump_addr);
+ #endif
 -- 
 1.7.4.1
