@@ -1,35 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Sep 2011 12:03:11 +0100
-Subject: [PATCH 1/5] ARM: Samsung: PWM: Allow to differentiate SoCs
-	based on platform device name.
-In-Reply-To: <1660939.8M3FnZsmga@flatron>
-References: <1731819.jJi37IsjvJ@flatron>
-	<CAH9JG2UiuaCyOk24hC=240ptQa8CKCVkXHaQzNt=YcnyQksnOA@mail.gmail.com>
-	<1645899.rJz3R6pebo@flatron> <1660939.8M3FnZsmga@flatron>
-Message-ID: <20110906110311.GM6619@n2100.arm.linux.org.uk>
+From: phil.sutter@viprinet.com (Phil Sutter)
+Date: Tue, 6 Sep 2011 13:05:03 +0200
+Subject: [PATCH] af_packet: flush complete kernel cache in packet_sendmsg
+In-Reply-To: <20110906095722.GK6619@n2100.arm.linux.org.uk>
+References: <20110505141107.GC30443@orbit.nwl.cc>
+	<1314961686-30870-1-git-send-email-phil.sutter@viprinet.com>
+	<1314971179.3092.159.camel@deadeye>
+	<20110902172850.GB6619@n2100.arm.linux.org.uk>
+	<20110905195714.GC29025@philter>
+	<20110906095722.GK6619@n2100.arm.linux.org.uk>
+Message-ID: <20110906110503.GE29025@philter>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 12:41:07PM +0200, Tomasz Figa wrote:
-> On Thursday 01 of September 2011 at 13:18:32, Tomasz Figa wrote:
-> > Well, now we have three alternatives:
-> > - to leave it as is (i.e. changing platform device names)
-> > - to use cpu_is_* (does it ever exist for S3C64xx or soc_is_s3c64xx is its equivalent?)
-> > - to use soc_is_* 
-> > 
-> > Waiting for more comments then.
-> > 
-> Ping.
+On Tue, Sep 06, 2011 at 10:57:22AM +0100, Russell King - ARM Linux wrote:
+> > The code in question uses __get_free_pages(), and if that fails uses
+> > vmalloc() (see alloc_one_pg_vec_page() for reference). Both code paths
+> > show result in the same faulty behaviour.
 > 
-> Should I keep it as is or rather change it to use soc_is_s3c64xx instead?
+> So, what you're wanting is cache coherency between vmalloc() and
+> userspace.  There is no API in the kernel to do that, and you'll see
+> the same failures of this interface not only on ARM but also other
+> architectures with virtual caches.
+> 
+> It sounds like we need an API to flush the cache using both the
+> userspace address, plus the kernel side address be that in the direct
+> map or the vmalloc map areas.
+> 
+> Or maybe the right solution is to simply disable AF_PACKET MMAP support
+> for virtual cached architectures - it may be that adding cache flushing
+> calls makes the thing too expensive and the benefits of mmap over normal
+> read/write are lost.
 
-I don't know what question you're asking (the questions don't make sense
-in terms of the quoted context.)
+OK, that's horrible. Of course we depend on just this combination to
+work flawlessly, i.e. PACKET_MMAP && VIVT. :(
 
-If you're asking whether you should use a cpu_ prefix instead of a soc_
-prefix for identifying s3c64xx, then consider the question.
+Another userspace-interface I'm working on uses a different solution:
+memory is allocated in userspace and accessed from kernelspace using
+get_user_pages(). I did not explicitly search for the earlier described
+fault pattern, but we didn't notice any problem with this approach on
+the very same hardware either. I already see myself writing TPACKET_V3.
+;)
 
-What is the CPU?
+What do you think?
 
-What are S3C64xx / OMAP / PXA310 / SA-11x0 / AT91RM9200?  CPU or SoC ?
-What are Cortex A8/A9 / Xscale / StrongARM / ARM920?  CPU or SoC ?
+Greetings, Phil
+
+-- 
+Viprinet GmbH
+Mainzer Str. 43
+55411 Bingen am Rhein
+Germany
+
+Zentrale:     +49-6721-49030-0
+Durchwahl:    +49-6721-49030-134
+Fax:          +49-6721-49030-209
+
+phil.sutter at viprinet.com
+http://www.viprinet.com
+
+Sitz der Gesellschaft: Bingen am Rhein
+Handelsregister: Amtsgericht Mainz HRB40380
+Gesch?ftsf?hrer: Simon Kissel
