@@ -1,61 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Sep 2011 10:57:22 +0100
-Subject: [PATCH] af_packet: flush complete kernel cache in packet_sendmsg
-In-Reply-To: <20110905195714.GC29025@philter>
-References: <20110505141107.GC30443@orbit.nwl.cc>
-	<1314961686-30870-1-git-send-email-phil.sutter@viprinet.com>
-	<1314971179.3092.159.camel@deadeye>
-	<20110902172850.GB6619@n2100.arm.linux.org.uk>
-	<20110905195714.GC29025@philter>
-Message-ID: <20110906095722.GK6619@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue,  6 Sep 2011 17:58:34 +0800
+Subject: [PATCH 0/6] add initial imx6q support
+Message-ID: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 05, 2011 at 09:57:14PM +0200, Phil Sutter wrote:
-> Hi,
-> 
-> On Fri, Sep 02, 2011 at 06:28:50PM +0100, Russell King - ARM Linux wrote:
-> > On Fri, Sep 02, 2011 at 02:46:17PM +0100, Ben Hutchings wrote:
-> > > On Fri, 2011-09-02 at 13:08 +0200, Phil Sutter wrote:
-> > > > This flushes the cache before and after accessing the mmapped packet
-> > > > buffer. It seems like the call to flush_dcache_page from inside
-> > > > __packet_get_status is not enough on Kirkwood (or ARM in general).
-> > > > ---
-> > > > I know this is far from an optimal solution, but it's in fact the only working
-> > > > one I found.
-> > > [...]
-> > > 
-> > > This is ridiculous.  If flush_dcache_page() isn't doing everything it
-> > > should, you need to fix that.
-> > 
-> > It does do everything it should - which is to perform maintanence on
-> > page cache pages.  It flushes the kernel mapping of the page.  It
-> > also flushes the userspace mappings of the page which it finds by
-> > walking the mmap list via the associated struct page.  It does not
-> > touch vmalloc mappings because it has no way to know whether they
-> > exist or not.
-> > 
-> > It doesn't do so much for anonymous pages - to do so would only
-> > duplicate what flush_anon_page() does at the very same callsites.
-> > Plus the mmap list isn't available for such pages so there's no
-> > way to find out what userspace addresses to flush.
-> 
-> Indeed very interesting information, thanks a lot!
-> 
-> The code in question uses __get_free_pages(), and if that fails uses
-> vmalloc() (see alloc_one_pg_vec_page() for reference). Both code paths
-> show result in the same faulty behaviour.
+This patch series adds the initial support for imx6q, which is a
+Cortex-A9 MPCore (4 cores) SoC.
 
-So, what you're wanting is cache coherency between vmalloc() and
-userspace.  There is no API in the kernel to do that, and you'll see
-the same failures of this interface not only on ARM but also other
-architectures with virtual caches.
+It's based on v3.1-rc4 with the patches below applied.
 
-It sounds like we need an API to flush the cache using both the
-userspace address, plus the kernel side address be that in the direct
-map or the vmalloc map areas.
+ * [PATCH v2 0/5] Convert DEBUG_LL UART selection to a Kconfig choice
+   http://thread.gmane.org/gmane.linux.ports.arm.kernel/129702
 
-Or maybe the right solution is to simply disable AF_PACKET MMAP support
-for virtual cached architectures - it may be that adding cache flushing
-calls makes the thing too expensive and the benefits of mmap over normal
-read/write are lost.
+ * [PATCH v4 2/2] ARM: l2x0: Add OF based initialization
+   http://article.gmane.org/gmane.linux.kernel/1164401
+
+ * [PATCH 1/7] ARM: l2x0: add empty l2x0_of_init
+   http://article.gmane.org/gmane.linux.ports.arm.kernel/130878
+
+ * [RFC PATCH 0/3] Yet another GIC OF binding series
+   http://thread.gmane.org/gmane.linux.drivers.devicetree/7226
+
+For suspend/resume support, it needs the following extra patches
+applied.
+
+ * [PATCH v2 0/2] make reinitialization of ARM core components possible
+   http://thread.gmane.org/gmane.linux.ports.arm.kernel/131356
+
+ * [PATCH v2 0/5] CPU PM notifiers
+   http://thread.gmane.org/gmane.linux.ports.arm.kernel/131212/focus=131353
+
+Thanks.
+
+Shawn Guo (6):
+      arm/imx6q: add device tree source
+      arm/imx6q: add core definitions and low-level debug uart
+      arm/imx6q: add core drivers clock, gpc, mmdc and src
+      arm/imx6q: add smp and cpu hotplug support
+      arm/imx6q: add device tree machine support
+      arm/imx6q: add suspend/resume support
+
+ Documentation/devicetree/bindings/arm/fsl.txt |    6 +
+ arch/arm/Kconfig                              |    2 +-
+ arch/arm/Kconfig.debug                        |    7 +
+ arch/arm/Makefile                             |    1 +
+ arch/arm/boot/dts/imx6q-sabreauto.dts         |   49 +
+ arch/arm/boot/dts/imx6q.dtsi                  |  570 +++++++
+ arch/arm/mach-imx/Kconfig                     |   31 +
+ arch/arm/mach-imx/Makefile                    |   11 +
+ arch/arm/mach-imx/Makefile.boot               |    4 +
+ arch/arm/mach-imx/clock-imx6q.c               | 1990 +++++++++++++++++++++++++
+ arch/arm/mach-imx/gpc.c                       |  110 ++
+ arch/arm/mach-imx/head-v7.S                   |   75 +
+ arch/arm/mach-imx/hotplug.c                   |   44 +
+ arch/arm/mach-imx/lluart.c                    |   33 +
+ arch/arm/mach-imx/localtimer.c                |   64 +
+ arch/arm/mach-imx/mach-imx6q.c                |   81 +
+ arch/arm/mach-imx/mmdc.c                      |   71 +
+ arch/arm/mach-imx/platsmp.c                   |   86 ++
+ arch/arm/mach-imx/pm-imx6q.c                  |   63 +
+ arch/arm/mach-imx/src.c                       |   52 +
+ arch/arm/mm/Kconfig                           |    2 +-
+ arch/arm/plat-mxc/Kconfig                     |    5 +
+ arch/arm/plat-mxc/include/mach/common.h       |   28 +
+ arch/arm/plat-mxc/include/mach/debug-macro.S  |    5 +
+ arch/arm/plat-mxc/include/mach/entry-macro.S  |   15 +-
+ arch/arm/plat-mxc/include/mach/hardware.h     |    1 +
+ arch/arm/plat-mxc/include/mach/irqs.h         |    9 +-
+ arch/arm/plat-mxc/include/mach/memory.h       |    3 +
+ arch/arm/plat-mxc/include/mach/mx6q.h         |   29 +
+ 29 files changed, 3441 insertions(+), 6 deletions(-)
