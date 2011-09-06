@@ -1,35 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 6 Sep 2011 21:45:25 +0200
-Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
-	DEBUG_LL UART
-In-Reply-To: <20110906110726.GN6619@n2100.arm.linux.org.uk>
-References: <20110821182604.GI28546@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1108211435320.20358@xanadu.home>
-	<20110821191835.GA19678@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1108211522280.20358@xanadu.home>
-	<20110906092816.GC3548@atomide.com>
-	<20110906093738.GJ6619@n2100.arm.linux.org.uk>
-	<20110906102703.GA1895@atomide.com>
-	<20110906105206.GL6619@n2100.arm.linux.org.uk>
-	<20110906110143.GB1895@atomide.com>
-	<20110906110726.GN6619@n2100.arm.linux.org.uk>
-Message-ID: <20110906194525.GP28816@pengutronix.de>
+From: gregkh@suse.de (Greg KH)
+Date: Tue, 6 Sep 2011 12:45:34 -0700
+Subject: [PATCH 1/5] Framework for exporting System-on-Chip information
+	via sysfs
+In-Reply-To: <4E65EAB7.4080300@linaro.org>
+References: <1314880043-22517-1-git-send-email-lee.jones@linaro.org>
+	<20110901233403.GA28176@suse.de> <4E609784.3080507@linaro.org>
+	<20110902163136.GB5331@suse.de> <4E65EAB7.4080300@linaro.org>
+Message-ID: <20110906194534.GA5949@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 12:07:26PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 06, 2011 at 04:01:43AM -0700, Tony Lindgren wrote:
-> > Yes I agree. As an alternative, how about we drop all the debug_ll code
-> > and allow people to patch it in as needed?
+On Tue, Sep 06, 2011 at 10:41:11AM +0100, Lee Jones wrote:
+> I don't have a great deal of time at the moment, as I'm currently on the
+> train on my way to Plumbers, but I would like to say just one thing.
 > 
-> Given all this argument over it, I'm mindful to rip out all the debug_ll
-> code and keep it permanently as an offline patch to prevent further abuse.
-Can you please just nack the changes and keep DEBUG_LL as is? You'll
-have my and IIRC Sascha's support for it.
+> On 02/09/11 17:31, Greg KH wrote:
+> > I'm feeling like it would be simpler for me to write this code than to
+> > keep providing review comments like this telling you to rewrite the
+> > whole thing over again each time :)
+> 
+> I'd really rather you didn't.
+> 
+> I have put a great deal of my own time into this and I really want to
+> see it through. Up until now I have been finding it quite difficult to
+> please everyone. I have been trying to follow everyone's suggestions and
+> as soon as I think we're getting close, the world flips upside down.
+> When I return, I will sit down and go through all of your (and Arnd's)
+> suggestions and re-write it.
 
-Best regards
-Uwe
+Ok, but expect a very tough code review if you do this. :)
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+greg k-h
