@@ -1,42 +1,103 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 6 Sep 2011 00:09:56 +0300
-Subject: [PATCH 1/2] ux500: Adding support for u8500 Hsem functionality V2
-In-Reply-To: <201104191810.18170.arnd@arndb.de>
-References: <1302535464-12294-1-git-send-email-mathieu.poirier@linaro.org>
-	<201104172239.57362.arnd@arndb.de> <4DADB2F1.1080405@linaro.org>
-	<201104191810.18170.arnd@arndb.de>
-Message-ID: <CAK=WgbZVuw3ERa+sbm+RwdBL+JrxmZwpQtjk3mBvtUZVbiNu6g@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 6 Sep 2011 09:01:07 +0800
+Subject: [PATCH v2 5/7] ARM: highbank: add SMP support
+In-Reply-To: <1314841446-11006-6-git-send-email-robherring2@gmail.com>
+References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
+	<1314841446-11006-6-git-send-email-robherring2@gmail.com>
+Message-ID: <20110906010105.GA7623@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+On Wed, Aug 31, 2011 at 08:44:04PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> This enables SMP support on highbank processor.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+> Changes in v2:
+>  - drop NULL check of scu_base
+>  - use IPI #0 instead of #1 to boot secondary
+>  - s/a9_base_addr/scu_base_addr/
+>  - fix muliple mapping of twd registers
+> 
+>  arch/arm/Kconfig                    |    2 +-
+>  arch/arm/mach-highbank/Makefile     |    2 +
+>  arch/arm/mach-highbank/localtimer.c |   38 +++++++++++++++++
+>  arch/arm/mach-highbank/platsmp.c    |   78 +++++++++++++++++++++++++++++++++++
+>  4 files changed, 119 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/mach-highbank/localtimer.c
+>  create mode 100644 arch/arm/mach-highbank/platsmp.c
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9019a56..6d2add5 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1372,7 +1372,7 @@ config SMP
+>  	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
+>  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+>  		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
+> -		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
+> +		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || ARCH_HIGHBANK
+>  	select USE_GENERIC_SMP_HELPERS
+>  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+>  	help
+> diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
+> index 11d4010..311c0e8e 100644
+> --- a/arch/arm/mach-highbank/Makefile
+> +++ b/arch/arm/mach-highbank/Makefile
+> @@ -1,2 +1,4 @@
+>  obj-y					:= clock.o highbank.o system.o
+>  obj-$(CONFIG_DEBUG_LL)			+= lluart.o
+> +obj-$(CONFIG_SMP)			+= platsmp.o
+> +obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+> diff --git a/arch/arm/mach-highbank/localtimer.c b/arch/arm/mach-highbank/localtimer.c
+> new file mode 100644
+> index 0000000..344ea29
+> --- /dev/null
+> +++ b/arch/arm/mach-highbank/localtimer.c
+> @@ -0,0 +1,38 @@
+> +/*
+> + * Copyright 2010-2011 Calxeda, Inc.
+> + * Based on localtimer.c, Copyright (C) 2002 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/init.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +
+> +#include <asm/smp_twd.h>
+> +
+> +/*
+> + * Setup the local clock events for a CPU.
+> + */
+> +int __cpuinit local_timer_setup(struct clock_event_device *evt)
+> +{
+> +	struct device_node *np;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
+> +	if (!twd_base)
+> +		twd_base = of_iomap(np, 0);
 
-On Tue, Apr 19, 2011 at 7:10 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 19 April 2011, Mathieu Poirier wrote:
->> > One more thing I just noticed: the hwspinlock_internal.h file defines
->> > the hwspinlock->id field as "a global, unique, system-wide, index of
->> > the lock", but the u8500 hsem just sets it to an integer starting
->> > at zero. If there are multiple devices providing hwspinlocks in the
->> > same system, that cannot work.
->> >
->> I have to admit I'm not sure of what your asking here. ?Hwspinlocks
->> should be administered by only one entity and this is what this driver
->> is doing.
->>
->> Please get back to me with a clarification.
->
-> You could have a system with multiple instances of the hardware block
-> that holds your spinlock. I've seen SMP systems that basically take
-> multiple SOCs and put them into a common address space.
->
-> More importantly, there could be a device on an external bus that also
-> provides a hwspinlock. The API can deal with this, but your driver will
-> conflict with any other driver trying to do the same.
-
-Looks like this thread has died. Is this driver still needed ?
-
-If yes, I don't mind picking it up and fixing the outstanding issues,
-as I'm doing some hwspinlock cleanups/fixes right now anyway.
+WARN_ON(!twd_base)?
 
 Regards,
-Ohad.
+Shawn
+
+> +	evt->irq = irq_of_parse_and_map(np, 0);
+> +	twd_timer_setup(evt);
+> +	return 0;
+> +}
