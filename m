@@ -1,38 +1,72 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Tue, 06 Sep 2011 11:31:02 +0530
-Subject: [PATCH v2 0/2] make reinitialization of ARM core components
-	possible
-In-Reply-To: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4E65B71E.6060307@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 6 Sep 2011 08:15:11 +0200
+Subject: [PATCH] at91: add Atmel ISI and ov2640 support on m10/g45 board.
+In-Reply-To: <4C79549CB6F772498162A641D92D532802A0995F@penmb01.corp.atmel.com>
+References: <1314960609-23396-1-git-send-email-josh.wu@atmel.com>
+	<20110902182137.GL20128@game.jcrosoft.org>
+	<4C79549CB6F772498162A641D92D532802A0995F@penmb01.corp.atmel.com>
+Message-ID: <20110906061511.GD677@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 September 2011 11:18 AM, Shawn Guo wrote:
-> When ARM core resumes from low-power mode where losing power, for my
-> example: CA-9 MPCore resumes from Dormant/Shutdown, we have to
-> reinitialize components like L2 Cache, GIC and SCU to bring system
-> back to work.
->
-I think you mean to drop GIC from above as well.
+On 16:55 Mon 05 Sep     , Wu, Josh wrote:
+> 
+> 
+> On 09/03/2011 2:22 AM Jean-Christophe PLAGNIOL-VILLARD wrote: 
+> 
+> >>  
+> >>  #include <asm/setup.h>
+> >>  #include <asm/mach-types.h>
+> >> @@ -194,6 +197,95 @@ static void __init ek_add_device_nand(void)
+> >>  	at91_add_device_nand(&ek_nand_data);
+> >>  }
+> >>  
+> >> +/*
+> >> + *  ISI
+> >> + */
+> >> +#if defined(CONFIG_VIDEO_ATMEL_ISI) || defined(CONFIG_VIDEO_ATMEL_ISI_MODULE)
+> >> +static struct isi_platform_data __initdata isi_data = {
+> >> +	.frate		= ISI_CFG1_FRATE_CAPTURE_ALL,
+> >> +	.has_emb_sync	= 0,
+> >> +	.emb_crc_sync = 0,
+> >> +	.hsync_act_low = 0,
+> >> +	.vsync_act_low = 0,
+> >> +	.pclk_act_falling = 0,
+> >> +	/* to use codec and preview path simultaneously */
+> >> +	.isi_full_mode = 1,
+> >> +	.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10,
+> >> +};
+> >> +
+> >> +static void __init isi_set_clk(void)
+> >> +{
+> >> +	struct clk *pck1;
+> >> +	struct clk *plla;
+> >> +
+> >> +	pck1 = clk_get(NULL, "pck1");
+> >> +	plla = clk_get(NULL, "plla");
+> >> +
+> >> +	clk_set_parent(pck1, plla);
+> >> +	clk_set_rate(pck1, 25000000);
+> >> +	clk_enable(pck1);
+> 
+> > you must not enable the clock always
+> 
+> > you must enable it just when you need it
+> 
+> > and manage the clock at the board level really so so
+> 
+> I see, I will move such clock code to atmel_isi.c driver and add clock name, clock frequence to isi_platform_data structure in next version.
+no you miss the idea bind the clkdev
 
-> The patch set basically removes __init annotation from a bunch of
-> initialization functions, so that platform resume procedure can call
-> into them again to set those components up.
->
-> Changes since v1:
->   * Drop the GIC patch, as it's been handled by [1] nicely.
->   * Drop the change of adding empty l2x0_of_init(), as it's been
->     handled by [2].
->
-> Shawn Guo (2):
->        ARM: cache-l2x0: remove __init annotation from initialization functions
-Do you really need to do a re-init function for L2.
-Look at the OMAP code, You just need to restore the configuration 
-registers and that's it. And the save can be done only once because
-these are configuration register which won't change in the live system.
+you manage the clock at soc level and then only if it's mandatory at board
+level
 
->        ARM: smp_scu: remove __init annotation from scu_enable()
->
-This init is really small one so should be ok but I still feel a
-simple register restore is better.
+for the clock rate you pass it to the driver
+
+and let the driver manage when it want to enable/disable the clock
+
+the driver need to have a abtraction of the clock constraint and just request
+it and use it
+
+Best Regards,
+J.
