@@ -1,101 +1,27 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 6 Sep 2011 09:15:59 +0200
-Subject: [PATCH 2/7] arm/dts: OMAP3: Add mpu and iva nodes
-In-Reply-To: <4E650AEA.2090109@firmworks.com>
-References: <1314897912-18178-1-git-send-email-b-cousson@ti.com>
-	<1377915.IaVE5xAurc@wuerfel> <4E64E527.4040409@ti.com>
-	<201109051923.51084.arnd@arndb.de> <4E650AEA.2090109@firmworks.com>
-Message-ID: <4E65C8AF.1060501@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 6 Sep 2011 09:19:03 +0200
+Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
+	initialization functions
+In-Reply-To: <1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
+References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
+	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CACRpkdZvb_y6m-uiFu-wMt5XR-UcZGRWUDGrgMFJ9ySzj6VAOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/5/2011 7:46 PM, Mitch Bradley wrote:
-> On 9/5/2011 7:23 AM, Arnd Bergmann wrote:
->> On Monday 05 September 2011, Cousson, Benoit wrote:
->>> Yeah, I saw that in the "cpus" node documentation. My point here is that
->>> I do need to represent the MPU subsystem that will contain the cpus. And
->>> thus the Cortex is inside the MPU subsystem.
->
->
-> The device tree hierarchy does not represent "containment", but rather
-> addressing from the standpoint of a program running on a CPU.
->
->   From that viewpoint, it might be better to have a phandle reference to
-> the mpu in each CPU node.
+On Tue, Sep 6, 2011 at 7:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-So in that case, I'd rather use a scheme similar to a shared cache 
-between CPUs:
+> The patch removes __init annotation from a few initialization
+> functions to make the reinitialization possible. ?For example,
+> platform resume function can call l2x0_of_init() to get L2 cache
+> back to work.
 
-cpus {
-	cpu at 0 {
-		compatible = "arm,cortex-a8";
-		subsystem = <&mpu>
+This will collide with patch 7080/1:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7080/1
 
-		mpu: arm_mpu {
-			compatible = "ti,omap3-mpu";
-			hwmods = "mpu";
-	};
-};
-
-And for an OMAP4 SMP system:
-
-cpus {
-	cpu at 0 {
-		compatible = "arm,cortex-a9";
-		subsystem = <&mpu>
-
-		mpu: arm_mpu {
-			compatible = "ti,omap4-mpu";
-			hwmods = "mpu";
-	};
-
-	cpu at 1 {
-		compatible = "arm,cortex-a9";
-		subsystem = <&mpu>
-	};
-};
-
-Ideally the interrupt-controller/GIC should probably be inside that MPU 
-node, isn't it?
+Before you put it into the patch tracker can you please rebase it
+on that patch and also remove the __init tag from the
+l2x0_unlock() function?
 
 Thanks,
-Benoit
-
-
->
->>>
->>> I can potentially keep the CPUs inside the cpus node, and just represent
->>> the mpu node inside the soc, with potentially some phandle to the real
->>> cpu nodes.
->>>
->>> Something like that:
->>>
->>> cpus {
->>>           cpu0: cpu at 0 {
->>>                           compatible = "arm,cortex-a8";
->>>           };
->>> };
->>>
->>> [...]
->>>
->>> soc {
->>>           compatible = "ti,omap-infra";
->>>           mpu {
->>>                   compatible = "ti,omap3-mpu";
->>>                   hwmods = "mpu";
->>>                   cpu at 0 {
->>>                           phandle =<&cpu0>;
->>>                           [...]
->>>                   };
->>>           };
->>> };
->>
->> Yes, that looks good. I wouldn't name the attribute "phandle" if I could
->> think of anything better (which I can't at the moment).
->>
->> 	Arnd
->> _______________________________________________
->> devicetree-discuss mailing list
->> devicetree-discuss at lists.ozlabs.org
->> https://lists.ozlabs.org/listinfo/devicetree-discuss
->>
+Linus Walleij
