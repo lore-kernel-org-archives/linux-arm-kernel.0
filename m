@@ -1,55 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Sep 2011 04:29:14 -0700
-Subject: [GIT PULL v3] OMAP: clock/powerdomain/clockdomain/hwmod: fixes
-	for 3.1-rc
-In-Reply-To: <alpine.DEB.2.00.1109042023190.9056@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1108222319310.28226@utopia.booyaka.com>
-	<alpine.DEB.2.00.1108230105180.28226@utopia.booyaka.com>
-	<alpine.DEB.2.00.1108300104010.26173@utopia.booyaka.com>
-	<alpine.DEB.2.00.1109011751370.26025@utopia.booyaka.com>
-	<alpine.DEB.2.00.1109042023190.9056@utopia.booyaka.com>
-Message-ID: <20110906112914.GC1895@atomide.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 06 Sep 2011 13:35:58 +0200
+Subject: [PATCH 1/5] ARM: Samsung: PWM: Allow to differentiate SoCs based
+	on platform device name.
+In-Reply-To: <20110906110311.GM6619@n2100.arm.linux.org.uk>
+References: <1731819.jJi37IsjvJ@flatron> <1660939.8M3FnZsmga@flatron>
+	<20110906110311.GM6619@n2100.arm.linux.org.uk>
+Message-ID: <5725201.5LdnvaEu1n@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Tuesday 06 of September 2011 at 12:03:11, Russell King - ARM Linux wrote:
+> On Tue, Sep 06, 2011 at 12:41:07PM +0200, Tomasz Figa wrote:
+> > On Thursday 01 of September 2011 at 13:18:32, Tomasz Figa wrote:
+> > > Well, now we have three alternatives:
+> > > - to leave it as is (i.e. changing platform device names)
+> > > - to use cpu_is_* (does it ever exist for S3C64xx or soc_is_s3c64xx is its equivalent?)
+> > > - to use soc_is_* 
+> > > 
+> > > Waiting for more comments then.
+> > > 
+> > Ping.
+> > 
+> > Should I keep it as is or rather change it to use soc_is_s3c64xx instead?
+> 
+> I don't know what question you're asking (the questions don't make sense
+> in terms of the quoted context.)
+> 
+> If you're asking whether you should use a cpu_ prefix instead of a soc_
+> prefix for identifying s3c64xx, then consider the question.
+> 
+> What is the CPU?
+> 
+> What are S3C64xx / OMAP / PXA310 / SA-11x0 / AT91RM9200?  CPU or SoC ?
+> What are Cortex A8/A9 / Xscale / StrongARM / ARM920?  CPU or SoC ?
 
-Care to pull the following fixes to the -rc series from Paul?
+Well, I believe that the context I quoted explains everything, but let me
+explain that again:
 
+The patch is about a driver being able to check to what SoC a device belongs,
+but there are at least two ways to achieve that.
 
-* Paul Walmsley <paul@pwsan.com> [110904 18:53]:
-> The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
-> 
->   Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
-> 
-> are available in the git repository at:
->   git://git.pwsan.com/linux-2.6 prcm-fixes-a-3.1rc
-> 
-> This update adds a patch for a missing array terminator in the OMAP2430 
-> hwmod data.
-> 
-> Paul Walmsley (5):
->       OMAP4: clock: re-enable previous clockdomain enable/disable sequence
->       OMAP4: clock: fix compile warning
->       OMAP3: clock: indicate that gpt12_fck and wdt1_fck are in the WKUP clockdomain
->       OMAP2430: hwmod: musb: add missing terminator to omap2430_usbhsotg_addrs[]
->       Merge branches 'non_hwmod_compliant_fix_3.1rc', 'omap3_clock_fixes_3.1rc', 'omap4_clock_fixes_3.1rc', 'missing_2430_musb_adds_terminator_fix_3.1rc' and 'pwrdm_clkdm_fixes_3.1rc' into prcm-fixes-a-3.1rc
-> 
-> Rajendra Nayak (1):
->       OMAP: powerdomains: Make all powerdomain target states as ON at init
-> 
-> Santosh Shilimkar (1):
->       OMAP: clockdomain: Wait for powerdomain to be ON when using clockdomain force wakeup
-> 
->  arch/arm/mach-omap2/clock3xxx_data.c       |    2 ++
->  arch/arm/mach-omap2/clock44xx_data.c       |   10 +++++++++-
->  arch/arm/mach-omap2/clockdomain.c          |    2 ++
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c |    1 +
->  arch/arm/mach-omap2/pm.c                   |    2 --
->  arch/arm/mach-omap2/powerdomain.c          |   25 ++++++++++++++++---------
->  6 files changed, 30 insertions(+), 12 deletions(-)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I can see many drivers using the way I used, i.e. distinct platform device names
+for each SoC that has to be differentiated plus a generic one. However, I was
+suggested that using cpu_is_*/soc_is_* might be a better approach, while at the
+same time I received an opinion that the original method is the preferred one.
+
+Best regards,
+Tom
