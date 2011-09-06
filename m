@@ -1,71 +1,74 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 6 Sep 2011 10:00:28 +0800
-Subject: [PATCH v11 1/3] MTD : add the common code for GPMI-NAND controller
-	driver
-In-Reply-To: <20110905151752.GA10987@pengutronix.de>
-References: <1314616381-11615-1-git-send-email-b32955@freescale.com>
-	<1314616381-11615-2-git-send-email-b32955@freescale.com>
-	<20110905151752.GA10987@pengutronix.de>
-Message-ID: <4E657EBC.7060800@freescale.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 6 Sep 2011 10:34:32 +0800
+Subject: [PATCH v2 0/5] CPU PM notifiers
+In-Reply-To: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20110906023430.GA7651@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram:
-> On Mon, Aug 29, 2011 at 07:12:59PM +0800, Huang Shijie wrote:
->> These files contain the common code for the GPMI-NAND driver.
->>
->> Signed-off-by: Huang Shijie <b32955@freescale.com>
->> Acked-by: Marek Vasut <marek.vasut@gmail.com>
->> Tested-by: Koen Beel <koen.beel@barco.com>
-> ...
->
->> +static int __devinit
->> +acquire_register_block(struct gpmi_nand_data *this, const char *res_name)
->> +{
->> +	struct platform_device *pdev = this->pdev;
->> +	struct resources *res = &this->resources;
->> +	struct resource *r;
->> +	void *p;
->> +
->> +	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, res_name);
->> +	if (!r) {
->> +		pr_err("Can't get resource for %s\n", res_name);
->> +		return -ENXIO;
->> +	}
->> +
->> +	p = ioremap(r->start, resource_size(r));
->> +	if (!p) {
->> +		pr_err("Can't remap %s\n", res_name);
->> +		return -ENOMEM;
->> +	}
->> +
->> +	if (res_name == GPMI_NAND_GPMI_REGS_ADDR_RES_NAME)
->> +		res->gpmi_regs = p;
->> +	else if (res_name == GPMI_NAND_BCH_REGS_ADDR_RES_NAME)
->> +		res->bch_regs = p;
-> Am I the only one getting warnings here?
->
-I did not meet the warinings. but it does worth fixing. thanks
-> drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'acquire_register_block':
-> drivers/mtd/nand/gpmi-nand/gpmi-nand.c:345:15: warning: comparison with string literal results in unspecified behavior
-> drivers/mtd/nand/gpmi-nand/gpmi-nand.c:347:20: warning: comparison with string literal results in unspecified behavior
->
-> Really worth fixing IMHO...
->
->> +	else
->> +		BUG();
-> dev_err + ENODEV?
->
-> Might be worth checking the other BUG()-occurences as well if they really need
-> to halt the kernel.
-ok. no problem.
+On Sat, Sep 03, 2011 at 08:09:10PM +0530, Santosh Shilimkar wrote:
+> Updates V2:
+> - The CPU PM notifiers are moved to generic level instead of keeping
+>   it ARM specific as per Rafael's comment.
+> - To avoid every driver duplicating the sys-core ops and cpu pm notfiers,
+>   the CPU PM common notifier is registering it in one place so that
+>   suspend is taken care.
+> - CPU COMPLEX events are renamed to more appropriate CPU CLUSTER.
+> - GIC distributor is not disabled to avoid the live locks. This is
+>   observed with CPUIDLE cases where at time CPU cluster fails to
+>   transition to low power states. As such there was no need to
+>   disable distributor in first place since on cluster reset, it
+>   will get disabled anyways.
+> - In VFP code, syscore ops are dropped in favour of CPU PM
+>   notifiers since S2R is already handled in core CPU PM notifiers.
+> - The last patch is an independent patch but can be pushed along with
+>   the other GIC changes done here. 
+>  
+> V1: [http://lwn.net/Articles/447259/]
+> 
+> This patch set tries to address concerns with platform pm code
+> calling into the driver for every block in the Cortex A9s
+> during idle, hotplug, and suspend.  The first patch adds cpu pm
+> notifiers that can be called by platform code, the second uses
+> the notifier to save and restore the GIC state, and the third
+> saves the VFP state.
+> 
+> The notifiers are used for two types of events, CPU PM events and
+> CPU cluster PM events.  CPU PM events are used to save and restore
+> per-cpu context when a single CPU is preparing to enter or has
+> just exited a low power state.  For example, the VFP saves the
+> last thread context, and the GIC saves banked CPU registers.
+> 
+> CPU cluster events are used after all the CPUs in a power domain
+> have been prepared for the low power state.  The GIC uses these
+> events to save global register state.
+> 
+> L2 cache is not covered by this patch set, as the determination
+> of when the L2 is reset and when it is retained is
+> platform-specific, and most of the APIs necessary are already
+> 
+> 
+> The series is tested with OMAP4 with S2R and CPUIDLE. 
+> 
+> The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
+> 
+>   Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
+> 
+> Colin Cross (5):
+>       cpu_pm: Add cpu power management notifiers
+>       cpu_pm: call notifiers during suspend
+>       ARM: gic: Use cpu pm notifiers to save gic state
+>       ARM: vfp: Use cpu pm notifiers to save vfp state
+>       ARM: gic: Allow gic arch extensions to provide irqchip flags
+> 
+Really appreciate the patches.  Now platform code needs to do nothing
+to have GIC back to work across suspend/resume cycle.
 
+On i.MX6Q:
 
-Did you test the driver with rootfs?
+Tested-and-Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Best Regards
-Huang Shijie
-> Regards,
->
->    Wolfram
->
+-- 
+Regards,
+Shawn
