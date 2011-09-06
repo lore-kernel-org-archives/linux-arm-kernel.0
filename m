@@ -1,35 +1,87 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue,  6 Sep 2011 13:48:25 +0800
-Subject: [PATCH v2 0/2] make reinitialization of ARM core components possible
-Message-ID: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
+Date: Tue,  6 Sep 2011 13:48:26 +0800
+Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
+	initialization functions
+In-Reply-To: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
+References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When ARM core resumes from low-power mode where losing power, for my
-example: CA-9 MPCore resumes from Dormant/Shutdown, we have to
-reinitialize components like L2 Cache, GIC and SCU to bring system
+If ARM core gets powered off during suspend, L2 cache controller
+has to be reinitialized by resume procedure.
+
+The patch removes __init annotation from a few initialization
+functions to make the reinitialization possible.  For example,
+platform resume function can call l2x0_of_init() to get L2 cache
 back to work.
 
-The patch set basically removes __init annotation from a bunch of
-initialization functions, so that platform resume procedure can call
-into them again to set those components up.
-
-Changes since v1:
- * Drop the GIC patch, as it's been handled by [1] nicely.
- * Drop the change of adding empty l2x0_of_init(), as it's been
-   handled by [2].
-
-Shawn Guo (2):
-      ARM: cache-l2x0: remove __init annotation from initialization functions
-      ARM: smp_scu: remove __init annotation from scu_enable()
-
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
  arch/arm/include/asm/hardware/cache-l2x0.h |    2 +-
- arch/arm/kernel/smp_scu.c                  |    2 +-
  arch/arm/mm/cache-l2x0.c                   |   10 +++++-----
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-[1] [PATCH v2 0/5] CPU PM notifiers
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/131212/focus=131353
-
-[2] [PATCH 1/7] ARM: l2x0: add empty l2x0_of_init
-http://article.gmane.org/gmane.linux.ports.arm.kernel/130878
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index d22765c..d270310 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -89,7 +89,7 @@
+ #define L2X0_ADDR_FILTER_EN		1
+ 
+ #ifndef __ASSEMBLY__
+-extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
++extern void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+ #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
+ extern int l2x0_of_init(__u32 aux_val, __u32 aux_mask);
+ #else
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index c035b9a..7835cb6 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -280,7 +280,7 @@ static void l2x0_disable(void)
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
+-void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
++void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ {
+ 	__u32 aux;
+ 	__u32 cache_id;
+@@ -356,7 +356,7 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ }
+ 
+ #ifdef CONFIG_OF
+-static void __init l2x0_of_setup(const struct device_node *np,
++static void l2x0_of_setup(const struct device_node *np,
+ 				 __u32 *aux_val, __u32 *aux_mask)
+ {
+ 	u32 data[2] = { 0, 0 };
+@@ -390,7 +390,7 @@ static void __init l2x0_of_setup(const struct device_node *np,
+ 	*aux_mask &= ~mask;
+ }
+ 
+-static void __init pl310_of_setup(const struct device_node *np,
++static void pl310_of_setup(const struct device_node *np,
+ 				  __u32 *aux_val, __u32 *aux_mask)
+ {
+ 	u32 data[3] = { 0, 0, 0 };
+@@ -424,14 +424,14 @@ static void __init pl310_of_setup(const struct device_node *np,
+ 	}
+ }
+ 
+-static const struct of_device_id l2x0_ids[] __initconst = {
++static const struct of_device_id l2x0_ids[] = {
+ 	{ .compatible = "arm,pl310-cache", .data = pl310_of_setup },
+ 	{ .compatible = "arm,l220-cache", .data = l2x0_of_setup },
+ 	{ .compatible = "arm,l210-cache", .data = l2x0_of_setup },
+ 	{}
+ };
+ 
+-int __init l2x0_of_init(__u32 aux_val, __u32 aux_mask)
++int l2x0_of_init(__u32 aux_val, __u32 aux_mask)
+ {
+ 	struct device_node *np;
+ 	void (*l2_setup)(const struct device_node *np,
+-- 
+1.7.4.1
