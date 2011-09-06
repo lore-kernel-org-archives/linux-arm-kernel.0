@@ -1,93 +1,124 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 6 Sep 2011 21:27:37 +0200
-Subject: [PATCH 4/4] ARM: mx53_ard: Add flexcan support
-In-Reply-To: <1315335696-20499-4-git-send-email-rogerio.pimentel@freescale.com>
+Date: Tue, 6 Sep 2011 21:32:58 +0200
+Subject: [PATCH 1/4] ARM: mx53: Add pads for flexcan pins
+In-Reply-To: <1315335696-20499-1-git-send-email-rogerio.pimentel@freescale.com>
 References: <1315335696-20499-1-git-send-email-rogerio.pimentel@freescale.com>
-	<1315335696-20499-4-git-send-email-rogerio.pimentel@freescale.com>
-Message-ID: <20110906192737.GM28816@pengutronix.de>
+Message-ID: <20110906193258.GN28816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 04:01:36PM -0300, Rogerio Pimentel wrote:
-> Adding flexcan support on i.MX53 ARD
-> 
+On Tue, Sep 06, 2011 at 04:01:33PM -0300, Rogerio Pimentel wrote:
+> Adding pads for flexcan on i.MX53
+Your patch doesn't really *add* the pad definition but changes them.
+
 > Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
 > ---
->  arch/arm/mach-mx5/Kconfig          |    1 +
->  arch/arm/mach-mx5/board-mx53_ard.c |   21 +++++++++++++++++++++
->  2 files changed, 22 insertions(+), 0 deletions(-)
+>  arch/arm/plat-mxc/include/mach/iomux-mx53.h |   24 ++++++++++++++----------
+>  1 files changed, 14 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-> index fb4c503..7c911d1 100644
-> --- a/arch/arm/mach-mx5/Kconfig
-> +++ b/arch/arm/mach-mx5/Kconfig
-> @@ -205,6 +205,7 @@ config MACH_MX53_LOCO
->  config MACH_MX53_ARD
->  	bool "Support MX53 ARD platforms"
->  	select SOC_IMX53
-> +	select IMX_HAVE_PLATFORM_FLEXCAN
->  	select IMX_HAVE_PLATFORM_IMX2_WDT
->  	select IMX_HAVE_PLATFORM_IMX_I2C
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
-> index 76a67c4..e5f174b 100644
-> --- a/arch/arm/mach-mx5/board-mx53_ard.c
-> +++ b/arch/arm/mach-mx5/board-mx53_ard.c
-> @@ -44,6 +44,8 @@
->  #define ARD_BACK			IMX_GPIO_NR(5, 11)
->  #define ARD_PROG			IMX_GPIO_NR(5, 12)
->  #define ARD_VOLUMEUP		IMX_GPIO_NR(5, 13)
-> +#define ARD_CAN_EN		IMX_GPIO_NR(7, 6)
-> +#define ARD_CAN_STBY		IMX_GPIO_NR(4, 15)
->  
->  static iomux_v3_cfg_t mx53_ard_pads[] = {
->  	/* UART1 */
-> @@ -102,6 +104,13 @@ static iomux_v3_cfg_t mx53_ard_pads[] = {
->  	MX53_PAD_DISP0_DAT18__GPIO5_12,	/* prog */
->  	MX53_PAD_DISP0_DAT19__GPIO5_13,	/* vol up */
->  	MX53_PAD_GPIO_10__GPIO4_0,		/* vol down */
-> +	/* CAN */
-> +	MX53_PAD_KEY_COL2__CAN1_TXCAN,
-> +	MX53_PAD_KEY_ROW2__CAN1_RXCAN,
-> +	MX53_PAD_PATA_RESET_B__CAN2_TXCAN,
-> +	MX53_PAD_PATA_IORDY__CAN2_RXCAN,
-> +	MX53_PAD_PATA_DA_0__GPIO7_6,
-> +	MX53_PAD_KEY_ROW4__GPIO4_15,
->  };
->  
->  #define GPIO_BUTTON(gpio_num, ev_code, act_low, descr, wake)	\
-> @@ -171,6 +180,8 @@ static struct imxi2c_platform_data mx53_ard_i2c3_data = {
->  
->  static void __init mx53_ard_io_init(void)
->  {
-> +	int ret;
-> +
->  	mxc_iomux_v3_setup_multiple_pads(mx53_ard_pads,
->  				ARRAY_SIZE(mx53_ard_pads));
->  
-> @@ -179,6 +190,14 @@ static void __init mx53_ard_io_init(void)
->  
->  	gpio_request(ARD_I2CPORTEXP_B, "i2cptexp-rst");
->  	gpio_direction_output(ARD_I2CPORTEXP_B, 1);
-> +
-> +	ret = gpio_request_one(ARD_CAN_EN, GPIOF_OUT_INIT_HIGH, "can-en");
-> +	if (ret)
-> +		pr_err("Cannot request ARD_CAN_EN pin: %d\n", ret);
-> +
-> +	ret = gpio_request_one(ARD_CAN_STBY, GPIOF_OUT_INIT_HIGH, "can-stby");
-> +	if (ret)
-> +		pr_err("Cannot request ARD_CAN_STBY pin: %d\n", ret);
->  }
->  
->  /* Config CS1 settings for ethernet controller */
-> @@ -234,6 +253,8 @@ static void __init mx53_ard_board_init(void)
->  	imx53_add_imx_i2c(1, &mx53_ard_i2c2_data);
->  	imx53_add_imx_i2c(2, &mx53_ard_i2c3_data);
->  	imx_add_gpio_keys(&ard_button_data);
-> +	imx53_add_flexcan0(NULL);
-> +	imx53_add_flexcan1(NULL);
-If gpio_request_one above fails, do you really want to add the devices
-then?
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> index 5408fd1..1aebd01 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> @@ -33,6 +33,10 @@
+>  #define PAD_CTRL_I2C	(PAD_CTL_SRE_FAST | PAD_CTL_ODE | PAD_CTL_PKE | \
+>  			PAD_CTL_PUE | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP \
+>  			| PAD_CTL_HYS)
+> +#define MX53_CAN_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
+> +					PAD_CTL_HYS)
+> +#define MX53_PAD_CTRL_1	(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
+> +					PAD_CTL_HYS | PAD_CTL_PUS_100K_UP)
+Hmm, isn't there a better name for this define? Maybe
+MX53_CAN_RX_PAD_CTRL and MX53_CAN_TX_PAD_CTRL?
+
+>  #define _MX53_PAD_GPIO_19__KPP_COL_5		IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
+>  #define _MX53_PAD_GPIO_19__GPIO4_5		IOMUX_PAD(0x348, 0x20, 1, 0x0, 0, 0)
+> @@ -1243,14 +1247,14 @@
+>  #define MX53_PAD_KEY_ROW1__USBPHY1_RXVALID		(_MX53_PAD_KEY_ROW1__USBPHY1_RXVALID | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__KPP_COL_2		(_MX53_PAD_KEY_COL2__KPP_COL_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__GPIO4_10		(_MX53_PAD_KEY_COL2__GPIO4_10 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_KEY_COL2__CAN1_TXCAN		(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_KEY_COL2__CAN1_TXCAN		(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(MX53_PAD_CTRL_1))
+I wonder if this change is universal. If an external pull-up is
+assembled using MX53_CAN_PAD_CTRL would be fine? (Note, I don't know if
+it is sensible to do so.)
+
+>  #define MX53_PAD_KEY_COL2__FEC_MDIO		(_MX53_PAD_KEY_COL2__FEC_MDIO | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__ECSPI1_SS1		(_MX53_PAD_KEY_COL2__ECSPI1_SS1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__FEC_RDATA_2		(_MX53_PAD_KEY_COL2__FEC_RDATA_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__USBPHY1_RXACTIVE		(_MX53_PAD_KEY_COL2__USBPHY1_RXACTIVE | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__KPP_ROW_2		(_MX53_PAD_KEY_ROW2__KPP_ROW_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__GPIO4_11		(_MX53_PAD_KEY_ROW2__GPIO4_11 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_KEY_ROW2__CAN1_RXCAN		(_MX53_PAD_KEY_ROW2__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_KEY_ROW2__CAN1_RXCAN		(_MX53_PAD_KEY_ROW2__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__FEC_MDC		(_MX53_PAD_KEY_ROW2__FEC_MDC | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__ECSPI1_SS2		(_MX53_PAD_KEY_ROW2__ECSPI1_SS2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__FEC_TDATA_2		(_MX53_PAD_KEY_ROW2__FEC_TDATA_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> @@ -1273,14 +1277,14 @@
+>  #define MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0		(_MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__KPP_COL_4		(_MX53_PAD_KEY_COL4__KPP_COL_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__GPIO4_14		(_MX53_PAD_KEY_COL4__GPIO4_14 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_KEY_COL4__CAN2_TXCAN		(_MX53_PAD_KEY_COL4__CAN2_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_KEY_COL4__CAN2_TXCAN		(_MX53_PAD_KEY_COL4__CAN2_TXCAN | MUX_PAD_CTRL(MX53_PAD_CTRL_1))
+>  #define MX53_PAD_KEY_COL4__IPU_SISG_4		(_MX53_PAD_KEY_COL4__IPU_SISG_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__UART5_RTS		(_MX53_PAD_KEY_COL4__UART5_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__USBOH3_USBOTG_OC		(_MX53_PAD_KEY_COL4__USBOH3_USBOTG_OC | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__USBPHY1_LINESTATE_1		(_MX53_PAD_KEY_COL4__USBPHY1_LINESTATE_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__KPP_ROW_4		(_MX53_PAD_KEY_ROW4__KPP_ROW_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__GPIO4_15		(_MX53_PAD_KEY_ROW4__GPIO4_15 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_KEY_ROW4__CAN2_RXCAN		(_MX53_PAD_KEY_ROW4__CAN2_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_KEY_ROW4__CAN2_RXCAN		(_MX53_PAD_KEY_ROW4__CAN2_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__IPU_SISG_5		(_MX53_PAD_KEY_ROW4__IPU_SISG_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__UART5_CTS		(_MX53_PAD_KEY_ROW4__UART5_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__USBOH3_USBOTG_PWR		(_MX53_PAD_KEY_ROW4__USBOH3_USBOTG_PWR | MUX_PAD_CTRL(NO_PAD_CTRL))
+> @@ -2053,25 +2057,25 @@
+>  #define MX53_PAD_PATA_INTRQ__PATA_INTRQ		(_MX53_PAD_PATA_INTRQ__PATA_INTRQ | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_INTRQ__GPIO7_2		(_MX53_PAD_PATA_INTRQ__GPIO7_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_INTRQ__UART2_CTS		(_MX53_PAD_PATA_INTRQ__UART2_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+> -#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN		(_MX53_PAD_PATA_INTRQ__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN		(_MX53_PAD_PATA_INTRQ__CAN1_TXCAN | MUX_PAD_CTRL(MX53_PAD_CTRL_1))
+>  #define MX53_PAD_PATA_INTRQ__CCM_CCM_OUT_2		(_MX53_PAD_PATA_INTRQ__CCM_CCM_OUT_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_INTRQ__USBPHY2_DATAOUT_6		(_MX53_PAD_PATA_INTRQ__USBPHY2_DATAOUT_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DIOR__PATA_DIOR		(_MX53_PAD_PATA_DIOR__PATA_DIOR | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DIOR__GPIO7_3		(_MX53_PAD_PATA_DIOR__GPIO7_3 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DIOR__UART2_RTS		(_MX53_PAD_PATA_DIOR__UART2_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+> -#define MX53_PAD_PATA_DIOR__CAN1_RXCAN		(_MX53_PAD_PATA_DIOR__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_PATA_DIOR__CAN1_RXCAN		(_MX53_PAD_PATA_DIOR__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_PATA_DIOR__USBPHY2_DATAOUT_7		(_MX53_PAD_PATA_DIOR__USBPHY2_DATAOUT_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_RESET_B__PATA_PATA_RESET_B		(_MX53_PAD_PATA_RESET_B__PATA_PATA_RESET_B | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_RESET_B__GPIO7_4		(_MX53_PAD_PATA_RESET_B__GPIO7_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_RESET_B__ESDHC3_CMD		(_MX53_PAD_PATA_RESET_B__ESDHC3_CMD | MUX_PAD_CTRL(MX53_SDHC_PAD_CTRL))
+>  #define MX53_PAD_PATA_RESET_B__UART1_CTS		(_MX53_PAD_PATA_RESET_B__UART1_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+> -#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		(_MX53_PAD_PATA_RESET_B__CAN2_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		(_MX53_PAD_PATA_RESET_B__CAN2_TXCAN | MUX_PAD_CTRL(MX53_PAD_CTRL_1))
+>  #define MX53_PAD_PATA_RESET_B__USBPHY1_DATAOUT_0		(_MX53_PAD_PATA_RESET_B__USBPHY1_DATAOUT_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__PATA_IORDY		(_MX53_PAD_PATA_IORDY__PATA_IORDY | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__GPIO7_5		(_MX53_PAD_PATA_IORDY__GPIO7_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__ESDHC3_CLK		(_MX53_PAD_PATA_IORDY__ESDHC3_CLK | MUX_PAD_CTRL(MX53_SDHC_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__UART1_RTS		(_MX53_PAD_PATA_IORDY__UART1_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+> -#define MX53_PAD_PATA_IORDY__CAN2_RXCAN		(_MX53_PAD_PATA_IORDY__CAN2_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_PATA_IORDY__CAN2_RXCAN		(_MX53_PAD_PATA_IORDY__CAN2_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__USBPHY1_DATAOUT_1		(_MX53_PAD_PATA_IORDY__USBPHY1_DATAOUT_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DA_0__PATA_DA_0		(_MX53_PAD_PATA_DA_0__PATA_DA_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DA_0__GPIO7_6		(_MX53_PAD_PATA_DA_0__GPIO7_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> @@ -2341,7 +2345,7 @@
+>  #define MX53_PAD_GPIO_7__ESAI1_TX4_RX1		(_MX53_PAD_GPIO_7__ESAI1_TX4_RX1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_7__GPIO1_7		(_MX53_PAD_GPIO_7__GPIO1_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_7__EPIT1_EPITO		(_MX53_PAD_GPIO_7__EPIT1_EPITO | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_GPIO_7__CAN1_TXCAN		(_MX53_PAD_GPIO_7__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_GPIO_7__CAN1_TXCAN		(_MX53_PAD_GPIO_7__CAN1_TXCAN | MUX_PAD_CTRL(MX53_PAD_CTRL_1))
+>  #define MX53_PAD_GPIO_7__UART2_TXD_MUX		(_MX53_PAD_GPIO_7__UART2_TXD_MUX | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+>  #define MX53_PAD_GPIO_7__FIRI_RXD		(_MX53_PAD_GPIO_7__FIRI_RXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_7__SPDIF_PLOCK		(_MX53_PAD_GPIO_7__SPDIF_PLOCK | MUX_PAD_CTRL(NO_PAD_CTRL))
+> @@ -2349,7 +2353,7 @@
+>  #define MX53_PAD_GPIO_8__ESAI1_TX5_RX0		(_MX53_PAD_GPIO_8__ESAI1_TX5_RX0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__GPIO1_8		(_MX53_PAD_GPIO_8__GPIO1_8 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__EPIT2_EPITO		(_MX53_PAD_GPIO_8__EPIT2_EPITO | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_GPIO_8__CAN1_RXCAN		(_MX53_PAD_GPIO_8__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_GPIO_8__CAN1_RXCAN		(_MX53_PAD_GPIO_8__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__UART2_RXD_MUX		(_MX53_PAD_GPIO_8__UART2_RXD_MUX | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__FIRI_TXD		(_MX53_PAD_GPIO_8__FIRI_TXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__SPDIF_SRCLK		(_MX53_PAD_GPIO_8__SPDIF_SRCLK | MUX_PAD_CTRL(NO_PAD_CTRL))
 
 Best regards
 Uwe
