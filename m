@@ -1,35 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Sep 2011 03:27:03 -0700
-Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
-	DEBUG_LL UART
-In-Reply-To: <20110906093738.GJ6619@n2100.arm.linux.org.uk>
-References: <20110819123238.GD8918@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1108191101560.20358@xanadu.home>
-	<20110821091452.GH12028@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1108211258490.20358@xanadu.home>
-	<20110821182604.GI28546@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1108211435320.20358@xanadu.home>
-	<20110821191835.GA19678@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1108211522280.20358@xanadu.home>
-	<20110906092816.GC3548@atomide.com>
-	<20110906093738.GJ6619@n2100.arm.linux.org.uk>
-Message-ID: <20110906102703.GA1895@atomide.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Tue, 6 Sep 2011 19:27:59 +0900
+Subject: [PATCH 2/2] ARM: Samsung: update/rewrite Samsung SYSMMU (IOMMU)
+	driver
+In-Reply-To: <1314971786-15140-3-git-send-email-m.szyprowski@samsung.com>
+References: <1314971786-15140-1-git-send-email-m.szyprowski@samsung.com>
+	<1314971786-15140-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAHQjnONHr-Ao_KLjdRKgVQQUKtOmmoyqFwdkSZCDsE6hx1q-Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110906 02:04]:
-> On Tue, Sep 06, 2011 at 12:28:17PM +0300, Tony Lindgren wrote:
-> > Probably the best long term solution is to set up the debug uart based
-> > on DT data and initialize it in the uncompress code. Anybody debugging
-> > lower level stuff can certainly patch in the ucompress debug_ll code.
-> 
-> How do you do that before the MMU has been setup?  Are you going to
-> write a DT data parser in pure assembly to extract this information?
+Hi.
 
-Don't we already have that with ATAGs to DT support in the DT append
-patches? At least it calls fdt_setprop so calling fdt_getprop should
-also work. The patch I'm talking about is:
+On Fri, Sep 2, 2011 at 10:56 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> + *
+> + * iova must be aligned on a 4kB, 64kB, 1MB and 16MB boundaries, respectively.
+> + */
 
-http://permalink.gmane.org/gmane.linux.drivers.devicetree/5938 
+Actually, iova is just needed to be aligned by 4KiB because it is
+minimum requirement.
+I think IOMMU driver is capable of mapping a group of page frames that
+is aligned
+by 1MiB with an iova that is aligned by 4KB
+if the iova is large enough to map the given page frames.
 
-Tony
+> +static int s5p_sysmmu_map(struct iommu_domain *domain, unsigned long iova,
+> + ? ? ? ? ? ? ? ? ? ? ? ? phys_addr_t paddr, int gfp_order, int prot)
+> +{
+> + ? ? ? struct s5p_sysmmu_domain *s5p_domain = domain->priv;
+> + ? ? ? int flpt_idx = flpt_index(iova);
+> + ? ? ? size_t len = 0x1000UL << gfp_order;
+> + ? ? ? void *flpt_va, *slpt_va;
+> +
+> + ? ? ? if (len != SZ_16M && len != SZ_1M && len != SZ_64K && len != SZ_4K) {
+> + ? ? ? ? ? ? ? sysmmu_debug(3, "bad order: %d\n", gfp_order);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+
+Likewise, I think this driver need to support mapping 128KiB aligned,
+128KiB physical memory, for example.
+
+Otherwise, it is somewhat restrictive than we expect.
+
+Thank you.
+
+Cho KyongHo.
