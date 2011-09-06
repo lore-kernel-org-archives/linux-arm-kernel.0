@@ -1,32 +1,35 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 06 Sep 2011 15:57:42 -0700
-Subject: [GIT PULL] gpio/omap: minor cleanups for v3.2
-Message-ID: <8739g91dp5.fsf@ti.com>
+Date: Tue, 06 Sep 2011 15:59:55 -0700
+Subject: [PATCH v6 00/25] gpio/omap: driver cleanup and fixes
+In-Reply-To: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com> (Tarun
+	Kanti DebBarma's message of "Wed, 31 Aug 2011 19:12:16 +0530")
+References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <87ty8pz384.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
+Hi Tarun,
 
-Please pull the following OMAP GPIO cleanups for v3.2.
+Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 
-Just a heads up: we're also working on another large series of cleanup
-for this driver that we'll be trying to merge for v3.2.
+> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+> The cleanup include getting rid of cpu_is_* checks wherever possible,
+> use of gpio_bank list instead of static array, use of unique platform
+> specific value associated data member to OMAP platforms to avoid
+> cpu_is_* checks. The series also include PM runtime support.*
+
+Thanks for your continued effort on this series.
+
+> Baseline: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+> Branch: master
+> Commit: c6a389f  Linux 3.1-rc4 
+
+This series was supposed to be based on my for_3.2/gpio-cleanup branch,
+which removes MOD_REG_BIT among other things.
+
+Please rebase onto that branch so these changes can be tested along with
+changes already queued for v3.2.
+
+Thanks,
 
 Kevin
-
-
-The following changes since commit fcb8ce5cfe30ca9ca5c9a79cdfe26d1993e65e0c:
-
-  Linux 3.1-rc3 (2011-08-22 11:42:53 -0700)
-
-are available in the git repository at:
-  git://gitorious.org/khilman/linux-omap-pm.git for_3.2/gpio-cleanup
-
-Kevin Hilman (1):
-      gpio/omap: replace MOD_REG_BIT macro with static inline
-
-Todd Poynor (1):
-      gpio/omap: check return value from irq_alloc_generic_chip
-
- drivers/gpio/gpio-omap.c |   59 ++++++++++++++++++++++++++-------------------
- 1 files changed, 34 insertions(+), 25 deletions(-)
