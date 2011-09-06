@@ -1,26 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Sep 2011 10:37:38 +0100
-Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
-	DEBUG_LL UART
-In-Reply-To: <20110906092816.GC3548@atomide.com>
-References: <20110819113740.GF12527@S2100-06.ap.freescale.net>
-	<20110819123238.GD8918@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1108191101560.20358@xanadu.home>
-	<20110821091452.GH12028@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1108211258490.20358@xanadu.home>
-	<20110821182604.GI28546@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1108211435320.20358@xanadu.home>
-	<20110821191835.GA19678@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1108211522280.20358@xanadu.home>
-	<20110906092816.GC3548@atomide.com>
-Message-ID: <20110906093738.GJ6619@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 06 Sep 2011 10:41:11 +0100
+Subject: [PATCH 1/5] Framework for exporting System-on-Chip information
+	via sysfs
+In-Reply-To: <20110902163136.GB5331@suse.de>
+References: <1314880043-22517-1-git-send-email-lee.jones@linaro.org>
+	<20110901233403.GA28176@suse.de> <4E609784.3080507@linaro.org>
+	<20110902163136.GB5331@suse.de>
+Message-ID: <4E65EAB7.4080300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 12:28:17PM +0300, Tony Lindgren wrote:
-> Probably the best long term solution is to set up the debug uart based
-> on DT data and initialize it in the uncompress code. Anybody debugging
-> lower level stuff can certainly patch in the ucompress debug_ll code.
+I don't have a great deal of time at the moment, as I'm currently on the
+train on my way to Plumbers, but I would like to say just one thing.
 
-How do you do that before the MMU has been setup?  Are you going to
-write a DT data parser in pure assembly to extract this information?
+On 02/09/11 17:31, Greg KH wrote:
+> I'm feeling like it would be simpler for me to write this code than to
+> keep providing review comments like this telling you to rewrite the
+> whole thing over again each time :)
+
+I'd really rather you didn't.
+
+I have put a great deal of my own time into this and I really want to
+see it through. Up until now I have been finding it quite difficult to
+please everyone. I have been trying to follow everyone's suggestions and
+as soon as I think we're getting close, the world flips upside down.
+When I return, I will sit down and go through all of your (and Arnd's)
+suggestions and re-write it.
+
+Please bear with me.
+
+> Anyone want to send me a device that this code is needed for so I can do
+> it?
+
+No. ;)
+
+Kind regards,
+Lee
