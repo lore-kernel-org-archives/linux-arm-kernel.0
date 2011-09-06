@@ -1,103 +1,71 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 6 Sep 2011 09:01:07 +0800
-Subject: [PATCH v2 5/7] ARM: highbank: add SMP support
-In-Reply-To: <1314841446-11006-6-git-send-email-robherring2@gmail.com>
-References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
-	<1314841446-11006-6-git-send-email-robherring2@gmail.com>
-Message-ID: <20110906010105.GA7623@S2100-06.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 6 Sep 2011 10:00:28 +0800
+Subject: [PATCH v11 1/3] MTD : add the common code for GPMI-NAND controller
+	driver
+In-Reply-To: <20110905151752.GA10987@pengutronix.de>
+References: <1314616381-11615-1-git-send-email-b32955@freescale.com>
+	<1314616381-11615-2-git-send-email-b32955@freescale.com>
+	<20110905151752.GA10987@pengutronix.de>
+Message-ID: <4E657EBC.7060800@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 31, 2011 at 08:44:04PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This enables SMP support on highbank processor.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-> Changes in v2:
->  - drop NULL check of scu_base
->  - use IPI #0 instead of #1 to boot secondary
->  - s/a9_base_addr/scu_base_addr/
->  - fix muliple mapping of twd registers
-> 
->  arch/arm/Kconfig                    |    2 +-
->  arch/arm/mach-highbank/Makefile     |    2 +
->  arch/arm/mach-highbank/localtimer.c |   38 +++++++++++++++++
->  arch/arm/mach-highbank/platsmp.c    |   78 +++++++++++++++++++++++++++++++++++
->  4 files changed, 119 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-highbank/localtimer.c
->  create mode 100644 arch/arm/mach-highbank/platsmp.c
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 9019a56..6d2add5 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1372,7 +1372,7 @@ config SMP
->  	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
->  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
->  		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
-> -		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
-> +		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || ARCH_HIGHBANK
->  	select USE_GENERIC_SMP_HELPERS
->  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
->  	help
-> diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
-> index 11d4010..311c0e8e 100644
-> --- a/arch/arm/mach-highbank/Makefile
-> +++ b/arch/arm/mach-highbank/Makefile
-> @@ -1,2 +1,4 @@
->  obj-y					:= clock.o highbank.o system.o
->  obj-$(CONFIG_DEBUG_LL)			+= lluart.o
-> +obj-$(CONFIG_SMP)			+= platsmp.o
-> +obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
-> diff --git a/arch/arm/mach-highbank/localtimer.c b/arch/arm/mach-highbank/localtimer.c
-> new file mode 100644
-> index 0000000..344ea29
-> --- /dev/null
-> +++ b/arch/arm/mach-highbank/localtimer.c
-> @@ -0,0 +1,38 @@
-> +/*
-> + * Copyright 2010-2011 Calxeda, Inc.
-> + * Based on localtimer.c, Copyright (C) 2002 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#include <linux/init.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +
-> +#include <asm/smp_twd.h>
-> +
-> +/*
-> + * Setup the local clock events for a CPU.
-> + */
-> +int __cpuinit local_timer_setup(struct clock_event_device *evt)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
-> +	if (!twd_base)
-> +		twd_base = of_iomap(np, 0);
+Hi Wolfram:
+> On Mon, Aug 29, 2011 at 07:12:59PM +0800, Huang Shijie wrote:
+>> These files contain the common code for the GPMI-NAND driver.
+>>
+>> Signed-off-by: Huang Shijie <b32955@freescale.com>
+>> Acked-by: Marek Vasut <marek.vasut@gmail.com>
+>> Tested-by: Koen Beel <koen.beel@barco.com>
+> ...
+>
+>> +static int __devinit
+>> +acquire_register_block(struct gpmi_nand_data *this, const char *res_name)
+>> +{
+>> +	struct platform_device *pdev = this->pdev;
+>> +	struct resources *res = &this->resources;
+>> +	struct resource *r;
+>> +	void *p;
+>> +
+>> +	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, res_name);
+>> +	if (!r) {
+>> +		pr_err("Can't get resource for %s\n", res_name);
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	p = ioremap(r->start, resource_size(r));
+>> +	if (!p) {
+>> +		pr_err("Can't remap %s\n", res_name);
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	if (res_name == GPMI_NAND_GPMI_REGS_ADDR_RES_NAME)
+>> +		res->gpmi_regs = p;
+>> +	else if (res_name == GPMI_NAND_BCH_REGS_ADDR_RES_NAME)
+>> +		res->bch_regs = p;
+> Am I the only one getting warnings here?
+>
+I did not meet the warinings. but it does worth fixing. thanks
+> drivers/mtd/nand/gpmi-nand/gpmi-nand.c: In function 'acquire_register_block':
+> drivers/mtd/nand/gpmi-nand/gpmi-nand.c:345:15: warning: comparison with string literal results in unspecified behavior
+> drivers/mtd/nand/gpmi-nand/gpmi-nand.c:347:20: warning: comparison with string literal results in unspecified behavior
+>
+> Really worth fixing IMHO...
+>
+>> +	else
+>> +		BUG();
+> dev_err + ENODEV?
+>
+> Might be worth checking the other BUG()-occurences as well if they really need
+> to halt the kernel.
+ok. no problem.
 
-WARN_ON(!twd_base)?
 
-Regards,
-Shawn
+Did you test the driver with rootfs?
 
-> +	evt->irq = irq_of_parse_and_map(np, 0);
-> +	twd_timer_setup(evt);
-> +	return 0;
-> +}
+Best Regards
+Huang Shijie
+> Regards,
+>
+>    Wolfram
+>
