@@ -1,72 +1,43 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 6 Sep 2011 08:15:11 +0200
-Subject: [PATCH] at91: add Atmel ISI and ov2640 support on m10/g45 board.
-In-Reply-To: <4C79549CB6F772498162A641D92D532802A0995F@penmb01.corp.atmel.com>
-References: <1314960609-23396-1-git-send-email-josh.wu@atmel.com>
-	<20110902182137.GL20128@game.jcrosoft.org>
-	<4C79549CB6F772498162A641D92D532802A0995F@penmb01.corp.atmel.com>
-Message-ID: <20110906061511.GD677@game.jcrosoft.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon,  5 Sep 2011 23:49:36 -0700
+Subject: [PATCH] ARM: S3C64XX: Raise the frequency of the second I2C bus on
+	Cragganmore
+Message-ID: <1315291776-1795-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:55 Mon 05 Sep     , Wu, Josh wrote:
-> 
-> 
-> On 09/03/2011 2:22 AM Jean-Christophe PLAGNIOL-VILLARD wrote: 
-> 
-> >>  
-> >>  #include <asm/setup.h>
-> >>  #include <asm/mach-types.h>
-> >> @@ -194,6 +197,95 @@ static void __init ek_add_device_nand(void)
-> >>  	at91_add_device_nand(&ek_nand_data);
-> >>  }
-> >>  
-> >> +/*
-> >> + *  ISI
-> >> + */
-> >> +#if defined(CONFIG_VIDEO_ATMEL_ISI) || defined(CONFIG_VIDEO_ATMEL_ISI_MODULE)
-> >> +static struct isi_platform_data __initdata isi_data = {
-> >> +	.frate		= ISI_CFG1_FRATE_CAPTURE_ALL,
-> >> +	.has_emb_sync	= 0,
-> >> +	.emb_crc_sync = 0,
-> >> +	.hsync_act_low = 0,
-> >> +	.vsync_act_low = 0,
-> >> +	.pclk_act_falling = 0,
-> >> +	/* to use codec and preview path simultaneously */
-> >> +	.isi_full_mode = 1,
-> >> +	.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10,
-> >> +};
-> >> +
-> >> +static void __init isi_set_clk(void)
-> >> +{
-> >> +	struct clk *pck1;
-> >> +	struct clk *plla;
-> >> +
-> >> +	pck1 = clk_get(NULL, "pck1");
-> >> +	plla = clk_get(NULL, "plla");
-> >> +
-> >> +	clk_set_parent(pck1, plla);
-> >> +	clk_set_rate(pck1, 25000000);
-> >> +	clk_enable(pck1);
-> 
-> > you must not enable the clock always
-> 
-> > you must enable it just when you need it
-> 
-> > and manage the clock at the board level really so so
-> 
-> I see, I will move such clock code to atmel_isi.c driver and add clock name, clock frequence to isi_platform_data structure in next version.
-no you miss the idea bind the clkdev
+The S3C I2C driver defaults to a rather low 66kHz, ask for 400kHz for
+a bit of a speed boost.
 
-you manage the clock at soc level and then only if it's mandatory at board
-level
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-for the clock rate you pass it to the driver
-
-and let the driver manage when it want to enable/disable the clock
-
-the driver need to have a abtraction of the clock constraint and just request
-it and use it
-
-Best Regards,
-J.
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index d484864..8415217 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -651,6 +651,11 @@ static struct i2c_board_info i2c_devs1[] __initdata = {
+ 	{ I2C_BOARD_INFO("wm1250-ev1", 0x27) },
+ };
+ 
++static struct s3c2410_platform_i2c i2c1_pdata = {
++	.frequency = 400000,
++	.bus_num = 1,
++};
++
+ static void __init crag6410_map_io(void)
+ {
+ 	s3c64xx_init_io(NULL, 0);
+@@ -709,7 +714,7 @@ static void __init crag6410_machine_init(void)
+ 	s3c_sdhci2_set_platdata(&crag6410_hsmmc2_pdata);
+ 
+ 	s3c_i2c0_set_platdata(&i2c0_pdata);
+-	s3c_i2c1_set_platdata(NULL);
++	s3c_i2c1_set_platdata(&i2c1_pdata);
+ 	s3c_fb_set_platdata(&crag6410_lcd_pdata);
+ 
+ 	i2c_register_board_info(0, i2c_devs0, ARRAY_SIZE(i2c_devs0));
+-- 
+1.7.5.4
