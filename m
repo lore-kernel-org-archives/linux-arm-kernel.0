@@ -1,35 +1,35 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 06 Sep 2011 15:59:55 -0700
-Subject: [PATCH v6 00/25] gpio/omap: driver cleanup and fixes
-In-Reply-To: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Wed, 31 Aug 2011 19:12:16 +0530")
-References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87ty8pz384.fsf@ti.com>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Wed, 7 Sep 2011 00:15:20 +0100
+Subject: [PATCH REPOST 0/3] i2c: tegra: Outstanding patches
+In-Reply-To: <1314726370-8193-1-git-send-email-swarren@nvidia.com>
+References: <1314726370-8193-1-git-send-email-swarren@nvidia.com>
+Message-ID: <20110906231520.GB25655@freya.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tarun,
+On Tue, Aug 30, 2011 at 11:46:07AM -0600, Stephen Warren wrote:
+> For convenience, here's a repost of the outstanding patches for the Tegra
+> I2C driver.
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+applied all of them.
 
-> This series is continuation of cleanup of OMAP GPIO driver and fixes.
-> The cleanup include getting rid of cpu_is_* checks wherever possible,
-> use of gpio_bank list instead of static array, use of unique platform
-> specific value associated data member to OMAP platforms to avoid
-> cpu_is_* checks. The series also include PM runtime support.*
-
-Thanks for your continued effort on this series.
-
-> Baseline: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
-> Branch: master
-> Commit: c6a389f  Linux 3.1-rc4 
-
-This series was supposed to be based on my for_3.2/gpio-cleanup branch,
-which removes MOD_REG_BIT among other things.
-
-Please rebase onto that branch so these changes can be tested along with
-changes already queued for v3.2.
-
-Thanks,
-
-Kevin
+in future, it would be helpful to have just i2c-tegra on the
+front of the subject. fixed these up and put them in pull req
+to linus
+ 
+> Doug Anderson (1):
+>   i2c: tegra: fix possible race condition after tx
+> 
+> John Bonesio (1):
+>   i2c: Tegra: Add of_match_table
+> 
+> Mike Rapoport (1):
+>   i2c: i2c-tegra: add I2C_FUNC_SMBUS_EMUL
+> 
+>  drivers/i2c/busses/i2c-tegra.c |   60 ++++++++++++++++++++++++++++++----------
+>  1 files changed, 45 insertions(+), 15 deletions(-)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
