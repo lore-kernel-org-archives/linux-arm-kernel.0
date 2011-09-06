@@ -1,42 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Sep 2011 20:39:29 +0200
-Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level debug
-	uart
-In-Reply-To: <1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <3922347.lxZAT2yslI@wuerfel>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 06 Sep 2011 14:45:04 -0400 (EDT)
+Subject: [PATCH 4.5/6] ARM: omap: pass phys,
+	virt and lsr from uncompress.h to debug-macro.S
+In-Reply-To: <20110905150758.GG1903@atomide.com>
+References: <1314932353-24813-1-git-send-email-nico@fluxnic.net>
+	<1314932353-24813-5-git-send-email-nico@fluxnic.net>
+	<20110905150758.GG1903@atomide.com>
+Message-ID: <alpine.LFD.2.00.1109061440590.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 September 2011 17:58:36 Shawn Guo wrote:
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/include/mach/mx6q.h
-> @@ -0,0 +1,29 @@
-> +#ifndef __MACH_MX6Q_H__
-> +#define __MACH_MX6Q_H__
-> +
-> +/* static mappings */
-> +#define IMX6Q_VA(x)            (0xf4000000 + (x))
+On Mon, 5 Sep 2011, Tony Lindgren wrote:
 
-This should return a 'void __iomem *' pointer, not an integer.
+> Earlier code passed the serial port configuration number as the
+> code originally used the scratchpad register in the serial port
+> to pass it from uncompress.h to debug-macro.S. This is no longer
+> the case as some omaps don't have a serial port. A memory address
+> is used instead.
+> 
+> Change the code to pass phys, virt and lsr from uncompress.h
+> to debug-macro.S. Note that the virt value is only used on zoom
+> boards that have an external 8250 hardware.
+> 
+> This will make it possible to combine omap1 and omap2+ debug-macro.S.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+[...]
+> 
+>  	u32 ram_start = (u32)&uart_shift & 0xf8000000;
+>  	u32 *uart_info = (u32 *)(ram_start + OMAP_UART_INFO_OFS);
+> -	*uart_info = port;
+> +	*uart_info = (u32)uart_base;
+> +	uart_info++;
+> +	*uart_info = (u32)uart_virt;
+> +	uart_info++;
+> +	*uart_info = UART_LSR << uart_shift;
 
-> +#define MX6Q_SCU_BASE_ADDR     0x00a00000
-> +#define MX6Q_CCM_BASE_ADDR     0x020c4000
-> +#define MX6Q_ANATOP_BASE_ADDR  0x020c8000
-> +#define MX6Q_UART4_BASE_ADDR   0x021f0000
-> +
-> +#define MX6Q_SCU_BASE_VADDR    IMX6Q_VA(MX6Q_SCU_BASE_ADDR)
-> +#define MX6Q_CCM_BASE_VADDR    IMX6Q_VA(MX6Q_CCM_BASE_ADDR)
-> +#define MX6Q_ANATOP_BASE_VADDR IMX6Q_VA(MX6Q_ANATOP_BASE_ADDR)
-> +#define MX6Q_UART4_BASE_VADDR  IMX6Q_VA(MX6Q_UART4_BASE_ADDR)
+Whouldn't this be clearer as:
 
-The list is reasonably short, but I think you can still try harder to remove
-some of the remaining elements. I can understand the need for UART4
-(for ll_debug), but I don't really understand what the others are and
-why you cannot get the values from the device tree and ioremap them.
+	uart_info[0] = (u32)uart_base;
+	uart_info[1] = (u32)uart_virt;
+	uart_info[2] = UART_LSR << uart_shift;
 
-Maybe you can add a few comments to explain these if they are indeed
-necessary.
+?
 
-	Arnd
+
+Nicolas
