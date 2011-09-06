@@ -1,44 +1,50 @@
-From: rogerio.pimentel@freescale.com (Rogerio Pimentel)
-Date: Tue, 6 Sep 2011 16:01:34 -0300
-Subject: [PATCH 2/4] ARM: mx53: Add clock for flexcan
-In-Reply-To: <1315335696-20499-1-git-send-email-rogerio.pimentel@freescale.com>
-References: <1315335696-20499-1-git-send-email-rogerio.pimentel@freescale.com>
-Message-ID: <1315335696-20499-2-git-send-email-rogerio.pimentel@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2011 21:14:29 +0200
+Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
+In-Reply-To: <1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1711465.COqYbTSZES@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding clock for flexcan on i.MX53
+On Tuesday 06 September 2011 17:58:37 Shawn Guo wrote:
+> It adds a number of core drivers support for imx6q, including clock,
+> General Power Controller (gpc), Multi Mode DDR Controller(mmdc) and
+> System Reset Controller (src).
+> 
+> Signed-off-by: Ranjani Vaidyanathan <ra5478@freescale.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-imx/Kconfig       |   13 +
+>  arch/arm/mach-imx/Makefile      |    4 +
+>  arch/arm/mach-imx/clock-imx6q.c | 1990 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/gpc.c         |  110 +++
+>  arch/arm/mach-imx/mmdc.c        |   71 ++
+>  arch/arm/mach-imx/src.c         |   52 +
+>  6 files changed, 2240 insertions(+), 0 deletions(-)
 
-Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+This is unfortunately still a major problem. I realize that we don't
+yet have a good framework to do this with significantly less code,
+but adding a platform that is mostly consisting of stupid additions
+of clock descriptions that really should be in the device tree does
+not scale much longer. We decided to let this still get in for prima2,
+which was also ugly in this regard but much simpler than imx6.
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index afecd78..3ae8ac0 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1422,6 +1422,12 @@ DEFINE_CLOCK(ipu_di1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG6_OFFSET,
- DEFINE_CLOCK(pata_clk, 0, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG0_OFFSET,
- 		NULL, NULL, &ipg_clk, &spba_clk);
- 
-+/* CAN */
-+DEFINE_CLOCK(can1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG10_OFFSET,
-+		NULL, NULL, &ipg_clk, NULL);
-+DEFINE_CLOCK(can2_clk, 1, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET,
-+		NULL, NULL, &ipg_clk, NULL);
-+
- #define _REGISTER_CLOCK(d, n, c) \
-        { \
- 		.dev_id = d, \
-@@ -1513,6 +1519,8 @@ static struct clk_lookup mx53_lookups[] = {
- 	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
- 	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
- 	_REGISTER_CLOCK("pata_imx", NULL, pata_clk)
-+	_REGISTER_CLOCK("flexcan.0", NULL, can1_clk)
-+	_REGISTER_CLOCK("flexcan.1", NULL, can2_clk)
- };
- 
- static void clk_tree_init(void)
--- 
-1.7.1
+My feeling is that this time, we should wait for the common clock
+framework to get in and simplify this. I believe Thomas is now planning
+to do this, but I haven't followed what the current state is.
+
+The other three drivers in this patch are basically ok, so you can
+definitely post them as a separate patch and perhaps get minor comments
+for those, similar to what I commented on the other patches.
+
+For the clock-imx6q.c file, what I first want to hear from someone
+is how this is supposed to look like in the long run with device tree
+integration, and how far away from that we are.
+
+Can you comment on how far we get without the clock driver with imx6?
+Is is basically useless, or is there a way we can merge the remaining
+imx6 code and other drivers but postpone the large clock driver?
+
+	Arnd
