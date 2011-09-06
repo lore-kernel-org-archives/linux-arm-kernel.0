@@ -1,22 +1,45 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 06 Sep 2011 19:25:15 +0530
-Subject: [PATCH 0/2] Add device tree support for Samsung's keypad controller
-	driver
-Message-ID: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
+Date: Tue, 06 Sep 2011 19:25:16 +0530
+Subject: [PATCH 1/2] input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD config
+	option
+In-Reply-To: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
+References: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds device tree support for samsung's keypad controller driver.
-First patch adds a new config option to be used by device tree enabled platforms
-for selecting the samsung's keypad controller driver. The second patch adds device
-tree support for the keypad driver.
+Samsung keyboard driver could be used with platforms using device tree.
+So the inclusion of samsung keyboard driver cannot be based on
+SAMSUNG_DEV_KEYPAD. A new config option HAVE_SAMSUNG_KEYPAD is added
+which device tree based platforms should use to include samsung keyboard
+driver.
 
-Thomas Abraham (2):
-  input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD config option
-  input: samsung-keypad: Add device tree support
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ drivers/input/keyboard/Kconfig |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
 
- .../devicetree/bindings/input/samsung-keypad.txt   |   88 +++++++++++
- drivers/input/keyboard/Kconfig                     |    9 +-
- drivers/input/keyboard/samsung-keypad.c            |  161 +++++++++++++++++++-
- 3 files changed, 254 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/samsung-keypad.txt
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index b4dee9d..370fb18 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -423,9 +423,16 @@ config KEYBOARD_PMIC8XXX
+ 	  To compile this driver as a module, choose M here: the module will
+ 	  be called pmic8xxx-keypad.
+ 
++config HAVE_SAMSUNG_KEYPAD
++	bool
++	help
++	  This will include Samsung Keypad controller driver support. If you
++	  want to include Samsung Keypad support for any machine, kindly
++	  select this in the respective mach-xxxx/Kconfig file.
++
+ config KEYBOARD_SAMSUNG
+ 	tristate "Samsung keypad support"
+-	depends on SAMSUNG_DEV_KEYPAD
++	depends on SAMSUNG_DEV_KEYPAD || HAVE_SAMSUNG_KEYPAD
+ 	help
+ 	  Say Y here if you want to use the Samsung keypad.
+ 
+-- 
+1.6.6.rc2
