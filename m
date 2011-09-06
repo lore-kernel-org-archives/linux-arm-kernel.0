@@ -1,63 +1,29 @@
-From: phil.sutter@viprinet.com (Phil Sutter)
-Date: Tue, 6 Sep 2011 13:05:03 +0200
-Subject: [PATCH] af_packet: flush complete kernel cache in packet_sendmsg
-In-Reply-To: <20110906095722.GK6619@n2100.arm.linux.org.uk>
-References: <20110505141107.GC30443@orbit.nwl.cc>
-	<1314961686-30870-1-git-send-email-phil.sutter@viprinet.com>
-	<1314971179.3092.159.camel@deadeye>
-	<20110902172850.GB6619@n2100.arm.linux.org.uk>
-	<20110905195714.GC29025@philter>
-	<20110906095722.GK6619@n2100.arm.linux.org.uk>
-Message-ID: <20110906110503.GE29025@philter>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Sep 2011 12:07:26 +0100
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
+	DEBUG_LL UART
+In-Reply-To: <20110906110143.GB1895@atomide.com>
+References: <alpine.LFD.2.00.1108211258490.20358@xanadu.home>
+	<20110821182604.GI28546@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1108211435320.20358@xanadu.home>
+	<20110821191835.GA19678@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1108211522280.20358@xanadu.home>
+	<20110906092816.GC3548@atomide.com>
+	<20110906093738.GJ6619@n2100.arm.linux.org.uk>
+	<20110906102703.GA1895@atomide.com>
+	<20110906105206.GL6619@n2100.arm.linux.org.uk>
+	<20110906110143.GB1895@atomide.com>
+Message-ID: <20110906110726.GN6619@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 10:57:22AM +0100, Russell King - ARM Linux wrote:
-> > The code in question uses __get_free_pages(), and if that fails uses
-> > vmalloc() (see alloc_one_pg_vec_page() for reference). Both code paths
-> > show result in the same faulty behaviour.
-> 
-> So, what you're wanting is cache coherency between vmalloc() and
-> userspace.  There is no API in the kernel to do that, and you'll see
-> the same failures of this interface not only on ARM but also other
-> architectures with virtual caches.
-> 
-> It sounds like we need an API to flush the cache using both the
-> userspace address, plus the kernel side address be that in the direct
-> map or the vmalloc map areas.
-> 
-> Or maybe the right solution is to simply disable AF_PACKET MMAP support
-> for virtual cached architectures - it may be that adding cache flushing
-> calls makes the thing too expensive and the benefits of mmap over normal
-> read/write are lost.
+On Tue, Sep 06, 2011 at 04:01:43AM -0700, Tony Lindgren wrote:
+> Yes I agree. As an alternative, how about we drop all the debug_ll code
+> and allow people to patch it in as needed?
 
-OK, that's horrible. Of course we depend on just this combination to
-work flawlessly, i.e. PACKET_MMAP && VIVT. :(
+Given all this argument over it, I'm mindful to rip out all the debug_ll
+code and keep it permanently as an offline patch to prevent further abuse.
 
-Another userspace-interface I'm working on uses a different solution:
-memory is allocated in userspace and accessed from kernelspace using
-get_user_pages(). I did not explicitly search for the earlier described
-fault pattern, but we didn't notice any problem with this approach on
-the very same hardware either. I already see myself writing TPACKET_V3.
-;)
-
-What do you think?
-
-Greetings, Phil
-
--- 
-Viprinet GmbH
-Mainzer Str. 43
-55411 Bingen am Rhein
-Germany
-
-Zentrale:     +49-6721-49030-0
-Durchwahl:    +49-6721-49030-134
-Fax:          +49-6721-49030-209
-
-phil.sutter at viprinet.com
-http://www.viprinet.com
-
-Sitz der Gesellschaft: Bingen am Rhein
-Handelsregister: Amtsgericht Mainz HRB40380
-Gesch?ftsf?hrer: Simon Kissel
+It means that people will have to individually write their own accessors
+rather than having the utility of it being merged in the kernel, but
+I'm sick of trying to stop the feature creap destroying its utility.
