@@ -1,24 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Sep 2011 12:45:26 +0100
-Subject: [GIT PULL v3] OMAP: clock/powerdomain/clockdomain/hwmod: fixes
-	for 3.1-rc
-In-Reply-To: <20110906112914.GC1895@atomide.com>
-References: <alpine.DEB.2.00.1108222319310.28226@utopia.booyaka.com>
-	<alpine.DEB.2.00.1108230105180.28226@utopia.booyaka.com>
-	<alpine.DEB.2.00.1108300104010.26173@utopia.booyaka.com>
-	<alpine.DEB.2.00.1109011751370.26025@utopia.booyaka.com>
-	<alpine.DEB.2.00.1109042023190.9056@utopia.booyaka.com>
-	<20110906112914.GC1895@atomide.com>
-Message-ID: <20110906114526.GD6918@n2100.arm.linux.org.uk>
+From: corone.il.han@gmail.com (Il Han)
+Date: Tue,  6 Sep 2011 20:45:48 +0900
+Subject: [PATCH] head.S: The official name of the Cache Size Selection
+	Register is CSSELR.
+Message-ID: <1315309548-23188-1-git-send-email-corone.il.han@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 04:29:14AM -0700, Tony Lindgren wrote:
-> Arnd,
-> 
-> Care to pull the following fixes to the -rc series from Paul?
+The official name of the Cache Size Selection Register is CSSELR.
+Modify it.
 
-Tony,
+Signed-off-by: Il Han <corone.il.han@gmail.com>
+---
+ arch/arm/boot/compressed/head.S |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-I don't think that will happen until master.kernel.org is back online
-as the tree was hosted on that machine.
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index e95a598..72026dc 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -949,8 +949,8 @@ loop1:
+ 		and	r1, r1, #7		@ mask of the bits for current cache only
+ 		cmp	r1, #2			@ see what cache we have at this level
+ 		blt	skip			@ skip if no cache, or just i-cache
+-		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
+-		mcr	p15, 0, r10, c7, c5, 4	@ isb to sych the new cssr&csidr
++		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in csselr
++		mcr	p15, 0, r10, c7, c5, 4	@ isb to sych the new csselr&csidr
+ 		mrc	p15, 1, r1, c0, c0, 0	@ read the new csidr
+ 		and	r2, r1, #7		@ extract the length of the cache lines
+ 		add	r2, r2, #4		@ add 4 (line length offset)
+@@ -980,7 +980,7 @@ skip:
+ finished:
+ 		ldmfd	sp!, {r0-r7, r9-r11}
+ 		mov	r10, #0			@ swith back to cache level 0
+-		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in cssr
++		mcr	p15, 2, r10, c0, c0, 0	@ select current cache level in csselr
+ iflush:
+ 		mcr	p15, 0, r10, c7, c10, 4	@ DSB
+ 		mcr	p15, 0, r10, c7, c5, 0	@ invalidate I+BTB
+-- 
+1.7.4.1
