@@ -1,40 +1,35 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Tue, 6 Sep 2011 16:02:15 +0200
-Subject: [PATCH] arm: omap: Fix build error in ispccdc.c
-Message-ID: <1315317735-5255-1-git-send-email-joerg.roedel@amd.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 6 Sep 2011 16:17:08 +0200
+Subject: [PATCH v11 1/3] MTD : add the common code for GPMI-NAND
+	controller driver
+In-Reply-To: <4E65F69D.5010808@freescale.com>
+References: <1314616381-11615-1-git-send-email-b32955@freescale.com>
+	<1314616381-11615-2-git-send-email-b32955@freescale.com>
+	<20110905151752.GA10987@pengutronix.de>
+	<4E65F69D.5010808@freescale.com>
+Message-ID: <20110906141708.GJ2610@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following build error occurs with 3.1-rc5:
 
-  CC      drivers/media/video/omap3isp/ispccdc.o
-/home/data/repos/linux.trees.git/drivers/media/video/omap3isp/ispccdc.c: In function 'ccdc_lsc_config':
-/home/data/repos/linux.trees.git/drivers/media/video/omap3isp/ispccdc.c:427:2: error: implicit declaration of function 'kzalloc' [-Werror=implicit-function-declaration]
-/home/data/repos/linux.trees.git/drivers/media/video/omap3isp/ispccdc.c:427:6: warning: assignment makes pointer from integer without a cast [enabled by default]
+> Should i wait for your test result, and send out the new version v12?
+> or I send out the new version first, and then you test it again?
 
-This patch adds the missing 'linux/slab.h' include to fix the problem.
+I'd suggest you send V12 and I will test it when NAND is on my list
+again. I need to bring up this board first before I can do further
+testing.
 
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: linux-media at vger.kernel.org
-Cc: linux-omap at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
----
- drivers/media/video/omap3isp/ispccdc.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Thanks,
 
-diff --git a/drivers/media/video/omap3isp/ispccdc.c b/drivers/media/video/omap3isp/ispccdc.c
-index 9d3459d..80796eb 100644
---- a/drivers/media/video/omap3isp/ispccdc.c
-+++ b/drivers/media/video/omap3isp/ispccdc.c
-@@ -31,6 +31,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/mm.h>
- #include <linux/sched.h>
-+#include <linux/slab.h>
- #include <media/v4l2-event.h>
- 
- #include "isp.h"
+   Wolfram
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110906/2846cd2e/attachment.sig>
