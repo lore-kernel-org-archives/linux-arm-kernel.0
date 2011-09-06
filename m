@@ -1,22 +1,30 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 06 Sep 2011 14:30:01 -0400 (EDT)
-Subject: [PATCH 2.5/6] ARM: omap: prepare debug-macro.S for offset based
-	calculation of omap_uart_phys and virt
-In-Reply-To: <20110905094611.GB1903@atomide.com>
-References: <1314932353-24813-1-git-send-email-nico@fluxnic.net>
-	<1314932353-24813-3-git-send-email-nico@fluxnic.net>
-	<20110905094611.GB1903@atomide.com>
-Message-ID: <alpine.LFD.2.00.1109061428450.20358@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2011 20:31:47 +0200
+Subject: [PATCH 1/6] arm/imx6q: add device tree source
+In-Reply-To: <1315303120-24203-2-git-send-email-shawn.guo@linaro.org>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <6584331.JVLA1MqVFx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Sep 2011, Tony Lindgren wrote:
+On Tuesday 06 September 2011 17:58:35 Shawn Guo wrote:
+> +
+> +       aips-bus at 02000000 { /* AIPS1 */
+> +               compatible = "fsl,aips-bus", "simple-bus";
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               reg = <0x02000000 0x100000>;
+> +               ranges;
+> +
+> +               spba-bus at 02000000 {
+> +                       compatible = "fsl,spba-bus", "simple-bus";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       reg = <0x02000000 0x40000>;
+> +                       ranges;
 
-> Just change 99 to 100 to allow using 99 for omap_uart_phys in the
-> following patches.
+Wouldn't it be better to have the ranges property translate bus-local addresses
+to global addresses, rather than having an empty ranges property?
 
-OK I've folded that into 3/6 and 4/6 rather than having a separated 
-patch just for this.
-
-
-Nicolas
+	Arnd
