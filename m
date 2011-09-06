@@ -1,35 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Sep 2011 13:27:18 +0100
-Subject: [PATCH v8 04/16] DMA: PL330: Remove the start operation for
-	handling DMA_TERMINATE_ALL command
-In-Reply-To: <CABb+yY1QN9CzT=CGJ1n-pk8_QyeEK1Sx=HT2n8SMB9O-XrsXDg@mail.gmail.com>
-References: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
-	<1314924284-25554-5-git-send-email-boojin.kim@samsung.com>
-	<CABb+yY1QN9CzT=CGJ1n-pk8_QyeEK1Sx=HT2n8SMB9O-XrsXDg@mail.gmail.com>
-Message-ID: <20110906122718.GP6619@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 6 Sep 2011 15:35:48 +0300
+Subject: [Linaro-mm-sig] [PATCH 2/2] ARM: Samsung: update/rewrite Samsung
+	SYSMMU (IOMMU) driver
+In-Reply-To: <CAHQjnONHr-Ao_KLjdRKgVQQUKtOmmoyqFwdkSZCDsE6hx1q-Ug@mail.gmail.com>
+References: <1314971786-15140-1-git-send-email-m.szyprowski@samsung.com>
+	<1314971786-15140-3-git-send-email-m.szyprowski@samsung.com>
+	<CAHQjnONHr-Ao_KLjdRKgVQQUKtOmmoyqFwdkSZCDsE6hx1q-Ug@mail.gmail.com>
+Message-ID: <CADMYwHzTe7WcqjCOSdgnbFsHm6gtV7Bf1154WHXiTnffGSAYRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 05:52:19PM +0530, Jassi Brar wrote:
-> On Fri, Sep 2, 2011 at 6:14 AM, Boojin Kim <boojin.kim@samsung.com> wrote:
-> > Origianl code carries out the start operation after flush operation.
-> > But start operation is not required for DMA_TERMINATE_ALL command.
-> > So, This patch removes the unnecessary start operation and only carries out
-> > the flush oeration for handling DMA_TERMINATE_ALL command.
-> 
-> Not exactly. The 'start' is impotent when called from this path because there
-> is nothing left queued after the call to 'flush'.
-> pl330_tasklet() is called because that is a common function that does the
-> house-keeping acc to what's presently in 'work' and 'done' lists.
-> 
-> Though as a side-effect, your patch does avoid doing callbacks on submitted
-> xfers during DMA_TERMINATE_ALL - which may or may not be the right thing
-> to do.
+On Tue, Sep 6, 2011 at 1:27 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> On Fri, Sep 2, 2011 at 10:56 PM, Marek Szyprowski
+>> +static int s5p_sysmmu_map(struct iommu_domain *domain, unsigned long iova,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? phys_addr_t paddr, int gfp_order, int prot)
+>> +{
+>> + ? ? ? struct s5p_sysmmu_domain *s5p_domain = domain->priv;
+>> + ? ? ? int flpt_idx = flpt_index(iova);
+>> + ? ? ? size_t len = 0x1000UL << gfp_order;
+>> + ? ? ? void *flpt_va, *slpt_va;
+>> +
+>> + ? ? ? if (len != SZ_16M && len != SZ_1M && len != SZ_64K && len != SZ_4K) {
+>> + ? ? ? ? ? ? ? sysmmu_debug(3, "bad order: %d\n", gfp_order);
+>> + ? ? ? ? ? ? ? return -EINVAL;
+>> + ? ? ? }
+>
+> Likewise, I think this driver need to support mapping 128KiB aligned,
+> 128KiB physical memory, for example.
+>
+> Otherwise, it is somewhat restrictive than we expect.
 
-It is defined that DMA_TERMINATE_ALL does not call the callbacks:
+That's actually OK, because the IOMMU core will split physically
+contiguous memory regions to pages on behalf of its drivers (drivers
+will just have to advertise the page sizes their hardware supports);
+this way you don't duplicate the logic in every IOMMU driver.
 
-1. int dmaengine_terminate_all(struct dma_chan *chan)
+Take a look:
 
-   This causes all activity for the DMA channel to be stopped, and may
-   discard data in the DMA FIFO which hasn't been fully transferred.
-   No callback functions will be called for any incomplete transfers.
+http://www.spinics.net/lists/linux-omap/msg56660.html
