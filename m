@@ -1,57 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Sep 2011 11:15:42 +0200
-Subject: [PATCH] gpio: rewrite U300 GPIO to use gpiolib
-In-Reply-To: <20110906084938.GI6619@n2100.arm.linux.org.uk>
-References: <1315297950-12720-1-git-send-email-linus.walleij@stericsson.com>
-	<20110906084938.GI6619@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkda0-SU5rUYkg7MyNSDpYZPmKYuosfJDh=yHA+Skac1Upg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Sep 2011 12:28:17 +0300
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting
+	DEBUG_LL UART
+In-Reply-To: <alpine.LFD.2.00.1108211522280.20358@xanadu.home>
+References: <20110819110822.GB8918@e102144-lin.cambridge.arm.com>
+	<20110819113740.GF12527@S2100-06.ap.freescale.net>
+	<20110819123238.GD8918@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1108191101560.20358@xanadu.home>
+	<20110821091452.GH12028@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1108211258490.20358@xanadu.home>
+	<20110821182604.GI28546@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1108211435320.20358@xanadu.home>
+	<20110821191835.GA19678@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1108211522280.20358@xanadu.home>
+Message-ID: <20110906092816.GC3548@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2011 at 10:49 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+* Nicolas Pitre <nico@fluxnic.net> [110821 22:21]:
+> On Sun, 21 Aug 2011, Russell King - ARM Linux wrote:
+> > 
+> > The decompressor has nothing to do with this.
+> 
+> Sure it does, since it relies on early serial output capabilities, just 
+> like earlyprintk, or possibly even the senduart code.  Solving this once 
+> for them all, *appropriately*, would certainly be nice.  I would be glad 
+> to see this need addressed without making further ugly abuses like the 
+> OMAP people did with their OMAP_UART_INFO and the 
+> arch/arm/plat-omap/include/plat/uncompress.h abomination.
 
->> +#include <linux/io.h>
->> +#include <mach/hardware.h>
->> +#include <asm/irq.h>
->> +#include <asm-generic/gpio.h>
->>
->> +/* Map these overrides to gpiolib functions, simply */
->> +#define gpio_get_value ?__gpio_get_value
->> +#define gpio_set_value ?__gpio_set_value
->> +#define gpio_cansleep ? __gpio_cansleep
->> +#define gpio_to_irq ? ? __gpio_to_irq
->>
->> +#endif
->
-> This is how mach/gpio.h ends up looking - two things:
->
-> 1. is there any reason for asm/irq.h and linux/io.h in there?
+Well the way the debug_ll code is currenty set up just won't scale.
+The basic problem is that the debug_ll code should be machine specific,
+not arch specific..
 
-No.
+Probably the best long term solution is to set up the debug uart based
+on DT data and initialize it in the uncompress code. Anybody debugging
+lower level stuff can certainly patch in the ucompress debug_ll code.
 
-> 2. asm/gpio.h already includes asm-generic/gpio.h and defines
-> ? the dispatchers for the trivial case.
+Regards,
 
-Yep.
-
-> So, I think this is how it should look:
->
-> #ifndef __MACH_U300_GPIO_H
-> #define __MACH_U300_GPIO_H
-> #include <mach/hardware.h>
-> #endif
->
-> Or even just:
->
-> /* empty */
-
-It works fine when left empty, so respinning it like
-that.
-
-> if mach/hardware.h include is not required for ARCH_NR_GPIOS.
-
-It'll survive with just the default number of GPIOs.
-
-Thanks,
-Linus Walleij
+Tony
