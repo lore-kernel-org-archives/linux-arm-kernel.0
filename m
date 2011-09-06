@@ -1,37 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 06 Sep 2011 21:33:05 +0200
-Subject: [PATCH 1/5] Framework for exporting System-on-Chip information
-	via sysfs
-In-Reply-To: <4E65EAB7.4080300@linaro.org>
-References: <1314880043-22517-1-git-send-email-lee.jones@linaro.org>
-	<20110902163136.GB5331@suse.de> <4E65EAB7.4080300@linaro.org>
-Message-ID: <13709095.eFgBnoufU1@wuerfel>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 6 Sep 2011 21:42:53 +0200
+Subject: [PATCH 0/6] add initial imx6q support
+In-Reply-To: <2043782.jegSLqAsTH@wuerfel>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<2043782.jegSLqAsTH@wuerfel>
+Message-ID: <20110906194253.GO28816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 September 2011 10:41:11 Lee Jones wrote:
-> I don't have a great deal of time at the moment, as I'm currently on the
-> train on my way to Plumbers, but I would like to say just one thing.
-> 
-> On 02/09/11 17:31, Greg KH wrote:
-> > I'm feeling like it would be simpler for me to write this code than to
-> > keep providing review comments like this telling you to rewrite the
-> > whole thing over again each time 
-> 
-> I'd really rather you didn't.
-> 
-> I have put a great deal of my own time into this and I really want to
-> see it through. Up until now I have been finding it quite difficult to
-> please everyone. I have been trying to follow everyone's suggestions and
-> as soon as I think we're getting close, the world flips upside down.
-> When I return, I will sit down and go through all of your (and Arnd's)
-> suggestions and re-write it.
+Hello Arnd,
 
-Ok. BTW, I feel a bit guilty for making you go through all this work
-on code that was written by other people and you are not to blame for,
-but I think we on the right track now. If you have any doubts about
-how to go on with the next version, please contact on IRC or phone
-so we can discuss the details. I think that will be more productive
-than the past email exchanges.
+On Tue, Sep 06, 2011 at 08:28:39PM +0200, Arnd Bergmann wrote:
+> We've talked about it before, but I don't remember the outcome. Can you
+> explain (and add to the above text) a short explanation of why this is
+> in the mach-imx directory, rather than the mach-mx5 (which probably is
+> closer to mx6 than mx3 is) or a new mach-mx6?
+Not having looked into the patches yet, but I think mach-imx is the
+right choice. The longterm plan for mach-mx5 is to be folded into
+mach-imx, too. We just didn't found a volunteer for that.
 
-	Arnd
+Best regards
+Uwe
+
+BTW, are you on irc somewhere?
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
