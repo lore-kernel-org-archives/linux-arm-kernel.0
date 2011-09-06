@@ -1,18 +1,55 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 6 Sep 2011 14:28:32 +0300
-Subject: [PATCH/RFC 0/7] iommu: fixes & extensions
-In-Reply-To: <20110906101535.GT16691@amd.com>
-References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-	<20110906101535.GT16691@amd.com>
-Message-ID: <CAK=WgbZ=QqXgwvFzu8AGdXEMridoFri5sRb0gy9mKmT2WHZVxg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Sep 2011 04:29:14 -0700
+Subject: [GIT PULL v3] OMAP: clock/powerdomain/clockdomain/hwmod: fixes
+	for 3.1-rc
+In-Reply-To: <alpine.DEB.2.00.1109042023190.9056@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1108222319310.28226@utopia.booyaka.com>
+	<alpine.DEB.2.00.1108230105180.28226@utopia.booyaka.com>
+	<alpine.DEB.2.00.1108300104010.26173@utopia.booyaka.com>
+	<alpine.DEB.2.00.1109011751370.26025@utopia.booyaka.com>
+	<alpine.DEB.2.00.1109042023190.9056@utopia.booyaka.com>
+Message-ID: <20110906112914.GC1895@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 6, 2011 at 1:15 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> Ok, I applied 1-5 to their respective branches. Patch 6 needs some more
-> discussion to make sure the interface is generally usable. Patch 7 seems
-> to be a starting point for now. This definitly requires conversion of
-> the other IOMMU drivers too.
-> Please make individual patch-sets from patch 6 and 7 respectivly.
+Arnd,
 
-Will do, thanks !
+Care to pull the following fixes to the -rc series from Paul?
+
+
+* Paul Walmsley <paul@pwsan.com> [110904 18:53]:
+> The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
+> 
+>   Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
+> 
+> are available in the git repository at:
+>   git://git.pwsan.com/linux-2.6 prcm-fixes-a-3.1rc
+> 
+> This update adds a patch for a missing array terminator in the OMAP2430 
+> hwmod data.
+> 
+> Paul Walmsley (5):
+>       OMAP4: clock: re-enable previous clockdomain enable/disable sequence
+>       OMAP4: clock: fix compile warning
+>       OMAP3: clock: indicate that gpt12_fck and wdt1_fck are in the WKUP clockdomain
+>       OMAP2430: hwmod: musb: add missing terminator to omap2430_usbhsotg_addrs[]
+>       Merge branches 'non_hwmod_compliant_fix_3.1rc', 'omap3_clock_fixes_3.1rc', 'omap4_clock_fixes_3.1rc', 'missing_2430_musb_adds_terminator_fix_3.1rc' and 'pwrdm_clkdm_fixes_3.1rc' into prcm-fixes-a-3.1rc
+> 
+> Rajendra Nayak (1):
+>       OMAP: powerdomains: Make all powerdomain target states as ON at init
+> 
+> Santosh Shilimkar (1):
+>       OMAP: clockdomain: Wait for powerdomain to be ON when using clockdomain force wakeup
+> 
+>  arch/arm/mach-omap2/clock3xxx_data.c       |    2 ++
+>  arch/arm/mach-omap2/clock44xx_data.c       |   10 +++++++++-
+>  arch/arm/mach-omap2/clockdomain.c          |    2 ++
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c |    1 +
+>  arch/arm/mach-omap2/pm.c                   |    2 --
+>  arch/arm/mach-omap2/powerdomain.c          |   25 ++++++++++++++++---------
+>  6 files changed, 30 insertions(+), 12 deletions(-)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
