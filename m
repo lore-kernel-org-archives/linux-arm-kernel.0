@@ -1,68 +1,43 @@
 From: sbabic@denx.de (Stefano Babic)
-Date: Tue, 06 Sep 2011 11:13:02 +0200
+Date: Tue, 06 Sep 2011 11:14:36 +0200
 Subject: [PATCH] ARM: mxs: Add initial support for DENX MX28
-In-Reply-To: <20110906083926.GE28816@pengutronix.de>
-References: <1314604250-29511-1-git-send-email-sbabic@denx.de>
-	<20110906083926.GE28816@pengutronix.de>
-Message-ID: <4E65E41E.9000108@denx.de>
+In-Reply-To: <20110906084627.GB2610@pengutronix.de>
+References: <1314604250-29511-1-git-send-email-sbabic@denx.de>	<20110906083926.GE28816@pengutronix.de>
+	<20110906084627.GB2610@pengutronix.de>
+Message-ID: <4E65E47C.3080505@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2011 10:39 AM, Uwe Kleine-K?nig wrote:
-> Hello Stefano,
+On 09/06/2011 10:46 AM, Wolfram Sang wrote:
+>>>  
+>>> +config MODULE_M28
+>>> +	bool
+>>> +	select SOC_IMX28
+>>> +	select LEDS_GPIO_REGISTER
+>>> +	select MXS_HAVE_AMBA_DUART
+>>> +	select MXS_HAVE_PLATFORM_AUART
+>>> +	select MXS_HAVE_PLATFORM_FEC
+>>> +	select MXS_HAVE_PLATFORM_FLEXCAN
+>>> +	select MXS_HAVE_PLATFORM_MXS_MMC
+>>> +	select MXS_HAVE_PLATFORM_MXSFB
+>>> +	select MXS_OCOTP
+>>> +
+>>>  config MACH_TX28
+>>>  	bool "Ka-Ro TX28 module"
+>>>  	select MODULE_TX28
+>>>  
+>>> +config MACH_M28EVK
+>>> +	bool "Support DENX M28EVK Platform"
+>>> +	select MODULE_M28
+>>> +
 > 
+> Does it build?
 
-Hi Uwe,
+Yes, but only because my config contains MXS_HAVE_PLATFORM_MXS_I2C...
 
-> Can you please Cc: kernel at pengutronix for your next mxs patches
-> (additional to or instead of s.hauer)? You increase your chances to get
-> a reply when Sascha is on vacation.
+> I'd think MXS_HAVE_PLATFORM_MXS_I2C is missing?
 
-Yes, thanks ! I am not aware of it, I will do it for V2.
-
-
->> +	/*
->> +	 * OCOTP only stores the last 4 octets for each mac address,
->> +	 * so hard-code DENX OUI (C0:E5:4E) here.
->> +	 */
->> +	for (i = 0; i < 2; i++) {
->> +		val = ocotp[i * 4];
->> +		mx28_fec_pdata[i].mac[0] = 0xC0;
->> +		mx28_fec_pdata[i].mac[1] = 0xE5;
->> +		mx28_fec_pdata[i].mac[2] = 0x4E;
->> +		mx28_fec_pdata[i].mac[3] = (val >> 16) & 0xff;
->> +		mx28_fec_pdata[i].mac[4] = (val >> 8) & 0xff;
->> +		mx28_fec_pdata[i].mac[5] = (val >> 0) & 0xff;
->> +	}
->> +
->> +	return 0;
->> +
->> +error:
-> As there is only a single place that can produce an error, I'd handle it
-> directly there. That is, move the printk and return into the body of the
-> if (!ocotp) above.
-
-You are right, I fix in V2.
-
->> +
-> please remove this empty line.
-
-Ok
-
->> +
->> +	if (m28evk_fec_get_mac())
->> +		pr_warn("%s: failed on fec mac setup\n", __func__);
-> I'd suggest to only register the fecs if get_mac() succeeded?
-
-I do not know - if m28evk_fec_get_mac fails (ok, it *should* not fail..)
-it should be still possible to add the MAC address via ifconfig (with hw
-ethar <mac>, I mean) if the device is present, at least this is what I
-supposed in error case.
-
-> Also you might want to skip that pr_warn as m28evk_fec_get_mac already
-> prints an error on failure.
-
-Right, I'll do it
+Thanks for catching it !
 
 Best regards,
 Stefano
