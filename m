@@ -1,24 +1,35 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Sep 2011 07:28:04 +0200
-Subject: [PATCH] dmaengine: amba-pl08x: make filter check that the channel
-	is owned by pl08x
-In-Reply-To: <CAHXqBFKVx_AeA2Z_mXVnZg2O4Y2_7C6eKLqgS9-BDr58z4sYVg@mail.gmail.com>
-References: <20110831083435.GD26905@n2100.arm.linux.org.uk>
-	<CAHXqBFKVx_AeA2Z_mXVnZg2O4Y2_7C6eKLqgS9-BDr58z4sYVg@mail.gmail.com>
-Message-ID: <CAKnu2MrcFGqR+CUkgjEm0=T7kj35tdxyQVCeucg8tmcCijdzTg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue,  6 Sep 2011 13:48:25 +0800
+Subject: [PATCH v2 0/2] make reinitialization of ARM core components possible
+Message-ID: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/8/31 Micha? Miros?aw <mirqus@gmail.com>:
-> 2011/8/31 Russell King - ARM Linux <linux@arm.linux.org.uk>:
->> +static struct amba_driver pl08x_amba_driver;
->> +
->
-> This will make C++ coders confused a bit. Valid C, though.
+When ARM core resumes from low-power mode where losing power, for my
+example: CA-9 MPCore resumes from Dormant/Shutdown, we have to
+reinitialize components like L2 Cache, GIC and SCU to bring system
+back to work.
 
-We do this kind of forward declarations all over the kernel
-if that's what you mean. (I cannot claim to know C++ well
-enough to grasp if that's the potential confusion...)
+The patch set basically removes __init annotation from a bunch of
+initialization functions, so that platform resume procedure can call
+into them again to set those components up.
 
-Yours,
-Linus Walleij
+Changes since v1:
+ * Drop the GIC patch, as it's been handled by [1] nicely.
+ * Drop the change of adding empty l2x0_of_init(), as it's been
+   handled by [2].
+
+Shawn Guo (2):
+      ARM: cache-l2x0: remove __init annotation from initialization functions
+      ARM: smp_scu: remove __init annotation from scu_enable()
+
+ arch/arm/include/asm/hardware/cache-l2x0.h |    2 +-
+ arch/arm/kernel/smp_scu.c                  |    2 +-
+ arch/arm/mm/cache-l2x0.c                   |   10 +++++-----
+ 3 files changed, 7 insertions(+), 7 deletions(-)
+
+[1] [PATCH v2 0/5] CPU PM notifiers
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/131212/focus=131353
+
+[2] [PATCH 1/7] ARM: l2x0: add empty l2x0_of_init
+http://article.gmane.org/gmane.linux.ports.arm.kernel/130878
