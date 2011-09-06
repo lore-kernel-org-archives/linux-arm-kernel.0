@@ -1,52 +1,42 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 06 Sep 2011 14:33:23 -0400 (EDT)
-Subject: [PATCH 3/6] ARM: mach-omap1: clean up debug-macro.S
-In-Reply-To: <20110905094928.GC1903@atomide.com>
-References: <1314932353-24813-1-git-send-email-nico@fluxnic.net>
-	<1314932353-24813-4-git-send-email-nico@fluxnic.net>
-	<20110905094928.GC1903@atomide.com>
-Message-ID: <alpine.LFD.2.00.1109061430210.20358@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 06 Sep 2011 20:39:29 +0200
+Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level debug
+	uart
+In-Reply-To: <1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <3922347.lxZAT2yslI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 5 Sep 2011, Tony Lindgren wrote:
+On Tuesday 06 September 2011 17:58:36 Shawn Guo wrote:
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/include/mach/mx6q.h
+> @@ -0,0 +1,29 @@
+> +#ifndef __MACH_MX6Q_H__
+> +#define __MACH_MX6Q_H__
+> +
+> +/* static mappings */
+> +#define IMX6Q_VA(x)            (0xf4000000 + (x))
 
-> * Nicolas Pitre <nico@fluxnic.net> [110901 19:26]:
-> > --- a/arch/arm/mach-omap1/include/mach/debug-macro.S
-> > +++ b/arch/arm/mach-omap1/include/mach/debug-macro.S
-> > @@ -34,13 +29,13 @@ omap_uart_virt:	.word	0x0
-> >  		.macro	addruart, rp, rv, tmp
-> >  
-> >  		/* Use omap_uart_phys/virt if already configured */
-> > -9:		mrc	p15, 0, \rp, c1, c0
-> > -		tst	\rp, #1			@ MMU enabled?
-> > -		ldreq	\rp, =omap_uart_v2p(omap_uart_phys)	@ MMU disabled
-> > -		ldrne	\rp, =omap_uart_phys	@ MMU enabled
-> > -		add	\rv, \rp, #4		@ omap_uart_virt
-> > -		ldr	\rp, [\rp, #0]
-> > -		ldr	\rv, [\rv, #0]
-> > +9:		adr	\rp, 11f		@ get effective addr of 11f
-> > +		ldr	\rv, [\rp]		@ get absolute addr of 11f
-> > +		sub	\rv, \rv, \rp		@ offset between the two
-> > +		ldr	\rp, [\rp, #4]		@ abs addr of omap_uart_phys
-> > +		sub	\tmp, \rp, \rv		@ make it effective
-> > +		ldr	\rp, [\tmp, #0]		@ omap_uart_phys
-> > +		ldr	\rv, [\tmp, #4]		@ omap_uart_virt
-> >  		cmp	\rp, #0			@ is port configured?
-> >  		cmpne	\rv, #0
-> >  		bne	99f			@ already configured
-> 
-> The 11f above will fail for omap1 as we already have 11 defined there
-> for omap1 uart1. The prepare patch I posted as 2.5/6 fixes that issue.
+This should return a 'void __iomem *' pointer, not an integer.
 
-Thanks, fixed here now.
+> +#define MX6Q_SCU_BASE_ADDR     0x00a00000
+> +#define MX6Q_CCM_BASE_ADDR     0x020c4000
+> +#define MX6Q_ANATOP_BASE_ADDR  0x020c8000
+> +#define MX6Q_UART4_BASE_ADDR   0x021f0000
+> +
+> +#define MX6Q_SCU_BASE_VADDR    IMX6Q_VA(MX6Q_SCU_BASE_ADDR)
+> +#define MX6Q_CCM_BASE_VADDR    IMX6Q_VA(MX6Q_CCM_BASE_ADDR)
+> +#define MX6Q_ANATOP_BASE_VADDR IMX6Q_VA(MX6Q_ANATOP_BASE_ADDR)
+> +#define MX6Q_UART4_BASE_VADDR  IMX6Q_VA(MX6Q_UART4_BASE_ADDR)
 
-> This will also allow further clean-up to combine omap1 and omap2+
-> debug-macro.S.
+The list is reasonably short, but I think you can still try harder to remove
+some of the remaining elements. I can understand the need for UART4
+(for ll_debug), but I don't really understand what the others are and
+why you cannot get the values from the device tree and ioremap them.
 
-I'll leave that to you.  My motive was to get rid of PLAT_PHYS_OFFSET so 
-that mach/memory.h could eventually be deleted further down my patch 
-series.
+Maybe you can add a few comments to explain these if they are indeed
+necessary.
 
-
-Nicolas
+	Arnd
