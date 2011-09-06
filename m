@@ -1,47 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Sep 2011 09:26:00 +0200
-Subject: [PATCH] arm: ixp4xx, u300: Select ARCH_REQUIRE_GPIOLIB,
-	not GENERIC_GPIO
-In-Reply-To: <20110905162226.GI2802@decadent.org.uk>
-References: <1315192383.3092.260.camel@deadeye>
-	<CACRpkdaACXxzhQ4m3+4tzTGrXubFF6jPkO9uG0kqVzvm+ORYwQ@mail.gmail.com>
-	<20110905162226.GI2802@decadent.org.uk>
-Message-ID: <CACRpkdZFj_OFkgDzyTVVCX9xkPPitSXm2FcpwWWaewsegzJYRg@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 6 Sep 2011 10:27:37 +0300
+Subject: [PATCH 1/2] ux500: Adding support for u8500 Hsem functionality V2
+In-Reply-To: <CACRpkdY+b9L=9tt2z9Fm_4iM=MOUoRbgaex-UC1iaw=afV-J2w@mail.gmail.com>
+References: <1302535464-12294-1-git-send-email-mathieu.poirier@linaro.org>
+	<201104172239.57362.arnd@arndb.de> <4DADB2F1.1080405@linaro.org>
+	<201104191810.18170.arnd@arndb.de>
+	<CAK=WgbZVuw3ERa+sbm+RwdBL+JrxmZwpQtjk3mBvtUZVbiNu6g@mail.gmail.com>
+	<CACRpkdY+b9L=9tt2z9Fm_4iM=MOUoRbgaex-UC1iaw=afV-J2w@mail.gmail.com>
+Message-ID: <CAK=WgbaWtbAf1MVVzRLok3F=70nm7oS7j7kTVKoD9a7Urg8Dmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 5, 2011 at 6:22 PM, Ben Hutchings <ben@decadent.org.uk> wrote:
-> On Mon, Sep 05, 2011 at 02:41:30PM +0200, Linus Walleij wrote:
->> On Mon, Sep 5, 2011 at 5:12 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
->>
->> > @@ -830,7 +830,7 @@ config ARCH_U300
->> > ? ? ? ?select GENERIC_CLOCKEVENTS
->> > ? ? ? ?select CLKDEV_LOOKUP
->> > ? ? ? ?select HAVE_MACH_CLKDEV
->> > - ? ? ? select GENERIC_GPIO
->> > + ? ? ? select ARCH_REQUIRE_GPIOLIB
->> > ? ? ? ?help
->> > ? ? ? ? ?Support for ST-Ericsson U300 series mobile platforms.
->>
->> Please don't do that, it really is no gpiolib implementation.
->>
->> In the archives you can find patches I already submitted switching
->> the U300 GPIO over to use gpiolib.
-> [...]
+On Tue, Sep 6, 2011 at 10:15 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Sep 5, 2011 at 11:09 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
 >
-> OK. ?But it doesn't seem to work without gpiolib either:
+>> Looks like this thread has died. Is this driver still needed ?
 >
-> ?CC [M] ?drivers/input/touchscreen/ads7846.o
-> drivers/input/touchscreen/ads7846.c: In function 'ads7846_setup_pendown':
-> drivers/input/touchscreen/ads7846.c:970:3: error: implicit declaration of function 'gpio_request_one'
+> The driver is still needed.
+>
+>> If yes, I don't mind picking it up and fixing the outstanding issues,
+>> as I'm doing some hwspinlock cleanups/fixes right now anyway.
+>
+> Please do this!
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Yes.
-
-I don't know a good way out of this really :-(
-
-I'll start looking for the bad ways out, like hacking
-the GPIO driver to do GPIOLIB in a not-so-elegant
-way.
-
-Yours,
-Linus Walleij
+Will do. Thanks !
