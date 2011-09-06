@@ -1,38 +1,77 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 06 Sep 2011 10:41:11 +0100
-Subject: [PATCH 1/5] Framework for exporting System-on-Chip information
-	via sysfs
-In-Reply-To: <20110902163136.GB5331@suse.de>
-References: <1314880043-22517-1-git-send-email-lee.jones@linaro.org>
-	<20110901233403.GA28176@suse.de> <4E609784.3080507@linaro.org>
-	<20110902163136.GB5331@suse.de>
-Message-ID: <4E65EAB7.4080300@linaro.org>
+From: phil.sutter@viprinet.com (Phil Sutter)
+Date: Tue, 6 Sep 2011 11:44:23 +0200
+Subject: FW: [PATCH] af_packet: flush complete kernel cache in
+	packet_sendmsg
+In-Reply-To: <CAAsGZS6Qiyc6nhgyVLrphSLW6vf16=hbGVWJ+CFw6rfZQsdiFQ@mail.gmail.com>
+References: <20110505141107.GC30443@orbit.nwl.cc>
+	<1314961686-30870-1-git-send-email-phil.sutter@viprinet.com>
+	<D3F292ADF945FB49B35E96C94C2061B90A239361@nsmail.netscout.com>
+	<CAAsGZS6Tt9FLXfanH1+DgKt_9gR_YPJ8kX_pryhnzWTQVkNkNw@mail.gmail.com>
+	<20110902153147.GB29025@philter>
+	<CAAsGZS6Qiyc6nhgyVLrphSLW6vf16=hbGVWJ+CFw6rfZQsdiFQ@mail.gmail.com>
+Message-ID: <20110906094423.GD29025@philter>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't have a great deal of time at the moment, as I'm currently on the
-train on my way to Plumbers, but I would like to say just one thing.
+On Fri, Sep 02, 2011 at 12:49:47PM -0400, chetan loke wrote:
+> On Fri, Sep 2, 2011 at 11:31 AM, Phil Sutter <phil.sutter@viprinet.com> wrote:
+> 
+> > So far we haven't noticed problems in that direction. I just tried some
+> > explicit test: having tcpdump print local timestamps (not the pcap-ones)
+> > on every received packet, activating icmp_echo_ignore_all and pinging
+> > the host on a dedicated line. I expected to sometimes see a second
+> > difference between the two timestamps, as like with sending from time to
+> > time a packet should get "lost" in the cache, and then occur to
+> > userspace after the next one arrived. Maybe my test is broken, or RX is
+> > indeed unaffected.
+> >
+> 
+> You will need high traffic rate. If interested, you could try
+> pktgen(with varying packet-load). Keep the packet-payload under 1500
+> bytes (don't send jumbo frames) unless you have the following fix:
+> commit cc9f01b246ca8e4fa245991840b8076394f86707
 
-On 02/09/11 17:31, Greg KH wrote:
-> I'm feeling like it would be simpler for me to write this code than to
-> keep providing review comments like this telling you to rewrite the
-> whole thing over again each time :)
+Hmm. I don't really get your point here: with higher traffic rates, the
+bug should be even harder to identify. Assuming the same behaviour as
+for TX, of course. There are no packets lost, just not immediately
+transmitted (or never, if it's the last packet to be sent). This is how
+it goes:
+1) userspace places packet into TX_RING, calls sendto()
+2) kernel does not see the packet, reads TP_STATUS_AVAILABLE for the
+   given field from the cache
+3) userspace places second packet into TX_RING (after the first one,
+   since it knows it's there)
+4) something happens that makes caches flush
+5) userspace calls sendto()
+5) kernel sees two packets to be transmitted, sends them out
 
-I'd really rather you didn't.
+So analogous for RX, this should mean:
+1) tcpdump runs pcap_loop() (which, according to strace, calls poll()
+   with a timeout of 1s)
+2) kernel receives packet, puts it into RX_RING, sets POLLIN
+3) tcpdump's poll() returns, but an unmodified RX_RING is seen
+4) something happens that makes caches flush
+5) (2) happens again
+6) tcpdump's poll() returns, two packets are seen in RX_RING
 
-I have put a great deal of my own time into this and I really want to
-see it through. Up until now I have been finding it quite difficult to
-please everyone. I have been trying to follow everyone's suggestions and
-as soon as I think we're getting close, the world flips upside down.
-When I return, I will sit down and go through all of your (and Arnd's)
-suggestions and re-write it.
+My tests on TX-side show that this "something that makes caches flush"
+actually happens quite frequently. But nevertheless, when receiving a
+packet once a second, I'm expecting to occasionally see no packet in two
+seconds, and then two in the following. The higher the packet rate, the
+harder it should be to notice this phenomenon.
 
-Please bear with me.
+> Your Tx path is working because flush_cache_call gets triggered before
+> flush_dcache_page. On the Rx path, since you don't have that
+> workaround, you will eventually(it's just a matter of time) see this
+> problem.
 
-> Anyone want to send me a device that this code is needed for so I can do
-> it?
+So you say if I called flush_cache_all() _after_ flush_dcache_page() it
+wouldn't work?
 
-No. ;)
+> Or, delete your patch and try this workaround (in
+> __packet_get/set_status) and you may be able to cover both Tx and Rx
+> paths.
 
-Kind regards,
-Lee
+Oh great, thanks a lot for improving my ugly hacks! :)
+
+Greetings, Phil
