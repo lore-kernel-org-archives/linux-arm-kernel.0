@@ -1,40 +1,35 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Wed, 7 Sep 2011 10:30:33 +0900
-Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
-	the hardware
-In-Reply-To: <1314984756-4400-8-git-send-email-ohad@wizery.com>
-References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-	<1314984756-4400-8-git-send-email-ohad@wizery.com>
-Message-ID: <CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 06 Sep 2011 21:36:27 -0400 (EDT)
+Subject: [PATCH 0/6] OMAP/Davinci debug UART code cleanup
+In-Reply-To: <87fwk91fhy.fsf@ti.com>
+References: <87fwk91fhy.fsf@ti.com>
+Message-ID: <alpine.LFD.2.00.1109062135520.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, 6 Sep 2011, Kevin Hilman wrote:
 
-On Sat, Sep 3, 2011 at 2:32 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> When mapping a memory region, split it to page sizes as supported
-> by the iommu hardware. Always prefer bigger pages, when possible,
-> in order to reduce the TLB pressure.
->
-True. It is important for the peripheral devices that works with IOMMU.
+> Hi Nico,
+> 
+> Nicolas Pitre <nico@fluxnic.net> writes:
+> 
+> > Let's remove some of the most offending parts of this code.
+> >
+> > [PATCH 1/6] ARM: add an extra temp register to the addruart low level debugging macro
+> > [PATCH 2/6] ARM: plat-omap: make OMAP_UART_INFO into a relative offset
+> > [PATCH 3/6] ARM: mach-omap1: clean up debug-macro.S
+> > [PATCH 4/6] ARM: mach-omap2: clean up debug-macro.S
+> > [PATCH 5/6] ARM: mach-davinci: make DAVINCI_UART_INFO into a relative offset
+> > [PATCH 6/6] ARM: mach-davinci: clean up debug-macro.S
+> 
+> Reviewed-by: Kevin Hilman <khilman@ti.com>
+> 
+> Also boot tested with CONFIG_DEBUG_LL on davinci/dm355 so for patches 1,
+> 5 & 6, feel free to add:
+> 
+> Tested-by: Kevin Hilman <khilman@ti.com>
 
-> This allows a more lenient granularity of mappings: traditionally the
-> IOMMU API took 'order' (of a page) as a mapping size, and directly let
-> the low level iommu drivers handle the mapping. Now that the IOMMU
-> core can split arbitrary memory regions into pages, we can remove this
-> limitation, so users don't have to split those regions by themselves.
->
+Thanks.
 
-Please find the following link that I submitted for our IOMMU.
-https://lkml.org/lkml/2011/7/3/152
 
-s5p_iommu_map/unmap accepts any order of physical address and iova
-without support of your suggestion if the order is not less than PAGE_SHIFT
-
-Of course, an IO virtual memory manager must be careful when it allocates
-IO virtual memory to lead best performance.
-But I think IOMMU API must not expect that the caller of iommu_map() knows
-about the restriction of IOMMU API implementation.
-
-Regards,
-Cho KyongHo.
+Nicolas
