@@ -1,47 +1,45 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  7 Sep 2011 16:59:16 +0100
-Subject: [RFC PATCH 1/3] ARM: iwmmxt: Fix Makefile rules for building iwmmxt
-	for Thumb-2
+Date: Wed,  7 Sep 2011 16:59:17 +0100
+Subject: [RFC PATCH 2/3] ARM: iwmmxt: Port problematic iwmmxt support code to
+	v7/Thumb-2
 In-Reply-To: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
 References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1315411158-17479-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <1315411158-17479-3-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because gcc/gas have no sane way to turn on individual CPU
-extensions from the command-line, iwmmxt.S was previously built
-with -mcpu=iwmmxt.  Unfortunately, this also downgrades the CPU to
-v5, with the result that this file fails to build for a Thumb-2
-kernel.
+The iwmmxt code contains some code to implement a pseudo-ISB, but
+this is not buildable for Thumb-2.
 
-New versions of the tools support -march=<base arch>+iwmmxt, and it
-seems reasonable to require up-to-date tools when building in
-Thumb-2.  So, this patch uses -march=armv7-a+iwmmxt for
-CONFIG_THUMB2_KERNEL=y.
+This patch replaces the pseudo-ISB with a real one for Thumb-2
+kernels.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/kernel/Makefile |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/kernel/iwmmxt.S |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index f7887dc..8a58339 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -65,7 +65,14 @@ obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
- obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
- obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
-+
-+# When enough people have binutils which support -march=...+iwmmxt, this
-+# should change to something like if __LINUX_ARM_ARCH__ < 7.
-+ifdef CONFIG_THUMB2_KERNEL
-+AFLAGS_iwmmxt.o			:= -Wa,-march=armv7-a+iwmmxt
-+else
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
-+endif
+diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+index a087838..bee8a74 100644
+--- a/arch/arm/kernel/iwmmxt.S
++++ b/arch/arm/kernel/iwmmxt.S
+@@ -319,8 +319,17 @@ ENTRY(iwmmxt_task_switch)
+ 	PJ4(eor r1, r1, #0xf)
+ 	PJ4(mcr	p15, 0, r1, c1, c0, 2)
  
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
++/*
++ * When enough people have binutils which support -march=...+iwmmxt, this
++ * should change to #if __LINUX_ARM_ARCH__ < 7.
++ */
++#ifndef CONFIG_THUMB2_KERNEL
+ 	mrc	p15, 0, r1, c2, c0, 0
+ 	sub	pc, lr, r1, lsr #32		@ cpwait and return
++#else
++	isb					@ ISB needed instead on ARMv7
++	mov	pc, lr
++#endif
+ 
+ /*
+  * Remove Concan ownership of given task
 -- 
 1.7.4.1
