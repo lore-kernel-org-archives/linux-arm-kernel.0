@@ -1,56 +1,39 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Wed, 7 Sep 2011 11:48:49 +0530
-Subject: [PATCH v6 24/25] gpio/omap: restore OE only after setting the
-	output level
-In-Reply-To: <87ty8pusfq.fsf@ti.com>
-References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
-	<1314798161-19523-25-git-send-email-tarun.kanti@ti.com>
-	<87ty8pusfq.fsf@ti.com>
-Message-ID: <CAC83ZvLgUp0-mjuNcEx3+JaX2-6-5t72CCZo93FiUssdE8m_Ag@mail.gmail.com>
+From: sbabic@denx.de (Stefano Babic)
+Date: Wed, 07 Sep 2011 08:28:13 +0200
+Subject: [PATCH] ARM: mxs: Add initial support for DENX MX28
+In-Reply-To: <20110906132546.GC7651@S2100-06.ap.freescale.net>
+References: <1314604250-29511-1-git-send-email-sbabic@denx.de>	<20110906083926.GE28816@pengutronix.de>	<20069.58232.365025.824697@ipc1.ka-ro>
+	<20110906132546.GC7651@S2100-06.ap.freescale.net>
+Message-ID: <4E670EFD.1060508@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2011 at 5:36 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->
->> From: Nishanth Menon <nm@ti.com>
+On 09/06/2011 03:25 PM, Shawn Guo wrote:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-July/057649.html
+>> Has this policy changed since?
+> 
+> No.
+> 
+>> Should I resend my patch for the TX53?
 >>
->> Setup the dataout register before setting the GPIO to output mode
->> in restore path.
->
-> Please summarize why. ?(again, it may seem obvious now, but may not be for
-> those not familiar with the driver or when coming back to it after a few
-> months looking at other code.
-Ok.
+> No.
+> 
 
->
-> Kevin
->
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->> ?drivers/gpio/gpio-omap.c | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index db22df8..a629498 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -1326,7 +1326,6 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
->> ? ? ? __raw_writel(bank->context.wake_en,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->wkup_en);
->> ? ? ? __raw_writel(bank->context.ctrl, bank->base + bank->regs->ctrl);
->> - ? ? __raw_writel(bank->context.oe, bank->base + bank->regs->direction);
->> ? ? ? __raw_writel(bank->context.leveldetect0,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->leveldetect0);
->> ? ? ? __raw_writel(bank->context.leveldetect1,
->> @@ -1336,6 +1335,7 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
->> ? ? ? __raw_writel(bank->context.fallingdetect,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->fallingdetect);
->> ? ? ? __raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
->> + ? ? __raw_writel(bank->context.oe, bank->base + bank->regs->direction);
->>
->> ? ? ? if (bank->dbck_enable_mask) {
->> ? ? ? ? ? ? ? __raw_writel(bank->context.debounce, bank->base +
->
+>  But comparing to the progress we have made on i.mx53,
+> mxs gets nothing to start with yet, and people have to start from
+> ground.  That said I do not have a strong position on i.mx28 as I do
+> on i.mx53.
+
+Understood. Agree that the goal will be to move to the device tree as
+soon as possible. Thanks to understand it is now not so easy and fast to
+move directly to device tree for mxs.
+
+Best regards,
+Stefano Babic
+
+-- 
+=====================================================================
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+=====================================================================
