@@ -1,89 +1,67 @@
-From: lacombar@gmail.com (Arnaud Lacombe)
-Date: Wed, 7 Sep 2011 15:34:35 -0400
-Subject: [RFC] Kbuild: allow code re-use across different directories
-In-Reply-To: <alpine.LFD.2.00.1109071437400.20358@xanadu.home>
-References: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
-	<alpine.LFD.2.00.1109071437400.20358@xanadu.home>
-Message-ID: <CACqU3MVF8XSdKi0PeZF5SFaH9i2HPqCjkMqccyb83x4V_1Vs1g@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 7 Sep 2011 22:58:02 +0300
+Subject: [RFC PATCH 06/10] hwspinlock: OMAP4: Add spinlock support in DT
+In-Reply-To: <1314191356-10963-7-git-send-email-b-cousson@ti.com>
+References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
+	<1314191356-10963-7-git-send-email-b-cousson@ti.com>
+Message-ID: <CAK=WgbYX50R_MCgwdzywgrAEDJkmDSmeSSCuuqst5UBYk_sYow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 24, 2011 at 4:09 PM, Benoit Cousson <b-cousson@ti.com> wrote:
+> Add a device-tree node for the spinlock.
+> Remove the static device build code if CONFIG_OF
+> is set.
+> Update the hwspinlock driver to use the of_match method.
+> Add the information in Documentation/devicetree.
+>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Ohad Ben-Cohen <ohad@wizery.com>
+> ---
+...
+> + ? ? ? ? ? ? ? spinlock {
+> + ? ? ? ? ? ? ? ? ? ? ? compatible = "ti,omap-spinlock";
+> + ? ? ? ? ? ? ? ? ? ? ? hwmods = "spinlock";
+> + ? ? ? ? ? ? ? };
 
-On Wed, Sep 7, 2011 at 3:07 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Fri, 19 Aug 2011, Arnaud Lacombe wrote:
->
->> Hi folks,
->>
->> The attached patch modify Kbuild to allow to directly re-use code in multiple
->> directory without having to go through a copy. Technically, it changes Kbuild to
->> use by default the VPATH feature of GNU make and provides accessors for Makefile
->> to change it indirectly.
->>
->> Considering:
->>
->> arch/foo/lib:
->> fancy.c
->>
->> We want to be able to build it with -DPANTS=32 in the kernel, but the
->> bootloader requires -DPANTS_SIZE=30.
->>
->> Currently we would do, either:
->>
->> arch/foo/lib/Makefile
->> LDFLAGS_fancy.o := -DPANTS=32
->> obj-y += fancy.o
->>
->> and, either:
->>
->> arch/foo/boot/Makefile:
->> LDFLAGS_fancy.o := -DPANTS=30
->> obj-y += fancy.o
->> $(obj)/fancy.c: $(srctree)/arch/foo/lib/fancy.c
->> ? ? ? $(call cmd,shipped)
->>
->> or
->>
->> arch/foo/boot/Makefile:
->> LDFLAGS_fancy.o := -DPANTS=30
->> obj-y += fancy.o
->> $(obj)/fancy.o: $(srctree)/arch/foo/lib/fancy.c
->> ? ? ? $(call cmd,cc_c_o)
->>
->> The former implies an extra copy of the source file, the latter expose Kbuild
->> internal function.
->>
->> With the attached patch, we would do:
->>
->> arch/foo/boot/Makefile:
->> LDFLAGS_fancy.o := -DPANTS=30
->> obj-y += fancy.o
->> vpath-y += $(srctree)/arch/foo/lib
->>
->> and let GNU make do the job.
->>
->> Comments welcome,
->
-> It doesn't work. ?Whatever I do to arch/arm/boot/compressed/Makefile
-> (which admittedly looks a bit hairy and could benefit from a shave) in
-> order to remove the $(call cmd,shipped) used with lib1funcs.S, I always
-> end up with:
->
-> make[2]: *** No rule to make target `arch/arm/boot/compressed/lib1funcs.S', needed by `arch/arm/boot/compressed/lib1funcs.o'. ?Stop.
->
-What was the exact change you made which triggered this ?
+This seem to satisfy the current hwspinlock driver, but I'm wondering
+about an issue which was discussed awhile ago by Arnd and Mathieu:
 
-Thanks,
- - Arnaud
+Hwspinlock devices provide system-wide hardware locks that are used by
+remote processors that have no other way to achieve synchronization.
 
-> Obviously, restoring the explicit dependency with a $(call cmd,as_o_S)
-> does make it work, but this is rather against the point of your patch.
->
-> Do you have an example of how arch/arm/boot/compressed/Makefile should
-> be changed to benefit from your patch?
->
+For that to work, each physical lock must have a system-wide unique id
+number that all processors are familiar with, otherwise they can't
+possibly assume they're using the same hardware lock.
 
+Usually SoC have a single hwspinlock device, which provides several
+hardware spinlocks, and in this case, the locks can be trivially
+numbered 0 to (num-of-locks - 1).
 
->
-> Nicolas
->
+In case boards have several hwspinlocks devices (each of which
+providing numerous hardware spinlocks) a different base id should be
+used for each hwspinlock device (they can't all use 0 as a starting
+id!).
+
+While this is certainly not common, it's just plain wrong for the
+hwspinlock driver to silently use 0 as a base id whenever it is probed
+with a device (and by that implicitly assume there will always be only
+one device).
+
+So we need to couple an hwspinlock device with a base id (which is
+trivially zero when there's only a single hwspinlock device). This can
+be easily achieved today using platform data, which boards will use to
+set a different base id for each of the hwspinlock devices they have
+(i'll send a patch demonstrating this soon), but I'm wondering how to
+specify this hwspinlock-specific data with DT: is there an existing
+binding we can use for this ? or should we create something like a
+"baseid" one especially for the hwspinlock driver ?
+
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id spinlock_match[] = {
+> + ? ? ? {.compatible = "ti,omap-spinlock", },
+> + ? ? ? {},
+> +}
+
+you're missing a semicolon there (yeah I actually tried to build this ;)
