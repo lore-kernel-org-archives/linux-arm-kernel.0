@@ -1,27 +1,28 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 7 Sep 2011 11:30:17 +0200
-Subject: [PATCH V2] ARM: mxs: Add initial support for DENX MX28
-In-Reply-To: <1315377931-15770-1-git-send-email-sbabic@denx.de>
-References: <1314604250-29511-1-git-send-email-sbabic@denx.de>
-	<1315377931-15770-1-git-send-email-sbabic@denx.de>
-Message-ID: <20110907093017.GA1912@pengutronix.de>
+Date: Wed, 7 Sep 2011 11:59:07 +0200
+Subject: [PATCH v11 1/3] MTD : add the common code for GPMI-NAND
+	controller driver
+In-Reply-To: <20110906141708.GJ2610@pengutronix.de>
+References: <1314616381-11615-1-git-send-email-b32955@freescale.com>
+	<1314616381-11615-2-git-send-email-b32955@freescale.com>
+	<20110905151752.GA10987@pengutronix.de>
+	<4E65F69D.5010808@freescale.com>
+	<20110906141708.GJ2610@pengutronix.de>
+Message-ID: <20110907095907.GB1912@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2011 at 08:45:31AM +0200, Stefano Babic wrote:
-> Added initial support for DENX M28 module and M28EVK
-> board. Ethernet(FEC), SDHC, Display are supported.
+On Tue, Sep 06, 2011 at 04:17:08PM +0200, Wolfram Sang wrote:
 > 
-> Signed-off-by: Stefano Babic <sbabic@denx.de>
+> > Should i wait for your test result, and send out the new version v12?
+> > or I send out the new version first, and then you test it again?
+> 
+> I'd suggest you send V12 and I will test it when NAND is on my list
+> again. I need to bring up this board first before I can do further
+> testing.
 
-Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
-
-May I ask what bootloader do you use? The FSL-uboot or will there be mxs
-support in mainline u-boot?
-
-Regards,
-
-   Wolfram
+Maybe you could also remove the debug log level mechanisms? We have
+DYNAMIC_DEBUG to select debug output these days...
 
 -- 
 Pengutronix e.K.                           | Wolfram Sang                |
@@ -32,4 +33,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110907/d0b543b4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110907/0d580c04/attachment.sig>
