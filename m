@@ -1,66 +1,59 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 7 Sep 2011 20:21:42 +0200
-Subject: [PATCH v2 2/3] ARM: mx28evk: set a initial clock rate for saif
-In-Reply-To: <1315403858-9904-3-git-send-email-b29396@freescale.com>
-References: <1315403858-9904-1-git-send-email-b29396@freescale.com>
-	<1315403858-9904-3-git-send-email-b29396@freescale.com>
-Message-ID: <20110907182142.GY28816@pengutronix.de>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 7 Sep 2011 11:22:48 -0700
+Subject: [PATCH 1/2] input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD
+	config option
+In-Reply-To: <1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
+References: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
+	<1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20110907182248.GA2874@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2011 at 09:57:37PM +0800, Dong Aisheng wrote:
-> Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Cc: Liam Girdwood <lrg@ti.com>
-> 
-> ---
-> No changes since v1.
-> 
-> Note this patch still needs another patch from Wolfram to work.
-> I send out it in this series as
-> [PATCH 3/3] arm: mxs: disable clock-gates when setting saif-clocks
-If your patch 2 depends on patch 3 there is something fishy.
+Hi Thomas,
+
+On Tue, Sep 06, 2011 at 07:25:16PM +0530, Thomas Abraham wrote:
+> Samsung keyboard driver could be used with platforms using device tree.
+> So the inclusion of samsung keyboard driver cannot be based on
+> SAMSUNG_DEV_KEYPAD. A new config option HAVE_SAMSUNG_KEYPAD is added
+> which device tree based platforms should use to include samsung keyboard
+> driver.
+
+I am sorry, I do not follow... What is the difference between
+SAMSUNG_DEV_KEYPAD and HAVE_SAMSUNG_KEYPAD? They look exactly the same.
+
+Thanks,
 
 > 
-> As discussed with Wolfram, that patch may still have some later work
-> to do. However, we just send out it for testers to work first.
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 > ---
->  arch/arm/mach-mxs/clock-mx28.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
+>  drivers/input/keyboard/Kconfig |    9 ++++++++-
+>  1 files changed, 8 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-> index f0c7cb6..33cc2ff 100644
-> --- a/arch/arm/mach-mxs/clock-mx28.c
-> +++ b/arch/arm/mach-mxs/clock-mx28.c
-> @@ -826,6 +826,15 @@ int __init mx28_clocks_init(void)
->  	clk_set_parent(&saif0_clk, &pll0_clk);
->  	clk_set_parent(&saif1_clk, &pll0_clk);
+> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+> index b4dee9d..370fb18 100644
+> --- a/drivers/input/keyboard/Kconfig
+> +++ b/drivers/input/keyboard/Kconfig
+> @@ -423,9 +423,16 @@ config KEYBOARD_PMIC8XXX
+>  	  To compile this driver as a module, choose M here: the module will
+>  	  be called pmic8xxx-keypad.
 >  
-> +	/*
-> +	 * Set an initial clk rate for saif's internal logic to work properly,
-> +	 * this is especially for the saif working on EXTMASTER mode that who
-> +	 * uses other saif's BITCLK&LRCLK but it still needs a basic clk which
-> +	 * should be bigger enough for its internal logic.
-This is not a proper (German) English sentence. Maybe this is better?:
-
-	Set an initial clock rate for the saif internal logic to work
-	properly. This is important when working in EXTMASTER mode that
-	uses the other saif's BITCLK&LRCLK but it still needs a basic
-	clock which should be fast enough for the internal logic.
-
-> +	 */
-> +	clk_set_rate(&saif0_clk, 24000000);
-> +	clk_set_rate(&saif1_clk, 24000000);
+> +config HAVE_SAMSUNG_KEYPAD
+> +	bool
+> +	help
+> +	  This will include Samsung Keypad controller driver support. If you
+> +	  want to include Samsung Keypad support for any machine, kindly
+> +	  select this in the respective mach-xxxx/Kconfig file.
 > +
-Do you need to check for clk_set_rate returning -ESOMETHING here?
-
-Uwe
->  	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+>  config KEYBOARD_SAMSUNG
+>  	tristate "Samsung keypad support"
+> -	depends on SAMSUNG_DEV_KEYPAD
+> +	depends on SAMSUNG_DEV_KEYPAD || HAVE_SAMSUNG_KEYPAD
+>  	help
+>  	  Say Y here if you want to use the Samsung keypad.
 >  
->  	mxs_timer_init(&clk32k_clk, MX28_INT_TIMER0);
+> -- 
+> 1.6.6.rc2
+> 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Dmitry
