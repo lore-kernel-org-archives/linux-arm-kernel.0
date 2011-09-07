@@ -1,32 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Sep 2011 15:40:16 +0100
-Subject: [PATCH] ARM: alignment: setup alignment handler earlier
-In-Reply-To: <87ehzstr07.fsf@vostro.fn.ogness.net>
-References: <87ehzstr07.fsf@vostro.fn.ogness.net>
-Message-ID: <20110907144016.GA30719@e102109-lin.cambridge.arm.com>
+From: vinod.koul@linux.intel.com (Vinod Koul)
+Date: Wed, 07 Sep 2011 20:32:04 +0530
+Subject: [PATCH 33/62] dmaengine: irq: Remove IRQF_DISABLED
+In-Reply-To: <1315383059-3673-34-git-send-email-yong.zhang0@gmail.com>
+References: <1315383059-3673-1-git-send-email-yong.zhang0@gmail.com>
+	<1315383059-3673-34-git-send-email-yong.zhang0@gmail.com>
+Message-ID: <1315407724.11863.0.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2011 at 02:35:04PM +0100, John Ogness wrote:
-> From 6f3f381800367127dc6430d9b9fa9bd6fc6d8ed0 Mon Sep 17 00:00:00 2001
-> From: John Ogness <john.ogness@linutronix.de>
+On Wed, 2011-09-07 at 16:10 +0800, Yong Zhang wrote:
+> This flag is a NOOP and can be removed now.
 > 
-> The alignment exception handler is setup fairly late in
-> the boot process (fs_initcall). However, with newer gcc
-> versions and the compiler option -fconserve-stack, code
-> accessing unaligned data is generated in functions that
-> are called earlier, for example pcpu_dump_alloc_info().
-> This results in unhandled alignment exceptions during
-> boot. By setting up the exception handler sooner, we
-> reduce the window where a compiler may generate code
-> accessing unaligned data.
+> Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
+> ---
+>  drivers/dma/amba-pl08x.c |    2 +-
+>  drivers/dma/coh901318.c  |    2 +-
+>  drivers/dma/shdma.c      |    4 ++--
+>  3 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index be21e3f..3688256 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -1930,7 +1930,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+>  	writel(0x000000FF, pl08x->base + PL080_ERR_CLEAR);
+>  	writel(0x000000FF, pl08x->base + PL080_TC_CLEAR);
+>  
+> -	ret = request_irq(adev->irq[0], pl08x_irq, IRQF_DISABLED,
+> +	ret = request_irq(adev->irq[0], pl08x_irq, 0,
+>  			  DRIVER_NAME, pl08x);
+>  	if (ret) {
+>  		dev_err(&adev->dev, "%s failed to request interrupt %d\n",
+> diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+> index 4234f41..1dd9455 100644
+> --- a/drivers/dma/coh901318.c
+> +++ b/drivers/dma/coh901318.c
+> @@ -1506,7 +1506,7 @@ static int __init coh901318_probe(struct platform_device *pdev)
+>  	if (irq < 0)
+>  		goto err_no_irq;
+>  
+> -	err = request_irq(irq, dma_irq_handler, IRQF_DISABLED,
+> +	err = request_irq(irq, dma_irq_handler, 0,
+>  			  "coh901318", base);
+>  	if (err) {
+>  		dev_crit(&pdev->dev,
+> diff --git a/drivers/dma/shdma.c b/drivers/dma/shdma.c
+> index 7f49235..8c137d2 100644
+> --- a/drivers/dma/shdma.c
+> +++ b/drivers/dma/shdma.c
+> @@ -1106,7 +1106,7 @@ static void sh_dmae_chan_remove(struct sh_dmae_device *shdev)
+>  static int __init sh_dmae_probe(struct platform_device *pdev)
+>  {
+>  	struct sh_dmae_pdata *pdata = pdev->dev.platform_data;
+> -	unsigned long irqflags = IRQF_DISABLED,
+> +	unsigned long irqflags = 0,
+>  		chan_flag[SH_DMAC_MAX_CHANNELS] = {};
+>  	int errirq, chan_irq[SH_DMAC_MAX_CHANNELS];
+>  	int err, i, irq_cnt = 0, irqres = 0, irq_cap = 0;
+> @@ -1266,7 +1266,7 @@ static int __init sh_dmae_probe(struct platform_device *pdev)
+>  				    IORESOURCE_IRQ_SHAREABLE)
+>  					chan_flag[irq_cnt] = IRQF_SHARED;
+>  				else
+> -					chan_flag[irq_cnt] = IRQF_DISABLED;
+> +					chan_flag[irq_cnt] = 0;
+>  				dev_dbg(&pdev->dev,
+>  					"Found IRQ %d for channel %d\n",
+>  					i, irq_cnt);
+Acked-by: Vinod Koul <vinod.koul@linux.intel.com>
 
-While this reduces the window and fixes this particular case, it still
-doesn't solve the problem. We never know when some unaligned access
-would be generated for some earlier code.
-
-I would just make sure that SCTLR.A bit is always cleared on ARMv6+,
-independent of CONFIG_ALIGNMENT_TRAP.
-
--- 
-Catalin
+--
+~Vinod
