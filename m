@@ -1,20 +1,37 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 7 Sep 2011 12:00:43 +0200 (CEST)
-Subject: [PATCH 1/4] mach-integrator: retire some timer macros
-In-Reply-To: <1315384233-27332-1-git-send-email-linus.walleij@stericsson.com>
-References: <1315384233-27332-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <alpine.LFD.2.02.1109071200201.2723@ionos>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 7 Sep 2011 09:54:20 +0200
+Subject: [PATCH] mach-integrator: fix VGA base regression
+In-Reply-To: <4E6620CF.3020201@gmail.com>
+References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
+	<4E64496E.1090000@gmail.com>
+	<CACRpkdYw4WCJ+kBm_FBH=H-vPKBUsb9DFToK0MN4F8t5T8Tc9g@mail.gmail.com>
+	<4E64EB24.7010800@gmail.com>
+	<CAKnu2MrFsnZrq-Fzq3HpV8oAwa9Vi6fFqrSSB7+kq8r8V7ANQg@mail.gmail.com>
+	<4E6620CF.3020201@gmail.com>
+Message-ID: <CAKnu2Mq3Thw-ybCgPouKDa2tRCJc=-ny+yvKbBwR5TPTuU5W2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Sep 2011, Linus Walleij wrote:
+2011/9/6 Rob Herring <robherring2@gmail.com>:
 
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> These macros are not used by anything since the switch to
-> generic time in commit b9cedda230793cbf58eb012ddadedd490cc8e129
-> so let's retire them.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
+> Integrator and footbridge are the only platforms that would ever
+> actually work with VGA console (...)
 
- Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Hm I wonder if I can test this. Can I just plug some arbitrary
+VGA-capable graphics card into an empty PCI socket and
+expect the console to come up?
+
+> the others are all returning a
+> physical address rather than a virtual address. kirkwood, dove, mv78xx0,
+> and orion5x are all wrong. I'm not sure on shark. Seems to be a virtual
+> address, but it's not mapped.
+>
+> So perhaps the correct fix is just to remove the initialization of
+> vga_base on all these platforms.
+
+Sounds like a pretty good idea, but since I ran into the
+problem, what's actually happening in these systems on
+boot? Are they reading/writing some arbitrary physical
+location as if it was a virtual address?
+
+Linus
