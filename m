@@ -1,50 +1,142 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 7 Sep 2011 21:57:37 +0800
-Subject: [PATCH v2 2/3] ARM: mx28evk: set a initial clock rate for saif
-In-Reply-To: <1315403858-9904-1-git-send-email-b29396@freescale.com>
-References: <1315403858-9904-1-git-send-email-b29396@freescale.com>
-Message-ID: <1315403858-9904-3-git-send-email-b29396@freescale.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 07 Sep 2011 15:47:23 +0200
+Subject: [PATCH] at91/usb: always provide all the clocks
+In-Reply-To: <1314667768-14129-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1314667768-14129-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4E6775EB.6060401@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
+Le 30/08/2011 03:29, Jean-Christophe PLAGNIOL-VILLARD :
+> drop the cpu_is in the driver
+> at91sam9261 and at91sam9g10 expect 3 clocks
+> 
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/mach-at91/at91cap9.c    |    2 ++
+>  arch/arm/mach-at91/at91rm9200.c  |    2 ++
+>  arch/arm/mach-at91/at91sam9260.c |    2 ++
+>  arch/arm/mach-at91/at91sam9261.c |   29 +++++++++++++++--------------
+>  arch/arm/mach-at91/at91sam9263.c |    2 ++
+>  arch/arm/mach-at91/at91sam9g45.c |    2 ++
 
----
-No changes since v1.
+I know that I have signed the patch *but* there is an issue here...
 
-Note this patch still needs another patch from Wolfram to work.
-I send out it in this series as
-[PATCH 3/3] arm: mxs: disable clock-gates when setting saif-clocks
 
-As discussed with Wolfram, that patch may still have some later work
-to do. However, we just send out it for testers to work first.
----
- arch/arm/mach-mxs/clock-mx28.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+>  drivers/usb/host/ohci-at91.c     |   15 +++++----------
+>  7 files changed, 30 insertions(+), 24 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+> index bfc6844..ecdd54d 100644
+> --- a/arch/arm/mach-at91/at91cap9.c
+> +++ b/arch/arm/mach-at91/at91cap9.c
+> @@ -219,6 +219,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+> +	/* fake hclk clock */
+> +	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+>  };
+>  
+>  static struct clk_lookup usart_clocks_lookups[] = {
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index f73302d..713d3bd 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -193,6 +193,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
+> +	/* fake hclk clock */
+> +	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+>  };
+>  
+>  static struct clk_lookup usart_clocks_lookups[] = {
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index cb397be..a9be758 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -199,6 +199,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("t4_clk", "atmel_tcb.1", &tc4_clk),
+>  	CLKDEV_CON_DEV_ID("t5_clk", "atmel_tcb.1", &tc5_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc_clk),
+> +	/* fake hclk clock */
+> +	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+>  };
+>  
+>  static struct clk_lookup usart_clocks_lookups[] = {
+> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> index 6c8e3b5..658a518 100644
+> --- a/arch/arm/mach-at91/at91sam9261.c
+> +++ b/arch/arm/mach-at91/at91sam9261.c
+> @@ -129,6 +129,20 @@ static struct clk lcdc_clk = {
+>  	.type		= CLK_TYPE_PERIPHERAL,
+>  };
+>  
+> +/* HClocks */
+> +static struct clk hck0 = {
+> +	.name		= "hck0",
+> +	.pmc_mask	= AT91_PMC_HCK0,
+> +	.type		= CLK_TYPE_SYSTEM,
+> +	.id		= 0,
+> +};
+> +static struct clk hck1 = {
+> +	.name		= "hck1",
+> +	.pmc_mask	= AT91_PMC_HCK1,
+> +	.type		= CLK_TYPE_SYSTEM,
+> +	.id		= 1,
+> +};
+> +
+>  static struct clk *periph_clocks[] __initdata = {
+>  	&pioA_clk,
+>  	&pioB_clk,
+> @@ -161,6 +175,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
+> +	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &hck0),
+>  };
+>  
+>  static struct clk_lookup usart_clocks_lookups[] = {
+> @@ -199,20 +214,6 @@ static struct clk pck3 = {
+>  	.id		= 3,
+>  };
+>  
+> -/* HClocks */
+> -static struct clk hck0 = {
+> -	.name		= "hck0",
+> -	.pmc_mask	= AT91_PMC_HCK0,
+> -	.type		= CLK_TYPE_SYSTEM,
+> -	.id		= 0,
+> -};
+> -static struct clk hck1 = {
+> -	.name		= "hck1",
+> -	.pmc_mask	= AT91_PMC_HCK1,
+> -	.type		= CLK_TYPE_SYSTEM,
+> -	.id		= 1,
+> -};
+> -
+>  static void __init at91sam9261_register_clocks(void)
+>  {
+>  	int i;
+> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+> index 044f3c9..f83fbb0 100644
+> --- a/arch/arm/mach-at91/at91sam9263.c
+> +++ b/arch/arm/mach-at91/at91sam9263.c
+> @@ -189,6 +189,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
+>  	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
+>  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
+> +	/* fake hclk clock */
+> +	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index f0c7cb6..33cc2ff 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -826,6 +826,15 @@ int __init mx28_clocks_init(void)
- 	clk_set_parent(&saif0_clk, &pll0_clk);
- 	clk_set_parent(&saif1_clk, &pll0_clk);
- 
-+	/*
-+	 * Set an initial clk rate for saif's internal logic to work properly,
-+	 * this is especially for the saif working on EXTMASTER mode that who
-+	 * uses other saif's BITCLK&LRCLK but it still needs a basic clk which
-+	 * should be bigger enough for its internal logic.
-+	 */
-+	clk_set_rate(&saif0_clk, 24000000);
-+	clk_set_rate(&saif1_clk, 24000000);
-+
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
- 
- 	mxs_timer_init(&clk32k_clk, MX28_INT_TIMER0);
+We cannot do this: it does not even compiles.
+The ohci_clk clock is not existing on this device. Moreover, the "hclk"
+con_id is already existing for the *gadget* device...
+
+We have to correct this before I can send it upstream.
+
+Bye,
 -- 
-1.7.0.4
+Nicolas Ferre
