@@ -1,33 +1,40 @@
-From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter?= Ujfalusi)
-Date: Wed, 07 Sep 2011 09:46:06 +0300
-Subject: [PATCH 00/14] McBSP cleanup and generalization
-In-Reply-To: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
-References: <1314804181-17260-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <2765628.C70gLzgCW7@barack>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 7 Sep 2011 17:43:24 +0530
+Subject: [GIT PULL] DaVinci fixes for v3.1-rc6
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593025743E832@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 August 2011 17:22:47 Jarkko Nikula wrote:
-> Hi
-> 
-> Updates and continuation to my McBSP cleanup RFC set I sent before vacation
-> period. Motivation here is to get rid off all is_omap and CONFIG_ARCH stuff
-> and to make code a step more generic (and for preparing to move code out
-> under arch/arm/).
-> 
-> I hope this version doesn't break OMAP1. I suppose it should work now as
-> the register and dma addresses are calculated from common register numbers
-> and not by mangling from OMAP2+ register offsets (Thanks for
-> Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> for the idea).
-> 
-> Also MCBSP_CONFIG_TYPEx defines are not used to replace is_omap tests in
-> plat/mcbsp.c in this version but by using a feature flags (Thanks for
-> Charulatha V <charu@ti.com> for the idea).
-> 
-> Note that patch 01/14 has from address to my disabled google account. This
-> is since the patch is already committed in to
-> for_3.2/omap_device branch of Kevin's git tree.
+Hi Arnd,
 
-These all looks good to me.
+Can you please pull the following fixes for v3.1-rc6?
 
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+These are not regression fixes in the strict sense since
+none of the bugs were actually introduced in v3.1 and have
+been around for a while. But I hope we don't have to wait
+till v3.2 for these.
+
+Thanks,
+Sekhar 
+
+The following changes since commit ddf28352b80c86754a6424e3a61e8bdf9213b3c7:
+  Linus Torvalds (1):
+        Linux 3.1-rc5
+
+are available in the git repository at:
+
+  git://gitorious.org/linux-davinci/linux-davinci.git fixes
+
+Linus Walleij (1):
+      ARM: davinci: fix cache flush build error
+
+Rajashekhara, Sudhakar (1):
+      ARM: davinci: da850 EVM: read mac address from SPI flash
+
+Sergei Shtylyov (1):
+      ARM: davinci: correct MDSTAT_STATE_MASK
+
+ arch/arm/mach-davinci/board-da850-evm.c  |   28 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/psc.h |    2 +-
+ arch/arm/mach-davinci/sleep.S            |    6 +++++-
+ 3 files changed, 34 insertions(+), 2 deletions(-) 
