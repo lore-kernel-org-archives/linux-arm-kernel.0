@@ -1,117 +1,226 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 7 Sep 2011 20:43:06 +0800
-Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
-In-Reply-To: <20110907060501.GE8148@S2100-06.ap.freescale.net>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
-	<1711465.COqYbTSZES@wuerfel>
-	<20110907060501.GE8148@S2100-06.ap.freescale.net>
-Message-ID: <CAGsJ_4zF0hPKmYYETPGEgHHeyZUfjPUFkrTk--yPuuNy_M=DJA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Sep 2011 14:50:47 +0200
+Subject: [PATCH] Add platform driver support to the CS890x driver
+In-Reply-To: <1315390967-6683-1-git-send-email-jaccon.bastiaansen@gmail.com>
+References: <1315390967-6683-1-git-send-email-jaccon.bastiaansen@gmail.com>
+Message-ID: <20110907125047.GU28816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/7 Shawn Guo <shawn.guo@freescale.com>:
-> Hi Arnd,
->
-> On Tue, Sep 06, 2011 at 09:14:29PM +0200, Arnd Bergmann wrote:
->> On Tuesday 06 September 2011 17:58:37 Shawn Guo wrote:
->> > It adds a number of core drivers support for imx6q, including clock,
->> > General Power Controller (gpc), Multi Mode DDR Controller(mmdc) and
->> > System Reset Controller (src).
->> >
->> > Signed-off-by: Ranjani Vaidyanathan <ra5478@freescale.com>
->> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> > ---
->> > ?arch/arm/mach-imx/Kconfig ? ? ? | ? 13 +
->> > ?arch/arm/mach-imx/Makefile ? ? ?| ? ?4 +
->> > ?arch/arm/mach-imx/clock-imx6q.c | 1990 +++++++++++++++++++++++++++++++++++++++
->> > ?arch/arm/mach-imx/gpc.c ? ? ? ? | ?110 +++
->> > ?arch/arm/mach-imx/mmdc.c ? ? ? ?| ? 71 ++
->> > ?arch/arm/mach-imx/src.c ? ? ? ? | ? 52 +
->> > ?6 files changed, 2240 insertions(+), 0 deletions(-)
->>
->> This is unfortunately still a major problem.
->
-> It's so sad to still get this comment. ?Back to Linaro Connect on
-> Cambridge, I believe I asked for your opinion on new SoC clock support
-> without waiting for the clock framework. ?You said you do not have a
-> strong position on this and would defer to others' judgement. ?Then
-> I talked to Russell and Grant respectively, and they both agree that
-> we should not be blocked by the clock framework. ?That's why I decided
-> to start upstreaming imx6q.
->
->> I realize that we don't
->> yet have a good framework to do this with significantly less code,
->> but adding a platform that is mostly consisting of stupid additions
->> of clock descriptions that really should be in the device tree does
->> not scale much longer.
->
-> I definitely agree this does not scale for long term. ?And I would
-> immediately migrate it to clock framework once it gets ready and put
-> the description into device tree when clock binding is ready. ?Before
-> we get there, we need a way out. ?It's unreasonable for us to hold
-> the new soc support for an unspecified time. ?It's been 20 months since
-> we saw the common clock patches[1] from Jeremy, and we do not know yet
-> how many months we still have to wait. ?Grant worked out the auxdata to
-> remove the device tree dependency on clock framework. ?I think we
-> should not get new soc support blocked by clock framework either.
->
->> We decided to let this still get in for prima2,
->> which was also ugly in this regard but much simpler than imx6.
->>
-> It's unfair to me that you reject imx6q clock code just because it's
-> an implementation for a hardware complexer than prima2.
+Hello Jaccon,
 
-i understand your feeling.
+On Wed, Sep 07, 2011 at 12:22:47PM +0200, Jaccon Bastiaansen wrote:
+> The CS89x0 ethernet controller is used on a number of evaluation
+> boards, such as the MX31ADS. The current driver has memory address and
+> IRQ settings for each board on which this controller is used. Driver
+> updates are therefore required to support other boards that also use
+> the CS89x0. To avoid these driver updates, a better mechanism
+> (platform driver support) is added to communicate the board dependent
+> settings to the driver.
+> 
+> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+> ---
+>  drivers/net/Kconfig  |   18 +++++++++--
+>  drivers/net/Space.c  |    2 +-
+>  drivers/net/cs89x0.c |   83 ++++++++++++++++++++++++++++++++++++++++++++++++--
+>  3 files changed, 96 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
+> index 93359fa..17be84f 100644
+> --- a/drivers/net/Kconfig
+> +++ b/drivers/net/Kconfig
+> @@ -1497,8 +1497,7 @@ config FORCEDETH
+>  
+>  config CS89x0
+>  	tristate "CS89x0 support"
+> -	depends on NET_ETHERNET && (ISA || EISA || MACH_IXDP2351 \
+> -		|| ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440)
+> +	depends on NET_ETHERNET
+>  	---help---
+>  	  Support for CS89x0 chipset based Ethernet cards. If you have a
+>  	  network (Ethernet) card of this type, say Y and read the
+> @@ -1509,10 +1508,23 @@ config CS89x0
+>  	  To compile this driver as a module, choose M here. The module
+>  	  will be called cs89x0.
+>  
+> +config CS89x0_PLATFORM
+> +	bool "CS89x0 platform driver support"
+> +	depends on CS89x0
+> +	default n
+default n is implicit so you don't need (and should not) add it here.
 
-actually i am also waiting for the common clock framework to finish
-the whole prima2 clock tree driver. now prima2 only includes a little
-part of clock trees, actually if i list all of them, the file will be
-large too. And codes are ugly too.
+> +	help
+> +	  Say Y to compile the cs890x0 driver as a platform driver. This
+> +	  makes this driver suitable for use on certain evaluation boards
+> +	  such as the IMX21ADS.
+> +
+> +	  If you are unsure, say N.
+> +
+>  config CS89x0_NONISA_IRQ
+>  	def_bool y
+>  	depends on CS89x0 != n
+> -	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440
+> +	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS || \
+> +		   MACH_QQ2440 || CS89x0_PLATFORM
+> +
+>  
+>  config TC35815
+>  	tristate "TOSHIBA TC35815 Ethernet support"
+> diff --git a/drivers/net/Space.c b/drivers/net/Space.c
+> index 068c356..3c53ab1 100644
+> --- a/drivers/net/Space.c
+> +++ b/drivers/net/Space.c
+> @@ -189,7 +189,7 @@ static struct devprobe2 isa_probes[] __initdata = {
+>  #ifdef CONFIG_SEEQ8005
+>  	{seeq8005_probe, 0},
+>  #endif
+> -#ifdef CONFIG_CS89x0
+> +#if defined(CONFIG_CS89x0) && !defined(CONFIG_CS89x0_PLATFORM)
+>   	{cs89x0_probe, 0},
+>  #endif
+>  #ifdef CONFIG_AT1700
+> diff --git a/drivers/net/cs89x0.c b/drivers/net/cs89x0.c
+> index 537a4b2..604c828 100644
+> --- a/drivers/net/cs89x0.c
+> +++ b/drivers/net/cs89x0.c
+> @@ -98,6 +98,8 @@
+>    Domenico Andreoli : cavokz at gmail.com
+>                      : QQ2440 platform support
+>  
+> +  Jaccon Bastiaansen: jaccon.bastiaansen at gmail.com
+> +		    : added platform driver support
+>  */
+>  
+>  /* Always include 'config.h' first in case the user wants to turn on
+> @@ -154,7 +156,9 @@
+>  #if ALLOW_DMA
+>  #include <asm/dma.h>
+>  #endif
+> -
+> +#ifdef CONFIG_CS89x0_PLATFORM
+> +#include <linux/platform_device.h>
+> +#endif
+IMHO better include that unconditionally.
 
-auxdata is really a temp solution, it really brings many details to
-kernel, which should not be in kernel at all.
+>  #include "cs89x0.h"
+>  
+>  static char version[] __initdata =
+> @@ -189,6 +193,9 @@ static unsigned int netcard_portlist[] __used __initdata = {
+>  	PBC_BASE_ADDRESS + PBC_CS8900A_IOBASE + 0x300, 0
+>  };
+>  static unsigned cs8900_irq_map[] = {EXPIO_INT_ENET_INT, 0, 0, 0};
+> +#elif defined(CONFIG_CS89x0_PLATFORM)
+> +static unsigned int netcard_portlist[] __used __initdata = {0, 0};
+> +static unsigned int cs8900_irq_map[] = {0, 0, 0, 0};
+>  #else
+>  static unsigned int netcard_portlist[] __used __initdata =
+>     { 0x300, 0x320, 0x340, 0x360, 0x200, 0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x2e0, 0};
+> @@ -1746,7 +1753,7 @@ static int set_mac_address(struct net_device *dev, void *p)
+>  	return 0;
+>  }
+>  
+> -#ifdef MODULE
+> +#if defined(MODULE) && !defined(CONFIG_CS89x0_PLATFORM)
+>  
+>  static struct net_device *dev_cs89x0;
+>  
+> @@ -1900,7 +1907,77 @@ cleanup_module(void)
+>  	release_region(dev_cs89x0->base_addr, NETCARD_IO_EXTENT);
+>  	free_netdev(dev_cs89x0);
+>  }
+> -#endif /* MODULE */
+> +#endif /* MODULE && !CONFIG_CS89x0_PLATFORM */
+> +
+> +#ifdef CONFIG_CS89x0_PLATFORM
+> +static int cs89x0_platform_probe(struct platform_device *pdev)
+> +{
+> +	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
+> +	struct resource *mem_res;
+> +	struct resource *irq_res;
+> +	int err;
+> +
+> +	if (!dev)
+> +		return -ENODEV;
+> +
+> +	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> +	if (mem_res == NULL || irq_res == NULL) {
+> +		printk(KERN_WARNING
+> +		       DRV_NAME
+> +		       ": memory and/or interrupt resource missing.\n");
+I'd prefer you do:
 
->
->> My feeling is that this time, we should wait for the common clock
->> framework to get in and simplify this. I believe Thomas is now planning
->> to do this, but I haven't followed what the current state is.
->>
-> Sadly, if this is the position of entire arm-soc maintainer group,
-> I think I have made a wrong decision to start upstreaming imx6q now.
->
->> The other three drivers in this patch are basically ok, so you can
->> definitely post them as a separate patch and perhaps get minor comments
->> for those, similar to what I commented on the other patches.
->>
->> For the clock-imx6q.c file, what I first want to hear from someone
->> is how this is supposed to look like in the long run with device tree
->> integration, and how far away from that we are.
->>
->> Can you comment on how far we get without the clock driver with imx6?
->> Is is basically useless, or is there a way we can merge the remaining
->> imx6 code and other drivers but postpone the large clock driver?
->>
-> Unfortunately, clock is pretty fundamental for imx6q support. ?Without
-> clock support, imx6q platform is useless. ?We have a real example here.
-> Back to Dec. 2010, Sascha refused to take clock patch when Freescale
-> was submitting imx50 platform support, because he thought the clock
-> framework will get merged pretty soon. ?But we end up with the facts
-> that clock framework is still up in the air and imx50 platform support
-> on mainline is totally useless.
->
-> I have been tried very hard to reduce the LOC of clock-imx6q.c. ?It's
-> a 5K LOC file in the Freescale internal tree. ?Now it's 2K LOC. ?I know
-> it's still large enough for you to dislike it. ?But this is the clock
-> that the hardware has. ?I'm afraid we can not do much to reduce the LOC
-> significantly, unless we only implement the small portion other than
-> the full clock tree, which is what I really hate to do.
->
-> Regards,
-> Shawn
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-January/007238.html
->
+	#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-Thanks
-barry
+at the top of the driver and then just use:
+
+	pr_warning("memory and/or interrupt resource missing\m");
+
+> +		err = -ENOENT;
+> +		goto out;
+> +	}
+> +
+> +	cs8900_irq_map[0] = irq_res->start;
+> +	err = cs89x0_probe1(dev, mem_res->start, 0);
+hmm, better switch the complete driver to be a platform driver and
+instead of the legacy probing let it create the corresponding device.
+
+> +	if (err) {
+> +		printk(KERN_WARNING
+> +		       DRV_NAME
+> +		       ": no cs8900 or cs8920 detected.\n");
+> +		goto out;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, dev);
+> +	return 0;
+> +out:
+> +	free_netdev(dev);
+> +	return err;
+> +}
+> +
+> +static int cs89x0_platform_remove(struct platform_device *pdev)
+> +{
+> +	struct net_device *dev = platform_get_drvdata(pdev);
+> +
+> +	unregister_netdev(dev);
+> +	free_netdev(dev);
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver cs89x0_platform_driver = {
+> +	.driver	= {
+> +		.name	= DRV_NAME,
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe	= cs89x0_platform_probe,
+> +	.remove	= cs89x0_platform_remove,
+> +};
+> +
+> +static int __init cs89x0_init(void)
+> +{
+> +	return platform_driver_register(&cs89x0_platform_driver);
+> +}
+> +
+> +static void __exit cs89x0_cleanup(void)
+> +{
+> +	platform_driver_unregister(&cs89x0_platform_driver);
+> +}
+> +
+> +module_init(cs89x0_init);
+this line should go directly after the function definition.
+
+> +module_exit(cs89x0_cleanup);
+> +
+> +#endif
+>  
+>  /*
+>   * Local variables:
+> -- 
+> 1.7.1
+> 
+> 
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
