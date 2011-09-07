@@ -1,40 +1,54 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 Sep 2011 19:16:41 +0800
-Subject: [PATCH 1/6] arm/imx6q: add device tree source
-In-Reply-To: <6584331.JVLA1MqVFx@wuerfel>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-2-git-send-email-shawn.guo@linaro.org>
-	<6584331.JVLA1MqVFx@wuerfel>
-Message-ID: <20110907111640.GJ8148@S2100-06.ap.freescale.net>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 7 Sep 2011 12:16:00 +0300
+Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
+	the hardware
+In-Reply-To: <CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
+References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+	<1314984756-4400-8-git-send-email-ohad@wizery.com>
+	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
+	<CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
+	<CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
+Message-ID: <CAK=WgbbFhmiC=PJfmyPOhbHGtiPFOcmqBx7nSpkuDX36hPYgbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 08:31:47PM +0200, Arnd Bergmann wrote:
-> On Tuesday 06 September 2011 17:58:35 Shawn Guo wrote:
-> > +
-> > +       aips-bus at 02000000 { /* AIPS1 */
-> > +               compatible = "fsl,aips-bus", "simple-bus";
-> > +               #address-cells = <1>;
-> > +               #size-cells = <1>;
-> > +               reg = <0x02000000 0x100000>;
-> > +               ranges;
-> > +
-> > +               spba-bus at 02000000 {
-> > +                       compatible = "fsl,spba-bus", "simple-bus";
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <1>;
-> > +                       reg = <0x02000000 0x40000>;
-> > +                       ranges;
-> 
-> Wouldn't it be better to have the ranges property translate bus-local addresses
-> to global addresses, rather than having an empty ranges property?
-> 
-All the bus-local addresses are directly mapped into cpu address
-space.  Looking at the i.MX Reference Manual memory map chapter,
-the base address of each block is given in global address other than
-bus address + offset.  Writing a global address in device tree is
-relatively easy to match the addresses defined in hardware document.
+Hi KyongHo,
 
--- 
-Regards,
-Shawn
+On Wed, Sep 7, 2011 at 11:05 AM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> However, it is faster because it does not calculate the given order and
+> not call any function.
+
+Hmm this sounds a bit like a red herring to me; optimization of the
+map function is not the main subject here. Especially not when we're
+discussing mapping of large physically contiguous memory regions which
+do not happen too often.
+
+But generally I don't think that duplicating code and eliminating
+function calls is a good optimization (the compiler can do that for
+us..). Moreover, it looks like s5p_iommu_map() gives a higher priority
+for bigger pages first, and only reaches 4KB pages after it tried all
+other supported pages. IMHO that's sub-optimal, because small mappings
+are more common than big ones.
+
+Another advantage for migrating s5p_iommu_map() over to the subject
+patch, is that s5p_iommu_map() doesn't support super sections yet. To
+support it, you'd need to add more code (duplicate another while
+loop). But if you migrated to the subject patch, then you would only
+need to flip the 16MB bit when you advertise page size capabilities
+and then that's it; you're done.
+
+> It is a logical error because the caller of iommu_map() gives
+> 4KB aligned physical address while saying that it is 64KB aligned.
+
+The caller of iommu_map() doesn't say anything about alignments. It
+just gives it a memory region to map, and expect things to just work.
+
+Obviously it's better if big physically contiguous mapping will be
+aligned to big pages, but things can still work even if it's not, by
+using smaller pages. No reason not to provide this flexibility.
+
+The only requirement the IOMMU API should have is the minimum 4KB
+alignment, because IOMMU hardware does not support smaller pages.
+
+Thanks,
+Ohad.
