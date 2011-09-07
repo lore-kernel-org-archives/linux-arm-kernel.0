@@ -1,506 +1,257 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Wed, 7 Sep 2011 23:39:04 +0530
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
-Message-ID: <438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Sep 2011 20:18:11 +0200
+Subject: [PATCH v2 1/3] ARM: mx28evk: add platform data for saif
+In-Reply-To: <1315403858-9904-2-git-send-email-b29396@freescale.com>
+References: <1315403858-9904-1-git-send-email-b29396@freescale.com>
+	<1315403858-9904-2-git-send-email-b29396@freescale.com>
+Message-ID: <20110907181811.GX28816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-09-08 at 00:46 +0800, Barry Song wrote:
-> Hi Vinod,
-> thanks for your quick feedback.
->
-> 2011/9/8 Koul, Vinod <vinod.koul@intel.com>:
-> > On Tue, 2011-09-06 at 22:41 -0700, Barry Song wrote:
-> >> From: Rongjun Ying <rongjun.ying@csr.com>
-> >
-> >> +config SIRF_DMA
-> >> +     tristate "CSR SiRFprimaII DMA support"
-> >> +     depends on ARCH_PRIMA2
-> >> +     select DMA_ENGINE
-> >> +     help
-> >> +       Enable support for the CSR SiRFprimaII DMA engine.
-> > How different is it from the other primacell based DMA drivers, and why
-> > wouldn't it make sense to use/modify one of them?
->
-> it is much different with primacell based DMA like pl080, pl330.
-> prima2 has a self-defined DMAC IP. basically it is a 2D mode dma with
-> two scales X and Y and direct way to start and stop DMA.
-> every channel has fixed function to serve only one perpheral. so you
-> find we have a filter id.
-okay, what do you mean by 2D mode? Is it similar to what TI folks, Linus
-W and Jassi Brar posted RFC's on?
-IIRC, other primacell dmacs do have this capability but not supported by
-the drivers, so I think this could be added in current drivers, Jassi
-and Linus W can comment better...
+Hello,
 
-[snip]
+On Wed, Sep 07, 2011 at 09:57:36PM +0800, Dong Aisheng wrote:
+> This is for supporting saif record function.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> 
+> ---
+> changes since v1:
+>  * move saif clkmux code into mach-specific part
+> ---
+>  arch/arm/mach-mxs/clock-mx28.c                  |   47 +++++++++++++++++++++++
+>  arch/arm/mach-mxs/devices-mx28.h                |    4 +-
+>  arch/arm/mach-mxs/devices/platform-mxs-saif.c   |    5 +-
+>  arch/arm/mach-mxs/include/mach/common.h         |    2 +
+>  arch/arm/mach-mxs/include/mach/devices-common.h |    4 +-
+>  arch/arm/mach-mxs/include/mach/digctl.h         |   18 +++++++++
+>  arch/arm/mach-mxs/mach-mx28evk.c                |   15 ++++++-
+>  7 files changed, 89 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 7954013..f0c7cb6 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -29,6 +29,7 @@
+>  #include <mach/mx28.h>
+>  #include <mach/common.h>
+>  #include <mach/clock.h>
+> +#include <mach/digctl.h>
+>  
+>  #include "regs-clkctrl-mx28.h"
+>  
+> @@ -43,6 +44,52 @@ static struct clk emi_clk;
+>  static struct clk saif0_clk;
+>  static struct clk saif1_clk;
+>  static struct clk clk32k_clk;
+> +static unsigned int saif_clkmux;
+> +
+> +/*
+> + * HW_SAIF_CLKMUX_SEL:
+> + *  DIRECT(0x0): SAIF0 clock pins selected for SAIF0 input clocks, and SAIF1
+> + *		clock pins selected for SAIF1 input clocks.
+> + *  CROSSINPUT(0x1): SAIF1 clock inputs selected for SAIF0 input clocks, and
+> + *		SAIF0 clock inputs selected for SAIF1 input clocks.
+> + *  EXTMSTR0(0x2): SAIF0 clock pin selected for both SAIF0 and SAIF1 input
+> + *		clocks.
+> + *  EXTMSTR1(0x3): SAIF1 clock pin selected for both SAIF0 and SAIF1 input
+> + *		clocks.
+> + */
+> +int mxs_saif_clkmux_select(unsigned int clkmux)
+> +{
+> +	if (clkmux > 0x3)
+> +		return -EINVAL;
+> +
+> +	__raw_writel(clkmux << 10, DIGCTRL_BASE_ADDR + MXS_SET_ADDR);
+hmm, in my version of the mx28 reference the module is named DIGCTL?!
 
->> +
-> >> +/* Submit descriptor to hardware */
-> >> +static dma_cookie_t sirfsoc_dma_tx_submit(struct dma_async_tx_descriptor *txd)
-> >> +{
-> >> +     struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(txd->chan);
-> >> +     struct sirfsoc_dma_desc *mdesc;
-> >> +     unsigned long flags;
-> >> +     dma_cookie_t cookie;
-> >> +
-> >> +     mdesc = container_of(txd, struct sirfsoc_dma_desc, desc);
-> >> +
-> >> +     spin_lock_irqsave(&schan->lock, flags);
-> >> +
-> >> +     /* Move descriptor to queue */
-> >> +     list_move_tail(&mdesc->node, &schan->queued);
-> >> +
-> >> +     /* If channel is idle, execute all queued descriptors */
-> >> +     if (list_empty(&schan->active))
-> >> +             sirfsoc_dma_execute(schan);
-> > this is wrong, this should be done in .issue_pending
->
-> ok. as i reference several current drivers in drivers/dma, they are
-> doing dma  start in submit....guess they are wrong too?
-Right, please see Documentation/dmaengine.txt.
+shouldn't that be something like:
 
->
-> >
-> >> +
-> >> +     /* Update cookie */
-> >> +     cookie = schan->chan.cookie + 1;
-> >> +     if (cookie <= 0)
-> >> +             cookie = 1;
-> >> +
-> >> +     schan->chan.cookie = cookie;
-> >> +     mdesc->desc.cookie = cookie;
-> >> +
-> >> +     spin_unlock_irqrestore(&schan->lock, flags);
-> >> +
-> >> +     return cookie;
-> >> +}
-> >> +
-> >> +static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
-> >> +     struct sirfsoc_dma_slave_config *config)
-> >> +{
-> >> +     u32 addr, direction;
-> >> +     unsigned long flags;
-> >> +
-> >> +     switch (config->generic_config.direction) {
-> >> +     case DMA_FROM_DEVICE:
-> >> +             direction = 0;
-> >> +             addr = config->generic_config.dst_addr;
-> >> +             break;
-> >> +
-> >> +     case DMA_TO_DEVICE:
-> >> +             direction = 1;
-> >> +             addr = config->generic_config.src_addr;
-> >> +             break;
-> >> +
-> >> +     default:
-> >> +             return -EINVAL;
-> >> +     }
-> >> +
-> >> +     if ((config->generic_config.src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
-> >> +             (config->generic_config.dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES))
-> >> +             return -EINVAL;
-> >> +
-> >> +     spin_lock_irqsave(&schan->lock, flags);
-> >> +     schan->addr = addr;
-> >> +     schan->direction = direction;
-> >> +     schan->xlen = config->xlen;
-> >> +     schan->ylen = config->ylen;
-> >> +     schan->width = config->width;
-> > what do these parameters mean, is width the dma fifo width, if so use
-> > existing members for that
->
-> the width is not dma fifo width. prima2 required 3 parameters to begin
-> a 2D dma transfer, the relationship is as below:
->
-> <----------------width----------------->
-> |-------|-------------------------|----------|          ---
-> |        |                              |             |           ^
-> |        | <----------xlen----->|             |           |
-> |        |                              |             |         ylen
-> |        |                              |             |           |
-> |-------|-------------------------|-----------|        _v_
->
-> after i go back to office, i'll copy details from datasheet to you.
->
-> >
-> >> +     schan->mode = (config->generic_config.src_maxburst == 4 ? 1 : 0);
-> >> +     spin_unlock_irqrestore(&schan->lock, flags);
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
-> >> +{
-> >> +     struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(&schan->chan);
-> >> +     int cid = schan->chan.chan_id;
-> >> +     unsigned long flags;
-> >> +
-> >> +     writel_relaxed(readl_relaxed(sdma->regs + SIRFSOC_DMA_INT_EN) & ~(1 << cid),
-> >> +             sdma->regs + SIRFSOC_DMA_INT_EN);
-> >> +     writel_relaxed(1 << cid, sdma->regs + SIRFSOC_DMA_CH_VALID);
-> >> +
-> >> +     spin_lock_irqsave(&schan->lock, flags);
-> >> +
-> >> +     list_splice_tail_init(&schan->queued, &schan->free);
-> > what about active list
-> >> +     spin_unlock_irqrestore(&schan->lock, flags);
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +static int sirfsoc_dma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-> >> +     unsigned long arg)
-> >> +{
-> >> +     struct sirfsoc_dma_slave_config *config;
-> >> +     struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-> >> +
-> >> +     switch (cmd) {
-> >> +     case DMA_TERMINATE_ALL:
-> >> +             return sirfsoc_dma_terminate_all(schan);
-> >> +     case DMA_SLAVE_CONFIG:
-> >> +             config = (struct sirfsoc_dma_slave_config *)arg;
-> >> +             return sirfsoc_dma_slave_config(schan, config);
-> >> +
-> >> +     default:
-> >> +             break;
-> >> +     }
-> >> +
-> >> +     return -ENOSYS;
-> >> +}
-> >> +
-> >> +/* Alloc channel resources */
-> >> +static int sirfsoc_dma_alloc_chan_resources(struct dma_chan *chan)
-> >> +{
-> >> +     struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
-> >> +     struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-> >> +     struct sirfsoc_dma_desc *mdesc;
-> >> +     unsigned long flags;
-> >> +     LIST_HEAD(descs);
-> >> +     int i;
-> >> +
-> >> +     /* Alloc descriptors for this channel */
-> >> +     for (i = 0; i < SIRFSOC_DMA_DESCRIPTORS; i++) {
-> >> +             mdesc = kzalloc(sizeof(struct sirfsoc_dma_desc), GFP_KERNEL);
-> >> +             if (!mdesc) {
-> >> +                     dev_notice(sdma->dma.dev, "Memory allocation error. "
-> >> +                             "Allocated only %u descriptors\n", i);
-> >> +                     break;
-> >> +             }
-> >> +
-> >> +             dma_async_tx_descriptor_init(&mdesc->desc, chan);
-> >> +             mdesc->desc.flags = DMA_CTRL_ACK;
-> >> +             mdesc->desc.tx_submit = sirfsoc_dma_tx_submit;
-> >> +
-> >> +             list_add_tail(&mdesc->node, &descs);
-> >> +     }
-> >> +
-> >> +     /* Return error only if no descriptors were allocated */
-> >> +     if (i == 0)
-> >> +             return -ENOMEM;
-> >> +
-> >> +     spin_lock_irqsave(&schan->lock, flags);
-> >> +
-> >> +     list_splice_tail_init(&descs, &schan->free);
-> >> +     spin_unlock_irqrestore(&schan->lock, flags);
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +/* Free channel resources */
-> >> +static void sirfsoc_dma_free_chan_resources(struct dma_chan *chan)
-> >> +{
-> >> +     struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-> >> +     struct sirfsoc_dma_desc *mdesc, *tmp;
-> >> +     unsigned long flags;
-> >> +     LIST_HEAD(descs);
-> >> +
-> >> +     spin_lock_irqsave(&schan->lock, flags);
-> >> +
-> >> +     /* Channel must be idle */
-> >> +     BUG_ON(!list_empty(&schan->prepared));
-> >> +     BUG_ON(!list_empty(&schan->queued));
-> >> +     BUG_ON(!list_empty(&schan->active));
-> >> +     BUG_ON(!list_empty(&schan->completed));
-> >> +
-> >> +     /* Move data */
-> >> +     list_splice_tail_init(&schan->free, &descs);
-> >> +
-> >> +     spin_unlock_irqrestore(&schan->lock, flags);
-> >> +
-> >> +     /* Free descriptors */
-> >> +     list_for_each_entry_safe(mdesc, tmp, &descs, node)
-> >> +             kfree(mdesc);
-> >> +}
-> >> +
-> >> +/* Send pending descriptor to hardware */
-> >> +static void sirfsoc_dma_issue_pending(struct dma_chan *chan)
-> >> +{
-> >> +     struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-> >> +     unsigned long flags;
-> >> +
-> >> +     spin_lock_irqsave(&schan->lock, flags);
-> >> +
-> >> +     if (list_empty(&schan->active) && !list_empty(&schan->queued))
-> >> +             sirfsoc_dma_execute(schan);
-> >> +
-> >> +     spin_unlock_irqrestore(&schan->lock, flags);
-> >> +}
-> >> +
-> >> +/* Check request completion status */
-> >> +static enum dma_status
-> >> +sirfsoc_dma_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
-> >> +     struct dma_tx_state *txstate)
-> >> +{
-> >> +     struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-> >> +     unsigned long flags;
-> >> +     dma_cookie_t last_used;
-> >> +     dma_cookie_t last_complete;
-> >> +
-> >> +     spin_lock_irqsave(&schan->lock, flags);
-> >> +     last_used = schan->chan.cookie;
-> >> +     last_complete = schan->completed_cookie;
-> >> +     spin_unlock_irqrestore(&schan->lock, flags);
-> >> +
-> >> +     dma_set_tx_state(txstate, last_complete, last_used, 0);
-> >> +     return dma_async_is_complete(cookie, last_complete, last_used);
-> >> +}
-> >> +
-> >> +/* Prepare descriptor for memory to memory copy */
-> >> +static struct dma_async_tx_descriptor *
-> >> +sirfsoc_dma_prep_memcpy(struct dma_chan *chan, dma_addr_t dst, dma_addr_t src,
-> >> +     size_t len, unsigned long flags)
-> >> +{
-> >> +     struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
-> >> +     struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
-> >> +     struct sirfsoc_dma_desc *mdesc = NULL;
-> >> +     unsigned long iflags;
-> >> +
-> >> +     /* Get free descriptor */
-> >> +     spin_lock_irqsave(&schan->lock, iflags);
-> >> +     if (!list_empty(&schan->free)) {
-> >> +             mdesc = list_first_entry(&schan->free, struct sirfsoc_dma_desc,
-> >> +                     node);
-> >> +             list_del(&mdesc->node);
-> >> +     }
-> >> +     spin_unlock_irqrestore(&schan->lock, iflags);
-> >> +
-> >> +     if (!mdesc) {
-> >> +             /* try to free completed descriptors */
-> >> +             sirfsoc_dma_process_completed(sdma);
-> >> +             return NULL;
-> >> +     }
-> >> +
-> >> +     /* Place descriptor in prepared list */
-> >> +     spin_lock_irqsave(&schan->lock, iflags);
-> >> +     list_add_tail(&mdesc->node, &schan->prepared);
-> >> +     spin_unlock_irqrestore(&schan->lock, iflags);
-> >> +
-> >> +     return &mdesc->desc;
-> >> +}
-> >> +
-> >> +/*
-> >> + * The DMA controller consists of 16 independent DMA channels.
-> >> + * Each channel is allocated to a different function
-> >> + */
-> >> +bool sirfsoc_dma_filter_id(struct dma_chan *chan, void *chan_id)
-> >> +{
-> >> +     unsigned int ch_nr = (unsigned int) chan_id;
-> >> +
-> >> +     if (ch_nr == chan->chan_id)
-> >> +             return true;
-> >> +
-> >> +     return false;
-> >> +}
-> >> +EXPORT_SYMBOL(sirfsoc_dma_filter_id);
-> >> +
-> >> +static int __devinit sirfsoc_dma_probe(struct platform_device *op)
-> >> +{
-> >> +     struct device_node *dn = op->dev.of_node;
-> >> +     struct device *dev = &op->dev;
-> >> +     struct dma_device *dma;
-> >> +     struct sirfsoc_dma *sdma;
-> >> +     struct sirfsoc_dma_chan *schan;
-> >> +     struct resource res;
-> >> +     ulong regs_start, regs_size;
-> >> +     u32 id;
-> >> +     int retval, i;
-> >> +
-> >> +     sdma = devm_kzalloc(dev, sizeof(struct sirfsoc_dma), GFP_KERNEL);
-> >> +     if (!sdma) {
-> >> +             dev_err(dev, "Memory exhausted!\n");
-> >> +             return -ENOMEM;
-> >> +     }
-> >> +
-> >> +     if (of_property_read_u32(dn, "cell-index", &id)) {
-> >> +             dev_err(dev, "Fail to get DMAC index\n");
-> >> +             return -ENODEV;
-> >> +     }
-> >> +
-> >> +     sdma->irq = irq_of_parse_and_map(dn, 0);
-> >> +     if (sdma->irq == NO_IRQ) {
-> >> +             dev_err(dev, "Error mapping IRQ!\n");
-> >> +             return -EINVAL;
-> >> +     }
-> >> +
-> >> +     retval = of_address_to_resource(dn, 0, &res);
-> >> +     if (retval) {
-> >> +             dev_err(dev, "Error parsing memory region!\n");
-> >> +             return retval;
-> >> +     }
-> >> +
-> >> +     regs_start = res.start;
-> >> +     regs_size = resource_size(&res);
-> >> +
-> >> +     if (!devm_request_mem_region(dev, regs_start, regs_size, DRV_NAME)) {
-> >> +             dev_err(dev, "Error requesting memory region!\n");
-> >> +             return -EBUSY;
-> >> +     }
-> >> +
-> >> +     sdma->regs = devm_ioremap(dev, regs_start, regs_size);
-> >> +     if (!sdma->regs) {
-> >> +             dev_err(dev, "Error mapping memory region!\n");
-> >> +             return -ENOMEM;
-> >> +     }
-> >> +
-> >> +     retval = devm_request_irq(dev, sdma->irq, &sirfsoc_dma_irq, 0, DRV_NAME,
-> >> +             sdma);
-> >> +     if (retval) {
-> >> +             dev_err(dev, "Error requesting IRQ!\n");
-> >> +             return -EINVAL;
-> >> +     }
-> >> +
-> >> +     dma = &sdma->dma;
-> >> +     dma->dev = dev;
-> >> +     dma->chancnt = SIRFSOC_DMA_CHANNELS;
-> >> +
-> >> +     dma->device_alloc_chan_resources = sirfsoc_dma_alloc_chan_resources;
-> >> +     dma->device_free_chan_resources = sirfsoc_dma_free_chan_resources;
-> >> +     dma->device_issue_pending = sirfsoc_dma_issue_pending;
-> >> +     dma->device_control = sirfsoc_dma_control;
-> >> +     dma->device_tx_status = sirfsoc_dma_tx_status;
-> >> +     dma->device_prep_dma_memcpy = sirfsoc_dma_prep_memcpy;
-> >> +
-> >> +     INIT_LIST_HEAD(&dma->channels);
-> >> +     dma_cap_set(DMA_MEMCPY, dma->cap_mask);
-> > DMA_SLAVE as well..
->
-> ok.
->
-> >
-> >> +
-> >> +     for (i = 0; i < dma->chancnt; i++) {
-> >> +             schan = &sdma->channels[i];
-> >> +
-> >> +             schan->chan.device = dma;
-> >> +             schan->chan.chan_id = dma->chancnt * id + i;
-> >> +             schan->chan.cookie = 1;
-> >> +             schan->completed_cookie = schan->chan.cookie;
-> >> +
-> >> +             INIT_LIST_HEAD(&schan->free);
-> >> +             INIT_LIST_HEAD(&schan->prepared);
-> >> +             INIT_LIST_HEAD(&schan->queued);
-> >> +             INIT_LIST_HEAD(&schan->active);
-> >> +             INIT_LIST_HEAD(&schan->completed);
-> >> +
-> >> +             spin_lock_init(&schan->lock);
-> >> +             list_add_tail(&schan->chan.device_node, &dma->channels);
-> >> +     }
-> >> +
-> >> +     tasklet_init(&sdma->tasklet, sirfsoc_dma_tasklet, (unsigned long)sdma);
-> >> +
-> >> +     /* Register DMA engine */
-> >> +     dev_set_drvdata(dev, sdma);
-> >> +     retval = dma_async_device_register(dma);
-> >> +     if (retval) {
-> >> +             devm_free_irq(dev, sdma->irq, sdma);
-> >> +             irq_dispose_mapping(sdma->irq);
-> >> +     }
-> >> +
-> >> +     return retval;
-> >> +}
-> >> +
-> >> +static int __devexit sirfsoc_dma_remove(struct platform_device *op)
-> >> +{
-> >> +     struct device *dev = &op->dev;
-> >> +     struct sirfsoc_dma *sdma = dev_get_drvdata(dev);
-> >> +
-> >> +     dma_async_device_unregister(&sdma->dma);
-> >> +     devm_free_irq(dev, sdma->irq, sdma);
-> >> +     irq_dispose_mapping(sdma->irq);
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +static struct of_device_id sirfsoc_dma_match[] = {
-> >> +     { .compatible = "sirf,prima2-dmac", },
-> >> +     {},
-> >> +};
-> >> +
-> >> +static struct platform_driver sirfsoc_dma_driver = {
-> >> +     .probe          = sirfsoc_dma_probe,
-> >> +     .remove         = __devexit_p(sirfsoc_dma_remove),
-> >> +     .driver = {
-> >> +             .name = DRV_NAME,
-> >> +             .owner = THIS_MODULE,
-> >> +             .of_match_table = sirfsoc_dma_match,
-> >> +     },
-> >> +};
-> >> +
-> >> +static int __init sirfsoc_dma_init(void)
-> >> +{
-> >> +     return platform_driver_register(&sirfsoc_dma_driver);
-> >> +}
-> >> +module_init(sirfsoc_dma_init);
-> >> +
-> >> +static void __exit sirfsoc_dma_exit(void)
-> >> +{
-> >> +     platform_driver_unregister(&sirfsoc_dma_driver);
-> >> +}
-> >> +module_exit(sirfsoc_dma_exit);
-> >> +
-> >> +MODULE_AUTHOR("Rongjun Ying <rongjun.ying@csr.com>, "
-> >> +     "Barry Song <baohua.song@csr.com>");
-> >> +MODULE_DESCRIPTION("SIRFSOC DMA control driver");
-> >> +MODULE_LICENSE("GPL");
-> >> diff --git a/include/linux/sirfsoc_dma.h b/include/linux/sirfsoc_dma.h
-> >> new file mode 100644
-> >> index 0000000..75d2d86
-> >> --- /dev/null
-> >> +++ b/include/linux/sirfsoc_dma.h
-> >> @@ -0,0 +1,18 @@
-> >> +#ifndef _SIRFSOC_DMA_H_
-> >> +#define _SIRFSOC_DMA_H_
-> >> +/*
-> >> + * create a custom slave config struct for CSR SiRFprimaII and pass that,
-> >> + * and make dma_slave_config a member of that struct
-> >> + */
-> >> +struct sirfsoc_dma_slave_config {
-> >> +     struct dma_slave_config generic_config;
-> >> +
-> >> +     /* CSR SiRFprimaII 2D-DMA config */
-> >> +     int             xlen;           /* DMA xlen */
-> >> +     int             ylen;           /* DMA ylen */
-> > what lengths?
-> >
-> >> +     int             width;          /* DMA width */
-> >> +};
-> >> +
-> >> +bool sirfsoc_dma_filter_id(struct dma_chan *chan, void *chan_id);
-> >> +
-> >> +#endif
->
-> Thanks
-> barry
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	DIGCTRL_BASE_ADDR + DIGCTRL_CTRL + MXS_SET_ADDR?
 
---
-~Vinod
+and is it intended that if you do:
+
+	mxs_saif_clkmux_select(1);
+	mxs_saif_clkmux_select(2);
+
+the SAIF_CLKMUX_SEL bitfield ends up being 3?
+
+> +	saif_clkmux = clkmux;
+> +	return 0;
+> +}
+> +
+> +int mxs_get_saif_clk_master_id(unsigned int saif_id)
+> +{
+> +	unsigned int master_id;
+> +
+> +	switch (saif_clkmux) {
+> +	case MXS_DIGCTL_SAIF_CLKMUX_DIRECT:
+> +		master_id = saif_id;
+> +		break;
+> +	case MXS_DIGCTL_SAIF_CLKMUX_CROSSINPUT:
+> +		master_id = saif_id ? 0 : 1;
+> +		break;
+> +	case MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0:
+> +		master_id = 0;
+> +		break;
+> +	case MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1:
+> +		master_id = 1;
+> +		break;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	return master_id;
+> +}
+These two functions are only supposed to be called by arch code right?
+(If not, you might need to export them.)
+
+>  
+>  static int _raw_clk_enable(struct clk *clk)
+>  {
+> diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+> index c888710..40be649 100644
+> --- a/arch/arm/mach-mxs/devices-mx28.h
+> +++ b/arch/arm/mach-mxs/devices-mx28.h
+> @@ -47,6 +47,8 @@ struct platform_device *__init mx28_add_mxsfb(
+>  		const struct mxsfb_platform_data *pdata);
+>  
+>  extern const struct mxs_saif_data mx28_saif_data[] __initconst;
+> -#define mx28_add_saif(id)              mxs_add_saif(&mx28_saif_data[id])
+> +#define mx28_add_saif(id, pdata) \
+> +	mxs_add_saif(&mx28_saif_data[id], pdata)
+should it be a seperate patch to add pdata for saif devices?
+
+> +
+undesirable empty line.
+>  
+>  struct platform_device *__init mx28_add_rtc_stmp3xxx(void);
+> diff --git a/arch/arm/mach-mxs/devices/platform-mxs-saif.c b/arch/arm/mach-mxs/devices/platform-mxs-saif.c
+> index 1ec965e..f6e3a60 100644
+> --- a/arch/arm/mach-mxs/devices/platform-mxs-saif.c
+> +++ b/arch/arm/mach-mxs/devices/platform-mxs-saif.c
+> @@ -32,7 +32,8 @@ const struct mxs_saif_data mx28_saif_data[] __initconst = {
+>  };
+>  #endif
+>  
+> -struct platform_device *__init mxs_add_saif(const struct mxs_saif_data *data)
+> +struct platform_device *__init mxs_add_saif(const struct mxs_saif_data *data,
+> +				const struct mxs_saif_platform_data *pdata)
+>  {
+>  	struct resource res[] = {
+>  		{
+> @@ -56,5 +57,5 @@ struct platform_device *__init mxs_add_saif(const struct mxs_saif_data *data)
+>  	};
+>  
+>  	return mxs_add_platform_device("mxs-saif", data->id, res,
+> -					ARRAY_SIZE(res), NULL, 0);
+> +				ARRAY_SIZE(res), pdata, sizeof(*pdata));
+>  }
+> diff --git a/arch/arm/mach-mxs/include/mach/common.h b/arch/arm/mach-mxs/include/mach/common.h
+> index 635bb5d..bf91a10 100644
+> --- a/arch/arm/mach-mxs/include/mach/common.h
+> +++ b/arch/arm/mach-mxs/include/mach/common.h
+> @@ -29,4 +29,6 @@ extern void mx28_init_irq(void);
+>  
+>  extern void icoll_init_irq(void);
+>  
+> +extern int mxs_saif_clkmux_select(unsigned int clkmux);
+> +extern int mxs_get_saif_clk_master_id(unsigned int saif_id);
+>  #endif /* __MACH_MXS_COMMON_H__ */
+> diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+> index a8080f4..dc369c1 100644
+> --- a/arch/arm/mach-mxs/include/mach/devices-common.h
+> +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+> @@ -94,6 +94,7 @@ struct platform_device *__init mxs_add_mxs_pwm(
+>  		resource_size_t iobase, int id);
+>  
+>  /* saif */
+> +#include <sound/saif.h>
+>  struct mxs_saif_data {
+>  	int id;
+>  	resource_size_t iobase;
+> @@ -103,4 +104,5 @@ struct mxs_saif_data {
+>  };
+>  
+>  struct platform_device *__init mxs_add_saif(
+> -		const struct mxs_saif_data *data);
+> +		const struct mxs_saif_data *data,
+> +		const struct mxs_saif_platform_data *pdata);
+> diff --git a/arch/arm/mach-mxs/include/mach/digctl.h b/arch/arm/mach-mxs/include/mach/digctl.h
+> new file mode 100644
+> index 0000000..6231e10
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/digctl.h
+> @@ -0,0 +1,18 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __MACH_DIGCTL_H__
+> +#define __MACH_DIGCTL_H__
+> +
+> +/* MXS DIGCTL SAIF CLKMUX */
+> +#define MXS_DIGCTL_SAIF_CLKMUX_DIRECT		0x0
+> +#define MXS_DIGCTL_SAIF_CLKMUX_CROSSINPUT	0x1
+> +#define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0		0x2
+> +#define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1		0x3
+> +
+> +#endif
+> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+> index 4a3cca3..6affe5d 100644
+> --- a/arch/arm/mach-mxs/mach-mx28evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
+> @@ -28,6 +28,7 @@
+>  
+>  #include <mach/common.h>
+>  #include <mach/iomux-mx28.h>
+> +#include <mach/digctl.h>
+>  
+>  #include "devices-mx28.h"
+>  
+> @@ -417,6 +418,16 @@ static void __init mx28evk_add_regulators(void)
+>  static void __init mx28evk_add_regulators(void) {}
+>  #endif
+>  
+> +static int mx28evk_mxs_saif_pinit(void)
+> +{
+> +	return mxs_saif_clkmux_select(MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0);
+> +}
+> +
+> +struct mxs_saif_platform_data mx28evk_mxs_saif_pdata __initdata = {
+const + __initconst?
+
+> +	.init = mx28evk_mxs_saif_pinit,
+> +	.get_master_id = mxs_get_saif_clk_master_id,
+> +};
+> +
+>  static void __init mx28evk_init(void)
+>  {
+>  	int ret;
+> @@ -457,8 +468,8 @@ static void __init mx28evk_init(void)
+>  
+>  	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
+>  
+> -	mx28_add_saif(0);
+> -	mx28_add_saif(1);
+> +	mx28_add_saif(0, &mx28evk_mxs_saif_pdata);
+> +	mx28_add_saif(1, &mx28evk_mxs_saif_pdata);
+>  
+>  	mx28_add_mxs_i2c(0);
+>  	i2c_register_board_info(0, mxs_i2c0_board_info,
+> -- 
+> 1.7.0.4
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
