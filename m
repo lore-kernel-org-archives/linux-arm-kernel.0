@@ -1,73 +1,56 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  7 Sep 2011 17:03:05 +0100
-Subject: [PATCH] ARM: Documentation: Update the Booting document with SMP boot
-	advice
-Message-ID: <1315411385-17669-1-git-send-email-dave.martin@linaro.org>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 7 Sep 2011 09:10:24 -0700
+Subject: [RFC PATCH 1/3] ARM: iwmmxt: Fix Makefile rules for building
+	iwmmxt for Thumb-2
+In-Reply-To: <1315411158-17479-2-git-send-email-dave.martin@linaro.org>
+References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
+	<1315411158-17479-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <CAMPhdO8tv9aFNcghySViCrTt97jzEw5rPfKo6AaU9DrQ32tTJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, Booting doesn't say anything about booting on an SMP
-system.
+On Wed, Sep 7, 2011 at 8:59 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> Because gcc/gas have no sane way to turn on individual CPU
+> extensions from the command-line, iwmmxt.S was previously built
+> with -mcpu=iwmmxt. ?Unfortunately, this also downgrades the CPU to
+> v5, with the result that this file fails to build for a Thumb-2
+> kernel.
+>
+> New versions of the tools support -march=<base arch>+iwmmxt, and it
+> seems reasonable to require up-to-date tools when building in
+> Thumb-2. ?So, this patch uses -march=armv7-a+iwmmxt for
+> CONFIG_THUMB2_KERNEL=y.
+>
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+> ?arch/arm/kernel/Makefile | ? ?7 +++++++
+> ?1 files changed, 7 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index f7887dc..8a58339 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -65,7 +65,14 @@ obj-$(CONFIG_CPU_PJ4) ? ? ? ? ? ? ? ?+= pj4-cp0.o
+> ?obj-$(CONFIG_IWMMXT) ? ? ? ? ? += iwmmxt.o
+> ?obj-$(CONFIG_CPU_HAS_PMU) ? ? ?+= pmu.o
+> ?obj-$(CONFIG_HW_PERF_EVENTS) ? += perf_event.o
+> +
+> +# When enough people have binutils which support -march=...+iwmmxt, this
+> +# should change to something like if __LINUX_ARM_ARCH__ < 7.
+> +ifdef CONFIG_THUMB2_KERNEL
+> +AFLAGS_iwmmxt.o ? ? ? ? ? ? ? ? ? ? ? ?:= -Wa,-march=armv7-a+iwmmxt
+> +else
+> ?AFLAGS_iwmmxt.o ? ? ? ? ? ? ? ? ? ? ? ?:= -Wa,-mcpu=iwmmxt
+> +endif
 
-Although SMP boot varies somewhat from platform to platform, there
-are some general requirements which will usually apply.  This patch
-documents those likely requirements, which should help to encourage
-some consistency between implementations.
+It looks more like the switch should depend on the compiler version.
+Unless there is a clear way to decide if gcc supports this switch, I
+think it's reasonable to have the change like above.
 
-There's also some minor rearrangement of the text to restore a
-logical reading order after the other changes.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- Documentation/arm/Booting |   31 ++++++++++++++++++++-----------
- 1 files changed, 20 insertions(+), 11 deletions(-)
-
-diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-index a341d87..dac6f02 100644
---- a/Documentation/arm/Booting
-+++ b/Documentation/arm/Booting
-@@ -146,22 +146,31 @@ In either case, the following conditions must be met:
-   corrupted by bogus network packets or disk data. This will save
-   you many hours of debug.
- 
--- CPU register settings
-+- Put the CPU(s) into the appropriate state.
-+  On SMP systems, these requirements normally apply to all secondary
-+  CPUs as well as the boot CPU.  However, the exact requirements for
-+  secondary CPUs may be platform-specific.
-+
-+  - CPU mode
-+    All forms of interrupts must be disabled (IRQs and FIQs)
-+    The CPU must be in SVC mode.  (A special exception exists for Angel)
-+
-+  - Caches, MMUs
-+    The MMU must be off.
-+    Instruction cache may be on or off.
-+    Data cache must be off.
-+
-+  - For SMP platforms, put the secondary CPUs in the appropriate state
-+    (such as entering a wait loop).  The exact requirements depend on
-+    the platform code.
-+
-+- Boot CPU register settings
-   r0 = 0,
-   r1 = machine type number discovered in (3) above.
-   r2 = physical address of tagged list in system RAM, or
-        physical address of device tree block (dtb) in system RAM
- 
--- CPU mode
--  All forms of interrupts must be disabled (IRQs and FIQs)
--  The CPU must be in SVC mode.  (A special exception exists for Angel)
--
--- Caches, MMUs
--  The MMU must be off.
--  Instruction cache may be on or off.
--  Data cache must be off.
--
--- The boot loader is expected to call the kernel image by jumping
-+- Finally, the boot loader is expected to call the kernel image by jumping
-   directly to the first instruction of the kernel image.
- 
-   On CPUs supporting the ARM instruction set, the entry must be
--- 
-1.7.4.1
+>
+> ?ifneq ($(CONFIG_ARCH_EBSA110),y)
+> ? obj-y ? ? ? ? ? ? ? ?+= io.o
+> --
+> 1.7.4.1
+>
+>
