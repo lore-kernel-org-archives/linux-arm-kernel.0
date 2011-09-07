@@ -1,42 +1,73 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  7 Sep 2011 17:00:53 +0100
-Subject: [PATCH] ARM: tegra: Remove redundant change to the CPSR in headsmp.S
-Message-ID: <1315411253-17559-1-git-send-email-dave.martin@linaro.org>
+Date: Wed,  7 Sep 2011 17:03:05 +0100
+Subject: [PATCH] ARM: Documentation: Update the Booting document with SMP boot
+	advice
+Message-ID: <1315411385-17669-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At secondary_startup, the MSR CPSR_cxsf, #0xd3 is not compatible
-with Thumb-2 and also unmasks asynchronous aborts (CPSR.A bit
-forced to zero -- this is probably unintentional).
+Currently, Booting doesn't say anything about booting on an SMP
+system.
 
-Any remotely sane bootloader should be putting each secondary CPU
-in the appropriate state _before_ entering the kernel anyway.
-Otherwise, disabling interrupts on entry to the kernel isn't going
-to fix it.
+Although SMP boot varies somewhat from platform to platform, there
+are some general requirements which will usually apply.  This patch
+documents those likely requirements, which should help to encourage
+some consistency between implementations.
 
-Therefore this patch just removes the MSR instruction.
+There's also some minor rearrangement of the text to restore a
+logical reading order after the other changes.
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
+ Documentation/arm/Booting |   31 ++++++++++++++++++++-----------
+ 1 files changed, 20 insertions(+), 11 deletions(-)
 
-I make assumptions about the bootloader in this patch.  If someone with
-Tegra knowledge can please comment and/or test, that would be much
-appreciated, thanks.
-
- arch/arm/mach-tegra/headsmp.S |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-index b5349b2..6ec4790 100644
---- a/arch/arm/mach-tegra/headsmp.S
-+++ b/arch/arm/mach-tegra/headsmp.S
-@@ -48,7 +48,6 @@ ENTRY(v7_invalidate_l1)
- ENDPROC(v7_invalidate_l1)
+diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
+index a341d87..dac6f02 100644
+--- a/Documentation/arm/Booting
++++ b/Documentation/arm/Booting
+@@ -146,22 +146,31 @@ In either case, the following conditions must be met:
+   corrupted by bogus network packets or disk data. This will save
+   you many hours of debug.
  
- ENTRY(tegra_secondary_startup)
--	msr	cpsr_fsxc, #0xd3
-         bl      v7_invalidate_l1
- 	mrc	p15, 0, r0, c0, c0, 5
-         and	r0, r0, #15
+-- CPU register settings
++- Put the CPU(s) into the appropriate state.
++  On SMP systems, these requirements normally apply to all secondary
++  CPUs as well as the boot CPU.  However, the exact requirements for
++  secondary CPUs may be platform-specific.
++
++  - CPU mode
++    All forms of interrupts must be disabled (IRQs and FIQs)
++    The CPU must be in SVC mode.  (A special exception exists for Angel)
++
++  - Caches, MMUs
++    The MMU must be off.
++    Instruction cache may be on or off.
++    Data cache must be off.
++
++  - For SMP platforms, put the secondary CPUs in the appropriate state
++    (such as entering a wait loop).  The exact requirements depend on
++    the platform code.
++
++- Boot CPU register settings
+   r0 = 0,
+   r1 = machine type number discovered in (3) above.
+   r2 = physical address of tagged list in system RAM, or
+        physical address of device tree block (dtb) in system RAM
+ 
+-- CPU mode
+-  All forms of interrupts must be disabled (IRQs and FIQs)
+-  The CPU must be in SVC mode.  (A special exception exists for Angel)
+-
+-- Caches, MMUs
+-  The MMU must be off.
+-  Instruction cache may be on or off.
+-  Data cache must be off.
+-
+-- The boot loader is expected to call the kernel image by jumping
++- Finally, the boot loader is expected to call the kernel image by jumping
+   directly to the first instruction of the kernel image.
+ 
+   On CPUs supporting the ARM instruction set, the entry must be
 -- 
 1.7.4.1
