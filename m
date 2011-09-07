@@ -1,81 +1,64 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 7 Sep 2011 17:31:00 +0200
-Subject: [PATCH 0/2] video: s3c-fb: Add window positioning support
-In-Reply-To: <4E5FB69E.2060907@gmx.de>
-References: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
-	<4E5FB69E.2060907@gmx.de>
-Message-ID: <201109071731.02293.laurent.pinchart@ideasonboard.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Sep 2011 16:35:05 +0100
+Subject: KVM ARM interrupt virtualization
+In-Reply-To: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>
+References: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>
+Message-ID: <CAHkRjk6Vm2yNLm8Gzk3+4mYAfiXVjufv2xc0Kc-6ac-oS4zytw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On 2 September 2011 04:01, carson bill <bill4carson@gmail.com> wrote:
+> I am trying to put interrupt virtualization support into KVM ARM
+> implementation by Christoffer.
+>
+> The approach is like this:
+>
+> ? Distributor emulation stays in Qemu, whenever Guest OS touch
+> ? Distributor iomem, this action is handled by Qemu as it is.
+>
+> ? Each time a device in Qemu call 'gic_update' to inject an
+> ? interrupt, the emulated Distributor figure out the 'best_irq'.
+> ? With the help of GIC virtulization, this "best_irq" can be routed
+> ? to virtual cpu interface which Guest OS has directly access into.
+>
+> ? Of course, when Guest OS query which interrupt fired, it need not
+> ? trapped out into Qemu anymore.
+...
+> Problem:
+> ? ?I did the experiment, and found the biggest obstoble on the way
+> ? ?is creating the mapping.
+>
+> ? ?arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
+> ? ?#define CT_CA9X4_MPIC ? ? ? (0x1e000000)
+> ? ?#define A9_MPCORE_SCU ? ? ? (CT_CA9X4_MPIC + 0x0000)
+> ? ?#define A9_MPCORE_GIC_CPU ? (CT_CA9X4_MPIC + 0x0100)
+> ? ?#define A9_MPCORE_GIT ? ? ? (CT_CA9X4_MPIC + 0x0200)
+> ? ?#define A9_MPCORE_TWD ? ? ? (CT_CA9X4_MPIC + 0x0600)
+> ? ?#define A9_MPCORE_GIC_DIST ?(CT_CA9X4_MPIC + 0x1000)
+>
+> ? ?If I create an identical mapping at A9_MPCORE_GIC_CPU, all the iomem
+> ? ?from CT_CA9X4_MPIC ~ CT_CA9X4_MPIC + 0x1000 could be access for
+> ? ?Guest OS, which means access to SCU/GIT/TWD will not been trapped
+> ? ?any more.
 
-On Thursday 01 September 2011 18:45:18 Florian Tobias Schandinat wrote:
-> Hi all,
-> 
-> On 08/25/2011 07:51 PM, Ajay Kumar wrote:
-> > Just as a note, there are many drivers like mx3fb.c, au1200fb.c and OMAP
-> > seem to be doing window/plane positioning in their driver code.
-> > Is it possible to have this window positioning support at a common place?
-> 
-> Good point. Congratulations for figuring out that I like to standardize
-> things. But I think your suggestion is far from being enough to be useful
-> for userspace (which is our goal so that applications can be reused along
-> drivers and don't need to know about individual drivers).
+Shouldn't you use the CT_CA15X4_MPIC base address? As for TWD, with
+A15 we use the generic timers (which also have support for
+virtualisation). The SCU doesn't need to be touched on A15, AFAIK.
 
-Beside standardizing things, do you also like to take them one level higher to 
-solve challenging issues ? I know the answer must be yes :-)
+With the VE/A15 memory map, the GIC Dist is placed at offset 0x1000
+and the GIC CPU interface a 0x2000. I think the VGIC interfaces are
+placed as follows:
 
-The problem at hand here is something we have solved in V4L2 (theoretically 
-only for part of it) with the media controller API, the V4L2 subdevs and their 
-pad-level format API.
+base + 0x4000 - GICV (Virtual Machine CPU interface - same registers
+as the physical GIC CPU interface)
+base + 0x6000 - GICH (GIC Hypervisor control registers)
 
-In a nutshell, the media controller lets drivers model hardware as a graph of 
-buliding blocks connected through their pads and expose that description to 
-userspace applications. In V4L2 most of those blocks are V4L2 subdevs, which 
-are abstract building blocks that implement sets of standard operations. Those 
-operations are exposed to userspace through the V4L2 subdevs pad-level format 
-API, allowing application to configure sizes and selection rectangles at all 
-pads in the graph. Selection rectangles can be used to configure cropping and 
-composing, which is exactly what the window positioning API needs to do.
-
-Instead of creating a new fbdev-specific API to do the same, shouldn't we try 
-to join forces ?
-
-> So let me at first summarize how I understand you implemented those things
-> after having a brief look at some of the drivers:
-> Windows are rectangular screen areas whose pixel data come from other
-> locations. The other locations are accessible via other framebuffer
-> devices (e.g. fb1). So in this area the data of fb1 is shown and not the
-> data of fb0 that would be normally shown.
-> 
-> So in addition to your proposed positioning I think we should also have the
-> following to give userspace a useful set of functionality:
-> 
-> - a way to discover how the screen is composited (how many windows are
-> there, how they are stacked and how to access those)
-> 
-> - a way to enable/disable windows (make them (in)visible)
-> 
-> - reporting and selecting how the window content can be mixed with the root
-> screen (overwrite, source or destination color keying)
-> 
-> - things like window size and color format could be handled by the usual fb
-> API used on the window. However there might be restrictions which cause
-> them to be not 100% API compatible (for example when changing the color
-> format if the windows are required to have the same format as the root
-> screen)
-> 
-> - do we need to worry about hardware (up/down) scaling of the window
-> content?
-> 
-> 
-> So is that what you need for a standardized window implementation?
-> Any additional things that were useful/needed in this context?
-> Would you consider adding support for this API in your drivers? (as
-> standardizing wouldn't be useful if nobody would implement it)
+So you would have to map GICH inside the host OS to control the VGIC.
+The guest OS would most likely want to use the same address as the
+physical GIC CPU interface (at offset 0x2000). In this case, the host
+OS needs to set up a stage 2 translation from the GIC CPU interface
+physical page at offset 0x2000 to offset 0x4000 where the VGIC is
+found.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Catalin
