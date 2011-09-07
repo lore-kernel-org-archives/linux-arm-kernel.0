@@ -1,64 +1,68 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Wed, 7 Sep 2011 17:05:16 +0900
-Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
-	the hardware
-In-Reply-To: <CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
-References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-	<1314984756-4400-8-git-send-email-ohad@wizery.com>
-	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
-	<CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
-Message-ID: <CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
+From: yong.zhang0@gmail.com (Yong Zhang)
+Date: Wed,  7 Sep 2011 16:10:30 +0800
+Subject: [PATCH 33/62] dmaengine: irq: Remove IRQF_DISABLED
+In-Reply-To: <1315383059-3673-1-git-send-email-yong.zhang0@gmail.com>
+References: <1315383059-3673-1-git-send-email-yong.zhang0@gmail.com>
+Message-ID: <1315383059-3673-34-git-send-email-yong.zhang0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2011 at 3:01 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Hi Cho,
->
-> On Wed, Sep 7, 2011 at 4:30 AM, KyongHo Cho <pullip.cho@samsung.com> wrote:
->> Please find the following link that I submitted for our IOMMU.
->> https://lkml.org/lkml/2011/7/3/152
->>
->> s5p_iommu_map/unmap accepts any order of physical address and iova
->> without support of your suggestion if the order is not less than PAGE_SHIFT
->
-> That's exactly what I'm trying to prevent; there's no reason to
-> duplicate the exact same logic in every iommu driver.
->
-> As a result, your map function is quite big (it even duplicates the
-> same logic for every page size it tries).
->
-I agree that my map function is big :)
-However, it is faster because it does not calculate the given order and
-not call any function.
+This flag is a NOOP and can be removed now.
 
-> Try to rebase your patch on the "iommu/core: split mapping to page
-> sizes as supported by the hardware" patch I've just sent, and see how
-> significantly simpler your code becomes.
->
-> Relying on a single implementation, provided by the IOMMU core, means
-> less code to maintain (and debug) and a consistent behavior (across
-> all supported hardware) exposed to users of the IOMMU API.
->
->> But I think IOMMU API must not expect that the caller of iommu_map() knows
->> about the restriction of IOMMU API implementation.
->
-> Right. But I don't think there's any disagreement here ?
->
-Yes, sorry:)
+Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
+---
+ drivers/dma/amba-pl08x.c |    2 +-
+ drivers/dma/coh901318.c  |    2 +-
+ drivers/dma/shdma.c      |    4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-> If any, then I think that s5p_iommu_map() is more limited than what I
-> propose: if it is given a 64KB region aligned only to a 4KB address,
-> it will BUG_ON() it. While not ideal, I don't think there's any reason
-> not to map it using 4KB pages (which is exactly what the new
-> iommu_map() I propose will do).
->
-It is a logical error because the caller of iommu_map() gives
-4KB aligned physical address while saying that it is 64KB aligned.
-I think it must not be happened .
-
-> Thanks,
-> Ohad.
-
-Thank you.
-
-KyongHo.
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index be21e3f..3688256 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -1930,7 +1930,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 	writel(0x000000FF, pl08x->base + PL080_ERR_CLEAR);
+ 	writel(0x000000FF, pl08x->base + PL080_TC_CLEAR);
+ 
+-	ret = request_irq(adev->irq[0], pl08x_irq, IRQF_DISABLED,
++	ret = request_irq(adev->irq[0], pl08x_irq, 0,
+ 			  DRIVER_NAME, pl08x);
+ 	if (ret) {
+ 		dev_err(&adev->dev, "%s failed to request interrupt %d\n",
+diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
+index 4234f41..1dd9455 100644
+--- a/drivers/dma/coh901318.c
++++ b/drivers/dma/coh901318.c
+@@ -1506,7 +1506,7 @@ static int __init coh901318_probe(struct platform_device *pdev)
+ 	if (irq < 0)
+ 		goto err_no_irq;
+ 
+-	err = request_irq(irq, dma_irq_handler, IRQF_DISABLED,
++	err = request_irq(irq, dma_irq_handler, 0,
+ 			  "coh901318", base);
+ 	if (err) {
+ 		dev_crit(&pdev->dev,
+diff --git a/drivers/dma/shdma.c b/drivers/dma/shdma.c
+index 7f49235..8c137d2 100644
+--- a/drivers/dma/shdma.c
++++ b/drivers/dma/shdma.c
+@@ -1106,7 +1106,7 @@ static void sh_dmae_chan_remove(struct sh_dmae_device *shdev)
+ static int __init sh_dmae_probe(struct platform_device *pdev)
+ {
+ 	struct sh_dmae_pdata *pdata = pdev->dev.platform_data;
+-	unsigned long irqflags = IRQF_DISABLED,
++	unsigned long irqflags = 0,
+ 		chan_flag[SH_DMAC_MAX_CHANNELS] = {};
+ 	int errirq, chan_irq[SH_DMAC_MAX_CHANNELS];
+ 	int err, i, irq_cnt = 0, irqres = 0, irq_cap = 0;
+@@ -1266,7 +1266,7 @@ static int __init sh_dmae_probe(struct platform_device *pdev)
+ 				    IORESOURCE_IRQ_SHAREABLE)
+ 					chan_flag[irq_cnt] = IRQF_SHARED;
+ 				else
+-					chan_flag[irq_cnt] = IRQF_DISABLED;
++					chan_flag[irq_cnt] = 0;
+ 				dev_dbg(&pdev->dev,
+ 					"Found IRQ %d for channel %d\n",
+ 					i, irq_cnt);
+-- 
+1.7.4.1
