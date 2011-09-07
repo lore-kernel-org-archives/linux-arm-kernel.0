@@ -1,37 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 7 Sep 2011 09:54:20 +0200
-Subject: [PATCH] mach-integrator: fix VGA base regression
-In-Reply-To: <4E6620CF.3020201@gmail.com>
-References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
-	<4E64496E.1090000@gmail.com>
-	<CACRpkdYw4WCJ+kBm_FBH=H-vPKBUsb9DFToK0MN4F8t5T8Tc9g@mail.gmail.com>
-	<4E64EB24.7010800@gmail.com>
-	<CAKnu2MrFsnZrq-Fzq3HpV8oAwa9Vi6fFqrSSB7+kq8r8V7ANQg@mail.gmail.com>
-	<4E6620CF.3020201@gmail.com>
-Message-ID: <CAKnu2Mq3Thw-ybCgPouKDa2tRCJc=-ny+yvKbBwR5TPTuU5W2Q@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 7 Sep 2011 12:42:20 +0200
+Subject: [PATCH 14/22] OMAP2+: voltage: split voltage controller (VC) code
+	into dedicated layer
+In-Reply-To: <1314639355-12713-15-git-send-email-khilman@ti.com>
+References: <1314639355-12713-1-git-send-email-khilman@ti.com>
+	<1314639355-12713-15-git-send-email-khilman@ti.com>
+Message-ID: <CAORVsuWEZmChCjy8dJV+acosr_8N9XN0VL8-L6HWaKnZkoqqYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/6 Rob Herring <robherring2@gmail.com>:
+Kevin,
 
-> Integrator and footbridge are the only platforms that would ever
-> actually work with VGA console (...)
-
-Hm I wonder if I can test this. Can I just plug some arbitrary
-VGA-capable graphics card into an empty PCI socket and
-expect the console to come up?
-
-> the others are all returning a
-> physical address rather than a virtual address. kirkwood, dove, mv78xx0,
-> and orion5x are all wrong. I'm not sure on shark. Seems to be a virtual
-> address, but it's not mapped.
+On Mon, Aug 29, 2011 at 7:35 PM, Kevin Hilman <khilman@ti.com> wrote:
+> As part of the voltage layer cleanup, split out VC specific code into
+> a dedicated VC layer. ?This patch primarily just moves VC code from
+> voltage.c into vc.c, and adds prototypes to vc.h.
 >
-> So perhaps the correct fix is just to remove the initialization of
-> vga_base on all these platforms.
+> No functional changes.
+>
+> For readability, each function was given a local 'vc' pointer:
+>
+> ? ?struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
+>
+> and a global replace of s/vdd->vc_data/vc/ was done.
+>
+> Also vc_init was renamed to vc_init_channel to reflect that this is
+> per-VC channel initializtion.
+>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> ?arch/arm/mach-omap2/Makefile ?| ? ?2 +-
+> ?arch/arm/mach-omap2/vc.c ? ? ?| ?276 +++++++++++++++++++++++++++++++++++++++++
+> ?arch/arm/mach-omap2/vc.h ? ? ?| ? 12 ++
+> ?arch/arm/mach-omap2/voltage.c | ?264 +--------------------------------------
+> ?4 files changed, 293 insertions(+), 261 deletions(-)
+> ?create mode 100644 arch/arm/mach-omap2/vc.c
+>
+...
 
-Sounds like a pretty good idea, but since I ran into the
-problem, what's actually happening in these systems on
-boot? Are they reading/writing some arbitrary physical
-location as if it was a virtual address?
+> diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+> new file mode 100644
+> index 0000000..98f5a4b
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/vc.c
+> @@ -0,0 +1,276 @@
 
-Linus
+The copyright notice is missing.
+
+> +#include <linux/kernel.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +
+> +#include <plat/cpu.h>
+> +
+> +#include "voltage.h"
+> +#include "vc.h"
+> +#include "prm-regbits-34xx.h"
+> +#include "prm-regbits-44xx.h"
+> +#include "prm44xx.h"
+> +
+...
+
+Regards,
+Jean
