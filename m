@@ -1,37 +1,47 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 7 Sep 2011 10:55:12 +0800
-Subject: [PATCH 0/6] add initial imx6q support
-In-Reply-To: <20110906194253.GO28816@pengutronix.de>
+Date: Wed, 7 Sep 2011 11:07:34 +0800
+Subject: [PATCH 5/6] arm/imx6q: add device tree machine support
+In-Reply-To: <26851240.8fI4nVmxXO@wuerfel>
 References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<2043782.jegSLqAsTH@wuerfel>
-	<20110906194253.GO28816@pengutronix.de>
-Message-ID: <20110907025512.GB8148@S2100-06.ap.freescale.net>
+	<1315303120-24203-6-git-send-email-shawn.guo@linaro.org>
+	<26851240.8fI4nVmxXO@wuerfel>
+Message-ID: <20110907030733.GC8148@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 09:42:53PM +0200, Uwe Kleine-K?nig wrote:
-> Hello Arnd,
+On Tue, Sep 06, 2011 at 08:55:45PM +0200, Arnd Bergmann wrote:
+> On Tuesday 06 September 2011 17:58:39 Shawn Guo wrote:
 > 
-> On Tue, Sep 06, 2011 at 08:28:39PM +0200, Arnd Bergmann wrote:
-> > We've talked about it before, but I don't remember the outcome. Can you
-> > explain (and add to the above text) a short explanation of why this is
-> > in the mach-imx directory, rather than the mach-mx5 (which probably is
-> > closer to mx6 than mx3 is) or a new mach-mx6?
-> Not having looked into the patches yet, but I think mach-imx is the
-> right choice. The longterm plan for mach-mx5 is to be folded into
-> mach-imx, too. We just didn't found a volunteer for that.
-
-My plan is to convert all the board files in mach-mx5 to imx51-dt.c
-and imx53-dt.c first, and then merge the folder into mach-imx.
-
+> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > index 13e0301..3364b59 100644
+> > --- a/arch/arm/mach-imx/Kconfig
+> > +++ b/arch/arm/mach-imx/Kconfig
+> > @@ -624,3 +624,16 @@ config MACH_VPR200
+> >  	  configurations for the board and its peripherals.
+> >  
+> >  endif
+> > +
+> > +if ARCH_MX6
+> > +comment "i.MX6 machines:"
+> > +
+> > +config MACH_IMX6Q
+> > +	bool "Support i.MX6 Quad platforms from device tree"
+> > +	select SOC_IMX6Q
+> > +	select USE_OF
+> > +	help
+> > +	  Include support for Freescale i.MX6 Quad based platforms
+> > +	  using the device tree for discovery
+> > +
+> > +endif
 > 
-> Best regards
-> Uwe
+> As we have done on zynq and prima2, I would suggest not to add multiple
+> machines types at all. You already have the intialization in a generic
+> imx6q file, it would be logical to get rid of the configuration entry
+> as well.
 > 
-> BTW, are you on irc somewhere?
-> 
-I'm not sure this is a question for me or Arnd.  I'm usually on
-#linaro-kernel.
+This MACH_IMX6Q was added to make the IMX6Q Kconfig hierarchy look
+consistent with other SoCs in arch/arm/mach-imx/Kconfig.  If you
+do not like it, I can kill it.
 
 -- 
 Regards,
