@@ -1,198 +1,148 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Wed,  7 Sep 2011 12:22:47 +0200
-Subject: [PATCH] Add platform driver support to the CS890x driver
-Message-ID: <1315390967-6683-1-git-send-email-jaccon.bastiaansen@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 07 Sep 2011 12:51:16 +0200
+Subject: [PATCH 3/3] at91-ohci: configure overcurrent pins as input GPIOs
+In-Reply-To: <1310549358-13330-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1310549358-13330-1-git-send-email-thomas.petazzoni@free-electrons.com>
+	<1310549358-13330-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <4E674CA4.6080506@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CS89x0 ethernet controller is used on a number of evaluation
-boards, such as the MX31ADS. The current driver has memory address and
-IRQ settings for each board on which this controller is used. Driver
-updates are therefore required to support other boards that also use
-the CS89x0. To avoid these driver updates, a better mechanism
-(platform driver support) is added to communicate the board dependent
-settings to the driver.
+Le 13/07/2011 11:29, Thomas Petazzoni :
+> As a new overcurrent_pin[] array has been added to the at91_usbh_data
+> structure, those pins must be muxed to work properly. This commit
+> implements this muxing for all AT91 SoCs that support the AT91 OHCI.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
----
- drivers/net/Kconfig  |   18 +++++++++--
- drivers/net/Space.c  |    2 +-
- drivers/net/cs89x0.c |   83 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 3 files changed, 96 insertions(+), 7 deletions(-)
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
-index 93359fa..17be84f 100644
---- a/drivers/net/Kconfig
-+++ b/drivers/net/Kconfig
-@@ -1497,8 +1497,7 @@ config FORCEDETH
- 
- config CS89x0
- 	tristate "CS89x0 support"
--	depends on NET_ETHERNET && (ISA || EISA || MACH_IXDP2351 \
--		|| ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440)
-+	depends on NET_ETHERNET
- 	---help---
- 	  Support for CS89x0 chipset based Ethernet cards. If you have a
- 	  network (Ethernet) card of this type, say Y and read the
-@@ -1509,10 +1508,23 @@ config CS89x0
- 	  To compile this driver as a module, choose M here. The module
- 	  will be called cs89x0.
- 
-+config CS89x0_PLATFORM
-+	bool "CS89x0 platform driver support"
-+	depends on CS89x0
-+	default n
-+	help
-+	  Say Y to compile the cs890x0 driver as a platform driver. This
-+	  makes this driver suitable for use on certain evaluation boards
-+	  such as the IMX21ADS.
-+
-+	  If you are unsure, say N.
-+
- config CS89x0_NONISA_IRQ
- 	def_bool y
- 	depends on CS89x0 != n
--	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440
-+	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS || \
-+		   MACH_QQ2440 || CS89x0_PLATFORM
-+
- 
- config TC35815
- 	tristate "TOSHIBA TC35815 Ethernet support"
-diff --git a/drivers/net/Space.c b/drivers/net/Space.c
-index 068c356..3c53ab1 100644
---- a/drivers/net/Space.c
-+++ b/drivers/net/Space.c
-@@ -189,7 +189,7 @@ static struct devprobe2 isa_probes[] __initdata = {
- #ifdef CONFIG_SEEQ8005
- 	{seeq8005_probe, 0},
- #endif
--#ifdef CONFIG_CS89x0
-+#if defined(CONFIG_CS89x0) && !defined(CONFIG_CS89x0_PLATFORM)
-  	{cs89x0_probe, 0},
- #endif
- #ifdef CONFIG_AT1700
-diff --git a/drivers/net/cs89x0.c b/drivers/net/cs89x0.c
-index 537a4b2..604c828 100644
---- a/drivers/net/cs89x0.c
-+++ b/drivers/net/cs89x0.c
-@@ -98,6 +98,8 @@
-   Domenico Andreoli : cavokz at gmail.com
-                     : QQ2440 platform support
- 
-+  Jaccon Bastiaansen: jaccon.bastiaansen at gmail.com
-+		    : added platform driver support
- */
- 
- /* Always include 'config.h' first in case the user wants to turn on
-@@ -154,7 +156,9 @@
- #if ALLOW_DMA
- #include <asm/dma.h>
- #endif
--
-+#ifdef CONFIG_CS89x0_PLATFORM
-+#include <linux/platform_device.h>
-+#endif
- #include "cs89x0.h"
- 
- static char version[] __initdata =
-@@ -189,6 +193,9 @@ static unsigned int netcard_portlist[] __used __initdata = {
- 	PBC_BASE_ADDRESS + PBC_CS8900A_IOBASE + 0x300, 0
- };
- static unsigned cs8900_irq_map[] = {EXPIO_INT_ENET_INT, 0, 0, 0};
-+#elif defined(CONFIG_CS89x0_PLATFORM)
-+static unsigned int netcard_portlist[] __used __initdata = {0, 0};
-+static unsigned int cs8900_irq_map[] = {0, 0, 0, 0};
- #else
- static unsigned int netcard_portlist[] __used __initdata =
-    { 0x300, 0x320, 0x340, 0x360, 0x200, 0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x2e0, 0};
-@@ -1746,7 +1753,7 @@ static int set_mac_address(struct net_device *dev, void *p)
- 	return 0;
- }
- 
--#ifdef MODULE
-+#if defined(MODULE) && !defined(CONFIG_CS89x0_PLATFORM)
- 
- static struct net_device *dev_cs89x0;
- 
-@@ -1900,7 +1907,77 @@ cleanup_module(void)
- 	release_region(dev_cs89x0->base_addr, NETCARD_IO_EXTENT);
- 	free_netdev(dev_cs89x0);
- }
--#endif /* MODULE */
-+#endif /* MODULE && !CONFIG_CS89x0_PLATFORM */
-+
-+#ifdef CONFIG_CS89x0_PLATFORM
-+static int cs89x0_platform_probe(struct platform_device *pdev)
-+{
-+	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
-+	struct resource *mem_res;
-+	struct resource *irq_res;
-+	int err;
-+
-+	if (!dev)
-+		return -ENODEV;
-+
-+	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (mem_res == NULL || irq_res == NULL) {
-+		printk(KERN_WARNING
-+		       DRV_NAME
-+		       ": memory and/or interrupt resource missing.\n");
-+		err = -ENOENT;
-+		goto out;
-+	}
-+
-+	cs8900_irq_map[0] = irq_res->start;
-+	err = cs89x0_probe1(dev, mem_res->start, 0);
-+	if (err) {
-+		printk(KERN_WARNING
-+		       DRV_NAME
-+		       ": no cs8900 or cs8920 detected.\n");
-+		goto out;
-+	}
-+
-+	platform_set_drvdata(pdev, dev);
-+	return 0;
-+out:
-+	free_netdev(dev);
-+	return err;
-+}
-+
-+static int cs89x0_platform_remove(struct platform_device *pdev)
-+{
-+	struct net_device *dev = platform_get_drvdata(pdev);
-+
-+	unregister_netdev(dev);
-+	free_netdev(dev);
-+	return 0;
-+}
-+
-+static struct platform_driver cs89x0_platform_driver = {
-+	.driver	= {
-+		.name	= DRV_NAME,
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe	= cs89x0_platform_probe,
-+	.remove	= cs89x0_platform_remove,
-+};
-+
-+static int __init cs89x0_init(void)
-+{
-+	return platform_driver_register(&cs89x0_platform_driver);
-+}
-+
-+static void __exit cs89x0_cleanup(void)
-+{
-+	platform_driver_unregister(&cs89x0_platform_driver);
-+}
-+
-+module_init(cs89x0_init);
-+module_exit(cs89x0_cleanup);
-+
-+#endif
- 
- /*
-  * Local variables:
+I will include this patch series in at91-l2 branch on:
+git://github.com/at91linux/linux-at91.git
+(mind the removal of -2.6-)
+
+But there are several changes to ohci-at91 which also may fit in an USB
+git tree...
+According to the nature of changes, I think it is better to send them
+upstream through the AT91 - arm-soc flow.
+
+Thanks Thomas, best regards,
+
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> ---
+>  arch/arm/mach-at91/at91cap9_devices.c    |    6 ++++++
+>  arch/arm/mach-at91/at91rm9200_devices.c  |    6 ++++++
+>  arch/arm/mach-at91/at91sam9260_devices.c |    6 ++++++
+>  arch/arm/mach-at91/at91sam9261_devices.c |    6 ++++++
+>  arch/arm/mach-at91/at91sam9263_devices.c |    6 ++++++
+>  arch/arm/mach-at91/at91sam9g45_devices.c |    6 ++++++
+>  6 files changed, 36 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
+> index dba0d8d..b46615a 100644
+> --- a/arch/arm/mach-at91/at91cap9_devices.c
+> +++ b/arch/arm/mach-at91/at91cap9_devices.c
+> @@ -80,6 +80,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+>  			at91_set_gpio_output(data->vbus_pin[i], 0);
+>  	}
+>  
+> +	/* Enable overcurrent notification */
+> +	for (i = 0; i < data->ports; i++) {
+> +		if (data->overcurrent_pin[i])
+> +			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+> +	}
+> +
+>  	usbh_data = *data;
+>  	platform_device_register(&at91_usbh_device);
+>  }
+> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+> index 7227755..b2202b6 100644
+> --- a/arch/arm/mach-at91/at91rm9200_devices.c
+> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
+> @@ -63,6 +63,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+>  	if (!data)
+>  		return;
+>  
+> +	/* Enable overcurrent notification */
+> +	for (i = 0; i < data->ports; i++) {
+> +		if (data->overcurrent_pin[i])
+> +			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+> +	}
+> +
+>  	usbh_data = *data;
+>  	platform_device_register(&at91rm9200_usbh_device);
+>  }
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index 39f81f4..ad64fc3 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -64,6 +64,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+>  	if (!data)
+>  		return;
+>  
+> +	/* Enable overcurrent notification */
+> +	for (i = 0; i < data->ports; i++) {
+> +		if (data->overcurrent_pin[i])
+> +			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+> +	}
+> +
+>  	usbh_data = *data;
+>  	platform_device_register(&at91_usbh_device);
+>  }
+> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+> index 5004bf0..e394e86 100644
+> --- a/arch/arm/mach-at91/at91sam9261_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
+> @@ -67,6 +67,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+>  	if (!data)
+>  		return;
+>  
+> +	/* Enable overcurrent notification */
+> +	for (i = 0; i < data->ports; i++) {
+> +		if (data->overcurrent_pin[i])
+> +			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+> +	}
+> +
+>  	usbh_data = *data;
+>  	platform_device_register(&at91sam9261_usbh_device);
+>  }
+> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+> index a050f41..d4aef76 100644
+> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+> @@ -74,6 +74,12 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+>  			at91_set_gpio_output(data->vbus_pin[i], 0);
+>  	}
+>  
+> +	/* Enable overcurrent notification */
+> +	for (i = 0; i < data->ports; i++) {
+> +		if (data->overcurrent_pin[i])
+> +			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+> +	}
+> +
+>  	usbh_data = *data;
+>  	platform_device_register(&at91_usbh_device);
+>  }
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 600bffb..e4a9857 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -124,6 +124,12 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
+>  			at91_set_gpio_output(data->vbus_pin[i], 0);
+>  	}
+>  
+> +	/* Enable overcurrent notification */
+> +	for (i = 0; i < data->ports; i++) {
+> +		if (data->overcurrent_pin[i])
+> +			at91_set_gpio_input(data->overcurrent_pin[i], 1);
+> +	}
+> +
+>  	usbh_ohci_data = *data;
+>  	platform_device_register(&at91_usbh_ohci_device);
+>  }
+
+
 -- 
-1.7.1
+Nicolas Ferre
