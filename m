@@ -1,59 +1,101 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 7 Sep 2011 11:22:48 -0700
-Subject: [PATCH 1/2] input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD
-	config option
-In-Reply-To: <1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
-References: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
-	<1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20110907182248.GA2874@core.coreip.homeip.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Sep 2011 20:24:42 +0200
+Subject: [PATCH v2 3/3] arm: mxs: disable clock-gates when setting
+	saif-clocks
+In-Reply-To: <1315403858-9904-4-git-send-email-b29396@freescale.com>
+References: <1315403858-9904-1-git-send-email-b29396@freescale.com>
+	<1315403858-9904-4-git-send-email-b29396@freescale.com>
+Message-ID: <20110907182442.GZ28816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Tue, Sep 06, 2011 at 07:25:16PM +0530, Thomas Abraham wrote:
-> Samsung keyboard driver could be used with platforms using device tree.
-> So the inclusion of samsung keyboard driver cannot be based on
-> SAMSUNG_DEV_KEYPAD. A new config option HAVE_SAMSUNG_KEYPAD is added
-> which device tree based platforms should use to include samsung keyboard
-> driver.
-
-I am sorry, I do not follow... What is the difference between
-SAMSUNG_DEV_KEYPAD and HAVE_SAMSUNG_KEYPAD? They look exactly the same.
-
-Thanks,
-
+On Wed, Sep 07, 2011 at 09:57:38PM +0800, Dong Aisheng wrote:
+> From: Wolfram Sang <w.sang@pengutronix.de>
 > 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> New divides should only be written when gates are off.
+> 
+> Reported-by: Dong Aisheng <b29396@freescale.com>
+> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> 
 > ---
->  drivers/input/keyboard/Kconfig |    9 ++++++++-
->  1 files changed, 8 insertions(+), 1 deletions(-)
+> Changes since v1:
+>  * Fix author name. It should be Wolfram Sang. :)
 > 
-> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> index b4dee9d..370fb18 100644
-> --- a/drivers/input/keyboard/Kconfig
-> +++ b/drivers/input/keyboard/Kconfig
-> @@ -423,9 +423,16 @@ config KEYBOARD_PMIC8XXX
->  	  To compile this driver as a module, choose M here: the module will
->  	  be called pmic8xxx-keypad.
->  
-> +config HAVE_SAMSUNG_KEYPAD
-> +	bool
-> +	help
-> +	  This will include Samsung Keypad controller driver support. If you
-> +	  want to include Samsung Keypad support for any machine, kindly
-> +	  select this in the respective mach-xxxx/Kconfig file.
-> +
->  config KEYBOARD_SAMSUNG
->  	tristate "Samsung keypad support"
-> -	depends on SAMSUNG_DEV_KEYPAD
-> +	depends on SAMSUNG_DEV_KEYPAD || HAVE_SAMSUNG_KEYPAD
->  	help
->  	  Say Y here if you want to use the Samsung keypad.
->  
-> -- 
-> 1.6.6.rc2
+> BTW, i did a minus change based on wolfram's patch or the saif will
+> not work.
 > 
+> Change
+> +       __raw_writel(clkgate, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs##_SET); \
+> to
+> +       __raw_writel(reg & ~clkgate,					\
+> 			CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
+IMHO this is worth to be noted in the commit log.
+
+> It seemed HW_CLKCTRL_##rs##_SET did not work well.
+> (i did not find HW_CLKCTRL_SAIFx_SET in spec).
+> ---
+>  arch/arm/mach-mxs/clock-mx28.c        |    7 +++++--
+>  arch/arm/mach-mxs/regs-clkctrl-mx28.h |    2 ++
+>  2 files changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+> index 33cc2ff..c9d0548 100644
+> --- a/arch/arm/mach-mxs/clock-mx28.c
+> +++ b/arch/arm/mach-mxs/clock-mx28.c
+> @@ -476,7 +476,7 @@ _CLK_SET_RATE1(xbus_clk, XBUS)
+>  static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+>  {									\
+>  	u16 div;							\
+> -	u32 reg;							\
+> +	u32 reg, clkgate;						\
+>  	u64 lrate;							\
+>  	unsigned long parent_rate;					\
+>  	int i;								\
+> @@ -493,7 +493,8 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+>  		return -EINVAL;						\
+>  									\
+>  	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
+> -	reg &= ~BM_CLKCTRL_##rs##_DIV;					\
+> +	clkgate = reg & BM_CLKCTRL_##rs##_CLKGATE;			\
+> +	reg &= ~(BM_CLKCTRL_##rs##_DIV | BM_CLKCTRL_##rs##_CLKGATE);	\
+>  	reg |= div << BP_CLKCTRL_##rs##_DIV;				\
+>  	__raw_writel(reg, CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
+>  									\
+> @@ -506,6 +507,8 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+>  		return -ETIMEDOUT;					\
+>  	}								\
+>  									\
+> +	__raw_writel(reg & ~clkgate,					\
+> +			CLKCTRL_BASE_ADDR + HW_CLKCTRL_##rs);		\
+>  	return 0;							\
+>  }
+>  
+> diff --git a/arch/arm/mach-mxs/regs-clkctrl-mx28.h b/arch/arm/mach-mxs/regs-clkctrl-mx28.h
+> index 7d1b061..08749b3 100644
+> --- a/arch/arm/mach-mxs/regs-clkctrl-mx28.h
+> +++ b/arch/arm/mach-mxs/regs-clkctrl-mx28.h
+> @@ -285,6 +285,7 @@
+>  		(((v) << 0) & BM_CLKCTRL_EMI_DIV_EMI)
+>  
+>  #define HW_CLKCTRL_SAIF0	(0x00000100)
+> +#define HW_CLKCTRL_SAIF0_SET	(0x00000104)
+Is this still needed?
+
+>  
+>  #define BP_CLKCTRL_SAIF0_CLKGATE	31
+>  #define BM_CLKCTRL_SAIF0_CLKGATE	0x80000000
+> @@ -296,6 +297,7 @@
+>  		(((v) << 0) & BM_CLKCTRL_SAIF0_DIV)
+>  
+>  #define HW_CLKCTRL_SAIF1	(0x00000110)
+> +#define HW_CLKCTRL_SAIF1_SET	(0x00000114)
+>  
+>  #define BP_CLKCTRL_SAIF1_CLKGATE	31
+>  #define BM_CLKCTRL_SAIF1_CLKGATE	0x80000000
+
+Best regards
+Uwe
 
 -- 
-Dmitry
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
