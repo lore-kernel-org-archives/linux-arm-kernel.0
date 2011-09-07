@@ -1,64 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Sep 2011 16:35:05 +0100
-Subject: KVM ARM interrupt virtualization
-In-Reply-To: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>
-References: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>
-Message-ID: <CAHkRjk6Vm2yNLm8Gzk3+4mYAfiXVjufv2xc0Kc-6ac-oS4zytw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 7 Sep 2011 11:36:13 -0400 (EDT)
+Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level debug
+	uart
+In-Reply-To: <20110907142350.GU6619@n2100.arm.linux.org.uk>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
+	<20110906202555.GQ28816@pengutronix.de>
+	<20110907110001.GI8148@S2100-06.ap.freescale.net>
+	<20110907123635.GT28816@pengutronix.de>
+	<20110907142350.GU6619@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1109071128040.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 September 2011 04:01, carson bill <bill4carson@gmail.com> wrote:
-> I am trying to put interrupt virtualization support into KVM ARM
-> implementation by Christoffer.
->
-> The approach is like this:
->
-> ? Distributor emulation stays in Qemu, whenever Guest OS touch
-> ? Distributor iomem, this action is handled by Qemu as it is.
->
-> ? Each time a device in Qemu call 'gic_update' to inject an
-> ? interrupt, the emulated Distributor figure out the 'best_irq'.
-> ? With the help of GIC virtulization, this "best_irq" can be routed
-> ? to virtual cpu interface which Guest OS has directly access into.
->
-> ? Of course, when Guest OS query which interrupt fired, it need not
-> ? trapped out into Qemu anymore.
-...
-> Problem:
-> ? ?I did the experiment, and found the biggest obstoble on the way
-> ? ?is creating the mapping.
->
-> ? ?arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
-> ? ?#define CT_CA9X4_MPIC ? ? ? (0x1e000000)
-> ? ?#define A9_MPCORE_SCU ? ? ? (CT_CA9X4_MPIC + 0x0000)
-> ? ?#define A9_MPCORE_GIC_CPU ? (CT_CA9X4_MPIC + 0x0100)
-> ? ?#define A9_MPCORE_GIT ? ? ? (CT_CA9X4_MPIC + 0x0200)
-> ? ?#define A9_MPCORE_TWD ? ? ? (CT_CA9X4_MPIC + 0x0600)
-> ? ?#define A9_MPCORE_GIC_DIST ?(CT_CA9X4_MPIC + 0x1000)
->
-> ? ?If I create an identical mapping at A9_MPCORE_GIC_CPU, all the iomem
-> ? ?from CT_CA9X4_MPIC ~ CT_CA9X4_MPIC + 0x1000 could be access for
-> ? ?Guest OS, which means access to SCU/GIT/TWD will not been trapped
-> ? ?any more.
+On Wed, 7 Sep 2011, Russell King - ARM Linux wrote:
 
-Shouldn't you use the CT_CA15X4_MPIC base address? As for TWD, with
-A15 we use the generic timers (which also have support for
-virtualisation). The SCU doesn't need to be touched on A15, AFAIK.
+> On Wed, Sep 07, 2011 at 02:36:35PM +0200, Uwe Kleine-K?nig wrote:
+> > But only if the image doesn't support imx6q, right? Anyhow, I hope
+> > imx6q_map_io isn't called for pre-imx6q SoCs. Ah, and I hope we don't
+> > need to argue here as Russell doesn't like the new DEBUG_LL changes :-)
+> 
+> I have no problem with the Kconfig menu approach or existing approaches
+> to DEBUG_LL.  What I have an objection to is trying to stuff the
+> information for it into places which ultimately render the facility
+> useless for its intended purpose - to permit debugging the _really_
+> _early_ assembly code.
+> 
+> That is what it was written for: if we introduce complicated ways to
+> put behind it, we'll need to come up with a completely new debugging
+> infrastructure to debug the now buggered debugging infrastructure.
 
-With the VE/A15 memory map, the GIC Dist is placed at offset 0x1000
-and the GIC CPU interface a 0x2000. I think the VGIC interfaces are
-placed as follows:
+For the record I now agree with Russell.
 
-base + 0x4000 - GICV (Virtual Machine CPU interface - same registers
-as the physical GIC CPU interface)
-base + 0x6000 - GICH (GIC Hypervisor control registers)
+In order to have early serial output that works across multiple SOCs in 
+the same kernel image intended to non developers we'll have to add a 
+parallel infrastructure.  Keeping the DEBUG_LL code as simple as 
+possible for developers is the way to go (and that might be needed to 
+debug that parallel infrastructure).
 
-So you would have to map GICH inside the host OS to control the VGIC.
-The guest OS would most likely want to use the same address as the
-physical GIC CPU interface (at offset 0x2000). In this case, the host
-OS needs to set up a stage 2 translation from the GIC CPU interface
-physical page at offset 0x2000 to offset 0x4000 where the VGIC is
-found.
 
--- 
-Catalin
+Nicolas
