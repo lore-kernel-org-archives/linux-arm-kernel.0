@@ -1,16 +1,62 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 7 Sep 2011 10:12:56 -0700
-Subject: [PATCH 60/62] sound: irq: Remove IRQF_DISABLED
-In-Reply-To: <1315383059-3673-61-git-send-email-yong.zhang0@gmail.com>
-References: <1315383059-3673-1-git-send-email-yong.zhang0@gmail.com>
-	<1315383059-3673-61-git-send-email-yong.zhang0@gmail.com>
-Message-ID: <20110907171256.GB2906@opensource.wolfsonmicro.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 7 Sep 2011 13:18:21 -0400 (EDT)
+Subject: [RFC PATCH 1/3] ARM: iwmmxt: Fix Makefile rules for building
+	iwmmxt for Thumb-2
+In-Reply-To: <CAMPhdO8tv9aFNcghySViCrTt97jzEw5rPfKo6AaU9DrQ32tTJA@mail.gmail.com>
+References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
+	<1315411158-17479-2-git-send-email-dave.martin@linaro.org>
+	<CAMPhdO8tv9aFNcghySViCrTt97jzEw5rPfKo6AaU9DrQ32tTJA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1109071306530.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2011 at 04:10:57PM +0800, Yong Zhang wrote:
-> This flag is a NOOP and can be removed now.
-> 
-> Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
+On Wed, 7 Sep 2011, Eric Miao wrote:
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> On Wed, Sep 7, 2011 at 8:59 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> > Because gcc/gas have no sane way to turn on individual CPU
+> > extensions from the command-line, iwmmxt.S was previously built
+> > with -mcpu=iwmmxt. ?Unfortunately, this also downgrades the CPU to
+> > v5, with the result that this file fails to build for a Thumb-2
+> > kernel.
+> >
+> > New versions of the tools support -march=<base arch>+iwmmxt, and it
+> > seems reasonable to require up-to-date tools when building in
+> > Thumb-2. ?So, this patch uses -march=armv7-a+iwmmxt for
+> > CONFIG_THUMB2_KERNEL=y.
+> >
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > ---
+> > ?arch/arm/kernel/Makefile | ? ?7 +++++++
+> > ?1 files changed, 7 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> > index f7887dc..8a58339 100644
+> > --- a/arch/arm/kernel/Makefile
+> > +++ b/arch/arm/kernel/Makefile
+> > @@ -65,7 +65,14 @@ obj-$(CONFIG_CPU_PJ4) ? ? ? ? ? ? ? ?+= pj4-cp0.o
+> > ?obj-$(CONFIG_IWMMXT) ? ? ? ? ? += iwmmxt.o
+> > ?obj-$(CONFIG_CPU_HAS_PMU) ? ? ?+= pmu.o
+> > ?obj-$(CONFIG_HW_PERF_EVENTS) ? += perf_event.o
+> > +
+> > +# When enough people have binutils which support -march=...+iwmmxt, this
+> > +# should change to something like if __LINUX_ARM_ARCH__ < 7.
+> > +ifdef CONFIG_THUMB2_KERNEL
+> > +AFLAGS_iwmmxt.o ? ? ? ? ? ? ? ? ? ? ? ?:= -Wa,-march=armv7-a+iwmmxt
+> > +else
+> > ?AFLAGS_iwmmxt.o ? ? ? ? ? ? ? ? ? ? ? ?:= -Wa,-mcpu=iwmmxt
+> > +endif
+> 
+> It looks more like the switch should depend on the compiler version.
+> Unless there is a clear way to decide if gcc supports this switch, I
+> think it's reasonable to have the change like above.
+
+Normally the way to go with gcc version dependent alternatives is to use 
+something like:
+
+AFLAGS_foo.o := $(call cc-option,<the_new_flag>,<the_fallback_flag>)
+
+This will test if <the_new_flag> is supported by the used gcc, and use 
+the fallback otherwise.
+
+
+Nicolas
