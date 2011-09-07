@@ -1,116 +1,32 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 7 Sep 2011 18:23:24 +0530
-Subject: [PATCH v4 02/11] OMAP2+: hwmod: Add API to check IO PAD wakeup status
-In-Reply-To: <1315400013-4849-1-git-send-email-govindraj.raja@ti.com>
-References: <1315400013-4849-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1315400013-4849-3-git-send-email-govindraj.raja@ti.com>
+Date: Wed, 7 Sep 2011 18:23:22 +0530
+Subject: [PATCH v4 00/11] OMAP2+: Serial: Runtime adaptation + cleanup
+Message-ID: <1315400013-4849-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add API to determine IO-PAD wakeup event status for a given
-hwmod dynamic_mux pad.
+Converting uart driver to adapt to pm runtime API's.
+Code re-org + cleanup.
+Moving some functionality from serial.c to omap-serial.c
 
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/mux.c                    |   30 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/mux.h                    |   13 +++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |    7 ++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 4 files changed, 51 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index 655e948..5f15ab8 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -351,6 +351,36 @@ err1:
- 	return NULL;
- }
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Gets the wakeup status of given pad from omap-hwmod.
-+ * Returns true if wakeup event is set for pad else false
-+ * if wakeup is not occured or pads are not avialable.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
-+{
-+	int i;
-+	unsigned int val;
-+	u8 ret = false;
-+
-+	for (i = 0; i < hmux->nr_pads; i++) {
-+		struct omap_device_pad *pad = &hmux->pads[i];
-+
-+		if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
-+			val = omap_mux_read(pad->partition,
-+					pad->mux->reg_offset);
-+			if (val & OMAP_WAKEUP_EVENT) {
-+				ret = true;
-+				break;
-+			}
-+		}
-+	}
-+
-+	return ret;
-+}
-+
- /* Assumes the calling function takes care of locking */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
- {
-diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index 2132308..8b2150a 100644
---- a/arch/arm/mach-omap2/mux.h
-+++ b/arch/arm/mach-omap2/mux.h
-@@ -225,8 +225,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
-  */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Called only from omap_hwmod.c, do not use.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux);
- #else
- 
-+static inline bool
-+omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
-+{
-+	return 0;
-+}
-+
- static inline int omap_mux_init_gpio(int gpio, int val)
- {
- 	return 0;
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index e751dd9..a8b24d7 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2724,3 +2724,10 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
- 
- 	return 0;
- }
-+
-+int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh)
-+{
-+	if (oh && oh->mux)
-+		return omap_hwmod_mux_get_wake_status(oh->mux);
-+	return -EINVAL;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 0e329ca..9a6195c 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -607,6 +607,7 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
- 
- int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
- 
-+int omap_hwmod_pad_get_wakeup_status(struct omap_hwmod *oh);
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
--- 
-1.7.4.1
+Changes involves:
+================
+1.) Cleaning up certain uart calls from sram_idle func.
+2.) Removed all types of uart clock handling code from serial.c
+3.) Using hwmod_mux API enable wakeup capability for uart pad during
+   hwmod_idle state i.e., when uart clocks are disabled we can enable
+   io-pad wakeup capability for uart if mux_data is available for
+   given uart. Also during during resume from idle call to uart we need
+   to enable clocks back conditionally and this can be done only when io-pad
+   wakeup event bit is set for uart_rx pad. So we need a hwmod API
+   which can probe the uart pad and let us know whether a uart wakeup
+   happened. So omap_hmwod_pad_wakeup_status API is added to meet this
+   requirement.
+3.) Adapted omap-serial driver to use runtime API's.
+4.) Modify serial_init calls to accept certain uart parameters from board file.
+5.) using prepare and resume_call to disable/enable uart_port.
+    Reference to discussion why we need to use prepare and resume hooks.
+	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg52707.html
+	http://www.mail-archive.com/linux-omap at vger.kernel.org/msg53209.html
+	
+Patch series is based on 3.1.0-rc4 + omap_device fixes.
