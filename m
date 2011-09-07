@@ -1,28 +1,150 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 8 Sep 2011 00:12:39 +0530
-Subject: [PATCH 16/18] dmaengine/amba-pl08x: Add support for sg len
-	greater than one for slave transfers
-In-Reply-To: <4E5F594D.10203@st.com>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
-	<20110814083618.GE4986@n2100.arm.linux.org.uk>	<4E4CCF7B.8060704@st.com>
-	<20110821083306.GA12028@n2100.arm.linux.org.uk>	<4E532B19.6000103@st.com>
-	<4E5715CE.2070806@st.com>
-	<CACRpkdapSvW=eMSoXTOOA2GyhfBLzq2OuyQcDctPxsnVzvr-4g@mail.gmail.com>
-	<4E575E75.40603@st.com>  <4E5F594D.10203@st.com>
-Message-ID: <438BB0150E931F4B9CE701519A4463010871804A4C@bgsmsx502.gar.corp.intel.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed,  7 Sep 2011 21:53:22 +0300
+Subject: [PATCH 1/3] iommu/core: add fault reporting mechanism
+Message-ID: <1315421604-12286-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-09-01 at 15:37 +0530, Viresh Kumar wrote:
-> On 8/26/2011 2:21 PM, Viresh Kumar wrote:
-> > I just wanted to know, whether i need to do any other modification in this patch or not?
-> 
-> Hello,
-> 
-> Do i need to update anything in this patch? Or can this be pushed as it is?
-> 
-I thought Linus W, and Russell had some comments on this. 
+Add iommu fault report mechanism to the IOMMU API, so implementations
+could report about mmu faults (translation errors, hardware errors,
+etc..).
 
---
-~Vinod
+Fault reports can be used in several ways:
+- mere logging
+- reset the device that accessed the faulting address (may be necessary
+  in case the device is a remote processor for example)
+- implement dynamic PTE/TLB loading
+
+A dedicated iommu_set_fault_handler() API has been added to allow
+users, who are interested to receive such reports, to provide
+their handler.
+
+At this point only a generic IOMMU_ERROR fault type has been added.
+Future users, who will require additional fault types, will add
+new events as needed.
+
+Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+---
+ drivers/iommu/iommu.c |   13 ++++++++++
+ include/linux/iommu.h |   65 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 78 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index e61a9ba..c68ff29 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -40,6 +40,19 @@ bool iommu_found(void)
+ }
+ EXPORT_SYMBOL_GPL(iommu_found);
+ 
++/**
++ * iommu_domain_alloc() - set a fault handler for an iommu domain
++ * @domain: iommu domain
++ * @handler: fault handler
++ */
++void iommu_set_fault_handler(struct iommu_domain *domain,
++					iommu_fault_handler_t handler)
++{
++	BUG_ON(!domain);
++
++	domain->handler = handler;
++}
++
+ struct iommu_domain *iommu_domain_alloc(void)
+ {
+ 	struct iommu_domain *domain;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 9940319..d67bf8c 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -26,9 +26,31 @@
+ #define IOMMU_CACHE	(4) /* DMA cache coherency */
+ 
+ struct device;
++struct iommu_domain;
++
++/**
++ * enum iommu_fault_types - iommu fault types
++ *
++ * @IOMMU_ERROR: Unrecoverable error
++ *
++ * Currently we only support a generic error fault type.
++ * Future users, which will require more informative fault types, will add
++ * them as needed.
++ */
++enum iommu_fault_types {
++	IOMMU_ERROR,
++};
++
++/* iommu fault flags */
++#define IOMMU_FAULT_READ	0x0
++#define IOMMU_FAULT_WRITE	0x1
++
++typedef int (*iommu_fault_handler_t)(struct iommu_domain *,
++				struct device *, unsigned long, int, int);
+ 
+ struct iommu_domain {
+ 	void *priv;
++	iommu_fault_handler_t handler;
+ };
+ 
+ #define IOMMU_CAP_CACHE_COHERENCY	0x1
+@@ -67,6 +89,44 @@ extern phys_addr_t iommu_iova_to_phys(struct iommu_domain *domain,
+ 				      unsigned long iova);
+ extern int iommu_domain_has_cap(struct iommu_domain *domain,
+ 				unsigned long cap);
++extern void iommu_set_fault_handler(struct iommu_domain *domain,
++					iommu_fault_handler_t handler);
++
++/**
++ * report_iommu_fault() - report about an IOMMU fault to the IOMMU framework
++ * @domain: the iommu domain where the fault has happened
++ * @dev: the device where the fault has happened
++ * @iova: the faulting address
++ * @flags: mmu fault flags (e.g. IOMMU_FAULT_READ/IOMMU_FAULT_WRITE/...)
++ * @event: the mmu fault type
++ *
++ * This function should be called by the low-level IOMMU implementations
++ * whenever IOMMU faults happen, to allow high-level users, that are
++ * interested in such events, to know about them.
++ *
++ * This event may be useful for several possible use cases:
++ * - mere logging of the event
++ * - dynamic TLB/PTE loading
++ * - if restarting of the faulting device is required
++ *
++ * Returns 0 on success and an appropriate error code otherwise (if dynamic
++ * PTE/TLB loading will one day be supported, implementations will be able
++ * to tell whether it succeeded or not according to this return value).
++ */
++static inline int report_iommu_fault(struct iommu_domain *domain,
++	struct device *dev, unsigned long iova, int flags, int event)
++{
++	int ret = 0;
++
++	/*
++	 * if upper layers showed interest and installed a fault handler,
++	 * invoke it.
++	 */
++	if (domain->handler)
++		ret = domain->handler(domain, dev, iova, flags, event);
++
++	return ret;
++}
+ 
+ #else /* CONFIG_IOMMU_API */
+ 
+@@ -123,6 +183,11 @@ static inline int domain_has_cap(struct iommu_domain *domain,
+ 	return 0;
+ }
+ 
++static inline void iommu_set_fault_handler(struct iommu_domain *domain,
++					iommu_fault_handler_t handler)
++{
++}
++
+ #endif /* CONFIG_IOMMU_API */
+ 
+ #endif /* __LINUX_IOMMU_H */
+-- 
+1.7.4.1
