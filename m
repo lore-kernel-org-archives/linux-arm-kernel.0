@@ -1,251 +1,149 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 7 Sep 2011 13:50:32 -0700
-Subject: [PATCH 2/2] input: samsung-keypad: Add device tree support
-In-Reply-To: <1315317317-21873-3-git-send-email-thomas.abraham@linaro.org>
-References: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
-	<1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
-	<1315317317-21873-3-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20110907205032.GA8265@core.coreip.homeip.net>
+From: lacombar@gmail.com (Arnaud Lacombe)
+Date: Wed, 7 Sep 2011 16:52:15 -0400
+Subject: [RFC] Kbuild: allow code re-use across different directories
+In-Reply-To: <alpine.LFD.2.00.1109071554480.20358@xanadu.home>
+References: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
+	<alpine.LFD.2.00.1109071437400.20358@xanadu.home>
+	<CACqU3MVF8XSdKi0PeZF5SFaH9i2HPqCjkMqccyb83x4V_1Vs1g@mail.gmail.com>
+	<alpine.LFD.2.00.1109071554480.20358@xanadu.home>
+Message-ID: <CACqU3MUiie5Zv+FwFkXcY7yZ1-wgCB7xVpHn36WaV7EpecU4Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi,
 
-On Tue, Sep 06, 2011 at 07:25:17PM +0530, Thomas Abraham wrote:
->  static int samsung_keypad_is_s5pv210(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
-> -	enum samsung_keypad_type type =
-> -		platform_get_device_id(pdev)->driver_data;
-> +	enum samsung_keypad_type type;
->  
-> +#ifdef CONFIG_OF
-> +	if (dev->of_node)
-> +		return of_device_is_compatible(dev->of_node,
-> +				"samsung,s5pv210-keypad");
-> +#endif
-> +	type = platform_get_device_id(pdev)->driver_data;
->  	return type == KEYPAD_TYPE_S5PV210;
+On Wed, Sep 7, 2011 at 3:59 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Wed, 7 Sep 2011, Arnaud Lacombe wrote:
+>
+>> Hi,
+>>
+>> On Wed, Sep 7, 2011 at 3:07 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> > On Fri, 19 Aug 2011, Arnaud Lacombe wrote:
+>> >
+>> >> Hi folks,
+>> >>
+>> >> The attached patch modify Kbuild to allow to directly re-use code in multiple
+>> >> directory without having to go through a copy. Technically, it changes Kbuild to
+>> >> use by default the VPATH feature of GNU make and provides accessors for Makefile
+>> >> to change it indirectly.
+>> >>
+>> >> Considering:
+>> >>
+>> >> arch/foo/lib:
+>> >> fancy.c
+>> >>
+>> >> We want to be able to build it with -DPANTS=32 in the kernel, but the
+>> >> bootloader requires -DPANTS_SIZE=30.
+>> >>
+>> >> Currently we would do, either:
+>> >>
+>> >> arch/foo/lib/Makefile
+>> >> LDFLAGS_fancy.o := -DPANTS=32
+>> >> obj-y += fancy.o
+>> >>
+>> >> and, either:
+>> >>
+>> >> arch/foo/boot/Makefile:
+>> >> LDFLAGS_fancy.o := -DPANTS=30
+>> >> obj-y += fancy.o
+>> >> $(obj)/fancy.c: $(srctree)/arch/foo/lib/fancy.c
+>> >> ? ? ? $(call cmd,shipped)
+>> >>
+>> >> or
+>> >>
+>> >> arch/foo/boot/Makefile:
+>> >> LDFLAGS_fancy.o := -DPANTS=30
+>> >> obj-y += fancy.o
+>> >> $(obj)/fancy.o: $(srctree)/arch/foo/lib/fancy.c
+>> >> ? ? ? $(call cmd,cc_c_o)
+>> >>
+>> >> The former implies an extra copy of the source file, the latter expose Kbuild
+>> >> internal function.
+>> >>
+>> >> With the attached patch, we would do:
+>> >>
+>> >> arch/foo/boot/Makefile:
+>> >> LDFLAGS_fancy.o := -DPANTS=30
+>> >> obj-y += fancy.o
+>> >> vpath-y += $(srctree)/arch/foo/lib
+>> >>
+>> >> and let GNU make do the job.
+>> >>
+>> >> Comments welcome,
+>> >
+>> > It doesn't work. ?Whatever I do to arch/arm/boot/compressed/Makefile
+>> > (which admittedly looks a bit hairy and could benefit from a shave) in
+>> > order to remove the $(call cmd,shipped) used with lib1funcs.S, I always
+>> > end up with:
+>> >
+>> > make[2]: *** No rule to make target `arch/arm/boot/compressed/lib1funcs.S', needed by `arch/arm/boot/compressed/lib1funcs.o'. ?Stop.
+>> >
+>> What was the exact change you made which triggered this ?
+>
+> In its simplest expression (not caring about the now undefined lib1funcs
+> variable):
+>
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index 0c74a6fab9..b34ed80977 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -70,6 +70,10 @@ ifeq ($(CONFIG_ARCH_SHMOBILE),y)
+> ?OBJS ? ? ? ? ? += head-shmobile.o
+> ?endif
+>
+> +# For __aeabi_uidivmod
+> +OBJS ? ? ? ? ? += lib1funcs.o
+> +vpath-y ? ? ? ? ? ? ? ?+= $(srctree)/arch/arm/lib
+> +
+> ?#
+> ?# We now have a PIC decompressor implementation. ?Decompressors running
+> ?# from RAM should not define ZTEXTADDR. ?Decompressors running directly
+> @@ -120,12 +124,6 @@ LDFLAGS_vmlinux += -X
+> ?# Next argument is a linker script
+> ?LDFLAGS_vmlinux += -T
+>
+> -# For __aeabi_uidivmod
+> -lib1funcs = $(obj)/lib1funcs.o
+> -
+> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
+> - ? ? ? $(call cmd,shipped)
+> -
+> ?# We need to prevent any GOTOFF relocs being used with references
+> ?# to symbols in the .bss section since we cannot relocate them
+> ?# independently from the rest at run time. ?This can be achieved by
+>
+that look correct to me, however, the error you get:
 
-This function is called every time we scan keypad matrix, I do not think
-you want to scan DT bindings here. You need to cache the device type at
-probe time and use it.
+make[2]: *** No rule to make target
+`arch/arm/boot/compressed/lib1funcs.S', needed by
+`arch/arm/boot/compressed/lib1funcs.o'.  Stop.
 
->  }
->  
-> @@ -235,6 +246,130 @@ static void samsung_keypad_close(struct input_dev *input_dev)
->  	samsung_keypad_stop(keypad);
->  }
->  
-> +#ifdef CONFIG_OF
-> +static
-> +struct samsung_keypad_platdata *samsung_keypad_parse_dt(struct device *dev)
-> +{
-> +	struct samsung_keypad_platdata *pdata;
-> +	struct matrix_keymap_data *keymap_data;
-> +	uint32_t *keymap;
-> +	struct device_node *np = dev->of_node, *key_np;
-> +	unsigned int key_count = 0;
-> +
-> +	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata) {
-> +		dev_err(dev, "could not allocate memory for platform data\n");
-> +		return NULL;
-> +	}
+seem odd to me.
 
-pdata is not used once probe() completes so it would be better to free
-it and not rely on devm_* facilities to free it for you once device
-unbinds from the driver.
+I just re-tried on x86 with:
 
-> +
-> +	of_property_read_u32(np, "samsung,keypad-num-rows", &pdata->rows);
-> +	of_property_read_u32(np, "samsung,keypad-num-columns", &pdata->cols);
-> +	if (!pdata->rows || !pdata->cols) {
-> +		dev_err(dev, "number of keypad rows/columns not specified\n");
-> +		return NULL;
-> +	}
-> +
-> +	keymap_data = devm_kzalloc(dev, sizeof(*keymap_data), GFP_KERNEL);
-> +	if (!keymap_data) {
-> +		dev_err(dev, "could not allocate memory for keymap data\n");
-> +		return NULL;
-> +	}
-> +	pdata->keymap_data = keymap_data;
-> +
-> +	for_each_child_of_node(np, key_np)
-> +		key_count++;
-> +
-> +	keymap_data->keymap_size = key_count;
-> +	keymap = devm_kzalloc(dev, sizeof(uint32_t) * key_count, GFP_KERNEL);
-> +	if (!keymap) {
-> +		dev_err(dev, "could not allocate memory for keymap\n");
-> +		return NULL;
-> +	}
-> +	keymap_data->keymap = keymap;
-> +
-> +	for_each_child_of_node(np, key_np) {
-> +		unsigned int row, col, key_code;
-> +		of_property_read_u32(key_np, "keypad,row", &row);
-> +		of_property_read_u32(key_np, "keypad,column", &col);
-> +		of_property_read_u32(key_np, "keypad,key-code", &key_code);
-> +		*keymap++ = KEY(row, col, key_code);
-> +	}
+diff --git a/arch/x86/boot/compressed/Makefile
+b/arch/x86/boot/compressed/Makefile
+index 09664ef..65c89f7 100644
+--- a/arch/x86/boot/compressed/Makefile
++++ b/arch/x86/boot/compressed/Makefile
+@@ -23,7 +23,9 @@ LDFLAGS_vmlinux := -T
 
-THis seems like generic mechanism that could be used by other drivers...
-Maybe move into matrix-keypad.c? You would also not need to allocate
-temporary buffer for intermediate keymap data.
+ hostprogs-y    := mkpiggy
 
-> +
-> +	if (of_get_property(np, "linux,input-no-autorepeat", NULL))
-> +		pdata->no_autorepeat = true;
-> +	if (of_get_property(np, "linux,input-wakeup", NULL))
-> +		pdata->wakeup = true;
-> +
-> +	return pdata;
-> +}
-> +
-> +static void samsung_keypad_parse_dt_gpio(struct device *dev,
-> +				struct samsung_keypad *keypad)
-> +{
-> +	struct device_node *np = dev->of_node;
-> +	int gpio, ret, row, col;
-> +
-> +	for (row = 0; row < keypad->rows; row++) {
-> +		gpio = of_get_named_gpio(np, "row-gpios", row);
-> +		keypad->row_gpios[row] = gpio;
-> +		if (!gpio_is_valid(gpio)) {
-> +			dev_err(dev, "keypad row[%d]: invalid gpio %d\n",
-> +					row, gpio);
-> +			continue;
-> +		}
-> +
-> +		ret = gpio_request(gpio, "keypad-row");
-> +		if (ret)
-> +			dev_err(dev, "keypad row[%d] gpio request failed\n",
-> +					row);
-> +	}
-> +
-> +	for (col = 0; col < keypad->cols; col++) {
-> +		gpio = of_get_named_gpio(np, "col-gpios", col);
-> +		keypad->col_gpios[col] = gpio;
-> +		if (!gpio_is_valid(gpio)) {
-> +			dev_err(dev, "keypad column[%d]: invalid gpio %d\n",
-> +					col, gpio);
-> +			continue;
-> +		}
-> +
-> +		ret = gpio_request(col, "keypad-col");
-> +		if (ret)
-> +			dev_err(dev, "keypad column[%d] gpio request failed\n",
-> +					col);
+-$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/head_$(BITS).o
+$(obj)/misc.o $(obj)/string.o $(obj)/cmdline.o
+$(obj)/early_serial_console.o $(obj)/piggy.o FORCE
++vpath-y += $(srctree)/arch/x86/lib
++
++$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/checksum_32.o
+$(obj)/head_$(BITS).o $(obj)/misc.o $(obj)/string.o $(obj)/cmdline.o
+$(obj)/early_serial_console.o $(obj)/piggy.o FORCE
+        $(call if_changed,ld)
+        @:
 
-I think we should bail out if one of the calls fails.
+and `checksum_32.o' gets built just fine from
+`$(srctree)/arch/x86/lib/checksum_32.S'. I guess I'll ends up building
+an arm toolchain tonight and see closer.
 
-> +	}
-> +}
-> +
-> +static void samsung_keypad_dt_gpio_free(struct samsung_keypad *keypad)
-> +{
-> +	int cnt;
-> +
-> +	for (cnt = 0; cnt < keypad->rows; cnt++)
-> +		if (gpio_is_valid(keypad->row_gpios[cnt]))
-> +			gpio_free(keypad->row_gpios[cnt]);
-> +
-> +	for (cnt = 0; cnt < keypad->cols; cnt++)
-> +		if (gpio_is_valid(keypad->col_gpios[cnt]))
-> +			gpio_free(keypad->col_gpios[cnt]);
-> +}
-> +#else
-> +static
-> +struct samsung_keypad_platdata *samsung_keypad_parse_dt(struct device *dev)
-> +{
-> +	return NULL;
-> +}
-> +
-> +static void samsung_keypad_parse_dt_gpio(struct device_node *np,
-> +		struct samsung_keypad *keypad, unsigned int rows,
-> +		unsigned int cols)
-> +{
-> +}
-> +
-> +static void samsung_keypad_dt_gpio_free(struct samsung_keypad *keypad)
-> +{
-> +}
-> +#endif
-> +
->  static int __devinit samsung_keypad_probe(struct platform_device *pdev)
->  {
->  	const struct samsung_keypad_platdata *pdata;
-> @@ -246,7 +381,10 @@ static int __devinit samsung_keypad_probe(struct platform_device *pdev)
->  	unsigned int keymap_size;
->  	int error;
->  
-> -	pdata = pdev->dev.platform_data;
-> +	if (pdev->dev.of_node)
-> +		pdata = samsung_keypad_parse_dt(&pdev->dev);
-> +	else
-> +		pdata = pdev->dev.platform_data;
->  	if (!pdata) {
->  		dev_err(&pdev->dev, "no platform data defined\n");
->  		return -EINVAL;
-> @@ -303,6 +441,9 @@ static int __devinit samsung_keypad_probe(struct platform_device *pdev)
->  	keypad->cols = pdata->cols;
->  	init_waitqueue_head(&keypad->wait);
->  
-> +	if (pdev->dev.of_node)
-> +		samsung_keypad_parse_dt_gpio(&pdev->dev, keypad);
-> +
->  	input_dev->name = pdev->name;
->  	input_dev->id.bustype = BUS_HOST;
->  	input_dev->dev.parent = &pdev->dev;
-> @@ -349,6 +490,7 @@ err_free_irq:
->  	free_irq(keypad->irq, keypad);
->  err_put_clk:
->  	clk_put(keypad->clk);
-> +	samsung_keypad_dt_gpio_free(keypad);
->  err_unmap_base:
->  	iounmap(keypad->base);
->  err_free_mem:
-> @@ -374,6 +516,7 @@ static int __devexit samsung_keypad_remove(struct platform_device *pdev)
->  	free_irq(keypad->irq, keypad);
->  
->  	clk_put(keypad->clk);
-> +	samsung_keypad_dt_gpio_free(keypad);
->  
->  	iounmap(keypad->base);
->  	kfree(keypad);
-> @@ -447,6 +590,17 @@ static const struct dev_pm_ops samsung_keypad_pm_ops = {
->  };
->  #endif
->  
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id samsung_keypad_dt_match[] = {
-> +	{ .compatible = "samsung,s3c6410-keypad" },
-> +	{ .compatible = "samsung,s5pv210-keypad" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, samsung_keypad_dt_match);
-> +#else
-> +#define samsung_keypad_dt_match NULL
-> +#endif
-> +
->  static struct platform_device_id samsung_keypad_driver_ids[] = {
->  	{
->  		.name		= "samsung-keypad",
-> @@ -465,6 +619,7 @@ static struct platform_driver samsung_keypad_driver = {
->  	.driver		= {
->  		.name	= "samsung-keypad",
->  		.owner	= THIS_MODULE,
-> +		.of_match_table = samsung_keypad_dt_match,
->  #ifdef CONFIG_PM
->  		.pm	= &samsung_keypad_pm_ops,
->  #endif
-> -- 
-> 1.6.6.rc2
-> 
-
-Thanks.
-
--- 
-Dmitry
+ - Arnaud
