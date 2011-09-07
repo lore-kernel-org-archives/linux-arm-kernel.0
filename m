@@ -1,65 +1,90 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 7 Sep 2011 12:42:20 +0200
-Subject: [PATCH 14/22] OMAP2+: voltage: split voltage controller (VC) code
-	into dedicated layer
-In-Reply-To: <1314639355-12713-15-git-send-email-khilman@ti.com>
-References: <1314639355-12713-1-git-send-email-khilman@ti.com>
-	<1314639355-12713-15-git-send-email-khilman@ti.com>
-Message-ID: <CAORVsuWEZmChCjy8dJV+acosr_8N9XN0VL8-L6HWaKnZkoqqYA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed,  7 Sep 2011 13:40:20 +0200
+Subject: [RFC PATCH] mmc: sdio: rw extended, use a sg entry for each block
+Message-ID: <1315395620-22641-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+While using io multiple blocks operations, change the way that sg is built:
+use one sg entry for each block instead of aggregating the whole buffer
+in a single sg entry.
+Using a single sg entry for a multiple block command may lead to
+misunderstanding between the sd/mmc and the DMA controllers. In fact, the
+knowledge of the block length will allow both controllers to optimize burst
+sizes on internal bus while dealing with those data.
 
-On Mon, Aug 29, 2011 at 7:35 PM, Kevin Hilman <khilman@ti.com> wrote:
-> As part of the voltage layer cleanup, split out VC specific code into
-> a dedicated VC layer. ?This patch primarily just moves VC code from
-> voltage.c into vc.c, and adds prototypes to vc.h.
->
-> No functional changes.
->
-> For readability, each function was given a local 'vc' pointer:
->
-> ? ?struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
->
-> and a global replace of s/vdd->vc_data/vc/ was done.
->
-> Also vc_init was renamed to vc_init_channel to reflect that this is
-> per-VC channel initializtion.
->
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> ?arch/arm/mach-omap2/Makefile ?| ? ?2 +-
-> ?arch/arm/mach-omap2/vc.c ? ? ?| ?276 +++++++++++++++++++++++++++++++++++++++++
-> ?arch/arm/mach-omap2/vc.h ? ? ?| ? 12 ++
-> ?arch/arm/mach-omap2/voltage.c | ?264 +--------------------------------------
-> ?4 files changed, 293 insertions(+), 261 deletions(-)
-> ?create mode 100644 arch/arm/mach-omap2/vc.c
->
-...
+Use a sg table to store start addresses of blocks within the data buffer.
 
-> diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-> new file mode 100644
-> index 0000000..98f5a4b
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/vc.c
-> @@ -0,0 +1,276 @@
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mmc/core/sdio_ops.c |   38 +++++++++++++++++++++++++++++---------
+ 1 files changed, 29 insertions(+), 9 deletions(-)
 
-The copyright notice is missing.
-
-> +#include <linux/kernel.h>
-> +#include <linux/delay.h>
-> +#include <linux/init.h>
-> +
-> +#include <plat/cpu.h>
-> +
-> +#include "voltage.h"
-> +#include "vc.h"
-> +#include "prm-regbits-34xx.h"
-> +#include "prm-regbits-44xx.h"
-> +#include "prm44xx.h"
-> +
-...
-
-Regards,
-Jean
+diff --git a/drivers/mmc/core/sdio_ops.c b/drivers/mmc/core/sdio_ops.c
+index f087d87..aea6978 100644
+--- a/drivers/mmc/core/sdio_ops.c
++++ b/drivers/mmc/core/sdio_ops.c
+@@ -124,7 +124,7 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
+ 	struct mmc_request mrq = {0};
+ 	struct mmc_command cmd = {0};
+ 	struct mmc_data data = {0};
+-	struct scatterlist sg;
++	struct sg_table sgt;
+ 
+ 	BUG_ON(!card);
+ 	BUG_ON(fn > 7);
+@@ -144,24 +144,44 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
+ 	cmd.arg |= fn << 28;
+ 	cmd.arg |= incr_addr ? 0x04000000 : 0x00000000;
+ 	cmd.arg |= addr << 9;
+-	if (blocks == 1 && blksz <= 512)
+-		cmd.arg |= (blksz == 512) ? 0 : blksz;	/* byte mode */
+-	else
+-		cmd.arg |= 0x08000000 | blocks;		/* block mode */
++	if (blocks == 1 && blksz <= 512) {
++		/* byte mode */
++		struct scatterlist sg;
++
++		cmd.arg |= (blksz == 512) ? 0 : blksz;
++		sg_init_one(&sg, buf, blksz * blocks);
++
++		data.sg = &sg;
++		data.sg_len = 1;
++	} else {
++		/* block mode */
++		struct scatterlist *sg_ptr;
++		int i;
++
++		cmd.arg |= 0x08000000 | blocks;
++		if (sg_alloc_table(&sgt, blocks, GFP_KERNEL))
++			return -ENOMEM;
++		for_each_sg(sgt.sgl, sg_ptr, sgt.nents, i) {
++			sg_set_buf(sg_ptr, buf + i * blksz, blksz);
++		}
++
++		data.sg = sgt.sgl;
++		data.sg_len = sgt.nents;
++	}
++
+ 	cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
+ 
+ 	data.blksz = blksz;
+ 	data.blocks = blocks;
+ 	data.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+-	data.sg = &sg;
+-	data.sg_len = 1;
+-
+-	sg_init_one(&sg, buf, blksz * blocks);
+ 
+ 	mmc_set_data_timeout(&data, card);
+ 
+ 	mmc_wait_for_req(card->host, &mrq);
+ 
++	if (blocks != 1 || blksz > 512)
++		sg_free_table(&sgt);
++
+ 	if (cmd.error)
+ 		return cmd.error;
+ 	if (data.error)
+-- 
+1.7.3
