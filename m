@@ -1,72 +1,81 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Wed, 07 Sep 2011 20:32:04 +0530
-Subject: [PATCH 33/62] dmaengine: irq: Remove IRQF_DISABLED
-In-Reply-To: <1315383059-3673-34-git-send-email-yong.zhang0@gmail.com>
-References: <1315383059-3673-1-git-send-email-yong.zhang0@gmail.com>
-	<1315383059-3673-34-git-send-email-yong.zhang0@gmail.com>
-Message-ID: <1315407724.11863.0.camel@vkoul-mobl4>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 7 Sep 2011 17:31:00 +0200
+Subject: [PATCH 0/2] video: s3c-fb: Add window positioning support
+In-Reply-To: <4E5FB69E.2060907@gmx.de>
+References: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
+	<4E5FB69E.2060907@gmx.de>
+Message-ID: <201109071731.02293.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-09-07 at 16:10 +0800, Yong Zhang wrote:
-> This flag is a NOOP and can be removed now.
-> 
-> Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
-> ---
->  drivers/dma/amba-pl08x.c |    2 +-
->  drivers/dma/coh901318.c  |    2 +-
->  drivers/dma/shdma.c      |    4 ++--
->  3 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-> index be21e3f..3688256 100644
-> --- a/drivers/dma/amba-pl08x.c
-> +++ b/drivers/dma/amba-pl08x.c
-> @@ -1930,7 +1930,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
->  	writel(0x000000FF, pl08x->base + PL080_ERR_CLEAR);
->  	writel(0x000000FF, pl08x->base + PL080_TC_CLEAR);
->  
-> -	ret = request_irq(adev->irq[0], pl08x_irq, IRQF_DISABLED,
-> +	ret = request_irq(adev->irq[0], pl08x_irq, 0,
->  			  DRIVER_NAME, pl08x);
->  	if (ret) {
->  		dev_err(&adev->dev, "%s failed to request interrupt %d\n",
-> diff --git a/drivers/dma/coh901318.c b/drivers/dma/coh901318.c
-> index 4234f41..1dd9455 100644
-> --- a/drivers/dma/coh901318.c
-> +++ b/drivers/dma/coh901318.c
-> @@ -1506,7 +1506,7 @@ static int __init coh901318_probe(struct platform_device *pdev)
->  	if (irq < 0)
->  		goto err_no_irq;
->  
-> -	err = request_irq(irq, dma_irq_handler, IRQF_DISABLED,
-> +	err = request_irq(irq, dma_irq_handler, 0,
->  			  "coh901318", base);
->  	if (err) {
->  		dev_crit(&pdev->dev,
-> diff --git a/drivers/dma/shdma.c b/drivers/dma/shdma.c
-> index 7f49235..8c137d2 100644
-> --- a/drivers/dma/shdma.c
-> +++ b/drivers/dma/shdma.c
-> @@ -1106,7 +1106,7 @@ static void sh_dmae_chan_remove(struct sh_dmae_device *shdev)
->  static int __init sh_dmae_probe(struct platform_device *pdev)
->  {
->  	struct sh_dmae_pdata *pdata = pdev->dev.platform_data;
-> -	unsigned long irqflags = IRQF_DISABLED,
-> +	unsigned long irqflags = 0,
->  		chan_flag[SH_DMAC_MAX_CHANNELS] = {};
->  	int errirq, chan_irq[SH_DMAC_MAX_CHANNELS];
->  	int err, i, irq_cnt = 0, irqres = 0, irq_cap = 0;
-> @@ -1266,7 +1266,7 @@ static int __init sh_dmae_probe(struct platform_device *pdev)
->  				    IORESOURCE_IRQ_SHAREABLE)
->  					chan_flag[irq_cnt] = IRQF_SHARED;
->  				else
-> -					chan_flag[irq_cnt] = IRQF_DISABLED;
-> +					chan_flag[irq_cnt] = 0;
->  				dev_dbg(&pdev->dev,
->  					"Found IRQ %d for channel %d\n",
->  					i, irq_cnt);
-Acked-by: Vinod Koul <vinod.koul@linux.intel.com>
+Hi Florian,
 
---
-~Vinod
+On Thursday 01 September 2011 18:45:18 Florian Tobias Schandinat wrote:
+> Hi all,
+> 
+> On 08/25/2011 07:51 PM, Ajay Kumar wrote:
+> > Just as a note, there are many drivers like mx3fb.c, au1200fb.c and OMAP
+> > seem to be doing window/plane positioning in their driver code.
+> > Is it possible to have this window positioning support at a common place?
+> 
+> Good point. Congratulations for figuring out that I like to standardize
+> things. But I think your suggestion is far from being enough to be useful
+> for userspace (which is our goal so that applications can be reused along
+> drivers and don't need to know about individual drivers).
+
+Beside standardizing things, do you also like to take them one level higher to 
+solve challenging issues ? I know the answer must be yes :-)
+
+The problem at hand here is something we have solved in V4L2 (theoretically 
+only for part of it) with the media controller API, the V4L2 subdevs and their 
+pad-level format API.
+
+In a nutshell, the media controller lets drivers model hardware as a graph of 
+buliding blocks connected through their pads and expose that description to 
+userspace applications. In V4L2 most of those blocks are V4L2 subdevs, which 
+are abstract building blocks that implement sets of standard operations. Those 
+operations are exposed to userspace through the V4L2 subdevs pad-level format 
+API, allowing application to configure sizes and selection rectangles at all 
+pads in the graph. Selection rectangles can be used to configure cropping and 
+composing, which is exactly what the window positioning API needs to do.
+
+Instead of creating a new fbdev-specific API to do the same, shouldn't we try 
+to join forces ?
+
+> So let me at first summarize how I understand you implemented those things
+> after having a brief look at some of the drivers:
+> Windows are rectangular screen areas whose pixel data come from other
+> locations. The other locations are accessible via other framebuffer
+> devices (e.g. fb1). So in this area the data of fb1 is shown and not the
+> data of fb0 that would be normally shown.
+> 
+> So in addition to your proposed positioning I think we should also have the
+> following to give userspace a useful set of functionality:
+> 
+> - a way to discover how the screen is composited (how many windows are
+> there, how they are stacked and how to access those)
+> 
+> - a way to enable/disable windows (make them (in)visible)
+> 
+> - reporting and selecting how the window content can be mixed with the root
+> screen (overwrite, source or destination color keying)
+> 
+> - things like window size and color format could be handled by the usual fb
+> API used on the window. However there might be restrictions which cause
+> them to be not 100% API compatible (for example when changing the color
+> format if the windows are required to have the same format as the root
+> screen)
+> 
+> - do we need to worry about hardware (up/down) scaling of the window
+> content?
+> 
+> 
+> So is that what you need for a standardized window implementation?
+> Any additional things that were useful/needed in this context?
+> Would you consider adding support for this API in your drivers? (as
+> standardizing wouldn't be useful if nobody would implement it)
+
+-- 
+Regards,
+
+Laurent Pinchart
