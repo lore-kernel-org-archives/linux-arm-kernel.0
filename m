@@ -1,56 +1,45 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 7 Sep 2011 12:49:06 +0300
-Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
-	the hardware
-In-Reply-To: <CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
-References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-	<1314984756-4400-8-git-send-email-ohad@wizery.com>
-	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
-	<CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
-	<CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
-Message-ID: <CAK=Wgbayt0D8u8u_t=Zs=15A0YBjKX3RUNtWFKVCOxEOKvH7fw@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 7 Sep 2011 10:30:33 +0200
+Subject: [PATCH 1/4] mach-integrator: retire some timer macros
+Message-ID: <1315384233-27332-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[resending due to mailer-daemon errors I got, sorry]
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Hi KyongHo,
+These macros are not used by anything since the switch to
+generic time in commit b9cedda230793cbf58eb012ddadedd490cc8e129
+so let's retire them.
 
-On Wed, Sep 7, 2011 at 11:05 AM, KyongHo Cho <pullip.cho@samsung.com> wrote:
-> However, it is faster because it does not calculate the given order and
-> not call any function.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-integrator/integrator_ap.c |   12 ------------
+ 1 files changed, 0 insertions(+), 12 deletions(-)
 
-Hmm this sounds a bit like a red herring to me; optimization of the
-map function is not the main subject here. Especially not when we're
-discussing mapping of large physically contiguous memory regions which
-do not happen too often.
-
-But generally I don't think that duplicating code and eliminating
-function calls is a good optimization (the compiler can do that for
-us..). Moreover, it looks like s5p_iommu_map() gives a higher priority
-for bigger pages first, and only reaches 4KB pages after it tried all
-other supported pages. IMHO that's sub-optimal, because small mappings
-are more common than big ones.
-
-Another advantage for migrating s5p_iommu_map() over to the subject
-patch, is that s5p_iommu_map() doesn't support super sections yet. To
-support it, you'd need to add more code (duplicate another while
-loop). But if you migrated to the subject patch, then you would only
-need to flip the 16MB bit when you advertise page size capabilities
-and then that's it; you're done.
-
-> It is a logical error because the caller of iommu_map() gives
-> 4KB aligned physical address while saying that it is 64KB aligned.
-
-The caller of iommu_map() doesn't say anything about alignments. It
-just gives it a memory region to map, and expect things to just work.
-
-Obviously it's better if big physically contiguous mapping will be
-aligned to big pages, but things can still work even if it's not, by
-using smaller pages. No reason not to provide this flexibility.
-
-The only requirement the IOMMU API should have is the minimum 4KB
-alignment, because IOMMU hardware does not support smaller pages.
-
-Thanks,
-Ohad.
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 8cdc730..7748be1 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -322,18 +322,6 @@ static void __init ap_init(void)
+ #define TIMER1_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER1_BASE)
+ #define TIMER2_VA_BASE IO_ADDRESS(INTEGRATOR_TIMER2_BASE)
+ 
+-/*
+- * How long is the timer interval?
+- */
+-#define TIMER_INTERVAL	(TICKS_PER_uSEC * mSEC_10)
+-#if TIMER_INTERVAL >= 0x100000
+-#define TICKS2USECS(x)	(256 * (x) / TICKS_PER_uSEC)
+-#elif TIMER_INTERVAL >= 0x10000
+-#define TICKS2USECS(x)	(16 * (x) / TICKS_PER_uSEC)
+-#else
+-#define TICKS2USECS(x)	((x) / TICKS_PER_uSEC)
+-#endif
+-
+ static unsigned long timer_reload;
+ 
+ static void integrator_clocksource_init(u32 khz)
+-- 
+1.7.3.2
