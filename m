@@ -1,39 +1,35 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 7 Sep 2011 11:52:43 +0200
-Subject: [PATCH 17/22] OMAP2+: voltage: split out voltage processor (VP)
-	code into new layer
-In-Reply-To: <1314639355-12713-18-git-send-email-khilman@ti.com>
-References: <1314639355-12713-1-git-send-email-khilman@ti.com>
-	<1314639355-12713-18-git-send-email-khilman@ti.com>
-Message-ID: <CAORVsuX2HP9JO2XpPNrnBmqtJoz+en6cGPxG6n4S2c04CbHetA@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 7 Sep 2011 11:30:17 +0200
+Subject: [PATCH V2] ARM: mxs: Add initial support for DENX MX28
+In-Reply-To: <1315377931-15770-1-git-send-email-sbabic@denx.de>
+References: <1314604250-29511-1-git-send-email-sbabic@denx.de>
+	<1315377931-15770-1-git-send-email-sbabic@denx.de>
+Message-ID: <20110907093017.GA1912@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 7:35 PM, Kevin Hilman <khilman@ti.com> wrote:
-> This patch is primarily a move of VP specific code from voltage.c into
-> its own code in vp.c and adds prototypes to vp.h
->
-> No functional changes, except debugfs...
-Could be split into a specific patch, if possible.
+On Wed, Sep 07, 2011 at 08:45:31AM +0200, Stefano Babic wrote:
+> Added initial support for DENX M28 module and M28EVK
+> board. Ethernet(FEC), SDHC, Display are supported.
+> 
+> Signed-off-by: Stefano Babic <sbabic@denx.de>
+
+Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+
+May I ask what bootloader do you use? The FSL-uboot or will there be mxs
+support in mainline u-boot?
 
 Regards,
-Jean
 
->
-> VP debugfs moved to 'vp' subdir of <debugfs>/voltage/ and 'vp_'
-> prefixes removed from all debugfs filenames.
->
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> ?arch/arm/mach-omap2/Makefile ?| ? ?2 +-
-> ?arch/arm/mach-omap2/voltage.c | ?348 +-------------------------------------
-> ?arch/arm/mach-omap2/voltage.h | ? ?3 -
-> ?arch/arm/mach-omap2/vp.c ? ? ?| ?374 +++++++++++++++++++++++++++++++++++++++++
-> ?arch/arm/mach-omap2/vp.h ? ? ?| ? ?9 +
-> ?5 files changed, 387 insertions(+), 349 deletions(-)
-> ?create mode 100644 arch/arm/mach-omap2/vp.c
->
-...
+   Wolfram
 
-Regards,
-Jean
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110907/d0b543b4/attachment.sig>
