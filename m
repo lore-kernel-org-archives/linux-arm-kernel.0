@@ -1,39 +1,47 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  7 Sep 2011 16:59:15 +0100
-Subject: [RFC PATCH 0/3] ARM: iwmmxt/pj4 fixes for v7/Thumb-2
-Message-ID: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
+Date: Wed,  7 Sep 2011 16:59:16 +0100
+Subject: [RFC PATCH 1/3] ARM: iwmmxt: Fix Makefile rules for building iwmmxt
+	for Thumb-2
+In-Reply-To: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
+References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1315411158-17479-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iwmmxt and pj4 support code contains some code which isn't
-compatible with Thumb-2 and looks possibly inappropriate for v7.
+Because gcc/gas have no sane way to turn on individual CPU
+extensions from the command-line, iwmmxt.S was previously built
+with -mcpu=iwmmxt.  Unfortunately, this also downgrades the CPU to
+v5, with the result that this file fails to build for a Thumb-2
+kernel.
 
-There is also an issue with Makefile rules causing iwmmxt.S to be
-built for the wrong architecture.
+New versions of the tools support -march=<base arch>+iwmmxt, and it
+seems reasonable to require up-to-date tools when building in
+Thumb-2.  So, this patch uses -march=armv7-a+iwmmxt for
+CONFIG_THUMB2_KERNEL=y.
 
-This series attempts to fix those issues.  However, I'm not totally
-happy with it -- if someone with relevant boards and/or experience
-can test or comment, that would be appreciated.
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/kernel/Makefile |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-In particular, the current makefile rules are still not really
-right.  To avoid excessive pain and disruption, simpler but
-somewhat incorrect changes are made in the Makefile, and iwmmxt.S
-is changed for Thumb-2 kernels only.  This may be adequete, but I
-don't kave the required knowledge to be sure.
-
-If someone with some platform knowledge can comment on whether it
-appears valid to replace the old instruction sequences with ISBs,
-that would be appreciated too.  In this series I'm currently making
-assumptions based on the core architecture.
-
-Dave Martin (3):
-  ARM: iwmmxt: Fix Makefile rules for building iwmmxt for Thumb-2
-  ARM: iwmmxt: Port problematic iwmmxt support code to v7/Thumb-2
-  ARM: pxa/pj4: Port problematic pj4 support code to v7/Thumb-2
-
- arch/arm/kernel/Makefile  |    7 +++++++
- arch/arm/kernel/iwmmxt.S  |    9 +++++++++
- arch/arm/kernel/pj4-cp0.c |    4 ++++
- 3 files changed, 20 insertions(+), 0 deletions(-)
-
--- 1.7.4.1
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index f7887dc..8a58339 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -65,7 +65,14 @@ obj-$(CONFIG_CPU_PJ4)		+= pj4-cp0.o
+ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+ obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
++
++# When enough people have binutils which support -march=...+iwmmxt, this
++# should change to something like if __LINUX_ARM_ARCH__ < 7.
++ifdef CONFIG_THUMB2_KERNEL
++AFLAGS_iwmmxt.o			:= -Wa,-march=armv7-a+iwmmxt
++else
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
++endif
+ 
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+   obj-y		+= io.o
+-- 
+1.7.4.1
