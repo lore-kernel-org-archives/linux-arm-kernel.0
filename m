@@ -1,92 +1,64 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 7 Sep 2011 11:54:39 +0100
-Subject: [RFC PATCH 5/5] ARM: entry: Fix Thumb-2 undef handling for
-	multi-CPU kernels
-In-Reply-To: <201109011652.12711.arnd@arndb.de>
-References: <1312971223-28165-1-git-send-email-dave.martin@linaro.org>
-	<1312971223-28165-6-git-send-email-dave.martin@linaro.org>
-	<201109011652.12711.arnd@arndb.de>
-Message-ID: <20110907105439.GA2174@arm.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 7 Sep 2011 17:05:16 +0900
+Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
+	the hardware
+In-Reply-To: <CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
+References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+	<1314984756-4400-8-git-send-email-ohad@wizery.com>
+	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
+	<CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
+Message-ID: <CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 01, 2011 at 04:52:12PM +0200, Arnd Bergmann wrote:
-> On Wednesday 10 August 2011, Dave Martin wrote:
-> > When v6 and >=v7 boards are supported in the same kernel, the
-> > __und_usr code currently makes a build-time assumption that Thumb-2
-> > instructions occurring in userspace don't need to be supported.
-> > Strictly speaking this is incorrect.
-> > 
-> > This patch fixes the above case by doing a run-time check on the
-> > CPU architecture in these cases.  This only affects kernels which
-> > support v6 and >=v7 CPUs together: plain v6 and plain v7 kernels
-> > are unaffected.
-> 
-> I think this patch broke random configurations (!THUMB2 && v7) for me:
-> 
-> > @@ -439,7 +440,27 @@ __und_usr:
-> >  #endif
-> >  	beq	call_fpe
-> >  	@ Thumb instruction
-> > -#if __LINUX_ARM_ARCH__ >= 7
-> > +#if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
-> > +/*
-> > + * Thumb-2 instruction handling.  Note that because pre-v6 and >= v6 platforms
-> > + * can never be supported in a single kernel, this code is not applicable at
-> > + * all when __LINUX_ARM_ARCH__ < 6.  This allows simplifying assumptions to be
-> > + * made about .arch directives.
-> > + */
-> > +#if __LINUX_ARM_ARCH__ < 7
-> > +/* If the target CPU may not be Thumb-2-capable, a run-time check is needed: */
-> > +#define NEED_CPU_ARCHITECTURE
-> > +	ldr	r5, .LCcpu_architecture
-> > +	ldr	r5, [r5]
-> > +	cmp	r5, #CPU_ARCH_ARMv7
-> > +	blo	__und_usr_unknown
-> > +/*
-> > + * The following code won't get run unless the running CPU really is v7, so
-> > + * coding round the lack of ldrht on older arches is pointless.  Temporarily
-> > + * override the assembler target arch with the minimum required instead:
-> > + */
-> > +	.arch	armv6t2
-> > +#endif
-> >  2:
-> >   ARM(	ldrht	r5, [r4], #2	)
-> 
-> 
-> This fixes it, please fold into the patch or apply on top.
-> 
-> 	Arnd
-> 
-> 8<---
-> ARM: entry: refix Fix Thumb-2 undef handling for multi-CPU kernels
-> 
-> In some configurations labels become obsolete, so don't generate fixups for them.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 9ad50c4..b145f16 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -497,7 +497,7 @@ ENDPROC(__und_usr)
->  	.popsection
->  	.pushsection __ex_table,"a"
->  	.long	1b, 4b
-> -#if __LINUX_ARM_ARCH__ >= 7
-> +#if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
->  	.long	2b, 4b
->  	.long	3b, 4b
->  #endif
+On Wed, Sep 7, 2011 at 3:01 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Hi Cho,
+>
+> On Wed, Sep 7, 2011 at 4:30 AM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+>> Please find the following link that I submitted for our IOMMU.
+>> https://lkml.org/lkml/2011/7/3/152
+>>
+>> s5p_iommu_map/unmap accepts any order of physical address and iova
+>> without support of your suggestion if the order is not less than PAGE_SHIFT
+>
+> That's exactly what I'm trying to prevent; there's no reason to
+> duplicate the exact same logic in every iommu driver.
+>
+> As a result, your map function is quite big (it even duplicates the
+> same logic for every page size it tries).
+>
+I agree that my map function is big :)
+However, it is faster because it does not calculate the given order and
+not call any function.
 
-This patch looks correct.
+> Try to rebase your patch on the "iommu/core: split mapping to page
+> sizes as supported by the hardware" patch I've just sent, and see how
+> significantly simpler your code becomes.
+>
+> Relying on a single implementation, provided by the IOMMU core, means
+> less code to maintain (and debug) and a consistent behavior (across
+> all supported hardware) exposed to users of the IOMMU API.
+>
+>> But I think IOMMU API must not expect that the caller of iommu_map() knows
+>> about the restriction of IOMMU API implementation.
+>
+> Right. But I don't think there's any disagreement here ?
+>
+Yes, sorry:)
 
-We could tidy things up so this is easier to maintain, by avoiding the
-fixups being declared in a separate place from the labels they
-reference, but I'm not sure if it's worth it just for this case.
+> If any, then I think that s5p_iommu_map() is more limited than what I
+> propose: if it is given a 64KB region aligned only to a 4KB address,
+> it will BUG_ON() it. While not ideal, I don't think there's any reason
+> not to map it using 4KB pages (which is exactly what the new
+> iommu_map() I propose will do).
+>
+It is a logical error because the caller of iommu_map() gives
+4KB aligned physical address while saying that it is 64KB aligned.
+I think it must not be happened .
 
-Russell, would you prefer to fold this in with the previous patch, or
-apply it on top?
+> Thanks,
+> Ohad.
 
-Cheers
----Dave
+Thank you.
+
+KyongHo.
