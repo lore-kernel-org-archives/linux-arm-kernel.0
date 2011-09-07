@@ -1,461 +1,117 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 7 Sep 2011 14:36:35 +0200
-Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level debug
-	uart
-In-Reply-To: <20110907110001.GI8148@S2100-06.ap.freescale.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 7 Sep 2011 20:43:06 +0800
+Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
+In-Reply-To: <20110907060501.GE8148@S2100-06.ap.freescale.net>
 References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
-	<20110906202555.GQ28816@pengutronix.de>
-	<20110907110001.GI8148@S2100-06.ap.freescale.net>
-Message-ID: <20110907123635.GT28816@pengutronix.de>
+	<1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
+	<1711465.COqYbTSZES@wuerfel>
+	<20110907060501.GE8148@S2100-06.ap.freescale.net>
+Message-ID: <CAGsJ_4zF0hPKmYYETPGEgHHeyZUfjPUFkrTk--yPuuNy_M=DJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2011 at 07:00:02PM +0800, Shawn Guo wrote:
-> On Tue, Sep 06, 2011 at 10:25:55PM +0200, Uwe Kleine-K?nig wrote:
-> > On Tue, Sep 06, 2011 at 05:58:36PM +0800, Shawn Guo wrote:
-> > > It adds the core definitions and low-level debug uart support
-> > > for imx6q.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > ---
-> > >  arch/arm/Kconfig                             |    2 +-
-> > >  arch/arm/Kconfig.debug                       |    7 +++++
-> > >  arch/arm/Makefile                            |    1 +
-> > >  arch/arm/mach-imx/Kconfig                    |    4 +++
-> > >  arch/arm/mach-imx/Makefile                   |    2 +
-> > >  arch/arm/mach-imx/Makefile.boot              |    4 +++
-> > >  arch/arm/mach-imx/lluart.c                   |   33 ++++++++++++++++++++++++++
-> > >  arch/arm/plat-mxc/Kconfig                    |    5 ++++
-> > >  arch/arm/plat-mxc/include/mach/debug-macro.S |    5 ++++
-> > >  arch/arm/plat-mxc/include/mach/entry-macro.S |   15 +++++++++++-
-> > >  arch/arm/plat-mxc/include/mach/hardware.h    |    1 +
-> > >  arch/arm/plat-mxc/include/mach/irqs.h        |    9 ++++--
-> > >  arch/arm/plat-mxc/include/mach/memory.h      |    3 ++
-> > >  arch/arm/plat-mxc/include/mach/mx6q.h        |   29 ++++++++++++++++++++++
-> > >  14 files changed, 115 insertions(+), 5 deletions(-)
-> > >  create mode 100644 arch/arm/mach-imx/lluart.c
-> > >  create mode 100644 arch/arm/plat-mxc/include/mach/mx6q.h
-> > > 
-> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > index 4ea9974..37c20a4 100644
-> > > --- a/arch/arm/Kconfig
-> > > +++ b/arch/arm/Kconfig
-> > > @@ -1348,7 +1348,7 @@ config SMP
-> > >  	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
-> > >  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
-> > >  		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
-> > > -		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
-> > > +		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || SOC_IMX6Q
-> > >  	select USE_GENERIC_SMP_HELPERS
-> > >  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
-> > >  	help
-> > > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > > index 965d59a..68fc155 100644
-> > > --- a/arch/arm/Kconfig.debug
-> > > +++ b/arch/arm/Kconfig.debug
-> > > @@ -155,6 +155,13 @@ choice
-> > >  		  Say Y here if you want kernel low-level debugging support
-> > >  		  on i.MX50 or i.MX53.
-> > >  
-> > > +	config DEBUG_IMX6Q_UART
-> > > +		bool "i.MX6Q Debug UART"
-> > > +		depends on SOC_IMX6Q
-> > > +		help
-> > > +		  Say Y here if you want kernel low-level debugging support
-> > > +		  on i.MX6Q.
-> > > +
-> > >  	config DEBUG_S3C_UART0
-> > >  		depends on PLAT_SAMSUNG
-> > >  		bool "Use S3C UART 0 for low-level debug"
-> > > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> > > index 70c424e..3a0bbe4 100644
-> > > --- a/arch/arm/Makefile
-> > > +++ b/arch/arm/Makefile
-> > > @@ -159,6 +159,7 @@ machine-$(CONFIG_ARCH_MX2)		:= imx
-> > >  machine-$(CONFIG_ARCH_MX25)		:= imx
-> > >  machine-$(CONFIG_ARCH_MX3)		:= imx
-> > >  machine-$(CONFIG_ARCH_MX5)		:= mx5
-> > > +machine-$(CONFIG_ARCH_MX6)		:= imx
-> > >  machine-$(CONFIG_ARCH_MXS)		:= mxs
-> > >  machine-$(CONFIG_ARCH_NETX)		:= netx
-> > >  machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
-> > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > > index 0519dd7..4cf5178 100644
-> > > --- a/arch/arm/mach-imx/Kconfig
-> > > +++ b/arch/arm/mach-imx/Kconfig
-> > > @@ -58,6 +58,10 @@ config SOC_IMX35
-> > >  	select ARCH_MX35
-> > >  	select MXC_AVIC
-> > >  
-> > > +config SOC_IMX6Q
-> > > +	bool
-> > > +	select ARM_GIC
-> > > +	select CPU_V7
-> > >  
-> > >  if ARCH_MX1
-> > >  
-> > > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> > > index e9eb36d..96ecc96 100644
-> > > --- a/arch/arm/mach-imx/Makefile
-> > > +++ b/arch/arm/mach-imx/Makefile
-> > > @@ -61,3 +61,5 @@ obj-$(CONFIG_MACH_MX35_3DS) += mach-mx35_3ds.o
-> > >  obj-$(CONFIG_MACH_EUKREA_CPUIMX35) += mach-cpuimx35.o
-> > >  obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD) += eukrea_mbimxsd35-baseboard.o
-> > >  obj-$(CONFIG_MACH_VPR200) += mach-vpr200.o
-> > > +
-> > > +obj-$(CONFIG_DEBUG_LL) += lluart.o
-> > > diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
-> > > index ebee18b..389a0e3 100644
-> > > --- a/arch/arm/mach-imx/Makefile.boot
-> > > +++ b/arch/arm/mach-imx/Makefile.boot
-> > > @@ -17,3 +17,7 @@ initrd_phys-$(CONFIG_MACH_MX27)	:= 0xA0800000
-> > >  zreladdr-$(CONFIG_ARCH_MX3)	:= 0x80008000
-> > >  params_phys-$(CONFIG_ARCH_MX3)	:= 0x80000100
-> > >  initrd_phys-$(CONFIG_ARCH_MX3)	:= 0x80800000
-> > > +
-> > > +zreladdr-$(CONFIG_SOC_IMX6Q)	:= 0x10008000
-> > > +params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
-> > > +initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
-> > Do you really need params_phys and initrd_phys?
-> > 
-> I added them to make IMX6Q look consistent with other soc in the file,
-> and leave it to a global cleanup, if we decide to clean later.
-If you ask me don't do that. Better do it for imx6q as clean as
-possible.
+2011/9/7 Shawn Guo <shawn.guo@freescale.com>:
+> Hi Arnd,
+>
+> On Tue, Sep 06, 2011 at 09:14:29PM +0200, Arnd Bergmann wrote:
+>> On Tuesday 06 September 2011 17:58:37 Shawn Guo wrote:
+>> > It adds a number of core drivers support for imx6q, including clock,
+>> > General Power Controller (gpc), Multi Mode DDR Controller(mmdc) and
+>> > System Reset Controller (src).
+>> >
+>> > Signed-off-by: Ranjani Vaidyanathan <ra5478@freescale.com>
+>> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+>> > ---
+>> > ?arch/arm/mach-imx/Kconfig ? ? ? | ? 13 +
+>> > ?arch/arm/mach-imx/Makefile ? ? ?| ? ?4 +
+>> > ?arch/arm/mach-imx/clock-imx6q.c | 1990 +++++++++++++++++++++++++++++++++++++++
+>> > ?arch/arm/mach-imx/gpc.c ? ? ? ? | ?110 +++
+>> > ?arch/arm/mach-imx/mmdc.c ? ? ? ?| ? 71 ++
+>> > ?arch/arm/mach-imx/src.c ? ? ? ? | ? 52 +
+>> > ?6 files changed, 2240 insertions(+), 0 deletions(-)
+>>
+>> This is unfortunately still a major problem.
+>
+> It's so sad to still get this comment. ?Back to Linaro Connect on
+> Cambridge, I believe I asked for your opinion on new SoC clock support
+> without waiting for the clock framework. ?You said you do not have a
+> strong position on this and would defer to others' judgement. ?Then
+> I talked to Russell and Grant respectively, and they both agree that
+> we should not be blocked by the clock framework. ?That's why I decided
+> to start upstreaming imx6q.
+>
+>> I realize that we don't
+>> yet have a good framework to do this with significantly less code,
+>> but adding a platform that is mostly consisting of stupid additions
+>> of clock descriptions that really should be in the device tree does
+>> not scale much longer.
+>
+> I definitely agree this does not scale for long term. ?And I would
+> immediately migrate it to clock framework once it gets ready and put
+> the description into device tree when clock binding is ready. ?Before
+> we get there, we need a way out. ?It's unreasonable for us to hold
+> the new soc support for an unspecified time. ?It's been 20 months since
+> we saw the common clock patches[1] from Jeremy, and we do not know yet
+> how many months we still have to wait. ?Grant worked out the auxdata to
+> remove the device tree dependency on clock framework. ?I think we
+> should not get new soc support blocked by clock framework either.
+>
+>> We decided to let this still get in for prima2,
+>> which was also ugly in this regard but much simpler than imx6.
+>>
+> It's unfair to me that you reject imx6q clock code just because it's
+> an implementation for a hardware complexer than prima2.
 
-> > > diff --git a/arch/arm/mach-imx/lluart.c b/arch/arm/mach-imx/lluart.c
-> > > new file mode 100644
-> > > index 0000000..34205cb
-> > > --- /dev/null
-> > > +++ b/arch/arm/mach-imx/lluart.c
-> > > @@ -0,0 +1,33 @@
-> > > +/*
-> > > + * Copyright 2011 Freescale Semiconductor, Inc.
-> > > + * Copyright 2011 Linaro Ltd.
-> > > + *
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +
-> > > +#include <linux/init.h>
-> > > +#include <asm/page.h>
-> > > +#include <asm/sizes.h>
-> > > +#include <asm/mach/map.h>
-> > > +#include <mach/hardware.h>
-> > > +
-> > > +static struct map_desc imx_lluart_desc = {
-> > > +#ifdef CONFIG_DEBUG_IMX6Q_UART
-> > > +	.virtual	= MX6Q_UART4_BASE_VADDR,
-> > > +	.pfn		= __phys_to_pfn(MX6Q_UART4_BASE_ADDR),
-> > > +	.length		= SZ_16K,
-> > > +	.type		= MT_DEVICE,
-> > > +#endif
-> > > +};
-> > > +
-> > > +void __init imx_lluart_map_io(void)
-> > > +{
-> > > +	if (imx_lluart_desc.virtual)
-> > > +		iotable_init(&imx_lluart_desc, 1);
-> > > +}
-> > I don't see yet where this is called, but I wonder what happens on a
-> > non-imx6q machine (provided it is called there).
-> 
-> This is called by imx6q_map_io() in mach-imx6q.c.  For non-imx6q
-> machines, imx_lluart_desc will be all zero,
-But only if the image doesn't support imx6q, right? Anyhow, I hope
-imx6q_map_io isn't called for pre-imx6q SoCs. Ah, and I hope we don't
-need to argue here as Russell doesn't like the new DEBUG_LL changes :-)
+i understand your feeling.
 
+actually i am also waiting for the common clock framework to finish
+the whole prima2 clock tree driver. now prima2 only includes a little
+part of clock trees, actually if i list all of them, the file will be
+large too. And codes are ugly too.
 
->                                             therefore iotable_init()
-> call will be bypassed.
+auxdata is really a temp solution, it really brings many details to
+kernel, which should not be in kernel at all.
 
-> 
-> > > +
-> > > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> > > index a5353fc..e548f9b 100644
-> > > --- a/arch/arm/plat-mxc/Kconfig
-> > > +++ b/arch/arm/plat-mxc/Kconfig
-> > > @@ -48,6 +48,11 @@ config ARCH_MX51
-> > >  	help
-> > >  	  This enables support for systems based on the Freescale i.MX51 family
-> > >  
-> > > +config ARCH_MX6
-> > > +	bool "i.MX6"
-> > > +	help
-> > > +	  This enables support for systems based on the Freescale i.MX6 family
-> > > +
-> > >  endchoice
-> > >  
-> > >  source "arch/arm/mach-imx/Kconfig"
-> > > diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> > > index 07cfdbe..471872a 100644
-> > > --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-> > > +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> > > @@ -24,9 +24,14 @@
-> > >  #define UART_PADDR	MX51_UART1_BASE_ADDR
-> > >  #elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
-> > >  #define UART_PADDR	MX53_UART1_BASE_ADDR
-> > > +#elif defined (CONFIG_DEBUG_IMX6Q_UART)
-> > > +#define UART_PADDR	MX6Q_UART4_BASE_ADDR
-> > > +#define UART_VADDR	MX6Q_UART4_BASE_VADDR
-> > You cannot use the existing IMX_IO_P2V? I'd like to have a look into it
-> > to make it usable there, too. See below.
-> > 
-> > >  #endif
-> > >  
-> > > +#ifndef UART_VADDR
-> > >  #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
-> > > +#endif
-> > >  
-> > >  		.macro	addruart, rp, rv
-> > >  		ldr	\rp, =UART_PADDR	@ physical
-> > > diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
-> > > index 066d464..341f800 100644
-> > > --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
-> > > +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
-> > > @@ -1,6 +1,6 @@
-> > >  /*
-> > >   *  Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
-> > > - *  Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-> > > + *  Copyright 2004-2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> > >   */
-> > >  
-> > >  /*
-> > > @@ -11,6 +11,17 @@
-> > >  
-> > >  #include <mach/hardware.h>
-> > >  
-> > > +#ifdef CONFIG_ARM_GIC
-> > > +#include <asm/hardware/entry-macro-gic.S>
-> > > +
-> > > +	.macro	disable_fiq
-> > > +	.endm
-> > > +
-> > > +	.macro	arch_ret_to_user, tmp1, tmp2
-> > > +	.endm
-> > > +
-> > > +#else
-> > > +
-> > hmm, this essentially means mx6 support cannot go into a kernel image
-> > for the other imx machines :-(
-> > 
-> Ah, sorry.  I totally forgot about this.  Will fix it in the next
-> version.
-> 
-> > >  #define AVIC_NIMASK	0x04
-> > >  
-> > >  	@ this macro disables fast irq (not implemented)
-> > > @@ -78,3 +89,5 @@
-> > >  	movs \irqnr, \irqnr
-> > >  #endif
-> > >  	.endm
-> > > +
-> > > +#endif /* CONFIG_ARM_GIC */
-> > > diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-> > > index a8bfd56..e1f84ce 100644
-> > > --- a/arch/arm/plat-mxc/include/mach/hardware.h
-> > > +++ b/arch/arm/plat-mxc/include/mach/hardware.h
-> > > @@ -97,6 +97,7 @@
-> > >  
-> > >  #include <mach/mxc.h>
-> > >  
-> > > +#include <mach/mx6q.h>
-> > >  #include <mach/mx50.h>
-> > >  #include <mach/mx51.h>
-> > >  #include <mach/mx53.h>
-> > > diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
-> > > index 00e812b..3ae400f 100644
-> > > --- a/arch/arm/plat-mxc/include/mach/irqs.h
-> > > +++ b/arch/arm/plat-mxc/include/mach/irqs.h
-> > > @@ -14,12 +14,15 @@
-> > >  #include <asm-generic/gpio.h>
-> > >  
-> > >  /*
-> > > - * SoCs with TZIC interrupt controller have 128 IRQs, those with AVIC have 64
-> > > + * SoCs with AVIC interrupt controller have 64 IRQs, those with TZIC
-> > > + * have 128, otherwise those with GIC have 160 IRQs.
-> > >   */
-> > > -#ifdef CONFIG_MXC_TZIC
-> > > +#if defined CONFIG_MXC_AVIC
-> > > +#define MXC_INTERNAL_IRQS	64
-> > > +#elif defined CONFIG_MXC_TZIC
-> > >  #define MXC_INTERNAL_IRQS	128
-> > >  #else
-> > > -#define MXC_INTERNAL_IRQS	64
-> > > +#define MXC_INTERNAL_IRQS	160
-> > >  #endif
-> > This is broken. The highest number has to go to the top. Otherwise if
-> > you have an image with at least 2 of the available irq controllers your
-> > MXC_INTERNAL_IRQS is too small.
-> > 
-> Yes, this is yet another one I forgot about single image support.
-> I should probably put some documentation about the correct order,
-> which can be forgot by people like me.
-Maybe just introduce a corresponding comment when you touch this part of
-code anyhow?!
+>
+>> My feeling is that this time, we should wait for the common clock
+>> framework to get in and simplify this. I believe Thomas is now planning
+>> to do this, but I haven't followed what the current state is.
+>>
+> Sadly, if this is the position of entire arm-soc maintainer group,
+> I think I have made a wrong decision to start upstreaming imx6q now.
+>
+>> The other three drivers in this patch are basically ok, so you can
+>> definitely post them as a separate patch and perhaps get minor comments
+>> for those, similar to what I commented on the other patches.
+>>
+>> For the clock-imx6q.c file, what I first want to hear from someone
+>> is how this is supposed to look like in the long run with device tree
+>> integration, and how far away from that we are.
+>>
+>> Can you comment on how far we get without the clock driver with imx6?
+>> Is is basically useless, or is there a way we can merge the remaining
+>> imx6 code and other drivers but postpone the large clock driver?
+>>
+> Unfortunately, clock is pretty fundamental for imx6q support. ?Without
+> clock support, imx6q platform is useless. ?We have a real example here.
+> Back to Dec. 2010, Sascha refused to take clock patch when Freescale
+> was submitting imx50 platform support, because he thought the clock
+> framework will get merged pretty soon. ?But we end up with the facts
+> that clock framework is still up in the air and imx50 platform support
+> on mainline is totally useless.
+>
+> I have been tried very hard to reduce the LOC of clock-imx6q.c. ?It's
+> a 5K LOC file in the Freescale internal tree. ?Now it's 2K LOC. ?I know
+> it's still large enough for you to dislike it. ?But this is the clock
+> that the hardware has. ?I'm afraid we can not do much to reduce the LOC
+> significantly, unless we only implement the small portion other than
+> the full clock tree, which is what I really hate to do.
+>
+> Regards,
+> Shawn
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-January/007238.html
+>
 
-> > >  #define MXC_GPIO_IRQ_START	MXC_INTERNAL_IRQS
-> > > diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
-> > > index 11be5cd..2b8e186 100644
-> > > --- a/arch/arm/plat-mxc/include/mach/memory.h
-> > > +++ b/arch/arm/plat-mxc/include/mach/memory.h
-> > > @@ -19,6 +19,7 @@
-> > >  #define MX50_PHYS_OFFSET	UL(0x70000000)
-> > >  #define MX51_PHYS_OFFSET	UL(0x90000000)
-> > >  #define MX53_PHYS_OFFSET	UL(0x70000000)
-> > > +#define MX6Q_PHYS_OFFSET	UL(0x10000000)
-> > >  
-> > >  #if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
-> > >  # if defined CONFIG_ARCH_MX1
-> > > @@ -37,6 +38,8 @@
-> > >  #  define PLAT_PHYS_OFFSET		MX51_PHYS_OFFSET
-> > >  # elif defined CONFIG_ARCH_MX53
-> > >  #  define PLAT_PHYS_OFFSET		MX53_PHYS_OFFSET
-> > > +# elif defined CONFIG_SOC_IMX6Q
-> > > +#  define PLAT_PHYS_OFFSET		MX6Q_PHYS_OFFSET
-> > >  # endif
-> > >  #endif
-> > >  
-> > > diff --git a/arch/arm/plat-mxc/include/mach/mx6q.h b/arch/arm/plat-mxc/include/mach/mx6q.h
-> > > new file mode 100644
-> > > index 0000000..7432310
-> > > --- /dev/null
-> > > +++ b/arch/arm/plat-mxc/include/mach/mx6q.h
-> > > @@ -0,0 +1,29 @@
-> > > +/*
-> > > + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> > > + * Copyright 2011 Linaro Ltd.
-> > > + *
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +
-> > > +#ifndef __MACH_MX6Q_H__
-> > > +#define __MACH_MX6Q_H__
-> > > +
-> > > +/* static mappings */
-> > > +#define IMX6Q_VA(x)		(0xf4000000 + (x))
-> > > +
-> > > +#define MX6Q_SCU_BASE_ADDR	0x00a00000
-> > > +#define MX6Q_CCM_BASE_ADDR	0x020c4000
-> > > +#define MX6Q_ANATOP_BASE_ADDR	0x020c8000
-> > > +#define MX6Q_UART4_BASE_ADDR	0x021f0000
-> > > +
-> > > +#define MX6Q_SCU_BASE_VADDR	IMX6Q_VA(MX6Q_SCU_BASE_ADDR)
-> > > +#define MX6Q_CCM_BASE_VADDR	IMX6Q_VA(MX6Q_CCM_BASE_ADDR)
-> > > +#define MX6Q_ANATOP_BASE_VADDR	IMX6Q_VA(MX6Q_ANATOP_BASE_ADDR)
-> > > +#define MX6Q_UART4_BASE_VADDR	IMX6Q_VA(MX6Q_UART4_BASE_ADDR)
-> > Depending on the sizes of these memory regions you can use the existing
-> > IMX_IO_P2V here. The conditions are:
-> > 
-> > 	SCU_SIZE <= 0x200000
-Actually this should be 0x100000 as this is the size that is mapped in a
-continous chunk.
-
-> > 	CCM_SIZE <= 0x4000
-> > 	ANATOP_SIZE <= 0x28000
-> > 	UART4 <= 0x100000
-> > 
-> This is exactly what I dislike about IMX_IO_P2V().  We have to verify
-> all these conditions manually.  Looking at the static mapping below
-I did it semi-manual, I just put your constants for imx6q into my script
-(all with size=0x4000 for now) and it told me:
-
-...
- * mx6q:
- *	SCU	0x00a00000+0x004000	->	0xf4000000+0x004000
- *	CCM	0x020c4000+0x004000	->	0xf42c4000+0x004000
- *	ANATOP	0x020c8000+0x004000	->	0xf42c8000+0x004000
- *	UART4	0x021f0000+0x004000	->	0xf42f0000+0x004000
-...
-
-> (copied from arch/arm/plat-mxc/include/mach/hardware.h), do you think
-> it's really scalable and easy to maintain for the long run?
-At least it provides a way to verify the correctness of the mapping.
-Before I introduced the mapping function there was a conflict IIRC.
-
-> /*
->  * This is rather complicated for humans and ugly to verify, but for a machine
->  * it's OK.  Still more as it is usually only applied to constants.  The upsides
->  * on using this approach are:
->  *
->  *  - same mapping on all i.MX machines
->  *  - works for assembler, too
->  *  - no need to nurture #defines for virtual addresses
->  *
->  * The downside it, it's hard to verify (but I have a script for that).
-If you want I can provide you that script.
-
->  * Obviously this needs to be injective for each SoC.  In general it maps the
->  * whole address space to [0xf4000000, 0xf5ffffff].  So [0xf6000000,0xfeffffff]
->  * is free for per-machine use (e.g. KZM_ARM11_01 uses 64MiB there).
->  *
->  * It applies the following mappings for the different SoCs:
->  *
->  * mx1:
->  *	IO	0x00200000+0x100000	->	0xf4000000+0x100000
->  * mx21:
->  *	AIPI	0x10000000+0x100000	->	0xf4400000+0x100000
->  *	SAHB1	0x80000000+0x100000	->	0xf4000000+0x100000
->  *	X_MEMC	0xdf000000+0x004000	->	0xf5f00000+0x004000
->  * mx25:
->  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
->  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
->  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
->  * mx27:
->  *	AIPI	0x10000000+0x100000	->	0xf4400000+0x100000
->  *	SAHB1	0x80000000+0x100000	->	0xf4000000+0x100000
->  *	X_MEMC	0xd8000000+0x100000	->	0xf5c00000+0x100000
->  * mx31:
->  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
->  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
->  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
->  *	X_MEMC	0xb8000000+0x010000	->	0xf4c00000+0x010000
->  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
->  * mx35:
->  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
->  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
->  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
->  *	X_MEMC	0xb8000000+0x010000	->	0xf4c00000+0x010000
->  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
->  * mx50:
->  *	TZIC	0x0fffc000+0x004000	->	0xf4bfc000+0x004000
->  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
->  *	AIPS1	0x53f00000+0x100000	->	0xf5700000+0x100000
->  *	AIPS2	0x63f00000+0x100000	->	0xf5300000+0x100000
->  * mx51:
->  *	IRAM	0x1ffe0000+0x020000	->	0xf4fe0000+0x020000
->  *	DEBUG	0x60000000+0x100000	->	0xf5000000+0x100000
->  *	SPBA0	0x70000000+0x100000	->	0xf5400000+0x100000
->  *	AIPS1	0x73f00000+0x100000	->	0xf5700000+0x100000
->  *	AIPS2	0x83f00000+0x100000	->	0xf4300000+0x100000
->  */
-> #define IMX_IO_P2V(x)	(						\
-> 			0xf4000000 +					\
-> 			(((x) & 0x50000000) >> 6) +			\
-> 			(((x) & 0x0b000000) >> 4) +			\
-> 			(((x) & 0x000fffff)))
-> 
-> > hmm, looking at patch 4 SCU_BASE is determined by a coprocessor
-> > instruction?!
-> 
-> Ah, yes.  The SCU physical base address can be retrieved from
-> coprocessor.
-Is there an advantage in autodetecting the base address?
- 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks
+barry
