@@ -1,51 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Sep 2011 10:55:13 +0100
-Subject: [PATCH 2/5] ARM: SAMSUNG: Make the sleep code common for
-	S3C64XX and newer SoCs
-In-Reply-To: <1313144787-30666-3-git-send-email-a.kesavan@samsung.com>
-References: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
-	<1313144787-30666-3-git-send-email-a.kesavan@samsung.com>
-Message-ID: <20110907095513.GQ6619@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 7 Sep 2011 12:39:36 +0200
+Subject: [PATCH 09/22] OMAP2: add voltage domains and connect to
+	powerdomains
+In-Reply-To: <1314639355-12713-10-git-send-email-khilman@ti.com>
+References: <1314639355-12713-1-git-send-email-khilman@ti.com>
+	<1314639355-12713-10-git-send-email-khilman@ti.com>
+Message-ID: <CAORVsuXd2eeSs_TFu+stJge6tqQzO+4d0FcnmDPMHnChLgCuiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 12, 2011 at 03:56:24PM +0530, Abhilash Kesavan wrote:
-> +ENTRY(s3c_cpu_resume)
-> +#if defined(CONFIG_S3C_PM_DEBUG_LED_SMDK)
-> +
-> +#undef S3C64XX_VA_GPIO
-> +#define S3C64XX_VA_GPIO (0x0)
-> +#define S3C64XX_GPNCON			(S3C64XX_GPN_BASE + 0x00)
-> +#define S3C64XX_GPNDAT			(S3C64XX_GPN_BASE + 0x04)
-> +
-> +#define S3C64XX_GPN_CONMASK(__gpio)	(0x3 << ((__gpio) * 2))
-> +#define S3C64XX_GPN_OUTPUT(__gpio)	(0x1 << ((__gpio) * 2))
-> +
-> +	/* Initialise the GPIO state if we are debugging via the SMDK LEDs,
-> +	 * as the uboot version supplied resets these to inputs during the
-> +	 * resume checks.
-> +	*/
-> +
-> +	ldr	r3, =S3C64XX_PA_GPIO
-> +	ldr	r0, [ r3, #S3C64XX_GPNCON ]
-> +	bic	r0, r0, #(S3C64XX_GPN_CONMASK(12) | S3C64XX_GPN_CONMASK(13) | \
-> +			  S3C64XX_GPN_CONMASK(14) | S3C64XX_GPN_CONMASK(15))
-> +	orr	r0, r0, #(S3C64XX_GPN_OUTPUT(12) | S3C64XX_GPN_OUTPUT(13) | \
-> +			  S3C64XX_GPN_OUTPUT(14) | S3C64XX_GPN_OUTPUT(15))
-> +	str	r0, [ r3, #S3C64XX_GPNCON ]
-> +
-> +	ldr	r0, [ r3, #S3C64XX_GPNDAT ]
-> +	bic	r0, r0, #0xf << 12			@ GPN12..15
-> +	orr	r0, r0, #1 << 15			@ GPN15
-> +	str	r0, [ r3, #S3C64XX_GPNDAT ]
-> +#endif
+Kevin,
 
-This is incompatible with the aim of a single kernel booting on many ARM
-platforms.
+On Mon, Aug 29, 2011 at 7:35 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Create basic voltagedomains for OMAP2 and associate OMAP2 powerdomains
+> with the newly created voltage domains.
+>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ? ? ?| ? ?3 +-
+> ?arch/arm/mach-omap2/io.c ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
+> ?arch/arm/mach-omap2/powerdomains2xxx_data.c ? | ? ?4 +++
+> ?arch/arm/mach-omap2/voltage.h ? ? ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-omap2/voltagedomains2xxx_data.c | ? 32 +++++++++++++++++++++++++
+> ?5 files changed, 41 insertions(+), 1 deletions(-)
+> ?create mode 100644 arch/arm/mach-omap2/voltagedomains2xxx_data.c
+>
+...
 
-Rather than consolidating down to just one implementation, how about
-consolidating to two - one for everything but SMDK, and one for the SMDK
-with the LED stuff.  You can then chose which you want - either the
-s3c_generic_resume (which is just the magic code plus the branch)
-or s3c_smdk_leds_resume (which would be the magic code plus the LEDS
-stuff plus the branch.)
+> diff --git a/arch/arm/mach-omap2/voltagedomains2xxx_data.c b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
+> new file mode 100644
+> index 0000000..69ff261
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
+> @@ -0,0 +1,32 @@
+> +/*
+> + * OMAP3 voltage domain data
+> + *
+> + * Copyright (C) 2007, 2010 Texas Instruments, Inc.
+2011?
+
+Regards,
+Jean
