@@ -1,52 +1,60 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 7 Sep 2011 10:38:10 +0530
-Subject: [PATCH 4/6] arm/imx6q: add smp and cpu hotplug support
-In-Reply-To: <20110907044144.GD8148@S2100-06.ap.freescale.net>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-5-git-send-email-shawn.guo@linaro.org>
-	<1588593.gaQsrFqt8B@wuerfel>
-	<20110907044144.GD8148@S2100-06.ap.freescale.net>
-Message-ID: <CAMQu2gwcT4CnDXHLzH1+awvULaHfOyQdpgc+qKj0xhFkV7-0Pw@mail.gmail.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 7 Sep 2011 10:47:20 +0530
+Subject: [PATCH v6 19/25] gpio/omap: cleanup prepare_for_idle and
+	resume_after_idle
+In-Reply-To: <874o0pxm77.fsf@ti.com>
+References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
+	<1314798161-19523-20-git-send-email-tarun.kanti@ti.com>
+	<874o0pxm77.fsf@ti.com>
+Message-ID: <CAC83Zv+zAve-fNGYR9BTZ7nPXpz5HDWzyX=gdwS92OouVVo14Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2011 at 10:11 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> On Tue, Sep 06, 2011 at 08:53:07PM +0200, Arnd Bergmann wrote:
->> On Tuesday 06 September 2011 17:58:38 Shawn Guo wrote:
->> > It adds smp and cpu hotplug support for imx6q.
->> > +static u32 twd_saved_regs[4];
->> > +static int twd_irq;
->> > +
->> > +/*
->> > + * Resuming from ARM Dormant/Shutdown mode, the boot procedure will
->> > + * re-setup local timer for secondary cores. ?For primary core, it
->> > + * has to take care of itself with the following pair of functions
->> > + * during suspend/resume.
->> > + */
->> > +void imx_local_timer_pre_suspend(void)
->> > +{
->> > + ? twd_saved_regs[0] = __raw_readl(twd_base + TWD_TIMER_LOAD);
->> > + ? twd_saved_regs[1] = __raw_readl(twd_base + TWD_TIMER_COUNTER);
->> > + ? twd_saved_regs[2] = __raw_readl(twd_base + TWD_TIMER_CONTROL);
->> > + ? twd_saved_regs[3] = __raw_readl(twd_base + TWD_TIMER_INTSTAT);
->> > +}
->> > +
->> > +void imx_local_timer_post_resume(void)
->> > +{
->> > + ? __raw_writel(twd_saved_regs[0], twd_base + TWD_TIMER_LOAD);
->> > + ? __raw_writel(twd_saved_regs[1], twd_base + TWD_TIMER_COUNTER);
->> > + ? __raw_writel(twd_saved_regs[2], twd_base + TWD_TIMER_CONTROL);
->> > + ? __raw_writel(twd_saved_regs[3], twd_base + TWD_TIMER_INTSTAT);
->> > +
->> > + ? gic_enable_ppi(twd_irq);
->> > +}
->>
->> readl_relaxed()?
->>
-> Ok. ?You get the best judgement on this.
+On Wed, Sep 7, 2011 at 5:23 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 >
-You don't have to save local timer registers any more. The local timer
-is always re-configued and this is already handled in common kernel.
+>> Cleanup ?omap2_gpio_prepare_for_idle() and omap2_gpio_resume_after_idle()
+>> by moving most of the stuff to *_runtime_suspend() and *_runtime_resume().
+>
+> Why?
+>
+> (I know the answer, but it should be in the changelog.)
+Ok.
 
-You can drop above change and test your patches. I am sure they will
-still work.
+>
+>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+>> Signed-off-by: Charulatha V <charu@ti.com>
+>> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>
+> Also, as pointed out in an earlier patch, now that this is moved out of
+> the idle path, where interrupts were known to be disabled, the register
+> accesses in the runtime PM callbacks need to be protected by the
+> spinlock just like they are in other parts of the driver.
+Ok.
+
+>
+> [...]
+>
+>> @@ -1305,9 +1316,14 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->fallingdetect);
+>> ? ? ? __raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
+>> ?}
+>> +#else
+>> +#define omap_gpio_runtime_suspend NULL
+>> +#define omap_gpio_runtime_resume NULL
+>> ?#endif
+>>
+>> ?static const struct dev_pm_ops gpio_pm_ops = {
+>> + ? ? .runtime_suspend ? ? ? ?= omap_gpio_runtime_suspend,
+>> + ? ? .runtime_resume ? ? ? ? = omap_gpio_runtime_resume,
+>
+> Please use SET_RUNTIME_PM_OPS() (see <linux/pm.h.)
+Sure.
+
+>
+>> ? ? ? .suspend ? ? ? ? ? ? ? ?= omap_gpio_suspend,
+>> ? ? ? .resume ? ? ? ? ? ? ? ? = omap_gpio_resume,
+>> ?};
+>
+> Kevin
+>
