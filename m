@@ -1,149 +1,169 @@
-From: lacombar@gmail.com (Arnaud Lacombe)
-Date: Wed, 7 Sep 2011 16:52:15 -0400
-Subject: [RFC] Kbuild: allow code re-use across different directories
-In-Reply-To: <alpine.LFD.2.00.1109071554480.20358@xanadu.home>
-References: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
-	<alpine.LFD.2.00.1109071437400.20358@xanadu.home>
-	<CACqU3MVF8XSdKi0PeZF5SFaH9i2HPqCjkMqccyb83x4V_1Vs1g@mail.gmail.com>
-	<alpine.LFD.2.00.1109071554480.20358@xanadu.home>
-Message-ID: <CACqU3MUiie5Zv+FwFkXcY7yZ1-wgCB7xVpHn36WaV7EpecU4Cw@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 7 Sep 2011 14:49:54 -0700
+Subject: [PATCH 1/2] input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD
+	config option
+In-Reply-To: <20110907182248.GA2874@core.coreip.homeip.net>
+References: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
+	<1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
+	<20110907182248.GA2874@core.coreip.homeip.net>
+Message-ID: <20110907214954.GA32235@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 07, 2011 at 11:22:48AM -0700, Dmitry Torokhov wrote:
+> Hi Thomas,
+> 
+> On Tue, Sep 06, 2011 at 07:25:16PM +0530, Thomas Abraham wrote:
+> > Samsung keyboard driver could be used with platforms using device tree.
+> > So the inclusion of samsung keyboard driver cannot be based on
+> > SAMSUNG_DEV_KEYPAD. A new config option HAVE_SAMSUNG_KEYPAD is added
+> > which device tree based platforms should use to include samsung keyboard
+> > driver.
+> 
+> I am sorry, I do not follow... What is the difference between
+> SAMSUNG_DEV_KEYPAD and HAVE_SAMSUNG_KEYPAD? They look exactly the same.
+> 
 
-On Wed, Sep 7, 2011 at 3:59 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> On Wed, 7 Sep 2011, Arnaud Lacombe wrote:
->
->> Hi,
->>
->> On Wed, Sep 7, 2011 at 3:07 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> > On Fri, 19 Aug 2011, Arnaud Lacombe wrote:
->> >
->> >> Hi folks,
->> >>
->> >> The attached patch modify Kbuild to allow to directly re-use code in multiple
->> >> directory without having to go through a copy. Technically, it changes Kbuild to
->> >> use by default the VPATH feature of GNU make and provides accessors for Makefile
->> >> to change it indirectly.
->> >>
->> >> Considering:
->> >>
->> >> arch/foo/lib:
->> >> fancy.c
->> >>
->> >> We want to be able to build it with -DPANTS=32 in the kernel, but the
->> >> bootloader requires -DPANTS_SIZE=30.
->> >>
->> >> Currently we would do, either:
->> >>
->> >> arch/foo/lib/Makefile
->> >> LDFLAGS_fancy.o := -DPANTS=32
->> >> obj-y += fancy.o
->> >>
->> >> and, either:
->> >>
->> >> arch/foo/boot/Makefile:
->> >> LDFLAGS_fancy.o := -DPANTS=30
->> >> obj-y += fancy.o
->> >> $(obj)/fancy.c: $(srctree)/arch/foo/lib/fancy.c
->> >> ? ? ? $(call cmd,shipped)
->> >>
->> >> or
->> >>
->> >> arch/foo/boot/Makefile:
->> >> LDFLAGS_fancy.o := -DPANTS=30
->> >> obj-y += fancy.o
->> >> $(obj)/fancy.o: $(srctree)/arch/foo/lib/fancy.c
->> >> ? ? ? $(call cmd,cc_c_o)
->> >>
->> >> The former implies an extra copy of the source file, the latter expose Kbuild
->> >> internal function.
->> >>
->> >> With the attached patch, we would do:
->> >>
->> >> arch/foo/boot/Makefile:
->> >> LDFLAGS_fancy.o := -DPANTS=30
->> >> obj-y += fancy.o
->> >> vpath-y += $(srctree)/arch/foo/lib
->> >>
->> >> and let GNU make do the job.
->> >>
->> >> Comments welcome,
->> >
->> > It doesn't work. ?Whatever I do to arch/arm/boot/compressed/Makefile
->> > (which admittedly looks a bit hairy and could benefit from a shave) in
->> > order to remove the $(call cmd,shipped) used with lib1funcs.S, I always
->> > end up with:
->> >
->> > make[2]: *** No rule to make target `arch/arm/boot/compressed/lib1funcs.S', needed by `arch/arm/boot/compressed/lib1funcs.o'. ?Stop.
->> >
->> What was the exact change you made which triggered this ?
->
-> In its simplest expression (not caring about the now undefined lib1funcs
-> variable):
->
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index 0c74a6fab9..b34ed80977 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -70,6 +70,10 @@ ifeq ($(CONFIG_ARCH_SHMOBILE),y)
-> ?OBJS ? ? ? ? ? += head-shmobile.o
-> ?endif
->
-> +# For __aeabi_uidivmod
-> +OBJS ? ? ? ? ? += lib1funcs.o
-> +vpath-y ? ? ? ? ? ? ? ?+= $(srctree)/arch/arm/lib
-> +
-> ?#
-> ?# We now have a PIC decompressor implementation. ?Decompressors running
-> ?# from RAM should not define ZTEXTADDR. ?Decompressors running directly
-> @@ -120,12 +124,6 @@ LDFLAGS_vmlinux += -X
-> ?# Next argument is a linker script
-> ?LDFLAGS_vmlinux += -T
->
-> -# For __aeabi_uidivmod
-> -lib1funcs = $(obj)/lib1funcs.o
-> -
-> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
-> - ? ? ? $(call cmd,shipped)
-> -
-> ?# We need to prevent any GOTOFF relocs being used with references
-> ?# to symbols in the .bss section since we cannot relocate them
-> ?# independently from the rest at run time. ?This can be achieved by
->
-that look correct to me, however, the error you get:
+BTW, should we do something like below?
 
-make[2]: *** No rule to make target
-`arch/arm/boot/compressed/lib1funcs.S', needed by
-`arch/arm/boot/compressed/lib1funcs.o'.  Stop.
+Thanks.
 
-seem odd to me.
+-- 
+Dmitry
 
-I just re-tried on x86 with:
+Input: samsung-keypad - enable compiling on other platforms
 
-diff --git a/arch/x86/boot/compressed/Makefile
-b/arch/x86/boot/compressed/Makefile
-index 09664ef..65c89f7 100644
---- a/arch/x86/boot/compressed/Makefile
-+++ b/arch/x86/boot/compressed/Makefile
-@@ -23,7 +23,9 @@ LDFLAGS_vmlinux := -T
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
- hostprogs-y    := mkpiggy
+There is nothing in keypad platform definitions that requires
+the driver be complied on Samsung platform only, so let's move them
+out of the platform subdirectory and relax the dependencies.
 
--$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/head_$(BITS).o
-$(obj)/misc.o $(obj)/string.o $(obj)/cmdline.o
-$(obj)/early_serial_console.o $(obj)/piggy.o FORCE
-+vpath-y += $(srctree)/arch/x86/lib
+Signed-off-by: Dmitry Torokhov <dtor@mail.ru>
+---
+
+ arch/arm/plat-samsung/include/plat/keypad.h |   27 +----------------
+ drivers/input/keyboard/Kconfig              |    5 ++-
+ drivers/input/keyboard/samsung-keypad.c     |    2 +
+ include/linux/input/samsung-keypad.h        |   43 +++++++++++++++++++++++++++
+ 4 files changed, 48 insertions(+), 29 deletions(-)
+ create mode 100644 include/linux/input/samsung-keypad.h
+
+
+diff --git a/arch/arm/plat-samsung/include/plat/keypad.h b/arch/arm/plat-samsung/include/plat/keypad.h
+index b59a648..8fddee3 100644
+--- a/arch/arm/plat-samsung/include/plat/keypad.h
++++ b/arch/arm/plat-samsung/include/plat/keypad.h
+@@ -13,32 +13,7 @@
+ #ifndef __PLAT_SAMSUNG_KEYPAD_H
+ #define __PLAT_SAMSUNG_KEYPAD_H
+ 
+-#include <linux/input/matrix_keypad.h>
+-
+-#define SAMSUNG_MAX_ROWS	8
+-#define SAMSUNG_MAX_COLS	8
+-
+-/**
+- * struct samsung_keypad_platdata - Platform device data for Samsung Keypad.
+- * @keymap_data: pointer to &matrix_keymap_data.
+- * @rows: number of keypad row supported.
+- * @cols: number of keypad col supported.
+- * @no_autorepeat: disable key autorepeat.
+- * @wakeup: controls whether the device should be set up as wakeup source.
+- * @cfg_gpio: configure the GPIO.
+- *
+- * Initialisation data specific to either the machine or the platform
+- * for the device driver to use or call-back when configuring gpio.
+- */
+-struct samsung_keypad_platdata {
+-	const struct matrix_keymap_data	*keymap_data;
+-	unsigned int rows;
+-	unsigned int cols;
+-	bool no_autorepeat;
+-	bool wakeup;
+-
+-	void (*cfg_gpio)(unsigned int rows, unsigned int cols);
+-};
++#include <linux/input/samsung_keypad.h>
+ 
+ /**
+  * samsung_keypad_set_platdata - Set platform data for Samsung Keypad device.
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index de846f8..db1b221 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -434,9 +434,10 @@ config KEYBOARD_PMIC8XXX
+ 
+ config KEYBOARD_SAMSUNG
+ 	tristate "Samsung keypad support"
+-	depends on SAMSUNG_DEV_KEYPAD
++	depends on HAVE_CLK
+ 	help
+-	  Say Y here if you want to use the Samsung keypad.
++	  Say Y here if you want to use the keypad on your Samsung mobile
++	  device.
+ 
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called samsung-keypad.
+diff --git a/drivers/input/keyboard/samsung-keypad.c b/drivers/input/keyboard/samsung-keypad.c
+index d244fdf..1a2b755 100644
+--- a/drivers/input/keyboard/samsung-keypad.c
++++ b/drivers/input/keyboard/samsung-keypad.c
+@@ -22,7 +22,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/sched.h>
+-#include <plat/keypad.h>
++#include <linux/input/samsung-keypad.h>
+ 
+ #define SAMSUNG_KEYIFCON			0x00
+ #define SAMSUNG_KEYIFSTSCLR			0x04
+diff --git a/include/linux/input/samsung-keypad.h b/include/linux/input/samsung-keypad.h
+new file mode 100644
+index 0000000..f25619b
+--- /dev/null
++++ b/include/linux/input/samsung-keypad.h
+@@ -0,0 +1,43 @@
++/*
++ * Samsung Keypad platform data definitions
++ *
++ * Copyright (C) 2010 Samsung Electronics Co.Ltd
++ * Author: Joonyoung Shim <jy0922.shim@samsung.com>
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
 +
-+$(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/checksum_32.o
-$(obj)/head_$(BITS).o $(obj)/misc.o $(obj)/string.o $(obj)/cmdline.o
-$(obj)/early_serial_console.o $(obj)/piggy.o FORCE
-        $(call if_changed,ld)
-        @:
-
-and `checksum_32.o' gets built just fine from
-`$(srctree)/arch/x86/lib/checksum_32.S'. I guess I'll ends up building
-an arm toolchain tonight and see closer.
-
- - Arnaud
++#ifndef __SAMSUNG_KEYPAD_H
++#define __SAMSUNG_KEYPAD_H
++
++#include <linux/input/matrix_keypad.h>
++
++#define SAMSUNG_MAX_ROWS	8
++#define SAMSUNG_MAX_COLS	8
++
++/**
++ * struct samsung_keypad_platdata - Platform device data for Samsung Keypad.
++ * @keymap_data: pointer to &matrix_keymap_data.
++ * @rows: number of keypad row supported.
++ * @cols: number of keypad col supported.
++ * @no_autorepeat: disable key autorepeat.
++ * @wakeup: controls whether the device should be set up as wakeup source.
++ * @cfg_gpio: configure the GPIO.
++ *
++ * Initialisation data specific to either the machine or the platform
++ * for the device driver to use or call-back when configuring gpio.
++ */
++struct samsung_keypad_platdata {
++	const struct matrix_keymap_data	*keymap_data;
++	unsigned int rows;
++	unsigned int cols;
++	bool no_autorepeat;
++	bool wakeup;
++
++	void (*cfg_gpio)(unsigned int rows, unsigned int cols);
++};
++
++#endif /* __SAMSUNG_KEYPAD_H */
