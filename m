@@ -1,60 +1,43 @@
 From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Wed, 7 Sep 2011 10:47:20 +0530
-Subject: [PATCH v6 19/25] gpio/omap: cleanup prepare_for_idle and
-	resume_after_idle
-In-Reply-To: <874o0pxm77.fsf@ti.com>
+Date: Wed, 7 Sep 2011 10:54:11 +0530
+Subject: [PATCH v6 00/25] gpio/omap: driver cleanup and fixes
+In-Reply-To: <87ty8pz384.fsf@ti.com>
 References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
-	<1314798161-19523-20-git-send-email-tarun.kanti@ti.com>
-	<874o0pxm77.fsf@ti.com>
-Message-ID: <CAC83Zv+zAve-fNGYR9BTZ7nPXpz5HDWzyX=gdwS92OouVVo14Q@mail.gmail.com>
+	<87ty8pz384.fsf@ti.com>
+Message-ID: <CAC83ZvKoSsGNMDoHNeCOZXk9mOZxcKjT_vMjnXGQn6F52YNDKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2011 at 5:23 AM, Kevin Hilman <khilman@ti.com> wrote:
+On Wed, Sep 7, 2011 at 4:29 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Tarun,
+>
 > Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 >
->> Cleanup ?omap2_gpio_prepare_for_idle() and omap2_gpio_resume_after_idle()
->> by moving most of the stuff to *_runtime_suspend() and *_runtime_resume().
+>> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+>> The cleanup include getting rid of cpu_is_* checks wherever possible,
+>> use of gpio_bank list instead of static array, use of unique platform
+>> specific value associated data member to OMAP platforms to avoid
+>> cpu_is_* checks. The series also include PM runtime support.*
 >
-> Why?
+> Thanks for your continued effort on this series.
 >
-> (I know the answer, but it should be in the changelog.)
+>> Baseline: git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux-2.6.git
+>> Branch: master
+>> Commit: c6a389f ?Linux 3.1-rc4
+>
+> This series was supposed to be based on my for_3.2/gpio-cleanup branch,
+> which removes MOD_REG_BIT among other things.
+I saw most of your patches on the mainline except MOD_REG_BIT.
+I thought you have no intention of taking it. That's why generated the
+series on the mainline.
+
+>
+> Please rebase onto that branch so these changes can be tested along with
+> changes already queued for v3.2.
 Ok.
 
 >
->> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->> Signed-off-by: Charulatha V <charu@ti.com>
->> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->
-> Also, as pointed out in an earlier patch, now that this is moved out of
-> the idle path, where interrupts were known to be disabled, the register
-> accesses in the runtime PM callbacks need to be protected by the
-> spinlock just like they are in other parts of the driver.
-Ok.
-
->
-> [...]
->
->> @@ -1305,9 +1316,14 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->fallingdetect);
->> ? ? ? __raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
->> ?}
->> +#else
->> +#define omap_gpio_runtime_suspend NULL
->> +#define omap_gpio_runtime_resume NULL
->> ?#endif
->>
->> ?static const struct dev_pm_ops gpio_pm_ops = {
->> + ? ? .runtime_suspend ? ? ? ?= omap_gpio_runtime_suspend,
->> + ? ? .runtime_resume ? ? ? ? = omap_gpio_runtime_resume,
->
-> Please use SET_RUNTIME_PM_OPS() (see <linux/pm.h.)
-Sure.
-
->
->> ? ? ? .suspend ? ? ? ? ? ? ? ?= omap_gpio_suspend,
->> ? ? ? .resume ? ? ? ? ? ? ? ? = omap_gpio_resume,
->> ?};
+> Thanks,
 >
 > Kevin
 >
