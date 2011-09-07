@@ -1,54 +1,81 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 7 Sep 2011 12:16:00 +0300
-Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
-	the hardware
-In-Reply-To: <CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
-References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-	<1314984756-4400-8-git-send-email-ohad@wizery.com>
-	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
-	<CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
-	<CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
-Message-ID: <CAK=WgbbFhmiC=PJfmyPOhbHGtiPFOcmqBx7nSpkuDX36hPYgbA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 7 Sep 2011 10:11:42 +0200
+Subject: [PATCH] gpio: rewrite U300 GPIO to use gpiolib
+In-Reply-To: <87vct65782.fsf@lebrac.rtp-net.org>
+References: <1315297950-12720-1-git-send-email-linus.walleij@stericsson.com>
+	<87vct65782.fsf@lebrac.rtp-net.org>
+Message-ID: <CACRpkdZx+7cEq+xRFWsFuoVCUDWauyAZbZohypNVzCTTFV6tog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi KyongHo,
+On Tue, Sep 6, 2011 at 11:51 AM, Arnaud Patard
+<arnaud.patard@rtp-net.org> wrote:
+> [Me]
+>> -#ifdef U300_COH901571_3
+>> +#if defined(CONFIG_MACH_U300_BS365) || defined(CONFIG_MACH_U300_BS335)
+>> ? ? ? {
+>> ? ? ? ? ? ? ? .name ?= "gpio3",
+>> ? ? ? ? ? ? ? .start = IRQ_U300_GPIO_PORT3,
+>> @@ -236,6 +237,7 @@ static struct resource gpio_resources[] = {
+>> ? ? ? ? ? ? ? .end ? = IRQ_U300_GPIO_PORT4,
+>> ? ? ? ? ? ? ? .flags = IORESOURCE_IRQ,
+>> ? ? ? },
+>> +#endif
+>
+> hmm.. silly question: Now that u300 gpios can/will be added through
+> gpiochip_add, is it still required to used #ifdef instead of
+> machine_is_foo() or use some different platform devices for that like it
+> was done on mxc ?
 
-On Wed, Sep 7, 2011 at 11:05 AM, KyongHo Cho <pullip.cho@samsung.com> wrote:
-> However, it is faster because it does not calculate the given order and
-> not call any function.
+Yes unfortunately all of these systems share a single
+MACHINE_TYPE. I will surely try to fix that and maybe
+just delete unsupported old hardware, or try to make this
+dynamically decided from the platform atleast.
 
-Hmm this sounds a bit like a red herring to me; optimization of the
-map function is not the main subject here. Especially not when we're
-discussing mapping of large physically contiguous memory regions which
-do not happen too often.
+As far as I can tell this patch does not make the situation
+worse atleast :-/
 
-But generally I don't think that duplicating code and eliminating
-function calls is a good optimization (the compiler can do that for
-us..). Moreover, it looks like s5p_iommu_map() gives a higher priority
-for bigger pages first, and only reaches 4KB pages after it tried all
-other supported pages. IMHO that's sub-optimal, because small mappings
-are more common than big ones.
+>> +struct u300_gpio {
+>> + ? ? struct gpio_chip chip;
+>> + ? ? struct list_head port_list;
+>> + ? ? struct clk *clk;
+>> + ? ? struct resource *memres;
+>> + ? ? void __iomem *base;
+>> + ? ? struct device *dev;
+>> + ? ? int irq_base;
+>> + ? ? int users;
+>> + ? ? u32 stride;
+>> + ? ? /* Register offsets */
+>> + ? ? u32 pcr;
+>> + ? ? u32 dor;
+>> + ? ? u32 dir;
+>> + ? ? u32 per;
+>> + ? ? u32 icr;
+>> + ? ? u32 ien;
+>> + ? ? u32 iev;
+>> +};
+>
+> Do you really need all theses ? I'm thinking of the 'users' field but
+> there are maybe others ?
 
-Another advantage for migrating s5p_iommu_map() over to the subject
-patch, is that s5p_iommu_map() doesn't support super sections yet. To
-support it, you'd need to add more code (duplicate another while
-loop). But if you migrated to the subject patch, then you would only
-need to flip the 16MB bit when you advertise page size capabilities
-and then that's it; you're done.
+You're absolutley right about users, I've deleted it.
 
-> It is a logical error because the caller of iommu_map() gives
-> 4KB aligned physical address while saying that it is 64KB aligned.
+The rest are needed I think.
 
-The caller of iommu_map() doesn't say anything about alignments. It
-just gives it a memory region to map, and expect things to just work.
+The stride+register offsets are needed to handle different
+HW variants at runtime, for example.
 
-Obviously it's better if big physically contiguous mapping will be
-aligned to big pages, but things can still work even if it's not, by
-using smaller pages. No reason not to provide this flexibility.
+>> ?/* Initial configuration */
+>> -const struct u300_gpio_configuration_data
+>> -u300_gpio_config[U300_GPIO_NUM_PORTS][U300_GPIO_PINS_PER_PORT] = {
+>> -#ifdef CONFIG_MACH_U300_BS335
+>> +static struct __initdata u300_gpio_confdata
+>> +bs335_gpio_config[BS335_GPIO_NUM_PORTS][U300_GPIO_PINS_PER_PORT] = {
+>
+> looks like const has been lost ?
 
-The only requirement the IOMMU API should have is the minimum 4KB
-alignment, because IOMMU hardware does not support smaller pages.
+You're right, fixed it up by re-constifying and adding a few
+alterations here and there to handle the const * pointers.
 
-Thanks,
-Ohad.
+Thanks a lot Arnaud!
+Linus Walleij
