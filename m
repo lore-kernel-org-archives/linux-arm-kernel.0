@@ -1,53 +1,56 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Wed,  7 Sep 2011 12:24:10 +0200
-Subject: [PATCH] Add CS890x0 ethernet controller support to the i.MX21ADS
-Message-ID: <1315391050-6715-1-git-send-email-jaccon.bastiaansen@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 7 Sep 2011 12:49:06 +0300
+Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
+	the hardware
+In-Reply-To: <CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
+References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+	<1314984756-4400-8-git-send-email-ohad@wizery.com>
+	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
+	<CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
+	<CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
+Message-ID: <CAK=Wgbayt0D8u8u_t=Zs=15A0YBjKX3RUNtWFKVCOxEOKvH7fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
----
- arch/arm/mach-imx/mach-mx21ads.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+[resending due to mailer-daemon errors I got, sorry]
 
-diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-index 74ac889..62b4717 100644
---- a/arch/arm/mach-imx/mach-mx21ads.c
-+++ b/arch/arm/mach-imx/mach-mx21ads.c
-@@ -159,6 +159,26 @@ static struct platform_device mx21ads_nor_mtd_device = {
- 	.resource = &mx21ads_flash_resource,
- };
- 
-+static struct resource mx21ads_cs8900_resources[] = {
-+	{
-+		.start	= (u32)MX21ADS_CS8900A_IOBASE_REG,
-+		.end	= (u32)MX21ADS_CS8900A_IOBASE_REG + 0x200000 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= MX21ADS_CS8900A_IRQ,
-+		.end	= MX21ADS_CS8900A_IRQ,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device mx21ads_cs8900_device = {
-+	.name		= "cs89x0",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(mx21ads_cs8900_resources),
-+	.resource	= mx21ads_cs8900_resources,
-+};
-+
- static const struct imxuart_platform_data uart_pdata_rts __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
-@@ -275,6 +295,7 @@ static void __init mx21ads_map_io(void)
- 
- static struct platform_device *platform_devices[] __initdata = {
- 	&mx21ads_nor_mtd_device,
-+	&mx21ads_cs8900_device
- };
- 
- static void __init mx21ads_board_init(void)
--- 
-1.7.1
+Hi KyongHo,
+
+On Wed, Sep 7, 2011 at 11:05 AM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> However, it is faster because it does not calculate the given order and
+> not call any function.
+
+Hmm this sounds a bit like a red herring to me; optimization of the
+map function is not the main subject here. Especially not when we're
+discussing mapping of large physically contiguous memory regions which
+do not happen too often.
+
+But generally I don't think that duplicating code and eliminating
+function calls is a good optimization (the compiler can do that for
+us..). Moreover, it looks like s5p_iommu_map() gives a higher priority
+for bigger pages first, and only reaches 4KB pages after it tried all
+other supported pages. IMHO that's sub-optimal, because small mappings
+are more common than big ones.
+
+Another advantage for migrating s5p_iommu_map() over to the subject
+patch, is that s5p_iommu_map() doesn't support super sections yet. To
+support it, you'd need to add more code (duplicate another while
+loop). But if you migrated to the subject patch, then you would only
+need to flip the 16MB bit when you advertise page size capabilities
+and then that's it; you're done.
+
+> It is a logical error because the caller of iommu_map() gives
+> 4KB aligned physical address while saying that it is 64KB aligned.
+
+The caller of iommu_map() doesn't say anything about alignments. It
+just gives it a memory region to map, and expect things to just work.
+
+Obviously it's better if big physically contiguous mapping will be
+aligned to big pages, but things can still work even if it's not, by
+using smaller pages. No reason not to provide this flexibility.
+
+The only requirement the IOMMU API should have is the minimum 4KB
+alignment, because IOMMU hardware does not support smaller pages.
+
+Thanks,
+Ohad.
