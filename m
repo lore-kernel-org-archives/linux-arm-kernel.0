@@ -1,48 +1,92 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 7 Sep 2011 09:01:26 +0300
-Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
-	the hardware
-In-Reply-To: <CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
-References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-	<1314984756-4400-8-git-send-email-ohad@wizery.com>
-	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
-Message-ID: <CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 07 Sep 2011 15:01:46 +0900
+Subject: [PATCH 4/5] ARM: S5P64X0: Fix incorrect serial clock name
+In-Reply-To: <1313144787-30666-5-git-send-email-a.kesavan@samsung.com>
+References: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
+	<1313144787-30666-5-git-send-email-a.kesavan@samsung.com>
+Message-ID: <000401cc6d23$a044d410$e0ce7c30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cho,
+Abhilash Kesavan wrote:
+> 
+> The S3C6400 serial glue driver(used by S5P64X0) needs the clock name to be
+> pclk or uclk1. Correct the clock name in init.c to pclk and source pclk
+> from pclk_low to get the correct rate.
+> 
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>  arch/arm/mach-s5p64x0/clock-s5p6440.c |    2 +-
+>  arch/arm/mach-s5p64x0/clock-s5p6450.c |    2 +-
+>  arch/arm/mach-s5p64x0/init.c          |    2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6440.c b/arch/arm/mach-
+> s5p64x0/clock-s5p6440.c
+> index 0e9cd30..4b594a4 100644
+> --- a/arch/arm/mach-s5p64x0/clock-s5p6440.c
+> +++ b/arch/arm/mach-s5p64x0/clock-s5p6440.c
+> @@ -554,7 +554,7 @@ void __init_or_cpufreq s5p6440_setup_clocks(void)
+> 
+>  	clk_f.rate = fclk;
+>  	clk_h.rate = hclk;
+> -	clk_p.rate = pclk;
+> +	clk_p.rate = pclk_low;
 
-On Wed, Sep 7, 2011 at 4:30 AM, KyongHo Cho <pullip.cho@samsung.com> wrote:
-> Please find the following link that I submitted for our IOMMU.
-> https://lkml.org/lkml/2011/7/3/152
->
-> s5p_iommu_map/unmap accepts any order of physical address and iova
-> without support of your suggestion if the order is not less than PAGE_SHIFT
+As you know, HCLK and PCLK are connected to IPs which are included in high
+frequency domain and HCLK_LOW and PCLK_LOW are connected to IPs which are
+included in low frequency domain. I wonder what value is the ARM clock on
+your SMDK64X0? 533MHz or 667MHz?
 
-That's exactly what I'm trying to prevent; there's no reason to
-duplicate the exact same logic in every iommu driver.
+Originally, the "struct clk clk_p" means PCLK not PCLK_LOW. So I think, the
+rate of clk_p should be pclk
 
-As a result, your map function is quite big (it even duplicates the
-same logic for every page size it tries).
+> 
+>  	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+>  		s3c_set_clksrc(&clksrcs[ptr], true);
+> diff --git a/arch/arm/mach-s5p64x0/clock-s5p6450.c b/arch/arm/mach-
+> s5p64x0/clock-s5p6450.c
+> index d9dc16c..eca9a57 100644
+> --- a/arch/arm/mach-s5p64x0/clock-s5p6450.c
+> +++ b/arch/arm/mach-s5p64x0/clock-s5p6450.c
+> @@ -613,7 +613,7 @@ void __init_or_cpufreq s5p6450_setup_clocks(void)
+> 
+>  	clk_f.rate = fclk;
+>  	clk_h.rate = hclk;
+> -	clk_p.rate = pclk;
+> +	clk_p.rate = pclk_low;
 
-Try to rebase your patch on the "iommu/core: split mapping to page
-sizes as supported by the hardware" patch I've just sent, and see how
-significantly simpler your code becomes.
+Same as above.
 
-Relying on a single implementation, provided by the IOMMU core, means
-less code to maintain (and debug) and a consistent behavior (across
-all supported hardware) exposed to users of the IOMMU API.
+> 
+>  	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
+>  		s3c_set_clksrc(&clksrcs[ptr], true);
+> diff --git a/arch/arm/mach-s5p64x0/init.c b/arch/arm/mach-s5p64x0/init.c
+> index 79833ca..ee25e28 100644
+> --- a/arch/arm/mach-s5p64x0/init.c
+> +++ b/arch/arm/mach-s5p64x0/init.c
+> @@ -25,7 +25,7 @@
+> 
+>  static struct s3c24xx_uart_clksrc s5p64x0_serial_clocks[] = {
+>  	[0] = {
+> -		.name		= "pclk_low",
+> +		.name		= "pclk",
 
-> But I think IOMMU API must not expect that the caller of iommu_map() knows
-> about the restriction of IOMMU API implementation.
+According to data sheet, should be pclk_low. Or if required for serial
+driver, uclk1 can be used here.
 
-Right. But I don't think there's any disagreement here ?
+>  		.divisor	= 1,
+>  		.min_baud	= 0,
+>  		.max_baud	= 0,
+> --
+> 1.7.4.1
 
-If any, then I think that s5p_iommu_map() is more limited than what I
-propose: if it is given a 64KB region aligned only to a 4KB address,
-it will BUG_ON() it. While not ideal, I don't think there's any reason
-not to map it using 4KB pages (which is exactly what the new
-iommu_map() I propose will do).
 
-Thanks,
-Ohad.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
