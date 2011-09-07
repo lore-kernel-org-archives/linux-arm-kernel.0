@@ -1,49 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 7 Sep 2011 17:54:58 +0100
-Subject: [PATCH 03/11] ARM: pm: some ARMv7 requires a dsb in resume to
-	ensure correctness
-In-Reply-To: <20110907161906.GA2327@n2100.arm.linux.org.uk>
-References: <20110901124752.GE29729@n2100.arm.linux.org.uk>
-	<E1Qz6hr-00078J-2k@rmk-PC.arm.linux.org.uk>
-	<CAHkRjk65O3wJLazxZeOOQrDuM-XkZXo4fcOuVZf4Jzq9OP3p3g@mail.gmail.com>
-	<20110907161906.GA2327@n2100.arm.linux.org.uk>
-Message-ID: <CAHkRjk5qyR4O2bXPSX4U7pPG2+K0B=U=G3kJGHM43vBzko-jsw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Sep 2011 18:04:52 +0100
+Subject: [PATCH] ARM: alignment: setup alignment handler earlier
+In-Reply-To: <yw1xipp4cnis.fsf@unicorn.mansr.com>
+References: <87ehzstr07.fsf@vostro.fn.ogness.net>
+	<20110907144016.GA30719@e102109-lin.cambridge.arm.com>
+	<20110907162857.GB2327@n2100.arm.linux.org.uk>
+	<yw1xipp4cnis.fsf@unicorn.mansr.com>
+Message-ID: <20110907170452.GC2327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 September 2011 17:19, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Sep 07, 2011 at 04:41:32PM +0100, Catalin Marinas wrote:
->> On 1 September 2011 13:49, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > Add a dsb after the isb to ensure that the previous writes to the
->> > CP15 registers take effect before we enable the MMU.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->> > ---
->> > ?arch/arm/mm/proc-v7.S | ? ?1 +
->> > ?1 files changed, 1 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
->> > index dec72ee..a773f4e 100644
->> > --- a/arch/arm/mm/proc-v7.S
->> > +++ b/arch/arm/mm/proc-v7.S
->> > @@ -255,6 +255,7 @@ ENTRY(cpu_v7_do_resume)
->> > ? ? ? ?mcr ? ? p15, 0, r4, c10, c2, 0 ?@ write PRRR
->> > ? ? ? ?mcr ? ? p15, 0, r5, c10, c2, 1 ?@ write NMRR
->> > ? ? ? ?isb
->> > + ? ? ? dsb
->>
->> Isn't an ISB enough here? We usually have the DSB for some background
->> operations like cache maintenance.
->
-> That depends whether you're including the effects of the cache
-> maintanence instructions in this. ?The ARM ARM tells me that
-> a DSB is required to ensure that all cache maintanence is issued
-> before the dsb is complete at the point that the dsb is executed.
+On Wed, Sep 07, 2011 at 05:42:19PM +0100, M?ns Rullg?rd wrote:
+> There are such instructions (ldrd, ldm), but gcc will not emit those
+> unless the address is known to be aligned.  For ARMv6 and later, gcc 4.6
+> *will* emit potentially unaligned ldr and ldrh since these very clearly
+> allow an unaligned address and are faster than the alternatives in all
+> implementations to date.  This is unless strict alignment checking is
+> explicitly enabled, which unfortunately the Linux kernel does for no
+> apparent reason at all.
 
-Another minor point, in general we would use the DSB before the ISB
-(but that's when the I-cache is enabled).
+"no apparant reason at all" heh.  The reason is to keep the code
+simple and free from bugs.  To do otherwise means that each of the
+CPU files needs to be littered with ifdefs to deal with the alignment
+fault configuration, of which there are 16 of them (ignoring v6 and v7.)
 
--- 
-Catalin
+If you think code maintanence of the same thing in 16 places is efficient
+then I guess there is "no apparant reason".  I beg to differ, being one
+of those folk who have had to edit 18 different places several times.
+
+So no, I do not intend to move this:
+
+#ifdef CONFIG_ALIGNMENT_TRAP
+        orr     r0, r0, #CR_A
+#else
+        bic     r0, r0, #CR_A
+#endif
+
+into 16 separate places in the kernel.
