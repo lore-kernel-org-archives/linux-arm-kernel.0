@@ -1,367 +1,461 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 7 Sep 2011 20:51:50 +0800
-Subject: [PATCH v3 1/1] ASoC: mxs-saif: add record function
-Message-ID: <1315399910-6525-1-git-send-email-b29396@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 7 Sep 2011 14:36:35 +0200
+Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level debug
+	uart
+In-Reply-To: <20110907110001.GI8148@S2100-06.ap.freescale.net>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
+	<20110906202555.GQ28816@pengutronix.de>
+	<20110907110001.GI8148@S2100-06.ap.freescale.net>
+Message-ID: <20110907123635.GT28816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. add different clkmux mode handling
-SAIF can use two instances to implement full duplex (playback &
-recording) and record saif may work on EXTMASTER mode which is
-using other saif's BITCLK&LRCLK.
+On Wed, Sep 07, 2011 at 07:00:02PM +0800, Shawn Guo wrote:
+> On Tue, Sep 06, 2011 at 10:25:55PM +0200, Uwe Kleine-K?nig wrote:
+> > On Tue, Sep 06, 2011 at 05:58:36PM +0800, Shawn Guo wrote:
+> > > It adds the core definitions and low-level debug uart support
+> > > for imx6q.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > ---
+> > >  arch/arm/Kconfig                             |    2 +-
+> > >  arch/arm/Kconfig.debug                       |    7 +++++
+> > >  arch/arm/Makefile                            |    1 +
+> > >  arch/arm/mach-imx/Kconfig                    |    4 +++
+> > >  arch/arm/mach-imx/Makefile                   |    2 +
+> > >  arch/arm/mach-imx/Makefile.boot              |    4 +++
+> > >  arch/arm/mach-imx/lluart.c                   |   33 ++++++++++++++++++++++++++
+> > >  arch/arm/plat-mxc/Kconfig                    |    5 ++++
+> > >  arch/arm/plat-mxc/include/mach/debug-macro.S |    5 ++++
+> > >  arch/arm/plat-mxc/include/mach/entry-macro.S |   15 +++++++++++-
+> > >  arch/arm/plat-mxc/include/mach/hardware.h    |    1 +
+> > >  arch/arm/plat-mxc/include/mach/irqs.h        |    9 ++++--
+> > >  arch/arm/plat-mxc/include/mach/memory.h      |    3 ++
+> > >  arch/arm/plat-mxc/include/mach/mx6q.h        |   29 ++++++++++++++++++++++
+> > >  14 files changed, 115 insertions(+), 5 deletions(-)
+> > >  create mode 100644 arch/arm/mach-imx/lluart.c
+> > >  create mode 100644 arch/arm/plat-mxc/include/mach/mx6q.h
+> > > 
+> > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > index 4ea9974..37c20a4 100644
+> > > --- a/arch/arm/Kconfig
+> > > +++ b/arch/arm/Kconfig
+> > > @@ -1348,7 +1348,7 @@ config SMP
+> > >  	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
+> > >  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+> > >  		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
+> > > -		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
+> > > +		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || SOC_IMX6Q
+> > >  	select USE_GENERIC_SMP_HELPERS
+> > >  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+> > >  	help
+> > > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> > > index 965d59a..68fc155 100644
+> > > --- a/arch/arm/Kconfig.debug
+> > > +++ b/arch/arm/Kconfig.debug
+> > > @@ -155,6 +155,13 @@ choice
+> > >  		  Say Y here if you want kernel low-level debugging support
+> > >  		  on i.MX50 or i.MX53.
+> > >  
+> > > +	config DEBUG_IMX6Q_UART
+> > > +		bool "i.MX6Q Debug UART"
+> > > +		depends on SOC_IMX6Q
+> > > +		help
+> > > +		  Say Y here if you want kernel low-level debugging support
+> > > +		  on i.MX6Q.
+> > > +
+> > >  	config DEBUG_S3C_UART0
+> > >  		depends on PLAT_SAMSUNG
+> > >  		bool "Use S3C UART 0 for low-level debug"
+> > > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> > > index 70c424e..3a0bbe4 100644
+> > > --- a/arch/arm/Makefile
+> > > +++ b/arch/arm/Makefile
+> > > @@ -159,6 +159,7 @@ machine-$(CONFIG_ARCH_MX2)		:= imx
+> > >  machine-$(CONFIG_ARCH_MX25)		:= imx
+> > >  machine-$(CONFIG_ARCH_MX3)		:= imx
+> > >  machine-$(CONFIG_ARCH_MX5)		:= mx5
+> > > +machine-$(CONFIG_ARCH_MX6)		:= imx
+> > >  machine-$(CONFIG_ARCH_MXS)		:= mxs
+> > >  machine-$(CONFIG_ARCH_NETX)		:= netx
+> > >  machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
+> > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > > index 0519dd7..4cf5178 100644
+> > > --- a/arch/arm/mach-imx/Kconfig
+> > > +++ b/arch/arm/mach-imx/Kconfig
+> > > @@ -58,6 +58,10 @@ config SOC_IMX35
+> > >  	select ARCH_MX35
+> > >  	select MXC_AVIC
+> > >  
+> > > +config SOC_IMX6Q
+> > > +	bool
+> > > +	select ARM_GIC
+> > > +	select CPU_V7
+> > >  
+> > >  if ARCH_MX1
+> > >  
+> > > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> > > index e9eb36d..96ecc96 100644
+> > > --- a/arch/arm/mach-imx/Makefile
+> > > +++ b/arch/arm/mach-imx/Makefile
+> > > @@ -61,3 +61,5 @@ obj-$(CONFIG_MACH_MX35_3DS) += mach-mx35_3ds.o
+> > >  obj-$(CONFIG_MACH_EUKREA_CPUIMX35) += mach-cpuimx35.o
+> > >  obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD) += eukrea_mbimxsd35-baseboard.o
+> > >  obj-$(CONFIG_MACH_VPR200) += mach-vpr200.o
+> > > +
+> > > +obj-$(CONFIG_DEBUG_LL) += lluart.o
+> > > diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
+> > > index ebee18b..389a0e3 100644
+> > > --- a/arch/arm/mach-imx/Makefile.boot
+> > > +++ b/arch/arm/mach-imx/Makefile.boot
+> > > @@ -17,3 +17,7 @@ initrd_phys-$(CONFIG_MACH_MX27)	:= 0xA0800000
+> > >  zreladdr-$(CONFIG_ARCH_MX3)	:= 0x80008000
+> > >  params_phys-$(CONFIG_ARCH_MX3)	:= 0x80000100
+> > >  initrd_phys-$(CONFIG_ARCH_MX3)	:= 0x80800000
+> > > +
+> > > +zreladdr-$(CONFIG_SOC_IMX6Q)	:= 0x10008000
+> > > +params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
+> > > +initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
+> > Do you really need params_phys and initrd_phys?
+> > 
+> I added them to make IMX6Q look consistent with other soc in the file,
+> and leave it to a global cleanup, if we decide to clean later.
+If you ask me don't do that. Better do it for imx6q as clean as
+possible.
 
-The clkmux mode could be set in pdata->init() in mach-specific code.
-For generic saif driver, it only needs to know who is his master
-and the master id is also provided in mach-specific code.
+> > > diff --git a/arch/arm/mach-imx/lluart.c b/arch/arm/mach-imx/lluart.c
+> > > new file mode 100644
+> > > index 0000000..34205cb
+> > > --- /dev/null
+> > > +++ b/arch/arm/mach-imx/lluart.c
+> > > @@ -0,0 +1,33 @@
+> > > +/*
+> > > + * Copyright 2011 Freescale Semiconductor, Inc.
+> > > + * Copyright 2011 Linaro Ltd.
+> > > + *
+> > > + * The code contained herein is licensed under the GNU General Public
+> > > + * License. You may obtain a copy of the GNU General Public License
+> > > + * Version 2 or later at the following locations:
+> > > + *
+> > > + * http://www.opensource.org/licenses/gpl-license.html
+> > > + * http://www.gnu.org/copyleft/gpl.html
+> > > + */
+> > > +
+> > > +#include <linux/init.h>
+> > > +#include <asm/page.h>
+> > > +#include <asm/sizes.h>
+> > > +#include <asm/mach/map.h>
+> > > +#include <mach/hardware.h>
+> > > +
+> > > +static struct map_desc imx_lluart_desc = {
+> > > +#ifdef CONFIG_DEBUG_IMX6Q_UART
+> > > +	.virtual	= MX6Q_UART4_BASE_VADDR,
+> > > +	.pfn		= __phys_to_pfn(MX6Q_UART4_BASE_ADDR),
+> > > +	.length		= SZ_16K,
+> > > +	.type		= MT_DEVICE,
+> > > +#endif
+> > > +};
+> > > +
+> > > +void __init imx_lluart_map_io(void)
+> > > +{
+> > > +	if (imx_lluart_desc.virtual)
+> > > +		iotable_init(&imx_lluart_desc, 1);
+> > > +}
+> > I don't see yet where this is called, but I wonder what happens on a
+> > non-imx6q machine (provided it is called there).
+> 
+> This is called by imx6q_map_io() in mach-imx6q.c.  For non-imx6q
+> machines, imx_lluart_desc will be all zero,
+But only if the image doesn't support imx6q, right? Anyhow, I hope
+imx6q_map_io isn't called for pre-imx6q SoCs. Ah, and I hope we don't
+need to argue here as Russell doesn't like the new DEBUG_LL changes :-)
 
-2. support playback and capture simutaneously however the sample
-rates can not be different due to hw limitation.
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
+>                                             therefore iotable_init()
+> call will be bypassed.
 
----
-Changes since v2:
- * remove mach-specific code(clkmux in DIGCTL) out of saif driver
- For supporting EXTMASTER mode, SAIF only nees to know who's
- its master and the master id is provided by mach layer according
- to different clkmux setting.
- So we need to add a pdata->get_master_id();
+> 
+> > > +
+> > > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+> > > index a5353fc..e548f9b 100644
+> > > --- a/arch/arm/plat-mxc/Kconfig
+> > > +++ b/arch/arm/plat-mxc/Kconfig
+> > > @@ -48,6 +48,11 @@ config ARCH_MX51
+> > >  	help
+> > >  	  This enables support for systems based on the Freescale i.MX51 family
+> > >  
+> > > +config ARCH_MX6
+> > > +	bool "i.MX6"
+> > > +	help
+> > > +	  This enables support for systems based on the Freescale i.MX6 family
+> > > +
+> > >  endchoice
+> > >  
+> > >  source "arch/arm/mach-imx/Kconfig"
+> > > diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> > > index 07cfdbe..471872a 100644
+> > > --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
+> > > +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> > > @@ -24,9 +24,14 @@
+> > >  #define UART_PADDR	MX51_UART1_BASE_ADDR
+> > >  #elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
+> > >  #define UART_PADDR	MX53_UART1_BASE_ADDR
+> > > +#elif defined (CONFIG_DEBUG_IMX6Q_UART)
+> > > +#define UART_PADDR	MX6Q_UART4_BASE_ADDR
+> > > +#define UART_VADDR	MX6Q_UART4_BASE_VADDR
+> > You cannot use the existing IMX_IO_P2V? I'd like to have a look into it
+> > to make it usable there, too. See below.
+> > 
+> > >  #endif
+> > >  
+> > > +#ifndef UART_VADDR
+> > >  #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
+> > > +#endif
+> > >  
+> > >  		.macro	addruart, rp, rv
+> > >  		ldr	\rp, =UART_PADDR	@ physical
+> > > diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> > > index 066d464..341f800 100644
+> > > --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
+> > > +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> > > @@ -1,6 +1,6 @@
+> > >  /*
+> > >   *  Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
+> > > - *  Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
+> > > + *  Copyright 2004-2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> > >   */
+> > >  
+> > >  /*
+> > > @@ -11,6 +11,17 @@
+> > >  
+> > >  #include <mach/hardware.h>
+> > >  
+> > > +#ifdef CONFIG_ARM_GIC
+> > > +#include <asm/hardware/entry-macro-gic.S>
+> > > +
+> > > +	.macro	disable_fiq
+> > > +	.endm
+> > > +
+> > > +	.macro	arch_ret_to_user, tmp1, tmp2
+> > > +	.endm
+> > > +
+> > > +#else
+> > > +
+> > hmm, this essentially means mx6 support cannot go into a kernel image
+> > for the other imx machines :-(
+> > 
+> Ah, sorry.  I totally forgot about this.  Will fix it in the next
+> version.
+> 
+> > >  #define AVIC_NIMASK	0x04
+> > >  
+> > >  	@ this macro disables fast irq (not implemented)
+> > > @@ -78,3 +89,5 @@
+> > >  	movs \irqnr, \irqnr
+> > >  #endif
+> > >  	.endm
+> > > +
+> > > +#endif /* CONFIG_ARM_GIC */
+> > > diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
+> > > index a8bfd56..e1f84ce 100644
+> > > --- a/arch/arm/plat-mxc/include/mach/hardware.h
+> > > +++ b/arch/arm/plat-mxc/include/mach/hardware.h
+> > > @@ -97,6 +97,7 @@
+> > >  
+> > >  #include <mach/mxc.h>
+> > >  
+> > > +#include <mach/mx6q.h>
+> > >  #include <mach/mx50.h>
+> > >  #include <mach/mx51.h>
+> > >  #include <mach/mx53.h>
+> > > diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
+> > > index 00e812b..3ae400f 100644
+> > > --- a/arch/arm/plat-mxc/include/mach/irqs.h
+> > > +++ b/arch/arm/plat-mxc/include/mach/irqs.h
+> > > @@ -14,12 +14,15 @@
+> > >  #include <asm-generic/gpio.h>
+> > >  
+> > >  /*
+> > > - * SoCs with TZIC interrupt controller have 128 IRQs, those with AVIC have 64
+> > > + * SoCs with AVIC interrupt controller have 64 IRQs, those with TZIC
+> > > + * have 128, otherwise those with GIC have 160 IRQs.
+> > >   */
+> > > -#ifdef CONFIG_MXC_TZIC
+> > > +#if defined CONFIG_MXC_AVIC
+> > > +#define MXC_INTERNAL_IRQS	64
+> > > +#elif defined CONFIG_MXC_TZIC
+> > >  #define MXC_INTERNAL_IRQS	128
+> > >  #else
+> > > -#define MXC_INTERNAL_IRQS	64
+> > > +#define MXC_INTERNAL_IRQS	160
+> > >  #endif
+> > This is broken. The highest number has to go to the top. Otherwise if
+> > you have an image with at least 2 of the available irq controllers your
+> > MXC_INTERNAL_IRQS is too small.
+> > 
+> Yes, this is yet another one I forgot about single image support.
+> I should probably put some documentation about the correct order,
+> which can be forgot by people like me.
+Maybe just introduce a corresponding comment when you touch this part of
+code anyhow?!
 
-Changes since v1:
- * calc the delay based on the rate
-  * change the saif.h #ifndef micro to match the directory
----
- include/sound/saif.h     |   16 +++++
- sound/soc/mxs/mxs-saif.c |  145 +++++++++++++++++++++++++++++++++++++++++-----
- sound/soc/mxs/mxs-saif.h |    4 +
- 3 files changed, 151 insertions(+), 14 deletions(-)
+> > >  #define MXC_GPIO_IRQ_START	MXC_INTERNAL_IRQS
+> > > diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
+> > > index 11be5cd..2b8e186 100644
+> > > --- a/arch/arm/plat-mxc/include/mach/memory.h
+> > > +++ b/arch/arm/plat-mxc/include/mach/memory.h
+> > > @@ -19,6 +19,7 @@
+> > >  #define MX50_PHYS_OFFSET	UL(0x70000000)
+> > >  #define MX51_PHYS_OFFSET	UL(0x90000000)
+> > >  #define MX53_PHYS_OFFSET	UL(0x70000000)
+> > > +#define MX6Q_PHYS_OFFSET	UL(0x10000000)
+> > >  
+> > >  #if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
+> > >  # if defined CONFIG_ARCH_MX1
+> > > @@ -37,6 +38,8 @@
+> > >  #  define PLAT_PHYS_OFFSET		MX51_PHYS_OFFSET
+> > >  # elif defined CONFIG_ARCH_MX53
+> > >  #  define PLAT_PHYS_OFFSET		MX53_PHYS_OFFSET
+> > > +# elif defined CONFIG_SOC_IMX6Q
+> > > +#  define PLAT_PHYS_OFFSET		MX6Q_PHYS_OFFSET
+> > >  # endif
+> > >  #endif
+> > >  
+> > > diff --git a/arch/arm/plat-mxc/include/mach/mx6q.h b/arch/arm/plat-mxc/include/mach/mx6q.h
+> > > new file mode 100644
+> > > index 0000000..7432310
+> > > --- /dev/null
+> > > +++ b/arch/arm/plat-mxc/include/mach/mx6q.h
+> > > @@ -0,0 +1,29 @@
+> > > +/*
+> > > + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> > > + * Copyright 2011 Linaro Ltd.
+> > > + *
+> > > + * The code contained herein is licensed under the GNU General Public
+> > > + * License. You may obtain a copy of the GNU General Public License
+> > > + * Version 2 or later at the following locations:
+> > > + *
+> > > + * http://www.opensource.org/licenses/gpl-license.html
+> > > + * http://www.gnu.org/copyleft/gpl.html
+> > > + */
+> > > +
+> > > +#ifndef __MACH_MX6Q_H__
+> > > +#define __MACH_MX6Q_H__
+> > > +
+> > > +/* static mappings */
+> > > +#define IMX6Q_VA(x)		(0xf4000000 + (x))
+> > > +
+> > > +#define MX6Q_SCU_BASE_ADDR	0x00a00000
+> > > +#define MX6Q_CCM_BASE_ADDR	0x020c4000
+> > > +#define MX6Q_ANATOP_BASE_ADDR	0x020c8000
+> > > +#define MX6Q_UART4_BASE_ADDR	0x021f0000
+> > > +
+> > > +#define MX6Q_SCU_BASE_VADDR	IMX6Q_VA(MX6Q_SCU_BASE_ADDR)
+> > > +#define MX6Q_CCM_BASE_VADDR	IMX6Q_VA(MX6Q_CCM_BASE_ADDR)
+> > > +#define MX6Q_ANATOP_BASE_VADDR	IMX6Q_VA(MX6Q_ANATOP_BASE_ADDR)
+> > > +#define MX6Q_UART4_BASE_VADDR	IMX6Q_VA(MX6Q_UART4_BASE_ADDR)
+> > Depending on the sizes of these memory regions you can use the existing
+> > IMX_IO_P2V here. The conditions are:
+> > 
+> > 	SCU_SIZE <= 0x200000
+Actually this should be 0x100000 as this is the size that is mapped in a
+continous chunk.
 
-diff --git a/include/sound/saif.h b/include/sound/saif.h
-new file mode 100644
-index 0000000..d0e0de7
---- /dev/null
-+++ b/include/sound/saif.h
-@@ -0,0 +1,16 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __SOUND_SAIF_H__
-+#define __SOUND_SAIF_H__
-+
-+struct mxs_saif_platform_data {
-+	int (*init) (void);
-+	int (*get_master_id) (unsigned int saif_id);
-+};
-+#endif
-diff --git a/sound/soc/mxs/mxs-saif.c b/sound/soc/mxs/mxs-saif.c
-index af5734f..401944c 100644
---- a/sound/soc/mxs/mxs-saif.c
-+++ b/sound/soc/mxs/mxs-saif.c
-@@ -23,10 +23,12 @@
- #include <linux/dma-mapping.h>
- #include <linux/clk.h>
- #include <linux/delay.h>
-+#include <linux/time.h>
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
- #include <sound/soc.h>
-+#include <sound/saif.h>
- #include <mach/dma.h>
- #include <asm/mach-types.h>
- #include <mach/hardware.h>
-@@ -36,6 +38,24 @@
+> > 	CCM_SIZE <= 0x4000
+> > 	ANATOP_SIZE <= 0x28000
+> > 	UART4 <= 0x100000
+> > 
+> This is exactly what I dislike about IMX_IO_P2V().  We have to verify
+> all these conditions manually.  Looking at the static mapping below
+I did it semi-manual, I just put your constants for imx6q into my script
+(all with size=0x4000 for now) and it told me:
+
+...
+ * mx6q:
+ *	SCU	0x00a00000+0x004000	->	0xf4000000+0x004000
+ *	CCM	0x020c4000+0x004000	->	0xf42c4000+0x004000
+ *	ANATOP	0x020c8000+0x004000	->	0xf42c8000+0x004000
+ *	UART4	0x021f0000+0x004000	->	0xf42f0000+0x004000
+...
+
+> (copied from arch/arm/plat-mxc/include/mach/hardware.h), do you think
+> it's really scalable and easy to maintain for the long run?
+At least it provides a way to verify the correctness of the mapping.
+Before I introduced the mapping function there was a conflict IIRC.
+
+> /*
+>  * This is rather complicated for humans and ugly to verify, but for a machine
+>  * it's OK.  Still more as it is usually only applied to constants.  The upsides
+>  * on using this approach are:
+>  *
+>  *  - same mapping on all i.MX machines
+>  *  - works for assembler, too
+>  *  - no need to nurture #defines for virtual addresses
+>  *
+>  * The downside it, it's hard to verify (but I have a script for that).
+If you want I can provide you that script.
+
+>  * Obviously this needs to be injective for each SoC.  In general it maps the
+>  * whole address space to [0xf4000000, 0xf5ffffff].  So [0xf6000000,0xfeffffff]
+>  * is free for per-machine use (e.g. KZM_ARM11_01 uses 64MiB there).
+>  *
+>  * It applies the following mappings for the different SoCs:
+>  *
+>  * mx1:
+>  *	IO	0x00200000+0x100000	->	0xf4000000+0x100000
+>  * mx21:
+>  *	AIPI	0x10000000+0x100000	->	0xf4400000+0x100000
+>  *	SAHB1	0x80000000+0x100000	->	0xf4000000+0x100000
+>  *	X_MEMC	0xdf000000+0x004000	->	0xf5f00000+0x004000
+>  * mx25:
+>  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
+>  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
+>  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
+>  * mx27:
+>  *	AIPI	0x10000000+0x100000	->	0xf4400000+0x100000
+>  *	SAHB1	0x80000000+0x100000	->	0xf4000000+0x100000
+>  *	X_MEMC	0xd8000000+0x100000	->	0xf5c00000+0x100000
+>  * mx31:
+>  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
+>  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
+>  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
+>  *	X_MEMC	0xb8000000+0x010000	->	0xf4c00000+0x010000
+>  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
+>  * mx35:
+>  *	AIPS1	0x43f00000+0x100000	->	0xf5300000+0x100000
+>  *	AIPS2	0x53f00000+0x100000	->	0xf5700000+0x100000
+>  *	AVIC	0x68000000+0x100000	->	0xf5800000+0x100000
+>  *	X_MEMC	0xb8000000+0x010000	->	0xf4c00000+0x010000
+>  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
+>  * mx50:
+>  *	TZIC	0x0fffc000+0x004000	->	0xf4bfc000+0x004000
+>  *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
+>  *	AIPS1	0x53f00000+0x100000	->	0xf5700000+0x100000
+>  *	AIPS2	0x63f00000+0x100000	->	0xf5300000+0x100000
+>  * mx51:
+>  *	IRAM	0x1ffe0000+0x020000	->	0xf4fe0000+0x020000
+>  *	DEBUG	0x60000000+0x100000	->	0xf5000000+0x100000
+>  *	SPBA0	0x70000000+0x100000	->	0xf5400000+0x100000
+>  *	AIPS1	0x73f00000+0x100000	->	0xf5700000+0x100000
+>  *	AIPS2	0x83f00000+0x100000	->	0xf4300000+0x100000
+>  */
+> #define IMX_IO_P2V(x)	(						\
+> 			0xf4000000 +					\
+> 			(((x) & 0x50000000) >> 6) +			\
+> 			(((x) & 0x0b000000) >> 4) +			\
+> 			(((x) & 0x000fffff)))
+> 
+> > hmm, looking at patch 4 SCU_BASE is determined by a coprocessor
+> > instruction?!
+> 
+> Ah, yes.  The SCU physical base address can be retrieved from
+> coprocessor.
+Is there an advantage in autodetecting the base address?
  
- static struct mxs_saif *mxs_saif[2];
- 
-+/*
-+ * SAIF is a little different with other normal SOC DAIs on clock using.
-+ *
-+ * For MXS, two SAIF modules are instantiated on-chip.
-+ * Each SAIF has a set of clock pins and can be operating in master
-+ * mode simultaneously if they are connected to different off-chip codecs.
-+ * Also, one of the two SAIFs can master or drive the clock pins while the
-+ * other SAIF, in slave mode, receives clocking from the master SAIF.
-+ * This also means that both SAIFs must operate at the same sample rate.
-+ *
-+ * We abstract this as each saif has a master, the master could be
-+ * himself or other saifs. In the generic saif driver, saif does not need
-+ * to know the different clkmux. Saif only needs to know who is his master
-+ * and operating his master to generate the proper clock rate for him.
-+ * The master id is provided in mach-specific layer according to different
-+ * clkmux setting.
-+ */
-+
- static int mxs_saif_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
- 			int clk_id, unsigned int freq, int dir)
- {
-@@ -52,6 +72,17 @@ static int mxs_saif_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
- }
- 
- /*
-+ * Since SAIF may work on EXTMASTER mode, IOW, it's working BITCLK&LRCLK
-+ * is provided by other SAIF, we provide a interface here to get its master
-+ * from its master_id.
-+ * Note that the master could be himself.
-+ */
-+static inline struct mxs_saif *mxs_saif_get_master(struct mxs_saif * saif)
-+{
-+	return mxs_saif[saif->master_id];
-+}
-+
-+/*
-  * Set SAIF clock and MCLK
-  */
- static int mxs_saif_set_clk(struct mxs_saif *saif,
-@@ -60,8 +91,26 @@ static int mxs_saif_set_clk(struct mxs_saif *saif,
- {
- 	u32 scr;
- 	int ret;
-+	struct mxs_saif *master_saif;
- 
--	scr = __raw_readl(saif->base + SAIF_CTRL);
-+	dev_dbg(saif->dev, "mclk %d rate %d\n", mclk, rate);
-+
-+	/* Set master saif to generate proper clock */
-+	master_saif = mxs_saif_get_master(saif);
-+	if (!master_saif)
-+		return -EINVAL;
-+
-+	dev_dbg(saif->dev, "master saif%d\n", master_saif->id);
-+
-+	/* Checking if can playback and capture simutaneously */
-+	if (master_saif->ongoing && rate != master_saif->cur_rate) {
-+		dev_err(saif->dev,
-+			"can not change clock, master saif%d(rate %d) is ongoing\n",
-+			master_saif->id, master_saif->cur_rate);
-+		return -EINVAL;
-+	}
-+
-+	scr = __raw_readl(master_saif->base + SAIF_CTRL);
- 	scr &= ~BM_SAIF_CTRL_BITCLK_MULT_RATE;
- 	scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
- 
-@@ -75,27 +124,29 @@ static int mxs_saif_set_clk(struct mxs_saif *saif,
- 	 *
- 	 * If MCLK is not used, we just set saif clk to 512*fs.
- 	 */
--	if (saif->mclk_in_use) {
-+	if (master_saif->mclk_in_use) {
- 		if (mclk % 32 == 0) {
- 			scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
--			ret = clk_set_rate(saif->clk, 512 * rate);
-+			ret = clk_set_rate(master_saif->clk, 512 * rate);
- 		} else if (mclk % 48 == 0) {
- 			scr |= BM_SAIF_CTRL_BITCLK_BASE_RATE;
--			ret = clk_set_rate(saif->clk, 384 * rate);
-+			ret = clk_set_rate(master_saif->clk, 384 * rate);
- 		} else {
- 			/* SAIF MCLK should be either 32x or 48x */
- 			return -EINVAL;
- 		}
- 	} else {
--		ret = clk_set_rate(saif->clk, 512 * rate);
-+		ret = clk_set_rate(master_saif->clk, 512 * rate);
- 		scr &= ~BM_SAIF_CTRL_BITCLK_BASE_RATE;
- 	}
- 
- 	if (ret)
- 		return ret;
- 
--	if (!saif->mclk_in_use) {
--		__raw_writel(scr, saif->base + SAIF_CTRL);
-+	master_saif->cur_rate = rate;
-+
-+	if (!master_saif->mclk_in_use) {
-+		__raw_writel(scr, master_saif->base + SAIF_CTRL);
- 		return 0;
- 	}
- 
-@@ -137,7 +188,7 @@ static int mxs_saif_set_clk(struct mxs_saif *saif,
- 		return -EINVAL;
- 	}
- 
--	__raw_writel(scr, saif->base + SAIF_CTRL);
-+	__raw_writel(scr, master_saif->base + SAIF_CTRL);
- 
- 	return 0;
- }
-@@ -183,6 +234,7 @@ int mxs_saif_get_mclk(unsigned int saif_id, unsigned int mclk,
- 	struct mxs_saif *saif = mxs_saif[saif_id];
- 	u32 stat;
- 	int ret;
-+	struct mxs_saif *master_saif;
- 
- 	if (!saif)
- 		return -EINVAL;
-@@ -195,6 +247,12 @@ int mxs_saif_get_mclk(unsigned int saif_id, unsigned int mclk,
- 	__raw_writel(BM_SAIF_CTRL_CLKGATE,
- 		saif->base + SAIF_CTRL + MXS_CLR_ADDR);
- 
-+	master_saif = mxs_saif_get_master(saif);
-+	if (saif != master_saif) {
-+		dev_err(saif->dev, "can not get mclk from a non-master saif\n");
-+		return -EINVAL;
-+	}
-+
- 	stat = __raw_readl(saif->base + SAIF_STAT);
- 	if (stat & BM_SAIF_STAT_BUSY) {
- 		dev_err(saif->dev, "error: busy\n");
-@@ -278,10 +336,17 @@ static int mxs_saif_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
- 	/*
- 	 * Note: We simply just support master mode since SAIF TX can only
- 	 * work as master.
-+	 * Here the master is relative to codec side.
-+	 * Saif internally could be slave when working on EXTMASTER mode.
-+	 * We just hide this to machine driver.
- 	 */
- 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
- 	case SND_SOC_DAIFMT_CBS_CFS:
--		scr &= ~BM_SAIF_CTRL_SLAVE_MODE;
-+		if (saif->id == saif->master_id)
-+			scr &= ~BM_SAIF_CTRL_SLAVE_MODE;
-+		else
-+			scr |= BM_SAIF_CTRL_SLAVE_MODE;
-+
- 		__raw_writel(scr | scr0, saif->base + SAIF_CTRL);
- 		break;
- 	default:
-@@ -396,6 +461,12 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
- 				struct snd_soc_dai *cpu_dai)
- {
- 	struct mxs_saif *saif = snd_soc_dai_get_drvdata(cpu_dai);
-+	struct mxs_saif *master_saif;
-+	u32 delay;
-+
-+	master_saif = mxs_saif_get_master(saif);
-+	if (!master_saif)
-+		return -EINVAL;
- 
- 	switch (cmd) {
- 	case SNDRV_PCM_TRIGGER_START:
-@@ -403,10 +474,20 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
- 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
- 		dev_dbg(cpu_dai->dev, "start\n");
- 
--		clk_enable(saif->clk);
--		if (!saif->mclk_in_use)
-+		clk_enable(master_saif->clk);
-+		if (!master_saif->mclk_in_use)
-+			__raw_writel(BM_SAIF_CTRL_RUN,
-+				master_saif->base + SAIF_CTRL + MXS_SET_ADDR);
-+
-+		/*
-+		 * If the saif's master is not himself, we also need to enable
-+		 * itself clk for its internal basic logic to work.
-+		 */
-+		if (saif != master_saif) {
-+			clk_enable(saif->clk);
- 			__raw_writel(BM_SAIF_CTRL_RUN,
- 				saif->base + SAIF_CTRL + MXS_SET_ADDR);
-+		}
- 
- 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
- 			/*
-@@ -422,20 +503,39 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
- 			__raw_readl(saif->base + SAIF_DATA);
- 		}
- 
--		dev_dbg(cpu_dai->dev, "CTRL 0x%x STAT 0x%x\n",
-+		master_saif->ongoing = 1;
-+
-+		dev_dbg(saif->dev, "CTRL 0x%x STAT 0x%x\n",
- 			__raw_readl(saif->base + SAIF_CTRL),
- 			__raw_readl(saif->base + SAIF_STAT));
- 
-+		dev_dbg(master_saif->dev, "CTRL 0x%x STAT 0x%x\n",
-+			__raw_readl(master_saif->base + SAIF_CTRL),
-+			__raw_readl(master_saif->base + SAIF_STAT));
- 		break;
- 	case SNDRV_PCM_TRIGGER_SUSPEND:
- 	case SNDRV_PCM_TRIGGER_STOP:
- 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
- 		dev_dbg(cpu_dai->dev, "stop\n");
- 
--		clk_disable(saif->clk);
--		if (!saif->mclk_in_use)
-+		/* wait a while for the current sample to complete */
-+		delay = USEC_PER_SEC / master_saif->cur_rate;
-+
-+		if (!master_saif->mclk_in_use) {
-+			__raw_writel(BM_SAIF_CTRL_RUN,
-+				master_saif->base + SAIF_CTRL + MXS_CLR_ADDR);
-+			udelay(delay);
-+		}
-+		clk_disable(master_saif->clk);
-+
-+		if (saif != master_saif) {
- 			__raw_writel(BM_SAIF_CTRL_RUN,
- 				saif->base + SAIF_CTRL + MXS_CLR_ADDR);
-+			udelay(delay);
-+			clk_disable(saif->clk);
-+		}
-+
-+		master_saif->ongoing = 0;
- 
- 		break;
- 	default:
-@@ -519,16 +619,33 @@ static int mxs_saif_probe(struct platform_device *pdev)
- {
- 	struct resource *res;
- 	struct mxs_saif *saif;
-+	struct mxs_saif_platform_data *pdata;
- 	int ret = 0;
- 
- 	if (pdev->id >= ARRAY_SIZE(mxs_saif))
- 		return -EINVAL;
- 
-+	pdata = pdev->dev.platform_data;
-+	if (pdata && pdata->init) {
-+		ret = pdata->init();
-+		if (ret)
-+			return ret;
-+	}
-+
- 	saif = kzalloc(sizeof(*saif), GFP_KERNEL);
- 	if (!saif)
- 		return -ENOMEM;
- 
- 	mxs_saif[pdev->id] = saif;
-+	saif->id = pdev->id;
-+
-+	saif->master_id = saif->id;
-+	if (pdata && pdata->get_master_id) {
-+		saif->master_id = pdata->get_master_id(saif->id);
-+		if (saif->master_id < 0 ||
-+			saif->master_id >= ARRAY_SIZE(mxs_saif))
-+			return -EINVAL;
-+	}
- 
- 	saif->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(saif->clk)) {
-diff --git a/sound/soc/mxs/mxs-saif.h b/sound/soc/mxs/mxs-saif.h
-index 0e2ff8c..12c91e4 100644
---- a/sound/soc/mxs/mxs-saif.h
-+++ b/sound/soc/mxs/mxs-saif.h
-@@ -118,6 +118,10 @@ struct mxs_saif {
- 	void __iomem *base;
- 	int irq;
- 	struct mxs_pcm_dma_params dma_param;
-+	unsigned int id;
-+	unsigned int master_id;
-+	unsigned int cur_rate;
-+	unsigned int ongoing;
- 
- 	struct platform_device *soc_platform_pdev;
- 	u32 fifo_underrun;
+Best regards
+Uwe
+
 -- 
-1.7.0.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
