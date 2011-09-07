@@ -1,27 +1,40 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 06 Sep 2011 17:08:36 -0700
-Subject: [PATCH v6 23/25] gpio/omap: enable irq at the end of all
-	configuration in restore
-In-Reply-To: <1314798161-19523-24-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Wed, 31 Aug 2011 19:12:39 +0530")
-References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
-	<1314798161-19523-24-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87hb4puscb.fsf@ti.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 7 Sep 2011 10:30:33 +0900
+Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
+	the hardware
+In-Reply-To: <1314984756-4400-8-git-send-email-ohad@wizery.com>
+References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+	<1314984756-4400-8-git-send-email-ohad@wizery.com>
+Message-ID: <CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+Hi
 
-> From: Nishanth Menon <nm@ti.com>
+On Sat, Sep 3, 2011 at 2:32 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> When mapping a memory region, split it to page sizes as supported
+> by the iommu hardware. Always prefer bigger pages, when possible,
+> in order to reduce the TLB pressure.
 >
-> Setup the interrupt enable registers only after we have configured the
-> required edge and required configurations, not before, to prevent
-> spurious events as part of restore routine.
+True. It is important for the peripheral devices that works with IOMMU.
+
+> This allows a more lenient granularity of mappings: traditionally the
+> IOMMU API took 'order' (of a page) as a mapping size, and directly let
+> the low level iommu drivers handle the mapping. Now that the IOMMU
+> core can split arbitrary memory regions into pages, we can remove this
+> limitation, so users don't have to split those regions by themselves.
 >
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Good catch Nishanth.
+Please find the following link that I submitted for our IOMMU.
+https://lkml.org/lkml/2011/7/3/152
 
-Kevin
+s5p_iommu_map/unmap accepts any order of physical address and iova
+without support of your suggestion if the order is not less than PAGE_SHIFT
+
+Of course, an IO virtual memory manager must be careful when it allocates
+IO virtual memory to lead best performance.
+But I think IOMMU API must not expect that the caller of iommu_map() knows
+about the restriction of IOMMU API implementation.
+
+Regards,
+Cho KyongHo.
