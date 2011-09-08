@@ -1,55 +1,29 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 8 Sep 2011 17:03:50 +0300
-Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
-	the hardware
-In-Reply-To: <CAHQjnONUvBtKSMxiDf5Mk+DLqfrTr09Us11rWoaR1mVZeiAmnA@mail.gmail.com>
-References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
-	<1314984756-4400-8-git-send-email-ohad@wizery.com>
-	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
-	<CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
-	<CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
-	<CAK=WgbbFhmiC=PJfmyPOhbHGtiPFOcmqBx7nSpkuDX36hPYgbA@mail.gmail.com>
-	<CAHQjnONUvBtKSMxiDf5Mk+DLqfrTr09Us11rWoaR1mVZeiAmnA@mail.gmail.com>
-Message-ID: <CAK=WgbZoF-F_hXHT1i=cAh8QJb+aFSjjubdy_YkHQ97acRvorA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 8 Sep 2011 16:40:05 +0200
+Subject: [RFC PATCH 2/3] ARM: iwmmxt: Port problematic iwmmxt support code
+	to v7/Thumb-2
+In-Reply-To: <20110908113354.GC2070@arm.com>
+References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
+	<20110908090122.GC14953@n2100.arm.linux.org.uk>
+	<20110908113354.GC2070@arm.com>
+Message-ID: <201109081640.06094.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi KyongHo,
+On Thursday 08 September 2011, Dave Martin wrote:
+> On Thu, Sep 08, 2011 at 10:01:22AM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Sep 08, 2011 at 09:58:00AM +0100, Dave Martin wrote:
+> > > I take pj4 and older platforms can never be built in the same kernel?
+> > > Otherwise, this approach is totally broken anyway-- we'll generate code
+> > > which won't run on some of the kernel's supported platforms.
+> > 
+> > We have a well enforced split between ARMv5 and older CPUs, and ARMv6
+> > and later CPUs.
+> 
+> Good point -- OK, I guess we don't need to worry about that scenario.
 
-On Thu, Sep 8, 2011 at 3:51 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
-> 16MB page is less practical in Linux because Linux kernel is unable
-> to allocated larger physically contiguous memory than 4MB by default.
-> But I also think that it is needed to support 16MB mapping for IO
-> virtualization someday
+I actually have a patch that enforces this rule in Kconfig for pxa.
+Right now, you can happily select any combination of boards, which
+blows up very early during the build phase if you combine v5 and v7.
 
-Actually we need physically contiguous memory regions that are much
-bigger (in the tens of megs), so we do utilize 16MB pages. Today we
-reserve that memory on boot, but the plan is to move to CMA.
-
-> Actually, I think your idea is good and does not cause performance degradation.
-> But I wondered if it is really useful.
-
-Well, the alternative is to duplicate this logic in every IOMMU driver.
-
-Go ahead and try to rebase your driver on my recent patch set and see
-if you like it; the result should significantly simplify your
-map/unmap functions.
-
-You only need to add this line:
-static unsigned long s5p_iommu_pgsizes = SZ_4K | SZ_64K | SZ_1M | SZ_16M;
-
-and then advertise it with iommu_register, and you're done. The IOMMU
-core will only ask you to handle a single page from now on, and will
-take care of the rest.
-
-> The caller of iommu_map() gives gfp_order that is the size of the physical
-> memory to map.
-
-I've changed it in the patch :)
-
-This way users are not bound to rigid mapping sizes (this allows us to
-better utilize the physically-contiguous memory region we reserve on
-boot).
-
-Thanks,
-Ohad.
+	Arnd
