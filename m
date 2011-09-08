@@ -1,23 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Sep 2011 22:18:13 +0200
-Subject: [PATCH 3/4] mach-integrator: modernize clock event registration
-In-Reply-To: <20110908085502.GB14953@n2100.arm.linux.org.uk>
-References: <1315384260-27404-1-git-send-email-linus.walleij@stericsson.com>
-	<alpine.LFD.2.02.1109071202000.2723@ionos>
-	<20110908085502.GB14953@n2100.arm.linux.org.uk>
-Message-ID: <CAKnu2MqVY0k2OdAC3awtQ-ry7hmqPHC9ttTbx8nsG7iuVJu=dg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 08 Sep 2011 22:18:41 +0200
+Subject: [RFC PATCH 0/3] Per SoC descriptor
+In-Reply-To: <1315501212-1820-1-git-send-email-marc.zyngier@arm.com>
+References: <1315501212-1820-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <8605786.uz70QLLSTu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/8 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On Thursday 08 September 2011 18:00:09 Marc Zyngier wrote:
+> This is my first stab at an idea that has floated around for a while,
+> which is to have a per-soc descriptor containing most of the SoC
+> specific operations, which should clear the path a bit more towards
+> the single zImage holy grail. It's as far as possible from being
+> perfect, but I thought I'd share it as early as possible and see what
+> people think of it.
+> 
+> This first patch series introduces the arm_soc_desc structure, adds
+> per-soc SMP and CPU hotplug operations, and converts both RealView and
+> VExpress to this new scheme.
 
-> My understanding is that periodic timers are not setup by the generic
-> clock event code, and so we do need to keep the 'timer_reload' stuff
-> around. ?Note that patch 2 deletes the register write for this too,
-> so you actually have one logical change split across patch 2 and 3.
+Very nice, I definitely like the concept! This is going to be really
+helpful reducing the amount of stuff we need in machine descriptors.
 
-I've fixed this up in v2 (hopefully) and I'll update the patches
-2 thru 4 to the new versions in the patch system.
-
-Thanks Russell!
-Linus Walleij
+	Arnd
