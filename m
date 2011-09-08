@@ -1,94 +1,58 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 8 Sep 2011 09:32:09 -0700
-Subject: [PATCH] ARM: supply a DTB file to be appended
-In-Reply-To: <1315476884-28470-1-git-send-email-linus.walleij@stericsson.com>
-References: <1315476884-28470-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110908163209.GB22308@ponder.secretlab.ca>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 8 Sep 2011 09:33:22 -0700
+Subject: [PATCH 1/2] input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD
+	config option
+In-Reply-To: <CAJuYYwQg8pMaM7Y-AQD5eDqw32rMOHggL2gWOtJH_ri8gsH-yg@mail.gmail.com>
+References: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
+	<1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
+	<20110907182248.GA2874@core.coreip.homeip.net>
+	<CAJuYYwQg8pMaM7Y-AQD5eDqw32rMOHggL2gWOtJH_ri8gsH-yg@mail.gmail.com>
+Message-ID: <20110908163322.GB17503@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2011 at 12:14:44PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Sep 08, 2011 at 09:16:46AM +0530, Thomas Abraham wrote:
+> Hi Dmitry,
 > 
-> This adds a Kconfig string where you can specify a
-> file to be appended to the zImage on build, then
-> auto-appends it. The idea is to mimic how we supply
-> an initramfs image by a similar parameter.
+> On 7 September 2011 23:52, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> > Hi Thomas,
+> >
+> > On Tue, Sep 06, 2011 at 07:25:16PM +0530, Thomas Abraham wrote:
+> >> Samsung keyboard driver could be used with platforms using device tree.
+> >> So the inclusion of samsung keyboard driver cannot be based on
+> >> SAMSUNG_DEV_KEYPAD. A new config option HAVE_SAMSUNG_KEYPAD is added
+> >> which device tree based platforms should use to include samsung keyboard
+> >> driver.
+> >
+> > I am sorry, I do not follow... What is the difference between
+> > SAMSUNG_DEV_KEYPAD and HAVE_SAMSUNG_KEYPAD? They look exactly the same.
 > 
-> This makes it easy to script the kernel build with
-> different device trees, and it also vastly simplifies
-> building uImages since "make uImage" will now pick
-> up the devcie tree and include it in the final image
-> as part of the build process.
+> The inclusion of platform device instance for keypad (in
+> arch/arm/plat-samsung/dev-keypad.c) in the build depends on
+> SAMSUNG_DEV_KEYPAD. The samsung-keypad driver is also dependent on
+> SAMSUNG_DEV_KEYPAD.
+> 
+> In case of device tree based instantiation of keypad, compilation of
+> dev-keypad.c file is not required. So SAMSUNG_DEV_KEYPAD config option
+> will not be selected.In that case, the compilation of the keypad
+> driver cannot be dependent on SAMSUNG_DEV_KEYPAD. There should be
+> another option to select the keypad driver and so HAVE_SAMSUNG_KEYPAD
+> was introduced. HAVE_SAMSUNG_KEYPAD can be selected on platforms that
+> need the samsung-keypad driver but do no need the keypad platform
+> device.
 
-The other option is to encode the .dtb filename into the zImage target
-name (something like zImage.%).  The advantage being that the build
-can emit multiple .dtb bound images without changing the kernel
-config.  This is what PowerPC currently does.
+I still think that it is an extra option... What about the following
+dependencies:
 
-Also, the way this is implemented means that it is no longer possible
-to emit a zImage without a dtb if the DTB config is set.  Personally,
-I'd use a different target name regardless instead of adjusting the
-semantics of zImage.
+	depends on SAMSUNG_DEV_KEYPAD || OF
+	depends on HAVE_CLK
 
-g.
+although I think we should relax dependencies like I did in my other
+patch. This will extend compile coverage of the driver and lessen the
+chances that API changes will cause unintended breakage because noone
+but Samsung platform users compile it.
 
-> 
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Niklas Hernaeus <niklas.hernaeus@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> This builds on top of Nicos pending appended device tree
-> patches. Nico, if this gains some liking, please include
-> it in your series.
-> ---
->  arch/arm/Kconfig       |   10 ++++++++++
->  arch/arm/boot/Makefile |    8 +++++++-
->  2 files changed, 17 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 4ea9974..cb8ee68 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1789,6 +1789,16 @@ config ARM_APPENDED_DTB
->  	  (dtb) appended to zImage
->  	  (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
->  
-> +config ARM_APPENDED_DTB_FILE
-> +	string "DTB file"
-> +	depends on ARM_APPENDED_DTB
-> +	default ""
-> +	help
-> +	  This gives the name of file from the build directory to append
-> +	  to the zImage after it has been built.
-> +
-> +	  If you are not sure, leave it blank.
-> +
->  config ARM_ATAG_DTB_COMPAT
->  	bool "Supplement the appended DTB with traditional ATAG information"
->  	depends on ARM_APPENDED_DTB
-> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-> index a1edfd5..5ab6abf 100644
-> --- a/arch/arm/boot/Makefile
-> +++ b/arch/arm/boot/Makefile
-> @@ -53,8 +53,14 @@ $(obj)/Image: vmlinux FORCE
->  $(obj)/compressed/vmlinux: $(obj)/Image FORCE
->  	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
->  
-> -$(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
-> +# Rule to optionally append a DTB
-> +dtbfile := $(shell echo $(CONFIG_ARM_APPENDED_DTB_FILE))
-> +quiet_cmd_append = CAT     $@
-> +      cmd_append = (cat /dev/null $(dtbfile) >> $@)
-> +
-> +$(obj)/zImage:	$(obj)/compressed/vmlinux $(dtbfile) FORCE
->  	$(call if_changed,objcopy)
-> +	$(call if_changed,append)
->  	@echo '  Kernel: $@ is ready'
->  
->  endif
-> -- 
-> 1.7.3.2
-> 
+Thanks.
+
+-- 
+Dmitry
