@@ -1,73 +1,57 @@
-From: abhilash.kv@ti.com (Abhilash K V)
-Date: Thu, 8 Sep 2011 18:18:11 +0530
-Subject: [PATCH v2 3/3] OMAP3: Remove auto-selection of PMICs
-Message-ID: <1315486091-835-1-git-send-email-abhilash.kv@ti.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Thu, 8 Sep 2011 21:51:57 +0900
+Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
+	the hardware
+In-Reply-To: <CAK=WgbbFhmiC=PJfmyPOhbHGtiPFOcmqBx7nSpkuDX36hPYgbA@mail.gmail.com>
+References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+	<1314984756-4400-8-git-send-email-ohad@wizery.com>
+	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
+	<CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
+	<CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
+	<CAK=WgbbFhmiC=PJfmyPOhbHGtiPFOcmqBx7nSpkuDX36hPYgbA@mail.gmail.com>
+Message-ID: <CAHQjnONUvBtKSMxiDf5Mk+DLqfrTr09Us11rWoaR1mVZeiAmnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation almost assumes that only
-TWL4030/TWL5030/TWl6030 are (or can be) used with the
-OMAP processors. This is, however, not true.
+Hi Ohad,
 
-This patch removes the automatic selection of the PMIC
-from Kconfig.
-All currently used PMICs are now added to omap2plus_defconfig;
-any new PMIC that gets supported in future could now be
-enabled here rather than by changing Kconfig for
-ARCH_OMAP2PLUS_TYPICAL
+On Wed, Sep 7, 2011 at 6:16 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Hmm this sounds a bit like a red herring to me; optimization of the
+:) I agree. sorry.
 
-TWL4030 CORE and POWER drivers are no longer built only for ARM and OMAP,
-as per the discussion here:
-	http://marc.info/?l=linux-omap&m=131402877315314&w=2
+> map function is not the main subject here. Especially not when we're
+> discussing mapping of large physically contiguous memory regions which
+> do not happen too often.
+>
+I've got your point but I thought that it is really needed.
 
-Signed-off-by: Sanjeev Premi <premi@ti.com>
-Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
----
- arch/arm/configs/omap2plus_defconfig |    3 +++
- arch/arm/mach-omap2/Kconfig          |    3 ---
- drivers/mfd/Kconfig                  |    2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+> Another advantage for migrating s5p_iommu_map() over to the subject
+> patch, is that s5p_iommu_map() doesn't support super sections yet. To
+> support it, you'd need to add more code (duplicate another while
+> loop). But if you migrated to the subject patch, then you would only
+> need to flip the 16MB bit when you advertise page size capabilities
+> and then that's it; you're done.
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index d5f00d7..076b131 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -130,6 +130,9 @@ CONFIG_POWER_SUPPLY=y
- CONFIG_WATCHDOG=y
- CONFIG_OMAP_WATCHDOG=y
- CONFIG_TWL4030_WATCHDOG=y
-+CONFIG_MENELAUS=y
-+CONFIG_TWL4030_CORE=y
-+CONFIG_TWL4030_POWER=y
- CONFIG_REGULATOR_TWL4030=y
- CONFIG_REGULATOR_TPS65023=y
- CONFIG_REGULATOR_TPS6507X=y
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 7edf802..d40f6d2 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -15,9 +15,6 @@ config ARCH_OMAP2PLUS_TYPICAL
- 	select I2C
- 	select I2C_OMAP
- 	select MFD_SUPPORT
--	select MENELAUS if ARCH_OMAP2
--	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
--	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
- 	help
- 	  Compile a kernel suitable for booting most boards
- 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 21574bd..72e15c8 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -238,7 +238,7 @@ config TWL4030_MADC
- 
- config TWL4030_POWER
- 	bool "Support power resources on TWL4030 family chips"
--	depends on TWL4030_CORE && ARM
-+	depends on TWL4030_CORE
- 	help
- 	  Say yes here if you want to use the power resources on the
- 	  TWL4030 family chips.  Most of these resources are regulators,
--- 
-1.7.1
+I did not implement that.
+16MB page is less practical in Linux because Linux kernel is unable
+to allocated larger physically contiguous memory than 4MB by default.
+But I also think that it is needed to support 16MB mapping for IO
+virtualization someday
+and it is just trivial job.
+
+And you pointed correctly that s5p_iommu_map() has duplicate similar codes.
+
+Actually, I think your idea is good and does not cause performance degradation.
+But I wondered if it is really useful.
+
+>
+> The caller of iommu_map() doesn't say anything about alignments. It
+> just gives it a memory region to map, and expect things to just work.
+>
+The caller of iommu_map() gives gfp_order that is the size of the physical
+memory to map.
+I thought that it also means alignment of the physical memory.
+Isn't it?
+
+Regards,
+KyongHo
