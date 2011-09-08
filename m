@@ -1,86 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Thu, 08 Sep 2011 21:42:06 +0530
-Subject: [PATCH v2 2/5] cpu_pm: call notifiers during suspend
-In-Reply-To: <87wrdjku9h.fsf@ti.com>
-References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>	<1315060755-4613-3-git-send-email-santosh.shilimkar@ti.com>	<87k49knmrw.fsf@ti.com>
-	<4E684F90.7010809@ti.com> <87wrdjku9h.fsf@ti.com>
-Message-ID: <4E68E956.9010006@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 08 Sep 2011 17:12:17 +0100
+Subject: [PATCH v11 0/4] Consolidating GIC per-cpu interrupts
+In-Reply-To: <alpine.LFD.2.02.1109081339120.2723@ionos>
+References: <1312883802-15022-1-git-send-email-marc.zyngier@arm.com>
+	<20110815121312.GF26827@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1109081339120.2723@ionos>
+Message-ID: <4E68E961.8050309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 September 2011 07:31 PM, Kevin Hilman wrote:
-> Santosh<santosh.shilimkar@ti.com>  writes:
->
->> On Thursday 08 September 2011 01:32 AM, Kevin Hilman wrote:
->>> Santosh Shilimkar<santosh.shilimkar@ti.com>   writes:
->>>
->>>> From: Colin Cross<ccross@android.com>
->>>>
->>>> Implements syscore_ops in cpu_pm to call the cpu and
->>>> cpu cluster notifiers during suspend and resume,
->>>> allowing drivers receiving the notifications to
->>>> avoid implementing syscore_ops.
->>>>
->>>> Signed-off-by: Colin Cross<ccross@android.com>
->>>> [santosh.shilimkar at ti.com: Rebased against 3.1-rc4]
->>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>>
->>> I don't think using syscore_ops is right here.  The platform code should
->>> decide where in its own suspend path the notifiers should be triggered.
->>>
->>> The reason is because while the syscore_ops run late in the suspend
->>> path, they still run before some platform-specific decisions about the
->>> low-power states are made.  That means that any notifiers that need to
->>> use information about the target low-power state (e.g. whether context
->>> will be lost or not) cannot do so since that information has not yet
->>> been decided until the platform_suspend_ops->enter() runs.
->>>
->> Initially I thought the same but in general S2R, platform doesn't
->> support multiple states like CPUIDLE. On OMAP, we do have a debug
->> option to choose the state but on real product, it's always the
->> deepest supported state is used. So the driver saving the
->> full context for S2R, should be fine.
->>
->> Ofcourse for CPUIDLE, the notifier call chain decisions are left
->> with platform CPUIDLE drivers since there can be multiple low
->> power states and the context save/restore has to be done based
->> on low power states.
->>
->> The advantage with this is, the platform code is clean from the
->> notfiers calls. CPUIDLE driver needs to call the different notifier
->> events based on C-states and that perfectly works.
->>
->> I liked this simplification for the S2R. Down side is in S2R if you
->> don't plan to hit deepest state, drivers end up saving full context
->> which is fine I guess.
->
-> That's not the downside I'm worried about.
->
-> If you have a driver that has a notifier, presumably it has something it
-> wants to do to prepare for suspend *and* for idle, and you'd only want a
-> single notifier callback in the driver to be used for both.  That
-> callback would look something like:
->
->     start_preparing_for_suspend();
->
->     if (next_state == OFF)
->        save_context();
->
->     finish_preparing_for_suspend();
->
->
-> The problem with the current cpu_*_pm_enter() calls in syscore_ops is
-> that they happen before the next states are programmed, so during
-> suspend the 'if (next_state == off)' above would never be true, but
-> during idle it might be.
->
-Point taken and now I agree with you.
+Thomas,
 
-I am going to drop this patch unless and until somebody shouts at me.
-What that means is platform code need to take care of suspend case
-as well which is trivial change.
+On 08/09/11 14:14, Thomas Gleixner wrote:
 
-Thanks for bringing up the point.
+> Another thing, which sticks out compared to other percpu interrupt
+> users in arch/* is that you provide the ability to assign different
+> handlers on different CPUs to a given PPI interrupt number. Most other
+> percpu implementations setup the interrupt with a unique percpu aware
+> handler and just enable/disable it per core in the low level
+> setup/shutdown code. Is running different handlers on different cores
+> a real requirement or just a nice feature with no usecase?
 
-Regards
-Santosh
+At the moment, it sort of falls into the second category. MSM has
+"asymmetric" timers (each core has its private timer on a different
+PPI), but that doesn't mandate having separate handlers per core, unless
+someone decides to connect something on another CPU, using the same
+PPI... The architecture would probably allow it.
+
+But a clear requirement we have is that the handler has to be called
+with a per-cpu dev_id pointer (we use this to obtain the
+clock_event_device in the timer handler, for example). Which makes
+having something similar to request_irq() quite the natural thing.
+
+Cheers,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
