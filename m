@@ -1,25 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Sep 2011 22:18:41 +0200
-Subject: [RFC PATCH 0/3] Per SoC descriptor
-In-Reply-To: <1315501212-1820-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 08 Sep 2011 22:23:53 +0200
+Subject: [RFC PATCH 2/3] ARM: SoC: Add per SoC SMP and CPU hotplug
+	operations
+In-Reply-To: <1315501212-1820-3-git-send-email-marc.zyngier@arm.com>
 References: <1315501212-1820-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <8605786.uz70QLLSTu@wuerfel>
+	<1315501212-1820-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1594529.EmMGjcLOoi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 September 2011 18:00:09 Marc Zyngier wrote:
-> This is my first stab at an idea that has floated around for a while,
-> which is to have a per-soc descriptor containing most of the SoC
-> specific operations, which should clear the path a bit more towards
-> the single zImage holy grail. It's as far as possible from being
-> perfect, but I thought I'd share it as early as possible and see what
-> people think of it.
-> 
-> This first patch series introduces the arm_soc_desc structure, adds
-> per-soc SMP and CPU hotplug operations, and converts both RealView and
-> VExpress to this new scheme.
+On Thursday 08 September 2011 18:00:11 Marc Zyngier wrote:
+> +struct arm_soc_smp_ops {
+> +       void (*smp_init_cpus)(void);
+> +       void (*smp_prepare_cpus)(unsigned int max_cpus);
+> +       void (*smp_secondary_init)(unsigned int cpu);
+> +       int  (*smp_boot_secondary)(unsigned int cpu, struct task_struct *idle);
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +       int  (*cpu_kill)(unsigned int cpu);
+> +       void (*cpu_die)(unsigned int cpu);
+> +       int  (*cpu_disable)(unsigned int cpu);
+> +#endif
+> +};
+> +
+>  struct arm_soc_desc {
+>         const char              *name;
+> +#ifdef CONFIG_SMP
+> +       struct arm_soc_smp_ops  smp_ops;
+> +#endif
+>  };
 
-Very nice, I definitely like the concept! This is going to be really
-helpful reducing the amount of stuff we need in machine descriptors.
+If you make this two data structures, I would actually recommend using a
+pointer to the arm_soc_smp_ops instead of embedding it in arm_soc_desc.
+
+This will make it possible to put the arm_soc_smp_ops into the plat_smp.c file
+and get rid of a few more #ifdefs.
+
+It may also be a good idea to have global pointers and for arm_soc_desc and
+arm_soc_smp_ops instead of pointing to them from the board file. I can see
+reasons both ways, and that should probably be driven by code efficiency
+concerns.
 
 	Arnd
