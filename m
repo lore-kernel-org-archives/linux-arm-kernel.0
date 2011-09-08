@@ -1,64 +1,72 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 08 Sep 2011 10:30:49 -0700
-Subject: [RFC PATCH v2 5/6] TI81XX: Add minimal hwmod data
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4AAB78D@dbde02.ent.ti.com>
-	(Hemant Pedanekar's message of "Thu, 8 Sep 2011 06:49:39 +0530")
-References: <1314119627-23088-1-git-send-email-hemantp@ti.com>
-	<87ty8zoi15.fsf@ti.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03B4AAB78D@dbde02.ent.ti.com>
-Message-ID: <87ehzrj60m.fsf@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 8 Sep 2011 13:32:37 -0400 (EDT)
+Subject: [PATCH v2 2/3] ARM: iwmmxt: Port problematic iwmmxt support code
+	to v7/Thumb-2
+In-Reply-To: <20110908172002.GG2070@arm.com>
+References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
+	<1315497854-13311-3-git-send-email-dave.martin@linaro.org>
+	<201109081845.58260.arnd@arndb.de>
+	<CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
+	<20110908172002.GG2070@arm.com>
+Message-ID: <alpine.LFD.2.00.1109081330410.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Pedanekar, Hemant" <hemantp@ti.com> writes:
+On Thu, 8 Sep 2011, Dave Martin wrote:
 
-> Hilman, Kevin wrote on Tuesday, August 30, 2011 6:03 AM:
->
->> Hemant Pedanekar <hemantp@ti.com> writes:
->> 
->>> This patch adds minimum required hwmod data (e.g., UARTs) for bootup of
->>> TI81XX devices (currently common data for TI816X and TI814X is added).
->>> 
->>> Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
->> 
->> I haven't looked at the details yet, but just tried to boot this using
->> current mainline and it fails.
->> 
->> My first guess is that it appears to be related to a missing clkdm for the
->> MPU hwmod. 
->> 
->> Kevin
->
-> Thanks for the feedback.
->
-> I think that the issue is bacause clk_get() on fck_source is failing
-> as TI816X clock data had different clock source names compared to
-> OMAP3 (e.g., osc_sys_ck instead of sys_ck). I will update this in next
-> version.
+> On Thu, Sep 08, 2011 at 10:03:52AM -0700, Eric Miao wrote:
+> > On Thu, Sep 8, 2011 at 9:45 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Thursday 08 September 2011, Dave Martin wrote:
+> > >> The iwmmxt code contains some code to implement a pseudo-ISB, but
+> > >> this is not buildable for Thumb-2.
+> > >>
+> > >> This patch replaces the pseudo-ISB with a real one for Thumb-2
+> > >> kernels.
+> > >>
+> > >> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > >> ---
+> > >> ?arch/arm/kernel/iwmmxt.S | ? ?9 +++++++++
+> > >> ?1 files changed, 9 insertions(+), 0 deletions(-)
+> > >
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > >
+> > 
+> > Maybe it'll be much simpler to have something like below:
+> > 
+> > diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+> > index a087838..5998f7d 100644
+> > --- a/arch/arm/kernel/iwmmxt.S
+> > +++ b/arch/arm/kernel/iwmmxt.S
+> > @@ -319,8 +319,9 @@ ENTRY(iwmmxt_task_switch)
+> >         PJ4(eor r1, r1, #0xf)
+> >         PJ4(mcr p15, 0, r1, c1, c0, 2)
+> > 
+> > -       mrc     p15, 0, r1, c2, c0, 0
+> > -       sub     pc, lr, r1, lsr #32             @ cpwait and return
+> > +       XSC(mrc p15, 0, r1, c2, c0, 0)
+> > +       PJ4(isb)
+> > +       mov     pc, lr                          @ cpwait and return
+> 
+> This won't allow the building of this code for a v7 ARM kernel with
+> current tools.
+> 
+> I think this is likely to be too much dirsuption: requiring really
+> new tools for Thumb-2 is unavoidable, but we should allow people
+> using existing tools to build this to carry on with the current
+> situation for the time being.  This is because of the fact that
+> not all current tools can support "isb" and the iwmmxt mnemonics
+> in the same file.
+> 
+> One thing we could do is to code the ISB using .long, since we
+> only need this for Thumb kernels.
 
-Actually, I realized also that ti816x doesn't boot on current l-o master
-branch, even without this series.
+You would have an ARM and a Thumb variant then, plus the legacy variant, 
+right?
 
-> Even after this, the kernel would get stuck at "Calibrating delay loop..."
-> because a few timer register offsets on TI81XX are different than
-> OMAP3. 
+> This would allow us to get rid of the Makefile warning, since the
+> generated code would be the preferred v7 code in that case.
 
-At least with my tests, it's getting past that and failing here:
+Makes sense.
 
-[...]
-[    0.000000] NR_IRQS:410                                                      
-[    0.000000] IRQ: Found an INTC at 0xfa200000 (revision 5.0) with 128 interrup
-ts                                                                              
-[    0.000000] Total of 128 interrupts on 1 active controller                   
-[    0.000000] omap_hwmod: timer1: cannot setup_one: MPU initiator hwmod mpu not
- yet registered                                                                 
 
-The reason seems to be that no hwmods are getting registered at all.
-
-> I see there are some patches floating on ML which add reg_map array
-> (similar to i2c driver) but seems they have not (yet) been
-> accepted. Any chance that this will get added to kernel?
-
-I'm not sure.  Which series are you referring to?
-
-Kevin
+Nicolas
