@@ -1,87 +1,65 @@
-From: ccross@android.com (Colin Cross)
-Date: Thu, 8 Sep 2011 11:04:26 -0700
-Subject: [PATCH v2 2/5] cpu_pm: call notifiers during suspend
-In-Reply-To: <87wrdjku9h.fsf@ti.com>
-References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315060755-4613-3-git-send-email-santosh.shilimkar@ti.com>
-	<87k49knmrw.fsf@ti.com> <4E684F90.7010809@ti.com>
-	<87wrdjku9h.fsf@ti.com>
-Message-ID: <CAMbhsRQvft4dqhAc4j_bXDR8018zeoSRXuWC6bS-d8rA0PgOyA@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 8 Sep 2011 11:09:11 -0700
+Subject: [RFC PATCH 05/10] documentation/dt: Add mpu, dsp and iva bindings
+In-Reply-To: <1314191356-10963-6-git-send-email-b-cousson@ti.com>
+References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
+	<1314191356-10963-6-git-send-email-b-cousson@ti.com>
+Message-ID: <20110908180910.GE2967@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2011 at 7:01 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Santosh <santosh.shilimkar@ti.com> writes:
->
->> On Thursday 08 September 2011 01:32 AM, Kevin Hilman wrote:
->>> Santosh Shilimkar<santosh.shilimkar@ti.com> ?writes:
->>>
->>>> From: Colin Cross<ccross@android.com>
->>>>
->>>> Implements syscore_ops in cpu_pm to call the cpu and
->>>> cpu cluster notifiers during suspend and resume,
->>>> allowing drivers receiving the notifications to
->>>> avoid implementing syscore_ops.
->>>>
->>>> Signed-off-by: Colin Cross<ccross@android.com>
->>>> [santosh.shilimkar at ti.com: Rebased against 3.1-rc4]
->>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>>
->>> I don't think using syscore_ops is right here. ?The platform code should
->>> decide where in its own suspend path the notifiers should be triggered.
->>>
->>> The reason is because while the syscore_ops run late in the suspend
->>> path, they still run before some platform-specific decisions about the
->>> low-power states are made. ?That means that any notifiers that need to
->>> use information about the target low-power state (e.g. whether context
->>> will be lost or not) cannot do so since that information has not yet
->>> been decided until the platform_suspend_ops->enter() runs.
->>>
->> Initially I thought the same but in general S2R, platform doesn't
->> support multiple states like CPUIDLE. On OMAP, we do have a debug
->> option to choose the state but on real product, it's always the
->> deepest supported state is used. So the driver saving the
->> full context for S2R, should be fine.
->>
->> Ofcourse for CPUIDLE, the notifier call chain decisions are left
->> with platform CPUIDLE drivers since there can be multiple low
->> power states and the context save/restore has to be done based
->> on low power states.
->>
->> The advantage with this is, the platform code is clean from the
->> notfiers calls. CPUIDLE driver needs to call the different notifier
->> events based on C-states and that perfectly works.
->>
->> I liked this simplification for the S2R. Down side is in S2R if you
->> don't plan to hit deepest state, drivers end up saving full context
->> which is fine I guess.
->
-> That's not the downside I'm worried about.
->
-> If you have a driver that has a notifier, presumably it has something it
-> wants to do to prepare for suspend *and* for idle, and you'd only want a
-> single notifier callback in the driver to be used for both. ?That
-> callback would look something like:
->
-> ? start_preparing_for_suspend();
->
-> ? if (next_state == OFF)
-> ? ? ?save_context();
->
-> ? finish_preparing_for_suspend();
->
->
-> The problem with the current cpu_*_pm_enter() calls in syscore_ops is
-> that they happen before the next states are programmed, so during
-> suspend the 'if (next_state == off)' above would never be true, but
-> during idle it might be.
+On Wed, Aug 24, 2011 at 03:09:11PM +0200, Benoit Cousson wrote:
+> Add documentation for the OMAP4 processors bindings.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Randy Dunlap <rdunlap@xenotime.net>
+> ---
+>  Documentation/devicetree/bindings/arm/omap/dsp.txt |   14 ++++++++
+>  Documentation/devicetree/bindings/arm/omap/iva.txt |   18 ++++++++++
+>  Documentation/devicetree/bindings/arm/omap/mpu.txt |   35 ++++++++++++++++++++
+>  3 files changed, 67 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/omap/dsp.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/omap/iva.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/omap/mpu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/dsp.txt b/Documentation/devicetree/bindings/arm/omap/dsp.txt
+> new file mode 100644
+> index 0000000..8fcd82c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/omap/dsp.txt
+> @@ -0,0 +1,14 @@
+> +* TI - DSP (Digital Signal Processor)
+> +
+> +TI DSP included in OMAP SoC
+> +
+> +Required properties:
+> +- compatible : Should be "ti,c64" for OMAP3 & 4
+> +- hwmods: "dsp"
+> +
+> +Examples:
+> +
+> +dsp {
+> +    compatible = "ti,omap4-c64", "ti,c64";
+> +    hwmods = "dsp";
+> +};
+> diff --git a/Documentation/devicetree/bindings/arm/omap/iva.txt b/Documentation/devicetree/bindings/arm/omap/iva.txt
+> new file mode 100644
+> index 0000000..f428e88
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/omap/iva.txt
+> @@ -0,0 +1,18 @@
+> +* TI - IVA (Imaging and Video Accelerator) subsystem
+> +
+> +The IVA contain various audio, video or imaging HW accelerator
+> +depending of the version.
+> +
+> +Required properties:
+> +- compatible : Should be:
+> +  - "ti,ivahd", "ti,iva" for OMAP4
+> +  - "ti,iva2", "ti,iva" for OMAP3
+> +  - "ti,iva1", "ti,iva" for OMAP2
 
-These notifiers are designed for drivers that are tightly coupled to
-the cpu, and shared across multiple architectures (mostly GIC and
-VFP).  In practice, all of these devices are off in every suspend
-state, because nobody leaves the CPU on in suspend.
+Again, be specific to the instantiation and encode the omap version
+into the compatible value.  Use the form "ti,omap4-*", etc.
 
-The (next_state == OFF) api you refer to would have to be something
-architecture specific, since the power state handling is very
-different on every platform, so it's not something that would ever be
-included in drivers that I imagined would be using these notifiers.
+g.
