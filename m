@@ -1,36 +1,92 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 08 Sep 2011 13:49:32 -0400 (EDT)
-Subject: [GIT PULL v3] OMAP: clock/powerdomain/clockdomain/hwmod: fixes for
-	3.1-rc
-In-Reply-To: <201109081717.23139.arnd@arndb.de>
-References: <alpine.DEB.2.00.1108222319310.28226@utopia.booyaka.com>
-	<20110906112914.GC1895@atomide.com>
-	<20110906114526.GD6918@n2100.arm.linux.org.uk>
-	<201109081717.23139.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1109081348150.20358@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 08 Sep 2011 10:56:25 -0700
+Subject: [PATCH v2 2/5] cpu_pm: call notifiers during suspend
+In-Reply-To: <4E68E956.9010006@ti.com> (Santosh's message of "Thu, 08 Sep 2011
+	21:42:06 +0530")
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315060755-4613-3-git-send-email-santosh.shilimkar@ti.com>
+	<87k49knmrw.fsf@ti.com> <4E684F90.7010809@ti.com>
+	<87wrdjku9h.fsf@ti.com> <4E68E956.9010006@ti.com>
+Message-ID: <87zkiehq9i.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Sep 2011, Arnd Bergmann wrote:
+Santosh <santosh.shilimkar@ti.com> writes:
 
-> On Tuesday 06 September 2011, Russell King - ARM Linux wrote:
-> > On Tue, Sep 06, 2011 at 04:29:14AM -0700, Tony Lindgren wrote:
-> > > Arnd,
-> > > 
-> > > Care to pull the following fixes to the -rc series from Paul?
-> > 
-> > Tony,
-> > 
-> > I don't think that will happen until master.kernel.org is back online
-> > as the tree was hosted on that machine.
-> 
-> Right. I have a number of pull requests lined up. While I did consider
-> starting a new tree on git.linaro.org to handle the time until then,
-> I'm still hoping for hera to get back online at some point, and linux-next
-> is equally disabled for now.
+> On Thursday 08 September 2011 07:31 PM, Kevin Hilman wrote:
+>> Santosh<santosh.shilimkar@ti.com>  writes:
+>>
+>>> On Thursday 08 September 2011 01:32 AM, Kevin Hilman wrote:
+>>>> Santosh Shilimkar<santosh.shilimkar@ti.com>   writes:
+>>>>
+>>>>> From: Colin Cross<ccross@android.com>
+>>>>>
+>>>>> Implements syscore_ops in cpu_pm to call the cpu and
+>>>>> cpu cluster notifiers during suspend and resume,
+>>>>> allowing drivers receiving the notifications to
+>>>>> avoid implementing syscore_ops.
+>>>>>
+>>>>> Signed-off-by: Colin Cross<ccross@android.com>
+>>>>> [santosh.shilimkar at ti.com: Rebased against 3.1-rc4]
+>>>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>>>
+>>>> I don't think using syscore_ops is right here.  The platform code should
+>>>> decide where in its own suspend path the notifiers should be triggered.
+>>>>
+>>>> The reason is because while the syscore_ops run late in the suspend
+>>>> path, they still run before some platform-specific decisions about the
+>>>> low-power states are made.  That means that any notifiers that need to
+>>>> use information about the target low-power state (e.g. whether context
+>>>> will be lost or not) cannot do so since that information has not yet
+>>>> been decided until the platform_suspend_ops->enter() runs.
+>>>>
+>>> Initially I thought the same but in general S2R, platform doesn't
+>>> support multiple states like CPUIDLE. On OMAP, we do have a debug
+>>> option to choose the state but on real product, it's always the
+>>> deepest supported state is used. So the driver saving the
+>>> full context for S2R, should be fine.
+>>>
+>>> Ofcourse for CPUIDLE, the notifier call chain decisions are left
+>>> with platform CPUIDLE drivers since there can be multiple low
+>>> power states and the context save/restore has to be done based
+>>> on low power states.
+>>>
+>>> The advantage with this is, the platform code is clean from the
+>>> notfiers calls. CPUIDLE driver needs to call the different notifier
+>>> events based on C-states and that perfectly works.
+>>>
+>>> I liked this simplification for the S2R. Down side is in S2R if you
+>>> don't plan to hit deepest state, drivers end up saving full context
+>>> which is fine I guess.
+>>
+>> That's not the downside I'm worried about.
+>>
+>> If you have a driver that has a notifier, presumably it has something it
+>> wants to do to prepare for suspend *and* for idle, and you'd only want a
+>> single notifier callback in the driver to be used for both.  That
+>> callback would look something like:
+>>
+>>     start_preparing_for_suspend();
+>>
+>>     if (next_state == OFF)
+>>        save_context();
+>>
+>>     finish_preparing_for_suspend();
+>>
+>>
+>> The problem with the current cpu_*_pm_enter() calls in syscore_ops is
+>> that they happen before the next states are programmed, so during
+>> suspend the 'if (next_state == off)' above would never be true, but
+>> during idle it might be.
+>>
+> Point taken and now I agree with you.
+>
+> I am going to drop this patch unless and until somebody shouts at me.
+> What that means is platform code need to take care of suspend case
+> as well which is trivial change.
 
-I think that putting the tree on git.linaro.org would be a good thing to 
-do as an intermediate measure.
+Agreed.
 
+Thanks,
 
-Nicolas
+Kevin
