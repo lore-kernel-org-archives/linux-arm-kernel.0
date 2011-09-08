@@ -1,48 +1,48 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 8 Sep 2011 10:51:59 +0530
-Subject: [PATCH 0/8] OMAP3/4: Misc fixes and clean-up
-Message-ID: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Thu, 8 Sep 2011 10:52:00 +0530
+Subject: [PATCH 1/8] OMAP: hwmod: Fix the addr spaces count API.
+In-Reply-To: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1315459327-3285-2-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series contains few fixes and clean-up for OMAP.
-Briefly,
-- HWMOD fix for the address space count
-- Improving the L3 register accesses
-- Bug fix in the L3 error handler
-- Sparce warning and indentation fixes in L3 error handler
-- Print master id in case of L3 custom errors for better debug.
-- Adding local time clock node for the CPUfreq and time re-calibration
-- Fix in the address overlap for emif and emulation domain.
+From: sricharan <r.sricharan@ti.com>
 
-The series is tested on OMAP4430 SDP and OMAP4430 beagle and SDP.
+The address space count API returns the number of address space
+entries for a hwmod including a additional null value present in the
+address space structure introduced recently. The devices which
+have multiple hwmods and use device_build_ss are broken with this,
+as their address resources are populated with a extra null value,
+subsequently the probe fails. So fix the API not to add the null value.
 
-The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
+Signed-off-by: sricharan <r.sricharan@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |    8 +++++---
+ 1 files changed, 5 insertions(+), 3 deletions(-)
 
-  Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
-
-are available in the git repository at:
-  git://gitorious.org/omap-sw-develoment/linux-omap-dev.git v3.1-rc4-omap-misc
-
-Santosh Shilimkar (2):
-      OMAP4: clock: Add CPU local timer clock node.
-      OMAP4: Fix the emif and dmm virtual mapping
-
-Todd Poynor (2):
-      OMAP: Improve register access in L3 Error handler.
-      OMAP: Fix a BUG in l3 error handler.
-
-sricharan (4):
-      OMAP: hwmod: Fix the addr spaces count API.
-      OMAP: Fix indentation issues in l3 error handler.
-      OMAP: Fix sparse warnings in l3 error handler.
-      OMAP: Print Initiator name for l3 custom error.
-
- arch/arm/mach-omap2/clock44xx_data.c |    9 ++
- arch/arm/mach-omap2/omap_hwmod.c     |    8 +-
- arch/arm/mach-omap2/omap_l3_noc.c    |  130 ++++++++++----------
- arch/arm/mach-omap2/omap_l3_noc.h    |  224 +++++++++++++++++++---------------
- arch/arm/mach-omap2/omap_l3_smx.c    |   91 +++++++-------
- arch/arm/mach-omap2/omap_l3_smx.h    |  164 ++++++++++++------------
- arch/arm/plat-omap/include/plat/io.h |    4 +-
- 7 files changed, 336 insertions(+), 294 deletions(-)
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 84cc0bd..32a0f48a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -791,9 +791,11 @@ static int _count_ocp_if_addr_spaces(struct omap_hwmod_ocp_if *os)
+ 	if (!os || !os->addr)
+ 		return 0;
+ 
+-	do {
+-		mem = &os->addr[i++];
+-	} while (mem->pa_start != mem->pa_end);
++	mem = &os->addr[i];
++
++	while (mem->pa_start != mem->pa_end) {
++		mem = &os->addr[++i];
++	};
+ 
+ 	return i;
+ }
+-- 
+1.7.4.1
