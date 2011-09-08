@@ -1,40 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Sep 2011 17:20:18 +0200
-Subject: [GIT PULL] i.MX features for next
-In-Reply-To: <20110906192229.GK28816@pengutronix.de>
-References: <20110823115658.GK31404@pengutronix.de>
-	<20110826082644.GD7526@pengutronix.de>
-	<20110906192229.GK28816@pengutronix.de>
-Message-ID: <201109081720.18929.arnd@arndb.de>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 8 Sep 2011 23:27:32 +0800
+Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <201109081652.20552.arnd@arndb.de>
+References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
+	<201109081652.20552.arnd@arndb.de>
+Message-ID: <CAGsJ_4wOQddus_Vz5zUjy-4ETOeaiZ+STRD22SwRy+yr4YLaRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 September 2011, Uwe Kleine-K?nig wrote:
-> if I remember correctly you don't mind non-fast-forward updates?! If I'm
-> wrong just tell me. 
+Hi Arnd,
+Thanks!
 
-Right, I can take a limited number of those at least. I want a reasonable
-git history, not a stainless one ;-)
+2011/9/8 Arnd Bergmann <arnd@arndb.de>
+>
+> On Wednesday 07 September 2011, Barry Song wrote:
+> > +/*
+> > + * The DMA controller consists of 16 independent DMA channels.
+> > + * Each channel is allocated to a different function
+> > + */
+> > +bool sirfsoc_dma_filter_id(struct dma_chan *chan, void *chan_id)
+> > +{
+> > + ? ? ? unsigned int ch_nr = (unsigned int) chan_id;
+> > +
+> > + ? ? ? if (ch_nr == chan->chan_id)
+> > + ? ? ? ? ? ? ? return true;
+> > +
+> > + ? ? ? return false;
+> > +}
+> > +EXPORT_SYMBOL(sirfsoc_dma_filter_id);
+> > +
+>
+> Hi Barry,
+>
+> It seems wrong that you have to export this function. The dmaengine API
+> should be able to work without this, and when you have drivers using the
+> interface, those should not rely on a specific implementation as the
+> purpose of the API is specifically to hide that.
+>
+> Am I missing something?
 
-> Compared to Sascha's pull request this mail is a reply to, the following
-> changed:
-> 
->  - squash a patch by Jason Liu <jason.hui@linaro.org> into
->    d27536c6619221528114746317def345467a3e80 fixing a build failure for
->    mx25 (1314623624-9999-1-git-send-email-jason.hui at linaro.org)
->  - squash a patch by Arnaud Patard (Rtp) <arnaud.patard@rtp-net.org>
->    into 236c4e8be436380b5354fe0d7facf94688e024ec fixing the resource
->    size for pata_imx devices (20110827131911.571434313 at rtp-net.org)
->  - two new patches:
->    "ARM: mx51/efika: Configure esdhc cd/wp on efika mx/sb" and "ARM: mx5: fix clock
->    usage for suspend" both by Arnaud Patard.
-> 
-> I choosed to squash the two fixes to ease bisection.
-> Though the 2nd patch by Arnaud fixes suspend, I think it's not necessary
-> to go in before v3.1.
+i am not sure whether i have other way to require a special channel
+for a special device. it seems dma_request_channel only gives me a
+chance to use a filter function since my all channels have same DMA
+cap masks.
 
-There were a few other pull requests that I haven't taken yet since
-master.kernel.org is down. If the general feeling is that I should take
-at least the bug fixes, I can start a branch on the linaro server for that.
+this filter is used by all drivers with DMA since every dma channel is
+fixed to be assigned to one device.
 
-	Arnd
+i did do some copy from coh901318.c:
+bool coh901318_filter_id(struct dma_chan *chan, void *chan_id)
+{
+    unsigned int ch_nr = (unsigned int) chan_id;
+
+    if (ch_nr == to_coh901318_chan(chan)->id)
+        return true;
+
+    return false;
+}
+EXPORT_SYMBOL(coh901318_filter_id);
+
+if it does become a common filter,  we might have a function like:
+
+bool dmaengine_filter_match_channel_id(struct dma_chan *chan, void *chan_id)
+{
+    if (ch_nr == chan->chan_id)
+        return true;
+
+    return false;
+}
+EXPORT_SYMBOL(dmaengine_filter_match_channel_id);
+
+Another filter is in amba-pl08x.c, it is filtering channel by name:
+bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
+{
+    struct pl08x_dma_chan *plchan = to_pl08x_chan(chan);
+    char *name = chan_id;
+
+    /* Check that the channel is not taken! */
+    if (!strcmp(plchan->name, name))
+        return true;
+
+    return false;
+}
+
+>
+> ? ? ? ?Arnd
+>
+
+-barry
