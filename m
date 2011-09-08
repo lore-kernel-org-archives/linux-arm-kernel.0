@@ -1,43 +1,94 @@
-From: rpimentel.silva@gmail.com (Rogerio Pimentel)
-Date: Thu, 8 Sep 2011 13:30:09 -0300
-Subject: [PATCH 1/4] ARM: mx53: Add pads for flexcan pins
-In-Reply-To: <20110906193258.GN28816@pengutronix.de>
-References: <1315335696-20499-1-git-send-email-rogerio.pimentel@freescale.com>
-	<20110906193258.GN28816@pengutronix.de>
-Message-ID: <CAOkaPuW+6tOFKHSbG+4254t=agqYT480X6bJCP9zicE4VHnvdQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 8 Sep 2011 09:32:09 -0700
+Subject: [PATCH] ARM: supply a DTB file to be appended
+In-Reply-To: <1315476884-28470-1-git-send-email-linus.walleij@stericsson.com>
+References: <1315476884-28470-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110908163209.GB22308@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/6 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-...
->> ?#define PAD_CTRL_I2C (PAD_CTL_SRE_FAST | PAD_CTL_ODE | PAD_CTL_PKE | \
->> ? ? ? ? ? ? ? ? ? ? ? PAD_CTL_PUE | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP \
->> ? ? ? ? ? ? ? ? ? ? ? | PAD_CTL_HYS)
->> +#define MX53_CAN_PAD_CTRL ? ?(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PAD_CTL_HYS)
->> +#define MX53_PAD_CTRL_1 ? ? ?(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PAD_CTL_HYS | PAD_CTL_PUS_100K_UP)
-> Hmm, isn't there a better name for this define? Maybe
-> MX53_CAN_RX_PAD_CTRL and MX53_CAN_TX_PAD_CTRL?
+On Thu, Sep 08, 2011 at 12:14:44PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This adds a Kconfig string where you can specify a
+> file to be appended to the zImage on build, then
+> auto-appends it. The idea is to mimic how we supply
+> an initramfs image by a similar parameter.
+> 
+> This makes it easy to script the kernel build with
+> different device trees, and it also vastly simplifies
+> building uImages since "make uImage" will now pick
+> up the devcie tree and include it in the final image
+> as part of the build process.
 
-CAN_RX uses a common pad config that will be used on further pin
-configs, so I think it will be redundant if I create two defines with
-the same config. You can see some other pins configured using
-MX53_PAD_CTRL_1 on Freescale Kernel:
-http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/plat-mxc/include/mach/iomux-mx53.h;h=4f28c0f48d299bf7b4399f964c433205549aba2d;hb=imx_2.6.35
-...
+The other option is to encode the .dtb filename into the zImage target
+name (something like zImage.%).  The advantage being that the build
+can emit multiple .dtb bound images without changing the kernel
+config.  This is what PowerPC currently does.
 
->> ?#define _MX53_PAD_GPIO_19__KPP_COL_5 ? ? ? ? IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
->> ?#define _MX53_PAD_GPIO_19__GPIO4_5 ? ? ? ? ? IOMUX_PAD(0x348, 0x20, 1, 0x0, 0, 0)
->> @@ -1243,14 +1247,14 @@
->> ?#define MX53_PAD_KEY_ROW1__USBPHY1_RXVALID ? ? ? ? ? (_MX53_PAD_KEY_ROW1__USBPHY1_RXVALID | MUX_PAD_CTRL(NO_PAD_CTRL))
->> ?#define MX53_PAD_KEY_COL2__KPP_COL_2 ? ? ? ? (_MX53_PAD_KEY_COL2__KPP_COL_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
->> ?#define MX53_PAD_KEY_COL2__GPIO4_10 ? ? ? ? ?(_MX53_PAD_KEY_COL2__GPIO4_10 | MUX_PAD_CTRL(NO_PAD_CTRL))
->> -#define MX53_PAD_KEY_COL2__CAN1_TXCAN ? ? ? ? ? ? ? ?(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
->> +#define MX53_PAD_KEY_COL2__CAN1_TXCAN ? ? ? ? ? ? ? ?(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(MX53_PAD_CTRL_1))
-> I wonder if this change is universal. If an external pull-up is
-> assembled using MX53_CAN_PAD_CTRL would be fine? (Note, I don't know if
-> it is sensible to do so.)
+Also, the way this is implemented means that it is no longer possible
+to emit a zImage without a dtb if the DTB config is set.  Personally,
+I'd use a different target name regardless instead of adjusting the
+semantics of zImage.
 
-At least on i.MX53 ARD board an internal pull up is used without any
-pull up resistor on the board. It avoids an extra component on board.
+g.
+
+> 
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Niklas Hernaeus <niklas.hernaeus@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> This builds on top of Nicos pending appended device tree
+> patches. Nico, if this gains some liking, please include
+> it in your series.
+> ---
+>  arch/arm/Kconfig       |   10 ++++++++++
+>  arch/arm/boot/Makefile |    8 +++++++-
+>  2 files changed, 17 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 4ea9974..cb8ee68 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1789,6 +1789,16 @@ config ARM_APPENDED_DTB
+>  	  (dtb) appended to zImage
+>  	  (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+>  
+> +config ARM_APPENDED_DTB_FILE
+> +	string "DTB file"
+> +	depends on ARM_APPENDED_DTB
+> +	default ""
+> +	help
+> +	  This gives the name of file from the build directory to append
+> +	  to the zImage after it has been built.
+> +
+> +	  If you are not sure, leave it blank.
+> +
+>  config ARM_ATAG_DTB_COMPAT
+>  	bool "Supplement the appended DTB with traditional ATAG information"
+>  	depends on ARM_APPENDED_DTB
+> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> index a1edfd5..5ab6abf 100644
+> --- a/arch/arm/boot/Makefile
+> +++ b/arch/arm/boot/Makefile
+> @@ -53,8 +53,14 @@ $(obj)/Image: vmlinux FORCE
+>  $(obj)/compressed/vmlinux: $(obj)/Image FORCE
+>  	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
+>  
+> -$(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
+> +# Rule to optionally append a DTB
+> +dtbfile := $(shell echo $(CONFIG_ARM_APPENDED_DTB_FILE))
+> +quiet_cmd_append = CAT     $@
+> +      cmd_append = (cat /dev/null $(dtbfile) >> $@)
+> +
+> +$(obj)/zImage:	$(obj)/compressed/vmlinux $(dtbfile) FORCE
+>  	$(call if_changed,objcopy)
+> +	$(call if_changed,append)
+>  	@echo '  Kernel: $@ is ready'
+>  
+>  endif
+> -- 
+> 1.7.3.2
+> 
