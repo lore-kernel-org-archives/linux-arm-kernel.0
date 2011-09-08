@@ -1,38 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 8 Sep 2011 11:10:01 -0700
-Subject: [RFC PATCH 07/10] documentation/dt: Add spinlock bindings
-In-Reply-To: <1314191356-10963-8-git-send-email-b-cousson@ti.com>
-References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-	<1314191356-10963-8-git-send-email-b-cousson@ti.com>
-Message-ID: <20110908181001.GF2967@ponder.secretlab.ca>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 8 Sep 2011 23:47:16 +0530
+Subject: [PATCH v2] ASoC: omap: convert per-board modules to platform
+	drivers
+In-Reply-To: <1315503297-8365-1-git-send-email-mans.rullgard@linaro.org>
+References: <1315503297-8365-1-git-send-email-mans.rullgard@linaro.org>
+Message-ID: <CABb+yY0b607kDSGU+trycqQuvGMhC-zpHcv20wjgmEcaK7dz8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 03:09:13PM +0200, Benoit Cousson wrote:
-> Add documentation for the HW spinlock in OMAP4.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Randy Dunlap <rdunlap@xenotime.net>
+On Thu, Sep 8, 2011 at 11:04 PM, Mans Rullgard <mans.rullgard@linaro.org> wrote:
+> This converts the per-board modules to platform drivers for a
+> device created by in main platform setup. ?These drivers call
+> snd_soc_register_card() directly instead of going via a "soc-audio"
+> device and the corresponding driver in soc-core.
+>
+> Signed-off-by: Mans Rullgard <mans.rullgard@linaro.org>
 > ---
->  .../bindings/hwspinlock/omap-spinlock.txt          |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/hwspinlock/omap-spinlock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/hwspinlock/omap-spinlock.txt b/Documentation/devicetree/bindings/hwspinlock/omap-spinlock.txt
-> new file mode 100644
-> index 0000000..36ac074
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwspinlock/omap-spinlock.txt
-> @@ -0,0 +1,5 @@
-> +HW spinlock on OMAP platform:
-> +
-> +Required properties:
-> +- compatible : Must be "ti,omap-spinlock";
+> Platform device names fixed.
+> N8x0 changed to get clocks before registering card.
+> ---
+> ?arch/arm/mach-omap2/board-3430sdp.c ? ? ? ? ?| ? ?6 ++
+> ?arch/arm/mach-omap2/board-4430sdp.c ? ? ? ? ?| ? ?6 ++
+> ?arch/arm/mach-omap2/board-am3517evm.c ? ? ? ?| ? ?7 +++
+> ?arch/arm/mach-omap2/board-devkit8000.c ? ? ? | ? ?6 ++
+> ?arch/arm/mach-omap2/board-igep0020.c ? ? ? ? | ? ?6 ++
+> ?arch/arm/mach-omap2/board-n8x0.c ? ? ? ? ? ? | ? ?6 ++
+> ?arch/arm/mach-omap2/board-omap3beagle.c ? ? ?| ? ?6 ++
+> ?arch/arm/mach-omap2/board-omap3evm.c ? ? ? ? | ? ?7 +++
+> ?arch/arm/mach-omap2/board-omap3pandora.c ? ? | ? ?6 ++
+> ?arch/arm/mach-omap2/board-overo.c ? ? ? ? ? ?| ? 17 ++++++
+> ?arch/arm/mach-omap2/board-rx51.c ? ? ? ? ? ? | ? ?6 ++
+> ?arch/arm/mach-omap2/board-zoom-peripherals.c | ? ?6 ++
 
-"ti,omap-*" is probably too generic. omap3-spinlock or omap4-spinlock
-would be better.
-
-> +- hwmods : "spinlock"
-> -- 
-> 1.7.0.4
-> 
+Can't we do by having omap_init_audio() in arch/arm/mach-omap2/devices.c
+generate a platform device of name depending upon machine_is_* ?
