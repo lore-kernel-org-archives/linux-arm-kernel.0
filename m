@@ -1,30 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Sep 2011 18:03:39 +0200
-Subject: [RFC PATCH 06/10] hwspinlock: OMAP4: Add spinlock support in DT
-In-Reply-To: <4E68E09B.4050006@ti.com>
-References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-	<201109081647.55377.arnd@arndb.de> <4E68E09B.4050006@ti.com>
-Message-ID: <201109081803.40328.arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu,  8 Sep 2011 17:04:12 +0100
+Subject: [PATCH v2 1/3] ARM: iwmmxt: Fix Makefile rules for building iwmmxt
+	for Thumb-2
+In-Reply-To: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
+References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1315497854-13311-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 September 2011, Cousson, Benoit wrote:
-> OK, this is indeed much more aligned with the current practice, and what 
-> DMA should do as well.
-> 
-> Practically speaking, that change will go beyond the original scope of 
-> that patch that was just adding the DT support based on the existing 
-> functionality.
-> 
-> Is it OK to handle that improvement in a further patch / series?
+Because gcc/gas have no sane way to turn on individual CPU
+extensions from the command-line, iwmmxt.S was previously built
+with -mcpu=iwmmxt.  Unfortunately, this also downgrades the CPU to
+v5, with the result that this file fails to build for a Thumb-2
+kernel.
 
-I think we should be very careful to get the device tree syntax right
-at first. So if you have a good representation of the data in the device
-tree but don't handle all possible cases in the kernel yet, that's ok.
+New versions of the tools support -march=<base arch>+iwmmxt, and it
+seems reasonable to require up-to-date tools when building in
+Thumb-2.  So, this patch uses -march=armv7-a+iwmmxt for
+CONFIG_THUMB2_KERNEL=y.
 
-E.g. the kernel code can assume for now that the device tree has only
-one spinlock controller node. We can fix that later when we actually
-need more, but we would not easily be able to fix the device trees
-after the fact.
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/kernel/Makefile |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index f7887dc..e03691e 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -66,6 +66,18 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+ obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
++ifdef CONFIG_CPU_V7
++AFLAGS_iwmmxt.o			:= $(call cc-option,-Wa$(comma)-march=armv7-a+iwmmxt,-DIWMMXT_LEGACY_ASSEMBLER)
++ifeq ($(AFLAGS_iwmmxt.o),-DIWMMXT_LEGACY_ASSEMBLER)
++ifdef CONFIG_THUMB2_KERNEL
++$(error Newer binutils is needed to build iwmmxt support for Thumb-2 kernels.)
++else
++$(warning Warning: Building legacy pre-v7 iwmmxt code for a v7 target.\
++  This is inadvisable.  Please upgrade to newer binutils.)
++AFLAGS_iwmmxt.o			+= -Wa,-mcpu=iwmmxt
++endif
++endif
++endif # CONFIG_CPU_V7
+ 
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+   obj-y		+= io.o
+-- 
+1.7.4.1
