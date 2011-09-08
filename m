@@ -1,39 +1,26 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 8 Sep 2011 11:34:59 +0200 (CEST)
-Subject: [PATCH 3/4] mach-integrator: modernize clock event
- registration
-In-Reply-To: <CACRpkdZ0HgvhgFU9-4f7QtWT3aJuZhY8QQB+oEW0mEy+Uzuh=Q@mail.gmail.com>
-References: <1315384260-27404-1-git-send-email-linus.walleij@stericsson.com>
-	<alpine.LFD.2.02.1109071202000.2723@ionos>
-	<20110908085502.GB14953@n2100.arm.linux.org.uk>
-	<CACRpkdZ0HgvhgFU9-4f7QtWT3aJuZhY8QQB+oEW0mEy+Uzuh=Q@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1109081133530.2723@ionos>
+From: Colin.Tuckley@arm.com (Colin Tuckley)
+Date: Thu, 8 Sep 2011 11:06:08 +0100
+Subject: [PATCH 1/3 v3] ARM Realview PCIX map include file changes
+In-Reply-To: <20110908090931.GD14953@n2100.arm.linux.org.uk>
+References: <20110822130507.23830.26191.stgit@e102602-lin.cambridge.arm.com>
+	<20110822130942.23830.4767.stgit@e102602-lin.cambridge.arm.com>
+	<201109051635.59927.arnd@arndb.de>
+	<20110908090931.GD14953@n2100.arm.linux.org.uk>
+Message-ID: <F01D8B85CFF58440B2A13965FBA90CA473758CF42D@GEORGE.Emea.Arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Sep 2011, Linus Walleij wrote:
+> -----Original Message-----
+> from Russell King - ARM Linux
+> Subject: Re: [PATCH 1/3 v3] ARM Realview PCIX map include file changes
 
-> On Thu, Sep 8, 2011 at 10:55 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> >> Acked-by: Thomas Gleixner <tglx@linutronix.de>
-> 
-> > My understanding is that periodic timers are not setup by the generic
-> > clock event code, and so we do need to keep the 'timer_reload' stuff
-> > around.
-> 
-> Aha. Yes maybe I've not tested that mode well enough, I'll
-> have a closer look.
-> 
-> An alteranative is to retire the periodic mode and only
-> support oneshot, like the plat-nomadik/timer.c currently
-> does. My impression is that oneshot will always work fine,
-> and doing this leaves all details up to the timekeeping
-> core so we don't need to deal with it, but I may be wrong.
-> Ideas?
+> Please can you answer Arnd's concerns.
 
-It does, but for a pure periodic setup (nohz=off, highres=off) you add
-the overhead of reprogramming the device for each tick.
+I'm looking at his comments incl the correction.
 
-Thanks,
+I'm about to move house and so I'm intermittently on holiday for the next couple of weeks so things might be delayed slightly. If you want to take the patches as they are and we can fix them later then that's ok by me - or maybe Arnd can do it if he sees it as urgent. I'll be validating his ideas on the hardware whatever happens.
 
-	tglx
+Colin
+
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
