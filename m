@@ -1,78 +1,55 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 08 Sep 2011 07:01:46 -0700
-Subject: [PATCH v2 2/5] cpu_pm: call notifiers during suspend
-In-Reply-To: <4E684F90.7010809@ti.com> (Santosh's message of "Thu, 08 Sep 2011
-	10:46:00 +0530")
-References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315060755-4613-3-git-send-email-santosh.shilimkar@ti.com>
-	<87k49knmrw.fsf@ti.com> <4E684F90.7010809@ti.com>
-Message-ID: <87wrdjku9h.fsf@ti.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 8 Sep 2011 17:03:50 +0300
+Subject: [RFC 7/7] iommu/core: split mapping to page sizes as supported by
+	the hardware
+In-Reply-To: <CAHQjnONUvBtKSMxiDf5Mk+DLqfrTr09Us11rWoaR1mVZeiAmnA@mail.gmail.com>
+References: <1314984756-4400-1-git-send-email-ohad@wizery.com>
+	<1314984756-4400-8-git-send-email-ohad@wizery.com>
+	<CAHQjnOMT3UOFMi=JbSXf4-s_BbZ+fSGbOEjxwT7t7N-zd+9-zg@mail.gmail.com>
+	<CAK=WgbZPFryzCFLa5AhAYDmH1S8c3x-OsSTyxYeq0WLAe8VyTg@mail.gmail.com>
+	<CAHQjnOMnOjAJ6QuuLmLa1UKvTRHfyyjiUYrfvzLx8FSsCixxng@mail.gmail.com>
+	<CAK=WgbbFhmiC=PJfmyPOhbHGtiPFOcmqBx7nSpkuDX36hPYgbA@mail.gmail.com>
+	<CAHQjnONUvBtKSMxiDf5Mk+DLqfrTr09Us11rWoaR1mVZeiAmnA@mail.gmail.com>
+Message-ID: <CAK=WgbZoF-F_hXHT1i=cAh8QJb+aFSjjubdy_YkHQ97acRvorA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh <santosh.shilimkar@ti.com> writes:
+Hi KyongHo,
 
-> On Thursday 08 September 2011 01:32 AM, Kevin Hilman wrote:
->> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
->>
->>> From: Colin Cross<ccross@android.com>
->>>
->>> Implements syscore_ops in cpu_pm to call the cpu and
->>> cpu cluster notifiers during suspend and resume,
->>> allowing drivers receiving the notifications to
->>> avoid implementing syscore_ops.
->>>
->>> Signed-off-by: Colin Cross<ccross@android.com>
->>> [santosh.shilimkar at ti.com: Rebased against 3.1-rc4]
->>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>
->> I don't think using syscore_ops is right here.  The platform code should
->> decide where in its own suspend path the notifiers should be triggered.
->>
->> The reason is because while the syscore_ops run late in the suspend
->> path, they still run before some platform-specific decisions about the
->> low-power states are made.  That means that any notifiers that need to
->> use information about the target low-power state (e.g. whether context
->> will be lost or not) cannot do so since that information has not yet
->> been decided until the platform_suspend_ops->enter() runs.
->>
-> Initially I thought the same but in general S2R, platform doesn't
-> support multiple states like CPUIDLE. On OMAP, we do have a debug
-> option to choose the state but on real product, it's always the
-> deepest supported state is used. So the driver saving the
-> full context for S2R, should be fine.
->
-> Ofcourse for CPUIDLE, the notifier call chain decisions are left
-> with platform CPUIDLE drivers since there can be multiple low
-> power states and the context save/restore has to be done based
-> on low power states.
->
-> The advantage with this is, the platform code is clean from the
-> notfiers calls. CPUIDLE driver needs to call the different notifier
-> events based on C-states and that perfectly works.
->
-> I liked this simplification for the S2R. Down side is in S2R if you
-> don't plan to hit deepest state, drivers end up saving full context
-> which is fine I guess.
+On Thu, Sep 8, 2011 at 3:51 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> 16MB page is less practical in Linux because Linux kernel is unable
+> to allocated larger physically contiguous memory than 4MB by default.
+> But I also think that it is needed to support 16MB mapping for IO
+> virtualization someday
 
-That's not the downside I'm worried about.
+Actually we need physically contiguous memory regions that are much
+bigger (in the tens of megs), so we do utilize 16MB pages. Today we
+reserve that memory on boot, but the plan is to move to CMA.
 
-If you have a driver that has a notifier, presumably it has something it
-wants to do to prepare for suspend *and* for idle, and you'd only want a
-single notifier callback in the driver to be used for both.  That
-callback would look something like:
+> Actually, I think your idea is good and does not cause performance degradation.
+> But I wondered if it is really useful.
 
-   start_preparing_for_suspend();
+Well, the alternative is to duplicate this logic in every IOMMU driver.
 
-   if (next_state == OFF)
-      save_context();
+Go ahead and try to rebase your driver on my recent patch set and see
+if you like it; the result should significantly simplify your
+map/unmap functions.
 
-   finish_preparing_for_suspend();
+You only need to add this line:
+static unsigned long s5p_iommu_pgsizes = SZ_4K | SZ_64K | SZ_1M | SZ_16M;
 
+and then advertise it with iommu_register, and you're done. The IOMMU
+core will only ask you to handle a single page from now on, and will
+take care of the rest.
 
-The problem with the current cpu_*_pm_enter() calls in syscore_ops is
-that they happen before the next states are programmed, so during
-suspend the 'if (next_state == off)' above would never be true, but
-during idle it might be.
+> The caller of iommu_map() gives gfp_order that is the size of the physical
+> memory to map.
 
-Kevin
+I've changed it in the patch :)
+
+This way users are not bound to rigid mapping sizes (this allows us to
+better utilize the physically-contiguous memory region we reserve on
+boot).
+
+Thanks,
+Ohad.
