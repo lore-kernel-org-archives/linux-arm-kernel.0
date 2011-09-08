@@ -1,54 +1,38 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 8 Sep 2011 11:33:48 +0200 (CEST)
+Date: Thu, 8 Sep 2011 11:34:59 +0200 (CEST)
 Subject: [PATCH 3/4] mach-integrator: modernize clock event
  registration
-In-Reply-To: <20110908085502.GB14953@n2100.arm.linux.org.uk>
+In-Reply-To: <CACRpkdZ0HgvhgFU9-4f7QtWT3aJuZhY8QQB+oEW0mEy+Uzuh=Q@mail.gmail.com>
 References: <1315384260-27404-1-git-send-email-linus.walleij@stericsson.com>
 	<alpine.LFD.2.02.1109071202000.2723@ionos>
 	<20110908085502.GB14953@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1109081131240.2723@ionos>
+	<CACRpkdZ0HgvhgFU9-4f7QtWT3aJuZhY8QQB+oEW0mEy+Uzuh=Q@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1109081133530.2723@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Sep 2011, Russell King - ARM Linux wrote:
+On Thu, 8 Sep 2011, Linus Walleij wrote:
 
-> On Wed, Sep 07, 2011 at 12:02:52PM +0200, Thomas Gleixner wrote:
-> > On Wed, 7 Sep 2011, Linus Walleij wrote:
-> > 
-> > > From: Linus Walleij <linus.walleij@linaro.org>
-> > > 
-> > > Drop the reload value for the timer - the timekeeping code
-> > > will call the .set_next_event to set this anyway.
-> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> On Thu, Sep 8, 2011 at 10:55 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >> Acked-by: Thomas Gleixner <tglx@linutronix.de>
 > 
-> > > 
-> > > Drop mult, shift and delta calculations and let the
-> > > clockevent core scale this as appropriate.
-> > > 
-> > > Set the minimum interval to 1 rather than 15 (0xf), there
-> > > is nothing in the data sheets I have indicating that 15
-> > > should be some minimum value.
-> > > 
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > 
-> > Acked-by: Thomas Gleixner <tglx@linutronix.de>
+> > My understanding is that periodic timers are not setup by the generic
+> > clock event code, and so we do need to keep the 'timer_reload' stuff
+> > around.
 > 
-> I mentioned to Thomas that which I've underlined above yesterday after I
-> received Thomas' ack.  I was expecting Thomas to reply about this, but
-> that obviously hasn't happened, so now that it's appeared in the patch
-> system, it's become my problem to deal with.
+> Aha. Yes maybe I've not tested that mode well enough, I'll
+> have a closer look.
+> 
+> An alteranative is to retire the periodic mode and only
+> support oneshot, like the plat-nomadik/timer.c currently
+> does. My impression is that oneshot will always work fine,
+> and doing this leaves all details up to the timekeeping
+> core so we don't need to deal with it, but I may be wrong.
+> Ideas?
 
-Sorry, I missed that detail in the patch :(
- 
-> My understanding is that periodic timers are not setup by the generic
-> clock event code, and so we do need to keep the 'timer_reload' stuff
-> around.  Note that patch 2 deletes the register write for this too,
-> so you actually have one logical change split across patch 2 and 3.
-
-Periodic mode is set up via clkevt->set_mode() if the clock event
-device provides CLOCK_EVT_FEAT_PERIODIC.
-
-clkevt->set_next_event() is only used in oneshot mode.
+It does, but for a pure periodic setup (nohz=off, highres=off) you add
+the overhead of reprogramming the device for each tick.
 
 Thanks,
 
