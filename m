@@ -1,43 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 08 Sep 2011 22:23:53 +0200
-Subject: [RFC PATCH 2/3] ARM: SoC: Add per SoC SMP and CPU hotplug
-	operations
-In-Reply-To: <1315501212-1820-3-git-send-email-marc.zyngier@arm.com>
-References: <1315501212-1820-1-git-send-email-marc.zyngier@arm.com>
-	<1315501212-1820-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1594529.EmMGjcLOoi@wuerfel>
+Date: Thu, 08 Sep 2011 22:28:50 +0200
+Subject: [PATCH v2] ASoC: omap: convert per-board modules to platform
+	drivers
+In-Reply-To: <CAG5Tg6UOuztenNid1=YbH9a4ZH5MqV4YhohG+r9R+7F=zXs=CQ@mail.gmail.com>
+References: <1315503297-8365-1-git-send-email-mans.rullgard@linaro.org>
+	<CABb+yY0b607kDSGU+trycqQuvGMhC-zpHcv20wjgmEcaK7dz8Q@mail.gmail.com>
+	<CAG5Tg6UOuztenNid1=YbH9a4ZH5MqV4YhohG+r9R+7F=zXs=CQ@mail.gmail.com>
+Message-ID: <3110288.bQbb0H2ME1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 September 2011 18:00:11 Marc Zyngier wrote:
-> +struct arm_soc_smp_ops {
-> +       void (*smp_init_cpus)(void);
-> +       void (*smp_prepare_cpus)(unsigned int max_cpus);
-> +       void (*smp_secondary_init)(unsigned int cpu);
-> +       int  (*smp_boot_secondary)(unsigned int cpu, struct task_struct *idle);
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +       int  (*cpu_kill)(unsigned int cpu);
-> +       void (*cpu_die)(unsigned int cpu);
-> +       int  (*cpu_disable)(unsigned int cpu);
-> +#endif
-> +};
-> +
->  struct arm_soc_desc {
->         const char              *name;
-> +#ifdef CONFIG_SMP
-> +       struct arm_soc_smp_ops  smp_ops;
-> +#endif
->  };
+On Thursday 08 September 2011 20:05:48 Mans Rullgard wrote:
+> >
+> > Can't we do by having omap_init_audio() in arch/arm/mach-omap2/devices.c
+> > generate a platform device of name depending upon machine_is_* ?
+> 
+> I had the same thought, but I couldn't find a suitable string anywhere.
+> Are you suggesting an if(machine_is_foo()) cascade in omap_init_audio()?
+> 
+> I'll be the first to agree this patch is not particularly pretty.
 
-If you make this two data structures, I would actually recommend using a
-pointer to the arm_soc_smp_ops instead of embedding it in arm_soc_desc.
-
-This will make it possible to put the arm_soc_smp_ops into the plat_smp.c file
-and get rid of a few more #ifdefs.
-
-It may also be a good idea to have global pointers and for arm_soc_desc and
-arm_soc_smp_ops instead of pointing to them from the board file. I can see
-reasons both ways, and that should probably be driven by code efficiency
-concerns.
+My general feeling is that practically every time someone writes
+machine_is_*(), they are doing it wrong. There are of course exceptions,
+but I would strongly recommend to have the initialization calling up
+from the board file into more general functions instead of having all
+boards calling the same function which then goes to board specific
+code again.
 
 	Arnd
