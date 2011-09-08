@@ -1,60 +1,88 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 8 Sep 2011 14:23:02 +0800
-Subject: [PATCH 6/6] arm/imx6q: add suspend/resume support
-In-Reply-To: <CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-7-git-send-email-shawn.guo@linaro.org>
-	<CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
-Message-ID: <20110908062301.GK8148@S2100-06.ap.freescale.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 8 Sep 2011 14:14:01 +0800
+Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
+References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
+	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
+	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
+	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
+	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
+	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
+Message-ID: <CAGsJ_4yzxz2rdyN-DDbcUM4BYXwmmDQU2oxX7HVKDtQsESaZfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2011 at 09:50:44PM +0800, Barry Song wrote:
-> > +
-> > +static int imx6q_pm_enter(suspend_state_t state)
-> > +{
-> > + ? ? ? switch (state) {
-> > + ? ? ? case PM_SUSPEND_MEM:
-> > + ? ? ? ? ? ? ? imx_local_timer_pre_suspend();
-> > + ? ? ? ? ? ? ? imx_gpc_pre_suspend();
-> > + ? ? ? ? ? ? ? outer_flush_all();
-> > + ? ? ? ? ? ? ? outer_disable();
-> > + ? ? ? ? ? ? ? imx_set_cpu_jump(0, v7_cpu_resume);
-> > +
-> > + ? ? ? ? ? ? ? /* Zzz ... */
-> > + ? ? ? ? ? ? ? cpu_suspend(0, imx6q_suspend_finish);
-> > +
-> > + ? ? ? ? ? ? ? imx_smp_prepare();
-> > + ? ? ? ? ? ? ? l2x0_of_init(0, ~0UL);
-> 
-> it is pretty clear and good. i think we can refine
-> arch/arm/mach-prima2/pm.c to the way you are suspending/resuming l2.
-> on prima2, l2 will totally lose power in suspend cycle. i remember you
-> once said imx6q will retain l2 in suspend cycle?
-> 
-Yes, if you lose L2 power in suspend, it's the easiest way for you to
-resume L2.
+Hi Jassi,
 
-For my case which retains L2, I actually do not want to call this
-function which will invalidate L2.  But since we still have problem
-to use rmk's generic suspend/resume updates (ARM: pm: add L2 cache
-cleaning for suspend), we have to flush the entire L2 on imx6q for now.
+2011/9/8 Jassi Brar <jassisinghbrar@gmail.com>:
+> On Thu, Sep 8, 2011 at 7:42 AM, Barry Song <21cnbao@gmail.com> wrote:
+>
+>>>> it is much different with primacell based DMA like pl080, pl330.
+>>>> prima2 has a self-defined DMAC IP. basically it is a 2D mode dma with
+>>>> two scales X and Y and direct way to start and stop DMA.
+>>>> every channel has fixed function to serve only one perpheral. so you
+>>>> find we have a filter id.
+>>> okay, what do you mean by 2D mode? Is it similar to what TI folks, Linus
+>>> W and Jassi Brar posted RFC's on?
+>>
+>> In SiRFprimaII 2-D DMA, the system memory space is interpreted
+>> as a 2-D layout instead of a linear 1-D layout. More specifically, the
+>> system memory can be considered as
+>> multiple data lines. The length of the data line is determined by the
+>> user-selected DMA_WIDTH register.
+>> The user can specify a data window that the user wants to access using
+>> four parameters:
+>> ? Start address
+>> ? X length
+>> ? Y length
+>> ? Width
+>>
+>> The idea of a 2-D DMA is shown in figure 2d-dma.png attached.
+>>
+>> If you specifies the Y length as 0 or the X length equals to the DMA
+>> width, then this 2-D DMA reduces to
+>> 1-D. If the user configures the X length greater than the DMA width,
+>> then the extra data is wrapped around
+>> to the next data line, this may corrupt the DMA transfer for
+>> multiple-line 2-D DMA. If this is a 1-D DMA, then
+>> there is no issue. The attached diagram 2d-dma2.png shows the
+>> wrap-around of the extra data in case the X length
+>> greater than DMA width.
+>
+> Sorry, the role of DMA_WIDTH is not clear to me yet.
+> In which case the user _must_ set {xlen > width} ?
 
-Regards,
-Shawn
+DMA_WIDTH is the size address will increase after every DMA line.
+For example:
+if xlen = 4, dma_width=8, ylen=5;
+Then DMA will run as(suppose DMA address start from 0):
+0~3
+8~11
+16~19
+24~27
+...
 
-> > + ? ? ? ? ? ? ? imx_gpc_post_resume();
-> > + ? ? ? ? ? ? ? imx_local_timer_post_resume();
-> > + ? ? ? ? ? ? ? break;
-> > + ? ? ? default:
-> > + ? ? ? ? ? ? ? return -EINVAL;
-> > + ? ? ? }
-> > +
-> > + ? ? ? return 0;
-> > +}
-> thanks
-> barry
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This feature can help us to do DMA operation to non-continuous memory
+area, for example, pick a part of a image.
+
+The DMA X-length is in the 32-bit D-word boundary. This value
+specifies the number of D-words transferred
+in each line. The value should be less than or equal to the value of
+DMA width register.
+
+The DMA Y-length specifies the number of lines in DMA transfers. The
+number of the lines in DMA transfer
+is Y-length + 1.
+
+Each channel has dedicated DMA Width registers. Each DMA channel
+should not use other channel?s DMA
+width.
+To enable a correct 2-D DMA, the DMA Width register must be correctly
+set. The value of the DMA Width
+register must be greater than or equal to the X-length, otherwise, the
+data is overlapped. DMA_WIDTH
+should not be set to 0.
+
+
+Thanks
+barry
