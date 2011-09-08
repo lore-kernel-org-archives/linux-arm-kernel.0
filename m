@@ -1,24 +1,28 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 9 Sep 2011 00:05:17 +0530
-Subject: [PATCH v2] ASoC: omap: convert per-board modules to platform
-	drivers
-In-Reply-To: <20110908181831.GE3591@opensource.wolfsonmicro.com>
-References: <1315503297-8365-1-git-send-email-mans.rullgard@linaro.org>
-	<CABb+yY0b607kDSGU+trycqQuvGMhC-zpHcv20wjgmEcaK7dz8Q@mail.gmail.com>
-	<20110908181831.GE3591@opensource.wolfsonmicro.com>
-Message-ID: <CAJe_Zhcq5ekv0TvUtYBaLb1=xrieiBrVTG0XrUHQCqRWJZ0Q0A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Sep 2011 20:48:26 +0200
+Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <201109081819.30035.arnd@arndb.de>
+References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
+	<201109081652.20552.arnd@arndb.de>
+	<CAGsJ_4wOQddus_Vz5zUjy-4ETOeaiZ+STRD22SwRy+yr4YLaRA@mail.gmail.com>
+	<201109081819.30035.arnd@arndb.de>
+Message-ID: <CAKnu2Mpnjec-hvfbT0zH1P2mGZKNwTQYgDLGHWUXLmGGQB0_ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2011 23:48, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Sep 08, 2011 at 11:47:16PM +0530, Jassi Brar wrote:
+2011/9/8 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 08 September 2011, Barry Song wrote:
+>>
+>> this filter is used by all drivers with DMA since every dma channel is
+>> fixed to be assigned to one device.
 >
->> Can't we do by having omap_init_audio() in arch/arm/mach-omap2/devices.c
->> generate a platform device of name depending upon machine_is_* ?
->
-> That's not a bad idea. ?If we were going to do that it shouldn't be OMAP
-> specific, any platform could use it. ?Though we'd need a way to override
-> it to provide platform data on systems that needs it.
-Perhaps by providing an optional call, say set_asoc_platdata(void *pdata),
-that boards could call from their init_machine() ?
+> Ok, I see now. I think it would be best to introduce a generic
+> 'filter by device tree property' function or alternatively an
+> dma_of_request_channel function like this:
+
+You'd have to discuss that with Vinod, the thing is that x86 Atom
+systems are using dmaengine for device slave transfers too, and
+IIRC these things don't use devicetrees. I may be wrong...
+
+Yours,
+Linus Walleij
