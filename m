@@ -1,34 +1,50 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 08 Sep 2011 16:54:31 -0400 (EDT)
-Subject: [RFC PATCH 0/3] Per SoC descriptor
-In-Reply-To: <8605786.uz70QLLSTu@wuerfel>
-References: <1315501212-1820-1-git-send-email-marc.zyngier@arm.com>
-	<8605786.uz70QLLSTu@wuerfel>
-Message-ID: <alpine.LFD.2.00.1109081649370.20358@xanadu.home>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Fri, 9 Sep 2011 02:38:15 +0530
+Subject: [PATCH v15 09/12] OMAP: dmtimer: mark clocksource and clockevent
+	timers reserved
+In-Reply-To: <1315516098-29761-1-git-send-email-tarun.kanti@ti.com>
+References: <1315516098-29761-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1315516098-29761-10-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Sep 2011, Arnd Bergmann wrote:
+In driver probe use sys_timer_reserved to identify which all timers
+have already been used for clocksource and clockevent. Mark all those
+timers as reserved so that no one else can use them.
 
-> On Thursday 08 September 2011 18:00:09 Marc Zyngier wrote:
-> > This is my first stab at an idea that has floated around for a while,
-> > which is to have a per-soc descriptor containing most of the SoC
-> > specific operations, which should clear the path a bit more towards
-> > the single zImage holy grail. It's as far as possible from being
-> > perfect, but I thought I'd share it as early as possible and see what
-> > people think of it.
-> > 
-> > This first patch series introduces the arm_soc_desc structure, adds
-> > per-soc SMP and CPU hotplug operations, and converts both RealView and
-> > VExpress to this new scheme.
-> 
-> Very nice, I definitely like the concept! This is going to be really
-> helpful reducing the amount of stuff we need in machine descriptors.
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/plat-omap/dmtimer.c |   17 +++++++++++------
+ 1 files changed, 11 insertions(+), 6 deletions(-)
 
-Agreed.  And starting up with things that are not already in the 
-per-machine descriptor is a good move.  Once this is well established 
-then we might consider moving some features over from the machine desc 
-to this SOC desc.
-
-
-Nicolas
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 39751f9..6312dfb 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -531,12 +531,17 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
+ 	timer->irq = irq->start;
+ 	timer->pdev = pdev;
+ 
+-	/* Skip pm_runtime_enable for OMAP1 */
+-	if (!pdata->needs_manual_reset) {
+-		pm_runtime_enable(&pdev->dev);
+-		pm_runtime_irq_safe(&pdev->dev);
+-	}
+-
++/*
++ * sys_timer_reserved is not defined for OMAP1.
++ * Use the macro to avoid compilation error on OMAP1.
++ */
++#if defined(CONFIG_ARCH_OMAP2PLUS)
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_irq_safe(&pdev->dev);
++	/* Mark clocksource and clockevent timers as reserved */
++	if ((sys_timer_reserved >> (pdev->id - 1)) & 0x1)
++		timer->reserved = 1;
++#endif
+ 	/* add the timer element to the list */
+ 	spin_lock_irqsave(&dm_timer_lock, flags);
+ 	list_add_tail(&timer->node, &omap_timer_list);
+-- 
+1.7.0.4
