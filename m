@@ -1,61 +1,48 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Thu, 08 Sep 2011 10:46:00 +0530
-Subject: [PATCH v2 2/5] cpu_pm: call notifiers during suspend
-In-Reply-To: <87k49knmrw.fsf@ti.com>
-References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>	<1315060755-4613-3-git-send-email-santosh.shilimkar@ti.com>
-	<87k49knmrw.fsf@ti.com>
-Message-ID: <4E684F90.7010809@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 8 Sep 2011 10:51:59 +0530
+Subject: [PATCH 0/8] OMAP3/4: Misc fixes and clean-up
+Message-ID: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 September 2011 01:32 AM, Kevin Hilman wrote:
-> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
->
->> From: Colin Cross<ccross@android.com>
->>
->> Implements syscore_ops in cpu_pm to call the cpu and
->> cpu cluster notifiers during suspend and resume,
->> allowing drivers receiving the notifications to
->> avoid implementing syscore_ops.
->>
->> Signed-off-by: Colin Cross<ccross@android.com>
->> [santosh.shilimkar at ti.com: Rebased against 3.1-rc4]
->> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->
-> I don't think using syscore_ops is right here.  The platform code should
-> decide where in its own suspend path the notifiers should be triggered.
->
-> The reason is because while the syscore_ops run late in the suspend
-> path, they still run before some platform-specific decisions about the
-> low-power states are made.  That means that any notifiers that need to
-> use information about the target low-power state (e.g. whether context
-> will be lost or not) cannot do so since that information has not yet
-> been decided until the platform_suspend_ops->enter() runs.
->
-Initially I thought the same but in general S2R, platform doesn't
-support multiple states like CPUIDLE. On OMAP, we do have a debug
-option to choose the state but on real product, it's always the
-deepest supported state is used. So the driver saving the
-full context for S2R, should be fine.
+The series contains few fixes and clean-up for OMAP.
+Briefly,
+- HWMOD fix for the address space count
+- Improving the L3 register accesses
+- Bug fix in the L3 error handler
+- Sparce warning and indentation fixes in L3 error handler
+- Print master id in case of L3 custom errors for better debug.
+- Adding local time clock node for the CPUfreq and time re-calibration
+- Fix in the address overlap for emif and emulation domain.
 
-Ofcourse for CPUIDLE, the notifier call chain decisions are left
-with platform CPUIDLE drivers since there can be multiple low
-power states and the context save/restore has to be done based
-on low power states.
+The series is tested on OMAP4430 SDP and OMAP4430 beagle and SDP.
 
-The advantage with this is, the platform code is clean from the
-notfiers calls. CPUIDLE driver needs to call the different notifier
-events based on C-states and that perfectly works.
+The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
 
-I liked this simplification for the S2R. Down side is in S2R if you
-don't plan to hit deepest state, drivers end up saving full context
-which is fine I guess.
+  Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
 
-> Basically, I think the cpu_*_pm_enter() calls should be called by
-> platform-specific code, not by common code.
->
-Sure and that's the case for CPUIDLE already. The change was
-done only for S2R based on above points.
+are available in the git repository at:
+  git://gitorious.org/omap-sw-develoment/linux-omap-dev.git v3.1-rc4-omap-misc
 
-Regards
-Santosh
+Santosh Shilimkar (2):
+      OMAP4: clock: Add CPU local timer clock node.
+      OMAP4: Fix the emif and dmm virtual mapping
+
+Todd Poynor (2):
+      OMAP: Improve register access in L3 Error handler.
+      OMAP: Fix a BUG in l3 error handler.
+
+sricharan (4):
+      OMAP: hwmod: Fix the addr spaces count API.
+      OMAP: Fix indentation issues in l3 error handler.
+      OMAP: Fix sparse warnings in l3 error handler.
+      OMAP: Print Initiator name for l3 custom error.
+
+ arch/arm/mach-omap2/clock44xx_data.c |    9 ++
+ arch/arm/mach-omap2/omap_hwmod.c     |    8 +-
+ arch/arm/mach-omap2/omap_l3_noc.c    |  130 ++++++++++----------
+ arch/arm/mach-omap2/omap_l3_noc.h    |  224 +++++++++++++++++++---------------
+ arch/arm/mach-omap2/omap_l3_smx.c    |   91 +++++++-------
+ arch/arm/mach-omap2/omap_l3_smx.h    |  164 ++++++++++++------------
+ arch/arm/plat-omap/include/plat/io.h |    4 +-
+ 7 files changed, 336 insertions(+), 294 deletions(-)
