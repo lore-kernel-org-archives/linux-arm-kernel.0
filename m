@@ -1,81 +1,54 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Thu, 8 Sep 2011 08:03:17 +0000
-Subject: [PATCH v2 2/3] ARM: mx28evk: set a initial clock rate for saif
-In-Reply-To: <20110907182142.GY28816@pengutronix.de>
-References: <1315403858-9904-1-git-send-email-b29396@freescale.com>
-	<1315403858-9904-3-git-send-email-b29396@freescale.com>
-	<20110907182142.GY28816@pengutronix.de>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F77223E900@039-SN1MPN1-003.039d.mgd.msft.net>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 8 Sep 2011 10:07:05 +0200
+Subject: [RFC PATCH 06/10] hwspinlock: OMAP4: Add spinlock support in
+ DT
+In-Reply-To: <CAK=WgbYgatyLWqmrZnUfSGxCkZsRiJ3sbQwmenxyiJ6JBw5vJA@mail.gmail.com>
+References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
+	<1314191356-10963-7-git-send-email-b-cousson@ti.com>
+	<CAK=WgbYX50R_MCgwdzywgrAEDJkmDSmeSSCuuqst5UBYk_sYow@mail.gmail.com>
+	<4E686B71.2060107@ti.com>
+	<CAK=WgbYgatyLWqmrZnUfSGxCkZsRiJ3sbQwmenxyiJ6JBw5vJA@mail.gmail.com>
+Message-ID: <4E6877A9.3090104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
-> Sent: Thursday, September 08, 2011 2:22 AM
-> To: Dong Aisheng-B29396
-> Cc: alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
-> broonie at opensource.wolfsonmicro.com; lrg at ti.com; linux-arm-
-> kernel at lists.infradead.org; w.sang at pengutronix.de
-> Subject: Re: [PATCH v2 2/3] ARM: mx28evk: set a initial clock rate for
-> saif
-> 
-> On Wed, Sep 07, 2011 at 09:57:37PM +0800, Dong Aisheng wrote:
-> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > Cc: Wolfram Sang <w.sang@pengutronix.de>
-> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > Cc: Liam Girdwood <lrg@ti.com>
-> >
-> > ---
-> > No changes since v1.
-> >
-> > Note this patch still needs another patch from Wolfram to work.
-> > I send out it in this series as
-> > [PATCH 3/3] arm: mxs: disable clock-gates when setting saif-clocks
-> If your patch 2 depends on patch 3 there is something fishy.
-Yes, because the original saif clk setting code has some issues
-Which can be fixed in patch 3.
- 
-> >
-> > As discussed with Wolfram, that patch may still have some later work
-> > to do. However, we just send out it for testers to work first.
-> > ---
-> >  arch/arm/mach-mxs/clock-mx28.c |    9 +++++++++
-> >  1 files changed, 9 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-mxs/clock-mx28.c
-> > b/arch/arm/mach-mxs/clock-mx28.c index f0c7cb6..33cc2ff 100644
-> > --- a/arch/arm/mach-mxs/clock-mx28.c
-> > +++ b/arch/arm/mach-mxs/clock-mx28.c
-> > @@ -826,6 +826,15 @@ int __init mx28_clocks_init(void)
-> >  	clk_set_parent(&saif0_clk, &pll0_clk);
-> >  	clk_set_parent(&saif1_clk, &pll0_clk);
-> >
-> > +	/*
-> > +	 * Set an initial clk rate for saif's internal logic to work
-> properly,
-> > +	 * this is especially for the saif working on EXTMASTER mode that
-> who
-> > +	 * uses other saif's BITCLK&LRCLK but it still needs a basic clk
-> which
-> > +	 * should be bigger enough for its internal logic.
-> This is not a proper (German) English sentence. Maybe this is better?:
-> 
-> 	Set an initial clock rate for the saif internal logic to work
-> 	properly. This is important when working in EXTMASTER mode that
-> 	uses the other saif's BITCLK&LRCLK but it still needs a basic
-> 	clock which should be fast enough for the internal logic.
-Yes, I think it's better. :)
-I will change like that.
+On 9/8/2011 9:56 AM, Ohad Ben-Cohen wrote:
+> Hi Benoit,
+>
+> On Thu, Sep 8, 2011 at 10:14 AM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>> Hehe, I'm not the one who wrote that driver :-)
+>>
+>> This is not wrong for the current HW. The point is do we want to anticipate
+>> potential HW evolution that might never happen on that IP?
+>
+> I originally really thought we can ignore those cases (hence the 0
+> base id ;), and personally I still think the scenario is a bit
+> fictional, and wouldn't even mind just having omap_hwspinlock_probe()
+> return an error if it is unexpectedly probed with a second device.
+>
+> But if fixing this entirely only means doing a small change, then it's
+> surely nicer.
 
-> > +	 */
-> > +	clk_set_rate(&saif0_clk, 24000000);
-> > +	clk_set_rate(&saif1_clk, 24000000);
-> > +
-> Do you need to check for clk_set_rate returning -ESOMETHING here?
-Basically this rate setting will not fail in clock_init.
-I noticed arch/arm/mach-mx5/clock-mx51-mx53.c also used like this.
-Should I add an error checking here?
+That should not be a big deal to add that kind of support.
 
-Regards
-Dong Aisheng
+>> This is no different than the multiple GPIO controllers we have today.
+>> Since we cannot rely on the DT nodes order, I added an explicit "id"
+>> attribute to provide that information to the driver. And then the baseid is
+>> "id * #gpios".
+>
+> That would work if #hwspinlock is a fixed number, but a "baseid"
+> attribute would allow supporting devices with different #hwspinlocks
+> per device. Since I am not aware of any real hardware that does this
+> kind of blasphemy, I can't say if the latter is really necessary :) If
+> you prefer the former, I'm entirely fine with it.
+
+The (small) issue for my point of view is that the #hwspinlock is 
+already encoded in the IP itself. So adding a baseid directly in DT will 
+look like duplicating indirectly something that is already there in the HW.
+That being said, since we cannot rely on the order, we will not be able 
+to get the proper baseid until the driver probe every hwspinlock devices 
+:-(
+So baseid might be a easier choice.
+
+Regards,
+Benoit
