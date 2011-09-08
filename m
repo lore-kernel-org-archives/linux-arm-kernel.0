@@ -1,39 +1,75 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 08 Sep 2011 11:27:25 -0700
-Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
-	gic_arch_extn
-In-Reply-To: <1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Sun, 4 Sep 2011 19:24:14 +0530")
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <878vpyhotu.fsf@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 8 Sep 2011 11:29:20 -0700
+Subject: [PATCH v3] net/smsc911x: add device tree probe support
+In-Reply-To: <20110908145946.GE2070@arm.com>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+	<1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
+	<20110908145946.GE2070@arm.com>
+Message-ID: <20110908182920.GL2967@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Thu, Sep 08, 2011 at 03:59:46PM +0100, Dave Martin wrote:
+> Hi Shawn,
+> 
+> On Sun, Jul 31, 2011 at 02:26:00AM +0800, Shawn Guo wrote:
+> > It adds device tree probe support for smsc911x driver.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Steve Glendinning <steve.glendinning@smsc.com>
+> > Cc: David S. Miller <davem@davemloft.net>
+> > Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+> > ---
+> > Changes since v2:
+> >  * Fix a typo in smsc911x.txt
+> > 
+> > Changes since v1:
+> >  * Instead of getting irq line from gpio number, it use irq domain
+> >    to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
+> >  * Use 'lan9115' the first model that smsc911x supports in the match
+> >    table
+> >  * Use reg-shift and reg-io-width which already used in of_serial for
+> >    shift and access size binding
+> 
+> When using this patch with vexpress, I found that 16-bit register access
+> mode doesn't seem to be getting set correctly.
+> 
+> Can you take a look at this additional patch and let me know if it looks
+> correct?
+> 
+> Cheers
+> ---Dave
+> 
+> From: Dave Martin <dave.martin@linaro.org>
+> Date: Wed, 7 Sep 2011 17:26:31 +0100
+> Subject: [PATCH] net/smsc911x: Correctly configure 16-bit register access from DT
+> 
+> The SMSC911X_USE_16BIT needs to be set when using 16-bit register
+> access.  However, currently no flag is set if the DT doesn't specify
+> 32-bit access.
+> 
+> This patch should set the SMSC911X_USE_16BIT flag in a manner consistent
+> with the documented DT bindings.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+>  drivers/net/smsc911x.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
+> index 75c08a5..1a35c25 100644
+> --- a/drivers/net/smsc911x.c
+> +++ b/drivers/net/smsc911x.c
+> @@ -2121,6 +2121,8 @@ static int __devinit smsc911x_probe_config_dt(
+>  	of_property_read_u32(np, "reg-io-width", &width);
+>  	if (width == 4)
+>  		config->flags |= SMSC911X_USE_32BIT;
+> +	else
+> +		config->flags |= SMSC911X_USE_16BIT;
 
-> OMAP WakeupGen is the interrupt controller extension used along
-> with ARM GIC to wake the CPU out from low power states on
-> external interrupts.
->
-> The WakeupGen unit is responsible for generating wakeup event
-> from the incoming interrupts and enable bits. It is implemented
-> in MPU always ON power domain. During normal operation,
-> WakeupGen delivers external interrupts directly to the GIC.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
+Would it be better to do "else if (width == 2)"?  (completely
+uninformed comment.  I've not looked at what the non-DT probe path
+does on this driver.)
 
-[...]
-
-> +#ifdef CONFIG_PM
-> +/*
-> + * Masking wakeup irqs is handled by the IRQCHIP_MASK_ON_SUSPEND flag,
-> + * so no action is necessary in set_wake, but implement an empty handler
-> + * here to prevent enable_irq_wake() returning an error.
-> + * FIXME: Remove the dummy handler once gen irq code fix above.
-> + */
-
-Just curious... is there a fix for this pending for v3.2?
-
-Kevin
+g.
