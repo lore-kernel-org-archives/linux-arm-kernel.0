@@ -1,187 +1,68 @@
 From: jason.hui@linaro.org (Jason Liu)
-Date: Thu, 8 Sep 2011 11:27:24 +0800
-Subject: [PATCH v3 1/4] ARM: i.MX5/mm: Consolidate arch/arm/mach-mx5/mm-*.c
+Date: Thu, 8 Sep 2011 11:27:25 +0800
+Subject: [PATCH v3 2/4] ARM: i.MX5/mm: Remove MX51_DEBUG related mapping
 In-Reply-To: <1315452447-20205-1-git-send-email-jason.hui@linaro.org>
 References: <1315452447-20205-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <1315452447-20205-2-git-send-email-jason.hui@linaro.org>
+Message-ID: <1315452447-20205-3-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need one seperate file to deal with i.mx50
-related stuff, which is very similar with i.mx51/53.
-We can put it together into one file.So, just merge
-function from mm-mx50.c to mm.c and remove mm-mx50.c
-
-No function change by this commit.
+MX51_DEBUG related mapping is dead code, no-one use it
 
 Signed-off-by: Jason Liu <jason.hui@linaro.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx5/Makefile  |    1 -
- arch/arm/mach-mx5/mm-mx50.c |   72 -------------------------------------------
- arch/arm/mach-mx5/mm.c      |   43 +++++++++++++++++++++++++
- 3 files changed, 43 insertions(+), 73 deletions(-)
+ arch/arm/mach-mx5/mm.c                    |    1 -
+ arch/arm/plat-mxc/include/mach/hardware.h |    1 -
+ arch/arm/plat-mxc/include/mach/mx51.h     |   12 ------------
+ 3 files changed, 0 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 383e7cd..60f756d 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -4,7 +4,6 @@
- 
- # Object file lists.
- obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o system.o
--obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
- 
- obj-$(CONFIG_PM) += pm-imx5.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
-diff --git a/arch/arm/mach-mx5/mm-mx50.c b/arch/arm/mach-mx5/mm-mx50.c
-deleted file mode 100644
-index 77e374c..0000000
---- a/arch/arm/mach-mx5/mm-mx50.c
-+++ /dev/null
-@@ -1,72 +0,0 @@
--/*
-- * Copyright (C) 2010 Freescale Semiconductor, Inc. All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
--
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
--
-- * You should have received a copy of the GNU General Public License along
-- * with this program; if not, write to the Free Software Foundation, Inc.,
-- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-- *
-- * Create static mapping between physical to virtual memory.
-- */
--
--#include <linux/mm.h>
--#include <linux/init.h>
--
--#include <asm/mach/map.h>
--
--#include <mach/hardware.h>
--#include <mach/common.h>
--#include <mach/iomux-v3.h>
--#include <mach/irqs.h>
--
--/*
-- * Define the MX50 memory map.
-- */
--static struct map_desc mx50_io_desc[] __initdata = {
--	imx_map_entry(MX50, TZIC, MT_DEVICE),
--	imx_map_entry(MX50, SPBA0, MT_DEVICE),
--	imx_map_entry(MX50, AIPS1, MT_DEVICE),
--	imx_map_entry(MX50, AIPS2, MT_DEVICE),
--};
--
--/*
-- * This function initializes the memory map. It is called during the
-- * system startup to create static physical to virtual memory mappings
-- * for the IO modules.
-- */
--void __init mx50_map_io(void)
--{
--	iotable_init(mx50_io_desc, ARRAY_SIZE(mx50_io_desc));
--}
--
--void __init imx50_init_early(void)
--{
--	mxc_set_cpu_type(MXC_CPU_MX50);
--	mxc_iomux_v3_init(MX50_IO_ADDRESS(MX50_IOMUXC_BASE_ADDR));
--	mxc_arch_reset_init(MX50_IO_ADDRESS(MX50_WDOG_BASE_ADDR));
--}
--
--void __init mx50_init_irq(void)
--{
--	tzic_init_irq(MX50_IO_ADDRESS(MX50_TZIC_BASE_ADDR));
--}
--
--void __init imx50_soc_init(void)
--{
--	/* i.mx50 has the i.mx31 type gpio */
--	mxc_register_gpio("imx31-gpio", 0, MX50_GPIO1_BASE_ADDR, SZ_16K, MX50_INT_GPIO1_LOW, MX50_INT_GPIO1_HIGH);
--	mxc_register_gpio("imx31-gpio", 1, MX50_GPIO2_BASE_ADDR, SZ_16K, MX50_INT_GPIO2_LOW, MX50_INT_GPIO2_HIGH);
--	mxc_register_gpio("imx31-gpio", 2, MX50_GPIO3_BASE_ADDR, SZ_16K, MX50_INT_GPIO3_LOW, MX50_INT_GPIO3_HIGH);
--	mxc_register_gpio("imx31-gpio", 3, MX50_GPIO4_BASE_ADDR, SZ_16K, MX50_INT_GPIO4_LOW, MX50_INT_GPIO4_HIGH);
--	mxc_register_gpio("imx31-gpio", 4, MX50_GPIO5_BASE_ADDR, SZ_16K, MX50_INT_GPIO5_LOW, MX50_INT_GPIO5_HIGH);
--	mxc_register_gpio("imx31-gpio", 5, MX50_GPIO6_BASE_ADDR, SZ_16K, MX50_INT_GPIO6_LOW, MX50_INT_GPIO6_HIGH);
--}
 diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-index baea6e5..63b0ab3 100644
+index 63b0ab3..0ca4c6a 100644
 --- a/arch/arm/mach-mx5/mm.c
 +++ b/arch/arm/mach-mx5/mm.c
-@@ -42,6 +42,16 @@ static struct map_desc mx53_io_desc[] __initdata = {
- };
+@@ -26,7 +26,6 @@
+  */
+ static struct map_desc mx51_io_desc[] __initdata = {
+ 	imx_map_entry(MX51, IRAM, MT_DEVICE),
+-	imx_map_entry(MX51, DEBUG, MT_DEVICE),
+ 	imx_map_entry(MX51, AIPS1, MT_DEVICE),
+ 	imx_map_entry(MX51, SPBA0, MT_DEVICE),
+ 	imx_map_entry(MX51, AIPS2, MT_DEVICE),
+diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
+index a8bfd56..33728aa 100644
+--- a/arch/arm/plat-mxc/include/mach/hardware.h
++++ b/arch/arm/plat-mxc/include/mach/hardware.h
+@@ -82,7 +82,6 @@
+  *	AIPS2	0x63f00000+0x100000	->	0xf5300000+0x100000
+  * mx51:
+  *	IRAM	0x1ffe0000+0x020000	->	0xf4fe0000+0x020000
+- *	DEBUG	0x60000000+0x100000	->	0xf5000000+0x100000
+  *	SPBA0	0x70000000+0x100000	->	0xf5400000+0x100000
+  *	AIPS1	0x73f00000+0x100000	->	0xf5700000+0x100000
+  *	AIPS2	0x83f00000+0x100000	->	0xf4300000+0x100000
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
+index dede19a..652f2b0 100644
+--- a/arch/arm/plat-mxc/include/mach/mx51.h
++++ b/arch/arm/plat-mxc/include/mach/mx51.h
+@@ -18,18 +18,6 @@
+ #define MX51_GPU_CTRL_BASE_ADDR		0x30000000
+ #define MX51_IPU_CTRL_BASE_ADDR		0x40000000
  
+-#define MX51_DEBUG_BASE_ADDR		0x60000000
+-#define MX51_DEBUG_SIZE			SZ_1M
+-
+-#define MX51_ETB_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x01000)
+-#define MX51_ETM_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x02000)
+-#define MX51_TPIU_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x03000)
+-#define MX51_CTI0_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x04000)
+-#define MX51_CTI1_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x05000)
+-#define MX51_CTI2_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x06000)
+-#define MX51_CTI3_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x07000)
+-#define MX51_CORTEX_DBG_BASE_ADDR	(MX51_DEBUG_BASE_ADDR + 0x08000)
+-
  /*
-+ * Define the MX50 memory map.
-+ */
-+static struct map_desc mx50_io_desc[] __initdata = {
-+	imx_map_entry(MX50, TZIC, MT_DEVICE),
-+	imx_map_entry(MX50, SPBA0, MT_DEVICE),
-+	imx_map_entry(MX50, AIPS1, MT_DEVICE),
-+	imx_map_entry(MX50, AIPS2, MT_DEVICE),
-+};
-+
-+/*
-  * This function initializes the memory map. It is called during the
-  * system startup to create static physical to virtual memory mappings
-  * for the IO modules.
-@@ -70,6 +80,23 @@ void __init imx53_init_early(void)
- 	mxc_arch_reset_init(MX53_IO_ADDRESS(MX53_WDOG1_BASE_ADDR));
- }
- 
-+/*
-+ * This function initializes the memory map. It is called during the
-+ * system startup to create static physical to virtual memory mappings
-+ * for the IO modules.
-+ */
-+void __init mx50_map_io(void)
-+{
-+	iotable_init(mx50_io_desc, ARRAY_SIZE(mx50_io_desc));
-+}
-+
-+void __init imx50_init_early(void)
-+{
-+	mxc_set_cpu_type(MXC_CPU_MX50);
-+	mxc_iomux_v3_init(MX50_IO_ADDRESS(MX50_IOMUXC_BASE_ADDR));
-+	mxc_arch_reset_init(MX50_IO_ADDRESS(MX50_WDOG_BASE_ADDR));
-+}
-+
- void __init mx51_init_irq(void)
- {
- 	unsigned long tzic_addr;
-@@ -101,6 +128,11 @@ void __init mx53_init_irq(void)
- 	tzic_init_irq(tzic_virt);
- }
- 
-+void __init mx50_init_irq(void)
-+{
-+	tzic_init_irq(MX50_IO_ADDRESS(MX50_TZIC_BASE_ADDR));
-+}
-+
- static struct sdma_script_start_addrs imx51_sdma_script __initdata = {
- 	.ap_2_ap_addr = 642,
- 	.uart_2_mcu_addr = 817,
-@@ -164,3 +196,14 @@ void __init imx53_soc_init(void)
- 	/* i.mx53 has the i.mx35 type sdma */
- 	imx_add_imx_sdma("imx35-sdma", MX53_SDMA_BASE_ADDR, MX53_INT_SDMA, &imx53_sdma_pdata);
- }
-+
-+void __init imx50_soc_init(void)
-+{
-+	/* i.mx50 has the i.mx31 type gpio */
-+	mxc_register_gpio("imx31-gpio", 0, MX50_GPIO1_BASE_ADDR, SZ_16K, MX50_INT_GPIO1_LOW, MX50_INT_GPIO1_HIGH);
-+	mxc_register_gpio("imx31-gpio", 1, MX50_GPIO2_BASE_ADDR, SZ_16K, MX50_INT_GPIO2_LOW, MX50_INT_GPIO2_HIGH);
-+	mxc_register_gpio("imx31-gpio", 2, MX50_GPIO3_BASE_ADDR, SZ_16K, MX50_INT_GPIO3_LOW, MX50_INT_GPIO3_HIGH);
-+	mxc_register_gpio("imx31-gpio", 3, MX50_GPIO4_BASE_ADDR, SZ_16K, MX50_INT_GPIO4_LOW, MX50_INT_GPIO4_HIGH);
-+	mxc_register_gpio("imx31-gpio", 4, MX50_GPIO5_BASE_ADDR, SZ_16K, MX50_INT_GPIO5_LOW, MX50_INT_GPIO5_HIGH);
-+	mxc_register_gpio("imx31-gpio", 5, MX50_GPIO6_BASE_ADDR, SZ_16K, MX50_INT_GPIO6_LOW, MX50_INT_GPIO6_HIGH);
-+}
+  * SPBA global module enabled #0
+  */
 -- 
 1.7.4.1
