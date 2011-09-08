@@ -1,57 +1,26 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 8 Sep 2011 12:07:43 +0530
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <CAGsJ_4yzxz2rdyN-DDbcUM4BYXwmmDQU2oxX7HVKDtQsESaZfw@mail.gmail.com>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
-	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
-	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
-	<CAGsJ_4yzxz2rdyN-DDbcUM4BYXwmmDQU2oxX7HVKDtQsESaZfw@mail.gmail.com>
-Message-ID: <CABb+yY3tJc3eaEV2ZhW6D5S5whr5fWZ-9pY5kOLN_bRLbz5u6w@mail.gmail.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Thu, 8 Sep 2011 08:39:58 +0200
+Subject: [PATCH] media i.MX27 camera: remove legacy dma support
+In-Reply-To: <Pine.LNX.4.64.1109072246320.31156@axis700.grange>
+References: <1314167073-11058-1-git-send-email-s.hauer@pengutronix.de>
+	<Pine.LNX.4.64.1108240843001.8985@axis700.grange>
+	<20110824073614.GU31404@pengutronix.de>
+	<Pine.LNX.4.64.1109072246320.31156@axis700.grange>
+Message-ID: <20110908063958.GX25231@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2011 at 11:44 AM, Barry Song <21cnbao@gmail.com> wrote:
->> Sorry, the role of DMA_WIDTH is not clear to me yet.
->> In which case the user _must_ set {xlen > width} ?
->
-> DMA_WIDTH is the size address will increase after every DMA line.
-> For example:
-> if xlen = 4, dma_width=8, ylen=5;
-> Then DMA will run as(suppose DMA address start from 0):
-> 0~3
-> 8~11
-> 16~19
-> 24~27
-> ...
-Ok, so I guessed right.  2d-dma.PNG is indeed inaccurate, unless
-there is some separate start-address of the 'width-window' which
-you haven't mentioned.
+On Wed, Sep 07, 2011 at 10:47:38PM +0200, Guennadi Liakhovetski wrote:
+> (hope, you've had good holidays:-))
+> 
+> Any update on this? Do we want this for 3.2?
 
-> This feature can help us to do DMA operation to non-continuous memory
-> area, for example, pick a part of a image.
-That's just a small part of what the proposed api can do.
+Sascha is on holiday for the rest of this week and next week. So you'd
+better asked him a bit later :)
 
-> The DMA X-length is in the 32-bit D-word boundary. This value
-> specifies the number of D-words transferred
-> in each line. The value should be less than or equal to the value of
-> DMA width register.
->
-> The DMA Y-length specifies the number of lines in DMA transfers. The
-> number of the lines in DMA transfer
-> is Y-length + 1.
->
-> Each channel has dedicated DMA Width registers. Each DMA channel
-> should not use other channel?s DMA
-> width.
-> To enable a correct 2-D DMA, the DMA Width register must be correctly
-> set. The value of the DMA Width
-> register must be greater than or equal to the X-length, otherwise, the
-> data is overlapped. DMA_WIDTH
-> should not be set to 0.
->
-Ok, so what I said in my last post [https://lkml.org/lkml/2011/9/8/10] seems
-quite accurate. Maybe you only need to additionally take care of
-conversion of sizes between bytes and words.
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
