@@ -1,39 +1,61 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 7 Sep 2011 22:02:04 -0700
-Subject: [PATCH v2] gpio: rewrite U300 GPIO to use gpiolib
-In-Reply-To: <20110907180207.GC9937@ponder.secretlab.ca>
-References: <1315383085-26352-1-git-send-email-linus.walleij@stericsson.com>
-	<20110907180207.GC9937@ponder.secretlab.ca>
-Message-ID: <CACxGe6vp7FS3YqOB2QUg+k-qC5t8sGFDjwJb1GSqxuV+BFWE-w@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Thu, 08 Sep 2011 10:46:00 +0530
+Subject: [PATCH v2 2/5] cpu_pm: call notifiers during suspend
+In-Reply-To: <87k49knmrw.fsf@ti.com>
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>	<1315060755-4613-3-git-send-email-santosh.shilimkar@ti.com>
+	<87k49knmrw.fsf@ti.com>
+Message-ID: <4E684F90.7010809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 7, 2011 at 11:02 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Sep 07, 2011 at 10:11:25AM +0200, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This rewrites the U300 GPIO so as to use gpiolib and
->> struct gpio_chip instead of just generic GPIO, hiding
->> all the platform specifics and passing in GPIO chip
->> variant as platform data at runtime instead of the
->> compiletime kludges.
->>
->> As a result <mach/gpio.h> is now empty for U300 and
->> using just defaults.
->>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> Cc: Debian kernel maintainers <debian-kernel@lists.debian.org>
->> Cc: Arnaud Patard <arnaud.patard@rtp-net.org>
->> Reported-by: Ben Hutchings <ben@decadent.org.uk>
->> Signed-off-nu: Linus Walleij <linus.walleij@linaro.org>
-> ? ? ? ? ? ? ^^
-> Your keyboard needs to be shifted 1cm to the right. :-)
+On Thursday 08 September 2011 01:32 AM, Kevin Hilman wrote:
+> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
 >
-> I'll pick it up, but there are some things that I've commented on
-> below that needs to be addressed in follow up patches.
+>> From: Colin Cross<ccross@android.com>
+>>
+>> Implements syscore_ops in cpu_pm to call the cpu and
+>> cpu cluster notifiers during suspend and resume,
+>> allowing drivers receiving the notifications to
+>> avoid implementing syscore_ops.
+>>
+>> Signed-off-by: Colin Cross<ccross@android.com>
+>> [santosh.shilimkar at ti.com: Rebased against 3.1-rc4]
+>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>
+> I don't think using syscore_ops is right here.  The platform code should
+> decide where in its own suspend path the notifiers should be triggered.
+>
+> The reason is because while the syscore_ops run late in the suspend
+> path, they still run before some platform-specific decisions about the
+> low-power states are made.  That means that any notifiers that need to
+> use information about the target low-power state (e.g. whether context
+> will be lost or not) cannot do so since that information has not yet
+> been decided until the platform_suspend_ops->enter() runs.
+>
+Initially I thought the same but in general S2R, platform doesn't
+support multiple states like CPUIDLE. On OMAP, we do have a debug
+option to choose the state but on real product, it's always the
+deepest supported state is used. So the driver saving the
+full context for S2R, should be fine.
 
-Hmmm, it doesn't apply against mainline.  Do you want to take it
-through your tree?
+Ofcourse for CPUIDLE, the notifier call chain decisions are left
+with platform CPUIDLE drivers since there can be multiple low
+power states and the context save/restore has to be done based
+on low power states.
 
-g.
+The advantage with this is, the platform code is clean from the
+notfiers calls. CPUIDLE driver needs to call the different notifier
+events based on C-states and that perfectly works.
+
+I liked this simplification for the S2R. Down side is in S2R if you
+don't plan to hit deepest state, drivers end up saving full context
+which is fine I guess.
+
+> Basically, I think the cpu_*_pm_enter() calls should be called by
+> platform-specific code, not by common code.
+>
+Sure and that's the case for CPUIDLE already. The change was
+done only for S2R based on above points.
+
+Regards
+Santosh
