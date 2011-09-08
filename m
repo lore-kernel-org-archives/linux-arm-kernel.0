@@ -1,59 +1,44 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 8 Sep 2011 21:16:54 +0200
-Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
-	gic_arch_extn
-In-Reply-To: <1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <CAORVsuX0NnDBtLOJwQF-qgo4hq9wp2+d=HcLLtJzYGsuzc_z1A@mail.gmail.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 9 Sep 2011 00:47:56 +0530
+Subject: [PATCH v2] ASoC: omap: convert per-board modules to platform
+	drivers
+In-Reply-To: <CAG5Tg6UOuztenNid1=YbH9a4ZH5MqV4YhohG+r9R+7F=zXs=CQ@mail.gmail.com>
+References: <1315503297-8365-1-git-send-email-mans.rullgard@linaro.org>
+	<CABb+yY0b607kDSGU+trycqQuvGMhC-zpHcv20wjgmEcaK7dz8Q@mail.gmail.com>
+	<CAG5Tg6UOuztenNid1=YbH9a4ZH5MqV4YhohG+r9R+7F=zXs=CQ@mail.gmail.com>
+Message-ID: <CAJe_ZhdGaKFU9kVii83KX+TmN9_edcfCU8TohEzJ4oKaQTEgHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 4, 2011 at 3:54 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> OMAP WakeupGen is the interrupt controller extension used along
-> with ARM GIC to wake the CPU out from low power states on
-> external interrupts.
+On 9 September 2011 00:35, Mans Rullgard <mans.rullgard@linaro.org> wrote:
+> On 8 September 2011 19:17, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Thu, Sep 8, 2011 at 11:04 PM, Mans Rullgard <mans.rullgard@linaro.org> wrote:
+>>> This converts the per-board modules to platform drivers for a
+>>> device created by in main platform setup. ?These drivers call
+>>> snd_soc_register_card() directly instead of going via a "soc-audio"
+>>> device and the corresponding driver in soc-core.
+>>>
+>>> Signed-off-by: Mans Rullgard <mans.rullgard@linaro.org>
+>>> ---
+>>> Platform device names fixed.
+>>> N8x0 changed to get clocks before registering card.
+>>> ---
+>>> ?arch/arm/mach-omap2/board-3430sdp.c ? ? ? ? ?| ? ?6 ++
+>>> ?arch/arm/mach-omap2/board-4430sdp.c ? ? ? ? ?| ? ?6 ++
+>>> ?arch/arm/mach-omap2/board-am3517evm.c ? ? ? ?| ? ?7 +++
+>>> ?arch/arm/mach-omap2/board-devkit8000.c ? ? ? | ? ?6 ++
+>>> ?arch/arm/mach-omap2/board-igep0020.c ? ? ? ? | ? ?6 ++
+>>> ?arch/arm/mach-omap2/board-n8x0.c ? ? ? ? ? ? | ? ?6 ++
+>>> ?arch/arm/mach-omap2/board-omap3beagle.c ? ? ?| ? ?6 ++
+>>> ?arch/arm/mach-omap2/board-omap3evm.c ? ? ? ? | ? ?7 +++
+>>> ?arch/arm/mach-omap2/board-omap3pandora.c ? ? | ? ?6 ++
+>>> ?arch/arm/mach-omap2/board-overo.c ? ? ? ? ? ?| ? 17 ++++++
+>>> ?arch/arm/mach-omap2/board-rx51.c ? ? ? ? ? ? | ? ?6 ++
+>>> ?arch/arm/mach-omap2/board-zoom-peripherals.c | ? ?6 ++
+>>
+>> Can't we do by having omap_init_audio() in arch/arm/mach-omap2/devices.c
+>> generate a platform device of name depending upon machine_is_* ?
 >
-> The WakeupGen unit is responsible for generating wakeup event
-... for generating the wakeup events
-> from the incoming interrupts and enable bits. It is implemented
-> in MPU always ON power domain. During normal operation,
-in the MPU...
-> WakeupGen delivers external interrupts directly to the GIC.
-... delivers the external interrupts
-
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> ---
-> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-omap2/include/mach/omap-wakeupgen.h | ? 39 ++++
-> ?arch/arm/mach-omap2/omap-wakeupgen.c ? ? ? ? ? ? ?| ?241 +++++++++++++++++++++
-> ?arch/arm/mach-omap2/omap4-common.c ? ? ? ? ? ? ? ?| ? ?3 +
-> ?4 files changed, 284 insertions(+), 1 deletions(-)
-> ?create mode 100644 arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
-> ?create mode 100644 arch/arm/mach-omap2/omap-wakeupgen.c
->
-...
-
-> + */
-> +int __init omap_wakeupgen_init(void)
-> +{
-> + ? ? ? int i;
-> + ? ? ? unsigned int boot_cpu = smp_processor_id();
-> +
-> + ? ? ? /* Not supported on OMAP4 ES1.0 silicon */
-> + ? ? ? if (omap_rev() == OMAP4430_REV_ES1_0) {
-> + ? ? ? ? ? ? ? WARN(1, "WakeupGen: Not supported on OMAP4430 ES1.0\n");
-> + ? ? ? ? ? ? ? return -EPERM;
-> + ? ? ? }
-> +
-> + ? ? ? /* Static mapping, never released */
-> + ? ? ? wakeupgen_base = ioremap(OMAP44XX_WKUPGEN_BASE, SZ_4K);
-> + ? ? ? if (WARN_ON(!wakeupgen_base))
-> + ? ? ? ? ? ? ? return -ENODEV;
--ENOMEM os required as discussed in the other patches of the series.
-
-Regards,
-Jean
+> I had the same thought, but I couldn't find a suitable string anywhere.
+> Are you suggesting an if(machine_is_foo()) cascade in omap_init_audio()?
+Yes. And you could assign same names as you do now in board init files.
