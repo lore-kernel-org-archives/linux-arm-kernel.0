@@ -1,39 +1,78 @@
-From: deepthy.ravi@ti.com (Deepthy Ravi)
-Date: Thu, 8 Sep 2011 19:07:26 +0530
-Subject: [PATCH 7/8] omap3evm: camera: Configure BT656 interface
-Message-ID: <1315489046-16332-1-git-send-email-deepthy.ravi@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 08 Sep 2011 07:01:46 -0700
+Subject: [PATCH v2 2/5] cpu_pm: call notifiers during suspend
+In-Reply-To: <4E684F90.7010809@ti.com> (Santosh's message of "Thu, 08 Sep 2011
+	10:46:00 +0530")
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315060755-4613-3-git-send-email-santosh.shilimkar@ti.com>
+	<87k49knmrw.fsf@ti.com> <4E684F90.7010809@ti.com>
+Message-ID: <87wrdjku9h.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Hiremath <hvaibhav@ti.com>
+Santosh <santosh.shilimkar@ti.com> writes:
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
----
- arch/arm/mach-omap2/board-omap3evm-camera.c |   11 ++++++++---
- 1 files changed, 8 insertions(+), 3 deletions(-)
+> On Thursday 08 September 2011 01:32 AM, Kevin Hilman wrote:
+>> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
+>>
+>>> From: Colin Cross<ccross@android.com>
+>>>
+>>> Implements syscore_ops in cpu_pm to call the cpu and
+>>> cpu cluster notifiers during suspend and resume,
+>>> allowing drivers receiving the notifications to
+>>> avoid implementing syscore_ops.
+>>>
+>>> Signed-off-by: Colin Cross<ccross@android.com>
+>>> [santosh.shilimkar at ti.com: Rebased against 3.1-rc4]
+>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>
+>> I don't think using syscore_ops is right here.  The platform code should
+>> decide where in its own suspend path the notifiers should be triggered.
+>>
+>> The reason is because while the syscore_ops run late in the suspend
+>> path, they still run before some platform-specific decisions about the
+>> low-power states are made.  That means that any notifiers that need to
+>> use information about the target low-power state (e.g. whether context
+>> will be lost or not) cannot do so since that information has not yet
+>> been decided until the platform_suspend_ops->enter() runs.
+>>
+> Initially I thought the same but in general S2R, platform doesn't
+> support multiple states like CPUIDLE. On OMAP, we do have a debug
+> option to choose the state but on real product, it's always the
+> deepest supported state is used. So the driver saving the
+> full context for S2R, should be fine.
+>
+> Ofcourse for CPUIDLE, the notifier call chain decisions are left
+> with platform CPUIDLE drivers since there can be multiple low
+> power states and the context save/restore has to be done based
+> on low power states.
+>
+> The advantage with this is, the platform code is clean from the
+> notfiers calls. CPUIDLE driver needs to call the different notifier
+> events based on C-states and that perfectly works.
+>
+> I liked this simplification for the S2R. Down side is in S2R if you
+> don't plan to hit deepest state, drivers end up saving full context
+> which is fine I guess.
 
-diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c b/arch/arm/mach-omap2/board-omap3evm-camera.c
-index 718dd6d..e92fb13 100644
---- a/arch/arm/mach-omap2/board-omap3evm-camera.c
-+++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
-@@ -141,9 +141,14 @@ static struct isp_v4l2_subdevs_group omap3evm_camera_subdevs[] = {
- 		.interface      = ISP_INTERFACE_PARALLEL,
- 		.bus            = {
- 			.parallel       = {
--				.data_lane_shift        = 1,
--				.clk_pol                = 0,
--				.bridge                 = 0,
-+				.width			= 8,
-+				.data_lane_shift	= 1,
-+				.clk_pol		= 0,
-+				.hs_pol			= 0,
-+				.vs_pol			= 1,
-+				.fldmode		= 1,
-+				.bridge			= 0,
-+				.is_bt656		= 1,
- 			},
- 		}
- 	},
--- 
-1.7.0.4
+That's not the downside I'm worried about.
+
+If you have a driver that has a notifier, presumably it has something it
+wants to do to prepare for suspend *and* for idle, and you'd only want a
+single notifier callback in the driver to be used for both.  That
+callback would look something like:
+
+   start_preparing_for_suspend();
+
+   if (next_state == OFF)
+      save_context();
+
+   finish_preparing_for_suspend();
+
+
+The problem with the current cpu_*_pm_enter() calls in syscore_ops is
+that they happen before the next states are programmed, so during
+suspend the 'if (next_state == off)' above would never be true, but
+during idle it might be.
+
+Kevin
