@@ -1,40 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Sep 2011 09:55:02 +0100
-Subject: [PATCH 3/4] mach-integrator: modernize clock event registration
-In-Reply-To: <alpine.LFD.2.02.1109071202000.2723@ionos>
-References: <1315384260-27404-1-git-send-email-linus.walleij@stericsson.com>
-	<alpine.LFD.2.02.1109071202000.2723@ionos>
-Message-ID: <20110908085502.GB14953@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 8 Sep 2011 10:56:18 +0200
+Subject: [PATCH v2 2/3] ARM: mx28evk: set a initial clock rate for saif
+In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F77223E900@039-SN1MPN1-003.039d.mgd.msft.net>
+References: <1315403858-9904-1-git-send-email-b29396@freescale.com>
+	<1315403858-9904-3-git-send-email-b29396@freescale.com>
+	<20110907182142.GY28816@pengutronix.de>
+	<65EE16ACC360FA4D99C96DC085B3F77223E900@039-SN1MPN1-003.039d.mgd.msft.net>
+Message-ID: <20110908085618.GC28816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2011 at 12:02:52PM +0200, Thomas Gleixner wrote:
-> On Wed, 7 Sep 2011, Linus Walleij wrote:
+Hello (must I say Dong or Aisheng here?)
+
+On Thu, Sep 08, 2011 at 08:03:17AM +0000, Dong Aisheng-B29396 wrote:
+> > -----Original Message-----
+> > From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
+> > Sent: Thursday, September 08, 2011 2:22 AM
+> > To: Dong Aisheng-B29396
+> > Cc: alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
+> > broonie at opensource.wolfsonmicro.com; lrg at ti.com; linux-arm-
+> > kernel at lists.infradead.org; w.sang at pengutronix.de
+> > Subject: Re: [PATCH v2 2/3] ARM: mx28evk: set a initial clock rate for
+> > saif
+> > 
+> > On Wed, Sep 07, 2011 at 09:57:37PM +0800, Dong Aisheng wrote:
+> > > Signed-off-by: Dong Aisheng <b29396@freescale.com>
+> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Cc: Wolfram Sang <w.sang@pengutronix.de>
+> > > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > > Cc: Liam Girdwood <lrg@ti.com>
+> > >
+> > > ---
+> > > No changes since v1.
+> > >
+> > > Note this patch still needs another patch from Wolfram to work.
+> > > I send out it in this series as
+> > > [PATCH 3/3] arm: mxs: disable clock-gates when setting saif-clocks
+> > If your patch 2 depends on patch 3 there is something fishy.
+> Yes, because the original saif clk setting code has some issues
+> Which can be fixed in patch 3.
+So patch 3 should come before patch 2 in the series.
+
+> > > As discussed with Wolfram, that patch may still have some later work
+> > > to do. However, we just send out it for testers to work first.
+> > > ---
+> > >  arch/arm/mach-mxs/clock-mx28.c |    9 +++++++++
+> > >  1 files changed, 9 insertions(+), 0 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-mxs/clock-mx28.c
+> > > b/arch/arm/mach-mxs/clock-mx28.c index f0c7cb6..33cc2ff 100644
+> > > --- a/arch/arm/mach-mxs/clock-mx28.c
+> > > +++ b/arch/arm/mach-mxs/clock-mx28.c
+> > > @@ -826,6 +826,15 @@ int __init mx28_clocks_init(void)
+> > >  	clk_set_parent(&saif0_clk, &pll0_clk);
+> > >  	clk_set_parent(&saif1_clk, &pll0_clk);
+> > >
+> > > +	/*
+> > > +	 * Set an initial clk rate for saif's internal logic to work
+> > properly,
+> > > +	 * this is especially for the saif working on EXTMASTER mode that
+> > who
+> > > +	 * uses other saif's BITCLK&LRCLK but it still needs a basic clk
+> > which
+> > > +	 * should be bigger enough for its internal logic.
+> > This is not a proper (German) English sentence. Maybe this is better?:
+> > 
+> > 	Set an initial clock rate for the saif internal logic to work
+> > 	properly. This is important when working in EXTMASTER mode that
+> > 	uses the other saif's BITCLK&LRCLK but it still needs a basic
+> > 	clock which should be fast enough for the internal logic.
+> Yes, I think it's better. :)
+> I will change like that.
 > 
-> > From: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > Drop the reload value for the timer - the timekeeping code
-> > will call the .set_next_event to set this anyway.
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> > > +	 */
+> > > +	clk_set_rate(&saif0_clk, 24000000);
+> > > +	clk_set_rate(&saif1_clk, 24000000);
+> > > +
+> > Do you need to check for clk_set_rate returning -ESOMETHING here?
+> Basically this rate setting will not fail in clock_init.
+> I noticed arch/arm/mach-mx5/clock-mx51-mx53.c also used like this.
+> Should I add an error checking here?
+Probably it's OK as is then.
 
-> > 
-> > Drop mult, shift and delta calculations and let the
-> > clockevent core scale this as appropriate.
-> > 
-> > Set the minimum interval to 1 rather than 15 (0xf), there
-> > is nothing in the data sheets I have indicating that 15
-> > should be some minimum value.
-> > 
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> 
-> Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Uwe
 
-I mentioned to Thomas that which I've underlined above yesterday after I
-received Thomas' ack.  I was expecting Thomas to reply about this, but
-that obviously hasn't happened, so now that it's appeared in the patch
-system, it's become my problem to deal with.
-
-My understanding is that periodic timers are not setup by the generic
-clock event code, and so we do need to keep the 'timer_reload' stuff
-around.  Note that patch 2 deletes the register write for this too,
-so you actually have one logical change split across patch 2 and 3.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
