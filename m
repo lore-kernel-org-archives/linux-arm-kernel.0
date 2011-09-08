@@ -1,42 +1,45 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 8 Sep 2011 15:14:09 +0200 (CEST)
-Subject: [PATCH v11 0/4] Consolidating GIC per-cpu interrupts
-In-Reply-To: <20110815121312.GF26827@n2100.arm.linux.org.uk>
-References: <1312883802-15022-1-git-send-email-marc.zyngier@arm.com>
-	<20110815121312.GF26827@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1109081339120.2723@ionos>
+From: m-karicheri2@ti.com (Karicheri, Muralidharan)
+Date: Thu, 8 Sep 2011 13:17:38 +0000
+Subject: [GIT PULL] DaVinci fixes for v3.1-rc6
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593025743EBEF@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB593025743E832@dbde02.ent.ti.com>
+	<3E54258959B69E4282D79E01AB1F32B701B8C9@DLEE12.ent.ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593025743EBEF@dbde02.ent.ti.com>
+Message-ID: <3E54258959B69E4282D79E01AB1F32B701BBFE@DLEE12.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-B1;2601;0cRussell,
+Sekhar,
 
-On Mon, 15 Aug 2011, Russell King - ARM Linux wrote:
+Ok.
 
-> Thomas,
-> 
-> Could you _please_ look Marcs patch series and give an opinion on it.
-> I've also attached my patch to this reply too, which is an alternative
-> approach to Marcs.
+Murali Karicheri
+Software Design Engineer
+email: m-karicheri2 at ti.com
+Phone: (301) 407 9583
 
-I don't have fundamental objections to Marcs or your approach. In fact
-they are very similar.
 
-The main difference is that Marc sets up regular interrupts with
-handle_percpu_irq instead of going through a separate entry point. The
-only downside is that it exposes the PPI interrupts to the generic irq
-API, so nothing can prevent stupid drivers to call disable/enable_irq
-& al. I'm not sure how much of an issue that is in reality. If it
-matters we can add a flag to the core code which excludes such
-interrupts from being accessed.
-
-Another thing, which sticks out compared to other percpu interrupt
-users in arch/* is that you provide the ability to assign different
-handlers on different CPUs to a given PPI interrupt number. Most other
-percpu implementations setup the interrupt with a unique percpu aware
-handler and just enable/disable it per core in the low level
-setup/shutdown code. Is running different handlers on different cores
-a real requirement or just a nice feature with no usecase?
-
-Thanks,
-
-	tglx
+>> -----Original Message-----
+>> From: Nori, Sekhar
+>> Sent: Thursday, September 08, 2011 3:05 AM
+>> To: Karicheri, Muralidharan; Arnd Bergmann
+>> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
+>> kernel at lists.infradead.org; Chemparathy, Cyril
+>> Subject: RE: [GIT PULL] DaVinci fixes for v3.1-rc6
+>> 
+>> Hi Murali,
+>> 
+>> On Wed, Sep 07, 2011 at 21:13:19, Karicheri, Muralidharan wrote:
+>> > Sekhar
+>> >
+>> > We ran into the build error when we started using linux-davinci tree for
+>> V7 architecture. So this fix for the following to be re-worked to include
+>> V7 as well.
+>> >
+>> 
+>> Since we don't support v7 in DaVinci currently, I don't
+>> want to hold a build break fix in anticipation of a new
+>> feature that will come in later.
+>> 
+>> Thanks,
+>> Sekhar
