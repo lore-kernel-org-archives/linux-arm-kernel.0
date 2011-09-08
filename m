@@ -1,48 +1,33 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 8 Sep 2011 12:35:11 +0100
-Subject: [RFC PATCH 3/3] ARM: pxa/pj4: Port problematic pj4 support code
-	to v7/Thumb-2
-In-Reply-To: <4E68A2A6.9080105@ru.mvista.com>
-References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
-	<1315411158-17479-4-git-send-email-dave.martin@linaro.org>
-	<4E68A2A6.9080105@ru.mvista.com>
-Message-ID: <20110908113511.GD2070@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 8 Sep 2011 13:01:49 +0100
+Subject: [Android-virt] KVM ARM interrupt virtualization
+In-Reply-To: <4E6899B5.70608@gmail.com>
+References: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>
+	<CAHkRjk6Vm2yNLm8Gzk3+4mYAfiXVjufv2xc0Kc-6ac-oS4zytw@mail.gmail.com>
+	<CAOMgcGJBoeKJ8FjDW9eESfT+FiXmFF9PfShJ=a2adbESLD2YkA@mail.gmail.com>
+	<20110908085449.GA29243@e102109-lin.cambridge.arm.com>
+	<4E6899B5.70608@gmail.com>
+Message-ID: <CAFEAcA8=mGUP0dXTNXM6y9RDtWWEkJ2YhuavMBW-3BFfbOPS0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2011 at 03:10:30PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 07-09-2011 19:59, Dave Martin wrote:
-> 
-> >The iwmmxt code contains some code to implement a pseudo-ISB, but
-> >this is not buildable for Thumb-2.
-> 
-> >This patch replaces the pseudo-ISB with a real one on v7 and above.
-> 
-> >Signed-off-by: Dave Martin<dave.martin@linaro.org>
-> >---
-> >  arch/arm/kernel/pj4-cp0.c |    4 ++++
-> >  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> >diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-> >index a4b1b07..5117d9d 100644
-> >--- a/arch/arm/kernel/pj4-cp0.c
-> >+++ b/arch/arm/kernel/pj4-cp0.c
-> >@@ -66,9 +66,13 @@ static void __init pj4_cp_access_write(u32 value)
-> >
-> >  	__asm__ __volatile__ (
-> >  		"mcr	p15, 0, %1, c1, c0, 2\n\t"
-> >+#ifdef __LINUX_ARM_ARCH__ >= 7
-> 
->   Maybe #if?
-> 
-> WBR, Sergei
+On 8 September 2011 11:32, bill4carson <bill4carson@gmail.com> wrote:
+> There is much more involved if I want to use A15 as Guest OS,
+> cause Qemu haven't got any A15 support yet.
 
-Hmmm, yes.
+In the interests of not accidentally duplicating work, I should
+mention that QEMU A15 work is on my (Linaro) todo list; basically
+I'm thinking in terms of adding enough support to boot an A15
+Linux guest, but not actually implementing emulation of the
+virtualization/LPAE extensions. If you'd like to do some of the
+work here we should probably coordinate on that...
 
-With a bit of luck, we may be able to get rid of the conditional
-anyway.
+The Fast Model Versatile Express platform (including its memory
+map) is documented here:
+http://infocenter.arm.com/help/topic/com.arm.doc.dui0423j/BEIEAGAA.html
 
-Cheers
----Dave
+The memory maps (legacy A9 and "Cortex A-Series") for VE
+hardware are here:
+http://infocenter.arm.com/help/topic/com.arm.doc.dui0447e/CACIHGFE.html
+
+-- PMM
