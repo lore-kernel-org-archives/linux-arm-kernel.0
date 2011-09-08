@@ -1,38 +1,27 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 08 Sep 2011 15:10:30 +0400
-Subject: [RFC PATCH 3/3] ARM: pxa/pj4: Port problematic pj4 support code
-	to v7/Thumb-2
-In-Reply-To: <1315411158-17479-4-git-send-email-dave.martin@linaro.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 8 Sep 2011 12:33:54 +0100
+Subject: [RFC PATCH 2/3] ARM: iwmmxt: Port problematic iwmmxt support
+	code to v7/Thumb-2
+In-Reply-To: <20110908090122.GC14953@n2100.arm.linux.org.uk>
 References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
-	<1315411158-17479-4-git-send-email-dave.martin@linaro.org>
-Message-ID: <4E68A2A6.9080105@ru.mvista.com>
+	<1315411158-17479-3-git-send-email-dave.martin@linaro.org>
+	<CAMPhdO927WucyKRjbj69ahD7xmu-7L-Vt1AkGe1yZsmXv4YS8A@mail.gmail.com>
+	<1790084.iooACCopcX@wuerfel> <20110908085800.GB2070@arm.com>
+	<20110908090122.GC14953@n2100.arm.linux.org.uk>
+Message-ID: <20110908113354.GC2070@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Sep 08, 2011 at 10:01:22AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 08, 2011 at 09:58:00AM +0100, Dave Martin wrote:
+> > I take pj4 and older platforms can never be built in the same kernel?
+> > Otherwise, this approach is totally broken anyway-- we'll generate code
+> > which won't run on some of the kernel's supported platforms.
+> 
+> We have a well enforced split between ARMv5 and older CPUs, and ARMv6
+> and later CPUs.
 
-On 07-09-2011 19:59, Dave Martin wrote:
+Good point -- OK, I guess we don't need to worry about that scenario.
 
-> The iwmmxt code contains some code to implement a pseudo-ISB, but
-> this is not buildable for Thumb-2.
-
-> This patch replaces the pseudo-ISB with a real one on v7 and above.
-
-> Signed-off-by: Dave Martin<dave.martin@linaro.org>
-> ---
->   arch/arm/kernel/pj4-cp0.c |    4 ++++
->   1 files changed, 4 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-> index a4b1b07..5117d9d 100644
-> --- a/arch/arm/kernel/pj4-cp0.c
-> +++ b/arch/arm/kernel/pj4-cp0.c
-> @@ -66,9 +66,13 @@ static void __init pj4_cp_access_write(u32 value)
->
->   	__asm__ __volatile__ (
->   		"mcr	p15, 0, %1, c1, c0, 2\n\t"
-> +#ifdef __LINUX_ARM_ARCH__ >= 7
-
-   Maybe #if?
-
-WBR, Sergei
+Cheers
+---Dave
