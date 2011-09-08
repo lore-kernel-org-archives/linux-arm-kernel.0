@@ -1,74 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Sep 2011 18:19:29 +0200
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <CAGsJ_4wOQddus_Vz5zUjy-4ETOeaiZ+STRD22SwRy+yr4YLaRA@mail.gmail.com>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<201109081652.20552.arnd@arndb.de>
-	<CAGsJ_4wOQddus_Vz5zUjy-4ETOeaiZ+STRD22SwRy+yr4YLaRA@mail.gmail.com>
-Message-ID: <201109081819.30035.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Sep 2011 17:24:52 +0100
+Subject: [PATCH 6/6] arm/imx6q: add suspend/resume support
+In-Reply-To: <20110908152222.GA31581@S2100-06.ap.freescale.net>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-7-git-send-email-shawn.guo@linaro.org>
+	<CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
+	<20110908062301.GK8148@S2100-06.ap.freescale.net>
+	<20110908074718.GA14953@n2100.arm.linux.org.uk>
+	<20110908152222.GA31581@S2100-06.ap.freescale.net>
+Message-ID: <20110908162452.GA20292@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 September 2011, Barry Song wrote:
-> i am not sure whether i have other way to require a special channel
-> for a special device. it seems dma_request_channel only gives me a
-> chance to use a filter function since my all channels have same DMA
-> cap masks.
-> 
-> this filter is used by all drivers with DMA since every dma channel is
-> fixed to be assigned to one device.
-> 
-> i did do some copy from coh901318.c:
-> bool coh901318_filter_id(struct dma_chan *chan, void *chan_id)
-> {
->     unsigned int ch_nr = (unsigned int) chan_id;
-> 
->     if (ch_nr == to_coh901318_chan(chan)->id)
->         return true;
-> 
->     return false;
-> }
-> EXPORT_SYMBOL(coh901318_filter_id);
-> 
-> if it does become a common filter,  we might have a function like:
-> 
-> bool dmaengine_filter_match_channel_id(struct dma_chan *chan, void *chan_id)
-> {
->     if (ch_nr == chan->chan_id)
->         return true;
-> 
->     return false;
-> }
-> EXPORT_SYMBOL(dmaengine_filter_match_channel_id);
+On Thu, Sep 08, 2011 at 11:22:23PM +0800, Shawn Guo wrote:
+> On Thu, Sep 08, 2011 at 08:47:18AM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Sep 08, 2011 at 02:23:02PM +0800, Shawn Guo wrote:
+> > > Yes, if you lose L2 power in suspend, it's the easiest way for you to
+> > > resume L2.
+> > > 
+> > > For my case which retains L2, I actually do not want to call this
+> > > function which will invalidate L2.  But since we still have problem
+> > > to use rmk's generic suspend/resume updates (ARM: pm: add L2 cache
+> > > cleaning for suspend), we have to flush the entire L2 on imx6q for now.
+> > 
+> > OMAP44xx has the same problem but they re-initialize L2 on resume in
+> > their pre-cpu_resume() assembly code.
+> > 
+> Are you suggesting that this might be the reason why imx6q has problem
+> with your patch?
 
-Ok, I see now. I think it would be best to introduce a generic
-'filter by device tree property' function or alternatively an
-dma_of_request_channel function like this:
+Consider the mechanics of what is happening.
 
-struct dma_chan *dma_of_request_channel(struct device *dev, unsigned int index)
-{
-	struct dma_device *dmadev;
-	struct {
-		unsigned int phandle;
-		unsigned int channel_num;
-	} *property;
-	int lenp;
+On suspend, when we enter cpu_suspend(), we assume the L2 cache is
+still enabled.
 
-	property = of_get_property(dev->of_node, "dma-channel", &lenp);
-	if (lenp < (index * sizeof (*property))
-		return -EINVAL;
+We _always_ assume that L1 cache state is lost, so we always flush the
+entire L1 cache.
 
-	property += index;
+As SoCs can (and do) preserve the L2 contents over suspend/resume cycles,
+we leave it to the platform's finisher to decide whether it needs to
+flush the entire L2 cache to RAM or not.
 
-	dmadev = dma_find_device(of_find_node_by_phandle(property->phandle));
-	if (!dmadev)
-		return -ENODEV;
+If L2 is preserved, then we want to ensure that as much data as possible
+is retained in the L2 cache (if the hardware preserves its contents, we
+don't want waste time flushing data out of the cache needlessly -
+especially if we're using these paths for cpuidle.)  However, we need
+access to a certain amount of data to bring the system back up, and as
+the L2 cache typically will not be searched before the MMU is enabled,
+we have to flush out a certain minimal amount of data (the location
+of the stacked restore information and the stacked restore information
+itself.)
 
-	return dma_get_channel(dmadev, property->channel_num);
-}
+However, we don't flush out anything else from the L2 cache.
 
-This way, you can link a device to its dma_channel in the device tree without
-the device driver even understanding what a dma_device or a channel id
-is.
+Now, upon resume, the resume code will be able to read the data it needs
+to restore the system as we ensured that was flushed out to memory - as
+I mentioned above, the L2 cache won't be searched for this irrespective
+of whether the control registers have enabled it or not.
 
-	Arnd
+We will continue to the point where we hit the first bit of information
+stored in L2, which will probably be the stacked SVC register set.  If
+at this point we're not able to search the L2 cache, then we'll read
+stale data from the backing memory instead, and the system will crash.
+
+Consider what generic code could do about this - if we flushed out that
+register set to memory, then we could get past that point - but we then
+would need to call a function to enable the L2 cache.  What if that
+function needs data which is sitting in the L2 cache to function (eg,
+it may need values from the device tree).  We would need to ensure
+that that data were also flushed out of the L2 cache.  What about
+spinlocks?  Maybe some other CPU has dragged the spinlock data into
+the L2 cache.  That gets _much_ harder to solve.
+
+Now to the physical act of enabling the L2 cache.  The L2 cache control
+registers are subject to security restrictions when running in non-secure
+mode, needing platform specific SMC calls to reprogram the cache.  Generic
+code is unable to do this.
+
+Hence why it's left up to the platform to figure out how to enable the
+L2 cache before calling cpu_resume().  The platform is best placed to
+work out what it needs to do to setup the L2 cache so that the L2 cache
+is available by the time the system control register is written, enabling
+the MMU and caches.
+
+> Are we supposed to re-initialize L2 before calling
+> into generic cpu_resume()?
+
+So, the above is the long way of saying "yes" to this question.  I hope
+it gives the full picture about why this is so.
