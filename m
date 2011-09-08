@@ -1,68 +1,67 @@
 From: jason.hui@linaro.org (Jason Liu)
-Date: Thu, 8 Sep 2011 11:27:25 +0800
-Subject: [PATCH v3 2/4] ARM: i.MX5/mm: Remove MX51_DEBUG related mapping
+Date: Thu, 8 Sep 2011 11:27:26 +0800
+Subject: [PATCH v3 3/4] ARM: i.MX5/mm: add the TZIC mapping resource
 In-Reply-To: <1315452447-20205-1-git-send-email-jason.hui@linaro.org>
 References: <1315452447-20205-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <1315452447-20205-3-git-send-email-jason.hui@linaro.org>
+Message-ID: <1315452447-20205-4-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX51_DEBUG related mapping is dead code, no-one use it
+Add the TZIC mapping size and also add missing static mapping
+comments for the i.mx53 part
 
 Signed-off-by: Jason Liu <jason.hui@linaro.org>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-mx5/mm.c                    |    1 -
- arch/arm/plat-mxc/include/mach/hardware.h |    1 -
- arch/arm/plat-mxc/include/mach/mx51.h     |   12 ------------
- 3 files changed, 0 insertions(+), 14 deletions(-)
+ arch/arm/plat-mxc/include/mach/hardware.h |    6 ++++++
+ arch/arm/plat-mxc/include/mach/mx51.h     |    1 +
+ arch/arm/plat-mxc/include/mach/mx53.h     |    1 +
+ 3 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-index 63b0ab3..0ca4c6a 100644
---- a/arch/arm/mach-mx5/mm.c
-+++ b/arch/arm/mach-mx5/mm.c
-@@ -26,7 +26,6 @@
-  */
- static struct map_desc mx51_io_desc[] __initdata = {
- 	imx_map_entry(MX51, IRAM, MT_DEVICE),
--	imx_map_entry(MX51, DEBUG, MT_DEVICE),
- 	imx_map_entry(MX51, AIPS1, MT_DEVICE),
- 	imx_map_entry(MX51, SPBA0, MT_DEVICE),
- 	imx_map_entry(MX51, AIPS2, MT_DEVICE),
 diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index a8bfd56..33728aa 100644
+index 33728aa..d1ba212 100644
 --- a/arch/arm/plat-mxc/include/mach/hardware.h
 +++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -82,7 +82,6 @@
+@@ -81,10 +81,16 @@
+  *	AIPS1	0x53f00000+0x100000	->	0xf5700000+0x100000
   *	AIPS2	0x63f00000+0x100000	->	0xf5300000+0x100000
   * mx51:
++ *	TZIC	0xe0000000+0x004000	->	0xf5000000+0x004000
   *	IRAM	0x1ffe0000+0x020000	->	0xf4fe0000+0x020000
-- *	DEBUG	0x60000000+0x100000	->	0xf5000000+0x100000
   *	SPBA0	0x70000000+0x100000	->	0xf5400000+0x100000
   *	AIPS1	0x73f00000+0x100000	->	0xf5700000+0x100000
   *	AIPS2	0x83f00000+0x100000	->	0xf4300000+0x100000
++ * mx53:
++ *	TZIC	0x0FFFC000+0x004000	->	0xf4bfc000+0x004000
++ *	SPBA0	0x50000000+0x100000	->	0xf5400000+0x100000
++ *	AIPS1	0x53F00000+0x100000	->	0xf5700000+0x100000
++ *	AIPS2	0x63F00000+0x100000	->	0xf5300000+0x100000
+  */
+ #define IMX_IO_P2V(x)	(						\
+ 			0xf4000000 +					\
 diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index dede19a..652f2b0 100644
+index 652f2b0..8da9d7a 100644
 --- a/arch/arm/plat-mxc/include/mach/mx51.h
 +++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -18,18 +18,6 @@
- #define MX51_GPU_CTRL_BASE_ADDR		0x30000000
- #define MX51_IPU_CTRL_BASE_ADDR		0x40000000
+@@ -120,6 +120,7 @@
  
--#define MX51_DEBUG_BASE_ADDR		0x60000000
--#define MX51_DEBUG_SIZE			SZ_1M
--
--#define MX51_ETB_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x01000)
--#define MX51_ETM_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x02000)
--#define MX51_TPIU_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x03000)
--#define MX51_CTI0_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x04000)
--#define MX51_CTI1_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x05000)
--#define MX51_CTI2_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x06000)
--#define MX51_CTI3_BASE_ADDR		(MX51_DEBUG_BASE_ADDR + 0x07000)
--#define MX51_CORTEX_DBG_BASE_ADDR	(MX51_DEBUG_BASE_ADDR + 0x08000)
--
+ #define MX51_GPU2D_BASE_ADDR		0xd0000000
+ #define MX51_TZIC_BASE_ADDR		0xe0000000
++#define MX51_TZIC_SIZE			SZ_16K
+ 
+ #define MX51_IO_P2V(x)			IMX_IO_P2V(x)
+ #define MX51_IO_ADDRESS(x)		IOMEM(MX51_IO_P2V(x))
+diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
+index 5e3c323..fbf2610 100644
+--- a/arch/arm/plat-mxc/include/mach/mx53.h
++++ b/arch/arm/plat-mxc/include/mach/mx53.h
+@@ -9,6 +9,7 @@
+ 
+ /* TZIC */
+ #define MX53_TZIC_BASE_ADDR		0x0FFFC000
++#define MX53_TZIC_SIZE                  SZ_16K
+ 
  /*
-  * SPBA global module enabled #0
-  */
+  * AHCI SATA
 -- 
 1.7.4.1
