@@ -1,178 +1,49 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 8 Sep 2011 19:21:27 +0200
-Subject: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
-In-Reply-To: <1315488922-16152-1-git-send-email-deepthy.ravi@ti.com>
-References: <1315488922-16152-1-git-send-email-deepthy.ravi@ti.com>
-Message-ID: <201109081921.28051.laurent.pinchart@ideasonboard.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 8 Sep 2011 18:23:46 +0100
+Subject: [PATCH v2 3/3] ARM: pxa/pj4: Port problematic pj4 support code
+	to v7/Thumb-2
+In-Reply-To: <201109081844.21371.arnd@arndb.de>
+References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
+	<1315497854-13311-4-git-send-email-dave.martin@linaro.org>
+	<201109081844.21371.arnd@arndb.de>
+Message-ID: <20110908172346.GH2070@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Sep 08, 2011 at 06:44:21PM +0200, Arnd Bergmann wrote:
+> On Thursday 08 September 2011, Dave Martin wrote:
+> >         __asm__ __volatile__ (
+> >                 "mcr    p15, 0, %1, c1, c0, 2\n\t"
+> > +#ifdef __LINUX_ARM_ARCH__ >= 7
+> > +               "isb\n\t"
+> > +#else
+> >                 "mrc    p15, 0, %0, c1, c0, 2\n\t"
+> >                 "mov    %0, %0\n\t"
+> >                 "sub    pc, pc, #4\n\t"
+> > +#endif
+> >                 : "=r" (temp) : "r" (value));
+> >  }
+> 
+> I thought we had concluded that we don't actually need the #else
+> path because there is no pre-v7 support for pj4 any more.
+> 
 
-Thanks for the patch.
+Ah, OK -- I somewhat missed the point, the was focusing on the other
+patches (I notice I didn't fix #ifdef to #if either...)
 
-On Thursday 08 September 2011 15:35:22 Deepthy Ravi wrote:
-> From: Vaibhav Hiremath <hvaibhav@ti.com>
-> 
-> In order to support TVP5146 (for that matter any video decoder),
-> it is important to support G/S/ENUM_STD ioctl on /dev/videoX
-> device node.
+Anyway, this patch can be drastically simplified -- i.e.,
+the #if conditional should just go away, along with the
+xscale-style code (which really doesn't make sense for a v7-only
+file).
 
-Why so ? Shouldn't it be queried on the subdev output pad directly ?
+So we'd end up with something like:
 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
-> ---
->  drivers/media/video/omap3isp/ispvideo.c |   98
-> ++++++++++++++++++++++++++++++- drivers/media/video/omap3isp/ispvideo.h | 
->   1 +
->  2 files changed, 98 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/media/video/omap3isp/ispvideo.c
-> b/drivers/media/video/omap3isp/ispvideo.c index d5b8236..ff0ffed 100644
-> --- a/drivers/media/video/omap3isp/ispvideo.c
-> +++ b/drivers/media/video/omap3isp/ispvideo.c
-> @@ -37,6 +37,7 @@
->  #include <plat/iovmm.h>
->  #include <plat/omap-pm.h>
-> 
-> +#include <media/tvp514x.h>
->  #include "ispvideo.h"
->  #include "isp.h"
-> 
-> @@ -1136,7 +1137,97 @@ isp_video_g_input(struct file *file, void *fh,
-> unsigned int *input) static int
->  isp_video_s_input(struct file *file, void *fh, unsigned int input)
->  {
-> -	return input == 0 ? 0 : -EINVAL;
-> +	struct isp_video *video = video_drvdata(file);
-> +	struct media_entity *entity = &video->video.entity;
-> +	struct media_entity_graph graph;
-> +	struct v4l2_subdev *subdev;
-> +	struct v4l2_routing route;
-> +	int ret = 0;
-> +
-> +	media_entity_graph_walk_start(&graph, entity);
-> +	while ((entity = media_entity_graph_walk_next(&graph))) {
-> +		if (media_entity_type(entity) ==
-> +				MEDIA_ENT_T_V4L2_SUBDEV) {
-> +			subdev = media_entity_to_v4l2_subdev(entity);
-> +			if (subdev != NULL) {
-> +				if (input == 0)
-> +					route.input = INPUT_CVBS_VI4A;
-> +				else
-> +					route.input = INPUT_SVIDEO_VI2C_VI1C;
-> +				route.output = 0;
-> +				ret = v4l2_subdev_call(subdev, video, s_routing,
-> +						route.input, route.output, 0);
-> +				if (ret < 0 && ret != -ENOIOCTLCMD)
-> +					return ret;
-> +			}
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int isp_video_querystd(struct file *file, void *fh, v4l2_std_id *a)
-> +{
-> +	struct isp_video_fh *vfh = to_isp_video_fh(fh);
-> +	struct isp_video *video = video_drvdata(file);
-> +	struct media_entity *entity = &video->video.entity;
-> +	struct media_entity_graph graph;
-> +	struct v4l2_subdev *subdev;
-> +	int ret = 0;
-> +
-> +	media_entity_graph_walk_start(&graph, entity);
-> +	while ((entity = media_entity_graph_walk_next(&graph))) {
-> +		if (media_entity_type(entity) ==
-> +				MEDIA_ENT_T_V4L2_SUBDEV) {
-> +			subdev = media_entity_to_v4l2_subdev(entity);
-> +			if (subdev != NULL) {
-> +				ret = v4l2_subdev_call(subdev, video, querystd,
-> +						a);
-> +				if (ret < 0 && ret != -ENOIOCTLCMD)
-> +					return ret;
-> +			}
-> +		}
-> +	}
-> +
-> +	vfh->standard.id = *a;
-> +	return 0;
-> +}
-> +
-> +static int isp_video_g_std(struct file *file, void *fh, v4l2_std_id *norm)
-> +{
-> +	struct isp_video_fh *vfh = to_isp_video_fh(fh);
-> +	struct isp_video *video = video_drvdata(file);
-> +
-> +	mutex_lock(&video->mutex);
-> +	*norm = vfh->standard.id;
-> +	mutex_unlock(&video->mutex);
-> +
-> +	return 0;
-> +}
-> +
-> +static int isp_video_s_std(struct file *file, void *fh, v4l2_std_id *norm)
-> +{
-> +	struct isp_video *video = video_drvdata(file);
-> +	struct media_entity *entity = &video->video.entity;
-> +	struct media_entity_graph graph;
-> +	struct v4l2_subdev *subdev;
-> +	int ret = 0;
-> +
-> +	media_entity_graph_walk_start(&graph, entity);
-> +	while ((entity = media_entity_graph_walk_next(&graph))) {
-> +		if (media_entity_type(entity) ==
-> +				MEDIA_ENT_T_V4L2_SUBDEV) {
-> +			subdev = media_entity_to_v4l2_subdev(entity);
-> +			if (subdev != NULL) {
-> +				ret = v4l2_subdev_call(subdev, core, s_std,
-> +						*norm);
-> +				if (ret < 0 && ret != -ENOIOCTLCMD)
-> +					return ret;
-> +			}
-> +		}
-> +	}
-> +
-> +	return 0;
->  }
-> 
->  static const struct v4l2_ioctl_ops isp_video_ioctl_ops = {
-> @@ -1161,6 +1252,9 @@ static const struct v4l2_ioctl_ops
-> isp_video_ioctl_ops = { .vidioc_enum_input		= isp_video_enum_input,
->  	.vidioc_g_input			= isp_video_g_input,
->  	.vidioc_s_input			= isp_video_s_input,
-> +	.vidioc_querystd		= isp_video_querystd,
-> +	.vidioc_g_std			= isp_video_g_std,
-> +	.vidioc_s_std			= isp_video_s_std,
->  };
-> 
->  /*
-> --------------------------------------------------------------------------
-> --- @@ -1325,6 +1419,8 @@ int omap3isp_video_register(struct isp_video
-> *video, struct v4l2_device *vdev) printk(KERN_ERR "%s: could not register
-> video device (%d)\n",
->  			__func__, ret);
-> 
-> +	video->video.tvnorms		= V4L2_STD_NTSC | V4L2_STD_PAL;
-> +	video->video.current_norm	= V4L2_STD_NTSC;
->  	return ret;
->  }
-> 
-> diff --git a/drivers/media/video/omap3isp/ispvideo.h
-> b/drivers/media/video/omap3isp/ispvideo.h index 53160aa..bb8feb6 100644
-> --- a/drivers/media/video/omap3isp/ispvideo.h
-> +++ b/drivers/media/video/omap3isp/ispvideo.h
-> @@ -182,6 +182,7 @@ struct isp_video_fh {
->  	struct isp_video *video;
->  	struct isp_video_queue queue;
->  	struct v4l2_format format;
-> +	struct v4l2_standard standard;
->  	struct v4l2_fract timeperframe;
->  };
+        __asm__ __volatile__ (
+                "mcr    p15, 0, %0, c1, c0, 2\n\t"
+                "isb"
+                : "r" (value));
 
--- 
-Regards,
+Better?
 
-Laurent Pinchart
+Cheers
+---Dave
