@@ -1,75 +1,57 @@
 From: vkoul@infradead.org (Vinod Koul)
-Date: Fri, 09 Sep 2011 03:21:16 +0530
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <CAGsJ_4xDh6c5=Uhw9zO34XeY5UNC=fLuRubryks6NOv3T5_kCQ@mail.gmail.com>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
-	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
-	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
-	<CABb+yY3F+DMn2SxeO0chjpiMBkgLvSK5EVYMdhQsfQoZNZ4_7Q@mail.gmail.com>
-	<CAGsJ_4xDh6c5=Uhw9zO34XeY5UNC=fLuRubryks6NOv3T5_kCQ@mail.gmail.com>
-Message-ID: <1315518676.6638.6.camel@vkoul-mobl4>
+Date: Fri, 09 Sep 2011 03:24:33 +0530
+Subject: [PATCH 16/18] dmaengine/ambhe rest oa-pl08x: Add support for
+	sg len greater than one for slave transfers
+In-Reply-To: <CACRpkdaqTYK5TJL2u+aeOfnzhdtdjxZhyu661eGKrNBOXTUTeA@mail.gmail.com>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
+	<20110814083618.GE4986@n2100.arm.linux.org.uk>
+	<4E4CCF7B.8060704@st.com>
+	<20110821083306.GA12028@n2100.arm.linux.org.uk>
+	<4E532B19.6000103@st.com> <4E5715CE.2070806@st.com>
+	<CACRpkdapSvW=eMSoXTOOA2GyhfBLzq2OuyQcDctPxsnVzvr-4g@mail.gmail.com>
+	<4E575E75.40603@st.com> <4E5F594D.10203@st.com>
+	<438BB0150E931F4B9CE701519A4463010871804A4C@bgsmsx502.gar.corp.intel.com>
+	<CAKnu2Mp3Ui7jZS2kjJykjuzcTzJhiAkoaVxZ2+tQX0banGh6mw@mail.gmail.com>
+	<4E683B74.5000701@st.com>
+	<CACRpkdaqTYK5TJL2u+aeOfnzhdtdjxZhyu661eGKrNBOXTUTeA@mail.gmail.com>
+Message-ID: <1315518873.6638.7.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-09-08 at 14:36 +0800, Barry Song wrote:
-> 2011/9/8 Jassi Brar <jassisinghbrar@gmail.com>:
-> > On Thu, Sep 8, 2011 at 8:47 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> >> On Thu, Sep 8, 2011 at 7:42 AM, Barry Song <21cnbao@gmail.com> wrote:
-> >>
-> >>>>> it is much different with primacell based DMA like pl080, pl330.
-> >>>>> prima2 has a self-defined DMAC IP. basically it is a 2D mode dma with
-> >>>>> two scales X and Y and direct way to start and stop DMA.
-> >>>>> every channel has fixed function to serve only one perpheral. so you
-> >>>>> find we have a filter id.
-> >>>> okay, what do you mean by 2D mode? Is it similar to what TI folks, Linus
-> >>>> W and Jassi Brar posted RFC's on?
-> >>>
-> >>> In SiRFprimaII 2-D DMA, the system memory space is interpreted
-> >>> as a 2-D layout instead of a linear 1-D layout. More specifically, the
-> >>> system memory can be considered as
-> >>> multiple data lines. The length of the data line is determined by the
-> >>> user-selected DMA_WIDTH register.
-> >>> The user can specify a data window that the user wants to access using
-> >>> four parameters:
-> >>> ? Start address
-> >>> ? X length
-> >>> ? Y length
-> >>> ? Width
-> >>>
-> >>> The idea of a 2-D DMA is shown in figure 2d-dma.png attached.
-> >>>
-> >>> If you specifies the Y length as 0 or the X length equals to the DMA
-> >>> width, then this 2-D DMA reduces to
-> >>> 1-D. If the user configures the X length greater than the DMA width,
-> >>> then the extra data is wrapped around
-> >>> to the next data line, this may corrupt the DMA transfer for
-> >>> multiple-line 2-D DMA. If this is a 1-D DMA, then
-> >>> there is no issue. The attached diagram 2d-dma2.png shows the
-> >>> wrap-around of the extra data in case the X length
-> >>> greater than DMA width.
-> >>
-> >> Sorry, the role of DMA_WIDTH is not clear to me yet.
-> >> In which case the user _must_ set {xlen > width} ?
-> >>
-> > Perhaps 2d-dma.PNG is inaccurate - it shouldn't depict any deltaX.
-> > Doesn't xlen and width always start together ? If no, please don't read ahead.
-> >
-> > According to figures, {xlen > width} is to be set _only_ when a transfer
-> > is divided into _exactly_ two chunks separated by gap _exactly_
-> > equal to length of the second chunk (an extremely rare case).
+On Thu, 2011-09-08 at 12:29 +0200, Linus Walleij wrote:
+> On Thu, Sep 8, 2011 at 5:50 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 > 
-> Sorry i didn't list related full information in datasheet in my early reply.
-> we don't have the case of xlen > dma_width.
-What is intended usage of the 2D dma? 
-
-In first diagram you sent, x length is first block length to transfer
-and (dma_width - x_len) is length to skip, right?
-
-So what is the second diagram about? Is this juts a case when notion of
-xlen > dma_width? How much you transfer and how much you skip?
+> > If i am getting this clearly, the concern is "why to queue separate transfers for
+> > individual sg's? Better would be to prepare the complete list at once and
+> > start the transfer, so that DMA stops only after finishing all sg's
+> > passed from user." Is this what you are pointing at?
+> 
+> Yes.
+> 
+> > If yes, then the same is done in this patch too. An array for llis is allocated at
+> > the start, then for each sg i prepare lli list from this array. Last lli from one sg
+> > is followed by first lli from next sg. And so i get a continuous chain of llis.
+> 
+> OK so I guess I was lost in the code ...
+> 
+> So this is mainy cached as txd->dsg_list so you can quickly retrieve the
+> number of bytes pending in the LLI by traversing that sglist.
+> 
+> This is better than what the coh901318 does, because that driver
+> resorts to going into the physical LLIs themselves to retrieve this
+> info.
+> 
+> It also seems like this will play nice with Per Forlin's MMC
+> speed-up patches, so that will become effective for your MMC
+> usecases.
+> 
+> Now I really like this patch.
+> 
+> Sorry for being such a slow learner!
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Okay, great. I will check the rest of the series (i think 3 patches) and
+apply then next week.
 
 -- 
 ~Vinod Koul
