@@ -1,172 +1,139 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  8 Sep 2011 22:13:32 +0200
-Subject: [PATCH 4/4 v2] mach-integrator: get timer frequency from clock
-Message-ID: <1315512812-21061-1-git-send-email-linus.walleij@linaro.org>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 8 Sep 2011 22:15:19 +0200
+Subject: [PATCH 00/25] OMAP4: PM: suspend, CPU-hotplug and CPUilde support
+In-Reply-To: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAORVsuX4wZOr71RahnLUHwDMT1B1593bdKFAynNqtVXJOWVazQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already have a clock definition for the 24MHz clock in
-the Integrator, use that instead of some unclear defines
-from the platform.h header. Also delete the senseless
-comment that the file shouldn't be edited, I just edited it
-and the world didn't come to an end, so it's obviously
-false. If anyone still has the mentioned ".s file" and the
-s2h awk script generating that header, raise your hand
-(and give me your files).
+Hi Santosh,
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Calculate also timer_reload from the incoming clock rate,
-  adjusting to previous patches.
----
- arch/arm/mach-integrator/core.c                  |    4 ++
- arch/arm/mach-integrator/include/mach/platform.h |   12 -------
- arch/arm/mach-integrator/integrator_ap.c         |   37 +++++++++++++--------
- 3 files changed, 27 insertions(+), 26 deletions(-)
+On Sun, Sep 4, 2011 at 3:54 PM, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> This series adds OMAP4 MPUSS (MPU SubSystem) power management support for
+> suspend (S2R), CPU hotplug and CPUidle.
+>
+> Most of these patches have been posted and reviewed earlier [1] on the list
+> and have missed last couple of merge windows because of dependencies.
+> New set of patches have diverged more and hence the series version
+> continuity isn't maintained.
+>
+> Below are the main updates from previous versions.
+> - Use of generic ARM suspend hooks instead of OMAP custom code.
+> - Making use of common GIC code instead of OMAP custom code.
+> - Use of generic CPU PM notifiers for CPUIDLE and suspend.
+> - Use of CPU PM notifiers and hotplug notifiers for GIC extension.
+> - PM support of OMAP4 HS devices.
+> - Introduction of interconnect barriers as per the OMAP4 requirements.
+>
+> Special thanks to,
+> - Kevin Hilman for the detailed reviews.
+> - Russell for adding the L2 cache handling support to generic suspend.
+> - Colin Cross for the generic CPU PM notifier patches.
+> - Rajendra Nayak and Paul Walmsley for clock-domain sequencing series.
+>
+> Below series has dependency on Russell's L2 generic suspend support [2]
+> and earlier posted CPU PM notifiers series [3].
+> An integrated branch with these dependencies can be found here [4].
+>
+> The series is tested on OMAP4430 SDP for suspend, hotplug and CPUidle
+> with OMAP4 GP and HS (secure) devices.
+>
+> The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
+>
+> ?Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
+>
+> are available in the git repository at:
+> ?git://gitorious.org/omap-sw-develoment/linux-omap-dev.git v3.1-rc4-omap4-mpuss-pm
 
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index 77315b9..82ebc8d 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -126,6 +126,10 @@ static struct clk_lookup lookups[] = {
- 	{	/* Bus clock */
- 		.con_id		= "apb_pclk",
- 		.clk		= &dummy_apb_pclk,
-+	}, {
-+		/* Integrator/AP timer frequency */
-+		.dev_id		= "ap_timer",
-+		.clk		= &clk24mhz,
- 	}, {	/* UART0 */
- 		.dev_id		= "mb:16",
- 		.clk		= &uartclk,
-diff --git a/arch/arm/mach-integrator/include/mach/platform.h b/arch/arm/mach-integrator/include/mach/platform.h
-index 5e6ea5c..ec467ba 100644
---- a/arch/arm/mach-integrator/include/mach/platform.h
-+++ b/arch/arm/mach-integrator/include/mach/platform.h
-@@ -13,9 +13,6 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
--/* DO NOT EDIT!! - this file automatically generated
-- *                 from .s file by awk -f s2h.awk
-- */
- /**************************************************************************
-  * * Copyright ?? ARM Limited 1998.  All rights reserved.
-  * ***********************************************************************/
-@@ -399,15 +396,6 @@
- #define INTEGRATOR_TIMER1_BASE          (INTEGRATOR_CT_BASE + 0x100)
- #define INTEGRATOR_TIMER2_BASE          (INTEGRATOR_CT_BASE + 0x200)
- 
--#define TICKS_PER_uSEC                  24
--
--/*
-- *  These are useconds NOT ticks.
-- *
-- */
--#define mSEC_1                          1000
--#define mSEC_10                         (mSEC_1 * 10)
--
- #define INTEGRATOR_CSR_BASE             0x10000000
- #define INTEGRATOR_CSR_SIZE             0x10000000
- 
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 0a6f397..8dca5a7 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -32,6 +32,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/clk.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -322,13 +323,14 @@ static void __init ap_init(void)
- 
- static unsigned long timer_reload;
- 
--static void integrator_clocksource_init(u32 khz)
-+static void integrator_clocksource_init(unsigned long inrate)
- {
- 	void __iomem *base = (void __iomem *)TIMER2_VA_BASE;
- 	u32 ctrl = TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC;
-+	unsigned long rate = inrate;
- 
--	if (khz >= 1500) {
--		khz /= 16;
-+	if (rate >= 1500000) {
-+		rate /= 16;
- 		ctrl |= TIMER_CTRL_DIV16;
- 	}
- 
-@@ -336,7 +338,7 @@ static void integrator_clocksource_init(u32 khz)
- 	writel(ctrl, base + TIMER_CTRL);
- 
- 	clocksource_mmio_init(base + TIMER_VALUE, "timer2",
--		khz * 1000, 200, 16, clocksource_mmio_readl_down);
-+			rate, 200, 16, clocksource_mmio_readl_down);
- }
- 
- static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;
-@@ -411,24 +413,25 @@ static struct irqaction integrator_timer_irq = {
- 	.dev_id		= &integrator_clockevent,
- };
- 
--static void integrator_clockevent_init(u32 khz)
-+static void integrator_clockevent_init(unsigned long inrate)
- {
-+	unsigned long rate = inrate;
- 	unsigned int ctrl = 0;
- 
- 	/* Calculate and program a divisor */
--	if (khz * 1000 > 0x100000 * HZ) {
--		khz /= 256;
-+	if (rate > 0x100000 * HZ) {
-+		rate /= 256;
- 		ctrl |= TIMER_CTRL_DIV256;
--	} else if (khz * 1000 > 0x10000 * HZ) {
--		khz /= 16;
-+	} else if (rate > 0x10000 * HZ) {
-+		rate /= 16;
- 		ctrl |= TIMER_CTRL_DIV16;
- 	}
--	timer_reload = khz * 1000 / HZ;
-+	timer_reload = rate / HZ;
- 	writel(ctrl, clkevt_base + TIMER_CTRL);
- 
- 	setup_irq(IRQ_TIMERINT1, &integrator_timer_irq);
- 	clockevents_config_and_register(&integrator_clockevent,
--					khz * 1000,
-+					rate,
- 					1,
- 					0xffffU);
- }
-@@ -438,14 +441,20 @@ static void integrator_clockevent_init(u32 khz)
-  */
- static void __init ap_init_timer(void)
- {
--	u32 khz = TICKS_PER_uSEC * 1000;
-+	struct clk *clk;
-+	unsigned long rate;
-+
-+	clk = clk_get_sys("ap_timer", NULL);
-+	BUG_ON(IS_ERR(clk));
-+	clk_enable(clk);
-+	rate = clk_get_rate(clk);
- 
- 	writel(0, TIMER0_VA_BASE + TIMER_CTRL);
- 	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
- 	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
- 
--	integrator_clocksource_init(khz);
--	integrator_clockevent_init(khz);
-+	integrator_clocksource_init(rate);
-+	integrator_clockevent_init(rate);
- }
- 
- static struct sys_timer ap_timer = {
--- 
-1.7.6
+Some comments have been sent on this patch set, otherwise OK after review.
+
+FWIW:
+Acked-by: Jean Pihet <j-pihet@ti.com>
+
+Regards,
+Jean
+
+>
+> Santosh Shilimkar (25):
+> ? ? ?ARM: mm: Add strongly ordered descriptor support.
+> ? ? ?OMAP4: Redefine mandatory barriers for OMAP to include interconnect barriers.
+> ? ? ?OMAP4: PM: Use custom omap_do_wfi() for suspend and default idle.
+> ? ? ?OMAP4: Remove un-used do_wfi() macro.
+> ? ? ?OMAP4: Use WARN_ON() instead of BUG_ON() with graceful exit
+> ? ? ?OMAP4: Export omap4_get_base*() rather than global address pointers
+> ? ? ?OMAP4: PM: Add SAR RAM support
+> ? ? ?OMAP4: PM: Keep static dep between MPUSS-EMIF and MPUSS-L3 and DUCATI-L3
+> ? ? ?OMAP4: PM: Avoid omap4_pm_init() on OMAP4430 ES1.0
+> ? ? ?OMAP4: PM: Initialise all the clockdomains to supported states
+> ? ? ?OMAP: Add Secure HAL and monitor mode API infrastructure.
+> ? ? ?OMAP: Add support to allocate the memory for secure RAM
+> ? ? ?OMAP4: PM: Add WakeupGen module as OMAP gic_arch_extn
+> ? ? ?OMAP4: PM: Add CPUX OFF mode support
+> ? ? ?OMAP4: Remove __INIT from omap_secondary_startup() to re-use it for hotplug.
+> ? ? ?OMAP4: PM: Program CPU1 to hit OFF when off-lined
+> ? ? ?OMAP4: PM: CPU1 wakeup workaround from Low power modes
+> ? ? ?OMAP4: suspend: Add MPUSS power domain RETENTION support
+> ? ? ?OMAP4: PM: Add WakeupGen and secure GIC low power support
+> ? ? ?OMAP4: PM: Add L2X0 cache lowpower support
+> ? ? ?OMAP4: PM: Add MPUSS power domain OSWR support
+> ? ? ?OMAP4: PM: Add power domain statistics support
+> ? ? ?OMAP4: PM: Add CPUidle support
+> ? ? ?OMAP4: cpuidle: Switch to gptimer from twd in deeper C-states.
+> ? ? ?OMAP3: CPUidle: Make use of CPU PM notifiers
+>
+> ?arch/arm/include/asm/mach/map.h ? ? ? ? ? ? ? ? ? ?| ? ?1 +
+> ?arch/arm/include/asm/pgtable.h ? ? ? ? ? ? ? ? ? ? | ? ?3 +
+> ?arch/arm/mach-omap2/Kconfig ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ? ? ? ? ? | ? 15 +-
+> ?arch/arm/mach-omap2/cpuidle34xx.c ? ? ? ? ? ? ? ? ?| ? ?7 +
+> ?arch/arm/mach-omap2/cpuidle44xx.c ? ? ? ? ? ? ? ? ?| ?206 ++++++++++
+> ?arch/arm/mach-omap2/include/mach/barriers.h ? ? ? ?| ? 48 +++
+> ?arch/arm/mach-omap2/include/mach/omap-secure.h ? ? | ? 57 +++
+> ?arch/arm/mach-omap2/include/mach/omap-wakeupgen.h ?| ? 39 ++
+> ?arch/arm/mach-omap2/include/mach/omap4-common.h ? ?| ? 70 +++-
+> ?arch/arm/mach-omap2/omap-headsmp.S ? ? ? ? ? ? ? ? | ? ?5 -
+> ?arch/arm/mach-omap2/omap-hotplug.c ? ? ? ? ? ? ? ? | ? 14 +-
+> ?arch/arm/mach-omap2/omap-mpuss-lowpower.c ? ? ? ? ?| ?398 +++++++++++++++++++
+> ?arch/arm/mach-omap2/omap-secure.c ? ? ? ? ? ? ? ? ?| ? 81 ++++
+> ?arch/arm/mach-omap2/{omap44xx-smc.S => omap-smc.S} | ? 23 ++
+> ?arch/arm/mach-omap2/omap-smp.c ? ? ? ? ? ? ? ? ? ? | ? 38 ++
+> ?arch/arm/mach-omap2/omap-wakeupgen.c ? ? ? ? ? ? ? | ?403 ++++++++++++++++++++
+> ?arch/arm/mach-omap2/omap4-common.c ? ? ? ? ? ? ? ? | ? 93 +++++-
+> ?arch/arm/mach-omap2/omap4-sar-layout.h ? ? ? ? ? ? | ? 50 +++
+> ?arch/arm/mach-omap2/pm.h ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-omap2/pm44xx.c ? ? ? ? ? ? ? ? ? ? ? | ?155 ++++++++-
+> ?arch/arm/mach-omap2/sleep44xx.S ? ? ? ? ? ? ? ? ? ?| ?385 +++++++++++++++++++
+> ?arch/arm/mm/mmu.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?8 +
+> ?arch/arm/plat-omap/common.c ? ? ? ? ? ? ? ? ? ? ? ?| ? ?3 +
+> ?arch/arm/plat-omap/include/plat/omap44xx.h ? ? ? ? | ? ?1 +
+> ?arch/arm/plat-omap/include/plat/sram.h ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/plat-omap/sram.c ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 47 ++-
+> ?27 files changed, 2104 insertions(+), 49 deletions(-)
+> ?create mode 100644 arch/arm/mach-omap2/cpuidle44xx.c
+> ?create mode 100644 arch/arm/mach-omap2/include/mach/barriers.h
+> ?create mode 100644 arch/arm/mach-omap2/include/mach/omap-secure.h
+> ?create mode 100644 arch/arm/mach-omap2/include/mach/omap-wakeupgen.h
+> ?create mode 100644 arch/arm/mach-omap2/omap-mpuss-lowpower.c
+> ?create mode 100644 arch/arm/mach-omap2/omap-secure.c
+> ?rename arch/arm/mach-omap2/{omap44xx-smc.S => omap-smc.S} (70%)
+> ?create mode 100644 arch/arm/mach-omap2/omap-wakeupgen.c
+> ?create mode 100644 arch/arm/mach-omap2/omap4-sar-layout.h
+> ?create mode 100644 arch/arm/mach-omap2/sleep44xx.S
+>
+> Regards
+> Santosh
+>
+> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg47511.html
+>
+> [2] http://www.spinics.net/lists/arm-kernel/msg138803.html
+>
+> [3] https://lkml.org/lkml/2011/9/3/49
+>
+> [4] https://gitorious.org/omap-sw-develoment/linux-omap-dev/commits/v3.1-rc4-omap4-pm-integrated
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
