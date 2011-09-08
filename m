@@ -1,41 +1,49 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 8 Sep 2011 10:56:17 +0300
-Subject: [RFC PATCH 06/10] hwspinlock: OMAP4: Add spinlock support in DT
-In-Reply-To: <4E686B71.2060107@ti.com>
-References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-	<1314191356-10963-7-git-send-email-b-cousson@ti.com>
-	<CAK=WgbYX50R_MCgwdzywgrAEDJkmDSmeSSCuuqst5UBYk_sYow@mail.gmail.com>
-	<4E686B71.2060107@ti.com>
-Message-ID: <CAK=WgbYgatyLWqmrZnUfSGxCkZsRiJ3sbQwmenxyiJ6JBw5vJA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Sep 2011 10:01:30 +0200
+Subject: [PATCH v2] gpio: rewrite U300 GPIO to use gpiolib
+In-Reply-To: <CACxGe6vp7FS3YqOB2QUg+k-qC5t8sGFDjwJb1GSqxuV+BFWE-w@mail.gmail.com>
+References: <1315383085-26352-1-git-send-email-linus.walleij@stericsson.com>
+	<20110907180207.GC9937@ponder.secretlab.ca>
+	<CACxGe6vp7FS3YqOB2QUg+k-qC5t8sGFDjwJb1GSqxuV+BFWE-w@mail.gmail.com>
+Message-ID: <CACRpkdb-0Rc14ist47OeVtRxgj8tU3eDhNujc4RJFZjgG75mbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Thu, Sep 8, 2011 at 7:02 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Wed, Sep 7, 2011 at 11:02 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> On Wed, Sep 07, 2011 at 10:11:25AM +0200, Linus Walleij wrote:
+>>> From: Linus Walleij <linus.walleij@linaro.org>
+>>>
+>>> This rewrites the U300 GPIO so as to use gpiolib and
+>>> struct gpio_chip instead of just generic GPIO, hiding
+>>> all the platform specifics and passing in GPIO chip
+>>> variant as platform data at runtime instead of the
+>>> compiletime kludges.
+>>>
+>>> As a result <mach/gpio.h> is now empty for U300 and
+>>> using just defaults.
+>>>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>>> Cc: Debian kernel maintainers <debian-kernel@lists.debian.org>
+>>> Cc: Arnaud Patard <arnaud.patard@rtp-net.org>
+>>> Reported-by: Ben Hutchings <ben@decadent.org.uk>
+>>> Signed-off-nu: Linus Walleij <linus.walleij@linaro.org>
+>> ? ? ? ? ? ? ^^
+>> Your keyboard needs to be shifted 1cm to the right. :-)
+>>
+>> I'll pick it up, but there are some things that I've commented on
+>> below that needs to be addressed in follow up patches.
 
-On Thu, Sep 8, 2011 at 10:14 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> Hehe, I'm not the one who wrote that driver :-)
->
-> This is not wrong for the current HW. The point is do we want to anticipate
-> potential HW evolution that might never happen on that IP?
+I know this...
+Cut me some slack will ya.
+Atleast it makes things better, not worse.
 
-I originally really thought we can ignore those cases (hence the 0
-base id ;), and personally I still think the scenario is a bit
-fictional, and wouldn't even mind just having omap_hwspinlock_probe()
-return an error if it is unexpectedly probed with a second device.
+> Hmmm, it doesn't apply against mainline. ?Do you want to take it
+> through your tree?
 
-But if fixing this entirely only means doing a small change, then it's
-surely nicer.
+I will feed it to Russells GPIO cleanup branch, where the
+prerequisites are.
 
-> This is no different than the multiple GPIO controllers we have today.
-> Since we cannot rely on the DT nodes order, I added an explicit "id"
-> attribute to provide that information to the driver. And then the baseid is
-> "id * #gpios".
-
-That would work if #hwspinlock is a fixed number, but a "baseid"
-attribute would allow supporting devices with different #hwspinlocks
-per device. Since I am not aware of any real hardware that does this
-kind of blasphemy, I can't say if the latter is really necessary :) If
-you prefer the former, I'm entirely fine with it.
-
-Thanks,
-Ohad.
+Thanks!
+Linus Walleij
