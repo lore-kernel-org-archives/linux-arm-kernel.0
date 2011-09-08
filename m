@@ -1,98 +1,84 @@
-From: jason.hui@linaro.org (Jason Liu)
-Date: Thu, 8 Sep 2011 11:27:27 +0800
-Subject: [PATCH v3 4/4] ARM: i.MX5/mm: consolidate TZIC map code
-In-Reply-To: <1315452447-20205-1-git-send-email-jason.hui@linaro.org>
-References: <1315452447-20205-1-git-send-email-jason.hui@linaro.org>
-Message-ID: <1315452447-20205-5-git-send-email-jason.hui@linaro.org>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 8 Sep 2011 09:16:46 +0530
+Subject: [PATCH 1/2] input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD config
+	option
+In-Reply-To: <20110907182248.GA2874@core.coreip.homeip.net>
+References: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
+	<1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
+	<20110907182248.GA2874@core.coreip.homeip.net>
+Message-ID: <CAJuYYwQg8pMaM7Y-AQD5eDqw32rMOHggL2gWOtJH_ri8gsH-yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can use static mapping for TZIC to get rid of the
-duplicated code for ioremap and the error handling of
-ioremap, which will made code more clean and consistent
+Hi Dmitry,
 
-This patch also removes TZIC mapping for i.mx51 TO1 since
-there is no support for TO1 now since the following commit:
-9ab4650f718a0e1cb8792bab4ef97efca4ac75c2
+On 7 September 2011 23:52, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> Hi Thomas,
+>
+> On Tue, Sep 06, 2011 at 07:25:16PM +0530, Thomas Abraham wrote:
+>> Samsung keyboard driver could be used with platforms using device tree.
+>> So the inclusion of samsung keyboard driver cannot be based on
+>> SAMSUNG_DEV_KEYPAD. A new config option HAVE_SAMSUNG_KEYPAD is added
+>> which device tree based platforms should use to include samsung keyboard
+>> driver.
+>
+> I am sorry, I do not follow... What is the difference between
+> SAMSUNG_DEV_KEYPAD and HAVE_SAMSUNG_KEYPAD? They look exactly the same.
 
-Signed-off-by: Jason Liu <jason.hui@linaro.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
----
-v3: remove the TZIC for i.mx51 TO1 since there is no support for TO1 now.
-v2: Remove the MX51_DEBUG related mapping which is conflict with TZIC.
-    MX51_DEBUG related mapping is dead code, no-one use it.
----
- arch/arm/mach-mx5/mm.c                |   27 ++++-----------------------
- arch/arm/plat-mxc/include/mach/mx51.h |    3 ---
- 2 files changed, 4 insertions(+), 26 deletions(-)
+The inclusion of platform device instance for keypad (in
+arch/arm/plat-samsung/dev-keypad.c) in the build depends on
+SAMSUNG_DEV_KEYPAD. The samsung-keypad driver is also dependent on
+SAMSUNG_DEV_KEYPAD.
 
-diff --git a/arch/arm/mach-mx5/mm.c b/arch/arm/mach-mx5/mm.c
-index 0ca4c6a..c7125ca 100644
---- a/arch/arm/mach-mx5/mm.c
-+++ b/arch/arm/mach-mx5/mm.c
-@@ -25,6 +25,7 @@
-  * Define the MX51 memory map.
-  */
- static struct map_desc mx51_io_desc[] __initdata = {
-+	imx_map_entry(MX51, TZIC, MT_DEVICE),
- 	imx_map_entry(MX51, IRAM, MT_DEVICE),
- 	imx_map_entry(MX51, AIPS1, MT_DEVICE),
- 	imx_map_entry(MX51, SPBA0, MT_DEVICE),
-@@ -35,6 +36,7 @@ static struct map_desc mx51_io_desc[] __initdata = {
-  * Define the MX53 memory map.
-  */
- static struct map_desc mx53_io_desc[] __initdata = {
-+	imx_map_entry(MX53, TZIC, MT_DEVICE),
- 	imx_map_entry(MX53, AIPS1, MT_DEVICE),
- 	imx_map_entry(MX53, SPBA0, MT_DEVICE),
- 	imx_map_entry(MX53, AIPS2, MT_DEVICE),
-@@ -98,33 +100,12 @@ void __init imx50_init_early(void)
- 
- void __init mx51_init_irq(void)
- {
--	unsigned long tzic_addr;
--	void __iomem *tzic_virt;
--
--	if (mx51_revision() < IMX_CHIP_REVISION_2_0)
--		tzic_addr = MX51_TZIC_BASE_ADDR_TO1;
--	else
--		tzic_addr = MX51_TZIC_BASE_ADDR;
--
--	tzic_virt = ioremap(tzic_addr, SZ_16K);
--	if (!tzic_virt)
--		panic("unable to map TZIC interrupt controller\n");
--
--	tzic_init_irq(tzic_virt);
-+	tzic_init_irq(MX51_IO_ADDRESS(MX51_TZIC_BASE_ADDR));
- }
- 
- void __init mx53_init_irq(void)
- {
--	unsigned long tzic_addr;
--	void __iomem *tzic_virt;
--
--	tzic_addr = MX53_TZIC_BASE_ADDR;
--
--	tzic_virt = ioremap(tzic_addr, SZ_16K);
--	if (!tzic_virt)
--		panic("unable to map TZIC interrupt controller\n");
--
--	tzic_init_irq(tzic_virt);
-+	tzic_init_irq(MX53_IO_ADDRESS(MX53_TZIC_BASE_ADDR));
- }
- 
- void __init mx50_init_irq(void)
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index 8da9d7a..ba88550 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -339,7 +339,4 @@ extern int mx51_revision(void);
- extern void mx51_display_revision(void);
- #endif
- 
--/* tape-out 1 defines */
--#define MX51_TZIC_BASE_ADDR_TO1		0x8fffc000
--
- #endif	/* ifndef __MACH_MX51_H__ */
--- 
-1.7.4.1
+In case of device tree based instantiation of keypad, compilation of
+dev-keypad.c file is not required. So SAMSUNG_DEV_KEYPAD config option
+will not be selected.In that case, the compilation of the keypad
+driver cannot be dependent on SAMSUNG_DEV_KEYPAD. There should be
+another option to select the keypad driver and so HAVE_SAMSUNG_KEYPAD
+was introduced. HAVE_SAMSUNG_KEYPAD can be selected on platforms that
+need the samsung-keypad driver but do no need the keypad platform
+device.
+
+Thanks for your review and comments.
+
+Regards,
+Thomas.
+
+>
+> Thanks,
+>
+>>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>> ?drivers/input/keyboard/Kconfig | ? ?9 ++++++++-
+>> ?1 files changed, 8 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+>> index b4dee9d..370fb18 100644
+>> --- a/drivers/input/keyboard/Kconfig
+>> +++ b/drivers/input/keyboard/Kconfig
+>> @@ -423,9 +423,16 @@ config KEYBOARD_PMIC8XXX
+>> ? ? ? ? To compile this driver as a module, choose M here: the module will
+>> ? ? ? ? be called pmic8xxx-keypad.
+>>
+>> +config HAVE_SAMSUNG_KEYPAD
+>> + ? ? bool
+>> + ? ? help
+>> + ? ? ? This will include Samsung Keypad controller driver support. If you
+>> + ? ? ? want to include Samsung Keypad support for any machine, kindly
+>> + ? ? ? select this in the respective mach-xxxx/Kconfig file.
+>> +
+>> ?config KEYBOARD_SAMSUNG
+>> ? ? ? tristate "Samsung keypad support"
+>> - ? ? depends on SAMSUNG_DEV_KEYPAD
+>> + ? ? depends on SAMSUNG_DEV_KEYPAD || HAVE_SAMSUNG_KEYPAD
+>> ? ? ? help
+>> ? ? ? ? Say Y here if you want to use the Samsung keypad.
+>>
+>> --
+>> 1.6.6.rc2
+>>
+>
+> --
+> Dmitry
+>
