@@ -1,65 +1,38 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 8 Sep 2011 11:09:11 -0700
-Subject: [RFC PATCH 05/10] documentation/dt: Add mpu, dsp and iva bindings
-In-Reply-To: <1314191356-10963-6-git-send-email-b-cousson@ti.com>
+Date: Thu, 8 Sep 2011 11:10:01 -0700
+Subject: [RFC PATCH 07/10] documentation/dt: Add spinlock bindings
+In-Reply-To: <1314191356-10963-8-git-send-email-b-cousson@ti.com>
 References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-	<1314191356-10963-6-git-send-email-b-cousson@ti.com>
-Message-ID: <20110908180910.GE2967@ponder.secretlab.ca>
+	<1314191356-10963-8-git-send-email-b-cousson@ti.com>
+Message-ID: <20110908181001.GF2967@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 03:09:11PM +0200, Benoit Cousson wrote:
-> Add documentation for the OMAP4 processors bindings.
+On Wed, Aug 24, 2011 at 03:09:13PM +0200, Benoit Cousson wrote:
+> Add documentation for the HW spinlock in OMAP4.
 > 
 > Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 > Cc: Randy Dunlap <rdunlap@xenotime.net>
 > ---
->  Documentation/devicetree/bindings/arm/omap/dsp.txt |   14 ++++++++
->  Documentation/devicetree/bindings/arm/omap/iva.txt |   18 ++++++++++
->  Documentation/devicetree/bindings/arm/omap/mpu.txt |   35 ++++++++++++++++++++
->  3 files changed, 67 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/dsp.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/iva.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/mpu.txt
+>  .../bindings/hwspinlock/omap-spinlock.txt          |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/hwspinlock/omap-spinlock.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/dsp.txt b/Documentation/devicetree/bindings/arm/omap/dsp.txt
+> diff --git a/Documentation/devicetree/bindings/hwspinlock/omap-spinlock.txt b/Documentation/devicetree/bindings/hwspinlock/omap-spinlock.txt
 > new file mode 100644
-> index 0000000..8fcd82c
+> index 0000000..36ac074
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/omap/dsp.txt
-> @@ -0,0 +1,14 @@
-> +* TI - DSP (Digital Signal Processor)
-> +
-> +TI DSP included in OMAP SoC
+> +++ b/Documentation/devicetree/bindings/hwspinlock/omap-spinlock.txt
+> @@ -0,0 +1,5 @@
+> +HW spinlock on OMAP platform:
 > +
 > +Required properties:
-> +- compatible : Should be "ti,c64" for OMAP3 & 4
-> +- hwmods: "dsp"
-> +
-> +Examples:
-> +
-> +dsp {
-> +    compatible = "ti,omap4-c64", "ti,c64";
-> +    hwmods = "dsp";
-> +};
-> diff --git a/Documentation/devicetree/bindings/arm/omap/iva.txt b/Documentation/devicetree/bindings/arm/omap/iva.txt
-> new file mode 100644
-> index 0000000..f428e88
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/omap/iva.txt
-> @@ -0,0 +1,18 @@
-> +* TI - IVA (Imaging and Video Accelerator) subsystem
-> +
-> +The IVA contain various audio, video or imaging HW accelerator
-> +depending of the version.
-> +
-> +Required properties:
-> +- compatible : Should be:
-> +  - "ti,ivahd", "ti,iva" for OMAP4
-> +  - "ti,iva2", "ti,iva" for OMAP3
-> +  - "ti,iva1", "ti,iva" for OMAP2
+> +- compatible : Must be "ti,omap-spinlock";
 
-Again, be specific to the instantiation and encode the omap version
-into the compatible value.  Use the form "ti,omap4-*", etc.
+"ti,omap-*" is probably too generic. omap3-spinlock or omap4-spinlock
+would be better.
 
-g.
+> +- hwmods : "spinlock"
+> -- 
+> 1.7.0.4
+> 
