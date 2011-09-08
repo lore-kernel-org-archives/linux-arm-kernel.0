@@ -1,77 +1,53 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 8 Sep 2011 12:14:44 +0200
-Subject: [PATCH] ARM: supply a DTB file to be appended
-Message-ID: <1315476884-28470-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Sep 2011 12:29:01 +0200
+Subject: [PATCH 16/18] dmaengine/amba-pl08x: Add support for sg len
+	greater than one for slave transfers
+In-Reply-To: <4E683B74.5000701@st.com>
+References: <cover.1311936523.git.viresh.kumar@st.com>
+	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
+	<20110814083618.GE4986@n2100.arm.linux.org.uk>
+	<4E4CCF7B.8060704@st.com>
+	<20110821083306.GA12028@n2100.arm.linux.org.uk>
+	<4E532B19.6000103@st.com> <4E5715CE.2070806@st.com>
+	<CACRpkdapSvW=eMSoXTOOA2GyhfBLzq2OuyQcDctPxsnVzvr-4g@mail.gmail.com>
+	<4E575E75.40603@st.com> <4E5F594D.10203@st.com>
+	<438BB0150E931F4B9CE701519A4463010871804A4C@bgsmsx502.gar.corp.intel.com>
+	<CAKnu2Mp3Ui7jZS2kjJykjuzcTzJhiAkoaVxZ2+tQX0banGh6mw@mail.gmail.com>
+	<4E683B74.5000701@st.com>
+Message-ID: <CACRpkdaqTYK5TJL2u+aeOfnzhdtdjxZhyu661eGKrNBOXTUTeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Sep 8, 2011 at 5:50 AM, Viresh Kumar <viresh.kumar@st.com> wrote:
 
-This adds a Kconfig string where you can specify a
-file to be appended to the zImage on build, then
-auto-appends it. The idea is to mimic how we supply
-an initramfs image by a similar parameter.
+> If i am getting this clearly, the concern is "why to queue separate transfers for
+> individual sg's? Better would be to prepare the complete list at once and
+> start the transfer, so that DMA stops only after finishing all sg's
+> passed from user." Is this what you are pointing at?
 
-This makes it easy to script the kernel build with
-different device trees, and it also vastly simplifies
-building uImages since "make uImage" will now pick
-up the devcie tree and include it in the final image
-as part of the build process.
+Yes.
 
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Niklas Hernaeus <niklas.hernaeus@linaro.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-This builds on top of Nicos pending appended device tree
-patches. Nico, if this gains some liking, please include
-it in your series.
----
- arch/arm/Kconfig       |   10 ++++++++++
- arch/arm/boot/Makefile |    8 +++++++-
- 2 files changed, 17 insertions(+), 1 deletions(-)
+> If yes, then the same is done in this patch too. An array for llis is allocated at
+> the start, then for each sg i prepare lli list from this array. Last lli from one sg
+> is followed by first lli from next sg. And so i get a continuous chain of llis.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4ea9974..cb8ee68 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1789,6 +1789,16 @@ config ARM_APPENDED_DTB
- 	  (dtb) appended to zImage
- 	  (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
- 
-+config ARM_APPENDED_DTB_FILE
-+	string "DTB file"
-+	depends on ARM_APPENDED_DTB
-+	default ""
-+	help
-+	  This gives the name of file from the build directory to append
-+	  to the zImage after it has been built.
-+
-+	  If you are not sure, leave it blank.
-+
- config ARM_ATAG_DTB_COMPAT
- 	bool "Supplement the appended DTB with traditional ATAG information"
- 	depends on ARM_APPENDED_DTB
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index a1edfd5..5ab6abf 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -53,8 +53,14 @@ $(obj)/Image: vmlinux FORCE
- $(obj)/compressed/vmlinux: $(obj)/Image FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
- 
--$(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
-+# Rule to optionally append a DTB
-+dtbfile := $(shell echo $(CONFIG_ARM_APPENDED_DTB_FILE))
-+quiet_cmd_append = CAT     $@
-+      cmd_append = (cat /dev/null $(dtbfile) >> $@)
-+
-+$(obj)/zImage:	$(obj)/compressed/vmlinux $(dtbfile) FORCE
- 	$(call if_changed,objcopy)
-+	$(call if_changed,append)
- 	@echo '  Kernel: $@ is ready'
- 
- endif
--- 
-1.7.3.2
+OK so I guess I was lost in the code ...
+
+So this is mainy cached as txd->dsg_list so you can quickly retrieve the
+number of bytes pending in the LLI by traversing that sglist.
+
+This is better than what the coh901318 does, because that driver
+resorts to going into the physical LLIs themselves to retrieve this
+info.
+
+It also seems like this will play nice with Per Forlin's MMC
+speed-up patches, so that will become effective for your MMC
+usecases.
+
+Now I really like this patch.
+
+Sorry for being such a slow learner!
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
