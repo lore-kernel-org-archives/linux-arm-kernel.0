@@ -1,33 +1,41 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 8 Sep 2011 13:01:49 +0100
-Subject: [Android-virt] KVM ARM interrupt virtualization
-In-Reply-To: <4E6899B5.70608@gmail.com>
-References: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>
-	<CAHkRjk6Vm2yNLm8Gzk3+4mYAfiXVjufv2xc0Kc-6ac-oS4zytw@mail.gmail.com>
-	<CAOMgcGJBoeKJ8FjDW9eESfT+FiXmFF9PfShJ=a2adbESLD2YkA@mail.gmail.com>
-	<20110908085449.GA29243@e102109-lin.cambridge.arm.com>
-	<4E6899B5.70608@gmail.com>
-Message-ID: <CAFEAcA8=mGUP0dXTNXM6y9RDtWWEkJ2YhuavMBW-3BFfbOPS0g@mail.gmail.com>
+From: abhilash.kv@ti.com (Abhilash K V)
+Date: Thu, 8 Sep 2011 17:34:09 +0530
+Subject: [PATCH v3 0/2] AM3517: Booting up
+Message-ID: <1315483449-17460-1-git-send-email-abhilash.kv@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 September 2011 11:32, bill4carson <bill4carson@gmail.com> wrote:
-> There is much more involved if I want to use A15 as Guest OS,
-> cause Qemu haven't got any A15 support yet.
+This patch-set gets the kernel booting up on a AM3517 EVM.
+The board is able to boot with ramdisk after this,but the MMC and Ethernet
+drivers are not up yet. Lots of warnings remain which will be addressed in
+subsequent patches.
 
-In the interests of not accidentally duplicating work, I should
-mention that QEMU A15 work is on my (Linaro) todo list; basically
-I'm thinking in terms of adding enough support to boot an A15
-Linux guest, but not actually implementing emulation of the
-virtualization/LPAE extensions. If you'd like to do some of the
-work here we should probably coordinate on that...
+The patches are tested on master of tmlind/linux-omap-2.6.git.
+Kernel version is 3.1-rc3 and last commit on top of which these patches
+were added is:
+	b148d763841161894ed6629794064065a834aa2b: Linux-omap rebuilt: Updated to
+	use omap_sdrc_init
 
-The Fast Model Versatile Express platform (including its memory
-map) is documented here:
-http://infocenter.arm.com/help/topic/com.arm.doc.dui0423j/BEIEAGAA.html
+with the folowing commit reverted:
+	f3637a5f2e2eb391ff5757bc83fb5de8f9726464: irq: Always set IRQF_ONESHOT
+	if no primary handler is specified
 
-The memory maps (legacy A9 and "Cortex A-Series") for VE
-hardware are here:
-http://infocenter.arm.com/help/topic/com.arm.doc.dui0447e/CACIHGFE.html
 
--- PMM
+Cc: Sanjeev Premi <premi@ti.com>
+---
+Changes in v3:
+ Presence of SR feature is now used to decide if TWL4030 initialisation is to
+ be done or not.
+	
+Abhilash K V (2):
+  AM35x: Using OMAP3 generic hwmods
+  omap_twl: Prevent SR to enable for am3517/am3505 devices
+
+ arch/arm/mach-omap2/id.c                     |    2 +-
+ arch/arm/mach-omap2/io.c                     |   11 +++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c             |    3 ++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   18 ++++++++++++++++++
+ arch/arm/mach-omap2/pm.c                     |    3 ++-
+ arch/arm/plat-omap/include/plat/cpu.h        |    2 ++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 +++
+ 7 files changed, 39 insertions(+), 3 deletions(-)
