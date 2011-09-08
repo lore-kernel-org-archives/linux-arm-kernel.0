@@ -1,44 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Sep 2011 16:56:33 +0200
-Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level debug
-	uart
-In-Reply-To: <alpine.LFD.2.00.1109071128040.20358@xanadu.home>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<20110907142350.GU6619@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109071128040.20358@xanadu.home>
-Message-ID: <201109081656.33404.arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 8 Sep 2011 15:59:46 +0100
+Subject: [PATCH v3] net/smsc911x: add device tree probe support
+In-Reply-To: <1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+	<1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110908145946.GE2070@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 September 2011, Nicolas Pitre wrote:
-> On Wed, 7 Sep 2011, Russell King - ARM Linux wrote:
-> 
-> > On Wed, Sep 07, 2011 at 02:36:35PM +0200, Uwe Kleine-K?nig wrote:
-> > > But only if the image doesn't support imx6q, right? Anyhow, I hope
-> > > imx6q_map_io isn't called for pre-imx6q SoCs. Ah, and I hope we don't
-> > > need to argue here as Russell doesn't like the new DEBUG_LL changes :-)
-> > 
-> > I have no problem with the Kconfig menu approach or existing approaches
-> > to DEBUG_LL.  What I have an objection to is trying to stuff the
-> > information for it into places which ultimately render the facility
-> > useless for its intended purpose - to permit debugging the really
-> > early assembly code.
-> > 
-> > That is what it was written for: if we introduce complicated ways to
-> > put behind it, we'll need to come up with a completely new debugging
-> > infrastructure to debug the now buggered debugging infrastructure.
-> 
-> For the record I now agree with Russell.
-> 
-> In order to have early serial output that works across multiple SOCs in 
-> the same kernel image intended to non developers we'll have to add a 
-> parallel infrastructure.  Keeping the DEBUG_LL code as simple as 
-> possible for developers is the way to go (and that might be needed to 
-> debug that parallel infrastructure).
+Hi Shawn,
 
-Yes, agreed. It should not be too hard to provide more CON_BOOT consoles.
-For 8250, this can actually be done already using the code from
-drivers/tty/serial/8250_early.c with a custom command line, but there
-are better ways to do that in a generic way.
+On Sun, Jul 31, 2011 at 02:26:00AM +0800, Shawn Guo wrote:
+> It adds device tree probe support for smsc911x driver.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Steve Glendinning <steve.glendinning@smsc.com>
+> Cc: David S. Miller <davem@davemloft.net>
+> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+> ---
+> Changes since v2:
+>  * Fix a typo in smsc911x.txt
+> 
+> Changes since v1:
+>  * Instead of getting irq line from gpio number, it use irq domain
+>    to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
+>  * Use 'lan9115' the first model that smsc911x supports in the match
+>    table
+>  * Use reg-shift and reg-io-width which already used in of_serial for
+>    shift and access size binding
 
-	Arnd
+When using this patch with vexpress, I found that 16-bit register access
+mode doesn't seem to be getting set correctly.
+
+Can you take a look at this additional patch and let me know if it looks
+correct?
+
+Cheers
+---Dave
+
+From: Dave Martin <dave.martin@linaro.org>
+Date: Wed, 7 Sep 2011 17:26:31 +0100
+Subject: [PATCH] net/smsc911x: Correctly configure 16-bit register access from DT
+
+The SMSC911X_USE_16BIT needs to be set when using 16-bit register
+access.  However, currently no flag is set if the DT doesn't specify
+32-bit access.
+
+This patch should set the SMSC911X_USE_16BIT flag in a manner consistent
+with the documented DT bindings.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ drivers/net/smsc911x.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
+index 75c08a5..1a35c25 100644
+--- a/drivers/net/smsc911x.c
++++ b/drivers/net/smsc911x.c
+@@ -2121,6 +2121,8 @@ static int __devinit smsc911x_probe_config_dt(
+ 	of_property_read_u32(np, "reg-io-width", &width);
+ 	if (width == 4)
+ 		config->flags |= SMSC911X_USE_32BIT;
++	else
++		config->flags |= SMSC911X_USE_16BIT;
+ 
+ 	if (of_get_property(np, "smsc,irq-active-high", NULL))
+ 		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
+-- 
+1.7.4.1
