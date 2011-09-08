@@ -1,90 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Sep 2011 17:24:52 +0100
-Subject: [PATCH 6/6] arm/imx6q: add suspend/resume support
-In-Reply-To: <20110908152222.GA31581@S2100-06.ap.freescale.net>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-7-git-send-email-shawn.guo@linaro.org>
-	<CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
-	<20110908062301.GK8148@S2100-06.ap.freescale.net>
-	<20110908074718.GA14953@n2100.arm.linux.org.uk>
-	<20110908152222.GA31581@S2100-06.ap.freescale.net>
-Message-ID: <20110908162452.GA20292@n2100.arm.linux.org.uk>
+From: rpimentel.silva@gmail.com (Rogerio Pimentel)
+Date: Thu, 8 Sep 2011 13:30:09 -0300
+Subject: [PATCH 1/4] ARM: mx53: Add pads for flexcan pins
+In-Reply-To: <20110906193258.GN28816@pengutronix.de>
+References: <1315335696-20499-1-git-send-email-rogerio.pimentel@freescale.com>
+	<20110906193258.GN28816@pengutronix.de>
+Message-ID: <CAOkaPuW+6tOFKHSbG+4254t=agqYT480X6bJCP9zicE4VHnvdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2011 at 11:22:23PM +0800, Shawn Guo wrote:
-> On Thu, Sep 08, 2011 at 08:47:18AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Sep 08, 2011 at 02:23:02PM +0800, Shawn Guo wrote:
-> > > Yes, if you lose L2 power in suspend, it's the easiest way for you to
-> > > resume L2.
-> > > 
-> > > For my case which retains L2, I actually do not want to call this
-> > > function which will invalidate L2.  But since we still have problem
-> > > to use rmk's generic suspend/resume updates (ARM: pm: add L2 cache
-> > > cleaning for suspend), we have to flush the entire L2 on imx6q for now.
-> > 
-> > OMAP44xx has the same problem but they re-initialize L2 on resume in
-> > their pre-cpu_resume() assembly code.
-> > 
-> Are you suggesting that this might be the reason why imx6q has problem
-> with your patch?
+2011/9/6 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+...
+>> ?#define PAD_CTRL_I2C (PAD_CTL_SRE_FAST | PAD_CTL_ODE | PAD_CTL_PKE | \
+>> ? ? ? ? ? ? ? ? ? ? ? PAD_CTL_PUE | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP \
+>> ? ? ? ? ? ? ? ? ? ? ? | PAD_CTL_HYS)
+>> +#define MX53_CAN_PAD_CTRL ? ?(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PAD_CTL_HYS)
+>> +#define MX53_PAD_CTRL_1 ? ? ?(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PAD_CTL_HYS | PAD_CTL_PUS_100K_UP)
+> Hmm, isn't there a better name for this define? Maybe
+> MX53_CAN_RX_PAD_CTRL and MX53_CAN_TX_PAD_CTRL?
 
-Consider the mechanics of what is happening.
+CAN_RX uses a common pad config that will be used on further pin
+configs, so I think it will be redundant if I create two defines with
+the same config. You can see some other pins configured using
+MX53_PAD_CTRL_1 on Freescale Kernel:
+http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/plat-mxc/include/mach/iomux-mx53.h;h=4f28c0f48d299bf7b4399f964c433205549aba2d;hb=imx_2.6.35
+...
 
-On suspend, when we enter cpu_suspend(), we assume the L2 cache is
-still enabled.
+>> ?#define _MX53_PAD_GPIO_19__KPP_COL_5 ? ? ? ? IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
+>> ?#define _MX53_PAD_GPIO_19__GPIO4_5 ? ? ? ? ? IOMUX_PAD(0x348, 0x20, 1, 0x0, 0, 0)
+>> @@ -1243,14 +1247,14 @@
+>> ?#define MX53_PAD_KEY_ROW1__USBPHY1_RXVALID ? ? ? ? ? (_MX53_PAD_KEY_ROW1__USBPHY1_RXVALID | MUX_PAD_CTRL(NO_PAD_CTRL))
+>> ?#define MX53_PAD_KEY_COL2__KPP_COL_2 ? ? ? ? (_MX53_PAD_KEY_COL2__KPP_COL_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>> ?#define MX53_PAD_KEY_COL2__GPIO4_10 ? ? ? ? ?(_MX53_PAD_KEY_COL2__GPIO4_10 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>> -#define MX53_PAD_KEY_COL2__CAN1_TXCAN ? ? ? ? ? ? ? ?(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+>> +#define MX53_PAD_KEY_COL2__CAN1_TXCAN ? ? ? ? ? ? ? ?(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(MX53_PAD_CTRL_1))
+> I wonder if this change is universal. If an external pull-up is
+> assembled using MX53_CAN_PAD_CTRL would be fine? (Note, I don't know if
+> it is sensible to do so.)
 
-We _always_ assume that L1 cache state is lost, so we always flush the
-entire L1 cache.
-
-As SoCs can (and do) preserve the L2 contents over suspend/resume cycles,
-we leave it to the platform's finisher to decide whether it needs to
-flush the entire L2 cache to RAM or not.
-
-If L2 is preserved, then we want to ensure that as much data as possible
-is retained in the L2 cache (if the hardware preserves its contents, we
-don't want waste time flushing data out of the cache needlessly -
-especially if we're using these paths for cpuidle.)  However, we need
-access to a certain amount of data to bring the system back up, and as
-the L2 cache typically will not be searched before the MMU is enabled,
-we have to flush out a certain minimal amount of data (the location
-of the stacked restore information and the stacked restore information
-itself.)
-
-However, we don't flush out anything else from the L2 cache.
-
-Now, upon resume, the resume code will be able to read the data it needs
-to restore the system as we ensured that was flushed out to memory - as
-I mentioned above, the L2 cache won't be searched for this irrespective
-of whether the control registers have enabled it or not.
-
-We will continue to the point where we hit the first bit of information
-stored in L2, which will probably be the stacked SVC register set.  If
-at this point we're not able to search the L2 cache, then we'll read
-stale data from the backing memory instead, and the system will crash.
-
-Consider what generic code could do about this - if we flushed out that
-register set to memory, then we could get past that point - but we then
-would need to call a function to enable the L2 cache.  What if that
-function needs data which is sitting in the L2 cache to function (eg,
-it may need values from the device tree).  We would need to ensure
-that that data were also flushed out of the L2 cache.  What about
-spinlocks?  Maybe some other CPU has dragged the spinlock data into
-the L2 cache.  That gets _much_ harder to solve.
-
-Now to the physical act of enabling the L2 cache.  The L2 cache control
-registers are subject to security restrictions when running in non-secure
-mode, needing platform specific SMC calls to reprogram the cache.  Generic
-code is unable to do this.
-
-Hence why it's left up to the platform to figure out how to enable the
-L2 cache before calling cpu_resume().  The platform is best placed to
-work out what it needs to do to setup the L2 cache so that the L2 cache
-is available by the time the system control register is written, enabling
-the MMU and caches.
-
-> Are we supposed to re-initialize L2 before calling
-> into generic cpu_resume()?
-
-So, the above is the long way of saying "yes" to this question.  I hope
-it gives the full picture about why this is so.
+At least on i.MX53 ARD board an internal pull up is used without any
+pull up resistor on the board. It avoids an extra component on board.
