@@ -1,102 +1,73 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 8 Sep 2011 11:07:07 -0700
-Subject: [RFC PATCH 04/10] arm/dts: OMAP4: Add mpu, dsp and iva nodes
-In-Reply-To: <1314191356-10963-5-git-send-email-b-cousson@ti.com>
-References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-	<1314191356-10963-5-git-send-email-b-cousson@ti.com>
-Message-ID: <20110908180707.GD2967@ponder.secretlab.ca>
+From: dave@linux.vnet.ibm.com (Dave Hansen)
+Date: Thu, 08 Sep 2011 11:05:52 -0700
+Subject: [PATCH 2/8] mm: alloc_contig_freed_pages() added
+In-Reply-To: <1313764064-9747-3-git-send-email-m.szyprowski@samsung.com>
+References: <1313764064-9747-1-git-send-email-m.szyprowski@samsung.com>
+	<1313764064-9747-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1315505152.3114.9.camel@nimitz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 03:09:10PM +0200, Benoit Cousson wrote:
-> Add nodes for devices used by PM code (mpu, dsp, iva).
-> 
-> Add an empty cpus node as well as recommended in the DT spec.
-> 
-> Remove mpu, dsp, iva devices init if CONFIG_OF is defined.
-> Ideally the whole function should be removed. It will be doable as
-> soon as the OMAP3 DT support will be added.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Kevin Hilman <khilman@ti.com>
-> ---
->  arch/arm/boot/dts/omap4.dtsi |   28 ++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/pm.c     |    5 ++++-
->  2 files changed, 32 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index 928a74c..a3efe76 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -25,11 +25,39 @@
->  	};
->  
->  	/*
-> +	 * XXX: The cpus node is mandatory, but since the CPUs are as well part
-> +	 * of the mpu subsystem below, it is not clear where the information
-> +	 * should be. Maybe here with a phandle inside the mpu?
-> +	 */
-> +	cpus {
-> +	};
+On Fri, 2011-08-19 at 16:27 +0200, Marek Szyprowski wrote:
+> +unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
+> +				       gfp_t flag)
+> +{
+> +	unsigned long pfn = start, count;
+> +	struct page *page;
+> +	struct zone *zone;
+> +	int order;
 > +
-> +	/*
->  	 * The soc node represents the soc top level view. It is uses for IPs
->  	 * that are not memory mapped in the MPU view or for the MPU itself.
->  	 */
->  	soc {
->  		compatible = "ti,omap-infra";
-> +		mpu {
-> +			compatible = "ti,omap4-mpu";
-> +			hwmods = "mpu";
-> +			cpu at 0 {
-> +				compatible = "arm,cortex-a9";
-> +			};
-> +			cpu at 1 {
-> +				compatible = "arm,cortex-a9";
-> +			};
-> +		};
-> +
-> +		dsp {
-> +			compatible = "ti,omap4-c64", "ti,c64";
-> +			hwmods = "dsp";
-> +		};
-> +
-> +		iva {
-> +			compatible = "ti,ivahd", "ti,iva";
-> +			hwmods = "iva";
-> +		};
->  	};
->  
->  	/*
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index 832577a..ba4d187 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -49,15 +49,18 @@ static int _init_omap_device(char *name)
->   */
->  static void omap2_init_processor_devices(void)
->  {
-> -	_init_omap_device("mpu");
->  	if (omap3_has_iva())
->  		_init_omap_device("iva");
->  
->  	if (cpu_is_omap44xx()) {
-> +#ifndef CONFIG_OF
-> +		_init_omap_device("mpu");
->  		_init_omap_device("l3_main_1");
->  		_init_omap_device("dsp");
->  		_init_omap_device("iva");
-> +#endif
+> +	VM_BUG_ON(!pfn_valid(start));
+> +	zone = page_zone(pfn_to_page(start));
 
-Ditto here, turning on CONFIG_OF should not be an either/or option
-with ATAGs support.
+This implies that start->end are entirely contained in a single zone.
+What enforces that?  If some higher layer enforces that, I think we
+probably need at least a VM_BUG_ON() in here and a comment about who
+enforces it.
 
->  	} else {
-> +		_init_omap_device("mpu");
->  		_init_omap_device("l3_main");
->  	}
->  }
-> -- 
-> 1.7.0.4
-> 
+> +	spin_lock_irq(&zone->lock);
+> +
+> +	page = pfn_to_page(pfn);
+> +	for (;;) {
+> +		VM_BUG_ON(page_count(page) || !PageBuddy(page));
+> +		list_del(&page->lru);
+> +		order = page_order(page);
+> +		zone->free_area[order].nr_free--;
+> +		rmv_page_order(page);
+> +		__mod_zone_page_state(zone, NR_FREE_PAGES, -(1UL << order));
+> +		pfn  += 1 << order;
+> +		if (pfn >= end)
+> +			break;
+> +		VM_BUG_ON(!pfn_valid(pfn));
+> +		page += 1 << order;
+> +	}
+
+This 'struct page *'++ stuff is OK, but only for small, aligned areas.
+For at least some of the sparsemem modes (non-VMEMMAP), you could walk
+off of the end of the section_mem_map[] when you cross a MAX_ORDER
+boundary.  I'd feel a little bit more comfortable if pfn_to_page() was
+being done each time, or only occasionally when you cross a section
+boundary.
+
+This may not apply to what ARM is doing today, but it shouldn't be too
+difficult to fix up, or to document what's going on.
+
+> +	spin_unlock_irq(&zone->lock);
+> +
+> +	/* After this, pages in the range can be freed one be one */
+> +	page = pfn_to_page(start);
+> +	for (count = pfn - start; count; --count, ++page)
+> +		prep_new_page(page, 0, flag);
+> +
+> +	return pfn;
+> +}
+> +
+> +void free_contig_pages(struct page *page, int nr_pages)
+> +{
+> +	for (; nr_pages; --nr_pages, ++page)
+> +		__free_page(page);
+> +}
+
+The same thing about 'struct page' pointer math goes here.
+
+-- Dave
