@@ -1,53 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  8 Sep 2011 18:00:09 +0100
-Subject: [RFC PATCH 0/3] Per SoC descriptor
-Message-ID: <1315501212-1820-1-git-send-email-marc.zyngier@arm.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 8 Sep 2011 10:03:52 -0700
+Subject: [PATCH v2 2/3] ARM: iwmmxt: Port problematic iwmmxt support code
+	to v7/Thumb-2
+In-Reply-To: <201109081845.58260.arnd@arndb.de>
+References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
+	<1315497854-13311-3-git-send-email-dave.martin@linaro.org>
+	<201109081845.58260.arnd@arndb.de>
+Message-ID: <CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is my first stab at an idea that has floated around for a while,
-which is to have a per-soc descriptor containing most of the SoC
-specific operations, which should clear the path a bit more towards
-the single zImage holy grail. It's as far as possible from being
-perfect, but I thought I'd share it as early as possible and see what
-people think of it.
+On Thu, Sep 8, 2011 at 9:45 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 08 September 2011, Dave Martin wrote:
+>> The iwmmxt code contains some code to implement a pseudo-ISB, but
+>> this is not buildable for Thumb-2.
+>>
+>> This patch replaces the pseudo-ISB with a real one for Thumb-2
+>> kernels.
+>>
+>> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+>> ---
+>> ?arch/arm/kernel/iwmmxt.S | ? ?9 +++++++++
+>> ?1 files changed, 9 insertions(+), 0 deletions(-)
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
 
-This first patch series introduces the arm_soc_desc structure, adds
-per-soc SMP and CPU hotplug operations, and converts both RealView and
-VExpress to this new scheme.
+Maybe it'll be much simpler to have something like below:
 
-There's a number of things I'm happy with yet in that patch series:
-- the per-soc descriptor init is ugly
-- all descriptors are kept around forever
+diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+index a087838..5998f7d 100644
+--- a/arch/arm/kernel/iwmmxt.S
++++ b/arch/arm/kernel/iwmmxt.S
+@@ -319,8 +319,9 @@ ENTRY(iwmmxt_task_switch)
+        PJ4(eor r1, r1, #0xf)
+        PJ4(mcr p15, 0, r1, c1, c0, 2)
 
-I plan to address those in the future (if this patch series has any!).
+-       mrc     p15, 0, r1, c2, c0, 0
+-       sub     pc, lr, r1, lsr #32             @ cpwait and return
++       XSC(mrc p15, 0, r1, c2, c0, 0)
++       PJ4(isb)
++       mov     pc, lr                          @ cpwait and return
 
-It's been tested on VExpress (A5 and A15) and RealView EB-11MP.
-
-Marc Zyngier (3):
-  ARM: SoC: Introduce per SoC descriptor
-  ARM: SoC: Add per SoC SMP and CPU hotplug operations
-  ARM: SoC: convert VExpress/RealView to SoC descriptor
-
- arch/arm/include/asm/mach/arch.h               |    2 +
- arch/arm/include/asm/soc.h                     |   38 +++++++++++++++++++
- arch/arm/kernel/setup.c                        |    5 ++
- arch/arm/kernel/smp.c                          |   48 ++++++++++++++++++++++++
- arch/arm/mach-realview/core.c                  |   19 +++++++++
- arch/arm/mach-realview/core.h                  |    9 ++++
- arch/arm/mach-realview/hotplug.c               |    6 +-
- arch/arm/mach-realview/platsmp.c               |    4 +-
- arch/arm/mach-realview/realview_eb.c           |    1 +
- arch/arm/mach-realview/realview_pb1176.c       |    1 +
- arch/arm/mach-realview/realview_pb11mp.c       |    1 +
- arch/arm/mach-realview/realview_pba8.c         |    1 +
- arch/arm/mach-realview/realview_pbx.c          |    1 +
- arch/arm/mach-vexpress/core.h                  |    6 +++
- arch/arm/mach-vexpress/hotplug.c               |    6 +-
- arch/arm/mach-vexpress/platsmp.c               |    4 +-
- arch/arm/mach-vexpress/v2m.c                   |   20 ++++++++++
- arch/arm/plat-versatile/include/plat/platsmp.h |   13 ++++++
- arch/arm/plat-versatile/platsmp.c              |    4 +-
- 19 files changed, 177 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm/include/asm/soc.h
- create mode 100644 arch/arm/plat-versatile/include/plat/platsmp.h
+ /*
+  * Remove Concan ownership of given task
