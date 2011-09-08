@@ -1,73 +1,87 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Thu, 08 Sep 2011 11:05:52 -0700
-Subject: [PATCH 2/8] mm: alloc_contig_freed_pages() added
-In-Reply-To: <1313764064-9747-3-git-send-email-m.szyprowski@samsung.com>
-References: <1313764064-9747-1-git-send-email-m.szyprowski@samsung.com>
-	<1313764064-9747-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1315505152.3114.9.camel@nimitz>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 8 Sep 2011 11:04:26 -0700
+Subject: [PATCH v2 2/5] cpu_pm: call notifiers during suspend
+In-Reply-To: <87wrdjku9h.fsf@ti.com>
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315060755-4613-3-git-send-email-santosh.shilimkar@ti.com>
+	<87k49knmrw.fsf@ti.com> <4E684F90.7010809@ti.com>
+	<87wrdjku9h.fsf@ti.com>
+Message-ID: <CAMbhsRQvft4dqhAc4j_bXDR8018zeoSRXuWC6bS-d8rA0PgOyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-08-19 at 16:27 +0200, Marek Szyprowski wrote:
-> +unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
-> +				       gfp_t flag)
-> +{
-> +	unsigned long pfn = start, count;
-> +	struct page *page;
-> +	struct zone *zone;
-> +	int order;
-> +
-> +	VM_BUG_ON(!pfn_valid(start));
-> +	zone = page_zone(pfn_to_page(start));
+On Thu, Sep 8, 2011 at 7:01 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Santosh <santosh.shilimkar@ti.com> writes:
+>
+>> On Thursday 08 September 2011 01:32 AM, Kevin Hilman wrote:
+>>> Santosh Shilimkar<santosh.shilimkar@ti.com> ?writes:
+>>>
+>>>> From: Colin Cross<ccross@android.com>
+>>>>
+>>>> Implements syscore_ops in cpu_pm to call the cpu and
+>>>> cpu cluster notifiers during suspend and resume,
+>>>> allowing drivers receiving the notifications to
+>>>> avoid implementing syscore_ops.
+>>>>
+>>>> Signed-off-by: Colin Cross<ccross@android.com>
+>>>> [santosh.shilimkar at ti.com: Rebased against 3.1-rc4]
+>>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>>
+>>> I don't think using syscore_ops is right here. ?The platform code should
+>>> decide where in its own suspend path the notifiers should be triggered.
+>>>
+>>> The reason is because while the syscore_ops run late in the suspend
+>>> path, they still run before some platform-specific decisions about the
+>>> low-power states are made. ?That means that any notifiers that need to
+>>> use information about the target low-power state (e.g. whether context
+>>> will be lost or not) cannot do so since that information has not yet
+>>> been decided until the platform_suspend_ops->enter() runs.
+>>>
+>> Initially I thought the same but in general S2R, platform doesn't
+>> support multiple states like CPUIDLE. On OMAP, we do have a debug
+>> option to choose the state but on real product, it's always the
+>> deepest supported state is used. So the driver saving the
+>> full context for S2R, should be fine.
+>>
+>> Ofcourse for CPUIDLE, the notifier call chain decisions are left
+>> with platform CPUIDLE drivers since there can be multiple low
+>> power states and the context save/restore has to be done based
+>> on low power states.
+>>
+>> The advantage with this is, the platform code is clean from the
+>> notfiers calls. CPUIDLE driver needs to call the different notifier
+>> events based on C-states and that perfectly works.
+>>
+>> I liked this simplification for the S2R. Down side is in S2R if you
+>> don't plan to hit deepest state, drivers end up saving full context
+>> which is fine I guess.
+>
+> That's not the downside I'm worried about.
+>
+> If you have a driver that has a notifier, presumably it has something it
+> wants to do to prepare for suspend *and* for idle, and you'd only want a
+> single notifier callback in the driver to be used for both. ?That
+> callback would look something like:
+>
+> ? start_preparing_for_suspend();
+>
+> ? if (next_state == OFF)
+> ? ? ?save_context();
+>
+> ? finish_preparing_for_suspend();
+>
+>
+> The problem with the current cpu_*_pm_enter() calls in syscore_ops is
+> that they happen before the next states are programmed, so during
+> suspend the 'if (next_state == off)' above would never be true, but
+> during idle it might be.
 
-This implies that start->end are entirely contained in a single zone.
-What enforces that?  If some higher layer enforces that, I think we
-probably need at least a VM_BUG_ON() in here and a comment about who
-enforces it.
+These notifiers are designed for drivers that are tightly coupled to
+the cpu, and shared across multiple architectures (mostly GIC and
+VFP).  In practice, all of these devices are off in every suspend
+state, because nobody leaves the CPU on in suspend.
 
-> +	spin_lock_irq(&zone->lock);
-> +
-> +	page = pfn_to_page(pfn);
-> +	for (;;) {
-> +		VM_BUG_ON(page_count(page) || !PageBuddy(page));
-> +		list_del(&page->lru);
-> +		order = page_order(page);
-> +		zone->free_area[order].nr_free--;
-> +		rmv_page_order(page);
-> +		__mod_zone_page_state(zone, NR_FREE_PAGES, -(1UL << order));
-> +		pfn  += 1 << order;
-> +		if (pfn >= end)
-> +			break;
-> +		VM_BUG_ON(!pfn_valid(pfn));
-> +		page += 1 << order;
-> +	}
-
-This 'struct page *'++ stuff is OK, but only for small, aligned areas.
-For at least some of the sparsemem modes (non-VMEMMAP), you could walk
-off of the end of the section_mem_map[] when you cross a MAX_ORDER
-boundary.  I'd feel a little bit more comfortable if pfn_to_page() was
-being done each time, or only occasionally when you cross a section
-boundary.
-
-This may not apply to what ARM is doing today, but it shouldn't be too
-difficult to fix up, or to document what's going on.
-
-> +	spin_unlock_irq(&zone->lock);
-> +
-> +	/* After this, pages in the range can be freed one be one */
-> +	page = pfn_to_page(start);
-> +	for (count = pfn - start; count; --count, ++page)
-> +		prep_new_page(page, 0, flag);
-> +
-> +	return pfn;
-> +}
-> +
-> +void free_contig_pages(struct page *page, int nr_pages)
-> +{
-> +	for (; nr_pages; --nr_pages, ++page)
-> +		__free_page(page);
-> +}
-
-The same thing about 'struct page' pointer math goes here.
-
--- Dave
+The (next_state == OFF) api you refer to would have to be something
+architecture specific, since the power state handling is very
+different on every platform, so it's not something that would ever be
+included in drivers that I imagined would be using these notifiers.
