@@ -1,29 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Sep 2011 16:40:05 +0200
-Subject: [RFC PATCH 2/3] ARM: iwmmxt: Port problematic iwmmxt support code
-	to v7/Thumb-2
-In-Reply-To: <20110908113354.GC2070@arm.com>
-References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
-	<20110908090122.GC14953@n2100.arm.linux.org.uk>
-	<20110908113354.GC2070@arm.com>
-Message-ID: <201109081640.06094.arnd@arndb.de>
+Date: Thu, 8 Sep 2011 16:47:55 +0200
+Subject: [RFC PATCH 06/10] hwspinlock: OMAP4: Add spinlock support in DT
+In-Reply-To: <CAK=WgbbN-RYj2quMQOyYbEBBfV3gty4dOE7DgjvsRcoYO=F3kw@mail.gmail.com>
+References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
+	<4E6877A9.3090104@ti.com>
+	<CAK=WgbbN-RYj2quMQOyYbEBBfV3gty4dOE7DgjvsRcoYO=F3kw@mail.gmail.com>
+Message-ID: <201109081647.55377.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 September 2011, Dave Martin wrote:
-> On Thu, Sep 08, 2011 at 10:01:22AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Sep 08, 2011 at 09:58:00AM +0100, Dave Martin wrote:
-> > > I take pj4 and older platforms can never be built in the same kernel?
-> > > Otherwise, this approach is totally broken anyway-- we'll generate code
-> > > which won't run on some of the kernel's supported platforms.
-> > 
-> > We have a well enforced split between ARMv5 and older CPUs, and ARMv6
-> > and later CPUs.
+On Thursday 08 September 2011, Ohad Ben-Cohen wrote:
+> On Thu, Sep 8, 2011 at 11:07 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> > The (small) issue for my point of view is that the #hwspinlock is already
+> > encoded in the IP itself. So adding a baseid directly in DT will look like
+> > duplicating indirectly something that is already there in the HW.
+> > That being said, since we cannot rely on the order, we will not be able to
+> > get the proper baseid until the driver probe every hwspinlock devices :-(
+> > So baseid might be a easier choice.
 > 
-> Good point -- OK, I guess we don't need to worry about that scenario.
+> Sounds good. Thanks a lot !
 
-I actually have a patch that enforces this rule in Kconfig for pxa.
-Right now, you can happily select any combination of boards, which
-blows up very early during the build phase if you combine v5 and v7.
+I think a number would work here but is not optimal for the device tree
+representation. I think a better binding would be to encode it like
+interrupt numbers, where every device that uses a hwspinlock will describe
+that as a combination of phandle to the hwspinlock controller and
+identifier to be used by that controller, e.g.
+
+	spinlock1 {
+		compatible = "ti,omap-spinlock";
+		regs = ...
+		interrupts = <42>;
+		interrupt-parent = &irq-controller;
+	};
+
+	dsp {
+		compatible = ...
+		regs = ...
+		spinlocks = <23>; // local number withing &spinlock1;
+		spinlock-controller = &spinlock1;
+	};
+
+or possibly shorter
+
+		spinlocks = <&spinlock1 23>;
 
 	Arnd
