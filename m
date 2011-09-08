@@ -1,50 +1,50 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Fri, 09 Sep 2011 03:08:03 +0530
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <2264116.VTHb2BIH5a@wuerfel>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<201109081819.30035.arnd@arndb.de>
-	<CAKnu2Mpnjec-hvfbT0zH1P2mGZKNwTQYgDLGHWUXLmGGQB0_ow@mail.gmail.com>
-	<2264116.VTHb2BIH5a@wuerfel>
-Message-ID: <1315517883.6638.1.camel@vkoul-mobl4>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 8 Sep 2011 23:42:10 +0200
+Subject: [PATCH v3 1/1] ASoC: mxs-saif: add record function
+In-Reply-To: <CABS+qY12ChK=aA-eOERH5ATWKcQdp3wE48SsBNcpe0nDzXWOMw@mail.gmail.com>
+References: <1315399910-6525-1-git-send-email-b29396@freescale.com>
+	<CABS+qY12ChK=aA-eOERH5ATWKcQdp3wE48SsBNcpe0nDzXWOMw@mail.gmail.com>
+Message-ID: <20110908214210.GB4423@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-09-08 at 22:11 +0200, Arnd Bergmann wrote:
-> On Thursday 08 September 2011 20:48:26 Linus Walleij wrote:
-> > 2011/9/8 Arnd Bergmann <arnd@arndb.de>:
-> > > On Thursday 08 September 2011, Barry Song wrote:
-> > >>
-> > >> this filter is used by all drivers with DMA since every dma channel is
-> > >> fixed to be assigned to one device.
-> > >
-> > > Ok, I see now. I think it would be best to introduce a generic
-> > > 'filter by device tree property' function or alternatively an
-> > > dma_of_request_channel function like this:
-> > 
-> > You'd have to discuss that with Vinod, the thing is that x86 Atom
-> > systems are using dmaengine for device slave transfers too, and
-> > IIRC these things don't use devicetrees. I may be wrong...
+On Thu, Sep 08, 2011 at 10:29:12PM +0100, Girdwood, Liam wrote:
+>    On 7 September 2011 13:51, Dong Aisheng <b29396@freescale.com> wrote:
 > 
-> Some of them use device tree, some don't.
+>      1. add different clkmux mode handling
+>      SAIF can use two instances to implement full duplex (playback &
+>      recording) and record saif may work on EXTMASTER mode which is
+>      using other saif's BITCLK&LRCLK.
 > 
-> I'm not saying that we have to convert all drivers to use this, but
-> for platforms that always have device tree available, it seems by far
-> the cleanest solution.
-We don't have a very clean solution for filter function in case of slave
-dmaengine. How should the client specify which channel it wants is not
-really clear.
+>      The clkmux mode could be set in pdata->init() in mach-specific code.
+>      For generic saif driver, it only needs to know who is his master
+>      and the master id is also provided in mach-specific code.
+> 
+>      2. support playback and capture simutaneously however the sample
+>      rates can not be different due to hw limitation.
+> 
+>      Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>      Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>      Cc: Liam Girdwood <lrg@ti.com>
+>      Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>      Cc: Wolfram Sang <w.sang@pengutronix.de>
+>    Acked-by Liam Girdwood <lrg@ti.com>
 
-We can look at device tree but that's something which wont work in case
-of non device tree platforms (atom x86).
-What we need is this information of channel mapping, which IMO is
-platform specific and needs to come from platform data, we can abstract
-it actually from the device tree data/PCI/firmware etc but essentially a
-mechanism to publish channels and slaves uniquely and match them in this
-kind of data
+Mark, please wait for my tag. This patch is related to the mach-specific parts
+and both parts should be proper. Shouldn't take me longer than the end of this
+week.
 
-Linus W, any progress on that patches you posted??
- 
+Regards,
+
+   Wolfram
+
 -- 
-~Vinod Koul
-Intel Corp.
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110908/a314c848/attachment.sig>
