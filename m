@@ -1,56 +1,97 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 8 Sep 2011 17:34:51 +0200
-Subject: [RFC PATCH 06/10] hwspinlock: OMAP4: Add spinlock support in
- DT
-In-Reply-To: <201109081647.55377.arnd@arndb.de>
-References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-	<4E6877A9.3090104@ti.com>
-	<CAK=WgbbN-RYj2quMQOyYbEBBfV3gty4dOE7DgjvsRcoYO=F3kw@mail.gmail.com>
-	<201109081647.55377.arnd@arndb.de>
-Message-ID: <4E68E09B.4050006@ti.com>
+From: mans.rullgard@linaro.org (Mans Rullgard)
+Date: Thu, 8 Sep 2011 16:41:30 +0100
+Subject: [alsa-devel] [PATCH] ASoC: omap: convert per-board modules to
+	platform drivers
+In-Reply-To: <4E68DBF7.1030009@metafoo.de>
+References: <1315494354-17597-1-git-send-email-mans.rullgard@linaro.org>
+	<4E68DBF7.1030009@metafoo.de>
+Message-ID: <CAG5Tg6XxGP1YhQ0zW3f=1EkZfAmb9vj3pBemeSazpH1_CZ3OzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/8/2011 4:47 PM, Arnd Bergmann wrote:
-> On Thursday 08 September 2011, Ohad Ben-Cohen wrote:
->> On Thu, Sep 8, 2011 at 11:07 AM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->>> The (small) issue for my point of view is that the #hwspinlock is already
->>> encoded in the IP itself. So adding a baseid directly in DT will look like
->>> duplicating indirectly something that is already there in the HW.
->>> That being said, since we cannot rely on the order, we will not be able to
->>> get the proper baseid until the driver probe every hwspinlock devices :-(
->>> So baseid might be a easier choice.
+On 8 September 2011 16:15, Lars-Peter Clausen <lars@metafoo.de> wrote:
+> On 09/08/2011 05:05 PM, Mans Rullgard wrote:
+>> This converts the per-board modules to platform drivers for a
+>> device created by in main platform setup. ?These drivers call
+>> snd_soc_register_card() directly instead of going via a "soc-audio"
+>> device and the corresponding driver in soc-core.
 >>
->> Sounds good. Thanks a lot !
+>> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+>> index 5b8ca68..7cb93d9 100644
+>> --- a/arch/arm/mach-omap2/devices.c
+>> +++ b/arch/arm/mach-omap2/devices.c
+>> @@ -299,6 +299,11 @@ static struct platform_device omap_pcm = {
+>> ? ? ? .id ? ? = -1,
+>> ?};
+>>
+>> +static struct platform_device omap_soc_audio = {
+>> + ? ? .name ? = "omap-soc-audio",
+>> + ? ? .id ? ? = -1,
+>> +};
+>> +
+>> ?/*
+>> ? * OMAP2420 has 2 McBSP ports
+>> ? * OMAP2430 has 5 McBSP ports
+>> @@ -323,6 +328,7 @@ static void omap_init_audio(void)
+>> ? ? ? ? ? ? ? platform_device_register(&omap_mcbsp5);
+>>
+>> ? ? ? platform_device_register(&omap_pcm);
+>> + ? ? platform_device_register(&omap_soc_audio);
+>> ?}
+>>
+>> ?#else
+>> diff --git a/sound/soc/omap/am3517evm.c b/sound/soc/omap/am3517evm.c
+>> index 73dde4a..fcd18af 100644
+>> --- a/sound/soc/omap/am3517evm.c
+>> +++ b/sound/soc/omap/am3517evm.c
+>> @@ -151,45 +151,60 @@ static struct snd_soc_card snd_soc_am3517evm = {
+>> ? ? ? .num_links = 1,
+>> ?};
+>>
+>> [...]
+>> +static struct platform_driver am3517evm_driver = {
+>> + ? ? .driver = {
+>> + ? ? ? ? ? ? .name = "omap-soc-audio",
+>> + ? ? ? ? ? ? .owner = THIS_MODULE,
+>> + ? ? },
+>>
+>> - ? ? return ret;
+>> + ? ? .probe = am3517evm_soc_probe,
+>> + ? ? .remove = __devexit_p(am3517evm_soc_remove),
+>> +};
+>> +[...]
+>> +
+>> +static struct platform_driver igep2_driver = {
+>> + ? ? .driver = {
+>> + ? ? ? ? ? ? .name = "omap-soc-audio",
+>> + ? ? ? ? ? ? .owner = THIS_MODULE,
+>> + ? ? },
+>> +
+>> + ? ? .probe = igep2_soc_probe,
+>> + ? ? .remove = __devexit_p(igep2_soc_remove),
+>> +};
+>> [...]
+>>
+>> +static struct platform_driver n810_driver = {
+>> + ? ? .driver = {
+>> + ? ? ? ? ? ? .name = "omap-soc-audio",
+>> + ? ? ? ? ? ? .owner = THIS_MODULE,
+>> + ? ? },
+>> +
+>> + ? ? .probe = n810_soc_probe,
+>> + ? ? .remove = __devexit_p(n810_soc_remove),
+>> +};
+>> [...]
 >
-> I think a number would work here but is not optimal for the device tree
-> representation. I think a better binding would be to encode it like
-> interrupt numbers, where every device that uses a hwspinlock will describe
-> that as a combination of phandle to the hwspinlock controller and
-> identifier to be used by that controller, e.g.
->
-> 	spinlock1 {
-> 		compatible = "ti,omap-spinlock";
-> 		regs = ...
-> 		interrupts =<42>;
-> 		interrupt-parent =&irq-controller;
-> 	};
->
-> 	dsp {
-> 		compatible = ...
-> 		regs = ...
-> 		spinlocks =<23>; // local number withing&spinlock1;
-> 		spinlock-controller =&spinlock1;
-> 	};
+> This isn't really any better then using the soc-core device, since all your
+> drivers are still named the same. udev still wouldn't know which one to load.
+> Use different device driver names for different drivers.
 
-OK, this is indeed much more aligned with the current practice, and what 
-DMA should do as well.
+I guess this worked by accident on my system.
 
-Practically speaking, that change will go beyond the original scope of 
-that patch that was just adding the DT support based on the existing 
-functionality.
+Are there any other changes needed?
 
-Is it OK to handle that improvement in a further patch / series?
-
-Thanks,
-Benoit
+-- 
+Mans Rullgard
+Multimedia
+mans.rullgard at linaro.org
