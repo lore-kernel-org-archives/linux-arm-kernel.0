@@ -1,80 +1,80 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 7 Sep 2011 12:04:44 -0700
-Subject: [PATCH 1/2] OMAP2/3: PM: trigger CPU PM notifiers in idle and
- suspend path
-Message-ID: <mailman.122.1315504676.20020.linux-arm-kernel@lists.infradead.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 8 Sep 2011 11:01:48 -0700
+Subject: [RFC PATCH 01/10] OMAP2+: l3-noc: Add support for device-tree
+In-Reply-To: <1314191356-10963-2-git-send-email-b-cousson@ti.com>
+References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
+	<1314191356-10963-2-git-send-email-b-cousson@ti.com>
+Message-ID: <20110908180148.GA2967@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add calls to CPU PM notifier core in the idle and suspend paths
-so any CPU PM notifiers are properly called.
+On Wed, Aug 24, 2011 at 03:09:07PM +0200, Benoit Cousson wrote:
+> Add device-tree support for the l3-noc driver.
+> 
+> Use platform_driver_register to defer the probing at device init
+> time.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_l3_noc.c |   16 ++++++++++++++--
+>  1 files changed, 14 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_l3_noc.c b/arch/arm/mach-omap2/omap_l3_noc.c
+> index 7b9f190..4630703 100644
+> --- a/arch/arm/mach-omap2/omap_l3_noc.c
+> +++ b/arch/arm/mach-omap2/omap_l3_noc.c
+> @@ -228,16 +228,28 @@ static int __exit omap4_l3_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id l3_noc_match[] = {
+> +	{.compatible = "arteris,noc", },
 
-[add more description about the need to trigger notifiers only after
- next power states are programmed.]
+Missing documentation for this compatible property.  Also, it appears
+to be rather on the generic side.
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/pm24xx.c |    5 +++++
- arch/arm/mach-omap2/pm34xx.c |    5 +++++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+> +	{},
+> +}
+> +MODULE_DEVICE_TABLE(of, l3_noc_match);
+> +#else
+> +#define l3_noc_match NULL
+> +#endif
+> +
+>  static struct platform_driver omap4_l3_driver = {
+> +	.probe		= omap4_l3_probe,
 
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index bf089e7..9f7e551 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -31,6 +31,7 @@
- #include <linux/time.h>
- #include <linux/gpio.h>
- #include <linux/console.h>
-+#include <linux/cpu_pm.h>
- 
- #include <asm/mach/time.h>
- #include <asm/mach/irq.h>
-@@ -142,11 +143,15 @@ static void omap2_enter_full_retention(void)
- 	omap_uart_prepare_idle(1);
- 	omap_uart_prepare_idle(2);
- 
-+	cpu_pm_enter();
-+
- 	/* Jump to SRAM suspend code */
- 	omap2_sram_suspend(sdrc_read_reg(SDRC_DLLA_CTRL),
- 			   OMAP_SDRC_REGADDR(SDRC_DLLA_CTRL),
- 			   OMAP_SDRC_REGADDR(SDRC_POWER));
- 
-+	cpu_pm_exit();
-+
- 	omap_uart_resume_idle(2);
- 	omap_uart_resume_idle(1);
- 	omap_uart_resume_idle(0);
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 7255d9b..b167c7f 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -29,6 +29,7 @@
- #include <linux/delay.h>
- #include <linux/slab.h>
- #include <linux/console.h>
-+#include <linux/cpu_pm.h>
- #include <trace/events/power.h>
- 
- #include <asm/suspend.h>
-@@ -386,6 +387,8 @@ void omap_sram_idle(void)
- 			if (!console_trylock())
- 				goto console_still_active;
- 
-+	cpu_pm_enter();
-+
- 	/* PER */
- 	if (per_next_state < PWRDM_POWER_ON) {
- 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
-@@ -465,6 +468,8 @@ void omap_sram_idle(void)
- 		omap_uart_resume_idle(3);
- 	}
- 
-+	cpu_pm_exit();
-+
- 	if (!is_suspending())
- 		console_unlock();
- 
--- 
-1.7.6
+.probe needs to be put into the __devinit section.
+
+>  	.remove		= __exit_p(omap4_l3_remove),
+
+Similarly, at the same time the remove hook should be changed to
+__devexit and __devexit_p() at the same time.
+
+>  	.driver		= {
+> -	.name		= "omap_l3_noc",
+> +		.name		= "omap_l3_noc",
+> +		.of_match_table = l3_noc_match,
+
+Looks like ".owner = THIS_MODULE," is missing too.
+
+>  	},
+>  };
+>  
+>  static int __init omap4_l3_init(void)
+>  {
+> -	return platform_driver_probe(&omap4_l3_driver, omap4_l3_probe);
+> +	return platform_driver_register(&omap4_l3_driver);
+>  }
+>  postcore_initcall_sync(omap4_l3_init);
+>  
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
