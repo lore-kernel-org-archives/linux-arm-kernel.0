@@ -1,70 +1,103 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 8 Sep 2011 13:09:53 -0400 (EDT)
-Subject: [PATCH v2 1/3] ARM: iwmmxt: Fix Makefile rules for building
-	iwmmxt for Thumb-2
-In-Reply-To: <1315497854-13311-2-git-send-email-dave.martin@linaro.org>
-References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-	<1315497854-13311-2-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1109081308370.20358@xanadu.home>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 8 Sep 2011 18:09:02 +0100
+Subject: [PATCH 6/6] arm/imx6q: add suspend/resume support
+In-Reply-To: <20110908162452.GA20292@n2100.arm.linux.org.uk>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-7-git-send-email-shawn.guo@linaro.org>
+	<CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
+	<20110908062301.GK8148@S2100-06.ap.freescale.net>
+	<20110908074718.GA14953@n2100.arm.linux.org.uk>
+	<20110908152222.GA31581@S2100-06.ap.freescale.net>
+	<20110908162452.GA20292@n2100.arm.linux.org.uk>
+Message-ID: <20110908170902.GA30402@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Sep 2011, Dave Martin wrote:
-
-> Because gcc/gas have no sane way to turn on individual CPU
-> extensions from the command-line, iwmmxt.S was previously built
-> with -mcpu=iwmmxt.  Unfortunately, this also downgrades the CPU to
-> v5, with the result that this file fails to build for a Thumb-2
-> kernel.
+On Thu, Sep 08, 2011 at 05:24:52PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 08, 2011 at 11:22:23PM +0800, Shawn Guo wrote:
+> > On Thu, Sep 08, 2011 at 08:47:18AM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Sep 08, 2011 at 02:23:02PM +0800, Shawn Guo wrote:
+> > > > Yes, if you lose L2 power in suspend, it's the easiest way for you to
+> > > > resume L2.
+> > > > 
+> > > > For my case which retains L2, I actually do not want to call this
+> > > > function which will invalidate L2.  But since we still have problem
+> > > > to use rmk's generic suspend/resume updates (ARM: pm: add L2 cache
+> > > > cleaning for suspend), we have to flush the entire L2 on imx6q for now.
+> > > 
+> > > OMAP44xx has the same problem but they re-initialize L2 on resume in
+> > > their pre-cpu_resume() assembly code.
+> > > 
+> > Are you suggesting that this might be the reason why imx6q has problem
+> > with your patch?
 > 
-> New versions of the tools support -march=<base arch>+iwmmxt, and it
-> seems reasonable to require up-to-date tools when building in
-> Thumb-2.  So, this patch uses -march=armv7-a+iwmmxt for
-> CONFIG_THUMB2_KERNEL=y.
+> Consider the mechanics of what is happening.
 > 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-
-I like this one better.
-
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-As you said, this should be merged with #2/3.
-
-
-
-> ---
->  arch/arm/kernel/Makefile |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
+> On suspend, when we enter cpu_suspend(), we assume the L2 cache is
+> still enabled.
 > 
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index f7887dc..e03691e 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -66,6 +66,18 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
->  obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
->  obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
->  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
-> +ifdef CONFIG_CPU_V7
-> +AFLAGS_iwmmxt.o			:= $(call cc-option,-Wa$(comma)-march=armv7-a+iwmmxt,-DIWMMXT_LEGACY_ASSEMBLER)
-> +ifeq ($(AFLAGS_iwmmxt.o),-DIWMMXT_LEGACY_ASSEMBLER)
-> +ifdef CONFIG_THUMB2_KERNEL
-> +$(error Newer binutils is needed to build iwmmxt support for Thumb-2 kernels.)
-> +else
-> +$(warning Warning: Building legacy pre-v7 iwmmxt code for a v7 target.\
-> +  This is inadvisable.  Please upgrade to newer binutils.)
-> +AFLAGS_iwmmxt.o			+= -Wa,-mcpu=iwmmxt
-> +endif
-> +endif
-> +endif # CONFIG_CPU_V7
->  
->  ifneq ($(CONFIG_ARCH_EBSA110),y)
->    obj-y		+= io.o
-> -- 
-> 1.7.4.1
+> We _always_ assume that L1 cache state is lost, so we always flush the
+> entire L1 cache.
 > 
+> As SoCs can (and do) preserve the L2 contents over suspend/resume cycles,
+> we leave it to the platform's finisher to decide whether it needs to
+> flush the entire L2 cache to RAM or not.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> If L2 is preserved, then we want to ensure that as much data as possible
+> is retained in the L2 cache (if the hardware preserves its contents, we
+> don't want waste time flushing data out of the cache needlessly -
+> especially if we're using these paths for cpuidle.)  However, we need
+> access to a certain amount of data to bring the system back up, and as
+> the L2 cache typically will not be searched before the MMU is enabled,
+> we have to flush out a certain minimal amount of data (the location
+> of the stacked restore information and the stacked restore information
+> itself.)
 > 
+> However, we don't flush out anything else from the L2 cache.
+> 
+> Now, upon resume, the resume code will be able to read the data it needs
+> to restore the system as we ensured that was flushed out to memory - as
+> I mentioned above, the L2 cache won't be searched for this irrespective
+> of whether the control registers have enabled it or not.
+> 
+> We will continue to the point where we hit the first bit of information
+> stored in L2, which will probably be the stacked SVC register set.  If
+> at this point we're not able to search the L2 cache, then we'll read
+> stale data from the backing memory instead, and the system will crash.
+> 
+> Consider what generic code could do about this - if we flushed out that
+> register set to memory, then we could get past that point - but we then
+> would need to call a function to enable the L2 cache.  What if that
+> function needs data which is sitting in the L2 cache to function (eg,
+> it may need values from the device tree).  We would need to ensure
+> that that data were also flushed out of the L2 cache.  What about
+> spinlocks?  Maybe some other CPU has dragged the spinlock data into
+> the L2 cache.  That gets _much_ harder to solve.
+> 
+> Now to the physical act of enabling the L2 cache.  The L2 cache control
+> registers are subject to security restrictions when running in non-secure
+> mode, needing platform specific SMC calls to reprogram the cache.  Generic
+> code is unable to do this.
+> 
+> Hence why it's left up to the platform to figure out how to enable the
+> L2 cache before calling cpu_resume().  The platform is best placed to
+> work out what it needs to do to setup the L2 cache so that the L2 cache
+> is available by the time the system control register is written, enabling
+> the MMU and caches.
+> 
+> > Are we supposed to re-initialize L2 before calling
+> > into generic cpu_resume()?
+> 
+> So, the above is the long way of saying "yes" to this question.  I hope
+> it gives the full picture about why this is so.
+> 
+
+I could not agree more. On top of that l2x0_of_init invalidates L2 which is
+not what we want on retention. 
+Furthermore, parsing the device tree every given suspend, as fast as it can be,
+that seems silly to me for registers that will never ever change (maybe perf
+counters, but perf will save them). And if they do change parsing them
+from the device tree might not be what we want.
+
+Let's save those registers once for all at boot and reprogramme them before 
+jumping to cpu_resume, that's by far the best solution.
