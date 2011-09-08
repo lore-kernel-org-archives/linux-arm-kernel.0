@@ -1,33 +1,70 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 8 Sep 2011 10:06:56 -0700
-Subject: [PATCH v2 3/3] ARM: pxa/pj4: Port problematic pj4 support code to
-	v7/Thumb-2
-In-Reply-To: <alpine.LFD.2.00.1109081304380.20358@xanadu.home>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 8 Sep 2011 13:09:53 -0400 (EDT)
+Subject: [PATCH v2 1/3] ARM: iwmmxt: Fix Makefile rules for building
+	iwmmxt for Thumb-2
+In-Reply-To: <1315497854-13311-2-git-send-email-dave.martin@linaro.org>
 References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-	<1315497854-13311-4-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1109081304380.20358@xanadu.home>
-Message-ID: <CAMPhdO_PFYcXfWXUgvKC8Mm4+M=xsg3fncDSD=mV6VuDrZUsPA@mail.gmail.com>
+	<1315497854-13311-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1109081308370.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2011 at 10:06 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 8 Sep 2011, Dave Martin wrote:
->
->> The iwmmxt code contains some code to implement a pseudo-ISB, but
->> this is not buildable for Thumb-2.
->>
->> This patch replaces the pseudo-ISB with a real one on v7 and above.
->>
->> Signed-off-by: Dave Martin <dave.martin@linaro.org>
->
-> In arch/arm/mm/Kconfig:
->
-> config CPU_PJ4
-> ? ? ? ?bool
-> ? ? ? ?select CPU_V7
-> ? ? ? ?select ARM_THUMBEE
->
-> So this code may only be ARMv7 aware now.
->
+On Thu, 8 Sep 2011, Dave Martin wrote:
 
-True.
+> Because gcc/gas have no sane way to turn on individual CPU
+> extensions from the command-line, iwmmxt.S was previously built
+> with -mcpu=iwmmxt.  Unfortunately, this also downgrades the CPU to
+> v5, with the result that this file fails to build for a Thumb-2
+> kernel.
+> 
+> New versions of the tools support -march=<base arch>+iwmmxt, and it
+> seems reasonable to require up-to-date tools when building in
+> Thumb-2.  So, this patch uses -march=armv7-a+iwmmxt for
+> CONFIG_THUMB2_KERNEL=y.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+
+I like this one better.
+
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+As you said, this should be merged with #2/3.
+
+
+
+> ---
+>  arch/arm/kernel/Makefile |   12 ++++++++++++
+>  1 files changed, 12 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index f7887dc..e03691e 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -66,6 +66,18 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+>  obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+>  obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+>  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+> +ifdef CONFIG_CPU_V7
+> +AFLAGS_iwmmxt.o			:= $(call cc-option,-Wa$(comma)-march=armv7-a+iwmmxt,-DIWMMXT_LEGACY_ASSEMBLER)
+> +ifeq ($(AFLAGS_iwmmxt.o),-DIWMMXT_LEGACY_ASSEMBLER)
+> +ifdef CONFIG_THUMB2_KERNEL
+> +$(error Newer binutils is needed to build iwmmxt support for Thumb-2 kernels.)
+> +else
+> +$(warning Warning: Building legacy pre-v7 iwmmxt code for a v7 target.\
+> +  This is inadvisable.  Please upgrade to newer binutils.)
+> +AFLAGS_iwmmxt.o			+= -Wa,-mcpu=iwmmxt
+> +endif
+> +endif
+> +endif # CONFIG_CPU_V7
+>  
+>  ifneq ($(CONFIG_ARCH_EBSA110),y)
+>    obj-y		+= io.o
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
