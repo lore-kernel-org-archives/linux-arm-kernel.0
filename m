@@ -1,24 +1,90 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 8 Sep 2011 12:34:35 +0530
-Subject: [GIT PULL] DaVinci fixes for v3.1-rc6
-In-Reply-To: <3E54258959B69E4282D79E01AB1F32B701B8C9@DLEE12.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593025743E832@dbde02.ent.ti.com>
-	<3E54258959B69E4282D79E01AB1F32B701B8C9@DLEE12.ent.ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593025743EBEF@dbde02.ent.ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 8 Sep 2011 09:14:57 +0200
+Subject: [RFC PATCH 06/10] hwspinlock: OMAP4: Add spinlock support in
+ DT
+In-Reply-To: <CAK=WgbYX50R_MCgwdzywgrAEDJkmDSmeSSCuuqst5UBYk_sYow@mail.gmail.com>
+References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
+	<1314191356-10963-7-git-send-email-b-cousson@ti.com>
+	<CAK=WgbYX50R_MCgwdzywgrAEDJkmDSmeSSCuuqst5UBYk_sYow@mail.gmail.com>
+Message-ID: <4E686B71.2060107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murali,
+Hi Ohad,
 
-On Wed, Sep 07, 2011 at 21:13:19, Karicheri, Muralidharan wrote:
-> Sekhar
-> 
-> We ran into the build error when we started using linux-davinci tree for V7 architecture. So this fix for the following to be re-worked to include V7 as well.
-> 
+On 9/7/2011 9:58 PM, Ohad Ben-Cohen wrote:
+> On Wed, Aug 24, 2011 at 4:09 PM, Benoit Cousson<b-cousson@ti.com>  wrote:
+>> Add a device-tree node for the spinlock.
+>> Remove the static device build code if CONFIG_OF
+>> is set.
+>> Update the hwspinlock driver to use the of_match method.
+>> Add the information in Documentation/devicetree.
+>>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> Cc: Ohad Ben-Cohen<ohad@wizery.com>
+>> ---
+> ...
+>> +               spinlock {
+>> +                       compatible = "ti,omap-spinlock";
+>> +                       hwmods = "spinlock";
+>> +               };
+>
+> This seem to satisfy the current hwspinlock driver, but I'm wondering
+> about an issue which was discussed awhile ago by Arnd and Mathieu:
+>
+> Hwspinlock devices provide system-wide hardware locks that are used by
+> remote processors that have no other way to achieve synchronization.
+>
+> For that to work, each physical lock must have a system-wide unique id
+> number that all processors are familiar with, otherwise they can't
+> possibly assume they're using the same hardware lock.
+>
+> Usually SoC have a single hwspinlock device, which provides several
+> hardware spinlocks, and in this case, the locks can be trivially
+> numbered 0 to (num-of-locks - 1).
+>
+> In case boards have several hwspinlocks devices (each of which
+> providing numerous hardware spinlocks) a different base id should be
+> used for each hwspinlock device (they can't all use 0 as a starting
+> id!).
+>
+> While this is certainly not common, it's just plain wrong for the
+> hwspinlock driver to silently use 0 as a base id whenever it is probed
+> with a device (and by that implicitly assume there will always be only
+> one device).
 
-Since we don't support v7 in DaVinci currently, I don't
-want to hold a build break fix in anticipation of a new
-feature that will come in later.
- 
-Thanks,
-Sekhar
+Hehe, I'm not the one who wrote that driver :-)
+
+This is not wrong for the current HW. The point is do we want to 
+anticipate potential HW evolution that might never happen on that IP?
+
+> So we need to couple an hwspinlock device with a base id (which is
+> trivially zero when there's only a single hwspinlock device). This can
+> be easily achieved today using platform data, which boards will use to
+> set a different base id for each of the hwspinlock devices they have
+> (i'll send a patch demonstrating this soon), but I'm wondering how to
+> specify this hwspinlock-specific data with DT: is there an existing
+> binding we can use for this ? or should we create something like a
+> "baseid" one especially for the hwspinlock driver ?
+
+This is no different than the multiple GPIO controllers we have today.
+Since we cannot rely on the DT nodes order, I added an explicit "id" 
+attribute to provide that information to the driver. And then the baseid 
+is "id * #gpios".
+
+>> +#if defined(CONFIG_OF)
+>> +static const struct of_device_id spinlock_match[] = {
+>> +       {.compatible = "ti,omap-spinlock", },
+>> +       {},
+>> +}
+>
+> you're missing a semicolon there (yeah I actually tried to build this ;)
+
+That was a test :-)
+In fact it looks like this driver is not built with a default 
+omap2plus_defconfig :-(
+I'll fix that.
+
+Thanks for the review,
+Benoit
