@@ -1,78 +1,156 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 8 Sep 2011 10:18:32 +0800
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
-	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
-Message-ID: <CAGsJ_4yv-35P244TaVS8oodis9P8g0kbTOvj9bgMC2ygQJFU0Q@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 8 Sep 2011 10:47:08 +0800
+Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
+Message-ID: <1315450031-6371-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/8 Koul, Vinod <vinod.koul@intel.com>:
-> On Thu, 2011-09-08 at 00:46 +0800, Barry Song wrote:
->> Hi Vinod,
->> thanks for your quick feedback.
->>
->> 2011/9/8 Koul, Vinod <vinod.koul@intel.com>:
->> > On Tue, 2011-09-06 at 22:41 -0700, Barry Song wrote:
->> >> From: Rongjun Ying <rongjun.ying@csr.com>
->> >
->> >> +config SIRF_DMA
->> >> + ? ? tristate "CSR SiRFprimaII DMA support"
->> >> + ? ? depends on ARCH_PRIMA2
->> >> + ? ? select DMA_ENGINE
->> >> + ? ? help
->> >> + ? ? ? Enable support for the CSR SiRFprimaII DMA engine.
->> > How different is it from the other primacell based DMA drivers, and why
->> > wouldn't it make sense to use/modify one of them?
->>
->> it is much different with primacell based DMA like pl080, pl330.
->> prima2 has a self-defined DMAC IP. basically it is a 2D mode dma with
->> two scales X and Y and direct way to start and stop DMA.
->> every channel has fixed function to serve only one perpheral. so you
->> find we have a filter id.
-> okay, what do you mean by 2D mode? Is it similar to what TI folks, Linus
-> W and Jassi Brar posted RFC's on?
+The patch set is based on Artem's tree:
+	http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
 
-In SiRFprimaII 2-D DMA, the system memory space is interpreted
-as a 2-D layout instead of a linear 1-D layout. More specifically, the
-system memory can be considered as
-multiple data lines. The length of the data line is determined by the
-user-selected DMA_WIDTH register.
-The user can specify a data window that the user wants to access using
-four parameters:
-? Start address
-? X length
-? Y length
-? Width
+The general-purpose media interface(GPMI) controller is a flexible interface
+to up to several NAND flashs.
 
-The idea of a 2-D DMA is shown in figure 2d-dma.png attached.
+The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
 
-If you specifies the Y length as 0 or the X length equals to the DMA
-width, then this 2-D DMA reduces to
-1-D. If the user configures the X length greater than the DMA width,
-then the extra data is wrapped around
-to the next data line, this may corrupt the DMA transfer for
-multiple-line 2-D DMA. If this is a 1-D DMA, then
-there is no issue. The attached diagram 2d-dma2.png shows the
-wrap-around of the extra data in case the X length
-greater than DMA width.
+With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+not.
 
-Thanks
-barry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 2d-dma.PNG
-Type: image/png
-Size: 16675 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110908/de9ea7b0/attachment-0002.png>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 2d-dma2.PNG
-Type: image/png
-Size: 9836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110908/de9ea7b0/attachment-0003.png>
+This driver is a _pure_ MTD NAND controller driver now.
+
+
+The driver depends on another GPMI-NAND device patch set, you can find them at :
+	[1] http://marc.info/?l=linux-arm-kernel&m=131416901319573&w=2
+	[2] http://marc.info/?l=linux-arm-kernel&m=131416912319668&w=2
+	[3] http://marc.info/?l=linux-arm-kernel&m=131416891119504&w=2
+	[4] http://marc.info/?l=linux-arm-kernel&m=131416896219539&w=2
+
+Test environment:
+	Using imx23 and imx28 boards for test. 
+
+	imx23 :
+	console=ttyAMA0,115200 mtdparts=gpmi-nfc:20m(boot),-(user)
+	Tested by USB boot and NAND boot.
+
+        imx28 :
+	#console=ttyAMA0,115200 root=/dev/mmcblk0p3 rw rootwait 
+	Tested by SD card boot mode.
+
+v11 --> v12:
+	[0] remove debug log level mechanism.
+	[1] replace BUG/BUG_ON() with pr_err()
+	[2] fix compiling warnings
+	[3] optimize the calculation of BCH's geometry.
+
+v10 --> v11:
+	[0] tiny fixes.
+	[1] optimize the calculation of BCH's geometry.
+	[2] renames
+
+v9 --> v10:
+	[0] fix DMA timeout bug by adding custom routine for reset blocks.
+	[1] remove mil{} 
+	[2] add gpmi_hw_ecclayout.
+	[3] add ecc_write_oob() again to prohibit the mtd ioctl : MEMWRITEOOB
+	[4] change pr_info to dev_dbg() or pr_err().
+	[5] merge the all the dump functions into gpmi_dump_info().
+	[6] remove parse_mtd_partitions(), and use mtd_device_parse_register().
+	[7] move the the debug control code from gpmi-nand.h to gpmi-nand.c
+	[8] renames
+	[9] others
+
+v8 --> v9:
+	[0] remove the ONFI nand code, it will cause the DMA timeout in the ONFI nand.
+	[1] remove sysfs entry.
+	[2] remove kernel command parameter.
+	[3] report to ecclayout that we will use all the page + OOB.
+		remove the ->ecc_write_oob().
+	[4] add our own block_markbad() hook.
+	[5] rename some functions from mil_* to gpmi_*.
+	[6] replace the __raw_readl/__raw_writel to readl/writel.
+	[7] others
+
+v7 --> v8:
+	[0] rename the name from `GPMI-NFC` to `GPMI-NAND`
+	[1] remove the `hal` layer, and change it to function library.
+	[2] Do not use ~0 to initialize the DMA address.
+	[3] fix the issue : several DMA channels share the same IRQ.
+	[4] DMA timeout issue. I use the .config created by `make mxs_defconfig`
+	    and the bug never occur. It seems some other module has impact to the
+	    DMA.
+	    Of course, you should enable the UBIFS,MTD_CHAR and GPMI for
+	    the .config. You can also disable the SPIN-LOCK/MUTEX debug features.
+	[5] add function to print out the GPMI registers.	    
+	[6] others.	    
+
+v6 --> v7:
+	[0] remove the function wrapping the clock.
+	[1] use the module_param() for debugging.
+	[2] use the new interface of MTD partitions.
+		replace add_mtd_partitions() with mtd_device_register().
+	[3] use pr_info() to print log.
+	[4] add `__devinit` for some functions, etc.
+	[5] add `gpmi_nfc` to control the GPMI-NFC driver's initialization.
+	[6] others.
+
+v5 --> v6:
+	[0] split out the IMX23/IMX28 arch code to separate patches.
+	[1] fix bug : missing empty item in the end of platform_id array.
+	[2] inconsistent identation.
+	[3] others
+
+v4 --> v5:
+	[0] rename the files.
+	[1] fix PM bug
+	[2] remove the rom_helper code, and move the necessary initialization code
+		to the main file.
+	[3] change the macros from CPU_IS_* to GPMI_IS_*
+	[4] remove the default partition layout init code. revert back the 
+		partition parsing command line code.
+	[5] others
+
+v3 --> v4:
+	[0] use the nand_ids{} as the nand database, drop my own database.
+	[1] remove the patch for DMA enginer, Shawn will submit his own version.
+	[2] use the platform_id to distinguish different Archs.
+	[3] fix the strange coding style.
+	[4] others.
+
+v2 --> v3:
+	[0] merge the imx23 and imx28 into one file(including the header file).
+	[1] remove the unuse registers in the headers.
+	[2] fix DMA bugs
+	[3] add bus width field to nand_attr{}
+	[4] others
+
+v1 --> v2:
+	[0] merge the common files into the gpmi-nfc-main.c
+	[1] change the code to get the clock.
+	[2] remove the timing in the nand_device_info{}
+	[3] fix DMA errors
+	[4] add the nand_device_info.[ch] to generic code
+	[5] use the chip->onfi_version for the ONFI nand
+	[6] useless init
+	[7] others
+
+Huang Shijie (3):
+  MTD : add the common code for GPMI-NAND controller driver
+  MTD : add helper functions library and header files for GPMI NAND
+    driver
+  MTD : add GPMI-NAND driver in the config and Makefile
+
+ drivers/mtd/nand/Kconfig               |   13 +
+ drivers/mtd/nand/Makefile              |    1 +
+ drivers/mtd/nand/gpmi-nand/Makefile    |    3 +
+ drivers/mtd/nand/gpmi-nand/bch-regs.h  |   84 ++
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  | 1057 +++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 1619 ++++++++++++++++++++++++++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.h |  273 ++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-regs.h |  172 ++++
+ 8 files changed, 3222 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mtd/nand/gpmi-nand/Makefile
+ create mode 100644 drivers/mtd/nand/gpmi-nand/bch-regs.h
+ create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+ create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+ create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-nand.h
+ create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-regs.h
