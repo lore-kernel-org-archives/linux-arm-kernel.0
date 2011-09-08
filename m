@@ -1,51 +1,34 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu,  8 Sep 2011 17:04:12 +0100
-Subject: [PATCH v2 1/3] ARM: iwmmxt: Fix Makefile rules for building iwmmxt
-	for Thumb-2
-In-Reply-To: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1315497854-13311-2-git-send-email-dave.martin@linaro.org>
+Date: Thu,  8 Sep 2011 17:04:11 +0100
+Subject: [PATCH v2 0/3] ARM: iwmmxt/pj4 fixes for v7/Thumb-2
+Message-ID: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because gcc/gas have no sane way to turn on individual CPU
-extensions from the command-line, iwmmxt.S was previously built
-with -mcpu=iwmmxt.  Unfortunately, this also downgrades the CPU to
-v5, with the result that this file fails to build for a Thumb-2
-kernel.
+The iwmmxt and pj4 support code contains some code which isn't
+compatible with Thumb-2 and looks possibly inappropriate for v7.
 
-New versions of the tools support -march=<base arch>+iwmmxt, and it
-seems reasonable to require up-to-date tools when building in
-Thumb-2.  So, this patch uses -march=armv7-a+iwmmxt for
-CONFIG_THUMB2_KERNEL=y.
+There is also an issue with Makefile rules causing iwmmxt.S to be
+built for the wrong architecture.
 
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/kernel/Makefile |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+The Makefile and .S changes for iwmmxt may get folded into a
+single patch; they don't make much sense independently any more.
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index f7887dc..e03691e 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -66,6 +66,18 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
- obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
-+ifdef CONFIG_CPU_V7
-+AFLAGS_iwmmxt.o			:= $(call cc-option,-Wa$(comma)-march=armv7-a+iwmmxt,-DIWMMXT_LEGACY_ASSEMBLER)
-+ifeq ($(AFLAGS_iwmmxt.o),-DIWMMXT_LEGACY_ASSEMBLER)
-+ifdef CONFIG_THUMB2_KERNEL
-+$(error Newer binutils is needed to build iwmmxt support for Thumb-2 kernels.)
-+else
-+$(warning Warning: Building legacy pre-v7 iwmmxt code for a v7 target.\
-+  This is inadvisable.  Please upgrade to newer binutils.)
-+AFLAGS_iwmmxt.o			+= -Wa,-mcpu=iwmmxt
-+endif
-+endif
-+endif # CONFIG_CPU_V7
- 
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
--- 
+v2 changes:
+
+*   Makefile logic changed, so that -march=armv7-a+iwmmxt is
+    demanded for Thumb-2 kernels, and a warning is printed if the
+    assembler doesn't support this when buiding a v7 ARM kernel.
+
+Dave Martin (3):
+  ARM: iwmmxt: Fix Makefile rules for building iwmmxt for Thumb-2
+  ARM: iwmmxt: Port problematic iwmmxt support code to v7/Thumb-2
+  ARM: pxa/pj4: Port problematic pj4 support code to v7/Thumb-2
+
+ arch/arm/kernel/Makefile  |   12 ++++++++++++
+ arch/arm/kernel/iwmmxt.S  |    9 +++++++++
+ arch/arm/kernel/pj4-cp0.c |    4 ++++
+ 3 files changed, 25 insertions(+), 0 deletions(-)
+
+--
 1.7.4.1
