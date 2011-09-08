@@ -1,66 +1,471 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 8 Sep 2011 18:20:02 +0100
-Subject: [PATCH v2 2/3] ARM: iwmmxt: Port problematic iwmmxt support code
-	to v7/Thumb-2
-In-Reply-To: <CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
-References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-	<1315497854-13311-3-git-send-email-dave.martin@linaro.org>
-	<201109081845.58260.arnd@arndb.de>
-	<CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
-Message-ID: <20110908172002.GG2070@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 8 Sep 2011 19:20:38 +0200
+Subject: [PATCH 3/8] tvp514x: Migrate to media-controller framework
+In-Reply-To: <1315488900-16106-1-git-send-email-deepthy.ravi@ti.com>
+References: <1315488900-16106-1-git-send-email-deepthy.ravi@ti.com>
+Message-ID: <201109081920.38758.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2011 at 10:03:52AM -0700, Eric Miao wrote:
-> On Thu, Sep 8, 2011 at 9:45 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 08 September 2011, Dave Martin wrote:
-> >> The iwmmxt code contains some code to implement a pseudo-ISB, but
-> >> this is not buildable for Thumb-2.
-> >>
-> >> This patch replaces the pseudo-ISB with a real one for Thumb-2
-> >> kernels.
-> >>
-> >> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> >> ---
-> >> ?arch/arm/kernel/iwmmxt.S | ? ?9 +++++++++
-> >> ?1 files changed, 9 insertions(+), 0 deletions(-)
-> >
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> >
+Hi,
+
+On Thursday 08 September 2011 15:35:00 Deepthy Ravi wrote:
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> Maybe it'll be much simpler to have something like below:
+> Migrate tvp5146 driver to media controller framework. The
+> driver registers as a sub-device entity to MC framwork
+> and sub-device to V4L2 layer. The default format code was
+> V4L2_MBUS_FMT_YUYV10_2X10. Changed it to V4L2_MBUS_FMT_UYVY8_2X8
+> and hence added the new format code to ccdc and isp format
+> arrays.
+
+Thanks for the patch.
+
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
+> ---
+>  drivers/media/video/omap3isp/ispccdc.c  |    1 +
+>  drivers/media/video/omap3isp/ispvideo.c |    3 +
+>  drivers/media/video/tvp514x.c           |  241 +++++++++++++++++++++++++---
+>  include/media/v4l2-subdev.h             |    7 +-
+
+This should be split in 3 patches.
+
+I've already posted patches to support UYVY8_2X8 in the OMAP3 ISP driver to 
+the linux-media mailing list. Can you reuse them ?
+
+>  4 files changed, 222 insertions(+), 30 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
-> index a087838..5998f7d 100644
-> --- a/arch/arm/kernel/iwmmxt.S
-> +++ b/arch/arm/kernel/iwmmxt.S
-> @@ -319,8 +319,9 @@ ENTRY(iwmmxt_task_switch)
->         PJ4(eor r1, r1, #0xf)
->         PJ4(mcr p15, 0, r1, c1, c0, 2)
+> diff --git a/drivers/media/video/omap3isp/ispccdc.c
+> b/drivers/media/video/omap3isp/ispccdc.c index 9d3459d..d58fe45 100644
+> --- a/drivers/media/video/omap3isp/ispccdc.c
+> +++ b/drivers/media/video/omap3isp/ispccdc.c
+> @@ -57,6 +57,7 @@ static const unsigned int ccdc_fmts[] = {
+>  	V4L2_MBUS_FMT_SRGGB12_1X12,
+>  	V4L2_MBUS_FMT_SBGGR12_1X12,
+>  	V4L2_MBUS_FMT_SGBRG12_1X12,
+> +	V4L2_MBUS_FMT_UYVY8_2X8,
+>  };
 > 
-> -       mrc     p15, 0, r1, c2, c0, 0
-> -       sub     pc, lr, r1, lsr #32             @ cpwait and return
-> +       XSC(mrc p15, 0, r1, c2, c0, 0)
-> +       PJ4(isb)
-> +       mov     pc, lr                          @ cpwait and return
+>  /*
+> diff --git a/drivers/media/video/omap3isp/ispvideo.c
+> b/drivers/media/video/omap3isp/ispvideo.c index fd965ad..d5b8236 100644
+> --- a/drivers/media/video/omap3isp/ispvideo.c
+> +++ b/drivers/media/video/omap3isp/ispvideo.c
+> @@ -100,6 +100,9 @@ static struct isp_format_info formats[] = {
+>  	{ V4L2_MBUS_FMT_YUYV8_1X16, V4L2_MBUS_FMT_YUYV8_1X16,
+>  	  V4L2_MBUS_FMT_YUYV8_1X16, 0,
+>  	  V4L2_PIX_FMT_YUYV, 16, },
+> +	{ V4L2_MBUS_FMT_UYVY8_2X8, V4L2_MBUS_FMT_UYVY8_2X8,
+> +	  V4L2_MBUS_FMT_UYVY8_2X8, 0,
+> +	  V4L2_PIX_FMT_UYVY, 16, },
+>  };
+> 
+>  const struct isp_format_info *
+> diff --git a/drivers/media/video/tvp514x.c b/drivers/media/video/tvp514x.c
+> index 9b3e828..10f3e87 100644
+> --- a/drivers/media/video/tvp514x.c
+> +++ b/drivers/media/video/tvp514x.c
+> @@ -32,11 +32,14 @@
+>  #include <linux/slab.h>
+>  #include <linux/delay.h>
+>  #include <linux/videodev2.h>
+> +#include <linux/v4l2-mediabus.h>
+> 
+>  #include <media/v4l2-device.h>
+>  #include <media/v4l2-common.h>
+> -#include <media/v4l2-mediabus.h>
+>  #include <media/v4l2-chip-ident.h>
+> +#include <media/v4l2-subdev.h>
+> +#include <media/v4l2-ctrls.h>
+> +
+>  #include <media/v4l2-ctrls.h>
+>  #include <media/tvp514x.h>
+> 
+> @@ -78,6 +81,8 @@ struct tvp514x_std_info {
+>  	unsigned long height;
+>  	u8 video_std;
+>  	struct v4l2_standard standard;
+> +	unsigned int mbus_code;
+> +	struct v4l2_mbus_framefmt format;
+>  };
+> 
+>  static struct tvp514x_reg tvp514x_reg_list_default[0x40];
+> @@ -101,6 +106,7 @@ struct tvp514x_decoder {
+>  	struct v4l2_ctrl_handler hdl;
+>  	struct tvp514x_reg tvp514x_regs[ARRAY_SIZE(tvp514x_reg_list_default)];
+>  	const struct tvp514x_platform_data *pdata;
+> +	struct media_pad pad;
+> 
+>  	int ver;
+>  	int streaming;
+> @@ -207,29 +213,46 @@ static struct tvp514x_reg tvp514x_reg_list_default[]
+> = { static const struct tvp514x_std_info tvp514x_std_list[] = {
+>  	/* Standard: STD_NTSC_MJ */
+>  	[STD_NTSC_MJ] = {
+> -	 .width = NTSC_NUM_ACTIVE_PIXELS,
+> -	 .height = NTSC_NUM_ACTIVE_LINES,
+> -	 .video_std = VIDEO_STD_NTSC_MJ_BIT,
+> -	 .standard = {
+> -		      .index = 0,
+> -		      .id = V4L2_STD_NTSC,
+> -		      .name = "NTSC",
+> -		      .frameperiod = {1001, 30000},
+> -		      .framelines = 525
+> -		     },
+> -	/* Standard: STD_PAL_BDGHIN */
+> +		.width = NTSC_NUM_ACTIVE_PIXELS,
+> +		.height = NTSC_NUM_ACTIVE_LINES,
+> +		.video_std = VIDEO_STD_NTSC_MJ_BIT,
+> +		.mbus_code = V4L2_MBUS_FMT_UYVY8_2X8,
+> +		.standard = {
+> +			.index = 0,
+> +			.id = V4L2_STD_NTSC,
+> +			.name = "NTSC",
+> +			.frameperiod = {1001, 30000},
+> +			.framelines = 525
+> +		},
+> +		.format = {
+> +			.width = NTSC_NUM_ACTIVE_PIXELS,
+> +			.height = NTSC_NUM_ACTIVE_LINES,
+> +			.code = V4L2_MBUS_FMT_UYVY8_2X8,
+> +			.field = V4L2_FIELD_INTERLACED,
+> +			.colorspace = V4L2_COLORSPACE_SMPTE170M,
+> +		}
+> +
+>  	},
+> +	/* Standard: STD_PAL_BDGHIN */
+>  	[STD_PAL_BDGHIN] = {
+> -	 .width = PAL_NUM_ACTIVE_PIXELS,
+> -	 .height = PAL_NUM_ACTIVE_LINES,
+> -	 .video_std = VIDEO_STD_PAL_BDGHIN_BIT,
+> -	 .standard = {
+> -		      .index = 1,
+> -		      .id = V4L2_STD_PAL,
+> -		      .name = "PAL",
+> -		      .frameperiod = {1, 25},
+> -		      .framelines = 625
+> -		     },
+> +		.width = PAL_NUM_ACTIVE_PIXELS,
+> +		.height = PAL_NUM_ACTIVE_LINES,
+> +		.video_std = VIDEO_STD_PAL_BDGHIN_BIT,
+> +		.mbus_code = V4L2_MBUS_FMT_UYVY8_2X8,
+> +		.standard = {
+> +			.index = 1,
+> +			.id = V4L2_STD_PAL,
+> +			.name = "PAL",
+> +			.frameperiod = {1, 25},
+> +			.framelines = 625
+> +		},
+> +		.format = {
+> +			.width = PAL_NUM_ACTIVE_PIXELS,
+> +			.height = PAL_NUM_ACTIVE_LINES,
+> +			.code = V4L2_MBUS_FMT_UYVY8_2X8,
+> +			.field = V4L2_FIELD_INTERLACED,
+> +			.colorspace = V4L2_COLORSPACE_SMPTE170M,
+> +		},
+>  	},
+>  	/* Standard: need to add for additional standard */
+>  };
+> @@ -792,7 +815,7 @@ tvp514x_enum_mbus_fmt(struct v4l2_subdev *sd, unsigned
+> index, if (index)
+>  		return -EINVAL;
+> 
+> -	*code = V4L2_MBUS_FMT_YUYV10_2X10;
+> +	*code = V4L2_MBUS_FMT_UYVY8_2X8;
+>  	return 0;
+>  }
+> 
+> @@ -815,7 +838,7 @@ tvp514x_mbus_fmt(struct v4l2_subdev *sd, struct
+> v4l2_mbus_framefmt *f) /* Calculate height and width based on current
+> standard */
+>  	current_std = decoder->current_std;
+> 
+> -	f->code = V4L2_MBUS_FMT_YUYV10_2X10;
+> +	f->code = V4L2_MBUS_FMT_UYVY8_2X8;
+>  	f->width = decoder->std_list[current_std].width;
+>  	f->height = decoder->std_list[current_std].height;
+>  	f->field = V4L2_FIELD_INTERLACED;
+> @@ -952,11 +975,154 @@ static int tvp514x_s_stream(struct v4l2_subdev *sd,
+> int enable) return err;
+>  }
+> 
+> +static int tvp514x_s_power(struct v4l2_subdev *sd, int on)
+> +{
+> +	struct tvp514x_decoder *decoder = to_decoder(sd);
+> +
+> +	if (decoder->pdata && decoder->pdata->s_power)
 
-This won't allow the building of this code for a v7 ARM kernel with
-current tools.
+The probe() method will fail if pdata is NULL, so you can check decoder-
+>pdata->s_power only.
 
-I think this is likely to be too much dirsuption: requiring really
-new tools for Thumb-2 is unavoidable, but we should allow people
-using existing tools to build this to carry on with the current
-situation for the time being.  This is because of the fact that
-not all current tools can support "isb" and the iwmmxt mnemonics
-in the same file.
+> +		return decoder->pdata->s_power(sd, on);
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> +* tvp514x_enum_mbus_code - V4L2 sensor interface handler for pad_ops
+> +* @subdev: pointer to standard V4L2 sub-device structure
+> +* @fh: pointer to standard V4L2 sub-device file handle
+> +* @code: pointer to v4l2_subdev_pad_mbus_code_enum structure
+> +*/
+> +static int tvp514x_enum_mbus_code(struct v4l2_subdev *subdev,
+> +		struct v4l2_subdev_fh *fh,
+> +		struct v4l2_subdev_mbus_code_enum *code)
+> +{
+> +	if (code->index >= ARRAY_SIZE(tvp514x_std_list))
+> +		return -EINVAL;
+> +	code->code = V4L2_MBUS_FMT_UYVY8_2X8;
+> +
+> +	return 0;
+> +}
+> +
+> +static int tvp514x_get_pad_format(struct v4l2_subdev *subdev,
+> +		struct v4l2_subdev_fh *fh,
+> +		struct v4l2_subdev_format *fmt)
+> +{
+> +	struct tvp514x_decoder *decoder = to_decoder(subdev);
+> +	enum tvp514x_std current_std;
+> +
+> +	/* query the current standard */
+> +	current_std = tvp514x_query_current_std(subdev);
+> +	if (current_std == STD_INVALID) {
+> +		v4l2_err(subdev, "Unable to query std\n");
+> +		return -EINVAL;
+> +	}
 
-One thing we could do is to code the ISB using .long, since we
-only need this for Thumb kernels.
+Hmmmm... I'm not sure if I really like this. I have little experience with 
+analog video sources, so this code could be required, but having the format 
+changing dynamically out of the driver's control depending on the video source 
+looks to me like it will bring a whole new share of issues. I'd appreciate 
+comments and advises from developers used to the analog world on this.
 
-This would allow us to get rid of the Makefile warning, since the
-generated code would be the preferred v7 code in that case.
+> +
+> +	fmt->format = decoder->std_list[current_std].format;
+> +
+> +	return 0;
+> +}
+> +
+> +static int tvp514x_set_pad_format(struct v4l2_subdev *subdev,
+> +		struct v4l2_subdev_fh *fh,
+> +		struct v4l2_subdev_format *fmt)
+> +{
+> +	struct tvp514x_decoder *decoder = to_decoder(subdev);
+> +	enum tvp514x_std current_std;
+> +
+> +	/* query the current standard */
+> +	current_std = tvp514x_query_current_std(subdev);
+> +	if (current_std == STD_INVALID) {
+> +		v4l2_err(subdev, "Unable to query std\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	fmt->format.width = decoder->std_list[current_std].width;
+> +	fmt->format.height = decoder->std_list[current_std].height;
+> +	fmt->format.code = V4L2_MBUS_FMT_UYVY8_2X8;
+> +	fmt->format.field = V4L2_FIELD_INTERLACED;
+> +	fmt->format.colorspace = V4L2_COLORSPACE_SMPTE170M;
+> +
+> +	return 0;
+> +}
+> +
+> +static int tvp514x_enum_frame_size(struct v4l2_subdev *subdev,
+> +		struct v4l2_subdev_fh *fh,
+> +		struct v4l2_subdev_frame_size_enum *fse)
+> +{
+> +	struct tvp514x_decoder *decoder = to_decoder(subdev);
+> +	enum tvp514x_std current_std;
+> +
+> +	if (fse->code != V4L2_MBUS_FMT_UYVY8_2X8)
+> +		return -EINVAL;
+> +
+> +	/* query the current standard */
+> +	current_std = tvp514x_query_current_std(subdev);
+> +	if (current_std == STD_INVALID) {
+> +		v4l2_err(subdev, "Unable to query std\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	fse->min_width = decoder->std_list[current_std].width;
+> +	fse->min_height = decoder->std_list[current_std].height;
+> +	fse->max_width = fse->min_width;
+> +	fse->max_height = fse->min_height;
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> +* V4L2 subdev internal operations
+> +*/
+> +static int tvp514x_registered(struct v4l2_subdev *subdev)
+> +{
+> +	enum tvp514x_std current_std;
+> +
+> +	tvp514x_s_stream(subdev, 1);
+> +	/* query the current standard */
+> +	current_std = tvp514x_query_current_std(subdev);
+> +	if (current_std == STD_INVALID) {
+> +		v4l2_err(subdev, "Unable to query std\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	tvp514x_s_stream(subdev, 0);
+> +
+> +	return 0;
+> +}
+> +
+> +static int tvp514x_open(struct v4l2_subdev *subdev, struct v4l2_subdev_fh
+> *fh) +{
+> +	enum tvp514x_std current_std;
+> +
+> +	tvp514x_s_stream(subdev, 1);
+> +	/* query the current standard */
+> +	current_std = tvp514x_query_current_std(subdev);
+> +	if (current_std == STD_INVALID) {
+> +		v4l2_err(subdev, "Unable to query std\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	tvp514x_s_stream(subdev, 0);
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> +* V4L2 subdev core operations
+> +*/
+> +static int tvp514x_g_chip_ident(struct v4l2_subdev *subdev,
+> +				struct v4l2_dbg_chip_ident *chip)
+> +{
+> +	struct i2c_client *client = v4l2_get_subdevdata(subdev);
+> +
+> +	return v4l2_chip_ident_i2c_client(client, chip, V4L2_IDENT_TVP5146, 0);
+> +}
+> +
 
-Any comments on this?
+g_chip_ident isn't mandatory for MC-enabled subdev drivers, I'm not sure if 
+you should add it.
 
-Cheers
----Dave
+>  static const struct v4l2_ctrl_ops tvp514x_ctrl_ops = {
+>  	.s_ctrl = tvp514x_s_ctrl,
+>  };
+> 
+>  static const struct v4l2_subdev_core_ops tvp514x_core_ops = {
+> +	.g_chip_ident = tvp514x_g_chip_ident,
+>  	.g_ext_ctrls = v4l2_subdev_g_ext_ctrls,
+>  	.try_ext_ctrls = v4l2_subdev_try_ext_ctrls,
+>  	.s_ext_ctrls = v4l2_subdev_s_ext_ctrls,
+> @@ -965,6 +1131,12 @@ static const struct v4l2_subdev_core_ops
+> tvp514x_core_ops = { .queryctrl = v4l2_subdev_queryctrl,
+>  	.querymenu = v4l2_subdev_querymenu,
+>  	.s_std = tvp514x_s_std,
+> +	.s_power = tvp514x_s_power,
+> +};
+> +
+> +static struct v4l2_subdev_internal_ops tvp514x_subdev_internal_ops = {
+> +	.registered	= tvp514x_registered,
+> +	.open		= tvp514x_open,
+>  };
+> 
+>  static const struct v4l2_subdev_video_ops tvp514x_video_ops = {
+> @@ -979,9 +1151,17 @@ static const struct v4l2_subdev_video_ops
+> tvp514x_video_ops = { .s_stream = tvp514x_s_stream,
+>  };
+> 
+> +static const struct v4l2_subdev_pad_ops tvp514x_pad_ops = {
+> +	.enum_mbus_code = tvp514x_enum_mbus_code,
+> +	.enum_frame_size = tvp514x_enum_frame_size,
+> +	.get_fmt = tvp514x_get_pad_format,
+> +	.set_fmt = tvp514x_set_pad_format,
+> +};
+> +
+>  static const struct v4l2_subdev_ops tvp514x_ops = {
+>  	.core = &tvp514x_core_ops,
+>  	.video = &tvp514x_video_ops,
+> +	.pad = &tvp514x_pad_ops,
+>  };
+> 
+>  static struct tvp514x_decoder tvp514x_dev = {
+> @@ -1005,6 +1185,7 @@ tvp514x_probe(struct i2c_client *client, const struct
+> i2c_device_id *id) {
+>  	struct tvp514x_decoder *decoder;
+>  	struct v4l2_subdev *sd;
+> +	int ret;
+> 
+>  	/* Check if the adapter supports the needed features */
+>  	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
+> @@ -1046,6 +1227,17 @@ tvp514x_probe(struct i2c_client *client, const
+> struct i2c_device_id *id) sd = &decoder->sd;
+>  	v4l2_i2c_subdev_init(sd, client, &tvp514x_ops);
+> 
+> +	decoder->sd.internal_ops = &tvp514x_subdev_internal_ops;
+> +	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
+
+To be consistent you should probably use decoder->sd.flags here (or use sd-> 
+directly on the other lines).
+
+> +	decoder->pad.flags = MEDIA_PAD_FL_SOURCE;
+> +	decoder->sd.entity.type = MEDIA_ENT_T_V4L2_SUBDEV;
+> +	ret = media_entity_init(&decoder->sd.entity, 1, &decoder->pad, 0);
+> +	if (ret < 0) {
+> +		v4l2_err(client, "failed to register as a media entity!!\n");
+> +		kfree(decoder);
+> +		return ret;
+> +	}
+> +
+>  	v4l2_ctrl_handler_init(&decoder->hdl, 5);
+>  	v4l2_ctrl_new_std(&decoder->hdl, &tvp514x_ctrl_ops,
+>  		V4L2_CID_BRIGHTNESS, 0, 255, 1, 128);
+> @@ -1087,6 +1279,7 @@ static int tvp514x_remove(struct i2c_client *client)
+> 
+>  	v4l2_device_unregister_subdev(sd);
+>  	v4l2_ctrl_handler_free(&decoder->hdl);
+> +	media_entity_cleanup(&decoder->sd.entity);
+>  	kfree(decoder);
+>  	return 0;
+>  }
+> diff --git a/include/media/v4l2-subdev.h b/include/media/v4l2-subdev.h
+> index 257da1a..0e9aa30 100644
+> --- a/include/media/v4l2-subdev.h
+> +++ b/include/media/v4l2-subdev.h
+> @@ -514,9 +514,8 @@ struct v4l2_subdev_internal_ops {
+>     stand-alone or embedded in a larger struct.
+>   */
+>  struct v4l2_subdev {
+> -#if defined(CONFIG_MEDIA_CONTROLLER)
+>  	struct media_entity entity;
+> -#endif
+> +
+>  	struct list_head list;
+>  	struct module *owner;
+>  	u32 flags;
+> @@ -547,16 +546,13 @@ struct v4l2_subdev {
+>   */
+>  struct v4l2_subdev_fh {
+>  	struct v4l2_fh vfh;
+> -#if defined(CONFIG_VIDEO_V4L2_SUBDEV_API)
+>  	struct v4l2_mbus_framefmt *try_fmt;
+>  	struct v4l2_rect *try_crop;
+> -#endif
+>  };
+> 
+>  #define to_v4l2_subdev_fh(fh)	\
+>  	container_of(fh, struct v4l2_subdev_fh, vfh)
+> 
+> -#if defined(CONFIG_VIDEO_V4L2_SUBDEV_API)
+>  static inline struct v4l2_mbus_framefmt *
+>  v4l2_subdev_get_try_format(struct v4l2_subdev_fh *fh, unsigned int pad)
+>  {
+> @@ -568,7 +564,6 @@ v4l2_subdev_get_try_crop(struct v4l2_subdev_fh *fh,
+> unsigned int pad) {
+>  	return &fh->try_crop[pad];
+>  }
+> -#endif
+> 
+>  extern const struct v4l2_file_operations v4l2_subdev_fops;
+
+-- 
+Regards,
+
+Laurent Pinchart
