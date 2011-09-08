@@ -1,75 +1,130 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 8 Sep 2011 11:29:20 -0700
-Subject: [PATCH v3] net/smsc911x: add device tree probe support
-In-Reply-To: <20110908145946.GE2070@arm.com>
-References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
-	<1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
-	<20110908145946.GE2070@arm.com>
-Message-ID: <20110908182920.GL2967@ponder.secretlab.ca>
+Date: Thu, 8 Sep 2011 11:16:20 -0700
+Subject: [RFC PATCH 09/10] arm/dts: OMAP4: Add gpio nodes
+In-Reply-To: <1314191356-10963-10-git-send-email-b-cousson@ti.com>
+References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
+	<1314191356-10963-10-git-send-email-b-cousson@ti.com>
+Message-ID: <20110908181620.GH2967@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2011 at 03:59:46PM +0100, Dave Martin wrote:
-> Hi Shawn,
+On Wed, Aug 24, 2011 at 03:09:15PM +0200, Benoit Cousson wrote:
+> Add the 6 GPIOs controller nodes.
+> Since the GPIO driver is still under cleanup, a couple of temp
+> hacks are needed. They will be removed as soon as the driver will
+> be cleaned.
 > 
-> On Sun, Jul 31, 2011 at 02:26:00AM +0800, Shawn Guo wrote:
-> > It adds device tree probe support for smsc911x driver.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Steve Glendinning <steve.glendinning@smsc.com>
-> > Cc: David S. Miller <davem@davemloft.net>
-> > Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
-> > ---
-> > Changes since v2:
-> >  * Fix a typo in smsc911x.txt
-> > 
-> > Changes since v1:
-> >  * Instead of getting irq line from gpio number, it use irq domain
-> >    to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
-> >  * Use 'lan9115' the first model that smsc911x supports in the match
-> >    table
-> >  * Use reg-shift and reg-io-width which already used in of_serial for
-> >    shift and access size binding
+> Remove gpio static device initialisation if CONFIG_OF is defined.
 > 
-> When using this patch with vexpress, I found that 16-bit register access
-> mode doesn't seem to be getting set correctly.
-> 
-> Can you take a look at this additional patch and let me know if it looks
-> correct?
-> 
-> Cheers
-> ---Dave
-> 
-> From: Dave Martin <dave.martin@linaro.org>
-> Date: Wed, 7 Sep 2011 17:26:31 +0100
-> Subject: [PATCH] net/smsc911x: Correctly configure 16-bit register access from DT
-> 
-> The SMSC911X_USE_16BIT needs to be set when using 16-bit register
-> access.  However, currently no flag is set if the DT doesn't specify
-> 32-bit access.
-> 
-> This patch should set the SMSC911X_USE_16BIT flag in a manner consistent
-> with the documented DT bindings.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Charulatha V <charu@ti.com>
 > ---
->  drivers/net/smsc911x.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
+>  arch/arm/boot/dts/omap4.dtsi |   69 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/gpio.c   |    2 +
+>  2 files changed, 71 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
-> index 75c08a5..1a35c25 100644
-> --- a/drivers/net/smsc911x.c
-> +++ b/drivers/net/smsc911x.c
-> @@ -2121,6 +2121,8 @@ static int __devinit smsc911x_probe_config_dt(
->  	of_property_read_u32(np, "reg-io-width", &width);
->  	if (width == 4)
->  		config->flags |= SMSC911X_USE_32BIT;
-> +	else
-> +		config->flags |= SMSC911X_USE_16BIT;
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index 231d7b4..f672927 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -110,5 +110,74 @@
+>  			compatible = "ti,omap-spinlock";
+>  			hwmods = "spinlock";
+>  		};
+> +
+> +		gpio1: gpio at 1 {
+> +			compatible = "ti,omap4-gpio", "ti,omap-gpio";
+> +			hwmods = "gpio1";
+> +			/* id should not be needed with a global GPIO parent */
+> +			id = <1>;
+> +			bank_width = <32>;
+> +			debounce;
+> +			/* XXX: big hack until the bank_count is removed */
+> +			bank_count = <6>;
+> +			no_idle_on_suspend;
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +		};
+> +
+> +		gpio2: gpio at 2 {
+> +			compatible = "ti,omap4-gpio", "ti,omap-gpio";
+> +			hwmods = "gpio2";
+> +			id = <2>;
+> +			bank_width = <32>;
+> +			debounce;
+> +			no_idle_on_suspend;
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +		};
+> +
+> +		gpio3: gpio at 3 {
+> +			compatible = "ti,omap4-gpio", "ti,omap-gpio";
+> +			hwmods = "gpio3";
+> +			id = <3>;
+> +			bank_width = <32>;
+> +			debounce;
+> +			no_idle_on_suspend;
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +		};
+> +
+> +		gpio4: gpio at 4 {
+> +			compatible = "ti,omap4-gpio", "ti,omap-gpio";
+> +			hwmods = "gpio4";
+> +			id = <4>;
+> +			bank_width = <32>;
+> +			debounce;
+> +			no_idle_on_suspend;
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +		};
+> +
+> +		gpio5: gpio at 5 {
+> +			compatible = "ti,omap4-gpio", "ti,omap-gpio";
+> +			hwmods = "gpio5";
+> +			id = <5>;
+> +			bank_width = <32>;
+> +			debounce;
+> +			no_idle_on_suspend;
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +		};
+> +
+> +		gpio6: gpio at 6 {
+> +			compatible = "ti,omap4-gpio", "ti,omap-gpio";
+> +			hwmods = "gpio6";
+> +			id = <6>;
+> +			bank_width = <32>;
+> +			debounce;
+> +			no_idle_on_suspend;
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+> index 8cbfbc2..c51e952 100644
+> --- a/arch/arm/mach-omap2/gpio.c
+> +++ b/arch/arm/mach-omap2/gpio.c
+> @@ -16,6 +16,7 @@
+>   * GNU General Public License for more details.
+>   */
+>  
+> +#ifndef CONFIG_OF
+>  #include <linux/gpio.h>
+>  #include <linux/err.h>
+>  #include <linux/slab.h>
+> @@ -126,3 +127,4 @@ static int __init omap2_gpio_init(void)
+>  						NULL);
+>  }
+>  postcore_initcall(omap2_gpio_init);
+> +#endif
 
-Would it be better to do "else if (width == 2)"?  (completely
-uninformed comment.  I've not looked at what the non-DT probe path
-does on this driver.)
+Same as on earlier patch, don't #ifndef CONFIG_OF out non-DT code.
 
 g.
+
+> -- 
+> 1.7.0.4
+> 
