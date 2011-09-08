@@ -1,89 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 8 Sep 2011 10:56:18 +0200
-Subject: [PATCH v2 2/3] ARM: mx28evk: set a initial clock rate for saif
-In-Reply-To: <65EE16ACC360FA4D99C96DC085B3F77223E900@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1315403858-9904-1-git-send-email-b29396@freescale.com>
-	<1315403858-9904-3-git-send-email-b29396@freescale.com>
-	<20110907182142.GY28816@pengutronix.de>
-	<65EE16ACC360FA4D99C96DC085B3F77223E900@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <20110908085618.GC28816@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 8 Sep 2011 09:58:00 +0100
+Subject: [RFC PATCH 2/3] ARM: iwmmxt: Port problematic iwmmxt support
+	code to v7/Thumb-2
+In-Reply-To: <1790084.iooACCopcX@wuerfel>
+References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
+	<1315411158-17479-3-git-send-email-dave.martin@linaro.org>
+	<CAMPhdO927WucyKRjbj69ahD7xmu-7L-Vt1AkGe1yZsmXv4YS8A@mail.gmail.com>
+	<1790084.iooACCopcX@wuerfel>
+Message-ID: <20110908085800.GB2070@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello (must I say Dong or Aisheng here?)
-
-On Thu, Sep 08, 2011 at 08:03:17AM +0000, Dong Aisheng-B29396 wrote:
-> > -----Original Message-----
-> > From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
-> > Sent: Thursday, September 08, 2011 2:22 AM
-> > To: Dong Aisheng-B29396
-> > Cc: alsa-devel at alsa-project.org; s.hauer at pengutronix.de;
-> > broonie at opensource.wolfsonmicro.com; lrg at ti.com; linux-arm-
-> > kernel at lists.infradead.org; w.sang at pengutronix.de
-> > Subject: Re: [PATCH v2 2/3] ARM: mx28evk: set a initial clock rate for
-> > saif
+On Wed, Sep 07, 2011 at 10:35:46PM +0200, Arnd Bergmann wrote:
+> On Wednesday 07 September 2011 09:13:38 Eric Miao wrote:
+> > >
+> > > +/*
+> > > + * When enough people have binutils which support -march=...+iwmmxt, this
+> > > + * should change to #if __LINUX_ARM_ARCH__ < 7.
+> > > + */
+> > > +#ifndef CONFIG_THUMB2_KERNEL
+> > >        mrc     p15, 0, r1, c2, c0, 0
+> > >        sub     pc, lr, r1, lsr #32             @ cpwait and return
+> > > +#else
+> > > +       isb                                     @ ISB needed instead on ARMv7
+> > > +       mov     pc, lr
+> > > +#endif
 > > 
-> > On Wed, Sep 07, 2011 at 09:57:37PM +0800, Dong Aisheng wrote:
-> > > Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Cc: Wolfram Sang <w.sang@pengutronix.de>
-> > > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > > Cc: Liam Girdwood <lrg@ti.com>
-> > >
-> > > ---
-> > > No changes since v1.
-> > >
-> > > Note this patch still needs another patch from Wolfram to work.
-> > > I send out it in this series as
-> > > [PATCH 3/3] arm: mxs: disable clock-gates when setting saif-clocks
-> > If your patch 2 depends on patch 3 there is something fishy.
-> Yes, because the original saif clk setting code has some issues
-> Which can be fixed in patch 3.
-So patch 3 should come before patch 2 in the series.
-
-> > > As discussed with Wolfram, that patch may still have some later work
-> > > to do. However, we just send out it for testers to work first.
-> > > ---
-> > >  arch/arm/mach-mxs/clock-mx28.c |    9 +++++++++
-> > >  1 files changed, 9 insertions(+), 0 deletions(-)
-> > >
-> > > diff --git a/arch/arm/mach-mxs/clock-mx28.c
-> > > b/arch/arm/mach-mxs/clock-mx28.c index f0c7cb6..33cc2ff 100644
-> > > --- a/arch/arm/mach-mxs/clock-mx28.c
-> > > +++ b/arch/arm/mach-mxs/clock-mx28.c
-> > > @@ -826,6 +826,15 @@ int __init mx28_clocks_init(void)
-> > >  	clk_set_parent(&saif0_clk, &pll0_clk);
-> > >  	clk_set_parent(&saif1_clk, &pll0_clk);
-> > >
-> > > +	/*
-> > > +	 * Set an initial clk rate for saif's internal logic to work
-> > properly,
-> > > +	 * this is especially for the saif working on EXTMASTER mode that
-> > who
-> > > +	 * uses other saif's BITCLK&LRCLK but it still needs a basic clk
-> > which
-> > > +	 * should be bigger enough for its internal logic.
-> > This is not a proper (German) English sentence. Maybe this is better?:
-> > 
-> > 	Set an initial clock rate for the saif internal logic to work
-> > 	properly. This is important when working in EXTMASTER mode that
-> > 	uses the other saif's BITCLK&LRCLK but it still needs a basic
-> > 	clock which should be fast enough for the internal logic.
-> Yes, I think it's better. :)
-> I will change like that.
+> > Or maybe using ARM() and THUMB() will be a better fit here?
 > 
-> > > +	 */
-> > > +	clk_set_rate(&saif0_clk, 24000000);
-> > > +	clk_set_rate(&saif1_clk, 24000000);
-> > > +
-> > Do you need to check for clk_set_rate returning -ESOMETHING here?
-> Basically this rate setting will not fail in clock_init.
-> I noticed arch/arm/mach-mx5/clock-mx51-mx53.c also used like this.
-> Should I add an error checking here?
-Probably it's OK as is then.
+> I think it would be logical to use XSC() and PJ4() instead, as those are used
+> elsehere in this file. However, that doesn't work with the only binutils.
 
-Uwe
+I take pj4 and older platforms can never be built in the same kernel?
+Otherwise, this approach is totally broken anyway-- we'll generate code
+which won't run on some of the kernel's supported platforms.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> If the !THUMB code above is actually correct for v7 in ARM mode (i.e. it performs
+> the equivalent of an ISB), then I think we should leave it.
+
+With the proposed change to use cc-option in the Makefile,
+we have the option of using the v7 code whenever binutils supports
+it, and printing a warning otherwise.
+
+> It does look like it's whitespace broken though.
+
+I'll double-check that.
+
+Cheers
+---Dave
