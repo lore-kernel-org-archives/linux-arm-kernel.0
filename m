@@ -1,49 +1,248 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 8 Sep 2011 18:23:46 +0100
-Subject: [PATCH v2 3/3] ARM: pxa/pj4: Port problematic pj4 support code
-	to v7/Thumb-2
-In-Reply-To: <201109081844.21371.arnd@arndb.de>
-References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-	<1315497854-13311-4-git-send-email-dave.martin@linaro.org>
-	<201109081844.21371.arnd@arndb.de>
-Message-ID: <20110908172346.GH2070@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 8 Sep 2011 19:23:54 +0200
+Subject: [PATCH 5/8] ispccdc: Configure CCDC registers
+In-Reply-To: <1315488944-16190-1-git-send-email-deepthy.ravi@ti.com>
+References: <1315488944-16190-1-git-send-email-deepthy.ravi@ti.com>
+Message-ID: <201109081923.55365.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2011 at 06:44:21PM +0200, Arnd Bergmann wrote:
-> On Thursday 08 September 2011, Dave Martin wrote:
-> >         __asm__ __volatile__ (
-> >                 "mcr    p15, 0, %1, c1, c0, 2\n\t"
-> > +#ifdef __LINUX_ARM_ARCH__ >= 7
-> > +               "isb\n\t"
-> > +#else
-> >                 "mrc    p15, 0, %0, c1, c0, 2\n\t"
-> >                 "mov    %0, %0\n\t"
-> >                 "sub    pc, pc, #4\n\t"
-> > +#endif
-> >                 : "=r" (temp) : "r" (value));
-> >  }
+Hi,
+
+Thanks for the patch.
+
+On Thursday 08 September 2011 15:35:44 Deepthy Ravi wrote:
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> I thought we had concluded that we don't actually need the #else
-> path because there is no pre-v7 support for pj4 any more.
+> Configure the CCDC registers for YUV and non YUV
+> data. Also some code clean-up for making it compact.
+
+I've already posted patches to the linux-media mailing list for this. Can you 
+rebase this patch on top of them ?
+
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
+> ---
+>  drivers/media/video/omap3isp/ispccdc.c  |   65
+> +++++++++++++++++++++---------- drivers/media/video/omap3isp/ispreg.h   | 
+>   1 +
+>  drivers/media/video/omap3isp/ispvideo.c |    3 +
+>  3 files changed, 48 insertions(+), 21 deletions(-)
 > 
+> diff --git a/drivers/media/video/omap3isp/ispccdc.c
+> b/drivers/media/video/omap3isp/ispccdc.c index d58fe45..c583384 100644
+> --- a/drivers/media/video/omap3isp/ispccdc.c
+> +++ b/drivers/media/video/omap3isp/ispccdc.c
+> @@ -58,6 +58,7 @@ static const unsigned int ccdc_fmts[] = {
+>  	V4L2_MBUS_FMT_SBGGR12_1X12,
+>  	V4L2_MBUS_FMT_SGBRG12_1X12,
+>  	V4L2_MBUS_FMT_UYVY8_2X8,
+> +	V4L2_MBUS_FMT_YUYV8_2X8,
+>  };
+> 
+>  /*
+> @@ -788,11 +789,16 @@ static void ccdc_apply_controls(struct
+> isp_ccdc_device *ccdc) void omap3isp_ccdc_restore_context(struct
+> isp_device *isp)
+>  {
+>  	struct isp_ccdc_device *ccdc = &isp->isp_ccdc;
+> +	struct v4l2_mbus_framefmt *format;
+> 
+>  	isp_reg_set(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_CFG, ISPCCDC_CFG_VDLC);
+> 
+> -	ccdc->update = OMAP3ISP_CCDC_ALAW | OMAP3ISP_CCDC_LPF
+> -		     | OMAP3ISP_CCDC_BLCLAMP | OMAP3ISP_CCDC_BCOMP;
+> +	/* CCDC_PAD_SINK */
+> +	format = &ccdc->formats[CCDC_PAD_SINK];
+> +	if ((format->code != V4L2_MBUS_FMT_UYVY8_2X8) &&
+> +			(format->code != V4L2_MBUS_FMT_UYVY8_2X8))
+> +		ccdc->update = OMAP3ISP_CCDC_ALAW | OMAP3ISP_CCDC_LPF
+> +				| OMAP3ISP_CCDC_BLCLAMP | OMAP3ISP_CCDC_BCOMP;
+>  	ccdc_apply_controls(ccdc);
+>  	ccdc_configure_fpc(ccdc);
+>  }
+> @@ -966,14 +972,22 @@ static void ccdc_config_sync_if(struct
+> isp_ccdc_device *ccdc, u32 syn_mode = isp_reg_readl(isp,
+> OMAP3_ISP_IOMEM_CCDC,
+>  				     ISPCCDC_SYN_MODE);
+> 
+> +	syn_mode &= ~(ISPCCDC_SYN_MODE_VDHDOUT |
+> +			ISPCCDC_SYN_MODE_FLDOUT |
+> +			ISPCCDC_SYN_MODE_VDPOL |
+> +			ISPCCDC_SYN_MODE_HDPOL |
+> +			ISPCCDC_SYN_MODE_FLDPOL |
+> +			ISPCCDC_SYN_MODE_FLDMODE |
+> +			ISPCCDC_SYN_MODE_DATAPOL |
+> +			ISPCCDC_SYN_MODE_DATSIZ_MASK |
+> +			ISPCCDC_SYN_MODE_PACK8 |
+> +			ISPCCDC_SYN_MODE_INPMOD_MASK);
+> +
+>  	syn_mode |= ISPCCDC_SYN_MODE_VDHDEN;
+> 
+>  	if (syncif->fldstat)
+>  		syn_mode |= ISPCCDC_SYN_MODE_FLDSTAT;
+> -	else
+> -		syn_mode &= ~ISPCCDC_SYN_MODE_FLDSTAT;
+> 
+> -	syn_mode &= ~ISPCCDC_SYN_MODE_DATSIZ_MASK;
+>  	switch (syncif->datsz) {
+>  	case 8:
+>  		syn_mode |= ISPCCDC_SYN_MODE_DATSIZ_8;
+> @@ -991,28 +1005,18 @@ static void ccdc_config_sync_if(struct
+> isp_ccdc_device *ccdc,
+> 
+>  	if (syncif->fldmode)
+>  		syn_mode |= ISPCCDC_SYN_MODE_FLDMODE;
+> -	else
+> -		syn_mode &= ~ISPCCDC_SYN_MODE_FLDMODE;
+> 
+>  	if (syncif->datapol)
+>  		syn_mode |= ISPCCDC_SYN_MODE_DATAPOL;
+> -	else
+> -		syn_mode &= ~ISPCCDC_SYN_MODE_DATAPOL;
+> 
+>  	if (syncif->fldpol)
+>  		syn_mode |= ISPCCDC_SYN_MODE_FLDPOL;
+> -	else
+> -		syn_mode &= ~ISPCCDC_SYN_MODE_FLDPOL;
+> 
+>  	if (syncif->hdpol)
+>  		syn_mode |= ISPCCDC_SYN_MODE_HDPOL;
+> -	else
+> -		syn_mode &= ~ISPCCDC_SYN_MODE_HDPOL;
+> 
+>  	if (syncif->vdpol)
+>  		syn_mode |= ISPCCDC_SYN_MODE_VDPOL;
+> -	else
+> -		syn_mode &= ~ISPCCDC_SYN_MODE_VDPOL;
+> 
+>  	if (syncif->ccdc_mastermode) {
+>  		syn_mode |= ISPCCDC_SYN_MODE_FLDOUT | ISPCCDC_SYN_MODE_VDHDOUT;
+> @@ -1027,9 +1031,7 @@ static void ccdc_config_sync_if(struct
+> isp_ccdc_device *ccdc,
+> 
+>  			     | syncif->hlprf << ISPCCDC_PIX_LINES_HLPRF_SHIFT,
+> 
+>  			       OMAP3_ISP_IOMEM_CCDC,
+>  			       ISPCCDC_PIX_LINES);
+> -	} else
+> -		syn_mode &= ~(ISPCCDC_SYN_MODE_FLDOUT |
+> -			      ISPCCDC_SYN_MODE_VDHDOUT);
+> +	}
+> 
+>  	isp_reg_writel(isp, syn_mode, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SYN_MODE);
+> 
+> @@ -1181,6 +1183,9 @@ static void ccdc_configure(struct isp_ccdc_device
+> *ccdc)
+> 
+>  	isp_reg_writel(isp, syn_mode, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SYN_MODE);
+> 
+> +	if (format->code == V4L2_MBUS_FMT_UYVY8_2X8)
+> +		isp_reg_set(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_CFG,
+> +			    ISPCCDC_CFG_Y8POS);
+>  	/* Mosaic filter */
+>  	switch (format->code) {
+>  	case V4L2_MBUS_FMT_SRGGB10_1X10:
+> @@ -1200,7 +1205,10 @@ static void ccdc_configure(struct isp_ccdc_device
+> *ccdc) ccdc_pattern = ccdc_sgrbg_pattern;
+>  		break;
+>  	}
+> -	ccdc_config_imgattr(ccdc, ccdc_pattern);
+> +
+> +	if ((format->code != V4L2_MBUS_FMT_YUYV8_2X8) &&
+> +			(format->code != V4L2_MBUS_FMT_UYVY8_2X8))
+> +		ccdc_config_imgattr(ccdc, ccdc_pattern);
+> 
+>  	/* Generate VD0 on the last line of the image and VD1 on the
+>  	 * 2/3 height line.
+> @@ -1221,6 +1229,15 @@ static void ccdc_configure(struct isp_ccdc_device
+> *ccdc) << ISPCCDC_VERT_LINES_NLV_SHIFT,
+>  		       OMAP3_ISP_IOMEM_CCDC, ISPCCDC_VERT_LINES);
+> 
+> +	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SDOFST,
+> +		    ISPCCDC_SDOFST_LOFST_MASK << ISPCCDC_SDOFST_LOFST0_SHIFT);
+> +	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SDOFST,
+> +		    ISPCCDC_SDOFST_LOFST_MASK << ISPCCDC_SDOFST_LOFST1_SHIFT);
+> +	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SDOFST,
+> +		    ISPCCDC_SDOFST_LOFST_MASK << ISPCCDC_SDOFST_LOFST2_SHIFT);
+> +	isp_reg_clr(isp, OMAP3_ISP_IOMEM_CCDC, ISPCCDC_SDOFST,
+> +		    ISPCCDC_SDOFST_LOFST_MASK << ISPCCDC_SDOFST_LOFST3_SHIFT);
+> +
+>  	ccdc_config_outlineoffset(ccdc, ccdc->video_out.bpl_value, 0, 0);
+> 
+>  	/* CCDC_PAD_SOURCE_VP */
+> @@ -1270,6 +1287,7 @@ static void __ccdc_enable(struct isp_ccdc_device
+> *ccdc, int enable) ISPCCDC_PCR_EN, enable ? ISPCCDC_PCR_EN : 0);
+>  }
+> 
+> +static int __ccdc_handle_stopping(struct isp_ccdc_device *ccdc, u32
+> event); static int ccdc_disable(struct isp_ccdc_device *ccdc)
+>  {
+>  	unsigned long flags;
+> @@ -1280,6 +1298,11 @@ static int ccdc_disable(struct isp_ccdc_device
+> *ccdc) ccdc->stopping = CCDC_STOP_REQUEST;
+>  	spin_unlock_irqrestore(&ccdc->lock, flags);
+> 
+> +	__ccdc_lsc_enable(ccdc, 0);
+> +	__ccdc_enable(ccdc, 0);
+> +	ccdc->stopping = CCDC_STOP_EXECUTED;
+> +	__ccdc_handle_stopping(ccdc, CCDC_STOP_FINISHED);
+> +
 
-Ah, OK -- I somewhat missed the point, the was focusing on the other
-patches (I notice I didn't fix #ifdef to #if either...)
+This looks a bit unrelated. Could you please explain why that's needed ?
 
-Anyway, this patch can be drastically simplified -- i.e.,
-the #if conditional should just go away, along with the
-xscale-style code (which really doesn't make sense for a v7-only
-file).
+>  	ret = wait_event_timeout(ccdc->wait,
+>  				 ccdc->stopping == CCDC_STOP_FINISHED,
+>  				 msecs_to_jiffies(2000));
+> @@ -1735,7 +1758,7 @@ static int ccdc_set_stream(struct v4l2_subdev *sd,
+> int enable) * links are inactive.
+>  		 */
+>  		ccdc_config_vp(ccdc);
+> -		ccdc_enable_vp(ccdc, 1);
+> +		ccdc_enable_vp(ccdc, 0);
 
-So we'd end up with something like:
+Are you sure about this ?
 
-        __asm__ __volatile__ (
-                "mcr    p15, 0, %0, c1, c0, 2\n\t"
-                "isb"
-                : "r" (value));
+>  		ccdc->error = 0;
+>  		ccdc_print_status(ccdc);
+>  	}
+> @@ -2265,7 +2288,7 @@ int omap3isp_ccdc_init(struct isp_device *isp)
+> 
+>  	ccdc->vpcfg.pixelclk = 0;
+> 
+> -	ccdc->update = OMAP3ISP_CCDC_BLCLAMP;
+> +	ccdc->update = 0;
+>  	ccdc_apply_controls(ccdc);
+> 
+>  	return ccdc_init_entities(ccdc);
+> diff --git a/drivers/media/video/omap3isp/ispreg.h
+> b/drivers/media/video/omap3isp/ispreg.h index 69f6af6..ada39c6 100644
+> --- a/drivers/media/video/omap3isp/ispreg.h
+> +++ b/drivers/media/video/omap3isp/ispreg.h
+> @@ -827,6 +827,7 @@
+>  #define ISPCCDC_SDOFST_LOFST2_SHIFT		3
+>  #define ISPCCDC_SDOFST_LOFST1_SHIFT		6
+>  #define ISPCCDC_SDOFST_LOFST0_SHIFT		9
+> +#define ISPCCDC_SDOFST_LOFST_MASK              0x7
+>  #define EVENEVEN				1
+>  #define ODDEVEN					2
+>  #define EVENODD					3
+> diff --git a/drivers/media/video/omap3isp/ispvideo.c
+> b/drivers/media/video/omap3isp/ispvideo.c index ff0ffed..d595d01 100644
+> --- a/drivers/media/video/omap3isp/ispvideo.c
+> +++ b/drivers/media/video/omap3isp/ispvideo.c
+> @@ -104,6 +104,9 @@ static struct isp_format_info formats[] = {
+>  	{ V4L2_MBUS_FMT_UYVY8_2X8, V4L2_MBUS_FMT_UYVY8_2X8,
+>  	  V4L2_MBUS_FMT_UYVY8_2X8, 0,
+>  	  V4L2_PIX_FMT_UYVY, 16, },
+> +	{ V4L2_MBUS_FMT_YUYV8_2X8, V4L2_MBUS_FMT_YUYV8_2X8,
+> +	  V4L2_MBUS_FMT_YUYV8_2X8, 0,
+> +	  V4L2_PIX_FMT_YUYV, 16, },
+>  };
+> 
+>  const struct isp_format_info *
 
-Better?
+-- 
+Regards,
 
-Cheers
----Dave
+Laurent Pinchart
