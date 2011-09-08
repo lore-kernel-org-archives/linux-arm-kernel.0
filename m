@@ -1,63 +1,60 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 8 Sep 2011 09:53:40 +0100
-Subject: [RFC PATCH 1/3] ARM: iwmmxt: Fix Makefile rules for building
-	iwmmxt for Thumb-2
-In-Reply-To: <1372213.9xxOYOJ3Ii@wuerfel>
-References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
-	<CAMPhdO8tv9aFNcghySViCrTt97jzEw5rPfKo6AaU9DrQ32tTJA@mail.gmail.com>
-	<alpine.LFD.2.00.1109071306530.20358@xanadu.home>
-	<1372213.9xxOYOJ3Ii@wuerfel>
-Message-ID: <20110908085340.GA2070@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Sep 2011 09:54:49 +0100
+Subject: KVM ARM interrupt virtualization
+In-Reply-To: <CAOMgcGJBoeKJ8FjDW9eESfT+FiXmFF9PfShJ=a2adbESLD2YkA@mail.gmail.com>
+References: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>
+	<CAHkRjk6Vm2yNLm8Gzk3+4mYAfiXVjufv2xc0Kc-6ac-oS4zytw@mail.gmail.com>
+	<CAOMgcGJBoeKJ8FjDW9eESfT+FiXmFF9PfShJ=a2adbESLD2YkA@mail.gmail.com>
+Message-ID: <20110908085449.GA29243@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 07, 2011 at 10:32:09PM +0200, Arnd Bergmann wrote:
-> On Wednesday 07 September 2011 13:18:21 Nicolas Pitre wrote:
-> > > > +
-> > > > +# When enough people have binutils which support -march=...+iwmmxt, this
-> > > > +# should change to something like if __LINUX_ARM_ARCH__ < 7.
-> > > > +ifdef CONFIG_THUMB2_KERNEL
-> > > > +AFLAGS_iwmmxt.o                        := -Wa,-march=armv7-a+iwmmxt
-> > > > +else
-> > > >  AFLAGS_iwmmxt.o                        := -Wa,-mcpu=iwmmxt
-> > > > +endif
-> > > 
-> > > It looks more like the switch should depend on the compiler version.
-> > > Unless there is a clear way to decide if gcc supports this switch, I
-> > > think it's reasonable to have the change like above.
-> > 
-> > Normally the way to go with gcc version dependent alternatives is to use 
-> > something like:
-> > 
-> > AFLAGS_foo.o := $(call cc-option,<the_new_flag>,<the_fallback_flag>)
-> > 
-> > This will test if <the_new_flag> is supported by the used gcc, and use 
-> > the fallback otherwise.
+On Thu, Sep 08, 2011 at 02:44:45AM +0100, carson bill wrote:
+> 2011/9/7 Catalin Marinas <catalin.marinas@arm.com>:
+> > On 2 September 2011 04:01, carson bill <bill4carson@gmail.com> wrote:
+> >> I am trying to put interrupt virtualization support into KVM ARM
+> >> implementation by Christoffer.
+...
+> >> Problem:
+> >> ? ?I did the experiment, and found the biggest obstoble on the way
+> >> ? ?is creating the mapping.
+> >>
+> >> ? ?arch/arm/mach-vexpress/include/mach/ct-ca9x4.h
+> >> ? ?#define CT_CA9X4_MPIC ? ? ? (0x1e000000)
+> >> ? ?#define A9_MPCORE_SCU ? ? ? (CT_CA9X4_MPIC + 0x0000)
+> >> ? ?#define A9_MPCORE_GIC_CPU ? (CT_CA9X4_MPIC + 0x0100)
+> >> ? ?#define A9_MPCORE_GIT ? ? ? (CT_CA9X4_MPIC + 0x0200)
+> >> ? ?#define A9_MPCORE_TWD ? ? ? (CT_CA9X4_MPIC + 0x0600)
+> >> ? ?#define A9_MPCORE_GIC_DIST ?(CT_CA9X4_MPIC + 0x1000)
+> >>
+> >> ? ?If I create an identical mapping at A9_MPCORE_GIC_CPU, all the iomem
+> >> ? ?from CT_CA9X4_MPIC ~ CT_CA9X4_MPIC + 0x1000 could be access for
+> >> ? ?Guest OS, which means access to SCU/GIT/TWD will not been trapped
+> >> ? ?any more.
+> >
+> > Shouldn't you use the CT_CA15X4_MPIC base address? As for TWD, with
+> > A15 we use the generic timers (which also have support for
+> > virtualisation). The SCU doesn't need to be touched on A15, AFAIK.
+...
+> Thanks Catalin for your reply :)
 > 
-> Yes, that's possible here, but it's not actually correct either, because the
-> CPU core that we are running on is either a v5 XScale with iwmmxt or
-> a v7 pj4 with iwmmxt. Now, it should not really matter if we build the
-> code with flags for a different more complex instruction set, but it can
-> potentially hide bugs.
-> 
-> I think the simple solution that Dave posted is actually more appropriate.
-> The three possible cases are:
-> 
-> v5+iwmmxt: always use -Wa,-mcpu=iwmmxt as we've always done, and it's correct
-> v7+iwmmxt+arm: still use -Wa,-mcpu=iwmmxt, not correct but close enough and
->                is known to build the file with all existing toolchaings
-> v7+iwmmxt+thumb2: always use -Wa,-march=armv7-a+iwmmxt, which is correct and
-> 		      the only possible way to build this file anyway. Old toolchains
-> 		      will fail and there is nothing we can do about it.
+> Do you mean Guest OS have to be built with A15 too ?
 
-There is another option, which is to use cc-option and then check the
-result in AFLAGS_iwmmxt.o, throwing an error from the Makefile as
-necessary.
+Only if you need to benefit from the virtual GIC interface. The GIC CPU
+interface on A9 starts at offset 0x100, which isn't multiple of
+PAGE_SIZE, so there is no way to map the GICV page (PAGE_SIZE aligned)
+there. As you noted, there are other private peripherals in the same
+page like TWD. This was cleaned up with A15 making the GIC interfaces
+page-aligned.
 
-I'll have a go at that if nobody has any objections.
+> Currently Versatile Express Cortex-A9x4 tile is used as Guest OS.
+> That's why I have to map A9_MPCORE_GIC_CPU from Guest OS into
+> A15_MPCORE_GIC_CPU at host side.
 
-There doesn't seem to be any cleaner way to catch this error -- compiler
-version issues are invisible to Kconfig.
+Can the guest OS not run with the VE/A15 memory map? You don't even need
+to have LPAE enabled, just the A15 core tile support for VE
+(unfortunately kernel.org is down now and cannot point you to the
+relevant patches).
 
-Cheers
----Dave
+-- 
+Catalin
