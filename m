@@ -1,70 +1,39 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 8 Sep 2011 11:18:19 -0700
-Subject: [RFC PATCH 10/10] documentation/dt: Add OMAP GPIO properties
-In-Reply-To: <1314191356-10963-11-git-send-email-b-cousson@ti.com>
-References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-	<1314191356-10963-11-git-send-email-b-cousson@ti.com>
-Message-ID: <20110908181819.GI2967@ponder.secretlab.ca>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 08 Sep 2011 11:27:25 -0700
+Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
+	gic_arch_extn
+In-Reply-To: <1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Sun, 4 Sep 2011 19:24:14 +0530")
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <878vpyhotu.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 03:09:16PM +0200, Benoit Cousson wrote:
-> Add documentation for GPIO properties specific to OMAP.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Randy Dunlap <rdunlap@xenotime.net>
-> ---
->  .../devicetree/bindings/gpio/gpio-omap.txt         |   33 ++++++++++++++++++++
->  1 files changed, 33 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
-> new file mode 100644
-> index 0000000..692b1c7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
-> @@ -0,0 +1,33 @@
-> +OMAP GPIO controller
-> +
-> +Required properties:
-> +- compatible:
-> +  - "ti,omap2-gpio" for OMAP2 and OMAP3 controllers
-> +  - "ti,omap4-gpio" for OMAP4 controller
-> +- #gpio-cells : Should be two.
-> +  - first cell is the pin number
-> +  - second cell is used to specify optional parameters (unused)
-> +- gpio-controller : Marks the device node as a GPIO controller.
-> +
-> +OMAP specific properties:
-> +- hwmods: Name of the hwmod associated to the GPIO
-> +- id: 32 bits to identify the id (1 based index)
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-id should not be necessary.  Linux GPIO numbers are to be dynamically
-assigned when using DT.
+> OMAP WakeupGen is the interrupt controller extension used along
+> with ARM GIC to wake the CPU out from low power states on
+> external interrupts.
+>
+> The WakeupGen unit is responsible for generating wakeup event
+> from the incoming interrupts and enable bits. It is implemented
+> in MPU always ON power domain. During normal operation,
+> WakeupGen delivers external interrupts directly to the GIC.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-> +- bank_width: number of pin supported by the controller (16 or 32)
-> +- debounce: set if the controller support the debouce funtionnality
-> +- bank_count: number of controller support by the SoC. This is a temporary
-> +  hack until the bank_count is removed from the driver.
+[...]
 
-All these properties should be prefixed with "ti,".
-Use '-' instead of '_' in property names
+> +#ifdef CONFIG_PM
+> +/*
+> + * Masking wakeup irqs is handled by the IRQCHIP_MASK_ON_SUSPEND flag,
+> + * so no action is necessary in set_wake, but implement an empty handler
+> + * here to prevent enable_irq_wake() returning an error.
+> + * FIXME: Remove the dummy handler once gen irq code fix above.
+> + */
 
-> +
-> +
-> +Example:
-> +
-> +gpio4: gpio4 {
-> +    compatible = "ti,omap4-gpio", "ti,omap-gpio";
-> +    hwmods = "gpio4";
-> +    id = <4>;
-> +    bank_width = <32>;
-> +    debounce;
-> +    no_idle_on_suspend;
-> +    #gpio-cells = <2>;
-> +    gpio-controller;
-> +};
-> +
-> -- 
-> 1.7.0.4
-> 
+Just curious... is there a fix for this pending for v3.2?
+
+Kevin
