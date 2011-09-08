@@ -1,33 +1,86 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 8 Sep 2011 23:22:23 +0800
-Subject: [PATCH 6/6] arm/imx6q: add suspend/resume support
-In-Reply-To: <20110908074718.GA14953@n2100.arm.linux.org.uk>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-7-git-send-email-shawn.guo@linaro.org>
-	<CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
-	<20110908062301.GK8148@S2100-06.ap.freescale.net>
-	<20110908074718.GA14953@n2100.arm.linux.org.uk>
-Message-ID: <20110908152222.GA31581@S2100-06.ap.freescale.net>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 08 Sep 2011 17:15:03 +0200
+Subject: [alsa-devel] [PATCH] ASoC: omap: convert per-board modules to
+	platform drivers
+In-Reply-To: <1315494354-17597-1-git-send-email-mans.rullgard@linaro.org>
+References: <1315494354-17597-1-git-send-email-mans.rullgard@linaro.org>
+Message-ID: <4E68DBF7.1030009@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2011 at 08:47:18AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Sep 08, 2011 at 02:23:02PM +0800, Shawn Guo wrote:
-> > Yes, if you lose L2 power in suspend, it's the easiest way for you to
-> > resume L2.
-> > 
-> > For my case which retains L2, I actually do not want to call this
-> > function which will invalidate L2.  But since we still have problem
-> > to use rmk's generic suspend/resume updates (ARM: pm: add L2 cache
-> > cleaning for suspend), we have to flush the entire L2 on imx6q for now.
-> 
-> OMAP44xx has the same problem but they re-initialize L2 on resume in
-> their pre-cpu_resume() assembly code.
-> 
-Are you suggesting that this might be the reason why imx6q has problem
-with your patch?  Are we supposed to re-initialize L2 before calling
-into generic cpu_resume()?
+On 09/08/2011 05:05 PM, Mans Rullgard wrote:
+> This converts the per-board modules to platform drivers for a
+> device created by in main platform setup.  These drivers call
+> snd_soc_register_card() directly instead of going via a "soc-audio"
+> device and the corresponding driver in soc-core.
+>
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index 5b8ca68..7cb93d9 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -299,6 +299,11 @@ static struct platform_device omap_pcm = {
+>  	.id	= -1,
+>  };
+>  
+> +static struct platform_device omap_soc_audio = {
+> +	.name	= "omap-soc-audio",
+> +	.id	= -1,
+> +};
+> +
+>  /*
+>   * OMAP2420 has 2 McBSP ports
+>   * OMAP2430 has 5 McBSP ports
+> @@ -323,6 +328,7 @@ static void omap_init_audio(void)
+>  		platform_device_register(&omap_mcbsp5);
+>  
+>  	platform_device_register(&omap_pcm);
+> +	platform_device_register(&omap_soc_audio);
+>  }
+>  
+>  #else
+> diff --git a/sound/soc/omap/am3517evm.c b/sound/soc/omap/am3517evm.c
+> index 73dde4a..fcd18af 100644
+> --- a/sound/soc/omap/am3517evm.c
+> +++ b/sound/soc/omap/am3517evm.c
+> @@ -151,45 +151,60 @@ static struct snd_soc_card snd_soc_am3517evm = {
+>  	.num_links = 1,
+>  };
+>  
+> [...]
+> +static struct platform_driver am3517evm_driver = {
+> +	.driver = {
+> +		.name = "omap-soc-audio",
+> +		.owner = THIS_MODULE,
+> +	},
+>  
+> -	return ret;
+> +	.probe = am3517evm_soc_probe,
+> +	.remove = __devexit_p(am3517evm_soc_remove),
+> +};
+> +[...]
+> +
+> +static struct platform_driver igep2_driver = {
+> +	.driver = {
+> +		.name = "omap-soc-audio",
+> +		.owner = THIS_MODULE,
+> +	},
+> +
+> +	.probe = igep2_soc_probe,
+> +	.remove = __devexit_p(igep2_soc_remove),
+> +};
+> [...]
+>  
+> +static struct platform_driver n810_driver = {
+> +	.driver = {
+> +		.name = "omap-soc-audio",
+> +		.owner = THIS_MODULE,
+> +	},
+> +
+> +	.probe = n810_soc_probe,
+> +	.remove = __devexit_p(n810_soc_remove),
+> +};
+> [...]
 
--- 
-Regards,
-Shawn
+This isn't really any better then using the soc-core device, since all your
+drivers are still named the same. udev still wouldn't know which one to load.
+Use different device driver names for different drivers.
