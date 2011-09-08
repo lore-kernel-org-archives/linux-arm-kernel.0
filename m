@@ -1,42 +1,124 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Thu, 8 Sep 2011 16:58:41 +0800
-Subject: [RFC PATCH 3/3] ARM: pxa/pj4: Port problematic pj4 support
-	code to v7/Thumb-2
-In-Reply-To: <52624752.OdLlzNdq0G@wuerfel>
-References: <1315411158-17479-1-git-send-email-dave.martin@linaro.org>
-	<1315411158-17479-4-git-send-email-dave.martin@linaro.org>
-	<CAMPhdO-wW5yfrpey7QK-F4M6t5L9zVyO5p8Vk_PFtT7aZP1hbQ@mail.gmail.com>
-	<52624752.OdLlzNdq0G@wuerfel>
-Message-ID: <1315472321.1985.29.camel@Lily>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 8 Sep 2011 10:09:31 +0100
+Subject: [PATCH 1/3 v3] ARM Realview PCIX map include file changes
+In-Reply-To: <201109051635.59927.arnd@arndb.de>
+References: <20110822130507.23830.26191.stgit@e102602-lin.cambridge.arm.com>
+	<20110822130942.23830.4767.stgit@e102602-lin.cambridge.arm.com>
+	<201109051635.59927.arnd@arndb.de>
+Message-ID: <20110908090931.GD14953@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-09-07 at 13:27 -0700, Arnd Bergmann wrote:
-> On Wednesday 07 September 2011 09:18:15 Eric Miao wrote:
-> > > diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-> > > index a4b1b07..5117d9d 100644
-> > > --- a/arch/arm/kernel/pj4-cp0.c
-> > > +++ b/arch/arm/kernel/pj4-cp0.c
-> > > @@ -66,9 +66,13 @@ static void __init pj4_cp_access_write(u32 value)
-> > >
-> > >        __asm__ __volatile__ (
-> > >                "mcr    p15, 0, %1, c1, c0, 2\n\t"
-> > > +#ifdef __LINUX_ARM_ARCH__ >= 7
-> > > +               "isb\n\t"
-> > > +#else
-> > >                "mrc    p15, 0, %0, c1, c0, 2\n\t"
-> > >                "mov    %0, %0\n\t"
-> > >                "sub    pc, pc, #4\n\t"
-> > > +#endif
-> > 
-> > Haojian,
-> > 
-> > Could you check internally if isb() will work here as PJ4 is both v6/v7
-> > compatible, and if it's in v7 mode, I guess isb() can be safely used here?
-> 
-PJ4 v6 mode is abandoned in real usage. So we only need to cover v7
-mode.
+Colin,
 
-> I thought we only support pj4 in v7 mode in Linux anyway.
+Please can you answer Arnd's concerns.  He's right that these points
+have been brought up before, they've also been discussed on the list
+a number of times with regards to other platforms too.
+
+Note that Arnd sent a follow-up email to the one below correcting a
+small mistake in his comments.
+
+Thanks.
+
+On Mon, Sep 05, 2011 at 04:35:59PM +0200, Arnd Bergmann wrote:
+> On Monday 22 August 2011, Colin Tuckley wrote:
+> > This patch adds the memory map PCI support to the include
+> > files for the Realview Northbridge based boards.
+> > 
+> > Signed-off-by: Colin Tuckley <colin.tuckley@arm.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> Hi Colin,
+> 
+> I think we've discussed this before. I think it's good to
+> have PCI support enabled in realview, but please do the
+> PIO window properly.
+> 
+> > diff --git a/arch/arm/mach-realview/include/mach/hardware.h b/arch/arm/mach-realview/include/mach/hardware.h
+> > index 8a638d1..dcc64f2 100644
+> > --- a/arch/arm/mach-realview/include/mach/hardware.h
+> > +++ b/arch/arm/mach-realview/include/mach/hardware.h
+> > +/*
+> > + * PCI space physical addresses and sizes
+> > + */
+> > +#define REALVIEW_PB_PCI_BASE		0x90040000	/* PCI-X Unit base */
+> > +#define REALVIEW_PB_PCI_BASE_SIZE	0x00010000	/* 4 Kb + 60Kb reserved */
+> > +#define REALVIEW_PB_PCI_IO_BASE		0x90050000	/* IO Region on AHB */
+> > +#define REALVIEW_PB_PCI_IO_SIZE		0x00010000	/* 64 Kb */
+> > +#define REALVIEW_PB_PCI_IO_LIMIT       (REALVIEW_PB_PCI_IO_BASE + REALVIEW_PB_PCI_IO_SIZE - 1)
+> > +#define REALVIEW_PB_PCI_MEM_BASE	0xA0000000	/* MEM Region on AHB */
+> > +#define REALVIEW_PB_PCI_MEM_SIZE	0x20000000	/* 512 MB */
+> > +
+> > +#define REALVIEW_ISSP_REG_BASE		0x100E3000
+> 
+> As you write here, the I/O window size is 64KB, which is totally normal
+> for PCI buses.
+> 
+> > +#ifdef CONFIG_PCI
+> > +#if !defined(__ASSEMBLY__)
+> > +static inline unsigned int pcibios_min_io(void)
+> > +{
+> > +	if (machine_is_realview_pb11mp() || machine_is_realview_pba8() ||
+> > +	    machine_is_realview_pbx())
+> > +		return REALVIEW_PB_PCI_IO_BASE;
+> > +	else
+> > +		return 0;
+> > +}
+> 
+> pcibios_min_io should be 0x1000 as a constant, in order to get the
+> ISA addresses out of the way, but there is no need to make it
+> board dependent.
+> 
+> > +static inline unsigned int pcibios_min_mem(void)
+> > +{
+> > +	if (machine_is_realview_pb11mp() || machine_is_realview_pba8() ||
+> > +	    machine_is_realview_pbx())
+> > +		return REALVIEW_PB_PCI_MEM_BASE;
+> > +	else
+> > +		return 0;
+> > +}
+> > +#endif
+> 
+> Just hardcode this to REALVIEW_PB_PCI_MEM_BASE
+> 
+> > diff --git a/arch/arm/mach-realview/include/mach/io.h b/arch/arm/mach-realview/include/mach/io.h
+> > index f05bcdf..aa97d18 100644
+> > --- a/arch/arm/mach-realview/include/mach/io.h
+> > +++ b/arch/arm/mach-realview/include/mach/io.h
+> > @@ -20,9 +20,25 @@
+> >  #ifndef __ASM_ARM_ARCH_IO_H
+> >  #define __ASM_ARM_ARCH_IO_H
+> >  
+> > +#include <asm/mach-types.h>
+> > +#include <mach/hardware.h>
+> > +
+> >  #define IO_SPACE_LIMIT 0xffffffff
+> 
+> The IO_SPACE_LIMIT should match the REALVIEW_PB_PCI_IO_BASE above.
+> 
+> > -#define __io(a)		__typesafe_io(a)
+> > +static inline void __iomem *__io(unsigned long addr)
+> > +{
+> > +#ifdef CONFIG_PCI
+> > +	/* check for PCI I/O space */
+> > +	if (addr >= REALVIEW_PB_PCI_IO_BASE && addr <= REALVIEW_PB_PCI_IO_LIMIT)
+> > +		return (void __iomem *)((addr - REALVIEW_PB_PCI_IO_BASE) + REALVIEW_PCI_IO_VBASE);
+> > +	else
+> > +		return (void __iomem *)addr;
+> > +#else
+> > +	return (void __iomem *)addr;
+> > +#endif
+> > +}
+> 
+> And there is no need to do these tricks when you only have a single
+> PCI bus. Just define the PIO window to be based on zero and 64K
+> in size, and hardcode that, to end up with
+> 
+> #define __io(a)  (REALVIEW_PCI_IO_VBASE + (a & IO_SPACE_LIMIT))
 > 
 > 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
