@@ -1,40 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Sep 2011 16:56:43 +0200
-Subject: [RFC PATCH v2 3/3] ARM: SoC: convert VExpress/RealView to SoC
-	descriptor
-In-Reply-To: <1315579616-27388-4-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 9 Sep 2011 17:06:39 +0200
+Subject: [RFC PATCH v2 2/3] ARM: SoC: Add per SoC SMP and CPU hotplug
+	operations
+In-Reply-To: <4E6A28F8.4070606@ti.com>
 References: <1315579616-27388-1-git-send-email-marc.zyngier@arm.com>
-	<1315579616-27388-4-git-send-email-marc.zyngier@arm.com>
-Message-ID: <201109091656.44068.arnd@arndb.de>
+	<1315579616-27388-3-git-send-email-marc.zyngier@arm.com>
+	<4E6A28F8.4070606@ti.com>
+Message-ID: <201109091706.39621.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 September 2011, Marc Zyngier wrote:
-> Convert both Realview and VExpress to use the SoC descriptor to
-> provide their SMP and CPU hotplug operation.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Friday 09 September 2011, Santosh wrote:
+> Sorry for such a basic question but I don't understand the need
+> of these wrappers.
+> I am not upto speed on this topic but what is the motivation
+> behind the soc_smp_ops(). All of above functions are CPU specific
+> and not really soc specific though, I agree that every SOC,
+> implements it's own version.
 
-Yes, looks good to me.
+We have two separate problems to solve that we should not confuse:
 
->  }
-> +
-> +struct arm_soc_desc realview_soc_desc __initdata = {
-> +       .name           = "ARM RealView Platform",
-> +#ifdef CONFIG_SMP
-> +       .smp_ops        = &realview_soc_smp_ops,
-> +#endif
-> +};
+1. Get multiple soc platforms to compile together in a single kernel
+   binary.
+2. Share as much code as possible between similar soc platforms.
 
-Do you think we should have a macro for this? Since this is
-always the same, we could do something like
+Marc's patch only addresses the first problem, and we need that
+anyway if we want to get e.g. cortex-a9 based systems to be
+supported in the same kernel as Qualcomm and Marvell CPU based
+ones.
 
-#ifdef CONFIG_SMP
-#define soc_smp_ops(ops)	.smp_ops = &(ops),
-#else
-#define soc_smp_ops(ops)	/* empty */
-#endif
+The other part is useful too, but it's easier to do after this one.
 
 	Arnd
