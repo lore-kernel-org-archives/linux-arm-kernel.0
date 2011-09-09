@@ -1,41 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 9 Sep 2011 09:45:48 -0700
-Subject: [PATCH] arm/dt: Add SoC detection macros
-In-Reply-To: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
-References: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
-Message-ID: <CAOesGMj7cwJ-B9cc0DbJ=ePMWeQtp6UiMQT7HCBdOxsmyJReZg@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Fri, 09 Sep 2011 22:29:49 +0530
+Subject: [PATCH 14/25] OMAP4: PM: Add CPUX OFF mode support
+In-Reply-To: <20110909152729.GG32138@S2100-06.ap.freescale.net>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-15-git-send-email-santosh.shilimkar@ti.com>
+	<20110909080416.GF31581@S2100-06.ap.freescale.net>
+	<4E69C9CF.6090709@ti.com>
+	<20110909141321.GC32138@S2100-06.ap.freescale.net>
+	<CAMQu2gxeDzFGyhsXK-wDkyiJRoD6_GN58m=3_=NC8yKa_ThJnQ@mail.gmail.com>
+	<20110909152729.GG32138@S2100-06.ap.freescale.net>
+Message-ID: <4E6A4605.3050305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 9, 2011 at 1:02 AM, Allen Martin <amartin@nvidia.com> wrote:
-> These macros allow runtime query of SoC family and version via
-> soc_is_*() ?If the corresponding SoC is not configured the macro will
-> evaluate to 0. ?If the corresponding SoC is the only architecure
-> configured, the macro will evaluate to 1. ?If multiple architecures
-> are configured the macro will evaluate to a runtime call to
-> soc_get_version().
+On Friday 09 September 2011 08:57 PM, Shawn Guo wrote:
+> On Fri, Sep 09, 2011 at 07:41:08PM +0530, Shilimkar, Santosh wrote:
+>> On Fri, Sep 9, 2011 at 7:43 PM, Shawn Guo<shawn.guo@freescale.com>  wrote:
+>>> On Fri, Sep 09, 2011 at 01:39:51PM +0530, Santosh wrote:
+>>>> On Friday 09 September 2011 01:34 PM, Shawn Guo wrote:
+>>>>> Hi Santosh,
 
-> +void soc_init_version(void)
-> +{
-> + ? ? ? if (of_machine_is_compatible("nvidia,tegra20"))
-> + ? ? ? ? ? ? ? soc_version = TEGRA_T20;
-> + ? ? ? else if (of_machine_is_compatible("nvidia,tegra30"))
-> + ? ? ? ? ? ? ? soc_version = TEGRA_T30;
-> + ? ? ? else
-> + ? ? ? ? ? ? ? panic("Unknown SoC");
-> +}
+[...]
 
+>> #ifdef CONFIG_CACHE_L2X0
+>> 	/*
+>> 	 * Clean and invalidate the L2 cache.
+>> 	 * Common cache-l2x0.c functions can't be used here since it
+>> 	 * uses spinlocks. We are out of coherency here with data cache
+>> 	 * disabled. The spinlock implementation uses exclusive load/store
+>> 	 * instruction which can fail without data cache being enabled.
+>> 	 * OMAP4 hardware doesn't support exclusive monitor which can
+>> 	 * overcome exclusive access issue. Because of this, CPU can
+>> 	 * lead to deadlock.
+>> 	 */
+>> l2x_clean_inv:
+>> 	bl	omap4_get_sar_ram_base
+>> 	mov	r8, r0
+>> 	mrc	p15, 0, r5, c0, c0, 5		@ Read MPIDR
+>> 	ands	r5, r5, #0x0f
+>> 	ldreq	r0, [r8, #L2X0_SAVE_OFFSET0]
+>> 	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]
+>> 	cmp	r0, #3
+>> 	bne	do_WFI
+>
+> It looks like you are bypassing L2 clean and invalidate for cases
+> "1" and "2" here.  But I really do not understand how you get r0
+> back here.
+>
+The value which is passed in R0 is also stored in scratch patch memory
+and retrieved using L2X0_SAVE_OFFSET0.
+Simple :)
 
-The above should be enough for your local code, no need to wrap it in
-layers of indirection.
-
-Sure, doing the of_machine_is...() calls are slow, but you shouldn't
-be doing runtime decisions about what SoC you are on during critical
-path anyway -- it should be done at setup/probe time, much of the rest
-should be possible to handle with setting appropriate function
-pointers, etc.
-
-Also, panic:ing is unacceptable.
-
-
--Olof
+Regards
+Santosh
