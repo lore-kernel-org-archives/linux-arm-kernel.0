@@ -1,8 +1,10 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Fri, 09 Sep 2011 14:00:51 -0400
+Date: Fri, 09 Sep 2011 14:01:36 -0400
 Subject: [PATCH V4 RESEND 1/6] video: s3c-fb: Add S5P64X0 specific
 	s3c_fb_driverdata
-Message-ID: <1315591251-17071-1-git-send-email-ajaykumar.rs@samsung.com>
+In-Reply-To: <1315591301-17166-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1315591301-17166-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1315591301-17166-2-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
