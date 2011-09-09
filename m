@@ -1,111 +1,44 @@
-From: rogerio.pimentel@freescale.com (Rogerio Pimentel)
-Date: Fri, 9 Sep 2011 17:00:08 -0300
-Subject: [PATCH v2 4/4] ARM: mx53_ard: Add flexcan support
-In-Reply-To: <1315598408-29563-1-git-send-email-rogerio.pimentel@freescale.com>
-References: <1315598408-29563-1-git-send-email-rogerio.pimentel@freescale.com>
-Message-ID: <1315598408-29563-4-git-send-email-rogerio.pimentel@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Sep 2011 21:56:45 +0100
+Subject: [PATCH v2] ASoC: omap: convert per-board modules to platform
+	drivers
+In-Reply-To: <20110909193010.GA2993@opensource.wolfsonmicro.com>
+References: <3110288.bQbb0H2ME1@wuerfel>
+	<1315520956.4126.3.camel@finisterre.wolfsonmicro.main>
+	<20110908223720.GA21469@n2100.arm.linux.org.uk>
+	<20110908224731.GB5201@opensource.wolfsonmicro.com>
+	<20110908230102.GB21469@n2100.arm.linux.org.uk>
+	<20110908235903.GA6370@opensource.wolfsonmicro.com>
+	<20110909094156.GE6918@n2100.arm.linux.org.uk>
+	<20110909161151.GA3515@opensource.wolfsonmicro.com>
+	<20110909190134.GA14520@n2100.arm.linux.org.uk>
+	<20110909193010.GA2993@opensource.wolfsonmicro.com>
+Message-ID: <20110909205645.GA16355@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding flexcan support on i.MX53 ARD
+On Fri, Sep 09, 2011 at 12:30:11PM -0700, Mark Brown wrote:
+> On Fri, Sep 09, 2011 at 08:01:35PM +0100, Russell King - ARM Linux wrote:
+> 
+> > Well, with DT, there won't be any 'board type' anymore.  There won't be
+> > any 'machine_is_xxx()' to sort it out anymore.  Using DT, all that will
+> > be history - it's all got to be sorted out by either devices or device
+> > properties.
+> 
+> There is a board type - there's a root compatible property for the board
+> which fulfils this purpose - so the situation with and without device
+> tree is essentially the same.
 
-Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
----
-Changes since v1: 
-Changed pull-up pad config from iomux-mx53.h to board-mx53_ard.c
-Created a function to request CAN pins
-If pins cannot be requested, flexcan will not be registered
- arch/arm/mach-mx5/Kconfig          |    1 +
- arch/arm/mach-mx5/board-mx53_ard.c |   37 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+), 0 deletions(-)
+So instead of a table of machine id numbers and soc device strings, you're
+going to have a table of board 'compatible' strings and soc device strings,
+and you're going to have to manually create the struct device with that
+name.
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index fb4c503..7c911d1 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -205,6 +205,7 @@ config MACH_MX53_LOCO
- config MACH_MX53_ARD
- 	bool "Support MX53 ARD platforms"
- 	select SOC_IMX53
-+	select IMX_HAVE_PLATFORM_FLEXCAN
- 	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_UART
-diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
-index 76a67c4..3b5d77e 100644
---- a/arch/arm/mach-mx5/board-mx53_ard.c
-+++ b/arch/arm/mach-mx5/board-mx53_ard.c
-@@ -44,6 +44,8 @@
- #define ARD_BACK			IMX_GPIO_NR(5, 11)
- #define ARD_PROG			IMX_GPIO_NR(5, 12)
- #define ARD_VOLUMEUP		IMX_GPIO_NR(5, 13)
-+#define ARD_CAN_EN		IMX_GPIO_NR(7, 6)
-+#define ARD_CAN_STBY		IMX_GPIO_NR(4, 15)
- 
- static iomux_v3_cfg_t mx53_ard_pads[] = {
- 	/* UART1 */
-@@ -102,6 +104,13 @@ static iomux_v3_cfg_t mx53_ard_pads[] = {
- 	MX53_PAD_DISP0_DAT18__GPIO5_12,	/* prog */
- 	MX53_PAD_DISP0_DAT19__GPIO5_13,	/* vol up */
- 	MX53_PAD_GPIO_10__GPIO4_0,		/* vol down */
-+	/* CAN */
-+	MX53_PAD_KEY_COL2__CAN1_TXCAN | PAD_CTL_PUS_100K_UP,
-+	MX53_PAD_KEY_ROW2__CAN1_RXCAN,
-+	MX53_PAD_PATA_RESET_B__CAN2_TXCAN | PAD_CTL_PUS_100K_UP,
-+	MX53_PAD_PATA_IORDY__CAN2_RXCAN,
-+	MX53_PAD_PATA_DA_0__GPIO7_6,
-+	MX53_PAD_KEY_ROW4__GPIO4_15,
- };
- 
- #define GPIO_BUTTON(gpio_num, ev_code, act_low, descr, wake)	\
-@@ -181,6 +190,25 @@ static void __init mx53_ard_io_init(void)
- 	gpio_direction_output(ARD_I2CPORTEXP_B, 1);
- }
- 
-+static int __init mx53_ard_flexcan_init(void)
-+{
-+	int ret;
-+
-+	ret = gpio_request_one(ARD_CAN_EN, GPIOF_OUT_INIT_HIGH, "can-en");
-+	if (ret) {
-+		pr_err("Cannot request ARD_CAN_EN pin: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = gpio_request_one(ARD_CAN_STBY, GPIOF_OUT_INIT_HIGH, "can-stby");
-+	if (ret) {
-+		pr_err("Cannot request ARD_CAN_STBY pin: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
- /* Config CS1 settings for ethernet controller */
- static int weim_cs_config(void)
- {
-@@ -222,6 +250,8 @@ static struct platform_device *devices[] __initdata = {
- 
- static void __init mx53_ard_board_init(void)
- {
-+	int ret;
-+
- 	imx53_soc_init();
- 	imx53_add_imx_uart(0, NULL);
- 
-@@ -234,6 +264,13 @@ static void __init mx53_ard_board_init(void)
- 	imx53_add_imx_i2c(1, &mx53_ard_i2c2_data);
- 	imx53_add_imx_i2c(2, &mx53_ard_i2c3_data);
- 	imx_add_gpio_keys(&ard_button_data);
-+	ret = mx53_ard_flexcan_init();
-+	if (ret) {
-+		pr_err("failed to request flexcan pins: %d\n", ret);
-+	} else {
-+		imx53_add_flexcan0(NULL);
-+		imx53_add_flexcan1(NULL);
-+	}
- }
- 
- static void __init mx53_ard_timer_init(void)
--- 
-1.7.1
+That's just twisted and utterly insane - adding more code for precisely
+zero benefit what so ever.  Think about it - the device tree is *already*
+creating platform devices for entries in the device tree file.  What's
+the point of having this special ASoC code look up the platform compatible
+property in a table of strings to find a different string to manually
+create a device with.  Why not just _add_ the bloody device to the DT
+file in the first place?  That's partly what DT is there for - to create
+platform specific struct devices.
