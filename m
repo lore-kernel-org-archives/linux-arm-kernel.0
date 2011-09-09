@@ -1,60 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 9 Sep 2011 13:59:35 +0530
-Subject: [PATCH] irq: Add IRQCHIP_SKIP_SET_WAKE flag to avoid need of dummy set_wake() handler.
-Message-ID: <mailman.124.1315559161.20020.linux-arm-kernel@lists.infradead.org>
+From: jason.hui@linaro.org (Jason Liu)
+Date: Fri, 9 Sep 2011 17:17:46 +0800
+Subject: [PATCH v4 0/3] consolidate and clean up the arch/arm/mach-mx5/mm-*.c
+Message-ID: <1315559869-24838-1-git-send-email-jason.hui@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain IRQCHIP's may not need to install the irq_set_wake() handler if
-the IRQCHIP_MASK_ON_SUSPEND flag is set. But but if it's not implemented,
-enable_irq_wake() will return an error.  That needs the IRQCHIP to install
-an empty set_wake handler.
+The patch-set work for consolidate and clean up the arch/arm/mach-mx5/mm-*.c
 
-Add an 'IRQCHIP_SKIP_SET_WAKE' flag so that IRQCHIP can inform the core
-irq code that irq_set_wake() handler is not necessary.
+Jason Liu (4):
+  ARM: i.MX5/mm: Consolidate arch/arm/mach-mx5/mm-*.c
+  ARM: i.MX5/mm: Remove MX51_DEBUG related mapping
+  ARM: i.MX5/mm: Consolidate TZIC map code
 
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- include/linux/irq.h |    2 ++
- kernel/irq/manage.c |    3 +++
- 2 files changed, 5 insertions(+), 0 deletions(-)
+v4: arrage code(mm.c) layout by the sequence:mx50,mx51,mx51
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 5951730..4b0d842 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -336,12 +336,14 @@ struct irq_chip {
-  * IRQCHIP_MASK_ON_SUSPEND:	Mask non wake irqs in the suspend path
-  * IRQCHIP_ONOFFLINE_ENABLED:	Only call irq_on/off_line callbacks
-  *				when irq enabled
-+ * IRQCHIP_SKIP_SET_WAKE:	Skip chip.irq_set_wake(), for this IRQCHIP
-  */
- enum {
- 	IRQCHIP_SET_TYPE_MASKED		= (1 <<  0),
- 	IRQCHIP_EOI_IF_HANDLED		= (1 <<  1),
- 	IRQCHIP_MASK_ON_SUSPEND		= (1 <<  2),
- 	IRQCHIP_ONOFFLINE_ENABLED	= (1 <<  3),
-+	IRQCHIP_SKIP_SET_WAKE		= (1 <<  4),
- };
- 
- /* This include will go away once we isolated irq_desc usage to core code */
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 9b956fa..7e1a3ed 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -467,6 +467,9 @@ static int set_irq_wake_real(unsigned int irq, unsigned int on)
- 	struct irq_desc *desc = irq_to_desc(irq);
- 	int ret = -ENXIO;
- 
-+	if (irq_desc_get_chip(desc)->flags &  IRQCHIP_SKIP_SET_WAKE)
-+		return 0;
-+
- 	if (desc->irq_data.chip->irq_set_wake)
- 		ret = desc->irq_data.chip->irq_set_wake(&desc->irq_data, on);
- 
+v3: remove the TZIC for i.mx51 TO1 since there is no support for TO1 now.
+    add missing static mapping comments for the i.mx53 part
+    split the patches to 1) remove DEBUG mapping 2) add TZIC mapping
+
+v2: Remove the MX51_DEBUG related mapping which is conflict with TZIC.
+    MX51_DEBUG related mapping is dead code, no-one use it.
+
+
+Jason Liu (3):
+  ARM: i.MX5/mm: Consolidate arch/arm/mach-mx5/mm-*.c
+  ARM: i.MX5/mm: Remove MX51_DEBUG related mapping
+  ARM: i.MX5/mm: Consolidate TZIC map code
+
+ arch/arm/mach-mx5/Makefile                |    1 -
+ arch/arm/mach-mx5/mm-mx50.c               |   72 ---------------------------
+ arch/arm/mach-mx5/mm.c                    |   76 ++++++++++++++++++-----------
+ arch/arm/plat-mxc/include/mach/hardware.h |    7 ++-
+ arch/arm/plat-mxc/include/mach/mx51.h     |   16 +------
+ arch/arm/plat-mxc/include/mach/mx53.h     |    1 +
+ 6 files changed, 55 insertions(+), 118 deletions(-)
+ delete mode 100644 arch/arm/mach-mx5/mm-mx50.c
+
 -- 
 1.7.4.1
-
-
---------------010300060004050802040203--
