@@ -1,65 +1,54 @@
 From: mmarek@suse.cz (Michal Marek)
-Date: Fri, 09 Sep 2011 14:30:56 +0200
+Date: Fri, 09 Sep 2011 14:32:28 +0200
 Subject: [RFC] Kbuild: allow code re-use across different directories
-In-Reply-To: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
+In-Reply-To: <CACqU3MV0PW=Cp3Px2Jjs3SSOBbQSSA7P=a1RNy4x9jKEB-VEiA@mail.gmail.com>
 References: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
-Message-ID: <4E6A0700.9030401@suse.cz>
+	<alpine.LFD.2.00.1109071437400.20358@xanadu.home>
+	<CACqU3MVF8XSdKi0PeZF5SFaH9i2HPqCjkMqccyb83x4V_1Vs1g@mail.gmail.com>
+	<alpine.LFD.2.00.1109071554480.20358@xanadu.home>
+	<CACqU3MXcksYxdV_=OR40fPeZzu1ygr-Qs79TV6kfn0DpbXhjuA@mail.gmail.com>
+	<alpine.LFD.2.00.1109081617440.20358@xanadu.home>
+	<CACqU3MV0PW=Cp3Px2Jjs3SSOBbQSSA7P=a1RNy4x9jKEB-VEiA@mail.gmail.com>
+Message-ID: <4E6A075C.1050102@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.8.2011 02:37, Arnaud Lacombe wrote:
-> Hi folks,
+On 9.9.2011 03:22, Arnaud Lacombe wrote:
+> Hi,
 > 
-> The attached patch modify Kbuild to allow to directly re-use code in multiple
-> directory without having to go through a copy. Technically, it changes Kbuild to
-> use by default the VPATH feature of GNU make and provides accessors for Makefile
-> to change it indirectly.
+> On Thu, Sep 8, 2011 at 4:33 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+>> On Thu, 8 Sep 2011, Arnaud Lacombe wrote:
+>>
+>>> you missed:
+>>>
+>>>  # Make sure files are removed during clean
+>>> -extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
+>>> +extra-y       += piggy.gzip piggy.lzo piggy.lzma
+>>>
+>>> This confused make.
+>>
+>> Well... that was suttle.
+>>
+> he, welcome to make(1) world :)
 > 
-> Considering:
+>> So yes, your patch may certainly be useful to a couple cases, and it
+>> works fine for this lib1func.S.
+>>
+>> It doesn't help me much in the following situation though.  What I
+>> actually want to achieve is to compile arch/arm/boot/compressed/fdt_rw.o
+>> from scripts/dtc/libfdt/fdt_rw.c, however I want it to include my local
+>> version of libfdt_env.h rather than scripts/dtc/libfdt/libfdt_env.h.  I
+>> still haven't found a way to convince gcc to do that.
+>>
+> The only choice you have in gcc, is to use -I-, to construct:
 > 
-> arch/foo/lib:
-> fancy.c
+>  $(CROSS_COMPILE)gcc -I$(srctree)/arch/arm/boot/compressed -I- [...]
 > 
-> We want to be able to build it with -DPANTS=32 in the kernel, but the
-> bootloader requires -DPANTS_SIZE=30.
-> 
-> Currently we would do, either:
-> 
-> arch/foo/lib/Makefile
-> LDFLAGS_fancy.o := -DPANTS=32
-> obj-y += fancy.o
-> 
-> and, either:
-> 
-> arch/foo/boot/Makefile:
-> LDFLAGS_fancy.o := -DPANTS=30
-> obj-y += fancy.o
-> $(obj)/fancy.c: $(srctree)/arch/foo/lib/fancy.c
-> 	$(call cmd,shipped)
-> 
-> or
-> 
-> arch/foo/boot/Makefile:
-> LDFLAGS_fancy.o := -DPANTS=30
-> obj-y += fancy.o
-> $(obj)/fancy.o: $(srctree)/arch/foo/lib/fancy.c
-> 	$(call cmd,cc_c_o)
-> 
-> The former implies an extra copy of the source file, the latter expose Kbuild
-> internal function.
-> 
-> With the attached patch, we would do:
-> 
-> arch/foo/boot/Makefile:
-> LDFLAGS_fancy.o := -DPANTS=30
-> obj-y += fancy.o
-> vpath-y += $(srctree)/arch/foo/lib
-> 
-> and let GNU make do the job.
+> however, it's been marked as deprecated, but still usable as of today
+> snapshot of 4.7.0. Its replacement, -iquote, do not provide this
+> functionnality, that is to override the source file origin directory
+> as search directory for #include "...".
 
-I like this. The only issue I can think of right now, is that if you add
-a large directory to vpath-y, then it would be easy to accidentally
-reuse more files from that directory than intended. But that could be
-easily prevented by isolating those reusable source files.
+Or you modify libfdt to support -DLIBFDT_ENV=libfdt_arm.h or similar.
 
 Michal
