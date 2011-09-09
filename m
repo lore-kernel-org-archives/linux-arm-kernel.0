@@ -1,86 +1,107 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 9 Sep 2011 09:50:30 +0100
-Subject: [PATCH v3] net/smsc911x: add device tree probe support
-In-Reply-To: <20110908182920.GL2967@ponder.secretlab.ca>
-References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
-	<1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
-	<20110908145946.GE2070@arm.com>
-	<20110908182920.GL2967@ponder.secretlab.ca>
-Message-ID: <20110909085030.GA3069@arm.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Fri, 09 Sep 2011 14:35:49 +0530
+Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
+	gic_arch_extn
+In-Reply-To: <alpine.LFD.2.02.1109091017300.2723@ionos>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+	<878vpyhotu.fsf@ti.com> <4E69961D.40700@ti.com>
+	<alpine.LFD.2.02.1109090912130.2723@ionos>
+	<4E69C957.5070708@ti.com>
+	<alpine.LFD.2.02.1109091017300.2723@ionos>
+Message-ID: <4E69D6ED.4080409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2011 at 11:29:20AM -0700, Grant Likely wrote:
-> On Thu, Sep 08, 2011 at 03:59:46PM +0100, Dave Martin wrote:
-> > Hi Shawn,
-> > 
-> > On Sun, Jul 31, 2011 at 02:26:00AM +0800, Shawn Guo wrote:
-> > > It adds device tree probe support for smsc911x driver.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
-> > > Cc: David S. Miller <davem@davemloft.net>
-> > > Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
-> > > ---
-> > > Changes since v2:
-> > >  * Fix a typo in smsc911x.txt
-> > > 
-> > > Changes since v1:
-> > >  * Instead of getting irq line from gpio number, it use irq domain
-> > >    to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
-> > >  * Use 'lan9115' the first model that smsc911x supports in the match
-> > >    table
-> > >  * Use reg-shift and reg-io-width which already used in of_serial for
-> > >    shift and access size binding
-> > 
-> > When using this patch with vexpress, I found that 16-bit register access
-> > mode doesn't seem to be getting set correctly.
-> > 
-> > Can you take a look at this additional patch and let me know if it looks
-> > correct?
-> > 
-> > Cheers
-> > ---Dave
-> > 
-> > From: Dave Martin <dave.martin@linaro.org>
-> > Date: Wed, 7 Sep 2011 17:26:31 +0100
-> > Subject: [PATCH] net/smsc911x: Correctly configure 16-bit register access from DT
-> > 
-> > The SMSC911X_USE_16BIT needs to be set when using 16-bit register
-> > access.  However, currently no flag is set if the DT doesn't specify
-> > 32-bit access.
-> > 
-> > This patch should set the SMSC911X_USE_16BIT flag in a manner consistent
-> > with the documented DT bindings.
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > ---
-> >  drivers/net/smsc911x.c |    2 ++
-> >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
-> > index 75c08a5..1a35c25 100644
-> > --- a/drivers/net/smsc911x.c
-> > +++ b/drivers/net/smsc911x.c
-> > @@ -2121,6 +2121,8 @@ static int __devinit smsc911x_probe_config_dt(
-> >  	of_property_read_u32(np, "reg-io-width", &width);
-> >  	if (width == 4)
-> >  		config->flags |= SMSC911X_USE_32BIT;
-> > +	else
-> > +		config->flags |= SMSC911X_USE_16BIT;
-> 
-> Would it be better to do "else if (width == 2)"?  (completely
-> uninformed comment.  I've not looked at what the non-DT probe path
-> does on this driver.)
+On Friday 09 September 2011 01:48 PM, Thomas Gleixner wrote:
+> On Fri, 9 Sep 2011, Santosh wrote:
+>> On Friday 09 September 2011 12:49 PM, Thomas Gleixner wrote:
+>>>
+>>> The flag says: MASK ON SUSPEND and it does not imply that you don't
+>>> need a wake function. There might be cases where you want to setup
+>>> stuff in that function in order to have the wakeup happen on that
+>>> interrupt line despite of the mask on suspend.
+>>>
+>> I see your point.
+>>
+>>> We either need a separate flag or a global dummy set_wake function in
+>>> the core to avoid empty copies all over the place.
+>>>
+>> A flag is probably better since you mentioned that on some arch, there
+>> might be need to have actual set_wake() handler. Or if the global
+>> dummy can be over-ridden by platform, that's fine too.
+>
+> Global dummy would mean:
+>
+> int irq_set_wake_dummy(...)
+> {
+> 	return 0;
+> }
+>
+> And you just add it to your chip, but either way I don't care whether
+> it's a dummy function or a flag.
+>
+Will below patch work for you then ?
+Attaching the same in case mailer damages it.
 
-I wouldn't have a problem with that.  But currently the binding
-documentation says that any value other than 4, or a missing property,
-implies 16-bit register access.
+Regards,
+Santosh
 
-So the binding documentation would need to change too in that case.
+ From d63d4347dc8fb144b19f4d4e7c0621397cccea94 Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Fri, 9 Sep 2011 13:59:35 +0530
+Subject: [PATCH] irq: Add IRQCHIP_SKIP_SET_WAKE flag to avoid need of 
+dummy set_wake() handler.
 
-Personally I think this would be better, but it's just an opinion.
+Certain IRQCHIP's may not need to install the irq_set_wake() handler if
+the IRQCHIP_MASK_ON_SUSPEND flag is set. But but if it's not implemented,
+enable_irq_wake() will return an error.  That needs the IRQCHIP to install
+an empty set_wake handler.
 
-Cheers
----Dave
+Add an 'IRQCHIP_SKIP_SET_WAKE' flag so that IRQCHIP can inform the core
+irq code that irq_set_wake() handler is not necessary.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+---
+  include/linux/irq.h |    2 ++
+  kernel/irq/manage.c |    3 +++
+  2 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 5951730..4b0d842 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -336,12 +336,14 @@ struct irq_chip {
+   * IRQCHIP_MASK_ON_SUSPEND:	Mask non wake irqs in the suspend path
+   * IRQCHIP_ONOFFLINE_ENABLED:	Only call irq_on/off_line callbacks
+   *				when irq enabled
++ * IRQCHIP_SKIP_SET_WAKE:	Skip chip.irq_set_wake(), for this IRQCHIP
+   */
+  enum {
+  	IRQCHIP_SET_TYPE_MASKED		= (1 <<  0),
+  	IRQCHIP_EOI_IF_HANDLED		= (1 <<  1),
+  	IRQCHIP_MASK_ON_SUSPEND		= (1 <<  2),
+  	IRQCHIP_ONOFFLINE_ENABLED	= (1 <<  3),
++	IRQCHIP_SKIP_SET_WAKE		= (1 <<  4),
+  };
+
+  /* This include will go away once we isolated irq_desc usage to core 
+code */
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 9b956fa..7e1a3ed 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -467,6 +467,9 @@ static int set_irq_wake_real(unsigned int irq, 
+unsigned int on)
+  	struct irq_desc *desc = irq_to_desc(irq);
+  	int ret = -ENXIO;
+
++	if (irq_desc_get_chip(desc)->flags &  IRQCHIP_SKIP_SET_WAKE)
++		return 0;
++
+  	if (desc->irq_data.chip->irq_set_wake)
+  		ret = desc->irq_data.chip->irq_set_wake(&desc->irq_data, on);
+
+-- 
+1.7.4.1
