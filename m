@@ -1,204 +1,128 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 09 Sep 2011 15:29:47 +0530
-Subject: [PATCH 14/25] OMAP4: PM: Add CPUX OFF mode support
-In-Reply-To: <CAORVsuUXtiitSTMB0MTJPobppqKymmYFsDpsOqALP8UV7Pm+dQ@mail.gmail.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>	<1315144466-9395-15-git-send-email-santosh.shilimkar@ti.com>
-	<CAORVsuUXtiitSTMB0MTJPobppqKymmYFsDpsOqALP8UV7Pm+dQ@mail.gmail.com>
-Message-ID: <4E69E393.2060003@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 09 Sep 2011 12:04:47 +0200
+Subject: [PATCH v2] [media] at91: add code to initialize and manage the
+	ISI_MCK for Atmel ISI driver.
+In-Reply-To: <Pine.LNX.4.64.1109060803590.14818@axis700.grange>
+References: <1315288601-22384-1-git-send-email-josh.wu@atmel.com>
+	<Pine.LNX.4.64.1109060803590.14818@axis700.grange>
+Message-ID: <4E69E4BF.3030402@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 September 2011 01:09 AM, Jean Pihet wrote:
-> On Sun, Sep 4, 2011 at 3:54 PM, Santosh Shilimkar
-> <santosh.shilimkar@ti.com>  wrote:
->> This patch adds the CPU0 and CPU1 off mode support. CPUX close switch
->> retention (CSWR) is not supported by hardware design.
+Le 06/09/2011 08:54, Guennadi Liakhovetski :
+> On Tue, 6 Sep 2011, Josh Wu wrote:
+> 
+>> This patch enable the configuration for ISI_MCK, which is provided by programmable clock.
 >>
->> The CPUx OFF mode isn't supported on OMAP4430 ES1.0
->>
->> CPUx sleep code is common for hotplug, suspend and CPUilde.
->>
->> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->> Cc: Kevin Hilman<khilman@ti.com>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 >> ---
->>   arch/arm/mach-omap2/Makefile                    |    3 +-
->>   arch/arm/mach-omap2/include/mach/omap-secure.h  |    8 +
->>   arch/arm/mach-omap2/include/mach/omap4-common.h |   25 +++
->>   arch/arm/mach-omap2/omap-mpuss-lowpower.c       |  249 +++++++++++++++++++++++
->>   arch/arm/mach-omap2/omap-smp.c                  |    6 +
->>   arch/arm/mach-omap2/omap4-sar-layout.h          |    9 +
->>   arch/arm/mach-omap2/pm44xx.c                    |    6 +
->>   arch/arm/mach-omap2/sleep44xx.S                 |  213 +++++++++++++++++++
->>   8 files changed, 518 insertions(+), 1 deletions(-)
->>   create mode 100644 arch/arm/mach-omap2/omap-mpuss-lowpower.c
+>>  drivers/media/video/atmel-isi.c |   60 ++++++++++++++++++++++++++++++++++++++-
+>>  include/media/atmel-isi.h       |    4 ++
+>>  2 files changed, 63 insertions(+), 1 deletions(-)
 >>
->> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
->> index b032c21..b4f2eeb 100644
->> --- a/arch/arm/mach-omap2/Makefile
->> +++ b/arch/arm/mach-omap2/Makefile
->> @@ -63,7 +63,8 @@ obj-$(CONFIG_ARCH_OMAP2)              += pm24xx.o
->>   obj-$(CONFIG_ARCH_OMAP2)               += sleep24xx.o
->>   obj-$(CONFIG_ARCH_OMAP3)               += pm34xx.o sleep34xx.o \
->>                                            cpuidle34xx.o
->> -obj-$(CONFIG_ARCH_OMAP4)               += pm44xx.o sleep44xx.o
->> +obj-$(CONFIG_ARCH_OMAP4)               += pm44xx.o sleep44xx.o \
->> +                                          omap-mpuss-lowpower.o
->>   obj-$(CONFIG_PM_DEBUG)                 += pm-debug.o
->>   obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
->>   obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)  += smartreflex-class3.o
->> diff --git a/arch/arm/mach-omap2/include/mach/omap-secure.h b/arch/arm/mach-omap2/include/mach/omap-secure.h
->> index e2f95a0..0062d49 100644
->> --- a/arch/arm/mach-omap2/include/mach/omap-secure.h
->> +++ b/arch/arm/mach-omap2/include/mach/omap-secure.h
->> @@ -35,10 +35,18 @@
->>   #define OMAP4_HAL_SAVEALL_INDEX                0x1c
->>   #define OMAP4_HAL_SAVEGIC_INDEX                0x1d
->>
->> +/* Secure Monitor mode APIs */
->> +#define OMAP4_MON_SCU_PWR_INDEX                0x108
->> +
->> +/* Secure PPA(Primary Protected Application) APIs */
->> +#define OMAP4_PPA_CPU_ACTRL_SMP_INDEX  0x25
->> +
->> +#ifndef __ASSEMBLER__
->>   extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
->>                                 u32 arg1, u32 arg2, u32 arg3, u32 arg4);
->>   extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
->>   extern phys_addr_t omap_secure_ram_mempool_base(void);
->>   extern int omap_secure_ram_reserve_memblock(void);
->>
->> +#endif /* __ASSEMBLER__ */
->>   #endif /* OMAP_ARCH_OMAP_SECURE_H */
->> diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
->> index 040dcf6..662f37c 100644
->> --- a/arch/arm/mach-omap2/include/mach/omap4-common.h
->> +++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
->> @@ -45,5 +45,30 @@ extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
->>   extern void omap_auxcoreboot_addr(u32 cpu_addr);
->>   extern u32 omap_read_auxcoreboot0(void);
->>   #endif
->> +
->> +#if defined(CONFIG_SMP)&&  defined(CONFIG_PM)
->> +extern int omap4_mpuss_init(void);
->> +extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
->> +extern int omap4_finish_suspend(unsigned long cpu_state);
->> +extern void omap4_cpu_resume(void);
->> +#else
->> +static inline int omap4_enter_lowpower(unsigned int cpu,
->> +                                       unsigned int power_state)
->> +{
->> +       omap_do_wfi();
->> +       return 0;
->> +}
->> +
->> +static inline int omap4_mpuss_init(void)
->> +{
->> +       return 0;
->> +}
->> +
->> +static inline int omap4_finish_suspend(unsigned long cpu_state)
->> +{}
-> The int function should return something (0?)
-> Has the code been test compiled without SMP and/or PM?
->
->> +static inline void omap4_cpu_resume(void)
->> +{}
->> +#endif
->> +
->>   #endif /* __ASSEMBLER__ */
->>   #endif /* OMAP_ARCH_OMAP4_COMMON_H */
->> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> ...
->
->> +/**
->> + * omap4_enter_lowpower: OMAP4 MPUSS Low Power Entry Function
->> + * The purpose of this function is to manage low power programming
->> + * of OMAP4 MPUSS subsystem
->> + * @cpu : CPU ID
->> + * @power_state: Low power state.
->> + */
->> +int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->> +{
->> +       unsigned int save_state = 0;
->> +       unsigned int wakeup_cpu;
->> +
->> +       if (omap_rev() == OMAP4430_REV_ES1_0)
->> +               return -ENXIO;
->> +
->> +       switch (power_state) {
->> +       case PWRDM_POWER_ON:
->> +       case PWRDM_POWER_INACTIVE:
->> +               save_state = 0;
->> +               break;
->> +       case PWRDM_POWER_OFF:
->> +               save_state = 1;
->> +               break;
->> +       case PWRDM_POWER_RET:
->> +       default:
->> +               /*
->> +                * CPUx CSWR is invalid hardware state. Also CPUx OSWR
->> +                * doesn't make much scense, since logic is lost and $L1
->> +                * needs to be cleaned because of coherency. This makes
->> +                * CPUx OSWR equivalent to CPUX OFF and hence not supported
->> +                */
->> +               WARN_ON(1);
->> +               return -ENXIO;
->> +       }
->> +
->> +       clear_cpu_prev_pwrst(cpu);
->> +       set_cpu_next_pwrst(cpu, power_state);
->> +       set_cpu_wakeup_addr(cpu, virt_to_phys(omap4_cpu_resume));
->> +       scu_pwrst_prepare(cpu, power_state);
->> +
->> +       /*
->> +        * Call low level function  with targeted CPU id
->> +        * and its low power state.
->> +        */
->> +       cpu_suspend(save_state, omap4_finish_suspend);
-> There is no CPU id parameter to the call although the above comment says so.
->
-> ...
->
->> diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
-> ...
->
->> +/*
->> + * =============================
->> + * == CPU suspend finisher ==
->> + * =============================
->> + *
->> + * void omap4_finish_suspend(unsigned long cpu_state)
->> + *
->> + * This function code saves the CPU context and performs the CPU
->> + * power down sequence. Calling WFI effectively changes the CPU
->> + * power domains states to the desired target power state.
->> + *
->> + * @cpu_state : contains context save state (r0)
->> + *     0 - No context lost
->> + *     1 - CPUx L1 and logic lost: MPUSS CSWR
->> + *     2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
->> + *     3 - CPUx L1 and logic lost + GIC + L2 lost: MPUSS OFF
->> + * @return: This function never returns for CPU OFF and DORMANT power states.
->> + * Post WFI, CPU transitions to DORMANT or OFF power state and on wake-up
->> + * from this follows a full CPU reset path via ROM code to CPU restore code.
-> Is the ROM code jumping to the physical address of omap4_cpu_resume?
-> If so please add it in the comment.
->
-> ...
->
->> +/*
->> + * ============================
->> + * == CPU resume entry point ==
->> + * ============================
->> + *
->> + * void omap4_cpu_resume(void)
->> + *
->> + * ROM code jumps to this function while waking up from CPU
->> + * OFF or DORMANT state. Physical address of the function is
->> + * stored in the SAR RAM while entering to OFF or DORMANT mode.
-> Which code stores the address in the SAR RAM? Please describe it here.
->
-Will add that comment.
+>> diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
 
-Regards
-Santosh
+[..]
+
+>>  /* -----------------------------------------------------------------------*/
+>> +/* Initialize ISI_MCK clock, called by atmel_isi_probe() function */
+>> +static int initialize_mck(struct platform_device *pdev,
+>> +			struct atmel_isi *isi)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	struct isi_platform_data *pdata = dev->platform_data;
+>> +	struct clk *pck_parent;
+>> +	int ret;
+>> +
+>> +	if (!strlen(pdata->pck_name) || !strlen(pdata->pck_parent_name))
+>> +		return -EINVAL;
+>> +
+>> +	/* ISI_MCK is provided by PCK clock */
+>> +	isi->mck = clk_get(dev, pdata->pck_name);
+> 
+> I think, it's still not what Russell meant. Look at 
+> drivers/mmc/host/atmel-mci.c:
+> 
+> 	host->mck = clk_get(&pdev->dev, "mci_clk");
+> 
+> and in arch/arm/mach-at91/at91sam9g45.c they've got
+> 
+> 	CLKDEV_CON_DEV_ID("mci_clk", "atmel_mci.0", &mmc0_clk),
+> 	CLKDEV_CON_DEV_ID("mci_clk", "atmel_mci.1", &mmc1_clk),
+> 
+> where
+> 
+> #define CLKDEV_CON_DEV_ID(_con_id, _dev_id, _clk)	\
+> 	{						\
+> 		.con_id = _con_id,			\
+> 		.dev_id = _dev_id,			\
+> 		.clk = _clk,				\
+> 	}
+> 
+> I.e., in the device driver (mmc in this case) you only use the (platform) 
+> device instance, whose dev_name(dev) is then matched against one of clock 
+> lookups above, and a connection ID, which is used in case your device is 
+> using more than one clock. In the ISI case, your pck1 clock, that you seem 
+> to need here, doesn't have a clock lookup object, so, you might have to 
+> add one, and then use its connection ID.
+> 
+>> +	if (IS_ERR(isi->mck)) {
+>> +		dev_err(dev, "Failed to get PCK: %s\n", pdata->pck_name);
+>> +		return PTR_ERR(isi->mck);
+>> +	}
+>> +
+>> +	pck_parent = clk_get(dev, pdata->pck_parent_name);
+>> +	if (IS_ERR(pck_parent)) {
+>> +		ret = PTR_ERR(pck_parent);
+>> +		dev_err(dev, "Failed to get PCK parent: %s\n",
+>> +				pdata->pck_parent_name);
+>> +		goto err_init_mck;
+>> +	}
+>> +
+>> +	ret = clk_set_parent(isi->mck, pck_parent);
+> 
+> I'm not entirely sure on this one, but as we had a similar situation with 
+> clocks, we decided to extablish the clock hierarchy in the board code, and 
+> only deal with the actual device clocks in the driver itself. I.e., we 
+> moved all clk_set_parent() and setting up the parent clock into the board. 
+> And I do think, this makes more sense, than doing this in the driver, not 
+> all users of this driver will need to manage the parent clock, right?
+
+Exactly.
+
+Josh, for the two comments by Guennadi above, you can take
+sound/soc/atmel/sam9g20_wm8731.c
+as an example of using PCK and parent clocks. You will also find how to
+use named clocks and how to set the programmable clocks rate...
+
+>> +	clk_put(pck_parent);
+>> +	if (ret)
+>> +		goto err_init_mck;
+>> +
+>> +	ret = clk_set_rate(isi->mck, pdata->isi_mck_hz);
+>> +	if (ret < 0)
+>> +		goto err_init_mck;
+>> +
+>> +	return 0;
+>> +
+>> +err_init_mck:
+>> +	clk_put(isi->mck);
+>> +	return ret;
+>> +}
+>> +
+>>  static int __devexit atmel_isi_remove(struct platform_device *pdev)
+>>  {
+>>  	struct soc_camera_host *soc_host = to_soc_camera_host(&pdev->dev);
+>> @@ -897,6 +948,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+>>  			isi->fb_descriptors_phys);
+>>  
+>>  	iounmap(isi->regs);
+>> +	clk_put(isi->mck);
+>>  	clk_put(isi->pclk);
+>>  	kfree(isi);
+
+[..]
+
+Best regards,
+-- 
+Nicolas Ferre
