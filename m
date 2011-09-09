@@ -1,65 +1,49 @@
-From: lacombar@gmail.com (Arnaud Lacombe)
-Date: Fri, 9 Sep 2011 12:16:03 -0400
-Subject: [RFC] Kbuild: allow code re-use across different directories
-In-Reply-To: <4E6A075C.1050102@suse.cz>
-References: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
-	<alpine.LFD.2.00.1109071437400.20358@xanadu.home>
-	<CACqU3MVF8XSdKi0PeZF5SFaH9i2HPqCjkMqccyb83x4V_1Vs1g@mail.gmail.com>
-	<alpine.LFD.2.00.1109071554480.20358@xanadu.home>
-	<CACqU3MXcksYxdV_=OR40fPeZzu1ygr-Qs79TV6kfn0DpbXhjuA@mail.gmail.com>
-	<alpine.LFD.2.00.1109081617440.20358@xanadu.home>
-	<CACqU3MV0PW=Cp3Px2Jjs3SSOBbQSSA7P=a1RNy4x9jKEB-VEiA@mail.gmail.com>
-	<4E6A075C.1050102@suse.cz>
-Message-ID: <CACqU3MVoQ_hkvEoOkyAd2Ceg9xt4M-=up-avzE2yDqp6ND5suw@mail.gmail.com>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Fri, 09 Sep 2011 21:40:59 +0530
+Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <2264116.VTHb2BIH5a@wuerfel>
+References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
+	<201109081819.30035.arnd@arndb.de>
+	<CAKnu2Mpnjec-hvfbT0zH1P2mGZKNwTQYgDLGHWUXLmGGQB0_ow@mail.gmail.com>
+	<2264116.VTHb2BIH5a@wuerfel>
+Message-ID: <1315584659.28058.5.camel@vkoul-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2011-09-08 at 22:11 +0200, Arnd Bergmann wrote:
+> On Thursday 08 September 2011 20:48:26 Linus Walleij wrote:
+> > 2011/9/8 Arnd Bergmann <arnd@arndb.de>:
+> > > On Thursday 08 September 2011, Barry Song wrote:
+> > >>
+> > >> this filter is used by all drivers with DMA since every dma channel is
+> > >> fixed to be assigned to one device.
+> > >
+> > > Ok, I see now. I think it would be best to introduce a generic
+> > > 'filter by device tree property' function or alternatively an
+> > > dma_of_request_channel function like this:
+> > 
+> > You'd have to discuss that with Vinod, the thing is that x86 Atom
+> > systems are using dmaengine for device slave transfers too, and
+> > IIRC these things don't use devicetrees. I may be wrong...
+> 
+> Some of them use device tree, some don't.
+> 
+> I'm not saying that we have to convert all drivers to use this, but
+> for platforms that always have device tree available, it seems by far
+> the cleanest solution.
+It maybe a clean solution but if it doesn't fit all needs, then it am
+not sure...
 
-On Fri, Sep 9, 2011 at 8:32 AM, Michal Marek <mmarek@suse.cz> wrote:
-> On 9.9.2011 03:22, Arnaud Lacombe wrote:
->> Hi,
->>
->> On Thu, Sep 8, 2011 at 4:33 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->>> On Thu, 8 Sep 2011, Arnaud Lacombe wrote:
->>>
->>>> you missed:
->>>>
->>>> ?# Make sure files are removed during clean
->>>> -extra-y ? ? ? += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
->>>> +extra-y ? ? ? += piggy.gzip piggy.lzo piggy.lzma
->>>>
->>>> This confused make.
->>>
->>> Well... that was suttle.
->>>
->> he, welcome to make(1) world :)
->>
->>> So yes, your patch may certainly be useful to a couple cases, and it
->>> works fine for this lib1func.S.
->>>
->>> It doesn't help me much in the following situation though. ?What I
->>> actually want to achieve is to compile arch/arm/boot/compressed/fdt_rw.o
->>> from scripts/dtc/libfdt/fdt_rw.c, however I want it to include my local
->>> version of libfdt_env.h rather than scripts/dtc/libfdt/libfdt_env.h. ?I
->>> still haven't found a way to convince gcc to do that.
->>>
->> The only choice you have in gcc, is to use -I-, to construct:
->>
->> ?$(CROSS_COMPILE)gcc -I$(srctree)/arch/arm/boot/compressed -I- [...]
->>
->> however, it's been marked as deprecated, but still usable as of today
->> snapshot of 4.7.0. Its replacement, -iquote, do not provide this
->> functionnality, that is to override the source file origin directory
->> as search directory for #include "...".
->
-> Or you modify libfdt to support -DLIBFDT_ENV=libfdt_arm.h or similar.
->
-If dtc has to be modified, let's just get rid of that #include "..."
-in favor of #include <...>. We will gain full control of search path,
-and it will be cleaner than this awful LIBFTD_ENV construct.
+One way as I said earlier to get the information of dmac-client
+relationships from arch specific way (pci, device tree etc) and
+dmacs/clients/platform presents them in arch-independent way to
+dmaengine...
 
- - Arnaud
+Thoughts?
 
-> Michal
->
+--
+~Vinod
+
+-- 
+~Vinod Koul
+Intel Corp.
