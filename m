@@ -1,63 +1,49 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 09 Sep 2011 11:34:48 -0700
-Subject: [PATCH 14/25] OMAP4: PM: Add CPUX OFF mode support
-In-Reply-To: <4E6A4605.3050305@ti.com> (Santosh's message of "Fri, 09 Sep 2011
-	22:29:49 +0530")
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-15-git-send-email-santosh.shilimkar@ti.com>
-	<20110909080416.GF31581@S2100-06.ap.freescale.net>
-	<4E69C9CF.6090709@ti.com>
-	<20110909141321.GC32138@S2100-06.ap.freescale.net>
-	<CAMQu2gxeDzFGyhsXK-wDkyiJRoD6_GN58m=3_=NC8yKa_ThJnQ@mail.gmail.com>
-	<20110909152729.GG32138@S2100-06.ap.freescale.net>
-	<4E6A4605.3050305@ti.com>
-Message-ID: <87hb4lwomv.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Sep 2011 19:47:08 +0100
+Subject: [PATCH 6/6] arm/imx6q: add suspend/resume support
+In-Reply-To: <20110909101509.GG31581@S2100-06.ap.freescale.net>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-7-git-send-email-shawn.guo@linaro.org>
+	<CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
+	<20110908062301.GK8148@S2100-06.ap.freescale.net>
+	<20110908074718.GA14953@n2100.arm.linux.org.uk>
+	<20110908152222.GA31581@S2100-06.ap.freescale.net>
+	<20110908162452.GA20292@n2100.arm.linux.org.uk>
+	<20110909073247.GD31581@S2100-06.ap.freescale.net>
+	<20110909081520.GE14953@n2100.arm.linux.org.uk>
+	<20110909101509.GG31581@S2100-06.ap.freescale.net>
+Message-ID: <20110909184708.GA14403@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh <santosh.shilimkar@ti.com> writes:
+On Fri, Sep 09, 2011 at 06:15:10PM +0800, Shawn Guo wrote:
+> On Fri, Sep 09, 2011 at 09:15:20AM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Sep 09, 2011 at 03:32:48PM +0800, Shawn Guo wrote:
+> > > > Now to the physical act of enabling the L2 cache.  The L2 cache control
+> > > > registers are subject to security restrictions when running in non-secure
+> > > > mode, needing platform specific SMC calls to reprogram the cache.  Generic
+> > > > code is unable to do this.
+> > >
+> > > I could be very possibly wrong here.  But isn't the core in secure mode
+> > > upon reset?  Do we really have to reprogram L2 through SMC calls there?
+> > 
+> > It probably will be, but the core won't be running the resume function
+> > directly on reset.  (No ARM CPU does this - not even the pre-security
+> > ones.  They've traditionally run the boot loader first.)
+> 
+> Some naive boot ROM may simply jump to the resume entry address saved
+> in persistent register.
 
-> On Friday 09 September 2011 08:57 PM, Shawn Guo wrote:
->> On Fri, Sep 09, 2011 at 07:41:08PM +0530, Shilimkar, Santosh wrote:
->>> On Fri, Sep 9, 2011 at 7:43 PM, Shawn Guo<shawn.guo@freescale.com>  wrote:
->>>> On Fri, Sep 09, 2011 at 01:39:51PM +0530, Santosh wrote:
->>>>> On Friday 09 September 2011 01:34 PM, Shawn Guo wrote:
->>>>>> Hi Santosh,
->
-> [...]
->
->>> #ifdef CONFIG_CACHE_L2X0
->>> 	/*
->>> 	 * Clean and invalidate the L2 cache.
->>> 	 * Common cache-l2x0.c functions can't be used here since it
->>> 	 * uses spinlocks. We are out of coherency here with data cache
->>> 	 * disabled. The spinlock implementation uses exclusive load/store
->>> 	 * instruction which can fail without data cache being enabled.
->>> 	 * OMAP4 hardware doesn't support exclusive monitor which can
->>> 	 * overcome exclusive access issue. Because of this, CPU can
->>> 	 * lead to deadlock.
->>> 	 */
->>> l2x_clean_inv:
->>> 	bl	omap4_get_sar_ram_base
->>> 	mov	r8, r0
->>> 	mrc	p15, 0, r5, c0, c0, 5		@ Read MPIDR
->>> 	ands	r5, r5, #0x0f
->>> 	ldreq	r0, [r8, #L2X0_SAVE_OFFSET0]
->>> 	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]
->>> 	cmp	r0, #3
->>> 	bne	do_WFI
->>
->> It looks like you are bypassing L2 clean and invalidate for cases
->> "1" and "2" here.  But I really do not understand how you get r0
->> back here.
->>
-> The value which is passed in R0 is also stored in scratch patch memory
-> and retrieved using L2X0_SAVE_OFFSET0.
-> Simple :)
+That would mean that the platform code needs to deal with this too - and
+it's likely that it too is platform specific.
 
-Sounds like some in-code documentation needs to be added to make this a
-bit more understandable.
+> Then the question is that for given bad boot ROM, whether kernel resume
+> routine should stand up to fill the hole up.
 
-Thanks,
+That can only be done with knowledge of the platform (eg, where the
+secure mode vectors should be pointed) and so can't be dealt with by
+generic code.
 
-Kevin
+I would also imagine that it's also far easier to sort out before we
+enable the MMU, rather than dealing with the aftermath of having pulled
+secure mode entries from the non-secure world into the caches.
