@@ -1,92 +1,55 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 9 Sep 2011 20:59:58 +0800
-Subject: [PATCH v3] net/smsc911x: add device tree probe support
-In-Reply-To: <20110909085030.GA3069@arm.com>
-References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
-	<1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
-	<20110908145946.GE2070@arm.com>
-	<20110908182920.GL2967@ponder.secretlab.ca>
-	<20110909085030.GA3069@arm.com>
-Message-ID: <20110909125957.GB32138@S2100-06.ap.freescale.net>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 9 Sep 2011 18:24:18 +0530
+Subject: [PATCH v6 17/25] gpio/omap: use pm-runtime framework
+In-Reply-To: <CAC83ZvL3Y-4f+nAvFb023JTPcBb-joG8JonujCMJCNUmYrSZaA@mail.gmail.com>
+References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
+	<1314798161-19523-18-git-send-email-tarun.kanti@ti.com>
+	<87ehztxmcg.fsf@ti.com>
+	<CAC83ZvL3Y-4f+nAvFb023JTPcBb-joG8JonujCMJCNUmYrSZaA@mail.gmail.com>
+Message-ID: <CAC83ZvJ1UDSKfzZR8Q9Bu-zwskVcS4GHo-5Cvti0MBx6ZcgUEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2011 at 09:50:30AM +0100, Dave Martin wrote:
-> On Thu, Sep 08, 2011 at 11:29:20AM -0700, Grant Likely wrote:
-> > On Thu, Sep 08, 2011 at 03:59:46PM +0100, Dave Martin wrote:
-> > > Hi Shawn,
-> > > 
-> > > On Sun, Jul 31, 2011 at 02:26:00AM +0800, Shawn Guo wrote:
-> > > > It adds device tree probe support for smsc911x driver.
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
-> > > > Cc: David S. Miller <davem@davemloft.net>
-> > > > Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
-> > > > ---
-> > > > Changes since v2:
-> > > >  * Fix a typo in smsc911x.txt
-> > > > 
-> > > > Changes since v1:
-> > > >  * Instead of getting irq line from gpio number, it use irq domain
-> > > >    to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
-> > > >  * Use 'lan9115' the first model that smsc911x supports in the match
-> > > >    table
-> > > >  * Use reg-shift and reg-io-width which already used in of_serial for
-> > > >    shift and access size binding
-> > > 
-> > > When using this patch with vexpress, I found that 16-bit register access
-> > > mode doesn't seem to be getting set correctly.
-> > > 
-> > > Can you take a look at this additional patch and let me know if it looks
-> > > correct?
-> > > 
-> > > Cheers
-> > > ---Dave
-> > > 
-> > > From: Dave Martin <dave.martin@linaro.org>
-> > > Date: Wed, 7 Sep 2011 17:26:31 +0100
-> > > Subject: [PATCH] net/smsc911x: Correctly configure 16-bit register access from DT
-> > > 
-> > > The SMSC911X_USE_16BIT needs to be set when using 16-bit register
-> > > access.  However, currently no flag is set if the DT doesn't specify
-> > > 32-bit access.
-> > > 
-> > > This patch should set the SMSC911X_USE_16BIT flag in a manner consistent
-> > > with the documented DT bindings.
-> > > 
-> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > > ---
-> > >  drivers/net/smsc911x.c |    2 ++
-> > >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > > 
-> > > diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
-> > > index 75c08a5..1a35c25 100644
-> > > --- a/drivers/net/smsc911x.c
-> > > +++ b/drivers/net/smsc911x.c
-> > > @@ -2121,6 +2121,8 @@ static int __devinit smsc911x_probe_config_dt(
-> > >  	of_property_read_u32(np, "reg-io-width", &width);
-> > >  	if (width == 4)
-> > >  		config->flags |= SMSC911X_USE_32BIT;
-> > > +	else
-> > > +		config->flags |= SMSC911X_USE_16BIT;
-> > 
-> > Would it be better to do "else if (width == 2)"?  (completely
-> > uninformed comment.  I've not looked at what the non-DT probe path
-> > does on this driver.)
-> 
-> I wouldn't have a problem with that.  But currently the binding
-> documentation says that any value other than 4, or a missing property,
-> implies 16-bit register access.
-> 
-> So the binding documentation would need to change too in that case.
-> 
-> Personally I think this would be better, but it's just an opinion.
-> 
-Yes.  SMSC911X_USE_32BIT and SMSC911X_USE_16BIT are the only two cases
-supported by the driver.
+On Fri, Sep 9, 2011 at 6:02 PM, DebBarma, Tarun Kanti
+<tarun.kanti@ti.com> wrote:
+> [...]
+>>>
+>>> +static const struct dev_pm_ops gpio_pm_ops = {
+>>> + ? ? .suspend ? ? ? ? ? ? ? ?= omap_gpio_suspend,
+>>> + ? ? .resume ? ? ? ? ? ? ? ? = omap_gpio_resume,
+>>> +};
+>>
+>> Please use SET_SYSTEM_SLEEP_PM_OPS(). ?See <linux/pm.h>
+> We can use following macro to initialize .suspend and .resume callbacks.
+> But how do we initialize .runtime_suspend and .runtime_resume callbacks?
+>
+> #define SIMPLE_DEV_PM_OPS(name, suspend_fn, resume_fn) \
+> const struct dev_pm_ops name = { \
+> ? ? ? ?SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
+> }
+>
+> Do we have something similar to following where we can assign separate
+> pair of callbacks?
+> The following macro on the other hand assigns the same set of
+> callbacks to both and this not what I want!!!
+>
+> #define UNIVERSAL_DEV_PM_OPS(name, suspend_fn, resume_fn, idle_fn) \
+> const struct dev_pm_ops name = { \
+> ? ? ? ?SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
+> ? ? ? ?SET_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn) \
+> }
+Ok, I saw an example... Thanks!!
 
--- 
-Regards,
-Shawn
+> --
+> Tarun
+>
+>>
+>>> ?static struct platform_driver omap_gpio_driver = {
+>>> ? ? ? .probe ? ? ? ? ?= omap_gpio_probe,
+>>> ? ? ? .driver ? ? ? ? = {
+>>> ? ? ? ? ? ? ? .name ? = "omap_gpio",
+>>> + ? ? ? ? ? ? .pm ? ? = &gpio_pm_ops,
+>>> ? ? ? },
+>>> ?};
+> [...]
+>
