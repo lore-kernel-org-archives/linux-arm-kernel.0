@@ -1,24 +1,38 @@
 From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 09 Sep 2011 22:34:14 +0530
-Subject: [PATCH 5/5] ARM: omap4: Kill private do_wfi macro.
-In-Reply-To: <1315582012-23507-6-git-send-email-nbowler@elliptictech.com>
-References: <1315582012-23507-1-git-send-email-nbowler@elliptictech.com>
-	<1315582012-23507-6-git-send-email-nbowler@elliptictech.com>
-Message-ID: <4E6A470E.9010703@ti.com>
+Date: Fri, 09 Sep 2011 22:36:37 +0530
+Subject: [RFC PATCH v2 2/3] ARM: SoC: Add per SoC SMP and CPU hotplug
+	operations
+In-Reply-To: <201109091706.39621.arnd@arndb.de>
+References: <1315579616-27388-1-git-send-email-marc.zyngier@arm.com>
+	<1315579616-27388-3-git-send-email-marc.zyngier@arm.com>
+	<4E6A28F8.4070606@ti.com> <201109091706.39621.arnd@arndb.de>
+Message-ID: <4E6A479D.9050706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 September 2011 08:56 PM, Nick Bowler wrote:
-> The do_wfi macro duplicates the functionality of the wfi macro in common
-> ARM code.  Use the common version instead.
+On Friday 09 September 2011 08:36 PM, Arnd Bergmann wrote:
+> On Friday 09 September 2011, Santosh wrote:
+>> Sorry for such a basic question but I don't understand the need
+>> of these wrappers.
+>> I am not upto speed on this topic but what is the motivation
+>> behind the soc_smp_ops(). All of above functions are CPU specific
+>> and not really soc specific though, I agree that every SOC,
+>> implements it's own version.
 >
-> Signed-off-by: Nick Bowler<nbowler@elliptictech.com>
-> ---
-> Compile tested in both ARM and Thumb-2 mode.
-
-Thanks but this is already handle in my PM series.
-
-https://patchwork.kernel.org/patch/624761/
+> We have two separate problems to solve that we should not confuse:
+>
+> 1. Get multiple soc platforms to compile together in a single kernel
+>     binary.
+> 2. Share as much code as possible between similar soc platforms.
+>
+> Marc's patch only addresses the first problem, and we need that
+> anyway if we want to get e.g. cortex-a9 based systems to be
+> supported in the same kernel as Qualcomm and Marvell CPU based
+> ones.
+>
+> The other part is useful too, but it's easier to do after this one.
+>
+Agree. Thanks for the clarification.
 
 Regards
 Santosh
