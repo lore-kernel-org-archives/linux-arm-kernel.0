@@ -1,72 +1,59 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 09 Sep 2011 14:52:51 -0700
-Subject: [PATCH 13/22] OMAP2+: voltage: keep track of powerdomains in each
-	voltagedomain
-In-Reply-To: <CAORVsuU27kNiJAt-YRgfJ5i0=ZpfcDhNfY+kYK+AnKurDHDPfQ@mail.gmail.com>
-	(Jean Pihet's message of "Wed, 7 Sep 2011 11:23:21 +0200")
+Date: Fri, 09 Sep 2011 14:51:40 -0700
+Subject: [PATCH 14/22] OMAP2+: voltage: split voltage controller (VC) code
+	into dedicated layer
+In-Reply-To: <CAORVsuWEZmChCjy8dJV+acosr_8N9XN0VL8-L6HWaKnZkoqqYA@mail.gmail.com>
+	(Jean Pihet's message of "Wed, 7 Sep 2011 12:42:20 +0200")
 References: <1314639355-12713-1-git-send-email-khilman@ti.com>
-	<1314639355-12713-14-git-send-email-khilman@ti.com>
-	<CAORVsuU27kNiJAt-YRgfJ5i0=ZpfcDhNfY+kYK+AnKurDHDPfQ@mail.gmail.com>
-Message-ID: <87pqj9s7rg.fsf@ti.com>
+	<1314639355-12713-15-git-send-email-khilman@ti.com>
+	<CAORVsuWEZmChCjy8dJV+acosr_8N9XN0VL8-L6HWaKnZkoqqYA@mail.gmail.com>
+Message-ID: <87vct1s7tf.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Jean Pihet <jean.pihet@newoldbits.com> writes:
 
-> Hi Kevin,
+> Kevin,
 >
 > On Mon, Aug 29, 2011 at 7:35 PM, Kevin Hilman <khilman@ti.com> wrote:
->> When a powerdomain is registered and it has an associated voltage domain,
->> add the powerdomain to the voltagedomain using voltdm_add_pwrdm().
+>> As part of the voltage layer cleanup, split out VC specific code into
+>> a dedicated VC layer. ?This patch primarily just moves VC code from
+>> voltage.c into vc.c, and adds prototypes to vc.h.
 >>
->> Also add voltagedomain iterator helper functions to iterate over all
->> registered voltagedomains and all powerdomains associated with a
->> voltagedomain.
+>> No functional changes.
 >>
->> Modeled after a similar relationship between clockdomains and powerdomains.
+>> For readability, each function was given a local 'vc' pointer:
+>>
+>> ? ?struct omap_vc_instance_data *vc = voltdm->vdd->vc_data;
+>>
+>> and a global replace of s/vdd->vc_data/vc/ was done.
+>>
+>> Also vc_init was renamed to vc_init_channel to reflect that this is
+>> per-VC channel initializtion.
 >>
 >> Signed-off-by: Kevin Hilman <khilman@ti.com>
 >> ---
->> ?arch/arm/mach-omap2/powerdomain.c | ? ?2 +
->> ?arch/arm/mach-omap2/powerdomain.h | ? ?2 +
->> ?arch/arm/mach-omap2/voltage.c ? ? | ? 80 +++++++++++++++++++++++++++++++++++++
->> ?arch/arm/mach-omap2/voltage.h ? ? | ? 10 +++++
->> ?4 files changed, 94 insertions(+), 0 deletions(-)
+>> ?arch/arm/mach-omap2/Makefile ?| ? ?2 +-
+>> ?arch/arm/mach-omap2/vc.c ? ? ?| ?276 +++++++++++++++++++++++++++++++++++++++++
+>> ?arch/arm/mach-omap2/vc.h ? ? ?| ? 12 ++
+>> ?arch/arm/mach-omap2/voltage.c | ?264 +--------------------------------------
+>> ?4 files changed, 293 insertions(+), 261 deletions(-)
+>> ?create mode 100644 arch/arm/mach-omap2/vc.c
 >>
 > ...
 >
->> diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
->> index 966aa88..b41d9f1 100644
->> --- a/arch/arm/mach-omap2/voltage.h
->> +++ b/arch/arm/mach-omap2/voltage.h
->> @@ -19,6 +19,8 @@
->> ?#include "vc.h"
->> ?#include "vp.h"
->>
->> +struct powerdomain;
->> +
->> ?/* XXX document */
->> ?#define VOLTSCALE_VPFORCEUPDATE ? ? ? ? ? ? ? ?1
->> ?#define VOLTSCALE_VCBYPASS ? ? ? ? ? ? 2
->> @@ -55,12 +57,15 @@ struct omap_vfsm_instance_data {
->> ?* @name: Name of the voltage domain which can be used as a unique identifier.
->> ?* @scalable: Whether or not this voltage domain is scalable
->> ?* @node: list_head linking all voltage domains
->> + * @pwrdm_node: list_head linking all powerdomains in this voltagedomain
->> ?* @vdd: to be removed
->> + * @pwrdms: powerdomains in this voltagedomain
->> ?*/
->> ?struct voltagedomain {
->> ? ? ? ?char *name;
->> ? ? ? ?bool scalable;
->> ? ? ? ?struct list_head node;
->> + ? ? ? struct list_head pwrdm_list;
->> ? ? ? ?struct omap_vdd_info *vdd;
->> ?};
-> The kerneldoc is not reflecting the code for struct voltagedomain.
+>> diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+>> new file mode 100644
+>> index 0000000..98f5a4b
+>> --- /dev/null
+>> +++ b/arch/arm/mach-omap2/vc.c
+>> @@ -0,0 +1,276 @@
+>
+> The copyright notice is missing.
+>
 
-hmm, looks like kerneldoc is out of sync in a few places.
+oops, will add.
 
-Thanks for catching.  Will fixup.
+Thanks,
 
 Kevin
