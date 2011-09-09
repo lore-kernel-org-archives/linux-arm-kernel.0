@@ -1,71 +1,50 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 9 Sep 2011 13:51:30 -0400 (EDT)
-Subject: [PATCH v2 2/3] ARM: iwmmxt: Port problematic iwmmxt support code
-	to v7/Thumb-2
-In-Reply-To: <20110909164123.GB3069@arm.com>
-References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-	<1315497854-13311-3-git-send-email-dave.martin@linaro.org>
-	<201109081845.58260.arnd@arndb.de>
-	<CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
-	<20110908172002.GG2070@arm.com>
-	<CAMPhdO9USGfrpgR0fXUL6024qWGLqsS72vzaO6AH1oo-TW1RtA@mail.gmail.com>
-	<1315562102.7961.5.camel@linaro1>
-	<alpine.LFD.2.00.1109090919170.20358@xanadu.home>
-	<20110909164123.GB3069@arm.com>
-Message-ID: <alpine.LFD.2.00.1109091339540.20358@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Sep 2011 10:28:14 -0700
+Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level
+	debug uart
+In-Reply-To: <201109081656.33404.arnd@arndb.de>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<20110907142350.GU6619@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109071128040.20358@xanadu.home>
+	<201109081656.33404.arnd@arndb.de>
+Message-ID: <20110909172814.GI1895@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Sep 2011, Dave Martin wrote:
-
-> On Fri, Sep 09, 2011 at 09:21:28AM -0400, Nicolas Pitre wrote:
-> > On Fri, 9 Sep 2011, Jon Medhurst (Tixy) wrote:
+* Arnd Bergmann <arnd@arndb.de> [110908 07:23]:
+> On Wednesday 07 September 2011, Nicolas Pitre wrote:
+> > On Wed, 7 Sep 2011, Russell King - ARM Linux wrote:
 > > 
-> > > On Thu, 2011-09-08 at 11:49 -0700, Eric Miao wrote:
-> > > > So the problem is really when compiling this file with existing toolchain,
-> > > > it's downgrading to v5 compatible mode, and the instruction below
-> > > > 
-> > > > sub pc, lr, r1, lsr #32
-> > > > 
-> > > > wouldn't be encoded when building a THUMB2 kernel. Considering the
-> > > > r1, lsr #32 is actually to create an explicit data dependency of the previous
-> > > > co-processor instruction, would it be one option to rewrite this as something
-> > > > like:
-> > > > 
-> > > > mov r1, r1
-> > > > mov pc, lr
+> > > On Wed, Sep 07, 2011 at 02:36:35PM +0200, Uwe Kleine-K?nig wrote:
+> > > > But only if the image doesn't support imx6q, right? Anyhow, I hope
+> > > > imx6q_map_io isn't called for pre-imx6q SoCs. Ah, and I hope we don't
+> > > > need to argue here as Russell doesn't like the new DEBUG_LL changes :-)
 > > > 
-> > > That doesn't include a data dependency of PC on R1, so it's possible for
-> > > MOV PC, LR and subsequent instructions to be executed before MOV R1, R1
-> > > has completed. We would want...
+> > > I have no problem with the Kconfig menu approach or existing approaches
+> > > to DEBUG_LL.  What I have an objection to is trying to stuff the
+> > > information for it into places which ultimately render the facility
+> > > useless for its intended purpose - to permit debugging the really
+> > > early assembly code.
 > > > 
-> > > add lr, lr, r1, lsr #32
-> > > mov pc, lr
+> > > That is what it was written for: if we introduce complicated ways to
+> > > put behind it, we'll need to come up with a completely new debugging
+> > > infrastructure to debug the now buggered debugging infrastructure.
 > > 
-> > But isn't the first insn unavailable with Thumb2?
+> > For the record I now agree with Russell.
 > > 
-> > Maybe something like:
-> > 
-> > 	sub	r1, r1, r1
-> > 	add	pc, lr, r1
+> > In order to have early serial output that works across multiple SOCs in 
+> > the same kernel image intended to non developers we'll have to add a 
+> > parallel infrastructure.  Keeping the DEBUG_LL code as simple as 
+> > possible for developers is the way to go (and that might be needed to 
+> > debug that parallel infrastructure).
 > 
-> Thumb-2 implies v7, the v7 implies that we have (and need) a real ISB.  So for the
-> Thumb-2 case, this should always become
-> 
-> 	isb
+> Yes, agreed. It should not be too hard to provide more CON_BOOT consoles.
+> For 8250, this can actually be done already using the code from
+> drivers/tty/serial/8250_early.c with a custom command line, but there
+> are better ways to do that in a generic way.
 
-Don't forget that here we are talking about the Marvell implementation.  
-Since I've no doubt that the real isb certainly works, so far the 
-advertized isb has always been implemented with a CP readback with a 
-data dependency.  Don't forget that this CPU core can also pretend to be 
-an ARMv6 and they probably didn't duplicate the whole instruction 
-decoder for each modes.
+Sounds good to me.
 
-So I really doubt the Marvell implementation would behave any 
-differently if this special isb is expressed in terms of Thumb2 rather 
-than ARM instructions as the backend is certainly common to all the 
-modes. If we can use the same implementation for all modes then we'll 
-just simplify maintenance of this code.
+Regards,
 
-
-Nicolas
+Tony
