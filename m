@@ -1,54 +1,49 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Fri, 09 Sep 2011 14:32:28 +0200
-Subject: [RFC] Kbuild: allow code re-use across different directories
-In-Reply-To: <CACqU3MV0PW=Cp3Px2Jjs3SSOBbQSSA7P=a1RNy4x9jKEB-VEiA@mail.gmail.com>
-References: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
-	<alpine.LFD.2.00.1109071437400.20358@xanadu.home>
-	<CACqU3MVF8XSdKi0PeZF5SFaH9i2HPqCjkMqccyb83x4V_1Vs1g@mail.gmail.com>
-	<alpine.LFD.2.00.1109071554480.20358@xanadu.home>
-	<CACqU3MXcksYxdV_=OR40fPeZzu1ygr-Qs79TV6kfn0DpbXhjuA@mail.gmail.com>
-	<alpine.LFD.2.00.1109081617440.20358@xanadu.home>
-	<CACqU3MV0PW=Cp3Px2Jjs3SSOBbQSSA7P=a1RNy4x9jKEB-VEiA@mail.gmail.com>
-Message-ID: <4E6A075C.1050102@suse.cz>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 9 Sep 2011 18:02:33 +0530
+Subject: [PATCH v6 17/25] gpio/omap: use pm-runtime framework
+In-Reply-To: <87ehztxmcg.fsf@ti.com>
+References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
+	<1314798161-19523-18-git-send-email-tarun.kanti@ti.com>
+	<87ehztxmcg.fsf@ti.com>
+Message-ID: <CAC83ZvL3Y-4f+nAvFb023JTPcBb-joG8JonujCMJCNUmYrSZaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9.9.2011 03:22, Arnaud Lacombe wrote:
-> Hi,
-> 
-> On Thu, Sep 8, 2011 at 4:33 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
->> On Thu, 8 Sep 2011, Arnaud Lacombe wrote:
+[...]
 >>
->>> you missed:
->>>
->>>  # Make sure files are removed during clean
->>> -extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
->>> +extra-y       += piggy.gzip piggy.lzo piggy.lzma
->>>
->>> This confused make.
->>
->> Well... that was suttle.
->>
-> he, welcome to make(1) world :)
-> 
->> So yes, your patch may certainly be useful to a couple cases, and it
->> works fine for this lib1func.S.
->>
->> It doesn't help me much in the following situation though.  What I
->> actually want to achieve is to compile arch/arm/boot/compressed/fdt_rw.o
->> from scripts/dtc/libfdt/fdt_rw.c, however I want it to include my local
->> version of libfdt_env.h rather than scripts/dtc/libfdt/libfdt_env.h.  I
->> still haven't found a way to convince gcc to do that.
->>
-> The only choice you have in gcc, is to use -I-, to construct:
-> 
->  $(CROSS_COMPILE)gcc -I$(srctree)/arch/arm/boot/compressed -I- [...]
-> 
-> however, it's been marked as deprecated, but still usable as of today
-> snapshot of 4.7.0. Its replacement, -iquote, do not provide this
-> functionnality, that is to override the source file origin directory
-> as search directory for #include "...".
+>> +static const struct dev_pm_ops gpio_pm_ops = {
+>> + ? ? .suspend ? ? ? ? ? ? ? ?= omap_gpio_suspend,
+>> + ? ? .resume ? ? ? ? ? ? ? ? = omap_gpio_resume,
+>> +};
+>
+> Please use SET_SYSTEM_SLEEP_PM_OPS(). ?See <linux/pm.h>
+We can use following macro to initialize .suspend and .resume callbacks.
+But how do we initialize .runtime_suspend and .runtime_resume callbacks?
 
-Or you modify libfdt to support -DLIBFDT_ENV=libfdt_arm.h or similar.
+#define SIMPLE_DEV_PM_OPS(name, suspend_fn, resume_fn) \
+const struct dev_pm_ops name = { \
+        SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
+}
 
-Michal
+Do we have something similar to following where we can assign separate
+pair of callbacks?
+The following macro on the other hand assigns the same set of
+callbacks to both and this not what I want!!!
+
+#define UNIVERSAL_DEV_PM_OPS(name, suspend_fn, resume_fn, idle_fn) \
+const struct dev_pm_ops name = { \
+        SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
+        SET_RUNTIME_PM_OPS(suspend_fn, resume_fn, idle_fn) \
+}
+--
+Tarun
+
+>
+>> ?static struct platform_driver omap_gpio_driver = {
+>> ? ? ? .probe ? ? ? ? ?= omap_gpio_probe,
+>> ? ? ? .driver ? ? ? ? = {
+>> ? ? ? ? ? ? ? .name ? = "omap_gpio",
+>> + ? ? ? ? ? ? .pm ? ? = &gpio_pm_ops,
+>> ? ? ? },
+>> ?};
+[...]
