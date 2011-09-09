@@ -1,5 +1,5 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 09 Sep 2011 14:41:31 -0700
+Date: Fri, 09 Sep 2011 14:46:03 -0700
 Subject: [PATCH 09/22] OMAP2: add voltage domains and connect to
 	powerdomains
 In-Reply-To: <CAORVsuXd2eeSs_TFu+stJge6tqQzO+4d0FcnmDPMHnChLgCuiQ@mail.gmail.com>
@@ -7,14 +7,14 @@ In-Reply-To: <CAORVsuXd2eeSs_TFu+stJge6tqQzO+4d0FcnmDPMHnChLgCuiQ@mail.gmail.com
 References: <1314639355-12713-1-git-send-email-khilman@ti.com>
 	<1314639355-12713-10-git-send-email-khilman@ti.com>
 	<CAORVsuXd2eeSs_TFu+stJge6tqQzO+4d0FcnmDPMHnChLgCuiQ@mail.gmail.com>
-Message-ID: <87d3f9tmus.fsf@ti.com>
+Message-ID: <877h5htmn8.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
-
 Jean Pihet <jean.pihet@newoldbits.com> writes:
 
+> Kevin,
+>
 > On Mon, Aug 29, 2011 at 7:35 PM, Kevin Hilman <khilman@ti.com> wrote:
 >> Create basic voltagedomains for OMAP2 and associate OMAP2 powerdomains
 >> with the newly created voltage domains.
@@ -44,8 +44,6 @@ Jean Pihet <jean.pihet@newoldbits.com> writes:
 > 2011?
 >
 
-Yup, thanks for the review!
-
-Will update.
+Thanks, will update.
 
 Kevin
