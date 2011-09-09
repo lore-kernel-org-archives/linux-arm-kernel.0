@@ -1,110 +1,55 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 9 Sep 2011 22:13:22 +0800
-Subject: [PATCH 14/25] OMAP4: PM: Add CPUX OFF mode support
-In-Reply-To: <4E69C9CF.6090709@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-15-git-send-email-santosh.shilimkar@ti.com>
-	<20110909080416.GF31581@S2100-06.ap.freescale.net>
-	<4E69C9CF.6090709@ti.com>
-Message-ID: <20110909141321.GC32138@S2100-06.ap.freescale.net>
+From: jon.medhurst@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 09 Sep 2011 15:05:18 +0100
+Subject: [PATCH v2 2/3] ARM: iwmmxt: Port problematic iwmmxt support
+	code to v7/Thumb-2
+In-Reply-To: <alpine.LFD.2.00.1109090919170.20358@xanadu.home>
+References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
+	<1315497854-13311-3-git-send-email-dave.martin@linaro.org>
+	<201109081845.58260.arnd@arndb.de>
+	<CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
+	<20110908172002.GG2070@arm.com>
+	<CAMPhdO9USGfrpgR0fXUL6024qWGLqsS72vzaO6AH1oo-TW1RtA@mail.gmail.com>
+	<1315562102.7961.5.camel@linaro1>
+	<alpine.LFD.2.00.1109090919170.20358@xanadu.home>
+Message-ID: <1315577118.2402.13.camel@linaro1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2011 at 01:39:51PM +0530, Santosh wrote:
-> On Friday 09 September 2011 01:34 PM, Shawn Guo wrote:
-> >Hi Santosh,
-> >
-> >On Sun, Sep 04, 2011 at 07:24:15PM +0530, Santosh Shilimkar wrote:
-> >>This patch adds the CPU0 and CPU1 off mode support. CPUX close switch
-> >>retention (CSWR) is not supported by hardware design.
-> >>
-> >>The CPUx OFF mode isn't supported on OMAP4430 ES1.0
-> >>
-> >>CPUx sleep code is common for hotplug, suspend and CPUilde.
-> >>
-> >>Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
-> >>Cc: Kevin Hilman<khilman@ti.com>
-> >>---
-> >>  arch/arm/mach-omap2/Makefile                    |    3 +-
-> >>  arch/arm/mach-omap2/include/mach/omap-secure.h  |    8 +
-> >>  arch/arm/mach-omap2/include/mach/omap4-common.h |   25 +++
-> >>  arch/arm/mach-omap2/omap-mpuss-lowpower.c       |  249 +++++++++++++++++++++++
-> >>  arch/arm/mach-omap2/omap-smp.c                  |    6 +
-> >>  arch/arm/mach-omap2/omap4-sar-layout.h          |    9 +
-> >>  arch/arm/mach-omap2/pm44xx.c                    |    6 +
-> >>  arch/arm/mach-omap2/sleep44xx.S                 |  213 +++++++++++++++++++
-> >>  8 files changed, 518 insertions(+), 1 deletions(-)
-> >>  create mode 100644 arch/arm/mach-omap2/omap-mpuss-lowpower.c
-> >>
-> >
-> >[...]
-> >
-> >>diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
-> >>index 049f426..230ab8c 100644
-> >>--- a/arch/arm/mach-omap2/sleep44xx.S
-> >>+++ b/arch/arm/mach-omap2/sleep44xx.S
-> >>@@ -11,8 +11,221 @@
-> >>
-> >>  #include<linux/linkage.h>
-> >>  #include<asm/system.h>
-> >>+#include<asm/smp_scu.h>
-> >>+#include<asm/memory.h>
-> >>+#include<asm/hardware/cache-l2x0.h>
-> >>
-> >>+#include<plat/omap44xx.h>
-> >>  #include<mach/omap4-common.h>
-> >>+#include<mach/omap-secure.h>
-> >>+
-> >>+#include "omap4-sar-layout.h"
-> >>+
-> >>+#ifdef CONFIG_SMP
-> >>+
-> >>+.macro	DO_SMC
-> >>+	dsb
-> >>+	smc	#0
-> >>+	dsb
-> >>+.endm
-> >>+
-> >>+ppa_zero_params:
-> >>+	.word		0x0
-> >>+
-> >>+/*
-> >>+ * =============================
-> >>+ * == CPU suspend finisher ==
-> >>+ * =============================
-> >>+ *
-> >>+ * void omap4_finish_suspend(unsigned long cpu_state)
-> >>+ *
-> >>+ * This function code saves the CPU context and performs the CPU
-> >>+ * power down sequence. Calling WFI effectively changes the CPU
-> >>+ * power domains states to the desired target power state.
-> >>+ *
-> >>+ * @cpu_state : contains context save state (r0)
-> >>+ *	0 - No context lost
-> >>+ * 	1 - CPUx L1 and logic lost: MPUSS CSWR
-> >>+ * 	2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
-> >>+ *	3 - CPUx L1 and logic lost + GIC + L2 lost: MPUSS OFF
-> >
-> >I was told by rmk that same as imx6q, omap44xx will retain L2 content
-> >across suspen/resume cycle.  Then what does "L2 lost" mean here?  Or
-> >what rmk meant is the case cpu_state == 2?
-> >
-> Yes.
+On Fri, 2011-09-09 at 09:21 -0400, Nicolas Pitre wrote:
+> On Fri, 9 Sep 2011, Jon Medhurst (Tixy) wrote:
 > 
-> The last case is entire SOC OFF. We call Device OFF in OMAP.
-> All voltages will scale to 0 V. This isn't supported by this
-> series.
+> > On Thu, 2011-09-08 at 11:49 -0700, Eric Miao wrote:
+> > > So the problem is really when compiling this file with existing toolchain,
+> > > it's downgrading to v5 compatible mode, and the instruction below
+> > > 
+> > > sub pc, lr, r1, lsr #32
+> > > 
+> > > wouldn't be encoded when building a THUMB2 kernel. Considering the
+> > > r1, lsr #32 is actually to create an explicit data dependency of the previous
+> > > co-processor instruction, would it be one option to rewrite this as something
+> > > like:
+> > > 
+> > > mov r1, r1
+> > > mov pc, lr
+> > 
+> > That doesn't include a data dependency of PC on R1, so it's possible for
+> > MOV PC, LR and subsequent instructions to be executed before MOV R1, R1
+> > has completed. We would want...
+> > 
+> > add lr, lr, r1, lsr #32
+> > mov pc, lr
 > 
-Then the second question would be what the following patch in this
-series is for.
+> But isn't the first insn unavailable with Thumb2?
 
-    [PATCH 20/25] OMAP4: PM: Add L2X0 cache lowpower support
+It is available in Thumb2.
 
-I could have read the patch incorrectly, but it seems l2x_clean_inv
-will also be called for "MPUSS OSWR" in which case L2 is retained?
-Shouldn't L2 for this case have been handled by rmk's patch (ARM: pm:
-add L2 cache cleaning for suspend)?
+> Maybe something like:
+> 
+> 	sub	r1, r1, r1
+> 	add	pc, lr, r1
+
+That's not allowed in Thumb2. ;-)
+There aren't many instruction forms which are allowed to set PC.
 
 -- 
-Regards,
-Shawn
+Tixy
