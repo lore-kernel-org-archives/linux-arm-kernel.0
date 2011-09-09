@@ -1,34 +1,53 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Fri,  9 Sep 2011 12:18:14 +0800
-Subject: [PATCH 4/4] ARM: pxa: update gpio number to 192
-In-Reply-To: <1315541894-19504-1-git-send-email-chao.xie@marvell.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Thu, 8 Sep 2011 20:22:40 -0700
+Subject: [PATCH 3/4] ARM: pxa: add irq ack for gpio irq
+In-Reply-To: <1315541894-19504-3-git-send-email-chao.xie@marvell.com>
 References: <1315541894-19504-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1315541894-19504-4-git-send-email-chao.xie@marvell.com>
+	<1315541894-19504-3-git-send-email-chao.xie@marvell.com>
+Message-ID: <CAMPhdO_Pu8uZcyMtDu=ZfD1++aGX+NkoKk_nyE_Po5BwFOAhXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Haojian Zhuang <haojian.zhuang@marvell.com>
+On Thu, Sep 8, 2011 at 9:18 PM, Chao Xie <chao.xie@marvell.com> wrote:
+> For previous pxa3xx and pxa168, pxa9xx, the interrupt controller does
+> not need any ack for the interrupt.
+> For next ARM V7 SMP core, it will use GIC, and it need ack for the
+> interrupt.
+>
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> ---
+> ?arch/arm/plat-pxa/gpio.c | ? ?4 ++++
+> ?1 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/plat-pxa/gpio.c b/arch/arm/plat-pxa/gpio.c
+> index 15de09d..66ae80a 100644
+> --- a/arch/arm/plat-pxa/gpio.c
+> +++ b/arch/arm/plat-pxa/gpio.c
+> @@ -19,6 +19,7 @@
+> ?#include <linux/slab.h>
+>
+> ?#include <mach/gpio.h>
+> +#include <asm/mach/irq.h>
+>
+> ?int pxa_last_gpio;
+>
+> @@ -206,7 +207,9 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ?struct pxa_gpio_chip *c;
+> ? ? ? ?int loop, gpio, gpio_base, n;
+> ? ? ? ?unsigned long gedr;
+> + ? ? ? struct irq_chip *chip = irq_get_chip(irq);
+>
+> + ? ? ? chained_irq_enter(chip, desc);
+> ? ? ? ?do {
+> ? ? ? ? ? ? ? ?loop = 0;
+> ? ? ? ? ? ? ? ?for_each_gpio_chip(gpio, c) {
+> @@ -225,6 +228,7 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
+> ? ? ? ? ? ? ? ? ? ? ? ?}
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?} while (loop);
+> + ? ? ? chained_irq_exit(chip, desc);
+> ?}
+>
+> ?static void pxa_ack_muxed_gpio(struct irq_data *d)
 
-192 GPIO pins are supported in pxa95x.
-
-Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/mach-pxa/pxa95x.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/pxa95x.c b/arch/arm/mach-pxa/pxa95x.c
-index 0ee166b..83ecc41 100644
---- a/arch/arm/mach-pxa/pxa95x.c
-+++ b/arch/arm/mach-pxa/pxa95x.c
-@@ -236,7 +236,7 @@ static struct clk_lookup pxa95x_clkregs[] = {
- void __init pxa95x_init_irq(void)
- {
- 	pxa_init_irq(96, NULL);
--	pxa_init_gpio(IRQ_GPIO_2_x, 2, 127, NULL);
-+	pxa_init_gpio(IRQ_GPIO_2_x, 2, 191, NULL);
- }
- 
- /*
--- 
-1.7.0.4
+Looks good to me.
