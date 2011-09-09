@@ -1,58 +1,46 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Fri, 09 Sep 2011 14:01:37 -0400
-Subject: [PATCH V4 RESEND 2/6] ARM: S5P64X0: Add register base and IRQ for
-	Framebuffer
+Date: Fri, 09 Sep 2011 14:01:38 -0400
+Subject: [PATCH V4 RESEND 3/6] ARM: S5P64X0: Set s3c_device_fb name
 In-Reply-To: <1315591301-17166-1-git-send-email-ajaykumar.rs@samsung.com>
 References: <1315591301-17166-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1315591301-17166-3-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1315591301-17166-4-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds:
-	-- Framebuffer related register mappings and bit fields.
-	-- IRQ number being used.
+Set s3c_device_fb name as "s5p64x0-fb" for S5P6440 and S5P6450.
 
 Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 ---
- arch/arm/mach-s5p64x0/include/mach/irqs.h |    4 ++++
- arch/arm/mach-s5p64x0/include/mach/map.h  |    3 +++
- 2 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5p64x0/cpu.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5p64x0/include/mach/irqs.h b/arch/arm/mach-s5p64x0/include/mach/irqs.h
-index 5837a36..53982db 100644
---- a/arch/arm/mach-s5p64x0/include/mach/irqs.h
-+++ b/arch/arm/mach-s5p64x0/include/mach/irqs.h
-@@ -87,6 +87,10 @@
+diff --git a/arch/arm/mach-s5p64x0/cpu.c b/arch/arm/mach-s5p64x0/cpu.c
+index a5c0095..617da3b 100644
+--- a/arch/arm/mach-s5p64x0/cpu.c
++++ b/arch/arm/mach-s5p64x0/cpu.c
+@@ -38,6 +38,7 @@
+ #include <plat/s5p6440.h>
+ #include <plat/s5p6450.h>
+ #include <plat/adc-core.h>
++#include <plat/fb-core.h>
  
- #define IRQ_I2S0		IRQ_I2SV40
+ /* Initial IO mappings */
  
-+#define IRQ_LCD_FIFO		IRQ_DISPCON0
-+#define IRQ_LCD_VSYNC		IRQ_DISPCON1
-+#define IRQ_LCD_SYSTEM		IRQ_DISPCON2
-+
- /* S5P6450 EINT feature will be added */
+@@ -108,6 +109,7 @@ void __init s5p6440_map_io(void)
+ {
+ 	/* initialize any device information early */
+ 	s3c_adc_setname("s3c64xx-adc");
++	s3c_fb_setname("s5p64x0-fb");
  
- /*
-diff --git a/arch/arm/mach-s5p64x0/include/mach/map.h b/arch/arm/mach-s5p64x0/include/mach/map.h
-index 95c9125..c5ef50c 100644
---- a/arch/arm/mach-s5p64x0/include/mach/map.h
-+++ b/arch/arm/mach-s5p64x0/include/mach/map.h
-@@ -47,6 +47,8 @@
+ 	iotable_init(s5p64x0_iodesc, ARRAY_SIZE(s5p64x0_iodesc));
+ 	iotable_init(s5p6440_iodesc, ARRAY_SIZE(s5p6440_iodesc));
+@@ -117,6 +119,7 @@ void __init s5p6450_map_io(void)
+ {
+ 	/* initialize any device information early */
+ 	s3c_adc_setname("s3c64xx-adc");
++	s3c_fb_setname("s5p64x0-fb");
  
- #define S5P64X0_PA_HSMMC(x)	(0xED800000 + ((x) * 0x100000))
- 
-+#define S5P64X0_PA_FB		0xEE000000
-+
- #define S5P64X0_PA_I2S		0xF2000000
- #define S5P6450_PA_I2S1		0xF2800000
- #define S5P6450_PA_I2S2		0xF2900000
-@@ -64,6 +66,7 @@
- #define S3C_PA_IIC1		S5P6440_PA_IIC1
- #define S3C_PA_RTC		S5P64X0_PA_RTC
- #define S3C_PA_WDT		S5P64X0_PA_WDT
-+#define S3C_PA_FB		S5P64X0_PA_FB
- 
- #define S5P_PA_CHIPID		S5P64X0_PA_CHIPID
- #define S5P_PA_SROMC		S5P64X0_PA_SROMC
+ 	iotable_init(s5p64x0_iodesc, ARRAY_SIZE(s5p64x0_iodesc));
+ 	iotable_init(s5p6450_iodesc, ARRAY_SIZE(s5p6450_iodesc));
 -- 
 1.7.0.4
