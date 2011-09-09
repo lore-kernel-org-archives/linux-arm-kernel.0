@@ -1,97 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 09 Sep 2011 13:39:51 +0530
-Subject: [PATCH 14/25] OMAP4: PM: Add CPUX OFF mode support
-In-Reply-To: <20110909080416.GF31581@S2100-06.ap.freescale.net>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-15-git-send-email-santosh.shilimkar@ti.com>
-	<20110909080416.GF31581@S2100-06.ap.freescale.net>
-Message-ID: <4E69C9CF.6090709@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 9 Sep 2011 09:15:20 +0100
+Subject: [PATCH 6/6] arm/imx6q: add suspend/resume support
+In-Reply-To: <20110909073247.GD31581@S2100-06.ap.freescale.net>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-7-git-send-email-shawn.guo@linaro.org>
+	<CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
+	<20110908062301.GK8148@S2100-06.ap.freescale.net>
+	<20110908074718.GA14953@n2100.arm.linux.org.uk>
+	<20110908152222.GA31581@S2100-06.ap.freescale.net>
+	<20110908162452.GA20292@n2100.arm.linux.org.uk>
+	<20110909073247.GD31581@S2100-06.ap.freescale.net>
+Message-ID: <20110909081520.GE14953@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 September 2011 01:34 PM, Shawn Guo wrote:
-> Hi Santosh,
+On Fri, Sep 09, 2011 at 03:32:48PM +0800, Shawn Guo wrote:
+> > Now to the physical act of enabling the L2 cache.  The L2 cache control
+> > registers are subject to security restrictions when running in non-secure
+> > mode, needing platform specific SMC calls to reprogram the cache.  Generic
+> > code is unable to do this.
 >
-> On Sun, Sep 04, 2011 at 07:24:15PM +0530, Santosh Shilimkar wrote:
->> This patch adds the CPU0 and CPU1 off mode support. CPUX close switch
->> retention (CSWR) is not supported by hardware design.
->>
->> The CPUx OFF mode isn't supported on OMAP4430 ES1.0
->>
->> CPUx sleep code is common for hotplug, suspend and CPUilde.
->>
->> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->> Cc: Kevin Hilman<khilman@ti.com>
->> ---
->>   arch/arm/mach-omap2/Makefile                    |    3 +-
->>   arch/arm/mach-omap2/include/mach/omap-secure.h  |    8 +
->>   arch/arm/mach-omap2/include/mach/omap4-common.h |   25 +++
->>   arch/arm/mach-omap2/omap-mpuss-lowpower.c       |  249 +++++++++++++++++++++++
->>   arch/arm/mach-omap2/omap-smp.c                  |    6 +
->>   arch/arm/mach-omap2/omap4-sar-layout.h          |    9 +
->>   arch/arm/mach-omap2/pm44xx.c                    |    6 +
->>   arch/arm/mach-omap2/sleep44xx.S                 |  213 +++++++++++++++++++
->>   8 files changed, 518 insertions(+), 1 deletions(-)
->>   create mode 100644 arch/arm/mach-omap2/omap-mpuss-lowpower.c
->>
->
-> [...]
->
->> diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
->> index 049f426..230ab8c 100644
->> --- a/arch/arm/mach-omap2/sleep44xx.S
->> +++ b/arch/arm/mach-omap2/sleep44xx.S
->> @@ -11,8 +11,221 @@
->>
->>   #include<linux/linkage.h>
->>   #include<asm/system.h>
->> +#include<asm/smp_scu.h>
->> +#include<asm/memory.h>
->> +#include<asm/hardware/cache-l2x0.h>
->>
->> +#include<plat/omap44xx.h>
->>   #include<mach/omap4-common.h>
->> +#include<mach/omap-secure.h>
->> +
->> +#include "omap4-sar-layout.h"
->> +
->> +#ifdef CONFIG_SMP
->> +
->> +.macro	DO_SMC
->> +	dsb
->> +	smc	#0
->> +	dsb
->> +.endm
->> +
->> +ppa_zero_params:
->> +	.word		0x0
->> +
->> +/*
->> + * =============================
->> + * == CPU suspend finisher ==
->> + * =============================
->> + *
->> + * void omap4_finish_suspend(unsigned long cpu_state)
->> + *
->> + * This function code saves the CPU context and performs the CPU
->> + * power down sequence. Calling WFI effectively changes the CPU
->> + * power domains states to the desired target power state.
->> + *
->> + * @cpu_state : contains context save state (r0)
->> + *	0 - No context lost
->> + * 	1 - CPUx L1 and logic lost: MPUSS CSWR
->> + * 	2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
->> + *	3 - CPUx L1 and logic lost + GIC + L2 lost: MPUSS OFF
->
-> I was told by rmk that same as imx6q, omap44xx will retain L2 content
-> across suspen/resume cycle.  Then what does "L2 lost" mean here?  Or
-> what rmk meant is the case cpu_state == 2?
->
-Yes.
+> I could be very possibly wrong here.  But isn't the core in secure mode
+> upon reset?  Do we really have to reprogram L2 through SMC calls there?
 
-The last case is entire SOC OFF. We call Device OFF in OMAP.
-All voltages will scale to 0 V. This isn't supported by this
-series.
+It probably will be, but the core won't be running the resume function
+directly on reset.  (No ARM CPU does this - not even the pre-security
+ones.  They've traditionally run the boot loader first.)
 
-Regards
-Santosh
+Take a moment to think about this in terms of security of data stored on
+the secure side (where there maybe private keys stored.)
+
+The kernel runs in the non-secure side of the partition.  If it were to be
+entered on resume in secure mode, it could access those keys.  That would
+be a really great security hole, which would make the whole thing pointless.
+
+What would happen is the secure monitor ROM code gets control first, just
+like it does at normal boot time on secure devices.  Eventually, the kernel
+will gain control but only after the secure monitor has switched to
+non-secure mode.
