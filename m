@@ -1,68 +1,92 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 09 Sep 2011 14:42:56 +0200
-Subject: [GIT PULL] at91: changes for next
-Message-ID: <4E6A09D0.40800@atmel.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 9 Sep 2011 20:59:58 +0800
+Subject: [PATCH v3] net/smsc911x: add device tree probe support
+In-Reply-To: <20110909085030.GA3069@arm.com>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+	<1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
+	<20110908145946.GE2070@arm.com>
+	<20110908182920.GL2967@ponder.secretlab.ca>
+	<20110909085030.GA3069@arm.com>
+Message-ID: <20110909125957.GB32138@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, Sep 09, 2011 at 09:50:30AM +0100, Dave Martin wrote:
+> On Thu, Sep 08, 2011 at 11:29:20AM -0700, Grant Likely wrote:
+> > On Thu, Sep 08, 2011 at 03:59:46PM +0100, Dave Martin wrote:
+> > > Hi Shawn,
+> > > 
+> > > On Sun, Jul 31, 2011 at 02:26:00AM +0800, Shawn Guo wrote:
+> > > > It adds device tree probe support for smsc911x driver.
+> > > > 
+> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
+> > > > Cc: David S. Miller <davem@davemloft.net>
+> > > > Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+> > > > ---
+> > > > Changes since v2:
+> > > >  * Fix a typo in smsc911x.txt
+> > > > 
+> > > > Changes since v1:
+> > > >  * Instead of getting irq line from gpio number, it use irq domain
+> > > >    to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
+> > > >  * Use 'lan9115' the first model that smsc911x supports in the match
+> > > >    table
+> > > >  * Use reg-shift and reg-io-width which already used in of_serial for
+> > > >    shift and access size binding
+> > > 
+> > > When using this patch with vexpress, I found that 16-bit register access
+> > > mode doesn't seem to be getting set correctly.
+> > > 
+> > > Can you take a look at this additional patch and let me know if it looks
+> > > correct?
+> > > 
+> > > Cheers
+> > > ---Dave
+> > > 
+> > > From: Dave Martin <dave.martin@linaro.org>
+> > > Date: Wed, 7 Sep 2011 17:26:31 +0100
+> > > Subject: [PATCH] net/smsc911x: Correctly configure 16-bit register access from DT
+> > > 
+> > > The SMSC911X_USE_16BIT needs to be set when using 16-bit register
+> > > access.  However, currently no flag is set if the DT doesn't specify
+> > > 32-bit access.
+> > > 
+> > > This patch should set the SMSC911X_USE_16BIT flag in a manner consistent
+> > > with the documented DT bindings.
+> > > 
+> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > > ---
+> > >  drivers/net/smsc911x.c |    2 ++
+> > >  1 files changed, 2 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
+> > > index 75c08a5..1a35c25 100644
+> > > --- a/drivers/net/smsc911x.c
+> > > +++ b/drivers/net/smsc911x.c
+> > > @@ -2121,6 +2121,8 @@ static int __devinit smsc911x_probe_config_dt(
+> > >  	of_property_read_u32(np, "reg-io-width", &width);
+> > >  	if (width == 4)
+> > >  		config->flags |= SMSC911X_USE_32BIT;
+> > > +	else
+> > > +		config->flags |= SMSC911X_USE_16BIT;
+> > 
+> > Would it be better to do "else if (width == 2)"?  (completely
+> > uninformed comment.  I've not looked at what the non-DT probe path
+> > does on this driver.)
+> 
+> I wouldn't have a problem with that.  But currently the binding
+> documentation says that any value other than 4, or a missing property,
+> implies 16-bit register access.
+> 
+> So the binding documentation would need to change too in that case.
+> 
+> Personally I think this would be better, but it's just an opinion.
+> 
+Yes.  SMSC911X_USE_32BIT and SMSC911X_USE_16BIT are the only two cases
+supported by the driver.
 
-Can you please pull the following changes since commit ddf28352b80c86754a6424e3a61e8bdf9213b3c7:
-
-  Linux 3.1-rc5 (2011-09-04 15:45:10 -0700)
-
-They are available in the git repository at:
-  git://github.com/at91linux/linux-at91.git  at91-next
-
-They have been present on linux-arm-kernel for some time and where recently added in linux-next.
-Stephen resolved some trivial conflicts relatives to the removal of a board file (Cf:
-https://lkml.org/lkml/2011/9/9/96 ).
-
-A series by Thomas is touching the USB subsystem: ohci-at91.c but as most of changes are in the at91 directory, it makes more sense to take them in arm-soc.
-
-
-Jean-Christophe PLAGNIOL-VILLARD (2):
-      at91: USB-A9G20 C01 & C11 board support
-      at91: ohci-at91: always provide all the clocks
-
-Josef Holzmayr (1):
-      at91: add support for RSIs EWS board
-
-Nico Erfurth (1):
-      at91: merge board USB-A9260 and USB-A9263 together
-
-Thomas Petazzoni (3):
-      at91: ohci-at91: add vbus_pin_inverted platform attribute
-      at91: at91-ohci: support overcurrent notification
-      at91: at91-ohci: configure overcurrent pins as input GPIOs
-
- arch/arm/mach-at91/Kconfig               |   13 +
- arch/arm/mach-at91/Makefile              |    6 +-
- arch/arm/mach-at91/at91cap9.c            |    2 +
- arch/arm/mach-at91/at91cap9_devices.c    |    6 +
- arch/arm/mach-at91/at91rm9200.c          |    2 +
- arch/arm/mach-at91/at91rm9200_devices.c  |    8 +
- arch/arm/mach-at91/at91sam9260.c         |    2 +
- arch/arm/mach-at91/at91sam9260_devices.c |    8 +
- arch/arm/mach-at91/at91sam9261.c         |   29 ++-
- arch/arm/mach-at91/at91sam9261_devices.c |    8 +
- arch/arm/mach-at91/at91sam9263.c         |    2 +
- arch/arm/mach-at91/at91sam9263_devices.c |    6 +
- arch/arm/mach-at91/at91sam9g45.c         |    2 +
- arch/arm/mach-at91/at91sam9g45_devices.c |    6 +
- arch/arm/mach-at91/board-rsi-ews.c       |  233 ++++++++++++++++++
- arch/arm/mach-at91/board-usb-a9260.c     |  230 ------------------
- arch/arm/mach-at91/board-usb-a9263.c     |  246 -------------------
- arch/arm/mach-at91/board-usb-a926x.c     |  383 ++++++++++++++++++++++++++++++
- arch/arm/mach-at91/include/mach/board.h  |    5 +
- arch/arm/mach-at91/include/mach/timex.h  |    5 +
- drivers/usb/host/ohci-at91.c             |  239 +++++++++++++++++--
- 21 files changed, 930 insertions(+), 511 deletions(-)
- create mode 100644 arch/arm/mach-at91/board-rsi-ews.c
- delete mode 100644 arch/arm/mach-at91/board-usb-a9260.c
- delete mode 100644 arch/arm/mach-at91/board-usb-a9263.c
- create mode 100644 arch/arm/mach-at91/board-usb-a926x.c
-
-Thanks, bye,
 -- 
-Nicolas Ferre
+Regards,
+Shawn
