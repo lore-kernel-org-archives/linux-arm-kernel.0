@@ -1,73 +1,105 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 9 Sep 2011 09:19:33 +0200 (CEST)
-Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
-	gic_arch_extn
-In-Reply-To: <4E69961D.40700@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-	<878vpyhotu.fsf@ti.com> <4E69961D.40700@ti.com>
-Message-ID: <alpine.LFD.2.02.1109090912130.2723@ionos>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 9 Sep 2011 15:32:48 +0800
+Subject: [PATCH 6/6] arm/imx6q: add suspend/resume support
+In-Reply-To: <20110908162452.GA20292@n2100.arm.linux.org.uk>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-7-git-send-email-shawn.guo@linaro.org>
+	<CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
+	<20110908062301.GK8148@S2100-06.ap.freescale.net>
+	<20110908074718.GA14953@n2100.arm.linux.org.uk>
+	<20110908152222.GA31581@S2100-06.ap.freescale.net>
+	<20110908162452.GA20292@n2100.arm.linux.org.uk>
+Message-ID: <20110909073247.GD31581@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Sep 2011, Santosh wrote:
+Hi Russell,
 
-> On Thursday 08 September 2011 11:57 PM, Kevin Hilman wrote:
-> > Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
-> > 
-> > > OMAP WakeupGen is the interrupt controller extension used along
-> > > with ARM GIC to wake the CPU out from low power states on
-> > > external interrupts.
+Really appreciate the explanation.
+
+On Thu, Sep 08, 2011 at 05:24:52PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 08, 2011 at 11:22:23PM +0800, Shawn Guo wrote:
+> > On Thu, Sep 08, 2011 at 08:47:18AM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Sep 08, 2011 at 02:23:02PM +0800, Shawn Guo wrote:
+> > > > Yes, if you lose L2 power in suspend, it's the easiest way for you to
+> > > > resume L2.
+> > > > 
+> > > > For my case which retains L2, I actually do not want to call this
+> > > > function which will invalidate L2.  But since we still have problem
+> > > > to use rmk's generic suspend/resume updates (ARM: pm: add L2 cache
+> > > > cleaning for suspend), we have to flush the entire L2 on imx6q for now.
 > > > 
-> > > The WakeupGen unit is responsible for generating wakeup event
-> > > from the incoming interrupts and enable bits. It is implemented
-> > > in MPU always ON power domain. During normal operation,
-> > > WakeupGen delivers external interrupts directly to the GIC.
+> > > OMAP44xx has the same problem but they re-initialize L2 on resume in
+> > > their pre-cpu_resume() assembly code.
 > > > 
-> > > Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
-> > > Cc: Kevin Hilman<khilman@ti.com>
-> > 
-> > [...]
-> > 
-> > > +#ifdef CONFIG_PM
-> > > +/*
-> > > + * Masking wakeup irqs is handled by the IRQCHIP_MASK_ON_SUSPEND flag,
-> > > + * so no action is necessary in set_wake, but implement an empty handler
-> > > + * here to prevent enable_irq_wake() returning an error.
-> > > + * FIXME: Remove the dummy handler once gen irq code fix above.
-> > > + */
-> > 
-> > Just curious... is there a fix for this pending for v3.2?
-> > 
-> I have sent a proposed change to Thomas but have not seen
-> any response yet from him.
+> > Are you suggesting that this might be the reason why imx6q has problem
+> > with your patch?
 > 
-> http://www.spinics.net/lists/arm-kernel/msg134297.html
+> Consider the mechanics of what is happening.
+> 
+> On suspend, when we enter cpu_suspend(), we assume the L2 cache is
+> still enabled.
+> 
+> We _always_ assume that L1 cache state is lost, so we always flush the
+> entire L1 cache.
+> 
+> As SoCs can (and do) preserve the L2 contents over suspend/resume cycles,
+> we leave it to the platform's finisher to decide whether it needs to
+> flush the entire L2 cache to RAM or not.
+> 
+> If L2 is preserved, then we want to ensure that as much data as possible
+> is retained in the L2 cache (if the hardware preserves its contents, we
+> don't want waste time flushing data out of the cache needlessly -
+> especially if we're using these paths for cpuidle.)  However, we need
+> access to a certain amount of data to bring the system back up, and as
+> the L2 cache typically will not be searched before the MMU is enabled,
+> we have to flush out a certain minimal amount of data (the location
+> of the stacked restore information and the stacked restore information
+> itself.)
+> 
+> However, we don't flush out anything else from the L2 cache.
+> 
+> Now, upon resume, the resume code will be able to read the data it needs
+> to restore the system as we ensured that was flushed out to memory - as
+> I mentioned above, the L2 cache won't be searched for this irrespective
+> of whether the control registers have enabled it or not.
+> 
+> We will continue to the point where we hit the first bit of information
+> stored in L2, which will probably be the stacked SVC register set.  If
+> at this point we're not able to search the L2 cache, then we'll read
+> stale data from the backing memory instead, and the system will crash.
+> 
+> Consider what generic code could do about this - if we flushed out that
+> register set to memory, then we could get past that point - but we then
+> would need to call a function to enable the L2 cache.  What if that
+> function needs data which is sitting in the L2 cache to function (eg,
+> it may need values from the device tree).  We would need to ensure
+> that that data were also flushed out of the L2 cache.  What about
+> spinlocks?  Maybe some other CPU has dragged the spinlock data into
+> the L2 cache.  That gets _much_ harder to solve.
+> 
+> Now to the physical act of enabling the L2 cache.  The L2 cache control
+> registers are subject to security restrictions when running in non-secure
+> mode, needing platform specific SMC calls to reprogram the cache.  Generic
+> code is unable to do this.
+> 
+I could be very possibly wrong here.  But isn't the core in secure mode
+upon reset?  Do we really have to reprogram L2 through SMC calls there?
 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 0a7840a..cd4bc01 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
+> Hence why it's left up to the platform to figure out how to enable the
+> L2 cache before calling cpu_resume().  The platform is best placed to
+> work out what it needs to do to setup the L2 cache so that the L2 cache
+> is available by the time the system control register is written, enabling
+> the MMU and caches.
+> 
+> > Are we supposed to re-initialize L2 before calling
+> > into generic cpu_resume()?
+> 
+> So, the above is the long way of saying "yes" to this question.  I hope
+> it gives the full picture about why this is so.
+> 
+Yes, it does.  Thanks, again.
 
-@@ -467,6 +467,9 @@ static int set_irq_wake_real(unsigned int irq, unsigned int on)
-
-   struct irq_desc *desc = irq_to_desc(irq);
-   int ret = -ENXIO;
-
-+  if (irq_desc_get_chip(desc)->flags & IRQCHIP_MASK_ON_SUSPEND)
-+     return 0;
-+
-	if (desc->irq_data.chip->irq_set_wake)
- 	   ret = desc->irq_data.chip->irq_set_wake(&desc->irq_data, on);
-
-The flag says: MASK ON SUSPEND and it does not imply that you don't
-need a wake function. There might be cases where you want to setup
-stuff in that function in order to have the wakeup happen on that
-interrupt line despite of the mask on suspend.
-
-We either need a separate flag or a global dummy set_wake function in
-the core to avoid empty copies all over the place.
-
-Thanks,
-
-	tglx
+-- 
+Regards,
+Shawn
