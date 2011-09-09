@@ -1,168 +1,113 @@
-From: koen.beel.barco@gmail.com (Koen Beel)
-Date: Fri, 9 Sep 2011 21:56:57 +0200
-Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <1315450031-6371-1-git-send-email-b32955@freescale.com>
-References: <1315450031-6371-1-git-send-email-b32955@freescale.com>
-Message-ID: <CAHMSPgPxNxCMjvemzQh0nrtYu7nj9+sYghKzrS3VHYhxDc1ocw@mail.gmail.com>
+From: rogerio.pimentel@freescale.com (Rogerio Pimentel)
+Date: Fri, 9 Sep 2011 17:00:05 -0300
+Subject: [PATCH v2 1/4] ARM: mx53: Add pads for flexcan pins
+Message-ID: <1315598408-29563-1-git-send-email-rogerio.pimentel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Koen Beel <koen.beel@barco.com>
+Adding pads for flexcan on i.MX53
 
-On Thu, Sep 8, 2011 at 4:47 AM, Huang Shijie <b32955@freescale.com> wrote:
-> The patch set is based on Artem's tree:
-> ? ? ? ?http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
->
-> The general-purpose media interface(GPMI) controller is a flexible interface
-> to up to several NAND flashs.
->
-> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
->
-> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
-> not.
->
-> This driver is a _pure_ MTD NAND controller driver now.
->
->
-> The driver depends on another GPMI-NAND device patch set, you can find them at :
-> ? ? ? ?[1] http://marc.info/?l=linux-arm-kernel&m=131416901319573&w=2
-> ? ? ? ?[2] http://marc.info/?l=linux-arm-kernel&m=131416912319668&w=2
-> ? ? ? ?[3] http://marc.info/?l=linux-arm-kernel&m=131416891119504&w=2
-> ? ? ? ?[4] http://marc.info/?l=linux-arm-kernel&m=131416896219539&w=2
->
-> Test environment:
-> ? ? ? ?Using imx23 and imx28 boards for test.
->
-> ? ? ? ?imx23 :
-> ? ? ? ?console=ttyAMA0,115200 mtdparts=gpmi-nfc:20m(boot),-(user)
-> ? ? ? ?Tested by USB boot and NAND boot.
->
-> ? ? ? ?imx28 :
-> ? ? ? ?#console=ttyAMA0,115200 root=/dev/mmcblk0p3 rw rootwait
-> ? ? ? ?Tested by SD card boot mode.
->
-> v11 --> v12:
-> ? ? ? ?[0] remove debug log level mechanism.
-> ? ? ? ?[1] replace BUG/BUG_ON() with pr_err()
-> ? ? ? ?[2] fix compiling warnings
-> ? ? ? ?[3] optimize the calculation of BCH's geometry.
->
-> v10 --> v11:
-> ? ? ? ?[0] tiny fixes.
-> ? ? ? ?[1] optimize the calculation of BCH's geometry.
-> ? ? ? ?[2] renames
->
-> v9 --> v10:
-> ? ? ? ?[0] fix DMA timeout bug by adding custom routine for reset blocks.
-> ? ? ? ?[1] remove mil{}
-> ? ? ? ?[2] add gpmi_hw_ecclayout.
-> ? ? ? ?[3] add ecc_write_oob() again to prohibit the mtd ioctl : MEMWRITEOOB
-> ? ? ? ?[4] change pr_info to dev_dbg() or pr_err().
-> ? ? ? ?[5] merge the all the dump functions into gpmi_dump_info().
-> ? ? ? ?[6] remove parse_mtd_partitions(), and use mtd_device_parse_register().
-> ? ? ? ?[7] move the the debug control code from gpmi-nand.h to gpmi-nand.c
-> ? ? ? ?[8] renames
-> ? ? ? ?[9] others
->
-> v8 --> v9:
-> ? ? ? ?[0] remove the ONFI nand code, it will cause the DMA timeout in the ONFI nand.
-> ? ? ? ?[1] remove sysfs entry.
-> ? ? ? ?[2] remove kernel command parameter.
-> ? ? ? ?[3] report to ecclayout that we will use all the page + OOB.
-> ? ? ? ? ? ? ? ?remove the ->ecc_write_oob().
-> ? ? ? ?[4] add our own block_markbad() hook.
-> ? ? ? ?[5] rename some functions from mil_* to gpmi_*.
-> ? ? ? ?[6] replace the __raw_readl/__raw_writel to readl/writel.
-> ? ? ? ?[7] others
->
-> v7 --> v8:
-> ? ? ? ?[0] rename the name from `GPMI-NFC` to `GPMI-NAND`
-> ? ? ? ?[1] remove the `hal` layer, and change it to function library.
-> ? ? ? ?[2] Do not use ~0 to initialize the DMA address.
-> ? ? ? ?[3] fix the issue : several DMA channels share the same IRQ.
-> ? ? ? ?[4] DMA timeout issue. I use the .config created by `make mxs_defconfig`
-> ? ? ? ? ? ?and the bug never occur. It seems some other module has impact to the
-> ? ? ? ? ? ?DMA.
-> ? ? ? ? ? ?Of course, you should enable the UBIFS,MTD_CHAR and GPMI for
-> ? ? ? ? ? ?the .config. You can also disable the SPIN-LOCK/MUTEX debug features.
-> ? ? ? ?[5] add function to print out the GPMI registers.
-> ? ? ? ?[6] others.
->
-> v6 --> v7:
-> ? ? ? ?[0] remove the function wrapping the clock.
-> ? ? ? ?[1] use the module_param() for debugging.
-> ? ? ? ?[2] use the new interface of MTD partitions.
-> ? ? ? ? ? ? ? ?replace add_mtd_partitions() with mtd_device_register().
-> ? ? ? ?[3] use pr_info() to print log.
-> ? ? ? ?[4] add `__devinit` for some functions, etc.
-> ? ? ? ?[5] add `gpmi_nfc` to control the GPMI-NFC driver's initialization.
-> ? ? ? ?[6] others.
->
-> v5 --> v6:
-> ? ? ? ?[0] split out the IMX23/IMX28 arch code to separate patches.
-> ? ? ? ?[1] fix bug : missing empty item in the end of platform_id array.
-> ? ? ? ?[2] inconsistent identation.
-> ? ? ? ?[3] others
->
-> v4 --> v5:
-> ? ? ? ?[0] rename the files.
-> ? ? ? ?[1] fix PM bug
-> ? ? ? ?[2] remove the rom_helper code, and move the necessary initialization code
-> ? ? ? ? ? ? ? ?to the main file.
-> ? ? ? ?[3] change the macros from CPU_IS_* to GPMI_IS_*
-> ? ? ? ?[4] remove the default partition layout init code. revert back the
-> ? ? ? ? ? ? ? ?partition parsing command line code.
-> ? ? ? ?[5] others
->
-> v3 --> v4:
-> ? ? ? ?[0] use the nand_ids{} as the nand database, drop my own database.
-> ? ? ? ?[1] remove the patch for DMA enginer, Shawn will submit his own version.
-> ? ? ? ?[2] use the platform_id to distinguish different Archs.
-> ? ? ? ?[3] fix the strange coding style.
-> ? ? ? ?[4] others.
->
-> v2 --> v3:
-> ? ? ? ?[0] merge the imx23 and imx28 into one file(including the header file).
-> ? ? ? ?[1] remove the unuse registers in the headers.
-> ? ? ? ?[2] fix DMA bugs
-> ? ? ? ?[3] add bus width field to nand_attr{}
-> ? ? ? ?[4] others
->
-> v1 --> v2:
-> ? ? ? ?[0] merge the common files into the gpmi-nfc-main.c
-> ? ? ? ?[1] change the code to get the clock.
-> ? ? ? ?[2] remove the timing in the nand_device_info{}
-> ? ? ? ?[3] fix DMA errors
-> ? ? ? ?[4] add the nand_device_info.[ch] to generic code
-> ? ? ? ?[5] use the chip->onfi_version for the ONFI nand
-> ? ? ? ?[6] useless init
-> ? ? ? ?[7] others
->
-> Huang Shijie (3):
-> ?MTD : add the common code for GPMI-NAND controller driver
-> ?MTD : add helper functions library and header files for GPMI NAND
-> ? ?driver
-> ?MTD : add GPMI-NAND driver in the config and Makefile
->
-> ?drivers/mtd/nand/Kconfig ? ? ? ? ? ? ? | ? 13 +
-> ?drivers/mtd/nand/Makefile ? ? ? ? ? ? ?| ? ?1 +
-> ?drivers/mtd/nand/gpmi-nand/Makefile ? ?| ? ?3 +
-> ?drivers/mtd/nand/gpmi-nand/bch-regs.h ?| ? 84 ++
-> ?drivers/mtd/nand/gpmi-nand/gpmi-lib.c ?| 1057 +++++++++++++++++++++
-> ?drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 1619 ++++++++++++++++++++++++++++++++
-> ?drivers/mtd/nand/gpmi-nand/gpmi-nand.h | ?273 ++++++
-> ?drivers/mtd/nand/gpmi-nand/gpmi-regs.h | ?172 ++++
-> ?8 files changed, 3222 insertions(+), 0 deletions(-)
-> ?create mode 100644 drivers/mtd/nand/gpmi-nand/Makefile
-> ?create mode 100644 drivers/mtd/nand/gpmi-nand/bch-regs.h
-> ?create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-> ?create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> ?create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-nand.h
-> ?create mode 100644 drivers/mtd/nand/gpmi-nand/gpmi-regs.h
->
->
->
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
->
+Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+---
+Changes since v1:
+Assigned only one pad config for CAN pins
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h |   22 ++++++++++++----------
+ 1 files changed, 12 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+index 5408fd1..d890c9c 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+@@ -33,6 +33,8 @@
+ #define PAD_CTRL_I2C	(PAD_CTL_SRE_FAST | PAD_CTL_ODE | PAD_CTL_PKE | \
+ 			PAD_CTL_PUE | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP \
+ 			| PAD_CTL_HYS)
++#define MX53_CAN_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
++					PAD_CTL_HYS)
+ 
+ #define _MX53_PAD_GPIO_19__KPP_COL_5		IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
+ #define _MX53_PAD_GPIO_19__GPIO4_5		IOMUX_PAD(0x348, 0x20, 1, 0x0, 0, 0)
+@@ -1243,14 +1245,14 @@
+ #define MX53_PAD_KEY_ROW1__USBPHY1_RXVALID		(_MX53_PAD_KEY_ROW1__USBPHY1_RXVALID | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL2__KPP_COL_2		(_MX53_PAD_KEY_COL2__KPP_COL_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL2__GPIO4_10		(_MX53_PAD_KEY_COL2__GPIO4_10 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_KEY_COL2__CAN1_TXCAN		(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_KEY_COL2__CAN1_TXCAN		(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_KEY_COL2__FEC_MDIO		(_MX53_PAD_KEY_COL2__FEC_MDIO | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL2__ECSPI1_SS1		(_MX53_PAD_KEY_COL2__ECSPI1_SS1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL2__FEC_RDATA_2		(_MX53_PAD_KEY_COL2__FEC_RDATA_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL2__USBPHY1_RXACTIVE		(_MX53_PAD_KEY_COL2__USBPHY1_RXACTIVE | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW2__KPP_ROW_2		(_MX53_PAD_KEY_ROW2__KPP_ROW_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW2__GPIO4_11		(_MX53_PAD_KEY_ROW2__GPIO4_11 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_KEY_ROW2__CAN1_RXCAN		(_MX53_PAD_KEY_ROW2__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_KEY_ROW2__CAN1_RXCAN		(_MX53_PAD_KEY_ROW2__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW2__FEC_MDC		(_MX53_PAD_KEY_ROW2__FEC_MDC | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW2__ECSPI1_SS2		(_MX53_PAD_KEY_ROW2__ECSPI1_SS2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW2__FEC_TDATA_2		(_MX53_PAD_KEY_ROW2__FEC_TDATA_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -1273,14 +1275,14 @@
+ #define MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0		(_MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL4__KPP_COL_4		(_MX53_PAD_KEY_COL4__KPP_COL_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL4__GPIO4_14		(_MX53_PAD_KEY_COL4__GPIO4_14 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_KEY_COL4__CAN2_TXCAN		(_MX53_PAD_KEY_COL4__CAN2_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_KEY_COL4__CAN2_TXCAN		(_MX53_PAD_KEY_COL4__CAN2_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_KEY_COL4__IPU_SISG_4		(_MX53_PAD_KEY_COL4__IPU_SISG_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL4__UART5_RTS		(_MX53_PAD_KEY_COL4__UART5_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+ #define MX53_PAD_KEY_COL4__USBOH3_USBOTG_OC		(_MX53_PAD_KEY_COL4__USBOH3_USBOTG_OC | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL4__USBPHY1_LINESTATE_1		(_MX53_PAD_KEY_COL4__USBPHY1_LINESTATE_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW4__KPP_ROW_4		(_MX53_PAD_KEY_ROW4__KPP_ROW_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW4__GPIO4_15		(_MX53_PAD_KEY_ROW4__GPIO4_15 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_KEY_ROW4__CAN2_RXCAN		(_MX53_PAD_KEY_ROW4__CAN2_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_KEY_ROW4__CAN2_RXCAN		(_MX53_PAD_KEY_ROW4__CAN2_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW4__IPU_SISG_5		(_MX53_PAD_KEY_ROW4__IPU_SISG_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW4__UART5_CTS		(_MX53_PAD_KEY_ROW4__UART5_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW4__USBOH3_USBOTG_PWR		(_MX53_PAD_KEY_ROW4__USBOH3_USBOTG_PWR | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -2053,25 +2055,25 @@
+ #define MX53_PAD_PATA_INTRQ__PATA_INTRQ		(_MX53_PAD_PATA_INTRQ__PATA_INTRQ | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_INTRQ__GPIO7_2		(_MX53_PAD_PATA_INTRQ__GPIO7_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_INTRQ__UART2_CTS		(_MX53_PAD_PATA_INTRQ__UART2_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+-#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN		(_MX53_PAD_PATA_INTRQ__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN		(_MX53_PAD_PATA_INTRQ__CAN1_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_PATA_INTRQ__CCM_CCM_OUT_2		(_MX53_PAD_PATA_INTRQ__CCM_CCM_OUT_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_INTRQ__USBPHY2_DATAOUT_6		(_MX53_PAD_PATA_INTRQ__USBPHY2_DATAOUT_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_DIOR__PATA_DIOR		(_MX53_PAD_PATA_DIOR__PATA_DIOR | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_DIOR__GPIO7_3		(_MX53_PAD_PATA_DIOR__GPIO7_3 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_DIOR__UART2_RTS		(_MX53_PAD_PATA_DIOR__UART2_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+-#define MX53_PAD_PATA_DIOR__CAN1_RXCAN		(_MX53_PAD_PATA_DIOR__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_PATA_DIOR__CAN1_RXCAN		(_MX53_PAD_PATA_DIOR__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_PATA_DIOR__USBPHY2_DATAOUT_7		(_MX53_PAD_PATA_DIOR__USBPHY2_DATAOUT_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_RESET_B__PATA_PATA_RESET_B		(_MX53_PAD_PATA_RESET_B__PATA_PATA_RESET_B | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_RESET_B__GPIO7_4		(_MX53_PAD_PATA_RESET_B__GPIO7_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_RESET_B__ESDHC3_CMD		(_MX53_PAD_PATA_RESET_B__ESDHC3_CMD | MUX_PAD_CTRL(MX53_SDHC_PAD_CTRL))
+ #define MX53_PAD_PATA_RESET_B__UART1_CTS		(_MX53_PAD_PATA_RESET_B__UART1_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+-#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		(_MX53_PAD_PATA_RESET_B__CAN2_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		(_MX53_PAD_PATA_RESET_B__CAN2_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_PATA_RESET_B__USBPHY1_DATAOUT_0		(_MX53_PAD_PATA_RESET_B__USBPHY1_DATAOUT_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_IORDY__PATA_IORDY		(_MX53_PAD_PATA_IORDY__PATA_IORDY | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_IORDY__GPIO7_5		(_MX53_PAD_PATA_IORDY__GPIO7_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_IORDY__ESDHC3_CLK		(_MX53_PAD_PATA_IORDY__ESDHC3_CLK | MUX_PAD_CTRL(MX53_SDHC_PAD_CTRL))
+ #define MX53_PAD_PATA_IORDY__UART1_RTS		(_MX53_PAD_PATA_IORDY__UART1_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+-#define MX53_PAD_PATA_IORDY__CAN2_RXCAN		(_MX53_PAD_PATA_IORDY__CAN2_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_PATA_IORDY__CAN2_RXCAN		(_MX53_PAD_PATA_IORDY__CAN2_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_PATA_IORDY__USBPHY1_DATAOUT_1		(_MX53_PAD_PATA_IORDY__USBPHY1_DATAOUT_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_DA_0__PATA_DA_0		(_MX53_PAD_PATA_DA_0__PATA_DA_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_PATA_DA_0__GPIO7_6		(_MX53_PAD_PATA_DA_0__GPIO7_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -2341,7 +2343,7 @@
+ #define MX53_PAD_GPIO_7__ESAI1_TX4_RX1		(_MX53_PAD_GPIO_7__ESAI1_TX4_RX1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_7__GPIO1_7		(_MX53_PAD_GPIO_7__GPIO1_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_7__EPIT1_EPITO		(_MX53_PAD_GPIO_7__EPIT1_EPITO | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_GPIO_7__CAN1_TXCAN		(_MX53_PAD_GPIO_7__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_GPIO_7__CAN1_TXCAN		(_MX53_PAD_GPIO_7__CAN1_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_GPIO_7__UART2_TXD_MUX		(_MX53_PAD_GPIO_7__UART2_TXD_MUX | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+ #define MX53_PAD_GPIO_7__FIRI_RXD		(_MX53_PAD_GPIO_7__FIRI_RXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_7__SPDIF_PLOCK		(_MX53_PAD_GPIO_7__SPDIF_PLOCK | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -2349,7 +2351,7 @@
+ #define MX53_PAD_GPIO_8__ESAI1_TX5_RX0		(_MX53_PAD_GPIO_8__ESAI1_TX5_RX0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_8__GPIO1_8		(_MX53_PAD_GPIO_8__GPIO1_8 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_8__EPIT2_EPITO		(_MX53_PAD_GPIO_8__EPIT2_EPITO | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_GPIO_8__CAN1_RXCAN		(_MX53_PAD_GPIO_8__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_GPIO_8__CAN1_RXCAN		(_MX53_PAD_GPIO_8__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+ #define MX53_PAD_GPIO_8__UART2_RXD_MUX		(_MX53_PAD_GPIO_8__UART2_RXD_MUX | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+ #define MX53_PAD_GPIO_8__FIRI_TXD		(_MX53_PAD_GPIO_8__FIRI_TXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_8__SPDIF_SRCLK		(_MX53_PAD_GPIO_8__SPDIF_SRCLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+-- 
+1.7.1
