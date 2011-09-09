@@ -1,38 +1,65 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 09 Sep 2011 14:14:19 +0200
-Subject: at91 next tree
-In-Reply-To: <20110423095558.99ee7136.sfr@canb.auug.org.au>
-References: <20110422155122.GB23775@game.jcrosoft.org>
-	<20110423095558.99ee7136.sfr@canb.auug.org.au>
-Message-ID: <4E6A031B.6020804@atmel.com>
+From: mmarek@suse.cz (Michal Marek)
+Date: Fri, 09 Sep 2011 14:30:56 +0200
+Subject: [RFC] Kbuild: allow code re-use across different directories
+In-Reply-To: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
+References: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
+Message-ID: <4E6A0700.9030401@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
-
-Le 23/04/2011 01:55, Stephen Rothwell :
-> Hi,
+On 20.8.2011 02:37, Arnaud Lacombe wrote:
+> Hi folks,
 > 
-> On Fri, 22 Apr 2011 17:51:22 +0200 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
->>
->> 	I'd like to known how we could get the at91 at91-next branch pull
->> 	in the next tree automaticaly?
+> The attached patch modify Kbuild to allow to directly re-use code in multiple
+> directory without having to go through a copy. Technically, it changes Kbuild to
+> use by default the VPATH feature of GNU make and provides accessors for Makefile
+> to change it indirectly.
 > 
-> You request it :-)
+> Considering:
 > 
->> 	git://github.com/at91linux/linux-2.6-at91.git at91-next
+> arch/foo/lib:
+> fancy.c
 > 
-> I have added that tree to linux-next.
+> We want to be able to build it with -DPANTS=32 in the kernel, but the
+> bootloader requires -DPANTS_SIZE=30.
+> 
+> Currently we would do, either:
+> 
+> arch/foo/lib/Makefile
+> LDFLAGS_fancy.o := -DPANTS=32
+> obj-y += fancy.o
+> 
+> and, either:
+> 
+> arch/foo/boot/Makefile:
+> LDFLAGS_fancy.o := -DPANTS=30
+> obj-y += fancy.o
+> $(obj)/fancy.c: $(srctree)/arch/foo/lib/fancy.c
+> 	$(call cmd,shipped)
+> 
+> or
+> 
+> arch/foo/boot/Makefile:
+> LDFLAGS_fancy.o := -DPANTS=30
+> obj-y += fancy.o
+> $(obj)/fancy.o: $(srctree)/arch/foo/lib/fancy.c
+> 	$(call cmd,cc_c_o)
+> 
+> The former implies an extra copy of the source file, the latter expose Kbuild
+> internal function.
+> 
+> With the attached patch, we would do:
+> 
+> arch/foo/boot/Makefile:
+> LDFLAGS_fancy.o := -DPANTS=30
+> obj-y += fancy.o
+> vpath-y += $(srctree)/arch/foo/lib
+> 
+> and let GNU make do the job.
 
-Can you please move our at91-next branch that is included currently in
-linux-next to the "2.6-less" github tree?
+I like this. The only issue I can think of right now, is that if you add
+a large directory to vpath-y, then it would be easy to accidentally
+reuse more files from that directory than intended. But that could be
+easily prevented by isolating those reusable source files.
 
-git://github.com/at91linux/linux-at91.git
-
-(I hope that the merge conflicts that you have just resolved will not
-suffer from this move: but as commits are the same, I am pretty sure
-that it will be transparent).
-
-Thanks for your help, best regards,
--- 
-Nicolas Ferre
+Michal
