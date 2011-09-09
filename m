@@ -1,55 +1,67 @@
-From: jon.medhurst@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 09 Sep 2011 15:05:18 +0100
-Subject: [PATCH v2 2/3] ARM: iwmmxt: Port problematic iwmmxt support
-	code to v7/Thumb-2
-In-Reply-To: <alpine.LFD.2.00.1109090919170.20358@xanadu.home>
-References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-	<1315497854-13311-3-git-send-email-dave.martin@linaro.org>
-	<201109081845.58260.arnd@arndb.de>
-	<CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
-	<20110908172002.GG2070@arm.com>
-	<CAMPhdO9USGfrpgR0fXUL6024qWGLqsS72vzaO6AH1oo-TW1RtA@mail.gmail.com>
-	<1315562102.7961.5.camel@linaro1>
-	<alpine.LFD.2.00.1109090919170.20358@xanadu.home>
-Message-ID: <1315577118.2402.13.camel@linaro1>
+From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
+Date: Fri, 9 Sep 2011 19:39:59 +0530
+Subject: [PATCH 12/25] OMAP: Add support to allocate the memory for secure
+	RAM
+In-Reply-To: <CAORVsuWNgXqmpuir7kpRHf5T7-o2DE8OSkwR1Evfo3=wKgiTUw@mail.gmail.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-13-git-send-email-santosh.shilimkar@ti.com>
+	<CAORVsuV8+zMzwT+PeWTo6TgWeEYfcSQdjY_kv4FcURohVoT=hw@mail.gmail.com>
+	<4E69DFBB.9020803@ti.com>
+	<CAORVsuWNgXqmpuir7kpRHf5T7-o2DE8OSkwR1Evfo3=wKgiTUw@mail.gmail.com>
+Message-ID: <CAMQu2gwkUdVffz=RBGGjuaSsKKS7HC-GunGHuTOZE7PDwMW2wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-09-09 at 09:21 -0400, Nicolas Pitre wrote:
-> On Fri, 9 Sep 2011, Jon Medhurst (Tixy) wrote:
-> 
-> > On Thu, 2011-09-08 at 11:49 -0700, Eric Miao wrote:
-> > > So the problem is really when compiling this file with existing toolchain,
-> > > it's downgrading to v5 compatible mode, and the instruction below
-> > > 
-> > > sub pc, lr, r1, lsr #32
-> > > 
-> > > wouldn't be encoded when building a THUMB2 kernel. Considering the
-> > > r1, lsr #32 is actually to create an explicit data dependency of the previous
-> > > co-processor instruction, would it be one option to rewrite this as something
-> > > like:
-> > > 
-> > > mov r1, r1
-> > > mov pc, lr
-> > 
-> > That doesn't include a data dependency of PC on R1, so it's possible for
-> > MOV PC, LR and subsequent instructions to be executed before MOV R1, R1
-> > has completed. We would want...
-> > 
-> > add lr, lr, r1, lsr #32
-> > mov pc, lr
-> 
-> But isn't the first insn unavailable with Thumb2?
-
-It is available in Thumb2.
-
-> Maybe something like:
-> 
-> 	sub	r1, r1, r1
-> 	add	pc, lr, r1
-
-That's not allowed in Thumb2. ;-)
-There aren't many instruction forms which are allowed to set PC.
-
--- 
-Tixy
+On Fri, Sep 9, 2011 at 6:24 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> Santosh,
+>
+> On Fri, Sep 9, 2011 at 11:43 AM, Santosh <santosh.shilimkar@ti.com> wrote:
+>> On Friday 09 September 2011 12:49 AM, Jean Pihet wrote:
+>>>
+>>> On Sun, Sep 4, 2011 at 3:54 PM, Santosh Shilimkar
+>>> <santosh.shilimkar@ti.com> ?wrote:
+>>>>
+>>>> Allocate the memory to save secure ram context which needs
+>>>> to be done when MPU is hitting off mode.
+>>>>
+>>>> The ROM code expects a physical address to this memory
+>>>> and hence use memblock APIs to reserve this memory as part
+>>>> of .reserve() callback.
+>>>>
+>>>> Maximum possible size is allocated and can cater to OMAP3XXX / OMAP4XXX
+>>>> secure RAM size requirements.
+>>>>
+>>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>>> ---
+>>>> ?arch/arm/mach-omap2/include/mach/omap-secure.h | ? ?4 +++
+>>>> ?arch/arm/mach-omap2/omap-secure.c ? ? ? ? ? ? ?| ? 29
+>>>> ++++++++++++++++++++++++
+>>>> ?arch/arm/plat-omap/common.c ? ? ? ? ? ? ? ? ? ?| ? ?3 ++
+>>>> ?3 files changed, 36 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/include/mach/omap-secure.h
+>>>> b/arch/arm/mach-omap2/include/mach/omap-secure.h
+>>>> index 26e7bcc..e2f95a0 100644
+>>>> --- a/arch/arm/mach-omap2/include/mach/omap-secure.h
+>>>> +++ b/arch/arm/mach-omap2/include/mach/omap-secure.h
+>>>> @@ -26,6 +26,8 @@
+>>>> ?#define FLAG_FIQ_ENABLE ? ? ? ? ? ? ? ? ? ? ? ?0x1
+>>>> ?#define NO_FLAG ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0x0
+>>>>
+>>>> +/* Maximum Secure memory storage size */
+>>>> +#define OMAP_SECURE_RAM_STORAGE ? ? ? ?(88 * SZ_1K)
+>>>
+>>> Is this valid for all supported devices? How to differentiate
+>>> variations in the size for new chips variants in the future?
+>>>
+>> You don't have to. ROM code does that job. We should just ensure
+>> that maximum needed memory is made available to secure code.
+> The question was: what would be the code if tomorrow -for example- we
+> have OMAP4460 with 88K of secure RAM, OMAP5432 with 128K and OMAP6667
+> with 132K? How to code the differences?
+>
+The size doesn't depend on silicon but depends on Secure software
+stack size. As I
+said, we will allocate maximum needed as per security team recommendation.
+If on newer security stack, if we need more, we will just increase it
+to maximum needed.
