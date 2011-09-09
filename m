@@ -1,41 +1,73 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 9 Sep 2011 09:18:45 +0200
-Subject: [PATCH REPOST 2/2] i2c-imx: add device tree probe support
-In-Reply-To: <4E69A0AE.1060004@gmail.com>
-References: <1315465775-31335-1-git-send-email-shawn.guo@linaro.org>
-	<1315465775-31335-3-git-send-email-shawn.guo@linaro.org>
-	<4E69A0AE.1060004@gmail.com>
-Message-ID: <20110909071845.GI28816@pengutronix.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 9 Sep 2011 09:19:33 +0200 (CEST)
+Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
+	gic_arch_extn
+In-Reply-To: <4E69961D.40700@ti.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+	<878vpyhotu.fsf@ti.com> <4E69961D.40700@ti.com>
+Message-ID: <alpine.LFD.2.02.1109090912130.2723@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
+On Fri, 9 Sep 2011, Santosh wrote:
 
-On Fri, Sep 09, 2011 at 12:14:22AM -0500, Rob Herring wrote:
-> > +i2c at 83fc4000 { /* I2C2 on i.MX51 */
-> > +	compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
-> > +	reg = <0x83fc4000 0x4000>;
-> > +	interrupts = <63>;
-> > +};
-> > +
-> > +i2c at 70038000 { /* HS-I2C on i.MX51 */
+> On Thursday 08 September 2011 11:57 PM, Kevin Hilman wrote:
+> > Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
+> > 
+> > > OMAP WakeupGen is the interrupt controller extension used along
+> > > with ARM GIC to wake the CPU out from low power states on
+> > > external interrupts.
+> > > 
+> > > The WakeupGen unit is responsible for generating wakeup event
+> > > from the incoming interrupts and enable bits. It is implemented
+> > > in MPU always ON power domain. During normal operation,
+> > > WakeupGen delivers external interrupts directly to the GIC.
+> > > 
+> > > Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> > > Cc: Kevin Hilman<khilman@ti.com>
+> > 
+> > [...]
+> > 
+> > > +#ifdef CONFIG_PM
+> > > +/*
+> > > + * Masking wakeup irqs is handled by the IRQCHIP_MASK_ON_SUSPEND flag,
+> > > + * so no action is necessary in set_wake, but implement an empty handler
+> > > + * here to prevent enable_irq_wake() returning an error.
+> > > + * FIXME: Remove the dummy handler once gen irq code fix above.
+> > > + */
+> > 
+> > Just curious... is there a fix for this pending for v3.2?
+> > 
+> I have sent a proposed change to Thomas but have not seen
+> any response yet from him.
 > 
-> The mainline driver doesn't support the HS-I2C block does it?
-> 
-> The high speed and "old" i2c blocks on MX51 are basically different
-> blocks, so the compatible property should be different.
-I stumbled about that recently, too and found in
-arch/arm/plat-mxc/devices/platform-imx-i2c.c that the third device
-description for imx51 is a normal "imx-i2c" one using
-MX51_HSI2C_DMA_BASE_ADDR. So I concluded it's different but compatible.
+> http://www.spinics.net/lists/arm-kernel/msg134297.html
 
-board-mx51_babbage.c uses imx51_add_hsi2c but doesn't add a bus
-description. So It might not attract attention if the driver doesn't
-match the device.
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 0a7840a..cd4bc01 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
 
-Best regards
-Uwe
+@@ -467,6 +467,9 @@ static int set_irq_wake_real(unsigned int irq, unsigned int on)
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+   struct irq_desc *desc = irq_to_desc(irq);
+   int ret = -ENXIO;
+
++  if (irq_desc_get_chip(desc)->flags & IRQCHIP_MASK_ON_SUSPEND)
++     return 0;
++
+	if (desc->irq_data.chip->irq_set_wake)
+ 	   ret = desc->irq_data.chip->irq_set_wake(&desc->irq_data, on);
+
+The flag says: MASK ON SUSPEND and it does not imply that you don't
+need a wake function. There might be cases where you want to setup
+stuff in that function in order to have the wakeup happen on that
+interrupt line despite of the mask on suspend.
+
+We either need a separate flag or a global dummy set_wake function in
+the core to avoid empty copies all over the place.
+
+Thanks,
+
+	tglx
