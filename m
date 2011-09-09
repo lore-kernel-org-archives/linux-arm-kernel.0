@@ -1,83 +1,66 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 9 Sep 2011 19:48:57 +0800
-Subject: [PATCH v3] net/smsc911x: add device tree probe support
-In-Reply-To: <20110908145946.GE2070@arm.com>
-References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
-	<1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
-	<20110908145946.GE2070@arm.com>
-Message-ID: <20110909114856.GA32138@S2100-06.ap.freescale.net>
+From: ajaykumar.rs@samsung.com (Ajay Kumar)
+Date: Fri, 09 Sep 2011 14:00:51 -0400
+Subject: [PATCH V4 RESEND 1/6] video: s3c-fb: Add S5P64X0 specific
+	s3c_fb_driverdata
+Message-ID: <1315591251-17071-1-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 08, 2011 at 03:59:46PM +0100, Dave Martin wrote:
-> Hi Shawn,
-> 
-> On Sun, Jul 31, 2011 at 02:26:00AM +0800, Shawn Guo wrote:
-> > It adds device tree probe support for smsc911x driver.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Steve Glendinning <steve.glendinning@smsc.com>
-> > Cc: David S. Miller <davem@davemloft.net>
-> > Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
-> > ---
-> > Changes since v2:
-> >  * Fix a typo in smsc911x.txt
-> > 
-> > Changes since v1:
-> >  * Instead of getting irq line from gpio number, it use irq domain
-> >    to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
-> >  * Use 'lan9115' the first model that smsc911x supports in the match
-> >    table
-> >  * Use reg-shift and reg-io-width which already used in of_serial for
-> >    shift and access size binding
-> 
-> When using this patch with vexpress, I found that 16-bit register access
-> mode doesn't seem to be getting set correctly.
-> 
-> Can you take a look at this additional patch and let me know if it looks
-> correct?
-> 
-> Cheers
-> ---Dave
-> 
-> From: Dave Martin <dave.martin@linaro.org>
-> Date: Wed, 7 Sep 2011 17:26:31 +0100
-> Subject: [PATCH] net/smsc911x: Correctly configure 16-bit register access from DT
-> 
-> The SMSC911X_USE_16BIT needs to be set when using 16-bit register
-> access.  However, currently no flag is set if the DT doesn't specify
-> 32-bit access.
-> 
-> This patch should set the SMSC911X_USE_16BIT flag in a manner consistent
-> with the documented DT bindings.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
+This patch:
+	-- Adds s3c_fb_driverdata for S5P64X0, which supports 3 windows.
+	-- Also, register "s5p64x0-fb" type driver_data.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ drivers/video/s3c-fb.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
 
->  drivers/net/smsc911x.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
-> index 75c08a5..1a35c25 100644
-> --- a/drivers/net/smsc911x.c
-> +++ b/drivers/net/smsc911x.c
-> @@ -2121,6 +2121,8 @@ static int __devinit smsc911x_probe_config_dt(
->  	of_property_read_u32(np, "reg-io-width", &width);
->  	if (width == 4)
->  		config->flags |= SMSC911X_USE_32BIT;
-> +	else
-> +		config->flags |= SMSC911X_USE_16BIT;
->  
->  	if (of_get_property(np, "smsc,irq-active-high", NULL))
->  		config->irq_polarity = SMSC911X_IRQ_POLARITY_ACTIVE_HIGH;
-> -- 
-> 1.7.4.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index 4aecf21..0fda252 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -1859,6 +1859,30 @@ static struct s3c_fb_driverdata s3c_fb_data_s3c2443 = {
+ 	},
+ };
+ 
++static struct s3c_fb_driverdata s3c_fb_data_s5p64x0 = {
++	.variant = {
++		.nr_windows	= 3,
++		.vidtcon	= VIDTCON0,
++		.wincon		= WINCON(0),
++		.winmap		= WINxMAP(0),
++		.keycon		= WKEYCON,
++		.osd		= VIDOSD_BASE,
++		.osd_stride	= 16,
++		.buf_start	= VIDW_BUF_START(0),
++		.buf_size	= VIDW_BUF_SIZE(0),
++		.buf_end	= VIDW_BUF_END(0),
++
++		.palette = {
++			[0] = 0x2400,
++			[1] = 0x2800,
++			[2] = 0x2c00,
++		},
++	},
++	.win[0] = &s3c_fb_data_s5p_wins[0],
++	.win[1] = &s3c_fb_data_s5p_wins[1],
++	.win[2] = &s3c_fb_data_s5p_wins[2],
++};
++
+ static struct platform_device_id s3c_fb_driver_ids[] = {
+ 	{
+ 		.name		= "s3c-fb",
+@@ -1872,6 +1896,9 @@ static struct platform_device_id s3c_fb_driver_ids[] = {
+ 	}, {
+ 		.name		= "s3c2443-fb",
+ 		.driver_data	= (unsigned long)&s3c_fb_data_s3c2443,
++	}, {
++		.name		= "s5p64x0-fb",
++		.driver_data	= (unsigned long)&s3c_fb_data_s5p64x0,
+ 	},
+ 	{},
+ };
+-- 
+1.7.0.4
