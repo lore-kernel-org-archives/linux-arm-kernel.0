@@ -1,50 +1,51 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 09 Sep 2011 14:00:28 -0700
-Subject: [PATCH v6 17/25] gpio/omap: use pm-runtime framework
-In-Reply-To: <CAC83Zv+=gbt=KTx0ZsxRfL1k4=R7c0CLSCRQ_D+PrNQOso3q-g@mail.gmail.com>
-	(Tarun Kanti DebBarma's message of "Sat, 10 Sep 2011 00:25:46 +0530")
-References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
-	<1314798161-19523-18-git-send-email-tarun.kanti@ti.com>
-	<87ehztxmcg.fsf@ti.com>
-	<CAC83ZvL3Y-4f+nAvFb023JTPcBb-joG8JonujCMJCNUmYrSZaA@mail.gmail.com>
-	<87pqj9y4mi.fsf@ti.com>
-	<CAC83Zv+=gbt=KTx0ZsxRfL1k4=R7c0CLSCRQ_D+PrNQOso3q-g@mail.gmail.com>
-Message-ID: <87ty8ltor7.fsf@ti.com>
+Date: Fri, 09 Sep 2011 14:41:31 -0700
+Subject: [PATCH 09/22] OMAP2: add voltage domains and connect to
+	powerdomains
+In-Reply-To: <CAORVsuXd2eeSs_TFu+stJge6tqQzO+4d0FcnmDPMHnChLgCuiQ@mail.gmail.com>
+	(Jean Pihet's message of "Wed, 7 Sep 2011 12:39:36 +0200")
+References: <1314639355-12713-1-git-send-email-khilman@ti.com>
+	<1314639355-12713-10-git-send-email-khilman@ti.com>
+	<CAORVsuXd2eeSs_TFu+stJge6tqQzO+4d0FcnmDPMHnChLgCuiQ@mail.gmail.com>
+Message-ID: <87d3f9tmus.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
+Hi Jean,
 
-> On Fri, Sep 9, 2011 at 11:34 PM, Kevin Hilman <khilman@ti.com> wrote:
->> "DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
+Jean Pihet <jean.pihet@newoldbits.com> writes:
+
+> On Mon, Aug 29, 2011 at 7:35 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> Create basic voltagedomains for OMAP2 and associate OMAP2 powerdomains
+>> with the newly created voltage domains.
 >>
->>> [...]
->>>>>
->>>>> +static const struct dev_pm_ops gpio_pm_ops = {
->>>>> + ? ? .suspend ? ? ? ? ? ? ? ?= omap_gpio_suspend,
->>>>> + ? ? .resume ? ? ? ? ? ? ? ? = omap_gpio_resume,
->>>>> +};
->>>>
->>>> Please use SET_SYSTEM_SLEEP_PM_OPS(). ?See <linux/pm.h>
->>> We can use following macro to initialize .suspend and .resume callbacks.
->>> But how do we initialize .runtime_suspend and .runtime_resume callbacks?
->>>
->>> #define SIMPLE_DEV_PM_OPS(name, suspend_fn, resume_fn) \
->>> const struct dev_pm_ops name = { \
->>> ? ? ? ? SET_SYSTEM_SLEEP_PM_OPS(suspend_fn, resume_fn) \
->>> }
->>>
->>> Do we have something similar to following where we can assign separate
->>> pair of callbacks?
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ? ? ?| ? ?3 +-
+>> ?arch/arm/mach-omap2/io.c ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
+>> ?arch/arm/mach-omap2/powerdomains2xxx_data.c ? | ? ?4 +++
+>> ?arch/arm/mach-omap2/voltage.h ? ? ? ? ? ? ? ? | ? ?1 +
+>> ?arch/arm/mach-omap2/voltagedomains2xxx_data.c | ? 32 +++++++++++++++++++++++++
+>> ?5 files changed, 41 insertions(+), 1 deletions(-)
+>> ?create mode 100644 arch/arm/mach-omap2/voltagedomains2xxx_data.c
 >>
->> SET_RUNTIME_PM_OPS()
-> Yes, I have done this way:
+> ...
 >
-> static const struct dev_pm_ops gpio_pm_ops = {
->         SET_SYSTEM_SLEEP_PM_OPS(omap_gpio_suspend, omap_gpio_resume)
->         SET_RUNTIME_PM_OPS(omap_gpio_runtime_suspend, omap_gpio_runtime_resume,
->                                                                         NULL)
+>> diff --git a/arch/arm/mach-omap2/voltagedomains2xxx_data.c b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
+>> new file mode 100644
+>> index 0000000..69ff261
+>> --- /dev/null
+>> +++ b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
+>> @@ -0,0 +1,32 @@
+>> +/*
+>> + * OMAP3 voltage domain data
+>> + *
+>> + * Copyright (C) 2007, 2010 Texas Instruments, Inc.
+> 2011?
+>
 
-Perfect.
+Yup, thanks for the review!
+
+Will update.
 
 Kevin
