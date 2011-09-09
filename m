@@ -1,33 +1,86 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 9 Sep 2011 14:18:07 +0530
-Subject: [PATCH v2] ASoC: omap: convert per-board modules to platform
-	drivers
-In-Reply-To: <20110908235903.GA6370@opensource.wolfsonmicro.com>
-References: <1315503297-8365-1-git-send-email-mans.rullgard@linaro.org>
-	<CABb+yY0b607kDSGU+trycqQuvGMhC-zpHcv20wjgmEcaK7dz8Q@mail.gmail.com>
-	<CAG5Tg6UOuztenNid1=YbH9a4ZH5MqV4YhohG+r9R+7F=zXs=CQ@mail.gmail.com>
-	<3110288.bQbb0H2ME1@wuerfel>
-	<1315520956.4126.3.camel@finisterre.wolfsonmicro.main>
-	<20110908223720.GA21469@n2100.arm.linux.org.uk>
-	<20110908224731.GB5201@opensource.wolfsonmicro.com>
-	<20110908230102.GB21469@n2100.arm.linux.org.uk>
-	<20110908235903.GA6370@opensource.wolfsonmicro.com>
-Message-ID: <CAJe_Zhd=-vpQ0oZ2fU0=yjO53pcBPw=xCFCtXotb+J4HAF4dpA@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 9 Sep 2011 09:50:30 +0100
+Subject: [PATCH v3] net/smsc911x: add device tree probe support
+In-Reply-To: <20110908182920.GL2967@ponder.secretlab.ca>
+References: <1311587040-8988-1-git-send-email-shawn.guo@linaro.org>
+	<1312050360-15767-1-git-send-email-shawn.guo@linaro.org>
+	<20110908145946.GE2070@arm.com>
+	<20110908182920.GL2967@ponder.secretlab.ca>
+Message-ID: <20110909085030.GA3069@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 September 2011 05:29, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> Jassi's suggestion was that we should have some magic to
-> automatically generate defaults for the relevant device registrations to
-> sidestep these issues.
-Perhaps there is some misunderstanding.... no witchcraft is involved here.
-To be clear, I suggested moving platform_device definition and registration
-from 12 board files to some common platform file and use machine_is_xxx()
-to assign names of those platform devices. Btw, omap_init_audio() is already
-called from an arch_initcall.
-Also please note that currently there's no platform_data needed to be passed.
-If that requirement arise in future, an optional set_asoc_platdata(void *pdata)
-could be defined beside platform_device creation.
-While the idea is not absolutely good, imho, it's certainly an improvement
-over this patch. Or am I overlooking something ?
+On Thu, Sep 08, 2011 at 11:29:20AM -0700, Grant Likely wrote:
+> On Thu, Sep 08, 2011 at 03:59:46PM +0100, Dave Martin wrote:
+> > Hi Shawn,
+> > 
+> > On Sun, Jul 31, 2011 at 02:26:00AM +0800, Shawn Guo wrote:
+> > > It adds device tree probe support for smsc911x driver.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Grant Likely <grant.likely@secretlab.ca>
+> > > Cc: Steve Glendinning <steve.glendinning@smsc.com>
+> > > Cc: David S. Miller <davem@davemloft.net>
+> > > Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
+> > > ---
+> > > Changes since v2:
+> > >  * Fix a typo in smsc911x.txt
+> > > 
+> > > Changes since v1:
+> > >  * Instead of getting irq line from gpio number, it use irq domain
+> > >    to keep platform_get_resource(IORESOURCE_IRQ) works for dt too.
+> > >  * Use 'lan9115' the first model that smsc911x supports in the match
+> > >    table
+> > >  * Use reg-shift and reg-io-width which already used in of_serial for
+> > >    shift and access size binding
+> > 
+> > When using this patch with vexpress, I found that 16-bit register access
+> > mode doesn't seem to be getting set correctly.
+> > 
+> > Can you take a look at this additional patch and let me know if it looks
+> > correct?
+> > 
+> > Cheers
+> > ---Dave
+> > 
+> > From: Dave Martin <dave.martin@linaro.org>
+> > Date: Wed, 7 Sep 2011 17:26:31 +0100
+> > Subject: [PATCH] net/smsc911x: Correctly configure 16-bit register access from DT
+> > 
+> > The SMSC911X_USE_16BIT needs to be set when using 16-bit register
+> > access.  However, currently no flag is set if the DT doesn't specify
+> > 32-bit access.
+> > 
+> > This patch should set the SMSC911X_USE_16BIT flag in a manner consistent
+> > with the documented DT bindings.
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > ---
+> >  drivers/net/smsc911x.c |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/net/smsc911x.c b/drivers/net/smsc911x.c
+> > index 75c08a5..1a35c25 100644
+> > --- a/drivers/net/smsc911x.c
+> > +++ b/drivers/net/smsc911x.c
+> > @@ -2121,6 +2121,8 @@ static int __devinit smsc911x_probe_config_dt(
+> >  	of_property_read_u32(np, "reg-io-width", &width);
+> >  	if (width == 4)
+> >  		config->flags |= SMSC911X_USE_32BIT;
+> > +	else
+> > +		config->flags |= SMSC911X_USE_16BIT;
+> 
+> Would it be better to do "else if (width == 2)"?  (completely
+> uninformed comment.  I've not looked at what the non-DT probe path
+> does on this driver.)
+
+I wouldn't have a problem with that.  But currently the binding
+documentation says that any value other than 4, or a missing property,
+implies 16-bit register access.
+
+So the binding documentation would need to change too in that case.
+
+Personally I think this would be better, but it's just an opinion.
+
+Cheers
+---Dave
