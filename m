@@ -1,74 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Fri, 09 Sep 2011 12:47:42 +0530
-Subject: [PATCH 25/25] OMAP3: CPUidle: Make use of CPU PM notifiers
-In-Reply-To: <87vct2hq79.fsf@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>	<1315144466-9395-26-git-send-email-santosh.shilimkar@ti.com>
-	<87vct2hq79.fsf@ti.com>
-Message-ID: <4E69BD96.9080002@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 9 Sep 2011 09:18:45 +0200
+Subject: [PATCH REPOST 2/2] i2c-imx: add device tree probe support
+In-Reply-To: <4E69A0AE.1060004@gmail.com>
+References: <1315465775-31335-1-git-send-email-shawn.guo@linaro.org>
+	<1315465775-31335-3-git-send-email-shawn.guo@linaro.org>
+	<4E69A0AE.1060004@gmail.com>
+Message-ID: <20110909071845.GI28816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 September 2011 11:27 PM, Kevin Hilman wrote:
->  From 8ad40f8c7f950105b25cc8d2cc35caa50871f86f Mon Sep 17 00:00:00 2001
-> From: Kevin Hilman<khilman@ti.com>
-> Date: Wed, 7 Sep 2011 12:04:44 -0700
-> Subject: [PATCH 1/2] OMAP2/3: PM: trigger CPU PM notifiers in idle and
->   suspend path
->
-> Add calls to CPU PM notifier core in the idle and suspend paths
-> so any CPU PM notifiers are properly called.
->
-> [add more description about the need to trigger notifiers only after
->   next power states are programmed.]
->
-> Signed-off-by: Kevin Hilman<khilman@ti.com>
-> ---
->   arch/arm/mach-omap2/pm24xx.c |    5 +++++
->   arch/arm/mach-omap2/pm34xx.c |    5 +++++
->   2 files changed, 10 insertions(+), 0 deletions(-)
->
+Hello Rob,
 
-[...]
+On Fri, Sep 09, 2011 at 12:14:22AM -0500, Rob Herring wrote:
+> > +i2c at 83fc4000 { /* I2C2 on i.MX51 */
+> > +	compatible = "fsl,imx51-i2c", "fsl,imx1-i2c";
+> > +	reg = <0x83fc4000 0x4000>;
+> > +	interrupts = <63>;
+> > +};
+> > +
+> > +i2c at 70038000 { /* HS-I2C on i.MX51 */
+> 
+> The mainline driver doesn't support the HS-I2C block does it?
+> 
+> The high speed and "old" i2c blocks on MX51 are basically different
+> blocks, so the compatible property should be different.
+I stumbled about that recently, too and found in
+arch/arm/plat-mxc/devices/platform-imx-i2c.c that the third device
+description for imx51 is a normal "imx-i2c" one using
+MX51_HSI2C_DMA_BASE_ADDR. So I concluded it's different but compatible.
 
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 7255d9b..b167c7f 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -29,6 +29,7 @@
->   #include<linux/delay.h>
->   #include<linux/slab.h>
->   #include<linux/console.h>
-> +#include<linux/cpu_pm.h>
->   #include<trace/events/power.h>
->
->   #include<asm/suspend.h>
-> @@ -386,6 +387,8 @@ void omap_sram_idle(void)
->   			if (!console_trylock())
->   				goto console_still_active;
->
-> +	cpu_pm_enter();
-> +
-I don't think you should blindly call CPU_PM notifiers.
-This should called if the MPU targeted state is OFF.
-With blind notifiers, CPU context like VFP or GIC or L2
-will be saved and restored even if CPU/CPU cluster is
-not entering into low power. This is highly un-optimal for
-CPUIDLE and defeats the purpose of adding different
-CPU PM events.
+board-mx51_babbage.c uses imx51_add_hsi2c but doesn't add a bus
+description. So It might not attract attention if the driver doesn't
+match the device.
 
-Looking at your UART driver notfier usage, you might need
-add new events instead of using the CPU and CPU cluster
-events.
+Best regards
+Uwe
 
-Even though on OMAP UART is idles as part of CPU, it's still
-an independent PD.
-
-E.g just to make a point,
-MPU is programmed to INACTIVE and let say PER PD is programmed
-to OFF.
- From MPU point of view the CPU_PM notifier change need not be called 
-because, it's doesn't loose any context, but UART notifier needs to
-be executed since UART context must be saved.
-
-Regards
-Santosh
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
