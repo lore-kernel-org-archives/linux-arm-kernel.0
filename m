@@ -1,38 +1,72 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 8 Sep 2011 19:40:47 -0700
-Subject: [RFC PATCH 05/10] documentation/dt: Add mpu, dsp and iva bindings
-In-Reply-To: <4E695E20.5070506@ti.com>
+Date: Thu, 8 Sep 2011 19:41:25 -0700
+Subject: [RFC PATCH 02/10] arm/dts: OMAP4: Add a main ocp entry bound to
+	l3-noc driver
+In-Reply-To: <4E695960.8010905@ti.com>
 References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-	<1314191356-10963-6-git-send-email-b-cousson@ti.com>
-	<20110908180910.GE2967@ponder.secretlab.ca>
-	<4E695E20.5070506@ti.com>
-Message-ID: <20110909024047.GA6726@ponder.secretlab.ca>
+	<1314191356-10963-3-git-send-email-b-cousson@ti.com>
+	<20110908180300.GB2967@ponder.secretlab.ca>
+	<4E695960.8010905@ti.com>
+Message-ID: <20110909024125.GB6726@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2011 at 02:30:24AM +0200, Cousson, Benoit wrote:
-> On 9/8/2011 8:09 PM, Grant Likely wrote:
-> >>+- compatible : Should be:
-> >>+  - "ti,ivahd", "ti,iva" for OMAP4
-> >>+  - "ti,iva2", "ti,iva" for OMAP3
-> >>+  - "ti,iva1", "ti,iva" for OMAP2
+On Fri, Sep 09, 2011 at 02:10:08AM +0200, Cousson, Benoit wrote:
+> On 9/8/2011 8:03 PM, Grant Likely wrote:
+> >On Wed, Aug 24, 2011 at 03:09:08PM +0200, Benoit Cousson wrote:
+> >>Used the main OCP node to add bindings with the l3_noc driver.
+> >>Remove l3_noc static device creation if CONFIG_OF is defined.
+> >>
+> >>Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+> >>Cc: Tony Lindgren<tony@atomide.com>
+> >>Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> >>---
+> >>  arch/arm/boot/dts/omap4.dtsi  |    3 ++-
+> >>  arch/arm/mach-omap2/devices.c |    2 ++
+> >>  2 files changed, 4 insertions(+), 1 deletions(-)
+> >>
+> >>diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> >>index 97a3ea7..928a74c 100644
+> >>--- a/arch/arm/boot/dts/omap4.dtsi
+> >>+++ b/arch/arm/boot/dts/omap4.dtsi
+> >>@@ -64,10 +64,11 @@
+> >>  	 * hierarchy.
+> >>  	 */
+> >>  	ocp {
+> >>-		compatible = "simple-bus";
+> >>+		compatible = "ti,l3-noc", "arteris,noc", "simple-bus";
+> >>  		#address-cells =<1>;
+> >>  		#size-cells =<1>;
+> >>  		ranges;
+> >>+		hwmods = "l3_main_1", "l3_main_2", "l3_main_3";
+> >>
+> >>  		gic: interrupt-controller at 48241000 {
+> >>  			compatible = "ti,omap4-gic", "arm,gic";
+> >>diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> >>index 2d4a199..5964650 100644
+> >>--- a/arch/arm/mach-omap2/devices.c
+> >>+++ b/arch/arm/mach-omap2/devices.c
+> >>@@ -70,6 +70,7 @@ static int __init omap3_l3_init(void)
+> >>  }
+> >>  postcore_initcall(omap3_l3_init);
+> >>
+> >>+#ifndef CONFIG_OF
+> >>  static int __init omap4_l3_init(void)
+> >>  {
+> >>  	int l, i;
+> >>@@ -100,6 +101,7 @@ static int __init omap4_l3_init(void)
+> >>  	return IS_ERR(pdev) ? PTR_ERR(pdev) : 0;
+> >>  }
+> >>  postcore_initcall(omap4_l3_init);
+> >>+#endif
 > >
-> >Again, be specific to the instantiation and encode the omap version
-> >into the compatible value.  Use the form "ti,omap4-*", etc.
+> >Don't do this.  Turning on CONFIG_OF must not break non-DT booting.
+> >Instead, check at runtime if a DT is available, and if it does then
+> >don't run the hook.
 > 
-> In that case, I do not necessarily agree. The IVA is a generic TI IP
-> used in various chips. The IP version is well documented in the TRM.
-> 
-> OK, in fact I didn't pick the proper version:-(
-> It should be:
-> 
-> +  - "ti,ivahd", for OMAP4
-> +  - "ti,iva2.2", for OMAP3
-> +  - "ti,iva2.1", for OMAP2430
-> +  - "ti,iva1", for OMAP2420
-> 
-> But still, no need to rely on OMAP version to identify the IVA version.
+> Do you want to check only the availability of the DT or the
+> availability of that specific node inside the DT?
 
-Fair enough, providing that the "ti,iva" value is dropped.
+Up to you.  What makes the most sense?
 
 g.
