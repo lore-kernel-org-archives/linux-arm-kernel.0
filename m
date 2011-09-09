@@ -1,48 +1,80 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 9 Sep 2011 09:21:28 -0400 (EDT)
-Subject: [PATCH v2 2/3] ARM: iwmmxt: Port problematic iwmmxt support code
-	to v7/Thumb-2
-In-Reply-To: <1315562102.7961.5.camel@linaro1>
-References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-	<1315497854-13311-3-git-send-email-dave.martin@linaro.org>
-	<201109081845.58260.arnd@arndb.de>
-	<CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
-	<20110908172002.GG2070@arm.com>
-	<CAMPhdO9USGfrpgR0fXUL6024qWGLqsS72vzaO6AH1oo-TW1RtA@mail.gmail.com>
-	<1315562102.7961.5.camel@linaro1>
-Message-ID: <alpine.LFD.2.00.1109090919170.20358@xanadu.home>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 9 Sep 2011 15:30:51 +0200
+Subject: [PATCH v3 1/1] ASoC: mxs-saif: add record function
+In-Reply-To: <1315399910-6525-1-git-send-email-b29396@freescale.com>
+References: <1315399910-6525-1-git-send-email-b29396@freescale.com>
+Message-ID: <20110909133051.GS1912@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Sep 2011, Jon Medhurst (Tixy) wrote:
-
-> On Thu, 2011-09-08 at 11:49 -0700, Eric Miao wrote:
-> > So the problem is really when compiling this file with existing toolchain,
-> > it's downgrading to v5 compatible mode, and the instruction below
-> > 
-> > sub pc, lr, r1, lsr #32
-> > 
-> > wouldn't be encoded when building a THUMB2 kernel. Considering the
-> > r1, lsr #32 is actually to create an explicit data dependency of the previous
-> > co-processor instruction, would it be one option to rewrite this as something
-> > like:
-> > 
-> > mov r1, r1
-> > mov pc, lr
+On Wed, Sep 07, 2011 at 08:51:50PM +0800, Dong Aisheng wrote:
+> 1. add different clkmux mode handling
+> SAIF can use two instances to implement full duplex (playback &
+> recording) and record saif may work on EXTMASTER mode which is
+> using other saif's BITCLK&LRCLK.
 > 
-> That doesn't include a data dependency of PC on R1, so it's possible for
-> MOV PC, LR and subsequent instructions to be executed before MOV R1, R1
-> has completed. We would want...
+> The clkmux mode could be set in pdata->init() in mach-specific code.
+> For generic saif driver, it only needs to know who is his master
+> and the master id is also provided in mach-specific code.
 > 
-> add lr, lr, r1, lsr #32
-> mov pc, lr
+> 2. support playback and capture simutaneously however the sample
+> rates can not be different due to hw limitation.
+> 
+> Signed-off-by: Dong Aisheng <b29396@freescale.com>
 
-But isn't the first insn unavailable with Thumb2?
+One thing I see...
 
-Maybe something like:
+> @@ -422,20 +503,39 @@ static int mxs_saif_trigger(struct snd_pcm_substream *substream, int cmd,
+>  			__raw_readl(saif->base + SAIF_DATA);
+>  		}
+>  
+> -		dev_dbg(cpu_dai->dev, "CTRL 0x%x STAT 0x%x\n",
+> +		master_saif->ongoing = 1;
+> +
+> +		dev_dbg(saif->dev, "CTRL 0x%x STAT 0x%x\n",
+>  			__raw_readl(saif->base + SAIF_CTRL),
+>  			__raw_readl(saif->base + SAIF_STAT));
+>  
+> +		dev_dbg(master_saif->dev, "CTRL 0x%x STAT 0x%x\n",
+> +			__raw_readl(master_saif->base + SAIF_CTRL),
+> +			__raw_readl(master_saif->base + SAIF_STAT));
+>  		break;
+>  	case SNDRV_PCM_TRIGGER_SUSPEND:
+>  	case SNDRV_PCM_TRIGGER_STOP:
+>  	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+>  		dev_dbg(cpu_dai->dev, "stop\n");
+>  
+> -		clk_disable(saif->clk);
+> -		if (!saif->mclk_in_use)
+> +		/* wait a while for the current sample to complete */
+> +		delay = USEC_PER_SEC / master_saif->cur_rate;
+> +
+> +		if (!master_saif->mclk_in_use) {
+> +			__raw_writel(BM_SAIF_CTRL_RUN,
+> +				master_saif->base + SAIF_CTRL + MXS_CLR_ADDR);
+> +			udelay(delay);
+> +		}
+> +		clk_disable(master_saif->clk);
+> +
+> +		if (saif != master_saif) {
+>  			__raw_writel(BM_SAIF_CTRL_RUN,
+>  				saif->base + SAIF_CTRL + MXS_CLR_ADDR);
+> +			udelay(delay);
 
-	sub	r1, r1, r1
-	add	pc, lr, r1
+I think we should use usleep_range for both udelays here? Having a rate
+of 8000, we'd burn 250us here.
 
+Regards,
 
-Nicolas
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110909/56c6ccac/attachment.sig>
