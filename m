@@ -1,46 +1,99 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Fri, 09 Sep 2011 14:01:38 -0400
-Subject: [PATCH V4 RESEND 3/6] ARM: S5P64X0: Set s3c_device_fb name
+Date: Fri, 09 Sep 2011 14:01:39 -0400
+Subject: [PATCH V4 4/6] ARM: S5P64X0: Add GPIO setup for LCD
 In-Reply-To: <1315591301-17166-1-git-send-email-ajaykumar.rs@samsung.com>
 References: <1315591301-17166-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1315591301-17166-4-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1315591301-17166-5-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set s3c_device_fb name as "s5p64x0-fb" for S5P6440 and S5P6450.
+This patch adds GPIO lines settings(HSYNC, VSYNC, VCLK and VD) for LCD.
 
 Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
 ---
- arch/arm/mach-s5p64x0/cpu.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/mach-s5p64x0/Kconfig           |    6 ++++++
+ arch/arm/mach-s5p64x0/Makefile          |    1 +
+ arch/arm/mach-s5p64x0/setup-fb-24bpp.c  |   29 +++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/include/plat/fb.h |    7 +++++++
+ 4 files changed, 43 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-s5p64x0/setup-fb-24bpp.c
 
-diff --git a/arch/arm/mach-s5p64x0/cpu.c b/arch/arm/mach-s5p64x0/cpu.c
-index a5c0095..617da3b 100644
---- a/arch/arm/mach-s5p64x0/cpu.c
-+++ b/arch/arm/mach-s5p64x0/cpu.c
-@@ -38,6 +38,7 @@
- #include <plat/s5p6440.h>
- #include <plat/s5p6450.h>
- #include <plat/adc-core.h>
-+#include <plat/fb-core.h>
+diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
+index 65c7518..7bec400 100644
+--- a/arch/arm/mach-s5p64x0/Kconfig
++++ b/arch/arm/mach-s5p64x0/Kconfig
+@@ -21,6 +21,12 @@ config CPU_S5P6450
+ 	help
+ 	  Enable S5P6450 CPU support
  
- /* Initial IO mappings */
++config S5P64X0_SETUP_FB_24BPP
++	bool
++	help
++	  Common setup code for S5P64X0 based boards with a LCD display
++	  through RGB interface.
++
+ config S5P64X0_SETUP_I2C1
+ 	bool
+ 	help
+diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
+index 5f6afdf..1bf54b2 100644
+--- a/arch/arm/mach-s5p64x0/Makefile
++++ b/arch/arm/mach-s5p64x0/Makefile
+@@ -28,3 +28,4 @@ obj-y				+= dev-audio.o
+ obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
  
-@@ -108,6 +109,7 @@ void __init s5p6440_map_io(void)
- {
- 	/* initialize any device information early */
- 	s3c_adc_setname("s3c64xx-adc");
-+	s3c_fb_setname("s5p64x0-fb");
+ obj-$(CONFIG_S5P64X0_SETUP_I2C1)	+= setup-i2c1.o
++obj-$(CONFIG_S5P64X0_SETUP_FB_24BPP)	+= setup-fb-24bpp.o
+diff --git a/arch/arm/mach-s5p64x0/setup-fb-24bpp.c b/arch/arm/mach-s5p64x0/setup-fb-24bpp.c
+new file mode 100644
+index 0000000..f346ee4
+--- /dev/null
++++ b/arch/arm/mach-s5p64x0/setup-fb-24bpp.c
+@@ -0,0 +1,29 @@
++/* linux/arch/arm/mach-s5p64x0/setup-fb-24bpp.c
++ *
++ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
++ *             http://www.samsung.com/
++ *
++ * Base S5P64X0 GPIO setup information for LCD framebuffer
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/fb.h>
++#include <linux/gpio.h>
++
++#include <plat/cpu.h>
++#include <plat/fb.h>
++#include <plat/gpio-cfg.h>
++
++void s5p64x0_fb_gpio_setup_24bpp(void)
++{
++	if (soc_is_s5p6440()) {
++		s3c_gpio_cfgrange_nopull(S5P6440_GPI(0), 16, S3C_GPIO_SFN(2));
++		s3c_gpio_cfgrange_nopull(S5P6440_GPJ(0), 12, S3C_GPIO_SFN(2));
++	} else if (soc_is_s5p6450()) {
++		s3c_gpio_cfgrange_nopull(S5P6450_GPI(0), 16, S3C_GPIO_SFN(2));
++		s3c_gpio_cfgrange_nopull(S5P6450_GPJ(0), 12, S3C_GPIO_SFN(2));
++	}
++}
+diff --git a/arch/arm/plat-samsung/include/plat/fb.h b/arch/arm/plat-samsung/include/plat/fb.h
+index 01f10e4..0fedf47 100644
+--- a/arch/arm/plat-samsung/include/plat/fb.h
++++ b/arch/arm/plat-samsung/include/plat/fb.h
+@@ -109,4 +109,11 @@ extern void s5pv210_fb_gpio_setup_24bpp(void);
+  */
+ extern void exynos4_fimd0_gpio_setup_24bpp(void);
  
- 	iotable_init(s5p64x0_iodesc, ARRAY_SIZE(s5p64x0_iodesc));
- 	iotable_init(s5p6440_iodesc, ARRAY_SIZE(s5p6440_iodesc));
-@@ -117,6 +119,7 @@ void __init s5p6450_map_io(void)
- {
- 	/* initialize any device information early */
- 	s3c_adc_setname("s3c64xx-adc");
-+	s3c_fb_setname("s5p64x0-fb");
- 
- 	iotable_init(s5p64x0_iodesc, ARRAY_SIZE(s5p64x0_iodesc));
- 	iotable_init(s5p6450_iodesc, ARRAY_SIZE(s5p6450_iodesc));
++/**
++ * s5p64x0_fb_gpio_setup_24bpp() - S5P6440/S5P6450 setup function for 24bpp LCD
++ *
++ * Initialise the GPIO for an 24bpp LCD display on the RGB interface.
++ */
++extern void s5p64x0_fb_gpio_setup_24bpp(void);
++
+ #endif /* __PLAT_S3C_FB_H */
 -- 
 1.7.0.4
