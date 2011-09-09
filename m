@@ -1,48 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 09 Sep 2011 16:20:18 +0100
-Subject: [RFC PATCH v2 3/3] ARM: SoC: convert VExpress/RealView to SoC
-	descriptor
-In-Reply-To: <201109091656.44068.arnd@arndb.de>
-References: <1315579616-27388-1-git-send-email-marc.zyngier@arm.com>
-	<1315579616-27388-4-git-send-email-marc.zyngier@arm.com>
-	<201109091656.44068.arnd@arndb.de>
-Message-ID: <4E6A2EB2.6080803@arm.com>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Fri,  9 Sep 2011 11:26:48 -0400
+Subject: [PATCH 1/5] ARM: realview: Use wfi macro in platform_do_lowpower.
+In-Reply-To: <1315582012-23507-1-git-send-email-nbowler@elliptictech.com>
+References: <1315582012-23507-1-git-send-email-nbowler@elliptictech.com>
+Message-ID: <1315582012-23507-2-git-send-email-nbowler@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/11 15:56, Arnd Bergmann wrote:
-> On Friday 09 September 2011, Marc Zyngier wrote:
->> Convert both Realview and VExpress to use the SoC descriptor to
->> provide their SMP and CPU hotplug operation.
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Nicolas Pitre <nico@fluxnic.net>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Yes, looks good to me.
-> 
->>  }
->> +
->> +struct arm_soc_desc realview_soc_desc __initdata = {
->> +       .name           = "ARM RealView Platform",
->> +#ifdef CONFIG_SMP
->> +       .smp_ops        = &realview_soc_smp_ops,
->> +#endif
->> +};
-> 
-> Do you think we should have a macro for this? Since this is
-> always the same, we could do something like
-> 
-> #ifdef CONFIG_SMP
-> #define soc_smp_ops(ops)	.smp_ops = &(ops),
-> #else
-> #define soc_smp_ops(ops)	/* empty */
-> #endif
+Current Realview CPU hotplug code includes a hardcoded WFI instruction,
+in ARM encoding.  The hardcoded instruction is both hard to understand
+and doomed to failure when building the kernel in Thumb-2 mode.
 
-That would be an improvement indeed. Will queue that for v3.
+Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
+---
+Compile tested in both ARM and Thumb-2 mode.
+---
+ arch/arm/mach-realview/hotplug.c |    9 ++-------
+ 1 files changed, 2 insertions(+), 7 deletions(-)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+index a87523d..6d19377 100644
+--- a/arch/arm/mach-realview/hotplug.c
++++ b/arch/arm/mach-realview/hotplug.c
+@@ -13,6 +13,7 @@
+ #include <linux/smp.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/system.h>
+ 
+ extern volatile int pen_release;
+ 
+@@ -61,13 +62,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 	 * code will have already disabled interrupts
+ 	 */
+ 	for (;;) {
+-		/*
+-		 * here's the WFI
+-		 */
+-		asm(".word	0xe320f003\n"
+-		    :
+-		    :
+-		    : "memory", "cc");
++		wfi();
+ 
+ 		if (pen_release == cpu) {
+ 			/*
 -- 
-Jazz is not dead. It just smells funny...
+1.7.3.4
