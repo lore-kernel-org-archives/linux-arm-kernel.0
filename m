@@ -1,49 +1,37 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 09 Sep 2011 14:46:03 -0700
-Subject: [PATCH 09/22] OMAP2: add voltage domains and connect to
-	powerdomains
-In-Reply-To: <CAORVsuXd2eeSs_TFu+stJge6tqQzO+4d0FcnmDPMHnChLgCuiQ@mail.gmail.com>
-	(Jean Pihet's message of "Wed, 7 Sep 2011 12:39:36 +0200")
+Date: Fri, 09 Sep 2011 14:48:54 -0700
+Subject: [PATCH 11/22] OMAP4: powerdomain data: add voltage domains
+In-Reply-To: <CAORVsuVikEPsk=1v_Mcevsu1iyDDQzdHuuKbBJUMRGL5mrLpXg@mail.gmail.com>
+	(Jean Pihet's message of "Wed, 7 Sep 2011 11:04:26 +0200")
 References: <1314639355-12713-1-git-send-email-khilman@ti.com>
-	<1314639355-12713-10-git-send-email-khilman@ti.com>
-	<CAORVsuXd2eeSs_TFu+stJge6tqQzO+4d0FcnmDPMHnChLgCuiQ@mail.gmail.com>
-Message-ID: <877h5htmn8.fsf@ti.com>
+	<1314639355-12713-12-git-send-email-khilman@ti.com>
+	<CAORVsuVikEPsk=1v_Mcevsu1iyDDQzdHuuKbBJUMRGL5mrLpXg@mail.gmail.com>
+Message-ID: <871uvptmih.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Jean Pihet <jean.pihet@newoldbits.com> writes:
 
-> Kevin,
+> Hi,
 >
 > On Mon, Aug 29, 2011 at 7:35 PM, Kevin Hilman <khilman@ti.com> wrote:
->> Create basic voltagedomains for OMAP2 and associate OMAP2 powerdomains
->> with the newly created voltage domains.
+>> From: Benoit Cousson <b-cousson@ti.com>
 >>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> ?arch/arm/mach-omap2/Makefile ? ? ? ? ? ? ? ? ?| ? ?3 +-
->> ?arch/arm/mach-omap2/io.c ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
->> ?arch/arm/mach-omap2/powerdomains2xxx_data.c ? | ? ?4 +++
->> ?arch/arm/mach-omap2/voltage.h ? ? ? ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-omap2/voltagedomains2xxx_data.c | ? 32 +++++++++++++++++++++++++
->> ?5 files changed, 41 insertions(+), 1 deletions(-)
->> ?create mode 100644 arch/arm/mach-omap2/voltagedomains2xxx_data.c
+>> Add voltage domain name to indicate which voltagedomain each
+>> powerdomain is in.
 >>
-> ...
->
->> diff --git a/arch/arm/mach-omap2/voltagedomains2xxx_data.c b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
->> new file mode 100644
->> index 0000000..69ff261
->> --- /dev/null
->> +++ b/arch/arm/mach-omap2/voltagedomains2xxx_data.c
->> @@ -0,0 +1,32 @@
->> +/*
->> + * OMAP3 voltage domain data
->> + *
->> + * Copyright (C) 2007, 2010 Texas Instruments, Inc.
-> 2011?
->
+>> The fixed voltage domain like ldo_wakeup for emu and wkup power
+>> domain is added too.
+>>
+>> Update the TI copyright date to 2011.
+> This seems to not be part of this patch.
 
-Thanks, will update.
+OK, dropping this part of the changelog.  The new stuff (voltagedomain data)
+already has a 2011 copyright, and I'll just leave the powerdomain stuff
+for now.
+
+> Ok for the rest of it.
+
+Thanks for the review.
 
 Kevin
