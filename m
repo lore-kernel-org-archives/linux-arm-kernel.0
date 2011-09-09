@@ -1,65 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 10 Sep 2011 07:34:49 +0800
-Subject: [PATCH 14/25] OMAP4: PM: Add CPUX OFF mode support
-In-Reply-To: <4E6A4605.3050305@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-15-git-send-email-santosh.shilimkar@ti.com>
-	<20110909080416.GF31581@S2100-06.ap.freescale.net>
-	<4E69C9CF.6090709@ti.com>
-	<20110909141321.GC32138@S2100-06.ap.freescale.net>
-	<CAMQu2gxeDzFGyhsXK-wDkyiJRoD6_GN58m=3_=NC8yKa_ThJnQ@mail.gmail.com>
-	<20110909152729.GG32138@S2100-06.ap.freescale.net>
-	<4E6A4605.3050305@ti.com>
-Message-ID: <20110909233448.GH32138@S2100-06.ap.freescale.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sat, 10 Sep 2011 07:37:59 +0800
+Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <1315585508.30522.3.camel@vkoul-mobl4>
+References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
+	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
+	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
+	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
+	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
+	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
+	<CABb+yY3F+DMn2SxeO0chjpiMBkgLvSK5EVYMdhQsfQoZNZ4_7Q@mail.gmail.com>
+	<CAGsJ_4xDh6c5=Uhw9zO34XeY5UNC=fLuRubryks6NOv3T5_kCQ@mail.gmail.com>
+	<1315518676.6638.6.camel@vkoul-mobl4>
+	<CAGsJ_4zQ0H99w4vDkFG2DtA561e0oPjKVgEZb1kBkGab=c-OAw@mail.gmail.com>
+	<CAGsJ_4zaOwHvViuh=nKhvxw3irnE9mXaG_FAKLp_a__XpdXtSA@mail.gmail.com>
+	<1315585508.30522.3.camel@vkoul-mobl4>
+Message-ID: <CAGsJ_4xgEVQh+F8ydKZn7z+NwDTJyxyZnZSUFcuR_N8Z2DMpsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2011 at 10:29:49PM +0530, Santosh wrote:
-> On Friday 09 September 2011 08:57 PM, Shawn Guo wrote:
-> >On Fri, Sep 09, 2011 at 07:41:08PM +0530, Shilimkar, Santosh wrote:
-> >>On Fri, Sep 9, 2011 at 7:43 PM, Shawn Guo<shawn.guo@freescale.com>  wrote:
-> >>>On Fri, Sep 09, 2011 at 01:39:51PM +0530, Santosh wrote:
-> >>>>On Friday 09 September 2011 01:34 PM, Shawn Guo wrote:
-> >>>>>Hi Santosh,
-> 
-> [...]
-> 
-> >>#ifdef CONFIG_CACHE_L2X0
-> >>	/*
-> >>	 * Clean and invalidate the L2 cache.
-> >>	 * Common cache-l2x0.c functions can't be used here since it
-> >>	 * uses spinlocks. We are out of coherency here with data cache
-> >>	 * disabled. The spinlock implementation uses exclusive load/store
-> >>	 * instruction which can fail without data cache being enabled.
-> >>	 * OMAP4 hardware doesn't support exclusive monitor which can
-> >>	 * overcome exclusive access issue. Because of this, CPU can
-> >>	 * lead to deadlock.
-> >>	 */
-> >>l2x_clean_inv:
-> >>	bl	omap4_get_sar_ram_base
-> >>	mov	r8, r0
-> >>	mrc	p15, 0, r5, c0, c0, 5		@ Read MPIDR
-> >>	ands	r5, r5, #0x0f
-> >>	ldreq	r0, [r8, #L2X0_SAVE_OFFSET0]
-> >>	ldrne	r0, [r8, #L2X0_SAVE_OFFSET1]
-> >>	cmp	r0, #3
-> >>	bne	do_WFI
-> >
-> >It looks like you are bypassing L2 clean and invalidate for cases
-> >"1" and "2" here.  But I really do not understand how you get r0
-> >back here.
-> >
-> The value which is passed in R0 is also stored in scratch patch memory
-> and retrieved using L2X0_SAVE_OFFSET0.
-> Simple :)
-> 
-Aha, no wonder that I read it wrongly.  The parameter passing in r0
-is here simply for confusing people.
+2011/9/10 Vinod Koul <vkoul@infradead.org>:
+> On Fri, 2011-09-09 at 10:52 +0800, Barry Song wrote:
+>> >
+>> > Actually, there is no real case for xlen > dma_width. this picture is
+>> > only explaining what will happen if we set xlen > dma_width.
+>> > when xlen > dma_width, for every line, dma will transfer only
+>> > dma_width. Then the extra data is wrapped around
+>> > to the next data line, it will corrupt the DMA transfer for
+>> > multiple-line 2-D DMA since the extra data will overlap with the real
+>> > next line.
+>> >
+>> > if we set ylen to 0, the DMA becomes 1D, the wrap-around of the extra
+>> > data has no issue nobody will overlap with it.
+>> >
+>>
+>> For example, if we set xlen = 7, dma_width =4, ylen > 0
+>> then dma will happen like:
+>> 0~6
+>> 4~10
+>> 8~14
+>> 12~18
+>> ....
+> Is there a real world use case of this??
 
-Also, IMO, lable "l2x_clean_inv" should be put after the "bne do_WFI".
-Otherwise, my original statement (it seems l2x_clean_inv will be
-called for case "2") stands correct :)
+no real case actually and hardware spec says it is wrong to set xlen >
+dma_width since it causes the above overlap.
 
--- 
-Regards,
-Shawn
+>
+>>
+>> But for ylen=0, it has no issue. there is no next line to overlap with
+>> the extra data.
+>>
+>> in case we set xlen = 0, something funny will happen:
+>> i will copy the same memory again and again(ylen+1 times).
+>
+>
+> --
+> ~Vinod Koul
+> Intel Corp.
+>
+>
+
+Thanks
+barry
