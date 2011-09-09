@@ -1,45 +1,96 @@
-From: cxie4@marvell.com (Chao Xie)
-Date: Thu, 8 Sep 2011 22:30:01 -0700
-Subject: [PATCH 1/4] ARM: mmp: add irq_disable callback for gpio chip
-In-Reply-To: <CAMPhdO_S4jSFBgDAeSQuMa-LEz1Bcxxbi1eRg_XHbT-=1_0XTw@mail.gmail.com>
-References: <1315541894-19504-1-git-send-email-chao.xie@marvell.com>
-	<CAMPhdO_S4jSFBgDAeSQuMa-LEz1Bcxxbi1eRg_XHbT-=1_0XTw@mail.gmail.com>
-Message-ID: <AAD1C6EB06EE3649B35B7E026785068D154C14452E@SC-VEXCH2.marvell.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Fri, 09 Sep 2011 11:57:02 +0530
+Subject: [PATCH v2 2/5] cpu_pm: call notifiers during suspend
+In-Reply-To: <87ehzqbvvh.fsf@ti.com>
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>	<1315060755-4613-3-git-send-email-santosh.shilimkar@ti.com>	<87k49knmrw.fsf@ti.com>
+	<4E684F90.7010809@ti.com>	<87wrdjku9h.fsf@ti.com>	<CAMbhsRQvft4dqhAc4j_bXDR8018zeoSRXuWC6bS-d8rA0PgOyA@mail.gmail.com>
+	<87ehzqbvvh.fsf@ti.com>
+Message-ID: <4E69B1B6.2080604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When driver invoke disable_irq to disable the gpio irq, it will failed to mask the bit in gpio register. Irq will still generate although the irq_handler for the gpio is not invoked.
-
------Original Message-----
-From: Eric Miao [mailto:eric.y.miao at gmail.com] 
-Sent: Friday, September 09, 2011 11:28 AM
-To: Chao Xie
-Cc: linux-arm-kernel at lists.infradead.org; Haojian Zhuang; linux at arm.linux.org.uk
-Subject: Re: [PATCH 1/4] ARM: mmp: add irq_disable callback for gpio chip
-
-Chao,
-
-I actually don't see why do we need irq_disable() here?
-
-On Thu, Sep 8, 2011 at 9:18 PM, Chao Xie <chao.xie@marvell.com> wrote:
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> ---
-> ?arch/arm/plat-pxa/gpio.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
+On Friday 09 September 2011 02:21 AM, Kevin Hilman wrote:
+> Colin Cross<ccross@android.com>  writes:
 >
-> diff --git a/arch/arm/plat-pxa/gpio.c b/arch/arm/plat-pxa/gpio.c
-> index a11dc36..15de09d 100644
-> --- a/arch/arm/plat-pxa/gpio.c
-> +++ b/arch/arm/plat-pxa/gpio.c
-> @@ -263,6 +263,7 @@ static struct irq_chip pxa_muxed_gpio_chip = {
-> ? ? ? ?.irq_ack ? ? ? ?= pxa_ack_muxed_gpio,
-> ? ? ? ?.irq_mask ? ? ? = pxa_mask_muxed_gpio,
-> ? ? ? ?.irq_unmask ? ? = pxa_unmask_muxed_gpio,
-> + ? ? ? .irq_disable ? ?= pxa_mask_muxed_gpio,
-> ? ? ? ?.irq_set_type ? = pxa_gpio_irq_type,
-> ?};
+>> On Thu, Sep 8, 2011 at 7:01 AM, Kevin Hilman<khilman@ti.com>  wrote:
+>>> Santosh<santosh.shilimkar@ti.com>  writes:
+>>>
+>>>> On Thursday 08 September 2011 01:32 AM, Kevin Hilman wrote:
+>>>>> Santosh Shilimkar<santosh.shilimkar@ti.com>    writes:
+>>>>>
+>>>>>> From: Colin Cross<ccross@android.com>
+[...]
+
+>>
+>> These notifiers are designed for drivers that are tightly coupled to
+>> the cpu, and shared across multiple architectures (mostly GIC and
+>> VFP).
 >
-> --
-> 1.7.0.4
+> That is certainly the initial intended usage, and I understand that
+> design, but they are useful for much more.
 >
+> Specifically, consider devices whose power transitions need to be
+> tightly coupled with the CPU, but are in different power domains.
+> Notifiers for these devices may need to be coordinated with
+> platform-specific events.
 >
+> Also, it's not only about context save for off-mode.  Some of these
+> tightly-coupled devices have other work to do besides context
+> save/restore, and CPU PM notifiers are useful there.  A dumb example off
+> the top of my head: pins (e.g. GPIOs), that need to be mux'd into safe
+> mode to avoid glitches when coming back from off.  (admittedly, this is
+> broken HW, but we all know broken HW is part of life.)
+>
+>> In practice, all of these devices are off in every suspend
+>> state, because nobody leaves the CPU on in suspend.
+>
+> Sure, but you might leave other power domains on (or in retention)
+> during suspend, and these domains might contain some of the devices
+> whose power transitions are coupled with CPU transitions and thus using
+> CPU PM notifiers.
+>
+> Also, so far we've only talked about suspend, but the CPU (and other
+> power domains) might also go off during idle.  The approach in $SUBJECT
+> patch addresses suspend but not idle, which means it's up to
+> platform-specific code to trigger the notifiers for idle.  I think it
+> should be the same for suspend.
+>
+>> The (next_state == OFF) api you refer to would have to be something
+>> architecture specific, since the power state handling is very
+>> different on every platform, so it's not something that would ever be
+>> included in drivers that I imagined would be using these notifiers.
+>
+> Sure, but you created something so useful that it can be used in other
+> areas than you initially imagined. :)   Thanks!
+>
+> I wouldn't imagine arch-specific being used in those generic drivers
+> either, but in addition to the drivers you imagined, I'm already trying
+> to the notifiers in drivers that are platform-specific.  I only imagine
+> using the "next state" type of checking in platform-specific code, not
+> in generic ones.
+>
+> Note however that I'm certainly not arguing that the notifiers should
+> not be called in suspend.  I'm only arguing that it should be up to
+> platform-specific code when to call them because of possible
+> platform-specific pre-requisites in platform-specific notifier
+> callbacks.
+>
+> IMO, there are 2 options.
+>
+> 1) leave it up to platform-specific code when to trigger the notifiers
+>     for *both* suspend and idle PM transitions
+>
+> 2) trigger the notifiers in arch-independent code for both suspend and
+>     idle *but* provide a way that platform-specific code can disable
+>     them in favor of using platform-specific trigger points.
+>
+> If most platforms really don't care, then maybe (2) would be the
+> better approach.  That's fine with me as long as there's a way to
+> disable them so platform-specific ones can be used.
+>
+I think, we should keep the notifiers simple and option 1 the one
+thing we should consider. It's just easy to take care of IDLE and
+suspend together.
+
+Regards
+Santosh
