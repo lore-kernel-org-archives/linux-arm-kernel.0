@@ -1,63 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Sep 2011 14:58:43 +0200
-Subject: [RFC PATCH 06/10] hwspinlock: OMAP4: Add spinlock support in DT
-In-Reply-To: <CAK=WgbZmFGqo2B_MO_FXDiQHUx1SoKvHEReTpVr9O6XZ2uo7Ng@mail.gmail.com>
-References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
-	<201109081647.55377.arnd@arndb.de>
-	<CAK=WgbZmFGqo2B_MO_FXDiQHUx1SoKvHEReTpVr9O6XZ2uo7Ng@mail.gmail.com>
-Message-ID: <201109091458.44153.arnd@arndb.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 9 Sep 2011 09:21:28 -0400 (EDT)
+Subject: [PATCH v2 2/3] ARM: iwmmxt: Port problematic iwmmxt support code
+	to v7/Thumb-2
+In-Reply-To: <1315562102.7961.5.camel@linaro1>
+References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
+	<1315497854-13311-3-git-send-email-dave.martin@linaro.org>
+	<201109081845.58260.arnd@arndb.de>
+	<CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
+	<20110908172002.GG2070@arm.com>
+	<CAMPhdO9USGfrpgR0fXUL6024qWGLqsS72vzaO6AH1oo-TW1RtA@mail.gmail.com>
+	<1315562102.7961.5.camel@linaro1>
+Message-ID: <alpine.LFD.2.00.1109090919170.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 September 2011, Ohad Ben-Cohen wrote:
-> On Thu, Sep 8, 2011 at 5:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I think a number would work here but is not optimal for the device tree
-> > representation. I think a better binding would be to encode it like
-> > interrupt numbers, where every device that uses a hwspinlock will describe
-> > that as a combination of phandle to the hwspinlock controller and
-> > identifier to be used by that controller
+On Fri, 9 Sep 2011, Jon Medhurst (Tixy) wrote:
+
+> On Thu, 2011-09-08 at 11:49 -0700, Eric Miao wrote:
+> > So the problem is really when compiling this file with existing toolchain,
+> > it's downgrading to v5 compatible mode, and the instruction below
+> > 
+> > sub pc, lr, r1, lsr #32
+> > 
+> > wouldn't be encoded when building a THUMB2 kernel. Considering the
+> > r1, lsr #32 is actually to create an explicit data dependency of the previous
+> > co-processor instruction, would it be one option to rewrite this as something
+> > like:
+> > 
+> > mov r1, r1
+> > mov pc, lr
 > 
-> I'm not sure.
+> That doesn't include a data dependency of PC on R1, so it's possible for
+> MOV PC, LR and subsequent instructions to be executed before MOV R1, R1
+> has completed. We would want...
 > 
-> This implies that devices are hardwired to the specific
-> controller+identifier, which is true for interrupts, but not for
-> hwspinlocks. As a result the hardware depicted by such representation
-> would be imprecise and might unnecessarily limit the software.
-> 
-> hwspinlock devices are really just a pool of locks, which are not
-> inherently bound to any device: any master that can initiate
-> read/write bus access can use any of the locks (hardware-wise). One
-> just needs to make sure that ownership of the locks, even if
-> determined dynamically at runtime, is managed correctly.
+> add lr, lr, r1, lsr #32
+> mov pc, lr
 
-ok
+But isn't the first insn unavailable with Thumb2?
 
-> I think the phandle+identifier approach is very elegant to achieve
-> static allocation of the hwspinlocks, and some boards will definitely
-> need it (e.g. those unlucky designs which arbiter i2c access using an
-> hwspinlock).
-> 
-> But wouldn't that limit us from providing dynamic allocation of
-> hwspinlocks ? I was told about teams working on complex multimedia use
-> cases which involves numerous object sharing and require actually more
-> hwspinlocks than exist (so they're planning on multiplexing several
-> logical locks on a single hwspinlock). They use dynamic allocation of
-> hwspinlocks in order to allow different hwspinlocks users to co-exist
-> (but naturally not run together at the same time).
+Maybe something like:
 
-Good point. I guess we will need both static and dynamic allocation
-then. You need the static allocation for cases where the other
-user of the spinlock is not under the control of Linux, but is known
-at boot time. For dynamic allocation, my impression is that we don't
-need any link from the spinlock user device to the controller at all,
-but instead the controller should have a list of the available
-spinlocks.
+	sub	r1, r1, r1
+	add	pc, lr, r1
 
-In a case where you have three operating systems running independently
-on the same hardware and each of the shares one spinlock with the
-other two, you want to be able to model in the device tree which
-spinlocks are already known to the other instances and therefore
-fixed, which ones are available to the local OS and which ones
-are not available.
 
-	Arnd
+Nicolas
