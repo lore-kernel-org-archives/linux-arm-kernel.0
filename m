@@ -1,51 +1,49 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Fri,  9 Sep 2011 12:18:13 +0800
-Subject: [PATCH 3/4] ARM: pxa: add irq ack for gpio irq
+Date: Fri,  9 Sep 2011 12:18:12 +0800
+Subject: [PATCH 2/4] ARM: mmp: add irq_disable callback for icu chip
 In-Reply-To: <1315541894-19504-1-git-send-email-chao.xie@marvell.com>
 References: <1315541894-19504-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1315541894-19504-3-git-send-email-chao.xie@marvell.com>
+Message-ID: <1315541894-19504-2-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For previous pxa3xx and pxa168, pxa9xx, the interrupt controller does
-not need any ack for the interrupt.
-For next ARM V7 SMP core, it will use GIC, and it need ack for the
-interrupt.
-
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/plat-pxa/gpio.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/mach-mmp/irq-mmp2.c   |    2 ++
+ arch/arm/mach-mmp/irq-pxa168.c |    1 +
+ 2 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-pxa/gpio.c b/arch/arm/plat-pxa/gpio.c
-index 15de09d..66ae80a 100644
---- a/arch/arm/plat-pxa/gpio.c
-+++ b/arch/arm/plat-pxa/gpio.c
-@@ -19,6 +19,7 @@
- #include <linux/slab.h>
+diff --git a/arch/arm/mach-mmp/irq-mmp2.c b/arch/arm/mach-mmp/irq-mmp2.c
+index d21c544..36530be 100644
+--- a/arch/arm/mach-mmp/irq-mmp2.c
++++ b/arch/arm/mach-mmp/irq-mmp2.c
+@@ -41,6 +41,7 @@ static struct irq_chip icu_irq_chip = {
+ 	.irq_mask	= icu_mask_irq,
+ 	.irq_mask_ack	= icu_mask_irq,
+ 	.irq_unmask	= icu_unmask_irq,
++	.irq_disable	= icu_mask_irq,
+ };
  
- #include <mach/gpio.h>
-+#include <asm/mach/irq.h>
- 
- int pxa_last_gpio;
- 
-@@ -206,7 +207,9 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
- 	struct pxa_gpio_chip *c;
- 	int loop, gpio, gpio_base, n;
- 	unsigned long gedr;
-+	struct irq_chip *chip = irq_get_chip(irq);
- 
-+	chained_irq_enter(chip, desc);
- 	do {
- 		loop = 0;
- 		for_each_gpio_chip(gpio, c) {
-@@ -225,6 +228,7 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
- 			}
- 		}
- 	} while (loop);
-+	chained_irq_exit(chip, desc);
+ static void pmic_irq_ack(struct irq_data *d)
+@@ -90,6 +91,7 @@ static struct irq_chip _name_##_irq_chip = {				\
+ 	.name		= #_name_,					\
+ 	.irq_mask	= _name_##_mask_irq,				\
+ 	.irq_unmask	= _name_##_unmask_irq,				\
++	.irq_disable	= _name_##_mask_irq,				\
  }
  
- static void pxa_ack_muxed_gpio(struct irq_data *d)
+ SECOND_IRQ_CHIP(pmic, IRQ_MMP2_PMIC_BASE, MMP2_ICU_INT4);
+diff --git a/arch/arm/mach-mmp/irq-pxa168.c b/arch/arm/mach-mmp/irq-pxa168.c
+index 89706a0..7185157 100644
+--- a/arch/arm/mach-mmp/irq-pxa168.c
++++ b/arch/arm/mach-mmp/irq-pxa168.c
+@@ -40,6 +40,7 @@ static struct irq_chip icu_irq_chip = {
+ 	.irq_ack	= icu_mask_irq,
+ 	.irq_mask	= icu_mask_irq,
+ 	.irq_unmask	= icu_unmask_irq,
++	.irq_disable	= icu_mask_irq,
+ };
+ 
+ void __init icu_init_irq(void)
 -- 
 1.7.0.4
