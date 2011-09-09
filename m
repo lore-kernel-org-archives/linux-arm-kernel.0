@@ -1,128 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 09 Sep 2011 12:04:47 +0200
-Subject: [PATCH v2] [media] at91: add code to initialize and manage the
-	ISI_MCK for Atmel ISI driver.
-In-Reply-To: <Pine.LNX.4.64.1109060803590.14818@axis700.grange>
-References: <1315288601-22384-1-git-send-email-josh.wu@atmel.com>
-	<Pine.LNX.4.64.1109060803590.14818@axis700.grange>
-Message-ID: <4E69E4BF.3030402@atmel.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 9 Sep 2011 18:15:10 +0800
+Subject: [PATCH 6/6] arm/imx6q: add suspend/resume support
+In-Reply-To: <20110909081520.GE14953@n2100.arm.linux.org.uk>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-7-git-send-email-shawn.guo@linaro.org>
+	<CAGsJ_4x6cUWey=jCxY-LaazxB=WCRAH0tFsKdpJHgy=iMFkjuw@mail.gmail.com>
+	<20110908062301.GK8148@S2100-06.ap.freescale.net>
+	<20110908074718.GA14953@n2100.arm.linux.org.uk>
+	<20110908152222.GA31581@S2100-06.ap.freescale.net>
+	<20110908162452.GA20292@n2100.arm.linux.org.uk>
+	<20110909073247.GD31581@S2100-06.ap.freescale.net>
+	<20110909081520.GE14953@n2100.arm.linux.org.uk>
+Message-ID: <20110909101509.GG31581@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/09/2011 08:54, Guennadi Liakhovetski :
-> On Tue, 6 Sep 2011, Josh Wu wrote:
+On Fri, Sep 09, 2011 at 09:15:20AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 09, 2011 at 03:32:48PM +0800, Shawn Guo wrote:
+> > > Now to the physical act of enabling the L2 cache.  The L2 cache control
+> > > registers are subject to security restrictions when running in non-secure
+> > > mode, needing platform specific SMC calls to reprogram the cache.  Generic
+> > > code is unable to do this.
+> >
+> > I could be very possibly wrong here.  But isn't the core in secure mode
+> > upon reset?  Do we really have to reprogram L2 through SMC calls there?
 > 
->> This patch enable the configuration for ISI_MCK, which is provided by programmable clock.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>  drivers/media/video/atmel-isi.c |   60 ++++++++++++++++++++++++++++++++++++++-
->>  include/media/atmel-isi.h       |    4 ++
->>  2 files changed, 63 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
+> It probably will be, but the core won't be running the resume function
+> directly on reset.  (No ARM CPU does this - not even the pre-security
+> ones.  They've traditionally run the boot loader first.)
+> 
+Some naive boot ROM may simply jump to the resume entry address saved
+in persistent register.
 
-[..]
+> Take a moment to think about this in terms of security of data stored on
+> the secure side (where there maybe private keys stored.)
+> 
+> The kernel runs in the non-secure side of the partition.  If it were to be
+> entered on resume in secure mode, it could access those keys.  That would
+> be a really great security hole, which would make the whole thing pointless.
+> 
+> What would happen is the secure monitor ROM code gets control first, just
+> like it does at normal boot time on secure devices.  Eventually, the kernel
+> will gain control but only after the secure monitor has switched to
+> non-secure mode.
+> 
+Then the question is that for given bad boot ROM, whether kernel resume
+routine should stand up to fill the hole up.
 
->>  /* -----------------------------------------------------------------------*/
->> +/* Initialize ISI_MCK clock, called by atmel_isi_probe() function */
->> +static int initialize_mck(struct platform_device *pdev,
->> +			struct atmel_isi *isi)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct isi_platform_data *pdata = dev->platform_data;
->> +	struct clk *pck_parent;
->> +	int ret;
->> +
->> +	if (!strlen(pdata->pck_name) || !strlen(pdata->pck_parent_name))
->> +		return -EINVAL;
->> +
->> +	/* ISI_MCK is provided by PCK clock */
->> +	isi->mck = clk_get(dev, pdata->pck_name);
-> 
-> I think, it's still not what Russell meant. Look at 
-> drivers/mmc/host/atmel-mci.c:
-> 
-> 	host->mck = clk_get(&pdev->dev, "mci_clk");
-> 
-> and in arch/arm/mach-at91/at91sam9g45.c they've got
-> 
-> 	CLKDEV_CON_DEV_ID("mci_clk", "atmel_mci.0", &mmc0_clk),
-> 	CLKDEV_CON_DEV_ID("mci_clk", "atmel_mci.1", &mmc1_clk),
-> 
-> where
-> 
-> #define CLKDEV_CON_DEV_ID(_con_id, _dev_id, _clk)	\
-> 	{						\
-> 		.con_id = _con_id,			\
-> 		.dev_id = _dev_id,			\
-> 		.clk = _clk,				\
-> 	}
-> 
-> I.e., in the device driver (mmc in this case) you only use the (platform) 
-> device instance, whose dev_name(dev) is then matched against one of clock 
-> lookups above, and a connection ID, which is used in case your device is 
-> using more than one clock. In the ISI case, your pck1 clock, that you seem 
-> to need here, doesn't have a clock lookup object, so, you might have to 
-> add one, and then use its connection ID.
-> 
->> +	if (IS_ERR(isi->mck)) {
->> +		dev_err(dev, "Failed to get PCK: %s\n", pdata->pck_name);
->> +		return PTR_ERR(isi->mck);
->> +	}
->> +
->> +	pck_parent = clk_get(dev, pdata->pck_parent_name);
->> +	if (IS_ERR(pck_parent)) {
->> +		ret = PTR_ERR(pck_parent);
->> +		dev_err(dev, "Failed to get PCK parent: %s\n",
->> +				pdata->pck_parent_name);
->> +		goto err_init_mck;
->> +	}
->> +
->> +	ret = clk_set_parent(isi->mck, pck_parent);
-> 
-> I'm not entirely sure on this one, but as we had a similar situation with 
-> clocks, we decided to extablish the clock hierarchy in the board code, and 
-> only deal with the actual device clocks in the driver itself. I.e., we 
-> moved all clk_set_parent() and setting up the parent clock into the board. 
-> And I do think, this makes more sense, than doing this in the driver, not 
-> all users of this driver will need to manage the parent clock, right?
-
-Exactly.
-
-Josh, for the two comments by Guennadi above, you can take
-sound/soc/atmel/sam9g20_wm8731.c
-as an example of using PCK and parent clocks. You will also find how to
-use named clocks and how to set the programmable clocks rate...
-
->> +	clk_put(pck_parent);
->> +	if (ret)
->> +		goto err_init_mck;
->> +
->> +	ret = clk_set_rate(isi->mck, pdata->isi_mck_hz);
->> +	if (ret < 0)
->> +		goto err_init_mck;
->> +
->> +	return 0;
->> +
->> +err_init_mck:
->> +	clk_put(isi->mck);
->> +	return ret;
->> +}
->> +
->>  static int __devexit atmel_isi_remove(struct platform_device *pdev)
->>  {
->>  	struct soc_camera_host *soc_host = to_soc_camera_host(&pdev->dev);
->> @@ -897,6 +948,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
->>  			isi->fb_descriptors_phys);
->>  
->>  	iounmap(isi->regs);
->> +	clk_put(isi->mck);
->>  	clk_put(isi->pclk);
->>  	kfree(isi);
-
-[..]
-
-Best regards,
 -- 
-Nicolas Ferre
+Regards,
+Shawn
