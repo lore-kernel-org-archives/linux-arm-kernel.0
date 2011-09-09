@@ -1,50 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Sep 2011 10:28:14 -0700
-Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level
-	debug uart
-In-Reply-To: <201109081656.33404.arnd@arndb.de>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<20110907142350.GU6619@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109071128040.20358@xanadu.home>
-	<201109081656.33404.arnd@arndb.de>
-Message-ID: <20110909172814.GI1895@atomide.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 09 Sep 2011 11:00:58 -0700
+Subject: [PATCH v2 0/5] CPU PM notifiers
+In-Reply-To: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Sat, 3 Sep 2011 20:09:10 +0530")
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87ty8ly4rp.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110908 07:23]:
-> On Wednesday 07 September 2011, Nicolas Pitre wrote:
-> > On Wed, 7 Sep 2011, Russell King - ARM Linux wrote:
-> > 
-> > > On Wed, Sep 07, 2011 at 02:36:35PM +0200, Uwe Kleine-K?nig wrote:
-> > > > But only if the image doesn't support imx6q, right? Anyhow, I hope
-> > > > imx6q_map_io isn't called for pre-imx6q SoCs. Ah, and I hope we don't
-> > > > need to argue here as Russell doesn't like the new DEBUG_LL changes :-)
-> > > 
-> > > I have no problem with the Kconfig menu approach or existing approaches
-> > > to DEBUG_LL.  What I have an objection to is trying to stuff the
-> > > information for it into places which ultimately render the facility
-> > > useless for its intended purpose - to permit debugging the really
-> > > early assembly code.
-> > > 
-> > > That is what it was written for: if we introduce complicated ways to
-> > > put behind it, we'll need to come up with a completely new debugging
-> > > infrastructure to debug the now buggered debugging infrastructure.
-> > 
-> > For the record I now agree with Russell.
-> > 
-> > In order to have early serial output that works across multiple SOCs in 
-> > the same kernel image intended to non developers we'll have to add a 
-> > parallel infrastructure.  Keeping the DEBUG_LL code as simple as 
-> > possible for developers is the way to go (and that might be needed to 
-> > debug that parallel infrastructure).
-> 
-> Yes, agreed. It should not be too hard to provide more CON_BOOT consoles.
-> For 8250, this can actually be done already using the code from
-> drivers/tty/serial/8250_early.c with a custom command line, but there
-> are better ways to do that in a generic way.
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-Sounds good to me.
+[...]
 
-Regards,
+> This patch set tries to address concerns with platform pm code
+> calling into the driver for every block in the Cortex A9s
+> during idle, hotplug, and suspend.  The first patch adds cpu pm
+> notifiers that can be called by platform code, the second uses
+> the notifier to save and restore the GIC state, and the third
+> saves the VFP state.
+>
+> The notifiers are used for two types of events, CPU PM events and
+> CPU cluster PM events.  CPU PM events are used to save and restore
+> per-cpu context when a single CPU is preparing to enter or has
+> just exited a low power state.  For example, the VFP saves the
+> last thread context, and the GIC saves banked CPU registers.
+>
+> CPU cluster events are used after all the CPUs in a power domain
+> have been prepared for the low power state.  The GIC uses these
+> events to save global register state.
 
-Tony
+Stepping back from my earlier objections, I think I had a fundamental
+misunderstanding about what these notifiers should be used for.
+
+The current assumptions/goals seem to be
+
+1) used only for devices in the same power domain as the CPU (cluster)
+2) use only for one specific power state of the CPU (cluster): off.
+
+For awhile now, we've been discussing how to better coordinate CPU PM
+transitions (CPUidle) with non-CPU PM transitions (runtime PM) for
+devices that are tightly coupled to the CPU, but not necessarily in the
+same powerdomain.
+
+I was assuming (and hoping) that CPU PM notifiers could be used to do
+that, but the more I think about it, I don't think we can achieve the
+current CPU PM goals and the coordination with runtime PM with this
+series.
+
+I think it's more likely that we'll need to do some work with Rafael's
+new PM domains to make that work correctly.
+
+So, I'll retract my objections to this series, and feel free to add
+
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+
+Kevin
