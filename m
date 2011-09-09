@@ -1,27 +1,54 @@
-From: eric.miao@linaro.org (Eric Miao)
-Date: Thu, 8 Sep 2011 17:49:05 -0700
-Subject: [PATCH] ARM: imx: move pwm driver to use platform device id table
-In-Reply-To: <CAOMZO5AybMLPK2Q8RrE9cAemHjGgsz-+Z0-VCtOB5t=rxFrN4w@mail.gmail.com>
-References: <1315524142-10566-1-git-send-email-eric.miao@linaro.org>
-	<CAOMZO5AybMLPK2Q8RrE9cAemHjGgsz-+Z0-VCtOB5t=rxFrN4w@mail.gmail.com>
-Message-ID: <CAMPhdO-k7yJxnqYdB+N4ZbyTxoASnwaXrWxHzyAR8sB+sJMjQg@mail.gmail.com>
+From: lacombar@gmail.com (Arnaud Lacombe)
+Date: Thu, 8 Sep 2011 21:22:05 -0400
+Subject: [RFC] Kbuild: allow code re-use across different directories
+In-Reply-To: <alpine.LFD.2.00.1109081617440.20358@xanadu.home>
+References: <1313800642-32418-1-git-send-email-lacombar@gmail.com>
+	<alpine.LFD.2.00.1109071437400.20358@xanadu.home>
+	<CACqU3MVF8XSdKi0PeZF5SFaH9i2HPqCjkMqccyb83x4V_1Vs1g@mail.gmail.com>
+	<alpine.LFD.2.00.1109071554480.20358@xanadu.home>
+	<CACqU3MXcksYxdV_=OR40fPeZzu1ygr-Qs79TV6kfn0DpbXhjuA@mail.gmail.com>
+	<alpine.LFD.2.00.1109081617440.20358@xanadu.home>
+Message-ID: <CACqU3MV0PW=Cp3Px2Jjs3SSOBbQSSA7P=a1RNy4x9jKEB-VEiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2011 at 5:42 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Thu, Sep 8, 2011 at 8:22 PM, Eric Miao <eric.miao@linaro.org> wrote:
->> Signed-off-by: Eric Miao <eric.miao@linaro.org>
->> ---
->> ?arch/arm/mach-imx/clock-imx25.c ? ? ? ? ? ? ?| ? ?8 ++++----
->> ?arch/arm/mach-imx/clock-imx27.c ? ? ? ? ? ? ?| ? ?2 +-
->> ?arch/arm/mach-imx/devices-imx25.h ? ? ? ? ? ?| ? ?2 +-
->> ?arch/arm/mach-mx5/clock-mx51-mx53.c ? ? ? ? ?| ? ?4 ++--
->> ?arch/arm/mach-mx5/devices-imx51.h ? ? ? ? ? ?| ? ?2 +-
->> ?arch/arm/plat-mxc/devices/platform-mxc_pwm.c | ? ?4 ++--
->> ?arch/arm/plat-mxc/pwm.c ? ? ? ? ? ? ? ? ? ? ?| ? 19 ++++++++++++++++---
->> ?7 files changed, 27 insertions(+), 14 deletions(-)
->
-> Looks like you missed mx1, mx21, mx31, mx27, mx35 and mx53.
+Hi,
 
-Did a search of 'mxc_pwm' string, but they didn't seem to be there?
-which is a bit strange.
+On Thu, Sep 8, 2011 at 4:33 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> On Thu, 8 Sep 2011, Arnaud Lacombe wrote:
+>
+>> you missed:
+>>
+>> ?# Make sure files are removed during clean
+>> -extra-y ? ? ? += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
+>> +extra-y ? ? ? += piggy.gzip piggy.lzo piggy.lzma
+>>
+>> This confused make.
+>
+> Well... that was suttle.
+>
+he, welcome to make(1) world :)
+
+> So yes, your patch may certainly be useful to a couple cases, and it
+> works fine for this lib1func.S.
+>
+> It doesn't help me much in the following situation though. ?What I
+> actually want to achieve is to compile arch/arm/boot/compressed/fdt_rw.o
+> from scripts/dtc/libfdt/fdt_rw.c, however I want it to include my local
+> version of libfdt_env.h rather than scripts/dtc/libfdt/libfdt_env.h. ?I
+> still haven't found a way to convince gcc to do that.
+>
+The only choice you have in gcc, is to use -I-, to construct:
+
+ $(CROSS_COMPILE)gcc -I$(srctree)/arch/arm/boot/compressed -I- [...]
+
+however, it's been marked as deprecated, but still usable as of today
+snapshot of 4.7.0. Its replacement, -iquote, do not provide this
+functionnality, that is to override the source file origin directory
+as search directory for #include "...".
+
+ - Arnaud
+
+
+> Nicolas
+>
