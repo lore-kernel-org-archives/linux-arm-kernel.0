@@ -1,185 +1,80 @@
-From: amartin@nvidia.com (Allen Martin)
-Date: Fri,  9 Sep 2011 01:02:19 -0700
-Subject: [PATCH] arm/dt: Add SoC detection macros
-Message-ID: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Fri, 09 Sep 2011 13:37:51 +0530
+Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
+	gic_arch_extn
+In-Reply-To: <alpine.LFD.2.02.1109090912130.2723@ionos>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+	<878vpyhotu.fsf@ti.com> <4E69961D.40700@ti.com>
+	<alpine.LFD.2.02.1109090912130.2723@ionos>
+Message-ID: <4E69C957.5070708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These macros allow runtime query of SoC family and version via
-soc_is_*()  If the corresponding SoC is not configured the macro will
-evaluate to 0.  If the corresponding SoC is the only architecure
-configured, the macro will evaluate to 1.  If multiple architecures
-are configured the macro will evaluate to a runtime call to
-soc_get_version().
+On Friday 09 September 2011 12:49 PM, Thomas Gleixner wrote:
+> On Fri, 9 Sep 2011, Santosh wrote:
+>
+>> On Thursday 08 September 2011 11:57 PM, Kevin Hilman wrote:
+>>> Santosh Shilimkar<santosh.shilimkar@ti.com>   writes:
+>>>
+>>>> OMAP WakeupGen is the interrupt controller extension used along
+>>>> with ARM GIC to wake the CPU out from low power states on
+>>>> external interrupts.
+>>>>
+>>>> The WakeupGen unit is responsible for generating wakeup event
+>>>> from the incoming interrupts and enable bits. It is implemented
+>>>> in MPU always ON power domain. During normal operation,
+>>>> WakeupGen delivers external interrupts directly to the GIC.
+>>>>
+>>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>>> Cc: Kevin Hilman<khilman@ti.com>
+>>>
+>>> [...]
+>>>
+>>>> +#ifdef CONFIG_PM
+>>>> +/*
+>>>> + * Masking wakeup irqs is handled by the IRQCHIP_MASK_ON_SUSPEND flag,
+>>>> + * so no action is necessary in set_wake, but implement an empty handler
+>>>> + * here to prevent enable_irq_wake() returning an error.
+>>>> + * FIXME: Remove the dummy handler once gen irq code fix above.
+>>>> + */
+>>>
+>>> Just curious... is there a fix for this pending for v3.2?
+>>>
+>> I have sent a proposed change to Thomas but have not seen
+>> any response yet from him.
+>>
+>> http://www.spinics.net/lists/arm-kernel/msg134297.html
+>
+> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+> index 0a7840a..cd4bc01 100644
+> --- a/kernel/irq/manage.c
+> +++ b/kernel/irq/manage.c
+>
+> @@ -467,6 +467,9 @@ static int set_irq_wake_real(unsigned int irq, unsigned int on)
+>
+>     struct irq_desc *desc = irq_to_desc(irq);
+>     int ret = -ENXIO;
+>
+> +  if (irq_desc_get_chip(desc)->flags&  IRQCHIP_MASK_ON_SUSPEND)
+> +     return 0;
+> +
+> 	if (desc->irq_data.chip->irq_set_wake)
+>   	   ret = desc->irq_data.chip->irq_set_wake(&desc->irq_data, on);
+>
+> The flag says: MASK ON SUSPEND and it does not imply that you don't
+> need a wake function. There might be cases where you want to setup
+> stuff in that function in order to have the wakeup happen on that
+> interrupt line despite of the mask on suspend.
+>
+I see your point.
 
-I've added tegra2 and tegra3 SoCs as a starting point.
+> We either need a separate flag or a global dummy set_wake function in
+> the core to avoid empty copies all over the place.
+>
+A flag is probably better since you mentioned that on some arch, there
+might be need to have actual set_wake() handler. Or if the global
+dummy can be over-ridden by platform, that's fine too.
 
-Signed-off-by: Allen Martin <amartin@nvidia.com>
----
- arch/arm/include/asm/soc.h |   76 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/Makefile   |    1 +
- arch/arm/kernel/setup.c    |    2 +
- arch/arm/kernel/soc.c      |   37 +++++++++++++++++++++
- 4 files changed, 116 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/soc.h
- create mode 100644 arch/arm/kernel/soc.c
-
-diff --git a/arch/arm/include/asm/soc.h b/arch/arm/include/asm/soc.h
-new file mode 100644
-index 0000000..d95f643
---- /dev/null
-+++ b/arch/arm/include/asm/soc.h
-@@ -0,0 +1,76 @@
-+/*
-+ * arch/arm/include/asm/soc.h
-+ *
-+ * Copyright (C) 2011 NVIDIA, Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+/* determine if multiple SoCs are enabled */
-+#undef MULTI_SOC
-+#undef SOC_NAME
-+
-+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-+# ifdef SOC_NAME
-+#  undef MULTI_SOC
-+#  define MULTI_SOC
-+# else
-+#   define SOC_NAME tegra2
-+# endif
-+#endif
-+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-+# ifdef SOC_NAME
-+#  undef MULTI_SOC
-+#  define MULTI_SOC
-+# else
-+#   define SOC_NAME tegra3
-+# endif
-+#endif
-+
-+#define soc_is_tegra2()			0
-+#define soc_is_tegra3()			0
-+
-+#if defined(MULTI_SOC)
-+# if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-+#  undef soc_is_tegra2
-+#  define soc_is_tegra2()		is_tegra2()
-+# endif
-+# if defined(CONFIG_ARCH_TEGRA_3x_SOC)
-+#  undef soc_is_tegra3
-+#  define soc_is_tegra3()		is_tegra3()
-+# endif
-+#else /* non-multi, only one architecture is on */
-+# if defined(CONFIG_ARCH_TEGRA_2x_SOC)
-+#  undef soc_is_tegra2
-+#  define soc_is_tegra2()		1
-+# elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
-+#  undef soc_is_tegra3
-+#  define soc_is_tegra3()		1
-+# endif
-+#endif
-+
-+enum soc_version {
-+	SOC_UNKNOWN = 0,
-+	TEGRA_T20,
-+	TEGRA_T30,
-+};
-+
-+void soc_init_version(void);
-+enum soc_version soc_get_version(void);
-+
-+static inline int is_tegra2(void)
-+{
-+	return soc_get_version() == TEGRA_T20;
-+}
-+
-+static inline int is_tegra3(void)
-+{
-+	return soc_get_version() == TEGRA_T30;
-+}
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index c687bce..de29477 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_KGDB)		+= kgdb.o
- obj-$(CONFIG_ARM_UNWIND)	+= unwind.o
- obj-$(CONFIG_HAVE_TCM)		+= tcm.o
- obj-$(CONFIG_OF)		+= devtree.o
-+obj-$(CONFIG_OF)		+= soc.o
- obj-$(CONFIG_CRASH_DUMP)	+= crash_dump.o
- obj-$(CONFIG_SWP_EMULATE)	+= swp_emulate.o
- CFLAGS_swp_emulate.o		:= -Wa,-march=armv7-a
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 0ca06f7..63ad6de 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -52,6 +52,7 @@
- #include <asm/mach/time.h>
- #include <asm/traps.h>
- #include <asm/unwind.h>
-+#include <asm/soc.h>
- 
- #if defined(CONFIG_DEPRECATED_PARAM_STRUCT)
- #include "compat.h"
-@@ -922,6 +923,7 @@ void __init setup_arch(char **cmdline_p)
- 	request_standard_resources(mdesc);
- 
- 	unflatten_device_tree();
-+	soc_init_version();
- 
- #ifdef CONFIG_SMP
- 	if (is_smp())
-diff --git a/arch/arm/kernel/soc.c b/arch/arm/kernel/soc.c
-new file mode 100644
-index 0000000..8686468
---- /dev/null
-+++ b/arch/arm/kernel/soc.c
-@@ -0,0 +1,37 @@
-+/*
-+ * arch/arm/kernel/soc.c
-+ *
-+ * Copyright (C) 2011 NVIDIA, Inc.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+
-+#include <asm/soc.h>
-+
-+static enum soc_version soc_version;
-+
-+enum soc_version soc_get_version(void)
-+{
-+	return soc_version;
-+}
-+
-+void soc_init_version(void)
-+{
-+	if (of_machine_is_compatible("nvidia,tegra20"))
-+		soc_version = TEGRA_T20;
-+	else if (of_machine_is_compatible("nvidia,tegra30"))
-+		soc_version = TEGRA_T30;
-+	else
-+		panic("Unknown SoC");
-+}
--- 
-1.7.4.1
+Regards
+Santosh
