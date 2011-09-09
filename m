@@ -1,53 +1,37 @@
 From: nbowler@elliptictech.com (Nick Bowler)
-Date: Fri,  9 Sep 2011 11:26:51 -0400
-Subject: [PATCH 4/5] ARM: tegra: Use wfi macro in platform_do_lowpower.
+Date: Fri, 9 Sep 2011 11:42:54 -0400
+Subject: [PATCH 0/5] Convert ARM subarchitectures to generic wfi macro.
 In-Reply-To: <1315582012-23507-1-git-send-email-nbowler@elliptictech.com>
-References: <1315582012-23507-1-git-send-email-nbowler@elliptictech.com>
-Message-ID: <1315582012-23507-5-git-send-email-nbowler@elliptictech.com>
+Message-ID: <20110909154254.GA23810@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current Tegra CPU hotplug code includes a hardcoded WFI instruction, in
-ARM encoding.  The hardcoded instruction is both hard to understand and
-doomed to failure when building the kernel in Thumb-2 mode.
+And after all that, I forgot to CC Russell on these patches.  Oops.
 
-Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
----
-Compile tested in ARM mode only as I could not build for this platform
-in Thumb-2 mode:
+On 2011-09-09 11:26 -0400, Nick Bowler wrote:
+> This series cleans up all remaining ARM subarchitectures that I could
+> find to use the generic wfi macro.  As I don't have any of the boards in
+> question, I've only compile-tested these patches to the extent that I
+> was able.
+> 
+> See the previous discussion in https://lkml.org/lkml/2011/8/19/433 for
+> more background.
+> 
+> Nick Bowler (5):
+>   ARM: realview: Use wfi macro in platform_do_lowpower.
+>   ARM: exynos4: Use wfi macro in platform_do_lowpower.
+>   ARM: shmobile: Use wfi macro in platform_cpu_die.
+>   ARM: tegra: Use wfi macro in platform_do_lowpower.
+>   ARM: omap4: Kill private do_wfi macro.
+> 
+>  arch/arm/mach-exynos4/hotplug.c                 |    9 ++-------
+>  arch/arm/mach-omap2/include/mach/omap4-common.h |   11 -----------
+>  arch/arm/mach-omap2/omap-hotplug.c              |    7 +++----
+>  arch/arm/mach-omap2/pm44xx.c                    |    4 +++-
+>  arch/arm/mach-realview/hotplug.c                |    9 ++-------
+>  arch/arm/mach-shmobile/hotplug.c                |   10 +++-------
+>  arch/arm/mach-tegra/hotplug.c                   |    9 ++-------
+>  7 files changed, 15 insertions(+), 44 deletions(-)
 
-/scratch_space/linux-2.6/arch/arm/mach-tegra/headsmp.S: Assembler messages:
-/scratch_space/linux-2.6/arch/arm/mach-tegra/headsmp.S:51: Error: Thumb encoding does not support an immediate here -- `msr cpsr_fsxc,#0xd3'
----
- arch/arm/mach-tegra/hotplug.c |    9 ++-------
- 1 files changed, 2 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-index f329404..4fc72d6 100644
---- a/arch/arm/mach-tegra/hotplug.c
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -13,6 +13,7 @@
- #include <linux/smp.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/system.h>
- 
- static inline void cpu_enter_lowpower(void)
- {
-@@ -60,13 +61,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 	 * code will have already disabled interrupts
- 	 */
- 	for (;;) {
--		/*
--		 * here's the WFI
--		 */
--		asm(".word	0xe320f003\n"
--		    :
--		    :
--		    : "memory", "cc");
-+		wfi();
- 
- 		/*if (pen_release == cpu) {*/
- 			/*
 -- 
-1.7.3.4
+Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
