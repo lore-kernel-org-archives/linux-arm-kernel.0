@@ -1,26 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Sep 2011 22:13:00 +0200
-Subject: [GIT PULL] ARM: Cavium CNS3xxx updates for 3.1
-In-Reply-To: <20110909195008.GA1089@oksana.dev.rtsoft.ru>
-References: <20110909195008.GA1089@oksana.dev.rtsoft.ru>
-Message-ID: <201109102213.00184.arnd@arndb.de>
+Date: Sat, 10 Sep 2011 22:37:15 +0200
+Subject: [PATCH v2] ASoC: omap: convert per-board modules to platform
+	drivers
+In-Reply-To: <20110909205645.GA16355@n2100.arm.linux.org.uk>
+References: <3110288.bQbb0H2ME1@wuerfel>
+	<20110909193010.GA2993@opensource.wolfsonmicro.com>
+	<20110909205645.GA16355@n2100.arm.linux.org.uk>
+Message-ID: <201109102237.15193.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 September 2011, Anton Vorontsov wrote:
-> Hi Arnd,
-> 
-> Please pull linux-cns3xxx.git tree to receive some fixes for CNS3xxx
-> platforms. Note that this is for 3.1.
-> 
-> Several post -rc1 commits broke CNS3xxx, and the pull request contains
-> patches to fix things. The patches are small, so for convenience' sake
-> I inline the them here.
+On Friday 09 September 2011, Russell King - ARM Linux wrote:
+> That's just twisted and utterly insane - adding more code for precisely
+> zero benefit what so ever.  Think about it - the device tree is already
+> creating platform devices for entries in the device tree file.  What's
+> the point of having this special ASoC code look up the platform compatible
+> property in a table of strings to find a different string to manually
+> create a device with.  Why not just add the bloody device to the DT
+> file in the first place?  That's partly what DT is there for - to create
+> platform specific struct devices.
 
-Ok, pulled. I've now started publishing the tree on
-http://git.linaro.org/git/people/arnd/arm-soc.git while kernel.org
-is done. It will move back once the server is up again.
-
-Thanks!
+Exactly. No driver or (worse) user program should ever need to look at
+the top-level compatible property. When you want information about a
+localized part of the system (e.g. the ASoC components), you should
+look up the information for that component.
 
 	Arnd
