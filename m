@@ -1,23 +1,38 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Sat, 10 Sep 2011 13:03:58 +0530
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <CAGsJ_4xv9+=+=2b=i47P5V5sOQH-GyTMaESwbeHxu439Vx1gLA@mail.gmail.com>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
-	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
-	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
-	<CABb+yY3F+DMn2SxeO0chjpiMBkgLvSK5EVYMdhQsfQoZNZ4_7Q@mail.gmail.com>
-	<1315518378.6638.2.camel@vkoul-mobl4>
-	<CAGsJ_4xv9+=+=2b=i47P5V5sOQH-GyTMaESwbeHxu439Vx1gLA@mail.gmail.com>
-Message-ID: <CAJe_ZhcW4smy8oDRyYw8RB7SJjXjRT8MwPRprcaR4OfSGKHP-A@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Sat, 10 Sep 2011 15:01:26 +0530
+Subject: [PATCH v2 1/5] cpu_pm: Add cpu power management notifiers
+In-Reply-To: <20110909155632.661f5696.akpm@linux-foundation.org>
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>	<1315060755-4613-2-git-send-email-santosh.shilimkar@ti.com>
+	<20110909155632.661f5696.akpm@linux-foundation.org>
+Message-ID: <4E6B2E6E.7010807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 September 2011 13:48, Barry Song <21cnbao@gmail.com> wrote:
+Andrew,
 
-> Jassi, you might think my reply as an ACK to "[PATCH] DMAEngine:
-> Define generic transfer request api".
+On Saturday 10 September 2011 04:26 AM, Andrew Morton wrote:
+> On Sat, 3 Sep 2011 20:09:11 +0530
+> Santosh Shilimkar<santosh.shilimkar@ti.com>  wrote:
 
-Thanks, but could you please formally ACK the patch in it's own thread?
+[...]
+
+>
+> Have you identified which indivudual you hope/expect to merge this into
+> mainline?
+>
+> The code is presumably and hopefully applicable to architectures other
+> than ARM, yes?  Can you suggest likely candidate architectures so we
+> can go off and bug the relevant maintainers to review it?
+>
+Sorry I missed above question in last email. Am not too sure but any
+arch which has CPU local timers, interrupt controller, Floating point
+co-processor etc, should be able to make use of it. So it's applicable
+to any architecture, but whether they want to use it, i don't know.
+
+As you noticed most of the ARM machine's are adapting to it.
+Along with generic patch, there are couple ARM drivers adapting
+to make use of it. That was the reason I was pushing this series
+via Russell's tree.
+
+Regards
+Santosh
