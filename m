@@ -1,254 +1,137 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Sat, 10 Sep 2011 13:37:07 +0200
-Subject: [PATCH] Add platform driver support to the CS890x driver
-In-Reply-To: <20110907125047.GU28816@pengutronix.de>
-References: <1315390967-6683-1-git-send-email-jaccon.bastiaansen@gmail.com>
-	<20110907125047.GU28816@pengutronix.de>
-Message-ID: <CAGzjT4f3VDL-rDzup4kSc11eCdhR9s7fxf8RYNjEZmK9Rk50Cw@mail.gmail.com>
+From: thomas@shipmail.org (Thomas Hellstrom)
+Date: Sat, 10 Sep 2011 16:04:14 +0200
+Subject: [PATCH v4] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
+In-Reply-To: <1315568333-6704-1-git-send-email-inki.dae@samsung.com>
+References: <1315568333-6704-1-git-send-email-inki.dae@samsung.com>
+Message-ID: <4E6B6E5E.3010702@shipmail.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
-
-2011/9/7 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Jaccon,
+On 09/09/2011 01:38 PM, Inki Dae wrote:
+> This patch is a DRM Driver for Samsung SoC Exynos4210 and now enables
+> only FIMD yet but we will add HDMI support also in the future.
 >
-> On Wed, Sep 07, 2011 at 12:22:47PM +0200, Jaccon Bastiaansen wrote:
->> The CS89x0 ethernet controller is used on a number of evaluation
->> boards, such as the MX31ADS. The current driver has memory address and
->> IRQ settings for each board on which this controller is used. Driver
->> updates are therefore required to support other boards that also use
->> the CS89x0. To avoid these driver updates, a better mechanism
->> (platform driver support) is added to communicate the board dependent
->> settings to the driver.
->>
->> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
->> ---
->> ?drivers/net/Kconfig ?| ? 18 +++++++++--
->> ?drivers/net/Space.c ?| ? ?2 +-
->> ?drivers/net/cs89x0.c | ? 83 ++++++++++++++++++++++++++++++++++++++++++++++++--
->> ?3 files changed, 96 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/net/Kconfig b/drivers/net/Kconfig
->> index 93359fa..17be84f 100644
->> --- a/drivers/net/Kconfig
->> +++ b/drivers/net/Kconfig
->> @@ -1497,8 +1497,7 @@ config FORCEDETH
->>
->> ?config CS89x0
->> ? ? ? tristate "CS89x0 support"
->> - ? ? depends on NET_ETHERNET && (ISA || EISA || MACH_IXDP2351 \
->> - ? ? ? ? ? ? || ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440)
->> + ? ? depends on NET_ETHERNET
->> ? ? ? ---help---
->> ? ? ? ? Support for CS89x0 chipset based Ethernet cards. If you have a
->> ? ? ? ? network (Ethernet) card of this type, say Y and read the
->> @@ -1509,10 +1508,23 @@ config CS89x0
->> ? ? ? ? To compile this driver as a module, choose M here. The module
->> ? ? ? ? will be called cs89x0.
->>
->> +config CS89x0_PLATFORM
->> + ? ? bool "CS89x0 platform driver support"
->> + ? ? depends on CS89x0
->> + ? ? default n
-> default n is implicit so you don't need (and should not) add it here.
+> from now on, I will remove RFC prefix because I think we have got comments
+> enough.
 >
-
-Ok, I will fix this in the next version of the patch.
-
->> + ? ? help
->> + ? ? ? Say Y to compile the cs890x0 driver as a platform driver. This
->> + ? ? ? makes this driver suitable for use on certain evaluation boards
->> + ? ? ? such as the IMX21ADS.
->> +
->> + ? ? ? If you are unsure, say N.
->> +
->> ?config CS89x0_NONISA_IRQ
->> ? ? ? def_bool y
->> ? ? ? depends on CS89x0 != n
->> - ? ? depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS || MACH_QQ2440
->> + ? ? depends on MACH_IXDP2351 || ARCH_IXDP2X01 || MACH_MX31ADS || \
->> + ? ? ? ? ? ? ? ?MACH_QQ2440 || CS89x0_PLATFORM
->> +
->>
->> ?config TC35815
->> ? ? ? tristate "TOSHIBA TC35815 Ethernet support"
->> diff --git a/drivers/net/Space.c b/drivers/net/Space.c
->> index 068c356..3c53ab1 100644
->> --- a/drivers/net/Space.c
->> +++ b/drivers/net/Space.c
->> @@ -189,7 +189,7 @@ static struct devprobe2 isa_probes[] __initdata = {
->> ?#ifdef CONFIG_SEEQ8005
->> ? ? ? {seeq8005_probe, 0},
->> ?#endif
->> -#ifdef CONFIG_CS89x0
->> +#if defined(CONFIG_CS89x0) && !defined(CONFIG_CS89x0_PLATFORM)
->> ? ? ? {cs89x0_probe, 0},
->> ?#endif
->> ?#ifdef CONFIG_AT1700
->> diff --git a/drivers/net/cs89x0.c b/drivers/net/cs89x0.c
->> index 537a4b2..604c828 100644
->> --- a/drivers/net/cs89x0.c
->> +++ b/drivers/net/cs89x0.c
->> @@ -98,6 +98,8 @@
->> ? ?Domenico Andreoli : cavokz at gmail.com
->> ? ? ? ? ? ? ? ? ? ? ?: QQ2440 platform support
->>
->> + ?Jaccon Bastiaansen: jaccon.bastiaansen at gmail.com
->> + ? ? ? ? ? ? ? ? : added platform driver support
->> ?*/
->>
->> ?/* Always include 'config.h' first in case the user wants to turn on
->> @@ -154,7 +156,9 @@
->> ?#if ALLOW_DMA
->> ?#include <asm/dma.h>
->> ?#endif
->> -
->> +#ifdef CONFIG_CS89x0_PLATFORM
->> +#include <linux/platform_device.h>
->> +#endif
-> IMHO better include that unconditionally.
+> this patch is based on git repository below:
+> git://git.kernel.org/pub/scm/linux/kernel/git/airlied/drm-2.6.git,
+> branch name: drm-next
+> commit-id: bcc65fd8e929a9d9d34d814d6efc1d2793546922
 >
-
-I will also fix this in the next version of this patch.
-
->> ?#include "cs89x0.h"
->>
->> ?static char version[] __initdata =
->> @@ -189,6 +193,9 @@ static unsigned int netcard_portlist[] __used __initdata = {
->> ? ? ? PBC_BASE_ADDRESS + PBC_CS8900A_IOBASE + 0x300, 0
->> ?};
->> ?static unsigned cs8900_irq_map[] = {EXPIO_INT_ENET_INT, 0, 0, 0};
->> +#elif defined(CONFIG_CS89x0_PLATFORM)
->> +static unsigned int netcard_portlist[] __used __initdata = {0, 0};
->> +static unsigned int cs8900_irq_map[] = {0, 0, 0, 0};
->> ?#else
->> ?static unsigned int netcard_portlist[] __used __initdata =
->> ? ? { 0x300, 0x320, 0x340, 0x360, 0x200, 0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x2e0, 0};
->> @@ -1746,7 +1753,7 @@ static int set_mac_address(struct net_device *dev, void *p)
->> ? ? ? return 0;
->> ?}
->>
->> -#ifdef MODULE
->> +#if defined(MODULE) && !defined(CONFIG_CS89x0_PLATFORM)
->>
->> ?static struct net_device *dev_cs89x0;
->>
->> @@ -1900,7 +1907,77 @@ cleanup_module(void)
->> ? ? ? release_region(dev_cs89x0->base_addr, NETCARD_IO_EXTENT);
->> ? ? ? free_netdev(dev_cs89x0);
->> ?}
->> -#endif /* MODULE */
->> +#endif /* MODULE && !CONFIG_CS89x0_PLATFORM */
->> +
->> +#ifdef CONFIG_CS89x0_PLATFORM
->> +static int cs89x0_platform_probe(struct platform_device *pdev)
->> +{
->> + ? ? struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
->> + ? ? struct resource *mem_res;
->> + ? ? struct resource *irq_res;
->> + ? ? int err;
->> +
->> + ? ? if (!dev)
->> + ? ? ? ? ? ? return -ENODEV;
->> +
->> + ? ? mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> + ? ? irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->> + ? ? if (mem_res == NULL || irq_res == NULL) {
->> + ? ? ? ? ? ? printk(KERN_WARNING
->> + ? ? ? ? ? ? ? ? ? ?DRV_NAME
->> + ? ? ? ? ? ? ? ? ? ?": memory and/or interrupt resource missing.\n");
-> I'd prefer you do:
+> you can refer to our working repository below:
+> http://git.infradead.org/users/kmpark/linux-2.6-samsung
+> branch name: samsung-drm
 >
-> ? ? ? ?#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+> We tried to re-use lowlevel codes of the FIMD driver(s3c-fb.c
+> based on Linux framebuffer) but couldn't so because lowlevel codes
+> of s3c-fb.c are included internally and so FIMD module of this driver has
+> its own lowlevel codes.
 >
-> at the top of the driver and then just use:
+> We used GEM framework for buffer management and DMA APIs(dma_alloc_*)
+> for buffer allocation. by using DMA API, we could use CMA later.
 >
-> ? ? ? ?pr_warning("memory and/or interrupt resource missing\m");
+> Refer to this link for CMA(Continuous Memory Allocator):
+> http://lkml.org/lkml/2011/7/20/45
 >
-
-I agree.
-
->> + ? ? ? ? ? ? err = -ENOENT;
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> +
->> + ? ? cs8900_irq_map[0] = irq_res->start;
->> + ? ? err = cs89x0_probe1(dev, mem_res->start, 0);
-> hmm, better switch the complete driver to be a platform driver and
-> instead of the legacy probing let it create the corresponding device.
+> this driver supports only physically continuous memory(non-iommu).
 >
-
-What exactly do you mean with "switch the complete driver to be a
-platform driver"? That I should remove all the legacy from the driver
-(which would break the driver for users who don't use it as a platform
-driver) or that I should add a new probe() function free of legacy
-(which would duplicate code of the existing cs89x0_probe1() function)?
-
-
->> + ? ? if (err) {
->> + ? ? ? ? ? ? printk(KERN_WARNING
->> + ? ? ? ? ? ? ? ? ? ?DRV_NAME
->> + ? ? ? ? ? ? ? ? ? ?": no cs8900 or cs8920 detected.\n");
->> + ? ? ? ? ? ? goto out;
->> + ? ? }
->> +
->> + ? ? platform_set_drvdata(pdev, dev);
->> + ? ? return 0;
->> +out:
->> + ? ? free_netdev(dev);
->> + ? ? return err;
->> +}
->> +
->> +static int cs89x0_platform_remove(struct platform_device *pdev)
->> +{
->> + ? ? struct net_device *dev = platform_get_drvdata(pdev);
->> +
->> + ? ? unregister_netdev(dev);
->> + ? ? free_netdev(dev);
->> + ? ? return 0;
->> +}
->> +
->> +static struct platform_driver cs89x0_platform_driver = {
->> + ? ? .driver = {
->> + ? ? ? ? ? ? .name ? = DRV_NAME,
->> + ? ? ? ? ? ? .owner ?= THIS_MODULE,
->> + ? ? },
->> + ? ? .probe ?= cs89x0_platform_probe,
->> + ? ? .remove = cs89x0_platform_remove,
->> +};
->> +
->> +static int __init cs89x0_init(void)
->> +{
->> + ? ? return platform_driver_register(&cs89x0_platform_driver);
->> +}
->> +
->> +static void __exit cs89x0_cleanup(void)
->> +{
->> + ? ? platform_driver_unregister(&cs89x0_platform_driver);
->> +}
->> +
->> +module_init(cs89x0_init);
-> this line should go directly after the function definition.
+> Links to previous versions of the patchset:
+> v1:<  https://lwn.net/Articles/454380/>
+> v2:<  http://www.spinics.net/lists/kernel/msg1224275.html>
+> v3:<  http://www.gossamer-threads.com/lists/linux/kernel/1423684>
 >
-
-Ok, I will also fix this in the next version of this patch.
-
->> +module_exit(cs89x0_cleanup);
->> +
->> +#endif
->>
->> ?/*
->> ? * Local variables:
->> --
->> 1.7.1
->>
->>
+> Changelog v2:
+> DRM: add DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl command.
 >
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+>      this feature maps user address space to physical memory region
+>      once user application requests DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl.
 >
+> DRM: code clean and add exception codes.
+>
+> Changelog v3:
+> DRM: Support multiple irq.
+>
+>      FIMD and HDMI have their own irq handler but DRM Framework can regiter
+>      only one irq handler this patch supports mutiple irq for Samsung SoC.
+>
+> DRM: Consider modularization.
+>
+>      each DRM, FIMD could be built as a module.
+>
+> DRM: Have indenpendent crtc object.
+>
+>      crtc isn't specific to SoC Platform so this patch gets a crtc
+>      to be used as common object.
+>      created crtc could be attached to any encoder object.
+>
+> DRM: code clean and add exception codes.
+>
+> Changelog v4:
+> DRM: remove is_defult from samsung_fb.
+>
+>      is_default isn't used for default framebuffer.
+>
+> DRM: code refactoring to fimd module.
+>      this patch is be considered with multiple display objects and
+>      would use its own request_irq() to register a irq handler instead of
+>      drm framework's one.
+>
+> DRM: remove find_samsung_drm_gem_object()
+>
+> DRM: move kernel private data structures and definitions to driver folder.
+>
+>      samsung_drm.h would contain only public information for userspace
+>      ioctl interface.
+>
+> DRM: code refactoring to gem modules.
+>      buffer module isn't dependent of gem module anymore.
+>
+> DRM: fixed security issue.
+>
+> DRM: remove encoder porinter from specific connector.
+>
+>      samsung connector doesn't need to have generic encoder.
+>
+> DRM: code clean and add exception codes.
+>
+> Signed-off-by: Inki Dae<inki.dae@samsung.com>
+> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
+> Signed-off-by: SeungWoo Kim<sw0312.kim@samsung.com>
+> Signed-off-by: kyungmin.park<kyungmin.park@samsung.com>
+> ---
+>
+> +static struct drm_ioctl_desc samsung_ioctls[] = {
+> +	DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_CREATE, samsung_drm_gem_create_ioctl,
+> +			DRM_UNLOCKED | DRM_AUTH),
+>    
 
-Regards,
-  Jaccon
+Hi!
+
+With reference my previous security comment.
+
+Let's say you have a compromised video player running as a DRM client, 
+that tries to repeatedly allocate huge GEM buffers...
+
+What will happen when all DMA memory is exhausted? Will this cause other 
+device drivers to see an OOM, or only DRM?
+
+The old DRI model basically allowed any authorized DRI client to exhaust 
+video ram or AGP memory, but never system memory. Newer DRI drivers 
+typically only allow DRI masters to do that.
+as
+
+I don't think an authorized DRI client should be able to easily exhaust 
+resources (DMA memory) used by other device drivers causing them to fail.
+
+/Thomas
+
+
+> +	DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_MAP_OFFSET,
+> +			samsung_drm_gem_map_offset_ioctl, DRM_UNLOCKED |
+> +				DRM_AUTH),
+> +	DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_MMAP,
+> +			samsung_drm_gem_mmap_ioctl, DRM_UNLOCKED | DRM_AUTH),
+> +};
+>
+>    
