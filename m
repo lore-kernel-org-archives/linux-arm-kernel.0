@@ -1,64 +1,23 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Sat, 10 Sep 2011 11:23:02 +0530
-Subject: [PATCH v2 0/5] CPU PM notifiers
-In-Reply-To: <87ty8ly4rp.fsf@ti.com>
-References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
-	<87ty8ly4rp.fsf@ti.com>
-Message-ID: <4E6AFB3E.3020902@ti.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Sat, 10 Sep 2011 13:03:58 +0530
+Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <CAGsJ_4xv9+=+=2b=i47P5V5sOQH-GyTMaESwbeHxu439Vx1gLA@mail.gmail.com>
+References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
+	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
+	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
+	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
+	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
+	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
+	<CABb+yY3F+DMn2SxeO0chjpiMBkgLvSK5EVYMdhQsfQoZNZ4_7Q@mail.gmail.com>
+	<1315518378.6638.2.camel@vkoul-mobl4>
+	<CAGsJ_4xv9+=+=2b=i47P5V5sOQH-GyTMaESwbeHxu439Vx1gLA@mail.gmail.com>
+Message-ID: <CAJe_ZhcW4smy8oDRyYw8RB7SJjXjRT8MwPRprcaR4OfSGKHP-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 September 2011 11:30 PM, Kevin Hilman wrote:
-> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
->
-> [...]
->
->> This patch set tries to address concerns with platform pm code
->> calling into the driver for every block in the Cortex A9s
->> during idle, hotplug, and suspend.  The first patch adds cpu pm
->> notifiers that can be called by platform code, the second uses
->> the notifier to save and restore the GIC state, and the third
->> saves the VFP state.
->>
->> The notifiers are used for two types of events, CPU PM events and
->> CPU cluster PM events.  CPU PM events are used to save and restore
->> per-cpu context when a single CPU is preparing to enter or has
->> just exited a low power state.  For example, the VFP saves the
->> last thread context, and the GIC saves banked CPU registers.
->>
->> CPU cluster events are used after all the CPUs in a power domain
->> have been prepared for the low power state.  The GIC uses these
->> events to save global register state.
->
-> Stepping back from my earlier objections, I think I had a fundamental
-> misunderstanding about what these notifiers should be used for.
->
-> The current assumptions/goals seem to be
->
-> 1) used only for devices in the same power domain as the CPU (cluster)
-> 2) use only for one specific power state of the CPU (cluster): off.
->
-> For awhile now, we've been discussing how to better coordinate CPU PM
-> transitions (CPUidle) with non-CPU PM transitions (runtime PM) for
-> devices that are tightly coupled to the CPU, but not necessarily in the
-> same powerdomain.
->
-> I was assuming (and hoping) that CPU PM notifiers could be used to do
-> that, but the more I think about it, I don't think we can achieve the
-> current CPU PM goals and the coordination with runtime PM with this
-> series.
->
-> I think it's more likely that we'll need to do some work with Rafael's
-> new PM domains to make that work correctly.
->
-> So, I'll retract my objections to this series, and feel free to add
->
-> Reviewed-by: Kevin Hilman<khilman@ti.com>
->
-Will add.
-Thanks for the review Kevin.
+On 9 September 2011 13:48, Barry Song <21cnbao@gmail.com> wrote:
 
-Regards
-Santosh
+> Jassi, you might think my reply as an ACK to "[PATCH] DMAEngine:
+> Define generic transfer request api".
 
-Regards
+Thanks, but could you please formally ACK the patch in it's own thread?
