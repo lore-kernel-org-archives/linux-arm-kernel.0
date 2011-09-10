@@ -1,35 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Sep 2011 23:06:58 +0200
-Subject: [GIT PULL] at91: changes for next
-In-Reply-To: <4E6A09D0.40800@atmel.com>
-References: <4E6A09D0.40800@atmel.com>
-Message-ID: <201109102306.58340.arnd@arndb.de>
+Date: Sat, 10 Sep 2011 23:13:59 +0200
+Subject: [GIT PULL] i.MX features for next
+In-Reply-To: <alpine.LFD.2.00.1109081410220.20358@xanadu.home>
+References: <20110823115658.GK31404@pengutronix.de>
+	<201109081720.18929.arnd@arndb.de>
+	<alpine.LFD.2.00.1109081410220.20358@xanadu.home>
+Message-ID: <201109102313.59548.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 September 2011, Nicolas Ferre wrote:
-> Can you please pull the following changes since commit ddf28352b80c86754a6424e3a61e8bdf9213b3c7:
+On Thursday 08 September 2011, Nicolas Pitre wrote:
+> On Thu, 8 Sep 2011, Arnd Bergmann wrote:
 > 
->   Linux 3.1-rc5 (2011-09-04 15:45:10 -0700)
+> > There were a few other pull requests that I haven't taken yet since
+> > master.kernel.org is down. If the general feeling is that I should take
+> > at least the bug fixes, I can start a branch on the linaro server for that.
 > 
-> They are available in the git repository at:
->   git://github.com/at91linux/linux-at91.git  at91-next
-> 
-> They have been present on linux-arm-kernel for some time and where recently added in linux-next.
-> Stephen resolved some trivial conflicts relatives to the removal of a board file (Cf:
-> https://lkml.org/lkml/2011/9/9/96 ).
-> 
-> A series by Thomas is touching the USB subsystem: ohci-at91.c but as most of changes are in the at91 directory, it makes more sense to take them in arm-soc.
+> My feeling is that you should take them all on git.linaro.org (or 
+> anywhere for that matter) just as if master.kernel.org was alive.  The 
+> nice property of Git is that the actual location of a repository 
+> shouldn't matter.  Bringing it back to master.kernel.org later on would 
+> be a no brainer.  I do have write access to that repository on 
+> master.kernel.org, but I practically never exercised that privilege so 
+> far, hence this doesn't have to be transferred as well.
 
-Hi Nicolas,
-
-I've resumed pulling patches and uploaded them to git.linaro.org while
-master.kernel.org continues to be unavailable.
-
-I've decided to split your branch into two separate branches 'board'
-and 'devel' to better match the code from other soc trees in a way
-that I can send forward to Linus. Please check that the split trees
-actually make sense, and tell me if that's ok for you or if you would
-prefer them split differently.
+Ok, pulled into imx/devel and next/devel now. Please check that everything
+still works.
 
 	Arnd
