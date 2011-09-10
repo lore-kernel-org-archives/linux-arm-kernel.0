@@ -1,10 +1,9 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat, 10 Sep 2011 12:04:57 +0100
-Subject: [PATCH v2 01/10] ARM: kprobes: Add config option for selecting the
-	ARM kprobes tests
+Date: Sat, 10 Sep 2011 12:05:06 +0100
+Subject: [PATCH v2 10/10] ARM: kprobes: Add introductory comment to test code
 In-Reply-To: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
 References: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1315652706-2900-2-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1315652706-2900-11-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,23 +11,40 @@ From: Jon Medhurst <tixy@yxit.co.uk>
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/Kconfig.debug |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/kernel/kprobes-test.c |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 81cbe40..be3a0f7 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -129,4 +129,10 @@ config DEBUG_S3C_UART
- 	  The uncompressor code port configuration is now handled
- 	  by CONFIG_S3C_LOWLEVEL_UART_PORT.
+diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
+index ec41ead..96cf18a 100644
+--- a/arch/arm/kernel/kprobes-test.c
++++ b/arch/arm/kernel/kprobes-test.c
+@@ -9,6 +9,27 @@
+  */
  
-+config ARM_KPROBES_TEST
-+	tristate "Kprobes test module"
-+	depends on KPROBES && MODULES
-+	help
-+	  Perform tests of kprobes API and instruction set simulation.
+ /*
++ * This file contains test code for ARM kprobes.
++ *
++ * The top level function run_all_tests() executes tests for all of the
++ * supported instruction sets: ARM, 16-bit Thumb, and 32-bit Thumb. These tests
++ * fall into two categories; run_api_tests() checks basic functionality of the
++ * kprobes API, and run_test_cases() is a comprehensive test for kprobes
++ * instruction decoding and simulation.
++ *
++ * run_test_cases() first checks the kprobes decoding table for self consistency
++ * (using table_test()) then executes a series of test cases for each of the CPU
++ * instruction forms. coverage_start() and coverage_end() are used to verify
++ * that these test cases cover all of the possible combinations of instructions
++ * described by the kprobes decoding tables.
++ *
++ * The individual test cases are in kprobes-test-arm.c and kprobes-test-thumb.c
++ * which use the macros defined in kprobes-test.h. The rest of this
++ * documentation will describe the operation of the framework used by these
++ * test cases.
++ */
 +
- endmenu
++/*
+  * TESTING METHODOLOGY
+  * -------------------
+  *
 -- 
 1.7.2.5
