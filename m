@@ -1,324 +1,382 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat, 10 Sep 2011 12:05:04 +0100
-Subject: [PATCH v2 08/10] ARM: kprobes: Add decoding table test coverage
-	analysis
+Date: Sat, 10 Sep 2011 12:04:58 +0100
+Subject: [PATCH v2 02/10] ARM: kprobes: Add basic API tests
 In-Reply-To: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
 References: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1315652706-2900-9-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1315652706-2900-3-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-This is used to verify that all combinations of CPU instructions
-described by the kprobes decoding tables have a test case.
+These test that the different kinds of probes can be successfully placed
+into ARM and Thumb code and that the handlers are called correctly when
+this code is executed.
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/kprobes-test.c |  261 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 261 insertions(+), 0 deletions(-)
+ arch/arm/kernel/Makefile       |    2 +
+ arch/arm/kernel/kprobes-test.c |  340 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 342 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index f7887dc..c7cbd96 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -43,6 +43,8 @@ obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o
+ else
+ obj-$(CONFIG_KPROBES)		+= kprobes-arm.o
+ endif
++obj-$(CONFIG_ARM_KPROBES_TEST)	+= test-kprobes.o
++test-kprobes-objs		:= kprobes-test.o
+ obj-$(CONFIG_ATAGS_PROC)	+= atags.o
+ obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
+ obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
 diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index 74a3a34..89758a8 100644
---- a/arch/arm/kernel/kprobes-test.c
+new file mode 100644
+index 0000000..9fff044
+--- /dev/null
 +++ b/arch/arm/kernel/kprobes-test.c
-@@ -178,6 +178,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/slab.h>
- #include <linux/kprobes.h>
- 
- #include "kprobes.h"
-@@ -529,6 +530,250 @@ static int table_test(const union decode_item *table)
- 
- 
- /*
-+ * Decoding table test coverage analysis
+@@ -0,0 +1,340 @@
++/*
++ * arch/arm/kernel/kprobes-test.c
 + *
-+ * coverage_start() builds a coverage_table which contains a list of
-+ * coverage_entry's to match each entry in the specified kprobes instruction
-+ * decoding table.
++ * Copyright (C) 2011 Jon Medhurst <tixy@yxit.co.uk>.
 + *
-+ * When test cases are run, coverage_add() is called to process each case.
-+ * This looks up the corresponding entry in the coverage_table and sets it as
-+ * being matched, as well as clearing the regs flag appropriate for the test.
-+ *
-+ * After all test cases have been run, coverage_end() is called to check that
-+ * all entries in coverage_table have been matched and that all regs flags are
-+ * cleared. I.e. that all possible combinations of instructions described by
-+ * the kprobes decoding tables have had a test case executed for them.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
 +
-+bool coverage_fail;
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/kprobes.h>
 +
-+#define MAX_COVERAGE_ENTRIES 256
++#include "kprobes.h"
 +
-+struct coverage_entry {
-+	const struct decode_header	*header;
-+	unsigned			regs;
-+	unsigned			nesting;
-+	char				matched;
-+};
 +
-+struct coverage_table {
-+	struct coverage_entry	*base;
-+	unsigned		num_entries;
-+	unsigned		nesting;
-+};
++/*
++ * Test basic API
++ */
 +
-+struct coverage_table coverage;
++static bool test_regs_ok;
++static int test_func_instance;
++static int pre_handler_called;
++static int post_handler_called;
++static int jprobe_func_called;
++static int kretprobe_handler_called;
 +
-+#define COVERAGE_ANY_REG	(1<<0)
-+#define COVERAGE_SP		(1<<1)
-+#define COVERAGE_PC		(1<<2)
-+#define COVERAGE_PCWB		(1<<3)
++#define FUNC_ARG1 0x12345678
++#define FUNC_ARG2 0xabcdef
 +
-+static const char coverage_register_lookup[16] = {
-+	[REG_TYPE_ANY]		= COVERAGE_ANY_REG | COVERAGE_SP | COVERAGE_PC,
-+	[REG_TYPE_SAMEAS16]	= COVERAGE_ANY_REG,
-+	[REG_TYPE_SP]		= COVERAGE_SP,
-+	[REG_TYPE_PC]		= COVERAGE_PC,
-+	[REG_TYPE_NOSP]		= COVERAGE_ANY_REG | COVERAGE_SP,
-+	[REG_TYPE_NOSPPC]	= COVERAGE_ANY_REG | COVERAGE_SP | COVERAGE_PC,
-+	[REG_TYPE_NOPC]		= COVERAGE_ANY_REG | COVERAGE_PC,
-+	[REG_TYPE_NOPCWB]	= COVERAGE_ANY_REG | COVERAGE_PC | COVERAGE_PCWB,
-+	[REG_TYPE_NOPCX]	= COVERAGE_ANY_REG,
-+	[REG_TYPE_NOSPPCX]	= COVERAGE_ANY_REG | COVERAGE_SP,
-+};
 +
-+unsigned coverage_start_registers(const struct decode_header *h)
++#ifndef CONFIG_THUMB2_KERNEL
++
++long arm_func(long r0, long r1);
++
++static void __used __naked __arm_kprobes_test_func(void)
 +{
-+	unsigned regs = 0;
-+	int i;
-+	for (i = 0; i < 20; i += 4) {
-+		int r = (h->type_regs.bits >> (DECODE_TYPE_BITS + i)) & 0xf;
-+		regs |= coverage_register_lookup[r] << i;
-+	}
-+	return regs;
++	__asm__ __volatile__ (
++		".arm					\n\t"
++		".type arm_func, %%function		\n\t"
++		"arm_func:				\n\t"
++		"adds	r0, r0, r1			\n\t"
++		"bx	lr				\n\t"
++		".code "NORMAL_ISA	 /* Back to Thumb if necessary */
++		: : : "r0", "r1", "cc"
++	);
 +}
 +
-+static int coverage_start_fn(const struct decode_header *h, void *args)
-+{
-+	struct coverage_table *coverage = (struct coverage_table *)args;
-+	enum decode_type type = h->type_regs.bits & DECODE_TYPE_MASK;
-+	struct coverage_entry *entry = coverage->base + coverage->num_entries;
++#else /* CONFIG_THUMB2_KERNEL */
 +
-+	if (coverage->num_entries == MAX_COVERAGE_ENTRIES - 1) {
-+		pr_err("FAIL: Out of space for test coverage data");
-+		return -ENOMEM;
++long thumb16_func(long r0, long r1);
++long thumb32even_func(long r0, long r1);
++long thumb32odd_func(long r0, long r1);
++
++static void __used __naked __thumb_kprobes_test_funcs(void)
++{
++	__asm__ __volatile__ (
++		".type thumb16_func, %%function		\n\t"
++		"thumb16_func:				\n\t"
++		"adds.n	r0, r0, r1			\n\t"
++		"bx	lr				\n\t"
++
++		".align					\n\t"
++		".type thumb32even_func, %%function	\n\t"
++		"thumb32even_func:			\n\t"
++		"adds.w	r0, r0, r1			\n\t"
++		"bx	lr				\n\t"
++
++		".align					\n\t"
++		"nop.n					\n\t"
++		".type thumb32odd_func, %%function	\n\t"
++		"thumb32odd_func:			\n\t"
++		"adds.w	r0, r0, r1			\n\t"
++		"bx	lr				\n\t"
++
++		: : : "r0", "r1", "cc"
++	);
++}
++
++#endif /* CONFIG_THUMB2_KERNEL */
++
++
++static int call_test_func(long (*func)(long, long), bool check_test_regs)
++{
++	long ret;
++
++	++test_func_instance;
++	test_regs_ok = false;
++
++	ret = (*func)(FUNC_ARG1, FUNC_ARG2);
++	if (ret != FUNC_ARG1 + FUNC_ARG2) {
++		pr_err("FAIL: call_test_func: func returned %lx\n", ret);
++		return false;
 +	}
 +
-+	++coverage->num_entries;
++	if (check_test_regs && !test_regs_ok) {
++		pr_err("FAIL: test regs not OK\n");
++		return false;
++	}
 +
-+	entry->header = h;
-+	entry->regs = coverage_start_registers(h);
-+	entry->nesting = coverage->nesting;
-+	entry->matched = false;
++	return true;
++}
 +
-+	if (type == DECODE_TYPE_TABLE) {
-+		struct decode_table *d = (struct decode_table *)h;
-+		int ret;
-+		++coverage->nesting;
-+		ret = table_iter(d->table.table, coverage_start_fn, coverage);
-+		--coverage->nesting;
++static int __kprobes pre_handler(struct kprobe *p, struct pt_regs *regs)
++{
++	pre_handler_called = test_func_instance;
++	if (regs->ARM_r0 == FUNC_ARG1 && regs->ARM_r1 == FUNC_ARG2)
++		test_regs_ok = true;
++	return 0;
++}
++
++static void __kprobes post_handler(struct kprobe *p, struct pt_regs *regs,
++				unsigned long flags)
++{
++	post_handler_called = test_func_instance;
++	if (regs->ARM_r0 != FUNC_ARG1 + FUNC_ARG2 || regs->ARM_r1 != FUNC_ARG2)
++		test_regs_ok = false;
++}
++
++static struct kprobe the_kprobe = {
++	.addr		= 0,
++	.pre_handler	= pre_handler,
++	.post_handler	= post_handler
++};
++
++static int test_kprobe(long (*func)(long, long))
++{
++	int ret;
++
++	the_kprobe.addr = (kprobe_opcode_t *)func;
++	ret = register_kprobe(&the_kprobe);
++	if (ret < 0) {
++		pr_err("FAIL: register_kprobe failed with %d\n", ret);
 +		return ret;
++	}
++
++	ret = call_test_func(func, true);
++
++	unregister_kprobe(&the_kprobe);
++	the_kprobe.flags = 0; /* Clear disable flag to allow reuse */
++
++	if (!ret)
++		return -EINVAL;
++	if (pre_handler_called != test_func_instance) {
++		pr_err("FAIL: kprobe pre_handler not called\n");
++		return -EINVAL;
++	}
++	if (post_handler_called != test_func_instance) {
++		pr_err("FAIL: kprobe post_handler not called\n");
++		return -EINVAL;
++	}
++	if (!call_test_func(func, false))
++		return -EINVAL;
++	if (pre_handler_called == test_func_instance ||
++				post_handler_called == test_func_instance) {
++		pr_err("FAIL: probe called after unregistering\n");
++		return -EINVAL;
 +	}
 +
 +	return 0;
 +}
 +
-+static int coverage_start(const union decode_item *table)
++static void __kprobes jprobe_func(long r0, long r1)
 +{
-+	coverage.base = kmalloc(MAX_COVERAGE_ENTRIES *
-+				sizeof(struct coverage_entry), GFP_KERNEL);
-+	coverage.num_entries = 0;
-+	coverage.nesting = 0;
-+	return table_iter(table, coverage_start_fn, &coverage);
++	jprobe_func_called = test_func_instance;
++	if (r0 == FUNC_ARG1 && r1 == FUNC_ARG2)
++		test_regs_ok = true;
++	jprobe_return();
 +}
 +
-+static void
-+coverage_add_registers(struct coverage_entry *entry, kprobe_opcode_t insn)
++static struct jprobe the_jprobe = {
++	.entry		= jprobe_func,
++};
++
++static int test_jprobe(long (*func)(long, long))
 +{
-+	int regs = entry->header->type_regs.bits >> DECODE_TYPE_BITS;
-+	int i;
-+	for (i = 0; i < 20; i += 4) {
-+		enum decode_reg_type reg_type = (regs >> i) & 0xf;
-+		int reg = (insn >> i) & 0xf;
-+		int flag;
++	int ret;
 +
-+		if (!reg_type)
-+			continue;
-+
-+		if (reg == 13)
-+			flag = COVERAGE_SP;
-+		else if (reg == 15)
-+			flag = COVERAGE_PC;
-+		else
-+			flag = COVERAGE_ANY_REG;
-+		entry->regs &= ~(flag << i);
-+
-+		switch (reg_type) {
-+
-+		case REG_TYPE_NONE:
-+		case REG_TYPE_ANY:
-+		case REG_TYPE_SAMEAS16:
-+			break;
-+
-+		case REG_TYPE_SP:
-+			if (reg != 13)
-+				return;
-+			break;
-+
-+		case REG_TYPE_PC:
-+			if (reg != 15)
-+				return;
-+			break;
-+
-+		case REG_TYPE_NOSP:
-+			if (reg == 13)
-+				return;
-+			break;
-+
-+		case REG_TYPE_NOSPPC:
-+		case REG_TYPE_NOSPPCX:
-+			if (reg == 13 || reg == 15)
-+				return;
-+			break;
-+
-+		case REG_TYPE_NOPCWB:
-+			if (!is_writeback(insn))
-+				break;
-+			if (reg == 15) {
-+				entry->regs &= ~(COVERAGE_PCWB << i);
-+				return;
-+			}
-+			break;
-+
-+		case REG_TYPE_NOPC:
-+		case REG_TYPE_NOPCX:
-+			if (reg == 15)
-+				return;
-+			break;
-+		}
-+
++	the_jprobe.kp.addr = (kprobe_opcode_t *)func;
++	ret = register_jprobe(&the_jprobe);
++	if (ret < 0) {
++		pr_err("FAIL: register_jprobe failed with %d\n", ret);
++		return ret;
 +	}
++
++	ret = call_test_func(func, true);
++
++	unregister_jprobe(&the_jprobe);
++	the_jprobe.kp.flags = 0; /* Clear disable flag to allow reuse */
++
++	if (!ret)
++		return -EINVAL;
++	if (jprobe_func_called != test_func_instance) {
++		pr_err("FAIL: jprobe handler function not called\n");
++		return -EINVAL;
++	}
++	if (!call_test_func(func, false))
++		return -EINVAL;
++	if (jprobe_func_called == test_func_instance) {
++		pr_err("FAIL: probe called after unregistering\n");
++		return -EINVAL;
++	}
++
++	return 0;
 +}
 +
-+static void coverage_add(kprobe_opcode_t insn)
++static int __kprobes
++kretprobe_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
 +{
-+	struct coverage_entry *entry = coverage.base;
-+	struct coverage_entry *end = coverage.base + coverage.num_entries;
-+	bool matched = false;
-+	unsigned nesting = 0;
-+
-+	for (; entry < end; ++entry) {
-+		const struct decode_header *h = entry->header;
-+		enum decode_type type = h->type_regs.bits & DECODE_TYPE_MASK;
-+
-+		if (entry->nesting > nesting)
-+			continue; /* Skip sub-table we didn't match */
-+
-+		if (entry->nesting < nesting)
-+			break; /* End of sub-table we were scanning */
-+
-+		if (!matched) {
-+			if ((insn & h->mask.bits) != h->value.bits)
-+				continue;
-+			entry->matched = true;
-+		}
-+
-+		switch (type) {
-+
-+		case DECODE_TYPE_TABLE:
-+			++nesting;
-+			break;
-+
-+		case DECODE_TYPE_CUSTOM:
-+		case DECODE_TYPE_SIMULATE:
-+		case DECODE_TYPE_EMULATE:
-+			coverage_add_registers(entry, insn);
-+			return;
-+
-+		case DECODE_TYPE_OR:
-+			matched = true;
-+			break;
-+
-+		case DECODE_TYPE_REJECT:
-+		default:
-+			return;
-+		}
-+
-+	}
++	kretprobe_handler_called = test_func_instance;
++	if (regs_return_value(regs) == FUNC_ARG1 + FUNC_ARG2)
++		test_regs_ok = true;
++	return 0;
 +}
 +
-+static void coverage_end(void)
++static struct kretprobe the_kretprobe = {
++	.handler	= kretprobe_handler,
++};
++
++static int test_kretprobe(long (*func)(long, long))
 +{
-+	struct coverage_entry *entry = coverage.base;
-+	struct coverage_entry *end = coverage.base + coverage.num_entries;
++	int ret;
 +
-+	for (; entry < end; ++entry) {
-+		u32 mask = entry->header->mask.bits;
-+		u32 value = entry->header->value.bits;
-+
-+		if (entry->regs) {
-+			pr_err("FAIL: Register test coverage missing for %08x %08x (%05x)\n",
-+				mask, value, entry->regs);
-+			coverage_fail = true;
-+		}
-+		if (!entry->matched) {
-+			pr_err("FAIL: Test coverage entry missing for %08x %08x\n",
-+				mask, value);
-+			coverage_fail = true;
-+		}
++	the_kretprobe.kp.addr = (kprobe_opcode_t *)func;
++	ret = register_kretprobe(&the_kretprobe);
++	if (ret < 0) {
++		pr_err("FAIL: register_kretprobe failed with %d\n", ret);
++		return ret;
 +	}
 +
-+	kfree(coverage.base);
++	ret = call_test_func(func, true);
++
++	unregister_kretprobe(&the_kretprobe);
++	the_kretprobe.kp.flags = 0; /* Clear disable flag to allow reuse */
++
++	if (!ret)
++		return -EINVAL;
++	if (kretprobe_handler_called != test_func_instance) {
++		pr_err("FAIL: kretprobe handler not called\n");
++		return -EINVAL;
++	}
++	if (!call_test_func(func, false))
++		return -EINVAL;
++	if (jprobe_func_called == test_func_instance) {
++		pr_err("FAIL: kretprobe called after unregistering\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int run_api_tests(long (*func)(long, long))
++{
++	int ret;
++
++	pr_info("    kprobe\n");
++	ret = test_kprobe(func);
++	if (ret < 0)
++		return ret;
++
++	pr_info("    jprobe\n");
++	ret = test_jprobe(func);
++	if (ret < 0)
++		return ret;
++
++	pr_info("    kretprobe\n");
++	ret = test_kretprobe(func);
++	if (ret < 0)
++		return ret;
++
++	return 0;
 +}
 +
 +
 +/*
-  * Framework for instruction set test cases
-  */
- 
-@@ -1039,6 +1284,8 @@ static uintptr_t __used kprobes_test_case_start(const char *title, void *stack)
- 		}
- 	}
- 
-+	coverage_add(current_instruction);
++ * Top level test functions
++ */
 +
- 	if (end_arg->flags & ARG_FLAG_UNSUPPORTED) {
- 		if (register_test_probe(&test_case_probe) < 0)
- 			goto pass;
-@@ -1213,8 +1460,13 @@ static int run_test_cases(void (*tests)(void), const union decode_item *table)
- 		return ret;
- 
- 	pr_info("    Run test cases\n");
-+	ret = coverage_start(table);
++static int __init run_all_tests(void)
++{
++	int ret = 0;
++
++	pr_info("Begining kprobe tests...\n");
++
++#ifndef CONFIG_THUMB2_KERNEL
++
++	pr_info("Probe ARM code\n");
++	ret = run_api_tests(arm_func);
 +	if (ret)
-+		return ret;
-+
- 	tests();
- 
-+	coverage_end();
- 	return 0;
- }
- 
-@@ -1274,6 +1526,15 @@ static int __init run_all_tests(void)
- 		goto out;
- 	}
- 
-+#if __LINUX_ARM_ARCH__ >= 7
-+	/* We are able to run all test cases so coverage should be complete */
-+	if (coverage_fail) {
-+		pr_err("FAIL: Test coverage checks failed\n");
-+		ret = -EINVAL;
 +		goto out;
-+	}
++
++#else /* CONFIG_THUMB2_KERNEL */
++
++	pr_info("Probe 16-bit Thumb code\n");
++	ret = run_api_tests(thumb16_func);
++	if (ret)
++		goto out;
++
++	pr_info("Probe 32-bit Thumb code, even halfword\n");
++	ret = run_api_tests(thumb32even_func);
++	if (ret)
++		goto out;
++
++	pr_info("Probe 32-bit Thumb code, odd halfword\n");
++	ret = run_api_tests(thumb32odd_func);
++	if (ret)
++		goto out;
++
 +#endif
 +
- out:
- 	if (ret == 0)
- 		pr_info("Finished kprobe tests OK\n");
++out:
++	if (ret == 0)
++		pr_info("Finished kprobe tests OK\n");
++	else
++		pr_err("kprobe tests failed\n");
++
++	return ret;
++}
++
++
++/*
++ * Module setup
++ */
++
++#ifdef MODULE
++
++static void __exit kprobe_test_exit(void)
++{
++}
++
++module_init(run_all_tests)
++module_exit(kprobe_test_exit)
++MODULE_LICENSE("GPL");
++
++#else /* !MODULE */
++
++late_initcall(run_all_tests);
++
++#endif
 -- 
 1.7.2.5
