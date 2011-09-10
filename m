@@ -1,14 +1,14 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 10 Sep 2011 10:23:57 -0400 (EDT)
-Subject: [PATCH] ARM: make cpu_is_v6_unaliagned() independent of
-	CONFIG_PROC_FS
-In-Reply-To: <1315629891-29102-1-git-send-email-eric.y.miao@gmail.com>
-References: <1315629891-29102-1-git-send-email-eric.y.miao@gmail.com>
-Message-ID: <alpine.LFD.2.00.1109101023360.20358@xanadu.home>
+Date: Sat, 10 Sep 2011 10:25:09 -0400 (EDT)
+Subject: [PATCH v2] ARM: make cpu_is_v6_unaligned() and safe_usermode()
+	independent of CONFIG_PROC_FS
+In-Reply-To: <1315630186-29654-1-git-send-email-eric.miao@linaro.org>
+References: <1315630186-29654-1-git-send-email-eric.miao@linaro.org>
+Message-ID: <alpine.LFD.2.00.1109101024470.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Sep 2011, Eric Miao wrote:
+On Fri, 9 Sep 2011, eric.miao at linaro.org wrote:
 
 > From: Eric Miao <eric.miao@linaro.org>
 > 
@@ -16,41 +16,52 @@ On Fri, 9 Sep 2011, Eric Miao wrote:
 
 Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-
 > ---
->  arch/arm/mm/alignment.c |   12 ++++++------
->  1 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> It turned out both cpu_is_v6_unaligned and safe_usermode() could be
+> referenced without CONFIG_PROC_FS being defined.
+> 
+>  arch/arm/mm/alignment.c |   20 ++++++++++----------
+>  1 files changed, 10 insertions(+), 10 deletions(-)
 > 
 > diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index cfbcf8b..2170021 100644
+> index cfbcf8b..c335c76 100644
 > --- a/arch/arm/mm/alignment.c
 > +++ b/arch/arm/mm/alignment.c
-> @@ -86,6 +86,12 @@ core_param(alignment, ai_usermode, int, 0600);
+> @@ -86,16 +86,6 @@ core_param(alignment, ai_usermode, int, 0600);
 >  #define UM_FIXUP	(1 << 1)
 >  #define UM_SIGNAL	(1 << 2)
 >  
-> +/* Return true if and only if the ARMv6 unaligned access model is in use. */
-> +static bool cpu_is_v6_unaligned(void)
-> +{
-> +	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
-> +}
-> +
->  #ifdef CONFIG_PROC_FS
->  static const char *usermode_action[] = {
->  	"ignored",
-> @@ -96,12 +102,6 @@ static const char *usermode_action[] = {
->  	"signal+warn"
->  };
->  
-> -/* Return true if and only if the ARMv6 unaligned access model is in use. */
-> -static bool cpu_is_v6_unaligned(void)
-> -{
-> -	return cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U);
-> -}
+> -#ifdef CONFIG_PROC_FS
+> -static const char *usermode_action[] = {
+> -	"ignored",
+> -	"warn",
+> -	"fixup",
+> -	"fixup+warn",
+> -	"signal",
+> -	"signal+warn"
+> -};
 > -
->  static int safe_usermode(int new_usermode, bool warn)
+>  /* Return true if and only if the ARMv6 unaligned access model is in use. */
+>  static bool cpu_is_v6_unaligned(void)
 >  {
->  	/*
+> @@ -123,6 +113,16 @@ static int safe_usermode(int new_usermode, bool warn)
+>  	return new_usermode;
+>  }
+>  
+> +#ifdef CONFIG_PROC_FS
+> +static const char *usermode_action[] = {
+> +	"ignored",
+> +	"warn",
+> +	"fixup",
+> +	"fixup+warn",
+> +	"signal",
+> +	"signal+warn"
+> +};
+> +
+>  static int alignment_proc_show(struct seq_file *m, void *v)
+>  {
+>  	seq_printf(m, "User:\t\t%lu\n", ai_user);
 > -- 
 > 1.7.4.1
 > 
