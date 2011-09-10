@@ -1,38 +1,33 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Sat, 10 Sep 2011 15:01:26 +0530
-Subject: [PATCH v2 1/5] cpu_pm: Add cpu power management notifiers
-In-Reply-To: <20110909155632.661f5696.akpm@linux-foundation.org>
-References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>	<1315060755-4613-2-git-send-email-santosh.shilimkar@ti.com>
-	<20110909155632.661f5696.akpm@linux-foundation.org>
-Message-ID: <4E6B2E6E.7010807@ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sat, 10 Sep 2011 12:26:07 +0200
+Subject: [PATCH] arm: mx28: fix bit operation in clock setting
+Message-ID: <1315650367-3371-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
+reg | (1 << clk->enable_shift) always evaluates to true. Switch it
+to & which makes much more sense. Same fix as 13be9f00 (ARM i.MX28: fix
+bit operation) at a different location.
 
-On Saturday 10 September 2011 04:26 AM, Andrew Morton wrote:
-> On Sat, 3 Sep 2011 20:09:11 +0530
-> Santosh Shilimkar<santosh.shilimkar@ti.com>  wrote:
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@freescale.com>
+---
+ arch/arm/mach-mxs/clock-mx28.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-[...]
-
->
-> Have you identified which indivudual you hope/expect to merge this into
-> mainline?
->
-> The code is presumably and hopefully applicable to architectures other
-> than ARM, yes?  Can you suggest likely candidate architectures so we
-> can go off and bug the relevant maintainers to review it?
->
-Sorry I missed above question in last email. Am not too sure but any
-arch which has CPU local timers, interrupt controller, Floating point
-co-processor etc, should be able to make use of it. So it's applicable
-to any architecture, but whether they want to use it, i don't know.
-
-As you noticed most of the ARM machine's are adapting to it.
-Along with generic patch, there are couple ARM drivers adapting
-to make use of it. That was the reason I was pushing this series
-via Russell's tree.
-
-Regards
-Santosh
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 633c395..63d6117 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -413,7 +413,7 @@ static int name##_set_rate(struct clk *clk, unsigned long rate)		\
+ 	reg = __raw_readl(CLKCTRL_BASE_ADDR + HW_CLKCTRL_##dr);		\
+ 	reg &= ~BM_CLKCTRL_##dr##_DIV;					\
+ 	reg |= div << BP_CLKCTRL_##dr##_DIV;				\
+-	if (reg | (1 << clk->enable_shift)) {				\
++	if (reg & (1 << clk->enable_shift)) {				\
+ 		pr_err("%s: clock is gated\n", __func__);		\
+ 		return -EINVAL;						\
+ 	}								\
+-- 
+1.7.5.4
