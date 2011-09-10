@@ -1,382 +1,216 @@
 From: tixy@yxit.co.uk (Tixy)
-Date: Sat, 10 Sep 2011 12:04:58 +0100
-Subject: [PATCH v2 02/10] ARM: kprobes: Add basic API tests
+Date: Sat, 10 Sep 2011 12:05:05 +0100
+Subject: [PATCH v2 09/10] ARM: kprobes: Add some benchmarking to test module
 In-Reply-To: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
 References: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <1315652706-2900-3-git-send-email-tixy@yxit.co.uk>
+Message-ID: <1315652706-2900-10-git-send-email-tixy@yxit.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jon Medhurst <tixy@yxit.co.uk>
 
-These test that the different kinds of probes can be successfully placed
-into ARM and Thumb code and that the handlers are called correctly when
-this code is executed.
+These benchmarks show the basic speed of kprobes and verify the success
+of optimisations done to the emulation of typical function entry
+instructions (i.e. push/stmdb).
 
 Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
 ---
- arch/arm/kernel/Makefile       |    2 +
- arch/arm/kernel/kprobes-test.c |  340 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 342 insertions(+), 0 deletions(-)
+ arch/arm/kernel/kprobes-test.c |  169 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 169 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index f7887dc..c7cbd96 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -43,6 +43,8 @@ obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o
- else
- obj-$(CONFIG_KPROBES)		+= kprobes-arm.o
- endif
-+obj-$(CONFIG_ARM_KPROBES_TEST)	+= test-kprobes.o
-+test-kprobes-objs		:= kprobes-test.o
- obj-$(CONFIG_ATAGS_PROC)	+= atags.o
- obj-$(CONFIG_OABI_COMPAT)	+= sys_oabi-compat.o
- obj-$(CONFIG_ARM_THUMBEE)	+= thumbee.o
 diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-new file mode 100644
-index 0000000..9fff044
---- /dev/null
+index 89758a8..ec41ead 100644
+--- a/arch/arm/kernel/kprobes-test.c
 +++ b/arch/arm/kernel/kprobes-test.c
-@@ -0,0 +1,340 @@
-+/*
-+ * arch/arm/kernel/kprobes-test.c
-+ *
-+ * Copyright (C) 2011 Jon Medhurst <tixy@yxit.co.uk>.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
+@@ -185,6 +185,9 @@
+ #include "kprobes-test.h"
+ 
+ 
++#define BENCHMARKING	1
++
++
+ /*
+  * Test basic API
+  */
+@@ -444,6 +447,165 @@ static int run_api_tests(long (*func)(long, long))
+ 
+ 
+ /*
++ * Benchmarking
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/kprobes.h>
++#if BENCHMARKING
 +
-+#include "kprobes.h"
-+
-+
-+/*
-+ * Test basic API
-+ */
-+
-+static bool test_regs_ok;
-+static int test_func_instance;
-+static int pre_handler_called;
-+static int post_handler_called;
-+static int jprobe_func_called;
-+static int kretprobe_handler_called;
-+
-+#define FUNC_ARG1 0x12345678
-+#define FUNC_ARG2 0xabcdef
-+
-+
-+#ifndef CONFIG_THUMB2_KERNEL
-+
-+long arm_func(long r0, long r1);
-+
-+static void __used __naked __arm_kprobes_test_func(void)
++static void __naked benchmark_nop(void)
 +{
 +	__asm__ __volatile__ (
-+		".arm					\n\t"
-+		".type arm_func, %%function		\n\t"
-+		"arm_func:				\n\t"
-+		"adds	r0, r0, r1			\n\t"
-+		"bx	lr				\n\t"
-+		".code "NORMAL_ISA	 /* Back to Thumb if necessary */
-+		: : : "r0", "r1", "cc"
++		"nop		\n\t"
++		"bx	lr"
 +	);
 +}
 +
-+#else /* CONFIG_THUMB2_KERNEL */
++#ifdef CONFIG_THUMB2_KERNEL
++#define wide ".w"
++#else
++#define wide
++#endif
 +
-+long thumb16_func(long r0, long r1);
-+long thumb32even_func(long r0, long r1);
-+long thumb32odd_func(long r0, long r1);
-+
-+static void __used __naked __thumb_kprobes_test_funcs(void)
++static void __naked benchmark_pushpop1(void)
 +{
 +	__asm__ __volatile__ (
-+		".type thumb16_func, %%function		\n\t"
-+		"thumb16_func:				\n\t"
-+		"adds.n	r0, r0, r1			\n\t"
-+		"bx	lr				\n\t"
-+
-+		".align					\n\t"
-+		".type thumb32even_func, %%function	\n\t"
-+		"thumb32even_func:			\n\t"
-+		"adds.w	r0, r0, r1			\n\t"
-+		"bx	lr				\n\t"
-+
-+		".align					\n\t"
-+		"nop.n					\n\t"
-+		".type thumb32odd_func, %%function	\n\t"
-+		"thumb32odd_func:			\n\t"
-+		"adds.w	r0, r0, r1			\n\t"
-+		"bx	lr				\n\t"
-+
-+		: : : "r0", "r1", "cc"
++		"stmdb"wide"	sp!, {r3-r11,lr}  \n\t"
++		"ldmia"wide"	sp!, {r3-r11,pc}"
 +	);
 +}
 +
-+#endif /* CONFIG_THUMB2_KERNEL */
-+
-+
-+static int call_test_func(long (*func)(long, long), bool check_test_regs)
++static void __naked benchmark_pushpop2(void)
 +{
-+	long ret;
-+
-+	++test_func_instance;
-+	test_regs_ok = false;
-+
-+	ret = (*func)(FUNC_ARG1, FUNC_ARG2);
-+	if (ret != FUNC_ARG1 + FUNC_ARG2) {
-+		pr_err("FAIL: call_test_func: func returned %lx\n", ret);
-+		return false;
-+	}
-+
-+	if (check_test_regs && !test_regs_ok) {
-+		pr_err("FAIL: test regs not OK\n");
-+		return false;
-+	}
-+
-+	return true;
++	__asm__ __volatile__ (
++		"stmdb"wide"	sp!, {r0-r8,lr}  \n\t"
++		"ldmia"wide"	sp!, {r0-r8,pc}"
++	);
 +}
 +
-+static int __kprobes pre_handler(struct kprobe *p, struct pt_regs *regs)
++static void __naked benchmark_pushpop3(void)
 +{
-+	pre_handler_called = test_func_instance;
-+	if (regs->ARM_r0 == FUNC_ARG1 && regs->ARM_r1 == FUNC_ARG2)
-+		test_regs_ok = true;
++	__asm__ __volatile__ (
++		"stmdb"wide"	sp!, {r4,lr}  \n\t"
++		"ldmia"wide"	sp!, {r4,pc}"
++	);
++}
++
++static void __naked benchmark_pushpop4(void)
++{
++	__asm__ __volatile__ (
++		"stmdb"wide"	sp!, {r0,lr}  \n\t"
++		"ldmia"wide"	sp!, {r0,pc}"
++	);
++}
++
++
++#ifdef CONFIG_THUMB2_KERNEL
++
++static void __naked benchmark_pushpop_thumb(void)
++{
++	__asm__ __volatile__ (
++		"push.n	{r0-r7,lr}  \n\t"
++		"pop.n	{r0-r7,pc}"
++	);
++}
++
++#endif
++
++static int __kprobes
++benchmark_pre_handler(struct kprobe *p, struct pt_regs *regs)
++{
 +	return 0;
 +}
 +
-+static void __kprobes post_handler(struct kprobe *p, struct pt_regs *regs,
-+				unsigned long flags)
++static int benchmark(void(*fn)(void))
 +{
-+	post_handler_called = test_func_instance;
-+	if (regs->ARM_r0 != FUNC_ARG1 + FUNC_ARG2 || regs->ARM_r1 != FUNC_ARG2)
-+		test_regs_ok = false;
-+}
++	int t, n;
++	for (n = 1000; ; n *= 2) {
++		struct timeval before;
++		struct timeval after;
++		int i;
 +
-+static struct kprobe the_kprobe = {
-+	.addr		= 0,
-+	.pre_handler	= pre_handler,
-+	.post_handler	= post_handler
++		do_gettimeofday(&before);
++
++		for (i = n; i > 0; --i)
++			fn();
++
++		do_gettimeofday(&after);
++		t = after.tv_usec - before.tv_usec;
++		if (t < 0)
++			t += 1000000; /* Adjust time if it wrapped */
++		if (t >= 250000)
++			break; /* Stop once we took more than 0.25 seconds */
++	}
++	return t / (n / 1000); /* Return time in nano-seconds */
 +};
 +
-+static int test_kprobe(long (*func)(long, long))
++static int kprobe_benchmark(void(*fn)(void), unsigned offset)
 +{
-+	int ret;
++	struct kprobe k = {
++		.addr		= (kprobe_opcode_t *)((uintptr_t)fn + offset),
++		.pre_handler	= benchmark_pre_handler,
++	};
 +
-+	the_kprobe.addr = (kprobe_opcode_t *)func;
-+	ret = register_kprobe(&the_kprobe);
++	int ret = register_kprobe(&k);
 +	if (ret < 0) {
 +		pr_err("FAIL: register_kprobe failed with %d\n", ret);
 +		return ret;
 +	}
 +
-+	ret = call_test_func(func, true);
++	ret = benchmark(fn);
 +
-+	unregister_kprobe(&the_kprobe);
-+	the_kprobe.flags = 0; /* Clear disable flag to allow reuse */
-+
-+	if (!ret)
-+		return -EINVAL;
-+	if (pre_handler_called != test_func_instance) {
-+		pr_err("FAIL: kprobe pre_handler not called\n");
-+		return -EINVAL;
-+	}
-+	if (post_handler_called != test_func_instance) {
-+		pr_err("FAIL: kprobe post_handler not called\n");
-+		return -EINVAL;
-+	}
-+	if (!call_test_func(func, false))
-+		return -EINVAL;
-+	if (pre_handler_called == test_func_instance ||
-+				post_handler_called == test_func_instance) {
-+		pr_err("FAIL: probe called after unregistering\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static void __kprobes jprobe_func(long r0, long r1)
-+{
-+	jprobe_func_called = test_func_instance;
-+	if (r0 == FUNC_ARG1 && r1 == FUNC_ARG2)
-+		test_regs_ok = true;
-+	jprobe_return();
-+}
-+
-+static struct jprobe the_jprobe = {
-+	.entry		= jprobe_func,
-+};
-+
-+static int test_jprobe(long (*func)(long, long))
-+{
-+	int ret;
-+
-+	the_jprobe.kp.addr = (kprobe_opcode_t *)func;
-+	ret = register_jprobe(&the_jprobe);
-+	if (ret < 0) {
-+		pr_err("FAIL: register_jprobe failed with %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = call_test_func(func, true);
-+
-+	unregister_jprobe(&the_jprobe);
-+	the_jprobe.kp.flags = 0; /* Clear disable flag to allow reuse */
-+
-+	if (!ret)
-+		return -EINVAL;
-+	if (jprobe_func_called != test_func_instance) {
-+		pr_err("FAIL: jprobe handler function not called\n");
-+		return -EINVAL;
-+	}
-+	if (!call_test_func(func, false))
-+		return -EINVAL;
-+	if (jprobe_func_called == test_func_instance) {
-+		pr_err("FAIL: probe called after unregistering\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int __kprobes
-+kretprobe_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
-+{
-+	kretprobe_handler_called = test_func_instance;
-+	if (regs_return_value(regs) == FUNC_ARG1 + FUNC_ARG2)
-+		test_regs_ok = true;
-+	return 0;
-+}
-+
-+static struct kretprobe the_kretprobe = {
-+	.handler	= kretprobe_handler,
-+};
-+
-+static int test_kretprobe(long (*func)(long, long))
-+{
-+	int ret;
-+
-+	the_kretprobe.kp.addr = (kprobe_opcode_t *)func;
-+	ret = register_kretprobe(&the_kretprobe);
-+	if (ret < 0) {
-+		pr_err("FAIL: register_kretprobe failed with %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = call_test_func(func, true);
-+
-+	unregister_kretprobe(&the_kretprobe);
-+	the_kretprobe.kp.flags = 0; /* Clear disable flag to allow reuse */
-+
-+	if (!ret)
-+		return -EINVAL;
-+	if (kretprobe_handler_called != test_func_instance) {
-+		pr_err("FAIL: kretprobe handler not called\n");
-+		return -EINVAL;
-+	}
-+	if (!call_test_func(func, false))
-+		return -EINVAL;
-+	if (jprobe_func_called == test_func_instance) {
-+		pr_err("FAIL: kretprobe called after unregistering\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int run_api_tests(long (*func)(long, long))
-+{
-+	int ret;
-+
-+	pr_info("    kprobe\n");
-+	ret = test_kprobe(func);
-+	if (ret < 0)
-+		return ret;
-+
-+	pr_info("    jprobe\n");
-+	ret = test_jprobe(func);
-+	if (ret < 0)
-+		return ret;
-+
-+	pr_info("    kretprobe\n");
-+	ret = test_kretprobe(func);
-+	if (ret < 0)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+
-+/*
-+ * Top level test functions
-+ */
-+
-+static int __init run_all_tests(void)
-+{
-+	int ret = 0;
-+
-+	pr_info("Begining kprobe tests...\n");
-+
-+#ifndef CONFIG_THUMB2_KERNEL
-+
-+	pr_info("Probe ARM code\n");
-+	ret = run_api_tests(arm_func);
-+	if (ret)
-+		goto out;
-+
-+#else /* CONFIG_THUMB2_KERNEL */
-+
-+	pr_info("Probe 16-bit Thumb code\n");
-+	ret = run_api_tests(thumb16_func);
-+	if (ret)
-+		goto out;
-+
-+	pr_info("Probe 32-bit Thumb code, even halfword\n");
-+	ret = run_api_tests(thumb32even_func);
-+	if (ret)
-+		goto out;
-+
-+	pr_info("Probe 32-bit Thumb code, odd halfword\n");
-+	ret = run_api_tests(thumb32odd_func);
-+	if (ret)
-+		goto out;
-+
-+#endif
-+
-+out:
-+	if (ret == 0)
-+		pr_info("Finished kprobe tests OK\n");
-+	else
-+		pr_err("kprobe tests failed\n");
-+
++	unregister_kprobe(&k);
 +	return ret;
++};
++
++struct benchmarks {
++	void		(*fn)(void);
++	unsigned	offset;
++	const char	*title;
++};
++
++static int run_benchmarks(void)
++{
++	int ret;
++	struct benchmarks list[] = {
++		{&benchmark_nop, 0, "nop"},
++		/*
++		 * benchmark_pushpop{1,3} will have the optimised
++		 * instruction emulation, whilst benchmark_pushpop{2,4} will
++		 * be the equivalent unoptimised instructions.
++		 */
++		{&benchmark_pushpop1, 0, "stmdb	sp!, {r3-r11,lr}"},
++		{&benchmark_pushpop1, 4, "ldmia	sp!, {r3-r11,pc}"},
++		{&benchmark_pushpop2, 0, "stmdb	sp!, {r0-r8,lr}"},
++		{&benchmark_pushpop2, 4, "ldmia	sp!, {r0-r8,pc}"},
++		{&benchmark_pushpop3, 0, "stmdb	sp!, {r4,lr}"},
++		{&benchmark_pushpop3, 4, "ldmia	sp!, {r4,pc}"},
++		{&benchmark_pushpop4, 0, "stmdb	sp!, {r0,lr}"},
++		{&benchmark_pushpop4, 4, "ldmia	sp!, {r0,pc}"},
++#ifdef CONFIG_THUMB2_KERNEL
++		{&benchmark_pushpop_thumb, 0, "push.n	{r0-r7,lr}"},
++		{&benchmark_pushpop_thumb, 2, "pop.n	{r0-r7,pc}"},
++#endif
++		{0}
++	};
++
++	struct benchmarks *b;
++	for (b = list; b->fn; ++b) {
++		ret = kprobe_benchmark(b->fn, b->offset);
++		if (ret < 0)
++			return ret;
++		pr_info("    %dns for kprobe %s\n", ret, b->title);
++	}
++
++	pr_info("\n");
++	return 0;
 +}
++
++#endif /* BENCHMARKING */
 +
 +
 +/*
-+ * Module setup
-+ */
-+
-+#ifdef MODULE
-+
-+static void __exit kprobe_test_exit(void)
-+{
-+}
-+
-+module_init(run_all_tests)
-+module_exit(kprobe_test_exit)
-+MODULE_LICENSE("GPL");
-+
-+#else /* !MODULE */
-+
-+late_initcall(run_all_tests);
-+
+  * Decoding table self-consistency tests
+  */
+ 
+@@ -1526,6 +1688,13 @@ static int __init run_all_tests(void)
+ 		goto out;
+ 	}
+ 
++#if BENCHMARKING
++	pr_info("Benchmarks\n");
++	ret = run_benchmarks();
++	if (ret)
++		goto out;
 +#endif
++
+ #if __LINUX_ARM_ARCH__ >= 7
+ 	/* We are able to run all test cases so coverage should be complete */
+ 	if (coverage_fail) {
 -- 
 1.7.2.5
