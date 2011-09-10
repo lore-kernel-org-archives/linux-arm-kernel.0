@@ -1,39 +1,64 @@
 From: santosh.shilimkar@ti.com (Santosh)
-Date: Sat, 10 Sep 2011 11:21:24 +0530
-Subject: [PATCH 14/25] OMAP4: PM: Add CPUX OFF mode support
-In-Reply-To: <20110910045454.GA32640@S2100-06.ap.freescale.net>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-15-git-send-email-santosh.shilimkar@ti.com>
-	<20110909080416.GF31581@S2100-06.ap.freescale.net>
-	<4E69C9CF.6090709@ti.com>
-	<20110909141321.GC32138@S2100-06.ap.freescale.net>
-	<CAMQu2gxeDzFGyhsXK-wDkyiJRoD6_GN58m=3_=NC8yKa_ThJnQ@mail.gmail.com>
-	<20110909152729.GG32138@S2100-06.ap.freescale.net>
-	<4E6A4605.3050305@ti.com>
-	<20110909233448.GH32138@S2100-06.ap.freescale.net>
-	<CAMQu2gwJQi55sY7aUnfcY-r8VGBPzWY2NnYUjJ-SEGiNC3Ty1Q@mail.gmail.com>
-	<20110910045454.GA32640@S2100-06.ap.freescale.net>
-Message-ID: <4E6AFADC.5080701@ti.com>
+Date: Sat, 10 Sep 2011 11:23:02 +0530
+Subject: [PATCH v2 0/5] CPU PM notifiers
+In-Reply-To: <87ty8ly4rp.fsf@ti.com>
+References: <1315060755-4613-1-git-send-email-santosh.shilimkar@ti.com>
+	<87ty8ly4rp.fsf@ti.com>
+Message-ID: <4E6AFB3E.3020902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 10 September 2011 10:24 AM, Shawn Guo wrote:
-> On Sat, Sep 10, 2011 at 09:08:16AM +0530, Shilimkar, Santosh wrote:
->> IOn Sat, Sep 10, 2011 at 5:04 AM, Shawn Guo<shawn.guo@freescale.com>  wrote:
-> [...]
->>> Also, IMO, lable "l2x_clean_inv" should be put after the "bne do_WFI".
->>> Otherwise, my original statement (it seems l2x_clean_inv will be
->>> called for case "2") stands correct :)
->>>
->> It's just a label. All L2 related code and checks for the valid state is
->> kept under that by purpose.
->>
-> So for some case, you enter l2x_clean_inv but do not actually clean
-> and invalidate L2.  I do not see this label being used anywhere, so
-> you may want to remove it to save the confusion to stupid people like
-> me.  Just my opinion.
+On Friday 09 September 2011 11:30 PM, Kevin Hilman wrote:
+> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
 >
-Will remove the label :)
+> [...]
+>
+>> This patch set tries to address concerns with platform pm code
+>> calling into the driver for every block in the Cortex A9s
+>> during idle, hotplug, and suspend.  The first patch adds cpu pm
+>> notifiers that can be called by platform code, the second uses
+>> the notifier to save and restore the GIC state, and the third
+>> saves the VFP state.
+>>
+>> The notifiers are used for two types of events, CPU PM events and
+>> CPU cluster PM events.  CPU PM events are used to save and restore
+>> per-cpu context when a single CPU is preparing to enter or has
+>> just exited a low power state.  For example, the VFP saves the
+>> last thread context, and the GIC saves banked CPU registers.
+>>
+>> CPU cluster events are used after all the CPUs in a power domain
+>> have been prepared for the low power state.  The GIC uses these
+>> events to save global register state.
+>
+> Stepping back from my earlier objections, I think I had a fundamental
+> misunderstanding about what these notifiers should be used for.
+>
+> The current assumptions/goals seem to be
+>
+> 1) used only for devices in the same power domain as the CPU (cluster)
+> 2) use only for one specific power state of the CPU (cluster): off.
+>
+> For awhile now, we've been discussing how to better coordinate CPU PM
+> transitions (CPUidle) with non-CPU PM transitions (runtime PM) for
+> devices that are tightly coupled to the CPU, but not necessarily in the
+> same powerdomain.
+>
+> I was assuming (and hoping) that CPU PM notifiers could be used to do
+> that, but the more I think about it, I don't think we can achieve the
+> current CPU PM goals and the coordination with runtime PM with this
+> series.
+>
+> I think it's more likely that we'll need to do some work with Rafael's
+> new PM domains to make that work correctly.
+>
+> So, I'll retract my objections to this series, and feel free to add
+>
+> Reviewed-by: Kevin Hilman<khilman@ti.com>
+>
+Will add.
+Thanks for the review Kevin.
 
 Regards
 Santosh
+
+Regards
