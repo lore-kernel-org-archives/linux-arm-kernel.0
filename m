@@ -1,137 +1,35 @@
-From: thomas@shipmail.org (Thomas Hellstrom)
-Date: Sat, 10 Sep 2011 16:04:14 +0200
-Subject: [PATCH v4] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
-In-Reply-To: <1315568333-6704-1-git-send-email-inki.dae@samsung.com>
-References: <1315568333-6704-1-git-send-email-inki.dae@samsung.com>
-Message-ID: <4E6B6E5E.3010702@shipmail.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 10 Sep 2011 16:08:52 +0200
+Subject: [PATCH v2 1/3] ARM: mx28evk: add platform data for saif
+In-Reply-To: <20110909134105.GT1912@pengutronix.de>
+References: <1315403858-9904-1-git-send-email-b29396@freescale.com>
+	<1315403858-9904-2-git-send-email-b29396@freescale.com>
+	<20110907181811.GX28816@pengutronix.de>
+	<65EE16ACC360FA4D99C96DC085B3F77223C8CB@039-SN1MPN1-003.039d.mgd.msft.net>
+	<20110909134105.GT1912@pengutronix.de>
+Message-ID: <20110910140852.GP28816@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2011 01:38 PM, Inki Dae wrote:
-> This patch is a DRM Driver for Samsung SoC Exynos4210 and now enables
-> only FIMD yet but we will add HDMI support also in the future.
->
-> from now on, I will remove RFC prefix because I think we have got comments
-> enough.
->
-> this patch is based on git repository below:
-> git://git.kernel.org/pub/scm/linux/kernel/git/airlied/drm-2.6.git,
-> branch name: drm-next
-> commit-id: bcc65fd8e929a9d9d34d814d6efc1d2793546922
->
-> you can refer to our working repository below:
-> http://git.infradead.org/users/kmpark/linux-2.6-samsung
-> branch name: samsung-drm
->
-> We tried to re-use lowlevel codes of the FIMD driver(s3c-fb.c
-> based on Linux framebuffer) but couldn't so because lowlevel codes
-> of s3c-fb.c are included internally and so FIMD module of this driver has
-> its own lowlevel codes.
->
-> We used GEM framework for buffer management and DMA APIs(dma_alloc_*)
-> for buffer allocation. by using DMA API, we could use CMA later.
->
-> Refer to this link for CMA(Continuous Memory Allocator):
-> http://lkml.org/lkml/2011/7/20/45
->
-> this driver supports only physically continuous memory(non-iommu).
->
-> Links to previous versions of the patchset:
-> v1:<  https://lwn.net/Articles/454380/>
-> v2:<  http://www.spinics.net/lists/kernel/msg1224275.html>
-> v3:<  http://www.gossamer-threads.com/lists/linux/kernel/1423684>
->
-> Changelog v2:
-> DRM: add DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl command.
->
->      this feature maps user address space to physical memory region
->      once user application requests DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl.
->
-> DRM: code clean and add exception codes.
->
-> Changelog v3:
-> DRM: Support multiple irq.
->
->      FIMD and HDMI have their own irq handler but DRM Framework can regiter
->      only one irq handler this patch supports mutiple irq for Samsung SoC.
->
-> DRM: Consider modularization.
->
->      each DRM, FIMD could be built as a module.
->
-> DRM: Have indenpendent crtc object.
->
->      crtc isn't specific to SoC Platform so this patch gets a crtc
->      to be used as common object.
->      created crtc could be attached to any encoder object.
->
-> DRM: code clean and add exception codes.
->
-> Changelog v4:
-> DRM: remove is_defult from samsung_fb.
->
->      is_default isn't used for default framebuffer.
->
-> DRM: code refactoring to fimd module.
->      this patch is be considered with multiple display objects and
->      would use its own request_irq() to register a irq handler instead of
->      drm framework's one.
->
-> DRM: remove find_samsung_drm_gem_object()
->
-> DRM: move kernel private data structures and definitions to driver folder.
->
->      samsung_drm.h would contain only public information for userspace
->      ioctl interface.
->
-> DRM: code refactoring to gem modules.
->      buffer module isn't dependent of gem module anymore.
->
-> DRM: fixed security issue.
->
-> DRM: remove encoder porinter from specific connector.
->
->      samsung connector doesn't need to have generic encoder.
->
-> DRM: code clean and add exception codes.
->
-> Signed-off-by: Inki Dae<inki.dae@samsung.com>
-> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
-> Signed-off-by: SeungWoo Kim<sw0312.kim@samsung.com>
-> Signed-off-by: kyungmin.park<kyungmin.park@samsung.com>
-> ---
->
-> +static struct drm_ioctl_desc samsung_ioctls[] = {
-> +	DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_CREATE, samsung_drm_gem_create_ioctl,
-> +			DRM_UNLOCKED | DRM_AUTH),
->    
+Hello,
 
-Hi!
+On Fri, Sep 09, 2011 at 03:41:05PM +0200, Wolfram Sang wrote:
+> > > >  extern const struct mxs_saif_data mx28_saif_data[] __initconst;
+> > > > -#define mx28_add_saif(id)
+> > > mxs_add_saif(&mx28_saif_data[id])
+> > > > +#define mx28_add_saif(id, pdata) \
+> > > > +	mxs_add_saif(&mx28_saif_data[id], pdata)
+> > > should it be a seperate patch to add pdata for saif devices?
+> > How do you suggest to separate?
+> > All changes are mainly to add saif pdata.
+> > You mean to move DIGCTL related saif pdata function to another patch?
+> 
+> I think he meant one patch for adding the functions in clock-mx28.c and
+> one patch to use the stuff when adding the pdata. Uwe?
+yeah.
 
-With reference my previous security comment.
+Uwe
 
-Let's say you have a compromised video player running as a DRM client, 
-that tries to repeatedly allocate huge GEM buffers...
-
-What will happen when all DMA memory is exhausted? Will this cause other 
-device drivers to see an OOM, or only DRM?
-
-The old DRI model basically allowed any authorized DRI client to exhaust 
-video ram or AGP memory, but never system memory. Newer DRI drivers 
-typically only allow DRI masters to do that.
-as
-
-I don't think an authorized DRI client should be able to easily exhaust 
-resources (DMA memory) used by other device drivers causing them to fail.
-
-/Thomas
-
-
-> +	DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_MAP_OFFSET,
-> +			samsung_drm_gem_map_offset_ioctl, DRM_UNLOCKED |
-> +				DRM_AUTH),
-> +	DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_MMAP,
-> +			samsung_drm_gem_mmap_ioctl, DRM_UNLOCKED | DRM_AUTH),
-> +};
->
->    
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
