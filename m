@@ -1,25 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Sep 2011 23:26:02 +0200
-Subject: [GIT PULL] CPU mapping platform updates for 3.2
-In-Reply-To: <20110902132655.GA19288@e102144-lin.cambridge.arm.com>
-References: <20110901211107.GB5209@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1109020908250.20358@xanadu.home>
-	<20110902132655.GA19288@e102144-lin.cambridge.arm.com>
-Message-ID: <201109102326.02485.arnd@arndb.de>
+Date: Sat, 10 Sep 2011 23:37:08 +0200
+Subject: [GIT PULL] msm: initial devicetree support
+In-Reply-To: <20110830225139.GA7093@huya.qualcomm.com>
+References: <20110830225139.GA7093@huya.qualcomm.com>
+Message-ID: <201109102337.09057.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 September 2011, Will Deacon wrote:
-> The following changes since commit c2b9ab71c6e6cf8c48c5f8fda47cd10879c5c7db:
->   Will Deacon (1):
->         ARM: 7061/1: gic: convert logical CPU numbers into physical numbers
+On Wednesday 31 August 2011, David Brown wrote:
+> The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
+> 
+>   Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
 > 
 > are available in the git repository at:
+>   git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-dt
 > 
->   git://linux-arm.org/linux-2.6-wd.git for-arnd
-> 
+> David Brown (3):
+>       msm_serial: Use relative resources for iomem
+>       msm_serial: Add devicetree support
+>       ARM: msm: Add devicetree support for msm8660-surf
 
-Thanks! I've pulled it into the cross-platform/cpu-mapping branch of the
-temporary arm-soc tree on git.linaro.org now.
+
+Pulled into the next/dt branch of the temporary arm-soc.git on git.linaro.org.
+
+Thanks!
 
 	Arnd
