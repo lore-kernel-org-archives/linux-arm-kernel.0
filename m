@@ -1,28 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Sep 2011 23:37:08 +0200
-Subject: [GIT PULL] msm: initial devicetree support
-In-Reply-To: <20110830225139.GA7093@huya.qualcomm.com>
-References: <20110830225139.GA7093@huya.qualcomm.com>
-Message-ID: <201109102337.09057.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 10 Sep 2011 22:43:44 +0100
+Subject: [PATCH v2] ASoC: omap: convert per-board modules to platform
+	drivers
+In-Reply-To: <201109102237.15193.arnd@arndb.de>
+References: <3110288.bQbb0H2ME1@wuerfel>
+	<20110909193010.GA2993@opensource.wolfsonmicro.com>
+	<20110909205645.GA16355@n2100.arm.linux.org.uk>
+	<201109102237.15193.arnd@arndb.de>
+Message-ID: <20110910214343.GB21361@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 August 2011, David Brown wrote:
-> The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
-> 
->   Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
-> 
-> are available in the git repository at:
->   git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-dt
-> 
-> David Brown (3):
->       msm_serial: Use relative resources for iomem
->       msm_serial: Add devicetree support
->       ARM: msm: Add devicetree support for msm8660-surf
+On Sat, Sep 10, 2011 at 10:37:15PM +0200, Arnd Bergmann wrote:
+> On Friday 09 September 2011, Russell King - ARM Linux wrote:
 
+> > That's just twisted and utterly insane - adding more code for precisely
+> > zero benefit what so ever.  Think about it - the device tree is already
+> > creating platform devices for entries in the device tree file.  What's
 
-Pulled into the next/dt branch of the temporary arm-soc.git on git.linaro.org.
+> Exactly. No driver or (worse) user program should ever need to look at
+> the top-level compatible property. When you want information about a
+> localized part of the system (e.g. the ASoC components), you should
+> look up the information for that component.
 
-Thanks!
-
-	Arnd
+Right, and this is the state of the art right now.  I can see why people
+find this inelegant and want to come up with a way of automatically
+generating all these different devices to describe boards especially
+with the non-device tree systems, though, so if people want to work on
+that stuff I don't see a problem with it.
