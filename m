@@ -1,25 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Sep 2011 23:22:23 +0200
-Subject: [GIT PULL] DaVinci fixes for v3.1-rc6
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593025743E832@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593025743E832@dbde02.ent.ti.com>
-Message-ID: <201109102322.23671.arnd@arndb.de>
+Date: Sat, 10 Sep 2011 23:26:02 +0200
+Subject: [GIT PULL] CPU mapping platform updates for 3.2
+In-Reply-To: <20110902132655.GA19288@e102144-lin.cambridge.arm.com>
+References: <20110901211107.GB5209@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1109020908250.20358@xanadu.home>
+	<20110902132655.GA19288@e102144-lin.cambridge.arm.com>
+Message-ID: <201109102326.02485.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 September 2011, Nori, Sekhar wrote:
-> Can you please pull the following fixes for v3.1-rc6?
+On Friday 02 September 2011, Will Deacon wrote:
+> The following changes since commit c2b9ab71c6e6cf8c48c5f8fda47cd10879c5c7db:
+>   Will Deacon (1):
+>         ARM: 7061/1: gic: convert logical CPU numbers into physical numbers
 > 
-> These are not regression fixes in the strict sense since
-> none of the bugs were actually introduced in v3.1 and have
-> been around for a while. But I hope we don't have to wait
-> till v3.2 for these.
+> are available in the git repository at:
+> 
+>   git://linux-arm.org/linux-2.6-wd.git for-arnd
 > 
 
-Ok, pulled into the fixes branch for 3.2 now. I've finally
-decided to move the arm-soc tree to git.linaro.org while waiting
-for master.kernel.org to come back.
-
-Thanks,
+Thanks! I've pulled it into the cross-platform/cpu-mapping branch of the
+temporary arm-soc tree on git.linaro.org now.
 
 	Arnd
