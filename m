@@ -1,30 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 10 Sep 2011 22:43:44 +0100
-Subject: [PATCH v2] ASoC: omap: convert per-board modules to platform
-	drivers
-In-Reply-To: <201109102237.15193.arnd@arndb.de>
-References: <3110288.bQbb0H2ME1@wuerfel>
-	<20110909193010.GA2993@opensource.wolfsonmicro.com>
-	<20110909205645.GA16355@n2100.arm.linux.org.uk>
-	<201109102237.15193.arnd@arndb.de>
-Message-ID: <20110910214343.GB21361@opensource.wolfsonmicro.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 11 Sep 2011 09:36:19 +0800
+Subject: [GIT PULL] CSR prima2 changes for next
+Message-ID: <CAGsJ_4xv3eeZtp_GEnifk3MpF=gaNRe=wVzLiojo=Jgy4qRePA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 10, 2011 at 10:37:15PM +0200, Arnd Bergmann wrote:
-> On Friday 09 September 2011, Russell King - ARM Linux wrote:
+Hi Arnd,
+can you please pull the 1st patchset of CSR prima2 for next? most of
+them are minor changes except that rtciobrg is new stuff.
 
-> > That's just twisted and utterly insane - adding more code for precisely
-> > zero benefit what so ever.  Think about it - the device tree is already
-> > creating platform devices for entries in the device tree file.  What's
+The following changes since commit ddf28352b80c86754a6424e3a61e8bdf9213b3c7:
+  Linus Torvalds (1):
+        Linux 3.1-rc5
 
-> Exactly. No driver or (worse) user program should ever need to look at
-> the top-level compatible property. When you want information about a
-> localized part of the system (e.g. the ASoC components), you should
-> look up the information for that component.
+are available in the git repository at:
 
-Right, and this is the state of the art right now.  I can see why people
-find this inelegant and want to come up with a way of automatically
-generating all these different devices to describe boards especially
-with the non-device tree systems, though, so if people want to work on
-that stuff I don't see a problem with it.
+  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git for-arnd
+
+Barry Song (3):
+      ARM: CSR: add lost Resource Sharing Control(RSC) node in dts
+      ARM: CSR: extend the compatibility of gpio controller to pinmux in dts
+      ARM: CSR: IRQ: add simple irq_domain so that hw irq can map to Linux
+
+Jamie Iles (1):
+      ARM: CSR: add missing sentinels to of_device_id tables
+
+Zhiwu Song (1):
+      ARM: CSR: add rtc i/o bridge interface for SiRFprimaII
+
+ arch/arm/boot/dts/prima2-cb.dts      |    9 ++-
+ arch/arm/mach-prima2/Makefile        |    1 +
+ arch/arm/mach-prima2/clock.c         |    1 +
+ arch/arm/mach-prima2/irq.c           |    4 +
+ arch/arm/mach-prima2/rstc.c          |    1 +
+ arch/arm/mach-prima2/rtciobrg.c      |  139 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-prima2/timer.c         |    1 +
+ include/linux/rtc/sirfsoc_rtciobrg.h |   18 +++++
+ 8 files changed, 172 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/rtciobrg.c
+ create mode 100644 include/linux/rtc/sirfsoc_rtciobrg.h
+
+Thanks
+barry
