@@ -1,34 +1,23 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sun, 11 Sep 2011 21:10:02 +1000
-Subject: temporary move of linux-arm-soc.git to git.linaro.org
-In-Reply-To: <10788526.YaHEPOob56@wuerfel>
-References: <10788526.YaHEPOob56@wuerfel>
-Message-ID: <20110911211002.604f4e64af72cf479b5a1f76@canb.auug.org.au>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Sun, 11 Sep 2011 16:29:38 +0300
+Subject: [PATCH v4] mach-realview: expose PB1176 ROM using physmap and
+	map_rom
+In-Reply-To: <1315292023-4125-1-git-send-email-linus.walleij@stericsson.com>
+References: <1315292023-4125-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1315747783.18731.59.camel@sauron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Sun, 11 Sep 2011 12:53:42 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
->
-> The URL of the arm-soc tree is now 
-> git://git.linaro.org/people/arnd/arm-soc.git for as long as the kernel.org
-> infrastructure remains down.
+On Tue, 2011-09-06 at 08:53 +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Please try to change the linux-next URL. If there are too many conflicts
-> (not unusual, I fear), just tell me which other trees I need to resolve
-> them with.
+> This exposes the PB1176 ROM if you compile in the MTD physmap
+> mapping and also the map_rom chiptype.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 
-OK, will do.
+I think this should go in via the corresponding arm subtree.
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110911/55d21a39/attachment.sig>
+Best Regards,
+Artem Bityutskiy
