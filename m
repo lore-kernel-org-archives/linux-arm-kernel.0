@@ -1,32 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 11 Sep 2011 09:37:14 +0100
-Subject: [PATCH v6 00/25] gpio/omap: driver cleanup and fixes
-In-Reply-To: <CAC83ZvLN1ucD6R11ga3x7caaPgnEjYPYTehE7xfPf59XSjKYpQ@mail.gmail.com>
-References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
-	<87ty8pz384.fsf@ti.com>
-	<CAC83ZvKoSsGNMDoHNeCOZXk9mOZxcKjT_vMjnXGQn6F52YNDKg@mail.gmail.com>
-	<CAC83ZvLN1ucD6R11ga3x7caaPgnEjYPYTehE7xfPf59XSjKYpQ@mail.gmail.com>
-Message-ID: <20110911083714.GA7187@n2100.arm.linux.org.uk>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sun, 11 Sep 2011 12:28:49 +0300
+Subject: [PATCH 1/7] ASoC: ep93xx-pcm: add MODULE_ALIAS
+In-Reply-To: <cover.1315732452.git.mika.westerberg@iki.fi>
+References: <cover.1315732452.git.mika.westerberg@iki.fi>
+Message-ID: <d678a0075d114443bd0821f5eef84669ad879048.1315732452.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 10, 2011 at 06:24:53AM +0530, DebBarma, Tarun Kanti wrote:
-> [...]
-> >> Please rebase onto that branch so these changes can be tested along with
-> >> changes already queued for v3.2.
-> > Ok.
-> I am not able to git pull
-> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
-> Looks like there is problem with git.kernel.org?
+To get the PCM module loaded automatically by udev et al. we need to add a
+proper MODULE_ALIAS.
 
-Yes - the main kernel.org server went down a week and a half ago due
-to being cracked.  They notified the authorities and have been working
-to analyze the intrusion, as well as verifying the considerable amount
-of user data that they hold.
+Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+---
+ sound/soc/ep93xx/ep93xx-pcm.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-That wasn't too much of a problem (trees can be hosted elsewhere), but
-it was followed a week later by the kernel.org DNS servers, which took
-out access to things like git.kernel.org.  As mailing lists (such as
-linux-omap) are hosted on vger.kernel.org, steps were taken to restore
-some of the DNS so the mailing lists would continue working, but without
-the master server the remainder of the DNS is still off-line.
+diff --git a/sound/soc/ep93xx/ep93xx-pcm.c b/sound/soc/ep93xx/ep93xx-pcm.c
+index 8dfd3ad..d00230a 100644
+--- a/sound/soc/ep93xx/ep93xx-pcm.c
++++ b/sound/soc/ep93xx/ep93xx-pcm.c
+@@ -355,3 +355,4 @@ module_exit(ep93xx_soc_platform_exit);
+ MODULE_AUTHOR("Ryan Mallon");
+ MODULE_DESCRIPTION("EP93xx ALSA PCM interface");
+ MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:ep93xx-pcm-audio");
+-- 
+1.7.5.4
