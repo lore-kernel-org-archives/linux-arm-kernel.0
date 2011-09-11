@@ -1,39 +1,39 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sun, 11 Sep 2011 14:10:13 +1000
-Subject: at91 next tree
-In-Reply-To: <4E6A031B.6020804@atmel.com>
-References: <20110422155122.GB23775@game.jcrosoft.org>
-	<20110423095558.99ee7136.sfr@canb.auug.org.au>
-	<4E6A031B.6020804@atmel.com>
-Message-ID: <20110911141013.2c1cde82fd6ccf79b115eb92@canb.auug.org.au>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 11 Sep 2011 10:57:41 +0300
+Subject: [RFC PATCH 06/10] hwspinlock: OMAP4: Add spinlock support in DT
+In-Reply-To: <201109091458.44153.arnd@arndb.de>
+References: <1314191356-10963-1-git-send-email-b-cousson@ti.com>
+	<201109081647.55377.arnd@arndb.de>
+	<CAK=WgbZmFGqo2B_MO_FXDiQHUx1SoKvHEReTpVr9O6XZ2uo7Ng@mail.gmail.com>
+	<201109091458.44153.arnd@arndb.de>
+Message-ID: <CAK=WgbYTo=R1=KhMzLv0iw2qYBPXXyLtB43Z4wvN5p-EvLL9Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On Fri, Sep 9, 2011 at 3:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> For dynamic allocation, my impression is that we don't
+> need any link from the spinlock user device to the controller at all,
 
-On Fri, 09 Sep 2011 14:14:19 +0200 Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->
-> Can you please move our at91-next branch that is included currently in
-> linux-next to the "2.6-less" github tree?
-> 
-> git://github.com/at91linux/linux-at91.git
+I agree.
 
-Done.
+> but instead the controller should have a list of the available
+> spinlocks.
 
-> (I hope that the merge conflicts that you have just resolved will not
-> suffer from this move: but as commits are the same, I am pretty sure
-> that it will be transparent).
+Might make more sense to give it the list of reserved (i.e. those that
+were statically allocated) spinlocks, and then let it treat the rest
+as available.
 
-It will be fine.
+hwspinlock drivers will tell the core which of their spinlocks are
+reserved, so it can make sure not to allocate them when someone calls
+hwspin_lock_request(). To use those reserved spinlocks, users will
+explicitly have to call hwspin_lock_request_specific().
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110911/5d7ffc12/attachment-0001.sig>
+The controller's node should still have something like a "baseid"
+attribute, and possibly also the number of available spinlocks. The
+latter is a bit redundant though, as drivers already know how many
+spinlocks are available (at least the OMAP driver reads it from an
+hardware register. The U8500 one seem just to have it hardcoded in the
+driver).
+
+Vast majority of hwspinlocks are not statically allocated, so this
+would keep the DT minimal, and IMHO, cleaner.
