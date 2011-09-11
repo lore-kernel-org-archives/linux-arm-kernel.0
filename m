@@ -1,118 +1,120 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 11 Sep 2011 12:28:50 +0300
-Subject: [PATCH 2/7] ASoC: simone: convert to use snd_soc_register_card()
+Date: Sun, 11 Sep 2011 12:28:51 +0300
+Subject: [PATCH 3/7] ASoC: edb93xx: convert to use snd_soc_register_card()
 In-Reply-To: <cover.1315732452.git.mika.westerberg@iki.fi>
 References: <cover.1315732452.git.mika.westerberg@iki.fi>
-Message-ID: <07a38037d85a237817acf1269a90c610f4dd5c8c.1315732452.git.mika.westerberg@iki.fi>
+Message-ID: <0fef3fd00e8cdb8a606f4a81ad4e7f2b7014621c.1315732452.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current method for machine driver to register with the ASoC core is to
-use snd_soc_register_card() instead of creating a "soc-audio" platform device.
-
-In addition we use platform_device_register_simple() to create a platform
-device for the codec. This function will handle putting and deleting the
-device automatically which simplifies the error handling in the machine
-driver.
+Current method for machine driver to register with the ASoC core is to use
+snd_soc_register_card() instead of creating a "soc-audio" platform device.
 
 Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+Cc: Alexander Sverdlin <subaparts@yandex.ru>
 ---
- sound/soc/ep93xx/simone.c |   64 +++++++++++++++++++++++++-------------------
- 1 files changed, 36 insertions(+), 28 deletions(-)
+ sound/soc/ep93xx/edb93xx.c |   60 ++++++++++++++++++++++++-------------------
+ 1 files changed, 33 insertions(+), 27 deletions(-)
 
-diff --git a/sound/soc/ep93xx/simone.c b/sound/soc/ep93xx/simone.c
-index 2868179..968cb31 100644
---- a/sound/soc/ep93xx/simone.c
-+++ b/sound/soc/ep93xx/simone.c
-@@ -39,53 +39,61 @@ static struct snd_soc_card snd_soc_simone = {
+diff --git a/sound/soc/ep93xx/edb93xx.c b/sound/soc/ep93xx/edb93xx.c
+index d3aa151..0134d4e 100644
+--- a/sound/soc/ep93xx/edb93xx.c
++++ b/sound/soc/ep93xx/edb93xx.c
+@@ -28,12 +28,6 @@
+ #include <mach/hardware.h>
+ #include "ep93xx-pcm.h"
+ 
+-#define edb93xx_has_audio() (machine_is_edb9301() ||	\
+-			     machine_is_edb9302() ||	\
+-			     machine_is_edb9302a() ||	\
+-			     machine_is_edb9307a() ||	\
+-			     machine_is_edb9315a())
+-
+ static int edb93xx_hw_params(struct snd_pcm_substream *substream,
+ 			     struct snd_pcm_hw_params *params)
+ {
+@@ -94,49 +88,61 @@ static struct snd_soc_card snd_soc_edb93xx = {
+ 	.num_links	= 1,
  };
  
- static struct platform_device *simone_snd_ac97_device;
--static struct platform_device *simone_snd_device;
- 
--static int __init simone_init(void)
-+static int __devinit simone_probe(struct platform_device *pdev)
+-static struct platform_device *edb93xx_snd_device;
+-
+-static int __init edb93xx_init(void)
++static int __devinit edb93xx_probe(struct platform_device *pdev)
  {
-+	struct snd_soc_card *card = &snd_soc_simone;
++	struct snd_soc_card *card = &snd_soc_edb93xx;
  	int ret;
  
--	if (!machine_is_sim_one())
+-	if (!edb93xx_has_audio())
 -		return -ENODEV;
 -
--	simone_snd_ac97_device = platform_device_alloc("ac97-codec", -1);
--	if (!simone_snd_ac97_device)
--		return -ENOMEM;
-+	simone_snd_ac97_device = platform_device_register_simple("ac97-codec",
-+								 -1, NULL, 0);
-+	if (IS_ERR(simone_snd_ac97_device))
-+		return PTR_ERR(simone_snd_ac97_device);
+ 	ret = ep93xx_i2s_acquire(EP93XX_SYSCON_DEVCFG_I2SONAC97,
+ 				 EP93XX_SYSCON_I2SCLKDIV_ORIDE |
+ 				 EP93XX_SYSCON_I2SCLKDIV_SPOL);
+ 	if (ret)
+ 		return ret;
  
--	ret = platform_device_add(simone_snd_ac97_device);
--	if (ret)
--		goto fail1;
-+	card->dev = &pdev->dev;
- 
--	simone_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!simone_snd_device) {
+-	edb93xx_snd_device = platform_device_alloc("soc-audio", -1);
+-	if (!edb93xx_snd_device) {
 -		ret = -ENOMEM;
--		goto fail2;
+-		goto free_i2s;
++	card->dev = &pdev->dev;
++
 +	ret = snd_soc_register_card(card);
 +	if (ret) {
 +		dev_err(&pdev->dev, "snd_soc_register_card() failed: %d\n",
 +			ret);
-+		platform_device_unregister(simone_snd_ac97_device);
++		ep93xx_i2s_release();
  	}
  
--	platform_set_drvdata(simone_snd_device, &snd_soc_simone);
--	ret = platform_device_add(simone_snd_device);
+-	platform_set_drvdata(edb93xx_snd_device, &snd_soc_edb93xx);
+-	ret = platform_device_add(edb93xx_snd_device);
 -	if (ret)
--		goto fail3;
+-		goto device_put;
 +	return ret;
 +}
-+
-+static int __devexit simone_remove(struct platform_device *pdev)
+ 
+-	return 0;
++static int __devexit edb93xx_remove(struct platform_device *pdev)
 +{
 +	struct snd_soc_card *card = platform_get_drvdata(pdev);
-+
+ 
+-device_put:
+-	platform_device_put(edb93xx_snd_device);
+-free_i2s:
 +	snd_soc_unregister_card(card);
-+	platform_device_unregister(simone_snd_ac97_device);
- 
- 	return 0;
-+}
- 
--fail3:
--	platform_device_put(simone_snd_device);
--fail2:
--	platform_device_del(simone_snd_ac97_device);
--fail1:
--	platform_device_put(simone_snd_ac97_device);
+ 	ep93xx_i2s_release();
 -	return ret;
-+static struct platform_driver simone_driver = {
++
++	return 0;
++}
++
++static struct platform_driver edb93xx_driver = {
 +	.driver		= {
-+		.name	= "simone-audio",
++		.name	= "edb93xx-audio",
 +		.owner	= THIS_MODULE,
 +	},
-+	.probe		= simone_probe,
-+	.remove		= __devexit_p(simone_remove),
++	.probe		= edb93xx_probe,
++	.remove		= __devexit_p(edb93xx_remove),
 +};
 +
-+static int __init simone_init(void)
++static int __init edb93xx_init(void)
 +{
-+	return platform_driver_register(&simone_driver);
++	return platform_driver_register(&edb93xx_driver);
  }
- module_init(simone_init);
+ module_init(edb93xx_init);
  
- static void __exit simone_exit(void)
+ static void __exit edb93xx_exit(void)
  {
--	platform_device_unregister(simone_snd_device);
--	platform_device_unregister(simone_snd_ac97_device);
-+	platform_driver_unregister(&simone_driver);
+-	platform_device_unregister(edb93xx_snd_device);
+-	ep93xx_i2s_release();
++	platform_driver_unregister(&edb93xx_driver);
  }
- module_exit(simone_exit);
+ module_exit(edb93xx_exit);
  
- MODULE_DESCRIPTION("ALSA SoC Simplemachines Sim.One");
- MODULE_AUTHOR("Mika Westerberg <mika.westerberg@iki.fi>");
+ MODULE_AUTHOR("Alexander Sverdlin <subaparts@yandex.ru>");
+ MODULE_DESCRIPTION("ALSA SoC EDB93xx");
  MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:simone-audio");
++MODULE_ALIAS("platform:edb93xx-audio");
 -- 
 1.7.5.4
