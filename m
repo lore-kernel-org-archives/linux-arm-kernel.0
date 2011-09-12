@@ -1,94 +1,127 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Sep 2011 11:46:34 +0200
-Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
-In-Reply-To: <1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110912094634.GP31404@pengutronix.de>
+From: embedded@gmx.net (A.Schallenberg)
+Date: Mon, 12 Sep 2011 11:54:17 +0200
+Subject: OMAP3503, SMC911x: mac address issue
+Message-ID: <201109121154.17796.embedded@gmx.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 05:58:37PM +0800, Shawn Guo wrote:
-> It adds a number of core drivers support for imx6q, including clock,
-> General Power Controller (gpc), Multi Mode DDR Controller(mmdc) and
-> System Reset Controller (src).
-> 
-> Signed-off-by: Ranjani Vaidyanathan <ra5478@freescale.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-> new file mode 100644
-> index 0000000..95fdd65
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/src.c
-> @@ -0,0 +1,52 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <asm/unified.h>
-> +
-> +#define SRC_SCR				0x000
-> +#define SRC_GPR1			0x020
-> +#define BP_SRC_SCR_CORE1_RST		14
-> +#define BP_SRC_SCR_CORE1_ENABLE		22
-> +
-> +static void __iomem *src_base;
-> +
-> +void imx_enable_cpu(int cpu, bool enable)
-> +{
-> +	u32 mask, val;
-> +
-> +	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
-> +	val = __raw_readl(src_base + SRC_SCR);
-> +	val = enable ? val | mask : val & ~mask;
-> +	__raw_writel(val, src_base + SRC_SCR);
-> +}
-> +
-> +void imx_set_cpu_jump(int cpu, void *jump_addr)
-> +{
-> +	__raw_writel(BSYM(virt_to_phys(jump_addr)),
-> +		     src_base + SRC_GPR1 + cpu * 8);
-> +}
-> +
-> +static int __init imx_src_init(void)
-> +{
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-src");
-> +	src_base = of_iomap(np, 0);
-> +	WARN_ON(!src_base);
-> +
-> +	return 0;
-> +}
-> +early_initcall(imx_src_init);
+Hello,
 
-What I'm concerned about is that we carefully removed all assumptions
-about which SoC the code runs on in the past. Now with this patchset
-many of them come back. Here we have a initcall without any check
-whether we really run on i.MX6. Above we have a imx_enable_cpu function
-but this is really a imx6 specific function. Nevertheless it is called
-from generic code in arch/arm/mach-imx/platsmp.c.
+I am adding support for a custom board to the 3.0 kernel.
+The board is very similar to the beagle board, so I took this
+as my starting point. I also have an older (v2.6.32) kernel
+with its beagle board support modified to support this custom
+board instead.
 
-We've been there before and it was hard to remove all the implicit
-assumptions on which SoC we are on. Please do not reintroduce it.
+Using the same boot paramaters passed by U-Boot (only the ttyS2
+to ttyO2 change was made) the new kernel has issues with eth0.
 
-Sascha
+The kernel driver is added to the board support, compiled and
+successfully probed. I verified this by adding some "printk" lines:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+...
+[    1.939361] SMC911x: init()
+[    1.942382] SMC911x: drv_probe()
+[    1.945831] SMC911x: probe()
+[    1.952484] eth0: LAN9115 (rev 2) at 0x2c000000 IRQ 225
+[    1.958099] eth0: Invalid ethernet MAC address ff:ff:ff:ff:ff:ff. Please 
+set using ifconfig.
+[    1.967071] eth0: External PHY 0xffffffff
+[    1.971313] eth0: probe() succeeded
+...
+
+Later on, I get:
+...
+[    2.087951] IP-Config: Failed to open eth0
+[    2.093109] IP-Config: Device `eth0' not found.
+[    2.098419] Root-NFS: no NFS server address
+...
+
+
+This is ic_open_devs() (from ipconfig.c) calling
+dev_change_flags(dev, oflags | IFF_UP). This ultimately
+leads to a call to eth_validate_addr() in eth.c
+which fails and returns -EADDRNOTAVAIL.
+So the MAC address is not correctly passed on to the driver.
+
+The kernel boot parameters are:
+[    0.000000] Kernel command line: console=ttyO2,115200n8 
+video=omapfb:vram:2M,vram:4M,mode:1024x768 at 60,vxres=1024,vyres=768 
+ip=10.100.100.28:10.100.10.69:10.100.0.1:255.255.0.0:3flex:eth0:none 
+ethaddr=00:E0:18:1B:21:55 root=/dev/nfs rootfstype=nfs
+
+Here is how I do the initialization in the board file now.
+The code is directly taken from the v2.6.32 kernel. 
+
+------------------------------------------------------------
+
+#define OMAP3_BOARD_ETHR_START     0x2c000000
+#define OMAP3_BOARD_ETHR_SIZE      1024
+#define OMAP3_BOARD_ETHR_GPIO_IRQ  65      // Sos
+#define OMAP3_BOARD_SMC911X_CS     5
+
+static struct resource omap3_board_smc911x_resources[] = {
+        [0] =   {
+                .start  = OMAP3_BOARD_ETHR_START,
+                .end    = (OMAP3_BOARD_ETHR_START + OMAP3_BOARD_ETHR_SIZE - 
+1),
+                .flags  = IORESOURCE_MEM,
+        },
+        [1] =   {
+                .start  = OMAP_GPIO_IRQ(OMAP3_BOARD_ETHR_GPIO_IRQ),
+                .end    = OMAP_GPIO_IRQ(OMAP3_BOARD_ETHR_GPIO_IRQ),
+                .flags  = IORESOURCE_IRQ,
+        },
+};
+
+static struct platform_device omap3_board_smc911x_device = {
+        .name           = "smc911x",
+        .id             = -1,
+        .num_resources  = ARRAY_SIZE(omap3_board_smc911x_resources),
+        .resource       = &omap3_board_smc911x_resources [0],
+};
+
+
+static inline void __init omap3_board_init_smc911x(void)
+{
+        int eth_cs;
+        struct clk *l3ck;
+        unsigned int rate;
+
+
+        eth_cs = OMAP3_BOARD_SMC911X_CS;
+
+
+        l3ck = clk_get(NULL, "l3_ck");
+        if (IS_ERR(l3ck))
+                rate = 100000000;
+        else
+                rate = clk_get_rate(l3ck);
+
+        if (gpio_request(OMAP3_BOARD_ETHR_GPIO_IRQ, "SMC911x irq") < 0) {
+                printk(KERN_ERR "Failed to request GPIO%d for smc911x IRQ\n",
+                        OMAP3_BOARD_ETHR_GPIO_IRQ);
+                return;
+        }
+
+        gpio_direction_input(OMAP3_BOARD_ETHR_GPIO_IRQ);
+        platform_device_register(&omap3_board_smc911x_device);
+        printk(KERN_INFO "BOARD: Registered SMC911x\n");
+}
+
+------------------------------------------------------------------------------
+
+What am I doing wrong here?
+
+I am aware of the thread "Linux Kernel without Ethernet (missed MAC)"
+( http://www.mail-archive.com/u-boot@lists.denx.de/msg27711.html )
+and also tried the patch by Daniel Gorsulowski but that didn't help.
+It should be some different issue here since I am using "ethaddr"
+to pass the MAC.
+
+
+If this is the wrong mailing list for this question,
+please point me to a more appropriate one.
+
+Best,
+Andreas Schallenberg
