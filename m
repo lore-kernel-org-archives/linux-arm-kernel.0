@@ -1,20 +1,29 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 12 Sep 2011 11:19:39 +0100
-Subject: [PATCH 0/7] ASoC: ep93xx: convert to use snd_soc_register_card()
-In-Reply-To: <CABS+qY15T_fR4o4kxBYguXH64wzaCrypJZdaduDDht_9Vqokfg@mail.gmail.com>
-References: <cover.1315732452.git.mika.westerberg@iki.fi>
-	<4E6D4100.7060007@gmail.com>
-	<CABS+qY15T_fR4o4kxBYguXH64wzaCrypJZdaduDDht_9Vqokfg@mail.gmail.com>
-Message-ID: <20110912101939.GA2953@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Sep 2011 11:22:49 +0100
+Subject: OMAP3503, SMC911x: mac address issue
+In-Reply-To: <201109121154.17796.embedded@gmx.net>
+References: <201109121154.17796.embedded@gmx.net>
+Message-ID: <20110912102249.GB7007@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2011 at 05:55:49AM +0100, Girdwood, Liam wrote:
+On Mon, Sep 12, 2011 at 11:54:17AM +0200, A.Schallenberg wrote:
+> The kernel boot parameters are:
+> [    0.000000] Kernel command line: console=ttyO2,115200n8 
+> video=omapfb:vram:2M,vram:4M,mode:1024x768 at 60,vxres=1024,vyres=768 
+> ip=10.100.100.28:10.100.10.69:10.100.0.1:255.255.0.0:3flex:eth0:none 
+> ethaddr=00:E0:18:1B:21:55 root=/dev/nfs rootfstype=nfs
 
-> ASoC parts
+There is no such kernel parameter called 'ethaddr='.  That sounds like
+a vendor specific hack somewhere along the lines.
 
-> Acked-by: Liam Girdwood <lrg@ti.com>
+> [    1.958099] eth0: Invalid ethernet MAC address ff:ff:ff:ff:ff:ff. Please
+set using ifconfig.
 
-I'm happy with them too - they should probably all go in together,
-do folks want me to apply them to ASoC or should we merge via the ARM
-tree?
+Normally, the MAC address is available either from the device registers,
+which the device will load from the attached EEPROM.  It sounds like you
+don't have an EEPROM attached, and nothing is programming the registers.
+This isn't a combination supported by the driver.
+
+Hence the driver is telling you in the above message how to fix it in
+userspace.
