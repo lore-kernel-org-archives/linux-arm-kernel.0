@@ -1,105 +1,24 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Mon, 12 Sep 2011 17:02:40 +0400
-Subject: [RESEND][PATCH] pxa/hx4700: add platform device and I2C info for
-	AK4641 codec
-Message-ID: <1315832560-1561-1-git-send-email-mad_soft@inbox.ru>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 12 Sep 2011 16:05:14 +0200
+Subject: [PATCH 1/2] mmc: core: clarify how to use post_req in case of
+	errors
+In-Reply-To: <1314624959-4634-2-git-send-email-per.forlin@linaro.org>
+References: <1314624959-4634-1-git-send-email-per.forlin@linaro.org>
+	<1314624959-4634-2-git-send-email-per.forlin@linaro.org>
+Message-ID: <CACRpkdZJq1C4TyXbW7WuV3xgC1AhV-3aL0L8+svrPYi_FhT_Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also rename AK4641 power GPIOs to document the codec chip.
+On Mon, Aug 29, 2011 at 3:35 PM, Per Forlin <per.forlin@linaro.org> wrote:
 
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
-Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
----
- arch/arm/mach-pxa/hx4700.c              |   25 +++++++++++++++++++++++++
- arch/arm/mach-pxa/include/mach/hx4700.h |    4 ++--
- 2 files changed, 27 insertions(+), 2 deletions(-)
+> The err condition in post_req() is set to undo a call made
+> to pre_req() that hasn't been started yet.
+> The err condition is not set if an MMC request returns error.
+>
+> Signed-off-by: Per Forlin <per.forlin@linaro.org>
 
-Most of the audio support for iPAQ hx4700 has been merged in 3.0, but
-this little patch with platform glue has been lost somehow and never applied.
-So here's resend - hope this time it'll be more lucky.
+Comments look correct so:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Patch is against current Linus' tree (3.1-rc5+). Please ping me, if it needs
-rebasing on top of something else.
-
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index c748a47..b23b746 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -45,6 +45,7 @@
- #include <mach/hx4700.h>
- #include <mach/irda.h>
- 
-+#include <sound/ak4641.h>
- #include <video/platform_lcd.h>
- #include <video/w100fb.h>
- 
-@@ -765,6 +766,28 @@ static struct i2c_board_info __initdata pi2c_board_info[] = {
- };
- 
- /*
-+ * Asahi Kasei AK4641 on I2C
-+ */
-+
-+static struct ak4641_platform_data ak4641_info = {
-+	.gpio_power = GPIO27_HX4700_AK4641_POWER,
-+	.gpio_npdn  = GPIO109_HX4700_AK4641_nPDN,
-+};
-+
-+static struct i2c_board_info i2c_board_info[] __initdata = {
-+	{
-+		I2C_BOARD_INFO("ak4641", 0x12),
-+		.platform_data = &ak4641_info,
-+	},
-+};
-+
-+static struct platform_device audio = {
-+	.name	= "hx4700-audio",
-+	.id	= -1,
-+};
-+
-+
-+/*
-  * PCMCIA
-  */
- 
-@@ -790,6 +813,7 @@ static struct platform_device *devices[] __initdata = {
- 	&gpio_vbus,
- 	&power_supply,
- 	&strataflash,
-+	&audio,
- 	&pcmcia,
- };
- 
-@@ -827,6 +851,7 @@ static void __init hx4700_init(void)
- 	pxa_set_ficp_info(&ficp_info);
- 	pxa27x_set_i2c_power_info(NULL);
- 	pxa_set_i2c_info(NULL);
-+	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
- 	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
- 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
- 	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
-diff --git a/arch/arm/mach-pxa/include/mach/hx4700.h b/arch/arm/mach-pxa/include/mach/hx4700.h
-index 3740844..73cd586 100644
---- a/arch/arm/mach-pxa/include/mach/hx4700.h
-+++ b/arch/arm/mach-pxa/include/mach/hx4700.h
-@@ -29,7 +29,7 @@
- #define GPIO14_HX4700_nWLAN_IRQ			14
- #define GPIO18_HX4700_RDY			18
- #define GPIO22_HX4700_LCD_RL			22
--#define GPIO27_HX4700_CODEC_ON			27
-+#define GPIO27_HX4700_AK4641_POWER		27
- #define GPIO32_HX4700_RS232_ON			32
- #define GPIO52_HX4700_CPU_nBATT_FAULT		52
- #define GPIO58_HX4700_TSC2046_nPENIRQ		58
-@@ -67,7 +67,7 @@
- #define GPIO105_HX4700_nIR_ON			105
- #define GPIO106_HX4700_CPU_BT_nRESET		106
- #define GPIO107_HX4700_SPK_nSD			107
--#define GPIO109_HX4700_CODEC_nPDN		109
-+#define GPIO109_HX4700_AK4641_nPDN		109
- #define GPIO110_HX4700_LCD_LVDD_3V3_ON		110
- #define GPIO111_HX4700_LCD_AVDD_3V3_ON		111
- #define GPIO112_HX4700_LCD_N2V7_7V3_ON		112
--- 
-1.7.5.1.300.gc565c
+Thanks,
+Linus Walleij
