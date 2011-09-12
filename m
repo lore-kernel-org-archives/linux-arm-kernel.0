@@ -1,92 +1,38 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 12 Sep 2011 08:13:24 +0800
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <1315756781.2246.1.camel@vkoul-mobl4>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
-	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
-	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
-	<CABb+yY3F+DMn2SxeO0chjpiMBkgLvSK5EVYMdhQsfQoZNZ4_7Q@mail.gmail.com>
-	<CAGsJ_4xDh6c5=Uhw9zO34XeY5UNC=fLuRubryks6NOv3T5_kCQ@mail.gmail.com>
-	<1315756781.2246.1.camel@vkoul-mobl4>
-Message-ID: <CAGsJ_4yQvpXdM4dU5virnQ7BeDZNwt=HEkRNiqJ_r89KksKutQ@mail.gmail.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Mon, 12 Sep 2011 11:01:14 +0930
+Subject: [RFC 1/2] virtio: Add AMBA bus driver for virtio device
+In-Reply-To: <1314966257-7503-2-git-send-email-pawel.moll@arm.com>
+References: <1314966257-7503-1-git-send-email-pawel.moll@arm.com>
+	<1314966257-7503-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <877h5e5yxp.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/11 Vinod Koul <vkoul@infradead.org>:
-> On Thu, 2011-09-08 at 14:36 +0800, Barry Song wrote:
->> 2011/9/8 Jassi Brar <jassisinghbrar@gmail.com>:
->> > On Thu, Sep 8, 2011 at 8:47 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> >> On Thu, Sep 8, 2011 at 7:42 AM, Barry Song <21cnbao@gmail.com> wrote:
->> >>
->> >>>>> it is much different with primacell based DMA like pl080, pl330.
->> >>>>> prima2 has a self-defined DMAC IP. basically it is a 2D mode dma with
->> >>>>> two scales X and Y and direct way to start and stop DMA.
->> >>>>> every channel has fixed function to serve only one perpheral. so you
->> >>>>> find we have a filter id.
->> >>>> okay, what do you mean by 2D mode? Is it similar to what TI folks, Linus
->> >>>> W and Jassi Brar posted RFC's on?
->> >>>
->> >>> In SiRFprimaII 2-D DMA, the system memory space is interpreted
->> >>> as a 2-D layout instead of a linear 1-D layout. More specifically, the
->> >>> system memory can be considered as
->> >>> multiple data lines. The length of the data line is determined by the
->> >>> user-selected DMA_WIDTH register.
->> >>> The user can specify a data window that the user wants to access using
->> >>> four parameters:
->> >>> ? Start address
->> >>> ? X length
->> >>> ? Y length
->> >>> ? Width
->> >>>
->> >>> The idea of a 2-D DMA is shown in figure 2d-dma.png attached.
->> >>>
->> >>> If you specifies the Y length as 0 or the X length equals to the DMA
->> >>> width, then this 2-D DMA reduces to
->> >>> 1-D. If the user configures the X length greater than the DMA width,
->> >>> then the extra data is wrapped around
->> >>> to the next data line, this may corrupt the DMA transfer for
->> >>> multiple-line 2-D DMA. If this is a 1-D DMA, then
->> >>> there is no issue. The attached diagram 2d-dma2.png shows the
->> >>> wrap-around of the extra data in case the X length
->> >>> greater than DMA width.
->> >>
->> >> Sorry, the role of DMA_WIDTH is not clear to me yet.
->> >> In which case the user _must_ set {xlen > width} ?
->> >>
->> > Perhaps 2d-dma.PNG is inaccurate - it shouldn't depict any deltaX.
->> > Doesn't xlen and width always start together ? If no, please don't read ahead.
->> >
->> > According to figures, {xlen > width} is to be set _only_ when a transfer
->> > is divided into _exactly_ two chunks separated by gap _exactly_
->> > equal to length of the second chunk (an extremely rare case).
->>
->> Sorry i didn't list related full information in datasheet in my early reply.
->> we don't have the case of xlen > dma_width.
-> But is it theoretically possible or just an error case?? Looks like its
-> latter, right?
+On Fri,  2 Sep 2011 13:24:16 +0100, Pawel Moll <pawel.moll@arm.com> wrote:
+> This patch, based on virtio PCI driver, adds support for virtio
+> AMBA device. This should allow environments like qemu to use
+> virtio-based block & network devices.
 
-hardware can do since it doesn't require xlen must be less than or
-equel with dma_width. but it is a wrong case in fact as prima2
-datasheet has said.
+Cool work!  I like the concept, but a few implementation notes below:
 
-it does exist a case cpu read same address (by volatile keyword or
-memory barrier), for example, polling. it totally intends to control
-some software execute  thread.
-but it doesn't exist a case dma read overlapped address in just a dma
-cycle since we bacically can't control when and where the dma will go
-to hold bus. data transferred by dma is generically not related with
-program switch and execution thread.
-we do want the overlap and same memory is tranferred again, it should
-be in another dma cycle with our instruction in software.
+> + * offset width name          description
+> + * ------ ----- ------------- -----------------
+> + *
+> + *  0x000   32  HostFeatures  Features supported by the host
+> + *  0x004   32  GuestFeatures Features activated by the guest
 
->
-> --
-> ~Vinod Koul
-> Intel Corp.
->
->
+You need to make these at least 64 bits.  Lguest makes them variable
+width, in fact.
 
--barry
+> + *  0x008   32  QueuePFN      PFN for the currently selected queue
+> + *  0x00c   32  QueueNum      Queue size for the currently selected queue
+
+You should, I believe, seriously consider allowing the guest to set the
+queue size, rather than the host (perhaps the host could suggest one,
+but the guest should be able to override it).
+
+Anthony or Michael might suggest other changes, since they are most
+familiar with virtio_pci limitations...
+
+Cheers,
+Rusty.
