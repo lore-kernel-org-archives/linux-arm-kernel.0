@@ -1,31 +1,53 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 12 Sep 2011 13:27:50 +0800
-Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
-	initialization functions
-In-Reply-To: <CACRpkdZvb_y6m-uiFu-wMt5XR-UcZGRWUDGrgMFJ9ySzj6VAOA@mail.gmail.com>
+Date: Mon, 12 Sep 2011 13:41:41 +0800
+Subject: [PATCH v2 0/2] make reinitialization of ARM core components
+	possible
+In-Reply-To: <4E65B71E.6060307@ti.com>
 References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
-	<CACRpkdZvb_y6m-uiFu-wMt5XR-UcZGRWUDGrgMFJ9ySzj6VAOA@mail.gmail.com>
-Message-ID: <20110912052749.GD1258@S2100-06.ap.freescale.net>
+	<4E65B71E.6060307@ti.com>
+Message-ID: <20110912054140.GE1258@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2011 at 09:19:03AM +0200, Linus Walleij wrote:
-> On Tue, Sep 6, 2011 at 7:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Tue, Sep 06, 2011 at 11:31:02AM +0530, Santosh wrote:
+> On Tuesday 06 September 2011 11:18 AM, Shawn Guo wrote:
+> >When ARM core resumes from low-power mode where losing power, for my
+> >example: CA-9 MPCore resumes from Dormant/Shutdown, we have to
+> >reinitialize components like L2 Cache, GIC and SCU to bring system
+> >back to work.
+> >
+> I think you mean to drop GIC from above as well.
 > 
-> > The patch removes __init annotation from a few initialization
-> > functions to make the reinitialization possible. ?For example,
-> > platform resume function can call l2x0_of_init() to get L2 cache
-> > back to work.
+> >The patch set basically removes __init annotation from a bunch of
+> >initialization functions, so that platform resume procedure can call
+> >into them again to set those components up.
+> >
+> >Changes since v1:
+> >  * Drop the GIC patch, as it's been handled by [1] nicely.
+> >  * Drop the change of adding empty l2x0_of_init(), as it's been
+> >    handled by [2].
+> >
+> >Shawn Guo (2):
+> >       ARM: cache-l2x0: remove __init annotation from initialization functions
+> Do you really need to do a re-init function for L2.
+> Look at the OMAP code, You just need to restore the configuration
+> registers and that's it. And the save can be done only once because
+> these are configuration register which won't change in the live system.
 > 
-> This will collide with patch 7080/1:
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7080/1
+OMAP and IMX6Q retains L2 cache, we have to go save/restore approach
+to work with generic cpu_suspend/resume routines.  But for platforms
+that will power off L2 during suspend, I think re-init is the easiest
+way for them get L2 back to work.
+
+> >       ARM: smp_scu: remove __init annotation from scu_enable()
+> >
+> This init is really small one so should be ok but I still feel a
+> simple register restore is better.
 > 
-> Before you put it into the patch tracker can you please rebase it
-> on that patch and also remove the __init tag from the
-> l2x0_unlock() function?
-> 
-Yes, will do, if rmk asks me to put the patch into patch tracker.
+Obviously, some people would disagree that.  We can see that function
+exynos4_scu_enable() found in arch/arm/mach-exynos4/pm.c is a direct
+copy of scu_enable().  We can save code duplication in platforms by
+simply remove the __init annotation from scu_enable().
 
 -- 
 Regards,
