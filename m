@@ -1,111 +1,47 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 12 Sep 2011 10:55:30 -0400 (EDT)
-Subject: [PATCH v2 2/3] ARM: iwmmxt: Port problematic iwmmxt support code
-	to v7/Thumb-2
-In-Reply-To: <20110912143708.GB2020@arm.com>
-References: <1315497854-13311-1-git-send-email-dave.martin@linaro.org>
-	<1315497854-13311-3-git-send-email-dave.martin@linaro.org>
-	<201109081845.58260.arnd@arndb.de>
-	<CAMPhdO82ho2WPrJ3irwLgfPOycQt=kyqK3hhtrLCjOw1vptTrg@mail.gmail.com>
-	<20110908172002.GG2070@arm.com>
-	<CAMPhdO9USGfrpgR0fXUL6024qWGLqsS72vzaO6AH1oo-TW1RtA@mail.gmail.com>
-	<1315562102.7961.5.camel@linaro1>
-	<alpine.LFD.2.00.1109090919170.20358@xanadu.home>
-	<20110909164123.GB3069@arm.com>
-	<alpine.LFD.2.00.1109091339540.20358@xanadu.home>
-	<20110912143708.GB2020@arm.com>
-Message-ID: <alpine.LFD.2.00.1109121044410.20358@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Sep 2011 17:15:36 +0200
+Subject: [GIT PULL] CSR prima2 changes for next
+In-Reply-To: <CAGsJ_4xv3eeZtp_GEnifk3MpF=gaNRe=wVzLiojo=Jgy4qRePA@mail.gmail.com>
+References: <CAGsJ_4xv3eeZtp_GEnifk3MpF=gaNRe=wVzLiojo=Jgy4qRePA@mail.gmail.com>
+Message-ID: <201109121715.37886.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Sep 2011, Dave Martin wrote:
-
-> On Fri, Sep 09, 2011 at 01:51:30PM -0400, Nicolas Pitre wrote:
-> > On Fri, 9 Sep 2011, Dave Martin wrote:
-> > 
-> > > On Fri, Sep 09, 2011 at 09:21:28AM -0400, Nicolas Pitre wrote:
-> > > > On Fri, 9 Sep 2011, Jon Medhurst (Tixy) wrote:
-> > > > 
-> > > > > On Thu, 2011-09-08 at 11:49 -0700, Eric Miao wrote:
-> > > > > > So the problem is really when compiling this file with existing toolchain,
-> > > > > > it's downgrading to v5 compatible mode, and the instruction below
-> > > > > > 
-> > > > > > sub pc, lr, r1, lsr #32
-> > > > > > 
-> > > > > > wouldn't be encoded when building a THUMB2 kernel. Considering the
-> > > > > > r1, lsr #32 is actually to create an explicit data dependency of the previous
-> > > > > > co-processor instruction, would it be one option to rewrite this as something
-> > > > > > like:
-> > > > > > 
-> > > > > > mov r1, r1
-> > > > > > mov pc, lr
-> > > > > 
-> > > > > That doesn't include a data dependency of PC on R1, so it's possible for
-> > > > > MOV PC, LR and subsequent instructions to be executed before MOV R1, R1
-> > > > > has completed. We would want...
-> > > > > 
-> > > > > add lr, lr, r1, lsr #32
-> > > > > mov pc, lr
-> > > > 
-> > > > But isn't the first insn unavailable with Thumb2?
-> > > > 
-> > > > Maybe something like:
-> > > > 
-> > > > 	sub	r1, r1, r1
-> > > > 	add	pc, lr, r1
-> > > 
-> > > Thumb-2 implies v7, the v7 implies that we have (and need) a real ISB.  So for the
-> > > Thumb-2 case, this should always become
-> > > 
-> > > 	isb
-> > 
-> > Don't forget that here we are talking about the Marvell implementation.  
-> > Since I've no doubt that the real isb certainly works, so far the 
-> > advertized isb has always been implemented with a CP readback with a 
-> > data dependency.  Don't forget that this CPU core can also pretend to be 
-> > an ARMv6 and they probably didn't duplicate the whole instruction 
-> > decoder for each modes.
+On Sunday 11 September 2011, Barry Song wrote:
+> Hi Arnd,
+> can you please pull the 1st patchset of CSR prima2 for next? most of
+> them are minor changes except that rtciobrg is new stuff.
 > 
-> If the isb instruction doesn't work for this in v7 mode, I think that
-> would be an architecture violation, but you're right that this may
-> not be available, or may not behave identically, when the CPU is
-> behaving like a v6 part.
-
-I'm sure isb is available in ARMv7 mode.
-
-What I'm saying is that the advertised trick for ARMv6 mode certainly 
-must work just as well here in ARMv7 mode.
-
-> > So I really doubt the Marvell implementation would behave any 
-> > differently if this special isb is expressed in terms of Thumb2 rather 
-> > than ARM instructions as the backend is certainly common to all the 
-> > modes. If we can use the same implementation for all modes then we'll 
-> > just simplify maintenance of this code.
+> The following changes since commit ddf28352b80c86754a6424e3a61e8bdf9213b3c7:
+>   Linus Torvalds (1):
+>         Linux 3.1-rc5
 > 
-> Agreed, but the trouble is that what constitutes a suitable data
-> dependency is completely microarchitecture dependent -- we're relying
-> on side-effects outside the architecture here.
-
-Sure.  But what is there now is what is documented by Marvell docs i.e. 
-create a data dependency on the register used to read back the CP value.  
-I've seen a few implementation variations on that theme too.
-
-> We can't code _exactly_ the same thing in Thumb-2 because of restrictions
-> in the instruction set, so we have to settle for something that "looks
-> similar" -- but there's no guarantee it will work.
+> are available in the git repository at:
 > 
-> Do you feel your judgement on this is authoritative?  If so, then
-> we can go ahead with your suggestion; otherwise we might need input
-> from someone else.
+>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git for-arnd
+> 
+> Barry Song (3):
+>       ARM: CSR: add lost Resource Sharing Control(RSC) node in dts
+>       ARM: CSR: extend the compatibility of gpio controller to pinmux in dts
+>       ARM: CSR: IRQ: add simple irq_domain so that hw irq can map to Linux
+> 
+> Jamie Iles (1):
+>       ARM: CSR: add missing sentinels to of_device_id tables
+> 
+> Zhiwu Song (1):
+>       ARM: CSR: add rtc i/o bridge interface for SiRFprimaII
+> 
 
-My suggestion would be what Tixy also proposed:
+Ok, pulled into the new arm-soc.git mirror on git.linaro.org.
 
-	mrc	p15, 0, r1, c2, c0, 0
-	add	lr, lr, r1, lsr #32
-	mov	pc, lr
+I have taken the patch from Jamie into the 'fixes' branch and will submit
+that for 3.1 unless there are complaints. The other patches are now in the
+'next/devel' branch and queued for 3.2.
 
-Running this past people still at Marvell (I'm not anymore) wouldn't 
-hurt of course.
+Please try to categorize your patches (bug fixes, general enhancements,
+cleanups, new features, ...) in the future so I can directly pull
+into the respective branches.
 
+Thanks,
 
-Nicolas
+	Arnd
