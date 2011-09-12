@@ -1,69 +1,116 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Mon, 12 Sep 2011 12:52:52 +0200
-Subject: [PATCH] Add platform driver support to the CS890x driver
-In-Reply-To: <20110911185312.GD28624@pengutronix.de>
-References: <1315390967-6683-1-git-send-email-jaccon.bastiaansen@gmail.com>
-	<20110907125047.GU28816@pengutronix.de>
-	<CAGzjT4f3VDL-rDzup4kSc11eCdhR9s7fxf8RYNjEZmK9Rk50Cw@mail.gmail.com>
-	<20110910141244.GQ28816@pengutronix.de>
-	<CAGzjT4f2agA30TGb8XFSRu57=--qyBt=bU5QWVTmU6LAGmwM8A@mail.gmail.com>
-	<20110911185312.GD28624@pengutronix.de>
-Message-ID: <CAGzjT4ce0gZ2e6cM1PfUb9JkZ=52PUCjPz1C9qjjRYxgSJckbQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Sep 2011 11:56:03 +0100
+Subject: [RFC PATCH v3 1/3] ARM: SoC: Introduce per SoC descriptor
+In-Reply-To: <1315824965-8485-1-git-send-email-marc.zyngier@arm.com>
+References: <1315824965-8485-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1315824965-8485-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Uwe,
+The ARM core code expects the various SoCs to hide their
+implementation differences behind a well established API.
+The various sub-arch-specific bit are often either at
+the machine descriptor level, or provided at link time
+by the sub-arch code.
 
-2011/9/11 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Jaccon,
->
-> On Sun, Sep 11, 2011 at 07:34:25PM +0200, Jaccon Bastiaansen wrote:
->> >> > hmm, better switch the complete driver to be a platform driver and
->> >> > instead of the legacy probing let it create the corresponding device.
->> >> >
->> >>
->> >> What exactly do you mean with "switch the complete driver to be a
->> >> platform driver"? That I should remove all the legacy from the driver
->> >> (which would break the driver for users who don't use it as a platform
->> >> driver) or that I should add a new probe() function free of legacy
->> >> (which would duplicate code of the existing cs89x0_probe1() function)?
->> > Of course you should not break it for legacy users. Just instead of the
->> > legacy stuff just add a platform device with the respective values such
->> > that the platform driver is used in all cases.
->> >
->> > For extra points move the adding of the device to platform code.
->> >
->>
->> The platform device you mention is added by another patch that I also
->> sent on the the 7th of September (not directly to you, but to Sascha
->> and kernel at pengutronix.de). This patch was called:
->>
->> [PATCH] Add CS890x0 ethernet controller support to the i.MX21ADS
->>
->> In this patch I add a platform device to the i.MX21ADS evaluation
->> board. All the required settings (memory address and IRQ) that the
->> CS890x platform driver needs to run on the i.MX21ADS board are set in
->> the i.MX21ADS specific code. You find the patch below. It this the
->> approach you mean?
-> not really. On some machines (e.g arm/imx/mx31ads) some magic constants
-> are defined somewhere in arch/ to fill in netcard_portlist and
-> cs8900_irq_map. On these machines the cs8900 driver does drive some
-> hardware, but not via the platform bus. This is what i want to have
-> changed.
->
+The SoC descriptor is a container that holds the SoC
+specific bits that can be moved away from the machine
+descriptor as well as an indirection point for the
+global symbols (SMP and CPU hotplug support, for example).
 
-Ok, so you would like to see the #ifdefs for the IXDP2351, IXDP2X01,
-QQ2440 and MX31ADS in the cs890x driver replaced by platform_device
-definitions in the platform specific code of those platforms (in the
-same way as I have done for the i.MX21ADS platform)? Is this correct?
+This patch introduce this SoC descriptor, with the only field
+being the name of the SoC.
 
-> Best regards
-> Uwe
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
->
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/mach/arch.h |    2 ++
+ arch/arm/include/asm/soc.h       |   21 +++++++++++++++++++++
+ arch/arm/kernel/setup.c          |    9 +++++++++
+ 3 files changed, 32 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/soc.h
 
-Regards,
-  Jaccon
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 727da11..82883ca 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -13,6 +13,7 @@
+ struct tag;
+ struct meminfo;
+ struct sys_timer;
++struct arm_soc_desc;
+ 
+ struct machine_desc {
+ 	unsigned int		nr;		/* architecture number	*/
+@@ -34,6 +35,7 @@ struct machine_desc {
+ 	unsigned int		reserve_lp1 :1;	/* never has lp1	*/
+ 	unsigned int		reserve_lp2 :1;	/* never has lp2	*/
+ 	unsigned int		soft_reboot :1;	/* soft reboot		*/
++	struct arm_soc_desc	*soc;		/* SoC descriptor	*/
+ 	void			(*fixup)(struct machine_desc *,
+ 					 struct tag *, char **,
+ 					 struct meminfo *);
+diff --git a/arch/arm/include/asm/soc.h b/arch/arm/include/asm/soc.h
+new file mode 100644
+index 0000000..ce92784
+--- /dev/null
++++ b/arch/arm/include/asm/soc.h
+@@ -0,0 +1,21 @@
++/*
++ *  linux/arch/arm/include/asm/soc.h
++ *
++ *  Copyright (C) 2011 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARM_SOC_H
++#define __ASM_ARM_SOC_H
++
++struct arm_soc_desc {
++	const char		*name;
++};
++
++extern const struct arm_soc_desc	*soc_desc;
++
++#endif	/* __ASM_ARM_SOC_H */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 192a24f..6bfa5f6 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -45,6 +45,7 @@
+ #include <asm/cachetype.h>
+ #include <asm/tlbflush.h>
+ #include <asm/system.h>
++#include <asm/soc.h>
+ 
+ #include <asm/prom.h>
+ #include <asm/mach/arch.h>
+@@ -140,6 +141,8 @@ static const char *cpu_name;
+ static const char *machine_name;
+ static char __initdata cmd_line[COMMAND_LINE_SIZE];
+ struct machine_desc *machine_desc __initdata;
++const struct arm_soc_desc *soc_desc;
++static struct arm_soc_desc __soc_desc __read_mostly;
+ 
+ static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
+ static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
+@@ -909,6 +912,12 @@ void __init setup_arch(char **cmdline_p)
+ 		mdesc = setup_machine_tags(machine_arch_type);
+ 	machine_desc = mdesc;
+ 	machine_name = mdesc->name;
++	if (mdesc->soc) {
++		__soc_desc = *mdesc->soc;
++		soc_desc = &__soc_desc;
++		pr_info("SoC: %s\n", soc_desc->name);
++	} else
++		soc_desc = NULL;
+ 
+ 	if (mdesc->soft_reboot)
+ 		reboot_setup("s");
+-- 
+1.7.0.4
