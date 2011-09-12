@@ -1,143 +1,110 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 12 Sep 2011 19:36:47 +0800
-Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level debug
-	uart
-In-Reply-To: <20110912084439.GO31404@pengutronix.de>
+Date: Mon, 12 Sep 2011 19:49:33 +0800
+Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
+In-Reply-To: <20110912094634.GP31404@pengutronix.de>
 References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
-	<20110906202555.GQ28816@pengutronix.de>
-	<20110907110001.GI8148@S2100-06.ap.freescale.net>
-	<20110912084439.GO31404@pengutronix.de>
-Message-ID: <20110912113646.GG1258@S2100-06.ap.freescale.net>
+	<1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
+	<20110912094634.GP31404@pengutronix.de>
+Message-ID: <20110912114932.GH1258@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2011 at 10:44:39AM +0200, Sascha Hauer wrote:
-> On Wed, Sep 07, 2011 at 07:00:02PM +0800, Shawn Guo wrote:
-> > On Tue, Sep 06, 2011 at 10:25:55PM +0200, Uwe Kleine-K?nig wrote:
-> > > On Tue, Sep 06, 2011 at 05:58:36PM +0800, Shawn Guo wrote:
-> > > > It adds the core definitions and low-level debug uart support
-> > > > for imx6q.
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > ---
-> > > >  arch/arm/Kconfig                             |    2 +-
-> > > >  arch/arm/Kconfig.debug                       |    7 +++++
-> > > >  arch/arm/Makefile                            |    1 +
-> > > >  arch/arm/mach-imx/Kconfig                    |    4 +++
-> > > >  arch/arm/mach-imx/Makefile                   |    2 +
-> > > >  arch/arm/mach-imx/Makefile.boot              |    4 +++
-> > > >  arch/arm/mach-imx/lluart.c                   |   33 ++++++++++++++++++++++++++
-> > > >  arch/arm/plat-mxc/Kconfig                    |    5 ++++
-> > > >  arch/arm/plat-mxc/include/mach/debug-macro.S |    5 ++++
-> > > >  arch/arm/plat-mxc/include/mach/entry-macro.S |   15 +++++++++++-
-> > > >  arch/arm/plat-mxc/include/mach/hardware.h    |    1 +
-> > > >  arch/arm/plat-mxc/include/mach/irqs.h        |    9 ++++--
-> > > >  arch/arm/plat-mxc/include/mach/memory.h      |    3 ++
-> > > >  arch/arm/plat-mxc/include/mach/mx6q.h        |   29 ++++++++++++++++++++++
-> > > >  14 files changed, 115 insertions(+), 5 deletions(-)
-> > > >  create mode 100644 arch/arm/mach-imx/lluart.c
-> > > >  create mode 100644 arch/arm/plat-mxc/include/mach/mx6q.h
-> > > > 
-> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > > > index 4ea9974..37c20a4 100644
-> > > > --- a/arch/arm/Kconfig
-> > > > +++ b/arch/arm/Kconfig
-> > > > @@ -1348,7 +1348,7 @@ config SMP
-> > > >  	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
-> > > >  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
-> > > >  		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
-> > > > -		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
-> > > > +		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || SOC_IMX6Q
-> > > >  	select USE_GENERIC_SMP_HELPERS
-> > > >  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
-> > > >  	help
-> > > > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> > > > index 965d59a..68fc155 100644
-> > > > --- a/arch/arm/Kconfig.debug
-> > > > +++ b/arch/arm/Kconfig.debug
-> > > > @@ -155,6 +155,13 @@ choice
-> > > >  		  Say Y here if you want kernel low-level debugging support
-> > > >  		  on i.MX50 or i.MX53.
-> > > >  
-> > > > +	config DEBUG_IMX6Q_UART
-> > > > +		bool "i.MX6Q Debug UART"
-> > > > +		depends on SOC_IMX6Q
-> > > > +		help
-> > > > +		  Say Y here if you want kernel low-level debugging support
-> > > > +		  on i.MX6Q.
-> > > > +
-> > > >  	config DEBUG_S3C_UART0
-> > > >  		depends on PLAT_SAMSUNG
-> > > >  		bool "Use S3C UART 0 for low-level debug"
-> > > > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> > > > index 70c424e..3a0bbe4 100644
-> > > > --- a/arch/arm/Makefile
-> > > > +++ b/arch/arm/Makefile
-> > > > @@ -159,6 +159,7 @@ machine-$(CONFIG_ARCH_MX2)		:= imx
-> > > >  machine-$(CONFIG_ARCH_MX25)		:= imx
-> > > >  machine-$(CONFIG_ARCH_MX3)		:= imx
-> > > >  machine-$(CONFIG_ARCH_MX5)		:= mx5
-> > > > +machine-$(CONFIG_ARCH_MX6)		:= imx
-> > > >  machine-$(CONFIG_ARCH_MXS)		:= mxs
-> > > >  machine-$(CONFIG_ARCH_NETX)		:= netx
-> > > >  machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
-> > > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > > > index 0519dd7..4cf5178 100644
-> > > > --- a/arch/arm/mach-imx/Kconfig
-> > > > +++ b/arch/arm/mach-imx/Kconfig
-> > > > @@ -58,6 +58,10 @@ config SOC_IMX35
-> > > >  	select ARCH_MX35
-> > > >  	select MXC_AVIC
-> > > >  
-> > > > +config SOC_IMX6Q
-> > > > +	bool
-> > > > +	select ARM_GIC
-> > > > +	select CPU_V7
-> > > >  
-> > > >  if ARCH_MX1
-> > > >  
-> > > > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> > > > index e9eb36d..96ecc96 100644
-> > > > --- a/arch/arm/mach-imx/Makefile
-> > > > +++ b/arch/arm/mach-imx/Makefile
-> > > > @@ -61,3 +61,5 @@ obj-$(CONFIG_MACH_MX35_3DS) += mach-mx35_3ds.o
-> > > >  obj-$(CONFIG_MACH_EUKREA_CPUIMX35) += mach-cpuimx35.o
-> > > >  obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD) += eukrea_mbimxsd35-baseboard.o
-> > > >  obj-$(CONFIG_MACH_VPR200) += mach-vpr200.o
-> > > > +
-> > > > +obj-$(CONFIG_DEBUG_LL) += lluart.o
-> > > > diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
-> > > > index ebee18b..389a0e3 100644
-> > > > --- a/arch/arm/mach-imx/Makefile.boot
-> > > > +++ b/arch/arm/mach-imx/Makefile.boot
-> > > > @@ -17,3 +17,7 @@ initrd_phys-$(CONFIG_MACH_MX27)	:= 0xA0800000
-> > > >  zreladdr-$(CONFIG_ARCH_MX3)	:= 0x80008000
-> > > >  params_phys-$(CONFIG_ARCH_MX3)	:= 0x80000100
-> > > >  initrd_phys-$(CONFIG_ARCH_MX3)	:= 0x80800000
-> > > > +
-> > > > +zreladdr-$(CONFIG_SOC_IMX6Q)	:= 0x10008000
-> > > > +params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
-> > > > +initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
-> > > Do you really need params_phys and initrd_phys?
-> > > 
-> > I added them to make IMX6Q look consistent with other soc in the file,
-> > and leave it to a global cleanup, if we decide to clean later.
+On Mon, Sep 12, 2011 at 11:46:34AM +0200, Sascha Hauer wrote:
+> On Tue, Sep 06, 2011 at 05:58:37PM +0800, Shawn Guo wrote:
+> > It adds a number of core drivers support for imx6q, including clock,
+> > General Power Controller (gpc), Multi Mode DDR Controller(mmdc) and
+> > System Reset Controller (src).
+> > 
+> > Signed-off-by: Ranjani Vaidyanathan <ra5478@freescale.com>
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
+> > new file mode 100644
+> > index 0000000..95fdd65
+> > --- /dev/null
+> > +++ b/arch/arm/mach-imx/src.c
+> > @@ -0,0 +1,52 @@
+> > +/*
+> > + * Copyright 2011 Freescale Semiconductor, Inc.
+> > + * Copyright 2011 Linaro Ltd.
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +#include <linux/init.h>
+> > +#include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +#include <asm/unified.h>
+> > +
+> > +#define SRC_SCR				0x000
+> > +#define SRC_GPR1			0x020
+> > +#define BP_SRC_SCR_CORE1_RST		14
+> > +#define BP_SRC_SCR_CORE1_ENABLE		22
+> > +
+> > +static void __iomem *src_base;
+> > +
+> > +void imx_enable_cpu(int cpu, bool enable)
+> > +{
+> > +	u32 mask, val;
+> > +
+> > +	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
+> > +	val = __raw_readl(src_base + SRC_SCR);
+> > +	val = enable ? val | mask : val & ~mask;
+> > +	__raw_writel(val, src_base + SRC_SCR);
+> > +}
+> > +
+> > +void imx_set_cpu_jump(int cpu, void *jump_addr)
+> > +{
+> > +	__raw_writel(BSYM(virt_to_phys(jump_addr)),
+> > +		     src_base + SRC_GPR1 + cpu * 8);
+> > +}
+> > +
+> > +static int __init imx_src_init(void)
+> > +{
+> > +	struct device_node *np;
+> > +
+> > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-src");
+> > +	src_base = of_iomap(np, 0);
+> > +	WARN_ON(!src_base);
+> > +
+> > +	return 0;
+> > +}
+> > +early_initcall(imx_src_init);
 > 
-> I vote to skip params_phys and initrd_phys now. Every recent bootloader
-> does not need them. As the i.MX6 is a new SoC, we have no reason to
-> handle legacy bootloaders. When we want to to a global cleanup for these
-> variables we already know that i.MX6 has no legacy bootloader problems.
-> 
-Ok.
+> What I'm concerned about is that we carefully removed all assumptions
+> about which SoC the code runs on in the past. Now with this patchset
+> many of them come back. Here we have a initcall without any check
+> whether we really run on i.MX6.
 
-> BTW many variables have the name imx6q, I suppose the 'q' is for quad
-> cpu. From the FSL website I know that there are other versions of the
-> i.MX6 planned. Are these variables really imx6q specific? Otherwise
-> please skip the 'q'.
+The "check" has been done on Kconfig level as below.
+
+config SOC_IMX6Q
+        bool "i.MX6 Quad support"
+        select HAVE_IMX_SRC
+
+obj-$(CONFIG_HAVE_IMX_SRC) += src.o
+
+
+> Above we have a imx_enable_cpu function
+> but this is really a imx6 specific function.
+
+I would say this is a imx smp specific function.
+
+> Nevertheless it is called
+> from generic code in arch/arm/mach-imx/platsmp.c.
 > 
-Before other imx6 family SoCs come to world, we really do not know what
-are imx6q specific and what are not.
+> We've been there before and it was hard to remove all the implicit
+> assumptions on which SoC we are on. Please do not reintroduce it.
+> 
+We create platform driver for (talking to) specific device (IP block),
+and select the driver for SoCs that have the device.  Anything wrong
+with this approach?  Or I missed your point here?
 
 -- 
 Regards,
