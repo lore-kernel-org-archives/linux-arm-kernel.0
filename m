@@ -1,49 +1,105 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Sep 2011 14:40:35 +0200
-Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
-In-Reply-To: <20110912123635.GK28624@pengutronix.de>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<20110912114932.GH1258@S2100-06.ap.freescale.net>
-	<20110912123635.GK28624@pengutronix.de>
-Message-ID: <201109121440.35933.arnd@arndb.de>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Mon, 12 Sep 2011 17:02:40 +0400
+Subject: [RESEND][PATCH] pxa/hx4700: add platform device and I2C info for
+	AK4641 codec
+Message-ID: <1315832560-1561-1-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 September 2011, Uwe Kleine-K?nig wrote:
-> On Mon, Sep 12, 2011 at 07:49:33PM +0800, Shawn Guo wrote:
-> > On Mon, Sep 12, 2011 at 11:46:34AM +0200, Sascha Hauer wrote:
-> > > On Tue, Sep 06, 2011 at 05:58:37PM +0800, Shawn Guo wrote:
-> > > > +static int __init imx_src_init(void)
-> > > > +{
-> > > > + struct device_node *np;
-> > > > +
-> > > > + np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-src");
-> > > > + src_base = of_iomap(np, 0);
-> > > > + WARN_ON(!src_base);
-> > > > +
-> > > > + return 0;
-> > > > +}
-> > > > +early_initcall(imx_src_init);
-> > > 
-> > > What I'm concerned about is that we carefully removed all assumptions
-> > > about which SoC the code runs on in the past. Now with this patchset
-> > > many of them come back. Here we have a initcall without any check
-> > > whether we really run on i.MX6.
-> > 
-> > The "check" has been done on Kconfig level as below.
-> > 
-> > config SOC_IMX6Q
-> >         bool "i.MX6 Quad support"
-> >         select HAVE_IMX_SRC
-> > 
-> > obj-$(CONFIG_HAVE_IMX_SRC) += src.o
-> Think multi-SoC-kernel that has SOC_IMX6Q and say SOC_IMX51.
+Also rename AK4641 power GPIOs to document the codec chip.
 
-I think the code is almost ok, since it's only active when there is
-a "fsl,imx6q-src" device node. However, the WARN_ON must be removed
-if we want this to work well on a multi-soc kernel.
+Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+---
+ arch/arm/mach-pxa/hx4700.c              |   25 +++++++++++++++++++++++++
+ arch/arm/mach-pxa/include/mach/hx4700.h |    4 ++--
+ 2 files changed, 27 insertions(+), 2 deletions(-)
 
-The more important point is to ensure that src_base is not being used
-on other SoCs, but that's probably covered as well.
+Most of the audio support for iPAQ hx4700 has been merged in 3.0, but
+this little patch with platform glue has been lost somehow and never applied.
+So here's resend - hope this time it'll be more lucky.
 
-	Arnd
+Patch is against current Linus' tree (3.1-rc5+). Please ping me, if it needs
+rebasing on top of something else.
+
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index c748a47..b23b746 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -45,6 +45,7 @@
+ #include <mach/hx4700.h>
+ #include <mach/irda.h>
+ 
++#include <sound/ak4641.h>
+ #include <video/platform_lcd.h>
+ #include <video/w100fb.h>
+ 
+@@ -765,6 +766,28 @@ static struct i2c_board_info __initdata pi2c_board_info[] = {
+ };
+ 
+ /*
++ * Asahi Kasei AK4641 on I2C
++ */
++
++static struct ak4641_platform_data ak4641_info = {
++	.gpio_power = GPIO27_HX4700_AK4641_POWER,
++	.gpio_npdn  = GPIO109_HX4700_AK4641_nPDN,
++};
++
++static struct i2c_board_info i2c_board_info[] __initdata = {
++	{
++		I2C_BOARD_INFO("ak4641", 0x12),
++		.platform_data = &ak4641_info,
++	},
++};
++
++static struct platform_device audio = {
++	.name	= "hx4700-audio",
++	.id	= -1,
++};
++
++
++/*
+  * PCMCIA
+  */
+ 
+@@ -790,6 +813,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&gpio_vbus,
+ 	&power_supply,
+ 	&strataflash,
++	&audio,
+ 	&pcmcia,
+ };
+ 
+@@ -827,6 +851,7 @@ static void __init hx4700_init(void)
+ 	pxa_set_ficp_info(&ficp_info);
+ 	pxa27x_set_i2c_power_info(NULL);
+ 	pxa_set_i2c_info(NULL);
++	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
+ 	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
+ 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
+ 	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
+diff --git a/arch/arm/mach-pxa/include/mach/hx4700.h b/arch/arm/mach-pxa/include/mach/hx4700.h
+index 3740844..73cd586 100644
+--- a/arch/arm/mach-pxa/include/mach/hx4700.h
++++ b/arch/arm/mach-pxa/include/mach/hx4700.h
+@@ -29,7 +29,7 @@
+ #define GPIO14_HX4700_nWLAN_IRQ			14
+ #define GPIO18_HX4700_RDY			18
+ #define GPIO22_HX4700_LCD_RL			22
+-#define GPIO27_HX4700_CODEC_ON			27
++#define GPIO27_HX4700_AK4641_POWER		27
+ #define GPIO32_HX4700_RS232_ON			32
+ #define GPIO52_HX4700_CPU_nBATT_FAULT		52
+ #define GPIO58_HX4700_TSC2046_nPENIRQ		58
+@@ -67,7 +67,7 @@
+ #define GPIO105_HX4700_nIR_ON			105
+ #define GPIO106_HX4700_CPU_BT_nRESET		106
+ #define GPIO107_HX4700_SPK_nSD			107
+-#define GPIO109_HX4700_CODEC_nPDN		109
++#define GPIO109_HX4700_AK4641_nPDN		109
+ #define GPIO110_HX4700_LCD_LVDD_3V3_ON		110
+ #define GPIO111_HX4700_LCD_AVDD_3V3_ON		111
+ #define GPIO112_HX4700_LCD_N2V7_7V3_ON		112
+-- 
+1.7.5.1.300.gc565c
