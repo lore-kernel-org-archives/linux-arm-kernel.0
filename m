@@ -1,62 +1,23 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 12 Sep 2011 11:52:06 -0700
-Subject: [PATCH 21/25] OMAP4: PM: Add MPUSS power domain OSWR support
-In-Reply-To: <1315144466-9395-22-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Sun, 4 Sep 2011 19:24:22 +0530")
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-22-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87obypfvah.fsf@ti.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 13 Sep 2011 00:27:48 +0530
+Subject: [PATCH v3 1/6] DMA: PL330: move filter function into driver
+In-Reply-To: <1315852165-32402-2-git-send-email-thomas.abraham@linaro.org>
+References: <1315852165-32402-1-git-send-email-thomas.abraham@linaro.org>
+	<1315852165-32402-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CABb+yY0Z5qH5TDAr+5mthzH8pdTu3Gfrzk9CLRWiJQ4n15eKEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-
-> This patch adds the MPUSS OSWR (Open Switch Retention) support. The MPUSS
-> OSWR configuration is as below.
-> 	- CPUx L1 and logic lost, MPUSS logic lost, L2 memory is retained
+On Mon, Sep 12, 2011 at 11:59 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> The dma channel selection filter function is moved from plat-samsung
+> into the pl330 driver. In additon to that, a check is added in the
+> filter function to ensure that the channel on which the filter has
+> been invoked is pl330 channel instance (and avoid any incorrect
+> access of chan->private in a system with multiple types of DMA
+> drivers).
 >
-> OMAP4460 onwards, MPUSS power domain doesn't support OFF state any more
-> anymore just like CORE power domain. The deepest state supported is OSWR.
-> On OMAP4430 secure devices too, MPUSS off mode can't be used because of
-> a bug which alters Ducati and Tesla states. Hence MPUSS off mode as an
-> independent state isn't supported on OMAP44XX devices.
->
-> Ofcourse when MPUSS power domain transitions to OSWR along
-> with device off mode, it eventually hits off state since memory
-> contents are lost.
->
-> Hence the MPUSS off mode independent state is not attempted without
-> device off mode. All the necessary infrastructure code for MPUSS
-> off mode is in place as part of this series.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
+> Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-Compile failure for the !CONFIG_PM case:
-
-[...]
-
-> @@ -70,11 +71,18 @@ static inline int omap4_mpuss_init(void)
->  {
->  	return 0;
->  }
-> -
-> +static inline u32 omap4_mpuss_read_prev_context_state(void)
-> +{
-> +	return 0;
-> +}
-
-added here
-
->  static inline int omap4_finish_suspend(unsigned long cpu_state)
->  {}
->  static inline void omap4_cpu_resume(void)
->  {}
-> +static inline u32 omap4_mpuss_read_prev_context_state(void)
-> +{
-> +	return 0;
-> +}
-
-same thing added here
-
-Kevin
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
