@@ -1,71 +1,69 @@
 From: govindraj.ti@gmail.com (Govindraj)
-Date: Mon, 12 Sep 2011 12:04:41 +0530
-Subject: [PATCH v4 10/11] OMAP: Serial: Allow UART parameters to be
-	configured from board file.
-In-Reply-To: <87zkidtttm.fsf@ti.com>
+Date: Mon, 12 Sep 2011 12:07:05 +0530
+Subject: [PATCH v4 09/11] OMAP2+: Serial: Use prepare and resume calls to
+	gate uart clocks
+In-Reply-To: <87ehzpv8wq.fsf@ti.com>
 References: <1315400013-4849-1-git-send-email-govindraj.raja@ti.com>
-	<1315400013-4849-11-git-send-email-govindraj.raja@ti.com>
-	<87zkidtttm.fsf@ti.com>
-Message-ID: <CAAL8m4x6uNKu9tTxj8L4HkrsFhigJ_mxOg+NMGcAk__aCg8VZA@mail.gmail.com>
+	<1315400013-4849-10-git-send-email-govindraj.raja@ti.com>
+	<87ehzpv8wq.fsf@ti.com>
+Message-ID: <CAAL8m4xtrpkWUZYEkcMGdttzwHEC-q72FDcLYLa6hFWjpjQ_0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 10, 2011 at 12:41 AM, Kevin Hilman <khilman@ti.com> wrote:
+On Sat, Sep 10, 2011 at 12:29 AM, Kevin Hilman <khilman@ti.com> wrote:
 > "Govindraj.R" <govindraj.raja@ti.com> writes:
 >
->> The following UART parameters are defined within the UART driver:
+>> Currently we are using uart prepare and resume calls to gate uart clocks
+>> retaining the same method.
 >>
->> 1). Whether the UART uses DMA (dma_enabled), by default set to 0
->> 2). The size of dma buffer (set to 4096 bytes)
->> 3). The time after which the dma should stop if no more data is received.
->> 4). The auto suspend delay that will be passed for pm_runtime_autosuspend
->> ? ? where uart will be disabled after timeout
->>
->> Different UARTs may be used for different purpose such as the console,
->> for interfacing bluetooth chip, for interfacing to a modem chip, etc.
->> Therefore, it is necessary to be able to customize the above settings
->> for a given board on a per UART basis.
->>
->> This change allows these parameters to be configured from the board file
->> and allows the parameters to be configured for each UART independently.
->>
->> If a board does not define its own custom parameters for the UARTs, then
->> use the default parameters in the structure "omap_serial_default_info".
->> The default parameters are defined to be the same as the current settings
->> in the UART driver to avoid breaking the UART for any board. By default,
->> make all boards use the default UART parameters.
->>
->> Signed-off-by: Deepak K <deepak.k@ti.com>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>> More details on reason to retain this design is provided here:
+>> http://www.spinics.net/lists/linux-serial/msg04128.html
 >
-> Who is the author of this patch? ?The first version says Jon[1], v2 says
-> Deepak[2]. ?Either way, please ensure proper authorship is attributed
-> using From: at the beginning of the changelog. ?(git-format-patch will
-> do this for you when the authorship is correct in the git history.)
->
-> Even better would be to summarize the changes since the first version
-> after the '---' so it would be clearer why the authorship was changed.
->
-> Only 1/3 of my comments from v3 were addressed in this version. ?Please
-> re-read my comments there[3].
+> This type of thing can go after the '---' since it doesn't belong in the
+> permanent git history.
 >
 
-Will fix this and repost.
+Okay.
+
+>> Since prepare and resume hooks are moved to driver itself we can just use
+>> a single prepare and resume call. As in driver we traverse on number of uart
+>> instance and handle it accordingly.
+>
+> Some important functionality has been removed (and not documented.)
+> Namely, the current code checks the next power when deciding whether or
+> not to call prepare_idle, and vice versa for resume_idle.
+>
+> It's quite possible that it is no longer needed with the runtime PM
+>
+>> In 34xx uart can wakeup using module level PM_WKEN or IO PAD wakeup use
+>> resume_call from prcm irq handler to wakeup uart, based on chk_wakeup_status
+>> from io_pad or PM_WKST.
+>
+> IMO, this patch should just replace the mulitple calls with a single
+> call, but still in the idle path.
+>
+
+Yes fine, will make resume from prcm_irq a separate patch.
+
+> Using the PRCM IRQ handler should be a separate patch with it's own
+> changelog.
+>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>
+> Also, moving these calls to the driver means that the driver cannot be
+> built as a module:
+>
+> arch/arm/mach-omap2/built-in.o: In function `omap2_enter_full_retention':
+> /work/kernel/omap/pm/arch/arm/mach-omap2/pm24xx.c:141: undefined reference to `omap_uart_prepare_idle'
+> /work/kernel/omap/pm/arch/arm/mach-omap2/pm24xx.c:148: undefined reference to `omap_uart_resume_idle'
+> arch/arm/mach-omap2/built-in.o: In function `prcm_clear_mod_irqs':
+> /work/kernel/omap/pm/arch/arm/mach-omap2/pm34xx.c:213: undefined reference to `omap_uart_resume_idle'
+> arch/arm/mach-omap2/built-in.o: In function `omap_sram_idle':
+> /work/kernel/omap/pm/arch/arm/mach-omap2/pm34xx.c:390: undefined reference to `omap_uart_prepare_idle'
+>
+
+Will check and fix this in next version.
 
 --
 Thanks,
 Govindraj.R
-
-
-> Kevin
->
->
-> [1] http://marc.info/?l=linux-omap&m=129890257812478&w=2
-> [2] http://marc.info/?l=linux-omap&m=130408096416887&w=2
-> [3] http://marc.info/?l=linux-omap&m=130896078622810&w=2
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
