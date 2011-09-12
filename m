@@ -1,42 +1,168 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Mon, 12 Sep 2011 12:03:01 +0530
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <1315756966.2246.3.camel@vkoul-mobl4>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
-	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
-	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
-	<CABb+yY3F+DMn2SxeO0chjpiMBkgLvSK5EVYMdhQsfQoZNZ4_7Q@mail.gmail.com>
-	<1315518378.6638.2.camel@vkoul-mobl4>
-	<CAGsJ_4xv9+=+=2b=i47P5V5sOQH-GyTMaESwbeHxu439Vx1gLA@mail.gmail.com>
-	<1315756966.2246.3.camel@vkoul-mobl4>
-Message-ID: <CAJe_ZhdTnRSzfRvnAaCy1M-LpAk0FqjNSXRLnQW2ksOS77A+=w@mail.gmail.com>
+From: thomas@shipmail.org (Thomas Hellstrom)
+Date: Mon, 12 Sep 2011 08:32:07 +0200
+Subject: [PATCH v4] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
+In-Reply-To: <4E6D278C.6010508@shipmail.org>
+References: <1315568333-6704-1-git-send-email-inki.dae@samsung.com>	<4E6B6E5E.3010702@shipmail.org>
+	<CAF6AEGt70bk8idsG48tmo_hgWY6M9kSNrEqyyLknYVYn83u4Rw@mail.gmail.com>
+	<4E6D278C.6010508@shipmail.org>
+Message-ID: <4E6DA767.9080408@shipmail.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 September 2011 21:32, Vinod Koul <vkoul@infradead.org> wrote:
-> On Fri, 2011-09-09 at 16:18 +0800, Barry Song wrote:
+On 09/11/2011 11:26 PM, Thomas Hellstrom wrote:
+> On 09/10/2011 07:31 PM, Rob Clark wrote:
+>> On Sat, Sep 10, 2011 at 9:04 AM, Thomas 
+>> Hellstrom<thomas@shipmail.org>  wrote:
+>>> On 09/09/2011 01:38 PM, Inki Dae wrote:
+>>>> This patch is a DRM Driver for Samsung SoC Exynos4210 and now enables
+>>>> only FIMD yet but we will add HDMI support also in the future.
+>>>>
+>>>> from now on, I will remove RFC prefix because I think we have got 
+>>>> comments
+>>>> enough.
+>>>>
+>>>> this patch is based on git repository below:
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/airlied/drm-2.6.git,
+>>>> branch name: drm-next
+>>>> commit-id: bcc65fd8e929a9d9d34d814d6efc1d2793546922
+>>>>
+>>>> you can refer to our working repository below:
+>>>> http://git.infradead.org/users/kmpark/linux-2.6-samsung
+>>>> branch name: samsung-drm
+>>>>
+>>>> We tried to re-use lowlevel codes of the FIMD driver(s3c-fb.c
+>>>> based on Linux framebuffer) but couldn't so because lowlevel codes
+>>>> of s3c-fb.c are included internally and so FIMD module of this 
+>>>> driver has
+>>>> its own lowlevel codes.
+>>>>
+>>>> We used GEM framework for buffer management and DMA APIs(dma_alloc_*)
+>>>> for buffer allocation. by using DMA API, we could use CMA later.
+>>>>
+>>>> Refer to this link for CMA(Continuous Memory Allocator):
+>>>> http://lkml.org/lkml/2011/7/20/45
+>>>>
+>>>> this driver supports only physically continuous memory(non-iommu).
+>>>>
+>>>> Links to previous versions of the patchset:
+>>>> v1:<    https://lwn.net/Articles/454380/>
+>>>> v2:<    http://www.spinics.net/lists/kernel/msg1224275.html>
+>>>> v3:<    http://www.gossamer-threads.com/lists/linux/kernel/1423684>
+>>>>
+>>>> Changelog v2:
+>>>> DRM: add DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl command.
+>>>>
+>>>>      this feature maps user address space to physical memory region
+>>>>      once user application requests DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl.
+>>>>
+>>>> DRM: code clean and add exception codes.
+>>>>
+>>>> Changelog v3:
+>>>> DRM: Support multiple irq.
+>>>>
+>>>>      FIMD and HDMI have their own irq handler but DRM Framework can 
+>>>> regiter
+>>>>      only one irq handler this patch supports mutiple irq for 
+>>>> Samsung SoC.
+>>>>
+>>>> DRM: Consider modularization.
+>>>>
+>>>>      each DRM, FIMD could be built as a module.
+>>>>
+>>>> DRM: Have indenpendent crtc object.
+>>>>
+>>>>      crtc isn't specific to SoC Platform so this patch gets a crtc
+>>>>      to be used as common object.
+>>>>      created crtc could be attached to any encoder object.
+>>>>
+>>>> DRM: code clean and add exception codes.
+>>>>
+>>>> Changelog v4:
+>>>> DRM: remove is_defult from samsung_fb.
+>>>>
+>>>>      is_default isn't used for default framebuffer.
+>>>>
+>>>> DRM: code refactoring to fimd module.
+>>>>      this patch is be considered with multiple display objects and
+>>>>      would use its own request_irq() to register a irq handler 
+>>>> instead of
+>>>>      drm framework's one.
+>>>>
+>>>> DRM: remove find_samsung_drm_gem_object()
+>>>>
+>>>> DRM: move kernel private data structures and definitions to driver 
+>>>> folder.
+>>>>
+>>>>      samsung_drm.h would contain only public information for userspace
+>>>>      ioctl interface.
+>>>>
+>>>> DRM: code refactoring to gem modules.
+>>>>      buffer module isn't dependent of gem module anymore.
+>>>>
+>>>> DRM: fixed security issue.
+>>>>
+>>>> DRM: remove encoder porinter from specific connector.
+>>>>
+>>>>      samsung connector doesn't need to have generic encoder.
+>>>>
+>>>> DRM: code clean and add exception codes.
+>>>>
+>>>> Signed-off-by: Inki Dae<inki.dae@samsung.com>
+>>>> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
+>>>> Signed-off-by: SeungWoo Kim<sw0312.kim@samsung.com>
+>>>> Signed-off-by: kyungmin.park<kyungmin.park@samsung.com>
+>>>> ---
+>>>>
+>>>> +static struct drm_ioctl_desc samsung_ioctls[] = {
+>>>> +       DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_CREATE,
+>>>> samsung_drm_gem_create_ioctl,
+>>>> +                       DRM_UNLOCKED | DRM_AUTH),
+>>>>
+>>> Hi!
+>>>
+>>> With reference my previous security comment.
+>>>
+>>> Let's say you have a compromised video player running as a DRM 
+>>> client, that
+>>> tries to repeatedly allocate huge GEM buffers...
+>>>
+>>> What will happen when all DMA memory is exhausted? Will this cause 
+>>> other
+>>> device drivers to see an OOM, or only DRM?
+>>>
+>>> The old DRI model basically allowed any authorized DRI client to 
+>>> exhaust
+>>> video ram or AGP memory, but never system memory. Newer DRI drivers
+>>> typically only allow DRI masters to do that.
+>>> as
+>>>
+>>> I don't think an authorized DRI client should be able to easily exhaust
+>>> resources (DMA memory) used by other device drivers causing them to 
+>>> fail.
+>> I'm not entirely sure what else can be done, other than have a
+>> threshold on max MB allocatable of buffer memory..
+>
+> Yes, I think that's what needs to be done, and that threshold should 
+> be low enough to keep other device drivers running in the worst 
+> allocation case.
+>
+>> In the samsung driver case, he is only allocating scanout memory from
+>> CMA, so the limit will be the CMA region size.. beyond that you can't
+>> get physically contiguous memory.  So I think this driver is safe.
+>
+> It's not really what well-behaved user-space drivers do that should be 
+> a concern, but what compromized application *might* do that is a concern.
 
->> Jassi prefer to use a transfer type instead of a control command.
->> though we will not really change the interleaved setting for every
->> transfer(it is more possible for one device, we will not change the
->> xlen/ylen/dma_width setting in the whole life period), i do believe
->> the transfer type is enough flexible for my possible applications to
->> change xlen, ylen and dma_width in different transfers.
+Hmm. I might have missed your point here. If the buffer allocation ioctl 
+only allows allocating CMA memory, then I agree the driver fits the old 
+DRI security model, as long as no other devices on the platform will 
+ever use CMA.
 
-> Is this usually the assumption or yours is a special case, how about
-> your's Jassi?
+But in that case, there really should be a way for the driver to say 
+"Hey, all CMA memory on this system is mine", in the same way 
+traditional video drivers can claim the VRAM PCI resource.
 
-1) Having type per transfer is more flexible than having to set the type
-     for a channel using a control command. The overhead is negligible
-     because the client reuses the same descriptors with only changed
-     source/destination addresses.
-2) DMA_SLAVE_CONFIG is meant for slave (Mem<->Dev) channels,
-    whereas it is very likely(for multimedia drives) to have such operations
-    Mem->Mem as well.
-3) Someday if people realize we can fold many, if not all, transfer types into
-    one, this api has the potential to be the survivor.
+This is to avoid the possibility that future drivers that need CMA will 
+be vulnerable to DOS-attacks from ill-behaved DRI clients.
 
-That was where my mind was grazing when I chose to do what I did.
+/Thomas
