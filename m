@@ -1,23 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Sep 2011 16:05:14 +0200
-Subject: [PATCH 1/2] mmc: core: clarify how to use post_req in case of
-	errors
-In-Reply-To: <1314624959-4634-2-git-send-email-per.forlin@linaro.org>
+Date: Mon, 12 Sep 2011 16:06:08 +0200
+Subject: [PATCH 2/2] mmc: mmci: simplify err check in mmci_post_request
+In-Reply-To: <1314624959-4634-3-git-send-email-per.forlin@linaro.org>
 References: <1314624959-4634-1-git-send-email-per.forlin@linaro.org>
-	<1314624959-4634-2-git-send-email-per.forlin@linaro.org>
-Message-ID: <CACRpkdZJq1C4TyXbW7WuV3xgC1AhV-3aL0L8+svrPYi_FhT_Qw@mail.gmail.com>
+	<1314624959-4634-3-git-send-email-per.forlin@linaro.org>
+Message-ID: <CACRpkdYq1eWCNtQB9BVJ814MU+m6CBRuOLySPpVAiyj2DpJ2vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Aug 29, 2011 at 3:35 PM, Per Forlin <per.forlin@linaro.org> wrote:
 
-> The err condition in post_req() is set to undo a call made
-> to pre_req() that hasn't been started yet.
-> The err condition is not set if an MMC request returns error.
+> The error condition indicates that mmci_post_request() should cleanup
+> after the mmci_pre_request(). In this case the resources allocated by
+> device_prep_slave_sg() are freed by calling dmaengine_terminate_all().
+> dma_unmap_sg() should always be performed if the host_cookie is set.
 >
 > Signed-off-by: Per Forlin <per.forlin@linaro.org>
 
-Comments look correct so:
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Thanks,
