@@ -1,75 +1,75 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 12 Sep 2011 09:56:04 +0200 (CEST)
-Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
-	gic_arch_extn
-In-Reply-To: <4E69D6ED.4080409@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-	<878vpyhotu.fsf@ti.com> <4E69961D.40700@ti.com>
-	<alpine.LFD.2.02.1109090912130.2723@ionos>
-	<4E69C957.5070708@ti.com>
-	<alpine.LFD.2.02.1109091017300.2723@ionos> <4E69D6ED.4080409@ti.com>
-Message-ID: <alpine.LFD.2.02.1109120955300.2723@ionos>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Mon, 12 Sep 2011 10:34:06 +0200
+Subject: [PATCH] mmc: omap_hsmmc: DMA unmap only once in case of MMC error
+In-Reply-To: <CANfBPZ-azGV0H7asRHD5+vdFjCkrx=E2Oypnrk_SW9K5+DwTLQ@mail.gmail.com>
+References: <1314569323-6886-1-git-send-email-per.forlin@linaro.org>
+	<CANfBPZ-azGV0H7asRHD5+vdFjCkrx=E2Oypnrk_SW9K5+DwTLQ@mail.gmail.com>
+Message-ID: <CAJ0pr1-ytbiXLYi_vXRx80j+H0CqvZSOFTQBpz=ia90GsH0TGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Sep 2011, Santosh wrote:
-
-> On Friday 09 September 2011 01:48 PM, Thomas Gleixner wrote:
-> > On Fri, 9 Sep 2011, Santosh wrote:
-> > > On Friday 09 September 2011 12:49 PM, Thomas Gleixner wrote:
-> > > > 
-> > > > The flag says: MASK ON SUSPEND and it does not imply that you don't
-> > > > need a wake function. There might be cases where you want to setup
-> > > > stuff in that function in order to have the wakeup happen on that
-> > > > interrupt line despite of the mask on suspend.
-> > > > 
-> > > I see your point.
-> > > 
-> > > > We either need a separate flag or a global dummy set_wake function in
-> > > > the core to avoid empty copies all over the place.
-> > > > 
-> > > A flag is probably better since you mentioned that on some arch, there
-> > > might be need to have actual set_wake() handler. Or if the global
-> > > dummy can be over-ridden by platform, that's fine too.
-> > 
-> > Global dummy would mean:
-> > 
-> > int irq_set_wake_dummy(...)
-> > {
-> > 	return 0;
-> > }
-> > 
-> > And you just add it to your chip, but either way I don't care whether
-> > it's a dummy function or a flag.
-> > 
-> Will below patch work for you then ?
-> Attaching the same in case mailer damages it.
-
-It does :)
- 
-> Regards,
-> Santosh
-> 
-> From d63d4347dc8fb144b19f4d4e7c0621397cccea94 Mon Sep 17 00:00:00 2001
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Fri, 9 Sep 2011 13:59:35 +0530
-> Subject: [PATCH] irq: Add IRQCHIP_SKIP_SET_WAKE flag to avoid need of dummy
-> set_wake() handler.
-> 
-> Certain IRQCHIP's may not need to install the irq_set_wake() handler if
-> the IRQCHIP_MASK_ON_SUSPEND flag is set. But but if it's not implemented,
-> enable_irq_wake() will return an error.  That needs the IRQCHIP to install
-> an empty set_wake handler.
-> 
-> Add an 'IRQCHIP_SKIP_SET_WAKE' flag so that IRQCHIP can inform the core
-> irq code that irq_set_wake() handler is not necessary.
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-
-Queued to irq/core for 3.2
+On 1 September 2011 21:19, S, Venkatraman <svenkatr@ti.com> wrote:
+> On Mon, Aug 29, 2011 at 3:38 AM, Per Forlin <per.forlin@linaro.org> wrote:
+>> Reported by Russell King:
+>> ------------
+>> mmcblk0: error -84 transferring data, sector 149201, nr 64,
+>> cmd response 0x900, card status 0xb00
+>> mmcblk0: retrying using single block read
+>>
+>> WARNING: at /home/rmk/git/linux-2.6-rmk/lib/dma-debug.c:811 check_unmap
+>> omap_hsmmc omap_hsmmc.0: DMA-API: device driver tries to free DMA memory
+>> it has not allocated [device address=0x0000000080933000] [size=20480 bytes]
+>> -------------
+>>
+>> In case of an error dma_unmap() is issued in omap_hsmmc_dma_cleanup()
+>> and then again in omap_hsmmc_post_req(). Resolve this by clearing the
+>> host_cookie to indicate there is no DMA mapped memory to unmap.
+>>
+>> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+>> ---
+>> Bug fix on 3.1-rc3
+>>
+>> ?drivers/mmc/host/omap_hsmmc.c | ? ?7 +++++--
+>> ?1 files changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+>> index 21e4a79..31d9817 100644
+>> --- a/drivers/mmc/host/omap_hsmmc.c
+>> +++ b/drivers/mmc/host/omap_hsmmc.c
+>> @@ -1011,6 +1011,7 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
+>> ? ? ? ? ? ? ? ? ? ? ? ?host->data->sg_len,
+>> ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_dma_dir(host, host->data));
+>> ? ? ? ? ? ? ? ?omap_free_dma(dma_ch);
+>> + ? ? ? ? ? ? ? host->data->host_cookie = 0;
+>> ? ? ? ?}
+>> ? ? ? ?host->data = NULL;
+>> ?}
+>> @@ -1576,8 +1577,10 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
+>> ? ? ? ?struct mmc_data *data = mrq->data;
+>>
+>> ? ? ? ?if (host->use_dma) {
+>> - ? ? ? ? ? ? ? dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_dma_dir(host, data));
+>> + ? ? ? ? ? ? ? if (data->host_cookie)
+>> + ? ? ? ? ? ? ? ? ? ? ? dma_unmap_sg(mmc_dev(host->mmc), data->sg,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?data->sg_len,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_dma_dir(host, data));
+>> ? ? ? ? ? ? ? ?data->host_cookie = 0;
+>> ? ? ? ?}
+>> ?}
+>> --
+>> 1.7.4.1
+>>
+>>
+>
+> I just posted a patch [1] which just consolidates all unmapping to
+> just post_req.
+> This would obviously prevent double unmapping, and keeps all the related
+> dma operations at a single place. Let me know if that works better.
+>
+I'm in favour of such patch. My patch only tries to do the minimal bug fix.
+I have been out of office the last 10 days or so. I'll look at your
+patch later today.
 
 Thanks,
-
-	tglx
+Per
