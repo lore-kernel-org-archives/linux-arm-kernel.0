@@ -1,55 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Sep 2011 20:36:18 +0200
-Subject: [GIT PULL] arm-soc fixes for 3.1
-In-Reply-To: <201109121807.45377.arnd@arndb.de>
-References: <201109121807.45377.arnd@arndb.de>
-Message-ID: <5084296.Xkn34IkqZ4@wuerfel>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 12 Sep 2011 11:52:06 -0700
+Subject: [PATCH 21/25] OMAP4: PM: Add MPUSS power domain OSWR support
+In-Reply-To: <1315144466-9395-22-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Sun, 4 Sep 2011 19:24:22 +0530")
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-22-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87obypfvah.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 September 2011 18:07:45 Arnd Bergmann wrote:
-> Hi Linus,
-> 
-> I've moved a copy of the arm-soc tree to git.linaro.org for now. Since
-> g.k.o contains to be unavailable, that seemed to be the most reliable
-> alternative for me.
-> 
-> The fixes for 3.1 that have come in during this time are for four platforms:
-> cns3xxx, davinci, omap2+, and prima2. I have a large set of build fixes
-> that I found myself during randconfig builds, but most of these have been
-> around forever, so I'm waiting for the merge window with those. I'm trying
-> to feed the actual build regressions through the individual maintainers,
-> so a few of those might be still be coming.
-> 
-> The following changes since commit ddf28352b80c86754a6424e3a61e8bdf9213b3c7:
-> 
->   Linux 3.1-rc5 (2011-09-04 15:45:10 -0700)
-> 
-> are available in the git repository at:
->  git://git.linaro.org/people/arnd/arm-soc.git fixes
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-One of the patches I mentioned was actually acked already but I had forgotten
-about it (sorry Kevin), so I've added it to the same branch.
+> This patch adds the MPUSS OSWR (Open Switch Retention) support. The MPUSS
+> OSWR configuration is as below.
+> 	- CPUx L1 and logic lost, MPUSS logic lost, L2 memory is retained
+>
+> OMAP4460 onwards, MPUSS power domain doesn't support OFF state any more
+> anymore just like CORE power domain. The deepest state supported is OSWR.
+> On OMAP4430 secure devices too, MPUSS off mode can't be used because of
+> a bug which alters Ducati and Tesla states. Hence MPUSS off mode as an
+> independent state isn't supported on OMAP44XX devices.
+>
+> Ofcourse when MPUSS power domain transitions to OSWR along
+> with device off mode, it eventually hits off state since memory
+> contents are lost.
+>
+> Hence the MPUSS off mode independent state is not attempted without
+> device off mode. All the necessary infrastructure code for MPUSS
+> off mode is in place as part of this series.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-If you haven't pulled already, you will get one more fix. Otherwise, I'll
-send this one together with the next bunch.
+Compile failure for the !CONFIG_PM case:
 
-	Arnd
+[...]
 
----
-The following changes since commit d035953e59ca8bb7ffc1023efba72438524457bb:
+> @@ -70,11 +71,18 @@ static inline int omap4_mpuss_init(void)
+>  {
+>  	return 0;
+>  }
+> -
+> +static inline u32 omap4_mpuss_read_prev_context_state(void)
+> +{
+> +	return 0;
+> +}
 
-  Merge branch 'sirf/fixes' into fixes (2011-09-12 14:59:37 +0000)
+added here
 
-are available in the git repository at:
+>  static inline int omap4_finish_suspend(unsigned long cpu_state)
+>  {}
+>  static inline void omap4_cpu_resume(void)
+>  {}
+> +static inline u32 omap4_mpuss_read_prev_context_state(void)
+> +{
+> +	return 0;
+> +}
 
-  git+ssh://arndbergmann at git.linaro.org/home/arndbergmann/public_git/arm-soc.git fixes
+same thing added here
 
-Arnd Bergmann (1):
-      Merge branch 'for_3.1/pm-fixes-2' of git://gitorious.org/khilman/linux-omap-pm into fixes
-
-Kevin Hilman (1):
-      OMAP: omap_device: fix !CONFIG_SUSPEND case in _noirq handlers
-
- arch/arm/plat-omap/omap_device.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Kevin
