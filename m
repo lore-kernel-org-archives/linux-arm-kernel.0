@@ -1,168 +1,71 @@
-From: thomas@shipmail.org (Thomas Hellstrom)
-Date: Mon, 12 Sep 2011 08:32:07 +0200
-Subject: [PATCH v4] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
-In-Reply-To: <4E6D278C.6010508@shipmail.org>
-References: <1315568333-6704-1-git-send-email-inki.dae@samsung.com>	<4E6B6E5E.3010702@shipmail.org>
-	<CAF6AEGt70bk8idsG48tmo_hgWY6M9kSNrEqyyLknYVYn83u4Rw@mail.gmail.com>
-	<4E6D278C.6010508@shipmail.org>
-Message-ID: <4E6DA767.9080408@shipmail.org>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Mon, 12 Sep 2011 12:04:41 +0530
+Subject: [PATCH v4 10/11] OMAP: Serial: Allow UART parameters to be
+	configured from board file.
+In-Reply-To: <87zkidtttm.fsf@ti.com>
+References: <1315400013-4849-1-git-send-email-govindraj.raja@ti.com>
+	<1315400013-4849-11-git-send-email-govindraj.raja@ti.com>
+	<87zkidtttm.fsf@ti.com>
+Message-ID: <CAAL8m4x6uNKu9tTxj8L4HkrsFhigJ_mxOg+NMGcAk__aCg8VZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2011 11:26 PM, Thomas Hellstrom wrote:
-> On 09/10/2011 07:31 PM, Rob Clark wrote:
->> On Sat, Sep 10, 2011 at 9:04 AM, Thomas 
->> Hellstrom<thomas@shipmail.org>  wrote:
->>> On 09/09/2011 01:38 PM, Inki Dae wrote:
->>>> This patch is a DRM Driver for Samsung SoC Exynos4210 and now enables
->>>> only FIMD yet but we will add HDMI support also in the future.
->>>>
->>>> from now on, I will remove RFC prefix because I think we have got 
->>>> comments
->>>> enough.
->>>>
->>>> this patch is based on git repository below:
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/airlied/drm-2.6.git,
->>>> branch name: drm-next
->>>> commit-id: bcc65fd8e929a9d9d34d814d6efc1d2793546922
->>>>
->>>> you can refer to our working repository below:
->>>> http://git.infradead.org/users/kmpark/linux-2.6-samsung
->>>> branch name: samsung-drm
->>>>
->>>> We tried to re-use lowlevel codes of the FIMD driver(s3c-fb.c
->>>> based on Linux framebuffer) but couldn't so because lowlevel codes
->>>> of s3c-fb.c are included internally and so FIMD module of this 
->>>> driver has
->>>> its own lowlevel codes.
->>>>
->>>> We used GEM framework for buffer management and DMA APIs(dma_alloc_*)
->>>> for buffer allocation. by using DMA API, we could use CMA later.
->>>>
->>>> Refer to this link for CMA(Continuous Memory Allocator):
->>>> http://lkml.org/lkml/2011/7/20/45
->>>>
->>>> this driver supports only physically continuous memory(non-iommu).
->>>>
->>>> Links to previous versions of the patchset:
->>>> v1:<    https://lwn.net/Articles/454380/>
->>>> v2:<    http://www.spinics.net/lists/kernel/msg1224275.html>
->>>> v3:<    http://www.gossamer-threads.com/lists/linux/kernel/1423684>
->>>>
->>>> Changelog v2:
->>>> DRM: add DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl command.
->>>>
->>>>      this feature maps user address space to physical memory region
->>>>      once user application requests DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl.
->>>>
->>>> DRM: code clean and add exception codes.
->>>>
->>>> Changelog v3:
->>>> DRM: Support multiple irq.
->>>>
->>>>      FIMD and HDMI have their own irq handler but DRM Framework can 
->>>> regiter
->>>>      only one irq handler this patch supports mutiple irq for 
->>>> Samsung SoC.
->>>>
->>>> DRM: Consider modularization.
->>>>
->>>>      each DRM, FIMD could be built as a module.
->>>>
->>>> DRM: Have indenpendent crtc object.
->>>>
->>>>      crtc isn't specific to SoC Platform so this patch gets a crtc
->>>>      to be used as common object.
->>>>      created crtc could be attached to any encoder object.
->>>>
->>>> DRM: code clean and add exception codes.
->>>>
->>>> Changelog v4:
->>>> DRM: remove is_defult from samsung_fb.
->>>>
->>>>      is_default isn't used for default framebuffer.
->>>>
->>>> DRM: code refactoring to fimd module.
->>>>      this patch is be considered with multiple display objects and
->>>>      would use its own request_irq() to register a irq handler 
->>>> instead of
->>>>      drm framework's one.
->>>>
->>>> DRM: remove find_samsung_drm_gem_object()
->>>>
->>>> DRM: move kernel private data structures and definitions to driver 
->>>> folder.
->>>>
->>>>      samsung_drm.h would contain only public information for userspace
->>>>      ioctl interface.
->>>>
->>>> DRM: code refactoring to gem modules.
->>>>      buffer module isn't dependent of gem module anymore.
->>>>
->>>> DRM: fixed security issue.
->>>>
->>>> DRM: remove encoder porinter from specific connector.
->>>>
->>>>      samsung connector doesn't need to have generic encoder.
->>>>
->>>> DRM: code clean and add exception codes.
->>>>
->>>> Signed-off-by: Inki Dae<inki.dae@samsung.com>
->>>> Signed-off-by: Joonyoung Shim<jy0922.shim@samsung.com>
->>>> Signed-off-by: SeungWoo Kim<sw0312.kim@samsung.com>
->>>> Signed-off-by: kyungmin.park<kyungmin.park@samsung.com>
->>>> ---
->>>>
->>>> +static struct drm_ioctl_desc samsung_ioctls[] = {
->>>> +       DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_CREATE,
->>>> samsung_drm_gem_create_ioctl,
->>>> +                       DRM_UNLOCKED | DRM_AUTH),
->>>>
->>> Hi!
->>>
->>> With reference my previous security comment.
->>>
->>> Let's say you have a compromised video player running as a DRM 
->>> client, that
->>> tries to repeatedly allocate huge GEM buffers...
->>>
->>> What will happen when all DMA memory is exhausted? Will this cause 
->>> other
->>> device drivers to see an OOM, or only DRM?
->>>
->>> The old DRI model basically allowed any authorized DRI client to 
->>> exhaust
->>> video ram or AGP memory, but never system memory. Newer DRI drivers
->>> typically only allow DRI masters to do that.
->>> as
->>>
->>> I don't think an authorized DRI client should be able to easily exhaust
->>> resources (DMA memory) used by other device drivers causing them to 
->>> fail.
->> I'm not entirely sure what else can be done, other than have a
->> threshold on max MB allocatable of buffer memory..
+On Sat, Sep 10, 2011 at 12:41 AM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
 >
-> Yes, I think that's what needs to be done, and that threshold should 
-> be low enough to keep other device drivers running in the worst 
-> allocation case.
+>> The following UART parameters are defined within the UART driver:
+>>
+>> 1). Whether the UART uses DMA (dma_enabled), by default set to 0
+>> 2). The size of dma buffer (set to 4096 bytes)
+>> 3). The time after which the dma should stop if no more data is received.
+>> 4). The auto suspend delay that will be passed for pm_runtime_autosuspend
+>> ? ? where uart will be disabled after timeout
+>>
+>> Different UARTs may be used for different purpose such as the console,
+>> for interfacing bluetooth chip, for interfacing to a modem chip, etc.
+>> Therefore, it is necessary to be able to customize the above settings
+>> for a given board on a per UART basis.
+>>
+>> This change allows these parameters to be configured from the board file
+>> and allows the parameters to be configured for each UART independently.
+>>
+>> If a board does not define its own custom parameters for the UARTs, then
+>> use the default parameters in the structure "omap_serial_default_info".
+>> The default parameters are defined to be the same as the current settings
+>> in the UART driver to avoid breaking the UART for any board. By default,
+>> make all boards use the default UART parameters.
+>>
+>> Signed-off-by: Deepak K <deepak.k@ti.com>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 >
->> In the samsung driver case, he is only allocating scanout memory from
->> CMA, so the limit will be the CMA region size.. beyond that you can't
->> get physically contiguous memory.  So I think this driver is safe.
+> Who is the author of this patch? ?The first version says Jon[1], v2 says
+> Deepak[2]. ?Either way, please ensure proper authorship is attributed
+> using From: at the beginning of the changelog. ?(git-format-patch will
+> do this for you when the authorship is correct in the git history.)
 >
-> It's not really what well-behaved user-space drivers do that should be 
-> a concern, but what compromized application *might* do that is a concern.
+> Even better would be to summarize the changes since the first version
+> after the '---' so it would be clearer why the authorship was changed.
+>
+> Only 1/3 of my comments from v3 were addressed in this version. ?Please
+> re-read my comments there[3].
+>
 
-Hmm. I might have missed your point here. If the buffer allocation ioctl 
-only allows allocating CMA memory, then I agree the driver fits the old 
-DRI security model, as long as no other devices on the platform will 
-ever use CMA.
+Will fix this and repost.
 
-But in that case, there really should be a way for the driver to say 
-"Hey, all CMA memory on this system is mine", in the same way 
-traditional video drivers can claim the VRAM PCI resource.
+--
+Thanks,
+Govindraj.R
 
-This is to avoid the possibility that future drivers that need CMA will 
-be vulnerable to DOS-attacks from ill-behaved DRI clients.
 
-/Thomas
+> Kevin
+>
+>
+> [1] http://marc.info/?l=linux-omap&m=129890257812478&w=2
+> [2] http://marc.info/?l=linux-omap&m=130408096416887&w=2
+> [3] http://marc.info/?l=linux-omap&m=130896078622810&w=2
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
