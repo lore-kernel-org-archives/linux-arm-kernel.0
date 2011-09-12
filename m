@@ -1,75 +1,153 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Mon, 12 Sep 2011 10:34:06 +0200
-Subject: [PATCH] mmc: omap_hsmmc: DMA unmap only once in case of MMC error
-In-Reply-To: <CANfBPZ-azGV0H7asRHD5+vdFjCkrx=E2Oypnrk_SW9K5+DwTLQ@mail.gmail.com>
-References: <1314569323-6886-1-git-send-email-per.forlin@linaro.org>
-	<CANfBPZ-azGV0H7asRHD5+vdFjCkrx=E2Oypnrk_SW9K5+DwTLQ@mail.gmail.com>
-Message-ID: <CAJ0pr1-ytbiXLYi_vXRx80j+H0CqvZSOFTQBpz=ia90GsH0TGQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 12 Sep 2011 16:43:52 +0800
+Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level debug
+	uart
+In-Reply-To: <20110912074147.GE28624@pengutronix.de>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
+	<20110906202555.GQ28816@pengutronix.de>
+	<20110907110001.GI8148@S2100-06.ap.freescale.net>
+	<20110907123635.GT28816@pengutronix.de>
+	<20110912023000.GC1258@S2100-06.ap.freescale.net>
+	<20110912074147.GE28624@pengutronix.de>
+Message-ID: <20110912084350.GF1258@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 September 2011 21:19, S, Venkatraman <svenkatr@ti.com> wrote:
-> On Mon, Aug 29, 2011 at 3:38 AM, Per Forlin <per.forlin@linaro.org> wrote:
->> Reported by Russell King:
->> ------------
->> mmcblk0: error -84 transferring data, sector 149201, nr 64,
->> cmd response 0x900, card status 0xb00
->> mmcblk0: retrying using single block read
->>
->> WARNING: at /home/rmk/git/linux-2.6-rmk/lib/dma-debug.c:811 check_unmap
->> omap_hsmmc omap_hsmmc.0: DMA-API: device driver tries to free DMA memory
->> it has not allocated [device address=0x0000000080933000] [size=20480 bytes]
->> -------------
->>
->> In case of an error dma_unmap() is issued in omap_hsmmc_dma_cleanup()
->> and then again in omap_hsmmc_post_req(). Resolve this by clearing the
->> host_cookie to indicate there is no DMA mapped memory to unmap.
->>
->> Signed-off-by: Per Forlin <per.forlin@linaro.org>
->> ---
->> Bug fix on 3.1-rc3
->>
->> ?drivers/mmc/host/omap_hsmmc.c | ? ?7 +++++--
->> ?1 files changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
->> index 21e4a79..31d9817 100644
->> --- a/drivers/mmc/host/omap_hsmmc.c
->> +++ b/drivers/mmc/host/omap_hsmmc.c
->> @@ -1011,6 +1011,7 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
->> ? ? ? ? ? ? ? ? ? ? ? ?host->data->sg_len,
->> ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_dma_dir(host, host->data));
->> ? ? ? ? ? ? ? ?omap_free_dma(dma_ch);
->> + ? ? ? ? ? ? ? host->data->host_cookie = 0;
->> ? ? ? ?}
->> ? ? ? ?host->data = NULL;
->> ?}
->> @@ -1576,8 +1577,10 @@ static void omap_hsmmc_post_req(struct mmc_host *mmc, struct mmc_request *mrq,
->> ? ? ? ?struct mmc_data *data = mrq->data;
->>
->> ? ? ? ?if (host->use_dma) {
->> - ? ? ? ? ? ? ? dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_dma_dir(host, data));
->> + ? ? ? ? ? ? ? if (data->host_cookie)
->> + ? ? ? ? ? ? ? ? ? ? ? dma_unmap_sg(mmc_dev(host->mmc), data->sg,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?data->sg_len,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_dma_dir(host, data));
->> ? ? ? ? ? ? ? ?data->host_cookie = 0;
->> ? ? ? ?}
->> ?}
->> --
->> 1.7.4.1
->>
->>
->
-> I just posted a patch [1] which just consolidates all unmapping to
-> just post_req.
-> This would obviously prevent double unmapping, and keeps all the related
-> dma operations at a single place. Let me know if that works better.
->
-I'm in favour of such patch. My patch only tries to do the minimal bug fix.
-I have been out of office the last 10 days or so. I'll look at your
-patch later today.
+On Mon, Sep 12, 2011 at 09:41:47AM +0200, Uwe Kleine-K?nig wrote:
+> Hello Shawn,
+> 
+> On Mon, Sep 12, 2011 at 10:30:01AM +0800, Shawn Guo wrote:
+> > On Wed, Sep 07, 2011 at 02:36:35PM +0200, Uwe Kleine-K?nig wrote:
+> > > On Wed, Sep 07, 2011 at 07:00:02PM +0800, Shawn Guo wrote:
+> > > > On Tue, Sep 06, 2011 at 10:25:55PM +0200, Uwe Kleine-K?nig wrote:
+> > > > > On Tue, Sep 06, 2011 at 05:58:36PM +0800, Shawn Guo wrote:
+> > 
+> > [...]
+> > 
+> > > > > > diff --git a/arch/arm/plat-mxc/include/mach/mx6q.h b/arch/arm/plat-mxc/include/mach/mx6q.h
+> > > > > > new file mode 100644
+> > > > > > index 0000000..7432310
+> > > > > > --- /dev/null
+> > > > > > +++ b/arch/arm/plat-mxc/include/mach/mx6q.h
+> > > > > > @@ -0,0 +1,29 @@
+> > > > > > +/*
+> > > > > > + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> > > > > > + * Copyright 2011 Linaro Ltd.
+> > > > > > + *
+> > > > > > + * The code contained herein is licensed under the GNU General Public
+> > > > > > + * License. You may obtain a copy of the GNU General Public License
+> > > > > > + * Version 2 or later at the following locations:
+> > > > > > + *
+> > > > > > + * http://www.opensource.org/licenses/gpl-license.html
+> > > > > > + * http://www.gnu.org/copyleft/gpl.html
+> > > > > > + */
+> > > > > > +
+> > > > > > +#ifndef __MACH_MX6Q_H__
+> > > > > > +#define __MACH_MX6Q_H__
+> > > > > > +
+> > > > > > +/* static mappings */
+> > > > > > +#define IMX6Q_VA(x)		(0xf4000000 + (x))
+> > > > > > +
+> > > > > > +#define MX6Q_SCU_BASE_ADDR	0x00a00000
+> > > > > > +#define MX6Q_CCM_BASE_ADDR	0x020c4000
+> > > > > > +#define MX6Q_ANATOP_BASE_ADDR	0x020c8000
+> > > > > > +#define MX6Q_UART4_BASE_ADDR	0x021f0000
+> > > > > > +
+> > > > > > +#define MX6Q_SCU_BASE_VADDR	IMX6Q_VA(MX6Q_SCU_BASE_ADDR)
+> > > > > > +#define MX6Q_CCM_BASE_VADDR	IMX6Q_VA(MX6Q_CCM_BASE_ADDR)
+> > > > > > +#define MX6Q_ANATOP_BASE_VADDR	IMX6Q_VA(MX6Q_ANATOP_BASE_ADDR)
+> > > > > > +#define MX6Q_UART4_BASE_VADDR	IMX6Q_VA(MX6Q_UART4_BASE_ADDR)
+> > > > > Depending on the sizes of these memory regions you can use the existing
+> > > > > IMX_IO_P2V here. The conditions are:
+> > > > > 
+> > > > > 	SCU_SIZE <= 0x200000
+> > > Actually this should be 0x100000 as this is the size that is mapped in a
+> > > continous chunk.
+> > > 
+> > > > > 	CCM_SIZE <= 0x4000
+> > > > > 	ANATOP_SIZE <= 0x28000
+> > > > > 	UART4 <= 0x100000
+> > > > > 
+> > > > This is exactly what I dislike about IMX_IO_P2V().  We have to verify
+> > > > all these conditions manually.  Looking at the static mapping below
+> > > I did it semi-manual, I just put your constants for imx6q into my script
+> > > (all with size=0x4000 for now) and it told me:
+> > > 
+> > > ...
+> > >  * mx6q:
+> > >  *	SCU	0x00a00000+0x004000	->	0xf4000000+0x004000
+> > >  *	CCM	0x020c4000+0x004000	->	0xf42c4000+0x004000
+> > >  *	ANATOP	0x020c8000+0x004000	->	0xf42c8000+0x004000
+> > >  *	UART4	0x021f0000+0x004000	->	0xf42f0000+0x004000
+> > > ...
+> > > 
+> > > > (copied from arch/arm/plat-mxc/include/mach/hardware.h), do you think
+> > > > it's really scalable and easy to maintain for the long run?
+> > > At least it provides a way to verify the correctness of the mapping.
+> > > Before I introduced the mapping function there was a conflict IIRC.
+> > > 
+> > > > /*
+> > > >  * This is rather complicated for humans and ugly to verify, but for a machine
+> > > >  * it's OK.  Still more as it is usually only applied to constants.  The upsides
+> > > >  * on using this approach are:
+> > > >  *
+> > > >  *  - same mapping on all i.MX machines
+> > > >  *  - works for assembler, too
+> > > >  *  - no need to nurture #defines for virtual addresses
+> > > >  *
+> > > >  * The downside it, it's hard to verify (but I have a script for that).
+> > > If you want I can provide you that script.
+> > > 
+> > Yes, please. I would use IMX_IO_P2V() in the next post.
+> I just found a bug in the conflict detection code, so I put it in a
+> repository to prevent the broken script to enter the archives. You can
+> find it on
+> 
+> 	git://git.pengutronix.de/git/ukl/imx-iop2v.git
+> 
+Thanks, Uwe.
 
-Thanks,
-Per
+> > [...]
+> > 
+> > > > #define IMX_IO_P2V(x)	(						\
+> > > > 			0xf4000000 +					\
+> > > > 			(((x) & 0x50000000) >> 6) +			\
+> > > > 			(((x) & 0x0b000000) >> 4) +			\
+> > > > 			(((x) & 0x000fffff)))
+> > > > 
+> > > > > hmm, looking at patch 4 SCU_BASE is determined by a coprocessor
+> > > > > instruction?!
+> > > > 
+> > > > Ah, yes.  The SCU physical base address can be retrieved from
+> > > > coprocessor.
+> > > Is there an advantage in autodetecting the base address?
+> > >  
+> > Any disadvantage for doing so?
+> It makes
+> 
+> 	#define MX6Q_SCU_BASE_ADDR       0x00a00000
+> 
+> superfluous.
+
+The definition is actually not needed.  I put it there as a
+documentation telling SCU is statically mapped.
+
+> And in case the real address is different it might make
+> 
+> 	IMX_IO_P2V(real scu address) != scu_io_desc.virtual
+> 
+
+This should never happen.
+
+One thing I'm trying to do is to keep arch/arm/mach-imx/platsmp.c
+not specific to imx6q.  The auto-detecting helps to keep
+MX6Q_SCU_BASE_ADDR away from the file, so that one day when we have
+another imx smp soc, we can simply reuse the file.
+
+Regards,
+Shawn
+
+> which makes the scriptable check for conflicts kind of useless and might
+> come as a surprise.
+> 
