@@ -1,80 +1,55 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 12 Sep 2011 23:59:24 +0530
-Subject: [PATCH v3 5/6] ARM: SAMSUNG: Add device tree support for pl330 dma
-	engine wrappers
-In-Reply-To: <1315852165-32402-5-git-send-email-thomas.abraham@linaro.org>
-References: <1315852165-32402-1-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-2-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-3-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-4-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-5-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1315852165-32402-6-git-send-email-thomas.abraham@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Sep 2011 20:36:18 +0200
+Subject: [GIT PULL] arm-soc fixes for 3.1
+In-Reply-To: <201109121807.45377.arnd@arndb.de>
+References: <201109121807.45377.arnd@arndb.de>
+Message-ID: <5084296.Xkn34IkqZ4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new dma request id 'DMACH_DT_PROP' is introduced for client drivers
-requesting a dma channel. This request indicates that a device tree
-node property represting the dma channel is available in
-'struct samsung_dma_info'. The dma channel request wrapper uses the
-node property value as the value for the filter parameter.
+On Monday 12 September 2011 18:07:45 Arnd Bergmann wrote:
+> Hi Linus,
+> 
+> I've moved a copy of the arm-soc tree to git.linaro.org for now. Since
+> g.k.o contains to be unavailable, that seemed to be the most reliable
+> alternative for me.
+> 
+> The fixes for 3.1 that have come in during this time are for four platforms:
+> cns3xxx, davinci, omap2+, and prima2. I have a large set of build fixes
+> that I found myself during randconfig builds, but most of these have been
+> around forever, so I'm waiting for the merge window with those. I'm trying
+> to feed the actual build regressions through the individual maintainers,
+> so a few of those might be still be coming.
+> 
+> The following changes since commit ddf28352b80c86754a6424e3a61e8bdf9213b3c7:
+> 
+>   Linux 3.1-rc5 (2011-09-04 15:45:10 -0700)
+> 
+> are available in the git repository at:
+>  git://git.linaro.org/people/arnd/arm-soc.git fixes
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+One of the patches I mentioned was actually acked already but I had forgotten
+about it (sorry Kevin), so I've added it to the same branch.
+
+If you haven't pulled already, you will get one more fix. Otherwise, I'll
+send this one together with the next bunch.
+
+	Arnd
+
 ---
- arch/arm/plat-samsung/dma-ops.c                |    9 ++++++++-
- arch/arm/plat-samsung/include/plat/dma-ops.h   |    1 +
- arch/arm/plat-samsung/include/plat/dma-pl330.h |    3 ++-
- 3 files changed, 11 insertions(+), 2 deletions(-)
+The following changes since commit d035953e59ca8bb7ffc1023efba72438524457bb:
 
-diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
-index 8d18425..b1135dd 100644
---- a/arch/arm/plat-samsung/dma-ops.c
-+++ b/arch/arm/plat-samsung/dma-ops.c
-@@ -23,11 +23,18 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
- 	struct dma_chan *chan;
- 	dma_cap_mask_t mask;
- 	struct dma_slave_config slave_config;
-+	void *filter_param;
- 
- 	dma_cap_zero(mask);
- 	dma_cap_set(info->cap, mask);
- 
--	chan = dma_request_channel(mask, pl330_filter, (void *)dma_ch);
-+	/*
-+	 * If a dma channel property of a device node from device tree is
-+	 * specified, use that as the fliter parameter.
-+	 */
-+	filter_param = (dma_ch == DMACH_DT_PROP) ? (void *)info->dt_dmach_prop :
-+				(void *)dma_ch;
-+	chan = dma_request_channel(mask, pl330_filter, filter_param);
- 
- 	if (info->direction == DMA_FROM_DEVICE) {
- 		memset(&slave_config, 0, sizeof(struct dma_slave_config));
-diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
-index 4c1a363..22eafc3 100644
---- a/arch/arm/plat-samsung/include/plat/dma-ops.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
-@@ -31,6 +31,7 @@ struct samsung_dma_info {
- 	enum dma_slave_buswidth width;
- 	dma_addr_t fifo;
- 	struct s3c2410_dma_client *client;
-+	struct property *dt_dmach_prop;
- };
- 
- struct samsung_dma_ops {
-diff --git a/arch/arm/plat-samsung/include/plat/dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-index 2e55e59..c5eaad5 100644
---- a/arch/arm/plat-samsung/include/plat/dma-pl330.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-@@ -21,7 +21,8 @@
-  * use these just as IDs.
-  */
- enum dma_ch {
--	DMACH_UART0_RX,
-+	DMACH_DT_PROP = -1,
-+	DMACH_UART0_RX = 0,
- 	DMACH_UART0_TX,
- 	DMACH_UART1_RX,
- 	DMACH_UART1_TX,
--- 
-1.6.6.rc2
+  Merge branch 'sirf/fixes' into fixes (2011-09-12 14:59:37 +0000)
+
+are available in the git repository at:
+
+  git+ssh://arndbergmann at git.linaro.org/home/arndbergmann/public_git/arm-soc.git fixes
+
+Arnd Bergmann (1):
+      Merge branch 'for_3.1/pm-fixes-2' of git://gitorious.org/khilman/linux-omap-pm into fixes
+
+Kevin Hilman (1):
+      OMAP: omap_device: fix !CONFIG_SUSPEND case in _noirq handlers
+
+ arch/arm/plat-omap/omap_device.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
