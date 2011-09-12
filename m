@@ -1,111 +1,57 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 12 Sep 2011 19:49:33 +0800
-Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
-In-Reply-To: <20110912094634.GP31404@pengutronix.de>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
-	<20110912094634.GP31404@pengutronix.de>
-Message-ID: <20110912114932.GH1258@S2100-06.ap.freescale.net>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 12 Sep 2011 17:14:29 +0530
+Subject: [PATCH v6 00/25] gpio/omap: driver cleanup and fixes
+In-Reply-To: <87bouxz21m.fsf@ti.com>
+References: <1314798161-19523-1-git-send-email-tarun.kanti@ti.com>
+	<87bouxz21m.fsf@ti.com>
+Message-ID: <CAC83ZvLkM+=SmcC-p0Yjmni00wug4XLGQ=HP0+-VZPsx7b1uMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2011 at 11:46:34AM +0200, Sascha Hauer wrote:
-> On Tue, Sep 06, 2011 at 05:58:37PM +0800, Shawn Guo wrote:
-> > It adds a number of core drivers support for imx6q, including clock,
-> > General Power Controller (gpc), Multi Mode DDR Controller(mmdc) and
-> > System Reset Controller (src).
-> > 
-> > Signed-off-by: Ranjani Vaidyanathan <ra5478@freescale.com>
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > diff --git a/arch/arm/mach-imx/src.c b/arch/arm/mach-imx/src.c
-> > new file mode 100644
-> > index 0000000..95fdd65
-> > --- /dev/null
-> > +++ b/arch/arm/mach-imx/src.c
-> > @@ -0,0 +1,52 @@
-> > +/*
-> > + * Copyright 2011 Freescale Semiconductor, Inc.
-> > + * Copyright 2011 Linaro Ltd.
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 or later at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +#include <linux/init.h>
-> > +#include <linux/io.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <asm/unified.h>
-> > +
-> > +#define SRC_SCR				0x000
-> > +#define SRC_GPR1			0x020
-> > +#define BP_SRC_SCR_CORE1_RST		14
-> > +#define BP_SRC_SCR_CORE1_ENABLE		22
-> > +
-> > +static void __iomem *src_base;
-> > +
-> > +void imx_enable_cpu(int cpu, bool enable)
-> > +{
-> > +	u32 mask, val;
-> > +
-> > +	mask = 1 << (BP_SRC_SCR_CORE1_ENABLE + cpu - 1);
-> > +	val = __raw_readl(src_base + SRC_SCR);
-> > +	val = enable ? val | mask : val & ~mask;
-> > +	__raw_writel(val, src_base + SRC_SCR);
-> > +}
-> > +
-> > +void imx_set_cpu_jump(int cpu, void *jump_addr)
-> > +{
-> > +	__raw_writel(BSYM(virt_to_phys(jump_addr)),
-> > +		     src_base + SRC_GPR1 + cpu * 8);
-> > +}
-> > +
-> > +static int __init imx_src_init(void)
-> > +{
-> > +	struct device_node *np;
-> > +
-> > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-src");
-> > +	src_base = of_iomap(np, 0);
-> > +	WARN_ON(!src_base);
-> > +
-> > +	return 0;
-> > +}
-> > +early_initcall(imx_src_init);
-> 
-> What I'm concerned about is that we carefully removed all assumptions
-> about which SoC the code runs on in the past. Now with this patchset
-> many of them come back. Here we have a initcall without any check
-> whether we really run on i.MX6.
+[...]
+> I tested this series on top of v3.1-rc4 using a 3430/n900 platform.
+>
+> During suspend the PER powerdomain does not hit the targetted power
+> state. ?Also, in idle PER never hits retention.
+>
+> As with previous versions of this series, it appears to be related to
+> debounce clocks being left enabled. ?On my n900, I removed debounce from
+> all the GPIO keys pads and PER was then able to hit retention during
+> suspend and idle.
+>
+> Please be sure to test on a platform that is using debounce, or modify
+> the board file for one of the platforms your testing so that at least
+> one of the GPIOs has debounce enabled so you are verifying the debounce
+> clock gating during suspend and idle.
+I was able to re-produce the problem by making explicit call to
+_set_gpio_debounce() in *_mod_init().
+Prior to calling this I initialized: bank->dbck = clk_get(bank->dev,
+"dbclk"); as in the function below.
+Later I realized that there is no alias associated with "dbclk" for GPIO[2-6].
 
-The "check" has been done on Kconfig level as below.
+static int gpio_debounce(struct gpio_chip *chip, unsigned offset,
+                unsigned debounce)
+{
+...
+        if (!bank->dbck) {
+                bank->dbck = clk_get(bank->dev, "dbclk");
+...
+        }
 
-config SOC_IMX6Q
-        bool "i.MX6 Quad support"
-        select HAVE_IMX_SRC
+After incorporating the following alias I was able to put system to OFF.
 
-obj-$(CONFIG_HAVE_IMX_SRC) += src.o
+static struct omap_clk omap3xxx_clks[] = {
+...
+        CLK("omap_gpio.6",       "dbclk",   &gpio6_dbck,    CK_3XXX),
+        CLK("omap_gpio.5",       "dbclk",   &gpio5_dbck,    CK_3XXX),
+        CLK("omap_gpio.4",       "dbclk",   &gpio4_dbck,    CK_3XXX),
+        CLK("omap_gpio.3",       "dbclk",   &gpio3_dbck,    CK_3XXX),
+        CLK("omap_gpio.2",       "dbclk",   &gpio2_dbck,    CK_3XXX),
 
-
-> Above we have a imx_enable_cpu function
-> but this is really a imx6 specific function.
-
-I would say this is a imx smp specific function.
-
-> Nevertheless it is called
-> from generic code in arch/arm/mach-imx/platsmp.c.
-> 
-> We've been there before and it was hard to remove all the implicit
-> assumptions on which SoC we are on. Please do not reintroduce it.
-> 
-We create platform driver for (talking to) specific device (IP block),
-and select the driver for SoCs that have the device.  Anything wrong
-with this approach?  Or I missed your point here?
-
--- 
-Regards,
-Shawn
+--
+Tarun
+>
+> Thanks,
+>
+> Kevin
+>
