@@ -1,34 +1,24 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 11 Sep 2011 23:01:24 -0400 (EDT)
-Subject: [PATCH v2 03/10] ARM: kprobes: Framework for instruction set test
-	cases
-In-Reply-To: <1315652706-2900-4-git-send-email-tixy@yxit.co.uk>
+Date: Sun, 11 Sep 2011 23:10:20 -0400 (EDT)
+Subject: [PATCH v2 00/10] ARM: kprobes: Add test code to kernel tree
+In-Reply-To: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
 References: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
-	<1315652706-2900-4-git-send-email-tixy@yxit.co.uk>
-Message-ID: <alpine.LFD.2.00.1109112259110.20358@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1109112304380.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, 10 Sep 2011, Tixy wrote:
 
-> From: Jon Medhurst <tixy@yxit.co.uk>
-> 
-> On ARM we have to simulate/emulate CPU instructions in order to
-> singlestep them. This patch adds a framework which can be used to
-> construct test cases for different instruction forms. It is described in
-> detail in the in-source comments of kprobes-test.c
-> 
-> Signed-off-by: Jon Medhurst <tixy@yxit.co.uk>
-> ---
+> This is pretty much an essential tool for anyone debugging or extending
+> the kprobes instruction simulation code and is a good regression test
+> for kprobes on ARM.
 
-[...]
+This is amazing work.  Well done.
 
-> + * Th pair of test case runs is repeated with different combinations of
-> + * flag values in CPSR and, for Thumb, different ITState.
+I've posted minor comments on some of the patches already.   You may 
+still add to all of them:
 
-s/Th/The/
-
-(noticed this typo by chance I suppose  ;-))
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
 
 Nicolas
