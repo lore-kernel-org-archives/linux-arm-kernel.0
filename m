@@ -1,76 +1,144 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 12 Sep 2011 16:49:49 +0530
-Subject: [PATCH 1/2] input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD config
-	option
-In-Reply-To: <20110908163322.GB17503@core.coreip.homeip.net>
-References: <1315317317-21873-1-git-send-email-thomas.abraham@linaro.org>
-	<1315317317-21873-2-git-send-email-thomas.abraham@linaro.org>
-	<20110907182248.GA2874@core.coreip.homeip.net>
-	<CAJuYYwQg8pMaM7Y-AQD5eDqw32rMOHggL2gWOtJH_ri8gsH-yg@mail.gmail.com>
-	<20110908163322.GB17503@core.coreip.homeip.net>
-Message-ID: <CAJuYYwSyJ3pKDSYLtad5hDKER2cgxOGo-pC93dtXtLfybvs=+w@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 12 Sep 2011 19:36:47 +0800
+Subject: [PATCH 2/6] arm/imx6q: add core definitions and low-level debug
+	uart
+In-Reply-To: <20110912084439.GO31404@pengutronix.de>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-3-git-send-email-shawn.guo@linaro.org>
+	<20110906202555.GQ28816@pengutronix.de>
+	<20110907110001.GI8148@S2100-06.ap.freescale.net>
+	<20110912084439.GO31404@pengutronix.de>
+Message-ID: <20110912113646.GG1258@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On Mon, Sep 12, 2011 at 10:44:39AM +0200, Sascha Hauer wrote:
+> On Wed, Sep 07, 2011 at 07:00:02PM +0800, Shawn Guo wrote:
+> > On Tue, Sep 06, 2011 at 10:25:55PM +0200, Uwe Kleine-K?nig wrote:
+> > > On Tue, Sep 06, 2011 at 05:58:36PM +0800, Shawn Guo wrote:
+> > > > It adds the core definitions and low-level debug uart support
+> > > > for imx6q.
+> > > > 
+> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > ---
+> > > >  arch/arm/Kconfig                             |    2 +-
+> > > >  arch/arm/Kconfig.debug                       |    7 +++++
+> > > >  arch/arm/Makefile                            |    1 +
+> > > >  arch/arm/mach-imx/Kconfig                    |    4 +++
+> > > >  arch/arm/mach-imx/Makefile                   |    2 +
+> > > >  arch/arm/mach-imx/Makefile.boot              |    4 +++
+> > > >  arch/arm/mach-imx/lluart.c                   |   33 ++++++++++++++++++++++++++
+> > > >  arch/arm/plat-mxc/Kconfig                    |    5 ++++
+> > > >  arch/arm/plat-mxc/include/mach/debug-macro.S |    5 ++++
+> > > >  arch/arm/plat-mxc/include/mach/entry-macro.S |   15 +++++++++++-
+> > > >  arch/arm/plat-mxc/include/mach/hardware.h    |    1 +
+> > > >  arch/arm/plat-mxc/include/mach/irqs.h        |    9 ++++--
+> > > >  arch/arm/plat-mxc/include/mach/memory.h      |    3 ++
+> > > >  arch/arm/plat-mxc/include/mach/mx6q.h        |   29 ++++++++++++++++++++++
+> > > >  14 files changed, 115 insertions(+), 5 deletions(-)
+> > > >  create mode 100644 arch/arm/mach-imx/lluart.c
+> > > >  create mode 100644 arch/arm/plat-mxc/include/mach/mx6q.h
+> > > > 
+> > > > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > > > index 4ea9974..37c20a4 100644
+> > > > --- a/arch/arm/Kconfig
+> > > > +++ b/arch/arm/Kconfig
+> > > > @@ -1348,7 +1348,7 @@ config SMP
+> > > >  	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
+> > > >  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+> > > >  		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
+> > > > -		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
+> > > > +		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || SOC_IMX6Q
+> > > >  	select USE_GENERIC_SMP_HELPERS
+> > > >  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+> > > >  	help
+> > > > diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> > > > index 965d59a..68fc155 100644
+> > > > --- a/arch/arm/Kconfig.debug
+> > > > +++ b/arch/arm/Kconfig.debug
+> > > > @@ -155,6 +155,13 @@ choice
+> > > >  		  Say Y here if you want kernel low-level debugging support
+> > > >  		  on i.MX50 or i.MX53.
+> > > >  
+> > > > +	config DEBUG_IMX6Q_UART
+> > > > +		bool "i.MX6Q Debug UART"
+> > > > +		depends on SOC_IMX6Q
+> > > > +		help
+> > > > +		  Say Y here if you want kernel low-level debugging support
+> > > > +		  on i.MX6Q.
+> > > > +
+> > > >  	config DEBUG_S3C_UART0
+> > > >  		depends on PLAT_SAMSUNG
+> > > >  		bool "Use S3C UART 0 for low-level debug"
+> > > > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> > > > index 70c424e..3a0bbe4 100644
+> > > > --- a/arch/arm/Makefile
+> > > > +++ b/arch/arm/Makefile
+> > > > @@ -159,6 +159,7 @@ machine-$(CONFIG_ARCH_MX2)		:= imx
+> > > >  machine-$(CONFIG_ARCH_MX25)		:= imx
+> > > >  machine-$(CONFIG_ARCH_MX3)		:= imx
+> > > >  machine-$(CONFIG_ARCH_MX5)		:= mx5
+> > > > +machine-$(CONFIG_ARCH_MX6)		:= imx
+> > > >  machine-$(CONFIG_ARCH_MXS)		:= mxs
+> > > >  machine-$(CONFIG_ARCH_NETX)		:= netx
+> > > >  machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
+> > > > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > > > index 0519dd7..4cf5178 100644
+> > > > --- a/arch/arm/mach-imx/Kconfig
+> > > > +++ b/arch/arm/mach-imx/Kconfig
+> > > > @@ -58,6 +58,10 @@ config SOC_IMX35
+> > > >  	select ARCH_MX35
+> > > >  	select MXC_AVIC
+> > > >  
+> > > > +config SOC_IMX6Q
+> > > > +	bool
+> > > > +	select ARM_GIC
+> > > > +	select CPU_V7
+> > > >  
+> > > >  if ARCH_MX1
+> > > >  
+> > > > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> > > > index e9eb36d..96ecc96 100644
+> > > > --- a/arch/arm/mach-imx/Makefile
+> > > > +++ b/arch/arm/mach-imx/Makefile
+> > > > @@ -61,3 +61,5 @@ obj-$(CONFIG_MACH_MX35_3DS) += mach-mx35_3ds.o
+> > > >  obj-$(CONFIG_MACH_EUKREA_CPUIMX35) += mach-cpuimx35.o
+> > > >  obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD) += eukrea_mbimxsd35-baseboard.o
+> > > >  obj-$(CONFIG_MACH_VPR200) += mach-vpr200.o
+> > > > +
+> > > > +obj-$(CONFIG_DEBUG_LL) += lluart.o
+> > > > diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
+> > > > index ebee18b..389a0e3 100644
+> > > > --- a/arch/arm/mach-imx/Makefile.boot
+> > > > +++ b/arch/arm/mach-imx/Makefile.boot
+> > > > @@ -17,3 +17,7 @@ initrd_phys-$(CONFIG_MACH_MX27)	:= 0xA0800000
+> > > >  zreladdr-$(CONFIG_ARCH_MX3)	:= 0x80008000
+> > > >  params_phys-$(CONFIG_ARCH_MX3)	:= 0x80000100
+> > > >  initrd_phys-$(CONFIG_ARCH_MX3)	:= 0x80800000
+> > > > +
+> > > > +zreladdr-$(CONFIG_SOC_IMX6Q)	:= 0x10008000
+> > > > +params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
+> > > > +initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
+> > > Do you really need params_phys and initrd_phys?
+> > > 
+> > I added them to make IMX6Q look consistent with other soc in the file,
+> > and leave it to a global cleanup, if we decide to clean later.
+> 
+> I vote to skip params_phys and initrd_phys now. Every recent bootloader
+> does not need them. As the i.MX6 is a new SoC, we have no reason to
+> handle legacy bootloaders. When we want to to a global cleanup for these
+> variables we already know that i.MX6 has no legacy bootloader problems.
+> 
+Ok.
 
-On 8 September 2011 22:03, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> On Thu, Sep 08, 2011 at 09:16:46AM +0530, Thomas Abraham wrote:
->> Hi Dmitry,
->>
->> On 7 September 2011 23:52, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
->> > Hi Thomas,
->> >
->> > On Tue, Sep 06, 2011 at 07:25:16PM +0530, Thomas Abraham wrote:
->> >> Samsung keyboard driver could be used with platforms using device tree.
->> >> So the inclusion of samsung keyboard driver cannot be based on
->> >> SAMSUNG_DEV_KEYPAD. A new config option HAVE_SAMSUNG_KEYPAD is added
->> >> which device tree based platforms should use to include samsung keyboard
->> >> driver.
->> >
->> > I am sorry, I do not follow... What is the difference between
->> > SAMSUNG_DEV_KEYPAD and HAVE_SAMSUNG_KEYPAD? They look exactly the same.
->>
->> The inclusion of platform device instance for keypad (in
->> arch/arm/plat-samsung/dev-keypad.c) in the build depends on
->> SAMSUNG_DEV_KEYPAD. The samsung-keypad driver is also dependent on
->> SAMSUNG_DEV_KEYPAD.
->>
->> In case of device tree based instantiation of keypad, compilation of
->> dev-keypad.c file is not required. So SAMSUNG_DEV_KEYPAD config option
->> will not be selected.In that case, the compilation of the keypad
->> driver cannot be dependent on SAMSUNG_DEV_KEYPAD. There should be
->> another option to select the keypad driver and so HAVE_SAMSUNG_KEYPAD
->> was introduced. HAVE_SAMSUNG_KEYPAD can be selected on platforms that
->> need the samsung-keypad driver but do no need the keypad platform
->> device.
->
-> I still think that it is an extra option... What about the following
-> dependencies:
->
-> ? ? ? ?depends on SAMSUNG_DEV_KEYPAD || OF
-> ? ? ? ?depends on HAVE_CLK
+> BTW many variables have the name imx6q, I suppose the 'q' is for quad
+> cpu. From the FSL website I know that there are other versions of the
+> i.MX6 planned. Are these variables really imx6q specific? Otherwise
+> please skip the 'q'.
+> 
+Before other imx6 family SoCs come to world, we really do not know what
+are imx6q specific and what are not.
 
-There could be OF based Samsung platforms that might not need the
-keypad controller driver to be compiled. And it could get selected for
-non-samsung platforms using OF. So, this change would not provide the
-intended dependencies.
-
->
-> although I think we should relax dependencies like I did in my other
-> patch. This will extend compile coverage of the driver and lessen the
-> chances that API changes will cause unintended breakage because noone
-> but Samsung platform users compile it.
-
-The only concern with your patch was that Samsung keypad driver gets
-listed even for non-samsung platforms. There is no particular
-preference on this. But if you prefer to extend Samsung keypad
-controller driver to other platforms as well, and if others agree,
-that should be fine.
-
-(Sorry for the delayed reply. I was out of office for three days.)
-
-Thanks,
-Thomas.
-
-[...]
+-- 
+Regards,
+Shawn
