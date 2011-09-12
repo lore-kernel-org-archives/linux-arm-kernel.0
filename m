@@ -1,24 +1,28 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sun, 11 Sep 2011 23:10:20 -0400 (EDT)
-Subject: [PATCH v2 00/10] ARM: kprobes: Add test code to kernel tree
-In-Reply-To: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
-References: <1315652706-2900-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <alpine.LFD.2.00.1109112304380.20358@xanadu.home>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Mon, 12 Sep 2011 00:34:12 -0400
+Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <1315737121.18731.3.camel@sauron>
+References: <1315450031-6371-1-git-send-email-b32955@freescale.com>
+	<1315737121.18731.3.camel@sauron>
+Message-ID: <CAMiH66FTWMmvFV8FpDur5sJw8_TBAH=E_CnH-8S4_CYw9L+ckQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 10 Sep 2011, Tixy wrote:
+Hi Artem:
 
-> This is pretty much an essential tool for anyone debugging or extending
-> the kprobes instruction simulation code and is a good regression test
-> for kprobes on ARM.
+Thanks a  lot :)
 
-This is amazing work.  Well done.
+Best Regards
+Huang Shijie
 
-I've posted minor comments on some of the patches already.   You may 
-still add to all of them:
-
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-
-Nicolas
+On Sun, Sep 11, 2011 at 6:31 AM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
+> On Thu, 2011-09-08 at 10:47 +0800, Huang Shijie wrote:
+>> The patch set is based on Artem's tree:
+>> ? ? ? http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
+>
+> Dropped v10 and taken this version to l2-mtd-2.6.git, thanks!
+> --
+> Best Regards,
+> Artem Bityutskiy
+>
+>
