@@ -1,42 +1,52 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 12 Sep 2011 19:47:04 +0300
-Subject: [PATCH 09/10] hwspinlock/omap: omap_hwspinlock_remove should be
-	__devexit
+Date: Mon, 12 Sep 2011 19:47:05 +0300
+Subject: [PATCH 10/10] hwspinlock: add MAINTAINERS entries
 In-Reply-To: <1315846025-11453-1-git-send-email-ohad@wizery.com>
 References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
-Message-ID: <1315846025-11453-10-git-send-email-ohad@wizery.com>
+Message-ID: <1315846025-11453-11-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark omap_hwspinlock_remove with __devexit (and use __devexit_p
-appropriately) so the function can be discarded when the conditions are met.
+Update MAINTAINERS with entries for hwspinlock/core and hwspinlock/omap
+files.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- drivers/hwspinlock/omap_hwspinlock.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ MAINTAINERS |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/hwspinlock/omap_hwspinlock.c b/drivers/hwspinlock/omap_hwspinlock.c
-index aec3006..887d34e 100644
---- a/drivers/hwspinlock/omap_hwspinlock.c
-+++ b/drivers/hwspinlock/omap_hwspinlock.c
-@@ -142,7 +142,7 @@ iounmap_base:
- 	return ret;
- }
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 28f65c2..92cee8e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2953,6 +2953,14 @@ F:	Documentation/hw_random.txt
+ F:	drivers/char/hw_random/
+ F:	include/linux/hw_random.h
  
--static int omap_hwspinlock_remove(struct platform_device *pdev)
-+static int __devexit omap_hwspinlock_remove(struct platform_device *pdev)
- {
- 	struct hwspinlock_device *bank = platform_get_drvdata(pdev);
- 	void __iomem *io_base = bank->lock[0].priv - LOCK_BASE_OFFSET;
-@@ -163,7 +163,7 @@ static int omap_hwspinlock_remove(struct platform_device *pdev)
++HARDWARE SPINLOCK CORE
++M:	Ohad Ben-Cohen <ohad@wizery.com>
++S:	Maintained
++F:	Documentation/hwspinlock.h
++F:	drivers/hwspinlock/hwspinlock_core.c
++F:	drivers/hwspinlock/hwspinlock_internal.h
++F:	include/linux/hwspinlock.h
++
+ HARMONY SOUND DRIVER
+ M:	Kyle McMartin <kyle@mcmartin.ca>
+ L:	linux-parisc at vger.kernel.org
+@@ -4625,6 +4633,13 @@ S:	Maintained
+ F:	drivers/video/omap2/
+ F:	Documentation/arm/OMAP/DSS
  
- static struct platform_driver omap_hwspinlock_driver = {
- 	.probe		= omap_hwspinlock_probe,
--	.remove		= omap_hwspinlock_remove,
-+	.remove		= __devexit_p(omap_hwspinlock_remove),
- 	.driver		= {
- 		.name	= "omap_hwspinlock",
- 		.owner	= THIS_MODULE,
++OMAP HARDWARE SPINLOCK SUPPORT
++M:	Ohad Ben-Cohen <ohad@wizery.com>
++L:	linux-omap at vger.kernel.org
++S:	Maintained
++F:	drivers/hwspinlock/omap_hwspinlock.c
++F:	arch/arm/mach-omap2/hwspinlock.c
++
+ OMAP MMC SUPPORT
+ M:	Jarkko Lavinen <jarkko.lavinen@nokia.com>
+ L:	linux-omap at vger.kernel.org
 -- 
 1.7.4.1
