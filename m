@@ -1,116 +1,193 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Sep 2011 11:56:03 +0100
-Subject: [RFC PATCH v3 1/3] ARM: SoC: Introduce per SoC descriptor
+Date: Mon, 12 Sep 2011 11:56:04 +0100
+Subject: [RFC PATCH v3 2/3] ARM: SoC: Add per SoC SMP and CPU hotplug
+	operations
 In-Reply-To: <1315824965-8485-1-git-send-email-marc.zyngier@arm.com>
 References: <1315824965-8485-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1315824965-8485-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1315824965-8485-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM core code expects the various SoCs to hide their
-implementation differences behind a well established API.
-The various sub-arch-specific bit are often either at
-the machine descriptor level, or provided at link time
-by the sub-arch code.
-
-The SoC descriptor is a container that holds the SoC
-specific bits that can be moved away from the machine
-descriptor as well as an indirection point for the
-global symbols (SMP and CPU hotplug support, for example).
-
-This patch introduce this SoC descriptor, with the only field
-being the name of the SoC.
+Populate the SoC descriptor structure with the SMP and CPU hotplug
+operations. To allow the kernel to continue building, the platform
+hooks are defined as weak symbols which are overrided by the
+platform code. Once all platforms are converted, the "weak" attribute
+will be removed and the function made static.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Nicolas Pitre <nico@fluxnic.net>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/mach/arch.h |    2 ++
- arch/arm/include/asm/soc.h       |   21 +++++++++++++++++++++
- arch/arm/kernel/setup.c          |    9 +++++++++
- 3 files changed, 32 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/soc.h
+ arch/arm/include/asm/soc.h |   35 ++++++++++++++++++++++++++++++-
+ arch/arm/kernel/setup.c    |   29 +++++++++++++++++++++++---
+ arch/arm/kernel/smp.c      |   47 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 105 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 727da11..82883ca 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -13,6 +13,7 @@
- struct tag;
- struct meminfo;
- struct sys_timer;
-+struct arm_soc_desc;
- 
- struct machine_desc {
- 	unsigned int		nr;		/* architecture number	*/
-@@ -34,6 +35,7 @@ struct machine_desc {
- 	unsigned int		reserve_lp1 :1;	/* never has lp1	*/
- 	unsigned int		reserve_lp2 :1;	/* never has lp2	*/
- 	unsigned int		soft_reboot :1;	/* soft reboot		*/
-+	struct arm_soc_desc	*soc;		/* SoC descriptor	*/
- 	void			(*fixup)(struct machine_desc *,
- 					 struct tag *, char **,
- 					 struct meminfo *);
 diff --git a/arch/arm/include/asm/soc.h b/arch/arm/include/asm/soc.h
-new file mode 100644
-index 0000000..ce92784
---- /dev/null
+index ce92784..83e33df 100644
+--- a/arch/arm/include/asm/soc.h
 +++ b/arch/arm/include/asm/soc.h
-@@ -0,0 +1,21 @@
-+/*
-+ *  linux/arch/arm/include/asm/soc.h
-+ *
-+ *  Copyright (C) 2011 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+@@ -12,10 +12,41 @@
+ #ifndef __ASM_ARM_SOC_H
+ #define __ASM_ARM_SOC_H
+ 
++struct task_struct;
 +
-+#ifndef __ASM_ARM_SOC_H
-+#define __ASM_ARM_SOC_H
-+
-+struct arm_soc_desc {
-+	const char		*name;
++struct arm_soc_smp_init_ops {
++	void (*smp_init_cpus)(void);
++	void (*smp_prepare_cpus)(unsigned int max_cpus);
 +};
 +
-+extern const struct arm_soc_desc	*soc_desc;
++struct arm_soc_smp_ops {
++	void (*smp_secondary_init)(unsigned int cpu);
++	int  (*smp_boot_secondary)(unsigned int cpu, struct task_struct *idle);
++#ifdef CONFIG_HOTPLUG_CPU
++	int  (*cpu_kill)(unsigned int cpu);
++	void (*cpu_die)(unsigned int cpu);
++	int  (*cpu_disable)(unsigned int cpu);
++#endif
++};
 +
-+#endif	/* __ASM_ARM_SOC_H */
+ struct arm_soc_desc {
+-	const char		*name;
++	const char			*name;
++#ifdef CONFIG_SMP
++	struct arm_soc_smp_init_ops	*smp_init_ops;
++	struct arm_soc_smp_ops		*smp_ops;
++#endif
+ };
+ 
+-extern const struct arm_soc_desc	*soc_desc;
++#ifdef CONFIG_SMP
++#define soc_smp_init_ops(ops)	.smp_init_ops = &(ops),
++#define soc_smp_ops(ops)	.smp_ops = &(ops),
++#else
++#define soc_smp_init_ops(ops)	/* empty */
++#define soc_smp_ops(ops)	/* empty */
++#endif
++
++extern const struct arm_soc_desc		*soc_desc;
++extern const struct arm_soc_smp_init_ops	*soc_smp_init_ops;
++extern const struct arm_soc_smp_ops		*soc_smp_ops;
+ 
+ #endif	/* __ASM_ARM_SOC_H */
 diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 192a24f..6bfa5f6 100644
+index 6bfa5f6..4e6dc63 100644
 --- a/arch/arm/kernel/setup.c
 +++ b/arch/arm/kernel/setup.c
-@@ -45,6 +45,7 @@
- #include <asm/cachetype.h>
- #include <asm/tlbflush.h>
- #include <asm/system.h>
-+#include <asm/soc.h>
- 
- #include <asm/prom.h>
- #include <asm/mach/arch.h>
-@@ -140,6 +141,8 @@ static const char *cpu_name;
+@@ -141,8 +141,12 @@ static const char *cpu_name;
  static const char *machine_name;
  static char __initdata cmd_line[COMMAND_LINE_SIZE];
  struct machine_desc *machine_desc __initdata;
-+const struct arm_soc_desc *soc_desc;
-+static struct arm_soc_desc __soc_desc __read_mostly;
+-const struct arm_soc_desc *soc_desc;
+-static struct arm_soc_desc __soc_desc __read_mostly;
++const struct arm_soc_desc *soc_desc __initdata;
++#ifdef CONFIG_SMP
++const struct arm_soc_smp_init_ops *soc_smp_init_ops  __initdata;
++const struct arm_soc_smp_ops *soc_smp_ops  __cpuinitdata;
++static struct arm_soc_smp_ops __soc_smp_ops __cpuinitdata;
++#endif
  
  static char default_command_line[COMMAND_LINE_SIZE] __initdata = CONFIG_CMDLINE;
  static union { char c[4]; unsigned long l; } endian_test __initdata = { { 'l', '?', '?', 'b' } };
-@@ -909,6 +912,12 @@ void __init setup_arch(char **cmdline_p)
- 		mdesc = setup_machine_tags(machine_arch_type);
+@@ -913,11 +917,28 @@ void __init setup_arch(char **cmdline_p)
  	machine_desc = mdesc;
  	machine_name = mdesc->name;
-+	if (mdesc->soc) {
-+		__soc_desc = *mdesc->soc;
-+		soc_desc = &__soc_desc;
-+		pr_info("SoC: %s\n", soc_desc->name);
+ 	if (mdesc->soc) {
+-		__soc_desc = *mdesc->soc;
+-		soc_desc = &__soc_desc;
++		soc_desc = mdesc->soc;
+ 		pr_info("SoC: %s\n", soc_desc->name);
+ 	} else
+ 		soc_desc = NULL;
++#ifdef CONFIG_SMP
++	if (soc_desc && soc_desc->smp_init_ops)
++		soc_smp_init_ops = soc_desc->smp_init_ops;
++	else
++		soc_smp_ops = NULL;
++
++	/*
++	 * Warning: we're copying an __initdata structure into a
++	 * __cpuinitdata structure. We *know* it is valid because only
++	 * __cpuinit (or more persistant) functions should be pointed
++	 * to by soc_smp_ops. Still, this is borderline ugly.
++	 */
++	if (soc_desc && soc_desc->smp_ops) {
++		__soc_smp_ops = *soc_desc->smp_ops;
++		soc_smp_ops = &__soc_smp_ops;
 +	} else
-+		soc_desc = NULL;
++		soc_smp_ops = NULL;
++#endif
  
  	if (mdesc->soft_reboot)
  		reboot_setup("s");
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 3f12ce9..04d7b80 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -28,6 +28,7 @@
+ #include <linux/completion.h>
+ 
+ #include <linux/atomic.h>
++#include <asm/soc.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
+@@ -155,9 +156,55 @@ int __cpuinit __cpu_up(unsigned int cpu)
+ 	return ret;
+ }
+ 
++/* SoC helpers */
++void __attribute__((weak)) __init smp_init_cpus(void)
++{
++	if (soc_smp_init_ops && soc_smp_init_ops->smp_init_cpus)
++		soc_smp_init_ops->smp_init_cpus();
++}
++
++void __attribute__((weak)) __init platform_smp_prepare_cpus(unsigned int max_cpus)
++{
++	if (soc_smp_ops && soc_smp_init_ops->smp_prepare_cpus)
++		soc_smp_init_ops->smp_prepare_cpus(max_cpus);
++}
++
++void __attribute__((weak)) __cpuinit platform_secondary_init(unsigned int cpu)
++{
++	if (soc_smp_ops && soc_smp_ops->smp_secondary_init)
++		soc_smp_ops->smp_secondary_init(cpu);
++}
++
++int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	if (soc_smp_ops && soc_smp_ops->smp_boot_secondary)
++		return soc_smp_ops->smp_boot_secondary(cpu, idle);
++	return -ENOSYS;
++}
++
+ #ifdef CONFIG_HOTPLUG_CPU
+ static void percpu_timer_stop(void);
+ 
++int __attribute__((weak)) __cpuinit platform_cpu_kill(unsigned int cpu)
++{
++	if (soc_smp_ops && soc_smp_ops->cpu_kill)
++		return soc_smp_ops->cpu_kill(cpu);
++	return 0;
++}
++
++void __attribute__((weak)) __cpuinit platform_cpu_die(unsigned int cpu)
++{
++	if (soc_smp_ops && soc_smp_ops->cpu_die)
++		soc_smp_ops->cpu_die(cpu);
++}
++
++int __attribute__((weak)) __cpuinit platform_cpu_disable(unsigned int cpu)
++{
++	if (soc_smp_ops && soc_smp_ops->cpu_disable)
++		return soc_smp_ops->cpu_disable(cpu);
++	return -EPERM;
++}
++
+ /*
+  * __cpu_disable runs on the processor to be shutdown.
+  */
 -- 
 1.7.0.4
