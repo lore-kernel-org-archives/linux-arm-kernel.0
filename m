@@ -1,130 +1,71 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 12 Sep 2011 14:45:34 -0600
-Subject: [PATCH 1/2 v2] power: bq20z75: devicetree init support
-In-Reply-To: <1315615669-8701-1-git-send-email-rklein@nvidia.com>
-References: <1315615669-8701-1-git-send-email-rklein@nvidia.com>
-Message-ID: <20110912204533.GI23345@ponder.secretlab.ca>
+Date: Mon, 12 Sep 2011 15:04:05 -0600
+Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
+In-Reply-To: <1703861.Hm5X9zr4LP@wuerfel>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<20110912161201.GN1258@S2100-06.ap.freescale.net>
+	<20110912194032.GB23345@ponder.secretlab.ca>
+	<1703861.Hm5X9zr4LP@wuerfel>
+Message-ID: <20110912210405.GJ23345@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2011 at 05:47:48PM -0700, Rhyland Klein wrote:
-> Adding support to generate platform data when kernel is configured
-> through device tree.
+On Mon, Sep 12, 2011 at 10:28:27PM +0200, Arnd Bergmann wrote:
+> On Monday 12 September 2011 13:40:33 Grant Likely wrote:
+> > On Tue, Sep 13, 2011 at 12:12:02AM +0800, Shawn Guo wrote:
+> > > On Wed, Sep 07, 2011 at 09:56:21AM +0200, Arnd Bergmann wrote:
+> > > > On Wednesday 07 September 2011 14:05:03 Shawn Guo wrote:
+> > > > > > My feeling is that this time, we should wait for the common clock
+> > > > > > framework to get in and simplify this. I believe Thomas is now planning
+> > > > > > to do this, but I haven't followed what the current state is.
+> > > > > > 
+> > > > > Sadly, if this is the position of entire arm-soc maintainer group,
+> > > > > I think I have made a wrong decision to start upstreaming imx6q now.
+> > > > 
+> > > > We haven't discussed it as a group, it's my own opinion.
+> > > > 
+> > > 
+> > > Hi Thomas, Grant,
+> > > 
+> > > Could you please share your opinion here?
+> > > 
+> > > I really do not see the hope that clock framework and device tree
+> > > binding could possibly catch v3.2 window, while I'm hoping that imx6q
+> > > series can go into v3.2.
+> > > 
+> > > Can you please agree that we can let the imx6q clock code in and then
+> > > migrate it to clock framework and device tree once they get ready?
+> > 
+> > I've not looked very deeply at this patch, but I completely agree that
+> > we cannot block new platforms on infrastructure that isn't remotely
+> > mergable at this point in time.
+> > 
+> > However, imx6 is a new platform.  There isn't any non-DT board support
+> > code to continue to support.  At the very least, the configurable
+> > parameters, like what is passed into mx6q_clocks_init() should be
+> > obtained from the device tree (maybe it already does this though, I
+> > haven't looked that closely).
+> > 
+> > In general, I say merge it.
 > 
-> Signed-off-by: Rhyland Klein <rklein@nvidia.com>
-> ---
-> 	v2: Fixed typo in binding description
-> 
->  drivers/power/bq20z75.c |   73 +++++++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 73 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/power/bq20z75.c b/drivers/power/bq20z75.c
-> index 9c5e5be..922f725 100644
-> --- a/drivers/power/bq20z75.c
-> +++ b/drivers/power/bq20z75.c
-> @@ -613,6 +613,76 @@ static void bq20z75_delayed_work(struct work_struct *work)
->  	}
->  }
->  
-> +#if defined(CONFIG_OF)
-> +#include <linux/of_device.h>
-> +static const struct of_device_id bq20z75_dt_ids[] = {
-> +	{ .compatible = "ti,bq20z75" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(platform, bq20z75_dt_ids);
-> +
-> +static struct bq20z75_platform_data *bq20z75_of_populate_pdata(
-> +	struct i2c_client *client)
-> +{
-> +	const struct of_device_id *dtid;
-> +	struct device_node *of_node = client->dev.of_node;
-> +	struct bq20z75_platform_data *pdata = client->dev.platform_data;
-> +	int rc;
-> +	u32 prop;
-> +
-> +	/* verify this driver matches this device */
-> +	dtid = of_match_device(bq20z75_dt_ids, &client->dev);
-> +	if (!dtid)
-> +		return NULL;
+> Ok, thanks for taking a look. Do you believe that the clock binding is any
+> closer to being finalized than the actual code implementing it? I think
 
-Just the fact that of_node pointer is set means that a match was made
-against the table.  No need for calling of_match_device.
+Amit is assigning a Linaro engineer to look at it, and there will be a
+conference call later this week to look over the work that has been
+done with an eye to getting something ready to be merged.  Hopefully
+with a full time engineer things will start moving forward again.  We
+had a meeting about it at LPC last week.
 
-> +
-> +	/* if platform data is set, honor it */
-> +	if (pdata)
-> +		return pdata;
-> +
-> +	/* first make sure at least one property is set, otherwise
-> +	 * it won't change behavior from running without pdata.
-> +	 */
-> +	if (!of_get_property(of_node, "i2c-retry-count", NULL) &&
-> +		!of_get_property(of_node, "poll-retry-count", NULL) &&
-> +		!of_get_property(of_node, "battery-detect", NULL) &&
-> +		!of_get_property(of_node, "battery-detect-present", NULL))
-> +		goto of_out;
-> +
-> +	pdata = devm_kzalloc(&client->dev, sizeof(struct bq20z75_platform_data),
-> +				GFP_KERNEL);
-> +	if (!pdata)
-> +		goto of_out;
-> +
-> +	rc = of_property_read_u32(of_node, "i2c-retry-count", &prop);
-> +	if (!rc)
-> +		pdata->i2c_retry_count = prop;
-> +
-> +	rc = of_property_read_u32(of_node, "battery-detect", &prop);
-> +	if (!rc)
-> +		pdata->battery_detect = prop;
-> +	else
-> +		pdata->battery_detect = -1; /*default is no gpio */
-> +
-> +	rc = of_property_read_u32(of_node, "battery-detect-present", &prop);
-> +	if (!rc)
-> +		pdata->battery_detect_present = prop;
-> +
-> +	rc = of_property_read_u32(of_node, "poll-retry-count", &prop);
-> +	if (!rc)
-> +		pdata->poll_retry_count = prop;
-> +
-> +of_out:
-> +	return pdata;
-> +}
-> +#else
-> +#define bq20z75_dt_ids NULL
-> +static struct bq20z75_platform_data *bq20z75_of_populate_pdata(
-> +	struct i2c_client *client)
-> +{
-> +	return NULL;
-> +}
-> +#endif
-> +
->  static int __devinit bq20z75_probe(struct i2c_client *client,
->  	const struct i2c_device_id *id)
->  {
-> @@ -642,6 +712,8 @@ static int __devinit bq20z75_probe(struct i2c_client *client,
->  	bq20z75_device->power_supply.external_power_changed =
->  		bq20z75_external_power_changed;
->  
-> +	pdata = bq20z75_of_populate_pdata(client);
-> +
->  	if (pdata) {
->  		bq20z75_device->gpio_detect =
->  			gpio_is_valid(pdata->battery_detect);
-> @@ -775,6 +847,7 @@ static struct i2c_driver bq20z75_battery_driver = {
->  	.id_table	= bq20z75_id,
->  	.driver = {
->  		.name	= "bq20z75-battery",
-> +		.of_match_table = bq20z75_dt_ids,
->  	},
->  };
->  
-> -- 
-> 1.7.6
+> it would be very helpful to at least put all the clock related settings
+> into the device tree in a way that is going to be stable, even if the
+> code is still in flux.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Moreover, if we have a binding document, we can start implementing code
+> for one platform and then generalize it later.
+
+Yes, a binding would be useful, but I still expect that things will be
+in flux during these early stages, so there will be some room to
+modify insufficient early bindings.
+
+g.
