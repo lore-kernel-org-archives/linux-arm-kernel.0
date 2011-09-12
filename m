@@ -1,39 +1,36 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 13 Sep 2011 00:28:34 +0530
-Subject: [PATCH v3 4/6] DMA: PL330: Add device tree support
-In-Reply-To: <1315852165-32402-5-git-send-email-thomas.abraham@linaro.org>
-References: <1315852165-32402-1-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-2-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-3-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-4-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-5-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <CABb+yY0QPQpfU=vvOLNG3U6idEv4Gy9btxt=-fRhMJwA+PLPzQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 12 Sep 2011 13:16:31 -0600
+Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
+In-Reply-To: <20110908064834.GL8148@S2100-06.ap.freescale.net>
+References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
+	<1315303120-24203-4-git-send-email-shawn.guo@linaro.org>
+	<1711465.COqYbTSZES@wuerfel>
+	<20110907060501.GE8148@S2100-06.ap.freescale.net>
+	<CAGsJ_4zF0hPKmYYETPGEgHHeyZUfjPUFkrTk--yPuuNy_M=DJA@mail.gmail.com>
+	<20110908064834.GL8148@S2100-06.ap.freescale.net>
+Message-ID: <20110912191631.GA23345@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2011 at 11:59 PM, Thomas Abraham
-<thomas.abraham@linaro.org> wrote:
-> For PL330 dma controllers instantiated from device tree, the channel
-> lookup is based on phandle of the dma controller and dma request id
-> specified by the client node. During probe, the private data of each
-> channel of the controller is set to point to the device node of the
-> dma controller. The 'chan_id' of the each channel is used as the
-> dma request id.
->
-> Client driver requesting dma channels specify the phandle of the
-> dma controller and the request id. The pl330 filter function
-> converts the phandle to the device node pointer and matches that
-> with channel's private data. If a match is found, the request id
-> from the client node and the 'chan_id' of the channel is matched.
-> A channel is found if both the values match.
->
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Boojin Kim <boojin.kim@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-> ---
+On Thu, Sep 08, 2011 at 02:48:35PM +0800, Shawn Guo wrote:
+> On Wed, Sep 07, 2011 at 08:43:06PM +0800, Barry Song wrote:
+> > auxdata is really a temp solution, it really brings many details to
+> > kernel, which should not be in kernel at all.
+> > 
+> The auxdata was originally designed to be a temp solution.  But we
+> will see if it's really temp, considering it could also be used to
+> carry platform callbacks and attach device id.  There are some other
+> cases beside clock lookup that we have not been able to sort out just
+> by device tree and will probably have to use auxdata as well.
 
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+auxdata is indeed intended to be a temporary solution, and it is an
+absolute requirement that board ports migrate away from it as soon as
+feasible (ie. when needed infrastructure for clk, etc, become
+available).
 
-thanks
--jassi
+However, I don't expect auxdata to ever be completely removed.  There
+will always be a handful of boards that require something special to
+be provided by board code.  In those cases, auxdata is a perfectly
+acceptable solution.
+
+g.
