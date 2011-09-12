@@ -1,23 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Sep 2011 16:06:08 +0200
-Subject: [PATCH 2/2] mmc: mmci: simplify err check in mmci_post_request
-In-Reply-To: <1314624959-4634-3-git-send-email-per.forlin@linaro.org>
-References: <1314624959-4634-1-git-send-email-per.forlin@linaro.org>
-	<1314624959-4634-3-git-send-email-per.forlin@linaro.org>
-Message-ID: <CACRpkdYq1eWCNtQB9BVJ814MU+m6CBRuOLySPpVAiyj2DpJ2vQ@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 12 Sep 2011 10:12:44 -0400
+Subject: [PATCH 10/24] C6X: time management
+In-Reply-To: <alpine.LFD.2.02.1109091612150.2723@ionos>
+References: <1314826019-22330-1-git-send-email-msalter@redhat.com>
+	<1314826019-22330-11-git-send-email-msalter@redhat.com>
+	<alpine.LFD.2.02.1109091612150.2723@ionos>
+Message-ID: <1315836765.11280.1.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 29, 2011 at 3:35 PM, Per Forlin <per.forlin@linaro.org> wrote:
+On Fri, 2011-09-09 at 16:19 +0200, Thomas Gleixner wrote:
+> On Wed, 31 Aug 2011, Mark Salter wrote:
+> > +	cd->cpumask		= cpumask_of(smp_processor_id());
+> > +
+> > +	clockevents_register_device(cd);
+> > +
+> > +	/* Set handler */
+> > +	if (cd->irq != NO_IRQ)
+> 
+> How does a timer device work w/o interrupt ?
 
-> The error condition indicates that mmci_post_request() should cleanup
-> after the mmci_pre_request(). In this case the resources allocated by
-> device_prep_slave_sg() are freed by calling dmaengine_terminate_all().
-> dma_unmap_sg() should always be performed if the host_cookie is set.
->
-> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+Heh, not very well. That check needs to happen earlier so we don't
+register the device if we can't find the irq number.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Thanks,
-Linus Walleij
+--Mark
