@@ -1,97 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Sep 2011 11:17:15 +0100
-Subject: Fwd: [PATCH] Fix build errors with gpio-generic.c
-Message-ID: <20110913101715.GA8141@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 13 Sep 2011 13:19:56 +0300
+Subject: [PATCH 1/3] iommu/core: add fault reporting mechanism
+In-Reply-To: <20110913100034.GJ11701@amd.com>
+References: <1315421604-12286-1-git-send-email-ohad@wizery.com>
+	<20110912160252.GE11701@amd.com>
+	<CAK=WgbZCDsBk+dueKfAX3ewsvqEnVDN+jW_ftW+BDKnayunOwA@mail.gmail.com>
+	<20110913100034.GJ11701@amd.com>
+Message-ID: <CAK=WgbZ0TGDevR+HP=KmE1DDanSwCxOnpNf_wn2UfRATALJHcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping.  Any chance of getting this in before 3.1 ?
+On Tue, Sep 13, 2011 at 1:00 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> For now I think it is the best to remove this IOMMU_ERROR thing. It is
+> inherent to the function call already. When a real use-case comes up we
+> can easily add it later.
 
------ Forwarded message from Russell King - ARM Linux <linux@arm.linux.org.uk> -----
-Date: Mon, 15 Aug 2011 20:25:31 +0100
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-To: Grant Likely <grant.likely@secretlab.ca>
-Cc: linux-arm-kernel at lists.infradead.org, linux-kernel at vger.kernel.org
-Subject: [PATCH] Fix build errors with gpio-generic.c
+I'm fine with this, will post an update.
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-GPIO: Fix build errors with gpio-generic.c
-
-Building a kernel with hotplug disabled results in a link failure:
-
-`bgpio_remove' referenced in section `___ksymtab_gpl+bgpio_remove' of drivers/built-in.o: defined in discarded section `.devexit.text' of drivers/built-in.o
-
-This is caused because of the bgpio_remove is exported.  It is illegal
-to export symbols which are discarded either at link time or as part of
-an init/exit section.
-
-Fix this by dropping the __devexit attributation from bgpio_remove().
-Also drop the __devinit attributation from bgpio_init().
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/gpio/gpio-generic.c     |   15 +++++----------
- include/linux/basic_mmio_gpio.h |   15 +++++----------
- 2 files changed, 10 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
-index 231714d..4e24436 100644
---- a/drivers/gpio/gpio-generic.c
-+++ b/drivers/gpio/gpio-generic.c
-@@ -351,7 +351,7 @@ static int bgpio_setup_direction(struct bgpio_chip *bgc,
- 	return 0;
- }
- 
--int __devexit bgpio_remove(struct bgpio_chip *bgc)
-+int bgpio_remove(struct bgpio_chip *bgc)
- {
- 	int err = gpiochip_remove(&bgc->gc);
- 
-@@ -361,15 +361,10 @@ int __devexit bgpio_remove(struct bgpio_chip *bgc)
- }
- EXPORT_SYMBOL_GPL(bgpio_remove);
- 
--int __devinit bgpio_init(struct bgpio_chip *bgc,
--			 struct device *dev,
--			 unsigned long sz,
--			 void __iomem *dat,
--			 void __iomem *set,
--			 void __iomem *clr,
--			 void __iomem *dirout,
--			 void __iomem *dirin,
--			 bool big_endian)
-+int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
-+	       unsigned long sz, void __iomem *dat, void __iomem *set,
-+	       void __iomem *clr, void __iomem *dirout, void __iomem *dirin,
-+	       bool big_endian)
- {
- 	int ret;
- 
-diff --git a/include/linux/basic_mmio_gpio.h b/include/linux/basic_mmio_gpio.h
-index 98999cf..feb91219 100644
---- a/include/linux/basic_mmio_gpio.h
-+++ b/include/linux/basic_mmio_gpio.h
-@@ -63,15 +63,10 @@ static inline struct bgpio_chip *to_bgpio_chip(struct gpio_chip *gc)
- 	return container_of(gc, struct bgpio_chip, gc);
- }
- 
--int __devexit bgpio_remove(struct bgpio_chip *bgc);
--int __devinit bgpio_init(struct bgpio_chip *bgc,
--			 struct device *dev,
--			 unsigned long sz,
--			 void __iomem *dat,
--			 void __iomem *set,
--			 void __iomem *clr,
--			 void __iomem *dirout,
--			 void __iomem *dirin,
--			 bool big_endian);
-+int bgpio_remove(struct bgpio_chip *bgc);
-+int bgpio_init(struct bgpio_chip *bgc, struct device *dev,
-+	       unsigned long sz, void __iomem *dat, void __iomem *set,
-+	       void __iomem *clr, void __iomem *dirout, void __iomem *dirin,
-+	       bool big_endian);
- 
- #endif /* __BASIC_MMIO_GPIO_H */
-
-
------ End forwarded message -----
+Thanks,
+Ohad.
