@@ -1,32 +1,28 @@
-From: dwmw2@infradead.org (David Woodhouse)
-Date: Tue, 13 Sep 2011 22:32:59 +0100
-Subject: [PATCH v2 5/6] iommu/intel: announce supported page sizes
-In-Reply-To: <1315942288-17297-5-git-send-email-ohad@wizery.com>
-References: <1315942288-17297-1-git-send-email-ohad@wizery.com>
-	<1315942288-17297-5-git-send-email-ohad@wizery.com>
-Message-ID: <1315949582.2687.204.camel@shinybook.infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Sep 2011 23:37:47 +0100
+Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
+	online/active
+In-Reply-To: <alpine.LFD.2.02.1109132247490.2723@ionos>
+References: <20110908215314.829452535@linutronix.de>
+	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
+	<20110913133258.GA6267@n2100.arm.linux.org.uk>
+	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+	<20110913175312.GB6267@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1109132247490.2723@ionos>
+Message-ID: <20110913223747.GA23109@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-09-13 at 22:31 +0300, Ohad Ben-Cohen wrote:
-> + * Traditionally the IOMMU core just handed us the mappings directly,
-> + * after making sure the size is an order of a 4KB page and that the
-> + * mapping has natural alignment.
-> + *
-> + * To retain this behavior, we currently advertise that we support
-> + * all page sizes that are an order of 4KB. 
+On Tue, Sep 13, 2011 at 10:48:48PM +0200, Thomas Gleixner wrote:
+> The question is whether you really need to calibrate the delay for
+> each core or if you simply can take the calibration of the first
+> core. That would avoid enabling interrupts all the way.
 
-This is wrong. We do not support 4000-byte pages. We only support
-4096-byte pages. 4KiB, not 4kB.
+That depends whether you require all cores in a SMP system to be built
+the same way or not (and therefore to have the same performance.)  I'm
+aware of at least one implementation where that isn't the case, and I
+see no reason why that would not become more common.
 
-Please fix.
-
--- 
-dwmw2
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 5818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110913/9925b4a6/attachment.bin>
+In that case, we need the individual core delay calibration, and lock
+delays to either cores or specific groups of cores, or use hardware
+timers (if available, and with enough precision) for them.
