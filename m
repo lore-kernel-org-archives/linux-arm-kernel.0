@@ -1,107 +1,28 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 13 Sep 2011 10:40:32 +0100
-Subject: [RFC 1/2] virtio: Add AMBA bus driver for virtio device
-In-Reply-To: <87hb4h408d.fsf@rustcorp.com.au>
-References: <1314966257-7503-1-git-send-email-pawel.moll@arm.com>
-	<1314966257-7503-2-git-send-email-pawel.moll@arm.com>
-	<877h5e5yxp.fsf@rustcorp.com.au>
-	<1315845956.3297.7.camel@hornet.cambridge.arm.com>
-	<87hb4h408d.fsf@rustcorp.com.au>
-Message-ID: <1315906832.3297.41.camel@hornet.cambridge.arm.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Tue, 13 Sep 2011 17:50:18 +0800
+Subject: [Android-virt] KVM ARM interrupt virtualization
+In-Reply-To: <CAFEAcA_GJ5-FXzT9ac_H8VSsMXez5rUgBTGuTQwM1-fZS2EYPA@mail.gmail.com>
+References: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>	<CAHkRjk6Vm2yNLm8Gzk3+4mYAfiXVjufv2xc0Kc-6ac-oS4zytw@mail.gmail.com>	<CAOMgcGJBoeKJ8FjDW9eESfT+FiXmFF9PfShJ=a2adbESLD2YkA@mail.gmail.com>	<20110908085449.GA29243@e102109-lin.cambridge.arm.com>	<4E6899B5.70608@gmail.com>	<CAFEAcA8=mGUP0dXTNXM6y9RDtWWEkJ2YhuavMBW-3BFfbOPS0g@mail.gmail.com>	<4E6EE90C.7000308@gmail.com>
+	<CAFEAcA_GJ5-FXzT9ac_H8VSsMXez5rUgBTGuTQwM1-fZS2EYPA@mail.gmail.com>
+Message-ID: <4E6F275A.1010507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > No problem, I've reserved 128 bits in the modified registers layout (see
-> > RFC v2), I can even change it into "offset/value" interface, which would
-> > give you variable width. One thing I don't get is how to access feature
-> > bits > 31? The get_features() seems
-> > to be limited to 32:
-> > 
-> > struct virtio_config_ops {
-> > <...>
-> > 	u32 (*get_features)(struct virtio_device *vdev);
-> > <...>
-> > }
-> 
-> There's a patch for that already :)
 
-Ok, so how about one of the following two options:
 
-1. 4 * 32-bit words of feature flags, 128 bits in total:
+On 2011?09?13? 15:43, Peter Maydell wrote:
+> On 13 September 2011 06:24, bill4carson<bill4carson@gmail.com>  wrote:
+>> Thanks for your informations, any contribution and help would be welcome.
+>> The initial Qemu A15 support has been added, and could boot with KVM
+>> support.
+> ...added where? If you have qemu patches can you point me at them,
+> or submit them to qemu-devel, please?
+>
+It's on my local private tree.
+I'll send the review request to qemu-devel ASAP.
 
- *  0x010   32  HostFeatures0  Features supported by the host, bits 0-31
- *  0x014   32  HostFeatures1  Features supported by the host, bits 32-63
- *  0x018   32  HostFeatures2  Features supported by the host, bits 64-95
- *  0x01c   32  HostFeatures3  Features supported by the host, bits 96-127
 
- *  0x020   32  GuestFeatures0 Features activated by the guest, bits 0-31
- *  0x024   32  GuestFeatures1 Features activated by the guest, bits 32-63
- *  0x028   32  GuestFeatures2 Features activated by the guest, bits 64-95
- *  0x02c   32  GuestFeatures3 Features activated by the guest, bits 96-127
-
-2. "Select word -> read flags" interface:
-
- *  0x010   32  HostFeaturesFlags  Features supported by the host
- *  0x014   32  HostFeaturesWord   Set of features to access
-
- *  0x020   32  GuestFeaturesFlags Features activated by the guest
- *  0x024   32  GuestFeaturesWord  Set of features to set
-
-In this case the algorithm would be:
-
-	writel(0, HostFeaturesWord);
-	bits_0_31 = readl(HostFeaturesFlags);
-	writel(1, HostFeaturesWord);
-	bits_32_63 = readl(HostFeaturesFlags);
-	<etc>
-
-The latter seems more "future-proof" to me, if slightly more complex...
-Any other suggestions?
-
-> > > > + *  0x008   32  QueuePFN      PFN for the currently selected queue
-> > > > + *  0x00c   32  QueueNum      Queue size for the currently selected queue
-> > > 
-> > > You should, I believe, seriously consider allowing the guest to set the
-> > > queue size, rather than the host (perhaps the host could suggest one,
-> > > but the guest should be able to override it).
-> > 
-> > I guess the QueueNum could be simply a read/write register - guest can
-> > read suggestion and override it writing it back. The same question
-> > though - how can guest change it? (I mean some API?)
-> 
-> We can sort that out later... the Guest may try some ambitious large
-> allocation and fall back if it fails.
-
-So, to my mind, the negotiations could look like this (from the Guest's
-point of view):
-
-1. (optional) The Guest is asking what size is "suggested" by the Host:
-
-	size = readl(QueueNum);
-
-2. The Guest requests size it would like to use:
-
-	writel(optimal_size(size), QueueNum);
-
-3. The Host does the best it can to accommodate the Guest and the Guest
-checks the effective size:
-
-	size = real(QueueNum);
-
-Does it make some sense?
-
-> > > Anthony or Michael might suggest other changes, since they are most
-> > > familiar with virtio_pci limitations...
-> > 
-> > I've added them on the RFC v2 Cc as well - all feedback more then
-> > welcome!
-> 
-> Excellent...  of course, the virtualization list is down at the moment,
-> making this a bit more awkward.
-
-Haha - at least once I can't blame our corporate IT for making my job
-harder ;-)
-
-Cheers!
-
-Pawe?
+bill
+> thanks
+> -- PMM
+>
