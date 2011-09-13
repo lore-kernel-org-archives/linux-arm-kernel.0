@@ -1,51 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Sep 2011 14:32:58 +0100
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
-	online/active
-In-Reply-To: <CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-References: <20110908215314.829452535@linutronix.de>
-	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-Message-ID: <20110913133258.GA6267@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 Sep 2011 08:50:56 -0500
+Subject: [PATCH] ARM: CACHE-L2X0: filter start address can be 0 and is
+	often 0
+In-Reply-To: <1315895573-30765-1-git-send-email-Baohua.Song@csr.com>
+References: <1315895573-30765-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <4E6F5FC0.20806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2011 at 07:00:53PM +0530, amit kachhap wrote:
-> Hi Thomas,
-> 
-> This movement of set_cpu_online before percpu_timer_setup is usefull
-> for samsung exyno4 platforms where the external gic timer
-> initialisation needs the secondary cpu to be online.
-> In addition to your modifications the following changes fixes the race
-> condition crash happening when sched_mc configuration flags
-> (CONFIG_ARM_CPU_TOPOLOGY, CONFIG_SCHED_MC ,CONFIG_SCHED_SMT) are
-> enabled. Sched_mc patches are recently submitted by Vincent and
-> accepted by Russell.(https://lkml.org/lkml/2011/7/5/209). I have not
-> attached the crash log here. If needed i can do so.
-> 
+On 09/13/2011 01:32 AM, Barry Song wrote:
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
 > ---
->  arch/arm/kernel/smp.c |    2 +-
+>  arch/arm/mm/cache-l2x0.c |    2 +-
 >  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 8cb94c8..04a8630 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -316,6 +316,7 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
->          * interrupts otherwise a wakeup of a kernel thread affine to
->          * this CPU might break the affinity and let hell break lose.
->          */
-> +       smp_store_cpu_info(cpu);
->         set_cpu_online(cpu, true);
->         while (!cpu_active(cpu))
->                 cpu_relax();
-> @@ -330,7 +331,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
-> 
->         calibrate_delay();
-> 
-> -       smp_store_cpu_info(cpu);
-
-This is totally wrong - the order of things here is quite specific.
-You can't store the CPU info until after you've calibrated the delay
-loop.
-
-Please continue playing cat-and-mouse with this.
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index a780448..0d85d22 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -437,7 +437,7 @@ static void __init pl310_of_setup(const struct device_node *np,
+>  
+>  	of_property_read_u32_array(np, "arm,filter-ranges",
+>  				   filter, ARRAY_SIZE(filter));
+> -	if (filter[0] && filter[1]) {
+> +	if (filter[1]) {
+>  		writel_relaxed(ALIGN(filter[0] + filter[1], SZ_1M),
+>  			       l2x0_base + L2X0_ADDR_FILTER_END);
+>  		writel_relaxed((filter[0] & ~(SZ_1M - 1)) | L2X0_ADDR_FILTER_EN,
