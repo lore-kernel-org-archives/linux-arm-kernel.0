@@ -1,92 +1,113 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Tue, 13 Sep 2011 02:10:06 -0700
-Subject: [PATCH] ARM: CSR: call l2x0_of_init to init L2 cache of SiRFprimaII
-Message-ID: <1315905006-21390-1-git-send-email-Baohua.Song@csr.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Sep 2011 11:21:51 +0200
+Subject: [PATCH 1/4 v6] drivers: create a pin control subsystem v6
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B327A58F@HQMAIL01.nvidia.com>
+References: <1314869536-5495-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B327A3FD@HQMAIL01.nvidia.com>
+	<CACRpkdYBaWq3BuXNvMtgaS1nMzU-vArRB9_y5WE3Zqp9idaOuA@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B327A58F@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdbMP8=BoNq63DVKoRwqw7zwyK4kLy3p1EhaCDfLt-+=zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <robherring2@gmail.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
+[I know Stephen is on vacation, just stacking up some nice reading for
+when he gets back and for others to enjoy]
 
-This patch depends on:
-[1]Rob Herring
-ARM: 7009/1: l2x0: Add OF based initialization
-http://www.spinics.net/lists/arm-kernel/msg131123.html
-it has been in rmk/for-next
+On Fri, Sep 2, 2011 at 6:33 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Linus Walleij wrote at Friday, September 02, 2011 6:59 AM:
 
-[2]Barry Song
-ARM: CACHE-L2X0: filter start address can be 0 and is often 0
-http://www.spinics.net/lists/arm-kernel/msg140126.html
-this patch fixes the filter start address error of Rob Herring'patch
+>> >> diff --git a/include/linux/pinctrl/pinmux.h b/include/linux/pinctrl/pinmux.h
+>> >
+>> >> +/**
+>> >> + * struct pinmux_ops - pinmux operations, to be implemented by pin controller
+>> >> + * drivers that support pinmuxing
+>> >> + * @request: called by the core to see if a certain pin can be made available
+>> >> + * ? available for muxing. This is called by the core to acquire the pins
+>> >> + * ? before selecting any actual mux setting across a function. The driver
+>> >> + * ? is allowed to answer "no" by returning a negative error code
+>> >> + * @free: the reverse function of the request() callback, frees a pin after
+>> >> + * ? being requested
+>> >
+>> > Shouldn't request/free be for a pingroup, not a pin, since that's what
+>> > functions are assigned to? Also, the function should be passed, since
+>> > some restrictions these functions might need to check for might depend
+>> > on what the pin/group will be used for.
+>>
+>> This is not for checking anything on function or group level.
+>> It's exclusively for things that need to be on a per-pin level, so any
+>> pin can deny being selected for muxing at any time.
+>>
+>> So what you're saying is that you need a function to check
+>> also on group level as part of the pinmux_get() sematics?
+>>
+>> We can add that and have two optional checks: @request_pin()
+>> on pin level and say @request_function_and_group() on the
+>> group+function level, would that work for your scenarios?
+>
+> Well, that's a move in the right direction, but not quite everything I'd
+> like.
+>
+> The basic issue is that a single logical function (I2C controller 0) can
+> be mux'd out onto more than one pingroup. However, the HW requires that
+> at /any given time/ it only be mux'd out onto a single pingroup.
+>
+> To fully enforce this, the request() function needs to know what the
+> complete state will be after the entire (set of) mapping entries is
+> processed.
 
- arch/arm/mach-prima2/l2x0.c |   48 ++----------------------------------------
- 1 files changed, 3 insertions(+), 45 deletions(-)
+I'm not quite following this, but I'm pretty sure that this verification
+can be bolted onto the subsystem later with apropriate callbacks.
 
-diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
-index 9cda205..5587958 100644
---- a/arch/arm/mach-prima2/l2x0.c
-+++ b/arch/arm/mach-prima2/l2x0.c
-@@ -8,52 +8,10 @@
- 
- #include <linux/init.h>
- #include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/errno.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
- #include <asm/hardware/cache-l2x0.h>
--#include <mach/memory.h>
- 
--#define L2X0_ADDR_FILTERING_START       0xC00
--#define L2X0_ADDR_FILTERING_END         0xC04
--
--static struct of_device_id l2x_ids[]  = {
--	{ .compatible = "arm,pl310-cache" },
--};
--
--static int __init sirfsoc_of_l2x_init(void)
-+static int __init sirfsoc_l2x0_init(void)
- {
--	struct device_node *np;
--	void __iomem *sirfsoc_l2x_base;
--
--	np = of_find_matching_node(NULL, l2x_ids);
--	if (!np)
--		panic("unable to find compatible l2x node in dtb\n");
--
--	sirfsoc_l2x_base = of_iomap(np, 0);
--	if (!sirfsoc_l2x_base)
--		panic("unable to map l2x cpu registers\n");
--
--	of_node_put(np);
--
--	if (!(readl_relaxed(sirfsoc_l2x_base + L2X0_CTRL) & 1)) {
--		/*
--		 * set the physical memory windows L2 cache will cover
--		 */
--		writel_relaxed(PLAT_PHYS_OFFSET + 1024 * 1024 * 1024,
--			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_END);
--		writel_relaxed(PLAT_PHYS_OFFSET | 0x1,
--			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_START);
--
--		writel_relaxed(0,
--			sirfsoc_l2x_base + L2X0_TAG_LATENCY_CTRL);
--		writel_relaxed(0,
--			sirfsoc_l2x_base + L2X0_DATA_LATENCY_CTRL);
--	}
--	l2x0_init((void __iomem *)sirfsoc_l2x_base, 0x00040000,
--		0x00000000);
--
--	return 0;
-+	return l2x0_of_init(0x40000, 0);
- }
--early_initcall(sirfsoc_of_l2x_init);
-+early_initcall(sirfsoc_l2x0_init);
--- 
-1.7.1
+It looks like you're after a state holder to avoid pinmux_get() to
+activate the same muxing in two different places, it's then a
+safety mechanism agains supplying bad mappings and doing
+pinmux_get() on stuff before doing pinmux_put() on conflicting
+mappings.
 
+> When the core can only process 1 mapping entry at a time, this is trivial,
+> since there's only 1 change relative to current HW to process in request().
 
+You will have this in v7 :-)
 
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+I was aware that this would cause new semantic issues, but since I
+think only Tegra will use that feature as of now, we can postpone
+this group denial stuff until there is a driver for it I think, it shouldn't
+be too hard to add, and you can still get the driver to a working
+state, it's just that it'll be possible to do some nasty things with it
+if you give it weird mapping tables and calls.
+
+> The only way I can see this being implementable is:
+>
+> a) Add request_start() and request_end() functions, so the driver can
+> copy HW state to SW state in request_start(), and modify this cached
+> state in each request() call, and hence has access to all state changes
+> to-date in each request() call. Then, request_end() to finalize the
+> whole set of changes.
+>
+> Or:
+>
+> b) request() passes an array of changes at once, instead of many calls
+> each requesting a single .change
+>
+> This is certainly a tough problem. The current Tegra pinmux driver doesn't
+> actually make any attempt to enforce this, so perhaps it's not worth
+> worrying about; we just assume people write sensible mapping tables.
+
+Ok we are at that stage with the subsystem now so let's wait
+with that until we have a driver we can fix.
+
+>> > When the core is modified to support applying n entries in the mapping
+>> > table for each pinmux_get() call, how will request/free be aware of the
+>> > partial pending state?
+>>
+>> That is like answering how code I haven't yet written will
+>> look like... The easiest answer is to implement it I think,
+>> then you can check if it looks sane.
+>
+> :-)
+
+As it is implemented now it backs off and free all pins if there
+is an error on any group when doing pinmux_get().
+
+Yours,
+Linus Walleij
