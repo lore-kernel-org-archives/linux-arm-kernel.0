@@ -1,56 +1,42 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Tue, 13 Sep 2011 12:28:26 +0930
-Subject: [RFC 1/2] virtio: Add AMBA bus driver for virtio device
-In-Reply-To: <1315845956.3297.7.camel@hornet.cambridge.arm.com>
-References: <1314966257-7503-1-git-send-email-pawel.moll@arm.com>
-	<1314966257-7503-2-git-send-email-pawel.moll@arm.com>
-	<877h5e5yxp.fsf@rustcorp.com.au>
-	<1315845956.3297.7.camel@hornet.cambridge.arm.com>
-Message-ID: <87hb4h408d.fsf@rustcorp.com.au>
+From: bill4carson@gmail.com (bill4carson)
+Date: Tue, 13 Sep 2011 13:24:28 +0800
+Subject: [Android-virt] KVM ARM interrupt virtualization
+In-Reply-To: <CAFEAcA8=mGUP0dXTNXM6y9RDtWWEkJ2YhuavMBW-3BFfbOPS0g@mail.gmail.com>
+References: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>	<CAHkRjk6Vm2yNLm8Gzk3+4mYAfiXVjufv2xc0Kc-6ac-oS4zytw@mail.gmail.com>	<CAOMgcGJBoeKJ8FjDW9eESfT+FiXmFF9PfShJ=a2adbESLD2YkA@mail.gmail.com>	<20110908085449.GA29243@e102109-lin.cambridge.arm.com>	<4E6899B5.70608@gmail.com>
+	<CAFEAcA8=mGUP0dXTNXM6y9RDtWWEkJ2YhuavMBW-3BFfbOPS0g@mail.gmail.com>
+Message-ID: <4E6EE90C.7000308@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Sep 2011 17:45:56 +0100, Pawel Moll <pawel.moll@arm.com> wrote:
-> On Mon, 2011-09-12 at 11:01 +0930, Rusty Russell wrote:
-> > You need to make these at least 64 bits.  Lguest makes them variable
-> > width, in fact.
-> 
-> No problem, I've reserved 128 bits in the modified registers layout (see
-> RFC v2), I can even change it into "offset/value" interface, which would
-> give you variable width. One thing I don't get is how to access feature
-> bits > 31? The get_features() seems
-> to be limited to 32:
-> 
-> struct virtio_config_ops {
-> <...>
-> 	u32 (*get_features)(struct virtio_device *vdev);
-> <...>
-> }
 
-There's a patch for that already :)
 
-> > > + *  0x008   32  QueuePFN      PFN for the currently selected queue
-> > > + *  0x00c   32  QueueNum      Queue size for the currently selected queue
-> > 
-> > You should, I believe, seriously consider allowing the guest to set the
-> > queue size, rather than the host (perhaps the host could suggest one,
-> > but the guest should be able to override it).
-> 
-> I guess the QueueNum could be simply a read/write register - guest can
-> read suggestion and override it writing it back. The same question
-> though - how can guest change it? (I mean some API?)
+On 2011?09?08? 20:01, Peter Maydell wrote:
+> On 8 September 2011 11:32, bill4carson<bill4carson@gmail.com>  wrote:
+>> There is much more involved if I want to use A15 as Guest OS,
+>> cause Qemu haven't got any A15 support yet.
+> In the interests of not accidentally duplicating work, I should
+> mention that QEMU A15 work is on my (Linaro) todo list; basically
+> I'm thinking in terms of adding enough support to boot an A15
+> Linux guest, but not actually implementing emulation of the
+> virtualization/LPAE extensions. If you'd like to do some of the
+> work here we should probably coordinate on that...
+>
+> The Fast Model Versatile Express platform (including its memory
+> map) is documented here:
+> http://infocenter.arm.com/help/topic/com.arm.doc.dui0423j/BEIEAGAA.html
+>
+> The memory maps (legacy A9 and "Cortex A-Series") for VE
+> hardware are here:
+> http://infocenter.arm.com/help/topic/com.arm.doc.dui0447e/CACIHGFE.html
+>
+> -- PMM
+>
+Hi Peter
 
-We can sort that out later... the Guest may try some ambitious large
-allocation and fall back if it fails.
+Thanks for your informations, any contribution and help would be welcome.
+The initial Qemu A15 support has been added, and could boot with KVM 
+support.
+The generic timer has been removed as I cannot find its base address.
 
-> > Anthony or Michael might suggest other changes, since they are most
-> > familiar with virtio_pci limitations...
-> 
-> I've added them on the RFC v2 Cc as well - all feedback more then
-> welcome!
 
-Excellent...  of course, the virtualization list is down at the moment,
-making this a bit more awkward.
-
-Cheers,
-Rusty.
+bill
