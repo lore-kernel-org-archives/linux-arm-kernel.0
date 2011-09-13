@@ -1,30 +1,31 @@
-From: liu.h.jason@gmail.com (Jason Liu)
-Date: Tue, 13 Sep 2011 14:55:24 +0800
-Subject: [[PATCH v2] mtd: check parts pointer before using it
-In-Reply-To: <1315896256.2639.97.camel@sauron>
-References: <1314185188-6151-1-git-send-email-jason.hui@linaro.org>
-	<CAB4PhKd_=KjNGJ+3TL5tqPqoetcD28oaWC55UqNRqFGZ7gmYHw@mail.gmail.com>
-	<1315896256.2639.97.camel@sauron>
-Message-ID: <CAB4PhKdU-_rg6SyYGOsDrAjBoA4WfMtRZKwP6jura_hH5gLaVg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 13 Sep 2011 00:01:17 -0700
+Subject: [PATCH v3 1/2] i2c: s3c2410: Keep a copy of platform data and
+	use it
+In-Reply-To: <1315887365-30532-2-git-send-email-thomas.abraham@linaro.org>
+References: <1315887365-30532-1-git-send-email-thomas.abraham@linaro.org>
+	<1315887365-30532-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <4E6EFFBD.6050609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Atrem,
+On 9/12/2011 9:16 PM, Thomas Abraham wrote:
+> @@ -809,6 +810,15 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	i2c->pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> +	if (!i2c->pdata) {
+> +		ret = -ENOMEM;
+> +		goto err_noclk;
+> +	}
+> +
+> +	if (pdata)
+> +		memcpy(i2c->pdata, pdata, sizeof(*pdata));
+> +
 
-2011/9/13 Artem Bityutskiy <dedekind1@gmail.com>:
-> On Tue, 2011-09-13 at 14:31 +0800, Jason Liu wrote:
->> Ping, any comments about it? Thanks,
->
-> I was sure I answered you, sorry - your patch is for long time in my l2
-> tree and hence, in linux-next.
+Is there a devm_kmemdup()? If not, maybe it would be a good idea to add it.
 
- I'm not aware of it. Thanks Artem.
-
-Jason
-
->
-> --
-> Best Regards,
-> Artem Bityutskiy
->
->
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
