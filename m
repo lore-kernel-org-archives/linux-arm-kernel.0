@@ -1,67 +1,79 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 13 Sep 2011 19:22:16 +0200
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
-	online/active
-In-Reply-To: <20110913133258.GA6267@n2100.arm.linux.org.uk>
-References: <20110908215314.829452535@linutronix.de>
-	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-	<20110913133258.GA6267@n2100.arm.linux.org.uk>
-Message-ID: <CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 13 Sep 2011 10:30:10 -0700
+Subject: [Question] RPC and SMD implementation
+In-Reply-To: <CAMChaFwHt62vLeRoVCpya5yt5xctPSnwPuEGrA0rK45yxwtoGg@mail.gmail.com>
+References: <CAMChaFwHt62vLeRoVCpya5yt5xctPSnwPuEGrA0rK45yxwtoGg@mail.gmail.com>
+Message-ID: <20110913173010.GA4222@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2011 15:32, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Sep 13, 2011 at 07:00:53PM +0530, amit kachhap wrote:
->> Hi Thomas,
->>
->> This movement of set_cpu_online before percpu_timer_setup is usefull
->> for samsung exyno4 platforms where the external gic timer
->> initialisation needs the secondary cpu to be online.
->> In addition to your modifications the following changes fixes the race
->> condition crash happening when sched_mc configuration flags
->> (CONFIG_ARM_CPU_TOPOLOGY, CONFIG_SCHED_MC ,CONFIG_SCHED_SMT) are
->> enabled. Sched_mc patches are recently submitted by Vincent and
->> accepted by Russell.(https://lkml.org/lkml/2011/7/5/209). I have not
->> attached the crash log here. If needed i can do so.
->>
->> ---
->> ?arch/arm/kernel/smp.c | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->> index 8cb94c8..04a8630 100644
->> --- a/arch/arm/kernel/smp.c
->> +++ b/arch/arm/kernel/smp.c
->> @@ -316,6 +316,7 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
->> ? ? ? ? ?* interrupts otherwise a wakeup of a kernel thread affine to
->> ? ? ? ? ?* this CPU might break the affinity and let hell break lose.
->> ? ? ? ? ?*/
->> + ? ? ? smp_store_cpu_info(cpu);
->> ? ? ? ? set_cpu_online(cpu, true);
->> ? ? ? ? while (!cpu_active(cpu))
->> ? ? ? ? ? ? ? ? cpu_relax();
->> @@ -330,7 +331,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
->>
->> ? ? ? ? calibrate_delay();
->>
->> - ? ? ? smp_store_cpu_info(cpu);
->
-> This is totally wrong - the order of things here is quite specific.
-> You can't store the CPU info until after you've calibrated the delay
-> loop.
->
-> Please continue playing cat-and-mouse with this.
->
+On Sun, Sep 11, 2011 at 05:29:55PM +0400, Alexander Tarasikov wrote:
 
-The assumption done in the 1st patch that smp_store_cpu_info can be
-delayed is no more true. The smp_store_cpu_info is now also used to
-store the cpu topology information
-(https://lkml.org/lkml/2011/7/5/209). This must be done before calling
-sched_init_smp, which will use this information for building
-sched_domain.
-If we move set_cpu_online before smp_store_cpu_info, sched_init_smp
-can be called before having called smp_store_cpu_info on all cpus.
+> Since RPC and SMD drivers are not fully integrated to vanilla linux,
+> I'd like to discuss a few points about them so that we don't face
+> troubles when these drivers are submitted.
+> 
+> As you know, most AMSS versions for modern QSD/MSM chips have the same
+> magic numbers for RPC program/version/procedure calls. Older ones
+> (namely, msm72[02]x), on the contrary, all have different versions. It
+> has been solved in hackish ways in Android kernel trees. Google's tree
+> had the AMSS version selectable in the config and code for different
+> AMSS was put under ifdefs. It is needless to say that this is a very
+> bad practice. No only the code size grows with any new version added,
+> but also we cannot support multiple devices or even multiple firmwares
+> on the same device in one kernel binary. Besides, if someone makes a
+> change to one branch of an ifdef, chances are they break the
+> compilation of another branch unless they're testing all possible
+> combinations. The kernel at CodeAurora git defines some kind of
+> functions that check if the RPC version on the BP is compatible with
+> the one in AP linux kernel, but it also needs to do like 3 or 4 probes
+> to get version which makes code unreadable.
 
-Regards,
-Vincent
+Is there much reason to get the msm72xx support into the kernel in the
+first place?  These targets are old, and I don't believe any new
+devices are being made using them.  There are no dev boards based on
+this chipset.  Things are a lot easier in the newer RPC/SMD versions,
+and I don't see a strong reason to keep the kruft in the kernel
+necessary to support the 72xx chips.
+
+> I also propose that we pass the following platform data structure to
+> the SMD driver
+> struct msm_smd_platform_data {
+>                 struct amss_value *amss_values; //can be just an array
+> as mentioned above
+>                 int n_amss_values;
+>                 struct msm_early_server *early_servers;
+>                 int n_early_servers;
+> }
+> where struct msm_early_server is { uint32_t cid; uint32_t pid;
+> uint32_t prog; uint32_t vers; }. Some legacy AMSS versions (namely,
+> 5225 and 6150) need to manually register some servers for the ADSP.
+
+We're not going to be able to get any new platform data.  If this is
+really needed, it'll have to be represented in the device tree and
+looked up that way.
+
+> What I want is to be able to integrate both official Android phones
+> and community ports into vanilla and to be able to build the support
+> for as many devices as possible in a single binary and set everything
+> up in runtime. Please let me know what the current plans on
+> integrating RPC and SMD (tty driver) are and whether you need help
+> with implementing the proposed changes.
+
+My desire is to focus on newer chips (msm8660 and beyond) in the
+mainstream kernel.  At some point, there will be enough cruft from the
+older targets (especially 7200) that it isn't worth carrying the
+support along, especially as there are fewer and fewer of these
+devices around.
+
+The msm8660 is the first MSM chipset with a readily-available
+development platform.  I'd like to start by getting this to work well.
+
+You've probably noticed that Google drops old targets in their newer
+kernel versions.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
