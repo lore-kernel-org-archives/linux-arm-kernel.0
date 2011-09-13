@@ -1,40 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Sep 2011 15:56:58 +0200
-Subject: Merging Cadence macb/gem patches
-In-Reply-To: <20110913125610.GE2781@pulham.picochip.com>
-References: <20110830103655.GE5414@pulham.picochip.com>
-	<20110913125610.GE2781@pulham.picochip.com>
-Message-ID: <201109131556.59492.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 Sep 2011 08:59:27 -0500
+Subject: [PATCH] ARM: CSR: call l2x0_of_init to init L2 cache of
+	SiRFprimaII
+In-Reply-To: <1315905006-21390-1-git-send-email-Baohua.Song@csr.com>
+References: <1315905006-21390-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <4E6F61BF.8000907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 September 2011, Jamie Iles wrote:
-> On Tue, Aug 30, 2011 at 11:36:55AM +0100, Jamie Iles wrote:
-> > Hi Arnd,
-> > 
-> > I have a series of patches[1] to add support for the Cadence GEM 
-> > Ethernet MAC to the macb driver.  A while back, DaveM said that he would 
-> > be happy for these to go through an ARM tree[2], so would you pull these 
-> > into the arm-soc tree?
-> > 
-> > At the moment my patches are based on 3.1-rc1, but since then the 
-> > drivers have been moved about and git merge doesn't seem to resolve 
-> > this, so should I base them on the commit that moved them from the 
-> > netdev tree?  I'm not sure how to handle this.
+On 09/13/2011 04:10 AM, Barry Song wrote:
+> Cc: Rob Herring <robherring2@gmail.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
 > 
-> Would you be able to take these if I send you a pull request please?
+> This patch depends on:
+> [1]Rob Herring
+> ARM: 7009/1: l2x0: Add OF based initialization
+> http://www.spinics.net/lists/arm-kernel/msg131123.html
+> it has been in rmk/for-next
+> 
+> [2]Barry Song
+> ARM: CACHE-L2X0: filter start address can be 0 and is often 0
+> http://www.spinics.net/lists/arm-kernel/msg140126.html
+> this patch fixes the filter start address error of Rob Herring'patch
+> 
+>  arch/arm/mach-prima2/l2x0.c |   48 ++----------------------------------------
+>  1 files changed, 3 insertions(+), 45 deletions(-)
+> 
+> diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
+> index 9cda205..5587958 100644
+> --- a/arch/arm/mach-prima2/l2x0.c
+> +++ b/arch/arm/mach-prima2/l2x0.c
+> @@ -8,52 +8,10 @@
+>  
+>  #include <linux/init.h>
+>  #include <linux/kernel.h>
+> -#include <linux/io.h>
+> -#include <linux/errno.h>
+> -#include <linux/of.h>
+> -#include <linux/of_address.h>
+>  #include <asm/hardware/cache-l2x0.h>
+> -#include <mach/memory.h>
+>  
+> -#define L2X0_ADDR_FILTERING_START       0xC00
+> -#define L2X0_ADDR_FILTERING_END         0xC04
+> -
+> -static struct of_device_id l2x_ids[]  = {
+> -	{ .compatible = "arm,pl310-cache" },
+> -};
+> -
+> -static int __init sirfsoc_of_l2x_init(void)
+> +static int __init sirfsoc_l2x0_init(void)
+>  {
+> -	struct device_node *np;
+> -	void __iomem *sirfsoc_l2x_base;
+> -
+> -	np = of_find_matching_node(NULL, l2x_ids);
+> -	if (!np)
+> -		panic("unable to find compatible l2x node in dtb\n");
+> -
+> -	sirfsoc_l2x_base = of_iomap(np, 0);
+> -	if (!sirfsoc_l2x_base)
+> -		panic("unable to map l2x cpu registers\n");
+> -
+> -	of_node_put(np);
+> -
+> -	if (!(readl_relaxed(sirfsoc_l2x_base + L2X0_CTRL) & 1)) {
+> -		/*
+> -		 * set the physical memory windows L2 cache will cover
+> -		 */
+> -		writel_relaxed(PLAT_PHYS_OFFSET + 1024 * 1024 * 1024,
+> -			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_END);
+> -		writel_relaxed(PLAT_PHYS_OFFSET | 0x1,
+> -			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_START);
+> -
+> -		writel_relaxed(0,
+> -			sirfsoc_l2x_base + L2X0_TAG_LATENCY_CTRL);
+> -		writel_relaxed(0,
+> -			sirfsoc_l2x_base + L2X0_DATA_LATENCY_CTRL);
+> -	}
+> -	l2x0_init((void __iomem *)sirfsoc_l2x_base, 0x00040000,
+> -		0x00000000);
+> -
+> -	return 0;
+> +	return l2x0_of_init(0x40000, 0);
+>  }
+> -early_initcall(sirfsoc_of_l2x_init);
+> +early_initcall(sirfsoc_l2x0_init);
 
-Hi Jamie,
+This needs to be called from a prima2 function that is only run for this
+platform rather than an initcall. This will run all platforms in a
+single kernel build. However, the that's not really a new problem with
+this patch, so you could fix in a follow-on patch.
 
-Sorry for not replying earlier on this. I first tried merging them
-when you sent the mail, but couldn't figure out a good way, especially
-with git.kernel.org being down, I can't see how the merge with the
-netdev tree would go (it would probably fail miserably because of the
-file move).
-
-DaveM, do you have a copy of the netdev tree available somewhere else,
-so I can take these patches into a branch that I push after yours is
-in? If not, I think it would be better to take the driver into your
-tree instead, including the ARM specific changes.
-
-	Arnd
+Rob
