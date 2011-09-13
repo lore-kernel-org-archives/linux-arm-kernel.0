@@ -1,55 +1,225 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Tue, 13 Sep 2011 12:44:33 +0200
-Subject: [PATCH 3/3] iommu/core: split mapping to page sizes as supported
-	by the hardware
-In-Reply-To: <CAK=WgbbhdFpAHTt=Bku-v1ZOCf48+u+XB-f4yO=5EDojv1kCJg@mail.gmail.com>
-References: <1315421604-12286-1-git-send-email-ohad@wizery.com>
-	<1315421604-12286-3-git-send-email-ohad@wizery.com>
-	<20110913101011.GK11701@amd.com>
-	<CAK=WgbbhdFpAHTt=Bku-v1ZOCf48+u+XB-f4yO=5EDojv1kCJg@mail.gmail.com>
-Message-ID: <20110913104433.GL11701@amd.com>
+From: abhilash.kv@ti.com (Koyamangalath, Abhilash)
+Date: Tue, 13 Sep 2011 17:01:01 +0530
+Subject: [PATCH 1/4] AM3517 : support for suspend/resume
+In-Reply-To: <87fwkild5k.fsf@ti.com>
+References: <1313754927-11992-1-git-send-email-abhilash.kv@ti.com>
+	<1313754927-11992-2-git-send-email-abhilash.kv@ti.com>
+	<87fwkild5k.fsf@ti.com>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC356087037B3D8823@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2011 at 06:34:23AM -0400, Ohad Ben-Cohen wrote:
-> Hi Joerg,
-> 
-> On Tue, Sep 13, 2011 at 1:10 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> > Please split this patch into the core-change and patches for the
-> > individual iommu-drivers and post this as a seperate patch-set.
-> 
-> But we'll be breaking bisectibility this way, no?
+Hi
 
-Not necessarily. You could implement this side-by-side with the old code
-until all drivers are converted and remove the old code then. This keeps
-bisectability.
+On Wed, Aug 31, 2011 at 4:28 AM, Hilman, Kevin wrote:
+>
+> Abhilash K V <abhilash.kv@ti.com> writes:
+>
+>> 1. Patch to disable dynamic sleep (as it is not supported
+>>    on AM35xx).
+>> 2. Imported the unique suspend/resume sequence for AM3517,
+>>    contained in the new file arch/arm/mach-omap2/sleep3517.S.
+>> 3. Added omap3517_ to symbol-names in sleep3517.S which are common
+>>    with sleep34xx.S, and added appropriate checks.
+>>
+>> There are still 3 caveats:
+>>
+>> 1. If "no_console_suspend" is enabled (via boot-args), the device
+>>    doesnot resume but simply hangs.
+>> 2. Every second and subsequent attempt to suspend/resume prints this slow-path
+>>    WARNING (for both uart1 and uart2), while resuming :
+>>    [   70.943939] omap_hwmod: uart1: idle state can only be entered from
+>>    enabled state
+>> 3. Wakeup using the TSC2004 touch-screen controller is not supported.
+>>
+>> Signed-off-by: Ranjith Lohithakshan <ranjithl@ti.com>
+>> Reviewed-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+>
+> In addition to Russell's comments about using the latest code from
+> mainline, I have some comments below.
+[Abhilash K V] I have reworked the patch against the tip (as suggested by
+Russell).
+And I've incorporated all of Kevin's comments too.
+There is one "known" issue left which needs to be closed before I can submit v2 of this patch.
+With no_console_suspend, suspend to RAM hangs right now on AM3517, after
+the message:
+          Disabling non-boot CPUs ...
+There is no error message or dump.
+I found that this crash is happening in a call to pr_warning(), from _omap_device_deactivate().
+The same code does not produce this issue on omap34xx due to this snippet from omap_sram_idle() :
+        /* PER */
+        if (per_next_state < PWRDM_POWER_ON) {
+                per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+                omap_uart_prepare_idle(2);
+                omap_uart_prepare_idle(3);
+                omap2_gpio_prepare_for_idle(per_going_off);
+                if (per_next_state == PWRDM_POWER_OFF)
+                                omap3_per_save_context();
+        }
+        /* CORE */
+        if (core_next_state < PWRDM_POWER_ON) {
+                omap_uart_prepare_idle(0);
+                omap_uart_prepare_idle(1);
+                if (core_next_state == PWRDM_POWER_OFF) {
+                        omap3_core_save_context();
+                        omap3_cm_save_context();
+                }
+        }
+This happens in preparation to the suspend operation (I,e. the WFI).
+As seen here, on 34xx the sequence in which the uarts are disabled is 2, 3, 0 and 1.The console-uart, which is uart-1 here (starting from uart-0) is disabled last.
+For AM3517 EVM, the console-uart is uart-2 and this ought to be disabled at the last to prevent this crash from occurring.
+So my suggestion is to use a console_uart flag to store the appropriate uart no. for that platform rather than hard-code it and to ensure that this uart is disabled@the last.
 
-> > Intel IOMMU does not support arbitrary page-sizes, afaik.
-> 
-> It does; besides the usual 4K it has "super page sizes" support of
-> 2MB, 1GB, 512GB and 1TB.
+Another point that complicates matters is that uart-1 and uart-2 are in different power domains (CORE and PER respectively) - so that would amount to using the console-uart
+no. to decide whether CORE or PER power-domains are disabled first.
+Would this have any side-effects?
+Is there a better way to go?
 
-But the value ~0xfffUL indicates support for 4k, 8k, 16k .. 2^63, no?
-
-> 
-> >> + ? ? ? pr_debug("map: iova 0x%lx pa 0x%lx size 0x%lx\n", iova,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long)paddr, size);
-> >
-> > Please keep the debug-code in a seperate patch in your dev-tree. No need
-> > for it to be merged upstream.
-> 
-> It's actually useful sometimes to have those around - it's off by
-> default, and can be enabled only when needed (CONFIG_DYNAMIC_DEBUG).
-> 
-> But I don't mind removing them.
-
-Ah right, it is just debug, so I am fine keeping it.
-
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+-Abhilash
+>
+>
+>> ---
+>>  arch/arm/mach-omap2/Makefile    |    2 +-
+>>  arch/arm/mach-omap2/control.c   |    7 ++-
+>>  arch/arm/mach-omap2/control.h   |    1 +
+>>  arch/arm/mach-omap2/pm.h        |    4 +
+>>  arch/arm/mach-omap2/pm34xx.c    |   18 ++++-
+>>  arch/arm/mach-omap2/sleep3517.S |  144 +++++++++++++++++++++++++++++++++++++++
+>>  6 files changed, 170 insertions(+), 6 deletions(-)
+>>  create mode 100644 arch/arm/mach-omap2/sleep3517.S
+>>
+>> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+>> index 46f5fbc..3fdf086 100644
+>> --- a/arch/arm/mach-omap2/Makefile
+>> +++ b/arch/arm/mach-omap2/Makefile
+>> @@ -61,7 +61,7 @@ endif
+>>  ifeq ($(CONFIG_PM),y)
+>>  obj-$(CONFIG_ARCH_OMAP2)             += pm24xx.o
+>>  obj-$(CONFIG_ARCH_OMAP2)             += sleep24xx.o
+>> -obj-$(CONFIG_ARCH_OMAP3)             += pm34xx.o sleep34xx.o \
+>> +obj-$(CONFIG_ARCH_OMAP3)             += pm34xx.o sleep34xx.o sleep3517.o \
+>>                                          cpuidle34xx.o
+>>  obj-$(CONFIG_ARCH_OMAP4)             += pm44xx.o
+>>  obj-$(CONFIG_PM_DEBUG)                       += pm-debug.o
+>> diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+>> index da53ba3..7d2d8a8 100644
+>> --- a/arch/arm/mach-omap2/control.c
+>> +++ b/arch/arm/mach-omap2/control.c
+>> @@ -284,10 +284,13 @@ void omap3_save_scratchpad_contents(void)
+>>        * The restore pointer is stored into the scratchpad.
+>>        */
+>>       scratchpad_contents.boot_config_ptr = 0x0;
+>> -     if (cpu_is_omap3630())
+>> +     if (cpu_is_omap3505() || cpu_is_omap3517()) {
+>> +             scratchpad_contents.public_restore_ptr =
+>> +                     virt_to_phys(omap3517_get_restore_pointer());
+>
+> Based on the contents of the get_restore_pointer() added below, this
+> value is obviously not being used.  Either off-mode was not tested (or not
+> supported.)   Either way, unused code like this should not be
+> added if it is not tested or supported.
+>
+>> +     } else if (cpu_is_omap3630()) {
+>>               scratchpad_contents.public_restore_ptr =
+>>                       virt_to_phys(get_omap3630_restore_pointer());
+>> -     else if (omap_rev() != OMAP3430_REV_ES3_0 &&
+>> +     } else if (omap_rev() != OMAP3430_REV_ES3_0 &&
+>>                                       omap_rev() != OMAP3430_REV_ES3_1)
+>>               scratchpad_contents.public_restore_ptr =
+>>                       virt_to_phys(get_restore_pointer());
+>> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+>> index ad024df..3003940 100644
+>> --- a/arch/arm/mach-omap2/control.h
+>> +++ b/arch/arm/mach-omap2/control.h
+>> @@ -389,6 +389,7 @@ extern void omap4_ctrl_pad_writel(u32 val, u16 offset);
+>>  extern void omap3_save_scratchpad_contents(void);
+>>  extern void omap3_clear_scratchpad_contents(void);
+>>  extern u32 *get_restore_pointer(void);
+>> +extern u32 *omap3517_get_restore_pointer(void);
+>>  extern u32 *get_es3_restore_pointer(void);
+>>  extern u32 *get_omap3630_restore_pointer(void);
+>>  extern u32 omap3_arm_context[128];
+>> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+>> index 5c2bd2f..d773e07 100644
+>> --- a/arch/arm/mach-omap2/pm.h
+>> +++ b/arch/arm/mach-omap2/pm.h
+>> @@ -77,13 +77,17 @@ extern void omap24xx_idle_loop_suspend(void);
+>>  extern void omap24xx_cpu_suspend(u32 dll_ctrl, void __iomem *sdrc_dlla_ctrl,
+>>                                       void __iomem *sdrc_power);
+>>  extern void omap34xx_cpu_suspend(u32 *addr, int save_state);
+>> +extern void omap3517_cpu_suspend(u32 *addr, int save_state);
+>>  extern int save_secure_ram_context(u32 *addr);
+>> +extern void omap3517_save_secure_ram_context(u32 *addr);
+>>  extern void omap3_save_scratchpad_contents(void);
+>>
+>>  extern unsigned int omap24xx_idle_loop_suspend_sz;
+>>  extern unsigned int save_secure_ram_context_sz;
+>> +extern unsigned int omap3517_save_secure_ram_context_sz;
+>>  extern unsigned int omap24xx_cpu_suspend_sz;
+>>  extern unsigned int omap34xx_cpu_suspend_sz;
+>> +extern unsigned int omap3517_cpu_suspend_sz;
+>>
+>>  #define PM_RTA_ERRATUM_i608          (1 << 0)
+>>  #define PM_SDRC_WAKEUP_ERRATUM_i583  (1 << 1)
+>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+>> index 96a7624..12af5b9 100644
+>> --- a/arch/arm/mach-omap2/pm34xx.c
+>> +++ b/arch/arm/mach-omap2/pm34xx.c
+>> @@ -497,6 +497,8 @@ console_still_active:
+>>
+>>  int omap3_can_sleep(void)
+>>  {
+>> +     if (cpu_is_omap3505() || cpu_is_omap3517())
+>> +             return 0;
+>>       if (!omap_uart_can_sleep())
+>>               return 0;
+>>       return 1;
+>> @@ -848,11 +850,21 @@ static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
+>>
+>>  void omap_push_sram_idle(void)
+>>  {
+>> -     _omap_sram_idle = omap_sram_push(omap34xx_cpu_suspend,
+>> +     if (cpu_is_omap3505() || cpu_is_omap3517())
+>> +             _omap_sram_idle = omap_sram_push(omap3517_cpu_suspend,
+>> +                                     omap3517_cpu_suspend_sz);
+>> +     else
+>> +             _omap_sram_idle = omap_sram_push(omap34xx_cpu_suspend,
+>>                                       omap34xx_cpu_suspend_sz);
+>>       if (omap_type() != OMAP2_DEVICE_TYPE_GP)
+>> -             _omap_save_secure_sram = omap_sram_push(save_secure_ram_context,
+>> -                             save_secure_ram_context_sz);
+>> +             if (cpu_is_omap3505() || cpu_is_omap3517())
+>> +                     _omap_save_secure_sram = omap_sram_push(
+>> +                                     omap3517_save_secure_ram_context,
+>> +                                     omap3517_save_secure_ram_context_sz);
+>> +             else
+>> +                     _omap_save_secure_sram = omap_sram_push(
+>> +                                     save_secure_ram_context,
+>> +                                     save_secure_ram_context_sz);
+>>  }
+>
+> You add a new assembly function for save secure context, but that
+> function is essentially a nop.
+>
+> It would be better to just not have a function for these devices.
+>
+> To that end, it would help to add an OMAP "feature" stating whether or
+> not the device has secure RAM.  Then, instead of the cpu_is_* checks
+> here, that feature flag can be checked.
+>
+>>
+>>  static void __init pm_errata_configure(void)
+>> diff --git a/arch/arm/mach-omap2/sleep3517.S b/arch/arm/mach-omap2/sleep3517.S
+>> new file mode 100644
+>> index 0000000..3fceefc
+>> --- /dev/null
+>> +++ b/arch/arm/mach-omap2/sleep3517.S
+>> @@ -0,0 +1,144 @@
+>> +/*
+>> +/* linux/arch/arm/mach-omap2/sleep3517.S
+>
+> You can leave out filenames in comments.  Files tend to move, and the
+> comments don't get changed and become stale.
+>
+> Kevin
