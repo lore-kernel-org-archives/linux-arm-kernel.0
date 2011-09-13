@@ -1,79 +1,50 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 13 Sep 2011 10:30:10 -0700
-Subject: [Question] RPC and SMD implementation
-In-Reply-To: <CAMChaFwHt62vLeRoVCpya5yt5xctPSnwPuEGrA0rK45yxwtoGg@mail.gmail.com>
-References: <CAMChaFwHt62vLeRoVCpya5yt5xctPSnwPuEGrA0rK45yxwtoGg@mail.gmail.com>
-Message-ID: <20110913173010.GA4222@huya.qualcomm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 13 Sep 2011 10:33:42 -0700
+Subject: [PATCH 14/25] OMAP4: PM: Add CPUX OFF mode support
+In-Reply-To: <4E6EECA3.4040704@ti.com> (Santosh's message of "Tue, 13 Sep 2011
+	11:09:47 +0530")
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-15-git-send-email-santosh.shilimkar@ti.com>
+	<87y5xteahc.fsf@ti.com> <4E6EECA3.4040704@ti.com>
+Message-ID: <87wrdcbb49.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 11, 2011 at 05:29:55PM +0400, Alexander Tarasikov wrote:
+Santosh <santosh.shilimkar@ti.com> writes:
 
-> Since RPC and SMD drivers are not fully integrated to vanilla linux,
-> I'd like to discuss a few points about them so that we don't face
-> troubles when these drivers are submitted.
-> 
-> As you know, most AMSS versions for modern QSD/MSM chips have the same
-> magic numbers for RPC program/version/procedure calls. Older ones
-> (namely, msm72[02]x), on the contrary, all have different versions. It
-> has been solved in hackish ways in Android kernel trees. Google's tree
-> had the AMSS version selectable in the config and code for different
-> AMSS was put under ifdefs. It is needless to say that this is a very
-> bad practice. No only the code size grows with any new version added,
-> but also we cannot support multiple devices or even multiple firmwares
-> on the same device in one kernel binary. Besides, if someone makes a
-> change to one branch of an ifdef, chances are they break the
-> compilation of another branch unless they're testing all possible
-> combinations. The kernel at CodeAurora git defines some kind of
-> functions that check if the RPC version on the BP is compatible with
-> the one in AP linux kernel, but it also needs to do like 3 or 4 probes
-> to get version which makes code unreadable.
+> On Tuesday 13 September 2011 02:36 AM, Kevin Hilman wrote:
+>> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
+>>
+>>> This patch adds the CPU0 and CPU1 off mode support. CPUX close switch
+>>> retention (CSWR) is not supported by hardware design.
+>>>
+>>> The CPUx OFF mode isn't supported on OMAP4430 ES1.0
+>>>
+>>> CPUx sleep code is common for hotplug, suspend and CPUilde.
+>>>
+>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>> Cc: Kevin Hilman<khilman@ti.com>
+>>
+>> [...]
+>>
+>>> @@ -38,6 +39,11 @@ void __iomem *omap4_get_scu_base(void)
+>>>
+>>>   void __cpuinit platform_secondary_init(unsigned int cpu)
+>>>   {
+>>> +	/* Enable NS access to SMP bit for this CPU on EMU/HS devices */
+>>> +	if (cpu_is_omap443x()&&  (omap_type() != OMAP2_DEVICE_TYPE_GP))
+>>
+>> A comment here about why this is 443x specific would be helpful.
+>>
+>> I see a comment in omap4_cpu_resume() that seems to indicate that SMP
+>> bit is accessible on 446x NS devices, but repeating that commen here
+>> would help future readability.
+>>
+> Ok. Will add comments here too. Was just trying to save some lines :)
 
-Is there much reason to get the msm72xx support into the kernel in the
-first place?  These targets are old, and I don't believe any new
-devices are being made using them.  There are no dev boards based on
-this chipset.  Things are a lot easier in the newer RPC/SMD versions,
-and I don't see a strong reason to keep the kruft in the kernel
-necessary to support the 72xx chips.
+heh, this is a negative side-effect of people caring primarily about
+diffstat. :(
 
-> I also propose that we pass the following platform data structure to
-> the SMD driver
-> struct msm_smd_platform_data {
->                 struct amss_value *amss_values; //can be just an array
-> as mentioned above
->                 int n_amss_values;
->                 struct msm_early_server *early_servers;
->                 int n_early_servers;
-> }
-> where struct msm_early_server is { uint32_t cid; uint32_t pid;
-> uint32_t prog; uint32_t vers; }. Some legacy AMSS versions (namely,
-> 5225 and 6150) need to manually register some servers for the ADSP.
+One other comment on this patch.  You need spaces around the '&&' above.
 
-We're not going to be able to get any new platform data.  If this is
-really needed, it'll have to be represented in the device tree and
-looked up that way.
-
-> What I want is to be able to integrate both official Android phones
-> and community ports into vanilla and to be able to build the support
-> for as many devices as possible in a single binary and set everything
-> up in runtime. Please let me know what the current plans on
-> integrating RPC and SMD (tty driver) are and whether you need help
-> with implementing the proposed changes.
-
-My desire is to focus on newer chips (msm8660 and beyond) in the
-mainstream kernel.  At some point, there will be enough cruft from the
-older targets (especially 7200) that it isn't worth carrying the
-support along, especially as there are fewer and fewer of these
-devices around.
-
-The msm8660 is the first MSM chipset with a readily-available
-development platform.  I'd like to start by getting this to work well.
-
-You've probably noticed that Google drops old targets in their newer
-kernel versions.
-
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Kevin
