@@ -1,136 +1,330 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 13 Sep 2011 18:32:40 +0530
-Subject: [PATCH v7 07/26] gpio/omap: avoid cpu checks during module ena/disable
+Date: Tue, 13 Sep 2011 18:32:48 +0530
+Subject: [PATCH v7 15/26] gpio/omap: remove bank->method & METHOD_* macros
 In-Reply-To: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
 References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1315918979-26173-8-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1315918979-26173-16-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Charulatha V <charu@ti.com>
 
-Remove cpu-is checks while enabling/disabling OMAP GPIO module during a gpio
-request/free.
+The only bank->type (method) used in the OMAP GPIO driver is MPUIO type as they
+need to be handled separately. Identify the same using a flag and remove all
+METHOD_* macros.
+
+mpuio_init() function is defined under #ifdefs. It is required only in case
+of MPUIO bank type and only when PM operations are supported by it.
+This is applicable only in case of OMAP16xx SoC's MPUIO GPIO bank type.
+For all the other cases it is a dummy function. Hence clean up the same
+and remove all the OMAP SoC specific #ifdefs.
 
 Signed-off-by: Charulatha V <charu@ti.com>
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/gpio.c             |    2 +
- arch/arm/plat-omap/include/plat/gpio.h |    1 +
- drivers/gpio/gpio-omap.c               |   53 ++++++++++++++------------------
- 3 files changed, 26 insertions(+), 30 deletions(-)
+ arch/arm/mach-omap1/gpio15xx.c         |    3 +-
+ arch/arm/mach-omap1/gpio16xx.c         |    6 +----
+ arch/arm/mach-omap1/gpio7xx.c          |    8 +------
+ arch/arm/mach-omap2/gpio.c             |    2 -
+ arch/arm/plat-omap/include/plat/gpio.h |    8 +------
+ drivers/gpio/gpio-omap.c               |   38 +++++--------------------------
+ 6 files changed, 10 insertions(+), 55 deletions(-)
 
+diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+index 950e467..634903e 100644
+--- a/arch/arm/mach-omap1/gpio15xx.c
++++ b/arch/arm/mach-omap1/gpio15xx.c
+@@ -47,7 +47,7 @@ static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
+ 
+ static struct __initdata omap_gpio_platform_data omap15xx_mpu_gpio_config = {
+ 	.virtual_irq_start	= IH_MPUIO_BASE,
+-	.bank_type		= METHOD_MPUIO,
++	.is_mpuio		= true,
+ 	.bank_width		= 16,
+ 	.bank_stride		= 1,
+ 	.regs			= &omap15xx_mpuio_regs,
+@@ -90,7 +90,6 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
+ 
+ static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE,
+-	.bank_type		= METHOD_GPIO_1510,
+ 	.bank_width		= 16,
+ 	.regs                   = &omap15xx_gpio_regs,
+ };
+diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
+index 86ac415..1c5f90e 100644
+--- a/arch/arm/mach-omap1/gpio16xx.c
++++ b/arch/arm/mach-omap1/gpio16xx.c
+@@ -53,7 +53,7 @@ static struct omap_gpio_reg_offs omap16xx_mpuio_regs = {
+ 
+ static struct __initdata omap_gpio_platform_data omap16xx_mpu_gpio_config = {
+ 	.virtual_irq_start	= IH_MPUIO_BASE,
+-	.bank_type		= METHOD_MPUIO,
++	.is_mpuio		= true,
+ 	.bank_width		= 16,
+ 	.bank_stride		= 1,
+ 	.regs                   = &omap16xx_mpuio_regs,
+@@ -100,7 +100,6 @@ static struct omap_gpio_reg_offs omap16xx_gpio_regs = {
+ 
+ static struct __initdata omap_gpio_platform_data omap16xx_gpio1_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE,
+-	.bank_type		= METHOD_GPIO_1610,
+ 	.bank_width		= 16,
+ 	.regs                   = &omap16xx_gpio_regs,
+ };
+@@ -130,7 +129,6 @@ static struct __initdata resource omap16xx_gpio2_resources[] = {
+ 
+ static struct __initdata omap_gpio_platform_data omap16xx_gpio2_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE + 16,
+-	.bank_type		= METHOD_GPIO_1610,
+ 	.bank_width		= 16,
+ 	.regs                   = &omap16xx_gpio_regs,
+ };
+@@ -160,7 +158,6 @@ static struct __initdata resource omap16xx_gpio3_resources[] = {
+ 
+ static struct __initdata omap_gpio_platform_data omap16xx_gpio3_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE + 32,
+-	.bank_type		= METHOD_GPIO_1610,
+ 	.bank_width		= 16,
+ 	.regs                   = &omap16xx_gpio_regs,
+ };
+@@ -190,7 +187,6 @@ static struct __initdata resource omap16xx_gpio4_resources[] = {
+ 
+ static struct __initdata omap_gpio_platform_data omap16xx_gpio4_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE + 48,
+-	.bank_type		= METHOD_GPIO_1610,
+ 	.bank_width		= 16,
+ 	.regs                   = &omap16xx_gpio_regs,
+ };
+diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+index 207a23c..433491c 100644
+--- a/arch/arm/mach-omap1/gpio7xx.c
++++ b/arch/arm/mach-omap1/gpio7xx.c
+@@ -52,8 +52,8 @@ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
+ 
+ static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
+ 	.virtual_irq_start	= IH_MPUIO_BASE,
+-	.bank_type		= METHOD_MPUIO,
+ 	.bank_width		= 32,
++	.is_mpuio		= true,
+ 	.bank_stride		= 2,
+ 	.regs                   = &omap7xx_mpuio_regs,
+ };
+@@ -94,7 +94,6 @@ static struct omap_gpio_reg_offs omap7xx_gpio_regs = {
+ 
+ static struct __initdata omap_gpio_platform_data omap7xx_gpio1_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE,
+-	.bank_type		= METHOD_GPIO_7XX,
+ 	.bank_width		= 32,
+ 	.regs			= &omap7xx_gpio_regs,
+ };
+@@ -124,7 +123,6 @@ static struct __initdata resource omap7xx_gpio2_resources[] = {
+ 
+ static struct __initdata omap_gpio_platform_data omap7xx_gpio2_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE + 32,
+-	.bank_type		= METHOD_GPIO_7XX,
+ 	.bank_width		= 32,
+ 	.regs			= &omap7xx_gpio_regs,
+ };
+@@ -154,7 +152,6 @@ static struct __initdata resource omap7xx_gpio3_resources[] = {
+ 
+ static struct __initdata omap_gpio_platform_data omap7xx_gpio3_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE + 64,
+-	.bank_type		= METHOD_GPIO_7XX,
+ 	.bank_width		= 32,
+ 	.regs			= &omap7xx_gpio_regs,
+ };
+@@ -184,7 +181,6 @@ static struct __initdata resource omap7xx_gpio4_resources[] = {
+ 
+ static struct __initdata omap_gpio_platform_data omap7xx_gpio4_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE + 96,
+-	.bank_type		= METHOD_GPIO_7XX,
+ 	.bank_width		= 32,
+ 	.regs			= &omap7xx_gpio_regs,
+ };
+@@ -214,7 +210,6 @@ static struct __initdata resource omap7xx_gpio5_resources[] = {
+ 
+ static struct __initdata omap_gpio_platform_data omap7xx_gpio5_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE + 128,
+-	.bank_type		= METHOD_GPIO_7XX,
+ 	.bank_width		= 32,
+ 	.regs			= &omap7xx_gpio_regs,
+ };
+@@ -244,7 +239,6 @@ static struct __initdata resource omap7xx_gpio6_resources[] = {
+ 
+ static struct __initdata omap_gpio_platform_data omap7xx_gpio6_config = {
+ 	.virtual_irq_start	= IH_GPIO_BASE + 160,
+-	.bank_type		= METHOD_GPIO_7XX,
+ 	.bank_width		= 32,
+ 	.regs			= &omap7xx_gpio_regs,
+ };
 diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index a430fb1..72a640d 100644
+index 5ce695c..d865033 100644
 --- a/arch/arm/mach-omap2/gpio.c
 +++ b/arch/arm/mach-omap2/gpio.c
-@@ -98,6 +98,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
- 		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
- 		pdata->regs->debounce_en = OMAP24XX_GPIO_DEBOUNCE_EN;
-+		pdata->regs->ctrl = OMAP24XX_GPIO_CTRL;
+@@ -84,7 +84,6 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		/* fall through */
+ 
+ 	case 1:
+-		pdata->bank_type = METHOD_GPIO_24XX;
+ 		pdata->regs->revision = OMAP24XX_GPIO_REVISION;
+ 		pdata->regs->direction = OMAP24XX_GPIO_OE;
+ 		pdata->regs->datain = OMAP24XX_GPIO_DATAIN;
+@@ -107,7 +106,6 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		pdata->regs->fallingdetect = OMAP24XX_GPIO_FALLINGDETECT;
  		break;
  	case 2:
- 		pdata->bank_type = METHOD_GPIO_44XX;
-@@ -114,6 +115,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
- 		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
- 		pdata->regs->debounce_en = OMAP4_GPIO_DEBOUNCENABLE;
-+		pdata->regs->ctrl = OMAP4_GPIO_CTRL;
- 		break;
- 	default:
- 		WARN(1, "Invalid gpio bank_type\n");
+-		pdata->bank_type = METHOD_GPIO_44XX;
+ 		pdata->regs->revision = OMAP4_GPIO_REVISION;
+ 		pdata->regs->direction = OMAP4_GPIO_OE;
+ 		pdata->regs->datain = OMAP4_GPIO_DATAIN;
 diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index a93adeb..eaa6de3 100644
+index a4e5ef3..c63b2ad 100644
 --- a/arch/arm/plat-omap/include/plat/gpio.h
 +++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -188,6 +188,7 @@ struct omap_gpio_reg_offs {
- 	u16 clr_irqenable;
- 	u16 debounce;
- 	u16 debounce_en;
-+	u16 ctrl;
+@@ -162,13 +162,6 @@
+ 				 IH_MPUIO_BASE + ((nr) & 0x0f) : \
+ 				 IH_GPIO_BASE + (nr))
  
- 	bool irqenable_inv;
- };
+-#define METHOD_MPUIO		0
+-#define METHOD_GPIO_1510	1
+-#define METHOD_GPIO_1610	2
+-#define METHOD_GPIO_7XX		3
+-#define METHOD_GPIO_24XX	5
+-#define METHOD_GPIO_44XX	6
+-
+ struct omap_gpio_dev_attr {
+ 	int bank_width;		/* GPIO bank width */
+ 	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
+@@ -210,6 +203,7 @@ struct omap_gpio_platform_data {
+ 	int bank_stride;	/* Only needed for omap1 MPUIO */
+ 	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
+ 	bool loses_context;	/* whether the bank would ever lose context */
++	bool is_mpuio;		/* whether the bank is of type MPUIO */
+ 	u32 non_wakeup_gpios;
+ 
+ 	struct omap_gpio_reg_offs *regs;
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 090feb8..84cd934 100644
+index d614c6d..6efacea 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -83,6 +83,7 @@ struct gpio_bank {
+@@ -49,7 +49,6 @@ struct gpio_bank {
+ 	void __iomem *base;
+ 	u16 irq;
+ 	u16 virtual_irq_start;
+-	int method;
+ 	u32 suspend_wakeup;
+ 	u32 saved_wakeup;
+ 	u32 non_wakeup_gpios;
+@@ -66,6 +65,7 @@ struct gpio_bank {
+ 	u32 mod_usage;
+ 	u32 dbck_enable_mask;
+ 	struct device *dev;
++	bool is_mpuio;
+ 	bool dbck_flag;
+ 	bool loses_context;
+ 	int stride;
+@@ -689,14 +689,6 @@ static struct irq_chip gpio_irq_chip = {
  
- #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
- #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
-+#define GPIO_MOD_CTRL_BIT	BIT(0)
+ /*---------------------------------------------------------------------*/
  
- static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
+-#ifdef CONFIG_ARCH_OMAP1
+-
+-#define bank_is_mpuio(bank)	((bank)->method == METHOD_MPUIO)
+-
+-#ifdef CONFIG_ARCH_OMAP16XX
+-
+-#include <linux/platform_device.h>
+-
+ static int omap_mpuio_suspend_noirq(struct device *dev)
  {
-@@ -577,22 +578,18 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
- 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
- 	}
- #endif
--	if (!cpu_class_is_omap1()) {
--		if (!bank->mod_usage) {
--			void __iomem *reg = bank->base;
--			u32 ctrl;
--
--			if (cpu_is_omap24xx() || cpu_is_omap34xx())
--				reg += OMAP24XX_GPIO_CTRL;
--			else if (cpu_is_omap44xx())
--				reg += OMAP4_GPIO_CTRL;
--			ctrl = __raw_readl(reg);
--			/* Module is enabled, clocks are not gated */
--			ctrl &= 0xFFFFFFFE;
--			__raw_writel(ctrl, reg);
--		}
--		bank->mod_usage |= 1 << offset;
-+	if (bank->regs->ctrl && !bank->mod_usage) {
-+		void __iomem *reg = bank->base + bank->regs->ctrl;
-+		u32 ctrl;
-+
-+		ctrl = __raw_readl(reg);
-+		/* Module is enabled, clocks are not gated */
-+		ctrl &= ~GPIO_MOD_CTRL_BIT;
-+		__raw_writel(ctrl, reg);
- 	}
-+
-+	bank->mod_usage |= 1 << offset;
-+
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 
- 	return 0;
-@@ -625,22 +622,18 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
- 		__raw_writel(1 << offset, reg);
- 	}
- #endif
--	if (!cpu_class_is_omap1()) {
--		bank->mod_usage &= ~(1 << offset);
--		if (!bank->mod_usage) {
--			void __iomem *reg = bank->base;
--			u32 ctrl;
--
--			if (cpu_is_omap24xx() || cpu_is_omap34xx())
--				reg += OMAP24XX_GPIO_CTRL;
--			else if (cpu_is_omap44xx())
--				reg += OMAP4_GPIO_CTRL;
--			ctrl = __raw_readl(reg);
--			/* Module is disabled, clocks are gated */
--			ctrl |= 1;
--			__raw_writel(ctrl, reg);
--		}
-+	bank->mod_usage &= ~(1 << offset);
-+
-+	if (bank->regs->ctrl && !bank->mod_usage) {
-+		void __iomem *reg = bank->base + bank->regs->ctrl;
-+		u32 ctrl;
-+
-+		ctrl = __raw_readl(reg);
-+		/* Module is disabled, clocks are gated */
-+		ctrl |= GPIO_MOD_CTRL_BIT;
-+		__raw_writel(ctrl, reg);
- 	}
-+
- 	_reset_gpio(bank, bank->chip.base + offset);
- 	spin_unlock_irqrestore(&bank->lock, flags);
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -758,23 +750,8 @@ static inline void mpuio_init(struct gpio_bank *bank)
+ 		(void) platform_device_register(&omap_mpuio_device);
  }
+ 
+-#else
+-static inline void mpuio_init(struct gpio_bank *bank) {}
+-#endif	/* 16xx */
+-
+-#else
+-
+-#define bank_is_mpuio(bank)	0
+-static inline void mpuio_init(struct gpio_bank *bank) {}
+-
+-#endif
+-
+ /*---------------------------------------------------------------------*/
+ 
+-/* REVISIT these are stupid implementations!  replace by ones that
+- * don't switch on METHOD_* and which mostly avoid spinlocks
+- */
+-
+ static int gpio_input(struct gpio_chip *chip, unsigned offset)
+ {
+ 	struct gpio_bank *bank;
+@@ -895,7 +872,7 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
+ 	if (bank->width == 16)
+ 		l = 0xffff;
+ 
+-	if (bank_is_mpuio(bank)) {
++	if (bank->is_mpuio) {
+ 		__raw_writel(l, bank->base + bank->regs->irqenable);
+ 		return;
+ 	}
+@@ -941,7 +918,6 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+ 	int j;
+ 	static int gpio;
+ 
+-	bank->mod_usage = 0;
+ 	/*
+ 	 * REVISIT eventually switch from OMAP-specific gpio structs
+ 	 * over to the generic ones
+@@ -954,12 +930,10 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+ 	bank->chip.set_debounce = gpio_debounce;
+ 	bank->chip.set = gpio_set;
+ 	bank->chip.to_irq = gpio_2irq;
+-	if (bank_is_mpuio(bank)) {
++	if (bank->is_mpuio) {
+ 		bank->chip.label = "mpuio";
+-#ifdef CONFIG_ARCH_OMAP16XX
+ 		if (bank->regs->wkup_en)
+ 			bank->chip.dev = &omap_mpuio_device.dev;
+-#endif
+ 		bank->chip.base = OMAP_MPUIO(0);
+ 	} else {
+ 		bank->chip.label = "gpio";
+@@ -974,7 +948,7 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+ 		     j < bank->virtual_irq_start + bank->width; j++) {
+ 		irq_set_lockdep_class(j, &gpio_lock_class);
+ 		irq_set_chip_data(j, bank);
+-		if (bank_is_mpuio(bank)) {
++		if (bank->is_mpuio) {
+ 			omap_mpuio_alloc_gc(bank, j, bank->width);
+ 		} else {
+ 			irq_set_chip(j, &gpio_irq_chip);
+@@ -1018,11 +992,11 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 
+ 	pdata = pdev->dev.platform_data;
+ 	bank->virtual_irq_start = pdata->virtual_irq_start;
+-	bank->method = pdata->bank_type;
+ 	bank->dev = &pdev->dev;
+ 	bank->dbck_flag = pdata->dbck_flag;
+ 	bank->stride = pdata->bank_stride;
+ 	bank->width = pdata->bank_width;
++	bank->is_mpuio = pdata->is_mpuio;
+ 	bank->non_wakeup_gpios = pdata->non_wakeup_gpios;
+ 	bank->loses_context = pdata->loses_context;
+ 	bank->get_context_loss_count = pdata->get_context_loss_count;
+@@ -1055,7 +1029,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 	pm_runtime_enable(bank->dev);
+ 	pm_runtime_get_sync(bank->dev);
+ 
+-	if (bank_is_mpuio(bank))
++	if (bank->is_mpuio)
+ 		mpuio_init(bank);
+ 
+ 	omap_gpio_mod_init(bank);
 -- 
 1.7.0.4
