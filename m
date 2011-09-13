@@ -1,189 +1,57 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 13 Sep 2011 18:32:45 +0530
-Subject: [PATCH v7 12/26] gpio/omap: cleanup omap_gpio_mod_init function
-In-Reply-To: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1315918979-26173-13-git-send-email-tarun.kanti@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 13 Sep 2011 15:06:23 +0200
+Subject: [PATCH 2/4 v6] pinmux: add a driver for the U300 pinmux
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B327A570@HQMAIL01.nvidia.com>
+References: <1314869552-5531-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B327A40C@HQMAIL01.nvidia.com>
+	<CACRpkdZ1kNbtOqw=X1mmM-bA+Gg2BbmO5_CT0sSQtBCK_WdwYw@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B327A570@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdan_g6dBvuXwbAdtHFd14GLkKsKLcHnybTuNGmYiqcStA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With register offsets now defined for respective OMAP versions we can get rid
-of cpu_class_* checks. This function now has common initialization code for
-all OMAP versions. Initialization specific to OMAP16xx has been moved within
-omap16xx_gpio_init().
+On Fri, Sep 2, 2011 at 6:04 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Linus Walleij wrote at Friday, September 02, 2011 2:12 AM:
+>> On Thu, Sep 1, 2011 at 11:33 PM, Stephen Warren <swarren@nvidia.com> wrote:
+>>
+>> >> +static const struct u300_pmx_func u300_pmx_functions[] = {
+>> >> + ? ? {
+>> >> + ? ? ? ? ? ? .name = "power",
+>> >> + ? ? ? ? ? ? .groups = { POWERGRP_INDEX },
+>> >> + ? ? ? ? ? ? /* Mask is N/A */
+>> >> + ? ? },
+>> >
+>> > Hmmm. That's a lot of _INDEX defines that'd need to be set up, at least
+>> > to fully represent a chip like Tegra. Can the pinmux core be modified
+>> > such that the group list is an array of names (char*) rather than the
+>> > actual numeric IDs of the groups? Still, perhaps we could use the enum
+>> > we already have for this, so perhaps it isn't a big deal...
+>>
+>> Well I could think about a lot of ways to do this, but it's basically up
+>> to the driver, the U300 is just some simple example of what you can
+>> do, it's just trying to satisfy the API.
+>>
+>> Maybe as part of writing the nVidia driver you find a clever
+>> mechanism for doing this, if it's looking generally useful at that
+>> point then let's move it to the core I'd say.
+>
+> The reason I asked about the pinmux core handling this is because the
+> driver op get_function_groups:
+>
+> + ? ? ? int (*get_function_groups) (struct pinctrl_dev *pctldev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned selector,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned ** const groups,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned * const num_groups);
+>
+> returns an array of integer indexes. I think the only way to get rid of
+> the index definitions in the drivers is to allow get_function_groups to
+> return an array of strings instead.
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-Signed-off-by: Charulatha V <charu@ti.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap1/gpio16xx.c |   35 +++++++++++++++++++-
- drivers/gpio/gpio-omap.c       |   71 +++++++++------------------------------
- 2 files changed, 51 insertions(+), 55 deletions(-)
+OK good idea, I reworked this interface to get an array of strings
+instead, I've been told several times to use strings rather than numbers
+when possible, so I think this is the right thing to do.
 
-diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-index 46bb57a..86ac415 100644
---- a/arch/arm/mach-omap1/gpio16xx.c
-+++ b/arch/arm/mach-omap1/gpio16xx.c
-@@ -24,6 +24,9 @@
- #define OMAP1610_GPIO4_BASE		0xfffbbc00
- #define OMAP1_MPUIO_VBASE		OMAP1_MPUIO_BASE
- 
-+/* smart idle, enable wakeup */
-+#define SYSCONFIG_WORD			0x14
-+
- /* mpu gpio */
- static struct __initdata resource omap16xx_mpu_gpio_resources[] = {
- 	{
-@@ -218,12 +221,42 @@ static struct __initdata platform_device * omap16xx_gpio_dev[] = {
- static int __init omap16xx_gpio_init(void)
- {
- 	int i;
-+	void __iomem *base;
-+	struct resource *res;
-+	struct platform_device *pdev;
-+	struct omap_gpio_platform_data *pdata;
- 
- 	if (!cpu_is_omap16xx())
- 		return -EINVAL;
- 
--	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++)
-+	for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++) {
-+		pdev = omap16xx_gpio_dev[i];
-+		pdata = pdev->dev.platform_data;
-+
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+		if (unlikely(!res)) {
-+			dev_err(&pdev->dev, "Invalid mem resource.\n");
-+			return -ENODEV;
-+		}
-+
-+		base = ioremap(res->start, resource_size(res));
-+		if (unlikely(!base)) {
-+			dev_err(&pdev->dev, "ioremap failed.\n");
-+			return -ENOMEM;
-+		}
-+
-+		__raw_writel(SYSCONFIG_WORD, base + OMAP1610_GPIO_SYSCONFIG);
-+		iounmap(base);
-+
-+		/*
-+		 * Enable system clock for GPIO module.
-+		 * The CAM_CLK_CTRL *is* really the right place.
-+		 */
-+		omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
-+					ULPD_CAM_CLK_CTRL);
-+
- 		platform_device_register(omap16xx_gpio_dev[i]);
-+	}
- 
- 	return 0;
- }
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index e51804b..2a57d0b 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -605,7 +605,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			if (!(isr & 1))
- 				continue;
- 
--#ifdef CONFIG_ARCH_OMAP1
- 			/*
- 			 * Some chips can't respond to both rising and falling
- 			 * at the same time.  If this irq was requested with
-@@ -615,7 +614,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			 */
- 			if (bank->toggle_mask & (1 << gpio_index))
- 				_toggle_gpio_edge_triggering(bank, gpio_index);
--#endif
- 
- 			generic_handle_irq(gpio_irq);
- 		}
-@@ -893,62 +891,24 @@ static void __init omap_gpio_show_rev(struct gpio_bank *bank)
-  */
- static struct lock_class_key gpio_lock_class;
- 
--/* TODO: Cleanup cpu_is_* checks */
- static void omap_gpio_mod_init(struct gpio_bank *bank)
- {
--	if (cpu_class_is_omap2()) {
--		if (cpu_is_omap44xx()) {
--			__raw_writel(0xffffffff, bank->base +
--					OMAP4_GPIO_IRQSTATUSCLR0);
--			__raw_writel(0x00000000, bank->base +
--					 OMAP4_GPIO_DEBOUNCENABLE);
--			/* Initialize interface clk ungated, module enabled */
--			__raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
--		} else if (cpu_is_omap34xx()) {
--			__raw_writel(0x00000000, bank->base +
--					OMAP24XX_GPIO_IRQENABLE1);
--			__raw_writel(0xffffffff, bank->base +
--					OMAP24XX_GPIO_IRQSTATUS1);
--			__raw_writel(0x00000000, bank->base +
--					OMAP24XX_GPIO_DEBOUNCE_EN);
--
--			/* Initialize interface clk ungated, module enabled */
--			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
--		}
--	} else if (cpu_class_is_omap1()) {
--		if (bank_is_mpuio(bank)) {
--			__raw_writew(0xffff, bank->base +
--				OMAP_MPUIO_GPIO_MASKIT / bank->stride);
--			mpuio_init(bank);
--		}
--		if (cpu_is_omap15xx() && bank->method == METHOD_GPIO_1510) {
--			__raw_writew(0xffff, bank->base
--						+ OMAP1510_GPIO_INT_MASK);
--			__raw_writew(0x0000, bank->base
--						+ OMAP1510_GPIO_INT_STATUS);
--		}
--		if (cpu_is_omap16xx() && bank->method == METHOD_GPIO_1610) {
--			__raw_writew(0x0000, bank->base
--						+ OMAP1610_GPIO_IRQENABLE1);
--			__raw_writew(0xffff, bank->base
--						+ OMAP1610_GPIO_IRQSTATUS1);
--			__raw_writew(0x0014, bank->base
--						+ OMAP1610_GPIO_SYSCONFIG);
-+	void __iomem *base = bank->base;
-+	u32 l = 0xffffffff;
- 
--			/*
--			 * Enable system clock for GPIO module.
--			 * The CAM_CLK_CTRL *is* really the right place.
--			 */
--			omap_writel(omap_readl(ULPD_CAM_CLK_CTRL) | 0x04,
--						ULPD_CAM_CLK_CTRL);
--		}
--		if (cpu_is_omap7xx() && bank->method == METHOD_GPIO_7XX) {
--			__raw_writel(0xffffffff, bank->base
--						+ OMAP7XX_GPIO_INT_MASK);
--			__raw_writel(0x00000000, bank->base
--						+ OMAP7XX_GPIO_INT_STATUS);
--		}
-+	if (bank->width == 16)
-+		l = 0xffff;
-+
-+	if (bank_is_mpuio(bank)) {
-+		__raw_writel(l, bank->base + bank->regs->irqenable);
-+		return;
- 	}
-+
-+	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->irqenable_inv);
-+	_gpio_rmw(base, bank->regs->irqstatus, l,
-+					bank->regs->irqenable_inv == false);
-+	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->debounce_en != 0);
-+	_gpio_rmw(base, bank->regs->irqenable, l, bank->regs->ctrl != 0);
- }
- 
- static __init void
-@@ -1099,6 +1059,9 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	pm_runtime_enable(bank->dev);
- 	pm_runtime_get_sync(bank->dev);
- 
-+	if (bank_is_mpuio(bank))
-+		mpuio_init(bank);
-+
- 	omap_gpio_mod_init(bank);
- 	omap_gpio_chip_init(bank);
- 	omap_gpio_show_rev(bank);
--- 
-1.7.0.4
+Check it out in v7!
+
+Yours,
+Linus Walleij
