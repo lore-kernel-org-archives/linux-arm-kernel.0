@@ -1,28 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Sep 2011 23:37:47 +0100
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
-	online/active
-In-Reply-To: <alpine.LFD.2.02.1109132247490.2723@ionos>
-References: <20110908215314.829452535@linutronix.de>
-	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-	<20110913133258.GA6267@n2100.arm.linux.org.uk>
-	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
-	<20110913175312.GB6267@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1109132247490.2723@ionos>
-Message-ID: <20110913223747.GA23109@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 13 Sep 2011 16:15:40 -0700
+Subject: [PATCH v15 11/12] OMAP: dmtimer: extend spinlock to exported APIs
+In-Reply-To: <1315516098-29761-12-git-send-email-tarun.kanti@ti.com>
+References: <1315516098-29761-1-git-send-email-tarun.kanti@ti.com>
+	<1315516098-29761-12-git-send-email-tarun.kanti@ti.com>
+Message-ID: <20110913231540.GI24252@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2011 at 10:48:48PM +0200, Thomas Gleixner wrote:
-> The question is whether you really need to calibrate the delay for
-> each core or if you simply can take the calibration of the first
-> core. That would avoid enabling interrupts all the way.
+* Tarun Kanti DebBarma <tarun.kanti@ti.com> [110908 13:36]:
+> Since the exported APIs can be called from interrupt context
+> extend spinlock protection to some more relevant APIs to avoid
+> race condition.
 
-That depends whether you require all cores in a SMP system to be built
-the same way or not (and therefore to have the same performance.)  I'm
-aware of at least one implementation where that isn't the case, and I
-see no reason why that would not become more common.
+We should have locking for requesting and releasing a timer etc,
+but I don't see need for that for the timer specific functions.
 
-In that case, we need the individual core delay calibration, and lock
-delays to either cores or specific groups of cores, or use hardware
-timers (if available, and with enough precision) for them.
+> @@ -317,9 +317,11 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_trigger);
+>  void omap_dm_timer_start(struct omap_dm_timer *timer)
+>  {
+>  	u32 l;
+> +	unsigned long flags;
+>  
+>  	omap_dm_timer_enable(timer);
+>  
+> +	spin_lock_irqsave(&dm_timer_lock, flags);
+>  	if (timer->loses_context) {
+>  		u32 ctx_loss_cnt_after =
+>  			timer->get_context_loss_count(&timer->pdev->dev);
+
+Here the caller already owns the timer being started. So there
+should never be multiple users for a single timer. If there are,
+then the caller should take care of locking.
+
+>  void omap_dm_timer_stop(struct omap_dm_timer *timer)
+>  {
+> -	unsigned long rate = 0;
+> +	unsigned long rate = 0, flags;
+>  	struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
+>  	bool is_omap2 = true;
+>  
+> +	spin_lock_irqsave(&dm_timer_lock, flags);
+>  	if (pdata->needs_manual_reset)
+>  		is_omap2 = false;
+>  	else
+
+Here too.
+
+> @@ -389,8 +394,10 @@ void omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+>  			    unsigned int load)
+>  {
+>  	u32 l;
+> +	unsigned long flags;
+>  
+>  	omap_dm_timer_enable(timer);
+> +	spin_lock_irqsave(&dm_timer_lock, flags);
+>  	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+>  	if (autoreload)
+>  		l |= OMAP_TIMER_CTRL_AR;
+
+And here.
+
+> @@ -412,9 +420,11 @@ void omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
+>                              unsigned int load)
+>  {
+>  	u32 l;
+> +	unsigned long flags;
+>  
+>  	omap_dm_timer_enable(timer);
+>  
+> +	spin_lock_irqsave(&dm_timer_lock, flags);
+>  	if (timer->loses_context) {
+>  		u32 ctx_loss_cnt_after =
+>  			timer->get_context_loss_count(&timer->pdev->dev);
+
+Not needed here either. And that's the case for all the other functions
+too.
+
+Regards,
+
+Tony
