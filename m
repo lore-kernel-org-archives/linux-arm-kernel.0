@@ -1,28 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 13 Sep 2011 18:11:28 +0200
-Subject: [PATCH 0/3] ARCH: CSR: basic PM suspend/resume support
-In-Reply-To: <1315908393-362-1-git-send-email-Baohua.Song@csr.com>
-References: <1315908393-362-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <201109131811.28241.arnd@arndb.de>
+Date: Tue, 13 Sep 2011 18:35:13 +0200
+Subject: [PATCH] ARM: CSR: call l2x0_of_init to init L2 cache of
+	SiRFprimaII
+In-Reply-To: <4E6F77C6.8040409@gmail.com>
+References: <1315905006-21390-1-git-send-email-Baohua.Song@csr.com>
+	<CAGsJ_4xtHsKpLqS81maGS5g=RHW+Paa09wKNVx3qEvxjCc8-Pw@mail.gmail.com>
+	<4E6F77C6.8040409@gmail.com>
+Message-ID: <201109131835.14230.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 September 2011, Barry Song wrote:
+On Tuesday 13 September 2011, Rob Herring wrote:
+> I have it in init_irq as I need the outer flush to work for SMP init.
+> init_machine may be okay as well, but as early as possible is probably
+> best. It depends if you are turning on the L2 or it is already on when
+> you boot.
 > 
-> it was in thread "ARM: CSR: add rtciobrg and PM support" before. See:
-> http://www.spinics.net/lists/arm-kernel/msg137375.html
-> 
-> Arnd has pulled rtciobrg into arm-soc next branch. PM should be another
-> series.
+> You could also just check your machine compatible string in this
+> function, but calling it from a machine specific function is a cleaner
+> solution.
 
-Looks good to me, feel free to add my Acked-by to the patches, but
-please add a meaningful changelog text to each patch first.
-You can use some of the text that you put in the introductory mail.
+I would suggest checking the specific "compatible" string of the l2x0
+device node, and making sure that you have something specific to
+prima2 in it.
 
-In general, I expect even trivial patches to have a changelog of
-one sentence and more text if the patch touches more code.
-
-If nobody has other comments on the code, please send me a pull
-request once that is done.
+That would easily let us combine this function with the respective
+l2x0 init code for other dt based platforms later, by checking
+multiple compatible values.
 
 	Arnd
