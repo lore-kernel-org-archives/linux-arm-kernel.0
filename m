@@ -1,58 +1,69 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 13 Sep 2011 08:07:06 +0800
-Subject: [PATCH 3/6] arm/imx6q: add core drivers clock, gpc, mmdc and src
-In-Reply-To: <20110912194032.GB23345@ponder.secretlab.ca>
-References: <1315303120-24203-1-git-send-email-shawn.guo@linaro.org>
-	<1711465.COqYbTSZES@wuerfel>
-	<20110907060501.GE8148@S2100-06.ap.freescale.net>
-	<2937243.vrss2TdbGN@wuerfel>
-	<20110912161201.GN1258@S2100-06.ap.freescale.net>
-	<20110912194032.GB23345@ponder.secretlab.ca>
-Message-ID: <20110913000705.GO1258@S2100-06.ap.freescale.net>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Mon, 12 Sep 2011 18:17:18 -0700
+Subject: [RFC PATCH] genirq: set pending flag for disabled level interrupt
+In-Reply-To: <alpine.LFD.2.02.1109021046240.2723@ionos>
+References: <1312820566-5842-1-git-send-email-adharmap@codeaurora.org>
+	<alpine.LFD.2.02.1109021046240.2723@ionos>
+Message-ID: <4E6EAF1E.6060608@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2011 at 01:40:33PM -0600, Grant Likely wrote:
-> On Tue, Sep 13, 2011 at 12:12:02AM +0800, Shawn Guo wrote:
-> > On Wed, Sep 07, 2011 at 09:56:21AM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 07 September 2011 14:05:03 Shawn Guo wrote:
-> > > > > My feeling is that this time, we should wait for the common clock
-> > > > > framework to get in and simplify this. I believe Thomas is now planning
-> > > > > to do this, but I haven't followed what the current state is.
-> > > > > 
-> > > > Sadly, if this is the position of entire arm-soc maintainer group,
-> > > > I think I have made a wrong decision to start upstreaming imx6q now.
-> > > 
-> > > We haven't discussed it as a group, it's my own opinion.
-> > > 
-> > 
-> > Hi Thomas, Grant,
-> > 
-> > Could you please share your opinion here?
-> > 
-> > I really do not see the hope that clock framework and device tree
-> > binding could possibly catch v3.2 window, while I'm hoping that imx6q
-> > series can go into v3.2.
-> > 
-> > Can you please agree that we can let the imx6q clock code in and then
-> > migrate it to clock framework and device tree once they get ready?
-> 
-> I've not looked very deeply at this patch, but I completely agree that
-> we cannot block new platforms on infrastructure that isn't remotely
-> mergable at this point in time.
-> 
-> However, imx6 is a new platform.  There isn't any non-DT board support
-> code to continue to support.  At the very least, the configurable
-> parameters, like what is passed into mx6q_clocks_init() should be
-> obtained from the device tree (maybe it already does this though, I
-> haven't looked that closely).
-> 
-Ok, will do in the next post.
+On 09/02/2011 01:47 AM, Thomas Gleixner wrote:
+>
+> On Mon, 8 Aug 2011, Abhijeet Dharmapurikar wrote:
+>
+>> For hardware which has no wakeup source configuration facility, it needs
+>> its wakeup interrupts unmasked.
+>> If a wakeup edge interrupt triggered while the system was suspending the
+>> edge flow handler marks it pending and masks the interrupt. The kernel
+>> checks pending flag on wakeup interrupts and aborts suspend if one is set.
+>>
+>> If a wakeup level interrupt triggered while the system was suspending the
+>> level flow handler masks the interrupt without setting the pending flag.
+>> Suspend won't be aborted. This is fine as it is expected that a level
+>> triggered interrupt will stay triggered and cause the system to resume.
+>> This however doesn't work on chips that don't have wakeup configuration
+>> in hardware because such chips need that interrupt unmasked for causing
+>> a resume.
+>>
+>> Address that shortcoming by making the level flow handler set the pending
+>> flag if a wakeup interrupt controlled by such a chip is triggered while
+>> it is suspended.
+>
+> And how is that supposed to work ?
+>
+> check_irq_resend()
+> {
+>          if (irq_settings_is_level(desc))
+>                  return;
+> ...
+>
 
-> In general, I say merge it.
-> 
-Thanks, Grant.
+Hmm, I missed this check. Sorry.
+
+I will send another patch that extends check_wakeup_irqs().
+
+>> Signed-off-by: Abhijeet Dharmapurikar<adharmap@codeaurora.org>
+>> ---
+>> If a level interrupt irq triggered right while the system was doing
+>> suspend_noirqs, the level flow handler will mask that interrupt and when the
+>> system went in to power collapse the interrupt controller did not wakeup the
+>> phone. The interrupt controller needs an interrupt triggered and masked to
+>> wakeup the phone - it does not have any wakeup interrupt configuration.
+>> The solution presented here is to mark that level triggered
+>> wakeup interrupt pending for chips with IRQCHIP_MASK_ON_SUSPEND. This will cause
+>> check_wakeup_irqs to abort suspend.
+>> Other solution would be to unmask such level interrupt in check_wakeup_irqs()
+>> but that seemed like I was expanding and complicating check_wakeup_irqs()
+>> duties - let me know if you think otherwise.
+>> Note that we cannot unmask the interrupt in the level flow handler, that will
+>> cause an interrupt storm.
+>>
+>>   include/linux/irq.h |    4 +++-
+>>   kernel/irq/chip.c   |   16 +++++++++++++++-
+>>   2 files changed, 18 insertions(+), 2 deletions(-)
+
 
 -- 
-Regards,
-Shawn
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
