@@ -1,31 +1,108 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 13 Sep 2011 00:01:17 -0700
-Subject: [PATCH v3 1/2] i2c: s3c2410: Keep a copy of platform data and
-	use it
-In-Reply-To: <1315887365-30532-2-git-send-email-thomas.abraham@linaro.org>
-References: <1315887365-30532-1-git-send-email-thomas.abraham@linaro.org>
-	<1315887365-30532-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4E6EFFBD.6050609@codeaurora.org>
+From: deepthy.ravi@ti.com (Ravi, Deepthy)
+Date: Tue, 13 Sep 2011 12:36:20 +0530
+Subject: [PATCH 1/8] omap3evm: Enable regulators for camera interface
+In-Reply-To: <201109081851.53078.laurent.pinchart@ideasonboard.com>
+References: <1315488831-15998-1-git-send-email-deepthy.ravi@ti.com>,
+	<201109081851.53078.laurent.pinchart@ideasonboard.com>
+Message-ID: <ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D090831@dbde03.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/12/2011 9:16 PM, Thomas Abraham wrote:
-> @@ -809,6 +810,15 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	}
->  
-> +	i2c->pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!i2c->pdata) {
-> +		ret = -ENOMEM;
-> +		goto err_noclk;
-> +	}
-> +
-> +	if (pdata)
-> +		memcpy(i2c->pdata, pdata, sizeof(*pdata));
-> +
+Hi,
+> ________________________________________
+> From: Laurent Pinchart [laurent.pinchart at ideasonboard.com]
+> Sent: Thursday, September 08, 2011 10:21 PM
+> To: Ravi, Deepthy
+> Cc: linux-omap at vger.kernel.org; tony at atomide.com; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; mchehab at infradead.org; linux-media at vger.kernel.org; g.liakhovetski at gmx.de; Hiremath, Vaibhav
+> Subject: Re: [PATCH 1/8] omap3evm: Enable regulators for camera interface
+>
+> Hi,
+>
+> On Thursday 08 September 2011 15:33:51 Deepthy Ravi wrote:
+>> From: Vaibhav Hiremath <hvaibhav@ti.com>
+>>
+>> Enabled 1v8 and 2v8 regulator output, which is being used by
+>> camera module.
+>
+> Thanks for the patch. Just one minor comment below.
+>
+>> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/board-omap3evm.c |   40
+>> ++++++++++++++++++++++++++++++++++ 1 files changed, 40 insertions(+), 0
+>> deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/board-omap3evm.c
+>> b/arch/arm/mach-omap2/board-omap3evm.c index a1184b3..8333ee4 100644
+>> --- a/arch/arm/mach-omap2/board-omap3evm.c
+>> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+>> @@ -273,6 +273,44 @@ static struct omap_dss_board_info omap3_evm_dss_data =
+>> { .default_device     = &omap3_evm_lcd_device,
+>>  };
+>>
+>> +static struct regulator_consumer_supply omap3evm_vaux3_supply = {
+>> +     .supply         = "cam_1v8",
+>> +};
+>> +
+>> +static struct regulator_consumer_supply omap3evm_vaux4_supply = {
+>> +     .supply         = "cam_2v8",
+>> +};
+>> +
+>> +/* VAUX3 for CAM_1V8 */
+>> +static struct regulator_init_data omap3evm_vaux3 = {
+>> +     .constraints = {
+>> +             .min_uV                 = 1800000,
+>> +             .max_uV                 = 1800000,
+>> +             .apply_uV               = true,
+>> +             .valid_modes_mask       = REGULATOR_MODE_NORMAL
+>> +                                     | REGULATOR_MODE_STANDBY,
+>> +             .valid_ops_mask         = REGULATOR_CHANGE_MODE
+>> +                                     | REGULATOR_CHANGE_STATUS,
+>> +             },
+>> +     .num_consumer_supplies  = 1,
+>> +     .consumer_supplies      = &omap3evm_vaux3_supply,
+>
+> I might be wrong, but I think we're standardizing on using REGULATOR_SUPPLY
+> arrays as described in commit 786b01a8c1db0c0decca55d660a2a3ebd7cfb26b
+> ("cleanup regulator supply definitions in mach-omap2").
+>
+[Deepthy Ravi] Yes, you are right. I will modify it.
+>> +};
+>> +
+>> +/* VAUX4 for CAM_2V8 */
+>> +static struct regulator_init_data omap3evm_vaux4 = {
+>> +     .constraints = {
+>> +             .min_uV                 = 1800000,
+>> +             .max_uV                 = 1800000,
+>> +             .apply_uV               = true,
+>> +             .valid_modes_mask       = REGULATOR_MODE_NORMAL
+>> +                     | REGULATOR_MODE_STANDBY,
+>> +             .valid_ops_mask         = REGULATOR_CHANGE_MODE
+>> +                     | REGULATOR_CHANGE_STATUS,
+>> +     },
+>> +     .num_consumer_supplies  = 1,
+>> +     .consumer_supplies      = &omap3evm_vaux4_supply,
+>> +};
+>> +
+>>  static struct regulator_consumer_supply omap3evm_vmmc1_supply[] = {
+>>       REGULATOR_SUPPLY("vmmc", "omap_hsmmc.0"),
+>>  };
+>> @@ -499,6 +537,8 @@ static struct twl4030_platform_data omap3evm_twldata =
+>> { .vio                = &omap3evm_vio,
+>>       .vmmc1          = &omap3evm_vmmc1,
+>>       .vsim           = &omap3evm_vsim,
+>> +     .vaux3          = &omap3evm_vaux3,
+>> +     .vaux4          = &omap3evm_vaux4,
+>>  };
+>>
+>>  static int __init omap3_evm_i2c_init(void)
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
 
-Is there a devm_kmemdup()? If not, maybe it would be a good idea to add it.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+Deepthy Ravi.
