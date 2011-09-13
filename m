@@ -1,133 +1,66 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 13 Sep 2011 18:32:35 +0530
-Subject: [PATCH v7 02/26] gpio/omap: use flag to identify wakeup domain
+Date: Tue, 13 Sep 2011 18:32:37 +0530
+Subject: [PATCH v7 04/26] gpio/omap: fix pwrdm_post_transition call sequence
 In-Reply-To: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
 References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1315918979-26173-3-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1315918979-26173-5-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Charulatha V <charu@ti.com>
 
-In omap3, save/restore context is implemented for GPIO banks 2-6 as GPIO bank1
-is in wakeup domain. Instead of identifying bank's power domain by bank id,
-use 'loses_context' flag which is filled by pwrdm_can_ever_lose_context()
-during dev_init.
+The context lost count is modified in omap_sram_idle() path when
+pwrdm_post_transition() is called. But pwrdm_post_transition() is called
+only after omap_gpio_resume_after_idle() is called. Correct this so that
+context lost count is modified before calling omap_gpio_resume_after_idle().
 
-For getting the powerdomain pointer, omap_hwmod_get_pwrdm() is used.
-omap_device_get_pwrdm() could not be used as the pwrdm information needs to be
-filled in pdata, whereas omap_device_get_pwrdm() could be used only after
-omap_device_build() call.
+This would be useful when OMAP GPIO save/restore context is called by
+the OMAP GPIO driver itself.
 
 Signed-off-by: Charulatha V <charu@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/gpio.c             |    6 ++++++
- arch/arm/plat-omap/include/plat/gpio.h |    1 +
- drivers/gpio/gpio-omap.c               |   13 ++++++-------
- 3 files changed, 13 insertions(+), 7 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index fb162fd..9f3a007 100644
---- a/arch/arm/mach-omap2/gpio.c
-+++ b/arch/arm/mach-omap2/gpio.c
-@@ -24,6 +24,8 @@
- #include <plat/omap_hwmod.h>
- #include <plat/omap_device.h>
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 7255d9b..1915050 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -363,7 +363,6 @@ void omap_sram_idle(void)
+ 		printk(KERN_ERR "Invalid mpu state in sram_idle\n");
+ 		return;
+ 	}
+-	pwrdm_pre_transition();
  
-+#include "powerdomain.h"
+ 	/* NEON control */
+ 	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
+@@ -386,6 +385,8 @@ void omap_sram_idle(void)
+ 			if (!console_trylock())
+ 				goto console_still_active;
+ 
++	pwrdm_pre_transition();
 +
- static struct omap_device_pm_latency omap_gpio_latency[] = {
- 	[0] = {
- 		.deactivate_func = omap_device_idle_hwmods,
-@@ -39,6 +41,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 	struct omap_gpio_dev_attr *dev_attr;
- 	char *name = "omap_gpio";
- 	int id;
-+	struct powerdomain *pwrdm;
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON) {
+ 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+@@ -455,6 +456,8 @@ void omap_sram_idle(void)
+ 	}
+ 	omap3_intc_resume_idle();
  
- 	/*
- 	 * extract the device id from name field available in the
-@@ -107,6 +110,9 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		return -EINVAL;
++	pwrdm_post_transition();
++
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON) {
+ 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
+@@ -478,8 +481,6 @@ console_still_active:
+ 		omap3_disable_io_chain();
  	}
  
-+	pwrdm = omap_hwmod_get_pwrdm(oh);
-+	pdata->loses_context = pwrdm_can_ever_lose_context(pwrdm);
-+
- 	od = omap_device_build(name, id - 1, oh, pdata,
- 				sizeof(*pdata),	omap_gpio_latency,
- 				ARRAY_SIZE(omap_gpio_latency),
-diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index dd330ed..58d0bf2 100644
---- a/arch/arm/plat-omap/include/plat/gpio.h
-+++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -198,6 +198,7 @@ struct omap_gpio_platform_data {
- 	int bank_width;		/* GPIO bank width */
- 	int bank_stride;	/* Only needed for omap1 MPUIO */
- 	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
-+	bool loses_context;	/* whether the bank would ever lose context */
- 
- 	struct omap_gpio_reg_offs *regs;
- };
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index fabe2c0..65fed50 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -56,6 +56,7 @@ struct gpio_bank {
- 	u32 dbck_enable_mask;
- 	struct device *dev;
- 	bool dbck_flag;
-+	bool loses_context;
- 	int stride;
- 	u32 width;
- 	u16 id;
-@@ -1181,7 +1182,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	bank->dbck_flag = pdata->dbck_flag;
- 	bank->stride = pdata->bank_stride;
- 	bank->width = pdata->bank_width;
+-	pwrdm_post_transition();
 -
-+	bank->loses_context = pdata->loses_context;
- 	bank->regs = pdata->regs;
+ 	clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
+ }
  
- 	if (bank->regs->set_dataout && bank->regs->clr_dataout)
-@@ -1337,8 +1338,7 @@ void omap2_gpio_prepare_for_idle(int off_mode)
- 		u32 l1 = 0, l2 = 0;
- 		int j;
- 
--		/* TODO: Do not use cpu_is_omap34xx */
--		if ((cpu_is_omap34xx()) && (bank->id == 0))
-+		if (!bank->loses_context)
- 			continue;
- 
- 		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
-@@ -1405,8 +1405,7 @@ void omap2_gpio_resume_after_idle(void)
- 		u32 l = 0, gen, gen0, gen1;
- 		int j;
- 
--		/* TODO: Do not use cpu_is_omap34xx */
--		if ((cpu_is_omap34xx()) && (bank->id == 0))
-+		if (!bank->loses_context)
- 			continue;
- 
- 		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
-@@ -1505,7 +1504,7 @@ void omap_gpio_save_context(void)
- 	list_for_each_entry(bank, &omap_gpio_list, node) {
- 		i++;
- 
--		if (bank->id == 0)
-+		if (!bank->loses_context)
- 			continue;
- 
- 		gpio_context[i].irqenable1 =
-@@ -1539,7 +1538,7 @@ void omap_gpio_restore_context(void)
- 	list_for_each_entry(bank, &omap_gpio_list, node) {
- 		i++;
- 
--		if (bank->id == 0)
-+		if (!bank->loses_context)
- 			continue;
- 
- 		__raw_writel(gpio_context[i].irqenable1,
 -- 
 1.7.0.4
