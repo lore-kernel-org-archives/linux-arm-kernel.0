@@ -1,51 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Sep 2011 18:53:12 +0100
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
-	online/active
-In-Reply-To: <CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
-References: <20110908215314.829452535@linutronix.de>
-	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-	<20110913133258.GA6267@n2100.arm.linux.org.uk>
-	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
-Message-ID: <20110913175312.GB6267@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 13 Sep 2011 13:01:57 -0500
+Subject: [PATCH] ARM: CSR: call l2x0_of_init to init L2 cache of
+	SiRFprimaII
+In-Reply-To: <201109131835.14230.arnd@arndb.de>
+References: <1315905006-21390-1-git-send-email-Baohua.Song@csr.com>
+	<CAGsJ_4xtHsKpLqS81maGS5g=RHW+Paa09wKNVx3qEvxjCc8-Pw@mail.gmail.com>
+	<4E6F77C6.8040409@gmail.com> <201109131835.14230.arnd@arndb.de>
+Message-ID: <4E6F9A95.1010109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2011 at 07:22:16PM +0200, Vincent Guittot wrote:
-> The assumption done in the 1st patch that smp_store_cpu_info can be
-> delayed is no more true. The smp_store_cpu_info is now also used to
-> store the cpu topology information
-> (https://lkml.org/lkml/2011/7/5/209). This must be done before calling
-> sched_init_smp, which will use this information for building
-> sched_domain.
-> If we move set_cpu_online before smp_store_cpu_info, sched_init_smp
-> can be called before having called smp_store_cpu_info on all cpus.
+On 09/13/2011 11:35 AM, Arnd Bergmann wrote:
+> On Tuesday 13 September 2011, Rob Herring wrote:
+>> I have it in init_irq as I need the outer flush to work for SMP init.
+>> init_machine may be okay as well, but as early as possible is probably
+>> best. It depends if you are turning on the L2 or it is already on when
+>> you boot.
+>>
+>> You could also just check your machine compatible string in this
+>> function, but calling it from a machine specific function is a cleaner
+>> solution.
+> 
+> I would suggest checking the specific "compatible" string of the l2x0
+> device node, and making sure that you have something specific to
+> prima2 in it.
+> 
+> That would easily let us combine this function with the respective
+> l2x0 init code for other dt based platforms later, by checking
+> multiple compatible values.
+> 
+The function does that, but you have a problem when multiple platforms
+have a "arm,pl310-cache" string. Or are you saying we need to have
+"csr,prima2-pl310-cache" and strings for every platform out there with a
+pl310?
 
-Right.  We hold off returning from cpu_up() by watching for the upcoming
-CPU setting its online bit.
-
-The bug which Thomas' patch introduces is to move the setting of that
-before we've finished bringing the CPU up - specifically, allowing the
-requesting CPU to continue while the brought-up CPU is still calibrating
-loops_per_jiffy, and before it's stored that information and setup the
-scheduler domain information.
-
-The other issue is that moving the marking of the CPU online in the
-way Thomas has means that we then invite the delivery of IPIs to the
-CPU which is still in the process of coming up.  Whether that's an
-issue depends on what the IPIs are.
-
-So, we must have the setting of CPU online _after_ we've setup the
-scheduler domain information etc - so the following is a strict
-ordering:
-
-1. calibrate_delay()
-2. smp_store_cpu_info()
-3. set_cpu_online()
-
-Now, the question is do we need interrupts enabled to setup timers
-via percpu_timer_setup() and calibrate delay.  Can we move enabling
-interrupts after smp_store_cpu_info().  IOW, instead of moving the
-setting of cpu online before all this, can we move notify_cpu_starting()
-and the enabling of _both_ interrupts after smp_store_cpu_info()...
-No idea at the moment.
+Rob
