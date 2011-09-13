@@ -1,35 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 13 Sep 2011 09:46:26 +0200
-Subject: [PATCH] Add platform driver support to the CS890x driver
-In-Reply-To: <20110913074424.GY31404@pengutronix.de>
-References: <1315390967-6683-1-git-send-email-jaccon.bastiaansen@gmail.com>
-	<20110907125047.GU28816@pengutronix.de>
-	<20110913074424.GY31404@pengutronix.de>
-Message-ID: <20110913074626.GM28624@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Tue, 13 Sep 2011 13:55:34 +0530
+Subject: [PATCH 21/25] OMAP4: PM: Add MPUSS power domain OSWR support
+In-Reply-To: <CAORVsuUaR8pcZ4MYigi85tmtWspz3tR_OJcvhaB0AFRLRaAANw@mail.gmail.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>	<1315144466-9395-22-git-send-email-santosh.shilimkar@ti.com>	<87obypfvah.fsf@ti.com>	<4E6EEC35.8080203@ti.com>
+	<CAORVsuUaR8pcZ4MYigi85tmtWspz3tR_OJcvhaB0AFRLRaAANw@mail.gmail.com>
+Message-ID: <4E6F137E.30105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tuesday 13 September 2011 01:09 PM, Jean Pihet wrote:
+> Hi Santosh,
+>
+> On Tue, Sep 13, 2011 at 7:37 AM, Santosh<santosh.shilimkar@ti.com>  wrote:
+>> On Tuesday 13 September 2011 12:22 AM, Kevin Hilman wrote:
+>>>
 
-On Tue, Sep 13, 2011 at 09:44:24AM +0200, Sascha Hauer wrote:
-> On Wed, Sep 07, 2011 at 02:50:47PM +0200, Uwe Kleine-K?nig wrote:
-> > > +		printk(KERN_WARNING
-> > > +		       DRV_NAME
-> > > +		       ": memory and/or interrupt resource missing.\n");
-> > I'd prefer you do:
-> > 
-> > 	#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-> > 
-> > at the top of the driver and then just use:
-> > 
-> > 	pr_warning("memory and/or interrupt resource missing\m");
-> 
-> Why not use dev_warn??
-Yeah, that works, too.
+[..]
 
-Best regards
-Uwe
+>>>
+>>>>   static inline int omap4_finish_suspend(unsigned long cpu_state)
+>>>>   {}
+> This one should return 0, as I already pointed out in the comments for [14/25].
+>
+Taken care already.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards
+Santosh
