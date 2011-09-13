@@ -1,72 +1,71 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 13 Sep 2011 11:18:44 -0700
-Subject: [PATCH] OMAP3: PM: fix UART handling when using no_console_suspend
-Message-ID: <mailman.131.1315938260.20020.linux-arm-kernel@lists.infradead.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 13 Sep 2011 12:03:20 -0700
+Subject: [PATCH 01/11] clk: Add a generic clock infrastructure
+In-Reply-To: <1314191759-16941-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <20110824131324.GB16520@opensource.wolfsonmicro.com>
+	<1314191759-16941-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <4E6FA8F8.2010807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the idle/suspend path, we expect the console lock to be held so
-that no console output is done during/after the UARTs are idled.
+On 08/24/11 06:15, Mark Brown wrote:
+> +struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
+> +		const char *name)
+> +{
+> +	struct clk *clk;
+> +
+> +	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
+> +	if (!clk)
+> +		return NULL;
+> +
+> +	clk->name = name;
+> +	clk->ops = ops;
+> +	clk->hw = hw;
+> +	hw->clk = clk;
+> +
+> +	/* Query the hardware for parent and initial rate */
+> +
+> +	if (clk->ops->get_parent)
+> +		/* We don't to lock against prepare/enable here, as
+> +		 * the clock is not yet accessible from anywhere */
+> +		clk->parent = clk->ops->get_parent(clk->hw);
+> +
+> +	if (clk->ops->recalc_rate)
+> +		clk->rate = clk->ops->recalc_rate(clk->hw);
+> +
+> +
+> +	return clk;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_register);
 
-However, when using the no_console_suspend argument on the
-command-line, the console driver does not take the console lock.  This
-allows the possibility of console activity after UARTs have been
-disabled.
+How will this play with clkdev? I think we'll need to add another
+function on top of this one that allows you to register a clk_hw and an
+array of clk_lookups at the same time. Otherwise we're going to get
+about 10 different implementations of the same code.
 
-To fix, update the current is_suspending() to also check the
-console_suspend_enabled flag.
+Something like:
 
-NOTE: this is short-term workaround until the OMAP serial driver
-      is fully converted to use runtime PM.
+struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw, 
+		const char *name, struct clk_lookup *lookups, 
+		size_t num_lookups)
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 7255d9b..c8cbd00 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -55,7 +55,7 @@
- static suspend_state_t suspend_state = PM_SUSPEND_ON;
- static inline bool is_suspending(void)
- {
--	return (suspend_state != PM_SUSPEND_ON);
-+	return (suspend_state != PM_SUSPEND_ON) && console_suspend_enabled;
- }
- #else
- static inline bool is_suspending(void)
+?
+
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 1d37f42..93ff870 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -11,17 +12,103 @@
+>  #ifndef __LINUX_CLK_H
+>  #define __LINUX_CLK_H
+>  
+> +#include <linux/err.h>
+> +#include <linux/spinlock.h>
+> +
+
+I don't see these includes used in this header.
+
 -- 
-1.7.6
-
-
-
-[2]
-commit e83df17f178360a8e7874441bca04a710c869e42
-Author: Kevin Hilman <khilman@deeprootsystems.com>
-Date:   Wed Dec 8 22:40:40 2010 +0000
-
-    OMAP2+: PM/serial: fix console semaphore acquire during suspend
-    
-    commit 0d8e2d0dad98a693bad88aea6876ac8b94ad95c6 (OMAP2+: PM/serial:
-    hold console semaphore while OMAP UARTs are disabled) added use of the
-    console semaphore to protect UARTs from being accessed after disabled
-    during idle, but this causes problems in suspend.
-    
-    During suspend, the console semaphore is acquired by the console
-    suspend method (console_suspend()) so the try_acquire_console_sem()
-    will always fail and suspend will be aborted.
-    
-    To fix, introduce a check so the console semaphore is only attempted
-    during idle, and not during suspend.  Also use the same check so that
-    the console semaphore is not prematurely released during resume.
-    
-    Thanks to Paul Walmsley for suggesting adding the same check during
-    resume.
-    
-    Cc: Paul Walmsley <paul@pwsan.com>
-    Tested-by: Jean Pihet <j-pihet@ti.com>
-    Tested-by: Paul Walmsley <paul@pwsan.com>
-    Signed-off-by: Kevin Hilman <khilman@deeprootsystems.com>
-    Signed-off-by: Tony Lindgren <tony@atomide.com>
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
