@@ -1,49 +1,78 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 13 Sep 2011 22:31:25 +0300
-Subject: [PATCH v2 3/6] iommu/msm: announce supported page sizes
+Date: Tue, 13 Sep 2011 22:31:27 +0300
+Subject: [PATCH v2 5/6] iommu/intel: announce supported page sizes
 In-Reply-To: <1315942288-17297-1-git-send-email-ohad@wizery.com>
 References: <1315942288-17297-1-git-send-email-ohad@wizery.com>
-Message-ID: <1315942288-17297-3-git-send-email-ohad@wizery.com>
+Message-ID: <1315942288-17297-5-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let the IOMMU core know we support 4KB, 64KB, 1MB and 16MB page sizes.
+Let the IOMMU core know we support arbitrary page sizes (as long as
+they're an order of 4KB).
 
-This way the IOMMU core can split any arbitrary-sized physically
-contiguous regions (that it needs to map) as needed.
+This way the IOMMU core will retain the existing behavior we're used to;
+it will let us map regions that:
+- their size is an order of 4KB
+- they are naturally aligned
+
+Note: Intel IOMMU hardware doesn't support arbitrary page sizes,
+but the driver does (it splits arbitrary-sized mappings into
+the pages supported by the hardware).
+
+To make everything simpler for now, though, this patch effectively tells
+the IOMMU core to keep giving this driver the same memory regions it did
+before, so nothing is changed as far as it's concerned.
+
+Note: at this point, the page sizes announced remain static within the IOMMU
+core. To correctly utilize the pgsize-splitting of the IOMMU core by
+this driver, it seems that some core changes should still be done,
+because Intel's IOMMU page size capabilities seem to have the potential
+to be different between different DMA remapping devices.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
+Cc: David Woodhouse <dwmw2@infradead.org>
 ---
- drivers/iommu/msm_iommu.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ drivers/iommu/intel-iommu.c |   21 ++++++++++++++++++++-
+ 1 files changed, 20 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index d1733f6..a4ed116 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu.c
-@@ -676,6 +676,9 @@ fail:
- 	return 0;
- }
+diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
+index c621c98..333a9cb 100644
+--- a/drivers/iommu/intel-iommu.c
++++ b/drivers/iommu/intel-iommu.c
+@@ -3426,6 +3426,24 @@ static struct notifier_block device_nb = {
+ 	.notifier_call = device_notifier,
+ };
  
-+/* bitmap of the page sizes currently supported */
-+static unsigned long msm_iommu_pgsizes = SZ_4K | SZ_64K | SZ_1M | SZ_16M;
++/*
++ * This bitmap is used to advertise the page sizes our hardware support
++ * to the IOMMU core, which will then use this information to split
++ * physically contiguous memory regions it is mapping into page sizes
++ * that we support.
++ *
++ * Traditionally the IOMMU core just handed us the mappings directly,
++ * after making sure the size is an order of a 4KB page and that the
++ * mapping has natural alignment.
++ *
++ * To retain this behavior, we currently advertise that we support
++ * all page sizes that are an order of 4KB.
++ *
++ * If at some point we'd like to utilize the IOMMU core's new behavior,
++ * we could change this to advertise the real page sizes we support.
++ */
++static unsigned long intel_iommu_pgsizes = ~0xFFFUL;
 +
- static struct iommu_ops msm_iommu_ops = {
- 	.domain_init = msm_iommu_domain_init,
- 	.domain_destroy = msm_iommu_domain_destroy,
-@@ -728,7 +731,10 @@ static void __init setup_iommu_tex_classes(void)
- static int __init msm_iommu_init(void)
+ int __init intel_iommu_init(void)
  {
- 	setup_iommu_tex_classes();
--	register_iommu(&msm_iommu_ops);
-+
-+	/* we're only using the first 25 bits of the pgsizes bitmap */
-+	register_iommu_pgsize(&msm_iommu_ops, &msm_iommu_pgsizes, 25);
-+
- 	return 0;
- }
+ 	int ret = 0;
+@@ -3486,7 +3504,8 @@ int __init intel_iommu_init(void)
+ 
+ 	init_iommu_pm_ops();
+ 
+-	register_iommu(&intel_iommu_ops);
++	register_iommu_pgsize(&intel_iommu_ops, &intel_iommu_pgsizes,
++							BITS_PER_LONG);
+ 
+ 	bus_register_notifier(&pci_bus_type, &device_nb);
  
 -- 
 1.7.4.1
