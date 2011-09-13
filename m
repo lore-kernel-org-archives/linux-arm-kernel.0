@@ -1,84 +1,25 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Tue, 13 Sep 2011 09:39:05 +0200
-Subject: [PATCH 21/25] OMAP4: PM: Add MPUSS power domain OSWR support
-In-Reply-To: <4E6EEC35.8080203@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-22-git-send-email-santosh.shilimkar@ti.com>
-	<87obypfvah.fsf@ti.com> <4E6EEC35.8080203@ti.com>
-Message-ID: <CAORVsuUaR8pcZ4MYigi85tmtWspz3tR_OJcvhaB0AFRLRaAANw@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 13 Sep 2011 08:43:09 +0100
+Subject: [Android-virt] KVM ARM interrupt virtualization
+In-Reply-To: <4E6EE90C.7000308@gmail.com>
+References: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>
+	<CAHkRjk6Vm2yNLm8Gzk3+4mYAfiXVjufv2xc0Kc-6ac-oS4zytw@mail.gmail.com>
+	<CAOMgcGJBoeKJ8FjDW9eESfT+FiXmFF9PfShJ=a2adbESLD2YkA@mail.gmail.com>
+	<20110908085449.GA29243@e102109-lin.cambridge.arm.com>
+	<4E6899B5.70608@gmail.com>
+	<CAFEAcA8=mGUP0dXTNXM6y9RDtWWEkJ2YhuavMBW-3BFfbOPS0g@mail.gmail.com>
+	<4E6EE90C.7000308@gmail.com>
+Message-ID: <CAFEAcA_GJ5-FXzT9ac_H8VSsMXez5rUgBTGuTQwM1-fZS2EYPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On 13 September 2011 06:24, bill4carson <bill4carson@gmail.com> wrote:
+> Thanks for your informations, any contribution and help would be welcome.
+> The initial Qemu A15 support has been added, and could boot with KVM
+> support.
 
-On Tue, Sep 13, 2011 at 7:37 AM, Santosh <santosh.shilimkar@ti.com> wrote:
-> On Tuesday 13 September 2011 12:22 AM, Kevin Hilman wrote:
->>
->> Santosh Shilimkar<santosh.shilimkar@ti.com> ?writes:
->>
->>> This patch adds the MPUSS OSWR (Open Switch Retention) support. The MPUSS
->>> OSWR configuration is as below.
->>> ? ? ? ?- CPUx L1 and logic lost, MPUSS logic lost, L2 memory is retained
->>>
->>> OMAP4460 onwards, MPUSS power domain doesn't support OFF state any more
->>> anymore just like CORE power domain. The deepest state supported is OSWR.
->>> On OMAP4430 secure devices too, MPUSS off mode can't be used because of
->>> a bug which alters Ducati and Tesla states. Hence MPUSS off mode as an
->>> independent state isn't supported on OMAP44XX devices.
->>>
->>> Ofcourse when MPUSS power domain transitions to OSWR along
->>> with device off mode, it eventually hits off state since memory
->>> contents are lost.
->>>
->>> Hence the MPUSS off mode independent state is not attempted without
->>> device off mode. All the necessary infrastructure code for MPUSS
->>> off mode is in place as part of this series.
->>>
->>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>> Cc: Kevin Hilman<khilman@ti.com>
->>
->> Compile failure for the !CONFIG_PM case:
->>
->> [...]
->>
->>> @@ -70,11 +71,18 @@ static inline int omap4_mpuss_init(void)
->>> ?{
->>> ? ? ? ?return 0;
->>> ?}
->>> -
->>> +static inline u32 omap4_mpuss_read_prev_context_state(void)
->>> +{
->>> + ? ? ? return 0;
->>> +}
->>
->> added here
->>
->>> ?static inline int omap4_finish_suspend(unsigned long cpu_state)
->>> ?{}
-This one should return 0, as I already pointed out in the comments for [14/25].
+...added where? If you have qemu patches can you point me at them,
+or submit them to qemu-devel, please?
 
-Regards,
-Jean
-
->>> ?static inline void omap4_cpu_resume(void)
->>> ?{}
->>> +static inline u32 omap4_mpuss_read_prev_context_state(void)
->>> +{
->>> + ? ? ? return 0;
->>> +}
->>
->> same thing added here
->>
-> I noticed this yesterday and was planning to send a note on this
-> patch. :(
-> Have removed this already in the updated patches.
-> Thanks for pointing it out.
->
-> Regards
-> Santosh
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+thanks
+-- PMM
