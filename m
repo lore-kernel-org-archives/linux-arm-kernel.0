@@ -1,29 +1,70 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 13 Sep 2011 13:56:10 +0100
-Subject: Merging Cadence macb/gem patches
-In-Reply-To: <20110830103655.GE5414@pulham.picochip.com>
-References: <20110830103655.GE5414@pulham.picochip.com>
-Message-ID: <20110913125610.GE2781@pulham.picochip.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Tue, 13 Sep 2011 18:32:46 +0530
+Subject: [PATCH v7 13/26] gpio/omap: use pinctrl offset instead of macro
+In-Reply-To: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
+References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1315918979-26173-14-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 30, 2011 at 11:36:55AM +0100, Jamie Iles wrote:
-> Hi Arnd,
-> 
-> I have a series of patches[1] to add support for the Cadence GEM 
-> Ethernet MAC to the macb driver.  A while back, DaveM said that he would 
-> be happy for these to go through an ARM tree[2], so would you pull these 
-> into the arm-soc tree?
-> 
-> At the moment my patches are based on 3.1-rc1, but since then the 
-> drivers have been moved about and git merge doesn't seem to resolve 
-> this, so should I base them on the commit that moved them from the 
-> netdev tree?  I'm not sure how to handle this.
+From: Charulatha V <charu@ti.com>
 
-Hi Arnd,
+Use regs->pinctrl field instead of using the macro OMAP1510_GPIO_PIN_CONTROL
 
-Would you be able to take these if I send you a pull request please?
+Signed-off-by: Charulatha V <charu@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap1/gpio15xx.c         |    1 +
+ arch/arm/plat-omap/include/plat/gpio.h |    1 +
+ drivers/gpio/gpio-omap.c               |    8 +++-----
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-Thanks,
-
-Jamie
+diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+index 2adfece..950e467 100644
+--- a/arch/arm/mach-omap1/gpio15xx.c
++++ b/arch/arm/mach-omap1/gpio15xx.c
+@@ -85,6 +85,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
+ 	.irqenable	= OMAP1510_GPIO_INT_MASK,
+ 	.irqenable_inv	= true,
+ 	.irqctrl	= OMAP1510_GPIO_INT_CONTROL,
++	.pinctrl	= OMAP1510_GPIO_PIN_CONTROL,
+ };
+ 
+ static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
+diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+index 92a6262..a4e5ef3 100644
+--- a/arch/arm/plat-omap/include/plat/gpio.h
++++ b/arch/arm/plat-omap/include/plat/gpio.h
+@@ -198,6 +198,7 @@ struct omap_gpio_reg_offs {
+ 	u16 irqctrl;
+ 	u16 edgectrl1;
+ 	u16 edgectrl2;
++	u16 pinctrl;
+ 
+ 	bool irqenable_inv;
+ };
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 2a57d0b..876e387 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -485,15 +485,13 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
+ 	 */
+ 	_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
+ 
+-#ifdef CONFIG_ARCH_OMAP15XX
+-	if (bank->method == METHOD_GPIO_1510) {
+-		void __iomem *reg;
++	if (bank->regs->pinctrl) {
++		void __iomem *reg = bank->base + bank->regs->pinctrl;
+ 
+ 		/* Claim the pin for MPU */
+-		reg = bank->base + OMAP1510_GPIO_PIN_CONTROL;
+ 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
+ 	}
+-#endif
++
+ 	if (bank->regs->ctrl && !bank->mod_usage) {
+ 		void __iomem *reg = bank->base + bank->regs->ctrl;
+ 		u32 ctrl;
+-- 
+1.7.0.4
