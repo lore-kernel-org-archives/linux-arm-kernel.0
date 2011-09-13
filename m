@@ -1,42 +1,35 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Tue, 13 Sep 2011 13:24:28 +0800
-Subject: [Android-virt] KVM ARM interrupt virtualization
-In-Reply-To: <CAFEAcA8=mGUP0dXTNXM6y9RDtWWEkJ2YhuavMBW-3BFfbOPS0g@mail.gmail.com>
-References: <CAOMgcGJoF74=q4uzuC+FGQYP3QiLEZvC+duJDAt0m8et8zmCqA@mail.gmail.com>	<CAHkRjk6Vm2yNLm8Gzk3+4mYAfiXVjufv2xc0Kc-6ac-oS4zytw@mail.gmail.com>	<CAOMgcGJBoeKJ8FjDW9eESfT+FiXmFF9PfShJ=a2adbESLD2YkA@mail.gmail.com>	<20110908085449.GA29243@e102109-lin.cambridge.arm.com>	<4E6899B5.70608@gmail.com>
-	<CAFEAcA8=mGUP0dXTNXM6y9RDtWWEkJ2YhuavMBW-3BFfbOPS0g@mail.gmail.com>
-Message-ID: <4E6EE90C.7000308@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Tue, 13 Sep 2011 11:05:23 +0530
+Subject: [PATCH 16/25] OMAP4: PM: Program CPU1 to hit OFF when off-lined
+In-Reply-To: <87mxe9ea7c.fsf@ti.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>	<1315144466-9395-17-git-send-email-santosh.shilimkar@ti.com>
+	<87mxe9ea7c.fsf@ti.com>
+Message-ID: <4E6EEB9B.1070305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2011?09?08? 20:01, Peter Maydell wrote:
-> On 8 September 2011 11:32, bill4carson<bill4carson@gmail.com>  wrote:
->> There is much more involved if I want to use A15 as Guest OS,
->> cause Qemu haven't got any A15 support yet.
-> In the interests of not accidentally duplicating work, I should
-> mention that QEMU A15 work is on my (Linaro) todo list; basically
-> I'm thinking in terms of adding enough support to boot an A15
-> Linux guest, but not actually implementing emulation of the
-> virtualization/LPAE extensions. If you'd like to do some of the
-> work here we should probably coordinate on that...
+On Tuesday 13 September 2011 02:42 AM, Kevin Hilman wrote:
+> Santosh Shilimkar<santosh.shilimkar@ti.com>  writes:
 >
-> The Fast Model Versatile Express platform (including its memory
-> map) is documented here:
-> http://infocenter.arm.com/help/topic/com.arm.doc.dui0423j/BEIEAGAA.html
+>> Program non-boot CPUs to hit lowest supported power state
+>> when it is off-lined using cpu hotplug framework.
+>>
+>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>> Cc: Kevin Hilman<khilman@ti.com>
 >
-> The memory maps (legacy A9 and "Cortex A-Series") for VE
-> hardware are here:
-> http://infocenter.arm.com/help/topic/com.arm.doc.dui0447e/CACIHGFE.html
+> [...]
 >
-> -- PMM
+>> @@ -39,15 +43,15 @@ void platform_cpu_die(unsigned int cpu)
+>>   	 * we're ready for shutdown now, so do it
+>>   	 */
+>>   	if (omap_modify_auxcoreboot0(0x0, 0x200) != 0x0)
+>> -		printk(KERN_CRIT "Secure clear status failed\n");
+>> +		pr_err("Secure clear status failed\n");
 >
-Hi Peter
+> nit: pr_crit() exists if you want to keep the same level.  Or did you
+> lower the level on purpose?
+>
+I lowered it on purpose since I didn't find it crtical.
 
-Thanks for your informations, any contribution and help would be welcome.
-The initial Qemu A15 support has been added, and could boot with KVM 
-support.
-The generic timer has been removed as I cannot find its base address.
-
-
-bill
+Regards
+Santosh
