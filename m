@@ -1,51 +1,33 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Tue, 13 Sep 2011 14:21:39 -0700
-Subject: [PATCH 2/2 v3] power: bq20z75: Add Device Tree Binding
-Message-ID: <1315948899-21536-1-git-send-email-rklein@nvidia.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 13 Sep 2011 15:28:01 -0600
+Subject: [PATCH 0/6] OMAP2+: id: cleanup for 3.2
+Message-ID: <20110913212638.26161.62284.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the binding for the TI bq20z75 fuel gadge and the
-bq20z75 driver.
+Clean up the SoC detection code for some OMAP3 devices.  The main goal
+is to make the AM3517 family detection code work like the rest of the
+OMAP3 SoCs, although this series does some other cleanup of this code
+at the same time.  This patch series will be a prerequisite for the
+OMAP_CHIP removal series.
 
-Signed-off-by: Rhyland Klein <rklein@nvidia.com>
+Tested on an OMAP3530ES2 BeagleBoard C2 and a OMAP3730ES1 BeagleBoard A2.
+These are the only OMAP3 boards I have access to right now - testing welcomed
+from people with other OMAP3 families or ES levels.
+
+- Paul
+
 ---
-	v2: Fixed typo in binding description
-	v3: Changed unique properties to be use "ti,"
-	    Changed to use single gpio entry for gpio info
 
- .../bindings/power_supply/ti_bq20z75.txt           |   23 ++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power_supply/ti_bq20z75.txt
+Paul Walmsley (6):
+      OMAP3: id: remove identification codes that only correspond to marketing names
+      OMAP3: id: remove useless strcpy()s
+      OMAP3: id: use explicit omap_revision codes for 3505/3517 ES levels
+      OMAP3: id: add fallthrough warning; fix some CodingStyle issues
+      OMAP3: id: remove duplicate code for testing SoC ES level
+      OMAP2+: id: remove OMAP_REVBITS_* macros
 
-diff --git a/Documentation/devicetree/bindings/power_supply/ti_bq20z75.txt b/Documentation/devicetree/bindings/power_supply/ti_bq20z75.txt
-new file mode 100644
-index 0000000..7571294
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power_supply/ti_bq20z75.txt
-@@ -0,0 +1,23 @@
-+TI bq20z75
-+~~~~~~~~~~
-+
-+Required properties :
-+ - compatible : "ti,bq20z75"
-+
-+Optional properties :
-+ - ti,i2c-retry-count : The number of times to retry i2c transactions on i2c
-+   IO failure.
-+ - ti,poll-retry-count : The number of times to try looking for new status
-+   after an external change notification.
-+ - ti,battery-detect-gpios : The gpio which signals battery detection and
-+   a flag specifying its polarity.
-+
-+Example:
-+
-+	bq20z75 at b {
-+		compatible = "ti,bq20z75";
-+		reg = < 0xb >;
-+		ti,i2c-retry-count = <2>;
-+		ti,poll-retry-count = <10>;
-+		ti,battery-detect-gpios = <&gpio-controller 122 1>;
-+	}
--- 
-1.7.6
+
+ arch/arm/mach-omap2/id.c              |  134 ++++++++++++---------------------
+ arch/arm/plat-omap/include/plat/cpu.h |   41 +++-------
+ 2 files changed, 62 insertions(+), 113 deletions(-)
