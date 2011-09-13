@@ -1,59 +1,53 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 13 Sep 2011 18:32:55 +0530
-Subject: [PATCH v7 22/26] gpio/omap: save and restore debounce registers
+Date: Tue, 13 Sep 2011 18:32:58 +0530
+Subject: [PATCH v7 25/26] gpio/omap: handle set_dataout reg capable IP on
+	restore
 In-Reply-To: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
 References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1315918979-26173-23-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1315918979-26173-26-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-GPIO debounce registers need to be saved and restored for proper functioning
-of driver. To save the registers, we cannot cut the clock before the save,
-hence move the clk disable after the save.
+GPIO IP revisions such as those used in OMAP4 have a set_dataout
+while the previous revisions used a single dataout register.
+Depending on what is available restore the dataout settings
+to the right register.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ drivers/gpio/gpio-omap.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index c84f620..a1aeeed 100644
+index 165a598..c597303 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -42,6 +42,8 @@ struct gpio_regs {
- 	u32 risingdetect;
- 	u32 fallingdetect;
- 	u32 dataout;
-+	u32 debounce;
-+	u32 debounce_en;
- };
+@@ -1048,7 +1048,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 	bank->get_context_loss_count = pdata->get_context_loss_count;
+ 	bank->regs = pdata->regs;
  
- struct gpio_bank {
-@@ -202,6 +204,8 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
- 	bank->dbck_enable_mask = val;
- 
- 	__raw_writel(val, reg);
-+	bank->context.debounce = debounce;
-+	bank->context.debounce_en = val;
- }
- 
- static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
-@@ -1323,6 +1327,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+-	if (bank->regs->set_dataout && bank->regs->clr_dataout)
++	if (bank->regs->set_dataout)
+ 		bank->set_dataout = _set_gpio_dataout_reg;
+ 	else
+ 		bank->set_dataout = _set_gpio_dataout_mask;
+@@ -1321,7 +1321,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+ 				bank->base + bank->regs->risingdetect);
  	__raw_writel(bank->context.fallingdetect,
  				bank->base + bank->regs->fallingdetect);
- 	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
-+	if (bank->dbck_enable_mask) {
-+		__raw_writel(bank->context.debounce, bank->base +
-+					bank->regs->debounce);
-+		__raw_writel(bank->context.debounce_en,
-+					bank->base + bank->regs->debounce_en);
-+	}
- }
- #else
- #define omap_gpio_suspend NULL
+-	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
++	if (bank->regs->set_dataout)
++		__raw_writel(bank->context.dataout,
++				bank->base + bank->regs->set_dataout);
++	else
++		__raw_writel(bank->context.dataout,
++				bank->base + bank->regs->dataout);
+ 	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
+ 
+ 	if (bank->dbck_enable_mask) {
 -- 
 1.7.0.4
