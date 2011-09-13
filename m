@@ -1,58 +1,55 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 13 Sep 2011 15:28:05 -0600
-Subject: [PATCH 4/6] OMAP3: id: add fallthrough warning;
-	fix some CodingStyle issues
+Date: Tue, 13 Sep 2011 15:28:04 -0600
+Subject: [PATCH 3/6] OMAP3: id: use explicit omap_revision codes for 3505/3517
+	ES levels
 In-Reply-To: <20110913212638.26161.62284.stgit@dusk>
 References: <20110913212638.26161.62284.stgit@dusk>
-Message-ID: <20110913212804.26161.38976.stgit@dusk>
+Message-ID: <20110913212803.26161.31753.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Emit a warning to the console in omap3_check_revision() if that code
-cannot determine what type of SoC the system is currently running on.
-
-Remove some extra whitespace, remove some duplicate code, and
-add an appropriate comment to a fallthrough case.
+Use explicit revision codes for OMAP/AM 3505/3517 ES levels, as the rest
+of the OMAP2+ SoCs do in mach-omap2/cpu.c.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Hemant Pedanekar <hemantp@ti.com>
+Cc: Sanjeev Premi <premi@ti.com>
 ---
- arch/arm/mach-omap2/id.c |   11 ++++++-----
- 1 files changed, 6 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap2/id.c              |   10 +++++++++-
+ arch/arm/plat-omap/include/plat/cpu.h |    3 ++-
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 6810c52..18c3797 100644
+index 46bc2f9..6810c52 100644
 --- a/arch/arm/mach-omap2/id.c
 +++ b/arch/arm/mach-omap2/id.c
-@@ -336,8 +336,9 @@ static void __init omap3_check_revision(void)
- 			omap_chip.oc |= CHIP_IS_OMAP3630ES1_1;
- 			break;
- 		case 2:
+@@ -312,7 +312,15 @@ static void __init omap3_check_revision(void)
+ 		 *
+ 		 * REVISIT: AM3505/AM3517 should have their own CHIP_IS
+ 		 */
+-		omap_revision = OMAP3517_REV(rev);
++		switch (rev) {
++		case 0:
++			omap_revision = OMAP3517_REV_ES1_0;
++			break;
++		case 1:
 +		/* FALLTHROUGH */
- 		default:
--			omap_revision =  OMAP3630_REV_ES1_2;
-+			omap_revision = OMAP3630_REV_ES1_2;
- 			omap_chip.oc |= CHIP_IS_OMAP3630ES1_2;
- 		}
++		default:
++			omap_revision = OMAP3517_REV_ES1_1;
++		}
+ 		omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
  		break;
-@@ -349,16 +350,16 @@ static void __init omap3_check_revision(void)
- 			omap_revision = TI8168_REV_ES1_0;
- 			break;
- 		case 1:
--			omap_revision = TI8168_REV_ES1_1;
--			break;
-+		/* FALLTHROUGH */
- 		default:
--			omap_revision =  TI8168_REV_ES1_1;
-+			omap_revision = TI8168_REV_ES1_1;
- 		}
- 		break;
- 	default:
--		/* Unknown default to latest silicon rev as default*/
-+		/* Unknown default to latest silicon rev as default */
- 		omap_revision =  OMAP3630_REV_ES1_2;
- 		omap_chip.oc |= CHIP_IS_OMAP3630ES1_2;
-+		pr_warn("Warning: unknown chip type; assuming OMAP3630ES1.2\n");
- 	}
- }
+ 	case 0xb891:
+diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+index b6bd8f7..566975c 100644
+--- a/arch/arm/plat-omap/include/plat/cpu.h
++++ b/arch/arm/plat-omap/include/plat/cpu.h
+@@ -398,7 +398,8 @@ IS_OMAP_TYPE(3517, 0x3517)
+ #define OMAP3630_REV_ES1_2	(OMAP363X_CLASS | (OMAP_REVBITS_02 << 8))
  
+ #define OMAP3517_CLASS		0x35170000
+-#define OMAP3517_REV(v)		(OMAP3517_CLASS | (v << 8))
++#define OMAP3517_REV_ES1_0	OMAP3517_CLASS
++#define OMAP3517_REV_ES1_1	(OMAP3517_CLASS | (OMAP_REVBITS_01 << 8))
+ 
+ #define TI816X_CLASS		0x81600034
+ #define TI8168_REV_ES1_0	TI816X_CLASS
