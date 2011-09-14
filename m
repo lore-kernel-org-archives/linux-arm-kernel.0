@@ -1,43 +1,58 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 14 Sep 2011 06:39:20 -0600
-Subject: [PATCH v2 0/6] OMAP2+: id: cleanup for 3.2
-Message-ID: <20110914123708.25282.78122.stgit@dusk>
+Date: Wed, 14 Sep 2011 06:39:35 -0600
+Subject: [PATCH v2 4/6] OMAP3: id: add fallthrough warning;
+	fix some CodingStyle issues
+In-Reply-To: <20110914123708.25282.78122.stgit@dusk>
+References: <20110914123708.25282.78122.stgit@dusk>
+Message-ID: <20110914123931.25282.13790.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean up the SoC detection code for some OMAP3 devices.  The main goal
-is to make the AM3517 family detection code work like the rest of the
-OMAP3 SoCs, although this series does some other cleanup of this code
-at the same time.  This patch series will be a prerequisite for the
-OMAP_CHIP removal series.
+Emit a warning to the console in omap3_check_revision() if that code
+cannot determine what type of SoC the system is currently running on.
 
-Tested on an OMAP3530ES2 BeagleBoard C2 and a OMAP3730ES1 BeagleBoard A2.
-These are the only OMAP3 boards I have access to right now - testing welcomed
-from people with other OMAP3 families or ES levels.
+Remove some extra whitespace, remove some duplicate code, and
+add an appropriate comment to a fallthrough case.
 
-This second version fixes a bug in the first patch, which requires the
-later patches to be updated to apply without rejects.  Thanks to Igor
-Grinberg <grinberg@compulab.co.il> for comments about this.
-
-
-- Paul
-
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Hemant Pedanekar <hemantp@ti.com>
 ---
-id_3517_cleanup_3.2
-   text	   data	    bss	    dec	    hex	filename
-6330180	 656956	5591124	12578260	 bfedd4	vmlinux.omap2plus_defconfig.orig
-6329884	 656964	5591124	12577972	 bfecb4	vmlinux.omap2plus_defconfig.patched
+ arch/arm/mach-omap2/id.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
-
-Paul Walmsley (6):
-      OMAP3: id: remove identification codes that only correspond to marketing names
-      OMAP3: id: remove useless strcpy()s
-      OMAP3: id: use explicit omap_revision codes for 3505/3517 ES levels
-      OMAP3: id: add fallthrough warning; fix some CodingStyle issues
-      OMAP3: id: remove duplicate code for testing SoC ES level
-      OMAP2+: id: remove OMAP_REVBITS_* macros
-
-
- arch/arm/mach-omap2/id.c              |  134 ++++++++++++---------------------
- arch/arm/plat-omap/include/plat/cpu.h |   46 ++++-------
- 2 files changed, 65 insertions(+), 115 deletions(-)
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 6810c52..18c3797 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -336,8 +336,9 @@ static void __init omap3_check_revision(void)
+ 			omap_chip.oc |= CHIP_IS_OMAP3630ES1_1;
+ 			break;
+ 		case 2:
++		/* FALLTHROUGH */
+ 		default:
+-			omap_revision =  OMAP3630_REV_ES1_2;
++			omap_revision = OMAP3630_REV_ES1_2;
+ 			omap_chip.oc |= CHIP_IS_OMAP3630ES1_2;
+ 		}
+ 		break;
+@@ -349,16 +350,16 @@ static void __init omap3_check_revision(void)
+ 			omap_revision = TI8168_REV_ES1_0;
+ 			break;
+ 		case 1:
+-			omap_revision = TI8168_REV_ES1_1;
+-			break;
++		/* FALLTHROUGH */
+ 		default:
+-			omap_revision =  TI8168_REV_ES1_1;
++			omap_revision = TI8168_REV_ES1_1;
+ 		}
+ 		break;
+ 	default:
+-		/* Unknown default to latest silicon rev as default*/
++		/* Unknown default to latest silicon rev as default */
+ 		omap_revision =  OMAP3630_REV_ES1_2;
+ 		omap_chip.oc |= CHIP_IS_OMAP3630ES1_2;
++		pr_warn("Warning: unknown chip type; assuming OMAP3630ES1.2\n");
+ 	}
+ }
+ 
