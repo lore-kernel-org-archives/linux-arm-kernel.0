@@ -1,49 +1,52 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 14 Sep 2011 11:31:18 -0400 (EDT)
-Subject: [PATCH] ARM: rename temp variable in read*_relaxed()
-In-Reply-To: <1316013082-21641-1-git-send-email-olof@lixom.net>
-References: <1316013082-21641-1-git-send-email-olof@lixom.net>
-Message-ID: <alpine.LFD.2.00.1109141129330.20358@xanadu.home>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Wed, 14 Sep 2011 17:33:03 +0200
+Subject: [PATCH] arm: omap: Fix build error in ispccdc.c
+In-Reply-To: <1315317735-5255-1-git-send-email-joerg.roedel@amd.com>
+References: <1315317735-5255-1-git-send-email-joerg.roedel@amd.com>
+Message-ID: <20110914153303.GW11701@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Sep 2011, Olof Johansson wrote:
+Ping?
 
-> This resolves the following sparse warning from readl() and other macros,
-> which ends up embedding readl_relaxed() using the same variable:
+On Tue, Sep 06, 2011 at 10:02:15AM -0400, Joerg Roedel wrote:
+> The following build error occurs with 3.1-rc5:
 > 
-> arch/arm/mach-tegra/dma.c:169:8: warning: symbol '__v' shadows an earlier one
-> arch/arm/mach-tegra/dma.c:169:8: originally declared here
+>   CC      drivers/media/video/omap3isp/ispccdc.o
+> /home/data/repos/linux.trees.git/drivers/media/video/omap3isp/ispccdc.c: In function 'ccdc_lsc_config':
+> /home/data/repos/linux.trees.git/drivers/media/video/omap3isp/ispccdc.c:427:2: error: implicit declaration of function 'kzalloc' [-Werror=implicit-function-declaration]
+> /home/data/repos/linux.trees.git/drivers/media/video/omap3isp/ispccdc.c:427:6: warning: assignment makes pointer from integer without a cast [enabled by default]
 > 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
+> This patch adds the missing 'linux/slab.h' include to fix the problem.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: linux-media at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Joerg Roedel <joerg.roedel@amd.com>
 > ---
->  arch/arm/include/asm/io.h |   10 +++++-----
->  1 files changed, 5 insertions(+), 5 deletions(-)
+>  drivers/media/video/omap3isp/ispccdc.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index d66605d..bbeb11e 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -189,11 +189,11 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
->   * IO port primitives for more information.
->   */
->  #ifdef __mem_pci
-> -#define readb_relaxed(c) ({ u8  __v = __raw_readb(__mem_pci(c)); __v; })
-> -#define readw_relaxed(c) ({ u16 __v = le16_to_cpu((__force __le16) \
-> -					__raw_readw(__mem_pci(c))); __v; })
-> -#define readl_relaxed(c) ({ u32 __v = le32_to_cpu((__force __le32) \
-> -					__raw_readl(__mem_pci(c))); __v; })
-> +#define readb_relaxed(c) ({ u8  __r = __raw_readb(__mem_pci(c)); __r; })
-> +#define readw_relaxed(c) ({ u16 __r = le16_to_cpu((__force __le16) \
-> +					__raw_readw(__mem_pci(c))); __r; })
-> +#define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
-> +					__raw_readl(__mem_pci(c))); __r; })
+> diff --git a/drivers/media/video/omap3isp/ispccdc.c b/drivers/media/video/omap3isp/ispccdc.c
+> index 9d3459d..80796eb 100644
+> --- a/drivers/media/video/omap3isp/ispccdc.c
+> +++ b/drivers/media/video/omap3isp/ispccdc.c
+> @@ -31,6 +31,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/mm.h>
+>  #include <linux/sched.h>
+> +#include <linux/slab.h>
+>  #include <media/v4l2-event.h>
 >  
->  #define writeb_relaxed(v,c)	((void)__raw_writeb(v,__mem_pci(c)))
->  #define writew_relaxed(v,c)	((void)__raw_writew((__force u16) \
+>  #include "isp.h"
 > -- 
 > 1.7.4.1
-> 
+
+-- 
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
