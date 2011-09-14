@@ -1,76 +1,103 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Wed, 14 Sep 2011 14:23:54 +0530
-Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
-	initialization functions
-In-Reply-To: <20110914084237.GC6267@n2100.arm.linux.org.uk>
-References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
-	<20110914084237.GC6267@n2100.arm.linux.org.uk>
-Message-ID: <4E706BA2.5060804@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 14 Sep 2011 10:15:32 +0100
+Subject: [PATCH] ARM: tegra: Remove redundant change to the CPSR in
+	headsmp.S
+In-Reply-To: <CAMbhsRSoSYhuqPC+SmCNk4dseok0vs02su0kihKNqXGpCvUvSg@mail.gmail.com>
+References: <1315411253-17559-1-git-send-email-dave.martin@linaro.org>
+	<20110912165222.GE2020@arm.com>
+	<CAMbhsRSoSYhuqPC+SmCNk4dseok0vs02su0kihKNqXGpCvUvSg@mail.gmail.com>
+Message-ID: <20110914091531.GA2104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 September 2011 02:12 PM, Russell King - ARM Linux wrote:
-> On Tue, Sep 06, 2011 at 01:48:26PM +0800, Shawn Guo wrote:
->> If ARM core gets powered off during suspend, L2 cache controller
->> has to be reinitialized by resume procedure.
->>
->> The patch removes __init annotation from a few initialization
->> functions to make the reinitialization possible.  For example,
->> platform resume function can call l2x0_of_init() to get L2 cache
->> back to work.
->>
->> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
->> ---
->>   arch/arm/include/asm/hardware/cache-l2x0.h |    2 +-
->>   arch/arm/mm/cache-l2x0.c                   |   10 +++++-----
->>   2 files changed, 6 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
->> index d22765c..d270310 100644
->> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
->> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
->> @@ -89,7 +89,7 @@
->>   #define L2X0_ADDR_FILTER_EN		1
->>
->>   #ifndef __ASSEMBLY__
->> -extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
->> +extern void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
->>   #if defined(CONFIG_CACHE_L2X0)&&  defined(CONFIG_OF)
->>   extern int l2x0_of_init(__u32 aux_val, __u32 aux_mask);
->>   #else
->> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->> index c035b9a..7835cb6 100644
->> --- a/arch/arm/mm/cache-l2x0.c
->> +++ b/arch/arm/mm/cache-l2x0.c
->> @@ -280,7 +280,7 @@ static void l2x0_disable(void)
->>   	spin_unlock_irqrestore(&l2x0_lock, flags);
->>   }
->>
->> -void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
->> +void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
->>   {
->>   	__u32 aux;
->>   	__u32 cache_id;
->
-> I'm unconvinced about the wise-ness of this.  We read-modify-write the
-> auxillary control register, which means some bits are preserved from
-> the initial boot.  If the boot loader sets the L2 cache up for normal
-> boot and not for resume, we'll end up with different L2 cache settings.
->
-> We've historically seen this kind of thing with boot loaders over the
-> years, to the point where systems boot at one CPU clock rate but resume
-> at some other CPU clock rate.
->
-> So, it may be wiser to implement a 'save' and 'restore' interface
-> instead so that we can be sure that things are setup in the same way
-> after resume.
->
-I agree with Russell and has same concern when I commented on V1 of this
-patch.
+On Tue, Sep 13, 2011 at 06:46:48PM -0700, Colin Cross wrote:
+> On Mon, Sep 12, 2011 at 9:52 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> > Colin, can you comment on this?
+> >
+> > On Wed, Sep 07, 2011 at 05:00:53PM +0100, Dave Martin wrote:
+> >> At secondary_startup, the MSR CPSR_cxsf, #0xd3 is not compatible
+> >> with Thumb-2 and also unmasks asynchronous aborts (CPSR.A bit
+> >> forced to zero -- this is probably unintentional).
+> >>
+> >> Any remotely sane bootloader should be putting each secondary CPU
+> >> in the appropriate state _before_ entering the kernel anyway.
+> >> Otherwise, disabling interrupts on entry to the kernel isn't going
+> >> to fix it.
+> >>
+> >> Therefore this patch just removes the MSR instruction.
+> >>
+> >> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> >> ---
+> >>
+> >> I make assumptions about the bootloader in this patch. ?If someone with
+> >> Tegra knowledge can please comment and/or test, that would be much
+> >> appreciated, thanks.
+> >>
+> >> ?arch/arm/mach-tegra/headsmp.S | ? ?1 -
+> >> ?1 files changed, 0 insertions(+), 1 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+> >> index b5349b2..6ec4790 100644
+> >> --- a/arch/arm/mach-tegra/headsmp.S
+> >> +++ b/arch/arm/mach-tegra/headsmp.S
+> >> @@ -48,7 +48,6 @@ ENTRY(v7_invalidate_l1)
+> >> ?ENDPROC(v7_invalidate_l1)
+> >>
+> >> ?ENTRY(tegra_secondary_startup)
+> >> - ? ? msr ? ? cpsr_fsxc, #0xd3
+> >> ? ? ? ? ?bl ? ? ?v7_invalidate_l1
+> >> ? ? ? mrc ? ? p15, 0, r0, c0, c0, 5
+> >> ? ? ? ? ?and ?r0, r0, #15
+> >
+> > My rationale here is that the CPU boots straight into the
+> > correct mode -- if there is any boot code before we get here,
+> > then it should already have established the correct mode, otherwise
+> > we're likely to get problems which "MSR" by itself isn't going to
+> > fix -- such as stray interrupts for example.
+> >
+> > If that feels unsafe however, we should still to be able to write
+> >
+> > ? ? ? ?cpsid ? aif, #SVC_MODE
+> >
+> > (which is the compact v6/v7-compatible way to set all the interrupt
+> > mask bits and get into a specific mode)
+> 
+> Tegra boots with one cpu enabled, and the other in reset.  The cpu
+> needs to be initialized from scratch by the kernel.  Does cpsid aif,
+> #SVC_MODE compile to the same instruction as the msr instruction?
 
-As mentioned earlier, you need to save only once since non of the L2
-configuration values will change. So 'save ones' and 'restore always
-when context lost' should be the right way to go about it.
+CPUs power on in SVC mode with all interrupts masked, so it should
+be safe to assume that the CPU is already in this state (this is actually
+_required_ by Documentation/arm/Booting).  If the CPU booted with a
+random mode and random interrupt masks, no system could boot reliably...
 
-Regards
-Santosh
+However, it's harmless to set the state explicitly if we want to be
+extra safe.
+
+My assumption is that the unmasking of asynchronous aborts done by
+msr CPSR_cxsf, #0xd3 is unintentional -- i.e., this is a copy-paste
+of code which would have been correct prior to ARMv6 (when there
+was no separate 'A' interrupt class).
+
+cps is a distinct instruction, introduced in ARMv6.
+The advantages are that it can be used to control the A bit, and
+doesn't clobber the T bit (or other CPSR bits).
+Since mach-tegra doesn't apply to any platform older than ARMv6,
+use of this instruction seems reasonable.
+
+cpsid aif disables all three kinds of interrupt.
+
+
+With regard to Thumb-2 kernels, what code is responsible for
+performing the jump to tegra_secondary_startup?
+
+If the jump is done by making an exception return from some firmware,
+you may find you hit tegra_secondary_starup in ARM state, and
+everything will go horribly wrong...
+
+It could be worth making the secondary kernel entry point ARM code
+unconditionally (just as is now done for the primary kernel entry
+point).
+
+Cheers
+---Dave
