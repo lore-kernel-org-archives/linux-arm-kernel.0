@@ -1,68 +1,81 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 14 Sep 2011 16:47:12 +0530
-Subject: [PATCH v8 00/16] To use DMA generic APIs for Samsung DMA
-In-Reply-To: <CABb+yY25NTbtRPOw-KH8U4zA1Bo8q0BDM8SXyrsobG7NEv8edg@mail.gmail.com>
-References: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
-	<1315980099.26251.498.camel@vkoul-udesk3>
-	<CABb+yY25NTbtRPOw-KH8U4zA1Bo8q0BDM8SXyrsobG7NEv8edg@mail.gmail.com>
-Message-ID: <1315999032.26251.501.camel@vkoul-udesk3>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 14 Sep 2011 20:23:12 +0900
+Subject: [PATCH] ARM: EXYNOS4: Enable double linefill in PL310 Prefetch
+	Control Register
+In-Reply-To: <CACY+gR2oRqEA80Ura9Wp5cDW7b-Cjo+KVnfuA-PBHbFZKfRpwQ@mail.gmail.com>
+References: <1315894031-9579-1-git-send-email-siarhei.siamashka@gmail.com>
+	<CAH9JG2VFSwL7hCmGpHXx_UKKwK3dbhNRGQB1bwvcD-YC1Qj-AQ@mail.gmail.com>
+	<CACY+gR2TX35XaVLiN7s_PkY4r=G1i3LMhHzSJJiaAOSoYDGwfg@mail.gmail.com>
+	<CAH9JG2Ww9J8h34Nub=gz=xR5767T7X=S+gk58o4HU809mdB52Q@mail.gmail.com>
+	<CACY+gR2oRqEA80Ura9Wp5cDW7b-Cjo+KVnfuA-PBHbFZKfRpwQ@mail.gmail.com>
+Message-ID: <007501cc72d0$b0778a50$11669ef0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-09-14 at 12:00 +0530, Jassi Brar wrote:
-> On Wed, Sep 14, 2011 at 11:31 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Fri, 2011-09-02 at 09:44 +0900, Boojin Kim wrote:
-> >> This patchset adds support DMA generic APIs for samsung DMA.
+Siarhei Siamashka wrote:
+> 
+> On Wed, Sep 14, 2011 at 10:57 AM, Kyungmin Park <kmpark@infradead.org>
+> wrote:
+> > On Wed, Sep 14, 2011 at 4:43 PM, Siarhei Siamashka
+> > <siarhei.siamashka@gmail.com> wrote:
+> >> On Wed, Sep 14, 2011 at 9:08 AM, Kyungmin Park <kmpark@infradead.org>
+> wrote:
+> >>> Hi Siarhei,
+> >>>
+> >>> Interesting feature, and it's not samsung soc issue, so add the arm
+> >>> mailing list.
+> >>> It checked and the see the read performance improvement from 868MiB/s
+> >>> to 981MiB/s with lmbench.
 > >>
-> >> The changes from V7 is following:
-> >> - Divides patch file.
-> >>   : The 03 patch on V7 patchset is divided into the 03 and 04 patch on V8 patchset.
-> >>     The O3 patch is only for DMA_SLAVE_CONFIG command.
-> >>     The 04 patch is only for DMA_TERMINATE_ALL command.
-> >> - Code clean-up
-> >>   : Remove unnecessary code on 05 patch.
+> >> Maybe lmbench does not try very hard to get the best out of the
+> >> hardware? On my origenboard, I'm getting ~1.15GB/s performance for the
+> >> standard LDM/STM based memcpy from libc-ports, which is ~2.3GB/s
+> >> memory bandwidth if both reads and writes are accounted separately.
 > >>
-> >> [PATCH v8 01/16] DMA: PL330: Add support runtime PM for PL330 DMAC
-> >> [PATCH v8 02/16] DMA: PL330: Update PL330 DMA API driver
-> >> [PATCH v8 03/16] DMA: PL330: Support DMA_SLAVE_CONFIG command
-> >> [PATCH v8 04/16] DMA: PL330: Remove the start operation for handling DMA_TERMINATE_ALL command
-> >> [PATCH v8 05/16] DMA: PL330: Add DMA_CYCLIC capability
-> >> [PATCH v8 06/16] ARM: SAMSUNG: Update to use PL330-DMA driver
-> >> [PATCH v8 07/16] ARM: SAMSUNG: Add common DMA operations
-> >> [PATCH v8 08/16] ARM: EXYNOS4: Use generic DMA PL330 driver
-> >> [PATCH v8 09/16] ARM: S5PV210: Use generic DMA PL330 driver
-> >> [PATCH v8 10/16] ARM: S5PC100: Use generic DMA PL330 driver
-> >> [PATCH v8 11/16] ARM: S5P64X0: Use generic DMA PL330 driver
-> >> [PATCH v8 12/16] ARM: SAMSUNG: Remove S3C-PL330-DMA driver
-> >> [PATCH v8 13/16] spi/s3c64xx: Add support DMA engine API
-> >> [PATCH v8 14/16] spi/s3c64xx: Merge dma control code
-> >> [PATCH v8 15/16] ASoC: Samsung: Update DMA interface
-> >> [PATCH v8 16/16] ARM: SAMSUNG: Remove Samsung specific enum type for dma direction
-> > Thanks,
-> >
-> > I have pushed these into my samsung-dma branch, Fixed the typos in the
-> > changelog of patch 4.
-> >
-> > Please check and let me know if all are fine, I will push them to my
-> > next tomorrow
-> >
-> > If anyone has concerns on this series please let me know by tomorrow
-> >
+> >>> It's helpful to test other SoC., e.g., OMAP4, STE and so on.
+> >>
+> >> The current (?) state of the support for this feature in OMAP4 is
+> >> explained here by Richard Woodruff:
+> >>    http://groups.google.com/group/pandaboard/msg/dfd2d2e1336d435b
+> >>
+> >>> BTW, why do you set the 27-bit? In my PL310 Spec., it's reserved bit
+> >>> and should be zero (SBZ).
+> >>
+> >> This PL310 thing seems to have been renamed to "CoreLink Level 2 Cache
+> >> Controller L2C-310" in later revisions, and its Prefetch Control
+> >> Register is described here:
+> >>    http://infocenter.arm.com/help/topic/com.arm.doc.ddi0246f/CHDHIECI.html
+> > Thanks for link. it has 27-bit description. but does it correct bit
+> > description for exynos4 PL310?
+> > I mean I received the PL310 TRM with exynos4 chip used. there's no
+> > 27-bit description. it's just reserved bit.
+> > Can it enable the 27-bit at exynos4210? or can be used for exynos4212 or later?
 > 
-> I have no concern about patches modifying samsung specific code.
+> That's a good point. I think it is exynos4210 that is used in
+> origenboard. And according to the value in Cache ID Register
+> (0x4100c4c5), it has r3p0 revision of L2C-310. Which means that the
+> Prefetch Control Register is actually described at:
+>     http://infocenter.arm.com/help/topic/com.arm.doc.ddi0246d/CHDHIECI.html
+> And bit 27 is indeed reserved. However flipping it seems to have some
+> measurable impact on performance (unless I screwed up the benchmarks),
+> so maybe it does something but is undocumented? In any case, I agree
+> that it's better not to mess up with this bit.
 > 
-> Of the patches touching common pl330 code, I had acked Patch-1,2,3 & 5
-> in previous revisions already. So for them, you may add my
->      Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
-Ok
-> 
-> The changelog for [PATCH v8 04/16] is misleading - we don't need any
-> modification for the reason mentioned in changelog. But the modification
-> has positive side-effect of preventing callbacks during terminate_all which
-> is no way understood from the changelog. So I would like to changelog
-> corrected.
-I thought change log was correct in depicting what patch does and Boojin
-had replied.... I will check again...
+Hi all,
 
--- 
-~Vinod
+Please adding me in Cc for Samsung stuff...
+
+> By the way, does anybody have L2C-310 errata list? Is double linefill
+> actually safe to use in r3p0?
+> 
+No. it is _not_ safe on EXYNOS4210.
+
+Since L2C-310 ERRTA, current EXYNOS4210 cannot enable double linefill feature and as Siarhei said, need to check its version of L2C-310 in Cache ID register before enabling it. As a note, it's possible to enable it on EXYNOS4212 SoC and in opposite of Siarhei's patch, enabling WRAP read is better on it. Actually my colleague, Boojin Kim is testing it so that can submit it soon.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
