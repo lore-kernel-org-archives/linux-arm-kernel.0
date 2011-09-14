@@ -1,5 +1,5 @@
 From: santosh.shilimkar@ti.com (Santosh)
-Date: Wed, 14 Sep 2011 22:51:04 +0530
+Date: Wed, 14 Sep 2011 22:52:38 +0530
 Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
 	gic_arch_extn
 In-Reply-To: <20110914171800.GO24252@atomide.com>
@@ -10,7 +10,7 @@ References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
 	<20110914152116.GM24252@atomide.com> <4E70DB33.5070501@ti.com>
 	<20110914170803.GN24252@atomide.com> <4E70E0CC.80300@ti.com>
 	<20110914171800.GO24252@atomide.com>
-Message-ID: <4E70E280.4090403@ti.com>
+Message-ID: <4E70E2DE.2030006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -36,6 +36,10 @@ You missed my point in the description. Clockdomain inactive
 doesn't depend on idle or WFI execution. Under HW supervison
 CPU clock domain can get into inactive when CPU is stalled and
 waiting for a read response from slow interconnect.
+
+One thing for sure. Designers has chosen a wrong name to this
+IP. Wakeugen apears like needed only for low power wakeup which
+not seems to be entirely correct as per specs
 
 Regards
 Santosh
