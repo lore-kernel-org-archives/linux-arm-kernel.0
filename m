@@ -1,137 +1,107 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 14 Sep 2011 05:39:16 -0600 (MDT)
-Subject: [PATCH v2 1/6] OMAP3: id: remove identification codes that only
-	correspond to marketing names
-In-Reply-To: <20110913212801.26161.47980.stgit@dusk>
-References: <20110913212638.26161.62284.stgit@dusk>
-	<20110913212801.26161.47980.stgit@dusk>
-Message-ID: <alpine.DEB.2.00.1109140536300.27954@utopia.booyaka.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 14 Sep 2011 20:50:42 +0900
+Subject: [PATCH 2/2] ARM: Exynos4: use s5p-timer for UniversalC210 board
+In-Reply-To: <CAH9JG2V6Sfjmjupj5oBd_5vziBa4iezBpRfK9tNECrFO5sSfLw@mail.gmail.com>
+References: <1311659456-6659-1-git-send-email-m.szyprowski@samsung.com>
+	<1311659456-6659-3-git-send-email-m.szyprowski@samsung.com>
+	<CAH9JG2V6Sfjmjupj5oBd_5vziBa4iezBpRfK9tNECrFO5sSfLw@mail.gmail.com>
+Message-ID: <007701cc72d4$8822d880$98688980$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Kyungmin Park wrote:
+> 
+> Hi,
+> 
+> It's required for boot universal c210 w/ EVT0 chip.
+> Can you include it at 3.1 fixed branch?
+> 
+Sure, will apply into samsung-fixes for 3.1.
 
-The OMAP3505/AM3505 appears to be based on the same silicon as the
-OMAP3517/AM3517, with some features disabled via eFuse bits.  Follow
-the same practice as OMAP3430 and identify these devices internally as
-part of the OMAP3517/AM3517 family.
+Thanks.
 
-The OMAP3503/3515/3525/3530 chips appear to be based on the same silicon
-as the OMAP3430, with some features disabled via eFuse bits.  Identify
-these devices internally as part of the OMAP3430 family.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-Remove the old OMAP35XX_CLASS, which actually covered two very different
-chip families.  The OMAP3503/3515/3525/3530 chips will now be covered by
-OMAP343X_CLASS, since the silicon appears to be identical.  For the
-OMAP3517/AM3517 family, create a new class, OMAP3517_CLASS.
-
-Thanks to Tony Lindgren <tony@atomide.com> for some help with the second
-revision of this patch.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Sanjeev Premi <premi@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
-
-This second version fixes a stupid bug that would have definitely caused 
-problems with the first patch version on AM3517/3505 devices.  Still not 
-sure if it works correctly, though, since I don't have an AM3517/3505 
-board here to test.  Testing help very welcome.
-
- arch/arm/mach-omap2/id.c              |   17 ++++++-----------
- arch/arm/plat-omap/include/plat/cpu.h |   14 +++++---------
- 2 files changed, 11 insertions(+), 20 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 37efb86..723e2f8 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -304,14 +304,15 @@ static void __init omap3_check_revision(void)
- 		}
- 		break;
- 	case 0xb868:
--		/* Handle OMAP35xx/AM35xx devices
-+		/*
-+		 * Handle OMAP/AM 3505/3517 devices
- 		 *
--		 * Set the device to be OMAP3505 here. Actual device
-+		 * Set the device to be OMAP3517 here. Actual device
- 		 * is identified later based on the features.
- 		 *
- 		 * REVISIT: AM3505/AM3517 should have their own CHIP_IS
- 		 */
--		omap_revision = OMAP3505_REV(rev);
-+		omap_revision = OMAP3517_REV(rev);
- 		omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
- 		break;
- 	case 0xb891:
-@@ -442,26 +443,20 @@ static void __init omap3_cpuinfo(void)
- 		/*
- 		 * AM35xx devices
- 		 */
--		if (omap3_has_sgx()) {
--			omap_revision = OMAP3517_REV(rev);
-+		if (omap3_has_sgx())
- 			strcpy(cpu_name, "AM3517");
--		} else {
--			/* Already set in omap3_check_revision() */
-+		else
- 			strcpy(cpu_name, "AM3505");
--		}
- 	} else if (cpu_is_ti816x()) {
- 		strcpy(cpu_name, "TI816X");
- 	} else if (omap3_has_iva() && omap3_has_sgx()) {
- 		/* OMAP3430, OMAP3525, OMAP3515, OMAP3503 devices */
- 		strcpy(cpu_name, "OMAP3430/3530");
- 	} else if (omap3_has_iva()) {
--		omap_revision = OMAP3525_REV(rev);
- 		strcpy(cpu_name, "OMAP3525");
- 	} else if (omap3_has_sgx()) {
--		omap_revision = OMAP3515_REV(rev);
- 		strcpy(cpu_name, "OMAP3515");
- 	} else {
--		omap_revision = OMAP3503_REV(rev);
- 		strcpy(cpu_name, "OMAP3503");
- 	}
- 
-diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index 67b3d75..34df171 100644
---- a/arch/arm/plat-omap/include/plat/cpu.h
-+++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -262,7 +262,7 @@ IS_OMAP_TYPE(2422, 0x2422)
- IS_OMAP_TYPE(2423, 0x2423)
- IS_OMAP_TYPE(2430, 0x2430)
- IS_OMAP_TYPE(3430, 0x3430)
--IS_OMAP_TYPE(3505, 0x3505)
-+IS_OMAP_TYPE(3505, 0x3517)
- IS_OMAP_TYPE(3517, 0x3517)
- 
- #define cpu_is_omap310()		0
-@@ -354,8 +354,9 @@ IS_OMAP_TYPE(3517, 0x3517)
- 						(!omap3_has_sgx()) &&	\
- 						(omap3_has_iva()))
- # define cpu_is_omap3530()		(cpu_is_omap3430())
--# define cpu_is_omap3505()		is_omap3505()
- # define cpu_is_omap3517()		is_omap3517()
-+# define cpu_is_omap3505()		(cpu_is_omap3517() &&		\
-+						!omap3_has_sgx())
- # undef cpu_is_omap3630
- # define cpu_is_omap3630()		is_omap363x()
- # define cpu_is_ti816x()		is_ti816x()
-@@ -397,13 +398,8 @@ IS_OMAP_TYPE(3517, 0x3517)
- #define OMAP3630_REV_ES1_1	(OMAP363X_CLASS | (OMAP_REVBITS_01 << 8))
- #define OMAP3630_REV_ES1_2	(OMAP363X_CLASS | (OMAP_REVBITS_02 << 8))
- 
--#define OMAP35XX_CLASS		0x35000034
--#define OMAP3503_REV(v)		(OMAP35XX_CLASS | (0x3503 << 16) | (v << 8))
--#define OMAP3515_REV(v)		(OMAP35XX_CLASS | (0x3515 << 16) | (v << 8))
--#define OMAP3525_REV(v)		(OMAP35XX_CLASS | (0x3525 << 16) | (v << 8))
--#define OMAP3530_REV(v)		(OMAP35XX_CLASS | (0x3530 << 16) | (v << 8))
--#define OMAP3505_REV(v)		(OMAP35XX_CLASS | (0x3505 << 16) | (v << 8))
--#define OMAP3517_REV(v)		(OMAP35XX_CLASS | (0x3517 << 16) | (v << 8))
-+#define OMAP3517_CLASS		0x35170034
-+#define OMAP3517_REV(v)		(OMAP3517_CLASS | (v << 8))
- 
- #define TI816X_CLASS		0x81600034
- #define TI8168_REV_ES1_0	TI816X_CLASS
--- 
-1.7.5.4
+> Thank you,
+> Kyungmin Park
+> 
+> On Tue, Jul 26, 2011 at 2:50 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > Commit 069d4e743 removed support for local timers and forced to use MCT
+as
+> > event source. However MCT is not operating properly on early revision
+(EVT0)
+> > of Exynos4 SoCs. All UniversalC210 boards are based on Exynos4 EVT0, so
+> that
+> > commit broke support for it. This patch provides a workaround that
+enables
+> > UniversalC210 boards to boot again. s5p-timer is used as an event
+source.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> > ?arch/arm/mach-exynos4/Kconfig ? ? ? ? ? ? ? | ? ?3 +++
+> > ?arch/arm/mach-exynos4/mach-universal_c210.c | ? ?4 +++-
+> > ?2 files changed, 6 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos4/Kconfig
+b/arch/arm/mach-exynos4/Kconfig
+> > index 9d62e13..2aad73f 100644
+> > --- a/arch/arm/mach-exynos4/Kconfig
+> > +++ b/arch/arm/mach-exynos4/Kconfig
+> > @@ -173,6 +173,9 @@ config MACH_ARMLEX4210
+> > ?config MACH_UNIVERSAL_C210
+> > ? ? ? ?bool "Mobile UNIVERSAL_C210 Board"
+> > ? ? ? ?select CPU_EXYNOS4210
+> > + ? ? ? select S5P_HRT
+> > + ? ? ? select CLKSRC_MMIO
+> > + ? ? ? select HAVE_SCHED_CLOCK
+> > ? ? ? ?select S5P_GPIO_INT
+> > ? ? ? ?select S5P_DEV_FIMC0
+> > ? ? ? ?select S5P_DEV_FIMC1
+> > diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c
+b/arch/arm/mach-
+> exynos4/mach-universal_c210.c
+> > index 0e280d1..ca9e7b7 100644
+> > --- a/arch/arm/mach-exynos4/mach-universal_c210.c
+> > +++ b/arch/arm/mach-exynos4/mach-universal_c210.c
+> > @@ -34,6 +34,7 @@
+> > ?#include <plat/mfc.h>
+> > ?#include <plat/sdhci.h>
+> > ?#include <plat/pd.h>
+> > +#include <plat/s5p-time.h>
+> >
+> > ?#include <mach/map.h>
+> >
+> > @@ -730,6 +731,7 @@ static void __init universal_map_io(void)
+> > ? ? ? ?s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> > ? ? ? ?s3c24xx_init_clocks(24000000);
+> > ? ? ? ?s3c24xx_init_uarts(universal_uartcfgs,
+ARRAY_SIZE(universal_uartcfgs));
+> > + ? ? ? s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
+> > ?}
+> >
+> > ?static void __init universal_reserve(void)
+> > @@ -766,6 +768,6 @@ MACHINE_START(UNIVERSAL_C210,
+> "UNIVERSAL_C210")
+> > ? ? ? ?.init_irq ? ? ? = exynos4_init_irq,
+> > ? ? ? ?.map_io ? ? ? ? = universal_map_io,
+> > ? ? ? ?.init_machine ? = universal_machine_init,
+> > - ? ? ? .timer ? ? ? ? ?= &exynos4_timer,
+> > + ? ? ? .timer ? ? ? ? ?= &s5p_timer,
+> > ? ? ? ?.reserve ? ? ? ?= &universal_reserve,
+> > ?MACHINE_END
+> > --
+> > 1.7.1.569.g6f426
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe
+linux-samsung-soc" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> >
