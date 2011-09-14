@@ -1,44 +1,101 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 14 Sep 2011 10:24:17 +0530
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <CACRpkdYkuhhR8yNMK1cENan9WX5Fv7o_0qSN3_c3VJQwrvzgjg@mail.gmail.com>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<201109081819.30035.arnd@arndb.de>
-	<CAKnu2Mpnjec-hvfbT0zH1P2mGZKNwTQYgDLGHWUXLmGGQB0_ow@mail.gmail.com>
-	<2264116.VTHb2BIH5a@wuerfel> <1315517883.6638.1.camel@vkoul-mobl4>
-	<CACRpkdYkuhhR8yNMK1cENan9WX5Fv7o_0qSN3_c3VJQwrvzgjg@mail.gmail.com>
-Message-ID: <1315976057.26251.461.camel@vkoul-udesk3>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Wed, 14 Sep 2011 10:28:06 +0530
+Subject: [PATCH v15 11/12] OMAP: dmtimer: extend spinlock to exported APIs
+In-Reply-To: <20110913231540.GI24252@atomide.com>
+References: <1315516098-29761-1-git-send-email-tarun.kanti@ti.com>
+	<1315516098-29761-12-git-send-email-tarun.kanti@ti.com>
+	<20110913231540.GI24252@atomide.com>
+Message-ID: <CAC83ZvK0rknVX3bw42dL-V2Dpq5wjwhU6H=fNjR1=oZCs+rkng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2011-09-11 at 23:27 +0200, Linus Walleij wrote:
-> On Thu, Sep 8, 2011 at 11:38 PM, Vinod Koul <vkoul@infradead.org> wrote:
-> >
-> > Linus W, any progress on that patches you posted??
-> 
-> I haven't written any, and I felt the whole issue was pretty inflamed
-> too so I felt bad about it and avoided to think about it even since
-> I have no real problem with this in my current setups.
-> 
-> Currently there is a strong coupling between platforms and filter
-> functions and I can live with it in the systems I use since they have
-> just one DMAC and need only one filter function per device,
-> that is specified in platform data for the device. This would likely
-> also work for the SiRFprimaII if it has only a single DMAC.
-> The people facing an immediate issue with this are IIRC the
-> Samsung S5Ps.
-> 
-> If you think this is in need of solving soon and want me to propose
-> patches for channel mapping to devices using the approach used in
-> clkdev and regulator APIs to create an attributed mapping table
-> using struct device * or its string representations, I can
-> try it out of course, but if it gets flamy I will just back off again.
-Please try at my request. I really would like this problem to be solved.
+On Wed, Sep 14, 2011 at 4:45 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Tarun Kanti DebBarma <tarun.kanti@ti.com> [110908 13:36]:
+>> Since the exported APIs can be called from interrupt context
+>> extend spinlock protection to some more relevant APIs to avoid
+>> race condition.
+>
+> We should have locking for requesting and releasing a timer etc,
+> but I don't see need for that for the timer specific functions.
+Alright... I will remove locking from timer specific functions.
+In that case we have extension of locks to just following two functions:
+omap_dm_timer_request()
+omap_dm_timer_request_specific()
 
-What we want is API which solves filter function issues (we should be
-able to completely do away after proper mapping). Making a simple to
-understand/code/maintain scheme which is platform independent.
+So, I can modify the patch subject and description accordingly.
 
+>
+>> @@ -317,9 +317,11 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_trigger);
+>> ?void omap_dm_timer_start(struct omap_dm_timer *timer)
+>> ?{
+>> ? ? ? u32 l;
+>> + ? ? unsigned long flags;
+>>
+>> ? ? ? omap_dm_timer_enable(timer);
+>>
+>> + ? ? spin_lock_irqsave(&dm_timer_lock, flags);
+>> ? ? ? if (timer->loses_context) {
+>> ? ? ? ? ? ? ? u32 ctx_loss_cnt_after =
+>> ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
+>
+> Here the caller already owns the timer being started. So there
+> should never be multiple users for a single timer. If there are,
+> then the caller should take care of locking.
+Ok.
 
--- 
-~Vinod
+>
+>> ?void omap_dm_timer_stop(struct omap_dm_timer *timer)
+>> ?{
+>> - ? ? unsigned long rate = 0;
+>> + ? ? unsigned long rate = 0, flags;
+>> ? ? ? struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
+>> ? ? ? bool is_omap2 = true;
+>>
+>> + ? ? spin_lock_irqsave(&dm_timer_lock, flags);
+>> ? ? ? if (pdata->needs_manual_reset)
+>> ? ? ? ? ? ? ? is_omap2 = false;
+>> ? ? ? else
+>
+> Here too.
+Right.
+
+>
+>> @@ -389,8 +394,10 @@ void omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int load)
+>> ?{
+>> ? ? ? u32 l;
+>> + ? ? unsigned long flags;
+>>
+>> ? ? ? omap_dm_timer_enable(timer);
+>> + ? ? spin_lock_irqsave(&dm_timer_lock, flags);
+>> ? ? ? l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+>> ? ? ? if (autoreload)
+>> ? ? ? ? ? ? ? l |= OMAP_TIMER_CTRL_AR;
+>
+> And here.
+Ok.
+
+>
+>> @@ -412,9 +420,11 @@ void omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int load)
+>> ?{
+>> ? ? ? u32 l;
+>> + ? ? unsigned long flags;
+>>
+>> ? ? ? omap_dm_timer_enable(timer);
+>>
+>> + ? ? spin_lock_irqsave(&dm_timer_lock, flags);
+>> ? ? ? if (timer->loses_context) {
+>> ? ? ? ? ? ? ? u32 ctx_loss_cnt_after =
+>> ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
+>
+> Not needed here either. And that's the case for all the other functions
+> too.
+Sure.
+--
+Tarun
+>
+> Regards,
+>
+> Tony
+>
