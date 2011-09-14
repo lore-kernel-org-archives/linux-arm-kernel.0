@@ -1,51 +1,36 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 14 Sep 2011 11:04:38 +0530
-Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
-	gic_arch_extn
-In-Reply-To: <20110913203616.GG24252@atomide.com>
+Date: Wed, 14 Sep 2011 11:06:32 +0530
+Subject: [PATCH 01/25] ARM: mm: Add strongly ordered descriptor support.
+In-Reply-To: <20110913202317.GE24252@atomide.com>
 References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-	<20110913203616.GG24252@atomide.com>
-Message-ID: <CAMQu2gyYETPZRJu=4MWX6bULgmMaJb8MRwfhvURtOuyyWhLkAQ@mail.gmail.com>
+	<1315144466-9395-2-git-send-email-santosh.shilimkar@ti.com>
+	<20110913202317.GE24252@atomide.com>
+Message-ID: <CAMQu2gw6=RmmoWnRQ34RVjvSBbfvK2-3R9eFXqLZLjw_XR7Jyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-On Wed, Sep 14, 2011 at 2:06 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110904 06:23]:
->> OMAP WakeupGen is the interrupt controller extension used along
->> with ARM GIC to wake the CPU out from low power states on
->> external interrupts.
->>
->> The WakeupGen unit is responsible for generating wakeup event
->> from the incoming interrupts and enable bits. It is implemented
->> in MPU always ON power domain. During normal operation,
->> WakeupGen delivers external interrupts directly to the GIC.
-> ...
+On Wed, Sep 14, 2011 at 1:53 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110904 06:22]:
+>> On certain architectures, there might be a need to mark certain
+>> addresses with strongly ordered memory attributes to avoid ordering
+>> issues at the interconnect level.
 >
->> + ? ? /*
->> + ? ? ?* Override GIC architecture specific functions to add
->> + ? ? ?* OMAP WakeupGen interrupt controller along with GIC
->> + ? ? ?*/
->> + ? ? gic_arch_extn.irq_mask = wakeupgen_mask;
->> + ? ? gic_arch_extn.irq_unmask = wakeupgen_unmask;
->> + ? ? gic_arch_extn.irq_set_wake = wakeupgen_set_wake;
->> + ? ? gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
+> This is something Russell needs to look.
 >
-> As I've commented before, there should not be any need to tweak
-> the wakeupgen registers for each interrupt during the runtime.
+> You might want to also read the mailing list archives regarding the
+> strongly ordered access.
 >
-And I gave you all the reasons why it needs to be done this way.
+> Basically it still won't guarantee that the write gets to the
+> device, only a read back from the device in question guarantees
+> that at the bus level.
+>
+Russell has already seen this. I have sent this patches to Russell
+before adding them
+in the queue.
 
-> AFAIK the wakeupgen registers only need to be armed every time
-> before entering idle.
->
-No that doesn't work and it completely hacky approach.
-This problem is for all SOC's using A9 SMP and GIC and every soc
-has an architecture specific interrupt controller extension. And that
-was the reason the GIC arch_extn was proposed.
-It's just another IRQCHIP and works seamlessly being part of the
-framework.  And it will also initialized with primary IRQCHIP( GIC).
+This is different. There is a BUG in asynchronous bridges on OMAP44XX
+devices and
+that's the reason it' s needed.
 
 Regards
 Santosh
