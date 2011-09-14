@@ -1,151 +1,236 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 14 Sep 2011 01:41:42 -0400
-Subject: [PATCH 2/6] ARM: zImage: Allow the appending of a device tree binary
+Date: Wed, 14 Sep 2011 01:41:44 -0400
+Subject: [PATCH 4/6] ARM: zImage: gather some string functions into string.c
 In-Reply-To: <1315978906-15829-1-git-send-email-nico@fluxnic.net>
 References: <1315978906-15829-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1315978906-15829-3-git-send-email-nico@fluxnic.net>
+Message-ID: <1315978906-15829-5-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-This patch provides the ability to boot using a device tree that is appended
-to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+This is a small subset of string functions needed by commits to come.
+Except for memcpy() which is unchanged from its original location, their
+implementation is meant to be small, and -Os is enforced to prevent gcc
+from doing pointless loop unrolling.
 
-Signed-off-by: John Bonesio <bones@secretlab.ca>
-[nico: adjusted to latest zImage changes plus additional cleanups]
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/Kconfig                |    8 ++++
- arch/arm/boot/compressed/head.S |   70 +++++++++++++++++++++++++++++++++++++--
- 2 files changed, 75 insertions(+), 3 deletions(-)
+ arch/arm/boot/compressed/Makefile |    4 +
+ arch/arm/boot/compressed/misc.c   |   42 +------------
+ arch/arm/boot/compressed/string.c |  127 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 132 insertions(+), 41 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/string.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5ebc5d922e..83323c2b1f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1781,6 +1781,14 @@ config ZBOOT_ROM_SH_MOBILE_SDHI
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index 4867647b97..c20ddc69d9 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -26,6 +26,10 @@ HEAD	= head.o
+ OBJS	+= misc.o decompress.o
+ FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
  
- endchoice
- 
-+config ARM_APPENDED_DTB
-+	bool "Use appended device tree blob to zImage"
-+	depends on OF && !ZBOOT_ROM
-+	help
-+	  With this option, the boot code will look for a device tree binary
-+	  (dtb) appended to zImage
-+	  (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
++# string library code (-Os is enforced to keep it much smaller)
++OBJS		+= string.o
++CFLAGS_string.o	:= -Os
 +
- config CMDLINE
- 	string "Default kernel command string"
- 	default ""
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index e95a598960..3ce5738ddb 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -216,6 +216,59 @@ restart:	adr	r0, LC0
- 		mov	r10, r6
- #endif
+ #
+ # Architecture dependencies
+ #
+diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
+index 832d37236c..8e2a8fca5e 100644
+--- a/arch/arm/boot/compressed/misc.c
++++ b/arch/arm/boot/compressed/misc.c
+@@ -18,14 +18,9 @@
  
-+		mov	r5, #0			@ init dtb size to 0
-+#ifdef CONFIG_ARM_APPENDED_DTB
+ unsigned int __machine_arch_type;
+ 
+-#define _LINUX_STRING_H_
+-
+ #include <linux/compiler.h>	/* for inline */
+-#include <linux/types.h>	/* for size_t */
+-#include <linux/stddef.h>	/* for NULL */
++#include <linux/types.h>
+ #include <linux/linkage.h>
+-#include <asm/string.h>
+-
+ 
+ static void putstr(const char *ptr);
+ extern void error(char *x);
+@@ -101,41 +96,6 @@ static void putstr(const char *ptr)
+ 	flush();
+ }
+ 
+-
+-void *memcpy(void *__dest, __const void *__src, size_t __n)
+-{
+-	int i = 0;
+-	unsigned char *d = (unsigned char *)__dest, *s = (unsigned char *)__src;
+-
+-	for (i = __n >> 3; i > 0; i--) {
+-		*d++ = *s++;
+-		*d++ = *s++;
+-		*d++ = *s++;
+-		*d++ = *s++;
+-		*d++ = *s++;
+-		*d++ = *s++;
+-		*d++ = *s++;
+-		*d++ = *s++;
+-	}
+-
+-	if (__n & 1 << 2) {
+-		*d++ = *s++;
+-		*d++ = *s++;
+-		*d++ = *s++;
+-		*d++ = *s++;
+-	}
+-
+-	if (__n & 1 << 1) {
+-		*d++ = *s++;
+-		*d++ = *s++;
+-	}
+-
+-	if (__n & 1)
+-		*d++ = *s++;
+-
+-	return __dest;
+-}
+-
+ /*
+  * gzip declarations
+  */
+diff --git a/arch/arm/boot/compressed/string.c b/arch/arm/boot/compressed/string.c
+new file mode 100644
+index 0000000000..36e53ef920
+--- /dev/null
++++ b/arch/arm/boot/compressed/string.c
+@@ -0,0 +1,127 @@
 +/*
-+ *   r0  = delta
-+ *   r2  = BSS start
-+ *   r3  = BSS end
-+ *   r4  = final kernel address
-+ *   r5  = appended dtb size (still unknown)
-+ *   r6  = _edata
-+ *   r7  = architecture ID
-+ *   r8  = atags/device tree pointer
-+ *   r9  = size of decompressed image
-+ *   r10 = end of this image, including  bss/stack/malloc space if non XIP
-+ *   r11 = GOT start
-+ *   r12 = GOT end
-+ *   sp  = stack pointer
++ * arch/arm/boot/compressed/string.c
 + *
-+ * if there are device trees (dtb) appended to zImage, advance r10 so that the
-+ * dtb data will get relocated along with the kernel if necessary.
++ * Small subset of simple string routines
 + */
 +
-+		ldr	lr, [r6, #0]
-+#ifndef __ARMEB__
-+		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
-+#else
-+		ldr	r1, =0xd00dfeed
-+#endif
-+		cmp	lr, r1
-+		bne	dtb_check_done		@ not found
++#include <linux/string.h>
 +
-+		mov	r8, r6			@ use the appended device tree
++void *memcpy(void *__dest, __const void *__src, size_t __n)
++{
++	int i = 0;
++	unsigned char *d = (unsigned char *)__dest, *s = (unsigned char *)__src;
 +
-+		/* Get the dtb's size */
-+		ldr	r5, [r6, #4]
-+#ifndef __ARMEB__
-+		/* convert r5 (dtb size) to little endian */
-+		eor	r1, r5, r5, ror #16
-+		bic	r1, r1, #0x00ff0000
-+		mov	r5, r5, ror #8
-+		eor	r5, r5, r1, lsr #8
-+#endif
++	for (i = __n >> 3; i > 0; i--) {
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++	}
 +
-+		/* preserve 64-bit alignment */
-+		add	r5, r5, #7
-+		bic	r5, r5, #7
++	if (__n & 1 << 2) {
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++		*d++ = *s++;
++	}
 +
-+		/* relocate some pointers past the appended dtb */
-+		add	r6, r6, r5
-+		add	r10, r10, r5
-+		add	sp, sp, r5
-+dtb_check_done:
-+#endif
++	if (__n & 1 << 1) {
++		*d++ = *s++;
++		*d++ = *s++;
++	}
 +
- /*
-  * Check to see if we will overwrite ourselves.
-  *   r4  = final kernel address
-@@ -285,14 +338,16 @@ wont_overwrite:
-  *   r2  = BSS start
-  *   r3  = BSS end
-  *   r4  = kernel execution address
-+ *   r5  = appended dtb size (0 if not present)
-  *   r7  = architecture ID
-  *   r8  = atags pointer
-  *   r11 = GOT start
-  *   r12 = GOT end
-  *   sp  = stack pointer
-  */
--		teq	r0, #0
-+		orrs	r1, r0, r5
- 		beq	not_relocated
++	if (__n & 1)
++		*d++ = *s++;
 +
- 		add	r11, r11, r0
- 		add	r12, r12, r0
- 
-@@ -307,12 +362,21 @@ wont_overwrite:
- 
- 		/*
- 		 * Relocate all entries in the GOT table.
-+		 * Bump bss entries to _edata + dtb size
- 		 */
- 1:		ldr	r1, [r11, #0]		@ relocate entries in the GOT
--		add	r1, r1, r0		@ table.  This fixes up the
--		str	r1, [r11], #4		@ C references.
-+		add	r1, r1, r0		@ This fixes up C references
-+		cmp	r1, r2			@ if entry >= bss_start &&
-+		cmphs	r3, r1			@       bss_end > entry
-+		addhi	r1, r1, r5		@    entry += dtb size
-+		str	r1, [r11], #4		@ next entry
- 		cmp	r11, r12
- 		blo	1b
++	return __dest;
++}
 +
-+		/* bump our bss pointers too */
-+		add	r2, r2, r5
-+		add	r3, r3, r5
++void *memmove(void *__dest, __const void *__src, size_t count)
++{
++	unsigned char *d = __dest;
++	const unsigned char *s = __src;
 +
- #else
- 
- 		/*
++	if (__dest == __src)
++		return __dest;
++
++	if (__dest < __src)
++		return memcpy(__dest, __src, count);
++
++	while (count--)
++		d[count] = s[count];
++	return __dest;
++}
++
++size_t strlen(const char *s)
++{
++	const char *sc = s;
++
++	while (*sc != '\0')
++		sc++;
++	return sc - s;
++}
++
++int memcmp(const void *cs, const void *ct, size_t count)
++{
++	const unsigned char *su1 = cs, *su2 = ct, *end = su1 + count;
++	int res = 0;
++
++	while (su1 < end) {
++		res = *su1++ - *su2++;
++		if (res)
++			break;
++	}
++	return res;
++}
++
++int strcmp(const char *cs, const char *ct)
++{
++	unsigned char c1, c2;
++	int res = 0;
++
++	do {
++		c1 = *cs++;
++		c2 = *ct++;
++		res = c1 - c2;
++		if (res)
++			break;
++	} while (c1);
++	return res;
++}
++
++void *memchr(const void *s, int c, size_t count)
++{
++	const unsigned char *p = s;
++
++	while (count--)
++		if ((unsigned char)c == *p++)
++			return (void *)(p - 1);
++	return NULL;
++}
++
++char *strchr(const char *s, int c)
++{
++	while (*s != (char)c)
++		if (*s++ == '\0')
++			return NULL;
++	return (char *)s;
++}
++
++#undef memset
++
++void *memset(void *s, int c, size_t count)
++{
++	char *xs = s;
++	while (count--)
++		*xs++ = c;
++	return s;
++}
++
++void __memzero(void *s, size_t count)
++{
++	memset(s, 0, count);
++}
 -- 
 1.7.7-rc0
