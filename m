@@ -1,115 +1,150 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Sep 2011 10:08:03 -0700
-Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
-	gic_arch_extn
-In-Reply-To: <4E70DB33.5070501@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-	<20110913203616.GG24252@atomide.com>
-	<CAMQu2gyYETPZRJu=4MWX6bULgmMaJb8MRwfhvURtOuyyWhLkAQ@mail.gmail.com>
-	<20110914152116.GM24252@atomide.com> <4E70DB33.5070501@ti.com>
-Message-ID: <20110914170803.GN24252@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 14 Sep 2011 11:13:18 -0600
+Subject: [PATCH 2/2] input: samsung-keypad: Add device tree support
+In-Reply-To: <CAJuYYwSNaVCnHFTMtW0RZLGLaS+iKBibWYwn5mqNT-0EW31yAQ@mail.gmail.com>
+References: <1315916779-21793-1-git-send-email-thomas.abraham@linaro.org>
+	<1315916779-21793-2-git-send-email-thomas.abraham@linaro.org>
+	<1315916779-21793-3-git-send-email-thomas.abraham@linaro.org>
+	<20110914161144.GF3134@ponder.secretlab.ca>
+	<CAJuYYwSNaVCnHFTMtW0RZLGLaS+iKBibWYwn5mqNT-0EW31yAQ@mail.gmail.com>
+Message-ID: <20110914171318.GA24425@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh <santosh.shilimkar@ti.com> [110914 09:16]:
+On Wed, Sep 14, 2011 at 10:19:22PM +0530, Thomas Abraham wrote:
+> Hi Grant,
 > 
-> First and foremost, I have to go with the approach here because MPUSS
-> hardware team put a requirement that GIC and wakeupgen should always be
-> kept in sync. If needed we can discuss this off-the list with Richard.
+> On 14 September 2011 21:41, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > On Tue, Sep 13, 2011 at 05:56:19PM +0530, Thomas Abraham wrote:
+> >> Add device tree based discovery support for Samsung's keypad controller.
+> >>
+> >> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+> >> Cc: Donghwa Lee <dh09.lee@samsung.com>
+> >> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> >> ---
+> >> ?.../devicetree/bindings/input/samsung-keypad.txt ? | ? 88 ++++++++++
+> >> ?drivers/input/keyboard/samsung-keypad.c ? ? ? ? ? ?| ?177 ++++++++++++++++++--
+> >> ?2 files changed, 253 insertions(+), 12 deletions(-)
+> >> ?create mode 100644 Documentation/devicetree/bindings/input/samsung-keypad.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/input/samsung-keypad.txt b/Documentation/devicetree/bindings/input/samsung-keypad.txt
+> >> new file mode 100644
+> >> index 0000000..e1c7237
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/input/samsung-keypad.txt
+> >> @@ -0,0 +1,88 @@
+> >> +* Samsung's Keypad Controller device tree bindings
+> >> +
+> >> +Samsung's Keypad controller is used to interface a SoC with a matrix-type
+> >> +keypad device. The keypad controller supports multiple row and column lines.
+> >> +A key can be placed at each intersection of a unique row and a unique column.
+> >> +The keypad controller can sense a key-press and key-release and report the
+> >> +event using a interrupt to the cpu.
+> >> +
+> >> +Required SoC Specific Properties:
+> >> +- compatible: should be one of the following
+> >> + ?- "samsung,s3c6410-keypad": For controllers compatible with s3c6410 keypad
+> >> + ? ?controller.
+> >> + ?- "samsung,s5pv210-keypad": For controllers compatible with s5pv210 keypad
+> >> + ? ?controller.
+> >> +
+> >> +- reg: physical base address of the controller and length of memory mapped
+> >> + ?region.
+> >> +
+> >> +- interrupts: The interrupt number to the cpu.
+> >> +
+> >> +Required Board Specific Properties:
+> >> +- samsung,keypad-num-rows: Number of row lines connected to the keypad
+> >> + ?controller.
+> >> +
+> >> +- samsung,keypad-num-columns: Number of column lines connected to the
+> >> + ?keypad controller.
+> >> +
+> >> +- row-gpios: List of gpios used as row lines. The gpio specifier for
+> >> + ?this property depends on the gpio controller to which these row lines
+> >> + ?are connected.
+> >> +
+> >> +- col-gpios: List of gpios used as column lines. The gpio specifier for
+> >> + ?this property depends on the gpio controller to which these column
+> >> + ?lines are connected.
+> >
+> > I know we've got overlapping terminology here. ?When you say GPIOs
+> > here, does it refer to the pin multiplexing feature of the samsung
+> > parts, and thus how the keypad controller IO is routed to the pins?
+> > Or does the driver manipulate GPIO lines manually?
 > 
-> Below is the extract from the veyron func specs.
-> -------------------------------------
-> Version 1.6 of veyron spec has this.
+> It is intended to mean gpio and not the pinmux. But the way the gpio
+> specifier is specified in the dts file, it includes information about
+> both gpio number and the pin-control details. For instance, if 'gpa0'
+> is a gpio controller (which includes pin-control functionality as well
+> in the hardware), then the gpio specifier for the keypad would be as
+> below.
 > 
-> From page 95, paragraph 2 on version 1.6:
+> row-gpios = <&gpa0 0 3 3 0>,
+>                  <&gpa0 1 3 3 0>;
 > 
-> "It is SW responsibility to program interrupt enabling/disabling
-> coherently in the GIC and in the Wugen enable registers. That is, a
-> given interrupt for a given CPU is either enable at both GIC and Wugen,
-> or disable at both, but no mix."
-> -------------------------------------
->
-> The way understand this IP is, even in normal scenario's every IRQ
-> will come to wakeupgen and then it will pass that to GIC. CPU clock
-> domains are kept under HW supervised always and they can enter inactive
-> any time without WFI. Only wakeup gen can bring the CPU out of inactive
-> state.
+> The syntax for the gpio specifier is
+> <[phandle of gpio controller] [pin number within the gpio controller]
+> [mux function] [pull up/down] [drive strength]>
 > 
-> That's requirement really lead to this design choice. Just to add
-> all ARM SOC's using GIC has a gic extension interrupt controller and
-> follow the same approach for the secondary IRQCHIPO.
-
-Thanks for the clarification. It seems to me the spec is most likely
-wrong as we've had the GIC working for over two years now without
-doing anything with the wakeup gen registers :)
-
-Of course the wakeup events probably don't work currently, but the
-GIC interrupts certainly do. So most likely there's no need to
-continuously syncronize the wakeup gen registers with the GIC
-registers.
- 
-> Below points as such don't matter after the strict hardware
-> requirement. Still .....
-
-I think the issue is that you're assuming the spec is correct,
-which does not seem to be the case here. 
- 
-> Let's say, we ignore the hardware recommendation and try
-> to do what you are suggesting.
+> The keypad driver does not know or use the mux function, pull up/down
+> and drive strength details. The driver would call of_get_gpio to get
+> the linux gpio number and then do a gpio_request on that gpio number.
+> The gpio dt support manges the pin-mux and other settings
+> transparently for the keypad driver. So even though the gpio specifier
+> format changes, the dt support code for the driver does not change.
 > 
-> How will you know while entering in idle which IRQ's to be
-> masked and which are to be unmasked ?
-> The only way is to run though entire 1024 possible IRQ's from GIC
-> and then check the state of each IRQ and set things accordingly.
-> At GIC level, mask and unmask registers are different so you will
-> end up reading those many registers. That also means you need to
-> export some non-standard APIs from GIC driver.
-
-When entering idle, we have plenty of time to do that. Sounds like
-that could be easily implemented in a generic way.
- 
-> In system wide suspend, the core irq code, communicates
-> the wakeup and non-wakeup functionality using standard mask/
-> unmask APIs when used with IRQCHIP_MASK_ON_SUSPEND.
-> With what you are suggesting it won't work
-> as desired. Because that information is only passed
-> to the IRQ chips. So you will still need IRQCHIP and
-> mask/unmask APIs. That can be done as part of set_wake()
-> handler as well though.
+> The driver does not manipulate the gpios directly. It just requests
+> for the gpio number and makes a note of the number to free it when the
+> driver unbinds.
 > 
-> The wakeupgen is within CPU cluster and the accesses
-> to it are not as expensive as like accessing 32 K timer or
-> GP timer.
-
-Sure, but it still causes unnecesary writes for every interrupt.
-There's no technical reason to do that.
-
-> By making the wakeupgen as an IRQCHIP, we meet the hardware
-> requirement and also make use of this IP properly for the
-> desired functionality using standard IRQCHIP interfaces
-> No need of non-standard hacking.
-
-Well it seems the "hardware requirement" is based on a buggy
-spec considering things are currently working.
- 
-> It also avoid platform code monkeing with common GIC code
-> and irq subsystem to hack the stuff.
-
-What I'm suggesting can be implemented in a generic way.
- 
-> Btw, not exactly related here, but because of common code
-> consolidation, we need to actually use GIC common
-> save/restore hooks, even though OMAP has very
-> optimal software save and hardware restore mechanism
-> for GIC.
+> >
+> > If it is pin multiplexing, then using the GPIO binding seems rather
+> > odd. It may be entirely appropriate, but it will need to play well
+> > with the pinmux stuff that linusw is working on.
 > 
-> Hope this email summarise all previous multiple discussions
-> in one place.
+> When pinmux/pin-ctrl functionality which linusw is developing is used
+> for this driver, it would be a extension to this patch. The driver
+> would request for the gpio and then use the pin-ctrl subsystem api to
+> setup the pin-control. In that case, the gpio-specifier would change
+> but that change would be break anything which this patch does.
+> 
+> >
+> >> +
+> >> +- Keys represented as child nodes: Each key connected to the keypad
+> >> + ?controller is represented as a child node to the keypad controller
+> >> + ?device node and should include the following properties.
+> >> + ?- keypad,row: the row number to which the key is connected.
+> >> + ?- keypad,column: the column number to which the key is connected.
+> >> + ?- keypad,key-code: the key-code to be reported when the key is pressed
+> >> + ? ?and released.
+> >
+> > What defines the meanings of the key codes?
+> 
+> The key-code could be any value which the system would want the keypad
+> driver to report when that key is pressed.
 
-Thanks, but unfortunately it does not. To me it still seems
-this is the wrong approach for the wakeup triggers.
+Are they linux keycodes?  If so, then this property name can
+probably be linux,code.  There is already precedence for that
+usage in Documentation/devicetree/bindings/gpio/gpio-keys.txt.  (I
+would personally prefer "linux,key-code", but sometimes it is better
+to go with existing precidence) You could also use linux,input-type as
+specified in that binding.
 
-Regards,
+> 
+> >
+> >> +
+> >> +Optional Properties specific to linux:
+> >> +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
+> >> +- linux,keypad-wakeup: use any event on keypad as wakeup event.
+> >
+> > Is this really a linux-specific feature?
+> 
+> Yes, it is a property defined by the linux subsystems. A non-linux
+> system might not have such features.
 
-Tony
+I was specifically referring to the wakeup property, but okay, I can
+see the argument that it is linux-specific because it is usage-policy
+related.
+
+g.
