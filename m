@@ -1,141 +1,76 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 14 Sep 2011 23:16:32 +0530
-Subject: [PATCH v3 4/6] DMA: PL330: Add device tree support
-In-Reply-To: <20110914162401.GK3134@ponder.secretlab.ca>
-References: <1315852165-32402-1-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-2-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-3-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-4-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-5-git-send-email-thomas.abraham@linaro.org>
-	<20110914162401.GK3134@ponder.secretlab.ca>
-Message-ID: <CAJuYYwTmw7y4DrrHcoSdnFv23BUELvKzTY5YQbGv6_23OeVnUg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 14 Sep 2011 18:46:54 +0100
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <1316017900-19918-6-git-send-email-robherring2@gmail.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+Message-ID: <4E70E88E.4090503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On 14/09/11 17:31, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> This adds gic initialization using device tree data. The initialization
+> functions are intended to be called by a generic OF interrupt
+> controller parsing function once the right pieces are in place.
+> 
+> PPIs are handled using 3rd cell of interrupts properties to specify the cpu
+> mask the PPI is assigned to.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  Documentation/devicetree/bindings/arm/gic.txt |   53 ++++++++++++++++++++++++
+>  arch/arm/common/gic.c                         |   55 +++++++++++++++++++++++--
+>  arch/arm/include/asm/hardware/gic.h           |   10 +++++
+>  3 files changed, 114 insertions(+), 4 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> new file mode 100644
+> index 0000000..6c513de
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> @@ -0,0 +1,53 @@
+> +* ARM Generic Interrupt Controller
+> +
+> +ARM SMP cores are often associated with a GIC, providing per processor
+> +interrupts (PPI), shared processor interrupts (SPI) and software
+> +generated interrupts (SGI).
+> +
+> +Primary GIC is attached directly to the CPU and typically has PPIs and SGIs.
+> +Secondary GICs are cascaded into the upward interrupt controller and do not
+> +have PPIs or SGIs.
+> +
+> +Main node required properties:
+> +
+> +- compatible : should be one of:
+> +	"arm,cortex-a9-gic"
+> +	"arm,arm11mp-gic"
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source.  The type shall be a <u32> and the value shall be 3.
+> +
+> +  The 1st cell is the interrupt number. 0-15 are reserved for SGIs. 16-31 are
+> +  for PPIs.
+> +
+> +  The 2nd cell is the level-sense information, encoded as follows:
+> +                    1 = low-to-high edge triggered
+> +                    2 = high-to-low edge triggered
+> +                    4 = active high level-sensitive
+> +                    8 = active low level-sensitive
+> +
+> +  Only values of 1 and 4 are valid for GIC 1.0 spec.
+> +
+> +  The 3rd cell contains the mask of the cpu number for the interrupt source.
+> +  The cpu mask is only valid for PPIs and shall be 0 for SPIs. This value shall
+> +  be 0 for PPIs.
+     ^^^^^^^^^^^^^
 
-On 14 September 2011 21:54, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Mon, Sep 12, 2011 at 11:59:23PM +0530, Thomas Abraham wrote:
->> For PL330 dma controllers instantiated from device tree, the channel
->> lookup is based on phandle of the dma controller and dma request id
->> specified by the client node. During probe, the private data of each
->> channel of the controller is set to point to the device node of the
->> dma controller. The 'chan_id' of the each channel is used as the
->> dma request id.
->>
->> Client driver requesting dma channels specify the phandle of the
->> dma controller and the request id. The pl330 filter function
->> converts the phandle to the device node pointer and matches that
->> with channel's private data. If a match is found, the request id
->> from the client node and the 'chan_id' of the channel is matched.
->> A channel is found if both the values match.
->>
->> Cc: Jassi Brar <jassisinghbrar@gmail.com>
->> Cc: Boojin Kim <boojin.kim@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
->> ---
->> ?.../devicetree/bindings/dma/arm-pl330.txt ? ? ? ? ?| ? 29 +++++++++++++++++
->> ?drivers/dma/pl330.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 33 +++++++++++++++++--
->> ?2 files changed, 58 insertions(+), 4 deletions(-)
->> ?create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
->>
->> diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
->> new file mode 100644
->> index 0000000..05b007d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
->> @@ -0,0 +1,29 @@
->> +* ARM PrimeCell PL330 DMA Controller
->> +
->> +The ARM PrimeCell PL330 DMA controller can move blocks of memory contents
->> +between memory and peripherals or memory to memory.
->> +
->> +Required properties:
->> + ?- compatible: should include both "arm,pl330" and "arm,primecell".
->> + ?- reg: physical base address of the controller and length of memory mapped
->> + ? ?region.
->> + ?- interrupts: interrupt number to the cpu.
->> +
->> +Example: (from Samsung's Exynos4 processor dtsi file)
->> +
->> + ? ? pdma0: pdma at 12680000 {
->> + ? ? ? ? ? ? compatible = "arm,pl330", "arm,primecell";
->> + ? ? ? ? ? ? reg = <0x12680000 0x1000>;
->> + ? ? ? ? ? ? interrupts = <99>;
->> + ? ? };
->> +
->> +Client drivers (device nodes requiring dma transfers from dev-to-mem or
->> +mem-to-dev) should specify the DMA channel numbers using a two-value pair
->> +as shown below.
->> +
->> + ?[property name] ?= <[phandle of the dma controller] [dma request id]>;
->> +
->> + ? ? ?where 'dma request id' is the dma request number which is connected
->> + ? ? ?to the client controller.
->> +
->> + ?Example: ?tx-dma-channel = <&pdma0 12>;
->
-> Looks good to me. ?You may want to specify that the property name
-> should be in the form: <name>-dma-channel just to enforce a bit of
-> convention on the users.
+Typo here ? The way I understand it, it should read "For PPIs, this
+value shall be the mask of the possible CPU numbers for the interrupt
+source" (or something to similar effect...).
 
-Ok. This will be added as a suggestion for property name specifying
-the dma channel.
-
->
->> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
->> index 992bf82..7a4ebf1 100644
->> --- a/drivers/dma/pl330.c
->> +++ b/drivers/dma/pl330.c
->> @@ -19,6 +19,7 @@
->> ?#include <linux/amba/pl330.h>
->> ?#include <linux/pm_runtime.h>
->> ?#include <linux/scatterlist.h>
->> +#include <linux/of.h>
->>
->> ?#define NR_DEFAULT_DESC ? ? ?16
->>
->> @@ -277,6 +278,20 @@ bool pl330_filter(struct dma_chan *chan, void *param)
->> ? ? ? if (chan->device->dev->driver != &pl330_driver.drv)
->> ? ? ? ? ? ? ? return false;
->>
->> +#ifdef CONFIG_OF
->> + ? ? if (chan->device->dev->of_node) {
->> + ? ? ? ? ? ? const __be32 *prop_value;
->> + ? ? ? ? ? ? phandle phandle;
->> + ? ? ? ? ? ? struct device_node *node;
->> +
->> + ? ? ? ? ? ? prop_value = ((struct property *)param)->value;
->> + ? ? ? ? ? ? phandle = be32_to_cpup(prop_value++);
->> + ? ? ? ? ? ? node = of_find_node_by_phandle(phandle);
->> + ? ? ? ? ? ? return ((chan->private == node) &&
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (chan->chan_id == be32_to_cpup(prop_value)));
->
-> Don't open code this. ?There is already a function to decode a phandle
-> property. ?of_parse_phandle() should do the trick.
-
-The parameter to this function 'void *param' is already pointing to a
-'struct property'. That 'struct property' has a value of type
-<[phandle of dma controller] [channel id]>.
-
-Since the property is already known, the of_get_property() call within
-the of_parse_phandle() would complicate the above code. And,
-of_parse_phandle requires a 'property name' inside the dma client
-device node, which the above code fragment does not know about
-(property names are defined by client drivers).
-
-So, I would prefer to continue with the above implementation.
-
->
-> Otherwise looks good to me.
->
-> g.
-
-
-Thanks for your review.
-
-Regards,
-Thomas.
-
-[...]
+	M.
+-- 
+Jazz is not dead. It just smells funny...
