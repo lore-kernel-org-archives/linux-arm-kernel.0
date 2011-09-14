@@ -1,39 +1,49 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 14 Sep 2011 20:56:12 +0530
-Subject: [PATCH 0/6] zImage improvements with DTB append and ATAG
-	compatibility
-In-Reply-To: <1315978906-15829-1-git-send-email-nico@fluxnic.net>
-References: <1315978906-15829-1-git-send-email-nico@fluxnic.net>
-Message-ID: <CAJuYYwS0Ny3hUSC_sO9OJ34r8_ssZ0hFY4NL6jt+1i-Tbr95Yw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 14 Sep 2011 11:31:18 -0400 (EDT)
+Subject: [PATCH] ARM: rename temp variable in read*_relaxed()
+In-Reply-To: <1316013082-21641-1-git-send-email-olof@lixom.net>
+References: <1316013082-21641-1-git-send-email-olof@lixom.net>
+Message-ID: <alpine.LFD.2.00.1109141129330.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 September 2011 11:11, Nicolas Pitre <nico@fluxnic.net> wrote:
-> This is the latest incarnation of my patch series allowing a DTB
-> to be appended to zImage, including the ATAG conversion wrapper and
-> other minor cleanups.
->
-> This can also be pulled from:
->
-> ? ? ? ?git://git.linaro.org/people/nico/linux zImage_DTB_append
->
-> This works for me on the test setup I have.
-> ACKs/Tested-By's would be appreciated.
+On Wed, 14 Sep 2011, Olof Johansson wrote:
 
+> This resolves the following sparse warning from readl() and other macros,
+> which ends up embedding readl_relaxed() using the same variable:
+> 
+> arch/arm/mach-tegra/dma.c:169:8: warning: symbol '__v' shadows an earlier one
+> arch/arm/mach-tegra/dma.c:169:8: originally declared here
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-Works fine for Exynos4 device tree support.
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Tested-by: Thomas Abraham <thomas.abraham@linaro.org>
-
->
->
->
->
-> Nicolas
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> ---
+>  arch/arm/include/asm/io.h |   10 +++++-----
+>  1 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index d66605d..bbeb11e 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -189,11 +189,11 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>   * IO port primitives for more information.
+>   */
+>  #ifdef __mem_pci
+> -#define readb_relaxed(c) ({ u8  __v = __raw_readb(__mem_pci(c)); __v; })
+> -#define readw_relaxed(c) ({ u16 __v = le16_to_cpu((__force __le16) \
+> -					__raw_readw(__mem_pci(c))); __v; })
+> -#define readl_relaxed(c) ({ u32 __v = le32_to_cpu((__force __le32) \
+> -					__raw_readl(__mem_pci(c))); __v; })
+> +#define readb_relaxed(c) ({ u8  __r = __raw_readb(__mem_pci(c)); __r; })
+> +#define readw_relaxed(c) ({ u16 __r = le16_to_cpu((__force __le16) \
+> +					__raw_readw(__mem_pci(c))); __r; })
+> +#define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
+> +					__raw_readl(__mem_pci(c))); __r; })
+>  
+>  #define writeb_relaxed(v,c)	((void)__raw_writeb(v,__mem_pci(c)))
+>  #define writew_relaxed(v,c)	((void)__raw_writew((__force u16) \
+> -- 
+> 1.7.4.1
+> 
