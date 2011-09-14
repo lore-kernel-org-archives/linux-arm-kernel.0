@@ -1,97 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 14 Sep 2011 11:37:30 +0800
-Subject: [PATCH] ARM: mach-mxs/mx28evk: Only register devices if their
-	GPIO requests succeeded
-In-Reply-To: <1315945519-15178-1-git-send-email-festevam@gmail.com>
-References: <1315945519-15178-1-git-send-email-festevam@gmail.com>
-Message-ID: <20110914033729.GB2638@S2100-06.ap.freescale.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Sep 2011 10:24:17 +0530
+Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <CACRpkdYkuhhR8yNMK1cENan9WX5Fv7o_0qSN3_c3VJQwrvzgjg@mail.gmail.com>
+References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
+	<201109081819.30035.arnd@arndb.de>
+	<CAKnu2Mpnjec-hvfbT0zH1P2mGZKNwTQYgDLGHWUXLmGGQB0_ow@mail.gmail.com>
+	<2264116.VTHb2BIH5a@wuerfel> <1315517883.6638.1.camel@vkoul-mobl4>
+	<CACRpkdYkuhhR8yNMK1cENan9WX5Fv7o_0qSN3_c3VJQwrvzgjg@mail.gmail.com>
+Message-ID: <1315976057.26251.461.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2011 at 05:25:19PM -0300, Fabio Estevam wrote:
-> Currently framebuffer and MMC devices are registered even if their associated 
-> GPIO pins fail to be requested.
+On Sun, 2011-09-11 at 23:27 +0200, Linus Walleij wrote:
+> On Thu, Sep 8, 2011 at 11:38 PM, Vinod Koul <vkoul@infradead.org> wrote:
+> >
+> > Linus W, any progress on that patches you posted??
 > 
-> Change the logic so that the registration of such devices only occurs if their 
-> GPIO requests succeeded.
+> I haven't written any, and I felt the whole issue was pretty inflamed
+> too so I felt bad about it and avoided to think about it even since
+> I have no real problem with this in my current setups.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mxs/mach-mx28evk.c |   18 ++++++++++++------
->  1 files changed, 12 insertions(+), 6 deletions(-)
+> Currently there is a strong coupling between platforms and filter
+> functions and I can live with it in the systems I use since they have
+> just one DMAC and need only one filter function per device,
+> that is specified in platform data for the device. This would likely
+> also work for the SiRFprimaII if it has only a single DMAC.
+> The people facing an immediate issue with this are IIRC the
+> Samsung S5Ps.
 > 
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index 3f86e7a..e5c66a2 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -353,7 +353,7 @@ static struct mxs_mmc_platform_data mx28evk_mmc_pdata[] __initdata = {
->  
->  static void __init mx28evk_init(void)
->  {
-> -	int ret;
-> +	int ret, gpio_lcd_error;
+> If you think this is in need of solving soon and want me to propose
+> patches for channel mapping to devices using the approach used in
+> clkdev and regulator APIs to create an attributed mapping table
+> using struct device * or its string representations, I can
+> try it out of course, but if it gets flamy I will just back off again.
+Please try at my request. I really would like this problem to be solved.
 
-Shouldn't gpio_lcd_error be initialized as 0?
+What we want is API which solves filter function issues (we should be
+able to completely do away after proper mapping). Making a simple to
+understand/code/maintain scheme which is platform independent.
 
->  
->  	mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
->  
-> @@ -378,18 +378,23 @@ static void __init mx28evk_init(void)
->  	}
->  
->  	ret = gpio_request_one(MX28EVK_LCD_ENABLE, GPIOF_DIR_OUT, "lcd-enable");
-> -	if (ret)
-> +	if (ret) {
->  		pr_warn("failed to request gpio lcd-enable: %d\n", ret);
-> +		gpio_lcd_error = 1;
-> +	}
->  	else
->  		gpio_set_value(MX28EVK_LCD_ENABLE, 1);
 
-Per Documentation/CodingStyle, this should be like the following.
-
-if (condition) {
-        do_this();
-        do_that();
-} else {
-        otherwise();
-}
-
->  
->  	ret = gpio_request_one(MX28EVK_BL_ENABLE, GPIOF_DIR_OUT, "bl-enable");
-> -	if (ret)
-> +	if (ret) {
->  		pr_warn("failed to request gpio bl-enable: %d\n", ret);
-> +		gpio_lcd_error = 1;
-> +	}
->  	else
->  		gpio_set_value(MX28EVK_BL_ENABLE, 1);
-
-Ditto
-
-Otherwise, Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-Regards,
-Shawn
-
->  
-> -	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
-> +	if (!gpio_lcd_error)
-> +		mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
->  
->  	/* power on mmc slot by writing 0 to the gpio */
->  	ret = gpio_request_one(MX28EVK_MMC0_SLOT_POWER, GPIOF_OUT_INIT_LOW,
-> @@ -402,8 +407,9 @@ static void __init mx28evk_init(void)
->  			       "mmc1-slot-power");
->  	if (ret)
->  		pr_warn("failed to request gpio mmc1-slot-power: %d\n", ret);
-> -	mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
-> -
-> +	else
-> +		mx28_add_mxs_mmc(1, &mx28evk_mmc_pdata[1]);
-> +
->  	gpio_led_register_device(0, &mx28evk_led_data);
->  }
->  
-> -- 
-> 1.7.1
+-- 
+~Vinod
