@@ -1,45 +1,141 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Wed, 14 Sep 2011 22:52:38 +0530
-Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
-	gic_arch_extn
-In-Reply-To: <20110914171800.GO24252@atomide.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-	<20110913203616.GG24252@atomide.com>
-	<CAMQu2gyYETPZRJu=4MWX6bULgmMaJb8MRwfhvURtOuyyWhLkAQ@mail.gmail.com>
-	<20110914152116.GM24252@atomide.com> <4E70DB33.5070501@ti.com>
-	<20110914170803.GN24252@atomide.com> <4E70E0CC.80300@ti.com>
-	<20110914171800.GO24252@atomide.com>
-Message-ID: <4E70E2DE.2030006@ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 14 Sep 2011 23:16:32 +0530
+Subject: [PATCH v3 4/6] DMA: PL330: Add device tree support
+In-Reply-To: <20110914162401.GK3134@ponder.secretlab.ca>
+References: <1315852165-32402-1-git-send-email-thomas.abraham@linaro.org>
+	<1315852165-32402-2-git-send-email-thomas.abraham@linaro.org>
+	<1315852165-32402-3-git-send-email-thomas.abraham@linaro.org>
+	<1315852165-32402-4-git-send-email-thomas.abraham@linaro.org>
+	<1315852165-32402-5-git-send-email-thomas.abraham@linaro.org>
+	<20110914162401.GK3134@ponder.secretlab.ca>
+Message-ID: <CAJuYYwTmw7y4DrrHcoSdnFv23BUELvKzTY5YQbGv6_23OeVnUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 September 2011 10:48 PM, Tony Lindgren wrote:
-> * Santosh<santosh.shilimkar@ti.com>  [110914 09:40]:
->> On Wednesday 14 September 2011 10:38 PM, Tony Lindgren wrote:
->>> * Santosh<santosh.shilimkar@ti.com>   [110914 09:16]:
->>>
->>> Thanks for the clarification. It seems to me the spec is most likely
->>> wrong as we've had the GIC working for over two years now without
->>> doing anything with the wakeup gen registers :)
->>>
->> It's working because CPU clockdomain are never put under HW
->> supervised mode and they are kept in force wakeup. Clock-domain
->> never idles on mainline code. PM series will put the clock-domains
->> under HW supervison as needed to achieve any low power states and
->> then all sorts of corner cases will come out.
->
-> But again the wakeup gen triggers only do something when hitting
-> idle. There should be no use for them during runtime, right?
->
-You missed my point in the description. Clockdomain inactive
-doesn't depend on idle or WFI execution. Under HW supervison
-CPU clock domain can get into inactive when CPU is stalled and
-waiting for a read response from slow interconnect.
+Hi Grant,
 
-One thing for sure. Designers has chosen a wrong name to this
-IP. Wakeugen apears like needed only for low power wakeup which
-not seems to be entirely correct as per specs
+On 14 September 2011 21:54, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Mon, Sep 12, 2011 at 11:59:23PM +0530, Thomas Abraham wrote:
+>> For PL330 dma controllers instantiated from device tree, the channel
+>> lookup is based on phandle of the dma controller and dma request id
+>> specified by the client node. During probe, the private data of each
+>> channel of the controller is set to point to the device node of the
+>> dma controller. The 'chan_id' of the each channel is used as the
+>> dma request id.
+>>
+>> Client driver requesting dma channels specify the phandle of the
+>> dma controller and the request id. The pl330 filter function
+>> converts the phandle to the device node pointer and matches that
+>> with channel's private data. If a match is found, the request id
+>> from the client node and the 'chan_id' of the channel is matched.
+>> A channel is found if both the values match.
+>>
+>> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+>> Cc: Boojin Kim <boojin.kim@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>> ?.../devicetree/bindings/dma/arm-pl330.txt ? ? ? ? ?| ? 29 +++++++++++++++++
+>> ?drivers/dma/pl330.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 33 +++++++++++++++++--
+>> ?2 files changed, 58 insertions(+), 4 deletions(-)
+>> ?create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
+>> new file mode 100644
+>> index 0000000..05b007d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
+>> @@ -0,0 +1,29 @@
+>> +* ARM PrimeCell PL330 DMA Controller
+>> +
+>> +The ARM PrimeCell PL330 DMA controller can move blocks of memory contents
+>> +between memory and peripherals or memory to memory.
+>> +
+>> +Required properties:
+>> + ?- compatible: should include both "arm,pl330" and "arm,primecell".
+>> + ?- reg: physical base address of the controller and length of memory mapped
+>> + ? ?region.
+>> + ?- interrupts: interrupt number to the cpu.
+>> +
+>> +Example: (from Samsung's Exynos4 processor dtsi file)
+>> +
+>> + ? ? pdma0: pdma at 12680000 {
+>> + ? ? ? ? ? ? compatible = "arm,pl330", "arm,primecell";
+>> + ? ? ? ? ? ? reg = <0x12680000 0x1000>;
+>> + ? ? ? ? ? ? interrupts = <99>;
+>> + ? ? };
+>> +
+>> +Client drivers (device nodes requiring dma transfers from dev-to-mem or
+>> +mem-to-dev) should specify the DMA channel numbers using a two-value pair
+>> +as shown below.
+>> +
+>> + ?[property name] ?= <[phandle of the dma controller] [dma request id]>;
+>> +
+>> + ? ? ?where 'dma request id' is the dma request number which is connected
+>> + ? ? ?to the client controller.
+>> +
+>> + ?Example: ?tx-dma-channel = <&pdma0 12>;
+>
+> Looks good to me. ?You may want to specify that the property name
+> should be in the form: <name>-dma-channel just to enforce a bit of
+> convention on the users.
 
-Regards
-Santosh
+Ok. This will be added as a suggestion for property name specifying
+the dma channel.
+
+>
+>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>> index 992bf82..7a4ebf1 100644
+>> --- a/drivers/dma/pl330.c
+>> +++ b/drivers/dma/pl330.c
+>> @@ -19,6 +19,7 @@
+>> ?#include <linux/amba/pl330.h>
+>> ?#include <linux/pm_runtime.h>
+>> ?#include <linux/scatterlist.h>
+>> +#include <linux/of.h>
+>>
+>> ?#define NR_DEFAULT_DESC ? ? ?16
+>>
+>> @@ -277,6 +278,20 @@ bool pl330_filter(struct dma_chan *chan, void *param)
+>> ? ? ? if (chan->device->dev->driver != &pl330_driver.drv)
+>> ? ? ? ? ? ? ? return false;
+>>
+>> +#ifdef CONFIG_OF
+>> + ? ? if (chan->device->dev->of_node) {
+>> + ? ? ? ? ? ? const __be32 *prop_value;
+>> + ? ? ? ? ? ? phandle phandle;
+>> + ? ? ? ? ? ? struct device_node *node;
+>> +
+>> + ? ? ? ? ? ? prop_value = ((struct property *)param)->value;
+>> + ? ? ? ? ? ? phandle = be32_to_cpup(prop_value++);
+>> + ? ? ? ? ? ? node = of_find_node_by_phandle(phandle);
+>> + ? ? ? ? ? ? return ((chan->private == node) &&
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (chan->chan_id == be32_to_cpup(prop_value)));
+>
+> Don't open code this. ?There is already a function to decode a phandle
+> property. ?of_parse_phandle() should do the trick.
+
+The parameter to this function 'void *param' is already pointing to a
+'struct property'. That 'struct property' has a value of type
+<[phandle of dma controller] [channel id]>.
+
+Since the property is already known, the of_get_property() call within
+the of_parse_phandle() would complicate the above code. And,
+of_parse_phandle requires a 'property name' inside the dma client
+device node, which the above code fragment does not know about
+(property names are defined by client drivers).
+
+So, I would prefer to continue with the above implementation.
+
+>
+> Otherwise looks good to me.
+>
+> g.
+
+
+Thanks for your review.
+
+Regards,
+Thomas.
+
+[...]
