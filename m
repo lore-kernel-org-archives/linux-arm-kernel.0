@@ -1,30 +1,32 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 14 Sep 2011 15:56:18 -0700
-Subject: [PATCH 0/6] zImage improvements with DTB append and ATAG
-	compatibility
-In-Reply-To: <1315978906-15829-1-git-send-email-nico@fluxnic.net>
-References: <1315978906-15829-1-git-send-email-nico@fluxnic.net>
-Message-ID: <20110914225618.GA13326@huya.qualcomm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 14 Sep 2011 16:59:17 -0600 (MDT)
+Subject: OMAP2+: hwmod: remove OMAP_CHIP*
+In-Reply-To: <alpine.DEB.2.00.1109051606330.19606@esdhcp041196.research.nokia.com>
+References: <alpine.DEB.2.00.1109042042250.9056@utopia.booyaka.com>
+	<alpine.DEB.2.00.1109051606330.19606@esdhcp041196.research.nokia.com>
+Message-ID: <alpine.DEB.2.00.1109141655370.15220@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2011 at 01:41:40AM -0400, Nicolas Pitre wrote:
+Hello Aaro,
 
-> This is the latest incarnation of my patch series allowing a DTB
-> to be appended to zImage, including the ATAG conversion wrapper and
-> other minor cleanups.
+On Tue, 6 Sep 2011, Aaro Koskinen wrote:
+
+> Should the timer12 be also removed from the common omap3xxx_hwmods
+> list, as it is not available on (some?) HS devices. See
+> e.g. <http://marc.info/?l=linux-omap&m=129433066521102&w=2>
 > 
-> This can also be pulled from:
-> 
-> 	git://git.linaro.org/people/nico/linux zImage_DTB_append
-> 
-> This works for me on the test setup I have.
-> ACKs/Tested-By's would be appreciated.  
+> Currently RM-680 boot is broken because of this.
 
-on MSM8660:
+Hmmm.  I guess the software that boots the HS devices can pick and choose 
+which of the secure devices to make available to Linux.  So I guess that 
+on HS/EMU devices, we'd have to assume that all of the HS devices (e.g. 
+GPT12) are unavailable?
 
-Tested-by: David Brown <davidb@codeaurora.org>
+Does that approach make sense?
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+If so, maybe we can add a fix patch on top of these cleanup patches that 
+handles that...
+
+
+- Paul
