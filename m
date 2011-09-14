@@ -1,45 +1,112 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 14 Sep 2011 16:30:06 +0300
-Subject: [PATCH 6/6] OMAP2+: id: remove OMAP_REVBITS_* macros
-In-Reply-To: <alpine.DEB.2.00.1109140708590.27954@utopia.booyaka.com>
-References: <20110913212638.26161.62284.stgit@dusk>
-	<20110913212806.26161.37867.stgit@dusk>
-	<4E709D13.1080908@compulab.co.il>
-	<alpine.DEB.2.00.1109140628520.27954@utopia.booyaka.com>
-	<4E70A337.6090400@compulab.co.il>
-	<alpine.DEB.2.00.1109140708590.27954@utopia.booyaka.com>
-Message-ID: <4E70AC5E.8050300@compulab.co.il>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 14 Sep 2011 14:32:44 +0100
+Subject: [PATCH 2/6] ARM: zImage: Allow the appending of a device tree
+	binary
+In-Reply-To: <1315978906-15829-3-git-send-email-nico@fluxnic.net>
+References: <1315978906-15829-1-git-send-email-nico@fluxnic.net>
+	<1315978906-15829-3-git-send-email-nico@fluxnic.net>
+Message-ID: <20110914133244.GE2104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/11 16:10, Paul Walmsley wrote:
-> Hi Igor,
+On Wed, Sep 14, 2011 at 01:41:42AM -0400, Nicolas Pitre wrote:
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
 > 
-> Could you try this patch on top of the ones that you are testing?
-
-After applying the patch to your id_3517_cleanup_3.2 branch:
---------------cut-------------------
-[    0.000000] Linux version 3.1.0-rc4-00014-gbe89163 (grinberg at grinberg-linux) (gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) ) #2 SMP Wed Sep 14 16:21:47 IDT 2011
-[    0.000000] CPU: ARMv7 Processor [411fc087] revision 7 (ARMv7), cr=10c53c7f
-[    0.000000] CPU: VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
-[    0.000000] Machine: Compulab CM-T3517
-[    0.000000] Reserving 8388608 bytes SDRAM for VRAM
-[    0.000000] Memory policy: ECC disabled, Data cache writeback
-[    0.000000] AM3517 ES1.0 (l2cache iva sgx neon isp )
--------------cut--------------------
-
-The SoC is really AM3517. I have no AM3505 available right now, sorry...
-
-Feel free to add:
-
-Tested-by: Igor Grinberg <grinberg@compulab.co.il>
-
+> This patch provides the ability to boot using a device tree that is appended
+> to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
 > 
-> thanks for the testing help,
+> Signed-off-by: John Bonesio <bones@secretlab.ca>
+> [nico: adjusted to latest zImage changes plus additional cleanups]
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/Kconfig                |    8 ++++
+>  arch/arm/boot/compressed/head.S |   70 +++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 75 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5ebc5d922e..83323c2b1f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1781,6 +1781,14 @@ config ZBOOT_ROM_SH_MOBILE_SDHI
+>  
+>  endchoice
+>  
+> +config ARM_APPENDED_DTB
+> +	bool "Use appended device tree blob to zImage"
+> +	depends on OF && !ZBOOT_ROM
+> +	help
+> +	  With this option, the boot code will look for a device tree binary
+> +	  (dtb) appended to zImage
+> +	  (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+> +
+>  config CMDLINE
+>  	string "Default kernel command string"
+>  	default ""
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index e95a598960..3ce5738ddb 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -216,6 +216,59 @@ restart:	adr	r0, LC0
+>  		mov	r10, r6
+>  #endif
+>  
+> +		mov	r5, #0			@ init dtb size to 0
+> +#ifdef CONFIG_ARM_APPENDED_DTB
+> +/*
+> + *   r0  = delta
+> + *   r2  = BSS start
+> + *   r3  = BSS end
+> + *   r4  = final kernel address
+> + *   r5  = appended dtb size (still unknown)
+> + *   r6  = _edata
+> + *   r7  = architecture ID
+> + *   r8  = atags/device tree pointer
+> + *   r9  = size of decompressed image
+> + *   r10 = end of this image, including  bss/stack/malloc space if non XIP
+> + *   r11 = GOT start
+> + *   r12 = GOT end
+> + *   sp  = stack pointer
+> + *
+> + * if there are device trees (dtb) appended to zImage, advance r10 so that the
+> + * dtb data will get relocated along with the kernel if necessary.
+> + */
+> +
+> +		ldr	lr, [r6, #0]
+> +#ifndef __ARMEB__
+> +		ldr	r1, =0xedfe0dd0		@ sig is 0xd00dfeed big endian
+> +#else
+> +		ldr	r1, =0xd00dfeed
+> +#endif
 
-No problem ;)
+Do we worry that garbage in memory after the zImage might match this
+magic number?
+
+For example, if an ordinary userspace program allocates a huge number
+of pages and fills them with bogus device tree headers, is there a chance
+that the those headers could remain in memory across a reboot?
+
+In principle this could lead to a security hole on platforms where the
+boot images don't append a device tree, by allowing an attacker to
+override the bootargs etc.
+
+I don't know whether this is exploitable in practice, but it's worth
+thinking about (apologies if it's already been discussed)
 
 
--- 
-Regards,
-Igor.
+A possible workaround is to put a relative pointer or a flag at the
+start of the zImage, which we can poke with a non-zero value when
+the device tree is appended.
+
+This makes appending the device tree non-trivial, but it's still pretty
+simple to do; something like:
+
+$ echo 'boo' | dd bs=4 count=1 seek=4 conv=notrunc of=zImage
+$ cat dtb >>zImage
+
+(Where I assume that the affected word in the zImage is initially not
+'boo').
+
+Cheers
+---Dave
