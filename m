@@ -1,83 +1,55 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 14 Sep 2011 06:39:42 -0600
-Subject: [PATCH v2 6/6] OMAP2+: id: remove OMAP_REVBITS_* macros
+Date: Wed, 14 Sep 2011 06:39:31 -0600
+Subject: [PATCH v2 3/6] OMAP3: id: use explicit omap_revision codes for
+	3505/3517 ES levels
 In-Reply-To: <20110914123708.25282.78122.stgit@dusk>
 References: <20110914123708.25282.78122.stgit@dusk>
-Message-ID: <20110914123938.25282.30133.stgit@dusk>
+Message-ID: <20110914123928.25282.21878.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP_REVBITS_* macros are just used as otherwise meaningless
-aliases for the numbers zero through five, so remove these macros.
+Use explicit revision codes for OMAP/AM 3505/3517 ES levels, as the rest
+of the OMAP2+ SoCs do in mach-omap2/cpu.c.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Sanjeev Premi <premi@ti.com>
 ---
- arch/arm/plat-omap/include/plat/cpu.h |   33 ++++++++++-----------------------
- 1 files changed, 10 insertions(+), 23 deletions(-)
+ arch/arm/mach-omap2/id.c              |   10 +++++++++-
+ arch/arm/plat-omap/include/plat/cpu.h |    3 ++-
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 46bc2f9..6810c52 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -312,7 +312,15 @@ static void __init omap3_check_revision(void)
+ 		 *
+ 		 * REVISIT: AM3505/AM3517 should have their own CHIP_IS
+ 		 */
+-		omap_revision = OMAP3517_REV(rev);
++		switch (rev) {
++		case 0:
++			omap_revision = OMAP3517_REV_ES1_0;
++			break;
++		case 1:
++		/* FALLTHROUGH */
++		default:
++			omap_revision = OMAP3517_REV_ES1_1;
++		}
+ 		omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
+ 		break;
+ 	case 0xb891:
 diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index 1debee9..ddbc025 100644
+index 34df171..1debee9 100644
 --- a/arch/arm/plat-omap/include/plat/cpu.h
 +++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -60,19 +60,6 @@ struct omap_chip_id {
- unsigned int omap_rev(void);
- 
- /*
-- * Define CPU revision bits
-- *
-- * Verbose meaning of the revision bits may be different for a silicon
-- * family. This difference can be handled separately.
-- */
--#define OMAP_REVBITS_00		0x00
--#define OMAP_REVBITS_01		0x01
--#define OMAP_REVBITS_02		0x02
--#define OMAP_REVBITS_03		0x03
--#define OMAP_REVBITS_04		0x04
--#define OMAP_REVBITS_05		0x05
--
--/*
-  * Get the CPU revision for OMAP devices
-  */
- #define GET_OMAP_REVISION()	((omap_rev() >> 8) & 0xff)
-@@ -380,31 +367,31 @@ IS_OMAP_TYPE(3517, 0x3517)
- /* Various silicon revisions for omap2 */
- #define OMAP242X_CLASS		0x24200024
- #define OMAP2420_REV_ES1_0	OMAP242X_CLASS
--#define OMAP2420_REV_ES2_0	(OMAP242X_CLASS | (OMAP_REVBITS_01 << 8))
-+#define OMAP2420_REV_ES2_0	(OMAP242X_CLASS | (0x1 << 8))
- 
- #define OMAP243X_CLASS		0x24300024
- #define OMAP2430_REV_ES1_0	OMAP243X_CLASS
- 
- #define OMAP343X_CLASS		0x34300034
- #define OMAP3430_REV_ES1_0	OMAP343X_CLASS
--#define OMAP3430_REV_ES2_0	(OMAP343X_CLASS | (OMAP_REVBITS_01 << 8))
--#define OMAP3430_REV_ES2_1	(OMAP343X_CLASS | (OMAP_REVBITS_02 << 8))
--#define OMAP3430_REV_ES3_0	(OMAP343X_CLASS | (OMAP_REVBITS_03 << 8))
--#define OMAP3430_REV_ES3_1	(OMAP343X_CLASS | (OMAP_REVBITS_04 << 8))
--#define OMAP3430_REV_ES3_1_2	(OMAP343X_CLASS | (OMAP_REVBITS_05 << 8))
-+#define OMAP3430_REV_ES2_0	(OMAP343X_CLASS | (0x1 << 8))
-+#define OMAP3430_REV_ES2_1	(OMAP343X_CLASS | (0x2 << 8))
-+#define OMAP3430_REV_ES3_0	(OMAP343X_CLASS | (0x3 << 8))
-+#define OMAP3430_REV_ES3_1	(OMAP343X_CLASS | (0x4 << 8))
-+#define OMAP3430_REV_ES3_1_2	(OMAP343X_CLASS | (0x5 << 8))
- 
- #define OMAP363X_CLASS		0x36300034
- #define OMAP3630_REV_ES1_0	OMAP363X_CLASS
--#define OMAP3630_REV_ES1_1	(OMAP363X_CLASS | (OMAP_REVBITS_01 << 8))
--#define OMAP3630_REV_ES1_2	(OMAP363X_CLASS | (OMAP_REVBITS_02 << 8))
-+#define OMAP3630_REV_ES1_1	(OMAP363X_CLASS | (0x1 << 8))
-+#define OMAP3630_REV_ES1_2	(OMAP363X_CLASS | (0x2 << 8))
+@@ -399,7 +399,8 @@ IS_OMAP_TYPE(3517, 0x3517)
+ #define OMAP3630_REV_ES1_2	(OMAP363X_CLASS | (OMAP_REVBITS_02 << 8))
  
  #define OMAP3517_CLASS		0x35170034
- #define OMAP3517_REV_ES1_0	OMAP3517_CLASS
--#define OMAP3517_REV_ES1_1	(OMAP3517_CLASS | (OMAP_REVBITS_01 << 8))
-+#define OMAP3517_REV_ES1_1	(OMAP3517_CLASS | (0x1 << 8))
+-#define OMAP3517_REV(v)		(OMAP3517_CLASS | (v << 8))
++#define OMAP3517_REV_ES1_0	OMAP3517_CLASS
++#define OMAP3517_REV_ES1_1	(OMAP3517_CLASS | (OMAP_REVBITS_01 << 8))
  
  #define TI816X_CLASS		0x81600034
  #define TI8168_REV_ES1_0	TI816X_CLASS
--#define TI8168_REV_ES1_1	(TI816X_CLASS | (OMAP_REVBITS_01 << 8))
-+#define TI8168_REV_ES1_1	(TI816X_CLASS | (0x1 << 8))
- 
- #define OMAP443X_CLASS		0x44300044
- #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
