@@ -1,55 +1,43 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 14 Sep 2011 06:39:31 -0600
-Subject: [PATCH v2 3/6] OMAP3: id: use explicit omap_revision codes for
-	3505/3517 ES levels
-In-Reply-To: <20110914123708.25282.78122.stgit@dusk>
-References: <20110914123708.25282.78122.stgit@dusk>
-Message-ID: <20110914123928.25282.21878.stgit@dusk>
+Date: Wed, 14 Sep 2011 06:39:20 -0600
+Subject: [PATCH v2 0/6] OMAP2+: id: cleanup for 3.2
+Message-ID: <20110914123708.25282.78122.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use explicit revision codes for OMAP/AM 3505/3517 ES levels, as the rest
-of the OMAP2+ SoCs do in mach-omap2/cpu.c.
+Clean up the SoC detection code for some OMAP3 devices.  The main goal
+is to make the AM3517 family detection code work like the rest of the
+OMAP3 SoCs, although this series does some other cleanup of this code
+at the same time.  This patch series will be a prerequisite for the
+OMAP_CHIP removal series.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Sanjeev Premi <premi@ti.com>
+Tested on an OMAP3530ES2 BeagleBoard C2 and a OMAP3730ES1 BeagleBoard A2.
+These are the only OMAP3 boards I have access to right now - testing welcomed
+from people with other OMAP3 families or ES levels.
+
+This second version fixes a bug in the first patch, which requires the
+later patches to be updated to apply without rejects.  Thanks to Igor
+Grinberg <grinberg@compulab.co.il> for comments about this.
+
+
+- Paul
+
 ---
- arch/arm/mach-omap2/id.c              |   10 +++++++++-
- arch/arm/plat-omap/include/plat/cpu.h |    3 ++-
- 2 files changed, 11 insertions(+), 2 deletions(-)
+id_3517_cleanup_3.2
+   text	   data	    bss	    dec	    hex	filename
+6330180	 656956	5591124	12578260	 bfedd4	vmlinux.omap2plus_defconfig.orig
+6329884	 656964	5591124	12577972	 bfecb4	vmlinux.omap2plus_defconfig.patched
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 46bc2f9..6810c52 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -312,7 +312,15 @@ static void __init omap3_check_revision(void)
- 		 *
- 		 * REVISIT: AM3505/AM3517 should have their own CHIP_IS
- 		 */
--		omap_revision = OMAP3517_REV(rev);
-+		switch (rev) {
-+		case 0:
-+			omap_revision = OMAP3517_REV_ES1_0;
-+			break;
-+		case 1:
-+		/* FALLTHROUGH */
-+		default:
-+			omap_revision = OMAP3517_REV_ES1_1;
-+		}
- 		omap_chip.oc |= CHIP_IS_OMAP3430ES3_1;
- 		break;
- 	case 0xb891:
-diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-index 34df171..1debee9 100644
---- a/arch/arm/plat-omap/include/plat/cpu.h
-+++ b/arch/arm/plat-omap/include/plat/cpu.h
-@@ -399,7 +399,8 @@ IS_OMAP_TYPE(3517, 0x3517)
- #define OMAP3630_REV_ES1_2	(OMAP363X_CLASS | (OMAP_REVBITS_02 << 8))
- 
- #define OMAP3517_CLASS		0x35170034
--#define OMAP3517_REV(v)		(OMAP3517_CLASS | (v << 8))
-+#define OMAP3517_REV_ES1_0	OMAP3517_CLASS
-+#define OMAP3517_REV_ES1_1	(OMAP3517_CLASS | (OMAP_REVBITS_01 << 8))
- 
- #define TI816X_CLASS		0x81600034
- #define TI8168_REV_ES1_0	TI816X_CLASS
+
+Paul Walmsley (6):
+      OMAP3: id: remove identification codes that only correspond to marketing names
+      OMAP3: id: remove useless strcpy()s
+      OMAP3: id: use explicit omap_revision codes for 3505/3517 ES levels
+      OMAP3: id: add fallthrough warning; fix some CodingStyle issues
+      OMAP3: id: remove duplicate code for testing SoC ES level
+      OMAP2+: id: remove OMAP_REVBITS_* macros
+
+
+ arch/arm/mach-omap2/id.c              |  134 ++++++++++++---------------------
+ arch/arm/plat-omap/include/plat/cpu.h |   46 ++++-------
+ 2 files changed, 65 insertions(+), 115 deletions(-)
