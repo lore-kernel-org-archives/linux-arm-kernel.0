@@ -1,36 +1,36 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 14 Sep 2011 11:31:36 -0500
-Subject: [PATCH 1/5] irq: add declaration of irq_domain_simple_ops to
-	irqdomain.h
+Date: Wed, 14 Sep 2011 11:31:37 -0500
+Subject: [PATCH 2/5] irq: fix existing domain check in irq_domain_add
 In-Reply-To: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
 References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1316017900-19918-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1316017900-19918-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-irq_domain_simple_ops is exported, but is not declared in irqdomain.h, so
-add it.
+irq_data will normally exist, so the domain was prevented from being set.
+The simple domain code did not hit this as nr_irq is always 0.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- include/linux/irqdomain.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ kernel/irq/irqdomain.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index e807ad6..3ad553e 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -80,6 +80,7 @@ extern void irq_domain_del(struct irq_domain *domain);
- #endif /* CONFIG_IRQ_DOMAIN */
- 
- #if defined(CONFIG_IRQ_DOMAIN) && defined(CONFIG_OF_IRQ)
-+extern struct irq_domain_ops irq_domain_simple_ops;
- extern void irq_domain_add_simple(struct device_node *controller, int irq_base);
- extern void irq_domain_generate_simple(const struct of_device_id *match,
- 					u64 phys_base, unsigned int irq_start);
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index d5828da..84f4110 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -29,7 +29,7 @@ void irq_domain_add(struct irq_domain *domain)
+ 	 */
+ 	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+ 		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
+-		if (d || d->domain) {
++		if (d && d->domain) {
+ 			/* things are broken; just report, don't clean up */
+ 			WARN(1, "error: irq_desc already assigned to a domain");
+ 			return;
 -- 
 1.7.5.4
