@@ -1,83 +1,49 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 14 Sep 2011 14:02:31 +0900
-Subject: [PATCH 2/2] ARM: Exynos4: use s5p-timer for UniversalC210 board
-In-Reply-To: <1311659456-6659-3-git-send-email-m.szyprowski@samsung.com>
-References: <1311659456-6659-1-git-send-email-m.szyprowski@samsung.com>
-	<1311659456-6659-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAH9JG2V6Sfjmjupj5oBd_5vziBa4iezBpRfK9tNECrFO5sSfLw@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 14 Sep 2011 10:37:17 +0530
+Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <CAJe_ZhdTnRSzfRvnAaCy1M-LpAk0FqjNSXRLnQW2ksOS77A+=w@mail.gmail.com>
+References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
+	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
+	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
+	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
+	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
+	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
+	<CABb+yY3F+DMn2SxeO0chjpiMBkgLvSK5EVYMdhQsfQoZNZ4_7Q@mail.gmail.com>
+	<1315518378.6638.2.camel@vkoul-mobl4>
+	<CAGsJ_4xv9+=+=2b=i47P5V5sOQH-GyTMaESwbeHxu439Vx1gLA@mail.gmail.com>
+	<1315756966.2246.3.camel@vkoul-mobl4>
+	<CAJe_ZhdTnRSzfRvnAaCy1M-LpAk0FqjNSXRLnQW2ksOS77A+=w@mail.gmail.com>
+Message-ID: <1315976837.26251.473.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2011-09-12 at 12:03 +0530, Jassi Brar wrote:
+> On 11 September 2011 21:32, Vinod Koul <vkoul@infradead.org> wrote:
+> > On Fri, 2011-09-09 at 16:18 +0800, Barry Song wrote:
+> 
+> >> Jassi prefer to use a transfer type instead of a control command.
+> >> though we will not really change the interleaved setting for every
+> >> transfer(it is more possible for one device, we will not change the
+> >> xlen/ylen/dma_width setting in the whole life period), i do believe
+> >> the transfer type is enough flexible for my possible applications to
+> >> change xlen, ylen and dma_width in different transfers.
+> 
+> > Is this usually the assumption or yours is a special case, how about
+> > your's Jassi?
+> 
+> 1) Having type per transfer is more flexible than having to set the type
+>      for a channel using a control command. The overhead is negligible
+>      because the client reuses the same descriptors with only changed
+>      source/destination addresses.
+> 2) DMA_SLAVE_CONFIG is meant for slave (Mem<->Dev) channels,
+>     whereas it is very likely(for multimedia drives) to have such operations
+>     Mem->Mem as well.
+> 3) Someday if people realize we can fold many, if not all, transfer types into
+>     one, this api has the potential to be the survivor.
+> 
+> That was where my mind was grazing when I chose to do what I did.
+I would agree that it makes sense to have it in API rather than config.
 
-It's required for boot universal c210 w/ EVT0 chip.
-Can you include it at 3.1 fixed branch?
 
-Thank you,
-Kyungmin Park
-
-On Tue, Jul 26, 2011 at 2:50 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Commit 069d4e743 removed support for local timers and forced to use MCT as
-> event source. However MCT is not operating properly on early revision (EVT0)
-> of Exynos4 SoCs. All UniversalC210 boards are based on Exynos4 EVT0, so that
-> commit broke support for it. This patch provides a workaround that enables
-> UniversalC210 boards to boot again. s5p-timer is used as an event source.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> ?arch/arm/mach-exynos4/Kconfig ? ? ? ? ? ? ? | ? ?3 +++
-> ?arch/arm/mach-exynos4/mach-universal_c210.c | ? ?4 +++-
-> ?2 files changed, 6 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-> index 9d62e13..2aad73f 100644
-> --- a/arch/arm/mach-exynos4/Kconfig
-> +++ b/arch/arm/mach-exynos4/Kconfig
-> @@ -173,6 +173,9 @@ config MACH_ARMLEX4210
-> ?config MACH_UNIVERSAL_C210
-> ? ? ? ?bool "Mobile UNIVERSAL_C210 Board"
-> ? ? ? ?select CPU_EXYNOS4210
-> + ? ? ? select S5P_HRT
-> + ? ? ? select CLKSRC_MMIO
-> + ? ? ? select HAVE_SCHED_CLOCK
-> ? ? ? ?select S5P_GPIO_INT
-> ? ? ? ?select S5P_DEV_FIMC0
-> ? ? ? ?select S5P_DEV_FIMC1
-> diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
-> index 0e280d1..ca9e7b7 100644
-> --- a/arch/arm/mach-exynos4/mach-universal_c210.c
-> +++ b/arch/arm/mach-exynos4/mach-universal_c210.c
-> @@ -34,6 +34,7 @@
-> ?#include <plat/mfc.h>
-> ?#include <plat/sdhci.h>
-> ?#include <plat/pd.h>
-> +#include <plat/s5p-time.h>
->
-> ?#include <mach/map.h>
->
-> @@ -730,6 +731,7 @@ static void __init universal_map_io(void)
-> ? ? ? ?s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-> ? ? ? ?s3c24xx_init_clocks(24000000);
-> ? ? ? ?s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
-> + ? ? ? s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
-> ?}
->
-> ?static void __init universal_reserve(void)
-> @@ -766,6 +768,6 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
-> ? ? ? ?.init_irq ? ? ? = exynos4_init_irq,
-> ? ? ? ?.map_io ? ? ? ? = universal_map_io,
-> ? ? ? ?.init_machine ? = universal_machine_init,
-> - ? ? ? .timer ? ? ? ? ?= &exynos4_timer,
-> + ? ? ? .timer ? ? ? ? ?= &s5p_timer,
-> ? ? ? ?.reserve ? ? ? ?= &universal_reserve,
-> ?MACHINE_END
-> --
-> 1.7.1.569.g6f426
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+-- 
+~Vinod
