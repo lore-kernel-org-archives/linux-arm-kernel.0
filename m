@@ -1,34 +1,43 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 14 Sep 2011 21:38:43 +0300
-Subject: [RFC 7/8] drivers: introduce rpmsg,
-	a remote-processor messaging bus
-In-Reply-To: <BANLkTi=7TBMqnEf2qustrmSaubtTam79Bw@mail.gmail.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-8-git-send-email-ohad@wizery.com>
-	<87liwu8u3q.fsf@rustcorp.com.au>
-	<BANLkTi=7TBMqnEf2qustrmSaubtTam79Bw@mail.gmail.com>
-Message-ID: <CAK=WgbY0zMkHw9XHDKPEfVQZVRfGP=nMmyJgm6jD5FEkBZkMRQ@mail.gmail.com>
+From: kheitke@codeaurora.org (Kenneth Heitke)
+Date: Wed, 14 Sep 2011 12:39:53 -0600
+Subject: [PATCH v2] i2c: QUP based bus driver for Qualcomm MSM chipsets
+In-Reply-To: <1308018114-19709-1-git-send-email-kheitke@codeaurora.org>
+References: <1308018114-19709-1-git-send-email-kheitke@codeaurora.org>
+Message-ID: <4E70F4F9.2000707@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rusty,
-
-On Wed, Jun 22, 2011 at 1:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Wed, Jun 22, 2011 at 5:42 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
->> On Tue, 21 Jun 2011 10:18:33 +0300, Ohad Ben-Cohen <ohad@wizery.com> wrote:
->>> +#define VIRTIO_ID_RPMSG ? ? ? ? ? ? ?10 /* virtio remote processor messaging */
->>
->> I think you want 6. ?Plan 9 jumped ahead to grab 9 :)
+On 06/13/2011 08:21 PM, Kenneth Heitke wrote:
+> This bus driver supports the QUP i2c hardware controller in the Qualcomm
+> MSM SOCs.  The Qualcomm Universal Peripheral Engine (QUP) is a general
+> purpose data path engine with input/output FIFOs and an embedded i2c
+> mini-core. The driver supports FIFO mode (for low bandwidth applications)
+> and block mode (interrupt generated for each block-size data transfer).
+> The driver currently does not support DMA transfers.
 >
-> 6 it is :)
+> Signed-off-by: Kenneth Heitke<kheitke@codeaurora.org>
+> ---
+> v2: updates to runtime PM calls (addresses comments from Mark Brown).
+>      Disable interrupts before setting completion object to NULL (bug fix).
+> ---
+>   drivers/i2c/busses/Kconfig                |   11 +
+>   drivers/i2c/busses/Makefile               |    1 +
+>   drivers/i2c/busses/i2c-qup.c              | 1175 +++++++++++++++++++++++++++++
+>   include/linux/platform_data/msm_qup_i2c.h |   24 +
+>   4 files changed, 1211 insertions(+), 0 deletions(-)
+>   create mode 100644 drivers/i2c/busses/i2c-qup.c
+>   create mode 100644 include/linux/platform_data/msm_qup_i2c.h
+>
 
-Looking at the virtio-spec, it seems that 6 is taken by 'ioMemory'.
-There's no indication for it in virtio_ids.h though, and the
-virtio-spec has no appendix for this id, so maybe it's available after
-all ?
+Hi Ben,
 
-If it is available, I'll take it for rpmsg, and will also update
-virtio-spec appropriately. Otherwise, we'll settle on 7 ? :)
+Would it be possible to pull this driver into your tree?  If not, please 
+let me know of any concerns that need to be addresses.
 
-Thanks,
-Ohad.
+thanks,
+Ken
+
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
