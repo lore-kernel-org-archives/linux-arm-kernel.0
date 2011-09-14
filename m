@@ -1,65 +1,56 @@
-From: jon.medhurst@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 14 Sep 2011 17:27:08 +0100
-Subject: [ltt-dev] LTTng 2.0 on ARM
-In-Reply-To: <20110914100931.GB2104@arm.com>
-References: <4E68559A.8080204@linaro.org>
-	<BLU0-SMTP86E263003FB9999131E2A196000@phx.gbl>
-	<4E6E4250.2000309@linaro.org>
-	<BLU0-SMTP6FB53F86865C7F0175B0D96020@phx.gbl>
-	<4E6F3B93.5050603@linaro.org>
-	<BLU0-SMTP720ADD6D0D065018E5C97196050@phx.gbl>
-	<CAH+eYFDrCav6sVzmapfN3YL8omYKc2NHorHuHMXh49dBbzw1Xg@mail.gmail.com>
-	<20110914100931.GB2104@arm.com>
-Message-ID: <1316017628.2576.44.camel@linaro1>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Sep 2011 11:31:35 -0500
+Subject: [PATCH 0/5] GIC OF bindings
+Message-ID: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-09-14 at 11:09 +0100, Dave Martin wrote:
-> On Tue, Sep 13, 2011 at 11:14:47PM +0530, Rabin Vincent wrote:
-[...]
-> > The problem is that the addresses returned by kallsyms_lookup_name()
-> > does not have the zero bit, which is what is expected for Thumb
-> > functions because the BLX instruction which is used to call them uses
-> > this bit to determines which mode to switch into.  Since it's cleared,
-> > you switch to ARM mode and attempt to execute Thumb-2 code, with obvious
-> > results.
-> > 
-> > A cursory look at the parties involved shows that nm doesn't show the
-> > zero bit (even though it's set in the vmlinux symbol table), and
-> > scripts/kallsyms builds the table by parsing nm's output.
-> 
-> It's not quite as simple as saying "the output of nm is wrong" though...
-> 
-> When getting the address of a function, there are actually two
-> separate answers:
-> 
->  a) the pointer which can be used to call the function
-> 
->  b) the address of the start of the function body
-> 
-> On many arches these they are identical, but on some they are different.
-> On ARM, they are identical for ARM code but different for Thumb code
-> (because the Thumb bit must be set in case (a) but not in case (b))
-> 
-> It may be worth looking at what is done in the kernel for ia64 and ppc64.
-> I believe that (a) and (b) are quite different for these because
-> functions are called through descriptors.  Don't quote me on that though:
-> I'm mostly ignorant about these arches.
-> 
-> For the Thumb-2 kernel case, we can probably hack around this: there
-> are various places in the kernel where we just force-set the Thumb bit
-> in addresses without really knowing what the target code is.  We get
-> away with this because the kernel is (very nearly) 100% Thumb code
-> for a Thumb-2 kernel.
-> 
-> However, if the kernel already has a correct approach for solving this
-> problem, we should probably be using it.
+From: Rob Herring <rob.herring@calxeda.com>
 
-This is the same issue I found recently with kprobes [1]. There is also
-an inconsistency as function symbols in loadable module do have bit zero
-set, but if the module is built-in then bit zero is clear. 
+This series introduces of_irq_init to scan the device tree for interrupt
+controller nodes and call their init functions in proper order. The GIC
+init function is then called from this function. The platform code then
+looks something like this:
+
+const static struct of_device_id irq_match[] = {
+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+	{}
+};
+
+static void __init highbank_init_irq(void)
+{
+	of_irq_init(irq_match);
+}
+
+The binding for GIC PPIs is now done with a 3rd interrupt cell to specify
+a cpu mask for which cpu the PPI is connected to. This was discussed at LPC
+and suggested by Grant.
+
+I dropped the public intc_desc struct. The the interrupt controller's node
+and the interrupt parent's node are passed in directly to the controller's
+init function. The linux irq assignment is now done dynamically using
+irq_alloc_descs.
+
+The first 2 patches are minor fixes to irqdomains.
+
+Rob
+
+Rob Herring (5):
+  irq: add declaration of irq_domain_simple_ops to irqdomain.h
+  irq: fix existing domain check in irq_domain_add
+  of/irq: introduce of_irq_init
+  ARM: gic: allow irq_start to be 0
+  ARM: gic: add OF based initialization
+
+ Documentation/devicetree/bindings/arm/gic.txt |   53 ++++++++++++++
+ arch/arm/common/gic.c                         |   57 +++++++++++++--
+ arch/arm/include/asm/hardware/gic.h           |   10 +++
+ drivers/of/irq.c                              |   96 +++++++++++++++++++++++++
+ include/linux/irqdomain.h                     |    1 +
+ include/linux/of_irq.h                        |    1 +
+ kernel/irq/irqdomain.c                        |    2 +-
+ 7 files changed, 214 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
 
 -- 
-Tixy
-
-[1] http://www.spinics.net/lists/arm-kernel/msg138283.html
+1.7.5.4
