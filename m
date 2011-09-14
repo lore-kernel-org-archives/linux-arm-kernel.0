@@ -1,75 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 14 Sep 2011 10:23:06 -0300
-Subject: [PATCH] ARM: mach-mxs/mx28evk: Only register devices if their
-	GPIO requests succeeded
-In-Reply-To: <20110914065501.GR28624@pengutronix.de>
-References: <1315945519-15178-1-git-send-email-festevam@gmail.com>
-	<20110914065501.GR28624@pengutronix.de>
-Message-ID: <CAOMZO5CWVwZ60z1WbA4Ctm8YRQkYQc5yXXZD9Z3DBWh39gv2yw@mail.gmail.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Wed, 14 Sep 2011 18:58:40 +0530
+Subject: [PATCH v15 11/12 REPOST] OMAP: dmtimer: extend spinlock in request
+	functions
+Message-ID: <1316006920-4785-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/14 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello,
->
-> On Tue, Sep 13, 2011 at 05:25:19PM -0300, Fabio Estevam wrote:
->> Currently framebuffer and MMC devices are registered even if their associated
->> GPIO pins fail to be requested.
-> Is this a real or only theoretic problem? (For me (or later Sascha) to
-> judge if it should go in before 3.2.)
+The request functions now verify the success of omap_dm_timer_prepare() call
+after a timer is acquired. If *_prepare() fails then we have to release the
+timer. In order to avoid race condition during this time, include *_prepare()
+within lock.
 
-I haven't seen this to happen, but it is the safe thing to do here.
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/plat-omap/dmtimer.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-I think this can wait 3.2 cycle.
-
->
->> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
->> index 3f86e7a..e5c66a2 100644
->> --- a/arch/arm/mach-mxs/mach-mx28evk.c
->> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
->> @@ -353,7 +353,7 @@ static struct mxs_mmc_platform_data mx28evk_mmc_pdata[] __initdata = {
->>
->> ?static void __init mx28evk_init(void)
->> ?{
->> - ? ? int ret;
->> + ? ? int ret, gpio_lcd_error;
->>
->> ? ? ? mxs_iomux_setup_multiple_pads(mx28evk_pads, ARRAY_SIZE(mx28evk_pads));
->>
->> @@ -378,18 +378,23 @@ static void __init mx28evk_init(void)
->> ? ? ? }
->>
->> ? ? ? ret = gpio_request_one(MX28EVK_LCD_ENABLE, GPIOF_DIR_OUT, "lcd-enable");
->> - ? ? if (ret)
->> + ? ? if (ret) {
->> ? ? ? ? ? ? ? pr_warn("failed to request gpio lcd-enable: %d\n", ret);
->> + ? ? ? ? ? ? gpio_lcd_error = 1;
->> + ? ? }
->> ? ? ? else
->> ? ? ? ? ? ? ? gpio_set_value(MX28EVK_LCD_ENABLE, 1);
->>
->> ? ? ? ret = gpio_request_one(MX28EVK_BL_ENABLE, GPIOF_DIR_OUT, "bl-enable");
->> - ? ? if (ret)
->> + ? ? if (ret) {
->> ? ? ? ? ? ? ? pr_warn("failed to request gpio bl-enable: %d\n", ret);
->> + ? ? ? ? ? ? gpio_lcd_error = 1;
->> + ? ? }
->> ? ? ? else
->> ? ? ? ? ? ? ? gpio_set_value(MX28EVK_BL_ENABLE, 1);
-> If it's not important which gpio failed, you can do:
->
-> ? ? ? ?ret = gpio_request_array(...)
-> ? ? ? ?if (ret)
-> ? ? ? ? ? ? ? ?pr_warn("failed to request gpio for lcd\n");
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
->
-> (Apart from the different message this differs in semantic when the 2nd
-> request fails. With my suggestion the first gpio is freed then which
-> seems cleaner.) I don't care much though.
-
-Ok, looks better. I did like you suggested in v2.
-
-Regards,
-
-Fabio Estevam
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index 15fe01a..7c915e8 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -174,7 +174,6 @@ struct omap_dm_timer *omap_dm_timer_request(void)
+ 		timer->reserved = 1;
+ 		break;
+ 	}
+-	spin_unlock_irqrestore(&dm_timer_lock, flags);
+ 
+ 	if (timer) {
+ 		ret = omap_dm_timer_prepare(timer);
+@@ -183,6 +182,7 @@ struct omap_dm_timer *omap_dm_timer_request(void)
+ 			timer = NULL;
+ 		}
+ 	}
++	spin_unlock_irqrestore(&dm_timer_lock, flags);
+ 
+ 	if (!timer)
+ 		pr_debug("%s: timer request failed!\n", __func__);
+@@ -205,7 +205,6 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ 			break;
+ 		}
+ 	}
+-	spin_unlock_irqrestore(&dm_timer_lock, flags);
+ 
+ 	if (timer) {
+ 		ret = omap_dm_timer_prepare(timer);
+@@ -214,6 +213,7 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ 			timer = NULL;
+ 		}
+ 	}
++	spin_unlock_irqrestore(&dm_timer_lock, flags);
+ 
+ 	if (!timer)
+ 		pr_debug("%s: timer%d request failed!\n", __func__, id);
+-- 
+1.7.0.4
