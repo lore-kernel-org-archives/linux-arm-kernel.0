@@ -1,38 +1,115 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 14 Sep 2011 14:04:38 -0300
-Subject: [PATCH] ARM: mx31pdk: Fix build by passing IMX_HAVE_PLATFORM_MXC_MMC
-Message-ID: <1316019878-15996-1-git-send-email-fabio.estevam@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Sep 2011 10:08:03 -0700
+Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
+	gic_arch_extn
+In-Reply-To: <4E70DB33.5070501@ti.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+	<20110913203616.GG24252@atomide.com>
+	<CAMQu2gyYETPZRJu=4MWX6bULgmMaJb8MRwfhvURtOuyyWhLkAQ@mail.gmail.com>
+	<20110914152116.GM24252@atomide.com> <4E70DB33.5070501@ti.com>
+Message-ID: <20110914170803.GN24252@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mx31pdk target fails to build:
+* Santosh <santosh.shilimkar@ti.com> [110914 09:16]:
+> 
+> First and foremost, I have to go with the approach here because MPUSS
+> hardware team put a requirement that GIC and wakeupgen should always be
+> kept in sync. If needed we can discuss this off-the list with Richard.
+> 
+> Below is the extract from the veyron func specs.
+> -------------------------------------
+> Version 1.6 of veyron spec has this.
+> 
+> From page 95, paragraph 2 on version 1.6:
+> 
+> "It is SW responsibility to program interrupt enabling/disabling
+> coherently in the GIC and in the Wugen enable registers. That is, a
+> given interrupt for a given CPU is either enable at both GIC and Wugen,
+> or disable at both, but no mix."
+> -------------------------------------
+>
+> The way understand this IP is, even in normal scenario's every IRQ
+> will come to wakeupgen and then it will pass that to GIC. CPU clock
+> domains are kept under HW supervised always and they can enter inactive
+> any time without WFI. Only wakeup gen can bring the CPU out of inactive
+> state.
+> 
+> That's requirement really lead to this design choice. Just to add
+> all ARM SOC's using GIC has a gic extension interrupt controller and
+> follow the same approach for the secondary IRQCHIPO.
 
-  CC      init/version.o
-  LD      init/built-in.o
-  LD      .tmp_vmlinux1
-arch/arm/mach-imx/built-in.o: In function `mx31_3ds_init':
-mach-mx31_3ds.c:(.init.text+0x548): undefined reference to `imx_add_mxc_mmc'
-mach-mx31_3ds.c:(.init.text+0x69c): undefined reference to `imx31_mxc_mmc_data'
-make: *** [.tmp_vmlinux1] Error
+Thanks for the clarification. It seems to me the spec is most likely
+wrong as we've had the GIC working for over two years now without
+doing anything with the wakeup gen registers :)
 
-Fix this by passsing IMX_HAVE_PLATFORM_MXC_MMC option.
+Of course the wakeup events probably don't work currently, but the
+GIC interrupts certainly do. So most likely there's no need to
+continuously syncronize the wakeup gen registers with the GIC
+registers.
+ 
+> Below points as such don't matter after the strict hardware
+> requirement. Still .....
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I think the issue is that you're assuming the spec is correct,
+which does not seem to be the case here. 
+ 
+> Let's say, we ignore the hardware recommendation and try
+> to do what you are suggesting.
+> 
+> How will you know while entering in idle which IRQ's to be
+> masked and which are to be unmasked ?
+> The only way is to run though entire 1024 possible IRQ's from GIC
+> and then check the state of each IRQ and set things accordingly.
+> At GIC level, mask and unmask registers are different so you will
+> end up reading those many registers. That also means you need to
+> export some non-standard APIs from GIC driver.
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0519dd7..e9c2968 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -449,6 +449,7 @@ config MACH_MX31_3DS
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_IPU_CORE
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
-+	select IMX_HAVE_PLATFORM_MXC_MMC
- 	select IMX_HAVE_PLATFORM_MXC_NAND
- 	select IMX_HAVE_PLATFORM_SPI_IMX
- 	select MXC_ULPI if USB_ULPI
--- 
-1.7.1
+When entering idle, we have plenty of time to do that. Sounds like
+that could be easily implemented in a generic way.
+ 
+> In system wide suspend, the core irq code, communicates
+> the wakeup and non-wakeup functionality using standard mask/
+> unmask APIs when used with IRQCHIP_MASK_ON_SUSPEND.
+> With what you are suggesting it won't work
+> as desired. Because that information is only passed
+> to the IRQ chips. So you will still need IRQCHIP and
+> mask/unmask APIs. That can be done as part of set_wake()
+> handler as well though.
+> 
+> The wakeupgen is within CPU cluster and the accesses
+> to it are not as expensive as like accessing 32 K timer or
+> GP timer.
+
+Sure, but it still causes unnecesary writes for every interrupt.
+There's no technical reason to do that.
+
+> By making the wakeupgen as an IRQCHIP, we meet the hardware
+> requirement and also make use of this IP properly for the
+> desired functionality using standard IRQCHIP interfaces
+> No need of non-standard hacking.
+
+Well it seems the "hardware requirement" is based on a buggy
+spec considering things are currently working.
+ 
+> It also avoid platform code monkeing with common GIC code
+> and irq subsystem to hack the stuff.
+
+What I'm suggesting can be implemented in a generic way.
+ 
+> Btw, not exactly related here, but because of common code
+> consolidation, we need to actually use GIC common
+> save/restore hooks, even though OMAP has very
+> optimal software save and hardware restore mechanism
+> for GIC.
+> 
+> Hope this email summarise all previous multiple discussions
+> in one place.
+
+Thanks, but unfortunately it does not. To me it still seems
+this is the wrong approach for the wakeup triggers.
+
+Regards,
+
+Tony
