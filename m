@@ -1,72 +1,86 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 14 Sep 2011 23:26:49 +0530
-Subject: [PATCH v3 6/6] ARM: EXYNOS4: Limit usage of pl330 device instance
-	to non-dt build
-In-Reply-To: <20110914162633.GL3134@ponder.secretlab.ca>
-References: <1315852165-32402-1-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-2-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-3-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-4-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-5-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-6-git-send-email-thomas.abraham@linaro.org>
-	<1315852165-32402-7-git-send-email-thomas.abraham@linaro.org>
-	<20110914162633.GL3134@ponder.secretlab.ca>
-Message-ID: <CAJuYYwRX20_qB69--dz2a9WrShN3hpUc_wSepdQ14D0Vr5QXoQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 14 Sep 2011 12:57:51 -0500
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <4E70E88E.4090503@arm.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<4E70E88E.4090503@arm.com>
+Message-ID: <4E70EB1F.4060000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+Marc,
 
-On 14 September 2011 21:56, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Mon, Sep 12, 2011 at 11:59:25PM +0530, Thomas Abraham wrote:
->> The pl330 device instances and associated platform data is required only
->> for non-device-tree builds. With device tree enabled, the data about the
->> platform is obtained from the device tree. For images that include both
->> dt and non-dt platforms, an addditional check is added to ensure that
->> static amba device registrations is applicable to only non-dt platforms.
+On 09/14/2011 12:46 PM, Marc Zyngier wrote:
+> On 14/09/11 17:31, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
 >>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Kyungmin Park <kyungmin.park@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> This adds gic initialization using device tree data. The initialization
+>> functions are intended to be called by a generic OF interrupt
+>> controller parsing function once the right pieces are in place.
+>>
+>> PPIs are handled using 3rd cell of interrupts properties to specify the cpu
+>> mask the PPI is assigned to.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 >> ---
->> diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
->> index c3c0d17..3203a31 100644
->> --- a/arch/arm/mach-exynos4/dma.c
->> +++ b/arch/arm/mach-exynos4/dma.c
->> @@ -24,6 +24,7 @@
->> ?#include <linux/dma-mapping.h>
->> ?#include <linux/amba/bus.h>
->> ?#include <linux/amba/pl330.h>
->> +#include <linux/of.h>
+>>  Documentation/devicetree/bindings/arm/gic.txt |   53 ++++++++++++++++++++++++
+>>  arch/arm/common/gic.c                         |   55 +++++++++++++++++++++++--
+>>  arch/arm/include/asm/hardware/gic.h           |   10 +++++
+>>  3 files changed, 114 insertions(+), 4 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
 >>
->> ?#include <asm/irq.h>
->> ?#include <plat/devs.h>
->> @@ -138,6 +139,11 @@ struct amba_device exynos4_device_pdma1 = {
->>
->> ?static int __init exynos4_dma_init(void)
->> ?{
->> +#ifdef CONFIG_OF
->> + ? ? if (of_have_populated_dt())
->> + ? ? ? ? ? ? return 0;
->> +#endif
+>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+>> new file mode 100644
+>> index 0000000..6c513de
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+>> @@ -0,0 +1,53 @@
+>> +* ARM Generic Interrupt Controller
 >> +
->
-> Drop the #ifdef. ?of_have_populated_dt() has an empty stub for
-> !CONFIG_OF. ?Otherwise looks good to me. ?Well done not breaking
-> non-DT support when CONFIG_OF is enabled. ?:-)
+>> +ARM SMP cores are often associated with a GIC, providing per processor
+>> +interrupts (PPI), shared processor interrupts (SPI) and software
+>> +generated interrupts (SGI).
+>> +
+>> +Primary GIC is attached directly to the CPU and typically has PPIs and SGIs.
+>> +Secondary GICs are cascaded into the upward interrupt controller and do not
+>> +have PPIs or SGIs.
+>> +
+>> +Main node required properties:
+>> +
+>> +- compatible : should be one of:
+>> +	"arm,cortex-a9-gic"
+>> +	"arm,arm11mp-gic"
+>> +- interrupt-controller : Identifies the node as an interrupt controller
+>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>> +  interrupt source.  The type shall be a <u32> and the value shall be 3.
+>> +
+>> +  The 1st cell is the interrupt number. 0-15 are reserved for SGIs. 16-31 are
+>> +  for PPIs.
+>> +
+>> +  The 2nd cell is the level-sense information, encoded as follows:
+>> +                    1 = low-to-high edge triggered
+>> +                    2 = high-to-low edge triggered
+>> +                    4 = active high level-sensitive
+>> +                    8 = active low level-sensitive
+>> +
+>> +  Only values of 1 and 4 are valid for GIC 1.0 spec.
+>> +
+>> +  The 3rd cell contains the mask of the cpu number for the interrupt source.
+>> +  The cpu mask is only valid for PPIs and shall be 0 for SPIs. This value shall
+>> +  be 0 for PPIs.
+>      ^^^^^^^^^^^^^
+> 
+> Typo here ? The way I understand it, it should read "For PPIs, this
+> value shall be the mask of the possible CPU numbers for the interrupt
+> source" (or something to similar effect...).
+> 
 
-Ok. I will drop the #ifdef. Well, I actually learnt from you on not
-breaking non-dt support because of your comments on my earlier patches
-which did break non-dt support. Thanks.
+Cut and paste error. This sentence goes in the previous paragraph. What
+I meant is the 2nd cell should contain 0 for PPIs as you cannot set the
+edge/level on PPIs (that is always true, right?). I probably should also
+add 0 in the list of values.
 
->
-> The other patches in this series look good to me too.
->
-> g.
+I take it you are otherwise fine with this binding?
 
-Thanks for your review. I will do the changes you have recommended for
-the pl330 dt support patches and resubmit. I would like to add your
-Ack to the patches when resubmitting.
-
-Regards,
-Thomas.
+Rob
