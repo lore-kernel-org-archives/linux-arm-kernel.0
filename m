@@ -1,34 +1,96 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 13 Sep 2011 19:22:17 -0700 (PDT)
-Subject: [PATCH 01/11] clk: Add a generic clock infrastructure
-In-Reply-To: <1314191759-16941-1-git-send-email-broonie@opensource.wolfsonmicro.com
-	>
-References: <20110824131324.GB16520@opensource.wolfsonmicro.com>
-	<1314191759-16941-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <decbd6943536eae1bddda9765ac5b267.squirrel@www.codeaurora.org>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Wed, 14 Sep 2011 09:48:26 +0930
+Subject: [RFC 1/2] virtio: Add AMBA bus driver for virtio device
+In-Reply-To: <1315906832.3297.41.camel@hornet.cambridge.arm.com>
+References: <1314966257-7503-1-git-send-email-pawel.moll@arm.com>
+	<1314966257-7503-2-git-send-email-pawel.moll@arm.com>
+	<877h5e5yxp.fsf@rustcorp.com.au>
+	<1315845956.3297.7.camel@hornet.cambridge.arm.com>
+	<87hb4h408d.fsf@rustcorp.com.au>
+	<1315906832.3297.41.camel@hornet.cambridge.arm.com>
+Message-ID: <87ehzkht7x.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 13 Sep 2011 10:40:32 +0100, Pawel Moll <pawel.moll@arm.com> wrote:
+> > > No problem, I've reserved 128 bits in the modified registers layout (see
+> > > RFC v2), I can even change it into "offset/value" interface, which would
+> > > give you variable width. One thing I don't get is how to access feature
+> > > bits > 31? The get_features() seems
+> > > to be limited to 32:
+> > > 
+> > > struct virtio_config_ops {
+> > > <...>
+> > > 	u32 (*get_features)(struct virtio_device *vdev);
+> > > <...>
+> > > }
+> > 
+> > There's a patch for that already :)
+> 
+> Ok, so how about one of the following two options:
+> 
+> 1. 4 * 32-bit words of feature flags, 128 bits in total:
+> 
+>  *  0x010   32  HostFeatures0  Features supported by the host, bits 0-31
+>  *  0x014   32  HostFeatures1  Features supported by the host, bits 32-63
+>  *  0x018   32  HostFeatures2  Features supported by the host, bits 64-95
+>  *  0x01c   32  HostFeatures3  Features supported by the host, bits 96-127
+> 
+>  *  0x020   32  GuestFeatures0 Features activated by the guest, bits 0-31
+>  *  0x024   32  GuestFeatures1 Features activated by the guest, bits 32-63
+>  *  0x028   32  GuestFeatures2 Features activated by the guest, bits 64-95
+>  *  0x02c   32  GuestFeatures3 Features activated by the guest, bits 96-127
+> 
+> 2. "Select word -> read flags" interface:
+> 
+>  *  0x010   32  HostFeaturesFlags  Features supported by the host
+>  *  0x014   32  HostFeaturesWord   Set of features to access
+> 
+>  *  0x020   32  GuestFeaturesFlags Features activated by the guest
+>  *  0x024   32  GuestFeaturesWord  Set of features to set
+> 
+> In this case the algorithm would be:
+> 
+> 	writel(0, HostFeaturesWord);
+> 	bits_0_31 = readl(HostFeaturesFlags);
+> 	writel(1, HostFeaturesWord);
+> 	bits_32_63 = readl(HostFeaturesFlags);
+> 	<etc>
+> 
+> The latter seems more "future-proof" to me, if slightly more complex...
+> Any other suggestions?
 
-On Wed, August 24, 2011 6:15 am, Mark Brown wrote:
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index 1d37f42..93ff870 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
+The former is almost certainly sufficient (remember, we can abuse the
+final feature bit to indicate there are extended features somewhere
+else, if we really have to).  But agree the latter is preferable: this
+isn't time-critical.
 
-> -struct clk;
-> +static inline int clk_prepare(struct clk *clk) { return 0; }
-> +static inline void clk_unprepare(struct clk *clk) { }
-> +
+> > We can sort that out later... the Guest may try some ambitious large
+> > allocation and fall back if it fails.
+> 
+> So, to my mind, the negotiations could look like this (from the Guest's
+> point of view):
+> 
+> 1. (optional) The Guest is asking what size is "suggested" by the Host:
+> 
+> 	size = readl(QueueNum);
+> 
+> 2. The Guest requests size it would like to use:
+> 
+> 	writel(optimal_size(size), QueueNum);
+> 
+> 3. The Host does the best it can to accommodate the Guest and the Guest
+> checks the effective size:
+> 
+> 	size = real(QueueNum);
+> 
+> Does it make some sense?
 
-You should add might_sleep() inside these stubs. That way, if any device
-driver developers wants to move over to the new APIs before their arch
-does, they get to see the warnings when they call prepare/unprepare in
-atomic context.
+Does Host care?  It is sufficient for it to publish min/max values?
 
-Thanks,
-Saravana
+You might want to throw the alignment value in there; there has been
+talk about adding that to PCI, for really small rings (less than a
+page).
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Cheers,
+Rusty.
