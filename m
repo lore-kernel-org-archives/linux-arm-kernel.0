@@ -1,57 +1,51 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Wed, 14 Sep 2011 10:56:36 +0530
-Subject: [PATCH 14/25] OMAP4: PM: Add CPUX OFF mode support
-In-Reply-To: <87wrdcbb49.fsf@ti.com>
+Date: Wed, 14 Sep 2011 11:04:38 +0530
+Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
+	gic_arch_extn
+In-Reply-To: <20110913203616.GG24252@atomide.com>
 References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-15-git-send-email-santosh.shilimkar@ti.com>
-	<87y5xteahc.fsf@ti.com> <4E6EECA3.4040704@ti.com>
-	<87wrdcbb49.fsf@ti.com>
-Message-ID: <CAMQu2gwtj17KTeQFA-okaPYV4KKTnvzM8FcqaO0ptm2ZEH-8=A@mail.gmail.com>
+	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+	<20110913203616.GG24252@atomide.com>
+Message-ID: <CAMQu2gyYETPZRJu=4MWX6bULgmMaJb8MRwfhvURtOuyyWhLkAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2011 at 11:03 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Santosh <santosh.shilimkar@ti.com> writes:
+Tony,
+On Wed, Sep 14, 2011 at 2:06 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110904 06:23]:
+>> OMAP WakeupGen is the interrupt controller extension used along
+>> with ARM GIC to wake the CPU out from low power states on
+>> external interrupts.
+>>
+>> The WakeupGen unit is responsible for generating wakeup event
+>> from the incoming interrupts and enable bits. It is implemented
+>> in MPU always ON power domain. During normal operation,
+>> WakeupGen delivers external interrupts directly to the GIC.
+> ...
 >
->> On Tuesday 13 September 2011 02:36 AM, Kevin Hilman wrote:
->>> Santosh Shilimkar<santosh.shilimkar@ti.com> ?writes:
->>>
->>>> This patch adds the CPU0 and CPU1 off mode support. CPUX close switch
->>>> retention (CSWR) is not supported by hardware design.
->>>>
->>>> The CPUx OFF mode isn't supported on OMAP4430 ES1.0
->>>>
->>>> CPUx sleep code is common for hotplug, suspend and CPUilde.
->>>>
->>>> Signed-off-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
->>>> Cc: Kevin Hilman<khilman@ti.com>
->>>
->>> [...]
->>>
->>>> @@ -38,6 +39,11 @@ void __iomem *omap4_get_scu_base(void)
->>>>
->>>> ? void __cpuinit platform_secondary_init(unsigned int cpu)
->>>> ? {
->>>> + ? /* Enable NS access to SMP bit for this CPU on EMU/HS devices */
->>>> + ? if (cpu_is_omap443x()&& ?(omap_type() != OMAP2_DEVICE_TYPE_GP))
->>>
->>> A comment here about why this is 443x specific would be helpful.
->>>
->>> I see a comment in omap4_cpu_resume() that seems to indicate that SMP
->>> bit is accessible on 446x NS devices, but repeating that commen here
->>> would help future readability.
->>>
->> Ok. Will add comments here too. Was just trying to save some lines :)
+>> + ? ? /*
+>> + ? ? ?* Override GIC architecture specific functions to add
+>> + ? ? ?* OMAP WakeupGen interrupt controller along with GIC
+>> + ? ? ?*/
+>> + ? ? gic_arch_extn.irq_mask = wakeupgen_mask;
+>> + ? ? gic_arch_extn.irq_unmask = wakeupgen_unmask;
+>> + ? ? gic_arch_extn.irq_set_wake = wakeupgen_set_wake;
+>> + ? ? gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
 >
-> heh, this is a negative side-effect of people caring primarily about
-> diffstat. :(
+> As I've commented before, there should not be any need to tweak
+> the wakeupgen registers for each interrupt during the runtime.
 >
-ya.
+And I gave you all the reasons why it needs to be done this way.
 
-> One other comment on this patch. ?You need spaces around the '&&' above.
+> AFAIK the wakeupgen registers only need to be armed every time
+> before entering idle.
 >
-The original patch is fine for that. Some replies has eaten that space. My
-Thunderbird email client is doing the same. :(
+No that doesn't work and it completely hacky approach.
+This problem is for all SOC's using A9 SMP and GIC and every soc
+has an architecture specific interrupt controller extension. And that
+was the reason the GIC arch_extn was proposed.
+It's just another IRQCHIP and works seamlessly being part of the
+framework.  And it will also initialized with primary IRQCHIP( GIC).
 
 Regards
 Santosh
