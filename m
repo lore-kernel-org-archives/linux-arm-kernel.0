@@ -1,64 +1,65 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Wed, 14 Sep 2011 11:20:16 +0300
-Subject: [PATCH] ARM: EXYNOS4: Enable double linefill in PL310 Prefetch
-	Control Register
-In-Reply-To: <CAH9JG2Ww9J8h34Nub=gz=xR5767T7X=S+gk58o4HU809mdB52Q@mail.gmail.com>
-References: <1315894031-9579-1-git-send-email-siarhei.siamashka@gmail.com>
-	<CAH9JG2VFSwL7hCmGpHXx_UKKwK3dbhNRGQB1bwvcD-YC1Qj-AQ@mail.gmail.com>
-	<CACY+gR2TX35XaVLiN7s_PkY4r=G1i3LMhHzSJJiaAOSoYDGwfg@mail.gmail.com>
-	<CAH9JG2Ww9J8h34Nub=gz=xR5767T7X=S+gk58o4HU809mdB52Q@mail.gmail.com>
-Message-ID: <CACY+gR2oRqEA80Ura9Wp5cDW7b-Cjo+KVnfuA-PBHbFZKfRpwQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Sep 2011 09:42:38 +0100
+Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
+	initialization functions
+In-Reply-To: <1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
+References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
+	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110914084237.GC6267@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2011 at 10:57 AM, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Wed, Sep 14, 2011 at 4:43 PM, Siarhei Siamashka
-> <siarhei.siamashka@gmail.com> wrote:
->> On Wed, Sep 14, 2011 at 9:08 AM, Kyungmin Park <kmpark@infradead.org> wrote:
->>> Hi Siarhei,
->>>
->>> Interesting feature, and it's not samsung soc issue, so add the arm
->>> mailing list.
->>> It checked and the see the read performance improvement from 868MiB/s
->>> to 981MiB/s with lmbench.
->>
->> Maybe lmbench does not try very hard to get the best out of the
->> hardware? On my origenboard, I'm getting ~1.15GB/s performance for the
->> standard LDM/STM based memcpy from libc-ports, which is ~2.3GB/s
->> memory bandwidth if both reads and writes are accounted separately.
->>
->>> It's helpful to test other SoC., e.g., OMAP4, STE and so on.
->>
->> The current (?) state of the support for this feature in OMAP4 is
->> explained here by Richard Woodruff:
->> ? ?http://groups.google.com/group/pandaboard/msg/dfd2d2e1336d435b
->>
->>> BTW, why do you set the 27-bit? In my PL310 Spec., it's reserved bit
->>> and should be zero (SBZ).
->>
->> This PL310 thing seems to have been renamed to "CoreLink Level 2 Cache
->> Controller L2C-310" in later revisions, and its Prefetch Control
->> Register is described here:
->> ? ?http://infocenter.arm.com/help/topic/com.arm.doc.ddi0246f/CHDHIECI.html
-> Thanks for link. it has 27-bit description. but does it correct bit
-> description for exynos4 PL310?
-> I mean I received the PL310 TRM with exynos4 chip used. there's no
-> 27-bit description. it's just reserved bit.
-> Can it enable the 27-bit at exynos4210? or can be used for exynos4212 or later?
+On Tue, Sep 06, 2011 at 01:48:26PM +0800, Shawn Guo wrote:
+> If ARM core gets powered off during suspend, L2 cache controller
+> has to be reinitialized by resume procedure.
+> 
+> The patch removes __init annotation from a few initialization
+> functions to make the reinitialization possible.  For example,
+> platform resume function can call l2x0_of_init() to get L2 cache
+> back to work.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/include/asm/hardware/cache-l2x0.h |    2 +-
+>  arch/arm/mm/cache-l2x0.c                   |   10 +++++-----
+>  2 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+> index d22765c..d270310 100644
+> --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+> +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+> @@ -89,7 +89,7 @@
+>  #define L2X0_ADDR_FILTER_EN		1
+>  
+>  #ifndef __ASSEMBLY__
+> -extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+> +extern void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+>  #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
+>  extern int l2x0_of_init(__u32 aux_val, __u32 aux_mask);
+>  #else
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index c035b9a..7835cb6 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -280,7 +280,7 @@ static void l2x0_disable(void)
+>  	spin_unlock_irqrestore(&l2x0_lock, flags);
+>  }
+>  
+> -void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+> +void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+>  {
+>  	__u32 aux;
+>  	__u32 cache_id;
 
-That's a good point. I think it is exynos4210 that is used in
-origenboard. And according to the value in Cache ID Register
-(0x4100c4c5), it has r3p0 revision of L2C-310. Which means that the
-Prefetch Control Register is actually described at:
-    http://infocenter.arm.com/help/topic/com.arm.doc.ddi0246d/CHDHIECI.html
-And bit 27 is indeed reserved. However flipping it seems to have some
-measurable impact on performance (unless I screwed up the benchmarks),
-so maybe it does something but is undocumented? In any case, I agree
-that it's better not to mess up with this bit.
+I'm unconvinced about the wise-ness of this.  We read-modify-write the
+auxillary control register, which means some bits are preserved from
+the initial boot.  If the boot loader sets the L2 cache up for normal
+boot and not for resume, we'll end up with different L2 cache settings.
 
-By the way, does anybody have L2C-310 errata list? Is double linefill
-actually safe to use in r3p0?
+We've historically seen this kind of thing with boot loaders over the
+years, to the point where systems boot at one CPU clock rate but resume
+at some other CPU clock rate.
 
--- 
-Best regards,
-Siarhei Siamashka
+So, it may be wiser to implement a 'save' and 'restore' interface
+instead so that we can be sure that things are setup in the same way
+after resume.
