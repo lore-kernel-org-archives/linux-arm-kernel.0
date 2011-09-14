@@ -1,101 +1,83 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Wed, 14 Sep 2011 10:28:06 +0530
-Subject: [PATCH v15 11/12] OMAP: dmtimer: extend spinlock to exported APIs
-In-Reply-To: <20110913231540.GI24252@atomide.com>
-References: <1315516098-29761-1-git-send-email-tarun.kanti@ti.com>
-	<1315516098-29761-12-git-send-email-tarun.kanti@ti.com>
-	<20110913231540.GI24252@atomide.com>
-Message-ID: <CAC83ZvK0rknVX3bw42dL-V2Dpq5wjwhU6H=fNjR1=oZCs+rkng@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Wed, 14 Sep 2011 14:02:31 +0900
+Subject: [PATCH 2/2] ARM: Exynos4: use s5p-timer for UniversalC210 board
+In-Reply-To: <1311659456-6659-3-git-send-email-m.szyprowski@samsung.com>
+References: <1311659456-6659-1-git-send-email-m.szyprowski@samsung.com>
+	<1311659456-6659-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAH9JG2V6Sfjmjupj5oBd_5vziBa4iezBpRfK9tNECrFO5sSfLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2011 at 4:45 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Tarun Kanti DebBarma <tarun.kanti@ti.com> [110908 13:36]:
->> Since the exported APIs can be called from interrupt context
->> extend spinlock protection to some more relevant APIs to avoid
->> race condition.
->
-> We should have locking for requesting and releasing a timer etc,
-> but I don't see need for that for the timer specific functions.
-Alright... I will remove locking from timer specific functions.
-In that case we have extension of locks to just following two functions:
-omap_dm_timer_request()
-omap_dm_timer_request_specific()
+Hi,
 
-So, I can modify the patch subject and description accordingly.
+It's required for boot universal c210 w/ EVT0 chip.
+Can you include it at 3.1 fixed branch?
 
->
->> @@ -317,9 +317,11 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_trigger);
->> ?void omap_dm_timer_start(struct omap_dm_timer *timer)
->> ?{
->> ? ? ? u32 l;
->> + ? ? unsigned long flags;
->>
->> ? ? ? omap_dm_timer_enable(timer);
->>
->> + ? ? spin_lock_irqsave(&dm_timer_lock, flags);
->> ? ? ? if (timer->loses_context) {
->> ? ? ? ? ? ? ? u32 ctx_loss_cnt_after =
->> ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
->
-> Here the caller already owns the timer being started. So there
-> should never be multiple users for a single timer. If there are,
-> then the caller should take care of locking.
-Ok.
+Thank you,
+Kyungmin Park
 
+On Tue, Jul 26, 2011 at 2:50 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Commit 069d4e743 removed support for local timers and forced to use MCT as
+> event source. However MCT is not operating properly on early revision (EVT0)
+> of Exynos4 SoCs. All UniversalC210 boards are based on Exynos4 EVT0, so that
+> commit broke support for it. This patch provides a workaround that enables
+> UniversalC210 boards to boot again. s5p-timer is used as an event source.
 >
->> ?void omap_dm_timer_stop(struct omap_dm_timer *timer)
->> ?{
->> - ? ? unsigned long rate = 0;
->> + ? ? unsigned long rate = 0, flags;
->> ? ? ? struct dmtimer_platform_data *pdata = timer->pdev->dev.platform_data;
->> ? ? ? bool is_omap2 = true;
->>
->> + ? ? spin_lock_irqsave(&dm_timer_lock, flags);
->> ? ? ? if (pdata->needs_manual_reset)
->> ? ? ? ? ? ? ? is_omap2 = false;
->> ? ? ? else
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+> ?arch/arm/mach-exynos4/Kconfig ? ? ? ? ? ? ? | ? ?3 +++
+> ?arch/arm/mach-exynos4/mach-universal_c210.c | ? ?4 +++-
+> ?2 files changed, 6 insertions(+), 1 deletions(-)
 >
-> Here too.
-Right.
-
+> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+> index 9d62e13..2aad73f 100644
+> --- a/arch/arm/mach-exynos4/Kconfig
+> +++ b/arch/arm/mach-exynos4/Kconfig
+> @@ -173,6 +173,9 @@ config MACH_ARMLEX4210
+> ?config MACH_UNIVERSAL_C210
+> ? ? ? ?bool "Mobile UNIVERSAL_C210 Board"
+> ? ? ? ?select CPU_EXYNOS4210
+> + ? ? ? select S5P_HRT
+> + ? ? ? select CLKSRC_MMIO
+> + ? ? ? select HAVE_SCHED_CLOCK
+> ? ? ? ?select S5P_GPIO_INT
+> ? ? ? ?select S5P_DEV_FIMC0
+> ? ? ? ?select S5P_DEV_FIMC1
+> diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
+> index 0e280d1..ca9e7b7 100644
+> --- a/arch/arm/mach-exynos4/mach-universal_c210.c
+> +++ b/arch/arm/mach-exynos4/mach-universal_c210.c
+> @@ -34,6 +34,7 @@
+> ?#include <plat/mfc.h>
+> ?#include <plat/sdhci.h>
+> ?#include <plat/pd.h>
+> +#include <plat/s5p-time.h>
 >
->> @@ -389,8 +394,10 @@ void omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int load)
->> ?{
->> ? ? ? u32 l;
->> + ? ? unsigned long flags;
->>
->> ? ? ? omap_dm_timer_enable(timer);
->> + ? ? spin_lock_irqsave(&dm_timer_lock, flags);
->> ? ? ? l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
->> ? ? ? if (autoreload)
->> ? ? ? ? ? ? ? l |= OMAP_TIMER_CTRL_AR;
+> ?#include <mach/map.h>
 >
-> And here.
-Ok.
-
+> @@ -730,6 +731,7 @@ static void __init universal_map_io(void)
+> ? ? ? ?s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> ? ? ? ?s3c24xx_init_clocks(24000000);
+> ? ? ? ?s3c24xx_init_uarts(universal_uartcfgs, ARRAY_SIZE(universal_uartcfgs));
+> + ? ? ? s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
+> ?}
 >
->> @@ -412,9 +420,11 @@ void omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int load)
->> ?{
->> ? ? ? u32 l;
->> + ? ? unsigned long flags;
->>
->> ? ? ? omap_dm_timer_enable(timer);
->>
->> + ? ? spin_lock_irqsave(&dm_timer_lock, flags);
->> ? ? ? if (timer->loses_context) {
->> ? ? ? ? ? ? ? u32 ctx_loss_cnt_after =
->> ? ? ? ? ? ? ? ? ? ? ? timer->get_context_loss_count(&timer->pdev->dev);
+> ?static void __init universal_reserve(void)
+> @@ -766,6 +768,6 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+> ? ? ? ?.init_irq ? ? ? = exynos4_init_irq,
+> ? ? ? ?.map_io ? ? ? ? = universal_map_io,
+> ? ? ? ?.init_machine ? = universal_machine_init,
+> - ? ? ? .timer ? ? ? ? ?= &exynos4_timer,
+> + ? ? ? .timer ? ? ? ? ?= &s5p_timer,
+> ? ? ? ?.reserve ? ? ? ?= &universal_reserve,
+> ?MACHINE_END
+> --
+> 1.7.1.569.g6f426
 >
-> Not needed here either. And that's the case for all the other functions
-> too.
-Sure.
---
-Tarun
->
-> Regards,
->
-> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
