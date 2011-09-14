@@ -1,444 +1,125 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 14 Sep 2011 22:19:22 +0530
-Subject: [PATCH 2/2] input: samsung-keypad: Add device tree support
-In-Reply-To: <20110914161144.GF3134@ponder.secretlab.ca>
-References: <1315916779-21793-1-git-send-email-thomas.abraham@linaro.org>
-	<1315916779-21793-2-git-send-email-thomas.abraham@linaro.org>
-	<1315916779-21793-3-git-send-email-thomas.abraham@linaro.org>
-	<20110914161144.GF3134@ponder.secretlab.ca>
-Message-ID: <CAJuYYwSNaVCnHFTMtW0RZLGLaS+iKBibWYwn5mqNT-0EW31yAQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Wed, 14 Sep 2011 22:19:55 +0530
+Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
+	gic_arch_extn
+In-Reply-To: <20110914152116.GM24252@atomide.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+	<20110913203616.GG24252@atomide.com>
+	<CAMQu2gyYETPZRJu=4MWX6bULgmMaJb8MRwfhvURtOuyyWhLkAQ@mail.gmail.com>
+	<20110914152116.GM24252@atomide.com>
+Message-ID: <4E70DB33.5070501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
-
-On 14 September 2011 21:41, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Tue, Sep 13, 2011 at 05:56:19PM +0530, Thomas Abraham wrote:
->> Add device tree based discovery support for Samsung's keypad controller.
->>
->> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
->> Cc: Donghwa Lee <dh09.lee@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->> ?.../devicetree/bindings/input/samsung-keypad.txt ? | ? 88 ++++++++++
->> ?drivers/input/keyboard/samsung-keypad.c ? ? ? ? ? ?| ?177 ++++++++++++++++++--
->> ?2 files changed, 253 insertions(+), 12 deletions(-)
->> ?create mode 100644 Documentation/devicetree/bindings/input/samsung-keypad.txt
->>
->> diff --git a/Documentation/devicetree/bindings/input/samsung-keypad.txt b/Documentation/devicetree/bindings/input/samsung-keypad.txt
->> new file mode 100644
->> index 0000000..e1c7237
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/input/samsung-keypad.txt
->> @@ -0,0 +1,88 @@
->> +* Samsung's Keypad Controller device tree bindings
->> +
->> +Samsung's Keypad controller is used to interface a SoC with a matrix-type
->> +keypad device. The keypad controller supports multiple row and column lines.
->> +A key can be placed at each intersection of a unique row and a unique column.
->> +The keypad controller can sense a key-press and key-release and report the
->> +event using a interrupt to the cpu.
->> +
->> +Required SoC Specific Properties:
->> +- compatible: should be one of the following
->> + ?- "samsung,s3c6410-keypad": For controllers compatible with s3c6410 keypad
->> + ? ?controller.
->> + ?- "samsung,s5pv210-keypad": For controllers compatible with s5pv210 keypad
->> + ? ?controller.
->> +
->> +- reg: physical base address of the controller and length of memory mapped
->> + ?region.
->> +
->> +- interrupts: The interrupt number to the cpu.
->> +
->> +Required Board Specific Properties:
->> +- samsung,keypad-num-rows: Number of row lines connected to the keypad
->> + ?controller.
->> +
->> +- samsung,keypad-num-columns: Number of column lines connected to the
->> + ?keypad controller.
->> +
->> +- row-gpios: List of gpios used as row lines. The gpio specifier for
->> + ?this property depends on the gpio controller to which these row lines
->> + ?are connected.
->> +
->> +- col-gpios: List of gpios used as column lines. The gpio specifier for
->> + ?this property depends on the gpio controller to which these column
->> + ?lines are connected.
+On Wednesday 14 September 2011 08:51 PM, Tony Lindgren wrote:
+> * Shilimkar, Santosh<santosh.shilimkar@ti.com>  [110913 22:01]:
+>> Tony,
+>> On Wed, Sep 14, 2011 at 2:06 AM, Tony Lindgren<tony@atomide.com>  wrote:
+>>> * Santosh Shilimkar<santosh.shilimkar@ti.com>  [110904 06:23]:
+>>>> OMAP WakeupGen is the interrupt controller extension used along
+>>>> with ARM GIC to wake the CPU out from low power states on
+>>>> external interrupts.
+>>>>
+>>>> The WakeupGen unit is responsible for generating wakeup event
+>>>> from the incoming interrupts and enable bits. It is implemented
+>>>> in MPU always ON power domain. During normal operation,
+>>>> WakeupGen delivers external interrupts directly to the GIC.
+>>> ...
+>>>
+>>>> +     /*
+>>>> +      * Override GIC architecture specific functions to add
+>>>> +      * OMAP WakeupGen interrupt controller along with GIC
+>>>> +      */
+>>>> +     gic_arch_extn.irq_mask = wakeupgen_mask;
+>>>> +     gic_arch_extn.irq_unmask = wakeupgen_unmask;
+>>>> +     gic_arch_extn.irq_set_wake = wakeupgen_set_wake;
+>>>> +     gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
+>>>
+>>> As I've commented before, there should not be any need to tweak
+>>> the wakeupgen registers for each interrupt during the runtime.
+>>>
+>> And I gave you all the reasons why it needs to be done this way.
 >
-> I know we've got overlapping terminology here. ?When you say GPIOs
-> here, does it refer to the pin multiplexing feature of the samsung
-> parts, and thus how the keypad controller IO is routed to the pins?
-> Or does the driver manipulate GPIO lines manually?
-
-It is intended to mean gpio and not the pinmux. But the way the gpio
-specifier is specified in the dts file, it includes information about
-both gpio number and the pin-control details. For instance, if 'gpa0'
-is a gpio controller (which includes pin-control functionality as well
-in the hardware), then the gpio specifier for the keypad would be as
-below.
-
-row-gpios = <&gpa0 0 3 3 0>,
-                 <&gpa0 1 3 3 0>;
-
-The syntax for the gpio specifier is
-<[phandle of gpio controller] [pin number within the gpio controller]
-[mux function] [pull up/down] [drive strength]>
-
-The keypad driver does not know or use the mux function, pull up/down
-and drive strength details. The driver would call of_get_gpio to get
-the linux gpio number and then do a gpio_request on that gpio number.
-The gpio dt support manges the pin-mux and other settings
-transparently for the keypad driver. So even though the gpio specifier
-format changes, the dt support code for the driver does not change.
-
-The driver does not manipulate the gpios directly. It just requests
-for the gpio number and makes a note of the number to free it when the
-driver unbinds.
-
+> Hmm, I don't think you ever answered the main question:
 >
-> If it is pin multiplexing, then using the GPIO binding seems rather
-> odd. It may be entirely appropriate, but it will need to play well
-> with the pinmux stuff that linusw is working on.
-
-When pinmux/pin-ctrl functionality which linusw is developing is used
-for this driver, it would be a extension to this patch. The driver
-would request for the gpio and then use the pin-ctrl subsystem api to
-setup the pin-control. In that case, the gpio-specifier would change
-but that change would be break anything which this patch does.
-
+> Why would you need to write the wakeupgen registers for every
+> interrupt during the runtime instead of arming them only when
+> entering idle?
 >
->> +
->> +- Keys represented as child nodes: Each key connected to the keypad
->> + ?controller is represented as a child node to the keypad controller
->> + ?device node and should include the following properties.
->> + ?- keypad,row: the row number to which the key is connected.
->> + ?- keypad,column: the column number to which the key is connected.
->> + ?- keypad,key-code: the key-code to be reported when the key is pressed
->> + ? ?and released.
->
-> What defines the meanings of the key codes?
+I thought I did that in last thread.
+Let me try again,
 
-The key-code could be any value which the system would want the keypad
-driver to report when that key is pressed.
+First and foremost, I have to go with the approach here because MPUSS
+hardware team put a requirement that GIC and wakeupgen should always be
+kept in sync. If needed we can discuss this off-the list with Richard.
 
->
->> +
->> +Optional Properties specific to linux:
->> +- linux,keypad-no-autorepeat: do no enable autorepeat feature.
->> +- linux,keypad-wakeup: use any event on keypad as wakeup event.
->
-> Is this really a linux-specific feature?
+Below is the extract from the veyron func specs.
+-------------------------------------
+Version 1.6 of veyron spec has this.
 
-Yes, it is a property defined by the linux subsystems. A non-linux
-system might not have such features.
+ From page 95, paragraph 2 on version 1.6:
 
->
->> +
->> +
->> +Example:
->> + ? ? keypad at 100A0000 {
->> + ? ? ? ? ? ? compatible = "samsung,s5pv210-keypad";
->> + ? ? ? ? ? ? reg = <0x100A0000 0x100>;
->> + ? ? ? ? ? ? interrupts = <173>;
->> + ? ? ? ? ? ? samsung,keypad-num-rows = <2>;
->> + ? ? ? ? ? ? samsung,keypad-num-columns = <8>;
->> + ? ? ? ? ? ? linux,input-no-autorepeat;
->> + ? ? ? ? ? ? linux,input-wakeup;
->> +
->> + ? ? ? ? ? ? row-gpios = <&gpx2 0 3 3 0
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?&gpx2 1 3 3 0>;
->> +
->> + ? ? ? ? ? ? col-gpios = <&gpx1 0 3 0 0
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?&gpx1 1 3 0 0
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?&gpx1 2 3 0 0
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?&gpx1 3 3 0 0
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?&gpx1 4 3 0 0
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?&gpx1 5 3 0 0
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?&gpx1 6 3 0 0
->> + ? ? ? ? ? ? ? ? ? ? ? ? ?&gpx1 7 3 0 0>;
->> +
->> + ? ? ? ? ? ? key_1 {
->> + ? ? ? ? ? ? ? ? ? ? keypad,row = <0>;
->> + ? ? ? ? ? ? ? ? ? ? keypad,column = <3>;
->> + ? ? ? ? ? ? ? ? ? ? keypad,key-code = <2>;
->> + ? ? ? ? ? ? };
->> +
->> + ? ? ? ? ? ? key_2 {
->> + ? ? ? ? ? ? ? ? ? ? keypad,row = <0>;
->> + ? ? ? ? ? ? ? ? ? ? keypad,column = <4>;
->> + ? ? ? ? ? ? ? ? ? ? keypad,key-code = <3>;
->> + ? ? ? ? ? ? };
->> +
->> + ? ? ? ? ? ? key_3 {
->> + ? ? ? ? ? ? ? ? ? ? keypad,row = <0>;
->> + ? ? ? ? ? ? ? ? ? ? keypad,column = <5>;
->> + ? ? ? ? ? ? ? ? ? ? keypad,key-code = <4>;
->> + ? ? ? ? ? ? };
->> + ? ? };
->> diff --git a/drivers/input/keyboard/samsung-keypad.c b/drivers/input/keyboard/samsung-keypad.c
->> index f689f49..cf01a56 100644
->> --- a/drivers/input/keyboard/samsung-keypad.c
->> +++ b/drivers/input/keyboard/samsung-keypad.c
->> @@ -21,6 +21,8 @@
->> ?#include <linux/module.h>
->> ?#include <linux/platform_device.h>
->> ?#include <linux/slab.h>
->> +#include <linux/of.h>
->> +#include <linux/of_gpio.h>
->> ?#include <linux/sched.h>
->> ?#include <plat/keypad.h>
->>
->> @@ -68,31 +70,26 @@ struct samsung_keypad {
->> ? ? ? wait_queue_head_t wait;
->> ? ? ? bool stopped;
->> ? ? ? int irq;
->> + ? ? enum samsung_keypad_type type;
->> ? ? ? unsigned int row_shift;
->> ? ? ? unsigned int rows;
->> ? ? ? unsigned int cols;
->> ? ? ? unsigned int row_state[SAMSUNG_MAX_COLS];
->> +#ifdef CONFIG_OF
->> + ? ? int row_gpios[SAMSUNG_MAX_ROWS];
->> + ? ? int col_gpios[SAMSUNG_MAX_COLS];
->> +#endif
->> ? ? ? unsigned short keycodes[];
->> ?};
->>
->> -static int samsung_keypad_is_s5pv210(struct device *dev)
->> -{
->> - ? ? struct platform_device *pdev = to_platform_device(dev);
->> - ? ? enum samsung_keypad_type type =
->> - ? ? ? ? ? ? platform_get_device_id(pdev)->driver_data;
->> -
->> - ? ? return type == KEYPAD_TYPE_S5PV210;
->> -}
->> -
->> ?static void samsung_keypad_scan(struct samsung_keypad *keypad,
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int *row_state)
->> ?{
->> - ? ? struct device *dev = keypad->input_dev->dev.parent;
->> ? ? ? unsigned int col;
->> ? ? ? unsigned int val;
->>
->> ? ? ? for (col = 0; col < keypad->cols; col++) {
->> - ? ? ? ? ? ? if (samsung_keypad_is_s5pv210(dev)) {
->> + ? ? ? ? ? ? if (keypad->type == KEYPAD_TYPE_S5PV210) {
->> ? ? ? ? ? ? ? ? ? ? ? val = S5PV210_KEYIFCOLEN_MASK;
->> ? ? ? ? ? ? ? ? ? ? ? val &= ~(1 << col) << 8;
->> ? ? ? ? ? ? ? } else {
->> @@ -235,6 +232,129 @@ static void samsung_keypad_close(struct input_dev *input_dev)
->> ? ? ? samsung_keypad_stop(keypad);
->> ?}
->>
->> +#ifdef CONFIG_OF
->> +static
->> +struct samsung_keypad_platdata *samsung_keypad_parse_dt(struct device *dev)
->
-> Nit: keep everything up to the function name on the same line. ?It is
-> more grep-friendly to make line breaks in the parameters list.
+"It is SW responsibility to program interrupt enabling/disabling
+coherently in the GIC and in the Wugen enable registers. That is, a
+given interrupt for a given CPU is either enable at both GIC and Wugen,
+or disable at both, but no mix."
+-------------------------------------
 
-Ok. I will change this.
+The way understand this IP is, even in normal scenario's every IRQ
+will come to wakeupgen and then it will pass that to GIC. CPU clock
+domains are kept under HW supervised always and they can enter inactive
+any time without WFI. Only wakeup gen can bring the CPU out of inactive
+state.
 
->
->> +{
->> + ? ? struct samsung_keypad_platdata *pdata;
->> + ? ? struct matrix_keymap_data *keymap_data;
->> + ? ? uint32_t *keymap;
->> + ? ? struct device_node *np = dev->of_node, *key_np;
->> + ? ? unsigned int key_count = 0;
->> +
->> + ? ? pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
->> + ? ? if (!pdata) {
->> + ? ? ? ? ? ? dev_err(dev, "could not allocate memory for platform data\n");
->> + ? ? ? ? ? ? return NULL;
->> + ? ? }
->> +
->> + ? ? of_property_read_u32(np, "samsung,keypad-num-rows", &pdata->rows);
->> + ? ? of_property_read_u32(np, "samsung,keypad-num-columns", &pdata->cols);
->
-> pdata->rows and ->cols needs to be changed to a u32 for this to be
-> safe.
+That's requirement really lead to this design choice. Just to add
+all ARM SOC's using GIC has a gic extension interrupt controller and
+follow the same approach for the secondary IRQCHIPO.
 
-Ok.
+Below points as such don't matter after the strict hardware
+requirement. Still .....
 
->
->> + ? ? if (!pdata->rows || !pdata->cols) {
->> + ? ? ? ? ? ? dev_err(dev, "number of keypad rows/columns not specified\n");
->> + ? ? ? ? ? ? return NULL;
->> + ? ? }
->> +
->> + ? ? keymap_data = devm_kzalloc(dev, sizeof(*keymap_data), GFP_KERNEL);
->> + ? ? if (!keymap_data) {
->> + ? ? ? ? ? ? dev_err(dev, "could not allocate memory for keymap data\n");
->> + ? ? ? ? ? ? return NULL;
->> + ? ? }
->> + ? ? pdata->keymap_data = keymap_data;
->> +
->> + ? ? for_each_child_of_node(np, key_np)
->> + ? ? ? ? ? ? key_count++;
->> +
->> + ? ? keymap_data->keymap_size = key_count;
->> + ? ? keymap = devm_kzalloc(dev, sizeof(uint32_t) * key_count, GFP_KERNEL);
->> + ? ? if (!keymap) {
->> + ? ? ? ? ? ? dev_err(dev, "could not allocate memory for keymap\n");
->> + ? ? ? ? ? ? return NULL;
->> + ? ? }
->> + ? ? keymap_data->keymap = keymap;
->> +
->> + ? ? for_each_child_of_node(np, key_np) {
->> + ? ? ? ? ? ? unsigned int row, col, key_code;
->
-> These need to be u32
 
-Ok.
+Let's say, we ignore the hardware recommendation and try
+to do what you are suggesting.
 
->
->> + ? ? ? ? ? ? of_property_read_u32(key_np, "keypad,row", &row);
->> + ? ? ? ? ? ? of_property_read_u32(key_np, "keypad,column", &col);
->> + ? ? ? ? ? ? of_property_read_u32(key_np, "keypad,key-code", &key_code);
->> + ? ? ? ? ? ? *keymap++ = KEY(row, col, key_code);
->> + ? ? }
->> +
->> + ? ? if (of_get_property(np, "linux,input-no-autorepeat", NULL))
->> + ? ? ? ? ? ? pdata->no_autorepeat = true;
->> + ? ? if (of_get_property(np, "linux,input-wakeup", NULL))
->> + ? ? ? ? ? ? pdata->wakeup = true;
->> +
->> + ? ? return pdata;
->> +}
->> +
->> +static void samsung_keypad_parse_dt_gpio(struct device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct samsung_keypad *keypad)
->> +{
->> + ? ? struct device_node *np = dev->of_node;
->> + ? ? int gpio, ret, row, col;
->> +
->> + ? ? for (row = 0; row < keypad->rows; row++) {
->> + ? ? ? ? ? ? gpio = of_get_named_gpio(np, "row-gpios", row);
->> + ? ? ? ? ? ? keypad->row_gpios[row] = gpio;
->> + ? ? ? ? ? ? if (!gpio_is_valid(gpio)) {
->> + ? ? ? ? ? ? ? ? ? ? dev_err(dev, "keypad row[%d]: invalid gpio %d\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? row, gpio);
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> + ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? ret = gpio_request(gpio, "keypad-row");
->> + ? ? ? ? ? ? if (ret)
->> + ? ? ? ? ? ? ? ? ? ? dev_err(dev, "keypad row[%d] gpio request failed\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? row);
->> + ? ? }
->> +
->> + ? ? for (col = 0; col < keypad->cols; col++) {
->> + ? ? ? ? ? ? gpio = of_get_named_gpio(np, "col-gpios", col);
->> + ? ? ? ? ? ? keypad->col_gpios[col] = gpio;
->> + ? ? ? ? ? ? if (!gpio_is_valid(gpio)) {
->> + ? ? ? ? ? ? ? ? ? ? dev_err(dev, "keypad column[%d]: invalid gpio %d\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? col, gpio);
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> + ? ? ? ? ? ? }
->> +
->> + ? ? ? ? ? ? ret = gpio_request(col, "keypad-col");
->> + ? ? ? ? ? ? if (ret)
->> + ? ? ? ? ? ? ? ? ? ? dev_err(dev, "keypad column[%d] gpio request failed\n",
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? col);
->> + ? ? }
->> +}
->> +
->> +static void samsung_keypad_dt_gpio_free(struct samsung_keypad *keypad)
->> +{
->> + ? ? int cnt;
->> +
->> + ? ? for (cnt = 0; cnt < keypad->rows; cnt++)
->> + ? ? ? ? ? ? if (gpio_is_valid(keypad->row_gpios[cnt]))
->> + ? ? ? ? ? ? ? ? ? ? gpio_free(keypad->row_gpios[cnt]);
->> +
->> + ? ? for (cnt = 0; cnt < keypad->cols; cnt++)
->> + ? ? ? ? ? ? if (gpio_is_valid(keypad->col_gpios[cnt]))
->> + ? ? ? ? ? ? ? ? ? ? gpio_free(keypad->col_gpios[cnt]);
->> +}
->> +#else
->> +static
->> +struct samsung_keypad_platdata *samsung_keypad_parse_dt(struct device *dev)
->> +{
->> + ? ? return NULL;
->> +}
->> +
->> +static void samsung_keypad_parse_dt_gpio(struct device *dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct samsung_keypad *keypad)
->> +{
->> +}
->> +
->> +static void samsung_keypad_dt_gpio_free(struct samsung_keypad *keypad)
->> +{
->> +}
->> +#endif
->> +
->> ?static int __devinit samsung_keypad_probe(struct platform_device *pdev)
->> ?{
->> ? ? ? const struct samsung_keypad_platdata *pdata;
->> @@ -246,7 +366,10 @@ static int __devinit samsung_keypad_probe(struct platform_device *pdev)
->> ? ? ? unsigned int keymap_size;
->> ? ? ? int error;
->>
->> - ? ? pdata = pdev->dev.platform_data;
->> + ? ? if (pdev->dev.of_node)
->> + ? ? ? ? ? ? pdata = samsung_keypad_parse_dt(&pdev->dev);
->> + ? ? else
->> + ? ? ? ? ? ? pdata = pdev->dev.platform_data;
->> ? ? ? if (!pdata) {
->> ? ? ? ? ? ? ? dev_err(&pdev->dev, "no platform data defined\n");
->> ? ? ? ? ? ? ? return -EINVAL;
->> @@ -303,6 +426,16 @@ static int __devinit samsung_keypad_probe(struct platform_device *pdev)
->> ? ? ? keypad->cols = pdata->cols;
->> ? ? ? init_waitqueue_head(&keypad->wait);
->>
->> + ? ? if (pdev->dev.of_node) {
->> + ? ? ? ? ? ? samsung_keypad_parse_dt_gpio(&pdev->dev, keypad);
->> +#ifdef CONFIG_OF
->> + ? ? ? ? ? ? keypad->type = of_device_is_compatible(pdev->dev.of_node,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "samsung,s5pv210-keypad");
->> +#endif
->
-> It is odd having the #ifdef around only part of the if() block.
+How will you know while entering in idle which IRQ's to be
+masked and which are to be unmasked ?
+The only way is to run though entire 1024 possible IRQ's from GIC
+and then check the state of each IRQ and set things accordingly.
+At GIC level, mask and unmask registers are different so you will
+end up reading those many registers. That also means you need to
+export some non-standard APIs from GIC driver.
 
-I did not want to do it this way. But any other way would have
-increased the number of lines added. If is against the coding rules or
-style, I will change it.
+In system wide suspend, the core irq code, communicates
+the wakeup and non-wakeup functionality using standard mask/
+unmask APIs when used with IRQCHIP_MASK_ON_SUSPEND.
+With what you are suggesting it won't work
+as desired. Because that information is only passed
+to the IRQ chips. So you will still need IRQCHIP and
+mask/unmask APIs. That can be done as part of set_wake()
+handler as well though.
 
->
->> + ? ? } else {
->> + ? ? ? ? ? ? keypad->type = platform_get_device_id(pdev)->driver_data;
->> + ? ? }
->> +
->> ? ? ? input_dev->name = pdev->name;
->> ? ? ? input_dev->id.bustype = BUS_HOST;
->> ? ? ? input_dev->dev.parent = &pdev->dev;
->> @@ -343,12 +476,19 @@ static int __devinit samsung_keypad_probe(struct platform_device *pdev)
->>
->> ? ? ? device_init_wakeup(&pdev->dev, pdata->wakeup);
->> ? ? ? platform_set_drvdata(pdev, keypad);
->> +
->> + ? ? if (pdev->dev.of_node) {
->> + ? ? ? ? ? ? devm_kfree(&pdev->dev, (void *)pdata->keymap_data->keymap);
->> + ? ? ? ? ? ? devm_kfree(&pdev->dev, (void *)pdata->keymap_data);
->> + ? ? ? ? ? ? devm_kfree(&pdev->dev, (void *)pdata);
->> + ? ? }
->
-> Don't need to do this. ?The driver core will take care of freeing the
-> devm for you when removed.
+The wakeupgen is within CPU cluster and the accesses
+to it are not as expensive as like accessing 32 K timer or
+GP timer.
 
-Dmitry Torokhov suggested that since the allocated pdata is not used
-after the probe, it can be deallocated to save some memory. So this
-was added.
+By making the wakeupgen as an IRQCHIP, we meet the hardware
+requirement and also make use of this IP properly for the
+desired functionality using standard IRQCHIP interfaces
+No need of non-standard hacking.
 
->
-> A few things that should be fixed up, but otherwise looks pretty good.
->
+It also avoid platform code monkeing with common GIC code
+and irq subsystem to hack the stuff.
 
-Thanks for your review and suggestions.
+Btw, not exactly related here, but because of common code consolidation, 
+we need to actually use GIC common
+save/restore hooks, even though OMAP has very
+optimal software save and hardware restore mechanism
+for GIC.
 
-Regards,
-Thomas.
+Hope this email summarise all previous multiple discussions
+in one place.
 
-[...]
+Regards
+Santosh
