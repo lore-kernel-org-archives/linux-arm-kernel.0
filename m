@@ -1,117 +1,110 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 14 Sep 2011 14:46:12 +0800
-Subject: [PATCH] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <CABb+yY3F+DMn2SxeO0chjpiMBkgLvSK5EVYMdhQsfQoZNZ4_7Q@mail.gmail.com>
-References: <1315374075-15479-1-git-send-email-Baohua.Song@csr.com>
-	<438BB0150E931F4B9CE701519A4463010871804A46@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4x4S+8d3xS+QTrjDpoxcHo3p7qArd7yFr=+h1vxSRvEpA@mail.gmail.com>
-	<438BB0150E931F4B9CE701519A4463010871804A48@bgsmsx502.gar.corp.intel.com>
-	<CAGsJ_4yeovNP=6CKTafbxrBTrYQ42B9yvAOM8gM_bYqD6mTnUw@mail.gmail.com>
-	<CABb+yY1=P=D3GFFxMOUM0a2yWCiAHNqwVU0a--t+pJnUhqKHKA@mail.gmail.com>
-	<CABb+yY3F+DMn2SxeO0chjpiMBkgLvSK5EVYMdhQsfQoZNZ4_7Q@mail.gmail.com>
-Message-ID: <CAGsJ_4x0isAUgmTkRavUC6p3K38ho70A+q8Pp2cMLnxbgMEL7Q@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 14 Sep 2011 08:55:01 +0200
+Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
+	online/active
+In-Reply-To: <4E6FFF0E.4070302@am.sony.com>
+References: <20110908215314.829452535@linutronix.de>
+	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
+	<20110913133258.GA6267@n2100.arm.linux.org.uk>
+	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+	<20110913175312.GB6267@n2100.arm.linux.org.uk>
+	<4E6FFF0E.4070302@am.sony.com>
+Message-ID: <CAKfTPtBJ=W3AQU5YsDwgm948+8pz4Jq8TuikSUKdUNvKy=LKXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
-2011/9/8 Jassi Brar <jassisinghbrar@gmail.com>:
-> On Thu, Sep 8, 2011 at 8:47 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Thu, Sep 8, 2011 at 7:42 AM, Barry Song <21cnbao@gmail.com> wrote:
+On 14 September 2011 03:10, Frank Rowand <frank.rowand@am.sony.com> wrote:
+> On 09/13/11 10:53, Russell King - ARM Linux wrote:
+>> On Tue, Sep 13, 2011 at 07:22:16PM +0200, Vincent Guittot wrote:
+>>> The assumption done in the 1st patch that smp_store_cpu_info can be
+>>> delayed is no more true. The smp_store_cpu_info is now also used to
+>>> store the cpu topology information
+>>> (https://lkml.org/lkml/2011/7/5/209). This must be done before calling
+>>> sched_init_smp, which will use this information for building
+>>> sched_domain.
+>>> If we move set_cpu_online before smp_store_cpu_info, sched_init_smp
+>>> can be called before having called smp_store_cpu_info on all cpus.
 >>
->>>>> it is much different with primacell based DMA like pl080, pl330.
->>>>> prima2 has a self-defined DMAC IP. basically it is a 2D mode dma with
->>>>> two scales X and Y and direct way to start and stop DMA.
->>>>> every channel has fixed function to serve only one perpheral. so you
->>>>> find we have a filter id.
->>>> okay, what do you mean by 2D mode? Is it similar to what TI folks, Linus
->>>> W and Jassi Brar posted RFC's on?
->>>
->>> In SiRFprimaII 2-D DMA, the system memory space is interpreted
->>> as a 2-D layout instead of a linear 1-D layout. More specifically, the
->>> system memory can be considered as
->>> multiple data lines. The length of the data line is determined by the
->>> user-selected DMA_WIDTH register.
->>> The user can specify a data window that the user wants to access using
->>> four parameters:
->>> ? Start address
->>> ? X length
->>> ? Y length
->>> ? Width
->>>
->>> The idea of a 2-D DMA is shown in figure 2d-dma.png attached.
->>>
->>> If you specifies the Y length as 0 or the X length equals to the DMA
->>> width, then this 2-D DMA reduces to
->>> 1-D. If the user configures the X length greater than the DMA width,
->>> then the extra data is wrapped around
->>> to the next data line, this may corrupt the DMA transfer for
->>> multiple-line 2-D DMA. If this is a 1-D DMA, then
->>> there is no issue. The attached diagram 2d-dma2.png shows the
->>> wrap-around of the extra data in case the X length
->>> greater than DMA width.
+>> Right. ?We hold off returning from cpu_up() by watching for the upcoming
+>> CPU setting its online bit.
 >>
->> Sorry, the role of DMA_WIDTH is not clear to me yet.
->> In which case the user _must_ set {xlen > width} ?
+>> The bug which Thomas' patch introduces is to move the setting of that
+>> before we've finished bringing the CPU up - specifically, allowing the
+>> requesting CPU to continue while the brought-up CPU is still calibrating
+>> loops_per_jiffy, and before it's stored that information and setup the
+>> scheduler domain information.
 >>
-> Perhaps 2d-dma.PNG is inaccurate - it shouldn't depict any deltaX.
-> Doesn't xlen and width always start together ? If no, please don't read ahead.
+>> The other issue is that moving the marking of the CPU online in the
+>> way Thomas has means that we then invite the delivery of IPIs to the
+>> CPU which is still in the process of coming up. ?Whether that's an
+>> issue depends on what the IPIs are.
+>>
+>> So, we must have the setting of CPU online _after_ we've setup the
+>> scheduler domain information etc - so the following is a strict
+>> ordering:
+>>
+>> 1. calibrate_delay()
+>> 2. smp_store_cpu_info()
+>> 3. set_cpu_online()
+>>
+>> Now, the question is do we need interrupts enabled to setup timers
+>> via percpu_timer_setup() and calibrate delay. ?Can we move enabling
+>> interrupts after smp_store_cpu_info(). ?IOW, instead of moving the
+>> setting of cpu online before all this, can we move notify_cpu_starting()
+>> and the enabling of _both_ interrupts after smp_store_cpu_info()...
+>> No idea at the moment.
 >
-> According to figures, {xlen > width} is to be set _only_ when a transfer
-> is divided into _exactly_ two chunks separated by gap _exactly_
-> equal to length of the second chunk (an extremely rare case).
+> Modified the patch from Thomas to move enabling interrupts after
+> smp_store_cpu_info(), as suggested by Russell.
 >
-> Anyways, every case can be easily expressed using the generic api
-> I proposed. See 'struct xfer_template' in https://lkml.org/lkml/2011/8/12/128
+> Tested on RealView (3.0.1, 3.0.1-rt11), Panda (3.0.0, 3.0.3-rt12).
 >
-> Roughly speaking, the following should be done...
-> Client driver :-
-> **************
-> For a 'Rectangular' transfer (2d-dma.PNG) :-
-> ? ? ?xfer_template.numf = Ylen; ?/* height of rectangle */
-> ? ? ?xfer_template.frame_size = 1;
-> ? ? ?xfer_template.sgl[0].size = Xlen; /* width of rectangle */
-> ? ? ?xfer_template.sgl[0].icg = start_addr_Y(n) - end_addr_Y(n-1);
-
-For prima2:
-
-xfer_template.numf = ylen + 1
-xfer_template.frame_size = 1;
-xfer_template.sgl[0].size = xlen;
-xfer_template.sgl[0].icg = dma_width - xlen;
-
+> The calibrate_delay() is platform specific, so be aware that there are
+> more platforms that I did not test.
 >
-> For the "A Line and some" transfer (2d-dma2.PNG) :-
-> ? ? ?xfer_template.numf = 1;
-> ? ? ?xfer_template.frame_size = 2;
-> ? ? ?xfer_template.sgl[0].size = xlen1; /* a line */
-> ? ? ?xfer_template.sgl[1].size = xlen2; ?/* and some */
-> ? ? ?xfer_template.sgl[0].icg = start_addr_Y(n) - end_addr_Y(n-1);
-> ? ? ?xfer_template.sgl[1].icg = 0; /* doesn't matter */
->
-> DMAC driver :-
-> ***************
-> ? ? ?if (xfer_template.frame_size == 1) {
-> ? ? ? ? ? /* rectangle */
-> ? ? ? ? ? schan->xlen = xfer_template.sgl[0].size;
-> ? ? ? ? ? schan->width = schan->xlen + xfer_template.sgl[0].icg;
-> ? ? ?} else if (xfer_template.frame_size == 2 &&
-> ? ? ? ? ? ? ? ? ?xfer_template.numf == 1 &&
-> ? ? ? ? ? ? ? ? ?xfer_template.sgl[1].size == xfer_template.sgl[0].icg){
-> ? ? ? ? ? /* a line and some */
-> ? ? ? ? ? schan->xlen = xfer_template.sgl[0].size + ?xfer_template.sgl[1].size.
-> ? ? ? ? ? schan->width = xfer_template.sgl[0].size;
-> ? ? ?} else {
-> ? ? ? ? ? /* _Hardware_ doesn't support the transfer as such. *
-> ? ? ? ? ? return -EINVAL;
-> ? ? ?}
-> ? ? ?schan->ylen = xfer_template.numf /* -1? */;
+> Note that these kernel versions do not have the store_cpu_topology()
+> that Vincent pointed out.
 >
 
-For prima2:
-xfer_template.frame_size is always 1, then
-schan->xlen = xfer_template.sgl[0].size;
-schan->width = schan->xlen + xfer_template.sgl[0].icg;
+I have tested your patch on a snowball with a kernel based on 3.1-rc4
+and cpu topology patch
 
-Thanks
-barry
+> Signed-off-by: Frank Rowand <frank.rowand@am.sony.com>
+> ---
+> ?arch/arm/kernel/smp.c | ? 14 ? 7 + ? ? 7 - ? ? 0 !
+> ?1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> Index: b/arch/arm/kernel/smp.c
+> ===================================================================
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -303,13 +303,6 @@ asmlinkage void __cpuinit secondary_star
+> ? ? ? ?platform_secondary_init(cpu);
+>
+> ? ? ? ?/*
+> - ? ? ? ?* Enable local interrupts.
+> - ? ? ? ?*/
+> - ? ? ? notify_cpu_starting(cpu);
+> - ? ? ? local_irq_enable();
+> - ? ? ? local_fiq_enable();
+> -
+> - ? ? ? /*
+> ? ? ? ? * Setup the percpu timer for this CPU.
+> ? ? ? ? */
+> ? ? ? ?percpu_timer_setup();
+> @@ -328,6 +321,13 @@ asmlinkage void __cpuinit secondary_star
+> ? ? ? ? ? ? ? ?cpu_relax();
+>
+> ? ? ? ?/*
+> + ? ? ? ?* Enable local interrupts.
+> + ? ? ? ?*/
+> + ? ? ? notify_cpu_starting(cpu);
+> + ? ? ? local_irq_enable();
+> + ? ? ? local_fiq_enable();
+> +
+> + ? ? ? /*
+> ? ? ? ? * OK, it's off to the idle thread for us
+> ? ? ? ? */
+> ? ? ? ?cpu_idle();
+>
+>
