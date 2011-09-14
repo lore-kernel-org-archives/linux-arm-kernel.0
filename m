@@ -1,48 +1,85 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 14 Sep 2011 18:44:50 +0200 (CEST)
-Subject: [PATCH 2/5] irq: fix existing domain check in irq_domain_add
-In-Reply-To: <1316017900-19918-3-git-send-email-robherring2@gmail.com>
-References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
-	<1316017900-19918-3-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1109141838510.2723@ionos>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 14 Sep 2011 17:47:23 +0100
+Subject: [RFC 1/2] virtio: Add AMBA bus driver for virtio device
+In-Reply-To: <87ehzkht7x.fsf@rustcorp.com.au>
+References: <1314966257-7503-1-git-send-email-pawel.moll@arm.com>
+	<1314966257-7503-2-git-send-email-pawel.moll@arm.com>
+	<877h5e5yxp.fsf@rustcorp.com.au>
+	<1315845956.3297.7.camel@hornet.cambridge.arm.com>
+	<87hb4h408d.fsf@rustcorp.com.au>
+	<1315906832.3297.41.camel@hornet.cambridge.arm.com>
+	<87ehzkht7x.fsf@rustcorp.com.au>
+Message-ID: <1316018843.3297.96.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Sep 2011, Rob Herring wrote:
-
-> From: Rob Herring <rob.herring@calxeda.com>
+> > 2. "Select word -> read flags" interface:
+> > 
+> >  *  0x010   32  HostFeaturesFlags  Features supported by the host
+> >  *  0x014   32  HostFeaturesWord   Set of features to access
+> > 
+> >  *  0x020   32  GuestFeaturesFlags Features activated by the guest
+> >  *  0x024   32  GuestFeaturesWord  Set of features to set
+> > 
+> > In this case the algorithm would be:
+> > 
+> > 	writel(0, HostFeaturesWord);
+> > 	bits_0_31 = readl(HostFeaturesFlags);
+> > 	writel(1, HostFeaturesWord);
+> > 	bits_32_63 = readl(HostFeaturesFlags);
+> > 	<etc>
+> > 
+> > The latter seems more "future-proof" to me, if slightly more complex...
+> > Any other suggestions?
 > 
-> irq_data will normally exist, so the domain was prevented from being set.
-> The simple domain code did not hit this as nr_irq is always 0.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
+> The former is almost certainly sufficient (remember, we can abuse the
+> final feature bit to indicate there are extended features somewhere
+> else, if we really have to).  But agree the latter is preferable: this
+> isn't time-critical.
 
-I take this and 1/5 through irq/urgent
+Ok, I'll do this in v3 then.
 
-Thanks,
+> > > We can sort that out later... the Guest may try some ambitious large
+> > > allocation and fall back if it fails.
+> > 
+> > So, to my mind, the negotiations could look like this (from the Guest's
+> > point of view):
+> > 
+> > 1. (optional) The Guest is asking what size is "suggested" by the Host:
+> > 
+> > 	size = readl(QueueNum);
+> > 
+> > 2. The Guest requests size it would like to use:
+> > 
+> > 	writel(optimal_size(size), QueueNum);
+> > 
+> > 3. The Host does the best it can to accommodate the Guest and the Guest
+> > checks the effective size:
+> > 
+> > 	size = real(QueueNum);
+> > 
+> > Does it make some sense?
+> 
+> Does Host care?  It is sufficient for it to publish min/max values?
 
-	tglx
+Hm. You're right, it should no care. Most likely the queue size will
+impact some Host's memory allocation size, but that's the Host's
+problem :-)
 
-> ---
->  kernel/irq/irqdomain.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index d5828da..84f4110 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -29,7 +29,7 @@ void irq_domain_add(struct irq_domain *domain)
->  	 */
->  	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
->  		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
-> -		if (d || d->domain) {
-> +		if (d && d->domain) {
->  			/* things are broken; just report, don't clean up */
->  			WARN(1, "error: irq_desc already assigned to a domain");
->  			return;
-> -- 
-> 1.7.5.4
-> 
-> 
+At the same time, how the Host would know what the max value is?
+
+Generally it looks like the matter was getting back to value suggested
+by the Host (as it is now) that may be changed by the Guest. Single R/W
+register should be fine, I believe?
+
+> You might want to throw the alignment value in there; there has been
+> talk about adding that to PCI, for really small rings (less than a
+> page).
+
+Sure thing, will do.
+
+v3 will be ready tomorrow.
+
+Cheers!
+
+Pawe?
