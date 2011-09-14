@@ -1,107 +1,70 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 14 Sep 2011 20:50:42 +0900
-Subject: [PATCH 2/2] ARM: Exynos4: use s5p-timer for UniversalC210 board
-In-Reply-To: <CAH9JG2V6Sfjmjupj5oBd_5vziBa4iezBpRfK9tNECrFO5sSfLw@mail.gmail.com>
-References: <1311659456-6659-1-git-send-email-m.szyprowski@samsung.com>
-	<1311659456-6659-3-git-send-email-m.szyprowski@samsung.com>
-	<CAH9JG2V6Sfjmjupj5oBd_5vziBa4iezBpRfK9tNECrFO5sSfLw@mail.gmail.com>
-Message-ID: <007701cc72d4$8822d880$98688980$%kim@samsung.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 14 Sep 2011 05:54:46 -0600 (MDT)
+Subject: [PATCH] OMAP2+: hwmod: remove OMAP_CHIP*
+In-Reply-To: <CANOLnOOkz2ZkhPSafTLxUUH2bSVoRrYA44-C1+yku8naYaRz3w@mail.gmail.com>
+References: <alpine.DEB.2.00.1109042042250.9056@utopia.booyaka.com>
+	<CANOLnOOkz2ZkhPSafTLxUUH2bSVoRrYA44-C1+yku8naYaRz3w@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1109140546300.27954@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kyungmin Park wrote:
-> 
-> Hi,
-> 
-> It's required for boot universal c210 w/ EVT0 chip.
-> Can you include it at 3.1 fixed branch?
-> 
-Sure, will apply into samsung-fixes for 3.1.
+Hello Gra?vydas,
 
-Thanks.
+On Mon, 5 Sep 2011, Grazvydas Ignotas wrote:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> Thank you,
-> Kyungmin Park
+> On Mon, Sep 5, 2011 at 5:43 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> > index 84cc0bd..d7138070 100644
+> > --- a/arch/arm/mach-omap2/omap_hwmod.c
+> > +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> <snip>
 > 
-> On Tue, Jul 26, 2011 at 2:50 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
-> > Commit 069d4e743 removed support for local timers and forced to use MCT
-as
-> > event source. However MCT is not operating properly on early revision
-(EVT0)
-> > of Exynos4 SoCs. All UniversalC210 boards are based on Exynos4 EVT0, so
-> that
-> > commit broke support for it. This patch provides a workaround that
-enables
-> > UniversalC210 boards to boot again. s5p-timer is used as an event
-source.
 > >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> > ?arch/arm/mach-exynos4/Kconfig ? ? ? ? ? ? ? | ? ?3 +++
-> > ?arch/arm/mach-exynos4/mach-universal_c210.c | ? ?4 +++-
-> > ?2 files changed, 6 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos4/Kconfig
-b/arch/arm/mach-exynos4/Kconfig
-> > index 9d62e13..2aad73f 100644
-> > --- a/arch/arm/mach-exynos4/Kconfig
-> > +++ b/arch/arm/mach-exynos4/Kconfig
-> > @@ -173,6 +173,9 @@ config MACH_ARMLEX4210
-> > ?config MACH_UNIVERSAL_C210
-> > ? ? ? ?bool "Mobile UNIVERSAL_C210 Board"
-> > ? ? ? ?select CPU_EXYNOS4210
-> > + ? ? ? select S5P_HRT
-> > + ? ? ? select CLKSRC_MMIO
-> > + ? ? ? select HAVE_SCHED_CLOCK
-> > ? ? ? ?select S5P_GPIO_INT
-> > ? ? ? ?select S5P_DEV_FIMC0
-> > ? ? ? ?select S5P_DEV_FIMC1
-> > diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c
-b/arch/arm/mach-
-> exynos4/mach-universal_c210.c
-> > index 0e280d1..ca9e7b7 100644
-> > --- a/arch/arm/mach-exynos4/mach-universal_c210.c
-> > +++ b/arch/arm/mach-exynos4/mach-universal_c210.c
-> > @@ -34,6 +34,7 @@
-> > ?#include <plat/mfc.h>
-> > ?#include <plat/sdhci.h>
-> > ?#include <plat/pd.h>
-> > +#include <plat/s5p-time.h>
-> >
-> > ?#include <mach/map.h>
-> >
-> > @@ -730,6 +731,7 @@ static void __init universal_map_io(void)
-> > ? ? ? ?s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-> > ? ? ? ?s3c24xx_init_clocks(24000000);
-> > ? ? ? ?s3c24xx_init_uarts(universal_uartcfgs,
-ARRAY_SIZE(universal_uartcfgs));
-> > + ? ? ? s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
-> > ?}
-> >
-> > ?static void __init universal_reserve(void)
-> > @@ -766,6 +768,6 @@ MACHINE_START(UNIVERSAL_C210,
-> "UNIVERSAL_C210")
-> > ? ? ? ?.init_irq ? ? ? = exynos4_init_irq,
-> > ? ? ? ?.map_io ? ? ? ? = universal_map_io,
-> > ? ? ? ?.init_machine ? = universal_machine_init,
-> > - ? ? ? .timer ? ? ? ? ?= &exynos4_timer,
-> > + ? ? ? .timer ? ? ? ? ?= &s5p_timer,
-> > ? ? ? ?.reserve ? ? ? ?= &universal_reserve,
-> > ?MACHINE_END
-> > --
-> > 1.7.1.569.g6f426
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe
-linux-samsung-soc" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> >
+> > ?int __init omap3xxx_hwmod_init(void)
+> > ?{
+> > - ? ? ? return omap_hwmod_register(omap3xxx_hwmods);
+> > + ? ? ? int r;
+> > + ? ? ? struct omap_hwmod **h = NULL;
+> > +
+> > + ? ? ? /* Register hwmods common to all OMAP3 */
+> > + ? ? ? r = omap_hwmod_register(omap3xxx_hwmods);
+> > + ? ? ? if (!r)
+> > + ? ? ? ? ? ? ? return r;
+> > +
+> > + ? ? ? /*
+> > + ? ? ? ?* Register hwmods common to individual OMAP3 families, all
+> > + ? ? ? ?* silicon revisions (e.g., 34xx, or AM3505/3517, or 36xx)
+> > + ? ? ? ?* All possible revisions should be included in this conditional.
+> > + ? ? ? ?*/
+> > + ? ? ? if (omap_rev() == OMAP3430_REV_ES1_0 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES2_0 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES2_1 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_0 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_1 ||
+> > + ? ? ? ? ? omap_rev() == OMAP3430_REV_ES3_1_2) {
+> > + ? ? ? ? ? ? ? h = omap34xx_hwmods;
+> > + ? ? ? } else if (omap_rev() & OMAP3505_REV(0)) {
+> > + ? ? ? ? ? ? ? h = am35xx_hwmods;
+> 
+> This check will be always true I think?
+
+Thanks for the review; you are absolutely right and this will be fixed.
+
+> Why not just use cpu_is_omap3xxx() for these tests, since it does same
+> omap_rev() call but only once per family?
+
+cpu_is_omap*() doesn't do what one would expect :-(
+
+For example, cpu_is_omap34xx() returns 1 on not only 34xx, but also 36xx 
+and 3517/3505.  Unfortunately, we don't currently do a good job of 
+separating SoC family detection from individual SoC detection.
+
+If your objection is to the multiple calls to omap_rev(), those do indeed 
+appear in the source to be potentially expensive function calls -- 
+although the compiler should inline them.  Just to be sure, the 
+next revision will use a variable.
+
+regards
+
+
+- Paul
