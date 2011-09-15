@@ -1,22 +1,23 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 15 Sep 2011 13:04:28 -0300
-Subject: gpio_ensure_requested error on mx31pdk boot
-In-Reply-To: <20110915071427.GD11297@pengutronix.de>
-References: <CAOMZO5AmM2yd5FopjNO9QsPNLZiBNH3U29_xXPV3cnZnB9EjtQ@mail.gmail.com>
-	<20110915071427.GD11297@pengutronix.de>
-Message-ID: <CAOMZO5DcPCVy9uMXPXd3Kmam1XcCjYPcEU_O8pvy2uhM17eseQ@mail.gmail.com>
+From: albert.arquer@gmail.com (Albert)
+Date: Thu, 15 Sep 2011 15:59:12 +0000 (UTC)
+Subject: Freescale i.mx25 SDIO/Libertas issue
+References: <4DE2F84D.8080907@bluewatersys.com>
+	<4DE44F16.8050407@bluewatersys.com>
+Message-ID: <loom.20110915T174853-849@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/15 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-...
-> I havn't seen it. Just in case you don't know, that means a gpio was
-> used without being (successfully) requested. On the other hand I wonder
-> if GPIO-0 is correct here?!
+Hi people, my company is also considering developing a platform for 
+the MX25 including a wifi module based on marvell's 8686 chip using 
+the SDIO interface. I am not very experienced in the topic and right now
+ we are only trying to establish some especifications and making a budget.
+I just wanted to know wether it is hard to get all this going.
 
-I managed to fix this. It is a bug in the spi-imx driver. Patch will
-be sent shortly.
+I have read all this thread but i don't really get what the real problem is, 
+specially when somebody talks about some firmware and kernel configuration....
 
-Regards,
+I just expected to connect the module to the SDIO bus loading the driver 
+the and configuring some stuff (wifi-network, access key etc.) what am I missing?
+I just wanna know if a rocky like me will be able to pull through with all this.
 
-Fabio Estevam
+Thanks a lot :P
