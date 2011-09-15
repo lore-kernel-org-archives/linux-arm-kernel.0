@@ -1,25 +1,26 @@
-From: girish.shivananjappa@linaro.org (Girish K S)
-Date: Thu, 15 Sep 2011 17:28:05 +0530
-Subject: confusion regarding the CMD19 and CMD21 in eMMC/SD card spec
-Message-ID: <CAGxe1ZH=mrAdfVR7Uw8mYNAD43BAbW7VGuhA1pN9hbSjTG9HVA@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 15 Sep 2011 08:32:02 -0300
+Subject: [PATCHv2 3/3] picoxcell: add the DTS for the PC7302 board
+In-Reply-To: <1314196906-20709-4-git-send-email-jamie@jamieiles.com>
+References: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
+	<1314196906-20709-4-git-send-email-jamie@jamieiles.com>
+Message-ID: <1316086322.2602.1.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
-             The eMMC 4.5 specification mentions that the CMD21 in
-class 2 is a SEND_TUNING BLOCK command. where as the SD card
-specification
-in the given link says CMD19 in class 2 is the SEND_TUNING_BLOCK
-http://www.scribd.com/doc/50685191/53/Figure-4-8-Send-Tuning-Block-Command.
-Also the implementation in the drivers/mmc/host/sdhci.c uses the CMD19
-as the SEND_TUNING_BLOCK.
-Can anybody clarify why there is overlapping in this command number.
-May be my understand is wrong.
+On Wed, 2011-08-24 at 15:41 +0100, Jamie Iles wrote:
 
-In the MMC spec the CMD19 is BUS_TEST_W in class 0 and CMD21 is
-reserved till eMMC 4.41 version.
-But in the SD specification (given link) CMD19 is SEND_TUNING_BLOCK
-and CMD21 is reserved.
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk loglevel=9 root=ubi0:rootfs rw rootfstype=ubifs ubi.mtd=5,2048";
+> +		linux,stdout-path = &uart0;
+> +	};
 
-Thanks and regards
-Girish K S
+Hrm... we don't normally put the bootargs in the device-tree.
+
+Either you have a way to pass it from a previous firmware (which
+can then slap it into the device-tree at runtime), or you
+can have a way to compile it in the kernel image but the device-tree
+isn't the right place for it.
+
+Cheers,
+Ben.
