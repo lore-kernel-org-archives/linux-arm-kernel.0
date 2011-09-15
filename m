@@ -1,90 +1,55 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 15 Sep 2011 20:17:07 +0200
-Subject: [PATCH] spi/imx: Fix spi-imx when the hardware SPI chipselects
-	are used
-In-Reply-To: <1316103406-16401-1-git-send-email-fabio.estevam@freescale.com>
-References: <1316103406-16401-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110915181707.GC29357@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 15 Sep 2011 13:17:32 -0500
+Subject: [RFC PATCH 03/11] DT: regulator: Helper routine to extract
+	regulator_init_data
+In-Reply-To: <20110915134427.GJ7988@opensource.wolfsonmicro.com>
+References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
+	<1316085727-15023-2-git-send-email-rnayak@ti.com>
+	<1316085727-15023-3-git-send-email-rnayak@ti.com>
+	<1316085727-15023-4-git-send-email-rnayak@ti.com>
+	<20110915134427.GJ7988@opensource.wolfsonmicro.com>
+Message-ID: <4E72413C.7020508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 01:16:46PM -0300, Fabio Estevam wrote:
-> commit 22a85e4cd51 (spi/imx: add device tree probe support) broke spi-imx usage
-> when the SPI chipselect is the one internal to the controller.
+On 09/15/2011 08:44 AM, Mark Brown wrote:
+> On Thu, Sep 15, 2011 at 04:51:59PM +0530, Rajendra Nayak wrote:
 > 
-> On a mx31pdk board the following error is seen:
+>>  .../devicetree/bindings/regulator/regulator.txt    |   37 +++++++++
+>>  drivers/of/Kconfig                                 |    6 ++
+>>  drivers/of/Makefile                                |    1 +
+>>  drivers/of/of_regulator.c                          |   85 ++++++++++++++++++++
+>>  include/linux/of_regulator.h                       |   23 +++++
 > 
-> Registering mxc_nand as whole device
-> ------------[ cut here ]------------
-> WARNING: at drivers/gpio/gpiolib.c:101 gpio_ensure_requested+0x4c/0xf4()
-> autorequest GPIO-0
-> Modules linked in:
-> [<c0014410>] (unwind_backtrace+0x0/0xf4) from [<c0025754>] (warn_slowpath_common+0x4c/0x64)
-> [<c0025754>] (warn_slowpath_common+0x4c/0x64) from [<c0025800>] (warn_slowpath_fmt+0x30/0x40)
-> [<c0025800>] (warn_slowpath_fmt+0x30/0x40) from [<c0198688>] (gpio_ensure_requested+0x4c/0xf4)
-> [<c0198688>] (gpio_ensure_requested+0x4c/0xf4) from [<c01988c8>] (gpio_direction_output+0xa0/0x138)
-> [<c01988c8>] (gpio_direction_output+0xa0/0x138) from [<c01ed198>] (spi_imx_setup+0x38/0x4c)
-> [<c01ed198>] (spi_imx_setup+0x38/0x4c) from [<c01eb5d0>] (spi_setup+0x38/0x50)
-> [<c01eb5d0>] (spi_setup+0x38/0x50) from [<c01eb85c>] (spi_add_device+0x94/0x124)
-> [<c01eb85c>] (spi_add_device+0x94/0x124) from [<c01eb960>] (spi_new_device+0x74/0xac)
-> [<c01eb960>] (spi_new_device+0x74/0xac) from [<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40)
-> [<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40) from [<c01eba88>] (spi_register_master+0xb0/0x104)
-> [<c01eba88>] (spi_register_master+0xb0/0x104) from [<c01ec0b4>] (spi_bitbang_start+0x104/0x17c)
-> [<c01ec0b4>] (spi_bitbang_start+0x104/0x17c) from [<c02c2c4c>] (spi_imx_probe+0x2fc/0x404)
-> [<c02c2c4c>] (spi_imx_probe+0x2fc/0x404) from [<c01c2498>] (platform_drv_probe+0x18/0x1c)
-> [<c01c2498>] (platform_drv_probe+0x18/0x1c) from [<c01c1058>] (driver_probe_device+0x78/0x174)
-> [<c01c1058>] (driver_probe_device+0x78/0x174) from [<c01c11e0>] (__driver_attach+0x8c/0x90)
-> [<c01c11e0>] (__driver_attach+0x8c/0x90) from [<c01c0860>] (bus_for_each_dev+0x60/0x8c)
-> [<c01c0860>] (bus_for_each_dev+0x60/0x8c) from [<c01c0088>] (bus_add_driver+0xa0/0x288)
-> [<c01c0088>] (bus_add_driver+0xa0/0x288) from [<c01c179c>] (driver_register+0x78/0x18c)
-> [<c01c179c>] (driver_register+0x78/0x18c) from [<c0008490>] (do_one_initcall+0x34/0x178)
-> [<c0008490>] (do_one_initcall+0x34/0x178) from [<c03a5204>] (kernel_init+0x74/0x118)
-> [<c03a5204>] (kernel_init+0x74/0x118) from [<c000f65c>] (kernel_thread_exit+0x0/0x8)
-> ---[ end trace 759f924b30fd5a44 ]---
+> Don't go hiding the bindings for things away from the code they're
+> binding.  Bindings for the regualtor API are a regulator API thing and
+> should be part of the regulator API code.
 > 
-> Fix this issue by using the original chip select logic and make spi-imx to work again.
+
+Agreed, but FYI not all subsystem maintainers agree. Moving of_i2c.c
+into i2c was rejected.
+
+Rob
+
+>> +Required properties:
+>> +- compatible: Must be "regulator";
 > 
-> Tested on a mx31pdk that uses the hardware SPI chipselect pins and also
-> on a mx27pdk that uses GPIO as SPI chipselect.
+> Is this idiomatic or should we just have a helper that parses a big list
+> of properties from the device node?
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  drivers/spi/spi-imx.c |    8 +++-----
->  1 files changed, 3 insertions(+), 5 deletions(-)
+>> +- mode-fast: boolean, Can handle fast changes in its load
+>> +- mode-normal: boolean, Normal regulator power supply mode
+>> +- mode-idle: boolean, Can be more efficient during light loads
+>> +- mode-standby: boolean, Can be most efficient during light loads
 > 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 8ac6542..7821c48 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -783,12 +783,10 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
->  	spi_imx->bitbang.master = spi_master_get(master);
->  
->  	for (i = 0; i < master->num_chipselect; i++) {
-> -		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
-> -		if (cs_gpio < 0)
-> -			cs_gpio = mxc_platform_info->chipselect[i];
-> -		if (cs_gpio < 0)
-> +		spi_imx->chipselect[i] = mxc_platform_info->chipselect[i];
-> +		if (spi_imx->chipselect[i] < 0)
->  			continue;
-> -		spi_imx->chipselect[i] = cs_gpio;
-> +
->  		ret = gpio_request(spi_imx->chipselect[i], DRIVER_NAME);
->  		if (ret) {
->  			while (i > 0) {
-I think this is wrong. My first guess is you need to move
-
-	spi_imx->chipselect[i] = cs_gpio;
-
-before
-
-	if (cs_gpio < 0)
-		continue;
-
-Does that make sense and works?
-
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> I guess these are actually permissions to set the given modes?  The
+> documentation should be clearer.
+> 
+>> +- apply-uV: apply uV constraint if min == max
+> 
+> This seems a bit Linux/runtime policy specific (especially the last
+> bit).
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
