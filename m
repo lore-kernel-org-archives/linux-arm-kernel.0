@@ -1,88 +1,118 @@
-From: B29396@freescale.com (Dong Aisheng-B29396)
-Date: Thu, 15 Sep 2011 13:06:12 +0000
-Subject: [PATCH v3 1/1] ASoC: mxs-saif: add record function
-In-Reply-To: <20110909133051.GS1912@pengutronix.de>
-References: <1315399910-6525-1-git-send-email-b29396@freescale.com>
-	<20110909133051.GS1912@pengutronix.de>
-Message-ID: <65EE16ACC360FA4D99C96DC085B3F77225DB00@039-SN1MPN1-003.039d.mgd.msft.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 15 Sep 2011 08:11:20 -0500
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <4E71CE5D.9030900@ti.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+	<4E71CE5D.9030900@ti.com>
+Message-ID: <4E71F978.6020402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:w.sang at pengutronix.de]
-> Sent: Friday, September 09, 2011 9:31 PM
-> To: Dong Aisheng-B29396
-> Cc: alsa-devel at alsa-project.org; linux-arm-kernel at lists.infradead.org;
-> broonie at opensource.wolfsonmicro.com; lrg at ti.com; s.hauer at pengutronix.de
-> Subject: Re: [PATCH v3 1/1] ASoC: mxs-saif: add record function
-> 
-> On Wed, Sep 07, 2011 at 08:51:50PM +0800, Dong Aisheng wrote:
-> > 1. add different clkmux mode handling
-> > SAIF can use two instances to implement full duplex (playback &
-> > recording) and record saif may work on EXTMASTER mode which is using
-> > other saif's BITCLK&LRCLK.
-> >
-> > The clkmux mode could be set in pdata->init() in mach-specific code.
-> > For generic saif driver, it only needs to know who is his master and
-> > the master id is also provided in mach-specific code.
-> >
-> > 2. support playback and capture simutaneously however the sample rates
-> > can not be different due to hw limitation.
-> >
-> > Signed-off-by: Dong Aisheng <b29396@freescale.com>
-> 
-> One thing I see...
-> 
-> > @@ -422,20 +503,39 @@ static int mxs_saif_trigger(struct
-> snd_pcm_substream *substream, int cmd,
-> >  			__raw_readl(saif->base + SAIF_DATA);
-> >  		}
-> >
-> > -		dev_dbg(cpu_dai->dev, "CTRL 0x%x STAT 0x%x\n",
-> > +		master_saif->ongoing = 1;
-> > +
-> > +		dev_dbg(saif->dev, "CTRL 0x%x STAT 0x%x\n",
-> >  			__raw_readl(saif->base + SAIF_CTRL),
-> >  			__raw_readl(saif->base + SAIF_STAT));
-> >
-> > +		dev_dbg(master_saif->dev, "CTRL 0x%x STAT 0x%x\n",
-> > +			__raw_readl(master_saif->base + SAIF_CTRL),
-> > +			__raw_readl(master_saif->base + SAIF_STAT));
-> >  		break;
-> >  	case SNDRV_PCM_TRIGGER_SUSPEND:
-> >  	case SNDRV_PCM_TRIGGER_STOP:
-> >  	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-> >  		dev_dbg(cpu_dai->dev, "stop\n");
-> >
-> > -		clk_disable(saif->clk);
-> > -		if (!saif->mclk_in_use)
-> > +		/* wait a while for the current sample to complete */
-> > +		delay = USEC_PER_SEC / master_saif->cur_rate;
-> > +
-> > +		if (!master_saif->mclk_in_use) {
-> > +			__raw_writel(BM_SAIF_CTRL_RUN,
-> > +				master_saif->base + SAIF_CTRL + MXS_CLR_ADDR);
-> > +			udelay(delay);
-> > +		}
-> > +		clk_disable(master_saif->clk);
-> > +
-> > +		if (saif != master_saif) {
-> >  			__raw_writel(BM_SAIF_CTRL_RUN,
-> >  				saif->base + SAIF_CTRL + MXS_CLR_ADDR);
-> > +			udelay(delay);
-> 
-> I think we should use usleep_range for both udelays here? Having a rate
-> of 8000, we'd burn 250us here.
->
-Yes, I agree that it's a bit long for 8000.
-I tried sleep way but I found the trigger function is called with
-spin_lock held, so it seems we may not be able to sleep here.
+Benoit,
 
-I think the way of dynamically calculate delay suggested by Liam has
-Already minimize the affection, especially for high sample rate, it
-may work more efficiency than sleep (context switch cost).
+On 09/15/2011 05:07 AM, Cousson, Benoit wrote:
+> Hi Rob,
+> 
+> On 9/15/2011 9:55 AM, Thomas Abraham wrote:
+>> Hi Rob,
+>>
+>> On 14 September 2011 22:01, Rob Herring<robherring2@gmail.com>  wrote:
+>>> From: Rob Herring<rob.herring@calxeda.com>
+>>>
+>>> This adds gic initialization using device tree data. The initialization
+>>> functions are intended to be called by a generic OF interrupt
+>>> controller parsing function once the right pieces are in place.
+>>>
+>>> PPIs are handled using 3rd cell of interrupts properties to specify
+>>> the cpu
+>>> mask the PPI is assigned to.
+>>>
+>>> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/arm/gic.txt |   53
+>>> ++++++++++++++++++++++++
+>>>   arch/arm/common/gic.c                         |   55
+>>> +++++++++++++++++++++++--
+>>>   arch/arm/include/asm/hardware/gic.h           |   10 +++++
+>>>   3 files changed, 114 insertions(+), 4 deletions(-)
+>>>   create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+>>
+>> [...]
+>>
+>>
+>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>>> index d1ccc72..14de380 100644
+>>> --- a/arch/arm/common/gic.c
+>>> +++ b/arch/arm/common/gic.c
+>>
+>> [...]
+>>
+>>> +void __init gic_of_init(struct device_node *node, struct device_node
+>>> *parent)
+>>> +{
+>>> +       void __iomem *cpu_base;
+>>> +       void __iomem *dist_base;
+>>> +       int irq;
+>>> +       struct irq_domain *domain =&gic_data[gic_cnt].domain;
+>>> +
+>>> +       if (WARN_ON(!node))
+>>> +               return;
+>>> +
+>>> +       dist_base = of_iomap(node, 0);
+>>> +       WARN(!dist_base, "unable to map gic dist registers\n");
+>>> +
+>>> +       cpu_base = of_iomap(node, 1);
+>>> +       WARN(!cpu_base, "unable to map gic cpu registers\n");
+>>> +
+>>> +       domain->nr_irq = gic_irq_count(dist_base);
+>>> +       domain->irq_base = irq_alloc_descs(-1, 0, domain->nr_irq,
+>>> numa_node_id());
+>>
+>> For exynos4, all the interrupts originating from GIC are statically
+>> mapped to start from 32 in the linux virq space (GIC SPI interrupts
+>> start from 64). In the above code, since irq_base would be 0 for
+>> exynos4, the interrupt mapping is not working correctly. In your
+>> previous version of the patch, you have given a option to the platform
+>> code to choose the offset. Could that option be added to this series
+>> also. Or a provision to use platform specific translate function
+>> instead of the irq_domain_simple translator.
+> 
+> I have another concern on a similar topic.
+> 
+> On OMAP4 the SoC interrupts external to the MPU (SPI) have an offset of
+> 32. Only the internal PPI are between 0 and 31.
+> 
+> For the moment we add 32 to every SoC interrupts in the irq.h define,
 
-Do you think if it's reasonable to accept it?
+Those defines will not be used in the DT case. So the question is
+whether to add 32 or not in the DT. Since we have just a single node and
+a linear mapping of PPIs and SPIs, the only choice is to have SPIs start
+at 32. And from the h/w definition, SPIs always start at 32, so it's in
+agreement.
 
-Regards
-Dong Aisheng
+> but I'm assuming that this offset calculation should be done thanks to a
+> dedicated irq domain for the SPI.
+> The real HW physical number start at 0, and thus this is that value that
+> should be in the irq binding of the device.
+> 
+> So ideally we should have a irq domain for the PPI starting at 0 and
+> another one for the SPI starting at 32. Or 32 and 64 for the exynos4
+> case, but it looks like the PPI/SPI offset is always 32.
+> 
+
+That offset of SPIs is always there. If you have a GIC as a secondary
+controller, It will have 32 reserved interrupts and the register layout
+is exactly the same as a cpu's GIC.
+
+Since the idea of splitting PPIs for each core out to a flattened linux
+irq map has been abandoned, I see no reason to have more than 1 domain
+with a simple linear translation. Ultimately, domains will do dynamic
+irqdesc allocation and the translation within the gic will be completely
+dynamic.
+
+The exynos4 case appears to be another controller hooked up in parallel
+to the GIC. The GIC itself is exactly the same as other platforms AFAICT.
+
+Rob
