@@ -1,201 +1,65 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Thu, 15 Sep 2011 08:49:44 +0530
-Subject: [PATCH 18/25] OMAP4: suspend: Add MPUSS power domain RETENTION
-	support
-In-Reply-To: <87ty8e8xam.fsf@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>	<1315144466-9395-19-git-send-email-santosh.shilimkar@ti.com>
-	<87ty8e8xam.fsf@ti.com>
-Message-ID: <4E716ED0.5040305@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 15 Sep 2011 00:39:07 -0300
+Subject: gpio_ensure_requested error on mx31pdk boot
+Message-ID: <CAOMZO5AmM2yd5FopjNO9QsPNLZiBNH3U29_xXPV3cnZnB9EjtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 15 September 2011 05:57 AM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> This patch adds MPUSS(MPU Sub System) power domain
->> CSWR(Close Switch Retention) support to system wide suspend.
->> For both MPUSS RET support, CPUs are programmed to OFF state.
-> 
-> is 'both' in the wrong place in this sentence?   I think you meant:
-> 
-You are right.
+Hi,
 
-> For MPUSS retention support, both CPUs are programmed to OFF state.
-> 
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: Kevin Hilman <khilman@ti.com>
->> ---
->>  arch/arm/mach-omap2/omap-mpuss-lowpower.c |   16 +++++++
->>  arch/arm/mach-omap2/pm44xx.c              |   71 +++++++++++++++++++++++++++--
->>  2 files changed, 82 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> index 9d68abf..9f632fe 100644
->> --- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> +++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
->> @@ -66,6 +66,7 @@ struct omap4_cpu_pm_info {
->>  };
->>  
->>  static DEFINE_PER_CPU(struct omap4_cpu_pm_info, omap4_pm_info);
->> +static struct powerdomain *mpuss_pd;
->>  
->>  /*
->>   * Program the wakeup routine address for the CPU0 and CPU1
->> @@ -140,6 +141,13 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
->>   * of OMAP4 MPUSS subsystem
->>   * @cpu : CPU ID
->>   * @power_state: Low power state.
->> + *
->> + * MPUSS states for the context save:
->> + * save_state =
->> + *	0 - Nothing lost and no need to save: MPUSS INACTIVE
->> + *	1 - CPUx L1 and logic lost: MPUSS CSWR
->> + *	2 - CPUx L1 and logic lost + GIC lost: MPUSS OSWR
->> + *	3 - CPUx L1 and logic lost + GIC + L2 lost: DEVICE OFF
->>   */
->>  int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->>  {
->> @@ -169,6 +177,7 @@ int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state)
->>  		return -ENXIO;
->>  	}
->>  
->> +	pwrdm_clear_all_prev_pwrst(mpuss_pd);
->>  	clear_cpu_prev_pwrst(cpu);
->>  	set_cpu_next_pwrst(cpu, power_state);
->>  	set_cpu_wakeup_addr(cpu, virt_to_phys(omap4_cpu_resume));
->> @@ -270,6 +279,13 @@ int __init omap4_mpuss_init(void)
->>  	/* Initialise CPU1 power domain state to ON */
->>  	pwrdm_set_next_pwrst(pm_info->pwrdm, PWRDM_POWER_ON);
->>  
->> +	mpuss_pd = pwrdm_lookup("mpu_pwrdm");
->> +	if (!mpuss_pd) {
->> +		pr_err("Failed to lookup MPUSS power domain\n");
->> +		return -ENODEV;
->> +	}
->> +	pwrdm_clear_all_prev_pwrst(mpuss_pd);
->> +
->>  	/* Save device type on scratchpad for low level code to use */
->>  	if (omap_type() != OMAP2_DEVICE_TYPE_GP)
->>  		__raw_writel(1, sar_base + OMAP_TYPE_OFFSET);
->> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
->> index 4f39de5..63e8f9b 100644
->> --- a/arch/arm/mach-omap2/pm44xx.c
->> +++ b/arch/arm/mach-omap2/pm44xx.c
->> @@ -1,8 +1,9 @@
->>  /*
->>   * OMAP4 Power Management Routines
->>   *
->> - * Copyright (C) 2010 Texas Instruments, Inc.
->> + * Copyright (C) 2010-2011 Texas Instruments, Inc.
->>   * Rajendra Nayak <rnayak@ti.com>
->> + * Santosh Shilimkar <santosh.shilimkar@ti.com>
->>   *
->>   * This program is free software; you can redistribute it and/or modify
->>   * it under the terms of the GNU General Public License version 2 as
->> @@ -16,9 +17,11 @@
->>  #include <linux/err.h>
->>  #include <linux/slab.h>
->>  
->> +#include <mach/omap4-common.h>
->> +
->>  #include "powerdomain.h"
->>  #include "clockdomain.h"
->> -#include <mach/omap4-common.h>
->> +#include "pm.h"
->>  
->>  struct power_state {
->>  	struct powerdomain *pwrdm;
->> @@ -34,7 +37,48 @@ static LIST_HEAD(pwrst_list);
->>  #ifdef CONFIG_SUSPEND
->>  static int omap4_pm_suspend(void)
->>  {
->> -	omap_do_wfi();
->> +	struct power_state *pwrst;
->> +	int state, ret = 0;
->> +	u32 cpu_id = smp_processor_id();
->> +
->> +	/* Save current powerdomain state */
->> +	list_for_each_entry(pwrst, &pwrst_list, node) {
->> +		pwrst->saved_state = pwrdm_read_next_pwrst(pwrst->pwrdm);
->> +	}
->> +
->> +	/* Set targeted power domain states by suspend */
->> +	list_for_each_entry(pwrst, &pwrst_list, node) {
->> +		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
->> +	}
->> +
->> +	/*
->> +	 * For MPUSS to hit power domain retention(CSWR or OSWR),
->> +	 * CPU0 and CPU1 power domain needs to be in OFF or DORMANT
-> 
-> s/domain needs/domains need/
->
-ok
+On a MX31PDK running 3.1-rc3 from Pengutronix's imx-features branch I
+get the following:
 
->> +	 * state. For MPUSS to reach off-mode. CPU0 and CPU1 power domain
->> +	 * should be in off state.
-> 
-> nit: please be consistent with naming of power states (e.g. OFF vs. off)
-> 
-ok.
+Registering mxc_nand as whole device
+------------[ cut here ]------------
+WARNING: at drivers/gpio/gpiolib.c:101 gpio_ensure_requested+0x4c/0xf4()
+autorequest GPIO-0
+Modules linked in:
+[<c0014410>] (unwind_backtrace+0x0/0xf4) from [<c0025754>] (warn_slowpath_common
++0x4c/0x64)
+[<c0025754>] (warn_slowpath_common+0x4c/0x64) from [<c0025800>] (warn_slowpath_f
+mt+0x30/0x40)
+[<c0025800>] (warn_slowpath_fmt+0x30/0x40) from [<c0198688>] (gpio_ensure_reques
+ted+0x4c/0xf4)
+[<c0198688>] (gpio_ensure_requested+0x4c/0xf4) from [<c01988c8>] (gpio_direction
+_output+0xa0/0x138)
+[<c01988c8>] (gpio_direction_output+0xa0/0x138) from [<c01ed198>] (spi_imx_setup
++0x38/0x4c)
+[<c01ed198>] (spi_imx_setup+0x38/0x4c) from [<c01eb5d0>] (spi_setup+0x38/0x50)
+[<c01eb5d0>] (spi_setup+0x38/0x50) from [<c01eb85c>] (spi_add_device+0x94/0x124)
+[<c01eb85c>] (spi_add_device+0x94/0x124) from [<c01eb960>] (spi_new_device+0x74/
+0xac)
+[<c01eb960>] (spi_new_device+0x74/0xac) from [<c01eb9b8>] (spi_match_master_to_b
+oardinfo+0x20/0x40)
+[<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40) from [<c01eba88>] (spi_re
+gister_master+0xb0/0x104)
+[<c01eba88>] (spi_register_master+0xb0/0x104) from [<c01ec0b4>] (spi_bitbang_sta
+rt+0x104/0x17c)
+[<c01ec0b4>] (spi_bitbang_start+0x104/0x17c) from [<c02c2c4c>] (spi_imx_probe+0x
+2fc/0x404)
+[<c02c2c4c>] (spi_imx_probe+0x2fc/0x404) from [<c01c2498>] (platform_drv_probe+0
+x18/0x1c)
+[<c01c2498>] (platform_drv_probe+0x18/0x1c) from [<c01c1058>] (driver_probe_devi
+ce+0x78/0x174)
+[<c01c1058>] (driver_probe_device+0x78/0x174) from [<c01c11e0>] (__driver_attach
++0x8c/0x90)
+[<c01c11e0>] (__driver_attach+0x8c/0x90) from [<c01c0860>] (bus_for_each_dev+0x6
+0/0x8c)
+[<c01c0860>] (bus_for_each_dev+0x60/0x8c) from [<c01c0088>] (bus_add_driver+0xa0
+/0x288)
+[<c01c0088>] (bus_add_driver+0xa0/0x288) from [<c01c179c>] (driver_register+0x78
+/0x18c)
+[<c01c179c>] (driver_register+0x78/0x18c) from [<c0008490>] (do_one_initcall+0x3
+4/0x178)
+[<c0008490>] (do_one_initcall+0x34/0x178) from [<c03a5204>] (kernel_init+0x74/0x
+118)
+[<c03a5204>] (kernel_init+0x74/0x118) from [<c000f65c>] (kernel_thread_exit+0x0/
+0x8)
+---[ end trace 759f924b30fd5a44 ]---
 
->> +	 * Only master CPU followes suspend path. All other CPUs follow
->> +	 * cpu-hotplug path in system wide suspend. On OMAP4, CPU power
->> +	 * domain CSWR is not supported by hardware.
-> 
-> I think this sentence belongs a little earlier.  E.g. something like
-> ...CPU0 and CPU1 power domains need to be in OFF or DORMANT state, since
-> CPU power domain CSWR is not supported by hardware.
->
-Looks better.
+I have not started debugging yet, but just wondering if anyone else
+has seen this.
 
+Regards,
 
->> +	 * More details can be found in OMAP4430 TRM section 4.3.4.2.
->> +	 */
->> +	omap4_enter_lowpower(cpu_id, PWRDM_POWER_OFF);
->> +
->> +	/* Restore next powerdomain state */
->> +	list_for_each_entry(pwrst, &pwrst_list, node) {
->> +		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
->> +		if (state > pwrst->next_state) {
->> +			pr_info("Powerdomain (%s) didn't enter "
->> +			       "target state %d\n",
->> +			       pwrst->pwrdm->name, pwrst->next_state);
->> +			ret = -1;
->> +		}0001
->> +		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
->> +	}
->> +	if (ret)
->> +		pr_err("Could not enter target state in pm_suspend\n");
-> 
-> Without more details, this isn't terribly useful.  I'd suggest just
-> making the per-state one above pr_err().
-> 
-You mean pr_crit ?
-
->> +	else
->> +		pr_err("Successfully put all powerdomains to target state\n");
-> 
-> and this one pr_info.
-> 
->>  	return 0;
->>  }
->>  
->> @@ -97,14 +141,31 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
->>  	if (!pwrdm->pwrsts)
->>  		return 0;
->>  
->> +	/*
->> +	 * Skip CPU0 and CPU1 power domains. CPU1 is programmed
->> +	 * through hotplug path and CPU0 explicitly programmed
->> +	 * further down in the code path
->> +	 */
->> +	if ((!strcmp(pwrdm->name, "cpu0_pwrdm")) ||
->> +		(!strcmp(pwrdm->name, "cpu1_pwrdm")))
-> 
-> or just one compare using strncmp(pwrdm->name, "cpu", 3)
-> 
-Let me check this.
-
-Regards
-Santosh
+Fabio Estevam
