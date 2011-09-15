@@ -1,34 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Sep 2011 00:29:03 +0100
-Subject: [RFC PATCH 1/3] genirq: add support for per-cpu dev_id interrupts
-In-Reply-To: <alpine.LFD.2.02.1109152207010.2723@ionos>
-References: <1316105551-17505-1-git-send-email-marc.zyngier@arm.com>
-	<1316105551-17505-2-git-send-email-marc.zyngier@arm.com>
-	<alpine.LFD.2.02.1109152207010.2723@ionos>
-Message-ID: <20110915232903.GA22533@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Sep 2011 16:30:22 -0700
+Subject: [GIT PULL] OMAP voltage layer cleanup for v3.2
+In-Reply-To: <87d3f14n4k.fsf@ti.com>
+References: <87d3f14n4k.fsf@ti.com>
+Message-ID: <20110915233021.GE2284@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 12:49:10AM +0200, Thomas Gleixner wrote:
-> Marc,
+* Kevin Hilman <khilman@ti.com> [110915 11:59]:
+> Tony,
 > 
-> On Thu, 15 Sep 2011, Marc Zyngier wrote:
-> > +
-> > +	raw_spin_unlock_irqrestore(&desc->lock, flags);
-> > +
-> > +	unregister_handler_proc(irq, action);
-> > +
-> > +	/* Make sure it's not being used on another CPU: */
-> > +	synchronize_irq(irq);
+> Please pull the OMAP voltage layer cleanup for v3.2.
 > 
-> That's not helping w/o making synchronize_irq() aware of the percpu
-> stuff. Also there is the question whether we need the ability to
-> remove such interrupts in the first place. The target users are low
-> level arch interrupts not some random device drivers.
+> This is a combination of the series A..E that have been posted, with
+> a handful of updates throughout the comments and kerneldoc.
+> 
+> It is based on the powerdomain/clockdomain OMAP_CHIP cleanup from Paul
+> (his pwrdm_clkdm_remove_omap_chip_cleanup_3.2 branch.)
 
-You do - think local timers which go away on hotunplug and come back
-on hotplug.  The alternative is requiring every local timer code to
-remember whether it registered its per-cpu handler on each CPU or not,
-and that just gets more messy than having them unregister on hotunplug.
-Not only would that be more prone to bugs but it will also mean extra
-complexity in arch code.
+Thanks, I've pulled Paul's omap_chip_remove_cleanup_3.2 into cleanup
+branch and your voltage changes into voltage branch and rebuilt linux-omap
+master branch. Then assuming no issues, I'll ask Arnd to pull these
+on Friday.
+
+Regards,
+
+Tony
