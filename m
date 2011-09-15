@@ -1,35 +1,91 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 15 Sep 2011 16:51:58 +0530
-Subject: [RFC PATCH 02/11] regulator: Fix error check in
-	set_consumer_device_supply
-In-Reply-To: <1316085727-15023-2-git-send-email-rnayak@ti.com>
+Date: Thu, 15 Sep 2011 16:52:01 +0530
+Subject: [RFC PATCH 05/11] TWL: regulator: Make twl-regulator driver extract
+	data from DT
+In-Reply-To: <1316085727-15023-5-git-send-email-rnayak@ti.com>
 References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
 	<1316085727-15023-2-git-send-email-rnayak@ti.com>
-Message-ID: <1316085727-15023-3-git-send-email-rnayak@ti.com>
+	<1316085727-15023-3-git-send-email-rnayak@ti.com>
+	<1316085727-15023-4-git-send-email-rnayak@ti.com>
+	<1316085727-15023-5-git-send-email-rnayak@ti.com>
+Message-ID: <1316085727-15023-6-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The parameters to set_consumer_device_supply() can be considered
-invalid (and hence it could return -EINVAL) if nether consumer_dev nor
-consumer_dev_name are passed, not when *both* are passed.
+Modify the twl regulator driver to extract the regulator_init_data from
+device tree when passed, instead of getting it through platform_data
+structures (on non-DT builds)
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- drivers/regulator/core.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/regulator/twl-regulator.c |   28 +++++++++++++++++++++++++---
+ 1 files changed, 25 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index d8e6a42..9365359 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -981,7 +981,7 @@ static int set_consumer_device_supply(struct regulator_dev *rdev,
- 	struct regulator_map *node;
- 	int has_dev;
+diff --git a/drivers/regulator/twl-regulator.c b/drivers/regulator/twl-regulator.c
+index ee8747f..df1b95a 100644
+--- a/drivers/regulator/twl-regulator.c
++++ b/drivers/regulator/twl-regulator.c
+@@ -17,6 +17,8 @@
+ #include <linux/regulator/driver.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/i2c/twl.h>
++#include <linux/of.h>
++#include <linux/of_regulator.h>
  
--	if (consumer_dev && consumer_dev_name)
-+	if (!consumer_dev && !consumer_dev_name)
+ 
+ /*
+@@ -1011,6 +1013,9 @@ static int __devinit twlreg_probe(struct platform_device *pdev)
+ 	struct regulation_constraints	*c;
+ 	struct regulator_dev		*rdev;
+ 
++	if (pdev->dev.of_node)
++		of_property_read_u32(pdev->dev.of_node, "ti,reg-id", &pdev->id);
++
+ 	for (i = 0, info = NULL; i < ARRAY_SIZE(twl_regs); i++) {
+ 		if (twl_regs[i].desc.id != pdev->id)
+ 			continue;
+@@ -1020,7 +1025,11 @@ static int __devinit twlreg_probe(struct platform_device *pdev)
+ 	if (!info)
+ 		return -ENODEV;
+ 
+-	initdata = pdev->dev.platform_data;
++	if (pdev->dev.of_node)
++		initdata = of_get_regulator_init_data(pdev->dev.of_node);
++	else
++		initdata = pdev->dev.platform_data;
++
+ 	if (!initdata)
  		return -EINVAL;
  
- 	if (!consumer_dev_name && consumer_dev)
+@@ -1101,14 +1110,27 @@ static int __devexit twlreg_remove(struct platform_device *pdev)
+ 
+ MODULE_ALIAS("platform:twl_reg");
+ 
++#if defined(CONFIG_OF)
++static const struct of_device_id twl_of_match[] __devinitconst = {
++	{ .compatible = "ti,twl-reg", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, twl_of_match);
++#else
++#define twl_of_match NULL
++#endif
++
+ static struct platform_driver twlreg_driver = {
+ 	.probe		= twlreg_probe,
+ 	.remove		= __devexit_p(twlreg_remove),
+ 	/* NOTE: short name, to work around driver model truncation of
+ 	 * "twl_regulator.12" (and friends) to "twl_regulator.1".
+ 	 */
+-	.driver.name	= "twl_reg",
+-	.driver.owner	= THIS_MODULE,
++	.driver  = {
++		.name  = "twl_reg",
++		.owner = THIS_MODULE,
++		.of_match_table = twl_of_match,
++	},
+ };
+ 
+ static int __init twlreg_init(void)
 -- 
 1.7.1
