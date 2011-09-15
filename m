@@ -1,8 +1,8 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 15 Sep 2011 16:52:06 +0530
-Subject: [RFC PATCH 10/11] regulator: Implement consumer regulator mapping
-	from device tree
-In-Reply-To: <1316085727-15023-10-git-send-email-rnayak@ti.com>
+Date: Thu, 15 Sep 2011 16:52:05 +0530
+Subject: [RFC PATCH 09/11] DT: regulator: Helper to extract regulator node
+	based on supply name
+In-Reply-To: <1316085727-15023-9-git-send-email-rnayak@ti.com>
 References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
 	<1316085727-15023-2-git-send-email-rnayak@ti.com>
 	<1316085727-15023-3-git-send-email-rnayak@ti.com>
@@ -12,114 +12,100 @@ References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
 	<1316085727-15023-7-git-send-email-rnayak@ti.com>
 	<1316085727-15023-8-git-send-email-rnayak@ti.com>
 	<1316085727-15023-9-git-send-email-rnayak@ti.com>
-	<1316085727-15023-10-git-send-email-rnayak@ti.com>
-Message-ID: <1316085727-15023-11-git-send-email-rnayak@ti.com>
+Message-ID: <1316085727-15023-10-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device tree, the consumer regulator mapping is deferred till
-a regulator_get is called from the corresponding device driver,
-instead of being done during regulator_register.
-This avoids a complete scan of all DT nodes to identify consumers
-for all regulators.
-
-Devices can assocaite with one or more regulators by providing a
-list of phandles and supply names.
+Device nodes in DT can associate themselves with one or more
+regulators by providing a list of phandles (to regulator nodes)
+and corresponding supply names.
 
 For Example:
-        devicenode: node at 0x0 {
-                ...
-                ...
-                regulator = <&regulator1>,<&regulator2>;
-                regulator-names = "supply1","supply2";
-        };
+	devicenode: node at 0x0 {
+		...
+		...
+		regulator = <&regulator1>,<&regulator2>;
+		regulator-names = "supply1","supply2";
+	};
 
-When a device driver calls a regulator_get, specifying the
-supply name, the phandle and eventually the regulator node
-is extracted from the device and a mapping created by calling
-set_consumer_device_supply().
+of_get_regulator() extracts the regulator node for a given
+device, based on the supply name.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- drivers/regulator/core.c         |   23 +++++++++++++++++++++++
- include/linux/regulator/driver.h |    3 +++
- 2 files changed, 26 insertions(+), 0 deletions(-)
+ drivers/of/of_regulator.c    |   37 +++++++++++++++++++++++++++++++++++++
+ include/linux/of_regulator.h |    7 +++++++
+ 2 files changed, 44 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 9365359..61da2e7 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -25,6 +25,8 @@
- #include <linux/mutex.h>
- #include <linux/suspend.h>
- #include <linux/delay.h>
-+#include <linux/of.h>
-+#include <linux/of_regulator.h>
- #include <linux/regulator/consumer.h>
- #include <linux/regulator/driver.h>
- #include <linux/regulator/machine.h>
-@@ -1167,6 +1169,15 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
- 
- 	mutex_lock(&regulator_list_mutex);
- 
-+#ifdef CONFIG_OF
-+	struct device_node *node;
-+	node = of_get_regulator(dev, id);
-+	if (!node)
-+		goto out;
-+	list_for_each_entry(rdev, &regulator_list, list)
-+		if (node == rdev->node)
-+			goto found;
-+#else
- 	list_for_each_entry(map, &regulator_map_list, list) {
- 		/* If the mapping has a device set up it must match */
- 		if (map->dev_name &&
-@@ -1178,6 +1189,7 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
- 			goto found;
- 		}
- 	}
-+#endif
- 
- 	if (board_wants_dummy_regulator) {
- 		rdev = dummy_regulator_rdev;
-@@ -1216,6 +1228,15 @@ found:
- 	if (!try_module_get(rdev->owner))
- 		goto out;
- 
-+#ifdef CONFIG_OF
-+	ret = set_consumer_device_supply(rdev, dev, devname, id);
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to set supply %d\n", ret);
-+		unset_regulator_supplies(rdev);
-+		goto out;
-+	}
-+#endif
+diff --git a/drivers/of/of_regulator.c b/drivers/of/of_regulator.c
+index 4d7a49d..6f8fd4e 100644
+--- a/drivers/of/of_regulator.c
++++ b/drivers/of/of_regulator.c
+@@ -114,3 +114,40 @@ struct fixed_voltage_config *of_get_fixed_voltage_config(struct device_node *np)
+ 	return config;
+ }
+ EXPORT_SYMBOL(of_get_fixed_voltage_config);
 +
- 	regulator = create_regulator(rdev, dev, id);
- 	if (regulator == NULL) {
- 		regulator = ERR_PTR(-ENOMEM);
-@@ -2619,6 +2640,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
- 	rdev->reg_data = driver_data;
- 	rdev->owner = regulator_desc->owner;
- 	rdev->desc = regulator_desc;
-+	if (dev && dev->of_node)
-+		rdev->node = dev->of_node;
- 	INIT_LIST_HEAD(&rdev->consumer_list);
- 	INIT_LIST_HEAD(&rdev->list);
- 	BLOCKING_INIT_NOTIFIER_HEAD(&rdev->notifier);
-diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
-index 1a80bc7..4aebbf5 100644
---- a/include/linux/regulator/driver.h
-+++ b/include/linux/regulator/driver.h
-@@ -196,6 +196,9 @@ struct regulator_dev {
- 	struct mutex mutex; /* consumer lock */
- 	struct module *owner;
- 	struct device dev;
-+#ifdef CONFIG_OF
-+	struct device_node *node;
-+#endif
- 	struct regulation_constraints *constraints;
- 	struct regulator *supply;	/* for tree */
++/**
++ * of_get_regulator - get a regulator device node based on supply name
++ * @dev: Device pointer for the consumer (of regulator) device
++ * @supply: regulator supply name
++ *
++ * Extract the regulator device node corresponding to the supply name.
++ * retruns the device node corresponding to the regulator if found, else
++ * returns NULL.
++ */
++struct device_node *of_get_regulator(struct device *dev, const char *supply)
++{
++	struct device_node *regnode = NULL;
++	u32 reghandle;
++	int regsz, namesz;
++	const void *regprop;
++	const char *namesprop;
++
++	regprop = of_get_property(dev->of_node, "regulator", &regsz);
++	namesprop = of_get_property(dev->of_node, "regulator-names", &namesz);
++	if (!regprop || !namesprop)
++		return NULL;
++
++	while (regsz && namesz) {
++		if (!strcmp(namesprop, supply)) {
++			reghandle = be32_to_cpup(regprop);
++			regnode = of_find_node_by_phandle(reghandle);
++			break;
++		}
++		regsz -= 4;
++		regprop += 4;
++		namesz -= strlen(namesprop) + 1;
++		namesprop += strlen(namesprop) + 1;
++	}
++	return regnode;
++}
++EXPORT_SYMBOL(of_get_regulator);
+diff --git a/include/linux/of_regulator.h b/include/linux/of_regulator.h
+index 39860c5..5fc7329 100644
+--- a/include/linux/of_regulator.h
++++ b/include/linux/of_regulator.h
+@@ -13,6 +13,8 @@ extern struct regulator_init_data
+ 	*of_get_regulator_init_data(struct device_node *np);
+ extern struct fixed_voltage_config
+ 	*of_get_fixed_voltage_config(struct device_node *np);
++extern struct device_node *of_get_regulator(struct device *dev,
++	const char *id);
+ #else
+ static inline struct regulator_init_data
+ 	*of_get_regulator_init_data(struct device_node *np)
+@@ -24,6 +26,11 @@ static inline struct fixed_voltage_config
+ {
+ 	return NULL;
+ }
++static inline struct device_node *of_get_regulator(struct device *dev,
++	const char *id)
++{
++	return NULL;
++}
+ #endif /* CONFIG_OF_REGULATOR */
  
+ #endif /* __LINUX_OF_REG_H */
 -- 
 1.7.1
