@@ -1,75 +1,31 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 15 Sep 2011 14:52:18 +0900
-Subject: [PATCH] arm: exynos4: fix incorrect pad configuration for keypad
-	row lines
-In-Reply-To: <1315129244-26489-1-git-send-email-thomas.abraham@linaro.org>
-References: <1315129244-26489-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <00a201cc736b$a11dc740$e35955c0$%kim@samsung.com>
+Date: Thu, 15 Sep 2011 15:03:23 +0900
+Subject: [PATCH 2/2] ARM: Exynos4: use s5p-timer for UniversalC210 board
+References: <1311659456-6659-1-git-send-email-m.szyprowski@samsung.com>
+	<1311659456-6659-3-git-send-email-m.szyprowski@samsung.com>
+	<CAH9JG2V6Sfjmjupj5oBd_5vziBa4iezBpRfK9tNECrFO5sSfLw@mail.gmail.com>
+Message-ID: <00a301cc736d$2d9c4fb0$88d4ef10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+Kukjin Kim wrote:
 > 
-> The keypad controller requires a external pull-up for all the keypad
-> row lines. Fix the incorrect pad configuration for keypad controller
-> row lines by enabling the pad pull-up for the all row lines of the
-> keypad controller.
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> SMDKV310 board does not have pull-up resistors populated for the keypad
-> row lines (unlike the smdk boards for the previous Samsung SoC's). So
-> the pad pull-up for all keypad row lines should be enabled for
-> smdkv310 board.
-> 
-> The default requirement for the keypad controller is to enable the
-> pull-up for all the keypad row lines. If a exynos4 based board has
-> on-board pull-up's populated for keypad row lines, this patch would
-> cause no harm. And in such cases, if internal pad pull-up is to be
-> disabled (to reduce some power consumption), an alternative gpio
-> configuration function can be supplied that does not enable the
-> internal pad pull-up.
-> ---
->  arch/arm/mach-exynos4/setup-keypad.c |   11 ++++++-----
->  1 files changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos4/setup-keypad.c b/arch/arm/mach-
-> exynos4/setup-keypad.c
-> index 1ee0ebf..7862bfb 100644
-> --- a/arch/arm/mach-exynos4/setup-keypad.c
-> +++ b/arch/arm/mach-exynos4/setup-keypad.c
-> @@ -19,15 +19,16 @@ void samsung_keypad_cfg_gpio(unsigned int rows,
-> unsigned int cols)
-> 
->  	if (rows > 8) {
->  		/* Set all the necessary GPX2 pins: KP_ROW[0~7] */
-> -		s3c_gpio_cfgrange_nopull(EXYNOS4_GPX2(0), 8,
-> S3C_GPIO_SFN(3));
-> +		s3c_gpio_cfgall_range(EXYNOS4_GPX2(0), 8,
-> S3C_GPIO_SFN(3),
-> +					S3C_GPIO_PULL_UP);
-> 
->  		/* Set all the necessary GPX3 pins: KP_ROW[8~] */
-> -		s3c_gpio_cfgrange_nopull(EXYNOS4_GPX3(0), (rows - 8),
-> -					 S3C_GPIO_SFN(3));
-> +		s3c_gpio_cfgall_range(EXYNOS4_GPX3(0), (rows - 8),
-> +					 S3C_GPIO_SFN(3),
-> S3C_GPIO_PULL_UP);
->  	} else {
->  		/* Set all the necessary GPX2 pins: KP_ROW[x] */
-> -		s3c_gpio_cfgrange_nopull(EXYNOS4_GPX2(0), rows,
-> -					 S3C_GPIO_SFN(3));
-> +		s3c_gpio_cfgall_range(EXYNOS4_GPX2(0), rows,
-> S3C_GPIO_SFN(3),
-> +					S3C_GPIO_PULL_UP);
->  	}
-> 
->  	/* Set all the necessary GPX1 pins to special-function 3: KP_COL[x]
-*/
-> --
-> 1.6.6.rc2
+> Kyungmin Park wrote:
+> >
+> > Hi,
+> >
+> > It's required for boot universal c210 w/ EVT0 chip.
+> > Can you include it at 3.1 fixed branch?
+> >
+> Sure, will apply into samsung-fixes for 3.1.
 
-Oops, you're right, applied.
+Unfortunately, it happens boot failure with this patch on other EXYNOS4210
+boards and it is due to HAVE_SCHED_CLOCK.
+
+> > > +       select HAVE_SCHED_CLOCK
+
+I think, we need to sort out the method...
+
 Thanks.
 
 Best regards,
@@ -77,3 +33,86 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> 
+> > Thank you,
+> > Kyungmin Park
+> >
+> > On Tue, Jul 26, 2011 at 2:50 PM, Marek Szyprowski
+> > <m.szyprowski@samsung.com> wrote:
+> > > Commit 069d4e743 removed support for local timers and forced to use
+MCT
+> as
+> > > event source. However MCT is not operating properly on early revision
+(EVT0)
+> > > of Exynos4 SoCs. All UniversalC210 boards are based on Exynos4 EVT0,
+so
+> > that
+> > > commit broke support for it. This patch provides a workaround that
+enables
+> > > UniversalC210 boards to boot again. s5p-timer is used as an event
+source.
+> > >
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > ---
+> > > ?arch/arm/mach-exynos4/Kconfig ? ? ? ? ? ? ? | ? ?3 +++
+> > > ?arch/arm/mach-exynos4/mach-universal_c210.c | ? ?4 +++-
+> > > ?2 files changed, 6 insertions(+), 1 deletions(-)
+> > >
+> > > diff --git a/arch/arm/mach-exynos4/Kconfig
+b/arch/arm/mach-exynos4/Kconfig
+> > > index 9d62e13..2aad73f 100644
+> > > --- a/arch/arm/mach-exynos4/Kconfig
+> > > +++ b/arch/arm/mach-exynos4/Kconfig
+> > > @@ -173,6 +173,9 @@ config MACH_ARMLEX4210
+> > > ?config MACH_UNIVERSAL_C210
+> > > ? ? ? ?bool "Mobile UNIVERSAL_C210 Board"
+> > > ? ? ? ?select CPU_EXYNOS4210
+> > > + ? ? ? select S5P_HRT
+> > > + ? ? ? select CLKSRC_MMIO
+> > > + ? ? ? select HAVE_SCHED_CLOCK
+> > > ? ? ? ?select S5P_GPIO_INT
+> > > ? ? ? ?select S5P_DEV_FIMC0
+> > > ? ? ? ?select S5P_DEV_FIMC1
+> > > diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c
+b/arch/arm/mach-
+> > exynos4/mach-universal_c210.c
+> > > index 0e280d1..ca9e7b7 100644
+> > > --- a/arch/arm/mach-exynos4/mach-universal_c210.c
+> > > +++ b/arch/arm/mach-exynos4/mach-universal_c210.c
+> > > @@ -34,6 +34,7 @@
+> > > ?#include <plat/mfc.h>
+> > > ?#include <plat/sdhci.h>
+> > > ?#include <plat/pd.h>
+> > > +#include <plat/s5p-time.h>
+> > >
+> > > ?#include <mach/map.h>
+> > >
+> > > @@ -730,6 +731,7 @@ static void __init universal_map_io(void)
+> > > ? ? ? ?s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+> > > ? ? ? ?s3c24xx_init_clocks(24000000);
+> > > ? ? ? ?s3c24xx_init_uarts(universal_uartcfgs,
+ARRAY_SIZE(universal_uartcfgs));
+> > > + ? ? ? s5p_set_timer_source(S5P_PWM2, S5P_PWM4);
+> > > ?}
+> > >
+> > > ?static void __init universal_reserve(void)
+> > > @@ -766,6 +768,6 @@ MACHINE_START(UNIVERSAL_C210,
+> > "UNIVERSAL_C210")
+> > > ? ? ? ?.init_irq ? ? ? = exynos4_init_irq,
+> > > ? ? ? ?.map_io ? ? ? ? = universal_map_io,
+> > > ? ? ? ?.init_machine ? = universal_machine_init,
+> > > - ? ? ? .timer ? ? ? ? ?= &exynos4_timer,
+> > > + ? ? ? .timer ? ? ? ? ?= &s5p_timer,
+> > > ? ? ? ?.reserve ? ? ? ?= &universal_reserve,
+> > > ?MACHINE_END
+> > > --
+> > > 1.7.1.569.g6f426
+> > >
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe
+linux-samsung-soc" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> > >
