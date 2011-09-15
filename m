@@ -1,54 +1,78 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 15 Sep 2011 12:43:34 +0530
-Subject: [RFC PATCH-V2 0/4] Introducing TI's New SoC/board AM335XEVM
-In-Reply-To: <20110915003210.GC30941@atomide.com>
-References: <hvaibhav@ti.com>
-	<1314621976-25750-1-git-send-email-hvaibhav@ti.com>
-	<20110915003210.GC30941@atomide.com>
-Message-ID: <19F8576C6E063C45BE387C64729E739404EC810B62@dbde02.ent.ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 15 Sep 2011 09:14:27 +0200
+Subject: gpio_ensure_requested error on mx31pdk boot
+In-Reply-To: <CAOMZO5AmM2yd5FopjNO9QsPNLZiBNH3U29_xXPV3cnZnB9EjtQ@mail.gmail.com>
+References: <CAOMZO5AmM2yd5FopjNO9QsPNLZiBNH3U29_xXPV3cnZnB9EjtQ@mail.gmail.com>
+Message-ID: <20110915071427.GD11297@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 15, 2011 at 12:39:07AM -0300, Fabio Estevam wrote:
+> Hi,
+> 
+> On a MX31PDK running 3.1-rc3 from Pengutronix's imx-features branch I
+> get the following:
+> 
+> Registering mxc_nand as whole device
+> ------------[ cut here ]------------
+> WARNING: at drivers/gpio/gpiolib.c:101 gpio_ensure_requested+0x4c/0xf4()
+> autorequest GPIO-0
+> Modules linked in:
+> [<c0014410>] (unwind_backtrace+0x0/0xf4) from [<c0025754>] (warn_slowpath_common
+> +0x4c/0x64)
+> [<c0025754>] (warn_slowpath_common+0x4c/0x64) from [<c0025800>] (warn_slowpath_f
+> mt+0x30/0x40)
+> [<c0025800>] (warn_slowpath_fmt+0x30/0x40) from [<c0198688>] (gpio_ensure_reques
+> ted+0x4c/0xf4)
+> [<c0198688>] (gpio_ensure_requested+0x4c/0xf4) from [<c01988c8>] (gpio_direction
+> _output+0xa0/0x138)
+> [<c01988c8>] (gpio_direction_output+0xa0/0x138) from [<c01ed198>] (spi_imx_setup
+> +0x38/0x4c)
+> [<c01ed198>] (spi_imx_setup+0x38/0x4c) from [<c01eb5d0>] (spi_setup+0x38/0x50)
+> [<c01eb5d0>] (spi_setup+0x38/0x50) from [<c01eb85c>] (spi_add_device+0x94/0x124)
+> [<c01eb85c>] (spi_add_device+0x94/0x124) from [<c01eb960>] (spi_new_device+0x74/
+> 0xac)
+> [<c01eb960>] (spi_new_device+0x74/0xac) from [<c01eb9b8>] (spi_match_master_to_b
+> oardinfo+0x20/0x40)
+> [<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40) from [<c01eba88>] (spi_re
+> gister_master+0xb0/0x104)
+> [<c01eba88>] (spi_register_master+0xb0/0x104) from [<c01ec0b4>] (spi_bitbang_sta
+> rt+0x104/0x17c)
+> [<c01ec0b4>] (spi_bitbang_start+0x104/0x17c) from [<c02c2c4c>] (spi_imx_probe+0x
+> 2fc/0x404)
+> [<c02c2c4c>] (spi_imx_probe+0x2fc/0x404) from [<c01c2498>] (platform_drv_probe+0
+> x18/0x1c)
+> [<c01c2498>] (platform_drv_probe+0x18/0x1c) from [<c01c1058>] (driver_probe_devi
+> ce+0x78/0x174)
+> [<c01c1058>] (driver_probe_device+0x78/0x174) from [<c01c11e0>] (__driver_attach
+> +0x8c/0x90)
+> [<c01c11e0>] (__driver_attach+0x8c/0x90) from [<c01c0860>] (bus_for_each_dev+0x6
+> 0/0x8c)
+> [<c01c0860>] (bus_for_each_dev+0x60/0x8c) from [<c01c0088>] (bus_add_driver+0xa0
+> /0x288)
+> [<c01c0088>] (bus_add_driver+0xa0/0x288) from [<c01c179c>] (driver_register+0x78
+> /0x18c)
+> [<c01c179c>] (driver_register+0x78/0x18c) from [<c0008490>] (do_one_initcall+0x3
+> 4/0x178)
+> [<c0008490>] (do_one_initcall+0x34/0x178) from [<c03a5204>] (kernel_init+0x74/0x
+> 118)
+> [<c03a5204>] (kernel_init+0x74/0x118) from [<c000f65c>] (kernel_thread_exit+0x0/
+> 0x8)
+> ---[ end trace 759f924b30fd5a44 ]---
+> 
+> I have not started debugging yet, but just wondering if anyone else
+> has seen this.
+I havn't seen it. Just in case you don't know, that means a gpio was
+used without being (successfully) requested. On the other hand I wonder
+if GPIO-0 is correct here?!
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Thursday, September 15, 2011 6:02 AM
-> To: Hiremath, Vaibhav
-> Cc: linux-omap at vger.kernel.org; Hilman, Kevin; paul at pwsan.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [RFC PATCH-V2 0/4] Introducing TI's New SoC/board AM335XEVM
-> 
-> * hvaibhav at ti.com <hvaibhav@ti.com> [110829 05:52]:
-> > From: Vaibhav Hiremath <hvaibhav@ti.com>
-> >
-> > This patch set adds support for AM335x device having
-> > Cortex-A8 MPU.
-> >
-> > AM335X is treated as another OMAP3 variant, where,
-> > along with existing cpu class OMAP34XX, new cpu class AM33XX is created
-> > and the respective type is AM335X, which is newly added device in the
-> family.
-> > This means, cpu_is_omap34xx(), cpu_is_am33xx() and
-> > cpu_is_am335x() checks return success for AM335X.
-> >
-> > Currently submitting this patch series as a RFC (V2), to initiate the
-> > discussion on the approach we have chosen for AM335x device support.
-> > Based on the feedback, will submit the final version of patch series
-> > immediately.
-> 
-> Can you please rebase these on Paul's CHIP_IS removal series?
-> 
-> Those patches are available at:
-> 
-> git://git.pwsan.com/linux-2.6 omap_chip_remove_cleanup_3.2
-> 
-[Hiremath, Vaibhav] Thanks Tony for your comments, 
+BTW, the master branch on the imx repo contains all current work, that
+is for-next + two fixes that won't enter mainline via the imx repo.
+That's probably the better branch to use.
 
-Yeah, I will rebase and submit it again ASAP.
+Best regards
+Uwe
 
-
-Thanks,
-Vaibhav
-> Regards,
-> 
-> Tony
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
