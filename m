@@ -1,38 +1,38 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Thu, 15 Sep 2011 09:42:05 +0930
-Subject: [RFC 7/8] drivers: introduce rpmsg,
-	a remote-processor messaging bus
-In-Reply-To: <CAK=WgbY0zMkHw9XHDKPEfVQZVRfGP=nMmyJgm6jD5FEkBZkMRQ@mail.gmail.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-8-git-send-email-ohad@wizery.com>
-	<87liwu8u3q.fsf@rustcorp.com.au>
-	<BANLkTi=7TBMqnEf2qustrmSaubtTam79Bw@mail.gmail.com>
-	<CAK=WgbY0zMkHw9XHDKPEfVQZVRfGP=nMmyJgm6jD5FEkBZkMRQ@mail.gmail.com>
-Message-ID: <87d3f2hdey.fsf@rustcorp.com.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 14 Sep 2011 17:33:25 -0700
+Subject: [RFC PATCH v2 0/6] TI81XX: Add clock and hwmod data
+In-Reply-To: <alpine.DEB.2.00.1108301246170.26173@utopia.booyaka.com>
+References: <1314119594-22647-1-git-send-email-hemantp@ti.com>
+	<alpine.DEB.2.00.1108301246170.26173@utopia.booyaka.com>
+Message-ID: <20110915003325.GD30941@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 14 Sep 2011 21:38:43 +0300, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Hi Rusty,
+* Paul Walmsley <paul@pwsan.com> [110830 11:13]:
+> On Tue, 23 Aug 2011, Hemant Pedanekar wrote:
 > 
-> On Wed, Jun 22, 2011 at 1:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> > On Wed, Jun 22, 2011 at 5:42 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
-> >> On Tue, 21 Jun 2011 10:18:33 +0300, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> >>> +#define VIRTIO_ID_RPMSG ? ? ? ? ? ? ?10 /* virtio remote processor messaging */
-> >>
-> >> I think you want 6. ?Plan 9 jumped ahead to grab 9 :)
-> >
-> > 6 it is :)
+> > This patch set is the v2 of TI816X clock and hwmods patches sent earlier.
+> > 
+> > The clock data is currently added only for TI816X, while minimal hwmod data
+> > common for TI816X and TI814X is added.
+> > 
+> > This patch set depends on following patches:
+> > 	TI81XX: Prepare for addition of TI814X support
+> > 	TI814X: Add cpu type macros and detection support
+> > 	TI814X: Create board support and enable build for TI8148 EVM
+> > 
+> > Please note that CHIP_IS_TI816X/CHIP_IS_TI814X are still being used and I will
+> > send update once SoC list usage is available.	
 > 
-> Looking at the virtio-spec, it seems that 6 is taken by 'ioMemory'.
-> There's no indication for it in virtio_ids.h though, and the
-> virtio-spec has no appendix for this id, so maybe it's available after
-> all ?
-> 
-> If it is available, I'll take it for rpmsg, and will also update
-> virtio-spec appropriately. Otherwise, we'll settle on 7 ? :)
+> Thanks - am working away on these patches & hope to have them out soon.
 
-7... numbers are cheap :)
+Hemant, can you please rebase your patches on Paul's CHIP_IS
+removal branch?
 
-Cheers,
-Rusty.
+It's available at:
+
+git://git.pwsan.com/linux-2.6 omap_chip_remove_cleanup_3.2
+
+Regards,
+
+Tony
