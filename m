@@ -1,88 +1,59 @@
-From: tghk48@motorola.com (TAO HU)
-Date: Thu, 15 Sep 2011 10:38:02 +0800
-Subject: Tasks schedule/migration issue with CPU hotplug?
-In-Reply-To: <20110908073943.GC11124@zhy>
-References: <CAOwKts_WTDBLkz9=0MBhs6wzc67XD_bYgGMiZ-JUM+8O7gP_fw@mail.gmail.com>
-	<CAOwKts8pXt6spknNfBV-wy4_KoSp-JaZsdbzOxxWTqu=f6X3Bg@mail.gmail.com>
-	<20110908072801.GA11124@zhy> <20110908073943.GC11124@zhy>
-Message-ID: <CAOwKts9kJGYke6xA6zrQ=h6T7KMAz6uruxC37+PCskNwn6iK2A@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Thu, 15 Sep 2011 08:27:48 +0530
+Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
+	gic_arch_extn
+In-Reply-To: <20110914190433.GP24252@atomide.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+	<20110913203616.GG24252@atomide.com>
+	<CAMQu2gyYETPZRJu=4MWX6bULgmMaJb8MRwfhvURtOuyyWhLkAQ@mail.gmail.com>
+	<20110914152116.GM24252@atomide.com> <4E70DB33.5070501@ti.com>
+	<20110914170803.GN24252@atomide.com> <4E70E0CC.80300@ti.com>
+	<20110914171800.GO24252@atomide.com> <4E70E2DE.2030006@ti.com>
+	<20110914190433.GP24252@atomide.com>
+Message-ID: <4E7169AC.1060601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Yong
+On Thursday 15 September 2011 12:34 AM, Tony Lindgren wrote:
+> * Santosh <santosh.shilimkar@ti.com> [110914 09:49]:
+>> On Wednesday 14 September 2011 10:48 PM, Tony Lindgren wrote:
+>>> * Santosh<santosh.shilimkar@ti.com>  [110914 09:40]:
+>>>> On Wednesday 14 September 2011 10:38 PM, Tony Lindgren wrote:
+>>>>> * Santosh<santosh.shilimkar@ti.com>   [110914 09:16]:
+>>>>>
+>>>>> Thanks for the clarification. It seems to me the spec is most likely
+>>>>> wrong as we've had the GIC working for over two years now without
+>>>>> doing anything with the wakeup gen registers :)
+>>>>>
+>>>> It's working because CPU clockdomain are never put under HW
+>>>> supervised mode and they are kept in force wakeup. Clock-domain
+>>>> never idles on mainline code. PM series will put the clock-domains
+>>>> under HW supervison as needed to achieve any low power states and
+>>>> then all sorts of corner cases will come out.
+>>>
+>>> But again the wakeup gen triggers only do something when hitting
+>>> idle. There should be no use for them during runtime, right?
+>>>
+>> You missed my point in the description. Clockdomain inactive
+>> doesn't depend on idle or WFI execution. Under HW supervison
+>> CPU clock domain can get into inactive when CPU is stalled and
+>> waiting for a read response from slow interconnect.
+> 
+> Ah OK. If it's needed during runtime too then that explains why
+> the registers need to be kept in sync.
+> 
+>> One thing for sure. Designers has chosen a wrong name to this
+>> IP. Wakeugen apears like needed only for low power wakeup which
+>> not seems to be entirely correct as per specs
+> 
+> Yes it's not obvious reading the TRM either. Maybe add some
+> comment about that to the patch?
+> 
+You are right. Documentation isn't clear about this. Will
+add the above point in change log.
 
-You're right. We figured out something is wrong (is negative) with
-vruntime of certain processes.
-Below link describes the same issue we observed.
-http://lkml.indiana.edu/hypermail/linux/kernel/1101.2/00333.html
+btw, thanks for the good discussion on this topic.
 
-And the commite indicated by you is exactly the fix.
-
-Appreciate it!.
-
-On Thu, Sep 8, 2011 at 3:39 PM, Yong Zhang <yong.zhang0@gmail.com> wrote:
-> On Thu, Sep 08, 2011 at 03:28:01PM +0800, Yong Zhang wrote:
->> On Thu, Sep 08, 2011 at 02:47:08PM +0800, TAO HU wrote:
->> > Resend with linux-kernel mail list included.
->>
->> Hmm, could you give a try with commit da7a735e?
->>
->> Thanks,
->> Yong
->>
->> ---
->> commit da7a735e51f9622eb3e1672594d4a41da01d7e4f
->> Author: Peter Zijlstra <a.p.zijlstra@chello.nl>
->> Date: ? Mon Jan 17 17:03:27 2011 +0100
->>
->> ? ? sched: Fix switch_from_fair()
->>
->> ? ? When a task is taken out of the fair class we must ensure the vruntime
->> ? ? is properly normalized because when we put it back in it will assume
->> ? ? to be normalized.
->>
->> ? ? The case that goes wrong is when changing away from the fair class
->> ? ? while sleeping. Sleeping tasks have non-normalized vruntime in order
->> ? ? to make sleeper-fairness work. So treat the switch away from fair as a
->> ? ? wakeup and preserve the relative vruntime.
->>
->> ? ? Also update sysrq-n to call the ->switch_{to,from} methods.
->>
->> ? ? Reported-by: Onkalo Samu <samu.p.onkalo@nokia.com>
->> ? ? Signed-off-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
->> ? ? LKML-Reference: <new-submission>
->> ? ? Signed-off-by: Ingo Molnar <mingo@elte.hu>
->>
->> >
->> > On Wed, Sep 7, 2011 at 10:22 PM, TAO HU <tghk48@motorola.com> wrote:
->> > > <4>[ 6950.136230] cfs_rq[0]:/
->> > > <4>[ 6950.136230] ? .exec_clock ? ? ? ? ? ? ? ? ? ?: 6520265.283900
->> > > <4>[ 6950.136260] ? .MIN_vruntime ? ? ? ? ? ? ? ? ?: 2223057.428522
->> > > <4>[ 6950.136260] ? .min_vruntime ? ? ? ? ? ? ? ? ?: 2223057.428522
->> > > <4>[ 6950.136291] ? .max_vruntime ? ? ? ? ? ? ? ? ?: 2223114.709956
->> > > <4>[ 6950.136291] ? .spread ? ? ? ? ? ? ? ? ? ? ? ?: 57.281434
->> > > <4>[ 6950.136291] ? .spread0 ? ? ? ? ? ? ? ? ? ? ? : 0.000000
->> > > <4>[ 6950.136322] ? .nr_running ? ? ? ? ? ? ? ? ? ?: 212
->> > > <4>[ 6950.136322] ? .load ? ? ? ? ? ? ? ? ? ? ? ? ?: 217650
->> > > <4>[ 6950.136352] ? .nr_spread_over ? ? ? ? ? ? ? ?: 125034
->> > > <4>[ 6950.136352] ? .shares ? ? ? ? ? ? ? ? ? ? ? ?: 0
->> > > <4>[ 6950.136352]
->> > > <4>[ 6950.136566] runnable tasks:
->> > > <4>[ 6950.136566] ? ? ? ? ? ? task ? PID ? ? ? ? tree-key ?switches
->> > > prio ? ? exec-runtime ? ? ? ? sum-exec ? ? ? ?sum-sleep
->> > > <4>[ 6950.136596]
->> > > ----------------------------------------------------------------------------------------------------------
->> > > <4>[ 6950.136627] ? ? ?omap2_mcspi ? ?21 ? 2223062.886210 ?29451523
->
-> The tree-key(2223062.886210) almost equals to cfs_rq.min_vruntime,
-> so maybe you hit the bug which is cured by the mentioned commit.
->
-> Thanks,
-> Yong
->
-
-
-
--- 
-Best Regards
-Hu Tao
+Regards
+Santosh
