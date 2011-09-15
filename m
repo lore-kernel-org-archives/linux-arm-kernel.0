@@ -1,28 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Sep 2011 09:43:32 +0100
-Subject: [PATCH v2 0/2] make reinitialization of ARM core components
-	possible
-In-Reply-To: <20110915015338.GF1488@S2100-06.ap.freescale.net>
-References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-	<4E65B71E.6060307@ti.com>
-	<20110912054140.GE1258@S2100-06.ap.freescale.net>
-	<20110914190739.GE6267@n2100.arm.linux.org.uk>
-	<20110915015338.GF1488@S2100-06.ap.freescale.net>
-Message-ID: <20110915084332.GH6267@n2100.arm.linux.org.uk>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 15 Sep 2011 09:43:47 +0100
+Subject: [PATCHv2 0/3] Initial support for Picochip picoxcell
+In-Reply-To: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
+References: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20110915084347.GA3089@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 09:53:39AM +0800, Shawn Guo wrote:
-> The re-init approach calls the exactly same function used for the
-> initial init during resume.  So if this is a problem, it's the problem
-> of initial init.  The initial init code should initialize the L2 into
-> a known state with "values" rather than "mask + values" method.
+On Wed, Aug 24, 2011 at 03:41:43PM +0100, Jamie Iles wrote:
+> This series adds support for Picochip picoXcell (PC3X2 and PC3X3)
+> ARM1176JZ-S based devices.  This is a device tree only platform and
+> currently supports interrupt controllers and UARTs.
+> 
+> This series is based off of Grant's devicetree/test branch and also uses
+> Russell's io and gpio cleanup patches to remove the definition of
+> IO_SPACE_LIMIT and trivial gpio definitions.
+> 
+> Changes since v1:
+> 
+> 	- Cleanup empty headers
+> 	- Use of_platform_populate() and the default match table
+> 	- Split the VIC's into separate device nodes
 
-That may not be possible - the kernel may have no knowledge of the correct
-settings for the number of ways and cacheline size etc for the platform.
-It may be that these settings have been configured by the secure monitor
-rather than the boot loader.
+ping?
 
-I couldn't tell you what the correct settings would be for Versatile
-Express for instance, and I bet that the correct settings are a function
-of the FPGA images loaded onto the board.
+Jamie
