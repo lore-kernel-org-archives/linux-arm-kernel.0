@@ -1,170 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 15 Sep 2011 11:42:29 -0700
-Subject: 3.1-rc1 link failure
-In-Reply-To: <20110808195804.GD19367@n2100.arm.linux.org.uk>
-References: <4E402FBB.2070401@gmail.com>
-	<20110808195804.GD19367@n2100.arm.linux.org.uk>
-Message-ID: <4E724715.1030505@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Sep 2011 20:11:34 +0100
+Subject: READ THIS: the next mach-types update
+In-Reply-To: <201109151726.02445.arnd@arndb.de>
+References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
+	<201109151726.02445.arnd@arndb.de>
+Message-ID: <20110915191134.GL6267@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-( Including full text for other lists)
+On Thu, Sep 15, 2011 at 05:26:02PM +0200, Arnd Bergmann wrote:
+> On Thursday 15 September 2011, Russell King - ARM Linux wrote:
+> > Moreover, entries older than 12 months which have not been merged will
+> > be removed.  It is not possible to automatically check for machine_is_xxx()
+> > usages as these could conflict with other architectures, and I'm
+> > certainly NOT checking for them by hand (I estimate that'd take a
+> > significant amount of manual effort to do.)  What that means is that it
+> > is important to get the core platform support in first before any
+> > drivers which may make use of this.
+> 
+> Hi Russell,
+> 
+> I've just tried checking the machine_is_xxx() values in the kernel for
+> the list you posted and found just two that are actually being used:
+> 
+> arch/arm/mach-orion5x/ts209-setup.c:    if (machine_is_ts_x09())
+> arch/arm/mach-kirkwood/sheevaplug-setup.c:      if (machine_is_sheeva_esata())
+> 
+> Would it be possible to just fix these to use the correct form instead,
+> along with the respective mach-types change?
 
-On 08/08/11 12:58, Russell King - ARM Linux wrote:
-> On Mon, Aug 08, 2011 at 01:49:31PM -0500, Rob Herring wrote:
->> Russell,
->>
->> This commit is causing some link failures:
->>
->>     ARM: vmlinux.lds: move discarded sections to beginning
->>
->>     Rather than scattering the discarded sections throughout the linker
->>     file, move them to the start.
->>
->>     Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->>     Tested-by: Stephen Boyd <sboyd@codeaurora.org>
->>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>
->> The error is this:
->>
->> `.exit.text' referenced in section `.alt.smp.init' of
->> drivers/built-in.o: defined in discarded section `.exit.text' of
->> drivers/built
->> -in.o
->> `.exit.text' referenced in section `.alt.smp.init' of net/built-in.o:
->> defined in discarded section `.exit.text' of net/built-in.o
->>
->> I traced the one in net/ to CONFIG_SMP_ON_UP=y and CONFIG_DCB=y.
->> dcbnl_exit calls dcb_flushapp which contains a spinlock. dcb_flushapp is
->> getting inlined into dcbnl_exit.
-> Argh.  This is going to be an absolute _pig_ to fix.
->
-> This is the relevent part of the linker script (reformatted to make it
-> clearer):
->
-> | SECTIONS
-> | {
-> |  /*
-> |   * unwind exit sections must be discarded before the rest of the
-> |   * unwind sections get included.
-> |   */
-> |  /DISCARD/ : {
-> |   *(.ARM.exidx.exit.text)
-> |   *(.ARM.extab.exit.text)
-> |  }
-> | ...
-> |  .exit.text : {
-> |   *(.exit.text)
-> |   *(.memexit.text)
-> |  }
-> | ...
-> |  /DISCARD/ : {
-> |   *(.exit.text)
-> |   *(.memexit.text)
-> |   *(.exit.data)
-> |   *(.memexit.data)
-> |   *(.memexit.rodata)
-> |   *(.exitcall.exit)
-> |   *(.discard)
-> |   *(.discard.*)
-> |   }
-> | }
->
-> Now, this is what the linker manual says about discarded output sections:
->
-> |    The special output section name `/DISCARD/' may be used to discard
-> | input sections.  Any input sections which are assigned to an output
-> | section named `/DISCARD/' are not included in the output file.
->
-> No questions, no exceptions.  It doesn't say "unless they are listed
-> before the /DISCARD/ section."  Now, this is what asn-generic/vmlinux.lds.S
-> says:
->
-> | /*
-> |  * Default discarded sections.
-> |  *
-> |  * Some archs want to discard exit text/data at runtime rather than
-> |  * link time due to cross-section references such as alt instructions,
-> |  * bug table, eh_frame, etc.  DISCARDS must be the last of output
-> |  * section definitions so that such archs put those in earlier section
-> |  * definitions.
-> |  */
->
-> And guess what - the list _always_ includes .exit.text etc.
->
-> Now, what's actually happening is that the linker is reading the script,
-> and it finds the first /DISCARD/ output section at the beginning of the
-> script.  It continues reading the script, and finds the 'DISCARD' macro
-> at the end, which having been postprocessed results in another
-> /DISCARD/ output section.  As the linker already contains the earlier
-> /DISCARD/ output section, it adds it to that existing section, so it
-> effectively is placed at the start.  This can be seen by using the -M
-> option to ld:
->
-> | Linker script and memory map
-> | 
-> |                 0xc037c080                jiffies = jiffies_64
-> | 
-> | /DISCARD/
-> |  *(.ARM.exidx.exit.text)
-> |  *(.ARM.extab.exit.text)
-> |  *(.exit.text)
-> |  *(.memexit.text)
-> |  *(.exit.data)
-> |  *(.memexit.data)
-> |  *(.memexit.rodata)
-> |  *(.exitcall.exit)
-> |  *(.discard)
-> |  *(.discard.*)
-> | 
-> |                 0xc0008000                . = 0xc0008000
-> | 
-> | .head.text      0xc0008000      0x1d0
-> |                 0xc0008000                _text = .
-> |  *(.head.text)
-> |  .head.text     0xc0008000      0x1d0 arch/arm/kernel/head.o
-> |                 0xc0008000                stext
-> | 
-> | .text           0xc0008200   0x2d78d0
-> |                 0xc0008200                _stext = .
-> |                 0xc0008200                __exception_text_start = .
-> |  *(.exception.text)
-> |  .exception.text
-> | ...
->
-> As you can see, all the discarded sections are grouped together - and
-> as a result of it being the first output section, they all appear before
-> any other section.
->
-> The result is that not only is the unwind information discarded (as
-> intended), but also the .exit.text, despite us wanting to have the
-> .exit.text preserved.
->
-> We can't move the unwind information elsewhere, because it'll then be
-> included even when we do actually discard the .exit.text (and similar)
-> sections.
->
-> The only solution that I can think of is to stop using this
-> asm-generic/vmlinux.lds.S and write our own fully conditionalized
-> linker script, ensuring that no input section is mentioned more than
-> once in the output sections.
->
-> Or someone sorts out the asm-generic/vmlinux.lds.S stuff to actually
-> conform to the linker manual, and stop relying on implementation defined
-> behaviour of the linker - again by having it fully conditionalized.
->
-
-Now that the generic bug patch has been merged to linux-next a lot of
-ARM builds are failing like so:
-
-`.exit.text' referenced in section `__bug_table' of net/built-in.o: defined in discarded section `.exit.text' of net/built-in.o
-`.exit.text' referenced in section `__bug_table' of net/built-in.o: defined in discarded section `.exit.text' of net/built-in.o
-`.exit.text' referenced in section `__bug_table' of net/built-in.o: defined in discarded section `.exit.text' of net/built-in.o
-
-
-I'm not sure what the fix is here. Hopefully we can figure out how to
-keep using the asm-generic stuff.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+That would of course be the preferred way, but I need to know which
+way they're supposed to be - the current disagreement in the names
+doesn't suggest which is the right one.
