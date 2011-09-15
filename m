@@ -1,135 +1,88 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 15 Sep 2011 10:21:17 +0800
-Subject: [PATCH V3 3/6] MTD : add the database for the NANDs
-In-Reply-To: <CAN8TOE9-iEPyWXLsxddeofazgrCWDWKgrx6eBkr7vdKErfgeCA@mail.gmail.com>
-References: <1301474413-28821-1-git-send-email-b32955@freescale.com>	<1301474413-28821-4-git-send-email-b32955@freescale.com>	<201103301046.04357.ffainelli@freebox.fr>	<4D92F277.7060607@freescale.com>	<1301566248.2828.40.camel@localhost>	<AANLkTi=59br1KueZupGevB4DgP7UqBKRgbGgRvsjgH-8@mail.gmail.com>
-	<CAN8TOE9-iEPyWXLsxddeofazgrCWDWKgrx6eBkr7vdKErfgeCA@mail.gmail.com>
-Message-ID: <4E71611D.7030508@freescale.com>
+From: tghk48@motorola.com (TAO HU)
+Date: Thu, 15 Sep 2011 10:38:02 +0800
+Subject: Tasks schedule/migration issue with CPU hotplug?
+In-Reply-To: <20110908073943.GC11124@zhy>
+References: <CAOwKts_WTDBLkz9=0MBhs6wzc67XD_bYgGMiZ-JUM+8O7gP_fw@mail.gmail.com>
+	<CAOwKts8pXt6spknNfBV-wy4_KoSp-JaZsdbzOxxWTqu=f6X3Bg@mail.gmail.com>
+	<20110908072801.GA11124@zhy> <20110908073943.GC11124@zhy>
+Message-ID: <CAOwKts9kJGYke6xA6zrQ=h6T7KMAz6uruxC37+PCskNwn6iK2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian:
-> Hi,
->
-> I see nothing has happened with this thread recently. It doesn't
-> deserve to die though.
->
-> On Thu, Mar 31, 2011 at 10:17 AM, Huang Shijie<shijie8@gmail.com>  wrote:
->> 2011/3/31 Artem Bityutskiy<dedekind1@gmail.com>:
->>>>> If you have new chips to support in the future, you should add them in
->>>>> drivers/mtd/nand/nand_ids.c and not keep this file.
->>>>>
->>>> The data structure  nand_flash_dev{} does not contain enough information.
->>>> So I want to the nand_device_info{} to replace it in future.
->>> Just add this information, if it is of generic nature (like SLC/MLC
->>> flag, required ECC strength, etc).
-> Are SLC/MLC and ECC strength necessary to track? I don't see a good
-> benefit to cost ratio of trying to detect ECC strength especially,
-> since the levels specified in data sheets vary without much pattern
-> and nobody provides a way for decoding this from ID; do you really
-> want to have to make separate chip entries for every single chip that
-> comes around?
-I do not need the SLC/MCL info. But i do need the ECC strength for the BCH.
-Currently i compute it myself based on the ECC chunk size to be 512 bytes.
-It's ok now.
+Hi, Yong
 
-But the ONFI nand MAYBE has its own requirements, such as some ONFI nand
-requires '24-bit ECC per 1080 bytes of data'(see 
-MT29F64G08CBAAA,MT29F128G08CEAAA).
-In this case, setting the ECC chunk size to 512 bytes maybe is not 
-proper. It's better to
-set the ECC chunk size to 1k, and set ECC strength to 24bit.
+You're right. We figured out something is wrong (is negative) with
+vruntime of certain processes.
+Below link describes the same issue we observed.
+http://lkml.indiana.edu/hypermail/linux/kernel/1101.2/00333.html
 
-So, add the ECC strength to nand is worthful ( at least, it's useful for 
-ONFI nand) .
+And the commite indicated by you is exactly the fix.
+
+Appreciate it!.
+
+On Thu, Sep 8, 2011 at 3:39 PM, Yong Zhang <yong.zhang0@gmail.com> wrote:
+> On Thu, Sep 08, 2011 at 03:28:01PM +0800, Yong Zhang wrote:
+>> On Thu, Sep 08, 2011 at 02:47:08PM +0800, TAO HU wrote:
+>> > Resend with linux-kernel mail list included.
+>>
+>> Hmm, could you give a try with commit da7a735e?
+>>
+>> Thanks,
+>> Yong
+>>
+>> ---
+>> commit da7a735e51f9622eb3e1672594d4a41da01d7e4f
+>> Author: Peter Zijlstra <a.p.zijlstra@chello.nl>
+>> Date: ? Mon Jan 17 17:03:27 2011 +0100
+>>
+>> ? ? sched: Fix switch_from_fair()
+>>
+>> ? ? When a task is taken out of the fair class we must ensure the vruntime
+>> ? ? is properly normalized because when we put it back in it will assume
+>> ? ? to be normalized.
+>>
+>> ? ? The case that goes wrong is when changing away from the fair class
+>> ? ? while sleeping. Sleeping tasks have non-normalized vruntime in order
+>> ? ? to make sleeper-fairness work. So treat the switch away from fair as a
+>> ? ? wakeup and preserve the relative vruntime.
+>>
+>> ? ? Also update sysrq-n to call the ->switch_{to,from} methods.
+>>
+>> ? ? Reported-by: Onkalo Samu <samu.p.onkalo@nokia.com>
+>> ? ? Signed-off-by: Peter Zijlstra <a.p.zijlstra@chello.nl>
+>> ? ? LKML-Reference: <new-submission>
+>> ? ? Signed-off-by: Ingo Molnar <mingo@elte.hu>
+>>
+>> >
+>> > On Wed, Sep 7, 2011 at 10:22 PM, TAO HU <tghk48@motorola.com> wrote:
+>> > > <4>[ 6950.136230] cfs_rq[0]:/
+>> > > <4>[ 6950.136230] ? .exec_clock ? ? ? ? ? ? ? ? ? ?: 6520265.283900
+>> > > <4>[ 6950.136260] ? .MIN_vruntime ? ? ? ? ? ? ? ? ?: 2223057.428522
+>> > > <4>[ 6950.136260] ? .min_vruntime ? ? ? ? ? ? ? ? ?: 2223057.428522
+>> > > <4>[ 6950.136291] ? .max_vruntime ? ? ? ? ? ? ? ? ?: 2223114.709956
+>> > > <4>[ 6950.136291] ? .spread ? ? ? ? ? ? ? ? ? ? ? ?: 57.281434
+>> > > <4>[ 6950.136291] ? .spread0 ? ? ? ? ? ? ? ? ? ? ? : 0.000000
+>> > > <4>[ 6950.136322] ? .nr_running ? ? ? ? ? ? ? ? ? ?: 212
+>> > > <4>[ 6950.136322] ? .load ? ? ? ? ? ? ? ? ? ? ? ? ?: 217650
+>> > > <4>[ 6950.136352] ? .nr_spread_over ? ? ? ? ? ? ? ?: 125034
+>> > > <4>[ 6950.136352] ? .shares ? ? ? ? ? ? ? ? ? ? ? ?: 0
+>> > > <4>[ 6950.136352]
+>> > > <4>[ 6950.136566] runnable tasks:
+>> > > <4>[ 6950.136566] ? ? ? ? ? ? task ? PID ? ? ? ? tree-key ?switches
+>> > > prio ? ? exec-runtime ? ? ? ? sum-exec ? ? ? ?sum-sleep
+>> > > <4>[ 6950.136596]
+>> > > ----------------------------------------------------------------------------------------------------------
+>> > > <4>[ 6950.136627] ? ? ?omap2_mcspi ? ?21 ? 2223062.886210 ?29451523
+>
+> The tree-key(2223062.886210) almost equals to cfs_rq.min_vruntime,
+> so maybe you hit the bug which is cured by the mentioned commit.
+>
+> Thanks,
+> Yong
+>
 
 
 
->>>>> I still do not understand why this would be needed, is it because the generic
->>>>> code does not provide enough informations for your driver?
->>>>>
->>>> yes.
->>>>
->>>> IMHO, the generic code is somehow trapped in a wrong way. :(
-> I may agree, but can you be more specific on the trap?
->
-I meant the parsing id code is not good.
-Maybe i am wrong.
->>>> Paring the id bytes is not sufficient to get all the information you
->>>> need which is faced by me.
-> What's an alternative to "paring the id bytes"?
->
-I meant the the code can not get sufficient info for ONFI nand.
-
-But the current code can parse out the info for ONFI nand now.
-though it does not parse out all the info.
-
->>>> What's more, I think the paring code is ugly, see the nand_get_flash_type().
->>> You are welcome to fix this. There is _a lot_ of ugly code in MTD
->>> because no one loves it. Give it some love :-)
-> While I agree that a lot of this is ugly, it is mostly a matter of
-> necessity. NAND manufacturers do not have a standard (ONFI doesn't
-> really count, since there's basically 1 manufacturer using it), and so
-> the most "generic" code is to have different code paths for different
-> manufacturers (often with exceptions to each rule, since even a single
-> manufacturer changes its standards arbitrarily). Then you find
-> manufacturers like Toshiba that recently don't have any (published)
-> pattern at all for detecting OOB size generically.
->
-> Thus, it seems to me like we will need some form of the approach
-> provided by Huang. As I've found, there are some things that just
-> can't be decoded from the ID these days, so our ID table will need to
-> be able to track:
-> * full ID string (not just the 2nd byte "Device ID")
-The same idea as mine. :)   I also thought it's better to store all the 
-ID bytes.
-> * relevant bad block scanning options
->
-> FWIW, we already implement an exception table in our own driver that
-> includes the above 2 items, for chips that can't be handled with the
-> table/detection structure as-is. We don't particularly need SLC/MLC
-> but I don't object to recording it if we can determine it reliably,
-> and while ECC level could be useful, it is difficult to discover
-> generically, as I mentioned above.
->
-at least the ECC strength is needed.
->>>> Why not create a new database which contains all the necessary
->>>> information for a nand, and can be easy
->>>> find by the id bytes as the keyword?
->>> You can create this database by extending/improving/cleaning up the
->>> existing code base with a nice series of patches.
->>>
->> ok. I will try to fix the generic code before my driver is submitted.
-> What happened to this statement? I see that your driver was submitted,
-> but no efforts were made for chip detection cleanup. Were you
-> satisfied with the current detection?
-I am not satisfied with the current code.
-I wish I could add the  code to parsing out  the ECC strength of ONFI, 
-and something else.
-But I have no time to do this. :(
-feel bad.
-> While we're on the subject, I'll direct your attention to this NAND
-> data table that I've worked on. It should provide a decent summary of
-> most of the data sheets I have sorted through. It should also show you
-> that certain things are going to be very hard to detect (e.g., ECC
-only the ONFI nand's ECC strength is useful now.
-You can ignore the normal NANDs, i can compute it myself.
-> level). It should also show that while some chips are not supported by
-> standard code (e.g., weird bad block scanning features that haven't
-> been supported, non-standard OOB sizes with no given pattern in the
-> datasheets), the vast majority of the chips I've come across should be
-> detected properly:
->
-> http://linux-mtd.infradead.org/nand-data/nanddata.html
->
-very good!
-
-Huang Shijie
-
-> And of course, please contribute to
-> git://git.infradead.org/mtd-www.git if you have additions or edits for
-> the table. It's not perfect, but it can help for sorting through
-> different chips.
->
-> Brian
->
+-- 
+Best Regards
+Hu Tao
