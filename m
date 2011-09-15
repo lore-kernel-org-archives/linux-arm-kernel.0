@@ -1,77 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 15 Sep 2011 09:39:39 +0800
-Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
-	initialization functions
-In-Reply-To: <20110914084237.GC6267@n2100.arm.linux.org.uk>
-References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
-	<20110914084237.GC6267@n2100.arm.linux.org.uk>
-Message-ID: <20110915013937.GE1488@S2100-06.ap.freescale.net>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Thu, 15 Sep 2011 07:11:37 +0530
+Subject: [RFC PATCH v2 0/6] TI81XX: Add clock and hwmod data
+In-Reply-To: <20110915003325.GD30941@atomide.com>
+References: <1314119594-22647-1-git-send-email-hemantp@ti.com>
+	<alpine.DEB.2.00.1108301246170.26173@utopia.booyaka.com>
+	<20110915003325.GD30941@atomide.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4BF4747@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2011 at 09:42:38AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Sep 06, 2011 at 01:48:26PM +0800, Shawn Guo wrote:
-> > If ARM core gets powered off during suspend, L2 cache controller
-> > has to be reinitialized by resume procedure.
-> > 
-> > The patch removes __init annotation from a few initialization
-> > functions to make the reinitialization possible.  For example,
-> > platform resume function can call l2x0_of_init() to get L2 cache
-> > back to work.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  arch/arm/include/asm/hardware/cache-l2x0.h |    2 +-
-> >  arch/arm/mm/cache-l2x0.c                   |   10 +++++-----
-> >  2 files changed, 6 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-> > index d22765c..d270310 100644
-> > --- a/arch/arm/include/asm/hardware/cache-l2x0.h
-> > +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-> > @@ -89,7 +89,7 @@
-> >  #define L2X0_ADDR_FILTER_EN		1
-> >  
-> >  #ifndef __ASSEMBLY__
-> > -extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
-> > +extern void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
-> >  #if defined(CONFIG_CACHE_L2X0) && defined(CONFIG_OF)
-> >  extern int l2x0_of_init(__u32 aux_val, __u32 aux_mask);
-> >  #else
-> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> > index c035b9a..7835cb6 100644
-> > --- a/arch/arm/mm/cache-l2x0.c
-> > +++ b/arch/arm/mm/cache-l2x0.c
-> > @@ -280,7 +280,7 @@ static void l2x0_disable(void)
-> >  	spin_unlock_irqrestore(&l2x0_lock, flags);
-> >  }
-> >  
-> > -void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
-> > +void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
-> >  {
-> >  	__u32 aux;
-> >  	__u32 cache_id;
-> 
-> I'm unconvinced about the wise-ness of this.  We read-modify-write the
-> auxillary control register, which means some bits are preserved from
-> the initial boot.  If the boot loader sets the L2 cache up for normal
-> boot and not for resume, we'll end up with different L2 cache settings.
-> 
-> We've historically seen this kind of thing with boot loaders over the
-> years, to the point where systems boot at one CPU clock rate but resume
-> at some other CPU clock rate.
-> 
-I would think this is a problem in the kernel.  Kernel initialization
-code should put all these stuff into a known state to ensure boot and
-resume of the kernel do not result in a different state, shouldn't it?
+Tony Lindgren wrote on Thursday, September 15, 2011 6:03 AM:
 
-> So, it may be wiser to implement a 'save' and 'restore' interface
-> instead so that we can be sure that things are setup in the same way
-> after resume.
+> * Paul Walmsley <paul@pwsan.com> [110830 11:13]:
+>> On Tue, 23 Aug 2011, Hemant Pedanekar wrote:
+>> 
+>>> This patch set is the v2 of TI816X clock and hwmods patches sent earlier.
+>>> 
+>>> The clock data is currently added only for TI816X, while minimal hwmod
+>>> data common for TI816X and TI814X is added.
+>>> 
+>>> This patch set depends on following patches:
+>>> 	TI81XX: Prepare for addition of TI814X support
+>>> 	TI814X: Add cpu type macros and detection support
+>>> 	TI814X: Create board support and enable build for TI8148 EVM
+>>> 
+>>> Please note that CHIP_IS_TI816X/CHIP_IS_TI814X are still being used and I
+>>> will send update once SoC list usage is available.
+>> 
+>> Thanks - am working away on these patches & hope to have them out soon.
 > 
-This will introduce extra codes in every single platform.
+> Hemant, can you please rebase your patches on Paul's CHIP_IS removal branch?
+> 
+> It's available at:
+> 
+> git://git.pwsan.com/linux-2.6 omap_chip_remove_cleanup_3.2
+> 
+> Regards,
+> 
+> Tony
 
--- 
-Regards,
-Shawn
+Thanks, I will do that and send v3.
+
+   Hemant
