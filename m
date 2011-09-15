@@ -1,32 +1,45 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 15 Sep 2011 17:12:13 +0200
-Subject: [PATCH 0/6] mc13783 cleanup
-In-Reply-To: <201108250905.13168.philippe.retornaz@epfl.ch>
-References: <20110824132740.GA28197@pengutronix.de>
-	<201108250905.13168.philippe.retornaz@epfl.ch>
-Message-ID: <20110915151213.GE32263@sortiz-mobl>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 15 Sep 2011 16:50:22 +0200
+Subject: READ THIS: the next mach-types update
+In-Reply-To: <20110915102528.GI6267@n2100.arm.linux.org.uk>
+References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
+Message-ID: <20110915145022.GM28104@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
-
-On Thu, Aug 25, 2011 at 09:05:12AM +0200, Philippe R?tornaz wrote:
-> Le mercredi 24 ao?t 2011 15:27:40, Uwe Kleine-K?nig a ?crit :
-> > Hello,
-> > 
-> > this series removes the long obsolte mc13783 API after fixing all
-> > remaining users.
+On 11:25 Thu 15 Sep     , Russell King - ARM Linux wrote:
+> I'm going to be merging a mach-types update (the cut-down and the
+> policy-conforming version) for the next merge window.  This will mean
+> that things WILL BREAK, and I will not notice that things have broken.
 > 
-> I posted a patch last month which was touching this MFD too.
-> We will need to synchronize both patch. 
-I applied Uwe's patchset now. Could you please sync your code and send me a
-patchset that applies on top of:
+> In order to fix this, entries need to be fixed to conform to the
+> requirements - where the machine_is_xxx() name is the same as the
+> MACH_TYPE_xxx name and the CONFIG_MACH_xxx name too.
+> 
+> Moreover, entries older than 12 months which have not been merged will
+> be removed.  It is not possible to automatically check for machine_is_xxx()
+> usages as these could conflict with other architectures, and I'm
+> certainly NOT checking for them by hand (I estimate that'd take a
+> significant amount of manual effort to do.)  What that means is that it
+> is _important_ to get the core platform support in _first_ before any
+> drivers which may make use of this.
+> 
+> The following will be deleted from the file this time around are:
+> -ts_x09                  MACH_TS209              TS209                   1565
+> -at572d940hfek           MACH_AT572D940HFEB      AT572D940HFEB           1783
+can be dropped the at572d940hfek as the at572d940hf is drop from mainline
 
-git://git.infradead.org/users/sameo/mfd-2.6.git for-next
+Russell an you confirm you will re-add the usb-a9g20 and the folowing one
 
-Cheers,
-Samuel.
+usb_a9g20               MACH_USB_A9G20          USB_A9G20               1841
+qil_a9g20               MACH_QIL_A9G20          QIL_A9G20               1844
+tny_a9260               MACH_TNY_A9260          TNY_A9260               2058
+tny_a9g20               MACH_TNY_A9G20          TNY_A9G20               2059
+tny_a9263               MACH_TNY_A9263          TNY_A9263               2140
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+I'm working on there port mainline
+
+I add the usb_a9g20 recently and will continue in the following weeks
+
+Best Regards,
+J.
