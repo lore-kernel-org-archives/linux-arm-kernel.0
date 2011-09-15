@@ -1,77 +1,142 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 15 Sep 2011 16:51:56 +0530
-Subject: [RFC PATCH 00/11] Device tree support for regulators
-Message-ID: <1316085727-15023-1-git-send-email-rnayak@ti.com>
+Date: Thu, 15 Sep 2011 16:52:02 +0530
+Subject: [RFC PATCH 06/11] DT: regulator: Helper routine to extract
+	fixed_voltage_config
+In-Reply-To: <1316085727-15023-6-git-send-email-rnayak@ti.com>
+References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
+	<1316085727-15023-2-git-send-email-rnayak@ti.com>
+	<1316085727-15023-3-git-send-email-rnayak@ti.com>
+	<1316085727-15023-4-git-send-email-rnayak@ti.com>
+	<1316085727-15023-5-git-send-email-rnayak@ti.com>
+	<1316085727-15023-6-git-send-email-rnayak@ti.com>
+Message-ID: <1316085727-15023-7-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant, Mark,
+The helper routine defined here (of_get_fixed_voltage_config) can
+be used to extract information about fixed regulators (which are not
+software controlable) from device tree.
 
-This RFC is an attempt to move the regulator mappings from
-board files into device tree for OMAP. In the process I have
-defined some helper routines for regulators and defined
-the bindings for these.
-The patches are based on top of Benoit's series which adds
-DT support for i2c and twl for OMAP from here
-git://gitorious.org/omap-pm/linux.git for_3.2/5_omap_dt_i2c_twl
+Add documenation about additional bindings for fixed
+regulators that can be passed through DT.
 
-I know Benoit is planning a respin of the series soon, in which
-he intends to register all twl child nodes as platform devices,
-which would mean I just drop the last patch in this series.
-The first couple of patches in the series are just fixes and
-cleanups leading to the regulator DT migration.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ .../devicetree/bindings/regulator/regulator.txt    |   19 ++++++++++++
+ drivers/of/of_regulator.c                          |   31 ++++++++++++++++++++
+ include/linux/of_regulator.h                       |    7 ++++
+ 3 files changed, 57 insertions(+), 0 deletions(-)
 
-The series is tested on OMAP4SDP and OMAP4PANDA boards.
-
-regards,
-Rajendra
-
-Rajendra Nayak (11):
-  OMAP: TWL: Clean up mode and ops mask passed from board files
-  regulator: Fix error check in set_consumer_device_supply
-  DT: regulator: Helper routine to extract regulator_init_data
-  omap4: SDP: Pass regulator_init_data from DT
-  TWL: regulator: Make twl-regulator driver extract data from DT
-  DT: regulator: Helper routine to extract fixed_voltage_config
-  regulator: Make fixed regulator driver extract data from DT
-  omap4: panda: Pass fixed regulator data from DT
-  DT: regulator: Helper to extract regulator node based on supply name
-  regulator: Implement consumer regulator mapping from device tree
-  DT: regulator: register regulators as platform devices
-
- .../devicetree/bindings/regulator/regulator.txt    |   56 ++++++
- .../bindings/regulator/twl-regulator.txt           |   18 ++
- arch/arm/boot/dts/omap4-panda.dts                  |   10 +
- arch/arm/boot/dts/omap4-sdp.dts                    |   16 ++
- arch/arm/mach-omap2/board-2430sdp.c                |    5 -
- arch/arm/mach-omap2/board-3430sdp.c                |   30 ----
- arch/arm/mach-omap2/board-4430sdp.c                |   10 -
- arch/arm/mach-omap2/board-cm-t35.c                 |   10 -
- arch/arm/mach-omap2/board-devkit8000.c             |   13 --
- arch/arm/mach-omap2/board-igep0020.c               |   11 --
- arch/arm/mach-omap2/board-ldp.c                    |    9 -
- arch/arm/mach-omap2/board-omap3beagle.c            |   10 -
- arch/arm/mach-omap2/board-omap3evm.c               |   14 --
- arch/arm/mach-omap2/board-omap3logic.c             |    5 -
- arch/arm/mach-omap2/board-omap3pandora.c           |   26 ---
- arch/arm/mach-omap2/board-omap3stalker.c           |    8 -
- arch/arm/mach-omap2/board-omap3touchbook.c         |   10 -
- arch/arm/mach-omap2/board-overo.c                  |    5 -
- arch/arm/mach-omap2/board-rm680.c                  |    4 -
- arch/arm/mach-omap2/board-rx51-peripherals.c       |   55 ------
- arch/arm/mach-omap2/board-zoom-peripherals.c       |   14 --
- arch/arm/mach-omap2/twl-common.c                   |   44 -----
- drivers/mfd/twl-core.c                             |    3 +
- drivers/of/Kconfig                                 |    6 +
- drivers/of/Makefile                                |    1 +
- drivers/of/of_regulator.c                          |  183 ++++++++++++++++++++
- drivers/regulator/core.c                           |   25 +++-
- drivers/regulator/fixed.c                          |   20 ++-
- drivers/regulator/twl-regulator.c                  |   28 +++-
- include/linux/of_regulator.h                       |   42 +++++
- include/linux/regulator/driver.h                   |    3 +
- 31 files changed, 406 insertions(+), 288 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/regulator.txt
- create mode 100644 Documentation/devicetree/bindings/regulator/twl-regulator.txt
- create mode 100644 drivers/of/of_regulator.c
- create mode 100644 include/linux/of_regulator.h
+diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
+index 001e5ce..f8c51d8 100644
+--- a/Documentation/devicetree/bindings/regulator/regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+@@ -2,6 +2,8 @@ Voltage/Current Regulators
+ 
+ Required properties:
+ - compatible: Must be "regulator";
++or
++- compatible: Must be "regulator-fixed"; /* For Fixed volatge regulator */
+ 
+ Optional properties:
+ - supply-regulator: Name of the parent regulator
+@@ -24,6 +26,13 @@ Optional properties:
+ - always-on: boolean, regulator should never be disabled
+ - boot-on: bootloader/firmware enabled regulator
+ - apply-uV: apply uV constraint if min == max
++# For fixed voltage regulators
++- supply-name: Name of the regulator supply
++- microvolts: Output voltage of regulator
++- gpio: gpio to use for enable control
++- startup-delay: startup time in microseconds
++- enable-high: Polarity of enable GPIO, 1 = Active High, 0 = Active low
++- enabled-at-boot: 1 = yes, 0 = no
+ 
+ Example:
+ 
+@@ -35,3 +44,13 @@ Example:
+ 		change-voltage;
+ 		always-on;
+ 	};
++
++	abc-fixedregulator {
++		compatible = "regulator-fixed";
++		supply-name = "fixed-supply";
++		microvolts = <1800000>;
++		gpio = <43>;
++		startup-delay = <70000>;
++		enable-high;
++		enabled-at-boot;
++	};
+diff --git a/drivers/of/of_regulator.c b/drivers/of/of_regulator.c
+index f01d275..4d7a49d 100644
+--- a/drivers/of/of_regulator.c
++++ b/drivers/of/of_regulator.c
+@@ -13,6 +13,7 @@
+ #include <linux/slab.h>
+ #include <linux/of.h>
+ #include <linux/regulator/machine.h>
++#include <linux/regulator/fixed.h>
+ 
+ static void of_get_regulation_constraints(struct device_node *np,
+ 					struct regulator_init_data **init_data)
+@@ -83,3 +84,33 @@ struct regulator_init_data *of_get_regulator_init_data(struct device_node *np)
+ 	return init_data;
+ }
+ EXPORT_SYMBOL(of_get_regulator_init_data);
++
++/**
++ * of_get_fixed_voltage_config - extract fixed_voltage_config structure info
++ * @np: Pointer to fixed-regulator device tree node
++ *
++ * Populates fixed_voltage_config structure by extracting data from device
++ * tree node, returns a pointer to the populated structure of NULL if memory
++ * alloc fails.
++ */
++struct fixed_voltage_config *of_get_fixed_voltage_config(struct device_node *np)
++{
++	struct fixed_voltage_config *config;
++
++	config = kzalloc(sizeof(struct fixed_voltage_config), GFP_KERNEL);
++	if (!config)
++		return NULL;
++
++	config->supply_name = (char *)of_get_property(np, "supply-name", NULL);
++	of_property_read_u32(np, "microvolts", &config->microvolts);
++	of_property_read_u32(np, "gpio", &config->gpio);
++	of_property_read_u32(np, "startup-delay", &config->startup_delay);
++	if (of_find_property(np, "enable-high", NULL))
++		config->enable_high = true;
++	if (of_find_property(np, "enabled-at-boot", NULL))
++		config->enabled_at_boot = true;
++	config->init_data = of_get_regulator_init_data(np);
++
++	return config;
++}
++EXPORT_SYMBOL(of_get_fixed_voltage_config);
+diff --git a/include/linux/of_regulator.h b/include/linux/of_regulator.h
+index 5eb048c..39860c5 100644
+--- a/include/linux/of_regulator.h
++++ b/include/linux/of_regulator.h
+@@ -11,12 +11,19 @@
+ #if defined(CONFIG_OF_REGULATOR)
+ extern struct regulator_init_data
+ 	*of_get_regulator_init_data(struct device_node *np);
++extern struct fixed_voltage_config
++	*of_get_fixed_voltage_config(struct device_node *np);
+ #else
+ static inline struct regulator_init_data
+ 	*of_get_regulator_init_data(struct device_node *np)
+ {
+ 	return NULL;
+ }
++static inline struct fixed_voltage_config
++	*of_get_fixed_voltage_config(struct device_node *np)
++{
++	return NULL;
++}
+ #endif /* CONFIG_OF_REGULATOR */
+ 
+ #endif /* __LINUX_OF_REG_H */
+-- 
+1.7.1
