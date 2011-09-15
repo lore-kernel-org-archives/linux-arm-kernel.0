@@ -1,38 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Sep 2011 17:33:25 -0700
-Subject: [RFC PATCH v2 0/6] TI81XX: Add clock and hwmod data
-In-Reply-To: <alpine.DEB.2.00.1108301246170.26173@utopia.booyaka.com>
-References: <1314119594-22647-1-git-send-email-hemantp@ti.com>
-	<alpine.DEB.2.00.1108301246170.26173@utopia.booyaka.com>
-Message-ID: <20110915003325.GD30941@atomide.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Thu, 15 Sep 2011 06:37:48 +0530
+Subject: [PATCH 2/2] input: samsung-keypad: Add device tree support
+In-Reply-To: <CACxGe6uh82U_uFUBCdk4anDywUre974xU8OqEpvVq7AF5Oj8KQ@mail.gmail.com>
+References: <1315916779-21793-1-git-send-email-thomas.abraham@linaro.org>
+	<1315916779-21793-2-git-send-email-thomas.abraham@linaro.org>
+	<1315916779-21793-3-git-send-email-thomas.abraham@linaro.org>
+	<20110914161144.GF3134@ponder.secretlab.ca>
+	<CAJuYYwSNaVCnHFTMtW0RZLGLaS+iKBibWYwn5mqNT-0EW31yAQ@mail.gmail.com>
+	<20110914171318.GA24425@ponder.secretlab.ca>
+	<CAJuYYwRP2DGge1aHz-CWMnUrdz686s6X5Fp=LvRkM35VQS1XYw@mail.gmail.com>
+	<CACxGe6uh82U_uFUBCdk4anDywUre974xU8OqEpvVq7AF5Oj8KQ@mail.gmail.com>
+Message-ID: <CAJuYYwQ0+wFqMou6SwWEDUTJkjN83gt04cysyoiLD4W4sGg1Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [110830 11:13]:
-> On Tue, 23 Aug 2011, Hemant Pedanekar wrote:
-> 
-> > This patch set is the v2 of TI816X clock and hwmods patches sent earlier.
-> > 
-> > The clock data is currently added only for TI816X, while minimal hwmod data
-> > common for TI816X and TI814X is added.
-> > 
-> > This patch set depends on following patches:
-> > 	TI81XX: Prepare for addition of TI814X support
-> > 	TI814X: Add cpu type macros and detection support
-> > 	TI814X: Create board support and enable build for TI8148 EVM
-> > 
-> > Please note that CHIP_IS_TI816X/CHIP_IS_TI814X are still being used and I will
-> > send update once SoC list usage is available.	
-> 
-> Thanks - am working away on these patches & hope to have them out soon.
+On 15 September 2011 00:40, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Wed, Sep 14, 2011 at 12:09 PM, Thomas Abraham
+> <thomas.abraham@linaro.org> wrote:
+>> On 14 September 2011 22:43, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>> On Wed, Sep 14, 2011 at 10:19:22PM +0530, Thomas Abraham wrote:
+>>>> On 14 September 2011 21:41, Grant Likely <grant.likely@secretlab.ca> wrote:
+>>>> > On Tue, Sep 13, 2011 at 05:56:19PM +0530, Thomas Abraham wrote:
+>>>> >> +- Keys represented as child nodes: Each key connected to the keypad
+>>>> >> + ?controller is represented as a child node to the keypad controller
+>>>> >> + ?device node and should include the following properties.
+>>>> >> + ?- keypad,row: the row number to which the key is connected.
+>>>> >> + ?- keypad,column: the column number to which the key is connected.
+>>>> >> + ?- keypad,key-code: the key-code to be reported when the key is pressed
+>>>> >> + ? ?and released.
+>>>> >
+>>>> > What defines the meanings of the key codes?
+>>>>
+>>>> The key-code could be any value which the system would want the keypad
+>>>> driver to report when that key is pressed.
+>>>
+>>> Are they linux keycodes? ?If so, then this property name can
+>>> probably be linux,code. ?There is already precedence for that
+>>> usage in Documentation/devicetree/bindings/gpio/gpio-keys.txt. ?(I
+>>> would personally prefer "linux,key-code", but sometimes it is better
+>>> to go with existing precidence) You could also use linux,input-type as
+>>> specified in that binding.
+>>
+>> Ok. For linux, "keypad,key-code" would mean linux keycodes. The
+>> property name 'keypad,key-code' was chosen since it can be reused on
+>> non-linux platforms as well. I did have a look at
+>> Documentation/devicetree/bindings/gpio/gpio-keys.txt while doing this,
+>> but preferred using 'keypad,key-code' since it would be generic. Given
+>> a choice, I would like to retain this.
+>
+> This was debated a bit on the gpio-keys binding. ?The binding *must*
+> specify where it is getting the keycodes from. ?For the gpio-keys
+> binding, it was decided that the Linux keycodes were sufficient since
+> they are exported to userspace, and therefore part of the stable
+> kernel ABI (they will never change). ?"keypad,key-code" is completely
+> useless as a generic binding since it doesn't specify where the
+> keycode meanings come from. ?Besides, "linux,code" can be reused on
+> non-linux platforms too, it just means that the authoritative source
+> of the keycodes is the Linux kernel.
+>
+> g
+>
 
-Hemant, can you please rebase your patches on Paul's CHIP_IS
-removal branch?
+Ok. I understand this now. I will change this to "linux,code" in the
+next submission.
 
-It's available at:
-
-git://git.pwsan.com/linux-2.6 omap_chip_remove_cleanup_3.2
-
-Regards,
-
-Tony
+Thanks,
+Thomas.
