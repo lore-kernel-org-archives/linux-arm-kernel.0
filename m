@@ -1,39 +1,85 @@
-From: mirqus@gmail.com (=?ISO-8859-2?Q?Micha=B3_Miros=B3aw?=)
-Date: Thu, 15 Sep 2011 23:36:23 +0200
-Subject: [RFC PATCH 1/3] genirq: add support for per-cpu dev_id interrupts
-In-Reply-To: <1316105551-17505-2-git-send-email-marc.zyngier@arm.com>
-References: <1316105551-17505-1-git-send-email-marc.zyngier@arm.com>
-	<1316105551-17505-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAHXqBFKOQNOePc00yuzfotrYP6wT0ue_CJfv7rKdC+gEkomunA@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 15 Sep 2011 15:55:20 -0600
+Subject: [PATCH v3] spi/imx: Fix spi-imx when the hardware SPI
+	chipselects are used
+In-Reply-To: <1316118075-14541-1-git-send-email-fabio.estevam@freescale.com>
+References: <1316118075-14541-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110915215520.GJ3523@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/15 Marc Zyngier <marc.zyngier@arm.com>:
-[...]
-> diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-> index a103732..f9b7fa3 100644
-> --- a/include/linux/interrupt.h
-> +++ b/include/linux/interrupt.h
-> @@ -95,6 +95,7 @@ typedef irqreturn_t (*irq_handler_t)(int, void *);
-> ?* @flags: ? ? flags (see IRQF_* above)
-> ?* @name: ? ? ?name of the device
-> ?* @dev_id: ? ?cookie to identify the device
-> + * @percpu_dev_id: ? ? cookie to identify the device
-> ?* @next: ? ? ?pointer to the next irqaction for shared interrupts
-> ?* @irq: ? ? ? interrupt number
-> ?* @dir: ? ? ? pointer to the proc/irq/NN/name entry
-> @@ -104,17 +105,20 @@ typedef irqreturn_t (*irq_handler_t)(int, void *);
-> ?* @thread_mask: ? ? ? bitmask for keeping track of @thread activity
-> ?*/
-> ?struct irqaction {
-[...]
-> + ? ? ? void ? ? ? ? ? ? ? ? ? ?*dev_id;
-> +#ifdef CONFIG_IRQ_PERCPU_DEVID
-> + ? ? ? void __percpu ? ? ? ? ? *percpu_dev_id;
-> +#endif
+On Thu, Sep 15, 2011 at 05:21:15PM -0300, Fabio Estevam wrote:
+> commit 22a85e4cd51 (spi/imx: add device tree probe support) broke spi-imx usage
+> when the SPI chipselect is the one internal to the controller.
+> 
+> On a mx31pdk board the following error is seen:
 
-Those two can share the memory (in a anonymous union), if I read the
-idea correctly.
+Applied, thanks.
 
-Best Regards,
-Micha? Miros?aw
+g.
+
+> 
+> Registering mxc_nand as whole device
+> ------------[ cut here ]------------
+> WARNING: at drivers/gpio/gpiolib.c:101 gpio_ensure_requested+0x4c/0xf4()
+> autorequest GPIO-0
+> Modules linked in:
+> [<c0014410>] (unwind_backtrace+0x0/0xf4) from [<c0025754>] (warn_slowpath_common+0x4c/0x64)
+> [<c0025754>] (warn_slowpath_common+0x4c/0x64) from [<c0025800>] (warn_slowpath_fmt+0x30/0x40)
+> [<c0025800>] (warn_slowpath_fmt+0x30/0x40) from [<c0198688>] (gpio_ensure_requested+0x4c/0xf4)
+> [<c0198688>] (gpio_ensure_requested+0x4c/0xf4) from [<c01988c8>] (gpio_direction_output+0xa0/0x138)
+> [<c01988c8>] (gpio_direction_output+0xa0/0x138) from [<c01ed198>] (spi_imx_setup+0x38/0x4c)
+> [<c01ed198>] (spi_imx_setup+0x38/0x4c) from [<c01eb5d0>] (spi_setup+0x38/0x50)
+> [<c01eb5d0>] (spi_setup+0x38/0x50) from [<c01eb85c>] (spi_add_device+0x94/0x124)
+> [<c01eb85c>] (spi_add_device+0x94/0x124) from [<c01eb960>] (spi_new_device+0x74/0xac)
+> [<c01eb960>] (spi_new_device+0x74/0xac) from [<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40)
+> [<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40) from [<c01eba88>] (spi_register_master+0xb0/0x104)
+> [<c01eba88>] (spi_register_master+0xb0/0x104) from [<c01ec0b4>] (spi_bitbang_start+0x104/0x17c)
+> [<c01ec0b4>] (spi_bitbang_start+0x104/0x17c) from [<c02c2c4c>] (spi_imx_probe+0x2fc/0x404)
+> [<c02c2c4c>] (spi_imx_probe+0x2fc/0x404) from [<c01c2498>] (platform_drv_probe+0x18/0x1c)
+> [<c01c2498>] (platform_drv_probe+0x18/0x1c) from [<c01c1058>] (driver_probe_device+0x78/0x174)
+> [<c01c1058>] (driver_probe_device+0x78/0x174) from [<c01c11e0>] (__driver_attach+0x8c/0x90)
+> [<c01c11e0>] (__driver_attach+0x8c/0x90) from [<c01c0860>] (bus_for_each_dev+0x60/0x8c)
+> [<c01c0860>] (bus_for_each_dev+0x60/0x8c) from [<c01c0088>] (bus_add_driver+0xa0/0x288)
+> [<c01c0088>] (bus_add_driver+0xa0/0x288) from [<c01c179c>] (driver_register+0x78/0x18c)
+> [<c01c179c>] (driver_register+0x78/0x18c) from [<c0008490>] (do_one_initcall+0x34/0x178)
+> [<c0008490>] (do_one_initcall+0x34/0x178) from [<c03a5204>] (kernel_init+0x74/0x118)
+> [<c03a5204>] (kernel_init+0x74/0x118) from [<c000f65c>] (kernel_thread_exit+0x0/0x8)
+> ---[ end trace 759f924b30fd5a44 ]---
+> 
+> Fix this issue by using the original chip select logic and make spi-imx to work again.
+> 
+> Tested on a mx31pdk that uses the hardware SPI chipselect pins and also
+> on a mx27pdk that uses GPIO as SPI chipselect.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v2:
+> - Place spi_imx->chipselect[i] = cs_gpio in the correct position
+> Changes since v1:
+> - Fix the logic for the internal chip select case and
+> keep the usage of of_get_named_gpio for getting the cs_gpio
+>  drivers/spi/spi-imx.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 8ac6542..c5b14e6 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -786,9 +786,11 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
+>  		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
+>  		if (cs_gpio < 0)
+>  			cs_gpio = mxc_platform_info->chipselect[i];
+> +
+> +		spi_imx->chipselect[i] = cs_gpio;
+>  		if (cs_gpio < 0)
+>  			continue;
+> -		spi_imx->chipselect[i] = cs_gpio;
+> +
+>  		ret = gpio_request(spi_imx->chipselect[i], DRIVER_NAME);
+>  		if (ret) {
+>  			while (i > 0) {
+> -- 
+> 1.7.1
+> 
+> 
