@@ -1,33 +1,40 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 15 Sep 2011 13:15:12 +0100
-Subject: [PATCHv2 3/3] picoxcell: add the DTS for the PC7302 board
-In-Reply-To: <1316086322.2602.1.camel@pasglop>
-References: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
-	<1314196906-20709-4-git-send-email-jamie@jamieiles.com>
-	<1316086322.2602.1.camel@pasglop>
-Message-ID: <20110915121512.GG3089@pulham.picochip.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 15 Sep 2011 14:28:06 +0200
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <20110915102915.GJ6267@n2100.arm.linux.org.uk>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+	<4E71CE5D.9030900@ti.com>
+	<20110915102915.GJ6267@n2100.arm.linux.org.uk>
+Message-ID: <4E71EF56.3050503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 08:32:02AM -0300, Benjamin Herrenschmidt wrote:
-> On Wed, 2011-08-24 at 15:41 +0100, Jamie Iles wrote:
-> 
-> > +	chosen {
-> > +		bootargs = "console=ttyS0,115200 earlyprintk loglevel=9 root=ubi0:rootfs rw rootfstype=ubifs ubi.mtd=5,2048";
-> > +		linux,stdout-path = &uart0;
-> > +	};
-> 
-> Hrm... we don't normally put the bootargs in the device-tree.
-> 
-> Either you have a way to pass it from a previous firmware (which
-> can then slap it into the device-tree at runtime), or you
-> can have a way to compile it in the kernel image but the device-tree
-> isn't the right place for it.
+On 9/15/2011 12:29 PM, Russell King - ARM Linux wrote:
+> On Thu, Sep 15, 2011 at 12:07:25PM +0200, Cousson, Benoit wrote:
+>> On OMAP4 the SoC interrupts external to the MPU (SPI) have an offset of
+>> 32. Only the internal PPI are between 0 and 31.
+>
+> SGIs are 0 to 15, PPIs are 16 to 31, and SPIs are 32+ - that's the
+> numbering given to us by the GIC.
+>
+>> The real HW physical number start at 0, and thus this is that value that
+>> should be in the irq binding of the device.
+>
+> That depends whether you're counting SPI number or whether you're counting
+> IRQ number in the GIC interfaces.  SPI0 will be reported to us from the
+> GIC as 32, not 0, so to start numbering from 0 (which is already frowned
+> upon for many reasons) we'd have to subtract 32 after checking that the
+> IRQ is not a SGI nor PPI in the assembly code instead.
 
-OK, that's fair enough.  A few other ARM platforms (tegra, prima2 and 
-zynq) have bootargs in the chosen node and that's where I got it from, 
-but our bootloader has fdt support so this can easily be removed.
+The HW specs is obviously counting the IRQ number at the GIC interface.
+That offset is not known outside the MPUSS. Please have a look at the 
+OMAP4430 TRM p4761 (NDA vM version).
+FWIW, the same numbering scheme is used on tegra2.
 
-Thanks,
+My proposal is just to handle the addition within the irq_domain_to_irq, 
+so I'm not sure to understand your concern.
 
-Jamie
+Regards,
+Benoit
