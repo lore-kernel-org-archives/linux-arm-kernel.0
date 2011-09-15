@@ -1,55 +1,65 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 15 Sep 2011 11:36:02 +0200
-Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
-	gic_arch_extn
-In-Reply-To: <4E70E2DE.2030006@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
-	<20110913203616.GG24252@atomide.com>
-	<CAMQu2gyYETPZRJu=4MWX6bULgmMaJb8MRwfhvURtOuyyWhLkAQ@mail.gmail.com>
-	<20110914152116.GM24252@atomide.com> <4E70DB33.5070501@ti.com>
-	<20110914170803.GN24252@atomide.com> <4E70E0CC.80300@ti.com>
-	<20110914171800.GO24252@atomide.com> <4E70E2DE.2030006@ti.com>
-Message-ID: <4E71C702.40206@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 15 Sep 2011 18:56:28 +0900
+Subject: [GIT PULL] Samsung Fixes for v3.1-rc7
+Message-ID: <00b101cc738d$bcf46ce0$36dd46a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+Hi Arnd :)
 
-On 9/14/2011 7:22 PM, Shilimkar, Santosh wrote:
-> On Wednesday 14 September 2011 10:48 PM, Tony Lindgren wrote:
->> * Santosh<santosh.shilimkar@ti.com>   [110914 09:40]:
->>> On Wednesday 14 September 2011 10:38 PM, Tony Lindgren wrote:
->>>> * Santosh<santosh.shilimkar@ti.com>    [110914 09:16]:
->>>>
->>>> Thanks for the clarification. It seems to me the spec is most likely
->>>> wrong as we've had the GIC working for over two years now without
->>>> doing anything with the wakeup gen registers :)
->>>>
->>> It's working because CPU clockdomain are never put under HW
->>> supervised mode and they are kept in force wakeup. Clock-domain
->>> never idles on mainline code. PM series will put the clock-domains
->>> under HW supervison as needed to achieve any low power states and
->>> then all sorts of corner cases will come out.
->>
->> But again the wakeup gen triggers only do something when hitting
->> idle. There should be no use for them during runtime, right?
->>
-> You missed my point in the description. Clockdomain inactive
-> doesn't depend on idle or WFI execution. Under HW supervison
-> CPU clock domain can get into inactive when CPU is stalled and
-> waiting for a read response from slow interconnect.
+This is Samsung fixes for v3.1
 
-I'm a little bit confused by that statement...
+Please pull from:
+  git://github.com/kgene/linux-samsung.git samsung-fixes-2
+As you know, git.kernel.org/master.kernel.org has been down so I use
+temporary git repo. at github now.
 
-I'm wondering how the PRCM can gate the CPU/MPU clock and re-enable it 
-if the MPU is gated? What kind of event can wakeup the CPU in case of 
-CPU stalled?
+These things are needed for v3.1 and if any problems, please let me know.
 
-The spec seems to indicate that wakeupgen is needed only if CPU are in 
-WFI. It is even written: "CPUx will change power state only when 
-StandbyWFI is asserted.". Even a WFE is not supposed to trigger a standby.
-How can the CPU be inactive at clock domain level without a WFI?
+As a note, others for v3.2 will be sent in the next week...
 
-Regards,
-Benoit
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit b6fd41e29dea9c6753b1843a77e50433e6123bcb:
+
+  Linux 3.1-rc6 (2011-09-12 14:02:02 -0700)
+
+are available in the git repository at:
+  git://github.com/kgene/linux-samsung.git samsung-fixes-2
+
+Banajit Goswami (1):
+      ARM: S3C64XX: Remove un-used code backlight code on SMDK6410
+
+Changhwan Youn (1):
+      ARM: EXYNOS4: restart clocksource while system resumes
+
+Jonghwan Choi (1):
+      ARM: EXYNOS4: Fix wrong pll type for vpll
+
+Kukjin Kim (3):
+      ARM: EXYNOS4: Fix return type of local_timer_setup()
+      ARM: EXYNOS4: Fix routing timer interrupt to offline CPU
+      ARM: SAMSUNG: fix to prevent declaring duplicated
+
+Marek Szyprowski (1):
+      ARM: SAMSUNG: fix watchdog reset issue with clk_get()
+
+Thomas Abraham (1):
+      ARM: EXYNOS4: fix incorrect pad configuration for keypad row lines
+
+ arch/arm/mach-exynos4/clock.c                      |    2 +-
+ arch/arm/mach-exynos4/mct.c                        |   10 +++++-
+ arch/arm/mach-exynos4/platsmp.c                    |    2 +
+ arch/arm/mach-exynos4/setup-keypad.c               |   11 +++---
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |   39
+--------------------
+ arch/arm/plat-samsung/clock.c                      |   11 ++++++
+ arch/arm/plat-samsung/include/plat/clock.h         |    8 ++++
+ .../arm/plat-samsung/include/plat/watchdog-reset.h |   10 ++----
+ 8 files changed, 40 insertions(+), 53 deletions(-)
