@@ -1,58 +1,39 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Thu, 15 Sep 2011 22:54:19 +0530
-Subject: [PATCH 02/25] OMAP4: Redefine mandatory barriers for OMAP to
-	include interconnect barriers.
-In-Reply-To: <87obyl7mj8.fsf@ti.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-3-git-send-email-santosh.shilimkar@ti.com>
-	<20110913202701.GF24252@atomide.com> <4E7080F8.9020302@ti.com>
-	<87obyl7mj8.fsf@ti.com>
-Message-ID: <CAMQu2gy6yVA7zWAPUsnzCtixHkjzkn6UnbapR0mpoJ+AwNMAcQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 15 Sep 2011 10:34:27 -0700
+Subject: [PATCH 1/3] ARM: debug: use kconfig choice for selecting DEBUG_LL
+	UART
+In-Reply-To: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+Message-ID: <4E723723.2030609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 10:47 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Santosh <santosh.shilimkar@ti.com> writes:
->
->> On Wednesday 14 September 2011 01:57 AM, Tony Lindgren wrote:
->>> * Santosh Shilimkar<santosh.shilimkar@ti.com> ?[110904 06:22]:
->>>> On OMAP4 SOC intecronnects has many write buffers in the async bridges
->>>> and they can be drained only with stongly ordered accesses.
->>>
->>> This is not correct, strongly ordered access does not guarantee
->>> anything here. If it fixes issues, it's because it makes the writes
->>> to reach the device faster. Strongly ordered does not affect anything
->>> outside ARM, so the bus access won't change.
->>>
->> What I said is the aync bridges WB and what is said is correct
->> from MPU accesses point of view.
->>
->> It's not about faster or slower. With device memory the, writes
->> can get stuck into write buffers where as with SO, the write buffers
->> will be bypassed.
->>
->> The behaviours is limited to the MPU side async bridge boundary which
->> is the problem. The statement is not for l3 and l4 interconnect which
->> probably you mean.
->>
->> There is always a hardware signal to communicate CPU at async bridges
->> to ensure that data is not stuck in these bridges before CPU
->> clock/voltage is cut. Unfortunately we have a BUG on OMAP44XX devices
->> and the dual channel makes it even worst since both pipes have the
->> same BUG. So what we are doing is issuing SO write/read accesses
->> on these pipes so that there is nothing stuck there before MPU
->> hits low power states and also avoids any race conditions when
->> both channels are used together by some initiators. The behaviour
->> is validated at RTL level and there is no ambiguity about it.
->>
->> May be you have mistaken the L3 and L4 as the interconnect levels
->> in this case.
->
-> Sounds to me like the changelog needs to be a bit more verbose.
->
-> Remember, we're all probably going to forget the gory details of this in
-> a few months and want to be able to go back to the code w/changelog to
-> refresh our memories.
->
-Change log was accurate but I agree it needs more description to make it
-clear. I plan to update it.
+On 08/16/11 14:41, Will Deacon wrote:
+> +choice
+> +	prompt "Kernel low-level debugging port"
+> +	depends on DEBUG_LL
+> +
+> +	config DEBUG_DC21285_PORT
+> +		bool "Kernel low-level debugging messages via footbridge serial port"
+> +		depends on FOOTBRIDGE
+> +		help
+> +		  Say Y here if you want the debug print routines to direct
+> +		  their output to the serial port in the DC21285 (Footbridge).
+> +		  Saying N will cause the debug messages to appear on the first
+> +		  16550 serial port.
+> +
+> +	config DEBUG_CLPS711X_UART2
+> +		bool "Kernel low-level debugging messages via UART2"
+> +		depends on ARCH_CLPS711X
+> +		help
+> +		  Say Y here if you want the debug print routines to direct
+> +		  their output to the second serial port on these devices.
+> +		  Saying N will cause the debug messages to appear on the first
+> +		  serial port.
+
+How would I unselect this UART2 config to get serial output on UART1? As
+far as I can tell there isn't an option for NONE in a choice menu.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
