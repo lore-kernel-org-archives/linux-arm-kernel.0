@@ -1,22 +1,20 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 15 Sep 2011 17:56:22 +0300
-Subject: [RFC 7/8] drivers: introduce rpmsg,
-	a remote-processor messaging bus
-In-Reply-To: <87d3f2hdey.fsf@rustcorp.com.au>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-8-git-send-email-ohad@wizery.com>
-	<87liwu8u3q.fsf@rustcorp.com.au>
-	<BANLkTi=7TBMqnEf2qustrmSaubtTam79Bw@mail.gmail.com>
-	<CAK=WgbY0zMkHw9XHDKPEfVQZVRfGP=nMmyJgm6jD5FEkBZkMRQ@mail.gmail.com>
-	<87d3f2hdey.fsf@rustcorp.com.au>
-Message-ID: <CAK=WgbaMUUdX3X8Y_xJ02F8=uM=9PJwhWa6LMyBu-DQPo2aD_A@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 15 Sep 2011 16:38:57 +0200
+Subject: [PATCH 2/2] ARM: mmp: add audio sram allocator
+In-Reply-To: <1312167547-26740-3-git-send-email-leoy@marvell.com>
+References: <1312167547-26740-1-git-send-email-leoy@marvell.com>
+	<1312167547-26740-3-git-send-email-leoy@marvell.com>
+Message-ID: <20110915143857.GL28104@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 3:12 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
-> 7... numbers are cheap :)
+On 10:59 Mon 01 Aug     , Leo Yan wrote:
+> Implement the audio sram allocator with genalloc,
+> so that can dynamically allocate the buffer
+> to pcm devices as need.
+> 
+> Signed-off-by: Leo Yan <leoy@marvell.com>
+this can be more generic nad move to lib/genalloc.c
 
-7 it is :)
-
-Thanks,
-Ohad.
+Best Regards,
+J.
