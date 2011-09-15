@@ -1,44 +1,41 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Thu, 15 Sep 2011 07:11:37 +0530
-Subject: [RFC PATCH v2 0/6] TI81XX: Add clock and hwmod data
-In-Reply-To: <20110915003325.GD30941@atomide.com>
-References: <1314119594-22647-1-git-send-email-hemantp@ti.com>
-	<alpine.DEB.2.00.1108301246170.26173@utopia.booyaka.com>
-	<20110915003325.GD30941@atomide.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4BF4747@dbde02.ent.ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 15 Sep 2011 09:53:39 +0800
+Subject: [PATCH v2 0/2] make reinitialization of ARM core components
+	possible
+In-Reply-To: <20110914190739.GE6267@n2100.arm.linux.org.uk>
+References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
+	<4E65B71E.6060307@ti.com>
+	<20110912054140.GE1258@S2100-06.ap.freescale.net>
+	<20110914190739.GE6267@n2100.arm.linux.org.uk>
+Message-ID: <20110915015338.GF1488@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote on Thursday, September 15, 2011 6:03 AM:
+On Wed, Sep 14, 2011 at 08:07:39PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 12, 2011 at 01:41:41PM +0800, Shawn Guo wrote:
+> > OMAP and IMX6Q retains L2 cache, we have to go save/restore approach
+> > to work with generic cpu_suspend/resume routines.  But for platforms
+> > that will power off L2 during suspend, I think re-init is the easiest
+> > way for them get L2 back to work.
+> 
+> It would be much better to re-init with the same configuration values
+> used during the initial init - rather than using the mask + values
+> method which preserves whatever the boot loader gave us.
+> 
+The re-init approach calls the exactly same function used for the
+initial init during resume.  So if this is a problem, it's the problem
+of initial init.  The initial init code should initialize the L2 into
+a known state with "values" rather than "mask + values" method.
 
-> * Paul Walmsley <paul@pwsan.com> [110830 11:13]:
->> On Tue, 23 Aug 2011, Hemant Pedanekar wrote:
->> 
->>> This patch set is the v2 of TI816X clock and hwmods patches sent earlier.
->>> 
->>> The clock data is currently added only for TI816X, while minimal hwmod
->>> data common for TI816X and TI814X is added.
->>> 
->>> This patch set depends on following patches:
->>> 	TI81XX: Prepare for addition of TI814X support
->>> 	TI814X: Add cpu type macros and detection support
->>> 	TI814X: Create board support and enable build for TI8148 EVM
->>> 
->>> Please note that CHIP_IS_TI816X/CHIP_IS_TI814X are still being used and I
->>> will send update once SoC list usage is available.
->> 
->> Thanks - am working away on these patches & hope to have them out soon.
+> We know with quite a bit of experience that we can't rely on boot loaders
+> setting things up in the same way on initial boot and resume, so we should
+> not rely on the boot loader setting the same L2 configuration on resume
+> as was set during boot.
 > 
-> Hemant, can you please rebase your patches on Paul's CHIP_IS removal branch?
-> 
-> It's available at:
-> 
-> git://git.pwsan.com/linux-2.6 omap_chip_remove_cleanup_3.2
-> 
-> Regards,
-> 
-> Tony
+Right, we should not reply on boot loader.  My point is we should not
+reply on boot loader on the initial boot.  Then we can get the same
+L2 configuration on resume as was set during initial boot.
 
-Thanks, I will do that and send v3.
-
-   Hemant
+-- 
+Regards,
+Shawn
