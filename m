@@ -1,118 +1,58 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 15 Sep 2011 10:09:32 -0700
-Subject: [PATCH 1/4] AM3517 : support for suspend/resume
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC356087037AF843DD@dbde02.ent.ti.com>
-	(Abhilash Koyamangalath's message of "Wed, 14 Sep 2011 18:30:51
-	+0530")
-References: <1313754927-11992-1-git-send-email-abhilash.kv@ti.com>
-	<1313754927-11992-2-git-send-email-abhilash.kv@ti.com>
-	<87fwkild5k.fsf@ti.com>
-	<FCCFB4CDC6E5564B9182F639FC356087037B3D8823@dbde02.ent.ti.com>
-	<8739g0b8sa.fsf@ti.com>
-	<FCCFB4CDC6E5564B9182F639FC356087037AF843DD@dbde02.ent.ti.com>
-Message-ID: <87wrd97mwj.fsf@ti.com>
+Date: Thu, 15 Sep 2011 10:17:31 -0700
+Subject: [PATCH 02/25] OMAP4: Redefine mandatory barriers for OMAP to
+	include interconnect barriers.
+In-Reply-To: <4E7080F8.9020302@ti.com> (Santosh's message of "Wed, 14 Sep 2011
+	15:54:56 +0530")
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-3-git-send-email-santosh.shilimkar@ti.com>
+	<20110913202701.GF24252@atomide.com> <4E7080F8.9020302@ti.com>
+Message-ID: <87obyl7mj8.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Koyamangalath, Abhilash" <abhilash.kv@ti.com> writes:
+Santosh <santosh.shilimkar@ti.com> writes:
 
-> hi  Kevin
+> On Wednesday 14 September 2011 01:57 AM, Tony Lindgren wrote:
+>> * Santosh Shilimkar<santosh.shilimkar@ti.com>  [110904 06:22]:
+>>> On OMAP4 SOC intecronnects has many write buffers in the async bridges
+>>> and they can be drained only with stongly ordered accesses.
+>>
+>> This is not correct, strongly ordered access does not guarantee
+>> anything here. If it fixes issues, it's because it makes the writes
+>> to reach the device faster. Strongly ordered does not affect anything
+>> outside ARM, so the bus access won't change.
+>>
+> What I said is the aync bridges WB and what is said is correct
+> from MPU accesses point of view.
 >
-> On Tue, Sep 13, 2011 at 11:54 PM, Hilman, Kevin wrote:
->> Hi Abhilash,
->>
->> "Koyamangalath, Abhilash" <abhilash.kv@ti.com> writes:
->>
->>> Hi
->>>
->>> On Wed, Aug 31, 2011 at 4:28 AM, Hilman, Kevin wrote:
->>>>
->>>> Abhilash K V <abhilash.kv@ti.com> writes:
->>>>
-> <snip>
->>>>
->>>> In addition to Russell's comments about using the latest code from
->>>> mainline, I have some comments below.
->>> [Abhilash K V] I have reworked the patch against the tip (as suggested by
->>> Russell).
->>> And I've incorporated all of Kevin's comments too.
->>
->> Great, thanks!
->>
->>> There is one "known" issue left which needs to be closed before I can submit v2 of this patch.
->>> With no_console_suspend, suspend to RAM hangs right now on AM3517, after
->>> the message:
->>>           Disabling non-boot CPUs ...
->>> There is no error message or dump.
->>> I found that this crash is happening in a call to pr_warning(), from _omap_device_deactivate().
->>> The same code does not produce this issue on omap34xx due to this snippet from omap_sram_idle() :
->>>         /* PER */
->>>         if (per_next_state < PWRDM_POWER_ON) {
->>>                 per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
->>>                 omap_uart_prepare_idle(2);
->>>                 omap_uart_prepare_idle(3);
->>>                 omap2_gpio_prepare_for_idle(per_going_off);
->>>                 if (per_next_state == PWRDM_POWER_OFF)
->>>                                 omap3_per_save_context();
->>>         }
->>>         /* CORE */
->>>         if (core_next_state < PWRDM_POWER_ON) {
->>>                 omap_uart_prepare_idle(0);
->>>                 omap_uart_prepare_idle(1);
->>>                 if (core_next_state == PWRDM_POWER_OFF) {
->>>                         omap3_core_save_context();
->>>                         omap3_cm_save_context();
->>>                 }
->>>         }
->>> This happens in preparation to the suspend operation (I,e. the WFI).
->>> As seen here, on 34xx the sequence in which the uarts are disabled is 2, 3, 0 and 1.The console-uart, which is uart-1 here (starting from uart-0) is disabled last.
->>
->>> For AM3517 EVM, the console-uart is uart-2 and this ought to be
->>> disabled at the last to prevent this crash from occurring.
->>
->> There are several other OMAP3 platforms (n900, Beagle, etc.) where the
->> UART console is also UART2, so console ordering is not the problem.
+> It's not about faster or slower. With device memory the, writes
+> can get stuck into write buffers where as with SO, the write buffers
+> will be bypassed.
 >
-> [Abhilash K V] OK. Yet changing the order so that uart-2 is disabled
-> at the last seems to rid me of the crash on AM35x.  I understand that
-> holding the console_sem before suspend (your fix below) is the way to
-> go, but I'm just curious over what's happening here.  
+> The behaviours is limited to the MPU side async bridge boundary which
+> is the problem. The statement is not for l3 and l4 interconnect which
+> probably you mean.
+>
+> There is always a hardware signal to communicate CPU at async bridges
+> to ensure that data is not stuck in these bridges before CPU
+> clock/voltage is cut. Unfortunately we have a BUG on OMAP44XX devices
+> and the dual channel makes it even worst since both pipes have the
+> same BUG. So what we are doing is issuing SO write/read accesses
+> on these pipes so that there is nothing stuck there before MPU
+> hits low power states and also avoids any race conditions when
+> both channels are used together by some initiators. The behaviour
+> is validated at RTL level and there is no ambiguity about it.
+>
+> May be you have mistaken the L3 and L4 as the interconnect levels
+> in this case.
 
-You're unlucky.  :)
+Sounds to me like the changelog needs to be a bit more verbose.
 
-Each time an omap_device is disabled, we print a message if it's a new
-worst case value.
+Remember, we're all probably going to forget the gory details of this in
+a few months and want to be able to go back to the code w/changelog to
+refresh our memories.
 
-What's happening to you is that one of the UARTs disabled after the
-console is getting a new worst case value.  Because of the missing
-console locking, it's trying to write to the console, and boom.
-
-> Simply put what is the rationale behind choosing this order of
-> UART-disables ?
-
-The order is not important at all.
-
-Changing the order might fix this problem for your current situation,
-but the same problem could pop up elsewhere.
-
-In fact, even if you disable the console UART last, we can still try to
-print the "new worst case" messages after the console is disabled.
-That's why the console locking is important.
-
->>
->> The fact that that pr_warning is making it to the console suggests that
->> the console is not locked.  In the idle path, we take the console lock
->> (using console_trylock(), just above the code you showed above.)
->>
->> But during suspend, there was an assumption (by me[2]) that the console
->> would always be locked in the suspend path.  During no_console_suspend,
->> it appears that is not the case.
->>
->> Can you try the patch below[1] to see if that fixes your problem?  I
->> think it should.
-> [Abhilash K V] Yes it does, thanks.
-
-Great, thanks for testing.  I'll add a Tested-by for you, and post it
-to the list.  
+Thanks,
 
 Kevin
