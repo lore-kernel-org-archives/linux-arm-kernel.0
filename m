@@ -1,14 +1,15 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 15 Sep 2011 16:26:39 +0800
+Date: Thu, 15 Sep 2011 16:28:49 +0800
 Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
 In-Reply-To: <20081.44941.12535.496764@ipc1.ka-ro>
 References: <1315450031-6371-1-git-send-email-b32955@freescale.com>
 	<20081.44941.12535.496764@ipc1.ka-ro>
-Message-ID: <4E71B6BF.1060603@freescale.com>
+Message-ID: <4E71B741.7010907@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
+  add more CC.
 > Hi,
 >
 > Huang Shijie writes:
@@ -46,17 +47,15 @@ Hi,
 > How did you perform your tests?
 >
 > I tried this driver on our TX28 board with the result that with
-> concurrent access of the SD card and the NAND flash, I still get the
 The nand conflicats with SD card1. You will get the DMA timeout if you 
 use it.
 Do you use sd card0 or sd card1?
 
-BTW:I tested the gpmi driver with SD card0.
+BTW:I tested the gpmi driver with SD card0. It works fine.
 
 Best Regards
 Huang Shijie
-
-
+> concurrent access of the SD card and the NAND flash, I still get the
 > dreaded DMA timeouts within seconds:
 > DMA timeout, last DMA :1
 > GPMI regs:
