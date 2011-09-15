@@ -1,133 +1,89 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 15 Sep 2011 18:04:34 +0800
-Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <20081.44941.12535.496764@ipc1.ka-ro>
-References: <1315450031-6371-1-git-send-email-b32955@freescale.com>
-	<20081.44941.12535.496764@ipc1.ka-ro>
-Message-ID: <4E71CDB2.4000205@freescale.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 15 Sep 2011 12:07:25 +0200
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+Message-ID: <4E71CE5D.9030900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-> Hi,
->
-> Huang Shijie writes:
->> The patch set is based on Artem's tree:
->> 	http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
->>
->> The general-purpose media interface(GPMI) controller is a flexible interface
->> to up to several NAND flashs.
->>
->> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
->>
->> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
->> not.
->>
->> This driver is a _pure_ MTD NAND controller driver now.
->>
->>
->> The driver depends on another GPMI-NAND device patch set, you can find them at :
->> 	[1] http://marc.info/?l=linux-arm-kernel&m=131416901319573&w=2
->> 	[2] http://marc.info/?l=linux-arm-kernel&m=131416912319668&w=2
->> 	[3] http://marc.info/?l=linux-arm-kernel&m=131416891119504&w=2
->> 	[4] http://marc.info/?l=linux-arm-kernel&m=131416896219539&w=2
->>
->> Test environment:
->> 	Using imx23 and imx28 boards for test.
->>
->> 	imx23 :
->> 	console=ttyAMA0,115200 mtdparts=gpmi-nfc:20m(boot),-(user)
->> 	Tested by USB boot and NAND boot.
->>
->>          imx28 :
->> 	#console=ttyAMA0,115200 root=/dev/mmcblk0p3 rw rootwait
->> 	Tested by SD card boot mode.
->>
-> How did you perform your tests?
->
-> I tried this driver on our TX28 board with the result that with
-> concurrent access of the SD card and the NAND flash, I still get the
-> dreaded DMA timeouts within seconds:
-> DMA timeout, last DMA :1
-> GPMI regs:
->              HW_GPMI_CTRL0[000]=21800001
->            HW_GPMI_COMPARE[010]=00000000
->            HW_GPMI_ECCCTRL[020]=00000000
->           HW_GPMI_ECCCOUNT[030]=00000840
->            HW_GPMI_PAYLOAD[040]=46578000
->          HW_GPMI_AUXILIARY[050]=46578800
->              HW_GPMI_CTRL1[060]=0004000c
->            HW_GPMI_TIMING0[070]=00010203
->            HW_GPMI_TIMING1[080]=05000000
->            HW_GPMI_TIMING2[090]=09020101
->               HW_GPMI_STAT[0b0]=0d000003
->              HW_GPMI_DEBUG[0c0]=01000000
-> BCH regs:
->                HW_BCH_CTRL[000]=00000100
->             HW_BCH_STATUS0[010]=00000010
->                HW_BCH_MODE[020]=00000000
->           HW_BCH_ENCODEPTR[030]=00000000
->             HW_BCH_DATAPTR[040]=00000000
->             HW_BCH_METAPTR[050]=00000000
->        HW_BCH_LAYOUTSELECT[070]=00000000
->       HW_BCH_FLASH0LAYOUT0[080]=030a4200
->       HW_BCH_FLASH0LAYOUT1[090]=08404200
->              HW_BCH_DEBUG0[100]=00000000
-> DMA regs:
->             HW_APBHX_CTRL0[000]=30000000
->             HW_APBHX_CTRL1[010]=ffff0000
->             HW_APBHX_CTRL2[020]=00000000
->      HW_APBHX_CHANNEL_CTRL[030]=00000000
->      HW_APBHX_CHn_CURCMDAR(0)[100]=46e1c000
->      HW_APBHX_CHn_NXTCMDAR(0)[110]=46e1c04c
->           HW_APBHX_CHn_CMD(0)[120]=000001c8
->           HW_APBHX_CHn_BAR(0)[130]=00000000
->          HW_APBHX_CHn_SEMA(0)[140]=00000000
->        HW_APBHX_CHn_DEBUG1(0)[150]=00a0001e
->        HW_APBHX_CHn_DEBUG2(0)[160]=00000000
->      HW_APBHX_CHn_CURCMDAR(4)[2c0]=4652c098
->      HW_APBHX_CHn_NXTCMDAR(4)[2d0]=4652c0e4
->           HW_APBHX_CHn_CMD(4)[2e0]=000001c9
->           HW_APBHX_CHn_BAR(4)[2f0]=46553241
->          HW_APBHX_CHn_SEMA(4)[300]=00010000
->        HW_APBHX_CHn_DEBUG1(4)[310]=27a00015
->        HW_APBHX_CHn_DEBUG2(4)[320]=00000000
-> BCH Geometry :
-> GF length              : 13
-> ECC Strength           : 8
-> Page Size in Bytes     : 2112
-> Metadata Size in Bytes : 10
-> ECC Chunk Size in Bytes: 512
-> ECC Chunk Count        : 4
-> Payload Size in Bytes  : 2048
-> Auxiliary Size in Bytes: 16
-> Auxiliary Status Offset: 12
-> Block Mark Byte Offset : 1999
-> Block Mark Bit Offset  : 0
->
-> I'm doing a:
-> dd if=/dev/mtd0>  /dev/null&  dd if=/dev/mmcblk0>  /dev/null
-> Sometimes the 'dd' accessing the SD card will stall indefinitely.
-> Also copying data from SD card to flash will produce the error, though
-> less likely.
->
-it reproduces in my side too.
-> This looks like the problem arises in the DMA driver when multiple
-anyway, I will debug it.
+Hi Rob,
 
-but i will on vacation next week.
+On 9/15/2011 9:55 AM, Thomas Abraham wrote:
+> Hi Rob,
+>
+> On 14 September 2011 22:01, Rob Herring<robherring2@gmail.com>  wrote:
+>> From: Rob Herring<rob.herring@calxeda.com>
+>>
+>> This adds gic initialization using device tree data. The initialization
+>> functions are intended to be called by a generic OF interrupt
+>> controller parsing function once the right pieces are in place.
+>>
+>> PPIs are handled using 3rd cell of interrupts properties to specify the cpu
+>> mask the PPI is assigned to.
+>>
+>> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+>> ---
+>>   Documentation/devicetree/bindings/arm/gic.txt |   53 ++++++++++++++++++++++++
+>>   arch/arm/common/gic.c                         |   55 +++++++++++++++++++++++--
+>>   arch/arm/include/asm/hardware/gic.h           |   10 +++++
+>>   3 files changed, 114 insertions(+), 4 deletions(-)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+>
+> [...]
+>
+>
+>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>> index d1ccc72..14de380 100644
+>> --- a/arch/arm/common/gic.c
+>> +++ b/arch/arm/common/gic.c
+>
+> [...]
+>
+>> +void __init gic_of_init(struct device_node *node, struct device_node *parent)
+>> +{
+>> +       void __iomem *cpu_base;
+>> +       void __iomem *dist_base;
+>> +       int irq;
+>> +       struct irq_domain *domain =&gic_data[gic_cnt].domain;
+>> +
+>> +       if (WARN_ON(!node))
+>> +               return;
+>> +
+>> +       dist_base = of_iomap(node, 0);
+>> +       WARN(!dist_base, "unable to map gic dist registers\n");
+>> +
+>> +       cpu_base = of_iomap(node, 1);
+>> +       WARN(!cpu_base, "unable to map gic cpu registers\n");
+>> +
+>> +       domain->nr_irq = gic_irq_count(dist_base);
+>> +       domain->irq_base = irq_alloc_descs(-1, 0, domain->nr_irq, numa_node_id());
+>
+> For exynos4, all the interrupts originating from GIC are statically
+> mapped to start from 32 in the linux virq space (GIC SPI interrupts
+> start from 64). In the above code, since irq_base would be 0 for
+> exynos4, the interrupt mapping is not working correctly. In your
+> previous version of the patch, you have given a option to the platform
+> code to choose the offset. Could that option be added to this series
+> also. Or a provision to use platform specific translate function
+> instead of the irq_domain_simple translator.
 
-I am not sure I can fix it tomorrow.
+I have another concern on a similar topic.
 
-Best Regards
-Huang Shijie
-> channels are being used concurrently. The GPMI driver will bail out
-> with the timeout error while the MMC driver obviously has no timeout
-> check for this situation.
->
-> I can mostly rule out HW problems, because the same board works
-> perfectly well with WindowsCE (tested with a copy operation between
-> flash and SD card).
->
->
-> Lothar Wa?mann
+On OMAP4 the SoC interrupts external to the MPU (SPI) have an offset of 
+32. Only the internal PPI are between 0 and 31.
+
+For the moment we add 32 to every SoC interrupts in the irq.h define, 
+but I'm assuming that this offset calculation should be done thanks to a 
+dedicated irq domain for the SPI.
+The real HW physical number start at 0, and thus this is that value that 
+should be in the irq binding of the device.
+
+So ideally we should have a irq domain for the PPI starting at 0 and 
+another one for the SPI starting at 32. Or 32 and 64 for the exynos4 
+case, but it looks like the PPI/SPI offset is always 32.
+
+Regards,
+Benoit
