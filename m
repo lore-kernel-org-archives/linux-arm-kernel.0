@@ -1,33 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 15 Sep 2011 17:49:15 +0900
-Subject: [PATCH v2 0/4] S3C2416: Enable IIS and HSSPI clocks
-In-Reply-To: <201109150921.34406.heiko@sntech.de>
-References: <201108282006.31667.heiko@sntech.de>
-	<201109150921.34406.heiko@sntech.de>
-Message-ID: <00ad01cc7384$59e4dcb0$0dae9610$%kim@samsung.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 15 Sep 2011 09:50:36 +0100
+Subject: [PATCH 0/5] GIC OF bindings
+In-Reply-To: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20110915085036.GB3089@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+On Wed, Sep 14, 2011 at 11:31:35AM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Am Sonntag, 28. August 2011, 20:06:31 schrieb Heiko St?bner:
-> > S3C2416/2450 (probably S3C2443 too) can use the newer style
-> > kernel-drivers made for S3C64xx and above for their I2S and
-> > HS-SPI controllers.
-> >
-> > So as a first step in this direction, these patches add their
-> > respective clocks.
-> ping? Any comments?
+> This series introduces of_irq_init to scan the device tree for interrupt
+> controller nodes and call their init functions in proper order. The GIC
+> init function is then called from this function. The platform code then
+> looks something like this:
 > 
-Hi Heiko,
+> const static struct of_device_id irq_match[] = {
+> 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+> 	{}
+> };
+> 
+> static void __init highbank_init_irq(void)
+> {
+> 	of_irq_init(irq_match);
+> }
+> 
+> The binding for GIC PPIs is now done with a 3rd interrupt cell to specify
+> a cpu mask for which cpu the PPI is connected to. This was discussed at LPC
+> and suggested by Grant.
+> 
+> I dropped the public intc_desc struct. The the interrupt controller's node
+> and the interrupt parent's node are passed in directly to the controller's
+> init function. The linux irq assignment is now done dynamically using
+> irq_alloc_descs.
 
-Sorry for late response...came back from Korean traditional holiday :)
-I will be back on this in this weekend.
+Hi Rob,
 
-Thanks.
+This looks really nicely implemented to me.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+
+Jamie
