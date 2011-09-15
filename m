@@ -1,85 +1,266 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 15 Sep 2011 15:55:20 -0600
-Subject: [PATCH v3] spi/imx: Fix spi-imx when the hardware SPI
-	chipselects are used
-In-Reply-To: <1316118075-14541-1-git-send-email-fabio.estevam@freescale.com>
-References: <1316118075-14541-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110915215520.GJ3523@ponder.secretlab.ca>
+Date: Thu, 15 Sep 2011 16:12:58 -0600
+Subject: [RFC PATCH 03/11] DT: regulator: Helper routine to extract
+	regulator_init_data
+In-Reply-To: <1316085727-15023-4-git-send-email-rnayak@ti.com>
+References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
+	<1316085727-15023-2-git-send-email-rnayak@ti.com>
+	<1316085727-15023-3-git-send-email-rnayak@ti.com>
+	<1316085727-15023-4-git-send-email-rnayak@ti.com>
+Message-ID: <20110915221258.GK3523@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 05:21:15PM -0300, Fabio Estevam wrote:
-> commit 22a85e4cd51 (spi/imx: add device tree probe support) broke spi-imx usage
-> when the SPI chipselect is the one internal to the controller.
+On Thu, Sep 15, 2011 at 04:51:59PM +0530, Rajendra Nayak wrote:
+> The helper routine is meant to be used by regulator drivers
+> to extract the regulator_init_data structure passed from device tree.
+> 'consumer_supplies' which is part of regulator_init_data is not extracted
+> as the regulator consumer mappings are passed through DT differently,
+> implemented in subsequent patches.
 > 
-> On a mx31pdk board the following error is seen:
-
-Applied, thanks.
-
-g.
-
+> Also add documentation for regulator bindings to be used to pass
+> regulator_init_data struct information from device tree.
 > 
-> Registering mxc_nand as whole device
-> ------------[ cut here ]------------
-> WARNING: at drivers/gpio/gpiolib.c:101 gpio_ensure_requested+0x4c/0xf4()
-> autorequest GPIO-0
-> Modules linked in:
-> [<c0014410>] (unwind_backtrace+0x0/0xf4) from [<c0025754>] (warn_slowpath_common+0x4c/0x64)
-> [<c0025754>] (warn_slowpath_common+0x4c/0x64) from [<c0025800>] (warn_slowpath_fmt+0x30/0x40)
-> [<c0025800>] (warn_slowpath_fmt+0x30/0x40) from [<c0198688>] (gpio_ensure_requested+0x4c/0xf4)
-> [<c0198688>] (gpio_ensure_requested+0x4c/0xf4) from [<c01988c8>] (gpio_direction_output+0xa0/0x138)
-> [<c01988c8>] (gpio_direction_output+0xa0/0x138) from [<c01ed198>] (spi_imx_setup+0x38/0x4c)
-> [<c01ed198>] (spi_imx_setup+0x38/0x4c) from [<c01eb5d0>] (spi_setup+0x38/0x50)
-> [<c01eb5d0>] (spi_setup+0x38/0x50) from [<c01eb85c>] (spi_add_device+0x94/0x124)
-> [<c01eb85c>] (spi_add_device+0x94/0x124) from [<c01eb960>] (spi_new_device+0x74/0xac)
-> [<c01eb960>] (spi_new_device+0x74/0xac) from [<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40)
-> [<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40) from [<c01eba88>] (spi_register_master+0xb0/0x104)
-> [<c01eba88>] (spi_register_master+0xb0/0x104) from [<c01ec0b4>] (spi_bitbang_start+0x104/0x17c)
-> [<c01ec0b4>] (spi_bitbang_start+0x104/0x17c) from [<c02c2c4c>] (spi_imx_probe+0x2fc/0x404)
-> [<c02c2c4c>] (spi_imx_probe+0x2fc/0x404) from [<c01c2498>] (platform_drv_probe+0x18/0x1c)
-> [<c01c2498>] (platform_drv_probe+0x18/0x1c) from [<c01c1058>] (driver_probe_device+0x78/0x174)
-> [<c01c1058>] (driver_probe_device+0x78/0x174) from [<c01c11e0>] (__driver_attach+0x8c/0x90)
-> [<c01c11e0>] (__driver_attach+0x8c/0x90) from [<c01c0860>] (bus_for_each_dev+0x60/0x8c)
-> [<c01c0860>] (bus_for_each_dev+0x60/0x8c) from [<c01c0088>] (bus_add_driver+0xa0/0x288)
-> [<c01c0088>] (bus_add_driver+0xa0/0x288) from [<c01c179c>] (driver_register+0x78/0x18c)
-> [<c01c179c>] (driver_register+0x78/0x18c) from [<c0008490>] (do_one_initcall+0x34/0x178)
-> [<c0008490>] (do_one_initcall+0x34/0x178) from [<c03a5204>] (kernel_init+0x74/0x118)
-> [<c03a5204>] (kernel_init+0x74/0x118) from [<c000f65c>] (kernel_thread_exit+0x0/0x8)
-> ---[ end trace 759f924b30fd5a44 ]---
-> 
-> Fix this issue by using the original chip select logic and make spi-imx to work again.
-> 
-> Tested on a mx31pdk that uses the hardware SPI chipselect pins and also
-> on a mx27pdk that uses GPIO as SPI chipselect.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 > ---
-> Changes since v2:
-> - Place spi_imx->chipselect[i] = cs_gpio in the correct position
-> Changes since v1:
-> - Fix the logic for the internal chip select case and
-> keep the usage of of_get_named_gpio for getting the cs_gpio
->  drivers/spi/spi-imx.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
+>  .../devicetree/bindings/regulator/regulator.txt    |   37 +++++++++
+>  drivers/of/Kconfig                                 |    6 ++
+>  drivers/of/Makefile                                |    1 +
+>  drivers/of/of_regulator.c                          |   85 ++++++++++++++++++++
+
+I originally put the DT stuff under drivers/of for i2c and spi because
+there was resistance from driver subsystem maintainers to having code
+for something that was powerpc only.  Now that it is no longer the
+case, I recommend putting this code under drivers/regulator.
+
+>  include/linux/of_regulator.h                       |   23 +++++
+>  5 files changed, 152 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/regulator.txt
+>  create mode 100644 drivers/of/of_regulator.c
+>  create mode 100644 include/linux/of_regulator.h
 > 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 8ac6542..c5b14e6 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -786,9 +786,11 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
->  		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
->  		if (cs_gpio < 0)
->  			cs_gpio = mxc_platform_info->chipselect[i];
+> diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
+> new file mode 100644
+> index 0000000..001e5ce
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+> @@ -0,0 +1,37 @@
+> +Voltage/Current Regulators
 > +
-> +		spi_imx->chipselect[i] = cs_gpio;
->  		if (cs_gpio < 0)
->  			continue;
-> -		spi_imx->chipselect[i] = cs_gpio;
+> +Required properties:
+> +- compatible: Must be "regulator";
+
+A "regulator" compatible doesn't actually help much.  Compatible is
+for specifying the specific device, not for trying to describe what
+kind of device it is.  Instead, specific regulator bindings can adopt
+& extend this binding.
+
 > +
->  		ret = gpio_request(spi_imx->chipselect[i], DRIVER_NAME);
->  		if (ret) {
->  			while (i > 0) {
+> +Optional properties:
+> +- supply-regulator: Name of the parent regulator
+
+If this is a reference to another regulator node then don't use names.
+Use phandles instead.  In which case it should probably be named
+something like "regulator-parent" (similar to interrupt parent).
+
+However, I can imagine it possible for a regulator to have multiple
+parents.  It may just be better to go with something like the gpio
+scheme of <phandle gpio-specifier> list of entries.  Or maybe just a
+list of phandles would be sufficient.
+
+> +- min-uV: smallest voltage consumers may set
+> +- max-uV: largest voltage consumers may set
+> +- uV-offset: Offset applied to voltages from consumer to compensate for voltage drops
+> +- min-uA: smallest current consumers may set
+> +- max-uA: largest current consumers may set
+> +- mode-fast: boolean, Can handle fast changes in its load
+> +- mode-normal: boolean, Normal regulator power supply mode
+> +- mode-idle: boolean, Can be more efficient during light loads
+> +- mode-standby: boolean, Can be most efficient during light loads
+> +- change-voltage: boolean, Output voltage can be changed by software
+> +- change-current: boolean, Output current can be chnaged by software
+> +- change-mode: boolean, Operating mode can be changed by software
+> +- change-status: boolean, Enable/Disable control for regulator exists
+> +- change-drms: boolean, Dynamic regulator mode switching is enabled
+> +- input-uV: Input voltage for regulator when supplied by another regulator
+> +- initial-mode: Mode to set at startup
+> +- always-on: boolean, regulator should never be disabled
+> +- boot-on: bootloader/firmware enabled regulator
+> +- apply-uV: apply uV constraint if min == max
+
+To avoid collisions, I'd prefix all of these with a common prefix.
+Something like regulator-*.
+
+These map 1:1 to how Linux currently implements regulators; which
+isn't exactly bad, but it means that even if Linux changes, we're
+still have to support this binding.  Does this represent the best
+layout for high level description of regulators?
+
+> +
+> +Example:
+> +
+> +	xyz-regulator: regulator at 0 {
+> +		compatible = "regulator";
+> +		min-uV = <1000000>;
+> +		max-uV = <2500000>;
+> +		mode-fast;
+> +		change-voltage;
+> +		always-on;
+> +	};
+> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> index b3bfea5..296b96d 100644
+> --- a/drivers/of/Kconfig
+> +++ b/drivers/of/Kconfig
+> @@ -87,4 +87,10 @@ config OF_PCI_IRQ
+>  	help
+>  	  OpenFirmware PCI IRQ routing helpers
+>  
+> +config OF_REGULATOR
+> +	def_bool y
+> +	depends on REGULATOR
+> +	help
+> +	  OpenFirmware regulator framework helpers
+> +
+>  endmenu # OF
+> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> index 74b959c..bea2852 100644
+> --- a/drivers/of/Makefile
+> +++ b/drivers/of/Makefile
+> @@ -12,3 +12,4 @@ obj-$(CONFIG_OF_SPI)	+= of_spi.o
+>  obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+>  obj-$(CONFIG_OF_PCI)	+= of_pci.o
+>  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+> +obj-$(CONFIG_OF_REGULATOR) += of_regulator.o
+> diff --git a/drivers/of/of_regulator.c b/drivers/of/of_regulator.c
+> new file mode 100644
+> index 0000000..f01d275
+> --- /dev/null
+> +++ b/drivers/of/of_regulator.c
+> @@ -0,0 +1,85 @@
+> +/*
+> + * OF helpers for regulator framework
+> + *
+> + * Copyright (C) 2011 Texas Instruments, Inc.
+> + * Rajendra Nayak <rnayak@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/slab.h>
+> +#include <linux/of.h>
+> +#include <linux/regulator/machine.h>
+> +
+> +static void of_get_regulation_constraints(struct device_node *np,
+> +					struct regulator_init_data **init_data)
+> +{
+> +	unsigned int valid_modes_mask = 0, valid_ops_mask = 0;
+> +
+> +	of_property_read_u32(np, "min-uV", &(*init_data)->constraints.min_uV);
+> +	of_property_read_u32(np, "max-uV", &(*init_data)->constraints.max_uV);
+> +	of_property_read_u32(np, "uV-offset", &(*init_data)->constraints.uV_offset);
+> +	of_property_read_u32(np, "min-uA", &(*init_data)->constraints.min_uA);
+> +	of_property_read_u32(np, "max-uA", &(*init_data)->constraints.max_uA);
+
+Are all these structure members are int and unsigned int.  They need
+to be u32 to be used with of_property_read_u32()  (which also tells
+me that the of_property_read_*() api still needs work).
+
+> +
+> +	/* valid modes mask */
+> +	if (of_find_property(np, "mode-fast", NULL))
+> +		valid_modes_mask |= REGULATOR_MODE_FAST;
+> +	if (of_find_property(np, "mode-normal", NULL))
+> +		valid_modes_mask |= REGULATOR_MODE_NORMAL;
+> +	if (of_find_property(np, "mode-idle", NULL))
+> +		valid_modes_mask |= REGULATOR_MODE_IDLE;
+> +	if (of_find_property(np, "mode-standby", NULL))
+> +		valid_modes_mask |= REGULATOR_MODE_STANDBY;
+> +
+> +	/* valid ops mask */
+> +	if (of_find_property(np, "change-voltage", NULL))
+> +		valid_ops_mask |= REGULATOR_CHANGE_VOLTAGE;
+> +	if (of_find_property(np, "change-current", NULL))
+> +		valid_ops_mask |= REGULATOR_CHANGE_CURRENT;
+> +	if (of_find_property(np, "change-mode", NULL))
+> +		valid_ops_mask |= REGULATOR_CHANGE_MODE;
+> +	if (of_find_property(np, "change-status", NULL))
+> +		valid_ops_mask |= REGULATOR_CHANGE_STATUS;
+> +
+> +	(*init_data)->constraints.valid_modes_mask = valid_modes_mask;
+> +	(*init_data)->constraints.valid_ops_mask = valid_ops_mask;
+> +
+> +	of_property_read_u32(np, "input-uV",
+> +			&(*init_data)->constraints.input_uV);
+> +	of_property_read_u32(np, "initial-mode",
+> +			&(*init_data)->constraints.initial_mode);
+> +
+> +	if (of_find_property(np, "always-on", NULL))
+> +			(*init_data)->constraints.always_on = true;
+> +	if (of_find_property(np, "boot-on", NULL))
+> +			(*init_data)->constraints.boot_on = true;
+> +	if (of_find_property(np, "apply-uV", NULL))
+> +			(*init_data)->constraints.apply_uV = true;
+> +}
+> +
+> +/**
+> + * of_get_regulator_init_data - extarct regulator_init_data structure info
+> + * @np: Pointer to regulator device tree node
+> + *
+> + * Populates regulator_init_data structure by extracting data from device
+> + * tree node, returns a pointer to the populated struture or NULL if memory
+> + * alloc fails.
+> + */
+> +struct regulator_init_data *of_get_regulator_init_data(struct device_node *np)
+> +{
+> +	struct regulator_init_data *init_data;
+> +
+> +	init_data = kzalloc(sizeof(struct regulator_init_data), GFP_KERNEL);
+> +	if (!init_data)
+> +		return NULL; /* Out of memory? */
+> +
+> +	init_data->supply_regulator = (char *)of_get_property(np,
+> +						"supply-regulator", NULL);
+> +	of_get_regulation_constraints(np, &init_data);
+> +	return init_data;
+> +}
+> +EXPORT_SYMBOL(of_get_regulator_init_data);
+
+Who will call this?  If it is done by proper device drivers, it would
+be better have it do the alloc so that it can do devm_kzalloc().  Or
+maybe have a devm_kzalloc variant.
+
+> diff --git a/include/linux/of_regulator.h b/include/linux/of_regulator.h
+> new file mode 100644
+> index 0000000..5eb048c
+> --- /dev/null
+> +++ b/include/linux/of_regulator.h
+> @@ -0,0 +1,23 @@
+> +/*
+> + * OpenFirmware regulator support routines
+> + *
+> + */
+> +
+> +#ifndef __LINUX_OF_REG_H
+> +#define __LINUX_OF_REG_H
+> +
+> +#include <linux/regulator/machine.h>
+> +
+> +#if defined(CONFIG_OF_REGULATOR)
+> +extern struct regulator_init_data
+> +	*of_get_regulator_init_data(struct device_node *np);
+> +#else
+> +static inline struct regulator_init_data
+> +	*of_get_regulator_init_data(struct device_node *np)
+> +{
+> +	return NULL;
+> +}
+> +#endif /* CONFIG_OF_REGULATOR */
+> +
+> +#endif /* __LINUX_OF_REG_H */
+> +
 > -- 
 > 1.7.1
-> 
 > 
