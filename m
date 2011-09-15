@@ -1,35 +1,28 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 15 Sep 2011 17:35:45 +0900
-Subject: [PATCH] arm: sched_clock: Enable HAVE_SCHED_CLOCK support without
-	init_sched_clock
-In-Reply-To: <20110915082024.GF6267@n2100.arm.linux.org.uk>
-References: <20110915073511.GA31732@july>
-	<20110915082024.GF6267@n2100.arm.linux.org.uk>
-Message-ID: <CAH9JG2WeR4QtYNFoOwipFz3H6YMxvRARJvyrkj0hO3ECnYwenw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 15 Sep 2011 09:43:32 +0100
+Subject: [PATCH v2 0/2] make reinitialization of ARM core components
+	possible
+In-Reply-To: <20110915015338.GF1488@S2100-06.ap.freescale.net>
+References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
+	<4E65B71E.6060307@ti.com>
+	<20110912054140.GE1258@S2100-06.ap.freescale.net>
+	<20110914190739.GE6267@n2100.arm.linux.org.uk>
+	<20110915015338.GF1488@S2100-06.ap.freescale.net>
+Message-ID: <20110915084332.GH6267@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 5:20 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Sep 15, 2011 at 04:35:12PM +0900, Kyungmin Park wrote:
->> From: Kyungmin Park <kyungmin.park@samsung.com>
->>
->> On Samsung Exynos4 series, EVT0 chip uses the s5p_timer with HAVE_SCHED_CLOCK and remains use the MCT timer without init_sched_clock.
->
-> So in other words, sched_clock on exynos4 is broken because the update
-> function won't be called, and it'll wrap well below the 64-bit ns range
-> required of it.
+On Thu, Sep 15, 2011 at 09:53:39AM +0800, Shawn Guo wrote:
+> The re-init approach calls the exactly same function used for the
+> initial init during resume.  So if this is a problem, it's the problem
+> of initial init.  The initial init code should initialize the L2 into
+> a known state with "values" rather than "mask + values" method.
 
-Right, even though MCT doesn't use the HAVE_SCHED_CLOCK, sched_clock
-is override with others.
-It mean it should be implement the sched_clock for all boards if there
-are some boards use the HAVE_SCHED_CLOCK.
+That may not be possible - the kernel may have no knowledge of the correct
+settings for the number of ways and cacheline size etc for the platform.
+It may be that these settings have been configured by the secure monitor
+rather than the boot loader.
 
-As I remember, there's attempt to solve the sched_clock registration
-issue. I'll check it.
-
-Thank you,
-Kyungmin Park
->
-> NAK.
->
+I couldn't tell you what the correct settings would be for Versatile
+Express for instance, and I bet that the correct settings are a function
+of the FPGA images loaded onto the board.
