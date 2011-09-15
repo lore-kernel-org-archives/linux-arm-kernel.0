@@ -1,40 +1,27 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 15 Sep 2011 15:23:01 +0200
-Subject: [PATCH v2] [media] at91: add code to initialize and manage the
-	ISI_MCK for Atmel ISI driver.
-In-Reply-To: <4E668BBF.4020600@gmail.com>
-References: <1315288601-22384-1-git-send-email-josh.wu@atmel.com>
-	<Pine.LNX.4.64.1109060803590.14818@axis700.grange>
-	<20110906200512.GA15083@game.jcrosoft.org>
-	<4E668BBF.4020600@gmail.com>
-Message-ID: <20110915132301.GK28104@game.jcrosoft.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 15 Sep 2011 14:46:18 +0100
+Subject: [RFC PATCH 04/11] omap4: SDP: Pass regulator_init_data from DT
+In-Reply-To: <1316085727-15023-5-git-send-email-rnayak@ti.com>
+References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
+	<1316085727-15023-2-git-send-email-rnayak@ti.com>
+	<1316085727-15023-3-git-send-email-rnayak@ti.com>
+	<1316085727-15023-4-git-send-email-rnayak@ti.com>
+	<1316085727-15023-5-git-send-email-rnayak@ti.com>
+Message-ID: <20110915134618.GK7988@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:08 Tue 06 Sep     , Sylwester Nawrocki wrote:
-> On 09/06/2011 10:05 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> I'm not entirely sure on this one, but as we had a similar situation with
-> >> clocks, we decided to extablish the clock hierarchy in the board code, and
-> >> only deal with the actual device clocks in the driver itself. I.e., we
-> >> moved all clk_set_parent() and setting up the parent clock into the board.
-> >> And I do think, this makes more sense, than doing this in the driver, not
-> >> all users of this driver will need to manage the parent clock, right?
-> >
-> > I don't like to manage the clock in the board except if it's manadatory otherwise
-> > we manage this at soc level
-> > 
-> > the driver does not have to manage the clock hierachy or detail implementation
-> > but manage the clock enable/disable and speed depending on it's need
-> 
-> We had a similar problem in the past and we ended up having the boot loader
-> setting up the parent clock for the device clock. The driver only controls clock
-> gating and sets its clock frequency based on an internal IP version information,
-> derived from the SoC revision.
-sorry NACK
+On Thu, Sep 15, 2011 at 04:52:00PM +0530, Rajendra Nayak wrote:
 
-I do not want to rely on bootloader
-when we will have the DT we will pass it via it right now we need find an
-other generic way
+> +Required properties:
+> +- compatible: Must be "regulator","ti,twl-reg";
 
-Best Regards,
-J.
+I'd expect listings for the specific chips too.
+
+> +	xyz-regulator: regulator at 0 {
+> +		compatible = "regulator","ti,twl-reg";
+> +		ti,reg-id = <37>; /* TWL6030_REG_VAUX1_6030 */
+
+These magic numbers are *very* Linux specific, we should have a better
+way of specifying regulators - I'd off the top of my head expect that
+the compatible property would identify the regulator.
