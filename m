@@ -1,43 +1,40 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 15 Sep 2011 14:44:27 +0100
-Subject: [RFC PATCH 03/11] DT: regulator: Helper routine to extract
-	regulator_init_data
-In-Reply-To: <1316085727-15023-4-git-send-email-rnayak@ti.com>
-References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
-	<1316085727-15023-2-git-send-email-rnayak@ti.com>
-	<1316085727-15023-3-git-send-email-rnayak@ti.com>
-	<1316085727-15023-4-git-send-email-rnayak@ti.com>
-Message-ID: <20110915134427.GJ7988@opensource.wolfsonmicro.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 15 Sep 2011 15:23:01 +0200
+Subject: [PATCH v2] [media] at91: add code to initialize and manage the
+	ISI_MCK for Atmel ISI driver.
+In-Reply-To: <4E668BBF.4020600@gmail.com>
+References: <1315288601-22384-1-git-send-email-josh.wu@atmel.com>
+	<Pine.LNX.4.64.1109060803590.14818@axis700.grange>
+	<20110906200512.GA15083@game.jcrosoft.org>
+	<4E668BBF.4020600@gmail.com>
+Message-ID: <20110915132301.GK28104@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 04:51:59PM +0530, Rajendra Nayak wrote:
+On 23:08 Tue 06 Sep     , Sylwester Nawrocki wrote:
+> On 09/06/2011 10:05 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >> I'm not entirely sure on this one, but as we had a similar situation with
+> >> clocks, we decided to extablish the clock hierarchy in the board code, and
+> >> only deal with the actual device clocks in the driver itself. I.e., we
+> >> moved all clk_set_parent() and setting up the parent clock into the board.
+> >> And I do think, this makes more sense, than doing this in the driver, not
+> >> all users of this driver will need to manage the parent clock, right?
+> >
+> > I don't like to manage the clock in the board except if it's manadatory otherwise
+> > we manage this at soc level
+> > 
+> > the driver does not have to manage the clock hierachy or detail implementation
+> > but manage the clock enable/disable and speed depending on it's need
+> 
+> We had a similar problem in the past and we ended up having the boot loader
+> setting up the parent clock for the device clock. The driver only controls clock
+> gating and sets its clock frequency based on an internal IP version information,
+> derived from the SoC revision.
+sorry NACK
 
->  .../devicetree/bindings/regulator/regulator.txt    |   37 +++++++++
->  drivers/of/Kconfig                                 |    6 ++
->  drivers/of/Makefile                                |    1 +
->  drivers/of/of_regulator.c                          |   85 ++++++++++++++++++++
->  include/linux/of_regulator.h                       |   23 +++++
+I do not want to rely on bootloader
+when we will have the DT we will pass it via it right now we need find an
+other generic way
 
-Don't go hiding the bindings for things away from the code they're
-binding.  Bindings for the regualtor API are a regulator API thing and
-should be part of the regulator API code.
-
-> +Required properties:
-> +- compatible: Must be "regulator";
-
-Is this idiomatic or should we just have a helper that parses a big list
-of properties from the device node?
-
-> +- mode-fast: boolean, Can handle fast changes in its load
-> +- mode-normal: boolean, Normal regulator power supply mode
-> +- mode-idle: boolean, Can be more efficient during light loads
-> +- mode-standby: boolean, Can be most efficient during light loads
-
-I guess these are actually permissions to set the given modes?  The
-documentation should be clearer.
-
-> +- apply-uV: apply uV constraint if min == max
-
-This seems a bit Linux/runtime policy specific (especially the last
-bit).
+Best Regards,
+J.
