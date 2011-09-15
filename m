@@ -1,72 +1,55 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 15 Sep 2011 17:20:11 +0800
-Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <20081.49563.934890.760378@ipc1.ka-ro>
-References: <1315450031-6371-1-git-send-email-b32955@freescale.com>	<20081.44941.12535.496764@ipc1.ka-ro>	<4E71B741.7010907@freescale.com>
-	<20081.49563.934890.760378@ipc1.ka-ro>
-Message-ID: <4E71C34B.3050308@freescale.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Thu, 15 Sep 2011 11:36:02 +0200
+Subject: [PATCH 13/25] OMAP4: PM: Add WakeupGen module as OMAP
+	gic_arch_extn
+In-Reply-To: <4E70E2DE.2030006@ti.com>
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-14-git-send-email-santosh.shilimkar@ti.com>
+	<20110913203616.GG24252@atomide.com>
+	<CAMQu2gyYETPZRJu=4MWX6bULgmMaJb8MRwfhvURtOuyyWhLkAQ@mail.gmail.com>
+	<20110914152116.GM24252@atomide.com> <4E70DB33.5070501@ti.com>
+	<20110914170803.GN24252@atomide.com> <4E70E0CC.80300@ti.com>
+	<20110914171800.GO24252@atomide.com> <4E70E2DE.2030006@ti.com>
+Message-ID: <4E71C702.40206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-> Hi,
->
-> Huang Shijie writes:
->> Hi,
->>    add more CC.
->>> Hi,
->>>
->>> Huang Shijie writes:
->>>> The patch set is based on Artem's tree:
->>>> 	http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
->>>>
->>>> The general-purpose media interface(GPMI) controller is a flexible interface
->>>> to up to several NAND flashs.
->>>>
->>>> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
->>>>
->>>> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
->>>> not.
->>>>
->>>> This driver is a _pure_ MTD NAND controller driver now.
->>>>
->>>>
->>>> The driver depends on another GPMI-NAND device patch set, you can find them at :
->>>> 	[1] http://marc.info/?l=linux-arm-kernel&m=131416901319573&w=2
->>>> 	[2] http://marc.info/?l=linux-arm-kernel&m=131416912319668&w=2
->>>> 	[3] http://marc.info/?l=linux-arm-kernel&m=131416891119504&w=2
->>>> 	[4] http://marc.info/?l=linux-arm-kernel&m=131416896219539&w=2
->>>>
->>>> Test environment:
->>>> 	Using imx23 and imx28 boards for test.
->>>>
->>>> 	imx23 :
->>>> 	console=ttyAMA0,115200 mtdparts=gpmi-nfc:20m(boot),-(user)
->>>> 	Tested by USB boot and NAND boot.
->>>>
->>>>           imx28 :
->>>> 	#console=ttyAMA0,115200 root=/dev/mmcblk0p3 rw rootwait
->>>> 	Tested by SD card boot mode.
->>>>
->>> How did you perform your tests?
->>>
->>> I tried this driver on our TX28 board with the result that with
->> The nand conflicats with SD card1. You will get the DMA timeout if you
->> use it.
->> Do you use sd card0 or sd card1?
->>
-> I'm using the SSP0 port.
->
-ok.
->> BTW:I tested the gpmi driver with SD card0. It works fine.
->>
-> What exactly did you do in your test?
-I tested it with bonnie++.
-> Can you try the concurrent 'dd' commands that I used?
-not yet.
+Hi Santosh,
 
-I will test it right now.
+On 9/14/2011 7:22 PM, Shilimkar, Santosh wrote:
+> On Wednesday 14 September 2011 10:48 PM, Tony Lindgren wrote:
+>> * Santosh<santosh.shilimkar@ti.com>   [110914 09:40]:
+>>> On Wednesday 14 September 2011 10:38 PM, Tony Lindgren wrote:
+>>>> * Santosh<santosh.shilimkar@ti.com>    [110914 09:16]:
+>>>>
+>>>> Thanks for the clarification. It seems to me the spec is most likely
+>>>> wrong as we've had the GIC working for over two years now without
+>>>> doing anything with the wakeup gen registers :)
+>>>>
+>>> It's working because CPU clockdomain are never put under HW
+>>> supervised mode and they are kept in force wakeup. Clock-domain
+>>> never idles on mainline code. PM series will put the clock-domains
+>>> under HW supervison as needed to achieve any low power states and
+>>> then all sorts of corner cases will come out.
+>>
+>> But again the wakeup gen triggers only do something when hitting
+>> idle. There should be no use for them during runtime, right?
+>>
+> You missed my point in the description. Clockdomain inactive
+> doesn't depend on idle or WFI execution. Under HW supervison
+> CPU clock domain can get into inactive when CPU is stalled and
+> waiting for a read response from slow interconnect.
 
-Huang Shijie
->
-> Lothar Wa?mann
+I'm a little bit confused by that statement...
+
+I'm wondering how the PRCM can gate the CPU/MPU clock and re-enable it 
+if the MPU is gated? What kind of event can wakeup the CPU in case of 
+CPU stalled?
+
+The spec seems to indicate that wakeupgen is needed only if CPU are in 
+WFI. It is even written: "CPUx will change power state only when 
+StandbyWFI is asserted.". Even a WFE is not supposed to trigger a standby.
+How can the CPU be inactive at clock domain level without a WFI?
+
+Regards,
+Benoit
