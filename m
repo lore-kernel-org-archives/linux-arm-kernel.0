@@ -1,105 +1,90 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 15 Sep 2011 15:32:57 -0400 (EDT)
-Subject: READ THIS: the next mach-types update
-In-Reply-To: <20110915191134.GL6267@n2100.arm.linux.org.uk>
-References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
-	<201109151726.02445.arnd@arndb.de>
-	<20110915191134.GL6267@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1109151524080.20358@xanadu.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 15 Sep 2011 15:01:08 -0600
+Subject: [PATCH v2] spi/imx: Fix spi-imx when the hardware SPI
+	chipselects are used
+In-Reply-To: <1316111337-13485-1-git-send-email-fabio.estevam@freescale.com>
+References: <1316111337-13485-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110915210108.GG3523@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Sep 2011, Russell King - ARM Linux wrote:
-
-> On Thu, Sep 15, 2011 at 05:26:02PM +0200, Arnd Bergmann wrote:
-> > On Thursday 15 September 2011, Russell King - ARM Linux wrote:
-> > > Moreover, entries older than 12 months which have not been merged will
-> > > be removed.  It is not possible to automatically check for machine_is_xxx()
-> > > usages as these could conflict with other architectures, and I'm
-> > > certainly NOT checking for them by hand (I estimate that'd take a
-> > > significant amount of manual effort to do.)  What that means is that it
-> > > is important to get the core platform support in first before any
-> > > drivers which may make use of this.
-> > 
-> > Hi Russell,
-> > 
-> > I've just tried checking the machine_is_xxx() values in the kernel for
-> > the list you posted and found just two that are actually being used:
-> > 
-> > arch/arm/mach-orion5x/ts209-setup.c:    if (machine_is_ts_x09())
-> > arch/arm/mach-kirkwood/sheevaplug-setup.c:      if (machine_is_sheeva_esata())
-> > 
-> > Would it be possible to just fix these to use the correct form instead,
-> > along with the respective mach-types change?
+On Thu, Sep 15, 2011 at 03:28:57PM -0300, Fabio Estevam wrote:
+> commit 22a85e4cd51 (spi/imx: add device tree probe support) broke spi-imx usage
+> when the SPI chipselect is the one internal to the controller.
 > 
-> That would of course be the preferred way, but I need to know which
-> way they're supposed to be - the current disagreement in the names
-> doesn't suggest which is the right one.
+> On a mx31pdk board the following error is seen:
+> 
+> Registering mxc_nand as whole device
+> ------------[ cut here ]------------
+> WARNING: at drivers/gpio/gpiolib.c:101 gpio_ensure_requested+0x4c/0xf4()
+> autorequest GPIO-0
+> Modules linked in:
+> [<c0014410>] (unwind_backtrace+0x0/0xf4) from [<c0025754>] (warn_slowpath_common+0x4c/0x64)
+> [<c0025754>] (warn_slowpath_common+0x4c/0x64) from [<c0025800>] (warn_slowpath_fmt+0x30/0x40)
+> [<c0025800>] (warn_slowpath_fmt+0x30/0x40) from [<c0198688>] (gpio_ensure_requested+0x4c/0xf4)
+> [<c0198688>] (gpio_ensure_requested+0x4c/0xf4) from [<c01988c8>] (gpio_direction_output+0xa0/0x138)
+> [<c01988c8>] (gpio_direction_output+0xa0/0x138) from [<c01ed198>] (spi_imx_setup+0x38/0x4c)
+> [<c01ed198>] (spi_imx_setup+0x38/0x4c) from [<c01eb5d0>] (spi_setup+0x38/0x50)
+> [<c01eb5d0>] (spi_setup+0x38/0x50) from [<c01eb85c>] (spi_add_device+0x94/0x124)
+> [<c01eb85c>] (spi_add_device+0x94/0x124) from [<c01eb960>] (spi_new_device+0x74/0xac)
+> [<c01eb960>] (spi_new_device+0x74/0xac) from [<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40)
+> [<c01eb9b8>] (spi_match_master_to_boardinfo+0x20/0x40) from [<c01eba88>] (spi_register_master+0xb0/0x104)
+> [<c01eba88>] (spi_register_master+0xb0/0x104) from [<c01ec0b4>] (spi_bitbang_start+0x104/0x17c)
+> [<c01ec0b4>] (spi_bitbang_start+0x104/0x17c) from [<c02c2c4c>] (spi_imx_probe+0x2fc/0x404)
+> [<c02c2c4c>] (spi_imx_probe+0x2fc/0x404) from [<c01c2498>] (platform_drv_probe+0x18/0x1c)
+> [<c01c2498>] (platform_drv_probe+0x18/0x1c) from [<c01c1058>] (driver_probe_device+0x78/0x174)
+> [<c01c1058>] (driver_probe_device+0x78/0x174) from [<c01c11e0>] (__driver_attach+0x8c/0x90)
+> [<c01c11e0>] (__driver_attach+0x8c/0x90) from [<c01c0860>] (bus_for_each_dev+0x60/0x8c)
+> [<c01c0860>] (bus_for_each_dev+0x60/0x8c) from [<c01c0088>] (bus_add_driver+0xa0/0x288)
+> [<c01c0088>] (bus_add_driver+0xa0/0x288) from [<c01c179c>] (driver_register+0x78/0x18c)
+> [<c01c179c>] (driver_register+0x78/0x18c) from [<c0008490>] (do_one_initcall+0x34/0x178)
+> [<c0008490>] (do_one_initcall+0x34/0x178) from [<c03a5204>] (kernel_init+0x74/0x118)
+> [<c03a5204>] (kernel_init+0x74/0x118) from [<c000f65c>] (kernel_thread_exit+0x0/0x8)
+> ---[ end trace 759f924b30fd5a44 ]---
+> 
+> Fix this issue by using the original chip select logic and make spi-imx to work again.
+> 
+> Tested on a mx31pdk that uses the hardware SPI chipselect pins and also
+> on a mx27pdk that uses GPIO as SPI chipselect.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Fix the logic for the internal chip select case and
+> keep the usage of of_get_named_gpio for getting the cs_gpio
+> 
+>  drivers/spi/spi-imx.c |    6 ++++--
+>  1 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 8ac6542..d917fa3 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -784,11 +784,13 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
+>  
+>  	for (i = 0; i < master->num_chipselect; i++) {
+>  		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
+> -		if (cs_gpio < 0)
+> +		if (cs_gpio < 0) {
+>  			cs_gpio = mxc_platform_info->chipselect[i];
+> +			spi_imx->chipselect[i] = cs_gpio;
+> +		}
+>  		if (cs_gpio < 0)
+>  			continue;
+> -		spi_imx->chipselect[i] = cs_gpio;
+> +
 
-Here's what I'd suggest:
+It looks like the removal of this line will break DT users.  Perhaps
+the spi_imx->chipselect[i] line should just be moved before the
+'if (cp_gpio < 0)' line.
 
-diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
-index 17de0bf53c..d989c0d1f9 100644
---- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
-+++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
-@@ -107,7 +107,7 @@ static void __init sheevaplug_init(void)
- 	kirkwood_init();
- 
- 	/* setup gpio pin select */
--	if (machine_is_sheeva_esata())
-+	if (machine_is_esata_sheevaplug())
- 		kirkwood_mpp_conf(sheeva_esata_mpp_config);
- 	else
- 		kirkwood_mpp_conf(sheevaplug_mpp_config);
-@@ -123,11 +123,11 @@ static void __init sheevaplug_init(void)
- 	kirkwood_ge00_init(&sheevaplug_ge00_data);
- 
- 	/* honor lower power consumption for plugs with out eSATA */
--	if (machine_is_sheeva_esata())
-+	if (machine_is_esata_sheevaplug())
- 		kirkwood_sata_init(&sheeva_esata_sata_data);
- 
- 	/* enable sd wp and sd cd on plugs with esata */
--	if (machine_is_sheeva_esata())
-+	if (machine_is_esata_sheevaplug())
- 		kirkwood_sdio_init(&sheeva_esata_mvsdio_data);
- 	else
- 		kirkwood_sdio_init(&sheevaplug_mvsdio_data);
-diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
-index c9831614e3..8588c08bbd 100644
---- a/arch/arm/mach-orion5x/ts209-setup.c
-+++ b/arch/arm/mach-orion5x/ts209-setup.c
-@@ -179,7 +179,7 @@ static struct hw_pci qnap_ts209_pci __initdata = {
- 
- static int __init qnap_ts209_pci_init(void)
- {
--	if (machine_is_ts_x09())
-+	if (machine_is_ts209())
- 		pci_common_init(&qnap_ts209_pci);
- 
- 	return 0;
-diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-index fff68d0d52..fae8c3b527 100644
---- a/arch/arm/tools/mach-types
-+++ b/arch/arm/tools/mach-types
-@@ -268,7 +268,7 @@ dns323			MACH_DNS323		DNS323			1542
- omap3_beagle		MACH_OMAP3_BEAGLE	OMAP3_BEAGLE		1546
- nokia_n810		MACH_NOKIA_N810		NOKIA_N810		1548
- pcm038			MACH_PCM038		PCM038			1551
--ts_x09			MACH_TS209		TS209			1565
-+ts209			MACH_TS209		TS209			1565
- at91cap9adk		MACH_AT91CAP9ADK	AT91CAP9ADK		1566
- mx31moboard		MACH_MX31MOBOARD	MX31MOBOARD		1574
- terastation_pro2	MACH_TERASTATION_PRO2	TERASTATION_PRO2	1584
-@@ -449,7 +449,7 @@ guruplug		MACH_GURUPLUG		GURUPLUG		2659
- spear310		MACH_SPEAR310		SPEAR310		2660
- spear320		MACH_SPEAR320		SPEAR320		2661
- aquila			MACH_AQUILA		AQUILA			2676
--sheeva_esata		MACH_ESATA_SHEEVAPLUG	ESATA_SHEEVAPLUG	2678
-+esata_sheevaplug	MACH_ESATA_SHEEVAPLUG	ESATA_SHEEVAPLUG	2678
- msm7x30_surf		MACH_MSM7X30_SURF	MSM7X30_SURF		2679
- ea2478devkit		MACH_EA2478DEVKIT	EA2478DEVKIT		2683
- terastation_wxl		MACH_TERASTATION_WXL	TERASTATION_WXL		2697
+g.
 
 
-Nicolas
+>  		ret = gpio_request(spi_imx->chipselect[i], DRIVER_NAME);
+>  		if (ret) {
+>  			while (i > 0) {
+> -- 
+> 1.7.1
+> 
+> 
