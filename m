@@ -1,36 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 14 Sep 2011 17:32:10 -0700
-Subject: [RFC PATCH-V2 0/4] Introducing TI's New SoC/board AM335XEVM
-In-Reply-To: <1314621976-25750-1-git-send-email-hvaibhav@ti.com>
-References: <hvaibhav@ti.com>
-	<1314621976-25750-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <20110915003210.GC30941@atomide.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Thu, 15 Sep 2011 09:42:05 +0930
+Subject: [RFC 7/8] drivers: introduce rpmsg,
+	a remote-processor messaging bus
+In-Reply-To: <CAK=WgbY0zMkHw9XHDKPEfVQZVRfGP=nMmyJgm6jD5FEkBZkMRQ@mail.gmail.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-8-git-send-email-ohad@wizery.com>
+	<87liwu8u3q.fsf@rustcorp.com.au>
+	<BANLkTi=7TBMqnEf2qustrmSaubtTam79Bw@mail.gmail.com>
+	<CAK=WgbY0zMkHw9XHDKPEfVQZVRfGP=nMmyJgm6jD5FEkBZkMRQ@mail.gmail.com>
+Message-ID: <87d3f2hdey.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* hvaibhav at ti.com <hvaibhav@ti.com> [110829 05:52]:
-> From: Vaibhav Hiremath <hvaibhav@ti.com>
+On Wed, 14 Sep 2011 21:38:43 +0300, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Hi Rusty,
 > 
-> This patch set adds support for AM335x device having
-> Cortex-A8 MPU.
+> On Wed, Jun 22, 2011 at 1:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> > On Wed, Jun 22, 2011 at 5:42 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> >> On Tue, 21 Jun 2011 10:18:33 +0300, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> >>> +#define VIRTIO_ID_RPMSG ? ? ? ? ? ? ?10 /* virtio remote processor messaging */
+> >>
+> >> I think you want 6. ?Plan 9 jumped ahead to grab 9 :)
+> >
+> > 6 it is :)
 > 
-> AM335X is treated as another OMAP3 variant, where,
-> along with existing cpu class OMAP34XX, new cpu class AM33XX is created
-> and the respective type is AM335X, which is newly added device in the family.
-> This means, cpu_is_omap34xx(), cpu_is_am33xx() and
-> cpu_is_am335x() checks return success for AM335X.
+> Looking at the virtio-spec, it seems that 6 is taken by 'ioMemory'.
+> There's no indication for it in virtio_ids.h though, and the
+> virtio-spec has no appendix for this id, so maybe it's available after
+> all ?
 > 
-> Currently submitting this patch series as a RFC (V2), to initiate the
-> discussion on the approach we have chosen for AM335x device support.
-> Based on the feedback, will submit the final version of patch series
-> immediately.
+> If it is available, I'll take it for rpmsg, and will also update
+> virtio-spec appropriately. Otherwise, we'll settle on 7 ? :)
 
-Can you please rebase these on Paul's CHIP_IS removal series?
+7... numbers are cheap :)
 
-Those patches are available at:
-
-git://git.pwsan.com/linux-2.6 omap_chip_remove_cleanup_3.2
-
-Regards,
-
-Tony
+Cheers,
+Rusty.
