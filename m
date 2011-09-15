@@ -1,45 +1,58 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 15 Sep 2011 16:50:22 +0200
-Subject: READ THIS: the next mach-types update
-In-Reply-To: <20110915102528.GI6267@n2100.arm.linux.org.uk>
-References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
-Message-ID: <20110915145022.GM28104@game.jcrosoft.org>
+From: gianlucarenzi@eurekelettronica.it (gianluca)
+Date: Thu, 15 Sep 2011 17:24:16 +0200
+Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <4E71CDB2.4000205@freescale.com>
+References: <1315450031-6371-1-git-send-email-b32955@freescale.com>	<20081.44941.12535.496764@ipc1.ka-ro>
+	<4E71CDB2.4000205@freescale.com>
+Message-ID: <4E7218A0.2020309@eurekelettronica.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:25 Thu 15 Sep     , Russell King - ARM Linux wrote:
-> I'm going to be merging a mach-types update (the cut-down and the
-> policy-conforming version) for the next merge window.  This will mean
-> that things WILL BREAK, and I will not notice that things have broken.
-> 
-> In order to fix this, entries need to be fixed to conform to the
-> requirements - where the machine_is_xxx() name is the same as the
-> MACH_TYPE_xxx name and the CONFIG_MACH_xxx name too.
-> 
-> Moreover, entries older than 12 months which have not been merged will
-> be removed.  It is not possible to automatically check for machine_is_xxx()
-> usages as these could conflict with other architectures, and I'm
-> certainly NOT checking for them by hand (I estimate that'd take a
-> significant amount of manual effort to do.)  What that means is that it
-> is _important_ to get the core platform support in _first_ before any
-> drivers which may make use of this.
-> 
-> The following will be deleted from the file this time around are:
-> -ts_x09                  MACH_TS209              TS209                   1565
-> -at572d940hfek           MACH_AT572D940HFEB      AT572D940HFEB           1783
-can be dropped the at572d940hfek as the at572d940hf is drop from mainline
+Sorry for intrusion in this discussion, but:
 
-Russell an you confirm you will re-add the usb-a9g20 and the folowing one
+Huang Shijie wrote:
+>> channels are being used concurrently. The GPMI driver will bail out
+>> with the timeout error while the MMC driver obviously has no timeout
+>> check for this situation.
+>>
+>> I can mostly rule out HW problems, because the same board works
+>> perfectly well with WindowsCE (tested with a copy operation between
+>> flash and SD card).
+>>
+>>
+>> Lothar Wa?mann
 
-usb_a9g20               MACH_USB_A9G20          USB_A9G20               1841
-qil_a9g20               MACH_QIL_A9G20          QIL_A9G20               1844
-tny_a9260               MACH_TNY_A9260          TNY_A9260               2058
-tny_a9g20               MACH_TNY_A9G20          TNY_A9G20               2059
-tny_a9263               MACH_TNY_A9263          TNY_A9263               2140
+@Lothar: Probably WinCE with a copy operation between flash and SD is 
+not reliable as synchronous as opposed dd command in the previous mail.
 
-I'm working on there port mainline
+dd is sync when: dd if=/dev/mtd... of=/dev/mmc...
 
-I add the usb_a9g20 recently and will continue in the following weeks
+dd is async when:
 
-Best Regards,
-J.
+# dd if=/dev/mtd of=/mnt/somewhere/file1 &
+# dd if=/mnt/somewhere/file2 of=/dev/mmc &
+
+Or even the worst scenario:
+
+# dd if=/dev/mtdX of=/dev/null &
+# dd if=/dev/urandom of=/dev/mmcX &
+# dd if=/dev/mmcX of=/dev/null &
+# dd if=/dev/urandom of=/dev/mtdX &
+
+Just my .2 cents.
+
+Best regards,
+-- 
+            ,,,
+           (o o)
+======oOO==(_)==OOo======
+
+Gianluca Renzi
+R&D
+phone: +39.0542.609120
+fax:   +39.0542.609212
+
+       .oooO  Oooo.
+======(   )==(   )=======
+        \ (    ) /
+         \_)  (_/
