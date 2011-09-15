@@ -1,53 +1,22 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 15 Sep 2011 18:03:21 +0200
-Subject: [PATCH 0/6] mc13783 cleanup
-In-Reply-To: <20110915151213.GE32263@sortiz-mobl>
-References: <20110824132740.GA28197@pengutronix.de>
-	<201108250905.13168.philippe.retornaz@epfl.ch>
-	<20110915151213.GE32263@sortiz-mobl>
-Message-ID: <20110915160321.GA29357@pengutronix.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 15 Sep 2011 13:04:28 -0300
+Subject: gpio_ensure_requested error on mx31pdk boot
+In-Reply-To: <20110915071427.GD11297@pengutronix.de>
+References: <CAOMZO5AmM2yd5FopjNO9QsPNLZiBNH3U29_xXPV3cnZnB9EjtQ@mail.gmail.com>
+	<20110915071427.GD11297@pengutronix.de>
+Message-ID: <CAOMZO5DcPCVy9uMXPXd3Kmam1XcCjYPcEU_O8pvy2uhM17eseQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+2011/9/15 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+...
+> I havn't seen it. Just in case you don't know, that means a gpio was
+> used without being (successfully) requested. On the other hand I wonder
+> if GPIO-0 is correct here?!
 
-On Thu, Sep 15, 2011 at 05:12:13PM +0200, Samuel Ortiz wrote:
-> On Thu, Aug 25, 2011 at 09:05:12AM +0200, Philippe R?tornaz wrote:
-> > Le mercredi 24 ao?t 2011 15:27:40, Uwe Kleine-K?nig a ?crit :
-> > > Hello,
-> > > 
-> > > this series removes the long obsolte mc13783 API after fixing all
-> > > remaining users.
-> > 
-> > I posted a patch last month which was touching this MFD too.
-> > We will need to synchronize both patch. 
-> I applied Uwe's patchset now.
-Thanks.
+I managed to fix this. It is a bug in the spi-imx driver. Patch will
+be sent shortly.
 
->                               Could you please sync your code and send me a
-> patchset that applies on top of:
-> 
-> git://git.infradead.org/users/sameo/mfd-2.6.git for-next
-You can fetch the updated series from
+Regards,
 
-	git://git.pengutronix.de/git/ukl/linux-2.6.git mc13783
-
-I also included the last patch that Sascha commented with:
-
-	Please ping once the rest is merged.
-
-This is OK as I'm currently substituting Sascha for imx maintainer
-duties while he is on vacation. Merging the above branch into the
-current imx/for-next branch yields a merge conflict in
-drivers/rtc/rtc-twl.c which is only touched on your side and in Linus'
-tree below imx/for-next.
-
-I guess you can drop 54d96ef785b5 as it is the same as dec35d19c4 +
-34d623d.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Fabio Estevam
