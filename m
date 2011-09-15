@@ -1,30 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 15 Sep 2011 09:32:48 +0100
-Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
-	initialization functions
-In-Reply-To: <20110915013937.GE1488@S2100-06.ap.freescale.net>
-References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
-	<20110914084237.GC6267@n2100.arm.linux.org.uk>
-	<20110915013937.GE1488@S2100-06.ap.freescale.net>
-Message-ID: <20110915083248.GG6267@n2100.arm.linux.org.uk>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 15 Sep 2011 17:35:45 +0900
+Subject: [PATCH] arm: sched_clock: Enable HAVE_SCHED_CLOCK support without
+	init_sched_clock
+In-Reply-To: <20110915082024.GF6267@n2100.arm.linux.org.uk>
+References: <20110915073511.GA31732@july>
+	<20110915082024.GF6267@n2100.arm.linux.org.uk>
+Message-ID: <CAH9JG2WeR4QtYNFoOwipFz3H6YMxvRARJvyrkj0hO3ECnYwenw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 09:39:39AM +0800, Shawn Guo wrote:
-> On Wed, Sep 14, 2011 at 09:42:38AM +0100, Russell King - ARM Linux wrote:
-> > I'm unconvinced about the wise-ness of this.  We read-modify-write the
-> > auxillary control register, which means some bits are preserved from
-> > the initial boot.  If the boot loader sets the L2 cache up for normal
-> > boot and not for resume, we'll end up with different L2 cache settings.
-> > 
-> > We've historically seen this kind of thing with boot loaders over the
-> > years, to the point where systems boot at one CPU clock rate but resume
-> > at some other CPU clock rate.
-> > 
-> I would think this is a problem in the kernel.  Kernel initialization
-> code should put all these stuff into a known state to ensure boot and
-> resume of the kernel do not result in a different state, shouldn't it?
+On Thu, Sep 15, 2011 at 5:20 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Sep 15, 2011 at 04:35:12PM +0900, Kyungmin Park wrote:
+>> From: Kyungmin Park <kyungmin.park@samsung.com>
+>>
+>> On Samsung Exynos4 series, EVT0 chip uses the s5p_timer with HAVE_SCHED_CLOCK and remains use the MCT timer without init_sched_clock.
+>
+> So in other words, sched_clock on exynos4 is broken because the update
+> function won't be called, and it'll wrap well below the 64-bit ns range
+> required of it.
 
-grep the kernel for l2x0_init() and look at the mask and value registers.
-Note that any bit set in the mask is preserved from boot time.
+Right, even though MCT doesn't use the HAVE_SCHED_CLOCK, sched_clock
+is override with others.
+It mean it should be implement the sched_clock for all boards if there
+are some boards use the HAVE_SCHED_CLOCK.
+
+As I remember, there's attempt to solve the sched_clock registration
+issue. I'll check it.
+
+Thank you,
+Kyungmin Park
+>
+> NAK.
+>
