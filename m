@@ -1,178 +1,169 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 15 Sep 2011 17:28:29 +0100
-Subject: [PATCH v2 6/6] arm/imx6q: add suspend/resume support
-In-Reply-To: <1316097926-913-7-git-send-email-shawn.guo@linaro.org>
-References: <1316097926-913-1-git-send-email-shawn.guo@linaro.org>
-	<1316097926-913-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110915162829.GA4797@e102568-lin.cambridge.arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 15 Sep 2011 11:43:25 -0500
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <4E72030F.1090300@ti.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+	<4E71CE5D.9030900@ti.com> <4E71F978.6020402@gmail.com>
+	<4E72030F.1090300@ti.com>
+Message-ID: <4E722B2D.4050307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 03:45:26PM +0100, Shawn Guo wrote:
-> It adds suspend/resume support for imx6q.
+Benoit,
+
+On 09/15/2011 08:52 AM, Cousson, Benoit wrote:
+> On 9/15/2011 3:11 PM, Rob Herring wrote:
+>> Benoit,
+>>
+>> On 09/15/2011 05:07 AM, Cousson, Benoit wrote:
+>>> Hi Rob,
+>>>
+>>> On 9/15/2011 9:55 AM, Thomas Abraham wrote:
+>>>> Hi Rob,
+>>>>
+>>>> On 14 September 2011 22:01, Rob Herring<robherring2@gmail.com>   wrote:
+>>>>> From: Rob Herring<rob.herring@calxeda.com>
+>>>>>
+>>>>> This adds gic initialization using device tree data. The
+>>>>> initialization
+>>>>> functions are intended to be called by a generic OF interrupt
+>>>>> controller parsing function once the right pieces are in place.
+>>>>>
+>>>>> PPIs are handled using 3rd cell of interrupts properties to specify
+>>>>> the cpu
+>>>>> mask the PPI is assigned to.
+>>>>>
+>>>>> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+>>>>> ---
+>>>>>    Documentation/devicetree/bindings/arm/gic.txt |   53
+>>>>> ++++++++++++++++++++++++
+>>>>>    arch/arm/common/gic.c                         |   55
+>>>>> +++++++++++++++++++++++--
+>>>>>    arch/arm/include/asm/hardware/gic.h           |   10 +++++
+>>>>>    3 files changed, 114 insertions(+), 4 deletions(-)
+>>>>>    create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+>>>>
+>>>> [...]
+>>>>
+>>>>
+>>>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>>>>> index d1ccc72..14de380 100644
+>>>>> --- a/arch/arm/common/gic.c
+>>>>> +++ b/arch/arm/common/gic.c
+>>>>
+>>>> [...]
+>>>>
+>>>>> +void __init gic_of_init(struct device_node *node, struct device_node
+>>>>> *parent)
+>>>>> +{
+>>>>> +       void __iomem *cpu_base;
+>>>>> +       void __iomem *dist_base;
+>>>>> +       int irq;
+>>>>> +       struct irq_domain *domain =&gic_data[gic_cnt].domain;
+>>>>> +
+>>>>> +       if (WARN_ON(!node))
+>>>>> +               return;
+>>>>> +
+>>>>> +       dist_base = of_iomap(node, 0);
+>>>>> +       WARN(!dist_base, "unable to map gic dist registers\n");
+>>>>> +
+>>>>> +       cpu_base = of_iomap(node, 1);
+>>>>> +       WARN(!cpu_base, "unable to map gic cpu registers\n");
+>>>>> +
+>>>>> +       domain->nr_irq = gic_irq_count(dist_base);
+>>>>> +       domain->irq_base = irq_alloc_descs(-1, 0, domain->nr_irq,
+>>>>> numa_node_id());
+>>>>
+>>>> For exynos4, all the interrupts originating from GIC are statically
+>>>> mapped to start from 32 in the linux virq space (GIC SPI interrupts
+>>>> start from 64). In the above code, since irq_base would be 0 for
+>>>> exynos4, the interrupt mapping is not working correctly. In your
+>>>> previous version of the patch, you have given a option to the platform
+>>>> code to choose the offset. Could that option be added to this series
+>>>> also. Or a provision to use platform specific translate function
+>>>> instead of the irq_domain_simple translator.
+>>>
+>>> I have another concern on a similar topic.
+>>>
+>>> On OMAP4 the SoC interrupts external to the MPU (SPI) have an offset of
+>>> 32. Only the internal PPI are between 0 and 31.
+>>>
+>>> For the moment we add 32 to every SoC interrupts in the irq.h define,
+>>
+>> Those defines will not be used in the DT case. So the question is
+>> whether to add 32 or not in the DT. Since we have just a single node and
+>> a linear mapping of PPIs and SPIs, the only choice is to have SPIs start
+>> at 32. And from the h/w definition, SPIs always start at 32, so it's in
+>> agreement.
 > 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-imx/Makefile              |    2 +-
->  arch/arm/mach-imx/head-v7.S             |   27 +++++++++
->  arch/arm/mach-imx/pm-imx6q.c            |   88 +++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/common.h |    8 +++
->  4 files changed, 124 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/mach-imx/pm-imx6q.c
+> This is a agreement inside the MPUSS, but not outside.
+> Both Tegra and OMAP4 must add an offset to the HW irq number to deal
+> with that today.
 > 
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index 16737ba..c787151 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -70,4 +70,4 @@ obj-$(CONFIG_CPU_V7) += head-v7.o
->  obj-$(CONFIG_SMP) += platsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
->  obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
-> -obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o
-> +obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o pm-imx6q.o
-> diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
-> index ede908b..0a86685 100644
-> --- a/arch/arm/mach-imx/head-v7.S
-> +++ b/arch/arm/mach-imx/head-v7.S
-> @@ -69,3 +69,30 @@ ENTRY(v7_secondary_startup)
->  	b	secondary_startup
->  ENDPROC(v7_secondary_startup)
->  #endif
-> +
-> +ENTRY(v7_cpu_resume)
-> +	bl	v7_invalidate_l1
-> +
-> +	/*
-> +	 * Restore L2 AUX_CTRL register saved by suspend procedure
-> +	 * and enable L2
-> +	 */
-> +	adr	r4, 1f
-> +	ldmia	r4, {r5, r6, r7}
-> +	sub	r4, r4, r5
-> +	add	r6, r6, r4
-> +	add	r7, r7, r4
-> +	ldr	r0, [r6]
-> +	ldr	r7, [r7]
-> +	ldr	r1, [r7]
-> +	str	r1, [r0, #L2X0_AUX_CTRL]
-> +	ldr	r1, =0x1
-> +	str	r1, [r0, #L2X0_CTRL]
-> +
-> +	b	cpu_resume
-> +
-> +	.align
-> +1:	.long	.
-> +	.long	pl310_pbase
-> +	.long	pl310_aux_ctrl_paddr
+>>> but I'm assuming that this offset calculation should be done thanks to a
+>>> dedicated irq domain for the SPI.
+>>> The real HW physical number start at 0, and thus this is that value that
+>>> should be in the irq binding of the device.
+>>>
+>>> So ideally we should have a irq domain for the PPI starting at 0 and
+>>> another one for the SPI starting at 32. Or 32 and 64 for the exynos4
+>>> case, but it looks like the PPI/SPI offset is always 32.
+>>>
+>>
+>> That offset of SPIs is always there. If you have a GIC as a secondary
+>> controller, It will have 32 reserved interrupts and the register layout
+>> is exactly the same as a cpu's GIC.
+> 
+> Yep, but that's the GIC view and not the SoC one. My concern is to have
+> to tweak the HW number provided by the HW spec in order to add that offset.
+> If you look at SoC level, the MPUSS is just an IP that can be
+> potentially replaced by other one that will not have a GIC. In that case
+> you will not change the IRQ mapping at SoC level.
+> For example if you replace the Dual-cortexA9 by a single CortexA8, then
+> all the interrupts will have to be shifted by 32 just because the MPU
+> subsystem is different.
+> 
 
-Would not something like:
+Is that a realistic case? That would be a new chip and new device tree.
+You could argue that the whole peripheral subsystem DT could be reused
+and the numbering needs to be the same. However, there's one thing that
+would prevent that. The number of interrupt cells is defined by the
+controller binding. So you have to change the peripheral nodes anyway.
 
-	adr	r4, pl310_pbase
-	ldmia	r4, {r6, r7}
-	[...]
+It's good that OMAP is trying to standardize the peripheral layout, but
+in my experience that's not something you can rely on.
 
-pl310_pbase:
-	.long 0
-pl310_aux_ctrl:
-	.long 0
+At some point the interrupt numbering is going to differ from the h/w
+documentation. If it's not in the DT, then it will be in linux. Right
+now its just offset of 32, but if irqdescs get assigned on demand as PPC
+is doing, then there will be no relationship to the documentation.
 
-be better and faster ? Why play with virtual addresses ?
-Of course you should initialize the values, but then you can access them
-through a PC relative load when running physical.
-Your code should be in the .data section for it to be writable (adr does not
-work across sections), have a look at Russell's code in sleep.S it is
-very well commented and similar to what you need.
+> Since that offset is dependent of the GIC internals and is not exposed
+> outside the MPUSS, it should not be visible by the SoC IPs. And the HW
+> spec is exposing exactly that.
+> 
+>> Since the idea of splitting PPIs for each core out to a flattened linux
+>> irq map has been abandoned, I see no reason to have more than 1 domain
+>> with a simple linear translation. Ultimately, domains will do dynamic
+>> irqdesc allocation and the translation within the gic will be completely
+>> dynamic.
+> 
+> I think the only reason to do that is to separate internal MPU
+> interrupts with the external ones that should not have a clue about the
+> GIC.
 
-> +ENDPROC(v7_cpu_resume)
-> diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-> new file mode 100644
-> index 0000000..124bcd5
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/pm-imx6q.c
-> @@ -0,0 +1,88 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/suspend.h>
-> +#include <asm/proc-fns.h>
-> +#include <asm/suspend.h>
-> +#include <asm/hardware/cache-l2x0.h>
-> +#include <mach/common.h>
-> +#include <mach/hardware.h>
-> +
-> +static void __iomem *pl310_vbase;
-> +void __iomem *pl310_pbase;
-> +
-> +static volatile unsigned long pl310_aux_ctrl;
-> +volatile unsigned long pl310_aux_ctrl_paddr;
+I see 2 options (besides leaving it as is):
 
-I think that by defining those variables in assembly you would make
-your life much simpler.
-I think you know your L2 is already initialized here to make sure you
-save the right aux value. Hence you should clean the variables above from
-L2 to make sure they are available at reset from DRAM (L2 is retained
-and you do not clean it on suspend, correct ?)
+- Revert back to my previous binding where PPIs are a sub-node and a
+different interrupt parent.
 
-I do not think that code to save/restore L2 config belongs here though.
-More below.
+- Use the current binding, but allow SPIs to start at 0. We can still
+distinguish PPIs and SPIs by the cpu mask cell. A cpu mask of 0 is a
+SPI. If there was ever a reason to have a cpu mask for an SPI, you would
+not be able to with this scheme.
 
-> +
-> +static int imx6q_suspend_finish(unsigned long val)
-> +{
-> +	cpu_do_idle();
-> +	return 0;
-> +}
-> +
-> +static int imx6q_pm_enter(suspend_state_t state)
-> +{
-> +	switch (state) {
-> +	case PM_SUSPEND_MEM:
-> +		imx6q_set_lpm(STOP_POWER_OFF);
-> +		imx_gpc_pre_suspend();
-> +		imx_set_cpu_jump(0, v7_cpu_resume);
-> +		/* Zzz ... */
-> +		cpu_suspend(0, imx6q_suspend_finish);
-> +		imx_smp_prepare();
-> +		imx_gpc_post_resume();
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct platform_suspend_ops imx6q_pm_ops = {
-> +	.enter = imx6q_pm_enter,
-> +	.valid = suspend_valid_only_mem,
-> +};
-> +
-> +void __init imx6q_pm_init(void)
-> +{
-> +	struct device_node *np;
-> +	u32 reg[2];
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
-> +	of_property_read_u32_array(np, "reg", reg, ARRAY_SIZE(reg));
-> +	pl310_vbase = ioremap(reg[0], reg[1]);
+Either way you will still have the above issue with the cell size changing.
 
-Mmmm...is this vma ever released ? L2 is already mapped in the L2
-driver from DT or through static mappings. 
-Overall, I think that code to restore PL310 belongs in cache-l2x0.c, not here.
-We can easily write an assembly stub that reinitialize L2 before
-resume if that's something we should and can do (security ?).
-
-Lorenzo
+Rob
