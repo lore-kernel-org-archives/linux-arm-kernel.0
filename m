@@ -1,39 +1,75 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 15 Sep 2011 22:45:25 +0800
-Subject: [PATCH v2 5/6] arm/imx6q: add device tree machine support
+Date: Thu, 15 Sep 2011 22:45:26 +0800
+Subject: [PATCH v2 6/6] arm/imx6q: add suspend/resume support
 In-Reply-To: <1316097926-913-1-git-send-email-shawn.guo@linaro.org>
 References: <1316097926-913-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1316097926-913-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1316097926-913-7-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds generic device tree based machine support for imx6q.
+It adds suspend/resume support for imx6q.
 
+Signed-off-by: Anson Huang <b20788@freescale.com>
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
  arch/arm/mach-imx/Makefile              |    2 +-
- arch/arm/mach-imx/mach-imx6q.c          |   73 +++++++++++++++++++++++++++++++
- arch/arm/mm/Kconfig                     |    2 +-
- arch/arm/plat-mxc/include/mach/common.h |   15 ++++++-
- 4 files changed, 88 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-imx/mach-imx6q.c
+ arch/arm/mach-imx/head-v7.S             |   27 +++++++++
+ arch/arm/mach-imx/pm-imx6q.c            |   88 +++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/common.h |    8 +++
+ 4 files changed, 124 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-imx/pm-imx6q.c
 
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index d46b2e7..16737ba 100644
+index 16737ba..c787151 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
 @@ -70,4 +70,4 @@ obj-$(CONFIG_CPU_V7) += head-v7.o
  obj-$(CONFIG_SMP) += platsmp.o
  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
  obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
--obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o
-+obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+-obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o
++obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o pm-imx6q.o
+diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
+index ede908b..0a86685 100644
+--- a/arch/arm/mach-imx/head-v7.S
++++ b/arch/arm/mach-imx/head-v7.S
+@@ -69,3 +69,30 @@ ENTRY(v7_secondary_startup)
+ 	b	secondary_startup
+ ENDPROC(v7_secondary_startup)
+ #endif
++
++ENTRY(v7_cpu_resume)
++	bl	v7_invalidate_l1
++
++	/*
++	 * Restore L2 AUX_CTRL register saved by suspend procedure
++	 * and enable L2
++	 */
++	adr	r4, 1f
++	ldmia	r4, {r5, r6, r7}
++	sub	r4, r4, r5
++	add	r6, r6, r4
++	add	r7, r7, r4
++	ldr	r0, [r6]
++	ldr	r7, [r7]
++	ldr	r1, [r7]
++	str	r1, [r0, #L2X0_AUX_CTRL]
++	ldr	r1, =0x1
++	str	r1, [r0, #L2X0_CTRL]
++
++	b	cpu_resume
++
++	.align
++1:	.long	.
++	.long	pl310_pbase
++	.long	pl310_aux_ctrl_paddr
++ENDPROC(v7_cpu_resume)
+diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
 new file mode 100644
-index 0000000..b9b9327
+index 0000000..124bcd5
 --- /dev/null
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -0,0 +1,73 @@
++++ b/arch/arm/mach-imx/pm-imx6q.c
+@@ -0,0 +1,88 @@
 +/*
 + * Copyright 2011 Freescale Semiconductor, Inc.
 + * Copyright 2011 Linaro Ltd.
@@ -47,112 +83,114 @@ index 0000000..b9b9327
 + */
 +
 +#include <linux/init.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
++#include <linux/io.h>
 +#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
++#include <linux/suspend.h>
++#include <asm/proc-fns.h>
++#include <asm/suspend.h>
 +#include <asm/hardware/cache-l2x0.h>
-+#include <asm/hardware/gic.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
 +#include <mach/common.h>
 +#include <mach/hardware.h>
 +
-+static void __init imx6q_init_machine(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++static void __iomem *pl310_vbase;
++void __iomem *pl310_pbase;
 +
-+	imx6q_pm_init();
++static volatile unsigned long pl310_aux_ctrl;
++volatile unsigned long pl310_aux_ctrl_paddr;
++
++static int imx6q_suspend_finish(unsigned long val)
++{
++	cpu_do_idle();
++	return 0;
 +}
 +
-+static void __init imx6q_map_io(void)
++static int imx6q_pm_enter(suspend_state_t state)
 +{
-+	imx_lluart_map_io();
-+	imx_scu_map_io();
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		imx6q_set_lpm(STOP_POWER_OFF);
++		imx_gpc_pre_suspend();
++		imx_set_cpu_jump(0, v7_cpu_resume);
++		/* Zzz ... */
++		cpu_suspend(0, imx6q_suspend_finish);
++		imx_smp_prepare();
++		imx_gpc_post_resume();
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
 +}
 +
-+static const struct of_device_id imx6q_irq_match[] __initconst = {
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{ .compatible = "fsl,imx6q-gpio", },
-+	{ /* sentinel */ }
++static const struct platform_suspend_ops imx6q_pm_ops = {
++	.enter = imx6q_pm_enter,
++	.valid = suspend_valid_only_mem,
 +};
 +
-+static void __init imx6q_init_irq(void)
++void __init imx6q_pm_init(void)
 +{
-+	l2x0_of_init(0, ~0UL);
-+	imx_src_init();
-+	imx_gpc_init();
-+	of_irq_init(imx6q_irq_match);
++	struct device_node *np;
++	u32 reg[2];
++
++	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
++	of_property_read_u32_array(np, "reg", reg, ARRAY_SIZE(reg));
++	pl310_vbase = ioremap(reg[0], reg[1]);
++	WARN_ON(!pl310_vbase);
++	pl310_pbase = (void __iomem *) reg[0];
++
++	/*
++	 * On imx6q, during system suspend, ARM core gets powered off,
++	 * but L2 cache is retained.  To avoid cleaning the entire L2,
++	 * we need to save L2 controller registers, and when system gets
++	 * woke up, restore the registers and re-enable L2 before
++	 * calling into cpu_resume().
++	 *
++	 * Most of pl310 configuration upon reset work just fine for
++	 * imx6q, and the only one register we actually need to save is
++	 * AUX_CTRL.  Also since pl310 configuration won't change in a
++	 * live system, we can save it here only once, and restore it
++	 * at resume entry v7_cpu_resume() which runs in physical
++	 * address space.
++	 */
++	pl310_aux_ctrl = readl_relaxed(pl310_vbase + L2X0_AUX_CTRL);
++	pl310_aux_ctrl_paddr = __pa(&pl310_aux_ctrl);
++
++	suspend_set_ops(&imx6q_pm_ops);
 +}
-+
-+static void __init imx6q_timer_init(void)
-+{
-+	mx6q_clocks_init();
-+}
-+
-+static struct sys_timer imx6q_timer = {
-+	.init = imx6q_timer_init,
-+};
-+
-+static const char *imx6q_dt_compat[] __initdata = {
-+	"fsl,imx6q-sabreauto",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
-+	.map_io		= imx6q_map_io,
-+	.init_irq	= imx6q_init_irq,
-+	.timer		= &imx6q_timer,
-+	.init_machine	= imx6q_init_machine,
-+	.dt_compat	= imx6q_dt_compat,
-+MACHINE_END
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 88633fe..c3ce146 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -822,7 +822,7 @@ config CACHE_L2X0
- 		   REALVIEW_EB_A9MP || SOC_IMX35 || SOC_IMX31 || MACH_REALVIEW_PBX || \
- 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
- 		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
--		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX
-+		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_MX6
- 	default y
- 	select OUTER_CACHE
- 	select OUTER_CACHE_SYNC
 diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 48dbc27..9c5be7b 100644
+index 9c5be7b..6673d7d 100644
 --- a/arch/arm/plat-mxc/include/mach/common.h
 +++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -64,6 +64,7 @@ extern int mx51_clocks_init(unsigned long ckil, unsigned long osc,
- 			unsigned long ckih1, unsigned long ckih2);
- extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
- 			unsigned long ckih1, unsigned long ckih2);
-+extern int mx6q_clocks_init(void);
- extern struct platform_device *mxc_register_gpio(char *name, int id,
- 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
- extern int mxc_register_device(struct platform_device *pdev, void *data);
-@@ -73,9 +74,19 @@ extern void mx51_efikamx_reset(void);
- extern int mx53_revision(void);
- extern int mx53_display_revision(void);
+@@ -13,6 +13,7 @@
  
--extern void imx_enable_cpu(int cpu, bool enable);
--extern void imx_set_cpu_jump(int cpu, void *jump_addr);
-+#ifdef CONFIG_DEBUG_LL
-+extern void imx_lluart_map_io(void);
-+#else
-+static inline void imx_lluart_map_io(void) {}
-+#endif
+ struct platform_device;
+ struct clk;
++enum mxc_cpu_pwr_mode;
+ 
+ extern void mx1_map_io(void);
+ extern void mx21_map_io(void);
+@@ -79,14 +80,21 @@ extern void imx_lluart_map_io(void);
+ #else
+ static inline void imx_lluart_map_io(void) {}
+ #endif
++extern void v7_cpu_resume(void);
  #ifdef CONFIG_SMP
  extern void v7_secondary_startup(void);
-+extern void imx_scu_map_io(void);
-+#else
-+static inline void imx_scu_map_io(void) {}
+ extern void imx_scu_map_io(void);
++extern void imx_smp_prepare(void);
+ #else
+ static inline void imx_scu_map_io(void) {}
++static inline void imx_smp_prepare(void) {}
  #endif
-+extern void imx_enable_cpu(int cpu, bool enable);
-+extern void imx_set_cpu_jump(int cpu, void *jump_addr);
-+extern void imx_src_init(void);
-+extern void imx_gpc_init(void);
+ extern void imx_enable_cpu(int cpu, bool enable);
+ extern void imx_set_cpu_jump(int cpu, void *jump_addr);
+ extern void imx_src_init(void);
+ extern void imx_gpc_init(void);
++extern void imx_gpc_pre_suspend(void);
++extern void imx_gpc_post_resume(void);
++extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
++extern void imx6q_pm_init(void);
  #endif
 -- 
 1.7.4.1
