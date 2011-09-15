@@ -1,41 +1,53 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Thu, 15 Sep 2011 16:50:05 +0100
-Subject: [PATCH v3 0/2] Add device tree probe for i2c-imx driver
-In-Reply-To: <1316101193-4295-1-git-send-email-shawn.guo@linaro.org>
-References: <1316101193-4295-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110915155005.GI19115@trinity.fluff.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 15 Sep 2011 18:03:21 +0200
+Subject: [PATCH 0/6] mc13783 cleanup
+In-Reply-To: <20110915151213.GE32263@sortiz-mobl>
+References: <20110824132740.GA28197@pengutronix.de>
+	<201108250905.13168.philippe.retornaz@epfl.ch>
+	<20110915151213.GE32263@sortiz-mobl>
+Message-ID: <20110915160321.GA29357@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 11:39:51PM +0800, Shawn Guo wrote:
-> Hi Ben,
-> 
-> Hopefully, you can pick up this version.
+Hi Samuel,
 
-ok, will do it for the weekend.
- 
-> Thanks.
+On Thu, Sep 15, 2011 at 05:12:13PM +0200, Samuel Ortiz wrote:
+> On Thu, Aug 25, 2011 at 09:05:12AM +0200, Philippe R?tornaz wrote:
+> > Le mercredi 24 ao?t 2011 15:27:40, Uwe Kleine-K?nig a ?crit :
+> > > Hello,
+> > > 
+> > > this series removes the long obsolte mc13783 API after fixing all
+> > > remaining users.
+> > 
+> > I posted a patch last month which was touching this MFD too.
+> > We will need to synchronize both patch. 
+> I applied Uwe's patchset now.
+Thanks.
+
+>                               Could you please sync your code and send me a
+> patchset that applies on top of:
 > 
-> Changes since v2:
->  * Drop HS-I2C from binding document fsl-imx-i2c.txt
-> 
-> Changes since v1:
->  * Fix a couple of typo in fsl-imx-i2c.txt
-> 
-> Shawn Guo (2):
->       i2c-imx: remove init/exit hooks from platform data
->       i2c-imx: add device tree probe support
-> 
->  .../devicetree/bindings/i2c/fsl-imx-i2c.txt        |   18 ++++++++
->  arch/arm/plat-mxc/include/mach/i2c.h               |    4 --
->  drivers/i2c/busses/i2c-imx.c                       |   46 +++++++++----------
->  3 files changed, 40 insertions(+), 28 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> git://git.infradead.org/users/sameo/mfd-2.6.git for-next
+You can fetch the updated series from
+
+	git://git.pengutronix.de/git/ukl/linux-2.6.git mc13783
+
+I also included the last patch that Sascha commented with:
+
+	Please ping once the rest is merged.
+
+This is OK as I'm currently substituting Sascha for imx maintainer
+duties while he is on vacation. Merging the above branch into the
+current imx/for-next branch yields a merge conflict in
+drivers/rtc/rtc-twl.c which is only touched on your side and in Linus'
+tree below imx/for-next.
+
+I guess you can drop 54d96ef785b5 as it is the same as dec35d19c4 +
+34d623d.
+
+Best regards
+Uwe
 
 -- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
