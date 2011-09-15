@@ -1,8 +1,8 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 15 Sep 2011 15:26:49 -0300
-Subject: [PATCH] spi/imx: Fix spi-imx when the hardware SPI chipselects are
+Date: Thu, 15 Sep 2011 15:28:57 -0300
+Subject: [PATCH v2] spi/imx: Fix spi-imx when the hardware SPI chipselects are
 	used
-Message-ID: <1316111209-13452-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1316111337-13485-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -46,23 +46,27 @@ on a mx27pdk that uses GPIO as SPI chipselect.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- drivers/spi/spi-imx.c |    8 +++-----
- 1 files changed, 3 insertions(+), 5 deletions(-)
+Changes since v1:
+- Fix the logic for the internal chip select case and
+keep the usage of of_get_named_gpio for getting the cs_gpio
+
+ drivers/spi/spi-imx.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-index 8ac6542..7821c48 100644
+index 8ac6542..d917fa3 100644
 --- a/drivers/spi/spi-imx.c
 +++ b/drivers/spi/spi-imx.c
-@@ -783,12 +783,10 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
- 	spi_imx->bitbang.master = spi_master_get(master);
+@@ -784,11 +784,13 @@ static int __devinit spi_imx_probe(struct platform_device *pdev)
  
  	for (i = 0; i < master->num_chipselect; i++) {
--		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
+ 		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
 -		if (cs_gpio < 0)
--			cs_gpio = mxc_platform_info->chipselect[i];
--		if (cs_gpio < 0)
-+		spi_imx->chipselect[i] = mxc_platform_info->chipselect[i];
-+		if (spi_imx->chipselect[i] < 0)
++		if (cs_gpio < 0) {
+ 			cs_gpio = mxc_platform_info->chipselect[i];
++			spi_imx->chipselect[i] = cs_gpio;
++		}
+ 		if (cs_gpio < 0)
  			continue;
 -		spi_imx->chipselect[i] = cs_gpio;
 +
