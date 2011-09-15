@@ -1,39 +1,79 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 15 Sep 2011 11:12:53 +0530
-Subject: [PATCH v15 06/12] OMAP: dmtimer: switch-over to platform device
-	driver
-In-Reply-To: <20110914214533.GA30941@atomide.com>
-References: <1315516098-29761-1-git-send-email-tarun.kanti@ti.com>
-	<1315516098-29761-7-git-send-email-tarun.kanti@ti.com>
-	<20110914214533.GA30941@atomide.com>
-Message-ID: <CAC83ZvJgPYb3JbWT4SKXpQvq-vdKK4b6hd6E-ik5uyRCqgwWsg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 15 Sep 2011 14:52:18 +0900
+Subject: [PATCH] arm: exynos4: fix incorrect pad configuration for keypad
+	row lines
+In-Reply-To: <1315129244-26489-1-git-send-email-thomas.abraham@linaro.org>
+References: <1315129244-26489-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <00a201cc736b$a11dc740$e35955c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 3:15 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi,
->
-> * Tarun Kanti DebBarma <tarun.kanti@ti.com> [110908 13:36]:
->> Register timer devices by going through hwmod database using
->> hwmod API. The driver probes each of the registered devices.
->> Functionality which are already performed by hwmod framework
->> are removed from timer code. New set of timers present on
->> OMAP4 are now supported.
->
-> Adding the support for the different offsets on some omap4
-> timers should be a separate patch.
->
-> Also, as we don't need the support for different register offsets
-> for the first two omap4 timers, please rather implement support
-> for the new timers and the timeouts directly in plat-omap/dmtimer.c.
->
-> That way we can still keep the minimal timer support simple
-> for clocksource and clockevent. Of course this means that we'll
-> be only supporting the first two timers as system timers on
-> omap4, but that's fine.
-Ok, I can make the change!
-But, do we have to keep OMAP5 in mind right now where even timers[1,2]
-require addition of offsets?
+Thomas Abraham wrote:
+> 
+> The keypad controller requires a external pull-up for all the keypad
+> row lines. Fix the incorrect pad configuration for keypad controller
+> row lines by enabling the pad pull-up for the all row lines of the
+> keypad controller.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> SMDKV310 board does not have pull-up resistors populated for the keypad
+> row lines (unlike the smdk boards for the previous Samsung SoC's). So
+> the pad pull-up for all keypad row lines should be enabled for
+> smdkv310 board.
+> 
+> The default requirement for the keypad controller is to enable the
+> pull-up for all the keypad row lines. If a exynos4 based board has
+> on-board pull-up's populated for keypad row lines, this patch would
+> cause no harm. And in such cases, if internal pad pull-up is to be
+> disabled (to reduce some power consumption), an alternative gpio
+> configuration function can be supplied that does not enable the
+> internal pad pull-up.
+> ---
+>  arch/arm/mach-exynos4/setup-keypad.c |   11 ++++++-----
+>  1 files changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos4/setup-keypad.c b/arch/arm/mach-
+> exynos4/setup-keypad.c
+> index 1ee0ebf..7862bfb 100644
+> --- a/arch/arm/mach-exynos4/setup-keypad.c
+> +++ b/arch/arm/mach-exynos4/setup-keypad.c
+> @@ -19,15 +19,16 @@ void samsung_keypad_cfg_gpio(unsigned int rows,
+> unsigned int cols)
+> 
+>  	if (rows > 8) {
+>  		/* Set all the necessary GPX2 pins: KP_ROW[0~7] */
+> -		s3c_gpio_cfgrange_nopull(EXYNOS4_GPX2(0), 8,
+> S3C_GPIO_SFN(3));
+> +		s3c_gpio_cfgall_range(EXYNOS4_GPX2(0), 8,
+> S3C_GPIO_SFN(3),
+> +					S3C_GPIO_PULL_UP);
+> 
+>  		/* Set all the necessary GPX3 pins: KP_ROW[8~] */
+> -		s3c_gpio_cfgrange_nopull(EXYNOS4_GPX3(0), (rows - 8),
+> -					 S3C_GPIO_SFN(3));
+> +		s3c_gpio_cfgall_range(EXYNOS4_GPX3(0), (rows - 8),
+> +					 S3C_GPIO_SFN(3),
+> S3C_GPIO_PULL_UP);
+>  	} else {
+>  		/* Set all the necessary GPX2 pins: KP_ROW[x] */
+> -		s3c_gpio_cfgrange_nopull(EXYNOS4_GPX2(0), rows,
+> -					 S3C_GPIO_SFN(3));
+> +		s3c_gpio_cfgall_range(EXYNOS4_GPX2(0), rows,
+> S3C_GPIO_SFN(3),
+> +					S3C_GPIO_PULL_UP);
+>  	}
+> 
+>  	/* Set all the necessary GPX1 pins to special-function 3: KP_COL[x]
+*/
+> --
+> 1.6.6.rc2
+
+Oops, you're right, applied.
+Thanks.
+
+Best regards,
+Kgene.
 --
-Tarun
-[...]
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
