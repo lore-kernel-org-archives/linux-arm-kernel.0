@@ -1,149 +1,203 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 15 Sep 2011 16:19:12 -0600
-Subject: [RFC PATCH 06/11] DT: regulator: Helper routine to extract
-	fixed_voltage_config
-In-Reply-To: <1316085727-15023-7-git-send-email-rnayak@ti.com>
-References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
-	<1316085727-15023-2-git-send-email-rnayak@ti.com>
-	<1316085727-15023-3-git-send-email-rnayak@ti.com>
-	<1316085727-15023-4-git-send-email-rnayak@ti.com>
-	<1316085727-15023-5-git-send-email-rnayak@ti.com>
-	<1316085727-15023-6-git-send-email-rnayak@ti.com>
-	<1316085727-15023-7-git-send-email-rnayak@ti.com>
-Message-ID: <20110915221912.GO3523@ponder.secretlab.ca>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 16 Sep 2011 00:49:10 +0200 (CEST)
+Subject: [RFC PATCH 1/3] genirq: add support for per-cpu dev_id interrupts
+In-Reply-To: <1316105551-17505-2-git-send-email-marc.zyngier@arm.com>
+References: <1316105551-17505-1-git-send-email-marc.zyngier@arm.com>
+	<1316105551-17505-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <alpine.LFD.2.02.1109152207010.2723@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 04:52:02PM +0530, Rajendra Nayak wrote:
-> The helper routine defined here (of_get_fixed_voltage_config) can
-> be used to extract information about fixed regulators (which are not
-> software controlable) from device tree.
-> 
-> Add documenation about additional bindings for fixed
-> regulators that can be passed through DT.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  .../devicetree/bindings/regulator/regulator.txt    |   19 ++++++++++++
->  drivers/of/of_regulator.c                          |   31 ++++++++++++++++++++
->  include/linux/of_regulator.h                       |    7 ++++
->  3 files changed, 57 insertions(+), 0 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
-> index 001e5ce..f8c51d8 100644
-> --- a/Documentation/devicetree/bindings/regulator/regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
-> @@ -2,6 +2,8 @@ Voltage/Current Regulators
->  
->  Required properties:
->  - compatible: Must be "regulator";
-> +or
-> +- compatible: Must be "regulator-fixed"; /* For Fixed volatge regulator */
+Marc,
 
-regulator-fixed should actually just be another driver binding that
-uses the regulator binding.
+On Thu, 15 Sep 2011, Marc Zyngier wrote:
+> 
+> Based on an initial patch by Thomas Gleixner.
 
->  
->  Optional properties:
->  - supply-regulator: Name of the parent regulator
-> @@ -24,6 +26,13 @@ Optional properties:
->  - always-on: boolean, regulator should never be disabled
->  - boot-on: bootloader/firmware enabled regulator
->  - apply-uV: apply uV constraint if min == max
-> +# For fixed voltage regulators
-> +- supply-name: Name of the regulator supply
-> +- microvolts: Output voltage of regulator
-> +- gpio: gpio to use for enable control
-> +- startup-delay: startup time in microseconds
-> +- enable-high: Polarity of enable GPIO, 1 = Active High, 0 = Active low
-> +- enabled-at-boot: 1 = yes, 0 = no
->  
->  Example:
->  
-> @@ -35,3 +44,13 @@ Example:
->  		change-voltage;
->  		always-on;
->  	};
-> +
-> +	abc-fixedregulator {
-> +		compatible = "regulator-fixed";
-> +		supply-name = "fixed-supply";
-> +		microvolts = <1800000>;
-> +		gpio = <43>;
-> +		startup-delay = <70000>;
-> +		enable-high;
-> +		enabled-at-boot;
-> +	};
-> diff --git a/drivers/of/of_regulator.c b/drivers/of/of_regulator.c
-> index f01d275..4d7a49d 100644
-> --- a/drivers/of/of_regulator.c
-> +++ b/drivers/of/of_regulator.c
-> @@ -13,6 +13,7 @@
->  #include <linux/slab.h>
->  #include <linux/of.h>
->  #include <linux/regulator/machine.h>
-> +#include <linux/regulator/fixed.h>
->  
->  static void of_get_regulation_constraints(struct device_node *np,
->  					struct regulator_init_data **init_data)
-> @@ -83,3 +84,33 @@ struct regulator_init_data *of_get_regulator_init_data(struct device_node *np)
->  	return init_data;
->  }
->  EXPORT_SYMBOL(of_get_regulator_init_data);
-> +
-> +/**
-> + * of_get_fixed_voltage_config - extract fixed_voltage_config structure info
-> + * @np: Pointer to fixed-regulator device tree node
-> + *
-> + * Populates fixed_voltage_config structure by extracting data from device
-> + * tree node, returns a pointer to the populated structure of NULL if memory
-> + * alloc fails.
-> + */
-> +struct fixed_voltage_config *of_get_fixed_voltage_config(struct device_node *np)
+Was more an idea than a patch :)
+
+> +	void			*dev_id;
+> +#ifdef CONFIG_IRQ_PERCPU_DEVID
+> +	void __percpu		*percpu_dev_id;
+> +#endif
+
+Can we please avoid that ifdef and use an anon union ?
+
+> +#ifdef CONFIG_IRQ_PERCPU_DEVID
+> +static inline int irq_set_percpu_devid(unsigned int irq)
+
+Real function in kernel/irq/ please
+
 > +{
-> +	struct fixed_voltage_config *config;
+> +	struct irq_desc *desc = irq_to_desc(irq);
 > +
-> +	config = kzalloc(sizeof(struct fixed_voltage_config), GFP_KERNEL);
-> +	if (!config)
+> +	if (!desc)
+> +		return -EINVAL;
+> +
+> +	if (!zalloc_cpumask_var(&desc->percpu_enabled, GFP_KERNEL))
+> +		return -ENOMEM;
+
+What prevents that allocation happening more than once ?
+
+> +	irq_set_status_flags(irq,
+> +			     IRQ_NOAUTOEN | IRQ_PER_CPU | IRQ_NOTHREAD |
+> +			     IRQ_NOPROBE | IRQ_PER_CPU_DEVID);
+> +	return 0;
+> +}
+> +#endif
+> +
+>  /* Handle dynamic irq creation and destruction */
+>  extern unsigned int create_irq_nr(unsigned int irq_want, int node);
+>  extern int create_irq(void);
+> diff --git a/include/linux/irqdesc.h b/include/linux/irqdesc.h
+> index 150134a..0b4419a 100644
+> --- a/include/linux/irqdesc.h
+> +++ b/include/linux/irqdesc.h
+> @@ -53,6 +53,9 @@ struct irq_desc {
+>  	unsigned long		last_unhandled;	/* Aging timer for unhandled count */
+>  	unsigned int		irqs_unhandled;
+>  	raw_spinlock_t		lock;
+> +#ifdef CONFIG_IRQ_PERCPU_DEVID
+
+Can we just make that a pointer and get rid of the config option ?
+
+> +#ifdef CONFIG_IRQ_PERCPU_DEVID
+> +void irq_percpu_enable(struct irq_desc *desc)
+> +{
+> +	unsigned int cpu = get_cpu();
+
+get_cpu() is overkill here. That's called with desc->lock held and
+interrupts disabled. No way that the cpu can go away :)
+
+I'd rather have a check in the calling function, which makes sure that
+enable_percpu_irq() is called from proper per cpu context. See comment
+below.
+
+>  void remove_irq(unsigned int irq, struct irqaction *act)
+>  {
+> -	__free_irq(irq, act->dev_id);
+> +	struct irq_desc *desc = irq_to_desc(irq);
+> +
+> +	if (desc && !irq_settings_is_per_cpu_devid(desc))
+
+That probably should be
+
+     if (!WARN_ON(....))
+
+> +	    __free_irq(irq, act->dev_id);
+>  }
+>  EXPORT_SYMBOL_GPL(remove_irq);
+>  
+> @@ -1246,7 +1251,7 @@ void free_irq(unsigned int irq, void *dev_id)
+>  {
+>  	struct irq_desc *desc = irq_to_desc(irq);
+>  
+> -	if (!desc)
+> +	if (!desc || irq_settings_is_per_cpu_devid(desc))
+>  		return;
+
+Please make these percpu_devid checks WARN_ON so we can avoid stupid
+questions on the mailing lists.
+
+>  #ifdef CONFIG_SMP
+> @@ -1324,7 +1329,8 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
+>  	if (!desc)
+>  		return -EINVAL;
+>  
+> -	if (!irq_settings_can_request(desc))
+> +	if (!irq_settings_can_request(desc) ||
+> +	    irq_settings_is_per_cpu_devid(desc))
+>  		return -EINVAL;
+
+That's fine.
+  
+>  	if (!handler) {
+> @@ -1409,3 +1415,198 @@ int request_any_context_irq(unsigned int irq, irq_handler_t handler,
+>  	return !ret ? IRQC_IS_HARDIRQ : ret;
+>  }
+>  EXPORT_SYMBOL_GPL(request_any_context_irq);
+> +
+> +#ifdef CONFIG_IRQ_PERCPU_DEVID
+> +void enable_percpu_irq(unsigned int irq)
+> +{
+> +	unsigned long flags;
+> +	struct irq_desc *desc = irq_get_desc_buslock(irq, &flags);
+> +
+> +	if (!desc)
+> +		return;
+> +
+> +	irq_percpu_enable(desc);
+> +	irq_put_desc_busunlock(desc, flags);
+
+To make this luser proof and better debuggable I'd like to have that as:
+
+	int cpu = smp_processsor_id();
+	unsigned long flags;
+	....
+	irq_percpu_enable(desc, cpu);
+
+That way we catch at least lusers who call that from random thread
+context - assuming that they enabled some debug options .....
+
+> +}
+> +EXPORT_SYMBOL(enable_percpu_irq);
+
+_GPL please if at all. Not sure whether this needs to be available for
+modules.
+
+> +/*
+> + * Internal function to unregister a percpu irqaction.
+> + */
+> +static struct irqaction *__free_percpu_irq(unsigned int irq, void __percpu *dev_id)
+> +{
+> +	struct irq_desc *desc = irq_to_desc(irq);
+> +	struct irqaction *action;
+> +	unsigned long flags;
+> +
+> +	WARN(in_interrupt(), "Trying to free IRQ %d from IRQ context!\n", irq);
+> +
+> +	if (!desc)
 > +		return NULL;
 > +
-> +	config->supply_name = (char *)of_get_property(np, "supply-name", NULL);
-> +	of_property_read_u32(np, "microvolts", &config->microvolts);
-> +	of_property_read_u32(np, "gpio", &config->gpio);
-> +	of_property_read_u32(np, "startup-delay", &config->startup_delay);
-> +	if (of_find_property(np, "enable-high", NULL))
-> +		config->enable_high = true;
-> +	if (of_find_property(np, "enabled-at-boot", NULL))
-> +		config->enabled_at_boot = true;
-> +	config->init_data = of_get_regulator_init_data(np);
+> +	raw_spin_lock_irqsave(&desc->lock, flags);
 > +
-> +	return config;
-> +}
-> +EXPORT_SYMBOL(of_get_fixed_voltage_config);
-> diff --git a/include/linux/of_regulator.h b/include/linux/of_regulator.h
-> index 5eb048c..39860c5 100644
-> --- a/include/linux/of_regulator.h
-> +++ b/include/linux/of_regulator.h
-> @@ -11,12 +11,19 @@
->  #if defined(CONFIG_OF_REGULATOR)
->  extern struct regulator_init_data
->  	*of_get_regulator_init_data(struct device_node *np);
-> +extern struct fixed_voltage_config
-> +	*of_get_fixed_voltage_config(struct device_node *np);
->  #else
->  static inline struct regulator_init_data
->  	*of_get_regulator_init_data(struct device_node *np)
->  {
->  	return NULL;
->  }
-> +static inline struct fixed_voltage_config
-> +	*of_get_fixed_voltage_config(struct device_node *np)
-> +{
-> +	return NULL;
-> +}
->  #endif /* CONFIG_OF_REGULATOR */
->  
->  #endif /* __LINUX_OF_REG_H */
-> -- 
-> 1.7.1
-> 
+> +	action = desc->action;
+> +	if (!action || action->percpu_dev_id != dev_id) {
+> +		WARN(1, "Trying to free already-free IRQ %d\n", irq);
+> +		raw_spin_unlock_irqrestore(&desc->lock, flags);
+> +		return NULL;
+> +	}
+> +
+> +	/* Found it - now remove it from the list of entries: */
+> +	WARN(!cpumask_empty(desc->percpu_enabled),
+> +	     "percpu IRQ %d still enabled on CPU%d!\n",
+> +	     irq, cpumask_first(desc->percpu_enabled));
+> +	desc->action = NULL;
+> +
+> +#ifdef CONFIG_SMP
+> +	/* make sure affinity_hint is cleaned up */
+> +	if (WARN_ON_ONCE(desc->affinity_hint))
+> +		desc->affinity_hint = NULL;
+> +#endif
+
+We don't want to have an affinity hint for percpu interrupts. That's
+pretty useless AFACIT :)
+
+> +
+> +	raw_spin_unlock_irqrestore(&desc->lock, flags);
+> +
+> +	unregister_handler_proc(irq, action);
+> +
+> +	/* Make sure it's not being used on another CPU: */
+> +	synchronize_irq(irq);
+
+That's not helping w/o making synchronize_irq() aware of the percpu
+stuff. Also there is the question whether we need the ability to
+remove such interrupts in the first place. The target users are low
+level arch interrupts not some random device drivers.
+
+Otherwise this is a pretty cool patch!
+
+Thanks,
+
+	tglx
