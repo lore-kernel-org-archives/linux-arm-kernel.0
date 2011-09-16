@@ -1,254 +1,169 @@
-From: rob.lee@linaro.org (Robert Lee)
-Date: Fri, 16 Sep 2011 12:27:48 -0500
-Subject: [PATCH v2 1/3] ARM: imx: Add imx cpuidle driver
-In-Reply-To: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
-References: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <1316194070-21889-2-git-send-email-rob.lee@linaro.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 16 Sep 2011 10:45:08 -0700
+Subject: [PATCH 23/25] OMAP4: PM: Add CPUidle support
+In-Reply-To: <1315144466-9395-24-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Sun, 4 Sep 2011 19:24:24 +0530")
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-24-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87k498pejf.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new cpuidle driver which provides the common cpuidle
-functionality necessary for any imx soc cpuidle implementation.
+Hi Santosh,
 
-Signed-off-by: Robert Lee <rob.lee@linaro.org>
----
- arch/arm/plat-mxc/Makefile               |    1 +
- arch/arm/plat-mxc/cpuidle.c              |  151 ++++++++++++++++++++++++++++++
- arch/arm/plat-mxc/include/mach/cpuidle.h |   56 +++++++++++
- 3 files changed, 208 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/cpuidle.c
- create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 
-diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-index d53c35f..8939f79 100644
---- a/arch/arm/plat-mxc/Makefile
-+++ b/arch/arm/plat-mxc/Makefile
-@@ -19,6 +19,7 @@ obj-$(CONFIG_ARCH_MXC_AUDMUX_V1) += audmux-v1.o
- obj-$(CONFIG_ARCH_MXC_AUDMUX_V2) += audmux-v2.o
- obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
-+obj-$(CONFIG_CPU_IDLE) += cpuidle.o
- ifdef CONFIG_SND_IMX_SOC
- obj-y += ssi-fiq.o
- obj-y += ssi-fiq-ksym.o
-diff --git a/arch/arm/plat-mxc/cpuidle.c b/arch/arm/plat-mxc/cpuidle.c
-new file mode 100644
-index 0000000..9e4c176
---- /dev/null
-+++ b/arch/arm/plat-mxc/cpuidle.c
-@@ -0,0 +1,151 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+#include <linux/cpuidle.h>
-+#include <linux/err.h>
-+#include <asm/proc-fns.h>
-+#include <mach/cpuidle.h>
-+
-+static int (*mach_cpuidle)(struct cpuidle_device *dev,
-+			       struct cpuidle_state *state);
-+static struct cpuidle_driver *imx_cpuidle_driver;
-+static struct __initdata cpuidle_device * device;
-+
-+static int imx_enter_idle(struct cpuidle_device *dev,
-+			       struct cpuidle_state *state)
-+{
-+	struct timeval before, after;
-+	int idle_time;
-+
-+	local_irq_disable();
-+	local_fiq_disable();
-+
-+	do_gettimeofday(&before);
-+
-+	mach_cpuidle(dev, state);
-+
-+	do_gettimeofday(&after);
-+
-+	local_fiq_enable();
-+	local_irq_enable();
-+
-+	idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
-+		(after.tv_usec - before.tv_usec);
-+
-+	return idle_time;
-+}
-+
-+static DEFINE_PER_CPU(struct cpuidle_device, imx_cpuidle_device);
-+
-+int __init imx_cpuidle_init(struct imx_cpuidle_data *cpuidle_data)
-+{
-+	int i, cpu_id;
-+
-+	if (cpuidle_data == NULL) {
-+		pr_err("%s: cpuidle_data pointer NULL\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	if (cpuidle_data->mach_cpuidle == NULL) {
-+		pr_err("%s: idle callback function NULL\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	imx_cpuidle_driver = cpuidle_data->imx_cpuidle_driver;
-+
-+	mach_cpuidle = cpuidle_data->mach_cpuidle;
-+
-+	/* register imx_cpuidle driver */
-+	if (cpuidle_register_driver(imx_cpuidle_driver)) {
-+		pr_err("%s: Failed to register cpuidle driver\n", __func__);
-+		return -ENODEV;
-+	}
-+
-+	/* if provided, initialize the mach level cpuidle functionality */
-+	if (cpuidle_data->mach_cpuidle_init) {
-+		if (cpuidle_data->mach_cpuidle_init(cpuidle_data)) {
-+			pr_err("%s: Failed to register cpuidle driver\n",
-+				 __func__);
-+			cpuidle_unregister_driver(imx_cpuidle_driver);
-+			return -ENODEV;
-+		}
-+	}
-+
-+	/* initialize state data for each cpuidle_device */
-+	for_each_cpu(cpu_id, cpu_online_mask) {
-+
-+		device = &per_cpu(imx_cpuidle_device, cpu_id);
-+		device->cpu = cpu_id;
-+
-+		device->state_count = min((unsigned int) CPUIDLE_STATE_MAX,
-+			cpuidle_data->num_states);
-+
-+		device->prepare = cpuidle_data->prepare;
-+
-+		for (i = 0; i < device->state_count; i++) {
-+			strlcpy(device->states[i].name,
-+				cpuidle_data->state_data[i].name,
-+				CPUIDLE_NAME_LEN);
-+
-+			strlcpy(device->states[i].desc,
-+				cpuidle_data->state_data[i].desc,
-+				CPUIDLE_DESC_LEN);
-+
-+			device->states[i].driver_data =
-+				(void *)cpuidle_data->
-+				state_data[i].mach_cpu_pwr_state;
-+
-+			/*
-+			 * Because the imx_enter_idle function measures
-+			 * and returns a valid time for all imx SoCs,
-+			 * we always set this flag.
-+			 */
-+			device->states[i].flags = CPUIDLE_FLAG_TIME_VALID;
-+
-+			device->states[i].exit_latency =
-+				cpuidle_data->state_data[i].exit_latency;
-+
-+			device->states[i].power_usage =
-+				cpuidle_data->state_data[i].power_usage;
-+
-+			device->states[i].target_residency =
-+				cpuidle_data->state_data[i].target_residency;
-+
-+			device->states[i].enter = imx_enter_idle;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+int __init imx_cpuidle_dev_init(void)
-+{
-+	int cpu_id;
-+
-+	if (device == NULL) {
-+		pr_err("%s: Failed to register (No device)\n", __func__);
-+		return -ENODEV;
-+	}
-+
-+	for_each_cpu(cpu_id, cpu_online_mask) {
-+		device = &per_cpu(imx_cpuidle_device, cpu_id);
-+		if (cpuidle_register_device(device)) {
-+			pr_err("%s: Failed to register\n", __func__);
-+			return -ENODEV;
-+		}
-+	}
-+
-+	return 0;
-+}
-+late_initcall(imx_cpuidle_dev_init);
-diff --git a/arch/arm/plat-mxc/include/mach/cpuidle.h b/arch/arm/plat-mxc/include/mach/cpuidle.h
-new file mode 100644
-index 0000000..2bb109e
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/cpuidle.h
-@@ -0,0 +1,56 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#ifndef __ARCH_ARM_PLAT_MXC_CPUIDLE_H__
-+#define __ARCH_ARM_PLAT_MXC_CPUIDLE_H__
-+
-+#include <linux/cpuidle.h>
-+#include <mach/hardware.h>
-+
-+/* for passing cpuidle state info to the cpuidle driver. */
-+struct imx_cpuidle_state_data {
-+	enum mxc_cpu_pwr_mode	mach_cpu_pwr_state;
-+	char			*name;
-+	char			*desc;
-+	/* time in uS to exit this idle state */
-+	unsigned int		exit_latency;
-+	/* OPTIONAL - power usage of this idle state in mW */
-+	unsigned int		power_usage;
-+	/* OPTIONAL - in uS. See drivers/cpuidle/governors/menu.c for usage */
-+	unsigned int		target_residency;
-+};
-+
-+struct imx_cpuidle_data {
-+	unsigned int num_states;
-+	struct cpuidle_driver *imx_cpuidle_driver;
-+	struct imx_cpuidle_state_data *state_data;
-+	int (*mach_cpuidle)(struct cpuidle_device *dev,
-+		struct cpuidle_state *state);
-+
-+	/* OPTIONAL - parameter of mach_cpuidle_init func below */
-+	void *mach_init_data;
-+	/* OPTIONAL - callback for mach level cpuidle initialization */
-+	int (*mach_cpuidle_init)(void *mach_init_data);
-+	/* OPTIONAL - Search drivers/cpuidle/cpuidle.c for usage */
-+	int (*prepare)(struct cpuidle_device *dev);
-+};
-+
-+#ifdef CONFIG_CPU_IDLE
-+int imx_cpuidle_init(struct imx_cpuidle_data *cpuidle_data);
-+#else
-+static inline int imx_cpuidle_init(struct imx_cpuidle_data *cpuidle_data)
-+{
-+	return -EINVAL;
-+}
-+#endif /* CONFIG_CPU_IDLE */
-+
-+#endif /* __ARCH_ARM_PLAT_MXC_CPUIDLE_H__ */
--- 
-1.7.1
+> Add OMAP4 CPUIDLE support. CPU1 is left with defualt idle and
+> the low power state for it is managed via cpu-hotplug.
+>
+> This patch adds MPUSS low power states in cpuidle.
+>
+> 	C1 - CPU0 ON + CPU1 ON + MPU ON
+> 	C2 - CPU0 OFF + CPU1 OFF + MPU CSWR
+> 	C3 - CPU0 OFF + CPU1 OFF + MPU OSWR
+>
+> OMAP4460 onwards, MPUSS power domain doesn't support OFF state any more
+> anymore just like CORE power domain. The deepest state supported is OSWr.
+> Ofcourse when MPUSS and CORE PD transitions to OSWR along with device
+> off mode, even the memory contemts are lost which is as good as
+> the PD off state.
+>
+> On OMAP4 because of hardware constraints, no low power states are
+> targeted when both CPUs are online and in SMP mode. The low power
+> states are attempted only when secondary CPU gets offline to OFF
+> through hotplug infrastructure.
+>
+> Thanks to Nicole Chalhoub <n-chalhoub@ti.com> for doing exhaustive
+> C-state latency profiling.
+>
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+
+A handful of minor comments below...
+
+[...]
+
+> +/**
+> + * omap4_enter_idle - Programs OMAP4 to enter the specified state
+> + * @dev: cpuidle device
+> + * @state: The target state to be programmed
+> + *
+> + * Called from the CPUidle framework to program the device to the
+> + * specified low power state selected by the governor.
+> + * Returns the amount of time spent in the low power state.
+> + */
+> +static int omap4_enter_idle(struct cpuidle_device *dev,
+> +			struct cpuidle_state *state)
+> +{
+> +	struct omap4_idle_statedata *cx = cpuidle_get_statedata(state);
+> +	struct timespec ts_preidle, ts_postidle, ts_idle;
+> +	u32 cpu1_state;
+> +
+> +	/* Used to keep track of the total time in idle */
+> +	getnstimeofday(&ts_preidle);
+> +
+> +	local_irq_disable();
+> +	local_fiq_disable();
+> +
+> +	/*
+> +	 * Keep demoting CPU0 C-state till CPU1 hits OFF state.
+
+IMO, the working here isn't as clear as it could be.   IOW, I don't like
+"keep demoting", which makes it sound iterative through a set of states, 
+where what's happening here is a one-time decision.
+
+Rather, what I think you mean is "CPU0 has to stay on (e.g in C1) until
+CPU1 is off."
+
+> +	 * This is necessary to honour hardware recommondation
+> +	 * of triggeing all the possible low power modes once CPU1 is
+> +	 * out of coherency and in OFF mode.
+> +	 * Update dev->last_state so that governor stats reflects right
+> +	 * data.
+> +	 */
+> +	cpu1_state = pwrdm_read_pwrst(cpu1_pd);
+> +	if (cpu1_state != PWRDM_POWER_OFF) {
+> +		dev->last_state = dev->safe_state;
+> +		cx = cpuidle_get_statedata(dev->safe_state);
+> +	}
+> +
+> +	/* Call idle CPU PM enter notifier chain */
+
+This comment doesn't add any value over the code.  If anything, a
+comment explaining why it's only there for off-mode transitions would be
+helpful.
+
+> +	if (cx->cpu_state == PWRDM_POWER_OFF)
+> +		cpu_pm_enter();
+
+I think the CPU PM notifier usage should probably be a separate patch.
+
+> +	pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
+> +	omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
+> +
+> +	/* Call idle CPU cluster PM enter notifier chain */
+> +	if ((cx->mpu_state == PWRDM_POWER_RET) &&
+> +		(cx->mpu_logic_state == PWRDM_POWER_OFF))
+> +			cpu_cluster_pm_enter();
+> +
+> +	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
+> +
+> +	/* Call idle CPU PM exit notifier chain */
+
+As above, this comment doesn't add any value over the code.
+
+While I understand why it's only done for CPU0 here (CPU1 is managed by
+hotplug), we should anticipating the moment where we will have forgotten
+why it's only done for CPU0, and add a comment here.
+
+> +	if (pwrdm_read_prev_pwrst(cpu0_pd) == PWRDM_POWER_OFF)
+> +		cpu_pm_exit();
+> +
+> +	/* Call idle CPU cluster PM exit notifier chain */
+
+again, comment not helpful
+
+> +	if (omap4_mpuss_read_prev_context_state())
+> +		cpu_cluster_pm_exit();
+> +
+> +	getnstimeofday(&ts_postidle);
+> +	ts_idle = timespec_sub(ts_postidle, ts_preidle);
+> +
+> +	local_irq_enable();
+> +	local_fiq_enable();
+> +
+> +	return ts_idle.tv_nsec / NSEC_PER_USEC + ts_idle.tv_sec * USEC_PER_SEC;
+> +}
+> +
+> +DEFINE_PER_CPU(struct cpuidle_device, omap4_idle_dev);
+> +
+> +struct cpuidle_driver omap4_idle_driver = {
+> +	.name =		"omap4_idle",
+> +	.owner =	THIS_MODULE,
+> +};
+> +
+> +/* Fill in the state data from the mach tables and register the driver_data */
+
+if documented, it should have a kerneldoc header instead
+
+> +static inline struct omap4_idle_statedata *_fill_cstate(
+> +					struct cpuidle_device *dev,
+> +					int idx, const char *descr)
+> +{
+> +	struct omap4_idle_statedata *cx = &omap4_idle_data[idx];
+> +	struct cpuidle_state *state = &dev->states[idx];
+> +
+> +	state->exit_latency	= cpuidle_params_table[idx].exit_latency;
+> +	state->target_residency	= cpuidle_params_table[idx].target_residency;
+> +	state->flags		= CPUIDLE_FLAG_TIME_VALID;
+> +	state->enter		= omap4_enter_idle;
+> +	cx->valid		= cpuidle_params_table[idx].valid;
+> +	sprintf(state->name, "C%d", idx + 1);
+> +	strncpy(state->desc, descr, CPUIDLE_DESC_LEN);
+> +	cpuidle_set_statedata(state, cx);
+> +
+> +	return cx;
+> +}
+
+Kevin
