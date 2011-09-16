@@ -1,69 +1,158 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 16 Sep 2011 03:07:28 -0400
-Subject: [PATCH 17/19] ARM: simplify __iounmap() when dealing with section
-	based mapping
+Date: Fri, 16 Sep 2011 03:07:29 -0400
+Subject: [PATCH 18/19] ARM: add generic ioremap optimization by reusing static
+	mappings
 In-Reply-To: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
 References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1316156850-31013-18-git-send-email-nico@fluxnic.net>
+Message-ID: <1316156850-31013-19-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Firstly, there is no need to have a double pointer here as we're only
-walking the vmlist and not modifying it.
-
-Secondly, for the same reason, we don't need a write lock but only a
-read lock here, since the lock only protects the coherency of the list
-nothing else.
-
-Lastly, the reason for holding a lock is not what the comment says, so
-let's remove that misleading piece of information.
+Now that we have all the static mappings from iotable_init() located
+in the vmalloc area, it is trivial to optimize ioremap by reusing those
+static mappings when the requested physical area fits in one of them,
+and so in a generic way for all platforms.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mm/ioremap.c |   20 +++++++++-----------
- 1 files changed, 9 insertions(+), 11 deletions(-)
+ arch/arm/mm/ioremap.c |   60 ++++++++++++++++++++++++++++++++++--------------
+ arch/arm/mm/mm.h      |   14 +++++++++++
+ arch/arm/mm/mmu.c     |    3 +-
+ 3 files changed, 58 insertions(+), 19 deletions(-)
 
 diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index ab506272b2..1ddcd8aa34 100644
+index 1ddcd8aa34..8a6ceb10d6 100644
 --- a/arch/arm/mm/ioremap.c
 +++ b/arch/arm/mm/ioremap.c
-@@ -293,26 +293,24 @@ void __iounmap(volatile void __iomem *io_addr)
+@@ -36,12 +36,6 @@
+ #include <asm/mach/map.h>
+ #include "mm.h"
+ 
+-/*
+- * Used by ioremap() and iounmap() code to mark (super)section-mapped
+- * I/O regions in vm_struct->flags field.
+- */
+-#define VM_ARM_SECTION_MAPPING	0x80000000
+-
+ int ioremap_page(unsigned long virt, unsigned long phys,
+ 		 const struct mem_type *mtype)
+ {
+@@ -216,6 +210,28 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+ 	 */
+ 	size = PAGE_ALIGN(offset + size);
+ 
++	/*
++	 * Try to reuse one of the static mapping whenever possible.
++	 */
++	read_lock(&vmlist_lock);
++	for (area = vmlist; area; area = area->next) {
++		if (!size || (sizeof(phys_addr_t) == 4 && pfn >= 0x100000))
++			break;
++		if (!(area->flags & VM_ARM_STATIC_MAPPING))
++			continue;
++		if ((area->flags & VM_ARM_MTYPE_MASK) != VM_ARM_MTYPE(mtype))
++			continue;
++		if (__phys_to_pfn(area->phys_addr) > pfn ||
++		    __pfn_to_phys(pfn) + size-1 > area->phys_addr + area->size-1)
++			continue;
++		/* we can drop the lock here as we know *area is static */
++		read_unlock(&vmlist_lock);
++		addr = (unsigned long)area->addr;
++		addr += __pfn_to_phys(pfn) - area->phys_addr;
++		return (void __iomem *) (offset + addr);
++	}
++	read_unlock(&vmlist_lock);
++
+ 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
+  	if (!area)
+  		return NULL;
+@@ -292,26 +308,34 @@ EXPORT_SYMBOL(__arm_ioremap);
+ void __iounmap(volatile void __iomem *io_addr)
  {
  	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
- #ifndef CONFIG_SMP
--	struct vm_struct **p, *tmp;
-+	struct vm_struct *vm;
+-#ifndef CONFIG_SMP
+ 	struct vm_struct *vm;
  
- 	/*
- 	 * If this is a section based mapping we need to handle it
- 	 * specially as the VM subsystem does not know how to handle
--	 * such a beast. We need the lock here b/c we need to clear
--	 * all the mappings before the area can be reclaimed
--	 * by someone else.
-+	 * such a beast.
- 	 */
--	write_lock(&vmlist_lock);
--	for (p = &vmlist ; (tmp = *p) ; p = &tmp->next) {
--		if ((tmp->flags & VM_IOREMAP) && (tmp->addr == addr)) {
--			if (tmp->flags & VM_ARM_SECTION_MAPPING) {
--				unmap_area_sections((unsigned long)tmp->addr,
--						    tmp->size);
-+	read_lock(&vmlist_lock);
-+	for (vm = vmlist; vm; vm = vm->next) {
-+		if ((vm->flags & VM_IOREMAP) && (vm->addr == addr)) {
-+			if (vm->flags & VM_ARM_SECTION_MAPPING) {
-+				unmap_area_sections((unsigned long)vm->addr,
-+						    vm->size);
- 			}
+-	/*
+-	 * If this is a section based mapping we need to handle it
+-	 * specially as the VM subsystem does not know how to handle
+-	 * such a beast.
+-	 */
+ 	read_lock(&vmlist_lock);
+ 	for (vm = vmlist; vm; vm = vm->next) {
+-		if ((vm->flags & VM_IOREMAP) && (vm->addr == addr)) {
+-			if (vm->flags & VM_ARM_SECTION_MAPPING) {
+-				unmap_area_sections((unsigned long)vm->addr,
+-						    vm->size);
+-			}
++		if (vm->addr > addr)
  			break;
++		if (!(vm->flags & VM_IOREMAP))
++			continue;
++		/* If this is a static mapping we must leave it alone */
++		if ((vm->flags & VM_ARM_STATIC_MAPPING) &&
++		    (vm->addr <= addr) && (vm->addr + vm->size > addr)) {
++			read_unlock(&vmlist_lock);
++			return;
  		}
++#ifndef CONFIG_SMP
++		/*
++		 * If this is a section based mapping we need to handle it
++		 * specially as the VM subsystem does not know how to handle
++		 * such a beast.
++		 */
++		if ((vm->addr == addr) &&
++		    (vm->flags & VM_ARM_SECTION_MAPPING)) {
++			unmap_area_sections((unsigned long)vm->addr, vm->size);
++			break;
++		}
++#endif
  	}
--	write_unlock(&vmlist_lock);
-+	read_unlock(&vmlist_lock);
- #endif
+ 	read_unlock(&vmlist_lock);
+-#endif
  
  	vunmap(addr);
+ }
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index 010566799c..7b7c9ca079 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -21,6 +21,20 @@ const struct mem_type *get_mem_type(unsigned int type);
+ 
+ extern void __flush_dcache_page(struct address_space *mapping, struct page *page);
+ 
++/*
++ * ARM specific vm_struct->flags bits. field.
++ */
++
++/* (super)section-mapped I/O regions used by ioremap()/iounmap() */
++#define VM_ARM_SECTION_MAPPING	0x80000000
++
++/* permanent static mappings from iotable_init() */
++#define VM_ARM_STATIC_MAPPING	0x40000000
++
++/* mapping type (attributes) for permanent static mappings */
++#define VM_ARM_MTYPE(mt)		((mt) << 20)
++#define VM_ARM_MTYPE_MASK	(0x1f << 20)
++
+ #endif
+ 
+ #ifdef CONFIG_ZONE_DMA
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 6996576488..b5eddf1fff 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -734,7 +734,8 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
+ 		vm->addr = (void *)(md->virtual & PAGE_MASK);
+ 		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
+ 		vm->phys_addr = __pfn_to_phys(md->pfn); 
+-		vm->flags = VM_IOREMAP;
++		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING; 
++		vm->flags |= VM_ARM_MTYPE(md->type);
+ 		vm->caller = iotable_init;
+ 		vm_area_add_early(vm++);
+ 	}
 -- 
 1.7.7-rc0
