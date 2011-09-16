@@ -1,39 +1,74 @@
-From: girish.shivananjappa@linaro.org (Girish K S)
-Date: Fri, 16 Sep 2011 11:00:12 +0530
-Subject: confusion regarding the CMD19 and CMD21 in eMMC/SD card spec
-In-Reply-To: <20110916044706.GA4030@lovegaga>
-References: <CAGxe1ZH=mrAdfVR7Uw8mYNAD43BAbW7VGuhA1pN9hbSjTG9HVA@mail.gmail.com>
-	<0356427A-B949-4DA6-9F5D-FE0DD54AEDFF@marvell.com>
-	<CAGxe1ZG4QjwB5OfrxupG_C+DtQ7sTQ4_EURaF-QrqPPSA3A0jw@mail.gmail.com>
-	<20110916044706.GA4030@lovegaga>
-Message-ID: <CAGxe1ZGNBPcCMZQDdxCbO_CBBAm5FcF8R7FV0_P8MLEOcXqwYg@mail.gmail.com>
+From: leiwen@marvell.com (Lei Wen)
+Date: Thu, 15 Sep 2011 22:32:09 -0700
+Subject: [PATCH] ARM: kdump: copy kernel relocation code at the kexec prepare
+	stage
+Message-ID: <1316151129-30491-1-git-send-email-leiwen@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Aaron Lu,
-                    please check the mmc 4.5 specification CMD21 is
-tuning command.
+This copy really don't need to do at the very second before the kernel
+would crash.
 
-regards
-Girish K S
+Signed-off-by: Lei Wen <leiwen@marvell.com>
+---
+ arch/arm/kernel/machine_kexec.c |   30 +++++++++++++++---------------
+ 1 files changed, 15 insertions(+), 15 deletions(-)
 
-On 16 September 2011 10:17, Aaron Lu <aaron.lu@amd.com> wrote:
-> On Fri, Sep 16, 2011 at 09:41:04AM +0530, Girish K S wrote:
->> but there is only one host controller to handle these commands.
->> the generic sdhci driver has cmd19 hard coded, thats the reason I
->> asked the question.
->> you can also check it in the function sdhci_execute_tuning it is hard coded as
->> cmd.opcode = MMC_SEND_TUNING_BLOCK; where the macro value is 19.
->> So in case of SD card insertion it will send a SEND_TUNING_BLOCK
->> command to the device. but if
->> MMC card is inserted then it will send a BUS_TEST_W command to the device.
->
-> sdhci_execute_tuning will only be called if the inserted card is a sd card
-> and it is operating at SDR104 or SDR50 mode(UHS-I).
->
-> The host's tuning function is called from the mmc_sd_init_uhs_card,
-> and for a mmc card, there is no chance of that function being called.
->
-> -Aaron
->
->
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index e59bbd4..f60fc90 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -32,6 +32,21 @@ static atomic_t waiting_for_crash_ipi;
+ 
+ int machine_kexec_prepare(struct kimage *image)
+ {
++	unsigned long page_list;
++	void *reboot_code_buffer;
++	page_list = image->head & PAGE_MASK;
++
++	reboot_code_buffer = page_address(image->control_code_page);
++
++	/* Prepare parameters for reboot_code_buffer*/
++	kexec_start_address = image->start;
++	kexec_indirection_page = page_list;
++	kexec_mach_type = machine_arch_type;
++	kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
++
++	/* copy our kernel relocation code to the control code page */
++	memcpy(reboot_code_buffer,
++	       relocate_new_kernel, relocate_new_kernel_size);
+ 	return 0;
+ }
+ 
+@@ -82,29 +97,14 @@ void (*kexec_reinit)(void);
+ 
+ void machine_kexec(struct kimage *image)
+ {
+-	unsigned long page_list;
+ 	unsigned long reboot_code_buffer_phys;
+ 	void *reboot_code_buffer;
+ 
+-
+-	page_list = image->head & PAGE_MASK;
+-
+ 	/* we need both effective and real address here */
+ 	reboot_code_buffer_phys =
+ 	    page_to_pfn(image->control_code_page) << PAGE_SHIFT;
+ 	reboot_code_buffer = page_address(image->control_code_page);
+ 
+-	/* Prepare parameters for reboot_code_buffer*/
+-	kexec_start_address = image->start;
+-	kexec_indirection_page = page_list;
+-	kexec_mach_type = machine_arch_type;
+-	kexec_boot_atags = image->start - KEXEC_ARM_ZIMAGE_OFFSET + KEXEC_ARM_ATAGS_OFFSET;
+-
+-	/* copy our kernel relocation code to the control code page */
+-	memcpy(reboot_code_buffer,
+-	       relocate_new_kernel, relocate_new_kernel_size);
+-
+-
+ 	flush_icache_range((unsigned long) reboot_code_buffer,
+ 			   (unsigned long) reboot_code_buffer + KEXEC_CONTROL_PAGE_SIZE);
+ 	printk(KERN_INFO "Bye!\n");
+-- 
+1.7.0.4
