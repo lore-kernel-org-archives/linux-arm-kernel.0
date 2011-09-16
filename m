@@ -1,10 +1,10 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 16 Sep 2011 03:07:19 -0400
-Subject: [PATCH 08/19] ARM: mach-tegra: remove arch specific special handling
+Date: Fri, 16 Sep 2011 03:07:18 -0400
+Subject: [PATCH 07/19] ARM: mach-davinci: remove arch specific special handling
 	for ioremap
 In-Reply-To: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
 References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1316156850-31013-9-git-send-email-nico@fluxnic.net>
+Message-ID: <1316156850-31013-8-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,55 +14,95 @@ A generic version should replace this later.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-tegra/include/mach/io.h |    6 ------
- arch/arm/mach-tegra/io.c              |   21 ---------------------
- 2 files changed, 0 insertions(+), 27 deletions(-)
+ arch/arm/mach-davinci/Makefile          |    2 +-
+ arch/arm/mach-davinci/include/mach/io.h |    8 -----
+ arch/arm/mach-davinci/io.c              |   48 -------------------------------
+ 3 files changed, 1 insertions(+), 57 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/io.c
 
-diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
-index 4cea2230c8..67fcb38c09 100644
---- a/arch/arm/mach-tegra/include/mach/io.h
-+++ b/arch/arm/mach-tegra/include/mach/io.h
-@@ -65,12 +65,6 @@
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index 0b87a1ca2b..d6a8879aa6 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -4,7 +4,7 @@
+ #
  
- #ifndef __ASSEMBLER__
+ # Common objects
+-obj-y 			:= time.o clock.o serial.o io.o psc.o \
++obj-y 			:= time.o clock.o serial.o psc.o \
+ 			   gpio.o dma.o usb.o common.o sram.o aemif.o
  
--#define __arch_ioremap		tegra_ioremap
--#define __arch_iounmap		tegra_iounmap
+ obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
+diff --git a/arch/arm/mach-davinci/include/mach/io.h b/arch/arm/mach-davinci/include/mach/io.h
+index d1b954955c..b2267d1e1a 100644
+--- a/arch/arm/mach-davinci/include/mach/io.h
++++ b/arch/arm/mach-davinci/include/mach/io.h
+@@ -21,12 +21,4 @@
+ #define __mem_pci(a)		(a)
+ #define __mem_isa(a)		(a)
+ 
+-#ifndef __ASSEMBLER__
+-#define __arch_ioremap		davinci_ioremap
+-#define __arch_iounmap		davinci_iounmap
 -
--void __iomem *tegra_ioremap(unsigned long phys, size_t size, unsigned int type);
--void tegra_iounmap(volatile void __iomem *addr);
+-void __iomem *davinci_ioremap(unsigned long phys, size_t size,
+-			      unsigned int type);
+-void davinci_iounmap(volatile void __iomem *addr);
+-#endif
+ #endif /* __ASM_ARCH_IO_H */
+diff --git a/arch/arm/mach-davinci/io.c b/arch/arm/mach-davinci/io.c
+deleted file mode 100644
+index 8ea60a8b24..0000000000
+--- a/arch/arm/mach-davinci/io.c
++++ /dev/null
+@@ -1,48 +0,0 @@
+-/*
+- * DaVinci I/O mapping code
+- *
+- * Copyright (C) 2005-2006 Texas Instruments
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
 -
- #define IO_ADDRESS(n) ((void __iomem *) IO_TO_VIRT(n))
- 
- #ifdef CONFIG_TEGRA_PCI
-diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
-index ea50fe28cf..d9d517dc4c 100644
---- a/arch/arm/mach-tegra/io.c
-+++ b/arch/arm/mach-tegra/io.c
-@@ -60,24 +60,3 @@ void __init tegra_map_common_io(void)
- {
- 	iotable_init(tegra_io_desc, ARRAY_SIZE(tegra_io_desc));
- }
+-#include <linux/module.h>
+-#include <linux/io.h>
+-
+-#include <asm/tlb.h>
+-#include <asm/mach/map.h>
+-
+-#include <mach/common.h>
 -
 -/*
 - * Intercept ioremap() requests for addresses in our fixed mapping regions.
 - */
--void __iomem *tegra_ioremap(unsigned long p, size_t size, unsigned int type)
+-void __iomem *davinci_ioremap(unsigned long p, size_t size, unsigned int type)
 -{
--	void __iomem *v = IO_ADDRESS(p);
--	if (v == NULL)
--		v = __arm_ioremap(p, size, type);
--	return v;
--}
--EXPORT_SYMBOL(tegra_ioremap);
+-	struct map_desc *desc = davinci_soc_info.io_desc;
+-	int desc_num = davinci_soc_info.io_desc_num;
+-	int i;
 -
--void tegra_iounmap(volatile void __iomem *addr)
+-	for (i = 0; i < desc_num; i++, desc++) {
+-		unsigned long iophys = __pfn_to_phys(desc->pfn);
+-		unsigned long iosize = desc->length;
+-
+-		if (p >= iophys && (p + size) <= (iophys + iosize))
+-			return __io(desc->virtual + p - iophys);
+-	}
+-
+-	return __arm_ioremap_caller(p, size, type,
+-					__builtin_return_address(0));
+-}
+-EXPORT_SYMBOL(davinci_ioremap);
+-
+-void davinci_iounmap(volatile void __iomem *addr)
 -{
 -	unsigned long virt = (unsigned long)addr;
 -
 -	if (virt >= VMALLOC_START && virt < VMALLOC_END)
 -		__iounmap(addr);
 -}
--EXPORT_SYMBOL(tegra_iounmap);
+-EXPORT_SYMBOL(davinci_iounmap);
 -- 
 1.7.7-rc0
