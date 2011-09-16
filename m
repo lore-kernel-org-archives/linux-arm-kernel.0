@@ -1,69 +1,34 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 16 Sep 2011 10:23:44 -0700
-Subject: [PATCH 20/25] OMAP4: PM: Add L2X0 cache lowpower support
-In-Reply-To: <1315144466-9395-21-git-send-email-santosh.shilimkar@ti.com>
-	(Santosh Shilimkar's message of "Sun, 4 Sep 2011 19:24:21 +0530")
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-21-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <87iposqu3j.fsf@ti.com>
+From: rob.lee@linaro.org (Robert Lee)
+Date: Fri, 16 Sep 2011 12:27:47 -0500
+Subject: [PATCH v2 0/3] ARM: imx: Add cpuidle for imx platforms
+Message-ID: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+This patch series adds a common imx cpuidle driver, some common 
+mach-mx5 level cpuidle functionality, and an i.MX51 instance of
+using this driver.
 
-> When MPUSS hits off-mode e, L2 cache is lost. This patch adds L2X0
-                          ^^^
-extra 'e' ?
+The patch series is based on v3.1-rc2.
 
-> necessary maintenance operations and context restoration in the
-> low power code.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
+Changes since v1:
+* To address all the problems found during review of v1, a complete
+re-write was needed.
 
-[...]
+Robert Lee (3):
+  ARM: imx: Add imx cpuidle driver
+  ARM: imx: Add cpuidle for mach-mx5
+  ARM: imx: Add cpuidle for i.MX51
 
-> @@ -135,6 +138,33 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
->  	__raw_writel(scu_pwr_st, pm_info->scu_sar_addr);
->  }
->  
-> +/*
-> + * Store the CPU cluster state for L2X0 low power operations.
-> + */
-> +static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
-> +{
-> +	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
-> +
-> +	__raw_writel(save_state, pm_info->l2x0_sar_addr);
-> +}
-> +
-> +/*
-> + * Save the L2X0 AUXCTRL and POR value to SAR memory. Its used to
-> + * in every restore MPUSS OFF path.
-> + */
-> +static void save_l2x0_context(void)
-> +{
-> +#ifdef CONFIG_CACHE_L2X0
-> +	u32 val;
-> +	void __iomem *l2x0_base = omap4_get_l2cache_base();
-> +
-> +	val = __raw_readl(l2x0_base + L2X0_AUX_CTRL);
-> +	__raw_writel(val, sar_base + L2X0_AUXCTRL_OFFSET);
-> +	val = __raw_readl(l2x0_base + L2X0_PREFETCH_CTRL);
-> +	__raw_writel(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
-> +#endif
-
-nit:  (c.f. '#ifdefs are ugly' in Documentatin/SubmittingPatches)
-
-This should probably be more like
-
-#ifdef CONFIG_CACHE_L2X0
-static void save_l2x0_context(void)
-{
-        /* real function */
-}
-#else
-static void save_l2x0_context(void) {}
-#endif
-
-Kevin
+ arch/arm/mach-mx5/Makefile               |    3 +-
+ arch/arm/mach-mx5/cpu_op-mx51.c          |   35 +++++++-
+ arch/arm/mach-mx5/cpu_op-mx51.h          |    1 +
+ arch/arm/mach-mx5/mm.c                   |    4 +
+ arch/arm/mach-mx5/system.c               |   35 +++++++
+ arch/arm/plat-mxc/Makefile               |    1 +
+ arch/arm/plat-mxc/cpuidle.c              |  151 ++++++++++++++++++++++++++++++
+ arch/arm/plat-mxc/include/mach/cpuidle.h |   56 +++++++++++
+ arch/arm/plat-mxc/include/mach/system.h  |    3 +
+ 9 files changed, 286 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/plat-mxc/cpuidle.c
+ create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
