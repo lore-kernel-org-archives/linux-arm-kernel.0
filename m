@@ -1,9 +1,10 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 16 Sep 2011 12:49:41 +0530
-Subject: [RFC PATCH 09/11] DT: regulator: Helper to extract regulator
-	node based on supply name
-In-Reply-To: <20110915230324.GD3218@opensource.wolfsonmicro.com>
-References: <1316085727-15023-3-git-send-email-rnayak@ti.com>
+Date: Fri, 16 Sep 2011 12:51:06 +0530
+Subject: [RFC PATCH 10/11] regulator: Implement consumer regulator mapping
+	from device tree
+In-Reply-To: <20110915135939.GO7988@opensource.wolfsonmicro.com>
+References: <1316085727-15023-2-git-send-email-rnayak@ti.com>
+	<1316085727-15023-3-git-send-email-rnayak@ti.com>
 	<1316085727-15023-4-git-send-email-rnayak@ti.com>
 	<1316085727-15023-5-git-send-email-rnayak@ti.com>
 	<1316085727-15023-6-git-send-email-rnayak@ti.com>
@@ -11,28 +12,68 @@ References: <1316085727-15023-3-git-send-email-rnayak@ti.com>
 	<1316085727-15023-8-git-send-email-rnayak@ti.com>
 	<1316085727-15023-9-git-send-email-rnayak@ti.com>
 	<1316085727-15023-10-git-send-email-rnayak@ti.com>
-	<20110915135416.GN7988@opensource.wolfsonmicro.com>
-	<20110915225035.GP3523@ponder.secretlab.ca>
-	<20110915230324.GD3218@opensource.wolfsonmicro.com>
-Message-ID: <4E72F88D.6070000@ti.com>
+	<1316085727-15023-11-git-send-email-rnayak@ti.com>
+	<20110915135939.GO7988@opensource.wolfsonmicro.com>
+Message-ID: <4E72F8E2.3020200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 September 2011 04:33 AM, Mark Brown wrote:
-> On Thu, Sep 15, 2011 at 04:50:35PM -0600, Grant Likely wrote:
+On Thursday 15 September 2011 07:29 PM, Mark Brown wrote:
+> On Thu, Sep 15, 2011 at 04:52:06PM +0530, Rajendra Nayak wrote:
 >
->> We've got two competing approaches here.  For reg and interrupts, the
->> proposal on the table that we talked about at LPC is to do reg-names
->> and interrupts-names so as to preserve the existing semantics of the
->> reg and interrupts properties.  For gpios we're using the binding
->> "<name>-gpios" for named gpio references.  There isn't the same
->> pressure to preserve existing bindings in that case.  I'm okay with
->> either approach, providing that "-regulator" is encoded into the name.
+>> +#ifdef CONFIG_OF
+>> +	struct device_node *node;
+>> +	node = of_get_regulator(dev, id);
+>> +	if (!node)
+>> +		goto out;
+>> +	list_for_each_entry(rdev, &regulator_list, list)
+>> +		if (node == rdev->node)
+>> +			goto found;
+>> +#else
+>>   	list_for_each_entry(map,&regulator_map_list, list) {
+>>   		/* If the mapping has a device set up it must match */
+>>   		if (map->dev_name &&
+>> @@ -1178,6 +1189,7 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
+>>   			goto found;
+>>   		}
+>>   	}
+>> +#endif
 >
-> I think I prefer the latter but I'm probably not too fussed.
->
-> I'd rather use something like -supply for these just on the basis that
-> you don't always connect things to regulators (for example, speaker
-> supplies are generally attached direct to the battery).
+> This forces all machines to use device tree when CONFIG_OF is enabled.
+> I'd expect to see both mechanisms supported simultaneously, for example
+> by falling back to the current code if the device tree lookup fails.
 
-Ok, I'll go with <name>-supply then.
+agree, will change this to fall back if the dt lookup fails.
+
+>
+>> @@ -1216,6 +1228,15 @@ found:
+>>   	if (!try_module_get(rdev->owner))
+>>   		goto out;
+>>
+>> +#ifdef CONFIG_OF
+>> +	ret = set_consumer_device_supply(rdev, dev, devname, id);
+>> +	if (ret <  0) {
+>> +		dev_err(dev, "Failed to set supply %d\n", ret);
+>> +		unset_regulator_supplies(rdev);
+>> +		goto out;
+>> +	}
+>> +#endif
+>> +
+>
+> This seems wrong, why are we adding things to the regulator_map which is
+> really only there for lookups when we already did the lookup using the
+> device tree?
+
+I did this only so the mappings show up in sysfs.
+
+>
+>> @@ -2619,6 +2640,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
+>>   	rdev->reg_data = driver_data;
+>>   	rdev->owner = regulator_desc->owner;
+>>   	rdev->desc = regulator_desc;
+>> +	if (dev &&  dev->of_node)
+>> +		rdev->node = dev->of_node;
+>
+> dev is mandatory.
+
+ok
