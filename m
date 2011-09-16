@@ -1,43 +1,46 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 16 Sep 2011 15:25:09 +0800
-Subject: [PATCH 03/19] ARM: mach-prima2: don't define SIRFSOC_VA in terms
-	of VMALLOC_END
-In-Reply-To: <1316156850-31013-4-git-send-email-nico@fluxnic.net>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<1316156850-31013-4-git-send-email-nico@fluxnic.net>
-Message-ID: <CAGsJ_4zaberDb0WAMgNfwfNxJ-QOxTa2AC8pTQPrxO1NkQJqEQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Sep 2011 08:31:59 +0100
+Subject: READ THIS: the next mach-types update
+In-Reply-To: <20110915145022.GM28104@game.jcrosoft.org>
+References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
+	<20110915145022.GM28104@game.jcrosoft.org>
+Message-ID: <20110916073159.GC22533@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/16 Nicolas Pitre <nico@fluxnic.net>:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
->
-> ... since it is going to change.
->
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+On Thu, Sep 15, 2011 at 04:50:22PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 11:25 Thu 15 Sep     , Russell King - ARM Linux wrote:
+> > I'm going to be merging a mach-types update (the cut-down and the
+> > policy-conforming version) for the next merge window.  This will mean
+> > that things WILL BREAK, and I will not notice that things have broken.
+> > 
+> > In order to fix this, entries need to be fixed to conform to the
+> > requirements - where the machine_is_xxx() name is the same as the
+> > MACH_TYPE_xxx name and the CONFIG_MACH_xxx name too.
+> > 
+> > Moreover, entries older than 12 months which have not been merged will
+> > be removed.  It is not possible to automatically check for machine_is_xxx()
+> > usages as these could conflict with other architectures, and I'm
+> > certainly NOT checking for them by hand (I estimate that'd take a
+> > significant amount of manual effort to do.)  What that means is that it
+> > is _important_ to get the core platform support in _first_ before any
+> > drivers which may make use of this.
+> > 
+> > The following will be deleted from the file this time around are:
+> > -ts_x09                  MACH_TS209              TS209                   1565
+> > -at572d940hfek           MACH_AT572D940HFEB      AT572D940HFEB           1783
+> can be dropped the at572d940hfek as the at572d940hf is drop from mainline
+> 
+> Russell an you confirm you will re-add the usb-a9g20 and the folowing one
+> 
+> usb_a9g20               MACH_USB_A9G20          USB_A9G20               1841
+> qil_a9g20               MACH_QIL_A9G20          QIL_A9G20               1844
+> tny_a9260               MACH_TNY_A9260          TNY_A9260               2058
+> tny_a9g20               MACH_TNY_A9G20          TNY_A9G20               2059
+> tny_a9263               MACH_TNY_A9263          TNY_A9263               2140
 
-Tested-by: Barry Song <baohua.song@csr.com>
+Here's the two relevent question:
+1. have they been submitted or edited within the last 12 months?  No.
+2. are they merged into mainline?  No.
 
-> ---
-> ?arch/arm/mach-prima2/include/mach/map.h | ? ?6 ++++--
-> ?1 files changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-prima2/include/mach/map.h b/arch/arm/mach-prima2/include/mach/map.h
-> index 66b1ae2e55..6f24353257 100644
-> --- a/arch/arm/mach-prima2/include/mach/map.h
-> +++ b/arch/arm/mach-prima2/include/mach/map.h
-> @@ -9,8 +9,10 @@
-> ?#ifndef __MACH_PRIMA2_MAP_H__
-> ?#define __MACH_PRIMA2_MAP_H__
->
-> -#include <mach/vmalloc.h>
-> +#include <linux/const.h>
->
-> -#define SIRFSOC_VA(x) ? ? ? ? ? ? ? ? ?(VMALLOC_END + ((x) & 0x00FFF000))
-> +#define SIRFSOC_VA_BASE ? ? ? ? ? ? ? ?_AC(0xFEC00000, UL)
-> +
-> +#define SIRFSOC_VA(x) ? ? ? ? ?(SIRFSOC_VA_BASE + ((x) & 0x00FFF000))
->
-> ?#endif
-> --
-> 1.7.7-rc0
+So will they be in the update?  No.
