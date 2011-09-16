@@ -1,63 +1,108 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 16 Sep 2011 16:44:39 -0400 (EDT)
-Subject: [PATCH 01/19] ARM: sort the meminfo array earlier
-In-Reply-To: <4E73A1AC.20709@codeaurora.org>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<1316156850-31013-2-git-send-email-nico@fluxnic.net>
-	<4E73858A.9050106@codeaurora.org>
-	<alpine.LFD.2.00.1109161345560.20358@xanadu.home>
-	<4E73A1AC.20709@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1109161557150.20358@xanadu.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 16 Sep 2011 16:34:51 -0500
+Subject: [PATCH v2] pata-generic/of: Make probing via device tree
+	non-powerpc-specific
+In-Reply-To: <1316190120-17010-1-git-send-email-dave.martin@linaro.org>
+References: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
+	<1316190120-17010-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <4E73C0FB.4030904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Sep 2011, Stephen Boyd wrote:
+Dave,
 
-> On 09/16/11 11:09, Nicolas Pitre wrote:
-> > On Fri, 16 Sep 2011, Stephen Boyd wrote:
-> >
-> >
-> >> This looks like:
-> >>
-> >>     return clamp(bank_pfn_start(a) - bank_pfn_start(b), -1, 1);
-> > Won't work.  The pfn is of an unsigned type, hence the subtraction 
-> > result will also be unsigned.  The code above looks a bit odd, but there 
-> > is an implicit cast to a signed result with the result stored into a 
-> > long.
-> >
-> > What would have been even clearer, and possibly more efficient as well, 
-> > is something like this:
-> >
-> > 	if (bank_pfn_start(a) < bank_pfn_start(b))
-> > 		return -1;
-> > 	if (bank_pfn_start(a) > bank_pfn_start(b))
-> > 		return 1;
-> > 	return 0;
+On 09/16/2011 11:22 AM, Dave Martin wrote:
+> This patch enables device-tree-based probing of the pata-generic
+> platform driver across all architectures:
 > 
-> Ok so
+>   * make the pata_of_generic module depend on OF instead of PPC_OF;
+>   * supply some missing inclues;
+>   * replace endianness-sensitive raw access to device tree data
+>     with of_property_read_u32() calls.
 > 
->     return clamp_t(long, bank_pfn_start(a) - bank_pfn_start(b), -1, 1); 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+> v2: correct sense of the check of_property_read_u32(dn, "pio-mode",
+> &pio_mode).  Somehow I posted an old version of this patch, depite
+> having already fixed this...
 > 
+> Tested on ARM Versatile Express, with my soon-to-be-posted device
+> tree support patches.
 > 
-> ?
+> I'm not in a position to build/test this for powerpc easily --
+> if anyone is able to do that, it would be appreciated.
+> 
+Building just requires getting Codesourcery PPC toolchain...
 
-Well...
+You also have to be aware that you are enabling this for all OF-enabled
+arches which could break with an allyesconfig. So really you need sparc,
+x86, mips, and microblaze, but a subset is probably sufficient.
 
-Given that the pfn range typically fits into an int, having a simple:
+> Grant, does this require similar cleanup to the isp1760 USB hcd driver?
+> 
+Yes. It really should be merged with pata_platform.c. If you're willing
+to combine them, I'll do ppc and sparc builds as I already have those on
+my system.
 
-	return bank_pfn_start(a) - bank_pfn_start(b);
+Rob
 
-should be all that is needed here, since the expected return value is 
-either <0, 0, or >0.  But that assumes that physical memory will always 
-be representable with less than 44 bits, and that's a bad assumption to 
-make these days.  Even your usage of clamp_t() is broken the same way, 
-just like the current code in fact.
-
-So probably using bank_phys_start() instead of bank_pfn_start() would 
-already be slightly more efficient, given that reducing the range with a 
-pfn is not going to help when PHYSADDR_t is a 64-bit type.  Then having 
-direct comparisons like I proposed would be the best that can be 
-achieved in C.
-
-
-Nicolas
+>  drivers/ata/Kconfig            |    2 +-
+>  drivers/ata/pata_of_platform.c |   16 +++++++---------
+>  2 files changed, 8 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index 5987e0b..c6ef9d0 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -820,7 +820,7 @@ config PATA_PLATFORM
+>  
+>  config PATA_OF_PLATFORM
+>  	tristate "OpenFirmware platform device PATA support"
+> -	depends on PATA_PLATFORM && PPC_OF
+> +	depends on PATA_PLATFORM && OF
+>  	help
+>  	  This option enables support for generic directly connected ATA
+>  	  devices commonly found on embedded systems with OpenFirmware
+> diff --git a/drivers/ata/pata_of_platform.c b/drivers/ata/pata_of_platform.c
+> index f305400..e6e9aa9 100644
+> --- a/drivers/ata/pata_of_platform.c
+> +++ b/drivers/ata/pata_of_platform.c
+> @@ -11,6 +11,9 @@
+>  
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/ata_platform.h>
+>  
+> @@ -21,10 +24,9 @@ static int __devinit pata_of_platform_probe(struct platform_device *ofdev)
+>  	struct resource io_res;
+>  	struct resource ctl_res;
+>  	struct resource irq_res;
+> -	unsigned int reg_shift = 0;
+> -	int pio_mode = 0;
+> +	u32 reg_shift = 0;
+> +	u32 pio_mode = 0;
+>  	int pio_mask;
+> -	const u32 *prop;
+>  
+>  	ret = of_address_to_resource(dn, 0, &io_res);
+>  	if (ret) {
+> @@ -55,13 +57,9 @@ static int __devinit pata_of_platform_probe(struct platform_device *ofdev)
+>  	else
+>  		irq_res.flags = 0;
+>  
+> -	prop = of_get_property(dn, "reg-shift", NULL);
+> -	if (prop)
+> -		reg_shift = *prop;
+> +	of_property_read_u32(dn, "reg-shift", &reg_shift);
+>  
+> -	prop = of_get_property(dn, "pio-mode", NULL);
+> -	if (prop) {
+> -		pio_mode = *prop;
+> +	if (!of_property_read_u32(dn, "pio-mode", &pio_mode)) {
+>  		if (pio_mode > 6) {
+>  			dev_err(&ofdev->dev, "invalid pio-mode\n");
+>  			return -EINVAL;
