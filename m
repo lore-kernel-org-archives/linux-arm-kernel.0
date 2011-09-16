@@ -1,36 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 16 Sep 2011 12:44:05 +0100
-Subject: [GIT PULL] Perf, PMU and hw_breakpoint updates for 3.2
-In-Reply-To: <20110901210614.GA5209@e102144-lin.cambridge.arm.com>
-References: <20110901210614.GA5209@e102144-lin.cambridge.arm.com>
-Message-ID: <20110916114405.GB31334@e102144-lin.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 16 Sep 2011 20:50:51 +0900
+Subject: [GIT PULL] Samsung Fixes for v3.1-rc7
+In-Reply-To: <201109151732.59886.arnd@arndb.de>
+References: <00b101cc738d$bcf46ce0$36dd46a0$%kim@samsung.com>
+	<201109151732.59886.arnd@arndb.de>
+Message-ID: <00cf01cc7466$e2cd66e0$a86834a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Thu, Sep 01, 2011 at 10:06:14PM +0100, Will Deacon wrote:
-> Please pull these perf/pmu/hw_breakpoint updates for 3.2. Note that the
-> patch entitled "perf: provide PMU when initing events" is a cherry-pick
-> from tip/master.
+Arnd Bergmann wrote:
 > 
-> I would have waited until -rc5 to send this, but I'm on holiday without
-> internet for the next couple of weeks. Instead this is taken against
-> the recent merge commit of your fixes branch by Linus.
-
-[...]
-
-> The following changes since commit 90e93648c41bd29a72f6ec55ce27a23c209eab8c:
+> On Thursday 15 September 2011, Kukjin Kim wrote:
+> > This is Samsung fixes for v3.1
+> >
+> > Please pull from:
+> >   git://github.com/kgene/linux-samsung.git samsung-fixes-2
+> > As you know, git.kernel.org/master.kernel.org has been down so I use
+> > temporary git repo. at github now.
+> >
+> > These things are needed for v3.1 and if any problems, please let me
+know.
+> >
+> > As a note, others for v3.2 will be sent in the next week...
 > 
->   Merge branch 'fixes' of master.kernel.org:/home/rmk/linux-2.6-arm (2011-08-29 16:34:07 -0700)
+> Thanks, pulled.
 > 
-> are available in the git repository at:
+> Is it correct that you want none of these patches to be backported
+> into the stable or longterm releases? Some of these look like they
+> should be marked 'Cc: stable at kernel.org'.
 > 
->   git://linux-arm.org/linux-2.6-wd.git for-rmk
+(Cc'ed Greg K-H)
 
-I can't see these in your for-next branch, so would you like me to rebase
-onto -rc6 now that it's around or are you happy to take this as-is?
+Yes, you're right. Some patches are needed to sent to stable at kernel.org.
+But unfortunately, when they have been submitted, there was no 'Cc:
+stable at kernel.org'...
 
-Cheers,
+In this case, I'm not sure which following method is proper...
+- to send 'pull request' to Greg / stable at kernel.org like bug fix during -rc
+- to submit each patches with adding 'Cc: stable at kernel.org' again
+- or ?
 
-Will
+Please kindly let me know.
+Thanks, have a nice weekend.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
