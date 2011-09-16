@@ -1,60 +1,31 @@
-From: gregkh@suse.de (Greg KH)
-Date: Fri, 16 Sep 2011 15:43:00 +0200
-Subject: [GIT PULL] Samsung Fixes for v3.1-rc7
-In-Reply-To: <00cf01cc7466$e2cd66e0$a86834a0$%kim@samsung.com>
-References: <00b101cc738d$bcf46ce0$36dd46a0$%kim@samsung.com>
-	<201109151732.59886.arnd@arndb.de>
-	<00cf01cc7466$e2cd66e0$a86834a0$%kim@samsung.com>
-Message-ID: <20110916134300.GB16280@suse.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 16 Sep 2011 14:50:27 +0100
+Subject: [RFC PATCH v2 0/3] genirq: handling GIC per-cpu interrupts
+Message-ID: <1316181030-5285-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 08:50:51PM +0900, Kukjin Kim wrote:
-> Arnd Bergmann wrote:
-> > 
-> > On Thursday 15 September 2011, Kukjin Kim wrote:
-> > > This is Samsung fixes for v3.1
-> > >
-> > > Please pull from:
-> > >   git://github.com/kgene/linux-samsung.git samsung-fixes-2
-> > > As you know, git.kernel.org/master.kernel.org has been down so I use
-> > > temporary git repo. at github now.
-> > >
-> > > These things are needed for v3.1 and if any problems, please let me
-> know.
-> > >
-> > > As a note, others for v3.2 will be sent in the next week...
-> > 
-> > Thanks, pulled.
-> > 
-> > Is it correct that you want none of these patches to be backported
-> > into the stable or longterm releases? Some of these look like they
-> > should be marked 'Cc: stable at kernel.org'.
-> > 
-> (Cc'ed Greg K-H)
-> 
-> Yes, you're right. Some patches are needed to sent to stable at kernel.org.
-> But unfortunately, when they have been submitted, there was no 'Cc:
-> stable at kernel.org'...
+The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
+problems:
 
-What do you mean?  Do you mean you just forgot to add them, or you
-created them so long ago before there was a stable at kernel.org?
+- They use a completely separate scheme to handle the interrupts,
+  mostly because the PPI concept doesn't really match the kernel view
+  of an interrupt.
+- PPIs can only be used by the timer code, unless we add more low-level
+  assembly code.
+- The local timer code can only be used by devices generating PPIs,
+  and not SPIs.
+- At least one platform (msm) has started implementing its own
+  alternative scheme.
+- Some low-level code gets duplicated, as usual...
 
-> In this case, I'm not sure which following method is proper...
-> - to send 'pull request' to Greg / stable at kernel.org like bug fix during -rc
-> - to submit each patches with adding 'Cc: stable at kernel.org' again
-> - or ?
+The proposed solution is to handle the PPIs using the same path as
+SPIs. A new core API is added to deal with per-cpu interrupts in a
+less awkward way. The local timer code is updated to reflect these
+changes.
 
-Are these in Linus's tree already?  If so, send me the git commit ids
-and I will add them to the stable kernels.
+The core API changes are based on an initial idea by Thomas Gleixner.
 
-If not, wait until they are, and then send me the git commit ids, and I
-will then add them.
-
-Before they get to Linus, there's nothing I can do with them, and I
-don't accept pull requests as that makes no sense when it comes to the
-stable kernel patch flow.
-
-Does this help?
-
-greg k-h
+Tested on ARM Versatile Express (Cortex A5 and A15), ARM RealView
+PB11MP, OMAP4 (Panda) and Tegra (Harmony). Patch series against
+next-20110831.
