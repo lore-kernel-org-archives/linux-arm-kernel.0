@@ -1,92 +1,158 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 16 Sep 2011 03:07:26 -0400
-Subject: [PATCH 15/19] mm: add vm_area_add_early()
+Date: Fri, 16 Sep 2011 03:07:27 -0400
+Subject: [PATCH 16/19] ARM: move iotable mappings within the vmalloc region
 In-Reply-To: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
 References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1316156850-31013-16-git-send-email-nico@fluxnic.net>
+Message-ID: <1316156850-31013-17-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-The existing vm_area_register_early() allows for early vmalloc space
-allocation.  However upcoming cleanups in the ARM architecture require
-that some fixed locations in the vmalloc area be reserved also very early.
-
-The name "vm_area_register_early" would have been a good name for the
-reservation part without the allocation.  Since it is already in use with
-different semantics, let's create vm_area_add_early() instead.
-
-Both vm_area_register_early() and vm_area_add_early() can be used together
-meaning that the former is now implemented using the later where it is
-ensured that no conflicting areas are added, but no attempt is made to
-make the allocation scheme in vm_area_register_early() more sophisticated.
-After all, you must know what you're doing when using those functions.
+In order to remove the build time variation between different SOCs with
+regards to VMALLOC_END, the iotable mappings are now allocated inside
+the vmalloc region.  This allows for VMALLOC_END to be identical across
+all machines.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: linux-mm at kvack.org
 ---
- include/linux/vmalloc.h |    1 +
- mm/vmalloc.c            |   28 ++++++++++++++++++++++++++--
- 2 files changed, 27 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/pgtable.h |    8 +------
+ arch/arm/mm/mmu.c              |   42 +++++++++++++++++++++++++++++----------
+ 2 files changed, 32 insertions(+), 18 deletions(-)
 
-diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
-index 9332e52ea8..e7d2cba995 100644
---- a/include/linux/vmalloc.h
-+++ b/include/linux/vmalloc.h
-@@ -130,6 +130,7 @@ extern long vwrite(char *buf, char *addr, unsigned long count);
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 5750704e02..950dee3ce2 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -21,7 +21,6 @@
+ #else
+ 
+ #include <asm/memory.h>
+-#include <mach/vmalloc.h>
+ #include <asm/pgtable-hwdef.h>
+ 
+ /*
+@@ -31,15 +30,10 @@
+  * any out-of-bounds memory accesses will hopefully be caught.
+  * The vmalloc() routines leaves a hole of 4kB between each vmalloced
+  * area for the same reason. ;)
+- *
+- * Note that platforms may override VMALLOC_START, but they must provide
+- * VMALLOC_END.  VMALLOC_END defines the (exclusive) limit of this space,
+- * which may not overlap IO space.
   */
- extern rwlock_t vmlist_lock;
- extern struct vm_struct *vmlist;
-+extern __init void vm_area_add_early(struct vm_struct *vm);
- extern __init void vm_area_register_early(struct vm_struct *vm, size_t align);
+-#ifndef VMALLOC_START
+ #define VMALLOC_OFFSET		(8*1024*1024)
+ #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+-#endif
++#define VMALLOC_END		0xff000000UL
  
- #ifdef CONFIG_SMP
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 7ef0903058..bf20a0ff95 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -1118,6 +1118,31 @@ void *vm_map_ram(struct page **pages, unsigned int count, int node, pgprot_t pro
- EXPORT_SYMBOL(vm_map_ram);
+ /*
+  * Hardware-wise, we have a two level page table structure, where the first
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 594d677b92..6996576488 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -15,6 +15,7 @@
+ #include <linux/nodemask.h>
+ #include <linux/memblock.h>
+ #include <linux/fs.h>
++#include <linux/vmalloc.h>
  
- /**
-+ * vm_area_add_early - add vmap area early during boot
-+ * @vm: vm_struct to add
-+ *
-+ * This function is used to add fixed kernel vm area to vmlist before
-+ * vmalloc_init() is called.  @vm->addr, @vm->size, and @vm->flags
-+ * should contain proper values and the other fields should be zero.
-+ *
-+ * DO NOT USE THIS FUNCTION UNLESS YOU KNOW WHAT YOU'RE DOING.
-+ */
-+void __init vm_area_add_early(struct vm_struct *vm)
-+{
-+	struct vm_struct *tmp, **p;
+ #include <asm/cputype.h>
+ #include <asm/sections.h>
+@@ -677,9 +678,10 @@ static void __init create_mapping(struct map_desc *md)
+ 	}
+ 
+ 	if ((md->type == MT_DEVICE || md->type == MT_ROM) &&
+-	    md->virtual >= PAGE_OFFSET && md->virtual < VMALLOC_END) {
++	    md->virtual >= PAGE_OFFSET &&
++	    (md->virtual < VMALLOC_START || md->virtual >= VMALLOC_END)) {
+ 		printk(KERN_WARNING "BUG: mapping for 0x%08llx"
+-		       " at 0x%08lx overlaps vmalloc space\n",
++		       " at 0x%08lx out of vmalloc space\n",
+ 		       (long long)__pfn_to_phys((u64)md->pfn), md->virtual);
+ 	}
+ 
+@@ -721,18 +723,29 @@ static void __init create_mapping(struct map_desc *md)
+  */
+ void __init iotable_init(struct map_desc *io_desc, int nr)
+ {
+-	int i;
++	struct map_desc *md;
++	struct vm_struct *vm;
 +
-+	for (p = &vmlist; (tmp = *p) != NULL; p = &tmp->next) {
-+		if (tmp->addr >= vm->addr) {
-+			BUG_ON(tmp->addr < vm->addr + vm->size);
-+			break;
-+		} else
-+			BUG_ON(tmp->addr + tmp->size > vm->addr);
++	vm = __va(memblock_alloc(sizeof(*vm) * nr, __alignof__(*vm)));
++	memset(vm, 0, sizeof(*vm) * nr);
+ 
+-	for (i = 0; i < nr; i++)
+-		create_mapping(io_desc + i);
++	for (md = io_desc; nr; md++, nr--) {
++		create_mapping(md);
++		vm->addr = (void *)(md->virtual & PAGE_MASK);
++		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
++		vm->phys_addr = __pfn_to_phys(md->pfn); 
++		vm->flags = VM_IOREMAP;
++		vm->caller = iotable_init;
++		vm_area_add_early(vm++);
 +	}
-+	vm->next = *p;
-+	*p = vm;
-+}
-+
-+/**
-  * vm_area_register_early - register vmap area early during boot
-  * @vm: vm_struct to register
-  * @align: requested alignment
-@@ -1139,8 +1164,7 @@ void __init vm_area_register_early(struct vm_struct *vm, size_t align)
- 
- 	vm->addr = (void *)addr;
- 
--	vm->next = vmlist;
--	vmlist = vm;
-+	vm_area_add_early(vm);
  }
  
- void __init vmalloc_init(void)
+-static void * __initdata vmalloc_min = (void *)(VMALLOC_END - SZ_128M);
++static void * __initdata vmalloc_min = (void *)(0xf0000000UL - VMALLOC_OFFSET);
+ 
+ /*
+  * vmalloc=size forces the vmalloc area to be exactly 'size'
+  * bytes. This can be used to increase (or decrease) the vmalloc
+- * area - the default is 128m.
++ * area - the default is 240m.
+  */
+ static int __init early_vmalloc(char *arg)
+ {
+@@ -853,6 +866,7 @@ void __init sanity_check_meminfo(void)
+ #endif
+ 	meminfo.nr_banks = j;
+ 	memblock_set_current_limit(lowmem_limit);
++	high_memory = __va(lowmem_limit - 1) + 1;
+ }
+ 
+ static inline void prepare_page_table(void)
+@@ -882,10 +896,10 @@ static inline void prepare_page_table(void)
+ 
+ 	/*
+ 	 * Clear out all the kernel space mappings, except for the first
+-	 * memory bank, up to the end of the vmalloc region.
++	 * memory bank, up to the vmalloc region.
+ 	 */
+ 	for (addr = __phys_to_virt(end);
+-	     addr < VMALLOC_END; addr += PGDIR_SIZE)
++	     addr < VMALLOC_START; addr += PGDIR_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+ }
+ 
+@@ -910,8 +924,8 @@ void __init arm_mm_memblock_reserve(void)
+ }
+ 
+ /*
+- * Set up device the mappings.  Since we clear out the page tables for all
+- * mappings above VMALLOC_END, we will remove any debug device mappings.
++ * Set up the device mappings.  Since we clear out the page tables for all
++ * mappings below VMALLOC_END, we will remove any debug device mappings.
+  * This means you have to be careful how you debug this function, or any
+  * called function.  This means you can't use any function or debugging
+  * method which may touch any device, otherwise the kernel _will_ crash.
+@@ -977,6 +991,12 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ 	}
+ 
+ 	/*
++	 * Clear the vmalloc area.
++	 */
++	for (addr = VMALLOC_START; addr < VMALLOC_END; addr += PGDIR_SIZE)
++		pmd_clear(pmd_off_k(addr));
++
++	/*
+ 	 * Ask the machine support to map in the statically mapped devices.
+ 	 */
+ 	if (mdesc->map_io)
 -- 
 1.7.7-rc0
