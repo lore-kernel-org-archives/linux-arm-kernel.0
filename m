@@ -1,69 +1,53 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Fri, 16 Sep 2011 11:02:11 +0800
-Subject: [alsa-devel] [RFC v2 PATCH 1/1] ASoC: soc-core: symmetry checking
-	for each DAIs separately
-In-Reply-To: <4E5E1285.8020508@ti.com>
-References: <1314609314-22162-1-git-send-email-b29396@freescale.com>
-	<CAOZdJXXzMgET+gDknrRBv_yFENrzJe+oFPN7_o7RisBLUhw0Rw@mail.gmail.com>
-	<65EE16ACC360FA4D99C96DC085B3F77222AE40@039-SN1MPN1-001.039d.mgd.msft.net>
-	<4E5E1285.8020508@ti.com>
-Message-ID: <CAA+hA=TSP4aUmQEOAsWyuKFHsq45rAeTzbpEaFNeDM8vZHg9=g@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 16 Sep 2011 11:24:36 +0800
+Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
+	initialization functions
+In-Reply-To: <20110915083248.GG6267@n2100.arm.linux.org.uk>
+References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
+	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
+	<20110914084237.GC6267@n2100.arm.linux.org.uk>
+	<20110915013937.GE1488@S2100-06.ap.freescale.net>
+	<20110915083248.GG6267@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4xpc-8zzGkZ9LThqP7in27n6uX4LRGAf+AtoWTM4p=82w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+2011/9/15 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Sep 15, 2011 at 09:39:39AM +0800, Shawn Guo wrote:
+>> On Wed, Sep 14, 2011 at 09:42:38AM +0100, Russell King - ARM Linux wrote:
+>> > I'm unconvinced about the wise-ness of this. ?We read-modify-write the
+>> > auxillary control register, which means some bits are preserved from
+>> > the initial boot. ?If the boot loader sets the L2 cache up for normal
+>> > boot and not for resume, we'll end up with different L2 cache settings.
+>> >
+>> > We've historically seen this kind of thing with boot loaders over the
+>> > years, to the point where systems boot at one CPU clock rate but resume
+>> > at some other CPU clock rate.
+>> >
+>> I would think this is a problem in the kernel. ?Kernel initialization
+>> code should put all these stuff into a known state to ensure boot and
+>> resume of the kernel do not result in a different state, shouldn't it?
+>
+> grep the kernel for l2x0_init() and look at the mask and value registers.
+> Note that any bit set in the mask is preserved from boot time.
 
-2011/8/31 Liam Girdwood <lrg@ti.com>:
-> On 30/08/11 03:54, Dong Aisheng-B29396 wrote:
->>> -----Original Message-----
->>> From: Tabi Timur-B04825
->>> Sent: Tuesday, August 30, 2011 4:35 AM
->>> To: Dong Aisheng-B29396
->>> Cc: alsa-devel at alsa-project.org; lars at metafoo.de; s.hauer at pengutronix.de;
->>> broonie at opensource.wolfsonmicro.com; w.sang at pengutronix.de; lrg at ti.com;
->>> linux-arm-kernel at lists.infradead.org
->>> Subject: Re: [alsa-devel] [RFC v2 PATCH 1/1] ASoC: soc-core: symmetry
->>> checking for each DAIs separately
->>>
->>> On Mon, Aug 29, 2011 at 4:15 AM, Dong Aisheng <b29396@freescale.com>
->>> wrote:
->>>> The orginal code does not cover the case that one DAI such as codec
->>>> may be shared between other two DAIs(CPU).
->>>
->>> Can you give me an example of how this can occur?
->>>
->>
->> Pls check the following case used in mx28evk.
->> static struct snd_soc_dai_link mxs_sgtl5000_dai[] = {
->> ? ? ? ? {
->> ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "HiFi Tx",
->> ? ? ? ? ? ? ? ? .stream_name ? ?= "HiFi Playback",
->> ? ? ? ? ? ? ? ? .codec_dai_name = "sgtl5000",
->> ? ? ? ? ? ? ? ? .codec_name ? ? = "sgtl5000.0-000a",
->> ? ? ? ? ? ? ? ? .cpu_dai_name ? = "mxs-saif.0",
->> ? ? ? ? ? ? ? ? .platform_name ?= "mxs-pcm-audio.0",
->> ? ? ? ? ? ? ? ? .ops ? ? ? ? ? ?= &mxs_sgtl5000_hifi_ops,
->> ? ? ? ? }, {
->> ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "HiFi Rx",
->> ? ? ? ? ? ? ? ? .stream_name ? ?= "HiFi Capture",
->> ? ? ? ? ? ? ? ? .codec_dai_name = "sgtl5000",
->> ? ? ? ? ? ? ? ? .codec_name ? ? = "sgtl5000.0-000a",
->> ? ? ? ? ? ? ? ? .cpu_dai_name ? = "mxs-saif.1",
->> ? ? ? ? ? ? ? ? .platform_name ?= "mxs-pcm-audio.1",
->> ? ? ? ? ? ? ? ? .ops ? ? ? ? ? ?= &mxs_sgtl5000_hifi_ops,
->> ? ? ? ? },
->> };
->> You can also refer to:
->> http://thread.gmane.org/gmane.linux.ports.arm.kernel/129789/focus=129839
->>
->
-> Timur, iirc your driver has some special symmetry requirement (maybe something todo with having 2 DAIs) ?
->
-> I assume this is OK for you too ?
->
-> Acked-by: Liam Girdwood <lrg@ti.com>
->
-Can you apply this?
+if we have a save/restore interface, it looks it will be very
+complicated. different l2 need to save different registers.
 
-Regards
-Dong Aisheng
+pl310:
+tag-latency(not all pl310 has TAG_LATENCY_CTRL ctrl setting)
+arm,data-latency(not all pl310 has L2X0_DATA_LATENCY_CTRL ctrl setting)
+arm,filter-ranges(not all pl310 has filter range setting)
+L2X0_AUX_CTRL
+L2X0_CTRL
+So the save interface needs to know what should be saved. but who can
+tell them those if the save interface is not in SoC-specific file but
+in arch/arm/mm/cache-l2x0.c?
+
+when we resume, we must disable l2 if bootloader has enabled it and
+restore all registers.
+
+so it looks like making l2 resume specific to chip is also the right
+choice even for chips which will lose l2 in suspend cycles.
+
+-barry
