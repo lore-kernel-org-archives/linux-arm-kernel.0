@@ -1,67 +1,108 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 16 Sep 2011 17:25:07 +0100
-Subject: [ltt-dev] LTTng 2.0 on ARM
-In-Reply-To: <1316017628.2576.44.camel@linaro1>
-References: <4E68559A.8080204@linaro.org>
-	<BLU0-SMTP86E263003FB9999131E2A196000@phx.gbl>
-	<4E6E4250.2000309@linaro.org>
-	<BLU0-SMTP6FB53F86865C7F0175B0D96020@phx.gbl>
-	<4E6F3B93.5050603@linaro.org>
-	<BLU0-SMTP720ADD6D0D065018E5C97196050@phx.gbl>
-	<CAH+eYFDrCav6sVzmapfN3YL8omYKc2NHorHuHMXh49dBbzw1Xg@mail.gmail.com>
-	<20110914100931.GB2104@arm.com> <1316017628.2576.44.camel@linaro1>
-Message-ID: <20110916162507.GB2100@arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 16 Sep 2011 09:41:41 -0700
+Subject: [PATCH v2 5/6] OMAP: omap_device: Create a default
+	omap_device_pm_latency
+In-Reply-To: <4E73387B.2030403@ti.com> (Benoit Cousson's message of "Fri, 16
+	Sep 2011 13:52:27 +0200")
+References: <1314973520-3585-1-git-send-email-b-cousson@ti.com>
+	<1314973520-3585-6-git-send-email-b-cousson@ti.com>
+	<4E73387B.2030403@ti.com>
+Message-ID: <8762kssam2.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2011 at 05:27:08PM +0100, Jon Medhurst (Tixy) wrote:
-> On Wed, 2011-09-14 at 11:09 +0100, Dave Martin wrote:
-> > On Tue, Sep 13, 2011 at 11:14:47PM +0530, Rabin Vincent wrote:
+"Cousson, Benoit" <b-cousson@ti.com> writes:
+
+> Hi Kevin,
+>
+> On 9/2/2011 4:25 PM, Cousson, Benoit wrote:
+>> Most devices are using the same default omap_device_pm_latency structure
+>> during device built. In order to avoid the duplication of the same
+>> structure everywhere, add a default structure that will be used if
+>> the device does not have an explicit one.
+>
 > [...]
-> > > The problem is that the addresses returned by kallsyms_lookup_name()
-> > > does not have the zero bit, which is what is expected for Thumb
-> > > functions because the BLX instruction which is used to call them uses
-> > > this bit to determines which mode to switch into.  Since it's cleared,
-> > > you switch to ARM mode and attempt to execute Thumb-2 code, with obvious
-> > > results.
-> > > 
-> > > A cursory look at the parties involved shows that nm doesn't show the
-> > > zero bit (even though it's set in the vmlinux symbol table), and
-> > > scripts/kallsyms builds the table by parsing nm's output.
-> > 
-> > It's not quite as simple as saying "the output of nm is wrong" though...
-> > 
-> > When getting the address of a function, there are actually two
-> > separate answers:
-> > 
-> >  a) the pointer which can be used to call the function
-> > 
-> >  b) the address of the start of the function body
-> > 
-> > On many arches these they are identical, but on some they are different.
-> > On ARM, they are identical for ARM code but different for Thumb code
-> > (because the Thumb bit must be set in case (a) but not in case (b))
-> > 
-> > It may be worth looking at what is done in the kernel for ia64 and ppc64.
-> > I believe that (a) and (b) are quite different for these because
-> > functions are called through descriptors.  Don't quote me on that though:
-> > I'm mostly ignorant about these arches.
-> > 
-> > For the Thumb-2 kernel case, we can probably hack around this: there
-> > are various places in the kernel where we just force-set the Thumb bit
-> > in addresses without really knowing what the target code is.  We get
-> > away with this because the kernel is (very nearly) 100% Thumb code
-> > for a Thumb-2 kernel.
-> > 
-> > However, if the kernel already has a correct approach for solving this
-> > problem, we should probably be using it.
-> 
-> This is the same issue I found recently with kprobes [1]. There is also
-> an inconsistency as function symbols in loadable module do have bit zero
-> set, but if the module is built-in then bit zero is clear. 
+>
+>> -	od->pm_lats = pm_lats;
+>> -	od->pm_lats_cnt = pm_lats_cnt;
+>> +	if (pm_lats) {
+>> +		od->pm_lats = pm_lats;
+>> +		od->pm_lats_cnt = pm_lats_cnt;
+>> +	} else {
+>> +		od->pm_lats = omap_default_latency;
+>> +		od->pm_lats_cnt = ARRAY_SIZE(omap_default_latency);
+>> +	}
+>
+> Here is the fix for that part. I did the easy version :-). Splitting
+> the structure in two parts will indeed require more work.
 
-Does that mean that some different infrastructure is used to get the module
-symbols compared with kallsyms?  That feels nasty -- they should at least
-be consistent...
+The kmemdup() method is fine with me.
 
----Dave
+> I updated the for_3.2/1_omap_device_cleanup branch.
+
+Thanks, I'll pick these into my branch (which is now renamed to
+for_3.2/omap_device-cleanup)
+
+Kevin
+
+> Regards,
+> Benoit
+>
+> ---
+> From ad163000568dd61dee441473d0a576d84152da9e Mon Sep 17 00:00:00 2001
+> From: Benoit Cousson <b-cousson@ti.com>
+> Date: Tue, 9 Aug 2011 16:54:19 +0200
+> Subject: [PATCH v3 5/6] OMAP: omap_device: Create a default omap_device_pm_latency
+>
+> Most devices are using the same default omap_device_pm_latency structure
+> during device built. In order to avoid the duplication of the same
+> structure everywhere, add a default structure that will be used if
+> the device does not have an explicit one.
+>
+> Next patches will clean the duplicated structures.
+>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> ---
+>  arch/arm/plat-omap/omap_device.c |   19 ++++++++++++++++++-
+>  1 files changed, 18 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index 7b2cf62..54bbe7b 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -97,6 +97,14 @@
+>  static int omap_device_register(struct platform_device *pdev);
+>  static int omap_early_device_register(struct platform_device *pdev);
+>  
+> +static struct omap_device_pm_latency omap_default_latency[] = {
+> +	{
+> +		.deactivate_func = omap_device_idle_hwmods,
+> +		.activate_func   = omap_device_enable_hwmods,
+> +		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+> +	}
+> +};
+> +
+>  /* Private functions */
+>  
+>  /**
+> @@ -510,8 +518,17 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+>  	if (ret)
+>  		goto odbs_exit3;
+>  
+> -	od->pm_lats = pm_lats;
+> +	if (!pm_lats) {
+> +		pm_lats = omap_default_latency;
+> +		pm_lats_cnt = ARRAY_SIZE(omap_default_latency);
+> +	}
+> +
+>  	od->pm_lats_cnt = pm_lats_cnt;
+> +	od->pm_lats = kmemdup(pm_lats,
+> +			sizeof(struct omap_device_pm_latency) * pm_lats_cnt,
+> +			GFP_KERNEL);
+> +	if (!od->pm_lats)
+> +		goto odbs_exit3;
+>  
+>  	for (i = 0; i < oh_cnt; i++) {
+>  		hwmods[i]->od = od;
