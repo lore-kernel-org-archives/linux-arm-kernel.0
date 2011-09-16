@@ -1,50 +1,92 @@
-From: jhbird.choi@gmail.com (Jonghwan Choi)
-Date: Fri, 16 Sep 2011 23:14:12 +0900
-Subject: [PATCH] CLKDEV: Reduce scaning time
-Message-ID: <1316182452-14061-1-git-send-email-jhbird.choi@gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 16 Sep 2011 15:38:10 +0100
+Subject: [PATCH] pata-generic/of: Make probing via device tree
+	non-powerpc-specific
+Message-ID: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If ether dev_id or con_id is NULL. it is not necessary that match point should be 3.
-it just takes a long time.
+This patch enables device-tree-based probing of the pata-generic
+platform driver across all architectures:
 
-Signed-off-by: Jonghwan Choi <jhbird.choi@gmail.com>
+  * make the pata_of_generic module depend on OF instead of PPC_OF;
+  * supply some missing inclues;
+  * replace endianness-sensitive raw access to device tree data
+    with of_property_read_u32() calls.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- drivers/clk/clkdev.c |   14 ++++++++++----
- 1 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 6db161f..d1fcb67 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -35,7 +35,13 @@ static DEFINE_MUTEX(clocks_mutex);
- static struct clk_lookup *clk_find(const char *dev_id, const char *con_id)
- {
- 	struct clk_lookup *p, *cl = NULL;
--	int match, best = 0;
-+	int match, best = 0, point = 0;
-+
-+	if (dev_id)
-+		point += 2;
-+
-+	if (con_id)
-+		point += 1;
+Tested on ARM Versatile Express, with my soon-to-be-posted device
+tree support patches.
+
+I'm not in a position to build/test this for powerpc easily --
+if anyone is able to do that, it would be appreciated.
+
+Grant, does this require similar cleanup to the isp1760 USB hcd driver?
+
+Cheers
+---Dave
+
+ drivers/ata/Kconfig            |    2 +-
+ drivers/ata/pata_of_platform.c |   16 +++++++---------
+ 2 files changed, 8 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index 5987e0b..c6ef9d0 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -820,7 +820,7 @@ config PATA_PLATFORM
  
- 	list_for_each_entry(p, &clocks, node) {
- 		match = 0;
-@@ -52,10 +58,10 @@ static struct clk_lookup *clk_find(const char *dev_id, const char *con_id)
+ config PATA_OF_PLATFORM
+ 	tristate "OpenFirmware platform device PATA support"
+-	depends on PATA_PLATFORM && PPC_OF
++	depends on PATA_PLATFORM && OF
+ 	help
+ 	  This option enables support for generic directly connected ATA
+ 	  devices commonly found on embedded systems with OpenFirmware
+diff --git a/drivers/ata/pata_of_platform.c b/drivers/ata/pata_of_platform.c
+index f305400..ac7c9f7 100644
+--- a/drivers/ata/pata_of_platform.c
++++ b/drivers/ata/pata_of_platform.c
+@@ -11,6 +11,9 @@
  
- 		if (match > best) {
- 			cl = p;
--			if (match != 3)
--				best = match;
--			else
-+			if (match == point)
- 				break;
-+			else
-+				best = match;
- 		}
- 	}
- 	return cl;
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/ata_platform.h>
+ 
+@@ -21,10 +24,9 @@ static int __devinit pata_of_platform_probe(struct platform_device *ofdev)
+ 	struct resource io_res;
+ 	struct resource ctl_res;
+ 	struct resource irq_res;
+-	unsigned int reg_shift = 0;
+-	int pio_mode = 0;
++	u32 reg_shift = 0;
++	u32 pio_mode = 0;
+ 	int pio_mask;
+-	const u32 *prop;
+ 
+ 	ret = of_address_to_resource(dn, 0, &io_res);
+ 	if (ret) {
+@@ -55,13 +57,9 @@ static int __devinit pata_of_platform_probe(struct platform_device *ofdev)
+ 	else
+ 		irq_res.flags = 0;
+ 
+-	prop = of_get_property(dn, "reg-shift", NULL);
+-	if (prop)
+-		reg_shift = *prop;
++	of_property_read_u32(dn, "reg-shift", &reg_shift);
+ 
+-	prop = of_get_property(dn, "pio-mode", NULL);
+-	if (prop) {
+-		pio_mode = *prop;
++	if (of_property_read_u32(dn, "pio-mode", &pio_mode)) {
+ 		if (pio_mode > 6) {
+ 			dev_err(&ofdev->dev, "invalid pio-mode\n");
+ 			return -EINVAL;
 -- 
-1.7.0.4
+1.7.4.1
