@@ -1,219 +1,278 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 16 Sep 2011 16:43:19 +0200
-Subject: [PATCH v2 2/2] OMAP: omap_device: Add a method to build an
-	omap_device from a DT node
-In-Reply-To: <1316184199-12599-1-git-send-email-b-cousson@ti.com>
-References: <1316184199-12599-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1316184199-12599-3-git-send-email-b-cousson@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 16 Sep 2011 15:45:39 +0100
+Subject: [PATCH v2 6/6] arm/imx6q: add suspend/resume support
+In-Reply-To: <20110916060859.GG25928@S2100-06.ap.freescale.net>
+References: <1316097926-913-1-git-send-email-shawn.guo@linaro.org>
+	<1316097926-913-7-git-send-email-shawn.guo@linaro.org>
+	<20110915162829.GA4797@e102568-lin.cambridge.arm.com>
+	<20110916060859.GG25928@S2100-06.ap.freescale.net>
+Message-ID: <20110916144539.GA18765@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a notifier called during device_add phase. If an of_node is present,
-retrieve the hwmod entry in order to populate properly the omap_device
-structure.
-For the moment the resource from the device-tree are overloaded.
-DT does not support named resource yet, and thus, most driver
-will not work without that information.
+Hi Shawn,
 
-Add two helpers function to parse a property that contains multiple
-strings.
+On Fri, Sep 16, 2011 at 07:09:00AM +0100, Shawn Guo wrote:
+> Hi Lorenzo,
+> 
+> On Thu, Sep 15, 2011 at 05:28:29PM +0100, Lorenzo Pieralisi wrote:
+> > On Thu, Sep 15, 2011 at 03:45:26PM +0100, Shawn Guo wrote:
+> > > It adds suspend/resume support for imx6q.
+> > > 
+> > > Signed-off-by: Anson Huang <b20788@freescale.com>
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > ---
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
----
- arch/arm/plat-omap/omap_device.c |  144 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 144 insertions(+), 0 deletions(-)
+[...]
 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index cac7b9a..da13630 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -85,6 +85,8 @@
- #include <linux/clk.h>
- #include <linux/clkdev.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of.h>
-+#include <linux/notifier.h>
- 
- #include <plat/omap_device.h>
- #include <plat/omap_hwmod.h>
-@@ -94,12 +96,15 @@
- #define USE_WAKEUP_LAT			0
- #define IGNORE_WAKEUP_LAT		1
- 
-+#define MAX_HWMOD_NAME_SIZE		32
-+
- static int omap_device_register(struct platform_device *pdev);
- static int omap_early_device_register(struct platform_device *pdev);
- static struct omap_device *omap_device_alloc(struct platform_device *pdev,
- 				      struct omap_hwmod **ohs, int oh_cnt,
- 				      struct omap_device_pm_latency *pm_lats,
- 				      int pm_lats_cnt);
-+static void omap_device_delete(struct omap_device *od);
- 
- 
- static struct omap_device_pm_latency omap_default_latency[] = {
-@@ -315,6 +320,138 @@ static void _add_hwmod_clocks_clkdev(struct omap_device *od,
- 		_add_clkdev(od, oh->opt_clks[i].role, oh->opt_clks[i].clk);
- }
- 
-+/*
-+ * XXX: DT helper functions that should probably move elsewhere if
-+ * they become usefull for other needs.
-+ */
-+static int _dt_count_property_string(const char *prop, int len)
-+{
-+	int i = 0;
-+	size_t l = 0, total = 0;
-+
-+	if (!prop || !len)
-+		return -EINVAL;
-+
-+	for (i = 0; len >= total; total += l, prop += l) {
-+		l = strlen(prop) + 1;
-+		if (*prop != 0)
-+			i++;
-+	}
-+	return i;
-+}
-+
-+static int _dt_get_property(const char *prop, int len, int index, char *output,
-+			    int size)
-+{
-+	int i = 0;
-+	size_t l = 0, total = 0;
-+
-+	if (!prop || !len)
-+		return -EINVAL;
-+
-+	for (i = 0; len >= total; total += l, prop += l) {
-+		l = strlcpy(output, prop, size) + 1;
-+		if (*prop != 0) {
-+			if (i++ == index)
-+				return 0;
-+		}
-+	}
-+	return -ENODEV;
-+}
-+
-+static struct dev_pm_domain omap_device_pm_domain;
-+
-+/**
-+ * omap_device_build_from_dt - build an omap_device with multiple hwmods
-+ * @pdev_name: name of the platform_device driver to use
-+ * @pdev_id: this platform_device's connection ID
-+ * @oh: ptr to the single omap_hwmod that backs this omap_device
-+ * @pdata: platform_data ptr to associate with the platform_device
-+ * @pdata_len: amount of memory pointed to by @pdata
-+ * @pm_lats: pointer to a omap_device_pm_latency array for this device
-+ * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
-+ * @is_early_device: should the device be registered as an early device or not
-+ *
-+ * Function for building an omap_device already registered from device-tree
-+ *
-+ * Returns 0 or PTR_ERR() on error.
-+ */
-+static int omap_device_build_from_dt(struct platform_device *pdev)
-+{
-+	struct omap_hwmod **hwmods;
-+	struct omap_device *od;
-+	struct omap_hwmod *oh;
-+	char oh_name[MAX_HWMOD_NAME_SIZE];
-+	const char *prop;
-+	int oh_cnt, i, prop_len;
-+	int ret = 0;
-+
-+	prop = of_get_property(pdev->dev.of_node, "hwmods", &prop_len);
-+	oh_cnt = _dt_count_property_string(prop, prop_len);
-+	if (!oh_cnt || IS_ERR_VALUE(oh_cnt)) {
-+		dev_warn(&pdev->dev, "No 'hwmods' to build omap_device\n");
-+		return -ENODEV;
-+	}
-+
-+	hwmods = kzalloc(sizeof(struct omap_hwmod *) * oh_cnt, GFP_KERNEL);
-+	if (!hwmods) {
-+		ret = -ENOMEM;
-+		goto odbfd_exit;
-+	}
-+
-+	for (i = 0; i < oh_cnt; i++) {
-+		_dt_get_property(prop, prop_len, i, oh_name,
-+				 MAX_HWMOD_NAME_SIZE);
-+
-+		oh = omap_hwmod_lookup(oh_name);
-+		if (!oh) {
-+			dev_err(&pdev->dev, "Cannot lookup hwmod '%s'\n",
-+				oh_name);
-+			ret = -EINVAL;
-+			goto odbfd_exit1;
-+		}
-+		hwmods[i] = oh;
-+	}
-+
-+	od = omap_device_alloc(pdev, hwmods, oh_cnt, NULL, 0);
-+	if (!od) {
-+		dev_err(&pdev->dev, "Cannot allocate omap_device for :%s\n",
-+			oh_name);
-+		ret = PTR_ERR(od);
-+		goto odbfd_exit1;
-+	}
-+
-+	if (of_get_property(pdev->dev.of_node, "no_idle_on_suspend", NULL))
-+		omap_device_disable_idle_on_suspend(pdev);
-+
-+	pdev->dev.pm_domain = &omap_device_pm_domain;
-+
-+odbfd_exit1:
-+	kfree(hwmods);
-+odbfd_exit:
-+	return ret;
-+}
-+
-+static int _omap_device_notifier_call(struct notifier_block *nb,
-+				      unsigned long event, void *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+
-+	switch (event) {
-+	case BUS_NOTIFY_ADD_DEVICE:
-+		if (pdev->dev.of_node)
-+			omap_device_build_from_dt(pdev);
-+		break;
-+
-+	case BUS_NOTIFY_DEL_DEVICE:
-+		if (pdev->archdata.od)
-+			omap_device_delete(pdev->archdata.od);
-+		break;
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
- 
- /* Public functions for use by core code */
- 
-@@ -499,6 +636,9 @@ oda_exit1:
- 
- static void omap_device_delete(struct omap_device *od)
- {
-+	if (!od)
-+		return;
-+
- 	od->pdev->archdata.od = NULL;
- 	kfree(od->pm_lats);
- 	kfree(od->hwmods);
-@@ -1034,8 +1174,12 @@ struct device omap_device_parent = {
- 	.parent         = &platform_bus,
- };
- 
-+static struct notifier_block platform_nb;
-+
- static int __init omap_device_init(void)
- {
-+	platform_nb.notifier_call = _omap_device_notifier_call;
-+	bus_register_notifier(&platform_bus_type, &platform_nb);
- 	return device_register(&omap_device_parent);
- }
- core_initcall(omap_device_init);
--- 
-1.7.0.4
+> > > +ENTRY(v7_cpu_resume)
+> > > +	bl	v7_invalidate_l1
+> > > +
+> > > +	/*
+> > > +	 * Restore L2 AUX_CTRL register saved by suspend procedure
+> > > +	 * and enable L2
+> > > +	 */
+> > > +	adr	r4, 1f
+> > > +	ldmia	r4, {r5, r6, r7}
+> > > +	sub	r4, r4, r5
+> > > +	add	r6, r6, r4
+> > > +	add	r7, r7, r4
+> > > +	ldr	r0, [r6]
+> > > +	ldr	r7, [r7]
+> > > +	ldr	r1, [r7]
+> > > +	str	r1, [r0, #L2X0_AUX_CTRL]
+> > > +	ldr	r1, =0x1
+> > > +	str	r1, [r0, #L2X0_CTRL]
+> > > +
+> > > +	b	cpu_resume
+> > > +
+> > > +	.align
+> > > +1:	.long	.
+> > > +	.long	pl310_pbase
+> > > +	.long	pl310_aux_ctrl_paddr
+> > 
+> > Would not something like:
+> > 
+> > 	adr	r4, pl310_pbase
+> > 	ldmia	r4, {r6, r7}
+> > 	[...]
+> > 
+> > pl310_pbase:
+> > 	.long 0
+> > pl310_aux_ctrl:
+> > 	.long 0
+> > 
+> > be better and faster ? Why play with virtual addresses ?
+> > Of course you should initialize the values, but then you can access them
+> > through a PC relative load when running physical.
+> 
+> Thanks for the comment.  I agree with you that it's better, though my
+> first thought on the existing approach is I can access the global
+> variables defined in C file directly from assembly code.
+> 
+
+You can even access assembly variables from C code, declare them
+
+	.globl pl310_base
+
+and 
+
+extern unsigned int pl310_base;
+
+in your C code and you are all set. But I would avoid global variables,
+comments below.
+
+> > Your code should be in the .data section for it to be writable (adr does not
+> > work across sections), have a look at Russell's code in sleep.S it is
+> > very well commented and similar to what you need.
+> 
+> Thanks for pointing me the example.
+> 
+
+You are welcome, my pleasure.
+
+> > 
+> > > +ENDPROC(v7_cpu_resume)
+> > > diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+> > > new file mode 100644
+> > > index 0000000..124bcd5
+> > > --- /dev/null
+> > > +++ b/arch/arm/mach-imx/pm-imx6q.c
+> > > @@ -0,0 +1,88 @@
+> > > +/*
+> > > + * Copyright 2011 Freescale Semiconductor, Inc.
+> > > + * Copyright 2011 Linaro Ltd.
+> > > + *
+> > > + * The code contained herein is licensed under the GNU General Public
+> > > + * License. You may obtain a copy of the GNU General Public License
+> > > + * Version 2 or later at the following locations:
+> > > + *
+> > > + * http://www.opensource.org/licenses/gpl-license.html
+> > > + * http://www.gnu.org/copyleft/gpl.html
+> > > + */
+> > > +
+> > > +#include <linux/init.h>
+> > > +#include <linux/io.h>
+> > > +#include <linux/of.h>
+> > > +#include <linux/suspend.h>
+> > > +#include <asm/proc-fns.h>
+> > > +#include <asm/suspend.h>
+> > > +#include <asm/hardware/cache-l2x0.h>
+> > > +#include <mach/common.h>
+> > > +#include <mach/hardware.h>
+> > > +
+> > > +static void __iomem *pl310_vbase;
+> > > +void __iomem *pl310_pbase;
+> > > +
+> > > +static volatile unsigned long pl310_aux_ctrl;
+> > > +volatile unsigned long pl310_aux_ctrl_paddr;
+> > 
+> > I think that by defining those variables in assembly you would make
+> > your life much simpler.
+> 
+> Yes.  But I need a function call to learn the address of those variables
+> from assembly now.
+> 
+
+No, you do not, see above.
+
+> > I think you know your L2 is already initialized here to make sure you
+> > save the right aux value. Hence you should clean the variables above from
+> > L2 to make sure they are available at reset from DRAM (L2 is retained
+> > and you do not clean it on suspend, correct ?)
+> 
+> Yes, agreed.  It's right thing to do for being safe.  Actually, I did it
+> when I saved the variables during suspend.  If I do not do, it simply
+> does not work.  But later, when I moved the saving to init function
+> since it needs to be done for only once, I found it works even without
+> the cache clean.  Then I dropped it.  To be safe, now I'm adding it
+> back with following your comment.
+> 
+> > 
+> > I do not think that code to save/restore L2 config belongs here though.
+> > More below.
+> > 
+> > > +
+> > > +static int imx6q_suspend_finish(unsigned long val)
+> > > +{
+> > > +	cpu_do_idle();
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static int imx6q_pm_enter(suspend_state_t state)
+> > > +{
+> > > +	switch (state) {
+> > > +	case PM_SUSPEND_MEM:
+> > > +		imx6q_set_lpm(STOP_POWER_OFF);
+> > > +		imx_gpc_pre_suspend();
+> > > +		imx_set_cpu_jump(0, v7_cpu_resume);
+> > > +		/* Zzz ... */
+> > > +		cpu_suspend(0, imx6q_suspend_finish);
+> > > +		imx_smp_prepare();
+> > > +		imx_gpc_post_resume();
+> > > +		break;
+> > > +	default:
+> > > +		return -EINVAL;
+> > > +	}
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +
+> > > +static const struct platform_suspend_ops imx6q_pm_ops = {
+> > > +	.enter = imx6q_pm_enter,
+> > > +	.valid = suspend_valid_only_mem,
+> > > +};
+> > > +
+> > > +void __init imx6q_pm_init(void)
+> > > +{
+> > > +	struct device_node *np;
+> > > +	u32 reg[2];
+> > > +
+> > > +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
+> > > +	of_property_read_u32_array(np, "reg", reg, ARRAY_SIZE(reg));
+> > > +	pl310_vbase = ioremap(reg[0], reg[1]);
+> > 
+> > Mmmm...is this vma ever released ? L2 is already mapped in the L2
+> > driver from DT or through static mappings. 
+> 
+> I think we can do another mapping even it's been done in the L2 driver,
+> no?
+> 
+
+I still think that it is not really clean. But more importantly you should
+release the mapping when you are done with it (iounmap).
+
+> > Overall, I think that code to restore PL310 belongs in cache-l2x0.c, not here.
+> > We can easily write an assembly stub that reinitialize L2 before
+> > resume if that's something we should and can do (security ?).
+> > 
+> I would be definitely happy to see that, but before rmk agrees on that,
+> I have to find a way around in the platform code.
+
+I am working on that; your point is fair, but security notwithstanding
+there is nothing that can prevent us from having an assembly hook to
+resume L2 in a platform independent manner. More to come.
+
+> 
+> Here is the updated patch.  If it looks better to you, I will
+> incorporate it in the v3 of the series.
+> 
+> 8<---
+> diff --git a/arch/arm/mach-imx/head-v7.S b/arch/arm/mach-imx/head-v7.S
+> index ede908b..5a486a9 100644
+> --- a/arch/arm/mach-imx/head-v7.S
+> +++ b/arch/arm/mach-imx/head-v7.S
+> @@ -69,3 +69,35 @@ ENTRY(v7_secondary_startup)
+>  	b	secondary_startup
+>  ENDPROC(v7_secondary_startup)
+>  #endif
+> +
+> +ENTRY(pl310_get_save_ptr)
+> +	ldr	r0, =pl310_pbase
+> +	mov	pc, lr
+> +ENDPROC(pl310_get_save_ptr)
+> +
+
+You do not need a function to do that. Just declare the label as 
+
+	.globl
+
+and from C you can access those values. See above.
+
+It would be nicer to avoid global variables altogether though.
+You can write an assembly function taking the values to be saved and
+returning the pointer to flush from L1 and L2.
+
+> +ENTRY(v7_cpu_resume)
+> +	bl	v7_invalidate_l1
+> +	bl	pl310_resume
+> +	b	cpu_resume
+> +ENDPROC(v7_cpu_resume)
+> +
+> +/*
+> + * The following code is located into the .data section.  This is to
+> + * allow pl310_pbase and pl310_aux_ctrl to be accessed with a relative
+> + * load as we are running on physical address here.
+> + */
+> +	.data
+> +	.align
+> +ENTRY(pl310_resume)
+> +	adr	r2, pl310_pbase
+> +	ldmia	r2, {r0, r1}
+> +	str	r1, [r0, #L2X0_AUX_CTRL]	@ restore aux_ctrl
+> +	mov	r1, #0x1
+> +	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
+> +	mov	pc, lr
+> +ENDPROC(pl310_resume)
+> +
+> +pl310_pbase:
+> +	.long	0
+> +pl310_aux_ctrl:
+> +	.long	0
+
+You might want to inline it and avoid the jump.
+
+I still think that we should try to generalize the approach, security issues 
+notwithstanding.
+
+Lorenzo
