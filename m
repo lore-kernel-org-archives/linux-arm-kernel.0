@@ -1,61 +1,69 @@
 From: dongas86@gmail.com (Dong Aisheng)
-Date: Fri, 16 Sep 2011 10:53:51 +0800
-Subject: [alsa-devel] [PATCH v3 1/1] ASoC: mxs-saif: add record function
-In-Reply-To: <CABS+qY12ChK=aA-eOERH5ATWKcQdp3wE48SsBNcpe0nDzXWOMw@mail.gmail.com>
-References: <1315399910-6525-1-git-send-email-b29396@freescale.com>
-	<CABS+qY12ChK=aA-eOERH5ATWKcQdp3wE48SsBNcpe0nDzXWOMw@mail.gmail.com>
-Message-ID: <CAA+hA=QTeNuq5rCMDWjvKiRK9xX8TFKqaXN31Cpt3RU-kogn2w@mail.gmail.com>
+Date: Fri, 16 Sep 2011 11:02:11 +0800
+Subject: [alsa-devel] [RFC v2 PATCH 1/1] ASoC: soc-core: symmetry checking
+	for each DAIs separately
+In-Reply-To: <4E5E1285.8020508@ti.com>
+References: <1314609314-22162-1-git-send-email-b29396@freescale.com>
+	<CAOZdJXXzMgET+gDknrRBv_yFENrzJe+oFPN7_o7RisBLUhw0Rw@mail.gmail.com>
+	<65EE16ACC360FA4D99C96DC085B3F77222AE40@039-SN1MPN1-001.039d.mgd.msft.net>
+	<4E5E1285.8020508@ti.com>
+Message-ID: <CAA+hA=TSP4aUmQEOAsWyuKFHsq45rAeTzbpEaFNeDM8vZHg9=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Mark,
 
-2011/9/9 Girdwood, Liam <lrg@ti.com>:
-> On 7 September 2011 13:51, Dong Aisheng <b29396@freescale.com> wrote:
+2011/8/31 Liam Girdwood <lrg@ti.com>:
+> On 30/08/11 03:54, Dong Aisheng-B29396 wrote:
+>>> -----Original Message-----
+>>> From: Tabi Timur-B04825
+>>> Sent: Tuesday, August 30, 2011 4:35 AM
+>>> To: Dong Aisheng-B29396
+>>> Cc: alsa-devel at alsa-project.org; lars at metafoo.de; s.hauer at pengutronix.de;
+>>> broonie at opensource.wolfsonmicro.com; w.sang at pengutronix.de; lrg at ti.com;
+>>> linux-arm-kernel at lists.infradead.org
+>>> Subject: Re: [alsa-devel] [RFC v2 PATCH 1/1] ASoC: soc-core: symmetry
+>>> checking for each DAIs separately
+>>>
+>>> On Mon, Aug 29, 2011 at 4:15 AM, Dong Aisheng <b29396@freescale.com>
+>>> wrote:
+>>>> The orginal code does not cover the case that one DAI such as codec
+>>>> may be shared between other two DAIs(CPU).
+>>>
+>>> Can you give me an example of how this can occur?
+>>>
+>>
+>> Pls check the following case used in mx28evk.
+>> static struct snd_soc_dai_link mxs_sgtl5000_dai[] = {
+>> ? ? ? ? {
+>> ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "HiFi Tx",
+>> ? ? ? ? ? ? ? ? .stream_name ? ?= "HiFi Playback",
+>> ? ? ? ? ? ? ? ? .codec_dai_name = "sgtl5000",
+>> ? ? ? ? ? ? ? ? .codec_name ? ? = "sgtl5000.0-000a",
+>> ? ? ? ? ? ? ? ? .cpu_dai_name ? = "mxs-saif.0",
+>> ? ? ? ? ? ? ? ? .platform_name ?= "mxs-pcm-audio.0",
+>> ? ? ? ? ? ? ? ? .ops ? ? ? ? ? ?= &mxs_sgtl5000_hifi_ops,
+>> ? ? ? ? }, {
+>> ? ? ? ? ? ? ? ? .name ? ? ? ? ? = "HiFi Rx",
+>> ? ? ? ? ? ? ? ? .stream_name ? ?= "HiFi Capture",
+>> ? ? ? ? ? ? ? ? .codec_dai_name = "sgtl5000",
+>> ? ? ? ? ? ? ? ? .codec_name ? ? = "sgtl5000.0-000a",
+>> ? ? ? ? ? ? ? ? .cpu_dai_name ? = "mxs-saif.1",
+>> ? ? ? ? ? ? ? ? .platform_name ?= "mxs-pcm-audio.1",
+>> ? ? ? ? ? ? ? ? .ops ? ? ? ? ? ?= &mxs_sgtl5000_hifi_ops,
+>> ? ? ? ? },
+>> };
+>> You can also refer to:
+>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/129789/focus=129839
+>>
 >
->> 1. add different clkmux mode handling
->> SAIF can use two instances to implement full duplex (playback &
->> recording) and record saif may work on EXTMASTER mode which is
->> using other saif's BITCLK&LRCLK.
->>
->> The clkmux mode could be set in pdata->init() in mach-specific code.
->> For generic saif driver, it only needs to know who is his master
->> and the master id is also provided in mach-specific code.
->>
->> 2. support playback and capture simutaneously however the sample
->> rates can not be different due to hw limitation.
->>
->> Signed-off-by: Dong Aisheng <b29396@freescale.com>
->> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> Cc: Liam Girdwood <lrg@ti.com>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> Cc: Wolfram Sang <w.sang@pengutronix.de>
->>
->> ---
->> Changes since v2:
->> ?* remove mach-specific code(clkmux in DIGCTL) out of saif driver
->> ?For supporting EXTMASTER mode, SAIF only nees to know who's
->> ?its master and the master id is provided by mach layer according
->> ?to different clkmux setting.
->> ?So we need to add a pdata->get_master_id();
->>
->> Changes since v1:
->> ?* calc the delay based on the rate
->> ?* change the saif.h #ifndef micro to match the directory
->> ---
->> ?include/sound/saif.h ? ? | ? 16 +++++
->> ?sound/soc/mxs/mxs-saif.c | ?145
->> +++++++++++++++++++++++++++++++++++++++++-----
->> ?sound/soc/mxs/mxs-saif.h | ? ?4 +
->> ?3 files changed, 151 insertions(+), 14 deletions(-)
->>
->>
-> Acked-by Liam Girdwood <lrg@ti.com>
+> Timur, iirc your driver has some special symmetry requirement (maybe something todo with having 2 DAIs) ?
+>
+> I assume this is OK for you too ?
+>
+> Acked-by: Liam Girdwood <lrg@ti.com>
 >
 Can you apply this?
-
-Also with the tag:
-Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
 
 Regards
 Dong Aisheng
