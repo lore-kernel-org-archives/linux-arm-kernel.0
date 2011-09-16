@@ -1,120 +1,71 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Thu, 15 Sep 2011 19:16:28 -0700
-Subject: [PATCH v2] ARM: CSR: call l2x0_of_init to init L2 cache of SiRFprimaII
-Message-ID: <1316139388-18833-1-git-send-email-Baohua.Song@csr.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 16 Sep 2011 10:28:17 +0800
+Subject: [PATCH v8 0/4] add the GPMI-NAND support for imx23/imx28
+In-Reply-To: <1314169643-23425-1-git-send-email-b32955@freescale.com>
+References: <1314169643-23425-1-git-send-email-b32955@freescale.com>
+Message-ID: <4E72B441.2010202@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Rob Herring <robherring2@gmail.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
--v2:
-add specific "compatible" string of the l2x0 device node, and making sure
-that we have something specific to prima2 in it.
+Hi Sascha:
+Is this patch set ok now?
 
-Note: This patch depends on[1][2]
-[1]Rob Herring
-ARM: 7009/1: l2x0: Add OF based initialization
-http://www.spinics.net/lists/arm-kernel/msg131123.html
-it has been in rmk/for-next
-
-[2]Barry Song
-ARM: 7009/1: CACHE-L2X0: filter start address can be 0 and is often 0
-http://www.spinics.net/lists/arm-kernel/msg140126.html
-it has been in rmk/for-next
-
- arch/arm/boot/dts/prima2-cb.dts |    5 +++-
- arch/arm/mach-prima2/l2x0.c     |   46 +++++++-------------------------------
- 2 files changed, 13 insertions(+), 38 deletions(-)
-
-diff --git a/arch/arm/boot/dts/prima2-cb.dts b/arch/arm/boot/dts/prima2-cb.dts
-index 6fecc88..9d6167c 100644
---- a/arch/arm/boot/dts/prima2-cb.dts
-+++ b/arch/arm/boot/dts/prima2-cb.dts
-@@ -39,9 +39,12 @@
- 		ranges = <0x40000000 0x40000000 0x80000000>;
- 
- 		l2-cache-controller at 80040000 {
--			compatible = "arm,pl310-cache";
-+			compatible = "arm,pl310-cache", "sirf,prima2-pl310-cache";
- 			reg = <0x80040000 0x1000>;
- 			interrupts = <59>;
-+			arm,tag-latency = <1 1 1>;
-+			arm,data-latency = <1 1 1>;
-+			arm,filter-ranges = <0 0x40000000>;
- 		};
- 
- 		intc: interrupt-controller at 80020000 {
-diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
-index 9cda205..c998377 100644
---- a/arch/arm/mach-prima2/l2x0.c
-+++ b/arch/arm/mach-prima2/l2x0.c
-@@ -8,52 +8,24 @@
- 
- #include <linux/init.h>
- #include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/errno.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
- #include <asm/hardware/cache-l2x0.h>
--#include <mach/memory.h>
- 
--#define L2X0_ADDR_FILTERING_START       0xC00
--#define L2X0_ADDR_FILTERING_END         0xC04
--
--static struct of_device_id l2x_ids[]  = {
--	{ .compatible = "arm,pl310-cache" },
-+static struct of_device_id prima2_l2x0_ids[]  = {
-+	{ .compatible = "sirf,prima2-pl310-cache" },
-+	{},
- };
- 
--static int __init sirfsoc_of_l2x_init(void)
-+static int __init sirfsoc_l2x0_init(void)
- {
- 	struct device_node *np;
--	void __iomem *sirfsoc_l2x_base;
--
--	np = of_find_matching_node(NULL, l2x_ids);
--	if (!np)
--		panic("unable to find compatible l2x node in dtb\n");
--
--	sirfsoc_l2x_base = of_iomap(np, 0);
--	if (!sirfsoc_l2x_base)
--		panic("unable to map l2x cpu registers\n");
--
--	of_node_put(np);
--
--	if (!(readl_relaxed(sirfsoc_l2x_base + L2X0_CTRL) & 1)) {
--		/*
--		 * set the physical memory windows L2 cache will cover
--		 */
--		writel_relaxed(PLAT_PHYS_OFFSET + 1024 * 1024 * 1024,
--			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_END);
--		writel_relaxed(PLAT_PHYS_OFFSET | 0x1,
--			sirfsoc_l2x_base + L2X0_ADDR_FILTERING_START);
- 
--		writel_relaxed(0,
--			sirfsoc_l2x_base + L2X0_TAG_LATENCY_CTRL);
--		writel_relaxed(0,
--			sirfsoc_l2x_base + L2X0_DATA_LATENCY_CTRL);
-+	np = of_find_matching_node(NULL, prima2_l2x0_ids);
-+	if (np) {
-+		pr_info("Initializing prima2 L2 cache\n");
-+		return l2x0_of_init(0x40000, 0);
- 	}
--	l2x0_init((void __iomem *)sirfsoc_l2x_base, 0x00040000,
--		0x00000000);
- 
- 	return 0;
- }
--early_initcall(sirfsoc_of_l2x_init);
-+early_initcall(sirfsoc_l2x0_init);
--- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+thanks
+Huang Shijie
+> The patch set is based on tag v3.1-rc2 of linus's tree.
+> and it can be git-am to Artem's tree:
+> 	http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
+>
+> The general-purpose media interface(GPMI) controller is a flexible interface
+> to up to several NAND flashs.
+>
+> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
+>
+> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+> not.
+>
+> v7 --> v8:
+> 	[0] add header file to fix compiling error.
+>
+> v6 --> v7:
+> 	[0] rename RES_SIZE to GPMI_NAND_RES_SIZE.
+> 	[1] move gpmi-nand.h to `include/linux/mtd/` directory.
+> 	[2] remove comment for new pad control.
+> 	[3] others
+>
+> v5 --> v6:
+> 	[0] rename `gpmi-nfc` to `gpmi-nand`.
+> 	[1] remove ->exit() in structure gpmi_nand_platform_data{}.
+> 	[2] drop the macros for the resource's definition of gpmi-nand.
+> 	[3] add a new pad control `MXS_PAD_CTRL_12MA`. 
+> 	[4] others.
+>
+> v4 --> v5:
+> 	[0] split out the mach code and the machine code.
+>
+> v3 --> v4:
+> 	merge the GPMI-NFC device code to the new branch.
+>
+> Huang Shijie (4):
+>   ARM: mxs: add GPMI-NAND support for imx23/imx28
+>   ARM: mxs: add new a pad control
+>   ARM: mxs/mx23evk: add GPMI-NAND device
+>   ARM: mxs/mx28evk: add GPMI-NAND device
+>
+>  arch/arm/mach-mxs/Kconfig                       |    2 +
+>  arch/arm/mach-mxs/clock-mx23.c                  |    1 +
+>  arch/arm/mach-mxs/clock-mx28.c                  |    1 +
+>  arch/arm/mach-mxs/devices-mx23.h                |    4 +
+>  arch/arm/mach-mxs/devices-mx28.h                |    4 +
+>  arch/arm/mach-mxs/devices/Kconfig               |    3 +
+>  arch/arm/mach-mxs/devices/Makefile              |    1 +
+>  arch/arm/mach-mxs/devices/platform-gpmi-nand.c  |  109 +++++++++++++++++++++++
+>  arch/arm/mach-mxs/include/mach/devices-common.h |   10 ++
+>  arch/arm/mach-mxs/include/mach/iomux.h          |    1 +
+>  arch/arm/mach-mxs/mach-mx23evk.c                |   36 ++++++++
+>  arch/arm/mach-mxs/mach-mx28evk.c                |   36 ++++++++
+>  include/linux/mtd/gpmi-nand.h                   |   68 ++++++++++++++
+>  13 files changed, 276 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi-nand.c
+>  create mode 100644 include/linux/mtd/gpmi-nand.h
+>
