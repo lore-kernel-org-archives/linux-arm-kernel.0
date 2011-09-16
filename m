@@ -1,23 +1,39 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 16 Sep 2011 10:12:16 +0100
-Subject: [PATCH 0/7] ASoC: ep93xx: convert to use snd_soc_register_card()
-In-Reply-To: <20110913174431.GA2651@mwesterb-mobl.ger.corp.intel.com>
-References: <cover.1315732452.git.mika.westerberg@iki.fi>
-	<4E6D4100.7060007@gmail.com>
-	<CABS+qY15T_fR4o4kxBYguXH64wzaCrypJZdaduDDht_9Vqokfg@mail.gmail.com>
-	<20110912101939.GA2953@opensource.wolfsonmicro.com>
-	<20110912155921.GA2657@mwesterb-mobl.ger.corp.intel.com>
-	<ADE657CA350FB648AAC2C43247A983F001F39DABAF29@AUSP01VMBX24.collaborationhost.net>
-	<20110913174431.GA2651@mwesterb-mobl.ger.corp.intel.com>
-Message-ID: <20110916091215.GH22062@opensource.wolfsonmicro.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 16 Sep 2011 14:55:57 +0530
+Subject: [RFC PATCH 01/11] OMAP: TWL: Clean up mode and ops mask passed
+	from board files
+In-Reply-To: <20110916085732.GB22062@opensource.wolfsonmicro.com>
+References: <1316085727-15023-1-git-send-email-rnayak@ti.com>
+	<1316085727-15023-2-git-send-email-rnayak@ti.com>
+	<20110915133236.GH7988@opensource.wolfsonmicro.com>
+	<4E72F6B9.4050207@ti.com>
+	<20110916085732.GB22062@opensource.wolfsonmicro.com>
+Message-ID: <4E731625.1040707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2011 at 08:44:31PM +0300, Mika Westerberg wrote:
+On Friday 16 September 2011 02:27 PM, Mark Brown wrote:
+> On Fri, Sep 16, 2011 at 12:41:53PM +0530, Rajendra Nayak wrote:
+>> On Thursday 15 September 2011 07:02 PM, Mark Brown wrote:
+>>> On Thu, Sep 15, 2011 at 04:51:57PM +0530, Rajendra Nayak wrote:
+>
+>>>> There is no need for all the board files to pass this information
+>>>> additionally, when the driver already sets them by default.
+>
+>>> "the driver"?  This sounds very buggy...
+>
+>> Yeah, the driver currently sets some default based on what
+>> the chip itself supports and completely ignores the board
+>> inputs.
+>> How about the driver using the defaults and letting the boards
+>> override it (if it ever wants to)?
+>> Currently none of the boards (using any of the twl
+>> regulators) seem to override the defaults and that way a lot of
+>> this duplication in board files could be avoided.
+>
+> No, this is just plain buggy.  It's fine for OMAP to have some common
+> stuff that the board reference but if the drivers are doing this that's
+> bad.  The drivers and framework shouldn't touch the hardware unless the
+> board says it's OK.
 
-> If Mark is ok with these and Reviewed-by from Ryan is enough then I guess
-> these can be merged in the ASoC tree now. On the other hand if formal acks
-> from ep93xx maintainers are needed, then these can wait until you come back
-> from your vacation.
-
-I've applied them all, thanks.
+fair enough, I'll fix up the driver then.
