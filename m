@@ -1,59 +1,92 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 16 Sep 2011 03:07:24 -0400
-Subject: [PATCH 13/19] ARM: mach-ixp23xx: remove arch specific special handling
-	for ioremap
+Date: Fri, 16 Sep 2011 03:07:26 -0400
+Subject: [PATCH 15/19] mm: add vm_area_add_early()
 In-Reply-To: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
 References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-Message-ID: <1316156850-31013-14-git-send-email-nico@fluxnic.net>
+Message-ID: <1316156850-31013-16-git-send-email-nico@fluxnic.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-A generic version should replace this later.
+The existing vm_area_register_early() allows for early vmalloc space
+allocation.  However upcoming cleanups in the ARM architecture require
+that some fixed locations in the vmalloc area be reserved also very early.
+
+The name "vm_area_register_early" would have been a good name for the
+reservation part without the allocation.  Since it is already in use with
+different semantics, let's create vm_area_add_early() instead.
+
+Both vm_area_register_early() and vm_area_add_early() can be used together
+meaning that the former is now implemented using the later where it is
+ensured that no conflicting areas are added, but no attempt is made to
+make the allocation scheme in vm_area_register_early() more sophisticated.
+After all, you must know what you're doing when using those functions.
 
 Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: linux-mm at kvack.org
 ---
- arch/arm/mach-ixp23xx/include/mach/io.h |   29 -----------------------------
- 1 files changed, 0 insertions(+), 29 deletions(-)
+ include/linux/vmalloc.h |    1 +
+ mm/vmalloc.c            |   28 ++++++++++++++++++++++++++--
+ 2 files changed, 27 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ixp23xx/include/mach/io.h b/arch/arm/mach-ixp23xx/include/mach/io.h
-index a1749d0fd8..4ce4353b9f 100644
---- a/arch/arm/mach-ixp23xx/include/mach/io.h
-+++ b/arch/arm/mach-ixp23xx/include/mach/io.h
-@@ -20,33 +20,4 @@
- #define __io(p)		((void __iomem*)((p) + IXP23XX_PCI_IO_VIRT))
- #define __mem_pci(a)	(a)
+diff --git a/include/linux/vmalloc.h b/include/linux/vmalloc.h
+index 9332e52ea8..e7d2cba995 100644
+--- a/include/linux/vmalloc.h
++++ b/include/linux/vmalloc.h
+@@ -130,6 +130,7 @@ extern long vwrite(char *buf, char *addr, unsigned long count);
+  */
+ extern rwlock_t vmlist_lock;
+ extern struct vm_struct *vmlist;
++extern __init void vm_area_add_early(struct vm_struct *vm);
+ extern __init void vm_area_register_early(struct vm_struct *vm, size_t align);
  
--static inline void __iomem *
--ixp23xx_ioremap(unsigned long addr, unsigned long size, unsigned int mtype)
--{
--	if (addr >= IXP23XX_PCI_MEM_START &&
--		addr <= IXP23XX_PCI_MEM_START + IXP23XX_PCI_MEM_SIZE) {
--		if (addr + size > IXP23XX_PCI_MEM_START + IXP23XX_PCI_MEM_SIZE)
--			return NULL;
--
--		return (void __iomem *)
-- 			((addr - IXP23XX_PCI_MEM_START) + IXP23XX_PCI_MEM_VIRT);
--	}
--
--	return __arm_ioremap(addr, size, mtype);
--}
--
--static inline void
--ixp23xx_iounmap(void __iomem *addr)
--{
--	if ((((u32)addr) >= IXP23XX_PCI_MEM_VIRT) &&
--	    (((u32)addr) < IXP23XX_PCI_MEM_VIRT + IXP23XX_PCI_MEM_SIZE))
--		return;
--
--	__iounmap(addr);
--}
--
--#define __arch_ioremap	ixp23xx_ioremap
--#define __arch_iounmap	ixp23xx_iounmap
--
--
- #endif
+ #ifdef CONFIG_SMP
+diff --git a/mm/vmalloc.c b/mm/vmalloc.c
+index 7ef0903058..bf20a0ff95 100644
+--- a/mm/vmalloc.c
++++ b/mm/vmalloc.c
+@@ -1118,6 +1118,31 @@ void *vm_map_ram(struct page **pages, unsigned int count, int node, pgprot_t pro
+ EXPORT_SYMBOL(vm_map_ram);
+ 
+ /**
++ * vm_area_add_early - add vmap area early during boot
++ * @vm: vm_struct to add
++ *
++ * This function is used to add fixed kernel vm area to vmlist before
++ * vmalloc_init() is called.  @vm->addr, @vm->size, and @vm->flags
++ * should contain proper values and the other fields should be zero.
++ *
++ * DO NOT USE THIS FUNCTION UNLESS YOU KNOW WHAT YOU'RE DOING.
++ */
++void __init vm_area_add_early(struct vm_struct *vm)
++{
++	struct vm_struct *tmp, **p;
++
++	for (p = &vmlist; (tmp = *p) != NULL; p = &tmp->next) {
++		if (tmp->addr >= vm->addr) {
++			BUG_ON(tmp->addr < vm->addr + vm->size);
++			break;
++		} else
++			BUG_ON(tmp->addr + tmp->size > vm->addr);
++	}
++	vm->next = *p;
++	*p = vm;
++}
++
++/**
+  * vm_area_register_early - register vmap area early during boot
+  * @vm: vm_struct to register
+  * @align: requested alignment
+@@ -1139,8 +1164,7 @@ void __init vm_area_register_early(struct vm_struct *vm, size_t align)
+ 
+ 	vm->addr = (void *)addr;
+ 
+-	vm->next = vmlist;
+-	vmlist = vm;
++	vm_area_add_early(vm);
+ }
+ 
+ void __init vmalloc_init(void)
 -- 
 1.7.7-rc0
