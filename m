@@ -1,56 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 15 Sep 2011 20:58:39 -0700
-Subject: [PATCH 6/6] ARM: zImage: prevent constant copy+rebuild of
-	lib1funcs.S
-In-Reply-To: <1315978906-15829-7-git-send-email-nico@fluxnic.net>
-References: <1315978906-15829-1-git-send-email-nico@fluxnic.net>
-	<1315978906-15829-7-git-send-email-nico@fluxnic.net>
-Message-ID: <4E72C96F.5000203@codeaurora.org>
+From: girish.shivananjappa@linaro.org (Girish K S)
+Date: Fri, 16 Sep 2011 09:41:04 +0530
+Subject: confusion regarding the CMD19 and CMD21 in eMMC/SD card spec
+In-Reply-To: <0356427A-B949-4DA6-9F5D-FE0DD54AEDFF@marvell.com>
+References: <CAGxe1ZH=mrAdfVR7Uw8mYNAD43BAbW7VGuhA1pN9hbSjTG9HVA@mail.gmail.com>
+	<0356427A-B949-4DA6-9F5D-FE0DD54AEDFF@marvell.com>
+Message-ID: <CAGxe1ZG4QjwB5OfrxupG_C+DtQ7sTQ4_EURaF-QrqPPSA3A0jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/11 22:41, Nicolas Pitre wrote:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
->
-> The rule to copy this file doesn't have to be forced.  However
-> lib1funcs.[So] have to be listed amongst the targets.
->
-> This prevents zImage from being recreated needlessly.
->
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
->  arch/arm/boot/compressed/Makefile |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> index ce2bef536e..db1fd260ed 100644
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -112,7 +112,7 @@ endif
->  
->  targets       := vmlinux vmlinux.lds \
->  		 piggy.$(suffix_y) piggy.$(suffix_y).o \
-> -		 font.o font.c head.o misc.o $(OBJS)
-> +		 lib1funcs.o lib1funcs.S font.o font.c head.o misc.o $(OBJS)
->  
->  # Make sure files are removed during clean
->  extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S $(libfdt) $(libfdt_hdrs)
-> @@ -147,7 +147,7 @@ LDFLAGS_vmlinux += -T
->  # For __aeabi_uidivmod
->  lib1funcs = $(obj)/lib1funcs.o
->  
-> -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
-> +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
->  	$(call cmd,shipped)
->  
->  # We need to prevent any GOTOFF relocs being used with references
+but there is only one host controller to handle these commands.
+the generic sdhci driver has cmd19 hard coded, thats the reason I
+asked the question.
+you can also check it in the function sdhci_execute_tuning it is hard coded as
+cmd.opcode = MMC_SEND_TUNING_BLOCK; where the macro value is 19.
+So in case of SD card insertion it will send a SEND_TUNING_BLOCK
+command to the device. but if
+MMC card is inserted then it will send a BUS_TEST_W command to the device.
 
-I already posted a very similar patch and put it into Russell's patch
-tracker. Can't you just use that instead?
+correct me if i am wrong
+regards
+Girish
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7016/1
-http://lists.arm.linux.org.uk/lurker/message/20110812.190002.18f88875.en.html
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+On 15 September 2011 21:53, Philip Rakity <prakity@marvell.com> wrote:
+>
+> Different committee's --- Different standards.
+>
+> There is no issue with overlap.
+>
+>
+> On Sep 15, 2011, at 4:58 AM, Girish K S wrote:
+>
+>> Dear all,
+>> ? ? ? ? ? ? The eMMC 4.5 specification mentions that the CMD21 in
+>> class 2 is a SEND_TUNING BLOCK command. where as the SD card
+>> specification
+>> in the given link says CMD19 in class 2 is the SEND_TUNING_BLOCK
+>> http://www.scribd.com/doc/50685191/53/Figure-4-8-Send-Tuning-Block-Command.
+>> Also the implementation in the drivers/mmc/host/sdhci.c uses the CMD19
+>> as the SEND_TUNING_BLOCK.
+>> Can anybody clarify why there is overlapping in this command number.
+>> May be my understand is wrong.
+>>
+>> In the MMC spec the CMD19 is BUS_TEST_W in class 0 and CMD21 is
+>> reserved till eMMC 4.41 version.
+>> But in the SD specification (given link) CMD19 is SEND_TUNING_BLOCK
+>> and CMD21 is reserved.
+>>
+>> Thanks and regards
+>> Girish K S
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+>
