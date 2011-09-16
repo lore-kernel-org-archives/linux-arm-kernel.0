@@ -1,68 +1,34 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Sat, 17 Sep 2011 00:25:56 +0530
-Subject: [PATCH v2] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <1316166960-20964-1-git-send-email-Baohua.Song@csr.com>
-References: <1316166960-20964-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <CABb+yY13Xum=nU2eD+DJ7Uv_8ppE+UKFUA6KD_4CP+eDG5rAaQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 16 Sep 2011 18:34:35 +0200
+Subject: [GIT PULL] Samsung Fixes for v3.1-rc7
+In-Reply-To: <20110916134300.GB16280@suse.de>
+References: <00b101cc738d$bcf46ce0$36dd46a0$%kim@samsung.com>
+	<00cf01cc7466$e2cd66e0$a86834a0$%kim@samsung.com>
+	<20110916134300.GB16280@suse.de>
+Message-ID: <1642876.jgt6epCtEP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 3:26 PM, Barry Song <Baohua.Song@csr.com> wrote:
+On Friday 16 September 2011 15:43:00 Greg KH wrote:
+> > In this case, I'm not sure which following method is proper...
+> > - to send 'pull request' to Greg / stable at kernel.org like bug fix during -rc
+> > - to submit each patches with adding 'Cc: stable at kernel.org' again
+> > - or ?
 
-> +static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
-> + ? ? ? struct dma_slave_config *config)
-> +{
-> + ? ? ? u32 addr, direction;
-> + ? ? ? unsigned long flags;
-> +
-> + ? ? ? switch (config->direction) {
-> + ? ? ? case DMA_FROM_DEVICE:
-> + ? ? ? ? ? ? ? direction = 0;
-> + ? ? ? ? ? ? ? addr = config->dst_addr;
-> + ? ? ? ? ? ? ? break;
-> +
-> + ? ? ? case DMA_TO_DEVICE:
-> + ? ? ? ? ? ? ? direction = 1;
-> + ? ? ? ? ? ? ? addr = config->src_addr;
-> + ? ? ? ? ? ? ? break;
-> +
-> + ? ? ? default:
-> + ? ? ? ? ? ? ? return -EINVAL;
-> + ? ? ? }
-> +
-> + ? ? ? if ((config->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
-> + ? ? ? ? ? ? ? (config->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES))
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> + ? ? ? spin_lock_irqsave(&schan->lock, flags);
-> + ? ? ? schan->addr = addr;
-> + ? ? ? schan->direction = direction;
-> + ? ? ? schan->mode = (config->src_maxburst == 4 ? 1 : 0);
-> + ? ? ? spin_unlock_irqrestore(&schan->lock, flags);
-> +
-> + ? ? ? return 0;
-> +}
-You don't need to pass as much info via dma_slave_config as you do here.
+The patches are currently queued in the stable branch of the arm-soc
+tree, I haven't forwarded them to Linus yet. I can easily change
+the changelog before I actually send them on (if you tell me which ones
+they are, or I can pull an updated set of patches to replace them.
 
-dmaxfer_template.src_inc  && !dmaxfer_template.dst_inc  => DMA_TO_DEVICE
-!dmaxfer_template.src_inc  && dmaxfer_template.dst_inc  => DMA_FROM_DEVICE
+> Are these in Linus's tree already?  If so, send me the git commit ids
+> and I will add them to the stable kernels.
+> 
+> If not, wait until they are, and then send me the git commit ids, and I
+> will then add them.
 
-Pass addresses using dmaxfer_template.src_start and dmaxfer_template.dst_start
-instead of dma_slave_config.dst_addr and dma_slave_config.src_addr
+This is fine with me as well, but I'm trying to get more people to
+send me patches that are annotated already. I forgot to ask during
+the last set of bug fixes I forwarded and should probably go through
+the ones that are already merged and ask the authors about backporting.
 
-So, currently you need dma_slave_config only to pass src_addr_width,
-dst_addr_width and src_maxburst to the dmac driver.
-
-
-> +
-> +static struct dma_async_tx_descriptor *sirfsoc_dma_prep_slave_sg(
-> + ? ? ? struct dma_chan *chan, struct scatterlist *sgl,
-> + ? ? ? unsigned int sg_len, enum dma_data_direction direction,
-> + ? ? ? unsigned long flags)
-> +{
-> + ? ? ? return NULL;
-> +}
-> +
-In v3 I'll remove the BUG_ON check that requires every SLAVE channel
-provides device_prep_slave_sg, so you should be able to simply discard
-this stub.
+	Arnd
