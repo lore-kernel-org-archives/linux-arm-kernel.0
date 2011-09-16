@@ -1,88 +1,159 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 16 Sep 2011 17:31:53 +0530
-Subject: [PATCH 02/25] OMAP4: Redefine mandatory barriers for OMAP to
-	include interconnect barriers.
-In-Reply-To: <CAMQu2gwv5y6PY_ooBjYuM497D=QuU54yWB+i6DRdn1YuuocY6Q@mail.gmail.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315144466-9395-3-git-send-email-santosh.shilimkar@ti.com>
-	<20110913202701.GF24252@atomide.com> <4E7080F8.9020302@ti.com>
-	<87obyl7mj8.fsf@ti.com>
-	<CAMQu2gy6yVA7zWAPUsnzCtixHkjzkn6UnbapR0mpoJ+AwNMAcQ@mail.gmail.com>
-	<20110915175354.GW24252@atomide.com>
-	<CAMQu2gzfU0K0Q1Pta4vX=dNBBYQ6wNg_Kf5EeMTCV_WHTs3Y=w@mail.gmail.com>
-	<20110915194330.GC2284@atomide.com>
-	<CAMQu2gwv5y6PY_ooBjYuM497D=QuU54yWB+i6DRdn1YuuocY6Q@mail.gmail.com>
-Message-ID: <CAMQu2gxhDyQqLqt3C+97s0vy_r0P2umcrygN5ZaN=A8p0TV3xQ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 16 Sep 2011 14:13:02 +0200
+Subject: [PATCH 0/2] pin controller subsystem v7
+Message-ID: <1316175182-10700-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 1:30 AM, Shilimkar, Santosh
-<santosh.shilimkar@ti.com> wrote:
-> On Fri, Sep 16, 2011 at 1:13 AM, Tony Lindgren <tony@atomide.com> wrote:
->> * Shilimkar, Santosh <santosh.shilimkar@ti.com> [110915 10:49]:
->>> On Thu, Sep 15, 2011 at 11:23 PM, Tony Lindgren <tony@atomide.com> wrote:
->>> >
->>> > Please also include the errata in the description and set it up with
->>> > a Kconfig entry with something like ARM_ERRATA_XXXXXX or TI_ERRATA_XXXXXX.
->>> >
->>> Sure.
->>> It's a ?TI ERRATA.
->>
->> OK
->>
->>> > Also it would be best to apply this fix at the end of the PM series so
->>> > it is easier to verify the bug and potentially remove the hack if
->>> > a better fix is ever available.
->>> >
->>> As such order doesn't matter much because it can be removed either way
->>> even if it is in the beginning of the series with KCONFIG entry.
->>>
->>> But I can change the order if you prefer that way.
->>
->> Well it seems that it's the omap4_finish_suspend in this series that
->> can be used to trigger the bug, although the bug has been around for
->> few years. So then instead of mentioning random hangups you can have
->> a better description with something like "Patch xyz added PM idle
->> support for omap4, however bug 123 causes so and so. Fix the issue
->> with blah blah".
->>
-> Sounds good .
->
->> Also, if you have some easy way to reproduce the bug maybe mention
->> that too? That would make it easy to verify if issue has been fixed.
->>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Just for record, Below are the errata details.
+This is the sixth iteration of the controller subsystem, most
+changes are described in the individual patches, mainly we are
+now doing away with the patch to the AMBA bus to acquire
+pinmuxes, instead this is done from the U300 machine core. This
+way the impacts on the existing drivers and buses are kept to a
+minimum for the time being.
 
-ERRATA: i688: Async Bridge Corruption
+Further I squashed the patch removing the old pinmux driver from
+the U300 machine into the patch adding the new driver, because
+it was not really possible to do a clean cut anyway.
 
-If a data is stalled inside asynchronous bridge because
-of backpressure, it may be accepted multiple times, creating pointer
-misalignment that will corrupt next transfers on that data path until next
-reset of the system (No recovery procedure once the issue is hit, the
-path remains consistently broken). Async bridge can be found on path between
-MPU to EMIF, MPU to L3 interconnect and Cortex M3 to Emif .
+ChangeLog v6->v7:
 
-This situation can happen only when the idle is initiated by a Master
-Request Disconnection (which is trigged by software whenexecuting WFI)
+- Make it possible to have several map entries matching the
+  same device, pin controller and function, but using
+  a different group, and alter the semantics so that
+  pinmux_get() will pick all matching map entries, and
+  store the associated groups in a list. The list will
+  then be iterated over at pinmux_enable()/pinmux_disable()
+  and corresponding driver functions called for each
+  defined group. Notice that you're only allowed to map
+  multiple *groups* to the same
+  { device, pin controller, function } triplet, attempts
+  to map the same device to multiple pin controllers will
+  for example fail. This is hopefully the crucial feature
+  requested by Stephen Warren.
 
-WORKAROUND
-All the initiators connected through Async Bridge must ensure that
-data path is properly drained before issuing WFI. This condition will be
-met if one Strongly ordered access is performed to the target right
-before executing the WFI.
+- Add a pinmux hogging field to the pinmux mapping entries,
+  and enable the pinmux core to hog pinmux map entries.
+  This currently only works for pinmuxes without assigned
+  devices as it looks now, but with device trees we can
+  look up the corresponding struct device * entries when
+  we register the pinmux driver, and have it hog each
+  pinmux map in turn, for a simple approach to
+  non-dynamic pin muxing. This addresses an issue from
+  Grant Likely that the machine should take care of as
+  much of the pinmux setup as possible, not the devices.
+  By supplying a list of hogs, it can now instruct the
+  core to take care of any static mappings.
 
-> There are some multimedia usecases where the bug was discovered
-> but on mainline obviously we don't have that support.
->
-> I will check with IP folks if any other simple test-case is possible
-> to reproduce the issue and If I find one, will mention that.
->
-We have a GFX usecase which demonstrate this issue but can't
-be tested on mainline sicne no GFX support.
+- Switch pinmux group retrieveal function to grab an
+  array of strings representing the groups rather than an
+  array of unsigned and rewrite accordingly.
 
-But the same patch is already in the product line which
-has fixed the GFX usecase issue.
+- Alter debugfs to show the grouplist handled by each
+  pinmux. Also add a list of hogs.
 
-Regards
-Santosh
+- Dynamically allocate a struct pinmux at pinmux_get() and
+  free it at pinmux_put(), then add these to the global
+  list of pinmuxes active as we go along.
+
+- Go over the list of pinmux maps at pinmux_get() time
+  and repeatedly apply matches.
+
+- Retrieve applicable groups per function from the driver
+  as a string array rather than a unsigned array, then
+  lookup the enumerators.
+
+- Make the device to pinmux map a singleton - only allow the
+  mapping table to be registered once and even tag the
+  registration function with __init so it surely won't be
+  abused.
+
+- Create a separate debugfs file to view the pinmux map at
+  runtime.
+
+- Introduce a spin lock to the pin descriptor struct, lock it
+  when modifying pin status entries. Reported by Stijn Devriendt.
+
+- Fix up the documentation after review from Stephen Warren.
+
+- Let the GPIO ranges give names as const char * instead of some
+  fixed-length string.
+
+- add a function to unregister GPIO ranges to mirror the
+  registration function.
+
+- Privatized the struct pinctrl_device and removed it from the
+  <linux/pinctrl/pinctrl.h> API, the drivers do not need to know
+  the members of this struct. It is now in the local header
+  "core.h".
+
+- Rename the concept of "anonymous" mux maps to "system" muxes
+  and add convenience macros and documentation.
+
+U300 driver:
+
+- Adjust the driver to return the group list as an array of
+  strings instead of a unsigned * array.
+
+- Add support for the EMIF0 and EMIF1 pin groups.
+
+- Acquire all muxmaps using pinmux hogs from the core using
+  a subsystem_initcall(). This way we need not change any
+  drivers or buses. We have the correct struct device *
+  pointers anyway so why not do it from there, and it
+  illustrates pretty well what the pinmux core will be able
+  to do once it can access the device tree.
+
+- Use new convenience macros for system mappings.
+
+- Unregister the GPIO range at removal.
+
+Linus Walleij (2):
+  drivers: create a pin control subsystem v7
+  pinmux: add a driver for the U300 pinmux
+
+ Documentation/ABI/testing/sysfs-class-pinmux |   11 +
+ Documentation/pinctrl.txt                    |  951 +++++++++++++++++++++
+ MAINTAINERS                                  |    5 +
+ arch/arm/mach-u300/Kconfig                   |    2 +
+ arch/arm/mach-u300/Makefile                  |    2 +-
+ arch/arm/mach-u300/core.c                    |   84 ++-
+ arch/arm/mach-u300/include/mach/syscon.h     |  136 ---
+ arch/arm/mach-u300/mmc.c                     |   16 -
+ arch/arm/mach-u300/padmux.c                  |  367 --------
+ arch/arm/mach-u300/padmux.h                  |   39 -
+ arch/arm/mach-u300/spi.c                     |   20 -
+ drivers/Kconfig                              |    4 +
+ drivers/Makefile                             |    2 +
+ drivers/pinctrl/Kconfig                      |   36 +
+ drivers/pinctrl/Makefile                     |    7 +
+ drivers/pinctrl/core.c                       |  632 ++++++++++++++
+ drivers/pinctrl/core.h                       |   73 ++
+ drivers/pinctrl/pinmux-u300.c                | 1008 ++++++++++++++++++++++
+ drivers/pinctrl/pinmux-u300.h                |  141 +++
+ drivers/pinctrl/pinmux.c                     | 1178 ++++++++++++++++++++++++++
+ drivers/pinctrl/pinmux.h                     |   47 +
+ include/linux/pinctrl/machine.h              |  107 +++
+ include/linux/pinctrl/pinctrl.h              |  133 +++
+ include/linux/pinctrl/pinmux.h               |  124 +++
+ 24 files changed, 4544 insertions(+), 581 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-class-pinmux
+ create mode 100644 Documentation/pinctrl.txt
+ delete mode 100644 arch/arm/mach-u300/padmux.c
+ delete mode 100644 arch/arm/mach-u300/padmux.h
+ create mode 100644 drivers/pinctrl/Kconfig
+ create mode 100644 drivers/pinctrl/Makefile
+ create mode 100644 drivers/pinctrl/core.c
+ create mode 100644 drivers/pinctrl/core.h
+ create mode 100644 drivers/pinctrl/pinmux-u300.c
+ create mode 100644 drivers/pinctrl/pinmux-u300.h
+ create mode 100644 drivers/pinctrl/pinmux.c
+ create mode 100644 drivers/pinctrl/pinmux.h
+ create mode 100644 include/linux/pinctrl/machine.h
+ create mode 100644 include/linux/pinctrl/pinctrl.h
+ create mode 100644 include/linux/pinctrl/pinmux.h
+
+-- 
+1.7.3.2
