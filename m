@@ -1,41 +1,98 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Fri, 16 Sep 2011 15:00:18 +0530
-Subject: [PATCH v15 06/12] OMAP: dmtimer: switch-over to platform device
-	driver
-In-Reply-To: <CAC83ZvKGoucZ=xQSa7GEk7Gg8jcFBQE==1a6m4=+nzDRrsw+jw@mail.gmail.com>
-References: <1315516098-29761-1-git-send-email-tarun.kanti@ti.com>
-	<1315516098-29761-7-git-send-email-tarun.kanti@ti.com>
-	<20110914214533.GA30941@atomide.com>
-	<CAC83ZvJgPYb3JbWT4SKXpQvq-vdKK4b6hd6E-ik5uyRCqgwWsg@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302575A050D@dbde02.ent.ti.com>
-	<20110915165810.GA2284@atomide.com>
-	<20110915170548.GB2284@atomide.com>
-	<CAC83ZvKGoucZ=xQSa7GEk7Gg8jcFBQE==1a6m4=+nzDRrsw+jw@mail.gmail.com>
-Message-ID: <CAC83ZvKXEb7MTujP4JqhrPeysYxQcLF+BV-J9tpYoRwWGVZ8_Q@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 16 Sep 2011 15:04:11 +0530
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <4E71F593.2040903@gmail.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+	<4E71F593.2040903@gmail.com>
+Message-ID: <CAJuYYwQ=tSh8k5ZOi2kx6KbMsQ4eVAvgE=T4kdckRSLjdj3dMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
->>> 1. Modify the inline access functions to take the PEND and others
->>> ? ?if needed registers as a parameter
+Hi Rob,
+
+On 15 September 2011 18:24, Rob Herring <robherring2@gmail.com> wrote:
+> On 09/15/2011 02:55 AM, Thomas Abraham wrote:
+>> Hi Rob,
+>>
+>> On 14 September 2011 22:01, Rob Herring <robherring2@gmail.com> wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
 >>>
->>> 2. Modify mach-omap2/timer.c to initialize the PEND and others
->>> ? ?in the SoC specific timer_init function
-Just to make my understanding complete, need some clarifications:
-As we would end up modifying almost all inline functions, what naming
-convention should we follow for the parameters? For instance, PEND
-is related to TWPS register. So are you suggesting using parameter
-names related to respective registers in each inline functions?
-If that is the case we would end up declaring lot of local variables along
-with PEND. Instead, we could very well have just two variables to
-represent functional and interrupt offsets.
+>>> This adds gic initialization using device tree data. The initialization
+>>> functions are intended to be called by a generic OF interrupt
+>>> controller parsing function once the right pieces are in place.
+>>>
+>>> PPIs are handled using 3rd cell of interrupts properties to specify the cpu
+>>> mask the PPI is assigned to.
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> ---
+>>> ?Documentation/devicetree/bindings/arm/gic.txt | ? 53 ++++++++++++++++++++++++
+>>> ?arch/arm/common/gic.c ? ? ? ? ? ? ? ? ? ? ? ? | ? 55 +++++++++++++++++++++++--
+>>> ?arch/arm/include/asm/hardware/gic.h ? ? ? ? ? | ? 10 +++++
+>>> ?3 files changed, 114 insertions(+), 4 deletions(-)
+>>> ?create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+>>
+>> [...]
+>>
+>>
+>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>>> index d1ccc72..14de380 100644
+>>> --- a/arch/arm/common/gic.c
+>>> +++ b/arch/arm/common/gic.c
+>>
+>> [...]
+>>
+>>> +void __init gic_of_init(struct device_node *node, struct device_node *parent)
+>>> +{
+>>> + ? ? ? void __iomem *cpu_base;
+>>> + ? ? ? void __iomem *dist_base;
+>>> + ? ? ? int irq;
+>>> + ? ? ? struct irq_domain *domain = &gic_data[gic_cnt].domain;
+>>> +
+>>> + ? ? ? if (WARN_ON(!node))
+>>> + ? ? ? ? ? ? ? return;
+>>> +
+>>> + ? ? ? dist_base = of_iomap(node, 0);
+>>> + ? ? ? WARN(!dist_base, "unable to map gic dist registers\n");
+>>> +
+>>> + ? ? ? cpu_base = of_iomap(node, 1);
+>>> + ? ? ? WARN(!cpu_base, "unable to map gic cpu registers\n");
+>>> +
+>>> + ? ? ? domain->nr_irq = gic_irq_count(dist_base);
+>>> + ? ? ? domain->irq_base = irq_alloc_descs(-1, 0, domain->nr_irq, numa_node_id());
+>>
+>> For exynos4, all the interrupts originating from GIC are statically
+>> mapped to start from 32 in the linux virq space (GIC SPI interrupts
+>> start from 64). In the above code, since irq_base would be 0 for
+>> exynos4, the interrupt mapping is not working correctly. In your
+>> previous version of the patch, you have given a option to the platform
+>> code to choose the offset. Could that option be added to this series
+>> also. Or a provision to use platform specific translate function
+>> instead of the irq_domain_simple translator.
+>>
+>
+> So I guess you have the A9 external nIRQ hooked up to another
+> controller? Why can't the 0-31 interrupts get mapped to after the gic
+> interrupts? Ultimately we want h/w irq numbers completely decoupled from
+> linux irq numbers. So you will want to put that controller in devicetree
+> and have an DT init function for it as well.
 
-Also, in plat-omap/dmtimer.c, timer_regs{} stores the register values and
-not the register offsets. Therefore, we would not be able to pass as
-parameters, timer->context.<x> ... etc.
+There are chained interrupt handlers mapped in between linux irq
+number 0 to 31. So the offset for GIC interrupts was set to 32 (SGI[0]
+= 32). The interrupt chaining for the interrupts mapped between 0 to
+31 seems unnecessary though. I will try removing them and check.
 
-Please let me know if I am off-track in my understanding.
-Thanks.
---
-Tarun
-[...]
+>
+> In anycase, there's a simple solution. You just need a call to
+> irq_alloc_descs to reserve the first 32 interrupts before calling
+> of_irq_init.
+>
+> Rob
+>
+
+Thanks for your comments.
+
+Regards,
+Thomas.
