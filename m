@@ -1,78 +1,68 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 16 Sep 2011 14:09:39 -0400 (EDT)
-Subject: [PATCH 01/19] ARM: sort the meminfo array earlier
-In-Reply-To: <4E73858A.9050106@codeaurora.org>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<1316156850-31013-2-git-send-email-nico@fluxnic.net>
-	<4E73858A.9050106@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1109161345560.20358@xanadu.home>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sat, 17 Sep 2011 00:25:56 +0530
+Subject: [PATCH v2] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <1316166960-20964-1-git-send-email-Baohua.Song@csr.com>
+References: <1316166960-20964-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <CABb+yY13Xum=nU2eD+DJ7Uv_8ppE+UKFUA6KD_4CP+eDG5rAaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Sep 2011, Stephen Boyd wrote:
+On Fri, Sep 16, 2011 at 3:26 PM, Barry Song <Baohua.Song@csr.com> wrote:
 
-> On 9/16/2011 12:07 AM, Nicolas Pitre wrote:
-> > @@ -875,6 +876,12 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
-> >  	return mdesc;
-> >  }
-> >  
-> > +static int __init meminfo_cmp(const void *_a, const void *_b)
-> > +{
-> > +	const struct membank *a = _a, *b = _b;
-> > +	long cmp = bank_pfn_start(a) - bank_pfn_start(b);
-> > +	return cmp < 0 ? -1 : cmp > 0 ? 1 : 0;
-> 
-> This looks like:
-> 
->     return clamp(bank_pfn_start(a) - bank_pfn_start(b), -1, 1);
+> +static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
+> + ? ? ? struct dma_slave_config *config)
+> +{
+> + ? ? ? u32 addr, direction;
+> + ? ? ? unsigned long flags;
+> +
+> + ? ? ? switch (config->direction) {
+> + ? ? ? case DMA_FROM_DEVICE:
+> + ? ? ? ? ? ? ? direction = 0;
+> + ? ? ? ? ? ? ? addr = config->dst_addr;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? case DMA_TO_DEVICE:
+> + ? ? ? ? ? ? ? direction = 1;
+> + ? ? ? ? ? ? ? addr = config->src_addr;
+> + ? ? ? ? ? ? ? break;
+> +
+> + ? ? ? default:
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? if ((config->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
+> + ? ? ? ? ? ? ? (config->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES))
+> + ? ? ? ? ? ? ? return -EINVAL;
+> +
+> + ? ? ? spin_lock_irqsave(&schan->lock, flags);
+> + ? ? ? schan->addr = addr;
+> + ? ? ? schan->direction = direction;
+> + ? ? ? schan->mode = (config->src_maxburst == 4 ? 1 : 0);
+> + ? ? ? spin_unlock_irqrestore(&schan->lock, flags);
+> +
+> + ? ? ? return 0;
+> +}
+You don't need to pass as much info via dma_slave_config as you do here.
 
-Won't work.  The pfn is of an unsigned type, hence the subtraction 
-result will also be unsigned.  The code above looks a bit odd, but there 
-is an implicit cast to a signed result with the result stored into a 
-long.
+dmaxfer_template.src_inc  && !dmaxfer_template.dst_inc  => DMA_TO_DEVICE
+!dmaxfer_template.src_inc  && dmaxfer_template.dst_inc  => DMA_FROM_DEVICE
 
-What would have been even clearer, and possibly more efficient as well, 
-is something like this:
+Pass addresses using dmaxfer_template.src_start and dmaxfer_template.dst_start
+instead of dma_slave_config.dst_addr and dma_slave_config.src_addr
 
-	if (bank_pfn_start(a) < bank_pfn_start(b))
-		return -1;
-	if (bank_pfn_start(a) > bank_pfn_start(b))
-		return 1;
-	return 0;
-
-But the goal here was to simply move the code, changing it would warrant 
-a separate patch.
-
-> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> > index 91bca355cd..7080f10cc2 100644
-> > --- a/arch/arm/mm/init.c
-> > +++ b/arch/arm/mm/init.c
-> > @@ -318,19 +317,10 @@ static void arm_memory_present(void)
-> >  }
-> >  #endif
-> >  
-> > -static int __init meminfo_cmp(const void *_a, const void *_b)
-> > -{
-> > -	const struct membank *a = _a, *b = _b;
-> > -	long cmp = bank_pfn_start(a) - bank_pfn_start(b);
-> > -	return cmp < 0 ? -1 : cmp > 0 ? 1 : 0;
-> > -}
-> > -
-> >  void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
-> >  {
-> >  	int i;
-> >  
-> > -	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
-> > -
-> 
-> Why not call sanity_check_meminfo() here?
-
-That could be done as well.  However the populating of the meminfo array 
-is done in kernel/setup.c, so it made sense to move the sort there as 
-this could be improved upon eventually to make the memory bank parser a 
-bit more robust against problems such as overlapping memory ranges which 
-was the subject of a somewhat entertaining thread recently.  But I don't 
-have a strong opinion about this.
+So, currently you need dma_slave_config only to pass src_addr_width,
+dst_addr_width and src_maxburst to the dmac driver.
 
 
-Nicolas
+> +
+> +static struct dma_async_tx_descriptor *sirfsoc_dma_prep_slave_sg(
+> + ? ? ? struct dma_chan *chan, struct scatterlist *sgl,
+> + ? ? ? unsigned int sg_len, enum dma_data_direction direction,
+> + ? ? ? unsigned long flags)
+> +{
+> + ? ? ? return NULL;
+> +}
+> +
+In v3 I'll remove the BUG_ON check that requires every SLAVE channel
+provides device_prep_slave_sg, so you should be able to simply discard
+this stub.
