@@ -1,68 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 16 Sep 2011 10:21:14 -0700
-Subject: [PATCH 01/19] ARM: sort the meminfo array earlier
-In-Reply-To: <1316156850-31013-2-git-send-email-nico@fluxnic.net>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<1316156850-31013-2-git-send-email-nico@fluxnic.net>
-Message-ID: <4E73858A.9050106@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 16 Sep 2011 10:23:44 -0700
+Subject: [PATCH 20/25] OMAP4: PM: Add L2X0 cache lowpower support
+In-Reply-To: <1315144466-9395-21-git-send-email-santosh.shilimkar@ti.com>
+	(Santosh Shilimkar's message of "Sun, 4 Sep 2011 19:24:21 +0530")
+References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315144466-9395-21-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <87iposqu3j.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/16/2011 12:07 AM, Nicolas Pitre wrote:
-> @@ -875,6 +876,12 @@ static struct machine_desc * __init setup_machine_tags(unsigned int nr)
->  	return mdesc;
+Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+
+> When MPUSS hits off-mode e, L2 cache is lost. This patch adds L2X0
+                          ^^^
+extra 'e' ?
+
+> necessary maintenance operations and context restoration in the
+> low power code.
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+
+[...]
+
+> @@ -135,6 +138,33 @@ static void scu_pwrst_prepare(unsigned int cpu_id, unsigned int cpu_state)
+>  	__raw_writel(scu_pwr_st, pm_info->scu_sar_addr);
 >  }
 >  
-> +static int __init meminfo_cmp(const void *_a, const void *_b)
+> +/*
+> + * Store the CPU cluster state for L2X0 low power operations.
+> + */
+> +static void l2x0_pwrst_prepare(unsigned int cpu_id, unsigned int save_state)
 > +{
-> +	const struct membank *a = _a, *b = _b;
-> +	long cmp = bank_pfn_start(a) - bank_pfn_start(b);
-> +	return cmp < 0 ? -1 : cmp > 0 ? 1 : 0;
-
-This looks like:
-
-    return clamp(bank_pfn_start(a) - bank_pfn_start(b), -1, 1);
-
-
+> +	struct omap4_cpu_pm_info *pm_info = &per_cpu(omap4_pm_info, cpu_id);
+> +
+> +	__raw_writel(save_state, pm_info->l2x0_sar_addr);
 > +}
->  
->  void __init setup_arch(char **cmdline_p)
->  {
-> @@ -903,6 +910,7 @@ void __init setup_arch(char **cmdline_p)
->  
->  	parse_early_param();
->  
-> +	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
->  	sanity_check_meminfo();
->  	arm_memblock_init(&meminfo, mdesc);
->  
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 91bca355cd..7080f10cc2 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -318,19 +317,10 @@ static void arm_memory_present(void)
->  }
->  #endif
->  
-> -static int __init meminfo_cmp(const void *_a, const void *_b)
-> -{
-> -	const struct membank *a = _a, *b = _b;
-> -	long cmp = bank_pfn_start(a) - bank_pfn_start(b);
-> -	return cmp < 0 ? -1 : cmp > 0 ? 1 : 0;
-> -}
-> -
->  void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
->  {
->  	int i;
->  
-> -	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
-> -
+> +
+> +/*
+> + * Save the L2X0 AUXCTRL and POR value to SAR memory. Its used to
+> + * in every restore MPUSS OFF path.
+> + */
+> +static void save_l2x0_context(void)
+> +{
+> +#ifdef CONFIG_CACHE_L2X0
+> +	u32 val;
+> +	void __iomem *l2x0_base = omap4_get_l2cache_base();
+> +
+> +	val = __raw_readl(l2x0_base + L2X0_AUX_CTRL);
+> +	__raw_writel(val, sar_base + L2X0_AUXCTRL_OFFSET);
+> +	val = __raw_readl(l2x0_base + L2X0_PREFETCH_CTRL);
+> +	__raw_writel(val, sar_base + L2X0_PREFETCH_CTRL_OFFSET);
+> +#endif
 
-Why not call sanity_check_meminfo() here?
+nit:  (c.f. '#ifdefs are ugly' in Documentatin/SubmittingPatches)
 
->  	memblock_init();
->  	for (i = 0; i < mi->nr_banks; i++)
->  		memblock_add(mi->bank[i].start, mi->bank[i].size);
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+This should probably be more like
+
+#ifdef CONFIG_CACHE_L2X0
+static void save_l2x0_context(void)
+{
+        /* real function */
+}
+#else
+static void save_l2x0_context(void) {}
+#endif
+
+Kevin
