@@ -1,46 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Sep 2011 08:31:59 +0100
-Subject: READ THIS: the next mach-types update
-In-Reply-To: <20110915145022.GM28104@game.jcrosoft.org>
-References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
-	<20110915145022.GM28104@game.jcrosoft.org>
-Message-ID: <20110916073159.GC22533@n2100.arm.linux.org.uk>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 16 Sep 2011 09:50:33 +0200
+Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <4E7218A0.2020309@eurekelettronica.it>
+References: <1315450031-6371-1-git-send-email-b32955@freescale.com>
+	<20081.44941.12535.496764@ipc1.ka-ro>
+	<4E71CDB2.4000205@freescale.com>
+	<4E7218A0.2020309@eurekelettronica.it>
+Message-ID: <20082.65481.262062.390598@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 04:50:22PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:25 Thu 15 Sep     , Russell King - ARM Linux wrote:
-> > I'm going to be merging a mach-types update (the cut-down and the
-> > policy-conforming version) for the next merge window.  This will mean
-> > that things WILL BREAK, and I will not notice that things have broken.
-> > 
-> > In order to fix this, entries need to be fixed to conform to the
-> > requirements - where the machine_is_xxx() name is the same as the
-> > MACH_TYPE_xxx name and the CONFIG_MACH_xxx name too.
-> > 
-> > Moreover, entries older than 12 months which have not been merged will
-> > be removed.  It is not possible to automatically check for machine_is_xxx()
-> > usages as these could conflict with other architectures, and I'm
-> > certainly NOT checking for them by hand (I estimate that'd take a
-> > significant amount of manual effort to do.)  What that means is that it
-> > is _important_ to get the core platform support in _first_ before any
-> > drivers which may make use of this.
-> > 
-> > The following will be deleted from the file this time around are:
-> > -ts_x09                  MACH_TS209              TS209                   1565
-> > -at572d940hfek           MACH_AT572D940HFEB      AT572D940HFEB           1783
-> can be dropped the at572d940hfek as the at572d940hf is drop from mainline
-> 
-> Russell an you confirm you will re-add the usb-a9g20 and the folowing one
-> 
-> usb_a9g20               MACH_USB_A9G20          USB_A9G20               1841
-> qil_a9g20               MACH_QIL_A9G20          QIL_A9G20               1844
-> tny_a9260               MACH_TNY_A9260          TNY_A9260               2058
-> tny_a9g20               MACH_TNY_A9G20          TNY_A9G20               2059
-> tny_a9263               MACH_TNY_A9263          TNY_A9263               2140
+Hi,
 
-Here's the two relevent question:
-1. have they been submitted or edited within the last 12 months?  No.
-2. are they merged into mainline?  No.
+gianluca writes:
+> Sorry for intrusion in this discussion, but:
+> 
+> Huang Shijie wrote:
+> >> channels are being used concurrently. The GPMI driver will bail out
+> >> with the timeout error while the MMC driver obviously has no timeout
+> >> check for this situation.
+> >>
+> >> I can mostly rule out HW problems, because the same board works
+> >> perfectly well with WindowsCE (tested with a copy operation between
+> >> flash and SD card).
+> >>
+> >>
+> >> Lothar Wa?mann
+> 
+> @Lothar: Probably WinCE with a copy operation between flash and SD is 
+> not reliable as synchronous as opposed dd command in the previous mail.
+> 
+I know that a copy operation on WinCE is not an adequate test. That's
+why I wrote 'I can _mostly_ rule out...'.
 
-So will they be in the update?  No.
+I'll try to do more agressive tests with WinCE to verify whether the
+hardware is actually not to blame.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
