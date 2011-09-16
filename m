@@ -1,35 +1,30 @@
-From: bill4carson@gmail.com (bill4carson)
-Date: Fri, 16 Sep 2011 14:13:34 +0800
-Subject: Query about ARM interrupt virtualization
-Message-ID: <4E72E90E.7060906@gmail.com>
+From: girish.shivananjappa@linaro.org (Girish K S)
+Date: Fri, 16 Sep 2011 11:44:29 +0530
+Subject: confusion regarding the CMD19 and CMD21 in eMMC/SD card spec
+In-Reply-To: <20110916055735.GA3938@lovegaga>
+References: <CAGxe1ZH=mrAdfVR7Uw8mYNAD43BAbW7VGuhA1pN9hbSjTG9HVA@mail.gmail.com>
+	<0356427A-B949-4DA6-9F5D-FE0DD54AEDFF@marvell.com>
+	<CAGxe1ZG4QjwB5OfrxupG_C+DtQ7sTQ4_EURaF-QrqPPSA3A0jw@mail.gmail.com>
+	<20110916044706.GA4030@lovegaga>
+	<CAGxe1ZGNBPcCMZQDdxCbO_CBBAm5FcF8R7FV0_P8MLEOcXqwYg@mail.gmail.com>
+	<20110916055735.GA3938@lovegaga>
+Message-ID: <CAGxe1ZEfuXJkVXTqBACoDXtGaYzQf29z+3-_Du7d4HpXfZw5xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, all
+our host controller supports both
+SD/MMC. single controller to read both cards.
 
-I have been doing ARM interrupt virtualization based on Christoffer KVM 
-work.
-Current status is an A15 guest os could boot successfully based on ARM KVM
-without interrupt virtualization.
-
-
-Interrupt injection is taken care of by Qemu, if interrupt 
-virtualization need to be
-supported, then all the gic cpu interface code in Qemu must be removed.
-The distributor in Qemu figure out the best irq, then ship this best_irq 
-into virtual
-cpu interface through list register.
-
-The problem is Distributor state must be synchronized with two cpu 
-interface
-actions: ACK(interrupt acknowledge) and EOI (end Of Interrupt).
-EOI could be trapped by hypervisor, this will enable us to call 
-gic_complete_irq
-in Qemu to update Distributor state.
-However for now I cannot find a way for ACK to be catch,
-or am I missing something important here?
-
-Any tips/suggestions would be appreciated!
-
-
-bill
+On 16 September 2011 11:27, Aaron Lu <aaron.lu@amd.com> wrote:
+> On Fri, Sep 16, 2011 at 11:00:12AM +0530, Girish K S wrote:
+>> Hello Aaron Lu,
+> Hi,
+>
+>> ? ? ? ? ? ? ? ? ? ? please check the mmc 4.5 specification CMD21 is
+>> tuning command.
+>
+> So you are using a mmc card with a sd host?
+>
+> -Aaron
+>
+>
