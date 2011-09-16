@@ -1,71 +1,61 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 16 Sep 2011 10:28:17 +0800
-Subject: [PATCH v8 0/4] add the GPMI-NAND support for imx23/imx28
-In-Reply-To: <1314169643-23425-1-git-send-email-b32955@freescale.com>
-References: <1314169643-23425-1-git-send-email-b32955@freescale.com>
-Message-ID: <4E72B441.2010202@freescale.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Fri, 16 Sep 2011 10:53:51 +0800
+Subject: [alsa-devel] [PATCH v3 1/1] ASoC: mxs-saif: add record function
+In-Reply-To: <CABS+qY12ChK=aA-eOERH5ATWKcQdp3wE48SsBNcpe0nDzXWOMw@mail.gmail.com>
+References: <1315399910-6525-1-git-send-email-b29396@freescale.com>
+	<CABS+qY12ChK=aA-eOERH5ATWKcQdp3wE48SsBNcpe0nDzXWOMw@mail.gmail.com>
+Message-ID: <CAA+hA=QTeNuq5rCMDWjvKiRK9xX8TFKqaXN31Cpt3RU-kogn2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha:
-Is this patch set ok now?
+Hi Mark,
 
-thanks
-Huang Shijie
-> The patch set is based on tag v3.1-rc2 of linus's tree.
-> and it can be git-am to Artem's tree:
-> 	http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
+2011/9/9 Girdwood, Liam <lrg@ti.com>:
+> On 7 September 2011 13:51, Dong Aisheng <b29396@freescale.com> wrote:
 >
-> The general-purpose media interface(GPMI) controller is a flexible interface
-> to up to several NAND flashs.
+>> 1. add different clkmux mode handling
+>> SAIF can use two instances to implement full duplex (playback &
+>> recording) and record saif may work on EXTMASTER mode which is
+>> using other saif's BITCLK&LRCLK.
+>>
+>> The clkmux mode could be set in pdata->init() in mach-specific code.
+>> For generic saif driver, it only needs to know who is his master
+>> and the master id is also provided in mach-specific code.
+>>
+>> 2. support playback and capture simutaneously however the sample
+>> rates can not be different due to hw limitation.
+>>
+>> Signed-off-by: Dong Aisheng <b29396@freescale.com>
+>> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> Cc: Liam Girdwood <lrg@ti.com>
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>> Cc: Wolfram Sang <w.sang@pengutronix.de>
+>>
+>> ---
+>> Changes since v2:
+>> ?* remove mach-specific code(clkmux in DIGCTL) out of saif driver
+>> ?For supporting EXTMASTER mode, SAIF only nees to know who's
+>> ?its master and the master id is provided by mach layer according
+>> ?to different clkmux setting.
+>> ?So we need to add a pdata->get_master_id();
+>>
+>> Changes since v1:
+>> ?* calc the delay based on the rate
+>> ?* change the saif.h #ifndef micro to match the directory
+>> ---
+>> ?include/sound/saif.h ? ? | ? 16 +++++
+>> ?sound/soc/mxs/mxs-saif.c | ?145
+>> +++++++++++++++++++++++++++++++++++++++++-----
+>> ?sound/soc/mxs/mxs-saif.h | ? ?4 +
+>> ?3 files changed, 151 insertions(+), 14 deletions(-)
+>>
+>>
+> Acked-by Liam Girdwood <lrg@ti.com>
 >
-> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
->
-> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
-> not.
->
-> v7 --> v8:
-> 	[0] add header file to fix compiling error.
->
-> v6 --> v7:
-> 	[0] rename RES_SIZE to GPMI_NAND_RES_SIZE.
-> 	[1] move gpmi-nand.h to `include/linux/mtd/` directory.
-> 	[2] remove comment for new pad control.
-> 	[3] others
->
-> v5 --> v6:
-> 	[0] rename `gpmi-nfc` to `gpmi-nand`.
-> 	[1] remove ->exit() in structure gpmi_nand_platform_data{}.
-> 	[2] drop the macros for the resource's definition of gpmi-nand.
-> 	[3] add a new pad control `MXS_PAD_CTRL_12MA`. 
-> 	[4] others.
->
-> v4 --> v5:
-> 	[0] split out the mach code and the machine code.
->
-> v3 --> v4:
-> 	merge the GPMI-NFC device code to the new branch.
->
-> Huang Shijie (4):
->   ARM: mxs: add GPMI-NAND support for imx23/imx28
->   ARM: mxs: add new a pad control
->   ARM: mxs/mx23evk: add GPMI-NAND device
->   ARM: mxs/mx28evk: add GPMI-NAND device
->
->  arch/arm/mach-mxs/Kconfig                       |    2 +
->  arch/arm/mach-mxs/clock-mx23.c                  |    1 +
->  arch/arm/mach-mxs/clock-mx28.c                  |    1 +
->  arch/arm/mach-mxs/devices-mx23.h                |    4 +
->  arch/arm/mach-mxs/devices-mx28.h                |    4 +
->  arch/arm/mach-mxs/devices/Kconfig               |    3 +
->  arch/arm/mach-mxs/devices/Makefile              |    1 +
->  arch/arm/mach-mxs/devices/platform-gpmi-nand.c  |  109 +++++++++++++++++++++++
->  arch/arm/mach-mxs/include/mach/devices-common.h |   10 ++
->  arch/arm/mach-mxs/include/mach/iomux.h          |    1 +
->  arch/arm/mach-mxs/mach-mx23evk.c                |   36 ++++++++
->  arch/arm/mach-mxs/mach-mx28evk.c                |   36 ++++++++
->  include/linux/mtd/gpmi-nand.h                   |   68 ++++++++++++++
->  13 files changed, 276 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi-nand.c
->  create mode 100644 include/linux/mtd/gpmi-nand.h
->
+Can you apply this?
+
+Also with the tag:
+Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
+
+Regards
+Dong Aisheng
