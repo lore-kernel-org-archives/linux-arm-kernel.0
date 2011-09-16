@@ -1,61 +1,28 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 16 Sep 2011 00:48:18 -0400 (EDT)
-Subject: [PATCH 6/6] ARM: zImage: prevent constant copy+rebuild of
-	lib1funcs.S
-In-Reply-To: <4E72C96F.5000203@codeaurora.org>
-References: <1315978906-15829-1-git-send-email-nico@fluxnic.net>
-	<1315978906-15829-7-git-send-email-nico@fluxnic.net>
-	<4E72C96F.5000203@codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1109160039030.20358@xanadu.home>
+From: aaron.lu@amd.com (Aaron Lu)
+Date: Fri, 16 Sep 2011 12:47:08 +0800
+Subject: confusion regarding the CMD19 and CMD21 in eMMC/SD card spec
+In-Reply-To: <CAGxe1ZG4QjwB5OfrxupG_C+DtQ7sTQ4_EURaF-QrqPPSA3A0jw@mail.gmail.com>
+References: <CAGxe1ZH=mrAdfVR7Uw8mYNAD43BAbW7VGuhA1pN9hbSjTG9HVA@mail.gmail.com>
+	<0356427A-B949-4DA6-9F5D-FE0DD54AEDFF@marvell.com>
+	<CAGxe1ZG4QjwB5OfrxupG_C+DtQ7sTQ4_EURaF-QrqPPSA3A0jw@mail.gmail.com>
+Message-ID: <20110916044706.GA4030@lovegaga>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Sep 2011, Stephen Boyd wrote:
+On Fri, Sep 16, 2011 at 09:41:04AM +0530, Girish K S wrote:
+> but there is only one host controller to handle these commands.
+> the generic sdhci driver has cmd19 hard coded, thats the reason I
+> asked the question.
+> you can also check it in the function sdhci_execute_tuning it is hard coded as
+> cmd.opcode = MMC_SEND_TUNING_BLOCK; where the macro value is 19.
+> So in case of SD card insertion it will send a SEND_TUNING_BLOCK
+> command to the device. but if
+> MMC card is inserted then it will send a BUS_TEST_W command to the device.
 
-> On 09/13/11 22:41, Nicolas Pitre wrote:
-> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> >
-> > The rule to copy this file doesn't have to be forced.  However
-> > lib1funcs.[So] have to be listed amongst the targets.
-> >
-> > This prevents zImage from being recreated needlessly.
-> >
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > ---
-> >  arch/arm/boot/compressed/Makefile |    4 ++--
-> >  1 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-> > index ce2bef536e..db1fd260ed 100644
-> > --- a/arch/arm/boot/compressed/Makefile
-> > +++ b/arch/arm/boot/compressed/Makefile
-> > @@ -112,7 +112,7 @@ endif
-> >  
-> >  targets       := vmlinux vmlinux.lds \
-> >  		 piggy.$(suffix_y) piggy.$(suffix_y).o \
-> > -		 font.o font.c head.o misc.o $(OBJS)
-> > +		 lib1funcs.o lib1funcs.S font.o font.c head.o misc.o $(OBJS)
-> >  
-> >  # Make sure files are removed during clean
-> >  extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S $(libfdt) $(libfdt_hdrs)
-> > @@ -147,7 +147,7 @@ LDFLAGS_vmlinux += -T
-> >  # For __aeabi_uidivmod
-> >  lib1funcs = $(obj)/lib1funcs.o
-> >  
-> > -$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
-> > +$(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S
-> >  	$(call cmd,shipped)
-> >  
-> >  # We need to prevent any GOTOFF relocs being used with references
-> 
-> I already posted a very similar patch and put it into Russell's patch
-> tracker. Can't you just use that instead?
+sdhci_execute_tuning will only be called if the inserted card is a sd card
+and it is operating at SDR104 or SDR50 mode(UHS-I).
 
-I remember this was discussed, but I forgot that you actually did send a 
-patch.  Either version is fine with me.
+The host's tuning function is called from the mmc_sd_init_uhs_card,
+and for a mmc card, there is no chance of that function being called.
 
-Hmmm. My version has been merged in RMK's devel-stable branch already 
-though.
-
-
-Nicolas
+-Aaron
