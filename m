@@ -1,66 +1,58 @@
-From: martin.schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Fri, 16 Sep 2011 12:31:40 +0200
-Subject: try_to_freeze() called with IRQs disabled on ARM
-In-Reply-To: <20110902174812.GD6619@n2100.arm.linux.org.uk>
-References: <20110823220056.GK3895@n2100.arm.linux.org.uk>
-	<20110825130907.GO3286@htj.dyndns.org>
-	<20110825145558.GF8883@n2100.arm.linux.org.uk>
-	<201108261644.26329.arnd@arndb.de>
-	<OF2C5ADB6A.65B1BE36-ONC12578FE.00493A67-C12578FE.004B3315@de.ibm.com>
-	<20110901140000.GF29729@n2100.arm.linux.org.uk>
-	<OF69A57AB0.CF22689A-ONC12578FF.004EDD71-C12578FF.005142FF@de.ibm.com>
-	<20110902172259.GA6619@n2100.arm.linux.org.uk>
-	<OFA88E54BC.55310B1A-ONC12578FF.00607E64-C12578FF.00611957@de.ibm.com>
-	<20110902174812.GD6619@n2100.arm.linux.org.uk>
-Message-ID: <OFFC3A1FCC.E1167E09-ONC125790D.0038D75B-C125790D.0039D4E1@de.ibm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 16 Sep 2011 11:39:31 +0100
+Subject: [PATCH 16/19] ARM: move iotable mappings within the vmalloc region
+In-Reply-To: <1316156850-31013-17-git-send-email-nico@fluxnic.net>
+References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
+	<1316156850-31013-17-git-send-email-nico@fluxnic.net>
+Message-ID: <20110916103931.GB3130@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Nicolas,
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote on 09/02/2011
-07:48:12 PM:
+On Fri, Sep 16, 2011 at 03:07:27AM -0400, Nicolas Pitre wrote:
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> In order to remove the build time variation between different SOCs with
+> regards to VMALLOC_END, the iotable mappings are now allocated inside
+> the vmalloc region.  This allows for VMALLOC_END to be identical across
+> all machines.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  arch/arm/include/asm/pgtable.h |    8 +------
+>  arch/arm/mm/mmu.c              |   42 +++++++++++++++++++++++++++++----------
+>  2 files changed, 32 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+> index 5750704e02..950dee3ce2 100644
+> --- a/arch/arm/include/asm/pgtable.h
+> +++ b/arch/arm/include/asm/pgtable.h
+> @@ -21,7 +21,6 @@
+>  #else
+>  
+>  #include <asm/memory.h>
+> -#include <mach/vmalloc.h>
+>  #include <asm/pgtable-hwdef.h>
+>  
+>  /*
+> @@ -31,15 +30,10 @@
+>   * any out-of-bounds memory accesses will hopefully be caught.
+>   * The vmalloc() routines leaves a hole of 4kB between each vmalloced
+>   * area for the same reason. ;)
+> - *
+> - * Note that platforms may override VMALLOC_START, but they must provide
+> - * VMALLOC_END.  VMALLOC_END defines the (exclusive) limit of this space,
+> - * which may not overlap IO space.
+>   */
+> -#ifndef VMALLOC_START
+>  #define VMALLOC_OFFSET		(8*1024*1024)
+>  #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+> -#endif
+> +#define VMALLOC_END		0xff000000UL
 
-> On Fri, Sep 02, 2011 at 07:40:34PM +0200, Ulrich Weigand wrote:
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote on 09/02/2011
-> > 07:22:59 PM:
-> > > On Fri, Sep 02, 2011 at 04:47:35PM +0200, Ulrich Weigand wrote:
-> > > > Assume the scenario you initally describe, where a first signal is
-> > > > ignored and leads to system call restart.  With your latest patch,
-> > > > you call into syscall_restart which sets everything up to restart
-> > > > the call (with interrupts disabled).
-> > >
-> > > I don't think SIG_IGN signals even set the TIF work flag, so they
-> > > never even cause a call into do_signal().  Therefore, as far as
-> > > syscalls go, attempting to send a process (eg) a SIGINT which its
-> > > handler is set to SIG_IGN results in the process not even being
-> > > notified about the attempt - we won't even wake up while the
-> > > syscall is sleeping.
-> >
-> > I don't see why SIG_IGN signals shouldn't set the TIF work flag;
-> > the decision whether to ignore a signal is only made once we've
-> > got to get_signal_to_deliver.
->
-> Yes, having looked deeper, you seem to be right - but only if the thread
-> is being ptraced.  If it's not being ptraced, ignored signals don't
-> make it that far.
->
-> And yes, we can end up processing the interrupt before the SVC is
-> executed, which is still a hole.  So we need to avoid doing the
-> restart in userspace - which might actually make things easier.
-> I'll take a look into that over the weekend.
+Only a minor nit, but I think this requires an update to 
+Documentation/arm/memory.txt as this says that VMALLOC_END -> feffffff 
+is free for platform use but this won't ever be true now.
 
-After some more discussions with Uli I've now created a patch that
-hopefully will address the issue on s390. The new code always uses
-the TIF_RESTART_SVC work flag to restart the system call if there
-is no signal to deliver. Only if there is a signal to deliver the
-traditional rewind of the instruction pointer is used to restart
-the system call (for -ERESTARTNOINTR and -ERESTARTSYS with a
-SA_RESTART signal handler).
-
-In case you are interested in the code is available at
-git://git390.marist.edu/pub/scm/linux-2.6.git features
-in particular git commit 4a6a001c39ac196530d8378408b61d6d2fee70d9.
-
-blue skies,
-   Martin
+Jamie
