@@ -1,49 +1,112 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 17 Sep 2011 10:08:30 +0900
-Subject: [GIT PULL] Samsung Fixes for v3.1-rc7
-In-Reply-To: <1642876.jgt6epCtEP@wuerfel>
-References: <00b101cc738d$bcf46ce0$36dd46a0$%kim@samsung.com>
-	<00cf01cc7466$e2cd66e0$a86834a0$%kim@samsung.com>
-	<20110916134300.GB16280@suse.de> <1642876.jgt6epCtEP@wuerfel>
-Message-ID: <00d801cc74d6$50d93fa0$f28bbee0$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 16 Sep 2011 18:46:23 -0700
+Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
+Message-ID: <20110917014623.GC2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> On Friday 16 September 2011 15:43:00 Greg KH wrote:
-> > > In this case, I'm not sure which following method is proper...
-> > > - to send 'pull request' to Greg / stable at kernel.org like bug fix
-during -rc
-> > > - to submit each patches with adding 'Cc: stable at kernel.org' again
-> > > - or ?
-> 
-> The patches are currently queued in the stable branch of the arm-soc
-> tree, I haven't forwarded them to Linus yet. I can easily change
-> the changelog before I actually send them on (if you tell me which ones
-> they are, or I can pull an updated set of patches to replace them.
-> 
-Arnd, I think, would be better to me if you could not change the
-changelog(commit id) because some my topic branch which is for v3.2 has it.
+Hi Arnd,
 
-> > Are these in Linus's tree already?  If so, send me the git commit ids
-> > and I will add them to the stable kernels.
-> >
-> > If not, wait until they are, and then send me the git commit ids, and I
-> > will then add them.
-> 
-> This is fine with me as well, but I'm trying to get more people to
-> send me patches that are annotated already. I forgot to ask during
-> the last set of bug fixes I forwarded and should probably go through
-> the ones that are already merged and ask the authors about backporting.
-> 
-I need to sort out commit ids which are needed to apply in stable among
-Samsung stuff already in mainline.
+Please pull the first part of omap cleanup from:
 
-Thanks.
+git://github.com/tmlind/linux.git cleanup
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+This series cleans up early_init functions and removes
+CHIP_IS macro usage. This makes it easier to have SoC
+specific init functions so adding support for new omap
+variants does not require patching all over the place.
+
+Regards,
+
+Tony
+
+
+The following changes since commit b6fd41e29dea9c6753b1843a77e50433e6123bcb:
+  Linus Torvalds (1):
+        Linux 3.1-rc6
+
+are available in the git repository at:
+
+  git://github.com/tmlind/linux.git cleanup
+
+Paul Walmsley (12):
+      OMAP3: id: remove identification codes that only correspond to marketing names
+      OMAP3: id: remove useless strcpy()s
+      OMAP3: id: use explicit omap_revision codes for 3505/3517 ES levels
+      OMAP3: id: add fallthrough warning; fix some CodingStyle issues
+      OMAP3: id: remove duplicate code for testing SoC ES level
+      OMAP2+: id: remove OMAP_REVBITS_* macros
+      OMAP: clockdomain: split clkdm_init()
+      OMAP: clockdomain code/data: remove omap_chip bitmask from struct clockdomain
+      OMAP: powerdomain: split pwrdm_init() into two functions
+      OMAP: powerdomain: remove omap_chip bitmasks
+      OMAP2+: hwmod: remove OMAP_CHIP*
+      OMAP: id: remove OMAP_CHIP declarations, code
+
+Tony Lindgren (4):
+      omap2+: Use Kconfig symbol in Makefile instead of obj-y
+      ARM: OMAP: Move omap2_init_common_devices out of init_early
+      ARM: OMAP: Introduce SoC specific early_init
+      Merge branch 'omap_chip_remove_cleanup_3.2' of git://git.pwsan.com/linux-2.6 into cleanup
+
+ arch/arm/mach-omap2/Makefile                     |   81 +--
+ arch/arm/mach-omap2/board-2430sdp.c              |    9 +-
+ arch/arm/mach-omap2/board-3430sdp.c              |    9 +-
+ arch/arm/mach-omap2/board-3630sdp.c              |   11 +-
+ arch/arm/mach-omap2/board-4430sdp.c              |    9 +-
+ arch/arm/mach-omap2/board-am3517crane.c          |    9 +-
+ arch/arm/mach-omap2/board-am3517evm.c            |    8 +-
+ arch/arm/mach-omap2/board-apollon.c              |    9 +-
+ arch/arm/mach-omap2/board-cm-t35.c               |   13 +-
+ arch/arm/mach-omap2/board-cm-t3517.c             |    9 +-
+ arch/arm/mach-omap2/board-devkit8000.c           |   12 +-
+ arch/arm/mach-omap2/board-generic.c              |    2 +-
+ arch/arm/mach-omap2/board-h4.c                   |    9 +-
+ arch/arm/mach-omap2/board-igep0020.c             |   13 +-
+ arch/arm/mach-omap2/board-ldp.c                  |    9 +-
+ arch/arm/mach-omap2/board-n8x0.c                 |   13 +-
+ arch/arm/mach-omap2/board-omap3beagle.c          |    4 +-
+ arch/arm/mach-omap2/board-omap3evm.c             |    9 +-
+ arch/arm/mach-omap2/board-omap3logic.c           |   11 +-
+ arch/arm/mach-omap2/board-omap3pandora.c         |   11 +-
+ arch/arm/mach-omap2/board-omap3stalker.c         |    9 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c       |   11 +-
+ arch/arm/mach-omap2/board-omap4panda.c           |    9 +-
+ arch/arm/mach-omap2/board-overo.c                |   11 +-
+ arch/arm/mach-omap2/board-rm680.c                |   17 +-
+ arch/arm/mach-omap2/board-rx51.c                 |   17 +-
+ arch/arm/mach-omap2/board-ti8168evm.c            |    9 +-
+ arch/arm/mach-omap2/board-zoom.c                 |   23 +-
+ arch/arm/mach-omap2/clock3xxx_data.c             |   11 +-
+ arch/arm/mach-omap2/clockdomain.c                |  147 +++--
+ arch/arm/mach-omap2/clockdomain.h                |   22 +-
+ arch/arm/mach-omap2/clockdomain2xxx_3xxx.c       |    4 -
+ arch/arm/mach-omap2/clockdomain44xx.c            |    2 -
+ arch/arm/mach-omap2/clockdomains2420_data.c      |  154 +++++
+ arch/arm/mach-omap2/clockdomains2430_data.c      |  181 +++++
+ arch/arm/mach-omap2/clockdomains2xxx_3xxx_data.c |  803 +---------------------
+ arch/arm/mach-omap2/clockdomains3xxx_data.c      |  398 +++++++++++
+ arch/arm/mach-omap2/clockdomains44xx_data.c      |  409 +++---------
+ arch/arm/mach-omap2/id.c                         |  191 ++----
+ arch/arm/mach-omap2/io.c                         |   52 ++-
+ arch/arm/mach-omap2/omap_hwmod.c                 |    3 -
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c       |   37 -
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c       |   45 --
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c       |  169 +++---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c       |   82 ---
+ arch/arm/mach-omap2/powerdomain-common.c         |    7 +-
+ arch/arm/mach-omap2/powerdomain.c                |   87 ++-
+ arch/arm/mach-omap2/powerdomain.h                |    9 +-
+ arch/arm/mach-omap2/powerdomains2xxx_3xxx_data.c |   19 +-
+ arch/arm/mach-omap2/powerdomains2xxx_data.c      |   44 +-
+ arch/arm/mach-omap2/powerdomains3xxx_data.c      |   81 ++-
+ arch/arm/mach-omap2/powerdomains44xx_data.c      |   20 +-
+ arch/arm/plat-omap/include/plat/clock.h          |    2 -
+ arch/arm/plat-omap/include/plat/common.h         |    9 +
+ arch/arm/plat-omap/include/plat/cpu.h            |  108 +---
+ arch/arm/plat-omap/include/plat/io.h             |    2 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h     |    2 -
+ 57 files changed, 1430 insertions(+), 2036 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/clockdomains2420_data.c
+ create mode 100644 arch/arm/mach-omap2/clockdomains2430_data.c
+ create mode 100644 arch/arm/mach-omap2/clockdomains3xxx_data.c
