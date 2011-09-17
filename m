@@ -1,32 +1,80 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Sep 2011 22:43:13 +0100
-Subject: [PATCH] pata-generic/of: Make probing via device tree
-	non-powerpc-specific
-In-Reply-To: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
-References: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20110916214313.GB16381@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 17 Sep 2011 10:02:38 +0900
+Subject: [GIT PULL] Samsung Fixes for v3.1-rc7
+In-Reply-To: <20110916134300.GB16280@suse.de>
+References: <00b101cc738d$bcf46ce0$36dd46a0$%kim@samsung.com>
+	<201109151732.59886.arnd@arndb.de>
+	<00cf01cc7466$e2cd66e0$a86834a0$%kim@samsung.com>
+	<20110916134300.GB16280@suse.de>
+Message-ID: <00d701cc74d5$7f302720$7d907560$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 03:38:10PM +0100, Dave Martin wrote:
-> This patch enables device-tree-based probing of the pata-generic
-> platform driver across all architectures:
+Greg KH wrote:
 > 
->   * make the pata_of_generic module depend on OF instead of PPC_OF;
->   * supply some missing inclues;
->   * replace endianness-sensitive raw access to device tree data
->     with of_property_read_u32() calls.
+> On Fri, Sep 16, 2011 at 08:50:51PM +0900, Kukjin Kim wrote:
+> > Arnd Bergmann wrote:
+> > >
+> > > On Thursday 15 September 2011, Kukjin Kim wrote:
+> > > > This is Samsung fixes for v3.1
+> > > >
+> > > > Please pull from:
+> > > >   git://github.com/kgene/linux-samsung.git samsung-fixes-2
+> > > > As you know, git.kernel.org/master.kernel.org has been down so I use
+> > > > temporary git repo. at github now.
+> > > >
+> > > > These things are needed for v3.1 and if any problems, please let me
+> > know.
+> > > >
+> > > > As a note, others for v3.2 will be sent in the next week...
+> > >
+> > > Thanks, pulled.
+> > >
+> > > Is it correct that you want none of these patches to be backported
+> > > into the stable or longterm releases? Some of these look like they
+> > > should be marked 'Cc: stable at kernel.org'.
+> > >
+> > (Cc'ed Greg K-H)
+> >
+> > Yes, you're right. Some patches are needed to sent to stable at kernel.org.
+> > But unfortunately, when they have been submitted, there was no 'Cc:
+> > stable at kernel.org'...
 > 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> ---
+> What do you mean?  Do you mean you just forgot to add them, or you
+> created them so long ago before there was a stable at kernel.org?
 > 
-> Tested on ARM Versatile Express, with my soon-to-be-posted device
-> tree support patches.
+I mean I didn't add them before sending 'pull request' during -rc :(
 
-This may not be the correct way to support the CF slot on Versatile
-Express - it depends whether the CF slot on VE supports just CF
-memory cards or whether it can take any CF card.
+> > In this case, I'm not sure which following method is proper...
+> > - to send 'pull request' to Greg / stable at kernel.org like bug fix during
+-rc
+> > - to submit each patches with adding 'Cc: stable at kernel.org' again
+> > - or ?
+> 
+> Are these in Linus's tree already?  If so, send me the git commit ids
+> and I will add them to the stable kernels.
+> 
+In this case, not yet. But there are some bug fixing patches which have been
+accepted in mainline not in stable.
 
-If the latter, then what may be inserted could be a CF network card,
-and that means it's probably wrong to tell the kernel that what's
-there is a PATA interface.
+> If not, wait until they are, and then send me the git commit ids, and I
+> will then add them.
+> 
+OK, let you know what git commit is needed to apply into stable.
+
+> Before they get to Linus, there's nothing I can do with them, and I
+> don't accept pull requests as that makes no sense when it comes to the
+> stable kernel patch flow.
+> 
+OK, I didn't know about the stable kernel patch flow exactly.
+
+> Does this help?
+> 
+Sure, thank you so much.
+Have a nice weekend :)
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
