@@ -1,66 +1,44 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 17 Sep 2011 23:33:31 +0800
-Subject: [PATCH v2] dmaengine: add CSR SiRFprimaII DMAC driver
-In-Reply-To: <20110917150246.GH16381@n2100.arm.linux.org.uk>
-References: <1316166960-20964-1-git-send-email-Baohua.Song@csr.com>
-	<20110917150246.GH16381@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4ySwfuaa1tbMcQkYHQQw61+-ajXwhxr_5xOxxKmn+aDog@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 17 Sep 2011 09:37:32 -0600
+Subject: [PATCH v2] pata-generic/of: Make probing via device tree
+	non-powerpc-specific
+In-Reply-To: <1316190120-17010-1-git-send-email-dave.martin@linaro.org>
+References: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
+	<1316190120-17010-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20110917153732.GR3523@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/17 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Fri, Sep 16, 2011 at 02:56:00AM -0700, Barry Song wrote:
->> +static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
->> + ? ? struct dma_slave_config *config)
->> +{
->> + ? ? u32 addr, direction;
->> + ? ? unsigned long flags;
->> +
->> + ? ? switch (config->direction) {
->
-> config->direction is deprecated, please don't use it.
+On Fri, Sep 16, 2011 at 05:22:00PM +0100, Dave Martin wrote:
+> This patch enables device-tree-based probing of the pata-generic
+> platform driver across all architectures:
+> 
+>   * make the pata_of_generic module depend on OF instead of PPC_OF;
+>   * supply some missing inclues;
+>   * replace endianness-sensitive raw access to device tree data
+>     with of_property_read_u32() calls.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+> v2: correct sense of the check of_property_read_u32(dn, "pio-mode",
+> &pio_mode).  Somehow I posted an old version of this patch, depite
+> having already fixed this...
+> 
+> Tested on ARM Versatile Express, with my soon-to-be-posted device
+> tree support patches.
+> 
+> I'm not in a position to build/test this for powerpc easily --
+> if anyone is able to do that, it would be appreciated.
 
-ok.
+What driver is normally used for versatile express pata?  This driver
+is kind of legacy in that it was created when there was a split
+between platform_device and of_platform_devices.  But that split was a
+bad idea and the same driver should be used regardless of whether or
+not DT is enabled.  pata_of_platform.c really should be removed.
 
->
->> + ? ? case DMA_FROM_DEVICE:
->> + ? ? ? ? ? ? direction = 0;
->> + ? ? ? ? ? ? addr = config->dst_addr;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? case DMA_TO_DEVICE:
->> + ? ? ? ? ? ? direction = 1;
->> + ? ? ? ? ? ? addr = config->src_addr;
->> + ? ? ? ? ? ? break;
->> +
->> + ? ? default:
->> + ? ? ? ? ? ? return -EINVAL;
->> + ? ? }
->> +
->> + ? ? if ((config->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
->> + ? ? ? ? ? ? (config->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES))
->> + ? ? ? ? ? ? return -EINVAL;
->> +
->> + ? ? spin_lock_irqsave(&schan->lock, flags);
->> + ? ? schan->addr = addr;
->> + ? ? schan->direction = direction;
->> + ? ? schan->mode = (config->src_maxburst == 4 ? 1 : 0);
->
-> Please store the source address, destination address, and mode separately
-> for each direction. ?You should then select from that at prepare time.
+So, instead of removing the PPC_OF restriction from
+pata_of_platform.c, you should look at adding DT support to the
+existing binding.  Bonus points if you can roll pata_of_platform.c
+support into pata_platform.c (assuming that is the correct driver).
 
-the dmac has fixed route. every channel has fixed function. one
-channel is for one device and one direction. for example, spi0 can
-have two fixed channel: spi0-tx, spi0-rx.
-then for every schan, device address is always fixed and we don't care
-it at all. we only need to write the memory address to dmac address
-register.
-
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
--barry
+g.
