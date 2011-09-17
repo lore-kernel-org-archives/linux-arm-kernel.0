@@ -1,49 +1,46 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Sat, 17 Sep 2011 22:15:34 +0800
-Subject: [PATCH] ARM: pxa/cm-x300: properly set bt_reset pin
-Message-ID: <1316268934.16763.2.camel@phoenix>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Sat, 17 Sep 2011 19:58:20 +0530
+Subject: READ THIS: the next mach-types update
+In-Reply-To: <20110915102528.GI6267@n2100.arm.linux.org.uk>
+References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4C80171@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix below build warning and properly set bt_reset pin.
+Hello,
 
-  CC      arch/arm/mach-pxa/cm-x300.o
-arch/arm/mach-pxa/cm-x300.c: In function 'cm_x300_init_wi2wi':
-arch/arm/mach-pxa/cm-x300.c:779: warning: unused variable 'wlan_en'
-arch/arm/mach-pxa/cm-x300.c:795: warning: 'bt_reset' may be used uninitialized in this function
+linux-arm-kernel-bounces at lists.infradead.org wrote on :
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- arch/arm/mach-pxa/cm-x300.c |    8 +++-----
- 1 files changed, 3 insertions(+), 5 deletions(-)
+> I'm going to be merging a mach-types update (the cut-down and the
+> policy-conforming version) for the next merge window.  This will mean
+> that things WILL BREAK, and I will not notice that things have broken.
+> 
+> In order to fix this, entries need to be fixed to conform to the
+> requirements - where the machine_is_xxx() name is the same as the
+> MACH_TYPE_xxx name and the CONFIG_MACH_xxx name too.
+> 
+> Moreover, entries older than 12 months which have not been merged will
+> be removed.  It is not possible to automatically check for machine_is_xxx()
+> usages as these could conflict with other architectures, and I'm
+> certainly NOT checking for them by hand (I estimate that'd take a
+> significant amount of manual effort to do.)  What that means
+> is that it
+> is _important_ to get the core platform support in _first_ before any
+> drivers which may make use of this.
+> 
+> The following will be deleted from the file this time around are:
+[...]
 
-diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-index 0f00e01..0e18eb9 100644
---- a/arch/arm/mach-pxa/cm-x300.c
-+++ b/arch/arm/mach-pxa/cm-x300.c
-@@ -776,7 +776,6 @@ static struct gpio cm_x300_wi2wi_gpios[] __initdata = {
- 
- static void __init cm_x300_init_wi2wi(void)
- {
--	int bt_reset, wlan_en;
- 	int err;
- 
- 	if (system_rev < 130) {
-@@ -792,12 +791,11 @@ static void __init cm_x300_init_wi2wi(void)
- 	}
- 
- 	udelay(10);
--	gpio_set_value(bt_reset, 0);
-+	gpio_set_value(cm_x300_wi2wi_gpios[1].gpio, 0);
- 	udelay(10);
--	gpio_set_value(bt_reset, 1);
-+	gpio_set_value(cm_x300_wi2wi_gpios[1].gpio, 1);
- 
--	gpio_free(wlan_en);
--	gpio_free(bt_reset);
-+	gpio_free_array(ARRAY_AND_SIZE(cm_x300_wi2wi_gpios));
- }
- 
- /* MFP */
--- 
-1.7.4.1
+> -ti8148evm               MACH_TI8148EVM          TI8148EVM            3004
+
+I guess this was removed due to being older than 12 months.
+
+But since I had submitted v1 (see [1]) and am working on v2 post review, can you
+please suggest how to go about it as I will need the above for adding support
+for TI8148 EVM?
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg53457.html
+
+Thanks.
+
+   Hemant
