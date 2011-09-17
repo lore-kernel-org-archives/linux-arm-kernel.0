@@ -1,42 +1,86 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 17 Sep 2011 15:30:25 -0600
-Subject: [PATCH v2] pata-generic/of: Make probing via device tree
-	non-powerpc-specific
-In-Reply-To: <2615461.zA8fCfbHH2@wuerfel>
-References: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
-	<1316190120-17010-1-git-send-email-dave.martin@linaro.org>
-	<20110917153732.GR3523@ponder.secretlab.ca>
-	<2615461.zA8fCfbHH2@wuerfel>
-Message-ID: <CACxGe6u8a0HbCSisVadhasMKpdmgmVP1OZOo0+pLWcNncJozbQ@mail.gmail.com>
+From: snjw23@gmail.com (Sylwester Nawrocki)
+Date: Sun, 18 Sep 2011 00:00:16 +0200
+Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based camera
+	board.
+In-Reply-To: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
+References: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
+Message-ID: <4E751870.5080605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 17, 2011 at 12:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 17 September 2011 09:37:32 Grant Likely wrote:
->> What driver is normally used for versatile express pata? ?This driver
->> is kind of legacy in that it was created when there was a split
->> between platform_device and of_platform_devices. ?But that split was a
->> bad idea and the same driver should be used regardless of whether or
->> not DT is enabled. ?pata_of_platform.c really should be removed.
->
-> It normally uses the plain pata_platform.c driver.
->
-> Note that the pata_of_platform driver is already just a shim on
-> top of the regular pata_platform driver. They could easily be combined,
-> but the current state is also ok, since there is very little code
-> duplication.
+On 09/17/2011 11:34 AM, Martin Hostettler wrote:
+> Adds board support for an MT9M032 based camera to omap3evm.
+...
+> +
+> +static int __init camera_init(void)
+> +{
+> +	int ret = -EINVAL;
+> +	
+> +	omap_mux_init_gpio(nCAM_VD_SEL, OMAP_PIN_OUTPUT);
+> +	if (gpio_request(nCAM_VD_SEL, "nCAM_VD_SEL")<  0) {
+> +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_SEL(%d)\n",
+> +		       nCAM_VD_SEL);
+> +		goto err;
+> +	}
+> +	if (gpio_direction_output(nCAM_VD_SEL, 1)<  0) {
+> +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_SEL(%d) direction\n",
+> +		       nCAM_VD_SEL);
+> +		goto err_vdsel;
+> +	}
 
-A bunch of the code is actually redundant since the resource table is
-no populated for DT devices.  I also see some directly references to
-reg-shift and pio-mode property values without using be32_to_cpu(), so
-that will also need to be fixed.  The of_irq_to_resource() and
-of_address_to_resource() calls are now redundant since
-platform_get_*() works for DT sourced platform device (with one quirk
-for the electra-ide device).  Given that the conversion is straight
-forward, I'd rather see pata_of_platform.c dropped and rolled into
-pata_platform.c.  I've hacked together a patch to do so, but I've only
-compile tested it.  Dave, if I send it to you, can you take care of
-testing it?
+How about replacing gpio_request + gpio_direction_output with:
 
-Thanks,
-g.
+	gpio_request_one(nCAM_VD_SEL, GPIOF_OUT_INIT_HIGH, "nCAM_VD_SEL");
+
+> +
+> +	if (gpio_request(EVM_TWL_GPIO_BASE + 2, "T2_GPIO2")<  0) {
+> +		pr_err("omap3evm-camera: Failed to get GPIO T2_GPIO2(%d)\n",
+> +		       EVM_TWL_GPIO_BASE + 2);
+> +		goto err_vdsel;
+> +	}
+> +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 2, 0)<  0) {
+> +		pr_err("omap3evm-camera: Failed to set GPIO T2_GPIO2(%d) direction\n",
+> +		       EVM_TWL_GPIO_BASE + 2);
+> +		goto err_2;
+> +	}
+
+ 	gpio_request_one(EVM_TWL_GPIO_BASE + 2, GPIOF_OUT_INIT_LOW, "T2_GPIO2");
+
+> +
+> +	if (gpio_request(EVM_TWL_GPIO_BASE + 8, "nCAM_VD_EN")<  0) {
+> +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_EN(%d)\n",
+> +		       EVM_TWL_GPIO_BASE + 8);
+> +		goto err_2;
+> +	}
+> +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 8, 0)<  0) {
+> +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_EN(%d) direction\n",
+> +		       EVM_TWL_GPIO_BASE + 8);
+> +		goto err_8;
+> +	}
+
+...and	gpio_request_one(EVM_TWL_GPIO_BASE + 8, GPIOF_OUT_INIT_LOW, "nCAM_VD_EN") ?
+
+> +
+> +	omap3evm_set_mux(MUX_CAMERA_SENSOR);
+> +
+> +	
+> +	ret = omap3_init_camera(&isp_platform_data);
+> +	if (ret<  0)
+> +		goto err_8;
+> +	return 0;
+> +	
+> +err_8:
+> +	gpio_free(EVM_TWL_GPIO_BASE + 8);
+> +err_2:
+> +	gpio_free(EVM_TWL_GPIO_BASE + 2);
+> +err_vdsel:
+> +	gpio_free(nCAM_VD_SEL);
+> +err:
+> +	return ret;
+> +}
+> +
+> +device_initcall(camera_init);
+
+--
+Regards,
+Sylwester
