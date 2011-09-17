@@ -1,76 +1,126 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 17 Sep 2011 11:45:18 +0100
-Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
-	initialization functions
-In-Reply-To: <CAGsJ_4xpc-8zzGkZ9LThqP7in27n6uX4LRGAf+AtoWTM4p=82w@mail.gmail.com>
-References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
-	<20110914084237.GC6267@n2100.arm.linux.org.uk>
-	<20110915013937.GE1488@S2100-06.ap.freescale.net>
-	<20110915083248.GG6267@n2100.arm.linux.org.uk>
-	<CAGsJ_4xpc-8zzGkZ9LThqP7in27n6uX4LRGAf+AtoWTM4p=82w@mail.gmail.com>
-Message-ID: <20110917104518.GD16381@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 17 Sep 2011 12:34:57 +0200
+Subject: [PATCH] arm/dt: Add SoC detection macros
+In-Reply-To: <20110917102811.GC16381@n2100.arm.linux.org.uk>
+References: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
+	<20110917102811.GC16381@n2100.arm.linux.org.uk>
+Message-ID: <20110917103457.GP28104@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 11:24:36AM +0800, Barry Song wrote:
-> if we have a save/restore interface, it looks it will be very
-> complicated. different l2 need to save different registers.
+On 11:28 Sat 17 Sep     , Russell King - ARM Linux wrote:
+> On Fri, Sep 09, 2011 at 01:02:19AM -0700, Allen Martin wrote:
+> > +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+> > +# ifdef SOC_NAME
+> > +#  undef MULTI_SOC
+> > +#  define MULTI_SOC
+> > +# else
+> > +#   define SOC_NAME tegra2
+> > +# endif
+> > +#endif
+> > +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> > +# ifdef SOC_NAME
+> > +#  undef MULTI_SOC
+> > +#  define MULTI_SOC
+> > +# else
+> > +#   define SOC_NAME tegra3
+> > +# endif
+> > +#endif
+> > +
+> > +#define soc_is_tegra2()			0
+> > +#define soc_is_tegra3()			0
+> > +
+> > +#if defined(MULTI_SOC)
+> > +# if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+> > +#  undef soc_is_tegra2
+> > +#  define soc_is_tegra2()		is_tegra2()
+> > +# endif
+> > +# if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+> > +#  undef soc_is_tegra3
+> > +#  define soc_is_tegra3()		is_tegra3()
+> > +# endif
+> > +#else /* non-multi, only one architecture is on */
+> > +# if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+> > +#  undef soc_is_tegra2
+> > +#  define soc_is_tegra2()		1
+> > +# elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+> > +#  undef soc_is_tegra3
+> > +#  define soc_is_tegra3()		1
+> > +# endif
+> > +#endif
+> 
+> This is not the way to do this, especially for a file in asm/*.h.  Look
+> at the way machine_is_xxx() is dealt with in include/generated/mach-types.h.
+> 
+> #define MULTI_SOC			0
+> #undef SOC_SELECTED
+> 
+> #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+> # ifdef SOC_SELECTED
+> #  undef MULTI_SOC
+> #  define MULTI_SOC			1
+> # else
+> #  define SOC_SELECTED
+> # endif
+> # define soc_is_tegra2()		(!MULTI_SOC || is_tegra2())
+> #else
+> # define soc_is_tegra2()		0
+> #endif
+> 
+> #ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> # ifdef SOC_SELECTED
+> #  undef MULTI_SOC
+> #  define MULTI_SOC			1
+> # else
+> #  define SOC_SELECTED
+> # endif
+> # define soc_is_tegra3()		(!MULTI_SOC || is_tegra3())
+> #else
+> # define soc_is_tegra3()		0
+> #endif
+> 
+> #undef SOC_SELECTED
+> 
+> The above is nicely extensible - if other SoCs need to extend this they
+> just need to add another outer ifdef..endif section to the file.
+> 
+> > +
+> > +enum soc_version {
+> > +	SOC_UNKNOWN = 0,
+> > +	TEGRA_T20,
+> > +	TEGRA_T30,
+> 
+> I'd suggest prefixing these with SOC_ to avoid any namespace problems.
+> 
+> > +};
+> > +
+> > +void soc_init_version(void);
+> > +enum soc_version soc_get_version(void);
+> > +
+> > +static inline int is_tegra2(void)
+> > +{
+> > +	return soc_get_version() == TEGRA_T20;
+> > +}
+> > +
+> > +static inline int is_tegra3(void)
+> > +{
+> > +	return soc_get_version() == TEGRA_T30;
+> > +}
+> 
+> If we require all SoCs to provide a value in soc_version, then we can use
+> exactly the same method as mach-types.h uses - and while at this, please
+> get rid of soc_get_version().  It's far cheaper to access the variable
+> directly rather than indirect through a function, just like we do with
+> __machine_arch_type.  Mark it __read_mostly too.
+> 
+> One last point to raise here is - and it's quite a fundamental one - do we
+> really want this?  If we're making decisions based on the SoC type, that
+> suggests to me that the hardware description in DT is incomplete, and
+> we're hiding stuff in the kernel behind the SoC type.  That doesn't sound
+> particularly appealing given the point of DT is to encode the hardware
+> specific information outside the kernel code.
+except if a machine can run on 2 soc so detect it will avoid to have 2 Device
+Tree
 
-Why?  It's quite simple as far as I can see:
-
-static u32 l2_aux_ctrl;
-
-void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
-{
-	...
-	aux = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
-
-	aux &= aux_mask;
-	aux |= aux_val;
-
-	l2_aux_ctrl = aux;
-	...
-}
-
-void l2x0_resume(void)
-{
-	bool need_setup = false;
-
-	if (l2_aux_ctrl != readl_relaxed(l2x0_base + L2X0_AUX_CTRL))
-		need_setup = true;
-	        
-	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
-		/* Make sure that I&D is not locked down when starting */
-		l2x0_unlock(cache_id);
-
-		/* l2x0 controller is disabled */
-		writel_relaxed(l2_aux_ctrl, l2x0_base + L2X0_AUX_CTRL);
-
-		l2x0_inv_all();
-
-		/* enable L2X0 */
-		writel_relaxed(1, l2x0_base + L2X0_CTRL);
-	}
-}
-
-and we can do a similar thing when initializing the PL310 and resuming
-the PL310 - add a new outer_cache callback called 'resume' to be pointed
-at the relevant resume function which knows which registers to restore.
-
-> when we resume, we must disable l2 if bootloader has enabled it and
-> restore all registers.
-
-That's not possible in SoCs operating in non-secure mode from generic
-code, as some of these registers will not be accessible.  They can only
-be programmed from platform specific code due to the complexities of
-dealing with the abhorrent secure monitor stuff.
-
-I'm now starting to think that we don't actually want any resume code
-at the L2 level - most SoCs will be operating in non-secure mode (I
-believe it's only ARM's development platforms which operate in secure
-mode) and so most of the generic code which will need to write to the
-L2 control registers on resume will fail.
-
-Even re-calling the initialization functions probably does nothing on
-parts operating in secure mode - whether at boot or at resume.
+Best Regards,
+J.
