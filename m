@@ -1,37 +1,25 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 17 Sep 2011 11:37:26 +0530
-Subject: [PATCH] ARM: BUG() dies silently
-In-Reply-To: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
-References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <CAH+eYFBSiL44CMOpgED+TAOTUH_dQMaKKu=hC3ynG0Y2nQ8ekw@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sat, 17 Sep 2011 09:52:02 +0300
+Subject: [PATCH 3/7] ASoC: edb93xx: convert to use snd_soc_register_card()
+In-Reply-To: <1316191555.17769.2.camel@r60e>
+References: <cover.1315732452.git.mika.westerberg@iki.fi>
+	<0fef3fd00e8cdb8a606f4a81ad4e7f2b7014621c.1315732452.git.mika.westerberg@iki.fi>
+	<1316191555.17769.2.camel@r60e>
+Message-ID: <20110917065202.GA2759@mwesterb-mobl.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 1, 2011 at 01:45, Omar Ramirez Luna <omar.ramirez@ti.com> wrote:
-> There are some cases where the code generated for BUG() results
-> into an infinite while loop without causing a null dereference,
-> this ends on a kernel being stuck on a loop and the user without
-> a clue of what happened.
->
-> E.g.: lib/scatterlist.c : __sg_alloc_table
->
-> ? ? ? ?BUG_ON(nents > max_ents);
-> ?438: ? 9a000000 ? ? ? ?bls ? ? 440 <__sg_alloc_table+0x20>
-> ?43c: ? eafffffe ? ? ? ?b ? ? ? 43c <__sg_alloc_table+0x1c>
->
-> Adding volatile makes the compiler to avoid optimizations on this
-> code, which makes the panic to occur:
->
-> ? ? ? ?BUG_ON(nents > max_ents);
-> ?438: ? 9a000002 ? ? ? ?bls ? ? 448 <__sg_alloc_table+0x28>
-> ?43c: ? e3a03000 ? ? ? ?mov ? ? r3, #0
-> ?440: ? e5833000 ? ? ? ?str ? ? r3, [r3]
-> ?444: ? eafffffc ? ? ? ?b ? ? ? 43c <__sg_alloc_table+0x1c>
->
-> Seen with gnu/linux cs arm-2010q1-202 and arm2010.09-50.
->
-> Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
+On Fri, Sep 16, 2011 at 06:45:55PM +0200, Alexander Sverdlin wrote:
+> 
+> Have you tried the driver on reference boards?
 
-If the "Use generic BUG() handler" patch is only scheduled for the next
-merge window and not for 3.1, can this patch be merged instead for 3.1
-and -stable?  This problem is easily seen with GCC 4.6.
+No - I don't have any of those.
+
+> For me it doesn't work any more. Boot messages are ok, as before, but
+> alsa open produces such messages:
+> Jan  1 00:32:19 IPCUn user.err kernel: asoc: can't open platform
+> ep93xx-pcm-audio
+
+Do you have the first patch ("ASoC: ep93xx-pcm: add MODULE_ALIAS") in this
+series applied? Have you tried whether it still works if you compile
+everything in?
