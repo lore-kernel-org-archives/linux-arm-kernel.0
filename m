@@ -1,244 +1,100 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 17 Sep 2011 10:13:14 -0600
-Subject: [PATCH v2 2/2] OMAP: omap_device: Add a method to build an
-	omap_device from a DT node
-In-Reply-To: <1316184199-12599-3-git-send-email-b-cousson@ti.com>
-References: <1316184199-12599-1-git-send-email-b-cousson@ti.com>
-	<1316184199-12599-3-git-send-email-b-cousson@ti.com>
-Message-ID: <20110917161314.GV3523@ponder.secretlab.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 17 Sep 2011 17:20:46 +0100
+Subject: [PATCH 16/19] ARM: move iotable mappings within the vmalloc region
+In-Reply-To: <alpine.LFD.2.00.1109171150320.20358@xanadu.home>
+References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
+	<1316156850-31013-17-git-send-email-nico@fluxnic.net>
+	<20110917151953.GJ16381@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109171150320.20358@xanadu.home>
+Message-ID: <20110917162046.GK16381@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 04:43:19PM +0200, Benoit Cousson wrote:
-> Add a notifier called during device_add phase. If an of_node is present,
-> retrieve the hwmod entry in order to populate properly the omap_device
-> structure.
-> For the moment the resource from the device-tree are overloaded.
-> DT does not support named resource yet, and thus, most driver
-> will not work without that information.
+On Sat, Sep 17, 2011 at 12:05:02PM -0400, Nicolas Pitre wrote:
+> On Sat, 17 Sep 2011, Russell King - ARM Linux wrote:
 > 
-> Add two helpers function to parse a property that contains multiple
-> strings.
+> > On Fri, Sep 16, 2011 at 03:07:27AM -0400, Nicolas Pitre wrote:
+> > >  void __init iotable_init(struct map_desc *io_desc, int nr)
+> > >  {
+> > > -	int i;
+> > > +	struct map_desc *md;
+> > > +	struct vm_struct *vm;
+> > > +
+> > > +	vm = __va(memblock_alloc(sizeof(*vm) * nr, __alignof__(*vm)));
+> > > +	memset(vm, 0, sizeof(*vm) * nr);
+> > 
+> > Any reason not to adapt early_alloc() ?
 > 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> ---
->  arch/arm/plat-omap/omap_device.c |  144 ++++++++++++++++++++++++++++++++++++++
->  1 files changed, 144 insertions(+), 0 deletions(-)
+> It uses the size for the alignment argument.  This is way too large an 
+> alignment in this case.  The size as alignment makes perfect sense in 
+> the other cases, and providing it explicitly for those cases might look 
+> strange.  But if you prefer that I'll just do it.
+
+Just change early_alloc() to also take the alignment and then fix up the
+existing callers.  It's silly to open-code the __va() + memset().
+
+> > This is silly.  You're defining VMALLOC_END to be 0xff000000UL, and
+> > then defining this to be 0xf0000000UL - 8MB.  Why hide the 240MB
+> > inside these constants?  Why not set it to VMALLOC_END - 240MB -
+> > VMALLOC_OFFSET - making the size in their _explicit_ instead of hidden?
 > 
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index cac7b9a..da13630 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -85,6 +85,8 @@
->  #include <linux/clk.h>
->  #include <linux/clkdev.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/of.h>
-> +#include <linux/notifier.h>
->  
->  #include <plat/omap_device.h>
->  #include <plat/omap_hwmod.h>
-> @@ -94,12 +96,15 @@
->  #define USE_WAKEUP_LAT			0
->  #define IGNORE_WAKEUP_LAT		1
->  
-> +#define MAX_HWMOD_NAME_SIZE		32
-> +
->  static int omap_device_register(struct platform_device *pdev);
->  static int omap_early_device_register(struct platform_device *pdev);
->  static struct omap_device *omap_device_alloc(struct platform_device *pdev,
->  				      struct omap_hwmod **ohs, int oh_cnt,
->  				      struct omap_device_pm_latency *pm_lats,
->  				      int pm_lats_cnt);
-> +static void omap_device_delete(struct omap_device *od);
->  
->  
->  static struct omap_device_pm_latency omap_default_latency[] = {
-> @@ -315,6 +320,138 @@ static void _add_hwmod_clocks_clkdev(struct omap_device *od,
->  		_add_clkdev(od, oh->opt_clks[i].role, oh->opt_clks[i].clk);
->  }
->  
-> +/*
-> + * XXX: DT helper functions that should probably move elsewhere if
-> + * they become usefull for other needs.
-> + */
+> Actually I care more about the absolute start address than the size this 
+> ends up creating.  This is to accommodate some of the static mappings 
+> that starts at 0xf0000000 on machines with a potential to have enough 
+> RAM that could map higher than that.  It just happens that this 
+> corresponds to 240MB.
 
-Lets just *assume* these are useful for other needs and start with
-them in drivers/of so that other people know that they actually exist.
-Otherwise they will never be made generic. :-)
+We should stick to dealing with the size of vmalloc area rather than an
+absolute address range as that's what we present to users via the
+vmalloc= argument to the kernel.
 
-> +static int _dt_count_property_string(const char *prop, int len)
-> +{
-> +	int i = 0;
-> +	size_t l = 0, total = 0;
-> +
-> +	if (!prop || !len)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; len >= total; total += l, prop += l) {
-> +		l = strlen(prop) + 1;
-> +		if (*prop != 0)
-> +			i++;
-> +	}
-> +	return i;
-> +}
-> +
-> +static int _dt_get_property(const char *prop, int len, int index, char *output,
-> +			    int size)
-> +{
-> +	int i = 0;
-> +	size_t l = 0, total = 0;
-> +
-> +	if (!prop || !len)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; len >= total; total += l, prop += l) {
-> +		l = strlcpy(output, prop, size) + 1;
-> +		if (*prop != 0) {
-> +			if (i++ == index)
-> +				return 0;
-> +		}
-> +	}
-> +	return -ENODEV;
-> +}
-> +
-> +static struct dev_pm_domain omap_device_pm_domain;
-> +
-> +/**
-> + * omap_device_build_from_dt - build an omap_device with multiple hwmods
-> + * @pdev_name: name of the platform_device driver to use
-> + * @pdev_id: this platform_device's connection ID
-> + * @oh: ptr to the single omap_hwmod that backs this omap_device
-> + * @pdata: platform_data ptr to associate with the platform_device
-> + * @pdata_len: amount of memory pointed to by @pdata
-> + * @pm_lats: pointer to a omap_device_pm_latency array for this device
-> + * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
-> + * @is_early_device: should the device be registered as an early device or not
-> + *
-> + * Function for building an omap_device already registered from device-tree
-> + *
-> + * Returns 0 or PTR_ERR() on error.
-> + */
-> +static int omap_device_build_from_dt(struct platform_device *pdev)
-> +{
-> +	struct omap_hwmod **hwmods;
-> +	struct omap_device *od;
-> +	struct omap_hwmod *oh;
-> +	char oh_name[MAX_HWMOD_NAME_SIZE];
-> +	const char *prop;
-> +	int oh_cnt, i, prop_len;
-> +	int ret = 0;
-> +
-> +	prop = of_get_property(pdev->dev.of_node, "hwmods", &prop_len);
-
-I know you've posted it before, but what is the status of the "hwmods"
-binding documentation.  I would expect it to be part of this patch.
-
-> +	oh_cnt = _dt_count_property_string(prop, prop_len);
-> +	if (!oh_cnt || IS_ERR_VALUE(oh_cnt)) {
-> +		dev_warn(&pdev->dev, "No 'hwmods' to build omap_device\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	hwmods = kzalloc(sizeof(struct omap_hwmod *) * oh_cnt, GFP_KERNEL);
-> +	if (!hwmods) {
-> +		ret = -ENOMEM;
-> +		goto odbfd_exit;
-> +	}
-> +
-> +	for (i = 0; i < oh_cnt; i++) {
-> +		_dt_get_property(prop, prop_len, i, oh_name,
-> +				 MAX_HWMOD_NAME_SIZE);
-> +
-> +		oh = omap_hwmod_lookup(oh_name);
-> +		if (!oh) {
-> +			dev_err(&pdev->dev, "Cannot lookup hwmod '%s'\n",
-> +				oh_name);
-> +			ret = -EINVAL;
-> +			goto odbfd_exit1;
-> +		}
-> +		hwmods[i] = oh;
-> +	}
-> +
-> +	od = omap_device_alloc(pdev, hwmods, oh_cnt, NULL, 0);
-> +	if (!od) {
-> +		dev_err(&pdev->dev, "Cannot allocate omap_device for :%s\n",
-> +			oh_name);
-> +		ret = PTR_ERR(od);
-> +		goto odbfd_exit1;
-> +	}
-> +
-> +	if (of_get_property(pdev->dev.of_node, "no_idle_on_suspend", NULL))
-> +		omap_device_disable_idle_on_suspend(pdev);
-> +
-> +	pdev->dev.pm_domain = &omap_device_pm_domain;
-> +
-> +odbfd_exit1:
-> +	kfree(hwmods);
-> +odbfd_exit:
-> +	return ret;
-> +}
-> +
-> +static int _omap_device_notifier_call(struct notifier_block *nb,
-> +				      unsigned long event, void *dev)
-
-Nit: Why the preceding underscore?  Generally that is only done for
-'special' variants of public functions.  ie. for a variant that
-expects a lock to already be held.
-
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +
-> +	switch (event) {
-> +	case BUS_NOTIFY_ADD_DEVICE:
-> +		if (pdev->dev.of_node)
-> +			omap_device_build_from_dt(pdev);
-> +		break;
-> +
-> +	case BUS_NOTIFY_DEL_DEVICE:
-> +		if (pdev->archdata.od)
-> +			omap_device_delete(pdev->archdata.od);
-> +		break;
-> +	}
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
->  
->  /* Public functions for use by core code */
->  
-> @@ -499,6 +636,9 @@ oda_exit1:
->  
->  static void omap_device_delete(struct omap_device *od)
->  {
-> +	if (!od)
-> +		return;
-> +
->  	od->pdev->archdata.od = NULL;
->  	kfree(od->pm_lats);
->  	kfree(od->hwmods);
-> @@ -1034,8 +1174,12 @@ struct device omap_device_parent = {
->  	.parent         = &platform_bus,
->  };
->  
-> +static struct notifier_block platform_nb;
-
-Nit: Since it is static initialization, you can do the following
-instead of setting it up in the init function.
-
-static struct notifier_block platform_nb = {
-	.notifier_call = _omap_device_notifier_call;
-};
-
-> +
->  static int __init omap_device_init(void)
->  {
-> +	platform_nb.notifier_call = _omap_device_notifier_call;
-> +	bus_register_notifier(&platform_bus_type, &platform_nb);
->  	return device_register(&omap_device_parent);
->  }
->  core_initcall(omap_device_init);
-> -- 
-> 1.7.0.4
+> > >  /*
+> > >   * vmalloc=size forces the vmalloc area to be exactly 'size'
+> > >   * bytes. This can be used to increase (or decrease) the vmalloc
+> > > - * area - the default is 128m.
+> > > + * area - the default is 240m.
+> > >   */
+> > >  static int __init early_vmalloc(char *arg)
+> > >  {
+> > > @@ -853,6 +866,7 @@ void __init sanity_check_meminfo(void)
+> > >  #endif
+> > >  	meminfo.nr_banks = j;
+> > >  	memblock_set_current_limit(lowmem_limit);
+> > > +	high_memory = __va(lowmem_limit - 1) + 1;
+> > 
+> > NAK.  This ends up initializing this setting twice during the boot,
+> > potentially leading to bugs because they're both done in different ways.
 > 
+> In that case I should remove the other one.
+
+If you do that, don't forget to fix nommu as well.
+
+> > > @@ -977,6 +991,12 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+> > >  	}
+> > >  
+> > >  	/*
+> > > +	 * Clear the vmalloc area.
+> > > +	 */
+> > > +	for (addr = VMALLOC_START; addr < VMALLOC_END; addr += PGDIR_SIZE)
+> > > +		pmd_clear(pmd_off_k(addr));
+> > 
+> > Why not combine this with the clearance above:
+> > 
+> >         for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
+> >                 pmd_clear(pmd_off_k(addr));
+> > 
+> > ?
+> 
+> Because I wanted to keep the mapping for the DEBUG_LL code alive as long 
+> as possible.
+
+You can't put DEUBG_LL code into create_mapping() anyway because at some
+point it will be called without the mapping in place, even with your
+modified code.
+
+It's not like we have a lot of code between those two points - we've
+done most of the allocation (eg vectors page), so the only failure point
+is if L2 page table allocation fails - but that's true of almost any
+create_mapping() call.
+
+So, I don't see the benefit of delaying the clearance.
