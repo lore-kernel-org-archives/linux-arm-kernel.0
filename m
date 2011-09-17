@@ -1,39 +1,44 @@
-From: joe@perches.com (Joe Perches)
-Date: Sat, 17 Sep 2011 13:24:29 -0700
-Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based
-	camera board.
-In-Reply-To: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
-References: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
-Message-ID: <1316291069.1610.23.camel@Joe-Laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 17 Sep 2011 22:52:38 +0200
+Subject: [PATCH 0/19] removal of mach/vmalloc.h and generic optimizations
+In-Reply-To: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
+References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
+Message-ID: <3319383.WZQsqr8ND4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-09-17 at 11:34 +0200, Martin Hostettler wrote:
-> Adds board support for an MT9M032 based camera to omap3evm.
+On Friday 16 September 2011 03:07:11 Nicolas Pitre wrote:
+> This patch series removes all instances of mach/vmalloc.h in order to
+> have a more unified memory map across all ARM architectures.  To do so,
+> the static mappings are moved inside the vmalloc area.  And finally this
+> allows for a generic optimization to ioremap where static mappings are
+> reused whenever possible, using common code instead of having this
+> duplicated in a couple places.
+> 
+> This also provides a net reduction of more than 1200 lines of code.
+> 
+> Those patches are also available in the following repository:
+> 
+>         git://git.linaro.org/people/nico/linux vmalloc
 
-All of the logging messages could be
-prefixed by the printk subsystem if you
-add #define pr_fmt before any #include
+Hi Nicolas,
 
-> diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c b/arch/arm/mach-omap2/board-omap3evm-camera.c
-[]
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-[]
-> +static int omap3evm_set_mux(enum omap3evmdc_mux mux_id)
-[]
-> +	switch (mux_id) {
-[]
-> +	default:
-> +		pr_err("omap3evm-camera: Invalid mux id #%d\n", mux_id);
+I like the series a lot. I had planned to work on this myself, but
+I guess you did a better job than I could have anyway.
 
-		pr_err("Invalid mux id #%d\n", mux_id);
-[]
-> +static int __init camera_init(void)
-[]
-> +	if (gpio_request(nCAM_VD_SEL, "nCAM_VD_SEL") < 0) {
-> +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_SEL(%d)\n",
-> +		       nCAM_VD_SEL);
+Doing some randconfig tests, I noticed that your series is currently broken
+on shmobile, which triggers a 
 
-		pr_err("Failed to get GPIO nCAM_VD_SEL(%d)\n",
-		       nCAM_VD_SEL);
-etc.
+	BUILD_BUG_ON(VMALLOC_END > CONSISTENT_BASE);
+
+in mem_init(), because the platform has a CONSISTENT_DMA_SIZE of 158MB.
+All other platforms have a CONSISTENT_DMA_SIZE of at most 14MB, which
+works correctly.
+
+My feeling is that a 158MB CONSISTENT_DMA_SIZE causes other problems
+anyway because we cannot map regular RAM both cached and uncached,
+but this is still a regression. The problem might be solved using
+Marek's CMA patches, which should eliminate the need for a huge
+CONSISTENT_DMA_SIZE.
+
+	Arnd
