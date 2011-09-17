@@ -1,51 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Sep 2011 20:35:57 +0200
-Subject: [PATCH] pata-generic/of: Make probing via device tree
-	non-powerpc-specific
-In-Reply-To: <20110916214313.GB16381@n2100.arm.linux.org.uk>
-References: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
-	<20110916214313.GB16381@n2100.arm.linux.org.uk>
-Message-ID: <2922376.ufKFh1svrE@wuerfel>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 17 Sep 2011 20:19:07 +0200
+Subject: [PATCH] arm/dt: Add SoC detection macros
+In-Reply-To: <20110917112321.GE16381@n2100.arm.linux.org.uk>
+References: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
+	<20110917102811.GC16381@n2100.arm.linux.org.uk>
+	<20110917103457.GP28104@game.jcrosoft.org>
+	<20110917112321.GE16381@n2100.arm.linux.org.uk>
+Message-ID: <20110917181907.GA16141@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 September 2011 22:43:13 Russell King - ARM Linux wrote:
-> On Fri, Sep 16, 2011 at 03:38:10PM +0100, Dave Martin wrote:
-> > This patch enables device-tree-based probing of the pata-generic
-> > platform driver across all architectures:
-> > 
-> >   * make the pata_of_generic module depend on OF instead of PPC_OF;
-> >   * supply some missing inclues;
-> >   * replace endianness-sensitive raw access to device tree data
-> >     with of_property_read_u32() calls.
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > ---
-> > 
-> > Tested on ARM Versatile Express, with my soon-to-be-posted device
-> > tree support patches.
+On 12:23 Sat 17 Sep     , Russell King - ARM Linux wrote:
+> On Sat, Sep 17, 2011 at 12:34:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 11:28 Sat 17 Sep     , Russell King - ARM Linux wrote:
+> > > One last point to raise here is - and it's quite a fundamental one - do we
+> > > really want this?  If we're making decisions based on the SoC type, that
+> > > suggests to me that the hardware description in DT is incomplete, and
+> > > we're hiding stuff in the kernel behind the SoC type.  That doesn't sound
+> > > particularly appealing given the point of DT is to encode the hardware
+> > > specific information outside the kernel code.
+> >
+> > except if a machine can run on 2 soc so detect it will avoid to have 2 Device
+> > Tree
 > 
-> This may not be the correct way to support the CF slot on Versatile
-> Express - it depends whether the CF slot on VE supports just CF
-> memory cards or whether it can take any CF card.
+> This code is structured to match the SoC based upon an entry in the DT,
+> so for tegra2 vs tegra3 it's already having to have two different DTs
+> to distinguish between them.
 > 
-> If the latter, then what may be inserted could be a CF network card,
-> and that means it's probably wrong to tell the kernel that what's
-> there is a PATA interface.
+> However, I still go back to my original point: the point of DT is to
+> provide a description of the hardware which the kernel is running on -
+> not only for current hardware but possibly future hardware as well.  Eg,
+> if Tegra4 comes along with more peripherals than Tegra3 but has basic
+> hardware which the kernel already supports, just wired up differently,
+> then Tegra4 should just work with a new DT file and no code changes.
+> 
+> What I'm saying is that in that scenario it should not be necessary to
+> edit the kernel to invent new SoC types, and then teach it that Tegra4
+> is mostly the same as Tegra3.  That information should all be encoded
+> into the DT rather than the C code in the kernel.
+> 
+> So, I think adding this SoC type stuff is the wrong approach to the
+> problem.
 
-The documentation at
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0447e/CACECHFJ.html
-claims that the slot only supports TrueIDE and PIO/Taskfile mode, which
-are the two modes for CF memory cards. Of course this is highly dependent
-on what you load into the FPGA that implements the CF interface on
-the versatile express, but at least for the currect Versatile Express
-FPGA load it should be right.
+I agree about it I just mean that if you have the same board with 2 SoC which
+are pin to pin compatible detect the soc type will be usefull as the soc
+resource may not be the same
 
-Also, the patch makes sense regardless of versatile express, it's just
-basic cleanup.
-
-One extension we might want to add eventually is support for the UDMA
-modes that are present on most of the current CF cards but not supported
-by this driver (AFAICT).
-
-	Arnd
+Best Regards,
+J.
