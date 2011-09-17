@@ -1,104 +1,271 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 17 Sep 2011 12:05:02 -0400 (EDT)
-Subject: [PATCH 16/19] ARM: move iotable mappings within the vmalloc region
-In-Reply-To: <20110917151953.GJ16381@n2100.arm.linux.org.uk>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<1316156850-31013-17-git-send-email-nico@fluxnic.net>
-	<20110917151953.GJ16381@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1109171150320.20358@xanadu.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 17 Sep 2011 10:05:14 -0600
+Subject: [PATCH v2 1/2] OMAP: omap_device: Add omap_device_[alloc|delete]
+	for DT integration
+In-Reply-To: <1316184199-12599-2-git-send-email-b-cousson@ti.com>
+References: <1316184199-12599-1-git-send-email-b-cousson@ti.com>
+	<1316184199-12599-2-git-send-email-b-cousson@ti.com>
+Message-ID: <20110917160514.GU3523@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 17 Sep 2011, Russell King - ARM Linux wrote:
-
-> On Fri, Sep 16, 2011 at 03:07:27AM -0400, Nicolas Pitre wrote:
-> >  void __init iotable_init(struct map_desc *io_desc, int nr)
-> >  {
-> > -	int i;
-> > +	struct map_desc *md;
-> > +	struct vm_struct *vm;
-> > +
-> > +	vm = __va(memblock_alloc(sizeof(*vm) * nr, __alignof__(*vm)));
-> > +	memset(vm, 0, sizeof(*vm) * nr);
+On Fri, Sep 16, 2011 at 04:43:18PM +0200, Benoit Cousson wrote:
+> Split the omap_device_build_ss into two smaller functions
+> that will allow to populate a platform_device already allocated by
+> device-tree.
+> The functionality of the omap_device_build_ss is still the same, but
+> the omap_device_alloc will be usable with devices already built by
+> device-tree.
 > 
-> Any reason not to adapt early_alloc() ?
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-It uses the size for the alignment argument.  This is way too large an 
-alignment in this case.  The size as alignment makes perfect sense in 
-the other cases, and providing it explicitly for those cases might look 
-strange.  But if you prefer that I'll just do it.
+Looks pretty good.  Comments below.
 
-> >  
-> > -	for (i = 0; i < nr; i++)
-> > -		create_mapping(io_desc + i);
-> > +	for (md = io_desc; nr; md++, nr--) {
-> > +		create_mapping(md);
-> > +		vm->addr = (void *)(md->virtual & PAGE_MASK);
-> > +		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
-> > +		vm->phys_addr = __pfn_to_phys(md->pfn); 
-> > +		vm->flags = VM_IOREMAP;
-> > +		vm->caller = iotable_init;
-> > +		vm_area_add_early(vm++);
-> > +	}
-> >  }
-> >  
-> > -static void * __initdata vmalloc_min = (void *)(VMALLOC_END - SZ_128M);
-> > +static void * __initdata vmalloc_min = (void *)(0xf0000000UL - VMALLOC_OFFSET);
+g.
+
+> ---
+>  arch/arm/plat-omap/omap_device.c |  177 +++++++++++++++++++++++++------------
+>  1 files changed, 119 insertions(+), 58 deletions(-)
 > 
-> This is silly.  You're defining VMALLOC_END to be 0xff000000UL, and
-> then defining this to be 0xf0000000UL - 8MB.  Why hide the 240MB
-> inside these constants?  Why not set it to VMALLOC_END - 240MB -
-> VMALLOC_OFFSET - making the size in their _explicit_ instead of hidden?
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index 54bbe7b..cac7b9a 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -96,6 +96,11 @@
+>  
+>  static int omap_device_register(struct platform_device *pdev);
+>  static int omap_early_device_register(struct platform_device *pdev);
+> +static struct omap_device *omap_device_alloc(struct platform_device *pdev,
+> +				      struct omap_hwmod **ohs, int oh_cnt,
+> +				      struct omap_device_pm_latency *pm_lats,
+> +				      int pm_lats_cnt);
+> +
+>  
+>  static struct omap_device_pm_latency omap_default_latency[] = {
+>  	{
+> @@ -397,6 +402,110 @@ static int omap_device_fill_resources(struct omap_device *od,
+>  }
+>  
+>  /**
+> + * omap_device_alloc - allocate an omap_device
+> + * @pdev: platform_device that will be included in this omap_device
+> + * @oh: ptr to the single omap_hwmod that backs this omap_device
+> + * @pdata: platform_data ptr to associate with the platform_device
+> + * @pdata_len: amount of memory pointed to by @pdata
+> + * @pm_lats: pointer to a omap_device_pm_latency array for this device
+> + * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
+> + *
+> + * Convenience function for allocating an omap_device structure and filling
+> + * hwmods, resources and pm_latency attributes.
+> + *
+> + * Returns an struct omap_device pointer or ERR_PTR() on error;
+> + */
+> +static struct omap_device *omap_device_alloc(struct platform_device *pdev,
+> +					struct omap_hwmod **ohs, int oh_cnt,
+> +					struct omap_device_pm_latency *pm_lats,
+> +					int pm_lats_cnt)
+> +{
+> +	int ret = -ENOMEM;
+> +	struct omap_device *od;
+> +	struct resource *res = NULL;
+> +	int i, res_count;
+> +	struct omap_hwmod **hwmods;
+> +
+> +	od = kzalloc(sizeof(struct omap_device), GFP_KERNEL);
 
-Actually I care more about the absolute start address than the size this 
-ends up creating.  This is to accommodate some of the static mappings 
-that starts at 0xf0000000 on machines with a potential to have enough 
-RAM that could map higher than that.  It just happens that this 
-corresponds to 240MB.
+possible enhancement:  devm_kzalloc() perhaps?  Would simplify the cleanup paths.
 
-> >  /*
-> >   * vmalloc=size forces the vmalloc area to be exactly 'size'
-> >   * bytes. This can be used to increase (or decrease) the vmalloc
-> > - * area - the default is 128m.
-> > + * area - the default is 240m.
-> >   */
-> >  static int __init early_vmalloc(char *arg)
-> >  {
-> > @@ -853,6 +866,7 @@ void __init sanity_check_meminfo(void)
-> >  #endif
-> >  	meminfo.nr_banks = j;
-> >  	memblock_set_current_limit(lowmem_limit);
-> > +	high_memory = __va(lowmem_limit - 1) + 1;
+> +	if (!od) {
+> +		ret = -ENOMEM;
+> +		goto oda_exit1;
+> +	}
+> +	od->hwmods_cnt = oh_cnt;
+> +
+> +	hwmods = kmemdup(ohs, sizeof(struct omap_hwmod *) * oh_cnt, GFP_KERNEL);
+
+Ditto here.  would require creation of devm_kmemdup()
+
+> +	if (!hwmods)
+> +		goto oda_exit2;
+> +
+> +	od->hwmods = hwmods;
+> +	od->pdev = pdev;
+> +
+> +	/*
+> +	 * HACK: Ideally the resources from DT should match, and hwmod
+> +	 * should just add the missing ones. Since the name is not
+> +	 * properly populated by DT, stick to hwmod resources only.
+> +	 */
+> +	if (pdev->num_resources && pdev->resource)
+> +		dev_warn(&pdev->dev, "%s(): resources already allocated %d\n",
+> +			__func__, pdev->num_resources);
+> +
+> +	res_count = omap_device_count_resources(od);
+> +	if (res_count > 0) {
+> +		dev_dbg(&pdev->dev, "%s(): resources allocated from hwmod %d\n",
+> +			__func__, res_count);
+> +		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
+> +		if (!res)
+> +			goto oda_exit3;
+> +
+> +		omap_device_fill_resources(od, res);
+> +
+> +		ret = platform_device_add_resources(pdev, res, res_count);
+> +		kfree(res);
+
+How big is res_count?  Struct resource isn't very big.  It can
+probably be on the stack.
+
+> +
+> +		if (ret)
+> +			goto oda_exit3;
+> +	}
+> +
+> +	if (!pm_lats) {
+> +		pm_lats = omap_default_latency;
+> +		pm_lats_cnt = ARRAY_SIZE(omap_default_latency);
+> +	}
+> +
+> +	od->pm_lats_cnt = pm_lats_cnt;
+> +	od->pm_lats = kmemdup(pm_lats,
+> +			sizeof(struct omap_device_pm_latency) * pm_lats_cnt,
+> +			GFP_KERNEL);
+> +	if (!od->pm_lats)
+> +		goto oda_exit3;
+> +
+> +	pdev->archdata.od = od;
+> +
+> +	for (i = 0; i < oh_cnt; i++) {
+> +		hwmods[i]->od = od;
+> +		_add_hwmod_clocks_clkdev(od, hwmods[i]);
+> +	}
+> +
+> +	return od;
+> +
+> +oda_exit3:
+> +	kfree(hwmods);
+> +oda_exit2:
+> +	kfree(od);
+> +oda_exit1:
+> +	dev_err(&pdev->dev, "omap_device: build failed (%d)\n", ret);
+> +
+> +	return ERR_PTR(ret);
+> +}
+> +
+> +static void omap_device_delete(struct omap_device *od)
+> +{
+> +	od->pdev->archdata.od = NULL;
+> +	kfree(od->pm_lats);
+> +	kfree(od->hwmods);
+> +	kfree(od);
+> +}
+> +
+> +/**
+>   * omap_device_build - build and register an omap_device with one omap_hwmod
+>   * @pdev_name: name of the platform_device driver to use
+>   * @pdev_id: this platform_device's connection ID
+> @@ -455,9 +564,6 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+>  	int ret = -ENOMEM;
+>  	struct platform_device *pdev;
+>  	struct omap_device *od;
+> -	struct resource *res = NULL;
+> -	int i, res_count;
+> -	struct omap_hwmod **hwmods;
+>  
+>  	if (!ohs || oh_cnt == 0 || !pdev_name)
+>  		return ERR_PTR(-EINVAL);
+> @@ -471,76 +577,31 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+>  		goto odbs_exit;
+>  	}
+>  
+> -	pr_debug("omap_device: %s: building with %d hwmods\n", pdev_name,
+> -		 oh_cnt);
+> +	/* Set the dev_name early to allow dev_xxx in omap_device_alloc */
+> +	if (pdev->id != -1)
+> +		dev_set_name(&pdev->dev, "%s.%d", pdev->name,  pdev->id);
+> +	else
+> +		dev_set_name(&pdev->dev, "%s", pdev->name);
+
+This is duplicated from the core platform_device code.  What is the
+reasoning for doing it again here?
+
+>  
+> -	od = kzalloc(sizeof(struct omap_device), GFP_KERNEL);
+> -	if (!od) {
+> -		ret = -ENOMEM;
+> +	od = omap_device_alloc(pdev, ohs, oh_cnt, pm_lats, pm_lats_cnt);
+> +	if (!od)
+>  		goto odbs_exit1;
+> -	}
+> -	od->hwmods_cnt = oh_cnt;
+> -
+> -	hwmods = kzalloc(sizeof(struct omap_hwmod *) * oh_cnt,
+> -			 GFP_KERNEL);
+> -	if (!hwmods)
+> -		goto odbs_exit2;
+> -
+> -	memcpy(hwmods, ohs, sizeof(struct omap_hwmod *) * oh_cnt);
+> -	od->hwmods = hwmods;
+> -	od->pdev = pdev;
+> -
+> -	res_count = omap_device_count_resources(od);
+> -	if (res_count > 0) {
+> -		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
+> -		if (!res)
+> -			goto odbs_exit3;
+> -
+> -		omap_device_fill_resources(od, res);
+> -
+> -		ret = platform_device_add_resources(pdev, res, res_count);
+> -		kfree(res);
+> -
+> -		if (ret)
+> -			goto odbs_exit3;
+> -	}
+>  
+>  	ret = platform_device_add_data(pdev, pdata, pdata_len);
+>  	if (ret)
+> -		goto odbs_exit3;
+> -
+> -	pdev->archdata.od = od;
+> +		goto odbs_exit2;
+>  
+>  	if (is_early_device)
+>  		ret = omap_early_device_register(pdev);
+>  	else
+>  		ret = omap_device_register(pdev);
+>  	if (ret)
+> -		goto odbs_exit3;
+> -
+> -	if (!pm_lats) {
+> -		pm_lats = omap_default_latency;
+> -		pm_lats_cnt = ARRAY_SIZE(omap_default_latency);
+> -	}
+> -
+> -	od->pm_lats_cnt = pm_lats_cnt;
+> -	od->pm_lats = kmemdup(pm_lats,
+> -			sizeof(struct omap_device_pm_latency) * pm_lats_cnt,
+> -			GFP_KERNEL);
+> -	if (!od->pm_lats)
+> -		goto odbs_exit3;
+> -
+> -	for (i = 0; i < oh_cnt; i++) {
+> -		hwmods[i]->od = od;
+> -		_add_hwmod_clocks_clkdev(od, hwmods[i]);
+> -	}
+> +		goto odbs_exit2;
+>  
+>  	return pdev;
+>  
+> -odbs_exit3:
+> -	kfree(hwmods);
+>  odbs_exit2:
+> -	kfree(od);
+> +	omap_device_delete(od);
+>  odbs_exit1:
+>  	platform_device_put(pdev);
+>  odbs_exit:
+> -- 
+> 1.7.0.4
 > 
-> NAK.  This ends up initializing this setting twice during the boot,
-> potentially leading to bugs because they're both done in different ways.
-
-In that case I should remove the other one.
-
-> You don't describe why this change is necessary so I assume that it's
-> part of some debugging you were trying and shouldn't be in this patch.
-
-No, it noe has to be set before create_mapping() is called so the final 
-VMALLOC_START address is known.
-
-> > @@ -977,6 +991,12 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
-> >  	}
-> >  
-> >  	/*
-> > +	 * Clear the vmalloc area.
-> > +	 */
-> > +	for (addr = VMALLOC_START; addr < VMALLOC_END; addr += PGDIR_SIZE)
-> > +		pmd_clear(pmd_off_k(addr));
-> 
-> Why not combine this with the clearance above:
-> 
->         for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
->                 pmd_clear(pmd_off_k(addr));
-> 
-> ?
-
-Because I wanted to keep the mapping for the DEBUG_LL code alive as long 
-as possible.
-
-
-Nicolas
