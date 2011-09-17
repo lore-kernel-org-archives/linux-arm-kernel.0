@@ -1,225 +1,119 @@
-From: martin@neutronstar.dyndns.org (Martin Hostettler)
-Date: Sat, 17 Sep 2011 11:34:57 +0200
-Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based camera
-	board.
-Message-ID: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 17 Sep 2011 11:28:11 +0100
+Subject: [PATCH] arm/dt: Add SoC detection macros
+In-Reply-To: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
+References: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
+Message-ID: <20110917102811.GC16381@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds board support for an MT9M032 based camera to omap3evm.
+On Fri, Sep 09, 2011 at 01:02:19AM -0700, Allen Martin wrote:
+> +#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+> +# ifdef SOC_NAME
+> +#  undef MULTI_SOC
+> +#  define MULTI_SOC
+> +# else
+> +#   define SOC_NAME tegra2
+> +# endif
+> +#endif
+> +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+> +# ifdef SOC_NAME
+> +#  undef MULTI_SOC
+> +#  define MULTI_SOC
+> +# else
+> +#   define SOC_NAME tegra3
+> +# endif
+> +#endif
+> +
+> +#define soc_is_tegra2()			0
+> +#define soc_is_tegra3()			0
+> +
+> +#if defined(MULTI_SOC)
+> +# if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+> +#  undef soc_is_tegra2
+> +#  define soc_is_tegra2()		is_tegra2()
+> +# endif
+> +# if defined(CONFIG_ARCH_TEGRA_3x_SOC)
+> +#  undef soc_is_tegra3
+> +#  define soc_is_tegra3()		is_tegra3()
+> +# endif
+> +#else /* non-multi, only one architecture is on */
+> +# if defined(CONFIG_ARCH_TEGRA_2x_SOC)
+> +#  undef soc_is_tegra2
+> +#  define soc_is_tegra2()		1
+> +# elif defined(CONFIG_ARCH_TEGRA_3x_SOC)
+> +#  undef soc_is_tegra3
+> +#  define soc_is_tegra3()		1
+> +# endif
+> +#endif
 
-Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
----
- arch/arm/mach-omap2/Makefile                |    1 +
- arch/arm/mach-omap2/board-omap3evm-camera.c |  183 +++++++++++++++++++++++++++
- 2 files changed, 184 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
+This is not the way to do this, especially for a file in asm/*.h.  Look
+at the way machine_is_xxx() is dealt with in include/generated/mach-types.h.
 
-Changes in V2:
- * ported to current mainline
- * Style fixes
- * Fix error handling
+#define MULTI_SOC			0
+#undef SOC_SELECTED
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index f343365..8ae3d25 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -202,6 +202,7 @@ obj-$(CONFIG_MACH_OMAP3_TORPEDO)        += board-omap3logic.o \
- obj-$(CONFIG_MACH_OVERO)		+= board-overo.o \
- 					   hsmmc.o
- obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o \
-+					   board-omap3evm-camera.o \
- 					   hsmmc.o
- obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
- 					   hsmmc.o
-diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c b/arch/arm/mach-omap2/board-omap3evm-camera.c
-new file mode 100644
-index 0000000..be987d9
---- /dev/null
-+++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
-@@ -0,0 +1,183 @@
-+/*
-+ * Copyright (C) 2010-2011 Lund Engineering
-+ * Contact: Gil Lund <gwlund@lundeng.com>
-+ * Author: Martin Hostettler <martin@neutronstar.dyndns.org>
-+ *
-+ * Board intregration for a MT9M032 camera connected to IMAGE_CONN and I2C Bus 2
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-+ * 02110-1301 USA
-+ */
-+
-+#include <linux/i2c.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+
-+#include <linux/gpio.h>
-+#include <plat/mux.h>
-+#include "mux.h"
-+
-+#include "../../../drivers/media/video/omap3isp/isp.h"
-+#include "media/mt9m032.h"
-+
-+#include "devices.h"
-+
-+#define EVM_TWL_GPIO_BASE OMAP_MAX_GPIO_LINES
-+#define GPIO98_VID_DEC_RES	98
-+#define nCAM_VD_SEL		157
-+
-+#define MT9M032_I2C_BUS_NUM	2
-+
-+
-+enum omap3evmdc_mux {
-+	MUX_TVP5146,
-+	MUX_CAMERA_SENSOR,
-+	MUX_EXP_CAMERA_SENSOR,
-+};
-+
-+/**
-+ * omap3evm_set_mux - Sets mux to enable signal routing to
-+ *                           different peripherals present on new EVM board
-+ * @mux_id: enum, mux id to enable
-+ *
-+ * Returns 0 for success or a negative error code
-+ */
-+static int omap3evm_set_mux(enum omap3evmdc_mux mux_id)
-+{
-+	/* Set GPIO6 = 1 */
-+	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 6, 1);
-+	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
-+
-+	switch (mux_id) {
-+	case MUX_TVP5146:
-+		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
-+		gpio_set_value(nCAM_VD_SEL, 1);
-+		break;
-+
-+	case MUX_CAMERA_SENSOR:
-+		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
-+		gpio_set_value(nCAM_VD_SEL, 0);
-+		break;
-+
-+	case MUX_EXP_CAMERA_SENSOR:
-+		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 1);
-+		break;
-+
-+	default:
-+		pr_err("omap3evm-camera: Invalid mux id #%d\n", mux_id);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct mt9m032_platform_data mt9m032_platform_data = {
-+	.ext_clock = 13500000,
-+	.pll_pre_div = 6,
-+	.pll_mul = 120,
-+	.pll_out_div = 5,
-+	.invert_pixclock = 1,
-+};
-+
-+static struct i2c_board_info camera_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO(MT9M032_NAME, MT9M032_I2C_ADDR),
-+		.platform_data = &mt9m032_platform_data,
-+	},
-+};
-+
-+static struct isp_subdev_i2c_board_info camera_i2c_subdevs[] = {
-+	{
-+		.board_info = &camera_i2c_devices[0],
-+		.i2c_adapter_id = MT9M032_I2C_BUS_NUM,
-+	},
-+	{},
-+};
-+
-+static struct isp_v4l2_subdevs_group camera_subdevs[] = {
-+	{
-+		.subdevs = camera_i2c_subdevs,
-+		.interface = ISP_INTERFACE_PARALLEL,
-+		.bus = {
-+			.parallel = {
-+				.data_lane_shift = 1,
-+				.clk_pol = 0,
-+				.bridge = ISPCTRL_PAR_BRIDGE_DISABLE,
-+			}
-+		},
-+	},
-+	{},
-+};
-+
-+static struct isp_platform_data isp_platform_data = {
-+	.subdevs = camera_subdevs,
-+};
-+
-+static int __init camera_init(void)
-+{
-+	int ret = -EINVAL;
-+	
-+	omap_mux_init_gpio(nCAM_VD_SEL, OMAP_PIN_OUTPUT);
-+	if (gpio_request(nCAM_VD_SEL, "nCAM_VD_SEL") < 0) {
-+		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_SEL(%d)\n",
-+		       nCAM_VD_SEL);
-+		goto err;
-+	}
-+	if (gpio_direction_output(nCAM_VD_SEL, 1) < 0) {
-+		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_SEL(%d) direction\n",
-+		       nCAM_VD_SEL);
-+		goto err_vdsel;
-+	}
-+
-+	if (gpio_request(EVM_TWL_GPIO_BASE + 2, "T2_GPIO2") < 0) {
-+		pr_err("omap3evm-camera: Failed to get GPIO T2_GPIO2(%d)\n",
-+		       EVM_TWL_GPIO_BASE + 2);
-+		goto err_vdsel;
-+	}
-+	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 2, 0) < 0) {
-+		pr_err("omap3evm-camera: Failed to set GPIO T2_GPIO2(%d) direction\n",
-+		       EVM_TWL_GPIO_BASE + 2);
-+		goto err_2;
-+	}
-+
-+	if (gpio_request(EVM_TWL_GPIO_BASE + 8, "nCAM_VD_EN") < 0) {
-+		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_EN(%d)\n",
-+		       EVM_TWL_GPIO_BASE + 8);
-+		goto err_2;
-+	}
-+	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 8, 0) < 0) {
-+		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_EN(%d) direction\n",
-+		       EVM_TWL_GPIO_BASE + 8);
-+		goto err_8;
-+	}
-+
-+	omap3evm_set_mux(MUX_CAMERA_SENSOR);
-+
-+	
-+	ret = omap3_init_camera(&isp_platform_data);
-+	if (ret < 0)
-+		goto err_8;
-+	return 0;
-+	
-+err_8:
-+	gpio_free(EVM_TWL_GPIO_BASE + 8);
-+err_2:
-+	gpio_free(EVM_TWL_GPIO_BASE + 2);
-+err_vdsel:
-+	gpio_free(nCAM_VD_SEL);
-+err:
-+	return ret;
-+}
-+
-+device_initcall(camera_init);
--- 
-1.7.2.5
+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+# ifdef SOC_SELECTED
+#  undef MULTI_SOC
+#  define MULTI_SOC			1
+# else
+#  define SOC_SELECTED
+# endif
+# define soc_is_tegra2()		(!MULTI_SOC || is_tegra2())
+#else
+# define soc_is_tegra2()		0
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
+# ifdef SOC_SELECTED
+#  undef MULTI_SOC
+#  define MULTI_SOC			1
+# else
+#  define SOC_SELECTED
+# endif
+# define soc_is_tegra3()		(!MULTI_SOC || is_tegra3())
+#else
+# define soc_is_tegra3()		0
+#endif
+
+#undef SOC_SELECTED
+
+The above is nicely extensible - if other SoCs need to extend this they
+just need to add another outer ifdef..endif section to the file.
+
+> +
+> +enum soc_version {
+> +	SOC_UNKNOWN = 0,
+> +	TEGRA_T20,
+> +	TEGRA_T30,
+
+I'd suggest prefixing these with SOC_ to avoid any namespace problems.
+
+> +};
+> +
+> +void soc_init_version(void);
+> +enum soc_version soc_get_version(void);
+> +
+> +static inline int is_tegra2(void)
+> +{
+> +	return soc_get_version() == TEGRA_T20;
+> +}
+> +
+> +static inline int is_tegra3(void)
+> +{
+> +	return soc_get_version() == TEGRA_T30;
+> +}
+
+If we require all SoCs to provide a value in soc_version, then we can use
+exactly the same method as mach-types.h uses - and while at this, please
+get rid of soc_get_version().  It's far cheaper to access the variable
+directly rather than indirect through a function, just like we do with
+__machine_arch_type.  Mark it __read_mostly too.
+
+One last point to raise here is - and it's quite a fundamental one - do we
+really want this?  If we're making decisions based on the SoC type, that
+suggests to me that the hardware description in DT is incomplete, and
+we're hiding stuff in the kernel behind the SoC type.  That doesn't sound
+particularly appealing given the point of DT is to encode the hardware
+specific information outside the kernel code.
