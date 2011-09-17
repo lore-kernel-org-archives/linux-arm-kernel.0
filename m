@@ -1,27 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 17 Sep 2011 20:40:54 +0200
-Subject: [PATCH v2] pata-generic/of: Make probing via device tree
-	non-powerpc-specific
-In-Reply-To: <20110917153732.GR3523@ponder.secretlab.ca>
-References: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
-	<1316190120-17010-1-git-send-email-dave.martin@linaro.org>
-	<20110917153732.GR3523@ponder.secretlab.ca>
-Message-ID: <2615461.zA8fCfbHH2@wuerfel>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 17 Sep 2011 20:58:43 +0200
+Subject: [PATCH 3/3] at91/gpio: fix display of number of irq setuped
+In-Reply-To: <1316285923-12461-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1316285923-12461-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1316285923-12461-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 September 2011 09:37:32 Grant Likely wrote:
-> What driver is normally used for versatile express pata?  This driver
-> is kind of legacy in that it was created when there was a split
-> between platform_device and of_platform_devices.  But that split was a
-> bad idea and the same driver should be used regardless of whether or
-> not DT is enabled.  pata_of_platform.c really should be removed.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/gpio.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-It normally uses the plain pata_platform.c driver.
-
-Note that the pata_of_platform driver is already just a shim on
-top of the regular pata_platform driver. They could easily be combined,
-but the current state is also ok, since there is very little code
-duplication.
-
-	Arnd
+diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+index e709406..743f668 100644
+--- a/arch/arm/mach-at91/gpio.c
++++ b/arch/arm/mach-at91/gpio.c
+@@ -528,7 +528,7 @@ void __init at91_gpio_irq_setup(void)
+ 		irq_set_chip_data(id, this);
+ 		irq_set_chained_handler(id, gpio_irq_handler);
+ 	}
+-	pr_info("AT91: %d gpio irqs in %d banks\n", irq, gpio_banks);
++	pr_info("AT91: %d gpio irqs in %d banks\n", irq - gpio_to_irq(0), gpio_banks);
+ }
+ 
+ /* gpiolib support */
+-- 
+1.7.5.4
