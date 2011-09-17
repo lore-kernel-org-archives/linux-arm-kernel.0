@@ -1,78 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 17 Sep 2011 16:19:53 +0100
-Subject: [PATCH 16/19] ARM: move iotable mappings within the vmalloc region
-In-Reply-To: <1316156850-31013-17-git-send-email-nico@fluxnic.net>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<1316156850-31013-17-git-send-email-nico@fluxnic.net>
-Message-ID: <20110917151953.GJ16381@n2100.arm.linux.org.uk>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sat, 17 Sep 2011 23:33:31 +0800
+Subject: [PATCH v2] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <20110917150246.GH16381@n2100.arm.linux.org.uk>
+References: <1316166960-20964-1-git-send-email-Baohua.Song@csr.com>
+	<20110917150246.GH16381@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4ySwfuaa1tbMcQkYHQQw61+-ajXwhxr_5xOxxKmn+aDog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 03:07:27AM -0400, Nicolas Pitre wrote:
->  void __init iotable_init(struct map_desc *io_desc, int nr)
->  {
-> -	int i;
-> +	struct map_desc *md;
-> +	struct vm_struct *vm;
-> +
-> +	vm = __va(memblock_alloc(sizeof(*vm) * nr, __alignof__(*vm)));
-> +	memset(vm, 0, sizeof(*vm) * nr);
+2011/9/17 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Fri, Sep 16, 2011 at 02:56:00AM -0700, Barry Song wrote:
+>> +static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
+>> + ? ? struct dma_slave_config *config)
+>> +{
+>> + ? ? u32 addr, direction;
+>> + ? ? unsigned long flags;
+>> +
+>> + ? ? switch (config->direction) {
+>
+> config->direction is deprecated, please don't use it.
 
-Any reason not to adapt early_alloc() ?
+ok.
 
->  
-> -	for (i = 0; i < nr; i++)
-> -		create_mapping(io_desc + i);
-> +	for (md = io_desc; nr; md++, nr--) {
-> +		create_mapping(md);
-> +		vm->addr = (void *)(md->virtual & PAGE_MASK);
-> +		vm->size = PAGE_ALIGN(md->length + (md->virtual & ~PAGE_MASK));
-> +		vm->phys_addr = __pfn_to_phys(md->pfn); 
-> +		vm->flags = VM_IOREMAP;
-> +		vm->caller = iotable_init;
-> +		vm_area_add_early(vm++);
-> +	}
->  }
->  
-> -static void * __initdata vmalloc_min = (void *)(VMALLOC_END - SZ_128M);
-> +static void * __initdata vmalloc_min = (void *)(0xf0000000UL - VMALLOC_OFFSET);
+>
+>> + ? ? case DMA_FROM_DEVICE:
+>> + ? ? ? ? ? ? direction = 0;
+>> + ? ? ? ? ? ? addr = config->dst_addr;
+>> + ? ? ? ? ? ? break;
+>> +
+>> + ? ? case DMA_TO_DEVICE:
+>> + ? ? ? ? ? ? direction = 1;
+>> + ? ? ? ? ? ? addr = config->src_addr;
+>> + ? ? ? ? ? ? break;
+>> +
+>> + ? ? default:
+>> + ? ? ? ? ? ? return -EINVAL;
+>> + ? ? }
+>> +
+>> + ? ? if ((config->src_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES) ||
+>> + ? ? ? ? ? ? (config->dst_addr_width != DMA_SLAVE_BUSWIDTH_4_BYTES))
+>> + ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? spin_lock_irqsave(&schan->lock, flags);
+>> + ? ? schan->addr = addr;
+>> + ? ? schan->direction = direction;
+>> + ? ? schan->mode = (config->src_maxburst == 4 ? 1 : 0);
+>
+> Please store the source address, destination address, and mode separately
+> for each direction. ?You should then select from that at prepare time.
 
-This is silly.  You're defining VMALLOC_END to be 0xff000000UL, and
-then defining this to be 0xf0000000UL - 8MB.  Why hide the 240MB
-inside these constants?  Why not set it to VMALLOC_END - 240MB -
-VMALLOC_OFFSET - making the size in their _explicit_ instead of hidden?
+the dmac has fixed route. every channel has fixed function. one
+channel is for one device and one direction. for example, spi0 can
+have two fixed channel: spi0-tx, spi0-rx.
+then for every schan, device address is always fixed and we don't care
+it at all. we only need to write the memory address to dmac address
+register.
 
->  /*
->   * vmalloc=size forces the vmalloc area to be exactly 'size'
->   * bytes. This can be used to increase (or decrease) the vmalloc
-> - * area - the default is 128m.
-> + * area - the default is 240m.
->   */
->  static int __init early_vmalloc(char *arg)
->  {
-> @@ -853,6 +866,7 @@ void __init sanity_check_meminfo(void)
->  #endif
->  	meminfo.nr_banks = j;
->  	memblock_set_current_limit(lowmem_limit);
-> +	high_memory = __va(lowmem_limit - 1) + 1;
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-NAK.  This ends up initializing this setting twice during the boot,
-potentially leading to bugs because they're both done in different ways.
-You don't describe why this change is necessary so I assume that it's
-part of some debugging you were trying and shouldn't be in this patch.
-
-> @@ -977,6 +991,12 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
->  	}
->  
->  	/*
-> +	 * Clear the vmalloc area.
-> +	 */
-> +	for (addr = VMALLOC_START; addr < VMALLOC_END; addr += PGDIR_SIZE)
-> +		pmd_clear(pmd_off_k(addr));
-
-Why not combine this with the clearance above:
-
-        for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
-                pmd_clear(pmd_off_k(addr));
-
-?
+-barry
