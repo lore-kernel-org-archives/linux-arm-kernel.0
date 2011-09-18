@@ -1,98 +1,188 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 18 Sep 2011 00:15:27 -0600
-Subject: [PATCH 5/5] ARM: gic: add OF based initialization
-In-Reply-To: <4E71CE5D.9030900@ti.com>
+Date: Sun, 18 Sep 2011 00:02:05 -0600
+Subject: [PATCH 3/5] of/irq: introduce of_irq_init
+In-Reply-To: <4E754B56.1010404@gmail.com>
 References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
-	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
-	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
-	<4E71CE5D.9030900@ti.com>
-Message-ID: <20110918061526.GE3523@ponder.secretlab.ca>
+	<1316017900-19918-4-git-send-email-robherring2@gmail.com>
+	<20110917235328.GA3523@ponder.secretlab.ca>
+	<4E754B56.1010404@gmail.com>
+Message-ID: <20110918060205.GC3523@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 15, 2011 at 12:07:25PM +0200, Cousson, Benoit wrote:
-> Hi Rob,
+On Sat, Sep 17, 2011 at 08:37:26PM -0500, Rob Herring wrote:
+> Grant,
 > 
-> On 9/15/2011 9:55 AM, Thomas Abraham wrote:
-> >Hi Rob,
-> >
-> >On 14 September 2011 22:01, Rob Herring<robherring2@gmail.com>  wrote:
-> >>From: Rob Herring<rob.herring@calxeda.com>
-> >>
-> >>This adds gic initialization using device tree data. The initialization
-> >>functions are intended to be called by a generic OF interrupt
-> >>controller parsing function once the right pieces are in place.
-> >>
-> >>PPIs are handled using 3rd cell of interrupts properties to specify the cpu
-> >>mask the PPI is assigned to.
-> >>
-> >>Signed-off-by: Rob Herring<rob.herring@calxeda.com>
-> >>---
-> >>  Documentation/devicetree/bindings/arm/gic.txt |   53 ++++++++++++++++++++++++
-> >>  arch/arm/common/gic.c                         |   55 +++++++++++++++++++++++--
-> >>  arch/arm/include/asm/hardware/gic.h           |   10 +++++
-> >>  3 files changed, 114 insertions(+), 4 deletions(-)
-> >>  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
-> >
-> >[...]
-> >
-> >
-> >>diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> >>index d1ccc72..14de380 100644
-> >>--- a/arch/arm/common/gic.c
-> >>+++ b/arch/arm/common/gic.c
-> >
-> >[...]
-> >
-> >>+void __init gic_of_init(struct device_node *node, struct device_node *parent)
-> >>+{
-> >>+       void __iomem *cpu_base;
-> >>+       void __iomem *dist_base;
-> >>+       int irq;
-> >>+       struct irq_domain *domain =&gic_data[gic_cnt].domain;
-> >>+
-> >>+       if (WARN_ON(!node))
-> >>+               return;
-> >>+
-> >>+       dist_base = of_iomap(node, 0);
-> >>+       WARN(!dist_base, "unable to map gic dist registers\n");
-> >>+
-> >>+       cpu_base = of_iomap(node, 1);
-> >>+       WARN(!cpu_base, "unable to map gic cpu registers\n");
-> >>+
-> >>+       domain->nr_irq = gic_irq_count(dist_base);
-> >>+       domain->irq_base = irq_alloc_descs(-1, 0, domain->nr_irq, numa_node_id());
-> >
-> >For exynos4, all the interrupts originating from GIC are statically
-> >mapped to start from 32 in the linux virq space (GIC SPI interrupts
-> >start from 64). In the above code, since irq_base would be 0 for
-> >exynos4, the interrupt mapping is not working correctly. In your
-> >previous version of the patch, you have given a option to the platform
-> >code to choose the offset. Could that option be added to this series
-> >also. Or a provision to use platform specific translate function
-> >instead of the irq_domain_simple translator.
+> On 09/17/2011 06:53 PM, Grant Likely wrote:
+> > On Wed, Sep 14, 2011 at 11:31:38AM -0500, Rob Herring wrote:
+> > The other option for implementing this would be to take the probe
+> > deferral approach and not try to sort the list, but instead allow
+> > probe functions to fail & request retry if the parent hasn't yet been
+> > probed.  I haven't thought enough about it though to say which would
+> > be the best approach.
+> > 
 > 
-> I have another concern on a similar topic.
+> Considering the list will typically be only a few entries, it is
+> probably not so important how efficiently we sort or walk the list.
 > 
-> On OMAP4 the SoC interrupts external to the MPU (SPI) have an offset
-> of 32. Only the internal PPI are between 0 and 31.
+> The only way I see controller code knowing if it needs to defer init is
+> if of_irq_create_mapping fails. The core code could simply do this
+> itself. However, I would imagine sorting it would be faster than that path.
 > 
-> For the moment we add 32 to every SoC interrupts in the irq.h
-> define, but I'm assuming that this offset calculation should be done
-> thanks to a dedicated irq domain for the SPI.
-> The real HW physical number start at 0, and thus this is that value
-> that should be in the irq binding of the device.
+> How about something like this (untested):
+> 
+> int find_order(struct intc_desc *node)
+> {
+> 	struct intc_desc *d;
+> 
+> 	list_for_each_entry(d, &intc_desc_list, list) {
+> 		if (node->parent != d->dev)
+> 			continue;
+> 
+> 		if (d->order < 0)
+> 			find_order(d);
+> 
+> 		node->order = d->order + 1;
+> 		break;
+> 	}
+> }
+> 
+> 
+> Then rather than sorting, do this:
+> 
+> 
+> 	list_for_each_entry(desc, &intc_desc_list, list)
+> 		find_order(desc);
+> 
+> 	for (order = 0; !list_empty(&intc_desc_list); order++) {
+> 		list_for_each_entry_safe(desc, temp_desc, &intc_desc_list, list) {
+> 			if (desc->order != order)
+> 				continue;
+> 			
+> 			match = of_match_node(matches, desc->dev);
+> 			if (match && match->data) {
+> 				irq_init_cb_t irq_init_cb = match->data;
+> 				pr_debug("of_irq_init: init %s @ %p, parent %p\n",
+> 					 match->compatible, desc->dev, desc->parent);
+> 				irq_init_cb(desc->dev, desc->parent);
+> 			}
+> 			list_del(&desc->list);
+> 			kfree(desc);
+> 		}
+> 	}
 
-Yes.
+I don't think there needs to be a separate pass for calculating order.
+What about a breadth-first search with a secondary list for pending
+parents?  Something like:
 
-> So ideally we should have a irq domain for the PPI starting at 0 and
-> another one for the SPI starting at 32. Or 32 and 64 for the exynos4
-> case, but it looks like the PPI/SPI offset is always 32.
 
-Part of the purpose behind irq_domains is to have a translator
-callback that can take care of complex mappings, such as mapping each
-of the GIC irq ranges onto the Linux irq space.  Plus, by being based
-on the DT irq specifiers and dynamically assigning the linux numbers,
-the actual mapping that the kernel chooses to use shouldn't actually
-have any relevance.  So whether or not the driver uses an offset is 32
-becomes an implementation detail.
+	struct list_head intc_desc_list;
+	struct list_head intc_parent_list;
+	struct device_node *parent = NULL;
+
+	while (!list_empty(&intc_desc_list)) {
+		/*
+		 * Process all controllers with the current 'parent'.
+		 * First pass will be looking for NULL as the parent.
+		 * The assumption is that NULL parent means a root
+		 * controller
+		 */
+		list_for_each_entry_safe(desc, temp_desc, &intc_desc_list, list) {
+			if (desc->parent == parent) {
+				list_del(&desc->list);
+				irq_init_cb_t irq_init_cb = match->data;
+				pr_debug("of_irq_init: init %s @ %p, parent %p\n",
+					 match->compatible, desc->dev, desc->parent);
+				irq_init_cb(desc->dev, desc->parent);
+
+				/*
+				 * This one is now set up; add it to
+				 * the parent list so its children
+				 * can get processed in a subsequent
+				 * pass.
+				 */
+				list_add_tail(&desc->list, &intc_parent_list);
+			}
+		}
+
+		/* Get the next pending parent that might have children */
+		desc = list_first_entry(&intc_parent_list, typeof(*desc), list);
+		if (!desc) {
+			pr_error("Danger Will Robinson!");
+			break;
+		}
+		list_del(&desc->list);
+		parent = desc->list
+		kfree(desc);
+	}
+
+> >> +	/*
+> >> +	 * The root irq controller is the one without an interrupt-parent.
+> >> +	 * That one goes first, followed by the controllers that reference it,
+> >> +	 * followed by the ones that reference the 2nd level controllers, etc
+> >> +	 */
+> > 
+> > I don't believe that this actually turns out to be true (and yes I
+> > know it is how I originally described it).  :-)  When the
+> > interrupt-parent property is at the root of the tree, then the root
+> > interrupt controller may very well inherit itself as it's interrupt
+> > parent, and of_irq_find_parent() will still return a value.  This
+> > should probably be considered a bug in of_irq_find_parent(), and it
+> > should return NULL if the parent is itself.
+> 
+> I did hit this exact issue. There is an easy, but not obvious fix to the
+> device tree. Simply adding "interupt-parent;" to the root interrupt
+> controller node will do the trick and override the value in the tree root.
+
+Hahaha.  Definitely a bug then.
+
+> > of_irq_find_parent should probably be implemented thusly (completely
+> > untested); although the only functional change is the line:
+> > 	return (p == child) ? NULL : p;
+> > 
+> > /**
+> >  * of_irq_find_parent - Given a device node, find its interrupt parent node
+> >  * @child: pointer to device node
+> >  *
+> >  * Returns a pointer to the interrupt parent node, or NULL if the
+> >  * interrupt parent could not be determined.
+> >  */
+> > struct device_node *of_irq_find_parent(struct device_node *child)
+> > {
+> > 	struct device_node *p, *c = child;
+> > 	const __be32 *parp;
+> > 
+> > 	if (!of_node_get(c))
+> > 		return NULL;
+> > 
+> > 	do {
+> > 		p = of_parse_phandle(c, "interrupt-parent", 0);
+> > 
+> > 		if (!p && (of_irq_workarounds & OF_IMAP_NO_PHANDLE) &&
+> > 		    of_find_property(c, "interrupt-parent", NULL))
+> > 			p = of_node_get(of_irq_dflt_pic);
+> > 
+> > 		if (!p)
+> > 			p = of_get_parent(c);
+> > 
+> > 		of_node_put(c);
+> > 		c = p;
+> > 	} while (p && !of_find_property(p, "#interrupt-cells", NULL));
+> > 
+> > 	return (p == child) ? NULL : p;
+> > }
+> > 
+> 
+> This change should probably be implemented as well as this is likely a
+> common occurrence that will be stumbled over or existing device trees
+> won't have this.
+
+Existing device trees probably do have this, but all the powerpc board
+support currently hard codes the interrupt controller setup.  They
+will hit the same issue if converted to use this approach.
+
+> I'll test and add to the next series.
+
+Awesome, thanks!
+
+g.
