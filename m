@@ -1,166 +1,30 @@
-From: shijie8@gmail.com (Huang Shijie)
-Date: Sun, 18 Sep 2011 19:40:28 +0800
-Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <20083.21122.830407.146310@ipc1.ka-ro>
-References: <1315450031-6371-1-git-send-email-b32955@freescale.com>
-	<20081.44941.12535.496764@ipc1.ka-ro>
-	<4E71CDB2.4000205@freescale.com>
-	<20083.21122.830407.146310@ipc1.ka-ro>
-Message-ID: <CAMiH66HvHhHHp=bGm_=Bsh+3WW3nzdm_c1DkqObE_KKO-7dfMw@mail.gmail.com>
+From: subaparts@yandex.ru (Alexander Sverdlin)
+Date: Sun, 18 Sep 2011 13:43:18 +0200
+Subject: [PATCH 3/7] ASoC: edb93xx: convert to use snd_soc_register_card()
+In-Reply-To: <20110918073852.GA2625@mwesterb-mobl.ger.corp.intel.com>
+References: <cover.1315732452.git.mika.westerberg@iki.fi>
+	<0fef3fd00e8cdb8a606f4a81ad4e7f2b7014621c.1315732452.git.mika.westerberg@iki.fi>
+	<1316191555.17769.2.camel@r60e>
+	<20110917065202.GA2759@mwesterb-mobl.ger.corp.intel.com>
+	<1316260700.17769.8.camel@r60e>
+	<20110918073852.GA2625@mwesterb-mobl.ger.corp.intel.com>
+Message-ID: <1316346198.17769.14.camel@r60e>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lothar:
+Hello!
 
-On Fri, Sep 16, 2011 at 9:43 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
-> Hi,
->
-> Huang Shijie writes:
->> Hi,
->> > Hi,
->> >
->> > Huang Shijie writes:
->> >> The patch set is based on Artem's tree:
->> >> ? ?http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
->> >>
->> >> The general-purpose media interface(GPMI) controller is a flexible interface
->> >> to up to several NAND flashs.
->> >>
->> >> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
->> >>
->> >> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
->> >> not.
->> >>
->> >> This driver is a _pure_ MTD NAND controller driver now.
->> >>
->> >>
->> >> The driver depends on another GPMI-NAND device patch set, you can find them at :
->> >> ? ?[1] http://marc.info/?l=linux-arm-kernel&m=131416901319573&w=2
->> >> ? ?[2] http://marc.info/?l=linux-arm-kernel&m=131416912319668&w=2
->> >> ? ?[3] http://marc.info/?l=linux-arm-kernel&m=131416891119504&w=2
->> >> ? ?[4] http://marc.info/?l=linux-arm-kernel&m=131416896219539&w=2
->> >>
->> >> Test environment:
->> >> ? ?Using imx23 and imx28 boards for test.
->> >>
->> >> ? ?imx23 :
->> >> ? ?console=ttyAMA0,115200 mtdparts=gpmi-nfc:20m(boot),-(user)
->> >> ? ?Tested by USB boot and NAND boot.
->> >>
->> >> ? ? ? ? ?imx28 :
->> >> ? ?#console=ttyAMA0,115200 root=/dev/mmcblk0p3 rw rootwait
->> >> ? ?Tested by SD card boot mode.
->> >>
->> > How did you perform your tests?
->> >
->> > I tried this driver on our TX28 board with the result that with
->> > concurrent access of the SD card and the NAND flash, I still get the
->> > dreaded DMA timeouts within seconds:
->> > DMA timeout, last DMA :1
->> > GPMI regs:
->> > ? ? ? ? ? ? ?HW_GPMI_CTRL0[000]=21800001
->> > ? ? ? ? ? ?HW_GPMI_COMPARE[010]=00000000
->> > ? ? ? ? ? ?HW_GPMI_ECCCTRL[020]=00000000
->> > ? ? ? ? ? HW_GPMI_ECCCOUNT[030]=00000840
->> > ? ? ? ? ? ?HW_GPMI_PAYLOAD[040]=46578000
->> > ? ? ? ? ?HW_GPMI_AUXILIARY[050]=46578800
->> > ? ? ? ? ? ? ?HW_GPMI_CTRL1[060]=0004000c
->> > ? ? ? ? ? ?HW_GPMI_TIMING0[070]=00010203
->> > ? ? ? ? ? ?HW_GPMI_TIMING1[080]=05000000
->> > ? ? ? ? ? ?HW_GPMI_TIMING2[090]=09020101
->> > ? ? ? ? ? ? ? HW_GPMI_STAT[0b0]=0d000003
->> > ? ? ? ? ? ? ?HW_GPMI_DEBUG[0c0]=01000000
->> > BCH regs:
->> > ? ? ? ? ? ? ? ?HW_BCH_CTRL[000]=00000100
->> > ? ? ? ? ? ? HW_BCH_STATUS0[010]=00000010
->> > ? ? ? ? ? ? ? ?HW_BCH_MODE[020]=00000000
->> > ? ? ? ? ? HW_BCH_ENCODEPTR[030]=00000000
->> > ? ? ? ? ? ? HW_BCH_DATAPTR[040]=00000000
->> > ? ? ? ? ? ? HW_BCH_METAPTR[050]=00000000
->> > ? ? ? ?HW_BCH_LAYOUTSELECT[070]=00000000
->> > ? ? ? HW_BCH_FLASH0LAYOUT0[080]=030a4200
->> > ? ? ? HW_BCH_FLASH0LAYOUT1[090]=08404200
->> > ? ? ? ? ? ? ?HW_BCH_DEBUG0[100]=00000000
->> > DMA regs:
->> > ? ? ? ? ? ? HW_APBHX_CTRL0[000]=30000000
->> > ? ? ? ? ? ? HW_APBHX_CTRL1[010]=ffff0000
->> > ? ? ? ? ? ? HW_APBHX_CTRL2[020]=00000000
->> > ? ? ?HW_APBHX_CHANNEL_CTRL[030]=00000000
->> > ? ? ?HW_APBHX_CHn_CURCMDAR(0)[100]=46e1c000
->> > ? ? ?HW_APBHX_CHn_NXTCMDAR(0)[110]=46e1c04c
->> > ? ? ? ? ? HW_APBHX_CHn_CMD(0)[120]=000001c8
->> > ? ? ? ? ? HW_APBHX_CHn_BAR(0)[130]=00000000
->> > ? ? ? ? ?HW_APBHX_CHn_SEMA(0)[140]=00000000
->> > ? ? ? ?HW_APBHX_CHn_DEBUG1(0)[150]=00a0001e
->> > ? ? ? ?HW_APBHX_CHn_DEBUG2(0)[160]=00000000
->> > ? ? ?HW_APBHX_CHn_CURCMDAR(4)[2c0]=4652c098
->> > ? ? ?HW_APBHX_CHn_NXTCMDAR(4)[2d0]=4652c0e4
->> > ? ? ? ? ? HW_APBHX_CHn_CMD(4)[2e0]=000001c9
->> > ? ? ? ? ? HW_APBHX_CHn_BAR(4)[2f0]=46553241
->> > ? ? ? ? ?HW_APBHX_CHn_SEMA(4)[300]=00010000
->> > ? ? ? ?HW_APBHX_CHn_DEBUG1(4)[310]=27a00015
->> > ? ? ? ?HW_APBHX_CHn_DEBUG2(4)[320]=00000000
->> > BCH Geometry :
->> > GF length ? ? ? ? ? ? ?: 13
->> > ECC Strength ? ? ? ? ? : 8
->> > Page Size in Bytes ? ? : 2112
->> > Metadata Size in Bytes : 10
->> > ECC Chunk Size in Bytes: 512
->> > ECC Chunk Count ? ? ? ?: 4
->> > Payload Size in Bytes ?: 2048
->> > Auxiliary Size in Bytes: 16
->> > Auxiliary Status Offset: 12
->> > Block Mark Byte Offset : 1999
->> > Block Mark Bit Offset ?: 0
->> >
->> > I'm doing a:
->> > dd if=/dev/mtd0> ?/dev/null& ?dd if=/dev/mmcblk0> ?/dev/null
->> > Sometimes the 'dd' accessing the SD card will stall indefinitely.
->> > Also copying data from SD card to flash will produce the error, though
->> > less likely.
->> >
->> it reproduces in my side too.
->> > This looks like the problem arises in the DMA driver when multiple
->> anyway, I will debug it.
->>
->> but i will on vacation next week.
->>
->> I am not sure I can fix it tomorrow.
->>
-> I now found, that selecting 'CONFIG_PREEMPT_NONE' in the kernel config
-> dramatically decreases the chance of hitting this problem.
->
-> I've checked the mxs-dma and gpmi-nand drivers, but could not find
-> anything fishy wrt preemption.
-thanks for your hard work.
+On Sun, 2011-09-18 at 10:38 +0300, Mika Westerberg wrote:
+> On Sat, Sep 17, 2011 at 01:58:20PM +0200, Alexander Sverdlin wrote:
+> > 
+> > I've checked mainline linux-next without your patches, it's broken too.
+> > So your patches are not the root cause for that.
+> 
+> Ok thanks.
+> 
+> Still it would be good to find out which causes it to fail. Are you able to
+> load all the modules manually? Does it work then?
+> 
 
-I think you could focus on the mxs-dma driver.
-I read code of sd driver.
-The only common place which gpmi and sd uses is the dma submit code.
-
-The DMA maybe become unstabe when the gpmi and sd submit the DMA
-operation at the same time. :(
-I remember you ever submit a patch about the mxs-dma.
-Could you try it with your patch?
-
-thanks
-
-Huang Shijie
-
-
-
-
->
->
-> Lothar Wa?mann
-> --
-> ___________________________________________________________
->
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
->
-> www.karo-electronics.de | info at karo-electronics.de
-> ___________________________________________________________
->
+I've limited access to hardware at the moment, so I'll find out that,
+but it will not be so fast )
