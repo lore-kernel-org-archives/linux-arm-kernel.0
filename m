@@ -1,48 +1,49 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sun, 18 Sep 2011 18:33:51 +0200
-Subject: [PATCH 0/6] mc13783 cleanup
-In-Reply-To: <20110915160321.GA29357@pengutronix.de>
-References: <20110824132740.GA28197@pengutronix.de>
-	<201108250905.13168.philippe.retornaz@epfl.ch>
-	<20110915151213.GE32263@sortiz-mobl>
-	<20110915160321.GA29357@pengutronix.de>
-Message-ID: <20110918163351.GL32263@sortiz-mobl>
+From: romieu@fr.zoreil.com (Francois Romieu)
+Date: Sun, 18 Sep 2011 20:09:12 +0200
+Subject: [PATCH 4/4] net/fec: add imx6q enet support
+In-Reply-To: <1316346852-17090-5-git-send-email-shawn.guo@linaro.org>
+References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
+	<1316346852-17090-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110918180912.GA3734@electric-eye.fr.zoreil.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Shawn Guo <shawn.guo@linaro.org> :
+[...]
+> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+> index 04206e4..849cb0b 100644
+> --- a/drivers/net/fec.c
+> +++ b/drivers/net/fec.c
+> @@ -442,18 +453,23 @@ fec_restart(struct net_device *ndev, int duplex)
+>  		/* Enable flow control and length check */
+>  		rcntl |= 0x40000000 | 0x00000020;
+>  
+> -		/* MII or RMII */
+> +		/* RGMII, RMII or MII */
+> +		if (fep->phy_interface == PHY_INTERFACE_MODE_RGMII)
+> +			rcntl |= (1 << 6);
+>  		if (fep->phy_interface == PHY_INTERFACE_MODE_RMII)
+           ^^^^ missing "else"
 
-On Thu, Sep 15, 2011 at 06:03:21PM +0200, Uwe Kleine-K?nig wrote:
-> Hi Samuel,
-> 
-> On Thu, Sep 15, 2011 at 05:12:13PM +0200, Samuel Ortiz wrote:
-> > On Thu, Aug 25, 2011 at 09:05:12AM +0200, Philippe R?tornaz wrote:
-> > > Le mercredi 24 ao?t 2011 15:27:40, Uwe Kleine-K?nig a ?crit :
-> > > > Hello,
-> > > > 
-> > > > this series removes the long obsolte mc13783 API after fixing all
-> > > > remaining users.
-> > > 
-> > > I posted a patch last month which was touching this MFD too.
-> > > We will need to synchronize both patch. 
-> > I applied Uwe's patchset now.
-> Thanks.
-> 
-> >                               Could you please sync your code and send me a
-> > patchset that applies on top of:
-> > 
-> > git://git.infradead.org/users/sameo/mfd-2.6.git for-next
-> You can fetch the updated series from
-> 
-> 	git://git.pengutronix.de/git/ukl/linux-2.6.git mc13783
-I merged this one on top of my for-next branch. My MFD tree temporary lives on
-infradead:
+[...]
+> +		/* 1G, 100M or 10M */
+> +		if (fep->phy_dev) {
+> +			if (fep->phy_dev->speed == SPEED_1000)
+> +				ecntl |= (1 << 8);
+> +			else if (fep->phy_dev->speed == SPEED_100)
+> +				rcntl &= ~(1 << 9);
+> +			else
+> +				rcntl |= (1 << 9);
+> +		}
+[...]
+> +	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
+> +		/* enable ENET endian swap */
+> +		ecntl |= (1 << 8);
 
-git://git.infradead.org/users/sameo/mfd-2.6.git
-
-Cheers,
-Samuel.
+I do not understand why the endian swap bit of ecntl needs to be
+set the same in these two different paths, especially as the latter
+handles the old faulty imx28 and the former the newly fixed imx6q.
+Typo ?
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Ueimor
