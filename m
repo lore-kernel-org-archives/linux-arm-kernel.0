@@ -1,78 +1,66 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 18 Sep 2011 22:39:27 +0200
-Subject: [PATCH 0/2] video: s3c-fb: Add window positioning support
-In-Reply-To: <4E7646B5.6000000@gmx.de>
-References: <1314301917-9938-1-git-send-email-ajaykumar.rs@samsung.com>
-	<201109071731.02293.laurent.pinchart@ideasonboard.com>
-	<4E7646B5.6000000@gmx.de>
-Message-ID: <201109182239.33124.laurent.pinchart@ideasonboard.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sun, 18 Sep 2011 22:43:40 +0200
+Subject: [PATCH 2/7] s3c-adc: describe features via quirk constants
+In-Reply-To: <201109182241.48858.heiko@sntech.de>
+References: <201109182241.48858.heiko@sntech.de>
+Message-ID: <201109182243.40440.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+The adc blocks of S3C2410 through S5P have a multitude of
+quirks, i.e. moved bits or whole new registers.
 
-On Sunday 18 September 2011 21:29:57 Florian Tobias Schandinat wrote:
-> On 09/07/2011 03:31 PM, Laurent Pinchart wrote:
-> > On Thursday 01 September 2011 18:45:18 Florian Tobias Schandinat wrote:
-> >> On 08/25/2011 07:51 PM, Ajay Kumar wrote:
-> >>> Just as a note, there are many drivers like mx3fb.c, au1200fb.c and
-> >>> OMAP seem to be doing window/plane positioning in their driver code.
-> >>> Is it possible to have this window positioning support at a common
-> >>> place?
-> >> 
-> >> Good point. Congratulations for figuring out that I like to standardize
-> >> things. But I think your suggestion is far from being enough to be
-> >> useful for userspace (which is our goal so that applications can be
-> >> reused along drivers and don't need to know about individual drivers).
-> > 
-> > Beside standardizing things, do you also like to take them one level
-> > higher to solve challenging issues ? I know the answer must be yes :-)
-> > 
-> > The problem at hand here is something we have solved in V4L2
-> > (theoretically only for part of it) with the media controller API, the
-> > V4L2 subdevs and their pad-level format API.
-> > 
-> > In a nutshell, the media controller lets drivers model hardware as a
-> > graph of buliding blocks connected through their pads and expose that
-> > description to userspace applications. In V4L2 most of those blocks are
-> > V4L2 subdevs, which are abstract building blocks that implement sets of
-> > standard operations. Those operations are exposed to userspace through
-> > the V4L2 subdevs pad-level format API, allowing application to configure
-> > sizes and selection rectangles at all pads in the graph. Selection
-> > rectangles can be used to configure cropping and composing, which is
-> > exactly what the window positioning API needs to do.
-> > 
-> > Instead of creating a new fbdev-specific API to do the same, shouldn't we
-> > try to join forces ?
-> 
-> Okay, thanks for the pointer. After having a look at your API I understand
-> that it would solve the problem to discover how many windows (in this
-> case) are there and how they can be accessed. It looks fine for this
-> purpose, powerful enough and not too complex. So if I get it correct we
-> still need at least a way to configure the position of the
-> windows/overlays/sink pads similar to what Ajay proposed.
+This patch tries to describe these individual features
+through constants which can be used to describe an adc.
 
-Yes, the media controller API can only expose the topology to userspace, it 
-can't be used to configure FB-specific parameters on the pipeline.
+As SoCs sometimes share only some of these quirks defining
+TYPE_ADCVx values for each one wouldn't scale well when
+adding more variants.
 
-> Additionally a way to get and/or set the z-position of the overlays if
-> multiple overlays overlap and set/get how the overlays work (overdraw,
-> constant alpha, source/destination color keying). Normally I'd consider
-> these link properties but I think implementing them as properties of the
-> source framebuffer or sink pad would work as well.
-> Is this correct or did I miss something?
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/plat-samsung/adc.c |   29 +++++++++++++++++++++++++++++
+ 1 files changed, 29 insertions(+), 0 deletions(-)
 
-That's correct.
-
-What bothers me is that both V4L2 and DRM/KMS have the exact same needs. I 
-don't think it makes sense to implement three different solutions to the same 
-problem in our three video-related APIs. What's your opinion about that ?
-
-I've tried to raise the issue on the dri-devel mailing list ("Proposal for a 
-low-level Linux display framework"), but there's still a long way to go before 
-convincing everybody. Feel free to help me :-)
-
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index ee8deef..b209d58 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -45,6 +45,35 @@ enum s3c_cpu_type {
+ 	TYPE_ADCV3, /* S5PV210, S5PC110, EXYNOS4210 */
+ };
+ 
++/*
++ * Resolution of the ADC - 10 or 12 bit
++ */
++#define S3C_ADC_QUIRK_10BIT		0
++#define S3C_ADC_QUIRK_12BIT		(1<<0)
++
++/*
++ * 12bit ADC can switch resolution between 10 bit and 12 bit
++ * ADCCON bit 03 for S3C2416
++ * ADCCON bit 16 for S3C64XX and up
++ */
++#define S3C_ADC_QUIRK_RESSEL03		(1<<1)
++#define S3C_ADC_QUIRK_RESSEL16		(1<<2)
++
++/*
++ * Input channel select can either be in
++ * - reg ADCCON, bit for S3C24XX and S3C64XX
++ * - reg base+0x18 for 2443/2416/2450
++ * - reg base+0x1C for S5P
++ */
++#define S3C_ADC_QUIRK_MUXADCCON		(1<<3)
++#define S3C_ADC_QUIRK_MUX18		(1<<4)
++#define S3C_ADC_QUIRK_MUX1C		(1<<5)
++
++/*
++ * CLRINT register on S3C64xx
++ */
++#define S3C_ADC_QUIRK_CLRINT		(1<<6)
++
+ struct s3c_adc_client {
+ 	struct platform_device	*pdev;
+ 	struct list_head	 pend;
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.2.3
