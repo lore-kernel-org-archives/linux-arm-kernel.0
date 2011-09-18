@@ -1,238 +1,451 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 18 Sep 2011 23:58:55 +0200
-Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based camera
-	board.
-In-Reply-To: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
-References: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
-Message-ID: <201109182358.55816.laurent.pinchart@ideasonboard.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Mon, 19 Sep 2011 09:19:42 +1000
+Subject: [PATCH 1/3] at91/gpio: make gpio register base soc independant
+In-Reply-To: <1316285923-12461-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1316285923-12461-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <4E767C8E.2040601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+On 18/09/11 04:58, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-On Saturday 17 September 2011 11:34:57 Martin Hostettler wrote:
-> Adds board support for an MT9M032 based camera to omap3evm.
-> 
-> Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
+Looks good to me. For whole series:
+
+Reviewed-by: Ryan Mallon <rmallon@gmail.com>
+
 > ---
->  arch/arm/mach-omap2/Makefile                |    1 +
->  arch/arm/mach-omap2/board-omap3evm-camera.c |  183
-> +++++++++++++++++++++++++++ 2 files changed, 184 insertions(+), 0
-> deletions(-)
->  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
-> 
-> Changes in V2:
->  * ported to current mainline
->  * Style fixes
->  * Fix error handling
-> 
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index f343365..8ae3d25 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -202,6 +202,7 @@ obj-$(CONFIG_MACH_OMAP3_TORPEDO)        +=
-> board-omap3logic.o \ obj-$(CONFIG_MACH_OVERO)		+= board-overo.o \
->  					   hsmmc.o
->  obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o \
-> +					   board-omap3evm-camera.o \
->  					   hsmmc.o
->  obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
->  					   hsmmc.o
-> diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c
-> b/arch/arm/mach-omap2/board-omap3evm-camera.c new file mode 100644
-> index 0000000..be987d9
-> --- /dev/null
-> +++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
-> @@ -0,0 +1,183 @@
-> +/*
-> + * Copyright (C) 2010-2011 Lund Engineering
-> + * Contact: Gil Lund <gwlund@lundeng.com>
-> + * Author: Martin Hostettler <martin@neutronstar.dyndns.org>
-> + *
-> + * Board intregration for a MT9M032 camera connected to IMAGE_CONN and I2C
-> Bus 2 + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-> + * 02110-1301 USA
-> + */
+>  arch/arm/mach-at91/at91cap9.c                 |    8 ++++----
+>  arch/arm/mach-at91/at91rm9200.c               |    8 ++++----
+>  arch/arm/mach-at91/at91sam9260.c              |    6 +++---
+>  arch/arm/mach-at91/at91sam9261.c              |    6 +++---
+>  arch/arm/mach-at91/at91sam9263.c              |   10 +++++-----
+>  arch/arm/mach-at91/at91sam9g45.c              |   10 +++++-----
+>  arch/arm/mach-at91/at91sam9rl.c               |    8 ++++----
+>  arch/arm/mach-at91/generic.h                  |    2 +-
+>  arch/arm/mach-at91/gpio.c                     |    8 ++++++--
+>  arch/arm/mach-at91/include/mach/at91cap9.h    |    9 +++++----
+>  arch/arm/mach-at91/include/mach/at91rm9200.h  |    9 +++++----
+>  arch/arm/mach-at91/include/mach/at91sam9260.h |    7 ++++---
+>  arch/arm/mach-at91/include/mach/at91sam9261.h |    7 ++++---
+>  arch/arm/mach-at91/include/mach/at91sam9263.h |   11 ++++++-----
+>  arch/arm/mach-at91/include/mach/at91sam9g45.h |   11 ++++++-----
+>  arch/arm/mach-at91/include/mach/at91sam9rl.h  |    9 +++++----
+>  16 files changed, 70 insertions(+), 59 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+> index ecdd54d..fe00dce 100644
+> --- a/arch/arm/mach-at91/at91cap9.c
+> +++ b/arch/arm/mach-at91/at91cap9.c
+> @@ -296,19 +296,19 @@ void __init at91cap9_set_console_clock(int id)
+>  static struct at91_gpio_bank at91cap9_gpio[] = {
+>  	{
+>  		.id		= AT91CAP9_ID_PIOABCD,
+> -		.offset		= AT91_PIOA,
+> +		.regbase	= AT91CAP9_BASE_PIOA,
+>  		.clock		= &pioABCD_clk,
+>  	}, {
+>  		.id		= AT91CAP9_ID_PIOABCD,
+> -		.offset		= AT91_PIOB,
+> +		.regbase	= AT91CAP9_BASE_PIOB,
+>  		.clock		= &pioABCD_clk,
+>  	}, {
+>  		.id		= AT91CAP9_ID_PIOABCD,
+> -		.offset		= AT91_PIOC,
+> +		.regbase	= AT91CAP9_BASE_PIOC,
+>  		.clock		= &pioABCD_clk,
+>  	}, {
+>  		.id		= AT91CAP9_ID_PIOABCD,
+> -		.offset		= AT91_PIOD,
+> +		.regbase	= AT91CAP9_BASE_PIOD,
+>  		.clock		= &pioABCD_clk,
+>  	}
+>  };
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index 713d3bd..8ce8675 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -271,19 +271,19 @@ void __init at91rm9200_set_console_clock(int id)
+>  static struct at91_gpio_bank at91rm9200_gpio[] = {
+>  	{
+>  		.id		= AT91RM9200_ID_PIOA,
+> -		.offset		= AT91_PIOA,
+> +		.regbase	= AT91RM9200_BASE_PIOA,
+>  		.clock		= &pioA_clk,
+>  	}, {
+>  		.id		= AT91RM9200_ID_PIOB,
+> -		.offset		= AT91_PIOB,
+> +		.regbase	= AT91RM9200_BASE_PIOB,
+>  		.clock		= &pioB_clk,
+>  	}, {
+>  		.id		= AT91RM9200_ID_PIOC,
+> -		.offset		= AT91_PIOC,
+> +		.regbase	= AT91RM9200_BASE_PIOC,
+>  		.clock		= &pioC_clk,
+>  	}, {
+>  		.id		= AT91RM9200_ID_PIOD,
+> -		.offset		= AT91_PIOD,
+> +		.regbase	= AT91RM9200_BASE_PIOD,
+>  		.clock		= &pioD_clk,
+>  	}
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+> index a9be758..d7ad3e0 100644
+> --- a/arch/arm/mach-at91/at91sam9260.c
+> +++ b/arch/arm/mach-at91/at91sam9260.c
+> @@ -265,15 +265,15 @@ void __init at91sam9260_set_console_clock(int id)
+>  static struct at91_gpio_bank at91sam9260_gpio[] = {
+>  	{
+>  		.id		= AT91SAM9260_ID_PIOA,
+> -		.offset		= AT91_PIOA,
+> +		.regbase	= AT91SAM9260_BASE_PIOA,
+>  		.clock		= &pioA_clk,
+>  	}, {
+>  		.id		= AT91SAM9260_ID_PIOB,
+> -		.offset		= AT91_PIOB,
+> +		.regbase	= AT91SAM9260_BASE_PIOB,
+>  		.clock		= &pioB_clk,
+>  	}, {
+>  		.id		= AT91SAM9260_ID_PIOC,
+> -		.offset		= AT91_PIOC,
+> +		.regbase	= AT91SAM9260_BASE_PIOC,
+>  		.clock		= &pioC_clk,
+>  	}
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+> index 658a518..574aa6b 100644
+> --- a/arch/arm/mach-at91/at91sam9261.c
+> +++ b/arch/arm/mach-at91/at91sam9261.c
+> @@ -254,15 +254,15 @@ void __init at91sam9261_set_console_clock(int id)
+>  static struct at91_gpio_bank at91sam9261_gpio[] = {
+>  	{
+>  		.id		= AT91SAM9261_ID_PIOA,
+> -		.offset		= AT91_PIOA,
+> +		.regbase	= AT91SAM9261_BASE_PIOA,
+>  		.clock		= &pioA_clk,
+>  	}, {
+>  		.id		= AT91SAM9261_ID_PIOB,
+> -		.offset		= AT91_PIOB,
+> +		.regbase	= AT91SAM9261_BASE_PIOB,
+>  		.clock		= &pioB_clk,
+>  	}, {
+>  		.id		= AT91SAM9261_ID_PIOC,
+> -		.offset		= AT91_PIOC,
+> +		.regbase	= AT91SAM9261_BASE_PIOC,
+>  		.clock		= &pioC_clk,
+>  	}
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+> index f83fbb0..dee0ed7 100644
+> --- a/arch/arm/mach-at91/at91sam9263.c
+> +++ b/arch/arm/mach-at91/at91sam9263.c
+> @@ -266,23 +266,23 @@ void __init at91sam9263_set_console_clock(int id)
+>  static struct at91_gpio_bank at91sam9263_gpio[] = {
+>  	{
+>  		.id		= AT91SAM9263_ID_PIOA,
+> -		.offset		= AT91_PIOA,
+> +		.regbase	= AT91SAM9263_BASE_PIOA,
+>  		.clock		= &pioA_clk,
+>  	}, {
+>  		.id		= AT91SAM9263_ID_PIOB,
+> -		.offset		= AT91_PIOB,
+> +		.regbase	= AT91SAM9263_BASE_PIOB,
+>  		.clock		= &pioB_clk,
+>  	}, {
+>  		.id		= AT91SAM9263_ID_PIOCDE,
+> -		.offset		= AT91_PIOC,
+> +		.regbase	= AT91SAM9263_BASE_PIOC,
+>  		.clock		= &pioCDE_clk,
+>  	}, {
+>  		.id		= AT91SAM9263_ID_PIOCDE,
+> -		.offset		= AT91_PIOD,
+> +		.regbase	= AT91SAM9263_BASE_PIOD,
+>  		.clock		= &pioCDE_clk,
+>  	}, {
+>  		.id		= AT91SAM9263_ID_PIOCDE,
+> -		.offset		= AT91_PIOE,
+> +		.regbase	= AT91SAM9263_BASE_PIOE,
+>  		.clock		= &pioCDE_clk,
+>  	}
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index 8f5db7b..753df63 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -282,23 +282,23 @@ void __init at91sam9g45_set_console_clock(int id)
+>  static struct at91_gpio_bank at91sam9g45_gpio[] = {
+>  	{
+>  		.id		= AT91SAM9G45_ID_PIOA,
+> -		.offset		= AT91_PIOA,
+> +		.regbase	= AT91SAM9G45_BASE_PIOA,
+>  		.clock		= &pioA_clk,
+>  	}, {
+>  		.id		= AT91SAM9G45_ID_PIOB,
+> -		.offset		= AT91_PIOB,
+> +		.regbase	= AT91SAM9G45_BASE_PIOB,
+>  		.clock		= &pioB_clk,
+>  	}, {
+>  		.id		= AT91SAM9G45_ID_PIOC,
+> -		.offset		= AT91_PIOC,
+> +		.regbase	= AT91SAM9G45_BASE_PIOC,
+>  		.clock		= &pioC_clk,
+>  	}, {
+>  		.id		= AT91SAM9G45_ID_PIODE,
+> -		.offset		= AT91_PIOD,
+> +		.regbase	= AT91SAM9G45_BASE_PIOD,
+>  		.clock		= &pioDE_clk,
+>  	}, {
+>  		.id		= AT91SAM9G45_ID_PIODE,
+> -		.offset		= AT91_PIOE,
+> +		.regbase	= AT91SAM9G45_BASE_PIOE,
+>  		.clock		= &pioDE_clk,
+>  	}
+>  };
+> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+> index a238105..c4004e2 100644
+> --- a/arch/arm/mach-at91/at91sam9rl.c
+> +++ b/arch/arm/mach-at91/at91sam9rl.c
+> @@ -246,19 +246,19 @@ void __init at91sam9rl_set_console_clock(int id)
+>  static struct at91_gpio_bank at91sam9rl_gpio[] = {
+>  	{
+>  		.id		= AT91SAM9RL_ID_PIOA,
+> -		.offset		= AT91_PIOA,
+> +		.regbase	= AT91SAM9RL_BASE_PIOA,
+>  		.clock		= &pioA_clk,
+>  	}, {
+>  		.id		= AT91SAM9RL_ID_PIOB,
+> -		.offset		= AT91_PIOB,
+> +		.regbase	= AT91SAM9RL_BASE_PIOB,
+>  		.clock		= &pioB_clk,
+>  	}, {
+>  		.id		= AT91SAM9RL_ID_PIOC,
+> -		.offset		= AT91_PIOC,
+> +		.regbase	= AT91SAM9RL_BASE_PIOC,
+>  		.clock		= &pioC_clk,
+>  	}, {
+>  		.id		= AT91SAM9RL_ID_PIOD,
+> -		.offset		= AT91_PIOD,
+> +		.regbase	= AT91SAM9RL_BASE_PIOD,
+>  		.clock		= &pioD_clk,
+>  	}
+>  };
+> diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+> index 938b34f..11d7297 100644
+> --- a/arch/arm/mach-at91/generic.h
+> +++ b/arch/arm/mach-at91/generic.h
+> @@ -65,7 +65,7 @@ extern void at91sam9_alt_reset(void);
+>  
+>  struct at91_gpio_bank {
+>  	unsigned short id;		/* peripheral ID */
+> -	unsigned long offset;		/* offset from system peripheral base */
+> +	unsigned long regbase;		/* offset from system peripheral base */
+>  	struct clk *clock;		/* associated clock */
+>  };
+>  extern void __init at91_gpio_init(struct at91_gpio_bank *, int nr_banks);
+> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+> index 4615528..04beff1 100644
+> --- a/arch/arm/mach-at91/gpio.c
+> +++ b/arch/arm/mach-at91/gpio.c
+> @@ -616,8 +616,12 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+>  
+>  		at91_gpio->bank = &data[i];
+>  		at91_gpio->chip.base = PIN_BASE + i * 32;
+> -		at91_gpio->regbase = at91_gpio->bank->offset +
+> -			(void __iomem *)AT91_VA_BASE_SYS;
 > +
-> +#include <linux/i2c.h>
-> +#include <linux/init.h>
-> +#include <linux/platform_device.h>
+> +		at91_gpio->regbase = ioremap(at91_gpio->bank->regbase, 512);
+> +		if (!at91_gpio->regbase) {
+> +			pr_err("at91_gpio.%d, failed to map registers, ignoring.\n", i);
+> +			continue;
+> +		}
+>  
+>  		/* enable PIO controller's clock */
+>  		clk_enable(at91_gpio->bank->clock);
+> diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
+> index c5df1e8..f65d083 100644
+> --- a/arch/arm/mach-at91/include/mach/at91cap9.h
+> +++ b/arch/arm/mach-at91/include/mach/at91cap9.h
+> @@ -88,10 +88,6 @@
+>  #define AT91_DMA	(0xffffec00 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+> -#define AT91_PIOA	(0xfffff200 - AT91_BASE_SYS)
+> -#define AT91_PIOB	(0xfffff400 - AT91_BASE_SYS)
+> -#define AT91_PIOC	(0xfffff600 - AT91_BASE_SYS)
+> -#define AT91_PIOD	(0xfffff800 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+>  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+> @@ -102,6 +98,11 @@
+>  			(0xfffffd50 - AT91_BASE_SYS) :	\
+>  			(0xfffffd60 - AT91_BASE_SYS))
+>  
+> +#define AT91CAP9_BASE_PIOA	0xfffff200
+> +#define AT91CAP9_BASE_PIOB	0xfffff400
+> +#define AT91CAP9_BASE_PIOC	0xfffff600
+> +#define AT91CAP9_BASE_PIOD	0xfffff800
 > +
-> +#include <linux/gpio.h>
-> +#include <plat/mux.h>
-> +#include "mux.h"
+>  #define AT91_USART0	AT91CAP9_BASE_US0
+>  #define AT91_USART1	AT91CAP9_BASE_US1
+>  #define AT91_USART2	AT91CAP9_BASE_US2
+> diff --git a/arch/arm/mach-at91/include/mach/at91rm9200.h b/arch/arm/mach-at91/include/mach/at91rm9200.h
+> index e4037b5..5740954 100644
+> --- a/arch/arm/mach-at91/include/mach/at91rm9200.h
+> +++ b/arch/arm/mach-at91/include/mach/at91rm9200.h
+> @@ -81,15 +81,16 @@
+>   */
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)	/* Advanced Interrupt Controller */
+>  #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)	/* Debug Unit */
+> -#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)	/* PIO Controller A */
+> -#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)	/* PIO Controller B */
+> -#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)	/* PIO Controller C */
+> -#define AT91_PIOD	(0xfffffa00 - AT91_BASE_SYS)	/* PIO Controller D */
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)	/* Power Management Controller */
+>  #define AT91_ST		(0xfffffd00 - AT91_BASE_SYS)	/* System Timer */
+>  #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)	/* Real-Time Clock */
+>  #define AT91_MC		(0xffffff00 - AT91_BASE_SYS)	/* Memory Controllers */
+>  
+> +#define AT91RM9200_BASE_PIOA	0xfffff400	/* PIO Controller A */
+> +#define AT91RM9200_BASE_PIOB	0xfffff600	/* PIO Controller B */
+> +#define AT91RM9200_BASE_PIOC	0xfffff800	/* PIO Controller C */
+> +#define AT91RM9200_BASE_PIOD	0xfffffa00	/* PIO Controller D */
 > +
-> +#include "../../../drivers/media/video/omap3isp/isp.h"
-> +#include "media/mt9m032.h"
+>  #define AT91_USART0	AT91RM9200_BASE_US0
+>  #define AT91_USART1	AT91RM9200_BASE_US1
+>  #define AT91_USART2	AT91RM9200_BASE_US2
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
+> index 9a79116..1bea3dc 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9260.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
+> @@ -87,9 +87,6 @@
+>  #define AT91_CCFG	(0xffffef10 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+> -#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)
+> -#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)
+> -#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+>  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+> @@ -98,6 +95,10 @@
+>  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+>  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+>  
+> +#define AT91SAM9260_BASE_PIOA	0xfffff400
+> +#define AT91SAM9260_BASE_PIOB	0xfffff600
+> +#define AT91SAM9260_BASE_PIOC	0xfffff800
 > +
-> +#include "devices.h"
+>  #define AT91_USART0	AT91SAM9260_BASE_US0
+>  #define AT91_USART1	AT91SAM9260_BASE_US1
+>  #define AT91_USART2	AT91SAM9260_BASE_US2
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
+> index ce59620..17ae9c7 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9261.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
+> @@ -70,9 +70,6 @@
+>  #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+> -#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)
+> -#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)
+> -#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+>  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+> @@ -81,6 +78,10 @@
+>  #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
+>  #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+>  
+> +#define AT91SAM9261_BASE_PIOA	0xfffff400
+> +#define AT91SAM9261_BASE_PIOB	0xfffff600
+> +#define AT91SAM9261_BASE_PIOC	0xfffff800
 > +
-> +#define EVM_TWL_GPIO_BASE OMAP_MAX_GPIO_LINES
-> +#define GPIO98_VID_DEC_RES	98
-> +#define nCAM_VD_SEL		157
+>  #define AT91_USART0	AT91SAM9261_BASE_US0
+>  #define AT91_USART1	AT91SAM9261_BASE_US1
+>  #define AT91_USART2	AT91SAM9261_BASE_US2
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
+> index f1b9296..dd54079 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9263.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
+> @@ -84,11 +84,6 @@
+>  #define AT91_CCFG	(0xffffed10 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+> -#define AT91_PIOA	(0xfffff200 - AT91_BASE_SYS)
+> -#define AT91_PIOB	(0xfffff400 - AT91_BASE_SYS)
+> -#define AT91_PIOC	(0xfffff600 - AT91_BASE_SYS)
+> -#define AT91_PIOD	(0xfffff800 - AT91_BASE_SYS)
+> -#define AT91_PIOE	(0xfffffa00 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+>  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+> @@ -98,6 +93,12 @@
+>  #define AT91_RTT1	(0xfffffd50 - AT91_BASE_SYS)
+>  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+>  
+> +#define AT91SAM9263_BASE_PIOA	0xfffff200
+> +#define AT91SAM9263_BASE_PIOB	0xfffff400
+> +#define AT91SAM9263_BASE_PIOC	0xfffff600
+> +#define AT91SAM9263_BASE_PIOD	0xfffff800
+> +#define AT91SAM9263_BASE_PIOE	0xfffffa00
 > +
-> +#define MT9M032_I2C_BUS_NUM	2
+>  #define AT91_USART0	AT91SAM9263_BASE_US0
+>  #define AT91_USART1	AT91SAM9263_BASE_US1
+>  #define AT91_USART2	AT91SAM9263_BASE_US2
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+> index 2c611b9..ec370cc 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
+> @@ -94,11 +94,6 @@
+>  #define AT91_DMA	(0xffffec00 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+> -#define AT91_PIOA	(0xfffff200 - AT91_BASE_SYS)
+> -#define AT91_PIOB	(0xfffff400 - AT91_BASE_SYS)
+> -#define AT91_PIOC	(0xfffff600 - AT91_BASE_SYS)
+> -#define AT91_PIOD	(0xfffff800 - AT91_BASE_SYS)
+> -#define AT91_PIOE	(0xfffffa00 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+>  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+> @@ -108,6 +103,12 @@
+>  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+>  #define AT91_RTC	(0xfffffdb0 - AT91_BASE_SYS)
+>  
+> +#define AT91SAM9G45_BASE_PIOA	0xfffff200
+> +#define AT91SAM9G45_BASE_PIOB	0xfffff400
+> +#define AT91SAM9G45_BASE_PIOC	0xfffff600
+> +#define AT91SAM9G45_BASE_PIOD	0xfffff800
+> +#define AT91SAM9G45_BASE_PIOE	0xfffffa00
 > +
+>  #define AT91_USART0	AT91SAM9G45_BASE_US0
+>  #define AT91_USART1	AT91SAM9G45_BASE_US1
+>  #define AT91_USART2	AT91SAM9G45_BASE_US2
+> diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+> index 1aabacd..d3ef11a 100644
+> --- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
+> +++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
+> @@ -77,10 +77,6 @@
+>  #define AT91_CCFG	(0xffffef10 - AT91_BASE_SYS)
+>  #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
+>  #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
+> -#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)
+> -#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)
+> -#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)
+> -#define AT91_PIOD	(0xfffffa00 - AT91_BASE_SYS)
+>  #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
+>  #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
+>  #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
+> @@ -91,6 +87,11 @@
+>  #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+>  #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)
+>  
+> +#define AT91SAM9RL_BASE_PIOA	0xfffff400
+> +#define AT91SAM9RL_BASE_PIOB	0xfffff600
+> +#define AT91SAM9RL_BASE_PIOC	0xfffff800
+> +#define AT91SAM9RL_BASE_PIOD	0xfffffa00
 > +
-> +enum omap3evmdc_mux {
-> +	MUX_TVP5146,
-> +	MUX_CAMERA_SENSOR,
-> +	MUX_EXP_CAMERA_SENSOR,
-> +};
-> +
-> +/**
-> + * omap3evm_set_mux - Sets mux to enable signal routing to
-> + *                           different peripherals present on new EVM
-> board + * @mux_id: enum, mux id to enable
-> + *
-> + * Returns 0 for success or a negative error code
-> + */
-> +static int omap3evm_set_mux(enum omap3evmdc_mux mux_id)
-> +{
-> +	/* Set GPIO6 = 1 */
-> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 6, 1);
-> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
-> +
-> +	switch (mux_id) {
-> +	case MUX_TVP5146:
-> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
-> +		gpio_set_value(nCAM_VD_SEL, 1);
-> +		break;
-> +
-> +	case MUX_CAMERA_SENSOR:
-> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
-> +		gpio_set_value(nCAM_VD_SEL, 0);
-> +		break;
-> +
-> +	case MUX_EXP_CAMERA_SENSOR:
-> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 1);
-> +		break;
-> +
-> +	default:
-> +		pr_err("omap3evm-camera: Invalid mux id #%d\n", mux_id);
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct mt9m032_platform_data mt9m032_platform_data = {
-> +	.ext_clock = 13500000,
-> +	.pll_pre_div = 6,
-> +	.pll_mul = 120,
-> +	.pll_out_div = 5,
-> +	.invert_pixclock = 1,
-> +};
-> +
-> +static struct i2c_board_info camera_i2c_devices[] = {
-> +	{
-> +		I2C_BOARD_INFO(MT9M032_NAME, MT9M032_I2C_ADDR),
-> +		.platform_data = &mt9m032_platform_data,
-> +	},
-> +};
-> +
-> +static struct isp_subdev_i2c_board_info camera_i2c_subdevs[] = {
-> +	{
-> +		.board_info = &camera_i2c_devices[0],
-> +		.i2c_adapter_id = MT9M032_I2C_BUS_NUM,
-> +	},
-> +	{},
-> +};
-> +
-> +static struct isp_v4l2_subdevs_group camera_subdevs[] = {
-> +	{
-> +		.subdevs = camera_i2c_subdevs,
-> +		.interface = ISP_INTERFACE_PARALLEL,
-> +		.bus = {
-> +			.parallel = {
-> +				.data_lane_shift = 1,
-> +				.clk_pol = 0,
-> +				.bridge = ISPCTRL_PAR_BRIDGE_DISABLE,
-> +			}
-> +		},
-> +	},
-> +	{},
-> +};
-> +
-> +static struct isp_platform_data isp_platform_data = {
-> +	.subdevs = camera_subdevs,
-> +};
-> +
-> +static int __init camera_init(void)
-> +{
-> +	int ret = -EINVAL;
-> +
-> +	omap_mux_init_gpio(nCAM_VD_SEL, OMAP_PIN_OUTPUT);
-> +	if (gpio_request(nCAM_VD_SEL, "nCAM_VD_SEL") < 0) {
-> +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_SEL(%d)\n",
-> +		       nCAM_VD_SEL);
-> +		goto err;
-> +	}
-> +	if (gpio_direction_output(nCAM_VD_SEL, 1) < 0) {
-> +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_SEL(%d)
-> direction\n", +		       nCAM_VD_SEL);
-> +		goto err_vdsel;
-> +	}
-> +
-> +	if (gpio_request(EVM_TWL_GPIO_BASE + 2, "T2_GPIO2") < 0) {
-> +		pr_err("omap3evm-camera: Failed to get GPIO T2_GPIO2(%d)\n",
-> +		       EVM_TWL_GPIO_BASE + 2);
-> +		goto err_vdsel;
-> +	}
-> +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 2, 0) < 0) {
-> +		pr_err("omap3evm-camera: Failed to set GPIO T2_GPIO2(%d) direction\n",
-> +		       EVM_TWL_GPIO_BASE + 2);
-> +		goto err_2;
-> +	}
-> +
-> +	if (gpio_request(EVM_TWL_GPIO_BASE + 8, "nCAM_VD_EN") < 0) {
-> +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_EN(%d)\n",
-> +		       EVM_TWL_GPIO_BASE + 8);
-> +		goto err_2;
-> +	}
-> +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 8, 0) < 0) {
-> +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_EN(%d) direction\n",
-> +		       EVM_TWL_GPIO_BASE + 8);
-> +		goto err_8;
-> +	}
-> +
-> +	omap3evm_set_mux(MUX_CAMERA_SENSOR);
-> +
-> +
-> +	ret = omap3_init_camera(&isp_platform_data);
-> +	if (ret < 0)
-> +		goto err_8;
-> +	return 0;
-> +
-> +err_8:
-> +	gpio_free(EVM_TWL_GPIO_BASE + 8);
-> +err_2:
-> +	gpio_free(EVM_TWL_GPIO_BASE + 2);
-> +err_vdsel:
-> +	gpio_free(nCAM_VD_SEL);
-> +err:
-> +	return ret;
-> +}
-> +
-> +device_initcall(camera_init);
-
-Please don't use device_initcall(), but call the function directly from the 
-OMAP3 EVM init handler. Otherwise camera_init() will be called if OMAP3 EVM 
-support is compiled in the kernel, regardless of the board the kernel runs on.
-
--- 
-Regards,
-
-Laurent Pinchart
+>  #define AT91_USART0	AT91SAM9RL_BASE_US0
+>  #define AT91_USART1	AT91SAM9RL_BASE_US1
+>  #define AT91_USART2	AT91SAM9RL_BASE_US2
