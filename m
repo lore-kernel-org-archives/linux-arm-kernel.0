@@ -1,46 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 18 Sep 2011 17:44:25 +0200
-Subject: READ THIS: the next mach-types update
-In-Reply-To: <20110916102754.GA6205@netboy.at.omicron.at>
-References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
-	<20110916102754.GA6205@netboy.at.omicron.at>
-Message-ID: <2659680.vCa59q5ODA@wuerfel>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Sun, 18 Sep 2011 18:33:51 +0200
+Subject: [PATCH 0/6] mc13783 cleanup
+In-Reply-To: <20110915160321.GA29357@pengutronix.de>
+References: <20110824132740.GA28197@pengutronix.de>
+	<201108250905.13168.philippe.retornaz@epfl.ch>
+	<20110915151213.GE32263@sortiz-mobl>
+	<20110915160321.GA29357@pengutronix.de>
+Message-ID: <20110918163351.GL32263@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 September 2011 12:27:54 Richard Cochran wrote:
-> On Thu, Sep 15, 2011 at 11:25:28AM +0100, Russell King - ARM Linux wrote:
-> > -devixp                  MACH_DEVIXP             DEVIXP                  2885
-> > -miccpt                  MACH_MICCPT             MICCPT                  2886
-> > -mic256                  MACH_MIC256             MIC256                  2887
-> 
-> Russell,
-> 
-> I had posted support for these some time ago, and shortly thereafter
-> the whole "clean up the ARM mess" campaign started. I did not follow
-> up on posting a second time, for fear of adding more churn.
-> 
-> So, my question is, what can I do to keep these in the list?
-> 
-> Can I get plain old board setup files merged (like three of the
-> following) ...
-> 
->  arch/arm/mach-ixp4xx/Kconfig                   |    8 +
->  arch/arm/mach-ixp4xx/Makefile                  |    2 +
->  arch/arm/mach-ixp4xx/include/mach/uncompress.h |    2 +-
->  arch/arm/mach-ixp4xx/miccpt-pci.c              |   78 +++++++++
->  arch/arm/mach-ixp4xx/miccpt-setup.c            |  219 ++++++++++++++++++++++++
->  5 files changed, 308 insertions(+), 1 deletions(-)
-> 
-> or would I have to somehow upgrade to DT?
+Hi Uwe,
 
-Post them for review again. The rules for new boards are much stricter
-now, but we still allow them to get merged if they look good enough.
+On Thu, Sep 15, 2011 at 06:03:21PM +0200, Uwe Kleine-K?nig wrote:
+> Hi Samuel,
+> 
+> On Thu, Sep 15, 2011 at 05:12:13PM +0200, Samuel Ortiz wrote:
+> > On Thu, Aug 25, 2011 at 09:05:12AM +0200, Philippe R?tornaz wrote:
+> > > Le mercredi 24 ao?t 2011 15:27:40, Uwe Kleine-K?nig a ?crit :
+> > > > Hello,
+> > > > 
+> > > > this series removes the long obsolte mc13783 API after fixing all
+> > > > remaining users.
+> > > 
+> > > I posted a patch last month which was touching this MFD too.
+> > > We will need to synchronize both patch. 
+> > I applied Uwe's patchset now.
+> Thanks.
+> 
+> >                               Could you please sync your code and send me a
+> > patchset that applies on top of:
+> > 
+> > git://git.infradead.org/users/sameo/mfd-2.6.git for-next
+> You can fetch the updated series from
+> 
+> 	git://git.pengutronix.de/git/ukl/linux-2.6.git mc13783
+I merged this one on top of my for-next branch. My MFD tree temporary lives on
+infradead:
 
-ixp4xx is not a very active platform, which means that it will take
-a while before converting it to device tree probing becomes a priority,
-so I would not object adding one board there. It's quite different for
-platforms that are still used for new hardware development and have
-lots of new boards waiting to get merged.
+git://git.infradead.org/users/sameo/mfd-2.6.git
 
-	Arnd
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
