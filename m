@@ -1,22 +1,72 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 18 Sep 2011 10:38:52 +0300
-Subject: [PATCH 3/7] ASoC: edb93xx: convert to use snd_soc_register_card()
-In-Reply-To: <1316260700.17769.8.camel@r60e>
-References: <cover.1315732452.git.mika.westerberg@iki.fi>
-	<0fef3fd00e8cdb8a606f4a81ad4e7f2b7014621c.1315732452.git.mika.westerberg@iki.fi>
-	<1316191555.17769.2.camel@r60e>
-	<20110917065202.GA2759@mwesterb-mobl.ger.corp.intel.com>
-	<1316260700.17769.8.camel@r60e>
-Message-ID: <20110918073852.GA2625@mwesterb-mobl.ger.corp.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 18 Sep 2011 10:40:37 +0200
+Subject: [PATCH 0/19] removal of mach/vmalloc.h and generic optimizations
+In-Reply-To: <alpine.LFD.2.00.1109172238070.20358@xanadu.home>
+References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
+	<3319383.WZQsqr8ND4@wuerfel>
+	<alpine.LFD.2.00.1109172238070.20358@xanadu.home>
+Message-ID: <1933895.GJBlYra9yP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 17, 2011 at 01:58:20PM +0200, Alexander Sverdlin wrote:
+On Saturday 17 September 2011 22:46:33 Nicolas Pitre wrote:
+> On Sat, 17 Sep 2011, Arnd Bergmann wrote:
 > 
-> I've checked mainline linux-next without your patches, it's broken too.
-> So your patches are not the root cause for that.
+> > On Friday 16 September 2011 03:07:11 Nicolas Pitre wrote:
+> > > This patch series removes all instances of mach/vmalloc.h in order to
+> > > have a more unified memory map across all ARM architectures.  To do so,
+> > > the static mappings are moved inside the vmalloc area.  And finally this
+> > > allows for a generic optimization to ioremap where static mappings are
+> > > reused whenever possible, using common code instead of having this
+> > > duplicated in a couple places.
+> > > 
+> > > This also provides a net reduction of more than 1200 lines of code.
 
-Ok thanks.
+> 
+> > Doing some randconfig tests, I noticed that your series is currently broken
+> > on shmobile, which triggers a 
+> > 
+> > 	BUILD_BUG_ON(VMALLOC_END > CONSISTENT_BASE);
+> > 
+> > in mem_init(), because the platform has a CONSISTENT_DMA_SIZE of 158MB.
+> > All other platforms have a CONSISTENT_DMA_SIZE of at most 14MB, which
+> > works correctly.
+> 
+> Any idea why shmobile requires such an amount of consistent memory?
 
-Still it would be good to find out which causes it to fail. Are you able to
-load all the modules manually? Does it work then?
+No, I couldn't find anything in the code or the changelog why this was
+done. Magnus changed it in this commit:
+
+commit 28f0721a79046056ced3b9bd79c319c5c417ec30
+Author: Magnus Damm <damm@opensource.se>
+Date:   Wed Apr 28 08:25:30 2010 +0000
+
+    ARM: mach-shmobile: Set CONSISTENT_DMA_SIZE to 158 MB
+    
+    This patch sets CONSISTENT_DMA_SIZE to 158 MB
+    for all SH-Mobile ARM processors.
+    
+    The DMA area is mapped at 0xf6000000 - 0xffdfffff,
+    on top of the 256 MB I/O window at 0xe6000000.
+    
+    Signed-off-by: Magnus Damm <damm@opensource.se>
+    Signed-off-by: Paul Mundt <lethal@linux-sh.org>
+
+Maybe he can give a better explanation and can say whether it's
+actually required. The patch series introducing it contained
+the introduction of the shdma dmaengine driver and some changes
+to video drivers, but I could not tell how they are related
+to this change.
+
+> > My feeling is that a 158MB CONSISTENT_DMA_SIZE causes other problems
+> > anyway because we cannot map regular RAM both cached and uncached,
+> > but this is still a regression. The problem might be solved using
+> > Marek's CMA patches, which should eliminate the need for a huge
+> > CONSISTENT_DMA_SIZE.
+> 
+> Maybe.  However I don't want for this series to depend on CMA.  I'll 
+> find some temporary hack in the mean time.
+
+Ok
+
+	Arnd
