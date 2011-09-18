@@ -1,219 +1,99 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 17 Sep 2011 17:53:28 -0600
-Subject: [PATCH 3/5] of/irq: introduce of_irq_init
-In-Reply-To: <1316017900-19918-4-git-send-email-robherring2@gmail.com>
+Date: Sat, 17 Sep 2011 18:13:17 -0600
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <4E70F7BE.6020909@gmail.com>
 References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
-	<1316017900-19918-4-git-send-email-robherring2@gmail.com>
-Message-ID: <20110917235328.GA3523@ponder.secretlab.ca>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<4E70E88E.4090503@arm.com> <4E70EB1F.4060000@gmail.com>
+	<4E70F3C9.2010202@arm.com> <4E70F7BE.6020909@gmail.com>
+Message-ID: <20110918001317.GB3523@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2011 at 11:31:38AM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Wed, Sep 14, 2011 at 01:51:42PM -0500, Rob Herring wrote:
+> On 09/14/2011 01:34 PM, Marc Zyngier wrote:
+> > Hi Rob,
+> > 
+> > On 14/09/11 18:57, Rob Herring wrote:
+> >> Marc,
+> >>
+> >> On 09/14/2011 12:46 PM, Marc Zyngier wrote:
+> >>> On 14/09/11 17:31, Rob Herring wrote:
+> >>>> From: Rob Herring <rob.herring@calxeda.com>
+> >>>>
+> >>>> This adds gic initialization using device tree data. The initialization
+> >>>> functions are intended to be called by a generic OF interrupt
+> >>>> controller parsing function once the right pieces are in place.
+> >>>>
+> >>>> PPIs are handled using 3rd cell of interrupts properties to specify the cpu
+> >>>> mask the PPI is assigned to.
+> >>>>
+> >>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> >>>> ---
+> >>>>  Documentation/devicetree/bindings/arm/gic.txt |   53 ++++++++++++++++++++++++
+> >>>>  arch/arm/common/gic.c                         |   55 +++++++++++++++++++++++--
+> >>>>  arch/arm/include/asm/hardware/gic.h           |   10 +++++
+> >>>>  3 files changed, 114 insertions(+), 4 deletions(-)
+> >>>>  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+> >>>>
+> >>>> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+> >>>> new file mode 100644
+> >>>> index 0000000..6c513de
+> >>>> --- /dev/null
+> >>>> +++ b/Documentation/devicetree/bindings/arm/gic.txt
+> >>>> @@ -0,0 +1,53 @@
+> >>>> +* ARM Generic Interrupt Controller
+> >>>> +
+> >>>> +ARM SMP cores are often associated with a GIC, providing per processor
+> >>>> +interrupts (PPI), shared processor interrupts (SPI) and software
+> >>>> +generated interrupts (SGI).
+> >>>> +
+> >>>> +Primary GIC is attached directly to the CPU and typically has PPIs and SGIs.
+> >>>> +Secondary GICs are cascaded into the upward interrupt controller and do not
+> >>>> +have PPIs or SGIs.
+> >>>> +
+> >>>> +Main node required properties:
+> >>>> +
+> >>>> +- compatible : should be one of:
+> >>>> +	"arm,cortex-a9-gic"
+> >>>> +	"arm,arm11mp-gic"
+> >>>> +- interrupt-controller : Identifies the node as an interrupt controller
+> >>>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> >>>> +  interrupt source.  The type shall be a <u32> and the value shall be 3.
+> >>>> +
+> >>>> +  The 1st cell is the interrupt number. 0-15 are reserved for SGIs. 16-31 are
+> >>>> +  for PPIs.
+> >>>> +
+> >>>> +  The 2nd cell is the level-sense information, encoded as follows:
+> >>>> +                    1 = low-to-high edge triggered
+> >>>> +                    2 = high-to-low edge triggered
+> >>>> +                    4 = active high level-sensitive
+> >>>> +                    8 = active low level-sensitive
+> >>>> +
+> >>>> +  Only values of 1 and 4 are valid for GIC 1.0 spec.
+> >>>> +
+> >>>> +  The 3rd cell contains the mask of the cpu number for the interrupt source.
+> >>>> +  The cpu mask is only valid for PPIs and shall be 0 for SPIs. This value shall
+> >>>> +  be 0 for PPIs.
+> >>>      ^^^^^^^^^^^^^
+> >>>
+> >>> Typo here ? The way I understand it, it should read "For PPIs, this
+> >>> value shall be the mask of the possible CPU numbers for the interrupt
+> >>> source" (or something to similar effect...).
+> >>>
+> >>
+> >> Cut and paste error. This sentence goes in the previous paragraph. What
+> >> I meant is the 2nd cell should contain 0 for PPIs as you cannot set the
+> >> edge/level on PPIs (that is always true, right?). I probably should also
+> >> add 0 in the list of values.
+> > 
+> > Ah, right. It makes sense indeed. You're correct about PPIs polarity,
+> > this is defined by the hardware and cannot be configured. But it may be
+> > interesting to have the DT to reflect the way the hardware is actually
+> > configured (on the Cortex-A9, some PPIs are configured active-low, and
+> > others are rising-edge).
 > 
-> of_irq_init will scan the devicetree for matching interrupt controller
-> nodes. Then it calls an initialization function for each found controller
-> in the proper order with parent nodes initialized before child nodes.
-> 
-> Based on initial pseudo code from Grant Likely.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
->  drivers/of/irq.c       |   96 ++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_irq.h |    1 +
->  2 files changed, 97 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index 9f689f1..a0cd7e8 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -19,10 +19,13 @@
->   */
->  
->  #include <linux/errno.h>
-> +#include <linux/list.h>
-> +#include <linux/list_sort.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_irq.h>
->  #include <linux/string.h>
-> +#include <linux/slab.h>
->  
->  /* For archs that don't support NO_IRQ (such as x86), provide a dummy value */
->  #ifndef NO_IRQ
-> @@ -386,3 +389,96 @@ int of_irq_to_resource_table(struct device_node *dev, struct resource *res,
->  
->  	return i;
->  }
-> +
-> +struct intc_desc {
-> +	struct list_head	list;
-> +	struct device_node	*dev;
-> +	struct device_node	*parent;
-> +};
-> +
-> +typedef void (*irq_init_cb_t)(struct device_node *, struct device_node *);
-> +
-> +static int __init irq_cmp_intc_desc(void *unused, struct list_head *a,
-> +				    struct list_head *b)
-> +{
-> +	const struct intc_desc *da = list_entry(a, typeof(*da), list);
-> +	const struct intc_desc *db = list_entry(b, typeof(*db), list);
-> +
-> +	/* same parent, so order doesn't matter */
-> +	if (da->parent == db->parent)
-> +		return 0;
-> +
-> +	/* NULL parent comes first */
-> +	if (!da->parent && db->parent)
-> +		return -1;
-> +	if (!db->parent && da->parent)
-> +		return 1;
-> +
-> +	/* parent node must be before child node */
-> +	if (da->dev == db->parent)
-> +		return -1;
-> +	if (db->dev == da->parent)
-> +		return 1;
+> So we should allow specifying what it is as the OS may need to know that.
 
-Does sort_list work for relationships 4 or more levels deep?  ie. if
-there was a relationship of A <- B <- C <- D, then B compared with D
-would return 0 from this function which could potentially result in an
-incorrectly ordered list.
-
-The other option for implementing this would be to take the probe
-deferral approach and not try to sort the list, but instead allow
-probe functions to fail & request retry if the parent hasn't yet been
-probed.  I haven't thought enough about it though to say which would
-be the best approach.
-
-> +
-> +	return 0;
-> +}
-> +
-> +/**
-> + * of_irq_init - Scan the device tree for matching interrupt controllers and
-> + * call their initialization functions in order with parents first.
-> + * @matches: 0 terminated array of nodes to match and initialization function
-> + * to call on match
-> + */
-> +void __init of_irq_init(const struct of_device_id *matches)
-> +{
-> +	struct device_node *np;
-> +	const struct of_device_id *match;
-> +	struct intc_desc *desc;
-> +	struct intc_desc *temp_desc;
-> +	struct list_head intc_desc_list;
-> +
-> +	INIT_LIST_HEAD(&intc_desc_list);
-> +
-> +	for_each_matching_node(np, matches) {
-> +		if (!of_find_property(np, "interrupt-controller", NULL))
-> +			continue;
-> +		/* Here, we allocate and populate an intc_desc with the node
-> +		* pointer, interrupt-parent device_node etc. */
-> +		desc = kzalloc(sizeof(*desc), GFP_KERNEL);
-> +		if (!desc) {
-> +			WARN_ON(1);
-> +			goto err;
-> +		}
-> +		desc->dev = np;
-> +		desc->parent = of_irq_find_parent(np);
-> +		list_add(&desc->list, &intc_desc_list);
-> +	}
-> +	if (list_empty(&intc_desc_list))
-> +		return;
-> +
-> +	/*
-> +	 * The root irq controller is the one without an interrupt-parent.
-> +	 * That one goes first, followed by the controllers that reference it,
-> +	 * followed by the ones that reference the 2nd level controllers, etc
-> +	 */
-
-I don't believe that this actually turns out to be true (and yes I
-know it is how I originally described it).  :-)  When the
-interrupt-parent property is at the root of the tree, then the root
-interrupt controller may very well inherit itself as it's interrupt
-parent, and of_irq_find_parent() will still return a value.  This
-should probably be considered a bug in of_irq_find_parent(), and it
-should return NULL if the parent is itself.
-
-of_irq_find_parent should probably be implemented thusly (completely
-untested); although the only functional change is the line:
-	return (p == child) ? NULL : p;
-
-/**
- * of_irq_find_parent - Given a device node, find its interrupt parent node
- * @child: pointer to device node
- *
- * Returns a pointer to the interrupt parent node, or NULL if the
- * interrupt parent could not be determined.
- */
-struct device_node *of_irq_find_parent(struct device_node *child)
-{
-	struct device_node *p, *c = child;
-	const __be32 *parp;
-
-	if (!of_node_get(c))
-		return NULL;
-
-	do {
-		p = of_parse_phandle(c, "interrupt-parent", 0);
-
-		if (!p && (of_irq_workarounds & OF_IMAP_NO_PHANDLE) &&
-		    of_find_property(c, "interrupt-parent", NULL))
-			p = of_node_get(of_irq_dflt_pic);
-
-		if (!p)
-			p = of_get_parent(c);
-
-		of_node_put(c);
-		c = p;
-	} while (p && !of_find_property(p, "#interrupt-cells", NULL));
-
-	return (p == child) ? NULL : p;
-}
-
-
-> +	list_sort(NULL, &intc_desc_list, irq_cmp_intc_desc);
-> +
-> +	list_for_each_entry_safe(desc, temp_desc, &intc_desc_list, list) {
-> +		match = of_match_node(matches, desc->dev);
-> +		if (match && match->data) {
-> +			irq_init_cb_t irq_init_cb = match->data;
-> +			pr_debug("of_irq_init: init %s @ %p, parent %p\n",
-> +				 match->compatible, desc->dev, desc->parent);
-> +			irq_init_cb(desc->dev, desc->parent);
-> +		}
-> +		list_del(&desc->list);
-> +		kfree(desc);
-> +	}
-> +	return;
-> +
-> +err:
-> +	list_for_each_entry_safe(desc, temp_desc, &intc_desc_list, list) {
-> +		list_del(&desc->list);
-> +		kfree(desc);
-> +	}
-> +}
-
-Overall, I'm pretty happy with how this is looking.  Great job!
-
-g.
-
-> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-> index cd2e61c..032d76c 100644
-> --- a/include/linux/of_irq.h
-> +++ b/include/linux/of_irq.h
-> @@ -73,6 +73,7 @@ extern int of_irq_to_resource_table(struct device_node *dev,
->  		struct resource *res, int nr_irqs);
->  extern struct device_node *of_irq_find_parent(struct device_node *child);
->  
-> +extern void of_irq_init(const struct of_device_id *matches);
->  
->  #endif /* CONFIG_OF_IRQ */
->  #endif /* CONFIG_OF */
-> -- 
-> 1.7.5.4
-> 
+If it is a difference between level & edge, then the OS absolutely
+needs to know about it.
