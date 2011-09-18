@@ -1,29 +1,31 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 18 Sep 2011 02:46:15 +0200
-Subject: [PATCH] arm/dt: Add SoC detection macros
-In-Reply-To: <3353131.FJY7smc8i5@wuerfel>
-References: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
-	<20110917112321.GE16381@n2100.arm.linux.org.uk>
-	<20110917181907.GA16141@game.jcrosoft.org>
-	<3353131.FJY7smc8i5@wuerfel>
-Message-ID: <20110918004615.GC16141@game.jcrosoft.org>
+Date: Sun, 18 Sep 2011 02:47:55 +0200
+Subject: [PATCH 2/2] ARM: mmp: add audio sram allocator
+In-Reply-To: <4E72A2A1.1020400@marvell.com>
+References: <1312167547-26740-1-git-send-email-leoy@marvell.com>
+	<1312167547-26740-3-git-send-email-leoy@marvell.com>
+	<20110915143857.GL28104@game.jcrosoft.org>
+	<4E72A2A1.1020400@marvell.com>
+Message-ID: <20110918004755.GD16141@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:56 Sat 17 Sep     , Arnd Bergmann wrote:
-> On Saturday 17 September 2011 20:19:07 Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > 
-> > I agree about it I just mean that if you have the same board with 2 SoC which
-> > are pin to pin compatible detect the soc type will be usefull as the soc
-> > resource may not be the same
+On 09:13 Fri 16 Sep     , Leo Yan wrote:
 > 
-> In that scenario, you would put all SOC specific data into one .dtsi
-> file and all board data into another .dtsi file and then create a
-> description for the combination using a trivial .dts file with two
-> include statements. This is all solved outside of the kernel already,
-> so there is no need for infrastructure in the kernel.
-except in this case you must have 2 machine id which can be avoided if you can
-detect the soc at kernel level
+> 
+> On 09/15/2011 10:38 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >On 10:59 Mon 01 Aug     , Leo Yan wrote:
+> >>Implement the audio sram allocator with genalloc,
+> >>so that can dynamically allocate the buffer
+> >>to pcm devices as need.
+> >>
+> >>Signed-off-by: Leo Yan<leoy@marvell.com>
+> >this can be more generic nad move to lib/genalloc.c
+> 
+> This is an older version, i have updated the patch same as you said.
+> pls see below link for the latest patch:
+> http://lists.arm.linux.org.uk/lurker/message/20110815.030920.2ad4227b.en.html
+I take a look on it it's the same issue this is not mach specific
 
 Best Regards,
 J.
