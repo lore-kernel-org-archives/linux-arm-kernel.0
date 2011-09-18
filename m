@@ -1,30 +1,22 @@
-From: subaparts@yandex.ru (Alexander Sverdlin)
-Date: Sun, 18 Sep 2011 13:43:18 +0200
-Subject: [PATCH 3/7] ASoC: edb93xx: convert to use snd_soc_register_card()
-In-Reply-To: <20110918073852.GA2625@mwesterb-mobl.ger.corp.intel.com>
-References: <cover.1315732452.git.mika.westerberg@iki.fi>
-	<0fef3fd00e8cdb8a606f4a81ad4e7f2b7014621c.1315732452.git.mika.westerberg@iki.fi>
-	<1316191555.17769.2.camel@r60e>
-	<20110917065202.GA2759@mwesterb-mobl.ger.corp.intel.com>
-	<1316260700.17769.8.camel@r60e>
-	<20110918073852.GA2625@mwesterb-mobl.ger.corp.intel.com>
-Message-ID: <1316346198.17769.14.camel@r60e>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 18 Sep 2011 19:54:08 +0800
+Subject: [PATCH 0/4] add fec support for imx6q
+Message-ID: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+This series adds imx6q enet support.  The imx6q enet is a derivative of
+imx28 enet controller.  It fixed the frame endian issue found on imx28,
+and added 1 Gbps support.
 
-On Sun, 2011-09-18 at 10:38 +0300, Mika Westerberg wrote:
-> On Sat, Sep 17, 2011 at 01:58:20PM +0200, Alexander Sverdlin wrote:
-> > 
-> > I've checked mainline linux-next without your patches, it's broken too.
-> > So your patches are not the root cause for that.
-> 
-> Ok thanks.
-> 
-> Still it would be good to find out which causes it to fail. Are you able to
-> load all the modules manually? Does it work then?
-> 
+It's based on v3.1-rc6.
 
-I've limited access to hardware at the moment, so I'll find out that,
-but it will not be so fast )
+Shawn Guo (4):
+      net/fec: change phy-reset-gpio request warning to debug message
+      net/fec: fix fec1 check in fec_enet_mii_init()
+      net/fec: set phy_speed to the optimal frequency 2.5 MHz
+      net/fec: add imx6q enet support
+
+ drivers/net/Kconfig |    3 +-
+ drivers/net/fec.c   |   65 ++++++++++++++++++++++++++++++++++++++++-----------
+ 2 files changed, 52 insertions(+), 16 deletions(-)
