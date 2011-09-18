@@ -1,107 +1,187 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Sun, 18 Sep 2011 22:49:26 +0200
-Subject: [PATCH v2 7/7] s3c-adc: Add support for S3C2416/S3C2450
-In-Reply-To: <201109182241.48858.heiko@sntech.de>
-References: <201109182241.48858.heiko@sntech.de>
-Message-ID: <201109182249.26493.heiko@sntech.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 18 Sep 2011 16:23:40 -0500
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <4E722B2D.4050307@gmail.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+	<4E71CE5D.9030900@ti.com> <4E71F978.6020402@gmail.com>
+	<4E72030F.1090300@ti.com> <4E722B2D.4050307@gmail.com>
+Message-ID: <4E76615C.3000005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ADC of the S3C2416/2450 SoC is 10 or 12 bit wide, has its
-source selection in the register base+0x18 and its width
-selection in bit 03 of the ADCCON register.
+On 09/15/2011 11:43 AM, Rob Herring wrote:
+> Benoit,
+> 
+> On 09/15/2011 08:52 AM, Cousson, Benoit wrote:
+>> On 9/15/2011 3:11 PM, Rob Herring wrote:
+>>> Benoit,
+>>>
+>>> On 09/15/2011 05:07 AM, Cousson, Benoit wrote:
+>>>> Hi Rob,
+>>>>
+>>>> On 9/15/2011 9:55 AM, Thomas Abraham wrote:
+>>>>> Hi Rob,
+>>>>>
+>>>>> On 14 September 2011 22:01, Rob Herring<robherring2@gmail.com>   wrote:
+>>>>>> From: Rob Herring<rob.herring@calxeda.com>
+>>>>>>
+>>>>>> This adds gic initialization using device tree data. The
+>>>>>> initialization
+>>>>>> functions are intended to be called by a generic OF interrupt
+>>>>>> controller parsing function once the right pieces are in place.
+>>>>>>
+>>>>>> PPIs are handled using 3rd cell of interrupts properties to specify
+>>>>>> the cpu
+>>>>>> mask the PPI is assigned to.
+>>>>>>
+>>>>>> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+>>>>>> ---
+>>>>>>    Documentation/devicetree/bindings/arm/gic.txt |   53
+>>>>>> ++++++++++++++++++++++++
+>>>>>>    arch/arm/common/gic.c                         |   55
+>>>>>> +++++++++++++++++++++++--
+>>>>>>    arch/arm/include/asm/hardware/gic.h           |   10 +++++
+>>>>>>    3 files changed, 114 insertions(+), 4 deletions(-)
+>>>>>>    create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+>>>>>
+>>>>> [...]
+>>>>>
+>>>>>
+>>>>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+>>>>>> index d1ccc72..14de380 100644
+>>>>>> --- a/arch/arm/common/gic.c
+>>>>>> +++ b/arch/arm/common/gic.c
+>>>>>
+>>>>> [...]
+>>>>>
+>>>>>> +void __init gic_of_init(struct device_node *node, struct device_node
+>>>>>> *parent)
+>>>>>> +{
+>>>>>> +       void __iomem *cpu_base;
+>>>>>> +       void __iomem *dist_base;
+>>>>>> +       int irq;
+>>>>>> +       struct irq_domain *domain =&gic_data[gic_cnt].domain;
+>>>>>> +
+>>>>>> +       if (WARN_ON(!node))
+>>>>>> +               return;
+>>>>>> +
+>>>>>> +       dist_base = of_iomap(node, 0);
+>>>>>> +       WARN(!dist_base, "unable to map gic dist registers\n");
+>>>>>> +
+>>>>>> +       cpu_base = of_iomap(node, 1);
+>>>>>> +       WARN(!cpu_base, "unable to map gic cpu registers\n");
+>>>>>> +
+>>>>>> +       domain->nr_irq = gic_irq_count(dist_base);
+>>>>>> +       domain->irq_base = irq_alloc_descs(-1, 0, domain->nr_irq,
+>>>>>> numa_node_id());
+>>>>>
+>>>>> For exynos4, all the interrupts originating from GIC are statically
+>>>>> mapped to start from 32 in the linux virq space (GIC SPI interrupts
+>>>>> start from 64). In the above code, since irq_base would be 0 for
+>>>>> exynos4, the interrupt mapping is not working correctly. In your
+>>>>> previous version of the patch, you have given a option to the platform
+>>>>> code to choose the offset. Could that option be added to this series
+>>>>> also. Or a provision to use platform specific translate function
+>>>>> instead of the irq_domain_simple translator.
+>>>>
+>>>> I have another concern on a similar topic.
+>>>>
+>>>> On OMAP4 the SoC interrupts external to the MPU (SPI) have an offset of
+>>>> 32. Only the internal PPI are between 0 and 31.
+>>>>
+>>>> For the moment we add 32 to every SoC interrupts in the irq.h define,
+>>>
+>>> Those defines will not be used in the DT case. So the question is
+>>> whether to add 32 or not in the DT. Since we have just a single node and
+>>> a linear mapping of PPIs and SPIs, the only choice is to have SPIs start
+>>> at 32. And from the h/w definition, SPIs always start at 32, so it's in
+>>> agreement.
+>>
+>> This is a agreement inside the MPUSS, but not outside.
+>> Both Tegra and OMAP4 must add an offset to the HW irq number to deal
+>> with that today.
+>>
+>>>> but I'm assuming that this offset calculation should be done thanks to a
+>>>> dedicated irq domain for the SPI.
+>>>> The real HW physical number start at 0, and thus this is that value that
+>>>> should be in the irq binding of the device.
+>>>>
+>>>> So ideally we should have a irq domain for the PPI starting at 0 and
+>>>> another one for the SPI starting at 32. Or 32 and 64 for the exynos4
+>>>> case, but it looks like the PPI/SPI offset is always 32.
+>>>>
+>>>
+>>> That offset of SPIs is always there. If you have a GIC as a secondary
+>>> controller, It will have 32 reserved interrupts and the register layout
+>>> is exactly the same as a cpu's GIC.
+>>
+>> Yep, but that's the GIC view and not the SoC one. My concern is to have
+>> to tweak the HW number provided by the HW spec in order to add that offset.
+>> If you look at SoC level, the MPUSS is just an IP that can be
+>> potentially replaced by other one that will not have a GIC. In that case
+>> you will not change the IRQ mapping at SoC level.
+>> For example if you replace the Dual-cortexA9 by a single CortexA8, then
+>> all the interrupts will have to be shifted by 32 just because the MPU
+>> subsystem is different.
+>>
+> 
+> Is that a realistic case? That would be a new chip and new device tree.
+> You could argue that the whole peripheral subsystem DT could be reused
+> and the numbering needs to be the same. However, there's one thing that
+> would prevent that. The number of interrupt cells is defined by the
+> controller binding. So you have to change the peripheral nodes anyway.
+> 
+> It's good that OMAP is trying to standardize the peripheral layout, but
+> in my experience that's not something you can rely on.
+> 
+> At some point the interrupt numbering is going to differ from the h/w
+> documentation. If it's not in the DT, then it will be in linux. Right
+> now its just offset of 32, but if irqdescs get assigned on demand as PPC
+> is doing, then there will be no relationship to the documentation.
+> 
+>> Since that offset is dependent of the GIC internals and is not exposed
+>> outside the MPUSS, it should not be visible by the SoC IPs. And the HW
+>> spec is exposing exactly that.
+>>
+>>> Since the idea of splitting PPIs for each core out to a flattened linux
+>>> irq map has been abandoned, I see no reason to have more than 1 domain
+>>> with a simple linear translation. Ultimately, domains will do dynamic
+>>> irqdesc allocation and the translation within the gic will be completely
+>>> dynamic.
+>>
+>> I think the only reason to do that is to separate internal MPU
+>> interrupts with the external ones that should not have a clue about the
+>> GIC.
+> 
+> I see 2 options (besides leaving it as is):
+> 
+> - Revert back to my previous binding where PPIs are a sub-node and a
+> different interrupt parent.
+> 
+> - Use the current binding, but allow SPIs to start at 0. We can still
+> distinguish PPIs and SPIs by the cpu mask cell. A cpu mask of 0 is a
+> SPI. If there was ever a reason to have a cpu mask for an SPI, you would
+> not be able to with this scheme.
+> 
+> Either way you will still have the above issue with the cell size changing.
+> 
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes since v1:
-move setname call
- arch/arm/mach-s3c2416/s3c2416.c |    3 +++
- arch/arm/plat-samsung/adc.c     |   24 +++++++++++++++++++-----
- 2 files changed, 22 insertions(+), 5 deletions(-)
+I was headed down the path of implementing the 2nd option above, but had
+a dilemma. What would be the numbering base for PPIs in this case?
+Should it be 0 in the DT as proposed for SPIs or does it stay at 16?
+Numbering PPIs at 0 will just cause confusion as will numbering
+differently from SPIs. There is absolutely no mention of SPI0 or SPIx
+numbering in the GIC spec. All interrupt number references refer to the
+absolute interrupt ID, not a relative number based on the type. The fact
+that the Cortex-A9 implementation has interrupt lines numbered equal to
+the GIC SPI interrupts is an implementation detail of the A9. Other
+cores could have different arrangement including bringing out PPI
+interrupts or reserving some SPIs.
 
-diff --git a/arch/arm/mach-s3c2416/s3c2416.c b/arch/arm/mach-s3c2416/s3c2416.c
-index 494ce91..4261bdc 100644
---- a/arch/arm/mach-s3c2416/s3c2416.c
-+++ b/arch/arm/mach-s3c2416/s3c2416.c
-@@ -60,6 +60,7 @@
- #include <plat/iic-core.h>
- #include <plat/fb-core.h>
- #include <plat/nand-core.h>
-+#include <plat/adc-core.h>
- 
- static struct map_desc s3c2416_iodesc[] __initdata = {
- 	IODESC_ENT(WATCHDOG),
-@@ -97,6 +98,8 @@ int __init s3c2416_init(void)
- 
- 	s3c_fb_setname("s3c2443-fb");
- 
-+	s3c_adc_setname("s3c2416-adc");
-+
- 	register_syscore_ops(&s3c2416_pm_syscore_ops);
- 	register_syscore_ops(&s3c24xx_irq_syscore_ops);
- 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index af16957..c53c509 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -358,6 +358,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct adc_device *adc;
-+	int cpu = platform_get_device_id(pdev)->driver_data;
- 	struct resource *regs;
- 	int ret;
- 	unsigned tmp;
-@@ -421,9 +422,12 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	clk_enable(adc->clk);
- 
- 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
--	if (platform_get_device_id(pdev)->driver_data & S3C_ADC_QUIRK_12BIT) {
--		/* Enable 12-bit ADC resolution */
--		tmp |= S3C64XX_ADCCON_RESSEL;
-+	/* Enable 12-bit ADC resolution */
-+	if (cpu & S3C_ADC_QUIRK_12BIT) {
-+		if (cpu & S3C_ADC_QUIRK_RESSEL03)
-+			tmp |= S3C2416_ADCCON_RESSEL;
-+		else
-+			tmp |= S3C64XX_ADCCON_RESSEL;
- 	}
- 	writel(tmp, adc->regs + S3C2410_ADCCON);
- 
-@@ -491,6 +495,7 @@ static int s3c_adc_resume(struct device *dev)
- 	struct platform_device *pdev = container_of(dev,
- 			struct platform_device, dev);
- 	struct adc_device *adc = platform_get_drvdata(pdev);
-+	int cpu = platform_get_device_id(pdev)->driver_data;
- 	int ret;
- 	unsigned long tmp;
- 
-@@ -502,8 +507,12 @@ static int s3c_adc_resume(struct device *dev)
- 
- 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
- 	/* Enable 12-bit ADC resolution */
--	if (platform_get_device_id(pdev)->driver_data & S3C_ADC_QUIRK_12BIT)
--		tmp |= S3C64XX_ADCCON_RESSEL;
-+	if (cpu & S3C_ADC_QUIRK_12BIT) {
-+		if (cpu & S3C_ADC_QUIRK_RESSEL03)
-+			tmp |= S3C2416_ADCCON_RESSEL;
-+		else
-+			tmp |= S3C64XX_ADCCON_RESSEL;
-+	}
- 	writel(tmp, adc->regs + S3C2410_ADCCON);
- 
- 	return 0;
-@@ -524,6 +533,11 @@ static struct platform_device_id s3c_adc_driver_ids[] = {
- 		.driver_data    = S3C_ADC_QUIRK_10BIT |
- 					S3C_ADC_QUIRK_MUX18,
- 	}, {
-+		.name           = "s3c2416-adc",
-+		.driver_data    = S3C_ADC_QUIRK_12BIT |
-+					S3C_ADC_QUIRK_MUX18 |
-+					S3C_ADC_QUIRK_RESSEL03,
-+	}, {
- 		.name           = "s3c64xx-adc",
- 		.driver_data    = S3C_ADC_QUIRK_12BIT |
- 					S3C_ADC_QUIRK_MUXADCCON |
--- 
-1.7.2.3
+As there are many users of the GIC, it makes more sense to align with
+the GIC documentation rather than the documentation of 1 SOC. BTW, I
+have the exact same issue in our documentation.
+
+Rob
