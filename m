@@ -1,246 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 17 Sep 2011 20:37:26 -0500
-Subject: [PATCH 3/5] of/irq: introduce of_irq_init
-In-Reply-To: <20110917235328.GA3523@ponder.secretlab.ca>
-References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
-	<1316017900-19918-4-git-send-email-robherring2@gmail.com>
-	<20110917235328.GA3523@ponder.secretlab.ca>
-Message-ID: <4E754B56.1010404@gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sat, 17 Sep 2011 22:46:33 -0400 (EDT)
+Subject: [PATCH 0/19] removal of mach/vmalloc.h and generic optimizations
+In-Reply-To: <3319383.WZQsqr8ND4@wuerfel>
+References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
+	<3319383.WZQsqr8ND4@wuerfel>
+Message-ID: <alpine.LFD.2.00.1109172238070.20358@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
+On Sat, 17 Sep 2011, Arnd Bergmann wrote:
 
-On 09/17/2011 06:53 PM, Grant Likely wrote:
-> On Wed, Sep 14, 2011 at 11:31:38AM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> of_irq_init will scan the devicetree for matching interrupt controller
->> nodes. Then it calls an initialization function for each found controller
->> in the proper order with parent nodes initialized before child nodes.
->>
->> Based on initial pseudo code from Grant Likely.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->> ---
->>  drivers/of/irq.c       |   96 ++++++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/of_irq.h |    1 +
->>  2 files changed, 97 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
->> index 9f689f1..a0cd7e8 100644
->> --- a/drivers/of/irq.c
->> +++ b/drivers/of/irq.c
->> @@ -19,10 +19,13 @@
->>   */
->>  
->>  #include <linux/errno.h>
->> +#include <linux/list.h>
->> +#include <linux/list_sort.h>
->>  #include <linux/module.h>
->>  #include <linux/of.h>
->>  #include <linux/of_irq.h>
->>  #include <linux/string.h>
->> +#include <linux/slab.h>
->>  
->>  /* For archs that don't support NO_IRQ (such as x86), provide a dummy value */
->>  #ifndef NO_IRQ
->> @@ -386,3 +389,96 @@ int of_irq_to_resource_table(struct device_node *dev, struct resource *res,
->>  
->>  	return i;
->>  }
->> +
->> +struct intc_desc {
->> +	struct list_head	list;
->> +	struct device_node	*dev;
->> +	struct device_node	*parent;
->> +};
->> +
->> +typedef void (*irq_init_cb_t)(struct device_node *, struct device_node *);
->> +
->> +static int __init irq_cmp_intc_desc(void *unused, struct list_head *a,
->> +				    struct list_head *b)
->> +{
->> +	const struct intc_desc *da = list_entry(a, typeof(*da), list);
->> +	const struct intc_desc *db = list_entry(b, typeof(*db), list);
->> +
->> +	/* same parent, so order doesn't matter */
->> +	if (da->parent == db->parent)
->> +		return 0;
->> +
->> +	/* NULL parent comes first */
->> +	if (!da->parent && db->parent)
->> +		return -1;
->> +	if (!db->parent && da->parent)
->> +		return 1;
->> +
->> +	/* parent node must be before child node */
->> +	if (da->dev == db->parent)
->> +		return -1;
->> +	if (db->dev == da->parent)
->> +		return 1;
+> On Friday 16 September 2011 03:07:11 Nicolas Pitre wrote:
+> > This patch series removes all instances of mach/vmalloc.h in order to
+> > have a more unified memory map across all ARM architectures.  To do so,
+> > the static mappings are moved inside the vmalloc area.  And finally this
+> > allows for a generic optimization to ioremap where static mappings are
+> > reused whenever possible, using common code instead of having this
+> > duplicated in a couple places.
+> > 
+> > This also provides a net reduction of more than 1200 lines of code.
+> > 
+> > Those patches are also available in the following repository:
+> > 
+> >         git://git.linaro.org/people/nico/linux vmalloc
 > 
-> Does sort_list work for relationships 4 or more levels deep?  ie. if
-> there was a relationship of A <- B <- C <- D, then B compared with D
-> would return 0 from this function which could potentially result in an
-> incorrectly ordered list.
+> Hi Nicolas,
 > 
+> I like the series a lot. I had planned to work on this myself, but
+> I guess you did a better job than I could have anyway.
 
-Doh! Um, 3 levels is enough for everyone!? ;)
+Thanks!
 
-> The other option for implementing this would be to take the probe
-> deferral approach and not try to sort the list, but instead allow
-> probe functions to fail & request retry if the parent hasn't yet been
-> probed.  I haven't thought enough about it though to say which would
-> be the best approach.
+> Doing some randconfig tests, I noticed that your series is currently broken
+> on shmobile, which triggers a 
 > 
-
-Considering the list will typically be only a few entries, it is
-probably not so important how efficiently we sort or walk the list.
-
-The only way I see controller code knowing if it needs to defer init is
-if of_irq_create_mapping fails. The core code could simply do this
-itself. However, I would imagine sorting it would be faster than that path.
-
-How about something like this (untested):
-
-int find_order(struct intc_desc *node)
-{
-	struct intc_desc *d;
-
-	list_for_each_entry(d, &intc_desc_list, list) {
-		if (node->parent != d->dev)
-			continue;
-
-		if (d->order < 0)
-			find_order(d);
-
-		node->order = d->order + 1;
-		break;
-	}
-}
-
-
-Then rather than sorting, do this:
-
-
-	list_for_each_entry(desc, &intc_desc_list, list)
-		find_order(desc);
-
-	for (order = 0; !list_empty(&intc_desc_list); order++) {
-		list_for_each_entry_safe(desc, temp_desc, &intc_desc_list, list) {
-			if (desc->order != order)
-				continue;
-			
-			match = of_match_node(matches, desc->dev);
-			if (match && match->data) {
-				irq_init_cb_t irq_init_cb = match->data;
-				pr_debug("of_irq_init: init %s @ %p, parent %p\n",
-					 match->compatible, desc->dev, desc->parent);
-				irq_init_cb(desc->dev, desc->parent);
-			}
-			list_del(&desc->list);
-			kfree(desc);
-		}
-	}
-
-
->> +
->> +	return 0;
->> +}
->> +
->> +/**
->> + * of_irq_init - Scan the device tree for matching interrupt controllers and
->> + * call their initialization functions in order with parents first.
->> + * @matches: 0 terminated array of nodes to match and initialization function
->> + * to call on match
->> + */
->> +void __init of_irq_init(const struct of_device_id *matches)
->> +{
->> +	struct device_node *np;
->> +	const struct of_device_id *match;
->> +	struct intc_desc *desc;
->> +	struct intc_desc *temp_desc;
->> +	struct list_head intc_desc_list;
->> +
->> +	INIT_LIST_HEAD(&intc_desc_list);
->> +
->> +	for_each_matching_node(np, matches) {
->> +		if (!of_find_property(np, "interrupt-controller", NULL))
->> +			continue;
->> +		/* Here, we allocate and populate an intc_desc with the node
->> +		* pointer, interrupt-parent device_node etc. */
->> +		desc = kzalloc(sizeof(*desc), GFP_KERNEL);
->> +		if (!desc) {
->> +			WARN_ON(1);
->> +			goto err;
->> +		}
->> +		desc->dev = np;
->> +		desc->parent = of_irq_find_parent(np);
->> +		list_add(&desc->list, &intc_desc_list);
->> +	}
->> +	if (list_empty(&intc_desc_list))
->> +		return;
->> +
->> +	/*
->> +	 * The root irq controller is the one without an interrupt-parent.
->> +	 * That one goes first, followed by the controllers that reference it,
->> +	 * followed by the ones that reference the 2nd level controllers, etc
->> +	 */
+> 	BUILD_BUG_ON(VMALLOC_END > CONSISTENT_BASE);
 > 
-> I don't believe that this actually turns out to be true (and yes I
-> know it is how I originally described it).  :-)  When the
-> interrupt-parent property is at the root of the tree, then the root
-> interrupt controller may very well inherit itself as it's interrupt
-> parent, and of_irq_find_parent() will still return a value.  This
-> should probably be considered a bug in of_irq_find_parent(), and it
-> should return NULL if the parent is itself.
+> in mem_init(), because the platform has a CONSISTENT_DMA_SIZE of 158MB.
+> All other platforms have a CONSISTENT_DMA_SIZE of at most 14MB, which
+> works correctly.
 
-I did hit this exact issue. There is an easy, but not obvious fix to the
-device tree. Simply adding "interupt-parent;" to the root interrupt
-controller node will do the trick and override the value in the tree root.
+Any idea why shmobile requires such an amount of consistent memory?
 
-> 
-> of_irq_find_parent should probably be implemented thusly (completely
-> untested); although the only functional change is the line:
-> 	return (p == child) ? NULL : p;
-> 
-> /**
->  * of_irq_find_parent - Given a device node, find its interrupt parent node
->  * @child: pointer to device node
->  *
->  * Returns a pointer to the interrupt parent node, or NULL if the
->  * interrupt parent could not be determined.
->  */
-> struct device_node *of_irq_find_parent(struct device_node *child)
-> {
-> 	struct device_node *p, *c = child;
-> 	const __be32 *parp;
-> 
-> 	if (!of_node_get(c))
-> 		return NULL;
-> 
-> 	do {
-> 		p = of_parse_phandle(c, "interrupt-parent", 0);
-> 
-> 		if (!p && (of_irq_workarounds & OF_IMAP_NO_PHANDLE) &&
-> 		    of_find_property(c, "interrupt-parent", NULL))
-> 			p = of_node_get(of_irq_dflt_pic);
-> 
-> 		if (!p)
-> 			p = of_get_parent(c);
-> 
-> 		of_node_put(c);
-> 		c = p;
-> 	} while (p && !of_find_property(p, "#interrupt-cells", NULL));
-> 
-> 	return (p == child) ? NULL : p;
-> }
-> 
+> My feeling is that a 158MB CONSISTENT_DMA_SIZE causes other problems
+> anyway because we cannot map regular RAM both cached and uncached,
+> but this is still a regression. The problem might be solved using
+> Marek's CMA patches, which should eliminate the need for a huge
+> CONSISTENT_DMA_SIZE.
 
-This change should probably be implemented as well as this is likely a
-common occurrence that will be stumbled over or existing device trees
-won't have this. I'll test and add to the next series.
+Maybe.  However I don't want for this series to depend on CMA.  I'll 
+find some temporary hack in the mean time.
 
-Rob
+
+Nicolas
