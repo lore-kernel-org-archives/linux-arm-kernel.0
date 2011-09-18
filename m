@@ -1,187 +1,238 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 18 Sep 2011 16:23:40 -0500
-Subject: [PATCH 5/5] ARM: gic: add OF based initialization
-In-Reply-To: <4E722B2D.4050307@gmail.com>
-References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
-	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
-	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
-	<4E71CE5D.9030900@ti.com> <4E71F978.6020402@gmail.com>
-	<4E72030F.1090300@ti.com> <4E722B2D.4050307@gmail.com>
-Message-ID: <4E76615C.3000005@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 18 Sep 2011 23:58:55 +0200
+Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based camera
+	board.
+In-Reply-To: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
+References: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
+Message-ID: <201109182358.55816.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/15/2011 11:43 AM, Rob Herring wrote:
-> Benoit,
-> 
-> On 09/15/2011 08:52 AM, Cousson, Benoit wrote:
->> On 9/15/2011 3:11 PM, Rob Herring wrote:
->>> Benoit,
->>>
->>> On 09/15/2011 05:07 AM, Cousson, Benoit wrote:
->>>> Hi Rob,
->>>>
->>>> On 9/15/2011 9:55 AM, Thomas Abraham wrote:
->>>>> Hi Rob,
->>>>>
->>>>> On 14 September 2011 22:01, Rob Herring<robherring2@gmail.com>   wrote:
->>>>>> From: Rob Herring<rob.herring@calxeda.com>
->>>>>>
->>>>>> This adds gic initialization using device tree data. The
->>>>>> initialization
->>>>>> functions are intended to be called by a generic OF interrupt
->>>>>> controller parsing function once the right pieces are in place.
->>>>>>
->>>>>> PPIs are handled using 3rd cell of interrupts properties to specify
->>>>>> the cpu
->>>>>> mask the PPI is assigned to.
->>>>>>
->>>>>> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
->>>>>> ---
->>>>>>    Documentation/devicetree/bindings/arm/gic.txt |   53
->>>>>> ++++++++++++++++++++++++
->>>>>>    arch/arm/common/gic.c                         |   55
->>>>>> +++++++++++++++++++++++--
->>>>>>    arch/arm/include/asm/hardware/gic.h           |   10 +++++
->>>>>>    3 files changed, 114 insertions(+), 4 deletions(-)
->>>>>>    create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
->>>>>
->>>>> [...]
->>>>>
->>>>>
->>>>>> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->>>>>> index d1ccc72..14de380 100644
->>>>>> --- a/arch/arm/common/gic.c
->>>>>> +++ b/arch/arm/common/gic.c
->>>>>
->>>>> [...]
->>>>>
->>>>>> +void __init gic_of_init(struct device_node *node, struct device_node
->>>>>> *parent)
->>>>>> +{
->>>>>> +       void __iomem *cpu_base;
->>>>>> +       void __iomem *dist_base;
->>>>>> +       int irq;
->>>>>> +       struct irq_domain *domain =&gic_data[gic_cnt].domain;
->>>>>> +
->>>>>> +       if (WARN_ON(!node))
->>>>>> +               return;
->>>>>> +
->>>>>> +       dist_base = of_iomap(node, 0);
->>>>>> +       WARN(!dist_base, "unable to map gic dist registers\n");
->>>>>> +
->>>>>> +       cpu_base = of_iomap(node, 1);
->>>>>> +       WARN(!cpu_base, "unable to map gic cpu registers\n");
->>>>>> +
->>>>>> +       domain->nr_irq = gic_irq_count(dist_base);
->>>>>> +       domain->irq_base = irq_alloc_descs(-1, 0, domain->nr_irq,
->>>>>> numa_node_id());
->>>>>
->>>>> For exynos4, all the interrupts originating from GIC are statically
->>>>> mapped to start from 32 in the linux virq space (GIC SPI interrupts
->>>>> start from 64). In the above code, since irq_base would be 0 for
->>>>> exynos4, the interrupt mapping is not working correctly. In your
->>>>> previous version of the patch, you have given a option to the platform
->>>>> code to choose the offset. Could that option be added to this series
->>>>> also. Or a provision to use platform specific translate function
->>>>> instead of the irq_domain_simple translator.
->>>>
->>>> I have another concern on a similar topic.
->>>>
->>>> On OMAP4 the SoC interrupts external to the MPU (SPI) have an offset of
->>>> 32. Only the internal PPI are between 0 and 31.
->>>>
->>>> For the moment we add 32 to every SoC interrupts in the irq.h define,
->>>
->>> Those defines will not be used in the DT case. So the question is
->>> whether to add 32 or not in the DT. Since we have just a single node and
->>> a linear mapping of PPIs and SPIs, the only choice is to have SPIs start
->>> at 32. And from the h/w definition, SPIs always start at 32, so it's in
->>> agreement.
->>
->> This is a agreement inside the MPUSS, but not outside.
->> Both Tegra and OMAP4 must add an offset to the HW irq number to deal
->> with that today.
->>
->>>> but I'm assuming that this offset calculation should be done thanks to a
->>>> dedicated irq domain for the SPI.
->>>> The real HW physical number start at 0, and thus this is that value that
->>>> should be in the irq binding of the device.
->>>>
->>>> So ideally we should have a irq domain for the PPI starting at 0 and
->>>> another one for the SPI starting at 32. Or 32 and 64 for the exynos4
->>>> case, but it looks like the PPI/SPI offset is always 32.
->>>>
->>>
->>> That offset of SPIs is always there. If you have a GIC as a secondary
->>> controller, It will have 32 reserved interrupts and the register layout
->>> is exactly the same as a cpu's GIC.
->>
->> Yep, but that's the GIC view and not the SoC one. My concern is to have
->> to tweak the HW number provided by the HW spec in order to add that offset.
->> If you look at SoC level, the MPUSS is just an IP that can be
->> potentially replaced by other one that will not have a GIC. In that case
->> you will not change the IRQ mapping at SoC level.
->> For example if you replace the Dual-cortexA9 by a single CortexA8, then
->> all the interrupts will have to be shifted by 32 just because the MPU
->> subsystem is different.
->>
-> 
-> Is that a realistic case? That would be a new chip and new device tree.
-> You could argue that the whole peripheral subsystem DT could be reused
-> and the numbering needs to be the same. However, there's one thing that
-> would prevent that. The number of interrupt cells is defined by the
-> controller binding. So you have to change the peripheral nodes anyway.
-> 
-> It's good that OMAP is trying to standardize the peripheral layout, but
-> in my experience that's not something you can rely on.
-> 
-> At some point the interrupt numbering is going to differ from the h/w
-> documentation. If it's not in the DT, then it will be in linux. Right
-> now its just offset of 32, but if irqdescs get assigned on demand as PPC
-> is doing, then there will be no relationship to the documentation.
-> 
->> Since that offset is dependent of the GIC internals and is not exposed
->> outside the MPUSS, it should not be visible by the SoC IPs. And the HW
->> spec is exposing exactly that.
->>
->>> Since the idea of splitting PPIs for each core out to a flattened linux
->>> irq map has been abandoned, I see no reason to have more than 1 domain
->>> with a simple linear translation. Ultimately, domains will do dynamic
->>> irqdesc allocation and the translation within the gic will be completely
->>> dynamic.
->>
->> I think the only reason to do that is to separate internal MPU
->> interrupts with the external ones that should not have a clue about the
->> GIC.
-> 
-> I see 2 options (besides leaving it as is):
-> 
-> - Revert back to my previous binding where PPIs are a sub-node and a
-> different interrupt parent.
-> 
-> - Use the current binding, but allow SPIs to start at 0. We can still
-> distinguish PPIs and SPIs by the cpu mask cell. A cpu mask of 0 is a
-> SPI. If there was ever a reason to have a cpu mask for an SPI, you would
-> not be able to with this scheme.
-> 
-> Either way you will still have the above issue with the cell size changing.
-> 
+Hi Martin,
 
-I was headed down the path of implementing the 2nd option above, but had
-a dilemma. What would be the numbering base for PPIs in this case?
-Should it be 0 in the DT as proposed for SPIs or does it stay at 16?
-Numbering PPIs at 0 will just cause confusion as will numbering
-differently from SPIs. There is absolutely no mention of SPI0 or SPIx
-numbering in the GIC spec. All interrupt number references refer to the
-absolute interrupt ID, not a relative number based on the type. The fact
-that the Cortex-A9 implementation has interrupt lines numbered equal to
-the GIC SPI interrupts is an implementation detail of the A9. Other
-cores could have different arrangement including bringing out PPI
-interrupts or reserving some SPIs.
+On Saturday 17 September 2011 11:34:57 Martin Hostettler wrote:
+> Adds board support for an MT9M032 based camera to omap3evm.
+> 
+> Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
+> ---
+>  arch/arm/mach-omap2/Makefile                |    1 +
+>  arch/arm/mach-omap2/board-omap3evm-camera.c |  183
+> +++++++++++++++++++++++++++ 2 files changed, 184 insertions(+), 0
+> deletions(-)
+>  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
+> 
+> Changes in V2:
+>  * ported to current mainline
+>  * Style fixes
+>  * Fix error handling
+> 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index f343365..8ae3d25 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -202,6 +202,7 @@ obj-$(CONFIG_MACH_OMAP3_TORPEDO)        +=
+> board-omap3logic.o \ obj-$(CONFIG_MACH_OVERO)		+= board-overo.o \
+>  					   hsmmc.o
+>  obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o \
+> +					   board-omap3evm-camera.o \
+>  					   hsmmc.o
+>  obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
+>  					   hsmmc.o
+> diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c
+> b/arch/arm/mach-omap2/board-omap3evm-camera.c new file mode 100644
+> index 0000000..be987d9
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
+> @@ -0,0 +1,183 @@
+> +/*
+> + * Copyright (C) 2010-2011 Lund Engineering
+> + * Contact: Gil Lund <gwlund@lundeng.com>
+> + * Author: Martin Hostettler <martin@neutronstar.dyndns.org>
+> + *
+> + * Board intregration for a MT9M032 camera connected to IMAGE_CONN and I2C
+> Bus 2 + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+> + * 02110-1301 USA
+> + */
+> +
+> +#include <linux/i2c.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include <linux/gpio.h>
+> +#include <plat/mux.h>
+> +#include "mux.h"
+> +
+> +#include "../../../drivers/media/video/omap3isp/isp.h"
+> +#include "media/mt9m032.h"
+> +
+> +#include "devices.h"
+> +
+> +#define EVM_TWL_GPIO_BASE OMAP_MAX_GPIO_LINES
+> +#define GPIO98_VID_DEC_RES	98
+> +#define nCAM_VD_SEL		157
+> +
+> +#define MT9M032_I2C_BUS_NUM	2
+> +
+> +
+> +enum omap3evmdc_mux {
+> +	MUX_TVP5146,
+> +	MUX_CAMERA_SENSOR,
+> +	MUX_EXP_CAMERA_SENSOR,
+> +};
+> +
+> +/**
+> + * omap3evm_set_mux - Sets mux to enable signal routing to
+> + *                           different peripherals present on new EVM
+> board + * @mux_id: enum, mux id to enable
+> + *
+> + * Returns 0 for success or a negative error code
+> + */
+> +static int omap3evm_set_mux(enum omap3evmdc_mux mux_id)
+> +{
+> +	/* Set GPIO6 = 1 */
+> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 6, 1);
+> +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+> +
+> +	switch (mux_id) {
+> +	case MUX_TVP5146:
+> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+> +		gpio_set_value(nCAM_VD_SEL, 1);
+> +		break;
+> +
+> +	case MUX_CAMERA_SENSOR:
+> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+> +		gpio_set_value(nCAM_VD_SEL, 0);
+> +		break;
+> +
+> +	case MUX_EXP_CAMERA_SENSOR:
+> +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 1);
+> +		break;
+> +
+> +	default:
+> +		pr_err("omap3evm-camera: Invalid mux id #%d\n", mux_id);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct mt9m032_platform_data mt9m032_platform_data = {
+> +	.ext_clock = 13500000,
+> +	.pll_pre_div = 6,
+> +	.pll_mul = 120,
+> +	.pll_out_div = 5,
+> +	.invert_pixclock = 1,
+> +};
+> +
+> +static struct i2c_board_info camera_i2c_devices[] = {
+> +	{
+> +		I2C_BOARD_INFO(MT9M032_NAME, MT9M032_I2C_ADDR),
+> +		.platform_data = &mt9m032_platform_data,
+> +	},
+> +};
+> +
+> +static struct isp_subdev_i2c_board_info camera_i2c_subdevs[] = {
+> +	{
+> +		.board_info = &camera_i2c_devices[0],
+> +		.i2c_adapter_id = MT9M032_I2C_BUS_NUM,
+> +	},
+> +	{},
+> +};
+> +
+> +static struct isp_v4l2_subdevs_group camera_subdevs[] = {
+> +	{
+> +		.subdevs = camera_i2c_subdevs,
+> +		.interface = ISP_INTERFACE_PARALLEL,
+> +		.bus = {
+> +			.parallel = {
+> +				.data_lane_shift = 1,
+> +				.clk_pol = 0,
+> +				.bridge = ISPCTRL_PAR_BRIDGE_DISABLE,
+> +			}
+> +		},
+> +	},
+> +	{},
+> +};
+> +
+> +static struct isp_platform_data isp_platform_data = {
+> +	.subdevs = camera_subdevs,
+> +};
+> +
+> +static int __init camera_init(void)
+> +{
+> +	int ret = -EINVAL;
+> +
+> +	omap_mux_init_gpio(nCAM_VD_SEL, OMAP_PIN_OUTPUT);
+> +	if (gpio_request(nCAM_VD_SEL, "nCAM_VD_SEL") < 0) {
+> +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_SEL(%d)\n",
+> +		       nCAM_VD_SEL);
+> +		goto err;
+> +	}
+> +	if (gpio_direction_output(nCAM_VD_SEL, 1) < 0) {
+> +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_SEL(%d)
+> direction\n", +		       nCAM_VD_SEL);
+> +		goto err_vdsel;
+> +	}
+> +
+> +	if (gpio_request(EVM_TWL_GPIO_BASE + 2, "T2_GPIO2") < 0) {
+> +		pr_err("omap3evm-camera: Failed to get GPIO T2_GPIO2(%d)\n",
+> +		       EVM_TWL_GPIO_BASE + 2);
+> +		goto err_vdsel;
+> +	}
+> +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 2, 0) < 0) {
+> +		pr_err("omap3evm-camera: Failed to set GPIO T2_GPIO2(%d) direction\n",
+> +		       EVM_TWL_GPIO_BASE + 2);
+> +		goto err_2;
+> +	}
+> +
+> +	if (gpio_request(EVM_TWL_GPIO_BASE + 8, "nCAM_VD_EN") < 0) {
+> +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_EN(%d)\n",
+> +		       EVM_TWL_GPIO_BASE + 8);
+> +		goto err_2;
+> +	}
+> +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 8, 0) < 0) {
+> +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_EN(%d) direction\n",
+> +		       EVM_TWL_GPIO_BASE + 8);
+> +		goto err_8;
+> +	}
+> +
+> +	omap3evm_set_mux(MUX_CAMERA_SENSOR);
+> +
+> +
+> +	ret = omap3_init_camera(&isp_platform_data);
+> +	if (ret < 0)
+> +		goto err_8;
+> +	return 0;
+> +
+> +err_8:
+> +	gpio_free(EVM_TWL_GPIO_BASE + 8);
+> +err_2:
+> +	gpio_free(EVM_TWL_GPIO_BASE + 2);
+> +err_vdsel:
+> +	gpio_free(nCAM_VD_SEL);
+> +err:
+> +	return ret;
+> +}
+> +
+> +device_initcall(camera_init);
 
-As there are many users of the GIC, it makes more sense to align with
-the GIC documentation rather than the documentation of 1 SOC. BTW, I
-have the exact same issue in our documentation.
+Please don't use device_initcall(), but call the function directly from the 
+OMAP3 EVM init handler. Otherwise camera_init() will be called if OMAP3 EVM 
+support is compiled in the kernel, regardless of the board the kernel runs on.
 
-Rob
+-- 
+Regards,
+
+Laurent Pinchart
