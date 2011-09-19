@@ -1,174 +1,132 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 19 Sep 2011 19:26:20 +0900
-Subject: [PATCH v2 6/6] ARM: EXYNOS4: Limit usage of pl330 device instance
-	to non-dt build
-In-Reply-To: <CAJuYYwSB3f8BPQx1jgsSykKKMMGsbeCCj7zSLp2-+gtonBrdVw@mail.gmail.com>
-References: <1314867882-11755-1-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-2-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-3-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-4-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-5-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-6-git-send-email-thomas.abraham@linaro.org>
-	<1314867882-11755-7-git-send-email-thomas.abraham@linaro.org>
-	<001901cc6b8b$0f450730$2dcf1590$%kim@samsung.com>
-	<CAJuYYwSB3f8BPQx1jgsSykKKMMGsbeCCj7zSLp2-+gtonBrdVw@mail.gmail.com>
-Message-ID: <001801cc76b6$92d65ff0$b8831fd0$%kim@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 19 Sep 2011 12:33:29 +0200
+Subject: [PATCH v2 1/4] ARM: mx53: Add pads for flexcan pins
+In-Reply-To: <1315598408-29563-1-git-send-email-rogerio.pimentel@freescale.com>
+References: <1315598408-29563-1-git-send-email-rogerio.pimentel@freescale.com>
+Message-ID: <20110919103329.GN31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+On Fri, Sep 09, 2011 at 05:00:05PM -0300, Rogerio Pimentel wrote:
+> Adding pads for flexcan on i.MX53
 > 
-> Dear Mr. Kim,
+> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+
+Can you please rebase this onto:
+
+git://git.pengutronix.de/git/imx/linux-2.6.git imx-cleanup
+
+Sascha
+
+> ---
+> Changes since v1:
+> Assigned only one pad config for CAN pins
+>  arch/arm/plat-mxc/include/mach/iomux-mx53.h |   22 ++++++++++++----------
+>  1 files changed, 12 insertions(+), 10 deletions(-)
 > 
-> On 5 September 2011 10:47, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> >> Subject: [PATCH v2 6/6] ARM: EXYNOS4: Limit usage of pl330 device
-instance
-> > to
-> >> non-dt build
-> >>
-> >> The pl330 device instances and associated platform data is required
-only
-> >> for non-device-tree builds. With device tree, all of this information
-is
-> >> obtained from the device tree.
-> >>
-> >> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> >> ---
-> >> ?arch/arm/mach-exynos4/Kconfig ?| ? ?7 +++++++
-> >> ?arch/arm/mach-exynos4/Makefile | ? ?3 ++-
-> >> ?2 files changed, 9 insertions(+), 1 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-exynos4/Kconfig
-b/arch/arm/mach-exynos4/Kconfig
-> >> index d4d401c..3edbf37 100644
-> >> --- a/arch/arm/mach-exynos4/Kconfig
-> >> +++ b/arch/arm/mach-exynos4/Kconfig
-> >> @@ -21,6 +21,13 @@ config EXYNOS4_MCT
-> >> ? ? ? help
-> >> ? ? ? ? Use MCT (Multi Core Timer) as kernel timers
-> >>
-> >> +config EXYNOS4_DEV_DMA
-> >> + ? ? bool
-> >> + ? ? default y if !OF
-> >> + ? ? help
-> >> + ? ? ? Compile in amba device definitions for DMA controller if OF
-> >> + ? ? ? is not enabled.
-> >> +
-> >> ?config EXYNOS4_DEV_AHCI
-> >> ? ? ? bool
-> >> ? ? ? help
-> >> diff --git a/arch/arm/mach-exynos4/Makefile
-> > b/arch/arm/mach-exynos4/Makefile
-> >> index d2bf5bf..a2f33dc 100644
-> >> --- a/arch/arm/mach-exynos4/Makefile
-> >> +++ b/arch/arm/mach-exynos4/Makefile
-> >> @@ -13,7 +13,8 @@ obj- ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?:=
-> >> ?# Core support for EXYNOS4 system
-> >>
-> >> ?obj-$(CONFIG_CPU_EXYNOS4210) += cpu.o init.o clock.o irq-combiner.o
-> >> -obj-$(CONFIG_CPU_EXYNOS4210) += setup-i2c0.o irq-eint.o dma.o
-> >> pmu.o
-> >> +obj-$(CONFIG_CPU_EXYNOS4210) += setup-i2c0.o irq-eint.o pmu.o
-> >> +obj-$(CONFIG_EXYNOS4_DEV_DMA) ? ? ? ?+= dma.o
-> >
-> > Do we need _really_ EXYNOS4_DEV_DMA here?
-> > How about to use like following?
-> >
-> > +obj-$(!CONFIG_OF) ? ? ? ? ? ? ?+= dma.o
-> >
-> > If any problems, let me know.
+> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> index 5408fd1..d890c9c 100644
+> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+> @@ -33,6 +33,8 @@
+>  #define PAD_CTRL_I2C	(PAD_CTL_SRE_FAST | PAD_CTL_ODE | PAD_CTL_PKE | \
+>  			PAD_CTL_PUE | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP \
+>  			| PAD_CTL_HYS)
+> +#define MX53_CAN_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
+> +					PAD_CTL_HYS)
+>  
+>  #define _MX53_PAD_GPIO_19__KPP_COL_5		IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
+>  #define _MX53_PAD_GPIO_19__GPIO4_5		IOMUX_PAD(0x348, 0x20, 1, 0x0, 0, 0)
+> @@ -1243,14 +1245,14 @@
+>  #define MX53_PAD_KEY_ROW1__USBPHY1_RXVALID		(_MX53_PAD_KEY_ROW1__USBPHY1_RXVALID | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__KPP_COL_2		(_MX53_PAD_KEY_COL2__KPP_COL_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__GPIO4_10		(_MX53_PAD_KEY_COL2__GPIO4_10 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_KEY_COL2__CAN1_TXCAN		(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_KEY_COL2__CAN1_TXCAN		(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__FEC_MDIO		(_MX53_PAD_KEY_COL2__FEC_MDIO | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__ECSPI1_SS1		(_MX53_PAD_KEY_COL2__ECSPI1_SS1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__FEC_RDATA_2		(_MX53_PAD_KEY_COL2__FEC_RDATA_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL2__USBPHY1_RXACTIVE		(_MX53_PAD_KEY_COL2__USBPHY1_RXACTIVE | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__KPP_ROW_2		(_MX53_PAD_KEY_ROW2__KPP_ROW_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__GPIO4_11		(_MX53_PAD_KEY_ROW2__GPIO4_11 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_KEY_ROW2__CAN1_RXCAN		(_MX53_PAD_KEY_ROW2__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_KEY_ROW2__CAN1_RXCAN		(_MX53_PAD_KEY_ROW2__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__FEC_MDC		(_MX53_PAD_KEY_ROW2__FEC_MDC | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__ECSPI1_SS2		(_MX53_PAD_KEY_ROW2__ECSPI1_SS2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW2__FEC_TDATA_2		(_MX53_PAD_KEY_ROW2__FEC_TDATA_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> @@ -1273,14 +1275,14 @@
+>  #define MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0		(_MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__KPP_COL_4		(_MX53_PAD_KEY_COL4__KPP_COL_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__GPIO4_14		(_MX53_PAD_KEY_COL4__GPIO4_14 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_KEY_COL4__CAN2_TXCAN		(_MX53_PAD_KEY_COL4__CAN2_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_KEY_COL4__CAN2_TXCAN		(_MX53_PAD_KEY_COL4__CAN2_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__IPU_SISG_4		(_MX53_PAD_KEY_COL4__IPU_SISG_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__UART5_RTS		(_MX53_PAD_KEY_COL4__UART5_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__USBOH3_USBOTG_OC		(_MX53_PAD_KEY_COL4__USBOH3_USBOTG_OC | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_COL4__USBPHY1_LINESTATE_1		(_MX53_PAD_KEY_COL4__USBPHY1_LINESTATE_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__KPP_ROW_4		(_MX53_PAD_KEY_ROW4__KPP_ROW_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__GPIO4_15		(_MX53_PAD_KEY_ROW4__GPIO4_15 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_KEY_ROW4__CAN2_RXCAN		(_MX53_PAD_KEY_ROW4__CAN2_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_KEY_ROW4__CAN2_RXCAN		(_MX53_PAD_KEY_ROW4__CAN2_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__IPU_SISG_5		(_MX53_PAD_KEY_ROW4__IPU_SISG_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__UART5_CTS		(_MX53_PAD_KEY_ROW4__UART5_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+>  #define MX53_PAD_KEY_ROW4__USBOH3_USBOTG_PWR		(_MX53_PAD_KEY_ROW4__USBOH3_USBOTG_PWR | MUX_PAD_CTRL(NO_PAD_CTRL))
+> @@ -2053,25 +2055,25 @@
+>  #define MX53_PAD_PATA_INTRQ__PATA_INTRQ		(_MX53_PAD_PATA_INTRQ__PATA_INTRQ | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_INTRQ__GPIO7_2		(_MX53_PAD_PATA_INTRQ__GPIO7_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_INTRQ__UART2_CTS		(_MX53_PAD_PATA_INTRQ__UART2_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+> -#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN		(_MX53_PAD_PATA_INTRQ__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN		(_MX53_PAD_PATA_INTRQ__CAN1_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_PATA_INTRQ__CCM_CCM_OUT_2		(_MX53_PAD_PATA_INTRQ__CCM_CCM_OUT_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_INTRQ__USBPHY2_DATAOUT_6		(_MX53_PAD_PATA_INTRQ__USBPHY2_DATAOUT_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DIOR__PATA_DIOR		(_MX53_PAD_PATA_DIOR__PATA_DIOR | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DIOR__GPIO7_3		(_MX53_PAD_PATA_DIOR__GPIO7_3 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DIOR__UART2_RTS		(_MX53_PAD_PATA_DIOR__UART2_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+> -#define MX53_PAD_PATA_DIOR__CAN1_RXCAN		(_MX53_PAD_PATA_DIOR__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_PATA_DIOR__CAN1_RXCAN		(_MX53_PAD_PATA_DIOR__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_PATA_DIOR__USBPHY2_DATAOUT_7		(_MX53_PAD_PATA_DIOR__USBPHY2_DATAOUT_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_RESET_B__PATA_PATA_RESET_B		(_MX53_PAD_PATA_RESET_B__PATA_PATA_RESET_B | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_RESET_B__GPIO7_4		(_MX53_PAD_PATA_RESET_B__GPIO7_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_RESET_B__ESDHC3_CMD		(_MX53_PAD_PATA_RESET_B__ESDHC3_CMD | MUX_PAD_CTRL(MX53_SDHC_PAD_CTRL))
+>  #define MX53_PAD_PATA_RESET_B__UART1_CTS		(_MX53_PAD_PATA_RESET_B__UART1_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+> -#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		(_MX53_PAD_PATA_RESET_B__CAN2_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		(_MX53_PAD_PATA_RESET_B__CAN2_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_PATA_RESET_B__USBPHY1_DATAOUT_0		(_MX53_PAD_PATA_RESET_B__USBPHY1_DATAOUT_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__PATA_IORDY		(_MX53_PAD_PATA_IORDY__PATA_IORDY | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__GPIO7_5		(_MX53_PAD_PATA_IORDY__GPIO7_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__ESDHC3_CLK		(_MX53_PAD_PATA_IORDY__ESDHC3_CLK | MUX_PAD_CTRL(MX53_SDHC_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__UART1_RTS		(_MX53_PAD_PATA_IORDY__UART1_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+> -#define MX53_PAD_PATA_IORDY__CAN2_RXCAN		(_MX53_PAD_PATA_IORDY__CAN2_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_PATA_IORDY__CAN2_RXCAN		(_MX53_PAD_PATA_IORDY__CAN2_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_PATA_IORDY__USBPHY1_DATAOUT_1		(_MX53_PAD_PATA_IORDY__USBPHY1_DATAOUT_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DA_0__PATA_DA_0		(_MX53_PAD_PATA_DA_0__PATA_DA_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_PATA_DA_0__GPIO7_6		(_MX53_PAD_PATA_DA_0__GPIO7_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+> @@ -2341,7 +2343,7 @@
+>  #define MX53_PAD_GPIO_7__ESAI1_TX4_RX1		(_MX53_PAD_GPIO_7__ESAI1_TX4_RX1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_7__GPIO1_7		(_MX53_PAD_GPIO_7__GPIO1_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_7__EPIT1_EPITO		(_MX53_PAD_GPIO_7__EPIT1_EPITO | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_GPIO_7__CAN1_TXCAN		(_MX53_PAD_GPIO_7__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_GPIO_7__CAN1_TXCAN		(_MX53_PAD_GPIO_7__CAN1_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_GPIO_7__UART2_TXD_MUX		(_MX53_PAD_GPIO_7__UART2_TXD_MUX | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+>  #define MX53_PAD_GPIO_7__FIRI_RXD		(_MX53_PAD_GPIO_7__FIRI_RXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_7__SPDIF_PLOCK		(_MX53_PAD_GPIO_7__SPDIF_PLOCK | MUX_PAD_CTRL(NO_PAD_CTRL))
+> @@ -2349,7 +2351,7 @@
+>  #define MX53_PAD_GPIO_8__ESAI1_TX5_RX0		(_MX53_PAD_GPIO_8__ESAI1_TX5_RX0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__GPIO1_8		(_MX53_PAD_GPIO_8__GPIO1_8 | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__EPIT2_EPITO		(_MX53_PAD_GPIO_8__EPIT2_EPITO | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -#define MX53_PAD_GPIO_8__CAN1_RXCAN		(_MX53_PAD_GPIO_8__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
+> +#define MX53_PAD_GPIO_8__CAN1_RXCAN		(_MX53_PAD_GPIO_8__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__UART2_RXD_MUX		(_MX53_PAD_GPIO_8__UART2_RXD_MUX | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__FIRI_TXD		(_MX53_PAD_GPIO_8__FIRI_TXD | MUX_PAD_CTRL(NO_PAD_CTRL))
+>  #define MX53_PAD_GPIO_8__SPDIF_SRCLK		(_MX53_PAD_GPIO_8__SPDIF_SRCLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+> -- 
+> 1.7.1
 > 
-> While trying out your suggestion, I found a issue with this patch
-> related to compiling a kernel with both dt and non-dt board files
-> included in the build.
 > 
-> When compiling a single kernel image with mach-smdkv310.c file and
-> exynos4 device tree enabled machine file, since CONFIG_OF is enabled,
-> dma platform data does not get compiled which is required for
-> mach-smdkv310. So, I would like to resubmit this patch and the updated
-> diff is listed below. Could you please review the following diff.
 > 
 
-Hi Thomas,
-
-Oops, you're right...so following is ok to me but you need to rebase this
-based on latest my tree.
-
-If any problems, please let me know.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> 
-> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-> index d4d401c..953ead7 100644
-> --- a/arch/arm/mach-exynos4/Kconfig
-> +++ b/arch/arm/mach-exynos4/Kconfig
-> @@ -21,6 +21,11 @@ config EXYNOS4_MCT
->  	help
->  	  Use MCT (Multi Core Timer) as kernel timers
-> 
-> +config EXYNOS4_DEV_DMA
-> +	bool
-> +	help
-> +	  Compile in amba device definitions for DMA controller
-> +
->  config EXYNOS4_DEV_AHCI
->  	bool
->  	help
-> @@ -129,6 +134,7 @@ config MACH_SMDKC210
->  	select EXYNOS4_SETUP_FIMD0
->  	select EXYNOS4_SETUP_I2C1
->  	select EXYNOS4_SETUP_SDHCI
-> +	select EXYNOS4_DEV_DMA
->  	help
->  	  Machine support for Samsung SMDKC210
-> 
-> @@ -153,6 +159,7 @@ config MACH_SMDKV310
->  	select EXYNOS4_SETUP_I2C1
->  	select EXYNOS4_SETUP_KEYPAD
->  	select EXYNOS4_SETUP_SDHCI
-> +	select EXYNOS4_DEV_DMA
->  	help
->  	  Machine support for Samsung SMDKV310
-> 
-> @@ -191,6 +198,7 @@ config MACH_UNIVERSAL_C210
->  	select EXYNOS4_SETUP_I2C3
->  	select EXYNOS4_SETUP_I2C5
->  	select EXYNOS4_SETUP_SDHCI
-> +	select EXYNOS4_DEV_DMA
->  	help
->  	  Machine support for Samsung Mobile Universal S5PC210 Reference
->  	  Board.
-> @@ -215,6 +223,7 @@ config MACH_NURI
->  	select EXYNOS4_SETUP_USB_PHY
->  	select SAMSUNG_DEV_PWM
->  	select SAMSUNG_DEV_ADC
-> +	select EXYNOS4_DEV_DMA
->  	help
->  	  Machine support for Samsung Mobile NURI Board.
-> 
-> diff --git a/arch/arm/mach-exynos4/Makefile
-b/arch/arm/mach-exynos4/Makefile
-> index 929262a..a2f33dc 100644
-> --- a/arch/arm/mach-exynos4/Makefile
-> +++ b/arch/arm/mach-exynos4/Makefile
-> @@ -14,7 +14,8 @@ obj-				:=
-> 
->  obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
-> -obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o
-> pmu.o
-> +obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o pmu.o
-> +obj-$(CONFIG_EXYNOS4_DEV_DMA)	+= dma.o
->  obj-$(CONFIG_PM)		+= pm.o sleep.o
->  obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
-> 
-> 
-> 
-> Thanks,
-> Thomas.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
