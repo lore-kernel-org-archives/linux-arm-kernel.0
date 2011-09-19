@@ -1,9 +1,9 @@
 From: boyko.lee@samsung.com (Jongpill Lee)
-Date: Mon, 19 Sep 2011 10:23:30 +0900
-Subject: [PATCH 3/3] ARM: EXYNOS4: Support suspend/resume for EXYNOS4212
-In-Reply-To: <1316395410-12023-1-git-send-email-boyko.lee@samsung.com>
-References: <1316395410-12023-1-git-send-email-boyko.lee@samsung.com>
-Message-ID: <1316395410-12023-3-git-send-email-boyko.lee@samsung.com>
+Date: Mon, 19 Sep 2011 10:25:42 +0900
+Subject: [PATCH V2 3/3] ARM: EXYNOS4: Support suspend/resume for EXYNOS4212
+In-Reply-To: <1316395542-27578-1-git-send-email-boyko.lee@samsung.com>
+References: <1316395542-27578-1-git-send-email-boyko.lee@samsung.com>
+Message-ID: <1316395542-27578-4-git-send-email-boyko.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
