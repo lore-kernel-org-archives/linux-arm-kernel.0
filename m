@@ -1,36 +1,71 @@
-From: albert.arquer@gmail.com (albert)
-Date: Mon, 19 Sep 2011 07:45:57 +0000 (UTC)
-Subject: Freescale i.mx25 SDIO/Libertas issue
-References: <4DE2F84D.8080907@bluewatersys.com>
-	<BANLkTi=GSw5HRdiqPB=JcgB9SyEhB1b79A@mail.gmail.com>
-Message-ID: <loom.20110919T094146-623@post.gmane.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 19 Sep 2011 10:01:12 +0200
+Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based camera
+	board.
+In-Reply-To: <20110919061019.GD9244@neutronstar.dyndns.org>
+References: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
+	<201109182358.55816.laurent.pinchart@ideasonboard.com>
+	<20110919061019.GD9244@neutronstar.dyndns.org>
+Message-ID: <201109191001.12364.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I used this Marvel WiFi 8686 in our previous product powered by i.MX51
-> and it worked fine. You need to load the firmware before using it.
-> Just put your binaries inside firmware directory on linux kernel and
-> setup your kernel config:
-> 
->  CONFIG_FW_LOADER=y
->  CONFIG_FIRMWARE_IN_KERNEL=y
-> -CONFIG_EXTRA_FIRMWARE=""
-> +CONFIG_EXTRA_FIRMWARE="sd8686_helper.bin sd8686.bin"
-> +CONFIG_EXTRA_FIRMWARE_DIR="firmware"
-> 
-> Best Regards,
-> 
-> Alan
-> 
+Hi Martin,
 
-Hi Alan, just a quick question. I am fairly new to all this linux embedded world.
-I just wandered what this code you wrote actually does. I searched around and I 
-understand that it plugs some extra firmware into the kernel at compiling time, 
-however I don't really understand what "firmware" really means in this case. 
+On Monday 19 September 2011 08:10:19 martin at neutronstar.dyndns.org wrote:
+> On Sun, Sep 18, 2011 at 11:58:55PM +0200, Laurent Pinchart wrote:
+> > On Saturday 17 September 2011 11:34:57 Martin Hostettler wrote:
+> > > Adds board support for an MT9M032 based camera to omap3evm.
+> > > 
+> > > Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
+> > > ---
+> > > 
+> > >  arch/arm/mach-omap2/Makefile                |    1 +
+> > >  arch/arm/mach-omap2/board-omap3evm-camera.c |  183
+> > > 
+> > > +++++++++++++++++++++++++++ 2 files changed, 184 insertions(+), 0
+> > > deletions(-)
+> > > 
+> > >  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
+> > > 
+> > > Changes in V2:
+> > >  * ported to current mainline
+> > >  * Style fixes
+> > >  * Fix error handling
+> > > 
+> > > diff --git a/arch/arm/mach-omap2/Makefile
+> > > b/arch/arm/mach-omap2/Makefile index f343365..8ae3d25 100644
+> > > --- a/arch/arm/mach-omap2/Makefile
+> > > +++ b/arch/arm/mach-omap2/Makefile
+> > > +	return 0;
+> > > +
+> > > +err_8:
+> > > +	gpio_free(EVM_TWL_GPIO_BASE + 8);
+> > > +err_2:
+> > > +	gpio_free(EVM_TWL_GPIO_BASE + 2);
+> > > +err_vdsel:
+> > > +	gpio_free(nCAM_VD_SEL);
+> > > +err:
+> > > +	return ret;
+> > > +}
+> > > +
+> > > +device_initcall(camera_init);
+> > 
+> > Please don't use device_initcall(), but call the function directly from
+> > the OMAP3 EVM init handler. Otherwise camera_init() will be called if
+> > OMAP3 EVM support is compiled in the kernel, regardless of the board the
+> > kernel runs on.
+> 
+> Ok, will do.
+> In which header should the prototyp of that function go? Or can i just
+> add a prototyp to board-omap3evm.c directly?
+> I couldn't find anything that looked right, this is rather board specific
+> after all.
 
-I mean, does it mean the driver itself? because I though all you had to do to 
-include a driver into the kernel was put the source codes in the "/drivers" 
-directory in the kernel's directory and modify a bit the makefile so that it is 
-compiled.. is this not right?
+You can either create arch/arm/mach-omap2/board-omap3evm.h or add the 
+prototype to board-omap3evm.c.
 
-Thanks for your time ;)
+-- 
+Regards,
+
+Laurent Pinchart
