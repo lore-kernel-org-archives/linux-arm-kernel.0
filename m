@@ -1,55 +1,31 @@
-From: sbabic@denx.de (Stefano Babic)
-Date: Mon, 19 Sep 2011 18:25:44 +0200
-Subject: [PATCH] ARM: mach-qong: Add watchdog support
-In-Reply-To: <1316440786-21118-1-git-send-email-fabio.estevam@freescale.com>
-References: <1316440786-21118-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <4E776D08.1040201@denx.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Sep 2011 17:32:15 +0100
+Subject: [PATCH 10/11] ARM: pm: convert some assembly to C
+In-Reply-To: <20110907154828.GA21987@e102568-lin.cambridge.arm.com>
+References: <20110901124752.GE29729@n2100.arm.linux.org.uk>
+	<E1Qz6k7-00078l-SM@rmk-PC.arm.linux.org.uk>
+	<20110907154828.GA21987@e102568-lin.cambridge.arm.com>
+Message-ID: <20110919163215.GD16591@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2011 03:59 PM, Fabio Estevam wrote:
-> Add watchdog support for mach-qong target.
+On Wed, Sep 07, 2011 at 04:48:28PM +0100, Lorenzo Pieralisi wrote:
+> > @@ -29,8 +48,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+> >  	 * resume (indicated by a zero return code), we need to switch
+> >  	 * back to the correct page tables.
+> >  	 */
+> > -	ret = __cpu_suspend(virt_to_phys(suspend_pgd),
+> > -			    PHYS_OFFSET - PAGE_OFFSET, arg, fn);
+> > +	ret = __cpu_suspend(arg, fn);
+> >  	if (ret == 0)
+> >  		cpu_switch_mm(mm->pgd, mm);
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/Kconfig     |    1 +
->  arch/arm/mach-imx/mach-qong.c |    1 +
->  2 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 0519dd7..8748531 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -485,6 +485,7 @@ config MACH_QONG
->  	bool "Support Dave/DENX QongEVB-LITE platform"
->  	select SOC_IMX31
->  	select IMX_HAVE_PLATFORM_IMX_UART
-> +	select IMX_HAVE_PLATFORM_IMX2_WDT
->  	help
->  	  Include support for Dave/DENX QongEVB-LITE platform. This includes
->  	  specific configurations for the board and its peripherals.
-> diff --git a/arch/arm/mach-imx/mach-qong.c b/arch/arm/mach-imx/mach-qong.c
-> index 3626f48..44462ce 100644
-> --- a/arch/arm/mach-imx/mach-qong.c
-> +++ b/arch/arm/mach-imx/mach-qong.c
-> @@ -249,6 +249,7 @@ static void __init qong_init(void)
->  	mxc_init_imx_uart();
->  	qong_init_nor_mtd();
->  	qong_init_fpga();
-> +	imx31_add_imx2_wdt(NULL);
->  }
->  
+> It is still early testing, but without a local tlb flush here I am getting
+> random segmentation faults in user space.
+> My fear is that 1:1 global TLB entries cause issues if user space processes 
+> happen to map those pages at addresses overlapping 1:1 mapping set-up for 
+> resume and we do not flush the TLB.
 
-Thanks for fixing !
-
-Tested-by : Stefano Babic <sbabic@denx.de>
-
-Best regards,
-Stefano Babic
-
--- 
-=====================================================================
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
-=====================================================================
+Yes, having the global TLB entry potentially in userspace is a problem.
+I don't think we can get around this any other way than by calling
+local_flush_tlb_all() here.  I'll post an updated series shortly.
