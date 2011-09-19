@@ -1,109 +1,66 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 19 Sep 2011 00:39:25 -0400 (EDT)
-Subject: [PATCH 0/19] removal of mach/vmalloc.h and generic optimizations
-In-Reply-To: <1933895.GJBlYra9yP@wuerfel>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<3319383.WZQsqr8ND4@wuerfel>
-	<alpine.LFD.2.00.1109172238070.20358@xanadu.home>
-	<1933895.GJBlYra9yP@wuerfel>
-Message-ID: <alpine.LFD.2.00.1109190034340.20358@xanadu.home>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 19 Sep 2011 10:52:04 +0530
+Subject: [PATCH] ARM: OMAP: Add support for dmtimer v2 ip (Re: [PATCH
+	v15 06/12] OMAP: dmtimer: switch-over to platform device driver)
+In-Reply-To: <20110917013531.GB2937@atomide.com>
+References: <1315516098-29761-1-git-send-email-tarun.kanti@ti.com>
+	<1315516098-29761-7-git-send-email-tarun.kanti@ti.com>
+	<20110914214533.GA30941@atomide.com>
+	<CAC83ZvJgPYb3JbWT4SKXpQvq-vdKK4b6hd6E-ik5uyRCqgwWsg@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB59302575A050D@dbde02.ent.ti.com>
+	<20110915165810.GA2284@atomide.com> <20110915170548.GB2284@atomide.com>
+	<CAC83ZvKGoucZ=xQSa7GEk7Gg8jcFBQE==1a6m4=+nzDRrsw+jw@mail.gmail.com>
+	<CAC83ZvKXEb7MTujP4JqhrPeysYxQcLF+BV-J9tpYoRwWGVZ8_Q@mail.gmail.com>
+	<20110917013531.GB2937@atomide.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB59302575A0FBC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 18 Sep 2011, Arnd Bergmann wrote:
+Hi Tony,
 
-> On Saturday 17 September 2011 22:46:33 Nicolas Pitre wrote:
-> > On Sat, 17 Sep 2011, Arnd Bergmann wrote:
-> > 
-> > > On Friday 16 September 2011 03:07:11 Nicolas Pitre wrote:
-> > > > This patch series removes all instances of mach/vmalloc.h in order to
-> > > > have a more unified memory map across all ARM architectures.  To do so,
-> > > > the static mappings are moved inside the vmalloc area.  And finally this
-> > > > allows for a generic optimization to ioremap where static mappings are
-> > > > reused whenever possible, using common code instead of having this
-> > > > duplicated in a couple places.
-> > > > 
-> > > > This also provides a net reduction of more than 1200 lines of code.
+On Sat, Sep 17, 2011 at 07:05:31, Tony Lindgren wrote:
 > 
-> > 
-> > > Doing some randconfig tests, I noticed that your series is currently broken
-> > > on shmobile, which triggers a 
-> > > 
-> > > 	BUILD_BUG_ON(VMALLOC_END > CONSISTENT_BASE);
-> > > 
-> > > in mem_init(), because the platform has a CONSISTENT_DMA_SIZE of 158MB.
-> > > All other platforms have a CONSISTENT_DMA_SIZE of at most 14MB, which
-> > > works correctly.
-> > 
-> > Any idea why shmobile requires such an amount of consistent memory?
-> 
-> No, I couldn't find anything in the code or the changelog why this was
-> done. Magnus changed it in this commit:
-> 
-> commit 28f0721a79046056ced3b9bd79c319c5c417ec30
-> Author: Magnus Damm <damm@opensource.se>
-> Date:   Wed Apr 28 08:25:30 2010 +0000
-> 
->     ARM: mach-shmobile: Set CONSISTENT_DMA_SIZE to 158 MB
->     
->     This patch sets CONSISTENT_DMA_SIZE to 158 MB
->     for all SH-Mobile ARM processors.
->     
->     The DMA area is mapped at 0xf6000000 - 0xffdfffff,
->     on top of the 256 MB I/O window at 0xe6000000.
->     
->     Signed-off-by: Magnus Damm <damm@opensource.se>
->     Signed-off-by: Paul Mundt <lethal@linux-sh.org>
-> 
-> Maybe he can give a better explanation and can say whether it's
-> actually required. The patch series introducing it contained
-> the introduction of the shdma dmaengine driver and some changes
-> to video drivers, but I could not tell how they are related
-> to this change.
-> 
-> > > My feeling is that a 158MB CONSISTENT_DMA_SIZE causes other problems
-> > > anyway because we cannot map regular RAM both cached and uncached,
-> > > but this is still a regression. The problem might be solved using
-> > > Marek's CMA patches, which should eliminate the need for a huge
-> > > CONSISTENT_DMA_SIZE.
-> > 
-> > Maybe.  However I don't want for this series to depend on CMA.  I'll 
-> > find some temporary hack in the mean time.
-> 
-> Ok
+> Afzal, care to check if that works for AM335X/TI816X/TI814X?
 
-I queued the patch below for the time being.  Alternatively, I could put 
-the consistent DMA area into the vmalloc area too, but I don't really 
-see the benefit of that.  I would prefer an explanation for the 158 MB 
-instead.
+With following patch over yours, AM335X (the only board with me) boots up fine.
 
------ >8
+Regards
+Afzal
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
-Subject: [PATCH] ARM: move VMALLOC_END down for shmobile
+>From ff64a239e60f9b517860eb2fe9c4f88a188ca51d Mon Sep 17 00:00:00 2001
+From: Afzal Mohammed <afzal@ti.com>
+Date: Mon, 19 Sep 2011 10:06:59 +0530
+Subject: [PATCH] ARM: OMAP: dmtimer register safe access
 
-THIS IS	A TEMPORARY HACK.  The purpose of this is _only_ to avoid a
-regression on an existing machine while a better solution is implemented.
+Access dmtimer registers after setting it's parent
+clock. If default parent is not physically present,
+accessing register causes abort, so access registers
+after proper parent is set.
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/include/asm/pgtable.h |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/timer.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 950dee3ce2..0d4fecf55f 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -35,6 +35,12 @@
- #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
- #define VMALLOC_END		0xff000000UL
- 
-+/* This is a temporary hack until shmobile's DMA area size is sorted out */
-+#ifdef CONFIG_ARCH_SHMOBILE
-+#undef VMALLOC_END
-+#define VMALLOC_END		0xe6000000UL
-+#endif
-+
- /*
-  * Hardware-wise, we have a two level page table structure, where the first
-  * level has 4096 entries, and the second level has 256 entries.  Each entry
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 1746c69..ababc4d 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -172,7 +172,6 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+        }
+
+        omap_hwmod_enable(oh);
+-       __omap_dm_timer_init_regs(timer);
+
+        sys_timer_reserved |= (1 << (gptimer_id - 1));
+
+@@ -190,6 +189,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+                        clk_put(src);
+                }
+        }
++       __omap_dm_timer_init_regs(timer);
+        __omap_dm_timer_reset(timer, 1, 1);
+        timer->posted = 1;
+
+--
+1.6.2.4
