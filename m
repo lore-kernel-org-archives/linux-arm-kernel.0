@@ -1,128 +1,58 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 19 Sep 2011 17:32:21 +0800
-Subject: [PATCH] mmc: sdhci-esdhc-imx: add basic imx6q usdhc support
-Message-ID: <1316424742-18502-1-git-send-email-shawn.guo@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 19 Sep 2011 11:35:16 +0200
+Subject: [PATCH v2 2/6] arm/imx6q: add core definitions and low-level
+	debug uart
+In-Reply-To: <1316097926-913-3-git-send-email-shawn.guo@linaro.org>
+References: <1316097926-913-1-git-send-email-shawn.guo@linaro.org>
+	<1316097926-913-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110919093516.GK31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the basic support for imx6q usdhc, which is a
-derivative of esdhc controller.
+On Thu, Sep 15, 2011 at 10:45:22PM +0800, Shawn Guo wrote:
+> It adds the core definitions and low-level debug uart support
+> for imx6q.
+> 
+>  
+>  #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
+> diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> index 066d464..341f800 100644
+> --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
+> +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> @@ -1,6 +1,6 @@
+>  /*
+>   *  Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
+> - *  Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *  Copyright 2004-2011 Freescale Semiconductor, Inc. All Rights Reserved.
+>   */
+>  
+>  /*
+> @@ -11,6 +11,17 @@
+>  
+>  #include <mach/hardware.h>
+>  
+> +#ifdef CONFIG_ARM_GIC
+> +#include <asm/hardware/entry-macro-gic.S>
+> +
+> +	.macro	disable_fiq
+> +	.endm
+> +
+> +	.macro	arch_ret_to_user, tmp1, tmp2
+> +	.endm
+> +
+> +#else
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/mmc/host/Kconfig           |    6 +++---
- drivers/mmc/host/sdhci-esdhc-imx.c |   36 ++++++++++++++++++++++++++++++++----
- 2 files changed, 35 insertions(+), 7 deletions(-)
+That's the third interrupt entry code handled here with ifdefs. I
+remember there was some infrastructure to have multiple irq
+controllers. I can't find any pointers, but I think Eric (added him
+to Cc) told me about it.
+As this is also the last roadblock to compile i.MX3 and i.MX5 into a
+single kernel this might be the right moment to work on this.
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index c226d54..87d5067 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -130,13 +130,13 @@ config MMC_SDHCI_CNS3XXX
- 	  If unsure, say N.
- 
- config MMC_SDHCI_ESDHC_IMX
--	tristate "SDHCI platform support for the Freescale eSDHC i.MX controller"
-+	tristate "SDHCI support for the Freescale eSDHC/uSDHC i.MX controller"
- 	depends on ARCH_MXC
- 	depends on MMC_SDHCI_PLTFM
- 	select MMC_SDHCI_IO_ACCESSORS
- 	help
--	  This selects the Freescale eSDHC controller support on the platform
--	  bus, found on i.MX25, i.MX35 and i.MX5x.
-+	  This selects the Freescale eSDHC/uSDHC controller support
-+	  found on i.MX25, i.MX35 i.MX5x and i.MX6x.
- 
- 	  If you have a controller with this interface, say Y or M here.
- 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 4557aa1..ae57769 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -32,6 +32,7 @@
- /* VENDOR SPEC register */
- #define SDHCI_VENDOR_SPEC		0xC0
- #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
-+#define SDHCI_MIX_CTRL			0x48
- 
- /*
-  * There is an INT DMA ERR mis-match between eSDHC and STD SDHC SPEC:
-@@ -59,6 +60,7 @@ enum imx_esdhc_type {
- 	IMX35_ESDHC,
- 	IMX51_ESDHC,
- 	IMX53_ESDHC,
-+	IMX6Q_USDHC,
- };
- 
- struct pltfm_imx_data {
-@@ -82,6 +84,9 @@ static struct platform_device_id imx_esdhc_devtype[] = {
- 		.name = "sdhci-esdhc-imx53",
- 		.driver_data = IMX53_ESDHC,
- 	}, {
-+		.name = "sdhci-usdhc-imx6q",
-+		.driver_data = IMX6Q_USDHC,
-+	}, {
- 		/* sentinel */
- 	}
- };
-@@ -92,6 +97,7 @@ static const struct of_device_id imx_esdhc_dt_ids[] = {
- 	{ .compatible = "fsl,imx35-esdhc", .data = &imx_esdhc_devtype[IMX35_ESDHC], },
- 	{ .compatible = "fsl,imx51-esdhc", .data = &imx_esdhc_devtype[IMX51_ESDHC], },
- 	{ .compatible = "fsl,imx53-esdhc", .data = &imx_esdhc_devtype[IMX53_ESDHC], },
-+	{ .compatible = "fsl,imx6q-usdhc", .data = &imx_esdhc_devtype[IMX6Q_USDHC], },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, imx_esdhc_dt_ids);
-@@ -116,6 +122,11 @@ static inline int is_imx53_esdhc(struct pltfm_imx_data *data)
- 	return data->devtype == IMX53_ESDHC;
- }
- 
-+static inline int is_imx6q_usdhc(struct pltfm_imx_data *data)
-+{
-+	return data->devtype == IMX6Q_USDHC;
-+}
-+
- static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, int reg)
- {
- 	void __iomem *base = host->ioaddr + (reg & ~0x3);
-@@ -220,8 +231,16 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 
- static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
- {
--	if (unlikely(reg == SDHCI_HOST_VERSION))
--		reg ^= 2;
-+	if (unlikely(reg == SDHCI_HOST_VERSION)) {
-+		u16 val = readw(host->ioaddr + (reg ^ 2));
-+		/*
-+		 * uSDHC supports SDHCI v3.0, but it's encoded as value
-+		 * 0x3 in host controller version register, which violates
-+		 * SDHCI_SPEC_300 definition.  Work it around here.
-+		 */
-+		if ((val & SDHCI_SPEC_VER_MASK) == 3)
-+			return --val;
-+	}
- 
- 	return readw(host->ioaddr + reg);
- }
-@@ -252,8 +271,17 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 		if ((host->cmd->opcode == MMC_STOP_TRANSMISSION)
- 			&& (imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT))
- 			val |= SDHCI_CMD_ABORTCMD;
--		writel(val << 16 | imx_data->scratchpad,
--			host->ioaddr + SDHCI_TRANSFER_MODE);
-+
-+		if (is_imx6q_usdhc(imx_data)) {
-+			u32 m = readl(host->ioaddr + SDHCI_MIX_CTRL);
-+			m = imx_data->scratchpad | (m & 0xffff0000);
-+			writel(m, host->ioaddr + SDHCI_MIX_CTRL);
-+			writel(val << 16,
-+			       host->ioaddr + SDHCI_TRANSFER_MODE);
-+		} else {
-+			writel(val << 16 | imx_data->scratchpad,
-+			       host->ioaddr + SDHCI_TRANSFER_MODE);
-+		}
- 		return;
- 	case SDHCI_BLOCK_SIZE:
- 		val &= ~SDHCI_MAKE_BLKSZ(0x7, 0);
+Sascha
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
