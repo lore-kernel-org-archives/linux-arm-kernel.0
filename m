@@ -1,7 +1,9 @@
 From: boyko.lee@samsung.com (Jongpill Lee)
-Date: Mon, 19 Sep 2011 10:23:28 +0900
-Subject: [PATCH 1/3] ARM: EXYNOS4: Modify PMU register setting function
-Message-ID: <1316395410-12023-1-git-send-email-boyko.lee@samsung.com>
+Date: Mon, 19 Sep 2011 10:25:40 +0900
+Subject: [PATCH V2 1/3] ARM: EXYNOS4: Modify PMU register setting function
+In-Reply-To: <1316395542-27578-1-git-send-email-boyko.lee@samsung.com>
+References: <1316395542-27578-1-git-send-email-boyko.lee@samsung.com>
+Message-ID: <1316395542-27578-2-git-send-email-boyko.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
