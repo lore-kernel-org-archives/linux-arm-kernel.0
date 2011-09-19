@@ -1,232 +1,128 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Sep 2011 10:28:30 +0100
-Subject: [RFC PATCH 1/3] genirq: add support for per-cpu dev_id interrupts
-In-Reply-To: <4E767CD6.6090208@codeaurora.org>
-References: <1316105551-17505-1-git-send-email-marc.zyngier@arm.com>
-	<1316105551-17505-2-git-send-email-marc.zyngier@arm.com>
-	<4E767CD6.6090208@codeaurora.org>
-Message-ID: <4E770B3E.9040401@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 19 Sep 2011 17:32:21 +0800
+Subject: [PATCH] mmc: sdhci-esdhc-imx: add basic imx6q usdhc support
+Message-ID: <1316424742-18502-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/11 00:20, Abhijeet Dharmapurikar wrote:
-> On 09/15/2011 09:52 AM, Marc Zyngier wrote:
->  > The ARM GIC interrupt controller offers per CPU interrupts (PPIs),
->  > which are usually used to connect local timers to each core.
->  > Each CPU has its own private interface to the GIC,
->  > and only sees the PPIs that are directly connect to it.
->  >
->  > While these timers are separate devices and have a separate
->  > interrupt line to a core, they all use the same IRQ number.
->  >
->  > For these devices, request_irq() is not the right API as it
->  > assumes that an IRQ number is visible by a number of CPUs
->  > (through the affinity setting), but makes it very awkward to
->  > express that an IRQ number can be handled by all CPUs, and
->  > yet be a different interrupt line on each CPU, requiring a
->  > different dev_id cookie to be passed back to the handler.
->  >
->  > The *_percpu_irq() functions is designed to overcome these
->  > limitations, by providing a per-cpu dev_id vector:
->  >
->  > int request_percpu_irq(unsigned int irq, irq_handler_t handler,
->  >                 const char *devname, void __percpu *percpu_dev_id);
->  > void free_percpu_irq(unsigned int, void __percpu *);
->  > int setup_percpu_irq(unsigned int irq, struct irqaction *new);
->  > void remove_percpu_irq(unsigned int irq, struct irqaction *act);
->  > void enable_percpu_irq(unsigned int irq);
->  > void disable_percpu_irq(unsigned int irq);
->  >
->  > The API has a number of limitations:
->  > - no interrupt sharing
->  > - no threading
->  > - common handler across all the CPUs
->  >
->  > Once the interrupt is requested using setup_percpu_irq() or
->  > request_percpu_irq(), it must be enabled by each core that wishes
->  > its local interrupt to be delivered.
->  >
->  > Based on an initial patch by Thomas Gleixner.
->  >
->  > Cc: Thomas Gleixner<tglx@linutronix.de>
->  > Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
->  > ---
->  >   include/linux/interrupt.h |   40 ++++++---
->  >   include/linux/irq.h       |   25 +++++-
->  >   include/linux/irqdesc.h   |    3 +
->  >   kernel/irq/Kconfig        |    4 +
->  >   kernel/irq/chip.c         |   58 +++++++++++++
->  >   kernel/irq/internals.h    |    2 +
->  >   kernel/irq/manage.c       |  209
-> ++++++++++++++++++++++++++++++++++++++++++++-
->  >   kernel/irq/settings.h     |    7 ++
->  >   8 files changed, 332 insertions(+), 16 deletions(-)
->  >
->  > diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
->  > index a103732..f9b7fa3 100644
->  > --- a/include/linux/interrupt.h
->  > +++ b/include/linux/interrupt.h
->  > @@ -95,6 +95,7 @@ typedef irqreturn_t (*irq_handler_t)(int, void *);
->  >    * @flags: flags (see IRQF_* above)
->  >    * @name:  name of the device
->  >    * @dev_id:        cookie to identify the device
->  > + * @percpu_dev_id:  cookie to identify the device
->  >    * @next:  pointer to the next irqaction for shared interrupts
->  >    * @irq:   interrupt number
->  >    * @dir:   pointer to the proc/irq/NN/name entry
->  > @@ -104,17 +105,20 @@ typedef irqreturn_t (*irq_handler_t)(int, void *);
->  >    * @thread_mask:   bitmask for keeping track of @thread activity
->  >    */
->  >   struct irqaction {
->  > -    irq_handler_t handler;
->  > -    unsigned long flags;
->  > -    void *dev_id;
->  > -    struct irqaction *next;
->  > -    int irq;
->  > -    irq_handler_t thread_fn;
->  > -    struct task_struct *thread;
->  > -    unsigned long thread_flags;
->  > -    unsigned long thread_mask;
->  > -    const char *name;
->  > -    struct proc_dir_entry *dir;
->  > +    irq_handler_t           handler;
->  > +    unsigned long           flags;
->  > +    void                    *dev_id;
->  > +#ifdef CONFIG_IRQ_PERCPU_DEVID
->  > +    void __percpu           *percpu_dev_id;
->  > +#endif
->  > +    struct irqaction        *next;
->  > +    int                     irq;
->  > +    irq_handler_t           thread_fn;
->  > +    struct task_struct      *thread;
->  > +    unsigned long           thread_flags;
->  > +    unsigned long           thread_mask;
->  > +    const char              *name;
->  > +    struct proc_dir_entry   *dir;
->  >   } ____cacheline_internodealigned_in_smp;
->  >
->  >   extern irqreturn_t no_action(int cpl, void *dev_id);
->  > @@ -136,6 +140,10 @@ extern int __must_check
->  >   request_any_context_irq(unsigned int irq, irq_handler_t handler,
->  >                      unsigned long flags, const char *name, void *dev_id);
->  >
->  > +extern int __must_check
->  > +request_percpu_irq(unsigned int irq, irq_handler_t handler,
->  > +               const char *devname, void __percpu *percpu_dev_id);
->  > +
->  >   extern void exit_irq_thread(void);
->  >   #else
->  >
->  > @@ -164,10 +172,18 @@ request_any_context_irq(unsigned int irq,
-> irq_handler_t handler,
->  >      return request_irq(irq, handler, flags, name, dev_id);
->  >   }
->  >
->  > +static inline int __must_check
->  > +request_percpu_irq(unsigned int irq, irq_handler_t handler,
->  > +               const char *devname, void __percpu *percpu_dev_id)
->  > +{
->  > +    return request_irq(irq, handler, 0, name, dev_id);
-> 
-> you probably meant devname here instead of name and also percpu_dev_id
-> instead of dev_id.
+This patch adds the basic support for imx6q usdhc, which is a
+derivative of esdhc controller.
 
-Doh. Indeed, thanks for noticing this.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/mmc/host/Kconfig           |    6 +++---
+ drivers/mmc/host/sdhci-esdhc-imx.c |   36 ++++++++++++++++++++++++++++++++----
+ 2 files changed, 35 insertions(+), 7 deletions(-)
 
->  > +/*
->  > + * Internal function to unregister a percpu irqaction.
->  > + */
->  > +static struct irqaction *__free_percpu_irq(unsigned int irq, void
-> __percpu *dev_id)
->  > +{
->  > +    struct irq_desc *desc = irq_to_desc(irq);
->  > +    struct irqaction *action;
->  > +    unsigned long flags;
->  > +
->  > +    WARN(in_interrupt(), "Trying to free IRQ %d from IRQ context!\n", irq);
->  > +
->  > +    if (!desc)
->  > +            return NULL;
->  > +
->  > +    raw_spin_lock_irqsave(&desc->lock, flags);
->  > +
->  > +    action = desc->action;
->  > +    if (!action || action->percpu_dev_id != dev_id) {
->  > +            WARN(1, "Trying to free already-free IRQ %d\n", irq);
->  > +            raw_spin_unlock_irqrestore(&desc->lock, flags);
->  > +            return NULL;
->  > +    }
->  > +
->  > +    /* Found it - now remove it from the list of entries: */
->  > +    WARN(!cpumask_empty(desc->percpu_enabled),
->  > +         "percpu IRQ %d still enabled on CPU%d!\n",
->  > +         irq, cpumask_first(desc->percpu_enabled));
->  > +    desc->action = NULL;
->  > +
->  > +#ifdef CONFIG_SMP
->  > +    /* make sure affinity_hint is cleaned up */
->  > +    if (WARN_ON_ONCE(desc->affinity_hint))
->  > +            desc->affinity_hint = NULL;
->  > +#endif
->  > +
->  > +    raw_spin_unlock_irqrestore(&desc->lock, flags);
->  > +
->  > +    unregister_handler_proc(irq, action);
->  > +
->  > +    /* Make sure it's not being used on another CPU: */
->  > +    synchronize_irq(irq);
->  > +
->  > +    module_put(desc->owner);
-> 
-> Not sure why is this required. Where is the corresponding try_module_get()?
-
-A few lines into __setup_irq().
-
->  > +/**
->  > + *  request_percpu_irq - allocate a percpu interrupt line
->  > + *  @irq: Interrupt line to allocate
->  > + *  @handler: Function to be called when the IRQ occurs.
->  > + *            Primary handler for threaded interrupts
->  > + *            If NULL and thread_fn != NULL the default
->  > + *            primary handler is installed
-> 
-> The patch doesnt support threaded percpu interrupts - please set the
-> comment accordingly?
-
-Yup, will fix.
-
->  > + *  @devname: An ascii name for the claiming device
->  > + *  @dev_id: A percpu cookie passed back to the handler function
->  > + *
->  > + *  This call allocates interrupt resources, but doesn't
->  > + *  automatically enable the interrupt. It has to be done on each
->  > + *  CPU using enable_percpu_irq().
->  > + *
->  > + *  Dev_id must be globally unique. It is a per-cpu variable, and
->  > + *  the handler gets called with the interrupted CPU's instance of
->  > + *  that variable.
->  > + */
->  > +int request_percpu_irq(unsigned int irq, irq_handler_t handler,
->  > +                   const char *devname, void __percpu *dev_id)
-> 
-> Can we add irqflags argument. I think it will be useful to pass flags,
-> at least the IRQF_TRIGGER_MASK since it ends up calling __setup_irq().
-> The chip could use a set_type callback for ppi's too.
-
-We're entering dangerous territory here. While this would work with the
-GIC (the interrupt type is at the distributor level), you could easily
-imagine an interrupt controller with the PPI configuration at the CPU
-interface level... In that case, calling set_type from __setup_irq()
-would end up doing the wrong thing, and I'd hate the API to give the
-idea it can do things it may not do in the end...
-
-Furthermore, do we actually have a GIC implementation where PPI
-configuration isn't read-only? I only know about the ARM implementation,
-and the Qualcomm may well be different (the spec says it's
-implementation defined).
-
-Cheers,
-
-	M.
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index c226d54..87d5067 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -130,13 +130,13 @@ config MMC_SDHCI_CNS3XXX
+ 	  If unsure, say N.
+ 
+ config MMC_SDHCI_ESDHC_IMX
+-	tristate "SDHCI platform support for the Freescale eSDHC i.MX controller"
++	tristate "SDHCI support for the Freescale eSDHC/uSDHC i.MX controller"
+ 	depends on ARCH_MXC
+ 	depends on MMC_SDHCI_PLTFM
+ 	select MMC_SDHCI_IO_ACCESSORS
+ 	help
+-	  This selects the Freescale eSDHC controller support on the platform
+-	  bus, found on i.MX25, i.MX35 and i.MX5x.
++	  This selects the Freescale eSDHC/uSDHC controller support
++	  found on i.MX25, i.MX35 i.MX5x and i.MX6x.
+ 
+ 	  If you have a controller with this interface, say Y or M here.
+ 
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 4557aa1..ae57769 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -32,6 +32,7 @@
+ /* VENDOR SPEC register */
+ #define SDHCI_VENDOR_SPEC		0xC0
+ #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
++#define SDHCI_MIX_CTRL			0x48
+ 
+ /*
+  * There is an INT DMA ERR mis-match between eSDHC and STD SDHC SPEC:
+@@ -59,6 +60,7 @@ enum imx_esdhc_type {
+ 	IMX35_ESDHC,
+ 	IMX51_ESDHC,
+ 	IMX53_ESDHC,
++	IMX6Q_USDHC,
+ };
+ 
+ struct pltfm_imx_data {
+@@ -82,6 +84,9 @@ static struct platform_device_id imx_esdhc_devtype[] = {
+ 		.name = "sdhci-esdhc-imx53",
+ 		.driver_data = IMX53_ESDHC,
+ 	}, {
++		.name = "sdhci-usdhc-imx6q",
++		.driver_data = IMX6Q_USDHC,
++	}, {
+ 		/* sentinel */
+ 	}
+ };
+@@ -92,6 +97,7 @@ static const struct of_device_id imx_esdhc_dt_ids[] = {
+ 	{ .compatible = "fsl,imx35-esdhc", .data = &imx_esdhc_devtype[IMX35_ESDHC], },
+ 	{ .compatible = "fsl,imx51-esdhc", .data = &imx_esdhc_devtype[IMX51_ESDHC], },
+ 	{ .compatible = "fsl,imx53-esdhc", .data = &imx_esdhc_devtype[IMX53_ESDHC], },
++	{ .compatible = "fsl,imx6q-usdhc", .data = &imx_esdhc_devtype[IMX6Q_USDHC], },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, imx_esdhc_dt_ids);
+@@ -116,6 +122,11 @@ static inline int is_imx53_esdhc(struct pltfm_imx_data *data)
+ 	return data->devtype == IMX53_ESDHC;
+ }
+ 
++static inline int is_imx6q_usdhc(struct pltfm_imx_data *data)
++{
++	return data->devtype == IMX6Q_USDHC;
++}
++
+ static inline void esdhc_clrset_le(struct sdhci_host *host, u32 mask, u32 val, int reg)
+ {
+ 	void __iomem *base = host->ioaddr + (reg & ~0x3);
+@@ -220,8 +231,16 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 
+ static u16 esdhc_readw_le(struct sdhci_host *host, int reg)
+ {
+-	if (unlikely(reg == SDHCI_HOST_VERSION))
+-		reg ^= 2;
++	if (unlikely(reg == SDHCI_HOST_VERSION)) {
++		u16 val = readw(host->ioaddr + (reg ^ 2));
++		/*
++		 * uSDHC supports SDHCI v3.0, but it's encoded as value
++		 * 0x3 in host controller version register, which violates
++		 * SDHCI_SPEC_300 definition.  Work it around here.
++		 */
++		if ((val & SDHCI_SPEC_VER_MASK) == 3)
++			return --val;
++	}
+ 
+ 	return readw(host->ioaddr + reg);
+ }
+@@ -252,8 +271,17 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
+ 		if ((host->cmd->opcode == MMC_STOP_TRANSMISSION)
+ 			&& (imx_data->flags & ESDHC_FLAG_MULTIBLK_NO_INT))
+ 			val |= SDHCI_CMD_ABORTCMD;
+-		writel(val << 16 | imx_data->scratchpad,
+-			host->ioaddr + SDHCI_TRANSFER_MODE);
++
++		if (is_imx6q_usdhc(imx_data)) {
++			u32 m = readl(host->ioaddr + SDHCI_MIX_CTRL);
++			m = imx_data->scratchpad | (m & 0xffff0000);
++			writel(m, host->ioaddr + SDHCI_MIX_CTRL);
++			writel(val << 16,
++			       host->ioaddr + SDHCI_TRANSFER_MODE);
++		} else {
++			writel(val << 16 | imx_data->scratchpad,
++			       host->ioaddr + SDHCI_TRANSFER_MODE);
++		}
+ 		return;
+ 	case SDHCI_BLOCK_SIZE:
+ 		val &= ~SDHCI_MAKE_BLKSZ(0x7, 0);
 -- 
-Jazz is not dead. It just smells funny...
+1.7.4.1
