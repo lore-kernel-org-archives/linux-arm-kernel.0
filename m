@@ -1,65 +1,80 @@
-From: martin@neutronstar.dyndns.org (martin at neutronstar.dyndns.org)
-Date: Mon, 19 Sep 2011 08:10:19 +0200
-Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based
-	camera board.
-In-Reply-To: <201109182358.55816.laurent.pinchart@ideasonboard.com>
-References: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
-	<201109182358.55816.laurent.pinchart@ideasonboard.com>
-Message-ID: <20110919061019.GD9244@neutronstar.dyndns.org>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 19 Sep 2011 11:58:56 +0530
+Subject: [PATCH v4 0/6] Add device tree support for PL330 dma controller driver
+Message-ID: <1316413742-23535-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 18, 2011 at 11:58:55PM +0200, Laurent Pinchart wrote:
-> Hi Martin,
-> 
-> On Saturday 17 September 2011 11:34:57 Martin Hostettler wrote:
-> > Adds board support for an MT9M032 based camera to omap3evm.
-> > 
-> > Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
-> > ---
-> >  arch/arm/mach-omap2/Makefile                |    1 +
-> >  arch/arm/mach-omap2/board-omap3evm-camera.c |  183
-> > +++++++++++++++++++++++++++ 2 files changed, 184 insertions(+), 0
-> > deletions(-)
-> >  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
-> > 
-> > Changes in V2:
-> >  * ported to current mainline
-> >  * Style fixes
-> >  * Fix error handling
-> > 
-> > diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> > index f343365..8ae3d25 100644
-> > --- a/arch/arm/mach-omap2/Makefile
-> > +++ b/arch/arm/mach-omap2/Makefile
-> > +	return 0;
-> > +
-> > +err_8:
-> > +	gpio_free(EVM_TWL_GPIO_BASE + 8);
-> > +err_2:
-> > +	gpio_free(EVM_TWL_GPIO_BASE + 2);
-> > +err_vdsel:
-> > +	gpio_free(nCAM_VD_SEL);
-> > +err:
-> > +	return ret;
-> > +}
-> > +
-> > +device_initcall(camera_init);
-> 
-> Please don't use device_initcall(), but call the function directly from the 
-> OMAP3 EVM init handler. Otherwise camera_init() will be called if OMAP3 EVM 
-> support is compiled in the kernel, regardless of the board the kernel runs on.
+Changes since v3:
+- In Patch 4/6, a recommendation is added in the pl330 binding documentation
+  for the name of the property which specifies the dma channel in the client
+  device node.
+- In Patch 6/6, dropped #ifdef around of_have_populated_dt.
 
-Ok, will do.
-In which header should the prototyp of that function go? Or can i just 
-add a prototyp to board-omap3evm.c directly?
-I couldn't find anything that looked right, this is rather board specific
-after all. 
+Changes since v2:
+- Only the sixth patch is changed, to make dma platform data conditionally
+  selectable.
+- Tested with v8 version of pl330 dma driver update patches from Boojin Kim.
 
- - Martin Hostettler
+Changes since v1:
+- Removed "arm,pl330-pdma" and "arm,pl330-mdma" compatible values.
+- Removed "arm,primecell-periphid" and "arm,pl330-peri-reqs"
+  property requirements.
 
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
+This patchset adds device tree support for PL330 driver and uses it
+to add device tree support for Samsung platforms, specifically Exynos4.
+
+First patch moves the pl330_filter function from Samsung specific wrappers
+to pl330 dma driver and also adds a check to ensure that the filter function
+proceeds only if it the dma channel being investigated belongs to pl330
+dma controller instance.
+
+Second patch adds support to infer the direction of the dma transfer
+using the direction specified with the transfer request instead of
+including this information in the platform data. This simlifies the
+addition of device tree support. Third patch simplifies the platform
+data for Exynos4 pl330 dma controllers. Similar patches simplifying
+the platform data for other Samsung platforms is under development.
+
+Fourth patch adds device tree support for pl330 dma controller driver.
+A dma channel is represented using a phandle of the dma controller
+node and the channel id within that controller. Client driver request
+a dma channel using the phandle and channel id pair. Correspondingly,
+the pl330 filter function has been modified to lookup a channel based
+on this value.
+
+Fifth patch adds device tree support for Samsung's DMA engine wrappers.
+Client drivers retrive the channel property from their device node and
+pass it to the wrappers. The wrapper functions use the property value
+as the filter function parameter. Sixth patch restricts the usage of
+pl330 device and platform data instances to non-dt platforms.
+
+This patchset is based on Linux 3.1-rc6 with the following patch sets.
+
+* To use DMA generic APIs for Samsung DMA - v8 - (16 patches)
+* ARM: Samsung: use dma-pl330 device name for clock (3 patches)
+* ARM: S5P64X0: Add the devname for DMA clock.
+* ARM: SAMSUNG: register the second instance of PL330 DMAC (3 patches)
+
+This patchset has been tested for both device-tree and non-device-tree
+based linux 3.1-rc6 kernel.
+
+Thomas Abraham (6):
+  DMA: PL330: move filter function into driver
+  DMA: PL330: Infer transfer direction from transfer request instead of platform data
+  ARM: EXYNOS4: Modify platform data for pl330 driver
+  DMA: PL330: Add device tree support
+  ARM: SAMSUNG: Add device tree support for pl330 dma engine wrappers
+  ARM: EXYNOS4: Limit usage of pl330 device instance to non-dt build
+
+ .../devicetree/bindings/dma/arm-pl330.txt          |   30 +++
+ arch/arm/mach-exynos4/Kconfig                      |   10 +
+ arch/arm/mach-exynos4/Makefile                     |    3 +-
+ arch/arm/mach-exynos4/dma.c                        |  227 ++++++--------------
+ arch/arm/plat-samsung/dma-ops.c                    |   15 +-
+ arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 +
+ arch/arm/plat-samsung/include/plat/dma-pl330.h     |    3 +-
+ drivers/dma/pl330.c                                |   99 +++++----
+ include/linux/amba/pl330.h                         |   15 +-
+ 9 files changed, 177 insertions(+), 226 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
