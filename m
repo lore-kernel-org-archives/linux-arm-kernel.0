@@ -1,33 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Sep 2011 10:43:53 -0700
-Subject: [PATCH] ARM: OMAP: Add support for dmtimer v2 ip (Re: [PATCH
-	v15 06/12] OMAP: dmtimer: switch-over to platform device driver)
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302575A0FBC@dbde02.ent.ti.com>
-References: <1315516098-29761-7-git-send-email-tarun.kanti@ti.com>
-	<20110914214533.GA30941@atomide.com>
-	<CAC83ZvJgPYb3JbWT4SKXpQvq-vdKK4b6hd6E-ik5uyRCqgwWsg@mail.gmail.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302575A050D@dbde02.ent.ti.com>
-	<20110915165810.GA2284@atomide.com>
-	<20110915170548.GB2284@atomide.com>
-	<CAC83ZvKGoucZ=xQSa7GEk7Gg8jcFBQE==1a6m4=+nzDRrsw+jw@mail.gmail.com>
-	<CAC83ZvKXEb7MTujP4JqhrPeysYxQcLF+BV-J9tpYoRwWGVZ8_Q@mail.gmail.com>
-	<20110917013531.GB2937@atomide.com>
-	<B85A65D85D7EB246BE421B3FB0FBB59302575A0FBC@dbde02.ent.ti.com>
-Message-ID: <20110919174353.GG2937@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 19 Sep 2011 11:44:38 -0600
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <20110919133301.GR16381@n2100.arm.linux.org.uk>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+	<4E71CE5D.9030900@ti.com> <4E71F978.6020402@gmail.com>
+	<4E72030F.1090300@ti.com>
+	<4E722B2D.4050307@gmail.com> <4E770FA6.2070305@ti.com>
+	<20110919133301.GR16381@n2100.arm.linux.org.uk>
+Message-ID: <CACxGe6soJQu5Cvc+ZANVS=WXwACzG69GPGF9fAuVLDB-sUurUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [110918 21:48]:
-> Hi Tony,
-> 
-> On Sat, Sep 17, 2011 at 07:05:31, Tony Lindgren wrote:
-> > 
-> > Afzal, care to check if that works for AM335X/TI816X/TI814X?
-> 
-> With following patch over yours, AM335X (the only board with me) boots up fine.
+On Mon, Sep 19, 2011 at 7:33 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Sep 19, 2011 at 11:47:18AM +0200, Cousson, Benoit wrote:
+>> Since the cpumask is not relevant for the SPI, maybe having two
+>> interrupt controllers will be more relevant. Or maybe 3, since there is
+>> some SGIs as well.
+>
+> I don't think anyone uses SGIs outside of the common SMP code.
+> Therefore they're handled entirely separately for the root GIC.
+>
+> (If there's two GICs - some platforms do have two - then the SGIs on
+> the non-root GIC are unused.)
 
-Thanks for catching that, will fold it in with your Signed-off-by.
+...and since SGIs aren't external HW inputs to the GIC, there really
+isn't any need to reflect them in the GIC DT binding.
 
-Regards,
-
-Tony
+g.
