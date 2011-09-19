@@ -1,72 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Sep 2011 17:40:04 +0100
-Subject: [PATCH 5/7] ARM: pm: get rid of cpu_resume_turn_mmu_on
-In-Reply-To: <20110919163741.GE16591@n2100.arm.linux.org.uk>
-References: <20110919163741.GE16591@n2100.arm.linux.org.uk>
-Message-ID: <E1R5gt2-00053J-B6@rmk-PC.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 19 Sep 2011 10:54:04 -0700
+Subject: [PATCH] msm: platsmp: Mark ioremapped memory as __iomem
+Message-ID: <1316454844-32733-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't require cpu_resume_turn_mmu_on as we can combine the ldr
-instruction with the following code provided we ensure that
-cpu_resume_mmu is aligned for older CPUs.  Note that we also align
-to a 32-byte boundary to ensure that the code can't cross a section
-boundary.
+Fixes a handful of sparse warnings.
 
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/kernel/sleep.S   |    8 ++------
- arch/arm/kernel/suspend.c |    4 ++--
- 2 files changed, 4 insertions(+), 8 deletions(-)
+ arch/arm/mach-msm/platsmp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index 25d42df..c9a43ca 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -72,19 +72,15 @@ ENDPROC(cpu_suspend_abort)
- /*
-  * r0 = control register value
-  */
-+	.align	5
- ENTRY(cpu_resume_mmu)
- 	ldr	r3, =cpu_resume_after_mmu
--	b	cpu_resume_turn_mmu_on
--ENDPROC(cpu_resume_mmu)
--	.ltorg
--	.align	5
--ENTRY(cpu_resume_turn_mmu_on)
- 	mcr	p15, 0, r0, c1, c0, 0	@ turn on MMU, I-cache, etc
- 	mrc	p15, 0, r0, c0, c0, 0	@ read id reg
- 	mov	r0, r0
- 	mov	r0, r0
- 	mov	pc, r3			@ jump to virtual address
--ENDPROC(cpu_resume_turn_mmu_on)
-+ENDPROC(cpu_resume_mmu)
- cpu_resume_after_mmu:
- 	bl	cpu_init		@ restore the und/abt/irq banked regs
- 	mov	r0, #0			@ return zero on success
-diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-index 2beda56..ed4160b 100644
---- a/arch/arm/kernel/suspend.c
-+++ b/arch/arm/kernel/suspend.c
-@@ -9,7 +9,7 @@
- static pgd_t *suspend_pgd;
- 
- extern int __cpu_suspend(int, long, unsigned long, int (*)(unsigned long));
--extern void cpu_resume_turn_mmu_on(void);
-+extern void cpu_resume_mmu(void);
- 
- /*
-  * Hide the first two arguments to __cpu_suspend - these are an implementation
-@@ -43,7 +43,7 @@ static int __init cpu_suspend_init(void)
- {
- 	suspend_pgd = pgd_alloc(&init_mm);
- 	if (suspend_pgd) {
--		unsigned long addr = virt_to_phys(cpu_resume_turn_mmu_on);
-+		unsigned long addr = virt_to_phys(cpu_resume_mmu);
- 		identity_mapping_add(suspend_pgd, addr, addr + SECTION_SIZE);
- 	}
- 	return suspend_pgd ? 0 : -ENOMEM;
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 1a1af9e..365ef3f 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -79,7 +79,7 @@ static __cpuinit void prepare_cold_cpu(unsigned int cpu)
+ 	ret = scm_set_boot_addr(virt_to_phys(msm_secondary_startup),
+ 				SCM_FLAG_COLDBOOT_CPU1);
+ 	if (ret == 0) {
+-		void *sc1_base_ptr;
++		void __iomem *sc1_base_ptr;
+ 		sc1_base_ptr = ioremap_nocache(0x00902000, SZ_4K*2);
+ 		if (sc1_base_ptr) {
+ 			writel(0, sc1_base_ptr + VDD_SC1_ARRAY_CLAMP_GFS_CTL);
 -- 
-1.7.4.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
