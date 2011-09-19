@@ -1,23 +1,74 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 19 Sep 2011 15:35:47 +0200
-Subject: [PATCH 06/19] ARM: mach-at91: remove arch specific special
-	handling for ioremap
-In-Reply-To: <1316156850-31013-7-git-send-email-nico@fluxnic.net>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<1316156850-31013-7-git-send-email-nico@fluxnic.net>
-Message-ID: <20110919130703.GG16141@game.jcrosoft.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 19 Sep 2011 22:21:13 +0800
+Subject: [PATCH v2 2/6] arm/imx6q: add core definitions and low-level
+	debug uart
+In-Reply-To: <20110919095544.GL31404@pengutronix.de>
+References: <1316097926-913-1-git-send-email-shawn.guo@linaro.org>
+	<1316097926-913-3-git-send-email-shawn.guo@linaro.org>
+	<20110919093516.GK31404@pengutronix.de>
+	<CAMPhdO-MWPo8xAF12O2cehfT8a4zmpY0zCVZBQGUsS42-LzQrw@mail.gmail.com>
+	<20110919095544.GL31404@pengutronix.de>
+Message-ID: <20110919142112.GB28084@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03:07 Fri 16 Sep     , Nicolas Pitre wrote:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> A generic version should replace this later.
-> 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Untill the replace will availlable
+On Mon, Sep 19, 2011 at 11:55:44AM +0200, Sascha Hauer wrote:
+> On Mon, Sep 19, 2011 at 05:45:59PM +0800, Eric Miao wrote:
+> > On Mon, Sep 19, 2011 at 5:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > > On Thu, Sep 15, 2011 at 10:45:22PM +0800, Shawn Guo wrote:
+> > >> It adds the core definitions and low-level debug uart support
+> > >> for imx6q.
+> > >>
+> > >>
+> > >> ?#define UART_VADDR ? IMX_IO_ADDRESS(UART_PADDR)
+> > >> diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> > >> index 066d464..341f800 100644
+> > >> --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
+> > >> +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
+> > >> @@ -1,6 +1,6 @@
+> > >> ?/*
+> > >> ? * ?Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
+> > >> - * ?Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
+> > >> + * ?Copyright 2004-2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> > >> ? */
+> > >>
+> > >> ?/*
+> > >> @@ -11,6 +11,17 @@
+> > >>
+> > >> ?#include <mach/hardware.h>
+> > >>
+> > >> +#ifdef CONFIG_ARM_GIC
+> > >> +#include <asm/hardware/entry-macro-gic.S>
+> > >> +
+> > >> + ? ? .macro ?disable_fiq
+> > >> + ? ? .endm
+> > >> +
+> > >> + ? ? .macro ?arch_ret_to_user, tmp1, tmp2
+> > >> + ? ? .endm
+> > >> +
+> > >> +#else
+> > >
+> > > That's the third interrupt entry code handled here with ifdefs. I
+> > > remember there was some infrastructure to have multiple irq
+> > > controllers. I can't find any pointers, but I think Eric (added him
+> > > to Cc) told me about it.
+> > > As this is also the last roadblock to compile i.MX3 and i.MX5 into a
+> > > single kernel this might be the right moment to work on this.
+> > 
 
-do not remove it
+It seems to be a work that basically need to touch very imx platforms.
+I would like to work on it, but I do not think it belongs to this
+series.
 
-Best Regards,
-J.
+Regards,
+Shawn
+
+> > It's CONFIG_MULTIPLE_IRQ_HANDLER. And check arch/arm/mach-pxa/irq.c
+> > for example. Basically to use a C function to handle the interrupts, and
+> > have each machine to specify the correct handler.
+> > 
+> > E.g. in pxa - there are pxa25x_handle_irq, pxa3xx_handle_irq ...
+> 
+> Nice, it's already merged. I should have used grep instead of google.
+> For reference, it's CONFIG_MULTI_IRQ_HANDLER.
+> 
