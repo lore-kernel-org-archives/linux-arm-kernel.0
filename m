@@ -1,53 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 19 Sep 2011 13:08:13 -0700
-Subject: [PATCH] arm/dt: Add SoC detection macros
-In-Reply-To: <3C7A7ACA8617D24290826EC008B5CD083E17B00988@HQMAIL03.nvidia.com>
-References: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
-	<20110917102811.GC16381@n2100.arm.linux.org.uk>
-	<20110917103457.GP28104@game.jcrosoft.org>
-	<20110917112321.GE16381@n2100.arm.linux.org.uk>
-	<3C7A7ACA8617D24290826EC008B5CD083E17B00988@HQMAIL03.nvidia.com>
-Message-ID: <CAOesGMjkYecYH=+YawN=v10C+Ciu-6HuWgei-d3_8ByYLSZ9rg@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 19 Sep 2011 14:49:48 -0600
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <4E76615C.3000005@gmail.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+	<4E71CE5D.9030900@ti.com> <4E71F978.6020402@gmail.com>
+	<4E72030F.1090300@ti.com> <4E722B2D.4050307@gmail.com>
+	<4E76615C.3000005@gmail.com>
+Message-ID: <20110919204948.GB30517@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2011 at 10:26 AM, Allen Martin <AMartin@nvidia.com> wrote:
->> What I'm saying is that in that scenario it should not be necessary to edit the
->> kernel to invent new SoC types, and then teach it that Tegra4 is mostly the
->> same as Tegra3. ?That information should all be encoded into the DT rather
->> than the C code in the kernel.
->>
->> So, I think adding this SoC type stuff is the wrong approach to the problem.
->
-> What ends up happening in practice for a lot of hw blocks inside the SoC, is that tegra4 is mostly the same as tegra3 with a few new registers and bug fixes that slightly change the programming model. ?So either we have to add device quirks to teach device tree about the differences, and pass those in as flags to the driver, or we can do SoC detection at runtime in the driver. ?It sounds like the consensus from you and Olof is that the first is preferable.
+On Sun, Sep 18, 2011 at 04:23:40PM -0500, Rob Herring wrote:
+> On 09/15/2011 11:43 AM, Rob Herring wrote:
+> > I see 2 options (besides leaving it as is):
+> > 
+> > - Revert back to my previous binding where PPIs are a sub-node and a
+> > different interrupt parent.
+> > 
+> > - Use the current binding, but allow SPIs to start at 0. We can still
+> > distinguish PPIs and SPIs by the cpu mask cell. A cpu mask of 0 is a
+> > SPI. If there was ever a reason to have a cpu mask for an SPI, you would
+> > not be able to with this scheme.
+> > 
+> > Either way you will still have the above issue with the cell size changing.
+> > 
+> 
+> I was headed down the path of implementing the 2nd option above, but had
+> a dilemma. What would be the numbering base for PPIs in this case?
+> Should it be 0 in the DT as proposed for SPIs or does it stay at 16?
+> Numbering PPIs at 0 will just cause confusion as will numbering
+> differently from SPIs. There is absolutely no mention of SPI0 or SPIx
+> numbering in the GIC spec. All interrupt number references refer to the
+> absolute interrupt ID, not a relative number based on the type.
 
-Well, my fear of making a performance-optimized implementation of this
-is that it will be overused at runtime. As an example on how it should
-not look when starting out on a new driver today, look at the gpio
-driver for omap. It looks the way it does because they merged the 3
-separate implementations together, but they have a bunch of functions
-in there that have three completely different code paths depending on
-which platform they are on. For those, having three different
-functions, and a function pointer to reach it through, makes more
-sense.
+Hi Rob,
 
-But for to-be-upstreamed SoC support for, for example, tegra3 -- a
-platform that has device-tree support -- it would be better to do a
-new compatible field in the device tree for it, and thus at the time
-of probing of the device (in the driver) you will know if it's a
-tegra2 or tegra3 gpio controller you are configuring. Based on that,
-you can setup your driver to behave appropriately -- some of that
-might of course still be runtime checks, but hopefully not too much of
-it.
+See here[1] and [2] (figures 3.14 and 3.16).  In both cases, there is
+clearly a reference to PPI numbering from 0-15 and SPI numbering from
+0-987 (as inputs to the distributor block).
 
-The SoC detection-at-runtime doesn't scale and map to drivers all that
-cleanly either. Today you have a linear roadmap of devices where
-development happens on the "family number" field. What if there is a
-future T32 that is an evolution of T30 but with tegra4's gpio
-controller, for example [assuming numbering is similar to today's
-tegra2 t20/t25/etc]?   It's better to do the versioning per
-IP/device/driver, than trying to map a global version/product number
-per-driver to different behavior.
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0416b/Bhacbfdb.html
+[2] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0416b/Cihebcbg.html
 
-
--Olof
+g.
