@@ -1,35 +1,36 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Mon, 19 Sep 2011 10:29:11 +0800
-Subject: [PATCH] ARM: kdump: copy kernel relocation code at the kexec
-	prepare stage
-In-Reply-To: <CALZhoSQSOTxV_OKVWwrmUt2tVqo3STEwonZcdzY398MLbP9U9w@mail.gmail.com>
-References: <1316151129-30491-1-git-send-email-leiwen@marvell.com>
-	<20110916054556.GA10298@verge.net.au>
-	<CALZhoSQSOTxV_OKVWwrmUt2tVqo3STEwonZcdzY398MLbP9U9w@mail.gmail.com>
-Message-ID: <CALZhoSSpx3e8JAb8JLdOoXXay_055XQ126SJLVyUPedUh9KAjw@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 19 Sep 2011 08:29:34 +0530
+Subject: [PATCH v8 00/16] To use DMA generic APIs for Samsung DMA
+In-Reply-To: <CAJe_ZhdrPMbBOkfwg=PFyVU14eT0Gc0=rtKwEiQCH5-Q5-CtVQ@mail.gmail.com>
+References: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
+	<1315980099.26251.498.camel@vkoul-udesk3>
+	<CABb+yY25NTbtRPOw-KH8U4zA1Bo8q0BDM8SXyrsobG7NEv8edg@mail.gmail.com>
+	<1315999032.26251.501.camel@vkoul-udesk3>
+	<CAJe_ZhdrPMbBOkfwg=PFyVU14eT0Gc0=rtKwEiQCH5-Q5-CtVQ@mail.gmail.com>
+Message-ID: <1316401174.21359.3.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 17, 2011 at 9:58 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
-> Hi Simon,
->
-> On Fri, Sep 16, 2011 at 1:45 PM, Simon Horman <horms@verge.net.au> wrote:
->> On Thu, Sep 15, 2011 at 10:32:09PM -0700, Lei Wen wrote:
->>> This copy really don't need to do at the very second before the kernel
->>> would crash.
->>>
->>> Signed-off-by: Lei Wen <leiwen@marvell.com>
->>
->> This seems reasonable to me.
->>
->> Acked-by: Simon Horman <horms@verge.net.au>
->
-> Thanks for acked. :)
->
-> BTW, do you know which git tree should this patch be merged?
->
+On Wed, 2011-09-14 at 17:03 +0530, Jassi Brar wrote:
+> On 14 September 2011 16:47, Vinod Koul <vinod.koul@intel.com> wrote:
+> 
+> >> The changelog for [PATCH v8 04/16] is misleading - we don't need any
+> >> modification for the reason mentioned in changelog. But the modification
+> >> has positive side-effect of preventing callbacks during terminate_all which
+> >> is no way understood from the changelog. So I would like to changelog
+> >> corrected.
+> > I thought change log was correct in depicting what patch does and Boojin
+> > had replied.... I will check again...
+> 
+> I didn't reply because I ran out of ways to explain the same thing in
+> different words.
+I checked again the patch, change log and your comments.
+I agree with current change log, and also your observation is right but
+that is just a side effect, which IMO should be best left to developer
+to choose or not, in this case she ignored it
 
-Push it to Russell's patch tracking system. :)
+So no changes to this and I a ready to merge it to my next in a day or
+two...
 
-Best regards,
-Lei
+-- 
+~Vinod
