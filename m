@@ -1,67 +1,88 @@
-From: bryanp35@comcast.net (B. J.)
-Date: Mon, 19 Sep 2011 15:26:54 -0700
-Subject: alloc_safe_buffer/map_single problem related to ath9k on ARM
-Message-ID: <769353EF-E030-494A-B1FE-7D6614B2C1AF@comcast.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 19 Sep 2011 15:12:04 -0700
+Subject: [PATCH 1/2] ARM: debug: Add CLSP711X_UART1 config choice
+In-Reply-To: <20110919212502.GB23613@e102144-lin.cambridge.arm.com>
+References: <20110916114140.GA31334@e102144-lin.cambridge.arm.com>
+	<1316455300-5752-1-git-send-email-sboyd@codeaurora.org>
+	<20110919212502.GB23613@e102144-lin.cambridge.arm.com>
+Message-ID: <4E77BE34.6070702@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 09/19/11 14:25, Will Deacon wrote:
+> Hi Stephen,
+>
+> On Mon, Sep 19, 2011 at 07:01:39PM +0100, Stephen Boyd wrote:
+>> ARM patch 7072/1 (debug: use kconfig choice for selecting
+>> DEBUG_LL UART) only allowed CLSP711X_UART2 to be selected because
+>> there is no NONE option in a choice menu. Add a UART1 choice so
+>> that users can still choose UART1 explicitly.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>
+>> On 09/16/11 04:41, Will Deacon wrote:
+>>> Ah yes. This will need to be added as part of the platform updates to go via
+>>> Arnd. It should be easy enough just to have a DEBUG_CLPS711X_UART1 option,
+>>> for example, and the platform code will fall back to the first UART.
+>> I couldn't find these patches applied in Arnd's tree so I based it off of
+>> Russell's for-next branch.
+> Thanks for cooking the patch, it was somewhere on my list of things to do
+> this week! I think we also need to fix the DEBUG_DC21285_PORT option as that
+> has a similar `if not selected then use a different UART' behaviour. It can be
+> fixed in the same way as you have done in this patch.'
 
-I've been fighting with a DMA problem on my ARM system, and have reached the point of crying out for a bit of help.  Hopefully someone has some ideas on what I can do to get past this...
+Ah my eyes glossed over the DC21285 one. Here's one on top of patch 2.
+Feel free to squash, etc.
 
-The platform in question is an IXP43x-based processor with an ath9k WiFi on the PCI bus, running a late 2.6.3x kernel (have been experimenting with different versions to no avail).
 
-The original problem is that, under network load over the WiFi, I get these messages:
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 9661c51..b976e04 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -93,14 +93,19 @@ choice
+                  It does include a timeout to ensure that the system does not
+                  totally freeze when there is nothing connected to read.
+ 
++       config DEBUG_DC21285_PORT1
++               bool "Kernel low-level debugging messages via footbridge serial port 1"
++               depends on FOOTBRIDGE
++               help
++                 Say Y here if you want the debug print routines to direct
++                 their output to the first serial port in the DC21285.
++
+        config DEBUG_DC21285_PORT
+-               bool "Kernel low-level debugging messages via footbridge serial port"
++               bool "Kernel low-level debugging messages via footbridge serial port 2"
+                depends on FOOTBRIDGE
+                help
+                  Say Y here if you want the debug print routines to direct
+-                 their output to the serial port in the DC21285 (Footbridge).
+-                 Saying N will cause the debug messages to appear on the first
+-                 16550 serial port.
++                 their output to the second serial port in the DC21285.
+ 
+        config DEBUG_CLPS711X_UART1
+                bool "Kernel low-level debugging messages via UART1"
 
-ath9k 0000:00:02.0: alloc_safe_buffer: could not alloc dma memory (size=87)
-ath9k 0000:00:02.0: map_single: unable to map unsafe buffer cf733828!
-ath9k 0000:00:02.0: alloc_safe_buffer: could not alloc dma memory (size=174)
-ath9k 0000:00:02.0: map_single: unable to map unsafe buffer c7ea4c5e!
-ath9k 0000:00:02.0: alloc_safe_buffer: could not alloc dma memory (size=1484)
-ath9k 0000:00:02.0: map_single: unable to map unsafe buffer cf734028!
 
-and eventually the system runs out of kernel memory and the OOM killer kicks in (yeah, so there's multiple problems here).
 
-I've been experimenting with various DMA/bounce-buffer patches, HIGHMEM configuration, and changing CONSISTENT_DMA_SIZE from 2M to 4M, but none of the changes resolve this problem, and the latter just causes a kernel assertion failure.
+>
+> Would you like me to take the three patches in with the ones I currently
+> have for other platforms (Realview, Samsung, imx) or would you prefer to
+> handle these separately? I was planning to send all of the platform bits to
+> Arnd once I've got my branches sorted out (been on holiday for the past two
+> weeks).
+>
 
-My understanding of what's causing this is that there is a really tiny amount of DMA-able memory available - 2MB - and I'm overrunning that while beating on the WiFi.  I'm not knowledgeable enough about the particulars of this platform to understand if it really is limited to 2MB of DMA memory (that seems crazily tiny!) or if this is a problem in the ath9k driver itself.
+If you want to handle them that sounds fine. I can't figure out who is
+coordinating the DEBUG_LL changes. It seems that Russell has at least
+applied the initial DEBUG_LL patches, so his tree will have some
+breakage without this fixup patch.
 
-Here are some details:
+I have some more patches on top of this one for MSM DEBUG_LL support
+too. Hopefully I can send them out in a little bit.
 
-Linux 2.6.35.12 armv5teb
-...
-CPU: XScale-IXP43x Family [69054041] revision 1 (ARMv5TE), cr=000039ff
-...
-free_area_init_node: node 0, pgdat c03dc890, node_mem_map c4000000
-  DMA zone: 128 pages used for memmap
-  DMA zone: 0 pages reserved
-  DMA zone: 16256 pages, LIFO batch:3
-  Normal zone: 384 pages used for memmap
-  Normal zone: 48768 pages, LIFO batch:15
-...
-Memory: 256MB = 256MB total
-Memory: 255756k/255756k available, 6388k reserved, 0K highmem
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-    DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
-    vmalloc : 0xd0800000 - 0xff000000   ( 744 MB)
-    lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
-    pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-    modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-      .init : 0xc0008000 - 0xc0023000   ( 108 kB)
-      .text : 0xc0023000 - 0xc03b6000   (3660 kB)
-      .data : 0xc03b6000 - 0xc03de260   ( 161 kB)
-
-# cat /sys/devices/pci0000\:00/0000\:00\:02.0/pools 
-poolinfo - 0.1
-large_dmabounce_pool    0    0 4096  0
-small_dmabounce_pool   21   50 2048 25
-# cat /sys/devices/pci0000\:00/0000\:00\:02.0/dmabounce_stats
-1113 0 0 1113 28292 1092
-# 
-
-Any advice appreciated!
-
---
--bp
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
