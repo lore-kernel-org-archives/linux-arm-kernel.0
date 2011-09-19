@@ -1,44 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Sep 2011 10:52:34 +0200
-Subject: [PATCH] ARM: supply a DTB file to be appended
-In-Reply-To: <1315476884-28470-1-git-send-email-linus.walleij@stericsson.com>
-References: <1315476884-28470-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CACRpkdZ+s_y=4VJuz5WetaU1tUFF-f6g38bpy6TSRjt9Q_VgLg@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 19 Sep 2011 17:08:29 +0800
+Subject: [PATCH 4/4] net/fec: add imx6q enet support
+In-Reply-To: <20110918180912.GA3734@electric-eye.fr.zoreil.com>
+References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
+	<1316346852-17090-5-git-send-email-shawn.guo@linaro.org>
+	<20110918180912.GA3734@electric-eye.fr.zoreil.com>
+Message-ID: <20110919090828.GA28084@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 8, 2011 at 12:14 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
+On Sun, Sep 18, 2011 at 08:09:12PM +0200, Francois Romieu wrote:
+> Shawn Guo <shawn.guo@linaro.org> :
+> [...]
+> > diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+> > index 04206e4..849cb0b 100644
+> > --- a/drivers/net/fec.c
+> > +++ b/drivers/net/fec.c
+> > @@ -442,18 +453,23 @@ fec_restart(struct net_device *ndev, int duplex)
+> >  		/* Enable flow control and length check */
+> >  		rcntl |= 0x40000000 | 0x00000020;
+> >  
+> > -		/* MII or RMII */
+> > +		/* RGMII, RMII or MII */
+> > +		if (fep->phy_interface == PHY_INTERFACE_MODE_RGMII)
+> > +			rcntl |= (1 << 6);
+> >  		if (fep->phy_interface == PHY_INTERFACE_MODE_RMII)
+>            ^^^^ missing "else"
+> 
+Yes, my bad.
 
-> This makes it easy to script the kernel build with
-> different device trees, and it also vastly simplifies
-> building uImages since "make uImage" will now pick
-> up the devcie tree and include it in the final image
-> as part of the build process.
+> [...]
+> > +		/* 1G, 100M or 10M */
+> > +		if (fep->phy_dev) {
+> > +			if (fep->phy_dev->speed == SPEED_1000)
+> > +				ecntl |= (1 << 8);
 
-A clarification here on what it actually simplifies.
+Right, this is a typo.  It should be (1 << 5);
 
-make zImage
-cat my.dtb >> arch/arm/boot/zImage
-make uImage
+> > +			else if (fep->phy_dev->speed == SPEED_100)
+> > +				rcntl &= ~(1 << 9);
+> > +			else
+> > +				rcntl |= (1 << 9);
+> > +		}
+> [...]
+> > +	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
+> > +		/* enable ENET endian swap */
+> > +		ecntl |= (1 << 8);
+> 
+> I do not understand why the endian swap bit of ecntl needs to be
+> set the same in these two different paths, especially as the latter
+> handles the old faulty imx28 and the former the newly fixed imx6q.
+> Typo ?
+> 
+Nice catches.  Thanks a lot, Ueimor.
 
-Does *not* work.
-
-The reason is that when you issue "make uImage"
-the zImage is overwritten due to changed timestamp.
-Then a uImage without the DTB is created.
-
-So currently to generate a uImage you have to
-do something like:
-
-make zImage
-cat my.dtb >> arch/arm/boot/zImage
-mkimage -A arm -O linux -T kernel -C none -a 0x00008000 -e 0x00008000
--n 'Linux-3.0' -d arch/arm/boot/zImage arch/arm/boot/uImage
-
-The patch folds all of this into:
-
-make uImage
-
-Yours,
-Linus Walleij
+-- 
+Regards,
+Shawn
