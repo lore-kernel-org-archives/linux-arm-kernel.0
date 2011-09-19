@@ -1,71 +1,81 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 19 Sep 2011 10:01:12 +0200
-Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based camera
-	board.
-In-Reply-To: <20110919061019.GD9244@neutronstar.dyndns.org>
-References: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
-	<201109182358.55816.laurent.pinchart@ideasonboard.com>
-	<20110919061019.GD9244@neutronstar.dyndns.org>
-Message-ID: <201109191001.12364.laurent.pinchart@ideasonboard.com>
+From: t.stanislaws@samsung.com (Tomasz Stanislawski)
+Date: Mon, 19 Sep 2011 10:27:07 +0200
+Subject: [PATCH 1/2] ARM: EXYNOS4: Add TVOUT support for SMDKV310
+In-Reply-To: <1314340747-13816-2-git-send-email-hatim.rv@samsung.com>
+References: <1314340747-13816-1-git-send-email-hatim.rv@samsung.com>
+	<1314340747-13816-2-git-send-email-hatim.rv@samsung.com>
+Message-ID: <4E76FCDB.8040708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+Hi Hatim Ali,
 
-On Monday 19 September 2011 08:10:19 martin at neutronstar.dyndns.org wrote:
-> On Sun, Sep 18, 2011 at 11:58:55PM +0200, Laurent Pinchart wrote:
-> > On Saturday 17 September 2011 11:34:57 Martin Hostettler wrote:
-> > > Adds board support for an MT9M032 based camera to omap3evm.
-> > > 
-> > > Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
-> > > ---
-> > > 
-> > >  arch/arm/mach-omap2/Makefile                |    1 +
-> > >  arch/arm/mach-omap2/board-omap3evm-camera.c |  183
-> > > 
-> > > +++++++++++++++++++++++++++ 2 files changed, 184 insertions(+), 0
-> > > deletions(-)
-> > > 
-> > >  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
-> > > 
-> > > Changes in V2:
-> > >  * ported to current mainline
-> > >  * Style fixes
-> > >  * Fix error handling
-> > > 
-> > > diff --git a/arch/arm/mach-omap2/Makefile
-> > > b/arch/arm/mach-omap2/Makefile index f343365..8ae3d25 100644
-> > > --- a/arch/arm/mach-omap2/Makefile
-> > > +++ b/arch/arm/mach-omap2/Makefile
-> > > +	return 0;
-> > > +
-> > > +err_8:
-> > > +	gpio_free(EVM_TWL_GPIO_BASE + 8);
-> > > +err_2:
-> > > +	gpio_free(EVM_TWL_GPIO_BASE + 2);
-> > > +err_vdsel:
-> > > +	gpio_free(nCAM_VD_SEL);
-> > > +err:
-> > > +	return ret;
-> > > +}
-> > > +
-> > > +device_initcall(camera_init);
-> > 
-> > Please don't use device_initcall(), but call the function directly from
-> > the OMAP3 EVM init handler. Otherwise camera_init() will be called if
-> > OMAP3 EVM support is compiled in the kernel, regardless of the board the
-> > kernel runs on.
-> 
-> Ok, will do.
-> In which header should the prototyp of that function go? Or can i just
-> add a prototyp to board-omap3evm.c directly?
-> I couldn't find anything that looked right, this is rather board specific
-> after all.
+On 08/26/2011 08:39 AM, Hatim Ali wrote:
+> Add support for TVOUT on SMDKV310 board.
+>
+> Signed-off-by: Hatim Ali<hatim.rv@samsung.com>
+> ---
+>   arch/arm/mach-exynos4/Kconfig         |    2 ++
+>   arch/arm/mach-exynos4/mach-smdkv310.c |    5 +++++
+>   2 files changed, 7 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+> index e6925de..4c399c0 100644
+> --- a/arch/arm/mach-exynos4/Kconfig
+> +++ b/arch/arm/mach-exynos4/Kconfig
+> @@ -139,6 +139,7 @@ config MACH_SMDKV310
+>   	select S3C_DEV_RTC
+>   	select S3C_DEV_WDT
+>   	select S3C_DEV_I2C1
+> +	select S5P_DEV_I2C_HDMIPHY
+>   	select S5P_DEV_MFC
+>   	select S3C_DEV_HSMMC
+>   	select S3C_DEV_HSMMC1
+> @@ -148,6 +149,7 @@ config MACH_SMDKV310
+>   	select EXYNOS4_DEV_AHCI
+>   	select SAMSUNG_DEV_KEYPAD
+>   	select EXYNOS4_DEV_PD
+> +	select S5P_DEV_TV
+>   	select SAMSUNG_DEV_PWM
+>   	select EXYNOS4_DEV_SYSMMU
+>   	select EXYNOS4_SETUP_FIMD0
+> diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
+> index 5f62b2b..8fdba16 100644
+> --- a/arch/arm/mach-exynos4/mach-smdkv310.c
+> +++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+> @@ -173,6 +173,7 @@ static struct platform_device *smdkv310_devices[] __initdata = {
+>   	&s3c_device_hsmmc2,
+>   	&s3c_device_hsmmc3,
+>   	&s3c_device_i2c1,
+> +	&s5p_device_i2c_hdmiphy,
+>   	&s3c_device_rtc,
+>   	&s3c_device_wdt,
+>   	&exynos4_device_ac97,
+> @@ -194,6 +195,8 @@ static struct platform_device *smdkv310_devices[] __initdata = {
+>   	&samsung_asoc_idma,
+>   	&smdkv310_smsc911x,
+>   	&exynos4_device_ahci,
+> +	&s5p_device_hdmi,
+> +	&s5p_device_mixer,
+I should add TV power domain device exynos4_device_pd[PD_TV]  here.
+>   };
+>
+>   static void __init smdkv310_smsc911x_init(void)
+> @@ -254,6 +257,8 @@ static void __init smdkv310_machine_init(void)
+>   	s3c_sdhci2_set_platdata(&smdkv310_hsmmc2_pdata);
+>   	s3c_sdhci3_set_platdata(&smdkv310_hsmmc3_pdata);
+>
+> +	s5p_i2c_hdmiphy_set_platdata(NULL);
+> +
+You should set mixer's and hdmi's parents here to device for TV power 
+domain.
+You should also configure gpio for hot-plug detection. Please refer to 
+function s5p_tv_setup
+in arch/arm/mach-exynos4/mach-universal_c210.c:1012.
+>   	samsung_keypad_set_platdata(&smdkv310_keypad_data);
+>
+>   	samsung_bl_set(&smdkv310_bl_gpio_info,&smdkv310_bl_data);
+I hope you find this information useful.
 
-You can either create arch/arm/mach-omap2/board-omap3evm.h or add the 
-prototype to board-omap3evm.c.
-
--- 
-Regards,
-
-Laurent Pinchart
+Best regards,
+Tomasz Stanislawski
