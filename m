@@ -1,41 +1,23 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 19 Sep 2011 10:59:46 -0300
-Subject: [PATCH] ARM: mach-qong: Add watchdog support
-Message-ID: <1316440786-21118-1-git-send-email-fabio.estevam@freescale.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 19 Sep 2011 15:35:47 +0200
+Subject: [PATCH 06/19] ARM: mach-at91: remove arch specific special
+	handling for ioremap
+In-Reply-To: <1316156850-31013-7-git-send-email-nico@fluxnic.net>
+References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
+	<1316156850-31013-7-git-send-email-nico@fluxnic.net>
+Message-ID: <20110919130703.GG16141@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add watchdog support for mach-qong target.
+On 03:07 Fri 16 Sep     , Nicolas Pitre wrote:
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> A generic version should replace this later.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Untill the replace will availlable
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/Kconfig     |    1 +
- arch/arm/mach-imx/mach-qong.c |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+do not remove it
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0519dd7..8748531 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -485,6 +485,7 @@ config MACH_QONG
- 	bool "Support Dave/DENX QongEVB-LITE platform"
- 	select SOC_IMX31
- 	select IMX_HAVE_PLATFORM_IMX_UART
-+	select IMX_HAVE_PLATFORM_IMX2_WDT
- 	help
- 	  Include support for Dave/DENX QongEVB-LITE platform. This includes
- 	  specific configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-imx/mach-qong.c b/arch/arm/mach-imx/mach-qong.c
-index 3626f48..44462ce 100644
---- a/arch/arm/mach-imx/mach-qong.c
-+++ b/arch/arm/mach-imx/mach-qong.c
-@@ -249,6 +249,7 @@ static void __init qong_init(void)
- 	mxc_init_imx_uart();
- 	qong_init_nor_mtd();
- 	qong_init_fpga();
-+	imx31_add_imx2_wdt(NULL);
- }
- 
- static void __init qong_timer_init(void)
--- 
-1.6.0.4
+Best Regards,
+J.
