@@ -1,59 +1,32 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 19 Sep 2011 17:08:29 +0800
-Subject: [PATCH 4/4] net/fec: add imx6q enet support
-In-Reply-To: <20110918180912.GA3734@electric-eye.fr.zoreil.com>
-References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
-	<1316346852-17090-5-git-send-email-shawn.guo@linaro.org>
-	<20110918180912.GA3734@electric-eye.fr.zoreil.com>
-Message-ID: <20110919090828.GA28084@S2100-06.ap.freescale.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 19 Sep 2011 10:01:34 +0100
+Subject: [RFC v3] arm: Add platform bus driver for memory mapped virtio
+	device
+In-Reply-To: <874o09ryzm.fsf@rustcorp.com.au>
+References: <1316191623-3835-1-git-send-email-pawel.moll@arm.com>
+	<4E7380FD.1030200@us.ibm.com>  <874o09ryzm.fsf@rustcorp.com.au>
+Message-ID: <1316422894.3014.1.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 18, 2011 at 08:09:12PM +0200, Francois Romieu wrote:
-> Shawn Guo <shawn.guo@linaro.org> :
-> [...]
-> > diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-> > index 04206e4..849cb0b 100644
-> > --- a/drivers/net/fec.c
-> > +++ b/drivers/net/fec.c
-> > @@ -442,18 +453,23 @@ fec_restart(struct net_device *ndev, int duplex)
-> >  		/* Enable flow control and length check */
-> >  		rcntl |= 0x40000000 | 0x00000020;
-> >  
-> > -		/* MII or RMII */
-> > +		/* RGMII, RMII or MII */
-> > +		if (fep->phy_interface == PHY_INTERFACE_MODE_RGMII)
-> > +			rcntl |= (1 << 6);
-> >  		if (fep->phy_interface == PHY_INTERFACE_MODE_RMII)
->            ^^^^ missing "else"
+> > Have you written a specification for this device?
+> > 
+> > Rusty maintains a formal spec for all virtio devices at:
+> > 
+> > http://ozlabs.org/~rusty/virtio-spec/
+> > 
+> > The spec should be written before merging the code to make sure that there 
+> > aren't future compatibility problems.
 > 
-Yes, my bad.
-
-> [...]
-> > +		/* 1G, 100M or 10M */
-> > +		if (fep->phy_dev) {
-> > +			if (fep->phy_dev->speed == SPEED_1000)
-> > +				ecntl |= (1 << 8);
-
-Right, this is a typo.  It should be (1 << 5);
-
-> > +			else if (fep->phy_dev->speed == SPEED_100)
-> > +				rcntl &= ~(1 << 9);
-> > +			else
-> > +				rcntl |= (1 << 9);
-> > +		}
-> [...]
-> > +	if (id_entry->driver_data & FEC_QUIRK_ENET_MAC) {
-> > +		/* enable ENET endian swap */
-> > +		ecntl |= (1 << 8);
+> A good idea, but the current spec is for PCI.  I wonder if we should
+> move the PCI part out to an appendix and make it more general?
 > 
-> I do not understand why the endian swap bit of ecntl needs to be
-> set the same in these two different paths, especially as the latter
-> handles the old faulty imx28 and the former the newly fixed imx6q.
-> Typo ?
-> 
-Nice catches.  Thanks a lot, Ueimor.
+> Meanwhile, perhaps this would be suitable as an appendix.
 
--- 
-Regards,
-Shawn
+Yes, that sounds reasonable. I'll work on this during the week, but in
+the meantime - does the driver look good enough to ask Peter to invest
+his time into QEMU side?
+
+Cheers!
+
+Pawe?
