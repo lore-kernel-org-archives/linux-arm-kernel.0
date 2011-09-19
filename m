@@ -1,8 +1,8 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Sep 2011 10:40:55 -0700
+Date: Mon, 19 Sep 2011 10:43:08 -0700
 Subject: [PATCH] ARM: OMAP: Add support for dmtimer v2 ip (Re: [PATCH
 	v15 06/12] OMAP: dmtimer: switch-over to platform device driver)
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4C80288@dbde02.ent.ti.com>
+In-Reply-To: <CAC83Zv+X+huFrG+_LNadNwi9zRAWHGRvrQnvpAoZJK=30TK0fg@mail.gmail.com>
 References: <1315516098-29761-7-git-send-email-tarun.kanti@ti.com>
 	<20110914214533.GA30941@atomide.com>
 	<CAC83ZvJgPYb3JbWT4SKXpQvq-vdKK4b6hd6E-ik5uyRCqgwWsg@mail.gmail.com>
@@ -12,20 +12,21 @@ References: <1315516098-29761-7-git-send-email-tarun.kanti@ti.com>
 	<CAC83ZvKGoucZ=xQSa7GEk7Gg8jcFBQE==1a6m4=+nzDRrsw+jw@mail.gmail.com>
 	<CAC83ZvKXEb7MTujP4JqhrPeysYxQcLF+BV-J9tpYoRwWGVZ8_Q@mail.gmail.com>
 	<20110917013531.GB2937@atomide.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03B4C80288@dbde02.ent.ti.com>
-Message-ID: <20110919174054.GE2937@atomide.com>
+	<CAC83Zv+X+huFrG+_LNadNwi9zRAWHGRvrQnvpAoZJK=30TK0fg@mail.gmail.com>
+Message-ID: <20110919174308.GF2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pedanekar, Hemant <hemantp@ti.com> [110918 20:32]:
-> 
-> Tony,
-> Kernel boots fine on TI816X (should also boot on TI814X) with your patch
-> and patches (including OSC clock fix) from series
-> http://www.spinics.net/lists/linux-omap/msg57011.html  
+* DebBarma, Tarun Kanti <tarun.kanti@ti.com> [110918 04:53]:
+> >
+> > But we can map the interrupt registers separately and then have
+> > the rest start from func_base that is different based on the timer
+> > version. Rebasing the rest of the dmtimer hwmod patches on this
+> > should be fairly easy, mostly just need to pass timer instead of
+> > timer->io_base and use __raw_read/write for the interrupt registers.
+> I went through the patch. It definitely looks much more simplified now.
+> I will rebase on top of this change.
 
-OK good to hear, I assume I can add your Tested-by then?
-
-Regards,
+OK thanks, can I add your Acked-by then?
 
 Tony
