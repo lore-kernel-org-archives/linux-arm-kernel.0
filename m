@@ -1,77 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 19 Sep 2011 17:58:27 +0800
-Subject: [PATCH v2 2/6] arm/imx6q: add core definitions and low-level
-	debug uart
-In-Reply-To: <20110919095544.GL31404@pengutronix.de>
-References: <1316097926-913-1-git-send-email-shawn.guo@linaro.org>
-	<1316097926-913-3-git-send-email-shawn.guo@linaro.org>
-	<20110919093516.GK31404@pengutronix.de>
-	<CAMPhdO-MWPo8xAF12O2cehfT8a4zmpY0zCVZBQGUsS42-LzQrw@mail.gmail.com>
-	<20110919095544.GL31404@pengutronix.de>
-Message-ID: <CAMPhdO8vPoFxLDoviRH8mmXfEGe6RxWeVhGENguqN4Ae7KjfSg@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 19 Sep 2011 11:05:41 +0100
+Subject: [PATCH] pata-generic/of: Make probing via device tree
+	non-powerpc-specific
+In-Reply-To: <20110916214313.GB16381@n2100.arm.linux.org.uk>
+References: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
+	<20110916214313.GB16381@n2100.arm.linux.org.uk>
+Message-ID: <CA+wbFdc0SicHLN6=JQz-rRXqKovhr7=acUQi3esUU_qcXgCaAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2011 at 5:55 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Mon, Sep 19, 2011 at 05:45:59PM +0800, Eric Miao wrote:
->> On Mon, Sep 19, 2011 at 5:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > On Thu, Sep 15, 2011 at 10:45:22PM +0800, Shawn Guo wrote:
->> >> It adds the core definitions and low-level debug uart support
->> >> for imx6q.
->> >>
->> >>
->> >> ?#define UART_VADDR ? IMX_IO_ADDRESS(UART_PADDR)
->> >> diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
->> >> index 066d464..341f800 100644
->> >> --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
->> >> +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
->> >> @@ -1,6 +1,6 @@
->> >> ?/*
->> >> ? * ?Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
->> >> - * ?Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
->> >> + * ?Copyright 2004-2011 Freescale Semiconductor, Inc. All Rights Reserved.
->> >> ? */
->> >>
->> >> ?/*
->> >> @@ -11,6 +11,17 @@
->> >>
->> >> ?#include <mach/hardware.h>
->> >>
->> >> +#ifdef CONFIG_ARM_GIC
->> >> +#include <asm/hardware/entry-macro-gic.S>
->> >> +
->> >> + ? ? .macro ?disable_fiq
->> >> + ? ? .endm
->> >> +
->> >> + ? ? .macro ?arch_ret_to_user, tmp1, tmp2
->> >> + ? ? .endm
->> >> +
->> >> +#else
->> >
->> > That's the third interrupt entry code handled here with ifdefs. I
->> > remember there was some infrastructure to have multiple irq
->> > controllers. I can't find any pointers, but I think Eric (added him
->> > to Cc) told me about it.
->> > As this is also the last roadblock to compile i.MX3 and i.MX5 into a
->> > single kernel this might be the right moment to work on this.
->>
->> It's CONFIG_MULTIPLE_IRQ_HANDLER. And check arch/arm/mach-pxa/irq.c
->> for example. Basically to use a C function to handle the interrupts, and
->> have each machine to specify the correct handler.
->>
->> E.g. in pxa - there are pxa25x_handle_irq, pxa3xx_handle_irq ...
->
-> Nice, it's already merged. I should have used grep instead of google.
-> For reference, it's CONFIG_MULTI_IRQ_HANDLER.
+Hi,
 
-My poor memory :-)
+On Fri, Sep 16, 2011 at 10:43 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Sep 16, 2011 at 03:38:10PM +0100, Dave Martin wrote:
+>> This patch enables device-tree-based probing of the pata-generic
+>> platform driver across all architectures:
+
+[...]
 
 >
-> Sascha
+> This may not be the correct way to support the CF slot on Versatile
+> Express - it depends whether the CF slot on VE supports just CF
+> memory cards or whether it can take any CF card.
 >
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
+> If the latter, then what may be inserted could be a CF network card,
+> and that means it's probably wrong to tell the kernel that what's
+> there is a PATA interface.
+
+Interesting point.  I don't know whether we've tried plugging anything
+else in...
+
+Pawel, can you comment?
+
+Cheers
+---Dave
