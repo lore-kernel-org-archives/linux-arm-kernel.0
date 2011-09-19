@@ -1,36 +1,43 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 19 Sep 2011 08:29:34 +0530
-Subject: [PATCH v8 00/16] To use DMA generic APIs for Samsung DMA
-In-Reply-To: <CAJe_ZhdrPMbBOkfwg=PFyVU14eT0Gc0=rtKwEiQCH5-Q5-CtVQ@mail.gmail.com>
-References: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
-	<1315980099.26251.498.camel@vkoul-udesk3>
-	<CABb+yY25NTbtRPOw-KH8U4zA1Bo8q0BDM8SXyrsobG7NEv8edg@mail.gmail.com>
-	<1315999032.26251.501.camel@vkoul-udesk3>
-	<CAJe_ZhdrPMbBOkfwg=PFyVU14eT0Gc0=rtKwEiQCH5-Q5-CtVQ@mail.gmail.com>
-Message-ID: <1316401174.21359.3.camel@vkoul-udesk3>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Mon, 19 Sep 2011 12:59:33 +0930
+Subject: [RFC v3] arm: Add platform bus driver for memory mapped virtio
+	device
+In-Reply-To: <4E7380FD.1030200@us.ibm.com>
+References: <1316191623-3835-1-git-send-email-pawel.moll@arm.com>
+	<4E7380FD.1030200@us.ibm.com>
+Message-ID: <874o09ryzm.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-09-14 at 17:03 +0530, Jassi Brar wrote:
-> On 14 September 2011 16:47, Vinod Koul <vinod.koul@intel.com> wrote:
+On Fri, 16 Sep 2011 12:01:49 -0500, Anthony Liguori <aliguori@us.ibm.com> wrote:
+> On 09/16/2011 11:47 AM, Pawel Moll wrote:
+> > This patch, based on virtio PCI driver, adds support for memory
+> > mapped (platform) virtio  device. This should allow environments
+> > like qemu to use virtio-based block&  network devices.
+> >
+> > One can define and register a platform device which resources
+> > will describe memory mapped control registers and "mailbox"
+> > interrupt. Such device can be also instantiated using the Device
+> > Tree node with compatible property equal "virtio,mmio".
+> >
+> > Cc: Rusty Russell<rusty@rustcorp.com.au>
+> > Cc: Anthony Liguori<aliguori@us.ibm.com>
+> > Cc: Michael S.Tsirkin<mst@redhat.com>
+> > Signed-off-by: Pawel Moll<pawel.moll@arm.com>
 > 
-> >> The changelog for [PATCH v8 04/16] is misleading - we don't need any
-> >> modification for the reason mentioned in changelog. But the modification
-> >> has positive side-effect of preventing callbacks during terminate_all which
-> >> is no way understood from the changelog. So I would like to changelog
-> >> corrected.
-> > I thought change log was correct in depicting what patch does and Boojin
-> > had replied.... I will check again...
+> Have you written a specification for this device?
 > 
-> I didn't reply because I ran out of ways to explain the same thing in
-> different words.
-I checked again the patch, change log and your comments.
-I agree with current change log, and also your observation is right but
-that is just a side effect, which IMO should be best left to developer
-to choose or not, in this case she ignored it
+> Rusty maintains a formal spec for all virtio devices at:
+> 
+> http://ozlabs.org/~rusty/virtio-spec/
+> 
+> The spec should be written before merging the code to make sure that there 
+> aren't future compatibility problems.
 
-So no changes to this and I a ready to merge it to my next in a day or
-two...
+A good idea, but the current spec is for PCI.  I wonder if we should
+move the PCI part out to an appendix and make it more general?
 
--- 
-~Vinod
+Meanwhile, perhaps this would be suitable as an appendix.
+
+Cheers,
+Rusty.
