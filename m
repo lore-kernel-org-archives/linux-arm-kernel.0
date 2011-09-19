@@ -1,32 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 19 Sep 2011 00:06:53 -0400 (EDT)
-Subject: [PATCH 01/19] ARM: sort the meminfo array earlier
-In-Reply-To: <alpine.LFD.2.00.1109171148390.20358@xanadu.home>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<1316156850-31013-2-git-send-email-nico@fluxnic.net>
-	<20110917150522.GI16381@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109171148390.20358@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1109182340370.20358@xanadu.home>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 19 Sep 2011 07:11:14 +0300
+Subject: [PATCH v4] mach-realview: expose PB1176 ROM using physmap and
+	map_rom
+In-Reply-To: <CACRpkdb7Qp527PqGT_kT5DF48ajvYgAMazw-sKyeT6hMegrXzQ@mail.gmail.com>
+References: <1315292023-4125-1-git-send-email-linus.walleij@stericsson.com>
+	<1315747783.18731.59.camel@sauron>
+	<CACRpkdb7Qp527PqGT_kT5DF48ajvYgAMazw-sKyeT6hMegrXzQ@mail.gmail.com>
+Message-ID: <1316405483.24366.15.camel@sauron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 17 Sep 2011, Nicolas Pitre wrote:
-
-> On Sat, 17 Sep 2011, Russell King - ARM Linux wrote:
+On Sun, 2011-09-11 at 23:12 +0200, Linus Walleij wrote:
+> On Sun, Sep 11, 2011 at 3:29 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
+> > On Tue, 2011-09-06 at 08:53 +0200, Linus Walleij wrote:
+> >> From: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> This exposes the PB1176 ROM if you compile in the MTD physmap
+> >> mapping and also the map_rom chiptype.
+> >>
+> >> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> >
+> > I think this should go in via the corresponding arm subtree.
 > 
-> > On Fri, Sep 16, 2011 at 03:07:12AM -0400, Nicolas Pitre wrote:
-> > > From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > 
-> > > The meminfo array has to be sorted before sanity_check_meminfo() can work
-> > > properly.
-> > 
-> > This is unrelated to the patch series, so it should be separate from the
-> > series.  I don't see anything in the series depending on it.
-> 
-> True.  I just stumbled across this issue while working on the rest.
+> Sure, but I think we need some nod from the MTD people that this is the
+> right way to present a ROM, so is that an Acked-by?
 
-Well, I'm about to post some revised patches for this series, and I'm 
-now taking advantage of the sorted array.  So here's this patch again 
-which is also revised:
+Acked-by: Artem Bityutskiy <artem.bityutskiy@intel.com>
 
------ >8
+-- 
+Best Regards,
+Artem Bityutskiy
