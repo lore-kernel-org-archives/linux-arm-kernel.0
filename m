@@ -1,141 +1,86 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 20 Sep 2011 01:29:26 +0530
-Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based
-	camera board.
-In-Reply-To: <20110919192442.GE9244@neutronstar.dyndns.org>
-References: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
-	<201109182358.55816.laurent.pinchart@ideasonboard.com>
-	<19F8576C6E063C45BE387C64729E739404EC8111DE@dbde02.ent.ti.com>
-	<20110919192442.GE9244@neutronstar.dyndns.org>
-Message-ID: <19F8576C6E063C45BE387C64729E739404EC811425@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Sep 2011 21:03:17 +0100
+Subject: Link failures due to __bug_table in current -next
+In-Reply-To: <20110919120954.GA20314@opensource.wolfsonmicro.com>
+References: <20110919120954.GA20314@opensource.wolfsonmicro.com>
+Message-ID: <20110919200317.GC16381@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 19, 2011 at 01:09:54PM +0100, Mark Brown wrote:
+> I'm seeing linker failures in -next as of today:
+> 
+> `.exit.text' referenced in section `__bug_table' of fs/built-in.o:
+> defined in discarded section `.exit.text' of fs/built-in.o
+> `.exit.text' referenced in section `__bug_table' of crypto/built-in.o:
+> defined in discarded section `.exit.text' of crypto/built-in.o
+> `.exit.text' referenced in section `__bug_table' of net/built-in.o:
+> defined in discarded section `.exit.text' of net/built-in.o
+> `.exit.text' referenced in section `__bug_table' of net/built-in.o:
+> defined in discarded section `.exit.text' of net/built-in.o
+> 
+> which appears to be due to the chnage to use generic BUG() introduced in
+> commit 5254a3 (ARM: 7017/1: Use generic BUG() handler), reverting that
+> commit resolves the issue for me.
 
-> -----Original Message-----
-> From: martin at neutronstar.dyndns.org [mailto:martin at neutronstar.dyndns.org]
-> Sent: Tuesday, September 20, 2011 12:55 AM
-> To: Hiremath, Vaibhav
-> Cc: Laurent Pinchart; Tony Lindgren; linux-omap at vger.kernel.org; linux-
-> media at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based
-> camera board.
-> 
-> On Mon, Sep 19, 2011 at 11:37:37AM +0530, Hiremath, Vaibhav wrote:
-> >
-> > > -----Original Message-----
-> > > From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
-> > > owner at vger.kernel.org] On Behalf Of Laurent Pinchart
-> > > Sent: Monday, September 19, 2011 3:29 AM
-> > > To: Martin Hostettler
-> > > Cc: Tony Lindgren; linux-omap at vger.kernel.org; linux-
-> > > media at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > > Subject: Re: [PATCH v2] arm: omap3evm: Add support for an MT9M032
-> based
-> > > camera board.
-> > >
-> > > Hi Martin,
-> > >
-> > > On Saturday 17 September 2011 11:34:57 Martin Hostettler wrote:
-> > > > Adds board support for an MT9M032 based camera to omap3evm.
-> > > >
-> > > > Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
-> > > > ---
-> > > >  arch/arm/mach-omap2/Makefile                |    1 +
-> > > >  arch/arm/mach-omap2/board-omap3evm-camera.c |  183
-> > > > +++++++++++++++++++++++++++ 2 files changed, 184 insertions(+), 0
-> > > > deletions(-)
-> > > >  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
-> > > >
-> > > > Changes in V2:
-> > > >  * ported to current mainline
-> > > >  * Style fixes
-> > > >  * Fix error handling
-> > > >
-> > > > diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-
-> omap2/Makefile
-> > > > index f343365..8ae3d25 100644
-> > > > --- a/arch/arm/mach-omap2/Makefile
-> > > > +++ b/arch/arm/mach-omap2/Makefile
-> > > > @@ -202,6 +202,7 @@ obj-$(CONFIG_MACH_OMAP3_TORPEDO)        +=
-> > > > board-omap3logic.o \ obj-$(CONFIG_MACH_OVERO)		+= board-
-> overo.o \
-> > > >  					   hsmmc.o
-> > > >  obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o \
-> > > > +					   board-omap3evm-camera.o \
-> > > >  					   hsmmc.o
-> > > >  obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
-> > > >  					   hsmmc.o
-> > > > diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c
-> > > > b/arch/arm/mach-omap2/board-omap3evm-camera.c new file mode 100644
-> > > > index 0000000..be987d9
-> > > > --- /dev/null
-> > > > +++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
-> > > > @@ -0,0 +1,183 @@
-> > > > +/*
-> > > > + * Copyright (C) 2010-2011 Lund Engineering
-> > > > + * Contact: Gil Lund <gwlund@lundeng.com>
-> > > > + * Author: Martin Hostettler <martin@neutronstar.dyndns.org>
-> > > > + *
-> > [Hiremath, Vaibhav] The file below seems copied from (which is coming
-> from all older releases of TI)
-> >
-> > http://arago-project.org/git/projects/?p=linux-
-> omap3.git;a=blob;f=arch/arm/mach-omap2/board-omap3evm-
-> camera.c;h=2e6ccfef69027dee880d507b98b5a7998d4bbe7e;hb=adcd067326836777c04
-> 9e3cb32a5b7d9d401fc31
-> >
-> > So I would appreciate if you keep original copyright and authorship of
-> the file and add your sign-off to the patch.
-> >
-> 
-> First of all i don't have any problem Adding your name and the TI
-> copyright.
-> Maybe i should have been more careful when looking at and adeption
-> omap3evm_set_mux as i really took that from the TI code.
-> 
+This might solve the problem - could you check please?
 
-The best practice it to always keep copy-right of the file intact... I wouldn't mind if you use and modify any part of the code and also add your authorship. 
-I feel, Copy-right is important part.
+ arch/arm/kernel/vmlinux.lds.S |   15 ++++++++++++---
+ 1 files changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 7b2541e..20b3041 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -24,8 +24,10 @@
+ #if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
+ 	defined(CONFIG_GENERIC_BUG)
+ #define ARM_EXIT_KEEP(x)	x
++#define ARM_EXIT_DISCARD(x)
+ #else
+ #define ARM_EXIT_KEEP(x)
++#define ARM_EXIT_DISCARD(x)	x
+ #endif
  
-> I honestly don't remember if i took any other code from that file or not.
-> It ends up doing what the hardware needs anyway. For me it doesn't matter
-> with such trival things, but i should have been more careful.
-> 
-> Do you consider it resolved if use the following at the start?
-> 
-> /*
->  * Copyright (C) 2010 Texas Instruments Inc
-
-Change it to 2011.
-
->  * Copyright (C) 2010-2011 Lund Engineering
->  * Contact: Gil Lund <gwlund@lundeng.com>
-
-Not sure do you really need above line...
-
->  * Authors:
->  *    Vaibhav Hiremath <hvaibhav@ti.com>
->  *    Martin Hostettler <martin@neutronstar.dyndns.org>
->  */
-> 
-> 
-Looks ok to me.
-
-> But then again the copy on my harddisk has these too...
-> 
->  * Contributors:
->  *     Anuj Aggarwal <anuj.aggarwal@ti.com>
->  *     Sivaraj R <sivaraj@ti.com>
-> 
-> Maybe i should add them too.
-> 
-> Not sure really...
-> 
-> 
-
-I think we should not pollute source file with all our names, so I would recommend to put copy rights and probably author.
-
-Thanks,
-Vaibhav
->  - Martin Hostettler
+ OUTPUT_ARCH(arm)
+@@ -40,6 +42,11 @@ jiffies = jiffies_64 + 4;
+ SECTIONS
+ {
+ 	/*
++	 * XXX: The linker does not define how output sections are
++	 * assigned to input sections when there are multiple statements
++	 * matching the same input section name.  There is no documented
++	 * order of matching.
++	 *
+ 	 * unwind exit sections must be discarded before the rest of the
+ 	 * unwind sections get included.
+ 	 */
+@@ -48,6 +55,9 @@ SECTIONS
+ 		*(.ARM.extab.exit.text)
+ 		ARM_CPU_DISCARD(*(.ARM.exidx.cpuexit.text))
+ 		ARM_CPU_DISCARD(*(.ARM.extab.cpuexit.text))
++		ARM_EXIT_DISCARD(EXIT_TEXT)
++		ARM_EXIT_DISCARD(EXIT_DATA)
++		EXIT_CALL
+ #ifndef CONFIG_HOTPLUG
+ 		*(.ARM.exidx.devexit.text)
+ 		*(.ARM.extab.devexit.text)
+@@ -59,6 +69,8 @@ SECTIONS
+ #ifndef CONFIG_SMP_ON_UP
+ 		*(.alt.smp.init)
+ #endif
++		*(.discard)
++		*(.discard.*)
+ 	}
+ 
+ #ifdef CONFIG_XIP_KERNEL
+@@ -280,9 +292,6 @@ SECTIONS
+ 
+ 	STABS_DEBUG
+ 	.comment 0 : { *(.comment) }
+-
+-	/* Default discards */
+-	DISCARDS
+ }
+ 
+ /*
