@@ -1,9 +1,10 @@
 From: boyko.lee@samsung.com (Jongpill Lee)
-Date: Mon, 19 Sep 2011 10:23:29 +0900
-Subject: [PATCH 2/3] ARM: EXYNOS4: Add PMU register definition for EXYNOS4212
-In-Reply-To: <1316395410-12023-1-git-send-email-boyko.lee@samsung.com>
-References: <1316395410-12023-1-git-send-email-boyko.lee@samsung.com>
-Message-ID: <1316395410-12023-2-git-send-email-boyko.lee@samsung.com>
+Date: Mon, 19 Sep 2011 10:25:41 +0900
+Subject: [PATCH V2 2/3] ARM: EXYNOS4: Add PMU register definition for
+	EXYNOS4212
+In-Reply-To: <1316395542-27578-1-git-send-email-boyko.lee@samsung.com>
+References: <1316395542-27578-1-git-send-email-boyko.lee@samsung.com>
+Message-ID: <1316395542-27578-3-git-send-email-boyko.lee@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
