@@ -1,64 +1,51 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 19 Sep 2011 11:01:40 -0700
-Subject: [PATCH 2/2] ARM: debug: Move DEBUG_ICEDCC into the DEBUG_LL choice
-In-Reply-To: <1316455300-5752-1-git-send-email-sboyd@codeaurora.org>
-References: <20110916114140.GA31334@e102144-lin.cambridge.arm.com>
-	<1316455300-5752-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1316455300-5752-2-git-send-email-sboyd@codeaurora.org>
+From: sjg@chromium.org (Simon Glass)
+Date: Mon, 19 Sep 2011 11:02:08 -0700
+Subject: [PATCH] ARM: BUG() dies silently
+In-Reply-To: <20110919165943.GX16381@n2100.arm.linux.org.uk>
+References: <1301602523-9906-1-git-send-email-omar.ramirez@ti.com>
+	<CAH+eYFBSiL44CMOpgED+TAOTUH_dQMaKKu=hC3ynG0Y2nQ8ekw@mail.gmail.com>
+	<CAB-zwWi1K8y8fHzy0hgcFPgSfhMrZNfoKQ9xuU00Y1sLg6ZBmw@mail.gmail.com>
+	<20110919144313.GU16381@n2100.arm.linux.org.uk>
+	<20110919165943.GX16381@n2100.arm.linux.org.uk>
+Message-ID: <CAPnjgZ1JDGt7Dzp9VrRKKApeZ9RT9oqry+UkQZwVCw1P+t9pew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DEBUG_ICEDCC support is just another DEBUG_LL choice and
-selecting it along with other DEBUG_LL options doesn't make
-much sense. Put it into the DEBUG_LL choice to avoid confusion.
+Hi Russell,
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/Kconfig.debug |   24 ++++++++++++------------
- 1 files changed, 12 insertions(+), 12 deletions(-)
+On Mon, Sep 19, 2011 at 9:59 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Sep 19, 2011 at 03:43:13PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Sep 19, 2011 at 09:26:49AM -0500, Ramirez Luna, Omar wrote:
+>> > Hi
+>> >
+>> > On Sat, Sep 17, 2011 at 1:07 AM, Rabin Vincent <rabin@rab.in> wrote:
+>> > > If the "Use generic BUG() handler" patch is only scheduled for the next
+>> > > merge window and not for 3.1, can this patch be merged instead for 3.1
+>> > > and -stable? ?This problem is easily seen with GCC 4.6.
+>> >
+>> > I can send it for both and let the maintainers decide.
+>> >
+>> > Russell, do you give your ack?
+>>
+>> I think it's too large a change for -stable and 3.1 - let's get it into
+>> 3.2 first, and make sure no one sees any regressions there. ?Then we can
+>> think about submitting it to stable once its proven itself.
+>
+> And we're seeing link failures with the patch in the kernel, so it's
+> *definitely* not stable material as it stands, even if the current code
+> is a problem for GCC 4.6.
+>
+> Regressions trump bug fixes.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index a37e646..9661c51 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -81,6 +81,18 @@ choice
- 	prompt "Kernel low-level debugging port"
- 	depends on DEBUG_LL
- 
-+	config DEBUG_ICEDCC
-+		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
-+		depends on DEBUG_LL
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to the EmbeddedICE macrocell's DCC channel using
-+		  co-processor 14. This is known to work on the ARM9 style ICE
-+		  channel and on the XScale with the PEEDI.
-+
-+		  It does include a timeout to ensure that the system does not
-+		  totally freeze when there is nothing connected to read.
-+
- 	config DEBUG_DC21285_PORT
- 		bool "Kernel low-level debugging messages via footbridge serial port"
- 		depends on FOOTBRIDGE
-@@ -114,18 +126,6 @@ config EARLY_PRINTK
- 	  kernel low-level debugging functions. Add earlyprintk to your
- 	  kernel parameters to enable this console.
- 
--config DEBUG_ICEDCC
--	bool "Kernel low-level debugging via EmbeddedICE DCC channel"
--	depends on DEBUG_LL
--	help
--	  Say Y here if you want the debug print routines to direct their
--	  output to the EmbeddedICE macrocell's DCC channel using
--	  co-processor 14. This is known to work on the ARM9 style ICE
--	  channel and on the XScale with the PEEDI.
--
--	  It does include a timeout to ensure that the system does not
--	  totally freeze when there is nothing connected to read.
--
- config OC_ETM
- 	bool "On-chip ETM and ETB"
- 	select ARM_AMBA
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Can you point me to the link failures please?
+
+Regards,
+Simon
+
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
