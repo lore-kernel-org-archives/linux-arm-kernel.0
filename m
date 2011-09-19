@@ -1,255 +1,51 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 19 Sep 2011 15:22:36 +0200
-Subject: [PATCH v2 2/2] OMAP: omap_device: Add a method to build an
-	omap_device from a DT node
-In-Reply-To: <20110917161314.GV3523@ponder.secretlab.ca>
-References: <1316184199-12599-1-git-send-email-b-cousson@ti.com>
-	<1316184199-12599-3-git-send-email-b-cousson@ti.com>
-	<20110917161314.GV3523@ponder.secretlab.ca>
-Message-ID: <4E77421C.3000202@ti.com>
+From: aliguori@us.ibm.com (Anthony Liguori)
+Date: Mon, 19 Sep 2011 08:28:23 -0500
+Subject: [RFC v3] arm: Add platform bus driver for memory mapped virtio
+	device
+In-Reply-To: <874o09ryzm.fsf@rustcorp.com.au>
+References: <1316191623-3835-1-git-send-email-pawel.moll@arm.com>	<4E7380FD.1030200@us.ibm.com>
+	<874o09ryzm.fsf@rustcorp.com.au>
+Message-ID: <4E774377.8030703@us.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/17/2011 6:13 PM, Grant Likely wrote:
-> On Fri, Sep 16, 2011 at 04:43:19PM +0200, Benoit Cousson wrote:
->> Add a notifier called during device_add phase. If an of_node is present,
->> retrieve the hwmod entry in order to populate properly the omap_device
->> structure.
->> For the moment the resource from the device-tree are overloaded.
->> DT does not support named resource yet, and thus, most driver
->> will not work without that information.
+On 09/18/2011 10:29 PM, Rusty Russell wrote:
+> On Fri, 16 Sep 2011 12:01:49 -0500, Anthony Liguori<aliguori@us.ibm.com>  wrote:
+>> On 09/16/2011 11:47 AM, Pawel Moll wrote:
+>>> This patch, based on virtio PCI driver, adds support for memory
+>>> mapped (platform) virtio  device. This should allow environments
+>>> like qemu to use virtio-based block&   network devices.
+>>>
+>>> One can define and register a platform device which resources
+>>> will describe memory mapped control registers and "mailbox"
+>>> interrupt. Such device can be also instantiated using the Device
+>>> Tree node with compatible property equal "virtio,mmio".
+>>>
+>>> Cc: Rusty Russell<rusty@rustcorp.com.au>
+>>> Cc: Anthony Liguori<aliguori@us.ibm.com>
+>>> Cc: Michael S.Tsirkin<mst@redhat.com>
+>>> Signed-off-by: Pawel Moll<pawel.moll@arm.com>
 >>
->> Add two helpers function to parse a property that contains multiple
->> strings.
+>> Have you written a specification for this device?
 >>
->> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
->> Cc: Kevin Hilman<khilman@ti.com>
->> ---
->>   arch/arm/plat-omap/omap_device.c |  144 ++++++++++++++++++++++++++++++++++++++
->>   1 files changed, 144 insertions(+), 0 deletions(-)
+>> Rusty maintains a formal spec for all virtio devices at:
 >>
->> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
->> index cac7b9a..da13630 100644
->> --- a/arch/arm/plat-omap/omap_device.c
->> +++ b/arch/arm/plat-omap/omap_device.c
->> @@ -85,6 +85,8 @@
->>   #include<linux/clk.h>
->>   #include<linux/clkdev.h>
->>   #include<linux/pm_runtime.h>
->> +#include<linux/of.h>
->> +#include<linux/notifier.h>
+>> http://ozlabs.org/~rusty/virtio-spec/
 >>
->>   #include<plat/omap_device.h>
->>   #include<plat/omap_hwmod.h>
->> @@ -94,12 +96,15 @@
->>   #define USE_WAKEUP_LAT			0
->>   #define IGNORE_WAKEUP_LAT		1
->>
->> +#define MAX_HWMOD_NAME_SIZE		32
->> +
->>   static int omap_device_register(struct platform_device *pdev);
->>   static int omap_early_device_register(struct platform_device *pdev);
->>   static struct omap_device *omap_device_alloc(struct platform_device *pdev,
->>   				      struct omap_hwmod **ohs, int oh_cnt,
->>   				      struct omap_device_pm_latency *pm_lats,
->>   				      int pm_lats_cnt);
->> +static void omap_device_delete(struct omap_device *od);
->>
->>
->>   static struct omap_device_pm_latency omap_default_latency[] = {
->> @@ -315,6 +320,138 @@ static void _add_hwmod_clocks_clkdev(struct omap_device *od,
->>   		_add_clkdev(od, oh->opt_clks[i].role, oh->opt_clks[i].clk);
->>   }
->>
->> +/*
->> + * XXX: DT helper functions that should probably move elsewhere if
->> + * they become usefull for other needs.
->> + */
+>> The spec should be written before merging the code to make sure that there
+>> aren't future compatibility problems.
 >
-> Lets just *assume* these are useful for other needs and start with
-> them in drivers/of so that other people know that they actually exist.
-> Otherwise they will never be made generic. :-)
-
-Good point...
-
-But, meanwhile Stephen Warren proposed a much nicer iterator to deal 
-with that. Since these patches are still not in mainline, I didn't want 
-to depend on them yet. So my "secret" plan was to remove these functions 
-once the ones from Stephen will be merged.
-
->> +static int _dt_count_property_string(const char *prop, int len)
->> +{
->> +	int i = 0;
->> +	size_t l = 0, total = 0;
->> +
->> +	if (!prop || !len)
->> +		return -EINVAL;
->> +
->> +	for (i = 0; len>= total; total += l, prop += l) {
->> +		l = strlen(prop) + 1;
->> +		if (*prop != 0)
->> +			i++;
->> +	}
->> +	return i;
->> +}
->> +
->> +static int _dt_get_property(const char *prop, int len, int index, char *output,
->> +			    int size)
->> +{
->> +	int i = 0;
->> +	size_t l = 0, total = 0;
->> +
->> +	if (!prop || !len)
->> +		return -EINVAL;
->> +
->> +	for (i = 0; len>= total; total += l, prop += l) {
->> +		l = strlcpy(output, prop, size) + 1;
->> +		if (*prop != 0) {
->> +			if (i++ == index)
->> +				return 0;
->> +		}
->> +	}
->> +	return -ENODEV;
->> +}
->> +
->> +static struct dev_pm_domain omap_device_pm_domain;
->> +
->> +/**
->> + * omap_device_build_from_dt - build an omap_device with multiple hwmods
->> + * @pdev_name: name of the platform_device driver to use
->> + * @pdev_id: this platform_device's connection ID
->> + * @oh: ptr to the single omap_hwmod that backs this omap_device
->> + * @pdata: platform_data ptr to associate with the platform_device
->> + * @pdata_len: amount of memory pointed to by @pdata
->> + * @pm_lats: pointer to a omap_device_pm_latency array for this device
->> + * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
->> + * @is_early_device: should the device be registered as an early device or not
->> + *
->> + * Function for building an omap_device already registered from device-tree
->> + *
->> + * Returns 0 or PTR_ERR() on error.
->> + */
->> +static int omap_device_build_from_dt(struct platform_device *pdev)
->> +{
->> +	struct omap_hwmod **hwmods;
->> +	struct omap_device *od;
->> +	struct omap_hwmod *oh;
->> +	char oh_name[MAX_HWMOD_NAME_SIZE];
->> +	const char *prop;
->> +	int oh_cnt, i, prop_len;
->> +	int ret = 0;
->> +
->> +	prop = of_get_property(pdev->dev.of_node, "hwmods",&prop_len);
+> A good idea, but the current spec is for PCI.  I wonder if we should
+> move the PCI part out to an appendix and make it more general?
 >
-> I know you've posted it before, but what is the status of the "hwmods"
-> binding documentation.  I would expect it to be part of this patch.
+> Meanwhile, perhaps this would be suitable as an appendix.
 
-It was part of the series that introduced the first node with hwmods 
-attribute 
-(http://lists.ozlabs.org/pipermail/devicetree-discuss/2011-August/007621.html).
-I do agree, it makes sense to add it here.
+I was thinking an appendix would be a good start.
 
->> +	oh_cnt = _dt_count_property_string(prop, prop_len);
->> +	if (!oh_cnt || IS_ERR_VALUE(oh_cnt)) {
->> +		dev_warn(&pdev->dev, "No 'hwmods' to build omap_device\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	hwmods = kzalloc(sizeof(struct omap_hwmod *) * oh_cnt, GFP_KERNEL);
->> +	if (!hwmods) {
->> +		ret = -ENOMEM;
->> +		goto odbfd_exit;
->> +	}
->> +
->> +	for (i = 0; i<  oh_cnt; i++) {
->> +		_dt_get_property(prop, prop_len, i, oh_name,
->> +				 MAX_HWMOD_NAME_SIZE);
->> +
->> +		oh = omap_hwmod_lookup(oh_name);
->> +		if (!oh) {
->> +			dev_err(&pdev->dev, "Cannot lookup hwmod '%s'\n",
->> +				oh_name);
->> +			ret = -EINVAL;
->> +			goto odbfd_exit1;
->> +		}
->> +		hwmods[i] = oh;
->> +	}
->> +
->> +	od = omap_device_alloc(pdev, hwmods, oh_cnt, NULL, 0);
->> +	if (!od) {
->> +		dev_err(&pdev->dev, "Cannot allocate omap_device for :%s\n",
->> +			oh_name);
->> +		ret = PTR_ERR(od);
->> +		goto odbfd_exit1;
->> +	}
->> +
->> +	if (of_get_property(pdev->dev.of_node, "no_idle_on_suspend", NULL))
->> +		omap_device_disable_idle_on_suspend(pdev);
->> +
->> +	pdev->dev.pm_domain =&omap_device_pm_domain;
->> +
->> +odbfd_exit1:
->> +	kfree(hwmods);
->> +odbfd_exit:
->> +	return ret;
->> +}
->> +
->> +static int _omap_device_notifier_call(struct notifier_block *nb,
->> +				      unsigned long event, void *dev)
+Regards,
+
+Anthony Liguori
+
 >
-> Nit: Why the preceding underscore?  Generally that is only done for
-> 'special' variants of public functions.  ie. for a variant that
-> expects a lock to already be held.
-
-Yeah, the convention in this file is not that strict, and it is used for 
-internal static helper function as well.
-I'll let Kevin arbitrate that point :-)
-
->> +{
->> +	struct platform_device *pdev = to_platform_device(dev);
->> +
->> +	switch (event) {
->> +	case BUS_NOTIFY_ADD_DEVICE:
->> +		if (pdev->dev.of_node)
->> +			omap_device_build_from_dt(pdev);
->> +		break;
->> +
->> +	case BUS_NOTIFY_DEL_DEVICE:
->> +		if (pdev->archdata.od)
->> +			omap_device_delete(pdev->archdata.od);
->> +		break;
->> +	}
->> +
->> +	return NOTIFY_DONE;
->> +}
->> +
->>
->>   /* Public functions for use by core code */
->>
->> @@ -499,6 +636,9 @@ oda_exit1:
->>
->>   static void omap_device_delete(struct omap_device *od)
->>   {
->> +	if (!od)
->> +		return;
->> +
->>   	od->pdev->archdata.od = NULL;
->>   	kfree(od->pm_lats);
->>   	kfree(od->hwmods);
->> @@ -1034,8 +1174,12 @@ struct device omap_device_parent = {
->>   	.parent         =&platform_bus,
->>   };
->>
->> +static struct notifier_block platform_nb;
->
-> Nit: Since it is static initialization, you can do the following
-> instead of setting it up in the init function.
->
-> static struct notifier_block platform_nb = {
-> 	.notifier_call = _omap_device_notifier_call;
-> };
-
-Much better, indeed.
-
-Thanks,
-Benoit
+> Cheers,
+> Rusty.
