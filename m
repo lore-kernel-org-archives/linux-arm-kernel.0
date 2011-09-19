@@ -1,40 +1,44 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Mon, 19 Sep 2011 18:13:11 -0500
-Subject: READ THIS: the next mach-types update
-In-Reply-To: <20110915102528.GI6267@n2100.arm.linux.org.uk>
-References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F39DAED674@AUSP01VMBX24.collaborationhost.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Sep 2011 00:14:07 +0100
+Subject: [PATCH 1/2] ARM: debug: Add CLSP711X_UART1 config choice
+In-Reply-To: <4E77BE34.6070702@codeaurora.org>
+References: <20110916114140.GA31334@e102144-lin.cambridge.arm.com>
+	<1316455300-5752-1-git-send-email-sboyd@codeaurora.org>
+	<20110919212502.GB23613@e102144-lin.cambridge.arm.com>
+	<4E77BE34.6070702@codeaurora.org>
+Message-ID: <20110919231407.GA28502@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 15, 2011 3:25 AM, Russell King wrote:
->
-> I'm going to be merging a mach-types update (the cut-down and the
-> policy-conforming version) for the next merge window.  This will mean
-> that things WILL BREAK, and I will not notice that things have broken.
->
-> In order to fix this, entries need to be fixed to conform to the
-> requirements - where the machine_is_xxx() name is the same as the
-> MACH_TYPE_xxx name and the CONFIG_MACH_xxx name too.
->
-> Moreover, entries older than 12 months which have not been merged will
-> be removed.  It is not possible to automatically check for machine_is_xxx()
-> usages as these could conflict with other architectures, and I'm
-> certainly NOT checking for them by hand (I estimate that'd take a
-> significant amount of manual effort to do.)  What that means is that it
-> is _important_ to get the core platform support in _first_ before any
-> drivers which may make use of this.
+On Mon, Sep 19, 2011 at 11:12:04PM +0100, Stephen Boyd wrote:
+> On 09/19/11 14:25, Will Deacon wrote:
+> >
+> > Would you like me to take the three patches in with the ones I currently
+> > have for other platforms (Realview, Samsung, imx) or would you prefer to
+> > handle these separately? I was planning to send all of the platform bits to
+> > Arnd once I've got my branches sorted out (been on holiday for the past two
+> > weeks).
+> >
+> 
+> If you want to handle them that sounds fine. I can't figure out who is
+> coordinating the DEBUG_LL changes. It seems that Russell has at least
+> applied the initial DEBUG_LL patches, so his tree will have some
+> breakage without this fixup patch.
 
-Russell,
+I sent the main changes via Russell and I plan to send new platforms moving
+to the Kconfig choice via Arnd. However, as you point out, there's some breakage
+without your three patches applied, so actually it's probably best if you
+send these via the patch system. In which case:
 
-I posted support for MACH_VISION_EP9307 back in March and it's in your
-patch tracker as 6851/1.  I assumed it was still there because of the
-work to clean up the ARM tree.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Is it possible to still get this patch merged and add the following
-back to mach-types:
+(this is for the second version of the Footbridge patch too)
 
-vision_ep9307		MACH_VISION_EP9307	VISION_EP9307		1578
+> I have some more patches on top of this one for MSM DEBUG_LL support
+> too. Hopefully I can send them out in a little bit.
 
-Thanks,
-Hartley
+Ok, great. These are the ones that can go via Arnd with imx, Realview etc.
+
+Cheers,
+
+Will
