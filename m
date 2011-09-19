@@ -1,42 +1,30 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Mon, 19 Sep 2011 15:39:30 -0700
-Subject: [PATCH 3/4] net/fec: set phy_speed to the optimal frequency 2.5
-	MHz
-In-Reply-To: <1316346852-17090-4-git-send-email-shawn.guo@linaro.org>
-References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
-	<1316346852-17090-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <4E77C4A2.1060802@boundarydevices.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Sep 2011 23:41:51 +0100
+Subject: [PATCH 1/2] ARM: debug: Add CLSP711X_UART1 config choice
+In-Reply-To: <4E77BE34.6070702@codeaurora.org>
+References: <20110916114140.GA31334@e102144-lin.cambridge.arm.com>
+	<1316455300-5752-1-git-send-email-sboyd@codeaurora.org>
+	<20110919212502.GB23613@e102144-lin.cambridge.arm.com>
+	<4E77BE34.6070702@codeaurora.org>
+Message-ID: <20110919224151.GB28237@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/18/2011 4:54 AM, Shawn Guo wrote:
-> With the unnecessary 1 bit left-shift on fep->phy_speed during the
-> calculation, the phy_speed always runs at the half frequency of the
-> optimal one 2.5 MHz.
->
-> The patch removes that 1 bit left-shift to get the optimal phy_speed.
->
-> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
-> ---
->   drivers/net/fec.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-> index 5ef0e34..04206e4 100644
-> --- a/drivers/net/fec.c
-> +++ b/drivers/net/fec.c
-> @@ -1007,7 +1007,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
->   	/*
->   	 * Set MII speed to 2.5 MHz (= clk_get_rate() / 2 * phy_speed)
->   	 */
-> -	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000)<<  1;
-> +	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000);
->   	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
->
->   	fep->mii_bus = mdiobus_alloc();
-Do you need to round up to an even value? Is the hardware documentation 
-wrong?
-Does this need a quirk? What boards has this been verified to fix?
+On Mon, Sep 19, 2011 at 03:12:04PM -0700, Stephen Boyd wrote:
+> On 09/19/11 14:25, Will Deacon wrote:
+> > Thanks for cooking the patch, it was somewhere on my list of things to do
+> > this week! I think we also need to fix the DEBUG_DC21285_PORT option as that
+> > has a similar `if not selected then use a different UART' behaviour. It can be
+> > fixed in the same way as you have done in this patch.'
+> 
+> Ah my eyes glossed over the DC21285 one. Here's one on top of patch 2.
+> Feel free to squash, etc.
 
-Thanks
-Troy
+Err, the DC21285 only has one serial port.
+
+Some footbridge platforms expose the DC21285 to the outside world, others
+don't.  Some footbridge platforms have a separate 8250 UART at the standard
+PCI COM1 address, others don't.
+
+What DEBUG_DC21285_PORT is selecting between is whether to use the DC21285
+port (when set) or the 8250 at PCI COM1 (when unset).
