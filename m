@@ -1,71 +1,218 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 19 Sep 2011 15:08:02 +0200
-Subject: [PATCH 5/5] ARM: gic: add OF based initialization
-In-Reply-To: <CA+wbFddVw5+CDMzNXE9Q4-v4kByQmC6xp-rK5e81ChbYFGVe=A@mail.gmail.com>
-References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
-	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
-	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
-	<4E71CE5D.9030900@ti.com>	<20110916160939.GA2100@arm.com>
-	<20110918062144.GF3523@ponder.secretlab.ca>
-	<CA+wbFddVw5+CDMzNXE9Q4-v4kByQmC6xp-rK5e81ChbYFGVe=A@mail.gmail.com>
-Message-ID: <4E773EB2.60504@ti.com>
+Date: Mon, 19 Sep 2011 15:11:45 +0200
+Subject: [PATCH v2 1/2] OMAP: omap_device: Add omap_device_[alloc|delete]
+	for DT integration
+In-Reply-To: <20110917160514.GU3523@ponder.secretlab.ca>
+References: <1316184199-12599-1-git-send-email-b-cousson@ti.com>
+	<1316184199-12599-2-git-send-email-b-cousson@ti.com>
+	<20110917160514.GU3523@ponder.secretlab.ca>
+Message-ID: <4E773F91.3030704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/19/2011 2:07 PM, Dave Martin wrote:
-> On Sun, Sep 18, 2011 at 7:21 AM, Grant Likely<grant.likely@secretlab.ca>  wrote:
->> On Fri, Sep 16, 2011 at 05:09:39PM +0100, Dave Martin wrote:
->>> For now, we express the mapping by putting an interrupt-map in the
->>> core-tile DT, but this feels inelegant as well as wasteful -- expressing
->>> "+ 32" using a table which is about 1K in size and duplicates that
->>> information 43 times.
->>>
->>> Using a dedicated irq domain or a fake interrupt controller node to
->>> encapsulate the motherboard interrupts feels like a cleaner approach,
->>> but for now I'm not clear on the best way to do it.
+On 9/17/2011 6:05 PM, Grant Likely wrote:
+> On Fri, Sep 16, 2011 at 04:43:18PM +0200, Benoit Cousson wrote:
+>> Split the omap_device_build_ss into two smaller functions
+>> that will allow to populate a platform_device already allocated by
+>> device-tree.
+>> The functionality of the omap_device_build_ss is still the same, but
+>> the omap_device_alloc will be usable with devices already built by
+>> device-tree.
 >>
->> An irq nexus node would indeed be something to investigate for your
->> particular case.  Look for examples of interrupt-map.  It is most
->> often used for handling IRQ swizzling on PCI busses.
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Kevin Hilman<khilman@ti.com>
 >
-> That's what I currently have -- this is logically correct, and it
-> works; it just feels like a sledgehammer for cracking this particular
-> nut, because we don't really have 43 independent interrupt mappings
-> and types.  We have one offset and one type which is applied to all
-> the interrupts, and this situation is expected to be the same for all
-> variations of this board, except that offset may change.  I suspect
-> this situation applies to many platforms -- the number of interrupts
-> may in general be much larger than the number of independent mappings.
+> Looks pretty good.  Comments below.
 >
-> Another way of looking at the problem is that it's difficult to come
-> up with a one-size-fits-all description of interrupt mappings which is
-> also efficient.  Requiring a single set of mapping semantics requires
-> the mappings to be both rather overspecified for most cases, and
-> flattened into a large, structureless table which may become pretty
-> large and unwieldy.  If there were 100+ interrupts instead of 43, we'd
-> really have to be generating the device tree using a script in order
-> for it to be maintainable (which is not necessarily a problem, but can
-> be a warning sign)
+> g.
+>
+>> ---
+>>   arch/arm/plat-omap/omap_device.c |  177 +++++++++++++++++++++++++------------
+>>   1 files changed, 119 insertions(+), 58 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+>> index 54bbe7b..cac7b9a 100644
+>> --- a/arch/arm/plat-omap/omap_device.c
+>> +++ b/arch/arm/plat-omap/omap_device.c
+>> @@ -96,6 +96,11 @@
+>>
+>>   static int omap_device_register(struct platform_device *pdev);
+>>   static int omap_early_device_register(struct platform_device *pdev);
+>> +static struct omap_device *omap_device_alloc(struct platform_device *pdev,
+>> +				      struct omap_hwmod **ohs, int oh_cnt,
+>> +				      struct omap_device_pm_latency *pm_lats,
+>> +				      int pm_lats_cnt);
+>> +
+>>
+>>   static struct omap_device_pm_latency omap_default_latency[] = {
+>>   	{
+>> @@ -397,6 +402,110 @@ static int omap_device_fill_resources(struct omap_device *od,
+>>   }
+>>
+>>   /**
+>> + * omap_device_alloc - allocate an omap_device
+>> + * @pdev: platform_device that will be included in this omap_device
+>> + * @oh: ptr to the single omap_hwmod that backs this omap_device
+>> + * @pdata: platform_data ptr to associate with the platform_device
+>> + * @pdata_len: amount of memory pointed to by @pdata
+>> + * @pm_lats: pointer to a omap_device_pm_latency array for this device
+>> + * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
+>> + *
+>> + * Convenience function for allocating an omap_device structure and filling
+>> + * hwmods, resources and pm_latency attributes.
+>> + *
+>> + * Returns an struct omap_device pointer or ERR_PTR() on error;
+>> + */
+>> +static struct omap_device *omap_device_alloc(struct platform_device *pdev,
+>> +					struct omap_hwmod **ohs, int oh_cnt,
+>> +					struct omap_device_pm_latency *pm_lats,
+>> +					int pm_lats_cnt)
+>> +{
+>> +	int ret = -ENOMEM;
+>> +	struct omap_device *od;
+>> +	struct resource *res = NULL;
+>> +	int i, res_count;
+>> +	struct omap_hwmod **hwmods;
+>> +
+>> +	od = kzalloc(sizeof(struct omap_device), GFP_KERNEL);
+>
+> possible enhancement:  devm_kzalloc() perhaps?  Would simplify the cleanup paths.
+>
+>> +	if (!od) {
+>> +		ret = -ENOMEM;
+>> +		goto oda_exit1;
+>> +	}
+>> +	od->hwmods_cnt = oh_cnt;
+>> +
+>> +	hwmods = kmemdup(ohs, sizeof(struct omap_hwmod *) * oh_cnt, GFP_KERNEL);
+>
+> Ditto here.  would require creation of devm_kmemdup()
+>
+>> +	if (!hwmods)
+>> +		goto oda_exit2;
+>> +
+>> +	od->hwmods = hwmods;
+>> +	od->pdev = pdev;
+>> +
+>> +	/*
+>> +	 * HACK: Ideally the resources from DT should match, and hwmod
+>> +	 * should just add the missing ones. Since the name is not
+>> +	 * properly populated by DT, stick to hwmod resources only.
+>> +	 */
+>> +	if (pdev->num_resources&&  pdev->resource)
+>> +		dev_warn(&pdev->dev, "%s(): resources already allocated %d\n",
+>> +			__func__, pdev->num_resources);
+>> +
+>> +	res_count = omap_device_count_resources(od);
+>> +	if (res_count>  0) {
+>> +		dev_dbg(&pdev->dev, "%s(): resources allocated from hwmod %d\n",
+>> +			__func__, res_count);
+>> +		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
+>> +		if (!res)
+>> +			goto oda_exit3;
+>> +
+>> +		omap_device_fill_resources(od, res);
+>> +
+>> +		ret = platform_device_add_resources(pdev, res, res_count);
+>> +		kfree(res);
+>
+> How big is res_count?  Struct resource isn't very big.  It can
+> probably be on the stack.
 
-Yep, this is exactly the issue I was facing when I tried to map the 128 
-interrupts lines of an OMAP4 to the GIC. Adding 128 entries to an 
-interrupt map just to handle a simple linear translation with a constant 
-value of 32 is clearly overkill.
+It will depend of the number of entries in the hwmod DB that can vary 
+from one address space to 10 addresses + a bunch of irqs + a bunch of 
+dmas. To be honest, that code is just a cut&paste of the original one.
+But since that number can vary based on another file content and 
+considering that this code is supposed to disappear as soon as the 
+resource will come from DT, I'm not 100% convince it worth the effort.
 
-> An alternative approach is to introduce a special interrupt controller
-> node which serves as the interrupt-parent for the child domain and
-> maps the interrupts with flexible semantics defined by the node's
-> bindings; or different kinds of interrupt-map/interrupt-map-mask
-> properties could be defined.  Bindings could be added as needed to
-> support different cases -- though really we should only expect to have
-> a small number at most.  When the interrupt mapping is significantly
-> complex, using interrupt-map will probably be the best approach
-> anyway.
+>> +
+>> +		if (ret)
+>> +			goto oda_exit3;
+>> +	}
+>> +
+>> +	if (!pm_lats) {
+>> +		pm_lats = omap_default_latency;
+>> +		pm_lats_cnt = ARRAY_SIZE(omap_default_latency);
+>> +	}
+>> +
+>> +	od->pm_lats_cnt = pm_lats_cnt;
+>> +	od->pm_lats = kmemdup(pm_lats,
+>> +			sizeof(struct omap_device_pm_latency) * pm_lats_cnt,
+>> +			GFP_KERNEL);
+>> +	if (!od->pm_lats)
+>> +		goto oda_exit3;
+>> +
+>> +	pdev->archdata.od = od;
+>> +
+>> +	for (i = 0; i<  oh_cnt; i++) {
+>> +		hwmods[i]->od = od;
+>> +		_add_hwmod_clocks_clkdev(od, hwmods[i]);
+>> +	}
+>> +
+>> +	return od;
+>> +
+>> +oda_exit3:
+>> +	kfree(hwmods);
+>> +oda_exit2:
+>> +	kfree(od);
+>> +oda_exit1:
+>> +	dev_err(&pdev->dev, "omap_device: build failed (%d)\n", ret);
+>> +
+>> +	return ERR_PTR(ret);
+>> +}
+>> +
+>> +static void omap_device_delete(struct omap_device *od)
+>> +{
+>> +	od->pdev->archdata.od = NULL;
+>> +	kfree(od->pm_lats);
+>> +	kfree(od->hwmods);
+>> +	kfree(od);
+>> +}
+>> +
+>> +/**
+>>    * omap_device_build - build and register an omap_device with one omap_hwmod
+>>    * @pdev_name: name of the platform_device driver to use
+>>    * @pdev_id: this platform_device's connection ID
+>> @@ -455,9 +564,6 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+>>   	int ret = -ENOMEM;
+>>   	struct platform_device *pdev;
+>>   	struct omap_device *od;
+>> -	struct resource *res = NULL;
+>> -	int i, res_count;
+>> -	struct omap_hwmod **hwmods;
+>>
+>>   	if (!ohs || oh_cnt == 0 || !pdev_name)
+>>   		return ERR_PTR(-EINVAL);
+>> @@ -471,76 +577,31 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+>>   		goto odbs_exit;
+>>   	}
+>>
+>> -	pr_debug("omap_device: %s: building with %d hwmods\n", pdev_name,
+>> -		 oh_cnt);
+>> +	/* Set the dev_name early to allow dev_xxx in omap_device_alloc */
+>> +	if (pdev->id != -1)
+>> +		dev_set_name(&pdev->dev, "%s.%d", pdev->name,  pdev->id);
+>> +	else
+>> +		dev_set_name(&pdev->dev, "%s", pdev->name);
+>
+> This is duplicated from the core platform_device code.  What is the
+> reasoning for doing it again here?
 
-Maybe we can just extend or add a new type of interrupt nexus to handle 
-simple translation. The actual one was done for complex PCI mapping but 
-with a small number of lines to handle. In our case, the mapping is 
-simple, but the number of lines is huge.
+Well, it is written in the comment... But this is maybe not that obvious :-)
+That part is only needed for the legacy path that will create a 
+omap_device before having created the device, and thus at that time the 
+dev_xxx will not give the device name. This is not a big deal, but that 
+was painful for the debug.
 
-Regards,
+That being said, by writing that, I'm now realizing that this is due to 
+the way the legacy code was working, because I didn't try to change the 
+sequence.
+But maybe, I can easily avoid that by changing the original sequence.
+In fact If I create the omap_device after the omap_device_register, the 
+platform_device will already have the correct name...
+
+That should work, I'll give it a try.
+
+Thanks for the comments,
 Benoit
