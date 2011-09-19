@@ -1,132 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 19 Sep 2011 12:33:29 +0200
-Subject: [PATCH v2 1/4] ARM: mx53: Add pads for flexcan pins
-In-Reply-To: <1315598408-29563-1-git-send-email-rogerio.pimentel@freescale.com>
-References: <1315598408-29563-1-git-send-email-rogerio.pimentel@freescale.com>
-Message-ID: <20110919103329.GN31404@pengutronix.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 19 Sep 2011 16:06:27 +0530
+Subject: [PATCH v8 00/16] To use DMA generic APIs for Samsung DMA
+In-Reply-To: <1316401174.21359.3.camel@vkoul-udesk3>
+References: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
+	<1315980099.26251.498.camel@vkoul-udesk3>
+	<CABb+yY25NTbtRPOw-KH8U4zA1Bo8q0BDM8SXyrsobG7NEv8edg@mail.gmail.com>
+	<1315999032.26251.501.camel@vkoul-udesk3>
+	<CAJe_ZhdrPMbBOkfwg=PFyVU14eT0Gc0=rtKwEiQCH5-Q5-CtVQ@mail.gmail.com>
+	<1316401174.21359.3.camel@vkoul-udesk3>
+Message-ID: <CABb+yY0Gv1=KvpBmYvZO_ux=b0QRssUvXxad5Y4E38OdwnhCxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 09, 2011 at 05:00:05PM -0300, Rogerio Pimentel wrote:
-> Adding pads for flexcan on i.MX53
-> 
-> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+On Mon, Sep 19, 2011 at 8:29 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> >> The changelog for [PATCH v8 04/16] is misleading - we don't need any
+>> >> modification for the reason mentioned in changelog. But the modification
+>> >> has positive side-effect of preventing callbacks during terminate_all which
+>> >> is no way understood from the changelog. So I would like to changelog
+>> >> corrected.
+>> > I thought change log was correct in depicting what patch does and Boojin
+>> > had replied.... I will check again...
+>>
+>> I didn't reply because I ran out of ways to explain the same thing in
+>> different words.
+> I checked again the patch, change log and your comments.
+> I agree with current change log, and also your observation is right but
+> that is just a side effect,
+It is not "just a side effect", it is "the only tangible effect".
+If it were not for this 'side-effect', the patch would be _purely_ cosmetic
+rearrangement.
+The _only_ difference seen would be by clients who would no longer
+have callbacks when they issue terminate_all.
+And I don't think that is expected at all reading the changelog in current form.
 
-Can you please rebase this onto:
-
-git://git.pengutronix.de/git/imx/linux-2.6.git imx-cleanup
-
-Sascha
-
-> ---
-> Changes since v1:
-> Assigned only one pad config for CAN pins
->  arch/arm/plat-mxc/include/mach/iomux-mx53.h |   22 ++++++++++++----------
->  1 files changed, 12 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> index 5408fd1..d890c9c 100644
-> --- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> +++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-> @@ -33,6 +33,8 @@
->  #define PAD_CTRL_I2C	(PAD_CTL_SRE_FAST | PAD_CTL_ODE | PAD_CTL_PKE | \
->  			PAD_CTL_PUE | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP \
->  			| PAD_CTL_HYS)
-> +#define MX53_CAN_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
-> +					PAD_CTL_HYS)
->  
->  #define _MX53_PAD_GPIO_19__KPP_COL_5		IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
->  #define _MX53_PAD_GPIO_19__GPIO4_5		IOMUX_PAD(0x348, 0x20, 1, 0x0, 0, 0)
-> @@ -1243,14 +1245,14 @@
->  #define MX53_PAD_KEY_ROW1__USBPHY1_RXVALID		(_MX53_PAD_KEY_ROW1__USBPHY1_RXVALID | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_COL2__KPP_COL_2		(_MX53_PAD_KEY_COL2__KPP_COL_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_COL2__GPIO4_10		(_MX53_PAD_KEY_COL2__GPIO4_10 | MUX_PAD_CTRL(NO_PAD_CTRL))
-> -#define MX53_PAD_KEY_COL2__CAN1_TXCAN		(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_KEY_COL2__CAN1_TXCAN		(_MX53_PAD_KEY_COL2__CAN1_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_KEY_COL2__FEC_MDIO		(_MX53_PAD_KEY_COL2__FEC_MDIO | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_COL2__ECSPI1_SS1		(_MX53_PAD_KEY_COL2__ECSPI1_SS1 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_COL2__FEC_RDATA_2		(_MX53_PAD_KEY_COL2__FEC_RDATA_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_COL2__USBPHY1_RXACTIVE		(_MX53_PAD_KEY_COL2__USBPHY1_RXACTIVE | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW2__KPP_ROW_2		(_MX53_PAD_KEY_ROW2__KPP_ROW_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW2__GPIO4_11		(_MX53_PAD_KEY_ROW2__GPIO4_11 | MUX_PAD_CTRL(NO_PAD_CTRL))
-> -#define MX53_PAD_KEY_ROW2__CAN1_RXCAN		(_MX53_PAD_KEY_ROW2__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_KEY_ROW2__CAN1_RXCAN		(_MX53_PAD_KEY_ROW2__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW2__FEC_MDC		(_MX53_PAD_KEY_ROW2__FEC_MDC | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW2__ECSPI1_SS2		(_MX53_PAD_KEY_ROW2__ECSPI1_SS2 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW2__FEC_TDATA_2		(_MX53_PAD_KEY_ROW2__FEC_TDATA_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
-> @@ -1273,14 +1275,14 @@
->  #define MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0		(_MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_COL4__KPP_COL_4		(_MX53_PAD_KEY_COL4__KPP_COL_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_COL4__GPIO4_14		(_MX53_PAD_KEY_COL4__GPIO4_14 | MUX_PAD_CTRL(NO_PAD_CTRL))
-> -#define MX53_PAD_KEY_COL4__CAN2_TXCAN		(_MX53_PAD_KEY_COL4__CAN2_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_KEY_COL4__CAN2_TXCAN		(_MX53_PAD_KEY_COL4__CAN2_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_KEY_COL4__IPU_SISG_4		(_MX53_PAD_KEY_COL4__IPU_SISG_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_COL4__UART5_RTS		(_MX53_PAD_KEY_COL4__UART5_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
->  #define MX53_PAD_KEY_COL4__USBOH3_USBOTG_OC		(_MX53_PAD_KEY_COL4__USBOH3_USBOTG_OC | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_COL4__USBPHY1_LINESTATE_1		(_MX53_PAD_KEY_COL4__USBPHY1_LINESTATE_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW4__KPP_ROW_4		(_MX53_PAD_KEY_ROW4__KPP_ROW_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW4__GPIO4_15		(_MX53_PAD_KEY_ROW4__GPIO4_15 | MUX_PAD_CTRL(NO_PAD_CTRL))
-> -#define MX53_PAD_KEY_ROW4__CAN2_RXCAN		(_MX53_PAD_KEY_ROW4__CAN2_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_KEY_ROW4__CAN2_RXCAN		(_MX53_PAD_KEY_ROW4__CAN2_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW4__IPU_SISG_5		(_MX53_PAD_KEY_ROW4__IPU_SISG_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW4__UART5_CTS		(_MX53_PAD_KEY_ROW4__UART5_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
->  #define MX53_PAD_KEY_ROW4__USBOH3_USBOTG_PWR		(_MX53_PAD_KEY_ROW4__USBOH3_USBOTG_PWR | MUX_PAD_CTRL(NO_PAD_CTRL))
-> @@ -2053,25 +2055,25 @@
->  #define MX53_PAD_PATA_INTRQ__PATA_INTRQ		(_MX53_PAD_PATA_INTRQ__PATA_INTRQ | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_INTRQ__GPIO7_2		(_MX53_PAD_PATA_INTRQ__GPIO7_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_INTRQ__UART2_CTS		(_MX53_PAD_PATA_INTRQ__UART2_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
-> -#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN		(_MX53_PAD_PATA_INTRQ__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN		(_MX53_PAD_PATA_INTRQ__CAN1_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_PATA_INTRQ__CCM_CCM_OUT_2		(_MX53_PAD_PATA_INTRQ__CCM_CCM_OUT_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_INTRQ__USBPHY2_DATAOUT_6		(_MX53_PAD_PATA_INTRQ__USBPHY2_DATAOUT_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_DIOR__PATA_DIOR		(_MX53_PAD_PATA_DIOR__PATA_DIOR | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_DIOR__GPIO7_3		(_MX53_PAD_PATA_DIOR__GPIO7_3 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_DIOR__UART2_RTS		(_MX53_PAD_PATA_DIOR__UART2_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
-> -#define MX53_PAD_PATA_DIOR__CAN1_RXCAN		(_MX53_PAD_PATA_DIOR__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_PATA_DIOR__CAN1_RXCAN		(_MX53_PAD_PATA_DIOR__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_PATA_DIOR__USBPHY2_DATAOUT_7		(_MX53_PAD_PATA_DIOR__USBPHY2_DATAOUT_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_RESET_B__PATA_PATA_RESET_B		(_MX53_PAD_PATA_RESET_B__PATA_PATA_RESET_B | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_RESET_B__GPIO7_4		(_MX53_PAD_PATA_RESET_B__GPIO7_4 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_RESET_B__ESDHC3_CMD		(_MX53_PAD_PATA_RESET_B__ESDHC3_CMD | MUX_PAD_CTRL(MX53_SDHC_PAD_CTRL))
->  #define MX53_PAD_PATA_RESET_B__UART1_CTS		(_MX53_PAD_PATA_RESET_B__UART1_CTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
-> -#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		(_MX53_PAD_PATA_RESET_B__CAN2_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		(_MX53_PAD_PATA_RESET_B__CAN2_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_PATA_RESET_B__USBPHY1_DATAOUT_0		(_MX53_PAD_PATA_RESET_B__USBPHY1_DATAOUT_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_IORDY__PATA_IORDY		(_MX53_PAD_PATA_IORDY__PATA_IORDY | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_IORDY__GPIO7_5		(_MX53_PAD_PATA_IORDY__GPIO7_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_IORDY__ESDHC3_CLK		(_MX53_PAD_PATA_IORDY__ESDHC3_CLK | MUX_PAD_CTRL(MX53_SDHC_PAD_CTRL))
->  #define MX53_PAD_PATA_IORDY__UART1_RTS		(_MX53_PAD_PATA_IORDY__UART1_RTS | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
-> -#define MX53_PAD_PATA_IORDY__CAN2_RXCAN		(_MX53_PAD_PATA_IORDY__CAN2_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_PATA_IORDY__CAN2_RXCAN		(_MX53_PAD_PATA_IORDY__CAN2_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_PATA_IORDY__USBPHY1_DATAOUT_1		(_MX53_PAD_PATA_IORDY__USBPHY1_DATAOUT_1 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_DA_0__PATA_DA_0		(_MX53_PAD_PATA_DA_0__PATA_DA_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_PATA_DA_0__GPIO7_6		(_MX53_PAD_PATA_DA_0__GPIO7_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
-> @@ -2341,7 +2343,7 @@
->  #define MX53_PAD_GPIO_7__ESAI1_TX4_RX1		(_MX53_PAD_GPIO_7__ESAI1_TX4_RX1 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_GPIO_7__GPIO1_7		(_MX53_PAD_GPIO_7__GPIO1_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_GPIO_7__EPIT1_EPITO		(_MX53_PAD_GPIO_7__EPIT1_EPITO | MUX_PAD_CTRL(NO_PAD_CTRL))
-> -#define MX53_PAD_GPIO_7__CAN1_TXCAN		(_MX53_PAD_GPIO_7__CAN1_TXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_GPIO_7__CAN1_TXCAN		(_MX53_PAD_GPIO_7__CAN1_TXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_GPIO_7__UART2_TXD_MUX		(_MX53_PAD_GPIO_7__UART2_TXD_MUX | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
->  #define MX53_PAD_GPIO_7__FIRI_RXD		(_MX53_PAD_GPIO_7__FIRI_RXD | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_GPIO_7__SPDIF_PLOCK		(_MX53_PAD_GPIO_7__SPDIF_PLOCK | MUX_PAD_CTRL(NO_PAD_CTRL))
-> @@ -2349,7 +2351,7 @@
->  #define MX53_PAD_GPIO_8__ESAI1_TX5_RX0		(_MX53_PAD_GPIO_8__ESAI1_TX5_RX0 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_GPIO_8__GPIO1_8		(_MX53_PAD_GPIO_8__GPIO1_8 | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_GPIO_8__EPIT2_EPITO		(_MX53_PAD_GPIO_8__EPIT2_EPITO | MUX_PAD_CTRL(NO_PAD_CTRL))
-> -#define MX53_PAD_GPIO_8__CAN1_RXCAN		(_MX53_PAD_GPIO_8__CAN1_RXCAN | MUX_PAD_CTRL(NO_PAD_CTRL))
-> +#define MX53_PAD_GPIO_8__CAN1_RXCAN		(_MX53_PAD_GPIO_8__CAN1_RXCAN | MUX_PAD_CTRL(MX53_CAN_PAD_CTRL))
->  #define MX53_PAD_GPIO_8__UART2_RXD_MUX		(_MX53_PAD_GPIO_8__UART2_RXD_MUX | MUX_PAD_CTRL(MX53_UART_PAD_CTRL))
->  #define MX53_PAD_GPIO_8__FIRI_TXD		(_MX53_PAD_GPIO_8__FIRI_TXD | MUX_PAD_CTRL(NO_PAD_CTRL))
->  #define MX53_PAD_GPIO_8__SPDIF_SRCLK		(_MX53_PAD_GPIO_8__SPDIF_SRCLK | MUX_PAD_CTRL(NO_PAD_CTRL))
-> -- 
-> 1.7.1
-> 
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> So no changes to this and I a ready to merge it to my next in a day or
+> two...
+I guess the world isn't gonna come to grinding halt with this changelog.
+Please feel free to do what you think is the best.
