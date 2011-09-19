@@ -1,86 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Sep 2011 17:22:22 +0100
-Subject: [PATCH 00/11] Add L2 cache cleaning to generic CPU suspend
-In-Reply-To: <20110910161002.GA462@S2100-06.ap.freescale.net>
-References: <20110901124752.GE29729@n2100.arm.linux.org.uk>
-	<20110901153342.GB5147@S2100-06.ap.freescale.net>
-	<20110901153451.GA16024@n2100.arm.linux.org.uk>
-	<20110901155752.GC5147@S2100-06.ap.freescale.net>
-	<20110910161002.GA462@S2100-06.ap.freescale.net>
-Message-ID: <20110919162222.GC16591@n2100.arm.linux.org.uk>
+From: sbabic@denx.de (Stefano Babic)
+Date: Mon, 19 Sep 2011 18:25:44 +0200
+Subject: [PATCH] ARM: mach-qong: Add watchdog support
+In-Reply-To: <1316440786-21118-1-git-send-email-fabio.estevam@freescale.com>
+References: <1316440786-21118-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <4E776D08.1040201@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 11, 2011 at 12:10:04AM +0800, Shawn Guo wrote:
-> On Thu, Sep 01, 2011 at 11:57:54PM +0800, Shawn Guo wrote:
-> > On Thu, Sep 01, 2011 at 04:34:51PM +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Sep 01, 2011 at 11:33:43PM +0800, Shawn Guo wrote:
-> > > > This is also the case on i.MX6Q, which L2 cache is retained during a
-> > > > suspend/resume cycle.  Currently, I have to call into the following
-> > > > before calling generic cpu_suspend() to clean/invalidate the entire
-> > > > L2 cache.
-> > > > 
-> > > > 	outer_flush_all();
-> > > > 	outer_disable();
-> > > > 
-> > > > But there is a wired thing on using generic cpu_resume().  I have to
-> > > > invalidate L1 before calling into cpu_resume() like below.
-> > > > 
-> > > > ENTRY(imx6q_cpu_resume)
-> > > >         bl      v7_invalidate_l1
-> > > >         b       cpu_resume
-> > > > ENDPROC(imx6q_cpu_resume)
-> > > > 
-> > > > ENTRY(imx6q_secondary_startup)
-> > > >         bl      v7_invalidate_l1
-> > > >         b       secondary_startup
-> > > > ENDPROC(imx6q_secondary_startup)
-> > > > 
-> > > > The v7_invalidate_l1() is the function copied from mach-tegra/headsmp.S,
-> > > > which has to be called before calling secondary_startup to boot
-> > > > secondary cores (same situation between Tegra and i.MX6Q).
-> > > 
-> > > Presumably that's because your L1 cache contains randomized data with
-> > > random validity (and presumably random dirtyness) at boot time - something
-> > > which unfortunately the ARM ARM permits.  I don't think we can go to the
-> > > extent of dealing with this in the generic code as it would unnecessarily
-> > > perturb those implementations which either the boot loader has already
-> > > sorted out that issue, or which don't have the issue at all.
-> > > 
-> > Yes, agreed.  It seems that Tegra and i.MX6Q are the only two CA9MP
-> > cases here.  But is it possible to maintain this v7_invalidate_l1()
-> > function in cache-v7.S, so that we do not need to duplicate it in
-> > platform codes?
-> > 
-> > > > Before applying this patch series, I have something like below actually
-> > > > working.
-> > > > 
-> > > > 
-> > > > 	outer_flush_all();
-> > > > 	outer_disable();
-> > > > 	imx_set_cpu_jump(0, imx6q_cpu_resume);
-> > > > 	/* Zzz ... */
-> > > > 	cpu_suspend(0, imx6q_suspend_finish);
-> > > > 
-> > > > I expect with you patches applied, I can still have it work with simply
-> > > > removing those two lines outer cache codes.
-> > > 
-> > > That should be the case.
-> > > 
-> > > > But unfortunately, I'm
-> > > > running into Oops when resuming back.  And I also have Oops with
-> > > > imx_set_cpu_jump(0, cpu_resume) which means skipping the
-> > > > v7_invalidate_l1() and calling generic cpu_resume() only.
-> > > 
-> > > Do you have a copy of the oops?
-> > > 
-> > 
-> Hi Russell,
+On 09/19/2011 03:59 PM, Fabio Estevam wrote:
+> Add watchdog support for mach-qong target.
 > 
-> After following your great debugging clue that we need to enable L2
-> before calling into generic cpu_resume(), now this patch series works
-> great for imx6q.  Thanks a lot, and here is my tag.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/Kconfig     |    1 +
+>  arch/arm/mach-imx/mach-qong.c |    1 +
+>  2 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 0519dd7..8748531 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -485,6 +485,7 @@ config MACH_QONG
+>  	bool "Support Dave/DENX QongEVB-LITE platform"
+>  	select SOC_IMX31
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+> +	select IMX_HAVE_PLATFORM_IMX2_WDT
+>  	help
+>  	  Include support for Dave/DENX QongEVB-LITE platform. This includes
+>  	  specific configurations for the board and its peripherals.
+> diff --git a/arch/arm/mach-imx/mach-qong.c b/arch/arm/mach-imx/mach-qong.c
+> index 3626f48..44462ce 100644
+> --- a/arch/arm/mach-imx/mach-qong.c
+> +++ b/arch/arm/mach-imx/mach-qong.c
+> @@ -249,6 +249,7 @@ static void __init qong_init(void)
+>  	mxc_init_imx_uart();
+>  	qong_init_nor_mtd();
+>  	qong_init_fpga();
+> +	imx31_add_imx2_wdt(NULL);
+>  }
+>  
 
-Is that for all these patches?
+Thanks for fixing !
+
+Tested-by : Stefano Babic <sbabic@denx.de>
+
+Best regards,
+Stefano Babic
+
+-- 
+=====================================================================
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+=====================================================================
