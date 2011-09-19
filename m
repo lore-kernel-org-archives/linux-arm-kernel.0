@@ -1,229 +1,269 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 19 Sep 2011 13:33:39 +0800
-Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
-	initialization functions
-In-Reply-To: <20110917145614.GG16381@n2100.arm.linux.org.uk>
-References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
-	<20110914084237.GC6267@n2100.arm.linux.org.uk>
-	<20110915013937.GE1488@S2100-06.ap.freescale.net>
-	<20110915083248.GG6267@n2100.arm.linux.org.uk>
-	<CAGsJ_4xpc-8zzGkZ9LThqP7in27n6uX4LRGAf+AtoWTM4p=82w@mail.gmail.com>
-	<20110917104518.GD16381@n2100.arm.linux.org.uk>
-	<CAGsJ_4ysZ7C7PZ7eCLyrLuUGux2U8mVknobaJ4tRdk1g97z-dA@mail.gmail.com>
-	<20110917145614.GG16381@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4xhQZUKx85+4mZLqFrAF+XmUqZp=VCRYwJyNafTUe814g@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 19 Sep 2011 11:37:37 +0530
+Subject: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based
+	camera board.
+In-Reply-To: <201109182358.55816.laurent.pinchart@ideasonboard.com>
+References: <1316252097-4213-1-git-send-email-martin@neutronstar.dyndns.org>
+	<201109182358.55816.laurent.pinchart@ideasonboard.com>
+Message-ID: <19F8576C6E063C45BE387C64729E739404EC8111DE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/17 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sat, Sep 17, 2011 at 10:41:58PM +0800, Barry Song wrote:
->> for aux ctrl, it is really simple. but how about the following:
->>
->> ?393 static void __init pl310_of_setup(const struct device_node *np,
->> ?394 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __u32 *aux_val, __u32 *aux_mask)
->> ?395 {
->> ?396 ? ? ? ? u32 data[3] = { 0, 0, 0 };
->> ?397 ? ? ? ? u32 tag[3] = { 0, 0, 0 };
->> ?398 ? ? ? ? u32 filter[2] = { 0, 0 };
->> ?399
->> ?400 ? ? ? ? of_property_read_u32_array(np, "arm,tag-latency", tag,
->> ARRAY_SIZE(tag));
->> ?401 ? ? ? ? if (tag[0] && tag[1] && tag[2])
->> ?402 ? ? ? ? ? ? ? ? writel_relaxed(
->> ?403 ? ? ? ? ? ? ? ? ? ? ? ? ((tag[0] - 1) << L2X0_LATENCY_CTRL_RD_SHIFT) |
->> ?404 ? ? ? ? ? ? ? ? ? ? ? ? ((tag[1] - 1) << L2X0_LATENCY_CTRL_WR_SHIFT) |
->> ?405 ? ? ? ? ? ? ? ? ? ? ? ? ((tag[2] - 1) << L2X0_LATENCY_CTRL_SETUP_SHIFT),
->> ?406 ? ? ? ? ? ? ? ? ? ? ? ? l2x0_base + L2X0_TAG_LATENCY_CTRL);
->> ?407
->> ?408 ? ? ? ? of_property_read_u32_array(np, "arm,data-latency",
->> ?409 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?data, ARRAY_SIZE(data));
->> ?410 ? ? ? ? if (data[0] && data[1] && data[2])
->> ?411 ? ? ? ? ? ? ? ? writel_relaxed(
->> ?412 ? ? ? ? ? ? ? ? ? ? ? ? ((data[0] - 1) << L2X0_LATENCY_CTRL_RD_SHIFT) |
->> ?413 ? ? ? ? ? ? ? ? ? ? ? ? ((data[1] - 1) << L2X0_LATENCY_CTRL_WR_SHIFT) |
->> ?414 ? ? ? ? ? ? ? ? ? ? ? ? ((data[2] - 1) << L2X0_LATENCY_CTRL_SETUP_SHIFT),
->> ?415 ? ? ? ? ? ? ? ? ? ? ? ? l2x0_base + L2X0_DATA_LATENCY_CTRL);
->> ?416
->> ?417 ? ? ? ? of_property_read_u32_array(np, "arm,filter-ranges",
->> ?418 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?filter, ARRAY_SIZE(filter));
->> ?419 ? ? ? ? if (filter[0] && filter[1]) {
->> ?420 ? ? ? ? ? ? ? ? writel_relaxed(ALIGN(filter[0] + filter[1], SZ_1M),
->> ?421 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?l2x0_base + L2X0_ADDR_FILTER_END);
->> ?422 ? ? ? ? ? ? ? ? writel_relaxed((filter[0] & ~(SZ_1M - 1)) |
->> L2X0_ADDR_FILTER_EN,
->> ?423 ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?l2x0_base + L2X0_ADDR_FILTER_START);
->> ?424 ? ? ? ? }
->> ?425 }
->>
->> not all l2 have all these registers. for example, it seems only prima2
->> has L2X0_ADDR_FILTER_START/END by now. and only some platforms set
->> latency too.
->
-> Save them as normal. ?If there aren't the values in DT, read them in the
-> above functions and save the value. ?Then...
-Do you think the following is what you want?
 
-diff --git a/arch/arm/include/asm/outercache.h
-b/arch/arm/include/asm/outercache.h
-index d838743..53426c6 100644
---- a/arch/arm/include/asm/outercache.h
-+++ b/arch/arm/include/asm/outercache.h
-@@ -34,6 +34,7 @@ struct outer_cache_fns {
- 	void (*sync)(void);
- #endif
- 	void (*set_debug)(unsigned long);
-+	void (*resume)(void);
- };
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Laurent Pinchart
+> Sent: Monday, September 19, 2011 3:29 AM
+> To: Martin Hostettler
+> Cc: Tony Lindgren; linux-omap at vger.kernel.org; linux-
+> media at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2] arm: omap3evm: Add support for an MT9M032 based
+> camera board.
+> 
+> Hi Martin,
+> 
+> On Saturday 17 September 2011 11:34:57 Martin Hostettler wrote:
+> > Adds board support for an MT9M032 based camera to omap3evm.
+> >
+> > Sigend-off-by: Martin Hostettler <martin@neutronstar.dyndns.org>
+> > ---
+> >  arch/arm/mach-omap2/Makefile                |    1 +
+> >  arch/arm/mach-omap2/board-omap3evm-camera.c |  183
+> > +++++++++++++++++++++++++++ 2 files changed, 184 insertions(+), 0
+> > deletions(-)
+> >  create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
+> >
+> > Changes in V2:
+> >  * ported to current mainline
+> >  * Style fixes
+> >  * Fix error handling
+> >
+> > diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> > index f343365..8ae3d25 100644
+> > --- a/arch/arm/mach-omap2/Makefile
+> > +++ b/arch/arm/mach-omap2/Makefile
+> > @@ -202,6 +202,7 @@ obj-$(CONFIG_MACH_OMAP3_TORPEDO)        +=
+> > board-omap3logic.o \ obj-$(CONFIG_MACH_OVERO)		+= board-overo.o \
+> >  					   hsmmc.o
+> >  obj-$(CONFIG_MACH_OMAP3EVM)		+= board-omap3evm.o \
+> > +					   board-omap3evm-camera.o \
+> >  					   hsmmc.o
+> >  obj-$(CONFIG_MACH_OMAP3_PANDORA)	+= board-omap3pandora.o \
+> >  					   hsmmc.o
+> > diff --git a/arch/arm/mach-omap2/board-omap3evm-camera.c
+> > b/arch/arm/mach-omap2/board-omap3evm-camera.c new file mode 100644
+> > index 0000000..be987d9
+> > --- /dev/null
+> > +++ b/arch/arm/mach-omap2/board-omap3evm-camera.c
+> > @@ -0,0 +1,183 @@
+> > +/*
+> > + * Copyright (C) 2010-2011 Lund Engineering
+> > + * Contact: Gil Lund <gwlund@lundeng.com>
+> > + * Author: Martin Hostettler <martin@neutronstar.dyndns.org>
+> > + *
+[Hiremath, Vaibhav] The file below seems copied from (which is coming from all older releases of TI)
 
- #ifdef CONFIG_OUTER_CACHE
-@@ -74,6 +75,12 @@ static inline void outer_disable(void)
- 		outer_cache.disable();
- }
+http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/board-omap3evm-camera.c;h=2e6ccfef69027dee880d507b98b5a7998d4bbe7e;hb=adcd067326836777c049e3cb32a5b7d9d401fc31
 
-+static inline void outer_resume(void)
-+{
-+	if (outer_cache.resume)
-+		outer_cache.resume();
-+}
-+
- #else
+So I would appreciate if you keep original copyright and authorship of the file and add your sign-off to the patch.
 
- static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 0d85d22..4722707 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -32,6 +32,14 @@ static void __iomem *l2x0_base;
- static DEFINE_SPINLOCK(l2x0_lock);
- static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
- static uint32_t l2x0_size;
-+static u32 l2x0_aux_ctrl;
-+static u32 l2x0_tag_latency, l2x0_data_latency, l2x0_filter_start,
-l2x0_filter_end;
-+
-+struct l2x0_of_data {
-+	void (*setup)(const struct device_node *,__u32 *, __u32 *);
-+	void (*save)(void);
-+	void (*resume)(void);
-+};
+Thanks,
+Vaibhav
 
- static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
- {
-@@ -280,7 +288,7 @@ static void l2x0_disable(void)
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
-
--static void __init l2x0_unlock(__u32 cache_id)
-+static void l2x0_unlock(__u32 cache_id)
- {
- 	int lockregs;
- 	int i;
-@@ -356,6 +364,8 @@ void __init l2x0_init(void __iomem *base, __u32
-aux_val, __u32 aux_mask)
- 		/* l2x0 controller is disabled */
- 		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
-
-+		l2x0_aux_ctrl = aux;
-+
- 		l2x0_inv_all();
-
- 		/* enable L2X0 */
-@@ -445,18 +455,64 @@ static void __init pl310_of_setup(const struct
-device_node *np,
- 	}
- }
-
-+static void __init pl310_save(void)
-+{
-+	l2x0_tag_latency = readl_relaxed(l2x0_base + L2X0_TAG_LATENCY_CTRL);
-+	l2x0_data_latency = readl_relaxed(l2x0_base + L2X0_DATA_LATENCY_CTRL);
-+	l2x0_filter_end = readl_relaxed(l2x0_base + L2X0_ADDR_FILTER_END);
-+	l2x0_filter_start = readl_relaxed(l2x0_base + L2X0_ADDR_FILTER_START);
-+}
-+
-+static void l2x0_resume(void)
-+{
-+	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
-+		/* restore aux ctrl and enable l2 */
-+		l2x0_unlock(readl_relaxed(l2x0_base + L2X0_CACHE_ID));
-+
-+		writel_relaxed(l2x0_aux_ctrl, l2x0_base + L2X0_AUX_CTRL);
-+
-+		l2x0_inv_all();
-+
-+		writel_relaxed(1, l2x0_base + L2X0_CTRL);
-+	}
-+}
-+
-+static void pl310_resume(void)
-+{
-+	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
-+		/* restore pl310 setup */
-+		writel_relaxed(l2x0_tag_latency, l2x0_base + L2X0_TAG_LATENCY_CTRL);
-+		writel_relaxed(l2x0_data_latency, l2x0_base + L2X0_DATA_LATENCY_CTRL);
-+		writel_relaxed(l2x0_filter_end, l2x0_base + L2X0_ADDR_FILTER_END);
-+		writel_relaxed(l2x0_filter_start, l2x0_base + L2X0_ADDR_FILTER_START);
-+	}
-+
-+	l2x0_resume();
-+}
-+
-+static const struct l2x0_of_data pl310_data = {
-+	pl310_of_setup,
-+	pl310_save,
-+	pl310_resume,
-+};
-+
-+static const struct l2x0_of_data l2x0_data = {
-+	l2x0_of_setup,
-+	NULL,
-+	l2x0_resume,
-+};
-+
- static const struct of_device_id l2x0_ids[] __initconst = {
--	{ .compatible = "arm,pl310-cache", .data = pl310_of_setup },
--	{ .compatible = "arm,l220-cache", .data = l2x0_of_setup },
--	{ .compatible = "arm,l210-cache", .data = l2x0_of_setup },
-+	{ .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
-+	{ .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
-+	{ .compatible = "arm,l210-cache", .data = (void *)&l2x0_data },
- 	{}
- };
-
- int __init l2x0_of_init(__u32 aux_val, __u32 aux_mask)
- {
- 	struct device_node *np;
--	void (*l2_setup)(const struct device_node *np,
--		__u32 *aux_val, __u32 *aux_mask);
-+	struct l2x0_of_data *data;
-
- 	np = of_find_matching_node(NULL, l2x0_ids);
- 	if (!np)
-@@ -465,13 +521,20 @@ int __init l2x0_of_init(__u32 aux_val, __u32 aux_mask)
- 	if (!l2x0_base)
- 		return -ENOMEM;
-
-+	data = of_match_node(l2x0_ids, np)->data;
-+
- 	/* L2 configuration can only be changed if the cache is disabled */
- 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
--		l2_setup = of_match_node(l2x0_ids, np)->data;
--		if (l2_setup)
--			l2_setup(np, &aux_val, &aux_mask);
-+		if (data->setup)
-+			data->setup(np, &aux_val, &aux_mask);
- 	}
-+
-+	if (data->save)
-+		data->save();
-+
- 	l2x0_init(l2x0_base, aux_val, aux_mask);
-+
-+	outer_cache.resume = data->resume;
- 	return 0;
- }
- #endif
-
-
--barry
+> > + * Board intregration for a MT9M032 camera connected to IMAGE_CONN and
+> I2C
+> > Bus 2 + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License
+> > + * version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful, but
+> > + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> > + * General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+> > + * 02110-1301 USA
+> > + */
+> > +
+> > +#include <linux/i2c.h>
+> > +#include <linux/init.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +#include <linux/gpio.h>
+> > +#include <plat/mux.h>
+> > +#include "mux.h"
+> > +
+> > +#include "../../../drivers/media/video/omap3isp/isp.h"
+> > +#include "media/mt9m032.h"
+> > +
+> > +#include "devices.h"
+> > +
+> > +#define EVM_TWL_GPIO_BASE OMAP_MAX_GPIO_LINES
+> > +#define GPIO98_VID_DEC_RES	98
+> > +#define nCAM_VD_SEL		157
+> > +
+> > +#define MT9M032_I2C_BUS_NUM	2
+> > +
+> > +
+> > +enum omap3evmdc_mux {
+> > +	MUX_TVP5146,
+> > +	MUX_CAMERA_SENSOR,
+> > +	MUX_EXP_CAMERA_SENSOR,
+> > +};
+> > +
+> > +/**
+> > + * omap3evm_set_mux - Sets mux to enable signal routing to
+> > + *                           different peripherals present on new EVM
+> > board + * @mux_id: enum, mux id to enable
+> > + *
+> > + * Returns 0 for success or a negative error code
+> > + */
+> > +static int omap3evm_set_mux(enum omap3evmdc_mux mux_id)
+> > +{
+> > +	/* Set GPIO6 = 1 */
+> > +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 6, 1);
+> > +	gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+> > +
+> > +	switch (mux_id) {
+> > +	case MUX_TVP5146:
+> > +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+> > +		gpio_set_value(nCAM_VD_SEL, 1);
+> > +		break;
+> > +
+> > +	case MUX_CAMERA_SENSOR:
+> > +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 0);
+> > +		gpio_set_value(nCAM_VD_SEL, 0);
+> > +		break;
+> > +
+> > +	case MUX_EXP_CAMERA_SENSOR:
+> > +		gpio_set_value_cansleep(EVM_TWL_GPIO_BASE + 2, 1);
+> > +		break;
+> > +
+> > +	default:
+> > +		pr_err("omap3evm-camera: Invalid mux id #%d\n", mux_id);
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct mt9m032_platform_data mt9m032_platform_data = {
+> > +	.ext_clock = 13500000,
+> > +	.pll_pre_div = 6,
+> > +	.pll_mul = 120,
+> > +	.pll_out_div = 5,
+> > +	.invert_pixclock = 1,
+> > +};
+> > +
+> > +static struct i2c_board_info camera_i2c_devices[] = {
+> > +	{
+> > +		I2C_BOARD_INFO(MT9M032_NAME, MT9M032_I2C_ADDR),
+> > +		.platform_data = &mt9m032_platform_data,
+> > +	},
+> > +};
+> > +
+> > +static struct isp_subdev_i2c_board_info camera_i2c_subdevs[] = {
+> > +	{
+> > +		.board_info = &camera_i2c_devices[0],
+> > +		.i2c_adapter_id = MT9M032_I2C_BUS_NUM,
+> > +	},
+> > +	{},
+> > +};
+> > +
+> > +static struct isp_v4l2_subdevs_group camera_subdevs[] = {
+> > +	{
+> > +		.subdevs = camera_i2c_subdevs,
+> > +		.interface = ISP_INTERFACE_PARALLEL,
+> > +		.bus = {
+> > +			.parallel = {
+> > +				.data_lane_shift = 1,
+> > +				.clk_pol = 0,
+> > +				.bridge = ISPCTRL_PAR_BRIDGE_DISABLE,
+> > +			}
+> > +		},
+> > +	},
+> > +	{},
+> > +};
+> > +
+> > +static struct isp_platform_data isp_platform_data = {
+> > +	.subdevs = camera_subdevs,
+> > +};
+> > +
+> > +static int __init camera_init(void)
+> > +{
+> > +	int ret = -EINVAL;
+> > +
+> > +	omap_mux_init_gpio(nCAM_VD_SEL, OMAP_PIN_OUTPUT);
+> > +	if (gpio_request(nCAM_VD_SEL, "nCAM_VD_SEL") < 0) {
+> > +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_SEL(%d)\n",
+> > +		       nCAM_VD_SEL);
+> > +		goto err;
+> > +	}
+> > +	if (gpio_direction_output(nCAM_VD_SEL, 1) < 0) {
+> > +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_SEL(%d)
+> > direction\n", +		       nCAM_VD_SEL);
+> > +		goto err_vdsel;
+> > +	}
+> > +
+> > +	if (gpio_request(EVM_TWL_GPIO_BASE + 2, "T2_GPIO2") < 0) {
+> > +		pr_err("omap3evm-camera: Failed to get GPIO T2_GPIO2(%d)\n",
+> > +		       EVM_TWL_GPIO_BASE + 2);
+> > +		goto err_vdsel;
+> > +	}
+> > +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 2, 0) < 0) {
+> > +		pr_err("omap3evm-camera: Failed to set GPIO T2_GPIO2(%d)
+> direction\n",
+> > +		       EVM_TWL_GPIO_BASE + 2);
+> > +		goto err_2;
+> > +	}
+> > +
+> > +	if (gpio_request(EVM_TWL_GPIO_BASE + 8, "nCAM_VD_EN") < 0) {
+> > +		pr_err("omap3evm-camera: Failed to get GPIO nCAM_VD_EN(%d)\n",
+> > +		       EVM_TWL_GPIO_BASE + 8);
+> > +		goto err_2;
+> > +	}
+> > +	if (gpio_direction_output(EVM_TWL_GPIO_BASE + 8, 0) < 0) {
+> > +		pr_err("omap3evm-camera: Failed to set GPIO nCAM_VD_EN(%d)
+> direction\n",
+> > +		       EVM_TWL_GPIO_BASE + 8);
+> > +		goto err_8;
+> > +	}
+> > +
+> > +	omap3evm_set_mux(MUX_CAMERA_SENSOR);
+> > +
+> > +
+> > +	ret = omap3_init_camera(&isp_platform_data);
+> > +	if (ret < 0)
+> > +		goto err_8;
+> > +	return 0;
+> > +
+> > +err_8:
+> > +	gpio_free(EVM_TWL_GPIO_BASE + 8);
+> > +err_2:
+> > +	gpio_free(EVM_TWL_GPIO_BASE + 2);
+> > +err_vdsel:
+> > +	gpio_free(nCAM_VD_SEL);
+> > +err:
+> > +	return ret;
+> > +}
+> > +
+> > +device_initcall(camera_init);
+> 
+> Please don't use device_initcall(), but call the function directly from
+> the
+> OMAP3 EVM init handler. Otherwise camera_init() will be called if OMAP3
+> EVM
+> support is compiled in the kernel, regardless of the board the kernel runs
+> on.
+> 
+> --
+> Regards,
+> 
+> Laurent Pinchart
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
