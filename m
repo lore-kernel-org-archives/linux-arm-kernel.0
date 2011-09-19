@@ -1,22 +1,47 @@
-From: AMartin@nvidia.com (Allen Martin)
-Date: Mon, 19 Sep 2011 10:26:08 -0700
-Subject: [PATCH] arm/dt: Add SoC detection macros
-In-Reply-To: <20110917112321.GE16381@n2100.arm.linux.org.uk>
-References: <1315555339-12685-1-git-send-email-amartin@nvidia.com>
-	<20110917102811.GC16381@n2100.arm.linux.org.uk>
-	<20110917103457.GP28104@game.jcrosoft.org>
-	<20110917112321.GE16381@n2100.arm.linux.org.uk>
-Message-ID: <3C7A7ACA8617D24290826EC008B5CD083E17B00988@HQMAIL03.nvidia.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 19 Sep 2011 19:30:38 +0200
+Subject: [PATCH v3 1/4] ARM: S5PV210: Rename sclk_cam clocks for FIMC media
+	driver
+In-Reply-To: <1316453441-13525-1-git-send-email-s.nawrocki@samsung.com>
+References: <1316453441-13525-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1316453441-13525-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> What I'm saying is that in that scenario it should not be necessary to edit the
-> kernel to invent new SoC types, and then teach it that Tegra4 is mostly the
-> same as Tegra3.  That information should all be encoded into the DT rather
-> than the C code in the kernel.
-> 
-> So, I think adding this SoC type stuff is the wrong approach to the problem.
+The sclk_cam clocks are now controlled by the top level FIMC media
+device driver bound to "s5p-fimc-md" platform device.
+Rename sclk_cam clocks so they accessible by the corresponding
+driver.
 
-What ends up happening in practice for a lot of hw blocks inside the SoC, is that tegra4 is mostly the same as tegra3 with a few new registers and bug fixes that slightly change the programming model.  So either we have to add device quirks to teach device tree about the differences, and pass those in as flags to the driver, or we can do SoC detection at runtime in the driver.  It sounds like the consensus from you and Olof is that the first is preferable.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-s5pv210/clock.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
--Allen
+diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+index ad553ee..4c5ac7a 100644
+--- a/arch/arm/mach-s5pv210/clock.c
++++ b/arch/arm/mach-s5pv210/clock.c
+@@ -879,8 +879,7 @@ static struct clksrc_clk clksrcs[] = {
+ 		.reg_div = { .reg = S5P_CLK_DIV3, .shift = 20, .size = 4 },
+ 	}, {
+ 		.clk		= {
+-			.name		= "sclk_cam",
+-			.devname	= "s5pv210-fimc.0",
++			.name		= "sclk_cam0",
+ 			.enable		= s5pv210_clk_mask0_ctrl,
+ 			.ctrlbit	= (1 << 3),
+ 		},
+@@ -889,8 +888,7 @@ static struct clksrc_clk clksrcs[] = {
+ 		.reg_div = { .reg = S5P_CLK_DIV1, .shift = 12, .size = 4 },
+ 	}, {
+ 		.clk		= {
+-			.name		= "sclk_cam",
+-			.devname	= "s5pv210-fimc.1",
++			.name		= "sclk_cam1",
+ 			.enable		= s5pv210_clk_mask0_ctrl,
+ 			.ctrlbit	= (1 << 4),
+ 		},
+-- 
+1.7.6.3
