@@ -1,32 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 19 Sep 2011 11:44:38 -0600
-Subject: [PATCH 5/5] ARM: gic: add OF based initialization
-In-Reply-To: <20110919133301.GR16381@n2100.arm.linux.org.uk>
-References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
-	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
-	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
-	<4E71CE5D.9030900@ti.com> <4E71F978.6020402@gmail.com>
-	<4E72030F.1090300@ti.com>
-	<4E722B2D.4050307@gmail.com> <4E770FA6.2070305@ti.com>
-	<20110919133301.GR16381@n2100.arm.linux.org.uk>
-Message-ID: <CACxGe6soJQu5Cvc+ZANVS=WXwACzG69GPGF9fAuVLDB-sUurUw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Sep 2011 17:40:44 +0100
+Subject: [PATCH 7/7] ARM: pm: add L2 cache cleaning for suspend
+In-Reply-To: <20110919163741.GE16591@n2100.arm.linux.org.uk>
+References: <20110919163741.GE16591@n2100.arm.linux.org.uk>
+Message-ID: <E1R5gtg-00056O-J9@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2011 at 7:33 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Sep 19, 2011 at 11:47:18AM +0200, Cousson, Benoit wrote:
->> Since the cpumask is not relevant for the SPI, maybe having two
->> interrupt controllers will be more relevant. Or maybe 3, since there is
->> some SGIs as well.
->
-> I don't think anyone uses SGIs outside of the common SMP code.
-> Therefore they're handled entirely separately for the root GIC.
->
-> (If there's two GICs - some platforms do have two - then the SGIs on
-> the non-root GIC are unused.)
+We need to ensure that state is pushed out from the L2 cache when
+suspending so that the resume paths can access their data before the
+MMU and caches have been re-initialized.  Add the necessary calls to
+__cpu_suspend_save().
 
-...and since SGIs aren't external HW inputs to the GIC, there really
-isn't any need to reflect them in the GIC DT binding.
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/suspend.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-g.
+diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+index 2d60f19..93a22d2 100644
+--- a/arch/arm/kernel/suspend.c
++++ b/arch/arm/kernel/suspend.c
+@@ -28,6 +28,9 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
+ 	cpu_do_suspend(ptr);
+ 
+ 	flush_cache_all();
++	outer_clean_range(*save_ptr, *save_ptr + ptrsz);
++	outer_clean_range(virt_to_phys(save_ptr),
++			  virt_to_phys(save_ptr) + sizeof(*save_ptr));
+ }
+ 
+ /*
+-- 
+1.7.4.4
