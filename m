@@ -1,51 +1,24 @@
-From: aliguori@us.ibm.com (Anthony Liguori)
-Date: Mon, 19 Sep 2011 08:28:23 -0500
-Subject: [RFC v3] arm: Add platform bus driver for memory mapped virtio
-	device
-In-Reply-To: <874o09ryzm.fsf@rustcorp.com.au>
-References: <1316191623-3835-1-git-send-email-pawel.moll@arm.com>	<4E7380FD.1030200@us.ibm.com>
-	<874o09ryzm.fsf@rustcorp.com.au>
-Message-ID: <4E774377.8030703@us.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Sep 2011 14:33:01 +0100
+Subject: [PATCH 5/5] ARM: gic: add OF based initialization
+In-Reply-To: <4E770FA6.2070305@ti.com>
+References: <1316017900-19918-1-git-send-email-robherring2@gmail.com>
+	<1316017900-19918-6-git-send-email-robherring2@gmail.com>
+	<CAJuYYwSFu2HC+u2NY41+yw9tEyy85RKa4Dpm3SL+jbwS_OOA0A@mail.gmail.com>
+	<4E71CE5D.9030900@ti.com> <4E71F978.6020402@gmail.com>
+	<4E72030F.1090300@ti.com> <4E722B2D.4050307@gmail.com>
+	<4E770FA6.2070305@ti.com>
+Message-ID: <20110919133301.GR16381@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/18/2011 10:29 PM, Rusty Russell wrote:
-> On Fri, 16 Sep 2011 12:01:49 -0500, Anthony Liguori<aliguori@us.ibm.com>  wrote:
->> On 09/16/2011 11:47 AM, Pawel Moll wrote:
->>> This patch, based on virtio PCI driver, adds support for memory
->>> mapped (platform) virtio  device. This should allow environments
->>> like qemu to use virtio-based block&   network devices.
->>>
->>> One can define and register a platform device which resources
->>> will describe memory mapped control registers and "mailbox"
->>> interrupt. Such device can be also instantiated using the Device
->>> Tree node with compatible property equal "virtio,mmio".
->>>
->>> Cc: Rusty Russell<rusty@rustcorp.com.au>
->>> Cc: Anthony Liguori<aliguori@us.ibm.com>
->>> Cc: Michael S.Tsirkin<mst@redhat.com>
->>> Signed-off-by: Pawel Moll<pawel.moll@arm.com>
->>
->> Have you written a specification for this device?
->>
->> Rusty maintains a formal spec for all virtio devices at:
->>
->> http://ozlabs.org/~rusty/virtio-spec/
->>
->> The spec should be written before merging the code to make sure that there
->> aren't future compatibility problems.
->
-> A good idea, but the current spec is for PCI.  I wonder if we should
-> move the PCI part out to an appendix and make it more general?
->
-> Meanwhile, perhaps this would be suitable as an appendix.
+On Mon, Sep 19, 2011 at 11:47:18AM +0200, Cousson, Benoit wrote:
+> Since the cpumask is not relevant for the SPI, maybe having two  
+> interrupt controllers will be more relevant. Or maybe 3, since there is  
+> some SGIs as well.
 
-I was thinking an appendix would be a good start.
+I don't think anyone uses SGIs outside of the common SMP code.
+Therefore they're handled entirely separately for the root GIC.
 
-Regards,
-
-Anthony Liguori
-
->
-> Cheers,
-> Rusty.
+(If there's two GICs - some platforms do have two - then the SGIs on
+the non-root GIC are unused.)
