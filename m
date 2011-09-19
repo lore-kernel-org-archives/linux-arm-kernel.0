@@ -1,74 +1,30 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 19 Sep 2011 22:21:13 +0800
-Subject: [PATCH v2 2/6] arm/imx6q: add core definitions and low-level
-	debug uart
-In-Reply-To: <20110919095544.GL31404@pengutronix.de>
-References: <1316097926-913-1-git-send-email-shawn.guo@linaro.org>
-	<1316097926-913-3-git-send-email-shawn.guo@linaro.org>
-	<20110919093516.GK31404@pengutronix.de>
-	<CAMPhdO-MWPo8xAF12O2cehfT8a4zmpY0zCVZBQGUsS42-LzQrw@mail.gmail.com>
-	<20110919095544.GL31404@pengutronix.de>
-Message-ID: <20110919142112.GB28084@S2100-06.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Sep 2011 15:13:07 +0100
+Subject: [PATCH 06/19] ARM: mach-at91: remove arch specific special
+	handling for ioremap
+In-Reply-To: <20110919130703.GG16141@game.jcrosoft.org>
+References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
+	<1316156850-31013-7-git-send-email-nico@fluxnic.net>
+	<20110919130703.GG16141@game.jcrosoft.org>
+Message-ID: <20110919141307.GS16381@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2011 at 11:55:44AM +0200, Sascha Hauer wrote:
-> On Mon, Sep 19, 2011 at 05:45:59PM +0800, Eric Miao wrote:
-> > On Mon, Sep 19, 2011 at 5:35 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > > On Thu, Sep 15, 2011 at 10:45:22PM +0800, Shawn Guo wrote:
-> > >> It adds the core definitions and low-level debug uart support
-> > >> for imx6q.
-> > >>
-> > >>
-> > >> ?#define UART_VADDR ? IMX_IO_ADDRESS(UART_PADDR)
-> > >> diff --git a/arch/arm/plat-mxc/include/mach/entry-macro.S b/arch/arm/plat-mxc/include/mach/entry-macro.S
-> > >> index 066d464..341f800 100644
-> > >> --- a/arch/arm/plat-mxc/include/mach/entry-macro.S
-> > >> +++ b/arch/arm/plat-mxc/include/mach/entry-macro.S
-> > >> @@ -1,6 +1,6 @@
-> > >> ?/*
-> > >> ? * ?Copyright (C) 2007 Lennert Buytenhek <buytenh@wantstofly.org>
-> > >> - * ?Copyright 2004-2009 Freescale Semiconductor, Inc. All Rights Reserved.
-> > >> + * ?Copyright 2004-2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> > >> ? */
-> > >>
-> > >> ?/*
-> > >> @@ -11,6 +11,17 @@
-> > >>
-> > >> ?#include <mach/hardware.h>
-> > >>
-> > >> +#ifdef CONFIG_ARM_GIC
-> > >> +#include <asm/hardware/entry-macro-gic.S>
-> > >> +
-> > >> + ? ? .macro ?disable_fiq
-> > >> + ? ? .endm
-> > >> +
-> > >> + ? ? .macro ?arch_ret_to_user, tmp1, tmp2
-> > >> + ? ? .endm
-> > >> +
-> > >> +#else
-> > >
-> > > That's the third interrupt entry code handled here with ifdefs. I
-> > > remember there was some infrastructure to have multiple irq
-> > > controllers. I can't find any pointers, but I think Eric (added him
-> > > to Cc) told me about it.
-> > > As this is also the last roadblock to compile i.MX3 and i.MX5 into a
-> > > single kernel this might be the right moment to work on this.
+On Mon, Sep 19, 2011 at 03:35:47PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 03:07 Fri 16 Sep     , Nicolas Pitre wrote:
+> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
 > > 
-
-It seems to be a work that basically need to touch very imx platforms.
-I would like to work on it, but I do not think it belongs to this
-series.
-
-Regards,
-Shawn
-
-> > It's CONFIG_MULTIPLE_IRQ_HANDLER. And check arch/arm/mach-pxa/irq.c
-> > for example. Basically to use a C function to handle the interrupts, and
-> > have each machine to specify the correct handler.
+> > A generic version should replace this later.
 > > 
-> > E.g. in pxa - there are pxa25x_handle_irq, pxa3xx_handle_irq ...
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Untill the replace will availlable
 > 
-> Nice, it's already merged. I should have used grep instead of google.
-> For reference, it's CONFIG_MULTI_IRQ_HANDLER.
-> 
+> do not remove it
+
+This patch series is all about adding that replacement.
+
+But yes, as a general point of principle, the replacement should be
+in place before the old stuff is pulled out.  I don't see any reason
+why that can't be the case, because __arm_ioremap() can be rigged up
+to use the static mappings first, and then the individual platform
+interception of ioremap() can be removed afterwards.
