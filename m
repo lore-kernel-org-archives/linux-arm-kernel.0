@@ -1,65 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 19 Sep 2011 15:55:10 -0700
-Subject: [PATCH 1/2] ARM: debug: Add CLSP711X_UART1 config choice
-In-Reply-To: <20110919224151.GB28237@n2100.arm.linux.org.uk>
-References: <20110916114140.GA31334@e102144-lin.cambridge.arm.com>
-	<1316455300-5752-1-git-send-email-sboyd@codeaurora.org>
-	<20110919212502.GB23613@e102144-lin.cambridge.arm.com>
-	<4E77BE34.6070702@codeaurora.org>
-	<20110919224151.GB28237@n2100.arm.linux.org.uk>
-Message-ID: <4E77C84E.9040202@codeaurora.org>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 19 Sep 2011 18:13:11 -0500
+Subject: READ THIS: the next mach-types update
+In-Reply-To: <20110915102528.GI6267@n2100.arm.linux.org.uk>
+References: <20110915102528.GI6267@n2100.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F39DAED674@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/11 15:41, Russell King - ARM Linux wrote:
-> On Mon, Sep 19, 2011 at 03:12:04PM -0700, Stephen Boyd wrote:
->> On 09/19/11 14:25, Will Deacon wrote:
->>> Thanks for cooking the patch, it was somewhere on my list of things to do
->>> this week! I think we also need to fix the DEBUG_DC21285_PORT option as that
->>> has a similar `if not selected then use a different UART' behaviour. It can be
->>> fixed in the same way as you have done in this patch.'
->> Ah my eyes glossed over the DC21285 one. Here's one on top of patch 2.
->> Feel free to squash, etc.
-> Err, the DC21285 only has one serial port.
+On Thursday, September 15, 2011 3:25 AM, Russell King wrote:
 >
-> Some footbridge platforms expose the DC21285 to the outside world, others
-> don't.  Some footbridge platforms have a separate 8250 UART at the standard
-> PCI COM1 address, others don't.
+> I'm going to be merging a mach-types update (the cut-down and the
+> policy-conforming version) for the next merge window.  This will mean
+> that things WILL BREAK, and I will not notice that things have broken.
 >
-> What DEBUG_DC21285_PORT is selecting between is whether to use the DC21285
-> port (when set) or the 8250 at PCI COM1 (when unset).
+> In order to fix this, entries need to be fixed to conform to the
+> requirements - where the machine_is_xxx() name is the same as the
+> MACH_TYPE_xxx name and the CONFIG_MACH_xxx name too.
+>
+> Moreover, entries older than 12 months which have not been merged will
+> be removed.  It is not possible to automatically check for machine_is_xxx()
+> usages as these could conflict with other architectures, and I'm
+> certainly NOT checking for them by hand (I estimate that'd take a
+> significant amount of manual effort to do.)  What that means is that it
+> is _important_ to get the core platform support in _first_ before any
+> drivers which may make use of this.
 
-Ah ok. How about this instead?
+Russell,
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 9661c51..31896f4 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -93,14 +93,19 @@ choice
-                  It does include a timeout to ensure that the system does not
-                  totally freeze when there is nothing connected to read.
- 
-+       config DEBUG_FOOTBRIDGE_COM1
-+               bool "Kernel low-level debugging messages via footbridge 8250 at PCI COM1"
-+               depends on FOOTBRIDGE
-+               help
-+                 Say Y here if you want the debug print routines to direct
-+                 their output to the 8250 at PCI COM1.
-+
-        config DEBUG_DC21285_PORT
-                bool "Kernel low-level debugging messages via footbridge serial port"
-                depends on FOOTBRIDGE
-                help
-                  Say Y here if you want the debug print routines to direct
-                  their output to the serial port in the DC21285 (Footbridge).
--                 Saying N will cause the debug messages to appear on the first
--                 16550 serial port.
- 
-        config DEBUG_CLPS711X_UART1
-                bool "Kernel low-level debugging messages via UART1"
+I posted support for MACH_VISION_EP9307 back in March and it's in your
+patch tracker as 6851/1.  I assumed it was still there because of the
+work to clean up the ARM tree.
 
+Is it possible to still get this patch merged and add the following
+back to mach-types:
 
+vision_ep9307		MACH_VISION_EP9307	VISION_EP9307		1578
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks,
+Hartley
