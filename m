@@ -1,73 +1,49 @@
-From: philippe.retornaz@epfl.ch (=?utf-8?q?Philippe=20R=C3=A9tornaz?=)
-Date: Tue, 20 Sep 2011 10:57:43 +0200
-Subject: [PATCH 1/1] mx31moboard: Add poweroff support
-Message-ID: <1316509063-26787-1-git-send-email-philippe.retornaz@epfl.ch>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 20 Sep 2011 12:07:48 +0300
+Subject: [PATCH 00/10] hwspinlock-next
+In-Reply-To: <1315846025-11453-1-git-send-email-ohad@wizery.com>
+References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
+Message-ID: <CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add poweroff support on mx31moboard platform.
-A watchdog timeout is generated while enabling the watchdog
-reset IO to trigger a PMIC poweroff.
+On Mon, Sep 12, 2011 at 7:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> This series includes a new u8500 hwspinlock driver from Mathieu,
+> a core fix from Juan and several other cleanups/fixes
+> (some of which were reported by Arnd while reviewing Mathieu's
+> driver).
+...
+> ?Documentation/hwspinlock.txt ? ? ? ? ? ? | ? 74 +++++++-----
+> ?MAINTAINERS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 15 +++
+> ?arch/arm/mach-omap2/hwspinlock.c ? ? ? ? | ? ?8 +-
+> ?drivers/hwspinlock/Kconfig ? ? ? ? ? ? ? | ? 27 +++--
+> ?drivers/hwspinlock/Makefile ? ? ? ? ? ? ?| ? ?2 +
+> ?drivers/hwspinlock/hwspinlock_core.c ? ? | ?204 +++++++++++++++++++-----------
+> ?drivers/hwspinlock/hwspinlock_internal.h | ? 40 ++++--
+> ?drivers/hwspinlock/omap_hwspinlock.c ? ? | ?127 +++++++------------
+> ?drivers/hwspinlock/u8500_hsem.c ? ? ? ? ?| ?198 +++++++++++++++++++++++++++++
+> ?include/linux/hwspinlock.h ? ? ? ? ? ? ? | ? 46 +++++--
+> ?10 files changed, 516 insertions(+), 225 deletions(-)
 
-Signed-off-by: Philippe R?tornaz <philippe.retornaz@epfl.ch>
----
- arch/arm/mach-imx/mach-mx31moboard.c       |   17 +++++++++++++++++
- arch/arm/plat-mxc/include/mach/iomux-mx3.h |    1 +
- 2 files changed, 18 insertions(+), 0 deletions(-)
+I'm wondering how hwspinlock updates like this should go upstream.
 
-diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-index 2a43492..3d3d10f 100644
---- a/arch/arm/mach-imx/mach-mx31moboard.c
-+++ b/arch/arm/mach-imx/mach-mx31moboard.c
-@@ -29,6 +29,9 @@
- #include <linux/types.h>
- #include <linux/memblock.h>
- #include <linux/input.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
- 
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
-@@ -509,6 +512,18 @@ err:
- 
- }
- 
-+static void mx31moboard_poweroff(void)
-+{
-+	struct clk *clk = clk_get_sys("imx2-wdt.0", NULL);
-+
-+	if (!IS_ERR(clk))
-+		clk_enable(clk);
-+
-+	mxc_iomux_mode(MX31_PIN_WATCHDOG_RST__WATCHDOG_RST);
-+
-+	__raw_writew(1 << 6 | 1 << 2, MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
-+}
-+
- static int mx31moboard_baseboard;
- core_param(mx31moboard_baseboard, mx31moboard_baseboard, int, 0444);
- 
-@@ -544,6 +559,8 @@ static void __init mx31moboard_init(void)
- 
- 	moboard_usbh2_init();
- 
-+	pm_power_off = mx31moboard_poweroff;
-+
- 	switch (mx31moboard_baseboard) {
- 	case MX31NOBOARD:
- 		break;
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx3.h b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-index c92f0b1..63f22a0 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx3.h
-@@ -735,6 +735,7 @@ enum iomux_pins {
- #define MX31_PIN_KEY_COL5_KEY_COL5	IOMUX_MODE(MX31_PIN_KEY_COL5, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_COL6_KEY_COL6	IOMUX_MODE(MX31_PIN_KEY_COL6, IOMUX_CONFIG_FUNC)
- #define MX31_PIN_KEY_COL7_KEY_COL7	IOMUX_MODE(MX31_PIN_KEY_COL7, IOMUX_CONFIG_FUNC)
-+#define MX31_PIN_WATCHDOG_RST__WATCHDOG_RST	IOMUX_MODE(MX31_PIN_WATCHDOG_RST, IOMUX_CONFIG_FUNC)
- 
- 
- /*
--- 
-1.6.3.3
+The first hwspinlock batch was picked by Tony, because it involved a
+bulk of OMAP changes.
+
+Hwspinlock isn't OMAP-specific anymore though (we gained support for
+STE's u8500) and the vast majority of changes are in drivers/. We're
+still very much ARM-related, though this may change too at some point
+(c6x has a similar "hardware semaphore" peripheral like the u8500
+does).
+
+Tony, if you're still willing to pick up these updates I'd be happy to
+send you pull requests of course.
+
+Otherwise, I'll appreciate if anyone has any suggestions ?
+
+I'll of course set up a tree for this and ask Stephen to take it to
+linux-next as expected (unless someone just prefers to pick up the
+acked patches into his tree).
+
+Thanks,
+Ohad.
