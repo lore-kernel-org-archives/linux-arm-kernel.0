@@ -1,63 +1,81 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 20 Sep 2011 10:46:25 -0600
-Subject: [PATCH REPOST 1/2] arm/dt: Tegra: Update SDHCI nodes to match bindings
-Message-ID: <1316537186-26753-1-git-send-email-swarren@nvidia.com>
+Date: Tue, 20 Sep 2011 09:51:08 -0700
+Subject: [PATCH] i2c/tegra: I2C driver uses the suspend_noirq/resume_noirq
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B3279D4F@HQMAIL01.nvidia.com>
+References: <1312586102-27907-1-git-send-email-swarren@nvidia.com>
+	<CAMbhsRScgMaTZ2e3a__OgOrrA6HN9_dkGuuNGaEfP+iqRdjyNQ@mail.gmail.com>
+	<20110806084805.GA18098@sirena.org.uk>
+	<74CDBE0F657A3D45AFBB94109FB122FF04AEA24CC8@HQMAIL01.nvidia.com>
+	<CAMbhsRR2+bhpjhGfUSt9M5tDk1EW2d70yC-tZy27zEgVqtkfSg@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04AEA24D09@HQMAIL01.nvidia.com>
+	<CAMbhsRTVm+dUODDgqiekpTrrNnpo9trJNNvOQ2ETCNkneh-L-g@mail.gmail.com>
+	<1313109916.19990.28.camel@finisterre.wolfsonmicro.main>
+	<CAMbhsRShLvyc2XKJAL8PwR0Uj4Pnp9rVt7QyK1qAVxJ-R2PSdQ@mail.gmail.com>
+	<20110812031433.GE10218@opensource.wolfsonmicro.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B24A3CA6@HQMAIL01.nvidia.com>
+	<CAMbhsRRRa_JV8_LHEvsM2h3e8Hbf1GAcpXz8gdU3wCc8Jgz5gw@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B3279D4F@HQMAIL01.nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B73215C9@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bindings were recently updated to have separate properties for each
-type of GPIO. Update the Device Tree source to match that.
+Stephen Warren wrote at Tuesday, August 30, 2011 10:25 AM:
+> Ben, Arnd,
+> 
+> Could you please ack/nack the patch at the start of this thread for Colin;
+> see below.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
-Acked-by: Olof Johansson <olof@lixom.net>
----
-I'd previously sent these to Grant assuming they'd go in his dt/next branch,
-but perhaps these should go in through Arnd's arm-soc next/dt branch?
+Ben, can you please comment on the acceptability of this patch?
 
- arch/arm/boot/dts/tegra-harmony.dts  |   12 ++++++------
- arch/arm/boot/dts/tegra-seaboard.dts |    6 +++---
- 2 files changed, 9 insertions(+), 9 deletions(-)
+Or Arnd, did Mark's most recent explanation of the situation provide enough
+context for you to ack/nak it?
 
-diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
-index 4c05334..e581866 100644
---- a/arch/arm/boot/dts/tegra-harmony.dts
-+++ b/arch/arm/boot/dts/tegra-harmony.dts
-@@ -57,14 +57,14 @@
- 	};
- 
- 	sdhci at c8000200 {
--		gpios = <&gpio 69 0>, /* cd, gpio PI5 */
--			<&gpio 57 0>, /* wp, gpio PH1 */
--			<&gpio 155 0>; /* power, gpio PT3 */
-+		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
-+		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
-+		power-gpios = <&gpio 155 0>; /* gpio PT3 */
- 	};
- 
- 	sdhci at c8000600 {
--		gpios = <&gpio 58 0>, /* cd, gpio PH2 */
--			<&gpio 59 0>, /* wp, gpio PH3 */
--			<&gpio 70 0>; /* power, gpio PI6 */
-+		cd-gpios = <&gpio 58 0>; /* gpio PH2 */
-+		wp-gpios = <&gpio 59 0>; /* gpio PH3 */
-+		power-gpios = <&gpio 70 0>; /* gpio PI6 */
- 	};
- };
-diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
-index 1940cae..64cedca 100644
---- a/arch/arm/boot/dts/tegra-seaboard.dts
-+++ b/arch/arm/boot/dts/tegra-seaboard.dts
-@@ -21,8 +21,8 @@
- 	};
- 
- 	sdhci at c8000400 {
--		gpios = <&gpio 69 0>, /* cd, gpio PI5 */
--			<&gpio 57 0>, /* wp, gpio PH1 */
--			<&gpio 70 0>; /* power, gpio PI6 */
-+		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
-+		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
-+		power-gpios = <&gpio 70 0>; /* gpio PI6 */
- 	};
- };
--- 
-1.7.0.4
+Thanks.
+
+> Thanks.
+> 
+> Colin Cross wrote at Wednesday, August 24, 2011 3:34 PM:
+> > On Wed, Aug 24, 2011 at 2:28 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> > > Mark Brown wrote at Thursday, August 11, 2011 9:15 PM:
+> > >> On Thu, Aug 11, 2011 at 07:59:27PM -0700, Colin Cross wrote:
+> > >> > On Thu, Aug 11, 2011 at 5:45 PM, Mark Brown
+> > >>
+> > >> > > For example with ASoC we'd sort all the components before the ASoC card
+> > >> > > without regard for their bus dependencies or any other dependencies they
+> > >> > > have (eg, their regulators). Since the ASoC card is a platform device
+> > >> > > it's likely to have registered early with no regard for where the buses
+> > >> > > the card needs are registered. I'd expect there's a reasonable chance
+> > >> > > it'll actually make things worse in the short term.
+> > >>
+> > >> > You can't just move everything after the card, you have to move
+> > >> > everything after the last device that was probed, and it only works if
+> > >> > nothing depends on any of the devices that are moved.
+> > >>
+> > >> Sorry, I said that the wrong way round due to trying to reply quickly -
+> > >> the card would be the thing that moves since that's the thing that
+> > >> actually does the suspend but we've *no* idea which device we need to
+> > >> move it after. ?Since all the function does is a direct move after or
+> > >> before a single device all we can do is pick one and pray that it's the
+> > >> right device.
+> > >
+> > > Colin,
+> > >
+> > > This thread seems to have died down; how should we make progress?
+> > >
+> > > It sounds like the suspend_irq solution is the current de-facto standard;
+> > > not optimal, but all we really have right now and already in use. I could
+> > > certainly see avoiding this solution if it was the first time it was
+> > > employed, but re-using it seems reasonable to me?
+> > >
+> > > Alternatively, are you attending either Linux Plumbers Conference or the
+> > > Kernel Summit? Mark implied this topic might well come up for discussion
+> > > there. Unfortunately, I won't be able to make LPC due to a conflict.
+> > I don't think I'll be able to make it.
+> >
+> > > (and you'd mentioned having the subsystem maintainers weigh in on this;
+> > > which sub-system; IRQ, power, I2C, ...?)
+> >
+> > If Ben says its OK, its fine with me.  Or maybe Arnd wants to weigh in?
+
+--
+nvpublic
