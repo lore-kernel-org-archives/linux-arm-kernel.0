@@ -1,43 +1,77 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 20 Sep 2011 14:05:09 +0100
-Subject: [PATCH] gpio/mxc: make it work with imx6q
-In-Reply-To: <1316423432-18333-1-git-send-email-shawn.guo@linaro.org>
-References: <1316423432-18333-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110920130508.GE2962@pulham.picochip.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 20 Sep 2011 09:27:01 -0400 (EDT)
+Subject: [PATCH] arm: Add unwinding annotations for 64bit division
+	functions
+In-Reply-To: <2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
+References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
+	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
+	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1109200922281.12663@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Mon, 19 Sep 2011, Laura Abbott wrote:
 
-On Mon, Sep 19, 2011 at 05:10:32PM +0800, Shawn Guo wrote:
-> The imx6q is a Cortex-A9 Quad Core SoC, which has GIC as the primary
-> interrupt controller.  GIC requires gpio irq handler to signal EOI,
-> otherwise system will hang whenever there is a gpio irq triggered.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/gpio/gpio-mxc.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-> index 4340aca..00b4c9c 100644
-> --- a/drivers/gpio/gpio-mxc.c
-> +++ b/drivers/gpio/gpio-mxc.c
-> @@ -233,6 +233,9 @@ static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
->  	u32 irq_stat;
->  	struct mxc_gpio_port *port = irq_get_handler_data(irq);
->  
-> +	if (desc->irq_data.chip->irq_eoi)
-> +		desc->irq_data.chip->irq_eoi(&desc->irq_data);
-> +
->  	irq_stat = readl(port->base + GPIO_ISR) & readl(port->base + GPIO_IMR);
->  
->  	mxc_gpio_irq_handler(port, irq_stat);
-> -- 
-> 1.7.4.1
+> On Mon, September 19, 2011 4:22 pm, Nicolas Pitre wrote:
+> > On Mon, 19 Sep 2011, Laura Abbott wrote:
+> >
+> >> The 64bit division functions never had unwinding annotations
+> >> added. This prevents a backtrace from being printed within
+> >> the function and if a division by 0 occurs. Add the annotations.
+> >>
+> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> >> ---
+> >>  arch/arm/lib/div64.S |    8 ++++++++
+> >>  1 files changed, 8 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/lib/div64.S b/arch/arm/lib/div64.S
+> >> index faa7748..e55c484 100644
+> >> --- a/arch/arm/lib/div64.S
+> >> +++ b/arch/arm/lib/div64.S
+> >> @@ -13,6 +13,7 @@
+> >>   */
+> >>
+> >>  #include <linux/linkage.h>
+> >> +#include <asm/unwind.h>
+> >>
+> >>  #ifdef __ARMEB__
+> >>  #define xh r0
+> >> @@ -44,6 +45,7 @@
+> >>   */
+> >>
+> >>  ENTRY(__do_div64)
+> >> +UNWIND(.fnstart)
+> >>
+> >>  	@ Test for easy paths first.
+> >>  	subs	ip, r4, #1
+> >> @@ -189,7 +191,12 @@ ENTRY(__do_div64)
+> >>  	moveq	yh, xh
+> >>  	moveq	xh, #0
+> >>  	moveq	pc, lr
+> >> +UNWIND(.fnend)
+> >>
+> >> +UNWIND(.fnstart)
+> >> +UNWIND(.pad #4)
+> >> +UNWIND(.save {lr})
+> >> +Ldiv0_64:
+> >
+> > Why this phony fnend+fnstart here?
+> >
+> If a division by 0 occurs, we need to be able to access the saved LR on
+> the stack which is setup right before calling the __div0 function. This
+> can't go at the top of __do_div64 because if we try to do a backtrace from
+> within __do_div64 the annotation won't be correct as the LR was never
+> saved on the stack.
 
-Could this make use of the chained_irq_enter/chained_irq_exit functions 
-added in 10a8c38 (ARM: 6806/1: irq: introduce entry and exit functions 
-for chained handlers)?
+I suppose the debug infrastructure always assume the same stack frame 
+for the whole function, hence you can't put that .pad and .save right 
+before the call to __div0 without the .fnstart and have it effective 
+only there?
 
-Jamie
+If so then:
+
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+
+Nicolas
