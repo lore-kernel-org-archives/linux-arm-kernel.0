@@ -1,47 +1,61 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Tue, 20 Sep 2011 11:03:20 +0300
-Subject: [PATCH v2 0/3] ARM: imx: Add cpuidle for imx platforms
-In-Reply-To: <20110920071633.GR31404@pengutronix.de>
-References: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
-	<20110920071633.GR31404@pengutronix.de>
-Message-ID: <20110920080320.GA2528@matterhorn1>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Sep 2011 16:14:39 +0800
+Subject: [PATCH 3/4] net/fec: set phy_speed to the optimal frequency 2.5
+	MHz
+In-Reply-To: <20088.17849.987651.196256@ipc1.ka-ro>
+References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
+	<1316346852-17090-4-git-send-email-shawn.guo@linaro.org>
+	<20088.17849.987651.196256@ipc1.ka-ro>
+Message-ID: <20110920081438.GB28389@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 Sep 20, Sascha Hauer wrote:
-> Hi Robert,
+On Tue, Sep 20, 2011 at 09:50:17AM +0200, Lothar Wa?mann wrote:
+> Hi,
 > 
-> On Fri, Sep 16, 2011 at 12:27:47PM -0500, Robert Lee wrote:
-> > This patch series adds a common imx cpuidle driver, some common 
-> > mach-mx5 level cpuidle functionality, and an i.MX51 instance of
-> > using this driver.
+> Shawn Guo writes:
+> > With the unnecessary 1 bit left-shift on fep->phy_speed during the
+> > calculation, the phy_speed always runs at the half frequency of the
+> > optimal one 2.5 MHz.
 > > 
-> > The patch series is based on v3.1-rc2.
+> > The patch removes that 1 bit left-shift to get the optimal phy_speed.
 > > 
-> > Changes since v1:
-> > * To address all the problems found during review of v1, a complete
-> > re-write was needed.
-> 
-> Much better than the last version, thanks.
-> 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  drivers/net/fec.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
 > > 
-> > Robert Lee (3):
-> >   ARM: imx: Add imx cpuidle driver
-> >   ARM: imx: Add cpuidle for mach-mx5
-> >   ARM: imx: Add cpuidle for i.MX51
-> > 
-> >  arch/arm/mach-mx5/Makefile               |    3 +-
-> >  arch/arm/mach-mx5/cpu_op-mx51.c          |   35 +++++++-
+> > diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+> > index 5ef0e34..04206e4 100644
+> > --- a/drivers/net/fec.c
+> > +++ b/drivers/net/fec.c
+> > @@ -1007,7 +1007,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+> >  	/*
+> >  	 * Set MII speed to 2.5 MHz (= clk_get_rate() / 2 * phy_speed)
+> >  	 */
+> > -	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000) << 1;
+> > +	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000);
+> >  	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
+> >  
+> >  	fep->mii_bus = mdiobus_alloc();
+> >
+> The left shift accounts for the fact, that the MII_SPEED bitfield
+> starts at pos 1 in the register. Thus the divider value has to be
+> shifted left to occupy the correct bit positions in the register.
 > 
-> Your additions to this file...
-> 
-> >  arch/arm/mach-mx5/cpu_op-mx51.h          |    1 +
-> >  arch/arm/mach-mx5/mm.c                   |    4 +
-> >  arch/arm/mach-mx5/system.c               |   35 +++++++
-> 
-> And this one should go to arch/arm/mach-mx5/cpuidle.c, then we have
-> all i.MX5 specific cpuidle stuff together without ifdeffing the code.
-> I assume that cpuidle support for i.MX53 will look identically, right?
+Oops, I missed that.
 
-Yes, let's not separate only for i.MX51. i.MX53 and even i.MX6 might look
-similar. They can always tune the exit latency criteria if needed.
+> According to my measurements on the TX28 the original code works
+> correctly!
+> Did you measure the actual frequency on the MDC pin after you change?
+> 
+I should have done that before sending this patch.  I'm working home
+these days and have not got the chance get into the lab.  Yes, I
+should have sent this patch as an RFC at least.  Sorry about this,
+and thank you for pointing this out.
+
+Will drop this patch from the v2 of the series.
+
+-- 
+Regards,
+Shawn
