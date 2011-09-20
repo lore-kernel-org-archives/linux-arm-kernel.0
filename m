@@ -1,52 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2011 23:34:43 +0200
-Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
-In-Reply-To: <20110917014623.GC2937@atomide.com>
-References: <20110917014623.GC2937@atomide.com>
-Message-ID: <201109202334.43213.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 20 Sep 2011 14:39:06 -0700
+Subject: [PATCH REPOST 1/2] arm/dt: Tegra: Update SDHCI nodes to match
+	bindings
+In-Reply-To: <201109202301.56983.arnd@arndb.de>
+References: <1316537186-26753-1-git-send-email-swarren@nvidia.com>
+	<20110920180731.GL7781@ponder.secretlab.ca>
+	<201109202134.50242.arnd@arndb.de>
+	<201109202301.56983.arnd@arndb.de>
+Message-ID: <CAOesGMg4kBH77Ou1xyyVT-Ojxg=9uyxmfsmhbbKquru=j+z6Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 September 2011, Tony Lindgren wrote:
-> Hi Arnd,
-> 
-> Please pull the first part of omap cleanup from:
-> 
-> git://github.com/tmlind/linux.git cleanup
-> 
-> This series cleans up early_init functions and removes
-> CHIP_IS macro usage. This makes it easier to have SoC
-> specific init functions so adding support for new omap
-> variants does not require patching all over the place.
+On Tue, Sep 20, 2011 at 2:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 20 September 2011, Arnd Bergmann wrote:
+>> On Tuesday 20 September 2011, Grant Likely wrote:
+>> > On Tue, Sep 20, 2011 at 07:43:29PM +0200, Arnd Bergmann wrote:
+>> > > On Tuesday 20 September 2011, Stephen Warren wrote:
+>> > > > The bindings were recently updated to have separate properties for each
+>> > > > type of GPIO. Update the Device Tree source to match that.
+>> > > >
+>> > > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> > > > Acked-by: Olof Johansson <olof@lixom.net>
+>> > > > ---
+>> > > > I'd previously sent these to Grant assuming they'd go in his dt/next branch,
+>> > > > but perhaps these should go in through Arnd's arm-soc next/dt branch?
+>> > > >
+>> > >
+>> > > Which tree has the update that changed the bindings? I think it should
+>> > > go into the same one.
+>> > >
+>> > > If it's already upstream, I can take it into the fixes branch.
+>> >
+>> > Already upstream
+>>
+>> Ok, I see. I've applied both patches to the fixes branch and will send
+>> it out with the next pull request for 3.1 to Linus then.
+>
+> Sorry, I just noticed that the second patch is not a bug fix, so I took it out
+> again and kept only patch 1/2 in the fixes branch for 3.1.
+>
+> Should I take the other one as well? It's probably better to let that
+> go the proper way through the tegra tree for 3.2, right?
 
-One more thing: my randconfig tests are running now and
-have spit out a new error after merging lost of stuff
-today:
+Given that you have a public tree right now, and I don't (since
+kernel.org is down), please feel free to start a tegra/for-3.2 branch
+for me and apply it there. I'll base further work on top of that if
+needed.
 
-arch/arm/mach-omap2/built-in.o: In function `omap_zoom_init':
-/home/arnd/linux-arm/arch/arm/mach-omap2/board-zoom.c:117: undefined reference to `board_nand_init'
-make[1]: *** [.tmp_vmlinux1] Error 1
-make[1]: Target `_all' not remade because of errors.
-make: *** [sub-make] Error 2
-make: Target `_all' not remade because of errors.
+(There also aren't a whole lot of other patches queued for 3.2 right now).
 
-It's not clear to me if this is actually caused by one of your
-changes, or just a mismerge of some sort. I've attached
-the defconfig that was used for your reference.
-
-Also, I've got a branch with lots of omap specific randconfig
-patches at
-
-git://git.linaro.org/people/arnd/linux.git randconfig/omap
-
-Probably not all of them are correct, but it would be nice
-if you could take a look and cherry-pick the ones you like.
-
-	Arnd
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: defconfig.gz
-Type: application/x-gzip
-Size: 2750 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110920/28f35e27/attachment.gz>
+-Olof
