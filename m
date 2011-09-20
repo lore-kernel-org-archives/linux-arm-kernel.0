@@ -1,38 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2011 21:34:50 +0200
-Subject: [PATCH REPOST 1/2] arm/dt: Tegra: Update SDHCI nodes to match
-	bindings
-In-Reply-To: <20110920180731.GL7781@ponder.secretlab.ca>
-References: <1316537186-26753-1-git-send-email-swarren@nvidia.com>
-	<201109201943.29510.arnd@arndb.de>
-	<20110920180731.GL7781@ponder.secretlab.ca>
-Message-ID: <201109202134.50242.arnd@arndb.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 20 Sep 2011 12:35:28 -0700
+Subject: IRQF_TRIGGER_LOW and ARM GIC
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B327A657@HQMAIL01.nvidia.com>
+References: <74CDBE0F657A3D45AFBB94109FB122FF04B327A657@HQMAIL01.nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B732169E@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 September 2011, Grant Likely wrote:
-> On Tue, Sep 20, 2011 at 07:43:29PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 20 September 2011, Stephen Warren wrote:
-> > > The bindings were recently updated to have separate properties for each
-> > > type of GPIO. Update the Device Tree source to match that.
-> > > 
-> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > > Acked-by: Olof Johansson <olof@lixom.net>
-> > > ---
-> > > I'd previously sent these to Grant assuming they'd go in his dt/next branch,
-> > > but perhaps these should go in through Arnd's arm-soc next/dt branch?
-> > > 
-> > 
-> > Which tree has the update that changed the bindings? I think it should
-> > go into the same one.
-> > 
-> > If it's already upstream, I can take it into the fixes branch.
+Stephen Warren wrote at Friday, September 02, 2011 1:28 PM:
+> Russell, Colin,
 > 
-> Already upstream
+> The Tegra Harmony board contains a TPS6586x chip, which has an active-low
+> interrupt output. This is then fed to Tegra's PMC's PWR_INT pin, which can
+> be programmed to accept active-low or active-high interrupt signals. This
+> then feeds into a GIC interrupt.
+> 
+> The problem is that the PMC appears to default to expecting the attached
+> signal to be active-high not active-low.
+> 
+> At a driver level, it seems that IRQF_TRIGGER_LEVEL_LOW should be passed
+> to request_threaded_irq() to solve this. However, gic.c:gic_set_type()
+> prohibits IRQ_TYPE_* except LEVEL_HIGH and EDGE_RISING.
+> 
+> I'm not quite sure how to solve this; should gic_set_type() be modified
+> to remove the restriction if gic_arch_extn.irq_set_type is present, and
+> assume that gic_arch_extn.irq_set_type will handle converting the input
+> signal from LEVEL_LOW to LEVEL_HIGH or EDGE_FALLING to EDGE_RISING?
+> 
+> In at least some non-mainline kernels, this has been solved by having
+> individual board files poke PMC registers to invert the signal to the
+> gic's expected LEVEL_HIGH. However, I assume that's not a good solution
+> for mainline.
+> 
+> Thanks.
 
-Ok, I see. I've applied both patches to the fixes branch and will send
-it out with the next pull request for 3.1 to Linus then.
+Russell, Colin, and thoughts on this? Should I simply modify gic_set_type()
+to allow LEVEL_LOW/EDGE_FALLING too?
 
-Thanks,
+Thanks.
 
-	Arnd
+-- 
+nvpublic
