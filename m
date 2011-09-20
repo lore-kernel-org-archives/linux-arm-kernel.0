@@ -1,163 +1,75 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 Sep 2011 09:37:58 -0500
-Subject: DT vs ARM static mappings
-In-Reply-To: <1316527365.4611.354.camel@hornet.cambridge.arm.com>
-References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
-	<4E788E12.8000801@gmail.com>
-	<1316527365.4611.354.camel@hornet.cambridge.arm.com>
-Message-ID: <4E78A546.9040604@gmail.com>
+From: ajaynumb@gmail.com (Ajay kumar)
+Date: Tue, 20 Sep 2011 20:16:00 +0530
+Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
+	structure
+In-Reply-To: <1316517021.1949.13.camel@deskari>
+References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
+	<1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
+	<1316517021.1949.13.camel@deskari>
+Message-ID: <CAEC9eQOTNaMcUWeSFN-DCTYrCJsVaDAO7uOZNQM=efjVdqtU2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pawel,
+Hi Tomi,
 
-On 09/20/2011 09:02 AM, Pawel Moll wrote:
->>> Of course the simplest solution would be to define two different
->>> compatible values, eg. "arm,vexpress-legacy" would execute the current
->>> map_io implementation, while "arm,vexpress-rs1" would use different one,
->>> setting up the other map_desc (the MMIO_P2V macro must die of course,
->>> replaced with a runtime-defined virtual base address for the
->>> peripherals).
->>>
->>> If you believe that's what I should do, say it and stop reading :-)
+On Tue, Sep 20, 2011 at 4:40 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> On Tue, 2011-09-20 at 11:30 -0400, Ajay Kumar wrote:
+>> This patch adds a data structure definiton to hold framebuffer windows/planes.
+>> An ioctl number is also added to provide user access
+>> to change window position dynamically.
 >>
->> Yes. Different tiles are fundamentally different boards, so they should
->> have different DTs. Using includes should help minimize duplication though.
-> 
-> You've misunderstood me or (most likely ;-) probably I wasn't clear
-> enough.
-> 
-> There is no doubt the DTs will be different across the "portfolio".
-> 
-> We already have (patches soon) vexpress-v2p-ca9.dts that includes
-> vexpress-v2m-legacy.dtsi.
-> 
-> A5 will be vexpress-v2p-ca5p.dts+vexpress-v2m-rs1.dtsi, A15
-> vexpress-v2p-ca15.dts+vexpress-v2m-rs1.dtsi (notice that the A5/A15 are
-> sharing the v2m bit, as the motherboard is common).
-> 
-> My point is that we should be able to handle _all_ of them using one
-> DT_MACHINE_START with a single compat value "arm,vexpress". The only
-> problem with this (so far) is the mapping.
-> 
-
-Yes, you should have 1 DT_MACHINE_START, but arm,vexpress is too
-generic. You can and should have a list of compatible strings for each
-board/machine.
-
->> Think about it this way. How would you solve this without DT? You
->> would have a bunch of duplicated data in the kernel for the different
->> configs. So you're not any worse off in this regard and still have the
->> other advantages of DT.
-> 
-> Exactly my point :-) I want to have as little duplication as possible.
-> And the static mapping issue is in the way.
-> 
->>> To my mind it looked like the whole mechanism was not flexible enough,
->>> so I wanted to explore other options...
->>>
->>> The obvious one was to describe the required static mapping in the DTS.
->>> I don't like this idea, though. It can hardly be called "hardware
->>> description". Besides, what node would carry such data? "chosen"?
->>> Hardly...
->>>
->>> Would it contain a "regs" property with the physical address and
->>> "virtual-reg" with the virtual one? Again, doesn't sound right to me
->>> (especially the virtual bit, however the virtual address could be common
->>> between different variants and be defined in the board support code, not
->>> the DTS).
->>>
->>> I have considered a reference (phandle or an alias?) to the node to be
->>> mapped ("peripherals" in my case), but where to define this reference?
->>> Any ideas?
+>> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+>> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+>> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>> ?include/linux/fb.h | ? ?7 +++++++
+>> ?1 files changed, 7 insertions(+), 0 deletions(-)
 >>
->> In "chosen" like the kernel command line would be the place, but I don't
->> think that is the right approach. Chosen is really for things that
->> change frequently and this doesn't really fall in that category.
-> 
-> Again, no argument from me here :-)
-> 
-> The question is - where should it be?
-> 
-
-Nowhere. It's an OS specific issue, not a h/w issue.
-
->>> There is an additional problem here... The "map_io" is executed before
->>> the tree is un-flattened, so:
->>>
->>> 1. One can't simply use "of_find_matching_node()" (as in the latest l2x0
->>> patches) to find the interesting nodes - the only way of going through
->>> the tree is raw of_scan_flat_dt() function. Therefore any conditions
->>> more complex then string comparison with the (full) node name are
->>> problematic.
->>>
->>> 2. The tree mappings (ranges) are not resolved yet, so one can't simply
->>> get the effective address of a node. Only "raw" properties are
->>> available, so all one can get scanning for "peripherals at 7" node is "0 7
->>> 0 0x20000" array, instead of the "0x10000000 0x00020000" that is really
->>> important. 
+>> diff --git a/include/linux/fb.h b/include/linux/fb.h
+>> index 1d6836c..2141941 100644
+>> --- a/include/linux/fb.h
+>> +++ b/include/linux/fb.h
+>> @@ -39,6 +39,7 @@
+>> ?#define FBIOPUT_MODEINFO ? ? ? ?0x4617
+>> ?#define FBIOGET_DISPINFO ? ? ? ?0x4618
+>> ?#define FBIO_WAITFORVSYNC ? ?_IOW('F', 0x20, __u32)
+>> +#define FBIOPOS_OVERLAY_WIN ?_IOW('F', 0x21, struct fb_overlay_win_pos)
 >>
->> If you add a compatible field to "motherboard" node, then you can read
->> the ranges.
-> 
-> ... and then and then scan for the sysregs, and add the offset and base
-> together... Sounds to me like duplication of the of_translate_*()?
-> 
->>> Initially I wanted to find the mentioned devices and create individual
->>> mappings for them, so the MMIO_P2V would be still valid (if slightly
->>> "abused"), but I failed due to the problems mentioned above. And I can't
->>> delay this operation till the tree is un-flattened, as the core tile
->>> must be probed (via sysreg) in map_io (tile's specific code must be able
->>> to create its own mappings):
+>> ?#define FB_TYPE_PACKED_PIXELS ? ? ? ? ? ? ? ?0 ? ? ? /* Packed Pixels ? ? ? ?*/
+>> ?#define FB_TYPE_PLANES ? ? ? ? ? ? ? ? ? ? ? 1 ? ? ? /* Non interleaved planes */
+>> @@ -366,6 +367,12 @@ struct fb_image {
+>> ? ? ? struct fb_cmap cmap; ? ?/* color map info */
+>> ?};
 >>
->> Do you really need MMIO_P2V? If you have fixed virtual addresses in the
->> kernel and can pull the phys addresses from DT to populate the iotable,
->> is that sufficient?
-> 
-> For the third time, 100% agree :-) Well, 90%.
-> 
-> What I need is:
-> 
-> 1. Get the phys address from DT. But how? This is getting as back to my
-> complaints about still-flat tree and ranges, the node to be used to
-> describe the mapping.
-> 
-> 2. The offset inside the mapping will be different (for sysregs it will
-> be 0 for old mapping, 0x10000 for the new one), so I have to work it out
-> from the tree as well. And as we are in map_io, the tree is still flat
-> and... read 1 :-)
+>> +/* Window overlaying */
+>> +struct fb_overlay_win_pos {
+>> + ? ? __u32 win_pos_x; ? ? ? ?/* x-offset from LCD(0,0) where window starts */
+>> + ? ? __u32 win_pos_y; ? ? ? ?/* y-offset from LCD(0,0) where window starts */
+>> +};
+>
+> Shouldn't this also include the window size (in case scaling is
+> supported)?
 
-So create a mapping per peripheral rather than per chip select. Then the
-virtual address can always be the same.
+The "xres" and "yres" fields in fb_var_screeninfo are being used to
+represent the size of the window (visible resolution). So we have,
 
-> 
->> Generally, the trend is to get rid of static mappings as much as
->> possible. Doing that first might simplify things.
-> 
-> You can't do ioremap() before kmalloc() is up and running (correct me if
-> I am wrong), at least you can't do this in map_io. So the static mapping
-> is a must sometimes. And actually, with the latest Nico's changes:
-> 
-Correct. You can't do ioremap until init_irq. map_io and init_early are
-too early. My point was if you can delay h/w access then you can remove
-the static mappings. But yes, we generally can't remove them all. SCU
-and LL debug uart are 2 examples.
+win_pos_x: x-offset from LCD(0,0) where window starts.
+win_pos_y: y-offset from LCD(0,0) where window starts.
+(win_pos_x + xres) : x-offset from LCD(0,0) where window ends.
+(win_pos_y + yres) : y-offset from LCD(0,0) where window ends.
 
-For the short term, I would just have 2 static iotables and select the
-right one based on the board's (or motherboard's) compatible string.
+> This also won't work for setups where the same framebuffer is used by
+> multiple overlays. For example, this is the case on OMAP when the same
+> content is cloned to, say, LCD and TV, each of which is showing an
+> overlay.
 
-Long term, we should look into implementing a common early DT address
-parsing function.
+These x and y position are used to configure the display controller
+(for LCD only) and not to alter the data in physical buffer
+(framebuffer). Could you elaborate the above use case you have
+mentioned and how adding the x and y offsets would not meet that
+requirement.
 
-Rob
+> ?Tomi
+>
 
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/132762
-> 
-> it may even be preferred for peripherals (one mapping shared across all
-> users).
-> 
-> Cheers!
-> 
-> Pawe?
-> 
-> 
+Ajay
