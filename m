@@ -1,37 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2011 22:22:41 +0200
-Subject: [GIT PULL] Samsung cleanup for v3.2
-In-Reply-To: <001901cc76b8$018d4fc0$04a7ef40$%kim@samsung.com>
-References: <001901cc76b8$018d4fc0$04a7ef40$%kim@samsung.com>
-Message-ID: <201109202222.41747.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 20 Sep 2011 15:24:01 -0500
+Subject: [PATCH 0/3] GIC OF bindings
+Message-ID: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 September 2011, Kukjin Kim wrote:
-> This is Samsung cleanup for v3.2.
-> 
-> Please pull from:
->   git://github.com/kgene/linux-samsung.git next-samsung-cleanup
+From: Rob Herring <rob.herring@calxeda.com>
 
-Pulled into arm-soc/next/cleanup.
+Hopefully, this is the final or near final version of GIC binding support.
 
-> If any problems, please let me know.
+Changes from the previous version:
+- SPIs and PPIs are numbered starting at 0. Now the gic has it's own irq
+  domain translate function instead of the simple domain one.
+- interrupt cell format has changed based on Grant's proposal.
+- Dropped "ARM: gic: allow irq_start to be 0". Instead, the first 16 irqs
+  are skipped and the domain irq_base adjusted accordingly.
+- Added a fix to of_irq_find_parent when the parent == child.
+- Renamed intc_desc.parent to intc_desc.interrupt_parent.
+- Implemented Grant's algorithm for walking the list of interrupt
+  controllers. Added a return value to interrupt init functions, so they
+  don't get added to the parent list on a init failure.
 
-One tiny conflict with Nico's cross-platform series:
+The changes are significant enough that I did not include previous
+acked/reviewed/tested-by's.
 
-+ 
-+ MACHINE_START(SMDKC210, "SMDKC210")
-+       /* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
- -      .boot_params    = S5P_PA_SDRAM + 0x100,
-++      .atag_offset    = 0x100,
-+       .init_irq       = exynos4_init_irq,
-+       .map_io         = smdkv310_map_io,
-+       .init_machine   = smdkv310_machine_init,
-+       .timer          = &exynos4_timer,
-+ MACHINE_END
+Rob
 
-I'll handle this in the upstream submission.
+Rob Herring (3):
+  of/irq: of_irq_find_parent: check for parent equal to child
+  of/irq: introduce of_irq_init
+  ARM: gic: add OF based initialization
 
-Thanks,
+ Documentation/devicetree/bindings/arm/gic.txt |   55 +++++++++++
+ arch/arm/common/gic.c                         |   89 ++++++++++++++++-
+ arch/arm/include/asm/hardware/gic.h           |   12 +++
+ drivers/of/irq.c                              |  128 +++++++++++++++++++++++--
+ include/linux/of_irq.h                        |    1 +
+ 5 files changed, 274 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
 
-	Arnd
+-- 
+1.7.5.4
