@@ -1,33 +1,328 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 20 Sep 2011 13:38:05 +0530
-Subject: [PATCH 16/18] dmaengine/ambhe rest oa-pl08x: Add support for
-	sg len greater than one for slave transfers
-In-Reply-To: <4E783243.5000404@st.com>
-References: <cover.1311936523.git.viresh.kumar@st.com>
-	<5d691ab0c4f447c9f324213d8d740ac61d1739a1.1311936524.git.viresh.kumar@st.com>
-	<20110814083618.GE4986@n2100.arm.linux.org.uk>
-	<4E4CCF7B.8060704@st.com>
-	<20110821083306.GA12028@n2100.arm.linux.org.uk>
-	<4E532B19.6000103@st.com> <4E5715CE.2070806@st.com>
-	<CACRpkdapSvW=eMSoXTOOA2GyhfBLzq2OuyQcDctPxsnVzvr-4g@mail.gmail.com>
-	<4E575E75.40603@st.com> <4E5F594D.10203@st.com>
-	<438BB0150E931F4B9CE701519A4463010871804A4C@bgsmsx502.gar.corp.intel.com>
-	<CAKnu2Mp3Ui7jZS2kjJykjuzcTzJhiAkoaVxZ2+tQX0banGh6mw@mail.gmail.com>
-	<4E683B74.5000701@st.com>
-	<CACRpkdaqTYK5TJL2u+aeOfnzhdtdjxZhyu661eGKrNBOXTUTeA@mail.gmail.com>
-	<1315518873.6638.7.camel@vkoul-mobl4>
-	<1316499574.31295.3.camel@vkoul-udesk3>  <4E783243.5000404@st.com>
-Message-ID: <1316506085.31295.4.camel@vkoul-udesk3>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 20 Sep 2011 10:42:12 +0200
+Subject: [PATCH v2] mach-ep93xx: break out GPIO driver specifics
+Message-ID: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-09-20 at 11:57 +0530, Viresh Kumar wrote:
-> On 9/20/2011 11:49 AM, Vinod Koul wrote:
-> > Applied the remaining two patches for the series to my next
-> 
-> Probably there were three patches left, 18/20, 19/20, 20/20 in V3 of my patchset.
-Looks like I had applied patch 20 earlier...
+From: Linus Walleij <linus.walleij@linaro.org>
 
+The <mach/gpio.h> file is included from upper directories
+and deal with generic GPIO and gpiolib stuff. Break out the
+platform and driver specific defines and functions into its own
+header file.
 
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Move the irq_to_gpio() into the driver since it was the only
+  thing actually using it, as a result the ep93xx gpio.h
+  is trivial and becomes empty.
+- Putting this into the patch tracker as 7042/2 soon-ish.
+---
+ arch/arm/mach-ep93xx/core.c                     |    1 +
+ arch/arm/mach-ep93xx/edb93xx.c                  |    1 +
+ arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h |  100 +++++++++++++++++++++
+ arch/arm/mach-ep93xx/include/mach/gpio.h        |  105 -----------------------
+ arch/arm/mach-ep93xx/simone.c                   |    2 +-
+ arch/arm/mach-ep93xx/snappercl15.c              |    2 +-
+ drivers/gpio/gpio-ep93xx.c                      |    3 +
+ 7 files changed, 107 insertions(+), 107 deletions(-)
+ create mode 100644 arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
+
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index a82265b..2432a6b 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -39,6 +39,7 @@
+ #include <mach/fb.h>
+ #include <mach/ep93xx_keypad.h>
+ #include <mach/ep93xx_spi.h>
++#include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
+index ace49ee..70ef8c5 100644
+--- a/arch/arm/mach-ep93xx/edb93xx.c
++++ b/arch/arm/mach-ep93xx/edb93xx.c
+@@ -37,6 +37,7 @@
+ #include <mach/hardware.h>
+ #include <mach/fb.h>
+ #include <mach/ep93xx_spi.h>
++#include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h b/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
+new file mode 100644
+index 0000000..8aff2ea
+--- /dev/null
++++ b/arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
+@@ -0,0 +1,100 @@
++/* Include file for the EP93XX GPIO controller machine specifics */
++
++#ifndef __GPIO_EP93XX_H
++#define __GPIO_EP93XX_H
++
++/* GPIO port A.  */
++#define EP93XX_GPIO_LINE_A(x)		((x) + 0)
++#define EP93XX_GPIO_LINE_EGPIO0		EP93XX_GPIO_LINE_A(0)
++#define EP93XX_GPIO_LINE_EGPIO1		EP93XX_GPIO_LINE_A(1)
++#define EP93XX_GPIO_LINE_EGPIO2		EP93XX_GPIO_LINE_A(2)
++#define EP93XX_GPIO_LINE_EGPIO3		EP93XX_GPIO_LINE_A(3)
++#define EP93XX_GPIO_LINE_EGPIO4		EP93XX_GPIO_LINE_A(4)
++#define EP93XX_GPIO_LINE_EGPIO5		EP93XX_GPIO_LINE_A(5)
++#define EP93XX_GPIO_LINE_EGPIO6		EP93XX_GPIO_LINE_A(6)
++#define EP93XX_GPIO_LINE_EGPIO7		EP93XX_GPIO_LINE_A(7)
++
++/* GPIO port B.  */
++#define EP93XX_GPIO_LINE_B(x)		((x) + 8)
++#define EP93XX_GPIO_LINE_EGPIO8		EP93XX_GPIO_LINE_B(0)
++#define EP93XX_GPIO_LINE_EGPIO9		EP93XX_GPIO_LINE_B(1)
++#define EP93XX_GPIO_LINE_EGPIO10	EP93XX_GPIO_LINE_B(2)
++#define EP93XX_GPIO_LINE_EGPIO11	EP93XX_GPIO_LINE_B(3)
++#define EP93XX_GPIO_LINE_EGPIO12	EP93XX_GPIO_LINE_B(4)
++#define EP93XX_GPIO_LINE_EGPIO13	EP93XX_GPIO_LINE_B(5)
++#define EP93XX_GPIO_LINE_EGPIO14	EP93XX_GPIO_LINE_B(6)
++#define EP93XX_GPIO_LINE_EGPIO15	EP93XX_GPIO_LINE_B(7)
++
++/* GPIO port C.  */
++#define EP93XX_GPIO_LINE_C(x)		((x) + 40)
++#define EP93XX_GPIO_LINE_ROW0		EP93XX_GPIO_LINE_C(0)
++#define EP93XX_GPIO_LINE_ROW1		EP93XX_GPIO_LINE_C(1)
++#define EP93XX_GPIO_LINE_ROW2		EP93XX_GPIO_LINE_C(2)
++#define EP93XX_GPIO_LINE_ROW3		EP93XX_GPIO_LINE_C(3)
++#define EP93XX_GPIO_LINE_ROW4		EP93XX_GPIO_LINE_C(4)
++#define EP93XX_GPIO_LINE_ROW5		EP93XX_GPIO_LINE_C(5)
++#define EP93XX_GPIO_LINE_ROW6		EP93XX_GPIO_LINE_C(6)
++#define EP93XX_GPIO_LINE_ROW7		EP93XX_GPIO_LINE_C(7)
++
++/* GPIO port D.  */
++#define EP93XX_GPIO_LINE_D(x)		((x) + 24)
++#define EP93XX_GPIO_LINE_COL0		EP93XX_GPIO_LINE_D(0)
++#define EP93XX_GPIO_LINE_COL1		EP93XX_GPIO_LINE_D(1)
++#define EP93XX_GPIO_LINE_COL2		EP93XX_GPIO_LINE_D(2)
++#define EP93XX_GPIO_LINE_COL3		EP93XX_GPIO_LINE_D(3)
++#define EP93XX_GPIO_LINE_COL4		EP93XX_GPIO_LINE_D(4)
++#define EP93XX_GPIO_LINE_COL5		EP93XX_GPIO_LINE_D(5)
++#define EP93XX_GPIO_LINE_COL6		EP93XX_GPIO_LINE_D(6)
++#define EP93XX_GPIO_LINE_COL7		EP93XX_GPIO_LINE_D(7)
++
++/* GPIO port E.  */
++#define EP93XX_GPIO_LINE_E(x)		((x) + 32)
++#define EP93XX_GPIO_LINE_GRLED		EP93XX_GPIO_LINE_E(0)
++#define EP93XX_GPIO_LINE_RDLED		EP93XX_GPIO_LINE_E(1)
++#define EP93XX_GPIO_LINE_DIORn		EP93XX_GPIO_LINE_E(2)
++#define EP93XX_GPIO_LINE_IDECS1n	EP93XX_GPIO_LINE_E(3)
++#define EP93XX_GPIO_LINE_IDECS2n	EP93XX_GPIO_LINE_E(4)
++#define EP93XX_GPIO_LINE_IDEDA0		EP93XX_GPIO_LINE_E(5)
++#define EP93XX_GPIO_LINE_IDEDA1		EP93XX_GPIO_LINE_E(6)
++#define EP93XX_GPIO_LINE_IDEDA2		EP93XX_GPIO_LINE_E(7)
++
++/* GPIO port F.  */
++#define EP93XX_GPIO_LINE_F(x)		((x) + 16)
++#define EP93XX_GPIO_LINE_WP		EP93XX_GPIO_LINE_F(0)
++#define EP93XX_GPIO_LINE_MCCD1		EP93XX_GPIO_LINE_F(1)
++#define EP93XX_GPIO_LINE_MCCD2		EP93XX_GPIO_LINE_F(2)
++#define EP93XX_GPIO_LINE_MCBVD1		EP93XX_GPIO_LINE_F(3)
++#define EP93XX_GPIO_LINE_MCBVD2		EP93XX_GPIO_LINE_F(4)
++#define EP93XX_GPIO_LINE_VS1		EP93XX_GPIO_LINE_F(5)
++#define EP93XX_GPIO_LINE_READY		EP93XX_GPIO_LINE_F(6)
++#define EP93XX_GPIO_LINE_VS2		EP93XX_GPIO_LINE_F(7)
++
++/* GPIO port G.  */
++#define EP93XX_GPIO_LINE_G(x)		((x) + 48)
++#define EP93XX_GPIO_LINE_EECLK		EP93XX_GPIO_LINE_G(0)
++#define EP93XX_GPIO_LINE_EEDAT		EP93XX_GPIO_LINE_G(1)
++#define EP93XX_GPIO_LINE_SLA0		EP93XX_GPIO_LINE_G(2)
++#define EP93XX_GPIO_LINE_SLA1		EP93XX_GPIO_LINE_G(3)
++#define EP93XX_GPIO_LINE_DD12		EP93XX_GPIO_LINE_G(4)
++#define EP93XX_GPIO_LINE_DD13		EP93XX_GPIO_LINE_G(5)
++#define EP93XX_GPIO_LINE_DD14		EP93XX_GPIO_LINE_G(6)
++#define EP93XX_GPIO_LINE_DD15		EP93XX_GPIO_LINE_G(7)
++
++/* GPIO port H.  */
++#define EP93XX_GPIO_LINE_H(x)		((x) + 56)
++#define EP93XX_GPIO_LINE_DD0		EP93XX_GPIO_LINE_H(0)
++#define EP93XX_GPIO_LINE_DD1		EP93XX_GPIO_LINE_H(1)
++#define EP93XX_GPIO_LINE_DD2		EP93XX_GPIO_LINE_H(2)
++#define EP93XX_GPIO_LINE_DD3		EP93XX_GPIO_LINE_H(3)
++#define EP93XX_GPIO_LINE_DD4		EP93XX_GPIO_LINE_H(4)
++#define EP93XX_GPIO_LINE_DD5		EP93XX_GPIO_LINE_H(5)
++#define EP93XX_GPIO_LINE_DD6		EP93XX_GPIO_LINE_H(6)
++#define EP93XX_GPIO_LINE_DD7		EP93XX_GPIO_LINE_H(7)
++
++/* maximum value for gpio line identifiers */
++#define EP93XX_GPIO_LINE_MAX		EP93XX_GPIO_LINE_H(7)
++
++/* maximum value for irq capable line identifiers */
++#define EP93XX_GPIO_LINE_MAX_IRQ	EP93XX_GPIO_LINE_F(7)
++
++#endif /* __GPIO_EP93XX_H */
+diff --git a/arch/arm/mach-ep93xx/include/mach/gpio.h b/arch/arm/mach-ep93xx/include/mach/gpio.h
+index 76c68fa..e69de29 100644
+--- a/arch/arm/mach-ep93xx/include/mach/gpio.h
++++ b/arch/arm/mach-ep93xx/include/mach/gpio.h
+@@ -1,105 +0,0 @@
+-/*
+- * arch/arm/mach-ep93xx/include/mach/gpio.h
+- */
+-
+-#ifndef __ASM_ARCH_GPIO_H
+-#define __ASM_ARCH_GPIO_H
+-
+-/* GPIO port A.  */
+-#define EP93XX_GPIO_LINE_A(x)		((x) + 0)
+-#define EP93XX_GPIO_LINE_EGPIO0		EP93XX_GPIO_LINE_A(0)
+-#define EP93XX_GPIO_LINE_EGPIO1		EP93XX_GPIO_LINE_A(1)
+-#define EP93XX_GPIO_LINE_EGPIO2		EP93XX_GPIO_LINE_A(2)
+-#define EP93XX_GPIO_LINE_EGPIO3		EP93XX_GPIO_LINE_A(3)
+-#define EP93XX_GPIO_LINE_EGPIO4		EP93XX_GPIO_LINE_A(4)
+-#define EP93XX_GPIO_LINE_EGPIO5		EP93XX_GPIO_LINE_A(5)
+-#define EP93XX_GPIO_LINE_EGPIO6		EP93XX_GPIO_LINE_A(6)
+-#define EP93XX_GPIO_LINE_EGPIO7		EP93XX_GPIO_LINE_A(7)
+-
+-/* GPIO port B.  */
+-#define EP93XX_GPIO_LINE_B(x)		((x) + 8)
+-#define EP93XX_GPIO_LINE_EGPIO8		EP93XX_GPIO_LINE_B(0)
+-#define EP93XX_GPIO_LINE_EGPIO9		EP93XX_GPIO_LINE_B(1)
+-#define EP93XX_GPIO_LINE_EGPIO10	EP93XX_GPIO_LINE_B(2)
+-#define EP93XX_GPIO_LINE_EGPIO11	EP93XX_GPIO_LINE_B(3)
+-#define EP93XX_GPIO_LINE_EGPIO12	EP93XX_GPIO_LINE_B(4)
+-#define EP93XX_GPIO_LINE_EGPIO13	EP93XX_GPIO_LINE_B(5)
+-#define EP93XX_GPIO_LINE_EGPIO14	EP93XX_GPIO_LINE_B(6)
+-#define EP93XX_GPIO_LINE_EGPIO15	EP93XX_GPIO_LINE_B(7)
+-
+-/* GPIO port C.  */
+-#define EP93XX_GPIO_LINE_C(x)		((x) + 40)
+-#define EP93XX_GPIO_LINE_ROW0		EP93XX_GPIO_LINE_C(0)
+-#define EP93XX_GPIO_LINE_ROW1		EP93XX_GPIO_LINE_C(1)
+-#define EP93XX_GPIO_LINE_ROW2		EP93XX_GPIO_LINE_C(2)
+-#define EP93XX_GPIO_LINE_ROW3		EP93XX_GPIO_LINE_C(3)
+-#define EP93XX_GPIO_LINE_ROW4		EP93XX_GPIO_LINE_C(4)
+-#define EP93XX_GPIO_LINE_ROW5		EP93XX_GPIO_LINE_C(5)
+-#define EP93XX_GPIO_LINE_ROW6		EP93XX_GPIO_LINE_C(6)
+-#define EP93XX_GPIO_LINE_ROW7		EP93XX_GPIO_LINE_C(7)
+-
+-/* GPIO port D.  */
+-#define EP93XX_GPIO_LINE_D(x)		((x) + 24)
+-#define EP93XX_GPIO_LINE_COL0		EP93XX_GPIO_LINE_D(0)
+-#define EP93XX_GPIO_LINE_COL1		EP93XX_GPIO_LINE_D(1)
+-#define EP93XX_GPIO_LINE_COL2		EP93XX_GPIO_LINE_D(2)
+-#define EP93XX_GPIO_LINE_COL3		EP93XX_GPIO_LINE_D(3)
+-#define EP93XX_GPIO_LINE_COL4		EP93XX_GPIO_LINE_D(4)
+-#define EP93XX_GPIO_LINE_COL5		EP93XX_GPIO_LINE_D(5)
+-#define EP93XX_GPIO_LINE_COL6		EP93XX_GPIO_LINE_D(6)
+-#define EP93XX_GPIO_LINE_COL7		EP93XX_GPIO_LINE_D(7)
+-
+-/* GPIO port E.  */
+-#define EP93XX_GPIO_LINE_E(x)		((x) + 32)
+-#define EP93XX_GPIO_LINE_GRLED		EP93XX_GPIO_LINE_E(0)
+-#define EP93XX_GPIO_LINE_RDLED		EP93XX_GPIO_LINE_E(1)
+-#define EP93XX_GPIO_LINE_DIORn		EP93XX_GPIO_LINE_E(2)
+-#define EP93XX_GPIO_LINE_IDECS1n	EP93XX_GPIO_LINE_E(3)
+-#define EP93XX_GPIO_LINE_IDECS2n	EP93XX_GPIO_LINE_E(4)
+-#define EP93XX_GPIO_LINE_IDEDA0		EP93XX_GPIO_LINE_E(5)
+-#define EP93XX_GPIO_LINE_IDEDA1		EP93XX_GPIO_LINE_E(6)
+-#define EP93XX_GPIO_LINE_IDEDA2		EP93XX_GPIO_LINE_E(7)
+-
+-/* GPIO port F.  */
+-#define EP93XX_GPIO_LINE_F(x)		((x) + 16)
+-#define EP93XX_GPIO_LINE_WP		EP93XX_GPIO_LINE_F(0)
+-#define EP93XX_GPIO_LINE_MCCD1		EP93XX_GPIO_LINE_F(1)
+-#define EP93XX_GPIO_LINE_MCCD2		EP93XX_GPIO_LINE_F(2)
+-#define EP93XX_GPIO_LINE_MCBVD1		EP93XX_GPIO_LINE_F(3)
+-#define EP93XX_GPIO_LINE_MCBVD2		EP93XX_GPIO_LINE_F(4)
+-#define EP93XX_GPIO_LINE_VS1		EP93XX_GPIO_LINE_F(5)
+-#define EP93XX_GPIO_LINE_READY		EP93XX_GPIO_LINE_F(6)
+-#define EP93XX_GPIO_LINE_VS2		EP93XX_GPIO_LINE_F(7)
+-
+-/* GPIO port G.  */
+-#define EP93XX_GPIO_LINE_G(x)		((x) + 48)
+-#define EP93XX_GPIO_LINE_EECLK		EP93XX_GPIO_LINE_G(0)
+-#define EP93XX_GPIO_LINE_EEDAT		EP93XX_GPIO_LINE_G(1)
+-#define EP93XX_GPIO_LINE_SLA0		EP93XX_GPIO_LINE_G(2)
+-#define EP93XX_GPIO_LINE_SLA1		EP93XX_GPIO_LINE_G(3)
+-#define EP93XX_GPIO_LINE_DD12		EP93XX_GPIO_LINE_G(4)
+-#define EP93XX_GPIO_LINE_DD13		EP93XX_GPIO_LINE_G(5)
+-#define EP93XX_GPIO_LINE_DD14		EP93XX_GPIO_LINE_G(6)
+-#define EP93XX_GPIO_LINE_DD15		EP93XX_GPIO_LINE_G(7)
+-
+-/* GPIO port H.  */
+-#define EP93XX_GPIO_LINE_H(x)		((x) + 56)
+-#define EP93XX_GPIO_LINE_DD0		EP93XX_GPIO_LINE_H(0)
+-#define EP93XX_GPIO_LINE_DD1		EP93XX_GPIO_LINE_H(1)
+-#define EP93XX_GPIO_LINE_DD2		EP93XX_GPIO_LINE_H(2)
+-#define EP93XX_GPIO_LINE_DD3		EP93XX_GPIO_LINE_H(3)
+-#define EP93XX_GPIO_LINE_DD4		EP93XX_GPIO_LINE_H(4)
+-#define EP93XX_GPIO_LINE_DD5		EP93XX_GPIO_LINE_H(5)
+-#define EP93XX_GPIO_LINE_DD6		EP93XX_GPIO_LINE_H(6)
+-#define EP93XX_GPIO_LINE_DD7		EP93XX_GPIO_LINE_H(7)
+-
+-/* maximum value for gpio line identifiers */
+-#define EP93XX_GPIO_LINE_MAX		EP93XX_GPIO_LINE_H(7)
+-
+-/* maximum value for irq capable line identifiers */
+-#define EP93XX_GPIO_LINE_MAX_IRQ	EP93XX_GPIO_LINE_F(7)
+-
+-#define gpio_to_irq		__gpio_to_irq
+-#define irq_to_gpio(irq)	((irq) - gpio_to_irq(0))
+-
+-#endif
+diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
+index 9ae4ea1..52e090d 100644
+--- a/arch/arm/mach-ep93xx/simone.c
++++ b/arch/arm/mach-ep93xx/simone.c
+@@ -18,12 +18,12 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+-#include <linux/gpio.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-gpio.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/fb.h>
++#include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-ep93xx/snappercl15.c b/arch/arm/mach-ep93xx/snappercl15.c
+index 3cea81f..8121e3a 100644
+--- a/arch/arm/mach-ep93xx/snappercl15.c
++++ b/arch/arm/mach-ep93xx/snappercl15.c
+@@ -20,7 +20,6 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+-#include <linux/gpio.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-gpio.h>
+ #include <linux/fb.h>
+@@ -30,6 +29,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/fb.h>
++#include <mach/gpio-ep93xx.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
+index 6a56895..386d9ff 100644
+--- a/drivers/gpio/gpio-ep93xx.c
++++ b/drivers/gpio/gpio-ep93xx.c
+@@ -24,6 +24,9 @@
+ #include <linux/module.h>
+ 
+ #include <mach/hardware.h>
++#include <mach/gpio-ep93xx.h>
++
++#define irq_to_gpio(irq)	((irq) - gpio_to_irq(0))
+ 
+ struct ep93xx_gpio {
+ 	void __iomem		*mmio_base;
 -- 
-~Vinod
+1.7.3.2
