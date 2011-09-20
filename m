@@ -1,61 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Sep 2011 15:33:12 -0700
-Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
-In-Reply-To: <201109202346.11393.arnd@arndb.de>
-References: <20110917014623.GC2937@atomide.com>
-	<201109202334.43213.arnd@arndb.de>
-	<201109202346.11393.arnd@arndb.de>
-Message-ID: <20110920223311.GK2937@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 20 Sep 2011 23:43:49 +0100
+Subject: [PATCH V2] ARM: kdump: copy kernel relocation code at the
+	kexec prepare stage
+In-Reply-To: <1316520043-14619-1-git-send-email-leiwen@marvell.com>
+References: <1316151129-30491-1-git-send-email-leiwen@marvell.com>
+	<1316520043-14619-1-git-send-email-leiwen@marvell.com>
+Message-ID: <20110920224349.GC17169@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110920 14:12]:
-> On Tuesday 20 September 2011, Arnd Bergmann wrote:
-> > 
-> > One more thing: my randconfig tests are running now and
-> > have spit out a new error after merging lost of stuff
-> > today:
-
-Good to hear you got "arndconfig" running :)
-
-Do you think we could also add support for something
-like this:
-
-$ echo CONFIG_ARCH_OMAP=y > .config
-$ make randconfig
-
-or
-
-$ make --force=CONFIG_ARCH_OMAP randconfig
-
-Where randconfig would keep the forced CONFIG_ARCH_OMAP
-static while randomly selecting the others?
-
-This would allow targeted randconfig for each patch more
-or less..
- 
-> > arch/arm/mach-omap2/built-in.o: In function `omap_zoom_init':
-> > /home/arnd/linux-arm/arch/arm/mach-omap2/board-zoom.c:117: undefined reference to `board_nand_init'
-> > make[1]: *** [.tmp_vmlinux1] Error 1
-> > make[1]: Target `_all' not remade because of errors.
-> > make: *** [sub-make] Error 2
-> > make: Target `_all' not remade because of errors.
+On Tue, Sep 20, 2011 at 08:00:43PM +0800, Lei Wen wrote:
+> This copy really don't need to do at the very second before the kernel
+> would crash.
 > 
-> Found it: the offending patch is:
-> 
->       omap2+: Use Kconfig symbol in Makefile instead of obj-y
-> 
-> 
-> It seems that you replace the #ifdef in the board-flash.c file
-> with a similar #ifdef in the header that replaces this with an
-> empty inline function when the object is not built.
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
+> Acked-by: Simon Horman <horms@verge.net.au>
+> ---
+> Changelog:
+> V2: move the flush_icache_range after the memcpy operation to ensure I/D cache
+>     coherency for the relocation code
 
-Oops. I'll do a fix for that. Those should be now inline
-functions in the header.
-
-As various other omap branches are based on the cleanup I'd
-rather not go mess with the original patch unless you insist.
-
-Regards,
-
-Tony
+Much better, thanks.
