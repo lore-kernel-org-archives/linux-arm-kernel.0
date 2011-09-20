@@ -1,99 +1,90 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 20 Sep 2011 18:39:53 +0300
-Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
-	structure
-In-Reply-To: <CAEC9eQOTNaMcUWeSFN-DCTYrCJsVaDAO7uOZNQM=efjVdqtU2g@mail.gmail.com>
-References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
-	<1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
-	<1316517021.1949.13.camel@deskari>
-	<CAEC9eQOTNaMcUWeSFN-DCTYrCJsVaDAO7uOZNQM=efjVdqtU2g@mail.gmail.com>
-Message-ID: <1316533193.18781.12.camel@deskari>
+From: rob.lee@linaro.org (Rob Lee)
+Date: Tue, 20 Sep 2011 10:40:49 -0500
+Subject: [PATCH v2 0/3] ARM: imx: Add cpuidle for imx platforms
+In-Reply-To: <20110920071633.GR31404@pengutronix.de>
+References: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
+	<20110920071633.GR31404@pengutronix.de>
+Message-ID: <CAMXH7KHKhMSY6zW_Dyu1QWq-Q4siqBm5Epz8C_Pqc=UjJWHVPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-09-20 at 20:16 +0530, Ajay kumar wrote:
-> Hi Tomi,
-> 
-> On Tue, Sep 20, 2011 at 4:40 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> > On Tue, 2011-09-20 at 11:30 -0400, Ajay Kumar wrote:
-> >> This patch adds a data structure definiton to hold framebuffer windows/planes.
-> >> An ioctl number is also added to provide user access
-> >> to change window position dynamically.
-> >>
-> >> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-> >> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
-> >> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >> ---
-> >>  include/linux/fb.h |    7 +++++++
-> >>  1 files changed, 7 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/include/linux/fb.h b/include/linux/fb.h
-> >> index 1d6836c..2141941 100644
-> >> --- a/include/linux/fb.h
-> >> +++ b/include/linux/fb.h
-> >> @@ -39,6 +39,7 @@
-> >>  #define FBIOPUT_MODEINFO        0x4617
-> >>  #define FBIOGET_DISPINFO        0x4618
-> >>  #define FBIO_WAITFORVSYNC    _IOW('F', 0x20, __u32)
-> >> +#define FBIOPOS_OVERLAY_WIN  _IOW('F', 0x21, struct fb_overlay_win_pos)
-> >>
-> >>  #define FB_TYPE_PACKED_PIXELS                0       /* Packed Pixels        */
-> >>  #define FB_TYPE_PLANES                       1       /* Non interleaved planes */
-> >> @@ -366,6 +367,12 @@ struct fb_image {
-> >>       struct fb_cmap cmap;    /* color map info */
-> >>  };
-> >>
-> >> +/* Window overlaying */
-> >> +struct fb_overlay_win_pos {
-> >> +     __u32 win_pos_x;        /* x-offset from LCD(0,0) where window starts */
-> >> +     __u32 win_pos_y;        /* y-offset from LCD(0,0) where window starts */
-> >> +};
-> >
-> > Shouldn't this also include the window size (in case scaling is
-> > supported)?
-> 
-> The "xres" and "yres" fields in fb_var_screeninfo are being used to
-> represent the size of the window (visible resolution). So we have,
-> 
-> win_pos_x: x-offset from LCD(0,0) where window starts.
-> win_pos_y: y-offset from LCD(0,0) where window starts.
-> (win_pos_x + xres) : x-offset from LCD(0,0) where window ends.
-> (win_pos_y + yres) : y-offset from LCD(0,0) where window ends.
+Hello Sascha,
 
-Sure, but the xres and yres tell the _input_ resolution, i.e. how many
-pixels are read from the memory. What is missing is the _output_
-resolution, which is the size of the window. These are not necessarily
-the same, if the system supports scaling.
+On 20 September 2011 02:16, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Hi Robert,
+>
+> On Fri, Sep 16, 2011 at 12:27:47PM -0500, Robert Lee wrote:
+>> This patch series adds a common imx cpuidle driver, some common
+>> mach-mx5 level cpuidle functionality, and an i.MX51 instance of
+>> using this driver.
+>>
+>> The patch series is based on v3.1-rc2.
+>>
+>> Changes since v1:
+>> * To address all the problems found during review of v1, a complete
+>> re-write was needed.
+>
+> Much better than the last version, thanks.
+>
 
-> > This also won't work for setups where the same framebuffer is used by
-> > multiple overlays. For example, this is the case on OMAP when the same
-> > content is cloned to, say, LCD and TV, each of which is showing an
-> > overlay.
-> 
-> These x and y position are used to configure the display controller
-> (for LCD only) and not to alter the data in physical buffer
-> (framebuffer). Could you elaborate the above use case you have
-> mentioned and how adding the x and y offsets would not meet that
-> requirement.
+Thanks to Shawn Guo for thoroughly reviewing and providing
+feedback on this version and Jason Hui contributed to the reviewing
+as well despite both of them being very busy with there own
+submissions.
 
-Nothing wrong with adding x/y offsets, but the problem is in configuring
-the two overlays. If the framebuffer data is used by two overlays, each
-overlay should be configured separately. And your ioctl does not have
-any way to define which overlay is being affected.
+>>
+>> Robert Lee (3):
+>> ? ARM: imx: Add imx cpuidle driver
+>> ? ARM: imx: Add cpuidle for mach-mx5
+>> ? ARM: imx: Add cpuidle for i.MX51
+>>
+>> ?arch/arm/mach-mx5/Makefile ? ? ? ? ? ? ? | ? ?3 +-
+>> ?arch/arm/mach-mx5/cpu_op-mx51.c ? ? ? ? ?| ? 35 +++++++-
+>
+> Your additions to this file...
+>
+>> ?arch/arm/mach-mx5/cpu_op-mx51.h ? ? ? ? ?| ? ?1 +
+>> ?arch/arm/mach-mx5/mm.c ? ? ? ? ? ? ? ? ? | ? ?4 +
+>> ?arch/arm/mach-mx5/system.c ? ? ? ? ? ? ? | ? 35 +++++++
+>
+> And this one should go to arch/arm/mach-mx5/cpuidle.c, then we have
+> all i.MX5 specific cpuidle stuff together without ifdeffing the code.
+> I assume that cpuidle support for i.MX53 will look identically, right?
+>
 
-Of course, if we specify that a single framebuffer will ever go only to
-one output, the problem disappears.
+After considering it further after the first patch, there can be differences
+between the i.MX51 and i.MX53 state data as i.MX51 supports an
+additional idle state that i.MX53 does not.  This state was not added
+to this version of the patch because it's additional power savings is very
+small and there is fairly time consuming characterization needed to
+come up with accurate cpuidle state data.  But to allow for the
+possibility that this state could be added in the future, it seemed the
+choice was to add this init data to the an i.MX51 specific file such as
+cpu_op-mx51.c/h and add ifdefs for cpuidle and cpufreq.  Or, make
+a cpuidle.c file as you suggest and add ifdefs for the different mx5
+SoCs.  Just let me know which way you think is better given this
+information.
 
-However, even if we specify so, this will make the fbdev a bit weird:
-what is x/yres after this patch? In the current fbdev x/yres is the size
-of the output, and x/yres are part of video timings. After this patch
-this is no longer the case: x/yres will be the size of the overlay. But
-the old code will still use x/yres as part of video timings, making
-things confusing.
+For the call to imx_cpuidle_init from imx51_soc_init in mm.c, this
+seems like a good location to initialize for all imx51_soc.  If I don't
+call the init from here, can you recommend another location that I
+should call it from?
 
-And generally I can't really make my mind about adding these more
-complex features. On one hand it would be very nice to have fbdev
-supporting overlays and whatnot, but on the other hand, I can't figure
-out how to add them properly.
-
- Tomi
+>> ?arch/arm/plat-mxc/Makefile ? ? ? ? ? ? ? | ? ?1 +
+>> ?arch/arm/plat-mxc/cpuidle.c ? ? ? ? ? ? ?| ?151 ++++++++++++++++++++++++++++++
+>> ?arch/arm/plat-mxc/include/mach/cpuidle.h | ? 56 +++++++++++
+>> ?arch/arm/plat-mxc/include/mach/system.h ?| ? ?3 +
+>> ?9 files changed, 286 insertions(+), 3 deletions(-)
+>> ?create mode 100644 arch/arm/plat-mxc/cpuidle.c
+>> ?create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
+>>
+>>
+>
+> Sascha
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
+> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
+>
