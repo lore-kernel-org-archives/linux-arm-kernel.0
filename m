@@ -1,55 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 20 Sep 2011 20:31:41 +0530
-Subject: [PATCH 8/8] OMAP4: Fix the emif and dmm virtual mapping
-In-Reply-To: <87r53gnzfh.fsf@ti.com>
-References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>	<1315459327-3285-9-git-send-email-santosh.shilimkar@ti.com>
-	<87r53gnzfh.fsf@ti.com>
-Message-ID: <4E78AAD5.6010906@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 20 Sep 2011 17:09:26 +0200 (CEST)
+Subject: [PATCH 2/5] [media] v4l: Add mt9t111 sensor driver
+In-Reply-To: <1316530612-23075-3-git-send-email-deepthy.ravi@ti.com>
+References: <1316530612-23075-1-git-send-email-deepthy.ravi@ti.com>
+	<1316530612-23075-3-git-send-email-deepthy.ravi@ti.com>
+Message-ID: <Pine.LNX.4.64.1109201704190.11274@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 16 September 2011 11:26 PM, Kevin Hilman wrote:
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> Fix the address overlap with Emulation domain (EMU).
->>
->> The previous mapping was entering into EMU mapping
->> and was not as per comments. Fix the mapping accordingly.
->>
->> [girishsg at ti.com: Helped fixing comments.]
->> Signed-off-by: Girish S G <girishsg@ti.com>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
->>  arch/arm/plat-omap/include/plat/io.h |    4 ++--
->>  1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/plat-omap/include/plat/io.h b/arch/arm/plat-omap/include/plat/io.h
->> index d72ec85..a2f7d31 100644
->> --- a/arch/arm/plat-omap/include/plat/io.h
->> +++ b/arch/arm/plat-omap/include/plat/io.h
->> @@ -228,12 +228,12 @@
->>  
->>  #define OMAP44XX_EMIF2_PHYS	OMAP44XX_EMIF2_BASE
->>  						/* 0x4d000000 --> 0xfd200000 */
->> -#define OMAP44XX_EMIF2_VIRT	(OMAP44XX_EMIF2_PHYS + OMAP4_L3_PER_IO_OFFSET)
->> +#define OMAP44XX_EMIF2_VIRT	(OMAP44XX_EMIF1_VIRT + SZ_1M)
-> 
-> IMO, this would be much clearer (and future proof) if you used
-> '+ OMAP44XX_EMIF1_SIZE' instead of SZ_1M.
-> 
-ok.
+On Tue, 20 Sep 2011, Deepthy Ravi wrote:
 
->>  #define OMAP44XX_EMIF2_SIZE	SZ_1M
->>  
->>  #define OMAP44XX_DMM_PHYS	OMAP44XX_DMM_BASE
->>  						/* 0x4e000000 --> 0xfd300000 */
->> -#define OMAP44XX_DMM_VIRT	(OMAP44XX_DMM_PHYS + OMAP4_L3_PER_IO_OFFSET)
->> +#define OMAP44XX_DMM_VIRT	(OMAP44XX_EMIF2_VIRT + SZ_1M)
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> and '+ OMAP44XX_EMIF2_SIZE' here.
+> The MT9T111 is a 3.1Mp CMOS sensor from Aptina with
+> its latest image signal processing (ISP) and 1.75??m
+> pixel technology.
+> The sensor driver currently supports only VGA
+> resolution.
 > 
-Will add OMAP44XX_EMIF_SIZE since 2 EMIFs instaces are and
-suppose to be identical.Almost missed this email in other traffic.
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
+> ---
+>  drivers/media/video/Kconfig       |    7 +
+>  drivers/media/video/Makefile      |    1 +
+>  drivers/media/video/mt9t111.c     |  793 +++++++++++++++++++++
+>  drivers/media/video/mt9t111_reg.h | 1367 +++++++++++++++++++++++++++++++++++++
+>  include/media/mt9t111.h           |   45 ++
+>  5 files changed, 2213 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/media/video/mt9t111.c
+>  create mode 100644 drivers/media/video/mt9t111_reg.h
+>  create mode 100644 include/media/mt9t111.h
 
-Regards
-Santosh
+NAK. The mt9t112 driver claims to also support mt9t111. I'm not sure, 
+whether the driver has indeed been tested with mt9t111, but this is 
+definitely something to verify. If the chips are indeed similar, please 
+use the tree at
+
+http://git.linuxtv.org/gliakhovetski/v4l-dvb.git/shortlog/refs/heads/rc1-for-3.2
+
+which has converted the mt9t112 driver to be also used outside ot the 
+soc-camera subsystem, and use that driver instead of adding another one.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
