@@ -1,27 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2011 22:01:18 +0200
-Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
-In-Reply-To: <20110917014623.GC2937@atomide.com>
-References: <20110917014623.GC2937@atomide.com>
-Message-ID: <201109202201.18574.arnd@arndb.de>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Tue, 20 Sep 2011 13:05:30 -0700
+Subject: [PATCH 3/4] net/fec: set phy_speed to the optimal frequency 2.5
+	MHz
+In-Reply-To: <20110920025700.GE28084@S2100-06.ap.freescale.net>
+References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
+	<1316346852-17090-4-git-send-email-shawn.guo@linaro.org>
+	<4E77C4A2.1060802@boundarydevices.com>
+	<20110920025700.GE28084@S2100-06.ap.freescale.net>
+Message-ID: <4E78F20A.30001@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 September 2011, Tony Lindgren wrote:
-> Please pull the first part of omap cleanup from:
-> 
-> git://github.com/tmlind/linux.git cleanup
-> 
-> This series cleans up early_init functions and removes
-> CHIP_IS macro usage. This makes it easier to have SoC
-> specific init functions so adding support for new omap
-> variants does not require patching all over the place.
+On 9/19/2011 7:57 PM, Shawn Guo wrote:
+> On Mon, Sep 19, 2011 at 03:39:30PM -0700, Troy Kisky wrote:
+>> On 9/18/2011 4:54 AM, Shawn Guo wrote:
+>>> With the unnecessary 1 bit left-shift on fep->phy_speed during the
+>>> calculation, the phy_speed always runs at the half frequency of the
+>>> optimal one 2.5 MHz.
+>>>
+>>> The patch removes that 1 bit left-shift to get the optimal phy_speed.
+>>>
+>>> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
+>>> ---
+>>>   drivers/net/fec.c |    2 +-
+>>>   1 files changed, 1 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+>>> index 5ef0e34..04206e4 100644
+>>> --- a/drivers/net/fec.c
+>>> +++ b/drivers/net/fec.c
+>>> @@ -1007,7 +1007,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+>>>   	/*
+>>>   	 * Set MII speed to 2.5 MHz (= clk_get_rate() / 2 * phy_speed)
+>>>   	 */
+>>> -	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000)<<   1;
+>>> +	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000);
+>>>   	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
+>>>
+>>>   	fep->mii_bus = mdiobus_alloc();
+>> Do you need to round up to an even value? Is the hardware
+>> documentation wrong?
+> The round up is something existed, and the patch does not touch that
+> part.
+That's not what I was referring to. Previously, phy_speed was always 
+even because of the shift.
+The MX53 manual says this field starts at bit 1, and bit 0 is unused. 
+Therefore, maybe the
+correct change would be
 
-Thanks, pulled.
+fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 2500000)<<   1;
 
-Note that we are trying to get everyone to use the similar
-prefixes for patch summaries, so it would be nice if you could
-change 'OMAP: powerdomain:' to 'ARM: OMAP: powerdomain' or
-'ARM: omap/powerdowmain:' in the future.
+So, the question is, does this field start@bit 0 (your version is correct)
+or bit 1? In other words, how did the hardware manual get it wrong? Wrong starting
+bit, or divide by 2 not needed. Please document the mistake in the code.
 
-	Arnd
+
+>
+>> Does this need a quirk? What boards has this been verified to fix?
+>>
+> I tested this on i.mx28, i.mx53 and i.mx6q.  Do you see problem on
+> your platform?
+>
+I have not tested yet, but will sometime this week.
