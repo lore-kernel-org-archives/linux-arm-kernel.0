@@ -1,27 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Sep 2011 22:45:41 +0200
-Subject: [PATCH] spi: Fix builderror in spi-pl022.c
-In-Reply-To: <CACRpkdb=Bt2j4iMV5NJHmPG8wDi6__CRD6kn_KOoaQ1R6uwrWQ@mail.gmail.com>
-References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
-	<1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
-	<CACRpkdb=Bt2j4iMV5NJHmPG8wDi6__CRD6kn_KOoaQ1R6uwrWQ@mail.gmail.com>
-Message-ID: <CACRpkdbsUMCvBofKjExiB2wCbK9CwpcXr5xmShJ4SHEGAAH4Bw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Sep 2011 22:48:01 +0200
+Subject: [GIT PULL] ux500-core for 3.2
+In-Reply-To: <CACRpkdZofKjOrPFWNR-2D0LWx3NGMiLwyhf7gAVdvBGvQHqJLQ@mail.gmail.com>
+References: <CACRpkdZofKjOrPFWNR-2D0LWx3NGMiLwyhf7gAVdvBGvQHqJLQ@mail.gmail.com>
+Message-ID: <201109202248.01993.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 5, 2011 at 2:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sun, Aug 28, 2011 at 9:26 PM, Peter Huewe <peterhuewe@gmx.de> wrote:
->
->> This patch fixes a build error, introduced by commit (67fc8b9f, "PM: add
->> runtime PM support to core Primecell driver") which unfortunately was a little
->> bit incomplete and did contain a typo (11 instead of 22).
->> I'm not sure how this patch could have been tested back then, if it
->> doesn't even compile ;)
->
-> Grant can you please apply this patch? Right now linux-next is
-> breaking because of this missing patch...
+On Tuesday 20 September 2011, Linus Walleij wrote:
+> could you please pull:
+> 
+> git://git.linaro.org/people/triad/linux-stericsson.git for-arnd
+> 
+> to the ARM SoC tree (ux500 branch or however you prefer to handle it)?
+> They have all been reviewed on the ARM list recently and are mostly
+> minor fixes and Lee Jones nice cleanup patch.
 
-Ping on this... ignore if it's been picked already.
+I would really like to see this split into logical branches, even
+if there are just a few patches for each of them. It looks like
+the series currently contains bug fixes and cleanups mixed together,
+which makes it hard to backport fixes and for me to aggregate patches
+across soc families by category.
+
+It's also not clear if the two bug fix patches should be applied
+to 3.1 and -stable as well as 3.2. My feeling is that they should.
+If you want bug fixes to be backported, please add a 'Cc: stable at kernel.org'
+line after your Signed-off-by. If not, add an explanation to the
+pull request why they are not relevant for backporting.
+
+I've applied the first four patches to the stericsson/cleanup
+and next/cleanup branches now, since these look like they are
+purely cleanup branches without noticeable code changes.
+
+Please submit the two bug fixes again, rebased to an -rc release.
+there is a dependency on one of the cleanup patches. Don't worry
+about that, I'll take care of resolving this conflict after you
+have rebased the bug fix to the mainline kernel.
 
 Thanks,
-Linus Walleij
+
+	Arnd
