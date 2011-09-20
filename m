@@ -1,82 +1,61 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 20 Sep 2011 15:15:05 -0700
-Subject: [PATCH 2/2 v7] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
-References: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B7321777@HQMAIL01.nvidia.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Sep 2011 15:33:12 -0700
+Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
+In-Reply-To: <201109202346.11393.arnd@arndb.de>
+References: <20110917014623.GC2937@atomide.com>
+	<201109202334.43213.arnd@arndb.de>
+	<201109202346.11393.arnd@arndb.de>
+Message-ID: <20110920223311.GK2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Friday, September 16, 2011 6:14 AM:
-> This adds a driver for the U300 pinmux portions of the system
-> controller "SYSCON". It also serves as an example of how to use
-> the pinmux subsystem. This driver also houses the platform data
-> for the only supported platform.
-...
-> diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-...
-> +/* Pinmux settings */
-> +static struct pinmux_map u300_pinmux_map[] = {
-> +	/* anonymous maps for chip power and EMIFs */
-> +	PINMUX_MAP_PRIMARY_SYS_HOG("POWER", "power"),
-> +	PINMUX_MAP_PRIMARY_SYS_HOG("EMIF0", "emif0"),
-> +	PINMUX_MAP_PRIMARY_SYS_HOG("EMIF1", "emif1"),
-> +	/* per-device maps for MMC/SD, SPI and UART */
-> +	PINMUX_MAP_PRIMARY("MMCSD", "mmc0", "mmci"),
-> +	PINMUX_MAP_PRIMARY("SPI", "spi0", "pl022"),
-> +	PINMUX_MAP_PRIMARY("UART0", "uart0", "uart0"),
-> +};
-> +
-> +struct u300_mux_hog {
-> +	const char *name;
-> +	struct device *dev;
-> +	struct pinmux *pmx;
-> +};
-> +
-> +static struct u300_mux_hog u300_mux_hogs[] = {
-> +	{
-> +		.name = "uart0",
-> +		.dev = &uart0_device.dev,
-> +	},
-> +	{
-> +		.name = "spi0",
-> +		.dev = &pl022_device.dev,
-> +	},
-> +	{
-> +		.name = "mmc0",
-> +		.dev = &mmcsd_device.dev,
-> +	},
-> +};
-> +
-> +static int __init u300_pinmux_fetch(void)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(u300_mux_hogs); i++) {
-> +		struct pinmux *pmx;
-> +		int ret;
-> +
-> +		pmx = pinmux_get(u300_mux_hogs[i].dev, NULL);
-> +		if (IS_ERR(pmx)) {
-> +			pr_err("u300: could not get pinmux hog %s\n",
-> +			       u300_mux_hogs[i].name);
-> +			continue;
-> +		}
-> +		ret = pinmux_enable(pmx);
-> +		if (ret) {
-> +			pr_err("u300: could enable pinmux hog %s\n",
-> +			       u300_mux_hogs[i].name);
-> +			continue;
-> +		}
-> +		u300_mux_hogs[i].pmx = pmx;
-> +	}
-> +	return 0;
-> +}
-> +subsys_initcall(u300_pinmux_fetch);
+* Arnd Bergmann <arnd@arndb.de> [110920 14:12]:
+> On Tuesday 20 September 2011, Arnd Bergmann wrote:
+> > 
+> > One more thing: my randconfig tests are running now and
+> > have spit out a new error after merging lost of stuff
+> > today:
 
-Why not just have the pinmux core support hogging on non-"system" mapping
-entries; then everything I quoted above except u300_pinmux_map[] could
-be deleted, and the "hog" flag set on the last 3 u300_pinmux_map[] entries.
+Good to hear you got "arndconfig" running :)
 
--- 
-nvpublic
+Do you think we could also add support for something
+like this:
+
+$ echo CONFIG_ARCH_OMAP=y > .config
+$ make randconfig
+
+or
+
+$ make --force=CONFIG_ARCH_OMAP randconfig
+
+Where randconfig would keep the forced CONFIG_ARCH_OMAP
+static while randomly selecting the others?
+
+This would allow targeted randconfig for each patch more
+or less..
+ 
+> > arch/arm/mach-omap2/built-in.o: In function `omap_zoom_init':
+> > /home/arnd/linux-arm/arch/arm/mach-omap2/board-zoom.c:117: undefined reference to `board_nand_init'
+> > make[1]: *** [.tmp_vmlinux1] Error 1
+> > make[1]: Target `_all' not remade because of errors.
+> > make: *** [sub-make] Error 2
+> > make: Target `_all' not remade because of errors.
+> 
+> Found it: the offending patch is:
+> 
+>       omap2+: Use Kconfig symbol in Makefile instead of obj-y
+> 
+> 
+> It seems that you replace the #ifdef in the board-flash.c file
+> with a similar #ifdef in the header that replaces this with an
+> empty inline function when the object is not built.
+
+Oops. I'll do a fix for that. Those should be now inline
+functions in the header.
+
+As various other omap branches are based on the cleanup I'd
+rather not go mess with the original patch unless you insist.
+
+Regards,
+
+Tony
