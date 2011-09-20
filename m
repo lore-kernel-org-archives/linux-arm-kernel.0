@@ -1,69 +1,48 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 20 Sep 2011 10:50:15 +0200
-Subject: [PATCH 2/2] gpio/nomadik: use genirq core to track enablement
-Message-ID: <1316508615-20351-1-git-send-email-linus.walleij@stericsson.com>
+From: ajaykumar.rs@samsung.com (Ajay Kumar)
+Date: Tue, 20 Sep 2011 11:30:39 -0400
+Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
+	structure
+In-Reply-To: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+This patch adds a data structure definiton to hold framebuffer windows/planes.
+An ioctl number is also added to provide user access
+to change window position dynamically.
 
-Currently the Nomadik GPIO driver tracks enabled/disabled interrupt
-status with a local variable, switch to using the interrupt core.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/gpio/gpio-nomadik.c |   11 ++---------
- 1 files changed, 2 insertions(+), 9 deletions(-)
+ include/linux/fb.h |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/gpio/gpio-nomadik.c b/drivers/gpio/gpio-nomadik.c
-index 97e9be9..0b7ec12 100644
---- a/drivers/gpio/gpio-nomadik.c
-+++ b/drivers/gpio/gpio-nomadik.c
-@@ -58,7 +58,6 @@ struct nmk_gpio_chip {
- 	u32 rwimsc;
- 	u32 fwimsc;
- 	u32 slpm;
--	u32 enabled;
- 	u32 pull_up;
+diff --git a/include/linux/fb.h b/include/linux/fb.h
+index 1d6836c..2141941 100644
+--- a/include/linux/fb.h
++++ b/include/linux/fb.h
+@@ -39,6 +39,7 @@
+ #define FBIOPUT_MODEINFO        0x4617
+ #define FBIOGET_DISPINFO        0x4618
+ #define FBIO_WAITFORVSYNC	_IOW('F', 0x20, __u32)
++#define FBIOPOS_OVERLAY_WIN	_IOW('F', 0x21, struct fb_overlay_win_pos)
+ 
+ #define FB_TYPE_PACKED_PIXELS		0	/* Packed Pixels	*/
+ #define FB_TYPE_PLANES			1	/* Non interleaved planes */
+@@ -366,6 +367,12 @@ struct fb_image {
+ 	struct fb_cmap cmap;	/* color map info */
  };
  
-@@ -605,11 +604,6 @@ static int nmk_gpio_irq_maskunmask(struct irq_data *d, bool enable)
- 	if (!nmk_chip)
- 		return -EINVAL;
- 
--	if (enable)
--		nmk_chip->enabled |= bitmask;
--	else
--		nmk_chip->enabled &= ~bitmask;
--
- 	clk_enable(nmk_chip->clk);
- 	spin_lock_irqsave(&nmk_gpio_slpm_lock, flags);
- 	spin_lock(&nmk_chip->lock);
-@@ -653,7 +647,7 @@ static int nmk_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
- 	spin_lock_irqsave(&nmk_gpio_slpm_lock, flags);
- 	spin_lock(&nmk_chip->lock);
- 
--	if (!(nmk_chip->enabled & bitmask))
-+	if (irqd_irq_disabled(d))
- 		__nmk_gpio_set_wake(nmk_chip, gpio, on);
- 
- 	if (on)
-@@ -670,7 +664,7 @@ static int nmk_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
- 
- static int nmk_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- {
--	bool enabled;
-+	bool enabled = !irqd_irq_disabled(d);
- 	bool wake = irqd_is_wakeup_set(d);
- 	int gpio;
- 	struct nmk_gpio_chip *nmk_chip;
-@@ -691,7 +685,6 @@ static int nmk_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- 	clk_enable(nmk_chip->clk);
- 	spin_lock_irqsave(&nmk_chip->lock, flags);
- 
--	enabled = !!(nmk_chip->enabled & bitmask);
- 	if (enabled)
- 		__nmk_gpio_irq_modify(nmk_chip, gpio, NORMAL, false);
- 
++/* Window overlaying */
++struct fb_overlay_win_pos {
++	__u32 win_pos_x;	/* x-offset from LCD(0,0) where window starts */
++	__u32 win_pos_y;	/* y-offset from LCD(0,0) where window starts */
++};
++
+ /*
+  * hardware cursor control
+  */
 -- 
-1.7.3.2
+1.7.0.4
