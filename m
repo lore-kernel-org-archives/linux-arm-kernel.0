@@ -1,67 +1,63 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 20 Sep 2011 09:35:04 +0200
-Subject: Link failures due to __bug_table in current -next
-In-Reply-To: <20110919191617.GB16381@n2100.arm.linux.org.uk>
-References: <20110919120954.GA20314@opensource.wolfsonmicro.com>
-	<20110919184027.GZ16381@n2100.arm.linux.org.uk>
-	<20110919184230.GF540@opensource.wolfsonmicro.com>
-	<20110919185809.GA16381@n2100.arm.linux.org.uk>
-	<20110919190602.GG540@opensource.wolfsonmicro.com>
-	<20110919191617.GB16381@n2100.arm.linux.org.uk>
-Message-ID: <20110920073504.GI23628@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Sep 2011 09:41:59 +0200
+Subject: [PATCH] ARM: mach-qong: Add watchdog support
+In-Reply-To: <1316440786-21118-1-git-send-email-fabio.estevam@freescale.com>
+References: <1316440786-21118-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110920074159.GA14191@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2011 at 08:16:17PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 19, 2011 at 08:06:03PM +0100, Mark Brown wrote:
-> > Yeah, it's a shame it doesn't include the disambiguated short ID in the
-> > standard git log output (which is what I always grep if I'm trying to
-> > search commit messages).  I've never seen a way to tell git to use %H
-> > instead of %h there by default that doesn't require me to start copying
-> > scripts or whatever between machines all the time.
+On Mon, Sep 19, 2011 at 10:59:46AM -0300, Fabio Estevam wrote:
+> Add watchdog support for mach-qong target.
+
+Applied to features branch.
+
+Sascha
+
 > 
-> I'm in two minds over this:
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/mach-imx/Kconfig     |    1 +
+>  arch/arm/mach-imx/mach-qong.c |    1 +
+>  2 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> [format]
->         pretty = %h %s
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 0519dd7..8748531 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -485,6 +485,7 @@ config MACH_QONG
+>  	bool "Support Dave/DENX QongEVB-LITE platform"
+>  	select SOC_IMX31
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+> +	select IMX_HAVE_PLATFORM_IMX2_WDT
+>  	help
+>  	  Include support for Dave/DENX QongEVB-LITE platform. This includes
+>  	  specific configurations for the board and its peripherals.
+> diff --git a/arch/arm/mach-imx/mach-qong.c b/arch/arm/mach-imx/mach-qong.c
+> index 3626f48..44462ce 100644
+> --- a/arch/arm/mach-imx/mach-qong.c
+> +++ b/arch/arm/mach-imx/mach-qong.c
+> @@ -249,6 +249,7 @@ static void __init qong_init(void)
+>  	mxc_init_imx_uart();
+>  	qong_init_nor_mtd();
+>  	qong_init_fpga();
+> +	imx31_add_imx2_wdt(NULL);
+>  }
+>  
+>  static void __init qong_timer_init(void)
+> -- 
+> 1.6.0.4
 > 
-> which I currently have in my ~/.gitconfig file.  It means that I always
-> get git log output as:
 > 
-> 38c0a0c Merge branches 'apei', 'bz-13195' and 'doc' into acpi
-> b6fd41e Linux 3.1-rc6
-> 8cb3ed17 Merge branch 'drm-fixes' of git://people.freedesktop.org/~airlied/linux4c75278 Merge branch 'fixes' of git://git.linaro.org/people/arnd/arm-soc
-> 14d01ff ioctl: register LTTng ioctl
 > 
-> rather than the more usual medium-pretty output.  I can get that by
-> using git log --pretty=medium.  The alternative to that is to use
-> shell aliases to pass the --pretty= argument for a gitslog alias -
-> or I believe you can create git command aliases in the ~/.gitconfig file.
-> (Never tried it yet, something I need to look at.)
-I did:
-
-	git config --global alias.lg "log --pretty=oneline --abbrev-commit"
-	git config --global alias.one "show -s --pretty='format:%h (%s)"
-
-which results in
-
-	[alias]
-		lg = log --pretty=oneline --abbrev-commit
-		one = show -s --pretty='format:%h (%s)'
-
-and makes available the commands
-
-	git lg
-
-(for summary logging) and
-
-	git one
-
-(to format a commit id for use in another commit message).
-
-Best regards
-Uwe
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
