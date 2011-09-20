@@ -1,49 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh)
-Date: Tue, 20 Sep 2011 17:07:21 +0530
-Subject: [PATCH 00/25] OMAP4: PM: suspend, CPU-hotplug and CPUilde support
-In-Reply-To: <9fa567d07831a1de1d0700151331b5c7@mail.gmail.com>
-References: <1315144466-9395-1-git-send-email-santosh.shilimkar@ti.com>
-	<9fa567d07831a1de1d0700151331b5c7@mail.gmail.com>
-Message-ID: <4E787AF1.5090400@ti.com>
+From: philippe.retornaz@epfl.ch (Philippe =?utf-8?q?R=C3=A9tornaz?=)
+Date: Tue, 20 Sep 2011 13:39:02 +0200
+Subject: [RFC PATCH] ARM ASoC: add sound driver for imx27pdk using mc13783
+	codec
+In-Reply-To: <CAPPnRU2LyJdHfA9W2porz_mWNo0fxAD+RSxrViNSK0Auinwpaw@mail.gmail.com>
+References: <1310131491-625-1-git-send-email-J.Lambrecht@televic.com>
+	<201107271028.09928.philippe.retornaz@epfl.ch>
+	<CAPPnRU2LyJdHfA9W2porz_mWNo0fxAD+RSxrViNSK0Auinwpaw@mail.gmail.com>
+Message-ID: <201109201339.02402.philippe.retornaz@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 September 2011 04:54 PM, Vishwanath Sripathy wrote:
->> -----Original Message-----
->> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
->> arm-kernel-bounces at lists.infradead.org] On Behalf Of Santosh
->> Shilimkar
->> Sent: Sunday, September 04, 2011 7:24 PM
->> To: linux-omap at vger.kernel.org
->> Cc: khilman at ti.com; Santosh Shilimkar; rnayak at ti.com;
->> linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org
->> Subject: [PATCH 00/25] OMAP4: PM: suspend, CPU-hotplug and CPUilde
->> support
->>
-
-[...]
-
->> The series is tested on OMAP4430 SDP for suspend, hotplug and
->> CPUidle
->> with OMAP4 GP and HS (secure) devices.
->>
->> The following changes since commit
->> c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
->>
->>   Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
->>
->> are available in the git repository at:
->>   git://gitorious.org/omap-sw-develoment/linux-omap-dev.git v3.1-
->> rc4-omap4-mpuss-pm
-> I have tested these patch series after adding core retention support  (In
-> suspend/resume path)[1] and it worked Fine. I do see that Core and MPU are
-> entering CSWR upon suspend and able to wake up via uart.
+Le vendredi 29 juillet 2011 21:14:47, J?rgen Lambrecht a ?crit :
+> 2011/7/27 Philippe R?tornaz <philippe.retornaz@epfl.ch>:
+> > Hi
+> > 
+> > Le vendredi 8 juillet 2011 16:19:22, Lambrecht J?rgen a ?crit :
+> >> indeed, doesn't work at all. I know it used to work on 2.6.34.
+> >> We also have a fsl linux 2.6.22 were it works.
+> >> I must say: when i use aplay to play a mono file, then there is no
+> >> error, it just never ends, and no sound also.
+> >> For a stereo file, it gives the error.
+> >> Mark also that when I use madplay (v0.15.2) (or mp3play) to play a mono
+> >> or stereo mp3, it allocates 3 DMA channels, but only frees one after the
+> >> error.
+> > 
+> > Did you made any progress on this ?
 > 
-> You could add tested-by: Vishwanath BS < Vishwanath.bs@ti.com> if you
-> want.
-> 
-Yes I want tested-by and will add your tested-by on the series.
-Thanks for testing
+> Yes. Sascha fixed it, and will commit it.
+> Regards,
+> J?rgen
 
-Regards
-Santosh
+Do you know if there is any public git tree containing this code ? 
+
+Regards,
+
+Philippe
