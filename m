@@ -1,77 +1,133 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 20 Sep 2011 09:27:01 -0400 (EDT)
-Subject: [PATCH] arm: Add unwinding annotations for 64bit division
-	functions
-In-Reply-To: <2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
-References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
-	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
-	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
-Message-ID: <alpine.LFD.2.00.1109200922281.12663@xanadu.home>
+From: javi.merino@arm.com (Javi Merino)
+Date: Tue, 20 Sep 2011 14:36:24 +0100
+Subject: [PATCH] ARM: pl330: Fix a race condition
+In-Reply-To: <CABb+yY0BGHSMA08uDMNkdSehFkQ_9afzzbkdpPkD0cz3owVWBQ@mail.gmail.com>
+References: <1316452291-19632-1-git-send-email-javi.merino@arm.com>
+	<CABb+yY0BGHSMA08uDMNkdSehFkQ_9afzzbkdpPkD0cz3owVWBQ@mail.gmail.com>
+Message-ID: <4E7896D8.5090606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Sep 2011, Laura Abbott wrote:
-
+On 19/09/11 19:07, Jassi Brar wrote:
+> On Mon, Sep 19, 2011 at 10:41 PM, Javi Merino <javi.merino@arm.com> wrote:
+>> If two requests have been submitted and one of them is running, if you
+>> call pl330_chan_ctrl(ch_id, PL330_OP_START), there's a window of time
+>> between the spin_lock_irqsave() and the _state() check in which the
+>> running transaction may finish.  In that case, we don't receive the
+>> interrupt (because they are disabled), but _start() sees that the DMA
+>> is stopped, so it starts it.  The problem is that it sends the
+>> transaction that has just finished again, because pl330_update()
+>> hasn't mark it as done yet.
+>>
+>> This patch moves the _state() check out of the critical section, which
+>> removes the race condition.  It also treats PL330_STATE_COMPLETING as
+>> still executing, because that introduces another race condition now
+>> that we call _state() with interrupts enabled.  Namely, if we read the
+>> state as "completing" and the DMA sends the interrupt before we
+>> disable interrupts, pl330_update() starts the next transaction and
+>> returns.  Then the _start() in pl330_chan_ctrl() will patiently wait
+>> until the just issued transaction finishes (because the state we read
+>> was PL330_STATE_COMPLETING) and when it does, it _trigger()s the same
+>> transaction again.
+>>
+>> Signed-off-by: Javi Merino <javi.merino@arm.com>
+>> Cc: Jassi Brar <jassi.brar@samsung.com>
+>> ---
+>>  arch/arm/common/pl330.c |   12 +++++++-----
+>>  1 files changed, 7 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+>> index 97912fa..26b5615 100644
+>> --- a/arch/arm/common/pl330.c
+>> +++ b/arch/arm/common/pl330.c
+>> @@ -936,9 +936,9 @@ static bool _trigger(struct pl330_thread *thrd)
+>>        return true;
+>>  }
+>>
+>> -static bool _start(struct pl330_thread *thrd)
+>> +static bool _start(struct pl330_thread *thrd, u32 state)
+>>  {
+>> -       switch (_state(thrd)) {
+>> +       switch (state) {
+>>        case PL330_STATE_FAULT_COMPLETING:
+>>                UNTIL(thrd, PL330_STATE_FAULTING | PL330_STATE_KILLING);
+>>
+>> @@ -949,7 +949,6 @@ static bool _start(struct pl330_thread *thrd)
+>>                _stop(thrd);
+>>
+>>        case PL330_STATE_KILLING:
+>> -       case PL330_STATE_COMPLETING:
+>>                UNTIL(thrd, PL330_STATE_STOPPED)
+>>
+>>        case PL330_STATE_STOPPED:
+>> @@ -961,6 +960,7 @@ static bool _start(struct pl330_thread *thrd)
+>>        case PL330_STATE_UPDTPC:
+>>        case PL330_STATE_CACHEMISS:
+>>        case PL330_STATE_EXECUTING:
+>> +       case PL330_STATE_COMPLETING:
+>>                return true;
+>>
+>>        case PL330_STATE_WFE: /* For RESUME, nothing yet */
+>> @@ -1471,7 +1471,7 @@ int pl330_update(const struct pl330_info *pi)
+>>                        MARK_FREE(rqdone);
+>>
+>>                        /* Get going again ASAP */
+>> -                       _start(thrd);
+>> +                       _start(thrd, _state(thrd));
+>>
+>>                        /* For now, just make a list of callbacks to be done */
+>>                        list_add_tail(&rqdone->rqd, &pl330->req_done);
+>> @@ -1510,12 +1510,14 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
+>>        struct pl330_dmac *pl330;
+>>        unsigned long flags;
+>>        int ret = 0, active;
+>> +       u32 dma_state;
+>>
+>>        if (!thrd || thrd->free || thrd->dmac->state == DYING)
+>>                return -EINVAL;
+>>
+>>        pl330 = thrd->dmac;
+>>
+>> +       dma_state = _state(thrd);
+>>        spin_lock_irqsave(&pl330->lock, flags);
+>>
+>>        switch (op) {
+>> @@ -1546,7 +1548,7 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
+>>
+>>                /* Start the next */
+>>        case PL330_OP_START:
+>> -               if (!_start(thrd))
+>> +               if (!_start(thrd, dma_state))
+>>                        ret = -EIO;
+>>                break;
+>>
+>> --
 > 
-> On Mon, September 19, 2011 4:22 pm, Nicolas Pitre wrote:
-> > On Mon, 19 Sep 2011, Laura Abbott wrote:
-> >
-> >> The 64bit division functions never had unwinding annotations
-> >> added. This prevents a backtrace from being printed within
-> >> the function and if a division by 0 occurs. Add the annotations.
-> >>
-> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> >> ---
-> >>  arch/arm/lib/div64.S |    8 ++++++++
-> >>  1 files changed, 8 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/arch/arm/lib/div64.S b/arch/arm/lib/div64.S
-> >> index faa7748..e55c484 100644
-> >> --- a/arch/arm/lib/div64.S
-> >> +++ b/arch/arm/lib/div64.S
-> >> @@ -13,6 +13,7 @@
-> >>   */
-> >>
-> >>  #include <linux/linkage.h>
-> >> +#include <asm/unwind.h>
-> >>
-> >>  #ifdef __ARMEB__
-> >>  #define xh r0
-> >> @@ -44,6 +45,7 @@
-> >>   */
-> >>
-> >>  ENTRY(__do_div64)
-> >> +UNWIND(.fnstart)
-> >>
-> >>  	@ Test for easy paths first.
-> >>  	subs	ip, r4, #1
-> >> @@ -189,7 +191,12 @@ ENTRY(__do_div64)
-> >>  	moveq	yh, xh
-> >>  	moveq	xh, #0
-> >>  	moveq	pc, lr
-> >> +UNWIND(.fnend)
-> >>
-> >> +UNWIND(.fnstart)
-> >> +UNWIND(.pad #4)
-> >> +UNWIND(.save {lr})
-> >> +Ldiv0_64:
-> >
-> > Why this phony fnend+fnstart here?
-> >
-> If a division by 0 occurs, we need to be able to access the saved LR on
-> the stack which is setup right before calling the __div0 function. This
-> can't go at the top of __do_div64 because if we try to do a backtrace from
-> within __do_div64 the annotation won't be correct as the LR was never
-> saved on the stack.
+> IIUIC your race scenario should be taken care of simply by doing...
+> 
+> diff --git a/arch/arm/common/pl330.c b/arch/arm/common/pl330.c
+> index 97912fa..7129cfb 100644
+> --- a/arch/arm/common/pl330.c
+> +++ b/arch/arm/common/pl330.c
+> @@ -1546,7 +1546,7 @@ int pl330_chan_ctrl(void *ch_id, enum pl330_chan_op op)
+> 
+>  		/* Start the next */
+>  	case PL330_OP_START:
+> -		if (!_start(thrd))
+> +		if (!_thrd_active(thrd) && !_start(thrd))
+>  			ret = -EIO;
+>  		break;
+> 
 
-I suppose the debug infrastructure always assume the same stack frame 
-for the whole function, hence you can't put that .pad and .save right 
-before the call to __div0 without the .fnstart and have it effective 
-only there?
+My first reaction was this was just moving the race condition, but
+thinking about it carefully, it looks like a better (simpler) solution.
 
-If so then:
+> Could you please test if it fixes the issue?
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Yes, I'll kick off runs later today and see how it goes.  I don't have a
+way to reproduce the bug consistently, I just do lots of DMA
+transactions and eventually, I end up hitting it.  I'll run it overnight
+and see if it fixes it or not.
 
-
-Nicolas
+Cheers,
+Javi
