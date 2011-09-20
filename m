@@ -1,43 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2011 23:01:56 +0200
-Subject: [PATCH REPOST 1/2] arm/dt: Tegra: Update SDHCI nodes to match
-	bindings
-In-Reply-To: <201109202134.50242.arnd@arndb.de>
-References: <1316537186-26753-1-git-send-email-swarren@nvidia.com>
-	<20110920180731.GL7781@ponder.secretlab.ca>
-	<201109202134.50242.arnd@arndb.de>
-Message-ID: <201109202301.56983.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Sep 2011 14:21:20 -0700
+Subject: [GIT PULL] omap voltage cleanup for v3.2 merge window
+In-Reply-To: <201109202206.24931.arnd@arndb.de>
+References: <20110917015419.GD2937@atomide.com>
+	<201109202206.24931.arnd@arndb.de>
+Message-ID: <20110920212120.GJ2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 September 2011, Arnd Bergmann wrote:
-> On Tuesday 20 September 2011, Grant Likely wrote:
-> > On Tue, Sep 20, 2011 at 07:43:29PM +0200, Arnd Bergmann wrote:
-> > > On Tuesday 20 September 2011, Stephen Warren wrote:
-> > > > The bindings were recently updated to have separate properties for each
-> > > > type of GPIO. Update the Device Tree source to match that.
-> > > > 
-> > > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > > > Acked-by: Olof Johansson <olof@lixom.net>
-> > > > ---
-> > > > I'd previously sent these to Grant assuming they'd go in his dt/next branch,
-> > > > but perhaps these should go in through Arnd's arm-soc next/dt branch?
-> > > > 
-> > > 
-> > > Which tree has the update that changed the bindings? I think it should
-> > > go into the same one.
-> > > 
-> > > If it's already upstream, I can take it into the fixes branch.
+* Arnd Bergmann <arnd@arndb.de> [110920 12:32]:
+> On Saturday 17 September 2011, Tony Lindgren wrote:
+> > Please pull omap voltage cleanup series:
 > > 
-> > Already upstream
+> > git://github.com/tmlind/linux.git voltage
+> > 
+> > This has a dependency to the cleanup part 1 series. As
+> > this contains some voltage fixes too, it's a separate
+> > series. You can either pull it into cleanup or keep it
+> > separate.
 > 
-> Ok, I see. I've applied both patches to the fixes branch and will send
-> it out with the next pull request for 3.1 to Linus then.
+> Hi Tony,
+> 
+> I've pulled it into the for-next branch, but haven't
+> made up my mind how it I will send it upstream.
+> I definitely think it's good that you sent it to me
+> as a separate series, given the number of patches in it.
 
-Sorry, I just noticed that the second patch is not a bug fix, so I took it out
-again and kept only patch 1/2 in the fixes branch for 3.1.
+OK thanks. FYI, most of the voltage stuff can eventually
+become just a regular device driver. But that depends on
+some other changes, like PRCM interrupt driver.
 
-Should I take the other one as well? It's probably better to let that
-go the proper way through the tegra tree for 3.2, right?
+Regards,
 
-	Arnd
+Tony
