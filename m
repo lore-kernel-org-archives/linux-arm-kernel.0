@@ -1,48 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Sep 2011 22:32:13 +0200
-Subject: [PATCH v2] mach-ep93xx: break out GPIO driver specifics
-In-Reply-To: <20110920174012.GE7781@ponder.secretlab.ca>
-References: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
-	<20110920174012.GE7781@ponder.secretlab.ca>
-Message-ID: <CACRpkdazjpKZRfpoYgZ=kC+auEj9q-KMHa6qsWsD+5Hpji+96w@mail.gmail.com>
+Date: Tue, 20 Sep 2011 22:43:40 +0200
+Subject: [PATCH] mach-integrator: fix VGA base regression
+In-Reply-To: <201109051621.18382.arnd@arndb.de>
+References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
+	<CACRpkdZfCd6XfV12v9_pJ+zpW7JNSLVm6pZNn6VhFMiB7SNJsQ@mail.gmail.com>
+	<201109051621.18382.arnd@arndb.de>
+Message-ID: <CACRpkdb5jdgR+_aZxVzaedr1FJdUWSi9b7utcB6NsiXhX3GvLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2011 at 7:40 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Tue, Sep 20, 2011 at 10:42:12AM +0200, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Sep 5, 2011 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 05 September 2011, Linus Walleij wrote:
+>> On Sun, Sep 4, 2011 at 11:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 >>
->> The <mach/gpio.h> file is included from upper directories
->> and deal with generic GPIO and gpiolib stuff. Break out the
->> platform and driver specific defines and functions into its own
->> header file.
+>> > The changes introduced in commit
+>> > cc22b4c18540e5e8bf55c7d124044f9317527d3c
+>> > "ARM: set vga memory base at run-time"
 >>
->> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
->> Cc: Ryan Mallon <rmallon@gmail.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ChangeLog v1->v2:
->> - Move the irq_to_gpio() into the driver since it was the only
->> ? thing actually using it, as a result the ep93xx gpio.h
->> ? is trivial and becomes empty.
->> - Putting this into the patch tracker as 7042/2 soon-ish.
->> ---
->> ?arch/arm/mach-ep93xx/core.c ? ? ? ? ? ? ? ? ? ? | ? ?1 +
->> ?arch/arm/mach-ep93xx/edb93xx.c ? ? ? ? ? ? ? ? ?| ? ?1 +
->> ?arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h | ?100 +++++++++++++++++++++
->> ?arch/arm/mach-ep93xx/include/mach/gpio.h ? ? ? ?| ?105 -----------------------
+>> Arnd can you choose whether to apply this patch or revert
+>> the commit making it necessary?
 >
-> Please use the --find-renames flag for patches like this, but otherwise:
->
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> I'm still stuck with master.kernel.org being down, so I can't really push
+> any updates right now. I'll do it once it's up again.
 
-Thanks, I'll fix that.
-
-> Which tree will this go through? ?I don't think it should go via the
-> gpio tree since it is mostly within arch/arm.
-
-It'd dependent on Russells cleanups so it'll go through Russells
-tree and his gpio cleanup branch there.
+Ping on this. Rob agreed to merge the patch, this is a regression
+making Integrator non-bootable in 3.1 so I'd really like to see it
+merged ASAP.
 
 Yours,
 Linus Walleij
