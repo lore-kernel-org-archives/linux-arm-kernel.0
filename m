@@ -1,35 +1,58 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 20 Sep 2011 14:24:28 +0300
-Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
-	structure
-In-Reply-To: <1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
-References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
-	<1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <20110920112427.GB19695@sapphire.tkos.co.il>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Tue, 20 Sep 2011 17:00:25 +0530
+Subject: [PATCH v16 10/12] OMAP: dmtimer: extend spinlock in request functions
+In-Reply-To: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
+References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1316518227-28116-11-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ajay,
+The request functions now verify the success of omap_dm_timer_prepare() call
+after a timer is acquired. If *_prepare() fails then we have to release the
+timer. In order to avoid race condition during this time, include *_prepare()
+within lock.
 
-On Tue, Sep 20, 2011 at 11:30:39AM -0400, Ajay Kumar wrote:
-> This patch adds a data structure definiton to hold framebuffer windows/planes.
-> An ioctl number is also added to provide user access
-> to change window position dynamically.
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/plat-omap/dmtimer.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-[snip]
-
-> +/* Window overlaying */
-> +struct fb_overlay_win_pos {
-> +	__u32 win_pos_x;	/* x-offset from LCD(0,0) where window starts */
-> +	__u32 win_pos_y;	/* y-offset from LCD(0,0) where window starts */
-> +};
-
-Why not allow negative offsets where the left or upper part of the framebuffer 
-is hidden?
-
-baruch
-
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index f549c63..631b6af 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -166,7 +166,6 @@ struct omap_dm_timer *omap_dm_timer_request(void)
+ 		timer->reserved = 1;
+ 		break;
+ 	}
+-	spin_unlock_irqrestore(&dm_timer_lock, flags);
+ 
+ 	if (timer) {
+ 		ret = omap_dm_timer_prepare(timer);
+@@ -175,6 +174,7 @@ struct omap_dm_timer *omap_dm_timer_request(void)
+ 			timer = NULL;
+ 		}
+ 	}
++	spin_unlock_irqrestore(&dm_timer_lock, flags);
+ 
+ 	if (!timer)
+ 		pr_debug("%s: timer request failed!\n", __func__);
+@@ -197,7 +197,6 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ 			break;
+ 		}
+ 	}
+-	spin_unlock_irqrestore(&dm_timer_lock, flags);
+ 
+ 	if (timer) {
+ 		ret = omap_dm_timer_prepare(timer);
+@@ -206,6 +205,7 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ 			timer = NULL;
+ 		}
+ 	}
++	spin_unlock_irqrestore(&dm_timer_lock, flags);
+ 
+ 	if (!timer)
+ 		pr_debug("%s: timer%d request failed!\n", __func__, id);
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.7.0.4
