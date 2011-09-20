@@ -1,29 +1,23 @@
 From: davem@davemloft.net (David Miller)
-Date: Tue, 20 Sep 2011 15:08:40 -0400 (EDT)
-Subject: [PATCH 0/4] add fec support for imx6q
-In-Reply-To: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
-References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110920.150840.1516237043684327742.davem@davemloft.net>
+Date: Tue, 20 Sep 2011 15:11:11 -0400 (EDT)
+Subject: [PATCH 3/4] net/fec: set phy_speed to the optimal frequency
+	2.5 MHz
+In-Reply-To: <20110920081438.GB28389@S2100-06.ap.freescale.net>
+References: <1316346852-17090-4-git-send-email-shawn.guo@linaro.org>
+	<20088.17849.987651.196256@ipc1.ka-ro>
+	<20110920081438.GB28389@S2100-06.ap.freescale.net>
+Message-ID: <20110920.151111.456825259983009921.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
-Date: Sun, 18 Sep 2011 19:54:08 +0800
+From: Shawn Guo <shawn.guo@freescale.com>
+Date: Tue, 20 Sep 2011 16:14:39 +0800
 
-> This series adds imx6q enet support.  The imx6q enet is a derivative of
-> imx28 enet controller.  It fixed the frame endian issue found on imx28,
-> and added 1 Gbps support.
+> I should have done that before sending this patch.  I'm working home
+> these days and have not got the chance get into the lab.  Yes, I
+> should have sent this patch as an RFC at least.  Sorry about this,
+> and thank you for pointing this out.
 > 
-> It's based on v3.1-rc6.
-> 
-> Shawn Guo (4):
->       net/fec: change phy-reset-gpio request warning to debug message
->       net/fec: fix fec1 check in fec_enet_mii_init()
->       net/fec: set phy_speed to the optimal frequency 2.5 MHz
->       net/fec: add imx6q enet support
+> Will drop this patch from the v2 of the series.
 
-Please respin this against the net-next tree as that's where these
-changes should be targetted and all the ethernet drivers have moved
-to different directories in net-next.
-
-Thanks.
+As mentioned you need to respin this anyways against net-next
