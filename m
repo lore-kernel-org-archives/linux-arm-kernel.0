@@ -1,90 +1,61 @@
 From: rob.lee@linaro.org (Rob Lee)
-Date: Tue, 20 Sep 2011 10:40:49 -0500
+Date: Tue, 20 Sep 2011 10:47:53 -0500
 Subject: [PATCH v2 0/3] ARM: imx: Add cpuidle for imx platforms
-In-Reply-To: <20110920071633.GR31404@pengutronix.de>
+In-Reply-To: <20110920080320.GA2528@matterhorn1>
 References: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
 	<20110920071633.GR31404@pengutronix.de>
-Message-ID: <CAMXH7KHKhMSY6zW_Dyu1QWq-Q4siqBm5Epz8C_Pqc=UjJWHVPQ@mail.gmail.com>
+	<20110920080320.GA2528@matterhorn1>
+Message-ID: <CAMXH7KG8W0LQCwbbneCGNJz7R0HUB2BiNbYZYGD_Z94edorTXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
+Hello Amit,
 
-On 20 September 2011 02:16, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> Hi Robert,
->
-> On Fri, Sep 16, 2011 at 12:27:47PM -0500, Robert Lee wrote:
->> This patch series adds a common imx cpuidle driver, some common
->> mach-mx5 level cpuidle functionality, and an i.MX51 instance of
->> using this driver.
+On 20 September 2011 03:03, Amit Kucheria <amit.kucheria@linaro.org> wrote:
+> On 11 Sep 20, Sascha Hauer wrote:
+>> Hi Robert,
 >>
->> The patch series is based on v3.1-rc2.
+>> On Fri, Sep 16, 2011 at 12:27:47PM -0500, Robert Lee wrote:
+>> > This patch series adds a common imx cpuidle driver, some common
+>> > mach-mx5 level cpuidle functionality, and an i.MX51 instance of
+>> > using this driver.
+>> >
+>> > The patch series is based on v3.1-rc2.
+>> >
+>> > Changes since v1:
+>> > * To address all the problems found during review of v1, a complete
+>> > re-write was needed.
 >>
->> Changes since v1:
->> * To address all the problems found during review of v1, a complete
->> re-write was needed.
->
-> Much better than the last version, thanks.
->
-
-Thanks to Shawn Guo for thoroughly reviewing and providing
-feedback on this version and Jason Hui contributed to the reviewing
-as well despite both of them being very busy with there own
-submissions.
-
+>> Much better than the last version, thanks.
 >>
->> Robert Lee (3):
->> ? ARM: imx: Add imx cpuidle driver
->> ? ARM: imx: Add cpuidle for mach-mx5
->> ? ARM: imx: Add cpuidle for i.MX51
+>> >
+>> > Robert Lee (3):
+>> > ? ARM: imx: Add imx cpuidle driver
+>> > ? ARM: imx: Add cpuidle for mach-mx5
+>> > ? ARM: imx: Add cpuidle for i.MX51
+>> >
+>> > ?arch/arm/mach-mx5/Makefile ? ? ? ? ? ? ? | ? ?3 +-
+>> > ?arch/arm/mach-mx5/cpu_op-mx51.c ? ? ? ? ?| ? 35 +++++++-
 >>
->> ?arch/arm/mach-mx5/Makefile ? ? ? ? ? ? ? | ? ?3 +-
->> ?arch/arm/mach-mx5/cpu_op-mx51.c ? ? ? ? ?| ? 35 +++++++-
+>> Your additions to this file...
+>>
+>> > ?arch/arm/mach-mx5/cpu_op-mx51.h ? ? ? ? ?| ? ?1 +
+>> > ?arch/arm/mach-mx5/mm.c ? ? ? ? ? ? ? ? ? | ? ?4 +
+>> > ?arch/arm/mach-mx5/system.c ? ? ? ? ? ? ? | ? 35 +++++++
+>>
+>> And this one should go to arch/arm/mach-mx5/cpuidle.c, then we have
+>> all i.MX5 specific cpuidle stuff together without ifdeffing the code.
+>> I assume that cpuidle support for i.MX53 will look identically, right?
 >
-> Your additions to this file...
->
->> ?arch/arm/mach-mx5/cpu_op-mx51.h ? ? ? ? ?| ? ?1 +
->> ?arch/arm/mach-mx5/mm.c ? ? ? ? ? ? ? ? ? | ? ?4 +
->> ?arch/arm/mach-mx5/system.c ? ? ? ? ? ? ? | ? 35 +++++++
->
-> And this one should go to arch/arm/mach-mx5/cpuidle.c, then we have
-> all i.MX5 specific cpuidle stuff together without ifdeffing the code.
-> I assume that cpuidle support for i.MX53 will look identically, right?
+> Yes, let's not separate only for i.MX51. i.MX53 and even i.MX6 might look
+> similar. They can always tune the exit latency criteria if needed.
 >
 
-After considering it further after the first patch, there can be differences
-between the i.MX51 and i.MX53 state data as i.MX51 supports an
-additional idle state that i.MX53 does not.  This state was not added
-to this version of the patch because it's additional power savings is very
-small and there is fairly time consuming characterization needed to
-come up with accurate cpuidle state data.  But to allow for the
-possibility that this state could be added in the future, it seemed the
-choice was to add this init data to the an i.MX51 specific file such as
-cpu_op-mx51.c/h and add ifdefs for cpuidle and cpufreq.  Or, make
-a cpuidle.c file as you suggest and add ifdefs for the different mx5
-SoCs.  Just let me know which way you think is better given this
-information.
+i.MX6 will have significantly different exit_latency values and may need
+to have target residency values as well.  Also, i.MX6 may have a
+different number of states, so I think it is best to have separate sets of
+SoC state data as needed instead of trying to make one set of state data
+to be used by all i.MX6.
 
-For the call to imx_cpuidle_init from imx51_soc_init in mm.c, this
-seems like a good location to initialize for all imx51_soc.  If I don't
-call the init from here, can you recommend another location that I
-should call it from?
-
->> ?arch/arm/plat-mxc/Makefile ? ? ? ? ? ? ? | ? ?1 +
->> ?arch/arm/plat-mxc/cpuidle.c ? ? ? ? ? ? ?| ?151 ++++++++++++++++++++++++++++++
->> ?arch/arm/plat-mxc/include/mach/cpuidle.h | ? 56 +++++++++++
->> ?arch/arm/plat-mxc/include/mach/system.h ?| ? ?3 +
->> ?9 files changed, 286 insertions(+), 3 deletions(-)
->> ?create mode 100644 arch/arm/plat-mxc/cpuidle.c
->> ?create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
->>
->>
 >
-> Sascha
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
 >
