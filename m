@@ -1,84 +1,89 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 20 Sep 2011 21:57:17 +0300
-Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
-	structure
-In-Reply-To: <4E78C579.9060305@gmx.de>
-References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
-	<1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
-	<1316517021.1949.13.camel@deskari>
-	<CAEC9eQOTNaMcUWeSFN-DCTYrCJsVaDAO7uOZNQM=efjVdqtU2g@mail.gmail.com>
-	<1316533193.18781.12.camel@deskari>  <4E78C579.9060305@gmx.de>
-Message-ID: <1316545037.18781.34.camel@deskari>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 20 Sep 2011 21:07:46 +0200
+Subject: [PATCH v2 0/3] ARM: imx: Add cpuidle for imx platforms
+In-Reply-To: <CAMXH7KHKhMSY6zW_Dyu1QWq-Q4siqBm5Epz8C_Pqc=UjJWHVPQ@mail.gmail.com>
+References: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
+	<20110920071633.GR31404@pengutronix.de>
+	<CAMXH7KHKhMSY6zW_Dyu1QWq-Q4siqBm5Epz8C_Pqc=UjJWHVPQ@mail.gmail.com>
+Message-ID: <20110920190746.GY31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-09-20 at 16:55 +0000, Florian Tobias Schandinat wrote:
+On Tue, Sep 20, 2011 at 10:40:49AM -0500, Rob Lee wrote:
+> Hello Sascha,
+> 
+> On 20 September 2011 02:16, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Hi Robert,
+> >
+> > On Fri, Sep 16, 2011 at 12:27:47PM -0500, Robert Lee wrote:
+> >> This patch series adds a common imx cpuidle driver, some common
+> >> mach-mx5 level cpuidle functionality, and an i.MX51 instance of
+> >> using this driver.
+> >>
+> >> The patch series is based on v3.1-rc2.
+> >>
+> >> Changes since v1:
+> >> * To address all the problems found during review of v1, a complete
+> >> re-write was needed.
+> >
+> > Much better than the last version, thanks.
+> >
+> 
+> Thanks to Shawn Guo for thoroughly reviewing and providing
+> feedback on this version and Jason Hui contributed to the reviewing
+> as well despite both of them being very busy with there own
+> submissions.
+> 
+> >>
+> >> Robert Lee (3):
+> >> ? ARM: imx: Add imx cpuidle driver
+> >> ? ARM: imx: Add cpuidle for mach-mx5
+> >> ? ARM: imx: Add cpuidle for i.MX51
+> >>
+> >> ?arch/arm/mach-mx5/Makefile ? ? ? ? ? ? ? | ? ?3 +-
+> >> ?arch/arm/mach-mx5/cpu_op-mx51.c ? ? ? ? ?| ? 35 +++++++-
+> >
+> > Your additions to this file...
+> >
+> >> ?arch/arm/mach-mx5/cpu_op-mx51.h ? ? ? ? ?| ? ?1 +
+> >> ?arch/arm/mach-mx5/mm.c ? ? ? ? ? ? ? ? ? | ? ?4 +
+> >> ?arch/arm/mach-mx5/system.c ? ? ? ? ? ? ? | ? 35 +++++++
+> >
+> > And this one should go to arch/arm/mach-mx5/cpuidle.c, then we have
+> > all i.MX5 specific cpuidle stuff together without ifdeffing the code.
+> > I assume that cpuidle support for i.MX53 will look identically, right?
+> >
+> 
+> After considering it further after the first patch, there can be differences
+> between the i.MX51 and i.MX53 state data as i.MX51 supports an
+> additional idle state that i.MX53 does not.  This state was not added
+> to this version of the patch because it's additional power savings is very
+> small and there is fairly time consuming characterization needed to
+> come up with accurate cpuidle state data.  But to allow for the
+> possibility that this state could be added in the future, it seemed the
+> choice was to add this init data to the an i.MX51 specific file such as
+> cpu_op-mx51.c/h and add ifdefs for cpuidle and cpufreq.  Or, make
+> a cpuidle.c file as you suggest and add ifdefs for the different mx5
+> SoCs.  Just let me know which way you think is better given this
+> information.
 
-> Did you have a look at the (existing) API [1] Laurent proposed for discovering
-> the internal connections between the framebuffers (or with any other devices)?
+Just put it in cpuidle.c for now. Better to have the cpuidle stuff
+together in one file. We can still decide to move it to another place
+should the need arise.
 
-I know the basics of media controller, but I haven't really looked at
-the code.
+> 
+> For the call to imx_cpuidle_init from imx51_soc_init in mm.c, this
+> seems like a good location to initialize for all imx51_soc.  If I don't
+> call the init from here, can you recommend another location that I
+> should call it from?
 
-> If you agree that it'd be a good idea to use it I feel that we should make the
-> windowing API more compatible with it. So basically what we want to have as a
+Calling it from mm.c is fine.
 
-I can't say if MC should be used for fb or not, but I think something
-similar should be used if we want to get overlays etc. supported. But
-even with MC (or something else) there, I'm not quite sure how they fit
-into the fb model.
+Sascha
 
-I think the core problem here is that in a more complex setup (at least
-as I see it for OMAP) the fb should be just a framebuffer in memory,
-without any direct relation to hardware. The hardware part (an overlay,
-or whichever is the corresponding element) will then use the framebuffer
-as the pixel source.
 
-However, the current fb model combines those two things into one. If we
-manage to separate them, and add MC or similar, I think it'll work.
-
-> window is one or more sunk pads so the pad-index should be also part of the
-> interface. I'm still confused with how OMAP works when it does not have a "root"
-
-Do you mean how the hardware works, or how I've designed omapfb driver?
-
-> window/framebuffer. Normally I feel that the window position should be a
-> property of the parent window as this is what the position is relative too. But
-> if the parent is no framebuffer, should we also include the entity into the
-> interface to allow configuring things that are nor even framebuffers?
-
-Right, I think you're pondering the core problem here =).
-
-On OMAP we have the display (the whole area shown on the panel/tv),
-which has video timings and things like that. But no pixel data as such
-(a configurable background color is there, though).
-
-And then we have the overlays, which are somewhere on the display, and
-the overlays get pixel data from memory (framebuffers).
-
-So in a way we have a contentless root window, but presenting that with
-an fb device doesn't feel right. And the fb device would logically be
-fb0, and if it couldn't show any content it couldn't be used as default
-framebuffer.
-
-> Also I think we need a z-index in case overlays overlap (might happen or?) and
-> enforcing that all z-indexes are different for the same entity.
-
-Yes, free z-order is supported in OMAP4. Previous OMAPs had fixed
-z-order, although in certain configuration (enable/disable alpha
-blending) the fixed z-order does change...
-
-> As I see it xres/yres (together with xoffset/yoffset) is always the visible part
-> of the framebuffer. Typically that's also part of the timings as they define
-> what is visible. With the introduction of overlays (and maybe even for some
-> hardware anyway) it is no longer always true to have any timings at all. So on
-> all framebuffer that do not have physical timings the timing interpretation is
-> useless anyway (I'm thinking about adding a FB_CAP_NOTIMING) and what remains is
-> the interpretation of xres/yres as visible screen region.
-
-For a system where there's always a root window for every output, plus
-variable size overlays, FB_CAP_NOTIMING makes sense. But it would still
-leave the problem if there's no root window. How to change timings on a
-system like OMAP?
-
- Tomi
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
