@@ -1,82 +1,53 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 19 Sep 2011 18:55:39 -0700 (PDT)
-Subject: [PATCH] arm: Add unwinding annotations for 64bit division
-	functions
-In-Reply-To: <alpine.LFD.2.00.1109191913210.12663@xanadu.home>
-References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
-	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
-Message-ID: <2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Sep 2011 10:57:01 +0800
+Subject: [PATCH 3/4] net/fec: set phy_speed to the optimal frequency 2.5
+	MHz
+In-Reply-To: <4E77C4A2.1060802@boundarydevices.com>
+References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
+	<1316346852-17090-4-git-send-email-shawn.guo@linaro.org>
+	<4E77C4A2.1060802@boundarydevices.com>
+Message-ID: <20110920025700.GE28084@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 19, 2011 at 03:39:30PM -0700, Troy Kisky wrote:
+> On 9/18/2011 4:54 AM, Shawn Guo wrote:
+> >With the unnecessary 1 bit left-shift on fep->phy_speed during the
+> >calculation, the phy_speed always runs at the half frequency of the
+> >optimal one 2.5 MHz.
+> >
+> >The patch removes that 1 bit left-shift to get the optimal phy_speed.
+> >
+> >Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
+> >---
+> >  drivers/net/fec.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> >diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+> >index 5ef0e34..04206e4 100644
+> >--- a/drivers/net/fec.c
+> >+++ b/drivers/net/fec.c
+> >@@ -1007,7 +1007,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+> >  	/*
+> >  	 * Set MII speed to 2.5 MHz (= clk_get_rate() / 2 * phy_speed)
+> >  	 */
+> >-	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000)<<  1;
+> >+	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000);
+> >  	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
+> >
+> >  	fep->mii_bus = mdiobus_alloc();
+> Do you need to round up to an even value? Is the hardware
+> documentation wrong?
 
-On Mon, September 19, 2011 4:22 pm, Nicolas Pitre wrote:
-> On Mon, 19 Sep 2011, Laura Abbott wrote:
->
->> The 64bit division functions never had unwinding annotations
->> added. This prevents a backtrace from being printed within
->> the function and if a division by 0 occurs. Add the annotations.
->>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->> ---
->>  arch/arm/lib/div64.S |    8 ++++++++
->>  1 files changed, 8 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/lib/div64.S b/arch/arm/lib/div64.S
->> index faa7748..e55c484 100644
->> --- a/arch/arm/lib/div64.S
->> +++ b/arch/arm/lib/div64.S
->> @@ -13,6 +13,7 @@
->>   */
->>
->>  #include <linux/linkage.h>
->> +#include <asm/unwind.h>
->>
->>  #ifdef __ARMEB__
->>  #define xh r0
->> @@ -44,6 +45,7 @@
->>   */
->>
->>  ENTRY(__do_div64)
->> +UNWIND(.fnstart)
->>
->>  	@ Test for easy paths first.
->>  	subs	ip, r4, #1
->> @@ -189,7 +191,12 @@ ENTRY(__do_div64)
->>  	moveq	yh, xh
->>  	moveq	xh, #0
->>  	moveq	pc, lr
->> +UNWIND(.fnend)
->>
->> +UNWIND(.fnstart)
->> +UNWIND(.pad #4)
->> +UNWIND(.save {lr})
->> +Ldiv0_64:
->
-> Why this phony fnend+fnstart here?
->
-If a division by 0 occurs, we need to be able to access the saved LR on
-the stack which is setup right before calling the __div0 function. This
-can't go at the top of __do_div64 because if we try to do a backtrace from
-within __do_div64 the annotation won't be correct as the LR was never
-saved on the stack. (yes, __do_div64 is all register math but it's still
-possible to take a prefetch abort in the middle of that function. Taking a
-prefetch abort in the middle of __do_div64 is what found this issue in the
-first place.) This setup handles both cases correctly.
+The round up is something existed, and the patch does not touch that
+part.
 
->
-> Nicolas
->
+> Does this need a quirk? What boards has this been verified to fix?
+> 
 
-Laura
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
+I tested this on i.mx28, i.mx53 and i.mx6q.  Do you see problem on
+your platform?
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Shawn
