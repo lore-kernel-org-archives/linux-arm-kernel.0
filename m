@@ -1,33 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2011 22:59:49 +0200
-Subject: [PATCH] mach-integrator: fix VGA base regression
-In-Reply-To: <CACRpkdb5jdgR+_aZxVzaedr1FJdUWSi9b7utcB6NsiXhX3GvLA@mail.gmail.com>
-References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
-	<201109051621.18382.arnd@arndb.de>
-	<CACRpkdb5jdgR+_aZxVzaedr1FJdUWSi9b7utcB6NsiXhX3GvLA@mail.gmail.com>
-Message-ID: <201109202259.49763.arnd@arndb.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 20 Sep 2011 15:01:01 -0600
+Subject: [PATCH 1/3] of/irq: of_irq_find_parent: check for parent equal
+	to child
+In-Reply-To: <1316550244-3655-2-git-send-email-robherring2@gmail.com>
+References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
+	<1316550244-3655-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20110920210101.GP7781@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 September 2011, Linus Walleij wrote:
-> On Mon, Sep 5, 2011 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday 05 September 2011, Linus Walleij wrote:
-> >> On Sun, Sep 4, 2011 at 11:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >>
-> >> > The changes introduced in commit
-> >> > cc22b4c18540e5e8bf55c7d124044f9317527d3c
-> >> > "ARM: set vga memory base at run-time"
-> >>
-> >> Arnd can you choose whether to apply this patch or revert
-> >> the commit making it necessary?
-> >
-> > I'm still stuck with master.kernel.org being down, so I can't really push
-> > any updates right now. I'll do it once it's up again.
+On Tue, Sep 20, 2011 at 03:24:02PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Ping on this. Rob agreed to merge the patch, this is a regression
-> making Integrator non-bootable in 3.1 so I'd really like to see it
-> merged ASAP.
+> An interrupt controller may often implicitly inherit itself from a parent
+> node when in fact the controller is the interrupt root controller. Guard
+> against the case of child == parent and return NULL in this case.
 > 
-Applied, thanks for the reminder!
+> This can also be fixed by adding an explicit "interrupt-parent;" to a root
+> interrupt controller node.
+> 
+> Based on code from Grant Likely.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
 
-	Arnd
+Looks great.
+
+Ben, can you look at this please?  Make sure I've not missed something
+about how powerpc expects of_irq_find_parent() to behave.
+
+g.
+
+> ---
+>  drivers/of/irq.c |   14 +++++++-------
+>  1 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 9f689f1..6a5b5e7 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -58,27 +58,27 @@ EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
+>   */
+>  struct device_node *of_irq_find_parent(struct device_node *child)
+>  {
+> -	struct device_node *p;
+> +	struct device_node *p, *c = child;
+>  	const __be32 *parp;
+>  
+> -	if (!of_node_get(child))
+> +	if (!of_node_get(c))
+>  		return NULL;
+>  
+>  	do {
+> -		parp = of_get_property(child, "interrupt-parent", NULL);
+> +		parp = of_get_property(c, "interrupt-parent", NULL);
+>  		if (parp == NULL)
+> -			p = of_get_parent(child);
+> +			p = of_get_parent(c);
+>  		else {
+>  			if (of_irq_workarounds & OF_IMAP_NO_PHANDLE)
+>  				p = of_node_get(of_irq_dflt_pic);
+>  			else
+>  				p = of_find_node_by_phandle(be32_to_cpup(parp));
+>  		}
+> -		of_node_put(child);
+> -		child = p;
+> +		of_node_put(c);
+> +		c = p;
+>  	} while (p && of_get_property(p, "#interrupt-cells", NULL) == NULL);
+>  
+> -	return p;
+> +	return (p == child) ? NULL : p;
+>  }
+>  
+>  /**
+> -- 
+> 1.7.5.4
+> 
