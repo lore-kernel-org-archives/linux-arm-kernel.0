@@ -1,60 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 20 Sep 2011 09:16:33 +0200
-Subject: [PATCH v2 0/3] ARM: imx: Add cpuidle for imx platforms
-In-Reply-To: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
-References: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
-Message-ID: <20110920071633.GR31404@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 20 Sep 2011 09:35:04 +0200
+Subject: Link failures due to __bug_table in current -next
+In-Reply-To: <20110919191617.GB16381@n2100.arm.linux.org.uk>
+References: <20110919120954.GA20314@opensource.wolfsonmicro.com>
+	<20110919184027.GZ16381@n2100.arm.linux.org.uk>
+	<20110919184230.GF540@opensource.wolfsonmicro.com>
+	<20110919185809.GA16381@n2100.arm.linux.org.uk>
+	<20110919190602.GG540@opensource.wolfsonmicro.com>
+	<20110919191617.GB16381@n2100.arm.linux.org.uk>
+Message-ID: <20110920073504.GI23628@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
-
-On Fri, Sep 16, 2011 at 12:27:47PM -0500, Robert Lee wrote:
-> This patch series adds a common imx cpuidle driver, some common 
-> mach-mx5 level cpuidle functionality, and an i.MX51 instance of
-> using this driver.
+On Mon, Sep 19, 2011 at 08:16:17PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 19, 2011 at 08:06:03PM +0100, Mark Brown wrote:
+> > Yeah, it's a shame it doesn't include the disambiguated short ID in the
+> > standard git log output (which is what I always grep if I'm trying to
+> > search commit messages).  I've never seen a way to tell git to use %H
+> > instead of %h there by default that doesn't require me to start copying
+> > scripts or whatever between machines all the time.
 > 
-> The patch series is based on v3.1-rc2.
+> I'm in two minds over this:
 > 
-> Changes since v1:
-> * To address all the problems found during review of v1, a complete
-> re-write was needed.
-
-Much better than the last version, thanks.
-
+> [format]
+>         pretty = %h %s
 > 
-> Robert Lee (3):
->   ARM: imx: Add imx cpuidle driver
->   ARM: imx: Add cpuidle for mach-mx5
->   ARM: imx: Add cpuidle for i.MX51
+> which I currently have in my ~/.gitconfig file.  It means that I always
+> get git log output as:
 > 
->  arch/arm/mach-mx5/Makefile               |    3 +-
->  arch/arm/mach-mx5/cpu_op-mx51.c          |   35 +++++++-
-
-Your additions to this file...
-
->  arch/arm/mach-mx5/cpu_op-mx51.h          |    1 +
->  arch/arm/mach-mx5/mm.c                   |    4 +
->  arch/arm/mach-mx5/system.c               |   35 +++++++
-
-And this one should go to arch/arm/mach-mx5/cpuidle.c, then we have
-all i.MX5 specific cpuidle stuff together without ifdeffing the code.
-I assume that cpuidle support for i.MX53 will look identically, right?
-
->  arch/arm/plat-mxc/Makefile               |    1 +
->  arch/arm/plat-mxc/cpuidle.c              |  151 ++++++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/cpuidle.h |   56 +++++++++++
->  arch/arm/plat-mxc/include/mach/system.h  |    3 +
->  9 files changed, 286 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/cpuidle.c
->  create mode 100644 arch/arm/plat-mxc/include/mach/cpuidle.h
+> 38c0a0c Merge branches 'apei', 'bz-13195' and 'doc' into acpi
+> b6fd41e Linux 3.1-rc6
+> 8cb3ed17 Merge branch 'drm-fixes' of git://people.freedesktop.org/~airlied/linux4c75278 Merge branch 'fixes' of git://git.linaro.org/people/arnd/arm-soc
+> 14d01ff ioctl: register LTTng ioctl
 > 
-> 
+> rather than the more usual medium-pretty output.  I can get that by
+> using git log --pretty=medium.  The alternative to that is to use
+> shell aliases to pass the --pretty= argument for a gitslog alias -
+> or I believe you can create git command aliases in the ~/.gitconfig file.
+> (Never tried it yet, something I need to look at.)
+I did:
 
-Sascha
+	git config --global alias.lg "log --pretty=oneline --abbrev-commit"
+	git config --global alias.one "show -s --pretty='format:%h (%s)"
+
+which results in
+
+	[alias]
+		lg = log --pretty=oneline --abbrev-commit
+		one = show -s --pretty='format:%h (%s)'
+
+and makes available the commands
+
+	git lg
+
+(for summary logging) and
+
+	git one
+
+(to format a commit id for use in another commit message).
+
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
