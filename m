@@ -1,24 +1,23 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 20 Sep 2011 11:52:39 +0200
-Subject: [PATCH 08/11] at92/udc: use gpio_is_valid to check the gpio
-In-Reply-To: <1316441002-27381-3-git-send-email-plagnioj@jcrosoft.com>
-References: <1316436695-19194-1-git-send-email-plagnioj@jcrosoft.com>
-	<1316441002-27381-3-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20110920095239.GC15285@linutronix.de>
+From: santosh.shilimkar@ti.com (Santosh)
+Date: Tue, 20 Sep 2011 16:14:52 +0530
+Subject: [PATCH 0/7] Add L2 cache cleaning to generic CPU suspend
+In-Reply-To: <20110919163741.GE16591@n2100.arm.linux.org.uk>
+References: <20110919163741.GE16591@n2100.arm.linux.org.uk>
+Message-ID: <4E786EA4.9020900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jean-Christophe PLAGNIOL-VILLARD | 2011-09-19 16:03:19 [+0200]:
+On Monday 19 September 2011 10:07 PM, Russell King - ARM Linux wrote:
+> This is a re-post of the previous patch series, but with an additional
+> TLB flush to ensure that hte global TLB entry in the page tables is
+> flushed out.  This is a flush of all TLB entries, but it could probably
+> be more targetted if we need to.
+> 
+I have tried this seven patches + already merged 4 patches against RC4
+and OMAP4 PM patches and they continue to work as expected.
 
->Hi,
-Hi,
+I guess once Lorenzo confirms that his userspace segmentation faults
+are fixed with the TLB flush updates, the series is good for the merge.
 
->	I'd like to apply this patch via AT91 with the whole gpio patch series
-
-Felipe is on vacation until next week. The cleanup looks nice so I guess
-he wouldn't mind if you push this with the whole gpio series.
-
->Best Regards,
->J.
-
-Sebastian
+Regards
+Santosh
