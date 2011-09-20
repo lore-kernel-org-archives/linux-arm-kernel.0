@@ -1,48 +1,24 @@
 From: ajaykumar.rs@samsung.com (Ajay Kumar)
-Date: Tue, 20 Sep 2011 11:30:39 -0400
-Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
-	structure
-In-Reply-To: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
-References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
-Message-ID: <1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
+Date: Tue, 20 Sep 2011 11:30:38 -0400
+Subject: [PATCH 0/3] FB: Add window positioning support
+Message-ID: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a data structure definiton to hold framebuffer windows/planes.
-An ioctl number is also added to provide user access
-to change window position dynamically.
+This patchset adds support for positioning the overlay windows on the LCD.
 
-Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
-Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
-Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- include/linux/fb.h |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+These patches are based on the discussion about adding features to fbdev at:
+http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg06292.html
 
-diff --git a/include/linux/fb.h b/include/linux/fb.h
-index 1d6836c..2141941 100644
---- a/include/linux/fb.h
-+++ b/include/linux/fb.h
-@@ -39,6 +39,7 @@
- #define FBIOPUT_MODEINFO        0x4617
- #define FBIOGET_DISPINFO        0x4618
- #define FBIO_WAITFORVSYNC	_IOW('F', 0x20, __u32)
-+#define FBIOPOS_OVERLAY_WIN	_IOW('F', 0x21, struct fb_overlay_win_pos)
- 
- #define FB_TYPE_PACKED_PIXELS		0	/* Packed Pixels	*/
- #define FB_TYPE_PLANES			1	/* Non interleaved planes */
-@@ -366,6 +367,12 @@ struct fb_image {
- 	struct fb_cmap cmap;	/* color map info */
- };
- 
-+/* Window overlaying */
-+struct fb_overlay_win_pos {
-+	__u32 win_pos_x;	/* x-offset from LCD(0,0) where window starts */
-+	__u32 win_pos_y;	/* y-offset from LCD(0,0) where window starts */
-+};
-+
- /*
-  * hardware cursor control
-  */
--- 
-1.7.0.4
+To Florian:
+  	include: fb: Add definiton for window positioning structure
+  	video: s3c-fb: Modify s3c-fb driver to support window positioning
+
+To Kukjin,
+  	ARM: SAMSUNG: Embed window positioning data structure in s3c-fb plat
+  		      data
+
+ arch/arm/plat-samsung/include/plat/fb.h |    3 ++
+ drivers/video/s3c-fb.c                  |   37 ++++++++++++++++++++++++++----
+ include/linux/fb.h                      |    7 ++++++
+ 3 files changed, 42 insertions(+), 5 deletions(-)
