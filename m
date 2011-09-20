@@ -1,35 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Sep 2011 14:21:20 -0700
-Subject: [GIT PULL] omap voltage cleanup for v3.2 merge window
-In-Reply-To: <201109202206.24931.arnd@arndb.de>
-References: <20110917015419.GD2937@atomide.com>
-	<201109202206.24931.arnd@arndb.de>
-Message-ID: <20110920212120.GJ2937@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Sep 2011 23:21:30 +0200
+Subject: [GIT PULL] arm-soc fixes for v3.1-rc7
+Message-ID: <201109202321.30320.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110920 12:32]:
-> On Saturday 17 September 2011, Tony Lindgren wrote:
-> > Please pull omap voltage cleanup series:
-> > 
-> > git://github.com/tmlind/linux.git voltage
-> > 
-> > This has a dependency to the cleanup part 1 series. As
-> > this contains some voltage fixes too, it's a separate
-> > series. You can either pull it into cleanup or keep it
-> > separate.
-> 
-> Hi Tony,
-> 
-> I've pulled it into the for-next branch, but haven't
-> made up my mind how it I will send it upstream.
-> I definitely think it's good that you sent it to me
-> as a separate series, given the number of patches in it.
+Hi Linus,
 
-OK thanks. FYI, most of the voltage stuff can eventually
-become just a regular device driver. But that depends on
-some other changes, like PRCM interrupt driver.
+Here are the latest bug fixes for integration into 3.1. It's mostly
+samsung stuff, which was missing in the last round, plus three
+small regression fixes in other platforms. 
 
-Regards,
+Please pull for the next -rc.
 
-Tony
+Thanks,
+
+	Arnd
+
+The following changes since commit b6fd41e29dea9c6753b1843a77e50433e6123bcb:
+
+  Linux 3.1-rc6 (2011-09-12 14:02:02 -0700)
+
+are available in the git repository at:
+  git://git.linaro.org/people/arnd/arm-soc.git fixes
+
+Arnd Bergmann (1):
+      Merge branch 'samsung-fixes-2' of git://github.com/kgene/linux-samsung into HEAD
+
+Banajit Goswami (1):
+      ARM: S3C64XX: Remove un-used code backlight code on SMDK6410
+
+Changhwan Youn (1):
+      ARM: EXYNOS4: restart clocksource while system resumes
+
+Jonghwan Choi (1):
+      ARM: EXYNOS4: Fix wrong pll type for vpll
+
+Kukjin Kim (3):
+      ARM: EXYNOS4: Fix return type of local_timer_setup()
+      ARM: EXYNOS4: Fix routing timer interrupt to offline CPU
+      ARM: SAMSUNG: fix to prevent declaring duplicated
+
+Linus Walleij (1):
+      mach-integrator: fix VGA base regression
+
+Marek Szyprowski (1):
+      ARM: SAMSUNG: fix watchdog reset issue with clk_get()
+
+Nicolas Pitre (1):
+      ARM: Dove: fix second SPI initialization call
+
+Stephen Warren (1):
+      arm/dt: Tegra: Update SDHCI nodes to match bindings
+
+Thomas Abraham (1):
+      ARM: EXYNOS4: fix incorrect pad configuration for keypad row lines
+
+ arch/arm/boot/dts/tegra-harmony.dts                |   12 +++---
+ arch/arm/boot/dts/tegra-seaboard.dts               |    6 ++--
+ arch/arm/mach-dove/common.c                        |    2 +-
+ arch/arm/mach-exynos4/clock.c                      |    2 +-
+ arch/arm/mach-exynos4/mct.c                        |   10 +++++-
+ arch/arm/mach-exynos4/platsmp.c                    |    2 +
+ arch/arm/mach-exynos4/setup-keypad.c               |   11 +++---
+ arch/arm/mach-integrator/integrator_ap.c           |    2 +
+ arch/arm/mach-integrator/pci_v3.c                  |    2 -
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |   39 --------------------
+ arch/arm/plat-samsung/clock.c                      |   11 ++++++
+ arch/arm/plat-samsung/include/plat/clock.h         |    8 ++++
+ .../arm/plat-samsung/include/plat/watchdog-reset.h |   10 ++----
+ 13 files changed, 52 insertions(+), 65 deletions(-)
