@@ -1,29 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2011 22:13:37 +0200
-Subject: [GIT PULL] davinci features for v3.2 merge windiow
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302575A0DD7@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB59302575A0DD7@dbde02.ent.ti.com>
-Message-ID: <201109202213.37594.arnd@arndb.de>
+Date: Tue, 20 Sep 2011 22:22:41 +0200
+Subject: [GIT PULL] Samsung cleanup for v3.2
+In-Reply-To: <001901cc76b8$018d4fc0$04a7ef40$%kim@samsung.com>
+References: <001901cc76b8$018d4fc0$04a7ef40$%kim@samsung.com>
+Message-ID: <201109202222.41747.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 17 September 2011, Nori, Sekhar wrote:
-> Please pull the following feature for v3.2 merge
-> window. It adds TI WLAN support on AM18x board.
+On Monday 19 September 2011, Kukjin Kim wrote:
+> This is Samsung cleanup for v3.2.
 > 
-> Thanks,
-> Sekhar
-> 
-> The following changes since commit b6fd41e29dea9c6753b1843a77e50433e6123bcb:
->   Linus Torvalds (1):
->         Linux 3.1-rc6
-> 
-> are available in the git repository at:
-> 
->   git://gitorious.org/linux-davinci/linux-davinci.git v3.2/features
-> 
+> Please pull from:
+>   git://github.com/kgene/linux-samsung.git next-samsung-cleanup
 
-Pulled into the next/devel branch.
+Pulled into arm-soc/next/cleanup.
+
+> If any problems, please let me know.
+
+One tiny conflict with Nico's cross-platform series:
+
++ 
++ MACHINE_START(SMDKC210, "SMDKC210")
++       /* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ -      .boot_params    = S5P_PA_SDRAM + 0x100,
+++      .atag_offset    = 0x100,
++       .init_irq       = exynos4_init_irq,
++       .map_io         = smdkv310_map_io,
++       .init_machine   = smdkv310_machine_init,
++       .timer          = &exynos4_timer,
++ MACHINE_END
+
+I'll handle this in the upstream submission.
 
 Thanks,
 
