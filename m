@@ -1,61 +1,30 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 20 Sep 2011 13:10:55 -0700
-Subject: [PATCH 0/2] pin controller subsystem v7
-In-Reply-To: <1316175182-10700-1-git-send-email-linus.walleij@stericsson.com>
-References: <1316175182-10700-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B73216C5@HQMAIL01.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Sep 2011 22:13:37 +0200
+Subject: [GIT PULL] davinci features for v3.2 merge windiow
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB59302575A0DD7@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB59302575A0DD7@dbde02.ent.ti.com>
+Message-ID: <201109202213.37594.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Friday, September 16, 2011 6:13 AM:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Saturday 17 September 2011, Nori, Sekhar wrote:
+> Please pull the following feature for v3.2 merge
+> window. It adds TI WLAN support on AM18x board.
 > 
-> This is the sixth iteration of the controller subsystem...
-
-Overall, the changelog sounds like a great move in the right direction.
-There's just one small thing I'd comment on here:
-
-> ChangeLog v6->v7:
+> Thanks,
+> Sekhar
 > 
-> - Make it possible to have several map entries matching the
->   same device, pin controller and function, but using
->   a different group, and alter the semantics so that
->   pinmux_get() will pick all matching map entries, and
->   store the associated groups in a list. The list will
->   then be iterated over at pinmux_enable()/pinmux_disable()
->   and corresponding driver functions called for each
->   defined group. Notice that you're only allowed to map
->   multiple *groups* to the same
->   { device, pin controller, function } triplet, attempts
->   to map the same device to multiple pin controllers will
->   for example fail. This is hopefully the crucial feature
->   requested by Stephen Warren.
+> The following changes since commit b6fd41e29dea9c6753b1843a77e50433e6123bcb:
+>   Linus Torvalds (1):
+>         Linux 3.1-rc6
+> 
+> are available in the git repository at:
+> 
+>   git://gitorious.org/linux-davinci/linux-davinci.git v3.2/features
+> 
 
-I've been viewing the map table as:
+Pulled into the next/devel branch.
 
-input: (device, device's function) 
-output: list of (controller, controller's group, controller's function)
+Thanks,
 
-... hence I was surprised to see that you explicitly note that mapping a
-single device to multiple controllers was disallowed.
-
-That said, I suppose this restriction won't cause any issues for any
-use-case I'm aware of; the only possibilities might be:
-
-a) Multiple pinmux controllers within the SoC, but perhaps the driver
-should just aggregate multiple HW modules into a single Linux device
-anyway?
-
-b) Where the pinmux map wants to affect the pinmux on both ends of some
-bus, where the two ends are different chips each having obviously separate
-pinmux controllers.
-
-Then again, if this need ever does arise, we should be able to just relax
-this restriction without causing any backwards-compatibility issues, so
-I don't see a specific need to change this now; I just thought I'd mention
-it so you're aware of what I'm thinking.
-
-I'll go review the code now.
-
--- 
-nvpublic
+	Arnd
