@@ -1,52 +1,93 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 Sep 2011 10:57:01 +0800
-Subject: [PATCH 3/4] net/fec: set phy_speed to the optimal frequency 2.5
-	MHz
-In-Reply-To: <4E77C4A2.1060802@boundarydevices.com>
-References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
-	<1316346852-17090-4-git-send-email-shawn.guo@linaro.org>
-	<4E77C4A2.1060802@boundarydevices.com>
-Message-ID: <20110920025700.GE28084@S2100-06.ap.freescale.net>
+Date: Tue, 20 Sep 2011 11:24:23 +0800
+Subject: [PATCH 00/11] Add L2 cache cleaning to generic CPU suspend
+In-Reply-To: <20110919162222.GC16591@n2100.arm.linux.org.uk>
+References: <20110901124752.GE29729@n2100.arm.linux.org.uk>
+	<20110901153342.GB5147@S2100-06.ap.freescale.net>
+	<20110901153451.GA16024@n2100.arm.linux.org.uk>
+	<20110901155752.GC5147@S2100-06.ap.freescale.net>
+	<20110910161002.GA462@S2100-06.ap.freescale.net>
+	<20110919162222.GC16591@n2100.arm.linux.org.uk>
+Message-ID: <20110920032422.GF28084@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2011 at 03:39:30PM -0700, Troy Kisky wrote:
-> On 9/18/2011 4:54 AM, Shawn Guo wrote:
-> >With the unnecessary 1 bit left-shift on fep->phy_speed during the
-> >calculation, the phy_speed always runs at the half frequency of the
-> >optimal one 2.5 MHz.
-> >
-> >The patch removes that 1 bit left-shift to get the optimal phy_speed.
-> >
-> >Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
-> >---
-> >  drivers/net/fec.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> >
-> >diff --git a/drivers/net/fec.c b/drivers/net/fec.c
-> >index 5ef0e34..04206e4 100644
-> >--- a/drivers/net/fec.c
-> >+++ b/drivers/net/fec.c
-> >@@ -1007,7 +1007,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
-> >  	/*
-> >  	 * Set MII speed to 2.5 MHz (= clk_get_rate() / 2 * phy_speed)
-> >  	 */
-> >-	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000)<<  1;
-> >+	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000);
-> >  	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
-> >
-> >  	fep->mii_bus = mdiobus_alloc();
-> Do you need to round up to an even value? Is the hardware
-> documentation wrong?
-
-The round up is something existed, and the patch does not touch that
-part.
-
-> Does this need a quirk? What boards has this been verified to fix?
+On Mon, Sep 19, 2011 at 05:22:22PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Sep 11, 2011 at 12:10:04AM +0800, Shawn Guo wrote:
+> > On Thu, Sep 01, 2011 at 11:57:54PM +0800, Shawn Guo wrote:
+> > > On Thu, Sep 01, 2011 at 04:34:51PM +0100, Russell King - ARM Linux wrote:
+> > > > On Thu, Sep 01, 2011 at 11:33:43PM +0800, Shawn Guo wrote:
+> > > > > This is also the case on i.MX6Q, which L2 cache is retained during a
+> > > > > suspend/resume cycle.  Currently, I have to call into the following
+> > > > > before calling generic cpu_suspend() to clean/invalidate the entire
+> > > > > L2 cache.
+> > > > > 
+> > > > > 	outer_flush_all();
+> > > > > 	outer_disable();
+> > > > > 
+> > > > > But there is a wired thing on using generic cpu_resume().  I have to
+> > > > > invalidate L1 before calling into cpu_resume() like below.
+> > > > > 
+> > > > > ENTRY(imx6q_cpu_resume)
+> > > > >         bl      v7_invalidate_l1
+> > > > >         b       cpu_resume
+> > > > > ENDPROC(imx6q_cpu_resume)
+> > > > > 
+> > > > > ENTRY(imx6q_secondary_startup)
+> > > > >         bl      v7_invalidate_l1
+> > > > >         b       secondary_startup
+> > > > > ENDPROC(imx6q_secondary_startup)
+> > > > > 
+> > > > > The v7_invalidate_l1() is the function copied from mach-tegra/headsmp.S,
+> > > > > which has to be called before calling secondary_startup to boot
+> > > > > secondary cores (same situation between Tegra and i.MX6Q).
+> > > > 
+> > > > Presumably that's because your L1 cache contains randomized data with
+> > > > random validity (and presumably random dirtyness) at boot time - something
+> > > > which unfortunately the ARM ARM permits.  I don't think we can go to the
+> > > > extent of dealing with this in the generic code as it would unnecessarily
+> > > > perturb those implementations which either the boot loader has already
+> > > > sorted out that issue, or which don't have the issue at all.
+> > > > 
+> > > Yes, agreed.  It seems that Tegra and i.MX6Q are the only two CA9MP
+> > > cases here.  But is it possible to maintain this v7_invalidate_l1()
+> > > function in cache-v7.S, so that we do not need to duplicate it in
+> > > platform codes?
+> > > 
+> > > > > Before applying this patch series, I have something like below actually
+> > > > > working.
+> > > > > 
+> > > > > 
+> > > > > 	outer_flush_all();
+> > > > > 	outer_disable();
+> > > > > 	imx_set_cpu_jump(0, imx6q_cpu_resume);
+> > > > > 	/* Zzz ... */
+> > > > > 	cpu_suspend(0, imx6q_suspend_finish);
+> > > > > 
+> > > > > I expect with you patches applied, I can still have it work with simply
+> > > > > removing those two lines outer cache codes.
+> > > > 
+> > > > That should be the case.
+> > > > 
+> > > > > But unfortunately, I'm
+> > > > > running into Oops when resuming back.  And I also have Oops with
+> > > > > imx_set_cpu_jump(0, cpu_resume) which means skipping the
+> > > > > v7_invalidate_l1() and calling generic cpu_resume() only.
+> > > > 
+> > > > Do you have a copy of the oops?
+> > > > 
+> > > 
+> > Hi Russell,
+> > 
+> > After following your great debugging clue that we need to enable L2
+> > before calling into generic cpu_resume(), now this patch series works
+> > great for imx6q.  Thanks a lot, and here is my tag.
+> > 
+> > Tested-by: Shawn Guo <shawn.guo@linaro.org>
 > 
-
-I tested this on i.mx28, i.mx53 and i.mx6q.  Do you see problem on
-your platform?
+> Is that for all these patches?
+> 
+Yes, it is.
 
 -- 
 Regards,
