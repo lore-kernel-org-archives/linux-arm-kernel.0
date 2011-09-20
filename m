@@ -1,42 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2011 22:48:01 +0200
-Subject: [GIT PULL] ux500-core for 3.2
-In-Reply-To: <CACRpkdZofKjOrPFWNR-2D0LWx3NGMiLwyhf7gAVdvBGvQHqJLQ@mail.gmail.com>
-References: <CACRpkdZofKjOrPFWNR-2D0LWx3NGMiLwyhf7gAVdvBGvQHqJLQ@mail.gmail.com>
-Message-ID: <201109202248.01993.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 20 Sep 2011 13:55:37 -0700
+Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
+In-Reply-To: <201109202201.18574.arnd@arndb.de>
+References: <20110917014623.GC2937@atomide.com>
+	<201109202201.18574.arnd@arndb.de>
+Message-ID: <20110920205537.GI2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 September 2011, Linus Walleij wrote:
-> could you please pull:
+* Arnd Bergmann <arnd@arndb.de> [110920 12:27]:
+> On Saturday 17 September 2011, Tony Lindgren wrote:
+> > Please pull the first part of omap cleanup from:
+> > 
+> > git://github.com/tmlind/linux.git cleanup
+> > 
+> > This series cleans up early_init functions and removes
+> > CHIP_IS macro usage. This makes it easier to have SoC
+> > specific init functions so adding support for new omap
+> > variants does not require patching all over the place.
 > 
-> git://git.linaro.org/people/triad/linux-stericsson.git for-arnd
+> Thanks, pulled.
 > 
-> to the ARM SoC tree (ux500 branch or however you prefer to handle it)?
-> They have all been reviewed on the ARM list recently and are mostly
-> minor fixes and Lee Jones nice cleanup patch.
+> Note that we are trying to get everyone to use the similar
+> prefixes for patch summaries, so it would be nice if you could
+> change 'OMAP: powerdomain:' to 'ARM: OMAP: powerdomain' or
+> 'ARM: omap/powerdowmain:' in the future.
 
-I would really like to see this split into logical branches, even
-if there are just a few patches for each of them. It looks like
-the series currently contains bug fixes and cleanups mixed together,
-which makes it hard to backport fixes and for me to aggregate patches
-across soc families by category.
-
-It's also not clear if the two bug fix patches should be applied
-to 3.1 and -stable as well as 3.2. My feeling is that they should.
-If you want bug fixes to be backported, please add a 'Cc: stable at kernel.org'
-line after your Signed-off-by. If not, add an explanation to the
-pull request why they are not relevant for backporting.
-
-I've applied the first four patches to the stericsson/cleanup
-and next/cleanup branches now, since these look like they are
-purely cleanup branches without noticeable code changes.
-
-Please submit the two bug fixes again, rebased to an -rc release.
-there is a dependency on one of the cleanup patches. Don't worry
-about that, I'll take care of resolving this conflict after you
-have rebased the bug fix to the mainline kernel.
+Already did that for my patches.. Paul and Kevin, can you
+please also start following that standard too?
 
 Thanks,
 
-	Arnd
+Tony
