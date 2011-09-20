@@ -1,179 +1,54 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 20 Sep 2011 17:08:00 -0600
-Subject: [PATCH 3/3] ARM: gic: add OF based initialization
-In-Reply-To: <1316550244-3655-4-git-send-email-robherring2@gmail.com>
-References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
-	<1316550244-3655-4-git-send-email-robherring2@gmail.com>
-Message-ID: <20110920230800.GS7781@ponder.secretlab.ca>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 21 Sep 2011 01:13:48 +0200
+Subject: [PATCH 5/5] omap2plus_defconfig: Enable omap3isp and MT9T111
+	sensor drivers
+In-Reply-To: <1316530612-23075-6-git-send-email-deepthy.ravi@ti.com>
+References: <1316530612-23075-1-git-send-email-deepthy.ravi@ti.com>
+	<1316530612-23075-6-git-send-email-deepthy.ravi@ti.com>
+Message-ID: <201109210113.49151.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2011 at 03:24:04PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+Hi Deepthy,
+
+Thanks for the patch.
+
+On Tuesday 20 September 2011 16:56:52 Deepthy Ravi wrote:
+> Enables multimedia driver, media controller api,
+> v4l2-subdev-api, omap3isp and mt9t111 sensor
+> drivers in omap2plus_defconfig.
 > 
-> This adds ARM gic interrupt controller initialization using device tree
-> data.
-> 
-> The initialization function is intended to be called by of_irq_init
-> function like this:
-> 
-> const static struct of_device_id irq_match[] = {
->         { .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
->         {}
-> };
-> 
-> static void __init init_irqs(void)
-> {
->         of_irq_init(irq_match);
-> }
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
 > ---
->  Documentation/devicetree/bindings/arm/gic.txt |   55 +++++++++++++++
->  arch/arm/common/gic.c                         |   89 +++++++++++++++++++++++-
->  arch/arm/include/asm/hardware/gic.h           |   12 ++++
->  3 files changed, 152 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+>  arch/arm/configs/omap2plus_defconfig |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-> new file mode 100644
-> index 0000000..52916b4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/gic.txt
-> @@ -0,0 +1,55 @@
-> +* ARM Generic Interrupt Controller
-> +
-> +ARM SMP cores are often associated with a GIC, providing per processor
-> +interrupts (PPI), shared processor interrupts (SPI) and software
-> +generated interrupts (SGI).
-> +
-> +Primary GIC is attached directly to the CPU and typically has PPIs and SGIs.
-> +Secondary GICs are cascaded into the upward interrupt controller and do not
-> +have PPIs or SGIs.
-> +
-> +Main node required properties:
-> +
-> +- compatible : should be one of:
-> +	"arm,cortex-a9-gic"
-> +	"arm,arm11mp-gic"
-> +- interrupt-controller : Identifies the node as an interrupt controller
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source.  The type shall be a <u32> and the value shall be 3.
-> +
-> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
-> +  interrupts.
-> +
-> +  The 2nd cell contains the interrupt number for the interrupt type.
-> +  SPI interrupts are in the range [0-987].  PPI interrupts are in the
-> +  range [0-15].
-> +
-> +  The 3rd cell is the flags, encoded as follows:
-> +	bits[3:0] trigger type and level flags.
-> +		1 = low-to-high edge triggered
-> +		2 = high-to-low edge triggered
-> +		4 = active high level-sensitive
-> +		8 = active low level-sensitive
-> +	bits[15:8] PPI interrupt cpu mask.  Each bit corresponds to each of
-> +	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
-> +	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
-> +
-> +- reg : Specifies base physical address(s) and size of the GIC registers. The
-> +  first region is the GIC distributor register base and size. The 2nd region is
-> +  the GIC cpu interface register base and size.
-> +
-> +Optional
-> +- interrupts	: Interrupt source of the parent interrupt controller. Only
-> +  present on secondary GICs.
-> +
-> +Example:
-> +
-> +	intc: interrupt-controller at fff11000 {
-> +		compatible = "arm,cortex-a9-gic";
-> +		#interrupt-cells = <3>;
-> +		#address-cells = <1>;
-> +		interrupt-controller;
-> +		reg = <0xfff11000 0x1000>,
-> +		      <0xfff10100 0x100>;
-> +	};
-> +
+> diff --git a/arch/arm/configs/omap2plus_defconfig
+> b/arch/arm/configs/omap2plus_defconfig index d5f00d7..548823d 100644
+> --- a/arch/arm/configs/omap2plus_defconfig
+> +++ b/arch/arm/configs/omap2plus_defconfig
+> @@ -133,6 +133,16 @@ CONFIG_TWL4030_WATCHDOG=y
+>  CONFIG_REGULATOR_TWL4030=y
+>  CONFIG_REGULATOR_TPS65023=y
+>  CONFIG_REGULATOR_TPS6507X=y
+> +CONFIG_MEDIA_SUPPORT=y
+> +CONFIG_MEDIA_CONTROLLER=y
+> +CONFIG_VIDEO_DEV=y
+> +CONFIG_VIDEO_V4L2_COMMON=y
+> +CONFIG_VIDEO_ALLOW_V4L1=y
+> +CONFIG_VIDEO_V4L1_COMPAT=y
+> +CONFIG_VIDEO_V4L2_SUBDEV_API=y
+> +CONFIG_VIDEO_MEDIA=y
+> +CONFIG_VIDEO_MT9T111=y
+> +CONFIG_VIDEO_OMAP3=y
 
-Ack on the binding.
+Shouldn't they be compiled as modules instead ?
 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index 666b278..84e69a4 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -28,6 +28,10 @@
->  #include <linux/smp.h>
->  #include <linux/cpumask.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/irqdomain.h>
->  
->  #include <asm/irq.h>
->  #include <asm/mach/irq.h>
-> @@ -255,6 +259,15 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
->  	irq_set_chained_handler(irq, gic_handle_cascade_irq);
->  }
->  
-> +static int gic_irq_count(void __iomem *dist_base)
-> +{
-> +	int gic_irqs = readl_relaxed(dist_base + GIC_DIST_CTR) & 0x1f;
-> +	gic_irqs = (gic_irqs + 1) * 32;
-> +	if (gic_irqs > 1020)
-> +		gic_irqs = 1020;
-> +	return gic_irqs;
-> +}
-> +
->  static void __init gic_dist_init(struct gic_chip_data *gic,
->  	unsigned int irq_start)
->  {
-> @@ -277,10 +290,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
->  	 * Find out how many interrupts are supported.
->  	 * The GIC only supports up to 1020 interrupt sources.
->  	 */
-> -	gic_irqs = readl_relaxed(base + GIC_DIST_CTR) & 0x1f;
-> -	gic_irqs = (gic_irqs + 1) * 32;
-> -	if (gic_irqs > 1020)
-> -		gic_irqs = 1020;
-> +	gic_irqs = gic_irq_count(base);
->  
->  	/*
->  	 * Set all global interrupts to be level triggered, active low.
-> @@ -405,3 +415,74 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  	writel_relaxed(map << 16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
->  }
->  #endif
-> +
-> +#ifdef CONFIG_OF
-> +static int gic_cnt __initdata = 0;
-> +
-> +int gic_irq_domain_dt_translate(struct irq_domain *d,
-> +			    struct device_node *controller,
-> +			    const u32 *intspec, unsigned int intsize,
-> +			    unsigned long *out_hwirq, unsigned int *out_type)
-> +{
-> +	struct gic_chip_data *gic_data = d->priv;
-> +
-> +	if (d->of_node != controller)
-> +		return -EINVAL;
-> +	if (intsize < 3)
-> +		return -EINVAL;
-> +
-> +	*out_hwirq = intspec[1];
-> +	/*
-> +	 * We've already skipped over SGIs, so PPIs need no translation.
-> +	 * For SPIs, we need to skip over 16 PPIs on primary GICs.
-> +	 */
-> +	if (!intspec[0] && !gic_data->irq_offset)
-> +		*out_hwirq += 16;
+>  CONFIG_FB=y
+>  CONFIG_FIRMWARE_EDID=y
+>  CONFIG_FB_MODE_HELPERS=y
 
-I though that the offset was 32 to get from SPI number to Interrrupt
-ID?  And that PPI interrupts start at Interrupt ID 16?  Or am I
-mistaken about the hwirq number that this driver uses internally?
+-- 
+Regards,
 
-Otherwise, the change looks about right to me.
-
-g.
+Laurent Pinchart
