@@ -1,49 +1,82 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 20 Sep 2011 14:58:05 -0700
-Subject: [PATCH 1/2] drivers: create a pin control subsystem v7
-In-Reply-To: <1316175203-10736-1-git-send-email-linus.walleij@stericsson.com>
-References: <1316175203-10736-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B7321751@HQMAIL01.nvidia.com>
+Date: Tue, 20 Sep 2011 15:15:05 -0700
+Subject: [PATCH 2/2 v7] pinmux: add a driver for the U300 pinmux
+In-Reply-To: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
+References: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B7321777@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Friday, September 16, 2011 6:13 AM:
-> This creates a subsystem for handling of pin control devices.
-> These are devices that control different aspects of package
-> pins.
-
-I've read through the documentation and header files, but not the .c files,
-and this looks almost perfect as far as I can tell right now. I'll try to
-review the .c files sometime too.
-
-I just have one comment:
-
-> diff --git a/include/linux/pinctrl/pinmux.h b/include/linux/pinctrl/pinmux.h
+Linus Walleij wrote at Friday, September 16, 2011 6:14 AM:
+> This adds a driver for the U300 pinmux portions of the system
+> controller "SYSCON". It also serves as an example of how to use
+> the pinmux subsystem. This driver also houses the platform data
+> for the only supported platform.
 ...
-> +/* External interface to pinmux */
-> +extern int pinmux_request_gpio(unsigned gpio);
-> +extern void pinmux_free_gpio(unsigned gpio);
-> +extern struct pinmux * __must_check pinmux_get(struct device *dev, const char *name);
-> +extern void pinmux_put(struct pinmux *pmx);
-> +extern int pinmux_enable(struct pinmux *pmx);
-> +extern void pinmux_disable(struct pinmux *pmx);
-> +extern int pinmux_config(struct pinmux *pmx, u16 param, unsigned long *data);
+> diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
+...
+> +/* Pinmux settings */
+> +static struct pinmux_map u300_pinmux_map[] = {
+> +	/* anonymous maps for chip power and EMIFs */
+> +	PINMUX_MAP_PRIMARY_SYS_HOG("POWER", "power"),
+> +	PINMUX_MAP_PRIMARY_SYS_HOG("EMIF0", "emif0"),
+> +	PINMUX_MAP_PRIMARY_SYS_HOG("EMIF1", "emif1"),
+> +	/* per-device maps for MMC/SD, SPI and UART */
+> +	PINMUX_MAP_PRIMARY("MMCSD", "mmc0", "mmci"),
+> +	PINMUX_MAP_PRIMARY("SPI", "spi0", "pl022"),
+> +	PINMUX_MAP_PRIMARY("UART0", "uart0", "uart0"),
+> +};
+> +
+> +struct u300_mux_hog {
+> +	const char *name;
+> +	struct device *dev;
+> +	struct pinmux *pmx;
+> +};
+> +
+> +static struct u300_mux_hog u300_mux_hogs[] = {
+> +	{
+> +		.name = "uart0",
+> +		.dev = &uart0_device.dev,
+> +	},
+> +	{
+> +		.name = "spi0",
+> +		.dev = &pl022_device.dev,
+> +	},
+> +	{
+> +		.name = "mmc0",
+> +		.dev = &mmcsd_device.dev,
+> +	},
+> +};
+> +
+> +static int __init u300_pinmux_fetch(void)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(u300_mux_hogs); i++) {
+> +		struct pinmux *pmx;
+> +		int ret;
+> +
+> +		pmx = pinmux_get(u300_mux_hogs[i].dev, NULL);
+> +		if (IS_ERR(pmx)) {
+> +			pr_err("u300: could not get pinmux hog %s\n",
+> +			       u300_mux_hogs[i].name);
+> +			continue;
+> +		}
+> +		ret = pinmux_enable(pmx);
+> +		if (ret) {
+> +			pr_err("u300: could enable pinmux hog %s\n",
+> +			       u300_mux_hogs[i].name);
+> +			continue;
+> +		}
+> +		u300_mux_hogs[i].pmx = pmx;
+> +	}
+> +	return 0;
+> +}
+> +subsys_initcall(u300_pinmux_fetch);
 
-That definition of pinmux_config doesn't seem as useful as it could be;
-I'd like the ability to execute pinmux_config on a /named/ group, and I
-can certainly see a use-case for applying it to /named/ pins too.
-
-The issues with applying pinmux_config to a mapping table entry are:
-
-* When there are multiple mapping table entries referenced by one
-pinmux_get, you don't necessarily want to apply the same configuration
-to all of the groups; think of a bus with a combination of low-speed
-output control signals and high-speed input data signals or something
-like that.
-
-* When muxing works in groups, you may want to apply the configuration
-to individual pins rather than the whole groups using in the mapping
-table.
+Why not just have the pinmux core support hogging on non-"system" mapping
+entries; then everything I quoted above except u300_pinmux_map[] could
+be deleted, and the "hog" flag set on the last 3 u300_pinmux_map[] entries.
 
 -- 
 nvpublic
