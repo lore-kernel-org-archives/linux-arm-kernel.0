@@ -1,31 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Sep 2011 22:43:40 +0200
-Subject: [PATCH] mach-integrator: fix VGA base regression
-In-Reply-To: <201109051621.18382.arnd@arndb.de>
-References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
-	<CACRpkdZfCd6XfV12v9_pJ+zpW7JNSLVm6pZNn6VhFMiB7SNJsQ@mail.gmail.com>
-	<201109051621.18382.arnd@arndb.de>
-Message-ID: <CACRpkdb5jdgR+_aZxVzaedr1FJdUWSi9b7utcB6NsiXhX3GvLA@mail.gmail.com>
+Date: Tue, 20 Sep 2011 22:45:41 +0200
+Subject: [PATCH] spi: Fix builderror in spi-pl022.c
+In-Reply-To: <CACRpkdb=Bt2j4iMV5NJHmPG8wDi6__CRD6kn_KOoaQ1R6uwrWQ@mail.gmail.com>
+References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
+	<1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
+	<CACRpkdb=Bt2j4iMV5NJHmPG8wDi6__CRD6kn_KOoaQ1R6uwrWQ@mail.gmail.com>
+Message-ID: <CACRpkdbsUMCvBofKjExiB2wCbK9CwpcXr5xmShJ4SHEGAAH4Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 5, 2011 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 05 September 2011, Linus Walleij wrote:
->> On Sun, Sep 4, 2011 at 11:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>
->> > The changes introduced in commit
->> > cc22b4c18540e5e8bf55c7d124044f9317527d3c
->> > "ARM: set vga memory base at run-time"
->>
->> Arnd can you choose whether to apply this patch or revert
->> the commit making it necessary?
+On Mon, Sep 5, 2011 at 2:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sun, Aug 28, 2011 at 9:26 PM, Peter Huewe <peterhuewe@gmx.de> wrote:
 >
-> I'm still stuck with master.kernel.org being down, so I can't really push
-> any updates right now. I'll do it once it's up again.
+>> This patch fixes a build error, introduced by commit (67fc8b9f, "PM: add
+>> runtime PM support to core Primecell driver") which unfortunately was a little
+>> bit incomplete and did contain a typo (11 instead of 22).
+>> I'm not sure how this patch could have been tested back then, if it
+>> doesn't even compile ;)
+>
+> Grant can you please apply this patch? Right now linux-next is
+> breaking because of this missing patch...
 
-Ping on this. Rob agreed to merge the patch, this is a regression
-making Integrator non-bootable in 3.1 so I'd really like to see it
-merged ASAP.
+Ping on this... ignore if it's been picked already.
 
-Yours,
+Thanks,
 Linus Walleij
