@@ -1,50 +1,65 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 20 Sep 2011 11:47:18 +0800
-Subject: [PATCH 0/7] Add L2 cache cleaning to generic CPU suspend
-In-Reply-To: <20110919163741.GE16591@n2100.arm.linux.org.uk>
-References: <20110919163741.GE16591@n2100.arm.linux.org.uk>
-Message-ID: <20110920034717.GG28084@S2100-06.ap.freescale.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 20 Sep 2011 09:12:01 +0530
+Subject: [PATCH v2] dmaengine: add CSR SiRFprimaII DMAC driver
+In-Reply-To: <CAGsJ_4y0F7JTwFwesVvbgq1Lupw+a_-EpiTwW9GtXxOauohdVQ@mail.gmail.com>
+References: <1316166960-20964-1-git-send-email-Baohua.Song@csr.com>
+	<1316422774.26662.30.camel@vkoul-udesk3>
+	<5EB3BFCD089AD643B9BB63439F5FD5E9840F3A8D@SHAASIEXM01.ASIA.ROOT.PRI>
+	<1316425277.26662.41.camel@vkoul-udesk3>
+	<5EB3BFCD089AD643B9BB63439F5FD5E9840F3B18@SHAASIEXM01.ASIA.ROOT.PRI>
+	<1316430878.26662.46.camel@vkoul-udesk3>
+	<CAGsJ_4y0F7JTwFwesVvbgq1Lupw+a_-EpiTwW9GtXxOauohdVQ@mail.gmail.com>
+Message-ID: <1316490121.31295.2.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2011 at 05:37:41PM +0100, Russell King - ARM Linux wrote:
-> This is a re-post of the previous patch series, but with an additional
-> TLB flush to ensure that hte global TLB entry in the page tables is
-> flushed out.  This is a flush of all TLB entries, but it could probably
-> be more targetted if we need to.
+On Mon, 2011-09-19 at 19:25 +0800, Barry Song wrote:
+> 2011/9/19 Vinod Koul <vinod.koul@intel.com>:
+> > On Mon, 2011-09-19 at 09:56 +0000, Barry Song wrote:
+> >> > > > Not sure why you support this, there seem to be no DMA_SLAVE
+> >> support in
+> >> > > > this version ate least
+> >> > >
+> >> > > Not. I support dma_slave. But I have no prep_slave_sg function
+> >> since I can
+> >> > use the gen xfer to replace it.
+> >> > Yes thats okay...
+> >> >
+> >> > Then I have questions on genxfer function...
+> >> > where are you copying either src or dstn_start address, you seem to
+> >> > completely ignore them?
+> >>
+> >> Since I only support memory->device or device ->memory, and channel
+> >> number is fixed to every device. Then I actually don't care device
+> >> address at all. Either src or dst is fixed to the device's address.
+> > peripheral address can be fixed, not the memory, where do you copy the
+> > memory address?
 > 
-
-Here is the diff on suspend.c between last post and this series.  With
-the outer_clean_range() calls added back, the series works fine on
-imx6q, otherwise it hangs on resume.
-
-diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
-index 4c95410..2d60f19 100644
---- a/arch/arm/kernel/suspend.c
-+++ b/arch/arm/kernel/suspend.c
-@@ -28,9 +28,6 @@ void __cpu_suspend_save(u32 *ptr, u32 ptrsz, u32 sp, u32 *save_ptr)
-        cpu_do_suspend(ptr);
-
-        flush_cache_all();
--       outer_clean_range(*save_ptr, *save_ptr + ptrsz);
--       outer_clean_range(virt_to_phys(save_ptr),
--                         virt_to_phys(save_ptr) + sizeof(*save_ptr));
- }
-
- /*
-@@ -52,8 +49,10 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
-         * back to the correct page tables.
-         */
-        ret = __cpu_suspend(arg, fn);
--       if (ret == 0)
-+       if (ret == 0) {
-                cpu_switch_mm(mm->pgd, mm);
-+               local_flush_tlb_all();
-+       }
-
-        return ret;
- }
+> +static int sirfsoc_dma_slave_config(struct sirfsoc_dma_chan *schan,
+> +       struct dma_slave_config *config)
+> +{
+> +       u32 addr, direction;
+> +       unsigned long flags;
+> +
+> +       switch (config->direction) {
+> +       case DMA_FROM_DEVICE:
+> +               direction = 0;
+> +               addr = config->dst_addr;
+> +               break;
+> +
+> +       case DMA_TO_DEVICE:
+> +               direction = 1;
+> +               addr = config->src_addr;
+> +               break;
+> +
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +  ...
+This is wrong. You are treating addresses passed in dma_slave_config as
+memory address. These should be treating this as peripheral address
+(destination in DMA_TO_DEVICE....) and take the memory address from your
+prepare function.
 
 -- 
-Regards,
-Shawn
+~Vinod
