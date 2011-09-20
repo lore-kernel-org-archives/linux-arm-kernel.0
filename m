@@ -1,70 +1,49 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 21 Sep 2011 01:26:19 +0200
-Subject: [PATCH 4/5] ispccdc: Configure CCDC_SYN_MODE register for
-	UYVY8_2X8 and YUYV8_2X8 formats
-In-Reply-To: <1316530612-23075-5-git-send-email-deepthy.ravi@ti.com>
-References: <1316530612-23075-1-git-send-email-deepthy.ravi@ti.com>
-	<1316530612-23075-5-git-send-email-deepthy.ravi@ti.com>
-Message-ID: <201109210126.20436.laurent.pinchart@ideasonboard.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 20 Sep 2011 17:45:02 -0600
+Subject: [PATCH 4/7] gpio/samsung: Remove useless old Samsung related
+	GPIO drivers
+In-Reply-To: <1314707249-12241-5-git-send-email-kgene.kim@samsung.com>
+References: <1314707249-12241-1-git-send-email-kgene.kim@samsung.com>
+	<1314707249-12241-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20110920234502.GU7781@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Deepthy,
-
-Thanks for the patch.
-
-On Tuesday 20 September 2011 16:56:51 Deepthy Ravi wrote:
-> Configure INPMOD and PACK8 fileds of CCDC_SYN_MODE
-> register for UYVY8_2X8 and YUYV8_2X8 formats.
+On Tue, Aug 30, 2011 at 09:27:26PM +0900, Kukjin Kim wrote:
+> Since gpio-samsung.c can replace old Samsung GPIO drivers,
+> this patch removes them.
 > 
-> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Removing this code before adding the new code means it is not
+bisectable.  I'll squash the two patches together when I pick them
+up..
+
+g.
+
 > ---
->  drivers/media/video/omap3isp/ispccdc.c |   11 ++++++++---
->  1 files changed, 8 insertions(+), 3 deletions(-)
+>  arch/arm/plat-samsung/Makefile      |    2 -
+>  arch/arm/plat-samsung/gpio-config.c |  431 -----------------------------
+>  arch/arm/plat-samsung/gpio.c        |  167 ------------
+>  drivers/gpio/Kconfig                |   28 --
+>  drivers/gpio/Makefile               |    9 -
+>  drivers/gpio/gpio-exynos4.c         |  385 --------------------------
+>  drivers/gpio/gpio-plat-samsung.c    |  205 --------------
+>  drivers/gpio/gpio-s3c24xx.c         |  283 -------------------
+>  drivers/gpio/gpio-s3c64xx.c         |  289 --------------------
+>  drivers/gpio/gpio-s5p64x0.c         |  510 -----------------------------------
+>  drivers/gpio/gpio-s5pc100.c         |  354 ------------------------
+>  drivers/gpio/gpio-s5pv210.c         |  287 --------------------
+>  12 files changed, 0 insertions(+), 2950 deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/gpio-config.c
+>  delete mode 100644 arch/arm/plat-samsung/gpio.c
+>  delete mode 100644 drivers/gpio/gpio-exynos4.c
+>  delete mode 100644 drivers/gpio/gpio-plat-samsung.c
+>  delete mode 100644 drivers/gpio/gpio-s3c24xx.c
+>  delete mode 100644 drivers/gpio/gpio-s3c64xx.c
+>  delete mode 100644 drivers/gpio/gpio-s5p64x0.c
+>  delete mode 100644 drivers/gpio/gpio-s5pc100.c
+>  delete mode 100644 drivers/gpio/gpio-s5pv210.c
 > 
-> diff --git a/drivers/media/video/omap3isp/ispccdc.c
-> b/drivers/media/video/omap3isp/ispccdc.c index 418ba65..1dcf180 100644
-> --- a/drivers/media/video/omap3isp/ispccdc.c
-> +++ b/drivers/media/video/omap3isp/ispccdc.c
-> @@ -985,8 +985,12 @@ static void ccdc_config_sync_if(struct isp_ccdc_device
-> *ccdc,
-> 
->  	syn_mode &= ~ISPCCDC_SYN_MODE_INPMOD_MASK;
->  	if (format->code == V4L2_MBUS_FMT_YUYV8_2X8 ||
-> -	    format->code == V4L2_MBUS_FMT_UYVY8_2X8)
-> -		syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
-> +	    format->code == V4L2_MBUS_FMT_UYVY8_2X8){
-> +		if (pdata && pdata->bt656)
-> +			syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
-> +		else
-> +			syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
-> +	}
->  	else if (format->code == V4L2_MBUS_FMT_YUYV8_1X16 ||
->  		 format->code == V4L2_MBUS_FMT_UYVY8_1X16)
->  		syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
-> @@ -1172,7 +1176,8 @@ static void ccdc_configure(struct isp_ccdc_device
-> *ccdc) syn_mode &= ~ISPCCDC_SYN_MODE_SDR2RSZ;
-> 
->  	/* Use PACK8 mode for 1byte per pixel formats. */
-> -	if (omap3isp_video_format_info(format->code)->width <= 8)
-> +	if ((omap3isp_video_format_info(format->code)->width <= 8) &&
-> +			(omap3isp_video_format_info(format->code)->bpp <= 8))
-
-I'm not sure to follow you. This will clear the PACK8 bit for the YUYV8_2X8 
-formats. Those formats are 8 bits wide, shouldn't PACK8 be set to store 
-samples on 8 bits instead of 16 bits ?
-
-Is this patch intended to support YUYV8_2X8 sensors in non BT.656 mode with 
-the bridge enabled ? In that case, what would you think about setting the CCDC 
-input format to YUYV8_1X16 instead ? This would better reflect the reality, as 
-the bridge converts YUYV8_2X8 to YUYV8_1X16, and the CCDC is then fed with 
-YUYV8_1X16.
-
->  		syn_mode |= ISPCCDC_SYN_MODE_PACK8;
->  	else
->  		syn_mode &= ~ISPCCDC_SYN_MODE_PACK8;
-
--- 
-Regards,
-
-Laurent Pinchart
