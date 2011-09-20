@@ -1,21 +1,38 @@
-From: jgarzik@pobox.com (Jeff Garzik)
-Date: Tue, 20 Sep 2011 15:30:45 -0400
-Subject: [PATCH v2] pata-generic/of: Make probing via device tree
-	non-powerpc-specific
-In-Reply-To: <CA+wbFdd6aVXkFokinxQ7KDUSDYo06K4mZq8gdZKUKj6gMXBn7A@mail.gmail.com>
-References: <1316183890-13677-1-git-send-email-dave.martin@linaro.org>
-	<1316190120-17010-1-git-send-email-dave.martin@linaro.org>
-	<4E73C0FB.4030904@gmail.com>
-	<CA+wbFdd6aVXkFokinxQ7KDUSDYo06K4mZq8gdZKUKj6gMXBn7A@mail.gmail.com>
-Message-ID: <4E78E9E5.1070304@pobox.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Sep 2011 21:34:50 +0200
+Subject: [PATCH REPOST 1/2] arm/dt: Tegra: Update SDHCI nodes to match
+	bindings
+In-Reply-To: <20110920180731.GL7781@ponder.secretlab.ca>
+References: <1316537186-26753-1-git-send-email-swarren@nvidia.com>
+	<201109201943.29510.arnd@arndb.de>
+	<20110920180731.GL7781@ponder.secretlab.ca>
+Message-ID: <201109202134.50242.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2011 06:10 AM, Dave Martin wrote:
-> Since this has now been superseded by Grant's patch anyway, I'll leave
-> it for others to judge.
+On Tuesday 20 September 2011, Grant Likely wrote:
+> On Tue, Sep 20, 2011 at 07:43:29PM +0200, Arnd Bergmann wrote:
+> > On Tuesday 20 September 2011, Stephen Warren wrote:
+> > > The bindings were recently updated to have separate properties for each
+> > > type of GPIO. Update the Device Tree source to match that.
+> > > 
+> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > > Acked-by: Olof Johansson <olof@lixom.net>
+> > > ---
+> > > I'd previously sent these to Grant assuming they'd go in his dt/next branch,
+> > > but perhaps these should go in through Arnd's arm-soc next/dt branch?
+> > > 
+> > 
+> > Which tree has the update that changed the bindings? I think it should
+> > go into the same one.
+> > 
+> > If it's already upstream, I can take it into the fixes branch.
+> 
+> Already upstream
 
+Ok, I see. I've applied both patches to the fixes branch and will send
+it out with the next pull request for 3.1 to Linus then.
 
-Grant's patch is certainly preferable, all other things being equal...
+Thanks,
 
-	Jeff
+	Arnd
