@@ -1,75 +1,43 @@
-From: ajaynumb@gmail.com (Ajay kumar)
-Date: Tue, 20 Sep 2011 20:16:00 +0530
-Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
-	structure
-In-Reply-To: <1316517021.1949.13.camel@deskari>
-References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
-	<1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
-	<1316517021.1949.13.camel@deskari>
-Message-ID: <CAEC9eQOTNaMcUWeSFN-DCTYrCJsVaDAO7uOZNQM=efjVdqtU2g@mail.gmail.com>
+From: deepthy.ravi@ti.com (Deepthy Ravi)
+Date: Tue, 20 Sep 2011 20:26:47 +0530
+Subject: [PATCH 0/5] OMAP3EVM: Add support for MT9T111 sensor
+Message-ID: <1316530612-23075-1-git-send-email-deepthy.ravi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+This patchset
+	-adds support for MT9T111 sensor on omap3evm.
+	Currently the sensor driver supports only
+	VGA resolution.
+	-enables MT9T111 sensor in omap2plus_defconfig.
 
-On Tue, Sep 20, 2011 at 4:40 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On Tue, 2011-09-20 at 11:30 -0400, Ajay Kumar wrote:
->> This patch adds a data structure definiton to hold framebuffer windows/planes.
->> An ioctl number is also added to provide user access
->> to change window position dynamically.
->>
->> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
->> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
->> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->> ?include/linux/fb.h | ? ?7 +++++++
->> ?1 files changed, 7 insertions(+), 0 deletions(-)
->>
->> diff --git a/include/linux/fb.h b/include/linux/fb.h
->> index 1d6836c..2141941 100644
->> --- a/include/linux/fb.h
->> +++ b/include/linux/fb.h
->> @@ -39,6 +39,7 @@
->> ?#define FBIOPUT_MODEINFO ? ? ? ?0x4617
->> ?#define FBIOGET_DISPINFO ? ? ? ?0x4618
->> ?#define FBIO_WAITFORVSYNC ? ?_IOW('F', 0x20, __u32)
->> +#define FBIOPOS_OVERLAY_WIN ?_IOW('F', 0x21, struct fb_overlay_win_pos)
->>
->> ?#define FB_TYPE_PACKED_PIXELS ? ? ? ? ? ? ? ?0 ? ? ? /* Packed Pixels ? ? ? ?*/
->> ?#define FB_TYPE_PLANES ? ? ? ? ? ? ? ? ? ? ? 1 ? ? ? /* Non interleaved planes */
->> @@ -366,6 +367,12 @@ struct fb_image {
->> ? ? ? struct fb_cmap cmap; ? ?/* color map info */
->> ?};
->>
->> +/* Window overlaying */
->> +struct fb_overlay_win_pos {
->> + ? ? __u32 win_pos_x; ? ? ? ?/* x-offset from LCD(0,0) where window starts */
->> + ? ? __u32 win_pos_y; ? ? ? ?/* y-offset from LCD(0,0) where window starts */
->> +};
->
-> Shouldn't this also include the window size (in case scaling is
-> supported)?
+This is applied on top of the following patchset
+http://www.spinics.net/lists/linux-media/msg37270.html 
+which adds YUYV input support for OMAP3ISP.
+---
 
-The "xres" and "yres" fields in fb_var_screeninfo are being used to
-represent the size of the window (visible resolution). So we have,
+Deepthy Ravi (2):
+  ispccdc: Configure CCDC_SYN_MODE register for     UYVY8_2X8 and
+    YUYV8_2X8 formats
+  omap2plus_defconfig: Enable omap3isp and MT9T111     sensor drivers
 
-win_pos_x: x-offset from LCD(0,0) where window starts.
-win_pos_y: y-offset from LCD(0,0) where window starts.
-(win_pos_x + xres) : x-offset from LCD(0,0) where window ends.
-(win_pos_y + yres) : y-offset from LCD(0,0) where window ends.
+Vaibhav Hiremath (3):
+  omap3evm: Enable regulators for camera interface
+  [media] v4l: Add mt9t111 sensor driver
+  omap3evm: Add Camera board init/hookup file
 
-> This also won't work for setups where the same framebuffer is used by
-> multiple overlays. For example, this is the case on OMAP when the same
-> content is cloned to, say, LCD and TV, each of which is showing an
-> overlay.
-
-These x and y position are used to configure the display controller
-(for LCD only) and not to alter the data in physical buffer
-(framebuffer). Could you elaborate the above use case you have
-mentioned and how adding the x and y offsets would not meet that
-requirement.
-
-> ?Tomi
->
-
-Ajay
+ arch/arm/configs/omap2plus_defconfig        |   10 +
+ arch/arm/mach-omap2/Makefile                |    5 +
+ arch/arm/mach-omap2/board-omap3evm-camera.c |  185 ++++
+ arch/arm/mach-omap2/board-omap3evm.c        |   25 +
+ drivers/media/video/Kconfig                 |    7 +
+ drivers/media/video/Makefile                |    1 +
+ drivers/media/video/mt9t111.c               |  793 ++++++++++++++++
+ drivers/media/video/mt9t111_reg.h           | 1367 +++++++++++++++++++++++++++
+ drivers/media/video/omap3isp/ispccdc.c      |   11 +-
+ include/media/mt9t111.h                     |   45 +
+ 10 files changed, 2446 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
+ create mode 100644 drivers/media/video/mt9t111.c
+ create mode 100644 drivers/media/video/mt9t111_reg.h
+ create mode 100644 include/media/mt9t111.h
