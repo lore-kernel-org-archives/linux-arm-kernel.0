@@ -1,75 +1,61 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Tue, 20 Sep 2011 13:10:11 -0700
-Subject: [PATCH 3/4] net/fec: set phy_speed to the optimal frequency 2.5
-	MHz
-In-Reply-To: <4E78F20A.30001@boundarydevices.com>
-References: <1316346852-17090-1-git-send-email-shawn.guo@linaro.org>
-	<1316346852-17090-4-git-send-email-shawn.guo@linaro.org>
-	<4E77C4A2.1060802@boundarydevices.com>
-	<20110920025700.GE28084@S2100-06.ap.freescale.net>
-	<4E78F20A.30001@boundarydevices.com>
-Message-ID: <4E78F323.1030302@boundarydevices.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 20 Sep 2011 13:10:55 -0700
+Subject: [PATCH 0/2] pin controller subsystem v7
+In-Reply-To: <1316175182-10700-1-git-send-email-linus.walleij@stericsson.com>
+References: <1316175182-10700-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B73216C5@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/20/2011 1:05 PM, Troy Kisky wrote:
-> On 9/19/2011 7:57 PM, Shawn Guo wrote:
->> On Mon, Sep 19, 2011 at 03:39:30PM -0700, Troy Kisky wrote:
->>> On 9/18/2011 4:54 AM, Shawn Guo wrote:
->>>> With the unnecessary 1 bit left-shift on fep->phy_speed during the
->>>> calculation, the phy_speed always runs at the half frequency of the
->>>> optimal one 2.5 MHz.
->>>>
->>>> The patch removes that 1 bit left-shift to get the optimal phy_speed.
->>>>
->>>> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
->>>> ---
->>>>   drivers/net/fec.c |    2 +-
->>>>   1 files changed, 1 insertions(+), 1 deletions(-)
->>>>
->>>> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
->>>> index 5ef0e34..04206e4 100644
->>>> --- a/drivers/net/fec.c
->>>> +++ b/drivers/net/fec.c
->>>> @@ -1007,7 +1007,7 @@ static int fec_enet_mii_init(struct 
->>>> platform_device *pdev)
->>>>       /*
->>>>        * Set MII speed to 2.5 MHz (= clk_get_rate() / 2 * phy_speed)
->>>>        */
->>>> -    fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 
->>>> 5000000)<<   1;
->>>> +    fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 5000000);
->>>>       writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
->>>>
->>>>       fep->mii_bus = mdiobus_alloc();
->>> Do you need to round up to an even value? Is the hardware
->>> documentation wrong?
->> The round up is something existed, and the patch does not touch that
->> part.
-> That's not what I was referring to. Previously, phy_speed was always 
-> even because of the shift.
-> The MX53 manual says this field starts at bit 1, and bit 0 is unused. 
-> Therefore, maybe the
-> correct change would be
->
-> fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 2500000)<<   1;
+Linus Walleij wrote at Friday, September 16, 2011 6:13 AM:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This is the sixth iteration of the controller subsystem...
 
-oops, I meant
-fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk), 2500000 * 4) <<   1;
-> So, the question is, does this field start at bit 0 (your version is 
-> correct)
-> or bit 1? In other words, how did the hardware manual get it wrong? 
-> Wrong starting
-> bit, or divide by 2 not needed. Please document the mistake in the code.
->
->
->>
->>> Does this need a quirk? What boards has this been verified to fix?
->>>
->> I tested this on i.mx28, i.mx53 and i.mx6q.  Do you see problem on
->> your platform?
->>
-> I have not tested yet, but will sometime this week.
->
->
->
+Overall, the changelog sounds like a great move in the right direction.
+There's just one small thing I'd comment on here:
+
+> ChangeLog v6->v7:
+> 
+> - Make it possible to have several map entries matching the
+>   same device, pin controller and function, but using
+>   a different group, and alter the semantics so that
+>   pinmux_get() will pick all matching map entries, and
+>   store the associated groups in a list. The list will
+>   then be iterated over at pinmux_enable()/pinmux_disable()
+>   and corresponding driver functions called for each
+>   defined group. Notice that you're only allowed to map
+>   multiple *groups* to the same
+>   { device, pin controller, function } triplet, attempts
+>   to map the same device to multiple pin controllers will
+>   for example fail. This is hopefully the crucial feature
+>   requested by Stephen Warren.
+
+I've been viewing the map table as:
+
+input: (device, device's function) 
+output: list of (controller, controller's group, controller's function)
+
+... hence I was surprised to see that you explicitly note that mapping a
+single device to multiple controllers was disallowed.
+
+That said, I suppose this restriction won't cause any issues for any
+use-case I'm aware of; the only possibilities might be:
+
+a) Multiple pinmux controllers within the SoC, but perhaps the driver
+should just aggregate multiple HW modules into a single Linux device
+anyway?
+
+b) Where the pinmux map wants to affect the pinmux on both ends of some
+bus, where the two ends are different chips each having obviously separate
+pinmux controllers.
+
+Then again, if this need ever does arise, we should be able to just relax
+this restriction without causing any backwards-compatibility issues, so
+I don't see a specific need to change this now; I just thought I'd mention
+it so you're aware of what I'm thinking.
+
+I'll go review the code now.
+
+-- 
+nvpublic
