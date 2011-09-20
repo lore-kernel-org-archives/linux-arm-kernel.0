@@ -1,19 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 20 Sep 2011 12:02:14 +0100
-Subject: Link failures due to __bug_table in current -next
-In-Reply-To: <20110919200317.GC16381@n2100.arm.linux.org.uk>
-References: <20110919120954.GA20314@opensource.wolfsonmicro.com>
-	<20110919200317.GC16381@n2100.arm.linux.org.uk>
-Message-ID: <20110920110214.GH2387@opensource.wolfsonmicro.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 20 Sep 2011 14:10:21 +0300
+Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
+	structure
+In-Reply-To: <1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
+References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
+	<1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <1316517021.1949.13.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2011 at 09:03:17PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Sep 19, 2011 at 01:09:54PM +0100, Mark Brown wrote:
+On Tue, 2011-09-20 at 11:30 -0400, Ajay Kumar wrote:
+> This patch adds a data structure definiton to hold framebuffer windows/planes.
+> An ioctl number is also added to provide user access
+> to change window position dynamically.
+> 
+> Signed-off-by: Ajay Kumar <ajaykumar.rs@samsung.com>
+> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  include/linux/fb.h |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/fb.h b/include/linux/fb.h
+> index 1d6836c..2141941 100644
+> --- a/include/linux/fb.h
+> +++ b/include/linux/fb.h
+> @@ -39,6 +39,7 @@
+>  #define FBIOPUT_MODEINFO        0x4617
+>  #define FBIOGET_DISPINFO        0x4618
+>  #define FBIO_WAITFORVSYNC	_IOW('F', 0x20, __u32)
+> +#define FBIOPOS_OVERLAY_WIN	_IOW('F', 0x21, struct fb_overlay_win_pos)
+>  
+>  #define FB_TYPE_PACKED_PIXELS		0	/* Packed Pixels	*/
+>  #define FB_TYPE_PLANES			1	/* Non interleaved planes */
+> @@ -366,6 +367,12 @@ struct fb_image {
+>  	struct fb_cmap cmap;	/* color map info */
+>  };
+>  
+> +/* Window overlaying */
+> +struct fb_overlay_win_pos {
+> +	__u32 win_pos_x;	/* x-offset from LCD(0,0) where window starts */
+> +	__u32 win_pos_y;	/* y-offset from LCD(0,0) where window starts */
+> +};
 
-> > `.exit.text' referenced in section `__bug_table' of net/built-in.o:
-> > defined in discarded section `.exit.text' of net/built-in.o
+Shouldn't this also include the window size (in case scaling is
+supported)?
 
-> This might solve the problem - could you check please?
+This also won't work for setups where the same framebuffer is used by
+multiple overlays. For example, this is the case on OMAP when the same
+content is cloned to, say, LCD and TV, each of which is showing an
+overlay.
 
-Yes, that works for me - thanks!
+ Tomi
