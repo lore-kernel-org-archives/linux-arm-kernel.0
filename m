@@ -1,34 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Sep 2011 13:55:37 -0700
-Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
-In-Reply-To: <201109202201.18574.arnd@arndb.de>
-References: <20110917014623.GC2937@atomide.com>
-	<201109202201.18574.arnd@arndb.de>
-Message-ID: <20110920205537.GI2937@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Sep 2011 22:59:49 +0200
+Subject: [PATCH] mach-integrator: fix VGA base regression
+In-Reply-To: <CACRpkdb5jdgR+_aZxVzaedr1FJdUWSi9b7utcB6NsiXhX3GvLA@mail.gmail.com>
+References: <1315172408-18957-1-git-send-email-linus.walleij@linaro.org>
+	<201109051621.18382.arnd@arndb.de>
+	<CACRpkdb5jdgR+_aZxVzaedr1FJdUWSi9b7utcB6NsiXhX3GvLA@mail.gmail.com>
+Message-ID: <201109202259.49763.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110920 12:27]:
-> On Saturday 17 September 2011, Tony Lindgren wrote:
-> > Please pull the first part of omap cleanup from:
-> > 
-> > git://github.com/tmlind/linux.git cleanup
-> > 
-> > This series cleans up early_init functions and removes
-> > CHIP_IS macro usage. This makes it easier to have SoC
-> > specific init functions so adding support for new omap
-> > variants does not require patching all over the place.
+On Tuesday 20 September 2011, Linus Walleij wrote:
+> On Mon, Sep 5, 2011 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 05 September 2011, Linus Walleij wrote:
+> >> On Sun, Sep 4, 2011 at 11:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >>
+> >> > The changes introduced in commit
+> >> > cc22b4c18540e5e8bf55c7d124044f9317527d3c
+> >> > "ARM: set vga memory base at run-time"
+> >>
+> >> Arnd can you choose whether to apply this patch or revert
+> >> the commit making it necessary?
+> >
+> > I'm still stuck with master.kernel.org being down, so I can't really push
+> > any updates right now. I'll do it once it's up again.
 > 
-> Thanks, pulled.
+> Ping on this. Rob agreed to merge the patch, this is a regression
+> making Integrator non-bootable in 3.1 so I'd really like to see it
+> merged ASAP.
 > 
-> Note that we are trying to get everyone to use the similar
-> prefixes for patch summaries, so it would be nice if you could
-> change 'OMAP: powerdomain:' to 'ARM: OMAP: powerdomain' or
-> 'ARM: omap/powerdowmain:' in the future.
+Applied, thanks for the reminder!
 
-Already did that for my patches.. Paul and Kevin, can you
-please also start following that standard too?
-
-Thanks,
-
-Tony
+	Arnd
