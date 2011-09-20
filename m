@@ -1,86 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 20 Sep 2011 08:59:16 +0100
-Subject: Link failures due to __bug_table in current -next
-In-Reply-To: <CAPnjgZ3+b=nhApZxV1aBGejxEr7MGN1e8neP-ychtVO2Ego2yQ@mail.gmail.com>
-References: <20110919120954.GA20314@opensource.wolfsonmicro.com>
-	<20110919200317.GC16381@n2100.arm.linux.org.uk>
-	<CAPnjgZ3+b=nhApZxV1aBGejxEr7MGN1e8neP-ychtVO2Ego2yQ@mail.gmail.com>
-Message-ID: <20110920075916.GD16381@n2100.arm.linux.org.uk>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Tue, 20 Sep 2011 11:03:20 +0300
+Subject: [PATCH v2 0/3] ARM: imx: Add cpuidle for imx platforms
+In-Reply-To: <20110920071633.GR31404@pengutronix.de>
+References: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
+	<20110920071633.GR31404@pengutronix.de>
+Message-ID: <20110920080320.GA2528@matterhorn1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2011 at 12:06:22AM -0700, Simon Glass wrote:
-> Hi Russell,
+On 11 Sep 20, Sascha Hauer wrote:
+> Hi Robert,
 > 
-> On Mon, Sep 19, 2011 at 1:03 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Sep 19, 2011 at 01:09:54PM +0100, Mark Brown wrote:
-> >> I'm seeing linker failures in -next as of today:
-> >>
-> >> `.exit.text' referenced in section `__bug_table' of fs/built-in.o:
-> >> defined in discarded section `.exit.text' of fs/built-in.o
-> >> `.exit.text' referenced in section `__bug_table' of crypto/built-in.o:
-> >> defined in discarded section `.exit.text' of crypto/built-in.o
-> >> `.exit.text' referenced in section `__bug_table' of net/built-in.o:
-> >> defined in discarded section `.exit.text' of net/built-in.o
-> >> `.exit.text' referenced in section `__bug_table' of net/built-in.o:
-> >> defined in discarded section `.exit.text' of net/built-in.o
-> >>
-> >> which appears to be due to the chnage to use generic BUG() introduced in
-> >> commit 5254a3 (ARM: 7017/1: Use generic BUG() handler), reverting that
-> >> commit resolves the issue for me.
+> On Fri, Sep 16, 2011 at 12:27:47PM -0500, Robert Lee wrote:
+> > This patch series adds a common imx cpuidle driver, some common 
+> > mach-mx5 level cpuidle functionality, and an i.MX51 instance of
+> > using this driver.
+> > 
+> > The patch series is based on v3.1-rc2.
+> > 
+> > Changes since v1:
+> > * To address all the problems found during review of v1, a complete
+> > re-write was needed.
 > 
-> Gosh this does seem a bit odd. Ordering seems to be clearly implied by
-> the file syntax and I agree we should seek guidance from binutils
-> people.
+> Much better than the last version, thanks.
+> 
+> > 
+> > Robert Lee (3):
+> >   ARM: imx: Add imx cpuidle driver
+> >   ARM: imx: Add cpuidle for mach-mx5
+> >   ARM: imx: Add cpuidle for i.MX51
+> > 
+> >  arch/arm/mach-mx5/Makefile               |    3 +-
+> >  arch/arm/mach-mx5/cpu_op-mx51.c          |   35 +++++++-
+> 
+> Your additions to this file...
+> 
+> >  arch/arm/mach-mx5/cpu_op-mx51.h          |    1 +
+> >  arch/arm/mach-mx5/mm.c                   |    4 +
+> >  arch/arm/mach-mx5/system.c               |   35 +++++++
+> 
+> And this one should go to arch/arm/mach-mx5/cpuidle.c, then we have
+> all i.MX5 specific cpuidle stuff together without ifdeffing the code.
+> I assume that cpuidle support for i.MX53 will look identically, right?
 
-I'm not sure that there's any value in seeking guidance from the linker
-folk - we can see what's going on with a few experiments.  That's fine
-to find out what current linker behaviour is, but unless the manual
-documents it, its something that shouldn't be relied upon.
-
-Here's where I researched what the manual says and what practically happens
-with the linker:
-
-http://lists.arm.linux.org.uk/lurker/message/20110808.195805.a073e07d.en.html
-
-> I added the BUG condition to CONFIG_SMP_ON_UP and
-> CONFIG_DEBUG_SPINLOCK which were already there. If BUG is causing
-> problems, I wonder why these are not? Have we just been lucky, or have
-> I crossed a line? Or perhaps there are no spinlocks in exit text?
-
-The other stuff is also having problems.  Rob Herring's report was about
-the SMP alternatives causing the same problem:
-
-http://lists.arm.linux.org.uk/lurker/message/20110808.184931.a38e1c4e.en.html
-
-> One option is to keep all exit text around - i.e. never discard it at
-> link time. From memory it is only 4-8KB. Doubtless many would be upset
-> with this, but it could be an option until this binutils behaviour is
-> resolved.
-
-We are trying to keep .exit.text around (when certain config options are
-set - and they are set - but the linker is deciding to discard it for us
-anyway, because asm-generic/vmlinux.lds.S always lists .exit.text in its
-discard section.
-
-As we have a discard section at the beginning of the file to discard the
-unwinder information for other sections, the one from the generic file
-gets merged at the _start_ of the linker file, which results in .exit.text
-first appearance to be in the discard section.
-
-It's not that simple though - if you read the quote from the linker manual,
-the implication is that the linker would be entirely free to discard an
-input section as a priority if it appears in a discard section anywhere
-in the linker script.  There's nothing to say future linkers won't do
-this.  It would still be conformant to the linker manual.
-
-> Another is to declare that it is a bug to use BUG in an exit section.
-> I was thinking about that at the time, but decided it was probably too
-> radical. There are only a small number of references in the kernel I
-> think (again from memory - this was back in April I think). Not
-> trivial to enforce, and the error you get is not exactly informative.
-
-When a BUG() is inside an inline function which is used in an exit path,
-it becomes non-trivial to eliminate.  That means there will be hidden
-BUG() instances and we really can't ask people to avoid inline functions.
+Yes, let's not separate only for i.MX51. i.MX53 and even i.MX6 might look
+similar. They can always tune the exit latency criteria if needed.
