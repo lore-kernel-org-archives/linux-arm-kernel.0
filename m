@@ -1,38 +1,43 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 20 Sep 2011 10:59:33 -0700
-Subject: [PATCH REPOST 1/2] arm/dt: Tegra: Update SDHCI nodes to match
-	bindings
-In-Reply-To: <201109201943.29510.arnd@arndb.de>
-References: <1316537186-26753-1-git-send-email-swarren@nvidia.com>
-	<201109201943.29510.arnd@arndb.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04B732161E@HQMAIL01.nvidia.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 20 Sep 2011 14:06:26 -0400 (EDT)
+Subject: [GIT PULL] ux500-core for 3.2
+In-Reply-To: <CACRpkdZofKjOrPFWNR-2D0LWx3NGMiLwyhf7gAVdvBGvQHqJLQ@mail.gmail.com>
+References: <CACRpkdZofKjOrPFWNR-2D0LWx3NGMiLwyhf7gAVdvBGvQHqJLQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1109201403040.12663@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote at Tuesday, September 20, 2011 11:43 AM:
-> On Tuesday 20 September 2011, Stephen Warren wrote:
-> > The bindings were recently updated to have separate properties for each
-> > type of GPIO. Update the Device Tree source to match that.
-> >
-> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> > Acked-by: Olof Johansson <olof@lixom.net>
-> > ---
-> > I'd previously sent these to Grant assuming they'd go in his dt/next branch,
-> > but perhaps these should go in through Arnd's arm-soc next/dt branch?
-> >
+On Tue, 20 Sep 2011, Linus Walleij wrote:
+
+> Hi Arnd,
 > 
-> Which tree has the update that changed the bindings? I think it should
-> go into the same one.
+> could you please pull:
 > 
-> If it's already upstream, I can take it into the fixes branch.
+> git://git.linaro.org/people/triad/linux-stericsson.git for-arnd
 
-Chris applied them to the mmc-next tree:
+[...]
 
-git://git.kernel.org/pub/scm/linux/kernel/git/cjb/mmc.git
+> Barry Song (1):
+>       ARM: mach-ux500: add explicit cpu_relax() for busy wait loop
+> 
+> Fredrik Svensson (1):
+>       mach-ux500: remove pull-pinconfig and add SPI2
+> 
+> Lee Jones (1):
+>       mach-ux500: remove most of the ugly machine_is_*() calls
+> 
+> Linus Walleij (2):
+>       mach-ux500: factor out l2x0 handling code
+>       mach-ux500: unlock I&D l2x0 caches before init
+> 
+> srinidhi kasagar (1):
+>       mach-ux500: enable fix for ARM errata 754322
 
-which appears to be temporarily at:
+Please try to include the "ARM: " prefix (or ask the people you merge 
+from) in all the patch titles.  Once in mainline with all the other 
+stuff this helps others making sense of the log summaries.
 
-git://dev.laptop.org/users/cjb/mmc
+no need to redo this lot though.
 
--- 
-nvpublic
+
+Nicolas
