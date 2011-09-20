@@ -1,210 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 Sep 2011 07:58:58 -0500
-Subject: DT vs ARM static mappings
-In-Reply-To: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
-References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
-Message-ID: <4E788E12.8000801@gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 20 Sep 2011 14:05:09 +0100
+Subject: [PATCH] gpio/mxc: make it work with imx6q
+In-Reply-To: <1316423432-18333-1-git-send-email-shawn.guo@linaro.org>
+References: <1316423432-18333-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110920130508.GE2962@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pawel,
+Hi Shawn,
 
-On 09/20/2011 06:51 AM, Pawel Moll wrote:
-> Hi All,
+On Mon, Sep 19, 2011 at 05:10:32PM +0800, Shawn Guo wrote:
+> The imx6q is a Cortex-A9 Quad Core SoC, which has GIC as the primary
+> interrupt controller.  GIC requires gpio irq handler to signal EOI,
+> otherwise system will hang whenever there is a gpio irq triggered.
 > 
-> Apologies for the length of the text below, but the problem is
-> complex... (or at least it seems to be)
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/gpio/gpio-mxc.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
 > 
-> While working on DT support for ARM Versatile Express I faced an
-> interesting problem... Some background first, to set a common ground and
-> test my understanding of the problem ;-)
-> 
-> ARM machine description contains a "map_io" method, which is used to
-> create static memory mappings (using iotable_init() function) for things
-> like peripherals or SRAMs. At least that's the theory, because most of
-> the platforms are doing much more stuff there, like clocking/GPIOs/UARTs
-> initialization, hardware probing etc.
-> 
-> Now the Versatile Express platform: it consists of a motherboard with a
-> set of peripherals and a processor daughterboard (core tile), both
-> connected via a static memory bus, which is mapped into processor's
-> physical address space. The motherboard can be shared between different
-> types of the tiles (eg. A9, A5, A15 etc.). The present one is probed byt
-> he motherboard firmware and exposed in "system registers".
-> 
-> Everything is fine so far. The interesting part starts here:
-> 
-> http://infocenter.arm.com/help/topic/com.arm.doc.dui0447e/CACIHGFE.html
-> 
-> In brief, depending on the configuration, the system can have one of
-> two, totally different, memory maps (please, do spare me the "but why
-> did they do that" comments - not my idea nor decision, I just have to
-> live with this ;-), depending on the core tile being used.
-> 
-> In result, the static mapping as defined currently in
-> arch/arm/mach-vexpress/v2m.c for A9 variant:
-> 
-> #define V2M_PA_CS7      0x10000000
-> 
-> static struct map_desc v2m_io_desc[] __initdata = {
->         {
->                 .virtual        = __MMIO_P2V(V2M_PA_CS7),
->                 .pfn            = __phys_to_pfn(V2M_PA_CS7),
->                 .length         = SZ_128K,
->                 .type           = MT_DEVICE,
->         },
-> };
-> 
-> is no longer valid for A5/A15. It would rather look like this:
-> 
-> #define V2M_PA_CS3      0x1c000000
-> 
-> static struct map_desc v2m_io_desc[] __initdata = {
->         {
->                 .virtual        = __MMIO_P2V(V2M_PA_CS3),
->                 .pfn            = __phys_to_pfn(V2M_PA_CS3),
->                 .length         = SZ_2M,
->                 .type           = MT_DEVICE,
->         },
-> };
-> 
-> Not only the peripherals base address is changed but also "internal"
-> alignment, thus offsets to peripherals. Some of them are not being
-> ioremap()ed, but directly used via the static mapping and MMIO_P2V macro
-> (like "readl(MMIO_P2V(V2M_SYS_PROCID0))" in v2m_populate_ct_desc(void)
-> function). For example, these two:
-> 
-> #define V2M_SYSREGS             (V2M_PA_CS7 + 0x00000000)
-> #define V2M_SYSCTL              (V2M_PA_CS7 + 0x00001000)
-> 
-> would have to become:
-> 
-> #define V2M_SYSREGS             (V2M_PA_CS3 + 0x00010000)
-> #define V2M_SYSCTL              (V2M_PA_CS3 + 0x00020000)
-> 
-> My current DTS for the original memory map looks like that (fragments):
-> 
-> {
->         motherboard {
->                 ranges = <7 0 0x10000000 0x00020000>;
->                 #address-cells = <2>; // SMB chipselect number and offset
->                 #size-cells = <1>;
-> 	
->                 peripherals at 7 {
-> 			ranges = <0 7 0 0x20000>;
->                         #address-cells = <1>;
->                         #size-cells = <1>;
-> 
->                         sysreg at 00000 {
->                                 reg = <0x00000 0x1000>;
->                         };      
->                         
->                         sysctl at 01000 {
->                                 reg = <0x01000 0x1000>;
->                         };
-> 		}
-> 	}		
-> }
-> 		
-> DTS for the second memory map would just have the addresses changed.
-> Unfortunately, because of the static mappings being hardcoded in the
-> board support file, one kernel won't Just Work (TM) with different DTBs.
-> 
-> Of course the simplest solution would be to define two different
-> compatible values, eg. "arm,vexpress-legacy" would execute the current
-> map_io implementation, while "arm,vexpress-rs1" would use different one,
-> setting up the other map_desc (the MMIO_P2V macro must die of course,
-> replaced with a runtime-defined virtual base address for the
-> peripherals).
-> 
-> If you believe that's what I should do, say it and stop reading :-)
-> 
+> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> index 4340aca..00b4c9c 100644
+> --- a/drivers/gpio/gpio-mxc.c
+> +++ b/drivers/gpio/gpio-mxc.c
+> @@ -233,6 +233,9 @@ static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+>  	u32 irq_stat;
+>  	struct mxc_gpio_port *port = irq_get_handler_data(irq);
+>  
+> +	if (desc->irq_data.chip->irq_eoi)
+> +		desc->irq_data.chip->irq_eoi(&desc->irq_data);
+> +
+>  	irq_stat = readl(port->base + GPIO_ISR) & readl(port->base + GPIO_IMR);
+>  
+>  	mxc_gpio_irq_handler(port, irq_stat);
+> -- 
+> 1.7.4.1
 
-Yes. Different tiles are fundamentally different boards, so they should
-have different DTs. Using includes should help minimize duplication though.
+Could this make use of the chained_irq_enter/chained_irq_exit functions 
+added in 10a8c38 (ARM: 6806/1: irq: introduce entry and exit functions 
+for chained handlers)?
 
-Think about it this way. How would you solve this without DT? You would
-have a bunch of duplicated data in the kernel for the different configs.
-So you're not any worse off in this regard and still have the other
-advantages of DT.
-
-> To my mind it looked like the whole mechanism was not flexible enough,
-> so I wanted to explore other options...
-> 
-> The obvious one was to describe the required static mapping in the DTS.
-> I don't like this idea, though. It can hardly be called "hardware
-> description". Besides, what node would carry such data? "chosen"?
-> Hardly...
-> 
-> Would it contain a "regs" property with the physical address and
-> "virtual-reg" with the virtual one? Again, doesn't sound right to me
-> (especially the virtual bit, however the virtual address could be common
-> between different variants and be defined in the board support code, not
-> the DTS).
-> 
-> I have considered a reference (phandle or an alias?) to the node to be
-> mapped ("peripherals" in my case), but where to define this reference?
-> Any ideas?
-
-In "chosen" like the kernel command line would be the place, but I don't
-think that is the right approach. Chosen is really for things that
-change frequently and this doesn't really fall in that category.
-
-> 
-> There is an additional problem here... The "map_io" is executed before
-> the tree is un-flattened, so:
-> 
-> 1. One can't simply use "of_find_matching_node()" (as in the latest l2x0
-> patches) to find the interesting nodes - the only way of going through
-> the tree is raw of_scan_flat_dt() function. Therefore any conditions
-> more complex then string comparison with the (full) node name are
-> problematic.
-> 
-> 2. The tree mappings (ranges) are not resolved yet, so one can't simply
-> get the effective address of a node. Only "raw" properties are
-> available, so all one can get scanning for "peripherals at 7" node is "0 7
-> 0 0x20000" array, instead of the "0x10000000 0x00020000" that is really
-> important.
-> 
-
-If you add a compatible field to "motherboard" node, then you can read
-the ranges.
-
-> Initially I wanted to find the mentioned devices and create individual
-> mappings for them, so the MMIO_P2V would be still valid (if slightly
-> "abused"), but I failed due to the problems mentioned above. And I can't
-> delay this operation till the tree is un-flattened, as the core tile
-> must be probed (via sysreg) in map_io (tile's specific code must be able
-> to create its own mappings):
-
-Do you really need MMIO_P2V? If you have fixed virtual addresses in the
-kernel and can pull the phys addresses from DT to populate the iotable,
-is that sufficient?
-
-> 
-> static void __init v2m_map_io(void)
-> {       
->         iotable_init(v2m_io_desc, ARRAY_SIZE(v2m_io_desc)); 
->         v2m_populate_ct_desc();
->         ct_desc->map_io();
-> }
-> 
-> Any comments, ideas and suggestions how to tackle this situation are
-> more than welcome.
-> 
-Generally, the trend is to get rid of static mappings as much as
-possible. Doing that first might simplify things.
-
-Rob
-
-> Cheers!
-> 
-> Pawe?
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Jamie
