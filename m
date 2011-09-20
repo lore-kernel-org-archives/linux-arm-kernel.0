@@ -1,44 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Sep 2011 23:46:11 +0200
-Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
-In-Reply-To: <201109202334.43213.arnd@arndb.de>
-References: <20110917014623.GC2937@atomide.com>
-	<201109202334.43213.arnd@arndb.de>
-Message-ID: <201109202346.11393.arnd@arndb.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 20 Sep 2011 15:52:02 -0600
+Subject: [PATCH] spi: Fix builderror in spi-pl022.c
+In-Reply-To: <CACRpkdbsUMCvBofKjExiB2wCbK9CwpcXr5xmShJ4SHEGAAH4Bw@mail.gmail.com>
+References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
+	<1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
+	<CACRpkdb=Bt2j4iMV5NJHmPG8wDi6__CRD6kn_KOoaQ1R6uwrWQ@mail.gmail.com>
+	<CACRpkdbsUMCvBofKjExiB2wCbK9CwpcXr5xmShJ4SHEGAAH4Bw@mail.gmail.com>
+Message-ID: <20110920215202.GQ7781@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 September 2011, Arnd Bergmann wrote:
-> On Saturday 17 September 2011, Tony Lindgren wrote:
-> > Hi Arnd,
-> > 
-> > Please pull the first part of omap cleanup from:
-> > 
-> > git://github.com/tmlind/linux.git cleanup
-> > 
-> > This series cleans up early_init functions and removes
-> > CHIP_IS macro usage. This makes it easier to have SoC
-> > specific init functions so adding support for new omap
-> > variants does not require patching all over the place.
+On Tue, Sep 20, 2011 at 10:45:41PM +0200, Linus Walleij wrote:
+> On Mon, Sep 5, 2011 at 2:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Sun, Aug 28, 2011 at 9:26 PM, Peter Huewe <peterhuewe@gmx.de> wrote:
+> >
+> >> This patch fixes a build error, introduced by commit (67fc8b9f, "PM: add
+> >> runtime PM support to core Primecell driver") which unfortunately was a little
+> >> bit incomplete and did contain a typo (11 instead of 22).
+> >> I'm not sure how this patch could have been tested back then, if it
+> >> doesn't even compile ;)
+> >
+> > Grant can you please apply this patch? Right now linux-next is
+> > breaking because of this missing patch...
 > 
-> One more thing: my randconfig tests are running now and
-> have spit out a new error after merging lost of stuff
-> today:
-> 
-> arch/arm/mach-omap2/built-in.o: In function `omap_zoom_init':
-> /home/arnd/linux-arm/arch/arm/mach-omap2/board-zoom.c:117: undefined reference to `board_nand_init'
-> make[1]: *** [.tmp_vmlinux1] Error 1
-> make[1]: Target `_all' not remade because of errors.
-> make: *** [sub-make] Error 2
-> make: Target `_all' not remade because of errors.
+> Ping on this... ignore if it's been picked already.
 
-Found it: the offending patch is:
+It's not a patch that went through my tree, so I cannot pick it up.
 
-      omap2+: Use Kconfig symbol in Makefile instead of obj-y
-
-
-It seems that you replace the #ifdef in the board-flash.c file
-with a similar #ifdef in the header that replaces this with an
-empty inline function when the object is not built.
-
-	Arnd
+g.
