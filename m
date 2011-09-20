@@ -1,41 +1,51 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 20 Sep 2011 12:43:50 -0500
-Subject: [PATCH v2] mach-ep93xx: break out GPIO driver specifics
-In-Reply-To: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
-References: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F39DAED82F@AUSP01VMBX24.collaborationhost.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 20 Sep 2011 11:41:55 -0600
+Subject: [PATCH REPOST 2/2] arm/dt: Tegra: Add support-8bit to SDHCI nodes
+In-Reply-To: <1316537186-26753-2-git-send-email-swarren@nvidia.com>
+References: <1316537186-26753-1-git-send-email-swarren@nvidia.com>
+	<1316537186-26753-2-git-send-email-swarren@nvidia.com>
+Message-ID: <20110920174155.GG7781@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, September 20, 2011 1:42 AM, Linus Walleij wrote:
->
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> The <mach/gpio.h> file is included from upper directories
-> and deal with generic GPIO and gpiolib stuff. Break out the
-> platform and driver specific defines and functions into its own
-> header file.
->
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <rmallon@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - Move the irq_to_gpio() into the driver since it was the only
->   thing actually using it, as a result the ep93xx gpio.h
->   is trivial and becomes empty.
-> - Putting this into the patch tracker as 7042/2 soon-ish.
-> ---
->  arch/arm/mach-ep93xx/core.c                     |    1 +
->  arch/arm/mach-ep93xx/edb93xx.c                  |    1 +
->  arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h |  100 +++++++++++++++++++++
->  arch/arm/mach-ep93xx/include/mach/gpio.h        |  105 -----------------------
->  arch/arm/mach-ep93xx/simone.c                   |    2 +-
->  arch/arm/mach-ep93xx/snappercl15.c              |    2 +-
->  drivers/gpio/gpio-ep93xx.c                      |    3 +
->  7 files changed, 107 insertions(+), 107 deletions(-)
->  create mode 100644 arch/arm/mach-ep93xx/include/mach/gpio-ep93xx.h
+On Tue, Sep 20, 2011 at 10:46:26AM -0600, Stephen Warren wrote:
+> For Seaboard's internal eMMC, this makes the difference between a
+> 5.5MB/s and 10.2MB/s transfer rate. On Harmony, there wasn't any
+> measurable difference on my cheap/slow ~2MB/s card.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Thanks!
+> ---
+>  arch/arm/boot/dts/tegra-harmony.dts  |    1 +
+>  arch/arm/boot/dts/tegra-seaboard.dts |    4 ++++
+>  2 files changed, 5 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+> index e581866..0e225b8 100644
+> --- a/arch/arm/boot/dts/tegra-harmony.dts
+> +++ b/arch/arm/boot/dts/tegra-harmony.dts
+> @@ -66,5 +66,6 @@
+>  		cd-gpios = <&gpio 58 0>; /* gpio PH2 */
+>  		wp-gpios = <&gpio 59 0>; /* gpio PH3 */
+>  		power-gpios = <&gpio 70 0>; /* gpio PI6 */
+> +		support-8bit;
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/tegra-seaboard.dts b/arch/arm/boot/dts/tegra-seaboard.dts
+> index 64cedca..a72299b 100644
+> --- a/arch/arm/boot/dts/tegra-seaboard.dts
+> +++ b/arch/arm/boot/dts/tegra-seaboard.dts
+> @@ -25,4 +25,8 @@
+>  		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
+>  		power-gpios = <&gpio 70 0>; /* gpio PI6 */
+>  	};
+> +
+> +	sdhci at c8000600 {
+> +		support-8bit;
+> +	};
+>  };
+> -- 
+> 1.7.0.4
+> 
