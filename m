@@ -1,55 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 20 Sep 2011 09:53:42 +0200
-Subject: [GIT PULL] ux500-core for 3.2
-Message-ID: <CACRpkdZofKjOrPFWNR-2D0LWx3NGMiLwyhf7gAVdvBGvQHqJLQ@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 20 Sep 2011 16:04:06 +0800
+Subject: [PATCH 0/7] Add L2 cache cleaning to generic CPU suspend
+In-Reply-To: <20110920074624.GF16591@n2100.arm.linux.org.uk>
+References: <20110919163741.GE16591@n2100.arm.linux.org.uk>
+	<20110920034717.GG28084@S2100-06.ap.freescale.net>
+	<20110920074624.GF16591@n2100.arm.linux.org.uk>
+Message-ID: <20110920080405.GA28389@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Sep 20, 2011 at 08:46:25AM +0100, Russell King - ARM Linux wrote:
+> On Tue, Sep 20, 2011 at 11:47:18AM +0800, Shawn Guo wrote:
+> > On Mon, Sep 19, 2011 at 05:37:41PM +0100, Russell King - ARM Linux wrote:
+> > > This is a re-post of the previous patch series, but with an additional
+> > > TLB flush to ensure that hte global TLB entry in the page tables is
+> > > flushed out.  This is a flush of all TLB entries, but it could probably
+> > > be more targetted if we need to.
+> > > 
+> > 
+> > Here is the diff on suspend.c between last post and this series.  With
+> > the outer_clean_range() calls added back, the series works fine on
+> > imx6q, otherwise it hangs on resume.
+> 
+> You seem to be missing patch 7 from the second series.
+> 
+Oops, indeed.  So on imx6q for all the series:
 
-could you please pull:
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
 
-git://git.linaro.org/people/triad/linux-stericsson.git for-arnd
-
-to the ARM SoC tree (ux500 branch or however you prefer to handle it)?
-They have all been reviewed on the ARM list recently and are mostly
-minor fixes and Lee Jones nice cleanup patch.
-
-I might be stacking up more but this is a good start.
-
-The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
-
-  Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
-
-are available in the git repository at:
-  git://git.linaro.org/people/triad/linux-stericsson.git for-arnd
-
-Barry Song (1):
-      ARM: mach-ux500: add explicit cpu_relax() for busy wait loop
-
-Fredrik Svensson (1):
-      mach-ux500: remove pull-pinconfig and add SPI2
-
-Lee Jones (1):
-      mach-ux500: remove most of the ugly machine_is_*() calls
-
-Linus Walleij (2):
-      mach-ux500: factor out l2x0 handling code
-      mach-ux500: unlock I&D l2x0 caches before init
-
-srinidhi kasagar (1):
-      mach-ux500: enable fix for ARM errata 754322
-
- arch/arm/mach-ux500/Kconfig                   |    1 +
- arch/arm/mach-ux500/Makefile                  |    1 +
- arch/arm/mach-ux500/board-mop500-pins.c       |   34 ++++--
- arch/arm/mach-ux500/board-mop500-sdi.c        |   52 ++++++---
- arch/arm/mach-ux500/board-mop500.c            |   78 +++++++++++---
- arch/arm/mach-ux500/board-mop500.h            |    3 +
- arch/arm/mach-ux500/cache-l2x0.c              |   95 +++++++++++++++++
- arch/arm/mach-ux500/cpu.c                     |   69 ------------
- arch/arm/mach-ux500/include/mach/uncompress.h |   10 +--
- arch/arm/mach-ux500/pins-db8500.h             |  142 +++++++++++++------------
- arch/arm/plat-nomadik/include/plat/pincfg.h   |    5 -
- 11 files changed, 294 insertions(+), 196 deletions(-)
- create mode 100644 arch/arm/mach-ux500/cache-l2x0.c
+-- 
+Regards,
+Shawn
