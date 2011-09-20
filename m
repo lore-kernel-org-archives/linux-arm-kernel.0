@@ -1,79 +1,43 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 20 Sep 2011 15:01:01 -0600
-Subject: [PATCH 1/3] of/irq: of_irq_find_parent: check for parent equal
-	to child
-In-Reply-To: <1316550244-3655-2-git-send-email-robherring2@gmail.com>
-References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
-	<1316550244-3655-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20110920210101.GP7781@ponder.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 20 Sep 2011 23:01:56 +0200
+Subject: [PATCH REPOST 1/2] arm/dt: Tegra: Update SDHCI nodes to match
+	bindings
+In-Reply-To: <201109202134.50242.arnd@arndb.de>
+References: <1316537186-26753-1-git-send-email-swarren@nvidia.com>
+	<20110920180731.GL7781@ponder.secretlab.ca>
+	<201109202134.50242.arnd@arndb.de>
+Message-ID: <201109202301.56983.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2011 at 03:24:02PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Tuesday 20 September 2011, Arnd Bergmann wrote:
+> On Tuesday 20 September 2011, Grant Likely wrote:
+> > On Tue, Sep 20, 2011 at 07:43:29PM +0200, Arnd Bergmann wrote:
+> > > On Tuesday 20 September 2011, Stephen Warren wrote:
+> > > > The bindings were recently updated to have separate properties for each
+> > > > type of GPIO. Update the Device Tree source to match that.
+> > > > 
+> > > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > > > Acked-by: Olof Johansson <olof@lixom.net>
+> > > > ---
+> > > > I'd previously sent these to Grant assuming they'd go in his dt/next branch,
+> > > > but perhaps these should go in through Arnd's arm-soc next/dt branch?
+> > > > 
+> > > 
+> > > Which tree has the update that changed the bindings? I think it should
+> > > go into the same one.
+> > > 
+> > > If it's already upstream, I can take it into the fixes branch.
+> > 
+> > Already upstream
 > 
-> An interrupt controller may often implicitly inherit itself from a parent
-> node when in fact the controller is the interrupt root controller. Guard
-> against the case of child == parent and return NULL in this case.
-> 
-> This can also be fixed by adding an explicit "interrupt-parent;" to a root
-> interrupt controller node.
-> 
-> Based on code from Grant Likely.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Ok, I see. I've applied both patches to the fixes branch and will send
+> it out with the next pull request for 3.1 to Linus then.
 
-Looks great.
+Sorry, I just noticed that the second patch is not a bug fix, so I took it out
+again and kept only patch 1/2 in the fixes branch for 3.1.
 
-Ben, can you look at this please?  Make sure I've not missed something
-about how powerpc expects of_irq_find_parent() to behave.
+Should I take the other one as well? It's probably better to let that
+go the proper way through the tegra tree for 3.2, right?
 
-g.
-
-> ---
->  drivers/of/irq.c |   14 +++++++-------
->  1 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> index 9f689f1..6a5b5e7 100644
-> --- a/drivers/of/irq.c
-> +++ b/drivers/of/irq.c
-> @@ -58,27 +58,27 @@ EXPORT_SYMBOL_GPL(irq_of_parse_and_map);
->   */
->  struct device_node *of_irq_find_parent(struct device_node *child)
->  {
-> -	struct device_node *p;
-> +	struct device_node *p, *c = child;
->  	const __be32 *parp;
->  
-> -	if (!of_node_get(child))
-> +	if (!of_node_get(c))
->  		return NULL;
->  
->  	do {
-> -		parp = of_get_property(child, "interrupt-parent", NULL);
-> +		parp = of_get_property(c, "interrupt-parent", NULL);
->  		if (parp == NULL)
-> -			p = of_get_parent(child);
-> +			p = of_get_parent(c);
->  		else {
->  			if (of_irq_workarounds & OF_IMAP_NO_PHANDLE)
->  				p = of_node_get(of_irq_dflt_pic);
->  			else
->  				p = of_find_node_by_phandle(be32_to_cpup(parp));
->  		}
-> -		of_node_put(child);
-> -		child = p;
-> +		of_node_put(c);
-> +		c = p;
->  	} while (p && of_get_property(p, "#interrupt-cells", NULL) == NULL);
->  
-> -	return p;
-> +	return (p == child) ? NULL : p;
->  }
->  
->  /**
-> -- 
-> 1.7.5.4
-> 
+	Arnd
