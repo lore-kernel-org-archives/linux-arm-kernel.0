@@ -1,35 +1,67 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 20 Sep 2011 16:13:40 -0700
-Subject: [PATCH 00/10] hwspinlock-next
-In-Reply-To: <CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
-References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
-	<CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
-Message-ID: <20110920231340.GT18894@atomide.com>
+Date: Tue, 20 Sep 2011 16:25:51 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix missing inline functions for Makefile
+	cleanup (Re: [GIT PULL] omap cleanup part1 for v3.2 merge window)
+In-Reply-To: <201109202334.43213.arnd@arndb.de>
+References: <20110917014623.GC2937@atomide.com>
+	<201109202334.43213.arnd@arndb.de>
+Message-ID: <20110920232551.GL2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [110920 01:34]:
-> On Mon, Sep 12, 2011 at 7:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> 
-> I'm wondering how hwspinlock updates like this should go upstream.
-> 
-> The first hwspinlock batch was picked by Tony, because it involved a
-> bulk of OMAP changes.
-> 
-> Hwspinlock isn't OMAP-specific anymore though (we gained support for
-> STE's u8500) and the vast majority of changes are in drivers/. We're
-> still very much ARM-related, though this may change too at some point
-> (c6x has a similar "hardware semaphore" peripheral like the u8500
-> does).
-> 
-> Tony, if you're still willing to pick up these updates I'd be happy to
-> send you pull requests of course.
+Commit f41caddbe73f52a42f529d668ce47b4d693fd2c0 (omap2+: Use
+Kconfig symbol in Makefile instead of obj-y) cleaned up the
+omap2+ Makefile. However this did not account for the inline
+functions that are now needed for board_flash_init and
+board_nand_init.
 
-I'd prefer for Greg to take these as these are drivers.
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-If he's not taking it at this point based on it being ARM only,
-I can take it then.
+---
 
-Regards,
+Will have this in the next pull request for cleanup
 
-Tony
+--- a/arch/arm/mach-omap2/board-flash.c
++++ b/arch/arm/mach-omap2/board-flash.c
+@@ -148,11 +148,6 @@ __init board_nand_init(struct mtd_partition *nand_parts,
+ 	board_nand_data.gpmc_irq = OMAP_GPMC_IRQ_BASE + cs;
+ 	gpmc_nand_init(&board_nand_data);
+ }
+-#else
+-void
+-__init board_nand_init(struct mtd_partition *nand_parts, u8 nr_parts, u8 cs, int nand_type)
+-{
+-}
+ #endif /* CONFIG_MTD_NAND_OMAP2 || CONFIG_MTD_NAND_OMAP2_MODULE */
+ 
+ /**
+--- a/arch/arm/mach-omap2/board-flash.h
++++ b/arch/arm/mach-omap2/board-flash.h
+@@ -24,7 +24,26 @@ struct flash_partitions {
+ 	int nr_parts;
+ };
+ 
++#if defined(CONFIG_MTD_NAND_OMAP2) || \
++		defined(CONFIG_MTD_NAND_OMAP2_MODULE) || \
++		defined(CONFIG_MTD_ONENAND_OMAP2) || \
++		defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
+ extern void board_flash_init(struct flash_partitions [],
+ 				char chip_sel[][GPMC_CS_NUM], int nand_type);
++#else
++static inline void board_flash_init(struct flash_partitions part[],
++				char chip_sel[][GPMC_CS_NUM], int nand_type)
++{
++}
++#endif
++
++#if defined(CONFIG_MTD_NAND_OMAP2) || \
++		defined(CONFIG_MTD_NAND_OMAP2_MODULE)
+ extern void board_nand_init(struct mtd_partition *nand_parts,
+ 					u8 nr_parts, u8 cs, int nand_type);
++#else
++static inline void board_nand_init(struct mtd_partition *nand_parts,
++					u8 nr_parts, u8 cs, int nand_type)
++{
++}
++#endif
