@@ -1,50 +1,58 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 20 Sep 2011 20:08:59 +0300
-Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
-	structure
-In-Reply-To: <CAEC9eQOpwfmRfcxHoiA00xX0a=dxXj1xJDpW14DozGXKXPJ3Xg@mail.gmail.com>
-References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
-	<1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
-	<20110920112427.GB19695@sapphire.tkos.co.il>
-	<CAEC9eQOpwfmRfcxHoiA00xX0a=dxXj1xJDpW14DozGXKXPJ3Xg@mail.gmail.com>
-Message-ID: <20110920170858.GA3827@tarshish>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 20 Sep 2011 11:17:06 -0600
+Subject: [PATCH V2 1/6] spi/spi-pl022: Resolve formatting issues
+In-Reply-To: <a72e7189be95278b97614fe9ab7d307d422d54e4.1312965741.git.viresh.kumar@st.com>
+References: <cover.1312965741.git.viresh.kumar@st.com>
+	<a72e7189be95278b97614fe9ab7d307d422d54e4.1312965741.git.viresh.kumar@st.com>
+Message-ID: <20110920171706.GA7781@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ajay,
-
-On Tue, Sep 20, 2011 at 08:56:57PM +0530, Ajay kumar wrote:
-> Hi Baruch,
-> On Tue, Sep 20, 2011 at 4:54 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> > Hi Ajay,
-> >
-> > On Tue, Sep 20, 2011 at 11:30:39AM -0400, Ajay Kumar wrote:
-> >> This patch adds a data structure definiton to hold framebuffer windows/planes.
-> >> An ioctl number is also added to provide user access
-> >> to change window position dynamically.
-> >
-> > [snip]
-> >
-> >> +/* Window overlaying */
-> >> +struct fb_overlay_win_pos {
-> >> + ? ? __u32 win_pos_x; ? ? ? ?/* x-offset from LCD(0,0) where window starts */
-> >> + ? ? __u32 win_pos_y; ? ? ? ?/* y-offset from LCD(0,0) where window starts */
-> >> +};
-> >
-> > Why not allow negative offsets where the left or upper part of the framebuffer
-> > is hidden?
+On Wed, Aug 10, 2011 at 02:20:54PM +0530, Viresh Kumar wrote:
+> There were few formatting related issues in code. This patch fixes them.
+> Fixes include:
+> - Remove extra blank lines
+> - align code to 80 cols
+> - combine several lines to one line
+> - Replace multiple spaces with tabs
+> - Remove spaces before labels
 > 
-> Thanks for pointing it out. Are there drivers which place the overlay
-> windows such that some part of the window is hidden from being
-> displayed on the screen?
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+> @@ -2243,23 +2233,23 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+>  	amba_vcore_disable(adev);
+>  	return 0;
+>  
+> - err_spi_register:
+> - err_start_queue:
+> - err_init_queue:
+> +err_spi_register:
+> +err_start_queue:
+> +err_init_queue:
+>  	destroy_queue(pl022);
+>  	pl022_dma_remove(pl022);
+>  	free_irq(adev->irq[0], pl022);
+>  	pm_runtime_disable(&adev->dev);
+> - err_no_irq:
+> +err_no_irq:
+>  	clk_put(pl022->clk);
+> - err_no_clk:
+> +err_no_clk:
+>  	iounmap(pl022->virtbase);
+> - err_no_ioremap:
+> +err_no_ioremap:
+>  	amba_release_regions(adev);
+> - err_no_ioregion:
+> +err_no_ioregion:
+>  	spi_master_put(master);
+> - err_no_master:
+> - err_no_pdata:
+> +err_no_master:
+> +err_no_pdata:
 
-I don't know. However, since this is new userspace ABI which should stay 
-compatible forever, we should make sure to do it right. Using __s32 instead of 
-__u32 won't limit us in the future.
+These label indentations are actually on purpose.  I'll apply the rest
+of the patch, but I'm going to remove this hunk.  Indenting error
+labels by 1 space makes 'diff' show the function name instead of the
+label in the context line.
 
-baruch
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+g.
