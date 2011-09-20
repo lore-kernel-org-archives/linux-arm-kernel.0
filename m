@@ -1,49 +1,69 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 20 Sep 2011 12:07:48 +0300
-Subject: [PATCH 00/10] hwspinlock-next
-In-Reply-To: <1315846025-11453-1-git-send-email-ohad@wizery.com>
-References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
-Message-ID: <CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 20 Sep 2011 10:50:15 +0200
+Subject: [PATCH 2/2] gpio/nomadik: use genirq core to track enablement
+Message-ID: <1316508615-20351-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 12, 2011 at 7:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> This series includes a new u8500 hwspinlock driver from Mathieu,
-> a core fix from Juan and several other cleanups/fixes
-> (some of which were reported by Arnd while reviewing Mathieu's
-> driver).
-...
-> ?Documentation/hwspinlock.txt ? ? ? ? ? ? | ? 74 +++++++-----
-> ?MAINTAINERS ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 15 +++
-> ?arch/arm/mach-omap2/hwspinlock.c ? ? ? ? | ? ?8 +-
-> ?drivers/hwspinlock/Kconfig ? ? ? ? ? ? ? | ? 27 +++--
-> ?drivers/hwspinlock/Makefile ? ? ? ? ? ? ?| ? ?2 +
-> ?drivers/hwspinlock/hwspinlock_core.c ? ? | ?204 +++++++++++++++++++-----------
-> ?drivers/hwspinlock/hwspinlock_internal.h | ? 40 ++++--
-> ?drivers/hwspinlock/omap_hwspinlock.c ? ? | ?127 +++++++------------
-> ?drivers/hwspinlock/u8500_hsem.c ? ? ? ? ?| ?198 +++++++++++++++++++++++++++++
-> ?include/linux/hwspinlock.h ? ? ? ? ? ? ? | ? 46 +++++--
-> ?10 files changed, 516 insertions(+), 225 deletions(-)
+From: Linus Walleij <linus.walleij@linaro.org>
 
-I'm wondering how hwspinlock updates like this should go upstream.
+Currently the Nomadik GPIO driver tracks enabled/disabled interrupt
+status with a local variable, switch to using the interrupt core.
 
-The first hwspinlock batch was picked by Tony, because it involved a
-bulk of OMAP changes.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/gpio-nomadik.c |   11 ++---------
+ 1 files changed, 2 insertions(+), 9 deletions(-)
 
-Hwspinlock isn't OMAP-specific anymore though (we gained support for
-STE's u8500) and the vast majority of changes are in drivers/. We're
-still very much ARM-related, though this may change too at some point
-(c6x has a similar "hardware semaphore" peripheral like the u8500
-does).
-
-Tony, if you're still willing to pick up these updates I'd be happy to
-send you pull requests of course.
-
-Otherwise, I'll appreciate if anyone has any suggestions ?
-
-I'll of course set up a tree for this and ask Stephen to take it to
-linux-next as expected (unless someone just prefers to pick up the
-acked patches into his tree).
-
-Thanks,
-Ohad.
+diff --git a/drivers/gpio/gpio-nomadik.c b/drivers/gpio/gpio-nomadik.c
+index 97e9be9..0b7ec12 100644
+--- a/drivers/gpio/gpio-nomadik.c
++++ b/drivers/gpio/gpio-nomadik.c
+@@ -58,7 +58,6 @@ struct nmk_gpio_chip {
+ 	u32 rwimsc;
+ 	u32 fwimsc;
+ 	u32 slpm;
+-	u32 enabled;
+ 	u32 pull_up;
+ };
+ 
+@@ -605,11 +604,6 @@ static int nmk_gpio_irq_maskunmask(struct irq_data *d, bool enable)
+ 	if (!nmk_chip)
+ 		return -EINVAL;
+ 
+-	if (enable)
+-		nmk_chip->enabled |= bitmask;
+-	else
+-		nmk_chip->enabled &= ~bitmask;
+-
+ 	clk_enable(nmk_chip->clk);
+ 	spin_lock_irqsave(&nmk_gpio_slpm_lock, flags);
+ 	spin_lock(&nmk_chip->lock);
+@@ -653,7 +647,7 @@ static int nmk_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
+ 	spin_lock_irqsave(&nmk_gpio_slpm_lock, flags);
+ 	spin_lock(&nmk_chip->lock);
+ 
+-	if (!(nmk_chip->enabled & bitmask))
++	if (irqd_irq_disabled(d))
+ 		__nmk_gpio_set_wake(nmk_chip, gpio, on);
+ 
+ 	if (on)
+@@ -670,7 +664,7 @@ static int nmk_gpio_irq_set_wake(struct irq_data *d, unsigned int on)
+ 
+ static int nmk_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ {
+-	bool enabled;
++	bool enabled = !irqd_irq_disabled(d);
+ 	bool wake = irqd_is_wakeup_set(d);
+ 	int gpio;
+ 	struct nmk_gpio_chip *nmk_chip;
+@@ -691,7 +685,6 @@ static int nmk_gpio_irq_set_type(struct irq_data *d, unsigned int type)
+ 	clk_enable(nmk_chip->clk);
+ 	spin_lock_irqsave(&nmk_chip->lock, flags);
+ 
+-	enabled = !!(nmk_chip->enabled & bitmask);
+ 	if (enabled)
+ 		__nmk_gpio_irq_modify(nmk_chip, gpio, NORMAL, false);
+ 
+-- 
+1.7.3.2
