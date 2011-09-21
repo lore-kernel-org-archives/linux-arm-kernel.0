@@ -1,18 +1,58 @@
-From: vrex@nvidia.com (Vinod Rex)
-Date: Wed, 21 Sep 2011 15:10:01 -0700
-Subject: change_page_attr() implementation for ARM?
-Message-ID: <D19EBEE1D7B1F742A8ED7130E050A38A4CA460FF0C@HQMAIL02.nvidia.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 21 Sep 2011 16:10:40 -0600
+Subject: [PATCH] arm/tegra: Harmony: Configure PMC for low-level interrupts
+Message-ID: <1316643040-7998-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Cortex-A9, we have observed stale data being read from write-combine (C=0 B=1) memory regions mapped into userspace which have a duplicate cacheable mapping in the kernel address space (due to the kernel linear mapping).
+Without this, the PMC continually detects an interrupt when the PMU_IRQ
+line is high, causing the tps6686x IRQ handler thread to hog an entire
+CPU.
 
-The issue appears to be due to speculative prefetch on the cacheable kernel linear mapping which gets lines into the L2 cache. When reads are performed on the write-combine mapping for this address range, these reads get the stale data from L2 instead of memory.
+This change was originally written by Wei Ni <wni@nvidia.com> for Seaboard
+in the ChromeOS kernel.
 
-As per the Cortex-A9 spec, behavior for double mappings with conflicting page attributes is undefined, so we need a way to make sure all duplicate mappings have the same memory type attributes. 
+Long-term, this should probably be moved into some kind of PMU driver,
+or perhaps integrated into the GPIO/IRQ/pinmux system?
 
-Similar issue on x86 is handled using the change_page_attr()/set_memory_*() functions defined in arch/x86/mm/pageattr.c. ?This function modifies the attributes of the page in kernel linear map to match the corresponding mapping in userspace to avoid having duplicate mappings with different page attributes. It accomplishes this by splitting section (large page) mappings into 4KB page mappings as needed so that the page attribute change is done only for the requested memory region.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/board-harmony-power.c |   13 ++++++++++++-
+ 1 files changed, 12 insertions(+), 1 deletions(-)
 
-Would a similar implementation for ARM be appropriate? We are experimenting with a port of change_page_attr() to ARM that seems to solve our problems.
-
-Other approaches proposed to solve this on ARM, by remapping CMA reserved region using 4KB page mappings will not help us since IOMMU mappings don't use DMA contiguous allocation routines.
+diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
+index 5ad8b2f..21d1285 100644
+--- a/arch/arm/mach-tegra/board-harmony-power.c
++++ b/arch/arm/mach-tegra/board-harmony-power.c
+@@ -18,10 +18,11 @@
+ #include <linux/i2c.h>
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+-
++#include <linux/io.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/mfd/tps6586x.h>
+ 
++#include <mach/iomap.h>
+ #include <mach/irqs.h>
+ 
+ #include "board-harmony.h"
+@@ -113,6 +114,16 @@ static struct i2c_board_info __initdata harmony_regulators[] = {
+ 
+ int __init harmony_regulator_init(void)
+ {
++	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
++	u32 pmc_ctrl;
++
++	/*
++	 * Configure the power management controller to trigger PMU
++	 * interrupts when low
++	 */
++	pmc_ctrl = readl(pmc + PMC_CTRL);
++	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
++
+ 	i2c_register_board_info(3, harmony_regulators, 1);
+ 
+ 	return 0;
+-- 
+1.7.0.4
