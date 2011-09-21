@@ -1,63 +1,84 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 21 Sep 2011 20:44:24 +0800
-Subject: [PATCH v2 1/3] net/fec: change phy-reset-gpio request warning to
-	debug message
-In-Reply-To: <20110921121159.GG1966@pengutronix.de>
-References: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
-	<1316603432-20032-2-git-send-email-shawn.guo@linaro.org>
-	<20110921112555.GE1966@pengutronix.de>
-	<20110921120341.GG28907@S2100-06.ap.freescale.net>
-	<20110921121159.GG1966@pengutronix.de>
-Message-ID: <20110921124423.GI28907@S2100-06.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Sep 2011 21:39:33 +0900
+Subject: [PATCH 0/5] S5P64X0 PM Support
+In-Reply-To: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
+References: <1313144787-30666-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <005901cc785b$8401f6a0$8c05e3e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 02:11:59PM +0200, Wolfram Sang wrote:
-> On Wed, Sep 21, 2011 at 08:03:42PM +0800, Shawn Guo wrote:
-> > On Wed, Sep 21, 2011 at 01:25:55PM +0200, Wolfram Sang wrote:
-> > > Hi Shawn,
-> > > 
-> > > On Wed, Sep 21, 2011 at 07:10:30PM +0800, Shawn Guo wrote:
-> > > > FEC can work without a phy reset on some platforms, which means not
-> > > > very platform necessarily have a phy-reset gpio encoded in device tree.
-> > > > So it makes more sense to have the phy-reset-gpio request failure as
-> > > > a debug message rather than a warning.
-> > > 
-> > > Or remove it entirely?
-> > > 
-> > I would like to keep it.  When people want to debug at this point, they
-> > do not need to type the debug message.
+Abhilash Kesavan wrote:
 > 
-> I just think the message might be confusing in case you don't need the
-> gpio, because then failing is expected behaviour. For those platforms,
-> it is not even an error then, so you must drop returning the error. To
-> be very precise, you should check of_get_named_gpio() and return if no
-> gpio is specified. Then, you can distinguish that case from problems
-> when getting the GPIO.
+> The patchset adds Power Mangement support for S5P64X0. The first
+> four patches lay the groundwork for adding PM support, while the
+> final patch adds the SoC specific PM code.
+> Tested using external interrupts as wake-up sources on SMDK6440
+> and SMDK6450.
 > 
-The whole fec_reset_phy() should not be a show-stopper failure.  Even
-on platforms that have the gpio, FEC can work without resetting the
-phy in FEC driver for some cases, for example, boot loader has done it.
-It might be good enough to give a warning message rather than getting
-the probe fail.
+> Abhilash Kesavan (5):
+>   ARM: S5P: Make the common S5P PM code conditionally compile
+>   ARM: SAMSUNG: Make the sleep code common for S3C64XX and newer SoCs
+>   ARM: S5P64X0: Add pm save/restore functions for GPIO banks
+>   ARM: S5P64X0: Fix incorrect serial clock name
+>   ARM: S5P64X0: Add Power Management support
+> 
+>  arch/arm/Kconfig                                |    2 +-
+>  arch/arm/mach-exynos4/Kconfig                   |    2 +
+>  arch/arm/mach-exynos4/Makefile                  |    2 +-
+>  arch/arm/mach-exynos4/sleep.S                   |   54 ------
+>  arch/arm/mach-s3c64xx/Kconfig                   |    1 +
+>  arch/arm/mach-s3c64xx/Makefile                  |    1 -
+>  arch/arm/mach-s3c64xx/sleep.S                   |   72 --------
+>  arch/arm/mach-s5p64x0/Kconfig                   |    4 +
+>  arch/arm/mach-s5p64x0/Makefile                  |    1 +
+>  arch/arm/mach-s5p64x0/clock-s5p6440.c           |    2 +-
+>  arch/arm/mach-s5p64x0/clock-s5p6450.c           |    2 +-
+>  arch/arm/mach-s5p64x0/gpiolib.c                 |    1 +
+>  arch/arm/mach-s5p64x0/include/mach/map.h        |    1 +
+>  arch/arm/mach-s5p64x0/include/mach/pm-core.h    |  117 +++++++++++++
+>  arch/arm/mach-s5p64x0/include/mach/regs-clock.h |   33 ++++
+>  arch/arm/mach-s5p64x0/include/mach/regs-gpio.h  |   19 ++
+>  arch/arm/mach-s5p64x0/init.c                    |    2 +-
+>  arch/arm/mach-s5p64x0/irq-eint.c                |    2 +
+>  arch/arm/mach-s5p64x0/irq-pm.c                  |   92 ++++++++++
+>  arch/arm/mach-s5p64x0/pm.c                      |  204
+> +++++++++++++++++++++++
+>  arch/arm/mach-s5pv210/Kconfig                   |    2 +
+>  arch/arm/mach-s5pv210/Makefile                  |    2 +-
+>  arch/arm/mach-s5pv210/sleep.S                   |   52 ------
+>  arch/arm/plat-s5p/Kconfig                       |    6 +
+>  arch/arm/plat-s5p/Makefile                      |    3 +-
+>  arch/arm/plat-samsung/Kconfig                   |    7 +
+>  arch/arm/plat-samsung/Makefile                  |    1 +
+>  arch/arm/plat-samsung/sleep.S                   |   80 +++++++++
+>  drivers/gpio/gpio-plat-samsung.c                |    4 +-
+>  29 files changed, 583 insertions(+), 188 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos4/sleep.S
+>  delete mode 100644 arch/arm/mach-s3c64xx/sleep.S
+>  create mode 100644 arch/arm/mach-s5p64x0/include/mach/pm-core.h
+>  create mode 100644 arch/arm/mach-s5p64x0/irq-pm.c
+>  create mode 100644 arch/arm/mach-s5p64x0/pm.c
+>  delete mode 100644 arch/arm/mach-s5pv210/sleep.S
+>  create mode 100644 arch/arm/plat-samsung/sleep.S
+> 
+> --
+> 1.7.4.1
 
-> > > I also wanted to suggested to drop returning the error code, since it is
-> > > not an error anymore, strictly speaking. Then I noticed that the caller
-> > > does not check the error code. So, this could be added or turn the
-> > > function to void?
-> > > 
-> > To me, keep the return value as integer is more scalable.  Someday,
-> > someone need to add more stuff in the function, or want to improve
-> > the caller to check return value, it plays.
-> 
-> I agree that keeping it int is way better. But why not add it now to
-> keep things proper and tested? If this patch gets accepted as it is and
-> later someone else will add error checking to the caller, your platform
-> will lose FEC support as a regression.
-> 
-Again, fec_reset_phy() failure is not a show-stopper.  We might not
-want to make the probe fail because of that.
+Hi Abhilash,
 
--- 
-Regards,
-Shawn
+As I know, you need to rebase this series based on latest for-next.
+
+Please re-submit this series...and I agree with Russell's suggestion on
+patch 2/5.
+But it's enough to use s3c64xx_smdk_leds_resume() firstly not common smdk
+now.
+
+Of course, we need to do it later ;)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
