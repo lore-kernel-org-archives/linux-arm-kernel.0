@@ -1,60 +1,90 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 21 Sep 2011 13:57:27 +0530
-Subject: [PATCH] dmaengine: delete redundant chan_id and chancnt
-	initialization in dma drivers
-In-Reply-To: <1316166200-20595-1-git-send-email-Baohua.Song@csr.com>
-References: <1316166200-20595-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <CABb+yY2L=wfRoascoriAcnNMKkV7LbQEHCpp78+rCY=aM46x7A@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Sep 2011 11:40:39 +0200
+Subject: [PATCH RESEND] mmc: sdio: rw extended, use a sg entry for each block
+Message-ID: <1316598039-30238-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 3:13 PM, Barry Song <Baohua.Song@csr.com> wrote:
-> dma_async_device_register will re-init chan_id and chancnt,
-> so whatever chan_id and chancnt are set in drivers, they will
-> be re-written by dma_async_device_register.
->
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Viresh Kumar <viresh.kumar@st.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Piotr Ziecik <kosmo@semihalf.com>
-> Cc: Yong Wang <yong.y.wang@intel.com>
-> Cc: Jaswinder Singh <jassi.brar@samsung.com>
-> Cc: Pelagicore AB <info@pelagicore.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
-> ?drivers/dma/at_hdmac.c ? ? ?| ? ?5 ++---
-> ?drivers/dma/dw_dmac.c ? ? ? | ? ?5 ++---
-> ?drivers/dma/intel_mid_dma.c | ? ?2 --
-> ?drivers/dma/mpc512x_dma.c ? | ? ?1 -
-> ?drivers/dma/pch_dma.c ? ? ? | ? ?2 --
-> ?drivers/dma/pl330.c ? ? ? ? | ? ?2 --
-> ?drivers/dma/timb_dma.c ? ? ?| ? ?3 +--
+While using io multiple blocks operations, change the way that sg is built:
+use one sg entry for each block instead of aggregating the whole buffer
+in a single sg entry.
+Using a single sg entry for a multiple block command may lead to
+misunderstanding between the sd/mmc and the DMA controllers. In fact, the
+knowledge of the block length will allow both controllers to optimize burst
+sizes on internal bus while dealing with those data.
 
-Apparently ....
+Use a sg table to store start addresses of blocks within the data buffer.
 
-drivers/dma/ppc4xx/adma.c
-drivers/dma/ipu/ipu_idmac.c
-       still write to chan_id.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mmc/core/sdio_ops.c |   38 +++++++++++++++++++++++++++++---------
+ 1 files changed, 29 insertions(+), 9 deletions(-)
 
-drivers/dma/amba-pl08x.c
-drivers/dma/fsldma.c
-drivers/dma/ioat/dma_v2.c
-drivers/dma/ioat/dma.c
-drivers/dma/mpc512x_dma.c
-drivers/dma/shdma.c
-       still write to chancnt
-
-Most of them are simply a matter of removal, but some seem
-like really depending upon setting them(?)
-
-Anyways, even after you modify those as well, chan_id and chancnt
-are rendered overstaying guests in dmaengine core. Because chan_id
-of each channel would be _precisely_ the order in which the
-_dmac-driver_ added the channel to the 'channels' list.
-
-So if their values are _always_ gonna be just contiguously incrementing
-why need variables for that in the dmaengine api?
-Dmac drivers could use local variables for that.
-
-OTOH, why not chan_id be left solely for use by dmac drivers read by the
-dmaengine only to create sysfs entries ?
+diff --git a/drivers/mmc/core/sdio_ops.c b/drivers/mmc/core/sdio_ops.c
+index f087d87..aea6978 100644
+--- a/drivers/mmc/core/sdio_ops.c
++++ b/drivers/mmc/core/sdio_ops.c
+@@ -124,7 +124,7 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
+ 	struct mmc_request mrq = {0};
+ 	struct mmc_command cmd = {0};
+ 	struct mmc_data data = {0};
+-	struct scatterlist sg;
++	struct sg_table sgt;
+ 
+ 	BUG_ON(!card);
+ 	BUG_ON(fn > 7);
+@@ -144,24 +144,44 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
+ 	cmd.arg |= fn << 28;
+ 	cmd.arg |= incr_addr ? 0x04000000 : 0x00000000;
+ 	cmd.arg |= addr << 9;
+-	if (blocks == 1 && blksz <= 512)
+-		cmd.arg |= (blksz == 512) ? 0 : blksz;	/* byte mode */
+-	else
+-		cmd.arg |= 0x08000000 | blocks;		/* block mode */
++	if (blocks == 1 && blksz <= 512) {
++		/* byte mode */
++		struct scatterlist sg;
++
++		cmd.arg |= (blksz == 512) ? 0 : blksz;
++		sg_init_one(&sg, buf, blksz * blocks);
++
++		data.sg = &sg;
++		data.sg_len = 1;
++	} else {
++		/* block mode */
++		struct scatterlist *sg_ptr;
++		int i;
++
++		cmd.arg |= 0x08000000 | blocks;
++		if (sg_alloc_table(&sgt, blocks, GFP_KERNEL))
++			return -ENOMEM;
++		for_each_sg(sgt.sgl, sg_ptr, sgt.nents, i) {
++			sg_set_buf(sg_ptr, buf + i * blksz, blksz);
++		}
++
++		data.sg = sgt.sgl;
++		data.sg_len = sgt.nents;
++	}
++
+ 	cmd.flags = MMC_RSP_SPI_R5 | MMC_RSP_R5 | MMC_CMD_ADTC;
+ 
+ 	data.blksz = blksz;
+ 	data.blocks = blocks;
+ 	data.flags = write ? MMC_DATA_WRITE : MMC_DATA_READ;
+-	data.sg = &sg;
+-	data.sg_len = 1;
+-
+-	sg_init_one(&sg, buf, blksz * blocks);
+ 
+ 	mmc_set_data_timeout(&data, card);
+ 
+ 	mmc_wait_for_req(card->host, &mrq);
+ 
++	if (blocks != 1 || blksz > 512)
++		sg_free_table(&sgt);
++
+ 	if (cmd.error)
+ 		return cmd.error;
+ 	if (data.error)
+-- 
+1.7.3
