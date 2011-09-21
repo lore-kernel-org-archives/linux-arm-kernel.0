@@ -1,42 +1,33 @@
-From: ccross@android.com (Colin Cross)
-Date: Wed, 21 Sep 2011 09:14:08 -0700
-Subject: [PATCH] ARM: tegra: Remove redundant change to the CPSR in
-	headsmp.S
-In-Reply-To: <20110914091531.GA2104@arm.com>
-References: <1315411253-17559-1-git-send-email-dave.martin@linaro.org>
-	<20110912165222.GE2020@arm.com>
-	<CAMbhsRSoSYhuqPC+SmCNk4dseok0vs02su0kihKNqXGpCvUvSg@mail.gmail.com>
-	<20110914091531.GA2104@arm.com>
-Message-ID: <CAMbhsRTrwyEwxCKHEYx0PVt7DTFDE7o5+9T8qz=82jZBEYYYxg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Sep 2011 09:14:24 -0700
+Subject: [PATCH 00/10] hwspinlock-next
+In-Reply-To: <CAK=WgbZw=q1HkU2U6iuzjSW==za5saFXmnf0yaYoHWkJfduZVA@mail.gmail.com>
+References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
+	<CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
+	<20110920231340.GT18894@atomide.com>
+	<201109211612.33504.arnd@arndb.de>
+	<20110921152812.GE2937@atomide.com>
+	<CAK=WgbZ_1M-p+BtJnhw_uvaCnLaFRPA_tyv-rSGWMv2GQcB5Cw@mail.gmail.com>
+	<CAK=WgbZw=q1HkU2U6iuzjSW==za5saFXmnf0yaYoHWkJfduZVA@mail.gmail.com>
+Message-ID: <20110921161424.GG2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2011 at 2:15 AM, Dave Martin <dave.martin@linaro.org> wrote:
+* Ohad Ben-Cohen <ohad@wizery.com> [110921 08:34]:
+> On Wed, Sep 21, 2011 at 6:56 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> > On Wed, Sep 21, 2011 at 6:28 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> Ohad can you please try this first? Just please make sure your patches are
+> >> first in next tree before sending in the pull request.
+> >
+> > Sure thing.
+> >
+> > Stephen, I'll send you the location of my tree in a few.
+> 
+> Just before I do, Tony can I please have your Ack for the mach-omap2
+> part of this patch-set:
+> 
+>  arch/arm/mach-omap2/hwspinlock.c         |    8 +-
 
-<snip>
+OK acked the related patch.
 
-> With regard to Thumb-2 kernels, what code is responsible for
-> performing the jump to tegra_secondary_startup?
-arch/arm/mach-tegra/platsmp.c puts the physical address of
-tegra_secondary_startup into the reset vector, and then brings the cpu
-out of reset.  As far as I know, it is always in ARM mode, but it is
-possible that it comes through ROM code that ends with a bx, allowing
-it to be entered in Thumb mode.
-
-> If the jump is done by making an exception return from some firmware,
-> you may find you hit tegra_secondary_starup in ARM state, and
-> everything will go horribly wrong...
->
-> It could be worth making the secondary kernel entry point ARM code
-> unconditionally (just as is now done for the primary kernel entry
-> point).
-That seems safest.
-
-> Cheers
-> ---Dave
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Tony
