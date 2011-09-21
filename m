@@ -1,307 +1,199 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 21 Sep 2011 23:17:47 +0800
-Subject: [PATCH v2 3/3] ARM: CSR: PM: add sleep entry for SiRFprimaII
-In-Reply-To: <1316618267-4348-1-git-send-email-21cnbao@gmail.com>
-References: <1316618267-4348-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1316618267-4348-4-git-send-email-21cnbao@gmail.com>
+From: mnazarewicz@google.com (Michal Nazarewicz)
+Date: Wed, 21 Sep 2011 17:19:05 +0200
+Subject: [PATCH 1/3] fixup! mm: alloc_contig_freed_pages() added
+In-Reply-To: <1315505152.3114.9.camel@nimitz>
+References: <1315505152.3114.9.camel@nimitz>
+Message-ID: <ea1bc31120e0670a044de6af7b3c67203c178065.1316617681.git.mina86@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rongjun Ying <rongjun.ying@csr.com>
+From: Michal Nazarewicz <mina86@mina86.com>
 
-This patch adds suspend-to-mem support for prima2. It will make prima2
-enter DEEPSLEEP mode while accepting PM_SUSPEND_MEM command.
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
 
-Signed-off-by: Rongjun Ying <baohua.song@csr.com>
-Signed-off-by: Barry Song <baohua.song@csr.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
--v2:
- don't call l2x0_of_init after resuming as Shawn's patch[1] seems
- not to be applied;
- Since people still need some time to figure out the best way for l2
- resume, we move the l2 re-init to bootloader for the moment to keep
- things go ahead.
+ include/linux/page-isolation.h |    4 ++-
+ mm/page_alloc.c                |   66 ++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 60 insertions(+), 10 deletions(-)
 
- arch/arm/mach-prima2/Makefile |    1 +
- arch/arm/mach-prima2/pm.c     |  149 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-prima2/pm.h     |   31 +++++++++
- arch/arm/mach-prima2/sleep.S  |   64 ++++++++++++++++++
- 4 files changed, 245 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-prima2/pm.c
- create mode 100644 arch/arm/mach-prima2/pm.h
- create mode 100644 arch/arm/mach-prima2/sleep.S
+> On Fri, 2011-08-19 at 16:27 +0200, Marek Szyprowski wrote:
+>> +unsigned long alloc_contig_freed_pages(unsigned long start, unsigned  
+>> long end,
+>> +				       gfp_t flag)
+>> +{
+>> +	unsigned long pfn = start, count;
+>> +	struct page *page;
+>> +	struct zone *zone;
+>> +	int order;
+>> +
+>> +	VM_BUG_ON(!pfn_valid(start));
+>> +	zone = page_zone(pfn_to_page(start));
 
-diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
-index f49d70b..13dd160 100644
---- a/arch/arm/mach-prima2/Makefile
-+++ b/arch/arm/mach-prima2/Makefile
-@@ -6,3 +6,4 @@ obj-y += prima2.o
- obj-y += rtciobrg.o
- obj-$(CONFIG_DEBUG_LL) += lluart.o
- obj-$(CONFIG_CACHE_L2X0) += l2x0.o
-+obj-$(CONFIG_SUSPEND) += pm.o sleep.o
-diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-new file mode 100644
-index 0000000..0ba39f3
---- /dev/null
-+++ b/arch/arm/mach-prima2/pm.c
-@@ -0,0 +1,149 @@
+On Thu, 08 Sep 2011 20:05:52 +0200, Dave Hansen <dave@linux.vnet.ibm.com> wrote:
+> This implies that start->end are entirely contained in a single zone.
+> What enforces that?  If some higher layer enforces that, I think we
+> probably need at least a VM_BUG_ON() in here and a comment about who
+> enforces it.
+
+>> +	spin_lock_irq(&zone->lock);
+>> +
+>> +	page = pfn_to_page(pfn);
+>> +	for (;;) {
+>> +		VM_BUG_ON(page_count(page) || !PageBuddy(page));
+>> +		list_del(&page->lru);
+>> +		order = page_order(page);
+>> +		zone->free_area[order].nr_free--;
+>> +		rmv_page_order(page);
+>> +		__mod_zone_page_state(zone, NR_FREE_PAGES, -(1UL << order));
+>> +		pfn  += 1 << order;
+>> +		if (pfn >= end)
+>> +			break;
+>> +		VM_BUG_ON(!pfn_valid(pfn));
+>> +		page += 1 << order;
+>> +	}
+
+> This 'struct page *'++ stuff is OK, but only for small, aligned areas.
+> For at least some of the sparsemem modes (non-VMEMMAP), you could walk
+> off of the end of the section_mem_map[] when you cross a MAX_ORDER
+> boundary.  I'd feel a little bit more comfortable if pfn_to_page() was
+> being done each time, or only occasionally when you cross a section
+> boundary.
+
+Do the attached changes seem to make sense?
+
+I wanted to avoid calling pfn_to_page() each time as it seem fairly
+expensive in sparsemem and disctontig modes.  At the same time, the
+macro trickery is so that users of sparsemem-vmemmap and flatmem won't
+have to pay the price.
+
+diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
+index b2a81fd..003c52f 100644
+--- a/include/linux/page-isolation.h
++++ b/include/linux/page-isolation.h
+@@ -46,11 +46,13 @@ static inline void unset_migratetype_isolate(struct page *page)
+ {
+ 	__unset_migratetype_isolate(page, MIGRATE_MOVABLE);
+ }
++
++/* The below functions must be run on a range from a single zone. */
+ extern unsigned long alloc_contig_freed_pages(unsigned long start,
+ 					      unsigned long end, gfp_t flag);
+ extern int alloc_contig_range(unsigned long start, unsigned long end,
+ 			      gfp_t flags, unsigned migratetype);
+-extern void free_contig_pages(struct page *page, int nr_pages);
++extern void free_contig_pages(unsigned long pfn, unsigned nr_pages);
+ 
+ /*
+  * For migration.
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 46e78d4..32fda5d 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5716,9 +5716,41 @@ out:
+ 	spin_unlock_irqrestore(&zone->lock, flags);
+ }
+ 
++#if defined(CONFIG_FLATMEM) || defined(CONFIG_SPARSEMEM_VMEMMAP)
++
 +/*
-+ * power management entry for CSR SiRFprimaII
-+ *
-+ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ *
-+ * Licensed under GPLv2 or later.
++ * In FLATMEM and CONFIG_SPARSEMEM_VMEMMAP we can safely increment the page
++ * pointer and get the same value as if we were to get by calling
++ * pfn_to_page() on incremented pfn counter.
 + */
++#define __contig_next_page(page, pageblock_left, pfn, increment) \
++	((page) + (increment))
 +
-+#include <linux/kernel.h>
-+#include <linux/suspend.h>
-+#include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/of_platform.h>
-+#include <linux/io.h>
-+#include <linux/rtc/sirfsoc_rtciobrg.h>
-+#include <asm/suspend.h>
-+#include <asm/hardware/cache-l2x0.h>
++#define __contig_first_page(pageblock_left, pfn) pfn_to_page(pfn)
 +
-+#include "pm.h"
++#else
 +
 +/*
-+ * suspend asm codes will access these to make DRAM become self-refresh and
-+ * system sleep
++ * If we cross pageblock boundary, make sure we get a valid page pointer.  If
++ * we are within pageblock, incrementing the pointer is good enough, and is
++ * a bit of an optimisation.
 + */
-+u32 sirfsoc_pwrc_base;
-+void __iomem *sirfsoc_memc_base;
++#define __contig_next_page(page, pageblock_left, pfn, increment)	\
++	(likely((pageblock_left) -= (increment)) ? (page) + (increment)	\
++	 : (((pageblock_left) = pageblock_nr_pages), pfn_to_page(pfn)))
 +
-+static void sirfsoc_set_wakeup_source(void)
-+{
-+	u32 pwr_trigger_en_reg;
-+	pwr_trigger_en_reg = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_TRIGGER_EN);
-+#define X_ON_KEY_B (1 << 0)
-+	sirfsoc_rtc_iobrg_writel(pwr_trigger_en_reg | X_ON_KEY_B,
-+		sirfsoc_pwrc_base + SIRFSOC_PWRC_TRIGGER_EN);
-+}
++#define __contig_first_page(pageblock_left, pfn) (			\
++	((pageblock_left) = pageblock_nr_pages -			\
++		 ((pfn) & (pageblock_nr_pages - 1))),			\
++	pfn_to_page(pfn))
 +
-+static void sirfsoc_set_sleep_mode(u32 mode)
-+{
-+	u32 sleep_mode = sirfsoc_rtc_iobrg_readl(sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_PDN_CTRL);
-+	sleep_mode &= ~(SIRFSOC_SLEEP_MODE_MASK << 1);
-+	sleep_mode |= mode << 1;
-+	sirfsoc_rtc_iobrg_writel(sleep_mode, sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_PDN_CTRL);
-+}
 +
-+static int sirfsoc_pre_suspend_power_off(void)
-+{
-+	u32 wakeup_entry = virt_to_phys(cpu_resume);
++#endif
 +
-+	sirfsoc_rtc_iobrg_writel(wakeup_entry, sirfsoc_pwrc_base +
-+		SIRFSOC_PWRC_SCRATCH_PAD1);
+ unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
+ 				       gfp_t flag)
+ {
++	unsigned long pageblock_left __unused;
+ 	unsigned long pfn = start, count;
+ 	struct page *page;
+ 	struct zone *zone;
+@@ -5729,27 +5761,37 @@ unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
+ 
+ 	spin_lock_irq(&zone->lock);
+ 
+-	page = pfn_to_page(pfn);
++	page = __contig_first_page(pageblock_left, pfn);
+ 	for (;;) {
+-		VM_BUG_ON(page_count(page) || !PageBuddy(page));
++		VM_BUG_ON(!page_count(page) || !PageBuddy(page) ||
++			  page_zone(page) != zone);
 +
-+	sirfsoc_set_wakeup_source();
+ 		list_del(&page->lru);
+ 		order = page_order(page);
++		count = 1UL << order;
+ 		zone->free_area[order].nr_free--;
+ 		rmv_page_order(page);
+-		__mod_zone_page_state(zone, NR_FREE_PAGES, -(1UL << order));
+-		pfn  += 1 << order;
++		__mod_zone_page_state(zone, NR_FREE_PAGES, -(long)count);
 +
-+	sirfsoc_set_sleep_mode(SIRFSOC_DEEP_SLEEP_MODE);
++		pfn += count;
+ 		if (pfn >= end)
+ 			break;
+ 		VM_BUG_ON(!pfn_valid(pfn));
+-		page += 1 << order;
 +
-+	return 0;
-+}
-+
-+static int sirfsoc_pm_enter(suspend_state_t state)
-+{
-+	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		sirfsoc_pre_suspend_power_off();
-+
-+		outer_flush_all();
-+		outer_disable();
-+		/* go zzz */
-+		cpu_suspend(0, sirfsoc_finish_suspend);
-+		break;
-+	default:
-+		return -EINVAL;
++		page = __contig_next_page(page, pageblock_left, pfn, count);
+ 	}
+ 
+ 	spin_unlock_irq(&zone->lock);
+ 
+ 	/* After this, pages in the range can be freed one be one */
+-	page = pfn_to_page(start);
+-	for (count = pfn - start; count; --count, ++page)
++	count = pfn - start;
++	pfn = start;
++	page = __contig_first_page(pageblock_left, pfn);
++	for (; count; --count) {
+ 		prep_new_page(page, 0, flag);
++		++pfn;
++		page = __contig_next_page(page, pageblock_left, pfn, 1);
 +	}
-+	return 0;
-+}
+ 
+ 	return pfn;
+ }
+@@ -5903,10 +5945,16 @@ done:
+ 	return ret;
+ }
+ 
+-void free_contig_pages(struct page *page, int nr_pages)
++void free_contig_pages(unsigned long pfn, unsigned nr_pages)
+ {
+-	for (; nr_pages; --nr_pages, ++page)
++	unsigned long pageblock_left __unused;
++	struct page *page = __contig_first_page(pageblock_left, pfn);
 +
-+static const struct platform_suspend_ops sirfsoc_pm_ops = {
-+	.enter = sirfsoc_pm_enter,
-+	.valid = suspend_valid_only_mem,
-+};
-+
-+static int __init sirfsoc_pm_init(void)
-+{
-+	suspend_set_ops(&sirfsoc_pm_ops);
-+	return 0;
-+}
-+late_initcall(sirfsoc_pm_init);
-+
-+static const struct of_device_id pwrc_ids[] = {
-+	{ .compatible = "sirf,prima2-pwrc" },
-+	{}
-+};
-+
-+static int __init sirfsoc_of_pwrc_init(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_matching_node(NULL, pwrc_ids);
-+	if (!np)
-+		panic("unable to find compatible pwrc node in dtb\n");
-+
-+	/*
-+	 * pwrc behind rtciobrg is not located in memory space
-+	 * though the property is named reg. reg only means base
-+	 * offset for pwrc. then of_iomap is not suitable here.
-+	 */
-+	if (of_property_read_u32(np, "reg", &sirfsoc_pwrc_base))
-+		panic("unable to find base address of pwrc node in dtb\n");
-+
-+	of_node_put(np);
-+
-+	return 0;
-+}
-+postcore_initcall(sirfsoc_of_pwrc_init);
-+
-+static const struct of_device_id memc_ids[] = {
-+	{ .compatible = "sirf,prima2-memc" },
-+	{}
-+};
-+
-+static int __devinit sirfsoc_memc_probe(struct platform_device *op)
-+{
-+	struct device_node *np = op->dev.of_node;
-+
-+	sirfsoc_memc_base = of_iomap(np, 0);
-+	if (!sirfsoc_memc_base)
-+		panic("unable to map memc registers\n");
-+
-+	return 0;
-+}
-+
-+static struct platform_driver sirfsoc_memc_driver = {
-+	.probe		= sirfsoc_memc_probe,
-+	.driver = {
-+		.name = "sirfsoc-memc",
-+		.owner = THIS_MODULE,
-+		.of_match_table	= memc_ids,
-+	},
-+};
-+
-+static int __init sirfsoc_memc_init(void)
-+{
-+	return platform_driver_register(&sirfsoc_memc_driver);
-+}
-+postcore_initcall(sirfsoc_memc_init);
-diff --git a/arch/arm/mach-prima2/pm.h b/arch/arm/mach-prima2/pm.h
-new file mode 100644
-index 0000000..aa2b428
---- /dev/null
-+++ b/arch/arm/mach-prima2/pm.h
-@@ -0,0 +1,31 @@
-+/*
-+ * arch/arm/mach-prima2/pm.h
-+ *
-+ * Copyright (C) 2011 CSR
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef _MACH_PRIMA2_PM_H_
-+#define _MACH_PRIMA2_PM_H_
-+
-+#define SIRFSOC_PWR_SLEEPFORCE		0x01
-+
-+#define SIRFSOC_SLEEP_MODE_MASK         0x3
-+#define SIRFSOC_DEEP_SLEEP_MODE         0x1
-+
-+#define SIRFSOC_PWRC_PDN_CTRL           0x0
-+#define SIRFSOC_PWRC_PON_OFF            0x4
-+#define SIRFSOC_PWRC_TRIGGER_EN         0x8
-+#define SIRFSOC_PWRC_PIN_STATUS         0x14
-+#define SIRFSOC_PWRC_SCRATCH_PAD1       0x18
-+#define SIRFSOC_PWRC_SCRATCH_PAD2       0x1C
-+
-+#ifndef __ASSEMBLY__
-+extern int sirfsoc_finish_suspend(unsigned long);
-+#endif
-+
-+#endif
-+
-diff --git a/arch/arm/mach-prima2/sleep.S b/arch/arm/mach-prima2/sleep.S
-new file mode 100644
-index 0000000..0745abc
---- /dev/null
-+++ b/arch/arm/mach-prima2/sleep.S
-@@ -0,0 +1,64 @@
-+/*
-+ * sleep mode for CSR SiRFprimaII
-+ *
-+ * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/ptrace.h>
-+#include <asm/assembler.h>
-+
-+#include "pm.h"
-+
-+#define DENALI_CTL_22_OFF	0x58
-+#define DENALI_CTL_112_OFF	0x1c0
-+
-+	.text
-+
-+ENTRY(sirfsoc_finish_suspend)
-+	@ r5: 	mem controller
-+	ldr     r0, =sirfsoc_memc_base
-+	ldr	r5, [r0]
-+	@ r6: 	pwrc base offset
-+	ldr     r0, =sirfsoc_pwrc_base
-+	ldr	r6, [r0]
-+	@ r7: 	rtc iobrg controller
-+	ldr     r0, =sirfsoc_rtciobrg_base
-+	ldr	r7, [r0]
-+
-+	@ Read the power control register and set the
-+	@ sleep force bit.
-+	add	r0, r6, #SIRFSOC_PWRC_PDN_CTRL
-+	bl	__sirfsoc_rtc_iobrg_readl
-+	orr	r0,r0,#SIRFSOC_PWR_SLEEPFORCE
-+	add	r1, r6, #SIRFSOC_PWRC_PDN_CTRL
-+	bl	sirfsoc_rtc_iobrg_pre_writel
-+	mov	r1, #0x1
-+
-+	@ read the MEM ctl register and set the self
-+	@ refresh bit
-+
-+	ldr	r2, [r5, #DENALI_CTL_22_OFF]
-+	orr	r2, r2, #0x1
-+
-+	@ Following code has to run from cache since
-+	@ the RAM is going to self refresh mode
-+	.align 5
-+	str	r2, [r5, #DENALI_CTL_22_OFF]
-+
-+1:
-+	ldr	r4, [r5, #DENALI_CTL_112_OFF]
-+	tst	r4, #0x1
-+	bne	1b
-+
-+	@ write SLEEPFORCE through rtc iobridge
-+
-+	str	r1, [r7]
-+	@ wait rtc io bridge sync
-+1:
-+	ldr	r3, [r7]
-+	tst	r3, #0x01
-+	bne	1b
-+	b .
++	while (nr_pages--) {
+ 		__free_page(page);
++		++pfn;
++		page = __contig_next_page(page, pageblock_left, pfn, 1);
++	}
+ }
+ 
+ #ifdef CONFIG_MEMORY_HOTREMOVE
 -- 
-1.7.0.4
+1.7.3.1
