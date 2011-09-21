@@ -1,168 +1,134 @@
-From: njun@marvell.com (Jun Nie)
-Date: Wed, 21 Sep 2011 21:07:26 +0800
-Subject: [PATCH] mmc: check SDIO card wake up during suspending
-In-Reply-To: <1316610446-24183-1-git-send-email-njun@marvell.com>
-References: <1316610446-24183-1-git-send-email-njun@marvell.com>
-Message-ID: <1316610446-24183-6-git-send-email-njun@marvell.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 21 Sep 2011 15:04:02 +0200
+Subject: [PATCH 2/7] s3c-adc: describe features via quirk constants
+In-Reply-To: <005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
+References: <201109182241.48858.heiko@sntech.de>
+	<201109182243.40440.heiko@sntech.de>
+	<005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
+Message-ID: <201109211504.03287.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible that SDIO card issue card interrupt to wake up
-system just after SDIO func driver and SDIO card firmware commit
-suspend state, while system is still in suspending process and
-mmc interrupt is not release yet.
+Hi,
 
-Interrupt storm may happen if func driver does not notify firmware
-to clear the wake up source. If func driver issue SDIO bus transaction
-to have firmware clear the source and driver try to handle the wake
-up event, system may enter suspend before all transaction done.
-In this case, SDIO card will not enter lower power mode never. But
-system can not be wake up for only card insert/remove/interrupt irq are
-listed in wake up source in SD spec. Data/command done irq can
-not wake up system.
+Am Mittwoch, 21. September 2011, 14:32:14 schrieben Sie:
+> Heiko St?bner wrote:
+> > The adc blocks of S3C2410 through S5P have a multitude of
+> > quirks, i.e. moved bits or whole new registers.
+> > 
+> > This patch tries to describe these individual features
+> > through constants which can be used to describe an adc.
+> > 
+> > As SoCs sometimes share only some of these quirks defining
+> > TYPE_ADCVx values for each one wouldn't scale well when
+> > adding more variants.
+> 
+> Hi Heiko,
+> 
+> I don't have idea we really need to use QUIRK in this case...as I know, the
+> QUIRK is used on other situation...
+> 
+> In addition, the TYPE_ADCVx can support each Samsung SoCs' ADC...but I need
+> to check again.
+The current types could not support the features of the 2443 and 2416/2450 - I 
+checked the datasheets.
 
-This patch check SDIO card interrupt and stop system suspend if there
-are card interrupt after func driver suspend.
+The mux register in base+0x18 does not exist on any of the current platforms.
+Also the bit 3 in ADCCON to select the resolution is specific to the 2416/2450 
+(see comments above constants and quirk definitions in patches 6 and 7).
 
-Signed-off-by: Jun Nie <njun@marvell.com>
----
- drivers/mmc/core/sdio.c       |   14 ++++++++++++++
- drivers/mmc/core/sdio_irq.c   |    5 +++++
- drivers/mmc/host/sdhci.c      |   14 +++++++++++++-
- include/linux/mmc/card.h      |    2 ++
- include/linux/mmc/sdio_func.h |    2 ++
- 5 files changed, 36 insertions(+), 1 deletions(-)
+So to support these SoCs would require the definition of two new types. 
+Including these new types in the existing conditionals would introduce a lot 
+of statements like
+	if ( (TYPE_X || TYPE_Y) && !TYPE_Z)
 
-diff --git a/drivers/mmc/core/sdio.c b/drivers/mmc/core/sdio.c
-index c3ad105..48a4106 100644
---- a/drivers/mmc/core/sdio.c
-+++ b/drivers/mmc/core/sdio.c
-@@ -584,6 +584,14 @@ static int mmc_sdio_suspend(struct mmc_host *host)
- 
- 	for (i = 0; i < host->card->sdio_funcs; i++) {
- 		struct sdio_func *func = host->card->sdio_func[i];
-+		/* cancel suspend once we detect external wake up source */
-+		if (host->card->pending_interrupt) {
-+			host->card->pending_interrupt = 0;
-+			err = -EBUSY;
-+			printk(KERN_ALERT "%s: wake up event after device suspended\n",
-+					mmc_hostname(host));
-+			break;
-+		}
- 		if (func && sdio_func_present(func) && func->dev.driver) {
- 			const struct dev_pm_ops *pmops = func->dev.driver->pm;
- 			if (!pmops || !pmops->suspend || !pmops->resume) {
-@@ -593,10 +601,15 @@ static int mmc_sdio_suspend(struct mmc_host *host)
- 				err = pmops->suspend(&func->dev);
- 			if (err)
- 				break;
-+			else
-+				/* It is prefer that func driver set it in its
-+				   suspend function with mmc_claim_host */
-+				func->suspended = true;
- 		}
- 	}
- 	while (err && --i >= 0) {
- 		struct sdio_func *func = host->card->sdio_func[i];
-+		func->suspended = false;
- 		if (func && sdio_func_present(func) && func->dev.driver) {
- 			const struct dev_pm_ops *pmops = func->dev.driver->pm;
- 			pmops->resume(&func->dev);
-@@ -639,6 +652,7 @@ static int mmc_sdio_resume(struct mmc_host *host)
- 	 */
- 	for (i = 0; !err && i < host->card->sdio_funcs; i++) {
- 		struct sdio_func *func = host->card->sdio_func[i];
-+		func->suspended = false;
- 		if (func && sdio_func_present(func) && func->dev.driver) {
- 			const struct dev_pm_ops *pmops = func->dev.driver->pm;
- 			err = pmops->resume(&func->dev);
-diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-index bb192f9..2665974 100644
---- a/drivers/mmc/core/sdio_irq.c
-+++ b/drivers/mmc/core/sdio_irq.c
-@@ -49,6 +49,11 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
- 					mmc_card_id(card));
- 				ret = -EINVAL;
- 			} else if (func->irq_handler) {
-+				if (func->suspended) {
-+					card->pending_interrupt = true;
-+					printk(KERN_WARNING "%s: IRQ that arrives in suspend mode"
-+						" mode\n", sdio_func_id(func));
-+				}
- 				func->irq_handler(func);
- 				count++;
- 			} else {
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 782c0ee..670c141 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -24,6 +24,7 @@
- #include <linux/leds.h>
- 
- #include <linux/mmc/host.h>
-+#include <linux/mmc/card.h>
- 
- #include "sdhci.h"
- 
-@@ -1631,7 +1632,7 @@ out:
- 
- int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
- {
--	int ret;
-+	int ret = 0;
- 
- 	sdhci_disable_card_detection(host);
- 
-@@ -1644,6 +1645,14 @@ int sdhci_suspend_host(struct sdhci_host *host, pm_message_t state)
- 	if (host->vmmc)
- 		ret = regulator_disable(host->vmmc);
- 
-+	if (host->mmc->card && host->mmc->card->pending_interrupt) {
-+		DBG("*** %s wake up event after suspend, resuming to handle it\n",
-+			mmc_hostname(host->mmc));
-+		host->mmc->card->pending_interrupt = 0;
-+		sdhci_resume_host(host);
-+		ret = -EBUSY;
-+	}
-+
- 	return ret;
- }
- 
-@@ -1659,6 +1668,9 @@ int sdhci_resume_host(struct sdhci_host *host)
- 			return ret;
- 	}
- 
-+	if (host->mmc->card && host->mmc->card->pending_interrupt)
-+		host->mmc->card->pending_interrupt = 0;
-+
- 
- 	if (host->flags & (SDHCI_USE_SDMA | SDHCI_USE_ADMA)) {
- 		if (host->ops->enable_dma)
-diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
-index 8ce0827..2252fe2 100644
---- a/include/linux/mmc/card.h
-+++ b/include/linux/mmc/card.h
-@@ -146,6 +146,8 @@ struct mmc_card {
- 	struct sdio_func_tuple	*tuples;	/* unknown common tuples */
- 
- 	struct dentry		*debugfs_root;
-+	/* external interrupt arrived after sdio function suspended */
-+	u32			pending_interrupt;
- };
- 
- #define mmc_card_mmc(c)		((c)->type == MMC_TYPE_MMC)
-diff --git a/include/linux/mmc/sdio_func.h b/include/linux/mmc/sdio_func.h
-index 31baaf8..5c1c462 100644
---- a/include/linux/mmc/sdio_func.h
-+++ b/include/linux/mmc/sdio_func.h
-@@ -59,6 +59,8 @@ struct sdio_func {
- 	const char		**info;		/* info strings */
- 
- 	struct sdio_func_tuple *tuples;
-+
-+	int			suspended; /* SDIO function driver state */
- };
- 
- #define sdio_func_present(f)	((f)->state & SDIO_STATE_PRESENT)
--- 
-1.7.0.4
+In my opinion testing for specific features also describes the difference 
+between implementations better if one reads the code later on.
+
+
+I will change the styling of the "<<"s but am wondering why checkpatch did not 
+complain, i.e. it complains for all other whitespace mistakes one can make but 
+not these.
+
+Heiko
+
+> 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  arch/arm/plat-samsung/adc.c |   29 +++++++++++++++++++++++++++++
+> >  1 files changed, 29 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+> > index ee8deef..b209d58 100644
+> > --- a/arch/arm/plat-samsung/adc.c
+> > +++ b/arch/arm/plat-samsung/adc.c
+> > @@ -45,6 +45,35 @@ enum s3c_cpu_type {
+> > 
+> >  	TYPE_ADCV3, /* S5PV210, S5PC110, EXYNOS4210 */
+> >  
+> >  };
+> > 
+> > +/*
+> > + * Resolution of the ADC - 10 or 12 bit
+> > + */
+> 
+> /* ... */
+> 
+> > +#define S3C_ADC_QUIRK_10BIT		0
+> > +#define S3C_ADC_QUIRK_12BIT		(1<<0)
+> 
+> According to coding style, should be added blank around <<.
+> 
+> > +
+> > +/*
+> > + * 12bit ADC can switch resolution between 10 bit and 12 bit
+> > + * ADCCON bit 03 for S3C2416
+> > + * ADCCON bit 16 for S3C64XX and up
+> > + */
+> > +#define S3C_ADC_QUIRK_RESSEL03		(1<<1)
+> > +#define S3C_ADC_QUIRK_RESSEL16		(1<<2)
+> 
+> Same as above.
+> 
+> > +
+> > +/*
+> > + * Input channel select can either be in
+> > + * - reg ADCCON, bit for S3C24XX and S3C64XX
+> > + * - reg base+0x18 for 2443/2416/2450
+> > + * - reg base+0x1C for S5P
+> > + */
+> > +#define S3C_ADC_QUIRK_MUXADCCON		(1<<3)
+> > +#define S3C_ADC_QUIRK_MUX18		(1<<4)
+> > +#define S3C_ADC_QUIRK_MUX1C		(1<<5)
+> 
+> Same.
+> 
+> > +
+> > +/*
+> > + * CLRINT register on S3C64xx
+> > + */
+> 
+> /* ... */
+> 
+> > +#define S3C_ADC_QUIRK_CLRINT		(1<<6)
+> 
+> Same.
+> 
+> > +
+> > 
+> >  struct s3c_adc_client {
+> >  
+> >  	struct platform_device	*pdev;
+> >  	struct list_head	 pend;
+> > 
+> > --
+> > 1.7.2.3
+> 
+> Thanks.
+> 
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
