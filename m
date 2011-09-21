@@ -1,45 +1,33 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 21 Sep 2011 21:18:39 +0800
-Subject: [PATCH v2 1/3] net/fec: change phy-reset-gpio request warning to
-	debug message
-In-Reply-To: <20110921125905.GI1966@pengutronix.de>
-References: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
-	<1316603432-20032-2-git-send-email-shawn.guo@linaro.org>
-	<20110921112555.GE1966@pengutronix.de>
-	<20110921120341.GG28907@S2100-06.ap.freescale.net>
-	<20110921121159.GG1966@pengutronix.de>
-	<20110921124423.GI28907@S2100-06.ap.freescale.net>
-	<20110921125905.GI1966@pengutronix.de>
-Message-ID: <20110921131838.GJ28907@S2100-06.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Sep 2011 14:10:52 +0100
+Subject: [PATCH] spi: Fix builderror in spi-pl022.c
+In-Reply-To: <CACRpkdbsUMCvBofKjExiB2wCbK9CwpcXr5xmShJ4SHEGAAH4Bw@mail.gmail.com>
+References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
+	<1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
+	<CACRpkdb=Bt2j4iMV5NJHmPG8wDi6__CRD6kn_KOoaQ1R6uwrWQ@mail.gmail.com>
+	<CACRpkdbsUMCvBofKjExiB2wCbK9CwpcXr5xmShJ4SHEGAAH4Bw@mail.gmail.com>
+Message-ID: <20110921131052.GG17169@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 02:59:05PM +0200, Wolfram Sang wrote:
-> > > I agree that keeping it int is way better. But why not add it now to
-> > > keep things proper and tested? If this patch gets accepted as it is and
-> > > later someone else will add error checking to the caller, your platform
-> > > will lose FEC support as a regression.
-> > > 
-> > Again, fec_reset_phy() failure is not a show-stopper.  We might not
-> > want to make the probe fail because of that.
+On Tue, Sep 20, 2011 at 10:45:41PM +0200, Linus Walleij wrote:
+> On Mon, Sep 5, 2011 at 2:45 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Sun, Aug 28, 2011 at 9:26 PM, Peter Huewe <peterhuewe@gmx.de> wrote:
+> >
+> >> This patch fixes a build error, introduced by commit (67fc8b9f, "PM: add
+> >> runtime PM support to core Primecell driver") which unfortunately was a little
+> >> bit incomplete and did contain a typo (11 instead of 22).
+> >> I'm not sure how this patch could have been tested back then, if it
+> >> doesn't even compile ;)
+> >
+> > Grant can you please apply this patch? Right now linux-next is
+> > breaking because of this missing patch...
 > 
-> That would be an argument to make the function returning void?
-> 
-Hmm, it seems to be.  Ok, will send v3 to return void.
+> Ping on this... ignore if it's been picked already.
 
-Regards,
-Shawn
+Isn't it already fixed?  I've had this in my tree for quite some time
+(since 5th September) which should also be in linux-next.
 
-> Well, I still think something like 
-> 
-> 	/* No phy reset configured */
-> 	if (phy_reset == -ENODEV)
-> 		return 0;
-> 
-> might be cleaner, yet I don't have the setup to test such an approach.
-> 
-> So, I'll be quiet now and hope for no problems.
-> 
-> -- 
-> Pengutronix e.K.                           | Wolfram Sang                |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+b21c57c ARM: 7079/1: spi: Fix builderror in spi-pl022.c
+612f2eb PM: add runtime PM support to MMCI
+67fc8b9 PM: add runtime PM support to core Primecell driver
