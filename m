@@ -1,469 +1,432 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Wed, 21 Sep 2011 11:52:00 +0200
-Subject: [PATCH 53/57] sound: irq: Remove IRQF_DISABLED
-In-Reply-To: <1316597339-29861-54-git-send-email-yong.zhang0@gmail.com>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Wed, 21 Sep 2011 17:52:31 +0800
+Subject: [PATCH 46/57] rtc: irq: Remove IRQF_DISABLED
+In-Reply-To: <1316597339-29861-47-git-send-email-yong.zhang0@gmail.com>
 References: <1316597339-29861-1-git-send-email-yong.zhang0@gmail.com>
-	<1316597339-29861-54-git-send-email-yong.zhang0@gmail.com>
-Message-ID: <s5hsjnqxlxb.wl%tiwai@suse.de>
+	<1316597339-29861-47-git-send-email-yong.zhang0@gmail.com>
+Message-ID: <CAKT61h-rkJdL+OFt7X5akbWem7MP8jtLtcVv+oRxUD9RsXcfyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Wed, 21 Sep 2011 17:28:54 +0800,
-Yong Zhang wrote:
-> 
+2011/9/21 Yong Zhang <yong.zhang0@gmail.com>:
 > Since commit [c58543c8: genirq: Run irq handlers with interrupts disabled],
-
-Hm, this id hits a different commit:
-    commit c58543c869606532c2382f027d6466f4672ea756
-    Author: David S. Miller <davem@davemloft.net>
-    Date:   Tue Oct 13 00:49:09 2009 -0700
-
-    sparc64: Set IRQF_DISABLED on LDC channel IRQs.
-
-You mean commit e58aa3d2d0cc01ad8d6f7f640a0670433f794922?
-
 > We run all interrupt handlers with interrupts disabled
 > and we even check and yell when an interrupt handler
 > returns with interrupts enabled (see commit [b738a50a:
 > genirq: Warn when handler enables interrupts]).
-> 
+>
 > So now this flag is a NOOP and can be removed.
-> 
+>
 > Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
-> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Do you want to merge by yourself or shall I take it to sound git tree?
-Since IRQF_DISABLED isn't used, it can be applied safely in 3.1-based
-tree, right?
+thanks, add Andrew in loop.
 
-Anyway, if needed, take my ack:
-	Acked-by: Takashi Iwai <tiwai@suse.de>
-
-
-thanks,
-
-Takashi
+Acked-by: Wan ZongShun <mcuos.com@gmail.com>
 
 > ---
->  include/sound/initval.h            |    2 +-
->  sound/arm/aaci.c                   |    2 +-
->  sound/arm/pxa2xx-ac97-lib.c        |    2 +-
->  sound/drivers/ml403-ac97cr.c       |    4 ++--
->  sound/drivers/mpu401/mpu401_uart.c |    2 +-
->  sound/drivers/mtpav.c              |    2 +-
->  sound/drivers/serial-u16550.c      |    2 +-
->  sound/isa/ad1816a/ad1816a_lib.c    |    2 +-
->  sound/isa/es1688/es1688_lib.c      |    2 +-
->  sound/isa/es18xx.c                 |    2 +-
->  sound/isa/gus/gus_main.c           |    2 +-
->  sound/isa/gus/gusmax.c             |    2 +-
->  sound/isa/gus/interwave.c          |    2 +-
->  sound/isa/opl3sa2.c                |    2 +-
->  sound/isa/opti9xx/opti92x-ad1848.c |    2 +-
->  sound/isa/sb/sb_common.c           |    2 +-
->  sound/isa/wavefront/wavefront.c    |    2 +-
->  sound/isa/wss/wss_lib.c            |    2 +-
->  sound/mips/au1x00.c                |    4 ++--
->  sound/pci/sis7019.c                |    4 ++--
->  sound/ppc/snd_ps3.c                |    2 +-
->  sound/soc/au1x/dma.c               |    2 +-
->  sound/soc/codecs/tlv320dac33.c     |    2 +-
->  sound/soc/nuc900/nuc900-pcm.c      |    2 +-
->  sound/soc/samsung/ac97.c           |    2 +-
->  sound/soc/sh/fsi.c                 |    2 +-
->  sound/soc/txx9/txx9aclc-ac97.c     |    2 +-
->  sound/sparc/amd7930.c              |    2 +-
->  28 files changed, 31 insertions(+), 31 deletions(-)
-> 
-> diff --git a/include/sound/initval.h b/include/sound/initval.h
-> index 1daa6df..f99a0d2 100644
-> --- a/include/sound/initval.h
-> +++ b/include/sound/initval.h
-> @@ -62,7 +62,7 @@ static int snd_legacy_find_free_irq(int *irq_table)
->  {
->  	while (*irq_table != -1) {
->  		if (!request_irq(*irq_table, snd_legacy_empty_irq_handler,
-> -				 IRQF_DISABLED | IRQF_PROBE_SHARED, "ALSA Test IRQ",
-> +				 IRQF_PROBE_SHARED, "ALSA Test IRQ",
->  				 (void *) irq_table)) {
->  			free_irq(*irq_table, (void *) irq_table);
->  			return *irq_table;
-> diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
-> index d0cead3..e518d38 100644
-> --- a/sound/arm/aaci.c
-> +++ b/sound/arm/aaci.c
-> @@ -443,7 +443,7 @@ static int aaci_pcm_open(struct snd_pcm_substream *substream)
->  	mutex_lock(&aaci->irq_lock);
->  	if (!aaci->users++) {
->  		ret = request_irq(aaci->dev->irq[0], aaci_irq,
-> -			   IRQF_SHARED | IRQF_DISABLED, DRIVER_NAME, aaci);
-> +			   IRQF_SHARED, DRIVER_NAME, aaci);
->  		if (ret != 0)
->  			aaci->users--;
->  	}
-> diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-> index 88eec38..8ad6535 100644
-> --- a/sound/arm/pxa2xx-ac97-lib.c
-> +++ b/sound/arm/pxa2xx-ac97-lib.c
-> @@ -359,7 +359,7 @@ int __devinit pxa2xx_ac97_hw_probe(struct platform_device *dev)
->  	if (ret)
->  		goto err_clk2;
->  
-> -	ret = request_irq(IRQ_AC97, pxa2xx_ac97_irq, IRQF_DISABLED, "AC97", NULL);
-> +	ret = request_irq(IRQ_AC97, pxa2xx_ac97_irq, 0, "AC97", NULL);
->  	if (ret < 0)
->  		goto err_irq;
->  
-> diff --git a/sound/drivers/ml403-ac97cr.c b/sound/drivers/ml403-ac97cr.c
-> index 5cfcb90..2c7a763 100644
-> --- a/sound/drivers/ml403-ac97cr.c
-> +++ b/sound/drivers/ml403-ac97cr.c
-> @@ -1153,7 +1153,7 @@ snd_ml403_ac97cr_create(struct snd_card *card, struct platform_device *pfdev,
->  		   "0x%x done\n", (unsigned int)ml403_ac97cr->port);
->  	/* get irq */
->  	irq = platform_get_irq(pfdev, 0);
-> -	if (request_irq(irq, snd_ml403_ac97cr_irq, IRQF_DISABLED,
-> +	if (request_irq(irq, snd_ml403_ac97cr_irq, 0,
->  			dev_name(&pfdev->dev), (void *)ml403_ac97cr)) {
->  		snd_printk(KERN_ERR SND_ML403_AC97CR_DRIVER ": "
->  			   "unable to grab IRQ %d\n",
-> @@ -1166,7 +1166,7 @@ snd_ml403_ac97cr_create(struct snd_card *card, struct platform_device *pfdev,
->  		   "request (playback) irq %d done\n",
->  		   ml403_ac97cr->irq);
->  	irq = platform_get_irq(pfdev, 1);
-> -	if (request_irq(irq, snd_ml403_ac97cr_irq, IRQF_DISABLED,
-> +	if (request_irq(irq, snd_ml403_ac97cr_irq, 0,
->  			dev_name(&pfdev->dev), (void *)ml403_ac97cr)) {
->  		snd_printk(KERN_ERR SND_ML403_AC97CR_DRIVER ": "
->  			   "unable to grab IRQ %d\n",
-> diff --git a/sound/drivers/mpu401/mpu401_uart.c b/sound/drivers/mpu401/mpu401_uart.c
-> index 34df505..1cff331 100644
-> --- a/sound/drivers/mpu401/mpu401_uart.c
-> +++ b/sound/drivers/mpu401/mpu401_uart.c
-> @@ -578,7 +578,7 @@ int snd_mpu401_uart_new(struct snd_card *card, int device,
->  	else
->  		mpu->cport = port + 1;
->  	if (irq >= 0) {
-> -		if (request_irq(irq, snd_mpu401_uart_interrupt, IRQF_DISABLED,
-> +		if (request_irq(irq, snd_mpu401_uart_interrupt, 0,
->  				"MPU401 UART", (void *) mpu)) {
->  			snd_printk(KERN_ERR "mpu401_uart: "
->  				   "unable to grab IRQ %d\n", irq);
-> diff --git a/sound/drivers/mtpav.c b/sound/drivers/mtpav.c
-> index f50021c..7693079 100644
-> --- a/sound/drivers/mtpav.c
-> +++ b/sound/drivers/mtpav.c
-> @@ -590,7 +590,7 @@ static int __devinit snd_mtpav_get_ISA(struct mtpav * mcard)
->  		return -EBUSY;
->  	}
->  	mcard->port = port;
-> -	if (request_irq(irq, snd_mtpav_irqh, IRQF_DISABLED, "MOTU MTPAV", mcard)) {
-> +	if (request_irq(irq, snd_mtpav_irqh, 0, "MOTU MTPAV", mcard)) {
->  		snd_printk(KERN_ERR "MTVAP IRQ %d busy\n", irq);
->  		return -EBUSY;
->  	}
-> diff --git a/sound/drivers/serial-u16550.c b/sound/drivers/serial-u16550.c
-> index 6c5bf58..85aad43 100644
-> --- a/sound/drivers/serial-u16550.c
-> +++ b/sound/drivers/serial-u16550.c
-> @@ -816,7 +816,7 @@ static int __devinit snd_uart16550_create(struct snd_card *card,
->  
->  	if (irq >= 0 && irq != SNDRV_AUTO_IRQ) {
->  		if (request_irq(irq, snd_uart16550_interrupt,
-> -				IRQF_DISABLED, "Serial MIDI", uart)) {
-> +				0, "Serial MIDI", uart)) {
->  			snd_printk(KERN_WARNING
->  				   "irq %d busy. Using Polling.\n", irq);
->  		} else {
-> diff --git a/sound/isa/ad1816a/ad1816a_lib.c b/sound/isa/ad1816a/ad1816a_lib.c
-> index 05aef8b..177eed3 100644
-> --- a/sound/isa/ad1816a/ad1816a_lib.c
-> +++ b/sound/isa/ad1816a/ad1816a_lib.c
-> @@ -595,7 +595,7 @@ int __devinit snd_ad1816a_create(struct snd_card *card,
->  		snd_ad1816a_free(chip);
->  		return -EBUSY;
->  	}
-> -	if (request_irq(irq, snd_ad1816a_interrupt, IRQF_DISABLED, "AD1816A", (void *) chip)) {
-> +	if (request_irq(irq, snd_ad1816a_interrupt, 0, "AD1816A", (void *) chip)) {
->  		snd_printk(KERN_ERR "ad1816a: can't grab IRQ %d\n", irq);
->  		snd_ad1816a_free(chip);
->  		return -EBUSY;
-> diff --git a/sound/isa/es1688/es1688_lib.c b/sound/isa/es1688/es1688_lib.c
-> index 0767620..d3eab6f 100644
-> --- a/sound/isa/es1688/es1688_lib.c
-> +++ b/sound/isa/es1688/es1688_lib.c
-> @@ -661,7 +661,7 @@ int snd_es1688_create(struct snd_card *card,
->  		snd_printk(KERN_ERR "es1688: can't grab port 0x%lx\n", port + 4);
->  		return -EBUSY;
->  	}
-> -	if (request_irq(irq, snd_es1688_interrupt, IRQF_DISABLED, "ES1688", (void *) chip)) {
-> +	if (request_irq(irq, snd_es1688_interrupt, 0, "ES1688", (void *) chip)) {
->  		snd_printk(KERN_ERR "es1688: can't grab IRQ %d\n", irq);
->  		return -EBUSY;
->  	}
-> diff --git a/sound/isa/es18xx.c b/sound/isa/es18xx.c
-> index aeee8f8..bf6ad0b 100644
-> --- a/sound/isa/es18xx.c
-> +++ b/sound/isa/es18xx.c
-> @@ -1805,7 +1805,7 @@ static int __devinit snd_es18xx_new_device(struct snd_card *card,
->  		return -EBUSY;
->  	}
->  
-> -	if (request_irq(irq, snd_es18xx_interrupt, IRQF_DISABLED, "ES18xx",
-> +	if (request_irq(irq, snd_es18xx_interrupt, 0, "ES18xx",
->  			(void *) card)) {
->  		snd_es18xx_free(card);
->  		snd_printk(KERN_ERR PFX "unable to grap IRQ %d\n", irq);
-> diff --git a/sound/isa/gus/gus_main.c b/sound/isa/gus/gus_main.c
-> index 12eb98f..3167e5a 100644
-> --- a/sound/isa/gus/gus_main.c
-> +++ b/sound/isa/gus/gus_main.c
-> @@ -180,7 +180,7 @@ int snd_gus_create(struct snd_card *card,
->  		snd_gus_free(gus);
->  		return -EBUSY;
->  	}
-> -	if (irq >= 0 && request_irq(irq, snd_gus_interrupt, IRQF_DISABLED, "GUS GF1", (void *) gus)) {
-> +	if (irq >= 0 && request_irq(irq, snd_gus_interrupt, 0, "GUS GF1", (void *) gus)) {
->  		snd_printk(KERN_ERR "gus: can't grab irq %d\n", irq);
->  		snd_gus_free(gus);
->  		return -EBUSY;
-> diff --git a/sound/isa/gus/gusmax.c b/sound/isa/gus/gusmax.c
-> index 3e4a58b..c43faa0 100644
-> --- a/sound/isa/gus/gusmax.c
-> +++ b/sound/isa/gus/gusmax.c
-> @@ -291,7 +291,7 @@ static int __devinit snd_gusmax_probe(struct device *pdev, unsigned int dev)
->  		goto _err;
->  	}
->  
-> -	if (request_irq(xirq, snd_gusmax_interrupt, IRQF_DISABLED, "GUS MAX", (void *)maxcard)) {
-> +	if (request_irq(xirq, snd_gusmax_interrupt, 0, "GUS MAX", (void *)maxcard)) {
->  		snd_printk(KERN_ERR PFX "unable to grab IRQ %d\n", xirq);
->  		err = -EBUSY;
->  		goto _err;
-> diff --git a/sound/isa/gus/interwave.c b/sound/isa/gus/interwave.c
-> index c7b80e4..5f869a3 100644
-> --- a/sound/isa/gus/interwave.c
-> +++ b/sound/isa/gus/interwave.c
-> @@ -684,7 +684,7 @@ static int __devinit snd_interwave_probe(struct snd_card *card, int dev)
->  	if ((err = snd_gus_initialize(gus)) < 0)
->  		return err;
->  
-> -	if (request_irq(xirq, snd_interwave_interrupt, IRQF_DISABLED,
-> +	if (request_irq(xirq, snd_interwave_interrupt, 0,
->  			"InterWave", iwcard)) {
->  		snd_printk(KERN_ERR PFX "unable to grab IRQ %d\n", xirq);
->  		return -EBUSY;
-> diff --git a/sound/isa/opl3sa2.c b/sound/isa/opl3sa2.c
-> index de99f47..bbafb0b 100644
-> --- a/sound/isa/opl3sa2.c
-> +++ b/sound/isa/opl3sa2.c
-> @@ -667,7 +667,7 @@ static int __devinit snd_opl3sa2_probe(struct snd_card *card, int dev)
->  	err = snd_opl3sa2_detect(card);
->  	if (err < 0)
->  		return err;
-> -	err = request_irq(xirq, snd_opl3sa2_interrupt, IRQF_DISABLED,
-> +	err = request_irq(xirq, snd_opl3sa2_interrupt, 0,
->  			  "OPL3-SA2", card);
->  	if (err) {
->  		snd_printk(KERN_ERR PFX "can't grab IRQ %d\n", xirq);
-> diff --git a/sound/isa/opti9xx/opti92x-ad1848.c b/sound/isa/opti9xx/opti92x-ad1848.c
-> index 346e12b..6dbbfa7 100644
-> --- a/sound/isa/opti9xx/opti92x-ad1848.c
-> +++ b/sound/isa/opti9xx/opti92x-ad1848.c
-> @@ -892,7 +892,7 @@ static int __devinit snd_opti9xx_probe(struct snd_card *card)
->  #endif
->  #ifdef OPTi93X
->  	error = request_irq(irq, snd_opti93x_interrupt,
-> -			    IRQF_DISABLED, DEV_NAME" - WSS", chip);
-> +			    0, DEV_NAME" - WSS", chip);
->  	if (error < 0) {
->  		snd_printk(KERN_ERR "opti9xx: can't grab IRQ %d\n", irq);
->  		return error;
-> diff --git a/sound/isa/sb/sb_common.c b/sound/isa/sb/sb_common.c
-> index eae6c1c..d2e1921 100644
-> --- a/sound/isa/sb/sb_common.c
-> +++ b/sound/isa/sb/sb_common.c
-> @@ -240,7 +240,7 @@ int snd_sbdsp_create(struct snd_card *card,
->  	if (request_irq(irq, irq_handler,
->  			(hardware == SB_HW_ALS4000 ||
->  			 hardware == SB_HW_CS5530) ?
-> -			IRQF_SHARED : IRQF_DISABLED,
-> +			IRQF_SHARED : 0,
->  			"SoundBlaster", (void *) chip)) {
->  		snd_printk(KERN_ERR "sb: can't grab irq %d\n", irq);
->  		snd_sbdsp_free(chip);
-> diff --git a/sound/isa/wavefront/wavefront.c b/sound/isa/wavefront/wavefront.c
-> index 83f291d..8714297 100644
-> --- a/sound/isa/wavefront/wavefront.c
-> +++ b/sound/isa/wavefront/wavefront.c
-> @@ -418,7 +418,7 @@ snd_wavefront_probe (struct snd_card *card, int dev)
->  		return -EBUSY;
->  	}
->  	if (request_irq(ics2115_irq[dev], snd_wavefront_ics2115_interrupt,
-> -			IRQF_DISABLED, "ICS2115", acard)) {
-> +			0, "ICS2115", acard)) {
->  		snd_printk(KERN_ERR "unable to use ICS2115 IRQ %d\n", ics2115_irq[dev]);
->  		return -EBUSY;
->  	}
-> diff --git a/sound/isa/wss/wss_lib.c b/sound/isa/wss/wss_lib.c
-> index 2a42cc3..7277c5b 100644
-> --- a/sound/isa/wss/wss_lib.c
-> +++ b/sound/isa/wss/wss_lib.c
-> @@ -1833,7 +1833,7 @@ int snd_wss_create(struct snd_card *card,
->  	}
->  	chip->cport = cport;
->  	if (!(hwshare & WSS_HWSHARE_IRQ))
-> -		if (request_irq(irq, snd_wss_interrupt, IRQF_DISABLED,
-> +		if (request_irq(irq, snd_wss_interrupt, 0,
->  				"WSS", (void *) chip)) {
->  			snd_printk(KERN_ERR "wss: can't grab IRQ %d\n", irq);
->  			snd_wss_free(chip);
-> diff --git a/sound/mips/au1x00.c b/sound/mips/au1x00.c
-> index 446cf97..7567ebd 100644
-> --- a/sound/mips/au1x00.c
-> +++ b/sound/mips/au1x00.c
-> @@ -465,13 +465,13 @@ snd_au1000_pcm_new(struct snd_au1000 *au1000)
->  
->  	flags = claim_dma_lock();
->  	if ((au1000->stream[PLAYBACK]->dma = request_au1000_dma(DMA_ID_AC97C_TX,
-> -			"AC97 TX", au1000_dma_interrupt, IRQF_DISABLED,
-> +			"AC97 TX", au1000_dma_interrupt, 0,
->  			au1000->stream[PLAYBACK])) < 0) {
->  		release_dma_lock(flags);
->  		return -EBUSY;
->  	}
->  	if ((au1000->stream[CAPTURE]->dma = request_au1000_dma(DMA_ID_AC97C_RX,
-> -			"AC97 RX", au1000_dma_interrupt, IRQF_DISABLED,
-> +			"AC97 RX", au1000_dma_interrupt, 0,
->  			au1000->stream[CAPTURE])) < 0){
->  		release_dma_lock(flags);
->  		return -EBUSY;
-> diff --git a/sound/pci/sis7019.c b/sound/pci/sis7019.c
-> index bcf6152..5ffb20b 100644
-> --- a/sound/pci/sis7019.c
-> +++ b/sound/pci/sis7019.c
-> @@ -1234,7 +1234,7 @@ static int sis_resume(struct pci_dev *pci)
->  		goto error;
->  	}
->  
-> -	if (request_irq(pci->irq, sis_interrupt, IRQF_DISABLED|IRQF_SHARED,
-> +	if (request_irq(pci->irq, sis_interrupt, IRQF_SHARED,
->  			KBUILD_MODNAME, sis)) {
->  		printk(KERN_ERR "sis7019: unable to regain IRQ %d\n", pci->irq);
->  		goto error;
-> @@ -1340,7 +1340,7 @@ static int __devinit sis_chip_create(struct snd_card *card,
->  	if (rc)
->  		goto error_out_cleanup;
->  
-> -	if (request_irq(pci->irq, sis_interrupt, IRQF_DISABLED|IRQF_SHARED,
-> +	if (request_irq(pci->irq, sis_interrupt, IRQF_SHARED,
->  			KBUILD_MODNAME, sis)) {
->  		printk(KERN_ERR "unable to allocate irq %d\n", sis->irq);
->  		goto error_out_cleanup;
-> diff --git a/sound/ppc/snd_ps3.c b/sound/ppc/snd_ps3.c
-> index bc823a5..775bd95 100644
-> --- a/sound/ppc/snd_ps3.c
-> +++ b/sound/ppc/snd_ps3.c
-> @@ -845,7 +845,7 @@ static int __devinit snd_ps3_allocate_irq(void)
->  		return ret;
->  	}
->  
-> -	ret = request_irq(the_card.irq_no, snd_ps3_interrupt, IRQF_DISABLED,
-> +	ret = request_irq(the_card.irq_no, snd_ps3_interrupt, 0,
->  			  SND_PS3_DRIVER_NAME, &the_card);
->  	if (ret) {
->  		pr_info("%s: request_irq failed (%d)\n", __func__, ret);
-> diff --git a/sound/soc/au1x/dma.c b/sound/soc/au1x/dma.c
-> index 7aa5b76..177f713 100644
-> --- a/sound/soc/au1x/dma.c
-> +++ b/sound/soc/au1x/dma.c
-> @@ -211,7 +211,7 @@ static int alchemy_pcm_open(struct snd_pcm_substream *substream)
->  	/* DMA setup */
->  	name = (s == SNDRV_PCM_STREAM_PLAYBACK) ? "audio-tx" : "audio-rx";
->  	ctx->stream[s].dma = request_au1000_dma(dmaids[s], name,
-> -					au1000_dma_interrupt, IRQF_DISABLED,
-> +					au1000_dma_interrupt, 0,
->  					&ctx->stream[s]);
->  	set_dma_mode(ctx->stream[s].dma,
->  		     get_dma_mode(ctx->stream[s].dma) & ~DMA_NC);
-> diff --git a/sound/soc/codecs/tlv320dac33.c b/sound/soc/codecs/tlv320dac33.c
-> index faa5e9f..243d177 100644
-> --- a/sound/soc/codecs/tlv320dac33.c
-> +++ b/sound/soc/codecs/tlv320dac33.c
-> @@ -1431,7 +1431,7 @@ static int dac33_soc_probe(struct snd_soc_codec *codec)
->  	/* Check if the IRQ number is valid and request it */
->  	if (dac33->irq >= 0) {
->  		ret = request_irq(dac33->irq, dac33_interrupt_handler,
-> -				  IRQF_TRIGGER_RISING | IRQF_DISABLED,
-> +				  IRQF_TRIGGER_RISING,
->  				  codec->name, codec);
->  		if (ret < 0) {
->  			dev_err(codec->dev, "Could not request IRQ%d (%d)\n",
-> diff --git a/sound/soc/nuc900/nuc900-pcm.c b/sound/soc/nuc900/nuc900-pcm.c
-> index e46d551..865b288 100644
-> --- a/sound/soc/nuc900/nuc900-pcm.c
-> +++ b/sound/soc/nuc900/nuc900-pcm.c
-> @@ -268,7 +268,7 @@ static int nuc900_dma_open(struct snd_pcm_substream *substream)
->  	nuc900_audio = nuc900_ac97_data;
->  
->  	if (request_irq(nuc900_audio->irq_num, nuc900_dma_interrupt,
-> -			IRQF_DISABLED, "nuc900-dma", substream))
-> +			0, "nuc900-dma", substream))
->  		return -EBUSY;
->  
->  	runtime->private_data = nuc900_audio;
-> diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
-> index b4f9b00..41b387b 100644
-> --- a/sound/soc/samsung/ac97.c
-> +++ b/sound/soc/samsung/ac97.c
-> @@ -450,7 +450,7 @@ static __devinit int s3c_ac97_probe(struct platform_device *pdev)
->  	}
->  
->  	ret = request_irq(irq_res->start, s3c_ac97_irq,
-> -					IRQF_DISABLED, "AC97", NULL);
-> +					0, "AC97", NULL);
->  	if (ret < 0) {
->  		dev_err(&pdev->dev, "ac97: interrupt request failed.\n");
->  		goto err4;
-> diff --git a/sound/soc/sh/fsi.c b/sound/soc/sh/fsi.c
-> index 8e112cc..1493ebf 100644
-> --- a/sound/soc/sh/fsi.c
-> +++ b/sound/soc/sh/fsi.c
-> @@ -1285,7 +1285,7 @@ static int fsi_probe(struct platform_device *pdev)
->  	pm_runtime_enable(&pdev->dev);
->  	dev_set_drvdata(&pdev->dev, master);
->  
-> -	ret = request_irq(irq, &fsi_interrupt, IRQF_DISABLED,
-> +	ret = request_irq(irq, &fsi_interrupt, 0,
->  			  id_entry->name, master);
->  	if (ret) {
->  		dev_err(&pdev->dev, "irq request err\n");
-> diff --git a/sound/soc/txx9/txx9aclc-ac97.c b/sound/soc/txx9/txx9aclc-ac97.c
-> index 743d07b..a4e3f55 100644
-> --- a/sound/soc/txx9/txx9aclc-ac97.c
-> +++ b/sound/soc/txx9/txx9aclc-ac97.c
-> @@ -201,7 +201,7 @@ static int __devinit txx9aclc_ac97_dev_probe(struct platform_device *pdev)
->  	if (!drvdata->base)
->  		return -EBUSY;
->  	err = devm_request_irq(&pdev->dev, irq, txx9aclc_ac97_irq,
-> -			       IRQF_DISABLED, dev_name(&pdev->dev), drvdata);
-> +			       0, dev_name(&pdev->dev), drvdata);
->  	if (err < 0)
->  		return err;
->  
-> diff --git a/sound/sparc/amd7930.c b/sound/sparc/amd7930.c
-> index ad7d4d7..f036776 100644
-> --- a/sound/sparc/amd7930.c
-> +++ b/sound/sparc/amd7930.c
-> @@ -962,7 +962,7 @@ static int __devinit snd_amd7930_create(struct snd_card *card,
->  	amd7930_idle(amd);
->  
->  	if (request_irq(irq, snd_amd7930_interrupt,
-> -			IRQF_DISABLED | IRQF_SHARED, "amd7930", amd)) {
-> +			IRQF_SHARED, "amd7930", amd)) {
->  		snd_printk(KERN_ERR "amd7930-%d: Unable to grab IRQ %d\n",
->  			   dev, irq);
->  		snd_amd7930_free(amd);
-> -- 
+> ?drivers/rtc/rtc-at91sam9.c ?| ? ?2 +-
+> ?drivers/rtc/rtc-cmos.c ? ? ?| ? ?2 +-
+> ?drivers/rtc/rtc-coh901331.c | ? ?2 +-
+> ?drivers/rtc/rtc-davinci.c ? | ? ?2 +-
+> ?drivers/rtc/rtc-ds1511.c ? ?| ? ?2 +-
+> ?drivers/rtc/rtc-ds1553.c ? ?| ? ?2 +-
+> ?drivers/rtc/rtc-lpc32xx.c ? | ? ?2 +-
+> ?drivers/rtc/rtc-mpc5121.c ? | ? ?4 ++--
+> ?drivers/rtc/rtc-mrst.c ? ? ?| ? ?2 +-
+> ?drivers/rtc/rtc-mv.c ? ? ? ?| ? ?2 +-
+> ?drivers/rtc/rtc-nuc900.c ? ?| ? ?2 +-
+> ?drivers/rtc/rtc-omap.c ? ? ?| ? ?4 ++--
+> ?drivers/rtc/rtc-pl030.c ? ? | ? ?2 +-
+> ?drivers/rtc/rtc-pl031.c ? ? | ? ?2 +-
+> ?drivers/rtc/rtc-puv3.c ? ? ?| ? ?4 ++--
+> ?drivers/rtc/rtc-pxa.c ? ? ? | ? ?4 ++--
+> ?drivers/rtc/rtc-s3c.c ? ? ? | ? ?4 ++--
+> ?drivers/rtc/rtc-sa1100.c ? ?| ? ?4 ++--
+> ?drivers/rtc/rtc-sh.c ? ? ? ?| ? ?8 ++++----
+> ?drivers/rtc/rtc-stk17ta8.c ?| ? ?2 +-
+> ?drivers/rtc/rtc-tx4939.c ? ?| ? ?2 +-
+> ?drivers/rtc/rtc-vr41xx.c ? ?| ? ?4 ++--
+> ?22 files changed, 32 insertions(+), 32 deletions(-)
+>
+> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
+> index a3ad957..0c09e8f 100644
+> --- a/drivers/rtc/rtc-at91sam9.c
+> +++ b/drivers/rtc/rtc-at91sam9.c
+> @@ -331,7 +331,7 @@ static int __init at91_rtc_probe(struct platform_device *pdev)
+>
+> ? ? ? ?/* register irq handler after we know what name we'll use */
+> ? ? ? ?ret = request_irq(AT91_ID_SYS, at91_rtc_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED | IRQF_SHARED,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_SHARED,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dev_name(&rtc->rtcdev->dev), rtc);
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?dev_dbg(&pdev->dev, "can't share IRQ %d?\n", AT91_ID_SYS);
+> diff --git a/drivers/rtc/rtc-cmos.c b/drivers/rtc/rtc-cmos.c
+> index 05beb6c..66d3b14 100644
+> --- a/drivers/rtc/rtc-cmos.c
+> +++ b/drivers/rtc/rtc-cmos.c
+> @@ -714,7 +714,7 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
+> ? ? ? ? ? ? ? ? ? ? ? ?rtc_cmos_int_handler = cmos_interrupt;
+>
+> ? ? ? ? ? ? ? ?retval = request_irq(rtc_irq, rtc_cmos_int_handler,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, dev_name(&cmos_rtc.rtc->dev),
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, dev_name(&cmos_rtc.rtc->dev),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?cmos_rtc.rtc);
+> ? ? ? ? ? ? ? ?if (retval < 0) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(dev, "IRQ %d is already in use\n", rtc_irq);
+> diff --git a/drivers/rtc/rtc-coh901331.c b/drivers/rtc/rtc-coh901331.c
+> index 80f9c88..a5b8a0c 100644
+> --- a/drivers/rtc/rtc-coh901331.c
+> +++ b/drivers/rtc/rtc-coh901331.c
+> @@ -199,7 +199,7 @@ static int __init coh901331_probe(struct platform_device *pdev)
+> ? ? ? ?}
+>
+> ? ? ? ?rtap->irq = platform_get_irq(pdev, 0);
+> - ? ? ? if (request_irq(rtap->irq, coh901331_interrupt, IRQF_DISABLED,
+> + ? ? ? if (request_irq(rtap->irq, coh901331_interrupt, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ?"RTC COH 901 331 Alarm", rtap)) {
+> ? ? ? ? ? ? ? ?ret = -EIO;
+> ? ? ? ? ? ? ? ?goto out_no_irq;
+> diff --git a/drivers/rtc/rtc-davinci.c b/drivers/rtc/rtc-davinci.c
+> index 755e1fe..14c2109 100644
+> --- a/drivers/rtc/rtc-davinci.c
+> +++ b/drivers/rtc/rtc-davinci.c
+> @@ -542,7 +542,7 @@ static int __init davinci_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?rtcss_write(davinci_rtc, 0, PRTCSS_RTC_CCTRL);
+>
+> ? ? ? ?ret = request_irq(davinci_rtc->irq, davinci_rtc_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "davinci_rtc", davinci_rtc);
+> + ? ? ? ? ? ? ? ? ? ? ? ? 0, "davinci_rtc", davinci_rtc);
+> ? ? ? ?if (ret < 0) {
+> ? ? ? ? ? ? ? ?dev_err(dev, "unable to register davinci RTC interrupt\n");
+> ? ? ? ? ? ? ? ?goto fail4;
+> diff --git a/drivers/rtc/rtc-ds1511.c b/drivers/rtc/rtc-ds1511.c
+> index 586c244..bbc7c86 100644
+> --- a/drivers/rtc/rtc-ds1511.c
+> +++ b/drivers/rtc/rtc-ds1511.c
+> @@ -532,7 +532,7 @@ ds1511_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?if (pdata->irq > 0) {
+> ? ? ? ? ? ? ? ?rtc_read(RTC_CMD1);
+> ? ? ? ? ? ? ? ?if (devm_request_irq(&pdev->dev, pdata->irq, ds1511_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED | IRQF_SHARED, pdev->name, pdev) < 0) {
+> + ? ? ? ? ? ? ? ? ? ? ? IRQF_SHARED, pdev->name, pdev) < 0) {
+>
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_warn(&pdev->dev, "interrupt not available.\n");
+> ? ? ? ? ? ? ? ? ? ? ? ?pdata->irq = 0;
+> diff --git a/drivers/rtc/rtc-ds1553.c b/drivers/rtc/rtc-ds1553.c
+> index 1350029..1ef2718 100644
+> --- a/drivers/rtc/rtc-ds1553.c
+> +++ b/drivers/rtc/rtc-ds1553.c
+> @@ -320,7 +320,7 @@ static int __devinit ds1553_rtc_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?writeb(0, ioaddr + RTC_INTERRUPTS);
+> ? ? ? ? ? ? ? ?if (devm_request_irq(&pdev->dev, pdata->irq,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?ds1553_rtc_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, pdev->name, pdev) < 0) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, pdev->name, pdev) < 0) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_warn(&pdev->dev, "interrupt not available.\n");
+> ? ? ? ? ? ? ? ? ? ? ? ?pdata->irq = 0;
+> ? ? ? ? ? ? ? ?}
+> diff --git a/drivers/rtc/rtc-lpc32xx.c b/drivers/rtc/rtc-lpc32xx.c
+> index ae16250..ba11a19 100644
+> --- a/drivers/rtc/rtc-lpc32xx.c
+> +++ b/drivers/rtc/rtc-lpc32xx.c
+> @@ -287,7 +287,7 @@ static int __devinit lpc32xx_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?if (rtc->irq >= 0) {
+> ? ? ? ? ? ? ? ?if (devm_request_irq(&pdev->dev, rtc->irq,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? lpc32xx_rtc_alarm_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?IRQF_DISABLED, pdev->name, rtc) < 0) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?0, pdev->name, rtc) < 0) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_warn(&pdev->dev, "Can't request interrupt.\n");
+> ? ? ? ? ? ? ? ? ? ? ? ?rtc->irq = -1;
+> ? ? ? ? ? ? ? ?} else {
+> diff --git a/drivers/rtc/rtc-mpc5121.c b/drivers/rtc/rtc-mpc5121.c
+> index da60915..3a683fd 100644
+> --- a/drivers/rtc/rtc-mpc5121.c
+> +++ b/drivers/rtc/rtc-mpc5121.c
+> @@ -327,7 +327,7 @@ static int __devinit mpc5121_rtc_probe(struct platform_device *op)
+> ? ? ? ?dev_set_drvdata(&op->dev, rtc);
+>
+> ? ? ? ?rtc->irq = irq_of_parse_and_map(op->dev.of_node, 1);
+> - ? ? ? err = request_irq(rtc->irq, mpc5121_rtc_handler, IRQF_DISABLED,
+> + ? ? ? err = request_irq(rtc->irq, mpc5121_rtc_handler, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"mpc5121-rtc", &op->dev);
+> ? ? ? ?if (err) {
+> ? ? ? ? ? ? ? ?dev_err(&op->dev, "%s: could not request irq: %i\n",
+> @@ -337,7 +337,7 @@ static int __devinit mpc5121_rtc_probe(struct platform_device *op)
+>
+> ? ? ? ?rtc->irq_periodic = irq_of_parse_and_map(op->dev.of_node, 0);
+> ? ? ? ?err = request_irq(rtc->irq_periodic, mpc5121_rtc_handler_upd,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "mpc5121-rtc_upd", &op->dev);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, "mpc5121-rtc_upd", &op->dev);
+> ? ? ? ?if (err) {
+> ? ? ? ? ? ? ? ?dev_err(&op->dev, "%s: could not request irq: %i\n",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, rtc->irq_periodic);
+> diff --git a/drivers/rtc/rtc-mrst.c b/drivers/rtc/rtc-mrst.c
+> index d335448..507f00e 100644
+> --- a/drivers/rtc/rtc-mrst.c
+> +++ b/drivers/rtc/rtc-mrst.c
+> @@ -363,7 +363,7 @@ vrtc_mrst_do_probe(struct device *dev, struct resource *iomem, int rtc_irq)
+>
+> ? ? ? ?if (rtc_irq) {
+> ? ? ? ? ? ? ? ?retval = request_irq(rtc_irq, mrst_rtc_irq,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, dev_name(&mrst_rtc.rtc->dev),
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, dev_name(&mrst_rtc.rtc->dev),
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?mrst_rtc.rtc);
+> ? ? ? ? ? ? ? ?if (retval < 0) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_dbg(dev, "IRQ %d is already in use, err %d\n",
+> diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+> index 768e2ed..1300962 100644
+> --- a/drivers/rtc/rtc-mv.c
+> +++ b/drivers/rtc/rtc-mv.c
+> @@ -273,7 +273,7 @@ static int __devinit mv_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?if (pdata->irq >= 0) {
+> ? ? ? ? ? ? ? ?writel(0, pdata->ioaddr + RTC_ALARM_INTERRUPT_MASK_REG_OFFS);
+> ? ? ? ? ? ? ? ?if (devm_request_irq(&pdev->dev, pdata->irq, mv_rtc_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?IRQF_DISABLED | IRQF_SHARED,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?IRQF_SHARED,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? pdev->name, pdata) < 0) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_warn(&pdev->dev, "interrupt not available.\n");
+> ? ? ? ? ? ? ? ? ? ? ? ?pdata->irq = -1;
+> diff --git a/drivers/rtc/rtc-nuc900.c b/drivers/rtc/rtc-nuc900.c
+> index 781068d..b790109 100644
+> --- a/drivers/rtc/rtc-nuc900.c
+> +++ b/drivers/rtc/rtc-nuc900.c
+> @@ -269,7 +269,7 @@ static int __devinit nuc900_rtc_probe(struct platform_device *pdev)
+>
+> ? ? ? ?nuc900_rtc->irq_num = platform_get_irq(pdev, 0);
+> ? ? ? ?if (request_irq(nuc900_rtc->irq_num, nuc900_rtc_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "nuc900rtc", nuc900_rtc)) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, "nuc900rtc", nuc900_rtc)) {
+> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "NUC900 RTC request irq failed\n");
+> ? ? ? ? ? ? ? ?err = -EBUSY;
+> ? ? ? ? ? ? ? ?goto fail4;
+> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> index 7789002..0b614e3 100644
+> --- a/drivers/rtc/rtc-omap.c
+> +++ b/drivers/rtc/rtc-omap.c
+> @@ -348,14 +348,14 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?rtc_write(OMAP_RTC_STATUS_ALARM, OMAP_RTC_STATUS_REG);
+>
+> ? ? ? ?/* handle periodic and alarm irqs */
+> - ? ? ? if (request_irq(omap_rtc_timer, rtc_irq, IRQF_DISABLED,
+> + ? ? ? if (request_irq(omap_rtc_timer, rtc_irq, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_name(&rtc->dev), rtc)) {
+> ? ? ? ? ? ? ? ?pr_debug("%s: RTC timer interrupt IRQ%d already claimed\n",
+> ? ? ? ? ? ? ? ? ? ? ? ?pdev->name, omap_rtc_timer);
+> ? ? ? ? ? ? ? ?goto fail1;
+> ? ? ? ?}
+> ? ? ? ?if ((omap_rtc_timer != omap_rtc_alarm) &&
+> - ? ? ? ? ? ? ? (request_irq(omap_rtc_alarm, rtc_irq, IRQF_DISABLED,
+> + ? ? ? ? ? ? ? (request_irq(omap_rtc_alarm, rtc_irq, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_name(&rtc->dev), rtc))) {
+> ? ? ? ? ? ? ? ?pr_debug("%s: RTC alarm interrupt IRQ%d already claimed\n",
+> ? ? ? ? ? ? ? ? ? ? ? ?pdev->name, omap_rtc_alarm);
+> diff --git a/drivers/rtc/rtc-pl030.c b/drivers/rtc/rtc-pl030.c
+> index 1d28d44..c5afd6f 100644
+> --- a/drivers/rtc/rtc-pl030.c
+> +++ b/drivers/rtc/rtc-pl030.c
+> @@ -123,7 +123,7 @@ static int pl030_probe(struct amba_device *dev, const struct amba_id *id)
+>
+> ? ? ? ?amba_set_drvdata(dev, rtc);
+>
+> - ? ? ? ret = request_irq(dev->irq[0], pl030_interrupt, IRQF_DISABLED,
+> + ? ? ? ret = request_irq(dev->irq[0], pl030_interrupt, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ?"rtc-pl030", rtc);
+> ? ? ? ?if (ret)
+> ? ? ? ? ? ? ? ?goto err_irq;
+> diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
+> index ff1b84b..d2df59d 100644
+> --- a/drivers/rtc/rtc-pl031.c
+> +++ b/drivers/rtc/rtc-pl031.c
+> @@ -352,7 +352,7 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+> ? ? ? ?}
+>
+> ? ? ? ?if (request_irq(adev->irq[0], pl031_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "rtc-pl031", ldata)) {
+> + ? ? ? ? ? ? ? ? ? ? ? 0, "rtc-pl031", ldata)) {
+> ? ? ? ? ? ? ? ?ret = -EIO;
+> ? ? ? ? ? ? ? ?goto out_no_irq;
+> ? ? ? ?}
+> diff --git a/drivers/rtc/rtc-puv3.c b/drivers/rtc/rtc-puv3.c
+> index b3eba3c..378fe4b 100644
+> --- a/drivers/rtc/rtc-puv3.c
+> +++ b/drivers/rtc/rtc-puv3.c
+> @@ -164,7 +164,7 @@ static int puv3_rtc_open(struct device *dev)
+> ? ? ? ?int ret;
+>
+> ? ? ? ?ret = request_irq(puv3_rtc_alarmno, puv3_rtc_alarmirq,
+> - ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, ?"pkunity-rtc alarm", rtc_dev);
+> + ? ? ? ? ? ? ? ? ? ? ? ? 0, ?"pkunity-rtc alarm", rtc_dev);
+>
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?dev_err(dev, "IRQ%d error %d\n", puv3_rtc_alarmno, ret);
+> @@ -172,7 +172,7 @@ static int puv3_rtc_open(struct device *dev)
+> ? ? ? ?}
+>
+> ? ? ? ?ret = request_irq(puv3_rtc_tickno, puv3_rtc_tickirq,
+> - ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, ?"pkunity-rtc tick", rtc_dev);
+> + ? ? ? ? ? ? ? ? ? ? ? ? 0, ?"pkunity-rtc tick", rtc_dev);
+>
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?dev_err(dev, "IRQ%d error %d\n", puv3_rtc_tickno, ret);
+> diff --git a/drivers/rtc/rtc-pxa.c b/drivers/rtc/rtc-pxa.c
+> index fc9f499..0075c8f 100644
+> --- a/drivers/rtc/rtc-pxa.c
+> +++ b/drivers/rtc/rtc-pxa.c
+> @@ -174,14 +174,14 @@ static int pxa_rtc_open(struct device *dev)
+> ? ? ? ?struct pxa_rtc *pxa_rtc = dev_get_drvdata(dev);
+> ? ? ? ?int ret;
+>
+> - ? ? ? ret = request_irq(pxa_rtc->irq_1Hz, pxa_rtc_irq, IRQF_DISABLED,
+> + ? ? ? ret = request_irq(pxa_rtc->irq_1Hz, pxa_rtc_irq, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ?"rtc 1Hz", dev);
+> ? ? ? ?if (ret < 0) {
+> ? ? ? ? ? ? ? ?dev_err(dev, "can't get irq %i, err %d\n", pxa_rtc->irq_1Hz,
+> ? ? ? ? ? ? ? ? ? ? ? ?ret);
+> ? ? ? ? ? ? ? ?goto err_irq_1Hz;
+> ? ? ? ?}
+> - ? ? ? ret = request_irq(pxa_rtc->irq_Alrm, pxa_rtc_irq, IRQF_DISABLED,
+> + ? ? ? ret = request_irq(pxa_rtc->irq_Alrm, pxa_rtc_irq, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ?"rtc Alrm", dev);
+> ? ? ? ?if (ret < 0) {
+> ? ? ? ? ? ? ? ?dev_err(dev, "can't get irq %i, err %d\n", pxa_rtc->irq_Alrm,
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index 7639ab9..9a073aa 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -536,14 +536,14 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?s3c_rtc_setfreq(&pdev->dev, 1);
+>
+> ? ? ? ?ret = request_irq(s3c_rtc_alarmno, s3c_rtc_alarmirq,
+> - ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, ?"s3c2410-rtc alarm", rtc);
+> + ? ? ? ? ? ? ? ? ? ? ? ? 0, ?"s3c2410-rtc alarm", rtc);
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "IRQ%d error %d\n", s3c_rtc_alarmno, ret);
+> ? ? ? ? ? ? ? ?goto err_alarm_irq;
+> ? ? ? ?}
+>
+> ? ? ? ?ret = request_irq(s3c_rtc_tickno, s3c_rtc_tickirq,
+> - ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, ?"s3c2410-rtc tick", rtc);
+> + ? ? ? ? ? ? ? ? ? ? ? ? 0, ?"s3c2410-rtc tick", rtc);
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?dev_err(&pdev->dev, "IRQ%d error %d\n", s3c_rtc_tickno, ret);
+> ? ? ? ? ? ? ? ?free_irq(s3c_rtc_alarmno, rtc);
+> diff --git a/drivers/rtc/rtc-sa1100.c b/drivers/rtc/rtc-sa1100.c
+> index 0b40bb8..7ca247e 100644
+> --- a/drivers/rtc/rtc-sa1100.c
+> +++ b/drivers/rtc/rtc-sa1100.c
+> @@ -161,13 +161,13 @@ static int sa1100_rtc_open(struct device *dev)
+> ? ? ? ?struct platform_device *plat_dev = to_platform_device(dev);
+> ? ? ? ?struct rtc_device *rtc = platform_get_drvdata(plat_dev);
+>
+> - ? ? ? ret = request_irq(IRQ_RTC1Hz, sa1100_rtc_interrupt, IRQF_DISABLED,
+> + ? ? ? ret = request_irq(IRQ_RTC1Hz, sa1100_rtc_interrupt, 0,
+> ? ? ? ? ? ? ? ?"rtc 1Hz", dev);
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?dev_err(dev, "IRQ %d already in use.\n", IRQ_RTC1Hz);
+> ? ? ? ? ? ? ? ?goto fail_ui;
+> ? ? ? ?}
+> - ? ? ? ret = request_irq(IRQ_RTCAlrm, sa1100_rtc_interrupt, IRQF_DISABLED,
+> + ? ? ? ret = request_irq(IRQ_RTCAlrm, sa1100_rtc_interrupt, 0,
+> ? ? ? ? ? ? ? ?"rtc Alrm", dev);
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?dev_err(dev, "IRQ %d already in use.\n", IRQ_RTCAlrm);
+> diff --git a/drivers/rtc/rtc-sh.c b/drivers/rtc/rtc-sh.c
+> index 6ac55fd..e55a763 100644
+> --- a/drivers/rtc/rtc-sh.c
+> +++ b/drivers/rtc/rtc-sh.c
+> @@ -666,7 +666,7 @@ static int __init sh_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?if (rtc->carry_irq <= 0) {
+> ? ? ? ? ? ? ? ?/* register shared periodic/carry/alarm irq */
+> ? ? ? ? ? ? ? ?ret = request_irq(rtc->periodic_irq, sh_rtc_shared,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "sh-rtc", rtc);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, "sh-rtc", rtc);
+> ? ? ? ? ? ? ? ?if (unlikely(ret)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&pdev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"request IRQ failed with %d, IRQ %d\n", ret,
+> @@ -676,7 +676,7 @@ static int __init sh_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?} else {
+> ? ? ? ? ? ? ? ?/* register periodic/carry/alarm irqs */
+> ? ? ? ? ? ? ? ?ret = request_irq(rtc->periodic_irq, sh_rtc_periodic,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "sh-rtc period", rtc);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, "sh-rtc period", rtc);
+> ? ? ? ? ? ? ? ?if (unlikely(ret)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&pdev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"request period IRQ failed with %d, IRQ %d\n",
+> @@ -685,7 +685,7 @@ static int __init sh_rtc_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?}
+>
+> ? ? ? ? ? ? ? ?ret = request_irq(rtc->carry_irq, sh_rtc_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "sh-rtc carry", rtc);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, "sh-rtc carry", rtc);
+> ? ? ? ? ? ? ? ?if (unlikely(ret)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&pdev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"request carry IRQ failed with %d, IRQ %d\n",
+> @@ -695,7 +695,7 @@ static int __init sh_rtc_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?}
+>
+> ? ? ? ? ? ? ? ?ret = request_irq(rtc->alarm_irq, sh_rtc_alarm,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED, "sh-rtc alarm", rtc);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 0, "sh-rtc alarm", rtc);
+> ? ? ? ? ? ? ? ?if (unlikely(ret)) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_err(&pdev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"request alarm IRQ failed with %d, IRQ %d\n",
+> diff --git a/drivers/rtc/rtc-stk17ta8.c b/drivers/rtc/rtc-stk17ta8.c
+> index ed3e9b5..5e9adec 100644
+> --- a/drivers/rtc/rtc-stk17ta8.c
+> +++ b/drivers/rtc/rtc-stk17ta8.c
+> @@ -329,7 +329,7 @@ static int __devinit stk17ta8_rtc_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?writeb(0, ioaddr + RTC_INTERRUPTS);
+> ? ? ? ? ? ? ? ?if (devm_request_irq(&pdev->dev, pdata->irq,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?stk17ta8_rtc_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_DISABLED | IRQF_SHARED,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IRQF_SHARED,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pdev->name, pdev) < 0) {
+> ? ? ? ? ? ? ? ? ? ? ? ?dev_warn(&pdev->dev, "interrupt not available.\n");
+> ? ? ? ? ? ? ? ? ? ? ? ?pdata->irq = 0;
+> diff --git a/drivers/rtc/rtc-tx4939.c b/drivers/rtc/rtc-tx4939.c
+> index aac0ffe..a12bfac 100644
+> --- a/drivers/rtc/rtc-tx4939.c
+> +++ b/drivers/rtc/rtc-tx4939.c
+> @@ -266,7 +266,7 @@ static int __init tx4939_rtc_probe(struct platform_device *pdev)
+> ? ? ? ?spin_lock_init(&pdata->lock);
+> ? ? ? ?tx4939_rtc_cmd(pdata->rtcreg, TX4939_RTCCTL_COMMAND_NOP);
+> ? ? ? ?if (devm_request_irq(&pdev->dev, irq, tx4939_rtc_interrupt,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ?IRQF_DISABLED, pdev->name, &pdev->dev) < 0)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?0, pdev->name, &pdev->dev) < 0)
+> ? ? ? ? ? ? ? ?return -EBUSY;
+> ? ? ? ?rtc = rtc_device_register(pdev->name, &pdev->dev,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?&tx4939_rtc_ops, THIS_MODULE);
+> diff --git a/drivers/rtc/rtc-vr41xx.c b/drivers/rtc/rtc-vr41xx.c
+> index c5698cd..6aef17d 100644
+> --- a/drivers/rtc/rtc-vr41xx.c
+> +++ b/drivers/rtc/rtc-vr41xx.c
+> @@ -333,7 +333,7 @@ static int __devinit rtc_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?goto err_device_unregister;
+> ? ? ? ?}
+>
+> - ? ? ? retval = request_irq(aie_irq, elapsedtime_interrupt, IRQF_DISABLED,
+> + ? ? ? retval = request_irq(aie_irq, elapsedtime_interrupt, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? "elapsed_time", pdev);
+> ? ? ? ?if (retval < 0)
+> ? ? ? ? ? ? ? ?goto err_device_unregister;
+> @@ -342,7 +342,7 @@ static int __devinit rtc_probe(struct platform_device *pdev)
+> ? ? ? ?if (pie_irq <= 0)
+> ? ? ? ? ? ? ? ?goto err_free_irq;
+>
+> - ? ? ? retval = request_irq(pie_irq, rtclong1_interrupt, IRQF_DISABLED,
+> + ? ? ? retval = request_irq(pie_irq, rtclong1_interrupt, 0,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? "rtclong1", pdev);
+> ? ? ? ?if (retval < 0)
+> ? ? ? ? ? ? ? ?goto err_free_irq;
+> --
 > 1.7.4.1
-> 
+>
+>
+
+
+
+-- 
+Wan ZongShun.
+www.mcuos.com
