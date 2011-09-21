@@ -1,42 +1,129 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 21 Sep 2011 13:32:39 +0200
-Subject: [PATCH v2 3/3] net/fec: add imx6q enet support
-In-Reply-To: <1316603432-20032-4-git-send-email-shawn.guo@linaro.org>
-References: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
-	<1316603432-20032-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110921113239.GF1966@pengutronix.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 21 Sep 2011 12:39:09 +0100
+Subject: [PATCH] arm: Add unwinding annotations for 64bit division
+	functions
+In-Reply-To: <2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
+References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
+	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
+	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
+Message-ID: <20110921113906.GB2872@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 19, 2011 at 06:55:39PM -0700, Laura Abbott wrote:
+> 
+> On Mon, September 19, 2011 4:22 pm, Nicolas Pitre wrote:
+> > On Mon, 19 Sep 2011, Laura Abbott wrote:
+> >
+> >> The 64bit division functions never had unwinding annotations
+> >> added. This prevents a backtrace from being printed within
+> >> the function and if a division by 0 occurs. Add the annotations.
+> >>
+> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> >> ---
+> >>  arch/arm/lib/div64.S |    8 ++++++++
+> >>  1 files changed, 8 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/lib/div64.S b/arch/arm/lib/div64.S
+> >> index faa7748..e55c484 100644
+> >> --- a/arch/arm/lib/div64.S
+> >> +++ b/arch/arm/lib/div64.S
+> >> @@ -13,6 +13,7 @@
+> >>   */
+> >>
+> >>  #include <linux/linkage.h>
+> >> +#include <asm/unwind.h>
+> >>
+> >>  #ifdef __ARMEB__
+> >>  #define xh r0
+> >> @@ -44,6 +45,7 @@
+> >>   */
+> >>
+> >>  ENTRY(__do_div64)
+> >> +UNWIND(.fnstart)
+> >>
+> >>  	@ Test for easy paths first.
+> >>  	subs	ip, r4, #1
+> >> @@ -189,7 +191,12 @@ ENTRY(__do_div64)
+> >>  	moveq	yh, xh
+> >>  	moveq	xh, #0
+> >>  	moveq	pc, lr
+> >> +UNWIND(.fnend)
+> >>
+> >> +UNWIND(.fnstart)
+> >> +UNWIND(.pad #4)
+> >> +UNWIND(.save {lr})
+> >> +Ldiv0_64:
+> >
+> > Why this phony fnend+fnstart here?
+> >
+> If a division by 0 occurs, we need to be able to access the saved LR on
+> the stack which is setup right before calling the __div0 function. This
+> can't go at the top of __do_div64 because if we try to do a backtrace from
+> within __do_div64 the annotation won't be correct as the LR was never
+> saved on the stack. (yes, __do_div64 is all register math but it's still
+> possible to take a prefetch abort in the middle of that function. Taking a
+> prefetch abort in the middle of __do_div64 is what found this issue in the
+> first place.) This setup handles both cases correctly.
 
-> +/* Controller has GBIT support */
-> +#define FEC_QUIRK_HAS_GBIT		(1 << 3)
+Talking to Catalin a bit more, it sounds like prefetch aborts should not
+happen in kernel code, and data aborts should not happen when accessing
+the kernel stack.  If either of these happens, there's no guarantee that
+the kernel will be able to recover from the situation fully, so
+backtracing may not be the primary concern.
 
-Heh, this is not really a quirk, but a nice feature :) I think we can
-drop QUIRK if we see driver_data more as "flags" instead of "quirks"?
-Minor, though.
+The kinds of situation that the backtracer _can_ cope with are:
 
->  MODULE_DEVICE_TABLE(of, fec_dt_ids);
-> @@ -373,6 +383,7 @@ fec_restart(struct net_device *ndev, int duplex)
->  	int i;
->  	u32 temp_mac[2];
->  	u32 rcntl = OPT_FRAME_SIZE | 0x04;
-> +	u32 ecntl = 0x2; /* ETHEREN */
+a) explicit, synchonous backtrace requests (BUG() etc. within C
+   functions)
 
-Also minor, but the patch looks like a good oportunity to start
-replacing magic values with proper defines?
+b) aborts when accessing random memory (but not the stack) outside the
+   function progolgue/epilogue sequences (i.e., so that the state the
+   unwind info described actually matches reality)
 
-Regards,
+If you get a data abort when accessing the kernel stack, the backtracer
+probably won't work at all, because it relies on the same stack.  Faults
+during prologue/epilogue sequences can't be handled correctly because
+the unwind annotations don't descirbe the interim state during these
+sequences.  There is no general way to use the unwinder annotations to
+describe fully how the state evolves during prologue/epilogue sequences.
 
-   Wolfram
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110921/1d03569b/attachment.sig>
+So, having thought about it, it may be that having the extra .fnstart/
+.fnend pair doesn't really help that much after all.
+
+For this code, we do want the unwind state to be properly recorded for
+the "bl __div0" call site after Ldiv0_64; but we probably don't need to
+worry about backtracing from any other point in this code -- partly
+becuase the probably of needing to do it is very low, and partly because
+we will likely fail to produce a backtrace in this situation.  If this
+is a reasonable assumption, then a single unwind annotation block should
+be sufficient:
+
+ENTRY(__do_div64)
+UNWIND(.fnstart)
+	subs	ip, r4, #1
+	@ ...
+
+	moveq	pc, lr
+
+UNWIND(.pad #4)
+UNWIND(.save {lr}
+	stmfd	sp!, {r0, lr}
+	@ ...
+
+	bl	__div0
+
+	@ ...
+UNWIND(.fnend)
+
+The location of the .pad and .save is of course not meaningful for the
+unwind data: only their respective order, and the fact that they appear
+between the .fnstart/.fnend directives.  Putting them next to the stmfd
+just makes the code easier to read.
+
+
+The extra annotations in the original patch are harmless, though.
+
+Cheers
+---Dave
