@@ -1,87 +1,127 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 21 Sep 2011 14:41:35 +0200
-Subject: [PATCH v4] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
-In-Reply-To: <CAF6AEGtgfvbKdjiLpjFxArSVKFeb-GUdmNhN0ra0codPogvbUA@mail.gmail.com>
-References: <1315568333-6704-1-git-send-email-inki.dae@samsung.com>
-	<4E6B6E5E.3010702@shipmail.org>
-	<CAF6AEGt70bk8idsG48tmo_hgWY6M9kSNrEqyyLknYVYn83u4Rw@mail.gmail.com>
-	<4E6D278C.6010508@shipmail.org> <4E6DA767.9080408@shipmail.org>
-	<000501cc7282$7e7dcb70$7b796250$%dae@samsung.com>
-	<CAF6AEGtE9fmbZ-_nV5Lr-x+W5hiGbLfk2GdFNzQgHwJ+hNvn-g@mail.gmail.com>
-	<001c01cc72a2$d872c390$89584ab0$%dae@samsung.com>
-	<4E705E4D.5030206@shipmail.org>
-	<CAF6AEGtgfvbKdjiLpjFxArSVKFeb-GUdmNhN0ra0codPogvbUA@mail.gmail.com>
-Message-ID: <000d01cc785b$cc5cc290$651647b0$%szyprowski@samsung.com>
+From: t.stanislaws@samsung.com (Tomasz Stanislawski)
+Date: Wed, 21 Sep 2011 14:44:57 +0200
+Subject: [PATCH V2 1/3] ARM: EXYNOS4: Add TVOUT support for SMDKV310
+In-Reply-To: <004901cc7856$d7ee21d0$87ca6570$%kim@samsung.com>
+References: <1316583860-32510-1-git-send-email-hatim.rv@samsung.com>
+	<1316583860-32510-2-git-send-email-hatim.rv@samsung.com>
+	<004901cc7856$d7ee21d0$87ca6570$%kim@samsung.com>
+Message-ID: <4E79DC49.1050407@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wednesday, September 14, 2011 11:53 PM Rob Clark wrote:
-
-> On Wed, Sep 14, 2011 at 2:57 AM, Thomas Hellstrom <thomas@shipmail.org> wrote:
-
-(snipped)
-
-> > Yes, that is true. A root client may be assumed to have AUTH permissions,
-> > but the inverse does not hold, meaning that an AUTH client may *not* be
-> > assumed to have root permissions. I think there is a ROOT_ONLY ioctl flag
-> > for that.
-> >
-> > The problem I'm seeing compared to other drivers is the following:
-> >
-> > Imagine for example that you have a disc driver that allocates temporary
-> > memory out of the same DMA pool as the DRM driver.
-> >
-> > Now you have a video player that is a DRM client. It contains a security
-> > flaw and is compromized by somebody trying to play a specially crafted video
-> > stream. The video player starts to allocate gem buffers until it receives an
-> > -ENOMEM. Then it stops allocating and does nothing.
-> >
-> > Now the system tries an important disc access (paging for example). This
-> > fails, because the video player has exhausted all DMA memory and the disc
-> > driver fails to allocate.
-> >
-> > The system is dead.
-> >
-> > The point is:
-> >
-> > If there is a chance that other drivers will use the same DMA/CMA pool as
-> > the DRM driver, DRM must leave enough DMA/CMA memory for those drivers to
-> > work.
-> 
-> ah, ok, I get your point
-> 
-> > The difference compared to other drm drivers:
-> >
-> > There are other drm drivers that work the same way, with a static allocator.
-> > For example "via" and "sis". But those drivers completely claim the
-> > resources they are using. Nobody else is expected to use VRAM / AGP.
-> >
-> > In the Samsung case, it's not clear to me whether the DMA/CMA pool *can* be
-> > shared with other devices.
-> > If it is, IMHO you must implement an allocation limit in DRM, if not, the
-> > driver should probably be safe.
-> 
-> It is possible to create a device private CMA pool..  although OTOH it
-> might be desirable to let some other drivers (like v4l2) use buffers
-> from the same pool..
-
-Creating a device private CMA pool doesn't prevent other drivers to access
-memory from it if there is a way to pass a buffer to them (i.e. using 
-dma_buf method). However the driver must be able to address that memory.
-CMA private pools were designed mainly to resolve the problem that some
-weird hardware can access certain types of buffers only at particular
-memory address ranges which matches particular memory bank.
- 
-> I'm not entirely sure what will happen w/ dma_alloc_coherent, etc, if
-> the global CMA pool is exhausted.
-> 
-> Marek?  I guess you know what would happen?
-
-The allocation will simply fail and dma_alloc_coherent will return NULL.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+On 09/21/2011 02:06 PM, Kukjin Kim wrote:
+> Hatim Ali wrote:
+>> Add support for TVOUT on SMDKV310 board.
+>>
+>> Signed-off-by: Hatim Ali<hatim.rv@samsung.com>
+>> ---
+>> Changes since V1:
+>> Incorporated changes as suggested by Tomasz Stanislawski
+>> - Added  GPIO settings for hot-plug detection.
+>> - Added setting hdmi and mixer's parent for TV power domain.
+>>
+>>   arch/arm/mach-exynos4/Kconfig         |    2 ++
+>>   arch/arm/mach-exynos4/mach-smdkv310.c |   25
+>> +++++++++++++++++++++++++
+>>   2 files changed, 27 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+>> index 3b594fe..0bf0fe04 100644
+>> --- a/arch/arm/mach-exynos4/Kconfig
+>> +++ b/arch/arm/mach-exynos4/Kconfig
+>> @@ -131,6 +131,7 @@ config MACH_SMDKV310
+>>   	select S3C_DEV_RTC
+>>   	select S3C_DEV_WDT
+>>   	select S3C_DEV_I2C1
+>> +	select S5P_DEV_I2C_HDMIPHY
+>>   	select S5P_DEV_MFC
+>>   	select S3C_DEV_HSMMC
+>>   	select S3C_DEV_HSMMC1
+>> @@ -140,6 +141,7 @@ config MACH_SMDKV310
+>>   	select EXYNOS4_DEV_AHCI
+>>   	select SAMSUNG_DEV_KEYPAD
+>>   	select EXYNOS4_DEV_PD
+>> +	select S5P_DEV_TV
+>>   	select SAMSUNG_DEV_PWM
+>>   	select EXYNOS4_DEV_SYSMMU
+>>   	select EXYNOS4_SETUP_FIMD0
+>> diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-
+>> exynos4/mach-smdkv310.c
+>> index 7ce4d8b..50de270 100644
+>> --- a/arch/arm/mach-exynos4/mach-smdkv310.c
+>> +++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+>> @@ -239,6 +239,7 @@ static struct platform_device *smdkv310_devices[]
+>> __initdata = {
+>>   	&s3c_device_hsmmc2,
+>>   	&s3c_device_hsmmc3,
+>>   	&s3c_device_i2c1,
+>> +	&s5p_device_i2c_hdmiphy,
+>>   	&s3c_device_rtc,
+>>   	&s3c_device_wdt,
+>>   	&exynos4_device_ac97,
+>> @@ -262,6 +263,8 @@ static struct platform_device *smdkv310_devices[]
+>> __initdata = {
+>>   	&smdkv310_lcd_lte480wv,
+>>   	&smdkv310_smsc911x,
+>>   	&exynos4_device_ahci,
+>> +	&s5p_device_hdmi,
+>> +	&s5p_device_mixer,
+>>   };
+>>
+>>   static void __init smdkv310_smsc911x_init(void)
+>> @@ -298,6 +301,25 @@ static struct platform_pwm_backlight_data
+>> smdkv310_bl_data = {
+>>   	.pwm_period_ns  = 1000,
+>>   };
+>>
+>> +static void s5p_tv_setup(void)
+>> +{
+>> +	int ret;
+>> +
+>> +	/* direct HPD to HDMI chip */
+>> +	ret = gpio_request(EXYNOS4_GPX3(7), "hpd-plug");
+>> +
+>> +	if (!ret) {
+Maybe we should generate WARN_ON(1) here. Failure of gpio request 
+indicate that
+board was configued not correctly.
+>> +		gpio_direction_input(EXYNOS4_GPX3(7));
+>> +		s3c_gpio_cfgpin_range(EXYNOS4_GPX3(7),
+>> +					1, S3C_GPIO_SFN(3));
+> Why do you use 's3c_gpio_cfgpin_range()' for just one gpio pin not range...?
+>
+>> +	} else
+>> +		pr_err("Failed to request gpio for hpd: %d\n", ret);
+> According to coding style, should be added { and } around above.
+>
+>> +
+>> +	/* setup dependencies between TV devices */
+>> +	s5p_device_hdmi.dev.parent =&exynos4_device_pd[PD_TV].dev;
+>> +	s5p_device_mixer.dev.parent =&exynos4_device_pd[PD_TV].dev;
+>> +}
+>> +
+>>   static void __init smdkv310_map_io(void)
+>>   {
+>>   	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
+>> @@ -327,6 +349,9 @@ static void __init smdkv310_machine_init(void)
+>>   	samsung_bl_set(&smdkv310_bl_gpio_info,&smdkv310_bl_data);
+>>   	s5p_fimd0_set_platdata(&smdkv310_lcd0_pdata);
+>>
+>> +	s5p_tv_setup();
+>> +	s5p_i2c_hdmiphy_set_platdata(NULL);
+>> +
+>>   	platform_add_devices(smdkv310_devices,
+>> ARRAY_SIZE(smdkv310_devices));
+>>   	s5p_device_mfc.dev.parent =&exynos4_device_pd[PD_MFC].dev;
+>>   }
+>> --
+>> 1.7.2.3
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim<kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
