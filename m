@@ -1,41 +1,18 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 21 Sep 2011 14:17:37 -0700
-Subject: [PATCH v2 2/2] OMAP: omap_device: Add a method to build an
-	omap_device from a DT node
-In-Reply-To: <4E77421C.3000202@ti.com> (Benoit Cousson's message of "Mon, 19
-	Sep 2011 15:22:36 +0200")
-References: <1316184199-12599-1-git-send-email-b-cousson@ti.com>
-	<1316184199-12599-3-git-send-email-b-cousson@ti.com>
-	<20110917161314.GV3523@ponder.secretlab.ca> <4E77421C.3000202@ti.com>
-Message-ID: <87lith389a.fsf@ti.com>
+From: vrex@nvidia.com (Vinod Rex)
+Date: Wed, 21 Sep 2011 15:10:01 -0700
+Subject: change_page_attr() implementation for ARM?
+Message-ID: <D19EBEE1D7B1F742A8ED7130E050A38A4CA460FF0C@HQMAIL02.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Cousson, Benoit" <b-cousson@ti.com> writes:
+On Cortex-A9, we have observed stale data being read from write-combine (C=0 B=1) memory regions mapped into userspace which have a duplicate cacheable mapping in the kernel address space (due to the kernel linear mapping).
 
-> On 9/17/2011 6:13 PM, Grant Likely wrote:
->> On Fri, Sep 16, 2011 at 04:43:19PM +0200, Benoit Cousson wrote:
+The issue appears to be due to speculative prefetch on the cacheable kernel linear mapping which gets lines into the L2 cache. When reads are performed on the write-combine mapping for this address range, these reads get the stale data from L2 instead of memory.
 
-[...]
+As per the Cortex-A9 spec, behavior for double mappings with conflicting page attributes is undefined, so we need a way to make sure all duplicate mappings have the same memory type attributes. 
 
->>> +}
->>> +
->>> +static int _omap_device_notifier_call(struct notifier_block *nb,
->>> +				      unsigned long event, void *dev)
->>
->> Nit: Why the preceding underscore?  Generally that is only done for
->> 'special' variants of public functions.  ie. for a variant that
->> expects a lock to already be held.
->
-> Yeah, the convention in this file is not that strict, and it is used
-> for internal static helper function as well.
-> I'll let Kevin arbitrate that point :-)
+Similar issue on x86 is handled using the change_page_attr()/set_memory_*() functions defined in arch/x86/mm/pageattr.c. ?This function modifies the attributes of the page in kernel linear map to match the corresponding mapping in userspace to avoid having duplicate mappings with different page attributes. It accomplishes this by splitting section (large page) mappings into 4KB page mappings as needed so that the page attribute change is done only for the requested memory region.
 
-The convention in this file is the leading '_' is used for internal
-helper functions.
+Would a similar implementation for ARM be appropriate? We are experimenting with a port of change_page_attr() to ARM that seems to solve our problems.
 
-I'd prefer to keep it that way, and if we decide to change the coding
-convention to match a coding convention elsewhere, we should do it all
-at the same time.
-
-Kevin
+Other approaches proposed to solve this on ARM, by remapping CMA reserved region using 4KB page mappings will not help us since IOMMU mappings don't use DMA contiguous allocation routines.
