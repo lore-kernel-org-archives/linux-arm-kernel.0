@@ -1,18 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 21 Sep 2011 13:17:55 -0700
-Subject: [PATCH 2/3] arm/tegra: Replace <mach/gpio.h> with
-	<mach/gpio-tegra.h>
-In-Reply-To: <1316633620-13184-2-git-send-email-swarren@nvidia.com>
-References: <1316633620-13184-1-git-send-email-swarren@nvidia.com>
-	<1316633620-13184-2-git-send-email-swarren@nvidia.com>
-Message-ID: <CAOesGMgLjABKExDWUdtW6zVsKmHQpw7-7bcTHCf9ip1auw7OoQ@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 21 Sep 2011 13:22:02 -0700
+Subject: [PATCH 49/57] video: irq: Remove IRQF_DISABLED
+In-Reply-To: <1316597339-29861-50-git-send-email-yong.zhang0@gmail.com>
+References: <1316597339-29861-1-git-send-email-yong.zhang0@gmail.com>
+	<1316597339-29861-50-git-send-email-yong.zhang0@gmail.com>
+Message-ID: <20110921202202.GB2321@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 12:33 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> This will eventually allow <mach/gpio.h> to be deleted. This mirrors
-> LinusW's recent equivalent work on various other ARM platforms.
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+On Wed, Sep 21, 2011 at 05:28:50PM +0800, Yong Zhang wrote:
+> Since commit [c58543c8: genirq: Run irq handlers with interrupts disabled],
+> We run all interrupt handlers with interrupts disabled
+> and we even check and yell when an interrupt handler
+> returns with interrupts enabled (see commit [b738a50a:
+> genirq: Warn when handler enables interrupts]).
+> 
+> So now this flag is a NOOP and can be removed.
+> 
+> Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
+> ---
+>  drivers/video/msm/mddi.c                  |    2 +-
+>  drivers/video/msm/mdp.c                   |    2 +-
 
-Acked-by: Olof Johansson <olof@lixom.net>
+Acked-by: David Brown <davidb@codeaurora.org>
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
