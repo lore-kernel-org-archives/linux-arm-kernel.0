@@ -1,5 +1,5 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Sep 2011 08:51:37 +0100
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 21 Sep 2011 15:53:08 +0800
 Subject: [PATCH] ARM: cache-l2x0: add resume entry for l2 in secure mode
 In-Reply-To: <CAGsJ_4xcWkGYrRoR_uSwtW6Qt4TkSWp+yQemP36sdF8o_Q=bLw@mail.gmail.com>
 References: <1316570265-13709-1-git-send-email-Baohua.Song@csr.com>
@@ -7,25 +7,27 @@ References: <1316570265-13709-1-git-send-email-Baohua.Song@csr.com>
 	<CAGsJ_4z4WJkDPhD1WYan3GecnAb0VfPx3_dgFHCmTWs7gVyFdA@mail.gmail.com>
 	<20110921073853.GD17169@n2100.arm.linux.org.uk>
 	<CAGsJ_4xcWkGYrRoR_uSwtW6Qt4TkSWp+yQemP36sdF8o_Q=bLw@mail.gmail.com>
-Message-ID: <20110921075137.GE17169@n2100.arm.linux.org.uk>
+Message-ID: <CAGsJ_4zwGGKpaxwiN7r5aqgG1O1MroiuJ5gRaJT7gaE0UcDqfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 03:49:23PM +0800, Barry Song wrote:
+2011/9/21 Barry Song <21cnbao@gmail.com>:
 > 2011/9/21 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Wed, Sep 21, 2011 at 01:53:37PM +0800, Barry Song wrote:
-> >> yes. imx6q actually needs to enable l2 earlier than cpu_resume(and mmu
-> >> resume). so how about letting outer_resume support both phy and virt
-> >> address restore?
-> >
-> > You can't call C functions in the kernel before the MMU is enabled.
-> 
+>> On Wed, Sep 21, 2011 at 01:53:37PM +0800, Barry Song wrote:
+>>> yes. imx6q actually needs to enable l2 earlier than cpu_resume(and mmu
+>>> resume). so how about letting outer_resume support both phy and virt
+>>> address restore?
+>>
+>> You can't call C functions in the kernel before the MMU is enabled.
+>
 > well. a direct call will fall into virtual address. then we need to
 > transfer it to a phy address before calling it.
 
-No.  I say again, you can't call C functions in the kernel before the
-MMU is enabled.
+stack and global variant is still a problem. then if we want a generic
+function for resuming before mmu on, it seems it is best to be asm
+codes.
 
-C functions have literal tables that contain absolute virtual addresses
-of variables and such like.  Without the MMU enabled, those addresses
-are meaningless and won't point at the right place.
+>
+>>
+>
+-barry
