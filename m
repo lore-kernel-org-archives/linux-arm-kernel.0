@@ -1,36 +1,48 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Wed, 21 Sep 2011 07:07:36 -0700
-Subject: [PATCH 2/8] mm: alloc_contig_freed_pages() added
-In-Reply-To: <op.v15tv0183l0zgt@mnazarewicz-glaptop>
-References: <1313764064-9747-1-git-send-email-m.szyprowski@samsung.com>
-	<1313764064-9747-3-git-send-email-m.szyprowski@samsung.com>
-	<1315505152.3114.9.camel@nimitz>
-	<op.v15tv0183l0zgt@mnazarewicz-glaptop>
-Message-ID: <1316614056.16137.278.camel@nimitz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Sep 2011 16:12:33 +0200
+Subject: [PATCH 00/10] hwspinlock-next
+In-Reply-To: <20110920231340.GT18894@atomide.com>
+References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
+	<CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
+	<20110920231340.GT18894@atomide.com>
+Message-ID: <201109211612.33504.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-09-21 at 15:17 +0200, Michal Nazarewicz wrote:
-> > This 'struct page *'++ stuff is OK, but only for small, aligned areas.
-> > For at least some of the sparsemem modes (non-VMEMMAP), you could walk
-> > off of the end of the section_mem_map[] when you cross a MAX_ORDER
-> > boundary.  I'd feel a little bit more comfortable if pfn_to_page() was
-> > being done each time, or only occasionally when you cross a section
-> > boundary.
+On Wednesday 21 September 2011, Tony Lindgren wrote:
+> * Ohad Ben-Cohen <ohad@wizery.com> [110920 01:34]:
+> > On Mon, Sep 12, 2011 at 7:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> > 
+> > I'm wondering how hwspinlock updates like this should go upstream.
+> > 
+> > The first hwspinlock batch was picked by Tony, because it involved a
+> > bulk of OMAP changes.
+> > 
+> > Hwspinlock isn't OMAP-specific anymore though (we gained support for
+> > STE's u8500) and the vast majority of changes are in drivers/. We're
+> > still very much ARM-related, though this may change too at some point
+> > (c6x has a similar "hardware semaphore" peripheral like the u8500
+> > does).
+> > 
+> > Tony, if you're still willing to pick up these updates I'd be happy to
+> > send you pull requests of course.
 > 
-> I'm fine with that.  I've used pointer arithmetic for performance reasons
-> but if that may potentially lead to bugs then obviously pfn_to_page()  
-> should be used
+> I'd prefer for Greg to take these as these are drivers.
+> 
+> If he's not taking it at this point based on it being ARM only,
+> I can take it then.
 
-pfn_to_page() on x86 these days is usually:
+Sorry for replying late, I had accidentally ignored the entire thread.
 
-	#define __pfn_to_page(pfn)      (vmemmap + (pfn))
+My feeling is that it would be best for Ohad to send these directly
+to Linus, since it's basically a standalone subsystem and he's listed
+as the maintainer (well, after this series at least).
 
-Even for the non-vmemmap sparsemem it stays pretty quick because the
-section array is in cache as you run through the loop.
+I'm also fine with any of the other paths like
 
-There are ways to _minimize_ the number of pfn_to_page() calls by
-checking when you cross a section boundary, or even at a
-MAX_ORDER_NR_PAGES boundary.  But, I don't think it's worth the trouble.
+ohad->GregKH->torvalds
+ohad->arnd->torvalds
+ohad->tmlind->torvalds
+ohad->tmlind->arnd->torvalds
 
--- Dave
+	Arnd
