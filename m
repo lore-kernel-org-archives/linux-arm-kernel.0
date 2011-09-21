@@ -1,36 +1,59 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 21 Sep 2011 08:18:34 -0400
-Subject: [PATCH v2 1/2] mmc: sdhci-s3c: add default controller
-	configuration
-In-Reply-To: <002501cc784d$1618f110$424ad330$%kim@samsung.com> (Kukjin Kim's
-	message of "Wed, 21 Sep 2011 19:56:16 +0900")
-References: <1315984158-29651-1-git-send-email-thomas.abraham@linaro.org>
-	<1315984158-29651-2-git-send-email-thomas.abraham@linaro.org>
-	<002501cc784d$1618f110$424ad330$%kim@samsung.com>
-Message-ID: <m2boue6qcl.fsf@bob.laptop.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 21 Sep 2011 14:26:33 +0200
+Subject: [PATCH v2 3/3] net/fec: add imx6q enet support
+In-Reply-To: <20110921115821.GF28907@S2100-06.ap.freescale.net>
+References: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
+	<1316603432-20032-4-git-send-email-shawn.guo@linaro.org>
+	<20110921113239.GF1966@pengutronix.de>
+	<20110921115821.GF28907@S2100-06.ap.freescale.net>
+Message-ID: <20110921122633.GH1966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 21, 2011 at 07:58:22PM +0800, Shawn Guo wrote:
+> On Wed, Sep 21, 2011 at 01:32:39PM +0200, Wolfram Sang wrote:
+> > 
+> > > +/* Controller has GBIT support */
+> > > +#define FEC_QUIRK_HAS_GBIT		(1 << 3)
+> > 
+> > Heh, this is not really a quirk, but a nice feature :) I think we can
+> > drop QUIRK if we see driver_data more as "flags" instead of "quirks"?
+> > Minor, though.
+> > 
+> As you have told, all these FEC_QUIRK_* are just flags actually.  The
+> name was pick to keep the consistency, as they are all used for the
+> same purpose.
 
-On Wed, Sep 21 2011, Kukjin Kim wrote:
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->
-> Hi Chris,
->
-> This is ok to me. Could you please pick this up in your tree so that I can
-> pick 2nd patch up in my tree.
->
-> As you know, this patch has no dependency with patch2/2 so that you can
-> handle without any conflicts.
+I think introducing FEC_FEATURE_HAS_GBIT would be consistent enough, but
+as I said, I don't mind much.
 
-Thanks, pushed to mmc-next for 3.2.
+> > Also minor, but the patch looks like a good oportunity to start
+> > replacing magic values with proper defines?
+> > 
+> There are already so many magic numbers.  It really deserves a separated
+> patch.
 
-I've been waiting for kernel.org to come back up, but I think later
-today I'll just move mmc-next to git://dev.laptop.org/users/cjb/mmc,
-so this will be available in linux-next soon.
+That is the other possibility, yes. Which sadly never happened.
 
-- Chris.
+> I heard that Uwe had a plan to do that some time ago.  He gives up
+> now? :)
+
+I don't know about this case. Also, it is not about blaming here. It is
+totally okay for you to say that you don't want to change your patch to
+start replacing the magic values. I mainly wanted to point out the
+oportunity here.
+
+Regards,
+
+   Wolfram
+
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110921/780cd0f7/attachment.sig>
