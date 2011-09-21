@@ -1,42 +1,66 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 21 Sep 2011 19:28:43 +0800
-Subject: [PATCH v2 3/3] net/fec: add imx6q enet support
-In-Reply-To: <CAOMZO5CzVj=sMhD24H0OQKqp2Z0XtHhkTX=kEp5oshKqTAJ4oA@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 21 Sep 2011 13:25:55 +0200
+Subject: [PATCH v2 1/3] net/fec: change phy-reset-gpio request warning
+	to debug message
+In-Reply-To: <1316603432-20032-2-git-send-email-shawn.guo@linaro.org>
 References: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
-	<1316603432-20032-4-git-send-email-shawn.guo@linaro.org>
-	<CAOMZO5CzVj=sMhD24H0OQKqp2Z0XtHhkTX=kEp5oshKqTAJ4oA@mail.gmail.com>
-Message-ID: <20110921112842.GE28907@S2100-06.ap.freescale.net>
+	<1316603432-20032-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110921112555.GE1966@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 08:07:42AM -0300, Fabio Estevam wrote:
-> On Wed, Sep 21, 2011 at 8:10 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> ...
-> > diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
-> > index 4dbe41f..1cf6716 100644
-> > --- a/drivers/net/ethernet/freescale/Kconfig
-> > +++ b/drivers/net/ethernet/freescale/Kconfig
-> > @@ -7,7 +7,7 @@ config NET_VENDOR_FREESCALE
-> > ? ? ? ?default y
-> > ? ? ? ?depends on FSL_SOC || QUICC_ENGINE || CPM1 || CPM2 || PPC_MPC512x || \
-> > ? ? ? ? ? ? ? ? ? M523x || M527x || M5272 || M528x || M520x || M532x || \
-> > - ? ? ? ? ? ? ? ? ?IMX_HAVE_PLATFORM_FEC || MXS_HAVE_PLATFORM_FEC || \
-> > + ? ? ? ? ? ? ? ? ?ARCH_MXC || ARCH_MXS || \
-> 
-> Do you need to get rid of  IMX_HAVE_PLATFORM_FEC and MXS_HAVE_PLATFORM_FEC?
-> 
-Yes, I do.  We are moving to device tree, so the Kconfig symbol
-IMX_HAVE_PLATFORM_FEC makes no sense any more, as the platform device
-registration will be done by DT core according whether there is a FEC
-node in device tree or not.
+Hi Shawn,
 
-> By doing that you are selecting FEC for SoCs that don?t have this
-> module such as MX1/MX21/MX31.
+On Wed, Sep 21, 2011 at 07:10:30PM +0800, Shawn Guo wrote:
+> FEC can work without a phy reset on some platforms, which means not
+> very platform necessarily have a phy-reset gpio encoded in device tree.
+> So it makes more sense to have the phy-reset-gpio request failure as
+> a debug message rather than a warning.
+
+Or remove it entirely?
+
 > 
-No.  By doing that, FEC will not be selected for any SoCs by default.
-You need to select it explicitly if you are building a platform with
-FEC support.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/net/ethernet/freescale/fec.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+> index 158b82e..a057abf 100644
+> --- a/drivers/net/ethernet/freescale/fec.c
+> +++ b/drivers/net/ethernet/freescale/fec.c
+> @@ -1422,7 +1422,7 @@ static int __devinit fec_reset_phy(struct platform_device *pdev)
+>  	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
+>  	err = gpio_request_one(phy_reset, GPIOF_OUT_INIT_LOW, "phy-reset");
+>  	if (err) {
+> -		pr_warn("FEC: failed to get gpio phy-reset: %d\n", err);
+> +		pr_debug("FEC: failed to get gpio phy-reset: %d\n", err);
+>  		return err;
+
+I also wanted to suggested to drop returning the error code, since it is
+not an error anymore, strictly speaking. Then I noticed that the caller
+does not check the error code. So, this could be added or turn the
+function to void?
+
+>  	}
+>  	msleep(1);
+> -- 
+> 1.7.4.1
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Regards,
-Shawn
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110921/ac4f8693/attachment.sig>
