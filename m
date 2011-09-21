@@ -1,38 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 21 Sep 2011 19:10:31 +0800
-Subject: [PATCH v2 2/3] net/fec: fix fec1 check in fec_enet_mii_init()
-In-Reply-To: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 21 Sep 2011 08:07:42 -0300
+Subject: [PATCH v2 3/3] net/fec: add imx6q enet support
+In-Reply-To: <1316603432-20032-4-git-send-email-shawn.guo@linaro.org>
 References: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1316603432-20032-3-git-send-email-shawn.guo@linaro.org>
+	<1316603432-20032-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <CAOMZO5CzVj=sMhD24H0OQKqp2Z0XtHhkTX=kEp5oshKqTAJ4oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In function fec_enet_mii_init(), it uses non-zero pdev->id as part
-of the condition to check the second fec instance (fec1).  This works
-before the driver supports device tree probe.  But in case of device
-tree probe, pdev->id is -1 which is also non-zero, so the logic becomes
-broken when device tree probe gets supported.
+On Wed, Sep 21, 2011 at 8:10 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+...
+> diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
+> index 4dbe41f..1cf6716 100644
+> --- a/drivers/net/ethernet/freescale/Kconfig
+> +++ b/drivers/net/ethernet/freescale/Kconfig
+> @@ -7,7 +7,7 @@ config NET_VENDOR_FREESCALE
+> ? ? ? ?default y
+> ? ? ? ?depends on FSL_SOC || QUICC_ENGINE || CPM1 || CPM2 || PPC_MPC512x || \
+> ? ? ? ? ? ? ? ? ? M523x || M527x || M5272 || M528x || M520x || M532x || \
+> - ? ? ? ? ? ? ? ? ?IMX_HAVE_PLATFORM_FEC || MXS_HAVE_PLATFORM_FEC || \
+> + ? ? ? ? ? ? ? ? ?ARCH_MXC || ARCH_MXS || \
 
-The patch change the logic to check "pdev->id > 0" as the part of the
-condition for identifying fec1.
+Do you need to get rid of  IMX_HAVE_PLATFORM_FEC and MXS_HAVE_PLATFORM_FEC?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/net/ethernet/freescale/fec.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+By doing that you are selecting FEC for SoCs that don?t have this
+module such as MX1/MX21/MX31.
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index a057abf..ca6f551 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -996,7 +996,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
- 	 * mdio interface in board design, and need to be configured by
- 	 * fec0 mii_bus.
- 	 */
--	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id) {
-+	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id > 0) {
- 		/* fec1 uses fec0 mii_bus */
- 		fep->mii_bus = fec0_mii_bus;
- 		return 0;
--- 
-1.7.4.1
+Regards,
+
+Fabio Estevan
