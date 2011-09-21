@@ -1,50 +1,60 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 21 Sep 2011 15:25:17 +0900
-Subject: [RESEND PATCH 2/3] ARM: EXYNOS4: Update consistent DMA size to 8MB
-In-Reply-To: <1316583860-32510-3-git-send-email-hatim.rv@samsung.com>
-References: <1316583860-32510-1-git-send-email-hatim.rv@samsung.com>
-	<1316583860-32510-3-git-send-email-hatim.rv@samsung.com>
-Message-ID: <CAH9JG2XegdW95MvFcstfrWOWsqQjJob9kiTwFq8tnZn_SbS+bQ@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 21 Sep 2011 09:25:36 +0300
+Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
+	structure
+In-Reply-To: <20110920170858.GA3827@tarshish>
+References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
+	<1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
+	<20110920112427.GB19695@sapphire.tkos.co.il>
+	<CAEC9eQOpwfmRfcxHoiA00xX0a=dxXj1xJDpW14DozGXKXPJ3Xg@mail.gmail.com>
+	<20110920170858.GA3827@tarshish>
+Message-ID: <1316586336.1949.14.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 2011-09-20 at 20:08 +0300, Baruch Siach wrote:
+> Hi Ajay,
+> 
+> On Tue, Sep 20, 2011 at 08:56:57PM +0530, Ajay kumar wrote:
+> > Hi Baruch,
+> > On Tue, Sep 20, 2011 at 4:54 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> > > Hi Ajay,
+> > >
+> > > On Tue, Sep 20, 2011 at 11:30:39AM -0400, Ajay Kumar wrote:
+> > >> This patch adds a data structure definiton to hold framebuffer windows/planes.
+> > >> An ioctl number is also added to provide user access
+> > >> to change window position dynamically.
+> > >
+> > > [snip]
+> > >
+> > >> +/* Window overlaying */
+> > >> +struct fb_overlay_win_pos {
+> > >> +     __u32 win_pos_x;        /* x-offset from LCD(0,0) where window starts */
+> > >> +     __u32 win_pos_y;        /* y-offset from LCD(0,0) where window starts */
+> > >> +};
+> > >
+> > > Why not allow negative offsets where the left or upper part of the framebuffer
+> > > is hidden?
+> > 
+> > Thanks for pointing it out. Are there drivers which place the overlay
+> > windows such that some part of the window is hidden from being
+> > displayed on the screen?
+> 
+> I don't know. However, since this is new userspace ABI which should stay 
+> compatible forever, we should make sure to do it right. Using __s32 instead of 
+> __u32 won't limit us in the future.
 
-As I know,  CONSISTENT_DMA_SIZE is removed, please use the updated APIs.
+OMAP HW doesn't allow "funny" things like overlay being outside the
+visible area, i.e. negative position or size larger than the display.
+And my guess is that hardware rarely allow things like that, as it would
+just complicate the hardware without any gain.
 
-Thank you,
-Kyungmin Park
+Out-of-display-overlays can of course be emulated by the software. But
+I'm not sure if it's good to add the complexity in the driver layer, as
+it could as well be handled in the userspace.
 
-On Wed, Sep 21, 2011 at 2:44 PM, Hatim Ali <hatim.rv@samsung.com> wrote:
-> Change the consistent DMA allocation to 8MB to support the
-> TVOUT driver.
->
-> NOTE: Once CMA support is merged into mainline, we will use it for memory
-> allocation.
->
-> Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
-> ---
-> ?arch/arm/mach-exynos4/include/mach/memory.h | ? ?2 ++
-> ?1 files changed, 2 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos4/include/mach/memory.h b/arch/arm/mach-exynos4/include/mach/memory.h
-> index 374ef2c..7549742 100644
-> --- a/arch/arm/mach-exynos4/include/mach/memory.h
-> +++ b/arch/arm/mach-exynos4/include/mach/memory.h
-> @@ -15,6 +15,8 @@
->
-> ?#define PLAT_PHYS_OFFSET ? ? ? ? ? ? ? UL(0x40000000)
->
-> +#define CONSISTENT_DMA_SIZE ? ? ? ? ? ?SZ_8M
-> +
-> ?/* Maximum of 256MiB in one bank */
-> ?#define MAX_PHYSMEM_BITS ? ? ? 32
-> ?#define SECTION_SIZE_BITS ? ? ?28
-> --
-> 1.7.2.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Then again, a signed value would be future safer ("just in case"), and
+if the driver can just reject values it doesn't want to support, there's
+no real harm there either.
+
+ Tomi
