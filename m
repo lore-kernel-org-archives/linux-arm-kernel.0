@@ -1,194 +1,179 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 20 Sep 2011 20:54:38 -0500
-Subject: [PATCH 3/3] ARM: gic: add OF based initialization
-In-Reply-To: <20110920230800.GS7781@ponder.secretlab.ca>
-References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
-	<1316550244-3655-4-git-send-email-robherring2@gmail.com>
-	<20110920230800.GS7781@ponder.secretlab.ca>
-Message-ID: <4E7943DE.3040700@gmail.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Tue, 20 Sep 2011 18:57:45 -0700
+Subject: [PATCH] ARM: cache-l2x0: add resume entry for l2 in secure mode
+Message-ID: <1316570265-13709-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2011 06:08 PM, Grant Likely wrote:
-> On Tue, Sep 20, 2011 at 03:24:04PM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> This adds ARM gic interrupt controller initialization using device tree
->> data.
->>
->> The initialization function is intended to be called by of_irq_init
->> function like this:
->>
->> const static struct of_device_id irq_match[] = {
->>         { .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
->>         {}
->> };
->>
->> static void __init init_irqs(void)
->> {
->>         of_irq_init(irq_match);
->> }
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
->>  Documentation/devicetree/bindings/arm/gic.txt |   55 +++++++++++++++
->>  arch/arm/common/gic.c                         |   89 +++++++++++++++++++++++-
->>  arch/arm/include/asm/hardware/gic.h           |   12 ++++
->>  3 files changed, 152 insertions(+), 4 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
->> new file mode 100644
->> index 0000000..52916b4
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/gic.txt
->> @@ -0,0 +1,55 @@
->> +* ARM Generic Interrupt Controller
->> +
->> +ARM SMP cores are often associated with a GIC, providing per processor
->> +interrupts (PPI), shared processor interrupts (SPI) and software
->> +generated interrupts (SGI).
->> +
->> +Primary GIC is attached directly to the CPU and typically has PPIs and SGIs.
->> +Secondary GICs are cascaded into the upward interrupt controller and do not
->> +have PPIs or SGIs.
->> +
->> +Main node required properties:
->> +
->> +- compatible : should be one of:
->> +	"arm,cortex-a9-gic"
->> +	"arm,arm11mp-gic"
->> +- interrupt-controller : Identifies the node as an interrupt controller
->> +- #interrupt-cells : Specifies the number of cells needed to encode an
->> +  interrupt source.  The type shall be a <u32> and the value shall be 3.
->> +
->> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
->> +  interrupts.
->> +
->> +  The 2nd cell contains the interrupt number for the interrupt type.
->> +  SPI interrupts are in the range [0-987].  PPI interrupts are in the
->> +  range [0-15].
->> +
->> +  The 3rd cell is the flags, encoded as follows:
->> +	bits[3:0] trigger type and level flags.
->> +		1 = low-to-high edge triggered
->> +		2 = high-to-low edge triggered
->> +		4 = active high level-sensitive
->> +		8 = active low level-sensitive
->> +	bits[15:8] PPI interrupt cpu mask.  Each bit corresponds to each of
->> +	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
->> +	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
->> +
->> +- reg : Specifies base physical address(s) and size of the GIC registers. The
->> +  first region is the GIC distributor register base and size. The 2nd region is
->> +  the GIC cpu interface register base and size.
->> +
->> +Optional
->> +- interrupts	: Interrupt source of the parent interrupt controller. Only
->> +  present on secondary GICs.
->> +
->> +Example:
->> +
->> +	intc: interrupt-controller at fff11000 {
->> +		compatible = "arm,cortex-a9-gic";
->> +		#interrupt-cells = <3>;
->> +		#address-cells = <1>;
->> +		interrupt-controller;
->> +		reg = <0xfff11000 0x1000>,
->> +		      <0xfff10100 0x100>;
->> +	};
->> +
-> 
-> Ack on the binding.
-> 
->> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->> index 666b278..84e69a4 100644
->> --- a/arch/arm/common/gic.c
->> +++ b/arch/arm/common/gic.c
->> @@ -28,6 +28,10 @@
->>  #include <linux/smp.h>
->>  #include <linux/cpumask.h>
->>  #include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/irqdomain.h>
->>  
->>  #include <asm/irq.h>
->>  #include <asm/mach/irq.h>
->> @@ -255,6 +259,15 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
->>  	irq_set_chained_handler(irq, gic_handle_cascade_irq);
->>  }
->>  
->> +static int gic_irq_count(void __iomem *dist_base)
->> +{
->> +	int gic_irqs = readl_relaxed(dist_base + GIC_DIST_CTR) & 0x1f;
->> +	gic_irqs = (gic_irqs + 1) * 32;
->> +	if (gic_irqs > 1020)
->> +		gic_irqs = 1020;
->> +	return gic_irqs;
->> +}
->> +
->>  static void __init gic_dist_init(struct gic_chip_data *gic,
->>  	unsigned int irq_start)
->>  {
->> @@ -277,10 +290,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
->>  	 * Find out how many interrupts are supported.
->>  	 * The GIC only supports up to 1020 interrupt sources.
->>  	 */
->> -	gic_irqs = readl_relaxed(base + GIC_DIST_CTR) & 0x1f;
->> -	gic_irqs = (gic_irqs + 1) * 32;
->> -	if (gic_irqs > 1020)
->> -		gic_irqs = 1020;
->> +	gic_irqs = gic_irq_count(base);
->>  
->>  	/*
->>  	 * Set all global interrupts to be level triggered, active low.
->> @@ -405,3 +415,74 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>  	writel_relaxed(map << 16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
->>  }
->>  #endif
->> +
->> +#ifdef CONFIG_OF
->> +static int gic_cnt __initdata = 0;
->> +
->> +int gic_irq_domain_dt_translate(struct irq_domain *d,
->> +			    struct device_node *controller,
->> +			    const u32 *intspec, unsigned int intsize,
->> +			    unsigned long *out_hwirq, unsigned int *out_type)
->> +{
->> +	struct gic_chip_data *gic_data = d->priv;
->> +
->> +	if (d->of_node != controller)
->> +		return -EINVAL;
->> +	if (intsize < 3)
->> +		return -EINVAL;
->> +
->> +	*out_hwirq = intspec[1];
->> +	/*
->> +	 * We've already skipped over SGIs, so PPIs need no translation.
->> +	 * For SPIs, we need to skip over 16 PPIs on primary GICs.
->> +	 */
->> +	if (!intspec[0] && !gic_data->irq_offset)
->> +		*out_hwirq += 16;
-> 
-> I though that the offset was 32 to get from SPI number to Interrrupt
-> ID?  And that PPI interrupts start at Interrupt ID 16?  Or am I
-> mistaken about the hwirq number that this driver uses internally?
-> 
+we save the l2x0 registers at the first initialization, and restore
+them after resuming every time.
 
-There's basically 2 cases to handle: primary and secondary controllers.
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/include/asm/outercache.h |    7 +++
+ arch/arm/mm/cache-l2x0.c          |   81 ++++++++++++++++++++++++++++++++----
+ 2 files changed, 79 insertions(+), 9 deletions(-)
 
-For primary ctrlrs, the domain irq_base is already 16 to skip over SGIs
-and legacy ISA interrupts. So PPIs don't need any conversion and SPIs
-only need 16 more added. I misspoke previously as it's not quite
-independent of virq numbering because entry-macro-gic.S is still fixed
-GIC ID = Linux virq (or offset of 32 in Exynos case).
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index d838743..53426c6 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -34,6 +34,7 @@ struct outer_cache_fns {
+ 	void (*sync)(void);
+ #endif
+ 	void (*set_debug)(unsigned long);
++	void (*resume)(void);
+ };
+ 
+ #ifdef CONFIG_OUTER_CACHE
+@@ -74,6 +75,12 @@ static inline void outer_disable(void)
+ 		outer_cache.disable();
+ }
+ 
++static inline void outer_resume(void)
++{
++	if (outer_cache.resume)
++		outer_cache.resume();
++}
++
+ #else
+ 
+ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 0d85d22..4722707 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -32,6 +32,14 @@ static void __iomem *l2x0_base;
+ static DEFINE_SPINLOCK(l2x0_lock);
+ static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
+ static uint32_t l2x0_size;
++static u32 l2x0_aux_ctrl;
++static u32 l2x0_tag_latency, l2x0_data_latency, l2x0_filter_start, l2x0_filter_end;
++
++struct l2x0_of_data {
++	void (*setup)(const struct device_node *,__u32 *, __u32 *);
++	void (*save)(void);
++	void (*resume)(void);
++};
+ 
+ static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+ {
+@@ -280,7 +288,7 @@ static void l2x0_disable(void)
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
+-static void __init l2x0_unlock(__u32 cache_id)
++static void l2x0_unlock(__u32 cache_id)
+ {
+ 	int lockregs;
+ 	int i;
+@@ -356,6 +364,8 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+ 		/* l2x0 controller is disabled */
+ 		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
+ 
++		l2x0_aux_ctrl = aux;
++
+ 		l2x0_inv_all();
+ 
+ 		/* enable L2X0 */
+@@ -445,18 +455,64 @@ static void __init pl310_of_setup(const struct device_node *np,
+ 	}
+ }
+ 
++static void __init pl310_save(void)
++{
++	l2x0_tag_latency = readl_relaxed(l2x0_base + L2X0_TAG_LATENCY_CTRL);
++	l2x0_data_latency = readl_relaxed(l2x0_base + L2X0_DATA_LATENCY_CTRL);
++	l2x0_filter_end = readl_relaxed(l2x0_base + L2X0_ADDR_FILTER_END);
++	l2x0_filter_start = readl_relaxed(l2x0_base + L2X0_ADDR_FILTER_START);
++}
++
++static void l2x0_resume(void)
++{
++	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
++		/* restore aux ctrl and enable l2 */
++		l2x0_unlock(readl_relaxed(l2x0_base + L2X0_CACHE_ID));
++
++		writel_relaxed(l2x0_aux_ctrl, l2x0_base + L2X0_AUX_CTRL);
++
++		l2x0_inv_all();
++
++		writel_relaxed(1, l2x0_base + L2X0_CTRL);
++	}
++}
++
++static void pl310_resume(void)
++{
++	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
++		/* restore pl310 setup */
++		writel_relaxed(l2x0_tag_latency, l2x0_base + L2X0_TAG_LATENCY_CTRL);
++		writel_relaxed(l2x0_data_latency, l2x0_base + L2X0_DATA_LATENCY_CTRL);
++		writel_relaxed(l2x0_filter_end, l2x0_base + L2X0_ADDR_FILTER_END);
++		writel_relaxed(l2x0_filter_start, l2x0_base + L2X0_ADDR_FILTER_START);
++	}
++
++	l2x0_resume();
++}
++
++static const struct l2x0_of_data pl310_data = {
++	pl310_of_setup,
++	pl310_save,
++	pl310_resume,
++};
++
++static const struct l2x0_of_data l2x0_data = {
++	l2x0_of_setup,
++	NULL,
++	l2x0_resume,
++};
++
+ static const struct of_device_id l2x0_ids[] __initconst = {
+-	{ .compatible = "arm,pl310-cache", .data = pl310_of_setup },
+-	{ .compatible = "arm,l220-cache", .data = l2x0_of_setup },
+-	{ .compatible = "arm,l210-cache", .data = l2x0_of_setup },
++	{ .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
++	{ .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
++	{ .compatible = "arm,l210-cache", .data = (void *)&l2x0_data },
+ 	{}
+ };
+ 
+ int __init l2x0_of_init(__u32 aux_val, __u32 aux_mask)
+ {
+ 	struct device_node *np;
+-	void (*l2_setup)(const struct device_node *np,
+-		__u32 *aux_val, __u32 *aux_mask);
++	struct l2x0_of_data *data;
+ 
+ 	np = of_find_matching_node(NULL, l2x0_ids);
+ 	if (!np)
+@@ -465,13 +521,20 @@ int __init l2x0_of_init(__u32 aux_val, __u32 aux_mask)
+ 	if (!l2x0_base)
+ 		return -ENOMEM;
+ 
++	data = of_match_node(l2x0_ids, np)->data;
++
+ 	/* L2 configuration can only be changed if the cache is disabled */
+ 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
+-		l2_setup = of_match_node(l2x0_ids, np)->data;
+-		if (l2_setup)
+-			l2_setup(np, &aux_val, &aux_mask);
++		if (data->setup)
++			data->setup(np, &aux_val, &aux_mask);
+ 	}
++
++	if (data->save)
++		data->save();
++
+ 	l2x0_init(l2x0_base, aux_val, aux_mask);
++
++	outer_cache.resume = data->resume;
+ 	return 0;
+ }
+ #endif
+-- 
+1.7.1
 
-For secondary ctrlrs, the gic code already accounts for 32 offset in ID
-to Linux virq with the irq_offset field which is set to Linux virq base
-- 32. So in this case, no conversion is needed.
 
-I don't really see a better way without breaking non-DT use of the gic.
 
-Rob
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
