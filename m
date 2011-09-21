@@ -1,47 +1,48 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 21 Sep 2011 11:52:52 +0530
-Subject: [PATCH v8 00/16] To use DMA generic APIs for Samsung DMA
-In-Reply-To: <001601cc76b6$2627cdd0$72776970$%kim@samsung.com>
-References: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
-	<1315980099.26251.498.camel@vkoul-udesk3>
-	<CABb+yY25NTbtRPOw-KH8U4zA1Bo8q0BDM8SXyrsobG7NEv8edg@mail.gmail.com>
-	<1315999032.26251.501.camel@vkoul-udesk3>
-	<CAJe_ZhdrPMbBOkfwg=PFyVU14eT0Gc0=rtKwEiQCH5-Q5-CtVQ@mail.gmail.com>
-	<1316401174.21359.3.camel@vkoul-udesk3>
-	<001601cc76b6$2627cdd0$72776970$%kim@samsung.com>
-Message-ID: <1316586172.1573.1.camel@vkoul-udesk3>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 21 Sep 2011 14:58:44 +0800
+Subject: [PATCH] ARM: cache-l2x0: add resume entry for l2 in secure mode
+In-Reply-To: <CAGsJ_4z4WJkDPhD1WYan3GecnAb0VfPx3_dgFHCmTWs7gVyFdA@mail.gmail.com>
+References: <1316570265-13709-1-git-send-email-Baohua.Song@csr.com>
+	<20110921055223.GA28907@S2100-06.ap.freescale.net>
+	<CAGsJ_4z4WJkDPhD1WYan3GecnAb0VfPx3_dgFHCmTWs7gVyFdA@mail.gmail.com>
+Message-ID: <20110921065842.GB28907@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-09-19 at 19:23 +0900, Kukjin Kim wrote:
-> Vinod Koul wrote:
-> > 
-> > On Wed, 2011-09-14 at 17:03 +0530, Jassi Brar wrote:
-> > > On 14 September 2011 16:47, Vinod Koul <vinod.koul@intel.com> wrote:
-> > >
-> > > >> The changelog for [PATCH v8 04/16] is misleading - we don't need any
-> > > >> modification for the reason mentioned in changelog. But the modification
-> > > >> has positive side-effect of preventing callbacks during terminate_all which
-> > > >> is no way understood from the changelog. So I would like to changelog
-> > > >> corrected.
-> > > > I thought change log was correct in depicting what patch does and Boojin
-> > > > had replied.... I will check again...
-> > >
-> > > I didn't reply because I ran out of ways to explain the same thing in
-> > > different words.
-> > I checked again the patch, change log and your comments.
-> > I agree with current change log, and also your observation is right but
-> > that is just a side effect, which IMO should be best left to developer
-> > to choose or not, in this case she ignored it
-> > 
-> > So no changes to this and I a ready to merge it to my next in a day or
-> > two...
-> > 
-> So as a note, pulled git://git.infradead.org/users/vkoul/slave-dma.git samsung_dma for other regarding dma patches in arch/arm/ samsung stuff.
+On Wed, Sep 21, 2011 at 01:53:37PM +0800, Barry Song wrote:
+> 2011/9/21 Shawn Guo <shawn.guo@freescale.com>:
+> > Hi Barry,
+> >
+> > On Tue, Sep 20, 2011 at 06:57:45PM -0700, Barry Song wrote:
+> >> we save the l2x0 registers at the first initialization, and restore
+> >> them after resuming every time.
+> >>
+> > I'm unsure that it will work for cases like imx6q, where L2 cache is
+> > retained and the controller needs to be restored at the very beginning
+> > of the resume entry (running on physical space).
 > 
-> If any problems, please let me know.
+> yes. imx6q actually needs to enable l2 earlier than cpu_resume(and mmu
+> resume). so how about letting outer_resume support both phy and virt
+> address restore?
+> for example, add early resume: outer_early_resume()
 > 
-I am pushing them to next now..
+> Then for your case, you use asm to "bl out_resume", then "b cpu_resume".
+> For those chips which lose l2 in suspend cycle, people can call it in
+> C function after cpu_resume.
+> 
+It's worth a try.  Except that, I have another two comments on the
+patch.
+
+* To be safe, all the variables used to save L2 registers need to
+  be ensured being written external memory.
+
+* What registers to save seems to be a platform decision.  For example,
+  you patch save 5 registers for pl310 while I only need one aux_ctrl
+  on imx6q.
+
+It seems that Lorenzo also has a plan working on this, so I Cc-ed him
+for comments.
 
 -- 
-~Vinod
+Regards,
+Shawn
