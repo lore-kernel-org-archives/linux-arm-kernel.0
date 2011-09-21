@@ -1,134 +1,59 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 21 Sep 2011 15:04:02 +0200
-Subject: [PATCH 2/7] s3c-adc: describe features via quirk constants
-In-Reply-To: <005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
-References: <201109182241.48858.heiko@sntech.de>
-	<201109182243.40440.heiko@sntech.de>
-	<005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
-Message-ID: <201109211504.03287.heiko@sntech.de>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 21 Sep 2011 15:05:38 +0200
+Subject: [PATCH V2 1/3] ARM: EXYNOS4: Add TVOUT support for SMDKV310
+In-Reply-To: <1316583860-32510-2-git-send-email-hatim.rv@samsung.com>
+References: <1316583860-32510-1-git-send-email-hatim.rv@samsung.com>
+	<1316583860-32510-2-git-send-email-hatim.rv@samsung.com>
+Message-ID: <4E79E122.2000600@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Hatim,
 
-Am Mittwoch, 21. September 2011, 14:32:14 schrieben Sie:
-> Heiko St?bner wrote:
-> > The adc blocks of S3C2410 through S5P have a multitude of
-> > quirks, i.e. moved bits or whole new registers.
-> > 
-> > This patch tries to describe these individual features
-> > through constants which can be used to describe an adc.
-> > 
-> > As SoCs sometimes share only some of these quirks defining
-> > TYPE_ADCVx values for each one wouldn't scale well when
-> > adding more variants.
+On 09/21/2011 07:44 AM, Hatim Ali wrote:
+> Add support for TVOUT on SMDKV310 board.
 > 
-> Hi Heiko,
-> 
-> I don't have idea we really need to use QUIRK in this case...as I know, the
-> QUIRK is used on other situation...
-> 
-> In addition, the TYPE_ADCVx can support each Samsung SoCs' ADC...but I need
-> to check again.
-The current types could not support the features of the 2443 and 2416/2450 - I 
-checked the datasheets.
+> Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
+> ---
+...
+> diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
+> index 7ce4d8b..50de270 100644
+> --- a/arch/arm/mach-exynos4/mach-smdkv310.c
+> +++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+> @@ -239,6 +239,7 @@ static struct platform_device *smdkv310_devices[] __initdata = {
+>  	&s3c_device_hsmmc2,
+>  	&s3c_device_hsmmc3,
+>  	&s3c_device_i2c1,
+> +	&s5p_device_i2c_hdmiphy,
+>  	&s3c_device_rtc,
+>  	&s3c_device_wdt,
+>  	&exynos4_device_ac97,
+> @@ -262,6 +263,8 @@ static struct platform_device *smdkv310_devices[] __initdata = {
+>  	&smdkv310_lcd_lte480wv,
+>  	&smdkv310_smsc911x,
+>  	&exynos4_device_ahci,
+> +	&s5p_device_hdmi,
+> +	&s5p_device_mixer,
+>  };
+>  
+>  static void __init smdkv310_smsc911x_init(void)
+> @@ -298,6 +301,25 @@ static struct platform_pwm_backlight_data smdkv310_bl_data = {
+>  	.pwm_period_ns  = 1000,
+>  };
+>  
+> +static void s5p_tv_setup(void)
+> +{
+> +	int ret;
+> +
+> +	/* direct HPD to HDMI chip */
+> +	ret = gpio_request(EXYNOS4_GPX3(7), "hpd-plug");
+> +
+> +	if (!ret) {
+> +		gpio_direction_input(EXYNOS4_GPX3(7));
 
-The mux register in base+0x18 does not exist on any of the current platforms.
-Also the bit 3 in ADCCON to select the resolution is specific to the 2416/2450 
-(see comments above constants and quirk definitions in patches 6 and 7).
+Since you're probably going to be reworking this anyway, I think gpio_request_one
+could be used here for simplicity.  
 
-So to support these SoCs would require the definition of two new types. 
-Including these new types in the existing conditionals would introduce a lot 
-of statements like
-	if ( (TYPE_X || TYPE_Y) && !TYPE_Z)
-
-In my opinion testing for specific features also describes the difference 
-between implementations better if one reads the code later on.
-
-
-I will change the styling of the "<<"s but am wondering why checkpatch did not 
-complain, i.e. it complains for all other whitespace mistakes one can make but 
-not these.
-
-Heiko
-
-> 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  arch/arm/plat-samsung/adc.c |   29 +++++++++++++++++++++++++++++
-> >  1 files changed, 29 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-> > index ee8deef..b209d58 100644
-> > --- a/arch/arm/plat-samsung/adc.c
-> > +++ b/arch/arm/plat-samsung/adc.c
-> > @@ -45,6 +45,35 @@ enum s3c_cpu_type {
-> > 
-> >  	TYPE_ADCV3, /* S5PV210, S5PC110, EXYNOS4210 */
-> >  
-> >  };
-> > 
-> > +/*
-> > + * Resolution of the ADC - 10 or 12 bit
-> > + */
-> 
-> /* ... */
-> 
-> > +#define S3C_ADC_QUIRK_10BIT		0
-> > +#define S3C_ADC_QUIRK_12BIT		(1<<0)
-> 
-> According to coding style, should be added blank around <<.
-> 
-> > +
-> > +/*
-> > + * 12bit ADC can switch resolution between 10 bit and 12 bit
-> > + * ADCCON bit 03 for S3C2416
-> > + * ADCCON bit 16 for S3C64XX and up
-> > + */
-> > +#define S3C_ADC_QUIRK_RESSEL03		(1<<1)
-> > +#define S3C_ADC_QUIRK_RESSEL16		(1<<2)
-> 
-> Same as above.
-> 
-> > +
-> > +/*
-> > + * Input channel select can either be in
-> > + * - reg ADCCON, bit for S3C24XX and S3C64XX
-> > + * - reg base+0x18 for 2443/2416/2450
-> > + * - reg base+0x1C for S5P
-> > + */
-> > +#define S3C_ADC_QUIRK_MUXADCCON		(1<<3)
-> > +#define S3C_ADC_QUIRK_MUX18		(1<<4)
-> > +#define S3C_ADC_QUIRK_MUX1C		(1<<5)
-> 
-> Same.
-> 
-> > +
-> > +/*
-> > + * CLRINT register on S3C64xx
-> > + */
-> 
-> /* ... */
-> 
-> > +#define S3C_ADC_QUIRK_CLRINT		(1<<6)
-> 
-> Same.
-> 
-> > +
-> > 
-> >  struct s3c_adc_client {
-> >  
-> >  	struct platform_device	*pdev;
-> >  	struct list_head	 pend;
-> > 
-> > --
-> > 1.7.2.3
-> 
-> Thanks.
-> 
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
+--
+Regards,
+Sylwester
