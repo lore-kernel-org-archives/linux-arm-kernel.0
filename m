@@ -1,84 +1,83 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 21 Sep 2011 17:43:50 +0530
-Subject: [PATCH v5 13/15] OMAP2+: UART: Take console_lock in suspend path if
-	not taken
+Date: Wed, 21 Sep 2011 17:43:52 +0530
+Subject: [PATCH v5 15/15] OMAP2+: UART: Do not gate uart clocks if used for
+	debug_prints
 In-Reply-To: <1316607232-21709-1-git-send-email-govindraj.raja@ti.com>
 References: <1316607232-21709-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1316607232-21709-4-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1316607232-21709-6-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In suspend path the console_lock is taken by uart_port_suspend
-however when no_console_suspend is used console_lock is not taken.
+If OMAP UART is used as console uart and debug is enabled,
+avoid gating of uart clocks to print all debug prints.
 
-During system wide suspend omap_pwr_domain hooks cut all
-clocks that are left enabled. So its unsafe to proceed printing after
-clocks are cut by pwr_domain hooks. Also pm_runtime will be disabled after
-dpm_suspend devices happens. So buffer all prints in suspend path by taking
-console_lock and print them back safely after power domain hooks re-enable
-clocks back.
+If uart clocks are gated then the debug prints from omap_device
+framework or hwmod framework can cause uart to enter recursive pm_runtime calls,
+which can cause a deadlock over power lock usage.
 
-Use CONFIG_SERIAL_OMAP_CONSOLE macro check to take console_lock since
-console ops are available only if omap console is defined.
-omap-serial can be built as module without console support.
+For example: Say, uart clocks are cut and we get a print from omap_device_disable
+stating disabling uart clocks. This print calls omap_uart driver console_write
+which will call runtime API get_sync which means we enter from runtime API put
+context to runtime API get context.
+
+--> runtime put (take power lock)
+    --> print disabling uart clocks
+        --> call uart console write
+            --> call get_sync (try to take power lock)
+
+Also any clock enable API call from uart driver should not call any uart
+operation until clocks are enabled back. Like get_sync having debug print
+calling uart console write even before clocks are enabled.
+
+So to avoid these scenarios, identify from bootargs  if OMAP_UART(ttyO) is used
+in debug mode. If so, do not set device_may_wakeup. This will prevent
+pm_runtime_enable in uart driver probe and will avoid uart clock gating.
 
 Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/plat-omap/include/plat/omap-serial.h |    1 +
- drivers/tty/serial/omap-serial.c              |   20 ++++++++++++++++++--
- 2 files changed, 19 insertions(+), 2 deletions(-)
+More details on this topic and experiments done listed here:
+http://www.spinics.net/lists/linux-serial/msg04128.html
 
-diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index 28abc6b..de8de87 100644
---- a/arch/arm/plat-omap/include/plat/omap-serial.h
-+++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -126,6 +126,7 @@ struct uart_omap_port {
- 	u32			context_loss_cnt;
- 	u8			wakeups_enabled;
- 	u32			errata;
-+	u8			console_locked;
- 
- };
- 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 64e4ab5..92a1f10 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -1133,8 +1133,15 @@ static int serial_omap_suspend(struct device *dev)
- {
- 	struct uart_omap_port *up = dev_get_drvdata(dev);
- 
--	if (up)
-+	if (up) {
- 		uart_suspend_port(&serial_omap_reg, &up->port);
-+#ifdef CONFIG_SERIAL_OMAP_CONSOLE
-+		if (up->port.line == up->port.cons->index &&
-+				!is_console_locked())
-+			up->console_locked = console_trylock();
-+#endif
-+	}
-+
- 	return 0;
+ arch/arm/mach-omap2/serial.c |   18 +++++++++++++++++-
+ 1 files changed, 17 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 87696bf..3d92b77f 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -266,8 +266,24 @@ struct omap_hwmod *omap_uart_hwmod_lookup(int num)
+ 	return oh;
  }
  
-@@ -1142,8 +1149,17 @@ static int serial_omap_resume(struct device *dev)
++static int uart_debug;
++
++char *cmdline_find_option(char *str)
++{
++	extern char *saved_command_line;
++
++	return strstr(saved_command_line, str);
++}
++
+ static int __init omap_serial_early_init(void)
  {
- 	struct uart_omap_port *up = dev_get_drvdata(dev);
- 
--	if (up)
-+	if (up) {
- 		uart_resume_port(&serial_omap_reg, &up->port);
-+#ifdef CONFIG_SERIAL_OMAP_CONSOLE
-+		if (up->port.line == up->port.cons->index &&
-+					up->console_locked) {
-+			console_unlock();
-+			up->console_locked = 0;
-+		}
-+#endif
++	if (cmdline_find_option("debug") &&
++			cmdline_find_option(OMAP_SERIAL_NAME)) {
++		uart_debug = true;
++		pr_info("OMAP UART used as console in debug mode"
++			" uart clocks will not be gated");
 +	}
 +
- 	return 0;
- }
+ 	do {
+ 		struct omap_hwmod *oh;
  
+@@ -361,7 +377,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+ 
+ 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
+ 
+-	if ((cpu_is_omap34xx() && bdata->pads))
++	if ((cpu_is_omap34xx() && bdata->pads) && !uart_debug)
+ 		device_init_wakeup(&pdev->dev, true);
+ 
+ 	kfree(pdata);
 -- 
 1.7.4.1
