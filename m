@@ -1,62 +1,47 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 21 Sep 2011 12:55:59 -0500
-Subject: [PATCH 3/3] ARM: gic: add OF based initialization
-In-Reply-To: <4E7A1BCA.1090006@ti.com>
-References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
-	<1316550244-3655-4-git-send-email-robherring2@gmail.com>
-	<4E7A1BCA.1090006@ti.com>
-Message-ID: <4E7A252F.2000402@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Sep 2011 11:20:51 -0700
+Subject: [GIT PULL] OMAP: omap_device cleanup for v3.2
+In-Reply-To: <87y5xps6kv.fsf@ti.com>
+References: <87mxe5tlzv.fsf@ti.com>
+ <87y5xps6kv.fsf@ti.com>
+Message-ID: <20110921182051.GH2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit,
+* Kevin Hilman <khilman@ti.com> [110915 16:23]:
+> Kevin Hilman <khilman@ti.com> writes:
+> 
+> > Please pull this omap_device cleanup series for v3.2.  This sets the
+> > groundwork for Benoit's DT infrastructure work.
+> 
+> Turns out this series has a dependency on a patch[1] in Russell's
+> for-next branch.
+> 
+> Russell, any chance of picking this patch into your devel-stable so we
+> have a fixed point to merge with?
 
-On 09/21/2011 12:15 PM, Cousson, Benoit wrote:
-> Hi Rob,
-> 
-> I'm testing that series with OMAP4 but have some issues for the moment :-(
-> 
-> [    0.000000] WARNING: at kernel/irq/irqdomain.c:34 gic_of_init+0x10c/0x180()
-> [    0.000000] error: irq_desc already assigned to a domain
-> [    0.000000] Modules linked in:
-> [    0.000000] [<c001b284>] (unwind_backtrace+0x0/0xf0) from [<c0051c34>] (warn_slowpath_common+0x4c/0x64)
-> [    0.000000] [<c0051c34>] (warn_slowpath_common+0x4c/0x64) from [<c0051ce0>] (warn_slowpath_fmt+0x30/0x40)
-> [    0.000000] [<c0051ce0>] (warn_slowpath_fmt+0x30/0x40) from [<c05f6874>] (gic_of_init+0x10c/0x180)
-> [    0.000000] [<c05f6874>] (gic_of_init+0x10c/0x180) from [<c05fa2e0>] (omap_gic_of_init+0x8/0x28)
-> [    0.000000] [<c05fa2e0>] (omap_gic_of_init+0x8/0x28) from [<c0616b44>] (of_irq_init+0x148/0x28c)
-> [    0.000000] [<c0616b44>] (of_irq_init+0x148/0x28c) from [<c05f3074>] (init_IRQ+0x14/0x1c)
-> [    0.000000] [<c05f3074>] (init_IRQ+0x14/0x1c) from [<c05f0650>] (start_kernel+0x184/0x2fc)
-> [    0.000000] [<c05f0650>] (start_kernel+0x184/0x2fc) from [<80008040>] (0x80008040)
->  
-> I'm not super familiar with all the irq stuff but I'm wondering if there is not something wrong with the test that print that message:
-> 
-> void irq_domain_add(struct irq_domain *domain)
-> {
-> 	struct irq_data *d;
-> 	int hwirq;
-> 
-> 	/*
-> 	 * This assumes that the irq_domain owner has already allocated
-> 	 * the irq_descs.  This block will be removed when support for dynamic
-> 	 * allocation of irq_descs is added to irq_domain.
-> 	 */
-> 	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
-> 		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
-> 		if (d || d->domain) {
-> 			/* things are broken; just report, don't clean up */
-> 			WARN(1, "error: irq_desc already assigned to a domain");
-> 			return;
-> 		}
-> [...]
-> 
-> Is the (d || d->domain) correct? Shouldn't it be (d && d->domain)?
-> 
-> But since that used to work properly, I have some doubt. Moreover the driver will not even get the proper interrupt later...
-> 
-> Do you have any clue?
+Or maybe Kevin can add it to his series instead?
 
-I fixed that in the prior series and tglx picked it up, so I did not
-repost. It should hit mainline for 3.1, but I haven't verified if it is
-in yet. Sorry for the confusion, I should have mentioned that.
+Tony
+ 
 
-Rob
+> [1]
+> commit 456f69c544d4298e921dc0c606492cdbaa60b34b
+> Author: Kevin Hilman <khilman@deeprootsystems.com>
+> Date:   Tue Sep 6 21:04:10 2011 +0100
+> 
+>     ARM: 7082/1: platform_device: pdev_archdata: add omap_device pointer
+>     
+>     Add omap_device pointer to the ARM-specific arch data in the
+>     platform_device.  This will be used to attach OMAP-specific
+>     device-data to the platform device with device lifetime.
+>     
+>     Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>     
+>     Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>     Signed-off-by: Kevin Hilman <khilman@ti.com>
+>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
