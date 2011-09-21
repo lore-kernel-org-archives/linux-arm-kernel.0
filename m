@@ -1,64 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Sep 2011 08:13:13 -0700
-Subject: [PATCH v7 26/26] gpio/omap: add dbclk aliases for all gpio modules
-In-Reply-To: <1315918979-26173-27-git-send-email-tarun.kanti@ti.com>
-References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-	<1315918979-26173-27-git-send-email-tarun.kanti@ti.com>
-Message-ID: <20110921151313.GC2937@atomide.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 21 Sep 2011 23:17:44 +0800
+Subject: [PATCH v2 0/3] ARCH: CSR: basic PM suspend/resume support
+Message-ID: <1316618267-4348-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tarun Kanti DebBarma <tarun.kanti@ti.com> [110913 05:29]:
-> Unless the dbclk aliases are assigned, clk_get(bank->dev, "dbclk")
-> would not fetch the associated clock handle. As a result, we would
-> not be able to turn on/off the debounce clock. This was preventing
-> the gpio modules going to low power mode whenever dbclk is enabled.
-> 
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+-v2:
+add acked-by Arnd in changelog;
+add necessary changelog for every patch;
+don't call l2x0_of_init after resuming as Shawn's patch[1] seems
+not to be applied;
+since people still need some time to figure out the best way for l2
+resume, we move the l2 re-init to bootloader for the moment to keep
+things go ahead.
 
-Looks OK to me, Paul should ack this one also:
+-v1:
+it was in thread "ARM: CSR: add rtciobrg and PM support" before. See:
+http://www.spinics.net/lists/arm-kernel/msg137375.html
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Arnd has pulled rtciobrg into arm-soc next branch. PM should be another
+series.
 
-> ---
->  arch/arm/mach-omap2/clock3xxx_data.c |    6 ++++++
->  arch/arm/mach-omap2/clock44xx_data.c |    6 ++++++
->  2 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
-> index ffd55b1..7238ec1 100644
-> --- a/arch/arm/mach-omap2/clock3xxx_data.c
-> +++ b/arch/arm/mach-omap2/clock3xxx_data.c
-> @@ -3462,6 +3462,12 @@ static struct omap_clk omap3xxx_clks[] = {
->  	CLK("musb-am35x",	"fck",		&hsotgusb_fck_am35xx,	CK_AM35XX),
->  	CLK(NULL,	"hecc_ck",	&hecc_ck,	CK_AM35XX),
->  	CLK(NULL,	"uart4_ick",	&uart4_ick_am35xx,	CK_AM35XX),
-> +	CLK("omap_gpio.1",	"dbclk",	&gpio1_dbck,	CK_3XXX),
-> +	CLK("omap_gpio.2",	"dbclk",	&gpio2_dbck,	CK_3XXX),
-> +	CLK("omap_gpio.3",	"dbclk",	&gpio3_dbck,	CK_3XXX),
-> +	CLK("omap_gpio.4",	"dbclk",	&gpio4_dbck,	CK_3XXX),
-> +	CLK("omap_gpio.5",	"dbclk",	&gpio5_dbck,	CK_3XXX),
-> +	CLK("omap_gpio.6",	"dbclk",	&gpio6_dbck,	CK_3XXX),
->  };
->  
->  
-> diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
-> index 2af0e3f..4986069 100644
-> --- a/arch/arm/mach-omap2/clock44xx_data.c
-> +++ b/arch/arm/mach-omap2/clock44xx_data.c
-> @@ -3363,6 +3363,12 @@ static struct omap_clk omap44xx_clks[] = {
->  	CLK("usbhs-omap.0",	"usbhost_ick",		&dummy_ck,		CK_443X),
->  	CLK("usbhs-omap.0",	"usbtll_fck",		&dummy_ck,	CK_443X),
->  	CLK("omap_wdt",	"ick",				&dummy_ck,	CK_443X),
-> +	CLK("omap_gpio.1",	"dbclk",	&gpio1_dbclk,	CK_443X),
-> +	CLK("omap_gpio.2",	"dbclk",	&gpio2_dbclk,	CK_443X),
-> +	CLK("omap_gpio.3",	"dbclk",	&gpio3_dbclk,	CK_443X),
-> +	CLK("omap_gpio.4",	"dbclk",	&gpio4_dbclk,	CK_443X),
-> +	CLK("omap_gpio.5",	"dbclk",	&gpio5_dbclk,	CK_443X),
-> +	CLK("omap_gpio.6",	"dbclk",	&gpio6_dbclk,	CK_443X),
->  };
->  
->  int __init omap4xxx_clk_init(void)
-> -- 
-> 1.7.0.4
-> 
+This series has been tested on prima2 Linux 3.1-rc6 with log:
+
+# echo mem > /sys/power/state
+PM: Syncing filesystems ... done.
+Freezing user space processes ... (elapsed 0.01 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+Suspending console(s) (use no_console_suspend to debug)
+C0PM: suspend of devices complete after 2.083 msecs
+PM: late suspend of devices complete after 0.697 msecs
+L310 cache controller enabled
+l2x0: 8 ways, CACHE_ID 0x410000c7, AUX_CTRL 0x00040000, Cache size: 262144 B
+PM: early resume of devices complete after 0.628 msecs
+PM: resume of devices complete after 1.804 msecs
+Restarting tasks ... done.
+
+Due to L2 cache will lose power and data in suspend cycle, prima2 actually requires
+the whole l2 cache flushed while suspending and re-initilized after resuming just
+like code boot.
+So the "ARM: CSR: PM: add sleep entry for SiRFprimaII" depends on [1]:
+
+[1] Shawn Guo <shawn.guo@linaro.org>'s
+[PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from initialization functions
+http://www.spinics.net/lists/arm-kernel/msg139198.html
+
+Barry Song (2):
+  ARM: CSR: PM: save/restore timer status in suspend cycle
+  ARM: CSR: PM: save/restore irq status in suspend cycle
+
+Rongjun Ying (1):
+  ARM: CSR: PM: add sleep entry for SiRFprimaII
+
+ arch/arm/mach-prima2/Makefile |    1 +
+ arch/arm/mach-prima2/irq.c    |   40 +++++++++++
+ arch/arm/mach-prima2/pm.c     |  149 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-prima2/pm.h     |   31 +++++++++
+ arch/arm/mach-prima2/sleep.S  |   64 ++++++++++++++++++
+ arch/arm/mach-prima2/timer.c  |   34 +++++++++
+ 6 files changed, 319 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/pm.c
+ create mode 100644 arch/arm/mach-prima2/pm.h
+ create mode 100644 arch/arm/mach-prima2/sleep.S
