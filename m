@@ -1,68 +1,76 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 21 Sep 2011 10:41:49 +0100
-Subject: DT vs ARM static mappings
-In-Reply-To: <201109202128.55517.arnd@arndb.de>
-References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
-	<4E78A546.9040604@gmail.com>
-	<1316535403.4611.534.camel@hornet.cambridge.arm.com>
-	<201109202128.55517.arnd@arndb.de>
-Message-ID: <1316598109.4611.613.camel@hornet.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 21 Sep 2011 11:45:31 +0200
+Subject: [PATCH 2/3] at91/gpio: drop PIN_BASE
+In-Reply-To: <4E76FF22.40001@atmel.com>
+References: <1316285923-12461-1-git-send-email-plagnioj@jcrosoft.com>
+	<1316285923-12461-2-git-send-email-plagnioj@jcrosoft.com>
+	<4E76FF22.40001@atmel.com>
+Message-ID: <4E79B23B.7040800@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > 2. Single DT_MACHINE_START matching (the most generic) "arm,vexpress"
-> > and doing (rougly) this in v2m_map_io:
-> > 
-> > of_scan_flat_dt(v2m_dt_iotable_init, NULL);
-> > 
-> > v2m_dt_iotable_init(...)
-> > {
-> > 	if (depth != 0)
-> > 		return 0;
-> > 	if (of_flat_dt_is_compatible(node, "arm,vexpress-legacy"))
-> > 		iotable_init(v2m_io_desc_legacy);
-> > 	else (of_flat_dt_is_compatible(node, "arm,vexpress-rs1"))
-> > 		iotable_init(v2m_io_desc_rs1);
-> > 	else
-> > 		panic();
-> > }
-> > 
-> > Neither of them seem particularly appealing... ;-)
+Le 19/09/2011 10:36, Nicolas Ferre :
+> Le 17/09/2011 20:58, Jean-Christophe PLAGNIOL-VILLARD :
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  arch/arm/mach-at91/gpio.c              |   54 ++--
+>>  arch/arm/mach-at91/include/mach/gpio.h |  454 ++++++++++++++++----------------
+>>  2 files changed, 254 insertions(+), 254 deletions(-)
+>>  rewrite arch/arm/mach-at91/include/mach/gpio.h (78%)
+>>
+>> diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
+>> index 04beff1..e709406 100644
+>> --- a/arch/arm/mach-at91/gpio.c
+>> +++ b/arch/arm/mach-at91/gpio.c
+>> @@ -60,18 +60,17 @@ static int at91_gpiolib_direction_input(struct gpio_chip *chip,
+>>  	}
+>>  
+>>  static struct at91_gpio_chip gpio_chip[] = {
+>> -	AT91_GPIO_CHIP("A", 0x00 + PIN_BASE, 32),
+>> -	AT91_GPIO_CHIP("B", 0x20 + PIN_BASE, 32),
+>> -	AT91_GPIO_CHIP("C", 0x40 + PIN_BASE, 32),
+>> -	AT91_GPIO_CHIP("D", 0x60 + PIN_BASE, 32),
+>> -	AT91_GPIO_CHIP("E", 0x80 + PIN_BASE, 32),
+>> +	AT91_GPIO_CHIP("A", 0x00, 32),
+>> +	AT91_GPIO_CHIP("B", 0x20, 32),
+>> +	AT91_GPIO_CHIP("C", 0x40, 32),
+>> +	AT91_GPIO_CHIP("D", 0x60, 32),
+>> +	AT91_GPIO_CHIP("E", 0x80, 32),
+>>  };
+>>  
+>>  static int gpio_banks;
+>>  
+>>  static inline void __iomem *pin_to_controller(unsigned pin)
+>>  {
+>> -	pin -= PIN_BASE;
+>>  	pin /= 32;
+>>  	if (likely(pin < gpio_banks))
+>>  		return gpio_chip[pin].regbase;
+>> @@ -81,7 +80,6 @@ static inline void __iomem *pin_to_controller(unsigned pin)
+>>  
+>>  static inline unsigned pin_to_mask(unsigned pin)
+>>  {
+>> -	pin -= PIN_BASE;
+>>  	return 1 << (pin % 32);
+>>  }
+>>  
+>> @@ -276,8 +274,9 @@ static u32 backups[MAX_GPIO_BANKS];
+>>  
+>>  static int gpio_irq_set_wake(struct irq_data *d, unsigned state)
+>>  {
+>> -	unsigned	mask = pin_to_mask(d->irq);
+>> -	unsigned	bank = (d->irq - PIN_BASE) / 32;
+>> +	unsigned	pin = irq_to_gpio(d->irq);
 > 
-> But I think both ways would be acceptable in the end. It's not a lot
-> of extra code either way. In the second case, I would probably have
-> the legacy case as a special variant of the map_io function and have
-> all others be the default instead of falling back to panic though.
+> No, we try to remove the use of this irq_to_gpio() function. So we have
+> to avoid re-introducing it...
 
-Ok, I'll go (roughly) that way.
+Well, as this use is limited to the gpio driver itself it seems that we
+can accept it...
 
-> > In my case it's sysreg and sysctl. There are two more users of static
-> > mappings: timer01 and timer23, but they could at some point do ioremap()
-> > on their own (especially with Nico's changes).
-> 
-> Well, I think with Nico's cahnges, you /can/ actually do ioremap for
-> areas that have been mapped through the iotable before kmalloc is up.
-> IIRC, omap does this for a number of peripherals.
-> 
-> It's a bit of a hack, but I think it's much better than taking hardcoded
-> addresses.
+So we can go forward with this patch series.
 
-Yes, I was thinking about that last night. If you think it's acceptable
-I'll do this (killing MMIO_P2V on the way ;-)
-
-> With the combination of the points mentioned above, you should be
-> able to do:
-> 
-> - map the entire I/O area in map_io(), depending on the board
-> - have an __iomem pointer for the sysreg
-> - populate that pointer using of_iomap from the device tree address
->   before you first access it.
-> 
-> Do you think that would work?
-
-Yes, I suppose so. The last bit (getting the offset from DT) will be a
-little ugly, I think, but let's wait till I get some code done.
-
-Cheers!
-
-Pawe?
+Best regards,
+-- 
+Nicolas Ferre
