@@ -1,43 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 21 Sep 2011 00:56:29 -0700
-Subject: [PATCHv2 2/2] ARM: debug: Move DEBUG_ICEDCC into the DEBUG_LL
-	choice
-In-Reply-To: <1316568208-4518-2-git-send-email-sboyd@codeaurora.org>
-References: <1316568208-4518-1-git-send-email-sboyd@codeaurora.org>
-	<1316568208-4518-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <4E7998AD.9070305@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Sep 2011 10:25:06 +0200
+Subject: [PATCH 2/2 v7] pinmux: add a driver for the U300 pinmux
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B7321777@HQMAIL01.nvidia.com>
+References: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B7321777@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdY5ETbJxSpwJL-7KZhjOnhwrdT1=djwByek75ye=S9L9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/20/2011 6:23 PM, Stephen Boyd wrote:
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 6dbcb00..31896f4 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -81,6 +81,17 @@ choice
->  	prompt "Kernel low-level debugging port"
->  	depends on DEBUG_LL
->  
-> +	config DEBUG_ICEDCC
-> +		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
-> +		depends on DEBUG_LL
-
-Oops. This depends isn't necessary. Will fix before submitting to patch
-tracker.
-
-> +		help
-> +		  Say Y here if you want the debug print routines to direct
-> +		  their output to the EmbeddedICE macrocell's DCC channel using
-> +		  co-processor 14. This is known to work on the ARM9 style ICE
-> +		  channel and on the XScale with the PEEDI.
-> +
-> +		  It does include a timeout to ensure that the system does not
-> +		  totally freeze when there is nothing connected to read.
->  
->  	config DEBUG_FOOTBRIDGE_COM1
->  		bool "Kernel low-level debugging messages via footbridge 8250 at PCI COM1"
+On Wed, Sep 21, 2011 at 12:15 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Linus Walleij wrote at Friday, September 16, 2011 6:14 AM:
+>> + ? ? for (i = 0; i < ARRAY_SIZE(u300_mux_hogs); i++) {
+>> + ? ? ? ? ? ? struct pinmux *pmx;
+>> + ? ? ? ? ? ? int ret;
+>> +
+>> + ? ? ? ? ? ? pmx = pinmux_get(u300_mux_hogs[i].dev, NULL);
+>> + ? ? ? ? ? ? if (IS_ERR(pmx)) {
+>> + ? ? ? ? ? ? ? ? ? ? pr_err("u300: could not get pinmux hog %s\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?u300_mux_hogs[i].name);
+>> + ? ? ? ? ? ? ? ? ? ? continue;
+>> + ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? ret = pinmux_enable(pmx);
+>> + ? ? ? ? ? ? if (ret) {
+>> + ? ? ? ? ? ? ? ? ? ? pr_err("u300: could enable pinmux hog %s\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?u300_mux_hogs[i].name);
+>> + ? ? ? ? ? ? ? ? ? ? continue;
+>> + ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? u300_mux_hogs[i].pmx = pmx;
+>> + ? ? }
+>> + ? ? return 0;
+>> +}
+>> +subsys_initcall(u300_pinmux_fetch);
 >
+> Why not just have the pinmux core support hogging on non-"system" mapping
+> entries; then everything I quoted above except u300_pinmux_map[] could
+> be deleted, and the "hog" flag set on the last 3 u300_pinmux_map[] entries.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Very good question, luckily I have a good answer.
+
+There is no way for the pinmux core to traverse the system and look
+up the apropriate struct device * pointers.
+
+When/if we have device tree support, I think this will be possible, then I
+will be able to have the pinmux hog look up devices from device tree
+and hog their pinmux.
+
+At that point we'll likely have the mapping in the device tree too and
+the core does not need to be involved at all.
+
+What I could do right now is add some open-ended function like
+pinmux_hog_device_pinmuxes(struct device **devices);
+that can take an array of devices and hog their respective
+pinmuxes in the hog list. Do you think it's a good idea?
+
+Yours,
+Linus Walleij
