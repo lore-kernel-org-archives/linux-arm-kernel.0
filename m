@@ -1,70 +1,92 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 21 Sep 2011 12:39:46 -0700
-Subject: [PATCH 2/2 v7] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <CACRpkdY5ETbJxSpwJL-7KZhjOnhwrdT1=djwByek75ye=S9L9w@mail.gmail.com>
-References: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B7321777@HQMAIL01.nvidia.com>
-	<CACRpkdY5ETbJxSpwJL-7KZhjOnhwrdT1=djwByek75ye=S9L9w@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1738180164@HQMAIL01.nvidia.com>
+Date: Wed, 21 Sep 2011 12:45:52 -0700
+Subject: [PATCH 1/2] drivers: create a pin control subsystem v7
+In-Reply-To: <CACRpkdZyhkydTutHXfry_dUPK_Ts_jq+5VHcr8XdgrHSExTyww@mail.gmail.com>
+References: <1316175203-10736-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B7321751@HQMAIL01.nvidia.com>
+	<CACRpkdZyhkydTutHXfry_dUPK_Ts_jq+5VHcr8XdgrHSExTyww@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1738180167@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Wednesday, September 21, 2011 2:25 AM:
-> On Wed, Sep 21, 2011 at 12:15 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> > Linus Walleij wrote at Friday, September 16, 2011 6:14 AM:
-> >> + ? ? for (i = 0; i < ARRAY_SIZE(u300_mux_hogs); i++) {
-> >> + ? ? ? ? ? ? struct pinmux *pmx;
-> >> + ? ? ? ? ? ? int ret;
-> >> +
-> >> + ? ? ? ? ? ? pmx = pinmux_get(u300_mux_hogs[i].dev, NULL);
-> >> + ? ? ? ? ? ? if (IS_ERR(pmx)) {
-> >> + ? ? ? ? ? ? ? ? ? ? pr_err("u300: could not get pinmux hog %s\n",
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?u300_mux_hogs[i].name);
-> >> + ? ? ? ? ? ? ? ? ? ? continue;
-> >> + ? ? ? ? ? ? }
-> >> + ? ? ? ? ? ? ret = pinmux_enable(pmx);
-> >> + ? ? ? ? ? ? if (ret) {
-> >> + ? ? ? ? ? ? ? ? ? ? pr_err("u300: could enable pinmux hog %s\n",
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?u300_mux_hogs[i].name);
-> >> + ? ? ? ? ? ? ? ? ? ? continue;
-> >> + ? ? ? ? ? ? }
-> >> + ? ? ? ? ? ? u300_mux_hogs[i].pmx = pmx;
-> >> + ? ? }
-> >> + ? ? return 0;
-> >> +}
-> >> +subsys_initcall(u300_pinmux_fetch);
+Linus Walleij wrote at Wednesday, September 21, 2011 3:17 AM:
+> On Tue, Sep 20, 2011 at 11:58 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> > Linus Walleij wrote at Friday, September 16, 2011 6:13 AM:
+> >> This creates a subsystem for handling of pin control devices.
+> >> These are devices that control different aspects of package
+> >> pins.
 > >
-> > Why not just have the pinmux core support hogging on non-"system" mapping
-> > entries; then everything I quoted above except u300_pinmux_map[] could
-> > be deleted, and the "hog" flag set on the last 3 u300_pinmux_map[] entries.
+> > I've read through the documentation and header files, but not the .c files,
+> > and this looks almost perfect as far as I can tell right now. I'll try to
+> > review the .c files sometime too.
 > 
-> Very good question, luckily I have a good answer.
-> 
-> There is no way for the pinmux core to traverse the system and look
-> up the apropriate struct device * pointers.
+> Great, I'm hunting your Acked-by/Reviewed-by ...
 
-It's unclear to me why that would be needed.
+Very close; I was just holding off until we resolved the discussion on
+hog'd non-system mapping table entries, and I figured I'd wait until v8
+which presumably would delete the pinmux_config function from the header?
 
-For non-system mappings, either the device-driver in question will be
-get'ing and enabling them (this case isn't relevant to this discussion),
-or they'll be hogged. In the hog case, I doubt anything would ever want
-to disable them and switch the device to a different mapping entry; if
-that were the case, the entries shouldn't be hogged, but get/enabled by
-the device anyway. Hence, I don't see the need for an activation of a
-hog'd non-system mapping entry to care about the device fields that are
-in the mapping table at all; they could just be ignored couldn't they?
+> I will likely request inclusion into linux-next soon-ish.
+> 
+> > I just have one comment:
+> >
+> >> diff --git a/include/linux/pinctrl/pinmux.h b/include/linux/pinctrl/pinmux.h
+> > ...
+> >> +/* External interface to pinmux */
+> >> +extern int pinmux_request_gpio(unsigned gpio);
+> >> +extern void pinmux_free_gpio(unsigned gpio);
+> >> +extern struct pinmux * __must_check pinmux_get(struct device *dev, const char *name);
+> >> +extern void pinmux_put(struct pinmux *pmx);
+> >> +extern int pinmux_enable(struct pinmux *pmx);
+> >> +extern void pinmux_disable(struct pinmux *pmx);
+> >> +extern int pinmux_config(struct pinmux *pmx, u16 param, unsigned long *data);
+> >
+> > That definition of pinmux_config doesn't seem as useful as it could be;
+> 
+> It should be removed. It's just there in the header file, I killed off
+> the implementation because specific control of a mux doesn't make
+> sense. We want to do stuff to pin groups directly, not related to
+> muxing, so that kind of thing needs to be in the generic pinctrl
+> interface.
 
-> When/if we have device tree support, I think this will be possible, then I
-> will be able to have the pinmux hog look up devices from device tree
-> and hog their pinmux.
+OK.
+
+> > I'd like the ability to execute pinmux_config on a /named/ group, and I
+> > can certainly see a use-case for applying it to /named/ pins too.
 > 
-> At that point we'll likely have the mapping in the device tree too and
-> the core does not need to be involved at all.
+> That sounds correct to me.
 > 
-> What I could do right now is add some open-ended function like
-> pinmux_hog_device_pinmuxes(struct device **devices);
-> that can take an array of devices and hog their respective
-> pinmuxes in the hog list. Do you think it's a good idea?
+> To abstract things the stuff we can do with the group should be
+> something enumerated too. So:
+> 
+> pinctrl_config_group(const char *pinctrl_device, const char *group,
+> const char *mode);
+> pinctrl_config_pin(const char *pinctrl_device, int pin, const char *mode);
+> 
+> So the driver need an API to enumerate pin and group modes.
+> 
+> I might want to save this thing for post-merge of the basic API and
+> pinmux stuff though so we don't try to push too much upfront
+> design at once.
+
+Yes, adding in a replacement _config API can certainly be a later patch.
+
+One comment on the API above: I think you want "mode" (or "setting"?)
+/and/ a value parameter; Tegra's pull strength definition for example
+is:
+
+enum tegra_pull_strength {
+        TEGRA_PULL_0 = 0,
+        TEGRA_PULL_1,
+// ... (every value in between)
+        TEGRA_PULL_30,
+        TEGRA_PULL_31,
+        TEGRA_MAX_PULL,
+};
+
+And it seems better to represent that as ("pull", 0) ... ("pull", 31) than
+"pull0" .. "pull31" such that the value needs to be parsed out of the "mode"
+string somehow by the driver.
 
 -- 
 nvpublic
