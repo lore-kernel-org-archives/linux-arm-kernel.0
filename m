@@ -1,29 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 22 Sep 2011 00:07:47 +0800
-Subject: [PATCH v3 0/3] add fec support for imx6q
-Message-ID: <1316621270-27805-1-git-send-email-shawn.guo@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 21 Sep 2011 19:07:55 +0300
+Subject: [PATCH 00/10] hwspinlock-next
+In-Reply-To: <CAK=WgbZ_1M-p+BtJnhw_uvaCnLaFRPA_tyv-rSGWMv2GQcB5Cw@mail.gmail.com>
+References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
+	<CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
+	<20110920231340.GT18894@atomide.com> <201109211612.33504.arnd@arndb.de>
+	<20110921152812.GE2937@atomide.com>
+	<CAK=WgbZ_1M-p+BtJnhw_uvaCnLaFRPA_tyv-rSGWMv2GQcB5Cw@mail.gmail.com>
+Message-ID: <CAK=WgbZw=q1HkU2U6iuzjSW==za5saFXmnf0yaYoHWkJfduZVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds imx6q enet support.  The imx6q enet is a derivative of
-imx28 enet controller.  It fixed the frame endian issue found on imx28,
-and added 1 Gbps support.
+On Wed, Sep 21, 2011 at 6:56 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Wed, Sep 21, 2011 at 6:28 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> Ohad can you please try this first? Just please make sure your patches are
+>> first in next tree before sending in the pull request.
+>
+> Sure thing.
+>
+> Stephen, I'll send you the location of my tree in a few.
 
-Changes since v2:
- * Refine patch #1 to get fec_reset_phy() return void
+Just before I do, Tony can I please have your Ack for the mach-omap2
+part of this patch-set:
 
-Changes since v1:
- * Fix typo pointed out by Francois Romieu
- * Drop patch #3 in the v1
- * Rebase on net-next tree
+ arch/arm/mach-omap2/hwspinlock.c         |    8 +-
 
-Thanks.
-
-Shawn Guo (3):
-      net/fec: fec_reset_phy() does not need to always succeed
-      net/fec: fix fec1 check in fec_enet_mii_init()
-      net/fec: add imx6q enet support
-
- drivers/net/ethernet/freescale/Kconfig |    9 ++--
- drivers/net/ethernet/freescale/fec.c   |   76 +++++++++++++++++++++++---------
- 2 files changed, 59 insertions(+), 26 deletions(-)
+Thanks,
+Ohad.
