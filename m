@@ -1,58 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Sep 2011 08:28:13 -0700
-Subject: [PATCH 00/10] hwspinlock-next
-In-Reply-To: <201109211612.33504.arnd@arndb.de>
-References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
-	<CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
-	<20110920231340.GT18894@atomide.com>
-	<201109211612.33504.arnd@arndb.de>
-Message-ID: <20110921152812.GE2937@atomide.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 21 Sep 2011 20:58:18 +0530
+Subject: [PATCH 8/8] OMAP4: Fix the emif and dmm virtual mapping
+In-Reply-To: <4E78AAD5.6010906@ti.com>
+References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>	<1315459327-3285-9-git-send-email-santosh.shilimkar@ti.com>
+	<87r53gnzfh.fsf@ti.com> <4E78AAD5.6010906@ti.com>
+Message-ID: <4E7A0292.4020408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110921 06:39]:
-> On Wednesday 21 September 2011, Tony Lindgren wrote:
-> > * Ohad Ben-Cohen <ohad@wizery.com> [110920 01:34]:
-> > > On Mon, Sep 12, 2011 at 7:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> > > 
-> > > I'm wondering how hwspinlock updates like this should go upstream.
-> > > 
-> > > The first hwspinlock batch was picked by Tony, because it involved a
-> > > bulk of OMAP changes.
-> > > 
-> > > Hwspinlock isn't OMAP-specific anymore though (we gained support for
-> > > STE's u8500) and the vast majority of changes are in drivers/. We're
-> > > still very much ARM-related, though this may change too at some point
-> > > (c6x has a similar "hardware semaphore" peripheral like the u8500
-> > > does).
-> > > 
-> > > Tony, if you're still willing to pick up these updates I'd be happy to
-> > > send you pull requests of course.
-> > 
-> > I'd prefer for Greg to take these as these are drivers.
-> > 
-> > If he's not taking it at this point based on it being ARM only,
-> > I can take it then.
+On Tuesday 20 September 2011 08:31 PM, Santosh Shilimkar wrote:
+> On Friday 16 September 2011 11:26 PM, Kevin Hilman wrote:
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>>
+
+[...]
+
 > 
-> Sorry for replying late, I had accidentally ignored the entire thread.
-> 
-> My feeling is that it would be best for Ohad to send these directly
-> to Linus, since it's basically a standalone subsystem and he's listed
-> as the maintainer (well, after this series at least).
+>>>  #define OMAP44XX_EMIF2_SIZE	SZ_1M
+>>>  
+>>>  #define OMAP44XX_DMM_PHYS	OMAP44XX_DMM_BASE
+>>>  						/* 0x4e000000 --> 0xfd300000 */
+>>> -#define OMAP44XX_DMM_VIRT	(OMAP44XX_DMM_PHYS + OMAP4_L3_PER_IO_OFFSET)
+>>> +#define OMAP44XX_DMM_VIRT	(OMAP44XX_EMIF2_VIRT + SZ_1M)
+>>
+>> and '+ OMAP44XX_EMIF2_SIZE' here.
+>>
+> Will add OMAP44XX_EMIF_SIZE since 2 EMIFs instaces are and
+> suppose to be identical.Almost missed this email in other traffic.
 
-Ohad can you please try this first? Just please make sure your patches are
-first in next tree before sending in the pull request.
- 
-> I'm also fine with any of the other paths like
-> 
-> ohad->GregKH->torvalds
+OPPs. It was already there. Dumb of me not using it. Below
+is the update what I will do.
 
-Greg does not prefer that as it's ARM only currently.
+diff --git a/arch/arm/plat-omap/include/plat/io.h
+b/arch/arm/plat-omap/include/plat/io.h
+index d72ec85..db36292 100644
+--- a/arch/arm/plat-omap/include/plat/io.h
++++ b/arch/arm/plat-omap/include/plat/io.h
+@@ -228,13 +228,13 @@
 
-> ohad->arnd->torvalds
-> ohad->tmlind->torvalds
-> ohad->tmlind->arnd->torvalds
+ #define OMAP44XX_EMIF2_PHYS	OMAP44XX_EMIF2_BASE
+ 						/* 0x4d000000 --> 0xfd200000 */
+-#define OMAP44XX_EMIF2_VIRT	(OMAP44XX_EMIF2_PHYS + OMAP4_L3_PER_IO_OFFSET)
+ #define OMAP44XX_EMIF2_SIZE	SZ_1M
++#define OMAP44XX_EMIF2_VIRT	(OMAP44XX_EMIF1_VIRT + OMAP44XX_EMIF2_SIZE)
 
-So as a backup plan any of these are also fine with me too.
-
-Tony
+ #define OMAP44XX_DMM_PHYS	OMAP44XX_DMM_BASE
+ 						/* 0x4e000000 --> 0xfd300000 */
+-#define OMAP44XX_DMM_VIRT	(OMAP44XX_DMM_PHYS + OMAP4_L3_PER_IO_OFFSET)
+ #define OMAP44XX_DMM_SIZE	SZ_1M
++#define OMAP44XX_DMM_VIRT	(OMAP44XX_EMIF2_VIRT + OMAP44XX_DMM_SIZE)
+ /*
+  *
+----------------------------------------------------------------------------
+  * Omap specific register access
+-- 
+1.7.4.1
