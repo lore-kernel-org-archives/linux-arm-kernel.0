@@ -1,33 +1,25 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 21 Sep 2011 11:39:22 -0700
-Subject: [GIT PULL] OMAP: omap_device cleanup for v3.2
-In-Reply-To: <20110921182051.GH2937@atomide.com> (Tony Lindgren's message of
-	"Wed, 21 Sep 2011 11:20:51 -0700")
-References: <87mxe5tlzv.fsf@ti.com> <87y5xps6kv.fsf@ti.com>
-	<20110921182051.GH2937@atomide.com>
-Message-ID: <87ty853fl1.fsf@ti.com>
+From: per.forlin@stericsson.com (=?ISO-8859-1?Q?Per_Frid=E9n_F=F6rlin?=)
+Date: Wed, 21 Sep 2011 20:43:11 +0200
+Subject: [PATCH 0/2] mmc: clarifications on host.post_req()
+In-Reply-To: <m2k4913fzs.fsf@bob.laptop.org>
+References: <1314624959-4634-1-git-send-email-per.forlin@linaro.org>
+	<m2k4913fzs.fsf@bob.laptop.org>
+Message-ID: <CAMTa3YhkZUY+KxAwHfzkJe58stz3pkLb9oc+Po0nrP81phWPYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
-
-> * Kevin Hilman <khilman@ti.com> [110915 16:23]:
->> Kevin Hilman <khilman@ti.com> writes:
->> 
->> > Please pull this omap_device cleanup series for v3.2.  This sets the
->> > groundwork for Benoit's DT infrastructure work.
->> 
->> Turns out this series has a dependency on a patch[1] in Russell's
->> for-next branch.
->> 
->> Russell, any chance of picking this patch into your devel-stable so we
->> have a fixed point to merge with?
+On Wed, Sep 21, 2011 at 8:30 PM, Chris Ball <cjb@laptop.org> wrote:
+> Hi Per,
 >
-> Or maybe Kevin can add it to his series instead?
+> On Mon, Aug 29 2011, Per Forlin wrote:
+>> Fixes for 3.1.
+>> This patchset doesn't fix any bugs in 3.1 but it improves the documentation
+>> in order to prevent new bugs.
+>
+> I've merged this into mmc-next now, but I'm planning on sending it for
+> 3.2 instead of 3.1 at this point; hope that's okay.
+>
+Fine with me.
 
-Sure. 
-
-Russell, if you're OK with dropping it from your for-next, I'll just
-add it to my series where the dependencies are.
-
-Kevin
+Thanks,
+Per
