@@ -1,52 +1,78 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 21 Sep 2011 21:24:04 +0800
-Subject: [PATCH] gpio/mxc: add chained_irq_enter/exit() to
-	mx3_gpio_irq_handler()
-Message-ID: <1316611444-14126-1-git-send-email-shawn.guo@linaro.org>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Wed, 21 Sep 2011 15:17:50 +0200
+Subject: [PATCH 2/8] mm: alloc_contig_freed_pages() added
+In-Reply-To: <1315505152.3114.9.camel@nimitz>
+References: <1313764064-9747-1-git-send-email-m.szyprowski@samsung.com>
+	<1313764064-9747-3-git-send-email-m.szyprowski@samsung.com>
+	<1315505152.3114.9.camel@nimitz>
+Message-ID: <op.v15tv0183l0zgt@mnazarewicz-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mx3_gpio_irq_handler() is also called on imx6q which has GIC as
-the primary interrupt controller.  As GIC implements the fasteoi flow
-control, we need to add chained_irq_enter/exit() to
-mx3_gpio_irq_handler() for signaling EOI, otherwise system will hang
-whenever there is a gpio irq triggered.
+On Thu, 08 Sep 2011 20:05:52 +0200, Dave Hansen <dave@linux.vnet.ibm.com>  
+wrote:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-This is the second post of '[PATCH] gpio/mxc: make it work with imx6q'
-to adopt the point given by Jamie.
+> On Fri, 2011-08-19 at 16:27 +0200, Marek Szyprowski wrote:
+>> +unsigned long alloc_contig_freed_pages(unsigned long start, unsigned  
+>> long end,
+>> +				       gfp_t flag)
+>> +{
+>> +	unsigned long pfn = start, count;
+>> +	struct page *page;
+>> +	struct zone *zone;
+>> +	int order;
+>> +
+>> +	VM_BUG_ON(!pfn_valid(start));
+>> +	zone = page_zone(pfn_to_page(start));
+>
+> This implies that start->end are entirely contained in a single zone.
+> What enforces that?
 
- drivers/gpio/gpio-mxc.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+In case of CMA, the __cma_activate_area() function from 6/8 has the check:
 
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 4340aca..82f7b65 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -30,6 +30,7 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <asm-generic/bug.h>
-+#include <asm/mach/irq.h>
- 
- enum mxc_gpio_hwtype {
- 	IMX1_GPIO,	/* runs on i.mx1 */
-@@ -232,10 +233,15 @@ static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
- {
- 	u32 irq_stat;
- 	struct mxc_gpio_port *port = irq_get_handler_data(irq);
-+	struct irq_chip *chip = irq_get_chip(irq);
-+
-+	chained_irq_enter(chip, desc);
- 
- 	irq_stat = readl(port->base + GPIO_ISR) & readl(port->base + GPIO_IMR);
- 
- 	mxc_gpio_irq_handler(port, irq_stat);
-+
-+	chained_irq_exit(chip, desc);
- }
- 
- /* MX2 has one interrupt *for all* gpio ports */
+  151                         VM_BUG_ON(!pfn_valid(pfn));
+  152                         VM_BUG_ON(page_zone(pfn_to_page(pfn)) !=  
+zone);
+
+This guarantees that CMA will never try to call alloc_contig_freed_pages()
+on a region that spans multiple regions.
+
+> If some higher layer enforces that, I think we probably need at least
+> a VM_BUG_ON() in here and a comment about who enforces it.
+
+Agreed.
+
+>> +	spin_lock_irq(&zone->lock);
+>> +
+>> +	page = pfn_to_page(pfn);
+>> +	for (;;) {
+>> +		VM_BUG_ON(page_count(page) || !PageBuddy(page));
+>> +		list_del(&page->lru);
+>> +		order = page_order(page);
+>> +		zone->free_area[order].nr_free--;
+>> +		rmv_page_order(page);
+>> +		__mod_zone_page_state(zone, NR_FREE_PAGES, -(1UL << order));
+>> +		pfn  += 1 << order;
+>> +		if (pfn >= end)
+>> +			break;
+>> +		VM_BUG_ON(!pfn_valid(pfn));
+>> +		page += 1 << order;
+>> +	}
+
+> This 'struct page *'++ stuff is OK, but only for small, aligned areas.
+> For at least some of the sparsemem modes (non-VMEMMAP), you could walk
+> off of the end of the section_mem_map[] when you cross a MAX_ORDER
+> boundary.  I'd feel a little bit more comfortable if pfn_to_page() was
+> being done each time, or only occasionally when you cross a section
+> boundary.
+
+I'm fine with that.  I've used pointer arithmetic for performance reasons
+but if that may potentially lead to bugs then obviously pfn_to_page()  
+should
+be used.
+
 -- 
-1.7.4.1
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
+ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
