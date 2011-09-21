@@ -1,43 +1,30 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Sep 2011 19:51:13 +0900
-Subject: [PATCH v2 0/2] Move sdhci-s3c platform helper into driver
-In-Reply-To: <1315984158-29651-1-git-send-email-thomas.abraham@linaro.org>
-References: <1315984158-29651-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <002401cc784c$61e2c180$25a84480$%kim@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Sep 2011 12:54:03 +0200
+Subject: [PATCH 0/2] pin controller subsystem v7
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B73216C5@HQMAIL01.nvidia.com>
+References: <1316175182-10700-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B73216C5@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdasYEFvJu0VhjGRTp2k2JupcWsrJ17g7fcrKXKphP3Zww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> 
-> Changes since v1:
-> - Rebased with 'for-next' branch of
->   http://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->   (tested with commit id a08b7e19811181309da2306338027fe1d3f8001d at the
->   tip of the for-next branch, not sure if there have been further
->   commits after that).
-> 
-> The platform helper that sets up the default sdhci-s3c controller
-> configuration can be removed and moved into the sdhci-s3c driver.
-> This platform helper is removed for s3c2416, s3c64xx, s5pc100,
-> s5pv210 and Exynos4 platforms.
-> 
-> Since the platform helper function pointer was being passed in the
-> platform data of sdhci-s3c driver, the removal of this pointer from
-> the platform data is step closer to complete device tree support for
-> sdhci-s3c driver.
-> 
-> This patchset has been tested on the following platforms.
-> SMDK2416, SMDK6410, SMDKC100, SMDKV210 and SMDKV310.
+On Tue, Sep 20, 2011 at 10:10 PM, Stephen Warren <swarren@nvidia.com> wrote:
 
-Oh, I found :)
-Looks ok to me, will apply.
+> ... hence I was surprised to see that you explicitly note that mapping a
+> single device to multiple controllers was disallowed.
 
-As a note, please kindly ignore previous my comments on v.1 patch.
+Actually it's easy to fix, I mainly wanted to keep that until we have
+a solid usecase for it, it's just a few lines of code the day we
+need it.
 
-Thanks.
+> Then again, if this need ever does arise, we should be able to just relax
+> this restriction without causing any backwards-compatibility issues, so
+> I don't see a specific need to change this now; I just thought I'd mention
+> it so you're aware of what I'm thinking.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+It was actually on my mind, I just wanted to keep down the feature
+creep to what was absolutely needed for the pin controllers we're
+facing in arch/arm/* today.
+
+Thanks!
+Linus Walleij
