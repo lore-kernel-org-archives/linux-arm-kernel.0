@@ -1,86 +1,26 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Sep 2011 19:56:16 +0900
-Subject: [PATCH v2 1/2] mmc: sdhci-s3c: add default controller
-	configuration
-In-Reply-To: <1315984158-29651-2-git-send-email-thomas.abraham@linaro.org>
-References: <1315984158-29651-1-git-send-email-thomas.abraham@linaro.org>
-	<1315984158-29651-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <002501cc784d$1618f110$424ad330$%kim@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 21 Sep 2011 19:10:29 +0800
+Subject: [PATCH v2 0/3] add fec support for imx6q
+Message-ID: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
-> 
-> The default controller configuration which was previously setup by
-> platform helper functions is moved into the driver.
-> 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+This series adds imx6q enet support.  The imx6q enet is a derivative of
+imx28 enet controller.  It fixed the frame endian issue found on imx28,
+and added 1 Gbps support.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Hi Chris,
-
-This is ok to me. Could you please pick this up in your tree so that I can
-pick 2nd patch up in my tree.
-
-As you know, this patch has no dependency with patch2/2 so that you can
-handle without any conflicts.
+Changes since v1:
+ * Fix typo pointed out by Francois Romieu
+ * Drop patch #3 in the v1
+ * Rebase on net-next tree
 
 Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Shawn Guo (3):
+      net/fec: change phy-reset-gpio request warning to debug message
+      net/fec: fix fec1 check in fec_enet_mii_init()
+      net/fec: add imx6q enet support
 
-> ---
->  drivers/mmc/host/sdhci-s3c.c |   28 +++++++++++++++++-----------
->  1 files changed, 17 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-> index 2bd7bf4..d891682 100644
-> --- a/drivers/mmc/host/sdhci-s3c.c
-> +++ b/drivers/mmc/host/sdhci-s3c.c
-> @@ -203,17 +203,23 @@ static void sdhci_s3c_set_clock(struct sdhci_host
-*host,
-> unsigned int clock)
->  		writel(ctrl, host->ioaddr + S3C_SDHCI_CONTROL2);
->  	}
-> 
-> -	/* reconfigure the hardware for new clock rate */
-> -
-> -	{
-> -		struct mmc_ios ios;
-> -
-> -		ios.clock = clock;
-> -
-> -		if (ourhost->pdata->cfg_card)
-> -			(ourhost->pdata->cfg_card)(ourhost->pdev, host-
-> >ioaddr,
-> -						   &ios, NULL);
-> -	}
-> +	/* reprogram default hardware configuration */
-> +	writel(S3C64XX_SDHCI_CONTROL4_DRIVE_9mA,
-> +		host->ioaddr + S3C64XX_SDHCI_CONTROL4);
-> +
-> +	ctrl = readl(host->ioaddr + S3C_SDHCI_CONTROL2);
-> +	ctrl |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
-> +		  S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
-> +		  S3C_SDHCI_CTRL2_ENFBCLKRX |
-> +		  S3C_SDHCI_CTRL2_DFCNT_NONE |
-> +		  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
-> +	writel(ctrl, host->ioaddr + S3C_SDHCI_CONTROL2);
-> +
-> +	/* reconfigure the controller for new clock rate */
-> +	ctrl = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
-> +	if (clock < 25 * 1000000)
-> +		ctrl |= (S3C_SDHCI_CTRL3_FCSEL3 |
-> S3C_SDHCI_CTRL3_FCSEL2);
-> +	writel(ctrl, host->ioaddr + S3C_SDHCI_CONTROL3);
->  }
-> 
->  /**
-> --
-> 1.6.6.rc2
+ drivers/net/ethernet/freescale/Kconfig |    9 ++--
+ drivers/net/ethernet/freescale/fec.c   |   65 +++++++++++++++++++++++++-------
+ 2 files changed, 55 insertions(+), 19 deletions(-)
