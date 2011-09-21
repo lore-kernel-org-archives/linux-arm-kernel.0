@@ -1,57 +1,81 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 21 Sep 2011 20:58:18 +0530
-Subject: [PATCH 8/8] OMAP4: Fix the emif and dmm virtual mapping
-In-Reply-To: <4E78AAD5.6010906@ti.com>
-References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>	<1315459327-3285-9-git-send-email-santosh.shilimkar@ti.com>
-	<87r53gnzfh.fsf@ti.com> <4E78AAD5.6010906@ti.com>
-Message-ID: <4E7A0292.4020408@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 21 Sep 2011 23:37:03 +0800
+Subject: [GIT PULL] CSR prima2 PM support for 3.2
+Message-ID: <CAGsJ_4y6vuy8ZicefRR8DE6Zoj2nzy1JcOxhHK3Xos8d9NxxSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 September 2011 08:31 PM, Santosh Shilimkar wrote:
-> On Friday 16 September 2011 11:26 PM, Kevin Hilman wrote:
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->>
+Hi Arnd,
 
-[...]
+Can you pls pull the prima2 PM support for 3.2? As the patchset
+depends on rtciobrg you pulled last time, i didn't rebase it to 3.1-rc
+to avoid merge conflict.
 
-> 
->>>  #define OMAP44XX_EMIF2_SIZE	SZ_1M
->>>  
->>>  #define OMAP44XX_DMM_PHYS	OMAP44XX_DMM_BASE
->>>  						/* 0x4e000000 --> 0xfd300000 */
->>> -#define OMAP44XX_DMM_VIRT	(OMAP44XX_DMM_PHYS + OMAP4_L3_PER_IO_OFFSET)
->>> +#define OMAP44XX_DMM_VIRT	(OMAP44XX_EMIF2_VIRT + SZ_1M)
->>
->> and '+ OMAP44XX_EMIF2_SIZE' here.
->>
-> Will add OMAP44XX_EMIF_SIZE since 2 EMIFs instaces are and
-> suppose to be identical.Almost missed this email in other traffic.
+The following changes since commit 684f741446f7a3108b4c167faf20214c42b7eeac:
+  Zhiwu Song (1):
+        ARM: CSR: add rtc i/o bridge interface for SiRFprimaII
 
-OPPs. It was already there. Dumb of me not using it. Below
-is the update what I will do.
+are available in the git repository at:
 
-diff --git a/arch/arm/plat-omap/include/plat/io.h
-b/arch/arm/plat-omap/include/plat/io.h
-index d72ec85..db36292 100644
---- a/arch/arm/plat-omap/include/plat/io.h
-+++ b/arch/arm/plat-omap/include/plat/io.h
-@@ -228,13 +228,13 @@
+  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git for-arnd
 
- #define OMAP44XX_EMIF2_PHYS	OMAP44XX_EMIF2_BASE
- 						/* 0x4d000000 --> 0xfd200000 */
--#define OMAP44XX_EMIF2_VIRT	(OMAP44XX_EMIF2_PHYS + OMAP4_L3_PER_IO_OFFSET)
- #define OMAP44XX_EMIF2_SIZE	SZ_1M
-+#define OMAP44XX_EMIF2_VIRT	(OMAP44XX_EMIF1_VIRT + OMAP44XX_EMIF2_SIZE)
+Barry Song (2):
+      ARM: CSR: PM: save/restore timer status in suspend cycle
+      ARM: CSR: PM: save/restore irq status in suspend cycle
 
- #define OMAP44XX_DMM_PHYS	OMAP44XX_DMM_BASE
- 						/* 0x4e000000 --> 0xfd300000 */
--#define OMAP44XX_DMM_VIRT	(OMAP44XX_DMM_PHYS + OMAP4_L3_PER_IO_OFFSET)
- #define OMAP44XX_DMM_SIZE	SZ_1M
-+#define OMAP44XX_DMM_VIRT	(OMAP44XX_EMIF2_VIRT + OMAP44XX_DMM_SIZE)
- /*
-  *
-----------------------------------------------------------------------------
-  * Omap specific register access
--- 
-1.7.4.1
+Rongjun Ying (1):
+      ARM: CSR: PM: add sleep entry for SiRFprimaII
+
+ arch/arm/mach-prima2/Makefile |    1 +
+ arch/arm/mach-prima2/irq.c    |   40 +++++++++++
+ arch/arm/mach-prima2/pm.c     |  149 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-prima2/pm.h     |   29 ++++++++
+ arch/arm/mach-prima2/sleep.S  |   64 ++++++++++++++++++
+ arch/arm/mach-prima2/timer.c  |   34 +++++++++
+ 6 files changed, 317 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-prima2/pm.c
+ create mode 100644 arch/arm/mach-prima2/pm.h
+ create mode 100644 arch/arm/mach-prima2/sleep.S
+
+Thanks
+barry
+
+2011/9/11 Barry Song <21cnbao@gmail.com>:
+> Hi Arnd,
+> can you please pull the 1st patchset of CSR prima2 for next? most of
+> them are minor changes except that rtciobrg is new stuff.
+>
+> The following changes since commit ddf28352b80c86754a6424e3a61e8bdf9213b3c7:
+> ?Linus Torvalds (1):
+> ? ? ? ?Linux 3.1-rc5
+>
+> are available in the git repository at:
+>
+> ?git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git for-arnd
+>
+> Barry Song (3):
+> ? ? ?ARM: CSR: add lost Resource Sharing Control(RSC) node in dts
+> ? ? ?ARM: CSR: extend the compatibility of gpio controller to pinmux in dts
+> ? ? ?ARM: CSR: IRQ: add simple irq_domain so that hw irq can map to Linux
+>
+> Jamie Iles (1):
+> ? ? ?ARM: CSR: add missing sentinels to of_device_id tables
+>
+> Zhiwu Song (1):
+> ? ? ?ARM: CSR: add rtc i/o bridge interface for SiRFprimaII
+>
+> ?arch/arm/boot/dts/prima2-cb.dts ? ? ?| ? ?9 ++-
+> ?arch/arm/mach-prima2/Makefile ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-prima2/clock.c ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-prima2/irq.c ? ? ? ? ? | ? ?4 +
+> ?arch/arm/mach-prima2/rstc.c ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-prima2/rtciobrg.c ? ? ?| ?139 ++++++++++++++++++++++++++++++++++
+> ?arch/arm/mach-prima2/timer.c ? ? ? ? | ? ?1 +
+> ?include/linux/rtc/sirfsoc_rtciobrg.h | ? 18 +++++
+> ?8 files changed, 172 insertions(+), 2 deletions(-)
+> ?create mode 100644 arch/arm/mach-prima2/rtciobrg.c
+> ?create mode 100644 include/linux/rtc/sirfsoc_rtciobrg.h
+>
+> Thanks
+> barry
+>
