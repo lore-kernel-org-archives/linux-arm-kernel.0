@@ -1,22 +1,25 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 21 Sep 2011 18:56:32 +0300
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Sep 2011 17:53:22 +0200
 Subject: [PATCH 00/10] hwspinlock-next
-In-Reply-To: <20110921152812.GE2937@atomide.com>
+In-Reply-To: <201109211612.33504.arnd@arndb.de>
 References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
 	<CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
-	<20110920231340.GT18894@atomide.com> <201109211612.33504.arnd@arndb.de>
-	<20110921152812.GE2937@atomide.com>
-Message-ID: <CAK=WgbZ_1M-p+BtJnhw_uvaCnLaFRPA_tyv-rSGWMv2GQcB5Cw@mail.gmail.com>
+	<20110920231340.GT18894@atomide.com>
+	<201109211612.33504.arnd@arndb.de>
+Message-ID: <CACRpkdbqVuFEgntw=bUYka5NuvpbPhjB8L0cD4CTmsjwoZBDSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 6:28 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Ohad can you please try this first? Just please make sure your patches are
-> first in next tree before sending in the pull request.
+On Wed, Sep 21, 2011 at 4:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Sure thing.
+> My feeling is that it would be best for Ohad to send these directly
+> to Linus, since it's basically a standalone subsystem and he's listed
+> as the maintainer (well, after this series at least).
 
-Stephen, I'll send you the location of my tree in a few.
+I agree. That's the path of least resistance and trouble.
 
-Thanks,
-Ohad.
+If/when ARM-specific driver subsystems need their own zuper-maintainer
+we can deal with it, can't we? There aren't many of them yet.
+
+Yours,
+Linus Walleij
