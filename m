@@ -1,63 +1,104 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 20 Sep 2011 18:23:28 -0700
-Subject: [PATCHv2 2/2] ARM: debug: Move DEBUG_ICEDCC into the DEBUG_LL choice
-In-Reply-To: <1316568208-4518-1-git-send-email-sboyd@codeaurora.org>
-References: <1316568208-4518-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1316568208-4518-2-git-send-email-sboyd@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Sep 2011 10:50:02 +0900
+Subject: [GIT PULL] Samsung boards for v3.2
+In-Reply-To: <201109202230.09426.arnd@arndb.de>
+References: <001a01cc76b8$208e52c0$61aaf840$%kim@samsung.com>
+	<201109202230.09426.arnd@arndb.de>
+Message-ID: <004101cc7800$c7cb8a00$57629e00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DEBUG_ICEDCC support is just another DEBUG_LL choice and
-selecting it along with other DEBUG_LL options doesn't make
-much sense. Put it into the DEBUG_LL choice to avoid confusion.
+Arnd Bergmann wrote:
+> 
+> On Monday 19 September 2011, Kukjin Kim wrote:
+> > Please pull from:
+> >   git://github.com/kgene/linux-samsung.git next-samsung-board
+> >
+> > As you see, the next-samsung-board includes new board, SMDK4212. Of
+course
+> > to support new SoC, EXYNOS4212 is required for it but current
+> > arch/arm/mach-exynos4 (ARCH_EXYNOS4) can support it so I merged it into
+> > next-samsung-board not next-samsung-soc and to support handling of cupid
+> and
+> > rev. in Samsung stuff for it. As I remember, you said -soc branch of
+arm-soc
+> > is for adding new architecture like arch/arm/mach-xxxx.
+> >
+> > As a note, this includes samsung-fixes-2 which has been already pulled
+in
+> > your tree too.
+> 
+> Looks good. I had to apply the same atag_offset change to the new board
+> file that was done in all other branches as well.
+> 
+Yes, as a note, so I have applied following for it in my -next.
+It's ok to me either your handling or following.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig.debug |   23 +++++++++++------------
- 1 files changed, 11 insertions(+), 12 deletions(-)
+commit 61338e607202a7cf9d5f63e69eb538782643ff90
+Author: Tushar Behera <tushar.behera@linaro.org>
+Date:   Mon Sep 19 20:09:01 2011 +0900
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 6dbcb00..31896f4 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -81,6 +81,17 @@ choice
- 	prompt "Kernel low-level debugging port"
- 	depends on DEBUG_LL
+    ARM: EXYNOS4: convert boot_params to atag_offset
+    
+    Based on "ARM: introduce atag_offset to replace boot_params"
+    by Nicolas Pitre (2bb9839e312ed55a6d5824ffa6077ce3d7d63b1e).
+    
+    Since boot_params variable is deleted from machine_desc, the variable
+    is modified in the newer board files.
+    
+    CC: Nicolas Pitre <nicolas.pitre@linaro.org>
+    Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+    Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+
+diff --git a/arch/arm/mach-exynos4/mach-origen.c
+b/arch/arm/mach-exynos4/mach-origen.c
+index c8121fc..421294b 100644
+--- a/arch/arm/mach-exynos4/mach-origen.c
++++ b/arch/arm/mach-exynos4/mach-origen.c
+@@ -209,7 +209,7 @@ static void __init origen_machine_init(void)
  
-+	config DEBUG_ICEDCC
-+		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
-+		depends on DEBUG_LL
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to the EmbeddedICE macrocell's DCC channel using
-+		  co-processor 14. This is known to work on the ARM9 style ICE
-+		  channel and on the XScale with the PEEDI.
-+
-+		  It does include a timeout to ensure that the system does not
-+		  totally freeze when there is nothing connected to read.
+ MACHINE_START(ORIGEN, "ORIGEN")
+ 	/* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
+-	.boot_params	= S5P_PA_SDRAM + 0x100,
++	.atag_offset	= 0x100,
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= origen_map_io,
+ 	.init_machine	= origen_machine_init,
+diff --git a/arch/arm/mach-exynos4/mach-smdk4212.c
+b/arch/arm/mach-exynos4/mach-smdk4212.c
+index 3479a93..8c41ae1 100644
+--- a/arch/arm/mach-exynos4/mach-smdk4212.c
++++ b/arch/arm/mach-exynos4/mach-smdk4212.c
+@@ -284,7 +284,7 @@ static void __init smdk4212_machine_init(void)
  
- 	config DEBUG_FOOTBRIDGE_COM1
- 		bool "Kernel low-level debugging messages via footbridge 8250 at PCI COM1"
-@@ -120,18 +131,6 @@ config EARLY_PRINTK
- 	  kernel low-level debugging functions. Add earlyprintk to your
- 	  kernel parameters to enable this console.
+ MACHINE_START(SMDK4212, "SMDK4212")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+-	.boot_params	= S5P_PA_SDRAM + 0x100,
++	.atag_offset	= 0x100,
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdk4212_map_io,
+ 	.init_machine	= smdk4212_machine_init,
+diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c
+b/arch/arm/mach-exynos4/mach-smdkv310.c
+index 57cf632..7ce4d8b 100644
+--- a/arch/arm/mach-exynos4/mach-smdkv310.c
++++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+@@ -344,7 +344,7 @@ MACHINE_END
  
--config DEBUG_ICEDCC
--	bool "Kernel low-level debugging via EmbeddedICE DCC channel"
--	depends on DEBUG_LL
--	help
--	  Say Y here if you want the debug print routines to direct their
--	  output to the EmbeddedICE macrocell's DCC channel using
--	  co-processor 14. This is known to work on the ARM9 style ICE
--	  channel and on the XScale with the PEEDI.
--
--	  It does include a timeout to ensure that the system does not
--	  totally freeze when there is nothing connected to read.
--
- config OC_ETM
- 	bool "On-chip ETM and ETB"
- 	select ARM_AMBA
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+ MACHINE_START(SMDKC210, "SMDKC210")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+-	.boot_params	= S5P_PA_SDRAM + 0x100,
++	.atag_offset	= 0x100,
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkv310_map_io,
+ 	.init_machine	= smdkv310_machine_init,
+
+> Pulled into next/board. Thanks!
+> 
+Thanks :)
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
