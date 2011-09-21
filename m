@@ -1,17 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Sep 2011 08:24:00 -0700
+Date: Wed, 21 Sep 2011 08:28:13 -0700
 Subject: [PATCH 00/10] hwspinlock-next
-In-Reply-To: <20110920234515.GA16276@kroah.com>
+In-Reply-To: <201109211612.33504.arnd@arndb.de>
 References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
 	<CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
 	<20110920231340.GT18894@atomide.com>
-	<20110920234515.GA16276@kroah.com>
-Message-ID: <20110921152359.GD2937@atomide.com>
+	<201109211612.33504.arnd@arndb.de>
+Message-ID: <20110921152812.GE2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Greg KH <greg@kroah.com> [110921 07:27]:
-> On Tue, Sep 20, 2011 at 04:13:40PM -0700, Tony Lindgren wrote:
+* Arnd Bergmann <arnd@arndb.de> [110921 06:39]:
+> On Wednesday 21 September 2011, Tony Lindgren wrote:
 > > * Ohad Ben-Cohen <ohad@wizery.com> [110920 01:34]:
 > > > On Mon, Sep 12, 2011 at 7:46 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
 > > > 
@@ -30,18 +30,29 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > > > send you pull requests of course.
 > > 
 > > I'd prefer for Greg to take these as these are drivers.
-> 
-> What, am I the catch-all for drivers these days?
-> 
-> Oh, right, it looks like I am :)
-> 
+> > 
 > > If he's not taking it at this point based on it being ARM only,
 > > I can take it then.
 > 
-> Please do, I don't even have the ability to build them here, as I don't
-> have an arm cross-compiler on this travel laptop.
+> Sorry for replying late, I had accidentally ignored the entire thread.
+> 
+> My feeling is that it would be best for Ohad to send these directly
+> to Linus, since it's basically a standalone subsystem and he's listed
+> as the maintainer (well, after this series at least).
 
-OK so you're off the hook then :) Now we still need to sort out the
-remaining options posted by Arnd.
+Ohad can you please try this first? Just please make sure your patches are
+first in next tree before sending in the pull request.
+ 
+> I'm also fine with any of the other paths like
+> 
+> ohad->GregKH->torvalds
+
+Greg does not prefer that as it's ARM only currently.
+
+> ohad->arnd->torvalds
+> ohad->tmlind->torvalds
+> ohad->tmlind->arnd->torvalds
+
+So as a backup plan any of these are also fine with me too.
 
 Tony
