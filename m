@@ -1,48 +1,76 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 21 Sep 2011 11:55:36 +0200 (CEST)
-Subject: [PATCH 53/57] sound: irq: Remove IRQF_DISABLED
-In-Reply-To: <s5hsjnqxlxb.wl%tiwai@suse.de>
-References: <1316597339-29861-1-git-send-email-yong.zhang0@gmail.com>
-	<1316597339-29861-54-git-send-email-yong.zhang0@gmail.com>
-	<s5hsjnqxlxb.wl%tiwai@suse.de>
-Message-ID: <alpine.LFD.2.02.1109211154280.2723@ionos>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 21 Sep 2011 10:59:37 +0100
+Subject: DT vs ARM static mappings
+In-Reply-To: <1316598109.4611.613.camel@hornet.cambridge.arm.com>
+References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
+	<4E78A546.9040604@gmail.com>
+	<1316535403.4611.534.camel@hornet.cambridge.arm.com>
+	<201109202128.55517.arnd@arndb.de>
+	<1316598109.4611.613.camel@hornet.cambridge.arm.com>
+Message-ID: <20110921095926.GA2041@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Sep 2011, Takashi Iwai wrote:
-
-> At Wed, 21 Sep 2011 17:28:54 +0800,
-> Yong Zhang wrote:
+On Wed, Sep 21, 2011 at 10:41:49AM +0100, Pawel Moll wrote:
+> > > 2. Single DT_MACHINE_START matching (the most generic) "arm,vexpress"
+> > > and doing (rougly) this in v2m_map_io:
+> > > 
+> > > of_scan_flat_dt(v2m_dt_iotable_init, NULL);
+> > > 
+> > > v2m_dt_iotable_init(...)
+> > > {
+> > > 	if (depth != 0)
+> > > 		return 0;
+> > > 	if (of_flat_dt_is_compatible(node, "arm,vexpress-legacy"))
+> > > 		iotable_init(v2m_io_desc_legacy);
+> > > 	else (of_flat_dt_is_compatible(node, "arm,vexpress-rs1"))
+> > > 		iotable_init(v2m_io_desc_rs1);
+> > > 	else
+> > > 		panic();
+> > > }
+> > > 
+> > > Neither of them seem particularly appealing... ;-)
 > > 
-> > Since commit [c58543c8: genirq: Run irq handlers with interrupts disabled],
+> > But I think both ways would be acceptable in the end. It's not a lot
+> > of extra code either way. In the second case, I would probably have
+> > the legacy case as a special variant of the map_io function and have
+> > all others be the default instead of falling back to panic though.
 > 
-> Hm, this id hits a different commit:
->     commit c58543c869606532c2382f027d6466f4672ea756
->     Author: David S. Miller <davem@davemloft.net>
->     Date:   Tue Oct 13 00:49:09 2009 -0700
+> Ok, I'll go (roughly) that way.
 > 
->     sparc64: Set IRQF_DISABLED on LDC channel IRQs.
-> 
-> You mean commit e58aa3d2d0cc01ad8d6f7f640a0670433f794922?
-
-Yeah.
- 
-> > We run all interrupt handlers with interrupts disabled
-> > and we even check and yell when an interrupt handler
-> > returns with interrupts enabled (see commit [b738a50a:
-> > genirq: Warn when handler enables interrupts]).
+> > > In my case it's sysreg and sysctl. There are two more users of static
+> > > mappings: timer01 and timer23, but they could at some point do ioremap()
+> > > on their own (especially with Nico's changes).
 > > 
-> > So now this flag is a NOOP and can be removed.
+> > Well, I think with Nico's cahnges, you /can/ actually do ioremap for
+> > areas that have been mapped through the iotable before kmalloc is up.
+> > IIRC, omap does this for a number of peripherals.
 > > 
-> > Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
-> > Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > It's a bit of a hack, but I think it's much better than taking hardcoded
+> > addresses.
 > 
-> Do you want to merge by yourself or shall I take it to sound git tree?
-> Since IRQF_DISABLED isn't used, it can be applied safely in 3.1-based
-> tree, right?
+> Yes, I was thinking about that last night. If you think it's acceptable
+> I'll do this (killing MMIO_P2V on the way ;-)
+> 
+> > With the combination of the points mentioned above, you should be
+> > able to do:
+> > 
+> > - map the entire I/O area in map_io(), depending on the board
+> > - have an __iomem pointer for the sysreg
+> > - populate that pointer using of_iomap from the device tree address
+> >   before you first access it.
+> > 
+> > Do you think that would work?
+> 
+> Yes, I suppose so. The last bit (getting the offset from DT) will be a
+> little ugly, I think, but let's wait till I get some code done.
 
-Yes, please go ahead. I'll pick up the leftovers.
+I won't attempt to modify the rest of the patch yet, but we can roll
+changes in when you've decided on a way forward.
 
-Thanks,
+Alternatively, the requisite changes can be done as patches on top of
+the basic patch -- since the initial patch doesn't attempt to support
+multiple core tiles anyway.
 
-	tglx
+Cheers
+---Dave
