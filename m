@@ -1,125 +1,62 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 21 Sep 2011 13:49:22 -0400 (EDT)
-Subject: DT vs ARM static mappings
-In-Reply-To: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
-References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.00.1109211320090.12663@xanadu.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 21 Sep 2011 12:55:59 -0500
+Subject: [PATCH 3/3] ARM: gic: add OF based initialization
+In-Reply-To: <4E7A1BCA.1090006@ti.com>
+References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
+	<1316550244-3655-4-git-send-email-robherring2@gmail.com>
+	<4E7A1BCA.1090006@ti.com>
+Message-ID: <4E7A252F.2000402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Sep 2011, Pawel Moll wrote:
+Benoit,
 
-> ARM machine description contains a "map_io" method, which is used to
-> create static memory mappings (using iotable_init() function) for things
-> like peripherals or SRAMs. At least that's the theory, because most of
-> the platforms are doing much more stuff there, like clocking/GPIOs/UARTs
-> initialization, hardware probing etc.
+On 09/21/2011 12:15 PM, Cousson, Benoit wrote:
+> Hi Rob,
+> 
+> I'm testing that series with OMAP4 but have some issues for the moment :-(
+> 
+> [    0.000000] WARNING: at kernel/irq/irqdomain.c:34 gic_of_init+0x10c/0x180()
+> [    0.000000] error: irq_desc already assigned to a domain
+> [    0.000000] Modules linked in:
+> [    0.000000] [<c001b284>] (unwind_backtrace+0x0/0xf0) from [<c0051c34>] (warn_slowpath_common+0x4c/0x64)
+> [    0.000000] [<c0051c34>] (warn_slowpath_common+0x4c/0x64) from [<c0051ce0>] (warn_slowpath_fmt+0x30/0x40)
+> [    0.000000] [<c0051ce0>] (warn_slowpath_fmt+0x30/0x40) from [<c05f6874>] (gic_of_init+0x10c/0x180)
+> [    0.000000] [<c05f6874>] (gic_of_init+0x10c/0x180) from [<c05fa2e0>] (omap_gic_of_init+0x8/0x28)
+> [    0.000000] [<c05fa2e0>] (omap_gic_of_init+0x8/0x28) from [<c0616b44>] (of_irq_init+0x148/0x28c)
+> [    0.000000] [<c0616b44>] (of_irq_init+0x148/0x28c) from [<c05f3074>] (init_IRQ+0x14/0x1c)
+> [    0.000000] [<c05f3074>] (init_IRQ+0x14/0x1c) from [<c05f0650>] (start_kernel+0x184/0x2fc)
+> [    0.000000] [<c05f0650>] (start_kernel+0x184/0x2fc) from [<80008040>] (0x80008040)
+>  
+> I'm not super familiar with all the irq stuff but I'm wondering if there is not something wrong with the test that print that message:
+> 
+> void irq_domain_add(struct irq_domain *domain)
+> {
+> 	struct irq_data *d;
+> 	int hwirq;
+> 
+> 	/*
+> 	 * This assumes that the irq_domain owner has already allocated
+> 	 * the irq_descs.  This block will be removed when support for dynamic
+> 	 * allocation of irq_descs is added to irq_domain.
+> 	 */
+> 	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+> 		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
+> 		if (d || d->domain) {
+> 			/* things are broken; just report, don't clean up */
+> 			WARN(1, "error: irq_desc already assigned to a domain");
+> 			return;
+> 		}
+> [...]
+> 
+> Is the (d || d->domain) correct? Shouldn't it be (d && d->domain)?
+> 
+> But since that used to work properly, I have some doubt. Moreover the driver will not even get the proper interrupt later...
+> 
+> Do you have any clue?
 
-No, most of them don't.  Maybe a few cases do for historical reasons, 
-but there are other hooks now to link probing and initialization code 
-to.
+I fixed that in the prior series and tglx picked it up, so I did not
+repost. It should hit mainline for 3.1, but I haven't verified if it is
+in yet. Sorry for the confusion, I should have mentioned that.
 
-The static mappings should be just that: static.  Most things should be 
-dynamically mapped instead.  With the series I'm working on, everybody 
-will get the benefit of a static mapping when one is available even if 
-the dynamic mapping interface like ioremap() is used.  So having a bunch 
-of static mappings is not bad, especially if they are easy.  But you 
-should defer as much hardware probing as possible after the memory is 
-initialized and the standard interfaces are available, keeping reliance 
-on direct access to static mappings as small as possible.
-
-> Now the Versatile Express platform: it consists of a motherboard with a
-> set of peripherals and a processor daughterboard (core tile), both
-> connected via a static memory bus, which is mapped into processor's
-> physical address space. The motherboard can be shared between different
-> types of the tiles (eg. A9, A5, A15 etc.). The present one is probed byt
-> he motherboard firmware and exposed in "system registers".
-> 
-> Everything is fine so far. The interesting part starts here:
-> 
-> http://infocenter.arm.com/help/topic/com.arm.doc.dui0447e/CACIHGFE.html
-> 
-> In brief, depending on the configuration, the system can have one of
-> two, totally different, memory maps (please, do spare me the "but why
-> did they do that" comments - not my idea nor decision, I just have to
-> live with this ;-), depending on the core tile being used.
-> 
-> In result, the static mapping as defined currently in
-> arch/arm/mach-vexpress/v2m.c for A9 variant:
-> 
-> #define V2M_PA_CS7      0x10000000
-> 
-> static struct map_desc v2m_io_desc[] __initdata = {
->         {
->                 .virtual        = __MMIO_P2V(V2M_PA_CS7),
->                 .pfn            = __phys_to_pfn(V2M_PA_CS7),
->                 .length         = SZ_128K,
->                 .type           = MT_DEVICE,
->         },
-> };
-> 
-> is no longer valid for A5/A15. It would rather look like this:
-> 
-> #define V2M_PA_CS3      0x1c000000
-> 
-> static struct map_desc v2m_io_desc[] __initdata = {
->         {
->                 .virtual        = __MMIO_P2V(V2M_PA_CS3),
->                 .pfn            = __phys_to_pfn(V2M_PA_CS3),
->                 .length         = SZ_2M,
->                 .type           = MT_DEVICE,
->         },
-> };
-> 
-> Not only the peripherals base address is changed but also "internal"
-> alignment, thus offsets to peripherals. Some of them are not being
-> ioremap()ed, but directly used via the static mapping and MMIO_P2V macro
-> (like "readl(MMIO_P2V(V2M_SYS_PROCID0))" in v2m_populate_ct_desc(void)
-> function). For example, these two:
-> 
-> #define V2M_SYSREGS             (V2M_PA_CS7 + 0x00000000)
-> #define V2M_SYSCTL              (V2M_PA_CS7 + 0x00001000)
-> 
-> would have to become:
-> 
-> #define V2M_SYSREGS             (V2M_PA_CS3 + 0x00010000)
-> #define V2M_SYSCTL              (V2M_PA_CS3 + 0x00020000)
-
-Your best bet would probably consist of keeping the virtual address 
-constant while the physical address is variable.  Adjusting the .pfn 
-field in the v2m_io_desc table right before calling iotable_init() 
-should be fine.  Alternatively you could have two such tables and select 
-the right one at run time.  The io_p2v macro doesn't make any sense 
-anymore in that context so it should be eliminated, and keeping only a 
-minimum set of fixed virtual addresses for the peripherals that can't 
-wait until ioremap is available should be fine.
-
-Of course you should use the largest alignment for the same peripheral 
-mapping.
-
-[...]
-> To my mind it looked like the whole mechanism was not flexible enough,
-> so I wanted to explore other options...
-> 
-> The obvious one was to describe the required static mapping in the DTS.
-> I don't like this idea, though. It can hardly be called "hardware
-> description". Besides, what node would carry such data? "chosen"?
-> Hardly...
-> 
-> Would it contain a "regs" property with the physical address and
-> "virtual-reg" with the virtual one? Again, doesn't sound right to me
-> (especially the virtual bit, however the virtual address could be common
-> between different variants and be defined in the board support code, not
-> the DTS).
-
-That's what I'm suggesting: keep the virtual addresses constant, and 
-adjust the static mapping's physical address accordingly.  But never 
-should virtual addresses be part of DT as this is just an implementation 
-detail.
-
-And if static mappings are a problem, then try to live without them as 
-much as possible.  Again there is no reason you should be doing too much 
-hardware probing at .map_io time.
-
-
-Nicolas
+Rob
