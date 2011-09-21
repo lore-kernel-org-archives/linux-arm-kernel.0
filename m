@@ -1,44 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Sep 2011 09:14:06 -0700
-Subject: [PATCH 04/10] hwspinlock/core/omap: fix id issues on multiple
-	hwspinlock devices
-In-Reply-To: <1315846025-11453-5-git-send-email-ohad@wizery.com>
-References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
-	<1315846025-11453-5-git-send-email-ohad@wizery.com>
-Message-ID: <20110921161406.GF2937@atomide.com>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 21 Sep 2011 09:14:08 -0700
+Subject: [PATCH] ARM: tegra: Remove redundant change to the CPSR in
+	headsmp.S
+In-Reply-To: <20110914091531.GA2104@arm.com>
+References: <1315411253-17559-1-git-send-email-dave.martin@linaro.org>
+	<20110912165222.GE2020@arm.com>
+	<CAMbhsRSoSYhuqPC+SmCNk4dseok0vs02su0kihKNqXGpCvUvSg@mail.gmail.com>
+	<20110914091531.GA2104@arm.com>
+Message-ID: <CAMbhsRTrwyEwxCKHEYx0PVt7DTFDE7o5+9T8qz=82jZBEYYYxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [110912 09:14]:
-> hwspinlock devices provide system-wide hardware locks that are used
-> by remote processors that have no other way to achieve synchronization.
-> 
-> For that to work, each physical lock must have a system-wide unique id
-> number that all processors are familiar with, otherwise they can't
-> possibly assume they're using the same hardware lock.
-> 
-> Usually SoCs have a single hwspinlock device, which provides several
-> hwspinlocks, and in this case, they can be trivially numbered 0 to
-> (num-of-locks - 1).
-> 
-> In case boards have several hwspinlocks devices (each of which
-> providing numerous hardware spinlocks) a different base id should be
-> used for each hwspinlock device (they can't all use 0 as a starting
-> id!).
-> 
-> While this is certainly not common, it's just plain wrong to just
-> silently use 0 as a base id whenever the hwspinlock driver is probed.
-> 
-> This patch provides a hwspinlock_pdata structure, that boards can use
-> to set a different base id for each of the hwspinlock devices they may
-> have, and demonstrates how to use it with the omap hwspinlock driver
-> (ultimately it will be DT which will supply this base_id information).
-> 
-> While we're at it, make sure the hwspinlock core prints an explicit
-> error message in case an hwspinlock is registered with an id number
-> that already exists; this will help users catch such base id issues.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+On Wed, Sep 14, 2011 at 2:15 AM, Dave Martin <dave.martin@linaro.org> wrote:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+<snip>
+
+> With regard to Thumb-2 kernels, what code is responsible for
+> performing the jump to tegra_secondary_startup?
+arch/arm/mach-tegra/platsmp.c puts the physical address of
+tegra_secondary_startup into the reset vector, and then brings the cpu
+out of reset.  As far as I know, it is always in ARM mode, but it is
+possible that it comes through ROM code that ends with a bx, allowing
+it to be entered in Thumb mode.
+
+> If the jump is done by making an exception return from some firmware,
+> you may find you hit tegra_secondary_starup in ARM state, and
+> everything will go horribly wrong...
+>
+> It could be worth making the secondary kernel entry point ARM code
+> unconditionally (just as is now done for the primary kernel entry
+> point).
+That seems safest.
+
+> Cheers
+> ---Dave
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
