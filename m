@@ -1,78 +1,74 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 21 Sep 2011 09:24:53 -0700
-Subject: [PATCH] ARM: OMAP: voltage layer present, even when CONFIG_PM=n
-Message-ID: <mailman.147.1316623396.20020.linux-arm-kernel@lists.infradead.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 21 Sep 2011 13:09:28 -0400 (EDT)
+Subject: [PATCH 0/19] removal of mach/vmalloc.h and generic optimizations
+In-Reply-To: <alpine.LFD.2.00.1109202047400.12663@xanadu.home>
+References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
+	<3319383.WZQsqr8ND4@wuerfel>
+	<alpine.LFD.2.00.1109172238070.20358@xanadu.home>
+	<1933895.GJBlYra9yP@wuerfel>
+	<alpine.LFD.2.00.1109202047400.12663@xanadu.home>
+Message-ID: <alpine.LFD.2.00.1109211303060.12663@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even when CONFIG_PM=n, we try to scale the boot voltage to a sane,
-known value using OPP table to find matching voltage based on boot
-frequency.  This should be done, even when CONFIG_PM=n to avoid
-mis-configured bootloaders and/or boot voltage assumptions made by
-boot loaders.
+On Tue, 20 Sep 2011, Nicolas Pitre wrote:
 
-Also fixes various compile problems due to depenencies between voltage
-domain and powerdomain code (also present when CONFIG_PM=n).
+> On Sun, 18 Sep 2011, Arnd Bergmann wrote:
+> 
+> > No, I couldn't find anything in the code or the changelog why this was
+> > done.
+> 
+> I found that drivers/video/sh_mobile_lcdcfb.c appears to be a heavy user 
+> of dma_alloc_coherent():
+> 
+>                 buf = dma_alloc_coherent(&pdev->dev, info->fix.smem_len,
+>                                          &ch->dma_handle, GFP_KERNEL);
+> 
+> So for this particular hypothetical case: 1920 * 1080 * 2 * 32 / 8 = 16MB
+> 
+> We are far from the 158MB figure.  Furthermore, the highest allowed 
+> amount is 14MB according to the available documentation, and none of the 
+> other ARM targets use more than that either.
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Compile tested with CONFIG_PM=n
-Applies to arm-soc/next/voltage
+For the record, here's the patch I'm including in my series:
 
- arch/arm/mach-omap2/Makefile  |    2 --
- arch/arm/mach-omap2/voltage.h |   14 --------------
- 2 files changed, 0 insertions(+), 16 deletions(-)
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
+Date: Mon, 19 Sep 2011 00:28:45 -0400
+Subject: [PATCH] ARM: move VMALLOC_END down temporarily for shmobile
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 8bd389d..5129785 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -89,7 +89,6 @@ obj-$(CONFIG_ARCH_OMAP4)		+= prcm.o cm2xxx_3xxx.o cminst44xx.o \
- 					   vp44xx_data.o
+THIS IS A TEMPORARY HACK.  The purpose of this is _only_ to avoid a
+regression on an existing machine while a better fix is implemented.
+
+On shmobile the consistent DMA memory area was set to 158MB in commit
+28f0721a79 with no explanation.  The documented size for this area should
+vary between 2MB and 14MB, and none of the other ARM targets exceed that.
+
+The included #warning is therefore meant to be noisy on purpose to get
+shmobile maintainers attention and this commit reverted once this
+consistent DMA size conflict is resolved.
+
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Magnus Damm <damm@opensource.se>
+Cc: Paul Mundt <lethal@linux-sh.org>
+
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 950dee3ce2..35eb517a21 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -35,6 +35,13 @@
+ #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+ #define VMALLOC_END		0xff000000UL
  
- # OMAP voltage domains
--ifeq ($(CONFIG_PM),y)
- voltagedomain-common			:= voltage.o vc.o vp.o
- obj-$(CONFIG_ARCH_OMAP2)		+= $(voltagedomain-common) \
- 					   voltagedomains2xxx_data.o
-@@ -97,7 +96,6 @@ obj-$(CONFIG_ARCH_OMAP3)		+= $(voltagedomain-common) \
- 					   voltagedomains3xxx_data.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common) \
- 					   voltagedomains44xx_data.o
--endif
- 
- # OMAP powerdomain framework
- powerdomain-common			+= powerdomain.o powerdomain-common.o
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index 4c09809..16a1b09 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -148,25 +148,11 @@ void omap_voltage_get_volttable(struct voltagedomain *voltdm,
- 		struct omap_volt_data **volt_data);
- struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
- 		unsigned long volt);
--#ifdef CONFIG_PM
- int omap_voltage_register_pmic(struct voltagedomain *voltdm,
- 			       struct omap_voltdm_pmic *pmic);
- void omap_change_voltscale_method(struct voltagedomain *voltdm,
- 		int voltscale_method);
- int omap_voltage_late_init(void);
--#else
--static inline int omap_voltage_register_pmic(struct voltagedomain *voltdm,
--					     struct omap_voltdm_pmic *pmic)
--{
--	return -EINVAL;
--}
--static inline  void omap_change_voltscale_method(struct voltagedomain *voltdm,
--		int voltscale_method) {}
--static inline int omap_voltage_late_init(void)
--{
--	return -EINVAL;
--}
--#endif
- 
- extern void omap2xxx_voltagedomains_init(void);
- extern void omap3xxx_voltagedomains_init(void);
--- 
-1.7.6
++/* This is a temporary hack until shmobile's DMA area size is sorted out */
++#ifdef CONFIG_ARCH_SHMOBILE
++#warning "SH-Mobile's consistent DMA size conflicts with VMALLOC_END by 144MB"
++#undef VMALLOC_END
++#define VMALLOC_END		0xF6000000UL
++#endif
++
+ /*
+  * Hardware-wise, we have a two level page table structure, where the first
+  * level has 4096 entries, and the second level has 256 entries.  Each entry
+
+
+Nicolas
