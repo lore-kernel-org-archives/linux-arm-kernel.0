@@ -1,25 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Sep 2011 17:53:22 +0200
-Subject: [PATCH 00/10] hwspinlock-next
-In-Reply-To: <201109211612.33504.arnd@arndb.de>
-References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
-	<CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
-	<20110920231340.GT18894@atomide.com>
-	<201109211612.33504.arnd@arndb.de>
-Message-ID: <CACRpkdbqVuFEgntw=bUYka5NuvpbPhjB8L0cD4CTmsjwoZBDSA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 22 Sep 2011 00:07:49 +0800
+Subject: [PATCH v3 2/3] net/fec: fix fec1 check in fec_enet_mii_init()
+In-Reply-To: <1316621270-27805-1-git-send-email-shawn.guo@linaro.org>
+References: <1316621270-27805-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1316621270-27805-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 4:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+In function fec_enet_mii_init(), it uses non-zero pdev->id as part
+of the condition to check the second fec instance (fec1).  This works
+before the driver supports device tree probe.  But in case of device
+tree probe, pdev->id is -1 which is also non-zero, so the logic becomes
+broken when device tree probe gets supported.
 
-> My feeling is that it would be best for Ohad to send these directly
-> to Linus, since it's basically a standalone subsystem and he's listed
-> as the maintainer (well, after this series at least).
+The patch change the logic to check "pdev->id > 0" as the part of the
+condition for identifying fec1.
 
-I agree. That's the path of least resistance and trouble.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/net/ethernet/freescale/fec.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-If/when ARM-specific driver subsystems need their own zuper-maintainer
-we can deal with it, can't we? There aren't many of them yet.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 9c1d059..2bbe6a5 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -996,7 +996,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+ 	 * mdio interface in board design, and need to be configured by
+ 	 * fec0 mii_bus.
+ 	 */
+-	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id) {
++	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id > 0) {
+ 		/* fec1 uses fec0 mii_bus */
+ 		fep->mii_bus = fec0_mii_bus;
+ 		return 0;
+-- 
+1.7.4.1
