@@ -1,76 +1,182 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 21 Sep 2011 10:59:37 +0100
-Subject: DT vs ARM static mappings
-In-Reply-To: <1316598109.4611.613.camel@hornet.cambridge.arm.com>
-References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
-	<4E78A546.9040604@gmail.com>
-	<1316535403.4611.534.camel@hornet.cambridge.arm.com>
-	<201109202128.55517.arnd@arndb.de>
-	<1316598109.4611.613.camel@hornet.cambridge.arm.com>
-Message-ID: <20110921095926.GA2041@arm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 21 Sep 2011 11:01:10 +0100
+Subject: [PATCH 2/3] of/irq: introduce of_irq_init
+In-Reply-To: <1316550244-3655-3-git-send-email-robherring2@gmail.com>
+References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
+	<1316550244-3655-3-git-send-email-robherring2@gmail.com>
+Message-ID: <20110921100110.GE18931@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 10:41:49AM +0100, Pawel Moll wrote:
-> > > 2. Single DT_MACHINE_START matching (the most generic) "arm,vexpress"
-> > > and doing (rougly) this in v2m_map_io:
-> > > 
-> > > of_scan_flat_dt(v2m_dt_iotable_init, NULL);
-> > > 
-> > > v2m_dt_iotable_init(...)
-> > > {
-> > > 	if (depth != 0)
-> > > 		return 0;
-> > > 	if (of_flat_dt_is_compatible(node, "arm,vexpress-legacy"))
-> > > 		iotable_init(v2m_io_desc_legacy);
-> > > 	else (of_flat_dt_is_compatible(node, "arm,vexpress-rs1"))
-> > > 		iotable_init(v2m_io_desc_rs1);
-> > > 	else
-> > > 		panic();
-> > > }
-> > > 
-> > > Neither of them seem particularly appealing... ;-)
-> > 
-> > But I think both ways would be acceptable in the end. It's not a lot
-> > of extra code either way. In the second case, I would probably have
-> > the legacy case as a special variant of the map_io function and have
-> > all others be the default instead of falling back to panic though.
-> 
-> Ok, I'll go (roughly) that way.
-> 
-> > > In my case it's sysreg and sysctl. There are two more users of static
-> > > mappings: timer01 and timer23, but they could at some point do ioremap()
-> > > on their own (especially with Nico's changes).
-> > 
-> > Well, I think with Nico's cahnges, you /can/ actually do ioremap for
-> > areas that have been mapped through the iotable before kmalloc is up.
-> > IIRC, omap does this for a number of peripherals.
-> > 
-> > It's a bit of a hack, but I think it's much better than taking hardcoded
-> > addresses.
-> 
-> Yes, I was thinking about that last night. If you think it's acceptable
-> I'll do this (killing MMIO_P2V on the way ;-)
-> 
-> > With the combination of the points mentioned above, you should be
-> > able to do:
-> > 
-> > - map the entire I/O area in map_io(), depending on the board
-> > - have an __iomem pointer for the sysreg
-> > - populate that pointer using of_iomap from the device tree address
-> >   before you first access it.
-> > 
-> > Do you think that would work?
-> 
-> Yes, I suppose so. The last bit (getting the offset from DT) will be a
-> little ugly, I think, but let's wait till I get some code done.
+Hi Rob,
 
-I won't attempt to modify the rest of the patch yet, but we can roll
-changes in when you've decided on a way forward.
+On Tue, Sep 20, 2011 at 03:24:03PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> of_irq_init will scan the devicetree for matching interrupt controller
+> nodes. Then it calls an initialization function for each found controller
+> in the proper order with parent nodes initialized before child nodes.
+> 
+> Based on initial pseudo code from Grant Likely.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  drivers/of/irq.c       |  114 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_irq.h |    1 +
+>  2 files changed, 115 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 6a5b5e7..1d51bc7 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -19,10 +19,12 @@
+>   */
+>  
+>  #include <linux/errno.h>
+> +#include <linux/list.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/string.h>
+> +#include <linux/slab.h>
+>  
+>  /* For archs that don't support NO_IRQ (such as x86), provide a dummy value */
+>  #ifndef NO_IRQ
+> @@ -386,3 +388,115 @@ int of_irq_to_resource_table(struct device_node *dev, struct resource *res,
+>  
+>  	return i;
+>  }
+> +
+> +struct intc_desc {
+> +	struct list_head	list;
+> +	struct device_node	*dev;
+> +	struct device_node	*interrupt_parent;
+> +};
+> +
+> +typedef int (*irq_init_cb_t)(struct device_node *, struct device_node *);
+> +
+> +/**
+> + * of_irq_init - Scan the device tree for matching interrupt controllers and
+> + * call their initialization functions in order with parents first.
+> + * @matches: 0 terminated array of nodes to match and initialization function
+> + * to call on match
+> + */
+> +void __init of_irq_init(const struct of_device_id *matches)
+> +{
+> +	struct device_node *np;
+> +	struct intc_desc *desc;
+> +	struct intc_desc *temp_desc;
+> +	struct intc_desc *parent_desc = NULL;
+> +	struct list_head intc_desc_list;
+> +	struct list_head intc_parent_list;
+> +
+> +	INIT_LIST_HEAD(&intc_desc_list);
+> +	INIT_LIST_HEAD(&intc_parent_list);
+> +
+> +	for_each_matching_node(np, matches) {
+> +		if (!of_find_property(np, "interrupt-controller", NULL))
+> +			continue;
+> +		/* Here, we allocate and populate an intc_desc with the node
+> +		* pointer, interrupt-parent device_node etc. */
+> +		desc = kzalloc(sizeof(*desc), GFP_KERNEL);
+> +		if (!desc) {
+> +			WARN_ON(1);
+> +			goto err;
+> +		}
+> +		desc->dev = np;
+> +		desc->interrupt_parent = of_irq_find_parent(np);
+> +		list_add(&desc->list, &intc_desc_list);
+> +	}
+> +	if (list_empty(&intc_desc_list))
+> +		return;
+> +
+> +	/*
+> +	 * The root irq controller is the one without an interrupt-parent.
+> +	 * That one goes first, followed by the controllers that reference it,
+> +	 * followed by the ones that reference the 2nd level controllers, etc
+> +	 */
+> +	while (!list_empty(&intc_desc_list)) {
+> +		/*
+> +		 * Process all controllers with the current 'parent'.
+> +		 * First pass will be looking for NULL as the parent.
+> +		 * The assumption is that NULL parent means a root controller.
+> +		 */
+> +		list_for_each_entry_safe(desc, temp_desc, &intc_desc_list, list) {
+> +			const struct of_device_id *match;
+> +			int ret;
+> +			irq_init_cb_t irq_init_cb;
+> +
+> +			if (parent_desc &&
+> +				(desc->interrupt_parent != parent_desc->dev))
+> +				continue;
+> +
+> +			list_del(&desc->list);
+> +			match = of_match_node(matches, desc->dev);
+> +			if (!match || !match->data)
+> +				continue;
 
-Alternatively, the requisite changes can be done as patches on top of
-the basic patch -- since the initial patch doesn't attempt to support
-multiple core tiles anyway.
+Doesn't this case need to kfree(desc)?
 
-Cheers
----Dave
+> +
+> +			pr_debug("of_irq_init: init %s @ %p, parent %p\n",
+> +				 match->compatible,
+> +				 desc->dev, desc->interrupt_parent);
+> +			irq_init_cb = match->data;
+> +			ret = irq_init_cb(desc->dev, desc->interrupt_parent);
+> +			if (ret)
+> +				continue;
+
+and here?
+
+> +
+> +			/*
+> +			 * This one is now set up; add it to the parent list so
+> +			 * its children can get processed in a subsequent pass.
+> +			 */
+> +			list_add_tail(&desc->list, &intc_parent_list);
+> +		}
+> +		/*
+> +		 * All the direct children for the current parent are
+> +		 * processed, so free the parent now.
+> +		 */
+> +		if (parent_desc)
+> +			kfree(parent_desc);
+> +
+> +		/* Get the next pending parent that might have children */
+> +		parent_desc = list_first_entry(&intc_parent_list,
+> +					       typeof(*parent_desc), list);
+> +		if (list_empty(&intc_parent_list) || !parent_desc) {
+> +			pr_debug("of_irq_init: children remain, but no parents\n");
+> +			goto err;
+> +		}
+> +
+> +		list_del(&parent_desc->list);
+> +	}
+> +	return;
+> +
+> +err:
+> +	list_for_each_entry_safe(desc, temp_desc, &intc_parent_list, list) {
+> +		list_del(&desc->list);
+> +		kfree(desc);
+> +	}
+> +	list_for_each_entry_safe(desc, temp_desc, &intc_desc_list, list) {
+> +		list_del(&desc->list);
+> +		kfree(desc);
+> +	}
+> +}
+> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+> index cd2e61c..032d76c 100644
+> --- a/include/linux/of_irq.h
+> +++ b/include/linux/of_irq.h
+> @@ -73,6 +73,7 @@ extern int of_irq_to_resource_table(struct device_node *dev,
+>  		struct resource *res, int nr_irqs);
+>  extern struct device_node *of_irq_find_parent(struct device_node *child);
+>  
+> +extern void of_irq_init(const struct of_device_id *matches);
+>  
+>  #endif /* CONFIG_OF_IRQ */
+>  #endif /* CONFIG_OF */
+> -- 
+> 1.7.5.4
+> 
