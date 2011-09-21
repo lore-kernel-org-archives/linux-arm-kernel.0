@@ -1,32 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 21 Sep 2011 17:54:59 +0200
-Subject: [PATCH] spi: Fix builderror in spi-pl022.c
-In-Reply-To: <20110921131052.GG17169@n2100.arm.linux.org.uk>
-References: <E1Qvo1q-0000qv-TQ@rmk-PC.arm.linux.org.uk>
-	<1314559619-19923-1-git-send-email-peterhuewe@gmx.de>
-	<CACRpkdb=Bt2j4iMV5NJHmPG8wDi6__CRD6kn_KOoaQ1R6uwrWQ@mail.gmail.com>
-	<CACRpkdbsUMCvBofKjExiB2wCbK9CwpcXr5xmShJ4SHEGAAH4Bw@mail.gmail.com>
-	<20110921131052.GG17169@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZio+Xpr6Q+E2Sf5juBDRXUPM5Vjx6GqDg66RDNiFvj3A@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 21 Sep 2011 18:56:32 +0300
+Subject: [PATCH 00/10] hwspinlock-next
+In-Reply-To: <20110921152812.GE2937@atomide.com>
+References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
+	<CAK=Wgbam6u1bq8fG+oMUhxfWH1g3dU7q+VhPWFEZOLgFMV_3vQ@mail.gmail.com>
+	<20110920231340.GT18894@atomide.com> <201109211612.33504.arnd@arndb.de>
+	<20110921152812.GE2937@atomide.com>
+Message-ID: <CAK=WgbZ_1M-p+BtJnhw_uvaCnLaFRPA_tyv-rSGWMv2GQcB5Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 3:10 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Sep 20, 2011 at 10:45:41PM +0200, Linus Walleij wrote:
+On Wed, Sep 21, 2011 at 6:28 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Ohad can you please try this first? Just please make sure your patches are
+> first in next tree before sending in the pull request.
 
->> > Grant can you please apply this patch? Right now linux-next is
->> > breaking because of this missing patch...
->>
->> Ping on this... ignore if it's been picked already.
->
-> Isn't it already fixed? ?I've had this in my tree for quite some time
-> (since 5th September) which should also be in linux-next.
+Sure thing.
 
-It is, just wasn't getting my linux-next right after all the kernelorg
-downtime.
+Stephen, I'll send you the location of my tree in a few.
 
-Thanks Russell, and sorry for the fuzz.
-
-Yours,
-Linus Walleij
+Thanks,
+Ohad.
