@@ -1,94 +1,69 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 20 Sep 2011 21:14:43 -0400 (EDT)
-Subject: [PATCH 0/19] removal of mach/vmalloc.h and generic optimizations
-In-Reply-To: <1933895.GJBlYra9yP@wuerfel>
-References: <1316156850-31013-1-git-send-email-nico@fluxnic.net>
-	<3319383.WZQsqr8ND4@wuerfel>
-	<alpine.LFD.2.00.1109172238070.20358@xanadu.home>
-	<1933895.GJBlYra9yP@wuerfel>
-Message-ID: <alpine.LFD.2.00.1109202047400.12663@xanadu.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 20 Sep 2011 18:23:27 -0700
+Subject: [PATCHv2 1/2] ARM: debug: Add UART1 config choices
+Message-ID: <1316568208-4518-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 18 Sep 2011, Arnd Bergmann wrote:
+ARM patch 7072/1 (debug: use kconfig choice for selecting
+DEBUG_LL UART) didn't notice that the Kconfigs relied on being
+unselected to configure a different serial port. Since there is
+no NONE option in a choice menu, explicitly add the other option
+so that both serial ports can be selected.
 
-> On Saturday 17 September 2011 22:46:33 Nicolas Pitre wrote:
-> > On Sat, 17 Sep 2011, Arnd Bergmann wrote:
-> > 
-> > > On Friday 16 September 2011 03:07:11 Nicolas Pitre wrote:
-> > > > This patch series removes all instances of mach/vmalloc.h in order to
-> > > > have a more unified memory map across all ARM architectures.  To do so,
-> > > > the static mappings are moved inside the vmalloc area.  And finally this
-> > > > allows for a generic optimization to ioremap where static mappings are
-> > > > reused whenever possible, using common code instead of having this
-> > > > duplicated in a couple places.
-> > > > 
-> > > > This also provides a net reduction of more than 1200 lines of code.
-> 
-> > 
-> > > Doing some randconfig tests, I noticed that your series is currently broken
-> > > on shmobile, which triggers a 
-> > > 
-> > > 	BUILD_BUG_ON(VMALLOC_END > CONSISTENT_BASE);
-> > > 
-> > > in mem_init(), because the platform has a CONSISTENT_DMA_SIZE of 158MB.
-> > > All other platforms have a CONSISTENT_DMA_SIZE of at most 14MB, which
-> > > works correctly.
-> > 
-> > Any idea why shmobile requires such an amount of consistent memory?
-> 
-> No, I couldn't find anything in the code or the changelog why this was
-> done. Magnus changed it in this commit:
-> 
-> commit 28f0721a79046056ced3b9bd79c319c5c417ec30
-> Author: Magnus Damm <damm@opensource.se>
-> Date:   Wed Apr 28 08:25:30 2010 +0000
-> 
->     ARM: mach-shmobile: Set CONSISTENT_DMA_SIZE to 158 MB
->     
->     This patch sets CONSISTENT_DMA_SIZE to 158 MB
->     for all SH-Mobile ARM processors.
->     
->     The DMA area is mapped at 0xf6000000 - 0xffdfffff,
->     on top of the 256 MB I/O window at 0xe6000000.
->     
->     Signed-off-by: Magnus Damm <damm@opensource.se>
->     Signed-off-by: Paul Mundt <lethal@linux-sh.org>
-> 
-> Maybe he can give a better explanation and can say whether it's
-> actually required. The patch series introducing it contained
-> the introduction of the shdma dmaengine driver and some changes
-> to video drivers, but I could not tell how they are related
-> to this change.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
 
-I found that drivers/video/sh_mobile_lcdcfb.c appears to be a heavy user 
-of dma_alloc_coherent():
+I plan to put these in the patch tracker if there are no further
+comments.
 
-                buf = dma_alloc_coherent(&pdev->dev, info->fix.smem_len,
-                                         &ch->dma_handle, GFP_KERNEL);
+ arch/arm/Kconfig.debug |   19 +++++++++++++++----
+ 1 files changed, 15 insertions(+), 4 deletions(-)
 
-...
-
-                info->fix.smem_len = max_size * 2 * cfg->bpp / 8;
-
-...
-
-                        max_size = MAX_XRES * MAX_YRES;
-
-...
-
-#define MAX_XRES 1920
-#define MAX_YRES 1080
-
-... and a switch statement on bpp shows it can be up to 32.
-
-So for this particular hypothetical case: 1920 * 1080 * 2 * 32 / 8 = 16MB
-
-We are far from the 158MB figure.  Furthermore, the highest allowed 
-amount is 14MB according to the available documentation, and none of the 
-other ARM targets use more than that either.
-
-Magnus and/or Paul: please could you explain where this 158MB comes from?
-
-
-Nicolas
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 60d1846..6dbcb00 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -81,14 +81,27 @@ choice
+ 	prompt "Kernel low-level debugging port"
+ 	depends on DEBUG_LL
+ 
++
++	config DEBUG_FOOTBRIDGE_COM1
++		bool "Kernel low-level debugging messages via footbridge 8250 at PCI COM1"
++		depends on FOOTBRIDGE
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the 8250 at PCI COM1.
++
+ 	config DEBUG_DC21285_PORT
+ 		bool "Kernel low-level debugging messages via footbridge serial port"
+ 		depends on FOOTBRIDGE
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the serial port in the DC21285 (Footbridge).
+-		  Saying N will cause the debug messages to appear on the first
+-		  16550 serial port.
++
++	config DEBUG_CLPS711X_UART1
++		bool "Kernel low-level debugging messages via UART1"
++		depends on ARCH_CLPS711X
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the first serial port on these devices.
+ 
+ 	config DEBUG_CLPS711X_UART2
+ 		bool "Kernel low-level debugging messages via UART2"
+@@ -96,8 +109,6 @@ choice
+ 		help
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the second serial port on these devices.
+-		  Saying N will cause the debug messages to appear on the first
+-		  serial port.
+ 
+ endchoice
+ 
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
