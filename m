@@ -1,121 +1,83 @@
-From: hemantp@ti.com (Hemant Pedanekar)
-Date: Wed, 21 Sep 2011 23:09:14 +0530
-Subject: [PATCH v2 3/3] TI814X: Create board support and enable build for
-	TI8148 EVM
-Message-ID: <1316626754-5764-1-git-send-email-hemantp@ti.com>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Wed, 21 Sep 2011 07:47:32 -1000
+Subject: [PATCH] ARM: vexpress: initial device tree support
+In-Reply-To: <20110921171545.GG2872@arm.com>
+References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
+	<4E79E588.6010703@gmail.com>
+	<CACxGe6sTYYXbpXvPb4C+y4JX0eRxLvwjbFycXA8Mjc-XWS1QUA@mail.gmail.com>
+	<4E7A12E2.9040107@gmail.com> <20110921171545.GG2872@arm.com>
+Message-ID: <4E7A2334.7020904@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds minimal support and build configuration for TI8148 EVM. Also
-adds support for low level debugging on UART1 console on the EVM.
+On 9/21/2011 7:15 AM, Dave Martin wrote:
+> On Wed, Sep 21, 2011 at 11:37:54AM -0500, Rob Herring wrote:
+>> On 09/21/2011 09:57 AM, Grant Likely wrote:
+>>> On Wed, Sep 21, 2011 at 7:24 AM, Rob Herring<robherring2@gmail.com>  wrote:
+>>>> On 09/21/2011 04:19 AM, Dave Martin wrote:
+>>>>>        * arm,amba-bus -- widely used by other boards and patchsets, but
+>>>>>          seems not to be documented.
+>>>>>
+>>>>
+>>>> This should be dropped. There's not really any bus component to an amba
+>>>> bus. All the probing info is within the primecell peripherals.
+>>>
+>>> No, if it is an AMBA bus, then it is entirely appropriate to declare
+>>> it as an amba bus, but to also be compatible with "simple-bus".  In
+>>> fact, it would be better to use a compatible string that specifies the
+>>> specific implementation of AMBA bus since there are several versions
+>>> of the spec.
+>>
+>> And type of AMBA bus as the spec includes AXI, AHB, and APB. None of
+>> which have any sort of programmability or software view.
+>>
+>> If this is required, then the policy should be simple-bus should never
+>> be allowed alone as every bus has some underlying type. Seems like
+>> overkill for buses like this.
+>
+> The key question is _where_ to draw the line between generic and specific.
+> By definition, the DT can never be a comprehensive description of the
+> hardware -- rather a good DT is a description of those details of the hardware
+> which could relevant to any hypothetical OS.
+>
+> The flipside is that details which were thought to be irrelevant at
+> design/implementation time can turn out to be relevant in practice, due
+> to errata and implementation issues etc.  So taking the description slightly
+> beyond what the OS needs to know can still have some merit.
+>
+>
+> I still don't know how to say where the line should be drawn in this particular
+> case though.
 
-Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
----
- arch/arm/mach-omap2/Kconfig                  |    5 +++
- arch/arm/mach-omap2/Makefile                 |    1 +
- arch/arm/mach-omap2/board-ti8148evm.c        |   51 ++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/uncompress.h |    3 ++
- 4 files changed, 60 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/board-ti8148evm.c
+Here are some criteria:
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index a3b9227..cc4f213 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -316,6 +316,11 @@ config MACH_TI8168EVM
- 	depends on SOC_OMAPTI81XX
- 	default y
- 
-+config MACH_TI8148EVM
-+	bool "TI8148 Evaluation Module"
-+	depends on SOC_OMAPTI81XX
-+	default y
-+
- config MACH_OMAP_4430SDP
- 	bool "OMAP 4430 SDP board"
- 	default y
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 46a3497..597a2b6 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -242,6 +242,7 @@ obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
- 
- obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o
- obj-$(CONFIG_MACH_TI8168EVM)		+= board-ti8168evm.o
-+obj-$(CONFIG_MACH_TI8148EVM)		+= board-ti8148evm.o
- 
- # Platform specific device init code
- 
-diff --git a/arch/arm/mach-omap2/board-ti8148evm.c b/arch/arm/mach-omap2/board-ti8148evm.c
-new file mode 100644
-index 0000000..355c766
---- /dev/null
-+++ b/arch/arm/mach-omap2/board-ti8148evm.c
-@@ -0,0 +1,51 @@
-+/*
-+ * Code for TI8148 EVM.
-+ *
-+ * Copyright (C) 2010 Texas Instruments, Inc. - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/mach-types.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+
-+#include <plat/irqs.h>
-+#include <plat/board.h>
-+#include <plat/common.h>
-+
-+static struct omap_board_config_kernel ti8148_evm_config[] __initdata = {
-+};
-+
-+static void __init ti8148_evm_init(void)
-+{
-+	omap_serial_init();
-+	omap_board_config = ti8148_evm_config;
-+	omap_board_config_size = ARRAY_SIZE(ti8148_evm_config);
-+}
-+
-+static void __init ti8148_evm_map_io(void)
-+{
-+	omap2_set_globals_ti81xx();
-+	omapti81xx_map_common_io();
-+}
-+
-+MACHINE_START(TI8148EVM, "ti8148evm")
-+	/* Maintainer: Texas Instruments */
-+	.atag_offset	= 0x100,
-+	.map_io		= ti8148_evm_map_io,
-+	.init_early	= ti81xx_init_early,
-+	.init_irq	= ti81xx_init_irq,
-+	.timer		= &omap3_timer,
-+	.init_machine	= ti8148_evm_init,
-+MACHINE_END
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index 40336ad..8d052e7 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -175,6 +175,9 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		/* TI8168 base boards using UART3 */
- 		DEBUG_LL_TI81XX(3, ti8168evm);
- 
-+		/* TI8148 base boards using UART1 */
-+		DEBUG_LL_TI81XX(1, ti8148evm);
-+
- 	} while (0);
- }
- 
--- 
-1.7.3.5
+If the controller for the bus itself has registers, include the bus node
+
+If it is possible to plug new stuff into the bus, include the bus node
+
+If the base address for the bus can be changed, thereby changing all the 
+addresses of its subordinates by the same offset, include the bus node 
+(this usually goes along with "has registers".)
+
+ARM buses typically don't have any of those attributes, but there are 
+some weaker criteria that can be used to justify including a bus node. 
+The SoC on which I'm currently working has some peripherals on AXI and 
+others on APB.  That doesn't matter from that addressing standpoint - 
+the individual peripherals can each be viewed as having an address, end 
+of story - but it does matter from a power management standpoint.  The 
+clock tree is quite related to the bus layout.  Including bus nodes in 
+the device tree might provide useful place-holders for properties 
+describing power or clock domains.
+
+So, on the whole, I'm in favor of including bus nodes for ARM standard 
+buses.  There is little down side to doing so, and a fair chance that it 
+might come in handy in the future.
+
+>
+> Cheers
+> ---Dave
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+>
