@@ -1,72 +1,33 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 21 Sep 2011 17:17:28 +0100
-Subject: [PATCH] ARM: vexpress: initial device tree support
-In-Reply-To: <1316620877.4611.647.camel@hornet.cambridge.arm.com>
-References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
-	<4E79E588.6010703@gmail.com>
-	<CACxGe6sTYYXbpXvPb4C+y4JX0eRxLvwjbFycXA8Mjc-XWS1QUA@mail.gmail.com>
-	<1316620877.4611.647.camel@hornet.cambridge.arm.com>
-Message-ID: <CA+wbFdcOSC6YfsmLndM9CCg2WC9GbQqHmgzk3r8JKs71Bsn8Xg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Sep 2011 18:21:54 +0200
+Subject: [PATCH 00/10] hwspinlock-next
+In-Reply-To: <CACRpkdbqVuFEgntw=bUYka5NuvpbPhjB8L0cD4CTmsjwoZBDSA@mail.gmail.com>
+References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
+	<201109211612.33504.arnd@arndb.de>
+	<CACRpkdbqVuFEgntw=bUYka5NuvpbPhjB8L0cD4CTmsjwoZBDSA@mail.gmail.com>
+Message-ID: <201109211821.55058.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 5:01 PM, Pawel Moll <pawel.moll@arm.com> wrote:
-> On Wed, 2011-09-21 at 15:57 +0100, Grant Likely wrote:
->> On Wed, Sep 21, 2011 at 7:24 AM, Rob Herring <robherring2@gmail.com> wrote:
->> > On 09/21/2011 04:19 AM, Dave Martin wrote:
->> >> ? ? ? * arm,amba-bus -- widely used by other boards and patchsets, but
->> >> ? ? ? ? seems not to be documented.
->> >>
->> >
->> > This should be dropped. There's not really any bus component to an amba
->> > bus. All the probing info is within the primecell peripherals.
->>
->> No, if it is an AMBA bus, then it is entirely appropriate to declare
->> it as an amba bus, but to also be compatible with "simple-bus". ?In
->> fact, it would be better to use a compatible string that specifies the
->> specific implementation of AMBA bus since there are several versions
->> of the spec.
->
-> Dave asked me about details of the VE implementation. It's
-> sort-of-complicated... ;-)
->
-> 1. Core talks to Static Memory Controller via AMBA (AXI)
->
-> ? SOC { core --AXI--> SMC }
->
-> 2. SMC generates transaction on Static Memory Bus talking to the IO FPGA
->
-> ? tile/motherboard connector { SMC --SMB--> IOFPGA }
->
-> 3. Now, depending on the device being accessed:
->
-> a) Transactions accessing SMSC9118, ISP1761, NOR Flash and PSRAM are
-> routed directly to the devices
->
-> ? IOFPGA { SMB --> SMSC9118 et al. }
->
-> b) The rest of the traffic is converted back to AMBA (AHB/APB)
-> transactions and sent to the devices connected to internal AMBA matrix.
->
-> ? IOFPGA { SMB --> AHB/APB bus master --AHB/APB--> PL180 }
->
-> I don't believe, though, that the DTS must reflect such level of
-> details. That's why I think that:
->
-> + ? ? ? motherboard {
-> + ? ? ? ? ? ? ? compatible = "simple-bus";
->
-> and
->
-> + ? ? ? ? ? ? ? peripherals at 7,00000000 {
-> + ? ? ? ? ? ? ? ? ? ? ? compatible = "arm,amba-bus", "simple-bus";
->
-> is the best description of the reality :-)
+On Wednesday 21 September 2011, Linus Walleij wrote:
+> On Wed, Sep 21, 2011 at 4:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > My feeling is that it would be best for Ohad to send these directly
+> > to Linus, since it's basically a standalone subsystem and he's listed
+> > as the maintainer (well, after this series at least).
+> 
+> I agree. That's the path of least resistance and trouble.
+> 
+> If/when ARM-specific driver subsystems need their own zuper-maintainer
+> we can deal with it, can't we? There aren't many of them yet.
 
-I wonder whether an OS will ever need to know this detail.
+Definitely, I think that's the ideal case. I would very much like to
+see independent subsystem maintainers for the device drivers that are
+currently buried in per-architecture or per-platform directories.
+Among the ones that we should be moving out of there (or have already)
+are cpufreq, gpio, irqchip, pinmux, clock, dmaengine, timer, and there
+are probably some more. Since none of these are strictly ARM specific,
+my feeling is that they should not be part of the arm or arm-soc tree
+in the future but have their own trees.
 
-Am I right in understanding that these buses are just interconnect
-logic, with no OS-visible control/configuration interface?
-
-Cheers
----Dave
+	Arnd
