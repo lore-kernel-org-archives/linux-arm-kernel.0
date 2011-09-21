@@ -1,24 +1,98 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 21 Sep 2011 01:21:58 -0400 (EDT)
-Subject: [PATCH 0/3] GIC OF bindings
-In-Reply-To: <4E796EE4.6070704@firmworks.com>
-References: <20110920.224910.1996429830782124690.davem@davemloft.net>
-	<CACxGe6t7Mdr+w+aGFPM2-FEAQaYHuG8Za9dybLgMo-5-whLyNQ@mail.gmail.com>
-	<4E796EE4.6070704@firmworks.com>
-Message-ID: <20110921.012158.2252182592946972727.davem@davemloft.net>
+From: deepthy.ravi@ti.com (Ravi, Deepthy)
+Date: Wed, 21 Sep 2011 11:02:44 +0530
+Subject: [PATCH 4/5] ispccdc: Configure CCDC_SYN_MODE register for
+	UYVY8_2X8 and YUYV8_2X8 formats
+In-Reply-To: <201109210126.20436.laurent.pinchart@ideasonboard.com>
+References: <1316530612-23075-1-git-send-email-deepthy.ravi@ti.com>
+	<1316530612-23075-5-git-send-email-deepthy.ravi@ti.com>,
+	<201109210126.20436.laurent.pinchart@ideasonboard.com>
+Message-ID: <ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D090847@dbde03.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mitch Bradley <wmb@firmworks.com>
-Date: Tue, 20 Sep 2011 18:58:12 -1000
+Hi Laurent,
+> ________________________________________
+> From: Laurent Pinchart [laurent.pinchart at ideasonboard.com]
+> Sent: Wednesday, September 21, 2011 4:56 AM
+> To: Ravi, Deepthy
+> Cc: mchehab at infradead.org; tony at atomide.com; Hiremath, Vaibhav;
+> linux-media at vger.kernel.org; linux at arm.linux.org.uk;
+> linux-arm-kernel at lists.infradead.org; kyungmin.park at samsung.com;
+> hverkuil at xs4all.nl; m.szyprowski at samsung.com; g.liakhovetski at gmx.de;
+> Shilimkar, Santosh; khilman at deeprootsystems.com; david.woodhouse at intel.com;
+> akpm at linux-foundation.org; linux-kernel at vger.kernel.org;
+> linux-omap at vger.kernel.org; Sakari Ailus
+> Subject: Re: [PATCH 4/5] ispccdc: Configure CCDC_SYN_MODE register for
+> UYVY8_2X8 and YUYV8_2X8 formats
+>
+> Hi Deepthy,
+>
+> Thanks for the patch.
+>
+> On Tuesday 20 September 2011 16:56:51 Deepthy Ravi wrote:
+>> Configure INPMOD and PACK8 fileds of CCDC_SYN_MODE
+>> register for UYVY8_2X8 and YUYV8_2X8 formats.
+>>
+>> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
+>> ---
+>>  drivers/media/video/omap3isp/ispccdc.c |   11 ++++++++---
+>>  1 files changed, 8 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/media/video/omap3isp/ispccdc.c
+>> b/drivers/media/video/omap3isp/ispccdc.c index 418ba65..1dcf180 100644
+>> --- a/drivers/media/video/omap3isp/ispccdc.c
+>> +++ b/drivers/media/video/omap3isp/ispccdc.c
+>> @@ -985,8 +985,12 @@ static void ccdc_config_sync_if(struct
+>> isp_ccdc_device
+>> *ccdc,
+>>
+>>       syn_mode &= ~ISPCCDC_SYN_MODE_INPMOD_MASK;
+>>       if (format->code == V4L2_MBUS_FMT_YUYV8_2X8 ||
+>> -         format->code == V4L2_MBUS_FMT_UYVY8_2X8)
+>> -             syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
+>> +         format->code == V4L2_MBUS_FMT_UYVY8_2X8){
+>> +             if (pdata && pdata->bt656)
+>> +                     syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
+>> +             else
+>> +                     syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
+>> +     }
+>>       else if (format->code == V4L2_MBUS_FMT_YUYV8_1X16 ||
+>>                format->code == V4L2_MBUS_FMT_UYVY8_1X16)
+>>               syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
+>> @@ -1172,7 +1176,8 @@ static void ccdc_configure(struct isp_ccdc_device
+>> *ccdc) syn_mode &= ~ISPCCDC_SYN_MODE_SDR2RSZ;
+>>
+>>       /* Use PACK8 mode for 1byte per pixel formats. */
+>> -     if (omap3isp_video_format_info(format->code)->width <= 8)
+>> +     if ((omap3isp_video_format_info(format->code)->width <= 8) &&
+>> +                     (omap3isp_video_format_info(format->code)->bpp <=
+>> 8))
+>
+> I'm not sure to follow you. This will clear the PACK8 bit for the YUYV8_2X8
+> formats. Those formats are 8 bits wide, shouldn't PACK8 be set to store
+> samples on 8 bits instead of 16 bits ?
+>
+> Is this patch intended to support YUYV8_2X8 sensors in non BT.656 mode with
+> the bridge enabled ? In that case, what would you think about setting the
+> CCDC
+> input format to YUYV8_1X16 instead ? This would better reflect the reality,
+> as
+> the bridge converts YUYV8_2X8 to YUYV8_1X16, and the CCDC is then fed with
+> YUYV8_1X16.
+>
+[Deepthy Ravi] Yes this is intended for  YUYV8_2X8 sensors in non BT.656 with 8 to 16 bit bridge enabled. So the data has to be stored as 16 bits per sample. Thats why PACK8 is cleared . I am not sure about using YUYV8_1X16. 
 
-> interrupt-parent has been part of the interrupt mapping spec from the
-> inception of same.
-> 
-> http://www.openfirmware.info/docs/rec.intmap.d09.pdf
+>>               syn_mode |= ISPCCDC_SYN_MODE_PACK8;
+>>       else
+>>               syn_mode &= ~ISPCCDC_SYN_MODE_PACK8;
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
 
-Thanks for the link.
 
-In my vast collection of Sun OF dumps, I cannot find a single instance
-where they've made use of this property, which is why I've never seen
-it before.
+-- 
+Thanks,
+Deepthy Ravi
