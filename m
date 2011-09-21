@@ -1,104 +1,63 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Sep 2011 21:32:14 +0900
-Subject: [PATCH 2/7] s3c-adc: describe features via quirk constants
-In-Reply-To: <201109182243.40440.heiko@sntech.de>
-References: <201109182241.48858.heiko@sntech.de>
-	<201109182243.40440.heiko@sntech.de>
-Message-ID: <005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 21 Sep 2011 20:44:24 +0800
+Subject: [PATCH v2 1/3] net/fec: change phy-reset-gpio request warning to
+	debug message
+In-Reply-To: <20110921121159.GG1966@pengutronix.de>
+References: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
+	<1316603432-20032-2-git-send-email-shawn.guo@linaro.org>
+	<20110921112555.GE1966@pengutronix.de>
+	<20110921120341.GG28907@S2100-06.ap.freescale.net>
+	<20110921121159.GG1966@pengutronix.de>
+Message-ID: <20110921124423.GI28907@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+On Wed, Sep 21, 2011 at 02:11:59PM +0200, Wolfram Sang wrote:
+> On Wed, Sep 21, 2011 at 08:03:42PM +0800, Shawn Guo wrote:
+> > On Wed, Sep 21, 2011 at 01:25:55PM +0200, Wolfram Sang wrote:
+> > > Hi Shawn,
+> > > 
+> > > On Wed, Sep 21, 2011 at 07:10:30PM +0800, Shawn Guo wrote:
+> > > > FEC can work without a phy reset on some platforms, which means not
+> > > > very platform necessarily have a phy-reset gpio encoded in device tree.
+> > > > So it makes more sense to have the phy-reset-gpio request failure as
+> > > > a debug message rather than a warning.
+> > > 
+> > > Or remove it entirely?
+> > > 
+> > I would like to keep it.  When people want to debug at this point, they
+> > do not need to type the debug message.
 > 
-> The adc blocks of S3C2410 through S5P have a multitude of
-> quirks, i.e. moved bits or whole new registers.
+> I just think the message might be confusing in case you don't need the
+> gpio, because then failing is expected behaviour. For those platforms,
+> it is not even an error then, so you must drop returning the error. To
+> be very precise, you should check of_get_named_gpio() and return if no
+> gpio is specified. Then, you can distinguish that case from problems
+> when getting the GPIO.
 > 
-> This patch tries to describe these individual features
-> through constants which can be used to describe an adc.
+The whole fec_reset_phy() should not be a show-stopper failure.  Even
+on platforms that have the gpio, FEC can work without resetting the
+phy in FEC driver for some cases, for example, boot loader has done it.
+It might be good enough to give a warning message rather than getting
+the probe fail.
+
+> > > I also wanted to suggested to drop returning the error code, since it is
+> > > not an error anymore, strictly speaking. Then I noticed that the caller
+> > > does not check the error code. So, this could be added or turn the
+> > > function to void?
+> > > 
+> > To me, keep the return value as integer is more scalable.  Someday,
+> > someone need to add more stuff in the function, or want to improve
+> > the caller to check return value, it plays.
 > 
-> As SoCs sometimes share only some of these quirks defining
-> TYPE_ADCVx values for each one wouldn't scale well when
-> adding more variants.
+> I agree that keeping it int is way better. But why not add it now to
+> keep things proper and tested? If this patch gets accepted as it is and
+> later someone else will add error checking to the caller, your platform
+> will lose FEC support as a regression.
 > 
-Hi Heiko,
+Again, fec_reset_phy() failure is not a show-stopper.  We might not
+want to make the probe fail because of that.
 
-I don't have idea we really need to use QUIRK in this case...as I know, the
-QUIRK is used on other situation...
-
-In addition, the TYPE_ADCVx can support each Samsung SoCs' ADC...but I need
-to check again.
-
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/plat-samsung/adc.c |   29 +++++++++++++++++++++++++++++
->  1 files changed, 29 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-> index ee8deef..b209d58 100644
-> --- a/arch/arm/plat-samsung/adc.c
-> +++ b/arch/arm/plat-samsung/adc.c
-> @@ -45,6 +45,35 @@ enum s3c_cpu_type {
->  	TYPE_ADCV3, /* S5PV210, S5PC110, EXYNOS4210 */
->  };
-> 
-> +/*
-> + * Resolution of the ADC - 10 or 12 bit
-> + */
-
-/* ... */
-
-> +#define S3C_ADC_QUIRK_10BIT		0
-> +#define S3C_ADC_QUIRK_12BIT		(1<<0)
-
-According to coding style, should be added blank around <<.
-
-> +
-> +/*
-> + * 12bit ADC can switch resolution between 10 bit and 12 bit
-> + * ADCCON bit 03 for S3C2416
-> + * ADCCON bit 16 for S3C64XX and up
-> + */
-> +#define S3C_ADC_QUIRK_RESSEL03		(1<<1)
-> +#define S3C_ADC_QUIRK_RESSEL16		(1<<2)
-
-Same as above.
-
-> +
-> +/*
-> + * Input channel select can either be in
-> + * - reg ADCCON, bit for S3C24XX and S3C64XX
-> + * - reg base+0x18 for 2443/2416/2450
-> + * - reg base+0x1C for S5P
-> + */
-> +#define S3C_ADC_QUIRK_MUXADCCON		(1<<3)
-> +#define S3C_ADC_QUIRK_MUX18		(1<<4)
-> +#define S3C_ADC_QUIRK_MUX1C		(1<<5)
-
-Same.
-
-> +
-> +/*
-> + * CLRINT register on S3C64xx
-> + */
-
-/* ... */
-
-> +#define S3C_ADC_QUIRK_CLRINT		(1<<6)
-
-Same.
-
-> +
->  struct s3c_adc_client {
->  	struct platform_device	*pdev;
->  	struct list_head	 pend;
-> --
-> 1.7.2.3
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Regards,
+Shawn
