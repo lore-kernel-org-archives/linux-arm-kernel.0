@@ -1,32 +1,35 @@
-From: hatim.rv@samsung.com (Hatim Ali)
-Date: Wed, 21 Sep 2011 11:14:20 +0530
-Subject: [RESEND PATCH 3/3] s5p-tv: Add PM_RUNTIME dependency
-In-Reply-To: <1316583860-32510-1-git-send-email-hatim.rv@samsung.com>
-References: <1316583860-32510-1-git-send-email-hatim.rv@samsung.com>
-Message-ID: <1316583860-32510-4-git-send-email-hatim.rv@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 21 Sep 2011 13:53:37 +0800
+Subject: [PATCH] ARM: cache-l2x0: add resume entry for l2 in secure mode
+In-Reply-To: <20110921055223.GA28907@S2100-06.ap.freescale.net>
+References: <1316570265-13709-1-git-send-email-Baohua.Song@csr.com>
+	<20110921055223.GA28907@S2100-06.ap.freescale.net>
+Message-ID: <CAGsJ_4z4WJkDPhD1WYan3GecnAb0VfPx3_dgFHCmTWs7gVyFdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TVOUT driver requires PM_RUNTIME support for proper clock
-enabling.
+2011/9/21 Shawn Guo <shawn.guo@freescale.com>:
+> Hi Barry,
+>
+> On Tue, Sep 20, 2011 at 06:57:45PM -0700, Barry Song wrote:
+>> we save the l2x0 registers at the first initialization, and restore
+>> them after resuming every time.
+>>
+> I'm unsure that it will work for cases like imx6q, where L2 cache is
+> retained and the controller needs to be restored at the very beginning
+> of the resume entry (running on physical space).
 
-Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
----
- drivers/media/video/s5p-tv/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+yes. imx6q actually needs to enable l2 earlier than cpu_resume(and mmu
+resume). so how about letting outer_resume support both phy and virt
+address restore?
+for example, add early resume: outer_early_resume()
 
-diff --git a/drivers/media/video/s5p-tv/Kconfig b/drivers/media/video/s5p-tv/Kconfig
-index 9c37dee..f2a0977 100644
---- a/drivers/media/video/s5p-tv/Kconfig
-+++ b/drivers/media/video/s5p-tv/Kconfig
-@@ -8,7 +8,7 @@
- 
- config VIDEO_SAMSUNG_S5P_TV
- 	bool "Samsung TV driver for S5P platform (experimental)"
--	depends on PLAT_S5P
-+	depends on PLAT_S5P && PM_RUNTIME
- 	depends on EXPERIMENTAL
- 	default n
- 	---help---
--- 
-1.7.2.3
+Then for your case, you use asm to "bl out_resume", then "b cpu_resume".
+For those chips which lose l2 in suspend cycle, people can call it in
+C function after cpu_resume.
+
+>
+> Regards,
+> Shawn
+
+-barry
