@@ -1,17 +1,18 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Sep 2011 07:55:10 -0700
-Subject: [PATCH v7 09/26] gpio/omap: use level/edge detect reg offsets
-In-Reply-To: <1315918979-26173-10-git-send-email-tarun.kanti@ti.com>
+Date: Wed, 21 Sep 2011 07:55:32 -0700
+Subject: [PATCH v7 10/26] gpio/omap: remove hardcoded offsets in
+	context save/restore
+In-Reply-To: <1315918979-26173-11-git-send-email-tarun.kanti@ti.com>
 References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-	<1315918979-26173-10-git-send-email-tarun.kanti@ti.com>
-Message-ID: <20110921145509.GU2937@atomide.com>
+	<1315918979-26173-11-git-send-email-tarun.kanti@ti.com>
+Message-ID: <20110921145532.GV2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Tarun Kanti DebBarma <tarun.kanti@ti.com> [110913 05:29]:
-> By adding level and edge detection register offsets and then initializing them
-> correctly according to OMAP versions during device registrations we can now remove
-> lot of revision checks in these functions.
+> It is not required to use hard-coded offsets any more in context save and
+> restore functions and instead use the generic offsets which have been correctly
+> initialized during device registration.
 > 
 > Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 > Signed-off-by: Charulatha V <charu@ti.com>
