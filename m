@@ -1,27 +1,28 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 21 Sep 2011 13:52:24 +0800
-Subject: [PATCH] ARM: cache-l2x0: add resume entry for l2 in secure mode
-In-Reply-To: <1316570265-13709-1-git-send-email-Baohua.Song@csr.com>
-References: <1316570265-13709-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20110921055223.GA28907@S2100-06.ap.freescale.net>
+From: hatim.rv@samsung.com (Hatim Ali)
+Date: Wed, 21 Sep 2011 11:14:17 +0530
+Subject: [PATCH V2 0/3] Add TVOUT support for SMDKV310
+Message-ID: <1316583860-32510-1-git-send-email-hatim.rv@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Barry,
+This is v2 of the TVOUT patch set for SMDKV310.
+v1 is available at below link.
+(http://www.spinics.net/lists/arm-kernel/msg138054.html)
 
-On Tue, Sep 20, 2011 at 06:57:45PM -0700, Barry Song wrote:
-> we save the l2x0 registers at the first initialization, and restore
-> them after resuming every time.
-> 
-I'm unsure that it will work for cases like imx6q, where L2 cache is
-retained and the controller needs to be restored at the very beginning
-of the resume entry (running on physical space).
+Patch 1 has been modified according to the comments received from
+Tomasz Stanislawski.
+Patches 2 and 3 are RESENDs.
 
-Regards,
-Shawn
+Hatim Ali (3):
+  ARM: EXYNOS4: Add TVOUT support for SMDKV310
+  ARM: EXYNOS4: Update consistent DMA size to 8MB
+  s5p-tv: Add PM_RUNTIME dependency
 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  arch/arm/include/asm/outercache.h |    7 +++
->  arch/arm/mm/cache-l2x0.c          |   81 ++++++++++++++++++++++++++++++++----
->  2 files changed, 79 insertions(+), 9 deletions(-)
+ arch/arm/mach-exynos4/Kconfig               |    2 ++
+ arch/arm/mach-exynos4/include/mach/memory.h |    2 ++
+ arch/arm/mach-exynos4/mach-smdkv310.c       |   25 +++++++++++++++++++++++++
+ drivers/media/video/s5p-tv/Kconfig          |    2 +-
+ 4 files changed, 30 insertions(+), 1 deletions(-)
+
+-- 
+1.7.2.3
