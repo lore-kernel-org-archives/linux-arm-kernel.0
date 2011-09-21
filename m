@@ -1,74 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 22 Sep 2011 00:07:48 +0800
-Subject: [PATCH v3 1/3] net/fec: fec_reset_phy() does not need to always
-	succeed
-In-Reply-To: <1316621270-27805-1-git-send-email-shawn.guo@linaro.org>
-References: <1316621270-27805-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1316621270-27805-2-git-send-email-shawn.guo@linaro.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 21 Sep 2011 17:01:17 +0100
+Subject: [PATCH] ARM: vexpress: initial device tree support
+In-Reply-To: <CACxGe6sTYYXbpXvPb4C+y4JX0eRxLvwjbFycXA8Mjc-XWS1QUA@mail.gmail.com>
+References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
+	<4E79E588.6010703@gmail.com>
+	<CACxGe6sTYYXbpXvPb4C+y4JX0eRxLvwjbFycXA8Mjc-XWS1QUA@mail.gmail.com>
+Message-ID: <1316620877.4611.647.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FEC can work without a phy reset on some platforms, which means not
-very platform necessarily have a phy-reset gpio encoded in device tree.
-Even on the platforms that have the gpio, FEC can work without
-resetting phy for some cases, e.g. boot loader has done that.
+On Wed, 2011-09-21 at 15:57 +0100, Grant Likely wrote:
+> On Wed, Sep 21, 2011 at 7:24 AM, Rob Herring <robherring2@gmail.com> wrote:
+> > On 09/21/2011 04:19 AM, Dave Martin wrote:
+> >>       * arm,amba-bus -- widely used by other boards and patchsets, but
+> >>         seems not to be documented.
+> >>
+> >
+> > This should be dropped. There's not really any bus component to an amba
+> > bus. All the probing info is within the primecell peripherals.
+> 
+> No, if it is an AMBA bus, then it is entirely appropriate to declare
+> it as an amba bus, but to also be compatible with "simple-bus".  In
+> fact, it would be better to use a compatible string that specifies the
+> specific implementation of AMBA bus since there are several versions
+> of the spec.
 
-So it makes more sense to have the phy-reset-gpio request failure as
-a debug message rather than a warning, and get fec_reset_phy() return
-void since the caller does not check the return anyway.
+Dave asked me about details of the VE implementation. It's
+sort-of-complicated... ;-)
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/net/ethernet/freescale/fec.c |   13 +++++--------
- 1 files changed, 5 insertions(+), 8 deletions(-)
+1. Core talks to Static Memory Controller via AMBA (AXI)
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 158b82e..9c1d059 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -1411,24 +1411,22 @@ static int __devinit fec_get_phy_mode_dt(struct platform_device *pdev)
- 	return -ENODEV;
- }
- 
--static int __devinit fec_reset_phy(struct platform_device *pdev)
-+static void __devinit fec_reset_phy(struct platform_device *pdev)
- {
- 	int err, phy_reset;
- 	struct device_node *np = pdev->dev.of_node;
- 
- 	if (!np)
--		return -ENODEV;
-+		return;
- 
- 	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
- 	err = gpio_request_one(phy_reset, GPIOF_OUT_INIT_LOW, "phy-reset");
- 	if (err) {
--		pr_warn("FEC: failed to get gpio phy-reset: %d\n", err);
--		return err;
-+		pr_debug("FEC: failed to get gpio phy-reset: %d\n", err);
-+		return;
- 	}
- 	msleep(1);
- 	gpio_set_value(phy_reset, 1);
--
--	return 0;
- }
- #else /* CONFIG_OF */
- static inline int fec_get_phy_mode_dt(struct platform_device *pdev)
-@@ -1436,13 +1434,12 @@ static inline int fec_get_phy_mode_dt(struct platform_device *pdev)
- 	return -ENODEV;
- }
- 
--static inline int fec_reset_phy(struct platform_device *pdev)
-+static inline void fec_reset_phy(struct platform_device *pdev)
- {
- 	/*
- 	 * In case of platform probe, the reset has been done
- 	 * by machine code.
- 	 */
--	return 0;
- }
- #endif /* CONFIG_OF */
- 
--- 
-1.7.4.1
+   SOC { core --AXI--> SMC }
+
+2. SMC generates transaction on Static Memory Bus talking to the IO FPGA
+
+   tile/motherboard connector { SMC --SMB--> IOFPGA }
+
+3. Now, depending on the device being accessed:
+
+a) Transactions accessing SMSC9118, ISP1761, NOR Flash and PSRAM are
+routed directly to the devices
+
+   IOFPGA { SMB --> SMSC9118 et al. }
+
+b) The rest of the traffic is converted back to AMBA (AHB/APB)
+transactions and sent to the devices connected to internal AMBA matrix.
+
+   IOFPGA { SMB --> AHB/APB bus master --AHB/APB--> PL180 }
+
+I don't believe, though, that the DTS must reflect such level of
+details. That's why I think that:
+
++       motherboard {
++               compatible = "simple-bus";
+
+and
+
++               peripherals at 7,00000000 {
++                       compatible = "arm,amba-bus", "simple-bus";
+
+is the best description of the reality :-)
+
+Cheers!
+
+Pawe?
