@@ -1,83 +1,51 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 21 Sep 2011 17:43:52 +0530
-Subject: [PATCH v5 15/15] OMAP2+: UART: Do not gate uart clocks if used for
-	debug_prints
-In-Reply-To: <1316607232-21709-1-git-send-email-govindraj.raja@ti.com>
-References: <1316607232-21709-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1316607232-21709-6-git-send-email-govindraj.raja@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 21 Sep 2011 20:23:41 +0800
+Subject: [PATCH] gpio/mxc: make it work with imx6q
+In-Reply-To: <20110920130508.GE2962@pulham.picochip.com>
+References: <1316423432-18333-1-git-send-email-shawn.guo@linaro.org>
+	<20110920130508.GE2962@pulham.picochip.com>
+Message-ID: <20110921122340.GH28907@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If OMAP UART is used as console uart and debug is enabled,
-avoid gating of uart clocks to print all debug prints.
+On Tue, Sep 20, 2011 at 02:05:09PM +0100, Jamie Iles wrote:
+> Hi Shawn,
+> 
+> On Mon, Sep 19, 2011 at 05:10:32PM +0800, Shawn Guo wrote:
+> > The imx6q is a Cortex-A9 Quad Core SoC, which has GIC as the primary
+> > interrupt controller.  GIC requires gpio irq handler to signal EOI,
+> > otherwise system will hang whenever there is a gpio irq triggered.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  drivers/gpio/gpio-mxc.c |    3 +++
+> >  1 files changed, 3 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> > index 4340aca..00b4c9c 100644
+> > --- a/drivers/gpio/gpio-mxc.c
+> > +++ b/drivers/gpio/gpio-mxc.c
+> > @@ -233,6 +233,9 @@ static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+> >  	u32 irq_stat;
+> >  	struct mxc_gpio_port *port = irq_get_handler_data(irq);
+> >  
+> > +	if (desc->irq_data.chip->irq_eoi)
+> > +		desc->irq_data.chip->irq_eoi(&desc->irq_data);
+> > +
+> >  	irq_stat = readl(port->base + GPIO_ISR) & readl(port->base + GPIO_IMR);
+> >  
+> >  	mxc_gpio_irq_handler(port, irq_stat);
+> > -- 
+> > 1.7.4.1
+> 
+> Could this make use of the chained_irq_enter/chained_irq_exit functions 
+> added in 10a8c38 (ARM: 6806/1: irq: introduce entry and exit functions 
+> for chained handlers)?
+> 
+Yes.  Will respin the patch to use it.
 
-If uart clocks are gated then the debug prints from omap_device
-framework or hwmod framework can cause uart to enter recursive pm_runtime calls,
-which can cause a deadlock over power lock usage.
+Thanks for the point, Jamie.
 
-For example: Say, uart clocks are cut and we get a print from omap_device_disable
-stating disabling uart clocks. This print calls omap_uart driver console_write
-which will call runtime API get_sync which means we enter from runtime API put
-context to runtime API get context.
-
---> runtime put (take power lock)
-    --> print disabling uart clocks
-        --> call uart console write
-            --> call get_sync (try to take power lock)
-
-Also any clock enable API call from uart driver should not call any uart
-operation until clocks are enabled back. Like get_sync having debug print
-calling uart console write even before clocks are enabled.
-
-So to avoid these scenarios, identify from bootargs  if OMAP_UART(ttyO) is used
-in debug mode. If so, do not set device_may_wakeup. This will prevent
-pm_runtime_enable in uart driver probe and will avoid uart clock gating.
-
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
-More details on this topic and experiments done listed here:
-http://www.spinics.net/lists/linux-serial/msg04128.html
-
- arch/arm/mach-omap2/serial.c |   18 +++++++++++++++++-
- 1 files changed, 17 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 87696bf..3d92b77f 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -266,8 +266,24 @@ struct omap_hwmod *omap_uart_hwmod_lookup(int num)
- 	return oh;
- }
- 
-+static int uart_debug;
-+
-+char *cmdline_find_option(char *str)
-+{
-+	extern char *saved_command_line;
-+
-+	return strstr(saved_command_line, str);
-+}
-+
- static int __init omap_serial_early_init(void)
- {
-+	if (cmdline_find_option("debug") &&
-+			cmdline_find_option(OMAP_SERIAL_NAME)) {
-+		uart_debug = true;
-+		pr_info("OMAP UART used as console in debug mode"
-+			" uart clocks will not be gated");
-+	}
-+
- 	do {
- 		struct omap_hwmod *oh;
- 
-@@ -361,7 +377,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
- 
- 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
- 
--	if ((cpu_is_omap34xx() && bdata->pads))
-+	if ((cpu_is_omap34xx() && bdata->pads) && !uart_debug)
- 		device_init_wakeup(&pdev->dev, true);
- 
- 	kfree(pdata);
 -- 
-1.7.4.1
+Regards,
+Shawn
