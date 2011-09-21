@@ -1,60 +1,47 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 21 Sep 2011 09:25:36 +0300
-Subject: [PATCH 1/3] include: fb: Add definiton for window positioning
-	structure
-In-Reply-To: <20110920170858.GA3827@tarshish>
-References: <1316532641-2657-1-git-send-email-ajaykumar.rs@samsung.com>
-	<1316532641-2657-2-git-send-email-ajaykumar.rs@samsung.com>
-	<20110920112427.GB19695@sapphire.tkos.co.il>
-	<CAEC9eQOpwfmRfcxHoiA00xX0a=dxXj1xJDpW14DozGXKXPJ3Xg@mail.gmail.com>
-	<20110920170858.GA3827@tarshish>
-Message-ID: <1316586336.1949.14.camel@deskari>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 21 Sep 2011 11:52:52 +0530
+Subject: [PATCH v8 00/16] To use DMA generic APIs for Samsung DMA
+In-Reply-To: <001601cc76b6$2627cdd0$72776970$%kim@samsung.com>
+References: <1314924284-25554-1-git-send-email-boojin.kim@samsung.com>
+	<1315980099.26251.498.camel@vkoul-udesk3>
+	<CABb+yY25NTbtRPOw-KH8U4zA1Bo8q0BDM8SXyrsobG7NEv8edg@mail.gmail.com>
+	<1315999032.26251.501.camel@vkoul-udesk3>
+	<CAJe_ZhdrPMbBOkfwg=PFyVU14eT0Gc0=rtKwEiQCH5-Q5-CtVQ@mail.gmail.com>
+	<1316401174.21359.3.camel@vkoul-udesk3>
+	<001601cc76b6$2627cdd0$72776970$%kim@samsung.com>
+Message-ID: <1316586172.1573.1.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-09-20 at 20:08 +0300, Baruch Siach wrote:
-> Hi Ajay,
-> 
-> On Tue, Sep 20, 2011 at 08:56:57PM +0530, Ajay kumar wrote:
-> > Hi Baruch,
-> > On Tue, Sep 20, 2011 at 4:54 PM, Baruch Siach <baruch@tkos.co.il> wrote:
-> > > Hi Ajay,
-> > >
-> > > On Tue, Sep 20, 2011 at 11:30:39AM -0400, Ajay Kumar wrote:
-> > >> This patch adds a data structure definiton to hold framebuffer windows/planes.
-> > >> An ioctl number is also added to provide user access
-> > >> to change window position dynamically.
-> > >
-> > > [snip]
-> > >
-> > >> +/* Window overlaying */
-> > >> +struct fb_overlay_win_pos {
-> > >> +     __u32 win_pos_x;        /* x-offset from LCD(0,0) where window starts */
-> > >> +     __u32 win_pos_y;        /* y-offset from LCD(0,0) where window starts */
-> > >> +};
-> > >
-> > > Why not allow negative offsets where the left or upper part of the framebuffer
-> > > is hidden?
+On Mon, 2011-09-19 at 19:23 +0900, Kukjin Kim wrote:
+> Vinod Koul wrote:
 > > 
-> > Thanks for pointing it out. Are there drivers which place the overlay
-> > windows such that some part of the window is hidden from being
-> > displayed on the screen?
+> > On Wed, 2011-09-14 at 17:03 +0530, Jassi Brar wrote:
+> > > On 14 September 2011 16:47, Vinod Koul <vinod.koul@intel.com> wrote:
+> > >
+> > > >> The changelog for [PATCH v8 04/16] is misleading - we don't need any
+> > > >> modification for the reason mentioned in changelog. But the modification
+> > > >> has positive side-effect of preventing callbacks during terminate_all which
+> > > >> is no way understood from the changelog. So I would like to changelog
+> > > >> corrected.
+> > > > I thought change log was correct in depicting what patch does and Boojin
+> > > > had replied.... I will check again...
+> > >
+> > > I didn't reply because I ran out of ways to explain the same thing in
+> > > different words.
+> > I checked again the patch, change log and your comments.
+> > I agree with current change log, and also your observation is right but
+> > that is just a side effect, which IMO should be best left to developer
+> > to choose or not, in this case she ignored it
+> > 
+> > So no changes to this and I a ready to merge it to my next in a day or
+> > two...
+> > 
+> So as a note, pulled git://git.infradead.org/users/vkoul/slave-dma.git samsung_dma for other regarding dma patches in arch/arm/ samsung stuff.
 > 
-> I don't know. However, since this is new userspace ABI which should stay 
-> compatible forever, we should make sure to do it right. Using __s32 instead of 
-> __u32 won't limit us in the future.
+> If any problems, please let me know.
+> 
+I am pushing them to next now..
 
-OMAP HW doesn't allow "funny" things like overlay being outside the
-visible area, i.e. negative position or size larger than the display.
-And my guess is that hardware rarely allow things like that, as it would
-just complicate the hardware without any gain.
-
-Out-of-display-overlays can of course be emulated by the software. But
-I'm not sure if it's good to add the complexity in the driver layer, as
-it could as well be handled in the userspace.
-
-Then again, a signed value would be future safer ("just in case"), and
-if the driver can just reject values it doesn't want to support, there's
-no real harm there either.
-
- Tomi
+-- 
+~Vinod
