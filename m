@@ -1,54 +1,87 @@
-From: yong.zhang0@gmail.com (Yong Zhang)
-Date: Wed, 21 Sep 2011 20:12:41 +0800
-Subject: [PATCH 53/57] sound: irq: Remove IRQF_DISABLED
-In-Reply-To: <alpine.LFD.2.02.1109211154280.2723@ionos>
-References: <1316597339-29861-1-git-send-email-yong.zhang0@gmail.com>
-	<1316597339-29861-54-git-send-email-yong.zhang0@gmail.com>
-	<s5hsjnqxlxb.wl%tiwai@suse.de>
-	<alpine.LFD.2.02.1109211154280.2723@ionos>
-Message-ID: <20110921121241.GC2550@zhy>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Sep 2011 21:13:04 +0900
+Subject: [PATCH V5 0/6] ARM: S5P64X0: Add Framebuffer support
+In-Reply-To: <1316454841-20869-1-git-send-email-ajaykumar.rs@samsung.com>
+References: <1316454841-20869-1-git-send-email-ajaykumar.rs@samsung.com>
+Message-ID: <004a01cc7857$d0d8aa90$7289ffb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 11:55:36AM +0200, Thomas Gleixner wrote:
-> On Wed, 21 Sep 2011, Takashi Iwai wrote:
+Ajay Kumar wrote:
 > 
-> > At Wed, 21 Sep 2011 17:28:54 +0800,
-> > Yong Zhang wrote:
-> > > 
-> > > Since commit [c58543c8: genirq: Run irq handlers with interrupts disabled],
-> > 
-> > Hm, this id hits a different commit:
-> >     commit c58543c869606532c2382f027d6466f4672ea756
-> >     Author: David S. Miller <davem@davemloft.net>
-> >     Date:   Tue Oct 13 00:49:09 2009 -0700
-> > 
-> >     sparc64: Set IRQF_DISABLED on LDC channel IRQs.
-> > 
-> > You mean commit e58aa3d2d0cc01ad8d6f7f640a0670433f794922?
+>  The patches are created against "for-next" branch of Kukjin Kim's tree
+at:
+>  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 > 
-> Yeah.
->  
-> > > We run all interrupt handlers with interrupts disabled
-> > > and we even check and yell when an interrupt handler
-> > > returns with interrupts enabled (see commit [b738a50a:
-> > > genirq: Warn when handler enables interrupts]).
-> > > 
-> > > So now this flag is a NOOP and can be removed.
-> > > 
-> > > Signed-off-by: Yong Zhang <yong.zhang0@gmail.com>
-> > > Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > 
-> > Do you want to merge by yourself or shall I take it to sound git tree?
-> > Since IRQF_DISABLED isn't used, it can be applied safely in 3.1-based
-> > tree, right?
+>  Changes since V1:
+> 	- Remove mach/regs-fb.h, instead use plat/regs-fb.h.
+> 	- Add common pdata for FB and LCD in SMDK6440 and SMDK6450.
+> 	- Modify names(s5p-->smdk), max_bpp and refresh rate.
+> 	- Modify variable name(cfg-->chipid).
+> 	- Use __raw_readl, __raw_writel instead of readl and writel.
 > 
-> Yes, please go ahead. I'll pick up the leftovers.
+>  Changes since V2:
+> 	-Change name of the config-COMMON_FB to SMDK64X0_COMMON_FB.
+> 	-Change filename common-fb.h to smdk64x0-common-fb.h.
+> 	-Change filename common-fb.c to smdk64x0-common-fb.c.
+> 
+>  Changes since V3:
+> 	-Add FB and LCD plat-data in corresponding machine files
+> 	 instead of creating common file smdk64x0-common-fb.c.
+> 	-Modify name S5P64X0_SETUP_FB to S5P64X0_SETUP_FB_24BPP.
+> 	-Modify file name setup-fb.c to setup-fb-24bpp.c.
+> 	-Move SPCON settings to machine file.
+> 	-Use soc_is_s5p6440()/soc_is_s5p6450() to check CPU ID.
+> 
+>  Changes since V4:
+> 	-Removed refresh rate from plat data(s3c_fb_pd_win)
+> 	-Fixed complation warning:"function declaration isn't a prototype"
+> 	 for s5p6440_set_lcd_interface() and s5p6450_set_lcd_interface().
+> 
+> 
+>   These patches have dependency on the patch:
+>   "ARM: S5P64X0: Fix mask value for S5P64X0 CPU IDs",
+>   at http://www.spinics.net/lists/arm-kernel/msg138990.html
+> 
+> o To Kukjin,
+>   [PATCH RESEND V5 1/6] video: s3c-fb: Add S5P64X0 specific
+> s3c_fb_driverdata
+>   [PATCH RESEND V5 2/6] ARM: S5P64X0: Add register base and IRQ for
+> Framebuffer
+>   [PATCH RESEND V5 3/6] ARM: S5P64X0: Set s3c_device_fb name
+>   [PATCH RESEND V5 4/6] ARM: S5P64X0: Add GPIO setup for LCD
+>   [PATCH V5 5/6]ARM: S5P6440: Add LCD-LTE480 and enable Framebuffer
+> support
+>   [PATCH V5 6/6]ARM: S5P6450: Add LCD-LTE480 and enable Framebuffer
+> support
+> 
+>  arch/arm/mach-s5p64x0/Kconfig                  |   10 +++
+>  arch/arm/mach-s5p64x0/Makefile                 |    1 +
+>  arch/arm/mach-s5p64x0/cpu.c                    |    3 +
+>  arch/arm/mach-s5p64x0/include/mach/irqs.h      |    4 +
+>  arch/arm/mach-s5p64x0/include/mach/map.h       |    3 +
+>  arch/arm/mach-s5p64x0/include/mach/regs-gpio.h |    4 +
+>  arch/arm/mach-s5p64x0/mach-smdk6440.c          |   74
+> +++++++++++++++++++++++
+>  arch/arm/mach-s5p64x0/mach-smdk6450.c          |   75
+> ++++++++++++++++++++++++
+>  arch/arm/mach-s5p64x0/setup-fb-24bpp.c         |   29 +++++++++
+>  arch/arm/plat-samsung/include/plat/fb.h        |    7 ++
+>  drivers/video/s3c-fb.c                         |   27 +++++++++
+>  11 files changed, 237 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-s5p64x0/setup-fb-24bpp.c
 
-Takashi, if you take it, could you please modify that commit id to the
-right one?
+Looks ok to me, will apply.
 
-Otherwise I could change it when I refresh this patchset.
+But as I said, the 'video: s3c-fb: Add S5P64X0 specific s3c_fb_driverdata'
+should be sent to Florian's tree.
 
-Thanks,
-Yong
+I think, it's enough to re-send it to Florian Tobias Schandina.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
