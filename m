@@ -1,30 +1,79 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 21 Sep 2011 21:28:48 +0200
-Subject: [PATCH 3/3] ARM: gic: add OF based initialization
-In-Reply-To: <4E7A252F.2000402@gmail.com>
-References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
-	<1316550244-3655-4-git-send-email-robherring2@gmail.com>
-	<4E7A1BCA.1090006@ti.com> <4E7A252F.2000402@gmail.com>
-Message-ID: <4E7A3AF0.1020809@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 21 Sep 2011 13:33:38 -0600
+Subject: [PATCH 1/3] arm/tegra: Move EN_VDD_1V05_GPIO to board-harmony.h
+Message-ID: <1316633620-13184-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/21/2011 7:55 PM, Rob Herring wrote:
+This centralizes all GPIO naming in one header.
 
-[...]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+This patch series relies on various previous changes to the Tegra GPIO
+driver that were made in Russell's GPIO tree. I assume this series will
+go in through that tree.
 
-> I fixed that in the prior series and tglx picked it up, so I did not
-> repost. It should hit mainline for 3.1, but I haven't verified if it is
-> in yet. Sorry for the confusion, I should have mentioned that.
+This first patch is cleanup which makes the second slightly cleaner (no
+need to edit board-harmony-pcie.c in patch 2). Usually, it would go in
+through the Tegra tree, but I think it makes sense to merge these 3
+patches all together in one place.
 
-OK, I remember now as well that Thomas took patched 2 patches from your 
-previous one. And I found it:
-https://lkml.org/lkml/2011/9/14/190
+ arch/arm/mach-tegra/board-harmony-pcie.c |   10 ++++------
+ arch/arm/mach-tegra/board-harmony.h      |    1 +
+ 2 files changed, 5 insertions(+), 6 deletions(-)
 
-Now, I have to find why the twl interrupt-controller is not working 
-anymore even with that fix.
-
-Almost-Tested-by: Benoit Cousson <b-cousson@ti.com>
-
-Thanks,
-Benoit
+diff --git a/arch/arm/mach-tegra/board-harmony-pcie.c b/arch/arm/mach-tegra/board-harmony-pcie.c
+index 9c27b95..6db7d69 100644
+--- a/arch/arm/mach-tegra/board-harmony-pcie.c
++++ b/arch/arm/mach-tegra/board-harmony-pcie.c
+@@ -24,12 +24,10 @@
+ 
+ #include <mach/pinmux.h>
+ #include "board.h"
++#include "board-harmony.h"
+ 
+ #ifdef CONFIG_TEGRA_PCI
+ 
+-/* GPIO 3 of the PMIC */
+-#define EN_VDD_1V05_GPIO	(TEGRA_NR_GPIOS + 2)
+-
+ static int __init harmony_pcie_init(void)
+ {
+ 	struct regulator *regulator = NULL;
+@@ -38,11 +36,11 @@ static int __init harmony_pcie_init(void)
+ 	if (!machine_is_harmony())
+ 		return 0;
+ 
+-	err = gpio_request(EN_VDD_1V05_GPIO, "EN_VDD_1V05");
++	err = gpio_request(TEGRA_GPIO_EN_VDD_1V05_GPIO, "EN_VDD_1V05");
+ 	if (err)
+ 		return err;
+ 
+-	gpio_direction_output(EN_VDD_1V05_GPIO, 1);
++	gpio_direction_output(TEGRA_GPIO_EN_VDD_1V05_GPIO, 1);
+ 
+ 	regulator = regulator_get(NULL, "pex_clk");
+ 	if (IS_ERR_OR_NULL(regulator))
+@@ -68,7 +66,7 @@ err_pcie:
+ 	regulator_disable(regulator);
+ 	regulator_put(regulator);
+ err_reg:
+-	gpio_free(EN_VDD_1V05_GPIO);
++	gpio_free(TEGRA_GPIO_EN_VDD_1V05_GPIO);
+ 
+ 	return err;
+ }
+diff --git a/arch/arm/mach-tegra/board-harmony.h b/arch/arm/mach-tegra/board-harmony.h
+index d85142e..280d203 100644
+--- a/arch/arm/mach-tegra/board-harmony.h
++++ b/arch/arm/mach-tegra/board-harmony.h
+@@ -31,6 +31,7 @@
+ #define TEGRA_GPIO_HP_DET		TEGRA_GPIO_PW2
+ #define TEGRA_GPIO_INT_MIC_EN		TEGRA_GPIO_PX0
+ #define TEGRA_GPIO_EXT_MIC_EN		TEGRA_GPIO_PX1
++#define TEGRA_GPIO_EN_VDD_1V05_GPIO	HARMONY_GPIO_TPS6586X(2)
+ 
+ void harmony_pinmux_init(void);
+ int harmony_regulator_init(void);
+-- 
+1.7.0.4
