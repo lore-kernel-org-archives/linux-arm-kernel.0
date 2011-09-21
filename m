@@ -1,453 +1,563 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 21 Sep 2011 13:30:35 +0200
-Subject: [PATCH 01/11 V2] ARM: at91/gpio: make gpio register base soc
-	independant
+Date: Wed, 21 Sep 2011 13:30:37 +0200
+Subject: [PATCH 03/11 V2] ARM: at91/soc: use gpio_is_valid to check the gpio
 In-Reply-To: <20110921112830.GP24966@game.jcrosoft.org>
 References: <20110921112830.GP24966@game.jcrosoft.org>
-Message-ID: <1316604645-22599-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1316604645-22599-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Reviewed-by: Ryan Mallon <rmallon@gmail.com>
 ---
 V2 update commit log
 
 Best Regards,
 J.
- arch/arm/mach-at91/at91cap9.c                 |    8 ++++----
- arch/arm/mach-at91/at91rm9200.c               |    8 ++++----
- arch/arm/mach-at91/at91sam9260.c              |    6 +++---
- arch/arm/mach-at91/at91sam9261.c              |    6 +++---
- arch/arm/mach-at91/at91sam9263.c              |   10 +++++-----
- arch/arm/mach-at91/at91sam9g45.c              |   10 +++++-----
- arch/arm/mach-at91/at91sam9rl.c               |    8 ++++----
- arch/arm/mach-at91/generic.h                  |    2 +-
- arch/arm/mach-at91/gpio.c                     |    8 ++++++--
- arch/arm/mach-at91/include/mach/at91cap9.h    |    9 +++++----
- arch/arm/mach-at91/include/mach/at91rm9200.h  |    9 +++++----
- arch/arm/mach-at91/include/mach/at91sam9260.h |    7 ++++---
- arch/arm/mach-at91/include/mach/at91sam9261.h |    7 ++++---
- arch/arm/mach-at91/include/mach/at91sam9263.h |   11 ++++++-----
- arch/arm/mach-at91/include/mach/at91sam9g45.h |   11 ++++++-----
- arch/arm/mach-at91/include/mach/at91sam9rl.h  |    9 +++++----
- 16 files changed, 70 insertions(+), 59 deletions(-)
+ arch/arm/mach-at91/at91cap9_devices.c    |   20 ++++++++++----------
+ arch/arm/mach-at91/at91rm9200_devices.c  |   22 +++++++++++-----------
+ arch/arm/mach-at91/at91sam9260_devices.c |   26 +++++++++++++-------------
+ arch/arm/mach-at91/at91sam9261_devices.c |   14 +++++++-------
+ arch/arm/mach-at91/at91sam9263_devices.c |   26 +++++++++++++-------------
+ arch/arm/mach-at91/at91sam9g45_devices.c |   20 ++++++++++----------
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   16 ++++++++--------
+ 7 files changed, 72 insertions(+), 72 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
-index ecdd54d..fe00dce 100644
---- a/arch/arm/mach-at91/at91cap9.c
-+++ b/arch/arm/mach-at91/at91cap9.c
-@@ -296,19 +296,19 @@ void __init at91cap9_set_console_clock(int id)
- static struct at91_gpio_bank at91cap9_gpio[] = {
- 	{
- 		.id		= AT91CAP9_ID_PIOABCD,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91CAP9_BASE_PIOA,
- 		.clock		= &pioABCD_clk,
- 	}, {
- 		.id		= AT91CAP9_ID_PIOABCD,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91CAP9_BASE_PIOB,
- 		.clock		= &pioABCD_clk,
- 	}, {
- 		.id		= AT91CAP9_ID_PIOABCD,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91CAP9_BASE_PIOC,
- 		.clock		= &pioABCD_clk,
- 	}, {
- 		.id		= AT91CAP9_ID_PIOABCD,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91CAP9_BASE_PIOD,
- 		.clock		= &pioABCD_clk,
+diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
+index dba0d8d..2838f8b 100644
+--- a/arch/arm/mach-at91/at91cap9_devices.c
++++ b/arch/arm/mach-at91/at91cap9_devices.c
+@@ -76,7 +76,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 
+ 	/* Enable VBus control for UHP ports */
+ 	for (i = 0; i < data->ports; i++) {
+-		if (data->vbus_pin[i])
++		if (gpio_is_valid(data->vbus_pin[i]))
+ 			at91_set_gpio_output(data->vbus_pin[i], 0);
  	}
- };
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 713d3bd..8ce8675 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -271,19 +271,19 @@ void __init at91rm9200_set_console_clock(int id)
- static struct at91_gpio_bank at91rm9200_gpio[] = {
- 	{
- 		.id		= AT91RM9200_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91RM9200_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91RM9200_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91RM9200_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91RM9200_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91RM9200_BASE_PIOC,
- 		.clock		= &pioC_clk,
- 	}, {
- 		.id		= AT91RM9200_ID_PIOD,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91RM9200_BASE_PIOD,
- 		.clock		= &pioD_clk,
+ 
+@@ -173,7 +173,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+ 	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ 
+-	if (data && data->vbus_pin > 0) {
++	if (data && gpio_is_valid(data->vbus_pin)) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+ 		at91_set_deglitch(data->vbus_pin, 1);
+ 		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
+@@ -226,7 +226,7 @@ void __init at91_add_device_eth(struct at91_eth_data *data)
+ 	if (!data)
+ 		return;
+ 
+-	if (data->phy_irq_pin) {
++	if (gpio_is_valid(data->phy_irq_pin)) {
+ 		at91_set_gpio_input(data->phy_irq_pin, 0);
+ 		at91_set_deglitch(data->phy_irq_pin, 1);
  	}
- };
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index a9be758..d7ad3e0 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -265,15 +265,15 @@ void __init at91sam9260_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9260_gpio[] = {
- 	{
- 		.id		= AT91SAM9260_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9260_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9260_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9260_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9260_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9260_BASE_PIOC,
- 		.clock		= &pioC_clk,
+@@ -326,13 +326,13 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		return;
+ 
+ 	/* input/irq */
+-	if (data->det_pin) {
++	if (gpio_is_valid(data->det_pin)) {
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 		at91_set_deglitch(data->det_pin, 1);
  	}
- };
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 658a518..574aa6b 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -254,15 +254,15 @@ void __init at91sam9261_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9261_gpio[] = {
- 	{
- 		.id		= AT91SAM9261_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9261_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9261_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9261_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9261_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9261_BASE_PIOC,
- 		.clock		= &pioC_clk,
+-	if (data->wp_pin)
++	if (gpio_is_valid(data->wp_pin))
+ 		at91_set_gpio_input(data->wp_pin, 1);
+-	if (data->vcc_pin)
++	if (gpio_is_valid(data->vcc_pin))
+ 		at91_set_gpio_output(data->vcc_pin, 0);
+ 
+ 	if (mmc_id == 0) {		/* MCI0 */
+@@ -419,15 +419,15 @@ void __init at91_add_device_nand(struct atmel_nand_data *data)
+ 	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_EBI_CS3A_SMC_SMARTMEDIA);
+ 
+ 	/* enable pin */
+-	if (data->enable_pin)
++	if (gpio_is_valid(data->enable_pin))
+ 		at91_set_gpio_output(data->enable_pin, 1);
+ 
+ 	/* ready/busy pin */
+-	if (data->rdy_pin)
++	if (gpio_is_valid(data->rdy_pin))
+ 		at91_set_gpio_input(data->rdy_pin, 1);
+ 
+ 	/* card detect pin */
+-	if (data->det_pin)
++	if (gpio_is_valid(data->det_pin))
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 
+ 	nand_data = *data;
+@@ -801,7 +801,7 @@ void __init at91_add_device_ac97(struct ac97c_platform_data *data)
+ 	at91_set_A_periph(AT91_PIN_PA9, 0);	/* AC97RX */
+ 
+ 	/* reset */
+-	if (data->reset_pin)
++	if (gpio_is_valid(data->reset_pin))
+ 		at91_set_gpio_output(data->reset_pin, 0);
+ 
+ 	ac97_data = *data;
+diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+index 7227755..ff90b63 100644
+--- a/arch/arm/mach-at91/at91rm9200_devices.c
++++ b/arch/arm/mach-at91/at91rm9200_devices.c
+@@ -106,11 +106,11 @@ void __init at91_add_device_udc(struct at91_udc_data *data)
+ 	if (!data)
+ 		return;
+ 
+-	if (data->vbus_pin) {
++	if (gpio_is_valid(data->vbus_pin)) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+ 		at91_set_deglitch(data->vbus_pin, 1);
  	}
- };
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index f83fbb0..dee0ed7 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -266,23 +266,23 @@ void __init at91sam9263_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9263_gpio[] = {
- 	{
- 		.id		= AT91SAM9263_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9263_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9263_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9263_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9263_ID_PIOCDE,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9263_BASE_PIOC,
- 		.clock		= &pioCDE_clk,
- 	}, {
- 		.id		= AT91SAM9263_ID_PIOCDE,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91SAM9263_BASE_PIOD,
- 		.clock		= &pioCDE_clk,
- 	}, {
- 		.id		= AT91SAM9263_ID_PIOCDE,
--		.offset		= AT91_PIOE,
-+		.regbase	= AT91SAM9263_BASE_PIOE,
- 		.clock		= &pioCDE_clk,
+-	if (data->pullup_pin)
++	if (gpio_is_valid(data->pullup_pin))
+ 		at91_set_gpio_output(data->pullup_pin, 0);
+ 
+ 	udc_data = *data;
+@@ -159,7 +159,7 @@ void __init at91_add_device_eth(struct at91_eth_data *data)
+ 	if (!data)
+ 		return;
+ 
+-	if (data->phy_irq_pin) {
++	if (gpio_is_valid(data->phy_irq_pin)) {
+ 		at91_set_gpio_input(data->phy_irq_pin, 0);
+ 		at91_set_deglitch(data->phy_irq_pin, 1);
  	}
- };
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 8f5db7b..753df63 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -282,23 +282,23 @@ void __init at91sam9g45_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9g45_gpio[] = {
- 	{
- 		.id		= AT91SAM9G45_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9G45_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9G45_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9G45_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9G45_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9G45_BASE_PIOC,
- 		.clock		= &pioC_clk,
- 	}, {
- 		.id		= AT91SAM9G45_ID_PIODE,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91SAM9G45_BASE_PIOD,
- 		.clock		= &pioDE_clk,
- 	}, {
- 		.id		= AT91SAM9G45_ID_PIODE,
--		.offset		= AT91_PIOE,
-+		.regbase	= AT91SAM9G45_BASE_PIOE,
- 		.clock		= &pioDE_clk,
+@@ -252,7 +252,7 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
+ 	);
+ 
+ 	/* input/irq */
+-	if (data->irq_pin) {
++	if (gpio_is_valid(data->irq_pin)) {
+ 		at91_set_gpio_input(data->irq_pin, 1);
+ 		at91_set_deglitch(data->irq_pin, 1);
  	}
- };
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index a238105..c4004e2 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -246,19 +246,19 @@ void __init at91sam9rl_set_console_clock(int id)
- static struct at91_gpio_bank at91sam9rl_gpio[] = {
- 	{
- 		.id		= AT91SAM9RL_ID_PIOA,
--		.offset		= AT91_PIOA,
-+		.regbase	= AT91SAM9RL_BASE_PIOA,
- 		.clock		= &pioA_clk,
- 	}, {
- 		.id		= AT91SAM9RL_ID_PIOB,
--		.offset		= AT91_PIOB,
-+		.regbase	= AT91SAM9RL_BASE_PIOB,
- 		.clock		= &pioB_clk,
- 	}, {
- 		.id		= AT91SAM9RL_ID_PIOC,
--		.offset		= AT91_PIOC,
-+		.regbase	= AT91SAM9RL_BASE_PIOC,
- 		.clock		= &pioC_clk,
- 	}, {
- 		.id		= AT91SAM9RL_ID_PIOD,
--		.offset		= AT91_PIOD,
-+		.regbase	= AT91SAM9RL_BASE_PIOD,
- 		.clock		= &pioD_clk,
+@@ -260,7 +260,7 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
+ 	at91_set_deglitch(data->det_pin, 1);
+ 
+ 	/* outputs, initially off */
+-	if (data->vcc_pin)
++	if (gpio_is_valid(data->vcc_pin))
+ 		at91_set_gpio_output(data->vcc_pin, 0);
+ 	at91_set_gpio_output(data->rst_pin, 0);
+ 
+@@ -320,13 +320,13 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		return;
+ 
+ 	/* input/irq */
+-	if (data->det_pin) {
++	if (gpio_is_valid(data->det_pin)) {
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 		at91_set_deglitch(data->det_pin, 1);
  	}
- };
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 938b34f..11d7297 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -65,7 +65,7 @@ extern void at91sam9_alt_reset(void);
+-	if (data->wp_pin)
++	if (gpio_is_valid(data->wp_pin))
+ 		at91_set_gpio_input(data->wp_pin, 1);
+-	if (data->vcc_pin)
++	if (gpio_is_valid(data->vcc_pin))
+ 		at91_set_gpio_output(data->vcc_pin, 0);
  
- struct at91_gpio_bank {
- 	unsigned short id;		/* peripheral ID */
--	unsigned long offset;		/* offset from system peripheral base */
-+	unsigned long regbase;		/* offset from system peripheral base */
- 	struct clk *clock;		/* associated clock */
- };
- extern void __init at91_gpio_init(struct at91_gpio_bank *, int nr_banks);
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index 4615528..04beff1 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -616,8 +616,12 @@ void __init at91_gpio_init(struct at91_gpio_bank *data, int nr_banks)
+ 	/* CLK */
+@@ -411,15 +411,15 @@ void __init at91_add_device_nand(struct atmel_nand_data *data)
+ 	);
  
- 		at91_gpio->bank = &data[i];
- 		at91_gpio->chip.base = PIN_BASE + i * 32;
--		at91_gpio->regbase = at91_gpio->bank->offset +
--			(void __iomem *)AT91_VA_BASE_SYS;
-+
-+		at91_gpio->regbase = ioremap(at91_gpio->bank->regbase, 512);
-+		if (!at91_gpio->regbase) {
-+			pr_err("at91_gpio.%d, failed to map registers, ignoring.\n", i);
-+			continue;
-+		}
+ 	/* enable pin */
+-	if (data->enable_pin)
++	if (gpio_is_valid(data->enable_pin))
+ 		at91_set_gpio_output(data->enable_pin, 1);
  
- 		/* enable PIO controller's clock */
- 		clk_enable(at91_gpio->bank->clock);
-diff --git a/arch/arm/mach-at91/include/mach/at91cap9.h b/arch/arm/mach-at91/include/mach/at91cap9.h
-index c5df1e8..f65d083 100644
---- a/arch/arm/mach-at91/include/mach/at91cap9.h
-+++ b/arch/arm/mach-at91/include/mach/at91cap9.h
-@@ -88,10 +88,6 @@
- #define AT91_DMA	(0xffffec00 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOD	(0xfffff800 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -102,6 +98,11 @@
- 			(0xfffffd50 - AT91_BASE_SYS) :	\
- 			(0xfffffd60 - AT91_BASE_SYS))
+ 	/* ready/busy pin */
+-	if (data->rdy_pin)
++	if (gpio_is_valid(data->rdy_pin))
+ 		at91_set_gpio_input(data->rdy_pin, 1);
  
-+#define AT91CAP9_BASE_PIOA	0xfffff200
-+#define AT91CAP9_BASE_PIOB	0xfffff400
-+#define AT91CAP9_BASE_PIOC	0xfffff600
-+#define AT91CAP9_BASE_PIOD	0xfffff800
-+
- #define AT91_USART0	AT91CAP9_BASE_US0
- #define AT91_USART1	AT91CAP9_BASE_US1
- #define AT91_USART2	AT91CAP9_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91rm9200.h b/arch/arm/mach-at91/include/mach/at91rm9200.h
-index e4037b5..5740954 100644
---- a/arch/arm/mach-at91/include/mach/at91rm9200.h
-+++ b/arch/arm/mach-at91/include/mach/at91rm9200.h
-@@ -81,15 +81,16 @@
-  */
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)	/* Advanced Interrupt Controller */
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)	/* Debug Unit */
--#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)	/* PIO Controller A */
--#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)	/* PIO Controller B */
--#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)	/* PIO Controller C */
--#define AT91_PIOD	(0xfffffa00 - AT91_BASE_SYS)	/* PIO Controller D */
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)	/* Power Management Controller */
- #define AT91_ST		(0xfffffd00 - AT91_BASE_SYS)	/* System Timer */
- #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)	/* Real-Time Clock */
- #define AT91_MC		(0xffffff00 - AT91_BASE_SYS)	/* Memory Controllers */
+ 	/* card detect pin */
+-	if (data->det_pin)
++	if (gpio_is_valid(data->det_pin))
+ 		at91_set_gpio_input(data->det_pin, 1);
  
-+#define AT91RM9200_BASE_PIOA	0xfffff400	/* PIO Controller A */
-+#define AT91RM9200_BASE_PIOB	0xfffff600	/* PIO Controller B */
-+#define AT91RM9200_BASE_PIOC	0xfffff800	/* PIO Controller C */
-+#define AT91RM9200_BASE_PIOD	0xfffffa00	/* PIO Controller D */
-+
- #define AT91_USART0	AT91RM9200_BASE_US0
- #define AT91_USART1	AT91RM9200_BASE_US1
- #define AT91_USART2	AT91RM9200_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9260.h b/arch/arm/mach-at91/include/mach/at91sam9260.h
-index 9a79116..1bea3dc 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9260.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9260.h
-@@ -87,9 +87,6 @@
- #define AT91_CCFG	(0xffffef10 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -98,6 +95,10 @@
- #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
- #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+ 	at91_set_A_periph(AT91_PIN_PC1, 0);		/* SMOE */
+diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+index 39f81f4..b981a5c 100644
+--- a/arch/arm/mach-at91/at91sam9260_devices.c
++++ b/arch/arm/mach-at91/at91sam9260_devices.c
+@@ -107,7 +107,7 @@ void __init at91_add_device_udc(struct at91_udc_data *data)
+ 	if (!data)
+ 		return;
  
-+#define AT91SAM9260_BASE_PIOA	0xfffff400
-+#define AT91SAM9260_BASE_PIOB	0xfffff600
-+#define AT91SAM9260_BASE_PIOC	0xfffff800
-+
- #define AT91_USART0	AT91SAM9260_BASE_US0
- #define AT91_USART1	AT91SAM9260_BASE_US1
- #define AT91_USART2	AT91SAM9260_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9261.h b/arch/arm/mach-at91/include/mach/at91sam9261.h
-index ce59620..17ae9c7 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9261.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9261.h
-@@ -70,9 +70,6 @@
- #define AT91_MATRIX	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -81,6 +78,10 @@
- #define AT91_WDT	(0xfffffd40 - AT91_BASE_SYS)
- #define AT91_GPBR	(0xfffffd50 - AT91_BASE_SYS)
+-	if (data->vbus_pin) {
++	if (gpio_is_valid(data->vbus_pin)) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+ 		at91_set_deglitch(data->vbus_pin, 1);
+ 	}
+@@ -160,7 +160,7 @@ void __init at91_add_device_eth(struct at91_eth_data *data)
+ 	if (!data)
+ 		return;
  
-+#define AT91SAM9261_BASE_PIOA	0xfffff400
-+#define AT91SAM9261_BASE_PIOB	0xfffff600
-+#define AT91SAM9261_BASE_PIOC	0xfffff800
-+
- #define AT91_USART0	AT91SAM9261_BASE_US0
- #define AT91_USART1	AT91SAM9261_BASE_US1
- #define AT91_USART2	AT91SAM9261_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9263.h b/arch/arm/mach-at91/include/mach/at91sam9263.h
-index f1b9296..dd54079 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9263.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9263.h
-@@ -84,11 +84,6 @@
- #define AT91_CCFG	(0xffffed10 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOD	(0xfffff800 - AT91_BASE_SYS)
--#define AT91_PIOE	(0xfffffa00 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -98,6 +93,12 @@
- #define AT91_RTT1	(0xfffffd50 - AT91_BASE_SYS)
- #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
+-	if (data->phy_irq_pin) {
++	if (gpio_is_valid(data->phy_irq_pin)) {
+ 		at91_set_gpio_input(data->phy_irq_pin, 0);
+ 		at91_set_deglitch(data->phy_irq_pin, 1);
+ 	}
+@@ -235,13 +235,13 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		return;
  
-+#define AT91SAM9263_BASE_PIOA	0xfffff200
-+#define AT91SAM9263_BASE_PIOB	0xfffff400
-+#define AT91SAM9263_BASE_PIOC	0xfffff600
-+#define AT91SAM9263_BASE_PIOD	0xfffff800
-+#define AT91SAM9263_BASE_PIOE	0xfffffa00
-+
- #define AT91_USART0	AT91SAM9263_BASE_US0
- #define AT91_USART1	AT91SAM9263_BASE_US1
- #define AT91_USART2	AT91SAM9263_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9g45.h b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-index 2c611b9..ec370cc 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9g45.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9g45.h
-@@ -94,11 +94,6 @@
- #define AT91_DMA	(0xffffec00 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xffffee00 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOD	(0xfffff800 - AT91_BASE_SYS)
--#define AT91_PIOE	(0xfffffa00 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -108,6 +103,12 @@
- #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
- #define AT91_RTC	(0xfffffdb0 - AT91_BASE_SYS)
+ 	/* input/irq */
+-	if (data->det_pin) {
++	if (gpio_is_valid(data->det_pin)) {
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 		at91_set_deglitch(data->det_pin, 1);
+ 	}
+-	if (data->wp_pin)
++	if (gpio_is_valid(data->wp_pin))
+ 		at91_set_gpio_input(data->wp_pin, 1);
+-	if (data->vcc_pin)
++	if (gpio_is_valid(data->vcc_pin))
+ 		at91_set_gpio_output(data->vcc_pin, 0);
  
-+#define AT91SAM9G45_BASE_PIOA	0xfffff200
-+#define AT91SAM9G45_BASE_PIOB	0xfffff400
-+#define AT91SAM9G45_BASE_PIOC	0xfffff600
-+#define AT91SAM9G45_BASE_PIOD	0xfffff800
-+#define AT91SAM9G45_BASE_PIOE	0xfffffa00
-+
- #define AT91_USART0	AT91SAM9G45_BASE_US0
- #define AT91_USART1	AT91SAM9G45_BASE_US1
- #define AT91_USART2	AT91SAM9G45_BASE_US2
-diff --git a/arch/arm/mach-at91/include/mach/at91sam9rl.h b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-index 1aabacd..d3ef11a 100644
---- a/arch/arm/mach-at91/include/mach/at91sam9rl.h
-+++ b/arch/arm/mach-at91/include/mach/at91sam9rl.h
-@@ -77,10 +77,6 @@
- #define AT91_CCFG	(0xffffef10 - AT91_BASE_SYS)
- #define AT91_AIC	(0xfffff000 - AT91_BASE_SYS)
- #define AT91_DBGU	(0xfffff200 - AT91_BASE_SYS)
--#define AT91_PIOA	(0xfffff400 - AT91_BASE_SYS)
--#define AT91_PIOB	(0xfffff600 - AT91_BASE_SYS)
--#define AT91_PIOC	(0xfffff800 - AT91_BASE_SYS)
--#define AT91_PIOD	(0xfffffa00 - AT91_BASE_SYS)
- #define AT91_PMC	(0xfffffc00 - AT91_BASE_SYS)
- #define AT91_RSTC	(0xfffffd00 - AT91_BASE_SYS)
- #define AT91_SHDWC	(0xfffffd10 - AT91_BASE_SYS)
-@@ -91,6 +87,11 @@
- #define AT91_GPBR	(0xfffffd60 - AT91_BASE_SYS)
- #define AT91_RTC	(0xfffffe00 - AT91_BASE_SYS)
+ 	/* CLK */
+@@ -322,11 +322,11 @@ void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data)
+ 	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
+ 		if (data->slot[i].bus_width) {
+ 			/* input/irq */
+-			if (data->slot[i].detect_pin) {
++			if (gpio_is_valid(data->slot[i].detect_pin)) {
+ 				at91_set_gpio_input(data->slot[i].detect_pin, 1);
+ 				at91_set_deglitch(data->slot[i].detect_pin, 1);
+ 			}
+-			if (data->slot[i].wp_pin)
++			if (gpio_is_valid(data->slot[i].wp_pin))
+ 				at91_set_gpio_input(data->slot[i].wp_pin, 1);
  
-+#define AT91SAM9RL_BASE_PIOA	0xfffff400
-+#define AT91SAM9RL_BASE_PIOB	0xfffff600
-+#define AT91SAM9RL_BASE_PIOC	0xfffff800
-+#define AT91SAM9RL_BASE_PIOD	0xfffffa00
-+
- #define AT91_USART0	AT91SAM9RL_BASE_US0
- #define AT91_USART1	AT91SAM9RL_BASE_US1
- #define AT91_USART2	AT91SAM9RL_BASE_US2
+ 			switch (i) {
+@@ -418,15 +418,15 @@ void __init at91_add_device_nand(struct atmel_nand_data *data)
+ 	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_CS3A_SMC_SMARTMEDIA);
+ 
+ 	/* enable pin */
+-	if (data->enable_pin)
++	if (gpio_is_valid(data->enable_pin))
+ 		at91_set_gpio_output(data->enable_pin, 1);
+ 
+ 	/* ready/busy pin */
+-	if (data->rdy_pin)
++	if (gpio_is_valid(data->rdy_pin))
+ 		at91_set_gpio_input(data->rdy_pin, 1);
+ 
+ 	/* card detect pin */
+-	if (data->det_pin)
++	if (gpio_is_valid(data->det_pin))
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 
+ 	nand_data = *data;
+@@ -1274,17 +1274,17 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
+ 
+ 	at91_sys_write(AT91_MATRIX_EBICSA, csa);
+ 
+-	if (data->rst_pin) {
++	if (gpio_is_valid(data->rst_pin)) {
+ 		at91_set_multi_drive(data->rst_pin, 0);
+ 		at91_set_gpio_output(data->rst_pin, 1);
+ 	}
+ 
+-	if (data->irq_pin) {
++	if (gpio_is_valid(data->irq_pin)) {
+ 		at91_set_gpio_input(data->irq_pin, 0);
+ 		at91_set_deglitch(data->irq_pin, 1);
+ 	}
+ 
+-	if (data->det_pin) {
++	if (gpio_is_valid(data->det_pin)) {
+ 		at91_set_gpio_input(data->det_pin, 0);
+ 		at91_set_deglitch(data->det_pin, 1);
+ 	}
+diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+index 0f91792..0dd3960 100644
+--- a/arch/arm/mach-at91/at91sam9261_devices.c
++++ b/arch/arm/mach-at91/at91sam9261_devices.c
+@@ -110,7 +110,7 @@ void __init at91_add_device_udc(struct at91_udc_data *data)
+ 	if (!data)
+ 		return;
+ 
+-	if (data->vbus_pin) {
++	if (gpio_is_valid(data->vbus_pin)) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+ 		at91_set_deglitch(data->vbus_pin, 1);
+ 	}
+@@ -163,13 +163,13 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		return;
+ 
+ 	/* input/irq */
+-	if (data->det_pin) {
++	if (gpio_is_valid(data->det_pin)) {
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 		at91_set_deglitch(data->det_pin, 1);
+ 	}
+-	if (data->wp_pin)
++	if (gpio_is_valid(data->wp_pin))
+ 		at91_set_gpio_input(data->wp_pin, 1);
+-	if (data->vcc_pin)
++	if (gpio_is_valid(data->vcc_pin))
+ 		at91_set_gpio_output(data->vcc_pin, 0);
+ 
+ 	/* CLK */
+@@ -232,15 +232,15 @@ void __init at91_add_device_nand(struct atmel_nand_data *data)
+ 	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_CS3A_SMC_SMARTMEDIA);
+ 
+ 	/* enable pin */
+-	if (data->enable_pin)
++	if (gpio_is_valid(data->enable_pin))
+ 		at91_set_gpio_output(data->enable_pin, 1);
+ 
+ 	/* ready/busy pin */
+-	if (data->rdy_pin)
++	if (gpio_is_valid(data->rdy_pin))
+ 		at91_set_gpio_input(data->rdy_pin, 1);
+ 
+ 	/* card detect pin */
+-	if (data->det_pin)
++	if (gpio_is_valid(data->det_pin))
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 
+ 	at91_set_A_periph(AT91_PIN_PC0, 0);		/* NANDOE */
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index a050f41..077d853 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -70,7 +70,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data)
+ 
+ 	/* Enable VBus control for UHP ports */
+ 	for (i = 0; i < data->ports; i++) {
+-		if (data->vbus_pin[i])
++		if (gpio_is_valid(data->vbus_pin[i]))
+ 			at91_set_gpio_output(data->vbus_pin[i], 0);
+ 	}
+ 
+@@ -117,7 +117,7 @@ void __init at91_add_device_udc(struct at91_udc_data *data)
+ 	if (!data)
+ 		return;
+ 
+-	if (data->vbus_pin) {
++	if (gpio_is_valid(data->vbus_pin)) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+ 		at91_set_deglitch(data->vbus_pin, 1);
+ 	}
+@@ -170,7 +170,7 @@ void __init at91_add_device_eth(struct at91_eth_data *data)
+ 	if (!data)
+ 		return;
+ 
+-	if (data->phy_irq_pin) {
++	if (gpio_is_valid(data->phy_irq_pin)) {
+ 		at91_set_gpio_input(data->phy_irq_pin, 0);
+ 		at91_set_deglitch(data->phy_irq_pin, 1);
+ 	}
+@@ -270,13 +270,13 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		return;
+ 
+ 	/* input/irq */
+-	if (data->det_pin) {
++	if (gpio_is_valid(data->det_pin)) {
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 		at91_set_deglitch(data->det_pin, 1);
+ 	}
+-	if (data->wp_pin)
++	if (gpio_is_valid(data->wp_pin))
+ 		at91_set_gpio_input(data->wp_pin, 1);
+-	if (data->vcc_pin)
++	if (gpio_is_valid(data->vcc_pin))
+ 		at91_set_gpio_output(data->vcc_pin, 0);
+ 
+ 	if (mmc_id == 0) {		/* MCI0 */
+@@ -424,17 +424,17 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
+ 	}
+ 	at91_sys_write(AT91_MATRIX_EBI0CSA, ebi0_csa);
+ 
+-	if (data->det_pin) {
++	if (gpio_is_valid(data->det_pin)) {
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 		at91_set_deglitch(data->det_pin, 1);
+ 	}
+ 
+-	if (data->irq_pin) {
++	if (gpio_is_valid(data->irq_pin)) {
+ 		at91_set_gpio_input(data->irq_pin, 1);
+ 		at91_set_deglitch(data->irq_pin, 1);
+ 	}
+ 
+-	if (data->vcc_pin)
++	if (gpio_is_valid(data->vcc_pin))
+ 		/* initially off */
+ 		at91_set_gpio_output(data->vcc_pin, 0);
+ 
+@@ -494,15 +494,15 @@ void __init at91_add_device_nand(struct atmel_nand_data *data)
+ 	at91_sys_write(AT91_MATRIX_EBI0CSA, csa | AT91_MATRIX_EBI0_CS3A_SMC_SMARTMEDIA);
+ 
+ 	/* enable pin */
+-	if (data->enable_pin)
++	if (gpio_is_valid(data->enable_pin))
+ 		at91_set_gpio_output(data->enable_pin, 1);
+ 
+ 	/* ready/busy pin */
+-	if (data->rdy_pin)
++	if (gpio_is_valid(data->rdy_pin))
+ 		at91_set_gpio_input(data->rdy_pin, 1);
+ 
+ 	/* card detect pin */
+-	if (data->det_pin)
++	if (gpio_is_valid(data->det_pin))
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 
+ 	nand_data = *data;
+@@ -743,7 +743,7 @@ void __init at91_add_device_ac97(struct ac97c_platform_data *data)
+ 	at91_set_A_periph(AT91_PIN_PB3, 0);	/* AC97RX */
+ 
+ 	/* reset */
+-	if (data->reset_pin)
++	if (gpio_is_valid(data->reset_pin))
+ 		at91_set_gpio_output(data->reset_pin, 0);
+ 
+ 	ac97_data = *data;
+diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+index 600bffb..3a0daa3 100644
+--- a/arch/arm/mach-at91/at91sam9g45_devices.c
++++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+@@ -120,7 +120,7 @@ void __init at91_add_device_usbh_ohci(struct at91_usbh_data *data)
+ 
+ 	/* Enable VBus control for UHP ports */
+ 	for (i = 0; i < data->ports; i++) {
+-		if (data->vbus_pin[i])
++		if (gpio_is_valid(data->vbus_pin[i]))
+ 			at91_set_gpio_output(data->vbus_pin[i], 0);
+ 	}
+ 
+@@ -175,7 +175,7 @@ void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data)
+ 
+ 	/* Enable VBus control for UHP ports */
+ 	for (i = 0; i < data->ports; i++) {
+-		if (data->vbus_pin[i])
++		if (gpio_is_valid(data->vbus_pin[i]))
+ 			at91_set_gpio_output(data->vbus_pin[i], 0);
+ 	}
+ 
+@@ -257,7 +257,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+ 	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ 
+-	if (data && data->vbus_pin > 0) {
++	if (data && gpio_is_valid(data->vbus_pin)) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+ 		at91_set_deglitch(data->vbus_pin, 1);
+ 		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
+@@ -310,7 +310,7 @@ void __init at91_add_device_eth(struct at91_eth_data *data)
+ 	if (!data)
+ 		return;
+ 
+-	if (data->phy_irq_pin) {
++	if (gpio_is_valid(data->phy_irq_pin)) {
+ 		at91_set_gpio_input(data->phy_irq_pin, 0);
+ 		at91_set_deglitch(data->phy_irq_pin, 1);
+ 	}
+@@ -443,11 +443,11 @@ void __init at91_add_device_mci(short mmc_id, struct mci_platform_data *data)
+ 
+ 
+ 	/* input/irq */
+-	if (data->slot[0].detect_pin) {
++	if (gpio_is_valid(data->slot[0].detect_pin)) {
+ 		at91_set_gpio_input(data->slot[0].detect_pin, 1);
+ 		at91_set_deglitch(data->slot[0].detect_pin, 1);
+ 	}
+-	if (data->slot[0].wp_pin)
++	if (gpio_is_valid(data->slot[0].wp_pin))
+ 		at91_set_gpio_input(data->slot[0].wp_pin, 1);
+ 
+ 	if (mmc_id == 0) {		/* MCI0 */
+@@ -550,15 +550,15 @@ void __init at91_add_device_nand(struct atmel_nand_data *data)
+ 	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_EBI_CS3A_SMC_SMARTMEDIA);
+ 
+ 	/* enable pin */
+-	if (data->enable_pin)
++	if (gpio_is_valid(data->enable_pin))
+ 		at91_set_gpio_output(data->enable_pin, 1);
+ 
+ 	/* ready/busy pin */
+-	if (data->rdy_pin)
++	if (gpio_is_valid(data->rdy_pin))
+ 		at91_set_gpio_input(data->rdy_pin, 1);
+ 
+ 	/* card detect pin */
+-	if (data->det_pin)
++	if (gpio_is_valid(data->det_pin))
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 
+ 	nand_data = *data;
+@@ -853,7 +853,7 @@ void __init at91_add_device_ac97(struct ac97c_platform_data *data)
+ 	at91_set_A_periph(AT91_PIN_PD6, 0);	/* AC97RX */
+ 
+ 	/* reset */
+-	if (data->reset_pin)
++	if (gpio_is_valid(data->reset_pin))
+ 		at91_set_gpio_output(data->reset_pin, 0);
+ 
+ 	ac97_data = *data;
+diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+index aacb19d..56cb73d 100644
+--- a/arch/arm/mach-at91/at91sam9rl_devices.c
++++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+@@ -147,7 +147,7 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
+ 	usba_udc_data.pdata.num_ep = ARRAY_SIZE(usba_udc_ep);
+ 	memcpy(usba_udc_data.ep, usba_udc_ep, sizeof(usba_udc_ep));
+ 
+-	if (data && data->vbus_pin > 0) {
++	if (data && gpio_is_valid(data->vbus_pin)) {
+ 		at91_set_gpio_input(data->vbus_pin, 0);
+ 		at91_set_deglitch(data->vbus_pin, 1);
+ 		usba_udc_data.pdata.vbus_pin = data->vbus_pin;
+@@ -201,13 +201,13 @@ void __init at91_add_device_mmc(short mmc_id, struct at91_mmc_data *data)
+ 		return;
+ 
+ 	/* input/irq */
+-	if (data->det_pin) {
++	if (gpio_is_valid(data->det_pin)) {
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 		at91_set_deglitch(data->det_pin, 1);
+ 	}
+-	if (data->wp_pin)
++	if (gpio_is_valid(data->wp_pin))
+ 		at91_set_gpio_input(data->wp_pin, 1);
+-	if (data->vcc_pin)
++	if (gpio_is_valid(data->vcc_pin))
+ 		at91_set_gpio_output(data->vcc_pin, 0);
+ 
+ 	/* CLK */
+@@ -275,15 +275,15 @@ void __init at91_add_device_nand(struct atmel_nand_data *data)
+ 	at91_sys_write(AT91_MATRIX_EBICSA, csa | AT91_MATRIX_CS3A_SMC_SMARTMEDIA);
+ 
+ 	/* enable pin */
+-	if (data->enable_pin)
++	if (gpio_is_valid(data->enable_pin))
+ 		at91_set_gpio_output(data->enable_pin, 1);
+ 
+ 	/* ready/busy pin */
+-	if (data->rdy_pin)
++	if (gpio_is_valid(data->rdy_pin))
+ 		at91_set_gpio_input(data->rdy_pin, 1);
+ 
+ 	/* card detect pin */
+-	if (data->det_pin)
++	if (gpio_is_valid(data->det_pin))
+ 		at91_set_gpio_input(data->det_pin, 1);
+ 
+ 	at91_set_A_periph(AT91_PIN_PB4, 0);		/* NANDOE */
+@@ -483,7 +483,7 @@ void __init at91_add_device_ac97(struct ac97c_platform_data *data)
+ 	at91_set_A_periph(AT91_PIN_PD4, 0);	/* AC97RX */
+ 
+ 	/* reset */
+-	if (data->reset_pin)
++	if (gpio_is_valid(data->reset_pin))
+ 		at91_set_gpio_output(data->reset_pin, 0);
+ 
+ 	ac97_data = *data;
 -- 
 1.7.6.3
