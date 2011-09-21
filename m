@@ -1,33 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 21 Sep 2011 18:21:54 +0200
-Subject: [PATCH 00/10] hwspinlock-next
-In-Reply-To: <CACRpkdbqVuFEgntw=bUYka5NuvpbPhjB8L0cD4CTmsjwoZBDSA@mail.gmail.com>
-References: <1315846025-11453-1-git-send-email-ohad@wizery.com>
-	<201109211612.33504.arnd@arndb.de>
-	<CACRpkdbqVuFEgntw=bUYka5NuvpbPhjB8L0cD4CTmsjwoZBDSA@mail.gmail.com>
-Message-ID: <201109211821.55058.arnd@arndb.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 21 Sep 2011 10:25:55 -0600
+Subject: [PATCH] gpio/mxc: add chained_irq_enter/exit() to
+	mx3_gpio_irq_handler()
+In-Reply-To: <1316611444-14126-1-git-send-email-shawn.guo@linaro.org>
+References: <1316611444-14126-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110921162555.GX7781@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 September 2011, Linus Walleij wrote:
-> On Wed, Sep 21, 2011 at 4:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Wed, Sep 21, 2011 at 09:24:04PM +0800, Shawn Guo wrote:
+> The mx3_gpio_irq_handler() is also called on imx6q which has GIC as
+> the primary interrupt controller.  As GIC implements the fasteoi flow
+> control, we need to add chained_irq_enter/exit() to
+> mx3_gpio_irq_handler() for signaling EOI, otherwise system will hang
+> whenever there is a gpio irq triggered.
 > 
-> > My feeling is that it would be best for Ohad to send these directly
-> > to Linus, since it's basically a standalone subsystem and he's listed
-> > as the maintainer (well, after this series at least).
-> 
-> I agree. That's the path of least resistance and trouble.
-> 
-> If/when ARM-specific driver subsystems need their own zuper-maintainer
-> we can deal with it, can't we? There aren't many of them yet.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> This is the second post of '[PATCH] gpio/mxc: make it work with imx6q'
+> to adopt the point given by Jamie.
 
-Definitely, I think that's the ideal case. I would very much like to
-see independent subsystem maintainers for the device drivers that are
-currently buried in per-architecture or per-platform directories.
-Among the ones that we should be moving out of there (or have already)
-are cpufreq, gpio, irqchip, pinmux, clock, dmaengine, timer, and there
-are probably some more. Since none of these are strictly ARM specific,
-my feeling is that they should not be part of the arm or arm-soc tree
-in the future but have their own trees.
+Nit: don't forget to include the patch version in the subject line, and I like to see the revision history appear before the s-o-b lines so that it makes it into the final commit.
 
-	Arnd
+I'll merge this one, thanks.
+g.
+
+> 
+>  drivers/gpio/gpio-mxc.c |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> index 4340aca..82f7b65 100644
+> --- a/drivers/gpio/gpio-mxc.c
+> +++ b/drivers/gpio/gpio-mxc.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+>  #include <asm-generic/bug.h>
+> +#include <asm/mach/irq.h>
+>  
+>  enum mxc_gpio_hwtype {
+>  	IMX1_GPIO,	/* runs on i.mx1 */
+> @@ -232,10 +233,15 @@ static void mx3_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+>  {
+>  	u32 irq_stat;
+>  	struct mxc_gpio_port *port = irq_get_handler_data(irq);
+> +	struct irq_chip *chip = irq_get_chip(irq);
+> +
+> +	chained_irq_enter(chip, desc);
+>  
+>  	irq_stat = readl(port->base + GPIO_ISR) & readl(port->base + GPIO_IMR);
+>  
+>  	mxc_gpio_irq_handler(port, irq_stat);
+> +
+> +	chained_irq_exit(chip, desc);
+>  }
+>  
+>  /* MX2 has one interrupt *for all* gpio ports */
+> -- 
+> 1.7.4.1
+> 
+> 
