@@ -1,92 +1,79 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 21 Sep 2011 11:06:41 +0200
-Subject: [PATCH 4/5] ispccdc: Configure CCDC_SYN_MODE register for
-	UYVY8_2X8 and YUYV8_2X8 formats
-In-Reply-To: <ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D090847@dbde03.ent.ti.com>
-References: <1316530612-23075-1-git-send-email-deepthy.ravi@ti.com>
-	<201109210126.20436.laurent.pinchart@ideasonboard.com>
-	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D090847@dbde03.ent.ti.com>
-Message-ID: <201109211106.41677.laurent.pinchart@ideasonboard.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 21 Sep 2011 11:17:23 +0200
+Subject: [PATCH 1/2] drivers: create a pin control subsystem v7
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04B7321751@HQMAIL01.nvidia.com>
+References: <1316175203-10736-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04B7321751@HQMAIL01.nvidia.com>
+Message-ID: <CACRpkdZyhkydTutHXfry_dUPK_Ts_jq+5VHcr8XdgrHSExTyww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Deepthy,
+On Tue, Sep 20, 2011 at 11:58 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Linus Walleij wrote at Friday, September 16, 2011 6:13 AM:
+>> This creates a subsystem for handling of pin control devices.
+>> These are devices that control different aspects of package
+>> pins.
+>
+> I've read through the documentation and header files, but not the .c files,
+> and this looks almost perfect as far as I can tell right now. I'll try to
+> review the .c files sometime too.
 
-On Wednesday 21 September 2011 07:32:44 Ravi, Deepthy wrote:
-> On Wednesday, September 21, 2011 4:56 AM Laurent Pinchart wrote:
-> > On Tuesday 20 September 2011 16:56:51 Deepthy Ravi wrote:
-> >> Configure INPMOD and PACK8 fileds of CCDC_SYN_MODE
-> >> register for UYVY8_2X8 and YUYV8_2X8 formats.
-> >> 
-> >> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
-> >> ---
-> >> 
-> >>  drivers/media/video/omap3isp/ispccdc.c |   11 ++++++++---
-> >>  1 files changed, 8 insertions(+), 3 deletions(-)
-> >> 
-> >> diff --git a/drivers/media/video/omap3isp/ispccdc.c
-> >> b/drivers/media/video/omap3isp/ispccdc.c index 418ba65..1dcf180 100644
-> >> --- a/drivers/media/video/omap3isp/ispccdc.c
-> >> +++ b/drivers/media/video/omap3isp/ispccdc.c
-> >> @@ -985,8 +985,12 @@ static void ccdc_config_sync_if(struct
-> >> isp_ccdc_device
-> >> *ccdc,
-> >> 
-> >>       syn_mode &= ~ISPCCDC_SYN_MODE_INPMOD_MASK;
-> >>       if (format->code == V4L2_MBUS_FMT_YUYV8_2X8 ||
-> >> 
-> >> -         format->code == V4L2_MBUS_FMT_UYVY8_2X8)
-> >> -             syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
-> >> +         format->code == V4L2_MBUS_FMT_UYVY8_2X8){
-> >> +             if (pdata && pdata->bt656)
-> >> +                     syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
-> >> +             else
-> >> +                     syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
-> >> +     }
-> >> 
-> >>       else if (format->code == V4L2_MBUS_FMT_YUYV8_1X16 ||
-> >>       
-> >>                format->code == V4L2_MBUS_FMT_UYVY8_1X16)
-> >>               
-> >>               syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
-> >> 
-> >> @@ -1172,7 +1176,8 @@ static void ccdc_configure(struct isp_ccdc_device
-> >> *ccdc) syn_mode &= ~ISPCCDC_SYN_MODE_SDR2RSZ;
-> >> 
-> >>       /* Use PACK8 mode for 1byte per pixel formats. */
-> >> 
-> >> -     if (omap3isp_video_format_info(format->code)->width <= 8)
-> >> +     if ((omap3isp_video_format_info(format->code)->width <= 8) &&
-> >> +                     (omap3isp_video_format_info(format->code)->bpp <=
-> >> 8))
-> > 
-> > I'm not sure to follow you. This will clear the PACK8 bit for the
-> > YUYV8_2X8 formats. Those formats are 8 bits wide, shouldn't PACK8 be set
-> > to store samples on 8 bits instead of 16 bits ?
-> > 
-> > Is this patch intended to support YUYV8_2X8 sensors in non BT.656 mode
-> > with the bridge enabled ? In that case, what would you think about setting
-> > the CCDC input format to YUYV8_1X16 instead ? This would better reflect
-> > the reality, as the bridge converts YUYV8_2X8 to YUYV8_1X16, and the CCDC
-> > is then fed with YUYV8_1X16.
-> 
-> Yes this is intended for  YUYV8_2X8 sensors in non BT.656 with 8 to 16 bit
-> bridge enabled. So the data has to be stored as 16 bits per sample. Thats
-> why PACK8 is cleared . I am not sure about using YUYV8_1X16.
+Great, I'm hunting your Acked-by/Reviewed-by ...
 
-My original idea when I wrote the YV support patches was to implement this use 
-case with YUYV8_2X8 at the sensor output and YUYV8_1X16 at the CCDC input. The 
-ISP driver could then enable the bridge automatically. I'm not sure if that's 
-the best solution though, it might be confusing for the users. What I would 
-like to keep, however, is the idea of enabling the bridge automatically.
+I will likely request inclusion into linux-next soon-ish.
 
-Sakari, any opinion on this ?
+> I just have one comment:
+>
+>> diff --git a/include/linux/pinctrl/pinmux.h b/include/linux/pinctrl/pinmux.h
+> ...
+>> +/* External interface to pinmux */
+>> +extern int pinmux_request_gpio(unsigned gpio);
+>> +extern void pinmux_free_gpio(unsigned gpio);
+>> +extern struct pinmux * __must_check pinmux_get(struct device *dev, const char *name);
+>> +extern void pinmux_put(struct pinmux *pmx);
+>> +extern int pinmux_enable(struct pinmux *pmx);
+>> +extern void pinmux_disable(struct pinmux *pmx);
+>> +extern int pinmux_config(struct pinmux *pmx, u16 param, unsigned long *data);
+>
+> That definition of pinmux_config doesn't seem as useful as it could be;
 
-> >>               syn_mode |= ISPCCDC_SYN_MODE_PACK8;
-> >>       else
-> >>               syn_mode &= ~ISPCCDC_SYN_MODE_PACK8;
+It should be removed. It's just there in the header file, I killed off
+the implementation because specific control of a mux doesn't make
+sense. We want to do stuff to pin groups directly, not related to
+muxing, so that kind of thing needs to be in the generic pinctrl
+interface.
 
--- 
-Regards,
+> I'd like the ability to execute pinmux_config on a /named/ group, and I
+> can certainly see a use-case for applying it to /named/ pins too.
 
-Laurent Pinchart
+That sounds correct to me.
+
+To abstract things the stuff we can do with the group should be
+something enumerated too. So:
+
+pinctrl_config_group(const char *pinctrl_device, const char *group,
+const char *mode);
+pinctrl_config_pin(const char *pinctrl_device, int pin, const char *mode);
+
+So the driver need an API to enumerate pin and group modes.
+
+I might want to save this thing for post-merge of the basic API and
+pinmux stuff though so we don't try to push too much upfront
+design at once.
+
+> The issues with applying pinmux_config to a mapping table entry are:
+>
+> * When there are multiple mapping table entries referenced by one
+> pinmux_get, you don't necessarily want to apply the same configuration
+> to all of the groups; think of a bus with a combination of low-speed
+> output control signals and high-speed input data signals or something
+> like that.
+>
+> * When muxing works in groups, you may want to apply the configuration
+> to individual pins rather than the whole groups using in the mapping
+> table.
+
+Yeah, we kill this old interface.
+
+Thanks,
+Linus Walleij
