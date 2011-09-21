@@ -1,59 +1,45 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 21 Sep 2011 15:05:38 +0200
-Subject: [PATCH V2 1/3] ARM: EXYNOS4: Add TVOUT support for SMDKV310
-In-Reply-To: <1316583860-32510-2-git-send-email-hatim.rv@samsung.com>
-References: <1316583860-32510-1-git-send-email-hatim.rv@samsung.com>
-	<1316583860-32510-2-git-send-email-hatim.rv@samsung.com>
-Message-ID: <4E79E122.2000600@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 21 Sep 2011 21:18:39 +0800
+Subject: [PATCH v2 1/3] net/fec: change phy-reset-gpio request warning to
+	debug message
+In-Reply-To: <20110921125905.GI1966@pengutronix.de>
+References: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
+	<1316603432-20032-2-git-send-email-shawn.guo@linaro.org>
+	<20110921112555.GE1966@pengutronix.de>
+	<20110921120341.GG28907@S2100-06.ap.freescale.net>
+	<20110921121159.GG1966@pengutronix.de>
+	<20110921124423.GI28907@S2100-06.ap.freescale.net>
+	<20110921125905.GI1966@pengutronix.de>
+Message-ID: <20110921131838.GJ28907@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hatim,
-
-On 09/21/2011 07:44 AM, Hatim Ali wrote:
-> Add support for TVOUT on SMDKV310 board.
+On Wed, Sep 21, 2011 at 02:59:05PM +0200, Wolfram Sang wrote:
+> > > I agree that keeping it int is way better. But why not add it now to
+> > > keep things proper and tested? If this patch gets accepted as it is and
+> > > later someone else will add error checking to the caller, your platform
+> > > will lose FEC support as a regression.
+> > > 
+> > Again, fec_reset_phy() failure is not a show-stopper.  We might not
+> > want to make the probe fail because of that.
 > 
-> Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
-> ---
-...
-> diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
-> index 7ce4d8b..50de270 100644
-> --- a/arch/arm/mach-exynos4/mach-smdkv310.c
-> +++ b/arch/arm/mach-exynos4/mach-smdkv310.c
-> @@ -239,6 +239,7 @@ static struct platform_device *smdkv310_devices[] __initdata = {
->  	&s3c_device_hsmmc2,
->  	&s3c_device_hsmmc3,
->  	&s3c_device_i2c1,
-> +	&s5p_device_i2c_hdmiphy,
->  	&s3c_device_rtc,
->  	&s3c_device_wdt,
->  	&exynos4_device_ac97,
-> @@ -262,6 +263,8 @@ static struct platform_device *smdkv310_devices[] __initdata = {
->  	&smdkv310_lcd_lte480wv,
->  	&smdkv310_smsc911x,
->  	&exynos4_device_ahci,
-> +	&s5p_device_hdmi,
-> +	&s5p_device_mixer,
->  };
->  
->  static void __init smdkv310_smsc911x_init(void)
-> @@ -298,6 +301,25 @@ static struct platform_pwm_backlight_data smdkv310_bl_data = {
->  	.pwm_period_ns  = 1000,
->  };
->  
-> +static void s5p_tv_setup(void)
-> +{
-> +	int ret;
-> +
-> +	/* direct HPD to HDMI chip */
-> +	ret = gpio_request(EXYNOS4_GPX3(7), "hpd-plug");
-> +
-> +	if (!ret) {
-> +		gpio_direction_input(EXYNOS4_GPX3(7));
+> That would be an argument to make the function returning void?
+> 
+Hmm, it seems to be.  Ok, will send v3 to return void.
 
-Since you're probably going to be reworking this anyway, I think gpio_request_one
-could be used here for simplicity.  
-
---
 Regards,
-Sylwester
+Shawn
+
+> Well, I still think something like 
+> 
+> 	/* No phy reset configured */
+> 	if (phy_reset == -ENODEV)
+> 		return 0;
+> 
+> might be cleaner, yet I don't have the setup to test such an approach.
+> 
+> So, I'll be quiet now and hope for no problems.
+> 
+> -- 
+> Pengutronix e.K.                           | Wolfram Sang                |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
