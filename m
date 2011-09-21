@@ -1,46 +1,101 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 21 Sep 2011 21:27:10 +0900
-Subject: [PATCH v2 1/2] mmc: sdhci-s3c: add default controller
-	configuration
-In-Reply-To: <m2boue6qcl.fsf@bob.laptop.org>
-References: <1315984158-29651-1-git-send-email-thomas.abraham@linaro.org>
-	<1315984158-29651-2-git-send-email-thomas.abraham@linaro.org>
-	<002501cc784d$1618f110$424ad330$%kim@samsung.com>
-	<m2boue6qcl.fsf@bob.laptop.org>
-Message-ID: <005101cc7859$c8d5a990$5a80fcb0$%kim@samsung.com>
+Date: Wed, 21 Sep 2011 21:32:14 +0900
+Subject: [PATCH 2/7] s3c-adc: describe features via quirk constants
+In-Reply-To: <201109182243.40440.heiko@sntech.de>
+References: <201109182241.48858.heiko@sntech.de>
+	<201109182243.40440.heiko@sntech.de>
+Message-ID: <005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chris Ball wrote:
+Heiko St?bner wrote:
 > 
-> Hi,
+> The adc blocks of S3C2410 through S5P have a multitude of
+> quirks, i.e. moved bits or whole new registers.
 > 
-> On Wed, Sep 21 2011, Kukjin Kim wrote:
-> > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> >
-> > Hi Chris,
-> >
-> > This is ok to me. Could you please pick this up in your tree so that I
-can
-> > pick 2nd patch up in my tree.
-> >
-> > As you know, this patch has no dependency with patch2/2 so that you can
-> > handle without any conflicts.
+> This patch tries to describe these individual features
+> through constants which can be used to describe an adc.
 > 
-> Thanks, pushed to mmc-next for 3.2.
+> As SoCs sometimes share only some of these quirks defining
+> TYPE_ADCVx values for each one wouldn't scale well when
+> adding more variants.
 > 
-Thanks!
+Hi Heiko,
 
-> I've been waiting for kernel.org to come back up, but I think later
+I don't have idea we really need to use QUIRK in this case...as I know, the
+QUIRK is used on other situation...
 
-Yeah, I know...
+In addition, the TYPE_ADCVx can support each Samsung SoCs' ADC...but I need
+to check again.
 
-> today I'll just move mmc-next to git://dev.laptop.org/users/cjb/mmc,
-> so this will be available in linux-next soon.
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  arch/arm/plat-samsung/adc.c |   29 +++++++++++++++++++++++++++++
+>  1 files changed, 29 insertions(+), 0 deletions(-)
 > 
-Yes, I also moved my tree to git://github.com/kgene/linux-samsung.git...
+> diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+> index ee8deef..b209d58 100644
+> --- a/arch/arm/plat-samsung/adc.c
+> +++ b/arch/arm/plat-samsung/adc.c
+> @@ -45,6 +45,35 @@ enum s3c_cpu_type {
+>  	TYPE_ADCV3, /* S5PV210, S5PC110, EXYNOS4210 */
+>  };
+> 
+> +/*
+> + * Resolution of the ADC - 10 or 12 bit
+> + */
 
-Anyway, thanks for your information.
+/* ... */
+
+> +#define S3C_ADC_QUIRK_10BIT		0
+> +#define S3C_ADC_QUIRK_12BIT		(1<<0)
+
+According to coding style, should be added blank around <<.
+
+> +
+> +/*
+> + * 12bit ADC can switch resolution between 10 bit and 12 bit
+> + * ADCCON bit 03 for S3C2416
+> + * ADCCON bit 16 for S3C64XX and up
+> + */
+> +#define S3C_ADC_QUIRK_RESSEL03		(1<<1)
+> +#define S3C_ADC_QUIRK_RESSEL16		(1<<2)
+
+Same as above.
+
+> +
+> +/*
+> + * Input channel select can either be in
+> + * - reg ADCCON, bit for S3C24XX and S3C64XX
+> + * - reg base+0x18 for 2443/2416/2450
+> + * - reg base+0x1C for S5P
+> + */
+> +#define S3C_ADC_QUIRK_MUXADCCON		(1<<3)
+> +#define S3C_ADC_QUIRK_MUX18		(1<<4)
+> +#define S3C_ADC_QUIRK_MUX1C		(1<<5)
+
+Same.
+
+> +
+> +/*
+> + * CLRINT register on S3C64xx
+> + */
+
+/* ... */
+
+> +#define S3C_ADC_QUIRK_CLRINT		(1<<6)
+
+Same.
+
+> +
+>  struct s3c_adc_client {
+>  	struct platform_device	*pdev;
+>  	struct list_head	 pend;
+> --
+> 1.7.2.3
+
+
+Thanks.
 
 Best regards,
 Kgene.
