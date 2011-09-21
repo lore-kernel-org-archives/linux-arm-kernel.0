@@ -1,73 +1,37 @@
-From: hatim.rv@gmail.com (Hatim R.V.)
-Date: Wed, 21 Sep 2011 19:18:05 +0530
-Subject: [PATCH V2 1/3] ARM: EXYNOS4: Add TVOUT support for SMDKV310
-In-Reply-To: <4E79E122.2000600@samsung.com>
-References: <1316583860-32510-1-git-send-email-hatim.rv@samsung.com>
-	<1316583860-32510-2-git-send-email-hatim.rv@samsung.com>
-	<4E79E122.2000600@samsung.com>
-Message-ID: <CAAYb1rh1_e88RWtXTByiMFZ2jeX_6C6nzZz+MJsZ6j+Pwwb8fA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Sep 2011 06:51:27 -0700
+Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
+In-Reply-To: <2241590.uiCS2D9jjt@wuerfel>
+References: <20110917014623.GC2937@atomide.com>
+	<201109202334.43213.arnd@arndb.de>
+	<201109202346.11393.arnd@arndb.de> <2241590.uiCS2D9jjt@wuerfel>
+Message-ID: <20110921135127.GN2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Kevin,
 
-On Wed, Sep 21, 2011 at 6:35 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> Hi Hatim,
->
-> On 09/21/2011 07:44 AM, Hatim Ali wrote:
->> Add support for TVOUT on SMDKV310 board.
->>
->> Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
->> ---
-> ...
->> diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
->> index 7ce4d8b..50de270 100644
->> --- a/arch/arm/mach-exynos4/mach-smdkv310.c
->> +++ b/arch/arm/mach-exynos4/mach-smdkv310.c
->> @@ -239,6 +239,7 @@ static struct platform_device *smdkv310_devices[] __initdata = {
->> ? ? ? &s3c_device_hsmmc2,
->> ? ? ? &s3c_device_hsmmc3,
->> ? ? ? &s3c_device_i2c1,
->> + ? ? &s5p_device_i2c_hdmiphy,
->> ? ? ? &s3c_device_rtc,
->> ? ? ? &s3c_device_wdt,
->> ? ? ? &exynos4_device_ac97,
->> @@ -262,6 +263,8 @@ static struct platform_device *smdkv310_devices[] __initdata = {
->> ? ? ? &smdkv310_lcd_lte480wv,
->> ? ? ? &smdkv310_smsc911x,
->> ? ? ? &exynos4_device_ahci,
->> + ? ? &s5p_device_hdmi,
->> + ? ? &s5p_device_mixer,
->> ?};
->>
->> ?static void __init smdkv310_smsc911x_init(void)
->> @@ -298,6 +301,25 @@ static struct platform_pwm_backlight_data smdkv310_bl_data = {
->> ? ? ? .pwm_period_ns ?= 1000,
->> ?};
->>
->> +static void s5p_tv_setup(void)
->> +{
->> + ? ? int ret;
->> +
->> + ? ? /* direct HPD to HDMI chip */
->> + ? ? ret = gpio_request(EXYNOS4_GPX3(7), "hpd-plug");
->> +
->> + ? ? if (!ret) {
->> + ? ? ? ? ? ? gpio_direction_input(EXYNOS4_GPX3(7));
->
-> Since you're probably going to be reworking this anyway, I think gpio_request_one
-> could be used here for simplicity.
+* Arnd Bergmann <arnd@arndb.de> [110921 01:55]:
+> On Tuesday 20 September 2011 23:46:11 Arnd Bergmann wrote:
+> 
+> > It seems that you replace the #ifdef in the board-flash.c file
+> > with a similar #ifdef in the header that replaces this with an
+> > empty inline function when the object is not built.
+> 
+> Found another similar problem over night, presumably in the voltage series:
+> 
+> arch/arm/mach-omap2/built-in.o: In function `pwrdm_register_pwrdms':
+> twl-common.c:(.text+0x5e20): undefined reference to `voltdm_lookup'
+> twl-common.c:(.text+0x5e40): undefined reference to `voltdm_add_pwrdm'
+> arch/arm/mach-omap2/built-in.o: In function `omap2_init_common_infrastructure':
+> twl-common.c:(.init.text+0x3a4): undefined reference to `omap2xxx_voltagedomains_init'
+> twl-common.c:(.init.text+0x3c8): undefined reference to `omap3xxx_voltagedomains_init'
+> arch/arm/mach-omap2/built-in.o: In function `omap2_set_init_voltage':
+> twl-common.c:(.init.text+0x13c8): undefined reference to `voltdm_lookup'
+> arch/arm/mach-omap2/built-in.o: In function `omap3_twl_init':
+> twl-common.c:(.init.text+0x1f44): undefined reference to `voltdm_lookup'
+> twl-common.c:(.init.text+0x1f4c): undefined reference to `voltdm_lookup'
 
-Thanks for your suggestion. Will change accordingly.
+Can you take a look at this one?
 
-
->
-> --
-> Regards,
-> Sylwester
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Tony
