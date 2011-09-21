@@ -1,217 +1,378 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 21 Sep 2011 17:43:21 +0530
-Subject: [PATCH v5 04/15] OMAP2+: UART: cleanup 8250 console driver support
+Date: Wed, 21 Sep 2011 17:43:24 +0530
+Subject: [PATCH v5 07/15] OMAP2+: UART: Add default mux for all uarts.
 In-Reply-To: <1316607206-21669-1-git-send-email-govindraj.raja@ti.com>
 References: <1316607206-21669-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1316607206-21669-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1316607206-21669-5-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We had been using traditional 8250 driver as uart console driver
-prior to omap-serial driver. Since we have omap-serial driver
-in mainline kernel for some time now it has been used as default
-uart console driver on omap2+ platforms. Remove 8250 support for
-omap-uarts.
+Prior to this change rx-pad wakeup was done by writing to rx-pad offset value
+populated in serial.c idle_init. Now with mux framework support we can use
+mux_utilities along with hmwod framework to handle io-pad configuration and
+enable rx-pad wake-up mechanism.
 
-Serial_in and serial_out override for 8250 serial driver is also
-removed. Empty fifo read fix is already taken care with omap-serial
-driver with data ready bit check from LSR reg before reading RX fifo.
-Also waiting for THRE(transmit hold reg empty) is done with wait_for_xmitr
-in omap-serial driver.
-
-Remove headers that were necessary to support 8250 support
-and remove all config bindings done to keep 8250 backward compatibility
-while adding omap-serial driver. Remove omap_uart_reset needed for
-8250 autoconf.
+Add default mux data for all uart's if mux info is not passed from
+board file to avoid breaking any board support.
+With the default pads we have populated wakeup capability for rx pads
+which can be used to enable uart_rx io-pad wakeup from hwmod framework.
+The pad values in 3430 board file are same as the default pad values
+populated in serial.c. Remove pad values from 3430 board file and use
+the default pads from serial.c file.
 
 Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/mach-omap2/serial.c |  111 ------------------------------------------
- 1 files changed, 0 insertions(+), 111 deletions(-)
+ arch/arm/mach-omap2/board-3430sdp.c |  100 +------------------
+ arch/arm/mach-omap2/serial.c        |  190 +++++++++++++++++++++++------------
+ 2 files changed, 128 insertions(+), 162 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+index bd600cf..b12b38f 100644
+--- a/arch/arm/mach-omap2/board-3430sdp.c
++++ b/arch/arm/mach-omap2/board-3430sdp.c
+@@ -482,106 +482,8 @@ static const struct usbhs_omap_board_data usbhs_bdata __initconst = {
+ static struct omap_board_mux board_mux[] __initdata = {
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
+-
+-static struct omap_device_pad serial1_pads[] __initdata = {
+-	/*
+-	 * Note that off output enable is an active low
+-	 * signal. So setting this means pin is a
+-	 * input enabled in off mode
+-	 */
+-	OMAP_MUX_STATIC("uart1_cts.uart1_cts",
+-			 OMAP_PIN_INPUT |
+-			 OMAP_PIN_OFF_INPUT_PULLDOWN |
+-			 OMAP_OFFOUT_EN |
+-			 OMAP_MUX_MODE0),
+-	OMAP_MUX_STATIC("uart1_rts.uart1_rts",
+-			 OMAP_PIN_OUTPUT |
+-			 OMAP_OFF_EN |
+-			 OMAP_MUX_MODE0),
+-	OMAP_MUX_STATIC("uart1_rx.uart1_rx",
+-			 OMAP_PIN_INPUT |
+-			 OMAP_PIN_OFF_INPUT_PULLDOWN |
+-			 OMAP_OFFOUT_EN |
+-			 OMAP_MUX_MODE0),
+-	OMAP_MUX_STATIC("uart1_tx.uart1_tx",
+-			 OMAP_PIN_OUTPUT |
+-			 OMAP_OFF_EN |
+-			 OMAP_MUX_MODE0),
+-};
+-
+-static struct omap_device_pad serial2_pads[] __initdata = {
+-	OMAP_MUX_STATIC("uart2_cts.uart2_cts",
+-			 OMAP_PIN_INPUT_PULLUP |
+-			 OMAP_PIN_OFF_INPUT_PULLDOWN |
+-			 OMAP_OFFOUT_EN |
+-			 OMAP_MUX_MODE0),
+-	OMAP_MUX_STATIC("uart2_rts.uart2_rts",
+-			 OMAP_PIN_OUTPUT |
+-			 OMAP_OFF_EN |
+-			 OMAP_MUX_MODE0),
+-	OMAP_MUX_STATIC("uart2_rx.uart2_rx",
+-			 OMAP_PIN_INPUT |
+-			 OMAP_PIN_OFF_INPUT_PULLDOWN |
+-			 OMAP_OFFOUT_EN |
+-			 OMAP_MUX_MODE0),
+-	OMAP_MUX_STATIC("uart2_tx.uart2_tx",
+-			 OMAP_PIN_OUTPUT |
+-			 OMAP_OFF_EN |
+-			 OMAP_MUX_MODE0),
+-};
+-
+-static struct omap_device_pad serial3_pads[] __initdata = {
+-	OMAP_MUX_STATIC("uart3_cts_rctx.uart3_cts_rctx",
+-			 OMAP_PIN_INPUT_PULLDOWN |
+-			 OMAP_PIN_OFF_INPUT_PULLDOWN |
+-			 OMAP_OFFOUT_EN |
+-			 OMAP_MUX_MODE0),
+-	OMAP_MUX_STATIC("uart3_rts_sd.uart3_rts_sd",
+-			 OMAP_PIN_OUTPUT |
+-			 OMAP_OFF_EN |
+-			 OMAP_MUX_MODE0),
+-	OMAP_MUX_STATIC("uart3_rx_irrx.uart3_rx_irrx",
+-			 OMAP_PIN_INPUT |
+-			 OMAP_PIN_OFF_INPUT_PULLDOWN |
+-			 OMAP_OFFOUT_EN |
+-			 OMAP_MUX_MODE0),
+-	OMAP_MUX_STATIC("uart3_tx_irtx.uart3_tx_irtx",
+-			 OMAP_PIN_OUTPUT |
+-			 OMAP_OFF_EN |
+-			 OMAP_MUX_MODE0),
+-};
+-
+-static struct omap_board_data serial1_data __initdata = {
+-	.id		= 0,
+-	.pads		= serial1_pads,
+-	.pads_cnt	= ARRAY_SIZE(serial1_pads),
+-};
+-
+-static struct omap_board_data serial2_data __initdata = {
+-	.id		= 1,
+-	.pads		= serial2_pads,
+-	.pads_cnt	= ARRAY_SIZE(serial2_pads),
+-};
+-
+-static struct omap_board_data serial3_data __initdata = {
+-	.id		= 2,
+-	.pads		= serial3_pads,
+-	.pads_cnt	= ARRAY_SIZE(serial3_pads),
+-};
+-
+-static inline void board_serial_init(void)
+-{
+-	omap_serial_init_port(&serial1_data);
+-	omap_serial_init_port(&serial2_data);
+-	omap_serial_init_port(&serial3_data);
+-}
+ #else
+ #define board_mux	NULL
+-
+-static inline void board_serial_init(void)
+-{
+-	omap_serial_init();
+-}
+ #endif
+ 
+ /*
+@@ -718,7 +620,7 @@ static void __init omap_3430sdp_init(void)
+ 	else
+ 		gpio_pendown = SDP3430_TS_GPIO_IRQ_SDPV1;
+ 	omap_ads7846_init(1, gpio_pendown, 310, NULL);
+-	board_serial_init();
++	omap_serial_init();
+ 	usb_musb_init(NULL);
+ 	board_smc91x_init();
+ 	board_flash_init(sdp_flash_partitions, chip_sel_3430, 0);
 diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 60108fd..784a8f9 100644
+index fd0c345..1561140 100644
 --- a/arch/arm/mach-omap2/serial.c
 +++ b/arch/arm/mach-omap2/serial.c
-@@ -19,22 +19,16 @@
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/serial_reg.h>
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/delay.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
--#include <linux/serial_8250.h>
- #include <linux/console.h>
- 
--#ifdef CONFIG_SERIAL_OMAP
- #include <plat/omap-serial.h>
--#endif
+@@ -57,11 +57,6 @@
+ struct omap_uart_state {
+ 	int num;
+ 	int can_sleep;
 -
- #include <plat/common.h>
- #include <plat/board.h>
--#include <plat/clock.h>
- #include <plat/dma.h>
- #include <plat/omap_hwmod.h>
- #include <plat/omap_device.h>
-@@ -46,10 +40,8 @@
- #include "control.h"
- #include "mux.h"
+-	void __iomem *wk_st;
+-	void __iomem *wk_en;
+-	u32 wk_mask;
+-	u32 padconf;
+ 	u32 dma_enabled;
  
--#define UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV	0x52
- #define UART_OMAP_WER		0x17	/* Wake-up enable register */
- 
--#define UART_ERRATA_FIFO_FULL_ABORT	(0x1 << 0)
- #define UART_ERRATA_i202_MDR1_ACCESS	(0x1 << 1)
- 
- /*
-@@ -156,19 +148,6 @@ static inline void serial_write_reg(struct omap_uart_state *uart, int offset,
- 	__raw_writeb(value, uart->membase + offset);
+ 	int clocked;
+@@ -326,69 +321,135 @@ static void omap_uart_block_sleep(struct omap_uart_state *uart)
+ 	uart->can_sleep = 0;
  }
  
--/*
-- * Internal UARTs need to be initialized for the 8250 autoconfig to work
-- * properly. Note that the TX watermark initialization may not be needed
-- * once the 8250.c watermark handling code is merged.
-- */
--
--static inline void __init omap_uart_reset(struct omap_uart_state *uart)
--{
--	serial_write_reg(uart, UART_OMAP_MDR1, UART_OMAP_MDR1_DISABLE);
--	serial_write_reg(uart, UART_OMAP_SCR, 0x08);
--	serial_write_reg(uart, UART_OMAP_MDR1, UART_OMAP_MDR1_16X_MODE);
--}
--
- #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
- 
- /*
-@@ -533,41 +512,6 @@ static void omap_uart_block_sleep(struct omap_uart_state *uart)
- #define DEV_CREATE_FILE(dev, attr)
- #endif /* CONFIG_PM */
- 
--#ifndef CONFIG_SERIAL_OMAP
--/*
-- * Override the default 8250 read handler: mem_serial_in()
-- * Empty RX fifo read causes an abort on omap3630 and omap4
-- * This function makes sure that an empty rx fifo is not read on these silicons
-- * (OMAP1/2/3430 are not affected)
-- */
--static unsigned int serial_in_override(struct uart_port *up, int offset)
--{
--	if (UART_RX == offset) {
--		unsigned int lsr;
--		lsr = __serial_read_reg(up, UART_LSR);
--		if (!(lsr & UART_LSR_DR))
--			return -EPERM;
--	}
--
--	return __serial_read_reg(up, offset);
--}
--
--static void serial_out_override(struct uart_port *up, int offset, int value)
--{
--	unsigned int status, tmout = 10000;
--
--	status = __serial_read_reg(up, UART_LSR);
--	while (!(status & UART_LSR_THRE)) {
--		/* Wait up to 10ms for the character(s) to be sent. */
--		if (--tmout == 0)
--			break;
--		udelay(1);
--		status = __serial_read_reg(up, UART_LSR);
--	}
--	__serial_write_reg(up, offset, value);
--}
--#endif
--
- static int __init omap_serial_early_init(void)
+-static void omap_uart_idle_init(struct omap_uart_port_info *uart,
+-				unsigned short num)
++#ifdef CONFIG_OMAP_MUX
++static struct omap_device_pad default_uart1_pads[] __initdata = {
++	{
++		.name	= "uart1_cts.uart1_cts",
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart1_rts.uart1_rts",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart1_tx.uart1_tx",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart1_rx.uart1_rx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++};
++
++static struct omap_device_pad default_uart2_pads[] __initdata = {
++	{
++		.name	= "uart2_cts.uart2_cts",
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart2_rts.uart2_rts",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart2_tx.uart2_tx",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart2_rx.uart2_rx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++};
++
++static struct omap_device_pad default_uart3_pads[] __initdata = {
++	{
++		.name	= "uart3_cts_rctx.uart3_cts_rctx",
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart3_rts_sd.uart3_rts_sd",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart3_tx_irtx.uart3_tx_irtx",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart3_rx_irrx.uart3_rx_irrx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
++		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
++	},
++};
++
++static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
++	{
++		.name   = "gpmc_wait2.uart4_tx",
++		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "gpmc_wait3.uart4_rx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
++		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
++	},
++};
++
++static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {
++	{
++		.name	= "uart4_tx.uart4_tx",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart4_rx.uart4_rx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
++		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
++	},
++};
++#else
++static struct omap_device_pad default_uart1_pads[] __initdata = {};
++static struct omap_device_pad default_uart2_pads[] __initdata = {};
++static struct omap_device_pad default_uart3_pads[] __initdata = {};
++static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {};
++static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {};
++#endif
++
++static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
  {
- 	int i = 0;
-@@ -628,15 +572,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
- 	void *pdata = NULL;
- 	u32 pdata_size = 0;
- 	char *name;
--#ifndef CONFIG_SERIAL_OMAP
--	struct plat_serial8250_port ports[2] = {
--		{},
--		{.flags = 0},
--	};
--	struct plat_serial8250_port *p = &ports[0];
--#else
- 	struct omap_uart_port_info omap_up;
--#endif
+-	if (cpu_is_omap34xx() && !cpu_is_ti816x()) {
+-		u32 mod = (num > 1) ? OMAP3430_PER_MOD : CORE_MOD;
+-		u32 wk_mask = 0;
+-		u32 padconf = 0;
+-
+-		uart->wk_en = OMAP34XX_PRM_REGADDR(mod, PM_WKEN1);
+-		uart->wk_st = OMAP34XX_PRM_REGADDR(mod, PM_WKST1);
+-		switch (num) {
+-		case 0:
+-			wk_mask = OMAP3430_ST_UART1_MASK;
+-			padconf = 0x182;
+-			break;
+-		case 1:
+-			wk_mask = OMAP3430_ST_UART2_MASK;
+-			padconf = 0x17a;
+-			break;
+-		case 2:
+-			wk_mask = OMAP3430_ST_UART3_MASK;
+-			padconf = 0x19e;
+-			break;
+-		case 3:
+-			wk_mask = OMAP3630_ST_UART4_MASK;
+-			padconf = 0x0d2;
+-			break;
+-		}
+-		uart->wk_mask = wk_mask;
+-	} else if (cpu_is_omap24xx()) {
+-		u32 wk_mask = 0;
+-		u32 wk_en = PM_WKEN1, wk_st = PM_WKST1;
+-
+-		switch (num) {
+-		case 0:
+-			wk_mask = OMAP24XX_ST_UART1_MASK;
+-			break;
+-		case 1:
+-			wk_mask = OMAP24XX_ST_UART2_MASK;
+-			break;
+-		case 2:
+-			wk_en = OMAP24XX_PM_WKEN2;
+-			wk_st = OMAP24XX_PM_WKST2;
+-			wk_mask = OMAP24XX_ST_UART3_MASK;
+-			break;
+-		}
+-		uart->wk_mask = wk_mask;
+-		if (cpu_is_omap2430()) {
+-			uart->wk_en = OMAP2430_PRM_REGADDR(CORE_MOD, wk_en);
+-			uart->wk_st = OMAP2430_PRM_REGADDR(CORE_MOD, wk_st);
+-		} else if (cpu_is_omap2420()) {
+-			uart->wk_en = OMAP2420_PRM_REGADDR(CORE_MOD, wk_en);
+-			uart->wk_st = OMAP2420_PRM_REGADDR(CORE_MOD, wk_st);
++	switch (bdata->id) {
++	case 0:
++		bdata->pads = default_uart1_pads;
++		bdata->pads_cnt = ARRAY_SIZE(default_uart1_pads);
++		break;
++	case 1:
++		bdata->pads = default_uart2_pads;
++		bdata->pads_cnt = ARRAY_SIZE(default_uart2_pads);
++		break;
++	case 2:
++		bdata->pads = default_uart3_pads;
++		bdata->pads_cnt = ARRAY_SIZE(default_uart3_pads);
++		break;
++	case 3:
++		if (cpu_is_omap44xx()) {
++			bdata->pads = default_omap4_uart4_pads;
++			bdata->pads_cnt =
++				ARRAY_SIZE(default_omap4_uart4_pads);
++		} else {
++			bdata->pads = default_omap36xx_uart4_pads;
++			bdata->pads_cnt =
++				ARRAY_SIZE(default_omap36xx_uart4_pads);
+ 		}
+-	} else {
+-		uart->wk_en = NULL;
+-		uart->wk_st = NULL;
+-		uart->wk_mask = 0;
++		break;
++	default:
++		break;
+ 	}
+ }
  
- 	if (WARN_ON(!bdata))
- 		return;
-@@ -651,51 +587,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
+ #else
+-static inline void omap_uart_idle_init(struct omap_uart_state *uart) {}
+ static void omap_uart_block_sleep(struct omap_uart_state *uart)
+ {
+ 	/* Needed to enable UART clocks when built without CONFIG_PM */
+@@ -473,7 +534,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
+ 	}
  
- 	oh = uart->oh;
- 	uart->dma_enabled = 0;
--#ifndef CONFIG_SERIAL_OMAP
--	name = "serial8250";
--
--	/*
--	 * !! 8250 driver does not use standard IORESOURCE* It
--	 * has it's own custom pdata that can be taken from
--	 * the hwmod resource data.  But, this needs to be
--	 * done after the build.
--	 *
--	 * ?? does it have to be done before the register ??
--	 * YES, because platform_device_data_add() copies
--	 * pdata, it does not use a pointer.
--	 */
--	p->flags = UPF_BOOT_AUTOCONF;
--	p->iotype = UPIO_MEM;
--	p->regshift = 2;
--	p->uartclk = OMAP24XX_BASE_BAUD * 16;
--	p->irq = oh->mpu_irqs[0].irq;
--	p->mapbase = oh->slaves[0]->addr->pa_start;
--	p->membase = omap_hwmod_get_mpu_rt_va(oh);
--	p->irqflags = IRQF_SHARED;
--	p->private_data = uart;
--
--	/*
--	 * omap44xx, ti816x: Never read empty UART fifo
--	 * omap3xxx: Never read empty UART fifo on UARTs
--	 * with IP rev >=0x52
--	 */
--	uart->regshift = p->regshift;
--	uart->membase = p->membase;
--	if (cpu_is_omap44xx() || cpu_is_ti816x())
--		uart->errata |= UART_ERRATA_FIFO_FULL_ABORT;
--	else if ((serial_read_reg(uart, UART_OMAP_MVER) & 0xFF)
--			>= UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV)
--		uart->errata |= UART_ERRATA_FIFO_FULL_ABORT;
--
--	if (uart->errata & UART_ERRATA_FIFO_FULL_ABORT) {
--		p->serial_in = serial_in_override;
--		p->serial_out = serial_out_override;
--	}
--
--	pdata = &ports[0];
--	pdata_size = 2 * sizeof(struct plat_serial8250_port);
--#else
--
- 	name = DRIVER_NAME;
- 
- 	omap_up.dma_enabled = uart->dma_enabled;
-@@ -707,7 +598,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
- 
- 	pdata = &omap_up;
  	pdata_size = sizeof(struct omap_uart_port_info);
--#endif
+-	omap_uart_idle_init(pdata, bdata->id);
  
- 	if (WARN_ON(!oh))
- 		return;
-@@ -740,7 +630,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
+ 	pdata->uartclk = OMAP24XX_BASE_BAUD * 16;
+ 	pdata->flags = UPF_BOOT_AUTOCONF;
+@@ -528,6 +588,10 @@ void __init omap_serial_init(void)
+ 		bdata.flags = 0;
+ 		bdata.pads = NULL;
+ 		bdata.pads_cnt = 0;
++
++		if (cpu_is_omap44xx() || cpu_is_omap34xx())
++			omap_serial_fill_default_pads(&bdata);
++
+ 		omap_serial_init_port(&bdata);
  
- 	omap_device_enable(uart->pdev);
- 	omap_uart_idle_init(uart);
--	omap_uart_reset(uart);
- 	omap_hwmod_enable_wakeup(uart->oh);
- 	omap_device_idle(uart->pdev);
- 
+ 	}
 -- 
 1.7.4.1
