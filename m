@@ -1,36 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 21 Sep 2011 11:28:36 +0200
-Subject: [PATCH 02/11] at91/boards: use -1 for invalid gpio
-In-Reply-To: <1316436695-19194-2-git-send-email-plagnioj@jcrosoft.com>
-References: <1316436695-19194-1-git-send-email-plagnioj@jcrosoft.com>
-	<1316436695-19194-2-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <4E79AE44.3070006@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 21 Sep 2011 11:28:31 +0200
+Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
+In-Reply-To: <201109202346.11393.arnd@arndb.de>
+References: <20110917014623.GC2937@atomide.com>
+	<201109202334.43213.arnd@arndb.de>
+	<201109202346.11393.arnd@arndb.de>
+Message-ID: <2241590.uiCS2D9jjt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/09/2011 14:51, Jean-Christophe PLAGNIOL-VILLARD :
-> this will allow to use gpio_is_valid
-> 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Tuesday 20 September 2011 23:46:11 Arnd Bergmann wrote:
 
-[..]
+> It seems that you replace the #ifdef in the board-flash.c file
+> with a similar #ifdef in the header that replaces this with an
+> empty inline function when the object is not built.
 
-> ---
->  34 files changed, 141 insertions(+), 50 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
-> index 5aa5885..17d9163 100644
-> --- a/arch/arm/mach-at91/board-1arm.c
-> +++ b/arch/arm/mach-at91/board-1arm.c
-> @@ -70,6 +70,7 @@ static struct at91_eth_data __initdata onearm_eth_data = {
->  
->  static struct at91_usbh_data __initdata onearm_usbh_data = {
->  	.ports		= 1,
-> +	.vbus_pin	= {-1, -1},
+Found another similar problem over night, presumably in the voltage series:
 
-I would prefer to use "-EINVAL" as stated in the documentation.
+arch/arm/mach-omap2/built-in.o: In function `pwrdm_register_pwrdms':
+twl-common.c:(.text+0x5e20): undefined reference to `voltdm_lookup'
+twl-common.c:(.text+0x5e40): undefined reference to `voltdm_add_pwrdm'
+arch/arm/mach-omap2/built-in.o: In function `omap2_init_common_infrastructure':
+twl-common.c:(.init.text+0x3a4): undefined reference to `omap2xxx_voltagedomains_init'
+twl-common.c:(.init.text+0x3c8): undefined reference to `omap3xxx_voltagedomains_init'
+arch/arm/mach-omap2/built-in.o: In function `omap2_set_init_voltage':
+twl-common.c:(.init.text+0x13c8): undefined reference to `voltdm_lookup'
+arch/arm/mach-omap2/built-in.o: In function `omap3_twl_init':
+twl-common.c:(.init.text+0x1f44): undefined reference to `voltdm_lookup'
+twl-common.c:(.init.text+0x1f4c): undefined reference to `voltdm_lookup'
 
-Best regards,
--- 
-Nicolas Ferre
+	Arnd
