@@ -1,36 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 21 Sep 2011 12:55:53 +0100
-Subject: [PATCH] arm: Add unwinding annotations for 64bit division
-	functions
-In-Reply-To: <20110921113906.GB2872@arm.com>
-References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
-	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
-	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
-	<20110921113906.GB2872@arm.com>
-Message-ID: <20110921115553.GF17169@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 21 Sep 2011 20:57:36 +0900
+Subject: [RESEND PATCH 2/3] ARM: EXYNOS4: Update consistent DMA size to 8MB
+In-Reply-To: <1316583860-32510-3-git-send-email-hatim.rv@samsung.com>
+References: <1316583860-32510-1-git-send-email-hatim.rv@samsung.com>
+	<1316583860-32510-3-git-send-email-hatim.rv@samsung.com>
+Message-ID: <004801cc7855$a7e381c0$f7aa8540$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 12:39:09PM +0100, Dave Martin wrote:
-> Talking to Catalin a bit more, it sounds like prefetch aborts should not
-> happen in kernel code, and data aborts should not happen when accessing
-> the kernel stack.
+Hatim Ali wrote:
+> 
+> Change the consistent DMA allocation to 8MB to support the
+> TVOUT driver.
+> 
+Probably, this conflicts with 'Remove define CONSISTENT_DMA_SIZE'. 
 
-No faults should happen in kernel code, except for:
+As other guy said, we need to check the progress of it before this.
 
-1. instructions specifically marked in the exception table, which are used
-   to access user memory.
-2. instructions causing an 'undefined instruction' exception.
+Thanks.
 
-Standard ARM instructions like 'add', 'mov' etc should _never_ fault,
-and if they do that means your core isn't executing ARM instructions
-correctly (eg, the hardware design is faulty.)
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-Instructions such as VFP, kprobes tracing, etc are expected fault
-locations, and those are fairly well controlled where they can be placed.
-With things like ftrace, it certainly is the case that the unwinder can
-theoretically be called from almost anywhere in a function.
 
-So I suggest that this does need to be fixed, and you can't rely on
-"prefetch aborts should not happen".  That's true of prefetch aborts
-but not of other aborts.
+> NOTE: Once CMA support is merged into mainline, we will use it for memory
+> allocation.
+> 
+> Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/include/mach/memory.h |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos4/include/mach/memory.h b/arch/arm/mach-
+> exynos4/include/mach/memory.h
+> index 374ef2c..7549742 100644
+> --- a/arch/arm/mach-exynos4/include/mach/memory.h
+> +++ b/arch/arm/mach-exynos4/include/mach/memory.h
+> @@ -15,6 +15,8 @@
+> 
+>  #define PLAT_PHYS_OFFSET		UL(0x40000000)
+> 
+> +#define CONSISTENT_DMA_SIZE		SZ_8M
+> +
+>  /* Maximum of 256MiB in one bank */
+>  #define MAX_PHYSMEM_BITS	32
+>  #define SECTION_SIZE_BITS	28
+> --
+> 1.7.2.3
