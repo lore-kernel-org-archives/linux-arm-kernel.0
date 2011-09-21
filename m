@@ -1,83 +1,125 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Wed, 21 Sep 2011 07:47:32 -1000
-Subject: [PATCH] ARM: vexpress: initial device tree support
-In-Reply-To: <20110921171545.GG2872@arm.com>
-References: <1316596786-2539-1-git-send-email-dave.martin@linaro.org>
-	<4E79E588.6010703@gmail.com>
-	<CACxGe6sTYYXbpXvPb4C+y4JX0eRxLvwjbFycXA8Mjc-XWS1QUA@mail.gmail.com>
-	<4E7A12E2.9040107@gmail.com> <20110921171545.GG2872@arm.com>
-Message-ID: <4E7A2334.7020904@firmworks.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 21 Sep 2011 13:49:22 -0400 (EDT)
+Subject: DT vs ARM static mappings
+In-Reply-To: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
+References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.00.1109211320090.12663@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/21/2011 7:15 AM, Dave Martin wrote:
-> On Wed, Sep 21, 2011 at 11:37:54AM -0500, Rob Herring wrote:
->> On 09/21/2011 09:57 AM, Grant Likely wrote:
->>> On Wed, Sep 21, 2011 at 7:24 AM, Rob Herring<robherring2@gmail.com>  wrote:
->>>> On 09/21/2011 04:19 AM, Dave Martin wrote:
->>>>>        * arm,amba-bus -- widely used by other boards and patchsets, but
->>>>>          seems not to be documented.
->>>>>
->>>>
->>>> This should be dropped. There's not really any bus component to an amba
->>>> bus. All the probing info is within the primecell peripherals.
->>>
->>> No, if it is an AMBA bus, then it is entirely appropriate to declare
->>> it as an amba bus, but to also be compatible with "simple-bus".  In
->>> fact, it would be better to use a compatible string that specifies the
->>> specific implementation of AMBA bus since there are several versions
->>> of the spec.
->>
->> And type of AMBA bus as the spec includes AXI, AHB, and APB. None of
->> which have any sort of programmability or software view.
->>
->> If this is required, then the policy should be simple-bus should never
->> be allowed alone as every bus has some underlying type. Seems like
->> overkill for buses like this.
->
-> The key question is _where_ to draw the line between generic and specific.
-> By definition, the DT can never be a comprehensive description of the
-> hardware -- rather a good DT is a description of those details of the hardware
-> which could relevant to any hypothetical OS.
->
-> The flipside is that details which were thought to be irrelevant at
-> design/implementation time can turn out to be relevant in practice, due
-> to errata and implementation issues etc.  So taking the description slightly
-> beyond what the OS needs to know can still have some merit.
->
->
-> I still don't know how to say where the line should be drawn in this particular
-> case though.
+On Tue, 20 Sep 2011, Pawel Moll wrote:
 
-Here are some criteria:
+> ARM machine description contains a "map_io" method, which is used to
+> create static memory mappings (using iotable_init() function) for things
+> like peripherals or SRAMs. At least that's the theory, because most of
+> the platforms are doing much more stuff there, like clocking/GPIOs/UARTs
+> initialization, hardware probing etc.
 
-If the controller for the bus itself has registers, include the bus node
+No, most of them don't.  Maybe a few cases do for historical reasons, 
+but there are other hooks now to link probing and initialization code 
+to.
 
-If it is possible to plug new stuff into the bus, include the bus node
+The static mappings should be just that: static.  Most things should be 
+dynamically mapped instead.  With the series I'm working on, everybody 
+will get the benefit of a static mapping when one is available even if 
+the dynamic mapping interface like ioremap() is used.  So having a bunch 
+of static mappings is not bad, especially if they are easy.  But you 
+should defer as much hardware probing as possible after the memory is 
+initialized and the standard interfaces are available, keeping reliance 
+on direct access to static mappings as small as possible.
 
-If the base address for the bus can be changed, thereby changing all the 
-addresses of its subordinates by the same offset, include the bus node 
-(this usually goes along with "has registers".)
+> Now the Versatile Express platform: it consists of a motherboard with a
+> set of peripherals and a processor daughterboard (core tile), both
+> connected via a static memory bus, which is mapped into processor's
+> physical address space. The motherboard can be shared between different
+> types of the tiles (eg. A9, A5, A15 etc.). The present one is probed byt
+> he motherboard firmware and exposed in "system registers".
+> 
+> Everything is fine so far. The interesting part starts here:
+> 
+> http://infocenter.arm.com/help/topic/com.arm.doc.dui0447e/CACIHGFE.html
+> 
+> In brief, depending on the configuration, the system can have one of
+> two, totally different, memory maps (please, do spare me the "but why
+> did they do that" comments - not my idea nor decision, I just have to
+> live with this ;-), depending on the core tile being used.
+> 
+> In result, the static mapping as defined currently in
+> arch/arm/mach-vexpress/v2m.c for A9 variant:
+> 
+> #define V2M_PA_CS7      0x10000000
+> 
+> static struct map_desc v2m_io_desc[] __initdata = {
+>         {
+>                 .virtual        = __MMIO_P2V(V2M_PA_CS7),
+>                 .pfn            = __phys_to_pfn(V2M_PA_CS7),
+>                 .length         = SZ_128K,
+>                 .type           = MT_DEVICE,
+>         },
+> };
+> 
+> is no longer valid for A5/A15. It would rather look like this:
+> 
+> #define V2M_PA_CS3      0x1c000000
+> 
+> static struct map_desc v2m_io_desc[] __initdata = {
+>         {
+>                 .virtual        = __MMIO_P2V(V2M_PA_CS3),
+>                 .pfn            = __phys_to_pfn(V2M_PA_CS3),
+>                 .length         = SZ_2M,
+>                 .type           = MT_DEVICE,
+>         },
+> };
+> 
+> Not only the peripherals base address is changed but also "internal"
+> alignment, thus offsets to peripherals. Some of them are not being
+> ioremap()ed, but directly used via the static mapping and MMIO_P2V macro
+> (like "readl(MMIO_P2V(V2M_SYS_PROCID0))" in v2m_populate_ct_desc(void)
+> function). For example, these two:
+> 
+> #define V2M_SYSREGS             (V2M_PA_CS7 + 0x00000000)
+> #define V2M_SYSCTL              (V2M_PA_CS7 + 0x00001000)
+> 
+> would have to become:
+> 
+> #define V2M_SYSREGS             (V2M_PA_CS3 + 0x00010000)
+> #define V2M_SYSCTL              (V2M_PA_CS3 + 0x00020000)
 
-ARM buses typically don't have any of those attributes, but there are 
-some weaker criteria that can be used to justify including a bus node. 
-The SoC on which I'm currently working has some peripherals on AXI and 
-others on APB.  That doesn't matter from that addressing standpoint - 
-the individual peripherals can each be viewed as having an address, end 
-of story - but it does matter from a power management standpoint.  The 
-clock tree is quite related to the bus layout.  Including bus nodes in 
-the device tree might provide useful place-holders for properties 
-describing power or clock domains.
+Your best bet would probably consist of keeping the virtual address 
+constant while the physical address is variable.  Adjusting the .pfn 
+field in the v2m_io_desc table right before calling iotable_init() 
+should be fine.  Alternatively you could have two such tables and select 
+the right one at run time.  The io_p2v macro doesn't make any sense 
+anymore in that context so it should be eliminated, and keeping only a 
+minimum set of fixed virtual addresses for the peripherals that can't 
+wait until ioremap is available should be fine.
 
-So, on the whole, I'm in favor of including bus nodes for ARM standard 
-buses.  There is little down side to doing so, and a fair chance that it 
-might come in handy in the future.
+Of course you should use the largest alignment for the same peripheral 
+mapping.
 
->
-> Cheers
-> ---Dave
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
->
+[...]
+> To my mind it looked like the whole mechanism was not flexible enough,
+> so I wanted to explore other options...
+> 
+> The obvious one was to describe the required static mapping in the DTS.
+> I don't like this idea, though. It can hardly be called "hardware
+> description". Besides, what node would carry such data? "chosen"?
+> Hardly...
+> 
+> Would it contain a "regs" property with the physical address and
+> "virtual-reg" with the virtual one? Again, doesn't sound right to me
+> (especially the virtual bit, however the virtual address could be common
+> between different variants and be defined in the board support code, not
+> the DTS).
+
+That's what I'm suggesting: keep the virtual addresses constant, and 
+adjust the static mapping's physical address accordingly.  But never 
+should virtual addresses be part of DT as this is just an implementation 
+detail.
+
+And if static mappings are a problem, then try to live without them as 
+much as possible.  Again there is no reason you should be doing too much 
+hardware probing at .map_io time.
+
+
+Nicolas
