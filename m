@@ -1,59 +1,36 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 21 Sep 2011 20:03:42 +0800
-Subject: [PATCH v2 1/3] net/fec: change phy-reset-gpio request warning to
-	debug message
-In-Reply-To: <20110921112555.GE1966@pengutronix.de>
-References: <1316603432-20032-1-git-send-email-shawn.guo@linaro.org>
-	<1316603432-20032-2-git-send-email-shawn.guo@linaro.org>
-	<20110921112555.GE1966@pengutronix.de>
-Message-ID: <20110921120341.GG28907@S2100-06.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 21 Sep 2011 12:55:53 +0100
+Subject: [PATCH] arm: Add unwinding annotations for 64bit division
+	functions
+In-Reply-To: <20110921113906.GB2872@arm.com>
+References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
+	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
+	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
+	<20110921113906.GB2872@arm.com>
+Message-ID: <20110921115553.GF17169@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 01:25:55PM +0200, Wolfram Sang wrote:
-> Hi Shawn,
-> 
-> On Wed, Sep 21, 2011 at 07:10:30PM +0800, Shawn Guo wrote:
-> > FEC can work without a phy reset on some platforms, which means not
-> > very platform necessarily have a phy-reset gpio encoded in device tree.
-> > So it makes more sense to have the phy-reset-gpio request failure as
-> > a debug message rather than a warning.
-> 
-> Or remove it entirely?
-> 
-I would like to keep it.  When people want to debug at this point, they
-do not need to type the debug message.
+On Wed, Sep 21, 2011 at 12:39:09PM +0100, Dave Martin wrote:
+> Talking to Catalin a bit more, it sounds like prefetch aborts should not
+> happen in kernel code, and data aborts should not happen when accessing
+> the kernel stack.
 
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  drivers/net/ethernet/freescale/fec.c |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-> > index 158b82e..a057abf 100644
-> > --- a/drivers/net/ethernet/freescale/fec.c
-> > +++ b/drivers/net/ethernet/freescale/fec.c
-> > @@ -1422,7 +1422,7 @@ static int __devinit fec_reset_phy(struct platform_device *pdev)
-> >  	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
-> >  	err = gpio_request_one(phy_reset, GPIOF_OUT_INIT_LOW, "phy-reset");
-> >  	if (err) {
-> > -		pr_warn("FEC: failed to get gpio phy-reset: %d\n", err);
-> > +		pr_debug("FEC: failed to get gpio phy-reset: %d\n", err);
-> >  		return err;
-> 
-> I also wanted to suggested to drop returning the error code, since it is
-> not an error anymore, strictly speaking. Then I noticed that the caller
-> does not check the error code. So, this could be added or turn the
-> function to void?
-> 
-To me, keep the return value as integer is more scalable.  Someday,
-someone need to add more stuff in the function, or want to improve
-the caller to check return value, it plays.
+No faults should happen in kernel code, except for:
 
-Regards,
-Shawn
+1. instructions specifically marked in the exception table, which are used
+   to access user memory.
+2. instructions causing an 'undefined instruction' exception.
 
-> >  	}
-> >  	msleep(1);
-> > -- 
+Standard ARM instructions like 'add', 'mov' etc should _never_ fault,
+and if they do that means your core isn't executing ARM instructions
+correctly (eg, the hardware design is faulty.)
+
+Instructions such as VFP, kprobes tracing, etc are expected fault
+locations, and those are fairly well controlled where they can be placed.
+With things like ftrace, it certainly is the case that the unwinder can
+theoretically be called from almost anywhere in a function.
+
+So I suggest that this does need to be fixed, and you can't rely on
+"prefetch aborts should not happen".  That's true of prefetch aborts
+but not of other aborts.
