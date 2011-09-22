@@ -1,23 +1,61 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 22 Sep 2011 13:13:01 +0300
-Subject: [PATCH 0/3] Add support for tegra2 based ventana board
-Message-ID: <1316686384-20236-1-git-send-email-pdeschrijver@nvidia.com>
+Date: Thu, 22 Sep 2011 13:13:02 +0300
+Subject: [PATCH 1/3] arm/tegra: prepare Seaboard pinmux code for derived boards
+In-Reply-To: <1316686384-20236-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1316686384-20236-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1316686384-20236-2-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds support for the tegra2 based ventana development board.
+This patch splits out the common part of pinmux and GPIO initialization for
+seaboard and derived boards. This code originates from chromeos kernel commit
+772f1b56e713be7a55759c2d5eadb9eb11d078db. Author Jong Kim <jongk@nvidia.com>.
 
-Boot tested on ventana.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |   14 ++++++++++----
+ 1 files changed, 10 insertions(+), 4 deletions(-)
 
-Peter De Schrijver (3):
-  arm/tegra: prepare Seaboard pinmux code for derived boards
-  arm/tegra: add support for ventana pinmuxing
-  arm/tegra: device tree support for ventana board
-
- arch/arm/boot/dts/tegra-ventana.dts         |   32 ++++++++++++++
- arch/arm/mach-tegra/Kconfig                 |    6 +++
- arch/arm/mach-tegra/Makefile.boot           |    1 +
- arch/arm/mach-tegra/board-dt.c              |    5 ++-
- arch/arm/mach-tegra/board-seaboard-pinmux.c |   63 ++++++++++++++++++++++++---
- 5 files changed, 100 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra-ventana.dts
+diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+index 74f78b7..b31c765 100644
+--- a/arch/arm/mach-tegra/board-seaboard-pinmux.c
++++ b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+@@ -1,5 +1,6 @@
+ /*
+- * Copyright (C) 2010 NVIDIA Corporation
++ * Copyright (C) 2010,2011 NVIDIA Corporation
++ * Copyright (C) 2011 Google, Inc.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -160,7 +161,7 @@ static __initdata struct tegra_pingroup_config seaboard_pinmux[] = {
+ 
+ 
+ 
+-static struct tegra_gpio_table gpio_table[] = {
++static struct tegra_gpio_table common_gpio_table[] = {
+ 	{ .gpio = TEGRA_GPIO_SD2_CD,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_SD2_WP,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_SD2_POWER,		.enable = true },
+@@ -171,12 +172,17 @@ static struct tegra_gpio_table gpio_table[] = {
+ 	{ .gpio = TEGRA_GPIO_USB1,		.enable = true },
+ };
+ 
+-void __init seaboard_pinmux_init(void)
++static void __init seaboard_common_pinmux_init(void)
+ {
+ 	tegra_pinmux_config_table(seaboard_pinmux, ARRAY_SIZE(seaboard_pinmux));
+ 
+ 	tegra_drive_pinmux_config_table(seaboard_drive_pinmux,
+ 					ARRAY_SIZE(seaboard_drive_pinmux));
+ 
+-	tegra_gpio_config(gpio_table, ARRAY_SIZE(gpio_table));
++	tegra_gpio_config(common_gpio_table, ARRAY_SIZE(common_gpio_table));
++}
++
++void __init seaboard_pinmux_init(void)
++{
++	seaboard_common_pinmux_init();
+ }
+-- 
+1.7.1
