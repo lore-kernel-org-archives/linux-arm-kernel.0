@@ -1,159 +1,83 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 22 Sep 2011 15:46:56 +0200
-Subject: [PATCH 6/7] ARM: plat-nomadik: timer: Export reset functions
-Message-ID: <1316699216-21426-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 22 Sep 2011 15:46:32 +0200
+Subject: [PATCH 3/7] ARM: ux500: add support for clocksource DBX500 PRCMU
+Message-ID: <1316699192-21326-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonas Aaberg <jonas.aberg@stericsson.com>
+From: Mattias Wallin <mattias.wallin@stericsson.com>
 
-We make the reset function from the driver public, then
-we also move of all register defines from the public header
-file into driver, where they belong.
+This patch adds support for the DBX500 PRCMU clocksource
+to ux500 platforms.
 
 Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.co>
 Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/plat-nomadik/include/plat/mtu.h |   47 +---------------------------
- arch/arm/plat-nomadik/timer.c            |   50 ++++++++++++++++++++++++++++--
- 2 files changed, 49 insertions(+), 48 deletions(-)
+ arch/arm/mach-ux500/cpu.c                      |    9 +++++++++
+ arch/arm/mach-ux500/include/mach/db5500-regs.h |    2 ++
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +++
+ 3 files changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-nomadik/include/plat/mtu.h b/arch/arm/plat-nomadik/include/plat/mtu.h
-index 65704a3..6508e76 100644
---- a/arch/arm/plat-nomadik/include/plat/mtu.h
-+++ b/arch/arm/plat-nomadik/include/plat/mtu.h
-@@ -1,54 +1,11 @@
- #ifndef __PLAT_MTU_H
- #define __PLAT_MTU_H
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index 1da23bb..c0e4593 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -10,6 +10,7 @@
+ #include <linux/clk.h>
+ #include <linux/mfd/db8500-prcmu.h>
+ #include <linux/mfd/db5500-prcmu.h>
++#include <linux/clksrc-dbx500-prcmu.h>
  
--/*
-- * Guaranteed runtime conversion range in seconds for
-- * the clocksource and clockevent.
-- */
--#define MTU_MIN_RANGE 4
--
- /* should be set by the platform code */
- extern void __iomem *mtu_base;
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -140,7 +141,15 @@ static void __init ux500_timer_init(void)
+ 	else
+ 		ux500_unknown_soc();
  
--/*
-- * The MTU device hosts four different counters, with 4 set of
-- * registers. These are register names.
-- */
--
--#define MTU_IMSC	0x00	/* Interrupt mask set/clear */
--#define MTU_RIS		0x04	/* Raw interrupt status */
--#define MTU_MIS		0x08	/* Masked interrupt status */
--#define MTU_ICR		0x0C	/* Interrupt clear register */
--
--/* per-timer registers take 0..3 as argument */
--#define MTU_LR(x)	(0x10 + 0x10 * (x) + 0x00)	/* Load value */
--#define MTU_VAL(x)	(0x10 + 0x10 * (x) + 0x04)	/* Current value */
--#define MTU_CR(x)	(0x10 + 0x10 * (x) + 0x08)	/* Control reg */
--#define MTU_BGLR(x)	(0x10 + 0x10 * (x) + 0x0c)	/* At next overflow */
--
--/* bits for the control register */
--#define MTU_CRn_ENA		0x80
--#define MTU_CRn_PERIODIC	0x40	/* if 0 = free-running */
--#define MTU_CRn_PRESCALE_MASK	0x0c
--#define MTU_CRn_PRESCALE_1		0x00
--#define MTU_CRn_PRESCALE_16		0x04
--#define MTU_CRn_PRESCALE_256		0x08
--#define MTU_CRn_32BITS		0x02
--#define MTU_CRn_ONESHOT		0x01	/* if 0 = wraps reloading from BGLR*/
--
--/* Other registers are usual amba/primecell registers, currently not used */
--#define MTU_ITCR	0xff0
--#define MTU_ITOP	0xff4
--
--#define MTU_PERIPH_ID0	0xfe0
--#define MTU_PERIPH_ID1	0xfe4
--#define MTU_PERIPH_ID2	0xfe8
--#define MTU_PERIPH_ID3	0xfeC
--
--#define MTU_PCELL0	0xff0
--#define MTU_PCELL1	0xff4
--#define MTU_PCELL2	0xff8
--#define MTU_PCELL3	0xffC
-+void nmdk_clkevt_reset(void);
-+void nmdk_clksrc_reset(void);
- 
- #endif /* __PLAT_MTU_H */
- 
-diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-index a04b521..30b6433 100644
---- a/arch/arm/plat-nomadik/timer.c
-+++ b/arch/arm/plat-nomadik/timer.c
-@@ -21,7 +21,51 @@
- #include <asm/mach/time.h>
- #include <asm/sched_clock.h>
- 
--#include <plat/mtu.h>
-+/*
-+ * Guaranteed runtime conversion range in seconds for
-+ * the clocksource and clockevent.
-+ */
-+#define MTU_MIN_RANGE 4
++	if (cpu_is_u8500())
++		clksrc_dbx500_timer_base = __io_address(U8500_PRCMU_TIMER_4_BASE);
++	else if (cpu_is_u5500())
++		clksrc_dbx500_timer_base = __io_address(U5500_PRCMU_TIMER_3_BASE);
++	else
++		ux500_unknown_soc();
 +
-+/*
-+ * The MTU device hosts four different counters, with 4 set of
-+ * registers. These are register names.
-+ */
-+
-+#define MTU_IMSC	0x00	/* Interrupt mask set/clear */
-+#define MTU_RIS		0x04	/* Raw interrupt status */
-+#define MTU_MIS		0x08	/* Masked interrupt status */
-+#define MTU_ICR		0x0C	/* Interrupt clear register */
-+
-+/* per-timer registers take 0..3 as argument */
-+#define MTU_LR(x)	(0x10 + 0x10 * (x) + 0x00)	/* Load value */
-+#define MTU_VAL(x)	(0x10 + 0x10 * (x) + 0x04)	/* Current value */
-+#define MTU_CR(x)	(0x10 + 0x10 * (x) + 0x08)	/* Control reg */
-+#define MTU_BGLR(x)	(0x10 + 0x10 * (x) + 0x0c)	/* At next overflow */
-+
-+/* bits for the control register */
-+#define MTU_CRn_ENA		0x80
-+#define MTU_CRn_PERIODIC	0x40	/* if 0 = free-running */
-+#define MTU_CRn_PRESCALE_MASK	0x0c
-+#define MTU_CRn_PRESCALE_1		0x00
-+#define MTU_CRn_PRESCALE_16		0x04
-+#define MTU_CRn_PRESCALE_256		0x08
-+#define MTU_CRn_32BITS		0x02
-+#define MTU_CRn_ONESHOT		0x01	/* if 0 = wraps reloading from BGLR*/
-+
-+/* Other registers are usual amba/primecell registers, currently not used */
-+#define MTU_ITCR	0xff0
-+#define MTU_ITOP	0xff4
-+
-+#define MTU_PERIPH_ID0	0xfe0
-+#define MTU_PERIPH_ID1	0xfe4
-+#define MTU_PERIPH_ID2	0xfe8
-+#define MTU_PERIPH_ID3	0xfeC
-+
-+#define MTU_PCELL0	0xff0
-+#define MTU_PCELL1	0xff4
-+#define MTU_PCELL2	0xff8
-+#define MTU_PCELL3	0xffC
- 
- static bool clkevt_periodic;
- static u32 clk_prescale;
-@@ -68,7 +112,7 @@ static int nmdk_clkevt_next(unsigned long evt, struct clock_event_device *ev)
- 	return 0;
+ 	nmdk_timer_init();
++	clksrc_dbx500_prcmu_init();
  }
  
--static void nmdk_clkevt_reset(void)
-+void nmdk_clkevt_reset(void)
- {
- 	if (clkevt_periodic) {
+ struct sys_timer ux500_timer = {
+diff --git a/arch/arm/mach-ux500/include/mach/db5500-regs.h b/arch/arm/mach-ux500/include/mach/db5500-regs.h
+index 6ad9832..994b5fe 100644
+--- a/arch/arm/mach-ux500/include/mach/db5500-regs.h
++++ b/arch/arm/mach-ux500/include/mach/db5500-regs.h
+@@ -61,6 +61,8 @@
+ #define U5500_SCR_BASE		(U5500_PER4_BASE + 0x5000)
+ #define U5500_DMC_BASE		(U5500_PER4_BASE + 0x6000)
+ #define U5500_PRCMU_BASE	(U5500_PER4_BASE + 0x7000)
++#define U5500_PRCMU_TIMER_3_BASE (U5500_PER4_BASE + 0x07338)
++#define U5500_PRCMU_TIMER_4_BASE (U5500_PER4_BASE + 0x07450)
+ #define U5500_MSP1_BASE		(U5500_PER4_BASE + 0x9000)
+ #define U5500_GPIO2_BASE	(U5500_PER4_BASE + 0xA000)
+ #define U5500_CDETECT_BASE	(U5500_PER4_BASE + 0xF000)
+diff --git a/arch/arm/mach-ux500/include/mach/db8500-regs.h b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+index 0499971..751b0e6 100644
+--- a/arch/arm/mach-ux500/include/mach/db8500-regs.h
++++ b/arch/arm/mach-ux500/include/mach/db8500-regs.h
+@@ -102,10 +102,13 @@
+ #define U8500_SCR_BASE		(U8500_PER4_BASE + 0x05000)
+ #define U8500_DMC_BASE		(U8500_PER4_BASE + 0x06000)
+ #define U8500_PRCMU_BASE	(U8500_PER4_BASE + 0x07000)
++#define U8500_PRCMU_TIMER_3_BASE (U8500_PER4_BASE + 0x07338)
++#define U8500_PRCMU_TIMER_4_BASE (U8500_PER4_BASE + 0x07450)
+ #define U8500_PRCMU_TCDM_BASE_V1 (U8500_PER4_BASE + 0x0f000)
+ #define U8500_PRCMU_TCDM_BASE	(U8500_PER4_BASE + 0x68000)
+ #define U8500_PRCMU_TCPM_BASE   (U8500_PER4_BASE + 0x60000)
  
-@@ -138,7 +182,7 @@ static struct irqaction nmdk_timer_irq = {
- 	.dev_id		= &nmdk_clkevt,
- };
- 
--static void nmdk_clksrc_reset(void)
-+void nmdk_clksrc_reset(void)
- {
- 	/* Disable */
- 	writel(0, mtu_base + MTU_CR(0));
++
+ /* per3 base addresses */
+ #define U8500_FSMC_BASE		(U8500_PER3_BASE + 0x0000)
+ #define U8500_SSP0_BASE		(U8500_PER3_BASE + 0x2000)
 -- 
 1.7.3.2
