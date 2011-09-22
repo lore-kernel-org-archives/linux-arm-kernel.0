@@ -1,41 +1,34 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 22 Sep 2011 09:53:06 -0700
-Subject: [PATCH 2/3] arm/tegra: add support for ventana pinmuxing
-In-Reply-To: <1316686384-20236-3-git-send-email-pdeschrijver@nvidia.com>
-References: <1316686384-20236-1-git-send-email-pdeschrijver@nvidia.com>
-	<1316686384-20236-3-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1739554CD4@HQMAIL01.nvidia.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 22 Sep 2011 11:25:42 -0600
+Subject: [PATCH 1/3] arm/tegra: Move EN_VDD_1V05_GPIO to board-harmony.h
+In-Reply-To: <20110922163258.GD8072@n2100.arm.linux.org.uk>
+References: <1316633620-13184-1-git-send-email-swarren@nvidia.com>
+	<CAOesGMisOtEQpcS-hHi-3brpYzJr-UiB6b71c+bwkesPDk9iuA@mail.gmail.com>
+	<20110922081140.GH17169@n2100.arm.linux.org.uk>
+	<74CDBE0F657A3D45AFBB94109FB122FF1739554CBD@HQMAIL01.nvidia.com>
+	<20110922163258.GD8072@n2100.arm.linux.org.uk>
+Message-ID: <20110922172542.GK17168@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Thursday, September 22, 2011 4:13 AM:
-> Add support for ventana pinmuxing as a seaboard derivative. This is a cut down
-> version of chromeos kernel commit 772f1b56e713be7a55759c2d5eadb9eb11d078db
-> by Jong Kim <jongk@nvidia.com>.
+On Thu, Sep 22, 2011 at 05:32:58PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 22, 2011 at 09:31:48AM -0700, Stephen Warren wrote:
+> > Russell King - ARM Linux wrote at Thursday, September 22, 2011 2:12 AM:
+> > > On Wed, Sep 21, 2011 at 01:16:49PM -0700, Olof Johansson wrote:
+> > > > Works for me. Or I could stage it in a topic branch that would be
+> > > > merged after Russell's GPIO tree.
+> > > 
+> > > Holding stuff off from being merged doesn't work.
+> > 
+> > Russell,
+> > 
+> > So I take it I should add the two ack'd patches to the ARM patch system,
+> > and have you pick them up?
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+> That's a workable solution, yes.  I've done that with various other
+> gpio patches from people, and Grant seems happy with that.
 
-Could you please repost these to the Tegra maintainers/lists as well.
+Yes, I'm comfortable with patches going in via other trees when there
+are dependencies.
 
-> diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
-...
-> +static __initdata struct tegra_pingroup_config ventana_pinmux[] = {
-
-The indentation of this new array uses a mix of spaces and TABs between
-the fields. Probably best to consistently use one or the other. For
-reference, the existing seaboard_pinmux[] uses just spaces internally.
-
-> +	{TEGRA_PINGROUP_DAP3, TEGRA_MUX_DAP3,     TEGRA_PUPD_NORMAL,	TEGRA_TRI_TRISTATE},
-...
-> +	{TEGRA_PINGROUP_DTA,  TEGRA_MUX_VI,       TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
-
-Finally, it's probably a good idea to add a patch to fix mach-tegra/Makefile
-such that CONFIG_MACH_TEGRA_DT includes board-seaboard-pinmux.o. I know
-internally I said it wasn't worth it since we'd be removing the pinmux
-calls from board-dt.c soon, but I'm thinking now it'll take a little
-while to sort that out, since I probably need to rework my patches for
-that so they're implemented within the core pinmux subsystem rather than
-separately within the Tegra pinmux driver. Sorry for flip-flopping here.
-
--- 
-nvpublic
+g.
