@@ -1,39 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 Sep 2011 10:48:43 +0100
-Subject: [PATCH] arm: Add unwinding annotations for 64bit division
-	functions
-In-Reply-To: <1316676488.2053.9.camel@linaro1>
-References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
-	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
-	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
-	<20110921113906.GB2872@arm.com>
-	<20110921115553.GF17169@n2100.arm.linux.org.uk>
-	<1316676488.2053.9.camel@linaro1>
-Message-ID: <CAHkRjk7B4Bmt2g6ptHO3TudXgrkr5rv4b--Hbx-mw7=MO9Q+BQ@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 22 Sep 2011 12:05:21 +0200
+Subject: [RESEND PATCH 2/2] s5p-tv: Add PM_RUNTIME dependency
+In-Reply-To: <1316670891-1672-1-git-send-email-hatim.rv@samsung.com>
+References: <1316670891-1672-1-git-send-email-hatim.rv@samsung.com>
+Message-ID: <005c01cc790f$24110fb0$6c332f10$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 September 2011 08:28, Jon Medhurst (Tixy) <jon.medhurst@linaro.org> wrote:
-> On Wed, 2011-09-21 at 12:55 +0100, Russell King - ARM Linux wrote:
->> Instructions such as VFP, kprobes tracing, etc are expected fault
->> locations, and those are fairly well controlled where they can be placed.
->> With things like ftrace, it certainly is the case that the unwinder can
->> theoretically be called from almost anywhere in a function.
->
-> Actually, kprobes can be places on any instruction in the kernel that
-> isn't in the section .kprobes.text.
->
-> I also strongly suspect that stack unwinding won't happen correctly
-> across the boundary between the kprobes handling code and the function
-> which was probed - there's an awful lot of stack jiggery pokery going on
-> there.
+Hello,
 
-Are people most likely to place kprobes on the first instruction of a
-function? We could improve things a bit in the unwinder and assume
-that if the fault address is the same as the .fnstart address, the
-return value is always in LR and the SP not affected (that's unwinding
-bytecode 0xb0). For a few instructions into the function prologue we
-can't reliably get the unwinding information.
+On Thursday, September 22, 2011 7:55 AM Hatim Ali wrote:
 
+> The TVOUT driver requires PM_RUNTIME support for proper clock
+> enabling.
+> 
+> Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
+
+I will take this patch to our v4l fixes branch. Thanks for your contribution.
+
+> ---
+>  drivers/media/video/s5p-tv/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/media/video/s5p-tv/Kconfig b/drivers/media/video/s5p-tv/Kconfig
+> index 9c37dee..f2a0977 100644
+> --- a/drivers/media/video/s5p-tv/Kconfig
+> +++ b/drivers/media/video/s5p-tv/Kconfig
+> @@ -8,7 +8,7 @@
+> 
+>  config VIDEO_SAMSUNG_S5P_TV
+>  	bool "Samsung TV driver for S5P platform (experimental)"
+> -	depends on PLAT_S5P
+> +	depends on PLAT_S5P && PM_RUNTIME
+>  	depends on EXPERIMENTAL
+>  	default n
+>  	---help---
+
+Best regards
 -- 
-Catalin
+Marek Szyprowski
+Samsung Poland R&D Center
