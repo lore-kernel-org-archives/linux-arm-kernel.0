@@ -1,52 +1,23 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 22 Sep 2011 11:35:07 -0600
-Subject: [PATCH v3 1/2] input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD
-	config option
-In-Reply-To: <1316427553-5033-2-git-send-email-thomas.abraham@linaro.org>
-References: <1316427553-5033-1-git-send-email-thomas.abraham@linaro.org>
-	<1316427553-5033-2-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <20110922173507.GN17168@ponder.secretlab.ca>
+From: arjan@linux.intel.com (Arjan van de Ven)
+Date: Thu, 22 Sep 2011 10:35:22 -0700
+Subject: [RFC PATCH V6 0/4] cpuidle: Global registration of idle states
+	with per-cpu statistics
+In-Reply-To: <20110922082840.10520.85895.stgit@localhost6.localdomain6>
+References: <20110922082840.10520.85895.stgit@localhost6.localdomain6>
+Message-ID: <4E7B71DA.90909@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2011 at 03:49:12PM +0530, Thomas Abraham wrote:
-> For platforms using device tree, the static keypad device instances
-> are not required and SAMSUNG_DEV_KEYPAD is not selected. Since,
-> samsung keypad driver has dependency on SAMSUNG_DEV_KEYPAD config
-> option, the driver is left out of the compilation for dt enabled
-> platforms.
-> 
-> An additional config option 'HAVE_SAMSUNG_KEYPAD' is added
-> which the device tree based platforms can select. This config
-> option is added as an alternative dependency for keypad driver.
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
->  drivers/input/keyboard/Kconfig |    9 ++++++++-
->  1 files changed, 8 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
-> index b4dee9d..7c322a3 100644
-> --- a/drivers/input/keyboard/Kconfig
-> +++ b/drivers/input/keyboard/Kconfig
-> @@ -423,9 +423,16 @@ config KEYBOARD_PMIC8XXX
->  	  To compile this driver as a module, choose M here: the module will
->  	  be called pmic8xxx-keypad.
->  
-> +config HAVE_SAMSUNG_KEYPAD
-> +	bool
-> +	help
-> +	  This will include Samsung Keypad controller driver support. If you
-> +	  want to include Samsung Keypad support for any machine, kindly
-> +	  select this in the respective mach-xxxx/Kconfig file.
-> +
->  config KEYBOARD_SAMSUNG
->  	tristate "Samsung keypad support"
-> -	depends on SAMSUNG_DEV_KEYPAD
-> +	depends on SAMSUNG_DEV_KEYPAD || HAVE_SAMSUNG_KEYPAD
+On 9/22/2011 1:28 AM, Deepthi Dharwar wrote:
+> The following patch series implements global registration of cpuidle
+> states, and also has the necessary data structure changes to
+> accommodate the per-cpu writable members of the cpuidle_states
+> structure.
+>
 
-It would be better to modify SAMSUNG_DEV_KEYPAD to select
-HAVE_SAMSUNG_KEYPAD and then make KEYBOARD_SAMSUNG only depend on
-HAVE_SAMSUNG_KEYPAD instead of both.
 
-g.
+you can consider this series Acked-by: Arjan van de Ven 
+<arjan@linux.intel.com>
+it's a good simplification of the code, and unlike frequencies, idle 
+states are really shared between all cpus for
+very practical reasons.
