@@ -1,41 +1,116 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Sep 2011 15:25:17 -0700
-Subject: [PATCH v3 3/3] OMAP3: Remove auto-selection of PMICs
-In-Reply-To: <877h50qlne.fsf@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 22 Sep 2011 15:30:07 -0700
+Subject: [PATCH v3 1/3] AM35x: voltage: Basic initialization
+In-Reply-To: <1316698155-954-2-git-send-email-abhilash.kv@ti.com> (Abhilash
+	K. V.'s message of "Thu, 22 Sep 2011 18:59:13 +0530")
 References: <1316698155-954-1-git-send-email-abhilash.kv@ti.com>
 	<1316698155-954-2-git-send-email-abhilash.kv@ti.com>
-	<1316698155-954-3-git-send-email-abhilash.kv@ti.com>
-	<1316698155-954-4-git-send-email-abhilash.kv@ti.com>
-	<877h50qlne.fsf@ti.com>
-Message-ID: <20110922222517.GX2937@atomide.com>
+Message-ID: <877h50p5w0.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [110922 14:30]:
-> Abhilash K V <abhilash.kv@ti.com> writes:
-> 
-> > The current implementation almost assumes that only
-> 
-> almost?  ;)
-> 
-> > TWL4030/TWL5030/TWl6030 are (or can be) used with the
-> > OMAP processors. This is, however, not true.
-> >
-> > This patch removes the automatic selection of the PMIC
-> > from Kconfig.
-> > All currently used PMICs are now added to omap2plus_defconfig;
-> 
-> I don't think adding them to omap2plus_defconfig is right either, as
-> those will get stripped out the next time that file is (re)generated.
-> 
-> > any new PMIC that gets supported in future could now be
-> > enabled here rather than by changing Kconfig for
-> > ARCH_OMAP2PLUS_TYPICAL
-> 
-> IMO, the right fix is to have the board Kconfig entries select the PMIC
-> being used on those boards.  That is the only solution that will scale,
-> and also work when using 'make randconfig'.
+Hi Abhilash,
 
-Agreed.
+Abhilash K V <abhilash.kv@ti.com> writes:
 
-Tony
+> This patch adds the basic initialization of voltage layer
+> for AM35x. Since AM35x doesn't support voltage scaling,
+
+I must admit to still being confused by this series.  
+
+This patch says AM35x doesn't support voltage scaling, and the next
+patch adds PMIC support, and registers it with the voltage layer.
+
+However, with each voltdm->scalable flag set to false, none of the PMIC
+values will ever be used (by the current voltage layer.)  Do you have
+more patches on top of this that extend the voltage layer to directly
+use the PMIC instead of using VC or VP?
+
+I'm assuming we have some more assumptions in our current voltage layer
+about the presence of VC/VP that are wrong and need to be fixed.  Now
+that the big voltage layer cleanup is done, I am *very* interested in
+getting rid of any more assumptions we have in that code about how
+devices are hooked up with PMICs.
+
+Can you summarize how these devices are using (or want to use) the
+voltage layer?
+
+Thanks,
+
+Kevin
+
+> Many functions have been defined to plug into existing
+> voltage layer.
+>
+> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_opp_data.h           |    1 +
+>  arch/arm/mach-omap2/opp3xxx_data.c            |    9 +++++++++
+>  arch/arm/mach-omap2/voltagedomains3xxx_data.c |   10 ++++++++--
+>  3 files changed, 18 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_opp_data.h b/arch/arm/mach-omap2/omap_opp_data.h
+> index c784c12..c7cedf3 100644
+> --- a/arch/arm/mach-omap2/omap_opp_data.h
+> +++ b/arch/arm/mach-omap2/omap_opp_data.h
+> @@ -88,6 +88,7 @@ extern struct omap_volt_data omap34xx_vddmpu_volt_data[];
+>  extern struct omap_volt_data omap34xx_vddcore_volt_data[];
+>  extern struct omap_volt_data omap36xx_vddmpu_volt_data[];
+>  extern struct omap_volt_data omap36xx_vddcore_volt_data[];
+> +extern struct omap_volt_data am35xx_vdd_volt_data[];
+>  
+>  extern struct omap_volt_data omap44xx_vdd_mpu_volt_data[];
+>  extern struct omap_volt_data omap44xx_vdd_iva_volt_data[];
+> diff --git a/arch/arm/mach-omap2/opp3xxx_data.c b/arch/arm/mach-omap2/opp3xxx_data.c
+> index d95f3f9..e4a5ee6 100644
+> --- a/arch/arm/mach-omap2/opp3xxx_data.c
+> +++ b/arch/arm/mach-omap2/opp3xxx_data.c
+> @@ -85,6 +85,15 @@ struct omap_volt_data omap36xx_vddcore_volt_data[] = {
+>  	VOLT_DATA_DEFINE(0, 0, 0, 0),
+>  };
+>  
+> +/* AM35x
+> + *
+> + * Fields related to SmartReflex and Voltage Processor are set to 0.
+> + */
+
+fix multi-line comment style (search for 'multi-line' in Documentation/CodingStyle)
+
+> +struct omap_volt_data am35xx_vdd_volt_data[] = {
+> +	VOLT_DATA_DEFINE(OMAP3430_VDD_MPU_OPP3_UV, 0x0, 0x0, 0x0),
+> +	VOLT_DATA_DEFINE(0, 0, 0, 0),
+> +};
+> +
+>  /* OPP data */
+>  
+>  static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
+> diff --git a/arch/arm/mach-omap2/voltagedomains3xxx_data.c b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
+> index 071101d..530082f 100644
+> --- a/arch/arm/mach-omap2/voltagedomains3xxx_data.c
+> +++ b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
+> @@ -85,7 +85,10 @@ void __init omap3xxx_voltagedomains_init(void)
+>  	 * XXX Will depend on the process, validation, and binning
+>  	 * for the currently-running IC
+>  	 */
+> -	if (cpu_is_omap3630()) {
+> +	if (cpu_is_omap3505() || cpu_is_omap3517()) {
+> +		omap3_voltdm_mpu.volt_data = am35xx_vdd_volt_data;
+> +		omap3_voltdm_core.volt_data = am35xx_vdd_volt_data;
+> +	} else if (cpu_is_omap3630()) {
+>  		omap3_voltdm_mpu.volt_data = omap36xx_vddmpu_volt_data;
+>  		omap3_voltdm_core.volt_data = omap36xx_vddcore_volt_data;
+>  	} else {
+> @@ -93,8 +96,11 @@ void __init omap3xxx_voltagedomains_init(void)
+>  		omap3_voltdm_core.volt_data = omap34xx_vddcore_volt_data;
+>  	}
+>  
+> -	for (i = 0; voltdm = voltagedomains_omap3[i], voltdm; i++)
+> +	for (i = 0; voltdm = voltagedomains_omap3[i], voltdm; i++) {
+> +		if (cpu_is_omap3505() || cpu_is_omap3517())
+> +			voltdm->scalable = false;
+>  		voltdm->sys_clk.name = sys_clk_name;
+> +	}
+>  
+>  	voltdm_init(voltagedomains_omap3);
+>  };
