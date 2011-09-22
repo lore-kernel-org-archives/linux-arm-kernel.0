@@ -1,38 +1,83 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 22 Sep 2011 08:57:56 -0400 (EDT)
-Subject: booting single uImage on platforms with different base addresses
-	for SDRAM
-In-Reply-To: <20110922111523.GM17169@n2100.arm.linux.org.uk>
-References: <20110922110411.GD20444@tbergstrom-lnx.Nvidia.com>
-	<20110922111523.GM17169@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1109220853460.12663@xanadu.home>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 22 Sep 2011 14:00:31 +0100
+Subject: [PATCH] arm: Add unwinding annotations for 64bit division
+	functions
+In-Reply-To: <1316693581.2053.38.camel@linaro1>
+References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
+	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
+	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
+	<20110921113906.GB2872@arm.com>
+	<20110921115553.GF17169@n2100.arm.linux.org.uk>
+	<1316676488.2053.9.camel@linaro1>
+	<CAHkRjk7B4Bmt2g6ptHO3TudXgrkr5rv4b--Hbx-mw7=MO9Q+BQ@mail.gmail.com>
+	<1316689606.2053.29.camel@linaro1>
+	<20110922115713.GJ12025@e102109-lin.cambridge.arm.com>
+	<1316693581.2053.38.camel@linaro1>
+Message-ID: <20110922130031.GK12025@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Sep 2011, Russell King - ARM Linux wrote:
-
-> On Thu, Sep 22, 2011 at 02:04:12PM +0300, Peter De Schrijver wrote:
-> > Currently uImages have the load address hardcoded. As we now try to support
-> > as many ARM platforms as possible with a single binary, this becomes a
-> > problem. On tegra20 SDRAM starts at physical address 0, but on tegra30 SDRAM
-> > starts at 0x80000000. It's possible to build a kernel image which can deal
-> > with this, but the uImage still uses a hardcoded address. This results
-> > in requiring 2 different uImages even though the zImage is the same.
+On Thu, Sep 22, 2011 at 01:13:01PM +0100, Jon Medhurst (Tixy) wrote:
+> On Thu, 2011-09-22 at 12:57 +0100, Catalin Marinas wrote:
+> > On Thu, Sep 22, 2011 at 12:06:46PM +0100, Jon Medhurst (Tixy) wrote:
+> > > On Thu, 2011-09-22 at 10:48 +0100, Catalin Marinas wrote:
+> > > > We could improve things a bit in the unwinder and assume
+> > > > that if the fault address is the same as the .fnstart address, the
+> > > > return value is always in LR and the SP not affected (that's unwinding
+> > > > bytecode 0xb0). For a few instructions into the function prologue we
+> > > > can't reliably get the unwinding information.
+> > > 
+> > > That would help make it possible to unwind out of kprobes handlers to
+> > > the probed function. The kprobes code itself would need work as well,
+> > > and possibly the undef handler. Do we think it is worthwhile to do
+> > > this? 
+> > 
+> > Does kprobes need to trace beyond the probed function? If not, you get
+> > the address of the probed function via pt_regs anyway, so no need for
+> > unwinding beyond that.
 > 
-> This is a problem with the uImage format.  It can only be fixed in uboot
-> - it's not a kernel problem.
-> 
-> > Has anyone thought of a solution to this problem?
-> 
-> There was talk about making '0' or something a special address, and
-> fixing uboot to place it appropriately (in much the same way that the
-> other boot loaders such as blob's offset from the start of RAM, or
-> redboot's scripted loading which takes the load address.)
+> To be honest, I'm not very sure how kprobes get used in the real world.
+> Though, if stack unwinding from their handlers currently doesn't work
+> and people had a usecase for it, we would expect them to complain.
 
-... or make u-Boot support plain zImage on ARM (like it apparently does 
-for MIPS).  The u-Boot load command can accept a destination memory 
-address just fine, but u-Boot always insists on relocating it when it is 
-a uImage.
+The unwinding fix should be simple (I haven't tested it yet):
 
+8<-----------------------------
+ARM: Ignore the unwinding information for the first instruction in a function
 
-Nicolas
+From: Catalin Marinas <catalin.marinas@arm.com>
+
+When backtracing from the first instruction of a function, the prologue
+has not been executed and the unwinding information is not valid. This
+patch checks for this case and just assumes that the return address is
+in LR.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/kernel/unwind.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+index d2cb0b3..946face 100644
+--- a/arch/arm/kernel/unwind.c
++++ b/arch/arm/kernel/unwind.c
+@@ -293,6 +293,16 @@ int unwind_frame(struct stackframe *frame)
+ 		return -URC_FAILURE;
+ 	}
+ 
++	/*
++	 * Check for backtrace on the first instruction of a function. The
++	 * prologue has not been executed yet and the unwinding information is
++	 * not valid. Assume that the return address is in LR.
++	 */
++	if (idx.addr == frame->pc) {
++		frame->pc = frame->lr;
++		return URC_OK;
++	}
++
+ 	ctrl.vrs[FP] = frame->fp;
+ 	ctrl.vrs[SP] = frame->sp;
+ 	ctrl.vrs[LR] = frame->lr;
+
+-- 
+Catalin
