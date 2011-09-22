@@ -1,41 +1,39 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 22 Sep 2011 16:11:38 -0700
-Subject: [PATCH 02/10] cpufreq: OMAP: Add SMP support for OMAP4+
-In-Reply-To: <1316725648-26710-3-git-send-email-khilman@ti.com> (Kevin
-	Hilman's message of "Thu, 22 Sep 2011 14:07:20 -0700")
-References: <1316725648-26710-1-git-send-email-khilman@ti.com>
-	<1316725648-26710-3-git-send-email-khilman@ti.com>
-Message-ID: <87sjnonped.fsf@ti.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 22 Sep 2011 16:17:42 -0700
+Subject: [PATCH v2 0/7] Add a generic struct clk
+In-Reply-To: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+Message-ID: <CAJOA=zP1+GPYZpqLtGsJYyU4_bZCpznovct+xiCqYcDhxHMH=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@ti.com> writes:
-
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
+On Thu, Sep 22, 2011 at 3:26 PM, Mike Turquette <mturquette@ti.com> wrote:
+> Hi all,
 >
-> On OMAP SMP configuartion, both processors share the voltage
-> and clock. So both CPUs needs to be scaled together and hence
-> needs software co-ordination.
+> The goal of this series is to provide a cross-platform clock framework
+> that platforms can use to model their clock trees and perform common
+> operations on them. ?Currently everyone re-invents their own clock tree
+> inside platform code which makes it impossible for drivers to use the
+> clock APIs safely across many platforms and for distro's to compile
+> multi-platform kernels which all redefine struct clk and its operations.
+>
+> This is the second version of the common clock patches which were
+> originally posted by Jeremy Kerr and then re-posted with some additional
+> patches by Mark Brown. ?Mark's re-post didn't have any changes done to
+> the original four patches from Jeremy which is why this series is "v2".
+>
+> The changes in this series are minimal: I've folded in some of Mark's
+> fixes and most of the comments posted to his series as well as rebasing
+> on top of v3.1-rc7. ?The design and functionality hasn't changed much
+> since Jeremy posted v1 of this series. ?Propagating the rate change up
+> to the parent has been removed from clk_set_rate since that needs some
+> more thought. ?I also dropped Mark's change to append a device's name to
+> a clk name since device tree might solve this neatly. ?Again more
+> discussion around that would be good.
 
-[...]
+For convenience these patches can be found at:
+git://git.linaro.org/people/mturquette/linux.git
+v3.1-rc7-clkv2
 
-> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-> index a6b2be7..f9b4c4d 100644
-> --- a/drivers/cpufreq/omap-cpufreq.c
-> +++ b/drivers/cpufreq/omap-cpufreq.c
-> @@ -23,6 +23,7 @@
->  #include <linux/clk.h>
->  #include <linux/io.h>
->  #include <linux/opp.h>
-> +#include <linux/cpu.h>
->  
->  #include <asm/system.h>
->  #include <asm/smp_plat.h>
-
-Thanks to checkpatch, I blindly removed an "#include <asm/cpu.h>" here
-without re-testing.  Turns out it was important.
-
-Added it back, and updated the version available in my
-for_3.2/omap-cpufreq branch.
-
-Kevin
+Regards,
+Mike
