@@ -1,29 +1,45 @@
-From: jgarzik@pobox.com (Jeff Garzik)
-Date: Thu, 22 Sep 2011 14:12:02 -0400
-Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
-	platforms
-In-Reply-To: <CAJNCFVLm=bUMvXq7acke7Bd_tiV+b1=HjVp37KwtYyGsZHa+OQ@mail.gmail.com>
-References: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
-	<1314762635-3923-2-git-send-email-richard.zhu@linaro.org>
-	<20110920203037.GE31404@pengutronix.de>
-	<CAJNCFVJ4EGQQ2CcRsPK6OidbU2uBEDertn8R9BuqxYGSBmxbPg@mail.gmail.com>
-	<CAJNCFVLm=bUMvXq7acke7Bd_tiV+b1=HjVp37KwtYyGsZHa+OQ@mail.gmail.com>
-Message-ID: <4E7B7A72.1020704@pobox.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 22 Sep 2011 19:13:13 +0100
+Subject: [PATCH v2] i2c-tegra: Use the suspend_noirq/resume_noirq not
+	suspend/resume
+In-Reply-To: <20110922180335.GQ17168@ponder.secretlab.ca>
+References: <1316713892-357-1-git-send-email-swarren@nvidia.com>
+	<20110922180335.GQ17168@ponder.secretlab.ca>
+Message-ID: <20110922181313.GG5173@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/21/2011 03:05 AM, Richard Zhu wrote:
-> Hi Sascha:
-> One proposal about how to convert the ahci driver to devicetree in future.
-> ahci driver system can make a reference to the evolution of the sdhc driver.
->
-> * separate the ahci to ahci common codes, ahci-pci driver and
-> ahci-platform driver.
+On Thu, Sep 22, 2011 at 12:03:35PM -0600, Grant Likely wrote:
+> On Thu, Sep 22, 2011 at 11:51:32AM -0600, Stephen Warren wrote:
 
-We already have this, with libahci.
+> > * Implement an explicit dependency management system within the kernel for
+> >   device suspend/resume, such that I2C bus would not be suspended before
+> >   the sound card that requires it. It is reported that Linus rejected this
+> >   proposal since he wanted suspend ordering to be based on probe ordering.
 
-"libahci" == ahci common code
-"ahci" == AHCI PCI driver
-"ahci-platform" == AHCI platform driver
+> This really should be revisted.  That was in the context of full
+> system suspend, but we're now in a world of runtime suspend which
+> absolutely does need dependency tracking or reference counting to get
+> the ordering right.
 
-	Jeff
+FWIW this was one of the bigger issues in the PM miniconference in Santa
+Rosa, though a lot of the discission involved explaining the issues to
+some of the x86 guys and there wasn't mssive progress on solutions.
+
+> > * Enhance device probing such that the ASoC sound card device could defer
+> >   its probing until all required resources were available. This would
+> >   then cause the overall sound card suspend to occur at an appropriate early
+> >   time. Grant Likely was reported to have been working towards this goal.
+
+> Yes, I'll send you my current patch for you to look at.  One of the
+> engineers from Linaro is going to be pushing that patch set forward.
+> However, I don't know if it helps with this problem because I believe
+> that the suspend order is based on the implicit probe order of
+> devices, but my patch allows drivers to cause the probe order to get
+> rearranged at runtime.  I don't believe there is a global list showing
+> the order that devices successfully got probed, but I may be wrong
+> here.
+
+Yes, I'm not convinced it'll change anything here.  Though I guess it
+should be a simple matter of programming to move devices around the list
+depending on when they probe.
