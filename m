@@ -1,37 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Sep 2011 14:13:02 +0100
-Subject: DT vs ARM static mappings
-In-Reply-To: <1316696696.4611.844.camel@hornet.cambridge.arm.com>
-References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
-	<alpine.LFD.2.00.1109211320090.12663@xanadu.home>
-	<1316696696.4611.844.camel@hornet.cambridge.arm.com>
-Message-ID: <20110922131302.GO17169@n2100.arm.linux.org.uk>
+From: jon.medhurst@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 22 Sep 2011 14:19:37 +0100
+Subject: [PATCH] arm: Add unwinding annotations for 64bit division
+	functions
+In-Reply-To: <20110922130031.GK12025@e102109-lin.cambridge.arm.com>
+References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
+	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
+	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
+	<20110921113906.GB2872@arm.com>
+	<20110921115553.GF17169@n2100.arm.linux.org.uk>
+	<1316676488.2053.9.camel@linaro1>
+	<CAHkRjk7B4Bmt2g6ptHO3TudXgrkr5rv4b--Hbx-mw7=MO9Q+BQ@mail.gmail.com>
+	<1316689606.2053.29.camel@linaro1>
+	<20110922115713.GJ12025@e102109-lin.cambridge.arm.com>
+	<1316693581.2053.38.camel@linaro1>
+	<20110922130031.GK12025@e102109-lin.cambridge.arm.com>
+Message-ID: <1316697577.2053.48.camel@linaro1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 02:04:56PM +0100, Pawel Moll wrote:
-> > > ARM machine description contains a "map_io" method, which is used to
-> > > create static memory mappings (using iotable_init() function) for things
-> > > like peripherals or SRAMs. At least that's the theory, because most of
-> > > the platforms are doing much more stuff there, like clocking/GPIOs/UARTs
-> > > initialization, hardware probing etc.
-> > 
-> > No, most of them don't.  Maybe a few cases do for historical reasons, 
-> > but there are other hooks now to link probing and initialization code 
-> > to.
+On Thu, 2011-09-22 at 14:00 +0100, Catalin Marinas wrote:
+> The unwinding fix should be simple (I haven't tested it yet):
 > 
-> Ok, what I did was grepping for all .map_io-s. Then I sorted the list
-> and had a look at first 100 and about 50% of them were doing more than
-> just creating mappings.
+> 8<-----------------------------
+> ARM: Ignore the unwinding information for the first instruction in a function
+> 
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> 
+> When backtracing from the first instruction of a function, the prologue
+> has not been executed and the unwinding information is not valid. This
+> patch checks for this case and just assumes that the return address is
+> in LR.
+> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/kernel/unwind.c |   10 ++++++++++
+>  1 files changed, 10 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
+> index d2cb0b3..946face 100644
+> --- a/arch/arm/kernel/unwind.c
+> +++ b/arch/arm/kernel/unwind.c
+> @@ -293,6 +293,16 @@ int unwind_frame(struct stackframe *frame)
+>  		return -URC_FAILURE;
+>  	}
+>  
+> +	/*
+> +	 * Check for backtrace on the first instruction of a function. The
+> +	 * prologue has not been executed yet and the unwinding information is
+> +	 * not valid. Assume that the return address is in LR.
+> +	 */
+> +	if (idx.addr == frame->pc) {
+> +		frame->pc = frame->lr;
+> +		return URC_OK;
+> +	}
+> +
+>  	ctrl.vrs[FP] = frame->fp;
+>  	ctrl.vrs[SP] = frame->sp;
+>  	ctrl.vrs[LR] = frame->lr;
+> 
 
-The answer to that is: they shouldn't be now that we have the init_early
-hook.  The only remainder for .map_io is where platforms make run-time
-decisions about what to map based on some register value somewhere
-(eg, Assabet vs Assabet+Neponset).
+I've never looked at the unwinding code before but the one comment I
+would make is: does the patch work with Thumb code? I.e. does bit zero
+of idx.addr, frame->pc or frame->lr ever get set to indicate Thumb
+state? And if so, they had better all get set otherwise it won't
+work :-)
 
-I do have a large patch series floating around in my git tree which tries
-to clean up to all those map_io functions - the biggest stumbling block
-to them is the Samsung stuff being indirected through its own tables.
-
-Of course, with all the changes to .boot_params etc, the patches no longer
-apply to current kernels.
+-- 
+Tixy
