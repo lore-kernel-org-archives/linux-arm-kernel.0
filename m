@@ -1,62 +1,50 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 22 Sep 2011 15:06:07 -0600
-Subject: [PATCH 4/4] arm/tegra: Convert pinmux driver to a platform device
-In-Reply-To: <1316725567-17881-1-git-send-email-swarren@nvidia.com>
-References: <1316725567-17881-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1316725567-17881-5-git-send-email-swarren@nvidia.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 22 Sep 2011 14:07:18 -0700
+Subject: [PATCH 00/10] cpufreq: OMAP: move into drivers,
+	cleanups/fixes for v3.2
+Message-ID: <1316725648-26710-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-See patch 0000 for details on dependencies.
+This series moves the OMAP CPUfreq driver into drivers/cpufreq, add
+support for SMP devices (OMAP4+) and includes several cleanups and
+fixes from Nishanth Menon.
 
- arch/arm/mach-tegra/pinmux.c |   26 ++++++++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
+This series applies to v3.1-rc6, and is available here:
 
-diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
-index f80d507..46b9d87 100644
---- a/arch/arm/mach-tegra/pinmux.c
-+++ b/arch/arm/mach-tegra/pinmux.c
-@@ -20,6 +20,7 @@
- #include <linux/errno.h>
- #include <linux/spinlock.h>
- #include <linux/io.h>
-+#include <linux/platform_device.h>
- 
- #include <mach/iomap.h>
- #include <mach/pinmux.h>
-@@ -665,6 +666,31 @@ void tegra_pinmux_config_pullupdown_table(const struct tegra_pingroup_config *co
- 	}
- }
- 
-+static int __init tegra_pinmux_probe(struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+
-+static struct of_device_id tegra_pinmux_of_match[] __devinitdata = {
-+	{ .compatible = "nvidia,tegra20-pinmux", },
-+	{ },
-+};
-+
-+static struct platform_driver tegra_pinmux_driver = {
-+	.driver		= {
-+		.name	= "tegra-pinmux",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = tegra_pinmux_of_match,
-+	},
-+	.probe		= tegra_pinmux_probe,
-+};
-+
-+static int __init tegra_pinmux_init(void)
-+{
-+	return platform_driver_register(&tegra_pinmux_driver);
-+}
-+postcore_initcall(tegra_pinmux_init);
-+
- #ifdef	CONFIG_DEBUG_FS
- 
- #include <linux/debugfs.h>
+   git://github.com/khilman/linux-omap-pm.git for_3.2/omap-cpufreq
+
+Kevin
+
+
+Colin Cross (1):
+  cpufreq: OMAP: notify even with bad boot frequency
+
+Nishanth Menon (6):
+  cpufreq: OMAP: move clk name decision to init
+  cpufreq: OMAP: deny initialization if no mpudev
+  cpufreq: OMAP: dont support !freq_table
+  cpufreq: OMAP: only supports OPP library
+  cpufreq: OMAP: put clk if cpu_init failed
+  cpufreq: OMAP: fix freq_table leak
+
+Russell King (1):
+  cpufreq: OMAP: Add SMP support for OMAP4+
+
+Santosh Shilimkar (1):
+  cpufreq: OMAP: cleanup for multi-SoC support, move into
+    drivers/cpufreq
+
+Todd Poynor (1):
+  cpufreq: OMAP: Enable all CPUs in shared policy mask
+
+ arch/arm/plat-omap/Makefile    |    1 -
+ arch/arm/plat-omap/cpu-omap.c  |  171 -------------------------
+ drivers/cpufreq/Makefile       |    1 +
+ drivers/cpufreq/omap-cpufreq.c |  271 ++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 272 insertions(+), 172 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/cpu-omap.c
+ create mode 100644 drivers/cpufreq/omap-cpufreq.c
+
 -- 
-1.7.0.4
+1.7.6
