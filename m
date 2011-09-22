@@ -1,46 +1,52 @@
-From: rogerio.pimentel@freescale.com (Rogerio Pimentel)
-Date: Thu, 22 Sep 2011 14:30:33 -0300
-Subject: [PATCH v3 2/4] ARM: mx53: Add clock for flexcan
-In-Reply-To: <1316712635-25126-1-git-send-email-rogerio.pimentel@freescale.com>
-References: <1316712635-25126-1-git-send-email-rogerio.pimentel@freescale.com>
-Message-ID: <1316712635-25126-2-git-send-email-rogerio.pimentel@freescale.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 22 Sep 2011 11:35:07 -0600
+Subject: [PATCH v3 1/2] input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD
+	config option
+In-Reply-To: <1316427553-5033-2-git-send-email-thomas.abraham@linaro.org>
+References: <1316427553-5033-1-git-send-email-thomas.abraham@linaro.org>
+	<1316427553-5033-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20110922173507.GN17168@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding clock for flexcan on i.MX53
+On Mon, Sep 19, 2011 at 03:49:12PM +0530, Thomas Abraham wrote:
+> For platforms using device tree, the static keypad device instances
+> are not required and SAMSUNG_DEV_KEYPAD is not selected. Since,
+> samsung keypad driver has dependency on SAMSUNG_DEV_KEYPAD config
+> option, the driver is left out of the compilation for dt enabled
+> platforms.
+> 
+> An additional config option 'HAVE_SAMSUNG_KEYPAD' is added
+> which the device tree based platforms can select. This config
+> option is added as an alternative dependency for keypad driver.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  drivers/input/keyboard/Kconfig |    9 ++++++++-
+>  1 files changed, 8 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+> index b4dee9d..7c322a3 100644
+> --- a/drivers/input/keyboard/Kconfig
+> +++ b/drivers/input/keyboard/Kconfig
+> @@ -423,9 +423,16 @@ config KEYBOARD_PMIC8XXX
+>  	  To compile this driver as a module, choose M here: the module will
+>  	  be called pmic8xxx-keypad.
+>  
+> +config HAVE_SAMSUNG_KEYPAD
+> +	bool
+> +	help
+> +	  This will include Samsung Keypad controller driver support. If you
+> +	  want to include Samsung Keypad support for any machine, kindly
+> +	  select this in the respective mach-xxxx/Kconfig file.
+> +
+>  config KEYBOARD_SAMSUNG
+>  	tristate "Samsung keypad support"
+> -	depends on SAMSUNG_DEV_KEYPAD
+> +	depends on SAMSUNG_DEV_KEYPAD || HAVE_SAMSUNG_KEYPAD
 
-Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
----
-Changes since v2: 
-Rebased to imx-cleanup
- arch/arm/mach-mx5/clock-mx51-mx53.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+It would be better to modify SAMSUNG_DEV_KEYPAD to select
+HAVE_SAMSUNG_KEYPAD and then make KEYBOARD_SAMSUNG only depend on
+HAVE_SAMSUNG_KEYPAD instead of both.
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index a3db355..30d008f 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1418,6 +1418,12 @@ DEFINE_CLOCK(ipu_di0_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG5_OFFSET,
- DEFINE_CLOCK(ipu_di1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG6_OFFSET,
- 		NULL, NULL, &pll3_sw_clk, NULL);
- 
-+/* CAN */
-+DEFINE_CLOCK(can1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG10_OFFSET,
-+		NULL, NULL, &ipg_clk, NULL);
-+DEFINE_CLOCK(can2_clk, 1, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET,
-+		NULL, NULL, &ipg_clk, NULL);
-+
- #define _REGISTER_CLOCK(d, n, c) \
-        { \
- 		.dev_id = d, \
-@@ -1507,6 +1513,8 @@ static struct clk_lookup mx53_lookups[] = {
- 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
- 	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
- 	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
-+	_REGISTER_CLOCK("flexcan.0", NULL, can1_clk)
-+	_REGISTER_CLOCK("flexcan.1", NULL, can2_clk)
- };
- 
- static void clk_tree_init(void)
--- 
-1.7.1
+g.
