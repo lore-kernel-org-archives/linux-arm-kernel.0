@@ -1,427 +1,192 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 22 Sep 2011 14:07:19 -0700
-Subject: [PATCH 01/10] cpufreq: OMAP: cleanup for multi-SoC support,
-	move into drivers/cpufreq
+Date: Thu, 22 Sep 2011 14:07:20 -0700
+Subject: [PATCH 02/10] cpufreq: OMAP: Add SMP support for OMAP4+
 In-Reply-To: <1316725648-26710-1-git-send-email-khilman@ti.com>
 References: <1316725648-26710-1-git-send-email-khilman@ti.com>
-Message-ID: <1316725648-26710-2-git-send-email-khilman@ti.com>
+Message-ID: <1316725648-26710-3-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+From: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Move OMAP cpufreq driver from arch/arm/mach-omap2 into
-drivers/cpufreq, along with a few cleanups:
+On OMAP SMP configuartion, both processors share the voltage
+and clock. So both CPUs needs to be scaled together and hence
+needs software co-ordination.
 
-- generalize support for better handling of different SoCs in the OMAP
-- use OPP layer instead of OMAP clock internals for frequency table init
+Also, update lpj with reference value to avoid progressive error.
 
+Adjust _both_ the per-cpu loops_per_jiffy and global lpj. Calibrate
+them with with reference to the initial values to avoid a
+progressively bigger and bigger error in the value over time.
+
+While at this, re-use the notifiers for UP/SMP since on UP machine or
+UP_ON_SMP policy->cpus mask would contain only the boot CPU.
+
+Based on initial SMP support by Santosh Shilimkar.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[khilman at ti.com: move to drivers]
+[khilman at ti.com: due to overlap/rework, combined original Santosh patch
+                 and Russell's rework]
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/plat-omap/Makefile    |    1 -
- arch/arm/plat-omap/cpu-omap.c  |  171 ------------------------------------
- drivers/cpufreq/Makefile       |    1 +
- drivers/cpufreq/omap-cpufreq.c |  188 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 189 insertions(+), 172 deletions(-)
- delete mode 100644 arch/arm/plat-omap/cpu-omap.c
- create mode 100644 drivers/cpufreq/omap-cpufreq.c
+ drivers/cpufreq/omap-cpufreq.c |   80 +++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 70 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-index f0233e6..4ef7493 100644
---- a/arch/arm/plat-omap/Makefile
-+++ b/arch/arm/plat-omap/Makefile
-@@ -21,7 +21,6 @@ obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
- obj-$(CONFIG_OMAP_IOMMU) += iommu.o iovmm.o
- obj-$(CONFIG_OMAP_IOMMU_DEBUG) += iommu-debug.o
- 
--obj-$(CONFIG_CPU_FREQ) += cpu-omap.o
- obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
- obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
- obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
-diff --git a/arch/arm/plat-omap/cpu-omap.c b/arch/arm/plat-omap/cpu-omap.c
-deleted file mode 100644
-index da4f68d..0000000
---- a/arch/arm/plat-omap/cpu-omap.c
-+++ /dev/null
-@@ -1,171 +0,0 @@
--/*
-- *  linux/arch/arm/plat-omap/cpu-omap.c
-- *
-- *  CPU frequency scaling for OMAP
-- *
-- *  Copyright (C) 2005 Nokia Corporation
-- *  Written by Tony Lindgren <tony@atomide.com>
-- *
-- *  Based on cpu-sa1110.c, Copyright (C) 2001 Russell King
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/types.h>
--#include <linux/kernel.h>
--#include <linux/sched.h>
--#include <linux/cpufreq.h>
--#include <linux/delay.h>
--#include <linux/init.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/io.h>
--
--#include <mach/hardware.h>
--#include <plat/clock.h>
--#include <asm/system.h>
--
--#define VERY_HI_RATE	900000000
--
--static struct cpufreq_frequency_table *freq_table;
--
--#ifdef CONFIG_ARCH_OMAP1
--#define MPU_CLK		"mpu"
--#else
--#define MPU_CLK		"virt_prcm_set"
--#endif
--
--static struct clk *mpu_clk;
--
--/* TODO: Add support for SDRAM timing changes */
--
--static int omap_verify_speed(struct cpufreq_policy *policy)
--{
--	if (freq_table)
--		return cpufreq_frequency_table_verify(policy, freq_table);
--
--	if (policy->cpu)
--		return -EINVAL;
--
--	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
--				     policy->cpuinfo.max_freq);
--
--	policy->min = clk_round_rate(mpu_clk, policy->min * 1000) / 1000;
--	policy->max = clk_round_rate(mpu_clk, policy->max * 1000) / 1000;
--	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
--				     policy->cpuinfo.max_freq);
--	return 0;
--}
--
--static unsigned int omap_getspeed(unsigned int cpu)
--{
--	unsigned long rate;
--
--	if (cpu)
--		return 0;
--
--	rate = clk_get_rate(mpu_clk) / 1000;
--	return rate;
--}
--
--static int omap_target(struct cpufreq_policy *policy,
--		       unsigned int target_freq,
--		       unsigned int relation)
--{
--	struct cpufreq_freqs freqs;
--	int ret = 0;
--
--	/* Ensure desired rate is within allowed range.  Some govenors
--	 * (ondemand) will just pass target_freq=0 to get the minimum. */
--	if (target_freq < policy->min)
--		target_freq = policy->min;
--	if (target_freq > policy->max)
--		target_freq = policy->max;
--
--	freqs.old = omap_getspeed(0);
--	freqs.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
--	freqs.cpu = 0;
--
--	if (freqs.old == freqs.new)
--		return ret;
--
--	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
--#ifdef CONFIG_CPU_FREQ_DEBUG
--	printk(KERN_DEBUG "cpufreq-omap: transition: %u --> %u\n",
--	       freqs.old, freqs.new);
--#endif
--	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
--	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
--
--	return ret;
--}
--
--static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
--{
--	int result = 0;
--
--	mpu_clk = clk_get(NULL, MPU_CLK);
--	if (IS_ERR(mpu_clk))
--		return PTR_ERR(mpu_clk);
--
--	if (policy->cpu != 0)
--		return -EINVAL;
--
--	policy->cur = policy->min = policy->max = omap_getspeed(0);
--
--	clk_init_cpufreq_table(&freq_table);
--	if (freq_table) {
--		result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
--		if (!result)
--			cpufreq_frequency_table_get_attr(freq_table,
--							policy->cpu);
--	} else {
--		policy->cpuinfo.min_freq = clk_round_rate(mpu_clk, 0) / 1000;
--		policy->cpuinfo.max_freq = clk_round_rate(mpu_clk,
--							VERY_HI_RATE) / 1000;
--	}
--
--	/* FIXME: what's the actual transition time? */
--	policy->cpuinfo.transition_latency = 300 * 1000;
--
--	return 0;
--}
--
--static int omap_cpu_exit(struct cpufreq_policy *policy)
--{
--	clk_exit_cpufreq_table(&freq_table);
--	clk_put(mpu_clk);
--	return 0;
--}
--
--static struct freq_attr *omap_cpufreq_attr[] = {
--	&cpufreq_freq_attr_scaling_available_freqs,
--	NULL,
--};
--
--static struct cpufreq_driver omap_driver = {
--	.flags		= CPUFREQ_STICKY,
--	.verify		= omap_verify_speed,
--	.target		= omap_target,
--	.get		= omap_getspeed,
--	.init		= omap_cpu_init,
--	.exit		= omap_cpu_exit,
--	.name		= "omap",
--	.attr		= omap_cpufreq_attr,
--};
--
--static int __init omap_cpufreq_init(void)
--{
--	return cpufreq_register_driver(&omap_driver);
--}
--
--arch_initcall(omap_cpufreq_init);
--
--/*
-- * if ever we want to remove this, upon cleanup call:
-- *
-- * cpufreq_unregister_driver()
-- * cpufreq_frequency_table_put_attr()
-- */
--
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index a48bc02..ce75fcb 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -43,6 +43,7 @@ obj-$(CONFIG_UX500_SOC_DB8500)		+= db8500-cpufreq.o
- obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
- obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
-+obj-$(CONFIG_ARCH_OMAP2PLUS)            += omap-cpufreq.o
- 
- ##################################################################################
- # PowerPC platform drivers
 diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-new file mode 100644
-index 0000000..a6b2be7
---- /dev/null
+index a6b2be7..f9b4c4d 100644
+--- a/drivers/cpufreq/omap-cpufreq.c
 +++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -0,0 +1,188 @@
-+/*
-+ *  CPU frequency scaling for OMAP
-+ *
-+ *  Copyright (C) 2005 Nokia Corporation
-+ *  Written by Tony Lindgren <tony@atomide.com>
-+ *
-+ *  Based on cpu-sa1110.c, Copyright (C) 2001 Russell King
-+ *
-+ * Copyright (C) 2007-2011 Texas Instruments, Inc.
-+ * - OMAP3/4 support by Rajendra Nayak, Santosh Shilimkar
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/sched.h>
-+#include <linux/cpufreq.h>
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+#include <linux/opp.h>
+@@ -23,6 +23,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/opp.h>
++#include <linux/cpu.h>
+ 
+ #include <asm/system.h>
+ #include <asm/smp_plat.h>
+@@ -35,6 +36,16 @@
+ 
+ #define VERY_HI_RATE	900000000
+ 
++#ifdef CONFIG_SMP
++struct lpj_info {
++	unsigned long	ref;
++	unsigned int	freq;
++};
 +
-+#include <asm/system.h>
-+#include <asm/smp_plat.h>
-+
-+#include <plat/clock.h>
-+#include <plat/omap-pm.h>
-+#include <plat/common.h>
-+
-+#include <mach/hardware.h>
-+
-+#define VERY_HI_RATE	900000000
-+
-+static struct cpufreq_frequency_table *freq_table;
-+static struct clk *mpu_clk;
-+
-+static int omap_verify_speed(struct cpufreq_policy *policy)
-+{
-+	if (freq_table)
-+		return cpufreq_frequency_table_verify(policy, freq_table);
-+
-+	if (policy->cpu)
-+		return -EINVAL;
-+
-+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-+				     policy->cpuinfo.max_freq);
-+
-+	policy->min = clk_round_rate(mpu_clk, policy->min * 1000) / 1000;
-+	policy->max = clk_round_rate(mpu_clk, policy->max * 1000) / 1000;
-+	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
-+				     policy->cpuinfo.max_freq);
-+	return 0;
-+}
-+
-+static unsigned int omap_getspeed(unsigned int cpu)
-+{
-+	unsigned long rate;
-+
-+	if (cpu)
-+		return 0;
-+
-+	rate = clk_get_rate(mpu_clk) / 1000;
-+	return rate;
-+}
-+
-+static int omap_target(struct cpufreq_policy *policy,
-+		       unsigned int target_freq,
-+		       unsigned int relation)
-+{
-+	int ret = 0;
-+	struct cpufreq_freqs freqs;
-+
-+	/* Ensure desired rate is within allowed range.  Some govenors
-+	 * (ondemand) will just pass target_freq=0 to get the minimum. */
-+	if (target_freq < policy->min)
-+		target_freq = policy->min;
-+	if (target_freq > policy->max)
-+		target_freq = policy->max;
-+
-+	freqs.old = omap_getspeed(0);
-+	freqs.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
-+	freqs.cpu = 0;
-+
-+	if (freqs.old == freqs.new)
-+		return ret;
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-+
-+#ifdef CONFIG_CPU_FREQ_DEBUG
-+	pr_info("cpufreq-omap: transition: %u --> %u\n", freqs.old, freqs.new);
++static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
++static struct lpj_info global_lpj_ref;
 +#endif
 +
-+	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
-+
-+	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-+
-+	return ret;
-+}
-+
-+static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
-+{
-+	int result = 0;
-+	struct device *mpu_dev;
-+
-+	if (cpu_is_omap24xx())
-+		mpu_clk = clk_get(NULL, "virt_prcm_set");
-+	else if (cpu_is_omap34xx())
-+		mpu_clk = clk_get(NULL, "dpll1_ck");
-+	else if (cpu_is_omap44xx())
-+		mpu_clk = clk_get(NULL, "dpll_mpu_ck");
-+
-+	if (IS_ERR(mpu_clk))
-+		return PTR_ERR(mpu_clk);
-+
-+	if (policy->cpu != 0)
-+		return -EINVAL;
-+
-+	policy->cur = policy->min = policy->max = omap_getspeed(0);
-+
-+	mpu_dev = omap2_get_mpuss_device();
-+	if (!mpu_dev) {
-+		pr_warning("%s: unable to get the mpu device\n", __func__);
-+		return -EINVAL;
+ static struct cpufreq_frequency_table *freq_table;
+ static struct clk *mpu_clk;
+ 
+@@ -60,7 +71,7 @@ static unsigned int omap_getspeed(unsigned int cpu)
+ {
+ 	unsigned long rate;
+ 
+-	if (cpu)
++	if (cpu >= NR_CPUS)
+ 		return 0;
+ 
+ 	rate = clk_get_rate(mpu_clk) / 1000;
+@@ -71,7 +82,7 @@ static int omap_target(struct cpufreq_policy *policy,
+ 		       unsigned int target_freq,
+ 		       unsigned int relation)
+ {
+-	int ret = 0;
++	int i, ret = 0;
+ 	struct cpufreq_freqs freqs;
+ 
+ 	/* Ensure desired rate is within allowed range.  Some govenors
+@@ -81,22 +92,57 @@ static int omap_target(struct cpufreq_policy *policy,
+ 	if (target_freq > policy->max)
+ 		target_freq = policy->max;
+ 
+-	freqs.old = omap_getspeed(0);
++	freqs.old = omap_getspeed(policy->cpu);
+ 	freqs.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
+-	freqs.cpu = 0;
++	freqs.cpu = policy->cpu;
+ 
+ 	if (freqs.old == freqs.new)
+ 		return ret;
+ 
+-	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
++	/* notifiers */
++	for_each_cpu(i, policy->cpus) {
++		freqs.cpu = i;
++		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 +	}
-+	opp_init_cpufreq_table(mpu_dev, &freq_table);
+ 
+ #ifdef CONFIG_CPU_FREQ_DEBUG
+ 	pr_info("cpufreq-omap: transition: %u --> %u\n", freqs.old, freqs.new);
+ #endif
+ 
+ 	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
++	freqs.new = omap_getspeed(policy->cpu);
 +
-+	if (freq_table) {
-+		result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
-+		if (!result)
-+			cpufreq_frequency_table_get_attr(freq_table,
-+							policy->cpu);
-+	} else {
-+		policy->cpuinfo.min_freq = clk_round_rate(mpu_clk, 0) / 1000;
-+		policy->cpuinfo.max_freq = clk_round_rate(mpu_clk,
-+							VERY_HI_RATE) / 1000;
++#ifdef CONFIG_SMP
++	/*
++	 * Note that loops_per_jiffy is not updated on SMP systems in
++	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
++	 * on frequency transition. We need to update all dependent CPUs.
++	 */
++	for_each_cpu(i, policy->cpus) {
++		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
++		if (!lpj->freq) {
++			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
++			lpj->freq = freqs.old;
++		}
++
++		per_cpu(cpu_data, i).loops_per_jiffy =
++			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
 +	}
+ 
+-	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++	/* And don't forget to adjust the global one */
++	if (!global_lpj_ref.freq) {
++		global_lpj_ref.ref = loops_per_jiffy;
++		global_lpj_ref.freq = freqs.old;
++	}
++	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, global_lpj_ref.freq,
++					freqs.new);
++#endif
 +
-+	policy->min = policy->cpuinfo.min_freq;
-+	policy->max = policy->cpuinfo.max_freq;
-+	policy->cur = omap_getspeed(0);
++	/* notifiers */
++	for_each_cpu(i, policy->cpus) {
++		freqs.cpu = i;
++		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
++	}
+ 
+ 	return ret;
+ }
+@@ -105,6 +151,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	int result = 0;
+ 	struct device *mpu_dev;
++	static cpumask_var_t cpumask;
+ 
+ 	if (cpu_is_omap24xx())
+ 		mpu_clk = clk_get(NULL, "virt_prcm_set");
+@@ -116,12 +163,12 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ 	if (IS_ERR(mpu_clk))
+ 		return PTR_ERR(mpu_clk);
+ 
+-	if (policy->cpu != 0)
++	if (policy->cpu >= NR_CPUS)
+ 		return -EINVAL;
+ 
+-	policy->cur = policy->min = policy->max = omap_getspeed(0);
+-
++	policy->cur = policy->min = policy->max = omap_getspeed(policy->cpu);
+ 	mpu_dev = omap2_get_mpuss_device();
 +
-+	/* FIXME: what's the actual transition time? */
-+	policy->cpuinfo.transition_latency = 300 * 1000;
+ 	if (!mpu_dev) {
+ 		pr_warning("%s: unable to get the mpu device\n", __func__);
+ 		return -EINVAL;
+@@ -141,7 +188,20 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ 
+ 	policy->min = policy->cpuinfo.min_freq;
+ 	policy->max = policy->cpuinfo.max_freq;
+-	policy->cur = omap_getspeed(0);
++	policy->cur = omap_getspeed(policy->cpu);
 +
-+	return 0;
-+}
-+
-+static int omap_cpu_exit(struct cpufreq_policy *policy)
-+{
-+	clk_exit_cpufreq_table(&freq_table);
-+	clk_put(mpu_clk);
-+	return 0;
-+}
-+
-+static struct freq_attr *omap_cpufreq_attr[] = {
-+	&cpufreq_freq_attr_scaling_available_freqs,
-+	NULL,
-+};
-+
-+static struct cpufreq_driver omap_driver = {
-+	.flags		= CPUFREQ_STICKY,
-+	.verify		= omap_verify_speed,
-+	.target		= omap_target,
-+	.get		= omap_getspeed,
-+	.init		= omap_cpu_init,
-+	.exit		= omap_cpu_exit,
-+	.name		= "omap",
-+	.attr		= omap_cpufreq_attr,
-+};
-+
-+static int __init omap_cpufreq_init(void)
-+{
-+	return cpufreq_register_driver(&omap_driver);
-+}
-+
-+static void __exit omap_cpufreq_exit(void)
-+{
-+	cpufreq_unregister_driver(&omap_driver);
-+}
-+
-+MODULE_DESCRIPTION("cpufreq driver for OMAP SoCs");
-+MODULE_LICENSE("GPL");
-+module_init(omap_cpufreq_init);
-+module_exit(omap_cpufreq_exit);
++	/*
++	 * On OMAP SMP configuartion, both processors share the voltage
++	 * and clock. So both CPUs needs to be scaled together and hence
++	 * needs software co-ordination. Use cpufreq affected_cpus
++	 * interface to handle this scenario. Additional is_smp() check
++	 * is to keep SMP_ON_UP build working.
++	 */
++	if (is_smp()) {
++		policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
++		cpumask_or(cpumask, cpumask_of(policy->cpu), cpumask);
++		cpumask_copy(policy->cpus, cpumask);
++	}
+ 
+ 	/* FIXME: what's the actual transition time? */
+ 	policy->cpuinfo.transition_latency = 300 * 1000;
 -- 
 1.7.6
