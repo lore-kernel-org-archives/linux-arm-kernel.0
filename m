@@ -1,79 +1,71 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 22 Sep 2011 15:46:17 +0200
-Subject: [PATCH 1/7] ARM: plat-nomadik: MTU sched_clock as an option
-Message-ID: <1316699177-21259-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 22 Sep 2011 15:46:06 +0200
+Subject: [PATCH 0/7] Ux500 timer patches for 3.2
+Message-ID: <1316699166-21226-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mattias Wallin <mattias.wallin@stericsson.com>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-This patch makes it possible to configure away the sched_clock
-part of the MTU timer.
+This patch series improves the Ux500/Nomadik timers to the point
+where we can actually use them in a power-constrained system
+which also tend to power off some of them from time to time.
 
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
-Signed-off-by: Jonas Aberg <jonas.aberg@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/plat-nomadik/Kconfig |    8 +++++++-
- arch/arm/plat-nomadik/timer.c |    8 ++++----
- 2 files changed, 11 insertions(+), 5 deletions(-)
+Patches 1 & 2 has been floated before:
+http://marc.info/?l=linux-arm-kernel&m=130700730707168&w=2
 
-diff --git a/arch/arm/plat-nomadik/Kconfig b/arch/arm/plat-nomadik/Kconfig
-index ce65901..bca4914 100644
---- a/arch/arm/plat-nomadik/Kconfig
-+++ b/arch/arm/plat-nomadik/Kconfig
-@@ -15,10 +15,16 @@ if PLAT_NOMADIK
- 
- config HAS_MTU
- 	bool
--	select HAVE_SCHED_CLOCK
- 	help
- 	  Support for Multi Timer Unit. MTU provides access
- 	  to multiple interrupt generating programmable
- 	  32-bit free running decrementing counters.
- 
-+config NOMADIK_MTU_SCHED_CLOCK
-+	bool
-+	depends on HAS_MTU
-+	select HAVE_SCHED_CLOCK
-+	help
-+	  Use the Multi Timer Unit as the sched_clock.
-+
- endif
-diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-index ef74e15..bd638c5 100644
---- a/arch/arm/plat-nomadik/timer.c
-+++ b/arch/arm/plat-nomadik/timer.c
-@@ -24,7 +24,7 @@
- #include <plat/mtu.h>
- 
- void __iomem *mtu_base; /* Assigned by machine code */
--
-+#ifdef CONFIG_NOMADIK_MTU_SCHED_CLOCK
- /*
-  * Override the global weak sched_clock symbol with this
-  * local implementation which uses the clocksource to get some
-@@ -48,7 +48,7 @@ static void notrace nomadik_update_sched_clock(void)
- 	u32 cyc = -readl(mtu_base + MTU_VAL(0));
- 	update_sched_clock(&cd, cyc, (u32)~0);
- }
--
-+#endif
- /* Clockevent device: use one-shot mode */
- static void nmdk_clkevt_mode(enum clock_event_mode mode,
- 			     struct clock_event_device *dev)
-@@ -153,9 +153,9 @@ void __init nmdk_timer_init(void)
- 			rate, 200, 32, clocksource_mmio_readl_down))
- 		pr_err("timer: failed to initialize clock source %s\n",
- 		       "mtu_0");
--
-+#ifdef CONFIG_NOMADIK_MTU_SCHED_CLOCK
- 	init_sched_clock(&cd, nomadik_update_sched_clock, 32, rate);
--
-+#endif
- 	/* Timer 1 is used for events */
- 
- 	clockevents_calc_mult_shift(&nmdk_clkevt, rate, MTU_MIN_RANGE);
+I'm not gonna claim this solves any issue of lost
+sched_clock or so. What it does is to add the PRCMU timer
+as an alternative clock source and sched_clock, nothing
+more, nothing less.
+
+If sched_clock() can be made to retain its value across
+suspend/resume cycles as proposed by Russell here is
+a really good question:
+http://marc.info/?l=linux-arm-kernel&m=130700801907853&w=2
+
+We would *still* need to be able to use the PRCMU as
+clock source, since it's the only truly continous thing
+we have in the system, and IIRC from my discussions with
+tglx it's really not a good idea to have clock sources
+that come and go.
+
+On top of this it merely adds the optional possibility to
+also use the PRCMU timer as sched_clock, if the MTU
+(Nomadik) timer is not used for this. If this selectable
+sched_clock base is frowned upon (there can be only one!)
+I can delete those hunks of the patch.
+
+Apart from this we have an update of the MTU (Nomadik)
+timer to support periodic mode and some reset calls.
+
+Jonas Aaberg (4):
+  ARM: ux500: Move timer code to separate file
+  ARM: plat-nomadik: timer: Add support for periodic timers
+  ARM: plat-nomadik: timer: Export reset functions
+  ARM: ux500: Reprogram timers upon resume
+
+Mattias Wallin (3):
+  ARM: plat-nomadik: MTU sched_clock as an option
+  clocksource: add DBX500 PRCMU Timer support
+  ARM: ux500: add support for clocksource DBX500 PRCMU
+
+ arch/arm/mach-ux500/Makefile                   |    2 +-
+ arch/arm/mach-ux500/cpu.c                      |   29 +-----
+ arch/arm/mach-ux500/include/mach/db5500-regs.h |    2 +
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
+ arch/arm/mach-ux500/timer.c                    |   65 +++++++++++
+ arch/arm/plat-nomadik/Kconfig                  |    8 ++-
+ arch/arm/plat-nomadik/include/plat/mtu.h       |   47 +--------
+ arch/arm/plat-nomadik/timer.c                  |  138 ++++++++++++++++++------
+ drivers/clocksource/Kconfig                    |   15 +++
+ drivers/clocksource/Makefile                   |    1 +
+ drivers/clocksource/clksrc-dbx500-prcmu.c      |  104 ++++++++++++++++++
+ include/linux/clksrc-dbx500-prcmu.h            |   22 ++++
+ 12 files changed, 330 insertions(+), 106 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/timer.c
+ create mode 100644 drivers/clocksource/clksrc-dbx500-prcmu.c
+ create mode 100644 include/linux/clksrc-dbx500-prcmu.h
+
 -- 
 1.7.3.2
