@@ -1,28 +1,31 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 22 Sep 2011 12:45:32 -0700
-Subject: [RFC PATCH V6 0/4] cpuidle: Global registration of idle states
-	with per-cpu statistics
-In-Reply-To: <20110922082840.10520.85895.stgit@localhost6.localdomain6>
-	(Deepthi Dharwar's message of "Thu, 22 Sep 2011 13:58:52 +0530")
-References: <20110922082840.10520.85895.stgit@localhost6.localdomain6>
-Message-ID: <87ty84tl7n.fsf@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 22 Sep 2011 14:03:22 -0600
+Subject: [PATCH] ARM: Don't include mach-nuc93x/Kconfig
+Message-ID: <1316721802-10852-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Deepthi Dharwar <deepthi@linux.vnet.ibm.com> writes:
+Commit 6adc1e7ff19d9befdbb7781b26fff42bb0bc21e2 "ARM: mach-nuc93x: delete"
+removed support for this sub-architecture, thus deleting that file. So,
+don't include it. grep indicates no more references to this machine.
 
-> The following patch series implements global registration of cpuidle
-> states, and also has the necessary data structure changes to
-> accommodate the per-cpu writable members of the cpuidle_states
-> structure.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/Kconfig |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-I reviewed earlier versions of the series, and this version still looks
-good to me.  Any reason it is still RFC?
-
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-
-and for the OMAP-specific parts,
-
-Acked-by: Kevin Hilman <khilman@ti.com>
-
-Kevin
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 89bd520..472a7f8 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -969,8 +969,6 @@ source "arch/arm/mach-netx/Kconfig"
+ source "arch/arm/mach-nomadik/Kconfig"
+ source "arch/arm/plat-nomadik/Kconfig"
+ 
+-source "arch/arm/mach-nuc93x/Kconfig"
+-
+ source "arch/arm/plat-omap/Kconfig"
+ 
+ source "arch/arm/mach-omap1/Kconfig"
+-- 
+1.7.0.4
