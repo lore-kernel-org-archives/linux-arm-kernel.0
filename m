@@ -1,69 +1,46 @@
-From: jon.medhurst@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 22 Sep 2011 14:19:37 +0100
-Subject: [PATCH] arm: Add unwinding annotations for 64bit division
-	functions
-In-Reply-To: <20110922130031.GK12025@e102109-lin.cambridge.arm.com>
-References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
-	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
-	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
-	<20110921113906.GB2872@arm.com>
-	<20110921115553.GF17169@n2100.arm.linux.org.uk>
-	<1316676488.2053.9.camel@linaro1>
-	<CAHkRjk7B4Bmt2g6ptHO3TudXgrkr5rv4b--Hbx-mw7=MO9Q+BQ@mail.gmail.com>
-	<1316689606.2053.29.camel@linaro1>
-	<20110922115713.GJ12025@e102109-lin.cambridge.arm.com>
-	<1316693581.2053.38.camel@linaro1>
-	<20110922130031.GK12025@e102109-lin.cambridge.arm.com>
-Message-ID: <1316697577.2053.48.camel@linaro1>
+From: abhilash.kv@ti.com (Abhilash K V)
+Date: Thu, 22 Sep 2011 18:56:30 +0530
+Subject: [PATCH v4 0/3] AM3517: Booting up
+Message-ID: <1316697993-696-1-git-send-email-abhilash.kv@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-09-22 at 14:00 +0100, Catalin Marinas wrote:
-> The unwinding fix should be simple (I haven't tested it yet):
-> 
-> 8<-----------------------------
-> ARM: Ignore the unwinding information for the first instruction in a function
-> 
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> When backtracing from the first instruction of a function, the prologue
-> has not been executed and the unwinding information is not valid. This
-> patch checks for this case and just assumes that the return address is
-> in LR.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm/kernel/unwind.c |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-> index d2cb0b3..946face 100644
-> --- a/arch/arm/kernel/unwind.c
-> +++ b/arch/arm/kernel/unwind.c
-> @@ -293,6 +293,16 @@ int unwind_frame(struct stackframe *frame)
->  		return -URC_FAILURE;
->  	}
->  
-> +	/*
-> +	 * Check for backtrace on the first instruction of a function. The
-> +	 * prologue has not been executed yet and the unwinding information is
-> +	 * not valid. Assume that the return address is in LR.
-> +	 */
-> +	if (idx.addr == frame->pc) {
-> +		frame->pc = frame->lr;
-> +		return URC_OK;
-> +	}
-> +
->  	ctrl.vrs[FP] = frame->fp;
->  	ctrl.vrs[SP] = frame->sp;
->  	ctrl.vrs[LR] = frame->lr;
-> 
+This patch-set gets the kernel booting up on a AM3517 EVM.
+The board is able to boot with ramdisk after this,but the MMC and Ethernet
+drivers are not up yet. Lots of warnings remain which will be addressed in
+subsequent patches.
 
-I've never looked at the unwinding code before but the one comment I
-would make is: does the patch work with Thumb code? I.e. does bit zero
-of idx.addr, frame->pc or frame->lr ever get set to indicate Thumb
-state? And if so, they had better all get set otherwise it won't
-work :-)
+The patches are tested on master of git://github.com/tmlind/linux.git
+Kernel version is 3.1.0-rc6 and last commit on top of which these patches
+were added is:
+	0c2838d00350afc5259730c35bbda81598e8875f: Linux-omap rebuilt: Updated
+	to -rc7, merged in dmtimer
 
--- 
-Tixy
+Cc: Sanjeev Premi <premi@ti.com>
+---
+Changes in v4:
+ -Rebased and tested against the latest 3.1.0-rc6.
+ -Added a patch [3/3] to check for missing PMIC info in vp init.
+
+Changes in v3:
+ Presence of SR feature is now used to decide if TWL4030 initialisation is to
+ be done or not.
+
+Changes in v2: Incorporated Kevin's comments to add SmartReflex as a FEATURE,
+  and use omap3_has_sr() to fall out of omap3_twl_init() for AM35x case.
+	
+
+Abhilash K V (3):
+  AM35x: Using OMAP3 generic hwmods
+  omap_twl: Prevent SR to enable for am3517/am3505 devices
+  OMAP2+: voltage: add check for missing PMIC info in vp init
+
+ arch/arm/mach-omap2/id.c                     |    2 +-
+ arch/arm/mach-omap2/io.c                     |   11 +++++++++++
+ arch/arm/mach-omap2/omap_hwmod.c             |    2 ++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |   18 ++++++++++++++++++
+ arch/arm/mach-omap2/pm.c                     |    3 ++-
+ arch/arm/mach-omap2/vp.c                     |    7 +++++++
+ arch/arm/plat-omap/include/plat/cpu.h        |    2 ++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    3 +++
+ 8 files changed, 46 insertions(+), 2 deletions(-)
