@@ -1,32 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Sep 2011 22:05:32 +0100
-Subject: [PATCH][RESEND] ARM: cache: detect PIPT I-cache using CTR
-In-Reply-To: <1316723111-10473-1-git-send-email-will.deacon@arm.com>
-References: <1316723111-10473-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20110922210532.GE8072@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 22 Sep 2011 15:06:03 -0600
+Subject: [PATCH 0/4] arm/tegra: Convert gpio & pinmux to platform devices
+Message-ID: <1316725567-17881-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 09:25:11PM +0100, Will Deacon wrote:
-> The Cache Type Register L1Ip field identifies I-caches with a PIPT
-> policy using the encoding 11b.
-> 
-> This patch extends the cache policy parsing to identify PIPT I-caches
-> correctly and prevent them from being treated as VIPT aliasing in cases
-> where they are sufficiently large.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> KernelVersion: 3.1-rc3
-> ---
-> 
-> Russell - this has been sitting in the patch system as 7062/1 for a
-> while now. Please can you add it to your for-next branch for 3.2?
+This series converts the Tegra GPIO and pinmux drivers to be regular
+platform devices.
 
-Well... I don't apply any patch to the for-next branch itself - that'd
-be madness as the branch is re-built from the topic branches and it's
-just a convenience for SFR so I don't have to keep on listing out all
-the individual branches for him to pull.
+The series is extracted from an earlier series I posted that augmented
+these drivers to initialize HW state from the device-tree. I'm holding
+off on that aspect of the changes, since it's not entirely clear to me
+whether the new pinmux API should drive the initial pinmux state setup
+via "system hog" definitions, or whether pinmux drivers should indeed
+do their own thing.
 
-Last time I tried to apply it to my misc branch (which was 3.1-rc1 based)
-it wouldn't apply.  I've since rebased that branch (for various reasons)
-and it now appears to apply cleanly, so I can _only_ _now_ apply it.
+Dependencies:
+* The patches need to be merged in one branch in order for bisectability.
+
+* At least patch 3 depends on changes in Russell's gpio branch, since it
+  edits a file renamed there. I imagine the series will be merged into
+  that branch.
+
+* The whole series is based off next-20110922 plus a couple patches in the
+  ARM patch system (7094, 7095).
+
+* This series affects both the GPIO and pinmux drivers. Potentially, the
+  changes to the two driver could be split into separate series, but this
+  would be complicated by the fact patch 1 edits all the board files to
+  make the same change for both GPIO and pinmux; if split up, merging that
+  all back together would cause conflicts.
+
+* Patch 1's changes to board-seaboard-pinmux.c will have some merge
+  conflicts with the patches Peter De Schrijver recently posted to enhance
+  that file to support Ventana; each of our patches will change the context
+  changes in the others' diffs. I'm not sure how best to manage this.
+ 
+Stephen Warren (4):
+  arm/tegra: Prep boards for gpio/pinmux conversion to pdevs
+  arm/dt: Tegra: Add pinmux node to tegra20.dtsi
+  gpio/tegra: Convert to a platform device
+  arm/tegra: Convert pinmux driver to a platform device
+
+ .../devicetree/bindings/pinmux/pinmux_nvidia.txt   |    5 +++
+ arch/arm/boot/dts/tegra20.dtsi                     |    5 +++
+ arch/arm/mach-tegra/board-harmony-pinmux.c         |    8 +++++
+ arch/arm/mach-tegra/board-paz00-pinmux.c           |    8 +++++
+ arch/arm/mach-tegra/board-seaboard-pinmux.c        |    9 ++++-
+ arch/arm/mach-tegra/board-trimslice-pinmux.c       |    7 ++++
+ arch/arm/mach-tegra/devices.c                      |   10 ++++++
+ arch/arm/mach-tegra/devices.h                      |    2 +
+ arch/arm/mach-tegra/pinmux.c                       |   26 ++++++++++++++++
+ drivers/gpio/gpio-tegra.c                          |   31 +++++++++++++-------
+ 10 files changed, 98 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinmux/pinmux_nvidia.txt
