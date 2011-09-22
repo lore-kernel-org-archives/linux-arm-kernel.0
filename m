@@ -1,39 +1,43 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 22 Sep 2011 16:17:42 -0700
-Subject: [PATCH v2 0/7] Add a generic struct clk
-In-Reply-To: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-Message-ID: <CAJOA=zP1+GPYZpqLtGsJYyU4_bZCpznovct+xiCqYcDhxHMH=Q@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 22 Sep 2011 16:57:27 -0700
+Subject: [PATCH v7 00/26] gpio/omap: driver cleanup and fixes
+In-Reply-To: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com> (Tarun
+	Kanti DebBarma's message of "Tue, 13 Sep 2011 18:32:33 +0530")
+References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <87mxdwm8pk.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 3:26 PM, Mike Turquette <mturquette@ti.com> wrote:
-> Hi all,
->
-> The goal of this series is to provide a cross-platform clock framework
-> that platforms can use to model their clock trees and perform common
-> operations on them. ?Currently everyone re-invents their own clock tree
-> inside platform code which makes it impossible for drivers to use the
-> clock APIs safely across many platforms and for distro's to compile
-> multi-platform kernels which all redefine struct clk and its operations.
->
-> This is the second version of the common clock patches which were
-> originally posted by Jeremy Kerr and then re-posted with some additional
-> patches by Mark Brown. ?Mark's re-post didn't have any changes done to
-> the original four patches from Jeremy which is why this series is "v2".
->
-> The changes in this series are minimal: I've folded in some of Mark's
-> fixes and most of the comments posted to his series as well as rebasing
-> on top of v3.1-rc7. ?The design and functionality hasn't changed much
-> since Jeremy posted v1 of this series. ?Propagating the rate change up
-> to the parent has been removed from clk_set_rate since that needs some
-> more thought. ?I also dropped Mark's change to append a device's name to
-> a clk name since device tree might solve this neatly. ?Again more
-> discussion around that would be good.
+Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 
-For convenience these patches can be found at:
-git://git.linaro.org/people/mturquette/linux.git
-v3.1-rc7-clkv2
+> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+> The cleanup include getting rid of cpu_is_* checks wherever possible,
+> use of gpio_bank list instead of static array, use of unique platform
+> specific value associated data member to OMAP platforms to avoid
+> cpu_is_* checks. The series also include PM runtime support.*
 
-Regards,
-Mike
+PER is still not hitting retention for me on 34xx/n900 when GPIOs have
+debounce enabled.  Disabling debounce in the board file makes it work.
+
+[...]
+
+> - Add dbclk aliases for all GPIO modules. Without this, GPIO modules were not
+>   getting the correct clock handle to enable/disable debounec clock.
+
+This isn't right.  hwmod should already be adding aliases for the
+optional clocks.
+
+After debugging this myself a bit, here's what I think may be going on.
+This may not be the only problem but here's at least one of them.
+
+First, debounce clocks are disabled in the runtime_suspend callback.
+
+When a GPIO is freed and it's the last one in the bank, bank->mod_usage
+goes to zero.
+
+After that, pm_runtime_put_sync() is called, which will trigger the
+driver's ->runtime_suspend callback.  The ->runtime_suspend() callback
+checks bank->mod_usage as well, and if zero, doesn't do anything
+(notably, it doesn't disable debounce clocks.)
+
+Kevin
