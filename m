@@ -1,54 +1,106 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 22 Sep 2011 21:14:56 +0100
-Subject: [PATCH] ARM: futex: preserve oldval in SMP __futex_atomic_op
-In-Reply-To: <alpine.LFD.2.00.1109221449470.12663@xanadu.home>
-References: <1316716500-25376-1-git-send-email-will.deacon@arm.com>
-	<alpine.LFD.2.00.1109221449470.12663@xanadu.home>
-Message-ID: <20110922201456.GA10140@e102144-lin.cambridge.arm.com>
+Date: Thu, 22 Sep 2011 21:25:11 +0100
+Subject: [PATCH][RESEND] ARM: cache: detect PIPT I-cache using CTR
+Message-ID: <1316723111-10473-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 08:09:41PM +0100, Nicolas Pitre wrote:
-> On Thu, 22 Sep 2011, Will Deacon wrote:
-> 
-> > The SMP implementation of __futex_atomic_op clobbers oldval with the
-> > status flag from the exclusive store. This causes it to always read as
-> > zero when performing the FUTEX_OP_CMP_* operation.
-> > 
-> > This patch updates the ARM __futex_atomic_op implementations to take a
-> > tmp argument, allowing us to store the strex status flag without
-> > overwriting the register containing oldval.
-> > 
-> > Cc: stable at kernel.org
-> > Reported-by: Minho Ben <mhban@samsung.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+The Cache Type Register L1Ip field identifies I-caches with a PIPT
+policy using the encoding 11b.
 
-Thanks Nicolas, I'll put this into the patch system tomorrow.
+This patch extends the cache policy parsing to identify PIPT I-caches
+correctly and prevent them from being treated as VIPT aliasing in cases
+where they are sufficiently large.
 
-> > ---
-> > 
-> > Following up on:
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2011-September/066348.html
-> > 
-> > it turns out that we don't need to use named arguments after all,
-> > although it might be nice to add that as a later patch. For now, I'm
-> > trying to keep this as small as possible for -stable.
-> 
-> Agreed that named arguments would make this code more obvious, 
-> especially with the insn argument of __futex_atomic_op() which uses 
-> numbered registers away from the actual inline asm statement where it is 
-> used.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+KernelVersion: 3.1-rc3
+---
 
-Yup, I'll post this as a separate patch in the future.
+Russell - this has been sitting in the patch system as 7062/1 for a
+while now. Please can you add it to your for-next branch for 3.2?
 
-> I'm a bit worried that the LTP tests still passed though.  In theory it 
-> shouldn't have worked at all except if you were lucky with test values.
-
-Urgh, I just looked at the implementation of the tests I ran; all they do is
-check that the {set,get}_robust_list system calls return -1 when passed
-invalid argument combinations. No wonder they passed...
+Thanks,
 
 Will
+
+
+ arch/arm/include/asm/cachetype.h |    5 ++++-
+ arch/arm/kernel/setup.c          |   15 +++++++++++++--
+ 2 files changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/cachetype.h b/arch/arm/include/asm/cachetype.h
+index c023db0..7ea7814 100644
+--- a/arch/arm/include/asm/cachetype.h
++++ b/arch/arm/include/asm/cachetype.h
+@@ -7,6 +7,7 @@
+ #define CACHEID_VIPT			(CACHEID_VIPT_ALIASING|CACHEID_VIPT_NONALIASING)
+ #define CACHEID_ASID_TAGGED		(1 << 3)
+ #define CACHEID_VIPT_I_ALIASING		(1 << 4)
++#define CACHEID_PIPT			(1 << 5)
+ 
+ extern unsigned int cacheid;
+ 
+@@ -16,6 +17,7 @@ extern unsigned int cacheid;
+ #define cache_is_vipt_aliasing()	cacheid_is(CACHEID_VIPT_ALIASING)
+ #define icache_is_vivt_asid_tagged()	cacheid_is(CACHEID_ASID_TAGGED)
+ #define icache_is_vipt_aliasing()	cacheid_is(CACHEID_VIPT_I_ALIASING)
++#define icache_is_pipt()		cacheid_is(CACHEID_PIPT)
+ 
+ /*
+  * __LINUX_ARM_ARCH__ is the minimum supported CPU architecture
+@@ -26,7 +28,8 @@ extern unsigned int cacheid;
+ #if __LINUX_ARM_ARCH__ >= 7
+ #define __CACHEID_ARCH_MIN	(CACHEID_VIPT_NONALIASING |\
+ 				 CACHEID_ASID_TAGGED |\
+-				 CACHEID_VIPT_I_ALIASING)
++				 CACHEID_VIPT_I_ALIASING |\
++				 CACHEID_PIPT)
+ #elif __LINUX_ARM_ARCH__ >= 6
+ #define	__CACHEID_ARCH_MIN	(~CACHEID_VIVT)
+ #else
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 2cdba13..6311da7 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -248,6 +248,10 @@ static int cpu_has_aliasing_icache(unsigned int arch)
+ 	int aliasing_icache;
+ 	unsigned int id_reg, num_sets, line_size;
+ 
++	/* PIPT caches never alias. */
++	if (icache_is_pipt())
++		return 0;
++
+ 	/* arch specifies the register format */
+ 	switch (arch) {
+ 	case CPU_ARCH_ARMv7:
+@@ -282,8 +286,14 @@ static void __init cacheid_init(void)
+ 			/* ARMv7 register format */
+ 			arch = CPU_ARCH_ARMv7;
+ 			cacheid = CACHEID_VIPT_NONALIASING;
+-			if ((cachetype & (3 << 14)) == 1 << 14)
++			switch (cachetype & (3 << 14)) {
++			case (1 << 14):
+ 				cacheid |= CACHEID_ASID_TAGGED;
++				break;
++			case (3 << 14):
++				cacheid |= CACHEID_PIPT;
++				break;
++			}
+ 		} else {
+ 			arch = CPU_ARCH_ARMv6;
+ 			if (cachetype & (1 << 23))
+@@ -300,10 +310,11 @@ static void __init cacheid_init(void)
+ 	printk("CPU: %s data cache, %s instruction cache\n",
+ 		cache_is_vivt() ? "VIVT" :
+ 		cache_is_vipt_aliasing() ? "VIPT aliasing" :
+-		cache_is_vipt_nonaliasing() ? "VIPT nonaliasing" : "unknown",
++		cache_is_vipt_nonaliasing() ? "PIPT / VIPT nonaliasing" : "unknown",
+ 		cache_is_vivt() ? "VIVT" :
+ 		icache_is_vivt_asid_tagged() ? "VIVT ASID tagged" :
+ 		icache_is_vipt_aliasing() ? "VIPT aliasing" :
++		icache_is_pipt() ? "PIPT" :
+ 		cache_is_vipt_nonaliasing() ? "VIPT nonaliasing" : "unknown");
+ }
+ 
+-- 
+1.7.0.4
