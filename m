@@ -1,58 +1,115 @@
-From: cbouatmailru@gmail.com (Anton Vorontsov)
-Date: Thu, 22 Sep 2011 22:31:17 +0400
-Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
-	platforms
-In-Reply-To: <CAJNCFVLm=bUMvXq7acke7Bd_tiV+b1=HjVp37KwtYyGsZHa+OQ@mail.gmail.com>
-References: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
-	<1314762635-3923-2-git-send-email-richard.zhu@linaro.org>
-	<20110920203037.GE31404@pengutronix.de>
-	<CAJNCFVJ4EGQQ2CcRsPK6OidbU2uBEDertn8R9BuqxYGSBmxbPg@mail.gmail.com>
-	<CAJNCFVLm=bUMvXq7acke7Bd_tiV+b1=HjVp37KwtYyGsZHa+OQ@mail.gmail.com>
-Message-ID: <20110922183117.GA17600@oksana.dev.rtsoft.ru>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 22 Sep 2011 19:35:00 +0100
+Subject: [PATCH] ARM: futex: preserve oldval in SMP __futex_atomic_op
+Message-ID: <1316716500-25376-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+The SMP implementation of __futex_atomic_op clobbers oldval with the
+status flag from the exclusive store. This causes it to always read as
+zero when performing the FUTEX_OP_CMP_* operation.
 
-On Wed, Sep 21, 2011 at 03:05:44PM +0800, Richard Zhu wrote:
-> Hi Sascha:
-> One proposal about how to convert the ahci driver to devicetree in future.
-> ahci driver system can make a reference to the evolution of the sdhc driver.
+This patch updates the ARM __futex_atomic_op implementations to take a
+tmp argument, allowing us to store the strex status flag without
+overwriting the register containing oldval.
 
-You don't need to "convert" ahci driver to devicetree. IIRC,
-the current ahci_platform driver should work almost* out of
-the box with OF-enabled architectures, as OF subsystem
-automatically populates memory and interrupt resources for
-platform devices.
+Cc: stable at kernel.org
+Reported-by: Minho Ben <mhban@samsung.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-Someday you might need to implement OF-specific bindings
-(e.g. get some property from the device tree and translate
-it into port flags). When/if you'll need it, you can just
-add it into the driver.
+Following up on:
 
-* Almost: you have to add of_match_table into 'struct
-  platform_driver ahci_driver'.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-September/066348.html
 
-> * separate the ahci to ahci common codes, ahci-pci driver and
-> ahci-platform driver.
+it turns out that we don't need to use named arguments after all,
+although it might be nice to add that as a later patch. For now, I'm
+trying to keep this as small as possible for -stable.
 
-Done. Long time ago, actually.
+ arch/arm/include/asm/futex.h |   34 +++++++++++++++++-----------------
+ 1 files changed, 17 insertions(+), 17 deletions(-)
 
-> * create kinds of ahci vendor's own ahci platform driver refer to the
-> sdhci-xxx driver solutions.
-
-I think that this is viable, but personally I would like to
-see platforms to just pass port flags and all needed hooks
-via platform_data. That is, I'd leave the hooks in the arch/
-code. Usually these hooks are very arch-specific (i.e. enable
-these and these clocks, etc), so arch/ seems like a perfect
-place for such things.
-
-Not a strong opinion though, and if you like to go your route,
-I'm also fine with this. It has its own pros (and cons).
-
-Thanks,
-
+diff --git a/arch/arm/include/asm/futex.h b/arch/arm/include/asm/futex.h
+index 8c73900..253cc86 100644
+--- a/arch/arm/include/asm/futex.h
++++ b/arch/arm/include/asm/futex.h
+@@ -25,17 +25,17 @@
+ 
+ #ifdef CONFIG_SMP
+ 
+-#define __futex_atomic_op(insn, ret, oldval, uaddr, oparg)	\
++#define __futex_atomic_op(insn, ret, oldval, tmp, uaddr, oparg)	\
+ 	smp_mb();						\
+ 	__asm__ __volatile__(					\
+-	"1:	ldrex	%1, [%2]\n"				\
++	"1:	ldrex	%1, [%3]\n"				\
+ 	"	" insn "\n"					\
+-	"2:	strex	%1, %0, [%2]\n"				\
+-	"	teq	%1, #0\n"				\
++	"2:	strex	%2, %0, [%3]\n"				\
++	"	teq	%2, #0\n"				\
+ 	"	bne	1b\n"					\
+ 	"	mov	%0, #0\n"				\
+-	__futex_atomic_ex_table("%4")				\
+-	: "=&r" (ret), "=&r" (oldval)				\
++	__futex_atomic_ex_table("%5")				\
++	: "=&r" (ret), "=&r" (oldval), "=&r" (tmp)		\
+ 	: "r" (uaddr), "r" (oparg), "Ir" (-EFAULT)		\
+ 	: "cc", "memory")
+ 
+@@ -73,14 +73,14 @@ futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
+ #include <linux/preempt.h>
+ #include <asm/domain.h>
+ 
+-#define __futex_atomic_op(insn, ret, oldval, uaddr, oparg)	\
++#define __futex_atomic_op(insn, ret, oldval, tmp, uaddr, oparg)	\
+ 	__asm__ __volatile__(					\
+-	"1:	" T(ldr) "	%1, [%2]\n"			\
++	"1:	" T(ldr) "	%1, [%3]\n"			\
+ 	"	" insn "\n"					\
+-	"2:	" T(str) "	%0, [%2]\n"			\
++	"2:	" T(str) "	%0, [%3]\n"			\
+ 	"	mov	%0, #0\n"				\
+-	__futex_atomic_ex_table("%4")				\
+-	: "=&r" (ret), "=&r" (oldval)				\
++	__futex_atomic_ex_table("%5")				\
++	: "=&r" (ret), "=&r" (oldval), "=&r" (tmp)		\
+ 	: "r" (uaddr), "r" (oparg), "Ir" (-EFAULT)		\
+ 	: "cc", "memory")
+ 
+@@ -117,7 +117,7 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
+ 	int cmp = (encoded_op >> 24) & 15;
+ 	int oparg = (encoded_op << 8) >> 20;
+ 	int cmparg = (encoded_op << 20) >> 20;
+-	int oldval = 0, ret;
++	int oldval = 0, ret, tmp;
+ 
+ 	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28))
+ 		oparg = 1 << oparg;
+@@ -129,19 +129,19 @@ futex_atomic_op_inuser (int encoded_op, u32 __user *uaddr)
+ 
+ 	switch (op) {
+ 	case FUTEX_OP_SET:
+-		__futex_atomic_op("mov	%0, %3", ret, oldval, uaddr, oparg);
++		__futex_atomic_op("mov	%0, %4", ret, oldval, tmp, uaddr, oparg);
+ 		break;
+ 	case FUTEX_OP_ADD:
+-		__futex_atomic_op("add	%0, %1, %3", ret, oldval, uaddr, oparg);
++		__futex_atomic_op("add	%0, %1, %4", ret, oldval, tmp, uaddr, oparg);
+ 		break;
+ 	case FUTEX_OP_OR:
+-		__futex_atomic_op("orr	%0, %1, %3", ret, oldval, uaddr, oparg);
++		__futex_atomic_op("orr	%0, %1, %4", ret, oldval, tmp, uaddr, oparg);
+ 		break;
+ 	case FUTEX_OP_ANDN:
+-		__futex_atomic_op("and	%0, %1, %3", ret, oldval, uaddr, ~oparg);
++		__futex_atomic_op("and	%0, %1, %4", ret, oldval, tmp, uaddr, ~oparg);
+ 		break;
+ 	case FUTEX_OP_XOR:
+-		__futex_atomic_op("eor	%0, %1, %3", ret, oldval, uaddr, oparg);
++		__futex_atomic_op("eor	%0, %1, %4", ret, oldval, tmp, uaddr, oparg);
+ 		break;
+ 	default:
+ 		ret = -ENOSYS;
 -- 
-Anton Vorontsov
-Email: cbouatmailru at gmail.com
+1.7.0.4
