@@ -1,172 +1,103 @@
 From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 22 Sep 2011 15:26:57 -0700
-Subject: [PATCH v2 2/7] clk: Implement clk_set_rate
+Date: Thu, 22 Sep 2011 15:26:58 -0700
+Subject: [PATCH v2 3/7] clk: Add fixed-rate clock
 In-Reply-To: <1316730422-20027-1-git-send-email-mturquette@ti.com>
 References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-Message-ID: <1316730422-20027-3-git-send-email-mturquette@ti.com>
+Message-ID: <1316730422-20027-4-git-send-email-mturquette@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jeremy Kerr <jeremy.kerr@canonical.com>
-
-Implement clk_set_rate by adding a set_rate callback to clk_hw_ops.
-Rates are propagated down the clock tree and recalculated.  Also adds a
-flag for signaling that parents must change rates to achieve the desired
-frequency (upstream propagation).
-
-TODO:
-Upstream propagation is not yet implemented.
-Device pre-change and post-change notifications are not implemented, but
-are marked up as FIXME comments.
 
 Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Signed-off-by: Mike Turquette <mturquette@ti.com>
 ---
 Changes since v1:
-Remove upstream propagation (for now)
-Rename CLK_SET_RATE_PROPAGATE to CLK_PARENT_RATE_CHANGE
+Add copyright header
 
- drivers/clk/clk.c   |   71 ++++++++++++++++++++++++++++++++++++++++++++++----
- include/linux/clk.h |   12 ++++++++
- 2 files changed, 77 insertions(+), 6 deletions(-)
+ drivers/clk/Kconfig     |    4 ++++
+ drivers/clk/Makefile    |    1 +
+ drivers/clk/clk-fixed.c |   24 ++++++++++++++++++++++++
+ include/linux/clk.h     |   14 ++++++++++++++
+ 4 files changed, 43 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/clk-fixed.c
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 1cd7315..86636c2 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -21,6 +21,8 @@ struct clk {
- 	unsigned int		enable_count;
- 	unsigned int		prepare_count;
- 	struct clk		*parent;
-+	struct hlist_head	children;
-+	struct hlist_node	child_node;
- 	unsigned long		rate;
- };
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index c53ed59..d8313d7 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -8,3 +8,7 @@ config HAVE_MACH_CLKDEV
  
-@@ -176,10 +178,57 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
- }
- EXPORT_SYMBOL_GPL(clk_round_rate);
+ config GENERIC_CLK
+ 	bool
++
++config GENERIC_CLK_FIXED
++	bool
++	depends on GENERIC_CLK
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 570d5b9..9a3325a 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -1,3 +1,4 @@
  
+ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+ obj-$(CONFIG_GENERIC_CLK)	+= clk.o
++obj-$(CONFIG_GENERIC_CLK_FIXED)	+= clk-fixed.o
+diff --git a/drivers/clk/clk-fixed.c b/drivers/clk/clk-fixed.c
+new file mode 100644
+index 0000000..956fb9a
+--- /dev/null
++++ b/drivers/clk/clk-fixed.c
+@@ -0,0 +1,24 @@
 +/*
-+ * clk_recalc_rates - Given a clock (with a recently updated clk->rate),
-+ *	notify its children that the rate may need to be recalculated, using
-+ *	ops->recalc_rate().
++ * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Simple fixed-rate clock implementation
 + */
-+static void clk_recalc_rates(struct clk *clk)
++
++#include <linux/clk.h>
++#include <linux/module.h>
++
++#define to_clk_fixed(c) container_of(c, struct clk_hw_fixed, hw)
++
++static unsigned long clk_fixed_recalc_rate(struct clk_hw *hw)
 +{
-+	struct hlist_node *tmp;
-+	struct clk *child;
-+
-+	if (clk->ops->recalc_rate)
-+		clk->rate = clk->ops->recalc_rate(clk->hw);
-+
-+	/* FIXME add post-rate change notification here */
-+
-+	hlist_for_each_entry(child, tmp, &clk->children, child_node)
-+		clk_recalc_rates(child);
++	return to_clk_fixed(hw)->rate;
 +}
 +
- int clk_set_rate(struct clk *clk, unsigned long rate)
- {
--	/* not yet implemented */
--	return -ENOSYS;
-+	unsigned long parent_rate, new_rate;
-+	int ret = 0;
-+
-+	if (!clk->ops->set_rate)
-+		return -ENOSYS;
-+
-+	new_rate = rate;
-+
-+	/* prevent racing with updates to the clock topology */
-+	mutex_lock(&prepare_lock);
-+
-+	/* FIXME add pre-rate change notification here */
-+
-+	ret = clk->ops->set_rate(clk->hw, new_rate, &parent_rate);
-+
-+	/* FIXME ignores CLK_PARENT_RATE_CHANGE */
-+	if (ret < 0)
-+		/* FIXME add rate change abort notification here */
-+		goto out;
-+
-+	/*
-+	 * If successful recalculate the rates of the clock, including
-+	 * children.
-+	 */
-+	clk_recalc_rates(clk);
-+
-+out:
-+	mutex_unlock(&prepare_lock);
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(clk_set_rate);
- 
-@@ -216,16 +265,26 @@ struct clk *clk_register(const struct clk_hw_ops *ops, struct clk_hw *hw,
- 	clk->hw = hw;
- 	hw->clk = clk;
- 
--	/* Query the hardware for parent and initial rate */
-+	/*
-+	 * Query the hardware for parent and initial rate. We may alter
-+	 * the clock topology, making this clock available from the parent's
-+	 * children list. So, we need to protect against concurrent
-+	 * accesses through set_rate
-+	 */
-+	mutex_lock(&prepare_lock);
- 
--	if (clk->ops->get_parent)
--		/* We don't to lock against prepare/enable here, as
--		 * the clock is not yet accessible from anywhere */
-+	if (clk->ops->get_parent) {
- 		clk->parent = clk->ops->get_parent(clk->hw);
-+		if (clk->parent)
-+			hlist_add_head(&clk->child_node,
-+					&clk->parent->children);
-+	}
- 
- 	if (clk->ops->recalc_rate)
- 		clk->rate = clk->ops->recalc_rate(clk->hw);
- 
-+	mutex_unlock(&prepare_lock);
-+
- 
- 	return clk;
- }
++struct clk_hw_ops clk_fixed_ops = {
++	.recalc_rate = clk_fixed_recalc_rate,
++};
++EXPORT_SYMBOL_GPL(clk_fixed_ops);
 diff --git a/include/linux/clk.h b/include/linux/clk.h
-index d6ae10b..0d2cd5e 100644
+index 0d2cd5e..1903dd8 100644
 --- a/include/linux/clk.h
 +++ b/include/linux/clk.h
-@@ -58,6 +58,12 @@ struct clk_hw {
-  *		parent. Currently only called when the clock is first
-  *		registered.
-  *
-+ * @set_rate	Change the rate of this clock. If this callback returns
-+ *		CLK_SET_RATE_PROPAGATE, the rate change will be propagated to
-+ *		the parent clock (which may propagate again). The requested
-+ *		rate of the parent is passed back from the callback in the
-+ *		second 'unsigned long *' argument.
-+ *
-  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
-  * implementations to split any work between atomic (enable) and sleepable
-  * (prepare) contexts.  If a clock requires sleeping code to be turned on, this
-@@ -76,9 +82,15 @@ struct clk_hw_ops {
- 	void		(*disable)(struct clk_hw *);
- 	unsigned long	(*recalc_rate)(struct clk_hw *);
- 	long		(*round_rate)(struct clk_hw *, unsigned long);
-+	int		(*set_rate)(struct clk_hw *,
-+					unsigned long, unsigned long *);
- 	struct clk *	(*get_parent)(struct clk_hw *);
- };
+@@ -110,6 +110,20 @@ int clk_prepare(struct clk *clk);
+  */
+ void clk_unprepare(struct clk *clk);
  
-+enum {
-+	CLK_PARENT_RATE_CHANGE = 1,
++/* Base clock implementations. Platform clock implementations can use these
++ * directly, or 'subclass' as approprate */
++
++#ifdef CONFIG_GENERIC_CLK_FIXED
++
++struct clk_hw_fixed {
++	struct clk_hw	hw;
++	unsigned long	rate;
 +};
 +
++extern struct clk_hw_ops clk_fixed_ops;
++
++#endif /* CONFIG_GENERIC_CLK_FIXED */
++
  /**
-  * clk_prepare - prepare clock for atomic enabling.
+  * clk_register - register and initialize a new clock
   *
 -- 
 1.7.4.1
