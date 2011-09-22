@@ -1,27 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Sep 2011 12:15:23 +0100
-Subject: booting single uImage on platforms with different base
-	addresses for SDRAM
-In-Reply-To: <20110922110411.GD20444@tbergstrom-lnx.Nvidia.com>
-References: <20110922110411.GD20444@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20110922111523.GM17169@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Sep 2011 13:23:51 +0200
+Subject: [GIT PULL] ux500-core for 3.2
+In-Reply-To: <201109202248.01993.arnd@arndb.de>
+References: <CACRpkdZofKjOrPFWNR-2D0LWx3NGMiLwyhf7gAVdvBGvQHqJLQ@mail.gmail.com>
+	<201109202248.01993.arnd@arndb.de>
+Message-ID: <CACRpkdakwQMaqJ4TwXxPJYjayMjO5iN68RQSZODGfhGCEjXnZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 02:04:12PM +0300, Peter De Schrijver wrote:
-> Currently uImages have the load address hardcoded. As we now try to support
-> as many ARM platforms as possible with a single binary, this becomes a
-> problem. On tegra20 SDRAM starts at physical address 0, but on tegra30 SDRAM
-> starts at 0x80000000. It's possible to build a kernel image which can deal
-> with this, but the uImage still uses a hardcoded address. This results
-> in requiring 2 different uImages even though the zImage is the same.
+On Tue, Sep 20, 2011 at 10:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 20 September 2011, Linus Walleij wrote:
+>> to the ARM SoC tree (ux500 branch or however you prefer to handle it)?
+>> They have all been reviewed on the ARM list recently and are mostly
+>> minor fixes and Lee Jones nice cleanup patch.
+>
+> I would really like to see this split into logical branches, even
+> if there are just a few patches for each of them.
 
-This is a problem with the uImage format.  It can only be fixed in uboot
-- it's not a kernel problem.
+No problem. So the preferred scheme is to have three topics
+for a SoC: fixes, cleanup and "new stuff" or something like that?
 
-> Has anyone thought of a solution to this problem?
+> It's also not clear if the two bug fix patches should be applied
+> to 3.1 and -stable as well as 3.2. My feeling is that they should.
 
-There was talk about making '0' or something a special address, and
-fixing uboot to place it appropriately (in much the same way that the
-other boot loaders such as blob's offset from the start of RAM, or
-redboot's scripted loading which takes the load address.)
+Depends. For Srinidhi's
+"mach-ux500: enable fix for ARM errata 754322"
+yes, definately.
+
+For:
+"mach-ux500: unlock I&D l2x0 caches before init"
+it's a performance regression, nothing like a crash or so.
+
+(I guess you're referring to these two?)
+
+> If you want bug fixes to be backported, please add a 'Cc: stable at kernel.org'
+> line after your Signed-off-by. If not, add an explanation to the
+> pull request why they are not relevant for backporting.
+(...)
+> Please submit the two bug fixes again, rebased to an -rc release.
+
+I'll fix.
+
+Since it's just two patches I guess you can just pick these
+two in plaintext? But I can make a pull request if you prefer...
+
+Thanks,
+Linus Walleij
