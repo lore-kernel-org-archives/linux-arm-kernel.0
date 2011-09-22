@@ -1,40 +1,30 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 22 Sep 2011 14:42:51 +0800
-Subject: [PATCH] dmaengine: delete redundant chan_id and chancnt
-	initialization in dma drivers
-In-Reply-To: <CABb+yY3ufFhD6Gf-OqYPpa2k--c8z52fFn6VDEpmc_NgWC04XQ@mail.gmail.com>
-References: <1316166200-20595-1-git-send-email-Baohua.Song@csr.com>
-	<CABb+yY2L=wfRoascoriAcnNMKkV7LbQEHCpp78+rCY=aM46x7A@mail.gmail.com>
-	<CAGsJ_4zURv1_zJ0rwZawa8VSOw0kT9U4-cCCj2Q4-BhV1pdTHA@mail.gmail.com>
-	<CABb+yY3T7JmcLXY-6GYHqF+3SiVK5N0xGzqsE8pv8A+S10hWQw@mail.gmail.com>
-	<CABb+yY3mCHwWx-8gQG75107eWQBT1kPDu59vi9vHU+OQFXq_kg@mail.gmail.com>
-	<CAGsJ_4x-SxYLyuyR9nQ530DhmfYN-Bqc2DOSyAVhM=h3zxCvMw@mail.gmail.com>
-	<CABb+yY3ufFhD6Gf-OqYPpa2k--c8z52fFn6VDEpmc_NgWC04XQ@mail.gmail.com>
-Message-ID: <CAGsJ_4wLyTj0aWv=ODejrCUALBtq7yn9suv0O90Bx+o31C4hdQ@mail.gmail.com>
+From: jon.medhurst@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 22 Sep 2011 08:28:08 +0100
+Subject: [PATCH] arm: Add unwinding annotations for 64bit division
+	functions
+In-Reply-To: <20110921115553.GF17169@n2100.arm.linux.org.uk>
+References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
+	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
+	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
+	<20110921113906.GB2872@arm.com>
+	<20110921115553.GF17169@n2100.arm.linux.org.uk>
+Message-ID: <1316676488.2053.9.camel@linaro1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/22 Jassi Brar <jassisinghbrar@gmail.com>:
-> On Thu, Sep 22, 2011 at 12:01 PM, Barry Song <21cnbao@gmail.com> wrote:
->> 2011/9/22 Jassi Brar <jassisinghbrar@gmail.com>:
->>> On Thu, Sep 22, 2011 at 11:11 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>>
->>>>> client drivers can request a specific chan_id just like it can request a gpio.
->>>> No dear. That's not gonna fly if we are to have common client drivers
->>>> across SoCs.
->>>>
->>> Btw, I meant you can't simply have clients specify a channel number and
->>> get the channel in a portable manner. Clients need to specify the capabilities
->>> they need of the channel.
->>
->> if the dmac is flexible in design, what you said is right. but the
->> problem is that there are some chips which actually fix one channel to
->> one peripheral.
-> Nevertheless it is better to assume the dmac's req-signals could be hacked
-> to re-route at even runtime.
-> Also it won't work for client drivers that run the same controller on different
-> SoC with a different dmac.
->
-you mean there is a mapping table in dmac driver. otherwise, there
-will always require some changes in client drivers.
--barry
+On Wed, 2011-09-21 at 12:55 +0100, Russell King - ARM Linux wrote:
+> Instructions such as VFP, kprobes tracing, etc are expected fault
+> locations, and those are fairly well controlled where they can be placed.
+> With things like ftrace, it certainly is the case that the unwinder can
+> theoretically be called from almost anywhere in a function.
+
+Actually, kprobes can be places on any instruction in the kernel that
+isn't in the section .kprobes.text.
+
+I also strongly suspect that stack unwinding won't happen correctly
+across the boundary between the kprobes handling code and the function
+which was probed - there's an awful lot of stack jiggery pokery going on
+there.
+
+-- 
+Tixy
