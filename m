@@ -1,62 +1,20 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Thu, 22 Sep 2011 06:11:54 +0530
-Subject: [PATCH v2 3/3] TI814X: Create board support and enable build
-	for TI8148 EVM
-In-Reply-To: <20110921204826.GK2937@atomide.com>
-References: <1316626754-5764-1-git-send-email-hemantp@ti.com>
-	<20110921204826.GK2937@atomide.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4D17101@dbde02.ent.ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 21 Sep 2011 17:42:44 -0700
+Subject: [PATCH v16 10/12] OMAP: dmtimer: extend spinlock in request
+	functions
+In-Reply-To: <1316518227-28116-11-git-send-email-tarun.kanti@ti.com>
+References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
+	<1316518227-28116-11-git-send-email-tarun.kanti@ti.com>
+Message-ID: <20110922004243.GL2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren wrote on Thursday, September 22, 2011 2:18 AM:
+* Tarun Kanti DebBarma <tarun.kanti@ti.com> [110920 03:57]:
+> The request functions now verify the success of omap_dm_timer_prepare() call
+> after a timer is acquired. If *_prepare() fails then we have to release the
+> timer. In order to avoid race condition during this time, include *_prepare()
+> within lock.
 
-> * Hemant Pedanekar <hemantp@ti.com> [110921 10:05]:
->> +
->> +static struct omap_board_config_kernel ti8148_evm_config[] __initdata = {
->> +}; +
->> +static void __init ti8148_evm_init(void)
->> +{
->> +	omap_serial_init();
->> +	omap_board_config = ti8148_evm_config;
->> +	omap_board_config_size = ARRAY_SIZE(ti8148_evm_config); +}
->> +
->> +static void __init ti8148_evm_map_io(void)
->> +{
->> +	omap2_set_globals_ti81xx();
->> +	omapti81xx_map_common_io();
->> +}
-> 
-> Hmm I guess we still have board specific map_io in board-ti8668evm.c
-> also. Those would be better replaced with ti81xx_map_io in
-> mach-omap2/common.c. Care to take a look at that?
->
+This I've folded into patch 5.
 
-Yes, you are right. I will do that.
- 
->> +MACHINE_START(TI8148EVM, "ti8148evm")
->> +	/* Maintainer: Texas Instruments */
->> +	.atag_offset	= 0x100,
->> +	.map_io		= ti8148_evm_map_io,
->> +	.init_early	= ti81xx_init_early,
->> +	.init_irq	= ti81xx_init_irq,
->> +	.timer		= &omap3_timer,
->> +	.init_machine	= ti8148_evm_init,
->> +MACHINE_END
-> 
-> Please add this all to board-ti8168evm.c instead of adding a new
-> board-*.c file. With the upcoming device tree conversion most of these will
-> disappear anyways. 
->
-
-Ok, I will do that.
-
-Thanks.
-   Hemant 
-> Regards,
-> 
-> Tony
-
-
-
-   Hemant
+Tony
