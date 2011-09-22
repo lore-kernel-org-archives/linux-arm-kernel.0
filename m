@@ -1,116 +1,74 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 22 Sep 2011 15:30:07 -0700
-Subject: [PATCH v3 1/3] AM35x: voltage: Basic initialization
-In-Reply-To: <1316698155-954-2-git-send-email-abhilash.kv@ti.com> (Abhilash
-	K. V.'s message of "Thu, 22 Sep 2011 18:59:13 +0530")
-References: <1316698155-954-1-git-send-email-abhilash.kv@ti.com>
-	<1316698155-954-2-git-send-email-abhilash.kv@ti.com>
-Message-ID: <877h50p5w0.fsf@ti.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Thu, 22 Sep 2011 15:26:55 -0700
+Subject: [PATCH v2 0/7] Add a generic struct clk
+Message-ID: <1316730422-20027-1-git-send-email-mturquette@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
+Hi all,
 
-Abhilash K V <abhilash.kv@ti.com> writes:
+The goal of this series is to provide a cross-platform clock framework
+that platforms can use to model their clock trees and perform common
+operations on them.  Currently everyone re-invents their own clock tree
+inside platform code which makes it impossible for drivers to use the
+clock APIs safely across many platforms and for distro's to compile
+multi-platform kernels which all redefine struct clk and its operations.
 
-> This patch adds the basic initialization of voltage layer
-> for AM35x. Since AM35x doesn't support voltage scaling,
+This is the second version of the common clock patches which were
+originally posted by Jeremy Kerr and then re-posted with some additional
+patches by Mark Brown.  Mark's re-post didn't have any changes done to
+the original four patches from Jeremy which is why this series is "v2".
 
-I must admit to still being confused by this series.  
+The changes in this series are minimal: I've folded in some of Mark's
+fixes and most of the comments posted to his series as well as rebasing
+on top of v3.1-rc7.  The design and functionality hasn't changed much
+since Jeremy posted v1 of this series.  Propagating the rate change up
+to the parent has been removed from clk_set_rate since that needs some
+more thought.  I also dropped Mark's change to append a device's name to
+a clk name since device tree might solve this neatly.  Again more
+discussion around that would be good.
 
-This patch says AM35x doesn't support voltage scaling, and the next
-patch adds PMIC support, and registers it with the voltage layer.
+v1 of the series can be found at,
+http://article.gmane.org/gmane.linux.kernel/1143182
 
-However, with each voltdm->scalable flag set to false, none of the PMIC
-values will ever be used (by the current voltage layer.)  Do you have
-more patches on top of this that extend the voltage layer to directly
-use the PMIC instead of using VC or VP?
+Mark's re-post (v1+) can be found at,
+http://article.gmane.org/gmane.linux.ports.arm.kernel/129889
 
-I'm assuming we have some more assumptions in our current voltage layer
-about the presence of VC/VP that are wrong and need to be fixed.  Now
-that the big voltage layer cleanup is done, I am *very* interested in
-getting rid of any more assumptions we have in that code about how
-devices are hooked up with PMICs.
+Todo in follow-up patches:
+clk_set_parent
+Implement a *safe* upstream propagation for parent rate changes
+Track tree topology and export to userspace (sysfs or debugfs)
+Manage root clocks globally
+Device tree support
+Per-tree locking instead of framework-wide locking
+Device driver rate-change notifiers
 
-Can you summarize how these devices are using (or want to use) the
-voltage layer?
+Jeremy Kerr (4):
+  clk: Add a generic clock infrastructure
+  clk: Implement clk_set_rate
+  clk: Add fixed-rate clock
+  clk: Add simple gated clock
 
-Thanks,
+Mark Brown (3):
+  clk: Add Kconfig option to build all generic clk drivers
+  clk: Add initial WM831x clock driver
+  x86: Enable generic clk API on x86
 
-Kevin
+ MAINTAINERS              |    1 +
+ arch/x86/Kconfig         |    1 +
+ drivers/clk/Kconfig      |   27 +++-
+ drivers/clk/Makefile     |    4 +
+ drivers/clk/clk-fixed.c  |   24 +++
+ drivers/clk/clk-gate.c   |   78 ++++++++++
+ drivers/clk/clk-wm831x.c |  386 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/clk.c        |  291 ++++++++++++++++++++++++++++++++++
+ drivers/clk/clkdev.c     |    7 +
+ include/linux/clk.h      |  179 ++++++++++++++++++++--
+ 10 files changed, 985 insertions(+), 13 deletions(-)
+ create mode 100644 drivers/clk/clk-fixed.c
+ create mode 100644 drivers/clk/clk-gate.c
+ create mode 100644 drivers/clk/clk-wm831x.c
+ create mode 100644 drivers/clk/clk.c
 
-> Many functions have been defined to plug into existing
-> voltage layer.
->
-> Signed-off-by: Sanjeev Premi <premi@ti.com>
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_opp_data.h           |    1 +
->  arch/arm/mach-omap2/opp3xxx_data.c            |    9 +++++++++
->  arch/arm/mach-omap2/voltagedomains3xxx_data.c |   10 ++++++++--
->  3 files changed, 18 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_opp_data.h b/arch/arm/mach-omap2/omap_opp_data.h
-> index c784c12..c7cedf3 100644
-> --- a/arch/arm/mach-omap2/omap_opp_data.h
-> +++ b/arch/arm/mach-omap2/omap_opp_data.h
-> @@ -88,6 +88,7 @@ extern struct omap_volt_data omap34xx_vddmpu_volt_data[];
->  extern struct omap_volt_data omap34xx_vddcore_volt_data[];
->  extern struct omap_volt_data omap36xx_vddmpu_volt_data[];
->  extern struct omap_volt_data omap36xx_vddcore_volt_data[];
-> +extern struct omap_volt_data am35xx_vdd_volt_data[];
->  
->  extern struct omap_volt_data omap44xx_vdd_mpu_volt_data[];
->  extern struct omap_volt_data omap44xx_vdd_iva_volt_data[];
-> diff --git a/arch/arm/mach-omap2/opp3xxx_data.c b/arch/arm/mach-omap2/opp3xxx_data.c
-> index d95f3f9..e4a5ee6 100644
-> --- a/arch/arm/mach-omap2/opp3xxx_data.c
-> +++ b/arch/arm/mach-omap2/opp3xxx_data.c
-> @@ -85,6 +85,15 @@ struct omap_volt_data omap36xx_vddcore_volt_data[] = {
->  	VOLT_DATA_DEFINE(0, 0, 0, 0),
->  };
->  
-> +/* AM35x
-> + *
-> + * Fields related to SmartReflex and Voltage Processor are set to 0.
-> + */
-
-fix multi-line comment style (search for 'multi-line' in Documentation/CodingStyle)
-
-> +struct omap_volt_data am35xx_vdd_volt_data[] = {
-> +	VOLT_DATA_DEFINE(OMAP3430_VDD_MPU_OPP3_UV, 0x0, 0x0, 0x0),
-> +	VOLT_DATA_DEFINE(0, 0, 0, 0),
-> +};
-> +
->  /* OPP data */
->  
->  static struct omap_opp_def __initdata omap34xx_opp_def_list[] = {
-> diff --git a/arch/arm/mach-omap2/voltagedomains3xxx_data.c b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-> index 071101d..530082f 100644
-> --- a/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-> +++ b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
-> @@ -85,7 +85,10 @@ void __init omap3xxx_voltagedomains_init(void)
->  	 * XXX Will depend on the process, validation, and binning
->  	 * for the currently-running IC
->  	 */
-> -	if (cpu_is_omap3630()) {
-> +	if (cpu_is_omap3505() || cpu_is_omap3517()) {
-> +		omap3_voltdm_mpu.volt_data = am35xx_vdd_volt_data;
-> +		omap3_voltdm_core.volt_data = am35xx_vdd_volt_data;
-> +	} else if (cpu_is_omap3630()) {
->  		omap3_voltdm_mpu.volt_data = omap36xx_vddmpu_volt_data;
->  		omap3_voltdm_core.volt_data = omap36xx_vddcore_volt_data;
->  	} else {
-> @@ -93,8 +96,11 @@ void __init omap3xxx_voltagedomains_init(void)
->  		omap3_voltdm_core.volt_data = omap34xx_vddcore_volt_data;
->  	}
->  
-> -	for (i = 0; voltdm = voltagedomains_omap3[i], voltdm; i++)
-> +	for (i = 0; voltdm = voltagedomains_omap3[i], voltdm; i++) {
-> +		if (cpu_is_omap3505() || cpu_is_omap3517())
-> +			voltdm->scalable = false;
->  		voltdm->sys_clk.name = sys_clk_name;
-> +	}
->  
->  	voltdm_init(voltagedomains_omap3);
->  };
+-- 
+1.7.4.1
