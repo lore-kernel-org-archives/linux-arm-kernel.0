@@ -1,91 +1,30 @@
 From: hatim.rv@samsung.com (Hatim Ali)
-Date: Thu, 22 Sep 2011 11:24:36 +0530
-Subject: [PATCH v3 1/2] ARM: EXYNOS4: Add TVOUT support for SMDKV310
-Message-ID: <1316670876-1636-1-git-send-email-hatim.rv@samsung.com>
+Date: Thu, 22 Sep 2011 11:24:51 +0530
+Subject: [RESEND PATCH 2/2] s5p-tv: Add PM_RUNTIME dependency
+Message-ID: <1316670891-1672-1-git-send-email-hatim.rv@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for TVOUT on SMDKV310 board.
+The TVOUT driver requires PM_RUNTIME support for proper clock
+enabling.
 
 Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
 ---
-Changes since v2:
-Incorporated review comments by Tomasz Stanislawski & Sylwester Nawrocki.
-- Used gpio_request_one to request for gpio line.
-- Added WARN_ON to check gpio_request is successful.
+ drivers/media/video/s5p-tv/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Changes since v1:
-Incorporated changes as suggested by Tomasz Stanislawski
-- Added  GPIO settings for hot-plug detection.
-- Added setting hdmi and mixer's parent for TV power domain.
-
- arch/arm/mach-exynos4/Kconfig         |    2 ++
- arch/arm/mach-exynos4/mach-smdkv310.c |   18 ++++++++++++++++++
- 2 files changed, 20 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index 690bf6f..2857ab0 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -139,7 +139,9 @@ config MACH_SMDKV310
- 	select S3C_DEV_RTC
- 	select S3C_DEV_WDT
- 	select S3C_DEV_I2C1
-+	select S5P_DEV_I2C_HDMIPHY
- 	select S5P_DEV_MFC
-+	select S5P_DEV_TV
- 	select S3C_DEV_HSMMC
- 	select S3C_DEV_HSMMC1
- 	select S3C_DEV_HSMMC2
-diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
-index 5f62b2b..fa3f9d7 100644
---- a/arch/arm/mach-exynos4/mach-smdkv310.c
-+++ b/arch/arm/mach-exynos4/mach-smdkv310.c
-@@ -173,6 +173,7 @@ static struct platform_device *smdkv310_devices[] __initdata = {
- 	&s3c_device_hsmmc2,
- 	&s3c_device_hsmmc3,
- 	&s3c_device_i2c1,
-+	&s5p_device_i2c_hdmiphy,
- 	&s3c_device_rtc,
- 	&s3c_device_wdt,
- 	&exynos4_device_ac97,
-@@ -194,6 +195,8 @@ static struct platform_device *smdkv310_devices[] __initdata = {
- 	&samsung_asoc_idma,
- 	&smdkv310_smsc911x,
- 	&exynos4_device_ahci,
-+	&s5p_device_hdmi,
-+	&s5p_device_mixer,
- };
+diff --git a/drivers/media/video/s5p-tv/Kconfig b/drivers/media/video/s5p-tv/Kconfig
+index 9c37dee..f2a0977 100644
+--- a/drivers/media/video/s5p-tv/Kconfig
++++ b/drivers/media/video/s5p-tv/Kconfig
+@@ -8,7 +8,7 @@
  
- static void __init smdkv310_smsc911x_init(void)
-@@ -230,6 +233,18 @@ static struct platform_pwm_backlight_data smdkv310_bl_data = {
- 	.pwm_period_ns  = 1000,
- };
- 
-+static void s5p_tv_setup(void)
-+{
-+	/* direct HPD to HDMI chip */
-+	WARN_ON(gpio_request_one(EXYNOS4_GPX3(7),GPIOF_IN, "hpd-plug"));
-+	s3c_gpio_cfgpin(EXYNOS4_GPX3(7), S3C_GPIO_SFN(0x3));
-+	s3c_gpio_setpull(EXYNOS4_GPX3(7), S3C_GPIO_PULL_NONE);
-+
-+	/* setup dependencies between TV devices */
-+	s5p_device_hdmi.dev.parent = &exynos4_device_pd[PD_TV].dev;
-+	s5p_device_mixer.dev.parent = &exynos4_device_pd[PD_TV].dev;
-+}
-+
- static void __init smdkv310_map_io(void)
- {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -254,6 +269,9 @@ static void __init smdkv310_machine_init(void)
- 	s3c_sdhci2_set_platdata(&smdkv310_hsmmc2_pdata);
- 	s3c_sdhci3_set_platdata(&smdkv310_hsmmc3_pdata);
- 
-+	s5p_tv_setup();
-+	s5p_i2c_hdmiphy_set_platdata(NULL);
-+
- 	samsung_keypad_set_platdata(&smdkv310_keypad_data);
- 
- 	samsung_bl_set(&smdkv310_bl_gpio_info, &smdkv310_bl_data);
+ config VIDEO_SAMSUNG_S5P_TV
+ 	bool "Samsung TV driver for S5P platform (experimental)"
+-	depends on PLAT_S5P
++	depends on PLAT_S5P && PM_RUNTIME
+ 	depends on EXPERIMENTAL
+ 	default n
+ 	---help---
 -- 
 1.7.2.3
