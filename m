@@ -1,89 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 22 Sep 2011 15:04:21 -0700
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 22 Sep 2011 15:25:17 -0700
 Subject: [PATCH v3 3/3] OMAP3: Remove auto-selection of PMICs
-In-Reply-To: <1316698155-954-4-git-send-email-abhilash.kv@ti.com> (Abhilash
-	K. V.'s message of "Thu, 22 Sep 2011 18:59:15 +0530")
+In-Reply-To: <877h50qlne.fsf@ti.com>
 References: <1316698155-954-1-git-send-email-abhilash.kv@ti.com>
 	<1316698155-954-2-git-send-email-abhilash.kv@ti.com>
 	<1316698155-954-3-git-send-email-abhilash.kv@ti.com>
 	<1316698155-954-4-git-send-email-abhilash.kv@ti.com>
-Message-ID: <877h50qlne.fsf@ti.com>
+	<877h50qlne.fsf@ti.com>
+Message-ID: <20110922222517.GX2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash K V <abhilash.kv@ti.com> writes:
+* Kevin Hilman <khilman@ti.com> [110922 14:30]:
+> Abhilash K V <abhilash.kv@ti.com> writes:
+> 
+> > The current implementation almost assumes that only
+> 
+> almost?  ;)
+> 
+> > TWL4030/TWL5030/TWl6030 are (or can be) used with the
+> > OMAP processors. This is, however, not true.
+> >
+> > This patch removes the automatic selection of the PMIC
+> > from Kconfig.
+> > All currently used PMICs are now added to omap2plus_defconfig;
+> 
+> I don't think adding them to omap2plus_defconfig is right either, as
+> those will get stripped out the next time that file is (re)generated.
+> 
+> > any new PMIC that gets supported in future could now be
+> > enabled here rather than by changing Kconfig for
+> > ARCH_OMAP2PLUS_TYPICAL
+> 
+> IMO, the right fix is to have the board Kconfig entries select the PMIC
+> being used on those boards.  That is the only solution that will scale,
+> and also work when using 'make randconfig'.
 
-> The current implementation almost assumes that only
+Agreed.
 
-almost?  ;)
-
-> TWL4030/TWL5030/TWl6030 are (or can be) used with the
-> OMAP processors. This is, however, not true.
->
-> This patch removes the automatic selection of the PMIC
-> from Kconfig.
-> All currently used PMICs are now added to omap2plus_defconfig;
-
-I don't think adding them to omap2plus_defconfig is right either, as
-those will get stripped out the next time that file is (re)generated.
-
-> any new PMIC that gets supported in future could now be
-> enabled here rather than by changing Kconfig for
-> ARCH_OMAP2PLUS_TYPICAL
-
-IMO, the right fix is to have the board Kconfig entries select the PMIC
-being used on those boards.  That is the only solution that will scale,
-and also work when using 'make randconfig'.
-
-Kevin
-
->
-> Signed-off-by: Sanjeev Premi <premi@ti.com>
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
-> ---
->  arch/arm/configs/omap2plus_defconfig |    3 +++
->  arch/arm/mach-omap2/Kconfig          |    3 ---
->  drivers/mfd/Kconfig                  |    2 +-
->  3 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-> index d5f00d7..076b131 100644
-> --- a/arch/arm/configs/omap2plus_defconfig
-> +++ b/arch/arm/configs/omap2plus_defconfig
-> @@ -130,6 +130,9 @@ CONFIG_POWER_SUPPLY=y
->  CONFIG_WATCHDOG=y
->  CONFIG_OMAP_WATCHDOG=y
->  CONFIG_TWL4030_WATCHDOG=y
-> +CONFIG_MENELAUS=y
-> +CONFIG_TWL4030_CORE=y
-> +CONFIG_TWL4030_POWER=y
->  CONFIG_REGULATOR_TWL4030=y
->  CONFIG_REGULATOR_TPS65023=y
->  CONFIG_REGULATOR_TPS6507X=y
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 7edf802..d40f6d2 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -15,9 +15,6 @@ config ARCH_OMAP2PLUS_TYPICAL
->  	select I2C
->  	select I2C_OMAP
->  	select MFD_SUPPORT
-> -	select MENELAUS if ARCH_OMAP2
-> -	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
-> -	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
->  	help
->  	  Compile a kernel suitable for booting most boards
->  
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 21574bd..72e15c8 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -238,7 +238,7 @@ config TWL4030_MADC
->  
->  config TWL4030_POWER
->  	bool "Support power resources on TWL4030 family chips"
-> -	depends on TWL4030_CORE && ARM
-> +	depends on TWL4030_CORE
->  	help
->  	  Say yes here if you want to use the power resources on the
->  	  TWL4030 family chips.  Most of these resources are regulators,
+Tony
