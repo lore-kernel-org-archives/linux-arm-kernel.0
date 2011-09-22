@@ -1,31 +1,22 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Thu, 22 Sep 2011 11:39:13 +0530
-Subject: [PATCH v16 00/12] OMAP: dmtimer: adaptation to platform_driver
-In-Reply-To: <20110922005930.GN2937@atomide.com>
-References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
-	<20110922005930.GN2937@atomide.com>
-Message-ID: <CAC83Zv+aFu6u7TezD0NA3UHf9DMtW0AsP15jB1FFn8avEwY7CQ@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 22 Sep 2011 11:56:46 +0530
+Subject: [PATCH] dmaengine: delete redundant chan_id and chancnt
+	initialization in dma drivers
+In-Reply-To: <CABb+yY3T7JmcLXY-6GYHqF+3SiVK5N0xGzqsE8pv8A+S10hWQw@mail.gmail.com>
+References: <1316166200-20595-1-git-send-email-Baohua.Song@csr.com>
+	<CABb+yY2L=wfRoascoriAcnNMKkV7LbQEHCpp78+rCY=aM46x7A@mail.gmail.com>
+	<CAGsJ_4zURv1_zJ0rwZawa8VSOw0kT9U4-cCCj2Q4-BhV1pdTHA@mail.gmail.com>
+	<CABb+yY3T7JmcLXY-6GYHqF+3SiVK5N0xGzqsE8pv8A+S10hWQw@mail.gmail.com>
+Message-ID: <CABb+yY3mCHwWx-8gQG75107eWQBT1kPDu59vi9vHU+OQFXq_kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 6:29 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Hi Tarun,
+On Thu, Sep 22, 2011 at 11:11 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
 >
-> * Tarun Kanti DebBarma <tarun.kanti@ti.com> [110920 03:57]:
->> Adaptation of dmtimer code to platform driver using omap_device and
->> omap_hwmod abstraction. It also include pm-runtime and off-mode support.
+>> client drivers can request a specific chan_id just like it can request a gpio.
+> No dear. That's not gonna fly if we are to have common client drivers
+> across SoCs.
 >
-> I've applied these into dmtimer branch with some changes to simplify
-> things further. I've also merged it into linux-omap master branch
-> for further testing.
->
-> I'll reply to your patches with the changes I've done. Care give the
-> dmtimer branch a try and see if I've missed something?
-Sure, I will go through the changes and do testing on it.
---
-Tarun
->
-> Regards,
->
-> Tony
->
+Btw, I meant you can't simply have clients specify a channel number and
+get the channel in a portable manner. Clients need to specify the capabilities
+they need of the channel.
