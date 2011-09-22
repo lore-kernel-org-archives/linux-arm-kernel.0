@@ -1,31 +1,79 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 22 Sep 2011 14:45:53 +0100
-Subject: DT vs ARM static mappings
-In-Reply-To: <20110922131302.GO17169@n2100.arm.linux.org.uk>
-References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
-	<alpine.LFD.2.00.1109211320090.12663@xanadu.home>
-	<1316696696.4611.844.camel@hornet.cambridge.arm.com>
-	<20110922131302.GO17169@n2100.arm.linux.org.uk>
-Message-ID: <1316699153.4611.858.camel@hornet.cambridge.arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 22 Sep 2011 15:46:17 +0200
+Subject: [PATCH 1/7] ARM: plat-nomadik: MTU sched_clock as an option
+Message-ID: <1316699177-21259-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Ok, what I did was grepping for all .map_io-s. Then I sorted the list
-> > and had a look at first 100 and about 50% of them were doing more than
-> > just creating mappings.
-> 
-> The answer to that is: they shouldn't be now that we have the init_early
-> hook.  The only remainder for .map_io is where platforms make run-time
-> decisions about what to map based on some register value somewhere
-> (eg, Assabet vs Assabet+Neponset).
-> 
-> I do have a large patch series floating around in my git tree which tries
-> to clean up to all those map_io functions - the biggest stumbling block
-> to them is the Samsung stuff being indirected through its own tables.
+From: Mattias Wallin <mattias.wallin@stericsson.com>
 
-Awesome. I'll work with an assumption that future map_io-s will only
-create static mappings and nothing more then.
+This patch makes it possible to configure away the sched_clock
+part of the MTU timer.
 
-Cheers!
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
+Signed-off-by: Jonas Aberg <jonas.aberg@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/plat-nomadik/Kconfig |    8 +++++++-
+ arch/arm/plat-nomadik/timer.c |    8 ++++----
+ 2 files changed, 11 insertions(+), 5 deletions(-)
 
-Pawe?
+diff --git a/arch/arm/plat-nomadik/Kconfig b/arch/arm/plat-nomadik/Kconfig
+index ce65901..bca4914 100644
+--- a/arch/arm/plat-nomadik/Kconfig
++++ b/arch/arm/plat-nomadik/Kconfig
+@@ -15,10 +15,16 @@ if PLAT_NOMADIK
+ 
+ config HAS_MTU
+ 	bool
+-	select HAVE_SCHED_CLOCK
+ 	help
+ 	  Support for Multi Timer Unit. MTU provides access
+ 	  to multiple interrupt generating programmable
+ 	  32-bit free running decrementing counters.
+ 
++config NOMADIK_MTU_SCHED_CLOCK
++	bool
++	depends on HAS_MTU
++	select HAVE_SCHED_CLOCK
++	help
++	  Use the Multi Timer Unit as the sched_clock.
++
+ endif
+diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
+index ef74e15..bd638c5 100644
+--- a/arch/arm/plat-nomadik/timer.c
++++ b/arch/arm/plat-nomadik/timer.c
+@@ -24,7 +24,7 @@
+ #include <plat/mtu.h>
+ 
+ void __iomem *mtu_base; /* Assigned by machine code */
+-
++#ifdef CONFIG_NOMADIK_MTU_SCHED_CLOCK
+ /*
+  * Override the global weak sched_clock symbol with this
+  * local implementation which uses the clocksource to get some
+@@ -48,7 +48,7 @@ static void notrace nomadik_update_sched_clock(void)
+ 	u32 cyc = -readl(mtu_base + MTU_VAL(0));
+ 	update_sched_clock(&cd, cyc, (u32)~0);
+ }
+-
++#endif
+ /* Clockevent device: use one-shot mode */
+ static void nmdk_clkevt_mode(enum clock_event_mode mode,
+ 			     struct clock_event_device *dev)
+@@ -153,9 +153,9 @@ void __init nmdk_timer_init(void)
+ 			rate, 200, 32, clocksource_mmio_readl_down))
+ 		pr_err("timer: failed to initialize clock source %s\n",
+ 		       "mtu_0");
+-
++#ifdef CONFIG_NOMADIK_MTU_SCHED_CLOCK
+ 	init_sched_clock(&cd, nomadik_update_sched_clock, 32, rate);
+-
++#endif
+ 	/* Timer 1 is used for events */
+ 
+ 	clockevents_calc_mult_shift(&nmdk_clkevt, rate, MTU_MIN_RANGE);
+-- 
+1.7.3.2
