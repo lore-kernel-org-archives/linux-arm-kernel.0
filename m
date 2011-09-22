@@ -1,31 +1,73 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 22 Sep 2011 16:27:25 +0300
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-Message-ID: <1316698045-23190-1-git-send-email-pdeschrijver@nvidia.com>
+From: abhilash.kv@ti.com (Abhilash K V)
+Date: Thu, 22 Sep 2011 18:59:15 +0530
+Subject: [PATCH v3 3/3] OMAP3: Remove auto-selection of PMICs
+In-Reply-To: <1316698155-954-3-git-send-email-abhilash.kv@ti.com>
+References: <1316698155-954-1-git-send-email-abhilash.kv@ti.com>
+	<1316698155-954-2-git-send-email-abhilash.kv@ti.com>
+	<1316698155-954-3-git-send-email-abhilash.kv@ti.com>
+Message-ID: <1316698155-954-4-git-send-email-abhilash.kv@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch causes the kernel uncompressor to determine the physical address
-of the SDRAM at runtime. This allows the kernel to boot on both tegra2 and
-tegra3 even though SDRAM is at different physical addresses on both SoCs.
+The current implementation almost assumes that only
+TWL4030/TWL5030/TWl6030 are (or can be) used with the
+OMAP processors. This is, however, not true.
 
-Change-Id: I91857a590946bbc54168c04bea3a5bd576d87824
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+This patch removes the automatic selection of the PMIC
+from Kconfig.
+All currently used PMICs are now added to omap2plus_defconfig;
+any new PMIC that gets supported in future could now be
+enabled here rather than by changing Kconfig for
+ARCH_OMAP2PLUS_TYPICAL
+
+Signed-off-by: Sanjeev Premi <premi@ti.com>
+Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
 ---
- arch/arm/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/configs/omap2plus_defconfig |    3 +++
+ arch/arm/mach-omap2/Kconfig          |    3 ---
+ drivers/mfd/Kconfig                  |    2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 4fda167..9fc0678 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -600,6 +600,7 @@ config ARCH_TEGRA
- 	select HAVE_CLK
- 	select HAVE_SCHED_CLOCK
- 	select ARCH_HAS_CPUFREQ
-+	select AUTO_ZRELADDR
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index d5f00d7..076b131 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -130,6 +130,9 @@ CONFIG_POWER_SUPPLY=y
+ CONFIG_WATCHDOG=y
+ CONFIG_OMAP_WATCHDOG=y
+ CONFIG_TWL4030_WATCHDOG=y
++CONFIG_MENELAUS=y
++CONFIG_TWL4030_CORE=y
++CONFIG_TWL4030_POWER=y
+ CONFIG_REGULATOR_TWL4030=y
+ CONFIG_REGULATOR_TPS65023=y
+ CONFIG_REGULATOR_TPS6507X=y
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 7edf802..d40f6d2 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -15,9 +15,6 @@ config ARCH_OMAP2PLUS_TYPICAL
+ 	select I2C
+ 	select I2C_OMAP
+ 	select MFD_SUPPORT
+-	select MENELAUS if ARCH_OMAP2
+-	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
+-	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
  	help
- 	  This enables support for NVIDIA Tegra based systems (Tegra APX,
- 	  Tegra 6xx and Tegra 2 series).
+ 	  Compile a kernel suitable for booting most boards
+ 
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 21574bd..72e15c8 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -238,7 +238,7 @@ config TWL4030_MADC
+ 
+ config TWL4030_POWER
+ 	bool "Support power resources on TWL4030 family chips"
+-	depends on TWL4030_CORE && ARM
++	depends on TWL4030_CORE
+ 	help
+ 	  Say yes here if you want to use the power resources on the
+ 	  TWL4030 family chips.  Most of these resources are regulators,
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+1.7.1
