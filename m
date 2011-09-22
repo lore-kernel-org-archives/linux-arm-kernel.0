@@ -1,268 +1,362 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Thu, 22 Sep 2011 03:29:59 -0400
-Subject: parallel load of modules on an ARM multicore
-In-Reply-To: <274124B9C6907D4B8CE985903EAA19E9185A92923E@SI-MBX06.de.bosch.com>
-References: <274124B9C6907D4B8CE985903EAA19E9185A92923E@SI-MBX06.de.bosch.com>
-Message-ID: <20110922072959.GA6897@mvista.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Thu, 22 Sep 2011 09:35:42 +0200 (CEST)
+Subject: [PATCH v3 2/2] at91: add Atmel ISI and ov2640 support on
+	sam9m10/sam9g45 board.
+In-Reply-To: <1316664661-11383-2-git-send-email-josh.wu@atmel.com>
+References: <1316664661-11383-1-git-send-email-josh.wu@atmel.com>
+	<1316664661-11383-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <Pine.LNX.4.64.1109220911500.11164@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, 22 Sep 2011, Josh Wu wrote:
 
-On Mon, Jun 20, 2011 at 03:43:27PM +0200, EXTERNAL Waechtler Peter (Fa. TCP, CM-AI/PJ-CF31) wrote:
-> Hi,
+> This patch
+> 1. add ISI_MCK parent setting code when add ISI device.
+> 2. add ov2640 support on board file.
+> 3. define isi_mck clock in sam9g45 chip file.
 > 
-> I'm getting unexpected results from loading several modules - some
-> of them in parallel - on an ARM11 MPcore system.
-> 
-> The system does not use "single sequential" modprobe commands - instead it
-> starts several shells doing insmod sequences like this:
-> 
-> shell A:
-> insmod a
-> insmod ab
-> insmod abc
-> 
-> shell B:
-> insmod b
-> insmod bc
-> insmod bcd
-> 
-> shell C:
-> insmod c
-> insmod cd
-> insmod cde
-> 
-> This is done to crash^H^H^H^H^Hboot faster ;)
-> 
-> While one insmod operation is protected via the module_mutex - I'm wondering
-> what happens with the instruction cache invalidation.
-> AFAICT the flush_icache_range only invalidates the ICache on the running cpu.
-> The module_mutex is unlocked after _loading_ the module, do_mod_ctors() and
-> do_one_initcall() are called without that lock - can they run on a different cpu?
-> It's an preemptible system (SMP PREEMPT armv6l).
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>  arch/arm/mach-at91/at91sam9g45.c         |    3 +
+>  arch/arm/mach-at91/at91sam9g45_devices.c |  105 +++++++++++++++++++++++++++++-
+>  arch/arm/mach-at91/board-sam9m10g45ek.c  |   85 ++++++++++++++++++++++++-
+>  arch/arm/mach-at91/include/mach/board.h  |    3 +-
 
-In case anyone missed the subtlety, this report was for an ARM11 MPCore system
-with CONFIG_PREEMPT enabled.  I've also been looking into this and various other
-memory corruption issues on ARM11 MPCore with CONFIG_PREEMPT enabled and have
-come to the conclusion that CONFIG_PREEMPT is broken on ARM11 MPCore.
+Personally, I think, it would be better to separate this into two patches 
+at least: one for at91 core and one for the specific board, but that's up 
+to arch maintainers to decide.
 
-I added the following instrumentation in 3.1.0-rc4ish to watch for
-process migration in a few places of interest:
+You also want to patch arch/arm/mach-at91/at91sam9263_devices.c, don't 
+you?
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 22de005..e36d682 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -62,11 +62,18 @@ static inline pte_t *
- pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
- {
- 	pte_t *pte;
-+	int cpu = raw_smp_processor_id();
- 
- 	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
- 	if (pte)
- 		clean_pte_table(pte);
- 
-+//	WARN_ON(cpu != raw_smp_processor_id());
-+	if (cpu != raw_smp_processor_id())
-+		printk(KERN_EMERG "%s:%d: cpu was %d but is now %d, memory corruption is possible\n",
-+		       __func__, __LINE__, cpu, raw_smp_processor_id());
-+
-+
- 	return pte;
- }
- 
-@@ -74,6 +81,7 @@ static inline pgtable_t
- pte_alloc_one(struct mm_struct *mm, unsigned long addr)
- {
- 	struct page *pte;
-+	int cpu = raw_smp_processor_id();
- 
- #ifdef CONFIG_HIGHPTE
- 	pte = alloc_pages(PGALLOC_GFP | __GFP_HIGHMEM, 0);
-@@ -86,6 +94,11 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
- 		pgtable_page_ctor(pte);
- 	}
- 
-+//	WARN_ON(cpu != raw_smp_processor_id());
-+	if (cpu != raw_smp_processor_id())
-+		printk(KERN_EMERG "%s:%d: cpu was %d but is now %d, memory corruption is possible\n",
-+		       __func__, __LINE__, cpu, raw_smp_processor_id());
-+
- 	return pte;
- }
- 
-@@ -108,9 +121,14 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
- 	unsigned long prot)
- {
- 	unsigned long pmdval = (pte + PTE_HWTABLE_OFF) | prot;
-+	int cpu = raw_smp_processor_id();
- 	pmdp[0] = __pmd(pmdval);
- 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
- 	flush_pmd_entry(pmdp);
-+//	WARN_ON(cpu != raw_smp_processor_id());
-+	if (cpu != raw_smp_processor_id())
-+		printk(KERN_EMERG "%s:%d: cpu was %d but is now %d, memory corruption is possible\n",
-+		       __func__, __LINE__, cpu, raw_smp_processor_id());
- }
- 
- /*
-diff --git a/kernel/module.c b/kernel/module.c
-index e0ddcec..6a43af8 100644
---- a/kernel/module.c
-+++ b/kernel/module.c
-@@ -2807,6 +2807,7 @@ static struct module *load_module(void __user *umod,
- 	struct load_info info = { NULL, };
- 	struct module *mod;
- 	long err;
-+	int cpu = raw_smp_processor_id();
- 
- 	DEBUGP("load_module: umod=%p, len=%lu, uargs=%p\n",
- 	       umod, len, uargs);
-@@ -2852,6 +2853,9 @@ static struct module *load_module(void __user *umod,
- 	if (err < 0)
- 		goto free_modinfo;
- 
-+	if (cpu != raw_smp_processor_id())
-+		printk(KERN_EMERG "%s:%d: cpu was %d but is now %d, memory corruption is possible\n",
-+		       __func__, __LINE__, cpu, raw_smp_processor_id());
- 	flush_module_icache(mod);
- 
- 	/* Now copy in args */
+>  4 files changed, 193 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index e04c5fb..5e23d6d 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -201,6 +201,7 @@ static struct clk *periph_clocks[] __initdata = {
+>  	// irq0
+>  };
+>  
+> +static struct clk pck1;
 
-Now with sufficient system stress, I get the following recurring problems
-(it's a 3-core system : ):
+Hm, it really doesn't need any initialisation, not even for the .type 
+field? .type=0 doesn't seem to be valid.
 
-load_module:2858: cpu was 0 but is now 1, memory corruption is possible
-load_module:2858: cpu was 0 but is now 2, memory corruption is possible
-load_module:2858: cpu was 1 but is now 0, memory corruption is possible
-load_module:2858: cpu was 1 but is now 2, memory corruption is possible
-load_module:2858: cpu was 2 but is now 0, memory corruption is possible
-load_module:2858: cpu was 2 but is now 1, memory corruption is possible
-pte_alloc_one:100: cpu was 0 but is now 1, memory corruption is possible
-pte_alloc_one:100: cpu was 0 but is now 2, memory corruption is possible
-pte_alloc_one:100: cpu was 1 but is now 0, memory corruption is possible
-pte_alloc_one:100: cpu was 1 but is now 2, memory corruption is possible
-pte_alloc_one:100: cpu was 2 but is now 0, memory corruption is possible
-pte_alloc_one:100: cpu was 2 but is now 1, memory corruption is possible
-pte_alloc_one_kernel:74: cpu was 2 but is now 1, memory corruption is possible
+>  static struct clk_lookup periph_clocks_lookups[] = {
+>  	/* One additional fake clock for ohci */
+>  	CLKDEV_CON_ID("ohci_clk", &uhphs_clk),
+> @@ -215,6 +216,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tcb0_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+> +	/* ISI_MCK, which is provided by programmable clock(PCK1) */
+> +	CLKDEV_CON_DEV_ID("isi_mck", "atmel_isi.0", &pck1),
+>  };
+>  
+>  static struct clk_lookup usart_clocks_lookups[] = {
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 600bffb..82eeac8 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -16,7 +16,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/i2c-gpio.h>
+>  #include <linux/atmel-mci.h>
+> -
+> +#include <linux/clk.h>
+>  #include <linux/fb.h>
+>  #include <video/atmel_lcdc.h>
+>  
+> @@ -28,6 +28,8 @@
+>  #include <mach/at_hdmac.h>
+>  #include <mach/atmel-mci.h>
+>  
+> +#include <media/atmel-isi.h>
+> +
+>  #include "generic.h"
+>  
+>  
+> @@ -863,6 +865,107 @@ void __init at91_add_device_ac97(struct ac97c_platform_data *data)
+>  void __init at91_add_device_ac97(struct ac97c_platform_data *data) {}
+>  #endif
+>  
+> +/* --------------------------------------------------------------------
+> + *  Image Sensor Interface
+> + * -------------------------------------------------------------------- */
+> +#if defined(CONFIG_VIDEO_ATMEL_ISI) || defined(CONFIG_VIDEO_ATMEL_ISI_MODULE)
+> +static u64 isi_dmamask = DMA_BIT_MASK(32);
+> +static struct isi_platform_data isi_data;
+> +
+> +struct resource isi_resources[] = {
+> +	[0] = {
+> +		.start	= AT91SAM9G45_BASE_ISI,
+> +		.end	= AT91SAM9G45_BASE_ISI + SZ_16K - 1,
+> +		.flags	= IORESOURCE_MEM,
+> +	},
+> +	[1] = {
+> +		.start	= AT91SAM9G45_ID_ISI,
+> +		.end	= AT91SAM9G45_ID_ISI,
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct platform_device at91sam9g45_isi_device = {
+> +	.name		= "atmel_isi",
+> +	.id		= 0,
+> +	.dev		= {
+> +			.dma_mask		= &isi_dmamask,
+> +			.coherent_dma_mask	= DMA_BIT_MASK(32),
+> +			.platform_data		= &isi_data,
+> +	},
+> +	.resource	= isi_resources,
+> +	.num_resources	= ARRAY_SIZE(isi_resources),
+> +};
+> +
+> +static int __init isi_set_clk_parent(void)
+> +{
+> +	struct clk *pck1;
+> +	struct clk *plla;
+> +	int ret;
+> +
+> +	/* ISI_MCK is supplied by PCK1 - set parent for it. */
+> +	pck1 = clk_get(NULL, "pck1");
+> +	if (IS_ERR(pck1)) {
+> +		printk(KERN_ERR "Failed to get PCK1\n");
+> +		ret = PTR_ERR(pck1);
+> +		goto err;
+> +	}
+> +
+> +	plla = clk_get(NULL, "plla");
+> +	if (IS_ERR(plla)) {
+> +		printk(KERN_ERR "Failed to get PLLA\n");
+> +		ret = PTR_ERR(plla);
+> +		goto err_pck1;
+> +	}
+> +	ret = clk_set_parent(pck1, plla);
+> +	clk_put(plla);
+> +	if (ret != 0) {
+> +		printk(KERN_ERR "Failed to set PCK1 parent\n");
+> +		goto err_pck1;
+> +	}
+> +	return ret;
+> +
+> +err_pck1:
+> +	clk_put(pck1);
+> +err:
+> +	return ret;
+> +}
+> +
+> +void __init at91_add_device_isi(struct isi_platform_data * data)
+> +{
+> +	if (!data)
+> +		return;
+> +	isi_data = *data;
+> +
+> +	at91_set_A_periph(AT91_PIN_PB20, 0);	/* ISI_D0 */
+> +	at91_set_A_periph(AT91_PIN_PB21, 0);	/* ISI_D1 */
+> +	at91_set_A_periph(AT91_PIN_PB22, 0);	/* ISI_D2 */
+> +	at91_set_A_periph(AT91_PIN_PB23, 0);	/* ISI_D3 */
+> +	at91_set_A_periph(AT91_PIN_PB24, 0);	/* ISI_D4 */
+> +	at91_set_A_periph(AT91_PIN_PB25, 0);	/* ISI_D5 */
+> +	at91_set_A_periph(AT91_PIN_PB26, 0);	/* ISI_D6 */
+> +	at91_set_A_periph(AT91_PIN_PB27, 0);	/* ISI_D7 */
+> +	at91_set_A_periph(AT91_PIN_PB28, 0);	/* ISI_PCK */
+> +	at91_set_A_periph(AT91_PIN_PB30, 0);	/* ISI_HSYNC */
+> +	at91_set_A_periph(AT91_PIN_PB29, 0);	/* ISI_VSYNC */
+> +	at91_set_B_periph(AT91_PIN_PB31, 0);	/* ISI_MCK (PCK1) */
+> +	at91_set_B_periph(AT91_PIN_PB8, 0);	/* ISI_PD8 */
+> +	at91_set_B_periph(AT91_PIN_PB9, 0);	/* ISI_PD9 */
+> +	at91_set_B_periph(AT91_PIN_PB10, 0);	/* ISI_PD10 */
+> +	at91_set_B_periph(AT91_PIN_PB11, 0);	/* ISI_PD11 */
+> +
+> +	platform_device_register(&at91sam9g45_isi_device);
+> +
+> +	if (isi_set_clk_parent())
+> +		printk(KERN_ERR "Fail to set parent for ISI_MCK.\n");
+> +
+> +	return;
+> +}
+> +#else
+> +static int __init isi_set_clk_parent(void) { }
+> +void __init at91_add_device_isi(struct isi_platform_data * data) { }
+> +#endif
+> +
+>  
+>  /* --------------------------------------------------------------------
+>   *  LCD Controller
+> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> index ad234cc..d5293fb 100644
+> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
+> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> @@ -23,11 +23,13 @@
+>  #include <linux/gpio_keys.h>
+>  #include <linux/input.h>
+>  #include <linux/leds.h>
+> -#include <linux/clk.h>
+>  #include <linux/atmel-mci.h>
+> +#include <linux/delay.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <video/atmel_lcdc.h>
+> +#include <media/soc_camera.h>
+> +#include <media/atmel-isi.h>
+>  
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+> @@ -185,6 +187,83 @@ static void __init ek_add_device_nand(void)
+>  	at91_add_device_nand(&ek_nand_data);
+>  }
+>  
+> +/*
+> + *  ISI
+> + */
+> +#if defined(CONFIG_VIDEO_ATMEL_ISI) || defined(CONFIG_VIDEO_ATMEL_ISI_MODULE)
+> +static struct isi_platform_data __initdata isi_data = {
+> +	.frate		= ISI_CFG1_FRATE_CAPTURE_ALL,
+> +	.has_emb_sync	= 0,
+> +	.emb_crc_sync = 0,
+> +	.hsync_act_low = 0,
+> +	.vsync_act_low = 0,
+> +	.pclk_act_falling = 0,
 
-With sufficient stress and extended run time, the system will eventually
-hang or oops with non-sensical oops traces - machine state does not
-make sense relative to the code excuting@the time of the oops.
+You don't need all the "= 0" assignments above - all uninitialised fields 
+will be = 0. Also, if you have started aligning assignments, as in .frate 
+and .has_emb_sync, would be better to align all of them.
 
-The interesting point here is that each of the above contain critical
-sections in which ARM11 MPCore memory is inconsistent, i.e. cache on
-CPU A contains modified entries but then migration occurs and the
-cache is flushed on CPU B yet those cache ops called in the above
-cases do not implement ARM11 MPCore RWFO workarounds.  Furthermore,
-the current ARM11 MPCore RWFO workarounds for DMA et al are unsafe
-as well for the CONFIG_PREEMPT case because, again, process migration
-can occur during DMA cache maintance operations in between RWFO and
-cache op instructions resulting in memory inconsistencies for the
-DMA case - a very narrow but real window.
+> +	/* to use codec and preview path simultaneously */
+> +	.isi_full_mode = 1,
+> +	.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10,
+> +	/* ISI_MCK is provided by PCK1  */
+> +	.isi_mck_hz = 25000000,
+> +};
+> +
+> +#else
+> +static struct isi_platform_data __initdata isi_data;
 
-So what's the recommendation, don't use CONFIG_PREEMPT on ARM11 MPCore?
+Hmm, that doesn't help a lot, does it? Either do not allocate isi_data if 
+ISI is not selected in .config, or just remove the "#if" completely.
 
-Are there any known fixes for CONFIG_PREEMPT on ARM11 MPCore if it
-is indeed broken as it appears?
+> +#endif
+> +
+> +/*
+> + * soc-camera OV2640
+> + */
+> +#if defined(CONFIG_SOC_CAMERA_OV2640)
 
-Thanks in advance for comments.
+... || defined(CONFIG_SOC_CAMERA_OV2640_MODULE)
 
---
-Regards,
-George
+> +static unsigned long isi_camera_query_bus_param(struct soc_camera_link *link)
+> +{
+> +	/* ISI board for ek using default 8-bits connection */
+> +	return SOCAM_DATAWIDTH_8;
+> +}
+> +
+> +static int i2c_camera_power(struct device *dev, int on)
+> +{
+> +	/* enable or disable the camera */
+> +	pr_debug("%s: %s the camera\n", __func__, on ? "ENABLE" : "DISABLE");
+> +	at91_set_gpio_output(AT91_PIN_PD13, on ? 0 : 1);
 
-> 
-> Wouldn't it be required to flush the icache on _all_ cpus?
-> It might be highly dependable from the cache organization, but isn't it possible
-> that the cpu that didn't load the module, is scheduled to run a function from it
-> with a "stale" instruction cache line???
-> 
-> I sometimes see oopses where I wonder how such a state could be reached.
-> The code and register state seem not to fit - looks like an interrupt does not
-> restore all registers properly :)
-> 
-> Also an Oops happens when loading module abc, and still the module list is
-> reported empty in the Oops despite the fact that "abc" depends on "a". Hmh.
-> 
-> 
-> Best regards
-> 
->         Peter
-> 
-> <snip kernel/module.c:SYSCALL_DEFINE3(init_module>
-> [..]
->         /* Only one module load at a time, please */
->         if (mutex_lock_interruptible(&module_mutex) != 0)
->                 return -EINTR;
-> 
->         /* Do all the hard work */
->         mod = load_module(umod, len, uargs);
->         if (IS_ERR(mod)) {
->                 mutex_unlock(&module_mutex);
->                 return PTR_ERR(mod);
->         }
-> 
->         /* Drop lock so they can recurse */
->         mutex_unlock(&module_mutex);
-> 
->         blocking_notifier_call_chain(&module_notify_list,
->                         MODULE_STATE_COMING, mod);
-> 
->         do_mod_ctors(mod);
->         /* Start the module */
->         if (mod->init != NULL)
->                 ret = do_one_initcall(mod->init);
-> </snip>
-> 
-> <snip kernel/module.c:load_module>
-> [..]
->         old_fs = get_fs();
->         set_fs(KERNEL_DS);
-> 
->         /*
->          * Flush the instruction cache, since we've played with text.
->          * Do it before processing of module parameters, so the module
->          * can provide parameter accessor functions of its own.
->          */
->         if (mod->module_init)
->                 flush_icache_range((unsigned long)mod->module_init,
->                                    (unsigned long)mod->module_init
->                                    + mod->init_size);
->         flush_icache_range((unsigned long)mod->module_core,
->                            (unsigned long)mod->module_core + mod->core_size);
-> 
->         set_fs(old_fs);
-> 
-> </snip>
-> 
-> arch/arm/mm/cache-v6.S:
-> 
-> ENTRY(v6_flush_kern_cache_all)
->         mov     r0, #0
-> #ifdef HARVARD_CACHE
->         mcr     p15, 0, r0, c7, c14, 0          @ D cache clean+invalidate
-> #ifndef CONFIG_ARM_ERRATA_411920
->         mcr     p15, 0, r0, c7, c5, 0           @ I+BTB cache invalidate
-> #else
->         b       v6_icache_inval_all
-> #endif
-> #else
->         mcr     p15, 0, r0, c7, c15, 0          @ Cache clean+invalidate
-> #endif
->         mov     pc, lr
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+maybe just
+
+	at91_set_gpio_output(AT91_PIN_PD13, !on);
+
+> +
+> +	if (!on)
+> +		goto out;
+> +
+> +	/* If enabled, give a reset impulse */
+> +	at91_set_gpio_output(AT91_PIN_PD12, 0);
+> +	msleep(20);
+> +	at91_set_gpio_output(AT91_PIN_PD12, 1);
+> +	msleep(100);
+> +
+> +out:
+> +	return 0;
+> +}
+> +
+> +static struct i2c_board_info i2c_camera = {
+> +	I2C_BOARD_INFO("ov2640", 0x30),
+> +};
+> +
+> +static struct soc_camera_link iclink_ov2640 = {
+> +	.bus_id		= 0,
+> +	.board_info	= &i2c_camera,
+> +	.i2c_adapter_id	= 0,
+> +	.power		= i2c_camera_power,
+> +	.query_bus_param	= isi_camera_query_bus_param,
+
+You could as well make this alignment look better.
+
+> +};
+> +
+> +static struct platform_device isi_ov2640 = {
+> +	.name	= "soc-camera-pdrv",
+> +	.id	= 0,
+> +	.dev	= {
+> +		.platform_data = &iclink_ov2640,
+> +	},
+> +};
+> +
+> +static struct platform_device *devices[] __initdata = {
+> +	&isi_ov2640,
+> +};
+> +#else
+> +static struct platform_device *devices[] __initdata = {};
+> +#endif
+>  
+>  /*
+>   * LCD Controller
+> @@ -400,6 +479,10 @@ static void __init ek_board_init(void)
+>  	ek_add_device_nand();
+>  	/* I2C */
+>  	at91_add_device_i2c(0, NULL, 0);
+> +	/* ISI */
+> +	platform_add_devices(devices, ARRAY_SIZE(devices));
+
+"devices" is a generic name, but you make it depend on 
+CONFIG_SOC_CAMERA_OV2640. Why don't you do
+
+static struct platform_device *devices[] __initdata = {
+#if defined(CONFIG_SOC_CAMERA_OV2640) || defined(CONFIG_SOC_CAMERA_OV2640_MODULE)
+	&isi_ov2640,
+#endif
+};
+
+and move
+
++	platform_add_devices(devices, ARRAY_SIZE(devices));
+
+out of the /* ISI */ section to a more generic location?
+
+> +	at91_add_device_isi(&isi_data);
+> +
+>  	/* LCD Controller */
+>  	at91_add_device_lcdc(&ek_lcdc_data);
+>  	/* Touch Screen */
+> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+> index ed544a0..276d63a 100644
+> --- a/arch/arm/mach-at91/include/mach/board.h
+> +++ b/arch/arm/mach-at91/include/mach/board.h
+> @@ -183,7 +183,8 @@ extern void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data);
+>  extern void __init at91_add_device_ac97(struct ac97c_platform_data *data);
+>  
+>   /* ISI */
+> -extern void __init at91_add_device_isi(void);
+> +struct isi_platform_data;
+> +extern void __init at91_add_device_isi(struct isi_platform_data *data);
+>  
+>   /* Touchscreen Controller */
+>  struct at91_tsadcc_data {
+> -- 
+> 1.6.3.3
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
