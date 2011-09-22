@@ -1,66 +1,95 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 22 Sep 2011 14:07:27 -0700
-Subject: [PATCH 09/10] cpufreq: OMAP: put clk if cpu_init failed
+Date: Thu, 22 Sep 2011 14:07:28 -0700
+Subject: [PATCH 10/10] cpufreq: OMAP: fix freq_table leak
 In-Reply-To: <1316725648-26710-1-git-send-email-khilman@ti.com>
 References: <1316725648-26710-1-git-send-email-khilman@ti.com>
-Message-ID: <1316725648-26710-10-git-send-email-khilman@ti.com>
+Message-ID: <1316725648-26710-11-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-Release the mpu_clk in fail paths.
+We use a single frequency table for multiple CPUs. But, with
+OMAP4, since we have multiple CPUs, the cpu_init call for CPU1
+causes freq_table previously allocated for CPU0 to be overwritten.
+In addition, we dont free the table on exit path.
 
-Reported-by: Todd Poynor <toddpoynor@google.com>
+We solve this by maintaining an atomic type counter to ensure
+just a single table exists at a given time.
+
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- drivers/cpufreq/omap-cpufreq.c |   14 +++++++++++---
- 1 files changed, 11 insertions(+), 3 deletions(-)
+ drivers/cpufreq/omap-cpufreq.c |   22 +++++++++++++++++-----
+ 1 files changed, 17 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index ce82d50..a66c8b5 100644
+index a66c8b5..90918e1 100644
 --- a/drivers/cpufreq/omap-cpufreq.c
 +++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -157,8 +157,10 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
- 	if (IS_ERR(mpu_clk))
- 		return PTR_ERR(mpu_clk);
+@@ -45,6 +45,7 @@ static struct lpj_info global_lpj_ref;
+ #endif
  
--	if (policy->cpu >= NR_CPUS)
--		return -EINVAL;
-+	if (policy->cpu >= NR_CPUS) {
-+		result = -EINVAL;
-+		goto fail_ck;
-+	}
+ static struct cpufreq_frequency_table *freq_table;
++static atomic_t freq_table_users = ATOMIC_INIT(0);
+ static struct clk *mpu_clk;
+ static char *mpu_clk_name;
+ static struct device *mpu_dev;
+@@ -149,6 +150,12 @@ static int omap_target(struct cpufreq_policy *policy,
+ 	return ret;
+ }
+ 
++static inline void freq_table_free(void)
++{
++	if (atomic_dec_and_test(&freq_table_users))
++		opp_free_cpufreq_table(mpu_dev, &freq_table);
++}
++
+ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ {
+ 	int result = 0;
+@@ -163,7 +170,9 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+ 	}
  
  	policy->cur = policy->min = policy->max = omap_getspeed(policy->cpu);
- 	result = opp_init_cpufreq_table(mpu_dev, &freq_table);
-@@ -166,12 +168,14 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+-	result = opp_init_cpufreq_table(mpu_dev, &freq_table);
++
++	if (atomic_inc_return(&freq_table_users) == 1)
++		result = opp_init_cpufreq_table(mpu_dev, &freq_table);
+ 
  	if (result) {
  		dev_err(mpu_dev, "%s: cpu%d: failed creating freq table[%d]\n",
- 				__func__, policy->cpu, result);
--		return result;
-+		goto fail_ck;
+@@ -172,10 +181,10 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
  	}
  
  	result = cpufreq_frequency_table_cpuinfo(policy, freq_table);
- 	if (!result)
- 		cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
-+	else
-+		goto fail_ck;
+-	if (!result)
+-		cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
+-	else
+-		goto fail_ck;
++	if (result)
++		goto fail_table;
++
++	cpufreq_frequency_table_get_attr(freq_table, policy->cpu);
  
  	policy->min = policy->cpuinfo.min_freq;
  	policy->max = policy->cpuinfo.max_freq;
-@@ -193,6 +197,10 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
- 	policy->cpuinfo.transition_latency = 300 * 1000;
+@@ -198,6 +207,8 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
  
  	return 0;
-+
-+fail_ck:
-+	clk_put(mpu_clk);
-+	return result;
- }
+ 
++fail_table:
++	freq_table_free();
+ fail_ck:
+ 	clk_put(mpu_clk);
+ 	return result;
+@@ -205,6 +216,7 @@ fail_ck:
  
  static int omap_cpu_exit(struct cpufreq_policy *policy)
+ {
++	freq_table_free();
+ 	clk_put(mpu_clk);
+ 	return 0;
+ }
 -- 
 1.7.6
