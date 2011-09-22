@@ -1,45 +1,31 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 22 Sep 2011 21:50:11 +0800
-Subject: [PATCH] ARM i.MX avic: convert to use generic irq chip
-In-Reply-To: <1316684408-12196-1-git-send-email-jason77.wang@gmail.com>
-References: <1316684408-12196-1-git-send-email-jason77.wang@gmail.com>
-Message-ID: <20110922135009.GA15024@S2100-06.ap.freescale.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 22 Sep 2011 14:45:53 +0100
+Subject: DT vs ARM static mappings
+In-Reply-To: <20110922131302.GO17169@n2100.arm.linux.org.uk>
+References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
+	<alpine.LFD.2.00.1109211320090.12663@xanadu.home>
+	<1316696696.4611.844.camel@hornet.cambridge.arm.com>
+	<20110922131302.GO17169@n2100.arm.linux.org.uk>
+Message-ID: <1316699153.4611.858.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 05:40:08PM +0800, Hui Wang wrote:
-> Convert i.MX avic irq handler to use generic irq chip. This not only
-> provides a cleanup implementation of irq chip handler, but also
-> implements suspend/resume interface with the help of generic irq chip
-> interface.
+> > Ok, what I did was grepping for all .map_io-s. Then I sorted the list
+> > and had a look at first 100 and about 50% of them were doing more than
+> > just creating mappings.
 > 
-> Change mxc_irq_chip to a new structure mxc_extra_irq to handle fiq
-> and priority functions.
+> The answer to that is: they shouldn't be now that we have the init_early
+> hook.  The only remainder for .map_io is where platforms make run-time
+> decisions about what to map based on some register value somewhere
+> (eg, Assabet vs Assabet+Neponset).
 > 
-> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
-> ---
-> 
-> This patch is basing on imx-features branch of linux-pengu. Have
-> validated this patch on 31pdk and 35pdk platforms, while have no
-> chance to validate it on mx2 and mx1 platforms since we don't have
-> those hardwares.
-> 
-> The purpose of changing avic to use generic irq chip is because i
-> added suspend/resume functions for 35pdk, and generic irq chip
-> naturally has suspend/resume interface. If this patch can be
-> accepted, i will continue to send out those 35pdk pm patches.
-> 
->  arch/arm/plat-mxc/avic.c       |   79 ++++++++++++++++++++++++++++------------
->  arch/arm/plat-mxc/irq-common.c |   21 ++++++-----
->  arch/arm/plat-mxc/irq-common.h |    3 +-
->  arch/arm/plat-mxc/tzic.c       |    8 ++++-
->  4 files changed, 75 insertions(+), 36 deletions(-)
-> 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> I do have a large patch series floating around in my git tree which tries
+> to clean up to all those map_io functions - the biggest stumbling block
+> to them is the Samsung stuff being indirected through its own tables.
 
-However, I'm wondering if you can add the suspend/resume interface for
-tzic as well.
+Awesome. I'll work with an assumption that future map_io-s will only
+create static mappings and nothing more then.
 
--- 
-Regards,
-Shawn
+Cheers!
+
+Pawe?
