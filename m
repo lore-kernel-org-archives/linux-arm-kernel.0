@@ -1,362 +1,510 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 22 Sep 2011 09:35:42 +0200 (CEST)
-Subject: [PATCH v3 2/2] at91: add Atmel ISI and ov2640 support on
-	sam9m10/sam9g45 board.
-In-Reply-To: <1316664661-11383-2-git-send-email-josh.wu@atmel.com>
-References: <1316664661-11383-1-git-send-email-josh.wu@atmel.com>
-	<1316664661-11383-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <Pine.LNX.4.64.1109220911500.11164@axis700.grange>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Thu, 22 Sep 2011 15:48:51 +0800
+Subject: [PATCH v5 09/15] OMAP2+: UART: Add runtime pm support for
+	omap-serial driver
+In-Reply-To: <1316607206-21669-7-git-send-email-govindraj.raja@ti.com>
+References: <1316607206-21669-1-git-send-email-govindraj.raja@ti.com>
+	<1316607206-21669-7-git-send-email-govindraj.raja@ti.com>
+Message-ID: <CACVXFVMpvF5foA1asLYE5WbvHQ3b_eXaBpiMT7Q1h0KHDGLSCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Sep 2011, Josh Wu wrote:
+Hi,
 
-> This patch
-> 1. add ISI_MCK parent setting code when add ISI device.
-> 2. add ov2640 support on board file.
-> 3. define isi_mck clock in sam9g45 chip file.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->  arch/arm/mach-at91/at91sam9g45.c         |    3 +
->  arch/arm/mach-at91/at91sam9g45_devices.c |  105 +++++++++++++++++++++++++++++-
->  arch/arm/mach-at91/board-sam9m10g45ek.c  |   85 ++++++++++++++++++++++++-
->  arch/arm/mach-at91/include/mach/board.h  |    3 +-
+On Wed, Sep 21, 2011 at 8:13 PM, Govindraj.R <govindraj.raja@ti.com> wrote:
+> Adapts omap-serial driver to use pm_runtime API's.
 
-Personally, I think, it would be better to separate this into two patches 
-at least: one for at91 core and one for the specific board, but that's up 
-to arch maintainers to decide.
+> ? ? ? ?console_unlock();
+>
+> - ? ? ? if ((cpu_is_omap34xx() && bdata->pads) ||
+> - ? ? ? ? ? ? ? (pdata->wk_en && pdata->wk_mask))
+> + ? ? ? if ((cpu_is_omap34xx() && bdata->pads))
+> ? ? ? ? ? ? ? ?device_init_wakeup(&pdev->dev, true);
 
-You also want to patch arch/arm/mach-at91/at91sam9263_devices.c, don't 
-you?
+Just a bit curious, why doesn't the code enable wakeup at default
+on omap4, which will disable runtime pm of serial port on omap4.
 
->  4 files changed, 193 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> index e04c5fb..5e23d6d 100644
-> --- a/arch/arm/mach-at91/at91sam9g45.c
-> +++ b/arch/arm/mach-at91/at91sam9g45.c
-> @@ -201,6 +201,7 @@ static struct clk *periph_clocks[] __initdata = {
->  	// irq0
->  };
->  
-> +static struct clk pck1;
+I have tested your patches on omap4 panda(enable wakeup at
+default manually), runtime pm of serial port 2 can work well and
+remote wakeup too.
 
-Hm, it really doesn't need any initialisation, not even for the .type 
-field? .type=0 doesn't seem to be valid.
-
->  static struct clk_lookup periph_clocks_lookups[] = {
->  	/* One additional fake clock for ohci */
->  	CLKDEV_CON_ID("ohci_clk", &uhphs_clk),
-> @@ -215,6 +216,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tcb0_clk),
->  	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
->  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
-> +	/* ISI_MCK, which is provided by programmable clock(PCK1) */
-> +	CLKDEV_CON_DEV_ID("isi_mck", "atmel_isi.0", &pck1),
->  };
->  
->  static struct clk_lookup usart_clocks_lookups[] = {
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index 600bffb..82eeac8 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -16,7 +16,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/i2c-gpio.h>
->  #include <linux/atmel-mci.h>
+>
+> ? ? ? ?kfree(pdata);
+> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+> index 74822b3..8ef81ce 100644
+> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
+> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+> @@ -62,6 +62,9 @@ struct omap_uart_port_info {
+> ? ? ? ?upf_t ? ? ? ? ? ? ? ? ? flags; ? ? ? ? ?/* UPF_* flags */
+>
+> ? ? ? ?u32 ? ? ? ? ? ? ? ? ? ? errata;
+> +
+> + ? ? ? void (*enable_wakeup)(struct platform_device *, bool);
+> + ? ? ? u32 (*get_context_loss_count)(struct device *);
+> ?};
+>
+> ?struct uart_omap_dma {
+> @@ -113,6 +116,8 @@ struct uart_omap_port {
+> ? ? ? ?unsigned char ? ? ? ? ? msr_saved_flags;
+> ? ? ? ?char ? ? ? ? ? ? ? ? ? ?name[20];
+> ? ? ? ?unsigned long ? ? ? ? ? port_activity;
+> + ? ? ? u32 ? ? ? ? ? ? ? ? ? ? context_loss_cnt;
+> + ? ? ? u8 ? ? ? ? ? ? ? ? ? ? ?wakeups_enabled;
+> ?};
+>
+> ?#endif /* __OMAP_SERIAL_H__ */
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 9a0eac2..43c33da 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -37,11 +37,14 @@
+> ?#include <linux/clk.h>
+> ?#include <linux/serial_core.h>
+> ?#include <linux/irq.h>
+> +#include <linux/pm_runtime.h>
+>
+> ?#include <plat/dma.h>
+> ?#include <plat/dmtimer.h>
+> ?#include <plat/omap-serial.h>
+>
+> +#define OMAP_UART_AUTOSUSPEND_DELAY -1
+> +
+> ?static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+>
+> ?/* Forward declaration of functions */
+> @@ -102,6 +105,8 @@ static void serial_omap_stop_rxdma(struct uart_omap_port *up)
+> ? ? ? ? ? ? ? ?omap_free_dma(up->uart_dma.rx_dma_channel);
+> ? ? ? ? ? ? ? ?up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
+> ? ? ? ? ? ? ? ?up->uart_dma.rx_dma_used = false;
+> + ? ? ? ? ? ? ? pm_runtime_mark_last_busy(&up->pdev->dev);
+> + ? ? ? ? ? ? ? pm_runtime_put_autosuspend(&up->pdev->dev);
+> ? ? ? ?}
+> ?}
+>
+> @@ -110,8 +115,11 @@ static void serial_omap_enable_ms(struct uart_port *port)
+> ? ? ? ?struct uart_omap_port *up = (struct uart_omap_port *)port;
+>
+> ? ? ? ?dev_dbg(up->port.dev, "serial_omap_enable_ms+%d\n", up->pdev->id);
+> +
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?up->ier |= UART_IER_MSI;
+> ? ? ? ?serial_out(up, UART_IER, up->ier);
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
+> ?}
+>
+> ?static void serial_omap_stop_tx(struct uart_port *port)
+> @@ -129,23 +137,32 @@ static void serial_omap_stop_tx(struct uart_port *port)
+> ? ? ? ? ? ? ? ?omap_stop_dma(up->uart_dma.tx_dma_channel);
+> ? ? ? ? ? ? ? ?omap_free_dma(up->uart_dma.tx_dma_channel);
+> ? ? ? ? ? ? ? ?up->uart_dma.tx_dma_channel = OMAP_UART_DMA_CH_FREE;
+> + ? ? ? ? ? ? ? pm_runtime_mark_last_busy(&up->pdev->dev);
+> + ? ? ? ? ? ? ? pm_runtime_put_autosuspend(&up->pdev->dev);
+> ? ? ? ?}
+>
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?if (up->ier & UART_IER_THRI) {
+> ? ? ? ? ? ? ? ?up->ier &= ~UART_IER_THRI;
+> ? ? ? ? ? ? ? ?serial_out(up, UART_IER, up->ier);
+> ? ? ? ?}
+> +
+> + ? ? ? pm_runtime_mark_last_busy(&up->pdev->dev);
+> + ? ? ? pm_runtime_put_autosuspend(&up->pdev->dev);
+> ?}
+>
+> ?static void serial_omap_stop_rx(struct uart_port *port)
+> ?{
+> ? ? ? ?struct uart_omap_port *up = (struct uart_omap_port *)port;
+>
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?if (up->use_dma)
+> ? ? ? ? ? ? ? ?serial_omap_stop_rxdma(up);
+> ? ? ? ?up->ier &= ~UART_IER_RLSI;
+> ? ? ? ?up->port.read_status_mask &= ~UART_LSR_DR;
+> ? ? ? ?serial_out(up, UART_IER, up->ier);
+> + ? ? ? pm_runtime_mark_last_busy(&up->pdev->dev);
+> + ? ? ? pm_runtime_put_autosuspend(&up->pdev->dev);
+> ?}
+>
+> ?static inline void receive_chars(struct uart_omap_port *up, int *status)
+> @@ -262,7 +279,10 @@ static void serial_omap_start_tx(struct uart_port *port)
+> ? ? ? ?int ret = 0;
+>
+> ? ? ? ?if (!up->use_dma) {
+> + ? ? ? ? ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ? ? ? ? ?serial_omap_enable_ier_thri(up);
+> + ? ? ? ? ? ? ? pm_runtime_mark_last_busy(&up->pdev->dev);
+> + ? ? ? ? ? ? ? pm_runtime_put_autosuspend(&up->pdev->dev);
+> ? ? ? ? ? ? ? ?return;
+> ? ? ? ?}
+>
+> @@ -272,6 +292,7 @@ static void serial_omap_start_tx(struct uart_port *port)
+> ? ? ? ?xmit = &up->port.state->xmit;
+>
+> ? ? ? ?if (up->uart_dma.tx_dma_channel == OMAP_UART_DMA_CH_FREE) {
+> + ? ? ? ? ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ? ? ? ? ?ret = omap_request_dma(up->uart_dma.uart_dma_tx,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"UART Tx DMA",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(void *)uart_tx_dma_callback, up,
+> @@ -354,9 +375,13 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
+> ? ? ? ?unsigned int iir, lsr;
+> ? ? ? ?unsigned long flags;
+>
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?iir = serial_in(up, UART_IIR);
+> - ? ? ? if (iir & UART_IIR_NO_INT)
+> + ? ? ? if (iir & UART_IIR_NO_INT) {
+> + ? ? ? ? ? ? ? pm_runtime_mark_last_busy(&up->pdev->dev);
+> + ? ? ? ? ? ? ? pm_runtime_put_autosuspend(&up->pdev->dev);
+> ? ? ? ? ? ? ? ?return IRQ_NONE;
+> + ? ? ? }
+>
+> ? ? ? ?spin_lock_irqsave(&up->port.lock, flags);
+> ? ? ? ?lsr = serial_in(up, UART_LSR);
+> @@ -378,6 +403,9 @@ static inline irqreturn_t serial_omap_irq(int irq, void *dev_id)
+> ? ? ? ? ? ? ? ?transmit_chars(up);
+>
+> ? ? ? ?spin_unlock_irqrestore(&up->port.lock, flags);
+> + ? ? ? pm_runtime_mark_last_busy(&up->pdev->dev);
+> + ? ? ? pm_runtime_put_autosuspend(&up->pdev->dev);
+> +
+> ? ? ? ?up->port_activity = jiffies;
+> ? ? ? ?return IRQ_HANDLED;
+> ?}
+> @@ -388,11 +416,12 @@ static unsigned int serial_omap_tx_empty(struct uart_port *port)
+> ? ? ? ?unsigned long flags = 0;
+> ? ? ? ?unsigned int ret = 0;
+>
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?dev_dbg(up->port.dev, "serial_omap_tx_empty+%d\n", up->pdev->id);
+> ? ? ? ?spin_lock_irqsave(&up->port.lock, flags);
+> ? ? ? ?ret = serial_in(up, UART_LSR) & UART_LSR_TEMT ? TIOCSER_TEMT : 0;
+> ? ? ? ?spin_unlock_irqrestore(&up->port.lock, flags);
 > -
-> +#include <linux/clk.h>
->  #include <linux/fb.h>
->  #include <video/atmel_lcdc.h>
->  
-> @@ -28,6 +28,8 @@
->  #include <mach/at_hdmac.h>
->  #include <mach/atmel-mci.h>
->  
-> +#include <media/atmel-isi.h>
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
+> ? ? ? ?return ret;
+> ?}
+>
+> @@ -402,7 +431,10 @@ static unsigned int serial_omap_get_mctrl(struct uart_port *port)
+> ? ? ? ?unsigned char status;
+> ? ? ? ?unsigned int ret = 0;
+>
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?status = check_modem_status(up);
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
 > +
->  #include "generic.h"
->  
->  
-> @@ -863,6 +865,107 @@ void __init at91_add_device_ac97(struct ac97c_platform_data *data)
->  void __init at91_add_device_ac97(struct ac97c_platform_data *data) {}
->  #endif
->  
-> +/* --------------------------------------------------------------------
-> + *  Image Sensor Interface
-> + * -------------------------------------------------------------------- */
-> +#if defined(CONFIG_VIDEO_ATMEL_ISI) || defined(CONFIG_VIDEO_ATMEL_ISI_MODULE)
-> +static u64 isi_dmamask = DMA_BIT_MASK(32);
-> +static struct isi_platform_data isi_data;
+> ? ? ? ?dev_dbg(up->port.dev, "serial_omap_get_mctrl+%d\n", up->pdev->id);
+>
+> ? ? ? ?if (status & UART_MSR_DCD)
+> @@ -433,9 +465,11 @@ static void serial_omap_set_mctrl(struct uart_port *port, unsigned int mctrl)
+> ? ? ? ?if (mctrl & TIOCM_LOOP)
+> ? ? ? ? ? ? ? ?mcr |= UART_MCR_LOOP;
+>
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?up->mcr = serial_in(up, UART_MCR);
+> ? ? ? ?up->mcr |= mcr;
+> ? ? ? ?serial_out(up, UART_MCR, up->mcr);
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
+> ?}
+>
+> ?static void serial_omap_break_ctl(struct uart_port *port, int break_state)
+> @@ -444,6 +478,7 @@ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
+> ? ? ? ?unsigned long flags = 0;
+>
+> ? ? ? ?dev_dbg(up->port.dev, "serial_omap_break_ctl+%d\n", up->pdev->id);
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?spin_lock_irqsave(&up->port.lock, flags);
+> ? ? ? ?if (break_state == -1)
+> ? ? ? ? ? ? ? ?up->lcr |= UART_LCR_SBC;
+> @@ -451,6 +486,7 @@ static void serial_omap_break_ctl(struct uart_port *port, int break_state)
+> ? ? ? ? ? ? ? ?up->lcr &= ~UART_LCR_SBC;
+> ? ? ? ?serial_out(up, UART_LCR, up->lcr);
+> ? ? ? ?spin_unlock_irqrestore(&up->port.lock, flags);
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
+> ?}
+>
+> ?static int serial_omap_startup(struct uart_port *port)
+> @@ -469,6 +505,7 @@ static int serial_omap_startup(struct uart_port *port)
+>
+> ? ? ? ?dev_dbg(up->port.dev, "serial_omap_startup+%d\n", up->pdev->id);
+>
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?/*
+> ? ? ? ? * Clear the FIFO buffers and disable them.
+> ? ? ? ? * (they will be reenabled in set_termios())
+> @@ -524,6 +561,8 @@ static int serial_omap_startup(struct uart_port *port)
+> ? ? ? ?/* Enable module level wake up */
+> ? ? ? ?serial_out(up, UART_OMAP_WER, OMAP_UART_WER_MOD_WKUP);
+>
+> + ? ? ? pm_runtime_mark_last_busy(&up->pdev->dev);
+> + ? ? ? pm_runtime_put_autosuspend(&up->pdev->dev);
+> ? ? ? ?up->port_activity = jiffies;
+> ? ? ? ?return 0;
+> ?}
+> @@ -534,6 +573,8 @@ static void serial_omap_shutdown(struct uart_port *port)
+> ? ? ? ?unsigned long flags = 0;
+>
+> ? ? ? ?dev_dbg(up->port.dev, "serial_omap_shutdown+%d\n", up->pdev->id);
 > +
-> +struct resource isi_resources[] = {
-> +	[0] = {
-> +		.start	= AT91SAM9G45_BASE_ISI,
-> +		.end	= AT91SAM9G45_BASE_ISI + SZ_16K - 1,
-> +		.flags	= IORESOURCE_MEM,
-> +	},
-> +	[1] = {
-> +		.start	= AT91SAM9G45_ID_ISI,
-> +		.end	= AT91SAM9G45_ID_ISI,
-> +		.flags	= IORESOURCE_IRQ,
-> +	},
-> +};
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?/*
+> ? ? ? ? * Disable interrupts from this port
+> ? ? ? ? */
+> @@ -567,6 +608,7 @@ static void serial_omap_shutdown(struct uart_port *port)
+> ? ? ? ? ? ? ? ? ? ? ? ?up->uart_dma.rx_buf_dma_phys);
+> ? ? ? ? ? ? ? ?up->uart_dma.rx_buf = NULL;
+> ? ? ? ?}
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
+> ? ? ? ?free_irq(up->port.irq, up);
+> ?}
+>
+> @@ -682,6 +724,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+> ? ? ? ? * Ok, we're now changing the port state. Do it with
+> ? ? ? ? * interrupts disabled.
+> ? ? ? ? */
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?spin_lock_irqsave(&up->port.lock, flags);
+>
+> ? ? ? ?/*
+> @@ -814,6 +857,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+> ? ? ? ?serial_omap_configure_xonxoff(up, termios);
+>
+> ? ? ? ?spin_unlock_irqrestore(&up->port.lock, flags);
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
+> ? ? ? ?dev_dbg(up->port.dev, "serial_omap_set_termios+%d\n", up->pdev->id);
+> ?}
+>
+> @@ -825,6 +869,8 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
+> ? ? ? ?unsigned char efr;
+>
+> ? ? ? ?dev_dbg(up->port.dev, "serial_omap_pm+%d\n", up->pdev->id);
 > +
-> +static struct platform_device at91sam9g45_isi_device = {
-> +	.name		= "atmel_isi",
-> +	.id		= 0,
-> +	.dev		= {
-> +			.dma_mask		= &isi_dmamask,
-> +			.coherent_dma_mask	= DMA_BIT_MASK(32),
-> +			.platform_data		= &isi_data,
-> +	},
-> +	.resource	= isi_resources,
-> +	.num_resources	= ARRAY_SIZE(isi_resources),
-> +};
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+> ? ? ? ?efr = serial_in(up, UART_EFR);
+> ? ? ? ?serial_out(up, UART_EFR, efr | UART_EFR_ECB);
+> @@ -834,6 +880,7 @@ serial_omap_pm(struct uart_port *port, unsigned int state,
+> ? ? ? ?serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+> ? ? ? ?serial_out(up, UART_EFR, efr);
+> ? ? ? ?serial_out(up, UART_LCR, 0);
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
+> ?}
+>
+> ?static void serial_omap_release_port(struct uart_port *port)
+> @@ -911,19 +958,26 @@ static inline void wait_for_xmitr(struct uart_omap_port *up)
+> ?static void serial_omap_poll_put_char(struct uart_port *port, unsigned char ch)
+> ?{
+> ? ? ? ?struct uart_omap_port *up = (struct uart_omap_port *)port;
 > +
-> +static int __init isi_set_clk_parent(void)
-> +{
-> +	struct clk *pck1;
-> +	struct clk *plla;
-> +	int ret;
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ?wait_for_xmitr(up);
+> ? ? ? ?serial_out(up, UART_TX, ch);
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
+> ?}
+>
+> ?static int serial_omap_poll_get_char(struct uart_port *port)
+> ?{
+> ? ? ? ?struct uart_omap_port *up = (struct uart_omap_port *)port;
+> - ? ? ? unsigned int status = serial_in(up, UART_LSR);
+> + ? ? ? unsigned int status;
+>
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> + ? ? ? status = serial_in(up, UART_LSR);
+> ? ? ? ?if (!(status & UART_LSR_DR))
+> ? ? ? ? ? ? ? ?return NO_POLL_CHAR;
+>
+> - ? ? ? return serial_in(up, UART_RX);
+> + ? ? ? status = serial_in(up, UART_RX);
+> + ? ? ? pm_runtime_put(&up->pdev->dev);
+> + ? ? ? return status;
+> ?}
+>
+> ?#endif /* CONFIG_CONSOLE_POLL */
+> @@ -951,6 +1005,8 @@ serial_omap_console_write(struct console *co, const char *s,
+> ? ? ? ?unsigned int ier;
+> ? ? ? ?int locked = 1;
+>
+> + ? ? ? pm_runtime_get_sync(&up->pdev->dev);
 > +
-> +	/* ISI_MCK is supplied by PCK1 - set parent for it. */
-> +	pck1 = clk_get(NULL, "pck1");
-> +	if (IS_ERR(pck1)) {
-> +		printk(KERN_ERR "Failed to get PCK1\n");
-> +		ret = PTR_ERR(pck1);
-> +		goto err;
-> +	}
+> ? ? ? ?local_irq_save(flags);
+> ? ? ? ?if (up->port.sysrq)
+> ? ? ? ? ? ? ? ?locked = 0;
+> @@ -983,6 +1039,8 @@ serial_omap_console_write(struct console *co, const char *s,
+> ? ? ? ?if (up->msr_saved_flags)
+> ? ? ? ? ? ? ? ?check_modem_status(up);
+>
+> + ? ? ? pm_runtime_mark_last_busy(&up->pdev->dev);
+> + ? ? ? pm_runtime_put_autosuspend(&up->pdev->dev);
+> ? ? ? ?if (locked)
+> ? ? ? ? ? ? ? ?spin_unlock(&up->port.lock);
+> ? ? ? ?local_irq_restore(flags);
+> @@ -1065,19 +1123,18 @@ static struct uart_driver serial_omap_reg = {
+> ? ? ? ?.cons ? ? ? ? ? = OMAP_CONSOLE,
+> ?};
+>
+> -static int
+> -serial_omap_suspend(struct platform_device *pdev, pm_message_t state)
+> +static int serial_omap_suspend(struct device *dev)
+> ?{
+> - ? ? ? struct uart_omap_port *up = platform_get_drvdata(pdev);
+> + ? ? ? struct uart_omap_port *up = dev_get_drvdata(dev);
+>
+> ? ? ? ?if (up)
+> ? ? ? ? ? ? ? ?uart_suspend_port(&serial_omap_reg, &up->port);
+> ? ? ? ?return 0;
+> ?}
+>
+> -static int serial_omap_resume(struct platform_device *dev)
+> +static int serial_omap_resume(struct device *dev)
+> ?{
+> - ? ? ? struct uart_omap_port *up = platform_get_drvdata(dev);
+> + ? ? ? struct uart_omap_port *up = dev_get_drvdata(dev);
+>
+> ? ? ? ?if (up)
+> ? ? ? ? ? ? ? ?uart_resume_port(&serial_omap_reg, &up->port);
+> @@ -1140,6 +1197,7 @@ static int serial_omap_start_rxdma(struct uart_omap_port *up)
+> ? ? ? ?int ret = 0;
+>
+> ? ? ? ?if (up->uart_dma.rx_dma_channel == -1) {
+> + ? ? ? ? ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+> ? ? ? ? ? ? ? ?ret = omap_request_dma(up->uart_dma.uart_dma_rx,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"UART Rx DMA",
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(void *)uart_rx_dma_callback, up,
+> @@ -1305,6 +1363,16 @@ static int serial_omap_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
+> ? ? ? ?}
+>
+> + ? ? ? pm_runtime_use_autosuspend(&pdev->dev);
+> + ? ? ? pm_runtime_set_autosuspend_delay(&pdev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? OMAP_UART_AUTOSUSPEND_DELAY);
 > +
-> +	plla = clk_get(NULL, "plla");
-> +	if (IS_ERR(plla)) {
-> +		printk(KERN_ERR "Failed to get PLLA\n");
-> +		ret = PTR_ERR(plla);
-> +		goto err_pck1;
-> +	}
-> +	ret = clk_set_parent(pck1, plla);
-> +	clk_put(plla);
-> +	if (ret != 0) {
-> +		printk(KERN_ERR "Failed to set PCK1 parent\n");
-> +		goto err_pck1;
-> +	}
-> +	return ret;
+> + ? ? ? pm_runtime_irq_safe(&pdev->dev);
+> + ? ? ? if (device_may_wakeup(&pdev->dev)) {
+> + ? ? ? ? ? ? ? pm_runtime_enable(&pdev->dev);
+> + ? ? ? ? ? ? ? pm_runtime_get_sync(&pdev->dev);
+> + ? ? ? }
 > +
-> +err_pck1:
-> +	clk_put(pck1);
-> +err:
-> +	return ret;
+> ? ? ? ?ui[pdev->id] = up;
+> ? ? ? ?serial_omap_add_console_port(up);
+>
+> @@ -1312,6 +1380,7 @@ static int serial_omap_probe(struct platform_device *pdev)
+> ? ? ? ?if (ret != 0)
+> ? ? ? ? ? ? ? ?goto do_release_region;
+>
+> + ? ? ? pm_runtime_put(&pdev->dev);
+> ? ? ? ?platform_set_drvdata(pdev, up);
+> ? ? ? ?return 0;
+> ?err:
+> @@ -1326,22 +1395,96 @@ static int serial_omap_remove(struct platform_device *dev)
+> ?{
+> ? ? ? ?struct uart_omap_port *up = platform_get_drvdata(dev);
+>
+> - ? ? ? platform_set_drvdata(dev, NULL);
+> ? ? ? ?if (up) {
+> + ? ? ? ? ? ? ? pm_runtime_disable(&up->pdev->dev);
+> ? ? ? ? ? ? ? ?uart_remove_one_port(&serial_omap_reg, &up->port);
+> ? ? ? ? ? ? ? ?kfree(up);
+> ? ? ? ?}
+> +
+> + ? ? ? platform_set_drvdata(dev, NULL);
+> + ? ? ? return 0;
 > +}
 > +
-> +void __init at91_add_device_isi(struct isi_platform_data * data)
+> +static void serial_omap_restore_context(struct uart_omap_port *up)
 > +{
-> +	if (!data)
-> +		return;
-> +	isi_data = *data;
-> +
-> +	at91_set_A_periph(AT91_PIN_PB20, 0);	/* ISI_D0 */
-> +	at91_set_A_periph(AT91_PIN_PB21, 0);	/* ISI_D1 */
-> +	at91_set_A_periph(AT91_PIN_PB22, 0);	/* ISI_D2 */
-> +	at91_set_A_periph(AT91_PIN_PB23, 0);	/* ISI_D3 */
-> +	at91_set_A_periph(AT91_PIN_PB24, 0);	/* ISI_D4 */
-> +	at91_set_A_periph(AT91_PIN_PB25, 0);	/* ISI_D5 */
-> +	at91_set_A_periph(AT91_PIN_PB26, 0);	/* ISI_D6 */
-> +	at91_set_A_periph(AT91_PIN_PB27, 0);	/* ISI_D7 */
-> +	at91_set_A_periph(AT91_PIN_PB28, 0);	/* ISI_PCK */
-> +	at91_set_A_periph(AT91_PIN_PB30, 0);	/* ISI_HSYNC */
-> +	at91_set_A_periph(AT91_PIN_PB29, 0);	/* ISI_VSYNC */
-> +	at91_set_B_periph(AT91_PIN_PB31, 0);	/* ISI_MCK (PCK1) */
-> +	at91_set_B_periph(AT91_PIN_PB8, 0);	/* ISI_PD8 */
-> +	at91_set_B_periph(AT91_PIN_PB9, 0);	/* ISI_PD9 */
-> +	at91_set_B_periph(AT91_PIN_PB10, 0);	/* ISI_PD10 */
-> +	at91_set_B_periph(AT91_PIN_PB11, 0);	/* ISI_PD11 */
-> +
-> +	platform_device_register(&at91sam9g45_isi_device);
-> +
-> +	if (isi_set_clk_parent())
-> +		printk(KERN_ERR "Fail to set parent for ISI_MCK.\n");
-> +
-> +	return;
-> +}
-> +#else
-> +static int __init isi_set_clk_parent(void) { }
-> +void __init at91_add_device_isi(struct isi_platform_data * data) { }
-> +#endif
-> +
->  
->  /* --------------------------------------------------------------------
->   *  LCD Controller
-> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> index ad234cc..d5293fb 100644
-> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> @@ -23,11 +23,13 @@
->  #include <linux/gpio_keys.h>
->  #include <linux/input.h>
->  #include <linux/leds.h>
-> -#include <linux/clk.h>
->  #include <linux/atmel-mci.h>
-> +#include <linux/delay.h>
->  
->  #include <mach/hardware.h>
->  #include <video/atmel_lcdc.h>
-> +#include <media/soc_camera.h>
-> +#include <media/atmel-isi.h>
->  
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
-> @@ -185,6 +187,83 @@ static void __init ek_add_device_nand(void)
->  	at91_add_device_nand(&ek_nand_data);
->  }
->  
-> +/*
-> + *  ISI
-> + */
-> +#if defined(CONFIG_VIDEO_ATMEL_ISI) || defined(CONFIG_VIDEO_ATMEL_ISI_MODULE)
-> +static struct isi_platform_data __initdata isi_data = {
-> +	.frate		= ISI_CFG1_FRATE_CAPTURE_ALL,
-> +	.has_emb_sync	= 0,
-> +	.emb_crc_sync = 0,
-> +	.hsync_act_low = 0,
-> +	.vsync_act_low = 0,
-> +	.pclk_act_falling = 0,
-
-You don't need all the "= 0" assignments above - all uninitialised fields 
-will be = 0. Also, if you have started aligning assignments, as in .frate 
-and .has_emb_sync, would be better to align all of them.
-
-> +	/* to use codec and preview path simultaneously */
-> +	.isi_full_mode = 1,
-> +	.data_width_flags = ISI_DATAWIDTH_8 | ISI_DATAWIDTH_10,
-> +	/* ISI_MCK is provided by PCK1  */
-> +	.isi_mck_hz = 25000000,
-> +};
-> +
-> +#else
-> +static struct isi_platform_data __initdata isi_data;
-
-Hmm, that doesn't help a lot, does it? Either do not allocate isi_data if 
-ISI is not selected in .config, or just remove the "#if" completely.
-
-> +#endif
-> +
-> +/*
-> + * soc-camera OV2640
-> + */
-> +#if defined(CONFIG_SOC_CAMERA_OV2640)
-
-... || defined(CONFIG_SOC_CAMERA_OV2640_MODULE)
-
-> +static unsigned long isi_camera_query_bus_param(struct soc_camera_link *link)
-> +{
-> +	/* ISI board for ek using default 8-bits connection */
-> +	return SOCAM_DATAWIDTH_8;
+> + ? ? ? serial_out(up, UART_OMAP_MDR1, up->mdr1);
+> + ? ? ? serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B); /* Config B mode */
+> + ? ? ? serial_out(up, UART_EFR, UART_EFR_ECB);
+> + ? ? ? serial_out(up, UART_LCR, 0x0); /* Operational mode */
+> + ? ? ? serial_out(up, UART_IER, 0x0);
+> + ? ? ? serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B); /* Config B mode */
+> + ? ? ? serial_out(up, UART_DLL, up->dll);
+> + ? ? ? serial_out(up, UART_DLM, up->dlh);
+> + ? ? ? serial_out(up, UART_LCR, 0x0); /* Operational mode */
+> + ? ? ? serial_out(up, UART_IER, up->ier);
+> + ? ? ? serial_out(up, UART_FCR, up->fcr);
+> + ? ? ? serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
+> + ? ? ? serial_out(up, UART_MCR, up->mcr);
+> + ? ? ? serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B); /* Config B mode */
+> + ? ? ? serial_out(up, UART_EFR, up->efr);
+> + ? ? ? serial_out(up, UART_LCR, up->lcr);
+> + ? ? ? /* UART 16x mode */
+> + ? ? ? serial_out(up, UART_OMAP_MDR1, up->mdr1);
 > +}
 > +
-> +static int i2c_camera_power(struct device *dev, int on)
+> +static int serial_omap_runtime_suspend(struct device *dev)
 > +{
-> +	/* enable or disable the camera */
-> +	pr_debug("%s: %s the camera\n", __func__, on ? "ENABLE" : "DISABLE");
-> +	at91_set_gpio_output(AT91_PIN_PD13, on ? 0 : 1);
-
-maybe just
-
-	at91_set_gpio_output(AT91_PIN_PD13, !on);
-
+> + ? ? ? struct uart_omap_port *up = dev_get_drvdata(dev);
+> + ? ? ? struct omap_uart_port_info *pdata = dev->platform_data;
 > +
-> +	if (!on)
-> +		goto out;
+> + ? ? ? if (!up)
+> + ? ? ? ? ? ? ? return -EINVAL;
 > +
-> +	/* If enabled, give a reset impulse */
-> +	at91_set_gpio_output(AT91_PIN_PD12, 0);
-> +	msleep(20);
-> +	at91_set_gpio_output(AT91_PIN_PD12, 1);
-> +	msleep(100);
+> + ? ? ? if (!pdata->enable_wakeup || !pdata->get_context_loss_count)
+> + ? ? ? ? ? ? ? return 0;
 > +
-> +out:
-> +	return 0;
+> + ? ? ? if (pdata->get_context_loss_count)
+> + ? ? ? ? ? ? ? up->context_loss_cnt = pdata->get_context_loss_count(dev);
+> +
+> + ? ? ? if (device_may_wakeup(dev)) {
+> + ? ? ? ? ? ? ? if (!up->wakeups_enabled) {
+> + ? ? ? ? ? ? ? ? ? ? ? pdata->enable_wakeup(up->pdev, true);
+> + ? ? ? ? ? ? ? ? ? ? ? up->wakeups_enabled = true;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? } else {
+> + ? ? ? ? ? ? ? if (up->wakeups_enabled) {
+> + ? ? ? ? ? ? ? ? ? ? ? pdata->enable_wakeup(up->pdev, false);
+> + ? ? ? ? ? ? ? ? ? ? ? up->wakeups_enabled = false;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? return 0;
 > +}
 > +
-> +static struct i2c_board_info i2c_camera = {
-> +	I2C_BOARD_INFO("ov2640", 0x30),
+> +static int serial_omap_runtime_resume(struct device *dev)
+> +{
+> + ? ? ? struct uart_omap_port *up = dev_get_drvdata(dev);
+> + ? ? ? struct omap_uart_port_info *pdata = dev->platform_data;
+> +
+> + ? ? ? if (up) {
+> + ? ? ? ? ? ? ? if (pdata->get_context_loss_count) {
+> + ? ? ? ? ? ? ? ? ? ? ? u32 loss_cnt = pdata->get_context_loss_count(dev);
+> +
+> + ? ? ? ? ? ? ? ? ? ? ? if (up->context_loss_cnt != loss_cnt)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? serial_omap_restore_context(up);
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> ? ? ? ?return 0;
+> ?}
+>
+> +static const struct dev_pm_ops serial_omap_dev_pm_ops = {
+> + ? ? ? SET_SYSTEM_SLEEP_PM_OPS(serial_omap_suspend, serial_omap_resume)
+> + ? ? ? SET_RUNTIME_PM_OPS(serial_omap_runtime_suspend,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? serial_omap_runtime_resume, NULL)
 > +};
 > +
-> +static struct soc_camera_link iclink_ov2640 = {
-> +	.bus_id		= 0,
-> +	.board_info	= &i2c_camera,
-> +	.i2c_adapter_id	= 0,
-> +	.power		= i2c_camera_power,
-> +	.query_bus_param	= isi_camera_query_bus_param,
+> ?static struct platform_driver serial_omap_driver = {
+> ? ? ? ?.probe ? ? ? ? ?= serial_omap_probe,
+> ? ? ? ?.remove ? ? ? ? = serial_omap_remove,
+> -
+> - ? ? ? .suspend ? ? ? ?= serial_omap_suspend,
+> - ? ? ? .resume ? ? ? ? = serial_omap_resume,
+> ? ? ? ?.driver ? ? ? ? = {
+> ? ? ? ? ? ? ? ?.name ? = DRIVER_NAME,
+> + ? ? ? ? ? ? ? .pm ? ? = &serial_omap_dev_pm_ops,
+> ? ? ? ?},
+> ?};
+>
+> --
+> 1.7.4.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
 
-You could as well make this alignment look better.
 
-> +};
-> +
-> +static struct platform_device isi_ov2640 = {
-> +	.name	= "soc-camera-pdrv",
-> +	.id	= 0,
-> +	.dev	= {
-> +		.platform_data = &iclink_ov2640,
-> +	},
-> +};
-> +
-> +static struct platform_device *devices[] __initdata = {
-> +	&isi_ov2640,
-> +};
-> +#else
-> +static struct platform_device *devices[] __initdata = {};
-> +#endif
->  
->  /*
->   * LCD Controller
-> @@ -400,6 +479,10 @@ static void __init ek_board_init(void)
->  	ek_add_device_nand();
->  	/* I2C */
->  	at91_add_device_i2c(0, NULL, 0);
-> +	/* ISI */
-> +	platform_add_devices(devices, ARRAY_SIZE(devices));
-
-"devices" is a generic name, but you make it depend on 
-CONFIG_SOC_CAMERA_OV2640. Why don't you do
-
-static struct platform_device *devices[] __initdata = {
-#if defined(CONFIG_SOC_CAMERA_OV2640) || defined(CONFIG_SOC_CAMERA_OV2640_MODULE)
-	&isi_ov2640,
-#endif
-};
-
-and move
-
-+	platform_add_devices(devices, ARRAY_SIZE(devices));
-
-out of the /* ISI */ section to a more generic location?
-
-> +	at91_add_device_isi(&isi_data);
-> +
->  	/* LCD Controller */
->  	at91_add_device_lcdc(&ek_lcdc_data);
->  	/* Touch Screen */
-> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-> index ed544a0..276d63a 100644
-> --- a/arch/arm/mach-at91/include/mach/board.h
-> +++ b/arch/arm/mach-at91/include/mach/board.h
-> @@ -183,7 +183,8 @@ extern void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data);
->  extern void __init at91_add_device_ac97(struct ac97c_platform_data *data);
->  
->   /* ISI */
-> -extern void __init at91_add_device_isi(void);
-> +struct isi_platform_data;
-> +extern void __init at91_add_device_isi(struct isi_platform_data *data);
->  
->   /* Touchscreen Controller */
->  struct at91_tsadcc_data {
-> -- 
-> 1.6.3.3
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+thanks,
+-- 
+Ming Lei
