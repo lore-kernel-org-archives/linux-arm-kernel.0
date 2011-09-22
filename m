@@ -1,42 +1,102 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 22 Sep 2011 12:05:21 +0200
-Subject: [RESEND PATCH 2/2] s5p-tv: Add PM_RUNTIME dependency
-In-Reply-To: <1316670891-1672-1-git-send-email-hatim.rv@samsung.com>
-References: <1316670891-1672-1-git-send-email-hatim.rv@samsung.com>
-Message-ID: <005c01cc790f$24110fb0$6c332f10$%szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Sep 2011 11:10:24 +0100
+Subject: [PATCH] clk: provide prepare/unprepare functions
+Message-ID: <20110922101024.GK17169@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+As discussed previously, there's the need on some platforms to run some
+parts of clk_enable() in contexts which can schedule.  The solution
+which was agreed upon was to provide clk_prepare() and clk_unprepare()
+to contain this parts, while clk_enable() and clk_disable() perform
+the atomic part.
 
-On Thursday, September 22, 2011 7:55 AM Hatim Ali wrote:
+This patch provides a common definition for clk_prepare() and
+clk_unprepare() in linux/clk.h, and provides an upgrade path for
+existing implementation and drivers: drivers can start using
+clk_prepare() and clk_unprepare() once this patch is merged without
+having to wait for platform support.  Platforms can then start to
+provide these additional functions.
 
-> The TVOUT driver requires PM_RUNTIME support for proper clock
-> enabling.
-> 
-> Signed-off-by: Hatim Ali <hatim.rv@samsung.com>
+Eventually, HAVE_CLK_PREPARE will be removed from the kernel, and
+everyone will have to provide these new APIs.
 
-I will take this patch to our v4l fixes branch. Thanks for your contribution.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ include/linux/clk.h |   38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-> ---
->  drivers/media/video/s5p-tv/Kconfig |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/media/video/s5p-tv/Kconfig b/drivers/media/video/s5p-tv/Kconfig
-> index 9c37dee..f2a0977 100644
-> --- a/drivers/media/video/s5p-tv/Kconfig
-> +++ b/drivers/media/video/s5p-tv/Kconfig
-> @@ -8,7 +8,7 @@
-> 
->  config VIDEO_SAMSUNG_S5P_TV
->  	bool "Samsung TV driver for S5P platform (experimental)"
-> -	depends on PLAT_S5P
-> +	depends on PLAT_S5P && PM_RUNTIME
->  	depends on EXPERIMENTAL
->  	default n
->  	---help---
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 1d37f42..c7eb17d 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -11,6 +11,8 @@
+ #ifndef __LINUX_CLK_H
+ #define __LINUX_CLK_H
+ 
++#include <linux/kernel.h>
++
+ struct device;
+ 
+ /*
+@@ -41,11 +43,29 @@ struct clk;
+ struct clk *clk_get(struct device *dev, const char *id);
+ 
+ /**
++ * clk_prepare - prepare a clock source
++ * @clk: clock source
++ *
++ * This prepares the clock source for use.
++ */
++#ifdef CONFIG_HAVE_CLK_PREPARE
++int clk_prepare(struct clk *clk);
++#else
++static inline int clk_prepare(struct clk *clk)
++{
++	might_sleep();
++	return 0;
++}
++#endif
++
++/**
+  * clk_enable - inform the system when the clock source should be running.
+  * @clk: clock source
+  *
+  * If the clock can not be enabled/disabled, this should return success.
+  *
++ * May be called from atomic contexts.
++ *
+  * Returns success (0) or negative errno.
+  */
+ int clk_enable(struct clk *clk);
+@@ -57,6 +77,8 @@ int clk_enable(struct clk *clk);
+  * Inform the system that a clock source is no longer required by
+  * a driver and may be shut down.
+  *
++ * May be called from atomic contexts.
++ *
+  * Implementation detail: if the clock source is shared between
+  * multiple drivers, clk_enable() calls must be balanced by the
+  * same number of clk_disable() calls for the clock source to be
+@@ -64,6 +86,21 @@ int clk_enable(struct clk *clk);
+  */
+ void clk_disable(struct clk *clk);
+ 
++/**
++ * clk_unprepare - undo preparation of a clock source
++ * @clk: clock source
++ *
++ * This prepares the clock source for use.
++ */
++#ifdef CONFIG_HAVE_CLK_PREPARE
++void clk_unprepare(struct clk *clk);
++#else
++static inline void clk_unprepare(struct clk *clk)
++{
++	might_sleep();
++}
++#endif
++
+ /**
+  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+  *		  This is only valid once the clock source has been enabled.
