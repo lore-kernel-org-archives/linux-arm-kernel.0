@@ -1,64 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 22 Sep 2011 11:21:13 -0700
-Subject: [PATCH v2 1/3] TI81XX: Prepare for addition of TI814X support
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4D17100@dbde02.ent.ti.com>
-References: <1316626735-5597-1-git-send-email-hemantp@ti.com>
-	<20110921204057.GJ2937@atomide.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03B4D17100@dbde02.ent.ti.com>
-Message-ID: <20110922182113.GU2937@atomide.com>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Thu, 22 Sep 2011 22:31:17 +0400
+Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
+	platforms
+In-Reply-To: <CAJNCFVLm=bUMvXq7acke7Bd_tiV+b1=HjVp37KwtYyGsZHa+OQ@mail.gmail.com>
+References: <1314762635-3923-1-git-send-email-richard.zhu@linaro.org>
+	<1314762635-3923-2-git-send-email-richard.zhu@linaro.org>
+	<20110920203037.GE31404@pengutronix.de>
+	<CAJNCFVJ4EGQQ2CcRsPK6OidbU2uBEDertn8R9BuqxYGSBmxbPg@mail.gmail.com>
+	<CAJNCFVLm=bUMvXq7acke7Bd_tiV+b1=HjVp37KwtYyGsZHa+OQ@mail.gmail.com>
+Message-ID: <20110922183117.GA17600@oksana.dev.rtsoft.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pedanekar, Hemant <hemantp@ti.com> [110921 17:00]:
-> Tony Lindgren wrote on Thursday, September 22, 2011 2:11 AM:
-> 
-> > * Hemant Pedanekar <hemantp@ti.com> [110921 10:05]:
-> >> --- a/arch/arm/mach-omap2/board-ti8168evm.c
-> >> +++ b/arch/arm/mach-omap2/board-ti8168evm.c
-> >> @@ -37,16 +37,16 @@ static void __init ti8168_evm_init(void)
-> >> 
-> >>  static void __init ti8168_evm_map_io(void)
-> >>  {
-> >> -	omap2_set_globals_ti816x();
-> >> -	omapti816x_map_common_io();
-> >> +	omap2_set_globals_ti81xx();
-> >> +	omapti81xx_map_common_io();
-> >>  }
-> >> 
-> >>  MACHINE_START(TI8168EVM, "ti8168evm")
-> >>  	/* Maintainer: Texas Instruments */
-> >>  	.atag_offset	= 0x100,
-> >>  	.map_io		= ti8168_evm_map_io,
-> >> -	.init_early	= ti816x_init_early,
-> >> -	.init_irq	= ti816x_init_irq,
-> >> +	.init_early	= ti81xx_init_early,
-> >> +	.init_irq	= ti81xx_init_irq,
-> >>  	.timer		= &omap3_timer,
-> >>  	.init_machine	= ti8168_evm_init,
-> >>  MACHINE_END
-> > 
-> > Looks like you still need a minor rebase on the current cleanup
-> > branch as the ti8668_evm_map_io is no longer needed. The cleanup
-> > branch already has Paul's CHIP_IS removal, so that should be trivial.
-> >
-> 
-> Tony,
-> Can you please clarify? Do we not need ti8168_evm_map_io() for global data
-> initianlization and io init? Or, as you mentioned in comment on 3/3 of the
-> series, do you mean to rename this with ti81xx and move to common.c?
+Hi Richard,
 
-Yes just have a generic one in common.c should be enough. Sorry I thought
-that was already done, but looks like it was only done for omap3_map_io.
-  
-> > Ideally the rename patch would be separate without any functional
-> > changes, maybe you can move the changes and additions to the next patch?
-> > 
-> > Tony
-> 
-> If the above understanding is correct, then I will just have to rename+move
-> ti8168_evm_map_io() so the change can still be in this patch, right? Or are
-> You referring to any other part which should not be in this patch?
+On Wed, Sep 21, 2011 at 03:05:44PM +0800, Richard Zhu wrote:
+> Hi Sascha:
+> One proposal about how to convert the ahci driver to devicetree in future.
+> ahci driver system can make a reference to the evolution of the sdhc driver.
 
-Yes it's OK to keep it in this patch.
+You don't need to "convert" ahci driver to devicetree. IIRC,
+the current ahci_platform driver should work almost* out of
+the box with OF-enabled architectures, as OF subsystem
+automatically populates memory and interrupt resources for
+platform devices.
 
-Tony
+Someday you might need to implement OF-specific bindings
+(e.g. get some property from the device tree and translate
+it into port flags). When/if you'll need it, you can just
+add it into the driver.
+
+* Almost: you have to add of_match_table into 'struct
+  platform_driver ahci_driver'.
+
+> * separate the ahci to ahci common codes, ahci-pci driver and
+> ahci-platform driver.
+
+Done. Long time ago, actually.
+
+> * create kinds of ahci vendor's own ahci platform driver refer to the
+> sdhci-xxx driver solutions.
+
+I think that this is viable, but personally I would like to
+see platforms to just pass port flags and all needed hooks
+via platform_data. That is, I'd leave the hooks in the arch/
+code. Usually these hooks are very arch-specific (i.e. enable
+these and these clocks, etc), so arch/ seems like a perfect
+place for such things.
+
+Not a strong opinion though, and if you like to go your route,
+I'm also fine with this. It has its own pros (and cons).
+
+Thanks,
+
+-- 
+Anton Vorontsov
+Email: cbouatmailru at gmail.com
