@@ -1,51 +1,25 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 21 Sep 2011 17:52:53 -0700
-Subject: [GIT PULL] omap cleanup part1 for v3.2 merge window
-In-Reply-To: <1836081.h7sKlomlak@wuerfel>
-References: <20110917014623.GC2937@atomide.com>
-	<201109202346.11393.arnd@arndb.de>
-	<20110920223311.GK2937@atomide.com> <1836081.h7sKlomlak@wuerfel>
-Message-ID: <20110922005252.GM2937@atomide.com>
+Date: Wed, 21 Sep 2011 17:59:30 -0700
+Subject: [PATCH v16 00/12] OMAP: dmtimer: adaptation to platform_driver
+In-Reply-To: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
+References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <20110922005930.GN2937@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110920 23:34]:
-> On Tuesday 20 September 2011 15:33:12 Tony Lindgren wrote:
-> > * Arnd Bergmann <arnd@arndb.de> [110920 14:12]:
-> > > On Tuesday 20 September 2011, Arnd Bergmann wrote:
-> > > > 
-> > > > One more thing: my randconfig tests are running now and
-> > > > have spit out a new error after merging lost of stuff
-> > > > today:
-> > 
-> > Good to hear you got "arndconfig" running :)
-> > 
-> > Do you think we could also add support for something
-> > like this:
-> > 
-> > $ echo CONFIG_ARCH_OMAP=y > .config
-> > $ make randconfig
-> > 
-> > or
-> > 
-> > $ make --force=CONFIG_ARCH_OMAP randconfig
-> > 
-> > Where randconfig would keep the forced CONFIG_ARCH_OMAP
-> > static while randomly selecting the others?
-> > 
-> > This would allow targeted randconfig for each patch more
-> > or less..
-> 
-> The mechanism I use is setting KCONFIG_ALLCONFIG= to a file
-> that has the options I want to have set to a specific value.
-> 
-> If you don't do that, randconfig will take the default option
-> for each 'choice' statement, which means we build for the
-> ARCH_VERSATILE platform.
-> 
-> See the script I'm using at the end of this mail. It should
-> be easy for you to pick out the parts you need.
+Hi Tarun,
 
-Thanks will take a look at that for sure.
+* Tarun Kanti DebBarma <tarun.kanti@ti.com> [110920 03:57]:
+> Adaptation of dmtimer code to platform driver using omap_device and
+> omap_hwmod abstraction. It also include pm-runtime and off-mode support.
+
+I've applied these into dmtimer branch with some changes to simplify
+things further. I've also merged it into linux-omap master branch
+for further testing.
+
+I'll reply to your patches with the changes I've done. Care give the
+dmtimer branch a try and see if I've missed something?
+
+Regards,
 
 Tony
