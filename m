@@ -1,76 +1,41 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 22 Sep 2011 09:33:37 -0700
-Subject: [GIT PULL] OMAP: omap_device cleanup for v3.2
-In-Reply-To: <20110921182051.GH2937@atomide.com> (Tony Lindgren's message of
-	"Wed, 21 Sep 2011 11:20:51 -0700")
-References: <87mxe5tlzv.fsf@ti.com> <87y5xps6kv.fsf@ti.com>
-	<20110921182051.GH2937@atomide.com>
-Message-ID: <878vpgv8ny.fsf@ti.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 22 Sep 2011 09:53:06 -0700
+Subject: [PATCH 2/3] arm/tegra: add support for ventana pinmuxing
+In-Reply-To: <1316686384-20236-3-git-send-email-pdeschrijver@nvidia.com>
+References: <1316686384-20236-1-git-send-email-pdeschrijver@nvidia.com>
+	<1316686384-20236-3-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1739554CD4@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+Peter De Schrijver wrote at Thursday, September 22, 2011 4:13 AM:
+> Add support for ventana pinmuxing as a seaboard derivative. This is a cut down
+> version of chromeos kernel commit 772f1b56e713be7a55759c2d5eadb9eb11d078db
+> by Jong Kim <jongk@nvidia.com>.
+> 
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
-> * Kevin Hilman <khilman@ti.com> [110915 16:23]:
->> Kevin Hilman <khilman@ti.com> writes:
->> 
->> > Please pull this omap_device cleanup series for v3.2.  This sets the
->> > groundwork for Benoit's DT infrastructure work.
->> 
->> Turns out this series has a dependency on a patch[1] in Russell's
->> for-next branch.
->> 
->> Russell, any chance of picking this patch into your devel-stable so we
->> have a fixed point to merge with?
->
-> Or maybe Kevin can add it to his series instead?
+Could you please repost these to the Tegra maintainers/lists as well.
 
-OK, Russell and I agreed (offline) that I would just take this patch,
-and he will drop from his for-next branch.
+> diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+...
+> +static __initdata struct tegra_pingroup_config ventana_pinmux[] = {
 
-I've cherry-picked it into the my branch, and here's the updated pull
-request.  Should have no external dependencies now, and I compile tested
-for OMAP1 and OMAP2+ on top of the arm-soc/next/cleanup branch.
+The indentation of this new array uses a mix of spaces and TABs between
+the fields. Probably best to consistently use one or the other. For
+reference, the existing seaboard_pinmux[] uses just spaces internally.
 
-Kevin
+> +	{TEGRA_PINGROUP_DAP3, TEGRA_MUX_DAP3,     TEGRA_PUPD_NORMAL,	TEGRA_TRI_TRISTATE},
+...
+> +	{TEGRA_PINGROUP_DTA,  TEGRA_MUX_VI,       TEGRA_PUPD_PULL_DOWN, TEGRA_TRI_NORMAL},
 
+Finally, it's probably a good idea to add a patch to fix mach-tegra/Makefile
+such that CONFIG_MACH_TEGRA_DT includes board-seaboard-pinmux.o. I know
+internally I said it wasn't worth it since we'd be removing the pinmux
+calls from board-dt.c soon, but I'm thinking now it'll take a little
+while to sort that out, since I probably need to rework my patches for
+that so they're implemented within the core pinmux subsystem rather than
+separately within the Tegra pinmux driver. Sorry for flip-flopping here.
 
-The following changes since commit b6fd41e29dea9c6753b1843a77e50433e6123bcb:
-
-  Linux 3.1-rc6 (2011-09-12 14:02:02 -0700)
-
-are available in the git repository at:
-  git://gitorious.org/khilman/linux-omap-pm.git for_3.2/omap_device
-
-Grazvydas Ignotas (1):
-      OMAP: omap_device: make latency autoadjust messages debug
-
-Jarkko Nikula (1):
-      omap: mcbsp: Remove omap device API
-
-Kevin Hilman (7):
-      OMAP: omap_device: replace debug/warning/error prints with dev_* macros
-      OMAP: omap_device: remove internal functions from omap_device.h
-      OMAP: omap_device: when building return platform_device instead of omap_device
-      OMAP: omap_device: device register functions now take platform_device pointer
-      OMAP: omap_device: _disable_idle_on_suspend() takes platform_device pointer
-      OMAP: omap_device: decouple platform_device from omap_device
-      ARM: 7082/1: platform_device: pdev_archdata: add omap_device pointer
-
- arch/arm/include/asm/device.h                 |    5 +
- arch/arm/mach-omap2/devices.c                 |   44 +++---
- arch/arm/mach-omap2/display.c                 |    6 +-
- arch/arm/mach-omap2/dma.c                     |   16 +-
- arch/arm/mach-omap2/gpio.c                    |   10 +-
- arch/arm/mach-omap2/hsmmc.c                   |    8 +-
- arch/arm/mach-omap2/hwspinlock.c              |    8 +-
- arch/arm/mach-omap2/mcbsp.c                   |    8 +-
- arch/arm/mach-omap2/opp.c                     |    2 +-
- arch/arm/mach-omap2/pm.c                      |    8 +-
- arch/arm/mach-omap2/serial.c                  |   14 +-
- arch/arm/mach-omap2/sr_device.c               |    6 +-
- arch/arm/plat-omap/i2c.c                      |    8 +-
- arch/arm/plat-omap/include/plat/omap_device.h |   30 ++--
- arch/arm/plat-omap/mcbsp.c                    |   27 ----
- arch/arm/plat-omap/omap_device.c              |  185 +++++++++++++------------
- 16 files changed, 185 insertions(+), 200 deletions(-)
+-- 
+nvpublic
