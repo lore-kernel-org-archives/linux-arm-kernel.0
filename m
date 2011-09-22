@@ -1,32 +1,75 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 22 Sep 2011 13:10:15 +0800
-Subject: [PATCH v4 0/3] add fec support for imx6q
-Message-ID: <1316668218-10194-1-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 22 Sep 2011 13:10:16 +0800
+Subject: [PATCH v4 1/3] net/fec: fec_reset_phy() does not need to always
+	succeed
+In-Reply-To: <1316668218-10194-1-git-send-email-shawn.guo@linaro.org>
+References: <1316668218-10194-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1316668218-10194-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds imx6q enet support.  The imx6q enet is a derivative of
-imx28 enet controller.  It fixed the frame endian issue found on imx28,
-and added 1 Gbps support.
+FEC can work without a phy reset on some platforms, which means not
+very platform necessarily have a phy-reset gpio encoded in device tree.
+Even on the platforms that have the gpio, FEC can work without
+resetting phy for some cases, e.g. boot loader has done that.
 
-Changes since v3:
- * The minus one on phy_speed should happend before left shift.
+So it makes more sense to have the phy-reset-gpio request failure as
+a debug message rather than a warning, and get fec_reset_phy() return
+void since the caller does not check the return anyway.
 
-Changes since v2:
- * Refine patch #1 to get fec_reset_phy() return void
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ drivers/net/ethernet/freescale/fec.c |   13 +++++--------
+ 1 files changed, 5 insertions(+), 8 deletions(-)
 
-Changes since v1:
- * Fix typo pointed out by Francois Romieu
- * Drop patch #3 in the v1
- * Rebase on net-next tree
-
-Thanks.
-
-Shawn Guo (3):
-      net/fec: fec_reset_phy() does not need to always succeed
-      net/fec: fix fec1 check in fec_enet_mii_init()
-      net/fec: add imx6q enet support
-
- drivers/net/ethernet/freescale/Kconfig |    9 ++--
- drivers/net/ethernet/freescale/fec.c   |   79 +++++++++++++++++++++++---------
- 2 files changed, 61 insertions(+), 27 deletions(-)
+diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
+index 158b82e..9c1d059 100644
+--- a/drivers/net/ethernet/freescale/fec.c
++++ b/drivers/net/ethernet/freescale/fec.c
+@@ -1411,24 +1411,22 @@ static int __devinit fec_get_phy_mode_dt(struct platform_device *pdev)
+ 	return -ENODEV;
+ }
+ 
+-static int __devinit fec_reset_phy(struct platform_device *pdev)
++static void __devinit fec_reset_phy(struct platform_device *pdev)
+ {
+ 	int err, phy_reset;
+ 	struct device_node *np = pdev->dev.of_node;
+ 
+ 	if (!np)
+-		return -ENODEV;
++		return;
+ 
+ 	phy_reset = of_get_named_gpio(np, "phy-reset-gpios", 0);
+ 	err = gpio_request_one(phy_reset, GPIOF_OUT_INIT_LOW, "phy-reset");
+ 	if (err) {
+-		pr_warn("FEC: failed to get gpio phy-reset: %d\n", err);
+-		return err;
++		pr_debug("FEC: failed to get gpio phy-reset: %d\n", err);
++		return;
+ 	}
+ 	msleep(1);
+ 	gpio_set_value(phy_reset, 1);
+-
+-	return 0;
+ }
+ #else /* CONFIG_OF */
+ static inline int fec_get_phy_mode_dt(struct platform_device *pdev)
+@@ -1436,13 +1434,12 @@ static inline int fec_get_phy_mode_dt(struct platform_device *pdev)
+ 	return -ENODEV;
+ }
+ 
+-static inline int fec_reset_phy(struct platform_device *pdev)
++static inline void fec_reset_phy(struct platform_device *pdev)
+ {
+ 	/*
+ 	 * In case of platform probe, the reset has been done
+ 	 * by machine code.
+ 	 */
+-	return 0;
+ }
+ #endif /* CONFIG_OF */
+ 
+-- 
+1.7.4.1
