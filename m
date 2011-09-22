@@ -1,42 +1,52 @@
-From: jon.medhurst@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 22 Sep 2011 13:13:01 +0100
-Subject: [PATCH] arm: Add unwinding annotations for 64bit division
-	functions
-In-Reply-To: <20110922115713.GJ12025@e102109-lin.cambridge.arm.com>
-References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
-	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
-	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
-	<20110921113906.GB2872@arm.com>
-	<20110921115553.GF17169@n2100.arm.linux.org.uk>
-	<1316676488.2053.9.camel@linaro1>
-	<CAHkRjk7B4Bmt2g6ptHO3TudXgrkr5rv4b--Hbx-mw7=MO9Q+BQ@mail.gmail.com>
-	<1316689606.2053.29.camel@linaro1>
-	<20110922115713.GJ12025@e102109-lin.cambridge.arm.com>
-Message-ID: <1316693581.2053.38.camel@linaro1>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Thu, 22 Sep 2011 20:19:26 +0800
+Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
+	platforms
+In-Reply-To: <CAODfWeFPwUa++=Bz6503KJS9dNhmkjNuWF_g==MaFKydqRRX3A@mail.gmail.com>
+References: <1314698171-7937-1-git-send-email-richard.zhu@linaro.org>
+	<CAODfWeEm8bkySXxb1qopbH1VMu-V+33k5x+0+qjABzesT0amOA@mail.gmail.com>
+	<CAJNCFV+XFGEba1J2dXDa4YVwqduAPV5y=5JYEXAZ0uv+S60vvw@mail.gmail.com>
+	<CAODfWeEueF45_yvPV5Zxbva6K2gEfKZbY2qoqySYFPZWnSgLsg@mail.gmail.com>
+	<CAJNCFVLP7gA_7vBjwVNkQaSg8LZ4hROLdNCx8SBVah=F1ptrhQ@mail.gmail.com>
+	<CAODfWeHTRuFZtnYZOD-mFonyjBvjhid4=0=a_mYXdjXAOQYejA@mail.gmail.com>
+	<CAMPhdO-f2RHtZ0RdV_wGZvohMT85Q3JzTePaD9w73shGpWkP6g@mail.gmail.com>
+	<CAODfWeFPwUa++=Bz6503KJS9dNhmkjNuWF_g==MaFKydqRRX3A@mail.gmail.com>
+Message-ID: <CAMPhdO98U2jJ24S=NDXBRGg013eAf8Q4mL02ySiWGOrXBAJVmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-09-22 at 12:57 +0100, Catalin Marinas wrote:
-> On Thu, Sep 22, 2011 at 12:06:46PM +0100, Jon Medhurst (Tixy) wrote:
-> > On Thu, 2011-09-22 at 10:48 +0100, Catalin Marinas wrote:
-> > > We could improve things a bit in the unwinder and assume
-> > > that if the fault address is the same as the .fnstart address, the
-> > > return value is always in LR and the SP not affected (that's unwinding
-> > > bytecode 0xb0). For a few instructions into the function prologue we
-> > > can't reliably get the unwinding information.
-> > 
-> > That would help make it possible to unwind out of kprobes handlers to
-> > the probed function. The kprobes code itself would need work as well,
-> > and possibly the undef handler. Do we think it is worthwhile to do
-> > this? 
-> 
-> Does kprobes need to trace beyond the probed function? If not, you get
-> the address of the probed function via pt_regs anyway, so no need for
-> unwinding beyond that.
+On Thu, Sep 22, 2011 at 5:30 PM, Hector Oron <hector.oron@gmail.com> wrote:
+> Hello,
+>
+> ?Apologies for late reply.
+>
+> 2011/9/6 Eric Miao <eric.miao@linaro.org>:
+>> On Tue, Sep 6, 2011 at 1:46 AM, Hector Oron <hector.oron@gmail.com> wrote:
+>>> 2011/9/1 Richard Zhu <richard.zhu@linaro.org>:
+>
+>>> Here is my complete dmesg. The system seems to work fine, it is a
+>>> 1.0TB WD10TPVT SATA disk in a case which provides eSATA and connected
+>>> to mx53 LOCO with eSATA-to-SATA cable.
+>
+>> Is it possible that it's caused by this converter? Do you have a separate
+>> SATA power supply that could help test the disk directly connected to
+>> mx53loco?
+>
+> I think I had a bad configuration setup for my kernel. I have rebuilt
+> 3.1.0-rc6 from Sascha's master git with this patches and now SATA is
+> working properly I do not see any issue as I did. So, from my side all
+> is OK now, and I assume I had some missing or conflicting module
+> setup.
+>
+> Kind regards and apologies for inconveniences,
 
-To be honest, I'm not very sure how kprobes get used in the real world.
-Though, if stack unwinding from their handlers currently doesn't work
-and people had a usecase for it, we would expect them to complain.
+That's great, Herton. Can we take it as a Tested-by?
 
--- 
-Tixy
+> --
+> ?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
