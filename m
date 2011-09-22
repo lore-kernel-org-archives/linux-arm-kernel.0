@@ -1,67 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Sep 2011 13:35:11 +0200
-Subject: [GIT PULL] ux500-core for 3.2
-In-Reply-To: <CACRpkdakwQMaqJ4TwXxPJYjayMjO5iN68RQSZODGfhGCEjXnZA@mail.gmail.com>
-References: <CACRpkdZofKjOrPFWNR-2D0LWx3NGMiLwyhf7gAVdvBGvQHqJLQ@mail.gmail.com>
-	<201109202248.01993.arnd@arndb.de>
-	<CACRpkdakwQMaqJ4TwXxPJYjayMjO5iN68RQSZODGfhGCEjXnZA@mail.gmail.com>
-Message-ID: <201109221335.11643.arnd@arndb.de>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 22 Sep 2011 15:42:07 +0400
+Subject: [V8 PATCH 5/5] MX53 Enable the AHCI SATA on MX53 SMD board
+In-Reply-To: <1316686488-4684-6-git-send-email-richard.zhu@linaro.org>
+References: <1316686488-4684-1-git-send-email-richard.zhu@linaro.org>
+	<1316686488-4684-6-git-send-email-richard.zhu@linaro.org>
+Message-ID: <4E7B1F0F.10601@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 September 2011, Linus Walleij wrote:
-> On Tue, Sep 20, 2011 at 10:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 20 September 2011, Linus Walleij wrote:
-> >> to the ARM SoC tree (ux500 branch or however you prefer to handle it)?
-> >> They have all been reviewed on the ARM list recently and are mostly
-> >> minor fixes and Lee Jones nice cleanup patch.
-> >
-> > I would really like to see this split into logical branches, even
-> > if there are just a few patches for each of them.
-> 
-> No problem. So the preferred scheme is to have three topics
-> for a SoC: fixes, cleanup and "new stuff" or something like that?
+Hello.
 
-Roughly, yes.  For new stuff, you can have multiple sub-categories,
-depending on how many patches you have.
+On 22-09-2011 14:14, Richard Zhu wrote:
 
-Some platforms have separated board-specific updates from overall
-platform changes, which I find very useful.
+> Signed-off-by: Richard Zhu<richard.zhu@linaro.org>
+> ---
+>   arch/arm/mach-mx5/board-mx53_smd.c |   16 ++++++++++++++++
+>   1 files changed, 16 insertions(+), 0 deletions(-)
 
-Also, if you add (or remove) a major feature, that can be a branch
-by itself for this feature.
+> diff --git a/arch/arm/mach-mx5/board-mx53_smd.c b/arch/arm/mach-mx5/board-mx53_smd.c
+> index bc02894..9d06fbe 100644
+> --- a/arch/arm/mach-mx5/board-mx53_smd.c
+> +++ b/arch/arm/mach-mx5/board-mx53_smd.c
+[...]
+> @@ -111,6 +112,19 @@ static const struct imxi2c_platform_data mx53_smd_i2c_data __initconst = {
+>   	.bitrate = 100000,
+>   };
+>
+> +static inline void mx53_smd_ahci_pwr_on(void)
+> +{
+> +	int ret;
+> +
+> +	/* Enable SATA PWR */
+> +	ret = gpio_request(MX53_SMD_SATA_PWR_EN, "ahci-sata-pwr");
+> +	if (ret) {
+> +		printk(KERN_ERR "failed to get SATA_PWR_EN: %d\n", ret);
+> +		return;
+> +	}
+> +	gpio_direction_output(MX53_SMD_SATA_PWR_EN, 1);
 
-> > It's also not clear if the two bug fix patches should be applied
-> > to 3.1 and -stable as well as 3.2. My feeling is that they should.
-> 
-> Depends. For Srinidhi's
-> "mach-ux500: enable fix for ARM errata 754322"
-> yes, definately.
-> 
-> For:
-> "mach-ux500: unlock I&D l2x0 caches before init"
-> it's a performance regression, nothing like a crash or so.
-> 
-> (I guess you're referring to these two?)
+    You can use gpio_request_one() instead of gpio_request()/gpio_direction_*().
 
-Right, thanks for the explanation. If the latter is a regression,
-I'd still treat it as a bug fix. For a general (non-regression)
-performance improvement, I'd put it into a development branch.
-
-> > If you want bug fixes to be backported, please add a 'Cc: stable at kernel.org'
-> > line after your Signed-off-by. If not, add an explanation to the
-> > pull request why they are not relevant for backporting.
-> (...)
-> > Please submit the two bug fixes again, rebased to an -rc release.
-> 
-> I'll fix.
-> 
-> Since it's just two patches I guess you can just pick these
-> two in plaintext? But I can make a pull request if you prefer...
-
-In general, I prefer pull requests, but if you have no other patches
-for 3.2, I can just cherry-pick them from the branch I already pulled.
-I would put the first patch into fixes for 3.1 and mark it as 'Cc:stable'
-and the other one into fixes for 3.2 then.
-
-	Arnd
+WBR, Sergei
