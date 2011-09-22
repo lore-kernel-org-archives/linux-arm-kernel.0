@@ -1,114 +1,46 @@
 From: rogerio.pimentel@freescale.com (Rogerio Pimentel)
-Date: Thu, 22 Sep 2011 14:30:32 -0300
-Subject: [PATCH v3 1/4] ARM: mx53: Change pad configs for flexcan pins
-Message-ID: <1316712635-25126-1-git-send-email-rogerio.pimentel@freescale.com>
+Date: Thu, 22 Sep 2011 14:30:33 -0300
+Subject: [PATCH v3 2/4] ARM: mx53: Add clock for flexcan
+In-Reply-To: <1316712635-25126-1-git-send-email-rogerio.pimentel@freescale.com>
+References: <1316712635-25126-1-git-send-email-rogerio.pimentel@freescale.com>
+Message-ID: <1316712635-25126-2-git-send-email-rogerio.pimentel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changing pad configs for flexcan on i.MX53
+Adding clock for flexcan on i.MX53
 
 Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
 ---
 Changes since v2: 
-Rebased to imx-cleanup, changed the patch subject
- arch/arm/plat-mxc/include/mach/iomux-mx53.h |   23 ++++++++++++-----------
- 1 files changed, 12 insertions(+), 11 deletions(-)
+Rebased to imx-cleanup
+ arch/arm/mach-mx5/clock-mx51-mx53.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-index 527f8fe..12b5a5d 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
-@@ -30,7 +30,8 @@
- #define MX53_SDHC_PAD_CTRL 	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
- 				PAD_CTL_PUS_47K_UP | PAD_CTL_DSE_HIGH | \
- 				PAD_CTL_SRE_FAST)
--
-+#define MX53_CAN_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_DSE_HIGH | \
-+					PAD_CTL_HYS)
+diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
+index a3db355..30d008f 100644
+--- a/arch/arm/mach-mx5/clock-mx51-mx53.c
++++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
+@@ -1418,6 +1418,12 @@ DEFINE_CLOCK(ipu_di0_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG5_OFFSET,
+ DEFINE_CLOCK(ipu_di1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG6_OFFSET,
+ 		NULL, NULL, &pll3_sw_clk, NULL);
  
- #define MX53_PAD_GPIO_19__KPP_COL_5			IOMUX_PAD(0x348, 0x020, 0, 0x840, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_19__GPIO4_5			IOMUX_PAD(0x348, 0x020, 1, __NA_, 0, NO_PAD_CTRL)
-@@ -69,14 +70,14 @@
- #define MX53_PAD_KEY_ROW1__USBPHY1_RXVALID		IOMUX_PAD(0x358, 0x030, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL2__KPP_COL_2			IOMUX_PAD(0x35C, 0x034, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL2__GPIO4_10			IOMUX_PAD(0x35C, 0x034, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_KEY_COL2__CAN1_TXCAN			IOMUX_PAD(0x35C, 0x034, 2, __NA_, 0, NO_PAD_CTRL)
-+#define MX53_PAD_KEY_COL2__CAN1_TXCAN			IOMUX_PAD(0x35C, 0x034, 2, __NA_, 0, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_KEY_COL2__FEC_MDIO			IOMUX_PAD(0x35C, 0x034, 4, 0x804, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL2__ECSPI1_SS1			IOMUX_PAD(0x35C, 0x034, 5, 0x7AC, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL2__FEC_RDATA_2			IOMUX_PAD(0x35C, 0x034, 6, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL2__USBPHY1_RXACTIVE		IOMUX_PAD(0x35C, 0x034, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW2__KPP_ROW_2			IOMUX_PAD(0x360, 0x038, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW2__GPIO4_11			IOMUX_PAD(0x360, 0x038, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_KEY_ROW2__CAN1_RXCAN			IOMUX_PAD(0x360, 0x038, 2, 0x760, 0, NO_PAD_CTRL)
-+#define MX53_PAD_KEY_ROW2__CAN1_RXCAN			IOMUX_PAD(0x360, 0x038, 2, 0x760, 0, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_KEY_ROW2__FEC_MDC			IOMUX_PAD(0x360, 0x038, 4, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW2__ECSPI1_SS2			IOMUX_PAD(0x360, 0x038, 5, 0x7B0, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW2__FEC_TDATA_2			IOMUX_PAD(0x360, 0x038, 6, __NA_, 0, NO_PAD_CTRL)
-@@ -99,14 +100,14 @@
- #define MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0		IOMUX_PAD(0x368, 0x040, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL4__KPP_COL_4			IOMUX_PAD(0x36C, 0x044, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL4__GPIO4_14			IOMUX_PAD(0x36C, 0x044, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_KEY_COL4__CAN2_TXCAN			IOMUX_PAD(0x36C, 0x044, 2, __NA_, 0, NO_PAD_CTRL)
-+#define MX53_PAD_KEY_COL4__CAN2_TXCAN			IOMUX_PAD(0x36C, 0x044, 2, __NA_, 0, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_KEY_COL4__IPU_SISG_4			IOMUX_PAD(0x36C, 0x044, 3, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL4__UART5_RTS			IOMUX_PAD(0x36C, 0x044, 4, 0x894, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_KEY_COL4__USBOH3_USBOTG_OC		IOMUX_PAD(0x36C, 0x044, 5, 0x89C, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_COL4__USBPHY1_LINESTATE_1		IOMUX_PAD(0x36C, 0x044, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW4__KPP_ROW_4			IOMUX_PAD(0x370, 0x048, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW4__GPIO4_15			IOMUX_PAD(0x370, 0x048, 1, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_KEY_ROW4__CAN2_RXCAN			IOMUX_PAD(0x370, 0x048, 2, 0x764, 0, NO_PAD_CTRL)
-+#define MX53_PAD_KEY_ROW4__CAN2_RXCAN			IOMUX_PAD(0x370, 0x048, 2, 0x764, 0, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_KEY_ROW4__IPU_SISG_5			IOMUX_PAD(0x370, 0x048, 3, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_KEY_ROW4__UART5_CTS			IOMUX_PAD(0x370, 0x048, 4, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_KEY_ROW4__USBOH3_USBOTG_PWR		IOMUX_PAD(0x370, 0x048, 5, __NA_, 0, NO_PAD_CTRL)
-@@ -891,25 +892,25 @@
- #define MX53_PAD_PATA_INTRQ__PATA_INTRQ			IOMUX_PAD(0x600, 0x280, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_INTRQ__GPIO7_2			IOMUX_PAD(0x600, 0x280, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_INTRQ__UART2_CTS			IOMUX_PAD(0x600, 0x280, 3, __NA_, 0, MX53_UART_PAD_CTRL)
--#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN			IOMUX_PAD(0x600, 0x280, 4, __NA_, 0, NO_PAD_CTRL)
-+#define MX53_PAD_PATA_INTRQ__CAN1_TXCAN			IOMUX_PAD(0x600, 0x280, 4, __NA_, 0, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_PATA_INTRQ__CCM_CCM_OUT_2		IOMUX_PAD(0x600, 0x280, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_INTRQ__USBPHY2_DATAOUT_6		IOMUX_PAD(0x600, 0x280, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DIOR__PATA_DIOR			IOMUX_PAD(0x604, 0x284, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DIOR__GPIO7_3			IOMUX_PAD(0x604, 0x284, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DIOR__UART2_RTS			IOMUX_PAD(0x604, 0x284, 3, 0x87C, 3, MX53_UART_PAD_CTRL)
--#define MX53_PAD_PATA_DIOR__CAN1_RXCAN			IOMUX_PAD(0x604, 0x284, 4, 0x760, 1, NO_PAD_CTRL)
-+#define MX53_PAD_PATA_DIOR__CAN1_RXCAN			IOMUX_PAD(0x604, 0x284, 4, 0x760, 1, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_PATA_DIOR__USBPHY2_DATAOUT_7		IOMUX_PAD(0x604, 0x284, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_RESET_B__PATA_PATA_RESET_B	IOMUX_PAD(0x608, 0x288, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_RESET_B__GPIO7_4			IOMUX_PAD(0x608, 0x288, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_RESET_B__ESDHC3_CMD		IOMUX_PAD(0x608, 0x288, 2, __NA_, 0, MX53_SDHC_PAD_CTRL)
- #define MX53_PAD_PATA_RESET_B__UART1_CTS		IOMUX_PAD(0x608, 0x288, 3, __NA_, 0, MX53_UART_PAD_CTRL)
--#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		IOMUX_PAD(0x608, 0x288, 4, __NA_, 0, NO_PAD_CTRL)
-+#define MX53_PAD_PATA_RESET_B__CAN2_TXCAN		IOMUX_PAD(0x608, 0x288, 4, __NA_, 0, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_PATA_RESET_B__USBPHY1_DATAOUT_0	IOMUX_PAD(0x608, 0x288, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_IORDY__PATA_IORDY			IOMUX_PAD(0x60C, 0x28C, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_IORDY__GPIO7_5			IOMUX_PAD(0x60C, 0x28C, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_IORDY__ESDHC3_CLK			IOMUX_PAD(0x60C, 0x28C, 2, __NA_, 0, MX53_SDHC_PAD_CTRL)
- #define MX53_PAD_PATA_IORDY__UART1_RTS			IOMUX_PAD(0x60C, 0x28C, 3, 0x874, 3, MX53_UART_PAD_CTRL)
--#define MX53_PAD_PATA_IORDY__CAN2_RXCAN			IOMUX_PAD(0x60C, 0x28C, 4, 0x764, 1, NO_PAD_CTRL)
-+#define MX53_PAD_PATA_IORDY__CAN2_RXCAN			IOMUX_PAD(0x60C, 0x28C, 4, 0x764, 1, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_PATA_IORDY__USBPHY1_DATAOUT_1		IOMUX_PAD(0x60C, 0x28C, 7, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DA_0__PATA_DA_0			IOMUX_PAD(0x610, 0x290, 0, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_PATA_DA_0__GPIO7_6			IOMUX_PAD(0x610, 0x290, 1, __NA_, 0, NO_PAD_CTRL)
-@@ -1179,7 +1180,7 @@
- #define MX53_PAD_GPIO_7__ESAI1_TX4_RX1			IOMUX_PAD(0x6C4, 0x334, 0, 0x7F4, 1, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_7__GPIO1_7			IOMUX_PAD(0x6C4, 0x334, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_7__EPIT1_EPITO			IOMUX_PAD(0x6C4, 0x334, 2, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_GPIO_7__CAN1_TXCAN			IOMUX_PAD(0x6C4, 0x334, 3, __NA_, 0, NO_PAD_CTRL)
-+#define MX53_PAD_GPIO_7__CAN1_TXCAN			IOMUX_PAD(0x6C4, 0x334, 3, __NA_, 0, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_GPIO_7__UART2_TXD_MUX			IOMUX_PAD(0x6C4, 0x334, 4, __NA_, 0, MX53_UART_PAD_CTRL)
- #define MX53_PAD_GPIO_7__FIRI_RXD			IOMUX_PAD(0x6C4, 0x334, 5, 0x80C, 1, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_7__SPDIF_PLOCK			IOMUX_PAD(0x6C4, 0x334, 6, __NA_, 0, NO_PAD_CTRL)
-@@ -1187,7 +1188,7 @@
- #define MX53_PAD_GPIO_8__ESAI1_TX5_RX0			IOMUX_PAD(0x6C8, 0x338, 0, 0x7F8, 1, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_8__GPIO1_8			IOMUX_PAD(0x6C8, 0x338, 1, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_8__EPIT2_EPITO			IOMUX_PAD(0x6C8, 0x338, 2, __NA_, 0, NO_PAD_CTRL)
--#define MX53_PAD_GPIO_8__CAN1_RXCAN			IOMUX_PAD(0x6C8, 0x338, 3, 0x760, 3, NO_PAD_CTRL)
-+#define MX53_PAD_GPIO_8__CAN1_RXCAN			IOMUX_PAD(0x6C8, 0x338, 3, 0x760, 3, MX53_CAN_PAD_CTRL)
- #define MX53_PAD_GPIO_8__UART2_RXD_MUX			IOMUX_PAD(0x6C8, 0x338, 4, 0x880, 5, MX53_UART_PAD_CTRL)
- #define MX53_PAD_GPIO_8__FIRI_TXD			IOMUX_PAD(0x6C8, 0x338, 5, __NA_, 0, NO_PAD_CTRL)
- #define MX53_PAD_GPIO_8__SPDIF_SRCLK			IOMUX_PAD(0x6C8, 0x338, 6, __NA_, 0, NO_PAD_CTRL)
++/* CAN */
++DEFINE_CLOCK(can1_clk, 0, MXC_CCM_CCGR6, MXC_CCM_CCGRx_CG10_OFFSET,
++		NULL, NULL, &ipg_clk, NULL);
++DEFINE_CLOCK(can2_clk, 1, MXC_CCM_CCGR4, MXC_CCM_CCGRx_CG3_OFFSET,
++		NULL, NULL, &ipg_clk, NULL);
++
+ #define _REGISTER_CLOCK(d, n, c) \
+        { \
+ 		.dev_id = d, \
+@@ -1507,6 +1513,8 @@ static struct clk_lookup mx53_lookups[] = {
+ 	_REGISTER_CLOCK("imx-ssi.1", NULL, ssi2_clk)
+ 	_REGISTER_CLOCK("imx-ssi.2", NULL, ssi3_clk)
+ 	_REGISTER_CLOCK("imx-keypad", NULL, dummy_clk)
++	_REGISTER_CLOCK("flexcan.0", NULL, can1_clk)
++	_REGISTER_CLOCK("flexcan.1", NULL, can2_clk)
+ };
+ 
+ static void clk_tree_init(void)
 -- 
 1.7.1
