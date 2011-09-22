@@ -1,34 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Sep 2011 17:13:27 +0200
-Subject: [GIT PULL] CSR prima2 PM support for 3.2
-In-Reply-To: <CAGsJ_4y6vuy8ZicefRR8DE6Zoj2nzy1JcOxhHK3Xos8d9NxxSQ@mail.gmail.com>
-References: <CAGsJ_4y6vuy8ZicefRR8DE6Zoj2nzy1JcOxhHK3Xos8d9NxxSQ@mail.gmail.com>
-Message-ID: <201109221713.27370.arnd@arndb.de>
+Date: Thu, 22 Sep 2011 17:19:40 +0200
+Subject: [PATCH v2 3/3] ARM: CSR: PM: add sleep entry for SiRFprimaII
+In-Reply-To: <CAGsJ_4zY=J5w5st5P1gYonPata4maWb7Phe1Gohf_qjgDxxbnw@mail.gmail.com>
+References: <1316618267-4348-1-git-send-email-21cnbao@gmail.com>
+	<1316618267-4348-4-git-send-email-21cnbao@gmail.com>
+	<CAGsJ_4zY=J5w5st5P1gYonPata4maWb7Phe1Gohf_qjgDxxbnw@mail.gmail.com>
+Message-ID: <201109221719.40279.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 September 2011, Barry Song wrote:
-> Hi Arnd,
+On Thursday 22 September 2011, Barry Song wrote:
+> 2011/9/21 Barry Song <21cnbao@gmail.com>:
+> > From: Rongjun Ying <rongjun.ying@csr.com>
+> >
+> > This patch adds suspend-to-mem support for prima2. It will make prima2
+> > enter DEEPSLEEP mode while accepting PM_SUSPEND_MEM command.
+> >
+> > Signed-off-by: Rongjun Ying <baohua.song@csr.com>
 > 
-> Can you pls pull the prima2 PM support for 3.2? As the patchset
-> depends on rtciobrg you pulled last time, i didn't rebase it to 3.1-rc
-> to avoid merge conflict.
+> sorry for typo. it should be:
+> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
 > 
-> The following changes since commit 684f741446f7a3108b4c167faf20214c42b7eeac:
->   Zhiwu Song (1):
->         ARM: CSR: add rtc i/o bridge interface for SiRFprimaII
-> 
-> are available in the git repository at:
-> 
->   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git for-arnd
-> 
-> Barry Song (2):
->       ARM: CSR: PM: save/restore timer status in suspend cycle
->       ARM: CSR: PM: save/restore irq status in suspend cycle
-> 
-> Rongjun Ying (1):
->       ARM: CSR: PM: add sleep entry for SiRFprimaII
+> this was fixed in repository for pull.
 
-Pulled, thanks!
+Ok, I've made sure I have the right version.
 
 	Arnd
