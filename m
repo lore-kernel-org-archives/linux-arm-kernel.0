@@ -1,41 +1,31 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Thu, 22 Sep 2011 13:25:36 +0530
-Subject: [PATCH v5 09/15] OMAP2+: UART: Add runtime pm support for
-	omap-serial driver
-In-Reply-To: <CACVXFVMpvF5foA1asLYE5WbvHQ3b_eXaBpiMT7Q1h0KHDGLSCg@mail.gmail.com>
-References: <1316607206-21669-1-git-send-email-govindraj.raja@ti.com>
-	<1316607206-21669-7-git-send-email-govindraj.raja@ti.com>
-	<CACVXFVMpvF5foA1asLYE5WbvHQ3b_eXaBpiMT7Q1h0KHDGLSCg@mail.gmail.com>
-Message-ID: <CAAL8m4zzynRm+c1xiwu117OkkX4X2ERoTDBPDL7XsihVcEL53g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Sep 2011 09:11:40 +0100
+Subject: [PATCH 1/3] arm/tegra: Move EN_VDD_1V05_GPIO to board-harmony.h
+In-Reply-To: <CAOesGMisOtEQpcS-hHi-3brpYzJr-UiB6b71c+bwkesPDk9iuA@mail.gmail.com>
+References: <1316633620-13184-1-git-send-email-swarren@nvidia.com>
+	<CAOesGMisOtEQpcS-hHi-3brpYzJr-UiB6b71c+bwkesPDk9iuA@mail.gmail.com>
+Message-ID: <20110922081140.GH17169@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 1:18 PM, Ming Lei <tom.leiming@gmail.com> wrote:
-> Hi,
->
-> On Wed, Sep 21, 2011 at 8:13 PM, Govindraj.R <govindraj.raja@ti.com> wrote:
->> Adapts omap-serial driver to use pm_runtime API's.
->
->> ? ? ? ?console_unlock();
->>
->> - ? ? ? if ((cpu_is_omap34xx() && bdata->pads) ||
->> - ? ? ? ? ? ? ? (pdata->wk_en && pdata->wk_mask))
->> + ? ? ? if ((cpu_is_omap34xx() && bdata->pads))
->> ? ? ? ? ? ? ? ?device_init_wakeup(&pdev->dev, true);
->
-> Just a bit curious, why doesn't the code enable wakeup at default
-> on omap4, which will disable runtime pm of serial port on omap4.
->
+On Wed, Sep 21, 2011 at 01:16:49PM -0700, Olof Johansson wrote:
+> Works for me. Or I could stage it in a topic branch that would be
+> merged after Russell's GPIO tree.
 
-yes sure will add for omap4.
+Holding stuff off from being merged doesn't work.  If you have the
+following commit structure:
 
+A---...-----M1-B-C-M2
++---A1-B1-C1'     /
++-A2-B2-C2-------'
 
-> I have tested your patches on omap4 panda(enable wakeup at
-> default manually), runtime pm of serial port 2 can work well and
-> remote wakeup too.
->
+Now, lets say A2 depends on C1.  Merely delaying the stuff so that M2
+happens after M1 is insufficient to ensure git state doesn't break.
+When bisecting, its entirely possible that the bisect algorithm may
+chose B2 as a potential test candidate.  At that point you end up with
+A2, but without C1.
 
-Thanks, for testing.
-
---
-Govindraj.R
+The only way to solve this is to have A2 following on from C1 - which
+of course requires A1..C1 to be declared stable and either pulled into
+your local tree or for A2..C2 to be submitted to the same tree which
+A1..C1 are already in.
