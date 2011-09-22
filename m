@@ -1,47 +1,53 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 22 Sep 2011 14:07:21 -0700
-Subject: [PATCH 03/10] cpufreq: OMAP: Enable all CPUs in shared policy mask
+Date: Thu, 22 Sep 2011 14:07:22 -0700
+Subject: [PATCH 04/10] cpufreq: OMAP: notify even with bad boot frequency
 In-Reply-To: <1316725648-26710-1-git-send-email-khilman@ti.com>
 References: <1316725648-26710-1-git-send-email-khilman@ti.com>
-Message-ID: <1316725648-26710-4-git-send-email-khilman@ti.com>
+Message-ID: <1316725648-26710-5-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Todd Poynor <toddpoynor@google.com>
+From: Colin Cross <ccross@google.com>
 
-Enable all CPUs in the shared policy in the CPU init callback.
-Otherwise, the governor CPUFREQ_GOV_START event is invoked with
-a policy that only includes the first CPU, leaving other CPUs
-uninitialized by the governor.
+Sometimes, bootloaders starts up with a frequency which is not
+in the OPP table. At cpu_init, policy->cur contains the frequency
+we pick at boot.  It is possible that system might have fixed
+it's boot frequency later on as part of power initialization.
+After this condition, the first call to omap_target results in the
+following:
 
-Signed-off-by: Todd Poynor <toddpoynor@google.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+omap_getspeed(actual device frequency) != policy->cur(frequency that
+cpufreq thinks that the system is at), and it is possible that
+freqs.old == freqs.new (because the governor requested a scale down).
+
+We exit without triggering the notifiers in the current code, which
+does'nt let code which depends on cpufreq_notify_transition to have
+accurate information as to what the system frequency is.
+
+Instead, we do a normal transition if policy->cur is wrong, then,
+freqs.old will be the actual cpu frequency, freqs.new will be the
+actual new cpu frequency and all required notifiers have the accurate
+information.
+
+Acked-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Colin Cross <ccross@google.com>
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- drivers/cpufreq/omap-cpufreq.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ drivers/cpufreq/omap-cpufreq.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
-index f9b4c4d..5e2f05a 100644
+index 5e2f05a..724d36c 100644
 --- a/drivers/cpufreq/omap-cpufreq.c
 +++ b/drivers/cpufreq/omap-cpufreq.c
-@@ -151,7 +151,6 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
- {
- 	int result = 0;
- 	struct device *mpu_dev;
--	static cpumask_var_t cpumask;
+@@ -96,7 +96,7 @@ static int omap_target(struct cpufreq_policy *policy,
+ 	freqs.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
+ 	freqs.cpu = policy->cpu;
  
- 	if (cpu_is_omap24xx())
- 		mpu_clk = clk_get(NULL, "virt_prcm_set");
-@@ -199,8 +198,7 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
- 	 */
- 	if (is_smp()) {
- 		policy->shared_type = CPUFREQ_SHARED_TYPE_ANY;
--		cpumask_or(cpumask, cpumask_of(policy->cpu), cpumask);
--		cpumask_copy(policy->cpus, cpumask);
-+		cpumask_setall(policy->cpus);
- 	}
+-	if (freqs.old == freqs.new)
++	if (freqs.old == freqs.new && policy->cur == freqs.new)
+ 		return ret;
  
- 	/* FIXME: what's the actual transition time? */
+ 	/* notifiers */
 -- 
 1.7.6
