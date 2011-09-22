@@ -1,29 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 22 Sep 2011 13:10:19 -0600 (MDT)
-Subject: [PATCH v4 1/3] AM35x: Using OMAP3 generic hwmods
-In-Reply-To: <1316697993-696-2-git-send-email-abhilash.kv@ti.com>
-References: <1316697993-696-1-git-send-email-abhilash.kv@ti.com>
-	<1316697993-696-2-git-send-email-abhilash.kv@ti.com>
-Message-ID: <alpine.DEB.2.00.1109221303530.10719@utopia.booyaka.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 22 Sep 2011 11:58:49 -0700
+Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <20110922184614.25419.84606.stgit@ponder>
+References: <20110922184614.25419.84606.stgit@ponder>
+Message-ID: <1316717930.21302.11.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Chase
+On Thu, 2011-09-22 at 12:51 -0600, Grant Likely wrote:
+> Allow drivers to report at probe time that they cannot get all the resources
+> required by the device, and should be retried at a later time.
+[]
+> I would appreciate
+> any feedback.
 
-Hi
+trivia:
 
-On Thu, 22 Sep 2011, Abhilash K V wrote:
+> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+[]
+> +static void driver_deferred_probe_add(struct device *dev)
+> +{
+> +	mutex_lock(&deferred_probe_mutex);
+> +	if (list_empty(&dev->deferred_probe)) {
+> +		dev_dbg(dev, "Added to deferred list\n");
 
-> This patch enables AM35x SoCs to use generic OMAP3 hwmods
-> (i,e. omap3xxx_hwmods) by allowing am35xx_init_early() to
-> disable the modules which are not present in AM3517.
-> 
-> Reviewed-by: Sanjeev Premi <premi@ti.com>
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+These messages might be more intelligible as
+"Added to deferred probe list\n"
 
-We now use a different approach for registering hwmods that are 
-device-specific.  Could you please take a look at the approach that's in 
-Tony's master branch and use it instead to handle AM3517 hwmod 
-registration?
+> +void driver_deferred_probe_del(struct device *dev)
+> +{
+> +	mutex_lock(&deferred_probe_mutex);
+> +	if (!list_empty(&dev->deferred_probe)) {
+> +		dev_dbg(dev, "Removed from deferred list\n");
 
-- Paul
+"Removed from deferred probe list\n"
