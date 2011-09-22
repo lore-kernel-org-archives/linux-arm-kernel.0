@@ -1,47 +1,86 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 22 Sep 2011 15:19:01 -0600
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <20110922212909.49966cf4@lxorguk.ukuu.org.uk>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20110922212909.49966cf4@lxorguk.ukuu.org.uk>
-Message-ID: <CACxGe6vAQ+_SKc-zH434bdd3akM5S1jB0N7+AFEjgZfX1uNrZQ@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 22 Sep 2011 14:35:53 -0700
+Subject: [PATCH v4 2/3] omap_twl: Prevent SR to enable for am3517/am3505
+	devices
+In-Reply-To: <1316697993-696-3-git-send-email-abhilash.kv@ti.com> (Abhilash
+	K. V.'s message of "Thu, 22 Sep 2011 18:56:32 +0530")
+References: <1316697993-696-1-git-send-email-abhilash.kv@ti.com>
+	<1316697993-696-2-git-send-email-abhilash.kv@ti.com>
+	<1316697993-696-3-git-send-email-abhilash.kv@ti.com>
+Message-ID: <87zkhws1ja.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 2:29 PM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
-> Definitely what is needed for some of the x86 SoC stuff and would let us
-> rip out some of the special case magic for the SCU discovery.
+Abhilash K V <abhilash.kv@ti.com> writes:
+
+> In case of AM3517 & AM3505, SmartReflex is not applicable so
+> we must not enable it. 
+
+This part is fine, but...
+
+> So omap3_twl_init() is now not called when the processor does not
+> support SR.
+
+...I don't think this is right.  DVFS using the PMIC is still doable
+without SR.
+
+Are you assuming that no DVFS is done on these devices?
+
+Kevin
+
+
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+> ---
+>  arch/arm/mach-omap2/id.c              |    2 +-
+>  arch/arm/mach-omap2/pm.c              |    3 ++-
+>  arch/arm/plat-omap/include/plat/cpu.h |    2 ++
+>  3 files changed, 5 insertions(+), 2 deletions(-)
 >
-> First thing that strikes me is driver_bound kicks the processing queue
-> again. That seems odd - surely this isn't needed because any driver that
-> does initialise this time and may allow something else to get going will
-> queue the kick itself. Thus this seems to just add overhead.
->
-> It all looks a bit O(N?) if we don't expect the drivers that might
-> trigger something else binding to just say 'hey I'm one of the
-> troublemakers'
-
-The way I read it, absolute worst case is when every device but one
-depends on another device.  In that case I believe it will be
-O(Nlog(N)).  (Every device gets probed on the first pass, but only the
-last one gets probed.  Then it goes through N-1 devices to the result
-of only 1 more device getting probed, then N-2, etc.).  Actual usage
-won't be anywhere near that complexity because there tends to be a
-small number of devices on these SoCs that a lot of other devices
-depend on, so I expect that there will be somewhere on the order of
-3-4 passes for the typical embedded SoCs that I've seen.
-
-driver_bound is used to kick off the process because anytime a new
-device becomes active (bound to a driver), there is a high likelyhood
-that one of the devices in the pending list can now be probed.
-However, the re-probing is performed in a workqueue to make sure that
-it is somewhat serialized to prevent the *entire* pending list to be
-processed for every driver_bound() call.  Instead, by kicking a
-workqueue, it guarantees that all the pending items are retried, but
-kicking the workqueue 6 times doesn't mean that the list is going to
-be processed 6 times.
-
-In other words, driver_bound will kick off the process, but it doesn't
-actually do the re-probing work.
-
-g.
+> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+> index d27daf9..b7e3082 100644
+> --- a/arch/arm/mach-omap2/id.c
+> +++ b/arch/arm/mach-omap2/id.c
+> @@ -188,7 +188,7 @@ static void __init omap3_check_features(void)
+>  	if (cpu_is_omap3630())
+>  		omap_features |= OMAP3_HAS_192MHZ_CLK;
+>  	if (!cpu_is_omap3505() && !cpu_is_omap3517())
+> -		omap_features |= OMAP3_HAS_IO_WAKEUP;
+> +		omap_features |= (OMAP3_HAS_IO_WAKEUP | OMAP3_HAS_SR);
+>  
+>  	omap_features |= OMAP3_HAS_SDRC;
+>  
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index d34fc52..da71abc 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -252,7 +252,8 @@ postcore_initcall(omap2_common_pm_init);
+>  static int __init omap2_common_pm_late_init(void)
+>  {
+>  	/* Init the OMAP TWL parameters */
+> -	omap3_twl_init();
+> +	if (omap3_has_sr())
+> +		omap3_twl_init();
+>  	omap4_twl_init();
+>  
+>  	/* Init the voltage layer */
+> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+> index 2f90269..cc6fcd3 100644
+> --- a/arch/arm/plat-omap/include/plat/cpu.h
+> +++ b/arch/arm/plat-omap/include/plat/cpu.h
+> @@ -413,6 +413,7 @@ extern u32 omap_features;
+>  #define OMAP4_HAS_MPU_1GHZ		BIT(8)
+>  #define OMAP4_HAS_MPU_1_2GHZ		BIT(9)
+>  #define OMAP4_HAS_MPU_1_5GHZ		BIT(10)
+> +#define OMAP3_HAS_SR			BIT(11)
+>  
+>  
+>  #define OMAP3_HAS_FEATURE(feat,flag)			\
+> @@ -429,6 +430,7 @@ OMAP3_HAS_FEATURE(isp, ISP)
+>  OMAP3_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
+>  OMAP3_HAS_FEATURE(io_wakeup, IO_WAKEUP)
+>  OMAP3_HAS_FEATURE(sdrc, SDRC)
+> +OMAP3_HAS_FEATURE(sr, SR)
+>  
+>  /*
+>   * Runtime detection of OMAP4 features
