@@ -1,23 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 22 Sep 2011 14:53:52 +0100
-Subject: Samsung GPIO changes break boot on Cragganmore
-Message-ID: <20110922135351.GC5173@opensource.wolfsonmicro.com>
+From: wd@denx.de (Wolfgang Denk)
+Date: Thu, 22 Sep 2011 15:57:02 +0200
+Subject: booting single uImage on platforms with different base addresses
+	for SDRAM
+In-Reply-To: <20110922110411.GD20444@tbergstrom-lnx.Nvidia.com>
+References: <20110922110411.GD20444@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20110922135702.EE2731407978@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Peter De Schrijver,
 
-Something in the recent GPIO changes have broken the boot for me on
-Cragganmore (S3C6410 based) systems.  The boot dies before any console
-output is produced so it's hard to isolate exactly what went wrong but
-backing out:
+In message <20110922110411.GD20444@tbergstrom-lnx.Nvidia.com> you wrote:
+> Hi,
+> 
+> Currently uImages have the load address hardcoded. As we now try to support
+> as many ARM platforms as possible with a single binary, this becomes a
+> problem. On tegra20 SDRAM starts at physical address 0, but on tegra30 SDRAM
+> starts at 0x80000000. It's possible to build a kernel image which can deal
+> with this, but the uImage still uses a hardcoded address. This results
+> in requiring 2 different uImages even though the zImage is the same.
+> 
+> Has anyone thought of a solution to this problem?
 
-   5ec7414 ARM: SAMSUNG: Remove useless Samsung GPIO related CONFIGs
-   7c15788 ARM: SAMSUNG: Update the name of regarding Samsung GPIO
-   bedcda6 gpio/samsung: gpio-samsung.c to support Samsung GPIOs
+Yes, this has been discussed before.  I proposed to allow for an
+offset specification instead of an absolute address.  After that, the
+discussions faded.  No code has been submitted yet.
 
-fixes the system boot for me.  The diff is rather substantial so it's
-hard to check by eyeball unfortunately.
+Best regards,
 
-Thanks,
-Mark
+Wolfgang Denk
+
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+"Never give in.  Never give in.  Never. Never. Never."
+- Winston Churchill
