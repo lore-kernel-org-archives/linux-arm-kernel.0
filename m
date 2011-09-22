@@ -1,75 +1,36 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 22 Sep 2011 14:16:42 +0200
-Subject: [PATCH 2/2] ARM: mach-ux500: unlock I&D l2x0 caches before init
-Message-ID: <1316693802-18656-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 22 Sep 2011 14:23:35 +0200
+Subject: [GIT PULL] ux500-fixes for v3.1
+Message-ID: <CACRpkdZhsHd=Cm1jQyU_u6yRO4ZOsnXTxLdvOH1AC5dxdXTTWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi Arnd,
 
-Apparently U8500 U-Boot versions may leave the l2x0 locked down
-before executing the kernel. Make sure we unlock it before we
-initialize the l2x0. This fixes a performance problem reported
-by Jan Rinze.
+As requested, here is a git branch with the ux500 fixes
+elegible for v3.1. The only changes to the patches already
+floated on the mailing list is the addition of the ARM:
+prefix at nicos request, and rebased to v3.1-rc7.
 
-The l2x0 core has been modified to unlock the l2x0 by default,
-but it will not touch the locking registers if the l2x0 was
-already enabled, as on the ux500, so we need this quirk to
-make sure it is properly turned off.
+As noted they have also been resubmitted with
+Cc: stable at kernel.org.
 
-Cc: stable at kernel.org
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Rabin Vincent <rabin.vincent@stericsson.com>
-Cc: Adrian Bunk <adrian.bunk@movial.com>
-Reported-by: Jan Rinze <janrinze@gmail.com>
-Tested-by: Robert Marklund <robert.marklund@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/cpu.c |   25 ++++++++++++++++++++++++-
- 1 files changed, 24 insertions(+), 1 deletions(-)
+The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
 
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index 1da23bb..8aa104a 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -99,7 +99,27 @@ static void ux500_l2x0_inv_all(void)
- 	ux500_cache_sync();
- }
- 
--static int ux500_l2x0_init(void)
-+static int __init ux500_l2x0_unlock(void)
-+{
-+	int i;
-+
-+	/*
-+	 * Unlock Data and Instruction Lock if locked. Ux500 U-Boot versions
-+	 * apparently locks both caches before jumping to the kernel. The
-+	 * l2x0 core will not touch the unlock registers if the l2x0 is
-+	 * already enabled, so we do it right here instead. The PL310 has
-+	 * 8 sets of registers, one per possible CPU.
-+	 */
-+	for (i = 0; i < 8; i++) {
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_D_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+		writel_relaxed(0x0, l2x0_base + L2X0_LOCKDOWN_WAY_I_BASE +
-+			       i * L2X0_LOCKDOWN_STRIDE);
-+	}
-+	return 0;
-+}
-+
-+static int __init ux500_l2x0_init(void)
- {
- 	if (cpu_is_u5500())
- 		l2x0_base = __io_address(U5500_L2CC_BASE);
-@@ -108,6 +128,9 @@ static int ux500_l2x0_init(void)
- 	else
- 		ux500_unknown_soc();
- 
-+	/* Unlock before init */
-+	ux500_l2x0_unlock();
-+
- 	/* 64KB way size, 8 way associativity, force WA */
- 	l2x0_init(l2x0_base, 0x3e060000, 0xc0000fff);
- 
--- 
-1.7.3.2
+  Linux 3.1-rc7 (2011-09-21 16:58:15 -0700)
+
+are available in the git repository at:
+  git://git.linaro.org/people/triad/linux-stericsson.git fixes-for-arnd
+
+Linus Walleij (1):
+      ARM: mach-ux500: unlock I&D l2x0 caches before init
+
+srinidhi kasagar (1):
+      ARM: mach-ux500: enable fix for ARM errata 754322
+
+ arch/arm/mach-ux500/Kconfig |    1 +
+ arch/arm/mach-ux500/cpu.c   |   25 ++++++++++++++++++++++++-
+ 2 files changed, 25 insertions(+), 1 deletions(-)
+
+Yours,
+Linus Walleij
