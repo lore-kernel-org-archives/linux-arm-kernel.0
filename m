@@ -1,83 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 22 Sep 2011 14:00:31 +0100
-Subject: [PATCH] arm: Add unwinding annotations for 64bit division
-	functions
-In-Reply-To: <1316693581.2053.38.camel@linaro1>
-References: <1316470297-5063-1-git-send-email-lauraa@codeaurora.org>
-	<alpine.LFD.2.00.1109191913210.12663@xanadu.home>
-	<2285dff3fee56758b6279062a5a30dc7.squirrel@www.codeaurora.org>
-	<20110921113906.GB2872@arm.com>
-	<20110921115553.GF17169@n2100.arm.linux.org.uk>
-	<1316676488.2053.9.camel@linaro1>
-	<CAHkRjk7B4Bmt2g6ptHO3TudXgrkr5rv4b--Hbx-mw7=MO9Q+BQ@mail.gmail.com>
-	<1316689606.2053.29.camel@linaro1>
-	<20110922115713.GJ12025@e102109-lin.cambridge.arm.com>
-	<1316693581.2053.38.camel@linaro1>
-Message-ID: <20110922130031.GK12025@e102109-lin.cambridge.arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 22 Sep 2011 14:04:56 +0100
+Subject: DT vs ARM static mappings
+In-Reply-To: <alpine.LFD.2.00.1109211320090.12663@xanadu.home>
+References: <1316519479.4611.150.camel@hornet.cambridge.arm.com>
+	<alpine.LFD.2.00.1109211320090.12663@xanadu.home>
+Message-ID: <1316696696.4611.844.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 01:13:01PM +0100, Jon Medhurst (Tixy) wrote:
-> On Thu, 2011-09-22 at 12:57 +0100, Catalin Marinas wrote:
-> > On Thu, Sep 22, 2011 at 12:06:46PM +0100, Jon Medhurst (Tixy) wrote:
-> > > On Thu, 2011-09-22 at 10:48 +0100, Catalin Marinas wrote:
-> > > > We could improve things a bit in the unwinder and assume
-> > > > that if the fault address is the same as the .fnstart address, the
-> > > > return value is always in LR and the SP not affected (that's unwinding
-> > > > bytecode 0xb0). For a few instructions into the function prologue we
-> > > > can't reliably get the unwinding information.
-> > > 
-> > > That would help make it possible to unwind out of kprobes handlers to
-> > > the probed function. The kprobes code itself would need work as well,
-> > > and possibly the undef handler. Do we think it is worthwhile to do
-> > > this? 
-> > 
-> > Does kprobes need to trace beyond the probed function? If not, you get
-> > the address of the probed function via pt_regs anyway, so no need for
-> > unwinding beyond that.
+> > ARM machine description contains a "map_io" method, which is used to
+> > create static memory mappings (using iotable_init() function) for things
+> > like peripherals or SRAMs. At least that's the theory, because most of
+> > the platforms are doing much more stuff there, like clocking/GPIOs/UARTs
+> > initialization, hardware probing etc.
 > 
-> To be honest, I'm not very sure how kprobes get used in the real world.
-> Though, if stack unwinding from their handlers currently doesn't work
-> and people had a usecase for it, we would expect them to complain.
+> No, most of them don't.  Maybe a few cases do for historical reasons, 
+> but there are other hooks now to link probing and initialization code 
+> to.
 
-The unwinding fix should be simple (I haven't tested it yet):
+Ok, what I did was grepping for all .map_io-s. Then I sorted the list
+and had a look at first 100 and about 50% of them were doing more than
+just creating mappings.
 
-8<-----------------------------
-ARM: Ignore the unwinding information for the first instruction in a function
+Never mind - I'll rephrase myself to "many" instead of "most" :-)
 
-From: Catalin Marinas <catalin.marinas@arm.com>
+> The static mappings should be just that: static.  Most things should be 
+> dynamically mapped instead.  With the series I'm working on, everybody 
+> will get the benefit of a static mapping when one is available even if 
+> the dynamic mapping interface like ioremap() is used.  So having a bunch 
+> of static mappings is not bad, especially if they are easy.  But you 
+> should defer as much hardware probing as possible after the memory is 
+> initialized and the standard interfaces are available, keeping reliance 
+> on direct access to static mappings as small as possible.
 
-When backtracing from the first instruction of a function, the prologue
-has not been executed and the unwinding information is not valid. This
-patch checks for this case and just assumes that the return address is
-in LR.
+You won't get any argument from me here - my task would be easier
+without the additional things happening in map_io...
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/kernel/unwind.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+> Your best bet would probably consist of keeping the virtual address 
+> constant while the physical address is variable.  Adjusting the .pfn 
+> field in the v2m_io_desc table right before calling iotable_init() 
+> should be fine.  Alternatively you could have two such tables and select 
+> the right one at run time.  The io_p2v macro doesn't make any sense 
+> anymore in that context so it should be eliminated, and keeping only a 
+> minimum set of fixed virtual addresses for the peripherals that can't 
+> wait until ioremap is available should be fine.
 
-diff --git a/arch/arm/kernel/unwind.c b/arch/arm/kernel/unwind.c
-index d2cb0b3..946face 100644
---- a/arch/arm/kernel/unwind.c
-+++ b/arch/arm/kernel/unwind.c
-@@ -293,6 +293,16 @@ int unwind_frame(struct stackframe *frame)
- 		return -URC_FAILURE;
- 	}
- 
-+	/*
-+	 * Check for backtrace on the first instruction of a function. The
-+	 * prologue has not been executed yet and the unwinding information is
-+	 * not valid. Assume that the return address is in LR.
-+	 */
-+	if (idx.addr == frame->pc) {
-+		frame->pc = frame->lr;
-+		return URC_OK;
-+	}
-+
- 	ctrl.vrs[FP] = frame->fp;
- 	ctrl.vrs[SP] = frame->sp;
- 	ctrl.vrs[LR] = frame->lr;
+Yep, that's (roughly) what my code is doing now. There is some hackery
+involved (manual operations on pointers) that will disappear with your
+changes.
 
--- 
-Catalin
+And MMIO_P2V macro is dying - motherboard code is not using it any more,
+the tile code will stop using it next week.
+
+> And if static mappings are a problem, then try to live without them as 
+> much as possible.  Again there is no reason you should be doing too much 
+> hardware probing at .map_io time.
+
+Current implementation is doing very little (just probing tile ID and
+calling tile's private map_io) but it's enough to be a pain in the neck.
+
+Anyway, patch (on top of Dave's initial support) to follow soon.
+
+Cheers!
+
+Pawe?
