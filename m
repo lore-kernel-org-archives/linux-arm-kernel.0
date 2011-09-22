@@ -1,39 +1,32 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 22 Sep 2011 13:10:17 +0800
-Subject: [PATCH v4 2/3] net/fec: fix fec1 check in fec_enet_mii_init()
-In-Reply-To: <1316668218-10194-1-git-send-email-shawn.guo@linaro.org>
-References: <1316668218-10194-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1316668218-10194-3-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 22 Sep 2011 13:10:15 +0800
+Subject: [PATCH v4 0/3] add fec support for imx6q
+Message-ID: <1316668218-10194-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In function fec_enet_mii_init(), it uses non-zero pdev->id as part
-of the condition to check the second fec instance (fec1).  This works
-before the driver supports device tree probe.  But in case of device
-tree probe, pdev->id is -1 which is also non-zero, so the logic becomes
-broken when device tree probe gets supported.
+This series adds imx6q enet support.  The imx6q enet is a derivative of
+imx28 enet controller.  It fixed the frame endian issue found on imx28,
+and added 1 Gbps support.
 
-The patch change the logic to check "pdev->id > 0" as the part of the
-condition for identifying fec1.
+Changes since v3:
+ * The minus one on phy_speed should happend before left shift.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
----
- drivers/net/ethernet/freescale/fec.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Changes since v2:
+ * Refine patch #1 to get fec_reset_phy() return void
 
-diff --git a/drivers/net/ethernet/freescale/fec.c b/drivers/net/ethernet/freescale/fec.c
-index 9c1d059..2bbe6a5 100644
---- a/drivers/net/ethernet/freescale/fec.c
-+++ b/drivers/net/ethernet/freescale/fec.c
-@@ -996,7 +996,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
- 	 * mdio interface in board design, and need to be configured by
- 	 * fec0 mii_bus.
- 	 */
--	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id) {
-+	if ((id_entry->driver_data & FEC_QUIRK_ENET_MAC) && pdev->id > 0) {
- 		/* fec1 uses fec0 mii_bus */
- 		fep->mii_bus = fec0_mii_bus;
- 		return 0;
--- 
-1.7.4.1
+Changes since v1:
+ * Fix typo pointed out by Francois Romieu
+ * Drop patch #3 in the v1
+ * Rebase on net-next tree
+
+Thanks.
+
+Shawn Guo (3):
+      net/fec: fec_reset_phy() does not need to always succeed
+      net/fec: fix fec1 check in fec_enet_mii_init()
+      net/fec: add imx6q enet support
+
+ drivers/net/ethernet/freescale/Kconfig |    9 ++--
+ drivers/net/ethernet/freescale/fec.c   |   79 +++++++++++++++++++++++---------
+ 2 files changed, 61 insertions(+), 27 deletions(-)
