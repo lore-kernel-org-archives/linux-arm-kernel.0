@@ -1,42 +1,47 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 22 Sep 2011 16:10:35 -0400 (EDT)
-Subject: [PATCH] ARM: Don't include mach-nuc93x/Kconfig
-In-Reply-To: <1316721802-10852-1-git-send-email-swarren@nvidia.com>
-References: <1316721802-10852-1-git-send-email-swarren@nvidia.com>
-Message-ID: <alpine.LFD.2.00.1109221610060.12663@xanadu.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 22 Sep 2011 15:19:01 -0600
+Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <20110922212909.49966cf4@lxorguk.ukuu.org.uk>
+References: <20110922184614.25419.84606.stgit@ponder>
+	<20110922212909.49966cf4@lxorguk.ukuu.org.uk>
+Message-ID: <CACxGe6vAQ+_SKc-zH434bdd3akM5S1jB0N7+AFEjgZfX1uNrZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Sep 2011, Stephen Warren wrote:
+On Thu, Sep 22, 2011 at 2:29 PM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
+> Definitely what is needed for some of the x86 SoC stuff and would let us
+> rip out some of the special case magic for the SCU discovery.
+>
+> First thing that strikes me is driver_bound kicks the processing queue
+> again. That seems odd - surely this isn't needed because any driver that
+> does initialise this time and may allow something else to get going will
+> queue the kick itself. Thus this seems to just add overhead.
+>
+> It all looks a bit O(N?) if we don't expect the drivers that might
+> trigger something else binding to just say 'hey I'm one of the
+> troublemakers'
 
-> Commit 6adc1e7ff19d9befdbb7781b26fff42bb0bc21e2 "ARM: mach-nuc93x: delete"
-> removed support for this sub-architecture, thus deleting that file. So,
-> don't include it. grep indicates no more references to this machine.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+The way I read it, absolute worst case is when every device but one
+depends on another device.  In that case I believe it will be
+O(Nlog(N)).  (Every device gets probed on the first pass, but only the
+last one gets probed.  Then it goes through N-1 devices to the result
+of only 1 more device getting probed, then N-2, etc.).  Actual usage
+won't be anywhere near that complexity because there tends to be a
+small number of devices on these SoCs that a lot of other devices
+depend on, so I expect that there will be somewhere on the order of
+3-4 passes for the typical embedded SoCs that I've seen.
 
-This is fixed in the latest arm-soc.git.
+driver_bound is used to kick off the process because anytime a new
+device becomes active (bound to a driver), there is a high likelyhood
+that one of the devices in the pending list can now be probed.
+However, the re-probing is performed in a workqueue to make sure that
+it is somewhat serialized to prevent the *entire* pending list to be
+processed for every driver_bound() call.  Instead, by kicking a
+workqueue, it guarantees that all the pending items are retried, but
+kicking the workqueue 6 times doesn't mean that the list is going to
+be processed 6 times.
 
+In other words, driver_bound will kick off the process, but it doesn't
+actually do the re-probing work.
 
-
-
-> ---
->  arch/arm/Kconfig |    2 --
->  1 files changed, 0 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 89bd520..472a7f8 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -969,8 +969,6 @@ source "arch/arm/mach-netx/Kconfig"
->  source "arch/arm/mach-nomadik/Kconfig"
->  source "arch/arm/plat-nomadik/Kconfig"
->  
-> -source "arch/arm/mach-nuc93x/Kconfig"
-> -
->  source "arch/arm/plat-omap/Kconfig"
->  
->  source "arch/arm/mach-omap1/Kconfig"
-> -- 
-> 1.7.0.4
-> 
+g.
