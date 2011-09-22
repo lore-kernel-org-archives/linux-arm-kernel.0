@@ -1,35 +1,34 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 22 Sep 2011 23:04:01 +0800
-Subject: [PATCH v2 2/2] ARM: smp_scu: remove __init annotation from
-	scu_enable()
-In-Reply-To: <20110917083236.GB26572@S2100-06.ap.freescale.net>
-References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-	<1315288107-14689-3-git-send-email-shawn.guo@linaro.org>
-	<20110917083236.GB26572@S2100-06.ap.freescale.net>
-Message-ID: <20110922150359.GB15024@S2100-06.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 Sep 2011 17:13:27 +0200
+Subject: [GIT PULL] CSR prima2 PM support for 3.2
+In-Reply-To: <CAGsJ_4y6vuy8ZicefRR8DE6Zoj2nzy1JcOxhHK3Xos8d9NxxSQ@mail.gmail.com>
+References: <CAGsJ_4y6vuy8ZicefRR8DE6Zoj2nzy1JcOxhHK3Xos8d9NxxSQ@mail.gmail.com>
+Message-ID: <201109221713.27370.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 17, 2011 at 04:32:37PM +0800, Shawn Guo wrote:
-> On Tue, Sep 06, 2011 at 01:48:27PM +0800, Shawn Guo wrote:
-> > When Cortex-A9 MPCore resumes from Dormant or Shutdown modes,
-> > SCU needs to be re-enabled.  This patch removes __init annotation
-> > from function scu_enable(), so that platform resume procedure can
-> > call it to re-enable SCU.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
+On Wednesday 21 September 2011, Barry Song wrote:
+> Hi Arnd,
 > 
-> Hi Russell,
+> Can you pls pull the prima2 PM support for 3.2? As the patchset
+> depends on rtciobrg you pulled last time, i didn't rebase it to 3.1-rc
+> to avoid merge conflict.
 > 
-> Do you have any comment on this patch?  Can I put it into patch tracker?
+> The following changes since commit 684f741446f7a3108b4c167faf20214c42b7eeac:
+>   Zhiwu Song (1):
+>         ARM: CSR: add rtc i/o bridge interface for SiRFprimaII
 > 
-Ping x 2.
+> are available in the git repository at:
+> 
+>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git for-arnd
+> 
+> Barry Song (2):
+>       ARM: CSR: PM: save/restore timer status in suspend cycle
+>       ARM: CSR: PM: save/restore irq status in suspend cycle
+> 
+> Rongjun Ying (1):
+>       ARM: CSR: PM: add sleep entry for SiRFprimaII
 
-As imx6q suspend support depends on this patch, I really need to know
-if you will merge it.  Otherwise, I will probably have to copy the code
-into imx6q platform code just like exynos4 is doing.
+Pulled, thanks!
 
--- 
-Regards,
-Shawn
+	Arnd
