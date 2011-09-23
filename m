@@ -1,20 +1,33 @@
 From: Baohua.Song@csr.com (Barry Song)
-Date: Thu, 22 Sep 2011 22:51:27 -0700
-Subject: [PATCH 0/4] ARM: CSR: cleanup some minor coding-style issues
-Message-ID: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
+Date: Thu, 22 Sep 2011 22:51:29 -0700
+Subject: [PATCH 2/4] ARM: CSR: timer: space required before the open
+	parenthesis '('
+In-Reply-To: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
+References: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <1316757091-14916-3-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Barry Song (4):
-  ARM: CSR: timer: do not initialise statics to 0 or NULL
-  ARM: CSR: timer: space required before the open parenthesis '('
-  ARM: CSR: prima2: fix trailing whitespace
-  ARM: CSR: clock: Fix indentation
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/mach-prima2/timer.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
- arch/arm/mach-prima2/clock.c  |    4 ++--
- arch/arm/mach-prima2/prima2.c |    2 +-
- arch/arm/mach-prima2/timer.c  |    4 ++--
- 3 files changed, 5 insertions(+), 5 deletions(-)
+diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer.c
+index 225ed3b..26ab6fe 100644
+--- a/arch/arm/mach-prima2/timer.c
++++ b/arch/arm/mach-prima2/timer.c
+@@ -140,7 +140,7 @@ unsigned long long notrace sched_clock(void)
+ 	 * if we map timer memory in .init of sys_timer, system
+ 	 * will panic due to illegal memory access
+ 	 */
+-	if(!is_mapped) {
++	if (!is_mapped) {
+ 		sirfsoc_of_timer_map();
+ 		is_mapped = 1;
+ 	}
+-- 
+1.7.1
 
 
 
