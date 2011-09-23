@@ -1,85 +1,111 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 23 Sep 2011 15:46:19 +0300
-Subject: [PATCHv9 11/18] omap3+: add omap prm driver initialization
+Date: Fri, 23 Sep 2011 15:46:20 +0300
+Subject: [PATCHv9 12/18] TEMP: serial: added mux support
 In-Reply-To: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
 References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1316781986-30642-12-git-send-email-t-kristo@ti.com>
+Message-ID: <1316781986-30642-13-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP PRM driver is initialized based on availability of PRM hwmods.
-This patch will sequentially check for a list of known PRM hwmods and
-will add an omap device if any is found.
+Just for PRCM chain handler testing purposes. This should be replaced with
+a proper implementation.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/devices.c |   46 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 46 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/serial.c |   71 ++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 69 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 10adf66..d6750a4 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -419,6 +419,51 @@ static void omap_init_pmu(void)
- 	platform_device_register(&omap_pmu_device);
- }
- 
-+#ifdef CONFIG_OMAP_PRM
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 3d1c1d3..e08feb1 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -862,17 +862,84 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
+  * can call this function when they want to have default behaviour
+  * for serial ports (e.g initialize them all as serial ports).
+  */
 +
-+#include <linux/mfd/omap-prm.h>
-+
-+static const char * const omap_prm_devnames[] = {
-+	"prm3xxx",
-+	"prm4xxx",
-+	NULL,
++struct serial_mux_conf {
++	char *name;
++	int omap3_mux;
++	int omap4_mux;
 +};
 +
-+static void omap_init_prm(void)
-+{
-+	struct platform_device *pdev;
-+	struct omap_hwmod *oh = NULL;
-+	struct omap_prm_platform_config *pdata;
-+	int i = 0;
++#define OMAP3_SERIAL_MUX_IN_PU (OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0)
++#define OMAP3_SERIAL_MUX_IN_PD (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE0)
++#define OMAP3_SERIAL_MUX_IN (OMAP_PIN_INPUT | OMAP_MUX_MODE0)
++#define OMAP3_SERIAL_MUX_OUT (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0)
++#define OMAP4_SERIAL_MUX_IN_PU (OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0)
++#define OMAP4_SERIAL_MUX_OUT (OMAP_PIN_OUTPUT | OMAP_MUX_MODE0)
++#define OMAP4_SERIAL_MUX_IN (OMAP_PIN_INPUT | OMAP_MUX_MODE0)
++#define SERIAL_DISABLED OMAP_MUX_MODE7
 +
-+	while (!oh && omap_prm_devnames[i]) {
-+		oh = omap_hwmod_lookup(omap_prm_devnames[i]);
-+		i++;
-+	}
++#define OMAP_SERIAL_NUM_PADS_PER_PORT 4
 +
-+	if (!oh) {
-+		pr_info("prm hwmod not available\n");
-+		return;
-+	}
++static const struct serial_mux_conf serial_mux_data[] = {
++	{ "uart1_cts.uart1_cts", OMAP3_SERIAL_MUX_IN, SERIAL_DISABLED, },
++	{ "uart1_rts.uart1_rts", OMAP3_SERIAL_MUX_OUT, SERIAL_DISABLED, },
++	{ "uart1_rx.uart1_rx", OMAP3_SERIAL_MUX_IN, SERIAL_DISABLED, },
++	{ "uart1_tx.uart1_tx", OMAP3_SERIAL_MUX_OUT, SERIAL_DISABLED, },
++	{ "uart2_cts.uart2_cts", OMAP3_SERIAL_MUX_IN,
++		OMAP4_SERIAL_MUX_IN_PU, },
++	{ "uart2_rts.uart2_rts", OMAP3_SERIAL_MUX_OUT, OMAP4_SERIAL_MUX_OUT, },
++	{ "uart2_rx.uart2_rx", OMAP3_SERIAL_MUX_IN, OMAP4_SERIAL_MUX_IN_PU, },
++	{ "uart2_tx.uart2_tx", OMAP3_SERIAL_MUX_OUT, OMAP4_SERIAL_MUX_OUT },
++	{ "uart3_cts_rctx.uart3_cts_rctx", OMAP3_SERIAL_MUX_IN_PD,
++		OMAP4_SERIAL_MUX_IN_PU, },
++	{ "uart3_rts_sd.uart3_rts_sd", OMAP3_SERIAL_MUX_OUT,
++		OMAP4_SERIAL_MUX_OUT, },
++	{ "uart3_rx_irrx.uart3_rx_irrx", OMAP3_SERIAL_MUX_IN,
++		OMAP4_SERIAL_MUX_IN, },
++	{ "uart3_tx_irtx.uart3_tx_irtx", OMAP3_SERIAL_MUX_OUT,
++		OMAP4_SERIAL_MUX_OUT, },
++	{ "uart4_rx.uart4_rx", SERIAL_DISABLED, OMAP4_SERIAL_MUX_IN, },
++	{ "uart4_tx.uart4_tx", SERIAL_DISABLED, OMAP4_SERIAL_MUX_OUT, },
++	{ NULL, SERIAL_DISABLED, SERIAL_DISABLED, },
++	{ NULL, SERIAL_DISABLED, SERIAL_DISABLED, },
++};
 +
-+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-+
-+	if (!pdata) {
-+		pr_err("%s: kzalloc failed\n", __func__);
-+		return;
-+	}
-+
-+	pdata->irq = oh->mpu_irqs[0].irq;
-+	pdata->base = omap_hwmod_get_mpu_rt_va(oh);
-+
-+	pdev = omap_device_build(oh->name, -1, oh, pdata,
-+		sizeof(*pdata), NULL, 0, 0);
-+
-+	WARN(IS_ERR(pdev), "Unable to build omap device for PRM\n");
-+}
-+#else
-+static inline void omap_init_prm(void) { }
-+#endif
+ void __init omap_serial_init(void)
+ {
+ 	struct omap_uart_state *uart;
+ 	struct omap_board_data bdata;
++	struct omap_device_pad *pads;
++	int idx;
++	int i;
  
- #if defined(CONFIG_CRYPTO_DEV_OMAP_SHAM) || defined(CONFIG_CRYPTO_DEV_OMAP_SHAM_MODULE)
- 
-@@ -687,6 +732,7 @@ static int __init omap2_init_devices(void)
- 	omap_init_mbox();
- 	omap_init_mcspi();
- 	omap_init_pmu();
-+	omap_init_prm();
- 	omap_hdq_init();
- 	omap_init_sti();
- 	omap_init_sham();
++	pads = kmalloc(sizeof(struct omap_device_pad) * 4, GFP_KERNEL);
+ 	list_for_each_entry(uart, &uart_list, node) {
+ 		bdata.id = uart->num;
+ 		bdata.flags = 0;
+-		bdata.pads = NULL;
+ 		bdata.pads_cnt = 0;
++		bdata.pads = pads;
++
++		for (i = 0; i < OMAP_SERIAL_NUM_PADS_PER_PORT; i++) {
++			idx = bdata.id * OMAP_SERIAL_NUM_PADS_PER_PORT + i;
++			pads[i].name = serial_mux_data[idx].name;
++			pads[i].enable = 0;
++			pads[i].idle = 0;
++			pads[i].flags = 0;
++			if (cpu_is_omap34xx())
++				pads[i].enable = serial_mux_data[idx].omap3_mux;
++			if (cpu_is_omap44xx())
++				pads[i].enable = serial_mux_data[idx].omap4_mux;
++			if (pads[i].enable != SERIAL_DISABLED)
++				bdata.pads_cnt++;
++			if (pads[i].enable & OMAP_PIN_INPUT) {
++				pads[i].flags = OMAP_DEVICE_PAD_REMUX |
++					OMAP_DEVICE_PAD_WAKEUP;
++			}
++			pads[i].idle = pads[i].enable;
++		}
++		if (bdata.pads_cnt == 0)
++			bdata.pads = NULL;
+ 		omap_serial_init_port(&bdata);
+-
+ 	}
++	kfree(pads);
+ }
 -- 
 1.7.4.1
 
