@@ -1,28 +1,43 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 23 Sep 2011 10:28:11 -0700
-Subject: [RFC PATCH 07/14] ARM: tegra2: convert to CONFIG_MULTI_IRQ_HANDLER
-In-Reply-To: <1316796692-15964-8-git-send-email-marc.zyngier@arm.com>
-References: <1316796692-15964-1-git-send-email-marc.zyngier@arm.com>
-	<1316796692-15964-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF1739554F81@HQMAIL01.nvidia.com>
+From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
+Date: Fri, 23 Sep 2011 13:50:23 -0400
+Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
+In-Reply-To: Your message of "Thu, 22 Sep 2011 15:19:01 MDT."
+	<CACxGe6vAQ+_SKc-zH434bdd3akM5S1jB0N7+AFEjgZfX1uNrZQ@mail.gmail.com>
+References: <20110922184614.25419.84606.stgit@ponder>
+	<20110922212909.49966cf4@lxorguk.ukuu.org.uk>
+	<CACxGe6vAQ+_SKc-zH434bdd3akM5S1jB0N7+AFEjgZfX1uNrZQ@mail.gmail.com>
+Message-ID: <7790.1316800223@turing-police.cc.vt.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier wrote at Friday, September 23, 2011 10:51 AM:
-> Convert the tegra2 platforms to be using the gic_handle_irq
-> function as their primary interrupt handler.
+On Thu, 22 Sep 2011 15:19:01 MDT, Grant Likely said:
+> On Thu, Sep 22, 2011 at 2:29 PM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
+> > Definitely what is needed for some of the x86 SoC stuff and would let us
+> > rip out some of the special case magic for the SCU discovery.
+> >
+> > First thing that strikes me is driver_bound kicks the processing queue
+> > again. That seems odd - surely this isn't needed because any driver that
+> > does initialise this time and may allow something else to get going will
+> > queue the kick itself. Thus this seems to just add overhead.
+> >
+> > It all looks a bit O(N?) if we don't expect the drivers that might
+> > trigger something else binding to just say 'hey I'm one of the
+> > troublemakers'
 > 
-> Tested on harmony.
-> 
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Colin Cross <ccross@android.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> The way I read it, absolute worst case is when every device but one
+> depends on another device.  In that case I believe it will be
+> O(Nlog(N)).  (Every device gets probed on the first pass, but only the
+> last one gets probed.  Then it goes through N-1 devices to the result
+> of only 1 more device getting probed, then N-2, etc.). 
 
-I'm not experienced in this area of the kernel, but I traced through the
-old assembly and new C code, and they appear to be doing the same thing,
-and be hooked together sanely, so:
+That is indeed O(N**2) not Nlog(N).  The total number of probes is (N+1)(N)/2
+To get it to O(Nlog(N)), you'd have to probe N devices the first pass, N/2 devices
+on the second pass, N/4 on the third, and so on.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
-
--- 
-nvpublic
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 227 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110923/f61d03c2/attachment.sig>
