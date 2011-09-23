@@ -1,50 +1,30 @@
-From: jason77.wang@gmail.com (Hui Wang)
-Date: Fri, 23 Sep 2011 16:56:14 +0800
-Subject: [PATCH] ARM i.MX avic: convert to use generic irq chip
-In-Reply-To: <20110922135009.GA15024@S2100-06.ap.freescale.net>
-References: <1316684408-12196-1-git-send-email-jason77.wang@gmail.com>
-	<20110922135009.GA15024@S2100-06.ap.freescale.net>
-Message-ID: <4E7C49AE.8070101@gmail.com>
+From: hector.oron@gmail.com (Hector Oron)
+Date: Fri, 23 Sep 2011 09:58:34 +0100
+Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
+	platforms
+In-Reply-To: <CAMPhdO98U2jJ24S=NDXBRGg013eAf8Q4mL02ySiWGOrXBAJVmA@mail.gmail.com>
+References: <1314698171-7937-1-git-send-email-richard.zhu@linaro.org>
+	<CAODfWeEm8bkySXxb1qopbH1VMu-V+33k5x+0+qjABzesT0amOA@mail.gmail.com>
+	<CAJNCFV+XFGEba1J2dXDa4YVwqduAPV5y=5JYEXAZ0uv+S60vvw@mail.gmail.com>
+	<CAODfWeEueF45_yvPV5Zxbva6K2gEfKZbY2qoqySYFPZWnSgLsg@mail.gmail.com>
+	<CAJNCFVLP7gA_7vBjwVNkQaSg8LZ4hROLdNCx8SBVah=F1ptrhQ@mail.gmail.com>
+	<CAODfWeHTRuFZtnYZOD-mFonyjBvjhid4=0=a_mYXdjXAOQYejA@mail.gmail.com>
+	<CAMPhdO-f2RHtZ0RdV_wGZvohMT85Q3JzTePaD9w73shGpWkP6g@mail.gmail.com>
+	<CAODfWeFPwUa++=Bz6503KJS9dNhmkjNuWF_g==MaFKydqRRX3A@mail.gmail.com>
+	<CAMPhdO98U2jJ24S=NDXBRGg013eAf8Q4mL02ySiWGOrXBAJVmA@mail.gmail.com>
+Message-ID: <CAODfWeHQWb4y5foNArN3ORdqEUXS6FVkE+kHv+M6m-b=yLg+=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
-> On Thu, Sep 22, 2011 at 05:40:08PM +0800, Hui Wang wrote:
->   
->> Convert i.MX avic irq handler to use generic irq chip. This not only
->> provides a cleanup implementation of irq chip handler, but also
->> implements suspend/resume interface with the help of generic irq chip
->> interface.
->>
->> Change mxc_irq_chip to a new structure mxc_extra_irq to handle fiq
->> and priority functions.
->>
->> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
->> ---
->>
->> This patch is basing on imx-features branch of linux-pengu. Have
->> validated this patch on 31pdk and 35pdk platforms, while have no
->> chance to validate it on mx2 and mx1 platforms since we don't have
->> those hardwares.
->>
->> The purpose of changing avic to use generic irq chip is because i
->> added suspend/resume functions for 35pdk, and generic irq chip
->> naturally has suspend/resume interface. If this patch can be
->> accepted, i will continue to send out those 35pdk pm patches.
->>
->>  arch/arm/plat-mxc/avic.c       |   79 ++++++++++++++++++++++++++++------------
->>  arch/arm/plat-mxc/irq-common.c |   21 ++++++-----
->>  arch/arm/plat-mxc/irq-common.h |    3 +-
->>  arch/arm/plat-mxc/tzic.c       |    8 ++++-
->>  4 files changed, 75 insertions(+), 36 deletions(-)
->>
->>     
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
->
-> However, I'm wondering if you can add the suspend/resume interface for
-> tzic as well.
->   
-Yes, this is the next plan, if this patch can be accepted, i will add 
-tzic suspend/resume as well.
+Hello,
 
-thanks.
+2011/9/22 Eric Miao <eric.miao@linaro.org>:
+> That's great, Herton. Can we take it as a Tested-by?
+
+Sure, but it's Hector ;-)
+
+Tested-By: Hector Oron Martinez <hector.oron@gmail.com>
+
+Cheers,
+-- 
+?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
