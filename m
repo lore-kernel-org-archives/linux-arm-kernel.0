@@ -1,5 +1,5 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Fri, 23 Sep 2011 10:22:25 -0400
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 23 Sep 2011 15:22:34 +0100
 Subject: Identifying Primecells
 In-Reply-To: <CAKON4OxHwjrw-dhH2qvXopqUqmKSx2TCPgW4eVHF9dmQO4=Cvw@mail.gmail.com>
 References: <CAKON4OxqqBh4xFLwiMZzsGrnoG8erQ0hMFX-_VA-EDMvdNkvQQ@mail.gmail.com>
@@ -9,22 +9,28 @@ References: <CAKON4OxqqBh4xFLwiMZzsGrnoG8erQ0hMFX-_VA-EDMvdNkvQQ@mail.gmail.com>
 	<CAKON4OxZPFFL5NAgxLPRw2xxnS=v7iVWtQSSLcUJWfOYh4yfjA@mail.gmail.com>
 	<1316787049.4611.920.camel@hornet.cambridge.arm.com>
 	<CAKON4OxHwjrw-dhH2qvXopqUqmKSx2TCPgW4eVHF9dmQO4=Cvw@mail.gmail.com>
-Message-ID: <CAKON4OySL81Hn6oHTOZuF7zkhwCMn3nn8T4GAgZySTVzxFHosA@mail.gmail.com>
+Message-ID: <1316787754.4611.925.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2011 at 10:17 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->>
->> Of course AMBA bus match_id will do this for you so, as I said, I'm not
->> sure what the problem is...
+> My registers don't seem to match up with the pl011 documentation...
+<...>
+> INTCE	W	0xFD8	Interrupt	Clear Enable Register
+> INTSE	W	0xFDC	Interrupt	Set Enable Register
+> INTS	R	0xFE0	Interrupt	Status Register
+> INTE	R	0xFE4	Interrupt	Enable Register
 
-The problem is that I have a bunch of drivers for all of the
-peripherals that were written by NXP. But the kernel has standardized
-drivers for a lot of the primecells. If the LPC3130 has used a
-standard primecell I want to get rid of the NXP supplied driver and
-switch to the standard one.  But in order to do that I need to
-identify the peripherals that are unmodified primecells.
+... nor any other PrimeCell, actually :-)
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+"Compliant" PrimeCells must have the PCellID in the last 4 registers:
+
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0183g/I54776.html
+
+* base + 0xff0 = 0x0d
+* base + 0xff4 = 0xf0
+* base + 0xff8 = 0x05
+* base + 0xffc = 0xb1
+
+Cheers!
+
+Pawe?
