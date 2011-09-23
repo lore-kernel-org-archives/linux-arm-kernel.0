@@ -1,66 +1,71 @@
-From: mhban@samsung.com (mhban)
-Date: Fri, 23 Sep 2011 09:18:49 +0900
-Subject: [PATCH] ARM: futex: fix clobbering oldval
-In-Reply-To: <20110922172653.GH13572@e102144-lin.cambridge.arm.com>
-References: <1316660015.6872.1.camel@puffmine-laptop>
-	<20110922172653.GH13572@e102144-lin.cambridge.arm.com>
-Message-ID: <1316737129.6872.17.camel@puffmine-laptop>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Fri, 23 Sep 2011 06:26:01 +0530
+Subject: [PATCH v2 1/3] TI81XX: Prepare for addition of TI814X support
+In-Reply-To: <20110922182113.GU2937@atomide.com>
+References: <1316626735-5597-1-git-send-email-hemantp@ti.com>
+	<20110921204057.GJ2937@atomide.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B03B4D17100@dbde02.ent.ti.com>
+	<20110922182113.GU2937@atomide.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4D177C7@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-09-22 at 18:26 +0100, Will Deacon wrote:
-> Hi,
-> 
-> On Thu, Sep 22, 2011 at 03:53:35AM +0100, mhban wrote:
-> > This patch fixes clobbering oldval bug. oldval should be preserved for next
-> > compare operation.
-> > 
-> > Change-Id: I2a63bc1bdb8de330eb9e1ac02d7da1f77e6e8c3c
-> > Signed-off-by: Minho Ban <mhban@samsung.com>
-> 
-> It would have been nice to have been CC'd on this...
+Tony Lindgren wrote on Thursday, September 22, 2011 11:51 PM:
 
-Will not miss next time. Thanks.
-
+> * Pedanekar, Hemant <hemantp@ti.com> [110921 17:00]:
+>> Tony Lindgren wrote on Thursday, September 22, 2011 2:11 AM:
+>> 
+>>> * Hemant Pedanekar <hemantp@ti.com> [110921 10:05]:
+>>>> --- a/arch/arm/mach-omap2/board-ti8168evm.c
+>>>> +++ b/arch/arm/mach-omap2/board-ti8168evm.c
+>>>> @@ -37,16 +37,16 @@ static void __init ti8168_evm_init(void)
+>>>> 
+>>>>  static void __init ti8168_evm_map_io(void)
+>>>>  {
+>>>> -	omap2_set_globals_ti816x();
+>>>> -	omapti816x_map_common_io();
+>>>> +	omap2_set_globals_ti81xx();
+>>>> +	omapti81xx_map_common_io();
+>>>>  }
+>>>> 
+>>>>  MACHINE_START(TI8168EVM, "ti8168evm")
+>>>>  	/* Maintainer: Texas Instruments */
+>>>>  	.atag_offset	= 0x100,
+>>>>  	.map_io		= ti8168_evm_map_io,
+>>>> -	.init_early	= ti816x_init_early,
+>>>> -	.init_irq	= ti816x_init_irq,
+>>>> +	.init_early	= ti81xx_init_early,
+>>>> +	.init_irq	= ti81xx_init_irq,
+>>>>  	.timer		= &omap3_timer,
+>>>>  	.init_machine	= ti8168_evm_init,
+>>>>  MACHINE_END
+>>> 
+>>> Looks like you still need a minor rebase on the current cleanup
+>>> branch as the ti8668_evm_map_io is no longer needed. The cleanup
+>>> branch already has Paul's CHIP_IS removal, so that should be trivial.
+>>> 
+>> 
+>> Tony,
+>> Can you please clarify? Do we not need ti8168_evm_map_io() for global data
+>> initianlization and io init? Or, as you mentioned in comment on 3/3 of the
+>> series, do you mean to rename this with ti81xx and move to common.c?
 > 
-> I ran LTP tests on this, so I'm surprised that this was broken (the tests
-> passed). Well spotted anyway!
+> Yes just have a generic one in common.c should be enough. Sorry I thought
+> that was already done, but looks like it was only done for omap3_map_io.
 > 
-> > ---
-> >  arch/arm/include/asm/futex.h |    6 +++---
-> >  1 files changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/futex.h b/arch/arm/include/asm/futex.h
-> > index d2d733c..b0f2e8e 100644
-> > --- a/arch/arm/include/asm/futex.h
-> > +++ b/arch/arm/include/asm/futex.h
-> > @@ -30,14 +30,14 @@
-> >  	__asm__ __volatile__(					\
-> >  	"1:	ldrex	%1, [%2]\n"				\
-> >  	"	" insn "\n"					\
-> > -	"2:	strex	%1, %0, [%2]\n"				\
-> > -	"	teq	%1, #0\n"				\
-> > +	"2:	strex	r5, %0, [%2]\n"				\
-> > +	"	teq	r5, #0\n"				\
-> >  	"	bne	1b\n"					\
-> >  	"	mov	%0, #0\n"				\
-> >  	__futex_atomic_ex_table("%4")				\
-> >  	: "=&r" (ret), "=&r" (oldval)				\
-> >  	: "r" (uaddr), "r" (oparg), "Ir" (-EFAULT)		\
-> > -	: "cc", "memory")
-> > +	: "r5", "cc", "memory")
+>>> Ideally the rename patch would be separate without any functional
+>>> changes, maybe you can move the changes and additions to the next patch?
+>>> 
+>>> Tony
+>> 
+>> If the above understanding is correct, then I will just have to rename+move
+>> ti8168_evm_map_io() so the change can still be in this patch, right? Or are
+>> You referring to any other part which should not be in this patch?
 > 
-> You shouldn't reference r5 directly here, but due to the way the futex code
-> is laid out, you can't add an extra output operand without converting the
-> code to use named arguments.
+> Yes it's OK to keep it in this patch.
 > 
-> I'll post a patch to do that.
-> 
-> Will
+> Tony
 
-I'm not familiar with gcc inline, thanks for pointing it out.
+Thanks. I will send updated version.
 
-BTW, my last name is Ban not Ben.
-
-
-Minho
+   Hemant
