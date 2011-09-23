@@ -1,45 +1,66 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 23 Sep 2011 17:23:40 +0530
-Subject: [PATCH 0/7]: ARM: SAMSUNG: Add SPI clkdev support
-Message-ID: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
+Date: Fri, 23 Sep 2011 17:23:41 +0530
+Subject: [PATCH 1/7] SPI: S3C64XX: Use bus clocks created using clkdev
+In-Reply-To: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
+References: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
+Message-ID: <1316778827-24694-2-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset modifies the existing clkdev to make SPI driver
-independent of the clock names send from platform data. This
-patches enables the SPI driver to request SPI bus clocks
-using generic connection ID.
+This patch modifies the driver to stop depending on the
+clock names being passed from platform and switch over
+to lookup clocks generic names using clkdev
 
-The patches are created against "for-next" branch of Kukjin Kim's tree at:
-git://github.com/kgene/linux-samsung.git
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
+ drivers/spi/spi-s3c64xx.c |   14 +++++---------
+ 1 files changed, 5 insertions(+), 9 deletions(-)
 
-Due to the issue with the GPIO in the latest commits of for-next branch,
-following patches are tested against the following commit: 
-9eb1e9aeec6f6f68d83a463446d1b30cb8ffcc65
-ARM: S5PV210: enable TV support on GONI board
-
-Padmavathi Venna (7):
-  SPI: S3C64XX: Use bus clocks created using clkdev
-  ARM: SAMSUNG: Add CLK Macro for clkdev support
-  ARM: S3C64XX: Add SPI clkdev support
-  ARM: S5PC100: Add SPI clkdev support
-  ARM: S5P64X0: Add SPI clkdev support
-  ARM: S5PV210: Add SPI clkdev support
-  ARM: SAMSUNG: Remove SPI bus clocks from platform data
-
- arch/arm/mach-s3c64xx/clock.c                    |   98 +++++++++++-----
- arch/arm/mach-s3c64xx/dev-spi.c                  |    7 -
- arch/arm/mach-s5p64x0/clock-s5p6440.c            |   57 ++++++----
- arch/arm/mach-s5p64x0/clock-s5p6450.c            |   57 ++++++----
- arch/arm/mach-s5p64x0/dev-spi.c                  |    6 -
- arch/arm/mach-s5pc100/clock.c                    |  132 +++++++++++++---------
- arch/arm/mach-s5pc100/dev-spi.c                  |    7 -
- arch/arm/mach-s5pv210/clock.c                    |   58 ++++++----
- arch/arm/mach-s5pv210/dev-spi.c                  |    6 -
- arch/arm/plat-samsung/include/plat/clock.h       |    7 +
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 -
- drivers/spi/spi-s3c64xx.c                        |   14 +--
- 12 files changed, 271 insertions(+), 180 deletions(-)
-
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 019a716..dcf7e10 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -971,6 +971,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 	struct s3c64xx_spi_info *sci;
+ 	struct spi_master *master;
+ 	int ret;
++	char clk_name[16];
+ 
+ 	if (pdev->id < 0) {
+ 		dev_err(&pdev->dev,
+@@ -984,11 +985,6 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	sci = pdev->dev.platform_data;
+-	if (!sci->src_clk_name) {
+-		dev_err(&pdev->dev,
+-			"Board init must call s3c64xx_spi_set_info()\n");
+-		return -EINVAL;
+-	}
+ 
+ 	/* Check for availability of necessary resource */
+ 
+@@ -1073,17 +1069,17 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
+ 		goto err4;
+ 	}
+ 
+-	sdd->src_clk = clk_get(&pdev->dev, sci->src_clk_name);
++	sprintf(clk_name, "spi_busclk%d", sci->src_clk_nr);
++	sdd->src_clk = clk_get(&pdev->dev, clk_name);
+ 	if (IS_ERR(sdd->src_clk)) {
+ 		dev_err(&pdev->dev,
+-			"Unable to acquire clock '%s'\n", sci->src_clk_name);
++			"Unable to acquire clock '%s'\n", clk_name);
+ 		ret = PTR_ERR(sdd->src_clk);
+ 		goto err5;
+ 	}
+ 
+ 	if (clk_enable(sdd->src_clk)) {
+-		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n",
+-							sci->src_clk_name);
++		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n", clk_name);
+ 		ret = -EBUSY;
+ 		goto err6;
+ 	}
 -- 
 1.7.4.4
