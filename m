@@ -1,39 +1,32 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Fri, 23 Sep 2011 09:54:28 +0530
-Subject: [PATCH v7 00/26] gpio/omap: driver cleanup and fixes
-In-Reply-To: <87fwjotity.fsf@ti.com>
-References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-	<CAC83ZvKa7R_rUe-Fa15m0_5P-GE4WC2thazQ+iqF-HAqn8cE1w@mail.gmail.com>
-	<87fwjotity.fsf@ti.com>
-Message-ID: <CAC83ZvJ90sq=bWyL2rVJWsHhRTDGCHOxX=mrUFGD4gRCa5FdoA@mail.gmail.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Thu, 22 Sep 2011 22:51:30 -0700
+Subject: [PATCH 3/4] ARM: CSR: prima2: fix trailing whitespace
+In-Reply-To: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
+References: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <1316757091-14916-4-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
->>> This series is continuation of cleanup of OMAP GPIO driver and fixes.
->>> The cleanup include getting rid of cpu_is_* checks wherever possible,
->>> use of gpio_bank list instead of static array, use of unique platform
->>> specific value associated data member to OMAP platforms to avoid
->>> cpu_is_* checks. The series also include PM runtime support.*
->>>
->>> Baseline: git://gitorious.org/khilman/linux-omap-pm.git
->>> Branch: for_3.2/gpio-cleanup
->>> Commit: 8323374
->> Thanks Tony for ack'ing the patches.
->> Kevin,
->> Since Tony's has acked the patches, can you please pull them?
->
-> Before merging, I still need to review and test this version, and I
-> *might* still get to it this week.
-That's fine. Thanks.
->
-> Based on the dbclk aliases you added, I assume this has now been tested
-> on platforms using some GPIOs with debounce enabled?
-I have replicated gpio_debounce() code within *_gpio_mod_init() whereby
-_set_gpio_debounce() is called to enable debounce.
-After this, confirmed system going to off-mode through the CPU IDLE path.
---
-Tarun
->
-> Kevin
->
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/mach-prima2/prima2.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-prima2/prima2.c b/arch/arm/mach-prima2/prima2.c
+index f57124b..0ddf446 100644
+--- a/arch/arm/mach-prima2/prima2.c
++++ b/arch/arm/mach-prima2/prima2.c
+@@ -1,5 +1,5 @@
+ /*
+- * Defines machines for CSR SiRFprimaII 
++ * Defines machines for CSR SiRFprimaII
+  *
+  * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+  *
+-- 
+1.7.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
