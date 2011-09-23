@@ -1,108 +1,257 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 23 Sep 2011 15:46:11 +0300
-Subject: [PATCHv9 03/18] TEMP: OMAP3xxx: hwmod data: add PRM hwmod
+Date: Fri, 23 Sep 2011 15:46:13 +0300
+Subject: [PATCHv9 05/18] mfd: omap-prm: add driver skeleton
 In-Reply-To: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
 References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1316781986-30642-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1316781986-30642-6-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is temporary until Paul can provide a final version.
+This driver will eventually support OMAP soc PRM module features, e.g. PRCM
+chain interrupts and voltage processor / controller. This patch only adds
+basic skeleton for the driver that can be probed for omap3 and omap4.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   56 ++++++++++++++++++++++++++++
- 1 files changed, 56 insertions(+), 0 deletions(-)
+ drivers/mfd/Kconfig           |    7 +++++
+ drivers/mfd/Makefile          |    2 +
+ drivers/mfd/omap-prm-common.c |   24 ++++++++++++++++
+ drivers/mfd/omap3xxx-prm.c    |   60 +++++++++++++++++++++++++++++++++++++++++
+ drivers/mfd/omap4xxx-prm.c    |   60 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/omap-prm.h  |   24 ++++++++++++++++
+ 6 files changed, 177 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/mfd/omap-prm-common.c
+ create mode 100644 drivers/mfd/omap3xxx-prm.c
+ create mode 100644 drivers/mfd/omap4xxx-prm.c
+ create mode 100644 include/linux/mfd/omap-prm.h
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 59fdb9f..26ced4f 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -161,6 +161,7 @@ static struct omap_hwmod omap3xxx_l3_main_hwmod = {
- };
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 21574bd..1ae2571 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -770,6 +770,13 @@ config MFD_AAT2870_CORE
+ 	  additional drivers must be enabled in order to use the
+ 	  functionality of the device.
  
- static struct omap_hwmod omap3xxx_l4_wkup_hwmod;
-+static struct omap_hwmod omap3xxx_prm_hwmod;
- static struct omap_hwmod omap3xxx_uart1_hwmod;
- static struct omap_hwmod omap3xxx_uart2_hwmod;
- static struct omap_hwmod omap3xxx_uart3_hwmod;
-@@ -478,6 +479,24 @@ static struct omap_hwmod omap3xxx_l4_per_hwmod = {
- 	.flags		= HWMOD_NO_IDLEST,
- };
++config OMAP_PRM
++	bool "OMAP Power and Reset Management driver"
++	depends on (ARCH_OMAP) && PM
++	help
++	  Say Y to enable support for the OMAP Power and Reset Management
++	  driver.
++
+ endif # MFD_SUPPORT
  
-+static struct omap_hwmod_addr_space omap3xxx_prm_addrs[] = {
-+	{
-+		.pa_start	= 0x48306000,
-+		.pa_end		= 0x48306000 + SZ_8K + SZ_4K - 1,
-+		.flags		= ADDR_TYPE_RT
+ menu "Multimedia Capabilities Port drivers"
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index c580203..503d85d 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -102,3 +102,5 @@ obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o
+ obj-$(CONFIG_MFD_PM8XXX_IRQ) 	+= pm8xxx-irq.o
+ obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+ obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
++obj-$(CONFIG_OMAP_PRM)		+= omap-prm-common.o omap3xxx-prm.o \
++				   omap4xxx-prm.o
+diff --git a/drivers/mfd/omap-prm-common.c b/drivers/mfd/omap-prm-common.c
+new file mode 100644
+index 0000000..39b199c8
+--- /dev/null
++++ b/drivers/mfd/omap-prm-common.c
+@@ -0,0 +1,24 @@
++/*
++ * OMAP Power and Reset Management (PRM) driver common functionality
++ *
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ *
++ * Author: Tero Kristo <t-kristo@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/ctype.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/init.h>
++#include <linux/err.h>
++
++MODULE_AUTHOR("Tero Kristo <t-kristo@ti.com>");
++MODULE_DESCRIPTION("OMAP PRM core driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/mfd/omap3xxx-prm.c b/drivers/mfd/omap3xxx-prm.c
+new file mode 100644
+index 0000000..177aced
+--- /dev/null
++++ b/drivers/mfd/omap3xxx-prm.c
+@@ -0,0 +1,60 @@
++/*
++ * OMAP Power and Reset Management (PRM) driver for OMAP3xxx
++ *
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ *
++ * Author: Tero Kristo <t-kristo@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/ctype.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/init.h>
++#include <linux/err.h>
++#include <linux/platform_device.h>
++#include <linux/mfd/omap-prm.h>
++
++#define DRIVER_NAME "prm3xxx"
++
++static int __devinit omap3xxx_prm_probe(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static int __devexit omap3xxx_prm_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver omap3xxx_prm_driver = {
++	.probe		= omap3xxx_prm_probe,
++	.remove		= __devexit_p(omap3xxx_prm_remove),
++	.driver		= {
++		.owner	= THIS_MODULE,
++		.name	= DRIVER_NAME,
 +	},
-+	{}
 +};
 +
-+/* L4_WKUP -> PRM interface */
-+static struct omap_hwmod_ocp_if omap3xxx_l4_wkup__prm = {
-+	.master		= &omap3xxx_l4_wkup_hwmod,
-+	.slave		= &omap3xxx_prm_hwmod,
-+	.clk		= "wkup_l4_ick",
-+	.addr		= omap3xxx_prm_addrs,
-+	.user		= OCP_USER_MPU,
++static int __init omap3xxx_prm_init(void)
++{
++	return platform_driver_register(&omap3xxx_prm_driver);
++}
++module_init(omap3xxx_prm_init);
++
++static void __exit omap3xxx_prm_exit(void)
++{
++	platform_driver_unregister(&omap3xxx_prm_driver);
++}
++module_exit(omap3xxx_prm_exit);
++
++MODULE_ALIAS("platform:"DRIVER_NAME);
++MODULE_AUTHOR("Tero Kristo <t-kristo@ti.com>");
++MODULE_DESCRIPTION("OMAP3xxx PRM driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/mfd/omap4xxx-prm.c b/drivers/mfd/omap4xxx-prm.c
+new file mode 100644
+index 0000000..9de8f3e
+--- /dev/null
++++ b/drivers/mfd/omap4xxx-prm.c
+@@ -0,0 +1,60 @@
++/*
++ * OMAP Power and Reset Management (PRM) driver for OMAP4xxx
++ *
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ *
++ * Author: Tero Kristo <t-kristo@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/kernel.h>
++#include <linux/ctype.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/init.h>
++#include <linux/err.h>
++#include <linux/platform_device.h>
++#include <linux/mfd/omap-prm.h>
++
++#define DRIVER_NAME "prm4xxx"
++
++static int __devinit omap4xxx_prm_probe(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static int __devexit omap4xxx_prm_remove(struct platform_device *pdev)
++{
++	return 0;
++}
++
++static struct platform_driver omap4xxx_prm_driver = {
++	.probe		= omap4xxx_prm_probe,
++	.remove		= __devexit_p(omap4xxx_prm_remove),
++	.driver		= {
++		.owner	= THIS_MODULE,
++		.name	= DRIVER_NAME,
++	},
 +};
 +
- /* Slave interfaces on the L4_WKUP interconnect */
- static struct omap_hwmod_ocp_if *omap3xxx_l4_wkup_slaves[] = {
- 	&omap3xxx_l4_core__l4_wkup,
-@@ -493,6 +512,40 @@ static struct omap_hwmod omap3xxx_l4_wkup_hwmod = {
- 	.flags		= HWMOD_NO_IDLEST,
- };
- 
-+/* Slave interfaces on the L4_WKUP interconnect */
-+static struct omap_hwmod_ocp_if *omap3xxx_prm_slaves[] = {
-+	&omap3xxx_l4_wkup__prm,
++static int __init omap4xxx_prm_init(void)
++{
++	return platform_driver_register(&omap4xxx_prm_driver);
++}
++module_init(omap4xxx_prm_init);
++
++static void __exit omap4xxx_prm_exit(void)
++{
++	platform_driver_unregister(&omap4xxx_prm_driver);
++}
++module_exit(omap4xxx_prm_exit);
++
++MODULE_ALIAS("platform:"DRIVER_NAME);
++MODULE_AUTHOR("Tero Kristo <t-kristo@ti.com>");
++MODULE_DESCRIPTION("OMAP4xxx PRM driver");
++MODULE_LICENSE("GPL");
+diff --git a/include/linux/mfd/omap-prm.h b/include/linux/mfd/omap-prm.h
+new file mode 100644
+index 0000000..ddc814e
+--- /dev/null
++++ b/include/linux/mfd/omap-prm.h
+@@ -0,0 +1,28 @@
++/*
++ * OMAP Power and Reset Management (PRM) driver
++ *
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ *
++ * Author: Tero Kristo <t-kristo@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __LINUX_MFD_OMAP_PRM_H__
++#define __LINUX_MFD_OMAP_PRM_H__
++
++#ifdef CONFIG_OMAP_PRM
++int omap_prcm_event_to_irq(const char *name);
++#else
++static inline int omap_prcm_event_to_irq(const char *name) { return -ENOENT; }
++#endif
++
++struct omap_prm_platform_config {
++	int irq;
++	void __iomem *base;
 +};
 +
-+static struct omap_hwmod_class_sysconfig omap3xxx_prm_sysc = {
-+	.rev_offs	= 0x0804,
-+	.sysc_offs	= 0x0814,
-+	.sysc_flags	= SYSC_HAS_AUTOIDLE,
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap3xxx_prm_hwmod_class = {
-+	.name		= "prm",
-+	.sysc		= &omap3xxx_prm_sysc,
-+};
-+
-+static struct omap_hwmod_irq_info omap3xxx_prm_irqs[] = {
-+	{ .irq = 11 },
-+	{ .irq = -1 }
-+};
-+
-+/* PRM */
-+static struct omap_hwmod omap3xxx_prm_hwmod = {
-+	.name		= "prm3xxx",
-+	.mpu_irqs	= omap3xxx_prm_irqs,
-+	.class		= &omap3xxx_prm_hwmod_class,
-+	.main_clk	= "wkup_32k_fck",
-+	.slaves		= omap3xxx_prm_slaves,
-+	.slaves_cnt	= ARRAY_SIZE(omap3xxx_prm_slaves),
-+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
-+	.flags		= HWMOD_NO_IDLEST,
-+};
-+
- /* Master interfaces on the MPU device */
- static struct omap_hwmod_ocp_if *omap3xxx_mpu_masters[] = {
- 	&omap3xxx_mpu__l3_main,
-@@ -3201,6 +3254,9 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
- 	&omap3xxx_l4_core_hwmod,
- 	&omap3xxx_l4_per_hwmod,
- 	&omap3xxx_l4_wkup_hwmod,
-+
-+	&omap3xxx_prm_hwmod,
-+
- 	&omap3xxx_mmc1_hwmod,
- 	&omap3xxx_mmc2_hwmod,
- 	&omap3xxx_mmc3_hwmod,
++#endif
 -- 
 1.7.4.1
 
