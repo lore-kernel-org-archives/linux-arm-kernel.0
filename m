@@ -1,23 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 23 Sep 2011 07:46:26 -0500
-Subject: Identifying Primecells
-In-Reply-To: <CAKON4OxqqBh4xFLwiMZzsGrnoG8erQ0hMFX-_VA-EDMvdNkvQQ@mail.gmail.com>
-References: <CAKON4OxqqBh4xFLwiMZzsGrnoG8erQ0hMFX-_VA-EDMvdNkvQQ@mail.gmail.com>
-Message-ID: <4E7C7FA2.30404@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 23 Sep 2011 15:46:08 +0300
+Subject: [PATCHv9 00/18] omap PRCM chain handler
+Message-ID: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/22/2011 01:19 PM, jonsmirl at gmail.com wrote:
-> I'm working on device tree support for the NXP LPC3130. To do this
-> right I need to know what specific Primecells were used in the chip.
-> How do I identify the primecell numbers for the devices? It is a
-> 926ejs core.
-> 
+Hello,
 
-I'm not sure I understand the question.
+Following set contains the version 9 of this work. This patch set contains
+a number of patches tagged as 'TEMP', they are only meant for testing
+purposes and to provide proof of concept. Most of the 'TEMP' patches are
+related to UART runtime handling and they will be replaced by work done
+by Govindraj Raja.
 
-The primecell periph id numbers are only in the DT if they are wrong in
-the h/w for some reason. The compatible property should contain the
-device model number (i.e. "arm,pl011" for the uart).
+As this is a new set sent to linux-arm and linux-kernel lists, the basic
+concept being tackled with this set is to provide a mechanism for multiple
+drivers to register for PRCM interrupts. PRCM interrupt contains a SoC
+depenpend number of events, which of most interesting ones are wakeup and
+IO chain. These are the only supported events in the driver currently, but
+it is possible to add more by tweaking omap3xxx-prm.c and omap4xxx-prm.c
+files.
 
-Rob
+This driver should also be expanded later to contain much of the code
+currently included within the OMAP voltage framework, which resides under
+arch/arm/mach-omap2/voltage*,vc*,vp*.
+
+Changes compared to previous version of this set:
+
+- PRM driver is now moved under /drivers/mfd
+- PRM driver split into three parts now, common, omap3 and omap4
+- version of the driver to init is detected based on PRM version (patch 11)
+- cleaned up the initialization logic a bit (platform device is built
+  separately, provide two different drivers)
+- renamed PRM hwmods as prm3xxx and prm4xxx
+
+These patches have been tested on omap3 beagle and omap4 blaze platforms.
+Tested features include suspend and dynamic idle.
+Tested trees are available at:
+
+git at gitorious.org:~kristo/omap-pm/omap-pm-work.git
+
+branches: omap3_prcm_chain and omap4_prcm_chain
+
+-Tero
+
+
+Texas Instruments Oy, Tekniikantie 12, 02150 Espoo. Y-tunnus: 0115040-6. Kotipaikka: Helsinki
+ 
