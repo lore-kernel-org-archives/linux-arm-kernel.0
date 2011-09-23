@@ -1,42 +1,485 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Sep 2011 10:04:31 +0100
-Subject: change_page_attr() implementation for ARM?
-In-Reply-To: <D19EBEE1D7B1F742A8ED7130E050A38A4CA460FF0C@HQMAIL02.nvidia.com>
-References: <D19EBEE1D7B1F742A8ED7130E050A38A4CA460FF0C@HQMAIL02.nvidia.com>
-Message-ID: <CAHkRjk4mqhu+HhoSAnowk6=5GzXXhmKCE-3jrjhMpVzbtakFYg@mail.gmail.com>
+From: vishwanath.bs@ti.com (Vishwanath Sripathy)
+Date: Fri, 23 Sep 2011 14:51:51 +0530
+Subject: [PATCH 01/10] cpufreq: OMAP: cleanup for multi-SoC support,move
+	into drivers/cpufreq
+In-Reply-To: <1316725648-26710-2-git-send-email-khilman@ti.com>
+References: <1316725648-26710-1-git-send-email-khilman@ti.com>
+	<1316725648-26710-2-git-send-email-khilman@ti.com>
+Message-ID: <9bc8649a2e151bec117424b678bb09f8@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Kevin,
 
-(I'm not sure how the quoted message ends up but your email client
-didn't wrap lines properly)
-
-On 21 September 2011 23:10, Vinod Rex <vrex@nvidia.com> wrote:
-> On Cortex-A9, we have observed stale data being read from write-combine (C=0 B=1) memory regions mapped into userspace which have a duplicate cacheable mapping in the kernel address space (due to the kernel linear mapping).
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org [mailto:linux-
+> arm-kernel-bounces at lists.infradead.org] On Behalf Of Kevin Hilman
+> Sent: Friday, September 23, 2011 2:37 AM
+> To: cpufreq at vger.kernel.org; Dave Jones
+> Cc: Nishanth Menon; linux-omap at vger.kernel.org; Santosh Shilimkar;
+> linux-arm-kernel at lists.infradead.org; Rajendra Nayak
+> Subject: [PATCH 01/10] cpufreq: OMAP: cleanup for multi-SoC
+> support,move into drivers/cpufreq
 >
-> The issue appears to be due to speculative prefetch on the cacheable kernel linear mapping which gets lines into the L2 cache. When reads are performed on the write-combine mapping for this address range, these reads get the stale data from L2 instead of memory.
-
-If your system has a PL310, there is bit 22 in the auxiliary control
-register which makes reads via the non-cacheable mapping not to hit
-the L2 cache. I had this patch queued in Russell's system for a long
-time:
-
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6529/1
-
-Alternatively, you can pass this bit via your platform code.
-
-> As per the Cortex-A9 spec, behavior for double mappings with conflicting page attributes is undefined, so we need a way to make sure all duplicate mappings have the same memory type attributes.
-
-Avoiding aliases would be better but we don't have a fully stable patch yet.
-
-> Similar issue on x86 is handled using the change_page_attr()/set_memory_*() functions defined in arch/x86/mm/pageattr.c. ?This function modifies the attributes of the page in kernel linear map to match the corresponding mapping in userspace to avoid having duplicate mappings with different page attributes. It accomplishes this by splitting section (large page) mappings into 4KB page mappings as needed so that the page attribute change is done only for the requested memory region.
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 >
-> Would a similar implementation for ARM be appropriate? We are experimenting with a port of change_page_attr() to ARM that seems to solve our problems.
+> Move OMAP cpufreq driver from arch/arm/mach-omap2 into
+> drivers/cpufreq, along with a few cleanups:
+>
+> - generalize support for better handling of different SoCs in the
+> OMAP
+> - use OPP layer instead of OMAP clock internals for frequency table
+> init
+>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> [khilman at ti.com: move to drivers]
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+>  arch/arm/plat-omap/Makefile    |    1 -
+>  arch/arm/plat-omap/cpu-omap.c  |  171 -----------------------------
+> -------
+>  drivers/cpufreq/Makefile       |    1 +
+>  drivers/cpufreq/omap-cpufreq.c |  188
+> ++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 189 insertions(+), 172 deletions(-)
+>  delete mode 100644 arch/arm/plat-omap/cpu-omap.c
+>  create mode 100644 drivers/cpufreq/omap-cpufreq.c
+>
+> diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-
+> omap/Makefile
+> index f0233e6..4ef7493 100644
+> --- a/arch/arm/plat-omap/Makefile
+> +++ b/arch/arm/plat-omap/Makefile
+> @@ -21,7 +21,6 @@ obj-$(CONFIG_OMAP_MCBSP) += mcbsp.o
+>  obj-$(CONFIG_OMAP_IOMMU) += iommu.o iovmm.o
+>  obj-$(CONFIG_OMAP_IOMMU_DEBUG) += iommu-debug.o
+>
+> -obj-$(CONFIG_CPU_FREQ) += cpu-omap.o
+>  obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+>  obj-$(CONFIG_OMAP_DEBUG_DEVICES) += debug-devices.o
+>  obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
+> diff --git a/arch/arm/plat-omap/cpu-omap.c b/arch/arm/plat-omap/cpu-
+> omap.c
+> deleted file mode 100644
+> index da4f68d..0000000
+> --- a/arch/arm/plat-omap/cpu-omap.c
+> +++ /dev/null
+> @@ -1,171 +0,0 @@
+> -/*
+> - *  linux/arch/arm/plat-omap/cpu-omap.c
+> - *
+> - *  CPU frequency scaling for OMAP
+> - *
+> - *  Copyright (C) 2005 Nokia Corporation
+> - *  Written by Tony Lindgren <tony@atomide.com>
+> - *
+> - *  Based on cpu-sa1110.c, Copyright (C) 2001 Russell King
+> - *
+> - * This program is free software; you can redistribute it and/or
+> modify
+> - * it under the terms of the GNU General Public License version 2
+> as
+> - * published by the Free Software Foundation.
+> - */
+> -#include <linux/types.h>
+> -#include <linux/kernel.h>
+> -#include <linux/sched.h>
+> -#include <linux/cpufreq.h>
+> -#include <linux/delay.h>
+> -#include <linux/init.h>
+> -#include <linux/err.h>
+> -#include <linux/clk.h>
+> -#include <linux/io.h>
+> -
+> -#include <mach/hardware.h>
+> -#include <plat/clock.h>
+> -#include <asm/system.h>
+> -
+> -#define VERY_HI_RATE	900000000
+> -
+> -static struct cpufreq_frequency_table *freq_table;
+> -
+> -#ifdef CONFIG_ARCH_OMAP1
+> -#define MPU_CLK		"mpu"
+> -#else
+> -#define MPU_CLK		"virt_prcm_set"
+> -#endif
+> -
+> -static struct clk *mpu_clk;
+> -
+> -/* TODO: Add support for SDRAM timing changes */
+> -
+> -static int omap_verify_speed(struct cpufreq_policy *policy)
+> -{
+> -	if (freq_table)
+> -		return cpufreq_frequency_table_verify(policy,
+> freq_table);
+> -
+> -	if (policy->cpu)
+> -		return -EINVAL;
+> -
+> -	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+> -				     policy->cpuinfo.max_freq);
+> -
+> -	policy->min = clk_round_rate(mpu_clk, policy->min * 1000) /
+> 1000;
+> -	policy->max = clk_round_rate(mpu_clk, policy->max * 1000) /
+> 1000;
+> -	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+> -				     policy->cpuinfo.max_freq);
+> -	return 0;
+> -}
+> -
+> -static unsigned int omap_getspeed(unsigned int cpu)
+> -{
+> -	unsigned long rate;
+> -
+> -	if (cpu)
+> -		return 0;
+> -
+> -	rate = clk_get_rate(mpu_clk) / 1000;
+> -	return rate;
+> -}
+> -
+> -static int omap_target(struct cpufreq_policy *policy,
+> -		       unsigned int target_freq,
+> -		       unsigned int relation)
+> -{
+> -	struct cpufreq_freqs freqs;
+> -	int ret = 0;
+> -
+> -	/* Ensure desired rate is within allowed range.  Some govenors
+> -	 * (ondemand) will just pass target_freq=0 to get the minimum.
+> */
+> -	if (target_freq < policy->min)
+> -		target_freq = policy->min;
+> -	if (target_freq > policy->max)
+> -		target_freq = policy->max;
+> -
+> -	freqs.old = omap_getspeed(0);
+> -	freqs.new = clk_round_rate(mpu_clk, target_freq * 1000) /
+> 1000;
+> -	freqs.cpu = 0;
+> -
+> -	if (freqs.old == freqs.new)
+> -		return ret;
+> -
+> -	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> -#ifdef CONFIG_CPU_FREQ_DEBUG
+> -	printk(KERN_DEBUG "cpufreq-omap: transition: %u --> %u\n",
+> -	       freqs.old, freqs.new);
+> -#endif
+> -	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
+> -	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> -
+> -	return ret;
+> -}
+> -
+> -static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+> -{
+> -	int result = 0;
+> -
+> -	mpu_clk = clk_get(NULL, MPU_CLK);
+> -	if (IS_ERR(mpu_clk))
+> -		return PTR_ERR(mpu_clk);
+> -
+> -	if (policy->cpu != 0)
+> -		return -EINVAL;
+> -
+> -	policy->cur = policy->min = policy->max = omap_getspeed(0);
+> -
+> -	clk_init_cpufreq_table(&freq_table);
+> -	if (freq_table) {
+> -		result = cpufreq_frequency_table_cpuinfo(policy,
+> freq_table);
+> -		if (!result)
+> -			cpufreq_frequency_table_get_attr(freq_table,
+> -							policy->cpu);
+> -	} else {
+> -		policy->cpuinfo.min_freq = clk_round_rate(mpu_clk, 0) /
+> 1000;
+> -		policy->cpuinfo.max_freq = clk_round_rate(mpu_clk,
+> -							VERY_HI_RATE) /
+1000;
+> -	}
+> -
+> -	/* FIXME: what's the actual transition time? */
+> -	policy->cpuinfo.transition_latency = 300 * 1000;
+> -
+> -	return 0;
+> -}
+> -
+> -static int omap_cpu_exit(struct cpufreq_policy *policy)
+> -{
+> -	clk_exit_cpufreq_table(&freq_table);
+> -	clk_put(mpu_clk);
+> -	return 0;
+> -}
+> -
+> -static struct freq_attr *omap_cpufreq_attr[] = {
+> -	&cpufreq_freq_attr_scaling_available_freqs,
+> -	NULL,
+> -};
+> -
+> -static struct cpufreq_driver omap_driver = {
+> -	.flags		= CPUFREQ_STICKY,
+> -	.verify		= omap_verify_speed,
+> -	.target		= omap_target,
+> -	.get		= omap_getspeed,
+> -	.init		= omap_cpu_init,
+> -	.exit		= omap_cpu_exit,
+> -	.name		= "omap",
+> -	.attr		= omap_cpufreq_attr,
+> -};
+> -
+> -static int __init omap_cpufreq_init(void)
+> -{
+> -	return cpufreq_register_driver(&omap_driver);
+> -}
+> -
+> -arch_initcall(omap_cpufreq_init);
+> -
+> -/*
+> - * if ever we want to remove this, upon cleanup call:
+> - *
+> - * cpufreq_unregister_driver()
+> - * cpufreq_frequency_table_put_attr()
+> - */
+> -
+> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> index a48bc02..ce75fcb 100644
+> --- a/drivers/cpufreq/Makefile
+> +++ b/drivers/cpufreq/Makefile
+> @@ -43,6 +43,7 @@ obj-$(CONFIG_UX500_SOC_DB8500)		+=
+> db8500-cpufreq.o
+>  obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
+>  obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
+>  obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
+> +obj-$(CONFIG_ARCH_OMAP2PLUS)            += omap-cpufreq.o
+>
+>
+> ####################################################################
+> ##############
+>  # PowerPC platform drivers
+> diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-
+> cpufreq.c
+> new file mode 100644
+> index 0000000..a6b2be7
+> --- /dev/null
+> +++ b/drivers/cpufreq/omap-cpufreq.c
+> @@ -0,0 +1,188 @@
+> +/*
+> + *  CPU frequency scaling for OMAP
+> + *
+> + *  Copyright (C) 2005 Nokia Corporation
+> + *  Written by Tony Lindgren <tony@atomide.com>
+> + *
+> + *  Based on cpu-sa1110.c, Copyright (C) 2001 Russell King
+> + *
+> + * Copyright (C) 2007-2011 Texas Instruments, Inc.
+> + * - OMAP3/4 support by Rajendra Nayak, Santosh Shilimkar
+> + *
+> + * This program is free software; you can redistribute it and/or
+> modify
+> + * it under the terms of the GNU General Public License version 2
+> as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/types.h>
+> +#include <linux/kernel.h>
+> +#include <linux/sched.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/err.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/opp.h>
+> +
+> +#include <asm/system.h>
+> +#include <asm/smp_plat.h>
+> +
+> +#include <plat/clock.h>
+> +#include <plat/omap-pm.h>
+> +#include <plat/common.h>
+> +
+> +#include <mach/hardware.h>
+> +
+> +#define VERY_HI_RATE	900000000
+> +
+> +static struct cpufreq_frequency_table *freq_table;
+> +static struct clk *mpu_clk;
+> +
+> +static int omap_verify_speed(struct cpufreq_policy *policy)
+> +{
+> +	if (freq_table)
+> +		return cpufreq_frequency_table_verify(policy,
+> freq_table);
+> +
+> +	if (policy->cpu)
+> +		return -EINVAL;
+> +
+> +	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+> +				     policy->cpuinfo.max_freq);
+> +
+> +	policy->min = clk_round_rate(mpu_clk, policy->min * 1000) /
+> 1000;
+> +	policy->max = clk_round_rate(mpu_clk, policy->max * 1000) /
+> 1000;
+> +	cpufreq_verify_within_limits(policy, policy->cpuinfo.min_freq,
+> +				     policy->cpuinfo.max_freq);
+> +	return 0;
+> +}
+> +
+> +static unsigned int omap_getspeed(unsigned int cpu)
+> +{
+> +	unsigned long rate;
+> +
+> +	if (cpu)
+> +		return 0;
+> +
+> +	rate = clk_get_rate(mpu_clk) / 1000;
+> +	return rate;
+> +}
+> +
+> +static int omap_target(struct cpufreq_policy *policy,
+> +		       unsigned int target_freq,
+> +		       unsigned int relation)
+> +{
+> +	int ret = 0;
+> +	struct cpufreq_freqs freqs;
+> +
+> +	/* Ensure desired rate is within allowed range.  Some govenors
+> +	 * (ondemand) will just pass target_freq=0 to get the minimum.
+> */
+> +	if (target_freq < policy->min)
+> +		target_freq = policy->min;
+> +	if (target_freq > policy->max)
+> +		target_freq = policy->max;
+> +
+> +	freqs.old = omap_getspeed(0);
+> +	freqs.new = clk_round_rate(mpu_clk, target_freq * 1000) /
+> 1000;
+> +	freqs.cpu = 0;
+> +
+> +	if (freqs.old == freqs.new)
+> +		return ret;
+> +
+> +	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> +
+> +#ifdef CONFIG_CPU_FREQ_DEBUG
+> +	pr_info("cpufreq-omap: transition: %u --> %u\n", freqs.old,
+> freqs.new);
+> +#endif
+> +
+> +	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
+Do you plan to post follow up patches to scale voltage along with Clock?
+Otherwise this will lead to crash on OMAP if voltage set by bootloader is
+not good enough for an OPP.
 
-The kernel linear mapping is done using sections, so we would have to
-change the attributes for a full section. Russell's approach I think
-is better but people reported some stability issues.
+Vishwa
 
--- 
-Catalin
+Setting the clock rate w/o voltage scaling would
+> +
+> +	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> +
+> +	return ret;
+> +}
+> +
+> +static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
+> +{
+> +	int result = 0;
+> +	struct device *mpu_dev;
+> +
+> +	if (cpu_is_omap24xx())
+> +		mpu_clk = clk_get(NULL, "virt_prcm_set");
+> +	else if (cpu_is_omap34xx())
+> +		mpu_clk = clk_get(NULL, "dpll1_ck");
+> +	else if (cpu_is_omap44xx())
+> +		mpu_clk = clk_get(NULL, "dpll_mpu_ck");
+> +
+> +	if (IS_ERR(mpu_clk))
+> +		return PTR_ERR(mpu_clk);
+> +
+> +	if (policy->cpu != 0)
+> +		return -EINVAL;
+> +
+> +	policy->cur = policy->min = policy->max = omap_getspeed(0);
+> +
+> +	mpu_dev = omap2_get_mpuss_device();
+> +	if (!mpu_dev) {
+> +		pr_warning("%s: unable to get the mpu device\n",
+> __func__);
+> +		return -EINVAL;
+> +	}
+> +	opp_init_cpufreq_table(mpu_dev, &freq_table);
+> +
+> +	if (freq_table) {
+> +		result = cpufreq_frequency_table_cpuinfo(policy,
+> freq_table);
+> +		if (!result)
+> +			cpufreq_frequency_table_get_attr(freq_table,
+> +							policy->cpu);
+> +	} else {
+> +		policy->cpuinfo.min_freq = clk_round_rate(mpu_clk, 0) /
+> 1000;
+> +		policy->cpuinfo.max_freq = clk_round_rate(mpu_clk,
+> +							VERY_HI_RATE) /
+1000;
+> +	}
+> +
+> +	policy->min = policy->cpuinfo.min_freq;
+> +	policy->max = policy->cpuinfo.max_freq;
+> +	policy->cur = omap_getspeed(0);
+> +
+> +	/* FIXME: what's the actual transition time? */
+> +	policy->cpuinfo.transition_latency = 300 * 1000;
+> +
+> +	return 0;
+> +}
+> +
+> +static int omap_cpu_exit(struct cpufreq_policy *policy)
+> +{
+> +	clk_exit_cpufreq_table(&freq_table);
+> +	clk_put(mpu_clk);
+> +	return 0;
+> +}
+> +
+> +static struct freq_attr *omap_cpufreq_attr[] = {
+> +	&cpufreq_freq_attr_scaling_available_freqs,
+> +	NULL,
+> +};
+> +
+> +static struct cpufreq_driver omap_driver = {
+> +	.flags		= CPUFREQ_STICKY,
+> +	.verify		= omap_verify_speed,
+> +	.target		= omap_target,
+> +	.get		= omap_getspeed,
+> +	.init		= omap_cpu_init,
+> +	.exit		= omap_cpu_exit,
+> +	.name		= "omap",
+> +	.attr		= omap_cpufreq_attr,
+> +};
+> +
+> +static int __init omap_cpufreq_init(void)
+> +{
+> +	return cpufreq_register_driver(&omap_driver);
+> +}
+> +
+> +static void __exit omap_cpufreq_exit(void)
+> +{
+> +	cpufreq_unregister_driver(&omap_driver);
+> +}
+> +
+> +MODULE_DESCRIPTION("cpufreq driver for OMAP SoCs");
+> +MODULE_LICENSE("GPL");
+> +module_init(omap_cpufreq_init);
+> +module_exit(omap_cpufreq_exit);
+> --
+> 1.7.6
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
