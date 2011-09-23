@@ -1,17 +1,83 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 23 Sep 2011 13:56:30 -0400 (EDT)
-Subject: [PATCH v5 0/3] add fec support for imx6q
-In-Reply-To: <1316779968-21390-1-git-send-email-shawn.guo@linaro.org>
-References: <1316779968-21390-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110923.135630.1776769972894401348.davem@davemloft.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 23 Sep 2011 11:33:33 -0700
+Subject: [PATCH v3 1/3] AM35x: voltage: Basic initialization
+In-Reply-To: <FCCFB4CDC6E5564B9182F639FC356087037AF843EC@dbde02.ent.ti.com>
+	(Abhilash Koyamangalath's message of "Fri, 23 Sep 2011 18:03:02
+	+0530")
+References: <1316698155-954-1-git-send-email-abhilash.kv@ti.com>
+	<1316698155-954-2-git-send-email-abhilash.kv@ti.com>
+	<877h50p5w0.fsf@ti.com>
+	<FCCFB4CDC6E5564B9182F639FC356087037AF843EC@dbde02.ent.ti.com>
+Message-ID: <877h4zglc2.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
-Date: Fri, 23 Sep 2011 20:12:45 +0800
+Hi Abhilash,
 
-> This series adds imx6q enet support.  The imx6q enet is a derivative of
-> imx28 enet controller.  It fixes the frame endian issue found on imx28,
-> and adds 1 Gbps support.
+"Koyamangalath, Abhilash" <abhilash.kv@ti.com> writes:
 
-All applied.
+> On Fri, Sep 23, 2011 at 4:00 AM, Hilman, Kevin wrote:
+>> Hi Abhilash, Abhilash K V <abhilash.kv@ti.com> writes:
+>>> This patch adds the basic initialization of voltage layer for
+>>> AM35x. Since AM35x doesn't support voltage scaling,
+>> I must admit to still being confused by this series.  This patch
+>> says AM35x doesn't support voltage scaling, and the next patch adds
+>> PMIC support, and registers it with the voltage layer.  However,
+>> with each voltdm->scalable flag set to false, none of the PMIC
+>> values will ever be used (by the current voltage layer.)  Do you
+>> have more patches on top of this that extend the voltage layer to
+>> directly use the PMIC instead of using VC or VP?  I'm assuming we
+>> have some more assumptions in our current voltage layer about the
+>> presence of VC/VP that are wrong and need to be fixed.  Now that the
+>> big voltage layer cleanup is done, I am *very* interested in getting
+>> rid of any more assumptions we have in that code about how devices
+>> are hooked up with PMICs.  Can you summarize how these devices are
+>> using (or want to use) the voltage layer?
+> [Abhilash K V] Your concerns are grave and am trying to address most,
+> however these are the only points I can make outright:
+>
+> - AM35x has just one voltage domain, so I tried having only one entry
+> in voltagedomains_omap3[ ] ( and calling it "mpu_core", maybe or "mpu"
+> or "core" ?).  
+
+Based the TRM, it's called core.
+
+> Either ways, some power-domain, say mpu_pwrdm would try
+> looking for the "mpu_iva" volt-domain and return error, this happens
+> for most powerdomains as their constituent volt-domains are hard-coded
+> (and so unavailable on am35xx). Changing the code (which will be
+> massive) there going against our initial premise that am35xx is still
+> a "type of" omap3 SoC.
+
+While the AM35x is similar to the OMAP3 in many ways, in terms of power,
+there are some significant differences that we need to model properly.
+
+The problem with the current approach is it's trying to trick the core
+code into thinking an AM35x is like an OMAP34xx by creating voltage
+domains that don't exist in hardware.  
+
+The point of these voltage/power/clock domain data files is to represent
+*exactly* what is in hardware.
+
+Looking closer at SPRUGR0B, I don't think you should be directly using
+the 34xx powerdomains as a starting point.  There are a few reasons:
+
+- not all 34xx powerdomains exist on AM35x (at least cam, iva2, USB host
+  are missing)
+- AM35x powerdomains are in different voltage domains
+- AM35x powerdomains do not support retention or off (only on and inactive
+  according to SPRUGR0B)
+
+> - TPS65023 PMIC code was originally included as a starting point to
+> support a omap34xx (with SR disabled maybe) with power supplied by a
+> TPS65023. Yes,I agree that since this looks more of like hypothetical
+> scenario right now and so we can do without the addition of file
+> pmic_tps65023.c for now as it doesn't provide any support for scaling.
+
+I see now.
+
+Adding support for that PMIC to the kernel is fine, I just don't think
+it makes sense in context of this series for this device, since it does
+not support voltage scaling, and AFAICT, this PMIC is for DVS uses.
+
+Kevin
