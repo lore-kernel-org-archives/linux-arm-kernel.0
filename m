@@ -1,43 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 23 Sep 2011 09:43:48 +0100
-Subject: [PATCH] ARM: futex: fix clobbering oldval
-In-Reply-To: <1316737129.6872.17.camel@puffmine-laptop>
-References: <1316660015.6872.1.camel@puffmine-laptop>
-	<20110922172653.GH13572@e102144-lin.cambridge.arm.com>
-	<1316737129.6872.17.camel@puffmine-laptop>
-Message-ID: <20110923084348.GA5468@e102144-lin.cambridge.arm.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 23 Sep 2011 14:18:08 +0530
+Subject: [GIT PULL] CPU PM notifiers and ARM driver PM updates for v3.2.
+Message-ID: <1316767688-23705-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2011 at 01:18:49AM +0100, mhban wrote:
-> On Thu, 2011-09-22 at 18:26 +0100, Will Deacon wrote:
-> > 
-> > It would have been nice to have been CC'd on this...
-> 
-> Will not miss next time. Thanks.
+Please pull the CPU PM notifier and ARM GIC, VFP PM updates for v3.2.
+I have added vfp comment fix and strongly ordered descriptor patch
+in this pull request.
 
-Thanks. You can use scripts/get_maintainer.pl to get a list of people to
-email.
+Regards,
+Santosh
 
-> > 
-> > You shouldn't reference r5 directly here, but due to the way the futex code
-> > is laid out, you can't add an extra output operand without converting the
-> > code to use named arguments.
-> > 
-> > I'll post a patch to do that.
-> > 
-> > Will
-> 
-> I'm not familiar with gcc inline, thanks for pointing it out.
 
-There's a good guide for ARM here:
+The following changes since commit b6fd41e29dea9c6753b1843a77e50433e6123bcb:
 
-http://www.ethernut.de/en/documents/arm-inline-asm.html
+  Linux 3.1-rc6 (2011-09-12 14:02:02 -0700)
 
-> BTW, my last name is Ban not Ben.
+are available in the git repository at:
+  git://gitorious.org/omap-sw-develoment/linux-omap-dev.git for_3_2/for-rmk/arm_cpu_pm
 
-Oops, I'll update my reported-by to spell that correctly.
+Colin Cross (5):
+      cpu_pm: Add cpu power management notifiers
+      cpu_pm: call notifiers during suspend
+      ARM: gic: Use cpu pm notifiers to save gic state
+      ARM: vfp: Use cpu pm notifiers to save vfp state
+      ARM: gic: Allow gic arch extensions to provide irqchip flags
 
-Cheers,
+Santosh Shilimkar (3):
+      ARM: Enable CPU_PM notifiers on ARM machines.
+      ARM: vfp: Fix the comment to make it consistent with the code.
+      ARM: mm: Add strongly ordered descriptor support.
 
-Will
+ arch/arm/Kconfig                    |    1 +
+ arch/arm/common/gic.c               |  188 ++++++++++++++++++++++++++++
+ arch/arm/include/asm/hardware/gic.h |    8 ++
+ arch/arm/include/asm/mach/map.h     |    1 +
+ arch/arm/include/asm/pgtable.h      |    3 +
+ arch/arm/mm/mmu.c                   |    8 ++
+ arch/arm/vfp/vfpmodule.c            |   31 ++++--
+ include/linux/cpu_pm.h              |  109 ++++++++++++++++
+ kernel/Makefile                     |    1 +
+ kernel/cpu_pm.c                     |  233 +++++++++++++++++++++++++++++++++++
+ kernel/power/Kconfig                |    4 +
+ 11 files changed, 578 insertions(+), 9 deletions(-)
+ create mode 100644 include/linux/cpu_pm.h
+ create mode 100644 kernel/cpu_pm.c
