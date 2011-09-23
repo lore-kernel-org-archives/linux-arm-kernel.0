@@ -1,134 +1,87 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 23 Sep 2011 17:23:47 +0530
-Subject: [PATCH 7/7] ARM: SAMSUNG: Remove SPI bus clocks from platform data
-In-Reply-To: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
-References: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1316778827-24694-8-git-send-email-padma.v@samsung.com>
+From: mh@glandium.org (Mike Hommey)
+Date: Fri, 23 Sep 2011 13:57:21 +0200
+Subject: I-cache/D-cache inconsistency issue with page cache
+Message-ID: <20110923115721.GA7013@glandium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SPI bus clocks can be avoided passing through platform
-data as spi driver is getting the bus clock using the
-generic clock connection id registered via clkdev.
+Hi,
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/mach-s3c64xx/dev-spi.c                  |    7 -------
- arch/arm/mach-s5p64x0/dev-spi.c                  |    6 ------
- arch/arm/mach-s5pc100/dev-spi.c                  |    7 -------
- arch/arm/mach-s5pv210/dev-spi.c                  |    6 ------
- arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 --
- 5 files changed, 0 insertions(+), 28 deletions(-)
+We've been hitting random crashes at startup with Firefox on tegras
+(under Android), and narrowed it down to a I-cache/D-cache
+inconsistency. A reduced testcase of the issue looks like the following
+(compile as ARM, not Thumb):
 
-diff --git a/arch/arm/mach-s3c64xx/dev-spi.c b/arch/arm/mach-s3c64xx/dev-spi.c
-index 5e6b420..86fb130 100644
---- a/arch/arm/mach-s3c64xx/dev-spi.c
-+++ b/arch/arm/mach-s3c64xx/dev-spi.c
-@@ -23,12 +23,6 @@
- #include <plat/gpio-cfg.h>
- #include <plat/devs.h>
- 
--static char *spi_src_clks[] = {
--	[S3C64XX_SPI_SRCCLK_PCLK] = "pclk",
--	[S3C64XX_SPI_SRCCLK_SPIBUS] = "spi-bus",
--	[S3C64XX_SPI_SRCCLK_48M] = "spi_48m",
--};
--
- /* SPI Controller platform_devices */
- 
- /* Since we emulate multi-cs capability, we do not touch the GPC-3,7.
-@@ -175,5 +169,4 @@ void __init s3c64xx_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
- 
- 	pd->num_cs = num_cs;
- 	pd->src_clk_nr = src_clk_nr;
--	pd->src_clk_name = spi_src_clks[src_clk_nr];
- }
-diff --git a/arch/arm/mach-s5p64x0/dev-spi.c b/arch/arm/mach-s5p64x0/dev-spi.c
-index ac825e8..0604494 100644
---- a/arch/arm/mach-s5p64x0/dev-spi.c
-+++ b/arch/arm/mach-s5p64x0/dev-spi.c
-@@ -24,11 +24,6 @@
- #include <plat/s3c64xx-spi.h>
- #include <plat/gpio-cfg.h>
- 
--static char *s5p64x0_spi_src_clks[] = {
--	[S5P64X0_SPI_SRCCLK_PCLK] = "pclk",
--	[S5P64X0_SPI_SRCCLK_SCLK] = "sclk_spi",
--};
--
- /* SPI Controller platform_devices */
- 
- /* Since we emulate multi-cs capability, we do not touch the CS.
-@@ -222,5 +217,4 @@ void __init s5p64x0_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
- 
- 	pd->num_cs = num_cs;
- 	pd->src_clk_nr = src_clk_nr;
--	pd->src_clk_name = s5p64x0_spi_src_clks[src_clk_nr];
- }
-diff --git a/arch/arm/mach-s5pc100/dev-spi.c b/arch/arm/mach-s5pc100/dev-spi.c
-index e5d6c4d..155f50d 100644
---- a/arch/arm/mach-s5pc100/dev-spi.c
-+++ b/arch/arm/mach-s5pc100/dev-spi.c
-@@ -21,12 +21,6 @@
- #include <plat/gpio-cfg.h>
- #include <plat/irqs.h>
- 
--static char *spi_src_clks[] = {
--	[S5PC100_SPI_SRCCLK_PCLK] = "pclk",
--	[S5PC100_SPI_SRCCLK_48M] = "spi_48m",
--	[S5PC100_SPI_SRCCLK_SPIBUS] = "spi_bus",
--};
--
- /* SPI Controller platform_devices */
- 
- /* Since we emulate multi-cs capability, we do not touch the CS.
-@@ -223,5 +217,4 @@ void __init s5pc100_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
- 
- 	pd->num_cs = num_cs;
- 	pd->src_clk_nr = src_clk_nr;
--	pd->src_clk_name = spi_src_clks[src_clk_nr];
- }
-diff --git a/arch/arm/mach-s5pv210/dev-spi.c b/arch/arm/mach-s5pv210/dev-spi.c
-index eaf9a7b..39bef19 100644
---- a/arch/arm/mach-s5pv210/dev-spi.c
-+++ b/arch/arm/mach-s5pv210/dev-spi.c
-@@ -20,11 +20,6 @@
- #include <plat/s3c64xx-spi.h>
- #include <plat/gpio-cfg.h>
- 
--static char *spi_src_clks[] = {
--	[S5PV210_SPI_SRCCLK_PCLK] = "pclk",
--	[S5PV210_SPI_SRCCLK_SCLK] = "sclk_spi",
--};
--
- /* SPI Controller platform_devices */
- 
- /* Since we emulate multi-cs capability, we do not touch the CS.
-@@ -171,5 +166,4 @@ void __init s5pv210_spi_set_info(int cntrlr, int src_clk_nr, int num_cs)
- 
- 	pd->num_cs = num_cs;
- 	pd->src_clk_nr = src_clk_nr;
--	pd->src_clk_name = spi_src_clks[src_clk_nr];
- }
-diff --git a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-index 4c16fa3..c3d82a5 100644
---- a/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c64xx-spi.h
-@@ -31,7 +31,6 @@ struct s3c64xx_spi_csinfo {
- /**
-  * struct s3c64xx_spi_info - SPI Controller defining structure
-  * @src_clk_nr: Clock source index for the CLK_CFG[SPI_CLKSEL] field.
-- * @src_clk_name: Platform name of the corresponding clock.
-  * @clk_from_cmu: If the SPI clock/prescalar control block is present
-  *     by the platform's clock-management-unit and not in SPI controller.
-  * @num_cs: Number of CS this controller emulates.
-@@ -43,7 +42,6 @@ struct s3c64xx_spi_csinfo {
-  */
- struct s3c64xx_spi_info {
- 	int src_clk_nr;
--	char *src_clk_name;
- 	bool clk_from_cmu;
- 
- 	int num_cs;
--- 
-1.7.4.4
+-----------------8<--------------
+#include <sys/mman.h>
+#include <string.h>
+#include <fcntl.h>
+
+__asm__(
+  ".text\n"
+  ".align 4\n"
+  ".type foo, %function\n"
+  "foo:\n"
+  "  bx lr\n"
+);
+
+static void foo() __attribute__((used));
+
+int main(int argc, char *argv[]) {
+  if (argc < 2)
+    return 0;
+  int fd = open(argv[1], O_RDWR | O_CREAT | O_TRUNC, 0600);
+  ftruncate(fd, 4096);
+  void *m = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED, fd, 0);
+  memcpy(m, foo, 4);
+  munmap(m, 4096);
+  void *mx = mmap(NULL, 4096, PROT_EXEC, MAP_SHARED, fd, 0);
+  void (*func)(void) = (void (*)(void)) mx;
+  func();
+  return 0;
+}
+----------------->8--------------
+
+We've been able to reliably reproduce with the above reduced testcase on
+tegras under both Android and Ubuntu (Maverick). It however doesn't seem
+to happen on all kinds of ARM processors, though.
+
+A corresponding real world use case is that we are (were) uncompressing
+libraries in mmap()ed memory and dlopen()ing the resulting file. We have
+been doing so for a long time, but only recently we got a library small
+enough to trigger an actual problem.
+
+Something along these lines has been discussed on this very list:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/001074.html
+
+What happens in practice with the above code is that by the time we jump
+into the copied function, RAM still has the zeroed out page, while the
+actual content is still in D-cache. Execution thus happens on zeroes, up
+to the point it reaches the next page, which in most cases would not be
+mapped, thus a segmentation fault.
+
+In our real world scenario, the execution would start on zeroes, up to
+some point where memory would have actual content, at which time we
+crash with SIGILL at a cache line boundary (adresses ending in 0x20,
+0x40, 0x60 or 0x80), depending on how much D-cache would have been
+flushed in between because there are various things happening between
+the uncompression and the execution of init functions in the library.
+This didn't happen until we had a library smaller than 4KB with an init
+function.
+
+Adding a cache flush in between does solve the problem. I however think
+the kernel should mitigate by making sure the page cache backing PROT_EXEC
+mappings is fresh.
+
+Please note that I'm not expecting
+ void *m = mmap(NULL, 4096, PROT_WRITE | PROT_EXEC, MAP_SHARED, fd, 0);
+ memcpy(m, foo, 4);
+ void (*func)(void) = (void (*)(void)) m;
+ func();
+to work, this would be unreasonable.
+
+Cheers,
+
+Mike
+
+PS: Please Cc me, I'm not subscribed.
