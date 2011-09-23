@@ -1,56 +1,64 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Fri, 23 Sep 2011 14:48:56 +0530
-Subject: [correction] [PATCH 09/12] OMAP: dmtimer: low-power mode support
-Message-ID: <mailman.148.1316770064.20020.linux-arm-kernel@lists.infradead.org>
+From: deepthi@linux.vnet.ibm.com (Deepthi Dharwar)
+Date: Fri, 23 Sep 2011 16:37:27 +0530
+Subject: [RFC PATCH V6 0/4] cpuidle: Global registration of idle states
+	with per-cpu statistics
+In-Reply-To: <87ty84tl7n.fsf@ti.com>
+References: <20110922082840.10520.85895.stgit@localhost6.localdomain6>
+	<87ty84tl7n.fsf@ti.com>
+Message-ID: <4E7C686F.30608@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are some missing content as well as correction to this patch.
+On Friday 23 September 2011 01:15 AM, Kevin Hilman wrote:
+> Deepthi Dharwar <deepthi@linux.vnet.ibm.com> writes:
+> 
+>> The following patch series implements global registration of cpuidle
+>> states, and also has the necessary data structure changes to
+>> accommodate the per-cpu writable members of the cpuidle_states
+>> structure.
+> 
+> I reviewed earlier versions of the series, and this version still looks
+> good to me.  Any reason it is still RFC?
+> 
+> Reviewed-by: Kevin Hilman <khilman@ti.com>
+> 
+> and for the OMAP-specific parts,
+> 
+> Acked-by: Kevin Hilman <khilman@ti.com>
+> 
+> Kevin
+> 
+Hi Kevin,
+Thanks for reviewing the patch.
 
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
----
- arch/arm/plat-omap/dmtimer.c |   21 ++++++++++++++++++---
- 1 files changed, 18 insertions(+), 3 deletions(-)
+This was posted as an RFC, as there were
+a couple of ToDos listed in this patch series
+which I thought needed additional review before 
+I could ask for inclusion. 
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index de7896f..81a2305 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -79,9 +79,9 @@ static void omap_dm_timer_write_reg(struct
-omap_dm_timer *timer, u32 reg,
+To Do :
+======
 
- static void omap_timer_restore_context(struct omap_dm_timer *timer)
- {
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_OFFSET,
--				timer->context.tiocp_cfg);
--	if (timer->revision > 1)
-+	__raw_writel(timer->context.tiocp_cfg,
-+			timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
-+	if (timer->revision == 1)
- 		__raw_writel(timer->context.tistat, timer->sys_stat);
+1. Russell King pointed out that in (V5 1/4) of this patch in
+arch/arm/mach-at91/cpuidle.c, AT91 pieces may be broken.
+In at91_enter_idle() routine, folks need to fix the two
+consecutive asm() statements by combining
+it to one as per the GCC reference manual.
 
- 	__raw_writel(timer->context.tisr, timer->irq_stat);
-@@ -356,6 +356,21 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+Reference:
+https://lkml.org/lkml/2011/6/6/273
 
- 	__omap_dm_timer_stop(timer, timer->posted, rate);
+2. In (V6 4/4), handle the case when idle states may change at run time
+and acpi_processor_cst_has_changed() routine is called in a
+better way than the current solution in this patch.
 
-+	if (timer->loses_context) {
-+		if (timer->get_context_loss_count)
-+			timer->ctx_loss_count =
-+			timer->get_context_loss_count(&timer->pdev->dev);
-+	}
-+
-+	/*
-+	 * Since the register values are computed and written within
-+	 * __omap_dm_timer_stop, we need to use read to retrieve the
-+	 * context.
-+	 */
-+	timer->context.tclr =
-+			omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
-+	timer->context.tisr = __raw_readl(timer->irq_stat);
-+	omap_dm_timer_disable(timer);
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
--- 
-1.7.0.4
+In this current solution where global registration is implemented,
+the boot cpu on x86 would disable all the devices, repopulate the
+states and later enable all the devices, irrespective of the cpu
+that would receive the notification first.
+
+Reference:
+https://lkml.org/lkml/2011/4/25/83
+
+Thanks & Regards,
+ -Deepthi
