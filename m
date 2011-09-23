@@ -1,34 +1,160 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 23 Sep 2011 17:23:42 +0530
-Subject: [PATCH 2/7] ARM: SAMSUNG: Add CLK Macro for clkdev support
+Date: Fri, 23 Sep 2011 17:23:43 +0530
+Subject: [PATCH 3/7] ARM: S3C64XX: Add SPI clkdev support
 In-Reply-To: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
 References: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1316778827-24694-3-git-send-email-padma.v@samsung.com>
+Message-ID: <1316778827-24694-4-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Registered the SPI bus clocks with clkdev using generic
+connection id.
+
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/clock.h |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c64xx/clock.c |   98 +++++++++++++++++++++++++++-------------
+ 1 files changed, 66 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
-index 73c66d4..c864825 100644
---- a/arch/arm/plat-samsung/include/plat/clock.h
-+++ b/arch/arm/plat-samsung/include/plat/clock.h
-@@ -17,6 +17,13 @@
+diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+index 872e683..e1d5376 100644
+--- a/arch/arm/mach-s3c64xx/clock.c
++++ b/arch/arm/mach-s3c64xx/clock.c
+@@ -184,18 +184,6 @@ static struct clk init_clocks_off[] = {
+ 		.enable		= s3c64xx_pclk_ctrl,
+ 		.ctrlbit	= S3C_CLKCON_PCLK_SPI1,
+ 	}, {
+-		.name		= "spi_48m",
+-		.devname	= "s3c64xx-spi.0",
+-		.parent		= &clk_48m,
+-		.enable		= s3c64xx_sclk_ctrl,
+-		.ctrlbit	= S3C_CLKCON_SCLK_SPI0_48,
+-	}, {
+-		.name		= "spi_48m",
+-		.devname	= "s3c64xx-spi.1",
+-		.parent		= &clk_48m,
+-		.enable		= s3c64xx_sclk_ctrl,
+-		.ctrlbit	= S3C_CLKCON_SCLK_SPI1_48,
+-	}, {
+ 		.name		= "48m",
+ 		.devname	= "s3c-sdhci.0",
+ 		.parent		= &clk_48m,
+@@ -625,26 +613,6 @@ static struct clksrc_clk clksrcs[] = {
+ 		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 16, .size = 4  },
+ 		.sources	= &clkset_uart,
+ 	}, {
+-/* Where does UCLK0 come from? */
+-		.clk	= {
+-			.name		= "spi-bus",
+-			.devname	= "s3c64xx-spi.0",
+-			.ctrlbit        = S3C_CLKCON_SCLK_SPI0,
+-			.enable		= s3c64xx_sclk_ctrl,
+-		},
+-		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 14, .size = 2  },
+-		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 0, .size = 4  },
+-		.sources	= &clkset_spi_mmc,
+-	}, {
+-		.clk	= {
+-			.name		= "spi-bus",
+-			.devname	= "s3c64xx-spi.1",
+-			.enable		= s3c64xx_sclk_ctrl,
+-		},
+-		.reg_src	= { .reg = S3C_CLK_SRC, .shift = 16, .size = 2  },
+-		.reg_div	= { .reg = S3C_CLK_DIV2, .shift = 4, .size = 4  },
+-		.sources	= &clkset_spi_mmc,
+-	}, {
+ 		.clk	= {
+ 			.name		= "audio-bus",
+ 			.devname	= "samsung-i2s.0",
+@@ -695,6 +663,60 @@ static struct clksrc_clk clksrcs[] = {
+ 	},
+ };
  
- struct clk;
- 
-+#define CLK(dev, con, ck)	\
-+	{			\
-+		.dev_id = dev,	\
-+		.con_id = con,	\
-+		.clk = ck,	\
-+	}
++static struct clk clk_48m_spi0 = {
++	.name		= "spi_48m",
++	.parent		= &clk_48m,
++	.enable		= s3c64xx_sclk_ctrl,
++	.ctrlbit	= S3C_CLKCON_SCLK_SPI0_48,
++};
 +
- /**
-  * struct clk_ops - standard clock operations
-  * @set_rate: set the clock rate, see clk_set_rate().
++static struct clk clk_48m_spi1 = {
++	.name		= "spi_48m",
++	.parent		= &clk_48m,
++	.enable		= s3c64xx_sclk_ctrl,
++	.ctrlbit	= S3C_CLKCON_SCLK_SPI1_48,
++};
++
++static struct clksrc_clk sclk_spi0 = {
++	.clk	 = {
++		.name		= "spi-bus",
++		.ctrlbit	= S3C_CLKCON_SCLK_SPI0,
++		.enable		= s3c64xx_sclk_ctrl,
++	},
++	.reg_src = { .reg = S3C_CLK_SRC, .shift = 14, .size = 2 },
++	.reg_div = { .reg = S3C_CLK_DIV2, .shift = 0, .size = 4 },
++	.sources = &clkset_spi_mmc,
++};
++
++static struct clksrc_clk sclk_spi1 = {
++	.clk	= {
++		.name		= "spi-bus",
++		.ctrlbit	= S3C_CLKCON_SCLK_SPI1,
++		.enable		= s3c64xx_sclk_ctrl,
++	},
++	.reg_src = { .reg = S3C_CLK_SRC, .shift = 16, .size = 2 },
++	.reg_div = { .reg = S3C_CLK_DIV2, .shift = 4, .size = 4 },
++	.sources = &clkset_spi_mmc,
++};
++
++static struct clk_lookup clk_lookup_table[] = {
++	CLK(NULL, "spi_busclk0", &clk_p),
++	CLK("s3c64xx-spi.0", "spi_busclk1", &sclk_spi0.clk),
++	CLK("s3c64xx-spi.0", "spi_busclk2", &clk_48m_spi0),
++	CLK("s3c64xx-spi.1", "spi_busclk1", &sclk_spi1.clk),
++	CLK("s3c64xx-spi.1", "spi_busclk2", &clk_48m_spi1),
++};
++
++static struct clksrc_clk *clksrc_cdev[] = {
++	&sclk_spi0,
++	&sclk_spi1,
++};
++
++static struct clk *clk_cdev[] = {
++	&clk_48m_spi0,
++	&clk_48m_spi1,
++};
++
+ /* Clock initialisation code */
+ 
+ static struct clksrc_clk *init_parents[] = {
+@@ -810,11 +832,16 @@ static struct clk *clks[] __initdata = {
+ void __init s3c64xx_register_clocks(unsigned long xtal, 
+ 				    unsigned armclk_divlimit)
+ {
++	int ptr;
++
+ 	armclk_mask = armclk_divlimit;
+ 
+ 	s3c24xx_register_baseclocks(xtal);
+ 	s3c24xx_register_clocks(clks, ARRAY_SIZE(clks));
+ 
++	for (ptr = 0; ptr < ARRAY_SIZE(clksrc_cdev); ptr++)
++		s3c_register_clksrc(clksrc_cdev[ptr], 1);
++
+ 	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
+ 
+ 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+@@ -822,5 +849,12 @@ void __init s3c64xx_register_clocks(unsigned long xtal,
+ 
+ 	s3c24xx_register_clocks(clks1, ARRAY_SIZE(clks1));
+ 	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
++
++	s3c24xx_register_clocks(clk_cdev, ARRAY_SIZE(clk_cdev));
++	for (ptr = 0; ptr < ARRAY_SIZE(clk_cdev); ptr++)
++		s3c_disable_clocks(clk_cdev[ptr], 1);
++
+ 	s3c_pwmclk_init();
++
++	clkdev_add_table(clk_lookup_table, ARRAY_SIZE(clk_lookup_table));
+ }
 -- 
 1.7.4.4
