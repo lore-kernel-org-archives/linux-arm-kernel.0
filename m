@@ -1,102 +1,109 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Sep 2011 17:51:26 +0100
-Subject: [RFC PATCH 08/14] ARM: ux500: convert to CONFIG_MULTI_IRQ_HANDLER
+Date: Fri, 23 Sep 2011 17:51:30 +0100
+Subject: [RFC PATCH 12/14] ARM: omap2/3: Add global omap2/3_intc_handle_irq()
+	functions
 In-Reply-To: <1316796692-15964-1-git-send-email-marc.zyngier@arm.com>
 References: <1316796692-15964-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1316796692-15964-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1316796692-15964-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the ux500 platforms to be using the gic_handle_irq
-function as their primary interrupt handler.
+Provide the OMAP2/3 IRQ code with low level handlers that can be used
+by platforms using CONFIG_MULTI_IRQ_HANDLER. Though the handlers are
+written in C, the compiled code looks very similar to its assembly
+counterpart (at least with my gcc 4.4.1).
 
-Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-ux500/Kconfig                    |    1 +
- arch/arm/mach-ux500/board-mop500.c             |    4 ++++
- arch/arm/mach-ux500/board-u5500.c              |    2 ++
- arch/arm/mach-ux500/include/mach/entry-macro.S |    2 --
- 4 files changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/irq.c              |   49 ++++++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/irqs.h |    2 +
+ 2 files changed, 51 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index a3e0c86..bb2b52b 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -7,6 +7,7 @@ config UX500_SOC_COMMON
- 	select HAS_MTU
- 	select ARM_ERRATA_753970
- 	select ARM_ERRATA_754322
-+	select MULTI_IRQ_HANDLER
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 3a12f75..0a48b33 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -35,6 +35,11 @@
+ /* Number of IRQ state bits in each MIR register */
+ #define IRQ_BITS_PER_REG	32
  
- menu "Ux500 SoC"
++#define OMAP2_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
++#define OMAP3_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
++#define INTCPS_SIR_IRQ_OFFSET	0x0040	/* omap2/3 active interrupt offset */
++#define ACTIVEIRQ_MASK		0x7f	/* omap2/3 active interrupt bits */
++
+ /*
+  * OMAP2 has a number of different interrupt controllers, each interrupt
+  * controller is identified as its own "bank". Register definitions are
+@@ -191,6 +196,44 @@ void __init ti816x_init_irq(void)
+ 	omap_init_irq(OMAP34XX_IC_BASE, 128);
+ }
  
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index f0b1a00..2539b0b 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -33,6 +33,7 @@
- #include <linux/leds.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-+#include <asm/hardware/gic.h>
++static inline void omap_intc_handle_irq(void __iomem *base_addr, struct pt_regs *regs)
++{
++	u32 irqnr;
++
++	do {
++		irqnr = readl_relaxed(base_addr + 0x98);
++		if (irqnr)
++			goto out;
++
++		irqnr = readl_relaxed(base_addr + 0xb8);
++		if (irqnr)
++			goto out;
++
++		irqnr = readl_relaxed(base_addr + 0xd8);
++#ifdef CONFIG_SOC_OMAPTI816X
++		if (irqnr)
++			goto out;
++		irqnr = readl_relaxed(base_addr + 0xf8);
++#endif
++
++out:
++		if (!irqnr)
++			break;
++
++		irqnr = readl_relaxed(base_addr + INTCPS_SIR_IRQ_OFFSET);
++		irqnr &= ACTIVEIRQ_MASK;
++
++		if (irqnr)
++			handle_IRQ(irqnr, regs);
++	} while (irqnr);
++}
++
++asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs)
++{
++	void __iomem *base_addr = OMAP2_IRQ_BASE;
++	omap_intc_handle_irq(base_addr, regs);
++}
++
+ #ifdef CONFIG_ARCH_OMAP3
+ static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
  
- #include <plat/i2c.h>
- #include <plat/ste_dma40.h>
-@@ -696,6 +697,7 @@ MACHINE_START(U8500, "ST-Ericsson MOP500 platform")
- 	.init_irq	= ux500_init_irq,
- 	/* we re-use nomadik timer here */
- 	.timer		= &ux500_timer,
-+	.handle_irq	= gic_handle_irq,
- 	.init_machine	= mop500_init_machine,
- MACHINE_END
+@@ -263,4 +306,10 @@ void omap3_intc_resume_idle(void)
+ 	/* Re-enable autoidle */
+ 	intc_bank_write_reg(1, &irq_banks[0], INTC_SYSCONFIG);
+ }
++
++asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
++{
++	void __iomem *base_addr = OMAP3_IRQ_BASE;
++	omap_intc_handle_irq(base_addr, regs);
++}
+ #endif /* CONFIG_ARCH_OMAP3 */
+diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
+index 30e1071..8b19a63 100644
+--- a/arch/arm/plat-omap/include/plat/irqs.h
++++ b/arch/arm/plat-omap/include/plat/irqs.h
+@@ -448,6 +448,8 @@ void omap_intc_restore_context(void);
+ void omap3_intc_suspend(void);
+ void omap3_intc_prepare_idle(void);
+ void omap3_intc_resume_idle(void);
++void omap2_intc_handle_irq(struct pt_regs *regs);
++void omap3_intc_handle_irq(struct pt_regs *regs);
+ #endif
  
-@@ -705,6 +707,7 @@ MACHINE_START(HREFV60, "ST-Ericsson U8500 Platform HREFv60+")
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	.timer		= &ux500_timer,
-+	.handle_irq	= gic_handle_irq,
- 	.init_machine	= hrefv60_init_machine,
- MACHINE_END
- 
-@@ -715,5 +718,6 @@ MACHINE_START(SNOWBALL, "Calao Systems Snowball platform")
- 	.init_irq	= ux500_init_irq,
- 	/* we re-use nomadik timer here */
- 	.timer		= &ux500_timer,
-+	.handle_irq	= gic_handle_irq,
- 	.init_machine	= snowball_init_machine,
- MACHINE_END
-diff --git a/arch/arm/mach-ux500/board-u5500.c b/arch/arm/mach-ux500/board-u5500.c
-index ddfad36..c4c90a3 100644
---- a/arch/arm/mach-ux500/board-u5500.c
-+++ b/arch/arm/mach-ux500/board-u5500.c
-@@ -11,6 +11,7 @@
- #include <linux/irq.h>
- #include <linux/i2c.h>
- 
-+#include <asm/hardware/gic.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- 
-@@ -123,5 +124,6 @@ MACHINE_START(U5500, "ST-Ericsson U5500 Platform")
- 	.map_io		= u5500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	.timer		= &ux500_timer,
-+	.handle_irq	= gic_handle_irq,
- 	.init_machine	= u5500_init_machine,
- MACHINE_END
-diff --git a/arch/arm/mach-ux500/include/mach/entry-macro.S b/arch/arm/mach-ux500/include/mach/entry-macro.S
-index 071bba9..e16299e 100644
---- a/arch/arm/mach-ux500/include/mach/entry-macro.S
-+++ b/arch/arm/mach-ux500/include/mach/entry-macro.S
-@@ -10,8 +10,6 @@
-  * License version 2. This program is licensed "as is" without any
-  * warranty of any kind, whether express or implied.
-  */
--#include <mach/hardware.h>
--#include <asm/hardware/entry-macro-gic.S>
- 
- 		.macro	disable_fiq
- 		.endm
+ #include <mach/hardware.h>
 -- 
 1.7.0.4
