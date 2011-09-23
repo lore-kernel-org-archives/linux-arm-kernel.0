@@ -1,137 +1,37 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Tue, 27 Sep 2011 13:42:33 +0200
-Subject: [PATCH 3/3] mmc: mmci: Change vdd_handler to a generic ios_handler
-Message-ID: <1317123753-29902-1-git-send-email-ulf.hansson@stericsson.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Fri, 23 Sep 2011 21:01:44 +0900
+Subject: [PATCH 0/3] iommu/exynos: Add iommu driver for Exynos4 SoCs
+Message-ID: <1316779307-2567-1-git-send-email-pullip.cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The purpose of the vdd_handler does not make sense. We remove it
-and use a generic approach instead. A new ios_handler is added, the
-purpose of which e.g. can be to control GPIO pins to a levelshifter.
+Hi.
 
-Previously the vdd_handler was also used for making additional
-changes to the power register bits. This option is superfluous and is
-therefore removed.
+This patch set enhances System MMU platform device definitions of Exynos
+SoC platforms, adds the implementation of IOMMU API as well as and moves
+Syste MMU driver to the drivers/iommu directory.
 
-Adaptaptions from the old vdd_handler to the new ios_handler is done for
-mach-ux500 board, which was the only one using the vdd_handler.
+The IOMMU driver also implements fault handler that Ohad Ben-Cohen has
+suggeested and iommu_ops per-bus_type that Joerg Roedel suggests.
 
-This patch is based upon a patch from Sebastian Rasmussen.
+CONFIG_S5P_SYSTEM_MMU is removed because it is replaceable
+with CONFIG_EXYNOS4_IOMMU.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
-Signed-off-by: Sebastian Rasmussen <sebastian.rasmussen@stericsson.com>
----
- arch/arm/mach-ux500/board-mop500-sdi.c |   21 ++++++++-------------
- drivers/mmc/host/mmci.c                |    8 ++++----
- include/linux/amba/mmci.h              |    6 +++---
- 3 files changed, 15 insertions(+), 20 deletions(-)
+Diffstat:
 
-diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-index 6826fae..3578c51 100644
---- a/arch/arm/mach-ux500/board-mop500-sdi.c
-+++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-@@ -25,21 +25,13 @@
-  * SDI 0 (MicroSD slot)
-  */
- 
--/* MMCIPOWER bits */
--#define MCI_DATA2DIREN		(1 << 2)
--#define MCI_CMDDIREN		(1 << 3)
--#define MCI_DATA0DIREN		(1 << 4)
--#define MCI_DATA31DIREN		(1 << 5)
--#define MCI_FBCLKEN		(1 << 7)
--
- /* GPIO pins used by the sdi0 level shifter */
- static int sdi0_en = -1;
- static int sdi0_vsel = -1;
- 
--static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
--				   unsigned char power_mode)
-+static int mop500_sdi0_ios_handler(struct device *dev, struct mmc_ios *ios)
- {
--	switch (power_mode) {
-+	switch (ios->power_mode) {
- 	case MMC_POWER_UP:
- 	case MMC_POWER_ON:
- 		/*
-@@ -59,8 +51,7 @@ static u32 mop500_sdi0_vdd_handler(struct device *dev, unsigned int vdd,
- 		break;
- 	}
- 
--	return MCI_FBCLKEN | MCI_CMDDIREN | MCI_DATA0DIREN |
--	       MCI_DATA2DIREN | MCI_DATA31DIREN;
-+	return 0;
- }
- 
- #ifdef CONFIG_STE_DMA40
-@@ -84,13 +75,17 @@ static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
- #endif
- 
- static struct mmci_platform_data mop500_sdi0_data = {
--	.vdd_handler	= mop500_sdi0_vdd_handler,
-+	.ios_handler	= mop500_sdi0_ios_handler,
- 	.ocr_mask	= MMC_VDD_29_30,
- 	.f_max		= 50000000,
- 	.capabilities	= MMC_CAP_4_BIT_DATA |
- 				MMC_CAP_SD_HIGHSPEED |
- 				MMC_CAP_MMC_HIGHSPEED,
- 	.gpio_wp	= -1,
-+	.sigdir		= MCI_ST_FBCLKEN |
-+				MCI_ST_CMDDIREN |
-+				MCI_ST_DATA0DIREN |
-+				MCI_ST_DATA2DIREN,
- #ifdef CONFIG_STE_DMA40
- 	.dma_filter	= stedma40_filter,
- 	.dma_rx_param	= &mop500_sdi0_dma_cfg_rx,
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 82810a6..13222bd 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1047,6 +1047,10 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	unsigned long flags;
- 	int ret;
- 
-+	if (host->plat->ios_handler &&
-+		host->plat->ios_handler(mmc_dev(mmc), ios))
-+			dev_err(mmc_dev(mmc), "platform ios_handler failed\n");
-+
- 	switch (ios->power_mode) {
- 	case MMC_POWER_OFF:
- 		if (host->vcc)
-@@ -1066,10 +1070,6 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 				return;
- 			}
- 		}
--		if (host->plat->vdd_handler)
--			pwr |= host->plat->vdd_handler(mmc_dev(mmc), ios->vdd,
--						       ios->power_mode);
--
- 		/*
- 		 * The ST Micro variant doesn't have the PL180s MCI_PWR_UP
- 		 * and instead uses MCI_PWR_ON so apply whatever value is
-diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
-index de8a7a1..188676b 100644
---- a/include/linux/amba/mmci.h
-+++ b/include/linux/amba/mmci.h
-@@ -31,7 +31,8 @@ struct dma_chan;
-  * @ocr_mask: available voltages on the 4 pins from the block, this
-  * is ignored if a regulator is used, see the MMC_VDD_* masks in
-  * mmc/host.h
-- * @vdd_handler: a callback function to translate a MMC_VDD_*
-+ * @ios_handler: a callback function to act on specfic ios changes,
-+ * used for example to control a levelshifter
-  * mask into a value to be binary (or set some other custom bits
-  * in MMCIPWR) or:ed and written into the MMCIPWR register of the
-  * block.  May also control external power based on the power_mode.
-@@ -60,8 +61,7 @@ struct dma_chan;
- struct mmci_platform_data {
- 	unsigned int f_max;
- 	unsigned int ocr_mask;
--	u32 (*vdd_handler)(struct device *, unsigned int vdd,
--			   unsigned char power_mode);
-+	int (*ios_handler)(struct device *, struct mmc_ios *);
- 	unsigned int (*status)(struct device *);
- 	int	gpio_wp;
- 	int	gpio_cd;
--- 
-1.7.5.4
+arch/arm/mach-exynos4/Kconfig               |    2 -
+arch/arm/mach-exynos4/clock.c               |   43 +-
+arch/arm/mach-exynos4/dev-sysmmu.c          |  281 +++-------
+arch/arm/mach-exynos4/include/mach/irqs.h   |    1 -
+arch/arm/mach-exynos4/include/mach/map.h    |    1 -
+arch/arm/mach-exynos4/include/mach/sysmmu.h |   96 ++--
+arch/arm/mach-exynos4/mach-armlex4210.c     |   24 +-
+arch/arm/mach-exynos4/mach-smdkv310.c       |   28 +-
+arch/arm/plat-s5p/Kconfig                   |    8 -
+arch/arm/plat-s5p/Makefile                  |    1 -
+arch/arm/plat-s5p/include/plat/sysmmu.h     |   95 ---
+arch/arm/plat-s5p/sysmmu.c                  |  312 ----------
+drivers/iommu/Kconfig                       |   14 +
+drivers/iommu/Makefile                      |    1 +
+drivers/iommu/exynos_iommu.c                |  859 +++++++++++++++++++++++++++
+15 files changed, 1084 insertions(+), 682 deletions(-)
