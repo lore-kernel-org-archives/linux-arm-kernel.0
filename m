@@ -1,109 +1,206 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Sep 2011 17:51:30 +0100
-Subject: [RFC PATCH 12/14] ARM: omap2/3: Add global omap2/3_intc_handle_irq()
-	functions
+Date: Fri, 23 Sep 2011 17:51:22 +0100
+Subject: [RFC PATCH 04/14] ARM: msm: convert SMP platforms to
+	CONFIG_MULTI_IRQ_HANDLER
 In-Reply-To: <1316796692-15964-1-git-send-email-marc.zyngier@arm.com>
 References: <1316796692-15964-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1316796692-15964-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1316796692-15964-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the OMAP2/3 IRQ code with low level handlers that can be used
-by platforms using CONFIG_MULTI_IRQ_HANDLER. Though the handlers are
-written in C, the compiled code looks very similar to its assembly
-counterpart (at least with my gcc 4.4.1).
+Convert the SMP msm platforms to be using the gic_handle_irq
+function as their primary interrupt handler.
 
-Cc: Tony Lindgren <tony@atomide.com>
+Cc: David Brown <davidb@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-omap2/irq.c              |   49 ++++++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/irqs.h |    2 +
- 2 files changed, 51 insertions(+), 0 deletions(-)
+ arch/arm/mach-msm/Kconfig                         |    2 +
+ arch/arm/mach-msm/board-msm8960.c                 |    2 +
+ arch/arm/mach-msm/board-msm8x60.c                 |    4 ++
+ arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   17 ---------
+ arch/arm/mach-msm/include/mach/entry-macro-vic.S  |   37 ---------------------
+ arch/arm/mach-msm/include/mach/entry-macro.S      |   27 +++++++++++++--
+ 6 files changed, 31 insertions(+), 58 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/include/mach/entry-macro-qgic.S
+ delete mode 100644 arch/arm/mach-msm/include/mach/entry-macro-vic.S
 
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 3a12f75..0a48b33 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -35,6 +35,11 @@
- /* Number of IRQ state bits in each MIR register */
- #define IRQ_BITS_PER_REG	32
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index ebde97f..ba36b74 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -50,6 +50,7 @@ config ARCH_MSM8X60
+ 	select GPIO_MSM_V2
+ 	select MSM_GPIOMUX
+ 	select MSM_SCM if SMP
++	select MULTI_IRQ_HANDLER
  
-+#define OMAP2_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
-+#define OMAP3_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
-+#define INTCPS_SIR_IRQ_OFFSET	0x0040	/* omap2/3 active interrupt offset */
-+#define ACTIVEIRQ_MASK		0x7f	/* omap2/3 active interrupt bits */
-+
- /*
-  * OMAP2 has a number of different interrupt controllers, each interrupt
-  * controller is identified as its own "bank". Register definitions are
-@@ -191,6 +196,44 @@ void __init ti816x_init_irq(void)
- 	omap_init_irq(OMAP34XX_IC_BASE, 128);
- }
+ config ARCH_MSM8960
+ 	bool "MSM8960"
+@@ -60,6 +61,7 @@ config ARCH_MSM8960
+ 	select MSM_V2_TLMM
+ 	select MSM_GPIOMUX
+ 	select MSM_SCM if SMP
++	select MULTI_IRQ_HANDLER
  
-+static inline void omap_intc_handle_irq(void __iomem *base_addr, struct pt_regs *regs)
-+{
-+	u32 irqnr;
-+
-+	do {
-+		irqnr = readl_relaxed(base_addr + 0x98);
-+		if (irqnr)
-+			goto out;
-+
-+		irqnr = readl_relaxed(base_addr + 0xb8);
-+		if (irqnr)
-+			goto out;
-+
-+		irqnr = readl_relaxed(base_addr + 0xd8);
-+#ifdef CONFIG_SOC_OMAPTI816X
-+		if (irqnr)
-+			goto out;
-+		irqnr = readl_relaxed(base_addr + 0xf8);
-+#endif
-+
-+out:
-+		if (!irqnr)
-+			break;
-+
-+		irqnr = readl_relaxed(base_addr + INTCPS_SIR_IRQ_OFFSET);
-+		irqnr &= ACTIVEIRQ_MASK;
-+
-+		if (irqnr)
-+			handle_IRQ(irqnr, regs);
-+	} while (irqnr);
-+}
-+
-+asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs)
-+{
-+	void __iomem *base_addr = OMAP2_IRQ_BASE;
-+	omap_intc_handle_irq(base_addr, regs);
-+}
-+
- #ifdef CONFIG_ARCH_OMAP3
- static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
+ endchoice
  
-@@ -263,4 +306,10 @@ void omap3_intc_resume_idle(void)
- 	/* Re-enable autoidle */
- 	intc_bank_write_reg(1, &irq_banks[0], INTC_SYSCONFIG);
- }
+diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
+index c811e29..7af9a6d 100644
+--- a/arch/arm/mach-msm/board-msm8960.c
++++ b/arch/arm/mach-msm/board-msm8960.c
+@@ -101,6 +101,7 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
+ 	.map_io = msm8960_map_io,
+ 	.init_irq = msm8960_init_irq,
+ 	.timer = &msm_timer,
++	.handle_irq = gic_handle_irq,
+ 	.init_machine = msm8960_sim_init,
+ MACHINE_END
+ 
+@@ -111,6 +112,7 @@ MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
+ 	.map_io = msm8960_map_io,
+ 	.init_irq = msm8960_init_irq,
+ 	.timer = &msm_timer,
++	.handle_irq = gic_handle_irq,
+ 	.init_machine = msm8960_rumi3_init,
+ MACHINE_END
+ 
+diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
+index 30c6b58..1eca320 100644
+--- a/arch/arm/mach-msm/board-msm8x60.c
++++ b/arch/arm/mach-msm/board-msm8x60.c
+@@ -111,6 +111,7 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
++	.handle_irq = gic_handle_irq,
+ 	.init_machine = msm8x60_init,
+ 	.timer = &msm_timer,
+ MACHINE_END
+@@ -121,6 +122,7 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
++	.handle_irq = gic_handle_irq,
+ 	.init_machine = msm8x60_init,
+ 	.timer = &msm_timer,
+ MACHINE_END
+@@ -131,6 +133,7 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
++	.handle_irq = gic_handle_irq,
+ 	.init_machine = msm8x60_init,
+ 	.timer = &msm_timer,
+ MACHINE_END
+@@ -141,6 +144,7 @@ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
+ 	.reserve = msm8x60_reserve,
+ 	.map_io = msm8x60_map_io,
+ 	.init_irq = msm8x60_init_irq,
++	.handle_irq = gic_handle_irq,
+ 	.init_machine = msm8x60_init,
+ 	.timer = &msm_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-msm/include/mach/entry-macro-qgic.S b/arch/arm/mach-msm/include/mach/entry-macro-qgic.S
+deleted file mode 100644
+index 717076f..0000000
+--- a/arch/arm/mach-msm/include/mach/entry-macro-qgic.S
++++ /dev/null
+@@ -1,17 +0,0 @@
+-/*
+- * Low-level IRQ helper macros
+- *
+- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+- *
+- * This file is licensed under  the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <asm/hardware/entry-macro-gic.S>
+-
+-	.macro	disable_fiq
+-	.endm
+-
+-	.macro  arch_ret_to_user, tmp1, tmp2
+-	.endm
+diff --git a/arch/arm/mach-msm/include/mach/entry-macro-vic.S b/arch/arm/mach-msm/include/mach/entry-macro-vic.S
+deleted file mode 100644
+index 70563ed..0000000
+--- a/arch/arm/mach-msm/include/mach/entry-macro-vic.S
++++ /dev/null
+@@ -1,37 +0,0 @@
+-/*
+- * Copyright (C) 2007 Google, Inc.
+- * Author: Brian Swetland <swetland@google.com>
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#include <mach/msm_iomap.h>
+-
+-	.macro	disable_fiq
+-	.endm
+-
+-	.macro	get_irqnr_preamble, base, tmp
+-	@ enable imprecise aborts
+-	cpsie	a
+-	mov	\base, #MSM_VIC_BASE
+-	.endm
+-
+-	.macro	arch_ret_to_user, tmp1, tmp2
+-	.endm
+-
+-	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+-	@ 0xD0 has irq# or old irq# if the irq has been handled
+-	@ 0xD4 has irq# or -1 if none pending *but* if you just
+-	@ read 0xD4 you never get the first irq for some reason
+-	ldr	\irqnr, [\base, #0xD0]
+-	ldr	\irqnr, [\base, #0xD4]
+-	cmp	\irqnr, #0xffffffff
+-	.endm
+diff --git a/arch/arm/mach-msm/include/mach/entry-macro.S b/arch/arm/mach-msm/include/mach/entry-macro.S
+index b16f082..41f7003 100644
+--- a/arch/arm/mach-msm/include/mach/entry-macro.S
++++ b/arch/arm/mach-msm/include/mach/entry-macro.S
+@@ -16,8 +16,27 @@
+  *
+  */
+ 
+-#if defined(CONFIG_ARM_GIC)
+-#include <mach/entry-macro-qgic.S>
+-#else
+-#include <mach/entry-macro-vic.S>
++	.macro	disable_fiq
++	.endm
 +
-+asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
-+{
-+	void __iomem *base_addr = OMAP3_IRQ_BASE;
-+	omap_intc_handle_irq(base_addr, regs);
-+}
- #endif /* CONFIG_ARCH_OMAP3 */
-diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
-index 30e1071..8b19a63 100644
---- a/arch/arm/plat-omap/include/plat/irqs.h
-+++ b/arch/arm/plat-omap/include/plat/irqs.h
-@@ -448,6 +448,8 @@ void omap_intc_restore_context(void);
- void omap3_intc_suspend(void);
- void omap3_intc_prepare_idle(void);
- void omap3_intc_resume_idle(void);
-+void omap2_intc_handle_irq(struct pt_regs *regs);
-+void omap3_intc_handle_irq(struct pt_regs *regs);
++	.macro	arch_ret_to_user, tmp1, tmp2
++	.endm
++
++#if !defined(CONFIG_ARM_GIC)
++#include <mach/msm_iomap.h>
++
++	.macro	get_irqnr_preamble, base, tmp
++	@ enable imprecise aborts
++	cpsie	a
++	mov	\base, #MSM_VIC_BASE
++	.endm
++
++	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
++	@ 0xD0 has irq# or old irq# if the irq has been handled
++	@ 0xD4 has irq# or -1 if none pending *but* if you just
++	@ read 0xD4 you never get the first irq for some reason
++	ldr	\irqnr, [\base, #0xD0]
++	ldr	\irqnr, [\base, #0xD4]
++	cmp	\irqnr, #0xffffffff
++	.endm
  #endif
- 
- #include <mach/hardware.h>
 -- 
 1.7.0.4
