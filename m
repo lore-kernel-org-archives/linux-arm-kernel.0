@@ -1,29 +1,31 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 23 Sep 2011 22:23:12 +0200
-Subject: [PATCH 04/11] arm/dts: Add support for OMAP4 SDP board
+Date: Fri, 23 Sep 2011 22:23:11 +0200
+Subject: [PATCH 03/11] arm/dts: Add support for OMAP4 PandaBoard
 In-Reply-To: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
 References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1316809399-19579-5-git-send-email-b-cousson@ti.com>
+Message-ID: <1316809399-19579-4-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SDP/Blaze (Software Development Board) support with
-device tree.
-That file is based on the omap4-panda.dts.
+Based on the original omap4-panda.dts file from Manju.
+http://www.spinics.net/lists/linux-omap/msg55836.html
+
+Add memory information and a default bootargs to allow
+a boot from RAMDISK.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: G, Manjunath Kondaiah <manjugk@ti.com>
 ---
- arch/arm/boot/dts/omap4-sdp.dts |   29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4-panda.dts |   29 +++++++++++++++++++++++++++++
  1 files changed, 29 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap4-sdp.dts
+ create mode 100644 arch/arm/boot/dts/omap4-panda.dts
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
 new file mode 100644
-index 0000000..066e28c
+index 0000000..c702657
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-panda.dts
 @@ -0,0 +1,29 @@
 +/*
 + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
@@ -37,8 +39,8 @@ index 0000000..066e28c
 +/include/ "omap4.dtsi"
 +
 +/ {
-+	model = "TI OMAP4 SDP board";
-+	compatible = "ti,omap4-sdp", "ti,omap4430", "ti,omap4";
++	model = "TI OMAP4 PandaBoard";
++	compatible = "ti,omap4-panda", "ti,omap4430", "ti,omap4";
 +
 +	/*
 +	 * Since the initial device tree board file does not create any
