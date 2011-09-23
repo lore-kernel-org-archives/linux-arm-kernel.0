@@ -1,73 +1,57 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 23 Sep 2011 22:23:13 +0200
-Subject: [PATCH 05/11] arm/dts: Add initial device tree support for OMAP3 SoC
+Date: Fri, 23 Sep 2011 22:23:12 +0200
+Subject: [PATCH 04/11] arm/dts: Add support for OMAP4 SDP board
 In-Reply-To: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
 References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1316809399-19579-6-git-send-email-b-cousson@ti.com>
+Message-ID: <1316809399-19579-5-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial OMAP3 soc file with empty ocp bus.
-
-Based on initial patch from Manju:
-http://www.spinics.net/lists/linux-omap/msg55830.html
+Add the SDP/Blaze (Software Development Board) support with
+device tree.
+That file is based on the omap4-panda.dts.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: G, Manjunath Kondaiah <manjugk@ti.com>
 ---
- arch/arm/boot/dts/omap3.dtsi |   44 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 44 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3.dtsi
+ arch/arm/boot/dts/omap4-sdp.dts |   29 +++++++++++++++++++++++++++++
+ 1 files changed, 29 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-sdp.dts
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
 new file mode 100644
-index 0000000..d558785
+index 0000000..066e28c
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -0,0 +1,44 @@
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -0,0 +1,29 @@
 +/*
-+ * Device Tree Source for OMAP3 SoC
-+ *
 + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
 + *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
++/dts-v1/;
 +
-+/include/ "skeleton.dtsi"
++/include/ "omap4.dtsi"
 +
 +/ {
-+	compatible = "ti,omap3430", "ti,omap3";
++	model = "TI OMAP4 SDP board";
++	compatible = "ti,omap4-sdp", "ti,omap4430", "ti,omap4";
 +
 +	/*
-+	 * The soc node represents the soc top level view. It is uses for IPs
-+	 * that are not memory mapped in the MPU view or for the MPU itself.
++	 * Since the initial device tree board file does not create any
++	 * devices (MMC, network...), the only way to boot is to provide a
++	 * ramdisk.
 +	 */
-+	soc {
-+		compatible = "ti,omap-infra";
++	chosen {
++		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
 +	};
 +
-+	/*
-+	 * XXX: Use a flat representation of the OMAP3 interconnect.
-+	 * The real OMAP interconnect network is quite complex.
-+	 * Since that will not bring real advantage to represent that in DT for
-+	 * the moment, just use a fake OCP bus entry to represent the whole bus
-+	 * hierarchy.
-+	 */
-+	ocp {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		ti,hwmods = "l3_main";
-+
-+		intc: interrupt-controller at 1 {
-+			compatible = "ti,omap3-intc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x40000000>; /* 1 GB */
 +	};
 +};
 -- 
