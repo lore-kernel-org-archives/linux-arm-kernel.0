@@ -1,37 +1,44 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 23 Sep 2011 07:02:17 -0700
-Subject: [PATCH 01/10] cpufreq: OMAP: cleanup for multi-SoC support,
-	move into drivers/cpufreq
-In-Reply-To: <9bc8649a2e151bec117424b678bb09f8@mail.gmail.com> (Vishwanath
-	Sripathy's message of "Fri, 23 Sep 2011 14:51:51 +0530")
-References: <1316725648-26710-1-git-send-email-khilman@ti.com>
-	<1316725648-26710-2-git-send-email-khilman@ti.com>
-	<9bc8649a2e151bec117424b678bb09f8@mail.gmail.com>
-Message-ID: <87d3erl5li.fsf@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 23 Sep 2011 15:10:49 +0100
+Subject: Identifying Primecells
+In-Reply-To: <CAKON4OxZPFFL5NAgxLPRw2xxnS=v7iVWtQSSLcUJWfOYh4yfjA@mail.gmail.com>
+References: <CAKON4OxqqBh4xFLwiMZzsGrnoG8erQ0hMFX-_VA-EDMvdNkvQQ@mail.gmail.com>
+	<4E7C7FA2.30404@gmail.com>
+	<CAKON4OzGEo+XvcNg=mzp3jhq3d3m7Z9bvZTSVCNLNjZ=KYbNBQ@mail.gmail.com>
+	<4E7C89FC.4090209@gmail.com>
+	<CAKON4OxZPFFL5NAgxLPRw2xxnS=v7iVWtQSSLcUJWfOYh4yfjA@mail.gmail.com>
+Message-ID: <1316787049.4611.920.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vishwanath Sripathy <vishwanath.bs@ti.com> writes:
+> Is peripheral use documented at ARM for the lpc3130? What I don't know
+> is if the peripherals have been modified or replaced with an
+> alternative implementation.
+> 
+> So I guess I need to figure out how to read the ID register.
 
-[...]
+I'm not sure what your problem exactly is, but if you want to know what
+PeriphID for PL011 is, have a look here:
 
->> +#ifdef CONFIG_CPU_FREQ_DEBUG
->> +	pr_info("cpufreq-omap: transition: %u --> %u\n", freqs.old,
->> freqs.new);
->> +#endif
->> +
->> +	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
->
-> Do you plan to post follow up patches to scale voltage along with Clock?
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0183g/I18381.html
 
-Yes.
+So if your UART is PL011, reading four 8-bit wide registers at
+* base + 0xfe0
+* base + 0xfe4
+* base + 0xfe8
+* base + 0xfec
+should give you (respectively):
+* 0x11
+* 0x10
+* 0x_4 (_ depends on the cell revision)
+* 0x00
 
-This series is just a move of existing code + minor cleanups.
+Of course AMBA bus match_id will do this for you so, as I said, I'm not
+sure what the problem is...
 
-The next step is to finalize/merge Tero's regulator driver and use
-that to scale voltage along with frequency here.
+If you don't know what the base address is, well, only NXP and their
+datasheet can help you here.
 
-Now that the voltage domain cleanups are merged, I hope to have
-regulator series + voltage scaling changes in this driver ready next week.
+Cheers!
 
-Kevin
+Pawe?
