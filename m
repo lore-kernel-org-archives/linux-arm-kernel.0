@@ -1,120 +1,103 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 23 Sep 2011 15:46:09 +0300
-Subject: [PATCHv9 01/18] OMAP2+: hwmod: Add API to enable IO ring wakeup.
+Date: Fri, 23 Sep 2011 15:46:12 +0300
+Subject: [PATCHv9 04/18] TEMP: OMAP4xxx: hwmod data: add PRM hwmod
 In-Reply-To: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
 References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1316781986-30642-2-git-send-email-t-kristo@ti.com>
+Message-ID: <1316781986-30642-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: R, Govindraj <govindraj.raja@ti.com>
+This patch is temporary until Benoit can provide final version.
 
-Add API to enable IO pad wakeup capability based on mux dynamic pad and
-wake_up enable flag available from hwmod_mux initialization.
-
-Use the wakeup_enable flag and enable wakeup capability
-for the given pads. Wakeup capability will be enabled/disabled
-during hwmod idle transition based on whether wakeup_flag is
-set or cleared.
-
-Map the enable/disable pad wakeup API's to hwmod_wakeup_enable/disable.
-
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   59 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   65 ++++++++++++++++++++++++++++
+ 1 files changed, 65 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 84cc0bd..e751dd9 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2062,6 +2062,34 @@ static int __init omap_hwmod_setup_all(void)
- core_initcall(omap_hwmod_setup_all);
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 6201422..c09bf4d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -3990,6 +3990,68 @@ static struct omap_hwmod omap44xx_mpu_hwmod = {
+ 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+ };
  
- /**
-+ * omap_hwmod_set_ioring_wakeup - enable io pad wakeup flag.
-+ * @oh: struct omap_hwmod *
-+ * @set: bool value indicating to set or clear wakeup status.
-+ *
-+ * Set or Clear wakeup flag for the io_pad.
++ /*
++ * 'prm' class
++ * power and reset manager (part of the prcm infrastructure)
 + */
-+static int omap_hwmod_set_ioring_wakeup(struct omap_hwmod *oh, bool set_wake)
-+{
-+	struct omap_device_pad *pad;
-+	int ret = -EINVAL, j;
 +
-+	if (oh->mux && oh->mux->enabled) {
-+		for (j = 0; j < oh->mux->nr_pads_dynamic; j++) {
-+			pad = oh->mux->pads_dynamic[j];
-+			if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
-+				if (set_wake)
-+					pad->idle |= OMAP_WAKEUP_EN;
-+				else
-+					pad->idle &= ~OMAP_WAKEUP_EN;
-+				ret = 0;
-+			}
-+		}
-+	}
++static struct omap_hwmod_class_sysconfig omap44xx_prm_sysc = {
++	.rev_offs	= 0x0000,
++	.sysc_flags	= 0,
++};
 +
-+	return ret;
-+}
++static struct omap_hwmod_class omap44xx_prm_hwmod_class = {
++	.name	= "prm",
++	.sysc	= &omap44xx_prm_sysc,
++};
 +
-+/**
-  * omap_hwmod_enable - enable an omap_hwmod
-  * @oh: struct omap_hwmod *
-  *
-@@ -2393,6 +2421,35 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
- {
- 	return _del_initiator_dep(oh, init_oh);
- }
-+/**
-+ * omap_hwmod_enable_ioring_wakeup - Set wakeup flag for iopad.
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Traverse through dynamic pads, if pad is enabled then
-+ * set wakeup enable bit flag for the mux pin. Wakeup pad bit
-+ * will be set during hwmod idle transistion.
-+ * Return error if pads are not enabled or not available.
-+ */
-+int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh)
-+{
-+	/* Enable pad wake-up capability */
-+	return omap_hwmod_set_ioring_wakeup(oh, true);
-+}
++/* prm */
++static struct omap_hwmod omap44xx_prm_hwmod;
++static struct omap_hwmod_irq_info omap44xx_prm_irqs[] = {
++	{ .irq = 11 + OMAP44XX_IRQ_GIC_START },
++	{ .irq = -1 }
++};
 +
-+/**
-+ * omap_hwmod_disable_ioring_wakeup - Clear wakeup flag for iopad.
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Traverse through dynamic pads, if pad is enabled then
-+ * clear wakeup enable bit flag for the mux pin. Wakeup pad bit
-+ * will be set during hwmod idle transistion.
-+ * Return error if pads are not enabled or not available.
-+ */
-+int omap_hwmod_disable_ioring_wakeup(struct omap_hwmod *oh)
-+{
-+	/* Disable pad wakeup capability */
-+	return omap_hwmod_set_ioring_wakeup(oh, false);
-+}
++static struct omap_hwmod_rst_info omap44xx_prm_resets[] = {
++	{ .name = "rst_global_warm_sw", .rst_shift = 0 },
++	{ .name = "rst_global_cold_sw", .rst_shift = 1 },
++};
++
++static struct omap_hwmod_addr_space omap44xx_prm_addrs[] = {
++	{
++		.pa_start       = 0x4a306000,
++		.pa_end         = 0x4a307fff,
++		.flags          = ADDR_TYPE_RT
++	},
++	{ }
++};
++
++/* l4_wkup -> prm */
++static struct omap_hwmod_ocp_if omap44xx_l4_wkup__prm = {
++	.master		= &omap44xx_l4_wkup_hwmod,
++	.slave		= &omap44xx_prm_hwmod,
++	.clk		= "l4_wkup_clk_mux_ck",
++	.addr		= omap44xx_prm_addrs,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* prm slave ports */
++static struct omap_hwmod_ocp_if *omap44xx_prm_slaves[] = {
++	&omap44xx_l4_wkup__prm,
++};
++
++static struct omap_hwmod omap44xx_prm_hwmod = {
++	.name		= "prm4xxx",
++	.class		= &omap44xx_prm_hwmod_class,
++	.mpu_irqs	= omap44xx_prm_irqs,
++	.clkdm_name	= "l4_wkup_clkdm",
++	.rst_lines	= omap44xx_prm_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(omap44xx_prm_resets),
++	.slaves		= omap44xx_prm_slaves,
++	.slaves_cnt	= ARRAY_SIZE(omap44xx_prm_slaves),
++	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
++};
++
+ /*
+  * 'smartreflex' class
+  * smartreflex module (monitor silicon performance and outputs a measure of
+@@ -5448,6 +5510,9 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+ 	/* mpu class */
+ 	&omap44xx_mpu_hwmod,
  
- /**
-  * omap_hwmod_enable_wakeup - allow device to wake up the system
-@@ -2419,6 +2476,7 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- 	v = oh->_sysc_cache;
- 	_enable_wakeup(oh, &v);
- 	_write_sysconfig(v, oh);
-+	omap_hwmod_enable_ioring_wakeup(oh);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
- 	return 0;
-@@ -2449,6 +2507,7 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- 	v = oh->_sysc_cache;
- 	_disable_wakeup(oh, &v);
- 	_write_sysconfig(v, oh);
-+	omap_hwmod_disable_ioring_wakeup(oh);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
- 
- 	return 0;
++	/* prm class */
++	&omap44xx_prm_hwmod,
++
+ 	/* smartreflex class */
+ 	&omap44xx_smartreflex_core_hwmod,
+ 	&omap44xx_smartreflex_iva_hwmod,
 -- 
 1.7.4.1
 
