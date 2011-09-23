@@ -1,64 +1,45 @@
-From: deepthi@linux.vnet.ibm.com (Deepthi Dharwar)
-Date: Fri, 23 Sep 2011 16:37:27 +0530
-Subject: [RFC PATCH V6 0/4] cpuidle: Global registration of idle states
-	with per-cpu statistics
-In-Reply-To: <87ty84tl7n.fsf@ti.com>
-References: <20110922082840.10520.85895.stgit@localhost6.localdomain6>
-	<87ty84tl7n.fsf@ti.com>
-Message-ID: <4E7C686F.30608@linux.vnet.ibm.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Fri, 23 Sep 2011 17:23:40 +0530
+Subject: [PATCH 0/7]: ARM: SAMSUNG: Add SPI clkdev support
+Message-ID: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 September 2011 01:15 AM, Kevin Hilman wrote:
-> Deepthi Dharwar <deepthi@linux.vnet.ibm.com> writes:
-> 
->> The following patch series implements global registration of cpuidle
->> states, and also has the necessary data structure changes to
->> accommodate the per-cpu writable members of the cpuidle_states
->> structure.
-> 
-> I reviewed earlier versions of the series, and this version still looks
-> good to me.  Any reason it is still RFC?
-> 
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
-> 
-> and for the OMAP-specific parts,
-> 
-> Acked-by: Kevin Hilman <khilman@ti.com>
-> 
-> Kevin
-> 
-Hi Kevin,
-Thanks for reviewing the patch.
+This patchset modifies the existing clkdev to make SPI driver
+independent of the clock names send from platform data. This
+patches enables the SPI driver to request SPI bus clocks
+using generic connection ID.
 
-This was posted as an RFC, as there were
-a couple of ToDos listed in this patch series
-which I thought needed additional review before 
-I could ask for inclusion. 
+The patches are created against "for-next" branch of Kukjin Kim's tree at:
+git://github.com/kgene/linux-samsung.git
 
-To Do :
-======
+Due to the issue with the GPIO in the latest commits of for-next branch,
+following patches are tested against the following commit: 
+9eb1e9aeec6f6f68d83a463446d1b30cb8ffcc65
+ARM: S5PV210: enable TV support on GONI board
 
-1. Russell King pointed out that in (V5 1/4) of this patch in
-arch/arm/mach-at91/cpuidle.c, AT91 pieces may be broken.
-In at91_enter_idle() routine, folks need to fix the two
-consecutive asm() statements by combining
-it to one as per the GCC reference manual.
+Padmavathi Venna (7):
+  SPI: S3C64XX: Use bus clocks created using clkdev
+  ARM: SAMSUNG: Add CLK Macro for clkdev support
+  ARM: S3C64XX: Add SPI clkdev support
+  ARM: S5PC100: Add SPI clkdev support
+  ARM: S5P64X0: Add SPI clkdev support
+  ARM: S5PV210: Add SPI clkdev support
+  ARM: SAMSUNG: Remove SPI bus clocks from platform data
 
-Reference:
-https://lkml.org/lkml/2011/6/6/273
+ arch/arm/mach-s3c64xx/clock.c                    |   98 +++++++++++-----
+ arch/arm/mach-s3c64xx/dev-spi.c                  |    7 -
+ arch/arm/mach-s5p64x0/clock-s5p6440.c            |   57 ++++++----
+ arch/arm/mach-s5p64x0/clock-s5p6450.c            |   57 ++++++----
+ arch/arm/mach-s5p64x0/dev-spi.c                  |    6 -
+ arch/arm/mach-s5pc100/clock.c                    |  132 +++++++++++++---------
+ arch/arm/mach-s5pc100/dev-spi.c                  |    7 -
+ arch/arm/mach-s5pv210/clock.c                    |   58 ++++++----
+ arch/arm/mach-s5pv210/dev-spi.c                  |    6 -
+ arch/arm/plat-samsung/include/plat/clock.h       |    7 +
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    2 -
+ drivers/spi/spi-s3c64xx.c                        |   14 +--
+ 12 files changed, 271 insertions(+), 180 deletions(-)
 
-2. In (V6 4/4), handle the case when idle states may change at run time
-and acpi_processor_cst_has_changed() routine is called in a
-better way than the current solution in this patch.
-
-In this current solution where global registration is implemented,
-the boot cpu on x86 would disable all the devices, repopulate the
-states and later enable all the devices, irrespective of the cpu
-that would receive the notification first.
-
-Reference:
-https://lkml.org/lkml/2011/4/25/83
-
-Thanks & Regards,
- -Deepthi
+-- 
+1.7.4.4
