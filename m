@@ -1,90 +1,155 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Sep 2011 16:00:50 -0700
-Subject: [PATCH 01/11] OMAP2+: Add SoC specific map_io functions
-In-Reply-To: <1316809399-19579-2-git-send-email-b-cousson@ti.com>
-References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
-	<1316809399-19579-2-git-send-email-b-cousson@ti.com>
-Message-ID: <20110923230049.GC6324@atomide.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Fri, 23 Sep 2011 16:03:15 -0700
+Subject: [RFC PATCH 0/3] Add accurate boot timing to a Linux system
+Message-ID: <1316818998-30711-1-git-send-email-sjg@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [110923 12:50]:
-> Add SoC specific map_io function to be used by the generic DT
-> board file. This is an intermediate step before having some
-> generic DT aware map_io function.
+This experimental patch set adds boot timing to a Linux system. The
+timing starts with the boot loader and extends through the kernel into
+user space to the completion of the boot process. The timing starts when
+the system leaves reset, not later when the kernel starts.
 
-Thanks, I'll apply this into cleanup branch and with the related
-conversion of board files.
+The concept is:
+- Boot loader records a timestamp for key events during its operation
+- These timestamps are passed to Linux, which adds more as it boots
+- These timestamps are made available to user space, where more
+timestamps are added as init does its job
+- Finally the whole record is collected by a user-space script run at
+the end of init. This is fed back through some mechanism to monitor
+boot time in the field.
 
-Regards,
+The bootstage record aims to provide 20-30 timestamps ranging from reset
+to login prompt (or some other definition of completion).
 
-Tony
- 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/common.c             |   18 ++++++++++++++++++
->  arch/arm/plat-omap/include/plat/common.h |    4 ++++
->  2 files changed, 22 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-> index 3f20cbb..de61f15 100644
-> --- a/arch/arm/mach-omap2/common.c
-> +++ b/arch/arm/mach-omap2/common.c
-> @@ -56,6 +56,12 @@ void __init omap2_set_globals_242x(void)
->  {
->  	__omap2_set_globals(&omap242x_globals);
->  }
-> +
-> +void __init omap242x_map_io(void)
-> +{
-> +	omap2_set_globals_242x();
-> +	omap242x_map_common_io();
-> +}
->  #endif
->  
->  #if defined(CONFIG_SOC_OMAP2430)
-> @@ -74,6 +80,12 @@ void __init omap2_set_globals_243x(void)
->  {
->  	__omap2_set_globals(&omap243x_globals);
->  }
-> +
-> +void __init omap243x_map_io(void)
-> +{
-> +	omap2_set_globals_243x();
-> +	omap243x_map_common_io();
-> +}
->  #endif
->  
->  #if defined(CONFIG_ARCH_OMAP3)
-> @@ -138,5 +150,11 @@ void __init omap2_set_globals_443x(void)
->  	omap2_set_globals_control(&omap4_globals);
->  	omap2_set_globals_prcm(&omap4_globals);
->  }
-> +
-> +void __init omap4_map_io(void)
-> +{
-> +	omap2_set_globals_443x();
-> +	omap44xx_map_common_io();
-> +}
->  #endif
->  
-> diff --git a/arch/arm/plat-omap/include/plat/common.h b/arch/arm/plat-omap/include/plat/common.h
-> index 5cac97e..abda2c7 100644
-> --- a/arch/arm/plat-omap/include/plat/common.h
-> +++ b/arch/arm/plat-omap/include/plat/common.h
-> @@ -83,7 +83,11 @@ void omap2_set_globals_sdrc(struct omap_globals *);
->  void omap2_set_globals_control(struct omap_globals *);
->  void omap2_set_globals_prcm(struct omap_globals *);
->  
-> +void omap242x_map_io(void);
-> +void omap243x_map_io(void);
->  void omap3_map_io(void);
-> +void omap4_map_io(void);
-> +
->  
->  /**
->   * omap_test_timeout - busy-loop, testing a condition
-> -- 
-> 1.7.0.4
-> 
+Current kernel timing architecture
+----------------------------------
+This is a note on what is currently in the kernel and what may justify
+adding something new.
+
+At present kernel support for boot timing does not extend to before
+Linux was loaded. This means that boot-time regressions in the boot
+loader are silently missed. Even it is possible to determine how long
+the boot loader took to run without being told, this information will
+lack any detail, such as how much time was taken initializing devices,
+how much time to load the kernel, etc.
+
+Within the kernel, timing information is typically written with each
+printk() (for example dmesg has timing in brackets at the start of each
+line). This log information can be analyzed later to look for particular
+messages which are known to be printed at different stages of the
+kernel boot. However, this approach is fragile, since the messages can
+change or disappear altogether, and the code is in two places: kernel
+creates the messages and user space tools look for them. Also there are
+few such messages and the init order is not guaranteed and can change
+from kernel release to release, and from one hardware platform to
+another.
+
+When the kernel boots it is difficult to obtain early boot timing.
+Existing tracing tools are inited after the architecture code and not
+early enough to provide full coverage of the kernel boot process.
+
+Individual developers who are interested in boot time can instrument
+their kernel with new messages, and write tools to look for them. But
+these messages must be maintained in their local source tree and bloat
+the logs. When a device goes into production such changes are generally
+left out of the 'production build' with the result that accurate boot
+timing is not done in the field even if a mechanism is made available to
+report back other information.
+
+Finally, in user space there is no kernel-blessed way to record
+timestamps. One approach is to add lines to the init scripts like
+'cat /proc/uptime >/tmp/login_starts'. This creates another place where
+the boot timing tool must look for information.
+
+This Patchset
+-------------
+This patchset aims to unify timing in one place: a simple driver which
+collects pre-kernel boot timestamps, adds its own as it boots, with
+calls to bootstage_mark(), then allows user space (init, etc.) to add
+more with 'echo "message" >>/sys/kernel/debug/bootstage/mask'.
+
+Finally it permits user space to access the full list of timestamps
+with 'cat /sys/kernel/debug/bootstage/report', which has two columns:
+the stage name and the timestamp:
+
+	reset	0
+	arch_cpu_init-AVP	258902
+	arch_cpu_init-A9	263267
+	arch_cpu_init-done	263312
+	board_init_f-start	263314
+	board_init_r-start	323671
+	main_loop	573008
+	usb_start	610771
+	bootm_start	11685215
+	start_kernel	11899970
+	bootstage_start	12278316
+	before_rest_init	12563688
+	before_initcalls	12855611
+	core_initcall	12856077
+	postcore_initcall	12856742
+	arch_initcall	12859536
+	subsys_initcall	12927416
+	fs_initcall	12944422
+	device_initcall	16765564
+	late_initcall	16858665
+	after_basic_setup	16858673
+	before_init_post	18368183
+	pre-startup	21956927
+	post-startup	23657468
+	x-started	30091946
+	chrome-exec	30511367
+	login-prompt-ready	41864650
+	login-prompt-visible	43850932
+	boot-complete	44014786
+
+Transfer of information from the boot loader to the kernel is just a
+prototype at present. This patch set uses the device tree and works on
+hardware which uses a device tree (e.g. ARM). Patches are in progress
+for one boot loader (U-Boot, commonly used on ARM systems) to support
+the other side of this.
+
+An accurate timer is required to make the numbers meaningful. Many
+modern platforms have a microsecond timer. This patch set uses a
+function called timer_get_us() to read the timer. The implementation of
+that is not included in this RFC patch set.
+
+Also not included in this patch set is an ID number for each stage. We
+have gone with a simple string since it is easier to extend and modify
+across software boundaries. But the intention is that these strings (at
+least within the kernel) remain unchanged over time, barring a
+significant refactor of the code which emits them.
+
+Comments
+--------
+At this early stage (and more spending too much time polishing) I am looking
+for comments:
+
+1. How does this approach compare with other (existing) ways of doing
+this?
+
+2. Does anyone have existing patches / ideas in this area?
+
+3. What standard way is there of passing boot timing from a boot load to
+the kernel (other than the fdt as used here)?
+
+
+Da Zheng (3):
+  bootstage: Add bootstages to record timing in the kernel.
+  bootstage: Insert bootstage_mark to record timing for bootup.
+  bootstage: Get u-boot timing from the device tree.
+
+ arch/arm/kernel/time.c    |   29 ++++
+ include/linux/bootstage.h |   19 +++
+ include/linux/timer.h     |    3 +
+ init/Kconfig              |    9 ++
+ init/Makefile             |    1 +
+ init/bootstage.c          |  313 +++++++++++++++++++++++++++++++++++++++++++++
+ init/main.c               |    7 +
+ kernel/timer.c            |    9 ++
+ 8 files changed, 390 insertions(+), 0 deletions(-)
+ create mode 100644 include/linux/bootstage.h
+ create mode 100644 init/bootstage.c
+
+-- 
+1.7.3.1
