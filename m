@@ -1,40 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 23 Sep 2011 15:49:40 +0800
-Subject: [PATCH] arm/mxs: PHYS_OFFSET can not be defined in platform any longer
-Message-ID: <1316764180-5722-1-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Sep 2011 09:40:01 +0100
+Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
+	online/active
+In-Reply-To: <20110913175312.GB6267@n2100.arm.linux.org.uk>
+References: <20110908215314.829452535@linutronix.de>
+	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
+	<20110913133258.GA6267@n2100.arm.linux.org.uk>
+	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+	<20110913175312.GB6267@n2100.arm.linux.org.uk>
+Message-ID: <20110923084001.GP17169@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since ARM_PATCH_PHYS_VIRT has been globally enabled by default,
-PHYS_OFFSET can not be defined in platform any longer.  Otherwise,
-we will run into the following warning.
+On Tue, Sep 13, 2011 at 06:53:12PM +0100, Russell King - ARM Linux wrote:
+> So, we must have the setting of CPU online _after_ we've setup the
+> scheduler domain information etc - so the following is a strict
+> ordering:
+> 
+> 1. calibrate_delay()
+> 2. smp_store_cpu_info()
+> 3. set_cpu_online()
+> 
+> Now, the question is do we need interrupts enabled to setup timers
+> via percpu_timer_setup() and calibrate delay.  Can we move enabling
+> interrupts after smp_store_cpu_info().  IOW, instead of moving the
+> setting of cpu online before all this, can we move notify_cpu_starting()
+> and the enabling of _both_ interrupts after smp_store_cpu_info()...
+> No idea at the moment.
 
-  arch/arm/include/asm/memory.h:156:0: warning: "PHYS_OFFSET" redefined
-  arch/arm/mach-mxs/include/mach/memory.h:22:0: note: this is the location of the previous definition
+And to make things worse... 4bd0fe1c78623062263cf5ae875fd484c5b8256d
+has appeared in mainline today.
 
-Change PHYS_OFFSET to PLAT_PHYS_OFFSET to avoid the warning.
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
+index 7c2282c..df6ef1b 100644
+--- a/arch/arm/mach-exynos4/platsmp.c
++++ b/arch/arm/mach-exynos4/platsmp.c
+@@ -106,6 +106,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+         */
+        spin_lock(&boot_lock);
+        spin_unlock(&boot_lock);
++
++       set_cpu_online(cpu, true);
+ }
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Yes, I know that Nicolas has a big patch to remove mach/memory.h
-globally.  But rmk has not acked/pulled it.  This patch is posted
-just for reminding that if Nicolas' patch does not hit v3.2, we will
-have to merge this patch to save a fix patch to remove the warning.
+ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 
- arch/arm/mach-mxs/include/mach/memory.h |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I think some work needs to be done to eliminate some of the dependencies
+in this code so that we can have a *sane* order for bringup of secondary
+CPUs.
 
-diff --git a/arch/arm/mach-mxs/include/mach/memory.h b/arch/arm/mach-mxs/include/mach/memory.h
-index b5420a5..0618ae2 100644
---- a/arch/arm/mach-mxs/include/mach/memory.h
-+++ b/arch/arm/mach-mxs/include/mach/memory.h
-@@ -19,6 +19,6 @@
- #ifndef __MACH_MXS_MEMORY_H__
- #define __MACH_MXS_MEMORY_H__
- 
--#define PHYS_OFFSET		UL(0x40000000)
-+#define PLAT_PHYS_OFFSET	UL(0x40000000)
- 
- #endif /* __MACH_MXS_MEMORY_H__ */
--- 
-1.7.4.1
+I'm just going to sit on the fence and watch what platform people do
+during the next merge window when the support for the topological
+scheduler goes in.
