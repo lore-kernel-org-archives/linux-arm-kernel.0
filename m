@@ -1,34 +1,30 @@
 From: Baohua.Song@csr.com (Barry Song)
-Date: Thu, 22 Sep 2011 22:51:31 -0700
-Subject: [PATCH 4/4] ARM: CSR: clock: Fix indentation
+Date: Thu, 22 Sep 2011 22:51:28 -0700
+Subject: [PATCH 1/4] ARM: CSR: timer: do not initialise statics to 0 or NULL
 In-Reply-To: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
 References: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1316757091-14916-5-git-send-email-Baohua.Song@csr.com>
+Message-ID: <1316757091-14916-2-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-prima2/clock.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-prima2/timer.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/clock.c b/arch/arm/mach-prima2/clock.c
-index 615a4e7..aebad7e 100644
---- a/arch/arm/mach-prima2/clock.c
-+++ b/arch/arm/mach-prima2/clock.c
-@@ -350,10 +350,10 @@ static struct clk_lookup onchip_clks[] = {
- 		.clk = &clk_mem,
- 	}, {
- 		.dev_id = "sys",
--			.clk = &clk_sys,
-+		.clk = &clk_sys,
- 	}, {
- 		.dev_id = "io",
--			.clk = &clk_io,
-+		.clk = &clk_io,
- 	},
- };
+diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer.c
+index ed7ec48..225ed3b 100644
+--- a/arch/arm/mach-prima2/timer.c
++++ b/arch/arm/mach-prima2/timer.c
+@@ -133,7 +133,7 @@ static struct irqaction sirfsoc_timer_irq = {
+ /* Overwrite weak default sched_clock with more precise one */
+ unsigned long long notrace sched_clock(void)
+ {
+-	static int is_mapped = 0;
++	static int is_mapped;
  
+ 	/*
+ 	 * sched_clock is called earlier than .init of sys_timer
 -- 
 1.7.1
 
