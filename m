@@ -1,52 +1,72 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 23 Sep 2011 10:31:54 +0800
-Subject: [PATCHv2 3/3] picoxcell: add the DTS for the PC7302 board
-In-Reply-To: <20110915121512.GG3089@pulham.picochip.com>
-References: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
-	<1314196906-20709-4-git-send-email-jamie@jamieiles.com>
-	<1316086322.2602.1.camel@pasglop>
-	<20110915121512.GG3089@pulham.picochip.com>
-Message-ID: <CAGsJ_4wniCS+85Hs7-vbaUyEL-yKEBnbgDOFPm0+THh6PMfCdw@mail.gmail.com>
+From: hzhuang1@marvell.com (Haojian Zhuang)
+Date: Thu, 22 Sep 2011 19:37:09 -0700
+Subject: [PATCH 15/19] plat-pxa: break out GPIO driver specifics
+In-Reply-To: <CAMPhdO-3AY-S6dsW4FU2qB5G_7ffqcpj7x3hD-T=uhBvSAzKBQ@mail.gmail.com>
+References: <1312978697-18572-1-git-send-email-linus.walleij@stericsson.com>
+	<CAMPhdO9eL_Sdq-=TCami=CkwWeYR3XeF0K=n9L0uzjS88YTsRA@mail.gmail.com>
+	<CACRpkdbGfhZnLaP9p27T1qbD0NVsW7Spp9ZVbR6zEGBSFU+M9g@mail.gmail.com>
+	<CAMPhdO-3AY-S6dsW4FU2qB5G_7ffqcpj7x3hD-T=uhBvSAzKBQ@mail.gmail.com>
+Message-ID: <25B60CDC2F704E4E9D88FFD52780CB4C05E9AF9F8B@SC-VEXCH1.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/15 Jamie Iles <jamie@jamieiles.com>:
-> On Thu, Sep 15, 2011 at 08:32:02AM -0300, Benjamin Herrenschmidt wrote:
->> On Wed, 2011-08-24 at 15:41 +0100, Jamie Iles wrote:
->>
->> > + ? chosen {
->> > + ? ? ? ? ? bootargs = "console=ttyS0,115200 earlyprintk loglevel=9 root=ubi0:rootfs rw rootfstype=ubifs ubi.mtd=5,2048";
->> > + ? ? ? ? ? linux,stdout-path = &uart0;
->> > + ? };
->>
->> Hrm... we don't normally put the bootargs in the device-tree.
->>
->> Either you have a way to pass it from a previous firmware (which
->> can then slap it into the device-tree at runtime), or you
->> can have a way to compile it in the kernel image but the device-tree
->> isn't the right place for it.
+
+
+>-----Original Message-----
+>From: Eric Miao [mailto:eric.y.miao at gmail.com]
+>Sent: 2011?9?21? 10:05 PM
+>To: Linus Walleij; Haojian Zhuang
+>Cc: Linus Walleij; Grant Likely; linux-kernel at vger.kernel.org; linux-
+>arm-kernel at lists.infradead.org; Lee Jones; Russell King
+>Subject: Re: [PATCH 15/19] plat-pxa: break out GPIO driver specifics
 >
-> OK, that's fair enough. ?A few other ARM platforms (tegra, prima2 and
-> zynq) have bootargs in the chosen node and that's where I got it from,
-> but our bootloader has fdt support so this can easily be removed.
-
-some powerpc platforms also do that:
-
-asp834x-redboot.dts:		bootargs = "console=ttyS0,38400
-root=/dev/mtdblock3 rootfstype=jffs2";
-gamecube.dts:		bootargs = "root=/dev/gcnsda2 rootwait udbg-immortal";
-prpmc2800.dts:		bootargs = "ip=on";
-rainier.dts:		bootargs = "console=ttyS0,115200";
-sequoia.dts:		bootargs = "console=ttyS0,115200";
-virtex440-ml507.dts:		bootargs = "console=ttyS0 root=/dev/ram";
-virtex440-ml510.dts:		bootargs = "console=ttyS0 root=/dev/ram";
-wii.dts:		bootargs = "root=/dev/mmcblk0p2 rootwait udbg-immortal";
-
-if we have no bootargs in bootloader, kernel will use that one in DT.
-
+>On Tue, Sep 20, 2011 at 4:45 PM, Linus Walleij <linus.walleij@linaro.org>
+>wrote:
+>> On Wed, Aug 10, 2011 at 4:38 PM, Eric Miao <eric.y.miao@gmail.com>
+>wrote:
+>>> On Wed, Aug 10, 2011 at 8:18 PM, Linus Walleij
+>>> <linus.walleij@stericsson.com> wrote:
+>>>> From: Linus Walleij <linus.walleij@linaro.org>
+>>>>
+>>>> The <mach/gpio.h> file is included from upper directories
+>>>> and deal with generic GPIO and gpiolib stuff. Break out the
+>>>> platform and driver specific defines and functions into its own
+>>>> header file.
+>>>>
+>>>> Cc: Eric Miao <eric.y.miao@gmail.com>
+>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>>
+>>> I think there is better way around this, am working on it with
+>several
+>>> patches already, will release soon.
+>>
+>> Anything happening on this front or shall I update this patch set?
 >
-> Thanks,
+>Hi Linus,
 >
-> Jamie
+>Several cleanup patches in my local tree but I didn't manage to find
+>time to finish the series. Please go ahead update the patch set. We
+>can fix the problems later.
+>
+>Haojian,
+>
+>Could you help on generalize the GPIO support code for PXA? Generally,
+>the goals are:
+>
+>1. independent of <mach/gpio.h>, i.e. no #include <mach/gpio.h> so
+>to support multiple sub-arch in a single kernel, that's to say -
+>possible
+>to build a single kernel supporting both mach-pxa/ and mach-mmp/
+>
+>2. as a result of 1), independent of <plat/gpio.h>
+>
+OK. I'll follow this.
 
--barry
+>Thanks
+>- eric
+>
+>>
+>> Yours,
+>> Linus Walleij
+>>
