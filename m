@@ -1,54 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Sep 2011 09:40:01 +0100
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
-	online/active
-In-Reply-To: <20110913175312.GB6267@n2100.arm.linux.org.uk>
-References: <20110908215314.829452535@linutronix.de>
-	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-	<20110913133258.GA6267@n2100.arm.linux.org.uk>
-	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
-	<20110913175312.GB6267@n2100.arm.linux.org.uk>
-Message-ID: <20110923084001.GP17169@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 23 Sep 2011 09:43:48 +0100
+Subject: [PATCH] ARM: futex: fix clobbering oldval
+In-Reply-To: <1316737129.6872.17.camel@puffmine-laptop>
+References: <1316660015.6872.1.camel@puffmine-laptop>
+	<20110922172653.GH13572@e102144-lin.cambridge.arm.com>
+	<1316737129.6872.17.camel@puffmine-laptop>
+Message-ID: <20110923084348.GA5468@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2011 at 06:53:12PM +0100, Russell King - ARM Linux wrote:
-> So, we must have the setting of CPU online _after_ we've setup the
-> scheduler domain information etc - so the following is a strict
-> ordering:
+On Fri, Sep 23, 2011 at 01:18:49AM +0100, mhban wrote:
+> On Thu, 2011-09-22 at 18:26 +0100, Will Deacon wrote:
+> > 
+> > It would have been nice to have been CC'd on this...
 > 
-> 1. calibrate_delay()
-> 2. smp_store_cpu_info()
-> 3. set_cpu_online()
+> Will not miss next time. Thanks.
+
+Thanks. You can use scripts/get_maintainer.pl to get a list of people to
+email.
+
+> > 
+> > You shouldn't reference r5 directly here, but due to the way the futex code
+> > is laid out, you can't add an extra output operand without converting the
+> > code to use named arguments.
+> > 
+> > I'll post a patch to do that.
+> > 
+> > Will
 > 
-> Now, the question is do we need interrupts enabled to setup timers
-> via percpu_timer_setup() and calibrate delay.  Can we move enabling
-> interrupts after smp_store_cpu_info().  IOW, instead of moving the
-> setting of cpu online before all this, can we move notify_cpu_starting()
-> and the enabling of _both_ interrupts after smp_store_cpu_info()...
-> No idea at the moment.
+> I'm not familiar with gcc inline, thanks for pointing it out.
 
-And to make things worse... 4bd0fe1c78623062263cf5ae875fd484c5b8256d
-has appeared in mainline today.
+There's a good guide for ARM here:
 
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-index 7c2282c..df6ef1b 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -106,6 +106,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
-         */
-        spin_lock(&boot_lock);
-        spin_unlock(&boot_lock);
-+
-+       set_cpu_online(cpu, true);
- }
+http://www.ethernut.de/en/documents/arm-inline-asm.html
 
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+> BTW, my last name is Ban not Ben.
 
-I think some work needs to be done to eliminate some of the dependencies
-in this code so that we can have a *sane* order for bringup of secondary
-CPUs.
+Oops, I'll update my reported-by to spell that correctly.
 
-I'm just going to sit on the fence and watch what platform people do
-during the next merge window when the support for the topological
-scheduler goes in.
+Cheers,
+
+Will
