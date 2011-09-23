@@ -1,120 +1,236 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Sep 2011 17:51:18 +0100
-Subject: [RFC PATCH 00/14] Switch GIC users (and omap2plus) to
-	CONFIG_MULTI_IRQ_HANDLER
-Message-ID: <1316796692-15964-1-git-send-email-marc.zyngier@arm.com>
+Date: Fri, 23 Sep 2011 17:51:24 +0100
+Subject: [RFC PATCH 06/14] ARM: exynos4: convert to CONFIG_MULTI_IRQ_HANDLER
+In-Reply-To: <1316796692-15964-1-git-send-email-marc.zyngier@arm.com>
+References: <1316796692-15964-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1316796692-15964-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support multiple primary interrupt controllers in the same
-image, it is necessary to use the MULTI_IRQ_HANDLER config option.
+Convert the Exynos4 platforms to be using the gic_handle_irq_offset()
+function as their primary interrupt handler.
 
-This patch series makes a first step in that direction by:
-- having the GIC code to provides a global handler,
-- make GIC users to provide this handler from their machine descriptor.
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/Kconfig                                 |    1 +
+ arch/arm/mach-exynos4/include/mach/entry-macro.S |   62 ----------------------
+ arch/arm/mach-exynos4/mach-armlex4210.c          |    2 +
+ arch/arm/mach-exynos4/mach-nuri.c                |    2 +
+ arch/arm/mach-exynos4/mach-origen.c              |    2 +
+ arch/arm/mach-exynos4/mach-smdk4212.c            |    2 +
+ arch/arm/mach-exynos4/mach-smdkv310.c            |    2 +
+ arch/arm/mach-exynos4/mach-universal_c210.c      |    2 +
+ 8 files changed, 13 insertions(+), 62 deletions(-)
 
-A side effect of this is that it forces OMAP2/3 platforms to be
-converted too in order to preserve the MULTI_OMAP feature. This leads
-to a certain simplification of the interrupt handling for the
-OMAP2/3/4 platforms.
-
-The primary IRQ handlers have been written in C, and the performance
-degradation is hardly noticeable. Should some tests reveal a major
-increase in latency, it is always possible to restore the ASM version.
-
-This series has been tested on VE (A9, A5, A15), PB11MP, Panda, IGEPv2
-and Harmony. Patches against next-2011 plus my PPI series.
-
-Marc Zyngier (14):
-  ARM: GIC: Add global gic_handle_irq() function
-  ARM: RealView: convert to CONFIG_MULTI_IRQ_HANDLER
-  ARM: VExpress: convert to CONFIG_MULTI_IRQ_HANDLER
-  ARM: msm: convert SMP platforms to CONFIG_MULTI_IRQ_HANDLER
-  ARM: GIC: Add global gic_handle_irq_offset() function
-  ARM: exynos4: convert to CONFIG_MULTI_IRQ_HANDLER
-  ARM: tegra2: convert to CONFIG_MULTI_IRQ_HANDLER
-  ARM: ux500: convert to CONFIG_MULTI_IRQ_HANDLER
-  ARM: shmobile: convert smp platforms to gic_handle_irq()
-  ARM: cns3xxx: convert to CONFIG_MULTI_IRQ_HANDLER
-  ARM: zynq: convert to CONFIG_MULTI_IRQ_HANDLER
-  ARM: omap2/3: Add global omap2/3_intc_handle_irq() functions
-  ARM: omap2plus: convert to CONFIG_MULTI_IRQ_HANDLER
-  ARM: GIC: Make MULTI_IRQ_HANDLER mandatory
-
- arch/arm/Kconfig                                  |    2 +
- arch/arm/common/Kconfig                           |    1 +
- arch/arm/common/gic.c                             |   49 +++++++-
- arch/arm/include/asm/hardware/entry-macro-gic.S   |   60 ---------
- arch/arm/include/asm/hardware/gic.h               |    3 +-
- arch/arm/mach-cns3xxx/cns3420vb.c                 |    2 +
- arch/arm/mach-cns3xxx/include/mach/entry-macro.S  |    2 -
- arch/arm/mach-exynos4/include/mach/entry-macro.S  |   62 ---------
- arch/arm/mach-exynos4/mach-armlex4210.c           |    2 +
- arch/arm/mach-exynos4/mach-nuri.c                 |    2 +
- arch/arm/mach-exynos4/mach-origen.c               |    2 +
- arch/arm/mach-exynos4/mach-smdk4212.c             |    2 +
- arch/arm/mach-exynos4/mach-smdkv310.c             |    2 +
- arch/arm/mach-exynos4/mach-universal_c210.c       |    2 +
- arch/arm/mach-msm/board-msm8960.c                 |    2 +
- arch/arm/mach-msm/board-msm8x60.c                 |    4 +
- arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   17 ---
- arch/arm/mach-msm/include/mach/entry-macro-vic.S  |   37 ------
- arch/arm/mach-msm/include/mach/entry-macro.S      |   27 ++++-
- arch/arm/mach-omap2/Kconfig                       |    2 +
- arch/arm/mach-omap2/board-2430sdp.c               |    1 +
- arch/arm/mach-omap2/board-3430sdp.c               |    1 +
- arch/arm/mach-omap2/board-3630sdp.c               |    1 +
- arch/arm/mach-omap2/board-4430sdp.c               |    2 +
- arch/arm/mach-omap2/board-am3517crane.c           |    1 +
- arch/arm/mach-omap2/board-am3517evm.c             |    1 +
- arch/arm/mach-omap2/board-apollon.c               |    1 +
- arch/arm/mach-omap2/board-cm-t35.c                |    2 +
- arch/arm/mach-omap2/board-cm-t3517.c              |    1 +
- arch/arm/mach-omap2/board-devkit8000.c            |    1 +
- arch/arm/mach-omap2/board-generic.c               |    1 +
- arch/arm/mach-omap2/board-h4.c                    |    1 +
- arch/arm/mach-omap2/board-igep0020.c              |    2 +
- arch/arm/mach-omap2/board-ldp.c                   |    1 +
- arch/arm/mach-omap2/board-n8x0.c                  |    3 +
- arch/arm/mach-omap2/board-omap3beagle.c           |    1 +
- arch/arm/mach-omap2/board-omap3evm.c              |    1 +
- arch/arm/mach-omap2/board-omap3logic.c            |    2 +
- arch/arm/mach-omap2/board-omap3pandora.c          |    1 +
- arch/arm/mach-omap2/board-omap3stalker.c          |    1 +
- arch/arm/mach-omap2/board-omap3touchbook.c        |    1 +
- arch/arm/mach-omap2/board-omap4panda.c            |    2 +
- arch/arm/mach-omap2/board-overo.c                 |    1 +
- arch/arm/mach-omap2/board-rm680.c                 |    1 +
- arch/arm/mach-omap2/board-rx51.c                  |    1 +
- arch/arm/mach-omap2/board-zoom.c                  |    2 +
- arch/arm/mach-omap2/include/mach/entry-macro.S    |  137 ---------------------
- arch/arm/mach-omap2/irq.c                         |   49 ++++++++
- arch/arm/mach-realview/include/mach/entry-macro.S |    2 -
- arch/arm/mach-realview/realview_eb.c              |    1 +
- arch/arm/mach-realview/realview_pb1176.c          |    1 +
- arch/arm/mach-realview/realview_pb11mp.c          |    1 +
- arch/arm/mach-realview/realview_pba8.c            |    1 +
- arch/arm/mach-realview/realview_pbx.c             |    1 +
- arch/arm/mach-shmobile/Makefile                   |    1 -
- arch/arm/mach-shmobile/board-ag5evm.c             |    2 +-
- arch/arm/mach-shmobile/entry-gic.S                |   18 ---
- arch/arm/mach-shmobile/include/mach/common.h      |    1 -
- arch/arm/mach-tegra/board-dt.c                    |    2 +
- arch/arm/mach-tegra/board-harmony.c               |    2 +
- arch/arm/mach-tegra/board-paz00.c                 |    2 +
- arch/arm/mach-tegra/board-seaboard.c              |    4 +
- arch/arm/mach-tegra/board-trimslice.c             |    2 +
- arch/arm/mach-tegra/include/mach/entry-macro.S    |   22 +---
- arch/arm/mach-ux500/board-mop500.c                |    4 +
- arch/arm/mach-ux500/board-u5500.c                 |    2 +
- arch/arm/mach-ux500/include/mach/entry-macro.S    |    2 -
- arch/arm/mach-vexpress/include/mach/entry-macro.S |    2 -
- arch/arm/mach-vexpress/v2m.c                      |    2 +
- arch/arm/mach-zynq/common.c                       |    1 +
- arch/arm/mach-zynq/include/mach/entry-macro.S     |    3 -
- arch/arm/plat-omap/include/plat/irqs.h            |    2 +
- 72 files changed, 212 insertions(+), 371 deletions(-)
- delete mode 100644 arch/arm/include/asm/hardware/entry-macro-gic.S
- delete mode 100644 arch/arm/mach-msm/include/mach/entry-macro-qgic.S
- delete mode 100644 arch/arm/mach-msm/include/mach/entry-macro-vic.S
- delete mode 100644 arch/arm/mach-shmobile/entry-gic.S
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d3e246c..e32a4d3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -787,6 +787,7 @@ config ARCH_EXYNOS4
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
++	select MULTI_IRQ_HANDLER
+ 	help
+ 	  Samsung EXYNOS4 series based systems
+ 
+diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
+index 807d05d..efe9a00 100644
+--- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
++++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
+@@ -9,71 +9,9 @@
+  * warranty of any kind, whether express or implied.
+ */
+ 
+-#include <mach/hardware.h>
+-#include <mach/map.h>
+-#include <asm/hardware/gic.h>
+-
+ 		.macro	disable_fiq
+ 		.endm
+ 
+-		.macro  get_irqnr_preamble, base, tmp
+-		ldr	\base, =gic_cpu_base_addr
+-		ldr	\base, [\base]
+-		mrc     p15, 0, \tmp, c0, c0, 5
+-		and     \tmp, \tmp, #3
+-		cmp     \tmp, #1
+-		addeq   \base, \base, #EXYNOS4_GIC_BANK_OFFSET
+-		.endm
+-
+ 		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+ 
+-		/*
+-		 * The interrupt numbering scheme is defined in the
+-		 * interrupt controller spec.  To wit:
+-		 *
+-		 * Interrupts 0-15 are IPI
+-		 * 16-28 are reserved
+-		 * 29-31 are local.  We allow 30 to be used for the watchdog.
+-		 * 32-1020 are global
+-		 * 1021-1022 are reserved
+-		 * 1023 is "spurious" (no interrupt)
+-		 *
+-		 * For now, we ignore all local interrupts so only return an interrupt if it's
+-		 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
+-		 *
+-		 * A simple read from the controller will tell us the number of the highest
+-                 * priority enabled interrupt.  We then just need to check whether it is in the
+-		 * valid range for an IRQ (30-1020 inclusive).
+-		 */
+-
+-		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-
+-		ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
+-
+-		ldr	\tmp, =1021
+-
+-		bic     \irqnr, \irqstat, #0x1c00
+-
+-		cmp     \irqnr, #15
+-		cmpcc	\irqnr, \irqnr
+-		cmpne	\irqnr, \tmp
+-		cmpcs	\irqnr, \irqnr
+-		addne	\irqnr, \irqnr, #32
+-
+-		.endm
+-
+-		/* We assume that irqstat (the raw value of the IRQ acknowledge
+-		 * register) is preserved from the macro above.
+-		 * If there is an IPI, we immediately signal end of interrupt on the
+-		 * controller, since this requires the original irqstat value which
+-		 * we won't easily be able to recreate later.
+-		 */
+-
+-		.macro test_for_ipi, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		cmp	\irqnr, #16
+-		strcc	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmpcs	\irqnr, \irqnr
+-		.endm
+-
+diff --git a/arch/arm/mach-exynos4/mach-armlex4210.c b/arch/arm/mach-exynos4/mach-armlex4210.c
+index 8c82c6b..969e04c 100644
+--- a/arch/arm/mach-exynos4/mach-armlex4210.c
++++ b/arch/arm/mach-exynos4/mach-armlex4210.c
+@@ -15,6 +15,7 @@
+ #include <linux/serial_core.h>
+ #include <linux/smsc911x.h>
+ 
++#include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+@@ -213,6 +214,7 @@ MACHINE_START(ARMLEX4210, "ARMLEX4210")
+ 	.soc		= &exynos4_soc_desc,
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= armlex4210_map_io,
++	.handle_irq	= gic_handle_irq_offset,
+ 	.init_machine	= armlex4210_machine_init,
+ 	.timer		= &exynos4_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
+index 5780ee3..5e133ae 100644
+--- a/arch/arm/mach-exynos4/mach-nuri.c
++++ b/arch/arm/mach-exynos4/mach-nuri.c
+@@ -28,6 +28,7 @@
+ 
+ #include <video/platform_lcd.h>
+ 
++#include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+@@ -1192,6 +1193,7 @@ MACHINE_START(NURI, "NURI")
+ 	.soc		= &exynos4_soc_desc,
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= nuri_map_io,
++	.handle_irq	= gic_handle_irq_offset,
+ 	.init_machine	= nuri_machine_init,
+ 	.timer		= &exynos4_timer,
+ 	.reserve        = &nuri_reserve,
+diff --git a/arch/arm/mach-exynos4/mach-origen.c b/arch/arm/mach-exynos4/mach-origen.c
+index 06250fc..7ede5fc 100644
+--- a/arch/arm/mach-exynos4/mach-origen.c
++++ b/arch/arm/mach-exynos4/mach-origen.c
+@@ -17,6 +17,7 @@
+ #include <linux/pwm_backlight.h>
+ #include <linux/gpio_keys.h>
+ 
++#include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+@@ -215,6 +216,7 @@ MACHINE_START(ORIGEN, "ORIGEN")
+ 	.soc		= &exynos4_soc_desc,
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= origen_map_io,
++	.handle_irq	= gic_handle_irq_offset,
+ 	.init_machine	= origen_machine_init,
+ 	.timer		= &exynos4_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-exynos4/mach-smdk4212.c b/arch/arm/mach-exynos4/mach-smdk4212.c
+index cf92514..84a0446 100644
+--- a/arch/arm/mach-exynos4/mach-smdk4212.c
++++ b/arch/arm/mach-exynos4/mach-smdk4212.c
+@@ -20,6 +20,7 @@
+ #include <linux/regulator/machine.h>
+ #include <linux/serial_core.h>
+ 
++#include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+@@ -290,6 +291,7 @@ MACHINE_START(SMDK4212, "SMDK4212")
+ 	.soc		= &exynos4_soc_desc,
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdk4212_map_io,
++	.handle_irq	= gic_handle_irq_offset,
+ 	.init_machine	= smdk4212_machine_init,
+ 	.timer		= &exynos4_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
+index 088644e..8e11eaa 100644
+--- a/arch/arm/mach-exynos4/mach-smdkv310.c
++++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+@@ -20,6 +20,7 @@
+ #include <linux/input.h>
+ #include <linux/pwm_backlight.h>
+ 
++#include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+@@ -351,6 +352,7 @@ MACHINE_START(SMDKC210, "SMDKC210")
+ 	.soc		= &exynos4_soc_desc,
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= smdkv310_map_io,
++	.handle_irq	= gic_handle_irq_offset,
+ 	.init_machine	= smdkv310_machine_init,
+ 	.timer		= &exynos4_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
+index 39c34a1..43f156d 100644
+--- a/arch/arm/mach-exynos4/mach-universal_c210.c
++++ b/arch/arm/mach-exynos4/mach-universal_c210.c
+@@ -23,6 +23,7 @@
+ #include <linux/i2c/mcs.h>
+ #include <linux/i2c/atmel_mxt_ts.h>
+ 
++#include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+@@ -876,6 +877,7 @@ MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
+ 	.soc		= &exynos4_soc_desc,
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= universal_map_io,
++	.handle_irq	= gic_handle_irq_offset,
+ 	.init_machine	= universal_machine_init,
+ 	.timer		= &exynos4_timer,
+ 	.reserve        = &universal_reserve,
+-- 
+1.7.0.4
