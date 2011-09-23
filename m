@@ -1,78 +1,51 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 23 Sep 2011 17:12:33 -0600
-Subject: [PATCH 1/7] SPI: S3C64XX: Use bus clocks created using clkdev
-In-Reply-To: <1316778827-24694-2-git-send-email-padma.v@samsung.com>
-References: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
-	<1316778827-24694-2-git-send-email-padma.v@samsung.com>
-Message-ID: <20110923231233.GE24631@ponder.secretlab.ca>
+Date: Fri, 23 Sep 2011 17:18:08 -0600
+Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <7790.1316800223@turing-police.cc.vt.edu>
+References: <20110922184614.25419.84606.stgit@ponder>
+	<20110922212909.49966cf4@lxorguk.ukuu.org.uk>
+	<CACxGe6vAQ+_SKc-zH434bdd3akM5S1jB0N7+AFEjgZfX1uNrZQ@mail.gmail.com>
+	<7790.1316800223@turing-police.cc.vt.edu>
+Message-ID: <20110923231808.GF24631@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2011 at 05:23:41PM +0530, Padmavathi Venna wrote:
-> This patch modifies the driver to stop depending on the
-> clock names being passed from platform and switch over
-> to lookup clocks generic names using clkdev
+On Fri, Sep 23, 2011 at 01:50:23PM -0400, Valdis.Kletnieks at vt.edu wrote:
+> On Thu, 22 Sep 2011 15:19:01 MDT, Grant Likely said:
+> > On Thu, Sep 22, 2011 at 2:29 PM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
+> > > Definitely what is needed for some of the x86 SoC stuff and would let us
+> > > rip out some of the special case magic for the SCU discovery.
+> > >
+> > > First thing that strikes me is driver_bound kicks the processing queue
+> > > again. That seems odd - surely this isn't needed because any driver that
+> > > does initialise this time and may allow something else to get going will
+> > > queue the kick itself. Thus this seems to just add overhead.
+> > >
+> > > It all looks a bit O(N?) if we don't expect the drivers that might
+> > > trigger something else binding to just say 'hey I'm one of the
+> > > troublemakers'
+> > 
+> > The way I read it, absolute worst case is when every device but one
+> > depends on another device.  In that case I believe it will be
+> > O(Nlog(N)).  (Every device gets probed on the first pass, but only the
+> > last one gets probed.  Then it goes through N-1 devices to the result
+> > of only 1 more device getting probed, then N-2, etc.). 
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> That is indeed O(N**2) not Nlog(N).  The total number of probes is (N+1)(N)/2
+> To get it to O(Nlog(N)), you'd have to probe N devices the first pass, N/2 devices
+> on the second pass, N/4 on the third, and so on.
+> 
 
-Looks okay to me.
+Ah, indeed, you are correct.  It's been too long since my engineering
+CS class.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Still, I'm not even remotely worried about this algorithm for the
+kernel.  The complexity is bounded by the number of levels of
+dependencies, not the number of devices requesting deferral.  I'd be
+very surprised if the nested dependencies ever get to half a dozen.
 
-This series I imagine should go in via the arm-soc tree.
+Note: these are only dependencies outside of the existing
+parent-child dependencies in the Linux device model, which further
+reduces the number of sources of nesting.
 
 g.
-
-> ---
->  drivers/spi/spi-s3c64xx.c |   14 +++++---------
->  1 files changed, 5 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 019a716..dcf7e10 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -971,6 +971,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
->  	struct s3c64xx_spi_info *sci;
->  	struct spi_master *master;
->  	int ret;
-> +	char clk_name[16];
->  
->  	if (pdev->id < 0) {
->  		dev_err(&pdev->dev,
-> @@ -984,11 +985,6 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
->  	}
->  
->  	sci = pdev->dev.platform_data;
-> -	if (!sci->src_clk_name) {
-> -		dev_err(&pdev->dev,
-> -			"Board init must call s3c64xx_spi_set_info()\n");
-> -		return -EINVAL;
-> -	}
->  
->  	/* Check for availability of necessary resource */
->  
-> @@ -1073,17 +1069,17 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
->  		goto err4;
->  	}
->  
-> -	sdd->src_clk = clk_get(&pdev->dev, sci->src_clk_name);
-> +	sprintf(clk_name, "spi_busclk%d", sci->src_clk_nr);
-> +	sdd->src_clk = clk_get(&pdev->dev, clk_name);
->  	if (IS_ERR(sdd->src_clk)) {
->  		dev_err(&pdev->dev,
-> -			"Unable to acquire clock '%s'\n", sci->src_clk_name);
-> +			"Unable to acquire clock '%s'\n", clk_name);
->  		ret = PTR_ERR(sdd->src_clk);
->  		goto err5;
->  	}
->  
->  	if (clk_enable(sdd->src_clk)) {
-> -		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n",
-> -							sci->src_clk_name);
-> +		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n", clk_name);
->  		ret = -EBUSY;
->  		goto err6;
->  	}
-> -- 
-> 1.7.4.4
-> 
