@@ -1,51 +1,69 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 23 Sep 2011 17:18:08 -0600
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <7790.1316800223@turing-police.cc.vt.edu>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20110922212909.49966cf4@lxorguk.ukuu.org.uk>
-	<CACxGe6vAQ+_SKc-zH434bdd3akM5S1jB0N7+AFEjgZfX1uNrZQ@mail.gmail.com>
-	<7790.1316800223@turing-police.cc.vt.edu>
-Message-ID: <20110923231808.GF24631@ponder.secretlab.ca>
+Date: Fri, 23 Sep 2011 17:21:42 -0600
+Subject: [PATCH 03/11] arm/dts: Add support for OMAP4 PandaBoard
+In-Reply-To: <1316809399-19579-4-git-send-email-b-cousson@ti.com>
+References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
+	<1316809399-19579-4-git-send-email-b-cousson@ti.com>
+Message-ID: <20110923232142.GG24631@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2011 at 01:50:23PM -0400, Valdis.Kletnieks at vt.edu wrote:
-> On Thu, 22 Sep 2011 15:19:01 MDT, Grant Likely said:
-> > On Thu, Sep 22, 2011 at 2:29 PM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
-> > > Definitely what is needed for some of the x86 SoC stuff and would let us
-> > > rip out some of the special case magic for the SCU discovery.
-> > >
-> > > First thing that strikes me is driver_bound kicks the processing queue
-> > > again. That seems odd - surely this isn't needed because any driver that
-> > > does initialise this time and may allow something else to get going will
-> > > queue the kick itself. Thus this seems to just add overhead.
-> > >
-> > > It all looks a bit O(N?) if we don't expect the drivers that might
-> > > trigger something else binding to just say 'hey I'm one of the
-> > > troublemakers'
-> > 
-> > The way I read it, absolute worst case is when every device but one
-> > depends on another device.  In that case I believe it will be
-> > O(Nlog(N)).  (Every device gets probed on the first pass, but only the
-> > last one gets probed.  Then it goes through N-1 devices to the result
-> > of only 1 more device getting probed, then N-2, etc.). 
+On Fri, Sep 23, 2011 at 10:23:11PM +0200, Benoit Cousson wrote:
+> Based on the original omap4-panda.dts file from Manju.
+> http://www.spinics.net/lists/linux-omap/msg55836.html
 > 
-> That is indeed O(N**2) not Nlog(N).  The total number of probes is (N+1)(N)/2
-> To get it to O(Nlog(N)), you'd have to probe N devices the first pass, N/2 devices
-> on the second pass, N/4 on the third, and so on.
+> Add memory information and a default bootargs to allow
+> a boot from RAMDISK.
 > 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: G, Manjunath Kondaiah <manjugk@ti.com>
+> ---
+>  arch/arm/boot/dts/omap4-panda.dts |   29 +++++++++++++++++++++++++++++
+>  1 files changed, 29 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap4-panda.dts
+> 
+> diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+> new file mode 100644
+> index 0000000..c702657
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap4-panda.dts
+> @@ -0,0 +1,29 @@
+> +/*
+> + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +/dts-v1/;
+> +
+> +/include/ "omap4.dtsi"
+> +
+> +/ {
+> +	model = "TI OMAP4 PandaBoard";
+> +	compatible = "ti,omap4-panda", "ti,omap4430", "ti,omap4";
+> +
+> +	/*
+> +	 * Since the initial device tree board file does not create any
+> +	 * devices (MMC, network...), the only way to boot is to provide a
+> +	 * ramdisk.
+> +	 */
+> +	chosen {
+> +		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
 
-Ah, indeed, you are correct.  It's been too long since my engineering
-CS class.
+Generally, we don't want bootargs in the .dts files; we want them
+added to the .dtb by the boot firmware.  However, we are bootstrapping
+here, so I'm okay with it in the short term until firmware matures a
+bit more.
 
-Still, I'm not even remotely worried about this algorithm for the
-kernel.  The complexity is bounded by the number of levels of
-dependencies, not the number of devices requesting deferral.  I'd be
-very surprised if the nested dependencies ever get to half a dozen.
-
-Note: these are only dependencies outside of the existing
-parent-child dependencies in the Linux device model, which further
-reduces the number of sources of nesting.
-
-g.
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x40000000>; /* 1 GB */
+> +	};
+> +};
+> -- 
+> 1.7.0.4
+> 
