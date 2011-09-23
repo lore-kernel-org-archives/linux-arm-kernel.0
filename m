@@ -1,47 +1,98 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 23 Sep 2011 15:46:26 +0300
-Subject: [PATCHv9 18/18] TEMP: OMAP device: change pr_warnings to pr_debugs
-In-Reply-To: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1316781986-30642-19-git-send-email-t-kristo@ti.com>
+From: abhilash.kv@ti.com (Koyamangalath, Abhilash)
+Date: Fri, 23 Sep 2011 18:21:08 +0530
+Subject: [PATCH v4 2/3] omap_twl: Prevent SR to enable for am3517/am3505
+	devices
+In-Reply-To: <87zkhws1ja.fsf@ti.com>
+References: <1316697993-696-1-git-send-email-abhilash.kv@ti.com>
+	<1316697993-696-2-git-send-email-abhilash.kv@ti.com>
+	<1316697993-696-3-git-send-email-abhilash.kv@ti.com>,
+	<87zkhws1ja.fsf@ti.com>
+Message-ID: <FCCFB4CDC6E5564B9182F639FC356087037AF843EE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prevents a hang when omap_device would want to print something for
-serial console device while enabling / disabling its clocks.
-Should be handled properly by serial runtime PM support.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/plat-omap/omap_device.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+hi Kevin,
 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index d8f2299..ecec0cc 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -154,7 +154,7 @@ static int _omap_device_activate(struct omap_device *od, u8 ignore_lat)
- 					"%d: %llu\n",
- 					od->pm_lat_level, act_lat);
- 			} else
--				dev_warn(&od->pdev->dev,
-+				dev_dbg(&od->pdev->dev,
- 					 "activate latency %d "
- 					 "higher than exptected. (%llu > %d)\n",
- 					 od->pm_lat_level, act_lat,
-@@ -221,7 +221,7 @@ static int _omap_device_deactivate(struct omap_device *od, u8 ignore_lat)
- 					"%d: %llu\n",
- 					od->pm_lat_level, deact_lat);
- 			} else
--				dev_warn(&od->pdev->dev,
-+				dev_dbg(&od->pdev->dev,
- 					 "deactivate latency %d "
- 					 "higher than exptected. (%llu > %d)\n",
- 					 od->pm_lat_level, deact_lat,
--- 
-1.7.4.1
+On Fri, Sep 23, 2011 at 3:05 PM, Hilman, Kevin wrote:
+>
+> Abhilash K V <abhilash.kv@ti.com> writes:
+>
+>> In case of AM3517 & AM3505, SmartReflex is not applicable so
+>> we must not enable it.
+>
+> This part is fine, but...
+>
+>> So omap3_twl_init() is now not called when the processor does not
+>> support SR.
+>
+> ...I don't think this is right.  DVFS using the PMIC is still doable
+> without SR.
+>
+> Are you assuming that no DVFS is done on these devices?
+[Abhilash K V] yes, I just verified (in sprugr0b), that DVFS is not supported on am35xx
+DPS however is supported, though I'm unsure of how or whether it needs
+software control.
 
+-Abhilash
 
-Texas Instruments Oy, Tekniikantie 12, 02150 Espoo. Y-tunnus: 0115040-6. Kotipaikka: Helsinki
- 
+>
+> Kevin
+>
+>
+>> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/id.c              |    2 +-
+>>  arch/arm/mach-omap2/pm.c              |    3 ++-
+>>  arch/arm/plat-omap/include/plat/cpu.h |    2 ++
+>>  3 files changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+>> index d27daf9..b7e3082 100644
+>> --- a/arch/arm/mach-omap2/id.c
+>> +++ b/arch/arm/mach-omap2/id.c
+>> @@ -188,7 +188,7 @@ static void __init omap3_check_features(void)
+>>       if (cpu_is_omap3630())
+>>               omap_features |= OMAP3_HAS_192MHZ_CLK;
+>>       if (!cpu_is_omap3505() && !cpu_is_omap3517())
+>> -             omap_features |= OMAP3_HAS_IO_WAKEUP;
+>> +             omap_features |= (OMAP3_HAS_IO_WAKEUP | OMAP3_HAS_SR);
+>>
+>>       omap_features |= OMAP3_HAS_SDRC;
+>>
+>> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+>> index d34fc52..da71abc 100644
+>> --- a/arch/arm/mach-omap2/pm.c
+>> +++ b/arch/arm/mach-omap2/pm.c
+>> @@ -252,7 +252,8 @@ postcore_initcall(omap2_common_pm_init);
+>>  static int __init omap2_common_pm_late_init(void)
+>>  {
+>>       /* Init the OMAP TWL parameters */
+>> -     omap3_twl_init();
+>> +     if (omap3_has_sr())
+>> +             omap3_twl_init();
+>>       omap4_twl_init();
+>>
+>>       /* Init the voltage layer */
+>> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
+>> index 2f90269..cc6fcd3 100644
+>> --- a/arch/arm/plat-omap/include/plat/cpu.h
+>> +++ b/arch/arm/plat-omap/include/plat/cpu.h
+>> @@ -413,6 +413,7 @@ extern u32 omap_features;
+>>  #define OMAP4_HAS_MPU_1GHZ           BIT(8)
+>>  #define OMAP4_HAS_MPU_1_2GHZ         BIT(9)
+>>  #define OMAP4_HAS_MPU_1_5GHZ         BIT(10)
+>> +#define OMAP3_HAS_SR                 BIT(11)
+>>
+>>
+>>  #define OMAP3_HAS_FEATURE(feat,flag)                 \
+>> @@ -429,6 +430,7 @@ OMAP3_HAS_FEATURE(isp, ISP)
+>>  OMAP3_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
+>>  OMAP3_HAS_FEATURE(io_wakeup, IO_WAKEUP)
+>>  OMAP3_HAS_FEATURE(sdrc, SDRC)
+>> +OMAP3_HAS_FEATURE(sr, SR)
+>>
+>>  /*
+>>   * Runtime detection of OMAP4 features
+>
