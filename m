@@ -1,9 +1,10 @@
 From: sjg@chromium.org (Simon Glass)
-Date: Fri, 23 Sep 2011 16:03:18 -0700
-Subject: [RFC PATCH 3/3] bootstage: Get u-boot timing from the device tree.
+Date: Fri, 23 Sep 2011 16:03:17 -0700
+Subject: [RFC PATCH 2/3] bootstage: Insert bootstage_mark to record timing for
+	bootup.
 In-Reply-To: <1316818998-30711-1-git-send-email-sjg@chromium.org>
 References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
-Message-ID: <1316818998-30711-4-git-send-email-sjg@chromium.org>
+Message-ID: <1316818998-30711-3-git-send-email-sjg@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,129 +12,124 @@ From: Da Zheng <zhengda@chromium.org>
 
 From: Da Zheng <zhengda@chromium.org>
 
-The bootstage driver accesses the u-boot timings in the device tree
-and copies them to its array during initialization.
+This inserts calls to bootstage_mark() to timestamp the kernel moving
+between the different initcall levels.
 
 Signed-off-by: Da Zheng <zhengda@chromium.com>
 ---
- arch/arm/kernel/time.c    |   29 +++++++++++++++++++++++++++++
- include/linux/bootstage.h |    1 +
- init/bootstage.c          |   36 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 66 insertions(+), 0 deletions(-)
+ init/bootstage.c |   49 +++++++++++++++++++++++++++++++++++++++++++++++++
+ init/main.c      |    7 +++++++
+ 2 files changed, 56 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index cb634c3..524a1f5 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -24,6 +24,8 @@
- #include <linux/syscore_ops.h>
- #include <linux/timer.h>
- #include <linux/irq.h>
-+#include <linux/bootstage.h>
-+#include <linux/of.h>
- 
- #include <linux/mc146818rtc.h>
- 
-@@ -156,3 +158,30 @@ void __init time_init(void)
- #endif
- }
- 
-+#ifdef CONFIG_BOOTSTAGE
-+int get_prekernel_timing(void)
-+{
-+	struct device_node *node;
-+	struct device_node *child;
-+	int i = 0;
-+
-+	printk(KERN_INFO "TEST: bootstage_init is called in tegra\n");
-+	node = of_find_node_by_path("/bootstage");
-+	if (node == NULL)
-+		return 0;
-+
-+	for_each_child_of_node(node, child) {
-+		const char *name = of_get_property(child, "name", NULL);
-+		const int *timep = of_get_property(child, "time", NULL);
-+
-+		if (name && timep) {
-+			insert_bootstage(i, name,
-+					(unsigned long) be32_to_cpu(*timep));
-+			i++;
-+		}
-+	}
-+	of_node_put(node);
-+
-+	return 0;
-+}
-+#endif
-diff --git a/include/linux/bootstage.h b/include/linux/bootstage.h
-index 08df102..95e837c 100644
---- a/include/linux/bootstage.h
-+++ b/include/linux/bootstage.h
-@@ -4,6 +4,7 @@
- #ifdef CONFIG_BOOTSTAGE
- unsigned long bootstage_mark(const char *name);
- unsigned long bootstage_mark_early(const char *name);
-+void insert_bootstage(int idx, const char *name, unsigned long time);
- #else
- static inline unsigned long bootstage_mark(const char *name)
- {
 diff --git a/init/bootstage.c b/init/bootstage.c
-index 6f4668f..51f731d 100644
+index 79e9761..6f4668f 100644
 --- a/init/bootstage.c
 +++ b/init/bootstage.c
-@@ -75,6 +75,32 @@ static inline int __inc_bootstages(void)
+@@ -226,3 +226,52 @@ static int __init bootstage_init(void)
  }
  
- /*
-+ * Insert a new bootstage in the slot specified by `idx'.
-+ * If the slot is already used, move it and slots behind it
-+ * before inserting the new bootstage.
-+ */
-+void insert_bootstage(int idx, const char *name, unsigned long time)
+ postcore_initcall(bootstage_init);
++
++static int __init post_core_initcall(void)
 +{
-+	mutex_lock(&bootstage_mutex);
-+
-+	if (num_bootstages == cap_bootstages) {
-+		if (__inc_bootstages() < 0) {
-+			mutex_unlock(&bootstage_mutex);
-+			return;
-+		}
-+	}
-+
-+	if (idx < num_bootstages)
-+		memmove(&full_bootstages[idx + 1], &full_bootstages[idx],
-+			sizeof(*full_bootstages) * (num_bootstages - idx));
-+
-+	strlcpy(full_bootstages[idx].name, name, MAX_NAME);
-+	full_bootstages[idx].time = time;
-+	num_bootstages++;
-+	mutex_unlock(&bootstage_mutex);
-+}
-+
-+/*
-  * This is used during the initialization of the kernel.
-  */
- unsigned long bootstage_mark(const char *name)
-@@ -211,10 +237,20 @@ static const struct file_operations mark_operations = {
- 	.write	= bootstage_write,
- };
- 
-+/*
-+ * Get the timings that were recorded before the kernel is initialized.
-+ */
-+int __attribute__((weak)) get_prekernel_timing(void)
-+{
++	bootstage_mark("core_initcall");
 +	return 0;
 +}
++core_initcall_sync(post_core_initcall);
 +
- static int __init bootstage_init(void)
- {
- 	struct dentry *dir;
++static int __init post_postcore_initcall(void)
++{
++	bootstage_mark("postcore_initcall");
++	return 0;
++}
++postcore_initcall_sync(post_postcore_initcall);
++
++static int __init post_arch_initcall(void)
++{
++	bootstage_mark("arch_initcall");
++	return 0;
++}
++arch_initcall_sync(post_arch_initcall);
++
++static int __init post_subsys_initcall(void)
++{
++	bootstage_mark("subsys_initcall");
++	return 0;
++}
++subsys_initcall_sync(post_subsys_initcall);
++
++static int __init post_fs_initcall(void)
++{
++	bootstage_mark("fs_initcall");
++	return 0;
++}
++fs_initcall_sync(post_fs_initcall);
++
++static int __init post_device_initcall(void)
++{
++	bootstage_mark("device_initcall");
++	return 0;
++}
++device_initcall_sync(post_device_initcall);
++
++static int __init post_late_initcall(void)
++{
++	bootstage_mark("late_initcall");
++	return 0;
++}
++late_initcall_sync(post_late_initcall);
+diff --git a/init/main.c b/init/main.c
+index 9c51ee7..671d6b7 100644
+--- a/init/main.c
++++ b/init/main.c
+@@ -75,6 +75,8 @@
+ #include <asm/sections.h>
+ #include <asm/cacheflush.h>
  
-+	get_prekernel_timing();
++#include <linux/bootstage.h>
 +
- 	dir = debugfs_create_dir("bootstage", NULL);
- 	if (dir && !IS_ERR(dir)) {
- 		debugfs_create_file("report", S_IFREG|S_IRUSR|S_IRGRP|S_IROTH,
+ #ifdef CONFIG_X86_LOCAL_APIC
+ #include <asm/smp.h>
+ #endif
+@@ -489,6 +491,7 @@ asmlinkage void __init start_kernel(void)
+ 	page_address_init();
+ 	printk(KERN_NOTICE "%s", linux_banner);
+ 	setup_arch(&command_line);
++	bootstage_mark_early("bootstage_start");
+ 	mm_init_owner(&init_mm, &init_task);
+ 	mm_init_cpumask(&init_mm);
+ 	setup_command_line(command_line);
+@@ -627,6 +630,7 @@ asmlinkage void __init start_kernel(void)
+ 	sfi_init_late();
+ 
+ 	ftrace_init();
++	bootstage_mark("before_rest_init");
+ 
+ 	/* Do the rest non-__init'ed, we're now alive */
+ 	rest_init();
+@@ -722,6 +726,7 @@ static void __init do_basic_setup(void)
+ 	driver_init();
+ 	init_irq_proc();
+ 	do_ctors();
++	bootstage_mark("before_initcalls");
+ 	do_initcalls();
+ }
+ 
+@@ -806,6 +811,7 @@ static int __init kernel_init(void * unused)
+ 	sched_init_smp();
+ 
+ 	do_basic_setup();
++	bootstage_mark("after_basic_setup");
+ 
+ 	/* Open the /dev/console on the rootfs, this should never fail */
+ 	if (sys_open((const char __user *) "/dev/console", O_RDWR, 0) < 0)
+@@ -832,6 +838,7 @@ static int __init kernel_init(void * unused)
+ 	 * initmem segments and start the user-mode stuff..
+ 	 */
+ 
++	bootstage_mark("before_init_post");
+ 	init_post();
+ 	return 0;
+ }
 -- 
 1.7.3.1
