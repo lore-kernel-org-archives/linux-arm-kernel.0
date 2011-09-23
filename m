@@ -1,66 +1,32 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Mon, 26 Sep 2011 10:45:47 +0300
-Subject: [PATCH resend 11/13] omap: mcbsp: Move address definitions to
-	arch/arm/mach-omap1/mcbsp.c
-In-Reply-To: <1317023150-6730-1-git-send-email-jarkko.nikula@bitmer.com>
-References: <1317023150-6730-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <1317023150-6730-12-git-send-email-jarkko.nikula@bitmer.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Sep 2011 18:48:52 +0200
+Subject: [PATCH 0/4] arm/tegra: Convert gpio & pinmux to platform devices
+In-Reply-To: <1316725567-17881-1-git-send-email-swarren@nvidia.com>
+References: <1316725567-17881-1-git-send-email-swarren@nvidia.com>
+Message-ID: <201109231848.52318.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These address definitions are OMAP1 specific can be in single source file.
+On Thursday 22 September 2011, Stephen Warren wrote:
+> 
+> This series converts the Tegra GPIO and pinmux drivers to be regular
+> platform devices.
 
-Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
- arch/arm/mach-omap1/mcbsp.c             |   11 +++++++++++
- arch/arm/plat-omap/include/plat/mcbsp.h |   11 -----------
- 2 files changed, 11 insertions(+), 11 deletions(-)
+Looks good overall.
 
-diff --git a/arch/arm/mach-omap1/mcbsp.c b/arch/arm/mach-omap1/mcbsp.c
-index 36ab5d8..91f9abb 100644
---- a/arch/arm/mach-omap1/mcbsp.c
-+++ b/arch/arm/mach-omap1/mcbsp.c
-@@ -79,6 +79,17 @@ static struct omap_mcbsp_ops omap1_mcbsp_ops = {
- 	.free		= omap1_mcbsp_free,
- };
- 
-+#define OMAP7XX_MCBSP1_BASE	0xfffb1000
-+#define OMAP7XX_MCBSP2_BASE	0xfffb1800
-+
-+#define OMAP1510_MCBSP1_BASE	0xe1011800
-+#define OMAP1510_MCBSP2_BASE	0xfffb1000
-+#define OMAP1510_MCBSP3_BASE	0xe1017000
-+
-+#define OMAP1610_MCBSP1_BASE	0xe1011800
-+#define OMAP1610_MCBSP2_BASE	0xfffb1000
-+#define OMAP1610_MCBSP3_BASE	0xe1017000
-+
- #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
- struct resource omap7xx_mcbsp_res[][6] = {
- 	{
-diff --git a/arch/arm/plat-omap/include/plat/mcbsp.h b/arch/arm/plat-omap/include/plat/mcbsp.h
-index 5d657d9..af5824a 100644
---- a/arch/arm/plat-omap/include/plat/mcbsp.h
-+++ b/arch/arm/plat-omap/include/plat/mcbsp.h
-@@ -38,17 +38,6 @@ static struct platform_device omap_mcbsp##port_nr = {	\
- #define MCBSP_CONFIG_TYPE3	0x3
- #define MCBSP_CONFIG_TYPE4	0x4
- 
--#define OMAP7XX_MCBSP1_BASE	0xfffb1000
--#define OMAP7XX_MCBSP2_BASE	0xfffb1800
--
--#define OMAP1510_MCBSP1_BASE	0xe1011800
--#define OMAP1510_MCBSP2_BASE	0xfffb1000
--#define OMAP1510_MCBSP3_BASE	0xe1017000
--
--#define OMAP1610_MCBSP1_BASE	0xe1011800
--#define OMAP1610_MCBSP2_BASE	0xfffb1000
--#define OMAP1610_MCBSP3_BASE	0xe1017000
--
- /* McBSP register numbers. Register address offset = num * reg_step */
- enum {
- 	/* Common registers */
--- 
-1.7.6.3
+> The series is extracted from an earlier series I posted that augmented
+> these drivers to initialize HW state from the device-tree. I'm holding
+> off on that aspect of the changes, since it's not entirely clear to me
+> whether the new pinmux API should drive the initial pinmux state setup
+> via "system hog" definitions, or whether pinmux drivers should indeed
+> do their own thing.
+
+I think at least you should try to do an ioremap of the pinmux register
+area in the pinmux probe function and make sure that it's called early
+enough, if at all possible.
+
+Right now, there is an empty probe() function, which is a bit silly,
+and the pg_readl()/pg_writel() functions use hardcoded register
+addresses.
+
+	Arnd
