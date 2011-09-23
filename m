@@ -1,31 +1,34 @@
 From: Baohua.Song@csr.com (Barry Song)
-Date: Thu, 22 Sep 2011 22:51:29 -0700
-Subject: [PATCH 2/4] ARM: CSR: timer: space required before the open
-	parenthesis '('
+Date: Thu, 22 Sep 2011 22:51:31 -0700
+Subject: [PATCH 4/4] ARM: CSR: clock: Fix indentation
 In-Reply-To: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
 References: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1316757091-14916-3-git-send-email-Baohua.Song@csr.com>
+Message-ID: <1316757091-14916-5-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-prima2/timer.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-prima2/clock.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer.c
-index 225ed3b..26ab6fe 100644
---- a/arch/arm/mach-prima2/timer.c
-+++ b/arch/arm/mach-prima2/timer.c
-@@ -140,7 +140,7 @@ unsigned long long notrace sched_clock(void)
- 	 * if we map timer memory in .init of sys_timer, system
- 	 * will panic due to illegal memory access
- 	 */
--	if(!is_mapped) {
-+	if (!is_mapped) {
- 		sirfsoc_of_timer_map();
- 		is_mapped = 1;
- 	}
+diff --git a/arch/arm/mach-prima2/clock.c b/arch/arm/mach-prima2/clock.c
+index 615a4e7..aebad7e 100644
+--- a/arch/arm/mach-prima2/clock.c
++++ b/arch/arm/mach-prima2/clock.c
+@@ -350,10 +350,10 @@ static struct clk_lookup onchip_clks[] = {
+ 		.clk = &clk_mem,
+ 	}, {
+ 		.dev_id = "sys",
+-			.clk = &clk_sys,
++		.clk = &clk_sys,
+ 	}, {
+ 		.dev_id = "io",
+-			.clk = &clk_io,
++		.clk = &clk_io,
+ 	},
+ };
+ 
 -- 
 1.7.1
 
