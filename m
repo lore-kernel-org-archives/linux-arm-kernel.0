@@ -1,104 +1,38 @@
-From: deepthy.ravi@ti.com (Ravi, Deepthy)
-Date: Fri, 23 Sep 2011 17:23:39 +0530
-Subject: [PATCH 4/5] ispccdc: Configure CCDC_SYN_MODE register for
-	UYVY8_2X8 and YUYV8_2X8 formats
-In-Reply-To: <201109211106.41677.laurent.pinchart@ideasonboard.com>
-References: <1316530612-23075-1-git-send-email-deepthy.ravi@ti.com>
-	<201109210126.20436.laurent.pinchart@ideasonboard.com>
-	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D090847@dbde03.ent.ti.com>,
-	<201109211106.41677.laurent.pinchart@ideasonboard.com>
-Message-ID: <ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D09084F@dbde03.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 23 Sep 2011 20:12:45 +0800
+Subject: [PATCH v5 0/3] add fec support for imx6q
+Message-ID: <1316779968-21390-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series adds imx6q enet support.  The imx6q enet is a derivative of
+imx28 enet controller.  It fixes the frame endian issue found on imx28,
+and adds 1 Gbps support.
 
-> ________________________________________
-> From: Laurent Pinchart [laurent.pinchart at ideasonboard.com]
-> Sent: Wednesday, September 21, 2011 2:36 PM
-> To: Ravi, Deepthy
-> Cc: mchehab at infradead.org; tony at atomide.com; Hiremath, Vaibhav; linux-media at vger.kernel.org; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org; kyungmin.park at samsung.com; hverkuil at xs4all.nl; m.szyprowski at samsung.com; g.liakhovetski at gmx.de; Shilimkar, Santosh; khilman at deeprootsystems.com; david.woodhouse at intel.com; akpm at linux-foundation.org; linux-kernel at vger.kernel.org; linux-omap at vger.kernel.org; Sakari Ailus
-> Subject: Re: [PATCH 4/5] ispccdc: Configure CCDC_SYN_MODE register for UYVY8_2X8 and YUYV8_2X8 formats
->
-> Hi Deepthy,
->
-> On Wednesday 21 September 2011 07:32:44 Ravi, Deepthy wrote:
->> On Wednesday, September 21, 2011 4:56 AM Laurent Pinchart wrote:
->> > On Tuesday 20 September 2011 16:56:51 Deepthy Ravi wrote:
->> >> Configure INPMOD and PACK8 fileds of CCDC_SYN_MODE
->> >> register for UYVY8_2X8 and YUYV8_2X8 formats.
->> >>
->> >> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
->> >> ---
->> >>
->> >>  drivers/media/video/omap3isp/ispccdc.c |   11 ++++++++---
->> >>  1 files changed, 8 insertions(+), 3 deletions(-)
->> >>
->> >> diff --git a/drivers/media/video/omap3isp/ispccdc.c
->> >> b/drivers/media/video/omap3isp/ispccdc.c index 418ba65..1dcf180 100644
->> >> --- a/drivers/media/video/omap3isp/ispccdc.c
->> >> +++ b/drivers/media/video/omap3isp/ispccdc.c
->> >> @@ -985,8 +985,12 @@ static void ccdc_config_sync_if(struct
->> >> isp_ccdc_device
->> >> *ccdc,
->> >>
->> >>       syn_mode &= ~ISPCCDC_SYN_MODE_INPMOD_MASK;
->> >>       if (format->code == V4L2_MBUS_FMT_YUYV8_2X8 ||
->> >>
->> >> -         format->code == V4L2_MBUS_FMT_UYVY8_2X8)
->> >> -             syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
->> >> +         format->code == V4L2_MBUS_FMT_UYVY8_2X8){
->> >> +             if (pdata && pdata->bt656)
->> >> +                     syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
->> >> +             else
->> >> +                     syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
->> >> +     }
->> >>
->> >>       else if (format->code == V4L2_MBUS_FMT_YUYV8_1X16 ||
->> >>
->> >>                format->code == V4L2_MBUS_FMT_UYVY8_1X16)
->> >>
->> >>               syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
->> >>
->> >> @@ -1172,7 +1176,8 @@ static void ccdc_configure(struct isp_ccdc_device
->> >> *ccdc) syn_mode &= ~ISPCCDC_SYN_MODE_SDR2RSZ;
->> >>
->> >>       /* Use PACK8 mode for 1byte per pixel formats. */
->> >>
->> >> -     if (omap3isp_video_format_info(format->code)->width <= 8)
->> >> +     if ((omap3isp_video_format_info(format->code)->width <= 8) &&
->> >> +                     (omap3isp_video_format_info(format->code)->bpp <=
->> >> 8))
->> >
->> > I'm not sure to follow you. This will clear the PACK8 bit for the
->> > YUYV8_2X8 formats. Those formats are 8 bits wide, shouldn't PACK8 be set
->> > to store samples on 8 bits instead of 16 bits ?
->> >
->> > Is this patch intended to support YUYV8_2X8 sensors in non BT.656 mode
->> > with the bridge enabled ? In that case, what would you think about setting
->> > the CCDC input format to YUYV8_1X16 instead ? This would better reflect
->> > the reality, as the bridge converts YUYV8_2X8 to YUYV8_1X16, and the CCDC
->> > is then fed with YUYV8_1X16.
->>
->> Yes this is intended for  YUYV8_2X8 sensors in non BT.656 with 8 to 16 bit
->> bridge enabled. So the data has to be stored as 16 bits per sample. Thats
->> why PACK8 is cleared . I am not sure about using YUYV8_1X16.
->
-> My original idea when I wrote the YV support patches was to implement this use
-> case with YUYV8_2X8 at the sensor output and YUYV8_1X16 at the CCDC input. The
-> ISP driver could then enable the bridge automatically. I'm not sure if that's
-> the best solution though, it might be confusing for the users. What I would
-> like to keep, however, is the idea of enabling the bridge automatically.
->
-[Deepthy Ravi] But for streaming to start, the formats on both ends of the link should match. I believe setting different formats at sensor output and ccdc input will give a broken pipe error. Is my understanding correct ? If so, how do you propose to handle the situation ? 
+Changes since v4:
+ * Confirmed with design team that i.MX28 Reference Manual has an error
+   on MII_SPEED formula.  FEC uses 'ref_freq / (MII_SPEED x 2)' while
+   ENET-MAC uses 'ref_freq / ((MII_SPEED + 1) x 2)', so that minus one
+   should really apply for just FEC_QUIRK_ENET_MAC.
 
-> Sakari, any opinion on this ?
->
->> >>               syn_mode |= ISPCCDC_SYN_MODE_PACK8;
->> >>       else
->> >>               syn_mode &= ~ISPCCDC_SYN_MODE_PACK8;
->
-> --
-> Regards,
->
-> Laurent Pinchart
->
+Changes since v3:
+ * The minus one on phy_speed should happen before left shift.
+
+Changes since v2:
+ * Refine patch #1 to get fec_reset_phy() return void
+
+Changes since v1:
+ * Fix typo pointed out by Francois Romieu
+ * Drop patch #3 in the v1
+ * Rebase on net-next tree
+
+Thanks.
+
+Shawn Guo (3):
+      net/fec: fec_reset_phy() does not need to always succeed
+      net/fec: fix fec1 check in fec_enet_mii_init()
+      net/fec: add imx6q enet support
+
+ drivers/net/ethernet/freescale/Kconfig |    9 ++--
+ drivers/net/ethernet/freescale/fec.c   |   81 +++++++++++++++++++++++---------
+ 2 files changed, 63 insertions(+), 27 deletions(-)
