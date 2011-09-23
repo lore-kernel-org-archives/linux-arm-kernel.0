@@ -1,31 +1,30 @@
-From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
-Date: Fri, 23 Sep 2011 19:34:21 -0400
-Subject: [RFC PATCH 0/3] Add accurate boot timing to a Linux system
-In-Reply-To: Your message of "Fri, 23 Sep 2011 16:03:15 PDT."
-	<1316818998-30711-1-git-send-email-sjg@chromium.org>
-References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
-Message-ID: <37959.1316820861@turing-police.cc.vt.edu>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 23 Sep 2011 17:47:44 -0600
+Subject: [PATCH 08/11] OMAP2+: board-generic: Add i2c static init
+In-Reply-To: <20110923231208.GE6324@atomide.com>
+References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
+	<1316809399-19579-9-git-send-email-b-cousson@ti.com>
+	<20110923231208.GE6324@atomide.com>
+Message-ID: <20110923234744.GL24631@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Sep 2011 16:03:15 PDT, Simon Glass said:
-> This experimental patch set adds boot timing to a Linux system. The
-> timing starts with the boot loader and extends through the kernel into
-> user space to the completion of the boot process. The timing starts when
-> the system leaves reset, not later when the kernel starts.
-> The bootstage record aims to provide 20-30 timestamps ranging from reset
-> to login prompt (or some other definition of completion).
+On Fri, Sep 23, 2011 at 04:12:08PM -0700, Tony Lindgren wrote:
+> * Benoit Cousson <b-cousson@ti.com> [110923 12:50]:
+> > Still needed to boot until the i2c & twl driver is adapted to
+> > device-tree. Otherwise the voltage control code will try to
+> > access the twl and crash.
+> 
+> That sounds OK to me for now. For merging these patches, how
+> about the following:
+> 
+> - Kevin queues up the omap_device related changes
+> 
+> - Grant queues up the .dts changes
+> 
+> - I'll queue the map_io and board changes based on Kevin's
+>   omap_device changes
 
-Any way to make this play nice with bootchart, which provides much finer
-detail records once userspace gets started?
+Go ahead and queue up the .dts changes in your tree.  No need to split them up.
 
-https://github.com/mmeeks/bootchart
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 227 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110923/7a4d56f4/attachment.sig>
+g.
