@@ -1,66 +1,34 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 23 Sep 2011 17:23:41 +0530
-Subject: [PATCH 1/7] SPI: S3C64XX: Use bus clocks created using clkdev
+Date: Fri, 23 Sep 2011 17:23:42 +0530
+Subject: [PATCH 2/7] ARM: SAMSUNG: Add CLK Macro for clkdev support
 In-Reply-To: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
 References: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1316778827-24694-2-git-send-email-padma.v@samsung.com>
+Message-ID: <1316778827-24694-3-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the driver to stop depending on the
-clock names being passed from platform and switch over
-to lookup clocks generic names using clkdev
-
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c |   14 +++++---------
- 1 files changed, 5 insertions(+), 9 deletions(-)
+ arch/arm/plat-samsung/include/plat/clock.h |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 019a716..dcf7e10 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -971,6 +971,7 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
- 	struct s3c64xx_spi_info *sci;
- 	struct spi_master *master;
- 	int ret;
-+	char clk_name[16];
+diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+index 73c66d4..c864825 100644
+--- a/arch/arm/plat-samsung/include/plat/clock.h
++++ b/arch/arm/plat-samsung/include/plat/clock.h
+@@ -17,6 +17,13 @@
  
- 	if (pdev->id < 0) {
- 		dev_err(&pdev->dev,
-@@ -984,11 +985,6 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
- 	}
+ struct clk;
  
- 	sci = pdev->dev.platform_data;
--	if (!sci->src_clk_name) {
--		dev_err(&pdev->dev,
--			"Board init must call s3c64xx_spi_set_info()\n");
--		return -EINVAL;
--	}
- 
- 	/* Check for availability of necessary resource */
- 
-@@ -1073,17 +1069,17 @@ static int __init s3c64xx_spi_probe(struct platform_device *pdev)
- 		goto err4;
- 	}
- 
--	sdd->src_clk = clk_get(&pdev->dev, sci->src_clk_name);
-+	sprintf(clk_name, "spi_busclk%d", sci->src_clk_nr);
-+	sdd->src_clk = clk_get(&pdev->dev, clk_name);
- 	if (IS_ERR(sdd->src_clk)) {
- 		dev_err(&pdev->dev,
--			"Unable to acquire clock '%s'\n", sci->src_clk_name);
-+			"Unable to acquire clock '%s'\n", clk_name);
- 		ret = PTR_ERR(sdd->src_clk);
- 		goto err5;
- 	}
- 
- 	if (clk_enable(sdd->src_clk)) {
--		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n",
--							sci->src_clk_name);
-+		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n", clk_name);
- 		ret = -EBUSY;
- 		goto err6;
- 	}
++#define CLK(dev, con, ck)	\
++	{			\
++		.dev_id = dev,	\
++		.con_id = con,	\
++		.clk = ck,	\
++	}
++
+ /**
+  * struct clk_ops - standard clock operations
+  * @set_rate: set the clock rate, see clk_set_rate().
 -- 
 1.7.4.4
