@@ -1,43 +1,41 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 24 Sep 2011 01:16:59 +0800
-Subject: [PATCH 2/4] ARM i.MX tzic: add handle_irq function
-In-Reply-To: <1316522956-28530-3-git-send-email-s.hauer@pengutronix.de>
-References: <1316522956-28530-1-git-send-email-s.hauer@pengutronix.de>
-	<1316522956-28530-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20110923171658.GB15511@S2100-06.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 24 Sep 2011 01:22:25 +0800
+Subject: [PATCH] ARM: localtimer: add header linux/errno.h explicitly
+Message-ID: <1316798545-21128-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 20, 2011 at 02:49:14PM +0200, Sascha Hauer wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/plat-mxc/include/mach/common.h |    4 ++++
->  arch/arm/plat-mxc/tzic.c                |   24 +++++++++++++++++++++++-
->  2 files changed, 27 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-> index 8de0d0c..2e8802b 100644
-> --- a/arch/arm/plat-mxc/include/mach/common.h
-> +++ b/arch/arm/plat-mxc/include/mach/common.h
-> @@ -74,6 +74,7 @@ extern int mx53_revision(void);
->  extern int mx53_display_revision(void);
->  
->  void avic_handle_irq(struct pt_regs *);
-> +void tzic_handle_irq(struct pt_regs *);
->  
->  #define mx1_handle_irq avic_handle_irq
->  #define mx21_handle_irq avic_handle_irq
-> @@ -81,5 +82,8 @@ void avic_handle_irq(struct pt_regs *);
->  #define mx27_handle_irq avic_handle_irq
->  #define mx31_handle_irq avic_handle_irq
->  #define mx35_handle_irq avic_handle_irq
-> +#define mx50_handle_irq tzic_handle_irq
-> +#define mx51_handle_irq tzic_handle_irq
-> +#define mx53_handle_irq tzic_handle_irq
->  
-Can we start forcing the consistent file/function naming between mx*
-and imx*?  I bet imx* will win :)
+Per the text in  Documentation/SubmitChecklist as below, we should
+explicitly have header linux/errno.h in localtimer.h for ENXIO
+reference.
 
+1: If you use a facility then #include the file that defines/declares
+   that facility.  Don't depend on other header files pulling in ones
+   that you use.
+
+Otherwise, we may run into some compiling error like the following one,
+if any file includes localtimer.h without CONFIG_LOCAL_TIMERS defined.
+
+  arch/arm/include/asm/localtimer.h: In function ?local_timer_setup?:
+  arch/arm/include/asm/localtimer.h:53:10: error: ?ENXIO? undeclared (first use in this function)
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/include/asm/localtimer.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index 080d74f..698ff73 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -48,6 +48,8 @@ int local_timer_setup(struct clock_event_device *);
+ 
+ #else
+ 
++#include <linux/errno.h>
++
+ static inline int local_timer_setup(struct clock_event_device *evt)
+ {
+ 	return -ENXIO;
 -- 
-Regards,
-Shawn
+1.7.4.1
