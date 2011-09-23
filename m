@@ -1,31 +1,31 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 23 Sep 2011 22:23:11 +0200
-Subject: [PATCH 03/11] arm/dts: Add support for OMAP4 PandaBoard
+Date: Fri, 23 Sep 2011 22:23:14 +0200
+Subject: [PATCH 06/11] arm/dts: Add support for OMAP3 Beagle board
 In-Reply-To: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
 References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1316809399-19579-4-git-send-email-b-cousson@ti.com>
+Message-ID: <1316809399-19579-7-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on the original omap4-panda.dts file from Manju.
-http://www.spinics.net/lists/linux-omap/msg55836.html
+Add OMAP3 beagleboard DTS file to use the omap3.dtsi
+SoC file.
 
-Add memory information and a default bootargs to allow
-a boot from RAMDISK.
+Add a default bootargs line to allow a boot from RAMDISK
+
+Add memory node information.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: G, Manjunath Kondaiah <manjugk@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda.dts |   29 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-beagle.dts |   29 +++++++++++++++++++++++++++++
  1 files changed, 29 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap4-panda.dts
+ create mode 100644 arch/arm/boot/dts/omap3-beagle.dts
 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
 new file mode 100644
-index 0000000..c702657
+index 0000000..9486be6
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap4-panda.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
 @@ -0,0 +1,29 @@
 +/*
 + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
@@ -36,11 +36,11 @@ index 0000000..c702657
 + */
 +/dts-v1/;
 +
-+/include/ "omap4.dtsi"
++/include/ "omap3.dtsi"
 +
 +/ {
-+	model = "TI OMAP4 PandaBoard";
-+	compatible = "ti,omap4-panda", "ti,omap4430", "ti,omap4";
++	model = "TI OMAP3 BeagleBoard";
++	compatible = "ti,omap3-beagle", "ti,omap3";
 +
 +	/*
 +	 * Since the initial device tree board file does not create any
@@ -48,12 +48,12 @@ index 0000000..c702657
 +	 * ramdisk.
 +	 */
 +	chosen {
-+		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug";
++		bootargs = "root=/dev/ram0 rw console=ttyO2,115200n8 initrd=0x81600000,20M ramdisk_size=20480 no_console_suspend debug earlyprintk";
 +	};
 +
 +	memory {
 +		device_type = "memory";
-+		reg = <0x80000000 0x40000000>; /* 1 GB */
++		reg = <0x80000000 0x20000000>; /* 512 MB */
 +	};
 +};
 -- 
