@@ -1,36 +1,58 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 23 Sep 2011 15:22:34 +0100
-Subject: Identifying Primecells
-In-Reply-To: <CAKON4OxHwjrw-dhH2qvXopqUqmKSx2TCPgW4eVHF9dmQO4=Cvw@mail.gmail.com>
-References: <CAKON4OxqqBh4xFLwiMZzsGrnoG8erQ0hMFX-_VA-EDMvdNkvQQ@mail.gmail.com>
-	<4E7C7FA2.30404@gmail.com>
-	<CAKON4OzGEo+XvcNg=mzp3jhq3d3m7Z9bvZTSVCNLNjZ=KYbNBQ@mail.gmail.com>
-	<4E7C89FC.4090209@gmail.com>
-	<CAKON4OxZPFFL5NAgxLPRw2xxnS=v7iVWtQSSLcUJWfOYh4yfjA@mail.gmail.com>
-	<1316787049.4611.920.camel@hornet.cambridge.arm.com>
-	<CAKON4OxHwjrw-dhH2qvXopqUqmKSx2TCPgW4eVHF9dmQO4=Cvw@mail.gmail.com>
-Message-ID: <1316787754.4611.925.camel@hornet.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 23 Sep 2011 16:29:02 +0200
+Subject: [PATCH] ARM i.MX avic: convert to use generic irq chip
+In-Reply-To: <4E7C49AE.8070101@gmail.com>
+References: <1316684408-12196-1-git-send-email-jason77.wang@gmail.com>
+	<20110922135009.GA15024@S2100-06.ap.freescale.net>
+	<4E7C49AE.8070101@gmail.com>
+Message-ID: <20110923142902.GM31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> My registers don't seem to match up with the pl011 documentation...
-<...>
-> INTCE	W	0xFD8	Interrupt	Clear Enable Register
-> INTSE	W	0xFDC	Interrupt	Set Enable Register
-> INTS	R	0xFE0	Interrupt	Status Register
-> INTE	R	0xFE4	Interrupt	Enable Register
+On Fri, Sep 23, 2011 at 04:56:14PM +0800, Hui Wang wrote:
+> Shawn Guo wrote:
+> >On Thu, Sep 22, 2011 at 05:40:08PM +0800, Hui Wang wrote:
+> >>Convert i.MX avic irq handler to use generic irq chip. This not only
+> >>provides a cleanup implementation of irq chip handler, but also
+> >>implements suspend/resume interface with the help of generic irq chip
+> >>interface.
+> >>
+> >>Change mxc_irq_chip to a new structure mxc_extra_irq to handle fiq
+> >>and priority functions.
+> >>
+> >>Signed-off-by: Hui Wang <jason77.wang@gmail.com>
+> >>---
+> >>
+> >>This patch is basing on imx-features branch of linux-pengu. Have
+> >>validated this patch on 31pdk and 35pdk platforms, while have no
+> >>chance to validate it on mx2 and mx1 platforms since we don't have
+> >>those hardwares.
+> >>
+> >>The purpose of changing avic to use generic irq chip is because i
+> >>added suspend/resume functions for 35pdk, and generic irq chip
+> >>naturally has suspend/resume interface. If this patch can be
+> >>accepted, i will continue to send out those 35pdk pm patches.
+> >>
+> >> arch/arm/plat-mxc/avic.c       |   79 ++++++++++++++++++++++++++++------------
+> >> arch/arm/plat-mxc/irq-common.c |   21 ++++++-----
+> >> arch/arm/plat-mxc/irq-common.h |    3 +-
+> >> arch/arm/plat-mxc/tzic.c       |    8 ++++-
+> >> 4 files changed, 75 insertions(+), 36 deletions(-)
+> >>
+> >Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> >
+> >However, I'm wondering if you can add the suspend/resume interface for
+> >tzic as well.
+> Yes, this is the next plan, if this patch can be accepted, i will
+> add tzic suspend/resume as well.
 
-... nor any other PrimeCell, actually :-)
+It is, go ahead.
 
-"Compliant" PrimeCells must have the PCellID in the last 4 registers:
+Sascha
 
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0183g/I54776.html
 
-* base + 0xff0 = 0x0d
-* base + 0xff4 = 0xf0
-* base + 0xff8 = 0x05
-* base + 0xffc = 0xb1
-
-Cheers!
-
-Pawe?
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
