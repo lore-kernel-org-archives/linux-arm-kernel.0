@@ -1,65 +1,45 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 23 Sep 2011 22:23:10 +0200
-Subject: [PATCH 02/11] arm/dts: Add initial device tree support for OMAP4 SoC
+Date: Fri, 23 Sep 2011 22:23:13 +0200
+Subject: [PATCH 05/11] arm/dts: Add initial device tree support for OMAP3 SoC
 In-Reply-To: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
 References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1316809399-19579-3-git-send-email-b-cousson@ti.com>
+Message-ID: <1316809399-19579-6-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial device-tree support for OMAP4 SoC.
+Add initial OMAP3 soc file with empty ocp bus.
 
-This is based on the original panda board patch done by Manju:
-http://permalink.gmane.org/gmane.linux.ports.arm.omap/60393
-
-Add the generic GIC interrupt-controller from ARM.
-
-Add an empty "soc" node to contain non memory mapped IPs
-(DSP, MPU, IPU...).
-
-Note: Since reg, irq and dma are provided by hwmod for the
-moment, these attributes will not be present at all in DTS
-to highlight the gap. They will be added as soon as dma bindings
-will be there and drivers will be adapted.
+Based on initial patch from Manju:
+http://www.spinics.net/lists/linux-omap/msg55830.html
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Cc: Grant Likely <grant.likely@secretlab.ca>
 Cc: G, Manjunath Kondaiah <manjugk@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi |   79 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 79 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap4.dtsi
+ arch/arm/boot/dts/omap3.dtsi |   44 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3.dtsi
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
 new file mode 100644
-index 0000000..d4131e3
+index 0000000..d558785
 --- /dev/null
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -0,0 +1,79 @@
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -0,0 +1,44 @@
 +/*
++ * Device Tree Source for OMAP3 SoC
++ *
 + * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
 + */
-+
-+/*
-+ * Carveout for multimedia usecases
-+ * It should be the last 48MB of the first 512MB memory part
-+ * In theory, it should not even exist. That zone should be reserved
-+ * dynamically during the .reserve callback.
-+ */
-+/memreserve/ 0x9d000000 0x03000000;
 +
 +/include/ "skeleton.dtsi"
 +
 +/ {
-+	compatible = "ti,omap4430", "ti,omap4";
-+	interrupt-parent = <&gic>;
-+
-+	aliases {
-+	};
++	compatible = "ti,omap3430", "ti,omap3";
 +
 +	/*
 +	 * The soc node represents the soc top level view. It is uses for IPs
@@ -70,32 +50,8 @@ index 0000000..d4131e3
 +	};
 +
 +	/*
-+	 * XXX: Use a flat representation of the OMAP4 interconnect.
++	 * XXX: Use a flat representation of the OMAP3 interconnect.
 +	 * The real OMAP interconnect network is quite complex.
-+	 *
-+	 * MPU -+-- MPU_PRIVATE - GIC, L2
-+	 *      |
-+	 *      +----------------+----------+
-+	 *      |                |          |
-+	 *      +            +- EMIF - DDR  |
-+	 *      |            |              |
-+	 *      |            +     +--------+
-+	 *      |            |     |
-+	 *      |            +- L4_ABE - AESS, MCBSP, TIMERs...
-+	 *      |            |
-+	 *      +- L3_MAIN --+- L4_CORE - IPs...
-+	 *                   |
-+	 *                   +- L4_PER - IPs...
-+	 *                   |
-+	 *                   +- L4_CFG -+- L4_WKUP - IPs...
-+	 *                   |          |
-+	 *                   |          +- IPs...
-+	 *                   +- IPU ----+
-+	 *                   |          |
-+	 *                   +- DSP ----+
-+	 *                   |          |
-+	 *                   +- DSS ----+
-+	 *
 +	 * Since that will not bring real advantage to represent that in DT for
 +	 * the moment, just use a fake OCP bus entry to represent the whole bus
 +	 * hierarchy.
@@ -105,13 +61,12 @@ index 0000000..d4131e3
 +		#address-cells = <1>;
 +		#size-cells = <1>;
 +		ranges;
++		ti,hwmods = "l3_main";
 +
-+		gic: interrupt-controller at 48241000 {
-+			compatible = "arm,cortex-a9-gic";
++		intc: interrupt-controller at 1 {
++			compatible = "ti,omap3-intc";
 +			interrupt-controller;
 +			#interrupt-cells = <1>;
-+			reg = <0x48241000 0x1000>,
-+			      <0x48240100 0x0100>;
 +		};
 +	};
 +};
