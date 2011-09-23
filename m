@@ -1,87 +1,104 @@
-From: mh@glandium.org (Mike Hommey)
-Date: Fri, 23 Sep 2011 13:57:21 +0200
-Subject: I-cache/D-cache inconsistency issue with page cache
-Message-ID: <20110923115721.GA7013@glandium.org>
+From: deepthy.ravi@ti.com (Ravi, Deepthy)
+Date: Fri, 23 Sep 2011 17:23:39 +0530
+Subject: [PATCH 4/5] ispccdc: Configure CCDC_SYN_MODE register for
+	UYVY8_2X8 and YUYV8_2X8 formats
+In-Reply-To: <201109211106.41677.laurent.pinchart@ideasonboard.com>
+References: <1316530612-23075-1-git-send-email-deepthy.ravi@ti.com>
+	<201109210126.20436.laurent.pinchart@ideasonboard.com>
+	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D090847@dbde03.ent.ti.com>,
+	<201109211106.41677.laurent.pinchart@ideasonboard.com>
+Message-ID: <ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D09084F@dbde03.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-We've been hitting random crashes at startup with Firefox on tegras
-(under Android), and narrowed it down to a I-cache/D-cache
-inconsistency. A reduced testcase of the issue looks like the following
-(compile as ARM, not Thumb):
+> ________________________________________
+> From: Laurent Pinchart [laurent.pinchart at ideasonboard.com]
+> Sent: Wednesday, September 21, 2011 2:36 PM
+> To: Ravi, Deepthy
+> Cc: mchehab at infradead.org; tony at atomide.com; Hiremath, Vaibhav; linux-media at vger.kernel.org; linux at arm.linux.org.uk; linux-arm-kernel at lists.infradead.org; kyungmin.park at samsung.com; hverkuil at xs4all.nl; m.szyprowski at samsung.com; g.liakhovetski at gmx.de; Shilimkar, Santosh; khilman at deeprootsystems.com; david.woodhouse at intel.com; akpm at linux-foundation.org; linux-kernel at vger.kernel.org; linux-omap at vger.kernel.org; Sakari Ailus
+> Subject: Re: [PATCH 4/5] ispccdc: Configure CCDC_SYN_MODE register for UYVY8_2X8 and YUYV8_2X8 formats
+>
+> Hi Deepthy,
+>
+> On Wednesday 21 September 2011 07:32:44 Ravi, Deepthy wrote:
+>> On Wednesday, September 21, 2011 4:56 AM Laurent Pinchart wrote:
+>> > On Tuesday 20 September 2011 16:56:51 Deepthy Ravi wrote:
+>> >> Configure INPMOD and PACK8 fileds of CCDC_SYN_MODE
+>> >> register for UYVY8_2X8 and YUYV8_2X8 formats.
+>> >>
+>> >> Signed-off-by: Deepthy Ravi <deepthy.ravi@ti.com>
+>> >> ---
+>> >>
+>> >>  drivers/media/video/omap3isp/ispccdc.c |   11 ++++++++---
+>> >>  1 files changed, 8 insertions(+), 3 deletions(-)
+>> >>
+>> >> diff --git a/drivers/media/video/omap3isp/ispccdc.c
+>> >> b/drivers/media/video/omap3isp/ispccdc.c index 418ba65..1dcf180 100644
+>> >> --- a/drivers/media/video/omap3isp/ispccdc.c
+>> >> +++ b/drivers/media/video/omap3isp/ispccdc.c
+>> >> @@ -985,8 +985,12 @@ static void ccdc_config_sync_if(struct
+>> >> isp_ccdc_device
+>> >> *ccdc,
+>> >>
+>> >>       syn_mode &= ~ISPCCDC_SYN_MODE_INPMOD_MASK;
+>> >>       if (format->code == V4L2_MBUS_FMT_YUYV8_2X8 ||
+>> >>
+>> >> -         format->code == V4L2_MBUS_FMT_UYVY8_2X8)
+>> >> -             syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
+>> >> +         format->code == V4L2_MBUS_FMT_UYVY8_2X8){
+>> >> +             if (pdata && pdata->bt656)
+>> >> +                     syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR8;
+>> >> +             else
+>> >> +                     syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
+>> >> +     }
+>> >>
+>> >>       else if (format->code == V4L2_MBUS_FMT_YUYV8_1X16 ||
+>> >>
+>> >>                format->code == V4L2_MBUS_FMT_UYVY8_1X16)
+>> >>
+>> >>               syn_mode |= ISPCCDC_SYN_MODE_INPMOD_YCBCR16;
+>> >>
+>> >> @@ -1172,7 +1176,8 @@ static void ccdc_configure(struct isp_ccdc_device
+>> >> *ccdc) syn_mode &= ~ISPCCDC_SYN_MODE_SDR2RSZ;
+>> >>
+>> >>       /* Use PACK8 mode for 1byte per pixel formats. */
+>> >>
+>> >> -     if (omap3isp_video_format_info(format->code)->width <= 8)
+>> >> +     if ((omap3isp_video_format_info(format->code)->width <= 8) &&
+>> >> +                     (omap3isp_video_format_info(format->code)->bpp <=
+>> >> 8))
+>> >
+>> > I'm not sure to follow you. This will clear the PACK8 bit for the
+>> > YUYV8_2X8 formats. Those formats are 8 bits wide, shouldn't PACK8 be set
+>> > to store samples on 8 bits instead of 16 bits ?
+>> >
+>> > Is this patch intended to support YUYV8_2X8 sensors in non BT.656 mode
+>> > with the bridge enabled ? In that case, what would you think about setting
+>> > the CCDC input format to YUYV8_1X16 instead ? This would better reflect
+>> > the reality, as the bridge converts YUYV8_2X8 to YUYV8_1X16, and the CCDC
+>> > is then fed with YUYV8_1X16.
+>>
+>> Yes this is intended for  YUYV8_2X8 sensors in non BT.656 with 8 to 16 bit
+>> bridge enabled. So the data has to be stored as 16 bits per sample. Thats
+>> why PACK8 is cleared . I am not sure about using YUYV8_1X16.
+>
+> My original idea when I wrote the YV support patches was to implement this use
+> case with YUYV8_2X8 at the sensor output and YUYV8_1X16 at the CCDC input. The
+> ISP driver could then enable the bridge automatically. I'm not sure if that's
+> the best solution though, it might be confusing for the users. What I would
+> like to keep, however, is the idea of enabling the bridge automatically.
+>
+[Deepthy Ravi] But for streaming to start, the formats on both ends of the link should match. I believe setting different formats at sensor output and ccdc input will give a broken pipe error. Is my understanding correct ? If so, how do you propose to handle the situation ? 
 
------------------8<--------------
-#include <sys/mman.h>
-#include <string.h>
-#include <fcntl.h>
-
-__asm__(
-  ".text\n"
-  ".align 4\n"
-  ".type foo, %function\n"
-  "foo:\n"
-  "  bx lr\n"
-);
-
-static void foo() __attribute__((used));
-
-int main(int argc, char *argv[]) {
-  if (argc < 2)
-    return 0;
-  int fd = open(argv[1], O_RDWR | O_CREAT | O_TRUNC, 0600);
-  ftruncate(fd, 4096);
-  void *m = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED, fd, 0);
-  memcpy(m, foo, 4);
-  munmap(m, 4096);
-  void *mx = mmap(NULL, 4096, PROT_EXEC, MAP_SHARED, fd, 0);
-  void (*func)(void) = (void (*)(void)) mx;
-  func();
-  return 0;
-}
------------------>8--------------
-
-We've been able to reliably reproduce with the above reduced testcase on
-tegras under both Android and Ubuntu (Maverick). It however doesn't seem
-to happen on all kinds of ARM processors, though.
-
-A corresponding real world use case is that we are (were) uncompressing
-libraries in mmap()ed memory and dlopen()ing the resulting file. We have
-been doing so for a long time, but only recently we got a library small
-enough to trigger an actual problem.
-
-Something along these lines has been discussed on this very list:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2009-September/001074.html
-
-What happens in practice with the above code is that by the time we jump
-into the copied function, RAM still has the zeroed out page, while the
-actual content is still in D-cache. Execution thus happens on zeroes, up
-to the point it reaches the next page, which in most cases would not be
-mapped, thus a segmentation fault.
-
-In our real world scenario, the execution would start on zeroes, up to
-some point where memory would have actual content, at which time we
-crash with SIGILL at a cache line boundary (adresses ending in 0x20,
-0x40, 0x60 or 0x80), depending on how much D-cache would have been
-flushed in between because there are various things happening between
-the uncompression and the execution of init functions in the library.
-This didn't happen until we had a library smaller than 4KB with an init
-function.
-
-Adding a cache flush in between does solve the problem. I however think
-the kernel should mitigate by making sure the page cache backing PROT_EXEC
-mappings is fresh.
-
-Please note that I'm not expecting
- void *m = mmap(NULL, 4096, PROT_WRITE | PROT_EXEC, MAP_SHARED, fd, 0);
- memcpy(m, foo, 4);
- void (*func)(void) = (void (*)(void)) m;
- func();
-to work, this would be unreasonable.
-
-Cheers,
-
-Mike
-
-PS: Please Cc me, I'm not subscribed.
+> Sakari, any opinion on this ?
+>
+>> >>               syn_mode |= ISPCCDC_SYN_MODE_PACK8;
+>> >>       else
+>> >>               syn_mode &= ~ISPCCDC_SYN_MODE_PACK8;
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
