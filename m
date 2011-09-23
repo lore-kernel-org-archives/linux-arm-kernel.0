@@ -1,30 +1,42 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Fri, 23 Sep 2011 09:58:34 +0100
-Subject: [PATCH V7 1/5] AHCI Add the AHCI SATA feature on the MX53
-	platforms
-In-Reply-To: <CAMPhdO98U2jJ24S=NDXBRGg013eAf8Q4mL02ySiWGOrXBAJVmA@mail.gmail.com>
-References: <1314698171-7937-1-git-send-email-richard.zhu@linaro.org>
-	<CAODfWeEm8bkySXxb1qopbH1VMu-V+33k5x+0+qjABzesT0amOA@mail.gmail.com>
-	<CAJNCFV+XFGEba1J2dXDa4YVwqduAPV5y=5JYEXAZ0uv+S60vvw@mail.gmail.com>
-	<CAODfWeEueF45_yvPV5Zxbva6K2gEfKZbY2qoqySYFPZWnSgLsg@mail.gmail.com>
-	<CAJNCFVLP7gA_7vBjwVNkQaSg8LZ4hROLdNCx8SBVah=F1ptrhQ@mail.gmail.com>
-	<CAODfWeHTRuFZtnYZOD-mFonyjBvjhid4=0=a_mYXdjXAOQYejA@mail.gmail.com>
-	<CAMPhdO-f2RHtZ0RdV_wGZvohMT85Q3JzTePaD9w73shGpWkP6g@mail.gmail.com>
-	<CAODfWeFPwUa++=Bz6503KJS9dNhmkjNuWF_g==MaFKydqRRX3A@mail.gmail.com>
-	<CAMPhdO98U2jJ24S=NDXBRGg013eAf8Q4mL02ySiWGOrXBAJVmA@mail.gmail.com>
-Message-ID: <CAODfWeHQWb4y5foNArN3ORdqEUXS6FVkE+kHv+M6m-b=yLg+=A@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Sep 2011 10:04:31 +0100
+Subject: change_page_attr() implementation for ARM?
+In-Reply-To: <D19EBEE1D7B1F742A8ED7130E050A38A4CA460FF0C@HQMAIL02.nvidia.com>
+References: <D19EBEE1D7B1F742A8ED7130E050A38A4CA460FF0C@HQMAIL02.nvidia.com>
+Message-ID: <CAHkRjk4mqhu+HhoSAnowk6=5GzXXhmKCE-3jrjhMpVzbtakFYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Vinod,
 
-2011/9/22 Eric Miao <eric.miao@linaro.org>:
-> That's great, Herton. Can we take it as a Tested-by?
+(I'm not sure how the quoted message ends up but your email client
+didn't wrap lines properly)
 
-Sure, but it's Hector ;-)
+On 21 September 2011 23:10, Vinod Rex <vrex@nvidia.com> wrote:
+> On Cortex-A9, we have observed stale data being read from write-combine (C=0 B=1) memory regions mapped into userspace which have a duplicate cacheable mapping in the kernel address space (due to the kernel linear mapping).
+>
+> The issue appears to be due to speculative prefetch on the cacheable kernel linear mapping which gets lines into the L2 cache. When reads are performed on the write-combine mapping for this address range, these reads get the stale data from L2 instead of memory.
 
-Tested-By: Hector Oron Martinez <hector.oron@gmail.com>
+If your system has a PL310, there is bit 22 in the auxiliary control
+register which makes reads via the non-cacheable mapping not to hit
+the L2 cache. I had this patch queued in Russell's system for a long
+time:
 
-Cheers,
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6529/1
+
+Alternatively, you can pass this bit via your platform code.
+
+> As per the Cortex-A9 spec, behavior for double mappings with conflicting page attributes is undefined, so we need a way to make sure all duplicate mappings have the same memory type attributes.
+
+Avoiding aliases would be better but we don't have a fully stable patch yet.
+
+> Similar issue on x86 is handled using the change_page_attr()/set_memory_*() functions defined in arch/x86/mm/pageattr.c. ?This function modifies the attributes of the page in kernel linear map to match the corresponding mapping in userspace to avoid having duplicate mappings with different page attributes. It accomplishes this by splitting section (large page) mappings into 4KB page mappings as needed so that the page attribute change is done only for the requested memory region.
+>
+> Would a similar implementation for ARM be appropriate? We are experimenting with a port of change_page_attr() to ARM that seems to solve our problems.
+
+The kernel linear mapping is done using sections, so we would have to
+change the attributes for a full section. Russell's approach I think
+is better but people reported some stability issues.
+
 -- 
-?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
+Catalin
