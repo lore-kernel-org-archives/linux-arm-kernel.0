@@ -1,130 +1,119 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 24 Sep 2011 11:44:23 +0530
-Subject: [PATCH v2 03/24] OMAP4: PM: Add SAR RAM support
+Date: Sat, 24 Sep 2011 11:44:28 +0530
+Subject: [PATCH v2 08/24] OMAP: PM: Add support to allocate the memory for
+	secure RAM
 In-Reply-To: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1316844884-21700-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1316844884-21700-9-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SAR RAM support on OMAP4430. SAR RAM used to save
-and restore the HW context in low power modes.
+Allocate the memory to save secure ram context which needs
+to be done when MPU is hitting OFF mode.
+
+The ROM code expects a physical address to this memory
+and hence use memblock APIs to reserve this memory as part
+of .reserve() callback. Maximum size as per secure RAM requirements
+is allocated.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Jean Pihet <j-pihet@ti.com>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 Tested-by: Vishwanath BS <vishwanath.bs@ti.com>
 ---
- arch/arm/mach-omap2/include/mach/omap4-common.h |    1 +
- arch/arm/mach-omap2/omap4-common.c              |   31 +++++++++++++++++++++++
- arch/arm/mach-omap2/omap4-sar-layout.h          |   22 ++++++++++++++++
- arch/arm/plat-omap/include/plat/omap44xx.h      |    1 +
- 4 files changed, 55 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-omap2/omap4-sar-layout.h
+ arch/arm/mach-omap2/include/mach/omap-secure.h |    4 +++
+ arch/arm/mach-omap2/omap-secure.c              |   29 ++++++++++++++++++++++++
+ arch/arm/plat-omap/common.c                    |    3 ++
+ 3 files changed, 36 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
-index b28ad10..947d0c8 100644
---- a/arch/arm/mach-omap2/include/mach/omap4-common.h
-+++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
-@@ -39,6 +39,7 @@ static inline void __iomem *omap4_get_scu_base(void)
+diff --git a/arch/arm/mach-omap2/include/mach/omap-secure.h b/arch/arm/mach-omap2/include/mach/omap-secure.h
+index 26e7bcc..e2f95a0 100644
+--- a/arch/arm/mach-omap2/include/mach/omap-secure.h
++++ b/arch/arm/mach-omap2/include/mach/omap-secure.h
+@@ -26,6 +26,8 @@
+ #define FLAG_FIQ_ENABLE			0x1
+ #define NO_FLAG				0x0
  
- extern void __init gic_init_irq(void);
- extern void omap_smc1(u32 fn, u32 arg);
-+extern void __iomem *omap4_get_sar_ram_base(void);
++/* Maximum Secure memory storage size */
++#define OMAP_SECURE_RAM_STORAGE	(88 * SZ_1K)
  
- #ifdef CONFIG_SMP
- /* Needed for secondary core boot */
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index a12896a..652e319 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -24,12 +24,16 @@
- #include <mach/hardware.h>
- #include <mach/omap4-common.h>
+ /* Secure low power HAL API index */
+ #define OMAP4_HAL_SAVESECURERAM_INDEX	0x1a
+@@ -36,5 +38,7 @@
+ extern u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs,
+ 				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+ extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
++extern phys_addr_t omap_secure_ram_mempool_base(void);
++extern int omap_secure_ram_reserve_memblock(void);
  
-+#include "omap4-sar-layout.h"
+ #endif /* OMAP_ARCH_OMAP_SECURE_H */
+diff --git a/arch/arm/mach-omap2/omap-secure.c b/arch/arm/mach-omap2/omap-secure.c
+index e5a606e..69f3c72 100644
+--- a/arch/arm/mach-omap2/omap-secure.c
++++ b/arch/arm/mach-omap2/omap-secure.c
+@@ -13,11 +13,14 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/memblock.h>
+ 
+ #include <asm/cacheflush.h>
+ 
+ #include <mach/omap-secure.h>
+ 
++static phys_addr_t omap_secure_memblock_base;
 +
- #ifdef CONFIG_CACHE_L2X0
- static void __iomem *l2cache_base;
- #endif
+ /**
+  * omap_sec_dispatcher: Routine to dispatch low power secure
+  * service routines
+@@ -50,3 +53,29 @@ u32 omap_secure_dispatcher(u32 idx, u32 flag, u32 nargs, u32 arg1, u32 arg2,
  
- void __iomem *gic_dist_base_addr;
- 
-+static void __iomem *sar_ram_base;
-+
- 
- void __init gic_init_irq(void)
- {
-@@ -117,3 +121,30 @@ static int __init omap_l2_cache_init(void)
+ 	return ret;
  }
- early_initcall(omap_l2_cache_init);
- #endif
 +
-+void __iomem *omap4_get_sar_ram_base(void)
++/* Allocate the memory to save secure ram */
++int __init omap_secure_ram_reserve_memblock(void)
 +{
-+	return sar_ram_base;
-+}
++	phys_addr_t paddr;
++	u32 size = OMAP_SECURE_RAM_STORAGE;
 +
-+/*
-+ * SAR RAM used to save and restore the HW
-+ * context in low power modes
-+ */
-+static int __init omap4_sar_ram_init(void)
-+{
-+	/*
-+	 * To avoid code running on other OMAPs in
-+	 * multi-omap builds
-+	 */
-+	if (!cpu_is_omap44xx())
++	size = ALIGN(size, SZ_1M);
++	paddr = memblock_alloc(size, SZ_1M);
++	if (!paddr) {
++		pr_err("%s: failed to reserve %x bytes\n",
++				__func__, size);
 +		return -ENOMEM;
++	}
++	memblock_free(paddr, size);
++	memblock_remove(paddr, size);
 +
-+	/* Static mapping, never released */
-+	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_8K);
-+	if (WARN_ON(!sar_ram_base))
-+		return -ENOMEM;
++	omap_secure_memblock_base = paddr;
 +
 +	return 0;
 +}
-+early_initcall(omap4_sar_ram_init);
-diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
-new file mode 100644
-index 0000000..7781ea4
---- /dev/null
-+++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-@@ -0,0 +1,22 @@
-+/*
-+ * omap4-sar-layout.h: OMAP4 SAR RAM layout header file
-+ *
-+ * Copyright (C) 2011 Texas Instruments, Inc.
-+ *	Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef OMAP_ARCH_OMAP4_SAR_LAYOUT_H
-+#define OMAP_ARCH_OMAP4_SAR_LAYOUT_H
 +
-+/*
-+ * SAR BANK offsets from base address OMAP44XX_SAR_RAM_BASE
-+ */
-+#define SAR_BANK1_OFFSET		0x0000
-+#define SAR_BANK2_OFFSET		0x1000
-+#define SAR_BANK3_OFFSET		0x2000
-+#define SAR_BANK4_OFFSET		0x3000
-+
-+#endif
-diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
-index ea2b8a6..c0d478e 100644
---- a/arch/arm/plat-omap/include/plat/omap44xx.h
-+++ b/arch/arm/plat-omap/include/plat/omap44xx.h
-@@ -45,6 +45,7 @@
- #define OMAP44XX_WKUPGEN_BASE		0x48281000
- #define OMAP44XX_MCPDM_BASE		0x40132000
- #define OMAP44XX_MCPDM_L3_BASE		0x49032000
-+#define OMAP44XX_SAR_RAM_BASE		0x4a326000
++phys_addr_t omap_secure_ram_mempool_base(void)
++{
++	return omap_secure_memblock_base;
++}
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index d9f10a3..827f896 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -21,6 +21,8 @@
+ #include <plat/vram.h>
+ #include <plat/dsp.h>
  
- #define OMAP44XX_MAILBOX_BASE		(L4_44XX_BASE + 0xF4000)
- #define OMAP44XX_HSUSB_OTG_BASE		(L4_44XX_BASE + 0xAB000)
++#include <mach/omap-secure.h>
++
+ 
+ #define NO_LENGTH_CHECK 0xffffffff
+ 
+@@ -65,4 +67,5 @@ void __init omap_reserve(void)
+ 	omapfb_reserve_sdram_memblock();
+ 	omap_vram_reserve_sdram_memblock();
+ 	omap_dsp_reserve_sdram_memblock();
++	omap_secure_ram_reserve_memblock();
+ }
 -- 
 1.7.4.1
