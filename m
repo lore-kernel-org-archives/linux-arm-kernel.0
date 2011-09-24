@@ -1,65 +1,81 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 24 Sep 2011 11:44:34 +0530
-Subject: [PATCH v2 14/24] OMAP4: PM: Use custom omap_do_wfi() for default idle.
+Date: Sat, 24 Sep 2011 11:44:33 +0530
+Subject: [PATCH v2 13/24] OMAP4: PM: CPU1 wakeup workaround from Low power
+	modes
 In-Reply-To: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1316844884-21700-15-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1316844884-21700-14-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Default arch_idle() isn't good enough for OMAP4 because of aync bridge errata
-and necessity of NOPs post WFI to avoid speculative prefetch aborts.
-Hence Use OMAP4 custom omap_do_wfi() hook for default idle.
+The SGI(Software Generated Interrupts) are not wakeup capable from
+low power states. This is known limitation on OMAP4 and needs to be
+worked around by using software forced clockdomain wake-up. CPU0 forces
+the CPU1 clockdomain to software force wakeup.
 
-Later in the series, async bridge errata work-around patch updates the
-omap_do_wfi() with necessary interconnects barriers.
+More details can be found in OMAP4430 TRM - Version J
+Section :
+	4.3.4.2 Power States of CPU0 and CPU1
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Jean Pihet <j-pihet@ti.com>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 Tested-by: Vishwanath BS <vishwanath.bs@ti.com>
 ---
- arch/arm/mach-omap2/pm44xx.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap-smp.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 3805c0c..fdba72a 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -108,6 +108,24 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- }
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index 844ca5d..d550a44 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -27,6 +27,8 @@
+ #include <mach/omap4-common.h>
+ #include <mach/omap-secure.h>
  
- /**
-+ * omap_default_idle - OMAP4 default ilde routine.'
-+ *
-+ * Implements OMAP4 memory, IO ordering requirements which can't be addressed
-+ * with default arch_idle() hook. Used by all CPUs with !CONFIG_CPUIDLE and
-+ * by secondary CPU with CONFIG_CPUIDLE.
-+ */
-+static void omap_default_idle(void)
-+{
-+	local_irq_disable();
-+	local_fiq_disable();
++#include "clockdomain.h"
 +
-+	omap_do_wfi();
-+
-+	local_fiq_enable();
-+	local_irq_enable();
-+}
-+
-+/**
-  * omap4_pm_init - Init routine for OMAP4 PM
-  *
-  * Initializes all powerdomain and clockdomain target states
-@@ -175,6 +193,9 @@ static int __init omap4_pm_init(void)
- 	suspend_set_ops(&omap_pm_ops);
- #endif /* CONFIG_SUSPEND */
+ /* SCU base address */
+ static void __iomem *scu_base;
  
-+	/* Overwrite the default arch_idle() */
-+	pm_idle = omap_default_idle;
+@@ -67,6 +69,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ 
+ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
++	static struct clockdomain *cpu1_clkdm;
++	static bool booted;
+ 	/*
+ 	 * Set synchronisation state between this boot processor
+ 	 * and the secondary one
+@@ -82,6 +86,29 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	omap_modify_auxcoreboot0(0x200, 0xfffffdff);
+ 	flush_cache_all();
+ 	smp_wmb();
 +
- err2:
- 	return ret;
- }
++	if (!cpu1_clkdm)
++		cpu1_clkdm = clkdm_lookup("mpu1_clkdm");
++
++	/*
++	 * The SGI(Software Generated Interrupts) are not wakeup capable
++	 * from low power states. This is known limitation on OMAP4 and
++	 * needs to be worked around by using software forced clockdomain
++	 * wake-up. To wakeup CPU1, CPU0 forces the CPU1 clockdomain to
++	 * software force wakeup. The clockdomain is then put back to
++	 * hardware supervised mode.
++	 * More details can be found in OMAP4430 TRM - Version J
++	 * Section :
++	 *	4.3.4.2 Power States of CPU0 and CPU1
++	 */
++	if (booted) {
++		clkdm_wakeup(cpu1_clkdm);
++		clkdm_allow_idle(cpu1_clkdm);
++	} else {
++		dsb_sev();
++		booted = true;
++	}
++
+ 	gic_raise_softirq(cpumask_of(cpu), 1);
+ 
+ 	/*
 -- 
 1.7.4.1
