@@ -1,52 +1,48 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 24 Sep 2011 14:20:19 +0530
-Subject: [PATCH v7 00/26] gpio/omap: driver cleanup and fixes
-In-Reply-To: <CAC83ZvKu5Fo-c88L4WFPdvq91T=usaZY4mzTVVzDLw9HE7g9Kg@mail.gmail.com>
-References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>	<87mxdwm8pk.fsf@ti.com>
-	<CAC83ZvKu5Fo-c88L4WFPdvq91T=usaZY4mzTVVzDLw9HE7g9Kg@mail.gmail.com>
-Message-ID: <4E7D99CB.7090004@ti.com>
+From: per.forlin@stericsson.com (=?ISO-8859-1?Q?Per_F=F6rlin?=)
+Date: Sat, 24 Sep 2011 11:32:48 +0200
+Subject: [PATCH] arm: proc-v7: pc phy addresses before disable MMU
+In-Reply-To: <20110924081342.GA2639@mwesterb-mobl.ger.corp.intel.com>
+References: <1316851370-7284-1-git-send-email-per.forlin@stericsson.com>
+	<20110924081342.GA2639@mwesterb-mobl.ger.corp.intel.com>
+Message-ID: <4E7DA3C0.7000208@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 24 September 2011 09:26 AM, DebBarma, Tarun Kanti wrote:
-> [...]
->> After debugging this myself a bit, here's what I think may be going on.
->> This may not be the only problem but here's at least one of them.
+On 09/24/2011 10:13 AM, Mika Westerberg wrote:
+> On Sat, Sep 24, 2011 at 10:02:50AM +0200, Per Forlin wrote:
+>> PC runs virtual addresses when calling cpu_v7_reset(). The MMU
+>> is switched off and "mov pc, r0" sets pc back to
+>> virtual addresses even though the MMU is switched off.
+>> This will result in a crash if the pipeline delay after
+>> MMU disable is one instruction. To prevent this set PC
+>> to physical addresses before disabling the MMU.
 >>
->> First, debounce clocks are disabled in the runtime_suspend callback.
+>> Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
+>> Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+>> ---
+>>  arch/arm/mm/proc-v7.S |    1 +
+>>  1 files changed, 1 insertions(+), 0 deletions(-)
 >>
->> When a GPIO is freed and it's the last one in the bank, bank->mod_usage
->> goes to zero.
->>
->> After that, pm_runtime_put_sync() is called, which will trigger the
->> driver's ->runtime_suspend callback.  The ->runtime_suspend() callback
->> checks bank->mod_usage as well, and if zero, doesn't do anything
->> (notably, it doesn't disable debounce clocks.)
-> I need some clarification in reproducing/testing the fix on OMAP3430SDP.
-> The first thing I am trying to verify is the code flow of suspend.
+>> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+>> index 9049c07..f26e831 100644
+>> --- a/arch/arm/mm/proc-v7.S
+>> +++ b/arch/arm/mm/proc-v7.S
+>> @@ -64,6 +64,7 @@ ENDPROC(cpu_v7_proc_fin)
+>>   */
+>>  	.align	5
+>>  ENTRY(cpu_v7_reset)
+>> +	sub	pc, pc, #PAGE_OFFSET+4		@ go to physical addresses
 > 
-> 1) With no debounce clock enabled, when I enable UART timeouts, I
-> automatically see
-> system going to retention. That is I don't have to type echo mem >
-> /sys/power/state
-> echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
-> echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
+> This only works on machines where PHYS_OFFSET is zero.
 > 
-> 2) I am do not see the print in omap_gpio_suspend/resume(), but I see
-> the print in
-> *_prepare_for_idle()/*_resume_after_idle().
+You are right! Russell was very quick to point out the same thing. 
+
+> IIRC, there is a P<->V offset calculated at boot time. Maybe you could use
+> that instead here?
 > 
-Hmmm,
+I am trying to figure out how I can get the value of PHYS_OFFSET in assembler code (proc-v7.S).
+I guess I could use the value calculated in arch/arm/kernel.head.S but wouldn't that make
+this patch dependent on CONFIG_ARM_PATCH_PHYS_VIRT?
 
-This is mostly happening because you are missing a below
-fix from Kevin in the branch you are testing with.
-
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg54927.html
-{OMAP: omap_device: fix !CONFIG_SUSPEND case in _noirq handlers}
-
-If you rebase, your branch against 3.1-rc6, you should already
-have this fix. Commit {126caf1376e7}
-
-Regards
-Santosh
+Regards,
+Per
