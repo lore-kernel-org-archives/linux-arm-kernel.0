@@ -1,37 +1,26 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 24 Sep 2011 07:26:09 +0200
-Subject: [PATCH v3 2/2] at91: add Atmel ISI and ov2640 support on
-	sam9m10/sam9g45 board.
-In-Reply-To: <Pine.LNX.4.64.1109220911500.11164@axis700.grange>
-References: <1316664661-11383-1-git-send-email-josh.wu@atmel.com>
-	<1316664661-11383-2-git-send-email-josh.wu@atmel.com>
-	<Pine.LNX.4.64.1109220911500.11164@axis700.grange>
-Message-ID: <20110924052609.GI29998@game.jcrosoft.org>
+From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
+Date: Sat, 24 Sep 2011 01:55:42 -0400
+Subject: [PATCHv9 00/18] omap PRCM chain handler
+In-Reply-To: Your message of "Sat, 24 Sep 2011 10:54:29 +0530."
+	<CA+mksuDD=7Zf1bhmdq_Ficz_ZQEdiE5GLOGH18Cgf+XEmCd74w@mail.gmail.com>
+References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
+	<35343.1316816580@turing-police.cc.vt.edu>
+	<CA+mksuDD=7Zf1bhmdq_Ficz_ZQEdiE5GLOGH18Cgf+XEmCd74w@mail.gmail.com>
+Message-ID: <77088.1316843742@turing-police.cc.vt.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:35 Thu 22 Sep     , Guennadi Liakhovetski wrote:
-> On Thu, 22 Sep 2011, Josh Wu wrote:
-> 
-> > This patch
-> > 1. add ISI_MCK parent setting code when add ISI device.
-> > 2. add ov2640 support on board file.
-> > 3. define isi_mck clock in sam9g45 chip file.
-> > 
-> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> > ---
-> >  arch/arm/mach-at91/at91sam9g45.c         |    3 +
-> >  arch/arm/mach-at91/at91sam9g45_devices.c |  105 +++++++++++++++++++++++++++++-
-> >  arch/arm/mach-at91/board-sam9m10g45ek.c  |   85 ++++++++++++++++++++++++-
-> >  arch/arm/mach-at91/include/mach/board.h  |    3 +-
-> 
-> Personally, I think, it would be better to separate this into two patches 
-> at least: one for at91 core and one for the specific board, but that's up 
-> to arch maintainers to decide.
-> 
-> You also want to patch arch/arm/mach-at91/at91sam9263_devices.c, don't 
-> you?
-agreed
+On Sat, 24 Sep 2011 10:54:29 +0530, "Sripathy, Vishwanath" said:
 
-Best Regards,
-J.
+> UART Runtime patches are already posted for review and it's also
+> targeted for next merge window. Our intention is to push both the
+> features together for next merge window.
+
+Oh, OK. That should work then. Thanks for the clarification...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 227 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110924/1ef96d68/attachment.sig>
