@@ -1,30 +1,43 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 23 Sep 2011 17:47:44 -0600
-Subject: [PATCH 08/11] OMAP2+: board-generic: Add i2c static init
-In-Reply-To: <20110923231208.GE6324@atomide.com>
-References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
-	<1316809399-19579-9-git-send-email-b-cousson@ti.com>
-	<20110923231208.GE6324@atomide.com>
-Message-ID: <20110923234744.GL24631@ponder.secretlab.ca>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Sat, 24 Sep 2011 09:26:41 +0530
+Subject: [PATCH v7 00/26] gpio/omap: driver cleanup and fixes
+In-Reply-To: <87mxdwm8pk.fsf@ti.com>
+References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
+	<87mxdwm8pk.fsf@ti.com>
+Message-ID: <CAC83ZvKu5Fo-c88L4WFPdvq91T=usaZY4mzTVVzDLw9HE7g9Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2011 at 04:12:08PM -0700, Tony Lindgren wrote:
-> * Benoit Cousson <b-cousson@ti.com> [110923 12:50]:
-> > Still needed to boot until the i2c & twl driver is adapted to
-> > device-tree. Otherwise the voltage control code will try to
-> > access the twl and crash.
-> 
-> That sounds OK to me for now. For merging these patches, how
-> about the following:
-> 
-> - Kevin queues up the omap_device related changes
-> 
-> - Grant queues up the .dts changes
-> 
-> - I'll queue the map_io and board changes based on Kevin's
->   omap_device changes
+[...]
+> After debugging this myself a bit, here's what I think may be going on.
+> This may not be the only problem but here's at least one of them.
+>
+> First, debounce clocks are disabled in the runtime_suspend callback.
+>
+> When a GPIO is freed and it's the last one in the bank, bank->mod_usage
+> goes to zero.
+>
+> After that, pm_runtime_put_sync() is called, which will trigger the
+> driver's ->runtime_suspend callback. ?The ->runtime_suspend() callback
+> checks bank->mod_usage as well, and if zero, doesn't do anything
+> (notably, it doesn't disable debounce clocks.)
+I need some clarification in reproducing/testing the fix on OMAP3430SDP.
+The first thing I am trying to verify is the code flow of suspend.
 
-Go ahead and queue up the .dts changes in your tree.  No need to split them up.
+1) With no debounce clock enabled, when I enable UART timeouts, I
+automatically see
+system going to retention. That is I don't have to type echo mem >
+/sys/power/state
+echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
+echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
+echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
 
-g.
+2) I am do not see the print in omap_gpio_suspend/resume(), but I see
+the print in
+*_prepare_for_idle()/*_resume_after_idle().
+
+Folks testing on Tablet2 platform said there is dedicated button to
+suspend/resume.
+Is there something equivalent?
+--
+Tarun
