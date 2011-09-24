@@ -1,26 +1,39 @@
-From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
-Date: Sat, 24 Sep 2011 01:55:42 -0400
-Subject: [PATCHv9 00/18] omap PRCM chain handler
-In-Reply-To: Your message of "Sat, 24 Sep 2011 10:54:29 +0530."
-	<CA+mksuDD=7Zf1bhmdq_Ficz_ZQEdiE5GLOGH18Cgf+XEmCd74w@mail.gmail.com>
-References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-	<35343.1316816580@turing-police.cc.vt.edu>
-	<CA+mksuDD=7Zf1bhmdq_Ficz_ZQEdiE5GLOGH18Cgf+XEmCd74w@mail.gmail.com>
-Message-ID: <77088.1316843742@turing-police.cc.vt.edu>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 24 Sep 2011 11:33:43 +0530
+Subject: [PATCH 0/8] OMAP3/4: Misc fixes and clean-up
+In-Reply-To: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <4E7D72BF.8060009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 24 Sep 2011 10:54:29 +0530, "Sripathy, Vishwanath" said:
+Paul,
 
-> UART Runtime patches are already posted for review and it's also
-> targeted for next merge window. Our intention is to push both the
-> features together for next merge window.
+On Thursday 08 September 2011 10:51 AM, Santosh Shilimkar wrote:
+> The series contains few fixes and clean-up for OMAP.
+> Briefly,
+> - HWMOD fix for the address space count
+> - Improving the L3 register accesses
+> - Bug fix in the L3 error handler
+> - Sparce warning and indentation fixes in L3 error handler
+> - Print master id in case of L3 custom errors for better debug.
+> - Adding local time clock node for the CPUfreq and time re-calibration
+> - Fix in the address overlap for emif and emulation domain.
+> 
+> The series is tested on OMAP4430 SDP and OMAP4430 beagle and SDP.
+> 
+> The following changes since commit c6a389f123b9f68d605bb7e0f9b32ec1e3e14132:
+> 
+>   Linux 3.1-rc4 (2011-08-28 21:16:01 -0700)
+> 
+> are available in the git repository at:
+>   git://gitorious.org/omap-sw-develoment/linux-omap-dev.git v3.1-rc4-omap-misc
+>
+I need your ack on below two patches so that I can re-base them and
+send a pull request to Tony.
 
-Oh, OK. That should work then. Thanks for the clarification...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 227 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110924/1ef96d68/attachment.sig>
+OMAP4: clock: Add CPU local timer clock node.
+OMAP: Fix sparse warnings in l3 error handler.
+
+Regards
+Santosh
