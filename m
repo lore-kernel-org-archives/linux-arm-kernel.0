@@ -1,31 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 24 Sep 2011 09:32:03 +0100
-Subject: [RFC PATCH 0/3] Add accurate boot timing to a Linux system
-In-Reply-To: <1316818998-30711-1-git-send-email-sjg@chromium.org>
-References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
-Message-ID: <20110924083203.GZ17169@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 24 Sep 2011 14:20:19 +0530
+Subject: [PATCH v7 00/26] gpio/omap: driver cleanup and fixes
+In-Reply-To: <CAC83ZvKu5Fo-c88L4WFPdvq91T=usaZY4mzTVVzDLw9HE7g9Kg@mail.gmail.com>
+References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>	<87mxdwm8pk.fsf@ti.com>
+	<CAC83ZvKu5Fo-c88L4WFPdvq91T=usaZY4mzTVVzDLw9HE7g9Kg@mail.gmail.com>
+Message-ID: <4E7D99CB.7090004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2011 at 04:03:15PM -0700, Simon Glass wrote:
-> An accurate timer is required to make the numbers meaningful. Many
-> modern platforms have a microsecond timer. This patch set uses a
-> function called timer_get_us() to read the timer.
+On Saturday 24 September 2011 09:26 AM, DebBarma, Tarun Kanti wrote:
+> [...]
+>> After debugging this myself a bit, here's what I think may be going on.
+>> This may not be the only problem but here's at least one of them.
+>>
+>> First, debounce clocks are disabled in the runtime_suspend callback.
+>>
+>> When a GPIO is freed and it's the last one in the bank, bank->mod_usage
+>> goes to zero.
+>>
+>> After that, pm_runtime_put_sync() is called, which will trigger the
+>> driver's ->runtime_suspend callback.  The ->runtime_suspend() callback
+>> checks bank->mod_usage as well, and if zero, doesn't do anything
+>> (notably, it doesn't disable debounce clocks.)
+> I need some clarification in reproducing/testing the fix on OMAP3430SDP.
+> The first thing I am trying to verify is the code flow of suspend.
+> 
+> 1) With no debounce clock enabled, when I enable UART timeouts, I
+> automatically see
+> system going to retention. That is I don't have to type echo mem >
+> /sys/power/state
+> echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
+> echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
+> echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
+> 
+> 2) I am do not see the print in omap_gpio_suspend/resume(), but I see
+> the print in
+> *_prepare_for_idle()/*_resume_after_idle().
+> 
+Hmmm,
 
-Not another 'get a time value' function.  Why do we need soo many?
-We have - at least:
+This is mostly happening because you are missing a below
+fix from Kevin in the branch you are testing with.
 
-ktime_get (and various flavours of it)
-do_gettimeofday
-getnstimeofday
-sched_clock
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg54927.html
+{OMAP: omap_device: fix !CONFIG_SUSPEND case in _noirq handlers}
 
-Do we really need yet another one which will have to be multiplexed
-amongst platforms, requiring scaling and so forth from whatever the
-platform provides?
+If you rebase, your branch against 3.1-rc6, you should already
+have this fix. Commit {126caf1376e7}
 
-Remember that ARM timers are virtually all MMIO mapped, which means
-they don't work during early kernel bringup when the MMU mappings for
-the hardware have not been setup.  (That's the reason stuff like
-sched_clock for printk doesn't work early.)  That can't be solved by
-creating yet another per-platform method to get microseconds.
+Regards
+Santosh
