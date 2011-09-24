@@ -1,69 +1,130 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 24 Sep 2011 11:44:26 +0530
-Subject: [PATCH v2 06/24] OMAP4: PM: Initialise all the clockdomains to
-	supported states
+Date: Sat, 24 Sep 2011 11:44:23 +0530
+Subject: [PATCH v2 03/24] OMAP4: PM: Add SAR RAM support
 In-Reply-To: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1316844884-21700-7-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1316844884-21700-4-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialise hardware supervised mode for all clockdomains if it's
-supported. Initiate sleep transition for other clockdomains,
-if they are not being used.
+This patch adds SAR RAM support on OMAP4430. SAR RAM used to save
+and restore the HW context in low power modes.
 
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Acked-by: Jean Pihet <j-pihet@ti.com>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 Tested-by: Vishwanath BS <vishwanath.bs@ti.com>
 ---
- arch/arm/mach-omap2/pm44xx.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/include/mach/omap4-common.h |    1 +
+ arch/arm/mach-omap2/omap4-common.c              |   31 +++++++++++++++++++++++
+ arch/arm/mach-omap2/omap4-sar-layout.h          |   22 ++++++++++++++++
+ arch/arm/plat-omap/include/plat/omap44xx.h      |    1 +
+ 4 files changed, 55 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap4-sar-layout.h
 
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 44761bb..5ec4bc6 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -17,6 +17,7 @@
- #include <linux/slab.h>
+diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
+index b28ad10..947d0c8 100644
+--- a/arch/arm/mach-omap2/include/mach/omap4-common.h
++++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
+@@ -39,6 +39,7 @@ static inline void __iomem *omap4_get_scu_base(void)
  
- #include "powerdomain.h"
-+#include "clockdomain.h"
+ extern void __init gic_init_irq(void);
+ extern void omap_smc1(u32 fn, u32 arg);
++extern void __iomem *omap4_get_sar_ram_base(void);
+ 
+ #ifdef CONFIG_SMP
+ /* Needed for secondary core boot */
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index a12896a..652e319 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -24,12 +24,16 @@
+ #include <mach/hardware.h>
  #include <mach/omap4-common.h>
  
- struct power_state {
-@@ -73,6 +74,22 @@ static const struct platform_suspend_ops omap_pm_ops = {
- };
- #endif /* CONFIG_SUSPEND */
++#include "omap4-sar-layout.h"
++
+ #ifdef CONFIG_CACHE_L2X0
+ static void __iomem *l2cache_base;
+ #endif
  
-+/*
-+ * Enable hardware supervised mode for all clockdomains if it's
-+ * supported. Initiate sleep transition for other clockdomains, if
-+ * they are not used
-+ */
-+static int __init clkdms_setup(struct clockdomain *clkdm, void *unused)
+ void __iomem *gic_dist_base_addr;
+ 
++static void __iomem *sar_ram_base;
++
+ 
+ void __init gic_init_irq(void)
+ {
+@@ -117,3 +121,30 @@ static int __init omap_l2_cache_init(void)
+ }
+ early_initcall(omap_l2_cache_init);
+ #endif
++
++void __iomem *omap4_get_sar_ram_base(void)
 +{
-+	if (clkdm->flags & CLKDM_CAN_ENABLE_AUTO)
-+		clkdm_allow_idle(clkdm);
-+	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP &&
-+			atomic_read(&clkdm->usecount) == 0)
-+		clkdm_sleep(clkdm);
-+	return 0;
++	return sar_ram_base;
 +}
 +
++/*
++ * SAR RAM used to save and restore the HW
++ * context in low power modes
++ */
++static int __init omap4_sar_ram_init(void)
++{
++	/*
++	 * To avoid code running on other OMAPs in
++	 * multi-omap builds
++	 */
++	if (!cpu_is_omap44xx())
++		return -ENOMEM;
 +
- static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- {
- 	struct power_state *pwrst;
-@@ -146,6 +163,8 @@ static int __init omap4_pm_init(void)
- 		goto err2;
- 	}
++	/* Static mapping, never released */
++	sar_ram_base = ioremap(OMAP44XX_SAR_RAM_BASE, SZ_8K);
++	if (WARN_ON(!sar_ram_base))
++		return -ENOMEM;
++
++	return 0;
++}
++early_initcall(omap4_sar_ram_init);
+diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
+new file mode 100644
+index 0000000..7781ea4
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap4-sar-layout.h
+@@ -0,0 +1,22 @@
++/*
++ * omap4-sar-layout.h: OMAP4 SAR RAM layout header file
++ *
++ * Copyright (C) 2011 Texas Instruments, Inc.
++ *	Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef OMAP_ARCH_OMAP4_SAR_LAYOUT_H
++#define OMAP_ARCH_OMAP4_SAR_LAYOUT_H
++
++/*
++ * SAR BANK offsets from base address OMAP44XX_SAR_RAM_BASE
++ */
++#define SAR_BANK1_OFFSET		0x0000
++#define SAR_BANK2_OFFSET		0x1000
++#define SAR_BANK3_OFFSET		0x2000
++#define SAR_BANK4_OFFSET		0x3000
++
++#endif
+diff --git a/arch/arm/plat-omap/include/plat/omap44xx.h b/arch/arm/plat-omap/include/plat/omap44xx.h
+index ea2b8a6..c0d478e 100644
+--- a/arch/arm/plat-omap/include/plat/omap44xx.h
++++ b/arch/arm/plat-omap/include/plat/omap44xx.h
+@@ -45,6 +45,7 @@
+ #define OMAP44XX_WKUPGEN_BASE		0x48281000
+ #define OMAP44XX_MCPDM_BASE		0x40132000
+ #define OMAP44XX_MCPDM_L3_BASE		0x49032000
++#define OMAP44XX_SAR_RAM_BASE		0x4a326000
  
-+	(void) clkdm_for_each(clkdms_setup, NULL);
-+
- #ifdef CONFIG_SUSPEND
- 	suspend_set_ops(&omap_pm_ops);
- #endif /* CONFIG_SUSPEND */
+ #define OMAP44XX_MAILBOX_BASE		(L4_44XX_BASE + 0xF4000)
+ #define OMAP44XX_HSUSB_OTG_BASE		(L4_44XX_BASE + 0xAB000)
 -- 
 1.7.4.1
