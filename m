@@ -1,65 +1,75 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Sat, 24 Sep 2011 16:11:52 +0530
-Subject: [PATCH v7 00/26] gpio/omap: driver cleanup and fixes
-In-Reply-To: <4E7D99CB.7090004@ti.com>
-References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-	<87mxdwm8pk.fsf@ti.com>
-	<CAC83ZvKu5Fo-c88L4WFPdvq91T=usaZY4mzTVVzDLw9HE7g9Kg@mail.gmail.com>
-	<4E7D99CB.7090004@ti.com>
-Message-ID: <CAC83ZvLfCOjKja1rZ6GB4bmn_KrcjitTJZJsa5jy01QVj2OXXw@mail.gmail.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Sat, 24 Sep 2011 13:32:32 +0530
+Subject: [PATCH] gpio/omap: fix debounce clock handling
+Message-ID: <mailman.151.1316860919.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh, Kevin,
+GPIO debounce clock can gate the PER power domain transition
+and needs to be disabled in GPIO driver suspend.
 
-[...]
->>> After that, pm_runtime_put_sync() is called, which will trigger the
->>> driver's ->runtime_suspend callback. ?The ->runtime_suspend() callback
->>> checks bank->mod_usage as well, and if zero, doesn't do anything
->>> (notably, it doesn't disable debounce clocks.)
->> I need some clarification in reproducing/testing the fix on OMAP3430SDP.
->> The first thing I am trying to verify is the code flow of suspend.
->>
->> 1) With no debounce clock enabled, when I enable UART timeouts, I
->> automatically see
->> system going to retention. That is I don't have to type echo mem >
->> /sys/power/state
->> echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
->> echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
->> echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
->>
->> 2) I am do not see the print in omap_gpio_suspend/resume(), but I see
->> the print in
->> *_prepare_for_idle()/*_resume_after_idle().
->>
-> Hmmm,
->
-> This is mostly happening because you are missing a below
-> fix from Kevin in the branch you are testing with.
->
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg54927.html
-> {OMAP: omap_device: fix !CONFIG_SUSPEND case in _noirq handlers}
->
-> If you rebase, your branch against 3.1-rc6, you should already
-> have this fix. Commit {126caf1376e7}
-Yes, this patch was missing in Kevin's branch and was
-causing the suspend issue.
+The debounce clock is not getting disabled in runtime_suspend
+callback because of an un-necessary bank->mod_usage check.
+In omap_gpio_suspend/resume too, there is no need to do
+any operation if the gpio bank is not used.
 
-As pointed out by Kevin, debounce clock was not getting disabled.
-In my testing I was somehow grepping CORE power domain instead
-of PER power domain and hence missed it. The fix for the debounce
-clock issue is at the end of the email.
+Remove the un-necessary bank->mod_usage check from
+suspend callbacks.
 
-- Have re-based the for_3.2/gpio-cleanup branch against 3.1-rc6.
-- Dropped [PATCH 26/26] gpio/omap: add dbclk aliases for all gpio modules
-as suggested by Kevin since it's already taken care by hwmod.
-- Added the debounce clock fix in the end.
+Thanks to Kevin Hilman for pointing out this issue.
 
-With above, PER is hitting low power state in Suspend and Idle path.
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ drivers/gpio/gpio-omap.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
 
-Have pushed a branch at below URL with mentioned changes.
-git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
-for_3.2/kevin/gpio-cleanup
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index c597303..349e774 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1107,6 +1107,9 @@ static int omap_gpio_suspend(struct device *dev)
+ 	void __iomem *wake_status;
+ 	unsigned long flags;
 
-Regards,
-Tarun
++	if (!bank->mod_usage || !bank->loses_context)
++		return 0;
++
+ 	if (!bank->regs->wkup_en || !bank->suspend_wakeup)
+ 		return 0;
+
+@@ -1128,6 +1131,9 @@ static int omap_gpio_resume(struct device *dev)
+ 	void __iomem *base =3D bank->base;
+ 	unsigned long flags;
+
++	if (!bank->mod_usage || !bank->loses_context)
++		return 0;
++
+ 	if (!bank->regs->wkup_en || !bank->saved_wakeup)
+ 		return 0;
+
+@@ -1151,9 +1157,6 @@ static int omap_gpio_runtime_suspend(struct device *d=
+ev)
+ 	int j;
+ 	unsigned long flags;
+
+-	if (!bank->mod_usage)
+-		return 0;
+-
+ 	spin_lock_irqsave(&bank->lock, flags);
+ 	/*
+ 	 * If going to OFF, remove triggering for all
+@@ -1199,9 +1202,6 @@ static int omap_gpio_runtime_resume(struct device *de=
+v)
+ 	int j;
+ 	unsigned long flags;
+
+-	if (!bank->mod_usage)
+-		return 0;
+-
+ 	spin_lock_irqsave(&bank->lock, flags);
+ 	for (j =3D 0; j < hweight_long(bank->dbck_enable_mask); j++)
+ 		clk_enable(bank->dbck);
+--=20
+1.7.0.4
