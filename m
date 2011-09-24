@@ -1,31 +1,54 @@
-From: pullip.cho@samsung.com (=?euc-kr?B?wbaw5sij?=)
-Date: Sat, 24 Sep 2011 07:36:27 +0000 (GMT)
-Subject: [PATCH 4/4] iommu/exynos: Use bus_set_iommu instead of register_iommu
-Message-ID: <9156991.50021316849787764.JavaMail.weblogic@epml24>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 24 Sep 2011 01:36:31 -0600 (MDT)
+Subject: [PATCH 0/8] OMAP3/4: Misc fixes and clean-up
+In-Reply-To: <4E7D7A28.3070005@ti.com>
+References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
+	<4E7D72BF.8060009@ti.com>
+	<alpine.DEB.2.00.1109240031280.22872@utopia.booyaka.com>
+	<4E7D7A28.3070005@ti.com>
+Message-ID: <alpine.DEB.2.00.1109240120240.22872@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This replaces register_iommu() with bus_set_iommu() according to the
-suggestion of Joerg Roedel.
+Hi
 
-Cc: Joerg Roedel 
-Signed-off-by: KyongHo Cho 
----
-drivers/iommu/exynos_iommu.c |    2 +-
-1 files changed, 1 insertions(+), 1 deletions(-)
+On Sat, 24 Sep 2011, Santosh Shilimkar wrote:
 
-diff --git a/drivers/iommu/exynos_iommu.c b/drivers/iommu/exynos_iommu.c
-index fe5b5d8..148e238 100644
---- a/drivers/iommu/exynos_iommu.c
-+++ b/drivers/iommu/exynos_iommu.c
-@@ -852,7 +852,7 @@ static int __init exynos_iommu_init(void)
-if (!l2table_cachep)
-return -ENOMEM;
+> On Saturday 24 September 2011 12:01 PM, Paul Walmsley wrote:
+> > Hi Santosh
+> > 
+> > On Sat, 24 Sep 2011, Santosh Shilimkar wrote:
+> > 
+> >> On Thursday 08 September 2011 10:51 AM, Santosh Shilimkar wrote:
+> >>>
+> >> I need your ack on below two patches so that I can re-base them and
+> >> send a pull request to Tony.
+> >>
+> >> OMAP4: clock: Add CPU local timer clock node.
+> >> OMAP: Fix sparse warnings in l3 error handler.
+> > 
+> > Are you targeting these for 3.1-rc ?
+> > 
+> Nope. It's for 3.2 merge window.
+> As such, the series doesn't have any major regression
+> fixes which should make it before 3.2
 
-- register_iommu(&exynos_iommu_ops);
-+ bus_set_iommu(&platform_bus_type, &omap_iommu_ops);
+In that case, patches 1 and 7 should go in through me.  The rest should go 
+via Tony.  So you can just drop 1 and 7 from your branch, I'll pull those 
+off the list. 
 
-return 0;
-}
--- 
-1.7.1
+Some comments though:  Looks like you need to repost patch 1 due to 
+comments from Beno?t?  Also, have the autogeneration scripts been updated 
+for patch 7?
+
+...
+
+As far as patch 5 goes, you don't need my ack on that one, since I'm not 
+the maintainer or original author of that code.  But feel free to add a 
+Reviewed-by:.  I also tested the two L3 files with sparse and they are 
+clean now.  Thanks very much for taking the initiative on this; I 
+personally appreciate it quite a bit, and I think having clean code 
+increases our credibility with upstream maintainers. 
+
+
+- Paul
