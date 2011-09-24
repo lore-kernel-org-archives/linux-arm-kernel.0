@@ -1,37 +1,33 @@
 From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Fri, 23 Sep 2011 21:01:44 +0900
-Subject: [PATCH 0/3] iommu/exynos: Add iommu driver for Exynos4 SoCs
-Message-ID: <1316779307-2567-1-git-send-email-pullip.cho@samsung.com>
+Date: Sat, 24 Sep 2011 11:02:50 +0900
+Subject: [PATCH 4/4] iommu/exynos: Use bus_set_iommu instead of register_iommu
+In-Reply-To: <1316829770-21949-1-git-send-email-pullip.cho@samsung.com>
+References: <1316829770-21949-1-git-send-email-pullip.cho@samsung.com>
+Message-ID: <1316829770-21949-5-git-send-email-pullip.cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+This replaces register_iommu() with bus_set_iommu() according to the
+suggestion of Joerg Roedel.
 
-This patch set enhances System MMU platform device definitions of Exynos
-SoC platforms, adds the implementation of IOMMU API as well as and moves
-Syste MMU driver to the drivers/iommu directory.
+Cc: Joerg Roedel <joerg.roedel@amd.com>
+Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
+---
+ drivers/iommu/exynos_iommu.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-The IOMMU driver also implements fault handler that Ohad Ben-Cohen has
-suggeested and iommu_ops per-bus_type that Joerg Roedel suggests.
-
-CONFIG_S5P_SYSTEM_MMU is removed because it is replaceable
-with CONFIG_EXYNOS4_IOMMU.
-
-Diffstat:
-
-arch/arm/mach-exynos4/Kconfig               |    2 -
-arch/arm/mach-exynos4/clock.c               |   43 +-
-arch/arm/mach-exynos4/dev-sysmmu.c          |  281 +++-------
-arch/arm/mach-exynos4/include/mach/irqs.h   |    1 -
-arch/arm/mach-exynos4/include/mach/map.h    |    1 -
-arch/arm/mach-exynos4/include/mach/sysmmu.h |   96 ++--
-arch/arm/mach-exynos4/mach-armlex4210.c     |   24 +-
-arch/arm/mach-exynos4/mach-smdkv310.c       |   28 +-
-arch/arm/plat-s5p/Kconfig                   |    8 -
-arch/arm/plat-s5p/Makefile                  |    1 -
-arch/arm/plat-s5p/include/plat/sysmmu.h     |   95 ---
-arch/arm/plat-s5p/sysmmu.c                  |  312 ----------
-drivers/iommu/Kconfig                       |   14 +
-drivers/iommu/Makefile                      |    1 +
-drivers/iommu/exynos_iommu.c                |  859 +++++++++++++++++++++++++++
-15 files changed, 1084 insertions(+), 682 deletions(-)
+diff --git a/drivers/iommu/exynos_iommu.c b/drivers/iommu/exynos_iommu.c
+index fe5b5d8..148e238 100644
+--- a/drivers/iommu/exynos_iommu.c
++++ b/drivers/iommu/exynos_iommu.c
+@@ -852,7 +852,7 @@ static int __init exynos_iommu_init(void)
+ 	if (!l2table_cachep)
+ 		return -ENOMEM;
+ 
+-	register_iommu(&exynos_iommu_ops);
++	bus_set_iommu(&platform_bus_type, &omap_iommu_ops);
+ 
+ 	return 0;
+ }
+-- 
+1.7.1
