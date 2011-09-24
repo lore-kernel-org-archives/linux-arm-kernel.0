@@ -1,26 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 24 Sep 2011 14:02:02 +0100
-Subject: [PATCH] arm: proc-v7: pc phy addresses before disable MMU
-In-Reply-To: <4E7DD34E.3060402@stericsson.com>
-References: <1316851370-7284-1-git-send-email-per.forlin@stericsson.com>
-	<20110924081342.GA2639@mwesterb-mobl.ger.corp.intel.com>
-	<4E7DA3C0.7000208@stericsson.com>
-	<20110924110024.GA20044@e102144-lin.cambridge.arm.com>
-	<4E7DD34E.3060402@stericsson.com>
-Message-ID: <20110924130202.GF17169@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 24 Sep 2011 15:27:18 +0200
+Subject: Identifying Primecells
+In-Reply-To: <CAKON4Ow1-jTM8fRpm12=5+acCt6A-35ZpWGJ_qMmRHi_JS8wAA@mail.gmail.com>
+References: <CAKON4OxqqBh4xFLwiMZzsGrnoG8erQ0hMFX-_VA-EDMvdNkvQQ@mail.gmail.com>
+	<4E7C7FA2.30404@gmail.com>
+	<CAKON4OzGEo+XvcNg=mzp3jhq3d3m7Z9bvZTSVCNLNjZ=KYbNBQ@mail.gmail.com>
+	<4E7C89FC.4090209@gmail.com>
+	<CAKON4OxZPFFL5NAgxLPRw2xxnS=v7iVWtQSSLcUJWfOYh4yfjA@mail.gmail.com>
+	<1316787049.4611.920.camel@hornet.cambridge.arm.com>
+	<CAKON4OxHwjrw-dhH2qvXopqUqmKSx2TCPgW4eVHF9dmQO4=Cvw@mail.gmail.com>
+	<1316787754.4611.925.camel@hornet.cambridge.arm.com>
+	<CAKON4Ow1-jTM8fRpm12=5+acCt6A-35ZpWGJ_qMmRHi_JS8wAA@mail.gmail.com>
+Message-ID: <CAKnu2Mpjv7Ohi4hyPT1Z-8tbjZBBTVZS7F_uCoa9m+kogwXa=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 24, 2011 at 02:55:42PM +0200, Per F?rlin wrote:
-> On 09/24/2011 01:00 PM, Will Deacon wrote:
-> > On Sat, Sep 24, 2011 at 10:32:48AM +0100, Per F?rlin wrote:
-> >> I am trying to figure out how I can get the value of PHYS_OFFSET in assembler code (proc-v7.S).
-> >> I guess I could use the value calculated in arch/arm/kernel.head.S but wouldn't that make
-> >> this patch dependent on CONFIG_ARM_PATCH_PHYS_VIRT?
-> > 
-> > Wouldn't we just be better off passing a physical address to cpu_v7_reset
-> > instead?
-> > 
-> Good point! I'm fine with that.
+2011/9/23 jonsmirl at gmail.com <jonsmirl@gmail.com>:
 
-Alternatively, call it using the phys address.
+> So it looks like NXP made almost all of their own peripherals. Which
+> means I have to clean up the drivers for all of them.
+
+Totally from-scratch IP blocks exist but is uncommon.
+
+When there are no helpfull primecell IDs giving the secret
+of ancestry away readily, fall back to comparing register maps,
+this usually reveals the family of hardware and possible
+ancestors. (Like was quickly done for the 8250 derivate
+serial.)
+
+Yours,
+Linus Walleij
