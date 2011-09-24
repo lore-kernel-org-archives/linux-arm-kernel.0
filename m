@@ -1,32 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 24 Sep 2011 15:27:18 +0200
-Subject: Identifying Primecells
-In-Reply-To: <CAKON4Ow1-jTM8fRpm12=5+acCt6A-35ZpWGJ_qMmRHi_JS8wAA@mail.gmail.com>
-References: <CAKON4OxqqBh4xFLwiMZzsGrnoG8erQ0hMFX-_VA-EDMvdNkvQQ@mail.gmail.com>
-	<4E7C7FA2.30404@gmail.com>
-	<CAKON4OzGEo+XvcNg=mzp3jhq3d3m7Z9bvZTSVCNLNjZ=KYbNBQ@mail.gmail.com>
-	<4E7C89FC.4090209@gmail.com>
-	<CAKON4OxZPFFL5NAgxLPRw2xxnS=v7iVWtQSSLcUJWfOYh4yfjA@mail.gmail.com>
-	<1316787049.4611.920.camel@hornet.cambridge.arm.com>
-	<CAKON4OxHwjrw-dhH2qvXopqUqmKSx2TCPgW4eVHF9dmQO4=Cvw@mail.gmail.com>
-	<1316787754.4611.925.camel@hornet.cambridge.arm.com>
-	<CAKON4Ow1-jTM8fRpm12=5+acCt6A-35ZpWGJ_qMmRHi_JS8wAA@mail.gmail.com>
-Message-ID: <CAKnu2Mpjv7Ohi4hyPT1Z-8tbjZBBTVZS7F_uCoa9m+kogwXa=A@mail.gmail.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Sat, 24 Sep 2011 07:06:47 -0700
+Subject: [RFC PATCH 0/3] Add accurate boot timing to a Linux system
+In-Reply-To: <20110924083203.GZ17169@n2100.arm.linux.org.uk>
+References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
+	<20110924083203.GZ17169@n2100.arm.linux.org.uk>
+Message-ID: <CAPnjgZ0yt2VGUHB+deb4BQ_dto8Jd+W8mxw7PjNYO9oiqEObuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/23 jonsmirl at gmail.com <jonsmirl@gmail.com>:
+Hi Russell,
 
-> So it looks like NXP made almost all of their own peripherals. Which
-> means I have to clean up the drivers for all of them.
+On Sat, Sep 24, 2011 at 1:32 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Sep 23, 2011 at 04:03:15PM -0700, Simon Glass wrote:
+>> An accurate timer is required to make the numbers meaningful. Many
+>> modern platforms have a microsecond timer. This patch set uses a
+>> function called timer_get_us() to read the timer.
+>
+> Not another 'get a time value' function. ?Why do we need soo many?
+> We have - at least:
+>
+> ktime_get (and various flavours of it)
+> do_gettimeofday
+> getnstimeofday
+> sched_clock
+>
+> Do we really need yet another one which will have to be multiplexed
+> amongst platforms, requiring scaling and so forth from whatever the
+> platform provides?
 
-Totally from-scratch IP blocks exist but is uncommon.
+No we don't need another! It is just a convenience for this RFC since
+the actual timer mechanism is not clear and not important for this
+RFC. Insert your favourite timer mechanism instead.
 
-When there are no helpfull primecell IDs giving the secret
-of ancestry away readily, fall back to comparing register maps,
-this usually reveals the family of hardware and possible
-ancestors. (Like was quickly done for the 8250 derivate
-serial.)
+>
+> Remember that ARM timers are virtually all MMIO mapped, which means
+> they don't work during early kernel bringup when the MMU mappings for
+> the hardware have not been setup. ?(That's the reason stuff like
+> sched_clock for printk doesn't work early.) ?That can't be solved by
+> creating yet another per-platform method to get microseconds.
+>
 
-Yours,
-Linus Walleij
+While it would be useful to measure early things like kernel
+decompression, it's hard to make that work cross-platform and there
+are other problems like you raise, and where to store timing info.
