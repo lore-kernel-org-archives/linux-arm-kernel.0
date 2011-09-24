@@ -1,41 +1,37 @@
-From: vishwanath.bs@ti.com (Sripathy, Vishwanath)
-Date: Sat, 24 Sep 2011 10:54:29 +0530
-Subject: [PATCHv9 00/18] omap PRCM chain handler
-In-Reply-To: <35343.1316816580@turing-police.cc.vt.edu>
-References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-	<35343.1316816580@turing-police.cc.vt.edu>
-Message-ID: <CA+mksuDD=7Zf1bhmdq_Ficz_ZQEdiE5GLOGH18Cgf+XEmCd74w@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 24 Sep 2011 07:26:09 +0200
+Subject: [PATCH v3 2/2] at91: add Atmel ISI and ov2640 support on
+	sam9m10/sam9g45 board.
+In-Reply-To: <Pine.LNX.4.64.1109220911500.11164@axis700.grange>
+References: <1316664661-11383-1-git-send-email-josh.wu@atmel.com>
+	<1316664661-11383-2-git-send-email-josh.wu@atmel.com>
+	<Pine.LNX.4.64.1109220911500.11164@axis700.grange>
+Message-ID: <20110924052609.GI29998@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Valdis.Kletnieks,
+On 09:35 Thu 22 Sep     , Guennadi Liakhovetski wrote:
+> On Thu, 22 Sep 2011, Josh Wu wrote:
+> 
+> > This patch
+> > 1. add ISI_MCK parent setting code when add ISI device.
+> > 2. add ov2640 support on board file.
+> > 3. define isi_mck clock in sam9g45 chip file.
+> > 
+> > Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> > ---
+> >  arch/arm/mach-at91/at91sam9g45.c         |    3 +
+> >  arch/arm/mach-at91/at91sam9g45_devices.c |  105 +++++++++++++++++++++++++++++-
+> >  arch/arm/mach-at91/board-sam9m10g45ek.c  |   85 ++++++++++++++++++++++++-
+> >  arch/arm/mach-at91/include/mach/board.h  |    3 +-
+> 
+> Personally, I think, it would be better to separate this into two patches 
+> at least: one for at91 core and one for the specific board, but that's up 
+> to arch maintainers to decide.
+> 
+> You also want to patch arch/arm/mach-at91/at91sam9263_devices.c, don't 
+> you?
+agreed
 
-On Sat, Sep 24, 2011 at 3:53 AM,  <Valdis.Kletnieks@vt.edu> wrote:
-> On Fri, 23 Sep 2011 15:46:08 +0300, Tero Kristo said:
->> Following set contains the version 9 of this work. This patch set contains
->> a number of patches tagged as 'TEMP', they are only meant for testing
->> purposes and to provide proof of concept. Most of the 'TEMP' patches are
->> related to UART runtime handling and they will be replaced by work done
->> by Govindraj Raja.
->
-> What do we do with these TEMP patches if the UART patches don't make the same
-> merge window, or have other issues? ?I'm always leery of "will be replaced"
-> code, because I've seen too many times when it *didn't* get replaced.
->
-> (I really don't care what the 'Plan B' is, as long as we have one...)
-UART Runtime patches are already posted for review and it's also
-targeted for next merge window. Our intention is to push both the
-features together for next merge window.
-
-Regards
-Vishwa
-
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+Best Regards,
+J.
