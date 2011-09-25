@@ -1,34 +1,47 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sun, 25 Sep 2011 06:54:26 -0600
-Subject: [RFC PATCH 0/3] Add accurate boot timing to a Linux system
-In-Reply-To: <1316818998-30711-1-git-send-email-sjg@chromium.org>
+Date: Sun, 25 Sep 2011 06:59:27 -0600
+Subject: [RFC PATCH 2/3] bootstage: Insert bootstage_mark to record timing
+	for bootup.
+In-Reply-To: <1316818998-30711-3-git-send-email-sjg@chromium.org>
 References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
-Message-ID: <CAErSpo63fYmQVRO2O3sB37k6rAo7Qttdh1xo=WH+QwcVb+neGg@mail.gmail.com>
+	<1316818998-30711-3-git-send-email-sjg@chromium.org>
+Message-ID: <CAErSpo6PFPLRAfPd_myJXrGdYofOR82YXy6U4YZEfp-bfXhQuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Sep 23, 2011 at 5:03 PM, Simon Glass <sjg@chromium.org> wrote:
-> This experimental patch set adds boot timing to a Linux system. The
-> timing starts with the boot loader and extends through the kernel into
-> user space to the completion of the boot process. The timing starts when
-> the system leaves reset, not later when the kernel starts.
+> From: Da Zheng <zhengda@chromium.org>
 >
-> The concept is:
-> - Boot loader records a timestamp for key events during its operation
-> - These timestamps are passed to Linux, which adds more as it boots
-> - These timestamps are made available to user space, where more
-> timestamps are added as init does its job
-> - Finally the whole record is collected by a user-space script run at
-> the end of init. This is fed back through some mechanism to monitor
-> boot time in the field.
+> From: Da Zheng <zhengda@chromium.org>
+>
+> This inserts calls to bootstage_mark() to timestamp the kernel moving
+> between the different initcall levels.
+>
+> Signed-off-by: Da Zheng <zhengda@chromium.com>
+> ---
+> ?init/bootstage.c | ? 49 +++++++++++++++++++++++++++++++++++++++++++++++++
+> ?init/main.c ? ? ?| ? ?7 +++++++
+> ?2 files changed, 56 insertions(+), 0 deletions(-)
+>
+> diff --git a/init/bootstage.c b/init/bootstage.c
+> index 79e9761..6f4668f 100644
+> --- a/init/bootstage.c
+> +++ b/init/bootstage.c
+> @@ -226,3 +226,52 @@ static int __init bootstage_init(void)
+> ?}
+>
+> ?postcore_initcall(bootstage_init);
+> +
+> +static int __init post_core_initcall(void)
+> +{
+> + ? ? ? bootstage_mark("core_initcall");
+> + ? ? ? return 0;
+> +}
+> +core_initcall_sync(post_core_initcall);
 
-I think this is a cool idea.  It's quite difficult to extract this
-sort of information today, and making it easily and consistently
-available should help focus attention and improve things.
-
-There are difficult issues about which clock to use, how to correlate
-bootloader & kernel timestamps, how to make sure the timestamps stay
-sensible even when we use hwclock, ntp, etc., but I think it's worth
-pushing on this to see how far you can go.
+I'm sure you considered just instrumenting do_one_initcall() rather
+than adding these individual initcall marks?  That would get you a lot
+more timestamps (maybe too many), and would help identify individual
+drivers, which I suspect will be common offenders.
 
 Bjorn
