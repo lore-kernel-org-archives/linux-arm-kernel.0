@@ -1,45 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 25 Sep 2011 11:34:45 +0100
-Subject: I-cache/D-cache inconsistency issue with page cache
-In-Reply-To: <CAHkRjk42PoRJrRb3vBdQCCno_LoMSdBrHSQ9xkiFcyB16PYkaw@mail.gmail.com>
-References: <20110923115721.GA7013@glandium.org>
-	<20110923193941.GQ17169@n2100.arm.linux.org.uk>
-	<20110924093544.GA5724@glandium.org>
-	<20110924094734.GC17169@n2100.arm.linux.org.uk>
-	<CAHkRjk42PoRJrRb3vBdQCCno_LoMSdBrHSQ9xkiFcyB16PYkaw@mail.gmail.com>
-Message-ID: <20110925103445.GA22455@n2100.arm.linux.org.uk>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 25 Sep 2011 13:58:52 +0300
+Subject: [RFC 0/5] OMAP groundwork for IOMMU-based DMA API
+Message-ID: <1316948337-7924-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 25, 2011 at 10:51:30AM +0100, Catalin Marinas wrote:
-> I had a discussion on Friday with the Firefox guys here in ARM. We
-> need to do some investigation next week but some random unverified
-> thoughts (that's on A9) - the scenario seems to be that a library
-> decompresses some data to a file using mmap(write) (which happens to
-> be code but it doesn't need to know that) while some other application
-> part tries, at a later time, to execute code in the same file using
-> mmap(exec).
-> 
-> By default, a new page cache page is dirty. At a first look,
-> mmap(write) and further access would not trigger a cache operation in
-> __sync_icache_dcache() and the page is still marked as dirty. Later
-> on, when the page is munmap'ed and mmap'ed(exec),
-> __sync_icache_dcache() (during fault processing) would flush the
-> D-cache and invalidate the I-cache, while marking the page 'clean'.
-> 
-> I wonder whether during the first mmap(write) and uncompressing, the
-> 'clean' state could be set (maybe some flush_dcache_page) call. This
-> state would be preserved in the page cache page status and a
-> subsequent __sync_icache_dcache(), even from a different file, would
-> just notice that the page is 'clean'.
-> 
-> As I said, just some thoughts, I haven't tested this theory yet.
+Another step towards generic IOMMU support on OMAP: eliminating
+the public omap-specific find_iommu_device API.
 
-Not quite.  Whenever we establish any page in the system which is
-executable, we always flush the D cache and entire I cache.
+Instead, we now bind iommu clients with their respective iommu device
+using a private iommu member which is added to ARM's dev_archdata.
 
-As I've already pointed out though, the report is against old kernels
-which doesn't have this code, so there's no point us speculating about
-it until the issue has been confirmed against a kernel which we expect
-_not_ to have the issue in the first place (rather than one which we
-_do_ expect it to go wrong.)
+With this in hand, generic IOMMU API users will now work on OMAP without
+utilizing any omap-specific API.
+
+The changes are tested on OMAP3 (with omap3isp) and OMAP4 (with
+remoteproc/rpmsg).
+
+This is still RFC (2nd patch is probably the least elegant).
+
+Ohad Ben-Cohen (5):
+  ARM: dev_archdata: add private iommu extension
+  ARM: OMAP: omap_device: add a method to set iommu private archdata
+  ARM: OMAP: iommu: declare a private iommu binding struct
+  ARM: OMAP3: bind omap3isp_device to its iommu device
+  iommu/omap: eliminate the public omap_find_iommu_device() method
+
+ arch/arm/include/asm/device.h                 |    3 +
+ arch/arm/mach-omap2/devices.c                 |    7 +++
+ arch/arm/plat-omap/include/plat/iommu.h       |   31 ++++++++++++-
+ arch/arm/plat-omap/include/plat/iovmm.h       |   12 +++---
+ arch/arm/plat-omap/include/plat/omap_device.h |    6 +++
+ arch/arm/plat-omap/omap_device.c              |   39 +++++++++++++++-
+ drivers/iommu/omap-iommu.c                    |   58 +++++++++++--------------
+ drivers/iommu/omap-iovmm.c                    |   31 +++++++++-----
+ drivers/media/video/omap3isp/isp.c            |   30 ++-----------
+ drivers/media/video/omap3isp/isp.h            |    2 -
+ drivers/media/video/omap3isp/ispccdc.c        |   18 ++++----
+ drivers/media/video/omap3isp/ispstat.c        |    8 ++--
+ drivers/media/video/omap3isp/ispvideo.c       |    4 +-
+ 13 files changed, 152 insertions(+), 97 deletions(-)
+
+-- 
+1.7.4.1
