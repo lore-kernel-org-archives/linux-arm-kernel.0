@@ -1,47 +1,60 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Sun, 25 Sep 2011 06:59:27 -0600
-Subject: [RFC PATCH 2/3] bootstage: Insert bootstage_mark to record timing
-	for bootup.
-In-Reply-To: <1316818998-30711-3-git-send-email-sjg@chromium.org>
-References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
-	<1316818998-30711-3-git-send-email-sjg@chromium.org>
-Message-ID: <CAErSpo6PFPLRAfPd_myJXrGdYofOR82YXy6U4YZEfp-bfXhQuA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 25 Sep 2011 16:26:42 +0100
+Subject: I-cache/D-cache inconsistency issue with page cache
+In-Reply-To: <20110925103445.GA22455@n2100.arm.linux.org.uk>
+References: <20110923115721.GA7013@glandium.org>
+	<20110923193941.GQ17169@n2100.arm.linux.org.uk>
+	<20110924093544.GA5724@glandium.org>
+	<20110924094734.GC17169@n2100.arm.linux.org.uk>
+	<CAHkRjk42PoRJrRb3vBdQCCno_LoMSdBrHSQ9xkiFcyB16PYkaw@mail.gmail.com>
+	<20110925103445.GA22455@n2100.arm.linux.org.uk>
+Message-ID: <CAHkRjk7u3RQxUSkU+DP0fD4qd2VzYB0eQA_NpVFebNtBcR6ysQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2011 at 5:03 PM, Simon Glass <sjg@chromium.org> wrote:
-> From: Da Zheng <zhengda@chromium.org>
+On 25 September 2011 11:34, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Sep 25, 2011 at 10:51:30AM +0100, Catalin Marinas wrote:
+>> I had a discussion on Friday with the Firefox guys here in ARM. We
+>> need to do some investigation next week but some random unverified
+>> thoughts (that's on A9) - the scenario seems to be that a library
+>> decompresses some data to a file using mmap(write) (which happens to
+>> be code but it doesn't need to know that) while some other application
+>> part tries, at a later time, to execute code in the same file using
+>> mmap(exec).
+>>
+>> By default, a new page cache page is dirty. At a first look,
+>> mmap(write) and further access would not trigger a cache operation in
+>> __sync_icache_dcache() and the page is still marked as dirty. Later
+>> on, when the page is munmap'ed and mmap'ed(exec),
+>> __sync_icache_dcache() (during fault processing) would flush the
+>> D-cache and invalidate the I-cache, while marking the page 'clean'.
+>>
+>> I wonder whether during the first mmap(write) and uncompressing, the
+>> 'clean' state could be set (maybe some flush_dcache_page) call. This
+>> state would be preserved in the page cache page status and a
+>> subsequent __sync_icache_dcache(), even from a different file, would
+>> just notice that the page is 'clean'.
+>>
+>> As I said, just some thoughts, I haven't tested this theory yet.
 >
-> From: Da Zheng <zhengda@chromium.org>
->
-> This inserts calls to bootstage_mark() to timestamp the kernel moving
-> between the different initcall levels.
->
-> Signed-off-by: Da Zheng <zhengda@chromium.com>
-> ---
-> ?init/bootstage.c | ? 49 +++++++++++++++++++++++++++++++++++++++++++++++++
-> ?init/main.c ? ? ?| ? ?7 +++++++
-> ?2 files changed, 56 insertions(+), 0 deletions(-)
->
-> diff --git a/init/bootstage.c b/init/bootstage.c
-> index 79e9761..6f4668f 100644
-> --- a/init/bootstage.c
-> +++ b/init/bootstage.c
-> @@ -226,3 +226,52 @@ static int __init bootstage_init(void)
-> ?}
->
-> ?postcore_initcall(bootstage_init);
-> +
-> +static int __init post_core_initcall(void)
-> +{
-> + ? ? ? bootstage_mark("core_initcall");
-> + ? ? ? return 0;
-> +}
-> +core_initcall_sync(post_core_initcall);
+> Not quite. ?Whenever we establish any page in the system which is
+> executable, we always flush the D cache and entire I cache.
 
-I'm sure you considered just instrumenting do_one_initcall() rather
-than adding these individual initcall marks?  That would get you a lot
-more timestamps (maybe too many), and would help identify individual
-drivers, which I suspect will be common offenders.
+We flush the D-cache only if the page was not marked 'clean'. Is there
+any chance that the page gets marked as clean before the first part of
+the application wrote the data (uncompressing) via a mmap(write)
+mapping? If this would happen, a subsequent mmap(exec) of the same
+page (as the kernel would most likely find it in the page cache) would
+find it 'clean' and avoid the D-cache flushing.
 
-Bjorn
+> As I've already pointed out though, the report is against old kernels
+> which doesn't have this code, so there's no point us speculating about
+> it until the issue has been confirmed against a kernel which we expect
+> _not_ to have the issue in the first place (rather than one which we
+> _do_ expect it to go wrong.)
+
+Yes, they should definitely try a more recent kernel.
+
+-- 
+Catalin
