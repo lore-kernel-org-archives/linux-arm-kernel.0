@@ -1,82 +1,66 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Sat, 24 Sep 2011 22:29:59 -0700
-Subject: [PATCH v2 6/7] clk: Add initial WM831x clock driver
-In-Reply-To: <20110925040836.GP24631@ponder.secretlab.ca>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-7-git-send-email-mturquette@ti.com>
-	<20110925040836.GP24631@ponder.secretlab.ca>
-Message-ID: <CAJOA=zOf6LjHjsZKYvyurSoRNo3Kb35TJqjNsZbauox4TBtsFg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 25 Sep 2011 10:51:30 +0100
+Subject: I-cache/D-cache inconsistency issue with page cache
+In-Reply-To: <20110924094734.GC17169@n2100.arm.linux.org.uk>
+References: <20110923115721.GA7013@glandium.org>
+	<20110923193941.GQ17169@n2100.arm.linux.org.uk>
+	<20110924093544.GA5724@glandium.org>
+	<20110924094734.GC17169@n2100.arm.linux.org.uk>
+Message-ID: <CAHkRjk42PoRJrRb3vBdQCCno_LoMSdBrHSQ9xkiFcyB16PYkaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 24, 2011 at 9:08 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Thu, Sep 22, 2011 at 03:27:01PM -0700, Mike Turquette wrote:
->> From: Mark Brown <broonie@opensource.wolfsonmicro.com>
+On 24 September 2011 10:47, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, Sep 24, 2011 at 11:35:44AM +0200, Mike Hommey wrote:
+>> On Fri, Sep 23, 2011 at 08:39:41PM +0100, Russell King - ARM Linux wrote:
+>> > On Fri, Sep 23, 2011 at 01:57:21PM +0200, Mike Hommey wrote:
+>> > > We've been hitting random crashes at startup with Firefox on tegras
+>> > > (under Android), and narrowed it down to a I-cache/D-cache
+>> > > inconsistency. A reduced testcase of the issue looks like the following
+>> > > (compile as ARM, not Thumb):
+>> >
+>> > If you write code at run time, you need to use the sys_cacheflush
+>> > API to ensure that it's properly synchronized with the I-cache. ?It's
+>> > a well known issue, and it applies to any harvard cache structured
+>> > CPU which doesn't automatically ensure coherence (which essentially
+>> > means all ARMs.)
 >>
->> The WM831x and WM832x series of PMICs contain a flexible clocking
->> subsystem intended to provide always on and system core clocks. ?It
->> features:
->>
->> - A 32.768kHz crystal oscillator which can optionally be used to pass
->> ? through an externally generated clock.
->> - A FLL which can be clocked from either the 32.768kHz oscillator or
->> ? the CLKIN pin.
->> - A CLKOUT pin which can bring out either the oscillator or the FLL
->> ? output.
->> - The 32.768kHz clock can also optionally be brought out on the GPIO
->> ? pins of the device.
->>
->> This driver fully supports the 32.768kHz oscillator and CLKOUT. ?The FLL
->> is supported only in AUTO mode, the full flexibility of the FLL cannot
->> currently be used. ?The use of clock references other than the internal
->> oscillator is not currently supported, and since clk_set_parent() is not
->> implemented in the generic clock API the clock tree configuration cannot
->> be changed at runtime.
->>
->> Due to a lack of access to systems where the core SoC has been converted
->> to use the generic clock API this driver has been compile tested only.
->>
->> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> Signed-off-by: Mike Turquette <mturquette@ti.com>
+>> I do agree it's reasonable to have applications doing that to handle
+>> cache synchronization themselves. I wrote such in my message. But I
+>> think the kernel should make sure that its page cache is fresh when
+>> it maps it PROT_EXEC. I think it's unreasonable to expect applications
+>> doing mmap(PROT_WRITE), inflate, munmap, something, mmap(PROT_EXEC),
+>> and execute something there to have to handle cache synchronisation
+>> themselves. Especially when it's very CPU dependent (the testcase does
+>> not even fail on all ARMs, only tegras, apparently). I'm not talking
+>> actual code generation here, which needs platform-dependent behaviour.
 >
-> A few minor comments below. ?Otherwise looks fine to me.
->
->> +static __devinit int wm831x_clk_probe(struct platform_device *pdev)
->> +{
->> + ? ? struct wm831x *wm831x = dev_get_drvdata(pdev->dev.parent);
->> + ? ? struct wm831x_clk *clkdata;
->> + ? ? int ret;
->> +
->> + ? ? clkdata = kzalloc(sizeof(*clkdata), GFP_KERNEL);
->
-> If devm_kzalloc() is used, then all the kfree unwinding can be
-> dropped.
->
->> +static int __init wm831x_clk_init(void)
->> +{
->> + ? ? int ret;
->> +
->> + ? ? ret = platform_driver_register(&wm831x_clk_driver);
->> + ? ? if (ret != 0)
->> + ? ? ? ? ? ? pr_err("Failed to register WM831x clock driver: %d\n", ret);
->> +
->> + ? ? return ret;
->
-> No need for this song-and-dance. ?The driver core is pretty well
-> debugged. ?Just use "return platform_driver_register(...);"
+> Ok. ?Which kernel are you trying this with, and which CPU (please
+> confirm Cortex-A9)?
 
-Grant,
+I had a discussion on Friday with the Firefox guys here in ARM. We
+need to do some investigation next week but some random unverified
+thoughts (that's on A9) - the scenario seems to be that a library
+decompresses some data to a file using mmap(write) (which happens to
+be code but it doesn't need to know that) while some other application
+part tries, at a later time, to execute code in the same file using
+mmap(exec).
 
-Thanks for the review.
+By default, a new page cache page is dirty. At a first look,
+mmap(write) and further access would not trigger a cache operation in
+__sync_icache_dcache() and the page is still marked as dirty. Later
+on, when the page is munmap'ed and mmap'ed(exec),
+__sync_icache_dcache() (during fault processing) would flush the
+D-cache and invalidate the I-cache, while marking the page 'clean'.
 
-Mark,
+I wonder whether during the first mmap(write) and uncompressing, the
+'clean' state could be set (maybe some flush_dcache_page) call. This
+state would be preserved in the page cache page status and a
+subsequent __sync_icache_dcache(), even from a different file, would
+just notice that the page is 'clean'.
 
-I know you're not carrying this whole set of patches but do you want
-to rework this and resend or do you just want me to fix it up?
-Changes are trivial if you don't want to touch it.
+As I said, just some thoughts, I haven't tested this theory yet.
 
-Regards,
-Mike
-
-> g.
->
+-- 
+Catalin
