@@ -1,45 +1,34 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 25 Sep 2011 13:58:52 +0300
-Subject: [RFC 0/5] OMAP groundwork for IOMMU-based DMA API
-Message-ID: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Sun, 25 Sep 2011 06:54:26 -0600
+Subject: [RFC PATCH 0/3] Add accurate boot timing to a Linux system
+In-Reply-To: <1316818998-30711-1-git-send-email-sjg@chromium.org>
+References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
+Message-ID: <CAErSpo63fYmQVRO2O3sB37k6rAo7Qttdh1xo=WH+QwcVb+neGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another step towards generic IOMMU support on OMAP: eliminating
-the public omap-specific find_iommu_device API.
+On Fri, Sep 23, 2011 at 5:03 PM, Simon Glass <sjg@chromium.org> wrote:
+> This experimental patch set adds boot timing to a Linux system. The
+> timing starts with the boot loader and extends through the kernel into
+> user space to the completion of the boot process. The timing starts when
+> the system leaves reset, not later when the kernel starts.
+>
+> The concept is:
+> - Boot loader records a timestamp for key events during its operation
+> - These timestamps are passed to Linux, which adds more as it boots
+> - These timestamps are made available to user space, where more
+> timestamps are added as init does its job
+> - Finally the whole record is collected by a user-space script run at
+> the end of init. This is fed back through some mechanism to monitor
+> boot time in the field.
 
-Instead, we now bind iommu clients with their respective iommu device
-using a private iommu member which is added to ARM's dev_archdata.
+I think this is a cool idea.  It's quite difficult to extract this
+sort of information today, and making it easily and consistently
+available should help focus attention and improve things.
 
-With this in hand, generic IOMMU API users will now work on OMAP without
-utilizing any omap-specific API.
+There are difficult issues about which clock to use, how to correlate
+bootloader & kernel timestamps, how to make sure the timestamps stay
+sensible even when we use hwclock, ntp, etc., but I think it's worth
+pushing on this to see how far you can go.
 
-The changes are tested on OMAP3 (with omap3isp) and OMAP4 (with
-remoteproc/rpmsg).
-
-This is still RFC (2nd patch is probably the least elegant).
-
-Ohad Ben-Cohen (5):
-  ARM: dev_archdata: add private iommu extension
-  ARM: OMAP: omap_device: add a method to set iommu private archdata
-  ARM: OMAP: iommu: declare a private iommu binding struct
-  ARM: OMAP3: bind omap3isp_device to its iommu device
-  iommu/omap: eliminate the public omap_find_iommu_device() method
-
- arch/arm/include/asm/device.h                 |    3 +
- arch/arm/mach-omap2/devices.c                 |    7 +++
- arch/arm/plat-omap/include/plat/iommu.h       |   31 ++++++++++++-
- arch/arm/plat-omap/include/plat/iovmm.h       |   12 +++---
- arch/arm/plat-omap/include/plat/omap_device.h |    6 +++
- arch/arm/plat-omap/omap_device.c              |   39 +++++++++++++++-
- drivers/iommu/omap-iommu.c                    |   58 +++++++++++--------------
- drivers/iommu/omap-iovmm.c                    |   31 +++++++++-----
- drivers/media/video/omap3isp/isp.c            |   30 ++-----------
- drivers/media/video/omap3isp/isp.h            |    2 -
- drivers/media/video/omap3isp/ispccdc.c        |   18 ++++----
- drivers/media/video/omap3isp/ispstat.c        |    8 ++--
- drivers/media/video/omap3isp/ispvideo.c       |    4 +-
- 13 files changed, 152 insertions(+), 97 deletions(-)
-
--- 
-1.7.4.1
+Bjorn
