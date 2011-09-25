@@ -1,58 +1,101 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Sat, 24 Sep 2011 23:03:39 -0400
-Subject: Identifying Primecells
-In-Reply-To: <CAMJBoFN+LBncBshhAkmG0Sf_nz=sKeBajf-Zv1CBagTkirCHUw@mail.gmail.com>
-References: <CAKON4OxqqBh4xFLwiMZzsGrnoG8erQ0hMFX-_VA-EDMvdNkvQQ@mail.gmail.com>
-	<4E7C7FA2.30404@gmail.com>
-	<CAKON4OzGEo+XvcNg=mzp3jhq3d3m7Z9bvZTSVCNLNjZ=KYbNBQ@mail.gmail.com>
-	<4E7C89FC.4090209@gmail.com>
-	<CAKON4OxZPFFL5NAgxLPRw2xxnS=v7iVWtQSSLcUJWfOYh4yfjA@mail.gmail.com>
-	<1316787049.4611.920.camel@hornet.cambridge.arm.com>
-	<CAKON4OxHwjrw-dhH2qvXopqUqmKSx2TCPgW4eVHF9dmQO4=Cvw@mail.gmail.com>
-	<1316787754.4611.925.camel@hornet.cambridge.arm.com>
-	<CAKON4Ow1-jTM8fRpm12=5+acCt6A-35ZpWGJ_qMmRHi_JS8wAA@mail.gmail.com>
-	<CAMJBoFN+LBncBshhAkmG0Sf_nz=sKeBajf-Zv1CBagTkirCHUw@mail.gmail.com>
-Message-ID: <CAKON4Ox5P7hURBZX8dCFe52er2OjyK7kpRU8R9-o5x_ULPcP=g@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 24 Sep 2011 21:55:36 -0600
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <1316730422-20027-2-git-send-email-mturquette@ti.com>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+Message-ID: <20110925035536.GN24631@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 24, 2011 at 7:15 PM, Vitaly Wool <vitalywool@gmail.com> wrote:
-> Hi,
->
-> On Fri, Sep 23, 2011 at 9:11 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->> On Fri, Sep 23, 2011 at 10:22 AM, Pawel Moll <pawel.moll@arm.com> wrote:
->>>> My registers don't seem to match up with the pl011 documentation...
->>> <...>
->>>> INTCE W ? ? ? 0xFD8 ? Interrupt ? ? ? Clear Enable Register
->>>> INTSE W ? ? ? 0xFDC ? Interrupt ? ? ? Set Enable Register
->>>> INTS ?R ? ? ? 0xFE0 ? Interrupt ? ? ? Status Register
->>>> INTE ?R ? ? ? 0xFE4 ? Interrupt ? ? ? Enable Register
->>>
->>> ... nor any other PrimeCell, actually :-)
->>>
->>> "Compliant" PrimeCells must have the PCellID in the last 4 registers:
->>
->> I scanned though 0xff0/f for all of the devices. The only one that had
->> anything that makes sense is the Multiport Memory Controller -
->> 0xb105f00d
->>
->> So it looks like NXP made almost all of their own peripherals. Which
->> means I have to clean up the drivers for all of them.
->>
->
-> I have a vague recollection that some time ago NXP was using UARTs
-> that were basically 8250-compatible but with some twist. You may also
-> want to check the pnx8xxx_uart implementation for another type of
-> UARTs NXP used to have on their MIPS boards.
+On Thu, Sep 22, 2011 at 03:26:56PM -0700, Mike Turquette wrote:
+> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> 
+> We currently have ~21 definitions of struct clk in the ARM architecture,
+> each defined on a per-platform basis. This makes it difficult to define
+> platform- (or architecture-) independent clock sources without making
+> assumptions about struct clk, and impossible to compile two
+> platforms with different struct clks into a single image.
+> 
+> This change is an effort to unify struct clk where possible, by defining
+> a common struct clk, and a set of clock operations. Different clock
+> implementations can set their own operations, and have a standard
+> interface for generic code. The callback interface is exposed to the
+> kernel proper, while the clock implementations only need to be seen by
+> the platform internals.
+> 
+> The interface is split into two halves:
+> 
+>  * struct clk, which is the generic-device-driver interface. This
+>    provides a set of functions which drivers may use to request
+>    enable/disable, query or manipulate in a hardware-independent manner.
+> 
+>  * struct clk_hw and struct clk_hw_ops, which is the hardware-specific
+>    interface. Clock drivers implement the ops, which allow the core
+>    clock code to implement the generic 'struct clk' API.
+> 
+> This allows us to share clock code among platforms, and makes it
+> possible to dynamically create clock devices in platform-independent
+> code.
+> 
+> Platforms can enable the generic struct clock through
+> CONFIG_GENERIC_CLK. In this case, the clock infrastructure consists of a
+> common, opaque struct clk, and a set of clock operations (defined per
+> type of clock):
+> 
+>   struct clk_hw_ops {
+>   	int		(*prepare)(struct clk_hw *);
+>   	void		(*unprepare)(struct clk_hw *);
+>   	int		(*enable)(struct clk_hw *);
+>   	void		(*disable)(struct clk_hw *);
+>   	unsigned long	(*recalc_rate)(struct clk_hw *);
+>   	int		(*set_rate)(struct clk_hw *,
+>   					unsigned long, unsigned long *);
+>   	long		(*round_rate)(struct clk_hw *, unsigned long);
+>   	int		(*set_parent)(struct clk_hw *, struct clk *);
+>   	struct clk *	(*get_parent)(struct clk_hw *);
+>   };
+> 
+> Platform clock code can register a clock through clk_register, passing a
+> set of operations, and a pointer to hardware-specific data:
+> 
+>   struct clk_hw_foo {
+>   	struct clk_hw clk;
+>   	void __iomem *enable_reg;
+>   };
+> 
+>   #define to_clk_foo(c) offsetof(c, clk_hw_foo, clk)
+> 
+>   static int clk_foo_enable(struct clk_hw *clk)
+>   {
+>   	struct clk_foo *foo = to_clk_foo(clk);
+>   	raw_writeb(foo->enable_reg, 1);
+>   	return 0;
+>   }
+> 
+>   struct clk_hw_ops clk_foo_ops = {
+>   	.enable = clk_foo_enable,
+>   };
+> 
+> And in the platform initialisation code:
+> 
+>   struct clk_foo my_clk_foo;
+> 
+>   void init_clocks(void)
+>   {
+>   	my_clk_foo.enable_reg = ioremap(...);
+> 
+>   	clk_register(&clk_foo_ops, &my_clk_foo, NULL);
 
-I have a driver for the chip. It is a 8250 compatible that has been
-extended with DMA support.
+Shouldn't this be:
 
-I've drivers for all of the peripherals on the chip. As I start
-sending them out for RFC maybe we can identify them as variants of
-drivers already in the kernel so that I don't add 20 new drivers if
-some are redundant.
+	clk_register(&clk_foo_ops, &my_clk_foo->clk, NULL);
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+?
+
+Also, this documentation would be good to have in the Documentation
+directory instead of lost in a commit header.
+
+Otherwise looks okay to me.
+
+Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
