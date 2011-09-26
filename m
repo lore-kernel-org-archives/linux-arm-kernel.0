@@ -1,22 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Sep 2011 12:47:32 +0100
-Subject: [PATCH v3 4/6] arm/imx6q: add smp and cpu hotplug support
-In-Reply-To: <20110926110634.GR31404@pengutronix.de>
-References: <1317021651-17359-1-git-send-email-shawn.guo@linaro.org>
-	<1317021651-17359-5-git-send-email-shawn.guo@linaro.org>
-	<20110926110634.GR31404@pengutronix.de>
-Message-ID: <20110926114732.GF22455@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 26 Sep 2011 13:52:12 +0200
+Subject: [PATCH] ARM: imx/mx31moboard: use mc13xxx structs instead of
+	removed mc13783 structs
+In-Reply-To: <20110926100511.GH32263@sortiz-mobl>
+References: <1317019855-10215-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110926100511.GH32263@sortiz-mobl>
+Message-ID: <20110926115212.GZ20550@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 01:06:34PM +0200, Sascha Hauer wrote:
-> +config ARCH_IMX_V6_V7
-> +	bool "i.MX3, i.MX6"
-> +	select AUTO_ZRELADDR
+Hi Samuel,
 
-It's not a good idea to select this symbol, because it prevents ZBOOT_ROM
-being used (iow, you can't ROM-ify the decompressor if you select this
-symbol.)
+On Mon, Sep 26, 2011 at 12:05:11PM +0200, Samuel Ortiz wrote:
+> On Mon, Sep 26, 2011 at 08:50:55AM +0200, Uwe Kleine-K?nig wrote:
+> > This is needed with patch
+> > 
+> > 	mfd: Remove mc13783 API functions and symbols
+> > 
+> > (currently cde41c030 in next)
+> Sorry, I missed this one.
+> Applied now, thanks a lot.
+It's me who missed it, isn't it?
 
-ZBOOT_ROM is still offered, but you end up breaking the dependencies for
-AUTO_ZRELADDR if you select it.
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
