@@ -1,32 +1,19 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Mon, 26 Sep 2011 13:18:36 -0700
-Subject: [PATCH v3 0/3] genirq: handling GIC per-cpu interrupts
-In-Reply-To: <1316793788-14500-1-git-send-email-marc.zyngier@arm.com>
-References: <1316793788-14500-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110926201836.GA27355@huya.qualcomm.com>
+Date: Mon, 26 Sep 2011 13:20:07 -0700
+Subject: [PATCH v2 00/16] Switch GIC users (and omap2plus) to
+	CONFIG_MULTI_IRQ_HANDLER
+In-Reply-To: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
+References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110926202007.GB27355@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 23, 2011 at 05:03:05PM +0100, Marc Zyngier wrote:
+On Mon, Sep 26, 2011 at 12:02:19PM +0100, Marc Zyngier wrote:
 
-> Tested on ARM Versatile Express (Cortex A15), ARM RealView PB11MP,
-> OMAP4 (Panda) and Tegra (Harmony). Patch series against next-20110923.
-> 
-> From v2:
-> - Fixed !GENERIC_HARDIRQS build
-> - Fixed request_percpu_irq documentation
-> 
-> From v1:
-> - General tidy-up after Thomas' review. I've kept the config option
->   for the time being until we can sort out the anonymous union
->   problem.
-> 
-> Marc Zyngier (3):
->   genirq: add support for per-cpu dev_id interrupts
->   ARM: gic: consolidate PPI handling
->   ARM: gic, local timers: use the request_percpu_irq() interface
+> This series has been tested on VE (A9, A5, A15), PB11MP, Panda, IGEPv2
+> and Harmony. Patches against next-20110926 plus my PPI series.
 
-I've tested this on an MSM8660 based off of next-20110926.
+Tested on an msm8660.
 
 Tested-by: David Brown <davidb@codeaurora.org>
 Acked-by: David Brown <davidb@codeaurora.org>
