@@ -1,44 +1,35 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 26 Sep 2011 23:52:33 +0800
-Subject: [PATCH v3 3/3] ARM: mx28evk: set a initial clock rate for saif
-In-Reply-To: <1317052353-6029-1-git-send-email-b29396@freescale.com>
-References: <1317052353-6029-1-git-send-email-b29396@freescale.com>
-Message-ID: <1317052353-6029-4-git-send-email-b29396@freescale.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 26 Sep 2011 09:48:19 -0600
+Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <20110926152634.GN2946@opensource.wolfsonmicro.com>
+References: <20110922184614.25419.84606.stgit@ponder>
+	<20110926141643.GK2946@opensource.wolfsonmicro.com>
+	<20110926151210.GO22455@n2100.arm.linux.org.uk>
+	<20110926152634.GN2946@opensource.wolfsonmicro.com>
+Message-ID: <CACxGe6swdnhk_GCAv3siSx4kxNQXmCLDbwBFjsX5VPNfCBc2Mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Dong Aisheng <b29396@freescale.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Liam Girdwood <lrg@ti.com>
+On Mon, Sep 26, 2011 at 9:26 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Mon, Sep 26, 2011 at 04:12:10PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Sep 26, 2011 at 03:16:43PM +0100, Mark Brown wrote:
+>
+>> > used but it's not a blocker for anything. ?Devices doing this would need
+>> > some way to figure out if they should -EBUSY or fail otherwise.
+>
+>> Just to avoid confusion - ITYM -EAGAIN there. ?-EBUSY is already used
+>> by drivers to mean "someone else claimed a resource I need" be it the
+>> IO region or an IRQ resource...
+>
+> Yes, I do - sorry.
 
----
-No changes since v1.
----
- arch/arm/mach-mxs/clock-mx28.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+Actually, in the next iteration, I'm thinking it would be a good idea
+to create a new #define to only be used by probe deferral.  I want it
+to be easy to find all the drivers that are using this mechanism
+without needing to filter all the unrelated hits.  However, this is a
+kernel-only thing so it is probably not appropriate to add it to
+include/asm-generic/errno.h.  I could use some guidance/advice as to
+the best way to handle this.
 
-diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
-index 9497346..2daab49 100644
---- a/arch/arm/mach-mxs/clock-mx28.c
-+++ b/arch/arm/mach-mxs/clock-mx28.c
-@@ -837,6 +837,15 @@ int __init mx28_clocks_init(void)
- 	clk_set_parent(&saif0_clk, &pll0_clk);
- 	clk_set_parent(&saif1_clk, &pll0_clk);
- 
-+	/*
-+	 * Set an initial clk rate for saif's internal logic to work properly,
-+	 * this is especially for the saif working on EXTMASTER mode that who
-+	 * uses other saif's BITCLK&LRCLK but it still needs a basic clk which
-+	 * should be bigger enough for its internal logic.
-+	 */
-+	clk_set_rate(&saif0_clk, 24000000);
-+	clk_set_rate(&saif1_clk, 24000000);
-+
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
- 
- 	mxs_timer_init(&clk32k_clk, MX28_INT_TIMER0);
--- 
-1.7.0.4
+g.
