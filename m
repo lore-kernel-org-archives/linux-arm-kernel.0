@@ -1,69 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 26 Sep 2011 12:02:26 +0100
-Subject: [PATCH v2 07/16] ARM: GIC: Add global gic_handle_irq_offset() function
+Date: Mon, 26 Sep 2011 12:02:32 +0100
+Subject: [PATCH v2 13/16] ARM: zynq: convert to CONFIG_MULTI_IRQ_HANDLER
 In-Reply-To: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
 References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1317034955-1029-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1317034955-1029-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to gic_handle_irq(), gic_handle_irq_offset() is provided
-for those platform who insist on having their GIC base interrupt
-at something different from zero. At the moment, Exynos4 is the
-only one...
+Convert the zynq platform to be using the gic_handle_irq
+function as its primary interrupt handler.
 
+Acked-by: John Linn <john.linn@xilinx.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/common/gic.c               |   24 ++++++++++++++++++++++++
- arch/arm/include/asm/hardware/gic.h |    1 +
- 2 files changed, 25 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig                              |    1 +
+ arch/arm/mach-zynq/common.c                   |    1 +
+ arch/arm/mach-zynq/include/mach/entry-macro.S |    3 ---
+ 3 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 5a22896..ef803d2 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -232,6 +232,30 @@ asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
- 	} while (1);
- }
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 70a947e..0514264 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -911,6 +911,7 @@ config ARCH_ZYNQ
+ 	select ARM_AMBA
+ 	select ICST
+ 	select USE_OF
++	select MULTI_IRQ_HANDLER
+ 	help
+ 	  Support for Xilinx Zynq ARM Cortex A9 Platform
+ endchoice
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 73e9368..ab5cfdd 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -112,6 +112,7 @@ static const char *xilinx_dt_match[] = {
+ MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+ 	.map_io		= xilinx_map_io,
+ 	.init_irq	= xilinx_irq_init,
++	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= xilinx_init_machine,
+ 	.timer		= &xttcpss_sys_timer,
+ 	.dt_compat	= xilinx_dt_match,
+diff --git a/arch/arm/mach-zynq/include/mach/entry-macro.S b/arch/arm/mach-zynq/include/mach/entry-macro.S
+index 3cfc01b..d621fb7 100644
+--- a/arch/arm/mach-zynq/include/mach/entry-macro.S
++++ b/arch/arm/mach-zynq/include/mach/entry-macro.S
+@@ -20,9 +20,6 @@
+  * GNU General Public License for more details.
+  */
  
-+asmlinkage void __exception_irq_entry gic_handle_irq_offset(struct pt_regs *regs)
-+{
-+	u32 irqstat, irqnr;
-+	u32 offset = gic_data[0].irq_offset;
-+
-+	do {
-+		irqstat = readl_relaxed(gic_cpu_base_addr + GIC_CPU_INTACK);
-+		irqnr = irqstat & ~0x1c00;
-+
-+		if (likely(irqnr > 15 && irqnr < 1021)) {
-+			handle_IRQ(irqnr + offset, regs);
-+			continue;
-+		}
-+		if (irqnr < 16) {
-+			writel_relaxed(irqstat, gic_cpu_base_addr + GIC_CPU_EOI);
-+#ifdef CONFIG_SMP
-+			handle_IPI(irqnr, regs);
-+#endif
-+			continue;
-+		}
-+		break;
-+	} while (1);
-+}
-+
- static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
- {
- 	struct gic_chip_data *chip_data = irq_get_handler_data(irq);
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index 45e4ab4..0f454c6 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -39,6 +39,7 @@ extern struct irq_chip gic_arch_extn;
- void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
- void gic_secondary_init(unsigned int);
- void gic_handle_irq(struct pt_regs *regs);
-+void gic_handle_irq_offset(struct pt_regs *regs);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+-#include <mach/hardware.h>
+-#include <asm/hardware/entry-macro-gic.S>
+-
+ 		.macro  disable_fiq
+ 		.endm
  
 -- 
 1.7.0.4
