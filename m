@@ -1,102 +1,170 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 26 Sep 2011 13:39:13 -0500
-Subject: [PATCH v2 0/7] Initial Calxeda Highbank support
-In-Reply-To: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
-References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
-Message-ID: <4E80C6D1.1010601@gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 26 Sep 2011 19:40:24 +0100
+Subject: [PATCH v2 4/7] clk: Add simple gated clock
+In-Reply-To: <4E80C564.3050004@gmail.com>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-5-git-send-email-mturquette@ti.com>
+	<4E80C564.3050004@gmail.com>
+Message-ID: <20110926184024.GB9194@gallagher>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+Hi Rob,
 
-On 08/31/2011 08:43 PM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Mon, Sep 26, 2011 at 01:33:08PM -0500, Rob Herring wrote:
+> Mike,
 > 
-> This adds initial platform support for Calxeda's Highbank ARM SOC including
-> SMP, hotplug, and suspend support. One new patch to add empty version of
-> l2x0_of_init. Changes for v2 are listed in each patch.
+> On 09/22/2011 05:26 PM, Mike Turquette wrote:
+> > From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > 
+> > Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> > Signed-off-by: Mike Turquette <mturquette@ti.com>
+> > ---
+> > Changes since v1:
+> > Add copyright header
+> > Fold in Jamie's patch for set-to-disable clks
+> > Use BIT macro instead of shift
+> > 
+> >  drivers/clk/Kconfig    |    4 ++
+> >  drivers/clk/Makefile   |    1 +
+> >  drivers/clk/clk-gate.c |   78 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/clk.h    |   13 ++++++++
+> >  4 files changed, 96 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/clk/clk-gate.c
+> > 
+> > diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> > index d8313d7..a78967c 100644
+> > --- a/drivers/clk/Kconfig
+> > +++ b/drivers/clk/Kconfig
+> > @@ -12,3 +12,7 @@ config GENERIC_CLK
+> >  config GENERIC_CLK_FIXED
+> >  	bool
+> >  	depends on GENERIC_CLK
+> > +
+> > +config GENERIC_CLK_GATE
+> > +	bool
+> > +	depends on GENERIC_CLK
+> > diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> > index 9a3325a..d186446 100644
+> > --- a/drivers/clk/Makefile
+> > +++ b/drivers/clk/Makefile
+> > @@ -2,3 +2,4 @@
+> >  obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+> >  obj-$(CONFIG_GENERIC_CLK)	+= clk.o
+> >  obj-$(CONFIG_GENERIC_CLK_FIXED)	+= clk-fixed.o
+> > +obj-$(CONFIG_GENERIC_CLK_GATE)	+= clk-gate.o
+> > diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> > new file mode 100644
+> > index 0000000..a1d8e79
+> > --- /dev/null
+> > +++ b/drivers/clk/clk-gate.c
+> > @@ -0,0 +1,78 @@
+> > +/*
+> > + * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * Simple clk gate implementation
+> > + */
+> > +
+> > +#include <linux/clk.h>
+> > +#include <linux/module.h>
+> > +#include <asm/io.h>
 > 
-> Based on rmk's for-next branch with gpio.h and io.h clean-ups plus previously
-> posted GIC devicetree binding support. The GIC patches are here:
+> use linux/io.h
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/060570.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/060790.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/062735.html
+> > +
+> > +#define to_clk_gate(clk) container_of(clk, struct clk_gate, hw)
+> > +
+> > +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
+> > +{
+> > +	return clk_get_rate(clk_get_parent(clk->clk));
+> > +}
+> > +
+> > +static void clk_gate_set_bit(struct clk_hw *clk)
+> > +{
+> > +	struct clk_gate *gate = to_clk_gate(clk);
+> > +	u32 reg;
+> > +
+> > +	reg = __raw_readl(gate->reg);
+> > +	reg |= BIT(gate->bit_idx);
+> > +	__raw_writel(reg, gate->reg);
 > 
-> Rob
+> Don't these read-mod-writes need a spinlock around it?
 > 
-> Martin Bogomolni (1):
->   ARM: highbank: Add cpu hotplug support
-> 
-> Rob Herring (6):
->   ARM: l2x0: add empty l2x0_of_init
->   ARM: highbank: add devicetree source
->   ARM: add Highbank core platform support
->   MAINTAINERS: add Calxeda Highbank ARM platform
->   ARM: highbank: add SMP support
->   ARM: highbank: add suspend support
-> 
->  Documentation/devicetree/bindings/arm/calxeda.txt |    8 +
->  MAINTAINERS                                       |    6 +
->  arch/arm/Kconfig                                  |   18 ++-
->  arch/arm/Makefile                                 |    1 +
->  arch/arm/boot/dts/highbank.dts                    |  224 +++++++++++++++++++++
->  arch/arm/include/asm/hardware/cache-l2x0.h        |    7 +
->  arch/arm/mach-highbank/Makefile                   |    6 +
->  arch/arm/mach-highbank/Makefile.boot              |    1 +
->  arch/arm/mach-highbank/clock.c                    |   62 ++++++
->  arch/arm/mach-highbank/core.h                     |    9 +
->  arch/arm/mach-highbank/highbank.c                 |  150 ++++++++++++++
->  arch/arm/mach-highbank/hotplug.c                  |   56 +++++
->  arch/arm/mach-highbank/include/mach/debug-macro.S |   19 ++
->  arch/arm/mach-highbank/include/mach/entry-macro.S |    7 +
->  arch/arm/mach-highbank/include/mach/gpio.h        |    1 +
->  arch/arm/mach-highbank/include/mach/io.h          |    7 +
->  arch/arm/mach-highbank/include/mach/irqs.h        |    6 +
->  arch/arm/mach-highbank/include/mach/memory.h      |    1 +
->  arch/arm/mach-highbank/include/mach/system.h      |   26 +++
->  arch/arm/mach-highbank/include/mach/timex.h       |    6 +
->  arch/arm/mach-highbank/include/mach/uncompress.h  |    9 +
->  arch/arm/mach-highbank/include/mach/vmalloc.h     |    6 +
->  arch/arm/mach-highbank/lluart.c                   |   34 +++
->  arch/arm/mach-highbank/localtimer.c               |   38 ++++
->  arch/arm/mach-highbank/platsmp.c                  |   78 +++++++
->  arch/arm/mach-highbank/pm.c                       |   55 +++++
->  arch/arm/mach-highbank/sysregs.h                  |   52 +++++
->  arch/arm/mach-highbank/system.c                   |   33 +++
->  arch/arm/mm/Kconfig                               |    2 +-
->  29 files changed, 926 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
->  create mode 100644 arch/arm/boot/dts/highbank.dts
->  create mode 100644 arch/arm/mach-highbank/Makefile
->  create mode 100644 arch/arm/mach-highbank/Makefile.boot
->  create mode 100644 arch/arm/mach-highbank/clock.c
->  create mode 100644 arch/arm/mach-highbank/core.h
->  create mode 100644 arch/arm/mach-highbank/highbank.c
->  create mode 100644 arch/arm/mach-highbank/hotplug.c
->  create mode 100644 arch/arm/mach-highbank/include/mach/debug-macro.S
->  create mode 100644 arch/arm/mach-highbank/include/mach/entry-macro.S
->  create mode 100644 arch/arm/mach-highbank/include/mach/gpio.h
->  create mode 100644 arch/arm/mach-highbank/include/mach/io.h
->  create mode 100644 arch/arm/mach-highbank/include/mach/irqs.h
->  create mode 100644 arch/arm/mach-highbank/include/mach/memory.h
->  create mode 100644 arch/arm/mach-highbank/include/mach/system.h
->  create mode 100644 arch/arm/mach-highbank/include/mach/timex.h
->  create mode 100644 arch/arm/mach-highbank/include/mach/uncompress.h
->  create mode 100644 arch/arm/mach-highbank/include/mach/vmalloc.h
->  create mode 100644 arch/arm/mach-highbank/lluart.c
->  create mode 100644 arch/arm/mach-highbank/localtimer.c
->  create mode 100644 arch/arm/mach-highbank/platsmp.c
->  create mode 100644 arch/arm/mach-highbank/pm.c
->  create mode 100644 arch/arm/mach-highbank/sysregs.h
->  create mode 100644 arch/arm/mach-highbank/system.c
-> 
+> It's possible to have an enable bits and dividers in the same register.
+> If you did a set_rate and while doing an enable/disable, there would be
+> a problem. Also, it may be 2 different clocks in the same register, so
+> the spinlock needs to be shared and not per clock.
 
-Any comments on v2?
+Well the prepare lock will be held here and I believe that would be 
+sufficient.
 
-The GIC binding series seems to be firming up. As myself and several
-others are dependent on it, I was planning to send both through arm-soc
-tree as 2 pulls. I also have some dependencies on rmk's tree with l2x0
-DT support and mach header clean-ups.
+> > +}
+> > +
+> > +static void clk_gate_clear_bit(struct clk_hw *clk)
+> > +{
+> > +	struct clk_gate *gate = to_clk_gate(clk);
+> > +	u32 reg;
+> > +
+> > +	reg = __raw_readl(gate->reg);
+> > +	reg &= ~BIT(gate->bit_idx);
+> > +	__raw_writel(reg, gate->reg);
+> > +}
+> > +
+> > +static int clk_gate_enable_set(struct clk_hw *clk)
+> > +{
+> > +	clk_gate_set_bit(clk);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void clk_gate_disable_clear(struct clk_hw *clk)
+> > +{
+> > +	clk_gate_clear_bit(clk);
+> > +}
+> > +
+> > +struct clk_hw_ops clk_gate_set_enable_ops = {
+> 
+> const?
 
-Rob
+Yup.
+
+> > +	.recalc_rate = clk_gate_get_rate,
+> > +	.enable = clk_gate_enable_set,
+> > +	.disable = clk_gate_disable_clear,
+> > +};
+> > +EXPORT_SYMBOL_GPL(clk_gate_set_enable_ops);
+> > +
+> > +static int clk_gate_enable_clear(struct clk_hw *clk)
+> > +{
+> > +	clk_gate_clear_bit(clk);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void clk_gate_disable_set(struct clk_hw *clk)
+> > +{
+> > +	clk_gate_set_bit(clk);
+> > +}
+> 
+> Are these wrapper functions really needed? Just assign set_bit and
+> clear_bit functions directly to the ops structs. Only the ops struct
+> name is exposed to the user.
+
+I used the wrappers because the .enable method has to return an int, but 
+the disable needs to return void.  It's either that or open code the 
+set/clear in each.
+
+> > +
+> > +struct clk_hw_ops clk_gate_set_disable_ops = {
+> 
+> const?
+
+Yes.
+
+Jamie
