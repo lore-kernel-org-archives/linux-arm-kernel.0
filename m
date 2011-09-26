@@ -1,46 +1,38 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 26 Sep 2011 20:57:04 +0100
-Subject: [PATCH 3/3] ARM: gic: add OF based initialization
-In-Reply-To: <1316550244-3655-4-git-send-email-robherring2@gmail.com>
-References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
-	<1316550244-3655-4-git-send-email-robherring2@gmail.com>
-Message-ID: <20110926195704.GD9194@gallagher>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 26 Sep 2011 16:00:11 -0400 (EDT)
+Subject: Pull request: removal of most instances of mach/memory.h
+In-Reply-To: <20110926191055.GP22455@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
+	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
+	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
+	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
+	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
+	<20110926191055.GP22455@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1109261514330.2718@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
 
-On Tue, Sep 20, 2011 at 03:24:04PM -0500, Rob Herring wrote:
-[...]
-> +int __init gic_of_init(struct device_node *node, struct device_node *parent)
-> +{
-> +	void __iomem *cpu_base;
-> +	void __iomem *dist_base;
-> +	int irq;
-> +	struct irq_domain *domain = &gic_data[gic_cnt].domain;
-> +
-> +	if (WARN_ON(!node))
-> +		return -ENODEV;
-> +
-> +	dist_base = of_iomap(node, 0);
-> +	WARN(!dist_base, "unable to map gic dist registers\n");
-> +
-> +	cpu_base = of_iomap(node, 1);
-> +	WARN(!cpu_base, "unable to map gic cpu registers\n");
-> +
-> +	domain->nr_irq = gic_irq_count(dist_base);
-> +	/* subtract off SGIs. Also subtract off PPIs for secondary GICs */
-> +	if (parent)
-> +		domain->nr_irq -= 32;
-> +	else
-> +		domain->nr_irq -= 16;
-> +
-> +	domain->irq_base = irq_alloc_descs(-1, 16, domain->nr_irq, numa_node_id());
+> On Mon, Sep 26, 2011 at 10:33:28AM -0400, Nicolas Pitre wrote:
+> >       ARM: mach-ep93xx: remove mach/memory.h and Kconfig selection of SDRAM bank
+> 
+> Are you planning to totally kill off ZBOOT_ROM too?  Because removing
+> the zreladdr stuff is doing exactly that.
 
-The way I understand irq_alloc_descs() (probably not very well) is that 
-having the irq parameter < 0 and the from parameter 16 means that it 
-needs to find domain->nr_irq descs starting from at least 16.  But if 
-the base is greater than 16, does this still work with the gic entry 
-macros as they are?
+It looks like ZBOOT_ROM is not used on that platform at all.  However, 
+the ability to have a single defconfig and binary for the whole platform 
+is something that the mach-ep93xx maintainers are looking for.  Having 
+ZBOOT_ROM depend on and use CONFIG_PHYS_OFFSET would probably makes 
+sense eventually.
 
-Jamie
+> This also gives additional merge conflicts elsewhere, and while git
+> rerere makes some of them easy, the quantity is going to be a right
+> pain to deal with on a repeated basis.
+
+Again, I'm perfectly willing to use a different base for this series and 
+fix the conflicts myself if you give me one.
+
+
+Nicolas
