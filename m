@@ -1,19 +1,44 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 26 Sep 2011 12:05:10 +0300
-Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
-In-Reply-To: <CAHQjnOOtVHUS3KmBz7LdO88fLQyLA6f-w3ye9nAH0Bx+zh38XA@mail.gmail.com>
-References: <15669786.49881316849426265.JavaMail.weblogic@epml24>
-	<CAK=WgbYnGjPKs6_nmFRGfMnbh_7wDR-0QcptAGaqDKVOo-x3cg@mail.gmail.com>
-	<CAHQjnOOtVHUS3KmBz7LdO88fLQyLA6f-w3ye9nAH0Bx+zh38XA@mail.gmail.com>
-Message-ID: <CAK=Wgbazwz9PRJSpZjopwxJ-PO88FtajmbXL=pVKDHOr1t61fQ@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 26 Sep 2011 11:06:23 +0200
+Subject: [PATCH 1/2] ARM: pxa: fix building error by palm27x_lcd_init()
+	when FB_PXA not defined
+In-Reply-To: <CAMPhdO-gZOnMjHog0t7cp74rs+Z+D76v2dPLBgp+jUGNG9J39A@mail.gmail.com>
+References: <1317009197-12578-1-git-send-email-eric.y.miao@gmail.com>
+	<201109261100.07265.marek.vasut@gmail.com>
+	<CAMPhdO-gZOnMjHog0t7cp74rs+Z+D76v2dPLBgp+jUGNG9J39A@mail.gmail.com>
+Message-ID: <201109261106.24026.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 11:58 AM, KyongHo Cho <pullip.cho@samsung.com> wrote:
-> As you've noticed, it is default behavior for iommu fault.
+On Monday, September 26, 2011 11:02:03 AM Eric Miao wrote:
+> 2011/9/26 Marek Vasut <marek.vasut@gmail.com>:
+> > On Monday, September 26, 2011 05:53:16 AM Eric Miao wrote:
+> >> Cc: Marek Vasut <marek.vasut@gmail.com>
+> >> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+> >> ---
+> >>  arch/arm/mach-pxa/include/mach/palm27x.h |    2 +-
+> >>  1 files changed, 1 insertions(+), 1 deletions(-)
+> >> 
+> >> diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h
+> >> b/arch/arm/mach-pxa/include/mach/palm27x.h index 0a5e5ea..f80bbe2 100644
+> >> --- a/arch/arm/mach-pxa/include/mach/palm27x.h
+> >> +++ b/arch/arm/mach-pxa/include/mach/palm27x.h
+> >> @@ -34,7 +34,7 @@ extern struct pxafb_mode_info
+> >> palm_320x320_new_lcd_mode; extern void __init palm27x_lcd_init(int
+> >> power,
+> >>                                       struct pxafb_mode_info *mode);
+> >>  #else
+> >> -static inline void palm27x_lcd_init(int power, struct pxafb_mode_info
+> >> *mode) {} +#define palm27x_lcd_init(power, mode)      do {} while (0)
+> >>  #endif
+> >> 
+> >>  #if  defined(CONFIG_USB_GADGET_PXA27X) || \
+> > 
+> > Hi Eric,
+> > 
+> > NAK. Why do you do such a change ? Especially as this will likely
+> > interfere with gcc4.6's unused-but-set variable checking.
+> 
+> OK, I'll hold this one. Feel free to give me a solution.
 
-Then why not add it to the IOMMU core ? it's quite generic and can be
-useful for others, too.
-
-Thanks,
-Ohad.
+Hang on, I'll run it through the cogs.
