@@ -1,71 +1,110 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 26 Sep 2011 10:28:14 +0200
-Subject: [PATCH] mmc: card: modify mmc_getgeo function
-In-Reply-To: <m2ty8520fb.fsf@bob.laptop.org>
-References: <1316516929-26694-1-git-send-email-girish.shivananjappa@linaro.org>
-	<m2ty8520fb.fsf@bob.laptop.org>
-Message-ID: <20110926082814.GA28149@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 26 Sep 2011 10:41:41 +0200
+Subject: [PATCH] ARM i.MX gic: add handle_irq function
+In-Reply-To: <1316797284-21010-1-git-send-email-shawn.guo@linaro.org>
+References: <1316522956-28530-1-git-send-email-s.hauer@pengutronix.de>
+	<1316797284-21010-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110926084141.GP31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, Sep 21, 2011 at 02:52:08PM -0400, Chris Ball wrote:
-> Hi,
+On Sat, Sep 24, 2011 at 01:01:24AM +0800, Shawn Guo wrote:
+> This is a plain translation of assembly gic irq handler to C function
+> for CONFIG_MULTI_IRQ_HANDLER support on imx family.
 > 
-> On Tue, Sep 20 2011, Girish K S wrote:
-> > In the earlier code the cylinder, sector and head are assigned
-> > independently. Current patch generates the cylinder number
-> > with the values of sector and head.
-> > This patch only makes they cylinder value to be dependent on
-> > the sector and head.
-> >
-> > Signed-off-by: Girish K S <girish.shivananjappa@linaro.org>
-> > ---
-> >  drivers/mmc/card/block.c |    3 ++-
-> >  1 files changed, 2 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-> > index 1ff5486..bebb13b 100644
-> > --- a/drivers/mmc/card/block.c
-> > +++ b/drivers/mmc/card/block.c
-> > @@ -226,9 +226,10 @@ static int mmc_blk_release(struct gendisk *disk, fmode_t mode)
-> >  static int
-> >  mmc_blk_getgeo(struct block_device *bdev, struct hd_geometry *geo)
-> >  {
-> > -	geo->cylinders = get_capacity(bdev->bd_disk) / (4 * 16);
-> >  	geo->heads = 4;
-> >  	geo->sectors = 16;
-> > +	geo->cylinders = get_capacity(bdev->bd_disk) /
-> > +		(geo->heads * geo->sectors);
-> >  	return 0;
-> >  }
+> As the speed of gic_handle_irq() is much more important than code
+> clean, the patch chooses to plug the ifdef in the function to compile
+> out the corresponding codes.
 > 
-> Thanks, pushed to mmc-next for 3.2 with a reworded commit message:
-This (i.e. ee9e0e0 (mmc: card: Remove duplicated constants) in next)
-makes gcc emit a reference to __aeabi_uldivmod in one of my nightly
-builds which isn't defined.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> Right, ideally the arch/arm/plat-mxc/gic.c should be merged into
+> arch/arm/common/gic.c.  But before rmk asks me to do that, I would
+> let it stay in imx platform.
+> 
+>  arch/arm/plat-mxc/Makefile                   |    2 +-
+>  arch/arm/plat-mxc/gic.c                      |   47 ++++++++++++++++++++++++++
+>  arch/arm/plat-mxc/include/mach/common.h      |    2 +
+>  arch/arm/plat-mxc/include/mach/entry-macro.S |    6 +++
+>  4 files changed, 56 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/plat-mxc/gic.c
+> 
+> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
+> index d53c35f..b9f0f5f 100644
+> --- a/arch/arm/plat-mxc/Makefile
+> +++ b/arch/arm/plat-mxc/Makefile
+> @@ -5,7 +5,7 @@
+>  # Common support
+>  obj-y := clock.o time.o devices.o cpu.o system.o irq-common.o
+>  
+> -# MX51 uses the TZIC interrupt controller, older platforms use AVIC
+> +obj-$(CONFIG_ARM_GIC) += gic.o
+>  obj-$(CONFIG_MXC_TZIC) += tzic.o
+>  obj-$(CONFIG_MXC_AVIC) += avic.o
+>  
+> diff --git a/arch/arm/plat-mxc/gic.c b/arch/arm/plat-mxc/gic.c
+> new file mode 100644
+> index 0000000..487d12c
+> --- /dev/null
+> +++ b/arch/arm/plat-mxc/gic.c
+> @@ -0,0 +1,47 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <asm/localtimer.h>
+> +#include <asm/hardware/gic.h>
+> +#ifdef CONFIG_SMP
+> +#include <asm/smp.h>
+> +#endif
+> +
+> +asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+> +{
+> +	u32 irqstat, irqnr;
+> +
+> +	do {
+> +		irqstat = readl_relaxed(gic_cpu_base_addr + GIC_CPU_INTACK);
+> +		irqnr = irqstat & 0x3ff;
+> +		if (irqnr == 1023)
+> +			break;
+> +
+> +		if (irqnr > 29 && irqnr < 1021)
+> +			handle_IRQ(irqnr, regs);
+> +#ifdef CONFIG_SMP
+> +		else if (irqnr < 16) {
+> +			writel_relaxed(irqstat, gic_cpu_base_addr +
+> +						GIC_CPU_EOI);
+> +			do_IPI(irqnr, regs);
+> +		}
+> +#endif
+> +#ifdef CONFIG_LOCAL_TIMERS
+> +		else if (irqnr == 29) {
+> +			writel_relaxed(irqstat, gic_cpu_base_addr +
+> +						GIC_CPU_EOI);
+> +			do_local_timer(regs);
+> +		}
+> +#endif
+> +	} while (1);
+> +}
 
-The final linking stage fails with:
+Shouldn't this code go to arch/arm/common/gic.c instead? The
+corresponding assembly code is generic so I see no reason to make
+this i.MX specific.
 
-	  LD      .tmp_vmlinux1
-	drivers/built-in.o: In function `mmc_blk_getgeo':
-	clkdev.c:(.text+0xd1528): undefined reference to `__aeabi_uldivmod'
-	make[2]: *** [.tmp_vmlinux1] Error 1
-	make[1]: *** [sub-make] Error 2
-	make: *** [all] Error 2
+Sascha
 
-(I don't know why clkdev.c is referenced here. I'm not using ccache.)
-
-It seems gcc isn't smart enough to notice that it can just use the same
-generated code ...
-
-Having said that AFAIK the code used before wasn't ok, too. (I.e. an u64
-division that was just noticed to be a shift by luck.)
-
-Best regards
-Uwe
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
