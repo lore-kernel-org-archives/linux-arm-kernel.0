@@ -1,44 +1,39 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 26 Sep 2011 13:26:37 +0900
-Subject: [PATCH] S3C2443: Fix bit-reset in setrate of clk_armdiv
-In-Reply-To: <201109222309.00068.heiko@sntech.de>
-References: <201109222309.00068.heiko@sntech.de>
-Message-ID: <00d601cc7c04$7b30f060$7192d120$%kim@samsung.com>
+Date: Mon, 26 Sep 2011 13:34:03 +0900
+Subject: [PATCH] ARM: S3C64xx: Add LDOVDD supply for CODEC on Cragganmore
+In-Reply-To: <1316714477-19994-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1316714477-19994-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <00d801cc7c05$84e877d0$8eb96770$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
+Mark Brown wrote:
 > 
-> The changed statement should set the old armdiv bits to 0
-> and not everything else, before setting the new value.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  arch/arm/mach-s3c2443/clock.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>  arch/arm/mach-s3c64xx/mach-crag6410.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-s3c2443/clock.c b/arch/arm/mach-s3c2443/clock.c
-> index 966bde5..27549c4 100644
-> --- a/arch/arm/mach-s3c2443/clock.c
-> +++ b/arch/arm/mach-s3c2443/clock.c
-> @@ -124,7 +124,7 @@ static int s3c2443_armclk_setrate(struct clk *clk,
-unsigned
-> long rate)
->  		unsigned long clkcon0;
+> diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-
+> s3c64xx/mach-crag6410.c
+> index a53b02e..613c165 100644
+> --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
+> +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> @@ -582,6 +582,7 @@ static struct regulator_init_data pvdd_1v2 __initdata
+= {
+>  };
 > 
->  		clkcon0 = __raw_readl(S3C2443_CLKDIV0);
-> -		clkcon0 &= S3C2443_CLKDIV0_ARMDIV_MASK;
-> +		clkcon0 &= ~S3C2443_CLKDIV0_ARMDIV_MASK;
->  		clkcon0 |= val << S3C2443_CLKDIV0_ARMDIV_SHIFT;
->  		__raw_writel(clkcon0, S3C2443_CLKDIV0);
->  	}
+>  static struct regulator_consumer_supply pvdd_1v8_consumers[] __initdata =
+{
+> +	REGULATOR_SUPPLY("LDOVDD", "1-001a"),
+>  	REGULATOR_SUPPLY("PLLVDD", "1-001a"),
+>  	REGULATOR_SUPPLY("DBVDD", "1-001a"),
+>  	REGULATOR_SUPPLY("DBVDD1", "1-001a"),
 > --
-> 1.7.2.3
+> 1.7.6.3
 
-Hi Heiko,
-
-Yes, you're right.
-Applied, thanks.
+Applied.
+Thanks.
 
 Best regards,
 Kgene.
