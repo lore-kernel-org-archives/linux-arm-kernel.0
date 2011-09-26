@@ -1,60 +1,63 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 26 Sep 2011 11:46:06 +0200
-Subject: [PATCH 1/4] ARM i.MX avic: add handle_irq function
-In-Reply-To: <1317030369-29352-1-git-send-email-s.hauer@pengutronix.de>
-References: <1317030369-29352-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1317030369-29352-2-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 26 Sep 2011 11:46:05 +0200
+Subject: [PATCH v2] i.MX: use CONFIG_MULTI_IRQ_HANDLER
+Message-ID: <1317030369-29352-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/plat-mxc/avic.c                |   13 +++++++++++++
- arch/arm/plat-mxc/include/mach/common.h |   10 ++++++++++
- 2 files changed, 23 insertions(+), 0 deletions(-)
+changes since v1:
 
-diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
-index 55d2534..4d68c5a 100644
---- a/arch/arm/plat-mxc/avic.c
-+++ b/arch/arm/plat-mxc/avic.c
-@@ -116,6 +116,19 @@ static struct mxc_irq_chip mxc_avic_chip = {
- #endif
- };
- 
-+asmlinkage void __exception_irq_entry avic_handle_irq(struct pt_regs *regs)
-+{
-+	u32 nivector;
-+
-+	do {
-+		nivector = __raw_readl(avic_base + AVIC_NIVECSR) >> 16;
-+		if (nivector == 0xffff)
-+			break;
-+
-+		handle_IRQ(nivector, regs);
-+	} while (1);
-+}
-+
- /*
-  * This function initializes the AVIC hardware and disables all the
-  * interrupts. It registers the interrupt enable and disable functions
-diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
-index 4e3d978..6a6182d 100644
---- a/arch/arm/plat-mxc/include/mach/common.h
-+++ b/arch/arm/plat-mxc/include/mach/common.h
-@@ -72,4 +72,14 @@ extern void mxc_arch_reset_init(void __iomem *);
- extern void mx51_efikamx_reset(void);
- extern int mx53_revision(void);
- extern int mx53_display_revision(void);
-+
-+void avic_handle_irq(struct pt_regs *);
-+
-+#define imx1_handle_irq avic_handle_irq
-+#define imx21_handle_irq avic_handle_irq
-+#define imx25_handle_irq avic_handle_irq
-+#define imx27_handle_irq avic_handle_irq
-+#define imx31_handle_irq avic_handle_irq
-+#define imx35_handle_irq avic_handle_irq
-+
- #endif
--- 
-1.7.6.3
+- use imx_ prefix rather than mx_ as suggested by Shawn
+
+Sascha Hauer (4):
+      ARM i.MX avic: add handle_irq function
+      ARM i.MX tzic: add handle_irq function
+      ARM i.MX boards: use CONFIG_MULTI_IRQ_HANDLER
+      ARM i.MX entry-macro.S: remove now unused code
+
+ arch/arm/Kconfig                             |    1 +
+ arch/arm/mach-imx/mach-apf9328.c             |    1 +
+ arch/arm/mach-imx/mach-armadillo5x0.c        |    1 +
+ arch/arm/mach-imx/mach-bug.c                 |    1 +
+ arch/arm/mach-imx/mach-cpuimx27.c            |    1 +
+ arch/arm/mach-imx/mach-cpuimx35.c            |    1 +
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c     |    1 +
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c  |    1 +
+ arch/arm/mach-imx/mach-imx27ipcam.c          |    1 +
+ arch/arm/mach-imx/mach-imx27lite.c           |    1 +
+ arch/arm/mach-imx/mach-kzm_arm11_01.c        |    1 +
+ arch/arm/mach-imx/mach-mx1ads.c              |    2 +
+ arch/arm/mach-imx/mach-mx21ads.c             |    1 +
+ arch/arm/mach-imx/mach-mx25_3ds.c            |    1 +
+ arch/arm/mach-imx/mach-mx27_3ds.c            |    1 +
+ arch/arm/mach-imx/mach-mx27ads.c             |    1 +
+ arch/arm/mach-imx/mach-mx31_3ds.c            |    1 +
+ arch/arm/mach-imx/mach-mx31ads.c             |    1 +
+ arch/arm/mach-imx/mach-mx31lilly.c           |    1 +
+ arch/arm/mach-imx/mach-mx31lite.c            |    1 +
+ arch/arm/mach-imx/mach-mx31moboard.c         |    1 +
+ arch/arm/mach-imx/mach-mx35_3ds.c            |    1 +
+ arch/arm/mach-imx/mach-mxt_td60.c            |    1 +
+ arch/arm/mach-imx/mach-pca100.c              |    1 +
+ arch/arm/mach-imx/mach-pcm037.c              |    1 +
+ arch/arm/mach-imx/mach-pcm038.c              |    1 +
+ arch/arm/mach-imx/mach-pcm043.c              |    1 +
+ arch/arm/mach-imx/mach-qong.c                |    1 +
+ arch/arm/mach-imx/mach-scb9328.c             |    1 +
+ arch/arm/mach-imx/mach-vpr200.c              |    1 +
+ arch/arm/mach-mx5/board-cpuimx51.c           |    1 +
+ arch/arm/mach-mx5/board-cpuimx51sd.c         |    1 +
+ arch/arm/mach-mx5/board-mx50_rdp.c           |    1 +
+ arch/arm/mach-mx5/board-mx51_3ds.c           |    1 +
+ arch/arm/mach-mx5/board-mx51_babbage.c       |    1 +
+ arch/arm/mach-mx5/board-mx51_efikamx.c       |    1 +
+ arch/arm/mach-mx5/board-mx51_efikasb.c       |    1 +
+ arch/arm/mach-mx5/board-mx53_ard.c           |    1 +
+ arch/arm/mach-mx5/board-mx53_evk.c           |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c          |    1 +
+ arch/arm/mach-mx5/board-mx53_smd.c           |    1 +
+ arch/arm/plat-mxc/avic.c                     |   13 ++++++
+ arch/arm/plat-mxc/include/mach/common.h      |   14 ++++++
+ arch/arm/plat-mxc/include/mach/entry-macro.S |   58 +-------------------------
+ arch/arm/plat-mxc/tzic.c                     |   24 ++++++++++-
+ 45 files changed, 93 insertions(+), 58 deletions(-)
