@@ -1,140 +1,22 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 26 Sep 2011 13:04:08 +0200
-Subject: [PATCH] merge i.MX3 and i.MX6
-Message-ID: <mailman.154.1317035208.20020.linux-arm-kernel@lists.infradead.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 Sep 2011 12:21:51 +0100
+Subject: [PATCH 1/4] ARM i.MX avic: add handle_irq function
+In-Reply-To: <1317030369-29352-2-git-send-email-s.hauer@pengutronix.de>
+References: <1317030369-29352-1-git-send-email-s.hauer@pengutronix.de>
+	<1317030369-29352-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110926112151.GE22455@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/Makefile          |    3 +--
- arch/arm/mach-imx/Kconfig  |    7 +++----
- arch/arm/mach-imx/Makefile |    1 +
- arch/arm/mm/Kconfig        |    4 ++--
- arch/arm/plat-mxc/Kconfig  |   14 ++++++--------
- 5 files changed, 13 insertions(+), 16 deletions(-)
+On Mon, Sep 26, 2011 at 11:46:06AM +0200, Sascha Hauer wrote:
+> +void avic_handle_irq(struct pt_regs *);
+> +
+> +#define imx1_handle_irq avic_handle_irq
+> +#define imx21_handle_irq avic_handle_irq
+> +#define imx25_handle_irq avic_handle_irq
+> +#define imx27_handle_irq avic_handle_irq
+> +#define imx31_handle_irq avic_handle_irq
+> +#define imx35_handle_irq avic_handle_irq
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 89be85d..42ab385 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -155,9 +155,8 @@ machine-$(CONFIG_ARCH_MMP)		:= mmp
- machine-$(CONFIG_ARCH_MSM)		:= msm
- machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
- machine-$(CONFIG_ARCH_IMX_V4_V5)	:= imx
--machine-$(CONFIG_ARCH_MX3)		:= imx
-+machine-$(CONFIG_ARCH_IMX_V6_V7)	:= imx
- machine-$(CONFIG_ARCH_MX5)		:= mx5
--machine-$(CONFIG_ARCH_MX6)		:= imx
- machine-$(CONFIG_ARCH_MXS)		:= mxs
- machine-$(CONFIG_ARCH_NETX)		:= netx
- machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 3852f45..27355cb 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -74,6 +74,7 @@ config SOC_IMX31
- 	select ARCH_MXC_AUDMUX_V2
- 	select ARCH_MX31
- 	select MXC_AVIC
-+	select SMP_ON_UP if SMP
- 
- config SOC_IMX35
- 	bool
-@@ -83,6 +84,7 @@ config SOC_IMX35
- 	select HAVE_EPIT
- 	select ARCH_MX35
- 	select MXC_AVIC
-+	select SMP_ON_UP if SMP
- 
- 
- if ARCH_IMX_V4_V5
-@@ -351,7 +353,7 @@ config MACH_IMX27IPCAM
- 
- endif
- 
--if ARCH_MX3
-+if ARCH_IMX_V6_V7
- 
- comment "MX31 platforms:"
- 
-@@ -601,9 +603,6 @@ config MACH_VPR200
- 	  Include support for VPR200 platform. This includes specific
- 	  configurations for the board and its peripherals.
- 
--endif
--
--if ARCH_MX6
- comment "i.MX6 family:"
- 
- config SOC_IMX6Q
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index aa1cf0c..b9dffe5 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -66,6 +66,7 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
- obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
- obj-$(CONFIG_HAVE_IMX_SRC) += src.o
-+AFLAGS_head-v7.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_CPU_V7) += head-v7.o
- obj-$(CONFIG_SMP) += platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c3ce146..9ab5be0 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -819,10 +819,10 @@ config CACHE_FEROCEON_L2_WRITETHROUGH
- config CACHE_L2X0
- 	bool "Enable the L2x0 outer cache controller"
- 	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
--		   REALVIEW_EB_A9MP || SOC_IMX35 || SOC_IMX31 || MACH_REALVIEW_PBX || \
-+		   REALVIEW_EB_A9MP || ARCH_IMX_V6_V7 || MACH_REALVIEW_PBX || \
- 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
- 		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
--		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_MX6
-+		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX
- 	default y
- 	select OUTER_CACHE
- 	select OUTER_CACHE_SYNC
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index 82b0d92..43efc3c 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -16,10 +16,13 @@ config ARCH_IMX_V4_V5
- 	  This enables support for systems based on the Freescale i.MX ARMv4
- 	  and ARMv5 SoCs
- 
--config ARCH_MX3
--	bool "MX3-based"
-+config ARCH_IMX_V6_V7
-+	bool "i.MX3, i.MX6"
-+	select AUTO_ZRELADDR
-+	select ARM_PATCH_PHYS_VIRT
- 	help
--	  This enables support for systems based on the Freescale i.MX3 family
-+	  This enables support for systems based on the Freescale i.MX3 and i.MX6
-+	  family.
- 
- config ARCH_MX5
- 	bool "i.MX50, i.MX51, i.MX53"
-@@ -29,11 +32,6 @@ config ARCH_MX5
- 	  This enables support for machines using Freescale's i.MX50 and i.MX51
- 	  processors.
- 
--config ARCH_MX6
--	bool "i.MX6"
--	help
--	  This enables support for systems based on the Freescale i.MX6 family
--
- endchoice
- 
- source "arch/arm/mach-imx/Kconfig"
--- 
-1.7.6.3
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Is there really something wrong in knowing (elsewhere) that mx1..mx35 all
+use the avic irq handler?
