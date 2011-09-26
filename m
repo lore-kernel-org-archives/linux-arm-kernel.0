@@ -1,70 +1,35 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Sun, 25 Sep 2011 18:58:10 -0700
-Subject: [RFC PATCH 1/3] genirq: add support for per-cpu dev_id interrupts
-In-Reply-To: <4E7FD5FD.5070103@codeaurora.org>
-References: <1316105551-17505-1-git-send-email-marc.zyngier@arm.com>	<1316105551-17505-2-git-send-email-marc.zyngier@arm.com>	<4E767CD6.6090208@codeaurora.org>	<4E770B3E.9040401@arm.com>
-	<4E7FD5FD.5070103@codeaurora.org>
-Message-ID: <4E7FDC32.8050100@codeaurora.org>
+From: gaowanlong@cn.fujitsu.com (Wanlong Gao)
+Date: Mon, 26 Sep 2011 10:17:08 +0800
+Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
+In-Reply-To: <CAHQjnOPMRQetGF5VnwsMD=_JxWC5C-LQ5WRyZhPs2HtCzis2Tg@mail.gmail.com>
+References: <5525949.50001316849744994.JavaMail.weblogic@epml24>	<20110924093851.GB17169@n2100.arm.linux.org.uk>
+	<CAHQjnOPMRQetGF5VnwsMD=_JxWC5C-LQ5WRyZhPs2HtCzis2Tg@mail.gmail.com>
+Message-ID: <4E7FE0A4.4050105@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2011 06:31 PM, Abhijeet Dharmapurikar wrote:
-> On 09/19/2011 02:28 AM, Marc Zyngier wrote:
->> On 19/09/11 00:20, Abhijeet Dharmapurikar wrote:
->>> On 09/15/2011 09:52 AM, Marc Zyngier wrote:
-> ...
->>> > + * @devname: An ascii name for the claiming device
->>> > + * @dev_id: A percpu cookie passed back to the handler function
->>> > + *
->>> > + * This call allocates interrupt resources, but doesn't
->>> > + * automatically enable the interrupt. It has to be done on each
->>> > + * CPU using enable_percpu_irq().
->>> > + *
->>> > + * Dev_id must be globally unique. It is a per-cpu variable, and
->>> > + * the handler gets called with the interrupted CPU's instance of
->>> > + * that variable.
->>> > + */
->>> > +int request_percpu_irq(unsigned int irq, irq_handler_t handler,
->>> > + const char *devname, void __percpu *dev_id)
->>>
->>> Can we add irqflags argument. I think it will be useful to pass flags,
->>> at least the IRQF_TRIGGER_MASK since it ends up calling __setup_irq().
->>> The chip could use a set_type callback for ppi's too.
+On 09/26/2011 08:44 AM, KyongHo Cho wrote:
+
+> Hi.
+> 
+> On Sat, Sep 24, 2011 at 6:38 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Sat, Sep 24, 2011 at 07:35:45AM +0000, ??? wrote:
+>>> +# EXYNOS IOMMU support
+>>> +config EXYNOS_IOMMU
+>>> + bool "Exynos IOMMU Support"
+>>> + depends on ARCH_EXYNOS4
+>>> + select IOMMU_API
+>>> + select EXYNOS4_DEV_SYSMMU
+>>> + help
 >>
->> We're entering dangerous territory here. While this would work with the
->> GIC (the interrupt type is at the distributor level), you could easily
->> imagine an interrupt controller with the PPI configuration at the CPU
->> interface level... In that case, calling set_type from __setup_irq()
->> would end up doing the wrong thing, and I'd hate the API to give the
->> idea it can do things it may not do in the end...
->>
->> Furthermore, do we actually have a GIC implementation where PPI
->> configuration isn't read-only? I only know about the ARM implementation,
->> and the Qualcomm may well be different (the spec says it's
->> implementation defined).
->
-> Yes, you are exactly right, Qualcomm's GIC has configurable PPIs. The
-> default configuration for PPI's is level triggered, but we change the
-> timer PPI to edge trigger. Without this we wont even boot (no timer
-> interrupts). We do this trigger type setting in board specific code.
->
-> Although I agree with your concern, I would still request to provide a
-> facility to set the trigger flags. All the PPI's request will have that
-> argument set to zero, except for msm timer (and few other msm
-> interrupts). Additionally we can add that concern as a comment in
-> request_percpu_irq so the user of request_percpu_irq is aware of it.
->
-
-I need to correct myself a tad bit. As Russell King pointed in the other 
-email, the trigger type register in the GIC is banked per cpu for PPI 
-interrupts. So, on those lines, enable_percpu_irq should take this 
-irqflags parameter (and call set_type on the chip) instead of 
-request_percpu_irq.
-
-Thanks,
-Abhijeet
+>> Looks like your mailer converted tabs to one space.  This makes it more
+>> difficult to read this patch as a whole.  Don't expect good reviews as
+>> long as your mailer breaks stuff in this way.
+> Sorry for that :(
+> I will try another way to send patches correctly.
 
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Use *git send-email* instead.
+
+Thanks
