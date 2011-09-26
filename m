@@ -1,103 +1,36 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 26 Sep 2011 18:50:21 +0200
-Subject: [PATCH 13/13] OMAP2+: board-generic: Remove i2c static init
-In-Reply-To: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
-References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1317055821-20652-14-git-send-email-b-cousson@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Sep 2011 09:45:55 -0700
+Subject: [PATCH 08/11] OMAP2+: board-generic: Add i2c static init
+In-Reply-To: <20110923234744.GL24631@ponder.secretlab.ca>
+References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
+	<1316809399-19579-9-git-send-email-b-cousson@ti.com>
+	<20110923231208.GE6324@atomide.com>
+	<20110923234744.GL24631@ponder.secretlab.ca>
+Message-ID: <20110926164555.GA17771@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This mainly reverts the commit that was adding the i2c static init.
+* Grant Likely <grant.likely@secretlab.ca> [110923 16:14]:
+> On Fri, Sep 23, 2011 at 04:12:08PM -0700, Tony Lindgren wrote:
+> > * Benoit Cousson <b-cousson@ti.com> [110923 12:50]:
+> > > Still needed to boot until the i2c & twl driver is adapted to
+> > > device-tree. Otherwise the voltage control code will try to
+> > > access the twl and crash.
+> > 
+> > That sounds OK to me for now. For merging these patches, how
+> > about the following:
+> > 
+> > - Kevin queues up the omap_device related changes
+> > 
+> > - Grant queues up the .dts changes
+> > 
+> > - I'll queue the map_io and board changes based on Kevin's
+> >   omap_device changes
+> 
+> Go ahead and queue up the .dts changes in your tree.  No need to split them up.
 
-Since the i2c and twl nodes are now present, there is no need
-for the static initialization anymore.
+OK, will do.
 
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-generic.c |   41 +---------------------------------
- 1 files changed, 2 insertions(+), 39 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 1186a76..dcbd64c 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -11,7 +11,6 @@
- #include <linux/io.h>
- #include <linux/of_platform.h>
- #include <linux/irqdomain.h>
--#include <linux/i2c/twl.h>
- 
- #include <mach/hardware.h>
- #include <asm/mach/arch.h>
-@@ -19,31 +18,7 @@
- #include <plat/board.h>
- #include <plat/common.h>
- #include <mach/omap4-common.h>
--#include "common-board-devices.h"
- 
--/*
-- * XXX: Still needed to boot until the i2c & twl driver is adapted to
-- * device-tree
-- */
--static struct twl4030_platform_data sdp4430_twldata = {
--	.irq_base	= TWL6030_IRQ_BASE,
--	.irq_end	= TWL6030_IRQ_END,
--};
--
--static void __init omap4_i2c_init(void)
--{
--	omap4_pmic_init("twl6030", &sdp4430_twldata);
--}
--
--static struct twl4030_platform_data beagle_twldata = {
--	.irq_base	= TWL4030_IRQ_BASE,
--	.irq_end	= TWL4030_IRQ_END,
--};
--
--static void __init omap3_i2c_init(void)
--{
--	omap3_pmic_init("twl4030", &beagle_twldata);
--}
- 
- static struct of_device_id omap_dt_match_table[] __initdata = {
- 	{ .compatible = "simple-bus", },
-@@ -69,18 +44,6 @@ static void __init omap_generic_init(void)
- 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
- }
- 
--static void __init omap4_init(void)
--{
--	omap4_i2c_init();
--	omap_generic_init();
--}
--
--static void __init omap3_init(void)
--{
--	omap3_i2c_init();
--	omap_generic_init();
--}
--
- #if defined(CONFIG_SOC_OMAP2420)
- static const char *omap242x_boards_compat[] __initdata = {
- 	"ti,omap2420",
-@@ -126,7 +89,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
- 	.map_io		= omap3_map_io,
- 	.init_early	= omap3430_init_early,
- 	.init_irq	= omap3_init_irq,
--	.init_machine	= omap3_init,
-+	.init_machine	= omap_generic_init,
- 	.timer		= &omap3_timer,
- 	.dt_compat	= omap3_boards_compat,
- MACHINE_END
-@@ -143,7 +106,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
- 	.map_io		= omap4_map_io,
- 	.init_early	= omap4430_init_early,
- 	.init_irq	= gic_init_irq,
--	.init_machine	= omap4_init,
-+	.init_machine	= omap_generic_init,
- 	.timer		= &omap4_timer,
- 	.dt_compat	= omap4_boards_compat,
- MACHINE_END
--- 
-1.7.0.4
+Tony
