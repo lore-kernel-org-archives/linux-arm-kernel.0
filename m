@@ -1,109 +1,123 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 26 Sep 2011 12:02:33 +0100
-Subject: [PATCH v2 14/16] ARM: omap2/3: Add global omap2/3_intc_handle_irq()
-	functions
+Date: Mon, 26 Sep 2011 12:02:20 +0100
+Subject: [PATCH v2 01/16] ARM: Make global handler and
+	CONFIG_MULTI_IRQ_HANDLER mutually exclusive
 In-Reply-To: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
 References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1317034955-1029-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1317034955-1029-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the OMAP2/3 IRQ code with low level handlers that can be used
-by platforms using CONFIG_MULTI_IRQ_HANDLER. Though the handlers are
-written in C, the compiled code looks very similar to its assembly
-counterpart (at least with my gcc 4.4.1).
+Even when CONFIG_MULTI_IRQ_HANDLER is selected, the core code
+requires the arch_irq_handler_default macro to be defined as
+a fallback.
 
-Cc: Tony Lindgren <tony@atomide.com>
+It turns out nobody is using that particular feature as both PXA
+and shmobile have all their machine descriptors populated with
+the interrupt handler, leaving unused code (or empty macros) in
+their entry-macro.S file just to be able to compile entry-armv.S.
+
+Make CONFIG_MULTI_IRQ_HANDLER exclusive wrt arch_irq_handler_default,
+which allows to remove one test from the hot path. Also cleanup both
+PXA and shmobile entry-macro.S.
+
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-omap2/irq.c              |   49 ++++++++++++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/irqs.h |    2 +
- 2 files changed, 51 insertions(+), 0 deletions(-)
+ arch/arm/kernel/entry-armv.S                      |    7 ++--
+ arch/arm/mach-pxa/include/mach/entry-macro.S      |   36 ---------------------
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |    9 -----
+ 3 files changed, 3 insertions(+), 49 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
-index 3a12f75..0a48b33 100644
---- a/arch/arm/mach-omap2/irq.c
-+++ b/arch/arm/mach-omap2/irq.c
-@@ -35,6 +35,11 @@
- /* Number of IRQ state bits in each MIR register */
- #define IRQ_BITS_PER_REG	32
- 
-+#define OMAP2_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
-+#define OMAP3_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
-+#define INTCPS_SIR_IRQ_OFFSET	0x0040	/* omap2/3 active interrupt offset */
-+#define ACTIVEIRQ_MASK		0x7f	/* omap2/3 active interrupt bits */
-+
- /*
-  * OMAP2 has a number of different interrupt controllers, each interrupt
-  * controller is identified as its own "bank". Register definitions are
-@@ -191,6 +196,44 @@ void __init ti816x_init_irq(void)
- 	omap_init_irq(OMAP34XX_IC_BASE, 128);
- }
- 
-+static inline void omap_intc_handle_irq(void __iomem *base_addr, struct pt_regs *regs)
-+{
-+	u32 irqnr;
-+
-+	do {
-+		irqnr = readl_relaxed(base_addr + 0x98);
-+		if (irqnr)
-+			goto out;
-+
-+		irqnr = readl_relaxed(base_addr + 0xb8);
-+		if (irqnr)
-+			goto out;
-+
-+		irqnr = readl_relaxed(base_addr + 0xd8);
-+#ifdef CONFIG_SOC_OMAPTI816X
-+		if (irqnr)
-+			goto out;
-+		irqnr = readl_relaxed(base_addr + 0xf8);
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 9ad50c4..bd49a6a 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -36,12 +36,11 @@
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+ 	ldr	r1, =handle_arch_irq
+ 	mov	r0, sp
+-	ldr	r1, [r1]
+ 	adr	lr, BSYM(9997f)
+-	teq	r1, #0
+-	movne	pc, r1
+-#endif
++	ldr	pc, [r1]
++#else
+ 	arch_irq_handler_default
 +#endif
-+
-+out:
-+		if (!irqnr)
-+			break;
-+
-+		irqnr = readl_relaxed(base_addr + INTCPS_SIR_IRQ_OFFSET);
-+		irqnr &= ACTIVEIRQ_MASK;
-+
-+		if (irqnr)
-+			handle_IRQ(irqnr, regs);
-+	} while (irqnr);
-+}
-+
-+asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs)
-+{
-+	void __iomem *base_addr = OMAP2_IRQ_BASE;
-+	omap_intc_handle_irq(base_addr, regs);
-+}
-+
- #ifdef CONFIG_ARCH_OMAP3
- static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
+ 9997:
+ 	.endm
  
-@@ -263,4 +306,10 @@ void omap3_intc_resume_idle(void)
- 	/* Re-enable autoidle */
- 	intc_bank_write_reg(1, &irq_banks[0], INTC_SYSCONFIG);
- }
-+
-+asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
-+{
-+	void __iomem *base_addr = OMAP3_IRQ_BASE;
-+	omap_intc_handle_irq(base_addr, regs);
-+}
- #endif /* CONFIG_ARCH_OMAP3 */
-diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
-index 30e1071..8b19a63 100644
---- a/arch/arm/plat-omap/include/plat/irqs.h
-+++ b/arch/arm/plat-omap/include/plat/irqs.h
-@@ -448,6 +448,8 @@ void omap_intc_restore_context(void);
- void omap3_intc_suspend(void);
- void omap3_intc_prepare_idle(void);
- void omap3_intc_resume_idle(void);
-+void omap2_intc_handle_irq(struct pt_regs *regs);
-+void omap3_intc_handle_irq(struct pt_regs *regs);
- #endif
+diff --git a/arch/arm/mach-pxa/include/mach/entry-macro.S b/arch/arm/mach-pxa/include/mach/entry-macro.S
+index a73bc86..260c0c1 100644
+--- a/arch/arm/mach-pxa/include/mach/entry-macro.S
++++ b/arch/arm/mach-pxa/include/mach/entry-macro.S
+@@ -7,45 +7,9 @@
+  * License version 2. This program is licensed "as is" without any
+  * warranty of any kind, whether express or implied.
+  */
+-#include <mach/hardware.h>
+-#include <mach/irqs.h>
  
- #include <mach/hardware.h>
+ 		.macro	disable_fiq
+ 		.endm
+ 
+-		.macro  get_irqnr_preamble, base, tmp
+-		.endm
+-
+ 		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+-
+-		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
+-		mrc	p15, 0, \tmp, c0, c0, 0		@ CPUID
+-		mov	\tmp, \tmp, lsr #13
+-		and	\tmp, \tmp, #0x7		@ Core G
+-		cmp	\tmp, #1
+-		bhi	1002f
+-
+-		@ Core Generation 1 (PXA25x)
+-		mov	\base, #io_p2v(0x40000000)	@ IIR Ctl = 0x40d00000
+-		add	\base, \base, #0x00d00000
+-		ldr	\irqstat, [\base, #0]		@ ICIP
+-		ldr	\irqnr, [\base, #4]		@ ICMR
+-
+-		ands	\irqnr, \irqstat, \irqnr
+-		beq	1001f
+-		rsb	\irqstat, \irqnr, #0
+-		and	\irqstat, \irqstat, \irqnr
+-		clz	\irqnr, \irqstat
+-		rsb	\irqnr, \irqnr, #(31 + PXA_IRQ(0))
+-		b	1001f
+-1002:
+-		@ Core Generation 2 (PXA27x) or Core Generation 3 (PXA3xx)
+-		mrc	p6, 0, \irqstat, c5, c0, 0	@ ICHP
+-		tst	\irqstat, #0x80000000
+-		beq	1001f
+-		bic	\irqstat, \irqstat, #0x80000000
+-		mov	\irqnr, \irqstat, lsr #16
+-		add	\irqnr, \irqnr, #(PXA_IRQ(0))
+-1001:
+-		.endm
+diff --git a/arch/arm/mach-shmobile/include/mach/entry-macro.S b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+index 8d4a416..2a57b29 100644
+--- a/arch/arm/mach-shmobile/include/mach/entry-macro.S
++++ b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+@@ -18,14 +18,5 @@
+ 	.macro  disable_fiq
+ 	.endm
+ 
+-	.macro  get_irqnr_preamble, base, tmp
+-	.endm
+-
+-	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-	.endm
+-
+-	.macro  test_for_ipi, irqnr, irqstat, base, tmp
+-	.endm
+-
+ 	.macro  arch_ret_to_user, tmp1, tmp2
+ 	.endm
 -- 
 1.7.0.4
