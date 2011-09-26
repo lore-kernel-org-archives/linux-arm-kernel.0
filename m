@@ -1,48 +1,53 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Mon, 26 Sep 2011 13:47:37 +0900
-Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
-In-Reply-To: <4E7FE0A4.4050105@cn.fujitsu.com>
-References: <5525949.50001316849744994.JavaMail.weblogic@epml24>
-	<20110924093851.GB17169@n2100.arm.linux.org.uk>
-	<CAHQjnOPMRQetGF5VnwsMD=_JxWC5C-LQ5WRyZhPs2HtCzis2Tg@mail.gmail.com>
-	<4E7FE0A4.4050105@cn.fujitsu.com>
-Message-ID: <CAHQjnOMAdkf6FUcVsr74zWM9Vij-5nduZWK+pa2MQC8KJUjRtw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Mon, 26 Sep 2011 08:26:19 +0200
+Subject: [PATCH] dma/imx-sdma+imx-dma: explicitly #include <linux/module.h>
+Message-ID: <1317018379-8897-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks. I will try.
+This is needed after commit
 
-Regards,
-Cho KyongHo.
+	include: replace linux/module.h with "struct module" wherever possible
 
-On Mon, Sep 26, 2011 at 11:17 AM, Wanlong Gao <gaowanlong@cn.fujitsu.com> wrote:
-> On 09/26/2011 08:44 AM, KyongHo Cho wrote:
->
->> Hi.
->>
->> On Sat, Sep 24, 2011 at 6:38 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Sat, Sep 24, 2011 at 07:35:45AM +0000, ??? wrote:
->>>> +# EXYNOS IOMMU support
->>>> +config EXYNOS_IOMMU
->>>> + bool "Exynos IOMMU Support"
->>>> + depends on ARCH_EXYNOS4
->>>> + select IOMMU_API
->>>> + select EXYNOS4_DEV_SYSMMU
->>>> + help
->>>
->>> Looks like your mailer converted tabs to one space. ?This makes it more
->>> difficult to read this patch as a whole. ?Don't expect good reviews as
->>> long as your mailer breaks stuff in this way.
->> Sorry for that :(
->> I will try another way to send patches correctly.
->
->
-> Use *git send-email* instead.
->
-> Thanks
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+(currently 25215aa in next).
+
+Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
+
+maybe it's sensible for Paul to take that before his commit?
+
+Best regards
+Uwe
+
+ drivers/dma/imx-dma.c  |    1 +
+ drivers/dma/imx-sdma.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index d99f71c..3732de8 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -23,6 +23,7 @@
+ #include <linux/slab.h>
+ #include <linux/platform_device.h>
+ #include <linux/dmaengine.h>
++#include <linux/module.h>
+ 
+ #include <asm/irq.h>
+ #include <mach/dma-v1.h>
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index b5cc27d..86fb6e5 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -34,6 +34,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/module.h>
+ 
+ #include <asm/irq.h>
+ #include <mach/sdma.h>
+-- 
+1.7.6.3
