@@ -1,7 +1,7 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Sep 2011 23:38:10 +0100
+Date: Mon, 26 Sep 2011 23:38:39 +0100
 Subject: Pull request: removal of most instances of mach/memory.h
-In-Reply-To: <alpine.LFD.2.00.1109261514330.2718@xanadu.home>
+In-Reply-To: <alpine.LFD.2.00.1109261606210.2718@xanadu.home>
 References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
 	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
 	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
@@ -10,35 +10,27 @@ References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
 	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
 	<20110926191055.GP22455@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.1109261514330.2718@xanadu.home>
-Message-ID: <20110926223810.GA23680@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109261606210.2718@xanadu.home>
+Message-ID: <20110926223839.GB23680@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 04:00:11PM -0400, Nicolas Pitre wrote:
-> On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
+On Mon, Sep 26, 2011 at 04:10:03PM -0400, Nicolas Pitre wrote:
+> On Mon, 26 Sep 2011, Nicolas Pitre wrote:
 > 
-> > On Mon, Sep 26, 2011 at 10:33:28AM -0400, Nicolas Pitre wrote:
-> > >       ARM: mach-ep93xx: remove mach/memory.h and Kconfig selection of SDRAM bank
+> > On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
 > > 
-> > Are you planning to totally kill off ZBOOT_ROM too?  Because removing
-> > the zreladdr stuff is doing exactly that.
+> > > This also gives additional merge conflicts elsewhere, and while git
+> > > rerere makes some of them easy, the quantity is going to be a right
+> > > pain to deal with on a repeated basis.
+> > 
+> > Again, I'm perfectly willing to use a different base for this series and 
+> > fix the conflicts myself if you give me one.
 > 
-> It looks like ZBOOT_ROM is not used on that platform at all.  However, 
-> the ability to have a single defconfig and binary for the whole platform 
-> is something that the mach-ep93xx maintainers are looking for.  Having 
-> ZBOOT_ROM depend on and use CONFIG_PHYS_OFFSET would probably makes 
-> sense eventually.
-
-You miss the point.  Removing zreladdr actively _prevents_ anyone from
-then choosing to build a kernel with ZBOOT_ROM enabled targetted for one
-platform if that's what they want, because the decompressor then loses
-the information it needs to properly locate the kernel.
-
-> > This also gives additional merge conflicts elsewhere, and while git
-> > rerere makes some of them easy, the quantity is going to be a right
-> > pain to deal with on a repeated basis.
+> Nevermind, I see that you merged it anyway.
 > 
-> Again, I'm perfectly willing to use a different base for this series and 
-> fix the conflicts myself if you give me one.
+> You may consider the rerere.autoupdate config option if you want Git to 
+> automatically pick the conflict resolution without you manually 
+> confirming them all the time.
 
-That's difficult when there are a number of unstable branches involved.
+rerere doesn't deal with modified/deleted conflicts though.
