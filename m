@@ -1,62 +1,147 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Sep 2011 00:18:06 +0100
-Subject: Pull request: removal of most instances of mach/memory.h
-In-Reply-To: <alpine.LFD.2.00.1109261852530.2718@xanadu.home>
-References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
-	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
-	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
-	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
-	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
-	<20110926191055.GP22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109261514330.2718@xanadu.home>
-	<20110926223810.GA23680@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109261852530.2718@xanadu.home>
-Message-ID: <20110926231806.GC23680@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Sep 2011 16:18:11 -0700
+Subject: [PATCH] ARM: OMAP2+: Remove custom init_irq for remaining boards
+In-Reply-To: <20110926231646.GJ6324@atomide.com>
+References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
+	<1316809399-19579-2-git-send-email-b-cousson@ti.com>
+	<20110923230049.GC6324@atomide.com>
+	<20110926231516.GI6324@atomide.com>
+	<20110926231646.GJ6324@atomide.com>
+Message-ID: <20110926231811.GK6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 07:01:22PM -0400, Nicolas Pitre wrote:
-> On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
-> 
-> > On Mon, Sep 26, 2011 at 04:00:11PM -0400, Nicolas Pitre wrote:
-> > > On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
-> > > 
-> > > > On Mon, Sep 26, 2011 at 10:33:28AM -0400, Nicolas Pitre wrote:
-> > > > >       ARM: mach-ep93xx: remove mach/memory.h and Kconfig selection of SDRAM bank
-> > > > 
-> > > > Are you planning to totally kill off ZBOOT_ROM too?  Because removing
-> > > > the zreladdr stuff is doing exactly that.
-> > > 
-> > > It looks like ZBOOT_ROM is not used on that platform at all.  However, 
-> > > the ability to have a single defconfig and binary for the whole platform 
-> > > is something that the mach-ep93xx maintainers are looking for.  Having 
-> > > ZBOOT_ROM depend on and use CONFIG_PHYS_OFFSET would probably makes 
-> > > sense eventually.
-> > 
-> > You miss the point.  Removing zreladdr actively _prevents_ anyone from
-> > then choosing to build a kernel with ZBOOT_ROM enabled targetted for one
-> > platform if that's what they want, because the decompressor then loses
-> > the information it needs to properly locate the kernel.
-> 
-> Sure.  My point is that ZBOOT_ROM should eventually be coupled with 
-> CONFIG_PHYS_OFFSET to derive the zreladdr value.  Like for XIP_KERNEL, 
-> there is no real point having ZBOOT_ROM when ARM_PATCH_PHYS_VIRT is set, 
-> and when not set we have the equivalent zreladdr information elsewhere 
-> already.
+With SoC specific timers, board specific init_irq is
+no longer needed. Earlier this was still needed to
+initialize the gptimer12 on Beagle based boards.
 
-I strongly disagree on a technical point - ARM_PATCH_PHYS_VIRT and
-ZBOOT_ROM are entirely separate options _technically_ - there is no
-inter-dependence between them.  ZBOOT_ROM just needs to know where
-to place the decompressed image, and once it knows that, the kernel
-can discover the P:V translation all by itself.
+Also convert board-h4.c to use omap2_init_irq accidentally
+did not get converted earlier.
 
-Moreover, PHYS_OFFSET does *not* define where the kernel ends up.
-Remember that we sometimes place the kernel 1MB + 32K into the
-physical memory space - you can't encode that into CONFIG_PHYS_OFFSET
-and hope that both PHYS_OFFSET and zreladdr end up at the right place.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-So this is argument is actually highly flawed technically.  You're
-trying to combine two things which are actually different.
-
-Or are we now in the business of breaking old platforms?
+diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+index 4b1f6c6..059b74d 100644
+--- a/arch/arm/mach-omap2/board-devkit8000.c
++++ b/arch/arm/mach-omap2/board-devkit8000.c
+@@ -397,11 +397,6 @@ static struct platform_device keys_gpio = {
+ 	},
+ };
+ 
+-static void __init devkit8000_init_irq(void)
+-{
+-	omap3_init_irq();
+-}
+-
+ #define OMAP_DM9000_BASE	0x2c000000
+ 
+ static struct resource omap_dm9000_resources[] = {
+@@ -665,7 +660,7 @@ MACHINE_START(DEVKIT8000, "OMAP3 Devkit8000")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+ 	.init_early	= omap35xx_init_early,
+-	.init_irq	= devkit8000_init_irq,
++	.init_irq	= omap3_init_irq,
+ 	.init_machine	= devkit8000_init,
+ 	.timer		= &omap3_secure_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
+index fcc5107..8486142 100644
+--- a/arch/arm/mach-omap2/board-h4.c
++++ b/arch/arm/mach-omap2/board-h4.c
+@@ -290,11 +290,6 @@ static struct omap_board_config_kernel h4_config[] __initdata = {
+ 	{ OMAP_TAG_LCD,		&h4_lcd_config },
+ };
+ 
+-static void __init omap_h4_init_irq(void)
+-{
+-	omap2_init_irq();
+-}
+-
+ static struct at24_platform_data m24c01 = {
+ 	.byte_len	= SZ_1K / 8,
+ 	.page_size	= 16,
+@@ -375,7 +370,7 @@ MACHINE_START(OMAP_H4, "OMAP2420 H4 board")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap242x_map_io,
+ 	.init_early	= omap2420_init_early,
+-	.init_irq	= omap_h4_init_irq,
++	.init_irq	= omap2_init_irq,
+ 	.init_machine	= omap_h4_init,
+ 	.timer		= &omap2_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index ce3234d..e085371 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -449,11 +449,6 @@ static void __init omap3_beagle_init_early(void)
+ 	omap2_init_common_infrastructure();
+ }
+ 
+-static void __init omap3_beagle_init_irq(void)
+-{
+-	omap3_init_irq();
+-}
+-
+ static struct platform_device *omap3_beagle_devices[] __initdata = {
+ 	&leds_gpio,
+ 	&keys_gpio,
+@@ -561,7 +556,7 @@ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+ 	.init_early	= omap3_beagle_init_early,
+-	.init_irq	= omap3_beagle_init_irq,
++	.init_irq	= omap3_init_irq,
+ 	.init_machine	= omap3_beagle_init,
+ 	.timer		= &omap3_secure_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
+index 807c274..fa58a0f 100644
+--- a/arch/arm/mach-omap2/board-omap3stalker.c
++++ b/arch/arm/mach-omap2/board-omap3stalker.c
+@@ -428,11 +428,6 @@ static int __init omap3_stalker_i2c_init(void)
+ static struct omap_board_config_kernel omap3_stalker_config[] __initdata = {
+ };
+ 
+-static void __init omap3_stalker_init_irq(void)
+-{
+-	omap3_init_irq();
+-}
+-
+ static struct platform_device *omap3_stalker_devices[] __initdata = {
+ 	&keys_gpio,
+ };
+@@ -492,7 +487,7 @@ MACHINE_START(SBC3530, "OMAP3 STALKER")
+ 	.boot_params		= 0x80000100,
+ 	.map_io			= omap3_map_io,
+ 	.init_early		= omap35xx_init_early,
+-	.init_irq		= omap3_stalker_init_irq,
++	.init_irq		= omap3_init_irq,
+ 	.init_machine		= omap3_stalker_init,
+ 	.timer			= &omap3_secure_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
+index f7f1809..05488fb 100644
+--- a/arch/arm/mach-omap2/board-omap3touchbook.c
++++ b/arch/arm/mach-omap2/board-omap3touchbook.c
+@@ -326,11 +326,6 @@ static struct omap_board_mux board_mux[] __initdata = {
+ };
+ #endif
+ 
+-static void __init omap3_touchbook_init_irq(void)
+-{
+-	omap3_init_irq();
+-}
+-
+ static struct platform_device *omap3_touchbook_devices[] __initdata = {
+ 	&omap3_touchbook_lcd_device,
+ 	&leds_gpio,
+@@ -403,7 +398,7 @@ MACHINE_START(TOUCHBOOK, "OMAP3 touchbook Board")
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+ 	.init_early	= omap3430_init_early,
+-	.init_irq	= omap3_touchbook_init_irq,
++	.init_irq	= omap3_init_irq,
+ 	.init_machine	= omap3_touchbook_init,
+ 	.timer		= &omap3_secure_timer,
+ MACHINE_END
