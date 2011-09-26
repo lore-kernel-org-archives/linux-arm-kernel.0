@@ -1,95 +1,93 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 27 Sep 2011 08:22:46 +0900
-Subject: [PATCH 1/7] SPI: S3C64XX: Use bus clocks created using clkdev
-In-Reply-To: <20110923231233.GE24631@ponder.secretlab.ca>
-References: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
-	<1316778827-24694-2-git-send-email-padma.v@samsung.com>
-	<20110923231233.GE24631@ponder.secretlab.ca>
-Message-ID: <003301cc7ca3$3314dae0$993e90a0$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Sep 2011 00:29:43 +0100
+Subject: Pull request: removal of most instances of mach/memory.h
+In-Reply-To: <alpine.LFD.2.00.1109261901550.2718@xanadu.home>
+References: <alpine.LFD.2.00.1109130849590.20358@xanadu.home>
+	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
+	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
+	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
+	<20110926191055.GP22455@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109261514330.2718@xanadu.home>
+	<alpine.LFD.2.00.1109261606210.2718@xanadu.home>
+	<20110926223839.GB23680@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109261901550.2718@xanadu.home>
+Message-ID: <20110926232943.GD23680@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely wrote:
+On Mon, Sep 26, 2011 at 07:03:12PM -0400, Nicolas Pitre wrote:
+> On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
 > 
-> On Fri, Sep 23, 2011 at 05:23:41PM +0530, Padmavathi Venna wrote:
-> > This patch modifies the driver to stop depending on the
-> > clock names being passed from platform and switch over
-> > to lookup clocks generic names using clkdev
-> >
-> > Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> > On Mon, Sep 26, 2011 at 04:10:03PM -0400, Nicolas Pitre wrote:
+> > > On Mon, 26 Sep 2011, Nicolas Pitre wrote:
+> > > 
+> > > > On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
+> > > > 
+> > > > > This also gives additional merge conflicts elsewhere, and while git
+> > > > > rerere makes some of them easy, the quantity is going to be a right
+> > > > > pain to deal with on a repeated basis.
+> > > > 
+> > > > Again, I'm perfectly willing to use a different base for this series and 
+> > > > fix the conflicts myself if you give me one.
+> > > 
+> > > Nevermind, I see that you merged it anyway.
+> > > 
+> > > You may consider the rerere.autoupdate config option if you want Git to 
+> > > automatically pick the conflict resolution without you manually 
+> > > confirming them all the time.
+> > 
+> > rerere doesn't deal with modified/deleted conflicts though.
 > 
-> Looks okay to me.
-> 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> 
-> This series I imagine should go in via the arm-soc tree.
-> 
-OK, if others ok to me, I will pick up this series so that it will be sent
-to upstream via arm-soc.
+> True.  That can be considered a limitation worth fixing.
 
-Thanks.
+Well.  Now I'm not impressed, having investigated the reason behind
+some of these conflicts.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-> 
-> > ---
-> >  drivers/spi/spi-s3c64xx.c |   14 +++++---------
-> >  1 files changed, 5 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> > index 019a716..dcf7e10 100644
-> > --- a/drivers/spi/spi-s3c64xx.c
-> > +++ b/drivers/spi/spi-s3c64xx.c
-> > @@ -971,6 +971,7 @@ static int __init s3c64xx_spi_probe(struct
-> platform_device *pdev)
-> >  	struct s3c64xx_spi_info *sci;
-> >  	struct spi_master *master;
-> >  	int ret;
-> > +	char clk_name[16];
-> >
-> >  	if (pdev->id < 0) {
-> >  		dev_err(&pdev->dev,
-> > @@ -984,11 +985,6 @@ static int __init s3c64xx_spi_probe(struct
-> platform_device *pdev)
-> >  	}
-> >
-> >  	sci = pdev->dev.platform_data;
-> > -	if (!sci->src_clk_name) {
-> > -		dev_err(&pdev->dev,
-> > -			"Board init must call s3c64xx_spi_set_info()\n");
-> > -		return -EINVAL;
-> > -	}
-> >
-> >  	/* Check for availability of necessary resource */
-> >
-> > @@ -1073,17 +1069,17 @@ static int __init s3c64xx_spi_probe(struct
-> platform_device *pdev)
-> >  		goto err4;
-> >  	}
-> >
-> > -	sdd->src_clk = clk_get(&pdev->dev, sci->src_clk_name);
-> > +	sprintf(clk_name, "spi_busclk%d", sci->src_clk_nr);
-> > +	sdd->src_clk = clk_get(&pdev->dev, clk_name);
-> >  	if (IS_ERR(sdd->src_clk)) {
-> >  		dev_err(&pdev->dev,
-> > -			"Unable to acquire clock '%s'\n",
-sci->src_clk_name);
-> > +			"Unable to acquire clock '%s'\n", clk_name);
-> >  		ret = PTR_ERR(sdd->src_clk);
-> >  		goto err5;
-> >  	}
-> >
-> >  	if (clk_enable(sdd->src_clk)) {
-> > -		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n",
-> > -							sci->src_clk_name);
-> > +		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n",
-clk_name);
-> >  		ret = -EBUSY;
-> >  		goto err6;
-> >  	}
-> > --
-> > 1.7.4.4
-> >
+The reason I'm getting the modify/delete conflict is because you've
+made the same change to arch/arm/mach-prima2/include/mach/memory.h
+as the one which you already submitted to me.
+
+commit e922fe6625fb4700f041e5984ba6c09a1cadae65
+Author:     Nicolas Pitre <nicolas.pitre@linaro.org>
+AuthorDate: Wed Sep 21 20:52:40 2011 +0100
+Commit:     Russell King <rmk+kernel@arm.linux.org.uk>
+CommitDate: Mon Sep 26 12:31:09 2011 +0100
+
+    ARM: 7093/1: mach-prima2: move ARM_DMA_ZONE_SIZE to mdesc->dma_zone_size
+    
+    The branch that contained the ARM_DMA_ZONE_SIZE removal missed prima2.
+    
+    Original comment:
+    
+      Restrict DMA-able region to workaround silicon limitation.
+      The limitation restricts buffers available for DMA to SD/MMC
+      hardware to be below 256MB.
+    
+    Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+vs
+
+commit 98b0124f0e2b88ec74cbd9345cf6195e527ce251
+Author:     Nicolas Pitre <nicolas.pitre@linaro.org>
+AuthorDate: Fri Sep 2 21:05:10 2011 -0400
+Commit:     Nicolas Pitre <nico@fluxnic.net>
+CommitDate: Tue Sep 6 17:25:54 2011 -0400
+
+    ARM: mach-prima2: move ARM_DMA_ZONE_SIZE to mdesc->dma_zone_size
+    
+    Original comment:
+    
+      Restrict DMA-able region to workaround silicon limitation.
+      The limitation restricts buffers available for DMA to SD/MMC
+      hardware to be below 256MB.
+    
+    Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+I've no idea why you submitted this change to me if you'd already merged
+it into your own tree - this is total madness and is just making more
+work for me with no reason.
+
+A little more discipline and communication (such as asking me to drop
+the duplicate commit _first_) would be nice.
