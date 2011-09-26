@@ -1,73 +1,60 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 26 Sep 2011 11:32:53 +0200 (CEST)
-Subject: [PATCH v3 2/2] at91: add Atmel ISI and ov2640 support on
-	sam9m10/sam9g45 board.
-In-Reply-To: <4E804440.7030709@atmel.com>
-References: <1316664661-11383-1-git-send-email-josh.wu@atmel.com>
-	<1316664661-11383-2-git-send-email-josh.wu@atmel.com>
-	<Pine.LNX.4.64.1109220911500.11164@axis700.grange>
-	<20110924052609.GI29998@game.jcrosoft.org>
-	<4E804440.7030709@atmel.com>
-Message-ID: <Pine.LNX.4.64.1109261130270.9168@axis700.grange>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 26 Sep 2011 12:36:23 +0300
+Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
+In-Reply-To: <CAHQjnON7dksupFeAYLuYXX2PhgjX-GXEGJiy0dRTmpoBjbURVg@mail.gmail.com>
+References: <15669786.49881316849426265.JavaMail.weblogic@epml24>
+	<CAK=WgbYnGjPKs6_nmFRGfMnbh_7wDR-0QcptAGaqDKVOo-x3cg@mail.gmail.com>
+	<CAHQjnOOtVHUS3KmBz7LdO88fLQyLA6f-w3ye9nAH0Bx+zh38XA@mail.gmail.com>
+	<CAK=Wgbazwz9PRJSpZjopwxJ-PO88FtajmbXL=pVKDHOr1t61fQ@mail.gmail.com>
+	<CAHQjnON7dksupFeAYLuYXX2PhgjX-GXEGJiy0dRTmpoBjbURVg@mail.gmail.com>
+Message-ID: <CAK=WgbaOwe8Q19tpZMeHdvyCj8fcV194zA-oSD20tF7j7_MvpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas
+Hi,
 
-On Mon, 26 Sep 2011, Nicolas Ferre wrote:
+On Mon, Sep 26, 2011 at 12:21 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> Every fault in IOMMU (System MMU) is an error logically
+> and must not happen in our multimedia device drivers
+> because, our device drivers always construct page table completely
+> before address translation in System MMU
+> and TLB loads translation information automatically when TLB miss.
 
-> Le 24/09/2011 07:26, Jean-Christophe PLAGNIOL-VILLARD :
-> > On 09:35 Thu 22 Sep     , Guennadi Liakhovetski wrote:
-> >> On Thu, 22 Sep 2011, Josh Wu wrote:
-> >>
-> >>> This patch
-> >>> 1. add ISI_MCK parent setting code when add ISI device.
-> >>> 2. add ov2640 support on board file.
-> >>> 3. define isi_mck clock in sam9g45 chip file.
-> >>>
-> >>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> >>> ---
-> >>>  arch/arm/mach-at91/at91sam9g45.c         |    3 +
-> >>>  arch/arm/mach-at91/at91sam9g45_devices.c |  105 +++++++++++++++++++++++++++++-
-> >>>  arch/arm/mach-at91/board-sam9m10g45ek.c  |   85 ++++++++++++++++++++++++-
-> >>>  arch/arm/mach-at91/include/mach/board.h  |    3 +-
-> >>
-> >> Personally, I think, it would be better to separate this into two patches 
-> >> at least: one for at91 core and one for the specific board, but that's up 
-> >> to arch maintainers to decide.
-> >>
-> >> You also want to patch arch/arm/mach-at91/at91sam9263_devices.c, don't 
-> >> you?
-> > agreed
-> 
-> No, I am not sure. The IP is not the same between 9263 and 9g45/9m10. So
-> this inclusion will not apply.
+Yeah, this is pretty much the same for OMAP too.
 
-Sorry, that's not what I meant. This patch changes a function declaration:
+> I am not sure if the default behavior of MMU fault in our IOMMU driver
+> is also correct for other IOMMU drivers.
 
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index ed544a0..276d63a 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -183,7 +183,8 @@ extern void __init at91_add_device_lcdc(struct 
-atmel_lcdfb_info *data);
- extern void __init at91_add_device_ac97(struct ac97c_platform_data 
-*data);
- 
-  /* ISI */
--extern void __init at91_add_device_isi(void);
-+struct isi_platform_data;
-+extern void __init at91_add_device_isi(struct isi_platform_data *data);
- 
-  /* Touchscreen Controller */
- struct at91_tsadcc_data {
+It seems your default behavior just prints an error message with the
+details of the fault (addresses, flags, etc..). We can probably have
+this unified.
 
-but doesn't change that function implementation in at91sam9263_devices.c, 
-which will break compilation, AFAICS.
+In case you want to print exonys-specific info when the fault is not
+handled by upper layers, we can change report_iommu_fault() to return
+an error whenever a handler is not installed. This way
+exynos_sysmmu_irq() can easily tell whether to proceed with the
+default behavior or not, without installing a fault handler in the
+driver:
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 297893f..dc4b282 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -103,7 +103,7 @@ extern void iommu_set_fault_handler(struct iommu_domain *dom
+ static inline int report_iommu_fault(struct iommu_domain *domain,
+                struct device *dev, unsigned long iova, int flags)
+ {
+-       int ret = 0;
++       int ret = -EFAULT;
+
+
+> BTW,
+> I think we need more fault type than IOMMU_FAULT_READ and IOMMU_FAULT_WRITE.
+> We have page fault, access fault(read, write), security fault
+> and bus error (translated physical address is not available)
+
+Initially we had a argument for the type of the fault, but dropped it
+because it was not used. Feel free to add it back if you need it.
+
+Thanks,
+Ohad.
