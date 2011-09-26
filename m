@@ -1,44 +1,39 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 26 Sep 2011 11:06:23 +0200
-Subject: [PATCH 1/2] ARM: pxa: fix building error by palm27x_lcd_init()
-	when FB_PXA not defined
-In-Reply-To: <CAMPhdO-gZOnMjHog0t7cp74rs+Z+D76v2dPLBgp+jUGNG9J39A@mail.gmail.com>
-References: <1317009197-12578-1-git-send-email-eric.y.miao@gmail.com>
-	<201109261100.07265.marek.vasut@gmail.com>
-	<CAMPhdO-gZOnMjHog0t7cp74rs+Z+D76v2dPLBgp+jUGNG9J39A@mail.gmail.com>
-Message-ID: <201109261106.24026.marek.vasut@gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 26 Sep 2011 10:20:08 +0100
+Subject: [PATCHv2 0/3] Initial support for Picochip picoxcell
+In-Reply-To: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
+References: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20110926092008.GC3372@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 26, 2011 11:02:03 AM Eric Miao wrote:
-> 2011/9/26 Marek Vasut <marek.vasut@gmail.com>:
-> > On Monday, September 26, 2011 05:53:16 AM Eric Miao wrote:
-> >> Cc: Marek Vasut <marek.vasut@gmail.com>
-> >> Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-> >> ---
-> >>  arch/arm/mach-pxa/include/mach/palm27x.h |    2 +-
-> >>  1 files changed, 1 insertions(+), 1 deletions(-)
-> >> 
-> >> diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h
-> >> b/arch/arm/mach-pxa/include/mach/palm27x.h index 0a5e5ea..f80bbe2 100644
-> >> --- a/arch/arm/mach-pxa/include/mach/palm27x.h
-> >> +++ b/arch/arm/mach-pxa/include/mach/palm27x.h
-> >> @@ -34,7 +34,7 @@ extern struct pxafb_mode_info
-> >> palm_320x320_new_lcd_mode; extern void __init palm27x_lcd_init(int
-> >> power,
-> >>                                       struct pxafb_mode_info *mode);
-> >>  #else
-> >> -static inline void palm27x_lcd_init(int power, struct pxafb_mode_info
-> >> *mode) {} +#define palm27x_lcd_init(power, mode)      do {} while (0)
-> >>  #endif
-> >> 
-> >>  #if  defined(CONFIG_USB_GADGET_PXA27X) || \
-> > 
-> > Hi Eric,
-> > 
-> > NAK. Why do you do such a change ? Especially as this will likely
-> > interfere with gcc4.6's unused-but-set variable checking.
+On Wed, Aug 24, 2011 at 03:41:43PM +0100, Jamie Iles wrote:
+> This series adds support for Picochip picoXcell (PC3X2 and PC3X3)
+> ARM1176JZ-S based devices.  This is a device tree only platform and
+> currently supports interrupt controllers and UARTs.
 > 
-> OK, I'll hold this one. Feel free to give me a solution.
+> This series is based off of Grant's devicetree/test branch and also uses
+> Russell's io and gpio cleanup patches to remove the definition of
+> IO_SPACE_LIMIT and trivial gpio definitions.
+> 
+> Changes since v1:
+> 
+> 	- Cleanup empty headers
+> 	- Use of_platform_populate() and the default match table
+> 	- Split the VIC's into separate device nodes
+> 
+> Jamie Iles (3):
+>   picoxcell: support for Picochip picoxcell devices
+>   picoxcell: add the DTS for pc3x2 and pc3x3 devices
+>   picoxcell: add the DTS for the PC7302 board
 
-Hang on, I'll run it through the cogs.
+Hi Arnd,
+
+Is there likely to be any chance of getting support for picoxcell 
+merged?  This series can now be based on top of Nicolas' static IO 
+mapping patches to remove some more code but I'm not sure what else I 
+can do to make them easier to review!
+
+Thanks,
+
+Jamie
