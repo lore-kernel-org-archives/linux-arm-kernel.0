@@ -1,83 +1,98 @@
-From: rob.lee@linaro.org (Rob Lee)
-Date: Mon, 26 Sep 2011 13:59:52 -0500
-Subject: [PATCH v2 1/3] ARM: imx: Add imx cpuidle driver
-In-Reply-To: <CAMXH7KEGyb+nu0ZbvwxFHe8+BZHp5qko_+goFNSxS3DxEoVBhg@mail.gmail.com>
-References: <1316194070-21889-1-git-send-email-rob.lee@linaro.org>
-	<1316194070-21889-2-git-send-email-rob.lee@linaro.org>
-	<20110916213613.GA16381@n2100.arm.linux.org.uk>
-	<CAMXH7KEGyb+nu0ZbvwxFHe8+BZHp5qko_+goFNSxS3DxEoVBhg@mail.gmail.com>
-Message-ID: <CAMXH7KGyBb1Co=jSVfkDEjz1cAe6-SBQdFHdZ_kVRT_VzfFVwA@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 27 Sep 2011 00:37:09 +0530
+Subject: serial: samsung: add clkdev based clock lookup and device tree support
+Message-ID: <1317064038-32428-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 September 2011 22:54, Rob Lee <rob.lee@linaro.org> wrote:
-> Hello Russell,
->
-> On 16 September 2011 16:36, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Fri, Sep 16, 2011 at 12:27:48PM -0500, Robert Lee wrote:
->>> Introduce a new cpuidle driver which provides the common cpuidle
->>> functionality necessary for any imx soc cpuidle implementation.
->>
->> I think its probably about time we said no to this duplication of CPU
->> idle infrastructure. ?There seems to be a common pattern appearing
->> through all SoCs - they're all doing this:
->>
->>> +static int imx_enter_idle(struct cpuidle_device *dev,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct cpuidle_state *state)
->>> +{
->>> + ? ? struct timeval before, after;
->>> + ? ? int idle_time;
->>> +
->>> + ? ? local_irq_disable();
->>> + ? ? local_fiq_disable();
->>> +
->>> + ? ? do_gettimeofday(&before);
->>> +
->>> + ? ? mach_cpuidle(dev, state);
->>> +
->>> + ? ? do_gettimeofday(&after);
->>> +
->>> + ? ? local_fiq_enable();
->>> + ? ? local_irq_enable();
->>> +
->>> + ? ? idle_time = (after.tv_sec - before.tv_sec) * USEC_PER_SEC +
->>> + ? ? ? ? ? ? (after.tv_usec - before.tv_usec);
->>> +
->>> + ? ? return idle_time;
->>> +}
->>
->
-> If I understand you correctly, it sounds like you are suggesting
-> adding cpuidle initialization functionality that is common for all ARM.
-> Did you mean just the above function or also the functionality found
-> in imx_cpuidle_init and imx_cpuidle_dev_init? ?For this common
-> ARM functionality, would a cpuidle.c file in arch/arm/common/ be the
-> right location?
+This patchset adds clkdev based clock lookup support and device tree based
+discovery for Samsung uart controller driver. Passing of clock names in
+platform data is removed.
 
-After looking at this further today, it appears that there is precedence
-for putting a cpuidle driver common to a particular cpu
-architecture in drivers/idle.  So perhaps a new file "arm_idle.c" that
-has common cpuidle functionality could be added to that location.
+In the process of adding these features, other changes have also been made
+that merges all the SoC specfic extensions into the parent driver.
 
->
->> in some form, where 'do_gettimeofday' might be ktime_get() or
->> getnstimeofday(). ?If we can standardize on which of the many time
->> functions can be used (which would be a definite plus) we should move
->> this out to common code.
->
-> Looking into the time keeping functionality more, of the time functions
-> you mentioned I think that ktime_get is preferable as its result it effectively
-> a monotonic time that won't be changed with calls to do_settimeofday
-> unlike the other two functions whose use of xtime only could result in
-> an error in the reported time difference on SMP systems.
->
->>
->> Maybe also the initialization code could be standardized and improved
->> too - for instance, what if you boot with maxcpus=1 on a platform
->> supporting 2 CPUs, and you bring CPU1 online from userspace? ?When
->> these CPU idle initialization functions are called, only one CPU will
->> be online, and as they use 'for_each_cpu(cpu_id, cpu_online_mask)'
->> CPU1 will be missing the cpu idle init.
->>
->
+This patch has been tested with a following addtional macro suggested by
+Russell King (<rmk+kernel@arm.linux.org.uk>) but this macro is not
+included in this patch nor is it available in any tree yet. There is a
+seperate work going on to prepare a patch series that consolidates
+the macros used to instantiate a 'struct clk_lookup'. This patchset
+would use that work when it is submitted.
+
+diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
+index 457bcb0..13ffbb8 100644
+--- a/include/linux/clkdev.h
++++ b/include/linux/clkdev.h
+@@ -24,6 +24,13 @@ struct clk_lookup {
+        struct clk              *clk;
+ };
+
++#define CLKDEV_INIT(dev, con, ck)      \
++       {                       \
++               .dev_id = dev,  \
++               .con_id = con,  \
++               .clk = ck,      \
++       }
++
+ struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
+        const char *dev_fmt, ...);
+
+
+This patchset is based on the following tree
+https://github.com/kgene/linux-samsung.git  branch: for-next
+
+with the following two patches applied
+[PATCH] serial: samsung: Add unified interrupt handler for s3c64xx and later SoC's
+[PATCH] ARM: SAMSUNG: Remove uart irq handling from plaform code
+
+and tested on the following boards.
+SMDK2440, SMDK2416, SMDK6410, SMDK6440, SMDK6450, SMDKC100, SMDKV210, SMDKV310.
+
+
+Thomas Abraham (9):
+  serial: samsung: Keep a copy of the location of platform data in driver's private data
+  serial: samsung: move handling of fclk/n clock to platform code
+  serial: samsung: switch to clkdev based clock lookup
+  serial: samsung: remove struct 's3c24xx_uart_clksrc' and all uses of it
+  serial: samsung: remove all uses of get_clksrc and set_clksrc
+  arm: samsung: register uart clocks to clock lookup list
+  serial: samsung: merge all SoC specific port reset functions
+  serial: samsung: merge probe() function from all SoC specific extensions
+  serial: samsung: add device tree support
+
+ arch/arm/mach-exynos4/clock.c                    |  106 +++--
+ arch/arm/mach-exynos4/init.c                     |   21 +-
+ arch/arm/mach-s3c2410/mach-bast.c                |   22 -
+ arch/arm/mach-s3c2410/mach-vr1000.c              |   24 -
+ arch/arm/mach-s3c2410/s3c2410.c                  |    6 +
+ arch/arm/mach-s3c2412/clock.c                    |    7 +
+ arch/arm/mach-s3c2440/clock.c                    |   44 ++
+ arch/arm/mach-s3c2440/mach-anubis.c              |   22 +-
+ arch/arm/mach-s3c2440/mach-at2440evb.c           |   22 +-
+ arch/arm/mach-s3c2440/mach-osiris.c              |   24 +-
+ arch/arm/mach-s3c2440/mach-rx1950.c              |   18 +-
+ arch/arm/mach-s3c2440/mach-rx3715.c              |   19 +-
+ arch/arm/mach-s3c64xx/clock.c                    |   37 +-
+ arch/arm/mach-s5p64x0/clock-s5p6440.c            |   32 +-
+ arch/arm/mach-s5p64x0/clock-s5p6450.c            |   32 +-
+ arch/arm/mach-s5p64x0/init.c                     |   31 -
+ arch/arm/mach-s5pc100/clock.c                    |   33 +-
+ arch/arm/mach-s5pv210/clock.c                    |  107 +++--
+ arch/arm/mach-s5pv210/init.c                     |   19 -
+ arch/arm/plat-s3c24xx/s3c2443-clock.c            |   22 +-
+ arch/arm/plat-samsung/include/plat/regs-serial.h |   45 +-
+ drivers/tty/serial/Kconfig                       |   45 +--
+ drivers/tty/serial/Makefile                      |    5 -
+ drivers/tty/serial/s3c2410.c                     |  115 ----
+ drivers/tty/serial/s3c2412.c                     |  149 -----
+ drivers/tty/serial/s3c2440.c                     |  178 ------
+ drivers/tty/serial/s3c6400.c                     |  149 -----
+ drivers/tty/serial/s5pv210.c                     |  158 ------
+ drivers/tty/serial/samsung.c                     |  639 +++++++++++++---------
+ drivers/tty/serial/samsung.h                     |   32 +-
+ 30 files changed, 737 insertions(+), 1426 deletions(-)
+ delete mode 100644 drivers/tty/serial/s3c2410.c
+ delete mode 100644 drivers/tty/serial/s3c2412.c
+ delete mode 100644 drivers/tty/serial/s3c2440.c
+ delete mode 100644 drivers/tty/serial/s3c6400.c
+ delete mode 100644 drivers/tty/serial/s5pv210.c
