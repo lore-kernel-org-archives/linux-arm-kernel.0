@@ -1,64 +1,40 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 26 Sep 2011 23:29:18 +0100
-Subject: [PATCH 3/3] ARM: gic: add OF based initialization
-In-Reply-To: <1316550244-3655-4-git-send-email-robherring2@gmail.com>
-References: <1316550244-3655-1-git-send-email-robherring2@gmail.com>
-	<1316550244-3655-4-git-send-email-robherring2@gmail.com>
-Message-ID: <20110926222918.GG9194@gallagher>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 26 Sep 2011 15:30:50 -0700
+Subject: [GIT PULL] I2C: OMAP: misc. cleanup for v3.2
+In-Reply-To: <4E669F36.2070008@ti.com>
+References: <871uwbhdoj.fsf@ti.com> <4E669F36.2070008@ti.com>
+Message-ID: <4E80FD1A.5040006@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+ping
 
-Apologies for the noise!  One minor comment below.
-
-Jamie
-
-On Tue, Sep 20, 2011 at 03:24:04PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> This adds ARM gic interrupt controller initialization using device tree
-> data.
-> 
-> The initialization function is intended to be called by of_irq_init
-> function like this:
-> 
-> const static struct of_device_id irq_match[] = {
->         { .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
->         {}
-> };
-> 
-> static void __init init_irqs(void)
-> {
->         of_irq_init(irq_match);
-> }
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-[...]
-> diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-> index 435d3f8..2862d0e 100644
-> --- a/arch/arm/include/asm/hardware/gic.h
-> +++ b/arch/arm/include/asm/hardware/gic.h
-> @@ -33,10 +33,21 @@
->  #define GIC_DIST_SOFTINT		0xf00
->  
->  #ifndef __ASSEMBLY__
-> +#include <linux/irqdomain.h>
-> +
->  extern void __iomem *gic_cpu_base_addr;
->  extern struct irq_chip gic_arch_extn;
->  
->  void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
-> +#ifdef CONFIG_OF
-> +int gic_of_init(struct device_node *node, struct device_node *parent);
-> +#else
-> +static inline void gic_of_init(struct device_node *node,
-> +			       struct device_node *parent)
-
-This should return int?
-
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
+On 09/06/2011 03:31 PM, Kevin Hilman wrote:
+> Hi Ben,
+>
+> On 08/23/2011 05:10 PM, Kevin Hilman wrote:
+>> Ben,
+>>
+>> Here's one more I2C cleanup series for v3.2.
+>>
+>> It applies on top of my for_3.2/i2c-fixes branch just submitted.
+>>
+>> Please pull into your tree for linux-next.
+>
+> I see you pulled the other two, can you pull this one as well?
+>
+> Since master.kernel.org is still down, I pushed a (backup) copy of these
+> branches to my gitorious repo[1]. It should pull cleanly into what
+> you've already pulled since this branch is based on my for_3.2/i2c-fixes
+> which you've already pulled.
+>
+> Thanks,
+>
+> Kevin
+>
+>
+> [1] git://gitorious.org/khilman/linux-omap-pm.git
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at http://vger.kernel.org/majordomo-info.html
