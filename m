@@ -1,44 +1,65 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 26 Sep 2011 19:03:12 -0400 (EDT)
-Subject: Pull request: removal of most instances of mach/memory.h
-In-Reply-To: <20110926223839.GB23680@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
-	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
-	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
-	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
-	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
-	<20110926191055.GP22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109261514330.2718@xanadu.home>
-	<alpine.LFD.2.00.1109261606210.2718@xanadu.home>
-	<20110926223839.GB23680@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1109261901550.2718@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 26 Sep 2011 16:10:05 -0700
+Subject: [PATCH v7 00/26] gpio/omap: driver cleanup and fixes
+In-Reply-To: <CAC83ZvLfCOjKja1rZ6GB4bmn_KrcjitTJZJsa5jy01QVj2OXXw@mail.gmail.com>
+	(Tarun Kanti DebBarma's message of "Sat, 24 Sep 2011 16:11:52 +0530")
+References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
+	<87mxdwm8pk.fsf@ti.com>
+	<CAC83ZvKu5Fo-c88L4WFPdvq91T=usaZY4mzTVVzDLw9HE7g9Kg@mail.gmail.com>
+	<4E7D99CB.7090004@ti.com>
+	<CAC83ZvLfCOjKja1rZ6GB4bmn_KrcjitTJZJsa5jy01QVj2OXXw@mail.gmail.com>
+Message-ID: <8739fi99yq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
+"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
 
-> On Mon, Sep 26, 2011 at 04:10:03PM -0400, Nicolas Pitre wrote:
-> > On Mon, 26 Sep 2011, Nicolas Pitre wrote:
-> > 
-> > > On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
-> > > 
-> > > > This also gives additional merge conflicts elsewhere, and while git
-> > > > rerere makes some of them easy, the quantity is going to be a right
-> > > > pain to deal with on a repeated basis.
-> > > 
-> > > Again, I'm perfectly willing to use a different base for this series and 
-> > > fix the conflicts myself if you give me one.
-> > 
-> > Nevermind, I see that you merged it anyway.
-> > 
-> > You may consider the rerere.autoupdate config option if you want Git to 
-> > automatically pick the conflict resolution without you manually 
-> > confirming them all the time.
-> 
-> rerere doesn't deal with modified/deleted conflicts though.
+[...]
 
-True.  That can be considered a limitation worth fixing.
+> As pointed out by Kevin, debounce clock was not getting disabled.
+> In my testing I was somehow grepping CORE power domain instead
+> of PER power domain and hence missed it. The fix for the debounce
+> clock issue is at the end of the email.
+>
+> - Have re-based the for_3.2/gpio-cleanup branch against 3.1-rc6.
+> - Dropped [PATCH 26/26] gpio/omap: add dbclk aliases for all gpio modules
+> as suggested by Kevin since it's already taken care by hwmod.
+> - Added the debounce clock fix in the end.
 
+That debounce fix definitely makes things look better, but it's not
+solving the problem...
 
-Nicolas
+> With above, PER is hitting low power state in Suspend and Idle path.
+>
+> Have pushed a branch at below URL with mentioned changes.
+> git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
+> for_3.2/kevin/gpio-cleanup
+
+I tested your branch on my 3430/n900 and PER is still not hitting
+retention.  Setting all debounce values in the board file to zero using
+the patch below[1] makes PER hit retention again.
+
+Assuming you don't have an n900 to test with, I suggest you just copy
+the GPIO keys init from board-rx51-peripherals.c (or some of it) into
+the board file you are testing with.
+
+The problem is most likely be related to having more than one GPIO in a
+bank with debounce enabled, or more than one bank with GPIOs enabled and
+your current test is not be catching it.
+
+Kevin
+
+[1]
+diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+index 5a886cd..1853194 100644
+--- a/arch/arm/mach-omap2/board-rx51-peripherals.c
++++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+@@ -207,7 +207,7 @@ static void __init rx51_charger_init(void)
+ #define RX51_GPIO_LOCK_BUTTON		113
+ #define RX51_GPIO_PROXIMITY		89
+ 
+-#define RX51_GPIO_DEBOUNCE_TIMEOUT	10
++#define RX51_GPIO_DEBOUNCE_TIMEOUT	0
+ 
+ static struct gpio_keys_button rx51_gpio_keys[] = {
+ 	{
