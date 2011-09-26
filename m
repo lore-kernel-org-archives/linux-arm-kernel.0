@@ -1,89 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Sep 2011 16:06:45 +0100
-Subject: [RFC PATCH 3/3] ARM: mm: add l2x0 suspend/resume support
-In-Reply-To: <1317047561-11020-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1317047561-11020-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1317047561-11020-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20110926150645.GN22455@n2100.arm.linux.org.uk>
+Date: Mon, 26 Sep 2011 16:12:10 +0100
+Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <20110926141643.GK2946@opensource.wolfsonmicro.com>
+References: <20110922184614.25419.84606.stgit@ponder>
+	<20110926141643.GK2946@opensource.wolfsonmicro.com>
+Message-ID: <20110926151210.GO22455@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 03:32:41PM +0100, Lorenzo Pieralisi wrote:
-> Context is saved once for all at boot time, along with the L2 physical address
-> and cache type.
+On Mon, Sep 26, 2011 at 03:16:43PM +0100, Mark Brown wrote:
+> On Thu, Sep 22, 2011 at 12:51:23PM -0600, Grant Likely wrote:
+> > Allow drivers to report at probe time that they cannot get all the resources
+> > required by the device, and should be retried at a later time.
+> 
+> > This should completely solve the problem of getting devices
+> > initialized in the right order.  Right now this is mostly handled by
+> > mucking about with initcall ordering which is a complete hack, and
+> > doesn't even remotely handle the case where device drivers are in
+> > modules.  This approach completely sidesteps the issues by allowing
+> > driver registration to occur in any order, and any driver can request
+> > to be retried after a few more other drivers get probed.
+> 
+> So, one issue I did think of the other day while putting some support in
+> the regulator core for using this: what happens with devices which can
+> optionally use a resource but don't rely on it?  One example here is
+> that a lot of the MMC drivers have an optional regulator to control some
+> of the supplies for the cards.  If the reglator isn't there it won't be
+> used but it's not a blocker for anything.  Devices doing this would need
+> some way to figure out if they should -EBUSY or fail otherwise.
 
-Why is this assembly code?  As Barry's previous patch shows, it's
-entirely possible to save all the state required at init time from
-the existing C code without needing any additional functions.
-
-> The resume hook avoids using the stack since it might be called
-> before the C environment is up and running and fetches data using
-> program counter relative addressing so that it can be run both
-> with MMU on or off to simplify its adoption.
-
-What about parts where the security gets in the way of reinitializing
-the L2 cache?
-
-> +resume_l210:
-> +	ldr	r2, [r0], #4				@ just use scratch regs
-> +	str	r2, [r1, #L2X0_AUX_CTRL]
-> +	mov	r3, #0
-> +	mov	r12, #L2X0_LOCKDOWN_WAY_D_BASE
-> +	mov	r2, r12
-> +	str	r3, [r1, r2]
-> +	add	r2, r2, #4
-> +	str	r3, [r1, r2]
-> +	movne	r0, #0x1				@ if l210 we are done
-> +	strne	r0, [r1, #L2X0_CTRL]			@ enable L2
-> +	movne	pc, lr
-
-It's not very obvious where the compare is for this conditional (which is
-at the end of l2x0_resume in the .data section.  Also, wouldn't a branch
-to the enable at the end of this function be better and a more obvious
-flow?
-
-> +resume_l310:
-> +	add	r12, r12, r1
-> +	add	r12, r12, #L2X0_LOCKDOWN_STRIDE		@ start D lock
-> +	mov	r2, #0
-> +	mov	r3, #7
-> +unlock:
-> +	str	r2, [r12, #4]				@ I lock
-> +	str	r2, [r12], #L2X0_LOCKDOWN_STRIDE	@ D lock and increment
-> +	subs	r3, r3, #1
-> +	bne 	unlock
-
-Why not reverse r2 and r3 here?  r3 was already set to zero previously.
-
-And given what you're doing, this code could become:
-
-	mov	r3, #0
-	add	r12, r1, #L2X0_LOCKDOWN_WAY_D_BASE
-	str	r3, [r12, #4]				@ I lock
-	str	r3, [r12], #L2X0_LOCKDOWN_STRIDE	@ D lock and increment
-	bne	enable_l2
-resume_l310:
-	mov	r2, #7
-unlock:
-	str	r3, [r12, #4]				@ I lock
-	str	r3, [r12], #L2X0_LOCKDOWN_STRIDE	@ D lock and increment
-	subs	r2, r2, #1
-	bne	unlock
-
-
-> +	ldmia	r0!, {r2, r3, r12}
-> +	str	r2, [r1, #L2X0_TAG_LATENCY_CTRL]
-> +	str	r3, [r1, #L2X0_DATA_LATENCY_CTRL]
-> +	str	r12, [r1, #L2X0_ADDR_FILTER_START]
-> +	ldmia	r0!, {r2, r3, r12}
-> +	str	r2, [r1, #L2X0_ADDR_FILTER_END]
-> +	str	r3, [r1, #L2X0_DEBUG_CTRL]
-> +	str	r12, [r1, #L2X0_PREFETCH_CTRL]
-> +	ldr	r2, [r0]
-> +	str	r2, [r1, #L2X0_POWER_CTRL]
-
-enable_l2:
-
-> +	mov	r0, #0x1
-> +	str	r0, [r1, #L2X0_CTRL]			@ enable L2
-> +	mov	pc, lr
+Just to avoid confusion - ITYM -EAGAIN there.  -EBUSY is already used
+by drivers to mean "someone else claimed a resource I need" be it the
+IO region or an IRQ resource...
