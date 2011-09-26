@@ -1,110 +1,76 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 26 Sep 2011 10:41:41 +0200
-Subject: [PATCH] ARM i.MX gic: add handle_irq function
-In-Reply-To: <1316797284-21010-1-git-send-email-shawn.guo@linaro.org>
-References: <1316522956-28530-1-git-send-email-s.hauer@pengutronix.de>
-	<1316797284-21010-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110926084141.GP31404@pengutronix.de>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Mon, 26 Sep 2011 17:58:49 +0900
+Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
+In-Reply-To: <CAK=WgbYnGjPKs6_nmFRGfMnbh_7wDR-0QcptAGaqDKVOo-x3cg@mail.gmail.com>
+References: <15669786.49881316849426265.JavaMail.weblogic@epml24>
+	<CAK=WgbYnGjPKs6_nmFRGfMnbh_7wDR-0QcptAGaqDKVOo-x3cg@mail.gmail.com>
+Message-ID: <CAHQjnOOtVHUS3KmBz7LdO88fLQyLA6f-w3ye9nAH0Bx+zh38XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 24, 2011 at 01:01:24AM +0800, Shawn Guo wrote:
-> This is a plain translation of assembly gic irq handler to C function
-> for CONFIG_MULTI_IRQ_HANDLER support on imx family.
-> 
-> As the speed of gic_handle_irq() is much more important than code
-> clean, the patch chooses to plug the ifdef in the function to compile
-> out the corresponding codes.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> Right, ideally the arch/arm/plat-mxc/gic.c should be merged into
-> arch/arm/common/gic.c.  But before rmk asks me to do that, I would
-> let it stay in imx platform.
-> 
->  arch/arm/plat-mxc/Makefile                   |    2 +-
->  arch/arm/plat-mxc/gic.c                      |   47 ++++++++++++++++++++++++++
->  arch/arm/plat-mxc/include/mach/common.h      |    2 +
->  arch/arm/plat-mxc/include/mach/entry-macro.S |    6 +++
->  4 files changed, 56 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/plat-mxc/gic.c
-> 
-> diff --git a/arch/arm/plat-mxc/Makefile b/arch/arm/plat-mxc/Makefile
-> index d53c35f..b9f0f5f 100644
-> --- a/arch/arm/plat-mxc/Makefile
-> +++ b/arch/arm/plat-mxc/Makefile
-> @@ -5,7 +5,7 @@
->  # Common support
->  obj-y := clock.o time.o devices.o cpu.o system.o irq-common.o
->  
-> -# MX51 uses the TZIC interrupt controller, older platforms use AVIC
-> +obj-$(CONFIG_ARM_GIC) += gic.o
->  obj-$(CONFIG_MXC_TZIC) += tzic.o
->  obj-$(CONFIG_MXC_AVIC) += avic.o
->  
-> diff --git a/arch/arm/plat-mxc/gic.c b/arch/arm/plat-mxc/gic.c
-> new file mode 100644
-> index 0000000..487d12c
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/gic.c
-> @@ -0,0 +1,47 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011 Linaro Ltd.
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <asm/localtimer.h>
-> +#include <asm/hardware/gic.h>
-> +#ifdef CONFIG_SMP
-> +#include <asm/smp.h>
-> +#endif
-> +
-> +asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
-> +{
-> +	u32 irqstat, irqnr;
-> +
-> +	do {
-> +		irqstat = readl_relaxed(gic_cpu_base_addr + GIC_CPU_INTACK);
-> +		irqnr = irqstat & 0x3ff;
-> +		if (irqnr == 1023)
-> +			break;
-> +
-> +		if (irqnr > 29 && irqnr < 1021)
-> +			handle_IRQ(irqnr, regs);
-> +#ifdef CONFIG_SMP
-> +		else if (irqnr < 16) {
-> +			writel_relaxed(irqstat, gic_cpu_base_addr +
-> +						GIC_CPU_EOI);
-> +			do_IPI(irqnr, regs);
-> +		}
-> +#endif
-> +#ifdef CONFIG_LOCAL_TIMERS
-> +		else if (irqnr == 29) {
-> +			writel_relaxed(irqstat, gic_cpu_base_addr +
-> +						GIC_CPU_EOI);
-> +			do_local_timer(regs);
-> +		}
-> +#endif
-> +	} while (1);
-> +}
+Hi.
 
-Shouldn't this code go to arch/arm/common/gic.c instead? The
-corresponding assembly code is generic so I see no reason to make
-this i.MX specific.
+On Mon, Sep 26, 2011 at 4:59 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> 2011/9/24 ??? <pullip.cho@samsung.com>:
+>> This is the System MMU driver and IOMMU API implementation for
+>> Exynos4 SOC platforms. Exynos4 platforms has more than 10 System
+>> MMUs dedicated for each multimedia accellerators.
+>>
+>> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
+> ...
+>> +static int exynos_iommu_fault_handler(struct iommu_domain *domain,
+>> + ? ? ? ? ? ? ? ? ? ? ? struct device *dev, unsigned long iova, int flags)
+>> +{
+>> + ? ? ? struct exynos_iommu_domain *priv = domain->priv;
+>> +
+>> + ? ? ? dev_err(priv->dev, "%s occured at %p(Page table base: %p)\n",
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sysmmu_fault_name[flags], (void *)iova,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (void *)(__pa(priv->pgtable)));
+>> + ? ? ? dev_err(priv->dev, "\t\tGenerating Kernel OOPS...\n");
+>> + ? ? ? dev_err(priv->dev, "\t\tbecause it is unrecoverable.\n");
+>> + ? ? ? dev_err(priv->dev,
+>> + ? ? ? ? ? ? ? "\t\tSet Fault handler with iommu_set_fault_handler().\n");
+>> + ? ? ? dev_err(priv->dev, "\t\tto handle System MMU fault.\n");
+>> +
+>> + ? ? ? BUG();
+>> +
+>> + ? ? ? return 0;
+>> +}
+>> +
+>> +static int exynos_iommu_domain_init(struct iommu_domain *domain)
+>> +{
+> ...
+>> + ? ? ? iommu_set_fault_handler(domain, &exynos_iommu_fault_handler);
+>
+> It doesn't make a lot of sense to set an iommu fault handler here; the
+> intention of iommu_set_fault_handler() is to allow upper layers to do
+> that.
 
-Sascha
+As you've noticed, it is default behavior for iommu fault.
+If an upper layer calls iommu_set_fault_handler(),
+it is replaced with the new one.
+>
+> Moreover, exynos_sysmmu_irq() anyway knows whenever a fault occurs, so
+> calling report_iommu_fault() just to have it call into the driver
+> again seems redundant.
+>
+I think calling report_iommu_fault() in exynos_sysmmu_irq() is rather simple.
+To do the default behavior in exynos_sysmmu_irq(),
+it must check if domain->handler is NULL or not.
+But the checking is also performed in report_iommu_fault() also.
 
+I think just calling report_iommu_fault() reduces redundancy.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> If you want an exynos-specific behavior to occur whenever there's an
+> iommu fault, you should do that in exynos_sysmmu_irq itself. If you
+> just want a generic default logging behavior to occur whenever there's
+> no other fault handler installed, you might even want to consider
+> adding it to the IOMMU core.
+
+It is neither a specific behavior nor a generic logging.
+
+Just a default MMU fault report that can be replaceable with a fault
+handler that a device driver provides.
+
+Regards,
+Cho KyongHo.
