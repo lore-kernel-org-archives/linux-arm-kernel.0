@@ -1,35 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Sep 2011 14:19:58 +0100
-Subject: [PATCH] mmc: card: modify mmc_getgeo function
-In-Reply-To: <20110926131333.GA20550@pengutronix.de>
-References: <1316516929-26694-1-git-send-email-girish.shivananjappa@linaro.org>
-	<m2ty8520fb.fsf@bob.laptop.org>
-	<20110926082814.GA28149@pengutronix.de>
-	<m2k48vtr12.fsf@bob.laptop.org>
-	<20110926131333.GA20550@pengutronix.de>
-Message-ID: <20110926131958.GK22455@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 26 Sep 2011 21:34:33 +0800
+Subject: [PATCH v3 4/6] arm/imx6q: add smp and cpu hotplug support
+In-Reply-To: <20110926110634.GR31404@pengutronix.de>
+References: <1317021651-17359-1-git-send-email-shawn.guo@linaro.org>
+	<1317021651-17359-5-git-send-email-shawn.guo@linaro.org>
+	<20110926110634.GR31404@pengutronix.de>
+Message-ID: <20110926133432.GB17577@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 03:13:33PM +0200, Uwe Kleine-K?nig wrote:
-> 00000028 <mmc_blk_getgeo>:
->       28:       e3a03004        mov     r3, #4
->       2c:       e3a02010        mov     r2, #16
->       30:       e92d4010        push    {r4, lr}
->       34:       e1a04001        mov     r4, r1
->       38:       e5c13000        strb    r3, [r1]
->       3c:       e5c12001        strb    r2, [r1, #1]
->       40:       e590c050        ldr     ip, [r0, #80]   ; 0x50
->       44:       e3a02040        mov     r2, #64 ; 0x40
->       48:       e3a03000        mov     r3, #0
->       4c:       e1cc04d8        ldrd    r0, [ip, #72]   ; 0x48
->       50:       ebfffffe        bl      0 <__aeabi_uldivmod>
->       54:       e1c400b2        strh    r0, [r4, #2]
+On Mon, Sep 26, 2011 at 01:06:34PM +0200, Sascha Hauer wrote:
+> On Mon, Sep 26, 2011 at 03:20:49PM +0800, Shawn Guo wrote:
+> > It adds smp and cpu hotplug support for imx6q.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  arch/arm/mach-imx/Kconfig               |    1 +
+> >  arch/arm/mach-imx/Makefile              |    4 ++
+> >  arch/arm/mach-imx/head-v7.S             |   71 ++++++++++++++++++++++++++
+> >  arch/arm/mach-imx/hotplug.c             |   44 ++++++++++++++++
+> >  arch/arm/mach-imx/localtimer.c          |   35 +++++++++++++
+> >  arch/arm/mach-imx/platsmp.c             |   85 +++++++++++++++++++++++++++++++
+> >  arch/arm/plat-mxc/include/mach/common.h |    5 ++
+> >  7 files changed, 245 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/mach-imx/head-v7.S
+> >  create mode 100644 arch/arm/mach-imx/hotplug.c
+> >  create mode 100644 arch/arm/mach-imx/localtimer.c
+> >  create mode 100644 arch/arm/mach-imx/platsmp.c
+> > 
+> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> > index af73b3e..6ec758d 100644
+> > --- a/arch/arm/mach-imx/Kconfig
+> > +++ b/arch/arm/mach-imx/Kconfig
+> > @@ -623,6 +623,7 @@ config SOC_IMX6Q
+> >  	bool "i.MX6 Quad support"
+> >  	select ARM_GIC
+> >  	select CPU_V7
+> > +	select HAVE_ARM_SCU
+> >  	select HAVE_IMX_GPC
+> >  	select HAVE_IMX_MMDC
+> >  	select HAVE_IMX_SRC
+> > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> > index 8c21fda..d46b2e7 100644
+> > --- a/arch/arm/mach-imx/Makefile
+> > +++ b/arch/arm/mach-imx/Makefile
+> > @@ -66,4 +66,8 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
+> >  obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
+> >  obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
+> >  obj-$(CONFIG_HAVE_IMX_SRC) += src.o
+> > +obj-$(CONFIG_CPU_V7) += head-v7.o
+> 
+> Can we have a
+> 
+> AFLAGS_head-v7.o :=-Wa,-march=armv7-a
+> 
+> here?
+> 
+> Then you only have to adjust some Kconfig variables and can compile
+> i.MX3 and i.MX6 together. I just gave it a test and it works on i.MX3, I
+> don't have a i.MX6 platform to test on though.
+> 
+> The following patch could be a starting point. I merged the imx-features
+> branch into it so it probably won't apply cleanly on your series.
+> 
+I will try to test and fold it in my series tomorrow.
 
-Yes, this is just silly.  A 64-bit by 64-bit division by a power-of-2
-value to ultimately store a 16-bit value.
-
-Even truncating the output from get_capacity() would be better and no
-less (in)correct (it may look weird but what the assembly shows is that
-it really doesn't matter).  u64 / 64 will give the same 16-bit result as
-u64-truncated-to-u32 / 64.
+-- 
+Regards,
+Shawn
