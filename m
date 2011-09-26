@@ -1,77 +1,61 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 26 Sep 2011 15:36:06 -0700
-Subject: [PATCH v2 0/6] OMAP: omap_device cleanup before device-tree
-	integration
-In-Reply-To: <1314973520-3585-1-git-send-email-b-cousson@ti.com> (Benoit
-	Cousson's message of "Fri, 2 Sep 2011 16:25:14 +0200")
-References: <1314973520-3585-1-git-send-email-b-cousson@ti.com>
-Message-ID: <87ehz39bjd.fsf@ti.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Mon, 26 Sep 2011 15:37:41 -0700
+Subject: [PATCH v2 4/7] clk: Add simple gated clock
+In-Reply-To: <20110926193733.GC9194@gallagher>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-5-git-send-email-mturquette@ti.com>
+	<4E80C564.3050004@gmail.com>
+	<20110926184024.GB9194@gallagher> <4E80CE28.9030103@gmail.com>
+	<20110926193733.GC9194@gallagher>
+Message-ID: <CAJOA=zMA8q-acr=BGWrpC9iLSR3E8Y0ybH4sZ=FOn54zQ7TJKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Mon, Sep 26, 2011 at 12:37 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> On Mon, Sep 26, 2011 at 02:10:32PM -0500, Rob Herring wrote:
+>> On 09/26/2011 01:40 PM, Jamie Iles wrote:
+>> > On Mon, Sep 26, 2011 at 01:33:08PM -0500, Rob Herring wrote:
+>> >>> +static void clk_gate_set_bit(struct clk_hw *clk)
+>> >>> +{
+>> >>> + struct clk_gate *gate = to_clk_gate(clk);
+>> >>> + u32 reg;
+>> >>> +
+>> >>> + reg = __raw_readl(gate->reg);
+>> >>> + reg |= BIT(gate->bit_idx);
+>> >>> + __raw_writel(reg, gate->reg);
+>> >>
+>> >> Don't these read-mod-writes need a spinlock around it?
+>> >>
+>> >> It's possible to have an enable bits and dividers in the same register.
+>> >> If you did a set_rate and while doing an enable/disable, there would be
+>> >> a problem. Also, it may be 2 different clocks in the same register, so
+>> >> the spinlock needs to be shared and not per clock.
+>> >
+>> > Well the prepare lock will be held here and I believe that would be
+>> > sufficient.
+>>
+>> No, the enable spinlock is protecting enable/disable. But set_rate is
+>> protected by the prepare mutex. So you clearly don't need locking if you
+>> have a register of only 1 bit enables. If you have a register accessed
+>> by both enable/disable and prepare/unprepare/set_rate, then you need
+>> some protection.
+>
+> OK fair point, but I would guess that if you had a clock like this then
+> you probably wouldn't use this simple gated clock would you? ?(speaking
+> from my world where we have quite simple clocks ;-))
 
-Benoit Cousson <b-cousson@ti.com> writes:
+I think it is a safe assumption that if a register controls both
+enable/disable and some programmable divider then,
 
-> Hi Kevin,
->
-> Here are a couple of cleanups on top of your (old) for_3.2/omap_device branch
-> rebased on top of -rc4 + Tony's cleanup patches.
->
-> Since I cannot pull your latest version, I repost the whole series.
+1) those controls are probably for the same clock
+2) that clock won't be using the cookie-cutter gated-clock
+implementation anyways
 
-I have a (temporary) tree at git://github.com/khilman/linux-omap-pm.git.
-Please base the updated series on my for_3.2/omap_device branch there.
+Rob, do you feel these assumptions are OK and locking can remain the
+same in this patch?
 
-Other than the minor API name, this series looks good and I'll add
-to my omap_device queue for v3.2.
+Regards,
+Mike
 
-Thanks,
-
-Kevin
-
-> patches are available here:
-> git://gitorious.org/omap-pm/linux.git for_3.2/1_omap_device_cleanup
+> Jamie
 >
-> It is tested on OMAP4 SDP, Panda and Beagle-xM (Yeah, I found one...).
->
-> Regards,
-> Benoit
->
->
-> Changes since v1: http://www.spinics.net/lists/linux-omap/msg55801.html
->  - Update the 2 patches from Nishanth based on Kevin's comment and merge
->    them into one patch.
->
->
-> Benoit Cousson (5):
->   OMAP3: beagle-board: Use the omap_hwmod_name_get_dev API
->   OMAP2+: pm: Use hwmod name instead of dev pointer
->   OMAP2+: pm: Remove static devices variable for mpu, dsp, iva and l3 PM
->   OMAP: omap_device: Create a default omap_device_pm_latency
->   OMAP2+: devices: Remove all omap_device_pm_latency structures
->
-> Nishanth Menon (1):
->   OMAP: omap_device: Add omap_hwmod_name_get_dev
->
->  arch/arm/mach-omap2/board-omap3beagle.c       |    4 +-
->  arch/arm/mach-omap2/devices.c                 |   46 ++---------------
->  arch/arm/mach-omap2/display.c                 |   11 +----
->  arch/arm/mach-omap2/dma.c                     |   11 +----
->  arch/arm/mach-omap2/gpio.c                    |   12 +----
->  arch/arm/mach-omap2/hsmmc.c                   |   18 +------
->  arch/arm/mach-omap2/hwspinlock.c              |   12 +----
->  arch/arm/mach-omap2/mcbsp.c                   |   11 +----
->  arch/arm/mach-omap2/pm.c                      |   69 ++++++++-----------------
->  arch/arm/mach-omap2/serial.c                  |   25 +---------
->  arch/arm/mach-omap2/sr_device.c               |   11 +----
->  arch/arm/mach-omap2/usb-musb.c                |   11 +----
->  arch/arm/plat-omap/i2c.c                      |   10 +---
->  arch/arm/plat-omap/include/plat/omap_device.h |   10 ++++
->  arch/arm/plat-omap/omap_device.c              |   49 +++++++++++++++++-
->  15 files changed, 95 insertions(+), 215 deletions(-)
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
