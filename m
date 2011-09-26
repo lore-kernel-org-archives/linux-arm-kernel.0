@@ -1,99 +1,174 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 27 Sep 2011 00:37:18 +0530
-Subject: [PATCH 9/9] serial: samsung: add device tree support
-In-Reply-To: <1317064038-32428-1-git-send-email-thomas.abraham@linaro.org>
-References: <1317064038-32428-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1317064038-32428-10-git-send-email-thomas.abraham@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 26 Sep 2011 14:10:32 -0500
+Subject: [PATCH v2 4/7] clk: Add simple gated clock
+In-Reply-To: <20110926184024.GB9194@gallagher>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-5-git-send-email-mturquette@ti.com>
+	<4E80C564.3050004@gmail.com> <20110926184024.GB9194@gallagher>
+Message-ID: <4E80CE28.9030103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree based discovery support for Samsung's uart controller.
+On 09/26/2011 01:40 PM, Jamie Iles wrote:
+> Hi Rob,
+> 
+> On Mon, Sep 26, 2011 at 01:33:08PM -0500, Rob Herring wrote:
+>> Mike,
+>>
+>> On 09/22/2011 05:26 PM, Mike Turquette wrote:
+>>> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+>>>
+>>> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+>>> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>>> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+>>> Signed-off-by: Mike Turquette <mturquette@ti.com>
+>>> ---
+>>> Changes since v1:
+>>> Add copyright header
+>>> Fold in Jamie's patch for set-to-disable clks
+>>> Use BIT macro instead of shift
+>>>
+>>>  drivers/clk/Kconfig    |    4 ++
+>>>  drivers/clk/Makefile   |    1 +
+>>>  drivers/clk/clk-gate.c |   78 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>>  include/linux/clk.h    |   13 ++++++++
+>>>  4 files changed, 96 insertions(+), 0 deletions(-)
+>>>  create mode 100644 drivers/clk/clk-gate.c
+>>>
+>>> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+>>> index d8313d7..a78967c 100644
+>>> --- a/drivers/clk/Kconfig
+>>> +++ b/drivers/clk/Kconfig
+>>> @@ -12,3 +12,7 @@ config GENERIC_CLK
+>>>  config GENERIC_CLK_FIXED
+>>>  	bool
+>>>  	depends on GENERIC_CLK
+>>> +
+>>> +config GENERIC_CLK_GATE
+>>> +	bool
+>>> +	depends on GENERIC_CLK
+>>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+>>> index 9a3325a..d186446 100644
+>>> --- a/drivers/clk/Makefile
+>>> +++ b/drivers/clk/Makefile
+>>> @@ -2,3 +2,4 @@
+>>>  obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+>>>  obj-$(CONFIG_GENERIC_CLK)	+= clk.o
+>>>  obj-$(CONFIG_GENERIC_CLK_FIXED)	+= clk-fixed.o
+>>> +obj-$(CONFIG_GENERIC_CLK_GATE)	+= clk-gate.o
+>>> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+>>> new file mode 100644
+>>> index 0000000..a1d8e79
+>>> --- /dev/null
+>>> +++ b/drivers/clk/clk-gate.c
+>>> @@ -0,0 +1,78 @@
+>>> +/*
+>>> + * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + * Simple clk gate implementation
+>>> + */
+>>> +
+>>> +#include <linux/clk.h>
+>>> +#include <linux/module.h>
+>>> +#include <asm/io.h>
+>>
+>> use linux/io.h
+>>
+>>> +
+>>> +#define to_clk_gate(clk) container_of(clk, struct clk_gate, hw)
+>>> +
+>>> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
+>>> +{
+>>> +	return clk_get_rate(clk_get_parent(clk->clk));
+>>> +}
+>>> +
+>>> +static void clk_gate_set_bit(struct clk_hw *clk)
+>>> +{
+>>> +	struct clk_gate *gate = to_clk_gate(clk);
+>>> +	u32 reg;
+>>> +
+>>> +	reg = __raw_readl(gate->reg);
+>>> +	reg |= BIT(gate->bit_idx);
+>>> +	__raw_writel(reg, gate->reg);
+>>
+>> Don't these read-mod-writes need a spinlock around it?
+>>
+>> It's possible to have an enable bits and dividers in the same register.
+>> If you did a set_rate and while doing an enable/disable, there would be
+>> a problem. Also, it may be 2 different clocks in the same register, so
+>> the spinlock needs to be shared and not per clock.
+> 
+> Well the prepare lock will be held here and I believe that would be 
+> sufficient.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- drivers/tty/serial/samsung.c |   36 ++++++++++++++++++++++++++++++++++--
- 1 files changed, 34 insertions(+), 2 deletions(-)
+No, the enable spinlock is protecting enable/disable. But set_rate is
+protected by the prepare mutex. So you clearly don't need locking if you
+have a register of only 1 bit enables. If you have a register accessed
+by both enable/disable and prepare/unprepare/set_rate, then you need
+some protection.
 
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 047b3bd..5e07da3 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -42,6 +42,7 @@
- #include <linux/delay.h>
- #include <linux/clk.h>
- #include <linux/cpufreq.h>
-+#include <linux/of.h>
- 
- #include <asm/irq.h>
- 
-@@ -1163,10 +1164,26 @@ static ssize_t s3c24xx_serial_show_clksrc(struct device *dev,
- 
- static DEVICE_ATTR(clock_source, S_IRUGO, s3c24xx_serial_show_clksrc, NULL);
- 
-+
- /* Device driver serial port probe */
- 
-+static const struct of_device_id s3c24xx_uart_dt_match[];
- static int probe_index;
- 
-+static inline struct s3c24xx_serial_drv_data *s3c24xx_get_driver_data(
-+			struct platform_device *pdev)
-+{
-+#ifdef CONFIG_OF
-+	if (pdev->dev.of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_node(s3c24xx_uart_dt_match, pdev->dev.of_node);
-+		return (struct s3c24xx_serial_drv_data *)match->data;
-+	}
-+#endif
-+	return (struct s3c24xx_serial_drv_data *)
-+			platform_get_device_id(pdev)->driver_data;
-+}
-+
- static int s3c24xx_serial_probe(struct platform_device *pdev)
- {
- 	struct s3c24xx_uart_port *ourport;
-@@ -1176,8 +1193,11 @@ static int s3c24xx_serial_probe(struct platform_device *pdev)
- 
- 	ourport = &s3c24xx_serial_ports[probe_index];
- 
--	ourport->drv_data = (struct s3c24xx_serial_drv_data *)
--			platform_get_device_id(pdev)->driver_data;
-+	ourport->drv_data = s3c24xx_get_driver_data(pdev);
-+	if (!ourport->drv_data) {
-+		dev_err(&pdev->dev, "could not find driver data\n");
-+		return -ENODEV;
-+	}
- 
- 	ourport->info = ourport->drv_data->info;
- 	ourport->cfg = (pdev->dev.platform_data) ?
-@@ -1626,6 +1646,17 @@ static struct platform_device_id s3c24xx_serial_driver_ids[] = {
- };
- MODULE_DEVICE_TABLE(platform, s3c24xx_serial_driver_ids);
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id s3c24xx_uart_dt_match[] = {
-+	{ .compatible = "samsung,s5pv310-uart",
-+		.data = &exynos4210_serial_drv_data },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, s3c24xx_uart_dt_match);
-+#else
-+#define s3c24xx_uart_dt_match NULL
-+#endif
-+
- static struct platform_driver samsung_serial_driver = {
- 	.probe		= s3c24xx_serial_probe,
- 	.remove		= __devexit_p(s3c24xx_serial_remove),
-@@ -1634,6 +1665,7 @@ static struct platform_driver samsung_serial_driver = {
- 		.name	= "samsung-uart",
- 		.owner	= THIS_MODULE,
- 		.pm	= SERIAL_SAMSUNG_PM_OPS,
-+		.of_match_table	= s3c24xx_uart_dt_match,
- 	},
- };
- 
--- 
-1.6.6.rc2
+
+> 
+>>> +}
+>>> +
+>>> +static void clk_gate_clear_bit(struct clk_hw *clk)
+>>> +{
+>>> +	struct clk_gate *gate = to_clk_gate(clk);
+>>> +	u32 reg;
+>>> +
+>>> +	reg = __raw_readl(gate->reg);
+>>> +	reg &= ~BIT(gate->bit_idx);
+>>> +	__raw_writel(reg, gate->reg);
+>>> +}
+>>> +
+>>> +static int clk_gate_enable_set(struct clk_hw *clk)
+>>> +{
+>>> +	clk_gate_set_bit(clk);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static void clk_gate_disable_clear(struct clk_hw *clk)
+>>> +{
+>>> +	clk_gate_clear_bit(clk);
+>>> +}
+>>> +
+>>> +struct clk_hw_ops clk_gate_set_enable_ops = {
+>>
+>> const?
+> 
+> Yup.
+> 
+>>> +	.recalc_rate = clk_gate_get_rate,
+>>> +	.enable = clk_gate_enable_set,
+>>> +	.disable = clk_gate_disable_clear,
+>>> +};
+>>> +EXPORT_SYMBOL_GPL(clk_gate_set_enable_ops);
+>>> +
+>>> +static int clk_gate_enable_clear(struct clk_hw *clk)
+>>> +{
+>>> +	clk_gate_clear_bit(clk);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static void clk_gate_disable_set(struct clk_hw *clk)
+>>> +{
+>>> +	clk_gate_set_bit(clk);
+>>> +}
+>>
+>> Are these wrapper functions really needed? Just assign set_bit and
+>> clear_bit functions directly to the ops structs. Only the ops struct
+>> name is exposed to the user.
+> 
+> I used the wrappers because the .enable method has to return an int, but 
+> the disable needs to return void.  It's either that or open code the 
+> set/clear in each.
+
+Okay. I missed that detail...
+
+Rob
