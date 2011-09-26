@@ -1,94 +1,214 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 26 Sep 2011 16:24:49 +0100
-Subject: [PATCHv3 4/4] picoxcell: remove custom ioremap implementation
+Date: Mon, 26 Sep 2011 16:24:48 +0100
+Subject: [PATCHv3 3/4] picoxcell: add the DTS for the PC7302 board
 In-Reply-To: <1317050689-16417-1-git-send-email-jamie@jamieiles.com>
 References: <1317050689-16417-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1317050689-16417-5-git-send-email-jamie@jamieiles.com>
+Message-ID: <1317050689-16417-4-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre's generic ioremap() patch set means that we don't need
-this any more.
+The PC7302 board can be populated with either a PC3X2 or PC3X3 device.
+Add DTS files for both variants of the PC7302.
+
+v3:	- remove bootargs from dts files
 
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-picoxcell/include/mach/io.h      |    7 -------
- arch/arm/mach-picoxcell/include/mach/vmalloc.h |   18 ------------------
- arch/arm/mach-picoxcell/io.c                   |   24 ------------------------
- 3 files changed, 0 insertions(+), 49 deletions(-)
- delete mode 100644 arch/arm/mach-picoxcell/include/mach/vmalloc.h
+ arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts |   86 ++++++++++++++++++++++++
+ arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts |   92 ++++++++++++++++++++++++++
+ 2 files changed, 178 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts
+ create mode 100644 arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts
 
-diff --git a/arch/arm/mach-picoxcell/include/mach/io.h b/arch/arm/mach-picoxcell/include/mach/io.h
-index a863b0f..7573ec7 100644
---- a/arch/arm/mach-picoxcell/include/mach/io.h
-+++ b/arch/arm/mach-picoxcell/include/mach/io.h
-@@ -19,11 +19,4 @@
- /* No PCI possible on picoxcell. */
- #define __mem_pci(a)		(a)
- 
--#define __arch_ioremap	picoxcell_ioremap
--#define __arch_iounmap	picoxcell_iounmap
--
--extern void __iomem *picoxcell_ioremap(unsigned long phys, size_t size,
--				       unsigned int type);
--extern void picoxcell_iounmap(volatile void __iomem *addr);
--
- #endif /* __ASM_ARM_ARCH_IO_H */
-diff --git a/arch/arm/mach-picoxcell/include/mach/vmalloc.h b/arch/arm/mach-picoxcell/include/mach/vmalloc.h
-deleted file mode 100644
-index 62559e3..0000000
---- a/arch/arm/mach-picoxcell/include/mach/vmalloc.h
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- * Copyright (c) 2011 Picochip Ltd., Jamie Iles
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#define VMALLOC_END		0xFE000000UL
-diff --git a/arch/arm/mach-picoxcell/io.c b/arch/arm/mach-picoxcell/io.c
-index 935a2fa..39e9b9e 100644
---- a/arch/arm/mach-picoxcell/io.c
-+++ b/arch/arm/mach-picoxcell/io.c
-@@ -30,27 +30,3 @@ void __init picoxcell_map_io(void)
- 
- 	iotable_init(&io_map, 1);
- }
--
--void __iomem *picoxcell_ioremap(unsigned long p, size_t size,
--				unsigned int type)
--{
--	if (unlikely(size == 0))
--		return NULL;
--
--	if (p >= PICOXCELL_PERIPH_BASE &&
--	    p < PICOXCELL_PERIPH_BASE + PICOXCELL_PERIPH_LENGTH)
--		return IO_ADDRESS(p);
--
--	return __arm_ioremap_caller(p, size, type,
--				    __builtin_return_address(0));
--}
--EXPORT_SYMBOL_GPL(picoxcell_ioremap);
--
--void picoxcell_iounmap(volatile void __iomem *addr)
--{
--	unsigned long virt = (unsigned long)addr;
--
--	if (virt >= VMALLOC_START && virt < VMALLOC_END)
--		__iounmap(addr);
--}
--EXPORT_SYMBOL_GPL(picoxcell_iounmap);
+diff --git a/arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts b/arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts
+new file mode 100644
+index 0000000..1297414
+--- /dev/null
++++ b/arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dts
+@@ -0,0 +1,86 @@
++/*
++ *  Copyright (C) 2011 Picochip, Jamie Iles
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++/include/ "picoxcell-pc3x2.dtsi"
++/ {
++	model = "Picochip PC7302 (PC3X2)";
++	compatible = "picochip,pc7302-pc3x2", "picochip,pc3x2";
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x08000000>;
++	};
++
++	chosen {
++		linux,stdout-path = &uart0;
++	};
++
++	clocks {
++		ref_clk: clock at 1 {
++			compatible = "fixed-clock";
++			clock-outputs = "ref";
++			clock-frequency = <20000000>;
++		};
++	};
++
++	rwid-axi {
++		ebi at 50000000 {
++			nand: gpio-nand at 2,0 {
++				compatible = "gpio-control-nand";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <2 0x0000 0x1000>;
++				bus-clock = <&pclk>, "bus";
++				gpio-control-nand,io-sync-reg =
++					<0x00000000 0x80220000>;
++
++				gpios = <&banka 1 0	/* rdy */
++					 &banka 2 0 	/* nce */
++					 &banka 3 0 	/* ale */
++					 &banka 4 0 	/* cle */
++					 0		/* nwp */>;
++
++				boot at 100000 {
++					label = "Boot";
++					reg = <0x100000 0x80000>;
++				};
++
++				redundant-boot at 200000 {
++					label = "Redundant Boot";
++					reg = <0x200000 0x80000>;
++				};
++
++				boot-env at 300000 {
++					label = "Boot Evironment";
++					reg = <0x300000 0x20000>;
++				};
++
++				redundant-boot-env at 320000 {
++					label = "Redundant Boot Environment";
++					reg = <0x300000 0x20000>;
++				};
++
++				kernel at 380000 {
++					label = "Kernel";
++					reg = <0x380000 0x800000>;
++				};
++
++				fs at b80000 {
++					label = "File System";
++					reg = <0xb80000 0xf480000>;
++				};
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts b/arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts
+new file mode 100644
+index 0000000..9e317a4
+--- /dev/null
++++ b/arch/arm/boot/dts/picoxcell-pc7302-pc3x3.dts
+@@ -0,0 +1,92 @@
++/*
++ *  Copyright (C) 2011 Picochip, Jamie Iles
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++/include/ "picoxcell-pc3x3.dtsi"
++/ {
++	model = "Picochip PC7302 (PC3X3)";
++	compatible = "picochip,pc7302-pc3x3", "picochip,pc3x3";
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x08000000>;
++	};
++
++	chosen {
++		linux,stdout-path = &uart0;
++	};
++
++	clocks {
++		ref_clk: clock at 10 {
++			compatible = "fixed-clock";
++			clock-outputs = "ref";
++			clock-frequency = <20000000>;
++		};
++
++		clkgate: clkgate at 800a0048 {
++			clock at 4 {
++				picochip,clk-no-disable;
++			};
++		};
++	};
++
++	rwid-axi {
++		ebi at 50000000 {
++			nand: gpio-nand at 2,0 {
++				compatible = "gpio-control-nand";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <2 0x0000 0x1000>;
++				bus-clock = <&ebi_clk>, "bus";
++				gpio-control-nand,io-sync-reg =
++					<0x00000000 0x80220000>;
++
++				gpios = <&banka 1 0	/* rdy */
++					 &banka 2 0 	/* nce */
++					 &banka 3 0 	/* ale */
++					 &banka 4 0 	/* cle */
++					 0		/* nwp */>;
++
++				boot at 100000 {
++					label = "Boot";
++					reg = <0x100000 0x80000>;
++				};
++
++				redundant-boot at 200000 {
++					label = "Redundant Boot";
++					reg = <0x200000 0x80000>;
++				};
++
++				boot-env at 300000 {
++					label = "Boot Evironment";
++					reg = <0x300000 0x20000>;
++				};
++
++				redundant-boot-env at 320000 {
++					label = "Redundant Boot Environment";
++					reg = <0x300000 0x20000>;
++				};
++
++				kernel at 380000 {
++					label = "Kernel";
++					reg = <0x380000 0x800000>;
++				};
++
++				fs at b80000 {
++					label = "File System";
++					reg = <0xb80000 0xf480000>;
++				};
++			};
++		};
++	};
++};
 -- 
 1.7.4.1
