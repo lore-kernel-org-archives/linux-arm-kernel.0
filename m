@@ -1,55 +1,35 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 26 Sep 2011 10:43:00 +0800
-Subject: [PATCH v2 1/2] ARM: cache-l2x0: remove __init annotation from
-	initialization functions
-In-Reply-To: <20110923205500.GW17169@n2100.arm.linux.org.uk>
-References: <1315288107-14689-1-git-send-email-shawn.guo@linaro.org>
-	<1315288107-14689-2-git-send-email-shawn.guo@linaro.org>
-	<20110914084237.GC6267@n2100.arm.linux.org.uk>
-	<20110915013937.GE1488@S2100-06.ap.freescale.net>
-	<20110915083248.GG6267@n2100.arm.linux.org.uk>
-	<CAGsJ_4xpc-8zzGkZ9LThqP7in27n6uX4LRGAf+AtoWTM4p=82w@mail.gmail.com>
-	<20110917104518.GD16381@n2100.arm.linux.org.uk>
-	<CAGsJ_4ysZ7C7PZ7eCLyrLuUGux2U8mVknobaJ4tRdk1g97z-dA@mail.gmail.com>
-	<20110917145614.GG16381@n2100.arm.linux.org.uk>
-	<CAGsJ_4xhQZUKx85+4mZLqFrAF+XmUqZp=VCRYwJyNafTUe814g@mail.gmail.com>
-	<20110923205500.GW17169@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4xpwZR-S2GjtMsi-BRb1ppc1Gh3Zebt4B8psnxB1ndg5g@mail.gmail.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Sun, 25 Sep 2011 20:26:09 -0700
+Subject: [PATCH v2] ARM: cache-l2x0: add resume entry for l2 in secure mode
+Message-ID: <1317007569-31213-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/24 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Sep 19, 2011 at 01:33:39PM +0800, Barry Song wrote:
->> Do you think the following is what you want?
->
-> Almost. ?A couple of things:
->
-> 1. Making the variables static means that folk like OMAP can't read the
-> ? values at resume time from their assembly (forcing them to save and
-> ? restore them, rather than using the already saved copy.)
->
-> 2. It probably makes sense to make a structure out of the saved state
-> ? information so that assembly code doesn't have to individually find
-> ? the address of each variable. ?Instead, they can find the address of
-> ? the structure (in physical memory if that's what they need) and use
-> ? offsets.
->
-> With (2) its probably worth adding a comment about the structure being
-> used in platform code and it should only ever be appended to.
-> (Alternatively, we could use the asm-offsets.h generation stuff to
-> create preprocessor symbols for the offsets in the struct if we put the
-> struct in a header file.)
->
- Then the incremental changes:
+we save the l2x0 registers at the first initialization, and platform codes
+can get them to restore l2x0 status after wakeup.
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h
-b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 733606b..99f2793 100644
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ -v2:
+ define the structure l2x0_regs to hold all saved registers;
+ make saved copy of registers non-static so that platform codes can access them;
+ add asm_offset for l2x0 saved regs(l2x0_regs struct) so that asm codes can use
+
+ arch/arm/include/asm/hardware/cache-l2x0.h |   13 +++++
+ arch/arm/include/asm/outercache.h          |    7 +++
+ arch/arm/kernel/asm-offsets.c              |    9 +++
+ arch/arm/mm/cache-l2x0.c                   |   81 ++++++++++++++++++++++++---
+ 4 files changed, 101 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index c48cb1e..4f9e81d 100644
 --- a/arch/arm/include/asm/hardware/cache-l2x0.h
 +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
 @@ -96,6 +96,19 @@
  #ifndef __ASSEMBLY__
- extern void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+ extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
  extern int l2x0_of_init(__u32 aux_val, __u32 aux_mask);
 +
 +struct l2x0_regs {
@@ -65,8 +45,33 @@ index 733606b..99f2793 100644
 +};
 +
  #endif
-
+ 
  #endif
+diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
+index d838743..53426c6 100644
+--- a/arch/arm/include/asm/outercache.h
++++ b/arch/arm/include/asm/outercache.h
+@@ -34,6 +34,7 @@ struct outer_cache_fns {
+ 	void (*sync)(void);
+ #endif
+ 	void (*set_debug)(unsigned long);
++	void (*resume)(void);
+ };
+ 
+ #ifdef CONFIG_OUTER_CACHE
+@@ -74,6 +75,12 @@ static inline void outer_disable(void)
+ 		outer_cache.disable();
+ }
+ 
++static inline void outer_resume(void)
++{
++	if (outer_cache.resume)
++		outer_cache.resume();
++}
++
+ #else
+ 
+ static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
 diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
 index 16baba2..b8d72a8 100644
 --- a/arch/arm/kernel/asm-offsets.c
@@ -77,7 +82,7 @@ index 16baba2..b8d72a8 100644
  #include <asm/procinfo.h>
 +#include <asm/hardware/cache-l2x0.h>
  #include <linux/kbuild.h>
-
+ 
  /*
 @@ -92,6 +93,14 @@ int main(void)
    DEFINE(S_OLD_R0,		offsetof(struct pt_regs, ARM_ORIG_r0));
@@ -95,77 +100,140 @@ index 16baba2..b8d72a8 100644
    DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id));
    BLANK();
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 98d03fb..b44f333 100644
+index 0d85d22..c22bee1 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -32,8 +32,8 @@ static void __iomem *l2x0_base;
- static DEFINE_SPINLOCK(l2x0_lock);
+@@ -33,6 +33,14 @@ static DEFINE_SPINLOCK(l2x0_lock);
  static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
  static uint32_t l2x0_size;
--static u32 l2x0_aux_ctrl;
--static u32 l2x0_tag_latency, l2x0_data_latency, l2x0_filter_start,
-l2x0_filter_end;
-+
+ 
 +struct l2x0_regs l2x0_saved_regs;
-
- struct l2x0_of_data {
- 	void (*setup)(const struct device_node *, __u32 *, __u32 *);
-@@ -364,7 +364,7 @@ void l2x0_init(void __iomem *base, __u32 aux_val,
-__u32 aux_mask)
++
++struct l2x0_of_data {
++	void (*setup)(const struct device_node *,__u32 *, __u32 *);
++	void (*save)(void);
++	void (*resume)(void);
++};
++
+ static inline void cache_wait_way(void __iomem *reg, unsigned long mask)
+ {
+ 	/* wait for cache operation by line or way to complete */
+@@ -280,7 +288,7 @@ static void l2x0_disable(void)
+ 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ }
+ 
+-static void __init l2x0_unlock(__u32 cache_id)
++static void l2x0_unlock(__u32 cache_id)
+ {
+ 	int lockregs;
+ 	int i;
+@@ -356,6 +364,8 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
  		/* l2x0 controller is disabled */
  		writel_relaxed(aux, l2x0_base + L2X0_AUX_CTRL);
-
--		l2x0_aux_ctrl = aux;
+ 
 +		l2x0_saved_regs.aux_ctrl = aux;
-
++
  		l2x0_inv_all();
-
-@@ -457,10 +457,10 @@ static void pl310_of_setup(const struct device_node *np,
-
- static void __init pl310_save(void)
- {
--	l2x0_tag_latency = readl_relaxed(l2x0_base + L2X0_TAG_LATENCY_CTRL);
--	l2x0_data_latency = readl_relaxed(l2x0_base + L2X0_DATA_LATENCY_CTRL);
--	l2x0_filter_end = readl_relaxed(l2x0_base + L2X0_ADDR_FILTER_END);
--	l2x0_filter_start = readl_relaxed(l2x0_base + L2X0_ADDR_FILTER_START);
-+	l2x0_saved_regs.tag_latency = readl_relaxed(l2x0_base +
-L2X0_TAG_LATENCY_CTRL);
-+	l2x0_saved_regs.data_latency = readl_relaxed(l2x0_base +
-L2X0_DATA_LATENCY_CTRL);
-+	l2x0_saved_regs.filter_end = readl_relaxed(l2x0_base + L2X0_ADDR_FILTER_END);
-+	l2x0_saved_regs.filter_start = readl_relaxed(l2x0_base +
-L2X0_ADDR_FILTER_START);
- }
-
- static void l2x0_resume(void)
-@@ -469,7 +469,7 @@ static void l2x0_resume(void)
- 		/* restore aux ctrl and enable l2 */
- 		l2x0_unlock(readl_relaxed(l2x0_base + L2X0_CACHE_ID));
-
--		writel_relaxed(l2x0_aux_ctrl, l2x0_base + L2X0_AUX_CTRL);
-+		writel_relaxed(l2x0_saved_regs.aux_ctrl, l2x0_base + L2X0_AUX_CTRL);
-
- 		l2x0_inv_all();
-
-@@ -481,10 +481,10 @@ static void pl310_resume(void)
- {
- 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
- 		/* restore pl310 setup */
--		writel_relaxed(l2x0_tag_latency, l2x0_base + L2X0_TAG_LATENCY_CTRL);
--		writel_relaxed(l2x0_data_latency, l2x0_base + L2X0_DATA_LATENCY_CTRL);
--		writel_relaxed(l2x0_filter_end, l2x0_base + L2X0_ADDR_FILTER_END);
--		writel_relaxed(l2x0_filter_start, l2x0_base + L2X0_ADDR_FILTER_START);
-+		writel_relaxed(l2x0_saved_regs.tag_latency, l2x0_base +
-L2X0_TAG_LATENCY_CTRL);
-+		writel_relaxed(l2x0_saved_regs.data_latency, l2x0_base +
-L2X0_DATA_LATENCY_CTRL);
-+		writel_relaxed(l2x0_saved_regs.filter_end, l2x0_base + L2X0_ADDR_FILTER_END);
-+		writel_relaxed(l2x0_saved_regs.filter_start, l2x0_base +
-L2X0_ADDR_FILTER_START);
+ 
+ 		/* enable L2X0 */
+@@ -445,18 +455,64 @@ static void __init pl310_of_setup(const struct device_node *np,
  	}
+ }
+ 
++static void __init pl310_save(void)
++{
++	l2x0_saved_regs.tag_latency = readl_relaxed(l2x0_base + L2X0_TAG_LATENCY_CTRL);
++	l2x0_saved_regs.data_latency = readl_relaxed(l2x0_base + L2X0_DATA_LATENCY_CTRL);
++	l2x0_saved_regs.filter_end = readl_relaxed(l2x0_base + L2X0_ADDR_FILTER_END);
++	l2x0_saved_regs.filter_start = readl_relaxed(l2x0_base + L2X0_ADDR_FILTER_START);
++}
++
++static void l2x0_resume(void)
++{
++	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
++		/* restore aux ctrl and enable l2 */
++		l2x0_unlock(readl_relaxed(l2x0_base + L2X0_CACHE_ID));
++
++		writel_relaxed(l2x0_saved_regs.aux_ctrl, l2x0_base + L2X0_AUX_CTRL);
++
++		l2x0_inv_all();
++
++		writel_relaxed(1, l2x0_base + L2X0_CTRL);
++	}
++}
++
++static void pl310_resume(void)
++{
++	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
++		/* restore pl310 setup */
++		writel_relaxed(l2x0_saved_regs.tag_latency, l2x0_base + L2X0_TAG_LATENCY_CTRL);
++		writel_relaxed(l2x0_saved_regs.data_latency, l2x0_base + L2X0_DATA_LATENCY_CTRL);
++		writel_relaxed(l2x0_saved_regs.filter_end, l2x0_base + L2X0_ADDR_FILTER_END);
++		writel_relaxed(l2x0_saved_regs.filter_start, l2x0_base + L2X0_ADDR_FILTER_START);
++	}
++
++	l2x0_resume();
++}
++
++static const struct l2x0_of_data pl310_data = {
++	pl310_of_setup,
++	pl310_save,
++	pl310_resume,
++};
++
++static const struct l2x0_of_data l2x0_data = {
++	l2x0_of_setup,
++	NULL,
++	l2x0_resume,
++};
++
+ static const struct of_device_id l2x0_ids[] __initconst = {
+-	{ .compatible = "arm,pl310-cache", .data = pl310_of_setup },
+-	{ .compatible = "arm,l220-cache", .data = l2x0_of_setup },
+-	{ .compatible = "arm,l210-cache", .data = l2x0_of_setup },
++	{ .compatible = "arm,pl310-cache", .data = (void *)&pl310_data },
++	{ .compatible = "arm,l220-cache", .data = (void *)&l2x0_data },
++	{ .compatible = "arm,l210-cache", .data = (void *)&l2x0_data },
+ 	{}
+ };
+ 
+ int __init l2x0_of_init(__u32 aux_val, __u32 aux_mask)
+ {
+ 	struct device_node *np;
+-	void (*l2_setup)(const struct device_node *np,
+-		__u32 *aux_val, __u32 *aux_mask);
++	struct l2x0_of_data *data;
+ 
+ 	np = of_find_matching_node(NULL, l2x0_ids);
+ 	if (!np)
+@@ -465,13 +521,20 @@ int __init l2x0_of_init(__u32 aux_val, __u32 aux_mask)
+ 	if (!l2x0_base)
+ 		return -ENOMEM;
+ 
++	data = of_match_node(l2x0_ids, np)->data;
++
+ 	/* L2 configuration can only be changed if the cache is disabled */
+ 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & 1)) {
+-		l2_setup = of_match_node(l2x0_ids, np)->data;
+-		if (l2_setup)
+-			l2_setup(np, &aux_val, &aux_mask);
++		if (data->setup)
++			data->setup(np, &aux_val, &aux_mask);
+ 	}
++
++	if (data->save)
++		data->save();
++
+ 	l2x0_init(l2x0_base, aux_val, aux_mask);
++
++	outer_cache.resume = data->resume;
+ 	return 0;
+ }
+ #endif
+-- 
+1.7.1
 
- 	l2x0_resume();
 
---
 
--barry
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
