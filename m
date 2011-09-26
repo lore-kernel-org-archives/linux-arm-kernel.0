@@ -1,86 +1,109 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 26 Sep 2011 12:02:30 +0100
-Subject: [PATCH v2 11/16] ARM: shmobile: convert smp platforms to
-	gic_handle_irq()
+Date: Mon, 26 Sep 2011 12:02:33 +0100
+Subject: [PATCH v2 14/16] ARM: omap2/3: Add global omap2/3_intc_handle_irq()
+	functions
 In-Reply-To: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
 References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1317034955-1029-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1317034955-1029-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the SMP shmobile platforms to use gic_handle_irq() instead
-of the assembly macro.
+Provide the OMAP2/3 IRQ code with low level handlers that can be used
+by platforms using CONFIG_MULTI_IRQ_HANDLER. Though the handlers are
+written in C, the compiled code looks very similar to its assembly
+counterpart (at least with my gcc 4.4.1).
 
-Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-shmobile/Makefile              |    1 -
- arch/arm/mach-shmobile/board-ag5evm.c        |    2 +-
- arch/arm/mach-shmobile/entry-gic.S           |   18 ------------------
- arch/arm/mach-shmobile/include/mach/common.h |    1 -
- 4 files changed, 1 insertions(+), 21 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/entry-gic.S
+ arch/arm/mach-omap2/irq.c              |   49 ++++++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/irqs.h |    2 +
+ 2 files changed, 51 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 612b270..f58ef1e 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -28,7 +28,6 @@ pfc-$(CONFIG_ARCH_SH73A0)	+= pfc-sh73a0.o
- obj-$(CONFIG_ARCH_SH7367)	+= entry-intc.o
- obj-$(CONFIG_ARCH_SH7377)	+= entry-intc.o
- obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
--obj-$(CONFIG_ARCH_SH73A0)	+= entry-gic.o
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 3a12f75..0a48b33 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -35,6 +35,11 @@
+ /* Number of IRQ state bits in each MIR register */
+ #define IRQ_BITS_PER_REG	32
  
- # PM objects
- obj-$(CONFIG_SUSPEND)		+= suspend.o
-diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
-index 475342b..145473e 100644
---- a/arch/arm/mach-shmobile/board-ag5evm.c
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c
-@@ -602,7 +602,7 @@ struct sys_timer ag5evm_timer = {
- MACHINE_START(AG5EVM, "ag5evm")
- 	.map_io		= ag5evm_map_io,
- 	.init_irq	= ag5evm_init_irq,
--	.handle_irq	= shmobile_handle_irq_gic,
-+	.handle_irq	= gic_handle_irq,
- 	.init_machine	= ag5evm_init,
- 	.timer		= &ag5evm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/entry-gic.S b/arch/arm/mach-shmobile/entry-gic.S
-deleted file mode 100644
-index e20239b..0000000
---- a/arch/arm/mach-shmobile/entry-gic.S
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- * ARM Interrupt demux handler using GIC
-- *
-- * Copyright (C) 2010 Magnus Damm
-- * Copyright (C) 2011 Paul Mundt
-- * Copyright (C) 2010 - 2011 Renesas Solutions Corp.
-- *
-- * This file is licensed under  the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <asm/assembler.h>
--#include <asm/entry-macro-multi.S>
--#include <asm/hardware/gic.h>
--#include <asm/hardware/entry-macro-gic.S>
--
--	arch_irq_handler shmobile_handle_irq_gic
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index c0cdbf9..137ba2a 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -7,7 +7,6 @@ extern void shmobile_secondary_vector(void);
- struct clk;
- extern int clk_init(void);
- extern void shmobile_handle_irq_intc(struct pt_regs *);
--extern void shmobile_handle_irq_gic(struct pt_regs *);
- extern struct platform_suspend_ops shmobile_suspend_ops;
- struct cpuidle_device;
- extern void (*shmobile_cpuidle_modes[])(void);
++#define OMAP2_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP24XX_IC_BASE)
++#define OMAP3_IRQ_BASE		OMAP2_L4_IO_ADDRESS(OMAP34XX_IC_BASE)
++#define INTCPS_SIR_IRQ_OFFSET	0x0040	/* omap2/3 active interrupt offset */
++#define ACTIVEIRQ_MASK		0x7f	/* omap2/3 active interrupt bits */
++
+ /*
+  * OMAP2 has a number of different interrupt controllers, each interrupt
+  * controller is identified as its own "bank". Register definitions are
+@@ -191,6 +196,44 @@ void __init ti816x_init_irq(void)
+ 	omap_init_irq(OMAP34XX_IC_BASE, 128);
+ }
+ 
++static inline void omap_intc_handle_irq(void __iomem *base_addr, struct pt_regs *regs)
++{
++	u32 irqnr;
++
++	do {
++		irqnr = readl_relaxed(base_addr + 0x98);
++		if (irqnr)
++			goto out;
++
++		irqnr = readl_relaxed(base_addr + 0xb8);
++		if (irqnr)
++			goto out;
++
++		irqnr = readl_relaxed(base_addr + 0xd8);
++#ifdef CONFIG_SOC_OMAPTI816X
++		if (irqnr)
++			goto out;
++		irqnr = readl_relaxed(base_addr + 0xf8);
++#endif
++
++out:
++		if (!irqnr)
++			break;
++
++		irqnr = readl_relaxed(base_addr + INTCPS_SIR_IRQ_OFFSET);
++		irqnr &= ACTIVEIRQ_MASK;
++
++		if (irqnr)
++			handle_IRQ(irqnr, regs);
++	} while (irqnr);
++}
++
++asmlinkage void __exception_irq_entry omap2_intc_handle_irq(struct pt_regs *regs)
++{
++	void __iomem *base_addr = OMAP2_IRQ_BASE;
++	omap_intc_handle_irq(base_addr, regs);
++}
++
+ #ifdef CONFIG_ARCH_OMAP3
+ static struct omap3_intc_regs intc_context[ARRAY_SIZE(irq_banks)];
+ 
+@@ -263,4 +306,10 @@ void omap3_intc_resume_idle(void)
+ 	/* Re-enable autoidle */
+ 	intc_bank_write_reg(1, &irq_banks[0], INTC_SYSCONFIG);
+ }
++
++asmlinkage void __exception_irq_entry omap3_intc_handle_irq(struct pt_regs *regs)
++{
++	void __iomem *base_addr = OMAP3_IRQ_BASE;
++	omap_intc_handle_irq(base_addr, regs);
++}
+ #endif /* CONFIG_ARCH_OMAP3 */
+diff --git a/arch/arm/plat-omap/include/plat/irqs.h b/arch/arm/plat-omap/include/plat/irqs.h
+index 30e1071..8b19a63 100644
+--- a/arch/arm/plat-omap/include/plat/irqs.h
++++ b/arch/arm/plat-omap/include/plat/irqs.h
+@@ -448,6 +448,8 @@ void omap_intc_restore_context(void);
+ void omap3_intc_suspend(void);
+ void omap3_intc_prepare_idle(void);
+ void omap3_intc_resume_idle(void);
++void omap2_intc_handle_irq(struct pt_regs *regs);
++void omap3_intc_handle_irq(struct pt_regs *regs);
+ #endif
+ 
+ #include <mach/hardware.h>
 -- 
 1.7.0.4
