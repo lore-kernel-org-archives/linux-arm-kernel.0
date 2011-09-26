@@ -1,224 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 26 Sep 2011 16:16:46 -0700
-Subject: [PATCH] ARM: OMAP2+: Use SoC specifc map_io
-In-Reply-To: <20110926231516.GI6324@atomide.com>
-References: <1316809399-19579-1-git-send-email-b-cousson@ti.com>
-	<1316809399-19579-2-git-send-email-b-cousson@ti.com>
-	<20110923230049.GC6324@atomide.com>
-	<20110926231516.GI6324@atomide.com>
-Message-ID: <20110926231646.GJ6324@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Sep 2011 00:18:06 +0100
+Subject: Pull request: removal of most instances of mach/memory.h
+In-Reply-To: <alpine.LFD.2.00.1109261852530.2718@xanadu.home>
+References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
+	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
+	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
+	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
+	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
+	<20110926191055.GP22455@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109261514330.2718@xanadu.home>
+	<20110926223810.GA23680@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109261852530.2718@xanadu.home>
+Message-ID: <20110926231806.GC23680@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no longer any need for the board specific
-map_io.
+On Mon, Sep 26, 2011 at 07:01:22PM -0400, Nicolas Pitre wrote:
+> On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
+> 
+> > On Mon, Sep 26, 2011 at 04:00:11PM -0400, Nicolas Pitre wrote:
+> > > On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
+> > > 
+> > > > On Mon, Sep 26, 2011 at 10:33:28AM -0400, Nicolas Pitre wrote:
+> > > > >       ARM: mach-ep93xx: remove mach/memory.h and Kconfig selection of SDRAM bank
+> > > > 
+> > > > Are you planning to totally kill off ZBOOT_ROM too?  Because removing
+> > > > the zreladdr stuff is doing exactly that.
+> > > 
+> > > It looks like ZBOOT_ROM is not used on that platform at all.  However, 
+> > > the ability to have a single defconfig and binary for the whole platform 
+> > > is something that the mach-ep93xx maintainers are looking for.  Having 
+> > > ZBOOT_ROM depend on and use CONFIG_PHYS_OFFSET would probably makes 
+> > > sense eventually.
+> > 
+> > You miss the point.  Removing zreladdr actively _prevents_ anyone from
+> > then choosing to build a kernel with ZBOOT_ROM enabled targetted for one
+> > platform if that's what they want, because the decompressor then loses
+> > the information it needs to properly locate the kernel.
+> 
+> Sure.  My point is that ZBOOT_ROM should eventually be coupled with 
+> CONFIG_PHYS_OFFSET to derive the zreladdr value.  Like for XIP_KERNEL, 
+> there is no real point having ZBOOT_ROM when ARM_PATCH_PHYS_VIRT is set, 
+> and when not set we have the equivalent zreladdr information elsewhere 
+> already.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+I strongly disagree on a technical point - ARM_PATCH_PHYS_VIRT and
+ZBOOT_ROM are entirely separate options _technically_ - there is no
+inter-dependence between them.  ZBOOT_ROM just needs to know where
+to place the decompressed image, and once it knows that, the kernel
+can discover the P:V translation all by itself.
 
-diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
-index 618216c..45dafe2 100644
---- a/arch/arm/mach-omap2/board-2430sdp.c
-+++ b/arch/arm/mach-omap2/board-2430sdp.c
-@@ -243,17 +243,11 @@ static void __init omap_2430sdp_init(void)
- 			 "Secondary LCD backlight");
- }
- 
--static void __init omap_2430sdp_map_io(void)
--{
--	omap2_set_globals_243x();
--	omap243x_map_common_io();
--}
--
- MACHINE_START(OMAP_2430SDP, "OMAP2430 sdp2430 board")
- 	/* Maintainer: Syed Khasim - Texas Instruments Inc */
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
--	.map_io		= omap_2430sdp_map_io,
-+	.map_io		= omap243x_map_io,
- 	.init_early	= omap2430_init_early,
- 	.init_irq	= omap2_init_irq,
- 	.init_machine	= omap_2430sdp_init,
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index ab19d30..44a3e2c 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -825,17 +825,11 @@ static void __init omap_4430sdp_init(void)
- 	omap_4430sdp_display_init();
- }
- 
--static void __init omap_4430sdp_map_io(void)
--{
--	omap2_set_globals_443x();
--	omap44xx_map_common_io();
--}
--
- MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
- 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
--	.map_io		= omap_4430sdp_map_io,
-+	.map_io		= omap4_map_io,
- 	.init_early	= omap4430_init_early,
- 	.init_irq	= gic_init_irq,
- 	.init_machine	= omap_4430sdp_init,
-diff --git a/arch/arm/mach-omap2/board-apollon.c b/arch/arm/mach-omap2/board-apollon.c
-index cf546f8..8528436 100644
---- a/arch/arm/mach-omap2/board-apollon.c
-+++ b/arch/arm/mach-omap2/board-apollon.c
-@@ -337,17 +337,11 @@ static void __init omap_apollon_init(void)
- 	omap_sdrc_init(NULL, NULL);
- }
- 
--static void __init omap_apollon_map_io(void)
--{
--	omap2_set_globals_242x();
--	omap242x_map_common_io();
--}
--
- MACHINE_START(OMAP_APOLLON, "OMAP24xx Apollon")
- 	/* Maintainer: Kyungmin Park <kyungmin.park@samsung.com> */
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
--	.map_io		= omap_apollon_map_io,
-+	.map_io		= omap242x_map_io,
- 	.init_early	= omap2420_init_early,
- 	.init_irq	= omap2_init_irq,
- 	.init_machine	= omap_apollon_init,
-diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-index 948fde0..fcc5107 100644
---- a/arch/arm/mach-omap2/board-h4.c
-+++ b/arch/arm/mach-omap2/board-h4.c
-@@ -369,17 +369,11 @@ static void __init omap_h4_init(void)
- 	h4_init_flash();
- }
- 
--static void __init omap_h4_map_io(void)
--{
--	omap2_set_globals_242x();
--	omap242x_map_common_io();
--}
--
- MACHINE_START(OMAP_H4, "OMAP2420 H4 board")
- 	/* Maintainer: Paul Mundt <paul.mundt@nokia.com> */
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
--	.map_io		= omap_h4_map_io,
-+	.map_io		= omap242x_map_io,
- 	.init_early	= omap2420_init_early,
- 	.init_irq	= omap_h4_init_irq,
- 	.init_machine	= omap_h4_init,
-diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-index 77a4e19..d1f4a02 100644
---- a/arch/arm/mach-omap2/board-n8x0.c
-+++ b/arch/arm/mach-omap2/board-n8x0.c
-@@ -616,12 +616,6 @@ static struct i2c_board_info n810_i2c_board_info_2[] __initdata = {
- 	},
- };
- 
--static void __init n8x0_map_io(void)
--{
--	omap2_set_globals_242x();
--	omap242x_map_common_io();
--}
--
- #ifdef CONFIG_OMAP_MUX
- static struct omap_board_mux board_mux[] __initdata = {
- 	/* I2S codec port pins for McBSP block */
-@@ -692,7 +686,7 @@ static void __init n8x0_init_machine(void)
- MACHINE_START(NOKIA_N800, "Nokia N800")
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
--	.map_io		= n8x0_map_io,
-+	.map_io		= omap242x_map_io,
- 	.init_early	= omap2420_init_early,
- 	.init_irq	= omap2_init_irq,
- 	.init_machine	= n8x0_init_machine,
-@@ -702,7 +696,7 @@ MACHINE_END
- MACHINE_START(NOKIA_N810, "Nokia N810")
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
--	.map_io		= n8x0_map_io,
-+	.map_io		= omap242x_map_io,
- 	.init_early	= omap2420_init_early,
- 	.init_irq	= omap2_init_irq,
- 	.init_machine	= n8x0_init_machine,
-@@ -712,7 +706,7 @@ MACHINE_END
- MACHINE_START(NOKIA_N810_WIMAX, "Nokia N810 WiMAX")
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
--	.map_io		= n8x0_map_io,
-+	.map_io		= omap242x_map_io,
- 	.init_early	= omap2420_init_early,
- 	.init_irq	= omap2_init_irq,
- 	.init_machine	= n8x0_init_machine,
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 1bce765..e269290 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -570,17 +570,11 @@ static void __init omap4_panda_init(void)
- 	omap4_panda_display_init();
- }
- 
--static void __init omap4_panda_map_io(void)
--{
--	omap2_set_globals_443x();
--	omap44xx_map_common_io();
--}
--
- MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
- 	/* Maintainer: David Anders - Texas Instruments Inc */
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
--	.map_io		= omap4_panda_map_io,
-+	.map_io		= omap4_map_io,
- 	.init_early	= omap4430_init_early,
- 	.init_irq	= gic_init_irq,
- 	.init_machine	= omap4_panda_init,
-diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
-index a3182e8..a98db61 100644
---- a/arch/arm/mach-omap2/board-rm680.c
-+++ b/arch/arm/mach-omap2/board-rm680.c
-@@ -143,16 +143,10 @@ static void __init rm680_init(void)
- 	rm680_peripherals_init();
- }
- 
--static void __init rm680_map_io(void)
--{
--	omap2_set_globals_3xxx();
--	omap34xx_map_common_io();
--}
--
- MACHINE_START(NOKIA_RM680, "Nokia RM-680 board")
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
--	.map_io		= rm680_map_io,
-+	.map_io		= omap3_map_io,
- 	.init_early	= omap3630_init_early,
- 	.init_irq	= omap3_init_irq,
- 	.init_machine	= rm680_init,
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index 32a79e2..8677a06 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -139,12 +139,6 @@ static void __init rx51_init(void)
- 	platform_device_register(&leds_gpio);
- }
- 
--static void __init rx51_map_io(void)
--{
--	omap2_set_globals_3xxx();
--	omap34xx_map_common_io();
--}
--
- static void __init rx51_reserve(void)
- {
- 	rx51_video_mem_init();
-@@ -155,7 +149,7 @@ MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
- 	/* Maintainer: Lauri Leukkunen <lauri.leukkunen@nokia.com> */
- 	.boot_params	= 0x80000100,
- 	.reserve	= rx51_reserve,
--	.map_io		= rx51_map_io,
-+	.map_io		= omap3_map_io,
- 	.init_early	= omap3430_init_early,
- 	.init_irq	= omap3_init_irq,
- 	.init_machine	= rx51_init,
+Moreover, PHYS_OFFSET does *not* define where the kernel ends up.
+Remember that we sometimes place the kernel 1MB + 32K into the
+physical memory space - you can't encode that into CONFIG_PHYS_OFFSET
+and hope that both PHYS_OFFSET and zreladdr end up at the right place.
+
+So this is argument is actually highly flawed technically.  You're
+trying to combine two things which are actually different.
+
+Or are we now in the business of breaking old platforms?
