@@ -1,77 +1,23 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 26 Sep 2011 19:32:46 -0400 (EDT)
-Subject: Pull request: removal of most instances of mach/memory.h
-In-Reply-To: <20110926231806.GC23680@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
-	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
-	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
-	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
-	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
-	<20110926191055.GP22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109261514330.2718@xanadu.home>
-	<20110926223810.GA23680@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109261852530.2718@xanadu.home>
-	<20110926231806.GC23680@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1109261924100.2718@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 26 Sep 2011 16:41:36 -0700
+Subject: [PATCH resend 00/13] McBSP cleanup and generalization
+In-Reply-To: <1317023150-6730-1-git-send-email-jarkko.nikula@bitmer.com>
+References: <1317023150-6730-1-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <20110926234136.GL6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Sep 2011, Russell King - ARM Linux wrote:
-
-> On Mon, Sep 26, 2011 at 07:01:22PM -0400, Nicolas Pitre wrote:
-> > On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
-> > 
-> > > On Mon, Sep 26, 2011 at 04:00:11PM -0400, Nicolas Pitre wrote:
-> > > > On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
-> > > > 
-> > > > > On Mon, Sep 26, 2011 at 10:33:28AM -0400, Nicolas Pitre wrote:
-> > > > > >       ARM: mach-ep93xx: remove mach/memory.h and Kconfig selection of SDRAM bank
-> > > > > 
-> > > > > Are you planning to totally kill off ZBOOT_ROM too?  Because removing
-> > > > > the zreladdr stuff is doing exactly that.
-> > > > 
-> > > > It looks like ZBOOT_ROM is not used on that platform at all.  However, 
-> > > > the ability to have a single defconfig and binary for the whole platform 
-> > > > is something that the mach-ep93xx maintainers are looking for.  Having 
-> > > > ZBOOT_ROM depend on and use CONFIG_PHYS_OFFSET would probably makes 
-> > > > sense eventually.
-> > > 
-> > > You miss the point.  Removing zreladdr actively _prevents_ anyone from
-> > > then choosing to build a kernel with ZBOOT_ROM enabled targetted for one
-> > > platform if that's what they want, because the decompressor then loses
-> > > the information it needs to properly locate the kernel.
-> > 
-> > Sure.  My point is that ZBOOT_ROM should eventually be coupled with 
-> > CONFIG_PHYS_OFFSET to derive the zreladdr value.  Like for XIP_KERNEL, 
-> > there is no real point having ZBOOT_ROM when ARM_PATCH_PHYS_VIRT is set, 
-> > and when not set we have the equivalent zreladdr information elsewhere 
-> > already.
+* Jarkko Nikula <jarkko.nikula@bitmer.com> [110926 00:12]:
+> This is just resend of patches 2-14/14 I posted earlier:
 > 
-> I strongly disagree on a technical point - ARM_PATCH_PHYS_VIRT and
-> ZBOOT_ROM are entirely separate options _technically_ - there is no
-> inter-dependence between them.  ZBOOT_ROM just needs to know where
-> to place the decompressed image, and once it knows that, the kernel
-> can discover the P:V translation all by itself.
+> http://marc.info/?l=linux-omap&m=131480421332374&w=2
+> 
+> Patch 1/14 is already in linux-omap, Acked-by from Peter added and I
+> took freedom to thank Janusz by adding Tested-by line as he tested the
+> set on OMAP1.
 
-What's the point having a discoverable P:V translation if you have to 
-specify the location of the decompressed image?  Might as well compile 
-the kernel with PATCH_PHYS_VIRT turned off in that case.
+Thanks, I'll apply these into cleanup branch.
 
-> Moreover, PHYS_OFFSET does *not* define where the kernel ends up.
-> Remember that we sometimes place the kernel 1MB + 32K into the
-> physical memory space - you can't encode that into CONFIG_PHYS_OFFSET
-> and hope that both PHYS_OFFSET and zreladdr end up at the right place.
+Regards,
 
-Technically, zreladdr = PHYS_OFFSET + TEXT_OFFSET. Always been.
-And TEXT_OFFSET is always constant.  Some platforms have restrictions on 
-TEXT_OFFSET which is basically making it large enough.  Most other 
-platforms don't care.
-
-> So this is argument is actually highly flawed technically.  You're
-> trying to combine two things which are actually different.
-
-I don't see why they have to be different.
-
-
-Nicolas
+Tony
