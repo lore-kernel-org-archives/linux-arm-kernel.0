@@ -1,36 +1,66 @@
 From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Mon, 26 Sep 2011 10:45:46 +0300
-Subject: [PATCH resend 10/13] omap: mcbsp: Update mcbsp.h include dependencies
+Date: Mon, 26 Sep 2011 10:45:47 +0300
+Subject: [PATCH resend 11/13] omap: mcbsp: Move address definitions to
+	arch/arm/mach-omap1/mcbsp.c
 In-Reply-To: <1317023150-6730-1-git-send-email-jarkko.nikula@bitmer.com>
 References: <1317023150-6730-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <1317023150-6730-11-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <1317023150-6730-12-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hardware.h is not needed here and let the definition for struct clk to come
-via linux/clk.h.
+These address definitions are OMAP1 specific can be in single source file.
 
 Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
 ---
- arch/arm/plat-omap/include/plat/mcbsp.h |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap1/mcbsp.c             |   11 +++++++++++
+ arch/arm/plat-omap/include/plat/mcbsp.h |   11 -----------
+ 2 files changed, 11 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm/mach-omap1/mcbsp.c b/arch/arm/mach-omap1/mcbsp.c
+index 36ab5d8..91f9abb 100644
+--- a/arch/arm/mach-omap1/mcbsp.c
++++ b/arch/arm/mach-omap1/mcbsp.c
+@@ -79,6 +79,17 @@ static struct omap_mcbsp_ops omap1_mcbsp_ops = {
+ 	.free		= omap1_mcbsp_free,
+ };
+ 
++#define OMAP7XX_MCBSP1_BASE	0xfffb1000
++#define OMAP7XX_MCBSP2_BASE	0xfffb1800
++
++#define OMAP1510_MCBSP1_BASE	0xe1011800
++#define OMAP1510_MCBSP2_BASE	0xfffb1000
++#define OMAP1510_MCBSP3_BASE	0xe1017000
++
++#define OMAP1610_MCBSP1_BASE	0xe1011800
++#define OMAP1610_MCBSP2_BASE	0xfffb1000
++#define OMAP1610_MCBSP3_BASE	0xe1017000
++
+ #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+ struct resource omap7xx_mcbsp_res[][6] = {
+ 	{
 diff --git a/arch/arm/plat-omap/include/plat/mcbsp.h b/arch/arm/plat-omap/include/plat/mcbsp.h
-index 9802055..5d657d9 100644
+index 5d657d9..af5824a 100644
 --- a/arch/arm/plat-omap/include/plat/mcbsp.h
 +++ b/arch/arm/plat-omap/include/plat/mcbsp.h
-@@ -25,9 +25,7 @@
- #define __ASM_ARCH_OMAP_MCBSP_H
+@@ -38,17 +38,6 @@ static struct platform_device omap_mcbsp##port_nr = {	\
+ #define MCBSP_CONFIG_TYPE3	0x3
+ #define MCBSP_CONFIG_TYPE4	0x4
  
- #include <linux/spinlock.h>
+-#define OMAP7XX_MCBSP1_BASE	0xfffb1000
+-#define OMAP7XX_MCBSP2_BASE	0xfffb1800
 -
--#include <mach/hardware.h>
--#include <plat/clock.h>
-+#include <linux/clk.h>
- 
- /* macro for building platform_device for McBSP ports */
- #define OMAP_MCBSP_PLATFORM_DEVICE(port_nr)		\
+-#define OMAP1510_MCBSP1_BASE	0xe1011800
+-#define OMAP1510_MCBSP2_BASE	0xfffb1000
+-#define OMAP1510_MCBSP3_BASE	0xe1017000
+-
+-#define OMAP1610_MCBSP1_BASE	0xe1011800
+-#define OMAP1610_MCBSP2_BASE	0xfffb1000
+-#define OMAP1610_MCBSP3_BASE	0xe1017000
+-
+ /* McBSP register numbers. Register address offset = num * reg_step */
+ enum {
+ 	/* Common registers */
 -- 
 1.7.6.3
