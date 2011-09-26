@@ -1,42 +1,55 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 26 Sep 2011 11:58:48 +0200
-Subject: [PATCH v3 3/3] OMAP3: Remove auto-selection of PMICs
-In-Reply-To: <1316698155-954-4-git-send-email-abhilash.kv@ti.com>
-References: <1316698155-954-1-git-send-email-abhilash.kv@ti.com>
-	<1316698155-954-2-git-send-email-abhilash.kv@ti.com>
-	<1316698155-954-3-git-send-email-abhilash.kv@ti.com>
-	<1316698155-954-4-git-send-email-abhilash.kv@ti.com>
-Message-ID: <20110926095848.GF32263@sortiz-mobl>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Mon, 26 Sep 2011 19:00:49 +0900
+Subject: [PATCH 0/4 v2] iommu/exynos: Add IOMMU and Enhance System MMU driver
+	for Exynos4
+Message-ID: <CAHQjnOMCU26ELOpn7h7hcju-s970SSG5E545rPgCpw3_LkkAhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
+This is the second try of submitting patches about IOMMU/System MMU
+driver for Exynos4 SoCs with the fixes of the following problems
+pointed by Russell King.:
+ - Missing unlocking a spinlock in exynos_iommu_attach_dev().
+ - atomic_t -> int in sysmmu_drvdata.activations
+ - sysmmu_platdata -> sysmmu_drvdata
+ - Change in error messages in irq handler
+ - Removed casting in format of error message
+ - omap_iommu_ops -> exynos_iommu_ops in the last patch.
 
-On Thu, Sep 22, 2011 at 06:59:15PM +0530, Abhilash K V wrote:
-> The current implementation almost assumes that only
-> TWL4030/TWL5030/TWl6030 are (or can be) used with the
-> OMAP processors. This is, however, not true.
-> 
-> This patch removes the automatic selection of the PMIC
-> from Kconfig.
-> All currently used PMICs are now added to omap2plus_defconfig;
-> any new PMIC that gets supported in future could now be
-> enabled here rather than by changing Kconfig for
-> ARCH_OMAP2PLUS_TYPICAL
-> 
-> Signed-off-by: Sanjeev Premi <premi@ti.com>
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
-> ---
->  arch/arm/configs/omap2plus_defconfig |    3 +++
->  arch/arm/mach-omap2/Kconfig          |    3 ---
->  drivers/mfd/Kconfig                  |    2 +-
-Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+First 2 patches enhance System MMU platform device definition:
+ - Removed System MMU for MDMA0 in LCD block because it is not used.
+  Use MDMA2 in TOP block.
+ - Removed System MMU ID. Instead a System MMU is bound to a device that
+  the System MMU is dedicated during machin initialization. If a device
+  driver wants to handle System MMU, it must bind its device with System
+  MMU with sysmmu_set_owner().
+ - clkdev
+ - System MMU device driver is removed from arch/arm/plat-s5p to move it
+  to driver/iommu directory.
+Last 2 patches implements IOMMU API:
+ - Implements IOMMU API and System MMU driver that is moved from
+  arch/arm/plat-s5p.
+ - Implements fault handling that is suggested by Ohad.
+ - Used bus_set_iommu instead of register_iommu that is suggested by Joerg.
 
-for the MFD part.
+Regards,
+Cho KyongHo.
 
-Cheers,
-Samuel.
+Diffstats:
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+arch/arm/mach-exynos4/Kconfig               |    2 -
+arch/arm/mach-exynos4/clock.c               |   43 +-
+arch/arm/mach-exynos4/dev-sysmmu.c          |  270 ++------
+arch/arm/mach-exynos4/include/mach/irqs.h   |    1 -
+arch/arm/mach-exynos4/include/mach/map.h    |    1 -
+arch/arm/mach-exynos4/include/mach/sysmmu.h |   85 ++-
+arch/arm/mach-exynos4/mach-armlex4210.c     |   24 +-
+arch/arm/mach-exynos4/mach-smdkv310.c       |   28 +-
+arch/arm/plat-s5p/Kconfig                   |    8 -
+arch/arm/plat-s5p/Makefile                  |    1 -
+arch/arm/plat-s5p/include/plat/sysmmu.h     |   95 ---
+arch/arm/plat-s5p/sysmmu.c                  |  312 ---------
+drivers/iommu/Kconfig                       |   14 +
+drivers/iommu/Makefile                      |    1 +
+drivers/iommu/exynos_iommu.c                |  933 +++++++++++++++++++++++++++
+15 files changed, 1134 insertions(+), 684 deletions(-)
