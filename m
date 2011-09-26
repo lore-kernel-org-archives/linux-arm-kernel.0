@@ -1,37 +1,37 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Mon, 26 Sep 2011 08:41:13 -0400
-Subject: [PATCH] mmc: card: modify mmc_getgeo function
-In-Reply-To: <20110926082814.GA28149@pengutronix.de> ("Uwe =?utf-8?Q?Klein?=
-	=?utf-8?Q?e-K=C3=B6nig=22's?=
-	message of "Mon, 26 Sep 2011 10:28:14 +0200")
-References: <1316516929-26694-1-git-send-email-girish.shivananjappa@linaro.org>
-	<m2ty8520fb.fsf@bob.laptop.org>
-	<20110926082814.GA28149@pengutronix.de>
-Message-ID: <m2k48vtr12.fsf@bob.laptop.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 Sep 2011 14:00:14 +0100
+Subject: [PATCH 6/8] drivers: add Contiguous Memory Allocator
+In-Reply-To: <1312393430.2855.51.camel@mulgrave>
+References: <1309851710-3828-1-git-send-email-m.szyprowski@samsung.com>
+	<1309851710-3828-7-git-send-email-m.szyprowski@samsung.com>
+	<20110705113345.GA8286@n2100.arm.linux.org.uk>
+	<201107051427.44899.arnd@arndb.de>
+	<1312393430.2855.51.camel@mulgrave>
+Message-ID: <20110926130014.GG22455@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 03, 2011 at 12:43:50PM -0500, James Bottomley wrote:
+> I assume from the above that ARM has a hardware page walker?
 
-On Mon, Sep 26 2011, Uwe Kleine-K?nig wrote:
->> Thanks, pushed to mmc-next for 3.2 with a reworded commit message:
-> This (i.e. ee9e0e0 (mmc: card: Remove duplicated constants) in next)
-> makes gcc emit a reference to __aeabi_uldivmod in one of my nightly
-> builds which isn't defined.
->
-> The final linking stage fails with:
->
-> 	  LD      .tmp_vmlinux1
-> 	drivers/built-in.o: In function `mmc_blk_getgeo':
-> 	clkdev.c:(.text+0xd1528): undefined reference to `__aeabi_uldivmod'
-> 	make[2]: *** [.tmp_vmlinux1] Error 1
-> 	make[1]: *** [sub-make] Error 2
-> 	make: *** [all] Error 2
+Correct, and speculative prefetch (which isn't prevented by not having
+TLB entries), so you can't keep entries out of the TLB.  If it's in
+the page tables it can end up in the TLB.
 
-Interesting, thanks.  It builds fine here on my (gcc-4.6) ARM toolchains.
-Looking online, I think you're hitting an old gcc-4.3 bug?
+The problem is that we could end up with conflicting attributes available
+to the hardware for the same physical page, and it is _completely_
+undefined how hardware behaves with that (except that it does not halt -
+and there's no exception path for the condition because there's no
+detection of the problem case.)
 
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+So, if you had one mapping which was fully cacheable and another mapping
+which wasn't, you can flush the TLB all you like - it could be possible
+that you still up with an access through the non-cacheable mapping being
+cached (either hitting speculatively prefetched cache lines via the
+cacheable mapping, or the cacheable attributes being applied to the
+non-cacheable mapping - or conversely uncacheable attributes applied to
+the cacheable mapping.)
+
+Essentially, the condition is labelled 'unpredictable' in the TRMs,
+which basically means that not even observed behaviour can be relied
+upon, because there may be cases where the observed behaviour fails.
