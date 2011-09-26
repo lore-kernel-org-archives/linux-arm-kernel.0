@@ -1,23 +1,27 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 26 Sep 2011 13:20:07 -0700
-Subject: [PATCH v2 00/16] Switch GIC users (and omap2plus) to
-	CONFIG_MULTI_IRQ_HANDLER
-In-Reply-To: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110926202007.GB27355@huya.qualcomm.com>
+From: fernando.endo@phiinnovations.com (Fernando Endo)
+Date: Mon, 26 Sep 2011 17:19:39 -0300
+Subject: Porting linux to Stellaris Cortex-M3
+Message-ID: <CAH8SYHDRT7OpLr0sx75rMyy4OV59JZGoRv_cr2+-+2yy3tfU9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 12:02:19PM +0100, Marc Zyngier wrote:
+Hello everybody,
 
-> This series has been tested on VE (A9, A5, A15), PB11MP, Panda, IGEPv2
-> and Harmony. Patches against next-20110926 plus my PPI series.
+I'm currently porting linux to a Stellaris board from TI.
+But I'm having some problems with the execution of the Busybox init program.
 
-Tested on an msm8660.
+Some info:
+- the toolchain is CodeSourcery lite edition
+- I've followed the steps described by Catalin Marinas at
+http://www.linux-arm.org/LinuxKernel/LinuxM3
+- I'm using my own bootloader, based on the script at the site above
+and on informations found on linux/Documents
+- I've based the mach-stellaris implementation from realview and mps ones
+- the timer, irqs and uart seems to work fine
+- the system crashes after calling /init, which is linked with Busybox init
+- BUG: scheduling while atomic: init/1/0xffff000a
 
-Tested-by: David Brown <davidb@codeaurora.org>
-Acked-by: David Brown <davidb@codeaurora.org>
+Any idea?
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Best regards,
+Fernando Akira Endo
