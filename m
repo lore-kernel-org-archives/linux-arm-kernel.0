@@ -1,206 +1,66 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 26 Sep 2011 12:02:25 +0100
-Subject: [PATCH v2 06/16] ARM: msm: convert SMP platforms to
-	CONFIG_MULTI_IRQ_HANDLER
+Date: Mon, 26 Sep 2011 12:02:31 +0100
+Subject: [PATCH v2 12/16] ARM: cns3xxx: convert to CONFIG_MULTI_IRQ_HANDLER
 In-Reply-To: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
 References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1317034955-1029-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1317034955-1029-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the SMP msm platforms to be using the gic_handle_irq
-function as their primary interrupt handler.
+Convert the cns3xxx platform to be using the gic_handle_irq
+function as its primary interrupt handler.
 
-Cc: David Brown <davidb@codeaurora.org>
+Cc: Anton Vorontsov <avorontsov@mvista.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-msm/Kconfig                         |    2 +
- arch/arm/mach-msm/board-msm8960.c                 |    2 +
- arch/arm/mach-msm/board-msm8x60.c                 |    4 ++
- arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   17 ---------
- arch/arm/mach-msm/include/mach/entry-macro-vic.S  |   37 ---------------------
- arch/arm/mach-msm/include/mach/entry-macro.S      |   27 +++++++++++++--
- 6 files changed, 31 insertions(+), 58 deletions(-)
- delete mode 100644 arch/arm/mach-msm/include/mach/entry-macro-qgic.S
- delete mode 100644 arch/arm/mach-msm/include/mach/entry-macro-vic.S
+ arch/arm/Kconfig                                 |    1 +
+ arch/arm/mach-cns3xxx/cns3420vb.c                |    2 ++
+ arch/arm/mach-cns3xxx/include/mach/entry-macro.S |    2 --
+ 3 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index ebde97f..ba36b74 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -50,6 +50,7 @@ config ARCH_MSM8X60
- 	select GPIO_MSM_V2
- 	select MSM_GPIOMUX
- 	select MSM_SCM if SMP
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e32a4d3..70a947e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -334,6 +334,7 @@ config ARCH_CNS3XXX
+ 	select ARM_GIC
+ 	select MIGHT_HAVE_PCI
+ 	select PCI_DOMAINS if PCI
 +	select MULTI_IRQ_HANDLER
+ 	help
+ 	  Support for Cavium Networks CNS3XXX platform.
  
- config ARCH_MSM8960
- 	bool "MSM8960"
-@@ -60,6 +61,7 @@ config ARCH_MSM8960
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
- 	select MSM_SCM if SMP
-+	select MULTI_IRQ_HANDLER
- 
- endchoice
- 
-diff --git a/arch/arm/mach-msm/board-msm8960.c b/arch/arm/mach-msm/board-msm8960.c
-index c811e29..7af9a6d 100644
---- a/arch/arm/mach-msm/board-msm8960.c
-+++ b/arch/arm/mach-msm/board-msm8960.c
-@@ -101,6 +101,7 @@ MACHINE_START(MSM8960_SIM, "QCT MSM8960 SIMULATOR")
- 	.map_io = msm8960_map_io,
- 	.init_irq = msm8960_init_irq,
- 	.timer = &msm_timer,
-+	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8960_sim_init,
+diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
+index 55f7b4b..594852f 100644
+--- a/arch/arm/mach-cns3xxx/cns3420vb.c
++++ b/arch/arm/mach-cns3xxx/cns3420vb.c
+@@ -26,6 +26,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <asm/setup.h>
+ #include <asm/mach-types.h>
++#include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+@@ -201,5 +202,6 @@ MACHINE_START(CNS3420VB, "Cavium Networks CNS3420 Validation Board")
+ 	.map_io		= cns3420_map_io,
+ 	.init_irq	= cns3xxx_init_irq,
+ 	.timer		= &cns3xxx_timer,
++	.handle_irq	= gic_handle_irq,
+ 	.init_machine	= cns3420_init,
  MACHINE_END
- 
-@@ -111,6 +112,7 @@ MACHINE_START(MSM8960_RUMI3, "QCT MSM8960 RUMI3")
- 	.map_io = msm8960_map_io,
- 	.init_irq = msm8960_init_irq,
- 	.timer = &msm_timer,
-+	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8960_rumi3_init,
- MACHINE_END
- 
-diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-index 30c6b58..1eca320 100644
---- a/arch/arm/mach-msm/board-msm8x60.c
-+++ b/arch/arm/mach-msm/board-msm8x60.c
-@@ -111,6 +111,7 @@ MACHINE_START(MSM8X60_RUMI3, "QCT MSM8X60 RUMI3")
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
- 	.init_irq = msm8x60_init_irq,
-+	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8x60_init,
- 	.timer = &msm_timer,
- MACHINE_END
-@@ -121,6 +122,7 @@ MACHINE_START(MSM8X60_SURF, "QCT MSM8X60 SURF")
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
- 	.init_irq = msm8x60_init_irq,
-+	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8x60_init,
- 	.timer = &msm_timer,
- MACHINE_END
-@@ -131,6 +133,7 @@ MACHINE_START(MSM8X60_SIM, "QCT MSM8X60 SIMULATOR")
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
- 	.init_irq = msm8x60_init_irq,
-+	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8x60_init,
- 	.timer = &msm_timer,
- MACHINE_END
-@@ -141,6 +144,7 @@ MACHINE_START(MSM8X60_FFA, "QCT MSM8X60 FFA")
- 	.reserve = msm8x60_reserve,
- 	.map_io = msm8x60_map_io,
- 	.init_irq = msm8x60_init_irq,
-+	.handle_irq = gic_handle_irq,
- 	.init_machine = msm8x60_init,
- 	.timer = &msm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/include/mach/entry-macro-qgic.S b/arch/arm/mach-msm/include/mach/entry-macro-qgic.S
-deleted file mode 100644
-index 717076f..0000000
---- a/arch/arm/mach-msm/include/mach/entry-macro-qgic.S
-+++ /dev/null
-@@ -1,17 +0,0 @@
--/*
-- * Low-level IRQ helper macros
-- *
-- * Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-- *
-- * This file is licensed under  the terms of the GNU General Public
-- * License version 2. This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-- */
--
--#include <asm/hardware/entry-macro-gic.S>
--
--	.macro	disable_fiq
--	.endm
--
--	.macro  arch_ret_to_user, tmp1, tmp2
--	.endm
-diff --git a/arch/arm/mach-msm/include/mach/entry-macro-vic.S b/arch/arm/mach-msm/include/mach/entry-macro-vic.S
-deleted file mode 100644
-index 70563ed..0000000
---- a/arch/arm/mach-msm/include/mach/entry-macro-vic.S
-+++ /dev/null
-@@ -1,37 +0,0 @@
--/*
-- * Copyright (C) 2007 Google, Inc.
-- * Author: Brian Swetland <swetland@google.com>
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--
--#include <mach/msm_iomap.h>
--
--	.macro	disable_fiq
--	.endm
--
--	.macro	get_irqnr_preamble, base, tmp
--	@ enable imprecise aborts
--	cpsie	a
--	mov	\base, #MSM_VIC_BASE
--	.endm
--
--	.macro	arch_ret_to_user, tmp1, tmp2
--	.endm
--
--	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
--	@ 0xD0 has irq# or old irq# if the irq has been handled
--	@ 0xD4 has irq# or -1 if none pending *but* if you just
--	@ read 0xD4 you never get the first irq for some reason
--	ldr	\irqnr, [\base, #0xD0]
--	ldr	\irqnr, [\base, #0xD4]
--	cmp	\irqnr, #0xffffffff
--	.endm
-diff --git a/arch/arm/mach-msm/include/mach/entry-macro.S b/arch/arm/mach-msm/include/mach/entry-macro.S
-index b16f082..41f7003 100644
---- a/arch/arm/mach-msm/include/mach/entry-macro.S
-+++ b/arch/arm/mach-msm/include/mach/entry-macro.S
-@@ -16,8 +16,27 @@
-  *
+diff --git a/arch/arm/mach-cns3xxx/include/mach/entry-macro.S b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
+index d87bfc3..01c57df 100644
+--- a/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
++++ b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
+@@ -8,8 +8,6 @@
+  * published by the Free Software Foundation.
   */
  
--#if defined(CONFIG_ARM_GIC)
--#include <mach/entry-macro-qgic.S>
--#else
--#include <mach/entry-macro-vic.S>
-+	.macro	disable_fiq
-+	.endm
-+
-+	.macro	arch_ret_to_user, tmp1, tmp2
-+	.endm
-+
-+#if !defined(CONFIG_ARM_GIC)
-+#include <mach/msm_iomap.h>
-+
-+	.macro	get_irqnr_preamble, base, tmp
-+	@ enable imprecise aborts
-+	cpsie	a
-+	mov	\base, #MSM_VIC_BASE
-+	.endm
-+
-+	.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
-+	@ 0xD0 has irq# or old irq# if the irq has been handled
-+	@ 0xD4 has irq# or -1 if none pending *but* if you just
-+	@ read 0xD4 you never get the first irq for some reason
-+	ldr	\irqnr, [\base, #0xD0]
-+	ldr	\irqnr, [\base, #0xD4]
-+	cmp	\irqnr, #0xffffffff
-+	.endm
- #endif
+-#include <asm/hardware/entry-macro-gic.S>
+-
+ 		.macro	disable_fiq
+ 		.endm
+ 
 -- 
 1.7.0.4
