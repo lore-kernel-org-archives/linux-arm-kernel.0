@@ -1,90 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 26 Sep 2011 16:31:12 +0200
-Subject: [PATCH v2] mach-integrator: update defconfig
-Message-ID: <1317047472-2720-1-git-send-email-linus.walleij@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 26 Sep 2011 15:32:38 +0100
+Subject: [RFC PATCH 0/3] ARM: mm: add L2 suspend/resume support
+Message-ID: <1317047561-11020-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Integrator defconfig with some sensible defaults:
-- Compile a combined image supporting Integrator/AP and
-  Integrator/CP, with the core modules CM720, CM920, CM922,
-  CM926, CM1020, CM1022 and CM1026 in a single image, this
-  works just fine and gives some nice compilation coverage
-- NOHZ (tickless) and HRTIMERS turned on
-- Compile using EABI, let's assume recent compilers are used
-  now (tested using GCC 4.4.1)
-- Remove forced 32MiB at command line, the bootloader usually
-  knows this better, and my U-Boot patches nowadays make that
-  boot loader pass the correct adjusted value
-- Enable the MTD Physmap flash driver, so that the changes done
-  earlier by Marc Zyngier replacing integrator-flash takes
-  effect
-- Enable the PL030 RTC driver that has not been default-compiled
-  with any config for a while
+As a follow up to the last L2 resume patch on alkml:
 
-This has been tested on the real hardware Integrator AP with
-both an ARM920T and ARM926EJ-S core module.
+http://www.spinics.net/lists/arm-kernel/msg141881.html
 
-Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/integrator_defconfig |   11 +++++++----
- 1 files changed, 7 insertions(+), 4 deletions(-)
+please have a look at this patchset and merge the required bits if needed,
+in particular MMU off for L2 retention use case.
 
-diff --git a/arch/arm/configs/integrator_defconfig b/arch/arm/configs/integrator_defconfig
-index 7196ade..baf4301 100644
---- a/arch/arm/configs/integrator_defconfig
-+++ b/arch/arm/configs/integrator_defconfig
-@@ -1,5 +1,6 @@
- CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
-+CONFIG_TINY_RCU=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=14
-@@ -11,17 +12,20 @@ CONFIG_ARCH_INTEGRATOR_AP=y
- CONFIG_CPU_ARM720T=y
- CONFIG_CPU_ARM920T=y
- CONFIG_PCI=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
- CONFIG_LEDS=y
- CONFIG_LEDS_CPU=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=ttyAM0,38400n8 root=/dev/nfs ip=bootp mem=32M"
-+CONFIG_CMDLINE="console=ttyAM0,38400n8 root=/dev/nfs ip=bootp"
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_GOV_POWERSAVE=y
- CONFIG_CPU_FREQ_GOV_USERSPACE=y
- CONFIG_CPU_FREQ_GOV_ONDEMAND=y
- CONFIG_FPE_NWFPE=y
--CONFIG_PM=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -32,7 +36,6 @@ CONFIG_IP_PNP_DHCP=y
- CONFIG_IP_PNP_BOOTP=y
- # CONFIG_IPV6 is not set
- CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_AFS_PARTS=y
- CONFIG_MTD_CHAR=y
-@@ -40,6 +43,7 @@ CONFIG_MTD_BLOCK=y
- CONFIG_MTD_CFI=y
- CONFIG_MTD_CFI_ADV_OPTIONS=y
- CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_PHYSMAP=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=8192
-@@ -68,4 +72,3 @@ CONFIG_NFSD_V3=y
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_KERNEL=y
--CONFIG_DEBUG_ERRORS=y
+Description:
+
+In order to support the deepest C-states on all ARM platforms, code to resume
+L2 state could be added to the kernel to avoid reliance on bootloaders.
+
+If L2 RAM is retained on power down, it is not cleaned on shutdown to preserve
+its content and improve performance. Hence, L2 state should be restored before
+the MMU is turned on, so that CPU resume code can search the data saved on
+power down in the L2 cache.
+
+This patch addresses this issue and extends outercache and l2x0 driver to
+support L2 resume in a platform independent way, security issues 
+notwithstanding that must be tackled separately.
+
+Since the L2 should be enabled when the MMU is possibly off,
+L2 physical address should be passed from platform code or retrieved from 
+the device tree so that the code can be made generic and platform
+independent. For that purpose, the signature of L2 init function has
+to be upgraded.
+
+The resume code should not use the stack and it must fetch data using 
+program counter relative loads so that it does not matter if it is run 
+in physical or virtual address space.
+
+This patch depends on three patches:
+
+ARM: 7090/1: CACHE-L2X0: filter start address can be 0 and is often 0
+http://www.spinics.net/lists/arm-kernel/msg140126.html
+available in rmk/for-next commit 2afda86d91b5f15a744182d7ddacf68f6a6054c9
+
+ARM: 7080/1: l2x0: make sure I&D are not locked down on init
+http://www.spinics.net/lists/arm-kernel/msg139119.html
+available in rmk/for-next commit bac7e6ecf60933b68af910eb4c83a775a8b20b19
+
+ARM: 7009/1: l2x0: Add OF based initialization
+http://www.spinics.net/lists/arm-kernel/msg131123.htm
+available in rmk/for-next commit 41c86ff5be44e26978282f86c20598181b999142
+
+Platform code initializing L2 has not been patched (l2x0_init requires
+a new parameter which is the physical base address) yet, waiting to
+see if there are platforms that can take advantage of this code.
+
+Tested on Samsung Origen within suspend and cpuidle code paths.
+DT support compile tested.
+
+Lorenzo Pieralisi (3):
+  ARM: mm: add outercache resume hook
+  ARM: mm: add l2x0 physical address parameter to init
+  ARM: mm: add l2x0 suspend/resume support
+
+ arch/arm/include/asm/hardware/cache-l2x0.h |   24 +++++-
+ arch/arm/include/asm/outercache.h          |    7 ++
+ arch/arm/kernel/asm-offsets.c              |   12 +++
+ arch/arm/mm/Makefile                       |    3 +
+ arch/arm/mm/cache-l2x0.c                   |   17 +++-
+ arch/arm/mm/l2x0-sleep.S                   |  136 ++++++++++++++++++++++++++++
+ 6 files changed, 193 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mm/l2x0-sleep.S
+
 -- 
-1.7.6
+1.7.4.4
