@@ -1,48 +1,50 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 26 Sep 2011 18:59:42 +0300
-Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
-In-Reply-To: <CAHQjnOM_KTiqzYnePScMHQ3bg5X1wqa4zu6=1A1z7UWeDxVZvQ@mail.gmail.com>
-References: <15669786.49881316849426265.JavaMail.weblogic@epml24>
-	<CAK=WgbYnGjPKs6_nmFRGfMnbh_7wDR-0QcptAGaqDKVOo-x3cg@mail.gmail.com>
-	<CAHQjnOOtVHUS3KmBz7LdO88fLQyLA6f-w3ye9nAH0Bx+zh38XA@mail.gmail.com>
-	<CAK=Wgbazwz9PRJSpZjopwxJ-PO88FtajmbXL=pVKDHOr1t61fQ@mail.gmail.com>
-	<CAHQjnON7dksupFeAYLuYXX2PhgjX-GXEGJiy0dRTmpoBjbURVg@mail.gmail.com>
-	<CAK=WgbaOwe8Q19tpZMeHdvyCj8fcV194zA-oSD20tF7j7_MvpQ@mail.gmail.com>
-	<CAHQjnOM_KTiqzYnePScMHQ3bg5X1wqa4zu6=1A1z7UWeDxVZvQ@mail.gmail.com>
-Message-ID: <CAK=WgbYzZKTRRf6hk=L5ZvXmFAUpq66Ud3F7xh2-8j6zSvAq9g@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 26 Sep 2011 17:02:23 +0100
+Subject: [RFC PATCH 2/3] ARM: mm: add l2x0 physical address parameter
+	to init
+In-Reply-To: <20110926145104.GL22455@n2100.arm.linux.org.uk>
+References: <1317047561-11020-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1317047561-11020-3-git-send-email-lorenzo.pieralisi@arm.com>
+	<20110926145104.GL22455@n2100.arm.linux.org.uk>
+Message-ID: <20110926160202.GA11647@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 5:48 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
-> I am sorry but I still think that
-> installing default fault handler is quite simple and straightforward.
+Hi Russell,
 
-... and abusing the IOMMU API.
+thanks for looking at this series.
 
-Please don't do that. Interfaces are written for specific goals, and
-this one was added for IOMMU users, not drivers. Just like all the
-other map/unmap/attach/... APIs.
+On Mon, Sep 26, 2011 at 03:51:04PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Sep 26, 2011 at 03:32:40PM +0100, Lorenzo Pieralisi wrote:
+> > This patch redefines the l2x0_init function, and it adds a
+> > parameter defining the L2 physical base address in preparation
+> > for L2 resume support. The device tree init code retrieves the
+> > physical address from the "reg" array and converts it to a
+> > physical address pointer.
+> 
+> I've no idea why many people have a really dire time understanding the
+> following basic fact.  I keep seeing the same things: virtual addresses
+> as integers and physical addresses as pointers.
 
-By using this from the IOMMU driver itself, you are adding burden on
-future development and evolution of this API. As use cases
-materialize, we will have to change it to support them, while
-considering existing use cases. Using this API inappropriately will
-make our life harder later on.
+I should not have converted it to a pointer, you are right, sorry; I am not 
+using it as such unless the MMU is off.
 
-Moreover, I'm really not sure how exactly are you going to use this.
+> 
+> Virtual addresses are pointers.
+> Physical addresses are NOT pointers but integers.
+> 
+> Why?  You CAN'T dereference a physical address when running in the virtual
+> address space (which is the space which the kernel runs in.)
+> 
 
-If you're having an IOMMU user which installs its own fault handler,
-then this is all moot since the default behavior you provide here will
-be overridden.
-If you're not having an IOMMU user which installs its own fault
-handler, then just provide the default behavior in your irq handler,
-regardless whether you report the fault to the IOMMU core or not. Or
-only when it fails. and yes, we can provide different error values for
-different scenarios. it's not rocket science :).
+Well, to be precise the kernel runs in it when the MMU is on.
 
-Really, there's a myriad of ways to do this right. Please explain your
-exact settings/use-case and I'll gladly help you find a clean
-solution.
+By no means, the purpose is NOT to dereference it when the MMU is on and
+I am not doing that.
 
-Thanks,
-Ohad.
+But I agree the physical address should be an integer parameter and be
+passed as so, lest someone might want for whatever reason to dereference
+it when the MMU is on and unleash hell.
+
+Thank you,
+Lorenzo
