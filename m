@@ -1,57 +1,95 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 26 Sep 2011 16:22:31 -0700
-Subject: [PATCH v7 05/26] gpio/omap: handle save/restore context in GPIO
-	driver
-In-Reply-To: <1315918979-26173-6-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Tue, 13 Sep 2011 18:32:38 +0530")
-References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-	<1315918979-26173-6-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87lita7utk.fsf@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 27 Sep 2011 08:22:46 +0900
+Subject: [PATCH 1/7] SPI: S3C64XX: Use bus clocks created using clkdev
+In-Reply-To: <20110923231233.GE24631@ponder.secretlab.ca>
+References: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
+	<1316778827-24694-2-git-send-email-padma.v@samsung.com>
+	<20110923231233.GE24631@ponder.secretlab.ca>
+Message-ID: <003301cc7ca3$3314dae0$993e90a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+Grant Likely wrote:
+> 
+> On Fri, Sep 23, 2011 at 05:23:41PM +0530, Padmavathi Venna wrote:
+> > This patch modifies the driver to stop depending on the
+> > clock names being passed from platform and switch over
+> > to lookup clocks generic names using clkdev
+> >
+> > Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> 
+> Looks okay to me.
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> 
+> This series I imagine should go in via the arm-soc tree.
+> 
+OK, if others ok to me, I will pick up this series so that it will be sent
+to upstream via arm-soc.
 
-> From: Charulatha V <charu@ti.com>
->
-> Modify omap_gpio_prepare_for_idle() & omap_gpio_resume_after_idle() functions
-> to handle save context & restore context respectively in the OMAP GPIO driver
-> itself instead of calling these functions from pm specific files.
-> For this, in gpio_prepare_for_idle(), call *_get_context_loss_count() and in
-> gpio_resume_after_idle() call it again. If the count is different, do restore
-> context. The workaround_enabled flag is no more required and is removed.
->
-> Signed-off-by: Charulatha V <charu@ti.com>
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Thanks.
 
-[...]
-
-> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-> index 9f3a007..6c6b1a7 100644
-> --- a/arch/arm/mach-omap2/gpio.c
-> +++ b/arch/arm/mach-omap2/gpio.c
-> @@ -23,6 +23,7 @@
->  
->  #include <plat/omap_hwmod.h>
->  #include <plat/omap_device.h>
-> +#include <plat/omap-pm.h>
->  
->  #include "powerdomain.h"
->  
-> @@ -63,7 +64,9 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
->  	pdata->bank_width = dev_attr->bank_width;
->  	pdata->dbck_flag = dev_attr->dbck_flag;
->  	pdata->virtual_irq_start = IH_GPIO_BASE + 32 * (id - 1);
-> -
-> +#ifdef CONFIG_PM
-> +	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
-> +#endif
-
-no #ifdef please (c.f. "#ifdefs are ugly" in
-Documentation/SubmittingPatches)
-
-In this case, the existence of this API isn't dependent on CONFIG_PM, so
-the #ifdef isn't right.
-
-Kevin
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 
+> > ---
+> >  drivers/spi/spi-s3c64xx.c |   14 +++++---------
+> >  1 files changed, 5 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> > index 019a716..dcf7e10 100644
+> > --- a/drivers/spi/spi-s3c64xx.c
+> > +++ b/drivers/spi/spi-s3c64xx.c
+> > @@ -971,6 +971,7 @@ static int __init s3c64xx_spi_probe(struct
+> platform_device *pdev)
+> >  	struct s3c64xx_spi_info *sci;
+> >  	struct spi_master *master;
+> >  	int ret;
+> > +	char clk_name[16];
+> >
+> >  	if (pdev->id < 0) {
+> >  		dev_err(&pdev->dev,
+> > @@ -984,11 +985,6 @@ static int __init s3c64xx_spi_probe(struct
+> platform_device *pdev)
+> >  	}
+> >
+> >  	sci = pdev->dev.platform_data;
+> > -	if (!sci->src_clk_name) {
+> > -		dev_err(&pdev->dev,
+> > -			"Board init must call s3c64xx_spi_set_info()\n");
+> > -		return -EINVAL;
+> > -	}
+> >
+> >  	/* Check for availability of necessary resource */
+> >
+> > @@ -1073,17 +1069,17 @@ static int __init s3c64xx_spi_probe(struct
+> platform_device *pdev)
+> >  		goto err4;
+> >  	}
+> >
+> > -	sdd->src_clk = clk_get(&pdev->dev, sci->src_clk_name);
+> > +	sprintf(clk_name, "spi_busclk%d", sci->src_clk_nr);
+> > +	sdd->src_clk = clk_get(&pdev->dev, clk_name);
+> >  	if (IS_ERR(sdd->src_clk)) {
+> >  		dev_err(&pdev->dev,
+> > -			"Unable to acquire clock '%s'\n",
+sci->src_clk_name);
+> > +			"Unable to acquire clock '%s'\n", clk_name);
+> >  		ret = PTR_ERR(sdd->src_clk);
+> >  		goto err5;
+> >  	}
+> >
+> >  	if (clk_enable(sdd->src_clk)) {
+> > -		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n",
+> > -							sci->src_clk_name);
+> > +		dev_err(&pdev->dev, "Couldn't enable clock '%s'\n",
+clk_name);
+> >  		ret = -EBUSY;
+> >  		goto err6;
+> >  	}
+> > --
+> > 1.7.4.4
+> >
