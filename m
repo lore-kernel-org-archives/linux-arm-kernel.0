@@ -1,57 +1,22 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 26 Sep 2011 13:21:17 +0200 (CEST)
-Subject: [PATCH v3 2/2] at91: add Atmel ISI and ov2640 support on
-	sam9m10/sam9g45 board.
-In-Reply-To: <4C79549CB6F772498162A641D92D532802D2C262@penmb01.corp.atmel.com>
-References: <1316664661-11383-1-git-send-email-josh.wu@atmel.com>
-	<1316664661-11383-2-git-send-email-josh.wu@atmel.com>
-	<Pine.LNX.4.64.1109220911500.11164@axis700.grange>
-	<20110924052609.GI29998@game.jcrosoft.org>
-	<4E804440.7030709@atmel.com>
-	<Pine.LNX.4.64.1109261130270.9168@axis700.grange>
-	<4C79549CB6F772498162A641D92D532802D2C262@penmb01.corp.atmel.com>
-Message-ID: <Pine.LNX.4.64.1109261318501.9168@axis700.grange>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 Sep 2011 12:47:32 +0100
+Subject: [PATCH v3 4/6] arm/imx6q: add smp and cpu hotplug support
+In-Reply-To: <20110926110634.GR31404@pengutronix.de>
+References: <1317021651-17359-1-git-send-email-shawn.guo@linaro.org>
+	<1317021651-17359-5-git-send-email-shawn.guo@linaro.org>
+	<20110926110634.GR31404@pengutronix.de>
+Message-ID: <20110926114732.GF22455@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Sep 2011, Wu, Josh wrote:
+On Mon, Sep 26, 2011 at 01:06:34PM +0200, Sascha Hauer wrote:
+> +config ARCH_IMX_V6_V7
+> +	bool "i.MX3, i.MX6"
+> +	select AUTO_ZRELADDR
 
-> On Thu, 22 Sep 2011, Guennadi wrote:
-> 
-> > On Thu, 22 Sep 2011, Josh Wu wrote:
+It's not a good idea to select this symbol, because it prevents ZBOOT_ROM
+being used (iow, you can't ROM-ify the decompressor if you select this
+symbol.)
 
-[snip]
-
-> >> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-> >> index e04c5fb..5e23d6d 100644
-> >> --- a/arch/arm/mach-at91/at91sam9g45.c
-> >> +++ b/arch/arm/mach-at91/at91sam9g45.c
-> >> @@ -201,6 +201,7 @@ static struct clk *periph_clocks[] __initdata = {
-> >>  	// irq0
-> >>  };
-> >>  
-> >> +static struct clk pck1;
-> 
-> > Hm, it really doesn't need any initialisation, not even for the .type 
-> > field? .type=0 doesn't seem to be valid.
-> 
-> This line is only a forward declaration. Since the real definition is behind the code we use it.
-> It defined in later lines:
-> 
-> static struct clk pck1 = {
->          .name           = "pck1",
->          .pmc_mask       = AT91_PMC_PCK1,
->          .type           = CLK_TYPE_PROGRAMMABLE,
->          .id             = 1,
-> };
-
-Ehem, yes, that's why I'm not very fond of forward declarations of 
-structs... Without looking at the code - would it be possible to swap the 
-order while still preserving clean source-code structure?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ZBOOT_ROM is still offered, but you end up breaking the dependencies for
+AUTO_ZRELADDR if you select it.
