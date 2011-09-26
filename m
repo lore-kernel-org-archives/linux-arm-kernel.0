@@ -1,37 +1,39 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 26 Sep 2011 21:55:24 +0800
-Subject: [PATCH] ARM i.MX gic: add handle_irq function
-In-Reply-To: <20110926131036.GI22455@n2100.arm.linux.org.uk>
-References: <1316522956-28530-1-git-send-email-s.hauer@pengutronix.de>
-	<1316797284-21010-1-git-send-email-shawn.guo@linaro.org>
-	<20110926131036.GI22455@n2100.arm.linux.org.uk>
-Message-ID: <20110926135523.GC17577@S2100-06.ap.freescale.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 26 Sep 2011 09:58:53 -0400 (EDT)
+Subject: Pull request: removal of most instances of mach/memory.h
+In-Reply-To: <20110926131524.GJ22455@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
+	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
+	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
+	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1109260952490.2718@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 02:10:36PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Sep 24, 2011 at 01:01:24AM +0800, Shawn Guo wrote:
-> > +#ifdef CONFIG_SMP
-> > +		else if (irqnr < 16) {
-> > +			writel_relaxed(irqstat, gic_cpu_base_addr +
-> > +						GIC_CPU_EOI);
-> > +			do_IPI(irqnr, regs);
-> > +		}
-> > +#endif
-> > +#ifdef CONFIG_LOCAL_TIMERS
-> > +		else if (irqnr == 29) {
-> > +			writel_relaxed(irqstat, gic_cpu_base_addr +
-> > +						GIC_CPU_EOI);
-> > +			do_local_timer(regs);
-> 
-> Neither of these two functions are designed to be called from C code.
-> Notice that they are marked __exception or __exception_irq_entry, and
-> thus they expect to have a pt_regs structure directly above themselves.
-> 
-Thanks for the points.  Since the testing did not tell any problem,
-I guess we can use it as a temporary solution before we have a
-sophisticated implementation available in GIC common code?
+On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
 
--- 
-Regards,
-Shawn
+> On Tue, Sep 20, 2011 at 01:53:49PM -0400, Nicolas Pitre wrote:
+> > Re-ping.
+> > 
+> > Please let me know if there is something wrong with this series as I 
+> > would like to have sufficient time to fix it if needed.
+> 
+> I think it's fairly obvious why I've not taken this (because of the
+> StrongARM changes which I've still not yet tested.)  Once I've sorted
+> that out I can take it, but not before then.  Especially so as my
+> firewall uses this CPU and I don't want it to break and force me
+> offline as a result.
+
+As I said in that same message:
+
+| I also merged the patch entitled "get rid of a few StrongARM
+| cache-related build time constants" as this is a prerequisite for the
+| removal of mach/memory.h in mach-ebsa110 and mach-shark (more if the
+| sparsemem stuff gets moved).  If you don't feel comfortable having 
+| this patch merged then I can remove it along with those commits that depend
+| on it.
+
+So let me remove that and ask you to pull again.
+
+
+Nicolas
