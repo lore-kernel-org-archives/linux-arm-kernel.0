@@ -1,36 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Sep 2011 23:38:39 +0100
-Subject: Pull request: removal of most instances of mach/memory.h
-In-Reply-To: <alpine.LFD.2.00.1109261606210.2718@xanadu.home>
-References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
-	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
-	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
-	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
-	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
-	<20110926191055.GP22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109261514330.2718@xanadu.home>
-	<alpine.LFD.2.00.1109261606210.2718@xanadu.home>
-Message-ID: <20110926223839.GB23680@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 26 Sep 2011 15:38:58 -0700
+Subject: [PATCH v3 0/2] OMAP: omap_device: Add a method to build an
+	omap_device from a DT node
+In-Reply-To: <1316724745-24896-1-git-send-email-b-cousson@ti.com> (Benoit
+	Cousson's message of "Thu, 22 Sep 2011 22:52:23 +0200")
+References: <1316724745-24896-1-git-send-email-b-cousson@ti.com>
+Message-ID: <8762kf9bel.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 04:10:03PM -0400, Nicolas Pitre wrote:
-> On Mon, 26 Sep 2011, Nicolas Pitre wrote:
-> 
-> > On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
-> > 
-> > > This also gives additional merge conflicts elsewhere, and while git
-> > > rerere makes some of them easy, the quantity is going to be a right
-> > > pain to deal with on a repeated basis.
-> > 
-> > Again, I'm perfectly willing to use a different base for this series and 
-> > fix the conflicts myself if you give me one.
-> 
-> Nevermind, I see that you merged it anyway.
-> 
-> You may consider the rerere.autoupdate config option if you want Git to 
-> automatically pick the conflict resolution without you manually 
-> confirming them all the time.
+Hi Benoit,
 
-rerere doesn't deal with modified/deleted conflicts though.
+Benoit Cousson <b-cousson@ti.com> writes:
+
+> This is the updated version of the initial series that introduced a
+> notifier in order to create an omap_device from a platform_device bound
+> to DT node as suggested by Grant.
+
+This series looks good to me.
+
+Barring any final comments (Grant?), I'll be queueing this for 3.2 in my
+omap_device queue on top of your previous cleanup series.
+
+Kevin
