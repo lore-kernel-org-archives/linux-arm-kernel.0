@@ -1,139 +1,111 @@
-From: amit.kachhap@linaro.org (Amit Kachhap)
-Date: Mon, 26 Sep 2011 12:56:07 +0530
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
-	online/active
-In-Reply-To: <20110923084001.GP17169@n2100.arm.linux.org.uk>
-References: <20110908215314.829452535@linutronix.de>
-	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-	<20110913133258.GA6267@n2100.arm.linux.org.uk>
-	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
-	<20110913175312.GB6267@n2100.arm.linux.org.uk>
-	<20110923084001.GP17169@n2100.arm.linux.org.uk>
-Message-ID: <CAK44p23rtqv3jPs-7oFbcs=xJPd6zsGyJNHOTSMUkh+Weh5zjg@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 26 Sep 2011 15:42:18 +0800
+Subject: [PATCH v12 0/3] add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <20081.49563.934890.760378@ipc1.ka-ro>
+References: <1315450031-6371-1-git-send-email-b32955@freescale.com>	<20081.44941.12535.496764@ipc1.ka-ro>	<4E71B741.7010907@freescale.com>
+	<20081.49563.934890.760378@ipc1.ka-ro>
+Message-ID: <4E802CDA.4080808@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On 23 September 2011 14:10, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Sep 13, 2011 at 06:53:12PM +0100, Russell King - ARM Linux wrote:
->> So, we must have the setting of CPU online _after_ we've setup the
->> scheduler domain information etc - so the following is a strict
->> ordering:
+Hi Lothar,
+> Hi,
+>
+> Huang Shijie writes:
+>> Hi,
+>>    add more CC.
+>>> Hi,
+>>>
+>>> Huang Shijie writes:
+>>>> The patch set is based on Artem's tree:
+>>>> 	http://git.infradead.org/users/dedekind/l2-mtd-2.6.git
+>>>>
+>>>> The general-purpose media interface(GPMI) controller is a flexible interface
+>>>> to up to several NAND flashs.
+>>>>
+>>>> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
+>>>>
+>>>> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+>>>> not.
+>>>>
+>>>> This driver is a _pure_ MTD NAND controller driver now.
+>>>>
+>>>>
+>>>> The driver depends on another GPMI-NAND device patch set, you can find them at :
+>>>> 	[1] http://marc.info/?l=linux-arm-kernel&m=131416901319573&w=2
+>>>> 	[2] http://marc.info/?l=linux-arm-kernel&m=131416912319668&w=2
+>>>> 	[3] http://marc.info/?l=linux-arm-kernel&m=131416891119504&w=2
+>>>> 	[4] http://marc.info/?l=linux-arm-kernel&m=131416896219539&w=2
+>>>>
+>>>> Test environment:
+>>>> 	Using imx23 and imx28 boards for test.
+>>>>
+>>>> 	imx23 :
+>>>> 	console=ttyAMA0,115200 mtdparts=gpmi-nfc:20m(boot),-(user)
+>>>> 	Tested by USB boot and NAND boot.
+>>>>
+>>>>           imx28 :
+>>>> 	#console=ttyAMA0,115200 root=/dev/mmcblk0p3 rw rootwait
+>>>> 	Tested by SD card boot mode.
+>>>>
+>>> How did you perform your tests?
+>>>
+>>> I tried this driver on our TX28 board with the result that with
+>> The nand conflicats with SD card1. You will get the DMA timeout if you
+>> use it.
+>> Do you use sd card0 or sd card1?
 >>
->> 1. calibrate_delay()
->> 2. smp_store_cpu_info()
->> 3. set_cpu_online()
+> I'm using the SSP0 port.
+>
+>> BTW:I tested the gpmi driver with SD card0. It works fine.
 >>
->> Now, the question is do we need interrupts enabled to setup timers
->> via percpu_timer_setup() and calibrate delay. ?Can we move enabling
->> interrupts after smp_store_cpu_info(). ?IOW, instead of moving the
->> setting of cpu online before all this, can we move notify_cpu_starting()
->> and the enabling of _both_ interrupts after smp_store_cpu_info()...
->> No idea at the moment.
+> What exactly did you do in your test?
+> Can you try the concurrent 'dd' commands that I used?
+I tested the following :
+   #dd if=/dev/mmcblk0 > /dev/null
+
+[943147.630000] mmcblk0: error -110 transferring data, sector 3972320, nr 256, cmd response 0x900, card status 0x80b00
+[943147.640000] mmcblk0: retrying using single block read
+[943158.250000] mmcblk0: error -110 transferring data, sector 3972480, nr 96, cmd response 0x900, card status 0x0
+[943158.260000] end_request: I/O error, dev mmcblk0, sector 3972480
+[943168.780000] mmcblk0: r/w command failed, status = 0x80900
+[943168.790000] end_request: I/O error, dev mmcblk0, sector 3972481
+[943168.790000] Buffer I/O error on device mmcblk0, logical block 496560
+[943168.790000] end_request: I/O error, dev mmcblk0, sector 3972488
+[943168.810000] Buffer I/O error on device mmcblk0, logical block 496561
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972496
+[943168.810000] Buffer I/O error on device mmcblk0, logical block 496562
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972504
+[943168.810000] Buffer I/O error on device mmcblk0, logical block 496563
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972512
+[943168.810000] Buffer I/O error on device mmcblk0, logical block 496564
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972520
+[943168.810000] Buffer I/O error on device mmcblk0, logical block 496565
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972528
+[943168.810000] Buffer I/O error on device mmcblk0, logical block 496566
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972536
+[943168.810000] Buffer I/O error on device mmcblk0, logical block 496567
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972544
+[943168.810000] Buffer I/O error on device mmcblk0, logical block 496568
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972552
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972560
+[943168.810000] end_request: I/O error, dev mmcblk0, sector 3972568
+[943179.450000] mmcblk0: error -110 transferring data, sector 3972480, nr 8, cmd response 0x900, card status 0x80b00
+[943179.460000] mmcblk0: retrying using single block read
+[943189.990000] mmcblk0: error -110 transferring data, sector 3972480, nr 8, cmd response 0x900, card status 0x0
+[943190.000000] end_request: I/O error, dev mmcblk0, sector 3972480
+[943200.530000] mmcblk0: r/w command failed, status = 0x80900
+[943200.530000] end_request: I/O error, dev mmcblk0, sector 3972481
+[943200.530000] quiet_error: 3 callbacks suppressed
+[943200.530000] Buffer I/O error on device mmcblk0, logical block 496560
+dd: /dev/mmcblk0: Input/output error
+root at freescale ~$
+-------------------------------------------------------------------------------------------------
+
+It seems only test the SD card also can reproduce the same DMA bug.
+
+Best Regards
+Huang Shijie
+
 >
-> And to make things worse... 4bd0fe1c78623062263cf5ae875fd484c5b8256d
-> has appeared in mainline today.
->
-> diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-> index 7c2282c..df6ef1b 100644
-> --- a/arch/arm/mach-exynos4/platsmp.c
-> +++ b/arch/arm/mach-exynos4/platsmp.c
-> @@ -106,6 +106,8 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
-> ? ? ? ? */
-> ? ? ? ?spin_lock(&boot_lock);
-> ? ? ? ?spin_unlock(&boot_lock);
-> +
-> + ? ? ? set_cpu_online(cpu, true);
-> ?}
->
-> ?int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
->
-
-The above patch was added as a workaround fix for
-5dfc54e087c15f823ee9b6541d2f0f314e69cbed (ARM: GIC: avoid routing
-interrupts to offline CPUs).
-
-Actually the main cause is that exynos4 uses external cpu timer and
-hence irq_set_affinity is called inside percpu_timer_setup and this
-will fail if secondary cpu is offline. I tried deferring
-irq_set_affinity using cpu_online notifiers but this approach effects
-bogomips calculation and looks complex also. So any suggestion on how
-to handle this situation in exynos4?
-
-diff --git a/arch/arm/mach-exynos4/mct.c b/arch/arm/mach-exynos4/mct.c
-index ddd8686..30a7226 100644
---- a/arch/arm/mach-exynos4/mct.c
-+++ b/arch/arm/mach-exynos4/mct.c
-@@ -19,6 +19,7 @@
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- #include <linux/percpu.h>
-+#include <linux/cpu.h>
-
- #include <mach/map.h>
- #include <mach/regs-mct.h>
-@@ -354,6 +355,18 @@ static struct irqaction mct_tick1_event_irq = {
-        .handler        = exynos4_mct_tick_isr,
- };
-
-+static int __cpuinit exynos4_set_affinity(struct notifier_block *self,
-+                                     unsigned long action, void *cpu)
-+{
-+       if (action == CPU_ONLINE || action == CPU_ONLINE_FROZEN)
-+               irq_set_affinity(IRQ_MCT_L1, cpumask_of(1));
-+       return NOTIFY_OK;
-+}
-+
-+static struct notifier_block __cpuinitdata exynos4_set_affinity_nb = {
-+       .notifier_call = exynos4_set_affinity,
-+};
-+
- static void exynos4_mct_tick_init(struct clock_event_device *evt)
- {
-        unsigned int cpu = smp_processor_id();
-@@ -390,7 +403,6 @@ static void exynos4_mct_tick_init(struct
-clock_event_device *evt)
-        } else {
-                mct_tick1_event_irq.dev_id = &mct_tick[cpu];
-                setup_irq(IRQ_MCT_L1, &mct_tick1_event_irq);
--               irq_set_affinity(IRQ_MCT_L1, cpumask_of(1));
-        }
- }
-
-@@ -422,6 +434,7 @@ static void __init exynos4_timer_init(void)
-        exynos4_timer_resources();
-        exynos4_clocksource_init();
-        exynos4_clockevent_init();
-+       register_cpu_notifier(&exynos4_set_affinity_nb);
- }
-
- struct sys_timer exynos4_timer = {
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-index ca01370..8c0d74f 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -108,8 +108,6 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
-         */
-        spin_lock(&boot_lock);
-        spin_unlock(&boot_lock);
--
--       set_cpu_online(cpu, true);
- }
-
- int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
--- 
-1.7.1
-
-Thanks,
-Amit D
-
-> I think some work needs to be done to eliminate some of the dependencies
-> in this code so that we can have a *sane* order for bringup of secondary
-> CPUs.
->
-> I'm just going to sit on the fence and watch what platform people do
-> during the next merge window when the support for the topological
-> scheduler goes in.
->
+> Lothar Wa?mann
