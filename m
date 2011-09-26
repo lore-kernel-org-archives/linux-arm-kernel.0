@@ -1,35 +1,48 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 26 Sep 2011 09:48:19 -0600
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <20110926152634.GN2946@opensource.wolfsonmicro.com>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20110926141643.GK2946@opensource.wolfsonmicro.com>
-	<20110926151210.GO22455@n2100.arm.linux.org.uk>
-	<20110926152634.GN2946@opensource.wolfsonmicro.com>
-Message-ID: <CACxGe6swdnhk_GCAv3siSx4kxNQXmCLDbwBFjsX5VPNfCBc2Mg@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 26 Sep 2011 18:59:42 +0300
+Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
+In-Reply-To: <CAHQjnOM_KTiqzYnePScMHQ3bg5X1wqa4zu6=1A1z7UWeDxVZvQ@mail.gmail.com>
+References: <15669786.49881316849426265.JavaMail.weblogic@epml24>
+	<CAK=WgbYnGjPKs6_nmFRGfMnbh_7wDR-0QcptAGaqDKVOo-x3cg@mail.gmail.com>
+	<CAHQjnOOtVHUS3KmBz7LdO88fLQyLA6f-w3ye9nAH0Bx+zh38XA@mail.gmail.com>
+	<CAK=Wgbazwz9PRJSpZjopwxJ-PO88FtajmbXL=pVKDHOr1t61fQ@mail.gmail.com>
+	<CAHQjnON7dksupFeAYLuYXX2PhgjX-GXEGJiy0dRTmpoBjbURVg@mail.gmail.com>
+	<CAK=WgbaOwe8Q19tpZMeHdvyCj8fcV194zA-oSD20tF7j7_MvpQ@mail.gmail.com>
+	<CAHQjnOM_KTiqzYnePScMHQ3bg5X1wqa4zu6=1A1z7UWeDxVZvQ@mail.gmail.com>
+Message-ID: <CAK=WgbYzZKTRRf6hk=L5ZvXmFAUpq66Ud3F7xh2-8j6zSvAq9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 9:26 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Sep 26, 2011 at 04:12:10PM +0100, Russell King - ARM Linux wrote:
->> On Mon, Sep 26, 2011 at 03:16:43PM +0100, Mark Brown wrote:
->
->> > used but it's not a blocker for anything. ?Devices doing this would need
->> > some way to figure out if they should -EBUSY or fail otherwise.
->
->> Just to avoid confusion - ITYM -EAGAIN there. ?-EBUSY is already used
->> by drivers to mean "someone else claimed a resource I need" be it the
->> IO region or an IRQ resource...
->
-> Yes, I do - sorry.
+On Mon, Sep 26, 2011 at 5:48 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> I am sorry but I still think that
+> installing default fault handler is quite simple and straightforward.
 
-Actually, in the next iteration, I'm thinking it would be a good idea
-to create a new #define to only be used by probe deferral.  I want it
-to be easy to find all the drivers that are using this mechanism
-without needing to filter all the unrelated hits.  However, this is a
-kernel-only thing so it is probably not appropriate to add it to
-include/asm-generic/errno.h.  I could use some guidance/advice as to
-the best way to handle this.
+... and abusing the IOMMU API.
 
-g.
+Please don't do that. Interfaces are written for specific goals, and
+this one was added for IOMMU users, not drivers. Just like all the
+other map/unmap/attach/... APIs.
+
+By using this from the IOMMU driver itself, you are adding burden on
+future development and evolution of this API. As use cases
+materialize, we will have to change it to support them, while
+considering existing use cases. Using this API inappropriately will
+make our life harder later on.
+
+Moreover, I'm really not sure how exactly are you going to use this.
+
+If you're having an IOMMU user which installs its own fault handler,
+then this is all moot since the default behavior you provide here will
+be overridden.
+If you're not having an IOMMU user which installs its own fault
+handler, then just provide the default behavior in your irq handler,
+regardless whether you report the fault to the IOMMU core or not. Or
+only when it fails. and yes, we can provide different error values for
+different scenarios. it's not rocket science :).
+
+Really, there's a myriad of ways to do this right. Please explain your
+exact settings/use-case and I'll gladly help you find a clean
+solution.
+
+Thanks,
+Ohad.
