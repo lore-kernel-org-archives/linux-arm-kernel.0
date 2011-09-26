@@ -1,136 +1,39 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 26 Sep 2011 15:20:47 +0800
-Subject: [PATCH v3 2/6] arm/imx6q: add core definitions and low-level debug
-	uart
+Date: Mon, 26 Sep 2011 15:20:50 +0800
+Subject: [PATCH v3 5/6] arm/imx6q: add device tree machine support
 In-Reply-To: <1317021651-17359-1-git-send-email-shawn.guo@linaro.org>
 References: <1317021651-17359-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1317021651-17359-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1317021651-17359-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds the core definitions and low-level debug uart support
-for imx6q.
+It adds generic device tree based machine support for imx6q.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/Kconfig                             |    2 +-
- arch/arm/Kconfig.debug                       |    7 +++++
- arch/arm/Makefile                            |    1 +
- arch/arm/mach-imx/Kconfig                    |   15 +++++++++++-
- arch/arm/mach-imx/Makefile                   |    2 +
- arch/arm/mach-imx/Makefile.boot              |    4 +++
- arch/arm/mach-imx/lluart.c                   |   32 +++++++++++++++++++++++++
- arch/arm/plat-mxc/Kconfig                    |    5 ++++
- arch/arm/plat-mxc/include/mach/debug-macro.S |    2 +
- arch/arm/plat-mxc/include/mach/hardware.h    |    6 ++++
- arch/arm/plat-mxc/include/mach/irqs.h        |   10 ++++++-
- arch/arm/plat-mxc/include/mach/memory.h      |    3 ++
- arch/arm/plat-mxc/include/mach/mx6q.h        |   33 ++++++++++++++++++++++++++
- 13 files changed, 118 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mach-imx/lluart.c
- create mode 100644 arch/arm/plat-mxc/include/mach/mx6q.h
+ arch/arm/mach-imx/Makefile              |    2 +-
+ arch/arm/mach-imx/mach-imx6q.c          |   84 +++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig                     |    2 +-
+ arch/arm/plat-mxc/include/mach/common.h |   13 +++++
+ 4 files changed, 99 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/mach-imx/mach-imx6q.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 414ff01..e023b06 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1376,7 +1376,7 @@ config SMP
- 	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
- 		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
- 		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
--		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
-+		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || SOC_IMX6Q
- 	select USE_GENERIC_SMP_HELPERS
- 	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
- 	help
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index add32ff..ba206e0 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -155,6 +155,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on i.MX50 or i.MX53.
- 
-+	config DEBUG_IMX6Q_UART
-+		bool "i.MX6Q Debug UART"
-+		depends on SOC_IMX6Q
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on i.MX6Q.
-+
- 	config DEBUG_S3C_UART0
- 		depends on PLAT_SAMSUNG
- 		bool "Use S3C UART 0 for low-level debug"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 5665c2a..9f4a924 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -162,6 +162,7 @@ machine-$(CONFIG_ARCH_MX2)		:= imx
- machine-$(CONFIG_ARCH_MX25)		:= imx
- machine-$(CONFIG_ARCH_MX3)		:= imx
- machine-$(CONFIG_ARCH_MX5)		:= mx5
-+machine-$(CONFIG_ARCH_MX6)		:= imx
- machine-$(CONFIG_ARCH_MXS)		:= mxs
- machine-$(CONFIG_ARCH_NETX)		:= netx
- machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 0519dd7..e88e366 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -58,7 +58,6 @@ config SOC_IMX35
- 	select ARCH_MX35
- 	select MXC_AVIC
- 
--
- if ARCH_MX1
- 
- comment "MX1 platforms:"
-@@ -606,3 +605,17 @@ config MACH_VPR200
- 	  configurations for the board and its peripherals.
- 
- endif
-+
-+if ARCH_MX6
-+comment "i.MX6 family:"
-+
-+config SOC_IMX6Q
-+	bool "i.MX6 Quad support"
-+	select ARM_GIC
-+	select CPU_V7
-+	select USE_OF
-+
-+	help
-+	  This enables support for Freescale i.MX6 Quad processor.
-+
-+endif
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index e9eb36d..96ecc96 100644
+index d46b2e7..16737ba 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -61,3 +61,5 @@ obj-$(CONFIG_MACH_MX35_3DS) += mach-mx35_3ds.o
- obj-$(CONFIG_MACH_EUKREA_CPUIMX35) += mach-cpuimx35.o
- obj-$(CONFIG_MACH_EUKREA_MBIMXSD35_BASEBOARD) += eukrea_mbimxsd35-baseboard.o
- obj-$(CONFIG_MACH_VPR200) += mach-vpr200.o
-+
-+obj-$(CONFIG_DEBUG_LL) += lluart.o
-diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
-index dbe6120..22d8588 100644
---- a/arch/arm/mach-imx/Makefile.boot
-+++ b/arch/arm/mach-imx/Makefile.boot
-@@ -17,3 +17,7 @@ initrd_phys-$(CONFIG_MACH_MX27)	:= 0xA0800000
- zreladdr-$(CONFIG_ARCH_MX3)	+= 0x80008000
- params_phys-$(CONFIG_ARCH_MX3)	:= 0x80000100
- initrd_phys-$(CONFIG_ARCH_MX3)	:= 0x80800000
-+
-+zreladdr-$(CONFIG_SOC_IMX6Q)	+= 0x10008000
-+params_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10000100
-+initrd_phys-$(CONFIG_SOC_IMX6Q)	:= 0x10800000
-diff --git a/arch/arm/mach-imx/lluart.c b/arch/arm/mach-imx/lluart.c
+@@ -70,4 +70,4 @@ obj-$(CONFIG_CPU_V7) += head-v7.o
+ obj-$(CONFIG_SMP) += platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+ obj-$(CONFIG_LOCAL_TIMERS) += localtimer.o
+-obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o
++obj-$(CONFIG_SOC_IMX6Q) += clock-imx6q.o mach-imx6q.o
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
 new file mode 100644
-index 0000000..d4ab6f2
+index 0000000..8bf5fa3
 --- /dev/null
-+++ b/arch/arm/mach-imx/lluart.c
-@@ -0,0 +1,32 @@
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -0,0 +1,84 @@
 +/*
 + * Copyright 2011 Freescale Semiconductor, Inc.
 + * Copyright 2011 Linaro Ltd.
@@ -144,159 +47,121 @@ index 0000000..d4ab6f2
 + */
 +
 +#include <linux/init.h>
-+#include <asm/page.h>
-+#include <asm/sizes.h>
-+#include <asm/mach/map.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
++#include <asm/hardware/cache-l2x0.h>
++#include <asm/hardware/gic.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/time.h>
++#include <mach/common.h>
 +#include <mach/hardware.h>
 +
-+static struct map_desc imx_lluart_desc = {
-+#ifdef CONFIG_DEBUG_IMX6Q_UART
-+	.virtual	= MX6Q_IO_P2V(MX6Q_UART4_BASE_ADDR),
-+	.pfn		= __phys_to_pfn(MX6Q_UART4_BASE_ADDR),
-+	.length		= MX6Q_UART4_SIZE,
-+	.type		= MT_DEVICE,
-+#endif
++static void __init imx6q_init_machine(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++
++	imx6q_pm_init();
++}
++
++static void __init imx6q_map_io(void)
++{
++	imx_lluart_map_io();
++	imx_scu_map_io();
++}
++
++static void __init imx6q_gpio_add_irq_domain(struct device_node *np,
++				struct device_node *interrupt_parent)
++{
++	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
++				   32 * 7; /* imx6q gets 7 gpio ports */
++
++	irq_domain_add_simple(np, gpio_irq_base);
++	gpio_irq_base += 32;
++}
++
++static const struct of_device_id imx6q_irq_match[] __initconst = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{ .compatible = "fsl,imx6q-gpio", .data = imx6q_gpio_add_irq_domain, },
++	{ /* sentinel */ }
 +};
 +
-+void __init imx_lluart_map_io(void)
++static void __init imx6q_init_irq(void)
 +{
-+	if (imx_lluart_desc.virtual)
-+		iotable_init(&imx_lluart_desc, 1);
++	l2x0_of_init(0, ~0UL);
++	imx_src_init();
++	imx_gpc_init();
++	of_irq_init(imx6q_irq_match);
 +}
-diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-index a5353fc..e548f9b 100644
---- a/arch/arm/plat-mxc/Kconfig
-+++ b/arch/arm/plat-mxc/Kconfig
-@@ -48,6 +48,11 @@ config ARCH_MX51
- 	help
- 	  This enables support for systems based on the Freescale i.MX51 family
- 
-+config ARCH_MX6
-+	bool "i.MX6"
-+	help
-+	  This enables support for systems based on the Freescale i.MX6 family
 +
- endchoice
++static void __init imx6q_timer_init(void)
++{
++	mx6q_clocks_init();
++}
++
++static struct sys_timer imx6q_timer = {
++	.init = imx6q_timer_init,
++};
++
++static const char *imx6q_dt_compat[] __initdata = {
++	"fsl,imx6q-sabreauto",
++	NULL,
++};
++
++DT_MACHINE_START(IMX6Q, "Freescale i.MX6 Quad (Device Tree)")
++	.map_io		= imx6q_map_io,
++	.init_irq	= imx6q_init_irq,
++	.handle_irq	= imx6q_handle_irq,
++	.timer		= &imx6q_timer,
++	.init_machine	= imx6q_init_machine,
++	.dt_compat	= imx6q_dt_compat,
++MACHINE_END
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 88633fe..c3ce146 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -822,7 +822,7 @@ config CACHE_L2X0
+ 		   REALVIEW_EB_A9MP || SOC_IMX35 || SOC_IMX31 || MACH_REALVIEW_PBX || \
+ 		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
+ 		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
+-		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX
++		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_MX6
+ 	default y
+ 	select OUTER_CACHE
+ 	select OUTER_CACHE_SYNC
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 5b24f5d..2c2eafa 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -64,6 +64,7 @@ extern int mx51_clocks_init(unsigned long ckil, unsigned long osc,
+ 			unsigned long ckih1, unsigned long ckih2);
+ extern int mx53_clocks_init(unsigned long ckil, unsigned long osc,
+ 			unsigned long ckih1, unsigned long ckih2);
++extern int mx6q_clocks_init(void);
+ extern struct platform_device *mxc_register_gpio(char *name, int id,
+ 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
+ extern int mxc_register_device(struct platform_device *pdev, void *data);
+@@ -90,7 +91,19 @@ void gic_handle_irq(struct pt_regs *);
  
- source "arch/arm/mach-imx/Kconfig"
-diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-index 07cfdbe..f2ce2cb 100644
---- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-+++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-@@ -24,6 +24,8 @@
- #define UART_PADDR	MX51_UART1_BASE_ADDR
- #elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
- #define UART_PADDR	MX53_UART1_BASE_ADDR
-+#elif defined (CONFIG_DEBUG_IMX6Q_UART)
-+#define UART_PADDR	MX6Q_UART4_BASE_ADDR
+ extern void imx_enable_cpu(int cpu, bool enable);
+ extern void imx_set_cpu_jump(int cpu, void *jump_addr);
++#ifdef CONFIG_DEBUG_LL
++extern void imx_lluart_map_io(void);
++#else
++static inline void imx_lluart_map_io(void) {}
++#endif
+ #ifdef CONFIG_SMP
+ extern void v7_secondary_startup(void);
++extern void imx_scu_map_io(void);
++#else
++static inline void imx_scu_map_io(void) {}
  #endif
- 
- #define UART_VADDR	IMX_IO_ADDRESS(UART_PADDR)
-diff --git a/arch/arm/plat-mxc/include/mach/hardware.h b/arch/arm/plat-mxc/include/mach/hardware.h
-index a8bfd56..ee28c56 100644
---- a/arch/arm/plat-mxc/include/mach/hardware.h
-+++ b/arch/arm/plat-mxc/include/mach/hardware.h
-@@ -86,6 +86,11 @@
-  *	SPBA0	0x70000000+0x100000	->	0xf5400000+0x100000
-  *	AIPS1	0x73f00000+0x100000	->	0xf5700000+0x100000
-  *	AIPS2	0x83f00000+0x100000	->	0xf4300000+0x100000
-+ * mx6q:
-+ *	SCU	0x00a00000+0x001000	->	0xf4000000+0x001000
-+ *	CCM	0x020c4000+0x004000	->	0xf42c4000+0x004000
-+ *	ANATOP	0x020c8000+0x001000	->	0xf42c8000+0x001000
-+ *	UART4	0x021f0000+0x004000	->	0xf42f0000+0x004000
-  */
- #define IMX_IO_P2V(x)	(						\
- 			0xf4000000 +					\
-@@ -97,6 +102,7 @@
- 
- #include <mach/mxc.h>
- 
-+#include <mach/mx6q.h>
- #include <mach/mx50.h>
- #include <mach/mx51.h>
- #include <mach/mx53.h>
-diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
-index 00e812b..fd9efb0 100644
---- a/arch/arm/plat-mxc/include/mach/irqs.h
-+++ b/arch/arm/plat-mxc/include/mach/irqs.h
-@@ -14,9 +14,15 @@
- #include <asm-generic/gpio.h>
- 
- /*
-- * SoCs with TZIC interrupt controller have 128 IRQs, those with AVIC have 64
-+ * SoCs with GIC interrupt controller have 160 IRQs, those with TZIC
-+ * have 128 IRQs, and those with AVIC have 64.
-+ *
-+ * To support single image, the biggest number should be defined on
-+ * top of the list.
-  */
--#ifdef CONFIG_MXC_TZIC
-+#if defined CONFIG_ARM_GIC
-+#define MXC_INTERNAL_IRQS	160
-+#elif defined CONFIG_MXC_TZIC
- #define MXC_INTERNAL_IRQS	128
- #else
- #define MXC_INTERNAL_IRQS	64
-diff --git a/arch/arm/plat-mxc/include/mach/memory.h b/arch/arm/plat-mxc/include/mach/memory.h
-index 3ec84b9..ff2792c 100644
---- a/arch/arm/plat-mxc/include/mach/memory.h
-+++ b/arch/arm/plat-mxc/include/mach/memory.h
-@@ -19,6 +19,7 @@
- #define MX50_PHYS_OFFSET	UL(0x70000000)
- #define MX51_PHYS_OFFSET	UL(0x90000000)
- #define MX53_PHYS_OFFSET	UL(0x70000000)
-+#define MX6Q_PHYS_OFFSET	UL(0x10000000)
- 
- #if !defined(CONFIG_RUNTIME_PHYS_OFFSET)
- # if defined CONFIG_ARCH_MX1
-@@ -37,6 +38,8 @@
- #  define PLAT_PHYS_OFFSET		MX51_PHYS_OFFSET
- # elif defined CONFIG_ARCH_MX53
- #  define PLAT_PHYS_OFFSET		MX53_PHYS_OFFSET
-+# elif defined CONFIG_SOC_IMX6Q
-+#  define PLAT_PHYS_OFFSET		MX6Q_PHYS_OFFSET
- # endif
++extern void imx_enable_cpu(int cpu, bool enable);
++extern void imx_set_cpu_jump(int cpu, void *jump_addr);
++extern void imx_src_init(void);
++extern void imx_gpc_init(void);
  #endif
- 
-diff --git a/arch/arm/plat-mxc/include/mach/mx6q.h b/arch/arm/plat-mxc/include/mach/mx6q.h
-new file mode 100644
-index 0000000..254a561
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/mx6q.h
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#ifndef __MACH_MX6Q_H__
-+#define __MACH_MX6Q_H__
-+
-+#define MX6Q_IO_P2V(x)			IMX_IO_P2V(x)
-+#define MX6Q_IO_ADDRESS(x)		IOMEM(MX6Q_IO_P2V(x))
-+
-+/*
-+ * The following are the blocks that need to be statically mapped.
-+ * For other blocks, the base address really should be retrieved from
-+ * device tree.
-+ */
-+#define MX6Q_SCU_BASE_ADDR		0x00a00000
-+#define MX6Q_SCU_SIZE			0x1000
-+#define MX6Q_CCM_BASE_ADDR		0x020c4000
-+#define MX6Q_CCM_SIZE			0x4000
-+#define MX6Q_ANATOP_BASE_ADDR		0x020c8000
-+#define MX6Q_ANATOP_SIZE		0x1000
-+#define MX6Q_UART4_BASE_ADDR		0x021f0000
-+#define MX6Q_UART4_SIZE			0x4000
-+
-+#endif	/* __MACH_MX6Q_H__ */
 -- 
 1.7.4.1
