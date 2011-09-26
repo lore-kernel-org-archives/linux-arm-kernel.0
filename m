@@ -1,39 +1,38 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 26 Sep 2011 10:20:08 +0100
-Subject: [PATCHv2 0/3] Initial support for Picochip picoxcell
-In-Reply-To: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
-References: <1314196906-20709-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <20110926092008.GC3372@pulham.picochip.com>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Mon, 26 Sep 2011 18:21:32 +0900
+Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
+In-Reply-To: <CAK=Wgbazwz9PRJSpZjopwxJ-PO88FtajmbXL=pVKDHOr1t61fQ@mail.gmail.com>
+References: <15669786.49881316849426265.JavaMail.weblogic@epml24>
+	<CAK=WgbYnGjPKs6_nmFRGfMnbh_7wDR-0QcptAGaqDKVOo-x3cg@mail.gmail.com>
+	<CAHQjnOOtVHUS3KmBz7LdO88fLQyLA6f-w3ye9nAH0Bx+zh38XA@mail.gmail.com>
+	<CAK=Wgbazwz9PRJSpZjopwxJ-PO88FtajmbXL=pVKDHOr1t61fQ@mail.gmail.com>
+Message-ID: <CAHQjnON7dksupFeAYLuYXX2PhgjX-GXEGJiy0dRTmpoBjbURVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 24, 2011 at 03:41:43PM +0100, Jamie Iles wrote:
-> This series adds support for Picochip picoXcell (PC3X2 and PC3X3)
-> ARM1176JZ-S based devices.  This is a device tree only platform and
-> currently supports interrupt controllers and UARTs.
-> 
-> This series is based off of Grant's devicetree/test branch and also uses
-> Russell's io and gpio cleanup patches to remove the definition of
-> IO_SPACE_LIMIT and trivial gpio definitions.
-> 
-> Changes since v1:
-> 
-> 	- Cleanup empty headers
-> 	- Use of_platform_populate() and the default match table
-> 	- Split the VIC's into separate device nodes
-> 
-> Jamie Iles (3):
->   picoxcell: support for Picochip picoxcell devices
->   picoxcell: add the DTS for pc3x2 and pc3x3 devices
->   picoxcell: add the DTS for the PC7302 board
+On Mon, Sep 26, 2011 at 6:05 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Mon, Sep 26, 2011 at 11:58 AM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+>> As you've noticed, it is default behavior for iommu fault.
+>
+> Then why not add it to the IOMMU core ? it's quite generic and can be
+> useful for others, too.
+>
+Every fault in IOMMU (System MMU) is an error logically
+and must not happen in our multimedia device drivers
+because, our device drivers always construct page table completely
+before address translation in System MMU
+and TLB loads translation information automatically when TLB miss.
 
-Hi Arnd,
+I am not sure if the default behavior of MMU fault in our IOMMU driver
+is also correct for other IOMMU drivers.
 
-Is there likely to be any chance of getting support for picoxcell 
-merged?  This series can now be based on top of Nicolas' static IO 
-mapping patches to remove some more code but I'm not sure what else I 
-can do to make them easier to review!
+BTW,
+I think we need more fault type than IOMMU_FAULT_READ and IOMMU_FAULT_WRITE.
+We have page fault, access fault(read, write), security fault
+and bus error (translated physical address is not available)
 
-Thanks,
+> Thanks,
+> Ohad.
 
-Jamie
+Thank you.
+Cho KyongHo.
