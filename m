@@ -1,153 +1,102 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 26 Sep 2011 11:39:00 -0700
-Subject: [PATCH v7 00/26] gpio/omap: driver cleanup and fixes
-In-Reply-To: <CAC83ZvLfCOjKja1rZ6GB4bmn_KrcjitTJZJsa5jy01QVj2OXXw@mail.gmail.com>
-	(Tarun Kanti DebBarma's message of "Sat, 24 Sep 2011 16:11:52 +0530")
-References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
-	<87mxdwm8pk.fsf@ti.com>
-	<CAC83ZvKu5Fo-c88L4WFPdvq91T=usaZY4mzTVVzDLw9HE7g9Kg@mail.gmail.com>
-	<4E7D99CB.7090004@ti.com>
-	<CAC83ZvLfCOjKja1rZ6GB4bmn_KrcjitTJZJsa5jy01QVj2OXXw@mail.gmail.com>
-Message-ID: <87mxdrcfnf.fsf@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 26 Sep 2011 13:39:13 -0500
+Subject: [PATCH v2 0/7] Initial Calxeda Highbank support
+In-Reply-To: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
+References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4E80C6D1.1010601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
+Arnd,
 
-> Santosh, Kevin,
->
-> [...]
->>>> After that, pm_runtime_put_sync() is called, which will trigger the
->>>> driver's ->runtime_suspend callback. ?The ->runtime_suspend() callback
->>>> checks bank->mod_usage as well, and if zero, doesn't do anything
->>>> (notably, it doesn't disable debounce clocks.)
->>> I need some clarification in reproducing/testing the fix on OMAP3430SDP.
->>> The first thing I am trying to verify is the code flow of suspend.
->>>
->>> 1) With no debounce clock enabled, when I enable UART timeouts, I
->>> automatically see
->>> system going to retention. That is I don't have to type echo mem >
->>> /sys/power/state
->>> echo 5 > /sys/devices/platform/omap/omap_uart.0/sleep_timeout
->>> echo 5 > /sys/devices/platform/omap/omap_uart.1/sleep_timeout
->>> echo 5 > /sys/devices/platform/omap/omap_uart.2/sleep_timeout
->>>
->>> 2) I am do not see the print in omap_gpio_suspend/resume(), but I see
->>> the print in
->>> *_prepare_for_idle()/*_resume_after_idle().
->>>
->> Hmmm,
->>
->> This is mostly happening because you are missing a below
->> fix from Kevin in the branch you are testing with.
->>
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg54927.html
->> {OMAP: omap_device: fix !CONFIG_SUSPEND case in _noirq handlers}
->>
->> If you rebase, your branch against 3.1-rc6, you should already
->> have this fix. Commit {126caf1376e7}
-> Yes, this patch was missing in Kevin's branch and was
-> causing the suspend issue.
->
-> As pointed out by Kevin, debounce clock was not getting disabled.
-> In my testing I was somehow grepping CORE power domain instead
-> of PER power domain and hence missed it. The fix for the debounce
-> clock issue is at the end of the email.
->
-> - Have re-based the for_3.2/gpio-cleanup branch against 3.1-rc6.
+On 08/31/2011 08:43 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> This adds initial platform support for Calxeda's Highbank ARM SOC including
+> SMP, hotplug, and suspend support. One new patch to add empty version of
+> l2x0_of_init. Changes for v2 are listed in each patch.
+> 
+> Based on rmk's for-next branch with gpio.h and io.h clean-ups plus previously
+> posted GIC devicetree binding support. The GIC patches are here:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/060570.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/060790.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/062735.html
+> 
+> Rob
+> 
+> Martin Bogomolni (1):
+>   ARM: highbank: Add cpu hotplug support
+> 
+> Rob Herring (6):
+>   ARM: l2x0: add empty l2x0_of_init
+>   ARM: highbank: add devicetree source
+>   ARM: add Highbank core platform support
+>   MAINTAINERS: add Calxeda Highbank ARM platform
+>   ARM: highbank: add SMP support
+>   ARM: highbank: add suspend support
+> 
+>  Documentation/devicetree/bindings/arm/calxeda.txt |    8 +
+>  MAINTAINERS                                       |    6 +
+>  arch/arm/Kconfig                                  |   18 ++-
+>  arch/arm/Makefile                                 |    1 +
+>  arch/arm/boot/dts/highbank.dts                    |  224 +++++++++++++++++++++
+>  arch/arm/include/asm/hardware/cache-l2x0.h        |    7 +
+>  arch/arm/mach-highbank/Makefile                   |    6 +
+>  arch/arm/mach-highbank/Makefile.boot              |    1 +
+>  arch/arm/mach-highbank/clock.c                    |   62 ++++++
+>  arch/arm/mach-highbank/core.h                     |    9 +
+>  arch/arm/mach-highbank/highbank.c                 |  150 ++++++++++++++
+>  arch/arm/mach-highbank/hotplug.c                  |   56 +++++
+>  arch/arm/mach-highbank/include/mach/debug-macro.S |   19 ++
+>  arch/arm/mach-highbank/include/mach/entry-macro.S |    7 +
+>  arch/arm/mach-highbank/include/mach/gpio.h        |    1 +
+>  arch/arm/mach-highbank/include/mach/io.h          |    7 +
+>  arch/arm/mach-highbank/include/mach/irqs.h        |    6 +
+>  arch/arm/mach-highbank/include/mach/memory.h      |    1 +
+>  arch/arm/mach-highbank/include/mach/system.h      |   26 +++
+>  arch/arm/mach-highbank/include/mach/timex.h       |    6 +
+>  arch/arm/mach-highbank/include/mach/uncompress.h  |    9 +
+>  arch/arm/mach-highbank/include/mach/vmalloc.h     |    6 +
+>  arch/arm/mach-highbank/lluart.c                   |   34 +++
+>  arch/arm/mach-highbank/localtimer.c               |   38 ++++
+>  arch/arm/mach-highbank/platsmp.c                  |   78 +++++++
+>  arch/arm/mach-highbank/pm.c                       |   55 +++++
+>  arch/arm/mach-highbank/sysregs.h                  |   52 +++++
+>  arch/arm/mach-highbank/system.c                   |   33 +++
+>  arch/arm/mm/Kconfig                               |    2 +-
+>  29 files changed, 926 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
+>  create mode 100644 arch/arm/boot/dts/highbank.dts
+>  create mode 100644 arch/arm/mach-highbank/Makefile
+>  create mode 100644 arch/arm/mach-highbank/Makefile.boot
+>  create mode 100644 arch/arm/mach-highbank/clock.c
+>  create mode 100644 arch/arm/mach-highbank/core.h
+>  create mode 100644 arch/arm/mach-highbank/highbank.c
+>  create mode 100644 arch/arm/mach-highbank/hotplug.c
+>  create mode 100644 arch/arm/mach-highbank/include/mach/debug-macro.S
+>  create mode 100644 arch/arm/mach-highbank/include/mach/entry-macro.S
+>  create mode 100644 arch/arm/mach-highbank/include/mach/gpio.h
+>  create mode 100644 arch/arm/mach-highbank/include/mach/io.h
+>  create mode 100644 arch/arm/mach-highbank/include/mach/irqs.h
+>  create mode 100644 arch/arm/mach-highbank/include/mach/memory.h
+>  create mode 100644 arch/arm/mach-highbank/include/mach/system.h
+>  create mode 100644 arch/arm/mach-highbank/include/mach/timex.h
+>  create mode 100644 arch/arm/mach-highbank/include/mach/uncompress.h
+>  create mode 100644 arch/arm/mach-highbank/include/mach/vmalloc.h
+>  create mode 100644 arch/arm/mach-highbank/lluart.c
+>  create mode 100644 arch/arm/mach-highbank/localtimer.c
+>  create mode 100644 arch/arm/mach-highbank/platsmp.c
+>  create mode 100644 arch/arm/mach-highbank/pm.c
+>  create mode 100644 arch/arm/mach-highbank/sysregs.h
+>  create mode 100644 arch/arm/mach-highbank/system.c
+> 
 
-Not needed.   Just merge with v3.1-rc6 when testing.
+Any comments on v2?
 
-> - Dropped [PATCH 26/26] gpio/omap: add dbclk aliases for all gpio modules
-> as suggested by Kevin since it's already taken care by hwmod.
+The GIC binding series seems to be firming up. As myself and several
+others are dependent on it, I was planning to send both through arm-soc
+tree as 2 pulls. I also have some dependencies on rmk's tree with l2x0
+DT support and mach header clean-ups.
 
-good
-
-> - Added the debounce clock fix in the end.
-
-Thanks.  Glad you found and fixed it.
-
-Rather than add this patch as a fix at the end, I prefer if the problem
-is fixed in the original patches that added/created the problem.
-
-Kevin
-
-
-> With above, PER is hitting low power state in Suspend and Idle path.
->
-> Have pushed a branch at below URL with mentioned changes.
-> git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
-> for_3.2/kevin/gpio-cleanup
->
-> Regards,
-> Tarun
->
-> From 5d9a97197ea5426fc79b7a47dd0fd9c6b6ebbbba Mon Sep 17 00:00:00 2001
-> From: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> Date: Sat, 24 Sep 2011 13:32:32 +0530
-> Subject: [PATCH] gpio/omap: fix debounce clock handling
->
-> GPIO debounce clock can gate the PER power domain transition
-> and needs to be disabled in GPIO driver suspend.
->
-> The debounce clock is not getting disabled in runtime_suspend
-> callback because of an un-necessary bank->mod_usage check.
-> In omap_gpio_suspend/resume too, there is no need to do
-> any operation if the gpio bank is not used.
->
-> Remove the un-necessary bank->mod_usage check from
-> suspend callbacks.
->
-> Thanks to Kevin Hilman for pointing out this issue.
->
-> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  drivers/gpio/gpio-omap.c |   12 ++++++------
->  1 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index c597303..349e774 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1107,6 +1107,9 @@ static int omap_gpio_suspend(struct device *dev)
->  	void __iomem *wake_status;
->  	unsigned long flags;
->
-> +	if (!bank->mod_usage || !bank->loses_context)
-> +		return 0;
-> +
->  	if (!bank->regs->wkup_en || !bank->suspend_wakeup)
->  		return 0;
->
-> @@ -1128,6 +1131,9 @@ static int omap_gpio_resume(struct device *dev)
->  	void __iomem *base = bank->base;
->  	unsigned long flags;
->
-> +	if (!bank->mod_usage || !bank->loses_context)
-> +		return 0;
-> +
->  	if (!bank->regs->wkup_en || !bank->saved_wakeup)
->  		return 0;
->
-> @@ -1151,9 +1157,6 @@ static int omap_gpio_runtime_suspend(struct device *dev)
->  	int j;
->  	unsigned long flags;
->
-> -	if (!bank->mod_usage)
-> -		return 0;
-> -
->  	spin_lock_irqsave(&bank->lock, flags);
->  	/*
->  	 * If going to OFF, remove triggering for all
-> @@ -1199,9 +1202,6 @@ static int omap_gpio_runtime_resume(struct device *dev)
->  	int j;
->  	unsigned long flags;
->
-> -	if (!bank->mod_usage)
-> -		return 0;
-> -
->  	spin_lock_irqsave(&bank->lock, flags);
->  	for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
->  		clk_enable(bank->dbck);
+Rob
