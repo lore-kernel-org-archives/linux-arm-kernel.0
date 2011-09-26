@@ -1,66 +1,52 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 26 Sep 2011 12:02:31 +0100
-Subject: [PATCH v2 12/16] ARM: cns3xxx: convert to CONFIG_MULTI_IRQ_HANDLER
+Date: Mon, 26 Sep 2011 12:02:21 +0100
+Subject: [PATCH v2 02/16] ARM: smp: Add an IPI handler callable from C code
 In-Reply-To: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
 References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1317034955-1029-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1317034955-1029-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the cns3xxx platform to be using the gic_handle_irq
-function as its primary interrupt handler.
+In order to be able to handle IPI directly from C code instead of
+assembly code, introduce handle_IPI(), which is modeled after handle_IRQ().
 
-Cc: Anton Vorontsov <avorontsov@mvista.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/Kconfig                                 |    1 +
- arch/arm/mach-cns3xxx/cns3420vb.c                |    2 ++
- arch/arm/mach-cns3xxx/include/mach/entry-macro.S |    2 --
- 3 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/smp.h |    5 +++++
+ arch/arm/kernel/smp.c      |    5 +++++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e32a4d3..70a947e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -334,6 +334,7 @@ config ARCH_CNS3XXX
- 	select ARM_GIC
- 	select MIGHT_HAVE_PCI
- 	select PCI_DOMAINS if PCI
-+	select MULTI_IRQ_HANDLER
- 	help
- 	  Support for Cavium Networks CNS3XXX platform.
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 7c2299f..1e5717a 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -33,6 +33,11 @@ extern void show_ipi_list(struct seq_file *, int);
+ asmlinkage void do_IPI(int ipinr, struct pt_regs *regs);
  
-diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
-index 55f7b4b..594852f 100644
---- a/arch/arm/mach-cns3xxx/cns3420vb.c
-+++ b/arch/arm/mach-cns3xxx/cns3420vb.c
-@@ -26,6 +26,7 @@
- #include <linux/mtd/partitions.h>
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-+#include <asm/hardware/gic.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-@@ -201,5 +202,6 @@ MACHINE_START(CNS3420VB, "Cavium Networks CNS3420 Validation Board")
- 	.map_io		= cns3420_map_io,
- 	.init_irq	= cns3xxx_init_irq,
- 	.timer		= &cns3xxx_timer,
-+	.handle_irq	= gic_handle_irq,
- 	.init_machine	= cns3420_init,
- MACHINE_END
-diff --git a/arch/arm/mach-cns3xxx/include/mach/entry-macro.S b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
-index d87bfc3..01c57df 100644
---- a/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
-+++ b/arch/arm/mach-cns3xxx/include/mach/entry-macro.S
-@@ -8,8 +8,6 @@
-  * published by the Free Software Foundation.
+ /*
++ * Called from C code, this handles an IPI.
++ */
++void handle_IPI(int ipinr, struct pt_regs *regs);
++
++/*
+  * Setup the set of possible CPUs (via set_cpu_possible)
   */
- 
--#include <asm/hardware/entry-macro-gic.S>
--
- 		.macro	disable_fiq
- 		.endm
+ extern void smp_init_cpus(void);
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index fcca40b..5e060ea 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -603,6 +603,11 @@ static void ipi_cpu_stop(unsigned int cpu)
+  */
+ asmlinkage void __exception_irq_entry do_IPI(int ipinr, struct pt_regs *regs)
+ {
++	handle_IPI(ipinr, regs);
++}
++
++void handle_IPI(int ipinr, struct pt_regs *regs)
++{
+ 	unsigned int cpu = smp_processor_id();
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
  
 -- 
 1.7.0.4
