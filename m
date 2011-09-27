@@ -1,54 +1,59 @@
 From: sjg@chromium.org (Simon Glass)
-Date: Tue, 27 Sep 2011 11:26:13 -0700
+Date: Tue, 27 Sep 2011 11:29:07 -0700
 Subject: [RFC PATCH 0/3] Add accurate boot timing to a Linux system
-In-Reply-To: <CAErSpo63fYmQVRO2O3sB37k6rAo7Qttdh1xo=WH+QwcVb+neGg@mail.gmail.com>
+In-Reply-To: <4E802F7D.9000006@parrot.com>
 References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
-	<CAErSpo63fYmQVRO2O3sB37k6rAo7Qttdh1xo=WH+QwcVb+neGg@mail.gmail.com>
-Message-ID: <CAPnjgZ2Z-nBg2m1P2zkda=nMAG0qCOzVtpAOSth6nwoGSUfrFQ@mail.gmail.com>
+	<20110924083203.GZ17169@n2100.arm.linux.org.uk>
+	<4E802F7D.9000006@parrot.com>
+Message-ID: <CAPnjgZ11uannvUOGSM_FuR9mhSY_yiSGv3vuJtmsMFMgV+Jo0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Matthieu,
 
-On Sun, Sep 25, 2011 at 5:54 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
-> On Fri, Sep 23, 2011 at 5:03 PM, Simon Glass <sjg@chromium.org> wrote:
->> This experimental patch set adds boot timing to a Linux system. The
->> timing starts with the boot loader and extends through the kernel into
->> user space to the completion of the boot process. The timing starts when
->> the system leaves reset, not later when the kernel starts.
+On Mon, Sep 26, 2011 at 12:53 AM, Matthieu CASTET
+<matthieu.castet@parrot.com> wrote:
+> Hi,
+>
+> Russell King - ARM Linux a ?crit :
+>> On Fri, Sep 23, 2011 at 04:03:15PM -0700, Simon Glass wrote:
+>>> An accurate timer is required to make the numbers meaningful. Many
+>>> modern platforms have a microsecond timer. This patch set uses a
+>>> function called timer_get_us() to read the timer.
 >>
->> The concept is:
->> - Boot loader records a timestamp for key events during its operation
->> - These timestamps are passed to Linux, which adds more as it boots
->> - These timestamps are made available to user space, where more
->> timestamps are added as init does its job
->> - Finally the whole record is collected by a user-space script run at
->> the end of init. This is fed back through some mechanism to monitor
->> boot time in the field.
+>> Not another 'get a time value' function. ?Why do we need soo many?
+>> We have - at least:
+>>
+>> ktime_get (and various flavours of it)
+>> do_gettimeofday
+>> getnstimeofday
+>> sched_clock
+>>
+>> Do we really need yet another one which will have to be multiplexed
+>> amongst platforms, requiring scaling and so forth from whatever the
+>> platform provides?
+>>
+>> Remember that ARM timers are virtually all MMIO mapped, which means
+>> they don't work during early kernel bringup when the MMU mappings for
+>> the hardware have not been setup. ?(That's the reason stuff like
+>> sched_clock for printk doesn't work early.)
+> Doesn't cortexA-8 (and A9 ?) have a cycle counter that can be read by
+> coprocessor 15 ?
 >
-> I think this is a cool idea. ?It's quite difficult to extract this
-> sort of information today, and making it easily and consistently
-> available should help focus attention and improve things.
->
-> There are difficult issues about which clock to use, how to correlate
-> bootloader & kernel timestamps, how to make sure the timestamps stay
-> sensible even when we use hwclock, ntp, etc., but I think it's worth
-> pushing on this to see how far you can go.
+> Couldn't we use that counter for early stuff on those architectures ?
 
-Yes it is not easy to get all of this right, especially trying to
-cross two completely different projects. I think the timestamps should
-be measured from reset. The kernel timestamps start not at zero, but
-from the time the kernel starts. This guarantees a consistent time
-base across the data. Also if there is a pre-boot program (such as a
-NAND loader) then its time will be counted also.
-
-A good timer would be an accurate monotonic wall clock, not
-necessarily related to time of day. An ideal timer would be a
-microsecond/nanosecond timer maintained by the hardware / SOC.
+Yes we could, but we need to be careful that we use a 'time of day'
+counter, not dependent on clock speed, CPU load and the like. See my
+other email for what I see as the ideal timer. Obviously this will
+have to be architecture-specific, but I hope for a simple fallback to
+something available on all architectures, with perhaps the ability to
+use better timers available on specific architectures which implement
+them.
 
 Regards,
 Simon
 
 >
-> Bjorn
+>
+> Matthieu
 >
