@@ -1,22 +1,70 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 27 Sep 2011 23:13:10 +0100
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <20110927210849.GD3994@ponder.secretlab.ca>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20110926152634.GN2946@opensource.wolfsonmicro.com>
-	<CACxGe6swdnhk_GCAv3siSx4kxNQXmCLDbwBFjsX5VPNfCBc2Mg@mail.gmail.com>
-	<201109271550.36427.arnd@arndb.de>
-	<20110927210849.GD3994@ponder.secretlab.ca>
-Message-ID: <20110927221308.GA2674@opensource.wolfsonmicro.com>
+From: mchehab@infradead.org (Mauro Carvalho Chehab)
+Date: Tue, 27 Sep 2011 19:31:32 -0300
+Subject: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
+In-Reply-To: <19F8576C6E063C45BE387C64729E739404EC8113E2@dbde02.ent.ti.com>
+References: <1315488922-16152-1-git-send-email-deepthy.ravi@ti.com>
+	<201109081921.28051.laurent.pinchart@ideasonboard.com>
+	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D09083D@dbde03.ent.ti.com>
+	<201109161506.16505.laurent.pinchart@ideasonboard.com>
+	<19F8576C6E063C45BE387C64729E739404EC8113E2@dbde02.ent.ti.com>
+Message-ID: <4E824EC4.20305@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 03:08:49PM -0600, Grant Likely wrote:
+Em 19-09-2011 12:31, Hiremath, Vaibhav escreveu:
+> 
+>> -----Original Message-----
+>> From: Laurent Pinchart [mailto:laurent.pinchart at ideasonboard.com]
+>> Sent: Friday, September 16, 2011 6:36 PM
+>> To: Ravi, Deepthy
+>> Cc: linux-media at vger.kernel.org; tony at atomide.com; linux at arm.linux.org.uk;
+>> linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+>> kernel at vger.kernel.org; mchehab at infradead.org; g.liakhovetski at gmx.de;
+>> Hiremath, Vaibhav
+>> Subject: Re: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
+>>
+>> Hi Deepthy,
+>>
+>> On Friday 16 September 2011 15:00:53 Ravi, Deepthy wrote:
+>>> On Thursday, September 08, 2011 10:51 PM Laurent Pinchart wrote:
+>>>> On Thursday 08 September 2011 15:35:22 Deepthy Ravi wrote:
+>>>>> From: Vaibhav Hiremath <hvaibhav@ti.com>
+>>>>>
+>>>>> In order to support TVP5146 (for that matter any video decoder),
+>>>>> it is important to support G/S/ENUM_STD ioctl on /dev/videoX
+>>>>> device node.
+>>>>
+>>>> Why so ? Shouldn't it be queried on the subdev output pad directly ?
+>>>
+>>> Because standard v4l2 application for analog devices will call these std
+>>> ioctls on the streaming device node. So it's done on /dev/video to make
+>> the
+>>> existing apllication work.
+>>
+>> Existing applications can't work with the OMAP3 ISP (and similar complex
+>> embedded devices) without userspace support anyway, either in the form of
+>> a
+>> GStreamer element or a libv4l plugin. I still believe that analog video
+>> standard operations should be added to the subdev pad operations and
+>> exposed
+>> through subdev device nodes, exactly as done with formats.
+>>
+> [Hiremath, Vaibhav] Laurent,
+> 
+> I completely agree with your point that, existing application will not work without setting links properly.
+> But I believe the assumption here is, media-controller should set the links (along with pad formants) and 
+> all existing application should work as is. Isn't it?
 
-> Okay, will do.  How does EPROBE_DEFER 518 sound?
+Yes.
 
-Note that I'm not sure this answers the issue I was raising - the issue
-isn't that the caller doesn't know what the error code means, the issue
-is that in some cases the driver needs to take a decision about what
-failure to get a resource means.  Does it mean that the driver can work
-fine and be slightly less featureful or should it cause a deferral?
+> The way it is being done currently is, set the format at the pad level which is same as analog standard resolution and use existing application for streaming...
+
+Yes.
+
+> I am ok, if we add s/g/enum_std api support at sub-dev level but this should also be supported on streaming device node.
+
+Agreed. Standards selection should be done at device node, just like any other
+device.
+
+Regards,
+Mauro
