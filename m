@@ -1,74 +1,52 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 27 Sep 2011 13:39:58 +0530
-Subject: [PATCH v3 2/2] input: samsung-keypad: Add device tree support
-In-Reply-To: <20110922174054.GO17168@ponder.secretlab.ca>
-References: <1316427553-5033-1-git-send-email-thomas.abraham@linaro.org>
-	<1316427553-5033-3-git-send-email-thomas.abraham@linaro.org>
-	<20110922174054.GO17168@ponder.secretlab.ca>
-Message-ID: <CAJuYYwTgn2KqNr28MNEPEC7eVkuUA-dzVzJHMTy-MV+GBCn=zA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Sep 2011 10:16:56 +0200
+Subject: [GIT PULL] ux500-timers
+Message-ID: <CACRpkdbCZwSdXzqvPCrGagaikc53xLyDTQaZMRtuyqo9vw=Yng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+Hi Arnd,
 
-On 22 September 2011 23:10, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Mon, Sep 19, 2011 at 03:49:13PM +0530, Thomas Abraham wrote:
->> Add device tree based discovery support for Samsung's keypad controller.
->>
->> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
->> Cc: Donghwa Lee <dh09.lee@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->
-> A few things to fix below, but you can add my acked-by when you've
-> addressed them.
+could you please pull the ux500-timers branch into the arm-soc
+tree? These patches have circulated for a long time and my repost
+from last week has not generated any new comments.
 
-Ok. Thanks for your review. I will fix as per your comments.
+(On popular request I try to keep pull requests per-topic...)
 
-[...]
+The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
 
->
->> diff --git a/drivers/input/keyboard/samsung-keypad.c b/drivers/input/keyboard/samsung-keypad.c
->> index f689f49..2a477bc 100644
->> --- a/drivers/input/keyboard/samsung-keypad.c
->> +++ b/drivers/input/keyboard/samsung-keypad.c
+  Linux 3.1-rc7 (2011-09-21 16:58:15 -0700)
 
-[...]
+are available in the git repository at:
+  git://git.linaro.org/people/triad/linux-stericsson.git ux500-nomadik-timers
 
->> +
->> + ? ? of_property_read_u32(np, "samsung,keypad-num-rows", &num_rows);
->> + ? ? of_property_read_u32(np, "samsung,keypad-num-columns", &num_cols);
->
-> property_read doesn't touch the values of num_rows or num_cols on
-> failure. ?The values need to be initialized if you're going to test
-> the result value.
+Jonas Aaberg (4):
+      ARM: ux500: Move timer code to separate file
+      ARM: plat-nomadik: timer: Add support for periodic timers
+      ARM: plat-nomadik: timer: Export reset functions
+      ARM: ux500: Reprogram timers upon resume
 
-Ok. num_rows and num_cols variables will be set to zero before the
-property read call.
+Mattias Wallin (3):
+      ARM: plat-nomadik: MTU sched_clock as an option
+      clocksource: add DBX500 PRCMU Timer support
+      ARM: ux500: add support for clocksource DBX500 PRCMU
 
->
->> + ? ? if (!num_rows || !num_cols) {
->> + ? ? ? ? ? ? dev_err(dev, "number of keypad rows/columns not specified\n");
->> + ? ? ? ? ? ? return NULL;
->> + ? ? }
+ arch/arm/mach-ux500/Makefile                   |    2 +-
+ arch/arm/mach-ux500/cpu.c                      |   29 +-----
+ arch/arm/mach-ux500/include/mach/db5500-regs.h |    2 +
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
+ arch/arm/mach-ux500/timer.c                    |   65 +++++++++++
+ arch/arm/plat-nomadik/Kconfig                  |    8 ++-
+ arch/arm/plat-nomadik/include/plat/mtu.h       |   47 +--------
+ arch/arm/plat-nomadik/timer.c                  |  138 ++++++++++++++++++------
+ drivers/clocksource/Kconfig                    |   15 +++
+ drivers/clocksource/Makefile                   |    1 +
+ drivers/clocksource/clksrc-dbx500-prcmu.c      |  104 ++++++++++++++++++
+ include/linux/clksrc-dbx500-prcmu.h            |   22 ++++
+ 12 files changed, 330 insertions(+), 106 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/timer.c
+ create mode 100644 drivers/clocksource/clksrc-dbx500-prcmu.c
+ create mode 100644 include/linux/clksrc-dbx500-prcmu.h
 
-[...]
-
->>
->> + ? ? if (pdev->dev.of_node) {
->> + ? ? ? ? ? ? samsung_keypad_parse_dt_gpio(&pdev->dev, keypad);
->> +#ifdef CONFIG_OF
->> + ? ? ? ? ? ? keypad->type = of_device_is_compatible(pdev->dev.of_node,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "samsung,s5pv210-keypad");
->> +#endif
->
-> This still looks odd. ?If you move the #ifdef up one line, then you
-> can remove the empty version of samsung_keypad_parse_dt_gpio(), and
-> this block won't look so weird.
->
-
-That would be a better approach. Thanks for the suggestion.
-
-Regards,
-Thomas.
-
-[...]
+Yours,
+Linus Walleij
