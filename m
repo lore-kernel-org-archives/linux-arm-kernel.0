@@ -1,31 +1,75 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 27 Sep 2011 13:23:57 +0100
-Subject: [PATCH 9/9] regulator: map consumer regulator based on device tree
-In-Reply-To: <1317118372-17052-10-git-send-email-rnayak@ti.com>
-References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-10-git-send-email-rnayak@ti.com>
-Message-ID: <20110927122357.GF4289@opensource.wolfsonmicro.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 27 Sep 2011 15:26:29 +0300
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <20110927100505.GH2138@amd.com>
+References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
+	<1316195506-9777-2-git-send-email-ohad@wizery.com>
+	<20110927100505.GH2138@amd.com>
+Message-ID: <CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 03:42:52PM +0530, Rajendra Nayak wrote:
-> Look up the regulator for a given consumer from device tree, during
-> a regulator_get(). If not found fallback and lookup through
-> the regulator_map_list instead.
+On Tue, Sep 27, 2011 at 1:05 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> On Fri, Sep 16, 2011 at 01:51:41PM -0400, Ohad Ben-Cohen wrote:
+>> ?int iommu_map(struct iommu_domain *domain, unsigned long iova,
+>> - ? ? ? ? ? ? phys_addr_t paddr, int gfp_order, int prot)
+>> + ? ? ? ? ? ? phys_addr_t paddr, size_t size, int prot)
+>> ?{
+>> - ? ? ? size_t size;
+>> + ? ? ? int ret = 0;
+>> +
+>> + ? ? ? /*
+>> + ? ? ? ?* both the virtual address and the physical one, as well as
+>> + ? ? ? ?* the size of the mapping, must be aligned (at least) to the
+>> + ? ? ? ?* size of the smallest page supported by the hardware
+>> + ? ? ? ?*/
+>> + ? ? ? if (!IS_ALIGNED(iova | paddr | size, iommu_min_pagesz)) {
+>> + ? ? ? ? ? ? ? pr_err("unaligned: iova 0x%lx pa 0x%lx size 0x%lx min_pagesz "
+>> + ? ? ? ? ? ? ? ? ? ? ? "0x%x\n", iova, (unsigned long)paddr,
+>> + ? ? ? ? ? ? ? ? ? ? ? (unsigned long)size, iommu_min_pagesz);
+>> + ? ? ? ? ? ? ? return -EINVAL;
+>> + ? ? ? }
+>> +
+>> + ? ? ? pr_debug("map: iova 0x%lx pa 0x%lx size 0x%lx\n", iova,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long)paddr, (unsigned long)size);
+>> +
+>> + ? ? ? while (size) {
+>> + ? ? ? ? ? ? ? unsigned long pgsize = iommu_min_pagesz;
+>> + ? ? ? ? ? ? ? unsigned long idx = iommu_min_page_idx;
+>> + ? ? ? ? ? ? ? unsigned long addr_merge = iova | paddr;
+>> + ? ? ? ? ? ? ? int order;
+>> +
+>> + ? ? ? ? ? ? ? /* find the max page size with which iova, paddr are aligned */
+>> + ? ? ? ? ? ? ? for (;;) {
+>> + ? ? ? ? ? ? ? ? ? ? ? unsigned long try_pgsize;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? ? idx = find_next_bit(iommu_pgsize_bitmap,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? iommu_nr_page_bits, idx + 1);
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? ? /* no more pages to check ? */
+>> + ? ? ? ? ? ? ? ? ? ? ? if (idx >= iommu_nr_page_bits)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? ? try_pgsize = 1 << idx;
+>>
+>> - ? ? ? size ? ? ? ? = 0x1000UL << gfp_order;
+>> + ? ? ? ? ? ? ? ? ? ? ? /* page too big ? addresses not aligned ? */
+>> + ? ? ? ? ? ? ? ? ? ? ? if (size < try_pgsize ||
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? !IS_ALIGNED(addr_merge, try_pgsize))
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>>
+>> - ? ? ? BUG_ON(!IS_ALIGNED(iova | paddr, size));
+>> + ? ? ? ? ? ? ? ? ? ? ? pgsize = try_pgsize;
+>> + ? ? ? ? ? ? ? }
+>
+> With an unsigned long you can use plain and fast bit_ops instead of the
+> full bitmap functions.
 
-As with the fixed voltage regulator patch just use the code along with
-adding it, no need to split it just makes it harder to review.
+Not sure I follow; the only bit operation I'm using while mapping is
+find_next_bit() (which is a bitops.h method).
 
-> +	if (dev->of_node) {
-> +		node = of_get_regulator(dev, id);
-> +		if (!node)
-> +			goto retry; /* fallback and chk regulator_map_list */
-> +		list_for_each_entry(rdev, &regulator_list, list)
-> +			if (node == rdev->node)
-> +				goto found;
-> +	}
-> +retry:
+What other faster variant are you referring to ?
 
-retry is a confusing name for the target, we don't ever actually retry
-using it.  Given the simplicity of the code I'd be inclined to just
-intert the if (!node) check.
+Thanks,
+Ohad.
