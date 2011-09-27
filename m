@@ -1,48 +1,85 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Tue, 27 Sep 2011 16:22:41 -0400
-Subject: [PATCH V2 0/3] S5P64X0 PM Support
-Message-ID: <1317154964-22600-1-git-send-email-a.kesavan@samsung.com>
+Date: Tue, 27 Sep 2011 16:22:42 -0400
+Subject: [PATCH 1/3] ARM: S5P: Make the common S5P PM code conditionally
+	compile
+In-Reply-To: <1317154964-22600-1-git-send-email-a.kesavan@samsung.com>
+References: <1317154964-22600-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1317154964-22600-2-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patchset adds Power Mangement support for S5P64X0. The first
-two patches lay the groundwork for adding PM support, while the
-final patch adds the SoC specific PM code.
+Pave the way for adding PM support on S5P64X0, which is more similar
+to the S3C64XX series than the S5P series. Hence, the common pm code
+(containing dummy functions) should not be used for S5P64X0.
 
-Changes since V1:
-- Changed register naming as per User Manual.
-- Dropped the pm-gpio warning patch as it will be taken care in the gpio
-  movement patch by Kukjin Kim.
-- Used soc_is_* for differentiating between 6440 and 6450.
-- Merged all the sleep files of S5P SoCs while leaving the S3C64XX sleep
-  code as is.
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ arch/arm/mach-exynos4/Kconfig |    2 ++
+ arch/arm/mach-s5pv210/Kconfig |    1 +
+ arch/arm/plat-s5p/Kconfig     |    6 ++++++
+ arch/arm/plat-s5p/Makefile    |    3 +--
+ 4 files changed, 10 insertions(+), 2 deletions(-)
 
-Abhilash Kesavan (3):
-  ARM: S5P: Make the common S5P PM code conditionally compile
-  ARM: S5P: Make the sleep code common for S5P series SoCs
-  ARM: S5P64X0: Add Power Management support
-
- arch/arm/Kconfig                                |    2 +-
- arch/arm/mach-exynos4/Kconfig                   |    4 +
- arch/arm/mach-exynos4/Makefile                  |    2 +-
- arch/arm/mach-s5p64x0/Kconfig                   |    4 +
- arch/arm/mach-s5p64x0/Makefile                  |    1 +
- arch/arm/mach-s5p64x0/include/mach/map.h        |    1 +
- arch/arm/mach-s5p64x0/include/mach/pm-core.h    |  117 +++++++++++++
- arch/arm/mach-s5p64x0/include/mach/regs-clock.h |   33 ++++
- arch/arm/mach-s5p64x0/include/mach/regs-gpio.h  |   19 ++
- arch/arm/mach-s5p64x0/irq-eint.c                |    2 +
- arch/arm/mach-s5p64x0/irq-pm.c                  |   92 ++++++++++
- arch/arm/mach-s5p64x0/pm.c                      |  204 +++++++++++++++++++++++
- arch/arm/mach-s5pv210/Kconfig                   |    2 +
- arch/arm/mach-s5pv210/Makefile                  |    2 +-
- arch/arm/mach-s5pv210/sleep.S                   |   52 ------
- arch/arm/plat-s5p/Kconfig                       |   12 ++
- arch/arm/plat-s5p/Makefile                      |    4 +-
- arch/arm/{mach-exynos4 => plat-s5p}/sleep.S     |   13 +-
- 18 files changed, 500 insertions(+), 66 deletions(-)
- create mode 100644 arch/arm/mach-s5p64x0/include/mach/pm-core.h
- create mode 100644 arch/arm/mach-s5p64x0/irq-pm.c
- create mode 100644 arch/arm/mach-s5p64x0/pm.c
- delete mode 100644 arch/arm/mach-s5pv210/sleep.S
- rename arch/arm/{mach-exynos4 => plat-s5p}/sleep.S (81%)
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index 3b594fe..7ed7d49 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -12,11 +12,13 @@ if ARCH_EXYNOS4
+ config CPU_EXYNOS4210
+ 	bool
+ 	select SAMSUNG_DMADEV
++	select S5P_PM if PM
+ 	help
+ 	  Enable EXYNOS4210 CPU support
+ 
+ config SOC_EXYNOS4212
+ 	bool
++	select S5P_PM if PM
+ 	help
+ 	  Enable EXYNOS4212 SoC support
+ 
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index ccef034..356aa75 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -14,6 +14,7 @@ config CPU_S5PV210
+ 	select SAMSUNG_DMADEV
+ 	select S5P_EXT_INT
+ 	select S5P_HRT
++	select S5P_PM if PM
+ 	help
+ 	  Enable S5PV210 CPU support
+ 
+diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+index f9241a7..53e6743 100644
+--- a/arch/arm/plat-s5p/Kconfig
++++ b/arch/arm/plat-s5p/Kconfig
+@@ -40,6 +40,12 @@ config S5P_HRT
+ 	help
+ 	  Use the High Resolution timer support
+ 
++config S5P_PM
++	bool
++	help
++	  Common code for power management support on S5P and newer SoCs
++	  Note: Do not select this for S5P6440 and S5P6450.
++
+ comment "System MMU"
+ 
+ config S5P_SYSTEM_MMU
+diff --git a/arch/arm/plat-s5p/Makefile b/arch/arm/plat-s5p/Makefile
+index 1812019..755d7ac 100644
+--- a/arch/arm/plat-s5p/Makefile
++++ b/arch/arm/plat-s5p/Makefile
+@@ -20,8 +20,7 @@ obj-y				+= irq.o
+ obj-$(CONFIG_S5P_EXT_INT)	+= irq-eint.o
+ obj-$(CONFIG_S5P_GPIO_INT)	+= irq-gpioint.o
+ obj-$(CONFIG_S5P_SYSTEM_MMU)	+= sysmmu.o
+-obj-$(CONFIG_PM)		+= pm.o
+-obj-$(CONFIG_PM)		+= irq-pm.o
++obj-$(CONFIG_S5P_PM)		+= pm.o irq-pm.o
+ obj-$(CONFIG_S5P_HRT) 		+= s5p-time.o
+ 
+ # devices
+-- 
+1.7.0.4
