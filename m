@@ -1,52 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Sep 2011 10:16:56 +0200
-Subject: [GIT PULL] ux500-timers
-Message-ID: <CACRpkdbCZwSdXzqvPCrGagaikc53xLyDTQaZMRtuyqo9vw=Yng@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Sep 2011 09:26:05 +0100
+Subject: [PATCH] clk: provide prepare/unprepare functions
+In-Reply-To: <4E7B72C2.3060402@codeaurora.org>
+References: <20110922101024.GK17169@n2100.arm.linux.org.uk>
+	<4E7B72C2.3060402@codeaurora.org>
+Message-ID: <20110927082605.GR22455@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Thu, Sep 22, 2011 at 10:39:14AM -0700, Saravana Kannan wrote:
+>>   /**
+>> + * clk_prepare - prepare a clock source
+>> + * @clk: clock source
+>> + *
+>> + * This prepares the clock source for use.
+>
+> Do you want to add a "May NOT be called from atomic context"? Yeah, the  
+> stub makes it obvious, but I think it would be consistent to add the  
+> comment in. No strong opinion though.
 
-could you please pull the ux500-timers branch into the arm-soc
-tree? These patches have circulated for a long time and my repost
-from last week has not generated any new comments.
+The might_sleep() is sufficient to enforce that, but adding the comment
+for when the helper goes away would be a good idea.
 
-(On popular request I try to keep pull requests per-topic...)
+> Not sure if you care, but LGTM/Ack.
 
-The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
-
-  Linux 3.1-rc7 (2011-09-21 16:58:15 -0700)
-
-are available in the git repository at:
-  git://git.linaro.org/people/triad/linux-stericsson.git ux500-nomadik-timers
-
-Jonas Aaberg (4):
-      ARM: ux500: Move timer code to separate file
-      ARM: plat-nomadik: timer: Add support for periodic timers
-      ARM: plat-nomadik: timer: Export reset functions
-      ARM: ux500: Reprogram timers upon resume
-
-Mattias Wallin (3):
-      ARM: plat-nomadik: MTU sched_clock as an option
-      clocksource: add DBX500 PRCMU Timer support
-      ARM: ux500: add support for clocksource DBX500 PRCMU
-
- arch/arm/mach-ux500/Makefile                   |    2 +-
- arch/arm/mach-ux500/cpu.c                      |   29 +-----
- arch/arm/mach-ux500/include/mach/db5500-regs.h |    2 +
- arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
- arch/arm/mach-ux500/timer.c                    |   65 +++++++++++
- arch/arm/plat-nomadik/Kconfig                  |    8 ++-
- arch/arm/plat-nomadik/include/plat/mtu.h       |   47 +--------
- arch/arm/plat-nomadik/timer.c                  |  138 ++++++++++++++++++------
- drivers/clocksource/Kconfig                    |   15 +++
- drivers/clocksource/Makefile                   |    1 +
- drivers/clocksource/clksrc-dbx500-prcmu.c      |  104 ++++++++++++++++++
- include/linux/clksrc-dbx500-prcmu.h            |   22 ++++
- 12 files changed, 330 insertions(+), 106 deletions(-)
- create mode 100644 arch/arm/mach-ux500/timer.c
- create mode 100644 drivers/clocksource/clksrc-dbx500-prcmu.c
- create mode 100644 include/linux/clksrc-dbx500-prcmu.h
-
-Yours,
-Linus Walleij
+Thanks.
