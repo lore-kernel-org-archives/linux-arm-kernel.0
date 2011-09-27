@@ -1,37 +1,98 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 27 Sep 2011 19:18:02 +0200
-Subject: [PATCH v3 2/6] OMAP3: beagle-board: Use the omap_hwmod_name_get_dev
-	API
+Date: Tue, 27 Sep 2011 19:18:04 +0200
+Subject: [PATCH v3 4/6] OMAP2+: pm: Remove static devices variable for mpu, dsp,
+	iva and l3 PM
 In-Reply-To: <1317143886-13285-1-git-send-email-b-cousson@ti.com>
 References: <1317143886-13285-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1317143886-13285-3-git-send-email-b-cousson@ti.com>
+Message-ID: <1317143886-13285-5-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the multiple omap2_get_XXX_device APIs with the new
-omap_hwmod_name_get_dev that uses the hwmod name to get the proper
-device.
+Since the device pointer is now retrieved using the hwmod name, remove
+the static variables used to store the device pointers for DSP, MPU, IVA
+and L3 devices for PM/DVFS usage.
 
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/mach-omap2/board-omap3beagle.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/pm.c |   47 ++++++---------------------------------------
+ 1 files changed, 7 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 3ae16b4..9815b2b 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -493,8 +493,8 @@ static void __init beagle_opp_init(void)
- 	if (cpu_is_omap3630()) {
- 		struct device *mpu_dev, *iva_dev;
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index f852e4f..d2ef1c2 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -26,38 +26,7 @@
  
--		mpu_dev = omap2_get_mpuss_device();
--		iva_dev = omap2_get_iva_device();
-+		mpu_dev = omap_device_get_by_hwmod_name("mpu");
-+		iva_dev = omap_device_get_by_hwmod_name("iva");
+ static struct omap_device_pm_latency *pm_lats;
  
- 		if (!mpu_dev || !iva_dev) {
- 			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
+-static struct device *mpu_dev;
+-static struct device *iva_dev;
+-static struct device *l3_dev;
+-static struct device *dsp_dev;
+-
+-struct device *omap2_get_mpuss_device(void)
+-{
+-	WARN_ON_ONCE(!mpu_dev);
+-	return mpu_dev;
+-}
+-
+-struct device *omap2_get_iva_device(void)
+-{
+-	WARN_ON_ONCE(!iva_dev);
+-	return iva_dev;
+-}
+-
+-struct device *omap2_get_l3_device(void)
+-{
+-	WARN_ON_ONCE(!l3_dev);
+-	return l3_dev;
+-}
+-
+-struct device *omap4_get_dsp_device(void)
+-{
+-	WARN_ON_ONCE(!dsp_dev);
+-	return dsp_dev;
+-}
+-EXPORT_SYMBOL(omap4_get_dsp_device);
+-
+-/* static int _init_omap_device(struct omap_hwmod *oh, void *user) */
+-static int _init_omap_device(char *name, struct device **new_dev)
++static int _init_omap_device(char *name)
+ {
+ 	struct omap_hwmod *oh;
+ 	struct platform_device *pdev;
+@@ -72,8 +41,6 @@ static int _init_omap_device(char *name, struct device **new_dev)
+ 		 __func__, name))
+ 		return -ENODEV;
+ 
+-	*new_dev = &pdev->dev;
+-
+ 	return 0;
+ }
+ 
+@@ -82,16 +49,16 @@ static int _init_omap_device(char *name, struct device **new_dev)
+  */
+ static void omap2_init_processor_devices(void)
+ {
+-	_init_omap_device("mpu", &mpu_dev);
++	_init_omap_device("mpu");
+ 	if (omap3_has_iva())
+-		_init_omap_device("iva", &iva_dev);
++		_init_omap_device("iva");
+ 
+ 	if (cpu_is_omap44xx()) {
+-		_init_omap_device("l3_main_1", &l3_dev);
+-		_init_omap_device("dsp", &dsp_dev);
+-		_init_omap_device("iva", &iva_dev);
++		_init_omap_device("l3_main_1");
++		_init_omap_device("dsp");
++		_init_omap_device("iva");
+ 	} else {
+-		_init_omap_device("l3_main", &l3_dev);
++		_init_omap_device("l3_main");
+ 	}
+ }
+ 
 -- 
 1.7.0.4
