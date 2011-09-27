@@ -1,49 +1,90 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Sep 2011 09:29:37 +0100
-Subject: [PATCH 9/9] clk: spi-pl022: convert to clk_prepare()/clk_unprepare()
-Message-ID: <E1R8T2n-0003wr-Rb@rmk-PC.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 27 Sep 2011 09:32:26 +0100
+Subject: [PATCH v2 16/16] ARM: GIC: Make MULTI_IRQ_HANDLER mandatory
+In-Reply-To: <20110927034350.GA17997@S2100-06.ap.freescale.net>
+References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
+	<1317034955-1029-17-git-send-email-marc.zyngier@arm.com>
+	<20110927034350.GA17997@S2100-06.ap.freescale.net>
+Message-ID: <4E818A1A.2090906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/spi/spi-pl022.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+Hi Shawn,
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 3520cf9..1ab2fa0 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2187,6 +2187,13 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 		dev_err(&adev->dev, "could not retrieve SSP/SPI bus clock\n");
- 		goto err_no_clk;
- 	}
-+
-+	status = clk_prepare(pl022->clk);
-+	if (status) {
-+		dev_err(&adev->dev, "could not prepare SSP/SPI bus clock\n");
-+		goto  err_clk_prep;
-+	}
-+
- 	/* Disable SSP */
- 	writew((readw(SSP_CR1(pl022->virtbase)) & (~SSP_CR1_MASK_SSE)),
- 	       SSP_CR1(pl022->virtbase));
-@@ -2238,6 +2245,8 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 	pl022_dma_remove(pl022);
- 	free_irq(adev->irq[0], pl022);
-  err_no_irq:
-+	clk_unprepare(pl022->clk);
-+ err_clk_prep:
- 	clk_put(pl022->clk);
-  err_no_clk:
- 	iounmap(pl022->virtbase);
-@@ -2271,6 +2280,7 @@ pl022_remove(struct amba_device *adev)
- 	pl022_dma_remove(pl022);
- 	free_irq(adev->irq[0], pl022);
- 	clk_disable(pl022->clk);
-+	clk_unprepare(pl022->clk);
- 	clk_put(pl022->clk);
- 	iounmap(pl022->virtbase);
- 	amba_release_regions(adev);
+On 27/09/11 04:43, Shawn Guo wrote:
+> On Mon, Sep 26, 2011 at 12:02:35PM +0100, Marc Zyngier wrote:
+>> Now that MULTI_IRQ_HANDLER is selected by all the in-tree
+>> GIC users, make it mandatory and remove the unused macros.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm/Kconfig                                |    3 -
+>>  arch/arm/common/Kconfig                         |    1 +
+>>  arch/arm/common/gic.c                           |    2 +-
+>>  arch/arm/include/asm/hardware/entry-macro-gic.S |   60 -----------------------
+>>  arch/arm/include/asm/hardware/gic.h             |    1 -
+>>  arch/arm/mach-msm/Kconfig                       |    2 -
+>>  arch/arm/mach-omap2/Kconfig                     |    1 +
+>>  arch/arm/mach-tegra/Kconfig                     |    1 -
+>>  arch/arm/mach-ux500/Kconfig                     |    1 -
+>>  arch/arm/plat-omap/Kconfig                      |    1 -
+>>  10 files changed, 3 insertions(+), 70 deletions(-)
+>>  delete mode 100644 arch/arm/include/asm/hardware/entry-macro-gic.S
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 0514264..d3e246c 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -334,7 +334,6 @@ config ARCH_CNS3XXX
+>>  	select ARM_GIC
+>>  	select MIGHT_HAVE_PCI
+>>  	select PCI_DOMAINS if PCI
+>> -	select MULTI_IRQ_HANDLER
+>>  	help
+>>  	  Support for Cavium Networks CNS3XXX platform.
+>>  
+>> @@ -788,7 +787,6 @@ config ARCH_EXYNOS4
+>>  	select HAVE_S3C_RTC if RTC_CLASS
+>>  	select HAVE_S3C2410_I2C if I2C
+>>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+>> -	select MULTI_IRQ_HANDLER
+>>  	help
+>>  	  Samsung EXYNOS4 series based systems
+>>  
+>> @@ -911,7 +909,6 @@ config ARCH_ZYNQ
+>>  	select ARM_AMBA
+>>  	select ICST
+>>  	select USE_OF
+>> -	select MULTI_IRQ_HANDLER
+>>  	help
+>>  	  Support for Xilinx Zynq ARM Cortex A9 Platform
+>>  endchoice
+> 
+> Hi Marc,
+> 
+> I'm unsure about your base.  But I have the following platforms in
+> arch/arm/Kconfig selecting MULTI_IRQ_HANDLER at the end of your series,
+> which should also be removed from?
+> 
+>   ARCH_REALVIEW
+>   ARCH_VEXPRESS
+
+These two can be indeed removed, as they are GIC users and GIC now
+selects MULTI_IRQ_HANDLER directly. I'll fix the patch.
+
+>   ARCH_PXA
+
+PXA doesn't use the GIC, so it has to select MULTI_IRQ_HANDLER directly
+as it used to before my patch.
+
+>   ARCH_SHMOBILE
+
+This one is caught in the middle. Only SMP shmobile platforms use the
+GIC, but they all need MULTI_IRQ_HANDLER anyway, so keeping the option
+selected doesn't hurt.
+
+Cheers,
+
+	M.
 -- 
-1.7.4.4
+Jazz is not dead. It just smells funny...
