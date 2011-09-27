@@ -1,28 +1,78 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 27 Sep 2011 07:27:19 -0700
-Subject: [PATCH v7 REPOST 00/24] gpio/omap: driver cleanup and fixes
-In-Reply-To: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Tue, 27 Sep 2011 05:43:56 +0530")
-References: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87vcse3vso.fsf@ti.com>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Tue, 27 Sep 2011 20:01:23 +0530
+Subject: [PATCH v7 00/26] gpio/omap: driver cleanup and fixes
+In-Reply-To: <8739fi99yq.fsf@ti.com>
+References: <1315918979-26173-1-git-send-email-tarun.kanti@ti.com>
+	<87mxdwm8pk.fsf@ti.com>
+	<CAC83ZvKu5Fo-c88L4WFPdvq91T=usaZY4mzTVVzDLw9HE7g9Kg@mail.gmail.com>
+	<4E7D99CB.7090004@ti.com>
+	<CAC83ZvLfCOjKja1rZ6GB4bmn_KrcjitTJZJsa5jy01QVj2OXXw@mail.gmail.com>
+	<8739fi99yq.fsf@ti.com>
+Message-ID: <CAC83ZvJ4qdyvGfJGXbhf8SsGOuvwuDzBFx-f8NZX1209KAVOYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
-
-> This series is continuation of cleanup of OMAP GPIO driver and fixes.
-> The cleanup include getting rid of cpu_is_* checks wherever possible,
-> use of gpio_bank list instead of static array, use of unique platform
-> specific value associated data member to OMAP platforms to avoid
-> cpu_is_* checks. The series also include PM runtime support.*
+On Tue, Sep 27, 2011 at 4:40 AM, Kevin Hilman <khilman@ti.com> wrote:
+> "DebBarma, Tarun Kanti" <tarun.kanti@ti.com> writes:
 >
-> Baseline: git://gitorious.org/khilman/linux-omap-pm.git
-> Branch: for_3.2/gpio-cleanup
-> Commit: 8323374
+> [...]
+>
+>> As pointed out by Kevin, debounce clock was not getting disabled.
+>> In my testing I was somehow grepping CORE power domain instead
+>> of PER power domain and hence missed it. The fix for the debounce
+>> clock issue is at the end of the email.
+>>
+>> - Have re-based the for_3.2/gpio-cleanup branch against 3.1-rc6.
+>> - Dropped [PATCH 26/26] gpio/omap: add dbclk aliases for all gpio modules
+>> as suggested by Kevin since it's already taken care by hwmod.
+>> - Added the debounce clock fix in the end.
+>
+> That debounce fix definitely makes things look better, but it's not
+> solving the problem...
+>
+>> With above, PER is hitting low power state in Suspend and Idle path.
+>>
+>> Have pushed a branch at below URL with mentioned changes.
+>> git://gitorious.org/omap-sw-develoment/linux-omap-dev.git
+>> for_3.2/kevin/gpio-cleanup
+>
+> I tested your branch on my 3430/n900 and PER is still not hitting
+> retention. ?Setting all debounce values in the board file to zero using
+> the patch below[1] makes PER hit retention again.
+>
+> Assuming you don't have an n900 to test with, I suggest you just copy
+> the GPIO keys init from board-rx51-peripherals.c (or some of it) into
+> the board file you are testing with.
+>
+> The problem is most likely be related to having more than one GPIO in a
+> bank with debounce enabled, or more than one bank with GPIOs enabled and
+> your current test is not be catching it.
+>
+As per commit c8c9fda506945 {OMAP: PM: disable idle on suspend for GPIO
+and UART}, the gpio code needs to be fixed once GPIO driver is run-time adapted.
+So I did below change as per the commit and now suspend is working fine even
+with board files change for debounce functionality. So the last series
++ below one
+line change is whats needed for suspend to work. Can you please see if this does
+help on your board ?
 
-Is this functionally different than the branch you posted yesterday?
+I am not finished my idle testing yet but just reporting the suspend results.
 
-I replied to that saying it does not fix the PER retention problems on
-n900, and giving a suggestion of how to test it.
+diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+index d865033..1957663 100644
+--- a/arch/arm/mach-omap2/gpio.c
++++ b/arch/arm/mach-omap2/gpio.c
+@@ -148,8 +148,6 @@ static int omap2_gpio_dev_init(struct omap_hwmod
+*oh, void *unused)
+                return PTR_ERR(od);
+        }
 
-Kevin
+-       omap_device_disable_idle_on_suspend(od);
+-
+        return 0;
+ }
+
+--
+
+Regards
+Tarun
