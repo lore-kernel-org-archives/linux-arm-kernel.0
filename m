@@ -1,263 +1,197 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 27 Sep 2011 11:10:23 +0530
-Subject: [PATCH 02/13] gpio/omap: Adapt GPIO driver to DT
-In-Reply-To: <1317055821-20652-3-git-send-email-b-cousson@ti.com>
+Date: Tue, 27 Sep 2011 11:12:10 +0530
+Subject: [PATCH 06/13] mfd: twl-core: Add initial DT support for
+	twl4030/twl6030
+In-Reply-To: <1317055821-20652-7-git-send-email-b-cousson@ti.com>
 References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
-	<1317055821-20652-3-git-send-email-b-cousson@ti.com>
-Message-ID: <4E8161C7.7020404@ti.com>
+	<1317055821-20652-7-git-send-email-b-cousson@ti.com>
+Message-ID: <4E816232.5020502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Monday 26 September 2011 10:20 PM, Benoit Cousson wrote:
-> Adapt the GPIO driver to retrieve information from a DT file.
-> Note that since the driver is currently under cleanup, some hacks
-> will have to be removed after.
+> Add initial device-tree support for twl familly chips.
+
+s/familly/family
+
+> The current version is missing the regulator entries due
+> to the lack of DT regulator bindings for the moment.
+> Only the simple sub-modules that do not depend on
+> platform_data information can be initialized properly.
 >
-> Add documentation for GPIO properties specific to OMAP.
->
-> Remove an un-needed whitespace.
+> Add documentation for the Texas Instruments TWL Integrated Chip.
 >
 > Signed-off-by: Benoit Cousson<b-cousson@ti.com>
-> Cc: Grant Likely<grant.likely@secretlab.ca>
-> Cc: Charulatha V<charu@ti.com>
-> Cc: Tarun Kanti DebBarma<tarun.kanti@ti.com>
+> Cc: Balaji T K<balajitk@ti.com>
+> Cc: Graeme Gregory<gg@slimlogic.co.uk>
+> Cc: Samuel Ortiz<sameo@linux.intel.com>
 > ---
->   .../devicetree/bindings/gpio/gpio-omap.txt         |   33 ++++++
->   drivers/gpio/gpio-omap.c                           |  108 ++++++++++++++++++--
->   2 files changed, 132 insertions(+), 9 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/gpio/gpio-omap.txt
+>   .../devicetree/bindings/mfd/twl-familly.txt        |   47 +++++++++++++++++
+>   drivers/mfd/twl-core.c                             |   53 ++++++++++++++++++--
+>   2 files changed, 96 insertions(+), 4 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/mfd/twl-familly.txt
+
+s/familly.txt/family.txt
+
 >
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-omap.txt b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
+> diff --git a/Documentation/devicetree/bindings/mfd/twl-familly.txt b/Documentation/devicetree/bindings/mfd/twl-familly.txt
 > new file mode 100644
-> index 0000000..bdd63de
+> index 0000000..ff4cacd
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-omap.txt
-> @@ -0,0 +1,33 @@
-> +OMAP GPIO controller
+> +++ b/Documentation/devicetree/bindings/mfd/twl-familly.txt
+> @@ -0,0 +1,47 @@
+> +Texas Instruments TWL family
+> +
+> +The TWLs are Integrated Power Management Chips.
+> +Some version might contain much more analog function like
+> +USB transceiver or Audio amplifier.
+> +These chips are connected to an i2c bus.
+> +
 > +
 > +Required properties:
-> +- compatible:
-> +  - "ti,omap2-gpio" for OMAP2 and OMAP3 controllers
-
-Would it be more readable to have
-"ti,omap2-gpio" for OMAP2 controllers and
-"ti,omap3-gpio" for OMAP3 controllers?
-
-> +  - "ti,omap4-gpio" for OMAP4 controller
-> +- #gpio-cells : Should be two.
-> +  - first cell is the pin number
-> +  - second cell is used to specify optional parameters (unused)
-> +- gpio-controller : Marks the device node as a GPIO controller.
+> +- compatible : Must be "ti,twl4030";
+> +  For Integrated power-management/audio CODEC device used in OMAP3
+> +  based boards
+> +- compatible : Must be "ti,twl6030";
+> +  For Integrated power-management used in OMAP4 based boards
+> +- interrupts : This i2c device has an IRQ line connected to the main SoC
+> +- interrupt-controller : Since the twl support several interrupts internally,
+> +  it is considered as an interrupt controller cascaded to the SoC one.
+> +- #interrupt-cells =<1>;
+> +- interrupt-parent : The parent interrupt controller.
 > +
-> +OMAP specific properties:
-> +- ti,hwmods: Name of the hwmod associated to the GPIO
-> +- id: 32 bits to identify the id (1 based index)
-> +- bank-width: number of pin supported by the controller (16 or 32)
-> +- debounce: set if the controller support the debouce funtionnality
-> +- bank-count: number of controller support by the SoC. This is a temporary
-> +  hack until the bank_count is removed from the driver.
-
-Is there a general rule to be followed as to when to use
-"ti,<prop-name>" and when to use just "<prop-name>".
-Since all these are OMAP specific properties, shouldn't all
-of them be "ti,<prop-name>"?
-
+> +Optional node:
+> +- Child nodes contain in the twl. The twl family is made of severals variants
+> +  that support a different number of features.
+> +  The children nodes will thus depend of the capabilty of the variant.
 > +
 > +
 > +Example:
+> +/*
+> + * Integrated Power Management Chip
+> + * http://www.ti.com/lit/ds/symlink/twl6030.pdf
+> + */
+> +twl at 48 {
+> +    compatible = "ti,twl6030";
+> +    reg =<0x48>;
+
+What does the 'reg' property signify here for twl?
+
+> +    interrupts =<39>; /* IRQ_SYS_1N cascaded to gic */
+> +    interrupt-controller;
+> +    #interrupt-cells =<1>;
+> +    interrupt-parent =<&gic>;
+> +    #address-cells =<1>;
+> +    #size-cells =<0>;
 > +
-> +gpio4: gpio4 {
-> +    compatible = "ti,omap4-gpio", "ti,omap-gpio";
-> +    ti,hwmods = "gpio4";
-> +    id =<4>;
-> +    bank-width =<32>;
-> +    debounce;
-> +    no_idle_on_suspend;
-> +    #gpio-cells =<2>;
-> +    gpio-controller;
+> +    twl_rtc {
+> +        compatible = "ti,twl_rtc";
+> +        interrupts =<11>;
+> +        reg =<0>;
+
+Does the 'reg' property need to be faked for
+every twl child node, even if it does not have
+any?
+
+> +    };
 > +};
-> +
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 0599854..f878fa4 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -21,6 +21,8 @@
->   #include<linux/io.h>
->   #include<linux/slab.h>
->   #include<linux/pm_runtime.h>
-> +#include<linux/of.h>
-> +#include<linux/of_device.h>
+> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+> index 01ecfee..3ef0b43 100644
+> --- a/drivers/mfd/twl-core.c
+> +++ b/drivers/mfd/twl-core.c
+> @@ -33,6 +33,10 @@
+>   #include<linux/platform_device.h>
+>   #include<linux/clk.h>
+>   #include<linux/err.h>
+> +#include<linux/slab.h>
+> +#include<linux/of_irq.h>
+> +#include<linux/of_platform.h>
+> +#include<linux/irqdomain.h>
 >
->   #include<mach/hardware.h>
->   #include<asm/irq.h>
-> @@ -521,7 +523,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
->   	unsigned long flags;
+>   #include<linux/regulator/machine.h>
 >
->   	if (bank->non_wakeup_gpios&  gpio_bit) {
-> -		dev_err(bank->dev,
-> +		dev_err(bank->dev,
-
-Stray change?
-
->   			"Unable to modify wakeup on non-wakeup GPIO%d\n", gpio);
->   		return -EINVAL;
->   	}
-> @@ -1150,6 +1152,8 @@ static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
->   	irq_set_handler_data(bank->irq, bank);
->   }
+> @@ -1182,22 +1186,53 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>   	int				status;
+>   	unsigned			i;
+>   	struct twl4030_platform_data	*pdata = client->dev.platform_data;
+> +	struct device_node		*node = client->dev.of_node;
+>   	u8 temp;
+>   	int ret = 0;
 >
-> +static const struct of_device_id omap_gpio_match[];
-> +
->   static int __devinit omap_gpio_probe(struct platform_device *pdev)
->   {
->   	static int gpio_init_done;
-> @@ -1157,11 +1161,31 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
->   	struct resource *res;
->   	int id;
->   	struct gpio_bank *bank;
-> +	struct device_node *node = pdev->dev.of_node;
-> +	const struct of_device_id *match;
-> +
-> +	match = of_match_device(omap_gpio_match,&pdev->dev);
-> +	if (match) {
-> +		pdata = match->data;
-> +		/* XXX: big hack until the bank_count is removed */
-> +		of_property_read_u32(node, "bank-count",&gpio_bank_count);
-> +		if (of_property_read_u32(node, "id",&id))
-
-id should be u32.
-
-> +			return -EINVAL;
+> +	if (node&&  !pdata) {
 > +		/*
-> +		 * In an ideal world, the id should not be needed, but since
-> +		 * the OMAP TRM consider the multiple GPIO controllers as
-> +		 * multiple banks, the GPIO number is based on the whole set
-> +		 * of banks. Hence the need to provide an id in order to
-> +		 * respect the order and the correct GPIO number.
+> +		 * XXX: Temporary fake pdata until the information
+> +		 * is correctly retrieved by every TWL modules from DT.
 > +		 */
-> +		id -= 1;
-> +	} else {
-> +		if (!pdev->dev.platform_data)
-> +			return -EINVAL;
->
-> -	if (!pdev->dev.platform_data)
+> +		pdata = kzalloc(sizeof(struct twl4030_platform_data),
+> +				GFP_KERNEL);
+
+devm_kzalloc instead?
+
+> +		if (!pdata) {
+> +			status = -ENOMEM;
+> +			goto exit;
+> +		}
+> +
+> +		/*
+> +		 * XXX: For the moment the IRQs for TWL seems to be encoded in
+> +		 * the global OMAP space. That should be cleaned to allow
+> +		 * dynamically adding a new IRQ controller.
+> +		 */
+> +		if ((id->driver_data)&  TWL6030_CLASS) {
+> +			pdata->irq_base = TWL6030_IRQ_BASE;
+> +			pdata->irq_end = pdata->irq_base + TWL6030_BASE_NR_IRQS;
+> +		} else {
+> +			pdata->irq_base = TWL4030_IRQ_BASE;
+> +			pdata->irq_end = pdata->irq_base + TWL4030_BASE_NR_IRQS;
+> +		}
+> +		irq_domain_add_simple(node, pdata->irq_base);
+> +	}
+> +
+>   	if (!pdata) {
+>   		dev_dbg(&client->dev, "no platform data?\n");
 > -		return -EINVAL;
-> -
-> -	pdata = pdev->dev.platform_data;
-> +		pdata = pdev->dev.platform_data;
-> +		id = pdev->id;
-> +	}
->
->   	if (!gpio_init_done) {
->   		int ret;
-> @@ -1171,7 +1195,6 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
->   			return ret;
+> +		status = -EINVAL;
+> +		goto fail_free;
 >   	}
 >
-> -	id = pdev->id;
->   	bank =&gpio_bank[id];
->
->   	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> @@ -1181,12 +1204,19 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+>   	if (i2c_check_functionality(client->adapter, I2C_FUNC_I2C) == 0) {
+>   		dev_dbg(&client->dev, "can't talk I2C?\n");
+> -		return -EIO;
+> +		status = -EIO;
+> +		goto fail_free;
 >   	}
 >
->   	bank->irq = res->start;
-> -	bank->virtual_irq_start = pdata->virtual_irq_start;
->   	bank->method = pdata->bank_type;
->   	bank->dev =&pdev->dev;
-> -	bank->dbck_flag = pdata->dbck_flag;
->   	bank->stride = pdata->bank_stride;
-> -	bank->width = pdata->bank_width;
-> +	if (match) {
-> +		of_property_read_u32(node, "bank-width",&bank->width);
-
-Bank width should be u32.
-
-> +		if (of_get_property(node, "debounce", NULL))
-
-of_find_property() should suffice.
-
-regards,
-Rajendra
-
-> +			bank->dbck_flag = true;
-> +		bank->virtual_irq_start = IH_GPIO_BASE + 32 * id;
-> +	} else {
-> +		bank->width = pdata->bank_width;
-> +		bank->dbck_flag = pdata->dbck_flag;
-> +		bank->virtual_irq_start = pdata->virtual_irq_start;
-> +	}
+>   	if (inuse) {
+>   		dev_dbg(&client->dev, "driver is already in use\n");
+> -		return -EBUSY;
+> +		status = -EBUSY;
+> +		goto fail_free;
+>   	}
 >
->   	bank->regs = pdata->regs;
+>   	for (i = 0; i<  TWL_NUM_SLAVES; i++) {
+> @@ -1269,10 +1304,20 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>   		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
+>   	}
 >
-> @@ -1559,10 +1589,70 @@ void omap_gpio_restore_context(void)
->   }
->   #endif
->
-> +#if defined(CONFIG_OF)
-> +static struct omap_gpio_reg_offs omap2_gpio_regs = {
-> +	.revision =		OMAP24XX_GPIO_REVISION,
-> +	.direction =		OMAP24XX_GPIO_OE,
-> +	.datain =		OMAP24XX_GPIO_DATAIN,
-> +	.dataout =		OMAP24XX_GPIO_DATAOUT,
-> +	.set_dataout =		OMAP24XX_GPIO_SETDATAOUT,
-> +	.clr_dataout =		OMAP24XX_GPIO_CLEARDATAOUT,
-> +	.irqstatus =		OMAP24XX_GPIO_IRQSTATUS1,
-> +	.irqstatus2 =		OMAP24XX_GPIO_IRQSTATUS2,
-> +	.irqenable =		OMAP24XX_GPIO_IRQENABLE1,
-> +	.set_irqenable =	OMAP24XX_GPIO_SETIRQENABLE1,
-> +	.clr_irqenable =	OMAP24XX_GPIO_CLEARIRQENABLE1,
-> +	.debounce =		OMAP24XX_GPIO_DEBOUNCE_VAL,
-> +	.debounce_en =		OMAP24XX_GPIO_DEBOUNCE_EN,
-> +};
-> +
-> +static struct omap_gpio_platform_data omap2_pdata = {
-> +	.bank_type = METHOD_GPIO_24XX,
-> +	.regs =&omap2_gpio_regs,
-> +};
-> +
-> +static struct omap_gpio_reg_offs omap4_gpio_regs = {
-> +	.revision =		OMAP4_GPIO_REVISION,
-> +	.direction =		OMAP4_GPIO_OE,
-> +	.datain =		OMAP4_GPIO_DATAIN,
-> +	.dataout =		OMAP4_GPIO_DATAOUT,
-> +	.set_dataout =		OMAP4_GPIO_SETDATAOUT,
-> +	.clr_dataout =		OMAP4_GPIO_CLEARDATAOUT,
-> +	.irqstatus =		OMAP4_GPIO_IRQSTATUS1,
-> +	.irqstatus2 =		OMAP4_GPIO_IRQSTATUS2,
-> +	.irqenable =		OMAP4_GPIO_IRQENABLE1,
-> +	.set_irqenable =	OMAP4_GPIO_SETIRQENABLE1,
-> +	.clr_irqenable =	OMAP4_GPIO_CLEARIRQENABLE1,
-> +	.debounce =		OMAP4_GPIO_DEBOUNCINGTIME,
-> +	.debounce_en =		OMAP4_GPIO_DEBOUNCENABLE,
-> +};
-> +
-> +static struct omap_gpio_platform_data omap4_pdata = {
-> +	.bank_type = METHOD_GPIO_44XX,
-> +	.regs =&omap4_gpio_regs,
-> +};
-> +
-> +static const struct of_device_id omap_gpio_match[] = {
-> +	{
-> +		.compatible = "ti,omap4-gpio",
-> +		.data =&omap4_pdata,
-> +	},
-> +	{
-> +		.compatible = "ti,omap2-gpio",
-> +		.data =&omap2_pdata,
-> +	},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, omap_gpio_match);
-> +#else
-> +#define omap_gpio_match NULL
+> -	status = add_children(pdata, id->driver_data);
+> +#ifdef CONFIG_OF_DEVICE
+
+is the #ifdef really needed?
+
+> +	if (node)
+> +		status = of_platform_populate(node, NULL, NULL,&client->dev);
+> +	else
 > +#endif
+> +		status = add_children(pdata, id->driver_data);
 > +
->   static struct platform_driver omap_gpio_driver = {
->   	.probe		= omap_gpio_probe,
->   	.driver		= {
->   		.name	= "omap_gpio",
-> +		.of_match_table = omap_gpio_match,
->   	},
->   };
+>   fail:
+>   	if (status<  0)
+>   		twl_remove(client);
+> +fail_free:
+> +	if (node)
+> +		kfree(pdata);
+> +exit:
+>   	return status;
+>   }
 >
