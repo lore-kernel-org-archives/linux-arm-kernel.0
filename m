@@ -1,72 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Sep 2011 10:00:56 +0200
-Subject: [PATCH 2/2 v7] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF1738180164@HQMAIL01.nvidia.com>
-References: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04B7321777@HQMAIL01.nvidia.com>
-	<CACRpkdY5ETbJxSpwJL-7KZhjOnhwrdT1=djwByek75ye=S9L9w@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF1738180164@HQMAIL01.nvidia.com>
-Message-ID: <CACRpkdbiWUFPfF9vKV5YpSW68ZTdjwb8NhWZ_9WDoY5Q+aVfvQ@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 27 Sep 2011 13:39:58 +0530
+Subject: [PATCH v3 2/2] input: samsung-keypad: Add device tree support
+In-Reply-To: <20110922174054.GO17168@ponder.secretlab.ca>
+References: <1316427553-5033-1-git-send-email-thomas.abraham@linaro.org>
+	<1316427553-5033-3-git-send-email-thomas.abraham@linaro.org>
+	<20110922174054.GO17168@ponder.secretlab.ca>
+Message-ID: <CAJuYYwTgn2KqNr28MNEPEC7eVkuUA-dzVzJHMTy-MV+GBCn=zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2011 at 9:39 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Linus Walleij wrote at Wednesday, September 21, 2011 2:25 AM:
->> On Wed, Sep 21, 2011 at 12:15 AM, Stephen Warren <swarren@nvidia.com> wrote:
->> > Linus Walleij wrote at Friday, September 16, 2011 6:14 AM:
->> >> + ? ? for (i = 0; i < ARRAY_SIZE(u300_mux_hogs); i++) {
->> >> + ? ? ? ? ? ? struct pinmux *pmx;
->> >> + ? ? ? ? ? ? int ret;
->> >> +
->> >> + ? ? ? ? ? ? pmx = pinmux_get(u300_mux_hogs[i].dev, NULL);
->> >> + ? ? ? ? ? ? if (IS_ERR(pmx)) {
->> >> + ? ? ? ? ? ? ? ? ? ? pr_err("u300: could not get pinmux hog %s\n",
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?u300_mux_hogs[i].name);
->> >> + ? ? ? ? ? ? ? ? ? ? continue;
->> >> + ? ? ? ? ? ? }
->> >> + ? ? ? ? ? ? ret = pinmux_enable(pmx);
->> >> + ? ? ? ? ? ? if (ret) {
->> >> + ? ? ? ? ? ? ? ? ? ? pr_err("u300: could enable pinmux hog %s\n",
->> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?u300_mux_hogs[i].name);
->> >> + ? ? ? ? ? ? ? ? ? ? continue;
->> >> + ? ? ? ? ? ? }
->> >> + ? ? ? ? ? ? u300_mux_hogs[i].pmx = pmx;
->> >> + ? ? }
->> >> + ? ? return 0;
->> >> +}
->> >> +subsys_initcall(u300_pinmux_fetch);
->> >
->> > Why not just have the pinmux core support hogging on non-"system" mapping
->> > entries; then everything I quoted above except u300_pinmux_map[] could
->> > be deleted, and the "hog" flag set on the last 3 u300_pinmux_map[] entries.
+Hi Grant,
+
+On 22 September 2011 23:10, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Mon, Sep 19, 2011 at 03:49:13PM +0530, Thomas Abraham wrote:
+>> Add device tree based discovery support for Samsung's keypad controller.
 >>
->> Very good question, luckily I have a good answer.
+>> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+>> Cc: Donghwa Lee <dh09.lee@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>
+> A few things to fix below, but you can add my acked-by when you've
+> addressed them.
+
+Ok. Thanks for your review. I will fix as per your comments.
+
+[...]
+
+>
+>> diff --git a/drivers/input/keyboard/samsung-keypad.c b/drivers/input/keyboard/samsung-keypad.c
+>> index f689f49..2a477bc 100644
+>> --- a/drivers/input/keyboard/samsung-keypad.c
+>> +++ b/drivers/input/keyboard/samsung-keypad.c
+
+[...]
+
+>> +
+>> + ? ? of_property_read_u32(np, "samsung,keypad-num-rows", &num_rows);
+>> + ? ? of_property_read_u32(np, "samsung,keypad-num-columns", &num_cols);
+>
+> property_read doesn't touch the values of num_rows or num_cols on
+> failure. ?The values need to be initialized if you're going to test
+> the result value.
+
+Ok. num_rows and num_cols variables will be set to zero before the
+property read call.
+
+>
+>> + ? ? if (!num_rows || !num_cols) {
+>> + ? ? ? ? ? ? dev_err(dev, "number of keypad rows/columns not specified\n");
+>> + ? ? ? ? ? ? return NULL;
+>> + ? ? }
+
+[...]
+
 >>
->> There is no way for the pinmux core to traverse the system and look
->> up the apropriate struct device * pointers.
+>> + ? ? if (pdev->dev.of_node) {
+>> + ? ? ? ? ? ? samsung_keypad_parse_dt_gpio(&pdev->dev, keypad);
+>> +#ifdef CONFIG_OF
+>> + ? ? ? ? ? ? keypad->type = of_device_is_compatible(pdev->dev.of_node,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "samsung,s5pv210-keypad");
+>> +#endif
 >
-> It's unclear to me why that would be needed.
+> This still looks odd. ?If you move the #ifdef up one line, then you
+> can remove the empty version of samsung_keypad_parse_dt_gpio(), and
+> this block won't look so weird.
 >
-> For non-system mappings, either the device-driver in question will be
-> get'ing and enabling them (this case isn't relevant to this discussion),
-> or they'll be hogged. In the hog case, I doubt anything would ever want
-> to disable them and switch the device to a different mapping entry; if
-> that were the case, the entries shouldn't be hogged, but get/enabled by
-> the device anyway. Hence, I don't see the need for an activation of a
-> hog'd non-system mapping entry to care about the device fields that are
-> in the mapping table at all; they could just be ignored couldn't they?
 
-I don't think so, atleast not in this case. I think it is helpful for the system
-to know which device is related to the specific hog, so it turns up in
-debugfs etc "aha, it is hogged for that device" etc. Not doing that
-makes the subsystem loose relevant information.
+That would be a better approach. Thanks for the suggestion.
 
-So for that reason I prefer to pass in the relevant struct device *
-pointers, atleast when they're readily available as in this boardfile.
+Regards,
+Thomas.
 
-If they are not available, or hard to get at, we could just redefine
-them as system mappings and remove the device fields, but
-in this case I'd say let's keep it around.
-
-Yours,
-Linus Walleij
+[...]
