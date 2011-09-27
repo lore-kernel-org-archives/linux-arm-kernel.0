@@ -1,67 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 27 Sep 2011 11:22:13 +0100
-Subject: [PATCH v2 00/16] Switch GIC users (and omap2plus) to
-	CONFIG_MULTI_IRQ_HANDLER
-In-Reply-To: <20110927102039.GC17997@S2100-06.ap.freescale.net>
-References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-	<20110927102039.GC17997@S2100-06.ap.freescale.net>
-Message-ID: <4E81A3D5.3060409@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 27 Sep 2011 11:28:35 +0100
+Subject: [RFC PATCH 3/3] ARM: mm: add l2x0 suspend/resume support
+In-Reply-To: <4E815F42.6010102@ti.com>
+References: <1317047561-11020-1-git-send-email-lorenzo.pieralisi@arm.com>
+	<1317047561-11020-4-git-send-email-lorenzo.pieralisi@arm.com>
+	<20110926150645.GN22455@n2100.arm.linux.org.uk>
+	<20110926171452.GC11647@e102568-lin.cambridge.arm.com>
+	<4E815F42.6010102@ti.com>
+Message-ID: <20110927102835.GA18572@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/09/11 11:20, Shawn Guo wrote:
-> On Mon, Sep 26, 2011 at 12:02:19PM +0100, Marc Zyngier wrote:
->> In order to support multiple primary interrupt controllers in the same
->> image, it is necessary to use the MULTI_IRQ_HANDLER config option.
->>
->> This patch series makes a first step in that direction by:
->> - having the GIC code to provides a global handler,
->> - make GIC users to provide this handler from their machine descriptor.
->>
->> A side effect of this is that it forces OMAP2/3 platforms to be
->> converted too in order to preserve the MULTI_OMAP feature. This leads
->> to a certain simplification of the interrupt handling for the
->> OMAP2/3/4 platforms.
->>
->> The primary IRQ handlers have been written in C, and the performance
->> degradation is hardly noticeable. Should some tests reveal a major
->> increase in latency, it is always possible to restore the ASM version.
->>
->> This series has been tested on VE (A9, A5, A15), PB11MP, Panda, IGEPv2
->> and Harmony. Patches against next-20110926 plus my PPI series.
->>
->> From v1:
->> - Add forgotten patch to make global handler and MULTI_IRQ_HANDLER
->>   mutually exclusive.
->> - Introduce handle_IPI(), which is similar to do_IP() and callable
->>   from C code.
->>
->> Marc Zyngier (16):
->>   ARM: Make global handler and CONFIG_MULTI_IRQ_HANDLER mutually
->>     exclusive
->>   ARM: smp: Add an IPI handler callable from C code
->>   ARM: GIC: Add global gic_handle_irq() function
->>   ARM: RealView: convert to CONFIG_MULTI_IRQ_HANDLER
->>   ARM: VExpress: convert to CONFIG_MULTI_IRQ_HANDLER
->>   ARM: msm: convert SMP platforms to CONFIG_MULTI_IRQ_HANDLER
->>   ARM: GIC: Add global gic_handle_irq_offset() function
->>   ARM: exynos4: convert to CONFIG_MULTI_IRQ_HANDLER
->>   ARM: tegra2: convert to CONFIG_MULTI_IRQ_HANDLER
->>   ARM: ux500: convert to CONFIG_MULTI_IRQ_HANDLER
->>   ARM: shmobile: convert smp platforms to gic_handle_irq()
->>   ARM: cns3xxx: convert to CONFIG_MULTI_IRQ_HANDLER
->>   ARM: zynq: convert to CONFIG_MULTI_IRQ_HANDLER
->>   ARM: omap2/3: Add global omap2/3_intc_handle_irq() functions
->>   ARM: omap2plus: convert to CONFIG_MULTI_IRQ_HANDLER
->>   ARM: GIC: Make MULTI_IRQ_HANDLER mandatory
->>
-> On imx6q:
+Santosh,
+
+On Tue, Sep 27, 2011 at 06:29:38AM +0100, Santosh Shilimkar wrote:
+> Lorenzo,
 > 
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+> On Monday 26 September 2011 10:44 PM, Lorenzo Pieralisi wrote:
+> > On Mon, Sep 26, 2011 at 04:06:45PM +0100, Russell King - ARM Linux wrote:
+> >> On Mon, Sep 26, 2011 at 03:32:41PM +0100, Lorenzo Pieralisi wrote:
+> >>> Context is saved once for all at boot time, along with the L2 physical address
+> >>> and cache type.
+> >>
+> >> Why is this assembly code?  As Barry's previous patch shows, it's
+> >> entirely possible to save all the state required at init time from
+> >> the existing C code without needing any additional functions.
+> >>
+> > 
+> I too didn't like this approach.
+> 
+> The platforms which needs to take care of security needs to take
+> care of the L2 on their own and this code doesn't help them.
+> 
+> Other platform which wants to use the L2 code, looks like are
+> fine to use the C-version which saves registers in init and restores
+> it in resume path whenever needed. The patch which was posted
+> on that was good enough. Regarding turning OFF MMU is really
+> not necessary unless and until some hardware's are buggy. In that
+> case, instead of adding that un-necessary code in generic code,
+> it's better to patch only that buggy SOC code.
 > 
 
-Thanks for testing.
+I summed up the reasons for this patch to exist in the cover letter 
+and I mentioned that some bits can be merged IF needed:
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+http://www.spinics.net/lists/arm-kernel/msg141989.html
+
+Having said that:
+
+- This patch does not switch the MMU off
+- This patch does not cover security, and I mentioned that
+- Russell referred to saving registers not restoring them, for a reason
+- If the resume hook is written in C you cannot call it when the MMU is
+  off, which we need if L2 is retained. Unless you think OMAP is the
+  only platform supporting L2 RAM retention, but there are people who might
+  disagree.
+
+And if you think it is not worth merging since most SoCs will run in
+non-secure mode, then that's a very valid point, but it is true for both
+patch series, not just for this one.
+
+Lorenzo
