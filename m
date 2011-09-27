@@ -1,24 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Sep 2011 10:29:06 +0100
-Subject: Porting linux to Stellaris Cortex-M3
-In-Reply-To: <CAH8SYHDRT7OpLr0sx75rMyy4OV59JZGoRv_cr2+-+2yy3tfU9g@mail.gmail.com>
-References: <CAH8SYHDRT7OpLr0sx75rMyy4OV59JZGoRv_cr2+-+2yy3tfU9g@mail.gmail.com>
-Message-ID: <20110927092906.GA9692@n2100.arm.linux.org.uk>
+From: highguy@gmail.com (Stijn Devriendt)
+Date: Tue, 27 Sep 2011 11:30:08 +0200
+Subject: [PATCH 1/2] drivers: create a pin control subsystem v7
+In-Reply-To: <1316175203-10736-1-git-send-email-linus.walleij@stericsson.com>
+References: <1316175203-10736-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAOY=C6ESgRpdCYb8tCxmmdRGfjv+gqroDNiq63zyRjardVicjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 05:19:39PM -0300, Fernando Endo wrote:
-> - BUG: scheduling while atomic: init/1/0xffff000a
+> +static int pin_request(struct pinctrl_dev *pctldev,
+> + ? ? ? ? ? ? ? ? ? ? ?int pin, const char *function, bool gpio,
+> + ? ? ? ? ? ? ? ? ? ? ?struct pinctrl_gpio_range *gpio_range)
+> +{
+> + ? ? ? struct pin_desc *desc;
+> + ? ? ? const struct pinmux_ops *ops = pctldev->desc->pmxops;
+> + ? ? ? int status = -EINVAL;
+> +
+> + ? ? ? dev_dbg(&pctldev->dev, "request pin %d for %s\n", pin, function);
+> +
+> + ? ? ? if (!pin_is_valid(pctldev, pin)) {
+> + ? ? ? ? ? ? ? dev_err(&pctldev->dev, "pin is invalid\n");
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? if (!function) {
+> + ? ? ? ? ? ? ? dev_err(&pctldev->dev, "no function name given\n");
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? desc = pin_desc_get(pctldev, pin);
+> + ? ? ? if (desc == NULL) {
+> + ? ? ? ? ? ? ? dev_err(&pctldev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? "pin is not registered so it cannot be requested\n");
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? spin_lock(&desc->lock);
+> + ? ? ? if (desc->mux_requested) {
+> + ? ? ? ? ? ? ? spin_unlock(&desc->lock);
+> + ? ? ? ? ? ? ? dev_err(&pctldev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? "pin already requested\n");
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> + ? ? ? spin_unlock(&desc->lock);
 
-The last figure is the preempt count.  This is made up from:
+Now this is racing with...
 
- * - bits 0-7 are the preemption count (max preemption depth: 256)
- * - bits 8-15 are the softirq count (max # of softirqs: 256)
- * - bits 16-25 are the hardirq count (max # of nested hardirqs: 1024)
- * - bit 26 is the NMI_MASK
- * - bit 28 is the PREEMPT_ACTIVE flag
+> +
+> + ? ? ? /* Let each pin increase references to this module */
+> + ? ? ? if (!try_module_get(pctldev->owner)) {
+> + ? ? ? ? ? ? ? dev_err(&pctldev->dev,
+> + ? ? ? ? ? ? ? ? ? ? ? "could not increase module refcount for pin %d\n",
+> + ? ? ? ? ? ? ? ? ? ? ? pin);
+> + ? ? ? ? ? ? ? status = -EINVAL;
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
+> + ? ? ? /*
+> + ? ? ? ?* If there is no kind of request function for the pin we just assume
+> + ? ? ? ?* we got it by default and proceed.
+> + ? ? ? ?*/
+> + ? ? ? if (gpio && ops->gpio_request_enable)
+> + ? ? ? ? ? ? ? /* This requests and enables a single GPIO pin */
+> + ? ? ? ? ? ? ? status = ops->gpio_request_enable(pctldev, gpio_range, pin);
+> + ? ? ? else if (ops->request)
+> + ? ? ? ? ? ? ? status = ops->request(pctldev, pin);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? status = 0;
+> +
+> + ? ? ? if (status) {
+> + ? ? ? ? ? ? ? dev_err(&pctldev->dev, "->request on device %s failed "
+> + ? ? ? ? ? ? ? ? ? ? ?"for pin %d\n",
+> + ? ? ? ? ? ? ? ? ? ? ?pctldev->desc->name, pin);
+> + ? ? ? ? ? ? ? goto out;
+> + ? ? ? }
+> +
 
-That seems to be saying that preemption has been disabled 10 times.
-The upper 16-bits being all-ones seems to be rather insane - maybe
-there's an additional __irq_exit() or irq_exit() call somewhere in
-one of your code paths.
+... this:
+
+> + ? ? ? spin_lock(&desc->lock);
+> + ? ? ? desc->mux_requested = true;
+> + ? ? ? strncpy(desc->mux_function, function, sizeof(desc->mux_function));
+> + ? ? ? spin_unlock(&desc->lock);
+> +
+
+2 threads can pass through when mux_requested is false and they might
+both acquire
+the pin, depending on specific driver implementation.
+
+Regards,
+Stijn
