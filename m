@@ -1,300 +1,194 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 26 Sep 2011 19:46:32 -0600
-Subject: [PATCH v3 2/2] OMAP: omap_device: Add a method to build an
-	omap_device from a DT node
-In-Reply-To: <1316724745-24896-3-git-send-email-b-cousson@ti.com>
-References: <1316724745-24896-1-git-send-email-b-cousson@ti.com>
-	<1316724745-24896-3-git-send-email-b-cousson@ti.com>
-Message-ID: <20110927014632.GB20588@ponder.secretlab.ca>
+Date: Mon, 26 Sep 2011 19:53:05 -0600
+Subject: [PATCH v4] of/irq: introduce of_irq_init
+In-Reply-To: <1317065083-23573-1-git-send-email-robherring2@gmail.com>
+References: <1316744473-13158-1-git-send-email-robherring2@gmail.com>
+	<1317065083-23573-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20110927015305.GD20588@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 10:52:25PM +0200, Benoit Cousson wrote:
-> Add a notifier called during device_add phase. If an of_node is present,
-> retrieve the hwmod entry in order to populate properly the omap_device
-> structure.
-> For the moment the resource from the device-tree are overloaded.
-> DT does not support named resource yet, and thus, most driver
-> will not work without that information.
+On Mon, Sep 26, 2011 at 02:24:43PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Add two helpers function to parse a property that contains multiple
-> strings. Please note that these helpers will be replaced by a more generic
-> iterator currently proposed on devicetree mailing list as soon as it
-> will be merged.
+> of_irq_init will scan the devicetree for matching interrupt controller
+> nodes. Then it calls an initialization function for each found controller
+> in the proper order with parent nodes initialized before child nodes.
 > 
-> Add a documentation to capture the specifics OMAP bindings
-> needed for device-tree support.
+> Based on initial pseudo code from Grant Likely.
 > 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> ---
->  .../devicetree/bindings/arm/omap/omap.txt          |   42 ++++++
->  arch/arm/plat-omap/omap_device.c                   |  145 ++++++++++++++++++++
->  2 files changed, 187 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/omap.txt
+> Changes in v4:
+> - Drop unnecessary empty list check
+> - Be more verbose on errors
+> - Simplify "if (!desc) WARN_ON(1)" to "if (WARN_ON(!desc))"
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> new file mode 100644
-> index 0000000..6513d05
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -0,0 +1,42 @@
-> +* Texas Instruments OMAP
-> +
-> +OMAP is currently using a static file per SoC family to describe the
-> +IPs present in the SoC.
-> +On top of that an omap_device is created to extend the platform_device
-> +capabilities and to allow binding with one or several hwmods.
-> +The hwmods will contain all the information to build the device:
-> +adresse range, irq lines, dma lines, interconnect, PRCM register,
-> +clock domain, input clocks.
-> +For the moment just point to the existing hwmod, the next step will be
-> +to move data from hwmod to device-tree representation.
-> +
-> +
-> +Required properties:
-> +- compatible: Every devices present in OMAP SoC should be in the
-> +  form: "ti,XXX"
-> +- ti,hwmods: list of hwmods attached to a device. Must contain at least
-> +  one hwmod.
+> Changes in v3:
+> - add missing kfree's found by Jamie
+> - Implement Grant's comments to simplify the init loop
+> - fix function comments
+> 
+> Changes in v2:
+> - Complete re-write of list searching code from Grant Likely
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
 
-Nit: This should specify that ti,hwmods is a list of hwmod names
-(ascii strings), and that the hwmod names come from the OMAP
-documentation.  Don't respin the patch over this though, just do a
-follow-up patch.
-
-> +
-> +Optional properties:
-> +- ti,no_idle_on_suspend: When present, it prevents the PM to idle the module
-> +  during suspend.
-> +
-> +
-> +Example:
-> +
-> +spinlock at 1 {
-> +    compatible = "ti,omap-spinlock";
-> +    ti,hwmods = "spinlock";
-> +};
-> +
-> +
-> +Boards:
-> +
-> +- OMAP3 BeagleBoard : Low cost community board
-> +  compatible = "ti,omap3-beagle", "ti,omap3"
-> +
-> +- OMAP4 SDP : Software Developement Board
-> +  compatible = "ti,omap4-sdp", "ti,omap4430"
-> +
-> +- OMAP4 PandaBoard : Low cost community board
-> +  compatible = "ti,omap4-panda", "ti,omap4430"
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index cac7b9a..5b63989 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -85,6 +85,8 @@
->  #include <linux/clk.h>
->  #include <linux/clkdev.h>
->  #include <linux/pm_runtime.h>
-> +#include <linux/of.h>
-> +#include <linux/notifier.h>
->  
->  #include <plat/omap_device.h>
->  #include <plat/omap_hwmod.h>
-> @@ -94,12 +96,15 @@
->  #define USE_WAKEUP_LAT			0
->  #define IGNORE_WAKEUP_LAT		1
->  
-> +#define MAX_HWMOD_NAME_SIZE		32
-> +
->  static int omap_device_register(struct platform_device *pdev);
->  static int omap_early_device_register(struct platform_device *pdev);
->  static struct omap_device *omap_device_alloc(struct platform_device *pdev,
->  				      struct omap_hwmod **ohs, int oh_cnt,
->  				      struct omap_device_pm_latency *pm_lats,
->  				      int pm_lats_cnt);
-> +static void omap_device_delete(struct omap_device *od);
->  
->  
->  static struct omap_device_pm_latency omap_default_latency[] = {
-> @@ -315,6 +320,138 @@ static void _add_hwmod_clocks_clkdev(struct omap_device *od,
->  		_add_clkdev(od, oh->opt_clks[i].role, oh->opt_clks[i].clk);
->  }
->  
-> +/*
-> + * XXX: DT helper functions that should be replaced by more generic
-> + * API introduced by Stephen Warren once they'll be in mainline.
-> + */
-> +static int _dt_count_property_string(const char *prop, int len)
-> +{
-> +	int i = 0;
-> +	size_t l = 0, total = 0;
-> +
-> +	if (!prop || !len)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; len >= total; total += l, prop += l) {
-> +		l = strlen(prop) + 1;
-> +		if (*prop != 0)
-> +			i++;
-> +	}
-> +	return i;
-> +}
-> +
-> +static int _dt_get_property(const char *prop, int len, int index, char *output,
-> +			    int size)
-> +{
-> +	int i = 0;
-> +	size_t l = 0, total = 0;
-> +
-> +	if (!prop || !len)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; len >= total; total += l, prop += l) {
-> +		l = strlcpy(output, prop, size) + 1;
-> +		if (*prop != 0) {
-> +			if (i++ == index)
-> +				return 0;
-> +		}
-> +	}
-> +	return -ENODEV;
-> +}
-
-Don't merge this.  Kevin or I could put Stephen's patch into a separate
-branch that both Kevin and I pull.  There's no need to merge temporary
-code.
-
-That said, I just looked at Stephen's iterator, and even without it
-this particular hunk shouldn't be merged here.  A
-of_property_count_strings() function is useful in and of itself, and
-of_property_read_string() could be extended with an
-of_property_read_string_index() version.  Both changes should be in
-the common drivers/of code, and you can easily do them.
-
-Otherwise, both patches look good to me.
+Looks good to me.  Merged.
 
 g.
 
-> +
-> +static struct dev_pm_domain omap_device_pm_domain;
-> +
-> +/**
-> + * omap_device_build_from_dt - build an omap_device with multiple hwmods
-> + * @pdev_name: name of the platform_device driver to use
-> + * @pdev_id: this platform_device's connection ID
-> + * @oh: ptr to the single omap_hwmod that backs this omap_device
-> + * @pdata: platform_data ptr to associate with the platform_device
-> + * @pdata_len: amount of memory pointed to by @pdata
-> + * @pm_lats: pointer to a omap_device_pm_latency array for this device
-> + * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
-> + * @is_early_device: should the device be registered as an early device or not
-> + *
-> + * Function for building an omap_device already registered from device-tree
-> + *
-> + * Returns 0 or PTR_ERR() on error.
-> + */
-> +static int omap_device_build_from_dt(struct platform_device *pdev)
-> +{
-> +	struct omap_hwmod **hwmods;
-> +	struct omap_device *od;
-> +	struct omap_hwmod *oh;
-> +	char oh_name[MAX_HWMOD_NAME_SIZE];
-> +	const char *prop;
-> +	int oh_cnt, i, prop_len;
-> +	int ret = 0;
-> +
-> +	prop = of_get_property(pdev->dev.of_node, "ti,hwmods", &prop_len);
-> +	oh_cnt = _dt_count_property_string(prop, prop_len);
-> +	if (!oh_cnt || IS_ERR_VALUE(oh_cnt)) {
-> +		dev_warn(&pdev->dev, "No 'hwmods' to build omap_device\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	hwmods = kzalloc(sizeof(struct omap_hwmod *) * oh_cnt, GFP_KERNEL);
-> +	if (!hwmods) {
-> +		ret = -ENOMEM;
-> +		goto odbfd_exit;
-> +	}
-> +
-> +	for (i = 0; i < oh_cnt; i++) {
-> +		_dt_get_property(prop, prop_len, i, oh_name,
-> +				 MAX_HWMOD_NAME_SIZE);
-> +
-> +		oh = omap_hwmod_lookup(oh_name);
-> +		if (!oh) {
-> +			dev_err(&pdev->dev, "Cannot lookup hwmod '%s'\n",
-> +				oh_name);
-> +			ret = -EINVAL;
-> +			goto odbfd_exit1;
-> +		}
-> +		hwmods[i] = oh;
-> +	}
-> +
-> +	od = omap_device_alloc(pdev, hwmods, oh_cnt, NULL, 0);
-> +	if (!od) {
-> +		dev_err(&pdev->dev, "Cannot allocate omap_device for :%s\n",
-> +			oh_name);
-> +		ret = PTR_ERR(od);
-> +		goto odbfd_exit1;
-> +	}
-> +
-> +	if (of_get_property(pdev->dev.of_node, "ti,no_idle_on_suspend", NULL))
-> +		omap_device_disable_idle_on_suspend(pdev);
-> +
-> +	pdev->dev.pm_domain = &omap_device_pm_domain;
-> +
-> +odbfd_exit1:
-> +	kfree(hwmods);
-> +odbfd_exit:
-> +	return ret;
-> +}
-> +
-> +static int _omap_device_notifier_call(struct notifier_block *nb,
-> +				      unsigned long event, void *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +
-> +	switch (event) {
-> +	case BUS_NOTIFY_ADD_DEVICE:
-> +		if (pdev->dev.of_node)
-> +			omap_device_build_from_dt(pdev);
-> +		break;
-> +
-> +	case BUS_NOTIFY_DEL_DEVICE:
-> +		if (pdev->archdata.od)
-> +			omap_device_delete(pdev->archdata.od);
-> +		break;
-> +	}
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
+> ---
+>  drivers/of/irq.c       |  107 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_irq.h |    3 +
+>  2 files changed, 110 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+> index 6a5b5e7..6d3dd39 100644
+> --- a/drivers/of/irq.c
+> +++ b/drivers/of/irq.c
+> @@ -19,10 +19,12 @@
+>   */
 >  
->  /* Public functions for use by core code */
+>  #include <linux/errno.h>
+> +#include <linux/list.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/string.h>
+> +#include <linux/slab.h>
 >  
-> @@ -499,6 +636,9 @@ oda_exit1:
+>  /* For archs that don't support NO_IRQ (such as x86), provide a dummy value */
+>  #ifndef NO_IRQ
+> @@ -386,3 +388,108 @@ int of_irq_to_resource_table(struct device_node *dev, struct resource *res,
 >  
->  static void omap_device_delete(struct omap_device *od)
->  {
-> +	if (!od)
-> +		return;
+>  	return i;
+>  }
 > +
->  	od->pdev->archdata.od = NULL;
->  	kfree(od->pm_lats);
->  	kfree(od->hwmods);
-> @@ -1034,8 +1174,13 @@ struct device omap_device_parent = {
->  	.parent         = &platform_bus,
->  };
->  
-> +static struct notifier_block platform_nb = {
-> +	.notifier_call = _omap_device_notifier_call,
+> +struct intc_desc {
+> +	struct list_head	list;
+> +	struct device_node	*dev;
+> +	struct device_node	*interrupt_parent;
 > +};
 > +
->  static int __init omap_device_init(void)
->  {
-> +	bus_register_notifier(&platform_bus_type, &platform_nb);
->  	return device_register(&omap_device_parent);
->  }
->  core_initcall(omap_device_init);
+> +/**
+> + * of_irq_init - Scan and init matching interrupt controllers in DT
+> + * @matches: 0 terminated array of nodes to match and init function to call
+> + *
+> + * This function scans the device tree for matching interrupt controller nodes,
+> + * and calls their initialization functions in order with parents first.
+> + */
+> +void __init of_irq_init(const struct of_device_id *matches)
+> +{
+> +	struct device_node *np, *parent = NULL;
+> +	struct intc_desc *desc, *temp_desc;
+> +	struct list_head intc_desc_list, intc_parent_list;
+> +
+> +	INIT_LIST_HEAD(&intc_desc_list);
+> +	INIT_LIST_HEAD(&intc_parent_list);
+> +
+> +	for_each_matching_node(np, matches) {
+> +		if (!of_find_property(np, "interrupt-controller", NULL))
+> +			continue;
+> +		/*
+> +		 * Here, we allocate and populate an intc_desc with the node
+> +		 * pointer, interrupt-parent device_node etc.
+> +		 */
+> +		desc = kzalloc(sizeof(*desc), GFP_KERNEL);
+> +		if (WARN_ON(!desc))
+> +			goto err;
+> +
+> +		desc->dev = np;
+> +		desc->interrupt_parent = of_irq_find_parent(np);
+> +		list_add_tail(&desc->list, &intc_desc_list);
+> +	}
+> +
+> +	/*
+> +	 * The root irq controller is the one without an interrupt-parent.
+> +	 * That one goes first, followed by the controllers that reference it,
+> +	 * followed by the ones that reference the 2nd level controllers, etc.
+> +	 */
+> +	while (!list_empty(&intc_desc_list)) {
+> +		/*
+> +		 * Process all controllers with the current 'parent'.
+> +		 * First pass will be looking for NULL as the parent.
+> +		 * The assumption is that NULL parent means a root controller.
+> +		 */
+> +		list_for_each_entry_safe(desc, temp_desc, &intc_desc_list, list) {
+> +			const struct of_device_id *match;
+> +			int ret;
+> +			of_irq_init_cb_t irq_init_cb;
+> +
+> +			if (desc->interrupt_parent != parent)
+> +				continue;
+> +
+> +			list_del(&desc->list);
+> +			match = of_match_node(matches, desc->dev);
+> +			if (WARN(!match->data,
+> +			    "of_irq_init: no init function for %s\n",
+> +			    match->compatible)) {
+> +				kfree(desc);
+> +				continue;
+> +			}
+> +
+> +			pr_debug("of_irq_init: init %s @ %p, parent %p\n",
+> +				 match->compatible,
+> +				 desc->dev, desc->interrupt_parent);
+> +			irq_init_cb = match->data;
+> +			ret = irq_init_cb(desc->dev, desc->interrupt_parent);
+> +			if (ret) {
+> +				kfree(desc);
+> +				continue;
+> +			}
+> +
+> +			/*
+> +			 * This one is now set up; add it to the parent list so
+> +			 * its children can get processed in a subsequent pass.
+> +			 */
+> +			list_add_tail(&desc->list, &intc_parent_list);
+> +		}
+> +
+> +		/* Get the next pending parent that might have children */
+> +		desc = list_first_entry(&intc_parent_list, typeof(*desc), list);
+> +		if (list_empty(&intc_parent_list) || !desc) {
+> +			pr_err("of_irq_init: children remain, but no parents\n");
+> +			break;
+> +		}
+> +		list_del(&desc->list);
+> +		parent = desc->dev;
+> +		kfree(desc);
+> +	}
+> +
+> +	list_for_each_entry_safe(desc, temp_desc, &intc_parent_list, list) {
+> +		list_del(&desc->list);
+> +		kfree(desc);
+> +	}
+> +err:
+> +	list_for_each_entry_safe(desc, temp_desc, &intc_desc_list, list) {
+> +		list_del(&desc->list);
+> +		kfree(desc);
+> +	}
+> +}
+> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+> index cd2e61c..d0307ee 100644
+> --- a/include/linux/of_irq.h
+> +++ b/include/linux/of_irq.h
+> @@ -33,6 +33,8 @@ struct of_irq {
+>  	u32 specifier[OF_MAX_IRQ_SPEC]; /* Specifier copy */
+>  };
+>  
+> +typedef int (*of_irq_init_cb_t)(struct device_node *, struct device_node *);
+> +
+>  /*
+>   * Workarounds only applied to 32bit powermac machines
+>   */
+> @@ -73,6 +75,7 @@ extern int of_irq_to_resource_table(struct device_node *dev,
+>  		struct resource *res, int nr_irqs);
+>  extern struct device_node *of_irq_find_parent(struct device_node *child);
+>  
+> +extern void of_irq_init(const struct of_device_id *matches);
+>  
+>  #endif /* CONFIG_OF_IRQ */
+>  #endif /* CONFIG_OF */
 > -- 
-> 1.7.0.4
+> 1.7.5.4
 > 
