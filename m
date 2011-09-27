@@ -1,67 +1,306 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Sep 2011 21:50:43 +0100
-Subject: Porting linux to Stellaris Cortex-M3
-In-Reply-To: <CAH8SYHBFgkp47vf97qC_pseBOKNMrqVMj9sddjzUg1xjWpg6xw@mail.gmail.com>
-References: <CAH8SYHDRT7OpLr0sx75rMyy4OV59JZGoRv_cr2+-+2yy3tfU9g@mail.gmail.com>
-	<CAAJ0-p7YwKR9B6BfoHcRqrNPVvpd49XrPsDCN7UF=-5jAf8XnQ@mail.gmail.com>
-	<CAH8SYHBFgkp47vf97qC_pseBOKNMrqVMj9sddjzUg1xjWpg6xw@mail.gmail.com>
-Message-ID: <20110927205043.GA23944@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 27 Sep 2011 15:00:56 -0600
+Subject: [PATCH 1/2] ARM: vic: device tree binding
+In-Reply-To: <1317125802-14386-1-git-send-email-jamie@jamieiles.com>
+References: <1317125802-14386-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <20110927210056.GB3994@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 09:54:18AM -0300, Fernando Endo wrote:
-> This is the log that I got with printascii bypassing printk:
+On Tue, Sep 27, 2011 at 01:16:41PM +0100, Jamie Iles wrote:
+> This adds a device tree binding for the VIC based on the of_irq_init()
+> support.
 > 
-> <5>Linux version 2.6.33-arm1 (fernando at fernando-POS-MIG31AG) (gcc
-> version 4.5.2 (Sourcery G++ Lite 2011.03-41) ) #127 Tue Sep 27
-> 09:14:21 BRT 2011
-> CPU: ARMv7-M Processor [412fc230] revision 0 (ARMv?(11)M)
-> CPU: VIPT nonaliasing data cache, VIPT nonaliasing instruction cache
-> Machine: Stellaris LM3S9B96
-> <7>On node 0 totalpages: 2048
-> <7>free_area_init_node: node 0, pgdat 600de1e0, node_mem_map 600f6000
-> <7> ?DMA zone: 16 pages used for memmap
-> <7> ?DMA zone: 0 pages reserved
-> <7> ?DMA zone: 2032 pages, LIFO batch:0
-> Built 1 zonelists in Zone order, mobility grouping off. ?Total pages: 2032
-> <5>Kernel command line: init=/bin/busybox console=ttyS mem=8M
-> <6>PID hash table entries: 32 (order: -5, 128 bytes)
-> <6>Dentry cache hash table entries: 1024 (order: 0, 4096 bytes)
-> <6>Inode-cache hash table entries: 1024 (order: 0, 4096 bytes)
-> <6>Memory: 8MB = 8MB total
-> <5>Memory: 7168k/7168k available, 1024k reserved, 0K highmem
-> <5>Virtual kernel memory layout:
-> ? ?vector ?: 0x00000000 - 0x00001000 ? ( ? 4 kB)
-> ? ?fixmap ?: 0xfff00000 - 0xfffe0000 ? ( 896 kB)
-> ? ?vmalloc : 0x00000000 - 0xffffffff ? (4095 MB)
-> ? ?lowmem ?: 0x60000000 - 0x60800000 ? ( ? 8 MB)
-> ? ?modules : 0x60000000 - 0x60800000 ? ( ? 8 MB)
-> ? ? ?.init : 0x60008000 - 0x6002f000 ? ( 156 kB)
-> ? ? ?.text : 0x6002f000 - 0x600cb000 ? ( 624 kB)
-> ? ? ?.data : 0x600d6000 - 0x600deb40 ? ( ?35 kB)
-> <6>Hierarchical RCU implementation.
-> <6>NR_IRQS:54
-> <6>console [ttyS0] enabled
-> <6>Calibrating delay loop... <c>3.82 BogoMIPS (lpj=19136)
-> Mount-cache hash table entries: 512
-> <6>Switching to clocksource timer3
-> <6>ttyS0 at MMIO 0x4000c000 (irq = 5) is a LM3S9B96 UARTx Port
-> <6>Freeing init memory: 156K
-> <3>BUG: scheduling while atomic: init/1/0xffff0003
-> [<60032b6d>] (unwind_backtrace+0x1/0x88) from [<600a1379>] (dump_stack+0xd/0x10)
-> [<600a1379>] (dump_stack+0xd/0x10) from [<60034ea5>] (__schedule_bug+0x35/0x40)
-> [<60034ea5>] (__schedule_bug+0x35/0x40) from [<600a17b1>] (schedule+0x2d1/0x2f4)
-> [<600a17b1>] (schedule+0x2d1/0x2f4) from [<6002f791>] (ret_slow_syscall+0x1/0xc)
+> Cc: Rob Herring <robherring2@gmail.com>
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> ---
+>  Documentation/devicetree/bindings/arm/vic.txt |   29 ++++++
+>  arch/arm/common/vic.c                         |  121 ++++++++++++++++++++-----
+>  arch/arm/include/asm/hardware/vic.h           |   13 +++-
+>  3 files changed, 137 insertions(+), 26 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/vic.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/vic.txt b/Documentation/devicetree/bindings/arm/vic.txt
+> new file mode 100644
+> index 0000000..266716b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/vic.txt
+> @@ -0,0 +1,29 @@
+> +* ARM Vectored Interrupt Controller
+> +
+> +One or more Vectored Interrupt Controllers (VIC's) can be connected in an ARM
+> +system for interrupt routing.  For multiple controllers they can either be
+> +nested or have the outputs wire-OR'd together.
+> +
+> +Required properties:
+> +
+> +- compatible : should be one of
+> +	"arm,pl190-vic"
+> +	"arm,pl192-vic"
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : The number of cells to define the interrupts.  Must be 1 as
+> +  the VIC has no configuration options for interrupt sources.  The cell is a u32
+> +  and defines the interrupt number.
+> +- reg : The register bank for the VIC.
+> +
+> +Optional properties:
+> +
+> +- interrupts : Interrupt source for parent controllers if the VIC is nested.
+> +
+> +Example:
+> +
+> +	vic0: interrupt-controller at 60000 {
+> +		compatible = "arm,pl192-vic";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		reg = <0x60000 0x1000>;
+> +	};
+> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+> index 7aa4262..3658579 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
+> @@ -22,6 +22,10 @@
+>  #include <linux/init.h>
+>  #include <linux/list.h>
+>  #include <linux/io.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/syscore_ops.h>
+>  #include <linux/device.h>
+>  #include <linux/amba/bus.h>
+> @@ -29,7 +33,6 @@
+>  #include <asm/mach/irq.h>
+>  #include <asm/hardware/vic.h>
+>  
+> -#ifdef CONFIG_PM
 
-Hmm, this doesn't look good.  What this is showing is that it's the
-call to schedule() in the code dealing with returning to userspace.
-The preempt count shouldn't be this wrong here - it suggests that
-something is returning with wrong preempt status.
+Interesting that this #ifdef is being removed, but no mention of it in
+the commit text.  It helps with review is some of the implementation
+details are described.
 
-The problem is it's not possible at this point to work out from the
-information you've supplied whether it's a data abort, prefetch abort,
-or SWI (SVC) call (and actually we don't have any tracking of that.)
+>  /**
+>   * struct vic_device - VIC PM device
+>   * @irq: The IRQ number for the base of the VIC.
+> @@ -50,13 +53,15 @@ struct vic_device {
+>  	u32		int_enable;
+>  	u32		soft_int;
+>  	u32		protect;
+> +#ifdef CONFIG_IRQ_DOMAIN
+> +	struct irq_domain domain;
+> +#endif /* CONFIG_IRQ_DOMAIN */
+>  };
+>  
+>  /* we cannot allocate memory when VICs are initially registered */
+>  static struct vic_device vic_devices[CONFIG_ARM_VIC_NR];
+>  
+>  static int vic_id;
+> -#endif /* CONFIG_PM */
+>  
+>  /**
+>   * vic_init2 - common initialisation code
+> @@ -156,9 +161,10 @@ static int __init vic_pm_init(void)
+>  	return 0;
+>  }
+>  late_initcall(vic_pm_init);
+> +#endif /* CONFIG_PM */
+>  
+>  /**
+> - * vic_pm_register - Register a VIC for later power management control
+> + * vic_register - Register a VIC.
 
-If I had to guess I'd suggest that there was something fishy with
-the IRQ handling - but without knowing what mods you've made to the
-stock kernel, that's about as much speculation that I can give.
+Nit: kerneldoc format is:
+
+/**
+ * function_name() - description
+ *
+ 
+>   * @base: The base address of the VIC.
+>   * @irq: The base IRQ for the VIC.
+>   * @resume_sources: bitmask of interrupts allowed for resume sources.
+> @@ -166,24 +172,28 @@ late_initcall(vic_pm_init);
+>   * Register the VIC with the system device tree so that it can be notified
+>   * of suspend and resume requests and ensure that the correct actions are
+>   * taken to re-instate the settings on resume.
+> + *
+> + * We return the VIC so that it can be used for IRQ domain operations for
+> + * device tree translation.
+>   */
+> -static void __init vic_pm_register(void __iomem *base, unsigned int irq, u32 resume_sources)
+> +static struct vic_device * __init
+> +vic_register(void __iomem *base, unsigned int irq, u32 resume_sources)
+
+Nit: Linebreaks should be restricted to the argument list.  That way
+grepping for the function name tells you both what the annotations &
+return value is, and that there are more arguments than can be seen
+because you don't see closing parentheses.
+
+>  {
+>  	struct vic_device *v;
+>  
+> -	if (vic_id >= ARRAY_SIZE(vic_devices))
+> +	if (vic_id >= ARRAY_SIZE(vic_devices)) {
+>  		printk(KERN_ERR "%s: too few VICs, increase CONFIG_ARM_VIC_NR\n", __func__);
+> -	else {
+> -		v = &vic_devices[vic_id];
+> -		v->base = base;
+> -		v->resume_sources = resume_sources;
+> -		v->irq = irq;
+> -		vic_id++;
+> +		return NULL;
+>  	}
+> +
+> +	v = &vic_devices[vic_id];
+> +	v->base = base;
+> +	v->resume_sources = resume_sources;
+> +	v->irq = irq;
+> +	vic_id++;
+> +
+> +	return v;
+>  }
+> -#else
+> -static inline void vic_pm_register(void __iomem *base, unsigned int irq, u32 arg1) { }
+> -#endif /* CONFIG_PM */
+>  
+>  static void vic_ack_irq(struct irq_data *d)
+>  {
+> @@ -331,15 +341,9 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
+>  	vic_set_irq_sources(base, irq_start, vic_sources);
+>  }
+>  
+> -/**
+> - * vic_init - initialise a vectored interrupt controller
+> - * @base: iomem base address
+> - * @irq_start: starting interrupt number, must be muliple of 32
+> - * @vic_sources: bitmask of interrupt sources to allow
+> - * @resume_sources: bitmask of interrupt sources to allow for resume
+> - */
+> -void __init vic_init(void __iomem *base, unsigned int irq_start,
+> -		     u32 vic_sources, u32 resume_sources)
+> +static struct vic_device * __init
+> +__vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources,
+
+Ditto here.
+
+> +	   u32 resume_sources)
+>  {
+>  	unsigned int i;
+>  	u32 cellid = 0;
+> @@ -357,7 +361,7 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+>  	switch(vendor) {
+>  	case AMBA_VENDOR_ST:
+>  		vic_init_st(base, irq_start, vic_sources);
+> -		return;
+> +		return NULL;
+>  	default:
+>  		printk(KERN_WARNING "VIC: unknown vendor, continuing anyways\n");
+>  		/* fall through */
+> @@ -375,5 +379,72 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+>  
+>  	vic_set_irq_sources(base, irq_start, vic_sources);
+>  
+> -	vic_pm_register(base, irq_start, resume_sources);
+> +	return vic_register(base, irq_start, resume_sources);
+>  }
+> +
+> +/**
+> + * vic_init - initialise a vectored interrupt controller
+> + * @base: iomem base address
+> + * @irq_start: starting interrupt number, must be muliple of 32
+> + * @vic_sources: bitmask of interrupt sources to allow
+> + * @resume_sources: bitmask of interrupt sources to allow for resume
+> + */
+> +void __init vic_init(void __iomem *base, unsigned int irq_start,
+> +		     u32 vic_sources, u32 resume_sources)
+> +{
+> +	__vic_init(base, irq_start, vic_sources, resume_sources);
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +static int
+> +vic_irq_domain_dt_translate(struct irq_domain *d, struct device_node *np,
+> +			    const u32 *intspec, unsigned int intsize,
+> +			    unsigned long *out_hwirq, unsigned int *out_type)
+> +{
+> +	if (d->of_node != np)
+> +		return -EINVAL;
+> +	if (intsize < 1)
+> +		return -EINVAL;
+> +
+> +	*out_hwirq = intspec[0];
+> +	*out_type = IRQ_TYPE_NONE;
+> +
+> +	return 0;
+> +}
+
+It matches the simple binding.  Just use
+irq_domain_simple_dt_translate() directly.
+
+> +
+> +static const struct irq_domain_ops vic_irq_domain_ops = {
+> +	.dt_translate = vic_irq_domain_dt_translate,
+> +};
+> +
+> +int __init vic_of_init(struct device_node *node, struct device_node *parent)
+> +{
+> +	void __iomem *regs = of_iomap(node, 0);
+> +	struct vic_device *vic;
+> +	int irq_base;
+> +
+> +	if (WARN_ON(!regs))
+> +		return -EIO;
+> +
+> +	irq_base = irq_alloc_descs(-1, 0, 32, numa_node_id());
+> +	if (WARN_ON(irq_base < 0))
+> +		goto out_unmap;
+> +
+> +	vic = __vic_init(regs, irq_base, ~0, ~0);
+> +	if (WARN_ON(!vic))
+> +		goto out_unmap;
+> +
+> +	vic->domain.irq_base = irq_base;
+> +	vic->domain.nr_irq = 32;
+> +	vic->domain.of_node = of_node_get(node);
+> +	vic->domain.ops = &vic_irq_domain_ops;
+> +	irq_domain_add(&vic->domain);
+> +
+> +	return 0;
+> +
+> +out_unmap:
+
+Nit: putting a single space before the label makes 'diff' behave
+better.
+
+> +	iounmap(regs);
+> +
+> +	return -EIO;
+> +}
+> +
+> +#endif /* CONFIG OF */
+> diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
+> index 5d72550..df1d895 100644
+> --- a/arch/arm/include/asm/hardware/vic.h
+> +++ b/arch/arm/include/asm/hardware/vic.h
+> @@ -41,7 +41,18 @@
+>  #define VIC_PL192_VECT_ADDR		0xF00
+>  
+>  #ifndef __ASSEMBLY__
+> +struct device_node;
+>  void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
+> -#endif
+> +
+> +#ifdef CONFIG_OF
+> +int vic_of_init(struct device_node *node, struct device_node *parent);
+> +#else /* CONFIG_OF */
+> +static inline int vic_of_init(struct device_node *node,
+> +			      struct device_node *parent)
+> +{
+> +	return -ENOSYS;
+> +}
+> +#endif /* CONFIG_OF */
+
+Will this ever be referenced when !CONFIG_OF?  It shouldn't be.
+
+Otherwise looks good.
+g.
