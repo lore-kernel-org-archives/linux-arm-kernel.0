@@ -1,38 +1,50 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 27 Sep 2011 20:19:45 +0530
-Subject: [PATCH 9/9] regulator: map consumer regulator based on device tree
-In-Reply-To: <20110927122357.GF4289@opensource.wolfsonmicro.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 27 Sep 2011 16:05:11 +0100
+Subject: [PATCH 2/9] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <4E81E224.2070408@ti.com>
 References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-10-git-send-email-rnayak@ti.com>
-	<20110927122357.GF4289@opensource.wolfsonmicro.com>
-Message-ID: <4E81E289.5060904@ti.com>
+	<1317118372-17052-3-git-send-email-rnayak@ti.com>
+	<20110927121003.GB4289@opensource.wolfsonmicro.com>
+	<4E81E224.2070408@ti.com>
+Message-ID: <20110927150511.GM4289@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 September 2011 05:53 PM, Mark Brown wrote:
-> On Tue, Sep 27, 2011 at 03:42:52PM +0530, Rajendra Nayak wrote:
->> Look up the regulator for a given consumer from device tree, during
->> a regulator_get(). If not found fallback and lookup through
->> the regulator_map_list instead.
->
-> As with the fixed voltage regulator patch just use the code along with
-> adding it, no need to split it just makes it harder to review.
+On Tue, Sep 27, 2011 at 08:18:04PM +0530, Rajendra Nayak wrote:
+> On Tuesday 27 September 2011 05:40 PM, Mark Brown wrote:
+> >On Tue, Sep 27, 2011 at 03:42:45PM +0530, Rajendra Nayak wrote:
 
-Ok.
+> >>+	init_data = devm_kzalloc(dev, sizeof(struct regulator_init_data),
+> >>+						 GFP_KERNEL);
+> >>+	if (!init_data)
+> >>+		return NULL; /* Out of memory? */
 
->
->> +	if (dev->of_node) {
->> +		node = of_get_regulator(dev, id);
->> +		if (!node)
->> +			goto retry; /* fallback and chk regulator_map_list */
->> +		list_for_each_entry(rdev,&regulator_list, list)
->> +			if (node == rdev->node)
->> +				goto found;
->> +	}
->> +retry:
->
-> retry is a confusing name for the target, we don't ever actually retry
-> using it.  Given the simplicity of the code I'd be inclined to just
-> intert the if (!node) check.
+> >This means that the init data will be kept around for the entire
+> >lifetime of the device rather than being discarded.
 
-Ok.
+> Wasn't it the same while this was passed around as platform_data?
+
+It was in the past but I remember fixing it at some point.  Perhaps I'm
+imagining things.
+
+> >>+	init_data->supply_regulator = (char *)of_get_property(dev->of_node,
+> >>+						"regulator-supplies", NULL);
+
+> >I'd expect that in the device tree world the supply regulator would
+> >reference the node for that regulator.
+
+> You mean using phandles? Thats what Grant proposed too but
+> I thought you instead had an inclination towards names? Or maybe
+> I misunderstood.
+
+They need both.  We need to reference the device that provides the
+supply and use a name to say which of the potentially multiple supplies
+on the consumer device is which.
+
+> >Hrm, I think loosing the signs here is bad karma - negative voltages do
+> >exist after all.
+
+> Oops.. they do? didn't know about that.
+
+Yup, ground is just a reference point.
