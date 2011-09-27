@@ -1,59 +1,70 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 27 Sep 2011 05:44:17 +0530
-Subject: [PATCH v7 REPOST 21/24] gpio/omap: save and restore debounce registers
+Date: Tue, 27 Sep 2011 05:44:09 +0530
+Subject: [PATCH v7 REPOST 13/24] gpio/omap: use pinctrl offset instead of macro
 In-Reply-To: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
 References: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1317082460-31706-22-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1317082460-31706-14-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+From: Charulatha V <charu@ti.com>
 
-GPIO debounce registers need to be saved and restored for proper functioning
-of driver. To save the registers, we cannot cut the clock before the save,
-hence move the clk disable after the save.
+Use regs->pinctrl field instead of using the macro OMAP1510_GPIO_PIN_CONTROL
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+Signed-off-by: Charulatha V <charu@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap1/gpio15xx.c         |    1 +
+ arch/arm/plat-omap/include/plat/gpio.h |    1 +
+ drivers/gpio/gpio-omap.c               |    8 +++-----
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index ad37379..981a1c1 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -42,6 +42,8 @@ struct gpio_regs {
- 	u32 risingdetect;
- 	u32 fallingdetect;
- 	u32 dataout;
-+	u32 debounce;
-+	u32 debounce_en;
+diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+index 2adfece..950e467 100644
+--- a/arch/arm/mach-omap1/gpio15xx.c
++++ b/arch/arm/mach-omap1/gpio15xx.c
+@@ -85,6 +85,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
+ 	.irqenable	= OMAP1510_GPIO_INT_MASK,
+ 	.irqenable_inv	= true,
+ 	.irqctrl	= OMAP1510_GPIO_INT_CONTROL,
++	.pinctrl	= OMAP1510_GPIO_PIN_CONTROL,
  };
  
- struct gpio_bank {
-@@ -202,6 +204,8 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
- 	bank->dbck_enable_mask = val;
+ static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
+diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+index 92a6262..a4e5ef3 100644
+--- a/arch/arm/plat-omap/include/plat/gpio.h
++++ b/arch/arm/plat-omap/include/plat/gpio.h
+@@ -198,6 +198,7 @@ struct omap_gpio_reg_offs {
+ 	u16 irqctrl;
+ 	u16 edgectrl1;
+ 	u16 edgectrl2;
++	u16 pinctrl;
  
- 	__raw_writel(val, reg);
-+	bank->context.debounce = debounce;
-+	bank->context.debounce_en = val;
- }
+ 	bool irqenable_inv;
+ };
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 2a57d0b..876e387 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -485,15 +485,13 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
+ 	 */
+ 	_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
  
- static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
-@@ -1323,6 +1327,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- 	__raw_writel(bank->context.fallingdetect,
- 				bank->base + bank->regs->fallingdetect);
- 	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
-+	if (bank->dbck_enable_mask) {
-+		__raw_writel(bank->context.debounce, bank->base +
-+					bank->regs->debounce);
-+		__raw_writel(bank->context.debounce_en,
-+					bank->base + bank->regs->debounce_en);
-+	}
- }
- #else
- #define omap_gpio_suspend NULL
+-#ifdef CONFIG_ARCH_OMAP15XX
+-	if (bank->method == METHOD_GPIO_1510) {
+-		void __iomem *reg;
++	if (bank->regs->pinctrl) {
++		void __iomem *reg = bank->base + bank->regs->pinctrl;
+ 
+ 		/* Claim the pin for MPU */
+-		reg = bank->base + OMAP1510_GPIO_PIN_CONTROL;
+ 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
+ 	}
+-#endif
++
+ 	if (bank->regs->ctrl && !bank->mod_usage) {
+ 		void __iomem *reg = bank->base + bank->regs->ctrl;
+ 		u32 ctrl;
 -- 
 1.7.0.4
