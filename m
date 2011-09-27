@@ -1,53 +1,24 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Tue, 27 Sep 2011 20:31:09 +0200
-Subject: [PATCH V2] Add CS890x0 ethernet controller support to the i.MX21ADS
-Message-ID: <1317148269-14996-1-git-send-email-jaccon.bastiaansen@gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 27 Sep 2011 21:35:21 +0300
+Subject: [PATCH v3 0/3] Add support for tegra2 based ventana board
+Message-ID: <1317148524-28528-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
----
- arch/arm/mach-imx/mach-mx21ads.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+This patch set adds support for the tegra2 based ventana development board.                                                                           
 
-diff --git a/arch/arm/mach-imx/mach-mx21ads.c b/arch/arm/mach-imx/mach-mx21ads.c
-index 74ac889..62b4717 100644
---- a/arch/arm/mach-imx/mach-mx21ads.c
-+++ b/arch/arm/mach-imx/mach-mx21ads.c
-@@ -159,6 +159,26 @@ static struct platform_device mx21ads_nor_mtd_device = {
- 	.resource = &mx21ads_flash_resource,
- };
- 
-+static struct resource mx21ads_cs8900_resources[] = {
-+	{
-+		.start	= (u32)MX21ADS_CS8900A_IOBASE_REG,
-+		.end	= (u32)MX21ADS_CS8900A_IOBASE_REG + 0x200000 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= MX21ADS_CS8900A_IRQ,
-+		.end	= MX21ADS_CS8900A_IRQ,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device mx21ads_cs8900_device = {
-+	.name		= "cs89x0",
-+	.id		= 0,
-+	.num_resources	= ARRAY_SIZE(mx21ads_cs8900_resources),
-+	.resource	= mx21ads_cs8900_resources,
-+};
-+
- static const struct imxuart_platform_data uart_pdata_rts __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
- };
-@@ -275,6 +295,7 @@ static void __init mx21ads_map_io(void)
- 
- static struct platform_device *platform_devices[] __initdata = {
- 	&mx21ads_nor_mtd_device,
-+	&mx21ads_cs8900_device
- };
- 
- static void __init mx21ads_board_init(void)
--- 
-1.7.1
+Boot tested on ventana.                                                                                                                               
+
+Peter De Schrijver (3):
+  arm/tegra: prepare Seaboard pinmux code for derived boards
+  arm/tegra: add support for ventana pinmuxing
+  arm/tegra: device tree support for ventana board
+
+ arch/arm/boot/dts/tegra-ventana.dts         |   32 ++++++++++++++
+ arch/arm/mach-tegra/Kconfig                 |    6 +++
+ arch/arm/mach-tegra/Makefile                |    1 +
+ arch/arm/mach-tegra/Makefile.boot           |    1 +
+ arch/arm/mach-tegra/board-dt.c              |    5 ++-
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |   63 ++++++++++++++++++++++++---
+ 6 files changed, 101 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra-ventana.dts
