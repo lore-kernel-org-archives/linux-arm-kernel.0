@@ -1,63 +1,48 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 27 Sep 2011 11:28:35 +0100
-Subject: [RFC PATCH 3/3] ARM: mm: add l2x0 suspend/resume support
-In-Reply-To: <4E815F42.6010102@ti.com>
-References: <1317047561-11020-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1317047561-11020-4-git-send-email-lorenzo.pieralisi@arm.com>
-	<20110926150645.GN22455@n2100.arm.linux.org.uk>
-	<20110926171452.GC11647@e102568-lin.cambridge.arm.com>
-	<4E815F42.6010102@ti.com>
-Message-ID: <20110927102835.GA18572@e102568-lin.cambridge.arm.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 27 Sep 2011 16:22:41 -0400
+Subject: [PATCH V2 0/3] S5P64X0 PM Support
+Message-ID: <1317154964-22600-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh,
+The patchset adds Power Mangement support for S5P64X0. The first
+two patches lay the groundwork for adding PM support, while the
+final patch adds the SoC specific PM code.
 
-On Tue, Sep 27, 2011 at 06:29:38AM +0100, Santosh Shilimkar wrote:
-> Lorenzo,
-> 
-> On Monday 26 September 2011 10:44 PM, Lorenzo Pieralisi wrote:
-> > On Mon, Sep 26, 2011 at 04:06:45PM +0100, Russell King - ARM Linux wrote:
-> >> On Mon, Sep 26, 2011 at 03:32:41PM +0100, Lorenzo Pieralisi wrote:
-> >>> Context is saved once for all at boot time, along with the L2 physical address
-> >>> and cache type.
-> >>
-> >> Why is this assembly code?  As Barry's previous patch shows, it's
-> >> entirely possible to save all the state required at init time from
-> >> the existing C code without needing any additional functions.
-> >>
-> > 
-> I too didn't like this approach.
-> 
-> The platforms which needs to take care of security needs to take
-> care of the L2 on their own and this code doesn't help them.
-> 
-> Other platform which wants to use the L2 code, looks like are
-> fine to use the C-version which saves registers in init and restores
-> it in resume path whenever needed. The patch which was posted
-> on that was good enough. Regarding turning OFF MMU is really
-> not necessary unless and until some hardware's are buggy. In that
-> case, instead of adding that un-necessary code in generic code,
-> it's better to patch only that buggy SOC code.
-> 
+Changes since V1:
+- Changed register naming as per User Manual.
+- Dropped the pm-gpio warning patch as it will be taken care in the gpio
+  movement patch by Kukjin Kim.
+- Used soc_is_* for differentiating between 6440 and 6450.
+- Merged all the sleep files of S5P SoCs while leaving the S3C64XX sleep
+  code as is.
 
-I summed up the reasons for this patch to exist in the cover letter 
-and I mentioned that some bits can be merged IF needed:
+Abhilash Kesavan (3):
+  ARM: S5P: Make the common S5P PM code conditionally compile
+  ARM: S5P: Make the sleep code common for S5P series SoCs
+  ARM: S5P64X0: Add Power Management support
 
-http://www.spinics.net/lists/arm-kernel/msg141989.html
-
-Having said that:
-
-- This patch does not switch the MMU off
-- This patch does not cover security, and I mentioned that
-- Russell referred to saving registers not restoring them, for a reason
-- If the resume hook is written in C you cannot call it when the MMU is
-  off, which we need if L2 is retained. Unless you think OMAP is the
-  only platform supporting L2 RAM retention, but there are people who might
-  disagree.
-
-And if you think it is not worth merging since most SoCs will run in
-non-secure mode, then that's a very valid point, but it is true for both
-patch series, not just for this one.
-
-Lorenzo
+ arch/arm/Kconfig                                |    2 +-
+ arch/arm/mach-exynos4/Kconfig                   |    4 +
+ arch/arm/mach-exynos4/Makefile                  |    2 +-
+ arch/arm/mach-s5p64x0/Kconfig                   |    4 +
+ arch/arm/mach-s5p64x0/Makefile                  |    1 +
+ arch/arm/mach-s5p64x0/include/mach/map.h        |    1 +
+ arch/arm/mach-s5p64x0/include/mach/pm-core.h    |  117 +++++++++++++
+ arch/arm/mach-s5p64x0/include/mach/regs-clock.h |   33 ++++
+ arch/arm/mach-s5p64x0/include/mach/regs-gpio.h  |   19 ++
+ arch/arm/mach-s5p64x0/irq-eint.c                |    2 +
+ arch/arm/mach-s5p64x0/irq-pm.c                  |   92 ++++++++++
+ arch/arm/mach-s5p64x0/pm.c                      |  204 +++++++++++++++++++++++
+ arch/arm/mach-s5pv210/Kconfig                   |    2 +
+ arch/arm/mach-s5pv210/Makefile                  |    2 +-
+ arch/arm/mach-s5pv210/sleep.S                   |   52 ------
+ arch/arm/plat-s5p/Kconfig                       |   12 ++
+ arch/arm/plat-s5p/Makefile                      |    4 +-
+ arch/arm/{mach-exynos4 => plat-s5p}/sleep.S     |   13 +-
+ 18 files changed, 500 insertions(+), 66 deletions(-)
+ create mode 100644 arch/arm/mach-s5p64x0/include/mach/pm-core.h
+ create mode 100644 arch/arm/mach-s5p64x0/irq-pm.c
+ create mode 100644 arch/arm/mach-s5p64x0/pm.c
+ delete mode 100644 arch/arm/mach-s5pv210/sleep.S
+ rename arch/arm/{mach-exynos4 => plat-s5p}/sleep.S (81%)
