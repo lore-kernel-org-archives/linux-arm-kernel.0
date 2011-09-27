@@ -1,42 +1,67 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 26 Sep 2011 17:11:48 -0700
-Subject: [PATCH v3 0/3] genirq: handling GIC per-cpu interrupts
-In-Reply-To: <20110926201836.GA27355@huya.qualcomm.com>
-References: <1316793788-14500-1-git-send-email-marc.zyngier@arm.com>
-	<20110926201836.GA27355@huya.qualcomm.com>
-Message-ID: <20110927001148.GA16174@huya.qualcomm.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Tue, 27 Sep 2011 05:44:00 +0530
+Subject: [PATCH v7 REPOST 04/24] gpio/omap: fix pwrdm_post_transition call
+	sequence
+In-Reply-To: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
+References: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1317082460-31706-5-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 01:18:36PM -0700, David Brown wrote:
-> On Fri, Sep 23, 2011 at 05:03:05PM +0100, Marc Zyngier wrote:
-> 
-> > Tested on ARM Versatile Express (Cortex A15), ARM RealView PB11MP,
-> > OMAP4 (Panda) and Tegra (Harmony). Patch series against next-20110923.
-> > 
-> > From v2:
-> > - Fixed !GENERIC_HARDIRQS build
-> > - Fixed request_percpu_irq documentation
-> > 
-> > From v1:
-> > - General tidy-up after Thomas' review. I've kept the config option
-> >   for the time being until we can sort out the anonymous union
-> >   problem.
-> > 
-> > Marc Zyngier (3):
-> >   genirq: add support for per-cpu dev_id interrupts
-> >   ARM: gic: consolidate PPI handling
-> >   ARM: gic, local timers: use the request_percpu_irq() interface
-> 
-> I've tested this on an MSM8660 based off of next-20110926.
-> 
-> Tested-by: David Brown <davidb@codeaurora.org>
-> Acked-by: David Brown <davidb@codeaurora.org>
+From: Charulatha V <charu@ti.com>
 
-Also tested on MSM8250.
+The context lost count is modified in omap_sram_idle() path when
+pwrdm_post_transition() is called. But pwrdm_post_transition() is called
+only after omap_gpio_resume_after_idle() is called. Correct this so that
+context lost count is modified before calling omap_gpio_resume_after_idle().
 
-David
+This would be useful when OMAP GPIO save/restore context is called by
+the OMAP GPIO driver itself.
 
+Signed-off-by: Charulatha V <charu@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/pm34xx.c |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 7255d9b..1915050 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -363,7 +363,6 @@ void omap_sram_idle(void)
+ 		printk(KERN_ERR "Invalid mpu state in sram_idle\n");
+ 		return;
+ 	}
+-	pwrdm_pre_transition();
+ 
+ 	/* NEON control */
+ 	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
+@@ -386,6 +385,8 @@ void omap_sram_idle(void)
+ 			if (!console_trylock())
+ 				goto console_still_active;
+ 
++	pwrdm_pre_transition();
++
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON) {
+ 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+@@ -455,6 +456,8 @@ void omap_sram_idle(void)
+ 	}
+ 	omap3_intc_resume_idle();
+ 
++	pwrdm_post_transition();
++
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON) {
+ 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
+@@ -478,8 +481,6 @@ console_still_active:
+ 		omap3_disable_io_chain();
+ 	}
+ 
+-	pwrdm_post_transition();
+-
+ 	clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
+ }
+ 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.0.4
