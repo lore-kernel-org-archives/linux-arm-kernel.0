@@ -1,27 +1,111 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Sep 2011 09:26:05 +0100
-Subject: [PATCH] clk: provide prepare/unprepare functions
-In-Reply-To: <4E7B72C2.3060402@codeaurora.org>
-References: <20110922101024.GK17169@n2100.arm.linux.org.uk>
-	<4E7B72C2.3060402@codeaurora.org>
-Message-ID: <20110927082605.GR22455@n2100.arm.linux.org.uk>
+Date: Tue, 27 Sep 2011 09:26:57 +0100
+Subject: [PATCH 1/9] clk: provide prepare/unprepare functions
+Message-ID: <E1R8T0C-0003wI-W2@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 10:39:14AM -0700, Saravana Kannan wrote:
->>   /**
->> + * clk_prepare - prepare a clock source
->> + * @clk: clock source
->> + *
->> + * This prepares the clock source for use.
->
-> Do you want to add a "May NOT be called from atomic context"? Yeah, the  
-> stub makes it obvious, but I think it would be consistent to add the  
-> comment in. No strong opinion though.
+As discussed previously, there's the need on some platforms to run some
+parts of clk_enable() in contexts which can schedule.  The solution
+which was agreed upon was to provide clk_prepare() and clk_unprepare()
+to contain this parts, while clk_enable() and clk_disable() perform
+the atomic part.
 
-The might_sleep() is sufficient to enforce that, but adding the comment
-for when the helper goes away would be a good idea.
+This patch provides a common definition for clk_prepare() and
+clk_unprepare() in linux/clk.h, and provides an upgrade path for
+existing implementation and drivers: drivers can start using
+clk_prepare() and clk_unprepare() once this patch is merged without
+having to wait for platform support.  Platforms can then start to
+provide these additional functions.
 
-> Not sure if you care, but LGTM/Ack.
+Eventually, HAVE_CLK_PREPARE will be removed from the kernel, and
+everyone will have to provide these new APIs.
 
-Thanks.
+Acked-by: Saravana Kannan <skannan@codeaurora.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ include/linux/clk.h |   43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 43 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 1d37f42..7213b52 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -11,6 +11,8 @@
+ #ifndef __LINUX_CLK_H
+ #define __LINUX_CLK_H
+ 
++#include <linux/kernel.h>
++
+ struct device;
+ 
+ /*
+@@ -41,11 +43,31 @@ struct clk;
+ struct clk *clk_get(struct device *dev, const char *id);
+ 
+ /**
++ * clk_prepare - prepare a clock source
++ * @clk: clock source
++ *
++ * This prepares the clock source for use.
++ *
++ * Must not be called from within atomic context.
++ */
++#ifdef CONFIG_HAVE_CLK_PREPARE
++int clk_prepare(struct clk *clk);
++#else
++static inline int clk_prepare(struct clk *clk)
++{
++	might_sleep();
++	return 0;
++}
++#endif
++
++/**
+  * clk_enable - inform the system when the clock source should be running.
+  * @clk: clock source
+  *
+  * If the clock can not be enabled/disabled, this should return success.
+  *
++ * May be called from atomic contexts.
++ *
+  * Returns success (0) or negative errno.
+  */
+ int clk_enable(struct clk *clk);
+@@ -57,6 +79,8 @@ int clk_enable(struct clk *clk);
+  * Inform the system that a clock source is no longer required by
+  * a driver and may be shut down.
+  *
++ * May be called from atomic contexts.
++ *
+  * Implementation detail: if the clock source is shared between
+  * multiple drivers, clk_enable() calls must be balanced by the
+  * same number of clk_disable() calls for the clock source to be
+@@ -64,6 +88,25 @@ int clk_enable(struct clk *clk);
+  */
+ void clk_disable(struct clk *clk);
+ 
++
++/**
++ * clk_unprepare - undo preparation of a clock source
++ * @clk: clock source
++ *
++ * This undoes a previously prepared clock.  The caller must balance
++ * the number of prepare and unprepare calls.
++ *
++ * Must not be called from within atomic context.
++ */
++#ifdef CONFIG_HAVE_CLK_PREPARE
++void clk_unprepare(struct clk *clk);
++#else
++static inline void clk_unprepare(struct clk *clk)
++{
++	might_sleep();
++}
++#endif
++
+ /**
+  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
+  *		  This is only valid once the clock source has been enabled.
+-- 
+1.7.4.4
