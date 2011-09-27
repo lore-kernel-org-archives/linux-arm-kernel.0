@@ -1,37 +1,90 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 26 Sep 2011 20:52:48 -0400 (EDT)
-Subject: Pull request: removal of most instances of mach/memory.h
-In-Reply-To: <alpine.LFD.2.00.1109262028310.2718@xanadu.home>
-References: <alpine.LFD.2.00.1109130849590.20358@xanadu.home>
-	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
-	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
-	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
-	<20110926191055.GP22455@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109261514330.2718@xanadu.home>
-	<alpine.LFD.2.00.1109261606210.2718@xanadu.home>
-	<20110926223839.GB23680@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109261901550.2718@xanadu.home>
-	<20110926232943.GD23680@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1109262028310.2718@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1109262047290.2718@xanadu.home>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Tue, 27 Sep 2011 09:56:14 +0900
+Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
+In-Reply-To: <CAK=WgbYzZKTRRf6hk=L5ZvXmFAUpq66Ud3F7xh2-8j6zSvAq9g@mail.gmail.com>
+References: <15669786.49881316849426265.JavaMail.weblogic@epml24>
+	<CAK=WgbYnGjPKs6_nmFRGfMnbh_7wDR-0QcptAGaqDKVOo-x3cg@mail.gmail.com>
+	<CAHQjnOOtVHUS3KmBz7LdO88fLQyLA6f-w3ye9nAH0Bx+zh38XA@mail.gmail.com>
+	<CAK=Wgbazwz9PRJSpZjopwxJ-PO88FtajmbXL=pVKDHOr1t61fQ@mail.gmail.com>
+	<CAHQjnON7dksupFeAYLuYXX2PhgjX-GXEGJiy0dRTmpoBjbURVg@mail.gmail.com>
+	<CAK=WgbaOwe8Q19tpZMeHdvyCj8fcV194zA-oSD20tF7j7_MvpQ@mail.gmail.com>
+	<CAHQjnOM_KTiqzYnePScMHQ3bg5X1wqa4zu6=1A1z7UWeDxVZvQ@mail.gmail.com>
+	<CAK=WgbYzZKTRRf6hk=L5ZvXmFAUpq66Ud3F7xh2-8j6zSvAq9g@mail.gmail.com>
+Message-ID: <CAHQjnOPdsf-QB3st94WRSH325j8WPOLLe4rqv0WN1qK1KYWtmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Sep 2011, Nicolas Pitre wrote:
+On Tue, Sep 27, 2011 at 12:59 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> On Mon, Sep 26, 2011 at 5:48 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+>> I am sorry but I still think that
+>> installing default fault handler is quite simple and straightforward.
+>
+> ... and abusing the IOMMU API.
+>
+> Please don't do that. Interfaces are written for specific goals, and
+> this one was added for IOMMU users, not drivers. Just like all the
+> other map/unmap/attach/... APIs.
+>
+> By using this from the IOMMU driver itself, you are adding burden on
+> future development and evolution of this API. As use cases
+> materialize, we will have to change it to support them, while
+> considering existing use cases. Using this API inappropriately will
+> make our life harder later on.
+I didn't think about this case.
+It can be a problem if IOMMU driver is dependent upon the change of
+IOMMU API as you told above.
 
-> On Tue, 27 Sep 2011, Russell King - ARM Linux wrote:
-> 
-> > A little more discipline and communication (such as asking me to drop
-> > the duplicate commit _first_) would be nice.
-> 
-> Certainly.  Improving communication both ways might help.
+>
+> Moreover, I'm really not sure how exactly are you going to use this.
+>
+> If you're having an IOMMU user which installs its own fault handler,
+> then this is all moot since the default behavior you provide here will
+> be overridden.
+Yes, this is what I really want.
+I wanted the IOMMU driver to provide default fault handler to its users
+that does not provide fault handler for debugging purpose.
+If a user want to handle MMU fault, IOMMU driver welcomes to overwrite
+the existing 'default' fault handler.
 
-One way this could be improved would be for your patch system to send 
-notification emails with the submitter address explicit in the To: 
-field.  Right now it contains linux-arm-patches at lists.arm.linux.org.uk 
-only, therefore those emails don't get sorted with the best priority 
-they could get.
+> If you're not having an IOMMU user which installs its own fault
+> handler, then just provide the default behavior in your irq handler,
+> regardless whether you report the fault to the IOMMU core or not. Or
+> only when it fails. and yes, we can provide different error values for
+> different scenarios. it's not rocket science :).
+>
+> Really, there's a myriad of ways to do this right. Please explain your
+> exact settings/use-case and I'll gladly help you find a clean
+> solution.
+>
+Thank you.
 
+As I explained before, MMU fault in our system is abnormal and
+the situation cannot be recovered because mapping information is set up
+completely before System MMU starts address translation with the mapping
+information.
+However we have to capture the MMU fault for debugging purpose.
+That's why our fault handler just prints debugging messages and
+generates kernel OOPS
 
-Nicolas
+A user of IOMMU may handle MMU faults due to the following reason:
+ - Its IOMMU sees the virtual address space of the user process (IOMMU
+refers the page table of CPU)
+   and virtual memory region allocated by userspace is not filled with
+physical memory.
+   Device driver which is user of IOMMU does not call get_user_pages()
+for the region but
+   handle page fault generated by IOMMU.
+ - A device driver working in the Monitor mode in ARM processors need
+to protect a memory region
+   from access in the Normal mode. If it happens, the device driver
+must catch the situation,
+   stop the current operation and inform the problem to the userspace.
+
+For the above reasons, some user of IOMMU may override the default
+fault handler.
+
+> Thanks,
+> Ohad.
+
+Thanks and regards,
+Cho KyongHo.
