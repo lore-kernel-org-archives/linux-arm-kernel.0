@@ -1,59 +1,54 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Tue, 27 Sep 2011 11:29:07 -0700
-Subject: [RFC PATCH 0/3] Add accurate boot timing to a Linux system
-In-Reply-To: <4E802F7D.9000006@parrot.com>
-References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
-	<20110924083203.GZ17169@n2100.arm.linux.org.uk>
-	<4E802F7D.9000006@parrot.com>
-Message-ID: <CAPnjgZ11uannvUOGSM_FuR9mhSY_yiSGv3vuJtmsMFMgV+Jo0Q@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 27 Sep 2011 11:29:51 -0700
+Subject: [PATCH v3 5/6] OMAP: omap_device: Create a default
+	omap_device_pm_latency
+In-Reply-To: <20110927173048.GM6324@atomide.com> (Tony Lindgren's message of
+	"Tue, 27 Sep 2011 10:30:48 -0700")
+References: <1317143886-13285-1-git-send-email-b-cousson@ti.com>
+	<1317143886-13285-6-git-send-email-b-cousson@ti.com>
+	<20110927173048.GM6324@atomide.com>
+Message-ID: <87hb3xzvmo.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthieu,
+Tony Lindgren <tony@atomide.com> writes:
 
-On Mon, Sep 26, 2011 at 12:53 AM, Matthieu CASTET
-<matthieu.castet@parrot.com> wrote:
-> Hi,
+> * Benoit Cousson <b-cousson@ti.com> [110927 09:45]:
+>> Most devices are using the same default omap_device_pm_latency structure
+>> during device built. In order to avoid the duplication of the same
+>> structure everywhere, add a default structure that will be used if
+>> the device does not have an explicit one.
+>> 
+>> Next patches will clean the duplicated structures.
+>> 
+>> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+>> Cc: Kevin Hilman <khilman@ti.com>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> ---
+>>  arch/arm/plat-omap/omap_device.c |   19 ++++++++++++++++++-
+>>  1 files changed, 18 insertions(+), 1 deletions(-)
+>> 
+>> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+>> index f832f92..cd8d977 100644
+>> --- a/arch/arm/plat-omap/omap_device.c
+>> +++ b/arch/arm/plat-omap/omap_device.c
+>> @@ -97,6 +97,14 @@
+>>  static int omap_device_register(struct platform_device *pdev);
+>>  static int omap_early_device_register(struct platform_device *pdev);
+>>  
+>> +static struct omap_device_pm_latency omap_default_latency[] = {
+>> +	{
+>> +		.deactivate_func = omap_device_idle_hwmods,
+>> +		.activate_func   = omap_device_enable_hwmods,
+>> +		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
+>> +	}
+>> +};
+>> +
+>>  /* Private functions */
 >
-> Russell King - ARM Linux a ?crit :
->> On Fri, Sep 23, 2011 at 04:03:15PM -0700, Simon Glass wrote:
->>> An accurate timer is required to make the numbers meaningful. Many
->>> modern platforms have a microsecond timer. This patch set uses a
->>> function called timer_get_us() to read the timer.
->>
->> Not another 'get a time value' function. ?Why do we need soo many?
->> We have - at least:
->>
->> ktime_get (and various flavours of it)
->> do_gettimeofday
->> getnstimeofday
->> sched_clock
->>
->> Do we really need yet another one which will have to be multiplexed
->> amongst platforms, requiring scaling and so forth from whatever the
->> platform provides?
->>
->> Remember that ARM timers are virtually all MMIO mapped, which means
->> they don't work during early kernel bringup when the MMU mappings for
->> the hardware have not been setup. ?(That's the reason stuff like
->> sched_clock for printk doesn't work early.)
-> Doesn't cortexA-8 (and A9 ?) have a cycle counter that can be read by
-> coprocessor 15 ?
->
-> Couldn't we use that counter for early stuff on those architectures ?
+> Isn't this racey between devices if the latency values get adjusted
+> automatically for each device?
 
-Yes we could, but we need to be careful that we use a 'time of day'
-counter, not dependent on clock speed, CPU load and the like. See my
-other email for what I see as the ideal timer. Obviously this will
-have to be architecture-specific, but I hope for a simple fallback to
-something available on all architectures, with perhaps the ability to
-use better timers available on specific architectures which implement
-them.
+A copy of this is made for each device (uses kmemdup later in the patch.)
 
-Regards,
-Simon
-
->
->
-> Matthieu
->
+Kevin
