@@ -1,45 +1,55 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 27 Sep 2011 09:27:17 +0100
-Subject: [PATCH 2/9] clk: amba bus: convert to clk_prepare()/clk_unprepare()
-Message-ID: <E1R8T0X-0003wM-3Q@rmk-PC.arm.linux.org.uk>
+Date: Tue, 27 Sep 2011 09:27:37 +0100
+Subject: [PATCH 3/9] clk: amba-clcd: convert to clk_prepare()/clk_unprepare()
+Message-ID: <E1R8T0r-0003wQ-7S@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/amba/bus.c |   11 ++++++++++-
- 1 files changed, 10 insertions(+), 1 deletions(-)
+ drivers/video/amba-clcd.c |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index 84bdaac..bd230e8 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -460,9 +460,17 @@ static int amba_get_enable_pclk(struct amba_device *pcdev)
- 	if (IS_ERR(pclk))
- 		return PTR_ERR(pclk);
+diff --git a/drivers/video/amba-clcd.c b/drivers/video/amba-clcd.c
+index cf03ad0..2cda6ba 100644
+--- a/drivers/video/amba-clcd.c
++++ b/drivers/video/amba-clcd.c
+@@ -447,6 +447,10 @@ static int clcdfb_register(struct clcd_fb *fb)
+ 		goto out;
+ 	}
  
-+	ret = clk_prepare(pclk);
-+	if (ret) {
-+		clk_put(pclk);
-+		return ret;
-+	}
++	ret = clk_prepare(fb->clk);
++	if (ret)
++		goto free_clk;
 +
- 	ret = clk_enable(pclk);
--	if (ret)
-+	if (ret) {
-+		clk_unprepare(pclk);
- 		clk_put(pclk);
-+	}
+ 	fb->fb.device		= &fb->dev->dev;
  
- 	return ret;
- }
-@@ -472,6 +480,7 @@ static void amba_put_disable_pclk(struct amba_device *pcdev)
- 	struct clk *pclk = pcdev->pclk;
+ 	fb->fb.fix.mmio_start	= fb->dev->res.start;
+@@ -456,7 +460,7 @@ static int clcdfb_register(struct clcd_fb *fb)
+ 	if (!fb->regs) {
+ 		printk(KERN_ERR "CLCD: unable to remap registers\n");
+ 		ret = -ENOMEM;
+-		goto free_clk;
++		goto clk_unprep;
+ 	}
  
- 	clk_disable(pclk);
-+	clk_unprepare(pclk);
- 	clk_put(pclk);
- }
+ 	fb->fb.fbops		= &clcdfb_ops;
+@@ -530,6 +534,8 @@ static int clcdfb_register(struct clcd_fb *fb)
+ 	fb_dealloc_cmap(&fb->fb.cmap);
+  unmap:
+ 	iounmap(fb->regs);
++ clk_unprep:
++	clk_unprepare(fb->clk);
+  free_clk:
+ 	clk_put(fb->clk);
+  out:
+@@ -595,6 +601,7 @@ static int clcdfb_remove(struct amba_device *dev)
+ 	if (fb->fb.cmap.len)
+ 		fb_dealloc_cmap(&fb->fb.cmap);
+ 	iounmap(fb->regs);
++	clk_unprepare(fb->clk);
+ 	clk_put(fb->clk);
  
+ 	fb->board->remove(fb);
 -- 
 1.7.4.4
