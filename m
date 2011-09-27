@@ -1,40 +1,46 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 27 Sep 2011 20:19:00 +0530
-Subject: [PATCH 5/9] regulator: helper routine to extract
-	fixed_voltage_config
-In-Reply-To: <20110927121622.GD4289@opensource.wolfsonmicro.com>
+Date: Tue, 27 Sep 2011 20:19:37 +0530
+Subject: [PATCH 8/9] regulator: helper to extract regulator node based
+	on supply name
+In-Reply-To: <20110927122155.GE4289@opensource.wolfsonmicro.com>
 References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-6-git-send-email-rnayak@ti.com>
-	<20110927121622.GD4289@opensource.wolfsonmicro.com>
-Message-ID: <4E81E25C.5080500@ti.com>
+	<1317118372-17052-9-git-send-email-rnayak@ti.com>
+	<20110927122155.GE4289@opensource.wolfsonmicro.com>
+Message-ID: <4E81E281.505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 September 2011 05:46 PM, Mark Brown wrote:
-> On Tue, Sep 27, 2011 at 03:42:48PM +0530, Rajendra Nayak wrote:
->> The helper routine of_get_fixed_voltage_config() extracts
->> fixed_voltage_config structure contents from device tree.
->>
->> Also add documenation for additional bindings for fixed
->> regulators that can be passed through dt.
+On Tuesday 27 September 2011 05:51 PM, Mark Brown wrote:
+> On Tue, Sep 27, 2011 at 03:42:51PM +0530, Rajendra Nayak wrote:
 >
-> Why not just add device tree support into the driver directly?
-
-Ok, will do.
-
+>> +	if (!dev)
+>> +		return NULL;
 >
->> +Optional properties:
->> +- regulator-fixed-supply: Name of the regulator supply
->
-> This is going to be confusing with respect to the generic regulator
-> supply property.
+> So how do we handle CPUs?  cpufreq is one of the most active users of
+> regulators...
 
-Yes, I guess. Any suggestions on how to make it less
-confusing? :-)
+Hmm, never thought of it :(
+Maybe I should associate a supply name with all
+regulators and then lookup from the global registered
+list.
 
 >
->> +- regulator-fixed-enable-high: Polarity of enable GPIO, 1 = Active High, 0 = Active low
+>> +	snprintf(prop_name, 32, "%s-supply", supply);
+>> +
+>> +	prop = of_get_property(dev->of_node, prop_name,&sz);
+>> +	if (!prop || sz<  4)
+>> +		return NULL;
 >
-> Word wrap for legibility please.
+> sz<  4?  Magic!  :)
 
-Ok.
+Its the valid phandle size.
+I guess I need a sz != 4
+
+>
+>> +extern struct device_node *of_get_regulator(struct device *dev,
+>> +	const char *supply);
+>
+> This shouldn't be part of the public API, it should be transparently
+> handled within the core.
+
+agreed.
