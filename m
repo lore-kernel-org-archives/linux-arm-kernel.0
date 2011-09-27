@@ -1,37 +1,46 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Tue, 27 Sep 2011 15:12:22 +0200
-Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
-	supported by the hardware
-In-Reply-To: <CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
-References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
-	<1316195506-9777-2-git-send-email-ohad@wizery.com>
-	<20110927100505.GH2138@amd.com>
-	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
-Message-ID: <20110927131222.GL2138@amd.com>
+From: fernando.endo@phiinnovations.com (Fernando Endo)
+Date: Tue, 27 Sep 2011 10:15:44 -0300
+Subject: Porting linux to Stellaris Cortex-M3
+In-Reply-To: <20110927101523.GF14237@e102109-lin.cambridge.arm.com>
+References: <CAH8SYHDRT7OpLr0sx75rMyy4OV59JZGoRv_cr2+-+2yy3tfU9g@mail.gmail.com>
+	<20110927092906.GA9692@n2100.arm.linux.org.uk>
+	<20110927101523.GF14237@e102109-lin.cambridge.arm.com>
+Message-ID: <CAH8SYHDtRRD0DuwkHAKJ6WgXtnGQBOm2Q3wq4Z3eVbu+UhcwjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 08:26:29AM -0400, Ohad Ben-Cohen wrote:
-> > With an unsigned long you can use plain and fast bit_ops instead of the
-> > full bitmap functions.
-> 
-> Not sure I follow; the only bit operation I'm using while mapping is
-> find_next_bit() (which is a bitops.h method).
-> 
-> What other faster variant are you referring to ?
+2011/9/27 Catalin Marinas <catalin.marinas@arm.com>:
+> On Tue, Sep 27, 2011 at 10:29:06AM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Sep 26, 2011 at 05:19:39PM -0300, Fernando Endo wrote:
+>> > - BUG: scheduling while atomic: init/1/0xffff000a
+>>
+>> The last figure is the preempt count. ?This is made up from:
+>>
+>> ?* - bits 0-7 are the preemption count (max preemption depth: 256)
+>> ?* - bits 8-15 are the softirq count (max # of softirqs: 256)
+>> ?* - bits 16-25 are the hardirq count (max # of nested hardirqs: 1024)
+>> ?* - bit 26 is the NMI_MASK
+>> ?* - bit 28 is the PREEMPT_ACTIVE flag
+>>
+>> That seems to be saying that preemption has been disabled 10 times.
+>> The upper 16-bits being all-ones seems to be rather insane - maybe
+>> there's an additional __irq_exit() or irq_exit() call somewhere in
+>> one of your code paths.
+>
+> Fernando, do you have CONFIG_PREEMPT enabled in your kernel? That's not
+> currently possible with my Cortex-M3 port (see the "Exception handling"
+> section in the M3 wiki page for an explanation).
 
-You pass a pointer to an unsigned long for the page-size bitmap. This
-allows to use an array of unsigned long. But a single unsigned long is
-sufficient and you can use functions like ffs() and fls() together with
-shifting. These functions often translate to a single intruction in the
-binary. The find_next_bit function has much more overhead because it
-needs to handle the array-of-ulong case.
+I set CONFIG_PREEMPT_NONE after having this bug, my .config is
+attached if you want to have a look
+Thank you both for the advices, I'll take a look
 
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Att,
+Fernando Akira Endo
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config
+Type: application/octet-stream
+Size: 4715 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110927/1db6d40f/attachment.obj>
