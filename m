@@ -1,62 +1,31 @@
-From: arm.maxinbjohn@gmail.com (Maxin John)
-Date: Tue, 27 Sep 2011 11:58:06 +0300
-Subject: Porting linux to Stellaris Cortex-M3
-In-Reply-To: <CAH8SYHDRT7OpLr0sx75rMyy4OV59JZGoRv_cr2+-+2yy3tfU9g@mail.gmail.com>
-References: <CAH8SYHDRT7OpLr0sx75rMyy4OV59JZGoRv_cr2+-+2yy3tfU9g@mail.gmail.com>
-Message-ID: <CAAJ0-p7YwKR9B6BfoHcRqrNPVvpd49XrPsDCN7UF=-5jAf8XnQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 27 Sep 2011 09:58:55 +0100
+Subject: [PATCH v2 00/16] Switch GIC users (and omap2plus) to
+	CONFIG_MULTI_IRQ_HANDLER
+In-Reply-To: <20110927001514.GB16174@huya.qualcomm.com>
+References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
+	<20110926202007.GB27355@huya.qualcomm.com>
+	<20110927001514.GB16174@huya.qualcomm.com>
+Message-ID: <4E81904F.1010406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fernando,
+On 27/09/11 01:15, David Brown wrote:
+> On Mon, Sep 26, 2011 at 01:20:07PM -0700, David Brown wrote:
+>> On Mon, Sep 26, 2011 at 12:02:19PM +0100, Marc Zyngier wrote:
+>>
+>>> This series has been tested on VE (A9, A5, A15), PB11MP, Panda, IGEPv2
+>>> and Harmony. Patches against next-20110926 plus my PPI series.
+>>
+>> Tested on an msm8660.
+>>
+>> Tested-by: David Brown <davidb@codeaurora.org>
+>> Acked-by: David Brown <davidb@codeaurora.org>
+> 
+> Tested as well on msm8250.
 
-On Mon, Sep 26, 2011 at 11:19 PM, Fernando Endo
-<fernando.endo@phiinnovations.com> wrote:
-> Hello everybody,
->
-> I'm currently porting linux to a Stellaris board from TI.
-> But I'm having some problems with the execution of the Busybox init program.
->
-> Some info:
-> - the toolchain is CodeSourcery lite edition
-> - I've followed the steps described by Catalin Marinas at
-> http://www.linux-arm.org/LinuxKernel/LinuxM3
-> - I'm using my own bootloader, based on the script at the site above
-> and on informations found on linux/Documents
-> - I've based the mach-stellaris implementation from realview and mps ones
-> - the timer, irqs and uart seems to work fine
-> - the system crashes after calling /init, which is linked with Busybox init
-> - BUG: scheduling while atomic: init/1/0xffff000a
+Awesome. Thanks a lot for testing all of this David.
 
-This is the code which corresponds to "scheduling while atomic" bug
-(from "kernel/sched.c") :
------
-/*
- * Print scheduling while atomic bug:
- */
-static noinline void __schedule_bug(struct task_struct *prev)
-{
-        struct pt_regs *regs = get_irq_regs();
-
-        printk(KERN_ERR "BUG: scheduling while atomic: %s/%d/0x%08x\n",
-                prev->comm, prev->pid, preempt_count());
-
-        debug_show_held_locks(prev);
-        print_modules();
-        if (irqs_disabled())
-                print_irqtrace_events(prev);
-
-        if (regs)
-                show_regs(regs);
-        else
-                dump_stack();
-}
-----
-
-We hit this bug if we are scheduling when we should not be. ie : if we
-call schedule() or sleep() from a driver while in an interrupt handler
-or holding a spin-lock, that will trigger this bug. This is because of
-a bug present in any of the kernel drivers.  Please share the detailed
-logs.
-
-Warm Regards,
-Maxin B. John
+	M.
+-- 
+Jazz is not dead. It just smells funny...
