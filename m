@@ -1,90 +1,47 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Tue, 27 Sep 2011 09:56:14 +0900
-Subject: [PATCH 3/4] iommu/exynos: Add iommu driver for Exynos4 Platforms
-In-Reply-To: <CAK=WgbYzZKTRRf6hk=L5ZvXmFAUpq66Ud3F7xh2-8j6zSvAq9g@mail.gmail.com>
-References: <15669786.49881316849426265.JavaMail.weblogic@epml24>
-	<CAK=WgbYnGjPKs6_nmFRGfMnbh_7wDR-0QcptAGaqDKVOo-x3cg@mail.gmail.com>
-	<CAHQjnOOtVHUS3KmBz7LdO88fLQyLA6f-w3ye9nAH0Bx+zh38XA@mail.gmail.com>
-	<CAK=Wgbazwz9PRJSpZjopwxJ-PO88FtajmbXL=pVKDHOr1t61fQ@mail.gmail.com>
-	<CAHQjnON7dksupFeAYLuYXX2PhgjX-GXEGJiy0dRTmpoBjbURVg@mail.gmail.com>
-	<CAK=WgbaOwe8Q19tpZMeHdvyCj8fcV194zA-oSD20tF7j7_MvpQ@mail.gmail.com>
-	<CAHQjnOM_KTiqzYnePScMHQ3bg5X1wqa4zu6=1A1z7UWeDxVZvQ@mail.gmail.com>
-	<CAK=WgbYzZKTRRf6hk=L5ZvXmFAUpq66Ud3F7xh2-8j6zSvAq9g@mail.gmail.com>
-Message-ID: <CAHQjnOPdsf-QB3st94WRSH325j8WPOLLe4rqv0WN1qK1KYWtmA@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 26 Sep 2011 19:30:01 -0600
+Subject: [RFC 1/5] ARM: dev_archdata: add private iommu extension
+In-Reply-To: <1316948337-7924-2-git-send-email-ohad@wizery.com>
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+	<1316948337-7924-2-git-send-email-ohad@wizery.com>
+Message-ID: <20110927013001.GA20588@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 12:59 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Mon, Sep 26, 2011 at 5:48 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
->> I am sorry but I still think that
->> installing default fault handler is quite simple and straightforward.
->
-> ... and abusing the IOMMU API.
->
-> Please don't do that. Interfaces are written for specific goals, and
-> this one was added for IOMMU users, not drivers. Just like all the
-> other map/unmap/attach/... APIs.
->
-> By using this from the IOMMU driver itself, you are adding burden on
-> future development and evolution of this API. As use cases
-> materialize, we will have to change it to support them, while
-> considering existing use cases. Using this API inappropriately will
-> make our life harder later on.
-I didn't think about this case.
-It can be a problem if IOMMU driver is dependent upon the change of
-IOMMU API as you told above.
+On Sun, Sep 25, 2011 at 01:58:53PM +0300, Ohad Ben-Cohen wrote:
+> Add a private iommu pointer to the ARM-specific arch data in the
+> device struct, which will be used to attach iommu-specific data
+> to devices which require iommu support.
+> 
+> Different iommu implementations (on different platforms) will attach
+> different types of data to this pointer, so 'void *' is currently used
+> (the downside is reduced typesafety).
+> 
+> Note: ia64, x86 and sparc have this exact iommu extension as well, and
+> if others are likely to adopt it too, we might want to consider
+> adding this to the device struct itself directly.
+> 
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  arch/arm/include/asm/device.h |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+> index 9f390ce..6615f03 100644
+> --- a/arch/arm/include/asm/device.h
+> +++ b/arch/arm/include/asm/device.h
+> @@ -10,6 +10,9 @@ struct dev_archdata {
+>  #ifdef CONFIG_DMABOUNCE
+>  	struct dmabounce_device_info *dmabounce;
+>  #endif
+> +#ifdef CONFIG_IOMMU_API
+> +	void *iommu; /* private IOMMU data */
+> +#endif
 
->
-> Moreover, I'm really not sure how exactly are you going to use this.
->
-> If you're having an IOMMU user which installs its own fault handler,
-> then this is all moot since the default behavior you provide here will
-> be overridden.
-Yes, this is what I really want.
-I wanted the IOMMU driver to provide default fault handler to its users
-that does not provide fault handler for debugging purpose.
-If a user want to handle MMU fault, IOMMU driver welcomes to overwrite
-the existing 'default' fault handler.
+Blech.  Oh well.  Not much point in doing something different if x86
+uses a void*.
 
-> If you're not having an IOMMU user which installs its own fault
-> handler, then just provide the default behavior in your irq handler,
-> regardless whether you report the fault to the IOMMU core or not. Or
-> only when it fails. and yes, we can provide different error values for
-> different scenarios. it's not rocket science :).
->
-> Really, there's a myriad of ways to do this right. Please explain your
-> exact settings/use-case and I'll gladly help you find a clean
-> solution.
->
-Thank you.
-
-As I explained before, MMU fault in our system is abnormal and
-the situation cannot be recovered because mapping information is set up
-completely before System MMU starts address translation with the mapping
-information.
-However we have to capture the MMU fault for debugging purpose.
-That's why our fault handler just prints debugging messages and
-generates kernel OOPS
-
-A user of IOMMU may handle MMU faults due to the following reason:
- - Its IOMMU sees the virtual address space of the user process (IOMMU
-refers the page table of CPU)
-   and virtual memory region allocated by userspace is not filled with
-physical memory.
-   Device driver which is user of IOMMU does not call get_user_pages()
-for the region but
-   handle page fault generated by IOMMU.
- - A device driver working in the Monitor mode in ARM processors need
-to protect a memory region
-   from access in the Normal mode. If it happens, the device driver
-must catch the situation,
-   stop the current operation and inform the problem to the userspace.
-
-For the above reasons, some user of IOMMU may override the default
-fault handler.
-
-> Thanks,
-> Ohad.
-
-Thanks and regards,
-Cho KyongHo.
+g.
