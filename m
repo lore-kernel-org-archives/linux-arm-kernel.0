@@ -1,99 +1,62 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 27 Sep 2011 18:19:47 +0800
-Subject: [PATCH v2 16/16] ARM: GIC: Make MULTI_IRQ_HANDLER mandatory
-In-Reply-To: <4E818A1A.2090906@arm.com>
+Date: Tue, 27 Sep 2011 18:20:39 +0800
+Subject: [PATCH v2 00/16] Switch GIC users (and omap2plus) to
+	CONFIG_MULTI_IRQ_HANDLER
+In-Reply-To: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
 References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-	<1317034955-1029-17-git-send-email-marc.zyngier@arm.com>
-	<20110927034350.GA17997@S2100-06.ap.freescale.net>
-	<4E818A1A.2090906@arm.com>
-Message-ID: <20110927101946.GB17997@S2100-06.ap.freescale.net>
+Message-ID: <20110927102039.GC17997@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 09:32:26AM +0100, Marc Zyngier wrote:
-> Hi Shawn,
+On Mon, Sep 26, 2011 at 12:02:19PM +0100, Marc Zyngier wrote:
+> In order to support multiple primary interrupt controllers in the same
+> image, it is necessary to use the MULTI_IRQ_HANDLER config option.
 > 
-> On 27/09/11 04:43, Shawn Guo wrote:
-> > On Mon, Sep 26, 2011 at 12:02:35PM +0100, Marc Zyngier wrote:
-> >> Now that MULTI_IRQ_HANDLER is selected by all the in-tree
-> >> GIC users, make it mandatory and remove the unused macros.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm/Kconfig                                |    3 -
-> >>  arch/arm/common/Kconfig                         |    1 +
-> >>  arch/arm/common/gic.c                           |    2 +-
-> >>  arch/arm/include/asm/hardware/entry-macro-gic.S |   60 -----------------------
-> >>  arch/arm/include/asm/hardware/gic.h             |    1 -
-> >>  arch/arm/mach-msm/Kconfig                       |    2 -
-> >>  arch/arm/mach-omap2/Kconfig                     |    1 +
-> >>  arch/arm/mach-tegra/Kconfig                     |    1 -
-> >>  arch/arm/mach-ux500/Kconfig                     |    1 -
-> >>  arch/arm/plat-omap/Kconfig                      |    1 -
-> >>  10 files changed, 3 insertions(+), 70 deletions(-)
-> >>  delete mode 100644 arch/arm/include/asm/hardware/entry-macro-gic.S
-> >>
-> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> >> index 0514264..d3e246c 100644
-> >> --- a/arch/arm/Kconfig
-> >> +++ b/arch/arm/Kconfig
-> >> @@ -334,7 +334,6 @@ config ARCH_CNS3XXX
-> >>  	select ARM_GIC
-> >>  	select MIGHT_HAVE_PCI
-> >>  	select PCI_DOMAINS if PCI
-> >> -	select MULTI_IRQ_HANDLER
-> >>  	help
-> >>  	  Support for Cavium Networks CNS3XXX platform.
-> >>  
-> >> @@ -788,7 +787,6 @@ config ARCH_EXYNOS4
-> >>  	select HAVE_S3C_RTC if RTC_CLASS
-> >>  	select HAVE_S3C2410_I2C if I2C
-> >>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> >> -	select MULTI_IRQ_HANDLER
-> >>  	help
-> >>  	  Samsung EXYNOS4 series based systems
-> >>  
-> >> @@ -911,7 +909,6 @@ config ARCH_ZYNQ
-> >>  	select ARM_AMBA
-> >>  	select ICST
-> >>  	select USE_OF
-> >> -	select MULTI_IRQ_HANDLER
-> >>  	help
-> >>  	  Support for Xilinx Zynq ARM Cortex A9 Platform
-> >>  endchoice
-> > 
-> > Hi Marc,
-> > 
-> > I'm unsure about your base.  But I have the following platforms in
-> > arch/arm/Kconfig selecting MULTI_IRQ_HANDLER at the end of your series,
-> > which should also be removed from?
-> > 
-> >   ARCH_REALVIEW
-> >   ARCH_VEXPRESS
+> This patch series makes a first step in that direction by:
+> - having the GIC code to provides a global handler,
+> - make GIC users to provide this handler from their machine descriptor.
 > 
-> These two can be indeed removed, as they are GIC users and GIC now
-> selects MULTI_IRQ_HANDLER directly. I'll fix the patch.
+> A side effect of this is that it forces OMAP2/3 platforms to be
+> converted too in order to preserve the MULTI_OMAP feature. This leads
+> to a certain simplification of the interrupt handling for the
+> OMAP2/3/4 platforms.
 > 
-> >   ARCH_PXA
+> The primary IRQ handlers have been written in C, and the performance
+> degradation is hardly noticeable. Should some tests reveal a major
+> increase in latency, it is always possible to restore the ASM version.
 > 
-> PXA doesn't use the GIC, so it has to select MULTI_IRQ_HANDLER directly
-> as it used to before my patch.
+> This series has been tested on VE (A9, A5, A15), PB11MP, Panda, IGEPv2
+> and Harmony. Patches against next-20110926 plus my PPI series.
 > 
-Ah, yes.  I missed that the MULTI_IRQ_HANDLER was selected by ARM_GIC
-in arch/arm/common/Kconfig.
+> From v1:
+> - Add forgotten patch to make global handler and MULTI_IRQ_HANDLER
+>   mutually exclusive.
+> - Introduce handle_IPI(), which is similar to do_IP() and callable
+>   from C code.
+> 
+> Marc Zyngier (16):
+>   ARM: Make global handler and CONFIG_MULTI_IRQ_HANDLER mutually
+>     exclusive
+>   ARM: smp: Add an IPI handler callable from C code
+>   ARM: GIC: Add global gic_handle_irq() function
+>   ARM: RealView: convert to CONFIG_MULTI_IRQ_HANDLER
+>   ARM: VExpress: convert to CONFIG_MULTI_IRQ_HANDLER
+>   ARM: msm: convert SMP platforms to CONFIG_MULTI_IRQ_HANDLER
+>   ARM: GIC: Add global gic_handle_irq_offset() function
+>   ARM: exynos4: convert to CONFIG_MULTI_IRQ_HANDLER
+>   ARM: tegra2: convert to CONFIG_MULTI_IRQ_HANDLER
+>   ARM: ux500: convert to CONFIG_MULTI_IRQ_HANDLER
+>   ARM: shmobile: convert smp platforms to gic_handle_irq()
+>   ARM: cns3xxx: convert to CONFIG_MULTI_IRQ_HANDLER
+>   ARM: zynq: convert to CONFIG_MULTI_IRQ_HANDLER
+>   ARM: omap2/3: Add global omap2/3_intc_handle_irq() functions
+>   ARM: omap2plus: convert to CONFIG_MULTI_IRQ_HANDLER
+>   ARM: GIC: Make MULTI_IRQ_HANDLER mandatory
+> 
+On imx6q:
 
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
+
+-- 
 Regards,
 Shawn
-
-> >   ARCH_SHMOBILE
-> 
-> This one is caught in the middle. Only SMP shmobile platforms use the
-> GIC, but they all need MULTI_IRQ_HANDLER anyway, so keeping the option
-> selected doesn't hurt.
-> 
-> Cheers,
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
-> 
