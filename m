@@ -1,75 +1,35 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 27 Sep 2011 15:26:29 +0300
-Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
-	supported by the hardware
-In-Reply-To: <20110927100505.GH2138@amd.com>
-References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
-	<1316195506-9777-2-git-send-email-ohad@wizery.com>
-	<20110927100505.GH2138@amd.com>
-Message-ID: <CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 27 Sep 2011 08:31:44 -0400 (EDT)
+Subject: Pull request: removal of most instances of mach/memory.h
+In-Reply-To: <20110927072156.GQ22455@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1109260952490.2718@xanadu.home>
+	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
+	<20110926191055.GP22455@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109261514330.2718@xanadu.home>
+	<alpine.LFD.2.00.1109261606210.2718@xanadu.home>
+	<20110926223839.GB23680@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109261901550.2718@xanadu.home>
+	<20110926232943.GD23680@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109262028310.2718@xanadu.home>
+	<alpine.LFD.2.00.1109262047290.2718@xanadu.home>
+	<20110927072156.GQ22455@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1109270829360.2718@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 1:05 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> On Fri, Sep 16, 2011 at 01:51:41PM -0400, Ohad Ben-Cohen wrote:
->> ?int iommu_map(struct iommu_domain *domain, unsigned long iova,
->> - ? ? ? ? ? ? phys_addr_t paddr, int gfp_order, int prot)
->> + ? ? ? ? ? ? phys_addr_t paddr, size_t size, int prot)
->> ?{
->> - ? ? ? size_t size;
->> + ? ? ? int ret = 0;
->> +
->> + ? ? ? /*
->> + ? ? ? ?* both the virtual address and the physical one, as well as
->> + ? ? ? ?* the size of the mapping, must be aligned (at least) to the
->> + ? ? ? ?* size of the smallest page supported by the hardware
->> + ? ? ? ?*/
->> + ? ? ? if (!IS_ALIGNED(iova | paddr | size, iommu_min_pagesz)) {
->> + ? ? ? ? ? ? ? pr_err("unaligned: iova 0x%lx pa 0x%lx size 0x%lx min_pagesz "
->> + ? ? ? ? ? ? ? ? ? ? ? "0x%x\n", iova, (unsigned long)paddr,
->> + ? ? ? ? ? ? ? ? ? ? ? (unsigned long)size, iommu_min_pagesz);
->> + ? ? ? ? ? ? ? return -EINVAL;
->> + ? ? ? }
->> +
->> + ? ? ? pr_debug("map: iova 0x%lx pa 0x%lx size 0x%lx\n", iova,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (unsigned long)paddr, (unsigned long)size);
->> +
->> + ? ? ? while (size) {
->> + ? ? ? ? ? ? ? unsigned long pgsize = iommu_min_pagesz;
->> + ? ? ? ? ? ? ? unsigned long idx = iommu_min_page_idx;
->> + ? ? ? ? ? ? ? unsigned long addr_merge = iova | paddr;
->> + ? ? ? ? ? ? ? int order;
->> +
->> + ? ? ? ? ? ? ? /* find the max page size with which iova, paddr are aligned */
->> + ? ? ? ? ? ? ? for (;;) {
->> + ? ? ? ? ? ? ? ? ? ? ? unsigned long try_pgsize;
->> +
->> + ? ? ? ? ? ? ? ? ? ? ? idx = find_next_bit(iommu_pgsize_bitmap,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? iommu_nr_page_bits, idx + 1);
->> +
->> + ? ? ? ? ? ? ? ? ? ? ? /* no more pages to check ? */
->> + ? ? ? ? ? ? ? ? ? ? ? if (idx >= iommu_nr_page_bits)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->> +
->> + ? ? ? ? ? ? ? ? ? ? ? try_pgsize = 1 << idx;
->>
->> - ? ? ? size ? ? ? ? = 0x1000UL << gfp_order;
->> + ? ? ? ? ? ? ? ? ? ? ? /* page too big ? addresses not aligned ? */
->> + ? ? ? ? ? ? ? ? ? ? ? if (size < try_pgsize ||
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? !IS_ALIGNED(addr_merge, try_pgsize))
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
->>
->> - ? ? ? BUG_ON(!IS_ALIGNED(iova | paddr, size));
->> + ? ? ? ? ? ? ? ? ? ? ? pgsize = try_pgsize;
->> + ? ? ? ? ? ? ? }
->
-> With an unsigned long you can use plain and fast bit_ops instead of the
-> full bitmap functions.
+On Tue, 27 Sep 2011, Russell King - ARM Linux wrote:
 
-Not sure I follow; the only bit operation I'm using while mapping is
-find_next_bit() (which is a bitops.h method).
+> The fact of the matter is that you should have said in the final pull
+> request that you'd also sent one of the patches to the patch system
+> _whether_ _or_ _not_ it was applied.  Whether it was applied or not
+> is completely irrelevant - because either way it requires some action
+> (either to remove it from my git tree if applied _OR_ discard it from
+> the patch system if not.)
+> 
+> The fact you didn't mention it in the final pull request at all is the
+> problem.
 
-What other faster variant are you referring to ?
+Yes, you'reright.
 
-Thanks,
-Ohad.
+
+Nicolas
