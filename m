@@ -1,48 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Sep 2011 10:30:48 -0700
-Subject: [PATCH v3 5/6] OMAP: omap_device: Create a default
-	omap_device_pm_latency
-In-Reply-To: <1317143886-13285-6-git-send-email-b-cousson@ti.com>
-References: <1317143886-13285-1-git-send-email-b-cousson@ti.com>
-	<1317143886-13285-6-git-send-email-b-cousson@ti.com>
-Message-ID: <20110927173048.GM6324@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 27 Sep 2011 10:36:24 -0700
+Subject: [PATCH v2 2/3] arm/tegra: add support for ventana pinmuxing
+In-Reply-To: <1317143421-27286-3-git-send-email-pdeschrijver@nvidia.com>
+References: <1317143421-27286-1-git-send-email-pdeschrijver@nvidia.com>
+	<1317143421-27286-3-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <CAOesGMjqhGYUQ2XmuBBTBSUA6mKnOLF=Hmi86hRQhLiUMPtiBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [110927 09:45]:
-> Most devices are using the same default omap_device_pm_latency structure
-> during device built. In order to avoid the duplication of the same
-> structure everywhere, add a default structure that will be used if
-> the device does not have an explicit one.
-> 
-> Next patches will clean the duplicated structures.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/plat-omap/omap_device.c |   19 ++++++++++++++++++-
->  1 files changed, 18 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index f832f92..cd8d977 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -97,6 +97,14 @@
->  static int omap_device_register(struct platform_device *pdev);
->  static int omap_early_device_register(struct platform_device *pdev);
->  
-> +static struct omap_device_pm_latency omap_default_latency[] = {
-> +	{
-> +		.deactivate_func = omap_device_idle_hwmods,
-> +		.activate_func   = omap_device_enable_hwmods,
-> +		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-> +	}
-> +};
-> +
->  /* Private functions */
+Hi,
 
-Isn't this racey between devices if the latency values get adjusted
-automatically for each device?
+The series looks reasonable to me, I'll apply it together with some of
+the other pending tegra patches from the list. Once Stephen's pinmux
+devicetree code is in place some of this can be removed.
 
-Tony
+One comment on this patch description though:
+
+
+On Tue, Sep 27, 2011 at 10:10 AM, Peter De Schrijver
+<pdeschrijver@nvidia.com> wrote:
+> Add support for ventana pinmuxing as a seaboard derivative. This is a cut down
+> version of chromeos kernel commit 772f1b56e713be7a55759c2d5eadb9eb11d078db
+> by Jong Kim <jongk@nvidia.com>.
+
+Having a reference to a SHA1 in a foreign source tree isn't really
+useful in the mainline kernel commit log.
+
+I would just phrase it "This is a cut down version of work done by <....>"
+
+
+-Olof
