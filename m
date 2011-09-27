@@ -1,63 +1,41 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 27 Sep 2011 16:25:12 +0300
-Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel Summit
-	2011
-In-Reply-To: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-Message-ID: <4E81CEB8.4090908@compulab.co.il>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 27 Sep 2011 16:28:37 +0300
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <20110927131222.GL2138@amd.com>
+References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
+	<1316195506-9777-2-git-send-email-ohad@wizery.com>
+	<20110927100505.GH2138@amd.com>
+	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
+	<20110927131222.GL2138@amd.com>
+Message-ID: <CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/11 09:00, Grant Likely wrote:
-> 
-> Agenda proposals (Thanks to Nicolas and Olof):
-> - DT bindings for GPIO and pin mux
-> - the pin mux subsystem from linusw (especially if it is still RFC by
->  then)
-> - progress with the single zImage work
-> - presentation/status of the DMA and memory management work wrt CMA
->  (some SOC specific hacks should go away once this is available)
-> - DT porting progress
-> - boot architecture status
-> - Report from Arnd on experiences from first arm-soc merge window
->   - what worked well and where's room for improvement?
->   - Any particular SoC workflow that should be tuned to make his life easier?
->   - Where are the gaps where he needs help right now?
->   - How did it work out for the SoC maintainers?
-> 
-> Still accepting more proposals.  Send me the topics you are burning to discuss.
+On Tue, Sep 27, 2011 at 4:12 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> You pass a pointer to an unsigned long for the page-size bitmap. This
+> allows to use an array of unsigned long. But a single unsigned long is
+> sufficient
 
-One of the LPC2011's bottom lines was:
-"We need more people involved in ARM maintainership to help
-the sub-architecture maintainers do a better job on
-review/consolidation/generalization/etc. of the code."
+This is fine; I can change that if you like it better (though without
+doing the change below this is probably moot).
 
-Despite the major goal of the DT to reduce the SoC and
-board specific code to absolute minimum, there will still be cases
-(e.g. discrete power management circuitry) when there is no
-appropriate DT solution available and the board file
-is a necessity. Also there are already many boards that will remain
-and will not be converted to DT.
+> and you can use functions like ffs() and fls() together with
+> shifting. These functions often translate to a single intruction in the
+> binary. The find_next_bit function has much more overhead because it
+> needs to handle the array-of-ulong case.
 
-Bringing all the above together, I'd like to propose a new "job"
-for maintaining board specific code on a cross-platform basis.
+So you're suggesting to re-implement find_next_bit() using ffs()/fls()
+and shifting ?
 
-Pros:
-1) There might (I have not checked this, but I'm sure there is) be
-code in the existing board files (that are not likely to go away
-at least in a couple of years) that can be consolidated and
-may be even in a cross-platform manner.
-2) Lower the work load from SoC maintainers (that don't have enough
-time to care much about the board specific changes).
-3) Some more eyes to review the newly submitted code.
+What's the point ?
 
-Cons:
-1) Resulting overhead for the code to go upstream.
-2) Possible addition of merge conflicts.
+Sure, if we'll have a proven performance issue while using
+find_next_bit() we can think of doing this, but at this stage, this
+sounds to me like a premature optimization which isn't too elegant.
 
+At this point I strongly prefer readable, maintainable and easier to
+debug code over optimization which isn't proven to be necessary.
 
-I'd like to hear, what do you think of the above proposal?
-
--- 
-Regards,
-Igor.
+Thanks,
+Ohad.
