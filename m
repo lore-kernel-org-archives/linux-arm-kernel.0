@@ -1,37 +1,36 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 27 Sep 2011 05:44:10 +0530
-Subject: [PATCH v7 REPOST 14/24] gpio/omap: remove unnecessary bit-masking for
-	read access
+Date: Tue, 27 Sep 2011 05:44:12 +0530
+Subject: [PATCH v7 REPOST 16/24] gpio/omap: fix bankwidth for OMAP7xx MPUIO
 In-Reply-To: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
 References: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1317082460-31706-15-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1317082460-31706-17-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove un-necessary bit masking. Since the register are 4 byte aligned
-and readl would work as is. The 'enabled' mask is already taking care
-to mask for bank width.
+From: Charulatha V <charu@ti.com>
+
+In all OMAP1 SoCs, the MPUIO bank width is 16 bits. But, in OMAP7xx,
+it is wrongly initialised to 32. Fix this.
 
 Signed-off-by: Charulatha V <charu@ti.com>
-Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap1/gpio7xx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 876e387..196884e 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -571,9 +571,6 @@ static void gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 		enabled = _get_gpio_irqbank_mask(bank);
- 		isr_saved = isr = __raw_readl(isr_reg) & enabled;
+diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+index 433491c..4771d6b 100644
+--- a/arch/arm/mach-omap1/gpio7xx.c
++++ b/arch/arm/mach-omap1/gpio7xx.c
+@@ -52,8 +52,8 @@ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
  
--		if (cpu_is_omap15xx() && (bank->method == METHOD_MPUIO))
--			isr &= 0x0000ffff;
--
- 		if (bank->level_mask)
- 			level_mask = bank->level_mask & enabled;
- 
+ static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
+ 	.virtual_irq_start	= IH_MPUIO_BASE,
+-	.bank_width		= 32,
+ 	.is_mpuio		= true,
++	.bank_width		= 16,
+ 	.bank_stride		= 2,
+ 	.regs                   = &omap7xx_mpuio_regs,
+ };
 -- 
 1.7.0.4
