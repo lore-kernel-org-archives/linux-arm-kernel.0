@@ -1,734 +1,771 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 27 Sep 2011 12:56:45 +0200
-Subject: [PATCH 1/2 v2] plat-pxa: move PXA GPIO driver to GPIO subsystem
-Message-ID: <1317121005-4716-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 27 Sep 2011 12:56:54 +0200
+Subject: [PATCH 2/2 v2] plat-pxa: break out GPIO driver specifics
+Message-ID: <1317121014-4749-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-As per example from the other ARM boards, push the PXA
-GPIO driver down to the GPIO subsystem so it can be consolidated.
+The <mach/gpio.h> file is included from upper directories
+and deal with generic GPIO and gpiolib stuff. Break out the
+platform and driver specific defines and functions into its own
+header file.
 
+Cc: Eric Miao <eric.y.miao@gmail.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/plat-pxa/Makefile |    1 -
- arch/arm/plat-pxa/gpio.c   |  336 --------------------------------------------
- drivers/gpio/Makefile      |    1 +
- drivers/gpio/gpio-pxa.c    |  336 ++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 337 insertions(+), 337 deletions(-)
- delete mode 100644 arch/arm/plat-pxa/gpio.c
- create mode 100644 drivers/gpio/gpio-pxa.c
+ arch/arm/mach-mmp/aspenite.c               |    1 +
+ arch/arm/mach-mmp/brownstone.c             |    1 -
+ arch/arm/mach-mmp/gplugd.c                 |    2 +-
+ arch/arm/mach-mmp/include/mach/gpio-pxa.h  |   30 ++++++
+ arch/arm/mach-mmp/include/mach/gpio.h      |   23 -----
+ arch/arm/mach-mmp/jasper.c                 |    1 -
+ arch/arm/mach-mmp/mmp2.c                   |    2 +-
+ arch/arm/mach-mmp/pxa168.c                 |    2 +-
+ arch/arm/mach-mmp/pxa910.c                 |    2 +-
+ arch/arm/mach-mmp/tavorevb.c               |    1 +
+ arch/arm/mach-pxa/cm-x255.c                |    1 -
+ arch/arm/mach-pxa/include/mach/gpio-pxa.h  |  133 ++++++++++++++++++++++++++++
+ arch/arm/mach-pxa/include/mach/gpio.h      |  110 +----------------------
+ arch/arm/mach-pxa/include/mach/littleton.h |    2 +-
+ arch/arm/mach-pxa/irq.c                    |    2 +-
+ arch/arm/mach-pxa/mfp-pxa2xx.c             |    1 +
+ arch/arm/mach-pxa/pxa25x.c                 |    1 +
+ arch/arm/mach-pxa/pxa27x.c                 |    1 +
+ arch/arm/mach-pxa/pxa3xx.c                 |    2 +-
+ arch/arm/mach-pxa/pxa95x.c                 |    2 +-
+ arch/arm/mach-pxa/saarb.c                  |    1 +
+ arch/arm/plat-pxa/include/plat/gpio-pxa.h  |   44 +++++++++
+ arch/arm/plat-pxa/include/plat/gpio.h      |   40 +--------
+ drivers/gpio/gpio-pxa.c                    |    2 +
+ 24 files changed, 227 insertions(+), 180 deletions(-)
+ create mode 100644 arch/arm/mach-mmp/include/mach/gpio-pxa.h
+ create mode 100644 arch/arm/mach-pxa/include/mach/gpio-pxa.h
+ create mode 100644 arch/arm/plat-pxa/include/plat/gpio-pxa.h
 
-diff --git a/arch/arm/plat-pxa/Makefile b/arch/arm/plat-pxa/Makefile
-index 3aca5ba..f302d04 100644
---- a/arch/arm/plat-pxa/Makefile
-+++ b/arch/arm/plat-pxa/Makefile
-@@ -4,7 +4,6 @@
- 
- obj-y	:= dma.o
- 
--obj-$(CONFIG_GENERIC_GPIO)	+= gpio.o
- obj-$(CONFIG_PXA3xx)		+= mfp.o
- obj-$(CONFIG_PXA95x)		+= mfp.o
- obj-$(CONFIG_ARCH_MMP)		+= mfp.o
-diff --git a/arch/arm/plat-pxa/gpio.c b/arch/arm/plat-pxa/gpio.c
-deleted file mode 100644
-index 5d6a86b..0000000
---- a/arch/arm/plat-pxa/gpio.c
-+++ /dev/null
-@@ -1,336 +0,0 @@
--/*
-- *  linux/arch/arm/plat-pxa/gpio.c
-- *
-- *  Generic PXA GPIO handling
-- *
-- *  Author:	Nicolas Pitre
-- *  Created:	Jun 15, 2001
-- *  Copyright:	MontaVista Software Inc.
-- *
-- *  This program is free software; you can redistribute it and/or modify
-- *  it under the terms of the GNU General Public License version 2 as
-- *  published by the Free Software Foundation.
-- */
--#include <linux/gpio.h>
--#include <linux/init.h>
--#include <linux/irq.h>
--#include <linux/io.h>
--#include <linux/syscore_ops.h>
--#include <linux/slab.h>
--
--int pxa_last_gpio;
--
--struct pxa_gpio_chip {
--	struct gpio_chip chip;
--	void __iomem	*regbase;
--	char label[10];
--
--	unsigned long	irq_mask;
--	unsigned long	irq_edge_rise;
--	unsigned long	irq_edge_fall;
--
--#ifdef CONFIG_PM
--	unsigned long	saved_gplr;
--	unsigned long	saved_gpdr;
--	unsigned long	saved_grer;
--	unsigned long	saved_gfer;
--#endif
--};
--
--static DEFINE_SPINLOCK(gpio_lock);
--static struct pxa_gpio_chip *pxa_gpio_chips;
--
--#define for_each_gpio_chip(i, c)			\
--	for (i = 0, c = &pxa_gpio_chips[0]; i <= pxa_last_gpio; i += 32, c++)
--
--static inline void __iomem *gpio_chip_base(struct gpio_chip *c)
--{
--	return container_of(c, struct pxa_gpio_chip, chip)->regbase;
--}
--
--static inline struct pxa_gpio_chip *gpio_to_pxachip(unsigned gpio)
--{
--	return &pxa_gpio_chips[gpio_to_bank(gpio)];
--}
--
--static int pxa_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
--{
--	void __iomem *base = gpio_chip_base(chip);
--	uint32_t value, mask = 1 << offset;
--	unsigned long flags;
--
--	spin_lock_irqsave(&gpio_lock, flags);
--
--	value = __raw_readl(base + GPDR_OFFSET);
--	if (__gpio_is_inverted(chip->base + offset))
--		value |= mask;
--	else
--		value &= ~mask;
--	__raw_writel(value, base + GPDR_OFFSET);
--
--	spin_unlock_irqrestore(&gpio_lock, flags);
--	return 0;
--}
--
--static int pxa_gpio_direction_output(struct gpio_chip *chip,
--				     unsigned offset, int value)
--{
--	void __iomem *base = gpio_chip_base(chip);
--	uint32_t tmp, mask = 1 << offset;
--	unsigned long flags;
--
--	__raw_writel(mask, base + (value ? GPSR_OFFSET : GPCR_OFFSET));
--
--	spin_lock_irqsave(&gpio_lock, flags);
--
--	tmp = __raw_readl(base + GPDR_OFFSET);
--	if (__gpio_is_inverted(chip->base + offset))
--		tmp &= ~mask;
--	else
--		tmp |= mask;
--	__raw_writel(tmp, base + GPDR_OFFSET);
--
--	spin_unlock_irqrestore(&gpio_lock, flags);
--	return 0;
--}
--
--static int pxa_gpio_get(struct gpio_chip *chip, unsigned offset)
--{
--	return __raw_readl(gpio_chip_base(chip) + GPLR_OFFSET) & (1 << offset);
--}
--
--static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
--{
--	__raw_writel(1 << offset, gpio_chip_base(chip) +
--				(value ? GPSR_OFFSET : GPCR_OFFSET));
--}
--
--static int __init pxa_init_gpio_chip(int gpio_end)
--{
--	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
--	struct pxa_gpio_chip *chips;
--
--	chips = kzalloc(nbanks * sizeof(struct pxa_gpio_chip), GFP_KERNEL);
--	if (chips == NULL) {
--		pr_err("%s: failed to allocate GPIO chips\n", __func__);
--		return -ENOMEM;
--	}
--
--	for (i = 0, gpio = 0; i < nbanks; i++, gpio += 32) {
--		struct gpio_chip *c = &chips[i].chip;
--
--		sprintf(chips[i].label, "gpio-%d", i);
--		chips[i].regbase = (void __iomem *)GPIO_BANK(i);
--
--		c->base  = gpio;
--		c->label = chips[i].label;
--
--		c->direction_input  = pxa_gpio_direction_input;
--		c->direction_output = pxa_gpio_direction_output;
--		c->get = pxa_gpio_get;
--		c->set = pxa_gpio_set;
--
--		/* number of GPIOs on last bank may be less than 32 */
--		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
--		gpiochip_add(c);
--	}
--	pxa_gpio_chips = chips;
--	return 0;
--}
--
--/* Update only those GRERx and GFERx edge detection register bits if those
-- * bits are set in c->irq_mask
-- */
--static inline void update_edge_detect(struct pxa_gpio_chip *c)
--{
--	uint32_t grer, gfer;
--
--	grer = __raw_readl(c->regbase + GRER_OFFSET) & ~c->irq_mask;
--	gfer = __raw_readl(c->regbase + GFER_OFFSET) & ~c->irq_mask;
--	grer |= c->irq_edge_rise & c->irq_mask;
--	gfer |= c->irq_edge_fall & c->irq_mask;
--	__raw_writel(grer, c->regbase + GRER_OFFSET);
--	__raw_writel(gfer, c->regbase + GFER_OFFSET);
--}
--
--static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
--{
--	struct pxa_gpio_chip *c;
--	int gpio = irq_to_gpio(d->irq);
--	unsigned long gpdr, mask = GPIO_bit(gpio);
--
--	c = gpio_to_pxachip(gpio);
--
--	if (type == IRQ_TYPE_PROBE) {
--		/* Don't mess with enabled GPIOs using preconfigured edges or
--		 * GPIOs set to alternate function or to output during probe
--		 */
--		if ((c->irq_edge_rise | c->irq_edge_fall) & GPIO_bit(gpio))
--			return 0;
--
--		if (__gpio_is_occupied(gpio))
--			return 0;
--
--		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
--	}
--
--	gpdr = __raw_readl(c->regbase + GPDR_OFFSET);
--
--	if (__gpio_is_inverted(gpio))
--		__raw_writel(gpdr | mask,  c->regbase + GPDR_OFFSET);
--	else
--		__raw_writel(gpdr & ~mask, c->regbase + GPDR_OFFSET);
--
--	if (type & IRQ_TYPE_EDGE_RISING)
--		c->irq_edge_rise |= mask;
--	else
--		c->irq_edge_rise &= ~mask;
--
--	if (type & IRQ_TYPE_EDGE_FALLING)
--		c->irq_edge_fall |= mask;
--	else
--		c->irq_edge_fall &= ~mask;
--
--	update_edge_detect(c);
--
--	pr_debug("%s: IRQ%d (GPIO%d) - edge%s%s\n", __func__, d->irq, gpio,
--		((type & IRQ_TYPE_EDGE_RISING)  ? " rising"  : ""),
--		((type & IRQ_TYPE_EDGE_FALLING) ? " falling" : ""));
--	return 0;
--}
--
--static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
--{
--	struct pxa_gpio_chip *c;
--	int loop, gpio, gpio_base, n;
--	unsigned long gedr;
--
--	do {
--		loop = 0;
--		for_each_gpio_chip(gpio, c) {
--			gpio_base = c->chip.base;
--
--			gedr = __raw_readl(c->regbase + GEDR_OFFSET);
--			gedr = gedr & c->irq_mask;
--			__raw_writel(gedr, c->regbase + GEDR_OFFSET);
--
--			n = find_first_bit(&gedr, BITS_PER_LONG);
--			while (n < BITS_PER_LONG) {
--				loop = 1;
--
--				generic_handle_irq(gpio_to_irq(gpio_base + n));
--				n = find_next_bit(&gedr, BITS_PER_LONG, n + 1);
--			}
--		}
--	} while (loop);
--}
--
--static void pxa_ack_muxed_gpio(struct irq_data *d)
--{
--	int gpio = irq_to_gpio(d->irq);
--	struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
--
--	__raw_writel(GPIO_bit(gpio), c->regbase + GEDR_OFFSET);
--}
--
--static void pxa_mask_muxed_gpio(struct irq_data *d)
--{
--	int gpio = irq_to_gpio(d->irq);
--	struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
--	uint32_t grer, gfer;
--
--	c->irq_mask &= ~GPIO_bit(gpio);
--
--	grer = __raw_readl(c->regbase + GRER_OFFSET) & ~GPIO_bit(gpio);
--	gfer = __raw_readl(c->regbase + GFER_OFFSET) & ~GPIO_bit(gpio);
--	__raw_writel(grer, c->regbase + GRER_OFFSET);
--	__raw_writel(gfer, c->regbase + GFER_OFFSET);
--}
--
--static void pxa_unmask_muxed_gpio(struct irq_data *d)
--{
--	int gpio = irq_to_gpio(d->irq);
--	struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
--
--	c->irq_mask |= GPIO_bit(gpio);
--	update_edge_detect(c);
--}
--
--static struct irq_chip pxa_muxed_gpio_chip = {
--	.name		= "GPIO",
--	.irq_ack	= pxa_ack_muxed_gpio,
--	.irq_mask	= pxa_mask_muxed_gpio,
--	.irq_unmask	= pxa_unmask_muxed_gpio,
--	.irq_set_type	= pxa_gpio_irq_type,
--};
--
--void __init pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn)
--{
--	struct pxa_gpio_chip *c;
--	int gpio, irq;
--
--	pxa_last_gpio = end;
--
--	/* Initialize GPIO chips */
--	pxa_init_gpio_chip(end);
--
--	/* clear all GPIO edge detects */
--	for_each_gpio_chip(gpio, c) {
--		__raw_writel(0, c->regbase + GFER_OFFSET);
--		__raw_writel(0, c->regbase + GRER_OFFSET);
--		__raw_writel(~0,c->regbase + GEDR_OFFSET);
--	}
--
--	for (irq  = gpio_to_irq(start); irq <= gpio_to_irq(end); irq++) {
--		irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
--					 handle_edge_irq);
--		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
--	}
--
--	/* Install handler for GPIO>=2 edge detect interrupts */
--	irq_set_chained_handler(mux_irq, pxa_gpio_demux_handler);
--	pxa_muxed_gpio_chip.irq_set_wake = fn;
--}
--
--#ifdef CONFIG_PM
--static int pxa_gpio_suspend(void)
--{
--	struct pxa_gpio_chip *c;
--	int gpio;
--
--	for_each_gpio_chip(gpio, c) {
--		c->saved_gplr = __raw_readl(c->regbase + GPLR_OFFSET);
--		c->saved_gpdr = __raw_readl(c->regbase + GPDR_OFFSET);
--		c->saved_grer = __raw_readl(c->regbase + GRER_OFFSET);
--		c->saved_gfer = __raw_readl(c->regbase + GFER_OFFSET);
--
--		/* Clear GPIO transition detect bits */
--		__raw_writel(0xffffffff, c->regbase + GEDR_OFFSET);
--	}
--	return 0;
--}
--
--static void pxa_gpio_resume(void)
--{
--	struct pxa_gpio_chip *c;
--	int gpio;
--
--	for_each_gpio_chip(gpio, c) {
--		/* restore level with set/clear */
--		__raw_writel( c->saved_gplr, c->regbase + GPSR_OFFSET);
--		__raw_writel(~c->saved_gplr, c->regbase + GPCR_OFFSET);
--
--		__raw_writel(c->saved_grer, c->regbase + GRER_OFFSET);
--		__raw_writel(c->saved_gfer, c->regbase + GFER_OFFSET);
--		__raw_writel(c->saved_gpdr, c->regbase + GPDR_OFFSET);
--	}
--}
--#else
--#define pxa_gpio_suspend	NULL
--#define pxa_gpio_resume		NULL
--#endif
--
--struct syscore_ops pxa_gpio_syscore_ops = {
--	.suspend	= pxa_gpio_suspend,
--	.resume		= pxa_gpio_resume,
--};
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index a4c8ac9..828e9ab 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -40,6 +40,7 @@ obj-$(CONFIG_GPIO_PCA953X)	+= gpio-pca953x.o
- obj-$(CONFIG_GPIO_PCF857X)	+= gpio-pcf857x.o
- obj-$(CONFIG_GPIO_PCH)		+= gpio-pch.o
- obj-$(CONFIG_GPIO_PL061)	+= gpio-pl061.o
-+obj-$(CONFIG_PLAT_PXA)		+= gpio-pxa.o
- obj-$(CONFIG_GPIO_RDC321X)	+= gpio-rdc321x.o
- obj-$(CONFIG_ARCH_SA1100)	+= gpio-sa1100.o
- obj-$(CONFIG_PLAT_SAMSUNG)	+= gpio-samsung.o
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-new file mode 100644
-index 0000000..5d6a86b
---- /dev/null
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -0,0 +1,336 @@
-+/*
-+ *  linux/arch/arm/plat-pxa/gpio.c
-+ *
-+ *  Generic PXA GPIO handling
-+ *
-+ *  Author:	Nicolas Pitre
-+ *  Created:	Jun 15, 2001
-+ *  Copyright:	MontaVista Software Inc.
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2 as
-+ *  published by the Free Software Foundation.
-+ */
+diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+index 2b3b0c6..7a60bbb 100644
+--- a/arch/arm/mach-mmp/aspenite.c
++++ b/arch/arm/mach-mmp/aspenite.c
+@@ -17,6 +17,7 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/interrupt.h>
 +#include <linux/gpio.h>
-+#include <linux/init.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/syscore_ops.h>
-+#include <linux/slab.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-mmp/brownstone.c b/arch/arm/mach-mmp/brownstone.c
+index c79162a..e411252 100644
+--- a/arch/arm/mach-mmp/brownstone.c
++++ b/arch/arm/mach-mmp/brownstone.c
+@@ -14,7 +14,6 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+-#include <linux/gpio.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/max8649.h>
+ #include <linux/regulator/fixed.h>
+diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
+index 98e25d9..32776f3 100644
+--- a/arch/arm/mach-mmp/gplugd.c
++++ b/arch/arm/mach-mmp/gplugd.c
+@@ -9,11 +9,11 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach-types.h>
+ 
+-#include <mach/gpio.h>
+ #include <mach/pxa168.h>
+ #include <mach/mfp-pxa168.h>
+ 
+diff --git a/arch/arm/mach-mmp/include/mach/gpio-pxa.h b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
+new file mode 100644
+index 0000000..c017a98
+--- /dev/null
++++ b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
+@@ -0,0 +1,30 @@
++#ifndef __ASM_MACH_GPIO_PXA_H
++#define __ASM_MACH_GPIO_PXA_H
 +
-+int pxa_last_gpio;
++#include <mach/addr-map.h>
++#include <mach/irqs.h>
 +
-+struct pxa_gpio_chip {
-+	struct gpio_chip chip;
-+	void __iomem	*regbase;
-+	char label[10];
++#define GPIO_REGS_VIRT	(APB_VIRT_BASE + 0x19000)
 +
-+	unsigned long	irq_mask;
-+	unsigned long	irq_edge_rise;
-+	unsigned long	irq_edge_fall;
++#define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
++#define GPIO_REG(x)	(*((volatile u32 *)(GPIO_REGS_VIRT + (x))))
 +
-+#ifdef CONFIG_PM
-+	unsigned long	saved_gplr;
-+	unsigned long	saved_gpdr;
-+	unsigned long	saved_grer;
-+	unsigned long	saved_gfer;
-+#endif
-+};
++#define NR_BUILTIN_GPIO		IRQ_GPIO_NUM
 +
-+static DEFINE_SPINLOCK(gpio_lock);
-+static struct pxa_gpio_chip *pxa_gpio_chips;
++#define gpio_to_bank(gpio)	((gpio) >> 5)
 +
-+#define for_each_gpio_chip(i, c)			\
-+	for (i = 0, c = &pxa_gpio_chips[0]; i <= pxa_last_gpio; i += 32, c++)
-+
-+static inline void __iomem *gpio_chip_base(struct gpio_chip *c)
-+{
-+	return container_of(c, struct pxa_gpio_chip, chip)->regbase;
-+}
-+
-+static inline struct pxa_gpio_chip *gpio_to_pxachip(unsigned gpio)
-+{
-+	return &pxa_gpio_chips[gpio_to_bank(gpio)];
-+}
-+
-+static int pxa_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	void __iomem *base = gpio_chip_base(chip);
-+	uint32_t value, mask = 1 << offset;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&gpio_lock, flags);
-+
-+	value = __raw_readl(base + GPDR_OFFSET);
-+	if (__gpio_is_inverted(chip->base + offset))
-+		value |= mask;
-+	else
-+		value &= ~mask;
-+	__raw_writel(value, base + GPDR_OFFSET);
-+
-+	spin_unlock_irqrestore(&gpio_lock, flags);
-+	return 0;
-+}
-+
-+static int pxa_gpio_direction_output(struct gpio_chip *chip,
-+				     unsigned offset, int value)
-+{
-+	void __iomem *base = gpio_chip_base(chip);
-+	uint32_t tmp, mask = 1 << offset;
-+	unsigned long flags;
-+
-+	__raw_writel(mask, base + (value ? GPSR_OFFSET : GPCR_OFFSET));
-+
-+	spin_lock_irqsave(&gpio_lock, flags);
-+
-+	tmp = __raw_readl(base + GPDR_OFFSET);
-+	if (__gpio_is_inverted(chip->base + offset))
-+		tmp &= ~mask;
-+	else
-+		tmp |= mask;
-+	__raw_writel(tmp, base + GPDR_OFFSET);
-+
-+	spin_unlock_irqrestore(&gpio_lock, flags);
-+	return 0;
-+}
-+
-+static int pxa_gpio_get(struct gpio_chip *chip, unsigned offset)
-+{
-+	return __raw_readl(gpio_chip_base(chip) + GPLR_OFFSET) & (1 << offset);
-+}
-+
-+static void pxa_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	__raw_writel(1 << offset, gpio_chip_base(chip) +
-+				(value ? GPSR_OFFSET : GPCR_OFFSET));
-+}
-+
-+static int __init pxa_init_gpio_chip(int gpio_end)
-+{
-+	int i, gpio, nbanks = gpio_to_bank(gpio_end) + 1;
-+	struct pxa_gpio_chip *chips;
-+
-+	chips = kzalloc(nbanks * sizeof(struct pxa_gpio_chip), GFP_KERNEL);
-+	if (chips == NULL) {
-+		pr_err("%s: failed to allocate GPIO chips\n", __func__);
-+		return -ENOMEM;
-+	}
-+
-+	for (i = 0, gpio = 0; i < nbanks; i++, gpio += 32) {
-+		struct gpio_chip *c = &chips[i].chip;
-+
-+		sprintf(chips[i].label, "gpio-%d", i);
-+		chips[i].regbase = (void __iomem *)GPIO_BANK(i);
-+
-+		c->base  = gpio;
-+		c->label = chips[i].label;
-+
-+		c->direction_input  = pxa_gpio_direction_input;
-+		c->direction_output = pxa_gpio_direction_output;
-+		c->get = pxa_gpio_get;
-+		c->set = pxa_gpio_set;
-+
-+		/* number of GPIOs on last bank may be less than 32 */
-+		c->ngpio = (gpio + 31 > gpio_end) ? (gpio_end - gpio + 1) : 32;
-+		gpiochip_add(c);
-+	}
-+	pxa_gpio_chips = chips;
-+	return 0;
-+}
-+
-+/* Update only those GRERx and GFERx edge detection register bits if those
-+ * bits are set in c->irq_mask
++/* NOTE: these macros are defined here to make optimization of
++ * gpio_{get,set}_value() to work when 'gpio' is a constant.
++ * Usage of these macros otherwise is no longer recommended,
++ * use generic GPIO API whenever possible.
 + */
-+static inline void update_edge_detect(struct pxa_gpio_chip *c)
++#define GPIO_bit(gpio)	(1 << ((gpio) & 0x1f))
++
++#define GPLR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x00)
++#define GPDR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x0c)
++#define GPSR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x18)
++#define GPCR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x24)
++
++#include <plat/gpio-pxa.h>
++
++#endif /* __ASM_MACH_GPIO_PXA_H */
+diff --git a/arch/arm/mach-mmp/include/mach/gpio.h b/arch/arm/mach-mmp/include/mach/gpio.h
+index 7bfb827..68126235 100644
+--- a/arch/arm/mach-mmp/include/mach/gpio.h
++++ b/arch/arm/mach-mmp/include/mach/gpio.h
+@@ -1,36 +1,13 @@
+ #ifndef __ASM_MACH_GPIO_H
+ #define __ASM_MACH_GPIO_H
+ 
+-#include <mach/addr-map.h>
+-#include <mach/irqs.h>
+ #include <asm-generic/gpio.h>
+ 
+-#define GPIO_REGS_VIRT	(APB_VIRT_BASE + 0x19000)
+-
+-#define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+-#define GPIO_REG(x)	(*((volatile u32 *)(GPIO_REGS_VIRT + (x))))
+-
+-#define NR_BUILTIN_GPIO		IRQ_GPIO_NUM
+-
+-#define gpio_to_bank(gpio)	((gpio) >> 5)
+ #define gpio_to_irq(gpio)	(IRQ_GPIO_START + (gpio))
+ #define irq_to_gpio(irq)	((irq) - IRQ_GPIO_START)
+ 
+-
+ #define __gpio_is_inverted(gpio)	(0)
+ #define __gpio_is_occupied(gpio)	(0)
+ 
+-/* NOTE: these macros are defined here to make optimization of
+- * gpio_{get,set}_value() to work when 'gpio' is a constant.
+- * Usage of these macros otherwise is no longer recommended,
+- * use generic GPIO API whenever possible.
+- */
+-#define GPIO_bit(gpio)	(1 << ((gpio) & 0x1f))
+-
+-#define GPLR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x00)
+-#define GPDR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x0c)
+-#define GPSR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x18)
+-#define GPCR(x)		GPIO_REG(BANK_OFF(gpio_to_bank(x)) + 0x24)
+-
+ #include <plat/gpio.h>
+ #endif /* __ASM_MACH_GPIO_H */
+diff --git a/arch/arm/mach-mmp/jasper.c b/arch/arm/mach-mmp/jasper.c
+index 5d6421d..8bfac66 100644
+--- a/arch/arm/mach-mmp/jasper.c
++++ b/arch/arm/mach-mmp/jasper.c
+@@ -14,7 +14,6 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+-#include <linux/gpio.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/max8649.h>
+ #include <linux/mfd/max8925.h>
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index 1935834..65d8689e 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -9,7 +9,6 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/gpio.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -25,6 +24,7 @@
+ #include <mach/irqs.h>
+ #include <mach/dma.h>
+ #include <mach/mfp.h>
++#include <mach/gpio-pxa.h>
+ #include <mach/devices.h>
+ #include <mach/mmp2.h>
+ 
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index e6f6789..76ca15c 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -7,7 +7,6 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/gpio.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -21,6 +20,7 @@
+ #include <mach/regs-apbc.h>
+ #include <mach/regs-apmu.h>
+ #include <mach/irqs.h>
++#include <mach/gpio-pxa.h>
+ #include <mach/dma.h>
+ #include <mach/devices.h>
+ #include <mach/mfp.h>
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index c70b4dd..4ebbfbb 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -7,7 +7,6 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/gpio.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -20,6 +19,7 @@
+ #include <mach/regs-apmu.h>
+ #include <mach/cputype.h>
+ #include <mach/irqs.h>
++#include <mach/gpio-pxa.h>
+ #include <mach/dma.h>
+ #include <mach/mfp.h>
+ #include <mach/devices.h>
+diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
+index 143e52e..eb5be87 100644
+--- a/arch/arm/mach-mmp/tavorevb.c
++++ b/arch/arm/mach-mmp/tavorevb.c
+@@ -12,6 +12,7 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/smc91x.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/mach-pxa/cm-x255.c b/arch/arm/mach-pxa/cm-x255.c
+index 93f59f8..be75147 100644
+--- a/arch/arm/mach-pxa/cm-x255.c
++++ b/arch/arm/mach-pxa/cm-x255.c
+@@ -11,7 +11,6 @@
+ 
+ #include <linux/platform_device.h>
+ #include <linux/irq.h>
+-#include <linux/gpio.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/mtd/nand-gpio.h>
+diff --git a/arch/arm/mach-pxa/include/mach/gpio-pxa.h b/arch/arm/mach-pxa/include/mach/gpio-pxa.h
+new file mode 100644
+index 0000000..41b4c93
+--- /dev/null
++++ b/arch/arm/mach-pxa/include/mach/gpio-pxa.h
+@@ -0,0 +1,133 @@
++/*
++ * Written by Philipp Zabel <philipp.zabel@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ *
++ */
++#ifndef __MACH_PXA_GPIO_PXA_H
++#define __MACH_PXA_GPIO_PXA_H
++
++#include <mach/irqs.h>
++#include <mach/hardware.h>
++
++#define GPIO_REGS_VIRT	io_p2v(0x40E00000)
++
++#define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
++#define GPIO_REG(x)	(*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
++
++/* GPIO Pin Level Registers */
++#define GPLR0		GPIO_REG(BANK_OFF(0) + 0x00)
++#define GPLR1		GPIO_REG(BANK_OFF(1) + 0x00)
++#define GPLR2		GPIO_REG(BANK_OFF(2) + 0x00)
++#define GPLR3		GPIO_REG(BANK_OFF(3) + 0x00)
++
++/* GPIO Pin Direction Registers */
++#define GPDR0		GPIO_REG(BANK_OFF(0) + 0x0c)
++#define GPDR1		GPIO_REG(BANK_OFF(1) + 0x0c)
++#define GPDR2		GPIO_REG(BANK_OFF(2) + 0x0c)
++#define GPDR3		GPIO_REG(BANK_OFF(3) + 0x0c)
++
++/* GPIO Pin Output Set Registers */
++#define GPSR0		GPIO_REG(BANK_OFF(0) + 0x18)
++#define GPSR1		GPIO_REG(BANK_OFF(1) + 0x18)
++#define GPSR2		GPIO_REG(BANK_OFF(2) + 0x18)
++#define GPSR3		GPIO_REG(BANK_OFF(3) + 0x18)
++
++/* GPIO Pin Output Clear Registers */
++#define GPCR0		GPIO_REG(BANK_OFF(0) + 0x24)
++#define GPCR1		GPIO_REG(BANK_OFF(1) + 0x24)
++#define GPCR2		GPIO_REG(BANK_OFF(2) + 0x24)
++#define GPCR3		GPIO_REG(BANK_OFF(3) + 0x24)
++
++/* GPIO Rising Edge Detect Registers */
++#define GRER0		GPIO_REG(BANK_OFF(0) + 0x30)
++#define GRER1		GPIO_REG(BANK_OFF(1) + 0x30)
++#define GRER2		GPIO_REG(BANK_OFF(2) + 0x30)
++#define GRER3		GPIO_REG(BANK_OFF(3) + 0x30)
++
++/* GPIO Falling Edge Detect Registers */
++#define GFER0		GPIO_REG(BANK_OFF(0) + 0x3c)
++#define GFER1		GPIO_REG(BANK_OFF(1) + 0x3c)
++#define GFER2		GPIO_REG(BANK_OFF(2) + 0x3c)
++#define GFER3		GPIO_REG(BANK_OFF(3) + 0x3c)
++
++/* GPIO Edge Detect Status Registers */
++#define GEDR0		GPIO_REG(BANK_OFF(0) + 0x48)
++#define GEDR1		GPIO_REG(BANK_OFF(1) + 0x48)
++#define GEDR2		GPIO_REG(BANK_OFF(2) + 0x48)
++#define GEDR3		GPIO_REG(BANK_OFF(3) + 0x48)
++
++/* GPIO Alternate Function Select Registers */
++#define GAFR0_L		GPIO_REG(0x0054)
++#define GAFR0_U		GPIO_REG(0x0058)
++#define GAFR1_L		GPIO_REG(0x005C)
++#define GAFR1_U		GPIO_REG(0x0060)
++#define GAFR2_L		GPIO_REG(0x0064)
++#define GAFR2_U		GPIO_REG(0x0068)
++#define GAFR3_L		GPIO_REG(0x006C)
++#define GAFR3_U		GPIO_REG(0x0070)
++
++/* More handy macros.  The argument is a literal GPIO number. */
++
++#define GPIO_bit(x)	(1 << ((x) & 0x1f))
++
++#define GPLR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x00)
++#define GPDR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x0c)
++#define GPSR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x18)
++#define GPCR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x24)
++#define GRER(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x30)
++#define GFER(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x3c)
++#define GEDR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x48)
++#define GAFR(x)		GPIO_REG(0x54 + (((x) & 0x70) >> 2))
++
++
++#define NR_BUILTIN_GPIO		PXA_GPIO_IRQ_NUM
++
++#define gpio_to_bank(gpio)	((gpio) >> 5)
++
++#ifdef CONFIG_CPU_PXA26x
++/* GPIO86/87/88/89 on PXA26x have their direction bits in GPDR2 inverted,
++ * as well as their Alternate Function value being '1' for GPIO in GAFRx.
++ */
++static inline int __gpio_is_inverted(unsigned gpio)
 +{
-+	uint32_t grer, gfer;
-+
-+	grer = __raw_readl(c->regbase + GRER_OFFSET) & ~c->irq_mask;
-+	gfer = __raw_readl(c->regbase + GFER_OFFSET) & ~c->irq_mask;
-+	grer |= c->irq_edge_rise & c->irq_mask;
-+	gfer |= c->irq_edge_fall & c->irq_mask;
-+	__raw_writel(grer, c->regbase + GRER_OFFSET);
-+	__raw_writel(gfer, c->regbase + GFER_OFFSET);
-+}
-+
-+static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
-+{
-+	struct pxa_gpio_chip *c;
-+	int gpio = irq_to_gpio(d->irq);
-+	unsigned long gpdr, mask = GPIO_bit(gpio);
-+
-+	c = gpio_to_pxachip(gpio);
-+
-+	if (type == IRQ_TYPE_PROBE) {
-+		/* Don't mess with enabled GPIOs using preconfigured edges or
-+		 * GPIOs set to alternate function or to output during probe
-+		 */
-+		if ((c->irq_edge_rise | c->irq_edge_fall) & GPIO_bit(gpio))
-+			return 0;
-+
-+		if (__gpio_is_occupied(gpio))
-+			return 0;
-+
-+		type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
-+	}
-+
-+	gpdr = __raw_readl(c->regbase + GPDR_OFFSET);
-+
-+	if (__gpio_is_inverted(gpio))
-+		__raw_writel(gpdr | mask,  c->regbase + GPDR_OFFSET);
-+	else
-+		__raw_writel(gpdr & ~mask, c->regbase + GPDR_OFFSET);
-+
-+	if (type & IRQ_TYPE_EDGE_RISING)
-+		c->irq_edge_rise |= mask;
-+	else
-+		c->irq_edge_rise &= ~mask;
-+
-+	if (type & IRQ_TYPE_EDGE_FALLING)
-+		c->irq_edge_fall |= mask;
-+	else
-+		c->irq_edge_fall &= ~mask;
-+
-+	update_edge_detect(c);
-+
-+	pr_debug("%s: IRQ%d (GPIO%d) - edge%s%s\n", __func__, d->irq, gpio,
-+		((type & IRQ_TYPE_EDGE_RISING)  ? " rising"  : ""),
-+		((type & IRQ_TYPE_EDGE_FALLING) ? " falling" : ""));
-+	return 0;
-+}
-+
-+static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct pxa_gpio_chip *c;
-+	int loop, gpio, gpio_base, n;
-+	unsigned long gedr;
-+
-+	do {
-+		loop = 0;
-+		for_each_gpio_chip(gpio, c) {
-+			gpio_base = c->chip.base;
-+
-+			gedr = __raw_readl(c->regbase + GEDR_OFFSET);
-+			gedr = gedr & c->irq_mask;
-+			__raw_writel(gedr, c->regbase + GEDR_OFFSET);
-+
-+			n = find_first_bit(&gedr, BITS_PER_LONG);
-+			while (n < BITS_PER_LONG) {
-+				loop = 1;
-+
-+				generic_handle_irq(gpio_to_irq(gpio_base + n));
-+				n = find_next_bit(&gedr, BITS_PER_LONG, n + 1);
-+			}
-+		}
-+	} while (loop);
-+}
-+
-+static void pxa_ack_muxed_gpio(struct irq_data *d)
-+{
-+	int gpio = irq_to_gpio(d->irq);
-+	struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
-+
-+	__raw_writel(GPIO_bit(gpio), c->regbase + GEDR_OFFSET);
-+}
-+
-+static void pxa_mask_muxed_gpio(struct irq_data *d)
-+{
-+	int gpio = irq_to_gpio(d->irq);
-+	struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
-+	uint32_t grer, gfer;
-+
-+	c->irq_mask &= ~GPIO_bit(gpio);
-+
-+	grer = __raw_readl(c->regbase + GRER_OFFSET) & ~GPIO_bit(gpio);
-+	gfer = __raw_readl(c->regbase + GFER_OFFSET) & ~GPIO_bit(gpio);
-+	__raw_writel(grer, c->regbase + GRER_OFFSET);
-+	__raw_writel(gfer, c->regbase + GFER_OFFSET);
-+}
-+
-+static void pxa_unmask_muxed_gpio(struct irq_data *d)
-+{
-+	int gpio = irq_to_gpio(d->irq);
-+	struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
-+
-+	c->irq_mask |= GPIO_bit(gpio);
-+	update_edge_detect(c);
-+}
-+
-+static struct irq_chip pxa_muxed_gpio_chip = {
-+	.name		= "GPIO",
-+	.irq_ack	= pxa_ack_muxed_gpio,
-+	.irq_mask	= pxa_mask_muxed_gpio,
-+	.irq_unmask	= pxa_unmask_muxed_gpio,
-+	.irq_set_type	= pxa_gpio_irq_type,
-+};
-+
-+void __init pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn)
-+{
-+	struct pxa_gpio_chip *c;
-+	int gpio, irq;
-+
-+	pxa_last_gpio = end;
-+
-+	/* Initialize GPIO chips */
-+	pxa_init_gpio_chip(end);
-+
-+	/* clear all GPIO edge detects */
-+	for_each_gpio_chip(gpio, c) {
-+		__raw_writel(0, c->regbase + GFER_OFFSET);
-+		__raw_writel(0, c->regbase + GRER_OFFSET);
-+		__raw_writel(~0,c->regbase + GEDR_OFFSET);
-+	}
-+
-+	for (irq  = gpio_to_irq(start); irq <= gpio_to_irq(end); irq++) {
-+		irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
-+					 handle_edge_irq);
-+		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+	}
-+
-+	/* Install handler for GPIO>=2 edge detect interrupts */
-+	irq_set_chained_handler(mux_irq, pxa_gpio_demux_handler);
-+	pxa_muxed_gpio_chip.irq_set_wake = fn;
-+}
-+
-+#ifdef CONFIG_PM
-+static int pxa_gpio_suspend(void)
-+{
-+	struct pxa_gpio_chip *c;
-+	int gpio;
-+
-+	for_each_gpio_chip(gpio, c) {
-+		c->saved_gplr = __raw_readl(c->regbase + GPLR_OFFSET);
-+		c->saved_gpdr = __raw_readl(c->regbase + GPDR_OFFSET);
-+		c->saved_grer = __raw_readl(c->regbase + GRER_OFFSET);
-+		c->saved_gfer = __raw_readl(c->regbase + GFER_OFFSET);
-+
-+		/* Clear GPIO transition detect bits */
-+		__raw_writel(0xffffffff, c->regbase + GEDR_OFFSET);
-+	}
-+	return 0;
-+}
-+
-+static void pxa_gpio_resume(void)
-+{
-+	struct pxa_gpio_chip *c;
-+	int gpio;
-+
-+	for_each_gpio_chip(gpio, c) {
-+		/* restore level with set/clear */
-+		__raw_writel( c->saved_gplr, c->regbase + GPSR_OFFSET);
-+		__raw_writel(~c->saved_gplr, c->regbase + GPCR_OFFSET);
-+
-+		__raw_writel(c->saved_grer, c->regbase + GRER_OFFSET);
-+		__raw_writel(c->saved_gfer, c->regbase + GFER_OFFSET);
-+		__raw_writel(c->saved_gpdr, c->regbase + GPDR_OFFSET);
-+	}
++	return cpu_is_pxa25x() && gpio > 85;
 +}
 +#else
-+#define pxa_gpio_suspend	NULL
-+#define pxa_gpio_resume		NULL
++static inline int __gpio_is_inverted(unsigned gpio) { return 0; }
 +#endif
 +
-+struct syscore_ops pxa_gpio_syscore_ops = {
-+	.suspend	= pxa_gpio_suspend,
-+	.resume		= pxa_gpio_resume,
-+};
++/*
++ * On PXA25x and PXA27x, GAFRx and GPDRx together decide the alternate
++ * function of a GPIO, and GPDRx cannot be altered once configured. It
++ * is attributed as "occupied" here (I know this terminology isn't
++ * accurate, you are welcome to propose a better one :-)
++ */
++static inline int __gpio_is_occupied(unsigned gpio)
++{
++	if (cpu_is_pxa27x() || cpu_is_pxa25x()) {
++		int af = (GAFR(gpio) >> ((gpio & 0xf) * 2)) & 0x3;
++		int dir = GPDR(gpio) & GPIO_bit(gpio);
++
++		if (__gpio_is_inverted(gpio))
++			return af != 1 || dir == 0;
++		else
++			return af != 0 || dir != 0;
++	} else
++		return GPDR(gpio) & GPIO_bit(gpio);
++}
++
++#include <plat/gpio-pxa.h>
++#endif /* __MACH_PXA_GPIO_PXA_H */
+diff --git a/arch/arm/mach-pxa/include/mach/gpio.h b/arch/arm/mach-pxa/include/mach/gpio.h
+index c463950..004cade 100644
+--- a/arch/arm/mach-pxa/include/mach/gpio.h
++++ b/arch/arm/mach-pxa/include/mach/gpio.h
+@@ -24,84 +24,10 @@
+ #ifndef __ASM_ARCH_PXA_GPIO_H
+ #define __ASM_ARCH_PXA_GPIO_H
+ 
+-#include <mach/irqs.h>
+-#include <mach/hardware.h>
+ #include <asm-generic/gpio.h>
++/* The defines for the driver are needed for the accelerated accessors */
++#include "gpio-pxa.h"
+ 
+-#define GPIO_REGS_VIRT	io_p2v(0x40E00000)
+-
+-#define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+-#define GPIO_REG(x)	(*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
+-
+-/* GPIO Pin Level Registers */
+-#define GPLR0		GPIO_REG(BANK_OFF(0) + 0x00)
+-#define GPLR1		GPIO_REG(BANK_OFF(1) + 0x00)
+-#define GPLR2		GPIO_REG(BANK_OFF(2) + 0x00)
+-#define GPLR3		GPIO_REG(BANK_OFF(3) + 0x00)
+-
+-/* GPIO Pin Direction Registers */
+-#define GPDR0		GPIO_REG(BANK_OFF(0) + 0x0c)
+-#define GPDR1		GPIO_REG(BANK_OFF(1) + 0x0c)
+-#define GPDR2		GPIO_REG(BANK_OFF(2) + 0x0c)
+-#define GPDR3		GPIO_REG(BANK_OFF(3) + 0x0c)
+-
+-/* GPIO Pin Output Set Registers */
+-#define GPSR0		GPIO_REG(BANK_OFF(0) + 0x18)
+-#define GPSR1		GPIO_REG(BANK_OFF(1) + 0x18)
+-#define GPSR2		GPIO_REG(BANK_OFF(2) + 0x18)
+-#define GPSR3		GPIO_REG(BANK_OFF(3) + 0x18)
+-
+-/* GPIO Pin Output Clear Registers */
+-#define GPCR0		GPIO_REG(BANK_OFF(0) + 0x24)
+-#define GPCR1		GPIO_REG(BANK_OFF(1) + 0x24)
+-#define GPCR2		GPIO_REG(BANK_OFF(2) + 0x24)
+-#define GPCR3		GPIO_REG(BANK_OFF(3) + 0x24)
+-
+-/* GPIO Rising Edge Detect Registers */
+-#define GRER0		GPIO_REG(BANK_OFF(0) + 0x30)
+-#define GRER1		GPIO_REG(BANK_OFF(1) + 0x30)
+-#define GRER2		GPIO_REG(BANK_OFF(2) + 0x30)
+-#define GRER3		GPIO_REG(BANK_OFF(3) + 0x30)
+-
+-/* GPIO Falling Edge Detect Registers */
+-#define GFER0		GPIO_REG(BANK_OFF(0) + 0x3c)
+-#define GFER1		GPIO_REG(BANK_OFF(1) + 0x3c)
+-#define GFER2		GPIO_REG(BANK_OFF(2) + 0x3c)
+-#define GFER3		GPIO_REG(BANK_OFF(3) + 0x3c)
+-
+-/* GPIO Edge Detect Status Registers */
+-#define GEDR0		GPIO_REG(BANK_OFF(0) + 0x48)
+-#define GEDR1		GPIO_REG(BANK_OFF(1) + 0x48)
+-#define GEDR2		GPIO_REG(BANK_OFF(2) + 0x48)
+-#define GEDR3		GPIO_REG(BANK_OFF(3) + 0x48)
+-
+-/* GPIO Alternate Function Select Registers */
+-#define GAFR0_L		GPIO_REG(0x0054)
+-#define GAFR0_U		GPIO_REG(0x0058)
+-#define GAFR1_L		GPIO_REG(0x005C)
+-#define GAFR1_U		GPIO_REG(0x0060)
+-#define GAFR2_L		GPIO_REG(0x0064)
+-#define GAFR2_U		GPIO_REG(0x0068)
+-#define GAFR3_L		GPIO_REG(0x006C)
+-#define GAFR3_U		GPIO_REG(0x0070)
+-
+-/* More handy macros.  The argument is a literal GPIO number. */
+-
+-#define GPIO_bit(x)	(1 << ((x) & 0x1f))
+-
+-#define GPLR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x00)
+-#define GPDR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x0c)
+-#define GPSR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x18)
+-#define GPCR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x24)
+-#define GRER(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x30)
+-#define GFER(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x3c)
+-#define GEDR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x48)
+-#define GAFR(x)		GPIO_REG(0x54 + (((x) & 0x70) >> 2))
+-
+-
+-#define NR_BUILTIN_GPIO		PXA_GPIO_IRQ_NUM
+-
+-#define gpio_to_bank(gpio)	((gpio) >> 5)
+ #define gpio_to_irq(gpio)	IRQ_GPIO(gpio)
+ 
+ static inline int irq_to_gpio(unsigned int irq)
+@@ -118,37 +44,5 @@ static inline int irq_to_gpio(unsigned int irq)
+ 	return -1;
+ }
+ 
+-#ifdef CONFIG_CPU_PXA26x
+-/* GPIO86/87/88/89 on PXA26x have their direction bits in GPDR2 inverted,
+- * as well as their Alternate Function value being '1' for GPIO in GAFRx.
+- */
+-static inline int __gpio_is_inverted(unsigned gpio)
+-{
+-	return cpu_is_pxa25x() && gpio > 85;
+-}
+-#else
+-static inline int __gpio_is_inverted(unsigned gpio) { return 0; }
+-#endif
+-
+-/*
+- * On PXA25x and PXA27x, GAFRx and GPDRx together decide the alternate
+- * function of a GPIO, and GPDRx cannot be altered once configured. It
+- * is attributed as "occupied" here (I know this terminology isn't
+- * accurate, you are welcome to propose a better one :-)
+- */
+-static inline int __gpio_is_occupied(unsigned gpio)
+-{
+-	if (cpu_is_pxa27x() || cpu_is_pxa25x()) {
+-		int af = (GAFR(gpio) >> ((gpio & 0xf) * 2)) & 0x3;
+-		int dir = GPDR(gpio) & GPIO_bit(gpio);
+-
+-		if (__gpio_is_inverted(gpio))
+-			return af != 1 || dir == 0;
+-		else
+-			return af != 0 || dir != 0;
+-	} else
+-		return GPDR(gpio) & GPIO_bit(gpio);
+-}
+-
+ #include <plat/gpio.h>
+ #endif
+diff --git a/arch/arm/mach-pxa/include/mach/littleton.h b/arch/arm/mach-pxa/include/mach/littleton.h
+index 1c585a7..b6238cb 100644
+--- a/arch/arm/mach-pxa/include/mach/littleton.h
++++ b/arch/arm/mach-pxa/include/mach/littleton.h
+@@ -1,7 +1,7 @@
+ #ifndef __ASM_ARCH_LITTLETON_H
+ #define __ASM_ARCH_LITTLETON_H
+ 
+-#include <asm/gpio.h>
++#include <mach/gpio-pxa.h>
+ 
+ #define LITTLETON_ETH_PHYS	0x30000000
+ 
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index dafb4bf..d493a23 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -11,7 +11,6 @@
+  *  it under the terms of the GNU General Public License version 2 as
+  *  published by the Free Software Foundation.
+  */
+-#include <linux/gpio.h>
+ #include <linux/init.h>
+ #include <linux/module.h>
+ #include <linux/interrupt.h>
+@@ -21,6 +20,7 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
++#include <mach/gpio-pxa.h>
+ 
+ #include "generic.h"
+ 
+diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
+index b129527..43a5f68 100644
+--- a/arch/arm/mach-pxa/mfp-pxa2xx.c
++++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
+@@ -20,6 +20,7 @@
+ 
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/mfp-pxa2xx.h>
++#include <mach/gpio-pxa.h>
+ 
+ #include "generic.h"
+ 
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index 6bb3fa5..8746e10 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -24,6 +24,7 @@
+ #include <linux/suspend.h>
+ #include <linux/syscore_ops.h>
+ #include <linux/irq.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/suspend.h>
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index d2cdcd6..2bb5cf8 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -21,6 +21,7 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/i2c/pxa-i2c.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach/map.h>
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index 3ab9e84..f940a13 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -12,7 +12,6 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/gpio.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -26,6 +25,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/suspend.h>
+ #include <mach/hardware.h>
++#include <mach/gpio-pxa.h>
+ #include <mach/pxa3xx-regs.h>
+ #include <mach/reset.h>
+ #include <mach/ohci.h>
+diff --git a/arch/arm/mach-pxa/pxa95x.c b/arch/arm/mach-pxa/pxa95x.c
+index de25ceb..51371b3 100644
+--- a/arch/arm/mach-pxa/pxa95x.c
++++ b/arch/arm/mach-pxa/pxa95x.c
+@@ -9,7 +9,6 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/gpio.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -21,6 +20,7 @@
+ #include <linux/syscore_ops.h>
+ 
+ #include <mach/hardware.h>
++#include <mach/gpio-pxa.h>
+ #include <mach/pxa3xx-regs.h>
+ #include <mach/pxa930.h>
+ #include <mach/reset.h>
+diff --git a/arch/arm/mach-pxa/saarb.c b/arch/arm/mach-pxa/saarb.c
+index 87070a8..3c988b6f 100644
+--- a/arch/arm/mach-pxa/saarb.c
++++ b/arch/arm/mach-pxa/saarb.c
+@@ -15,6 +15,7 @@
+ #include <linux/i2c.h>
+ #include <linux/i2c/pxa-i2c.h>
+ #include <linux/mfd/88pm860x.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+diff --git a/arch/arm/plat-pxa/include/plat/gpio-pxa.h b/arch/arm/plat-pxa/include/plat/gpio-pxa.h
+new file mode 100644
+index 0000000..b6390be
+--- /dev/null
++++ b/arch/arm/plat-pxa/include/plat/gpio-pxa.h
+@@ -0,0 +1,44 @@
++#ifndef __PLAT_PXA_GPIO_H
++#define __PLAT_PXA_GPIO_H
++
++struct irq_data;
++
++/*
++ * We handle the GPIOs by banks, each bank covers up to 32 GPIOs with
++ * one set of registers. The register offsets are organized below:
++ *
++ *           GPLR    GPDR    GPSR    GPCR    GRER    GFER    GEDR
++ * BANK 0 - 0x0000  0x000C  0x0018  0x0024  0x0030  0x003C  0x0048
++ * BANK 1 - 0x0004  0x0010  0x001C  0x0028  0x0034  0x0040  0x004C
++ * BANK 2 - 0x0008  0x0014  0x0020  0x002C  0x0038  0x0044  0x0050
++ *
++ * BANK 3 - 0x0100  0x010C  0x0118  0x0124  0x0130  0x013C  0x0148
++ * BANK 4 - 0x0104  0x0110  0x011C  0x0128  0x0134  0x0140  0x014C
++ * BANK 5 - 0x0108  0x0114  0x0120  0x012C  0x0138  0x0144  0x0150
++ *
++ * NOTE:
++ *   BANK 3 is only available on PXA27x and later processors.
++ *   BANK 4 and 5 are only available on PXA935
++ */
++
++#define GPIO_BANK(n)	(GPIO_REGS_VIRT + BANK_OFF(n))
++
++#define GPLR_OFFSET	0x00
++#define GPDR_OFFSET	0x0C
++#define GPSR_OFFSET	0x18
++#define GPCR_OFFSET	0x24
++#define GRER_OFFSET	0x30
++#define GFER_OFFSET	0x3C
++#define GEDR_OFFSET	0x48
++
++/* NOTE: some PXAs have fewer on-chip GPIOs (like PXA255, with 85).
++ * Those cases currently cause holes in the GPIO number space, the
++ * actual number of the last GPIO is recorded by 'pxa_last_gpio'.
++ */
++extern int pxa_last_gpio;
++
++typedef int (*set_wake_t)(struct irq_data *d, unsigned int on);
++
++extern void pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn);
++
++#endif /* __PLAT_PXA_GPIO_H */
+diff --git a/arch/arm/plat-pxa/include/plat/gpio.h b/arch/arm/plat-pxa/include/plat/gpio.h
+index 6fc41db..258f772 100644
+--- a/arch/arm/plat-pxa/include/plat/gpio.h
++++ b/arch/arm/plat-pxa/include/plat/gpio.h
+@@ -3,35 +3,8 @@
+ 
+ #define __ARM_GPIOLIB_COMPLEX
+ 
+-struct irq_data;
+-
+-/*
+- * We handle the GPIOs by banks, each bank covers up to 32 GPIOs with
+- * one set of registers. The register offsets are organized below:
+- *
+- *           GPLR    GPDR    GPSR    GPCR    GRER    GFER    GEDR
+- * BANK 0 - 0x0000  0x000C  0x0018  0x0024  0x0030  0x003C  0x0048
+- * BANK 1 - 0x0004  0x0010  0x001C  0x0028  0x0034  0x0040  0x004C
+- * BANK 2 - 0x0008  0x0014  0x0020  0x002C  0x0038  0x0044  0x0050
+- *
+- * BANK 3 - 0x0100  0x010C  0x0118  0x0124  0x0130  0x013C  0x0148
+- * BANK 4 - 0x0104  0x0110  0x011C  0x0128  0x0134  0x0140  0x014C
+- * BANK 5 - 0x0108  0x0114  0x0120  0x012C  0x0138  0x0144  0x0150
+- *
+- * NOTE:
+- *   BANK 3 is only available on PXA27x and later processors.
+- *   BANK 4 and 5 are only available on PXA935
+- */
+-
+-#define GPIO_BANK(n)	(GPIO_REGS_VIRT + BANK_OFF(n))
+-
+-#define GPLR_OFFSET	0x00
+-#define GPDR_OFFSET	0x0C
+-#define GPSR_OFFSET	0x18
+-#define GPCR_OFFSET	0x24
+-#define GRER_OFFSET	0x30
+-#define GFER_OFFSET	0x3C
+-#define GEDR_OFFSET	0x48
++/* The individual machine provides register offsets and NR_BUILTIN_GPIO */
++#include <mach/gpio-pxa.h>
+ 
+ static inline int gpio_get_value(unsigned gpio)
+ {
+@@ -54,13 +27,4 @@ static inline void gpio_set_value(unsigned gpio, int value)
+ 
+ #define gpio_cansleep		__gpio_cansleep
+ 
+-/* NOTE: some PXAs have fewer on-chip GPIOs (like PXA255, with 85).
+- * Those cases currently cause holes in the GPIO number space, the
+- * actual number of the last GPIO is recorded by 'pxa_last_gpio'.
+- */
+-extern int pxa_last_gpio;
+-
+-typedef int (*set_wake_t)(struct irq_data *d, unsigned int on);
+-
+-extern void pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn);
+ #endif /* __PLAT_GPIO_H */
+diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+index 5d6a86b..9052925 100644
+--- a/drivers/gpio/gpio-pxa.c
++++ b/drivers/gpio/gpio-pxa.c
+@@ -18,6 +18,8 @@
+ #include <linux/syscore_ops.h>
+ #include <linux/slab.h>
+ 
++#include <mach/gpio-pxa.h>
++
+ int pxa_last_gpio;
+ 
+ struct pxa_gpio_chip {
 -- 
 1.7.3.2
