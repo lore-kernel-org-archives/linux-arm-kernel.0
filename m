@@ -1,55 +1,96 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 27 Sep 2011 19:18:00 +0200
-Subject: [PATCH v3 0/6] OMAP: omap_device cleanup before device-tree
-	integration
-Message-ID: <1317143886-13285-1-git-send-email-b-cousson@ti.com>
+Date: Tue, 27 Sep 2011 19:18:01 +0200
+Subject: [PATCH v3 1/6] OMAP: omap_device: Add omap_device_get_by_hwmod_name
+In-Reply-To: <1317143886-13285-1-git-send-email-b-cousson@ti.com>
+References: <1317143886-13285-1-git-send-email-b-cousson@ti.com>
+Message-ID: <1317143886-13285-2-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+From: Nishanth Menon <nm@ti.com>
 
-Here are a couple of cleanups on top of your for_3.2/omap_device branch.
+An API which translates a standard hwmod name to corresponding
+platform_device is useful for drivers when they need to look up the
+device associated with a hwmod name to map back into the device
+structure pointers. These ideally should be used by drivers in
+mach directory. Using a generic hwmod name like "gpu" instead of
+the actual device name which could change in the future, allows
+us to:
+a) Could in effect help replace apis such as omap2_get_mpuss_device,
+omap2_get_iva_device, omap2_get_l3_device, omap4_get_dsp_device,
+etc..
+b) Scale to more devices rather than be restricted to named functions
+c) Simplify driver's platform_data from passing additional fields
+all doing the same thing with different function pointer names
+just for accessing a different device name.
 
-patches are available here:
-git://gitorious.org/omap-pm/linux.git for_3.2/1_omap_device_cleanup
-
-Regards,
-Benoit
-
-
-Changes since v1: http://www.spinics.net/lists/linux-omap/msg55801.html
- - Update the 2 patches from Nishanth based on Kevin's comment and merge
-   them into one patch.
- - Fix the omap_device_pm_latency issue reported by Paul.
-
-Changes since v2: http://www.spinics.net/lists/arm-kernel/msg138993.html
- - Change the API name from omap_hwmod_name_get_dev to 
-   omap_device_get_by_hwmod_name per Kevin's suggestion.
- 
-
-Benoit Cousson (5):
-  OMAP3: beagle-board: Use the omap_hwmod_name_get_dev API
-  OMAP2+: pm: Use hwmod name instead of dev pointer
-  OMAP2+: pm: Remove static devices variable for mpu, dsp, iva and l3 PM
-  OMAP: omap_device: Create a default omap_device_pm_latency
-  OMAP2+: devices: Remove all omap_device_pm_latency structures
-
-Nishanth Menon (1):
-  OMAP: omap_device: Add omap_device_get_by_hwmod_name
-
- arch/arm/mach-omap2/board-omap3beagle.c       |    4 +-
- arch/arm/mach-omap2/devices.c                 |   46 ++---------------
- arch/arm/mach-omap2/display.c                 |   11 +----
- arch/arm/mach-omap2/dma.c                     |   11 +----
- arch/arm/mach-omap2/gpio.c                    |   12 +----
- arch/arm/mach-omap2/hsmmc.c                   |   18 +------
- arch/arm/mach-omap2/hwspinlock.c              |   12 +----
- arch/arm/mach-omap2/mcbsp.c                   |   11 +----
- arch/arm/mach-omap2/pm.c                      |   69 ++++++++-----------------
- arch/arm/mach-omap2/serial.c                  |   25 +---------
- arch/arm/mach-omap2/sr_device.c               |   11 +----
- arch/arm/mach-omap2/usb-musb.c                |   11 +----
- arch/arm/plat-omap/i2c.c                      |   10 +---
+Signed-off-by: Nishanth Menon <nm@ti.com>
+[b-cousson at ti.com: Adapt it to the new pdev pointer inside od,
+remove the unneeded helpers, and fold the next patch here]
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+---
  arch/arm/plat-omap/include/plat/omap_device.h |    1 +
- arch/arm/plat-omap/omap_device.c              |   55 +++++++++++++++++++-
- 15 files changed, 93 insertions(+), 214 deletions(-)
+ arch/arm/plat-omap/omap_device.c              |   36 +++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index d4d9b96..12c5b0c 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -101,6 +101,7 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
+ 					 int pm_lats_cnt, int is_early_device);
+ 
+ void __iomem *omap_device_get_rt_va(struct omap_device *od);
++struct device *omap_device_get_by_hwmod_name(const char *oh_name);
+ 
+ /* OMAP PM interface */
+ int omap_device_align_pm_lat(struct platform_device *pdev,
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 26aee5c..f832f92 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -844,6 +844,42 @@ void __iomem *omap_device_get_rt_va(struct omap_device *od)
+ 	return omap_hwmod_get_mpu_rt_va(od->hwmods[0]);
+ }
+ 
++/**
++ * omap_device_get_by_hwmod_name() - convert a hwmod name to
++ * device pointer.
++ * @oh_name: name of the hwmod device
++ *
++ * Returns back a struct device * pointer associated with a hwmod
++ * device represented by a hwmod_name
++ */
++struct device *omap_device_get_by_hwmod_name(const char *oh_name)
++{
++	struct omap_hwmod *oh;
++
++	if (!oh_name) {
++		WARN(1, "%s: no hwmod name!\n", __func__);
++		return ERR_PTR(-EINVAL);
++	}
++
++	oh = omap_hwmod_lookup(oh_name);
++	if (IS_ERR_OR_NULL(oh)) {
++		WARN(1, "%s: no hwmod for %s\n", __func__,
++			oh_name);
++		return ERR_PTR(oh ? PTR_ERR(oh) : -ENODEV);
++	}
++	if (IS_ERR_OR_NULL(oh->od)) {
++		WARN(1, "%s: no omap_device for %s\n", __func__,
++			oh_name);
++		return ERR_PTR(oh->od ? PTR_ERR(oh->od) : -ENODEV);
++	}
++
++	if (IS_ERR_OR_NULL(oh->od->pdev))
++		return ERR_PTR(oh->od->pdev ? PTR_ERR(oh->od->pdev) : -ENODEV);
++
++	return &oh->od->pdev->dev;
++}
++EXPORT_SYMBOL(omap_device_get_by_hwmod_name);
++
+ /*
+  * Public functions intended for use in omap_device_pm_latency
+  * .activate_func and .deactivate_func function pointers
+-- 
+1.7.0.4
