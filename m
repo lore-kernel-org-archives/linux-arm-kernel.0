@@ -1,149 +1,99 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Tue, 27 Sep 2011 12:05:05 +0200
-Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
-	supported by the hardware
-In-Reply-To: <1316195506-9777-2-git-send-email-ohad@wizery.com>
-References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
-	<1316195506-9777-2-git-send-email-ohad@wizery.com>
-Message-ID: <20110927100505.GH2138@amd.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 27 Sep 2011 18:19:47 +0800
+Subject: [PATCH v2 16/16] ARM: GIC: Make MULTI_IRQ_HANDLER mandatory
+In-Reply-To: <4E818A1A.2090906@arm.com>
+References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
+	<1317034955-1029-17-git-send-email-marc.zyngier@arm.com>
+	<20110927034350.GA17997@S2100-06.ap.freescale.net>
+	<4E818A1A.2090906@arm.com>
+Message-ID: <20110927101946.GB17997@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 01:51:41PM -0400, Ohad Ben-Cohen wrote:
->  drivers/iommu/iommu.c      |  158 +++++++++++++++++++++++++++++++++++++++++---
->  drivers/iommu/omap-iovmm.c |   12 +---
->  include/linux/iommu.h      |    6 +-
->  virt/kvm/iommu.c           |    4 +-
->  4 files changed, 157 insertions(+), 23 deletions(-)
+On Tue, Sep 27, 2011 at 09:32:26AM +0100, Marc Zyngier wrote:
+> Hi Shawn,
 > 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index c68ff29..7c01c8c 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -16,6 +16,8 @@
->   * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
->   */
+> On 27/09/11 04:43, Shawn Guo wrote:
+> > On Mon, Sep 26, 2011 at 12:02:35PM +0100, Marc Zyngier wrote:
+> >> Now that MULTI_IRQ_HANDLER is selected by all the in-tree
+> >> GIC users, make it mandatory and remove the unused macros.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm/Kconfig                                |    3 -
+> >>  arch/arm/common/Kconfig                         |    1 +
+> >>  arch/arm/common/gic.c                           |    2 +-
+> >>  arch/arm/include/asm/hardware/entry-macro-gic.S |   60 -----------------------
+> >>  arch/arm/include/asm/hardware/gic.h             |    1 -
+> >>  arch/arm/mach-msm/Kconfig                       |    2 -
+> >>  arch/arm/mach-omap2/Kconfig                     |    1 +
+> >>  arch/arm/mach-tegra/Kconfig                     |    1 -
+> >>  arch/arm/mach-ux500/Kconfig                     |    1 -
+> >>  arch/arm/plat-omap/Kconfig                      |    1 -
+> >>  10 files changed, 3 insertions(+), 70 deletions(-)
+> >>  delete mode 100644 arch/arm/include/asm/hardware/entry-macro-gic.S
+> >>
+> >> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> index 0514264..d3e246c 100644
+> >> --- a/arch/arm/Kconfig
+> >> +++ b/arch/arm/Kconfig
+> >> @@ -334,7 +334,6 @@ config ARCH_CNS3XXX
+> >>  	select ARM_GIC
+> >>  	select MIGHT_HAVE_PCI
+> >>  	select PCI_DOMAINS if PCI
+> >> -	select MULTI_IRQ_HANDLER
+> >>  	help
+> >>  	  Support for Cavium Networks CNS3XXX platform.
+> >>  
+> >> @@ -788,7 +787,6 @@ config ARCH_EXYNOS4
+> >>  	select HAVE_S3C_RTC if RTC_CLASS
+> >>  	select HAVE_S3C2410_I2C if I2C
+> >>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+> >> -	select MULTI_IRQ_HANDLER
+> >>  	help
+> >>  	  Samsung EXYNOS4 series based systems
+> >>  
+> >> @@ -911,7 +909,6 @@ config ARCH_ZYNQ
+> >>  	select ARM_AMBA
+> >>  	select ICST
+> >>  	select USE_OF
+> >> -	select MULTI_IRQ_HANDLER
+> >>  	help
+> >>  	  Support for Xilinx Zynq ARM Cortex A9 Platform
+> >>  endchoice
+> > 
+> > Hi Marc,
+> > 
+> > I'm unsure about your base.  But I have the following platforms in
+> > arch/arm/Kconfig selecting MULTI_IRQ_HANDLER at the end of your series,
+> > which should also be removed from?
+> > 
+> >   ARCH_REALVIEW
+> >   ARCH_VEXPRESS
 > 
-> +#define pr_fmt(fmt)    "%s: " fmt, __func__
-> +
->  #include <linux/kernel.h>
->  #include <linux/bug.h>
->  #include <linux/types.h>
-> @@ -23,15 +25,73 @@
->  #include <linux/slab.h>
->  #include <linux/errno.h>
->  #include <linux/iommu.h>
-> +#include <linux/bitmap.h>
+> These two can be indeed removed, as they are GIC users and GIC now
+> selects MULTI_IRQ_HANDLER directly. I'll fix the patch.
 > 
->  static struct iommu_ops *iommu_ops;
+> >   ARCH_PXA
 > 
-> +/* bitmap of supported page sizes */
-> +static unsigned long *iommu_pgsize_bitmap;
-> +
-> +/* number of bits used to represent the supported pages */
-> +static unsigned int iommu_nr_page_bits;
-> +
-> +/* size of the smallest supported page (in bytes) */
-> +static unsigned int iommu_min_pagesz;
-> +
-> +/* bit number of the smallest supported page */
-> +static unsigned int iommu_min_page_idx;
-> +
-> +/**
-> + * register_iommu() - register an IOMMU hardware
-> + * @ops: iommu handlers
-> + * @pgsize_bitmap: bitmap of page sizes supported by the hardware
-> + * @nr_page_bits: size of @pgsize_bitmap (in bits)
-> + *
-> + * Note: this is a temporary function, which will be removed once
-> + * all IOMMU drivers are converted. The only reason it exists is to
-> + * allow splitting the pgsizes changes to several patches in order to ease
-> + * the review.
-> + */
-> +void register_iommu_pgsize(struct iommu_ops *ops, unsigned long *pgsize_bitmap,
-> +                                       unsigned int nr_page_bits)
+> PXA doesn't use the GIC, so it has to select MULTI_IRQ_HANDLER directly
+> as it used to before my patch.
+> 
+Ah, yes.  I missed that the MULTI_IRQ_HANDLER was selected by ARM_GIC
+in arch/arm/common/Kconfig.
 
-I think a plain unsigned long value is sufficient to encode the
-supported page-sizes. No need to use a full bitmap.
+Regards,
+Shawn
 
->  int iommu_map(struct iommu_domain *domain, unsigned long iova,
-> -             phys_addr_t paddr, int gfp_order, int prot)
-> +             phys_addr_t paddr, size_t size, int prot)
->  {
-> -       size_t size;
-> +       int ret = 0;
-> +
-> +       /*
-> +        * both the virtual address and the physical one, as well as
-> +        * the size of the mapping, must be aligned (at least) to the
-> +        * size of the smallest page supported by the hardware
-> +        */
-> +       if (!IS_ALIGNED(iova | paddr | size, iommu_min_pagesz)) {
-> +               pr_err("unaligned: iova 0x%lx pa 0x%lx size 0x%lx min_pagesz "
-> +                       "0x%x\n", iova, (unsigned long)paddr,
-> +                       (unsigned long)size, iommu_min_pagesz);
-> +               return -EINVAL;
-> +       }
-> +
-> +       pr_debug("map: iova 0x%lx pa 0x%lx size 0x%lx\n", iova,
-> +                               (unsigned long)paddr, (unsigned long)size);
-> +
-> +       while (size) {
-> +               unsigned long pgsize = iommu_min_pagesz;
-> +               unsigned long idx = iommu_min_page_idx;
-> +               unsigned long addr_merge = iova | paddr;
-> +               int order;
-> +
-> +               /* find the max page size with which iova, paddr are aligned */
-> +               for (;;) {
-> +                       unsigned long try_pgsize;
-> +
-> +                       idx = find_next_bit(iommu_pgsize_bitmap,
-> +                                               iommu_nr_page_bits, idx + 1);
-> +
-> +                       /* no more pages to check ? */
-> +                       if (idx >= iommu_nr_page_bits)
-> +                               break;
-> +
-> +                       try_pgsize = 1 << idx;
+> >   ARCH_SHMOBILE
 > 
-> -       size         = 0x1000UL << gfp_order;
-> +                       /* page too big ? addresses not aligned ? */
-> +                       if (size < try_pgsize ||
-> +                                       !IS_ALIGNED(addr_merge, try_pgsize))
-> +                               break;
+> This one is caught in the middle. Only SMP shmobile platforms use the
+> GIC, but they all need MULTI_IRQ_HANDLER anyway, so keeping the option
+> selected doesn't hurt.
 > 
-> -       BUG_ON(!IS_ALIGNED(iova | paddr, size));
-> +                       pgsize = try_pgsize;
-> +               }
-
-With an unsigned long you can use plain and fast bit_ops instead of the
-full bitmap functions. 
-
+> Cheers,
 > 
-> -       return iommu_ops->map(domain, iova, paddr, gfp_order, prot);
-> +               order = get_order(pgsize);
-> +
-> +               pr_debug("mapping: iova 0x%lx pa 0x%lx order %d\n", iova,
-> +                                       (unsigned long)paddr, order);
-> +
-> +               ret = iommu_ops->map(domain, iova, paddr, order, prot);
-> +               if (ret)
-> +                       break;
-> +
-> +               size -= pgsize;
-> +               iova += pgsize;
-> +               paddr += pgsize;
-> +       }
-> +
-> +       return ret;
->  }
->  EXPORT_SYMBOL_GPL(iommu_map);
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
 > 
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
