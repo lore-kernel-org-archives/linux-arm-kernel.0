@@ -1,52 +1,53 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 27 Sep 2011 05:44:18 +0530
-Subject: [PATCH v7 REPOST 22/24] gpio/omap: enable irq at the end of all
-	configuration in restore
+Date: Tue, 27 Sep 2011 05:44:20 +0530
+Subject: [PATCH v7 REPOST 24/24] gpio/omap: handle set_dataout reg capable IP
+	on restore
 In-Reply-To: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
 References: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1317082460-31706-23-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1317082460-31706-25-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Nishanth Menon <nm@ti.com>
 
-Setup the interrupt enable registers only after we have configured the
-required edge and required configurations, not before, to prevent
-spurious events as part of restore routine.
+GPIO IP revisions such as those used in OMAP4 have a set_dataout
+while the previous revisions used a single dataout register.
+Depending on what is available restore the dataout settings
+to the right register.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/gpio/gpio-omap.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+ drivers/gpio/gpio-omap.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 981a1c1..75b6265 100644
+index 05ab0e8..349e774 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -1310,10 +1310,6 @@ void omap2_gpio_resume_after_idle(void)
+@@ -1048,7 +1048,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 	bank->get_context_loss_count = pdata->get_context_loss_count;
+ 	bank->regs = pdata->regs;
  
- static void omap_gpio_restore_context(struct gpio_bank *bank)
- {
--	__raw_writel(bank->context.irqenable1,
--				bank->base + bank->regs->irqenable);
--	__raw_writel(bank->context.irqenable2,
--				bank->base + bank->regs->irqenable2);
- 	__raw_writel(bank->context.wake_en,
- 				bank->base + bank->regs->wkup_en);
- 	__raw_writel(bank->context.ctrl, bank->base + bank->regs->ctrl);
-@@ -1333,6 +1329,11 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- 		__raw_writel(bank->context.debounce_en,
- 					bank->base + bank->regs->debounce_en);
- 	}
-+
-+	__raw_writel(bank->context.irqenable1,
-+				bank->base + bank->regs->irqenable);
-+	__raw_writel(bank->context.irqenable2,
-+				bank->base + bank->regs->irqenable2);
- }
- #else
- #define omap_gpio_suspend NULL
+-	if (bank->regs->set_dataout && bank->regs->clr_dataout)
++	if (bank->regs->set_dataout)
+ 		bank->set_dataout = _set_gpio_dataout_reg;
+ 	else
+ 		bank->set_dataout = _set_gpio_dataout_mask;
+@@ -1321,7 +1321,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+ 				bank->base + bank->regs->risingdetect);
+ 	__raw_writel(bank->context.fallingdetect,
+ 				bank->base + bank->regs->fallingdetect);
+-	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
++	if (bank->regs->set_dataout)
++		__raw_writel(bank->context.dataout,
++				bank->base + bank->regs->set_dataout);
++	else
++		__raw_writel(bank->context.dataout,
++				bank->base + bank->regs->dataout);
+ 	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
+ 
+ 	if (bank->dbck_enable_mask) {
 -- 
 1.7.0.4
