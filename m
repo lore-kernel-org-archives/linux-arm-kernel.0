@@ -1,30 +1,52 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 27 Sep 2011 15:08:49 -0600
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <201109271550.36427.arnd@arndb.de>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20110926152634.GN2946@opensource.wolfsonmicro.com>
-	<CACxGe6swdnhk_GCAv3siSx4kxNQXmCLDbwBFjsX5VPNfCBc2Mg@mail.gmail.com>
-	<201109271550.36427.arnd@arndb.de>
-Message-ID: <20110927210849.GD3994@ponder.secretlab.ca>
+Date: Tue, 27 Sep 2011 15:24:42 -0600
+Subject: [PATCH v4] of/irq: introduce of_irq_init
+In-Reply-To: <4E81C9B7.9000004@gmail.com>
+References: <1316744473-13158-1-git-send-email-robherring2@gmail.com>
+	<1317065083-23573-1-git-send-email-robherring2@gmail.com>
+	<20110927015305.GD20588@ponder.secretlab.ca>
+	<4E81C9B7.9000004@gmail.com>
+Message-ID: <CACxGe6to4e3UjyjOhohNhnMhzQwfA2_2cL2c0ChwnR3_gb+H1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 03:50:36PM +0200, Arnd Bergmann wrote:
-> On Monday 26 September 2011, Grant Likely wrote:
-> > Actually, in the next iteration, I'm thinking it would be a good idea
-> > to create a new #define to only be used by probe deferral.  I want it
-> > to be easy to find all the drivers that are using this mechanism
-> > without needing to filter all the unrelated hits.  However, this is a
-> > kernel-only thing so it is probably not appropriate to add it to
-> > include/asm-generic/errno.h.  I could use some guidance/advice as to
-> > the best way to handle this.
-> 
-> include/linux/errno.h already has a bunch of kernel-internal error
-> codes that are never supposed to be seen in user space. Just
-> add one there, the next free one right now is 517, after
-> ERESTART_RESTARTBLOCK.
+On Tue, Sep 27, 2011 at 7:03 AM, Rob Herring <robherring2@gmail.com> wrote:
+> Grant,
+>
+> On 09/26/2011 08:53 PM, Grant Likely wrote:
+>> On Mon, Sep 26, 2011 at 02:24:43PM -0500, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> of_irq_init will scan the devicetree for matching interrupt controller
+>>> nodes. Then it calls an initialization function for each found controller
+>>> in the proper order with parent nodes initialized before child nodes.
+>>>
+>>> Based on initial pseudo code from Grant Likely.
+>>>
+>>> Changes in v4:
+>>> - Drop unnecessary empty list check
+>>> - Be more verbose on errors
+>>> - Simplify "if (!desc) WARN_ON(1)" to "if (WARN_ON(!desc))"
+>>>
+>>> Changes in v3:
+>>> - add missing kfree's found by Jamie
+>>> - Implement Grant's comments to simplify the init loop
+>>> - fix function comments
+>>>
+>>> Changes in v2:
+>>> - Complete re-write of list searching code from Grant Likely
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>>
+>> Looks good to me. ?Merged.
+>>
+>
+> I'm dependent on this and things in rmk's tree for initial highbank
+> support, so should this series go in thru arm-soc tree? Several others
+> are dependent on this as well.
 
-Okay, will do.  How does EPROBE_DEFER 518 sound?
+Sure, it can go in via arm-soc.  I don't have anything depending on it
+in mine.  Add my acked-by.
 
 g.
