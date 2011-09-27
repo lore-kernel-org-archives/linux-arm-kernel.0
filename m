@@ -1,111 +1,63 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 27 Sep 2011 08:25:30 -0500
-Subject: [PATCH 2/2] ARM: vic: MULTI_IRQ_HANDLER handler
-In-Reply-To: <1317125802-14386-2-git-send-email-jamie@jamieiles.com>
-References: <1317125802-14386-1-git-send-email-jamie@jamieiles.com>
-	<1317125802-14386-2-git-send-email-jamie@jamieiles.com>
-Message-ID: <4E81CECA.6050306@gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 27 Sep 2011 16:25:12 +0300
+Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel Summit
+	2011
+In-Reply-To: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+Message-ID: <4E81CEB8.4090908@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2011 07:16 AM, Jamie Iles wrote:
-> Add a handler for the VIC that is suitable for MULTI_IRQ_HANDLER
-> platforms.  This only works for platforms with CONFIG_OF=y as we can
-> determine which controllers are the primary controllers (no parent).
-
-That's probably not an acceptable limitation. I guess this is hard-wired
-into entry-macro.S files currently? Perhaps adding an "is_root" flag to
-vic_init would fix it for non-DT.
-
-Rob
-
+On 08/30/11 09:00, Grant Likely wrote:
 > 
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> ---
->  arch/arm/common/vic.c               |   48 +++++++++++++++++++++++++++++++++++
->  arch/arm/include/asm/hardware/vic.h |    1 +
->  2 files changed, 49 insertions(+), 0 deletions(-)
+> Agenda proposals (Thanks to Nicolas and Olof):
+> - DT bindings for GPIO and pin mux
+> - the pin mux subsystem from linusw (especially if it is still RFC by
+>  then)
+> - progress with the single zImage work
+> - presentation/status of the DMA and memory management work wrt CMA
+>  (some SOC specific hacks should go away once this is available)
+> - DT porting progress
+> - boot architecture status
+> - Report from Arnd on experiences from first arm-soc merge window
+>   - what worked well and where's room for improvement?
+>   - Any particular SoC workflow that should be tuned to make his life easier?
+>   - Where are the gaps where he needs help right now?
+>   - How did it work out for the SoC maintainers?
 > 
-> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> index 3658579..e9b72d3 100644
-> --- a/arch/arm/common/vic.c
-> +++ b/arch/arm/common/vic.c
-> @@ -63,6 +63,22 @@ static struct vic_device vic_devices[CONFIG_ARM_VIC_NR];
->  
->  static int vic_id;
->  
-> +#if defined(CONFIG_OF) && defined(CONFIG_MULTI_IRQ_HANDLER)
-> +/*
-> + * The root VIC's.  We keep track of these so that we can do the IRQ demuxing
-> + * as we can have more than one root VIC.
-> + */
-> +static struct vic_device *vic_root_devices[CONFIG_ARM_VIC_NR];
-> +static int nr_root_vics;
-> +
-> +static void vic_register_root_controller(struct vic_device *vic)
-> +{
-> +	vic_root_devices[nr_root_vics++] = vic;
-> +}
-> +#else /* CONFIG_OF && CONFIG_MULTI_IRQ_HANDLER */
-> +static inline void vic_register_root_controller(struct vic_device *vic) {}
-> +#endif /* CONFIG_OF && CONFIG_MULTI_IRQ_HANDLER */
-> +
->  /**
->   * vic_init2 - common initialisation code
->   * @base: Base of the VIC.
-> @@ -439,6 +455,9 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
->  	vic->domain.ops = &vic_irq_domain_ops;
->  	irq_domain_add(&vic->domain);
->  
-> +	if (!parent)
-> +		vic_register_root_controller(vic);
-> +
->  	return 0;
->  
->  out_unmap:
-> @@ -447,4 +466,33 @@ out_unmap:
->  	return -EIO;
->  }
->  
-> +#ifdef CONFIG_MULTI_IRQ_HANDLER
-> +static void vic_single_handle_irq(struct vic_device *vic, struct pt_regs *regs)
-> +{
-> +	u32 stat, irq;
-> +	bool handled = false;
-> +
-> +	while (!handled) {
-> +		stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> +		if (!stat)
-> +			break;
-> +
-> +		while (stat) {
-> +			irq = fls(stat) - 1;
-> +			handle_IRQ(irq + vic->irq, regs);
-> +			stat &= ~(1 << irq);
-> +			handled = true;
-> +		}
-> +	}
-> +}
-> +
-> +asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < nr_root_vics; ++i)
-> +		vic_single_handle_irq(vic_root_devices[i], regs);
-> +}
-> +#endif /* CONFIG_MULTI_IRQ_HANDLER */
-> +
->  #endif /* CONFIG OF */
-> diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
-> index df1d895..451788c 100644
-> --- a/arch/arm/include/asm/hardware/vic.h
-> +++ b/arch/arm/include/asm/hardware/vic.h
-> @@ -53,6 +53,7 @@ static inline int vic_of_init(struct device_node *node,
->  	return -ENOSYS;
->  }
->  #endif /* CONFIG_OF */
-> +void vic_handle_irq(struct pt_regs *regs);
->  #endif /* __ASSEMBLY__ */
->  
->  #endif
+> Still accepting more proposals.  Send me the topics you are burning to discuss.
+
+One of the LPC2011's bottom lines was:
+"We need more people involved in ARM maintainership to help
+the sub-architecture maintainers do a better job on
+review/consolidation/generalization/etc. of the code."
+
+Despite the major goal of the DT to reduce the SoC and
+board specific code to absolute minimum, there will still be cases
+(e.g. discrete power management circuitry) when there is no
+appropriate DT solution available and the board file
+is a necessity. Also there are already many boards that will remain
+and will not be converted to DT.
+
+Bringing all the above together, I'd like to propose a new "job"
+for maintaining board specific code on a cross-platform basis.
+
+Pros:
+1) There might (I have not checked this, but I'm sure there is) be
+code in the existing board files (that are not likely to go away
+at least in a couple of years) that can be consolidated and
+may be even in a cross-platform manner.
+2) Lower the work load from SoC maintainers (that don't have enough
+time to care much about the board specific changes).
+3) Some more eyes to review the newly submitted code.
+
+Cons:
+1) Resulting overhead for the code to go upstream.
+2) Possible addition of merge conflicts.
+
+
+I'd like to hear, what do you think of the above proposal?
+
+-- 
+Regards,
+Igor.
