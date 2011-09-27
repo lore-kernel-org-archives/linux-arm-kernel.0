@@ -1,26 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 27 Sep 2011 15:50:36 +0200
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <CACxGe6swdnhk_GCAv3siSx4kxNQXmCLDbwBFjsX5VPNfCBc2Mg@mail.gmail.com>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20110926152634.GN2946@opensource.wolfsonmicro.com>
-	<CACxGe6swdnhk_GCAv3siSx4kxNQXmCLDbwBFjsX5VPNfCBc2Mg@mail.gmail.com>
-Message-ID: <201109271550.36427.arnd@arndb.de>
+From: gary@mlbassoc.com (Gary Thomas)
+Date: Tue, 27 Sep 2011 07:51:18 -0600
+Subject: [PATCH v2 0/5] OMAP3EVM: Add support for MT9T111 sensor
+In-Reply-To: <1317130848-21136-1-git-send-email-deepthy.ravi@ti.com>
+References: <1317130848-21136-1-git-send-email-deepthy.ravi@ti.com>
+Message-ID: <4E81D4D6.2000000@mlbassoc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 26 September 2011, Grant Likely wrote:
-> Actually, in the next iteration, I'm thinking it would be a good idea
-> to create a new #define to only be used by probe deferral.  I want it
-> to be easy to find all the drivers that are using this mechanism
-> without needing to filter all the unrelated hits.  However, this is a
-> kernel-only thing so it is probably not appropriate to add it to
-> include/asm-generic/errno.h.  I could use some guidance/advice as to
-> the best way to handle this.
+On 2011-09-27 07:40, Deepthy Ravi wrote:
+> This patchset
+> 	-adds support for MT9T111 sensor on omap3evm.
+> 	Currently the sensor driver supports only
+> 	VGA resolution.
+> 	-enables MT9T111 sensor in omap2plus_defconfig.
+>
+> This is dependent on the following patchset
+> http://www.spinics.net/lists/linux-media/msg37270.html
+> which adds YUYV input support for OMAP3ISP. And is
+> applied on top of rc1-for-3.2 of gliakhovetski/v4l-dvb.git
 
-include/linux/errno.h already has a bunch of kernel-internal error
-codes that are never supposed to be seen in user space. Just
-add one there, the next free one right now is 517, after
-ERESTART_RESTARTBLOCK.
+Why not use the same base as Lennart?
+   The set is based on
+   http://git.linuxtv.org/pinchartl/media.git/shortlog/refs/heads/omap3isp-omap3isp-next
 
-	Arnd
+> ---
+> Changes in v2:
+> 	As per the discussion here,
+> 	https://lkml.org/lkml/2011/9/20/280
+> 	the existing mt9t112 driver is reused for
+> 	adding support for mt9t111 sensor.
+> Deepthy Ravi (3):
+>    [media] v4l: Add support for mt9t111 sensor driver
+>    ispccdc: Configure CCDC_SYN_MODE register
+>    omap2plus_defconfig: Enable omap3isp and MT9T111 sensor drivers
+>
+> Vaibhav Hiremath (2):
+>    omap3evm: Enable regulators for camera interface
+>    omap3evm: Add Camera board init/hookup file
+>
+>   arch/arm/configs/omap2plus_defconfig        |    9 +
+>   arch/arm/mach-omap2/Makefile                |    5 +
+>   arch/arm/mach-omap2/board-omap3evm-camera.c |  185 ++++
+>   arch/arm/mach-omap2/board-omap3evm.c        |   26 +
+>   drivers/media/video/Kconfig                 |    7 +
+>   drivers/media/video/Makefile                |    1 +
+>   drivers/media/video/mt9t111_reg.h           | 1367 +++++++++++++++++++++++++++
+>   drivers/media/video/mt9t112.c               |  320 ++++++-
+>   drivers/media/video/omap3isp/ispccdc.c      |   11 +-
+>   include/media/mt9t111.h                     |   45 +
+>   10 files changed, 1937 insertions(+), 39 deletions(-)
+>   create mode 100644 arch/arm/mach-omap2/board-omap3evm-camera.c
+>   create mode 100644 drivers/media/video/mt9t111_reg.h
+>   create mode 100644 include/media/mt9t111.h
+
+-- 
+------------------------------------------------------------
+Gary Thomas                 |  Consulting for the
+MLB Associates              |    Embedded world
+------------------------------------------------------------
