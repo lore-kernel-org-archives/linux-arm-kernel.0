@@ -1,70 +1,126 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 27 Sep 2011 05:44:09 +0530
-Subject: [PATCH v7 REPOST 13/24] gpio/omap: use pinctrl offset instead of macro
+Date: Tue, 27 Sep 2011 05:44:06 +0530
+Subject: [PATCH v7 REPOST 10/24] gpio/omap: remove hardcoded offsets in
+	context save/restore
 In-Reply-To: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
 References: <1317082460-31706-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1317082460-31706-14-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1317082460-31706-11-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Charulatha V <charu@ti.com>
+It is not required to use hard-coded offsets any more in context save and
+restore functions and instead use the generic offsets which have been correctly
+initialized during device registration.
 
-Use regs->pinctrl field instead of using the macro OMAP1510_GPIO_PIN_CONTROL
-
+Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 Signed-off-by: Charulatha V <charu@ti.com>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap1/gpio15xx.c         |    1 +
+ arch/arm/mach-omap2/gpio.c             |    2 +
  arch/arm/plat-omap/include/plat/gpio.h |    1 +
- drivers/gpio/gpio-omap.c               |    8 +++-----
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/gpio/gpio-omap.c               |   41 ++++++++++++++-----------------
+ 3 files changed, 22 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
-index 2adfece..950e467 100644
---- a/arch/arm/mach-omap1/gpio15xx.c
-+++ b/arch/arm/mach-omap1/gpio15xx.c
-@@ -85,6 +85,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
- 	.irqenable	= OMAP1510_GPIO_INT_MASK,
- 	.irqenable_inv	= true,
- 	.irqctrl	= OMAP1510_GPIO_INT_CONTROL,
-+	.pinctrl	= OMAP1510_GPIO_PIN_CONTROL,
- };
- 
- static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
+diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+index 06fa913..5ce695c 100644
+--- a/arch/arm/mach-omap2/gpio.c
++++ b/arch/arm/mach-omap2/gpio.c
+@@ -94,6 +94,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		pdata->regs->irqstatus = OMAP24XX_GPIO_IRQSTATUS1;
+ 		pdata->regs->irqstatus2 = OMAP24XX_GPIO_IRQSTATUS2;
+ 		pdata->regs->irqenable = OMAP24XX_GPIO_IRQENABLE1;
++		pdata->regs->irqenable2 = OMAP24XX_GPIO_IRQENABLE2;
+ 		pdata->regs->set_irqenable = OMAP24XX_GPIO_SETIRQENABLE1;
+ 		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
+ 		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
+@@ -116,6 +117,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		pdata->regs->irqstatus = OMAP4_GPIO_IRQSTATUS0;
+ 		pdata->regs->irqstatus2 = OMAP4_GPIO_IRQSTATUS1;
+ 		pdata->regs->irqenable = OMAP4_GPIO_IRQSTATUSSET0;
++		pdata->regs->irqenable2 = OMAP4_GPIO_IRQSTATUSSET1;
+ 		pdata->regs->set_irqenable = OMAP4_GPIO_IRQSTATUSSET0;
+ 		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
+ 		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
 diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index 92a6262..a4e5ef3 100644
+index 9590532..61865b4 100644
 --- a/arch/arm/plat-omap/include/plat/gpio.h
 +++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -198,6 +198,7 @@ struct omap_gpio_reg_offs {
- 	u16 irqctrl;
- 	u16 edgectrl1;
- 	u16 edgectrl2;
-+	u16 pinctrl;
- 
- 	bool irqenable_inv;
- };
+@@ -184,6 +184,7 @@ struct omap_gpio_reg_offs {
+ 	u16 irqstatus;
+ 	u16 irqstatus2;
+ 	u16 irqenable;
++	u16 irqenable2;
+ 	u16 set_irqenable;
+ 	u16 clr_irqenable;
+ 	u16 debounce;
 diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 2a57d0b..876e387 100644
+index d9bf7ac..9715cf2 100644
 --- a/drivers/gpio/gpio-omap.c
 +++ b/drivers/gpio/gpio-omap.c
-@@ -485,15 +485,13 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
- 	 */
- 	_set_gpio_triggering(bank, offset, IRQ_TYPE_NONE);
+@@ -1371,45 +1371,42 @@ void omap2_gpio_resume_after_idle(void)
+ static void omap_gpio_save_context(struct gpio_bank *bank)
+ {
+ 	bank->context.irqenable1 =
+-		__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE1);
++			__raw_readl(bank->base + bank->regs->irqenable);
+ 	bank->context.irqenable2 =
+-		__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE2);
++			__raw_readl(bank->base + bank->regs->irqenable2);
+ 	bank->context.wake_en =
+-		__raw_readl(bank->base + OMAP24XX_GPIO_WAKE_EN);
+-	bank->context.ctrl = __raw_readl(bank->base + OMAP24XX_GPIO_CTRL);
+-	bank->context.oe = __raw_readl(bank->base + OMAP24XX_GPIO_OE);
++			__raw_readl(bank->base + bank->regs->wkup_en);
++	bank->context.ctrl = __raw_readl(bank->base + bank->regs->ctrl);
++	bank->context.oe = __raw_readl(bank->base + bank->regs->direction);
+ 	bank->context.leveldetect0 =
+-		__raw_readl(bank->base + OMAP24XX_GPIO_LEVELDETECT0);
++			__raw_readl(bank->base + bank->regs->leveldetect0);
+ 	bank->context.leveldetect1 =
+-		__raw_readl(bank->base + OMAP24XX_GPIO_LEVELDETECT1);
++			__raw_readl(bank->base + bank->regs->leveldetect1);
+ 	bank->context.risingdetect =
+-		__raw_readl(bank->base + OMAP24XX_GPIO_RISINGDETECT);
++			__raw_readl(bank->base + bank->regs->risingdetect);
+ 	bank->context.fallingdetect =
+-		__raw_readl(bank->base + OMAP24XX_GPIO_FALLINGDETECT);
+-	bank->context.dataout =
+-		__raw_readl(bank->base + OMAP24XX_GPIO_DATAOUT);
++	bank->context.dataout = __raw_readl(bank->base + bank->regs->dataout);
+ }
  
--#ifdef CONFIG_ARCH_OMAP15XX
--	if (bank->method == METHOD_GPIO_1510) {
--		void __iomem *reg;
-+	if (bank->regs->pinctrl) {
-+		void __iomem *reg = bank->base + bank->regs->pinctrl;
+ static void omap_gpio_restore_context(struct gpio_bank *bank)
+ {
+ 	__raw_writel(bank->context.irqenable1,
+-			bank->base + OMAP24XX_GPIO_IRQENABLE1);
++				bank->base + bank->regs->irqenable);
+ 	__raw_writel(bank->context.irqenable2,
+-			bank->base + OMAP24XX_GPIO_IRQENABLE2);
++				bank->base + bank->regs->irqenable2);
+ 	__raw_writel(bank->context.wake_en,
+-			bank->base + OMAP24XX_GPIO_WAKE_EN);
+-	__raw_writel(bank->context.ctrl, bank->base + OMAP24XX_GPIO_CTRL);
+-	__raw_writel(bank->context.oe, bank->base + OMAP24XX_GPIO_OE);
++				bank->base + bank->regs->wkup_en);
++	__raw_writel(bank->context.ctrl, bank->base + bank->regs->ctrl);
++	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
+ 	__raw_writel(bank->context.leveldetect0,
+-			bank->base + OMAP24XX_GPIO_LEVELDETECT0);
++				bank->base + bank->regs->leveldetect0);
+ 	__raw_writel(bank->context.leveldetect1,
+-			bank->base + OMAP24XX_GPIO_LEVELDETECT1);
++				bank->base + bank->regs->leveldetect1);
+ 	__raw_writel(bank->context.risingdetect,
+-			bank->base + OMAP24XX_GPIO_RISINGDETECT);
++				bank->base + bank->regs->risingdetect);
+ 	__raw_writel(bank->context.fallingdetect,
+-			bank->base + OMAP24XX_GPIO_FALLINGDETECT);
+-	__raw_writel(bank->context.dataout,
+-			bank->base + OMAP24XX_GPIO_DATAOUT);
++				bank->base + bank->regs->fallingdetect);
++	__raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
+ }
+ #endif
  
- 		/* Claim the pin for MPU */
--		reg = bank->base + OMAP1510_GPIO_PIN_CONTROL;
- 		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
- 	}
--#endif
-+
- 	if (bank->regs->ctrl && !bank->mod_usage) {
- 		void __iomem *reg = bank->base + bank->regs->ctrl;
- 		u32 ctrl;
 -- 
 1.7.0.4
