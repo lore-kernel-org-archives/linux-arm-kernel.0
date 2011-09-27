@@ -1,37 +1,56 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Tue, 27 Sep 2011 20:17:28 +0530
-Subject: [PATCH 1/9] regulator: twl: Remove hardcoded board constraints
-	from driver
-In-Reply-To: <20110927113719.GH2910@opensource.wolfsonmicro.com>
+Date: Tue, 27 Sep 2011 20:18:04 +0530
+Subject: [PATCH 2/9] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20110927121003.GB4289@opensource.wolfsonmicro.com>
 References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-2-git-send-email-rnayak@ti.com>
-	<20110927113719.GH2910@opensource.wolfsonmicro.com>
-Message-ID: <4E81E200.4030505@ti.com>
+	<1317118372-17052-3-git-send-email-rnayak@ti.com>
+	<20110927121003.GB4289@opensource.wolfsonmicro.com>
+Message-ID: <4E81E224.2070408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 September 2011 05:07 PM, Mark Brown wrote:
-> On Tue, Sep 27, 2011 at 03:42:44PM +0530, Rajendra Nayak wrote:
->> Remove the hardcoded .valid_modes_mask and .valid_ops_mask for
->> each regulator from the twl driver and let the boards pass it.
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+On Tuesday 27 September 2011 05:40 PM, Mark Brown wrote:
+> On Tue, Sep 27, 2011 at 03:42:45PM +0530, Rajendra Nayak wrote:
 >
+>> +	init_data = devm_kzalloc(dev, sizeof(struct regulator_init_data),
+>> +						 GFP_KERNEL);
+>> +	if (!init_data)
+>> +		return NULL; /* Out of memory? */
 >
->> -	/* Constrain board-specific capabilities according to what
->> -	 * this driver and the chip itself can actually do.
->> -	 */
->> -	c =&initdata->constraints;
->> -	c->valid_modes_mask&= REGULATOR_MODE_NORMAL | REGULATOR_MODE_STANDBY;
->> -	c->valid_ops_mask&= REGULATOR_CHANGE_VOLTAGE
->> -				| REGULATOR_CHANGE_MODE
->> -				| REGULATOR_CHANGE_STATUS;
->
-> This isn't actually hard coding constraints, this is restricting the
-> constraints passed in further rather than adding new ones.
->
-> However should be fine:
->
-> Acked-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
+> This means that the init data will be kept around for the entire
+> lifetime of the device rather than being discarded.
 
-Thanks.
+Wasn't it the same while this was passed around as platform_data?
+
+>
+>> +	init_data->supply_regulator = (char *)of_get_property(dev->of_node,
+>> +						"regulator-supplies", NULL);
+>
+> I'd expect that in the device tree world the supply regulator would
+> reference the node for that regulator.
+
+You mean using phandles? Thats what Grant proposed too but
+I thought you instead had an inclination towards names? Or maybe
+I misunderstood.
+
+>
+>>   	/* voltage output range (inclusive) - for voltage control */
+>> -	int min_uV;
+>> -	int max_uV;
+>> +	u32 min_uV;
+>> +	u32 max_uV;
+>>
+>> -	int uV_offset;
+>> +	u32 uV_offset;
+>>
+>>   	/* current output range (inclusive) - for current control */
+>> -	int min_uA;
+>> -	int max_uA;
+>> +	u32 min_uA;
+>> +	u32 max_uA;
+>
+> Hrm, I think loosing the signs here is bad karma - negative voltages do
+> exist after all.
+
+Oops.. they do? didn't know about that.
