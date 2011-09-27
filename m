@@ -1,72 +1,54 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Tue, 27 Sep 2011 20:14:38 +0200
-Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
-	supported by the hardware
-In-Reply-To: <CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
-References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
-	<1316195506-9777-2-git-send-email-ohad@wizery.com>
-	<20110927100505.GH2138@amd.com>
-	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
-	<20110927131222.GL2138@amd.com>
-	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
-Message-ID: <20110927181438.GM2138@amd.com>
+From: sjg@chromium.org (Simon Glass)
+Date: Tue, 27 Sep 2011 11:26:13 -0700
+Subject: [RFC PATCH 0/3] Add accurate boot timing to a Linux system
+In-Reply-To: <CAErSpo63fYmQVRO2O3sB37k6rAo7Qttdh1xo=WH+QwcVb+neGg@mail.gmail.com>
+References: <1316818998-30711-1-git-send-email-sjg@chromium.org>
+	<CAErSpo63fYmQVRO2O3sB37k6rAo7Qttdh1xo=WH+QwcVb+neGg@mail.gmail.com>
+Message-ID: <CAPnjgZ2Z-nBg2m1P2zkda=nMAG0qCOzVtpAOSth6nwoGSUfrFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 09:28:37AM -0400, Ohad Ben-Cohen wrote:
-> So you're suggesting to re-implement find_next_bit() using ffs()/fls()
-> and shifting ?
+Hi Bjorn,
 
-No. I suggest a simpler and shorter algorithm using the bit helpers.
-Something like that:
+On Sun, Sep 25, 2011 at 5:54 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Fri, Sep 23, 2011 at 5:03 PM, Simon Glass <sjg@chromium.org> wrote:
+>> This experimental patch set adds boot timing to a Linux system. The
+>> timing starts with the boot loader and extends through the kernel into
+>> user space to the completion of the boot process. The timing starts when
+>> the system leaves reset, not later when the kernel starts.
+>>
+>> The concept is:
+>> - Boot loader records a timestamp for key events during its operation
+>> - These timestamps are passed to Linux, which adds more as it boots
+>> - These timestamps are made available to user space, where more
+>> timestamps are added as init does its job
+>> - Finally the whole record is collected by a user-space script run at
+>> the end of init. This is fed back through some mechanism to monitor
+>> boot time in the field.
+>
+> I think this is a cool idea. ?It's quite difficult to extract this
+> sort of information today, and making it easily and consistently
+> available should help focus attention and improve things.
+>
+> There are difficult issues about which clock to use, how to correlate
+> bootloader & kernel timestamps, how to make sure the timestamps stay
+> sensible even when we use hwclock, ntp, etc., but I think it's worth
+> pushing on this to see how far you can go.
 
-        min_idx = __ffs(iommu_page_sizes);
+Yes it is not easy to get all of this right, especially trying to
+cross two completely different projects. I think the timestamps should
+be measured from reset. The kernel timestamps start not at zero, but
+from the time the kernel starts. This guarantees a consistent time
+base across the data. Also if there is a pre-boot program (such as a
+NAND loader) then its time will be counted also.
 
-        while (size) {
-                /* Max alignment allowed by current physical address */
-                phys_idx = __ffs(phys);
+A good timer would be an accurate monotonic wall clock, not
+necessarily related to time of day. An ideal timer would be a
+microsecond/nanosecond timer maintained by the hardware / SOC.
 
-                /* Max alignment allowed by current size */
-                size_idx = __fls(size);
+Regards,
+Simon
 
-                /* special case: iova == 0 */
-                if (likely(phys))
-                        idx = min(phys_idx, size_idx);
-                else
-                        idx = size_idx;
-
-                BUG_ON(idx < min_idx);
-
-                psize = 1UL << idx;
-
-                /* search next smaller page-size supported */
-                while (psize && !(iommu_page_sizes & psize))
-                        psize >>= 1;
-
-                BUG_ON(psize == 0);
-
-		iommu_ops->map(domain, iova, phys, get_order(psize), prot);
-
-                iova += psize;
-		phys += psize;
-                size -= psize;
-        }
-
-It is only C-style pseudo-code, of course. These __ffs and __fls lines
-all translate to a single instruction later. The find_next_bit()
-function has a lot more overhead because it needs to take account of
-real bitmaps (arrays of ulong). But this complexity is not required
-here.
-
-And yes, overhead is important when we implement the generic dma-ops
-on-top of the iommu-api because this will make the iommu_map function a
-fast-path. So we really care about overhead here.
-
-	Joerg
-
--- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+>
+> Bjorn
+>
