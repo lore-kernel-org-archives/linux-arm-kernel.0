@@ -1,268 +1,97 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Wed, 28 Sep 2011 11:20:07 +0530
-Subject: [PATCH V2 1/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
-In-Reply-To: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
-References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <1317189007-23033-2-git-send-email-alim.akhtar@samsung.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 28 Sep 2011 11:40:19 +0530
+Subject: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
+In-Reply-To: <201109272006.30130.laurent.pinchart@ideasonboard.com>
+References: <1315488922-16152-1-git-send-email-deepthy.ravi@ti.com>
+	<201109161506.16505.laurent.pinchart@ideasonboard.com>
+	<19F8576C6E063C45BE387C64729E739404EC8113E2@dbde02.ent.ti.com>
+	<201109272006.30130.laurent.pinchart@ideasonboard.com>
+Message-ID: <19F8576C6E063C45BE387C64729E739404ECA54C58@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- drivers/dma/amba-pl08x.c |  135 ++++++++++++++++++++++++++++++++++++++--------
- 1 files changed, 112 insertions(+), 23 deletions(-)
+> -----Original Message-----
+> From: Laurent Pinchart [mailto:laurent.pinchart at ideasonboard.com]
+> Sent: Tuesday, September 27, 2011 11:36 PM
+> To: Hiremath, Vaibhav
+> Cc: Ravi, Deepthy; linux-media at vger.kernel.org; tony at atomide.com;
+> linux at arm.linux.org.uk; linux-omap at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> mchehab at infradead.org; g.liakhovetski at gmx.de
+> Subject: Re: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
+> 
+> Hi Vaibhav,
+> 
+> On Monday 19 September 2011 17:31:02 Hiremath, Vaibhav wrote:
+> > On Friday, September 16, 2011 6:36 PM Laurent Pinchart wrote:
+> > > On Friday 16 September 2011 15:00:53 Ravi, Deepthy wrote:
+> > > > On Thursday, September 08, 2011 10:51 PM Laurent Pinchart wrote:
+> > > > > On Thursday 08 September 2011 15:35:22 Deepthy Ravi wrote:
+> > > > >> From: Vaibhav Hiremath <hvaibhav@ti.com>
+> > > > >>
+> > > > >> In order to support TVP5146 (for that matter any video decoder),
+> > > > >> it is important to support G/S/ENUM_STD ioctl on /dev/videoX
+> > > > >> device node.
+> > > > >
+> > > > > Why so ? Shouldn't it be queried on the subdev output pad
+> directly ?
+> > > >
+> > > > Because standard v4l2 application for analog devices will call these
+> > > > std ioctls on the streaming device node. So it's done on /dev/video
+> to
+> > > > make the existing apllication work.
+> > >
+> > > Existing applications can't work with the OMAP3 ISP (and similar
+> complex
+> > > embedded devices) without userspace support anyway, either in the form
+> of
+> > > a GStreamer element or a libv4l plugin. I still believe that analog
+> video
+> > > standard operations should be added to the subdev pad operations and
+> > > exposed through subdev device nodes, exactly as done with formats.
+> >
+> > I completely agree with your point that, existing application will not
+> work
+> > without setting links properly. But I believe the assumption here is,
+> > media-controller should set the links (along with pad formants) and all
+> > existing application should work as is. Isn't it?
+> 
+> The media controller is an API used (among other things) to set the links.
+> You
+> still need to call it from userspace. That won't happen magically. The
+> userspace component that sets up the links and configures the formats, be
+> it a
+> GStreamer element, a libv4l plugin, or something else, can as well setup
+> the
+> standard on the TVP5146 subdev.
+> 
+Please look at from analog device point of view which is interfaced to ISP.
 
-diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index cd8df7f..501540f 100644
---- a/drivers/dma/amba-pl08x.c
-+++ b/drivers/dma/amba-pl08x.c
-@@ -66,8 +66,25 @@
-  *    after the final transfer signalled by LBREQ or LSREQ.  The DMAC
-  *    will then move to the next LLI entry.
-  *
-- * Global TODO:
-- * - Break out common code from arch/arm/mach-s3c64xx and share
-+ * Samsung S3C64xx SoCs uses a variant of PL080 DMAC. It contains an extra
-+ * control register to hold the TransferSize. Below is the LLI structure
-+ * and offsets of S3C64xx DMAC.
-+ *	-----------------------------------------------------------------
-+ *	|	Offset		|	Contents		        |
-+ *	-----------------------------------------------------------------
-+ *	| Next LLI Address	| Source Address for Next xfer	        |
-+ *	-----------------------------------------------------------------
-+ *	| Next LLI Address+0x04	| Destination Address for Next xfer     |
-+ *	-----------------------------------------------------------------
-+ *	| Next LLI Address+0x08	| Next LLI address for next xfer        |
-+ *	-----------------------------------------------------------------
-+ *	| Next LLI Address+0x0c	| DMACCxControl0 data for next xfer     |
-+ *	-----------------------------------------------------------------
-+ *	| Next LLI Address+0x10	| DMACCxControl1 xfer size for next xfer|
-+ *	-----------------------------------------------------------------
-+ * Also S3C64XX has a config register at offset 0x14
-+ * Have a look at arch/arm/include/asm/hardware/pl080.h for complete register
-+ * details.
-  */
- #include <linux/amba/bus.h>
- #include <linux/amba/pl08x.h>
-@@ -97,6 +114,8 @@ static struct amba_driver pl08x_amba_driver;
- struct vendor_data {
- 	u8 channels;
- 	bool dualmaster;
-+	/* To identify samsung DMAC */
-+	bool is_pl080_s3c;
- };
- 
- /*
-@@ -110,6 +129,11 @@ struct pl08x_lli {
- 	u32 dst;
- 	u32 lli;
- 	u32 cctl;
-+	/*
-+	 * Samsung pl080 DMAC has one exrta control register
-+	 * which is used to hold the transfer_size
-+	 */
-+	u32 cctl1;
- };
- 
- /**
-@@ -171,9 +195,20 @@ static inline struct pl08x_txd *to_pl08x_txd(struct dma_async_tx_descriptor *tx)
- /* Whether a certain channel is busy or not */
- static int pl08x_phy_channel_busy(struct pl08x_phy_chan *ch)
- {
-+	struct pl08x_dma_chan *plchan = ch->serving;
-+	struct pl08x_driver_data *pl08x;
- 	unsigned int val;
- 
--	val = readl(ch->base + PL080_CH_CONFIG);
-+	if (plchan == NULL)
-+		return false;
-+
-+	pl08x = plchan->host;
-+
-+	if (pl08x->vd->is_pl080_s3c)
-+		val = readl(ch->base + PL080S_CH_CONFIG);
-+	else
-+		val = readl(ch->base + PL080_CH_CONFIG);
-+
- 	return val & PL080_CONFIG_ACTIVE;
- }
- 
-@@ -207,7 +242,12 @@ static void pl08x_start_txd(struct pl08x_dma_chan *plchan,
- 	writel(lli->dst, phychan->base + PL080_CH_DST_ADDR);
- 	writel(lli->lli, phychan->base + PL080_CH_LLI);
- 	writel(lli->cctl, phychan->base + PL080_CH_CONTROL);
--	writel(txd->ccfg, phychan->base + PL080_CH_CONFIG);
-+
-+	if (pl08x->vd->is_pl080_s3c) {
-+		writel(txd->ccfg, phychan->base + PL080S_CH_CONFIG);
-+		writel(lli->cctl1, phychan->base + PL080S_CH_CONTROL2);
-+	} else
-+		writel(txd->ccfg, phychan->base + PL080_CH_CONFIG);
- 
- 	/* Enable the DMA channel */
- 	/* Do not access config register until channel shows as disabled */
-@@ -215,11 +255,23 @@ static void pl08x_start_txd(struct pl08x_dma_chan *plchan,
- 		cpu_relax();
- 
- 	/* Do not access config register until channel shows as inactive */
--	val = readl(phychan->base + PL080_CH_CONFIG);
--	while ((val & PL080_CONFIG_ACTIVE) || (val & PL080_CONFIG_ENABLE))
-+	if (pl08x->vd->is_pl080_s3c) {
-+		val = readl(phychan->base + PL080S_CH_CONFIG);
-+		while ((val & PL080_CONFIG_ACTIVE) ||
-+			(val & PL080_CONFIG_ENABLE))
-+			val = readl(phychan->base + PL080S_CH_CONFIG);
-+
-+		writel(val | PL080_CONFIG_ENABLE,
-+			phychan->base + PL080S_CH_CONFIG);
-+	} else {
- 		val = readl(phychan->base + PL080_CH_CONFIG);
-+			while ((val & PL080_CONFIG_ACTIVE) ||
-+				(val & PL080_CONFIG_ENABLE))
-+				val = readl(phychan->base + PL080_CH_CONFIG);
- 
--	writel(val | PL080_CONFIG_ENABLE, phychan->base + PL080_CH_CONFIG);
-+		writel(val | PL080_CONFIG_ENABLE,
-+			phychan->base + PL080_CH_CONFIG);
-+	}
- }
- 
- /*
-@@ -236,12 +288,19 @@ static void pl08x_pause_phy_chan(struct pl08x_phy_chan *ch)
- {
- 	u32 val;
- 	int timeout;
-+	struct pl08x_dma_chan *plchan = ch->serving;
-+	struct pl08x_driver_data *pl08x = plchan->host;
- 
- 	/* Set the HALT bit and wait for the FIFO to drain */
--	val = readl(ch->base + PL080_CH_CONFIG);
--	val |= PL080_CONFIG_HALT;
--	writel(val, ch->base + PL080_CH_CONFIG);
--
-+	if (pl08x->vd->is_pl080_s3c) {
-+		val = readl(ch->base + PL080S_CH_CONFIG);
-+		val |= PL080_CONFIG_HALT;
-+		writel(val, ch->base + PL080S_CH_CONFIG);
-+	} else {
-+		val = readl(ch->base + PL080_CH_CONFIG);
-+		val |= PL080_CONFIG_HALT;
-+		writel(val, ch->base + PL080_CH_CONFIG);
-+	}
- 	/* Wait for channel inactive */
- 	for (timeout = 1000; timeout; timeout--) {
- 		if (!pl08x_phy_channel_busy(ch))
-@@ -255,11 +314,19 @@ static void pl08x_pause_phy_chan(struct pl08x_phy_chan *ch)
- static void pl08x_resume_phy_chan(struct pl08x_phy_chan *ch)
- {
- 	u32 val;
-+	struct pl08x_dma_chan *plchan = ch->serving;
-+	struct pl08x_driver_data *pl08x = plchan->host;
- 
- 	/* Clear the HALT bit */
--	val = readl(ch->base + PL080_CH_CONFIG);
--	val &= ~PL080_CONFIG_HALT;
--	writel(val, ch->base + PL080_CH_CONFIG);
-+	if (pl08x->vd->is_pl080_s3c) {
-+		val = readl(ch->base + PL080S_CH_CONFIG);
-+		val &= ~PL080_CONFIG_HALT;
-+		writel(val, ch->base + PL080S_CH_CONFIG);
-+	} else {
-+		val = readl(ch->base + PL080_CH_CONFIG);
-+		val &= ~PL080_CONFIG_HALT;
-+		writel(val, ch->base + PL080_CH_CONFIG);
-+	}
- }
- 
- /*
-@@ -271,12 +338,17 @@ static void pl08x_resume_phy_chan(struct pl08x_phy_chan *ch)
- static void pl08x_terminate_phy_chan(struct pl08x_driver_data *pl08x,
- 	struct pl08x_phy_chan *ch)
- {
--	u32 val = readl(ch->base + PL080_CH_CONFIG);
--
--	val &= ~(PL080_CONFIG_ENABLE | PL080_CONFIG_ERR_IRQ_MASK |
--	         PL080_CONFIG_TC_IRQ_MASK);
--
--	writel(val, ch->base + PL080_CH_CONFIG);
-+	if (pl08x->vd->is_pl080_s3c) {
-+		u32 val = readl(ch->base + PL080S_CH_CONFIG);
-+		val &= ~(PL080_CONFIG_ENABLE | PL080_CONFIG_ERR_IRQ_MASK |
-+				PL080_CONFIG_TC_IRQ_MASK);
-+		writel(val, ch->base + PL080S_CH_CONFIG);
-+	} else {
-+		u32 val = readl(ch->base + PL080_CH_CONFIG);
-+		val &= ~(PL080_CONFIG_ENABLE | PL080_CONFIG_ERR_IRQ_MASK |
-+				PL080_CONFIG_TC_IRQ_MASK);
-+		writel(val, ch->base + PL080_CH_CONFIG);
-+	}
- 
- 	writel(1 << ch->id, pl08x->base + PL080_ERR_CLEAR);
- 	writel(1 << ch->id, pl08x->base + PL080_TC_CLEAR);
-@@ -569,6 +641,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 	u32 cctl, early_bytes = 0;
- 	size_t max_bytes_per_lli, total_bytes = 0;
- 	struct pl08x_lli *llis_va;
-+	size_t lli_len = 0, target_len, tsize, odd_bytes;
- 
- 	txd->llis_va = dma_pool_alloc(pl08x->pool, GFP_NOWAIT, &txd->llis_bus);
- 	if (!txd->llis_va) {
-@@ -700,7 +773,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 		 * width left
- 		 */
- 		while (bd.remainder > (mbus->buswidth - 1)) {
--			size_t lli_len, tsize, width;
-+			size_t width;
- 
- 			/*
- 			 * If enough left try to send max possible,
-@@ -759,6 +832,9 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 	llis_va[num_llis - 1].lli = 0;
- 	/* The final LLI element shall also fire an interrupt. */
- 	llis_va[num_llis - 1].cctl |= PL080_CONTROL_TC_IRQ_EN;
-+	/* Keep the TransferSize seperate to fill samsung specific register */
-+	if (pl08x->vd->is_pl080_s3c)
-+		llis_va[num_llis - 1].cctl1 |= lli_len;
- 
- #ifdef VERBOSE_DEBUG
- 	{
-@@ -771,8 +847,8 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
- 			dev_vdbg(&pl08x->adev->dev,
- 				 "%3d @%p: 0x%08x 0x%08x 0x%08x 0x%08x\n",
- 				 i, &llis_va[i], llis_va[i].src,
--				 llis_va[i].dst, llis_va[i].lli, llis_va[i].cctl
--				);
-+				 llis_va[i].dst, llis_va[i].lli,
-+				 llis_va[i].cctl);
- 		}
- 	}
- #endif
-@@ -1979,6 +2055,12 @@ static struct vendor_data vendor_pl081 = {
- 	.dualmaster = false,
- };
- 
-+static struct vendor_data vendor_pl080_s3c = {
-+	.channels = 8,
-+	.dualmaster = true,
-+	.is_pl080_s3c = true,
-+};
-+
- static struct amba_id pl08x_ids[] = {
- 	/* PL080 */
- 	{
-@@ -1998,6 +2080,13 @@ static struct amba_id pl08x_ids[] = {
- 		.mask	= 0x00ffffff,
- 		.data	= &vendor_pl080,
- 	},
-+	/* Samsung DMAC is PL080 variant*/
-+	{
-+		.id	= 0x00041082,
-+		.mask	= 0x000fffff,
-+		.data	= &vendor_pl080_s3c,
-+
-+	},
- 	{ 0, 0 },
- };
- 
--- 
-1.7.2.3
+OMAP3 ISP => TVP5146 (video decoder)
+
+As a user I would want to expect the standard to be supported on streaming device node, since all standard streaming applications (for analog devices/interfaces) does this.
+
+Setting up the links and format is still something got added with MC framework, and I would consider it as a separate plug-in along with existing applications.
+
+Why do I need to write/use two different streaming application one for MC compatible device and another for non-MC?
+
+> > The way it is being done currently is, set the format at the pad level
+> > which is same as analog standard resolution and use existing application
+> > for streaming...
+> 
+> At then end of the OMAP3 ISP pipeline video data has long lost its analog
+> roots. I don't think standards make sense there.
+> 
+I don't agree with you here, I think we made it clear when we started with MC development activity, we will not break existing standard applications. Media-controller will play a roll to setup the links, connecting the pads and stuff.
+
+
+Thanks,
+Vaibhav
+
+> > I am ok, if we add s/g/enum_std api support at sub-dev level but this
+> > should also be supported on streaming device node.
+> 
+> --
+> Regards,
+> 
+> Laurent Pinchart
