@@ -1,25 +1,42 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 28 Sep 2011 19:11:17 +0200
-Subject: MAC firmware does not load due to (commit 288d5abe usermodehelper)
-In-Reply-To: <CA+55aFy4aZPdUNBR0O3SP1iRRJyeF9kPZxH9G_eYdxueYskF4g@mail.gmail.com>
-References: <20110928120630.GB9456@netboy.at.omicron.at>
-	<CA+55aFy4aZPdUNBR0O3SP1iRRJyeF9kPZxH9G_eYdxueYskF4g@mail.gmail.com>
-Message-ID: <20110928171115.GA5909@netboy.at.omicron.at>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 28 Sep 2011 20:11:51 +0300
+Subject: [PATCH v4 3/3] arm/tegra: device tree support for ventana board
+In-Reply-To: <201109281516.42513.arnd@arndb.de>
+References: <1317171902-14736-1-git-send-email-pdeschrijver@nvidia.com>
+	<1317171902-14736-4-git-send-email-pdeschrijver@nvidia.com>
+	<201109281516.42513.arnd@arndb.de>
+Message-ID: <20110928171151.GN21166@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2011 at 08:21:05AM -0700, Linus Torvalds wrote:
+On Wed, Sep 28, 2011 at 03:16:42PM +0200, Arnd Bergmann wrote:
+> On Wednesday 28 September 2011, Peter De Schrijver wrote:
+> > --- a/arch/arm/mach-tegra/board-dt.c
+> > +++ b/arch/arm/mach-tegra/board-dt.c
+> > @@ -47,7 +47,7 @@
+> >  
+> >  void harmony_pinmux_init(void);
+> >  void seaboard_pinmux_init(void);
+> > -
+> > +void ventana_pinmux_init(void);
+> >  
+> >  struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
+> >         OF_DEV_AUXDATA("nvidia,tegra20-sdhci", TEGRA_SDMMC1_BASE, "sdhci-tegra.0", NULL),
+> > @@ -95,6 +95,8 @@ static void __init tegra_dt_init(void)
+> >                 harmony_pinmux_init();
+> >         else if (of_machine_is_compatible("nvidia,seaboard"))
+> >                 seaboard_pinmux_init();
+> > +       else if (of_machine_is_compatible("nvidia,ventana"))
+> > +               ventana_pinmux_init();
 > 
-> Something seems to be calling ioctl() befor rest_init() has even
-> completed. Which sounds odd, but I wonder if the schedule() there
-> before it might have let 'init' get going.
+> Are you (Peter, Colin, Olof) confident that this is not getting out
+> of hand before it's getting better?
+> 
 
-It does look like it. The init is busybox, and the startup script does
-mount, syslogd, and then ifup, so that all can go by quickly.
+We don't planning to add more derived boards besides ventana until we have the
+devicetree bindings for the new pinmux API in at which point this code
+will become obsolete.
 
-> Does something like the attached (UNTESTED) fix it?
+Cheers,
 
-Yup, problem cured.
-
-Thanks,
-Richard
+Peter.
