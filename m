@@ -1,91 +1,57 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 28 Sep 2011 09:19:26 +0530
-Subject: [PATCH] dma/imx-sdma+imx-dma: explicitly #include <linux/module.h>
-In-Reply-To: <4E824821.8040105@windriver.com>
-References: <1317018379-8897-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4E824821.8040105@windriver.com>
-Message-ID: <1317181766.1573.1641.camel@vkoul-udesk3>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 27 Sep 2011 20:56:02 -0700
+Subject: [PATCH 0/4] arm/tegra: Convert gpio & pinmux to platform devices
+In-Reply-To: <201109231848.52318.arnd@arndb.de>
+References: <1316725567-17881-1-git-send-email-swarren@nvidia.com>
+	<201109231848.52318.arnd@arndb.de>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173955572E@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-09-27 at 18:03 -0400, Paul Gortmaker wrote:
-> On 11-09-26 02:26 AM, Uwe Kleine-K?nig wrote:
-> > This is needed after commit
-> > 
-> > 	include: replace linux/module.h with "struct module" wherever possible
-> > 
-> > (currently 25215aa in next).
-> > 
-> > Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by Vinod Koul <vinod.koul@intel.com>
+Arnd Bergmann wrote at Friday, September 23, 2011 10:49 AM:
+> On Thursday 22 September 2011, Stephen Warren wrote:
+> >
+> > This series converts the Tegra GPIO and pinmux drivers to be regular
+> > platform devices.
+> 
+> Looks good overall.
 
-> > ---
-> > Hello,
-> > 
-> > maybe it's sensible for Paul to take that before his commit?
-> 
-> Thanks, I'll blend it into the commit adding module.h to the other
-> drivers/dma files.  It seems the imx boards don't have a defconfig
-> in the arch/arm/configs that enables this (CONFIG_IMX_[S]DMA).
-You can find imx_v4_v5_defconfig in linux-next tree.
+Thanks.
 
+> > The series is extracted from an earlier series I posted that augmented
+> > these drivers to initialize HW state from the device-tree. I'm holding
+> > off on that aspect of the changes, since it's not entirely clear to me
+> > whether the new pinmux API should drive the initial pinmux state setup
+> > via "system hog" definitions, or whether pinmux drivers should indeed
+> > do their own thing.
 > 
-> What is really interesting (at least to me anyway) is that I
-> didn't get one iMX build in some 6000+ ARM randconfig builds....
+> I think at least you should try to do an ioremap of the pinmux register
+> area in the pinmux probe function and make sure that it's called early
+> enough, if at all possible.
 > 
-> I would have thought it would have showed up at least a couple
-> times, given that number of builds.  Maybe randconfig doesn't
-> deal so well with "choice" Kconfig items?
-> 
-> ~/git/module.h/linux-2.6.git$ ls -1 ../build-10*arm |wc -l
-> 6399
-> ~/git/module.h/linux-2.6.git$ grep CONFIG_ARCH_[A-Z0-9]*=y ../build-10*arm*/.config | sed 's/.*CON/CON/'|sort |uniq
-> CONFIG_ARCH_EBSA110=y
-> CONFIG_ARCH_H7201=y
-> CONFIG_ARCH_H7202=y
-> CONFIG_ARCH_H720X=y
-> CONFIG_ARCH_VERSATILE=y
-> ~/git/module.h/linux-2.6.git$ 
-> 
-> No ARCH_MXC, no ARCH_MXS, PXA, or any of the other 20+ variants.
-> Definitely not a random spread there, with all 6000 builds falling
-> in just 5 buckets.
-> 
-> Paul.
-> 
-> 
-> > 
-> > Best regards
-> > Uwe
-> > 
-> >  drivers/dma/imx-dma.c  |    1 +
-> >  drivers/dma/imx-sdma.c |    1 +
-> >  2 files changed, 2 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-> > index d99f71c..3732de8 100644
-> > --- a/drivers/dma/imx-dma.c
-> > +++ b/drivers/dma/imx-dma.c
-> > @@ -23,6 +23,7 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/dmaengine.h>
-> > +#include <linux/module.h>
-> >  
-> >  #include <asm/irq.h>
-> >  #include <mach/dma-v1.h>
-> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> > index b5cc27d..86fb6e5 100644
-> > --- a/drivers/dma/imx-sdma.c
-> > +++ b/drivers/dma/imx-sdma.c
-> > @@ -34,6 +34,7 @@
-> >  #include <linux/dmaengine.h>
-> >  #include <linux/of.h>
-> >  #include <linux/of_device.h>
-> > +#include <linux/module.h>
-> >  
-> >  #include <asm/irq.h>
-> >  #include <mach/sdma.h>
+> Right now, there is an empty probe() function, which is a bit silly,
+> and the pg_readl()/pg_writel() functions use hardcoded register
+> addresses.
+
+For GPIO, calling ioremap() should be pretty easy.
+
+For pinmux, there are complications: The pinmux HW doesn't have a dedicated
+address range, but rather the registers are somewhat scattered in groups
+throughout the "APB_MISC" address range. APB_MISC also includes strapping,
+JTAG configuration, and USB PHY registers, all of which exist between the
+various groups of pinmux registers. On Tegra30, there's slightly less of
+this, yet in turn this means that the number of chunks of address space used
+by the pinmux module differs from Tegra20.
+
+Right now, the pinmux driver data tables (which define the set of pin groups
+known to the pinmux driver) all store register addresses as offsets from the
+base of this APB_MISC region for simplicity.
+
+What are your thoughts here; should I go ahead and update the pinmux driver
+to ioremap() each of these chunks individually, and update the data tables
+to be a tuple (chunk ID, offset_from_chunk), or leave things as is?
+
+Thanks.
+
 -- 
-~Vinod
+nvpublic
