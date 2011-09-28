@@ -1,40 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Sep 2011 07:34:05 +0200
-Subject: [PATCH 3/3] mmc: mmci: Change vdd_handler to a generic ios_handler
-In-Reply-To: <1317123753-29902-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1317123753-29902-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdZpbs06Gi27dpVearp1zV6Xi-8-88E1GJmRca3u_N1zbg@mail.gmail.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Wed, 28 Sep 2011 11:20:06 +0530
+Subject: [PATCH V2 0/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
+Message-ID: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 1:42 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+This patch modifies the amba-pl08x driver for s3c64xx.
+The DMA controller of S3C64XX is a variant of PrimeCell pl080 DMAC.
+S3C64xx contents extra register to hold the TransferSize.
 
-> The purpose of the vdd_handler does not make sense. We remove it
-> and use a generic approach instead. A new ios_handler is added, the
-> purpose of which e.g. can be to control GPIO pins to a levelshifter.
->
-> Previously the vdd_handler was also used for making additional
-> changes to the power register bits. This option is superfluous and is
-> therefore removed.
->
-> Adaptaptions from the old vdd_handler to the new ios_handler is done for
-> mach-ux500 board, which was the only one using the vdd_handler.
+Below diagram explains the s3c64xx LLI structure and offsets.
+	-----------------------------------------------------------------
+	|       Offset          |       Contents                        |
+	-----------------------------------------------------------------
+	| Next LLI Address      | Source Address for Next xfer          |
+	----------------------------------------------------------------- 
+	| Next LLI Address+0x04 | Destination Address for Next xfer     |
+	-----------------------------------------------------------------
+	| Next LLI Address+0x08 | Next LLI address for Next xfer        |
+	-----------------------------------------------------------------
+	| Next LLI Address+0x0c | DMACCxControl0 data for Next xfer     |
+	-----------------------------------------------------------------
+	| Next LLI Address+0x10 | DMACCxControl1 xfer size for Next xfer|
+	----------------------------------------------------------------- 
 
-I've tried to undestand (by reading the data sheets I have) what the
-purpose of the original 4 power bits handled by the mechanism that
-nobody really use is, and I'm still lost.
+Changes since v1:
+	- Rebased with "samsung_dma" branch of 
+	http://git.infradead.org/users/vkoul/slave-dma.git
 
-I'm guessing it was some feature intended to control e.g. a
-regulator of some kind by routing them off-chip (since mixed-signal
-chips rarely have MMC controllers inside...) and most designers
-already have their own regulator designs so it made no sense
-for anyone to actually implement it that way.
+	- Addressed review comments from linus.walleij 
+	http://www.spinics.net/lists/arm-kernel/msg135411.html
 
-If some vendor would actually start using these bits for the
-intended purpose I guess we could adapt. (The pirate driver
-msm_sdcc.c does not seem to use these bits either BTW.)
+Alim Akhtar (1):
+  dmaengine/amba-pl08x: Add support for s3c64xx DMAC
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+ drivers/dma/amba-pl08x.c |  135 ++++++++++++++++++++++++++++++++++++++--------
+ 1 files changed, 112 insertions(+), 23 deletions(-)
 
-Yours,
-Linus Walleij
+-- 
+1.7.2.3
