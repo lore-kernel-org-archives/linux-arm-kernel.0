@@ -1,78 +1,91 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 28 Sep 2011 09:12:45 +0530
-Subject: [linux-pm Query] Power Management Device Suspend/ Resume
-In-Reply-To: <4E8293C4.5090009@st.com>
-References: <CAO1yOm2pbApTwa0gj3Q9RsC1mxNGGirxm6FzaDC7zbgjHdkKDw@mail.gmail.com>
-	<4E8293C4.5090009@st.com>
-Message-ID: <1317181365.1573.1636.camel@vkoul-udesk3>
+Date: Wed, 28 Sep 2011 09:19:26 +0530
+Subject: [PATCH] dma/imx-sdma+imx-dma: explicitly #include <linux/module.h>
+In-Reply-To: <4E824821.8040105@windriver.com>
+References: <1317018379-8897-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4E824821.8040105@windriver.com>
+Message-ID: <1317181766.1573.1641.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-09-28 at 08:55 +0530, Viresh Kumar wrote:
-> Hi,
+On Tue, 2011-09-27 at 18:03 -0400, Paul Gortmaker wrote:
+> On 11-09-26 02:26 AM, Uwe Kleine-K?nig wrote:
+> > This is needed after commit
+> > 
+> > 	include: replace linux/module.h with "struct module" wherever possible
+> > 
+> > (currently 25215aa in next).
+> > 
+> > Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by Vinod Koul <vinod.koul@intel.com>
+
+> > ---
+> > Hello,
+> > 
+> > maybe it's sensible for Paul to take that before his commit?
 > 
-> Can somebody please help us understand suspend/resume.
-> It would be a great help, even if you can point us to some earlier fruitful
-> discussion.
-are you trying to do runtime power management or traditional suspend and
-resume? IMO both should be done...
+> Thanks, I'll blend it into the commit adding module.h to the other
+> drivers/dma files.  It seems the imx boards don't have a defconfig
+> in the arch/arm/configs that enables this (CONFIG_IMX_[S]DMA).
+You can find imx_v4_v5_defconfig in linux-next tree.
+
 > 
-> --
-> viresh
+> What is really interesting (at least to me anyway) is that I
+> didn't get one iMX build in some 6000+ ARM randconfig builds....
 > 
-> On 9/22/2011 4:19 PM, Deepak Sikri wrote:
-> > Hi,
+> I would have thought it would have showed up at least a couple
+> times, given that number of builds.  Maybe randconfig doesn't
+> deal so well with "choice" Kconfig items?
+> 
+> ~/git/module.h/linux-2.6.git$ ls -1 ../build-10*arm |wc -l
+> 6399
+> ~/git/module.h/linux-2.6.git$ grep CONFIG_ARCH_[A-Z0-9]*=y ../build-10*arm*/.config | sed 's/.*CON/CON/'|sort |uniq
+> CONFIG_ARCH_EBSA110=y
+> CONFIG_ARCH_H7201=y
+> CONFIG_ARCH_H7202=y
+> CONFIG_ARCH_H720X=y
+> CONFIG_ARCH_VERSATILE=y
+> ~/git/module.h/linux-2.6.git$ 
+> 
+> No ARCH_MXC, no ARCH_MXS, PXA, or any of the other 20+ variants.
+> Definitely not a random spread there, with all 6000 builds falling
+> in just 5 buckets.
+> 
+> Paul.
+> 
+> 
+> > 
+> > Best regards
+> > Uwe
+> > 
+> >  drivers/dma/imx-dma.c  |    1 +
+> >  drivers/dma/imx-sdma.c |    1 +
+> >  2 files changed, 2 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+> > index d99f71c..3732de8 100644
+> > --- a/drivers/dma/imx-dma.c
+> > +++ b/drivers/dma/imx-dma.c
+> > @@ -23,6 +23,7 @@
+> >  #include <linux/slab.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/dmaengine.h>
+> > +#include <linux/module.h>
 > >  
-> > We are in the process of adding Suspend/ Resume call backs for the devices on SPEAr platform.
-> > The platform makes use of various power domains which could be turned off (during suspend, implying
-> > the devices in those power domains lose their context).
+> >  #include <asm/irq.h>
+> >  #include <mach/dma-v1.h>
+> > diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+> > index b5cc27d..86fb6e5 100644
+> > --- a/drivers/dma/imx-sdma.c
+> > +++ b/drivers/dma/imx-sdma.c
+> > @@ -34,6 +34,7 @@
+> >  #include <linux/dmaengine.h>
+> >  #include <linux/of.h>
+> >  #include <linux/of_device.h>
+> > +#include <linux/module.h>
 > >  
-> > *There are certain queries*.
-> >  
-> > *Query- 1*. Suppose my platform has a ADC driver under char framework, which internally uses the
-> > DMA driver (channels). Now, ADC driver can be used by other kernel drivers or directly from user application.
-> >  
-> > *1. a.* What are the expectations from the suspend and resume routines of both the devices, DMA & ADC ?
-> >  
-> > */-- Given that few of the options are/*
-> > */1.a.1. On suspend,/*
-> > In ADC suspend function: ADC releases all the DMA channels, latches its registers; and
-> > DMA suspend function: DMA does nothing except for lataching of registers if required.
-> >  
-> > */1.a.2. On suspend, /*
-> > ADC suspend function: ADC just latches its registers and stops R/W through DMA, no DMA channel release;
-> > DMA suspend function: DMA halts its operating channels, and latches its registers if required.
-Well channel release/alloc is not really required. You can goto suspend
-in between as well. if you have queued but not active descriptors on all
-channels then dmac is idle and you can use this time to goto suspend.
-
-> >  
-> > */1.a.3 Some other alternative/*
-> > *//* 
-> >  
-> > *1.b* Will the suspend resume for the dependent drivers follow sequencing, i.e. Suspend of ADC followed by
-> > Suspend of DMA? (Assume both of these devices are hooked on to Platform bus, given that ADC uses DMA)
-why do you care?
-Each driver is independent and should manage its own resources properly
-> >  
-> > *Query-2*
-> >  
-> > 2.1 The user space threads freeze first followed by kernel space.  In case the user space process issues a a system
-> > call (lets assume an ioctl system call), how will the user space thread respond in case of suspend to ram?
-all user space processes are frozen on STR
-> >  
-> > 2.2 Will the kernel thread running on behalf of user space process complete the ioctl call OR 
-> >  freeze upon in the middle of execution?
-IIRC, It will be frozen
-
-> >  
-> > *Query-3*
-> > ** 
-> > Are there any modalities w.r.t latching and restoring the contents at the driver level ?
-> > that is: Should this process be handled at drier level or platform specific code can also handle this
-kernel context is not lost during suspend, so I don't think you need to
-do much apart from resuming your device properly
-
-
+> >  #include <asm/irq.h>
+> >  #include <mach/sdma.h>
 -- 
 ~Vinod
