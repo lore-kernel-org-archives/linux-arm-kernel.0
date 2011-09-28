@@ -1,38 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Sep 2011 17:53:29 -0700
-Subject: [PATCH v2 00/16] Switch GIC users (and omap2plus) to
-	CONFIG_MULTI_IRQ_HANDLER
-In-Reply-To: <20110927235309.GP6324@atomide.com>
-References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-	<20110927235309.GP6324@atomide.com>
-Message-ID: <20110928005329.GQ6324@atomide.com>
+Date: Tue, 27 Sep 2011 17:59:04 -0700
+Subject: [PATCH v3 2/3] ARM: gic: consolidate PPI handling
+In-Reply-To: <1316793788-14500-3-git-send-email-marc.zyngier@arm.com>
+References: <1316793788-14500-1-git-send-email-marc.zyngier@arm.com>
+	<1316793788-14500-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110928005904.GR6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110927 16:19]:
+* Marc Zyngier <marc.zyngier@arm.com> [110923 12:03]:
+> PPI handling is a bit of an odd beast. It uses its own low level
+> handling code and is hardwired to the local timers (hence lacking
+> a registration interface).
 > 
-> * Marc Zyngier <marc.zyngier@arm.com> [110926 07:02]:
-> > 
-> > This series has been tested on VE (A9, A5, A15), PB11MP, Panda, IGEPv2
-> > and Harmony. Patches against next-20110926 plus my PPI series.
+> Instead, switch the low handling to the normal SPI handling code.
+> PPIs are handled by the handle_percpu_devid_irq flow.
 > 
-> I gave this series a quick try, it works except with all the patches
-> applied omap2plus_defconfig will failt to boot on omap4. It seems that
-> the issue is somewhere in the GIC related patches, the last one just
-> enables the MULTI_IRQ..
+> This also allows the removal of some duplicated code.
 > 
-> Care to give it a try on your Panda and see if omap2plus_defconfig
-> works for you with this series?
-> 
-> Looks like disabling CONFIG_SMP made it omap4 boot again.
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Nevermind, looks like I was missing the PPI series.. No wonder
-I had to do some rebasing to get the patches to apply..
+For the omap changes:
 
-Booting just fine now, will ack some patches separately. Gave
-the PPI + MULTI_IRQ series a quick boot test on n800, 2430sdp,
-n900, zoom3 and blaze. So that pretty much covers omap2, 3 & 4.
+Tested-by: Tony Lindgren <tony@atomide.com>
 
-Regards,
-
-Tony
+(Sorry had to dig this one from the archive, looks like
+the Cc addresses might be left out)
