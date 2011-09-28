@@ -1,55 +1,55 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 28 Sep 2011 13:08:32 +0100
-Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
-In-Reply-To: <CACRpkdYyurmMSF0LnN3Ut8fmQDkjVC5pNCeUWQ=ik8Ete6UYzg@mail.gmail.com>
-References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
-	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
-	<CACRpkdYyurmMSF0LnN3Ut8fmQDkjVC5pNCeUWQ=ik8Ete6UYzg@mail.gmail.com>
-Message-ID: <20110928120832.GI17204@pulham.picochip.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 28 Sep 2011 14:18:08 +0200
+Subject: [PATCH 6/6] arm/imx: merge i.MX3 and i.MX6
+In-Reply-To: <1317201368-6403-7-git-send-email-shawn.guo@linaro.org>
+References: <1317201368-6403-1-git-send-email-shawn.guo@linaro.org>
+	<1317201368-6403-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110928121808.GY31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Sep 28, 2011 at 05:16:08PM +0800, Shawn Guo wrote:
+> 
+>  
+> -config ARCH_MX3
+> -	bool "MX3-based"
+> +config ARCH_IMX_V6_V7
+> +	bool "i.MX3, i.MX6"
+> +	select AUTO_ZRELADDR
+> +	select ARM_PATCH_PHYS_VIRT
 
-On Wed, Sep 28, 2011 at 01:09:48PM +0200, Linus Walleij wrote:
-> On Wed, Sep 28, 2011 at 12:41 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> 
-> > +static void vic_single_handle_irq(struct vic_device *vic, struct pt_regs *regs)
-> > +{
-> > + ? ? ? u32 stat, irq;
-> > + ? ? ? bool handled = false;
-> > +
-> > + ? ? ? while (!handled) {
-> > + ? ? ? ? ? ? ? stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> > + ? ? ? ? ? ? ? if (!stat)
-> > + ? ? ? ? ? ? ? ? ? ? ? break;
-> > +
-> > + ? ? ? ? ? ? ? while (stat) {
-> > + ? ? ? ? ? ? ? ? ? ? ? irq = fls(stat) - 1;
-> 
-> Isn't fls "find last set"?
-> 
-> That means IRQs with higher numbers will be handled first will it not?
-> 
-> For U300 IRQs with lower numbers will be handled first
-> by iteratively testing bit 0 and shifting right:
-> 
-> -1002:  tst     \irqstat, #1
-> -       bne     1003f
-> -       add     \irqnr, \irqnr, #1
-> -       movs    \irqstat, \irqstat, lsr #1
-> -       bne     1002b
-> 
-> So I would use ffs() for this to work the same way as before in
-> U300.
-> 
-> Since this can have some performance impact, if the platforms differ
-> in whether they handle IRQs from low to high or from high to low
-> might need to be a flag passed in to vic_init() or so...
+Russell pointed out that it's not a good idea to select this.
 
-I don't know how important the ordering is, but if it is important then 
-we could have vic_handle_irq_msb_first() and vic_handle_irq_lsb_first() 
-as the handlers so there isn't any additional indirection/selection in 
-the interrupt hot-path.
+Sascha
 
-Jamie
+>  	help
+> -	  This enables support for systems based on the Freescale i.MX3 family
+> +	  This enables support for systems based on the Freescale i.MX3 and i.MX6
+> +	  family.
+>  
+>  config ARCH_MX5
+>  	bool "i.MX50, i.MX51, i.MX53"
+> @@ -29,13 +32,6 @@ config ARCH_MX5
+>  	  This enables support for machines using Freescale's i.MX50 and i.MX51
+>  	  processors.
+>  
+> -config ARCH_MX6
+> -	bool "i.MX6"
+> -	select AUTO_ZRELADDR
+> -	select ARM_PATCH_PHYS_VIRT
+> -	help
+> -	  This enables support for systems based on the Freescale i.MX6 family
+> -
+>  endchoice
+>  
+>  source "arch/arm/mach-imx/Kconfig"
+> -- 
+> 1.7.4.1
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
