@@ -1,73 +1,37 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Wed, 28 Sep 2011 13:23:14 -0500
-Subject: [PATCH 02/13] gpio/omap: Adapt GPIO driver to DT
-In-Reply-To: <4E82D7B3.6080909@ti.com>
-References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>	<1317055821-20652-3-git-send-email-b-cousson@ti.com>	<4E8161C7.7020404@ti.com>
-	<4E82D7B3.6080909@ti.com>
-Message-ID: <4E836612.2010709@freescale.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 28 Sep 2011 11:28:48 -0700
+Subject: [PATCH] OMAP: Fix linking error in twl-common.c for OMAP2/3/4
+	only builds
+In-Reply-To: <4E43F029.6060208@matrix-vision.de>
+References: <20110808110056.GA15134@n2100.arm.linux.org.uk>
+	<1312893410-3968-1-git-send-email-peter.ujfalusi@ti.com>
+	<20110810091519.GB1939@atomide.com>
+	<4E43F029.6060208@matrix-vision.de>
+Message-ID: <20110928182848.GB6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2011 03:15 AM, Cousson, Benoit wrote:
-> On 9/27/2011 7:40 AM, Nayak, Rajendra wrote:
->> On Monday 26 September 2011 10:20 PM, Benoit Cousson wrote:
->>> +Required properties:
->>> +- compatible:
->>> +  - "ti,omap2-gpio" for OMAP2 and OMAP3 controllers
->>
->> Would it be more readable to have
->> "ti,omap2-gpio" for OMAP2 controllers and
->> "ti,omap3-gpio" for OMAP3 controllers?
+Hi,
 
-Or have OMAP3 say this if it's fully backwards compatible:
+Sorry for the delay in replying..
 
-	compatible = "ti,omap3-gpio", "ti,omap2-gpio";
-
->>> +  - "ti,omap4-gpio" for OMAP4 controller
->>> +- #gpio-cells : Should be two.
->>> +  - first cell is the pin number
->>> +  - second cell is used to specify optional parameters (unused)
->>> +- gpio-controller : Marks the device node as a GPIO controller.
->>> +
->>> +OMAP specific properties:
->>> +- ti,hwmods: Name of the hwmod associated to the GPIO
->>> +- id: 32 bits to identify the id (1 based index)
-
-What does "the id" mean, in relation to the actual hardware?
-
-Some existing bindings have such a thing (often called "cell-index"),
-but it should be well-defined what it refers to.  Often aliases would be
-a better approach, if it just refers to what the manual calls the device.
-
->>> +- bank-width: number of pin supported by the controller (16 or 32)
->>> +- debounce: set if the controller support the debouce funtionnality
->>> +- bank-count: number of controller support by the SoC. This is a
->>> temporary
->>> +  hack until the bank_count is removed from the driver.
->>
->> Is there a general rule to be followed as to when to use
->> "ti,<prop-name>" and when to use just"<prop-name>".
->> Since all these are OMAP specific properties, shouldn't all
->> of them be "ti,<prop-name>"?
+* Michael Jones <michael.jones@matrix-vision.de> [110811 07:34]:
 > 
-> To be honest, I was wondering as well about this rule.
-> I think that a property that is not purely OMAP specific and that
-> represents some standard HW information does not have to be prefixed by
-> "ti,XXX".
-> So hwmods must be "ti,hwmods", but bank-witdh and bank-count seems to me
-> quite generic.
+> I still stumbled upon these linker errors when building for my OMAP3
+> board, using the current linux-omap master branch. I inadvertently had
+> CONFIG_ARCH_OMAP4=y (leftover from my starting point,
+> omap2plus_defconfig), but didn't have any of the boards with
+> omap_phy_internal.o selected (OMAP_4430SDP, OMAP4_PANDA, PCM049, PCM049,
+> OMAP3517EVM). Maybe this isn't a concern anyway, since anybody building
+> with CONFIG_ARCH_OMAP4 will presumably also be building one of those
+> boards? I don't know if it is our goal to build successfully with every
+> wacky CONFIG_ combination, but I thought I would report it here just in
+> case.
 
-It's about where the property is documented.  Suppose you use an
-un-prefixed bank-width but define it in the TI-specific binding to mean
-width in bits.  Later, someone wants something similar for another
-driver, doesn't look at the TI binding, but says, "This is generic, I'll
-define something in the main gpio binding," but defines it as width in
-bytes (ignore the (de)merits of defining it that way in this case).  If
-you had a namespace prefix, it would be clear which binding a node is
-referring to.
+Probably the best way is to get omap specific randconfigs going based
+on something what Arnd posted few days ago. Even with the old defconfig
+files we'll still be missing many corner cases.
 
-As for bank-count, the description "this is a temporary hack until the
-bank_count is removed from the driver" suggests it shouldn't be there at
-all, much less be part of the generic binding.
+Regards,
 
--Scott
+Tony
