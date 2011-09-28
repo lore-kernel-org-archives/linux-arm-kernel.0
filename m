@@ -1,57 +1,56 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 27 Sep 2011 20:56:02 -0700
-Subject: [PATCH 0/4] arm/tegra: Convert gpio & pinmux to platform devices
-In-Reply-To: <201109231848.52318.arnd@arndb.de>
-References: <1316725567-17881-1-git-send-email-swarren@nvidia.com>
-	<201109231848.52318.arnd@arndb.de>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173955572E@HQMAIL01.nvidia.com>
+From: padma.kvr@gmail.com (padma venkat)
+Date: Wed, 28 Sep 2011 09:55:24 +0530
+Subject: [PATCH 2/7] ARM: SAMSUNG: Add CLK Macro for clkdev support
+In-Reply-To: <20110923202606.GT17169@n2100.arm.linux.org.uk>
+References: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
+	<1316778827-24694-3-git-send-email-padma.v@samsung.com>
+	<20110923202606.GT17169@n2100.arm.linux.org.uk>
+Message-ID: <CAAgF-Bdf59wBWqj43FhB9m3Oo9ZFyMEA1yfAf7b3_qnbARNLfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote at Friday, September 23, 2011 10:49 AM:
-> On Thursday 22 September 2011, Stephen Warren wrote:
+Hi Russell,
+
+On Sat, Sep 24, 2011 at 1:56 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>
+> On Fri, Sep 23, 2011 at 05:23:42PM +0530, Padmavathi Venna wrote:
+> > diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
+> > index 73c66d4..c864825 100644
+> > --- a/arch/arm/plat-samsung/include/plat/clock.h
+> > +++ b/arch/arm/plat-samsung/include/plat/clock.h
+> > @@ -17,6 +17,13 @@
 > >
-> > This series converts the Tegra GPIO and pinmux drivers to be regular
-> > platform devices.
-> 
-> Looks good overall.
+> > ?struct clk;
+> >
+> > +#define CLK(dev, con, ck) ? ?\
+> > + ? ? { ? ? ? ? ? ? ? ? ? ? ? \
+> > + ? ? ? ? ? ? .dev_id = dev, ?\
+> > + ? ? ? ? ? ? .con_id = con, ?\
+> > + ? ? ? ? ? ? .clk = ck, ? ? ?\
+> > + ? ? }
+> > +
+>
+> How about a patch series which moves this to include/linux/clkdev.h,
+> preferably called CLKDEV_INIT() ?
+>
+   Thanks for the review. I am currently working on preparing the patch series
+   as per your suggestion.
 
-Thanks.
+> There's versions of this already in:
+> arch/arm/mach-ux500/clock.h
+> arch/arm/mach-tegra/tegra2_clocks.c
+> arch/arm/mach-nomadik/clock.c
+> arch/arm/mach-davinci/clock.h
+>
+> so let's have it standardized instead of everyone inventing their own.
+>
+> (Remember, that's what we're supposed to already being looking out for
+> since Linus' whinge about how ARM stuff tends to grow out of control...)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 
-> > The series is extracted from an earlier series I posted that augmented
-> > these drivers to initialize HW state from the device-tree. I'm holding
-> > off on that aspect of the changes, since it's not entirely clear to me
-> > whether the new pinmux API should drive the initial pinmux state setup
-> > via "system hog" definitions, or whether pinmux drivers should indeed
-> > do their own thing.
-> 
-> I think at least you should try to do an ioremap of the pinmux register
-> area in the pinmux probe function and make sure that it's called early
-> enough, if at all possible.
-> 
-> Right now, there is an empty probe() function, which is a bit silly,
-> and the pg_readl()/pg_writel() functions use hardcoded register
-> addresses.
-
-For GPIO, calling ioremap() should be pretty easy.
-
-For pinmux, there are complications: The pinmux HW doesn't have a dedicated
-address range, but rather the registers are somewhat scattered in groups
-throughout the "APB_MISC" address range. APB_MISC also includes strapping,
-JTAG configuration, and USB PHY registers, all of which exist between the
-various groups of pinmux registers. On Tegra30, there's slightly less of
-this, yet in turn this means that the number of chunks of address space used
-by the pinmux module differs from Tegra20.
-
-Right now, the pinmux driver data tables (which define the set of pin groups
-known to the pinmux driver) all store register addresses as offsets from the
-base of this APB_MISC region for simplicity.
-
-What are your thoughts here; should I go ahead and update the pinmux driver
-to ioremap() each of these chunks individually, and update the data tables
-to be a tuple (chunk ID, offset_from_chunk), or leave things as is?
-
-Thanks.
-
--- 
-nvpublic
+Best Regards
+Padma
