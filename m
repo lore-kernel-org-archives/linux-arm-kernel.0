@@ -1,16 +1,18 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Sep 2011 18:01:15 -0700
-Subject: [PATCH v2 02/16] ARM: smp: Add an IPI handler callable from C code
-In-Reply-To: <1317034955-1029-3-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 27 Sep 2011 18:01:34 -0700
+Subject: [PATCH v2 03/16] ARM: GIC: Add global gic_handle_irq() function
+In-Reply-To: <1317034955-1029-4-git-send-email-marc.zyngier@arm.com>
 References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-	<1317034955-1029-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110928010115.GT6324@atomide.com>
+	<1317034955-1029-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110928010134.GU6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Marc Zyngier <marc.zyngier@arm.com> [110926 03:33]:
-> In order to be able to handle IPI directly from C code instead of
-> assembly code, introduce handle_IPI(), which is modeled after handle_IRQ().
+> Provide the GIC code with a low level handler that can be used
+> by platforms using CONFIG_MULTI_IRQ_HANDLER. Though the handler is
+> written in C, the compiled code doesn't feel much slower than its
+> assembly counterpart (at least with my gcc 4.4.1).
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
