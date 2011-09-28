@@ -1,48 +1,62 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Wed, 28 Sep 2011 15:19:00 -0700
-Subject: [PATCH v2 2/6] OMAP4: Clock: round_rate and recalc functions for
-	DPLL_ABE
-In-Reply-To: <alpine.DEB.2.00.1109280056570.4399@utopia.booyaka.com>
-References: <1316195263-14951-1-git-send-email-jon-hunter@ti.com>
-	<alpine.DEB.2.00.1109280056570.4399@utopia.booyaka.com>
-Message-ID: <CAJOA=zPDQ4sqoT7EV7HSa43g_i-q5CT6Q8UBvggG2BBvMrQ_bw@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 29 Sep 2011 01:29:34 +0300
+Subject: [PATCH v5 1/3] arm/tegra: prepare Seaboard pinmux code for derived
+	boards
+In-Reply-To: <1317248978-10829-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1317248978-10829-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1317248978-10829-2-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 11:59 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi Jon and Mike,
->
-> On Fri, 16 Sep 2011, Jon Hunter wrote:
->
->> From: Mike Turquette <mturquette@ti.com>
->>
->> OMAP4 DPLL_ABE can enable a 4X multipler on top of the normal MN multipler
->> and divider. This is achieved by setting CM_CLKMODE_DPLL_ABE.DPLL_REGM4XEN
->> bit in CKGEN module of CM1. From the OMAP4 TRM:
->>
->> Fdpll = Fref x 2 x (4 x M/(N+1)) in case REGM4XEN bit field is set (only
->> applicable to DPLL_ABE).
->>
->> Add new round_rate() and recalc() functions for OMAP4, that check the
->> setting of REGM4XEN bit and handle this appropriately. The new functions
->> are a simple wrapper on top of the existing omap2_dpll_round_rate() and
->> omap2_dpll_get_rate() functions to handle the REGM4XEN bit.
->>
->> The REGM4XEN bit is only implemented for the ABE DPLL on OMAP4 and so
->> only dpll_abe_ck uses omap4_dpll_regm4xen_round_rate() and
->> omap4_dpll_regm4xen_recalc() functions.
->>
->> Signed-off-by: Mike Turquette <mturquette@ti.com>
->> Tested-by: Jon Hunter <jon-hunter@ti.com>
->
-> Some changes have been made to this patch here, to fix a few minor bugs in
-> error paths and to add documentation and Jon's Signed-off-by: (since he's
-> in the submittal chain).
->
-> Care to review and send any comments? ?Otherwise, I plan to queue this
-> revised version for 3.2.
+This patch splits out the common part of pinmux and GPIO initialization for
+seaboard and derived boards. This code is based on work done by Jong Kim
+<jongk@nvidia.com>.
 
-Your changes to the patch look good.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |   14 ++++++++++----
+ 1 files changed, 10 insertions(+), 4 deletions(-)
 
-Regards,
-Mike
+diff --git a/arch/arm/mach-tegra/board-seaboard-pinmux.c b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+index 74f78b7..b31c765 100644
+--- a/arch/arm/mach-tegra/board-seaboard-pinmux.c
++++ b/arch/arm/mach-tegra/board-seaboard-pinmux.c
+@@ -1,5 +1,6 @@
+ /*
+- * Copyright (C) 2010 NVIDIA Corporation
++ * Copyright (C) 2010,2011 NVIDIA Corporation
++ * Copyright (C) 2011 Google, Inc.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -160,7 +161,7 @@ static __initdata struct tegra_pingroup_config seaboard_pinmux[] = {
+ 
+ 
+ 
+-static struct tegra_gpio_table gpio_table[] = {
++static struct tegra_gpio_table common_gpio_table[] = {
+ 	{ .gpio = TEGRA_GPIO_SD2_CD,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_SD2_WP,		.enable = true },
+ 	{ .gpio = TEGRA_GPIO_SD2_POWER,		.enable = true },
+@@ -171,12 +172,17 @@ static struct tegra_gpio_table gpio_table[] = {
+ 	{ .gpio = TEGRA_GPIO_USB1,		.enable = true },
+ };
+ 
+-void __init seaboard_pinmux_init(void)
++static void __init seaboard_common_pinmux_init(void)
+ {
+ 	tegra_pinmux_config_table(seaboard_pinmux, ARRAY_SIZE(seaboard_pinmux));
+ 
+ 	tegra_drive_pinmux_config_table(seaboard_drive_pinmux,
+ 					ARRAY_SIZE(seaboard_drive_pinmux));
+ 
+-	tegra_gpio_config(gpio_table, ARRAY_SIZE(gpio_table));
++	tegra_gpio_config(common_gpio_table, ARRAY_SIZE(common_gpio_table));
++}
++
++void __init seaboard_pinmux_init(void)
++{
++	seaboard_common_pinmux_init();
+ }
+-- 
+1.7.0.4
