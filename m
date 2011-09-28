@@ -1,35 +1,47 @@
-From: nicolas.ferre@atmel.com (Nicolas FERRE)
-Date: Wed, 28 Sep 2011 23:19:51 +0200
-Subject: [GIT PULL] at91 fixes for 3.1
-Message-ID: <4E838F77.2040705@atmel.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Wed, 28 Sep 2011 16:32:47 -0500
+Subject: [PATCH 02/13] gpio/omap: Adapt GPIO driver to DT
+In-Reply-To: <4E838A41.8010408@ti.com>
+References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
+	<1317055821-20652-3-git-send-email-b-cousson@ti.com>
+	<4E8161C7.7020404@ti.com> <4E82D7B3.6080909@ti.com>
+	<4E836612.2010709@freescale.com> <4E838A41.8010408@ti.com>
+Message-ID: <4E83927F.1060309@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 09/28/2011 03:57 PM, Cousson, Benoit wrote:
+> On 9/28/2011 8:23 PM, Scott Wood wrote:
+>> What does "the id" mean, in relation to the actual hardware?
+> 
+> It's true that the description is not super meaningful...
+> This is the HW instance number. We have 6 gpios, named gpio1 to gpio6,
+> but the pin numbering is global, meaning from 1 to 192, sine only the
+> global number is referenced in the pinmuxing control, we have to
+> maintain the order to ensure the right number.
 
-Here is a couple of fixes that may be included in 3.1-final.
-The Kconfig modification will allow to select the PWM driver for SAM9G45 
-SoC. This will also benefit to stable kernels.
-The new defconfig for SAM9G45 family will allow us to better monitor the 
-health of this port through automatic compilation mechanism. I find it 
-interesting to have it included the sooner.
+I'd either have one node that handles all the banks (with multiple "reg"
+resources in the order that they should be mapped to the numberspace),
+or avoid using that global numberspace and reference things by
+bank/offset (with the bank identified by alias or phandle).
 
-The pull is based on the following changes since commit 
-a102a9ece5489e1718cd7543aa079082450ac3a2:
+> I still do not know how to use that with the way gpio binding is
+> working. Because in theory each gpio controller should be referenced
+> with the local number, not the global one. And converting that global
+> number from HW spec to a gpio instance + local number seems to me very
+> error prone.
 
-   Linux 3.1-rc8 (2011-09-27 15:48:34 -0700)
+You could say the same thing about a chip whose manual is written
+assuming a global IRQ numberspace with a certain encoding scheme.
 
-are available in the git repository at:
-   git://github.com/at91linux/linux-at91.git at91-fixes
+Or in the other direction, Freescale's manuals split up MPIC interrupts
+into external/internal/MSI, while they really just map to different
+regions of the openpic (hardware standard that Freescale's MPIC is an
+instance of) interrupt space.  The device trees use the raw openpic
+interrupt numbers.
 
-Nicolas Ferre (2):
-   ARM: at91: remove dependency for Atmel PWM driver selector in Kconfig
-   ARM: at91: add defconfig for at91sam9g45 family
+There's certainly potential for confusion, but at least the device tree
+representation is internally consistent and doesn't make assumptions
+about the overall system.
 
-  arch/arm/configs/at91sam9g45_defconfig |  214 ++++++++++++++++++++++
-  drivers/misc/Kconfig                   |    1 -
-  2 files changed, 214 insertions(+), 1 deletions(-)
-  create mode 100644 arch/arm/configs/at91sam9g45_defconfig
-
--- 
-Nicolas Ferre
+-Scott
