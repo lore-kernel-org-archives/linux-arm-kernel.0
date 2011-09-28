@@ -1,69 +1,69 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 28 Sep 2011 08:43:15 +0200
-Subject: [PATCH v2 2/2] s3c-adc: describe features via quirk constants
-In-Reply-To: <005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
-References: <201109182241.48858.heiko@sntech.de>
-	<201109182243.40440.heiko@sntech.de>
-	<005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
-Message-ID: <201109280843.16984.heiko@sntech.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 28 Sep 2011 08:46:14 +0200
+Subject: [PATCH] dma/imx-sdma+imx-dma: explicitly #include <linux/module.h>
+In-Reply-To: <4E824821.8040105@windriver.com>
+References: <1317018379-8897-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4E824821.8040105@windriver.com>
+Message-ID: <20110928064614.GN20550@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The adc blocks of S3C2410 through S5P have a multitude of
-quirks, i.e. moved bits or whole new registers.
+[Cc: += linux-kbuild at v.k.o + Michal Marek]
 
-This patch tries to describe these individual features
-through constants which can be used to describe an adc.
+Hello,
 
-As SoCs sometimes share only some of these quirks defining
-TYPE_ADCVx values for each one wouldn't scale well when
-adding more variants.
+On Tue, Sep 27, 2011 at 06:03:13PM -0400, Paul Gortmaker wrote:
+> On 11-09-26 02:26 AM, Uwe Kleine-K?nig wrote:
+> > This is needed after commit
+> > 
+> > 	include: replace linux/module.h with "struct module" wherever possible
+> > 
+> > (currently 25215aa in next).
+> > 
+> > Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> > Hello,
+> > 
+> > maybe it's sensible for Paul to take that before his commit?
+> 
+> Thanks, I'll blend it into the commit adding module.h to the other
+> drivers/dma files.  It seems the imx boards don't have a defconfig
+> in the arch/arm/configs that enables this (CONFIG_IMX_[S]DMA).
+> 
+> What is really interesting (at least to me anyway) is that I
+> didn't get one iMX build in some 6000+ ARM randconfig builds....
+> 
+> I would have thought it would have showed up at least a couple
+> times, given that number of builds.  Maybe randconfig doesn't
+> deal so well with "choice" Kconfig items?
+> 
+> ~/git/module.h/linux-2.6.git$ ls -1 ../build-10*arm |wc -l
+> 6399
+> ~/git/module.h/linux-2.6.git$ grep CONFIG_ARCH_[A-Z0-9]*=y ../build-10*arm*/.config | sed 's/.*CON/CON/'|sort |uniq
+> CONFIG_ARCH_EBSA110=y
+> CONFIG_ARCH_H7201=y
+> CONFIG_ARCH_H7202=y
+> CONFIG_ARCH_H720X=y
+> CONFIG_ARCH_VERSATILE=y
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes since v1: add spaces around <<
- arch/arm/plat-samsung/adc.c |   29 +++++++++++++++++++++++++++++
- 1 files changed, 29 insertions(+), 0 deletions(-)
+I don't understand why you did that sed, but AFAICT it doesn't hurt,
+too. Maybe adding -c to uniq in your command line is interesting for the
+kbuild people?!
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index ee8deef..4fc4deb 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -45,6 +45,35 @@ enum s3c_cpu_type {
- 	TYPE_ADCV3, /* S5PV210, S5PC110, EXYNOS4210 */
- };
- 
-+/*
-+ * Resolution of the ADC - 10 or 12 bit
-+ */
-+#define S3C_ADC_QUIRK_10BIT		0
-+#define S3C_ADC_QUIRK_12BIT		(1 << 0)
-+
-+/*
-+ * 12bit ADC can switch resolution between 10 bit and 12 bit
-+ * ADCCON bit 03 for S3C2416
-+ * ADCCON bit 16 for S3C64XX and up
-+ */
-+#define S3C_ADC_QUIRK_RESSEL03		(1 << 1)
-+#define S3C_ADC_QUIRK_RESSEL16		(1 << 2)
-+
-+/*
-+ * Input channel select can either be in
-+ * - reg ADCCON, bit for S3C24XX and S3C64XX
-+ * - reg base+0x18 for 2443/2416/2450
-+ * - reg base+0x1C for S5P
-+ */
-+#define S3C_ADC_QUIRK_MUXADCCON		(1 << 3)
-+#define S3C_ADC_QUIRK_MUX18		(1 << 4)
-+#define S3C_ADC_QUIRK_MUX1C		(1 << 5)
-+
-+/*
-+ * CLRINT register on S3C64xx
-+ */
-+#define S3C_ADC_QUIRK_CLRINT		(1 << 6)
-+
- struct s3c_adc_client {
- 	struct platform_device	*pdev;
- 	struct list_head	 pend;
+> ~/git/module.h/linux-2.6.git$ 
+> 
+> No ARCH_MXC, no ARCH_MXS, PXA, or any of the other 20+ variants.
+> Definitely not a random spread there, with all 6000 builds falling
+> in just 5 buckets.
+How did you test? Generate a .config, test without your change and if
+that succeeds test with it? If so, maybe the problem isn't that
+randconfig doesn't generate more random configs but that you got many
+failures in the first run?!
+
+Best regards
+Uwe
+
 -- 
-1.7.5.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
