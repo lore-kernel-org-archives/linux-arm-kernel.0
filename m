@@ -1,34 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 28 Sep 2011 13:26:28 +0100
-Subject: [PATCH 8/9] regulator: helper to extract regulator node based on
-	supply name
-In-Reply-To: <4E82D63A.7030207@ti.com>
-References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-9-git-send-email-rnayak@ti.com>
-	<20110927122155.GE4289@opensource.wolfsonmicro.com>
-	<4E81E281.505@ti.com>
-	<20110927185913.GU4289@opensource.wolfsonmicro.com>
-	<4E82D63A.7030207@ti.com>
-Message-ID: <20110928122628.GF3279@opensource.wolfsonmicro.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 28 Sep 2011 13:29:18 +0100
+Subject: [PATCHv2 08/10] ARM: u300: convert to MULTI_IRQ_HANDLER
+In-Reply-To: <CACRpkdarydeYAyOV8Cm134TtPeh9_qFSqWPkvpZjUE9yPNNtJA@mail.gmail.com>
+References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
+	<1317206507-18867-9-git-send-email-jamie@jamieiles.com>
+	<CACRpkdYOdWA2vg2zq+nhOPSvPN7zdy9NVsOcqfZ7i9W5Sq5cpw@mail.gmail.com>
+	<20110928120340.GH17204@pulham.picochip.com>
+	<CACRpkdarydeYAyOV8Cm134TtPeh9_qFSqWPkvpZjUE9yPNNtJA@mail.gmail.com>
+Message-ID: <20110928122918.GJ17204@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2011 at 10:09:30AM +0200, Cousson, Benoit wrote:
-> On 9/27/2011 8:59 PM, Mark Brown wrote:
+On Wed, Sep 28, 2011 at 02:18:14PM +0200, Linus Walleij wrote:
+> On Wed, Sep 28, 2011 at 2:03 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> 
+> >> vic_single_handle_irq() needs to be modified to handle several
+> >> ranges or atleast two.
+> >
+> > The platform IRQ handler is actually vic_handle_irq() that internally
+> > calls vic_single_handle_irq() for each registered vic (in the order of
+> > registration).
+> 
+> Ah I get it I'm dead wrong as usual :-)
+> 
+> I tried to apply them to test but Iget into dependency trouble with
+> the referenced required patches, do you have some handy
+> git branch with all stuff applied in order that I can pull in and
+> test off?
 
-> >I'm not sure how this should work in a device tree world, I'd *hope*
-> >we'd get a device tree node for the CPU and could then just make this a
-> >regular consumer thing but then the cpufreq drivers would need to be
-> >updated to make use of it.  The only reason we allow null devices right
-> >now is the fact that cpufreq doesn't have a struct device it can use.
+Sure,
 
-> That's why we do have a MPU node in OMAP dts, in order to build an
-> omap_device that will be mainly used for the DVFS on the MPU.
+	git://github.com/jamieiles/linux-2.6-ji.git vic-dt
 
-> And even before DT migration, we used to build statically some
-> omap_device to represent the various processors in the system (MPU,
-> DSP, CortexM3...).
+has all of the dependencies in there too.  Thanks for taking a look at 
+the patches Linus!
 
-Yeah, but that's very OMAP specific - we don't have that in general (in
-fact it's the only Linux platform I'm aware of that has a device for the
-CPU).
+Jamie
