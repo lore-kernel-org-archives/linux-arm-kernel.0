@@ -1,29 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Sep 2011 15:04:34 +0200
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <20110927221308.GA2674@opensource.wolfsonmicro.com>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20110927210849.GD3994@ponder.secretlab.ca>
-	<20110927221308.GA2674@opensource.wolfsonmicro.com>
-Message-ID: <201109281504.34560.arnd@arndb.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 28 Sep 2011 15:16:40 +0200
+Subject: [PATCH 0/1] A trio of IXP425 boards
+Message-ID: <cover.1317215339.git.richard.cochran@omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 September 2011, Mark Brown wrote:
-> On Tue, Sep 27, 2011 at 03:08:49PM -0600, Grant Likely wrote:
-> 
-> > Okay, will do.  How does EPROBE_DEFER 518 sound?
-> 
-> Note that I'm not sure this answers the issue I was raising - the issue
-> isn't that the caller doesn't know what the error code means, the issue
-> is that in some cases the driver needs to take a decision about what
-> failure to get a resource means.  Does it mean that the driver can work
-> fine and be slightly less featureful or should it cause a deferral?
+This patch adds support for three boards using the ixp425. Since they
+are are almost identical to each other, they can share one setup file.
 
-Can you think of cases where this information cannot be put into the
-device tree or platform_data? If a board provides an optional feature,
-I think that should be a property of the device that the driver gets,
-so it can return an error when that feature is not around, or continue
-when it knows that the feature will never become available.
+The three machine types are slated for removal due to the fact that
+the board support has not been merged. My polite request is to merge
+this patch and restore the machine types.
 
-	Arnd
+Thanks,
+Richard
+
+
+Richard Cochran (1):
+  ixp4xx: support omicron ixp425 based boards
+
+ arch/arm/mach-ixp4xx/Kconfig                   |   19 ++
+ arch/arm/mach-ixp4xx/Makefile                  |    4 +
+ arch/arm/mach-ixp4xx/include/mach/uncompress.h |    3 +-
+ arch/arm/mach-ixp4xx/miccpt-pci.c              |   78 +++++++
+ arch/arm/mach-ixp4xx/omixp-setup.c             |  273 ++++++++++++++++++++++++
+ 5 files changed, 376 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/mach-ixp4xx/miccpt-pci.c
+ create mode 100644 arch/arm/mach-ixp4xx/omixp-setup.c
+
+-- 
+1.7.2.5
