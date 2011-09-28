@@ -1,55 +1,30 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 28 Sep 2011 14:18:08 +0200
-Subject: [PATCH 6/6] arm/imx: merge i.MX3 and i.MX6
-In-Reply-To: <1317201368-6403-7-git-send-email-shawn.guo@linaro.org>
-References: <1317201368-6403-1-git-send-email-shawn.guo@linaro.org>
-	<1317201368-6403-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110928121808.GY31404@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Sep 2011 14:18:14 +0200
+Subject: [PATCHv2 08/10] ARM: u300: convert to MULTI_IRQ_HANDLER
+In-Reply-To: <20110928120340.GH17204@pulham.picochip.com>
+References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
+	<1317206507-18867-9-git-send-email-jamie@jamieiles.com>
+	<CACRpkdYOdWA2vg2zq+nhOPSvPN7zdy9NVsOcqfZ7i9W5Sq5cpw@mail.gmail.com>
+	<20110928120340.GH17204@pulham.picochip.com>
+Message-ID: <CACRpkdarydeYAyOV8Cm134TtPeh9_qFSqWPkvpZjUE9yPNNtJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2011 at 05:16:08PM +0800, Shawn Guo wrote:
-> 
->  
-> -config ARCH_MX3
-> -	bool "MX3-based"
-> +config ARCH_IMX_V6_V7
-> +	bool "i.MX3, i.MX6"
-> +	select AUTO_ZRELADDR
-> +	select ARM_PATCH_PHYS_VIRT
+On Wed, Sep 28, 2011 at 2:03 PM, Jamie Iles <jamie@jamieiles.com> wrote:
 
-Russell pointed out that it's not a good idea to select this.
+>> vic_single_handle_irq() needs to be modified to handle several
+>> ranges or atleast two.
+>
+> The platform IRQ handler is actually vic_handle_irq() that internally
+> calls vic_single_handle_irq() for each registered vic (in the order of
+> registration).
 
-Sascha
+Ah I get it I'm dead wrong as usual :-)
 
->  	help
-> -	  This enables support for systems based on the Freescale i.MX3 family
-> +	  This enables support for systems based on the Freescale i.MX3 and i.MX6
-> +	  family.
->  
->  config ARCH_MX5
->  	bool "i.MX50, i.MX51, i.MX53"
-> @@ -29,13 +32,6 @@ config ARCH_MX5
->  	  This enables support for machines using Freescale's i.MX50 and i.MX51
->  	  processors.
->  
-> -config ARCH_MX6
-> -	bool "i.MX6"
-> -	select AUTO_ZRELADDR
-> -	select ARM_PATCH_PHYS_VIRT
-> -	help
-> -	  This enables support for systems based on the Freescale i.MX6 family
-> -
->  endchoice
->  
->  source "arch/arm/mach-imx/Kconfig"
-> -- 
-> 1.7.4.1
-> 
-> 
+I tried to apply them to test but Iget into dependency trouble with
+the referenced required patches, do you have some handy
+git branch with all stuff applied in order that I can pull in and
+test off?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yours,
+Linus Walleij
