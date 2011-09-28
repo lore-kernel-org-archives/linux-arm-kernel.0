@@ -1,667 +1,202 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 28 Sep 2011 14:47:43 +0100
-Subject: [PATCH] virtio: Add platform bus driver for memory mapped virtio
-	device
-Message-ID: <1317217663-32647-1-git-send-email-pawel.moll@arm.com>
+Date: Wed, 28 Sep 2011 14:54:46 +0100
+Subject: [PATCH] virtio: Add platform bus driver for memory mapped
+	virtio device
+In-Reply-To: <1317217663-32647-1-git-send-email-pawel.moll@arm.com>
+References: <1317217663-32647-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1317218086.3058.142.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch, based on virtio PCI driver, adds support for memory
-mapped (platform) virtio device. This should allow environments
-like qemu to use virtio-based block & network devices even on
-platforms without PCI support.
+> So here I am with the first non-RFC patch :-) It will be followed by the
+> spec, as we discussed, in the form of an appendix to the main document.
 
-One can define and register a platform device which resources
-will describe memory mapped control registers and "mailbox"
-interrupt. Such device can be also instantiated using the Device
-Tree node with compatible property equal "virtio,mmio".
+Here it goes than... It's LaTeX so Rusty can easily get it into his
+spec, hope it's readable enough - if not I can provide a PDF.
 
-Cc: Rusty Russell <rusty@rustcorp.com.au>
-Cc: Anthony Liguori <aliguori@us.ibm.com>
-Cc: Michael S.Tsirkin <mst@redhat.com>
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
+8<---------------------------------------------------------------------
 
-So here I am with the first non-RFC patch :-) It will be followed by the
-spec, as we discussed, in the form of an appendix to the main document.
+\documentclass[12pt]{article}
 
-Comparing to RFCv3 I've added "version" register, to make the device's
-evolution easier. I hope the code is good enough for next merge window,
-if you think otherwise - please, do shout! ;-)
+\begin{document}
 
-If there are no objections I'll ask Peter to start adding support for
-this into qemu. I've tested the driver with a virtio block device in
-our proprietary emulation environment and it works just fine :-)
+Virtual environments without PCI support (a common situation in embedded
+devices models) might use simple memory mapped device (``virtio-mmio'')
+instead of the PCI device.
+
+The memory mapped virtio device behaviour is based on the PCI device
+specification. Therefore most of operations like device initialization,
+queues configuration and buffer transfers are nearly identical. Existing
+differences are described in the following sections. 
+
+\subsection{Device Initialization}
+
+Instead of using the PCI IO space for virtio header, the ``virtio-mmio''
+device provides a set of memory mapped control registers, all 32 bits
+wide, followed by device-specific configuration space. The following
+list presents their layout: 
+
+\begin{itemize}
+\item Offset from the device base address | Direction | Name \\
+Description
+\item 0x000 | R | MagicValue \\
+``virt'' string.
+\item 0x004 | R | Version \\
+Device version number. Currently must be 1.
+\item 0x008 | R | DeviceID \\
+Virtio Subsystem Device ID (ie. 1 for network card).
+\item 0x00c | R | VendorID \\
+Virtio Subsystem Vendor ID.
+\item 0x010 | R | HostFeatures \\
+Flags representing features the device supports.\\
+Reading from this register returns 32 consecutive flag bits, first bit
+depending on the last value written to HostFeaturesSel register.  Access
+to this register returns bits $HostFeaturesSel*32$ to
+$(HostFeaturesSel*32)+31$, eg. feature bits 0 to 31 if HostFeaturesSel
+is set to 0 and features bits 32 to 63 if HostFeaturesSel is set to 1.
+Also see p. 2.2.2.2 ``Feature Bits''.
+\item 0x014 | W | HostFeaturesSel \\
+Device (Host) features word selection.\\
+Writing to this register selects a set of 32 device feature bits
+accessible by reading from HostFeatures register. Device driver must
+write a value to the HostFeaturesSel register before reading from the
+HostFeatures register.
+\item 0x020 | W | GuestFeatures \\
+Flags representing device features understood and activated by the
+driver.\\
+Writing to this register sets 32 consecutive flag bits, first bit
+depending on the last value written to GuestFeaturesSel register. Access
+to this register sets bits $GuestFeaturesSel*32$ to
+$(GuestFeaturesSel*32)+31$, eg. feature bits 0 to 31 if GuestFeaturesSel
+is set to 0 and features bits 32 to 63 if GuestFeaturesSel is set to 1.\
+\
+Also see p. 2.2.2.2 ``Feature Bits''.
+\item 0x024 | W | GuestFeaturesSel \\
+Activated (Guest) features word selection.\\
+Writing to this register selects a set of 32 activated feature bits
+accessible by writing to the GuestFeatures register. Device driver must
+write a value to the GuestFeaturesSel register before writing to the
+GuestFeatures register.
+\item 0x028 | W | GuestPageSize \\
+Guest page size.\\
+Device driver must write the guest page size in bytes to the register
+during initialization, before any queues are used.
+\item 0x030 | W | QueueSel \\
+Virtual queue index (first queue is 0).\\
+Writing to this register selects the virtual queue that the following
+operations on QueueNum, QueueAlign and QueuePFN apply to.
+\item 0x034 | RW | QueueNum \\
+Virtual queue size (number of elements in the queue, therefore size of
+the descriptor table and both available and used rings).\\
+Writing to this register notifies the Host what size of the queue the
+Guest would like to use.\\
+Reading from the register returns the queue size that the Host is ready
+to process (might be different than the requested size) or zero (0x0) if
+queue is not available.\\
+Both read and write accesses apply to the queue selected by writing to
+QueueSel.
+\item 0x038 | W | QueueAlign \\
+Used Ring alignment in the virtual queue.\\
+Writing to this register notifies the Host about alignment boundary of
+the Used Ring in bytes. This applies to the queue selected by writing to
+QueueSel.
+\item 0x03c | RW | QueuePFN \\
+Guest physical page number of the virtual queue.\\
+Writing to this register notifies the host about location of the virtual
+queue in the Guest's physical address space. This value is the index
+number of a page starting with the queue Descriptor Table.  Value zero
+(0x0) means physical address zero (0x00000000) and is illegal. When the
+Guest stops using the queue it must write zero (0x0) to this register.\\
+Reading from this register returns the currently used page number of the
+queue, therefore a value other than zero (0x0) means that the queue is
+in use.\\
+Both read and write accesses apply to the queue selected by writing to
+QueueSel.
+\item 0x050 | W | QueueNotify \\
+Queue notifier.\\
+Writing a queue index to this register notifies the Host that there are
+new buffers to process in the queue.
+\item 0x060 | W | InterruptACK \\
+Interrupt acknowledge. \\
+Writing to this register notifies the Host that the Guest finished
+receiving used buffers from the device and therefore serviced an
+asserted interrupt. Values written to this register are currently not
+used, but for future extensions it must be set to one (0x1).
+\item 0x070 | RW | Status \\
+Device status. \\
+Reading from this register returns the current device status flags. \\
+Writing non-zero values to this register sets the status flags,
+indicating the Guest progress. Writing zero (0x0) to this register
+triggers a device reset. \\
+Also see p. 2.2.2.1 ``Device Status''.
+\item 0x100+ | RW | Config \\
+Device-specific configuration space starts@an offset 0x100 and is
+accessed with byte alignment. Its meaning and size depends on the device
+and the driver.
+\end{itemize}
+
+The endianness of the registers follows the native endianness of the
+Guest. Writing to registers described as ``R'' and reading from
+registers described as ``W'' is not permitted and can cause undefined
+behavior.
+
+The device initialization is performed as described in p. 2.2.1 ``Device
+Initialization Sequence'' with one exception: the Guest must notify the
+Host about its page size, writing the size in bytes to GuestPageSize
+register before the initialization is finished.
+
+The memory mapped virtio devices generate single interrupt only,
+therefore no special configuration is required.
+
+
+\subsection{Virtqueue Configuration}
+
+The virtual queue configuration is performed in a similar way to the one
+described in p 2.3 ``Virtqueue Configuration'' with a few additional
+operations:
+\begin{enumerate}
+\item Write the queue index (first queue is 0) to the QueueSel register.
+\item Check if the queue is not already in use: read QueuePFN register,
+returned value should be zero (0x0).
+\item Optionally write requested queue size to QueueNum register. If
+this is not done, the Host uses the default, device specific, queue
+size.
+\item Read configured queue size from the QueueNum register. Note that
+it might be different from the size requested in previous step.
+\item Allocate and zero the queue in contiguous virtual memory, aligning
+the Used Ring to an optimal boundary (usually page size).
+\item Notify the Host about the used alignment by writing its value in
+bytes to QueueAlign register.
+\item Write the physical number of the first page of the queue to the
+QueuePFN register.
+\end{enumerate}
+The queue and the device are ready to begin normal operations now.
+
+
+\subsection{Device Operation}
+
+The memory mapped virtio device behaves in the same way as described in
+p. 2.4 ``Device Operation'', with the following exceptions:
+\begin{enumerate}
+\item The device is notified about new buffers available in a queue by
+writing the queue index to register QueueNum instead of the virtio
+header in PCI I/O space (p. 2.4.1.4 ``Notifying The Device'').
+\item As the memory mapped virtio device is using single, dedicated
+interrupt signal, its handling is much simpler than in the PCI (MSI-X)
+case (p.  2.4.2 ``Receiving Used Buffer From The Device''). Therefore
+all the Guest interrupt handler should do after receiving used buffers
+is acknowledging the interrupt by writing a value to the InterruptACK
+register. Currently this value does not carry any meaning, but for
+future extensions it must be set to one (0x1).
+\item The dynamic configuration changes, as described in p. 2.4.3
+``Dealing With Configuration Changes'' are not permitted.
+\end{enumerate}
+
+\end{document}
+
+
+8<---------------------------------------------------------------------
 
 Cheers!
 
-Pawel
-
- Documentation/devicetree/bindings/virtio/mmio.txt |   17 +
- drivers/virtio/Kconfig                            |   11 +
- drivers/virtio/Makefile                           |    1 +
- drivers/virtio/virtio_mmio.c                      |  459 +++++++++++++++++++++
- include/linux/virtio_mmio.h                       |   92 ++++
- 5 files changed, 580 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/virtio/mmio.txt
- create mode 100644 drivers/virtio/virtio_mmio.c
- create mode 100644 include/linux/virtio_mmio.h
-
-diff --git a/Documentation/devicetree/bindings/virtio/mmio.txt b/Documentation/devicetree/bindings/virtio/mmio.txt
-new file mode 100644
-index 0000000..5069c1b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/virtio/mmio.txt
-@@ -0,0 +1,17 @@
-+* virtio memory mapped device
-+
-+See http://ozlabs.org/~rusty/virtio-spec/ for more details.
-+
-+Required properties:
-+
-+- compatible:	"virtio,mmio" compatibility string
-+- reg:		control registers base address and size including configuration space
-+- interrupts:	interrupt generated by the device
-+
-+Example:
-+
-+	virtio_block at 3000 {
-+		compatible = "virtio,mmio";
-+		reg = <0x3000 0x100>;
-+		interrupts = <41>;
-+	}
-diff --git a/drivers/virtio/Kconfig b/drivers/virtio/Kconfig
-index 57e493b..816ed08 100644
---- a/drivers/virtio/Kconfig
-+++ b/drivers/virtio/Kconfig
-@@ -35,4 +35,15 @@ config VIRTIO_BALLOON
- 
- 	 If unsure, say M.
- 
-+ config VIRTIO_MMIO
-+ 	tristate "Platform bus driver for memory mapped virtio devices (EXPERIMENTAL)"
-+ 	depends on EXPERIMENTAL
-+ 	select VIRTIO
-+ 	select VIRTIO_RING
-+ 	---help---
-+ 	 This drivers provides support for memory mapped virtio
-+	 platform device driver.
-+
-+ 	 If unsure, say N.
-+
- endmenu
-diff --git a/drivers/virtio/Makefile b/drivers/virtio/Makefile
-index 6738c44..5a4c63c 100644
---- a/drivers/virtio/Makefile
-+++ b/drivers/virtio/Makefile
-@@ -1,4 +1,5 @@
- obj-$(CONFIG_VIRTIO) += virtio.o
- obj-$(CONFIG_VIRTIO_RING) += virtio_ring.o
-+obj-$(CONFIG_VIRTIO_MMIO) += virtio_mmio.o
- obj-$(CONFIG_VIRTIO_PCI) += virtio_pci.o
- obj-$(CONFIG_VIRTIO_BALLOON) += virtio_balloon.o
-diff --git a/drivers/virtio/virtio_mmio.c b/drivers/virtio/virtio_mmio.c
-new file mode 100644
-index 0000000..3c8d52f
---- /dev/null
-+++ b/drivers/virtio/virtio_mmio.c
-@@ -0,0 +1,459 @@
-+/*
-+ * Virtio memory mapped device driver
-+ *
-+ * Copyright 2011, ARM Ltd.
-+ *
-+ * This module allows virtio devices to be used over a virtual, memory mapped
-+ * platform device.
-+ *
-+ * Registers layout (all 32-bit wide):
-+ *
-+ * offset name             description
-+ * ------ ---------------- -----------------
-+ *
-+ *  0x000 MagicValue       Magic value "virt"
-+ *  0x004 Version          Device version (current max. 1)
-+ *  0x008 DeviceID         Virtio device ID
-+ *  0x00c VendorID         Virtio vendor ID
-+ *
-+ *  0x010 HostFeatures     Features supported by the host
-+ *  0x014 HostFeaturesSel  Set of host features to access via HostFeatures
-+ *
-+ *  0x020 GuestFeatures    Features activated by the guest
-+ *  0x024 GuestFeaturesSel Set of activated features to set via GuestFeatures
-+ *  0x028 GuestPageSize    Size of guest's memory page in bytes
-+ *
-+ *  0x030 QueueSel         Queue selector
-+ *  0x034 QueueNum         Queue size for the currently selected queue
-+ *  0x038 QueueAlign       Used Ring alignment for the current queue
-+ *  0x03c QueuePFN         PFN for the currently selected queue
-+
-+ *  0x050 QueueNotify      Queue notifier
-+ *  0x060 InterruptACK     Interrupt acknowledge register
-+ *  0x070 Status           Device status register
-+ *
-+ *  0x100+                 Device-specific configuration space
-+ *
-+ * Based on Virtio PCI driver by Anthony Liguori, copyright IBM Corp. 2007
-+ *
-+ * This work is licensed under the terms of the GNU GPL, version 2 or later.
-+ * See the COPYING file in the top-level directory.
-+ */
-+
-+#include <linux/highmem.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/list.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+#include <linux/virtio.h>
-+#include <linux/virtio_config.h>
-+#include <linux/virtio_mmio.h>
-+#include <linux/virtio_ring.h>
-+
-+
-+
-+/* The alignment to use between consumer and producer parts of vring.
-+ * Currently hardcoded to page size. */
-+#define VIRTIO_MMIO_VRING_ALIGN		PAGE_SIZE
-+
-+
-+
-+#define to_virtio_mmio_device(_plat_dev) \
-+	container_of(_plat_dev, struct virtio_mmio_device, vdev)
-+
-+struct virtio_mmio_device {
-+	struct virtio_device vdev;
-+	struct platform_device *pdev;
-+
-+	void __iomem *base;
-+	unsigned long version;
-+
-+	/* a list of queues so we can dispatch IRQs */
-+	spinlock_t lock;
-+	struct list_head virtqueues;
-+};
-+
-+struct virtio_mmio_vq_info {
-+	/* the actual virtqueue */
-+	struct virtqueue *vq;
-+
-+	/* the number of entries in the queue */
-+	int num;
-+
-+	/* the index of the queue */
-+	int queue_index;
-+
-+	/* the virtual address of the ring queue */
-+	void *queue;
-+
-+	/* the list node for the virtqueues list */
-+	struct list_head node;
-+};
-+
-+
-+
-+/* Configuration interface */
-+
-+static u32 vm_get_features(struct virtio_device *vdev)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+
-+	/* TODO: Features > 32 bits */
-+	writel(0, vm_dev->base + VIRTIO_MMIO_HOST_FEATURES_SEL);
-+
-+	return readl(vm_dev->base + VIRTIO_MMIO_HOST_FEATURES);
-+}
-+
-+static void vm_finalize_features(struct virtio_device *vdev)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+	int i;
-+
-+	/* Give virtio_ring a chance to accept features. */
-+	vring_transport_features(vdev);
-+
-+	for (i = 0; i < ARRAY_SIZE(vdev->features); i++) {
-+		writel(i, vm_dev->base + VIRTIO_MMIO_GUEST_FEATURES_SET);
-+		writel(vdev->features[i],
-+				vm_dev->base + VIRTIO_MMIO_GUEST_FEATURES);
-+	}
-+}
-+
-+static void vm_get(struct virtio_device *vdev, unsigned offset,
-+		   void *buf, unsigned len)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+	u8 *ptr = buf;
-+	int i;
-+
-+	for (i = 0; i < len; i++)
-+		ptr[i] = readb(vm_dev->base + VIRTIO_MMIO_CONFIG + offset + i);
-+}
-+
-+static void vm_set(struct virtio_device *vdev, unsigned offset,
-+		   const void *buf, unsigned len)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+	const u8 *ptr = buf;
-+	int i;
-+
-+	for (i = 0; i < len; i++)
-+		writeb(ptr[i], vm_dev->base + VIRTIO_MMIO_CONFIG + offset + i);
-+}
-+
-+static u8 vm_get_status(struct virtio_device *vdev)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+
-+	return readl(vm_dev->base + VIRTIO_MMIO_STATUS) & 0xff;
-+}
-+
-+static void vm_set_status(struct virtio_device *vdev, u8 status)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+
-+	/* We should never be setting status to 0. */
-+	BUG_ON(status == 0);
-+
-+	writel(status, vm_dev->base + VIRTIO_MMIO_STATUS);
-+}
-+
-+static void vm_reset(struct virtio_device *vdev)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+
-+	/* 0 status means a reset. */
-+	writel(0, vm_dev->base + VIRTIO_MMIO_STATUS);
-+}
-+
-+
-+
-+/* Transport interface */
-+
-+/* the notify function used when creating a virt queue */
-+static void vm_notify(struct virtqueue *vq)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vq->vdev);
-+	struct virtio_mmio_vq_info *info = vq->priv;
-+
-+	/* We write the queue's selector into the notification register to
-+	 * signal the other end */
-+	writel(info->queue_index, vm_dev->base + VIRTIO_MMIO_QUEUE_NOTIFY);
-+}
-+
-+/* Notify all virtqueues on an interrupt. */
-+static irqreturn_t vm_interrupt(int irq, void *opaque)
-+{
-+	struct virtio_mmio_device *vm_dev = opaque;
-+	struct virtio_mmio_vq_info *info;
-+	irqreturn_t ret = IRQ_NONE;
-+	unsigned long flags;
-+
-+	writel(1, vm_dev->base + VIRTIO_MMIO_INTERRUPT_ACK);
-+
-+	spin_lock_irqsave(&vm_dev->lock, flags);
-+	list_for_each_entry(info, &vm_dev->virtqueues, node) {
-+		if (vring_interrupt(irq, info->vq) == IRQ_HANDLED)
-+			ret = IRQ_HANDLED;
-+	}
-+	spin_unlock_irqrestore(&vm_dev->lock, flags);
-+
-+	return ret;
-+}
-+
-+
-+
-+static void vm_del_vq(struct virtqueue *vq)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vq->vdev);
-+	struct virtio_mmio_vq_info *info = vq->priv;
-+	unsigned long flags, size;
-+
-+	spin_lock_irqsave(&vm_dev->lock, flags);
-+	list_del(&info->node);
-+	spin_unlock_irqrestore(&vm_dev->lock, flags);
-+
-+	vring_del_virtqueue(vq);
-+
-+	/* Select and deactivate the queue */
-+	writel(info->queue_index, vm_dev->base + VIRTIO_MMIO_QUEUE_SEL);
-+	writel(0, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
-+
-+	size = PAGE_ALIGN(vring_size(info->num, VIRTIO_MMIO_VRING_ALIGN));
-+	free_pages_exact(info->queue, size);
-+	kfree(info);
-+}
-+
-+static void vm_del_vqs(struct virtio_device *vdev)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+	struct virtqueue *vq, *n;
-+
-+	list_for_each_entry_safe(vq, n, &vdev->vqs, list)
-+		vm_del_vq(vq);
-+
-+	free_irq(platform_get_irq(vm_dev->pdev, 0), vm_dev);
-+}
-+
-+
-+
-+static struct virtqueue *vm_setup_vq(struct virtio_device *vdev, unsigned index,
-+				  void (*callback)(struct virtqueue *vq),
-+				  const char *name)
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+	struct virtio_mmio_vq_info *info;
-+	struct virtqueue *vq;
-+	unsigned long flags, size;
-+	u16 num;
-+	int err;
-+
-+	/* Select the queue we're interested in */
-+	writel(index, vm_dev->base + VIRTIO_MMIO_QUEUE_SEL);
-+
-+	/* TODO: Write requested queue size to VIRTIO_MMIO_QUEUE_NUM */
-+
-+	/* Check if queue is either not available or already active. */
-+	num = readl(vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
-+	if (!num || readl(vm_dev->base + VIRTIO_MMIO_QUEUE_PFN)) {
-+		err = -ENOENT;
-+		goto error_available;
-+	}
-+
-+	/* Allocate and fill out our structure the represents an active
-+	 * queue */
-+	info = kmalloc(sizeof(struct virtio_mmio_vq_info), GFP_KERNEL);
-+	if (!info) {
-+		err = -ENOMEM;
-+		goto error_kmalloc;
-+	}
-+
-+	info->queue_index = index;
-+	info->num = num;
-+
-+	size = PAGE_ALIGN(vring_size(num, VIRTIO_MMIO_VRING_ALIGN));
-+	info->queue = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
-+	if (info->queue == NULL) {
-+		err = -ENOMEM;
-+		goto error_alloc_pages;
-+	}
-+
-+	/* Activate the queue */
-+	writel(VIRTIO_MMIO_VRING_ALIGN,
-+			vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
-+	writel(virt_to_phys(info->queue) >> PAGE_SHIFT,
-+			vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
-+
-+	/* Create the vring */
-+	vq = vring_new_virtqueue(info->num, VIRTIO_MMIO_VRING_ALIGN,
-+				 vdev, info->queue, vm_notify, callback, name);
-+	if (!vq) {
-+		err = -ENOMEM;
-+		goto error_new_virtqueue;
-+	}
-+
-+	vq->priv = info;
-+	info->vq = vq;
-+
-+	spin_lock_irqsave(&vm_dev->lock, flags);
-+	list_add(&info->node, &vm_dev->virtqueues);
-+	spin_unlock_irqrestore(&vm_dev->lock, flags);
-+
-+	return vq;
-+
-+error_new_virtqueue:
-+	writel(0, vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
-+	free_pages_exact(info->queue, size);
-+error_alloc_pages:
-+	kfree(info);
-+error_kmalloc:
-+error_available:
-+	return ERR_PTR(err);
-+}
-+
-+static int vm_find_vqs(struct virtio_device *vdev, unsigned nvqs,
-+		       struct virtqueue *vqs[],
-+		       vq_callback_t *callbacks[],
-+		       const char *names[])
-+{
-+	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
-+	unsigned int irq = platform_get_irq(vm_dev->pdev, 0);
-+	int i, err;
-+
-+	err = request_irq(irq, vm_interrupt, IRQF_SHARED,
-+			dev_name(&vdev->dev), vm_dev);
-+	if (err)
-+		return err;
-+
-+	for (i = 0; i < nvqs; ++i) {
-+		vqs[i] = vm_setup_vq(vdev, i, callbacks[i], names[i]);
-+		if (IS_ERR(vqs[i])) {
-+			vm_del_vqs(vdev);
-+			free_irq(irq, vm_dev);
-+			return PTR_ERR(vqs[i]);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+
-+
-+static struct virtio_config_ops virtio_mmio_config_ops = {
-+	.get		= vm_get,
-+	.set		= vm_set,
-+	.get_status	= vm_get_status,
-+	.set_status	= vm_set_status,
-+	.reset		= vm_reset,
-+	.find_vqs	= vm_find_vqs,
-+	.del_vqs	= vm_del_vqs,
-+	.get_features	= vm_get_features,
-+	.finalize_features = vm_finalize_features,
-+};
-+
-+
-+
-+/* Platform device */
-+
-+static int __devinit virtio_mmio_probe(struct platform_device *pdev)
-+{
-+	struct virtio_mmio_device *vm_dev;
-+	struct resource *mem;
-+	unsigned long magic;
-+
-+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!mem)
-+		return -EINVAL;
-+
-+	if (!devm_request_mem_region(&pdev->dev, mem->start,
-+			resource_size(mem), pdev->name))
-+		return -EBUSY;
-+
-+	vm_dev = devm_kzalloc(&pdev->dev, sizeof(struct virtio_mmio_device),
-+			GFP_KERNEL);
-+	if (!vm_dev)
-+		return  -ENOMEM;
-+
-+	vm_dev->vdev.dev.parent = &pdev->dev;
-+	vm_dev->vdev.config = &virtio_mmio_config_ops;
-+	vm_dev->pdev = pdev;
-+	INIT_LIST_HEAD(&vm_dev->virtqueues);
-+	spin_lock_init(&vm_dev->lock);
-+
-+	vm_dev->base = devm_ioremap(&pdev->dev, mem->start, resource_size(mem));
-+	if (vm_dev->base == NULL)
-+		return -EFAULT;
-+
-+	/* Check magic value */
-+	magic = readl(vm_dev->base + VIRTIO_MMIO_MAGIC_VALUE);
-+	if (memcmp(&magic, "virt", 4) != 0) {
-+		dev_warn(&pdev->dev, "Wrong magic value 0x%08lx!\n", magic);
-+		return -ENODEV;
-+	}
-+
-+	/* Check device version */
-+	vm_dev->version = readl(vm_dev->base + VIRTIO_MMIO_VERSION);
-+	if (vm_dev->version != 1) {
-+		dev_err(&pdev->dev, "Version %ld not supported!\n",
-+				vm_dev->version);
-+		return -ENXIO;
-+	}
-+
-+	vm_dev->vdev.id.device = readl(vm_dev->base + VIRTIO_MMIO_DEVICE_ID);
-+	vm_dev->vdev.id.vendor = readl(vm_dev->base + VIRTIO_MMIO_VENDOR_ID);
-+
-+	writel(PAGE_SIZE, vm_dev->base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
-+
-+	platform_set_drvdata(pdev, vm_dev);
-+
-+	return register_virtio_device(&vm_dev->vdev);
-+}
-+
-+static int __devexit virtio_mmio_remove(struct platform_device *pdev)
-+{
-+	struct virtio_mmio_device *vm_dev = platform_get_drvdata(pdev);
-+
-+	unregister_virtio_device(&vm_dev->vdev);
-+
-+	return 0;
-+}
-+
-+
-+
-+/* Platform driver */
-+
-+static struct of_device_id virtio_mmio_match[] = {
-+	{ .compatible = "virtio,mmio", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, virtio_mmio_match);
-+
-+static struct platform_driver virtio_mmio_driver = {
-+	.probe		= virtio_mmio_probe,
-+	.remove		= __devexit_p(virtio_mmio_remove),
-+	.driver		= {
-+		.name	= "virtio-mmio",
-+		.owner	= THIS_MODULE,
-+		.of_match_table	= virtio_mmio_match,
-+	},
-+};
-+
-+static int __init virtio_mmio_init(void)
-+{
-+	return platform_driver_register(&virtio_mmio_driver);
-+}
-+
-+static void __exit virtio_mmio_exit(void)
-+{
-+	platform_driver_unregister(&virtio_mmio_driver);
-+}
-+
-+module_init(virtio_mmio_init);
-+module_exit(virtio_mmio_exit);
-+
-+MODULE_AUTHOR("Pawel Moll <pawel.moll@arm.com>");
-+MODULE_DESCRIPTION("Platform bus driver for memory mapped virtio devices");
-+MODULE_LICENSE("GPL");
-diff --git a/include/linux/virtio_mmio.h b/include/linux/virtio_mmio.h
-new file mode 100644
-index 0000000..5d1ea5c
---- /dev/null
-+++ b/include/linux/virtio_mmio.h
-@@ -0,0 +1,92 @@
-+/*
-+ * Virtio platform device driver
-+ *
-+ * Copyright 2011, ARM Ltd.
-+ *
-+ * Based on Virtio PCI driver by Anthony Liguori, copyright IBM Corp. 2007
-+ *
-+ * This header is BSD licensed so anyone can use the definitions to implement
-+ * compatible drivers/servers.
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions
-+ * are met:
-+ * 1. Redistributions of source code must retain the above copyright
-+ *    notice, this list of conditions and the following disclaimer.
-+ * 2. Redistributions in binary form must reproduce the above copyright
-+ *    notice, this list of conditions and the following disclaimer in the
-+ *    documentation and/or other materials provided with the distribution.
-+ * 3. Neither the name of IBM nor the names of its contributors
-+ *    may be used to endorse or promote products derived from this software
-+ *    without specific prior written permission.
-+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS'' AND
-+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-+ * ARE DISCLAIMED.  IN NO EVENT SHALL IBM OR CONTRIBUTORS BE LIABLE
-+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-+ * SUCH DAMAGE.
-+ */
-+
-+#ifndef _LINUX_VIRTIO_MMIO_H
-+#define _LINUX_VIRTIO_MMIO_H
-+
-+/* Magic value ("virt" string) */
-+#define VIRTIO_MMIO_MAGIC_VALUE		0x000
-+
-+/* Virtio device version */
-+#define VIRTIO_MMIO_VERSION		0x004
-+
-+/* Virtio device ID */
-+#define VIRTIO_MMIO_DEVICE_ID		0x008
-+
-+/* Virtio vendor ID */
-+#define VIRTIO_MMIO_VENDOR_ID		0x00c
-+
-+/* Bitmask of the features supported by the host (32 bits per set) */
-+#define VIRTIO_MMIO_HOST_FEATURES	0x010
-+
-+/* Host features set selector */
-+#define VIRTIO_MMIO_HOST_FEATURES_SEL	0x014
-+
-+/* Bitmask of features activated by the guest (32 bits per set) */
-+#define VIRTIO_MMIO_GUEST_FEATURES	0x020
-+
-+/* Activated features set selector */
-+#define VIRTIO_MMIO_GUEST_FEATURES_SET	0x024
-+
-+/* Guest's memory page size in bytes */
-+#define VIRTIO_MMIO_GUEST_PAGE_SIZE	0x028
-+
-+/* Queue selector */
-+#define VIRTIO_MMIO_QUEUE_SEL		0x030
-+
-+/* Queue size for the currently selected queue */
-+#define VIRTIO_MMIO_QUEUE_NUM		0x034
-+
-+/* Used Ring alignment for the currently selected queue */
-+#define VIRTIO_MMIO_QUEUE_ALIGN		0x038
-+
-+/* Guest's PFN for the currently selected queue */
-+#define VIRTIO_MMIO_QUEUE_PFN		0x03c
-+
-+/* Queue notifier */
-+#define VIRTIO_MMIO_QUEUE_NOTIFY	0x050
-+
-+/* Interrupt acknowledge */
-+#define VIRTIO_MMIO_INTERRUPT_ACK	0x060
-+
-+/* Device status register */
-+#define VIRTIO_MMIO_STATUS		0x070
-+
-+/* The config space is defined by each driver as
-+ * the per-driver configuration space */
-+#define VIRTIO_MMIO_CONFIG		0x100
-+
-+
-+
-+#endif
--- 
-1.6.3.3
+Pawe?
