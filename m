@@ -1,75 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 28 Sep 2011 14:48:15 -0700
-Subject: [PATCH 1/4] ARM: OMAP4: MMC: fix power and audio issue,
-	decouple USBC1 from MMC1
+Date: Wed, 28 Sep 2011 14:48:21 -0700
+Subject: [PATCH 3/4] ARM: OMAP4: Keyboard: Fix section mismatch in the board
+	file
 In-Reply-To: <20110928214707.29263.58095.stgit@kaulin.local>
 References: <20110928214707.29263.58095.stgit@kaulin.local>
-Message-ID: <20110928214815.29263.90657.stgit@kaulin.local>
+Message-ID: <20110928214821.29263.29309.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bryan Buckley <bryan.buckley@ti.com>
+From: Bjarne Steinsbo <bsteinsbo@gmail.com>
 
-Remove OMAP4_USBC1_ICUSB_PWRDNZ_MASK during enable/disable PWRDNZ mode for
-MMC1_PBIAS and associated extended-drain MMC1 I/O cell. This is in accordance
-with the control module programming guide. This fixes a bug where if trying to
-use gpio_98 or gpio_99 and MMC1 at the same time the GPIO signal will be
-affected by a changing SDMMC1_VDDS.
+`keypad_pads' is referred to by `keypad_data' which is
+not __initdata, so `keypad_pads' should not be __initdata either.
 
-Software must keep MMC1_PBIAS cell and MMC1_IO cell PWRDNZ signals low whenever
-SDMMC1_VDDS ramps up/down or changes for cell protection purposes.
-
-MMC1 is based on SDMMC1_VDDS whereas USBC1 is based on SIM_VDDS therefore
-they can operate independently.
-
-Signed-off-by: Bryan Buckley <bryan.buckley@ti.com>
-Acked-by:  Kishore Kadiyala <kishore.kadiyala@ti.com>
-Tested-by: Balaji T K <balajitk@ti.com>
+Signed-off-by: Bjarne Steinsbo <bsteinsbo@gmail.com>
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/hsmmc.c |   12 ++++--------
- 1 files changed, 4 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/board-4430sdp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index a9b45c7..097a42d 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -137,8 +137,7 @@ static void omap4_hsmmc1_before_set_reg(struct device *dev, int slot,
- 	 */
- 	reg = omap4_ctrl_pad_readl(control_pbias_offset);
- 	reg &= ~(OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK |
--		OMAP4_MMC1_PWRDNZ_MASK |
--		OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
-+		OMAP4_MMC1_PWRDNZ_MASK);
- 	omap4_ctrl_pad_writel(reg, control_pbias_offset);
- }
- 
-@@ -156,8 +155,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
- 		else
- 			reg |= OMAP4_MMC1_PBIASLITE_VMODE_MASK;
- 		reg |= (OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK |
--			OMAP4_MMC1_PWRDNZ_MASK |
--			OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
-+			OMAP4_MMC1_PWRDNZ_MASK);
- 		omap4_ctrl_pad_writel(reg, control_pbias_offset);
- 
- 		timeout = jiffies + msecs_to_jiffies(5);
-@@ -171,16 +169,14 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
- 		if (reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK) {
- 			pr_err("Pbias Voltage is not same as LDO\n");
- 			/* Caution : On VMODE_ERROR Power Down MMC IO */
--			reg &= ~(OMAP4_MMC1_PWRDNZ_MASK |
--				OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
-+			reg &= ~(OMAP4_MMC1_PWRDNZ_MASK);
- 			omap4_ctrl_pad_writel(reg, control_pbias_offset);
- 		}
- 	} else {
- 		reg = omap4_ctrl_pad_readl(control_pbias_offset);
- 		reg |= (OMAP4_MMC1_PBIASLITE_PWRDNZ_MASK |
- 			OMAP4_MMC1_PWRDNZ_MASK |
--			OMAP4_MMC1_PBIASLITE_VMODE_MASK |
--			OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
-+			OMAP4_MMC1_PBIASLITE_VMODE_MASK);
- 		omap4_ctrl_pad_writel(reg, control_pbias_offset);
- 	}
- }
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index c7cef44..9e423ac 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -129,7 +129,7 @@ static const int sdp4430_keymap[] = {
+ 	KEY(7, 6, KEY_OK),
+ 	KEY(7, 7, KEY_DOWN),
+ };
+-static struct omap_device_pad keypad_pads[] __initdata = {
++static struct omap_device_pad keypad_pads[] = {
+ 	{	.name   = "kpd_col1.kpd_col1",
+ 		.enable = OMAP_WAKEUP_EN | OMAP_MUX_MODE1,
+ 	},
