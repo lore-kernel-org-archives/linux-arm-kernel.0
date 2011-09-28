@@ -1,42 +1,76 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 28 Sep 2011 16:48:06 +0100
-Subject: [PATCH] arm: Add VIRTUALIZATION configuration menu and virtio options
-Message-ID: <1317224886-3925-1-git-send-email-pawel.moll@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 28 Sep 2011 10:50:32 -0500
+Subject: [PATCH v2 07/16] ARM: GIC: Add global gic_handle_irq_offset()
+	function
+In-Reply-To: <1317034955-1029-8-git-send-email-marc.zyngier@arm.com>
+References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
+	<1317034955-1029-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4E834248.3010908@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds menuconfig VIRTUALIZATION to arm Kconfig
-and includes virtio Kconfig in it.
+On 09/26/2011 06:02 AM, Marc Zyngier wrote:
+> Similar to gic_handle_irq(), gic_handle_irq_offset() is provided
+> for those platform who insist on having their GIC base interrupt
+> at something different from zero. At the moment, Exynos4 is the
+> only one...
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/common/gic.c               |   24 ++++++++++++++++++++++++
+>  arch/arm/include/asm/hardware/gic.h |    1 +
+>  2 files changed, 25 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> index 5a22896..ef803d2 100644
+> --- a/arch/arm/common/gic.c
+> +++ b/arch/arm/common/gic.c
+> @@ -232,6 +232,30 @@ asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+>  	} while (1);
+>  }
+>  
+> +asmlinkage void __exception_irq_entry gic_handle_irq_offset(struct pt_regs *regs)
+> +{
+> +	u32 irqstat, irqnr;
+> +	u32 offset = gic_data[0].irq_offset;
+> +
+> +	do {
+> +		irqstat = readl_relaxed(gic_cpu_base_addr + GIC_CPU_INTACK);
+> +		irqnr = irqstat & ~0x1c00;
+> +
+> +		if (likely(irqnr > 15 && irqnr < 1021)) {
+> +			handle_IRQ(irqnr + offset, regs);
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/Kconfig |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+Can't this be combined with gic_handle_irq. irq_offset will be 0 in that
+case. Really, irq_domain should be used here.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 3269576..426f330 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2101,4 +2101,20 @@ source "security/Kconfig"
- 
- source "crypto/Kconfig"
- 
-+menuconfig VIRTUALIZATION
-+	bool "Virtualization"
-+	default n
-+	---help---
-+	  Say Y here to get to see options for using your Linux host to run other
-+	  operating systems inside virtual machines (guests).
-+	  This option alone does not add any kernel code.
-+
-+	  If you say N, all options in this submenu will be skipped and disabled.
-+
-+if VIRTUALIZATION
-+
-+source drivers/virtio/Kconfig
-+
-+endif # VIRTUALIZATION
-+
- source "lib/Kconfig"
--- 
-1.6.3.3
+Rob
+
+> +			continue;
+> +		}
+> +		if (irqnr < 16) {
+> +			writel_relaxed(irqstat, gic_cpu_base_addr + GIC_CPU_EOI);
+> +#ifdef CONFIG_SMP
+> +			handle_IPI(irqnr, regs);
+> +#endif
+> +			continue;
+> +		}
+> +		break;
+> +	} while (1);
+> +}
+> +
+>  static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+>  {
+>  	struct gic_chip_data *chip_data = irq_get_handler_data(irq);
+> diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+> index 45e4ab4..0f454c6 100644
+> --- a/arch/arm/include/asm/hardware/gic.h
+> +++ b/arch/arm/include/asm/hardware/gic.h
+> @@ -39,6 +39,7 @@ extern struct irq_chip gic_arch_extn;
+>  void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
+>  void gic_secondary_init(unsigned int);
+>  void gic_handle_irq(struct pt_regs *regs);
+> +void gic_handle_irq_offset(struct pt_regs *regs);
+>  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+>  void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+>  
