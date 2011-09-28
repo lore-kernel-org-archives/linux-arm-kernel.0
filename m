@@ -1,69 +1,80 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 28 Sep 2011 08:46:14 +0200
-Subject: [PATCH] dma/imx-sdma+imx-dma: explicitly #include <linux/module.h>
-In-Reply-To: <4E824821.8040105@windriver.com>
-References: <1317018379-8897-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<4E824821.8040105@windriver.com>
-Message-ID: <20110928064614.GN20550@pengutronix.de>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Wed, 28 Sep 2011 12:15:40 +0530
+Subject: [linux-pm Query] Power Management Device Suspend/ Resume
+In-Reply-To: <1317181365.1573.1636.camel@vkoul-udesk3>
+References: <CAO1yOm2pbApTwa0gj3Q9RsC1mxNGGirxm6FzaDC7zbgjHdkKDw@mail.gmail.com>
+	<4E8293C4.5090009@st.com> <1317181365.1573.1636.camel@vkoul-udesk3>
+Message-ID: <4E82C294.7000308@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Cc: += linux-kbuild at v.k.o + Michal Marek]
+Vinod,
 
-Hello,
+Thanks for mailing us back.
 
-On Tue, Sep 27, 2011 at 06:03:13PM -0400, Paul Gortmaker wrote:
-> On 11-09-26 02:26 AM, Uwe Kleine-K?nig wrote:
-> > This is needed after commit
-> > 
-> > 	include: replace linux/module.h with "struct module" wherever possible
-> > 
-> > (currently 25215aa in next).
-> > 
-> > Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Hello,
-> > 
-> > maybe it's sensible for Paul to take that before his commit?
-> 
-> Thanks, I'll blend it into the commit adding module.h to the other
-> drivers/dma files.  It seems the imx boards don't have a defconfig
-> in the arch/arm/configs that enables this (CONFIG_IMX_[S]DMA).
-> 
-> What is really interesting (at least to me anyway) is that I
-> didn't get one iMX build in some 6000+ ARM randconfig builds....
-> 
-> I would have thought it would have showed up at least a couple
-> times, given that number of builds.  Maybe randconfig doesn't
-> deal so well with "choice" Kconfig items?
-> 
-> ~/git/module.h/linux-2.6.git$ ls -1 ../build-10*arm |wc -l
-> 6399
-> ~/git/module.h/linux-2.6.git$ grep CONFIG_ARCH_[A-Z0-9]*=y ../build-10*arm*/.config | sed 's/.*CON/CON/'|sort |uniq
-> CONFIG_ARCH_EBSA110=y
-> CONFIG_ARCH_H7201=y
-> CONFIG_ARCH_H7202=y
-> CONFIG_ARCH_H720X=y
-> CONFIG_ARCH_VERSATILE=y
+On 9/28/2011 9:12 AM, Vinod Koul wrote:
+> On Wed, 2011-09-28 at 08:55 +0530, Viresh Kumar wrote:
+>> On 9/22/2011 4:19 PM, Deepak Sikri wrote:
+> are you trying to do runtime power management or traditional suspend and
+> resume? IMO both should be done...
 
-I don't understand why you did that sed, but AFAICT it doesn't hurt,
-too. Maybe adding -c to uniq in your command line is interesting for the
-kbuild people?!
+We will first be testing traditional suspend/resume, but obviously we would
+try to design drivers in order to support runtime PM too.
 
-> ~/git/module.h/linux-2.6.git$ 
-> 
-> No ARCH_MXC, no ARCH_MXS, PXA, or any of the other 20+ variants.
-> Definitely not a random spread there, with all 6000 builds falling
-> in just 5 buckets.
-How did you test? Generate a .config, test without your change and if
-that succeeds test with it? If so, maybe the problem isn't that
-randconfig doesn't generate more random configs but that you got many
-failures in the first run?!
+>>> *Query- 1*. Suppose my platform has a ADC driver under char framework, which internally uses the
+>>> DMA driver (channels). Now, ADC driver can be used by other kernel drivers or directly from user application.
+>>>  
+>>> *1. a.* What are the expectations from the suspend and resume routines of both the devices, DMA & ADC ?
+>>>  
+>>> */-- Given that few of the options are/*
+>>> */1.a.1. On suspend,/*
+>>> In ADC suspend function: ADC releases all the DMA channels, latches its registers; and
+>>> DMA suspend function: DMA does nothing except for lataching of registers if required.
+>>>  
+>>> */1.a.2. On suspend, /*
+>>> ADC suspend function: ADC just latches its registers and stops R/W through DMA, no DMA channel release;
+>>> DMA suspend function: DMA halts its operating channels, and latches its registers if required.
+> Well channel release/alloc is not really required. You can goto suspend
+> in between as well. if you have queued but not active descriptors on all
+> channels then dmac is idle and you can use this time to goto suspend.
 
-Best regards
-Uwe
+But the time suspend is called for DMA, we may in middle of DMA transfers
+on few channels. So should we wait for them to finish or simply disable
+channel transfer? And in case of resume what will happen to transfers that
+were active during suspend?
+
+>>> *1.b* Will the suspend resume for the dependent drivers follow sequencing, i.e. Suspend of ADC followed by
+>>> Suspend of DMA? (Assume both of these devices are hooked on to Platform bus, given that ADC uses DMA)
+> why do you care?
+
+Suppose suspend of DMA occurs first and we disable its clock in the suspend
+routine. Now before the suspend of ADC is called, ADC requests for DMA
+transfers and because not every routine of DMA keeps track of clk is on/off,
+it may try to access DMA register.
+
+So, we must ensure that all children are suspended before the parent is
+requested to suspend. And probably this is the correct way.
+So, here we need ADC to suspend before DMA. How is this sequencing ensured?
+
+>>> 2.1 The user space threads freeze first followed by kernel space.  In case the user space process issues a a system
+>>> call (lets assume an ioctl system call), how will the user space thread respond in case of suspend to ram?
+> all user space processes are frozen on STR
+
+Yes, but what will be its state. Will the system calls complete? Will it
+close all devices opened by it before freezing?
+
+Suppose a user applications is accessing few ADC channels. ADC controller
+and its channel are all configured. Now, suspend is requested. What should
+ADC driver do? As power will be turned off, its register will loose their
+value.
+
+Should ADC reconfigure all its channel registers by keeping their state?
+Also it is not very straight forward to reconfigure channels directly, as
+registers are required to be programmed in certain sequence, so there
+needs to be good amount of intelligence put into driver for that.
+
+IIRC, i couldn't find any such stuff in other mainline drivers. And that's
+why we are confused on this topic.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+viresh
