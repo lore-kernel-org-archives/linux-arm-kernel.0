@@ -1,23 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Sep 2011 18:02:17 -0700
-Subject: [PATCH v2 14/16] ARM: omap2/3: Add global
-	omap2/3_intc_handle_irq() functions
-In-Reply-To: <1317034955-1029-15-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 27 Sep 2011 18:04:09 -0700
+Subject: [PATCH v2 15/16] ARM: omap2plus: convert to
+	CONFIG_MULTI_IRQ_HANDLER
+In-Reply-To: <1317034955-1029-16-git-send-email-marc.zyngier@arm.com>
 References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-	<1317034955-1029-15-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110928010217.GV6324@atomide.com>
+	<1317034955-1029-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110928010408.GW6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Marc Zyngier <marc.zyngier@arm.com> [110926 07:02]:
-> Provide the OMAP2/3 IRQ code with low level handlers that can be used
-> by platforms using CONFIG_MULTI_IRQ_HANDLER. Though the handlers are
-> written in C, the compiled code looks very similar to its assembly
-> counterpart (at least with my gcc 4.4.1).
+> Convert the omap2plus platforms to be using CONFIG_MULTI_IRQ_HANDLER.
+> Each machine is modified to provide either omap2_intc_handle_irq(),
+> omap3_intc_handle_irq() or gic_handle_irq().
 > 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> This allows for a major cleanup, removing the MULTI_OMAP setup
+> from the interrupt path.
+> 
+> Tested on both Panda and IGEPv2 (single kernel image)
+...
 
-Nice, thanks for doing this!
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -25,6 +25,7 @@ config ARCH_OMAP2
+>  	depends on ARCH_OMAP2PLUS
+>  	default y
+>  	select CPU_V6
+> +	select MULTI_IRQ_HANDLER
+>  
+>  config ARCH_OMAP3
+>  	bool "TI OMAP3"
+
+This one selects it only for ARCH_OMAP2, not for ARCH_OMAP2PLUS.
+
+This might require minor merging with the cleanup I've posted, but
+that should be trivial.
+
+Other than that:
 
 Tested-by: Tony Lindgren <tony@atomide.com>
