@@ -1,76 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 28 Sep 2011 10:50:32 -0500
-Subject: [PATCH v2 07/16] ARM: GIC: Add global gic_handle_irq_offset()
-	function
-In-Reply-To: <1317034955-1029-8-git-send-email-marc.zyngier@arm.com>
-References: <1317034955-1029-1-git-send-email-marc.zyngier@arm.com>
-	<1317034955-1029-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4E834248.3010908@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 28 Sep 2011 10:50:44 -0500
+Subject: [PATCH v3 3/6] OMAP3+: use DPLL's round_rate when setting rate
+In-Reply-To: <alpine.DEB.2.00.1109280059380.4399@utopia.booyaka.com>
+References: <1316195281-14988-1-git-send-email-jon-hunter@ti.com>
+	<alpine.DEB.2.00.1109280059380.4399@utopia.booyaka.com>
+Message-ID: <4E834254.9040802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2011 06:02 AM, Marc Zyngier wrote:
-> Similar to gic_handle_irq(), gic_handle_irq_offset() is provided
-> for those platform who insist on having their GIC base interrupt
-> at something different from zero. At the moment, Exynos4 is the
-> only one...
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/common/gic.c               |   24 ++++++++++++++++++++++++
->  arch/arm/include/asm/hardware/gic.h |    1 +
->  2 files changed, 25 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index 5a22896..ef803d2 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -232,6 +232,30 @@ asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->  	} while (1);
->  }
->  
-> +asmlinkage void __exception_irq_entry gic_handle_irq_offset(struct pt_regs *regs)
-> +{
-> +	u32 irqstat, irqnr;
-> +	u32 offset = gic_data[0].irq_offset;
-> +
-> +	do {
-> +		irqstat = readl_relaxed(gic_cpu_base_addr + GIC_CPU_INTACK);
-> +		irqnr = irqstat & ~0x1c00;
-> +
-> +		if (likely(irqnr > 15 && irqnr < 1021)) {
-> +			handle_IRQ(irqnr + offset, regs);
+Hi Paul,
 
-Can't this be combined with gic_handle_irq. irq_offset will be 0 in that
-case. Really, irq_domain should be used here.
+On 9/28/2011 2:02, Paul Walmsley wrote:
+> Hi,
+>
+> On Fri, 16 Sep 2011, Jon Hunter wrote:
+>
+>> From: Mike Turquette<mturquette@ti.com>
+>>
+>> omap3_noncore_dpll_set_rate uses omap2_dpll_round_rate explicitly.  Instead
+>> use the struct clk pointer's round_rate function to allow for DPLL's with
+>> special needs.
+>>
+>> Also the rounded rate can differ from target rate, so to better reflect
+>> reality set clk->rate equal to the rounded rate when setting DPLL frequency.
+>> This avoids issues where the DPLL frequency is slightly different than what
+>> debugfs clock tree reports using the old target rate.
+>>
+>> An example of both of these needs is DPLL_ABE on OMAP4 which can have a 4x
+>> multiplier on top of the usual MN dividers depending on register settings.
+>> This requires a special round_rate function that might yield a rate
+>> different from the initial target.
+>>
+>> Signed-off-by: Mike Turquette<mturquette@ti.com>
+>> Signed-off-by: Jon Hunter<jon-hunter@ti.com>
+>
+> The two separate changes in this patch have been separated out into two
+> patches - both included below.  Please let me know if you have any
+> comments; otherwise, I'll queue for 3.2.
 
-Rob
-
-> +			continue;
-> +		}
-> +		if (irqnr < 16) {
-> +			writel_relaxed(irqstat, gic_cpu_base_addr + GIC_CPU_EOI);
-> +#ifdef CONFIG_SMP
-> +			handle_IPI(irqnr, regs);
-> +#endif
-> +			continue;
-> +		}
-> +		break;
-> +	} while (1);
-> +}
-> +
->  static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
->  {
->  	struct gic_chip_data *chip_data = irq_get_handler_data(irq);
-> diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-> index 45e4ab4..0f454c6 100644
-> --- a/arch/arm/include/asm/hardware/gic.h
-> +++ b/arch/arm/include/asm/hardware/gic.h
-> @@ -39,6 +39,7 @@ extern struct irq_chip gic_arch_extn;
->  void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
->  void gic_secondary_init(unsigned int);
->  void gic_handle_irq(struct pt_regs *regs);
-> +void gic_handle_irq_offset(struct pt_regs *regs);
->  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
->  void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
->  
+Yes, looks good to me. Thanks. Jon
