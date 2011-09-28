@@ -1,30 +1,35 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 28 Sep 2011 04:07:47 +0300
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-Message-ID: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 27 Sep 2011 20:45:13 -0500
+Subject: [PATCH 1/2] devicetree: Add ARM pl061 gpio controller binding doc
+Message-ID: <1317174314-16122-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch causes the kernel uncompressor to determine the physical address
-of the SDRAM at runtime. This allows the kernel to boot on both tegra20 and
-tegra30 even though SDRAM is at different physical addresses on both SoCs.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Add binding documentation for ARM's Primecell PL061 GPIO controller.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/gpio/pl061-gpio.txt        |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/pl061-gpio.txt
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 472a7f8..474737b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -596,6 +596,7 @@ config ARCH_TEGRA
- 	select HAVE_CLK
- 	select HAVE_SCHED_CLOCK
- 	select ARCH_HAS_CPUFREQ
-+	select AUTO_ZRELADDR
- 	help
- 	  This enables support for NVIDIA Tegra based systems (Tegra APX,
- 	  Tegra 6xx and Tegra 2 series).
+diff --git a/Documentation/devicetree/bindings/gpio/pl061-gpio.txt b/Documentation/devicetree/bindings/gpio/pl061-gpio.txt
+new file mode 100644
+index 0000000..a2c416b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/pl061-gpio.txt
+@@ -0,0 +1,10 @@
++ARM PL061 GPIO controller
++
++Required properties:
++- compatible : "arm,pl061", "arm,primecell"
++- #gpio-cells : Should be two. The first cell is the pin number and the
++  second cell is used to specify optional parameters:
++  - bit 0 specifies polarity (0 for normal, 1 for inverted)
++- gpio-controller : Marks the device node as a GPIO controller.
++- interrupts : Interrupt mapping for GPIO IRQ.
++
 -- 
-1.7.0.4
+1.7.5.4
