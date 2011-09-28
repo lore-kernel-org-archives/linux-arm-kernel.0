@@ -1,58 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 28 Sep 2011 14:20:49 +0200
-Subject: [PATCH 0/6] Support single zImage for imx3 and imx6
-In-Reply-To: <1317201368-6403-1-git-send-email-shawn.guo@linaro.org>
-References: <1317201368-6403-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110928122049.GZ31404@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 28 Sep 2011 13:26:28 +0100
+Subject: [PATCH 8/9] regulator: helper to extract regulator node based on
+	supply name
+In-Reply-To: <4E82D63A.7030207@ti.com>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-9-git-send-email-rnayak@ti.com>
+	<20110927122155.GE4289@opensource.wolfsonmicro.com>
+	<4E81E281.505@ti.com>
+	<20110927185913.GU4289@opensource.wolfsonmicro.com>
+	<4E82D63A.7030207@ti.com>
+Message-ID: <20110928122628.GF3279@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wed, Sep 28, 2011 at 10:09:30AM +0200, Cousson, Benoit wrote:
+> On 9/27/2011 8:59 PM, Mark Brown wrote:
 
-On Wed, Sep 28, 2011 at 05:16:02PM +0800, Shawn Guo wrote:
-> This series supports the single zImage build for imx3 and imx6.  It's
-> based on linux-next with imx6 series applied, and tested on imx35 and
-> imx6q.
+> >I'm not sure how this should work in a device tree world, I'd *hope*
+> >we'd get a device tree node for the CPU and could then just make this a
+> >regular consumer thing but then the cpufreq drivers would need to be
+> >updated to make use of it.  The only reason we allow null devices right
+> >now is the fact that cpufreq doesn't have a struct device it can use.
 
-I'm fine with this series (and the i.MX6 series). I can merge this
-series without the last patch now. For the i.MX6 series I think we have
-to wait until the prerequisites are merged. Maybe we should merge this
-in a second pull request during the merge window.
+> That's why we do have a MPU node in OMAP dts, in order to build an
+> omap_device that will be mainly used for the DVFS on the MPU.
 
-Sascha
+> And even before DT migration, we used to build statically some
+> omap_device to represent the various processors in the system (MPU,
+> DSP, CortexM3...).
 
-> 
-> Sascha Hauer (1):
->       arm/imx: merge i.MX3 and i.MX6
-> 
-> Shawn Guo (5):
->       arm/imx: merge mm-imx35.c into mm-imx31.c
->       arm/imx: rename mm-imx31.c to mm-imx3.c
->       arm/imx: change mxc_init_l2x0() to an imx31/35 specific call
->       arm/imx: remove cpu_is_xxx() from arch_idle()
->       arm/imx: remove cpu_is_xxx() check from __imx_ioremap()
-> 
->  arch/arm/Makefile                       |    3 +-
->  arch/arm/mach-imx/Kconfig               |    7 +-
->  arch/arm/mach-imx/Makefile              |    5 +-
->  arch/arm/mach-imx/Makefile.boot         |   10 +-
->  arch/arm/mach-imx/cache-l2x0.c          |   56 -------
->  arch/arm/mach-imx/mm-imx3.c             |  256 +++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/mm-imx31.c            |   91 -----------
->  arch/arm/mach-imx/mm-imx35.c            |  109 -------------
->  arch/arm/mach-mx5/mm.c                  |    6 +
->  arch/arm/mach-mx5/pm-imx5.c             |    3 +-
->  arch/arm/mm/Kconfig                     |    4 +-
->  arch/arm/plat-mxc/Kconfig               |   18 +--
->  arch/arm/plat-mxc/include/mach/common.h |    2 +
->  arch/arm/plat-mxc/include/mach/io.h     |   22 +--
->  arch/arm/plat-mxc/include/mach/system.h |   35 +----
->  arch/arm/plat-mxc/system.c              |    3 +
->  16 files changed, 300 insertions(+), 330 deletions(-)
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yeah, but that's very OMAP specific - we don't have that in general (in
+fact it's the only Linux platform I'm aware of that has a device for the
+CPU).
