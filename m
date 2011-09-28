@@ -1,52 +1,36 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 28 Sep 2011 13:48:41 +0530
-Subject: [PATCH 8/9] regulator: helper to extract regulator node based
-	on supply name
-In-Reply-To: <4E82D63A.7030207@ti.com>
-References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-9-git-send-email-rnayak@ti.com>
-	<20110927122155.GE4289@opensource.wolfsonmicro.com>
-	<4E81E281.505@ti.com>
-	<20110927185913.GU4289@opensource.wolfsonmicro.com>
-	<4E82D63A.7030207@ti.com>
-Message-ID: <4E82D861.6030303@ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 28 Sep 2011 10:20:51 +0200
+Subject: [PATCH 02/13] gpio/omap: Adapt GPIO driver to DT
+In-Reply-To: <4E8161C7.7020404@ti.com>
+References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
+	<1317055821-20652-3-git-send-email-b-cousson@ti.com>
+	<4E8161C7.7020404@ti.com>
+Message-ID: <4E82D8E3.8080405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 September 2011 01:39 PM, Cousson, Benoit wrote:
-> On 9/27/2011 8:59 PM, Mark Brown wrote:
->> On Tue, Sep 27, 2011 at 08:19:37PM +0530, Rajendra Nayak wrote:
->>> On Tuesday 27 September 2011 05:51 PM, Mark Brown wrote:
->>>> On Tue, Sep 27, 2011 at 03:42:51PM +0530, Rajendra Nayak wrote:
->>
->>>>> + if (!dev)
->>>>> + return NULL;
->>
->>>> So how do we handle CPUs? cpufreq is one of the most active users of
->>>> regulators...
->>
->>> Hmm, never thought of it :(
->>> Maybe I should associate a supply name with all
->>> regulators and then lookup from the global registered
->>> list.
->>
->> I'm not sure how this should work in a device tree world, I'd *hope*
->> we'd get a device tree node for the CPU and could then just make this a
->> regular consumer thing but then the cpufreq drivers would need to be
->> updated to make use of it. The only reason we allow null devices right
->> now is the fact that cpufreq doesn't have a struct device it can use.
->
-> That's why we do have a MPU node in OMAP dts, in order to build an
-> omap_device that will be mainly used for the DVFS on the MPU.
->
-> And even before DT migration, we used to build statically some
-> omap_device to represent the various processors in the system (MPU, DSP,
-> CortexM3...).
+I missed one comment...
 
-yes, but clearly not everyone seems to do this. and then there are
-also these instances of board files requesting regulators without
-associating them with any device :(
+On 9/27/2011 7:40 AM, Nayak, Rajendra wrote:
+> On Monday 26 September 2011 10:20 PM, Benoit Cousson wrote:
 
+[...]
+
+>> +Required properties:
+>> +- compatible:
+>> +  - "ti,omap2-gpio" for OMAP2 and OMAP3 controllers
 >
-> Regards,
-> Benoit
+> Would it be more readable to have
+> "ti,omap2-gpio" for OMAP2 controllers and
+> "ti,omap3-gpio" for OMAP3 controllers?
+
+The point here is to identify the IP version used in various OMAPs. 
+Since OMAP3 and OMAP2 are using the same IP version, there is no point 
+to differentiate the OMAP3 version.
+What is doable is to put both "ti,omap3-gpio", "ti,omap2-gpio" to avoid 
+modifying the driver for no reason and still being able to identify the 
+OMAP3 version.
+But I'm not sure we should do that if there is not real difference.
+
+regards,
+Benoit
