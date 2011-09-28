@@ -1,35 +1,34 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 28 Sep 2011 14:48:21 -0700
-Subject: [PATCH 3/4] ARM: OMAP4: Keyboard: Fix section mismatch in the board
-	file
+Date: Wed, 28 Sep 2011 14:48:23 -0700
+Subject: [PATCH 4/4] ARM: OMAP: irq: loop counter fix in omap_init_irq()
 In-Reply-To: <20110928214707.29263.58095.stgit@kaulin.local>
 References: <20110928214707.29263.58095.stgit@kaulin.local>
-Message-ID: <20110928214821.29263.29309.stgit@kaulin.local>
+Message-ID: <20110928214823.29263.53645.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bjarne Steinsbo <bsteinsbo@gmail.com>
+From: Tapani Utriainen <tapani@technexion.com>
 
-`keypad_pads' is referred to by `keypad_data' which is
-not __initdata, so `keypad_pads' should not be __initdata either.
+Fixes bug where variable i was redundantly used for counting two nested loops.
 
-Signed-off-by: Bjarne Steinsbo <bsteinsbo@gmail.com>
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Tapani Utriainen <tapani@technexion.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/board-4430sdp.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/irq.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index c7cef44..9e423ac 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -129,7 +129,7 @@ static const int sdp4430_keymap[] = {
- 	KEY(7, 6, KEY_OK),
- 	KEY(7, 7, KEY_DOWN),
- };
--static struct omap_device_pad keypad_pads[] __initdata = {
-+static struct omap_device_pad keypad_pads[] = {
- 	{	.name   = "kpd_col1.kpd_col1",
- 		.enable = OMAP_WAKEUP_EN | OMAP_MUX_MODE1,
- 	},
+diff --git a/arch/arm/mach-omap2/irq.c b/arch/arm/mach-omap2/irq.c
+index 3a12f75..65f1be6 100644
+--- a/arch/arm/mach-omap2/irq.c
++++ b/arch/arm/mach-omap2/irq.c
+@@ -165,8 +165,8 @@ static void __init omap_init_irq(u32 base, int nr_irqs)
+ 
+ 		omap_irq_bank_init_one(bank);
+ 
+-		for (i = 0, j = 0; i < bank->nr_irqs; i += 32, j += 0x20)
+-			omap_alloc_gc(bank->base_reg + j, i, 32);
++		for (j = 0; j < bank->nr_irqs; j += 32)
++			omap_alloc_gc(bank->base_reg + j, j, 32);
+ 
+ 		nr_of_irqs += bank->nr_irqs;
+ 		nr_banks++;
