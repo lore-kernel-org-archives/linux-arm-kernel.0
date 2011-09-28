@@ -1,36 +1,55 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 28 Sep 2011 10:20:51 +0200
-Subject: [PATCH 02/13] gpio/omap: Adapt GPIO driver to DT
-In-Reply-To: <4E8161C7.7020404@ti.com>
-References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
-	<1317055821-20652-3-git-send-email-b-cousson@ti.com>
-	<4E8161C7.7020404@ti.com>
-Message-ID: <4E82D8E3.8080405@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 28 Sep 2011 10:27:10 +0200
+Subject: [PATCH for 3.1] ARM: at91: add PWM driver selector in Kconfig
+	for 9g45 family
+In-Reply-To: <1316710934-22405-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1316710934-22405-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4E82DA5E.6070906@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I missed one comment...
+Le 22/09/2011 19:02, Nicolas Ferre :
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/misc/Kconfig |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index 2d6423c..7ce658e 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -63,7 +63,7 @@ config AD525X_DPOT_SPI
+>  
+>  config ATMEL_PWM
+>  	tristate "Atmel AT32/AT91 PWM support"
+> -	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91CAP9
+> +	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45 || ARCH_AT91CAP9
 
-On 9/27/2011 7:40 AM, Nayak, Rajendra wrote:
-> On Monday 26 September 2011 10:20 PM, Benoit Cousson wrote:
+I am rethinking about that just planning to remove entirely this "depends" line...
 
-[...]
+>  	help
+>  	  This option enables device driver support for the PWM channels
+>  	  on certain Atmel processors.  Pulse Width Modulation is used for
 
->> +Required properties:
->> +- compatible:
->> +  - "ti,omap2-gpio" for OMAP2 and OMAP3 controllers
->
-> Would it be more readable to have
-> "ti,omap2-gpio" for OMAP2 controllers and
-> "ti,omap3-gpio" for OMAP3 controllers?
+---8<--------
+From: Nicolas Ferre <nicolas.ferre@atmel.com>
+Date: Wed, 28 Sep 2011 09:38:44 +0200
+Subject: [PATCH for 3.1 V2] ARM: at91: add PWM driver selector in Kconfig for 9g45 family
 
-The point here is to identify the IP version used in various OMAPs. 
-Since OMAP3 and OMAP2 are using the same IP version, there is no point 
-to differentiate the OMAP3 version.
-What is doable is to put both "ti,omap3-gpio", "ti,omap2-gpio" to avoid 
-modifying the driver for no reason and still being able to identify the 
-OMAP3 version.
-But I'm not sure we should do that if there is not real difference.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-regards,
-Benoit
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index 2d6423c..7ce658e 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -63,7 +63,6 @@ config AD525X_DPOT_SPI
+ 
+ config ATMEL_PWM
+ 	tristate "Atmel AT32/AT91 PWM support"
+-	depends on AVR32 || ARCH_AT91SAM9263 || ARCH_AT91SAM9RL || ARCH_AT91CAP9
+ 	help
+ 	  This option enables device driver support for the PWM channels
+ 	  on certain Atmel processors.  Pulse Width Modulation is used for
+
+-- 
+Nicolas Ferre
