@@ -1,140 +1,52 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 28 Sep 2011 11:41:46 +0100
-Subject: [PATCHv2 09/10] ARM: versatile: convert to MULTI_IRQ_HANDLER
-In-Reply-To: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
-References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1317206507-18867-10-git-send-email-jamie@jamieiles.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 28 Sep 2011 16:26:46 +0530
+Subject: [PATCH 8/9] regulator: helper to extract regulator node based
+	on supply name
+In-Reply-To: <20110927185913.GU4289@opensource.wolfsonmicro.com>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-9-git-send-email-rnayak@ti.com>
+	<20110927122155.GE4289@opensource.wolfsonmicro.com>
+	<4E81E281.505@ti.com>
+	<20110927185913.GU4289@opensource.wolfsonmicro.com>
+Message-ID: <4E82FD6E.6030606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that there is a generic IRQ handler for multiple VIC devices use it
-for versatile to help building multi platform kernels.
+On Wednesday 28 September 2011 12:29 AM, Mark Brown wrote:
+> On Tue, Sep 27, 2011 at 08:19:37PM +0530, Rajendra Nayak wrote:
+>> On Tuesday 27 September 2011 05:51 PM, Mark Brown wrote:
+>>> On Tue, Sep 27, 2011 at 03:42:51PM +0530, Rajendra Nayak wrote:
+>
+>>>> +	if (!dev)
+>>>> +		return NULL;
+>
+>>> So how do we handle CPUs?  cpufreq is one of the most active users of
+>>> regulators...
+>
+>> Hmm, never thought of it :(
+>> Maybe I should associate a supply name with all
+>> regulators and then lookup from the global registered
+>> list.
+>
+> I'm not sure how this should work in a device tree world, I'd *hope*
+> we'd get a device tree node for the CPU and could then just make this a
+> regular consumer thing but then the cpufreq drivers would need to be
+> updated to make use of it.  The only reason we allow null devices right
+> now is the fact that cpufreq doesn't have a struct device it can use.
+>
+>>>> +	snprintf(prop_name, 32, "%s-supply", supply);
+>>>> +
+>>>> +	prop = of_get_property(dev->of_node, prop_name,&sz);
+>>>> +	if (!prop || sz<   4)
+>>>> +		return NULL;
+>
+>>> sz<   4?  Magic!  :)
+>
+>> Its the valid phandle size.
+>> I guess I need a sz != 4
+>
+> I think we need an of_get_phandle(), it'd be clearer what the check is,
+> more type safe and would avoid needing to replicate the check.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/Kconfig                                   |    1 +
- arch/arm/mach-versatile/include/mach/entry-macro.S |   30 --------------------
- arch/arm/mach-versatile/versatile_ab.c             |    2 +
- arch/arm/mach-versatile/versatile_dt.c             |    2 +
- arch/arm/mach-versatile/versatile_pb.c             |    2 +
- 5 files changed, 7 insertions(+), 30 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 6587e20..5e6c744 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -277,6 +277,7 @@ config ARCH_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_FPGA_IRQ
- 	select ARM_TIMER_SP804
-+	select MULTI_IRQ_HANDLER
- 	help
- 	  This enables support for ARM Ltd Versatile board.
- 
-diff --git a/arch/arm/mach-versatile/include/mach/entry-macro.S b/arch/arm/mach-versatile/include/mach/entry-macro.S
-index e6f7c16..b6f0dbf 100644
---- a/arch/arm/mach-versatile/include/mach/entry-macro.S
-+++ b/arch/arm/mach-versatile/include/mach/entry-macro.S
-@@ -7,39 +7,9 @@
-  * License version 2. This program is licensed "as is" without any
-  * warranty of any kind, whether express or implied.
-  */
--#include <mach/hardware.h>
--#include <mach/platform.h>
--#include <asm/hardware/vic.h>
- 
- 		.macro	disable_fiq
- 		.endm
- 
--		.macro  get_irqnr_preamble, base, tmp
--		ldr	\base, =IO_ADDRESS(VERSATILE_VIC_BASE)
--		.endm
--
- 		.macro  arch_ret_to_user, tmp1, tmp2
- 		.endm
--
--		.macro	get_irqnr_and_base, irqnr, irqstat, base, tmp
--		ldr	\irqstat, [\base, #VIC_IRQ_STATUS]	@ get masked status
--		mov	\irqnr, #0
--		teq	\irqstat, #0
--		beq	1003f
--
--1001:		tst	\irqstat, #15
--		bne	1002f
--		add	\irqnr, \irqnr, #4
--		movs	\irqstat, \irqstat, lsr #4
--		bne	1001b
--1002:		tst	\irqstat, #1
--		bne	1003f
--		add	\irqnr, \irqnr, #1
--		movs	\irqstat, \irqstat, lsr #1
--		bne	1002b
--1003:		/* EQ will be set if no irqs pending */
--
--@		clz	\irqnr, \irqstat
-- at 1003:		/* EQ will be set if we reach MAXIRQNUM */
--		.endm
--
-diff --git a/arch/arm/mach-versatile/versatile_ab.c b/arch/arm/mach-versatile/versatile_ab.c
-index f8ae64b..29b1f34 100644
---- a/arch/arm/mach-versatile/versatile_ab.c
-+++ b/arch/arm/mach-versatile/versatile_ab.c
-@@ -27,6 +27,7 @@
- 
- #include <mach/hardware.h>
- #include <asm/irq.h>
-+#include <asm/hardware/vic.h>
- #include <asm/mach-types.h>
- 
- #include <asm/mach/arch.h>
-@@ -39,6 +40,7 @@ MACHINE_START(VERSATILE_AB, "ARM-Versatile AB")
- 	.map_io		= versatile_map_io,
- 	.init_early	= versatile_init_early,
- 	.init_irq	= versatile_init_irq,
-+	.handle_irq	= vic_handle_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_init,
- MACHINE_END
-diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
-index 54e037c..f4d1e0f 100644
---- a/arch/arm/mach-versatile/versatile_dt.c
-+++ b/arch/arm/mach-versatile/versatile_dt.c
-@@ -24,6 +24,7 @@
- #include <linux/init.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-+#include <asm/hardware/vic.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-@@ -45,6 +46,7 @@ DT_MACHINE_START(VERSATILE_PB, "ARM-Versatile (Device Tree Support)")
- 	.map_io		= versatile_map_io,
- 	.init_early	= versatile_init_early,
- 	.init_irq	= versatile_init_irq,
-+	.handle_irq	= vic_handle_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_dt_init,
- 	.dt_compat	= versatile_dt_match,
-diff --git a/arch/arm/mach-versatile/versatile_pb.c b/arch/arm/mach-versatile/versatile_pb.c
-index 37c23df..229d0a3b 100644
---- a/arch/arm/mach-versatile/versatile_pb.c
-+++ b/arch/arm/mach-versatile/versatile_pb.c
-@@ -28,6 +28,7 @@
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-+#include <asm/hardware/vic.h>
- #include <asm/irq.h>
- #include <asm/mach-types.h>
- 
-@@ -107,6 +108,7 @@ MACHINE_START(VERSATILE_PB, "ARM-Versatile PB")
- 	.map_io		= versatile_map_io,
- 	.init_early	= versatile_init_early,
- 	.init_irq	= versatile_init_irq,
-+	.handle_irq	= vic_handle_irq,
- 	.timer		= &versatile_timer,
- 	.init_machine	= versatile_pb_init,
- MACHINE_END
--- 
-1.7.4.1
+Yes, there already seems to be one, of_parse_phandle() which I should
+have used. thanks.
