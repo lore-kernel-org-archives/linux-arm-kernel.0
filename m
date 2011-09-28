@@ -1,36 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 28 Sep 2011 08:29:45 +0200
-Subject: [PATCH v3 4/6] arm/imx6q: add smp and cpu hotplug support
-In-Reply-To: <20110927151546.GF17997@S2100-06.ap.freescale.net>
-References: <1317021651-17359-1-git-send-email-shawn.guo@linaro.org>
-	<1317021651-17359-5-git-send-email-shawn.guo@linaro.org>
-	<20110926110634.GR31404@pengutronix.de>
-	<20110927134401.GE17997@S2100-06.ap.freescale.net>
-	<20110927151546.GF17997@S2100-06.ap.freescale.net>
-Message-ID: <20110928062945.GC14191@pengutronix.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 28 Sep 2011 08:42:19 +0200
+Subject: [PATCH v2 1/2] S3C2443/S3C2416: Add adc registers
+In-Reply-To: <201109182242.55394.heiko@sntech.de>
+References: <201109182241.48858.heiko@sntech.de>
+	<201109182242.55394.heiko@sntech.de>
+Message-ID: <201109280842.20542.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 11:15:47PM +0800, Shawn Guo wrote:
-> > 
-> > I do not want to add mxc_cpu_type and cpu_is_mx6q() stuff, so I intend
-> > to remove early_initcall there, and let imx31/35_soc_init() explicitly
-> > calls mxc_init_l2x0().
-> > 
-> I'm changing my mind (so quickly).  It turns out we will fall into a
-> number of other traps if we build imx6q with imx3 without mxc_cpu_type
-> set up for imx6q, arch_idle(), __imx_ioremap(), etc.  So for now, I
-> want to add mxc_cpu_type for imx6q to cooperate with all these traps.
+The adc blocks of the S3C2443 and S3C2416 define some
+additional registers and bits.
 
-I'm fine with reducing the usage of cpu_is_* macros up to the point when
-we don't need them anymore. But as you already found out, it's better to
-do this seperately.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+changes since v1: add spaces around <<
+ arch/arm/plat-samsung/include/plat/regs-adc.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Sascha
-
-
+diff --git a/arch/arm/plat-samsung/include/plat/regs-adc.h b/arch/arm/plat-samsung/include/plat/regs-adc.h
+index 035e8c3..7061210 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-adc.h
++++ b/arch/arm/plat-samsung/include/plat/regs-adc.h
+@@ -20,6 +20,7 @@
+ #define S3C2410_ADCDAT0	   S3C2410_ADCREG(0x0C)
+ #define S3C2410_ADCDAT1	   S3C2410_ADCREG(0x10)
+ #define S3C64XX_ADCUPDN		S3C2410_ADCREG(0x14)
++#define S3C2443_ADCMUX		S3C2410_ADCREG(0x18)
+ #define S3C64XX_ADCCLRINT	S3C2410_ADCREG(0x18)
+ #define S5P_ADCMUX		S3C2410_ADCREG(0x1C)
+ #define S3C64XX_ADCCLRINTPNDNUP	S3C2410_ADCREG(0x20)
+@@ -33,6 +34,7 @@
+ #define S3C2410_ADCCON_PRSCVLMASK	(0xFF<<6)
+ #define S3C2410_ADCCON_SELMUX(x)	(((x)&0x7)<<3)
+ #define S3C2410_ADCCON_MUXMASK		(0x7<<3)
++#define S3C2416_ADCCON_RESSEL		(1 << 3)
+ #define S3C2410_ADCCON_STDBM		(1<<2)
+ #define S3C2410_ADCCON_READ_START	(1<<1)
+ #define S3C2410_ADCCON_ENABLE_START	(1<<0)
+@@ -40,6 +42,7 @@
+ 
+ 
+ /* ADCTSC Register Bits */
++#define S3C2443_ADCTSC_UD_SEN		(1 << 8)
+ #define S3C2410_ADCTSC_YM_SEN		(1<<7)
+ #define S3C2410_ADCTSC_YP_SEN		(1<<6)
+ #define S3C2410_ADCTSC_XM_SEN		(1<<5)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.5.4
