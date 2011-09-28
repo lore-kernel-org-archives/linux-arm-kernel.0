@@ -1,48 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 28 Sep 2011 15:12:51 -0700
-Subject: [GIT PULL] OMAP: Few sparse/bug fixes and clean-up for 3.2
-In-Reply-To: <1316852520-10377-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1316852520-10377-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20110928221251.GF6324@atomide.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 28 Sep 2011 15:19:00 -0700
+Subject: [PATCH v2 2/6] OMAP4: Clock: round_rate and recalc functions for
+	DPLL_ABE
+In-Reply-To: <alpine.DEB.2.00.1109280056570.4399@utopia.booyaka.com>
+References: <1316195263-14951-1-git-send-email-jon-hunter@ti.com>
+	<alpine.DEB.2.00.1109280056570.4399@utopia.booyaka.com>
+Message-ID: <CAJOA=zPDQ4sqoT7EV7HSa43g_i-q5CT6Q8UBvggG2BBvMrQ_bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [110924 00:48]:
-> Tony,
-> 
-> Please pull few OMAP sparse/bug fixes and clean-up for 3.2 
+On Tue, Sep 27, 2011 at 11:59 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi Jon and Mike,
+>
+> On Fri, 16 Sep 2011, Jon Hunter wrote:
+>
+>> From: Mike Turquette <mturquette@ti.com>
+>>
+>> OMAP4 DPLL_ABE can enable a 4X multipler on top of the normal MN multipler
+>> and divider. This is achieved by setting CM_CLKMODE_DPLL_ABE.DPLL_REGM4XEN
+>> bit in CKGEN module of CM1. From the OMAP4 TRM:
+>>
+>> Fdpll = Fref x 2 x (4 x M/(N+1)) in case REGM4XEN bit field is set (only
+>> applicable to DPLL_ABE).
+>>
+>> Add new round_rate() and recalc() functions for OMAP4, that check the
+>> setting of REGM4XEN bit and handle this appropriately. The new functions
+>> are a simple wrapper on top of the existing omap2_dpll_round_rate() and
+>> omap2_dpll_get_rate() functions to handle the REGM4XEN bit.
+>>
+>> The REGM4XEN bit is only implemented for the ABE DPLL on OMAP4 and so
+>> only dpll_abe_ck uses omap4_dpll_regm4xen_round_rate() and
+>> omap4_dpll_regm4xen_recalc() functions.
+>>
+>> Signed-off-by: Mike Turquette <mturquette@ti.com>
+>> Tested-by: Jon Hunter <jon-hunter@ti.com>
+>
+> Some changes have been made to this patch here, to fix a few minor bugs in
+> error paths and to add documentation and Jon's Signed-off-by: (since he's
+> in the submittal chain).
+>
+> Care to review and send any comments? ?Otherwise, I plan to queue this
+> revised version for 3.2.
 
-Thanks I'll pull these into l3 branch for v3.2 merge window and
-merge them into l-o master.
+Your changes to the patch look good.
 
-Tony
-
- 
-> Thnaks,
-> Santosh
-> 
-> The following changes since commit b6fd41e29dea9c6753b1843a77e50433e6123bcb:
-> 
->   Linux 3.1-rc6 (2011-09-12 14:02:02 -0700)
-> 
-> are available in the git repository at:
->   git://gitorious.org/omap-sw-develoment/linux-omap-dev.git for_3_2/omap_misc
-> 
-> Santosh Shilimkar (1):
->       OMAP4: Fix the emif and dmm virtual mapping
-> 
-> Todd Poynor (2):
->       OMAP: Improve register access in L3 Error handler.
->       OMAP: Fix a BUG in l3 error handler.
-> 
-> sricharan (3):
->       OMAP: Fix indentation issues in l3 error handler.
->       OMAP: Fix sparse warnings in l3 error handler.
->       OMAP: Print Initiator name for l3 custom error.
-> 
->  arch/arm/mach-omap2/omap_l3_noc.c    |  130 ++++++++++----------
->  arch/arm/mach-omap2/omap_l3_noc.h    |  224 +++++++++++++++++++---------------
->  arch/arm/mach-omap2/omap_l3_smx.c    |   91 +++++++-------
->  arch/arm/mach-omap2/omap_l3_smx.h    |  164 ++++++++++++------------
->  arch/arm/plat-omap/include/plat/io.h |    4 +-
->  5 files changed, 322 insertions(+), 291 deletions(-)
+Regards,
+Mike
