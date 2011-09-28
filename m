@@ -1,77 +1,104 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 28 Sep 2011 14:55:24 +0530
-Subject: [PATCH v5 5/6] ARM: SAMSUNG: Add device tree support for pl330 dma
-	engine wrappers
-In-Reply-To: <1317201925-25148-1-git-send-email-thomas.abraham@linaro.org>
-References: <1317201925-25148-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1317201925-25148-6-git-send-email-thomas.abraham@linaro.org>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 28 Sep 2011 12:28:15 +0300
+Subject: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
+In-Reply-To: <19F8576C6E063C45BE387C64729E739404ECA54C58@dbde02.ent.ti.com>
+References: <1315488922-16152-1-git-send-email-deepthy.ravi@ti.com>
+	<201109161506.16505.laurent.pinchart@ideasonboard.com>
+	<19F8576C6E063C45BE387C64729E739404EC8113E2@dbde02.ent.ti.com>
+	<201109272006.30130.laurent.pinchart@ideasonboard.com>
+	<19F8576C6E063C45BE387C64729E739404ECA54C58@dbde02.ent.ti.com>
+Message-ID: <4E82E8AF.8080609@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new dma request id 'DMACH_DT_PROP' is introduced for client drivers
-requesting a dma channel. This request indicates that a device tree
-node property represting the dma channel is available in
-'struct samsung_dma_info'. The dma channel request wrapper uses the
-node property value as the value for the filter parameter.
+Hi Hiremath,
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
----
- arch/arm/plat-samsung/dma-ops.c                |    9 ++++++++-
- arch/arm/plat-samsung/include/plat/dma-ops.h   |    1 +
- arch/arm/plat-samsung/include/plat/dma-pl330.h |    3 ++-
- 3 files changed, 11 insertions(+), 2 deletions(-)
+Hiremath, Vaibhav wrote:
+>> -----Original Message----- From: Laurent Pinchart
+>> [mailto:laurent.pinchart at ideasonboard.com] Sent: Tuesday, September
+>> 27, 2011 11:36 PM To: Hiremath, Vaibhav Cc: Ravi, Deepthy;
+>> linux-media at vger.kernel.org; tony at atomide.com; 
+>> linux at arm.linux.org.uk; linux-omap at vger.kernel.org; linux-arm- 
+>> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; 
+>> mchehab at infradead.org; g.liakhovetski at gmx.de Subject: Re: [PATCH
+>> 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
+>> 
+>> Hi Vaibhav,
+>> 
+>> On Monday 19 September 2011 17:31:02 Hiremath, Vaibhav wrote:
+>>> On Friday, September 16, 2011 6:36 PM Laurent Pinchart wrote:
+>>>> On Friday 16 September 2011 15:00:53 Ravi, Deepthy wrote:
+>>>>> On Thursday, September 08, 2011 10:51 PM Laurent Pinchart
+>>>>> wrote:
+>>>>>> On Thursday 08 September 2011 15:35:22 Deepthy Ravi wrote:
+>>>>>>> From: Vaibhav Hiremath <hvaibhav@ti.com>
+>>>>>>> 
+>>>>>>> In order to support TVP5146 (for that matter any video
+>>>>>>> decoder), it is important to support G/S/ENUM_STD ioctl
+>>>>>>> on /dev/videoX device node.
+>>>>>> 
+>>>>>> Why so ? Shouldn't it be queried on the subdev output pad
+>> directly ?
+>>>>> 
+>>>>> Because standard v4l2 application for analog devices will
+>>>>> call these std ioctls on the streaming device node. So it's
+>>>>> done on /dev/video
+>> to
+>>>>> make the existing apllication work.
+>>>> 
+>>>> Existing applications can't work with the OMAP3 ISP (and
+>>>> similar
+>> complex
+>>>> embedded devices) without userspace support anyway, either in
+>>>> the form
+>> of
+>>>> a GStreamer element or a libv4l plugin. I still believe that
+>>>> analog
+>> video
+>>>> standard operations should be added to the subdev pad
+>>>> operations and exposed through subdev device nodes, exactly as
+>>>> done with formats.
+>>> 
+>>> I completely agree with your point that, existing application
+>>> will not
+>> work
+>>> without setting links properly. But I believe the assumption here
+>>> is, media-controller should set the links (along with pad
+>>> formants) and all existing application should work as is. Isn't
+>>> it?
+>> 
+>> The media controller is an API used (among other things) to set the
+>> links. You still need to call it from userspace. That won't happen
+>> magically. The userspace component that sets up the links and
+>> configures the formats, be it a GStreamer element, a libv4l plugin,
+>> or something else, can as well setup the standard on the TVP5146
+>> subdev.
+>> 
+> Please look at from analog device point of view which is interfaced
+> to ISP.
+> 
+> OMAP3 ISP => TVP5146 (video decoder)
+> 
+> As a user I would want to expect the standard to be supported on
+> streaming device node, since all standard streaming applications (for
+> analog devices/interfaces) does this.
+> 
+> Setting up the links and format is still something got added with MC
+> framework, and I would consider it as a separate plug-in along with
+> existing applications.
+> 
+> Why do I need to write/use two different streaming application one
+> for MC compatible device and another for non-MC?
 
-diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
-index 8d18425..b1135dd 100644
---- a/arch/arm/plat-samsung/dma-ops.c
-+++ b/arch/arm/plat-samsung/dma-ops.c
-@@ -23,11 +23,18 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
- 	struct dma_chan *chan;
- 	dma_cap_mask_t mask;
- 	struct dma_slave_config slave_config;
-+	void *filter_param;
- 
- 	dma_cap_zero(mask);
- 	dma_cap_set(info->cap, mask);
- 
--	chan = dma_request_channel(mask, pl330_filter, (void *)dma_ch);
-+	/*
-+	 * If a dma channel property of a device node from device tree is
-+	 * specified, use that as the fliter parameter.
-+	 */
-+	filter_param = (dma_ch == DMACH_DT_PROP) ? (void *)info->dt_dmach_prop :
-+				(void *)dma_ch;
-+	chan = dma_request_channel(mask, pl330_filter, filter_param);
- 
- 	if (info->direction == DMA_FROM_DEVICE) {
- 		memset(&slave_config, 0, sizeof(struct dma_slave_config));
-diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
-index 4c1a363..22eafc3 100644
---- a/arch/arm/plat-samsung/include/plat/dma-ops.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
-@@ -31,6 +31,7 @@ struct samsung_dma_info {
- 	enum dma_slave_buswidth width;
- 	dma_addr_t fifo;
- 	struct s3c2410_dma_client *client;
-+	struct property *dt_dmach_prop;
- };
- 
- struct samsung_dma_ops {
-diff --git a/arch/arm/plat-samsung/include/plat/dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-index 2e55e59..c5eaad5 100644
---- a/arch/arm/plat-samsung/include/plat/dma-pl330.h
-+++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
-@@ -21,7 +21,8 @@
-  * use these just as IDs.
-  */
- enum dma_ch {
--	DMACH_UART0_RX,
-+	DMACH_DT_PROP = -1,
-+	DMACH_UART0_RX = 0,
- 	DMACH_UART0_TX,
- 	DMACH_UART1_RX,
- 	DMACH_UART1_TX,
+You musn't need to.
+
+This is something that will have to be handled by the libv4l plugin, as
+the rest of controlling the device. Controls related ioctls will be
+passed from the source to downstream once they apply, and I don't see
+why the same shouldn't be done to the {G,S,ENUM}_STD.
+
+Regards,
+
 -- 
-1.6.6.rc2
+Sakari Ailus
+sakari.ailus at iki.fi
