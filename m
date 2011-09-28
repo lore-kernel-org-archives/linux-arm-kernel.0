@@ -1,56 +1,49 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Wed, 28 Sep 2011 09:55:24 +0530
-Subject: [PATCH 2/7] ARM: SAMSUNG: Add CLK Macro for clkdev support
-In-Reply-To: <20110923202606.GT17169@n2100.arm.linux.org.uk>
-References: <1316778827-24694-1-git-send-email-padma.v@samsung.com>
-	<1316778827-24694-3-git-send-email-padma.v@samsung.com>
-	<20110923202606.GT17169@n2100.arm.linux.org.uk>
-Message-ID: <CAAgF-Bdf59wBWqj43FhB9m3Oo9ZFyMEA1yfAf7b3_qnbARNLfw@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 28 Sep 2011 10:45:24 +0530
+Subject: [PATCH v4 0/2] Add device tree support for Samsung's keypad controller
+	driver
+Message-ID: <1317186926-17822-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Changes since v3:
+- Addressed comments from Grant Likely.
+  - Set num_rows and num_cols to zero in samsung_keypad_parse_dt function.
+  - Fixed the wierd looking if-else block in samsung_keypad_probe function.
 
-On Sat, Sep 24, 2011 at 1:56 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
->
-> On Fri, Sep 23, 2011 at 05:23:42PM +0530, Padmavathi Venna wrote:
-> > diff --git a/arch/arm/plat-samsung/include/plat/clock.h b/arch/arm/plat-samsung/include/plat/clock.h
-> > index 73c66d4..c864825 100644
-> > --- a/arch/arm/plat-samsung/include/plat/clock.h
-> > +++ b/arch/arm/plat-samsung/include/plat/clock.h
-> > @@ -17,6 +17,13 @@
-> >
-> > ?struct clk;
-> >
-> > +#define CLK(dev, con, ck) ? ?\
-> > + ? ? { ? ? ? ? ? ? ? ? ? ? ? \
-> > + ? ? ? ? ? ? .dev_id = dev, ?\
-> > + ? ? ? ? ? ? .con_id = con, ?\
-> > + ? ? ? ? ? ? .clk = ck, ? ? ?\
-> > + ? ? }
-> > +
->
-> How about a patch series which moves this to include/linux/clkdev.h,
-> preferably called CLKDEV_INIT() ?
->
-   Thanks for the review. I am currently working on preparing the patch series
-   as per your suggestion.
+Changes since v2:
+- Addressed comments from Grant Likely.
+  - Renamed 'keypad,key-code' property name to 'linux,code'.
+  - Fixed incorrect data types for all instances of of_property+read_u32.
+  - linux,input-type binding was not added as suggested since the driver
+    supports only EV_KEY event type.
 
-> There's versions of this already in:
-> arch/arm/mach-ux500/clock.h
-> arch/arm/mach-tegra/tegra2_clocks.c
-> arch/arm/mach-nomadik/clock.c
-> arch/arm/mach-davinci/clock.h
->
-> so let's have it standardized instead of everyone inventing their own.
->
-> (Remember, that's what we're supposed to already being looking out for
-> since Linus' whinge about how ARM stuff tends to grow out of control...)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+Changes since v1:
+- Addressed comments from Dmitry Torokhov.
+  - Type of controller is cached in driver's private data and the function
+    that determines the type of the controller for each keypad scan is
+    removed.
+  - pdata allocated during probe is explicitly freed after probe completes
+    without any error. In case of exit from probe due a error, no explicit
+    deallocation of pdata memory is performed and it is left to devres to
+    handle that.
+  - The generic code to translate KEY(x,y,code) is retained in the driver
+    itself. I am unsure of a right common place for it.
+  - Driver continues with the probe even if one or more gpio configuration
+    fails.
+  - Patch 1 that adds a new config option is still retained in this patchset.
 
-Best Regards
-Padma
+
+This patchset adds device tree support for samsung's keypad controller driver.
+First patch adds a new config option to be used by device tree enabled platforms
+for selecting the samsung's keypad controller driver. The second patch adds device
+tree support for the keypad driver.
+
+Thomas Abraham (2):
+  input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD config option
+  input: samsung-keypad: Add device tree support
+
+ .../devicetree/bindings/input/samsung-keypad.txt   |   88 ++++++++++
+ drivers/input/keyboard/Kconfig                     |    9 +-
+ drivers/input/keyboard/samsung-keypad.c            |  174 ++++++++++++++++++--
+ 3 files changed, 258 insertions(+), 13 deletions(-)
