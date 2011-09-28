@@ -1,97 +1,36 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 28 Sep 2011 11:40:19 +0530
-Subject: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
-In-Reply-To: <201109272006.30130.laurent.pinchart@ideasonboard.com>
-References: <1315488922-16152-1-git-send-email-deepthy.ravi@ti.com>
-	<201109161506.16505.laurent.pinchart@ideasonboard.com>
-	<19F8576C6E063C45BE387C64729E739404EC8113E2@dbde02.ent.ti.com>
-	<201109272006.30130.laurent.pinchart@ideasonboard.com>
-Message-ID: <19F8576C6E063C45BE387C64729E739404ECA54C58@dbde02.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 28 Sep 2011 08:29:45 +0200
+Subject: [PATCH v3 4/6] arm/imx6q: add smp and cpu hotplug support
+In-Reply-To: <20110927151546.GF17997@S2100-06.ap.freescale.net>
+References: <1317021651-17359-1-git-send-email-shawn.guo@linaro.org>
+	<1317021651-17359-5-git-send-email-shawn.guo@linaro.org>
+	<20110926110634.GR31404@pengutronix.de>
+	<20110927134401.GE17997@S2100-06.ap.freescale.net>
+	<20110927151546.GF17997@S2100-06.ap.freescale.net>
+Message-ID: <20110928062945.GC14191@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Laurent Pinchart [mailto:laurent.pinchart at ideasonboard.com]
-> Sent: Tuesday, September 27, 2011 11:36 PM
-> To: Hiremath, Vaibhav
-> Cc: Ravi, Deepthy; linux-media at vger.kernel.org; tony at atomide.com;
-> linux at arm.linux.org.uk; linux-omap at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> mchehab at infradead.org; g.liakhovetski at gmx.de
-> Subject: Re: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
-> 
-> Hi Vaibhav,
-> 
-> On Monday 19 September 2011 17:31:02 Hiremath, Vaibhav wrote:
-> > On Friday, September 16, 2011 6:36 PM Laurent Pinchart wrote:
-> > > On Friday 16 September 2011 15:00:53 Ravi, Deepthy wrote:
-> > > > On Thursday, September 08, 2011 10:51 PM Laurent Pinchart wrote:
-> > > > > On Thursday 08 September 2011 15:35:22 Deepthy Ravi wrote:
-> > > > >> From: Vaibhav Hiremath <hvaibhav@ti.com>
-> > > > >>
-> > > > >> In order to support TVP5146 (for that matter any video decoder),
-> > > > >> it is important to support G/S/ENUM_STD ioctl on /dev/videoX
-> > > > >> device node.
-> > > > >
-> > > > > Why so ? Shouldn't it be queried on the subdev output pad
-> directly ?
-> > > >
-> > > > Because standard v4l2 application for analog devices will call these
-> > > > std ioctls on the streaming device node. So it's done on /dev/video
-> to
-> > > > make the existing apllication work.
-> > >
-> > > Existing applications can't work with the OMAP3 ISP (and similar
-> complex
-> > > embedded devices) without userspace support anyway, either in the form
-> of
-> > > a GStreamer element or a libv4l plugin. I still believe that analog
-> video
-> > > standard operations should be added to the subdev pad operations and
-> > > exposed through subdev device nodes, exactly as done with formats.
-> >
-> > I completely agree with your point that, existing application will not
-> work
-> > without setting links properly. But I believe the assumption here is,
-> > media-controller should set the links (along with pad formants) and all
-> > existing application should work as is. Isn't it?
-> 
-> The media controller is an API used (among other things) to set the links.
-> You
-> still need to call it from userspace. That won't happen magically. The
-> userspace component that sets up the links and configures the formats, be
-> it a
-> GStreamer element, a libv4l plugin, or something else, can as well setup
-> the
-> standard on the TVP5146 subdev.
-> 
-Please look at from analog device point of view which is interfaced to ISP.
+On Tue, Sep 27, 2011 at 11:15:47PM +0800, Shawn Guo wrote:
+> > 
+> > I do not want to add mxc_cpu_type and cpu_is_mx6q() stuff, so I intend
+> > to remove early_initcall there, and let imx31/35_soc_init() explicitly
+> > calls mxc_init_l2x0().
+> > 
+> I'm changing my mind (so quickly).  It turns out we will fall into a
+> number of other traps if we build imx6q with imx3 without mxc_cpu_type
+> set up for imx6q, arch_idle(), __imx_ioremap(), etc.  So for now, I
+> want to add mxc_cpu_type for imx6q to cooperate with all these traps.
 
-OMAP3 ISP => TVP5146 (video decoder)
+I'm fine with reducing the usage of cpu_is_* macros up to the point when
+we don't need them anymore. But as you already found out, it's better to
+do this seperately.
 
-As a user I would want to expect the standard to be supported on streaming device node, since all standard streaming applications (for analog devices/interfaces) does this.
-
-Setting up the links and format is still something got added with MC framework, and I would consider it as a separate plug-in along with existing applications.
-
-Why do I need to write/use two different streaming application one for MC compatible device and another for non-MC?
-
-> > The way it is being done currently is, set the format at the pad level
-> > which is same as analog standard resolution and use existing application
-> > for streaming...
-> 
-> At then end of the OMAP3 ISP pipeline video data has long lost its analog
-> roots. I don't think standards make sense there.
-> 
-I don't agree with you here, I think we made it clear when we started with MC development activity, we will not break existing standard applications. Media-controller will play a roll to setup the links, connecting the pads and stuff.
+Sascha
 
 
-Thanks,
-Vaibhav
-
-> > I am ok, if we add s/g/enum_std api support at sub-dev level but this
-> > should also be supported on streaming device node.
-> 
-> --
-> Regards,
-> 
-> Laurent Pinchart
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
