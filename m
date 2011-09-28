@@ -1,134 +1,200 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 28 Sep 2011 14:20:24 +0530
-Subject: [PATCH V2 1/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
-In-Reply-To: <4E82D0A1.8050203@st.com>
-References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
-	<1317189007-23033-2-git-send-email-alim.akhtar@samsung.com>
-	<4E82D0A1.8050203@st.com>
-Message-ID: <CAGOxZ53qZy+VUM65oK68W088QR=RgQ=cNxOCbO7_WESJesJaVQ@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 28 Sep 2011 10:52:29 +0200
+Subject: [PATCH 06/13] mfd: twl-core: Add initial DT support for
+	twl4030/twl6030
+In-Reply-To: <4E816232.5020502@ti.com>
+References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
+	<1317055821-20652-7-git-send-email-b-cousson@ti.com>
+	<4E816232.5020502@ti.com>
+Message-ID: <4E82E04D.2000300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+On 9/27/2011 7:42 AM, Nayak, Rajendra wrote:
+> On Monday 26 September 2011 10:20 PM, Benoit Cousson wrote:
+>> Add initial device-tree support for twl familly chips.
+>
+> s/familly/family
 
-Thanks for reviewing the patch.
+Oops.
 
-On Wed, Sep 28, 2011 at 1:15 PM, Viresh Kumar <viresh.kumar@st.com> wrote:
-> On 9/28/2011 11:20 AM, Alim Akhtar wrote:
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> The current version is missing the regulator entries due
+>> to the lack of DT regulator bindings for the moment.
+>> Only the simple sub-modules that do not depend on
+>> platform_data information can be initialized properly.
+>>
+>> Add documentation for the Texas Instruments TWL Integrated Chip.
+>>
+>> Signed-off-by: Benoit Cousson<b-cousson@ti.com>
+>> Cc: Balaji T K<balajitk@ti.com>
+>> Cc: Graeme Gregory<gg@slimlogic.co.uk>
+>> Cc: Samuel Ortiz<sameo@linux.intel.com>
 >> ---
->> ?drivers/dma/amba-pl08x.c | ?135 ++++++++++++++++++++++++++++++++++++++--------
->> ?1 files changed, 112 insertions(+), 23 deletions(-)
->>
+>>    .../devicetree/bindings/mfd/twl-familly.txt        |   47 +++++++++++++++++
+>>    drivers/mfd/twl-core.c                             |   53 ++++++++++++++++++--
+>>    2 files changed, 96 insertions(+), 4 deletions(-)
+>>    create mode 100644 Documentation/devicetree/bindings/mfd/twl-familly.txt
 >
-> It would be good if you can add pick some part from cover-letter and put it in
-> commit log too.
->
-Ok, I will write more comments in the commit log.
+> s/familly.txt/family.txt
 
->> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
->> index cd8df7f..501540f 100644
->> --- a/drivers/dma/amba-pl08x.c
->> +++ b/drivers/dma/amba-pl08x.c
->> @@ -110,6 +129,11 @@ struct pl08x_lli {
->> ? ? ? u32 dst;
->> ? ? ? u32 lli;
->> ? ? ? u32 cctl;
->> + ? ? /*
->> + ? ? ?* Samsung pl080 DMAC has one exrta control register
->> + ? ? ?* which is used to hold the transfer_size
->> + ? ? ?*/
->> + ? ? u32 cctl1;
->
-> Will you write transfer_size in cctl also? What is the purpose of cctl1?
->
-The main difference between Primecell PL080 and samsung variant is in
-LLI control register bit [0:11] is reserved in case of samsung pl080
-and one extra register is add to hold the transfer size at offset
-0x10. The purpose of cctl1 is store the transfer_size.
+At least I am consistent in my typos ;-)
 
->> @@ -215,11 +255,23 @@ static void pl08x_start_txd(struct pl08x_dma_chan *plchan,
->> ? ? ? ? ? ? ? cpu_relax();
->>
->> ? ? ? /* Do not access config register until channel shows as inactive */
->> - ? ? val = readl(phychan->base + PL080_CH_CONFIG);
->> - ? ? while ((val & PL080_CONFIG_ACTIVE) || (val & PL080_CONFIG_ENABLE))
->> + ? ? if (pl08x->vd->is_pl080_s3c) {
->> + ? ? ? ? ? ? val = readl(phychan->base + PL080S_CH_CONFIG);
->> + ? ? ? ? ? ? while ((val & PL080_CONFIG_ACTIVE) ||
->> + ? ? ? ? ? ? ? ? ? ? (val & PL080_CONFIG_ENABLE))
->> + ? ? ? ? ? ? ? ? ? ? val = readl(phychan->base + PL080S_CH_CONFIG);
+>> diff --git a/Documentation/devicetree/bindings/mfd/twl-familly.txt b/Documentation/devicetree/bindings/mfd/twl-familly.txt
+>> new file mode 100644
+>> index 0000000..ff4cacd
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/twl-familly.txt
+>> @@ -0,0 +1,47 @@
+>> +Texas Instruments TWL family
 >> +
->> + ? ? ? ? ? ? writel(val | PL080_CONFIG_ENABLE,
->> + ? ? ? ? ? ? ? ? ? ? phychan->base + PL080S_CH_CONFIG);
->> + ? ? } else {
->> ? ? ? ? ? ? ? val = readl(phychan->base + PL080_CH_CONFIG);
->> + ? ? ? ? ? ? ? ? ? ? while ((val & PL080_CONFIG_ACTIVE) ||
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? (val & PL080_CONFIG_ENABLE))
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? val = readl(phychan->base + PL080_CH_CONFIG);
->>
->> - ? ? writel(val | PL080_CONFIG_ENABLE, phychan->base + PL080_CH_CONFIG);
->> + ? ? ? ? ? ? writel(val | PL080_CONFIG_ENABLE,
->> + ? ? ? ? ? ? ? ? ? ? phychan->base + PL080_CH_CONFIG);
->> + ? ? }
+>> +The TWLs are Integrated Power Management Chips.
+>> +Some version might contain much more analog function like
+>> +USB transceiver or Audio amplifier.
+>> +These chips are connected to an i2c bus.
+>> +
+>> +
+>> +Required properties:
+>> +- compatible : Must be "ti,twl4030";
+>> +  For Integrated power-management/audio CODEC device used in OMAP3
+>> +  based boards
+>> +- compatible : Must be "ti,twl6030";
+>> +  For Integrated power-management used in OMAP4 based boards
+>> +- interrupts : This i2c device has an IRQ line connected to the main SoC
+>> +- interrupt-controller : Since the twl support several interrupts internally,
+>> +  it is considered as an interrupt controller cascaded to the SoC one.
+>> +- #interrupt-cells =<1>;
+>> +- interrupt-parent : The parent interrupt controller.
+>> +
+>> +Optional node:
+>> +- Child nodes contain in the twl. The twl family is made of severals variants
+>> +  that support a different number of features.
+>> +  The children nodes will thus depend of the capabilty of the variant.
+>> +
+>> +
+>> +Example:
+>> +/*
+>> + * Integrated Power Management Chip
+>> + * http://www.ti.com/lit/ds/symlink/twl6030.pdf
+>> + */
+>> +twl at 48 {
+>> +    compatible = "ti,twl6030";
+>> +    reg =<0x48>;
 >
-> You have similar stuff in most the the changes in this patch, because offset of
-> config register changes for s3c, you placed in if,else block.
->
-> If you check these changes again, there is a lot of code duplication in this if,else
-> blocks. The only different thing in if,else is the offset of CH_CONFIG register.
->
-> It would be much better if you can do following:
->
-> u32 ch_cfg_off;
->
-> ? ? ? ?if (pl08x->vd->is_pl080_s3c)
-> ? ? ? ? ? ? ? ?ch_cfg_off = PL080S_CH_CONFIG;
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?ch_cfg_off = PL080_CH_CONFIG;
->
-> Now, this offset can be used in existing code, without much code duplication.
->
-I will use suggestion and remove the code duplications.
+> What does the 'reg' property signify here for twl?
 
->> @@ -569,6 +641,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->> ? ? ? u32 cctl, early_bytes = 0;
->> ? ? ? size_t max_bytes_per_lli, total_bytes = 0;
->> ? ? ? struct pl08x_lli *llis_va;
->> + ? ? size_t lli_len = 0, target_len, tsize, odd_bytes;
+The i2c slave address.
+
+>> +    interrupts =<39>; /* IRQ_SYS_1N cascaded to gic */
+>> +    interrupt-controller;
+>> +    #interrupt-cells =<1>;
+>> +    interrupt-parent =<&gic>;
+>> +    #address-cells =<1>;
+>> +    #size-cells =<0>;
+>> +
+>> +    twl_rtc {
+>> +        compatible = "ti,twl_rtc";
+>> +        interrupts =<11>;
+>> +        reg =<0>;
+>
+> Does the 'reg' property need to be faked for
+> every twl child node, even if it does not have
+> any?
+
+No, it was even removed from the DTS. But I forgot to update the 
+documentation:-(
+
+>> +    };
+>> +};
+>> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+>> index 01ecfee..3ef0b43 100644
+>> --- a/drivers/mfd/twl-core.c
+>> +++ b/drivers/mfd/twl-core.c
+>> @@ -33,6 +33,10 @@
+>>    #include<linux/platform_device.h>
+>>    #include<linux/clk.h>
+>>    #include<linux/err.h>
+>> +#include<linux/slab.h>
+>> +#include<linux/of_irq.h>
+>> +#include<linux/of_platform.h>
+>> +#include<linux/irqdomain.h>
 >>
->> ? ? ? txd->llis_va = dma_pool_alloc(pl08x->pool, GFP_NOWAIT, &txd->llis_bus);
->> ? ? ? if (!txd->llis_va) {
->> @@ -700,7 +773,7 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->> ? ? ? ? ? ? ? ?* width left
->> ? ? ? ? ? ? ? ?*/
->> ? ? ? ? ? ? ? while (bd.remainder > (mbus->buswidth - 1)) {
->> - ? ? ? ? ? ? ? ? ? ? size_t lli_len, tsize, width;
->> + ? ? ? ? ? ? ? ? ? ? size_t width;
+>>    #include<linux/regulator/machine.h>
 >>
+>> @@ -1182,22 +1186,53 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>>    	int				status;
+>>    	unsigned			i;
+>>    	struct twl4030_platform_data	*pdata = client->dev.platform_data;
+>> +	struct device_node		*node = client->dev.of_node;
+>>    	u8 temp;
+>>    	int ret = 0;
+>>
+>> +	if (node&&   !pdata) {
+>> +		/*
+>> +		 * XXX: Temporary fake pdata until the information
+>> +		 * is correctly retrieved by every TWL modules from DT.
+>> +		 */
+>> +		pdata = kzalloc(sizeof(struct twl4030_platform_data),
+>> +				GFP_KERNEL);
 >
-> why do we need above two changes. odd_bytes and target_len are still unused.
+> devm_kzalloc instead?
+
+Good point.
+
+>> +		if (!pdata) {
+>> +			status = -ENOMEM;
+>> +			goto exit;
+>> +		}
+>> +
+>> +		/*
+>> +		 * XXX: For the moment the IRQs for TWL seems to be encoded in
+>> +		 * the global OMAP space. That should be cleaned to allow
+>> +		 * dynamically adding a new IRQ controller.
+>> +		 */
+>> +		if ((id->driver_data)&   TWL6030_CLASS) {
+>> +			pdata->irq_base = TWL6030_IRQ_BASE;
+>> +			pdata->irq_end = pdata->irq_base + TWL6030_BASE_NR_IRQS;
+>> +		} else {
+>> +			pdata->irq_base = TWL4030_IRQ_BASE;
+>> +			pdata->irq_end = pdata->irq_base + TWL4030_BASE_NR_IRQS;
+>> +		}
+>> +		irq_domain_add_simple(node, pdata->irq_base);
+>> +	}
+>> +
+>>    	if (!pdata) {
+>>    		dev_dbg(&client->dev, "no platform data?\n");
+>> -		return -EINVAL;
+>> +		status = -EINVAL;
+>> +		goto fail_free;
+>>    	}
+>>
+>>    	if (i2c_check_functionality(client->adapter, I2C_FUNC_I2C) == 0) {
+>>    		dev_dbg(&client->dev, "can't talk I2C?\n");
+>> -		return -EIO;
+>> +		status = -EIO;
+>> +		goto fail_free;
+>>    	}
+>>
+>>    	if (inuse) {
+>>    		dev_dbg(&client->dev, "driver is already in use\n");
+>> -		return -EBUSY;
+>> +		status = -EBUSY;
+>> +		goto fail_free;
+>>    	}
+>>
+>>    	for (i = 0; i<   TWL_NUM_SLAVES; i++) {
+>> @@ -1269,10 +1304,20 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>>    		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
+>>    	}
+>>
+>> -	status = add_children(pdata, id->driver_data);
+>> +#ifdef CONFIG_OF_DEVICE
 >
-sorry, I will remove the used variables.
->> ? ? ? ? ? ? ? ? ? ? ? /*
->> ? ? ? ? ? ? ? ? ? ? ? ?* If enough left try to send max possible,
->> @@ -759,6 +832,9 @@ static int pl08x_fill_llis_for_desc(struct pl08x_driver_data *pl08x,
->> ? ? ? llis_va[num_llis - 1].lli = 0;
->> ? ? ? /* The final LLI element shall also fire an interrupt. */
->> ? ? ? llis_va[num_llis - 1].cctl |= PL080_CONTROL_TC_IRQ_EN;
->> + ? ? /* Keep the TransferSize seperate to fill samsung specific register */
->> + ? ? if (pl08x->vd->is_pl080_s3c)
->> + ? ? ? ? ? ? llis_va[num_llis - 1].cctl1 |= lli_len;
->
-> I couldn't get this completely. Why do you keep only length of
-> last lli in cctl1. what about all other llis. Also why |=
-> and not directly cctl1 = lli_len
->
-I will write more explanation about it.
-> --
-> viresh
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> is the #ifdef really needed?
+
+Yes, because the of_platform_populate does not have a stub in case of 
+none DT build... But I agree, it is ugly and the of_platform.h should 
+maybe be fixed instead.
+I was too lazy to fix it :-)
+
+Thanks,
+Benoit
