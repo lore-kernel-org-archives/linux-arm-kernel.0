@@ -1,32 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Sep 2011 07:25:49 +0200
-Subject: [PATCH 2/3] mmc: mmci: Provide option to configure bus signal
-	direction
-In-Reply-To: <1317123738-29867-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1317123738-29867-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdbUO96VerVShwWfd99245T90JcEGcO0PXCy80PLPLygQg@mail.gmail.com>
+From: gigin_jose@yahoo.co.in (GIGIN JOSE)
+Date: Wed, 28 Sep 2011 05:29:45 +0000 (UTC)
+Subject: CODEC support for s3c2440
+Message-ID: <loom.20110928T064537-241@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 1:42 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+Hi, 
 
-> @@ -30,6 +43,8 @@ struct dma_chan;
-> ?* @cd_invert: true if the gpio_cd pin value is active low
-> ?* @capabilities: the capabilities of the block as implemented in
-> ?* this platform, signify anything MMC_CAP_* from mmc/host.h
-> + * @sigdir: a bit field indicating for what bits in the MMC bus the host
-> + * should enable signal direction indication.
-> ?* @dma_filter: function used to select an appropriate RX and TX
-> ?* DMA channel to be used for DMA, if and only if you're deploying the
-> ?* generic DMA engine
-> @@ -52,6 +67,7 @@ struct mmci_platform_data {
-> ? ? ? ?int ? ? gpio_cd;
-> ? ? ? ?bool ? ?cd_invert;
-> ? ? ? ?unsigned long capabilities;
-> + ? ? ? unsigned int sigdir;
+I am using s3c2440 with linux 2.6.30. The camera driver for s3c2440 
+currently supports preview mode. Should I enable my camera to RGB 
+configuration to interface with the processor ? 
 
-u32 again, no big deal. Can be fixed when submitting it to the patch tracker.
-Acked-by.
+The camera device also gives YCbCr output.How can I configure 
+the processor to see the YCbCr output from the camera ? Is it 
+necessary that I should enable the codec mode of the s3c2440 
+camera controller to get the YCbCr output.
 
-Yours,
-Linus Walleij
+What is the advantage of using codec path of the camera 
+controller with respect to the preview path ? 
+
+Thank You 
