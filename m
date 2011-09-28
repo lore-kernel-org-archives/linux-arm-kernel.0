@@ -1,111 +1,46 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Wed, 28 Sep 2011 06:58:05 -0300
-Subject: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
-In-Reply-To: <4E8252F1.9@mlbassoc.com>
-References: <1315488922-16152-1-git-send-email-deepthy.ravi@ti.com>
-	<201109081921.28051.laurent.pinchart@ideasonboard.com>
-	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047C4D09083D@dbde03.ent.ti.com>
-	<201109161506.16505.laurent.pinchart@ideasonboard.com>
-	<19F8576C6E063C45BE387C64729E739404EC8113E2@dbde02.ent.ti.com>
-	<4E824EC4.20305@infradead.org> <4E8252F1.9@mlbassoc.com>
-Message-ID: <4E82EFAD.5060108@infradead.org>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 28 Sep 2011 12:17:33 +0200
+Subject: [PATCH 0/8] S3C2416: Enable armdiv and armclk
+Message-ID: <201109281217.33813.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em 27-09-2011 19:49, Gary Thomas escreveu:
-> On 2011-09-27 16:31, Mauro Carvalho Chehab wrote:
->> Em 19-09-2011 12:31, Hiremath, Vaibhav escreveu:
->>>
->>>> -----Original Message-----
->>>> From: Laurent Pinchart [mailto:laurent.pinchart at ideasonboard.com]
->>>> Sent: Friday, September 16, 2011 6:36 PM
->>>> To: Ravi, Deepthy
->>>> Cc: linux-media at vger.kernel.org; tony at atomide.com; linux at arm.linux.org.uk;
->>>> linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
->>>> kernel at vger.kernel.org; mchehab at infradead.org; g.liakhovetski at gmx.de;
->>>> Hiremath, Vaibhav
->>>> Subject: Re: [PATCH 4/8] ispvideo: Add support for G/S/ENUM_STD ioctl
->>>>
->>>> Hi Deepthy,
->>>>
->>>> On Friday 16 September 2011 15:00:53 Ravi, Deepthy wrote:
->>>>> On Thursday, September 08, 2011 10:51 PM Laurent Pinchart wrote:
->>>>>> On Thursday 08 September 2011 15:35:22 Deepthy Ravi wrote:
->>>>>>> From: Vaibhav Hiremath<hvaibhav@ti.com>
->>>>>>>
->>>>>>> In order to support TVP5146 (for that matter any video decoder),
->>>>>>> it is important to support G/S/ENUM_STD ioctl on /dev/videoX
->>>>>>> device node.
->>>>>>
->>>>>> Why so ? Shouldn't it be queried on the subdev output pad directly ?
->>>>>
->>>>> Because standard v4l2 application for analog devices will call these std
->>>>> ioctls on the streaming device node. So it's done on /dev/video to make
->>>> the
->>>>> existing apllication work.
->>>>
->>>> Existing applications can't work with the OMAP3 ISP (and similar complex
->>>> embedded devices) without userspace support anyway, either in the form of
->>>> a
->>>> GStreamer element or a libv4l plugin. I still believe that analog video
->>>> standard operations should be added to the subdev pad operations and
->>>> exposed
->>>> through subdev device nodes, exactly as done with formats.
->>>>
->>> [Hiremath, Vaibhav] Laurent,
->>>
->>> I completely agree with your point that, existing application will not work without setting links properly.
->>> But I believe the assumption here is, media-controller should set the links (along with pad formants) and
->>> all existing application should work as is. Isn't it?
->>
->> Yes.
->>
->>> The way it is being done currently is, set the format at the pad level which is same as analog standard resolution and use existing application for streaming...
->>
->> Yes.
->>
->>> I am ok, if we add s/g/enum_std api support at sub-dev level but this should also be supported on streaming device node.
->>
->> Agreed. Standards selection should be done at device node, just like any other
->> device.
-> 
-> So how do you handle a part like the TVP5150 that is standard agnostic?
-> That device can sense the standard from the input signal and sets the
-> result appropriately.
-> 
-See the em28xx driver. It uses tvp5150 at the device node, and works properly.
+To enable cpu frequency scaling on the S3C2416/2450 it is necessary
+to define the arm-divider and armclock.
 
-It should be noticed, however, that the implementation at tvp5150 doesn't
-implement standards detection properly, due to hardware limitation.
+The layout of the clocks (i.e. msysclk -> armdiv -> armclk) is the
+same on all three architectures (S3C2443/2416/2450) and only the
+possible dividers for armdiv differ.
+Therefore it is possible to move the armdiv and armclk to common
+code with only the divider table definition remaining in the respective
+clock.c-files.
+The s3c2443_common_init_clocks method is modified to make it possible
+to transmit the divider table to the common code.
 
-A proper implementation of standards detection is to get the standards mask from
-userspace and let the driver detect between the standards that the userspace is
-expecting.
+As the armdiv is available in common code now, the fdiv function
+pointer passed to s3c2443_common_init_clocks becomes obsolete and is
+therefore removed as the fclk rate can be set by a clk_get_rate call.
 
-So, userspace could, for example, do things like:
+It works as expected on S3C2416, is compile-tested on S3C2443
+and checkpatch was happy.
 
-	v4l2_std_id std = V4L2_STD_PAL_M | V4L2_STD_NTSC_M | V4L2_STD_PAL_DK;
 
-	ioctl (fd, VIDIOC_S_STD, &std);
-	msleep (100);
-	ioctl (fd, VIDIOC_G_STD, &std);
-	if (std & V4L2_STD_625_50)
-		height = 576;
-	else
-		height = 480;
+Heiko Stuebner (8):
+  S3C2416: Add armdiv_mask constant.
+  S3C2443: Add infrastructure to transmit armdiv to common code
+  S3C2443: Move clk_arm and clk_armdiv to common code.
+  S3C2416: Add comment describing the armdiv/armclk.
+  S3C2443: Add get_rate operation for clk_armdiv
+  S3C2443: handle unset armdiv values gracefully.
+  S3C2443: Accommodate cpufreq frequency scheme in armdiv
+  S3C2443: use clk_get_rate to init fclk in common_setup_clocks
 
-The above code won't work with the current tvp5150 driver, due to two reasons:
+ .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
+ arch/arm/mach-s3c2416/clock.c                      |   21 ++--
+ arch/arm/mach-s3c2443/clock.c                      |   98 +--------------
+ arch/arm/plat-s3c24xx/include/plat/s3c2443.h       |    7 +-
+ arch/arm/plat-s3c24xx/s3c2443-clock.c              |  134 +++++++++++++++++++-
+ 5 files changed, 152 insertions(+), 109 deletions(-)
 
-1) The tvp5150 register 0x28 doesn't allow an arbitrary standards mask like the above.
-The driver does support standards detection, if V4L2_STD_ALL is passed into it.
-
-2) even if V4L2_STD_ALL is used, the driver currently doesn't implement a
-vidioc_g_std callback. So, the driver cannot return back to userspace and to
-the bridge driver what standard were detected. Without this information, userspace
-might use the wrong number of lines when allocating the buffer, and this won't
-work.
-
-Of course, patches for fixing this are welcome.
-
-Thanks,
-Mauro
+-- 
+1.7.5.4
