@@ -1,41 +1,36 @@
-From: johan.palsson@stericsson.com (Johan Palsson)
-Date: Wed, 28 Sep 2011 10:32:28 +0200
-Subject: [PATCH] ARM: mm: Align bank start to MAX_ORDER_NR_PAGES
-Message-ID: <1317198748-17705-1-git-send-email-johan.palsson@stericsson.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 28 Sep 2011 16:57:32 +0800
+Subject: [PATCH v3 4/6] arm/imx6q: add smp and cpu hotplug support
+In-Reply-To: <20110928062945.GC14191@pengutronix.de>
+References: <1317021651-17359-1-git-send-email-shawn.guo@linaro.org>
+	<1317021651-17359-5-git-send-email-shawn.guo@linaro.org>
+	<20110926110634.GR31404@pengutronix.de>
+	<20110927134401.GE17997@S2100-06.ap.freescale.net>
+	<20110927151546.GF17997@S2100-06.ap.freescale.net>
+	<20110928062945.GC14191@pengutronix.de>
+Message-ID: <20110928085730.GA18819@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VM subsystem assumes that there are valid memmap entries from
-the bank start aligned to MAX_ORDER_NR_PAGES.
+On Wed, Sep 28, 2011 at 08:29:45AM +0200, Sascha Hauer wrote:
+> On Tue, Sep 27, 2011 at 11:15:47PM +0800, Shawn Guo wrote:
+> > > 
+> > > I do not want to add mxc_cpu_type and cpu_is_mx6q() stuff, so I intend
+> > > to remove early_initcall there, and let imx31/35_soc_init() explicitly
+> > > calls mxc_init_l2x0().
+> > > 
+> > I'm changing my mind (so quickly).  It turns out we will fall into a
+> > number of other traps if we build imx6q with imx3 without mxc_cpu_type
+> > set up for imx6q, arch_idle(), __imx_ioremap(), etc.  So for now, I
+> > want to add mxc_cpu_type for imx6q to cooperate with all these traps.
+> 
+> I'm fine with reducing the usage of cpu_is_* macros up to the point when
+> we don't need them anymore. But as you already found out, it's better to
+> do this seperately.
+> 
+I'm changing my mind again.  I decided to clean up these traps with a
+patch series, which I'm sending right now.
 
-Cc: stable at kernel.org
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Michael Bohan <mbohan@codeaurora.org>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Signed-off-by: Johan Palsson <johan.palsson@stericsson.com>
-Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mm/init.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index cc7e2d8..f8037ba 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -496,6 +496,13 @@ static void __init free_unused_memmap(struct meminfo *mi)
- 		 */
- 		bank_start = min(bank_start,
- 				 ALIGN(prev_bank_end, PAGES_PER_SECTION));
-+#else
-+		/*
-+		 * Align down here since the VM subsystem insists that the
-+		 * memmap entries are valid from the bank start aligned to
-+		 * MAX_ORDER_NR_PAGES.
-+		 */
-+		bank_start = round_down(bank_start, MAX_ORDER_NR_PAGES);
- #endif
- 		/*
- 		 * If we had a previous bank, and there is a space
 -- 
-1.7.3.2
+Regards,
+Shawn
