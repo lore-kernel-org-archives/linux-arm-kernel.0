@@ -1,143 +1,77 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 28 Sep 2011 14:55:25 +0530
-Subject: [PATCH v5 6/6] ARM: EXYNOS4: Limit usage of pl330 device instance to
-	non-dt build
+Date: Wed, 28 Sep 2011 14:55:24 +0530
+Subject: [PATCH v5 5/6] ARM: SAMSUNG: Add device tree support for pl330 dma
+	engine wrappers
 In-Reply-To: <1317201925-25148-1-git-send-email-thomas.abraham@linaro.org>
 References: <1317201925-25148-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1317201925-25148-7-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1317201925-25148-6-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pl330 device instances and associated platform data is required only
-for non-device-tree builds. With device tree enabled, the data about the
-platform is obtained from the device tree. For images that include both
-dt and non-dt platforms, an addditional check is added to ensure that
-static amba device registrations is applicable to only non-dt platforms.
+A new dma request id 'DMACH_DT_PROP' is introduced for client drivers
+requesting a dma channel. This request indicates that a device tree
+node property represting the dma channel is available in
+'struct samsung_dma_info'. The dma channel request wrapper uses the
+node property value as the value for the filter parameter.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- arch/arm/mach-exynos4/Kconfig  |   12 ++++++++++++
- arch/arm/mach-exynos4/Makefile |    3 ++-
- arch/arm/mach-exynos4/dma.c    |    4 ++++
- 3 files changed, 18 insertions(+), 1 deletions(-)
+ arch/arm/plat-samsung/dma-ops.c                |    9 ++++++++-
+ arch/arm/plat-samsung/include/plat/dma-ops.h   |    1 +
+ arch/arm/plat-samsung/include/plat/dma-pl330.h |    3 ++-
+ 3 files changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index 0c964b7..b013907 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -26,6 +26,11 @@ config EXYNOS4_MCT
- 	help
- 	  Use MCT (Multi Core Timer) as kernel timers
+diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
+index 8d18425..b1135dd 100644
+--- a/arch/arm/plat-samsung/dma-ops.c
++++ b/arch/arm/plat-samsung/dma-ops.c
+@@ -23,11 +23,18 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
+ 	struct dma_chan *chan;
+ 	dma_cap_mask_t mask;
+ 	struct dma_slave_config slave_config;
++	void *filter_param;
  
-+config EXYNOS4_DEV_DMA
-+	bool
-+	help
-+	  Compile in amba device definitions for DMA controller
-+
- config EXYNOS4_DEV_AHCI
- 	bool
- 	help
-@@ -144,6 +149,7 @@ config MACH_SMDKV310
- 	select EXYNOS4_DEV_PD
- 	select SAMSUNG_DEV_PWM
- 	select EXYNOS4_DEV_SYSMMU
-+	select EXYNOS4_DEV_DMA
- 	select EXYNOS4_SETUP_FIMD0
- 	select EXYNOS4_SETUP_I2C1
- 	select EXYNOS4_SETUP_KEYPAD
-@@ -161,6 +167,7 @@ config MACH_ARMLEX4210
- 	select S3C_DEV_HSMMC3
- 	select EXYNOS4_DEV_AHCI
- 	select EXYNOS4_DEV_SYSMMU
-+	select EXYNOS4_DEV_DMA
- 	select EXYNOS4_SETUP_SDHCI
- 	help
- 	  Machine support for Samsung ARMLEX4210 based on EXYNOS4210
-@@ -185,6 +192,7 @@ config MACH_UNIVERSAL_C210
- 	select S5P_DEV_MFC
- 	select S5P_DEV_ONENAND
- 	select S5P_DEV_TV
-+	select EXYNOS4_DEV_DMA
- 	select EXYNOS4_DEV_PD
- 	select EXYNOS4_SETUP_FIMD0
- 	select EXYNOS4_SETUP_I2C1
-@@ -211,6 +219,7 @@ config MACH_NURI
- 	select S3C_DEV_I2C5
- 	select S5P_DEV_MFC
- 	select S5P_DEV_USB_EHCI
-+	select EXYNOS4_DEV_DMA
- 	select EXYNOS4_DEV_PD
- 	select EXYNOS4_SETUP_FIMD0
- 	select EXYNOS4_SETUP_I2C1
-@@ -237,6 +246,7 @@ config MACH_ORIGEN
- 	select S5P_DEV_I2C_HDMIPHY
- 	select S5P_DEV_TV
- 	select S5P_DEV_USB_EHCI
-+	select EXYNOS4_DEV_DMA
- 	select SAMSUNG_DEV_BACKLIGHT
- 	select SAMSUNG_DEV_PWM
- 	select EXYNOS4_SETUP_SDHCI
-@@ -256,6 +266,7 @@ config MACH_SMDK4212
- 	select S3C_DEV_I2C7
- 	select S3C_DEV_RTC
- 	select S3C_DEV_WDT
-+	select EXYNOS4_DEV_DMA
- 	select SAMSUNG_DEV_BACKLIGHT
- 	select SAMSUNG_DEV_KEYPAD
- 	select SAMSUNG_DEV_PWM
-@@ -271,6 +282,7 @@ config MACH_EXYNOS4_DT
- 	bool "Samsung Exynos4 Machine using device tree"
- 	select CPU_EXYNOS4210
- 	select USE_OF
-+	select ARM_AMBA
- 	help
- 	  Machine support for Samsung Exynos4 machine with device tree enabled.
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(info->cap, mask);
  
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index 9e8b7e5..d0c5706 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -13,7 +13,7 @@ obj-				:=
- # Core support for EXYNOS4 system
+-	chan = dma_request_channel(mask, pl330_filter, (void *)dma_ch);
++	/*
++	 * If a dma channel property of a device node from device tree is
++	 * specified, use that as the fliter parameter.
++	 */
++	filter_param = (dma_ch == DMACH_DT_PROP) ? (void *)info->dt_dmach_prop :
++				(void *)dma_ch;
++	chan = dma_request_channel(mask, pl330_filter, filter_param);
  
- obj-$(CONFIG_ARCH_EXYNOS4)	+= cpu.o init.o clock.o irq-combiner.o
--obj-$(CONFIG_ARCH_EXYNOS4)	+= setup-i2c0.o irq-eint.o dma.o pmu.o
-+obj-$(CONFIG_ARCH_EXYNOS4)	+= setup-i2c0.o irq-eint.o pmu.o
- obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
- obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
- obj-$(CONFIG_PM)		+= pm.o sleep.o
-@@ -44,6 +44,7 @@ obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
- obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
- obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
- obj-$(CONFIG_EXYNOS4_DEV_DWMCI)	+= dev-dwmci.o
-+obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
+ 	if (info->direction == DMA_FROM_DEVICE) {
+ 		memset(&slave_config, 0, sizeof(struct dma_slave_config));
+diff --git a/arch/arm/plat-samsung/include/plat/dma-ops.h b/arch/arm/plat-samsung/include/plat/dma-ops.h
+index 4c1a363..22eafc3 100644
+--- a/arch/arm/plat-samsung/include/plat/dma-ops.h
++++ b/arch/arm/plat-samsung/include/plat/dma-ops.h
+@@ -31,6 +31,7 @@ struct samsung_dma_info {
+ 	enum dma_slave_buswidth width;
+ 	dma_addr_t fifo;
+ 	struct s3c2410_dma_client *client;
++	struct property *dt_dmach_prop;
+ };
  
- obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
- obj-$(CONFIG_EXYNOS4_SETUP_FIMD0)	+= setup-fimd0.o
-diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
-index c3c0d17..921d31d 100644
---- a/arch/arm/mach-exynos4/dma.c
-+++ b/arch/arm/mach-exynos4/dma.c
-@@ -24,6 +24,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl330.h>
-+#include <linux/of.h>
- 
- #include <asm/irq.h>
- #include <plat/devs.h>
-@@ -138,6 +139,9 @@ struct amba_device exynos4_device_pdma1 = {
- 
- static int __init exynos4_dma_init(void)
- {
-+	if (of_have_populated_dt())
-+		return 0;
-+
- 	dma_cap_set(DMA_SLAVE, exynos4_pdma0_pdata.cap_mask);
- 	dma_cap_set(DMA_CYCLIC, exynos4_pdma0_pdata.cap_mask);
- 	amba_device_register(&exynos4_device_pdma0, &iomem_resource);
+ struct samsung_dma_ops {
+diff --git a/arch/arm/plat-samsung/include/plat/dma-pl330.h b/arch/arm/plat-samsung/include/plat/dma-pl330.h
+index 2e55e59..c5eaad5 100644
+--- a/arch/arm/plat-samsung/include/plat/dma-pl330.h
++++ b/arch/arm/plat-samsung/include/plat/dma-pl330.h
+@@ -21,7 +21,8 @@
+  * use these just as IDs.
+  */
+ enum dma_ch {
+-	DMACH_UART0_RX,
++	DMACH_DT_PROP = -1,
++	DMACH_UART0_RX = 0,
+ 	DMACH_UART0_TX,
+ 	DMACH_UART1_RX,
+ 	DMACH_UART1_TX,
 -- 
 1.6.6.rc2
