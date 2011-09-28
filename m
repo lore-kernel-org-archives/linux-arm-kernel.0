@@ -1,22 +1,40 @@
-From: gigin_jose@yahoo.co.in (GIGIN JOSE)
-Date: Wed, 28 Sep 2011 05:29:45 +0000 (UTC)
-Subject: CODEC support for s3c2440
-Message-ID: <loom.20110928T064537-241@post.gmane.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 28 Sep 2011 07:34:05 +0200
+Subject: [PATCH 3/3] mmc: mmci: Change vdd_handler to a generic ios_handler
+In-Reply-To: <1317123753-29902-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1317123753-29902-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdZpbs06Gi27dpVearp1zV6Xi-8-88E1GJmRca3u_N1zbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+On Tue, Sep 27, 2011 at 1:42 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-I am using s3c2440 with linux 2.6.30. The camera driver for s3c2440 
-currently supports preview mode. Should I enable my camera to RGB 
-configuration to interface with the processor ? 
+> The purpose of the vdd_handler does not make sense. We remove it
+> and use a generic approach instead. A new ios_handler is added, the
+> purpose of which e.g. can be to control GPIO pins to a levelshifter.
+>
+> Previously the vdd_handler was also used for making additional
+> changes to the power register bits. This option is superfluous and is
+> therefore removed.
+>
+> Adaptaptions from the old vdd_handler to the new ios_handler is done for
+> mach-ux500 board, which was the only one using the vdd_handler.
 
-The camera device also gives YCbCr output.How can I configure 
-the processor to see the YCbCr output from the camera ? Is it 
-necessary that I should enable the codec mode of the s3c2440 
-camera controller to get the YCbCr output.
+I've tried to undestand (by reading the data sheets I have) what the
+purpose of the original 4 power bits handled by the mechanism that
+nobody really use is, and I'm still lost.
 
-What is the advantage of using codec path of the camera 
-controller with respect to the preview path ? 
+I'm guessing it was some feature intended to control e.g. a
+regulator of some kind by routing them off-chip (since mixed-signal
+chips rarely have MMC controllers inside...) and most designers
+already have their own regulator designs so it made no sense
+for anyone to actually implement it that way.
 
-Thank You 
+If some vendor would actually start using these bits for the
+intended purpose I guess we could adapt. (The pirate driver
+msm_sdcc.c does not seem to use these bits either BTW.)
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
