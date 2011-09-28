@@ -1,130 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Sep 2011 10:01:16 +0200
-Subject: [PATCH V2 1/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
-In-Reply-To: <1317189007-23033-2-git-send-email-alim.akhtar@samsung.com>
-References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
-	<1317189007-23033-2-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <CACRpkdZesKGuPGmUifLj4puN_e=kYAb4WyuQs+xERn9q7036rg@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 28 Sep 2011 10:06:17 +0200
+Subject: [PATCH 2/9] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20110927150511.GM4289@opensource.wolfsonmicro.com>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-3-git-send-email-rnayak@ti.com>
+	<20110927121003.GB4289@opensource.wolfsonmicro.com>
+	<4E81E224.2070408@ti.com>
+	<20110927150511.GM4289@opensource.wolfsonmicro.com>
+Message-ID: <4E82D579.3080503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry if I missed a few nitpicks last time, anyway it's looking much better now:
-
-On Wed, Sep 28, 2011 at 7:50 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
-> + ? ? ? /*
-> + ? ? ? ?* Samsung pl080 DMAC has one exrta control register
-
-s/exrta/exstra
-
-> + ? ? ? if (pl08x->vd->is_pl080_s3c) {
-> + ? ? ? ? ? ? ? writel(txd->ccfg, phychan->base + PL080S_CH_CONFIG);
-> + ? ? ? ? ? ? ? writel(lli->cctl1, phychan->base + PL080S_CH_CONTROL2);
-> + ? ? ? } else
-> + ? ? ? ? ? ? ? writel(txd->ccfg, phychan->base + PL080_CH_CONFIG);
-
-What do you think about adding a field to the struct pl08x
-like
-
-u32 config_reg
-
-that we set to the proper config register (PL080S_CH_CONFIG or
-PL080_CH_CONFIG in probe(), so the above
-becomes the simpler variant:
-
-writel(txd->ccfg, phychan->base + pl08x->config_reg);
-if (pl08x->vd->is_pl080_s3c)
-    writel(lli->cctl1, phychan->base + PL080S_CH_CONTROL2);
-
-> + ? ? ? if (pl08x->vd->is_pl080_s3c) {
-> + ? ? ? ? ? ? ? val = readl(phychan->base + PL080S_CH_CONFIG);
-> + ? ? ? ? ? ? ? while ((val & PL080_CONFIG_ACTIVE) ||
-> + ? ? ? ? ? ? ? ? ? ? ? (val & PL080_CONFIG_ENABLE))
-> + ? ? ? ? ? ? ? ? ? ? ? val = readl(phychan->base + PL080S_CH_CONFIG);
-> +
-> + ? ? ? ? ? ? ? writel(val | PL080_CONFIG_ENABLE,
-> + ? ? ? ? ? ? ? ? ? ? ? phychan->base + PL080S_CH_CONFIG);
-> + ? ? ? } else {
-> ? ? ? ? ? ? ? ?val = readl(phychan->base + PL080_CH_CONFIG);
-> + ? ? ? ? ? ? ? ? ? ? ? while ((val & PL080_CONFIG_ACTIVE) ||
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (val & PL080_CONFIG_ENABLE))
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? val = readl(phychan->base + PL080_CH_CONFIG);
+On 9/27/2011 5:05 PM, Mark Brown wrote:
+> On Tue, Sep 27, 2011 at 08:18:04PM +0530, Rajendra Nayak wrote:
+>> On Tuesday 27 September 2011 05:40 PM, Mark Brown wrote:
+>>> On Tue, Sep 27, 2011 at 03:42:45PM +0530, Rajendra Nayak wrote:
 >
-> - ? ? ? writel(val | PL080_CONFIG_ENABLE, phychan->base + PL080_CH_CONFIG);
-> + ? ? ? ? ? ? ? writel(val | PL080_CONFIG_ENABLE,
-> + ? ? ? ? ? ? ? ? ? ? ? phychan->base + PL080_CH_CONFIG);
-> + ? ? ? }
+>>>> +	init_data = devm_kzalloc(dev, sizeof(struct regulator_init_data),
+>>>> +						 GFP_KERNEL);
+>>>> +	if (!init_data)
+>>>> +		return NULL; /* Out of memory? */
+>
+>>> This means that the init data will be kept around for the entire
+>>> lifetime of the device rather than being discarded.
+>
+>> Wasn't it the same while this was passed around as platform_data?
+>
+> It was in the past but I remember fixing it at some point.  Perhaps I'm
+> imagining things.
+>
+>>>> +	init_data->supply_regulator = (char *)of_get_property(dev->of_node,
+>>>> +						"regulator-supplies", NULL);
+>
+>>> I'd expect that in the device tree world the supply regulator would
+>>> reference the node for that regulator.
+>
+>> You mean using phandles? Thats what Grant proposed too but
+>> I thought you instead had an inclination towards names? Or maybe
+>> I misunderstood.
+>
+> They need both.  We need to reference the device that provides the
+> supply and use a name to say which of the potentially multiple supplies
+> on the consumer device is which.
+>
+>>> Hrm, I think loosing the signs here is bad karma - negative voltages do
+>>> exist after all.
+>
+>> Oops.. they do? didn't know about that.
+>
+> Yup, ground is just a reference point.
 
-This would also become much simpler with that approach I think...
+Yep, we do have a negative charge pump to generate -1.9v from 3.8v to 
+supply the audio power amplifier part in twl6040 for example.
 
-> ? ? ? ?/* Set the HALT bit and wait for the FIFO to drain */
-> - ? ? ? val = readl(ch->base + PL080_CH_CONFIG);
-> - ? ? ? val |= PL080_CONFIG_HALT;
-> - ? ? ? writel(val, ch->base + PL080_CH_CONFIG);
-> -
-> + ? ? ? if (pl08x->vd->is_pl080_s3c) {
-> + ? ? ? ? ? ? ? val = readl(ch->base + PL080S_CH_CONFIG);
-> + ? ? ? ? ? ? ? val |= PL080_CONFIG_HALT;
-> + ? ? ? ? ? ? ? writel(val, ch->base + PL080S_CH_CONFIG);
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? val = readl(ch->base + PL080_CH_CONFIG);
-> + ? ? ? ? ? ? ? val |= PL080_CONFIG_HALT;
-> + ? ? ? ? ? ? ? writel(val, ch->base + PL080_CH_CONFIG);
-> + ? ? ? }
-
-This would become simply:
-
-val = readl(ch->base + pl08x->config_reg);
-val |= PL080_CONFIG_HALT;
-writel(val, ch->base + pl08x->config_reg);
-
-
-> ? ? ? ?/* Clear the HALT bit */
-> - ? ? ? val = readl(ch->base + PL080_CH_CONFIG);
-> - ? ? ? val &= ~PL080_CONFIG_HALT;
-> - ? ? ? writel(val, ch->base + PL080_CH_CONFIG);
-> + ? ? ? if (pl08x->vd->is_pl080_s3c) {
-> + ? ? ? ? ? ? ? val = readl(ch->base + PL080S_CH_CONFIG);
-> + ? ? ? ? ? ? ? val &= ~PL080_CONFIG_HALT;
-> + ? ? ? ? ? ? ? writel(val, ch->base + PL080S_CH_CONFIG);
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? val = readl(ch->base + PL080_CH_CONFIG);
-> + ? ? ? ? ? ? ? val &= ~PL080_CONFIG_HALT;
-> + ? ? ? ? ? ? ? writel(val, ch->base + PL080_CH_CONFIG);
-> + ? ? ? }
-
-This would get rid of the if/else clauses
-
-> + ? ? ? if (pl08x->vd->is_pl080_s3c) {
-> + ? ? ? ? ? ? ? u32 val = readl(ch->base + PL080S_CH_CONFIG);
-> + ? ? ? ? ? ? ? val &= ~(PL080_CONFIG_ENABLE | PL080_CONFIG_ERR_IRQ_MASK |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PL080_CONFIG_TC_IRQ_MASK);
-> + ? ? ? ? ? ? ? writel(val, ch->base + PL080S_CH_CONFIG);
-> + ? ? ? } else {
-> + ? ? ? ? ? ? ? u32 val = readl(ch->base + PL080_CH_CONFIG);
-> + ? ? ? ? ? ? ? val &= ~(PL080_CONFIG_ENABLE | PL080_CONFIG_ERR_IRQ_MASK |
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PL080_CONFIG_TC_IRQ_MASK);
-> + ? ? ? ? ? ? ? writel(val, ch->base + PL080_CH_CONFIG);
-> + ? ? ? }
-
-As would this...
-
-> + ? ? ? /* Samsung DMAC is PL080 variant*/
-> + ? ? ? {
-> + ? ? ? ? ? ? ? .id ? ? = 0x00041082,
-> + ? ? ? ? ? ? ? .mask ? = 0x000fffff,
-> + ? ? ? ? ? ? ? .data ? = &vendor_pl080_s3c,
-
-Does the hardware realy have this primecell number or is it something that is
-hardcoded from the board/device tree?
-
-If it is hardcoded then no objections.
-
-In the latter case, replace 0x41 (= 'A', ARM) with something like
-0x55 'U' for Samsung or so. Or 0x51 'S'. Or whatever you like.
-
-Then add that to include/linux/amba/bus.h as
-AMBA_VENDOR_SAMSUNG = 0x55,
-so we have this under some kind of control.
-
-Yours,
-Linus Walleij
+Benoit
