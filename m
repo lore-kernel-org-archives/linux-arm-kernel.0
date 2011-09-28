@@ -1,32 +1,27 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 28 Sep 2011 08:21:05 -0700
-Subject: MAC firmware does not load due to (commit 288d5abe usermodehelper)
-In-Reply-To: <20110928120630.GB9456@netboy.at.omicron.at>
-References: <20110928120630.GB9456@netboy.at.omicron.at>
-Message-ID: <CA+55aFy4aZPdUNBR0O3SP1iRRJyeF9kPZxH9G_eYdxueYskF4g@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 28 Sep 2011 11:35:16 -0400
+Subject: nr_cpus cmdline parameter not working
+Message-ID: <1317224117.2580.84.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2011 at 5:06 AM, Richard Cochran
-<richardcochran@gmail.com> wrote:
->
-> A warning appears on the console, shown below. ?I don't know what
-> commit 288d5abe was trying to fix, but it sure made a regression for
-> me. It probably would also spoil using NFS boot, too.
->
-> Any ideas what to do about this?
+I noticed that nr_cpus=1 doesn't appear to have any effect on a
+pandaboard (and probably others from the looks of things). This
+changes seems to be needed, but I'm not really sure if this is
+the right thing or not.
 
-Something seems to be calling ioctl() befor rest_init() has even
-completed. Which sounds odd, but I wonder if the schedule() there
-before it might have let 'init' get going.
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index ce65e93..a1198ac 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -117,6 +117,9 @@ void __init smp_init_cpus(void)
+ 		ncores = NR_CPUS;
+ 	}
+ 
++	if (ncores > nr_cpu_ids)
++		ncores = nr_cpu_ids;
++
+ 	for (i = 0; i < ncores; i++)
+ 		set_cpu_possible(i, true);
 
-Does something like the attached (UNTESTED) fix it?
-
-                             Linus
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: patch.diff
-Type: text/x-patch
-Size: 678 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110928/ab9b1404/attachment.bin>
+--Mark
