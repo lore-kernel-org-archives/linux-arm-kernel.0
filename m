@@ -1,32 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Sep 2011 20:24:43 +0100
-Subject: [RFC PATCH 3/3] ARM: mm: add l2x0 suspend/resume support
-In-Reply-To: <4E81AC1C.4090405@ti.com>
-References: <1317047561-11020-1-git-send-email-lorenzo.pieralisi@arm.com>
-	<1317047561-11020-4-git-send-email-lorenzo.pieralisi@arm.com>
-	<20110926150645.GN22455@n2100.arm.linux.org.uk>
-	<20110926171452.GC11647@e102568-lin.cambridge.arm.com>
-	<4E815F42.6010102@ti.com>
-	<20110927102835.GA18572@e102568-lin.cambridge.arm.com>
-	<4E81AC1C.4090405@ti.com>
-Message-ID: <20110928192443.GB23944@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 28 Sep 2011 21:59:34 +0200
+Subject: [PATCH] S3C2443: Add devname for hsmmc1 pclk
+Message-ID: <201109282159.35240.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 04:27:32PM +0530, Santosh Shilimkar wrote:
-> I agree. From various discussion so far, apart MX, nobody complained
-> about C-version of the code. Hence the comment. If there are more
-> platforms which needs it, then the asm version would be useful and
-> should be preferred over C-version.
+S3C2443 uses hsmmc1 as its only hsmmc device and for S3C2416/2450 it's
+the second hsmmc channel with the same PCLKCON bit.
+The hsmmc-if clocks on both systems already got a devname, as did the
+hsmmc pclk for hsmmc0 on the S3C2416.
+So to make it possible to identify the hsmmc1 pclk on S3C2416 add the
+correct devname for it. The sclk name on S3C2443 also is s3c-sdhci.1.
 
-Santosh,
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/plat-s3c24xx/s3c2443-clock.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Can you also look at Barry Song's version of this infrastructure as
-well?  He posted it a couple of days ago:
-
-Subject: [PATCH v2] ARM: cache-l2x0: add resume entry for l2 in secure mode
-Message-ID: <1317007569-31213-1-git-send-email-Baohua.Song@csr.com>
-
-with this diffstat:
-
- 4 files changed, 101 insertions(+), 9 deletions(-)
+diff --git a/arch/arm/plat-s3c24xx/s3c2443-clock.c b/arch/arm/plat-s3c24xx/s3c2443-clock.c
+index b4b2fa1..6408650 100644
+--- a/arch/arm/plat-s3c24xx/s3c2443-clock.c
++++ b/arch/arm/plat-s3c24xx/s3c2443-clock.c
+@@ -416,6 +416,7 @@ static struct clk init_clocks[] = {
+ 		.ctrlbit	= S3C2443_HCLKCON_DMA5,
+ 	}, {
+ 		.name		= "hsmmc",
++		.devname	= "s3c-sdhci.1",
+ 		.parent		= &clk_h,
+ 		.enable		= s3c2443_clkcon_enable_h,
+ 		.ctrlbit	= S3C2443_HCLKCON_HSMMC,
+-- 
+1.7.2.3
