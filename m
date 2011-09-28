@@ -1,49 +1,69 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 28 Sep 2011 08:42:19 +0200
-Subject: [PATCH v2 1/2] S3C2443/S3C2416: Add adc registers
-In-Reply-To: <201109182242.55394.heiko@sntech.de>
+Date: Wed, 28 Sep 2011 08:43:15 +0200
+Subject: [PATCH v2 2/2] s3c-adc: describe features via quirk constants
+In-Reply-To: <005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
 References: <201109182241.48858.heiko@sntech.de>
-	<201109182242.55394.heiko@sntech.de>
-Message-ID: <201109280842.20542.heiko@sntech.de>
+	<201109182243.40440.heiko@sntech.de>
+	<005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
+Message-ID: <201109280843.16984.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The adc blocks of the S3C2443 and S3C2416 define some
-additional registers and bits.
+The adc blocks of S3C2410 through S5P have a multitude of
+quirks, i.e. moved bits or whole new registers.
+
+This patch tries to describe these individual features
+through constants which can be used to describe an adc.
+
+As SoCs sometimes share only some of these quirks defining
+TYPE_ADCVx values for each one wouldn't scale well when
+adding more variants.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
 changes since v1: add spaces around <<
- arch/arm/plat-samsung/include/plat/regs-adc.h |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/plat-samsung/adc.c |   29 +++++++++++++++++++++++++++++
+ 1 files changed, 29 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-adc.h b/arch/arm/plat-samsung/include/plat/regs-adc.h
-index 035e8c3..7061210 100644
---- a/arch/arm/plat-samsung/include/plat/regs-adc.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-adc.h
-@@ -20,6 +20,7 @@
- #define S3C2410_ADCDAT0	   S3C2410_ADCREG(0x0C)
- #define S3C2410_ADCDAT1	   S3C2410_ADCREG(0x10)
- #define S3C64XX_ADCUPDN		S3C2410_ADCREG(0x14)
-+#define S3C2443_ADCMUX		S3C2410_ADCREG(0x18)
- #define S3C64XX_ADCCLRINT	S3C2410_ADCREG(0x18)
- #define S5P_ADCMUX		S3C2410_ADCREG(0x1C)
- #define S3C64XX_ADCCLRINTPNDNUP	S3C2410_ADCREG(0x20)
-@@ -33,6 +34,7 @@
- #define S3C2410_ADCCON_PRSCVLMASK	(0xFF<<6)
- #define S3C2410_ADCCON_SELMUX(x)	(((x)&0x7)<<3)
- #define S3C2410_ADCCON_MUXMASK		(0x7<<3)
-+#define S3C2416_ADCCON_RESSEL		(1 << 3)
- #define S3C2410_ADCCON_STDBM		(1<<2)
- #define S3C2410_ADCCON_READ_START	(1<<1)
- #define S3C2410_ADCCON_ENABLE_START	(1<<0)
-@@ -40,6 +42,7 @@
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index ee8deef..4fc4deb 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -45,6 +45,35 @@ enum s3c_cpu_type {
+ 	TYPE_ADCV3, /* S5PV210, S5PC110, EXYNOS4210 */
+ };
  
- 
- /* ADCTSC Register Bits */
-+#define S3C2443_ADCTSC_UD_SEN		(1 << 8)
- #define S3C2410_ADCTSC_YM_SEN		(1<<7)
- #define S3C2410_ADCTSC_YP_SEN		(1<<6)
- #define S3C2410_ADCTSC_XM_SEN		(1<<5)
++/*
++ * Resolution of the ADC - 10 or 12 bit
++ */
++#define S3C_ADC_QUIRK_10BIT		0
++#define S3C_ADC_QUIRK_12BIT		(1 << 0)
++
++/*
++ * 12bit ADC can switch resolution between 10 bit and 12 bit
++ * ADCCON bit 03 for S3C2416
++ * ADCCON bit 16 for S3C64XX and up
++ */
++#define S3C_ADC_QUIRK_RESSEL03		(1 << 1)
++#define S3C_ADC_QUIRK_RESSEL16		(1 << 2)
++
++/*
++ * Input channel select can either be in
++ * - reg ADCCON, bit for S3C24XX and S3C64XX
++ * - reg base+0x18 for 2443/2416/2450
++ * - reg base+0x1C for S5P
++ */
++#define S3C_ADC_QUIRK_MUXADCCON		(1 << 3)
++#define S3C_ADC_QUIRK_MUX18		(1 << 4)
++#define S3C_ADC_QUIRK_MUX1C		(1 << 5)
++
++/*
++ * CLRINT register on S3C64xx
++ */
++#define S3C_ADC_QUIRK_CLRINT		(1 << 6)
++
+ struct s3c_adc_client {
+ 	struct platform_device	*pdev;
+ 	struct list_head	 pend;
 -- 
 1.7.5.4
