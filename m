@@ -1,83 +1,122 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 28 Sep 2011 11:41:39 +0100
-Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
+Date: Wed, 28 Sep 2011 11:41:41 +0100
+Subject: [PATCHv2 04/10] ARM: netx: convert to MULTI_IRQ_HANDLER
 In-Reply-To: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
 References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <1317206507-18867-3-git-send-email-jamie@jamieiles.com>
+Message-ID: <1317206507-18867-5-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a handler for the VIC that is suitable for MULTI_IRQ_HANDLER
-platforms.  This can replace the ASM entry macros for platforms that use
-the VIC.
+Now that there is a generic IRQ handler for multiple VIC devices use it
+for netx to help building multi platform kernels.
 
-v2:	- allow the handler be used for !CONFIG_OF
-	- use irq_domain_to_irq()
-
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
 Signed-off-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/common/vic.c               |   29 +++++++++++++++++++++++++++++
- arch/arm/include/asm/hardware/vic.h |    4 ++++
- 2 files changed, 33 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig                              |    1 +
+ arch/arm/mach-netx/include/mach/entry-macro.S |   13 -------------
+ arch/arm/mach-netx/nxdb500.c                  |    2 ++
+ arch/arm/mach-netx/nxdkn.c                    |    2 ++
+ arch/arm/mach-netx/nxeb500hmi.c               |    2 ++
+ 5 files changed, 7 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-index 3f9c8f2..71adced 100644
---- a/arch/arm/common/vic.c
-+++ b/arch/arm/common/vic.c
-@@ -427,3 +427,32 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
- 	return -EIO;
- }
- #endif /* CONFIG OF */
-+
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+static void vic_single_handle_irq(struct vic_device *vic, struct pt_regs *regs)
-+{
-+	u32 stat, irq;
-+	bool handled = false;
-+
-+	while (!handled) {
-+		stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-+		if (!stat)
-+			break;
-+
-+		while (stat) {
-+			irq = fls(stat) - 1;
-+			handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
-+			stat &= ~(1 << irq);
-+			handled = true;
-+		}
-+	}
-+}
-+
-+asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
-+{
-+	int i;
-+
-+	for (i = 0; i < vic_id; ++i)
-+		vic_single_handle_irq(&vic_devices[i], regs);
-+}
-+#endif /* CONFIG_MULTI_IRQ_HANDLER */
-diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
-index 0135215..c02fd6f 100644
---- a/arch/arm/include/asm/hardware/vic.h
-+++ b/arch/arm/include/asm/hardware/vic.h
-@@ -45,11 +45,15 @@
- #include <linux/types.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7facb7c..b7cab06 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -416,6 +416,7 @@ config ARCH_NETX
+ 	select CPU_ARM926T
+ 	select ARM_VIC
+ 	select GENERIC_CLOCKEVENTS
++	select MULTI_IRQ_HANDLER
+ 	help
+ 	  This enables support for systems based on the Hilscher NetX Soc
  
- struct device_node;
-+struct pt_regs;
-+
- void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
+diff --git a/arch/arm/mach-netx/include/mach/entry-macro.S b/arch/arm/mach-netx/include/mach/entry-macro.S
+index 844f1f9..6e9f1cb 100644
+--- a/arch/arm/mach-netx/include/mach/entry-macro.S
++++ b/arch/arm/mach-netx/include/mach/entry-macro.S
+@@ -18,22 +18,9 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
+-#include <mach/hardware.h>
  
- #ifdef CONFIG_OF
- int vic_of_init(struct device_node *node, struct device_node *parent);
- #endif /* CONFIG_OF */
+ 		.macro  disable_fiq
+ 		.endm
  
-+void vic_handle_irq(struct pt_regs *regs);
-+
- #endif /* __ASSEMBLY__ */
- #endif
+-		.macro  get_irqnr_preamble, base, tmp
+-		ldr	\base, =io_p2v(0x001ff000)
+-		.endm
+-
+ 		.macro  arch_ret_to_user, tmp1, tmp2
+ 		.endm
+-
+-		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-		ldr	\irqstat, [\base, #0]
+-		clz	\irqnr, \irqstat
+-		rsb     \irqnr, \irqnr, #31
+-		cmp	\irqstat, #0
+-		.endm
+-
+diff --git a/arch/arm/mach-netx/nxdb500.c b/arch/arm/mach-netx/nxdb500.c
+index ca8b203..e86aea8 100644
+--- a/arch/arm/mach-netx/nxdb500.c
++++ b/arch/arm/mach-netx/nxdb500.c
+@@ -28,6 +28,7 @@
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++#include <asm/hardware/vic.h>
+ #include <mach/netx-regs.h>
+ #include <mach/eth.h>
+ 
+@@ -203,6 +204,7 @@ MACHINE_START(NXDB500, "Hilscher nxdb500")
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= netx_map_io,
+ 	.init_irq	= netx_init_irq,
++	.handle_irq	= vic_handle_irq,
+ 	.timer		= &netx_timer,
+ 	.init_machine	= nxdb500_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-netx/nxdkn.c b/arch/arm/mach-netx/nxdkn.c
+index d775cbe..b3170da 100644
+--- a/arch/arm/mach-netx/nxdkn.c
++++ b/arch/arm/mach-netx/nxdkn.c
+@@ -28,6 +28,7 @@
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++#include <asm/hardware/vic.h>
+ #include <mach/netx-regs.h>
+ #include <mach/eth.h>
+ 
+@@ -96,6 +97,7 @@ MACHINE_START(NXDKN, "Hilscher nxdkn")
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= netx_map_io,
+ 	.init_irq	= netx_init_irq,
++	.handle_irq	= vic_handle_irq,
+ 	.timer		= &netx_timer,
+ 	.init_machine	= nxdkn_init,
+ MACHINE_END
+diff --git a/arch/arm/mach-netx/nxeb500hmi.c b/arch/arm/mach-netx/nxeb500hmi.c
+index de369cd..dc6fa77 100644
+--- a/arch/arm/mach-netx/nxeb500hmi.c
++++ b/arch/arm/mach-netx/nxeb500hmi.c
+@@ -28,6 +28,7 @@
+ #include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
++#include <asm/hardware/vic.h>
+ #include <mach/netx-regs.h>
+ #include <mach/eth.h>
+ 
+@@ -180,6 +181,7 @@ MACHINE_START(NXEB500HMI, "Hilscher nxeb500hmi")
+ 	.boot_params	= 0x80000100,
+ 	.map_io		= netx_map_io,
+ 	.init_irq	= netx_init_irq,
++	.handle_irq	= vic_handle_irq,
+ 	.timer		= &netx_timer,
+ 	.init_machine	= nxeb500hmi_init,
+ MACHINE_END
 -- 
 1.7.4.1
