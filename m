@@ -1,212 +1,125 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 28 Sep 2011 15:43:09 +0800
-Subject: [PATCH v3 4/6] arm/imx6q: add smp and cpu hotplug support
-In-Reply-To: <20110926110634.GR31404@pengutronix.de>
-References: <1317021651-17359-1-git-send-email-shawn.guo@linaro.org>
-	<1317021651-17359-5-git-send-email-shawn.guo@linaro.org>
-	<20110926110634.GR31404@pengutronix.de>
-Message-ID: <20110928074307.GA18785@S2100-06.ap.freescale.net>
+From: lacombar@gmail.com (Arnaud Lacombe)
+Date: Wed, 28 Sep 2011 03:34:41 -0400
+Subject: [PATCH] dma/imx-sdma+imx-dma: explicitly #include <linux/module.h>
+In-Reply-To: <20110928064614.GN20550@pengutronix.de>
+References: <1317018379-8897-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<4E824821.8040105@windriver.com>
+	<20110928064614.GN20550@pengutronix.de>
+Message-ID: <CACqU3MXO_yQKJbafD8g+kBje4y+ZWcUMsXvk_2xddrTiumSBbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 01:06:34PM +0200, Sascha Hauer wrote:
-> On Mon, Sep 26, 2011 at 03:20:49PM +0800, Shawn Guo wrote:
-> > It adds smp and cpu hotplug support for imx6q.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  arch/arm/mach-imx/Kconfig               |    1 +
-> >  arch/arm/mach-imx/Makefile              |    4 ++
-> >  arch/arm/mach-imx/head-v7.S             |   71 ++++++++++++++++++++++++++
-> >  arch/arm/mach-imx/hotplug.c             |   44 ++++++++++++++++
-> >  arch/arm/mach-imx/localtimer.c          |   35 +++++++++++++
-> >  arch/arm/mach-imx/platsmp.c             |   85 +++++++++++++++++++++++++++++++
-> >  arch/arm/plat-mxc/include/mach/common.h |    5 ++
-> >  7 files changed, 245 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/mach-imx/head-v7.S
-> >  create mode 100644 arch/arm/mach-imx/hotplug.c
-> >  create mode 100644 arch/arm/mach-imx/localtimer.c
-> >  create mode 100644 arch/arm/mach-imx/platsmp.c
-> > 
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index af73b3e..6ec758d 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -623,6 +623,7 @@ config SOC_IMX6Q
-> >  	bool "i.MX6 Quad support"
-> >  	select ARM_GIC
-> >  	select CPU_V7
-> > +	select HAVE_ARM_SCU
-> >  	select HAVE_IMX_GPC
-> >  	select HAVE_IMX_MMDC
-> >  	select HAVE_IMX_SRC
-> > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> > index 8c21fda..d46b2e7 100644
-> > --- a/arch/arm/mach-imx/Makefile
-> > +++ b/arch/arm/mach-imx/Makefile
-> > @@ -66,4 +66,8 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
-> >  obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
-> >  obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
-> >  obj-$(CONFIG_HAVE_IMX_SRC) += src.o
-> > +obj-$(CONFIG_CPU_V7) += head-v7.o
-> 
-> Can we have a
-> 
-> AFLAGS_head-v7.o :=-Wa,-march=armv7-a
-> 
-> here?
-> 
-> Then you only have to adjust some Kconfig variables and can compile
-> i.MX3 and i.MX6 together. I just gave it a test and it works on i.MX3, I
-> don't have a i.MX6 platform to test on though.
-> 
-> The following patch could be a starting point. I merged the imx-features
-> branch into it so it probably won't apply cleanly on your series.
-> 
-> 8<----------------------------------------
-> 
-> 
-> From 010a61373355e6cba6856272e3fd8e22e8ee3ccd Mon Sep 17 00:00:00 2001
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> Date: Mon, 26 Sep 2011 13:04:08 +0200
-> Subject: [PATCH] merge i.MX3 and i.MX6
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/Makefile          |    3 +--
->  arch/arm/mach-imx/Kconfig  |    7 +++----
->  arch/arm/mach-imx/Makefile |    1 +
->  arch/arm/mm/Kconfig        |    4 ++--
->  arch/arm/plat-mxc/Kconfig  |   14 ++++++--------
->  5 files changed, 13 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 89be85d..42ab385 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -155,9 +155,8 @@ machine-$(CONFIG_ARCH_MMP)		:= mmp
->  machine-$(CONFIG_ARCH_MSM)		:= msm
->  machine-$(CONFIG_ARCH_MV78XX0)		:= mv78xx0
->  machine-$(CONFIG_ARCH_IMX_V4_V5)	:= imx
-> -machine-$(CONFIG_ARCH_MX3)		:= imx
-> +machine-$(CONFIG_ARCH_IMX_V6_V7)	:= imx
->  machine-$(CONFIG_ARCH_MX5)		:= mx5
-> -machine-$(CONFIG_ARCH_MX6)		:= imx
->  machine-$(CONFIG_ARCH_MXS)		:= mxs
->  machine-$(CONFIG_ARCH_NETX)		:= netx
->  machine-$(CONFIG_ARCH_NOMADIK)		:= nomadik
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 3852f45..27355cb 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -74,6 +74,7 @@ config SOC_IMX31
->  	select ARCH_MXC_AUDMUX_V2
->  	select ARCH_MX31
->  	select MXC_AVIC
-> +	select SMP_ON_UP if SMP
->  
->  config SOC_IMX35
->  	bool
-> @@ -83,6 +84,7 @@ config SOC_IMX35
->  	select HAVE_EPIT
->  	select ARCH_MX35
->  	select MXC_AVIC
-> +	select SMP_ON_UP if SMP
->  
->  
->  if ARCH_IMX_V4_V5
-> @@ -351,7 +353,7 @@ config MACH_IMX27IPCAM
->  
->  endif
->  
-> -if ARCH_MX3
-> +if ARCH_IMX_V6_V7
->  
->  comment "MX31 platforms:"
->  
-> @@ -601,9 +603,6 @@ config MACH_VPR200
->  	  Include support for VPR200 platform. This includes specific
->  	  configurations for the board and its peripherals.
->  
-> -endif
-> -
-> -if ARCH_MX6
->  comment "i.MX6 family:"
->  
->  config SOC_IMX6Q
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index aa1cf0c..b9dffe5 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -66,6 +66,7 @@ obj-$(CONFIG_DEBUG_LL) += lluart.o
->  obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
->  obj-$(CONFIG_HAVE_IMX_MMDC) += mmdc.o
->  obj-$(CONFIG_HAVE_IMX_SRC) += src.o
-> +AFLAGS_head-v7.o :=-Wa,-march=armv7-a
->  obj-$(CONFIG_CPU_V7) += head-v7.o
->  obj-$(CONFIG_SMP) += platsmp.o
->  obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index c3ce146..9ab5be0 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -819,10 +819,10 @@ config CACHE_FEROCEON_L2_WRITETHROUGH
->  config CACHE_L2X0
->  	bool "Enable the L2x0 outer cache controller"
->  	depends on REALVIEW_EB_ARM11MP || MACH_REALVIEW_PB11MP || MACH_REALVIEW_PB1176 || \
-> -		   REALVIEW_EB_A9MP || SOC_IMX35 || SOC_IMX31 || MACH_REALVIEW_PBX || \
-> +		   REALVIEW_EB_A9MP || ARCH_IMX_V6_V7 || MACH_REALVIEW_PBX || \
->  		   ARCH_NOMADIK || ARCH_OMAP4 || ARCH_EXYNOS4 || ARCH_TEGRA || \
->  		   ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || ARCH_SHMOBILE || \
-> -		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX || ARCH_MX6
-> +		   ARCH_PRIMA2 || ARCH_ZYNQ || ARCH_CNS3XXX
->  	default y
->  	select OUTER_CACHE
->  	select OUTER_CACHE_SYNC
-> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> index 82b0d92..43efc3c 100644
-> --- a/arch/arm/plat-mxc/Kconfig
-> +++ b/arch/arm/plat-mxc/Kconfig
-> @@ -16,10 +16,13 @@ config ARCH_IMX_V4_V5
->  	  This enables support for systems based on the Freescale i.MX ARMv4
->  	  and ARMv5 SoCs
->  
-> -config ARCH_MX3
-> -	bool "MX3-based"
+Hi,
 
-Then the following ARCH_MX3 references need to be removed properly.
-I will take care of them.
+2011/9/28 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> [Cc: += linux-kbuild at v.k.o + Michal Marek]
+>
+> Hello,
+>
+> On Tue, Sep 27, 2011 at 06:03:13PM -0400, Paul Gortmaker wrote:
+>> On 11-09-26 02:26 AM, Uwe Kleine-K?nig wrote:
+>> > This is needed after commit
+>> >
+>> > ? ? include: replace linux/module.h with "struct module" wherever possible
+>> >
+>> > (currently 25215aa in next).
+>> >
+>> > Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
+>> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> > ---
+>> > Hello,
+>> >
+>> > maybe it's sensible for Paul to take that before his commit?
+>>
+>> Thanks, I'll blend it into the commit adding module.h to the other
+>> drivers/dma files. ?It seems the imx boards don't have a defconfig
+>> in the arch/arm/configs that enables this (CONFIG_IMX_[S]DMA).
+>>
+>> What is really interesting (at least to me anyway) is that I
+>> didn't get one iMX build in some 6000+ ARM randconfig builds....
+>>
+>> I would have thought it would have showed up at least a couple
+>> times, given that number of builds. ?Maybe randconfig doesn't
+>> deal so well with "choice" Kconfig items?
+>>
+>> ~/git/module.h/linux-2.6.git$ ls -1 ../build-10*arm |wc -l
+>> 6399
+>> ~/git/module.h/linux-2.6.git$ grep CONFIG_ARCH_[A-Z0-9]*=y ../build-10*arm*/.config | sed 's/.*CON/CON/'|sort |uniq
+>> CONFIG_ARCH_EBSA110=y
+>> CONFIG_ARCH_H7201=y
+>> CONFIG_ARCH_H7202=y
+>> CONFIG_ARCH_H720X=y
+>> CONFIG_ARCH_VERSATILE=y
+>
+> I don't understand why you did that sed, but AFAICT it doesn't hurt,
+> too. Maybe adding -c to uniq in your command line is interesting for the
+> kbuild people?!
+>
+this can be reproduced trivially:
 
-  arch/arm/mach-imx/Makefile.boot:17:zreladdr-$(CONFIG_ARCH_MX3)  += 0x80008000
-  arch/arm/mach-imx/Makefile.boot:18:params_phys-$(CONFIG_ARCH_MX3)       := 0x80000100
-  arch/arm/mach-imx/Makefile.boot:19:initrd_phys-$(CONFIG_ARCH_MX3)       := 0x80800000
-  arch/arm/plat-mxc/Kconfig:9:    default ARCH_MX3
-  arch/arm/plat-mxc/include/mach/memory.h:25:# if defined CONFIG_ARCH_MX3
+for i in $(seq 1 100); do
+    make ARCH=arm randconfig
+    sed -e '/CONFIG_ARCH_INTEGRATOR/,/CONFIG_ARCH_ZYNQ/!d;' \
+        -e '/=y/!d' .config >> arch_selected
+done
+sort arch_selected | uniq -c
 
-Regards,
-Shawn
+I may have a trivial explanation for part of the symbol, which depends
+on MMU, so if these symbols are selected, but MMU is not, it will
+fall-back on the default, VERSATILE, which should happen 50% of the
+time. However, there is plenty of symbols which have no specific
+dependency, and are still not selected.
 
-> +config ARCH_IMX_V6_V7
-> +	bool "i.MX3, i.MX6"
-> +	select AUTO_ZRELADDR
-> +	select ARM_PATCH_PHYS_VIRT
->  	help
-> -	  This enables support for systems based on the Freescale i.MX3 family
-> +	  This enables support for systems based on the Freescale i.MX3 and i.MX6
-> +	  family.
->  
->  config ARCH_MX5
->  	bool "i.MX50, i.MX51, i.MX53"
-> @@ -29,11 +32,6 @@ config ARCH_MX5
->  	  This enables support for machines using Freescale's i.MX50 and i.MX51
->  	  processors.
->  
-> -config ARCH_MX6
-> -	bool "i.MX6"
-> -	help
-> -	  This enables support for systems based on the Freescale i.MX6 family
-> -
->  endchoice
->  
->  source "arch/arm/mach-imx/Kconfig"
-> -- 
+On the other side, all the result of a randconfig, on the choice alone
+(ie. without any 'select' and any other symbols) is spread
+"correctly".
+
+Taken as a whole:
+
+% cat arch_selected | sort | uniq -c | wc -l
+     3
+
+% cat arch_selected | sort | uniq -c
+      2 CONFIG_ARCH_EBSA110=y
+      4 CONFIG_ARCH_H720X=y
+    100 CONFIG_ARCH_VERSATILE=y
+
+However, when the choice is alone:
+
+% cat arch_selected | sort | uniq -c | wc -l
+     39
+
+>> ~/git/module.h/linux-2.6.git$
+>>
+>> No ARCH_MXC, no ARCH_MXS, PXA, or any of the other 20+ variants.
+>> Definitely not a random spread there, with all 6000 builds falling
+>> in just 5 buckets.
+> How did you test? Generate a .config, test without your change and if
+> that succeeds test with it? If so, maybe the problem isn't that
+> randconfig doesn't generate more random configs but that you got many
+> failures in the first run?!
+>
+it would seem that taken globally, the result of this particular
+choice is not random, but I'm not sure of the dynamic involved
+precisely.
+
+I'm not a huge fan of the way randconfig works presently, that it by
+just iterating over all symbols and setting a value . I'd prefer to
+keep traversing all the menu, picking a random value for
+user-changeable setting, over and over until all symbol have been
+chosen. However, this is a whole lots of change...
+
+ - Arnaud
+
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | Uwe Kleine-K?nig ? ? ? ? ? ?|
+> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
