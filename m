@@ -1,35 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Sep 2011 07:23:06 +0200
-Subject: [PATCH 1/3] mmc: mmci: Put power register deviations in variant
-	data
-In-Reply-To: <1317123725-29832-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1317123725-29832-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdZoXmQiUJbLkzgTkRnjukS18RvcZASXzZshnuDSQDE1aQ@mail.gmail.com>
+Date: Wed, 28 Sep 2011 07:25:49 +0200
+Subject: [PATCH 2/3] mmc: mmci: Provide option to configure bus signal
+	direction
+In-Reply-To: <1317123738-29867-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1317123738-29867-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdbUO96VerVShwWfd99245T90JcEGcO0PXCy80PLPLygQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Sep 27, 2011 at 1:42 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 4da20ec..32de82b 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -53,6 +53,7 @@ static unsigned int fmax = 515633;
-> ?* @st_clkdiv: true if using a ST-specific clock divider algorithm
-> ?* @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
-> ?* @non_power_of_2_blksize: true if block sizes can be other than power of two
-> + * @pwrreg_powerup: power up value for MMCIPOWER register
-> ?*/
-> ?struct variant_data {
-> ? ? ? ?unsigned int ? ? ? ? ? ?clkreg;
-> @@ -64,18 +65,21 @@ struct variant_data {
-> ? ? ? ?bool ? ? ? ? ? ? ? ? ? ?st_clkdiv;
-> ? ? ? ?bool ? ? ? ? ? ? ? ? ? ?blksz_datactrl16;
-> ? ? ? ?bool ? ? ? ? ? ? ? ? ? ?non_power_of_2_blksize;
-> + ? ? ? unsigned int ? ? ? ? ? ?pwrreg_powerup;
+> @@ -30,6 +43,8 @@ struct dma_chan;
+> ?* @cd_invert: true if the gpio_cd pin value is active low
+> ?* @capabilities: the capabilities of the block as implemented in
+> ?* this platform, signify anything MMC_CAP_* from mmc/host.h
+> + * @sigdir: a bit field indicating for what bits in the MMC bus the host
+> + * should enable signal direction indication.
+> ?* @dma_filter: function used to select an appropriate RX and TX
+> ?* DMA channel to be used for DMA, if and only if you're deploying the
+> ?* generic DMA engine
+> @@ -52,6 +67,7 @@ struct mmci_platform_data {
+> ? ? ? ?int ? ? gpio_cd;
+> ? ? ? ?bool ? ?cd_invert;
+> ? ? ? ?unsigned long capabilities;
+> + ? ? ? unsigned int sigdir;
 
-This should probably be u32, no big deal but easy to fix.
-Can be done when putting it into Russells patch tracker I guess.
+u32 again, no big deal. Can be fixed when submitting it to the patch tracker.
+Acked-by.
 
 Yours,
 Linus Walleij
