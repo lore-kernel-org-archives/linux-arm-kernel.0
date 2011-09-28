@@ -1,39 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 28 Sep 2011 14:48:12 -0700
-Subject: [PATCH 0/4] Few omap fixes for review
-Message-ID: <20110928214707.29263.58095.stgit@kaulin.local>
+Date: Wed, 28 Sep 2011 14:48:19 -0700
+Subject: [PATCH 2/4] ARM: OMAP: Fix i2c init for twl4030
+In-Reply-To: <20110928214707.29263.58095.stgit@kaulin.local>
+References: <20110928214707.29263.58095.stgit@kaulin.local>
+Message-ID: <20110928214819.29263.83936.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Looks like 2600 kHz rate does not work reliably on 2430,
+so just use the 100 kHz rate.
 
-Here are some omap fixes for review. Only the first two would
-be nice to get into v3.1 during the -rc cycle.
+Otherwise the system often fails to boot properly with:
 
-Regards,
+omap_i2c omap_i2c.2: timeout waiting for bus ready
+omap_i2c omap_i2c.2: timeout waiting for bus ready
+twl: i2c_write failed to transfer all messages
+omap_i2c omap_i2c.2: timeout waiting for bus ready
+twl: i2c_write failed to transfer all messages
+omap_i2c omap_i2c.2: timeout waiting for bus ready
+twl: i2c_write failed to transfer all messages
+twl: clock init err [-110]
+omap_i2c omap_i2c.2: timeout waiting for bus ready
+twl: i2c_write failed to transfer all messages
+TWL4030 Unable to unlock IDCODE registers --110
 
-Tony
-
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
-
-Bjarne Steinsbo (1):
-      ARM: OMAP4: Keyboard: Fix section mismatch in the board file
-
-Bryan Buckley (1):
-      ARM: OMAP4: MMC: fix power and audio issue, decouple USBC1 from MMC1
-
-Tapani Utriainen (1):
-      ARM: OMAP: irq: loop counter fix in omap_init_irq()
-
-Tony Lindgren (1):
-      ARM: OMAP: Fix i2c init for twl4030
-
-
  arch/arm/mach-omap2/board-2430sdp.c |    3 ++-
- arch/arm/mach-omap2/board-4430sdp.c |    2 +-
- arch/arm/mach-omap2/hsmmc.c         |   12 ++++--------
- arch/arm/mach-omap2/irq.c           |    4 ++--
- 4 files changed, 9 insertions(+), 12 deletions(-)
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
--- 
-Signature
+diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+index 2028464..f79b7d2 100644
+--- a/arch/arm/mach-omap2/board-2430sdp.c
++++ b/arch/arm/mach-omap2/board-2430sdp.c
+@@ -193,7 +193,8 @@ static int __init omap2430_i2c_init(void)
+ {
+ 	omap_register_i2c_bus(1, 100, sdp2430_i2c1_boardinfo,
+ 			ARRAY_SIZE(sdp2430_i2c1_boardinfo));
+-	omap2_pmic_init("twl4030", &sdp2430_twldata);
++	omap_pmic_init(2, 100, "twl4030", INT_24XX_SYS_NIRQ,
++			&sdp2430_twldata);
+ 	return 0;
+ }
+ 
