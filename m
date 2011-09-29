@@ -1,136 +1,48 @@
 From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Thu, 29 Sep 2011 18:13:59 +0300
-Subject: [PATCH 1/2] arm: orion5x: use native hex2bin()
-Message-ID: <05721ba890447cd2f40d24bd70b133fe8750b969.1317309052.git.andriy.shevchenko@linux.intel.com>
+Date: Thu, 29 Sep 2011 18:14:00 +0300
+Subject: [PATCH 2/2] arm: orion5x: print mac address with %pM
+In-Reply-To: <05721ba890447cd2f40d24bd70b133fe8750b969.1317309052.git.andriy.shevchenko@linux.intel.com>
+References: <05721ba890447cd2f40d24bd70b133fe8750b969.1317309052.git.andriy.shevchenko@linux.intel.com>
+Message-ID: <c7d9af28cdf5834ed8a7f0dcbd064a7fa9bbaabc.1317309052.git.andriy.shevchenko@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Cc: Nicolas Pitre <nico@fluxnic.net>
 ---
- arch/arm/mach-orion5x/dns323-setup.c |   40 ++-------------------------------
- arch/arm/mach-orion5x/tsx09-common.c |   35 ++---------------------------
- 2 files changed, 6 insertions(+), 69 deletions(-)
+ arch/arm/mach-orion5x/dns323-setup.c |    5 ++---
+ arch/arm/mach-orion5x/tsx09-common.c |    4 +---
+ 2 files changed, 3 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
-index 343f60e..c95166e 100644
+index c95166e..09b8ed2 100644
 --- a/arch/arm/mach-orion5x/dns323-setup.c
 +++ b/arch/arm/mach-orion5x/dns323-setup.c
-@@ -172,37 +172,6 @@ static struct mv643xx_eth_platform_data dns323_eth_data = {
- 	.phy_addr = MV643XX_ETH_PHY_ADDR(8),
- };
- 
--/* dns323_parse_hex_*() taken from tsx09-common.c; should a common copy of these
-- * functions be kept somewhere?
-- */
--static int __init dns323_parse_hex_nibble(char n)
--{
--	if (n >= '0' && n <= '9')
--		return n - '0';
--
--	if (n >= 'A' && n <= 'F')
--		return n - 'A' + 10;
--
--	if (n >= 'a' && n <= 'f')
--		return n - 'a' + 10;
--
--	return -1;
--}
--
--static int __init dns323_parse_hex_byte(const char *b)
--{
--	int hi;
--	int lo;
--
--	hi = dns323_parse_hex_nibble(b[0]);
--	lo = dns323_parse_hex_nibble(b[1]);
--
--	if (hi < 0 || lo < 0)
--		return -1;
--
--	return (hi << 4) | lo;
--}
--
- static int __init dns323_read_mac_addr(void)
- {
- 	u_int8_t addr[6];
-@@ -224,14 +193,11 @@ static int __init dns323_read_mac_addr(void)
- 	}
- 
- 	for (i = 0; i < 6; i++)	{
--		int byte;
-+		int rc;
- 
--		byte = dns323_parse_hex_byte(mac_page + (i * 3));
--		if (byte < 0) {
-+	        rc = hex2bin(&addr[i], mac_page + (i * 3), 1);
-+		if (rc < 0)
- 			goto error_fail;
--		}
--
--		addr[i] = byte;
+@@ -201,9 +201,8 @@ static int __init dns323_read_mac_addr(void)
  	}
  
  	iounmap(mac_page);
+-	printk("DNS-323: Found ethernet MAC address: ");
+-	for (i = 0; i < 6; i++)
+-		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
++
++	printk("DNS-323: Found ethernet MAC address: %pM.\n", addr);
+ 
+ 	memcpy(dns323_eth_data.mac_addr, addr, 6);
+ 
 diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
-index c9abb8f..e65b528f 100644
+index e65b528f..c1aef01 100644
 --- a/arch/arm/mach-orion5x/tsx09-common.c
 +++ b/arch/arm/mach-orion5x/tsx09-common.c
-@@ -52,41 +52,13 @@ struct mv643xx_eth_platform_data qnap_tsx09_eth_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
- };
- 
--static int __init qnap_tsx09_parse_hex_nibble(char n)
--{
--	if (n >= '0' && n <= '9')
--		return n - '0';
--
--	if (n >= 'A' && n <= 'F')
--		return n - 'A' + 10;
--
--	if (n >= 'a' && n <= 'f')
--		return n - 'a' + 10;
--
--	return -1;
--}
--
--static int __init qnap_tsx09_parse_hex_byte(const char *b)
--{
--	int hi;
--	int lo;
--
--	hi = qnap_tsx09_parse_hex_nibble(b[0]);
--	lo = qnap_tsx09_parse_hex_nibble(b[1]);
--
--	if (hi < 0 || lo < 0)
--		return -1;
--
--	return (hi << 4) | lo;
--}
--
- static int __init qnap_tsx09_check_mac_addr(const char *addr_str)
- {
- 	u_int8_t addr[6];
- 	int i;
- 
- 	for (i = 0; i < 6; i++) {
--		int byte;
-+		int rc;
- 
- 		/*
- 		 * Enforce "xx:xx:xx:xx:xx:xx\n" format.
-@@ -94,10 +66,9 @@ static int __init qnap_tsx09_check_mac_addr(const char *addr_str)
- 		if (addr_str[(i * 3) + 2] != ((i < 5) ? ':' : '\n'))
+@@ -71,9 +71,7 @@ static int __init qnap_tsx09_check_mac_addr(const char *addr_str)
  			return -1;
- 
--		byte = qnap_tsx09_parse_hex_byte(addr_str + (i * 3));
--		if (byte < 0)
-+		rc = hex2bin(&addr[i], addr_str + (i * 3), 1);
-+		if (rc < 0)
- 			return -1;
--		addr[i] = byte;
  	}
  
- 	printk(KERN_INFO "tsx09: found ethernet mac address ");
+-	printk(KERN_INFO "tsx09: found ethernet mac address ");
+-	for (i = 0; i < 6; i++)
+-		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
++	printk(KERN_INFO "tsx09: found ethernet mac address %pM.\n", addr);
+ 
+ 	memcpy(qnap_tsx09_eth_data.mac_addr, addr, 6);
+ 
 -- 
 1.7.6.3
