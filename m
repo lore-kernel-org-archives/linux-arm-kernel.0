@@ -1,30 +1,89 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Sep 2011 09:56:34 +0100
-Subject: Perf support for OMAP4
-In-Reply-To: <CACVXFVPxVQmAGmbhCH6KSogeQC3EcCseoApNABfmqWmGePpoOA@mail.gmail.com>
-References: <20110928155437.GA18202@e102144-lin.cambridge.arm.com>
-	<CACVXFVPxVQmAGmbhCH6KSogeQC3EcCseoApNABfmqWmGePpoOA@mail.gmail.com>
-Message-ID: <20110929085634.GA25061@e102144-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 29 Sep 2011 10:59:36 +0200
+Subject: [PATCH 4/6] arm/imx: remove cpu_is_xxx() from arch_idle()
+In-Reply-To: <1317201368-6403-5-git-send-email-shawn.guo@linaro.org>
+References: <1317201368-6403-1-git-send-email-shawn.guo@linaro.org>
+	<1317201368-6403-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110929085936.GD31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 08:20:53AM +0100, Ming Lei wrote:
-> Hi,
+On Wed, Sep 28, 2011 at 05:16:06PM +0800, Shawn Guo wrote:
+> This patch adds an idle hook imx_idle to be called in arch_idle().
+> Any soc that needs a customized idle implementation other than
+> cpu_do_idle() can set up this hook in soc specific call.
 > 
-> On Wed, Sep 28, 2011 at 11:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi Tom,
-> >
-> > I can't see your OMAP4 Perf/PMU patches from here:
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2011-March/045283.html
-> >
-> > in mainline or next.
-> >
-> > Are you still pushing these or did you get blocked awaiting feedback?
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/mach-imx/mm-imx3.c             |   30 ++++++++++++++++++++++++++
+>  arch/arm/mach-mx5/mm.c                  |    6 +++++
+>  arch/arm/mach-mx5/pm-imx5.c             |    3 +-
+>  arch/arm/plat-mxc/include/mach/common.h |    2 +
+>  arch/arm/plat-mxc/include/mach/system.h |   35 ++----------------------------
+>  arch/arm/plat-mxc/system.c              |    2 +
+>  6 files changed, 45 insertions(+), 33 deletions(-)
 > 
-> OK, I will rebase the patch against -next tree and resend it later.
 
-Ok. Note that there are some substantial changes to the ARM perf and PMU
-code that are in Russell's devel-stable branch but don't appear in -next.
+I had to fold the following into this commit, otherwise we end
+up with:
 
-Will
+In file included from arch/arm/mach-mx5/pm-imx5.c:17:0:arch/arm/plat-mxc/include/mach/common.h:77:33: warning: 'enum mxc_cpu_pwr_mode' declared inside parameter list
+arch/arm/plat-mxc/include/mach/common.h:77:33: warning: its scope is only this definition or declaration, which is probably not what you want
+
+Sascha
+
+diff --git a/arch/arm/mach-mx5/system.c b/arch/arm/mach-mx5/system.c
+index 76ae8dc..144ebeb 100644
+--- a/arch/arm/mach-mx5/system.c
++++ b/arch/arm/mach-mx5/system.c
+@@ -13,6 +13,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <mach/hardware.h>
++#include <mach/common.h>
+ #include "crm_regs.h"
+ 
+ /* set cpu low power mode before WFI instruction. This function is called
+diff --git a/arch/arm/plat-mxc/include/mach/common.h b/arch/arm/plat-mxc/include/mach/common.h
+index 2b298d8..afaa967 100644
+--- a/arch/arm/plat-mxc/include/mach/common.h
++++ b/arch/arm/plat-mxc/include/mach/common.h
+@@ -72,6 +72,15 @@ extern void mxc_arch_reset_init(void __iomem *);
+ extern void mx51_efikamx_reset(void);
+ extern int mx53_revision(void);
+ extern int mx53_display_revision(void);
++
++enum mxc_cpu_pwr_mode {
++	WAIT_CLOCKED,		/* wfi only */
++	WAIT_UNCLOCKED,		/* WAIT */
++	WAIT_UNCLOCKED_POWER_OFF,	/* WAIT + SRPG */
++	STOP_POWER_ON,		/* just STOP */
++	STOP_POWER_OFF,		/* STOP + SRPG */
++};
++
+ extern void mx5_cpu_lp_set(enum mxc_cpu_pwr_mode mode);
+ extern void (*imx_idle)(void);
+ #endif
+diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
+index 0987923..00a7819 100644
+--- a/arch/arm/plat-mxc/include/mach/mxc.h
++++ b/arch/arm/plat-mxc/include/mach/mxc.h
+@@ -183,13 +183,6 @@ struct cpu_op {
+ };
+ 
+ int tzic_enable_wake(int is_idle);
+-enum mxc_cpu_pwr_mode {
+-	WAIT_CLOCKED,		/* wfi only */
+-	WAIT_UNCLOCKED,		/* WAIT */
+-	WAIT_UNCLOCKED_POWER_OFF,	/* WAIT + SRPG */
+-	STOP_POWER_ON,		/* just STOP */
+-	STOP_POWER_OFF,		/* STOP + SRPG */
+-};
+ 
+ extern struct cpu_op *(*get_cpu_op)(int *op);
+ #endif
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
