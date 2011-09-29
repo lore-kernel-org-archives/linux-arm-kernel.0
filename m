@@ -1,38 +1,46 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 29 Sep 2011 23:07:56 +0800
-Subject: [PATCH v2] ARM: cache-l2x0: add resume entry for l2 in secure mode
-In-Reply-To: <CAGsJ_4zKRbBn0bmA+B=xYOt9ts=3c79zvkatkfGA4bb-=OqUyw@mail.gmail.com>
-References: <1317007569-31213-1-git-send-email-Baohua.Song@csr.com>
-	<20110929135744.GI19318@S2100-06.ap.freescale.net>
-	<CAGsJ_4zKRbBn0bmA+B=xYOt9ts=3c79zvkatkfGA4bb-=OqUyw@mail.gmail.com>
-Message-ID: <20110929150755.GN19318@S2100-06.ap.freescale.net>
+From: zdevai@gmail.com (Zoltan Devai)
+Date: Thu, 29 Sep 2011 17:03:34 +0200
+Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
+In-Reply-To: <1317206507-18867-3-git-send-email-jamie@jamieiles.com>
+References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
+	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
+Message-ID: <CAGVye5O492Ev1Zz_8tTZKo16K+FALZ6Oo3TgyuzPuf7RYVyBzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 10:55:29PM +0800, Barry Song wrote:
-> Hi Shawn,
-> 
-> 2011/9/29 Shawn Guo <shawn.guo@freescale.com>:
-> > On Sun, Sep 25, 2011 at 08:26:09PM -0700, Barry Song wrote:
-> >> we save the l2x0 registers at the first initialization, and platform codes
-> >> can get them to restore l2x0 status after wakeup.
-> >>
-> >> Cc: Shawn Guo <shawn.guo@linaro.org>
-> >> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> >> ---
-> >
-> > Barry,
-> >
-> > You may want to fix those checkpatch error and warnings in v3.
-> 
-> Thanks. i will.
-> since people have basically agreen about what should be fixed and what
-> should not be, i'd like to send v3 tomorrow. you might help to test on
-> imx6q as well.
-> 
-Sure.
+2011/9/28 Jamie Iles <jamie@jamieiles.com>:
+> Add a handler for the VIC that is suitable for MULTI_IRQ_HANDLER
+> platforms. ?This can replace the ASM entry macros for platforms that use
+> the VIC.
+>
+> v2: ? ? - allow the handler be used for !CONFIG_OF
+> ? ? ? ?- use irq_domain_to_irq()
+>
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> ---
+> ?arch/arm/common/vic.c ? ? ? ? ? ? ? | ? 29 +++++++++++++++++++++++++++++
+> ?arch/arm/include/asm/hardware/vic.h | ? ?4 ++++
+> ?2 files changed, 33 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+> index 3f9c8f2..71adced 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
 
--- 
-Regards,
-Shawn
+> +asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
+> +{
+> + ? ? ? int i;
+> +
+> + ? ? ? for (i = 0; i < vic_id; ++i)
+> + ? ? ? ? ? ? ? vic_single_handle_irq(&vic_devices[i], regs);
+> +}
+> +#endif /* CONFIG_MULTI_IRQ_HANDLER */
+
+__exception_irq_entry doesn't compile with CONFIG_FUNCTION_GRAPH_TRACER enabled.
+Either this file, or arch/arm/include/asm/system.h needs an #include
+<linux/ftrace.h>
+
+Cheers,
+Zoltan
