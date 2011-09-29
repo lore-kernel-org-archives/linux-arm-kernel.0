@@ -1,81 +1,115 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 29 Sep 2011 12:25:29 -0500
-Subject: [PATCH 12/13] arm/dts: omap3-beagle: Add twl4030 and i2c EEPROM
-In-Reply-To: <1317055821-20652-13-git-send-email-b-cousson@ti.com>
-References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
-	<1317055821-20652-13-git-send-email-b-cousson@ti.com>
-Message-ID: <20110929172529.GE6800@ponder.secretlab.ca>
+Date: Thu, 29 Sep 2011 11:55:07 -0500
+Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
+In-Reply-To: <20110929093009.GM17204@pulham.picochip.com>
+References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
+	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
+	<20110928203905.GB2838@ponder.secretlab.ca>
+	<CACRpkdZKns-GraGp-YMD6jzOPETkvEpt9bC8HcYUmf3JUyCV3A@mail.gmail.com>
+	<20110929093009.GM17204@pulham.picochip.com>
+Message-ID: <20110929165507.GB6800@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2011 at 06:50:20PM +0200, Benoit Cousson wrote:
-> Add required clock frequencies for the i2c client devices existing
-> on beagle board.
+On Thu, Sep 29, 2011 at 10:30:09AM +0100, Jamie Iles wrote:
+> On Thu, Sep 29, 2011 at 08:55:08AM +0200, Linus Walleij wrote:
+> > On Wed, Sep 28, 2011 at 10:39 PM, Grant Likely
+> > <grant.likely@secretlab.ca> wrote:
+> > 
+> > > Why isn't it simply written this way:
+> > >
+> > > ? ? ? ?stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+> > > ? ? ? ?while (stat) {
+> > > ? ? ? ? ? ? ? ?irq = fls(stat) - 1;
+> > > ? ? ? ? ? ? ? ?handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
+> > > ? ? ? ? ? ? ? ?stat &= ~(1 << irq);
+> > > ? ? ? ?}
+> > 
+> > That is indeed closer to the assembly loop most platforms have
+> > implemented.
+> > 
+> > Jamie can you test this approach? And also use ffs() insteadof
+> > fls()...
 > 
-> Add the twl4030 basic description with only the twl_rtc module.
+> OK, here it is (and it works)!  That does make it a lot simpler, thanks 
+> guys!  I've updated the vic-dt branch in my repo too.
 > 
-> Add the EEPROM node.
+> Jamie
 > 
-> Based on original patch from Manju:
-> http://www.spinics.net/lists/linux-omap/msg55831.html
+> 8<------
+> From: Jamie Iles <jamie@jamieiles.com>
+> Subject: [PATCHv3] ARM: vic: MULTI_IRQ_HANDLER handler
 > 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: G, Manjunath Kondaiah <manjugk@ti.com>
+> Add a handler for the VIC that is suitable for MULTI_IRQ_HANDLER
+> platforms.  This can replace the ASM entry macros for platforms that use
+> the VIC.
+> 
+> v3:	- simplify irq handling loop as suggested by Grant
+> 	- service interrupts from msb->lsb order
+> v2:	- allow the handler be used for !CONFIG_OF
+> 	- use irq_domain_to_irq()
+> 
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
 > ---
->  arch/arm/boot/dts/omap3-beagle.dts |   38 ++++++++++++++++++++++++++++++++++++
->  1 files changed, 38 insertions(+), 0 deletions(-)
+>  arch/arm/common/vic.c               |   22 ++++++++++++++++++++++
+>  arch/arm/include/asm/hardware/vic.h |    4 ++++
+>  2 files changed, 26 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index 9486be6..a65f39d 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -27,3 +27,41 @@
->  		reg = <0x80000000 0x20000000>; /* 512 MB */
->  	};
->  };
+> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+> index 3f9c8f2..b22b83d 100644
+> --- a/arch/arm/common/vic.c
+> +++ b/arch/arm/common/vic.c
+> @@ -427,3 +427,25 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+>  	return -EIO;
+>  }
+>  #endif /* CONFIG OF */
 > +
-> +&i2c1 {
-> +	clock-frequency = <2600000>;
+> +#ifdef CONFIG_MULTI_IRQ_HANDLER
+> +static void vic_single_handle_irq(struct vic_device *vic, struct pt_regs *regs)
+> +{
+> +	u32 stat, irq;
 > +
-> +	/*
-> +	 * Integrated Power Management Chip
-> +	 */
-> +	twl at 48 {
-> +		compatible = "ti,twl4030";
-> +		reg = <0x48>;
-> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		interrupt-parent = <&intc>;
+> +	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
+> +	while (stat) {
+> +		irq = ffs(stat) - 1;
+> +		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
+> +		stat &= ~(1 << irq);
+> +	}
+> +}
 > +
-> +		twl_rtc {
-
-Nit: use the generic names recommended practise for node names (in
-this case, simply 'rtc' sounds appropriate, and don't use underscores
-(it's not forbidden, just doesn't match the style.
-
-> +			compatible = "ti,twl4030-rtc";
-> +			interrupts = <11>;
-> +		};
-> +	};
-> +};
+> +asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
+> +{
+> +	int i;
 > +
-> +&i2c2 {
-> +	clock-frequency = <400000>;
-> +};
+> +	for (i = 0; i < vic_id; ++i)
+> +		vic_single_handle_irq(&vic_devices[i], regs);
+> +}
+> +#endif /* CONFIG_MULTI_IRQ_HANDLER */
+> diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
+> index 0135215..c02fd6f 100644
+> --- a/arch/arm/include/asm/hardware/vic.h
+> +++ b/arch/arm/include/asm/hardware/vic.h
+> @@ -45,11 +45,15 @@
+>  #include <linux/types.h>
+>  
+>  struct device_node;
+> +struct pt_regs;
 > +
-> +&i2c3 {
-> +	clock-frequency = <100000>;
+>  void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
+>  
+>  #ifdef CONFIG_OF
+>  int vic_of_init(struct device_node *node, struct device_node *parent);
+>  #endif /* CONFIG_OF */
+>  
+> +void vic_handle_irq(struct pt_regs *regs);
 > +
-> +	/*
-> +	 * Display monitor features are burnt in the EEPROM
-> +	 * as EDID data.
-> +	 */
-> +	eeprom at 50 {
-> +		compatible = "ti,eeprom";
-> +		reg = <0x50>;
-> +	};
-> +};
+>  #endif /* __ASSEMBLY__ */
+>  #endif
 > -- 
-> 1.7.0.4
+> 1.7.4.1
 > 
