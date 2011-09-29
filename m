@@ -1,27 +1,27 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Thu, 29 Sep 2011 15:20:53 +0800
-Subject: Perf support for OMAP4
-In-Reply-To: <20110928155437.GA18202@e102144-lin.cambridge.arm.com>
-References: <20110928155437.GA18202@e102144-lin.cambridge.arm.com>
-Message-ID: <CACVXFVPxVQmAGmbhCH6KSogeQC3EcCseoApNABfmqWmGePpoOA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 29 Sep 2011 16:24:22 +0900
+Subject: [PATCH 0/2] ARM: EXYNOS4: Add support for MCT PPI
+Message-ID: <008e01cc7e78$cf8e8160$6eab8420$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch is required to support upcoming Samsung SoCs.
 
-On Wed, Sep 28, 2011 at 11:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Tom,
->
-> I can't see your OMAP4 Perf/PMU patches from here:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-March/045283.html
->
-> in mainline or next.
->
-> Are you still pushing these or did you get blocked awaiting feedback?
+Current MCT can support only SPI for local timers but upcoming EXYNOS SoCs
+doesn't have SPI for local timers.
 
-OK, I will rebase the patch against -next tree and resend it later.
+NOTE:
+This patches will not work with Marc Zyngier's "ARM: gic: consolidate
+PPI handling". It means if his patch is applied, this should be dropped
+and re-worked.
 
-thanks,
--- 
-Ming Lei
+[PATCH 1/2] ARM: EXYNOS4: Add support PPI in external GIC
+[PATCH 2/2] ARM: EXYNOS4: Add support MCT PPI for EXYNOS4212
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
