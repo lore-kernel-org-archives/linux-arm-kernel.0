@@ -1,39 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Sep 2011 10:21:03 +0100
-Subject: [PATCHv2 2/2] ARM: debug: Move DEBUG_ICEDCC into the DEBUG_LL
-	choice
-In-Reply-To: <4E83D25C.6020306@codeaurora.org>
-References: <1316568208-4518-1-git-send-email-sboyd@codeaurora.org>
-	<1316568208-4518-2-git-send-email-sboyd@codeaurora.org>
-	<4E83D25C.6020306@codeaurora.org>
-Message-ID: <20110929092102.GB25061@e102144-lin.cambridge.arm.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 29 Sep 2011 10:21:49 +0100
+Subject: [PATCH 0/2] GIC OF bindings
+In-Reply-To: <1317268436-1613-1-git-send-email-robherring2@gmail.com>
+References: <1317268436-1613-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20110929092149.GL17204@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 03:05:16AM +0100, Stephen Boyd wrote:
-> On 09/20/11 18:23, Stephen Boyd wrote:
-> > DEBUG_ICEDCC support is just another DEBUG_LL choice and
-> > selecting it along with other DEBUG_LL options doesn't make
-> > much sense. Put it into the DEBUG_LL choice to avoid confusion.
-> >
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >
+On Wed, Sep 28, 2011 at 10:53:54PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Chatting with David Brown made me realize that this patch now forces
-> ICEDCC for anybody who selects DEBUG_LL and hasn't moved to adding a
-> Kconfig in the choice menu. I'm not sure if that actually matters since
-> it may be incentive to put your machine of choice into this menu.
+> With recent patches for VIC device tree support and GIC MULTI_IRQ support,
+> it is evident that the irq domain support should be moved into the core GIC
+> code and not be dependent on the DT initialization. So I've split things up
+> into 2 patches separating irq_domain and device-tree code.
 > 
-> Otherwise, we may want to drop this until a later point, or just leave
-> it out of the choice menu altogether.
+> This should only change the internals of the GIC code. The binding is
+> unchanged from the previous version. Yeah!
+> 
+> The full series is available here. This includes Russell's devel-stable and
+> for-next branches and Nico's vmalloc branch.
 
-Given that the ICEDCC stuff shouldn't cause any other problems by having it
-enabled (that is, your kernel should still boot) then we should be alright
-leaving this as-is while platforms move over to the new scheme.
+Looks good to me!
 
-However, if we get attacked by the United Army of Enraged Platform Maintainers
-wanting to use earlyprintk, then I'm hiding behind you :)
-
-Will
+Reviewed-by: Jamie Iles <jamie@jamieiles.com>
