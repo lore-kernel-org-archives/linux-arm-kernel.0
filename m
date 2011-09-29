@@ -1,103 +1,189 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 29 Sep 2011 23:15:57 +0800
-Subject: [PATCH v2] PM: HIBERNATION: add resume_wait param to support MMC-like
-	devices as resume file
-Message-ID: <1317309357-3871-1-git-send-email-21cnbao@gmail.com>
+From: haojian.zhuang@marvell.com (Haojian Zhuang)
+Date: Thu, 29 Sep 2011 23:19:02 +0800
+Subject: [PATCH 1/5] ARM: pxa: remove redundant macro on GPIO
+In-Reply-To: <2011092901>
+References: <2011092901>
+Message-ID: <1317309546-19682-1-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <baohua.song@csr.com>
+Both GPLRx and GPLR(x) are provided. GPLRx means register GPLR0/1/...
+GPLR(x) means register GPLR0/1/... and x ranges from 0 to the maximum
+bit number.
 
-Some devices like mmc are async detected very slow. For example,
-drivers/mmc/host/sdhci.c launchs a 200ms delayed work to detect
-mmc partitions then add disk.
+Remove GPLRx since it's redundant.
 
-we do have wait_for_device_probe and scsi_complete_async_scans
-before calling swsusp_check, but it is not enough to wait mmc.
-
-This patch adds resumewait kernel param just like rootwait so
-that we have enough time to wait mmc ready. The differene is
-here we wait for resume partition but rootwait waits for rootfs
-partition.
-
-This patch will make swsusp support many embedded products
-without scsi devices but devices like mmc.
-
-This was tested on one ARM platform with Frank Hofmann's patch.
-
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Reviewed-by: Valdis Kletnieks <valdis.kletnieks@vt.edu>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- -v2:
- add document for the resumewait kernel parameter
+ arch/arm/mach-pxa/corgi_pm.c          |    5 ++-
+ arch/arm/mach-pxa/include/mach/gpio.h |   60 ++++----------------------------
+ arch/arm/mach-pxa/irq.c               |   17 +++++----
+ arch/arm/mach-pxa/spitz_pm.c          |    3 +-
+ 4 files changed, 22 insertions(+), 63 deletions(-)
 
- Documentation/kernel-parameters.txt |    4 ++++
- kernel/power/hibernate.c            |   16 ++++++++++++++++
- 2 files changed, 20 insertions(+), 0 deletions(-)
-
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 614d038..2aed0d2 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -2237,6 +2237,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			in <PAGE_SIZE> units (needed only for swap files).
- 			See  Documentation/power/swsusp-and-swap-files.txt
+diff --git a/arch/arm/mach-pxa/corgi_pm.c b/arch/arm/mach-pxa/corgi_pm.c
+index 2903477..1a7a4c0 100644
+--- a/arch/arm/mach-pxa/corgi_pm.c
++++ b/arch/arm/mach-pxa/corgi_pm.c
+@@ -90,7 +90,7 @@ static int corgi_should_wakeup(unsigned int resume_on_alarm)
+ {
+ 	int is_resume = 0;
  
-+	resumewait	[HIBERNATION] Wait (indefinitely) for resume device to show up.
-+			Useful for devices that are detected asynchronously
-+			(e.g. USB and MMC devices).
-+
- 	hibernate=	[HIBERNATION]
- 		noresume	Don't check if there's a hibernation image
- 				present during boot.
-diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-index 8f7b1db..9f4b4f3 100644
---- a/kernel/power/hibernate.c
-+++ b/kernel/power/hibernate.c
-@@ -14,6 +14,7 @@
- #include <linux/reboot.h>
- #include <linux/string.h>
- #include <linux/device.h>
-+#include <linux/async.h>
- #include <linux/kmod.h>
- #include <linux/delay.h>
- #include <linux/fs.h>
-@@ -31,6 +32,7 @@
+-	dev_dbg(sharpsl_pm.dev, "GPLR0 = %x,%x\n", GPLR0, PEDR);
++	dev_dbg(sharpsl_pm.dev, "GPLR0 = %x,%x\n", GPLR(0), PEDR);
  
- static int nocompress = 0;
- static int noresume = 0;
-+static int resume_wait = 0;
- static char resume_file[256] = CONFIG_PM_STD_PARTITION;
- dev_t swsusp_resume_device;
- sector_t swsusp_resume_block;
-@@ -732,6 +734,13 @@ static int software_resume(void)
- 		 * to wait for this to finish.
- 		 */
- 		wait_for_device_probe();
-+
-+		if (resume_wait) {
-+			while ((swsusp_resume_device = name_to_dev_t(resume_file)) == 0)
-+				msleep(10);
-+			async_synchronize_full();
-+		}
-+
- 		/*
- 		 * We can't depend on SCSI devices being available after loading
- 		 * one of their modules until scsi_complete_async_scans() is
-@@ -1060,7 +1069,14 @@ static int __init noresume_setup(char *str)
- 	return 1;
+ 	if ((PEDR & GPIO_bit(CORGI_GPIO_AC_IN))) {
+ 		if (sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_ACIN)) {
+@@ -124,7 +124,8 @@ static int corgi_should_wakeup(unsigned int resume_on_alarm)
+ 
+ static unsigned long corgi_charger_wakeup(void)
+ {
+-	return ~GPLR0 & ( GPIO_bit(CORGI_GPIO_AC_IN) | GPIO_bit(CORGI_GPIO_KEY_INT) | GPIO_bit(CORGI_GPIO_WAKEUP) );
++	return ~GPLR(CORGI_GPIO_AC_IN) & ( GPIO_bit(CORGI_GPIO_AC_IN)
++		| GPIO_bit(CORGI_GPIO_KEY_INT) | GPIO_bit(CORGI_GPIO_WAKEUP) );
  }
  
-+static int __init resumewait_setup(char *str)
-+{
-+	resume_wait = 1;
-+	return 1;
-+}
-+
- __setup("noresume", noresume_setup);
- __setup("resume_offset=", resume_offset_setup);
- __setup("resume=", resume_setup);
- __setup("hibernate=", hibernate_setup);
-+__setup("resumewait", resumewait_setup);
+ unsigned long corgipm_read_devdata(int type)
+diff --git a/arch/arm/mach-pxa/include/mach/gpio.h b/arch/arm/mach-pxa/include/mach/gpio.h
+index c463950..1b77c11 100644
+--- a/arch/arm/mach-pxa/include/mach/gpio.h
++++ b/arch/arm/mach-pxa/include/mach/gpio.h
+@@ -33,69 +33,25 @@
+ #define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+ #define GPIO_REG(x)	(*(volatile u32 *)(GPIO_REGS_VIRT + (x)))
+ 
+-/* GPIO Pin Level Registers */
+-#define GPLR0		GPIO_REG(BANK_OFF(0) + 0x00)
+-#define GPLR1		GPIO_REG(BANK_OFF(1) + 0x00)
+-#define GPLR2		GPIO_REG(BANK_OFF(2) + 0x00)
+-#define GPLR3		GPIO_REG(BANK_OFF(3) + 0x00)
+-
+-/* GPIO Pin Direction Registers */
+-#define GPDR0		GPIO_REG(BANK_OFF(0) + 0x0c)
+-#define GPDR1		GPIO_REG(BANK_OFF(1) + 0x0c)
+-#define GPDR2		GPIO_REG(BANK_OFF(2) + 0x0c)
+-#define GPDR3		GPIO_REG(BANK_OFF(3) + 0x0c)
+-
+-/* GPIO Pin Output Set Registers */
+-#define GPSR0		GPIO_REG(BANK_OFF(0) + 0x18)
+-#define GPSR1		GPIO_REG(BANK_OFF(1) + 0x18)
+-#define GPSR2		GPIO_REG(BANK_OFF(2) + 0x18)
+-#define GPSR3		GPIO_REG(BANK_OFF(3) + 0x18)
+-
+-/* GPIO Pin Output Clear Registers */
+-#define GPCR0		GPIO_REG(BANK_OFF(0) + 0x24)
+-#define GPCR1		GPIO_REG(BANK_OFF(1) + 0x24)
+-#define GPCR2		GPIO_REG(BANK_OFF(2) + 0x24)
+-#define GPCR3		GPIO_REG(BANK_OFF(3) + 0x24)
+-
+-/* GPIO Rising Edge Detect Registers */
+-#define GRER0		GPIO_REG(BANK_OFF(0) + 0x30)
+-#define GRER1		GPIO_REG(BANK_OFF(1) + 0x30)
+-#define GRER2		GPIO_REG(BANK_OFF(2) + 0x30)
+-#define GRER3		GPIO_REG(BANK_OFF(3) + 0x30)
+-
+-/* GPIO Falling Edge Detect Registers */
+-#define GFER0		GPIO_REG(BANK_OFF(0) + 0x3c)
+-#define GFER1		GPIO_REG(BANK_OFF(1) + 0x3c)
+-#define GFER2		GPIO_REG(BANK_OFF(2) + 0x3c)
+-#define GFER3		GPIO_REG(BANK_OFF(3) + 0x3c)
+-
+-/* GPIO Edge Detect Status Registers */
+-#define GEDR0		GPIO_REG(BANK_OFF(0) + 0x48)
+-#define GEDR1		GPIO_REG(BANK_OFF(1) + 0x48)
+-#define GEDR2		GPIO_REG(BANK_OFF(2) + 0x48)
+-#define GEDR3		GPIO_REG(BANK_OFF(3) + 0x48)
+-
+-/* GPIO Alternate Function Select Registers */
+-#define GAFR0_L		GPIO_REG(0x0054)
+-#define GAFR0_U		GPIO_REG(0x0058)
+-#define GAFR1_L		GPIO_REG(0x005C)
+-#define GAFR1_U		GPIO_REG(0x0060)
+-#define GAFR2_L		GPIO_REG(0x0064)
+-#define GAFR2_U		GPIO_REG(0x0068)
+-#define GAFR3_L		GPIO_REG(0x006C)
+-#define GAFR3_U		GPIO_REG(0x0070)
+-
+ /* More handy macros.  The argument is a literal GPIO number. */
+ 
+ #define GPIO_bit(x)	(1 << ((x) & 0x1f))
+ 
++/* GPIO Pin Level Registers */
+ #define GPLR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x00)
++/* GPIO Pin Direction Registers */
+ #define GPDR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x0c)
++/* GPIO Pin Output Set Registers */
+ #define GPSR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x18)
++/* GPIO Pin Output Clear Registers */
+ #define GPCR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x24)
++/* GPIO Rising Edge Detect Registers */
+ #define GRER(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x30)
++/* GPIO Falling Edge Detect Registers */
+ #define GFER(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x3c)
++/* GPIO Edge Detect Status Registers */
+ #define GEDR(x)		GPIO_REG(BANK_OFF((x) >> 5) + 0x48)
++/* GPIO Alternate Function Select Registers */
+ #define GAFR(x)		GPIO_REG(0x54 + (((x) & 0x70) >> 2))
+ 
+ 
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index dafb4bf..b569e70 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -103,21 +103,22 @@ static int pxa_set_low_gpio_type(struct irq_data *d, unsigned int type)
+ 	}
+ 
+ 	if (type & IRQ_TYPE_EDGE_RISING)
+-		GRER0 |= GPIO_bit(gpio);
++		GRER(gpio) |= GPIO_bit(gpio);
+ 	else
+-		GRER0 &= ~GPIO_bit(gpio);
++		GRER(gpio) &= ~GPIO_bit(gpio);
+ 
+ 	if (type & IRQ_TYPE_EDGE_FALLING)
+-		GFER0 |= GPIO_bit(gpio);
++		GFER(gpio) |= GPIO_bit(gpio);
+ 	else
+-		GFER0 &= ~GPIO_bit(gpio);
++		GFER(gpio) &= ~GPIO_bit(gpio);
+ 
+ 	return 0;
+ }
+ 
+ static void pxa_ack_low_gpio(struct irq_data *d)
+ {
+-	GEDR0 = (1 << (d->irq - IRQ_GPIO0));
++	int gpio = d->irq - IRQ_GPIO0;
++	GEDR(gpio) = 1 << gpio;
+ }
+ 
+ static struct irq_chip pxa_low_gpio_chip = {
+@@ -163,9 +164,9 @@ static void __init pxa_init_low_gpio_irq(set_wake_t fn)
+ 	int irq;
+ 
+ 	/* clear edge detection on GPIO 0 and 1 */
+-	GFER0 &= ~0x3;
+-	GRER0 &= ~0x3;
+-	GEDR0 = 0x3;
++	GFER(0) &= ~0x3;
++	GRER(0) &= ~0x3;
++	GEDR(0) = 0x3;
+ 
+ 	for (irq = IRQ_GPIO0; irq <= IRQ_GPIO1; irq++) {
+ 		irq_set_chip_and_handler(irq, &pxa_low_gpio_chip,
+diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
+index 094279a..d5295b7 100644
+--- a/arch/arm/mach-pxa/spitz_pm.c
++++ b/arch/arm/mach-pxa/spitz_pm.c
+@@ -169,7 +169,8 @@ static int spitz_should_wakeup(unsigned int resume_on_alarm)
+ 
+ static unsigned long spitz_charger_wakeup(void)
+ {
+-	return (~GPLR0 & GPIO_bit(SPITZ_GPIO_KEY_INT)) | (GPLR0 & GPIO_bit(SPITZ_GPIO_SYNC));
++	return (~GPLR(SPITZ_GPIO_KEY_INT) & GPIO_bit(SPITZ_GPIO_KEY_INT))
++		| (GPLR(SPITZ_GPIO_SYNC) & GPIO_bit(SPITZ_GPIO_SYNC));
+ }
+ 
+ unsigned long spitzpm_read_devdata(int type)
 -- 
-1.7.0.4
+1.7.2.5
