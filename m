@@ -1,49 +1,31 @@
 From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 29 Sep 2011 16:13:02 +0100
-Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
-In-Reply-To: <CAGVye5O492Ev1Zz_8tTZKo16K+FALZ6Oo3TgyuzPuf7RYVyBzQ@mail.gmail.com>
-References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
-	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
-	<CAGVye5O492Ev1Zz_8tTZKo16K+FALZ6Oo3TgyuzPuf7RYVyBzQ@mail.gmail.com>
-Message-ID: <20110929151302.GR17204@pulham.picochip.com>
+Date: Thu, 29 Sep 2011 16:13:22 +0100
+Subject: [PATCH] Add missing include of linux/ftrace.h
+Message-ID: <1317309202-1001-1-git-send-email-jamie@jamieiles.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 05:03:34PM +0200, Zoltan Devai wrote:
-> 2011/9/28 Jamie Iles <jamie@jamieiles.com>:
-> > Add a handler for the VIC that is suitable for MULTI_IRQ_HANDLER
-> > platforms. ?This can replace the ASM entry macros for platforms that use
-> > the VIC.
-> >
-> > v2: ? ? - allow the handler be used for !CONFIG_OF
-> > ? ? ? ?- use irq_domain_to_irq()
-> >
-> > Cc: Rob Herring <robherring2@gmail.com>
-> > Cc: Grant Likely <grant.likely@secretlab.ca>
-> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
-> > ---
-> > ?arch/arm/common/vic.c ? ? ? ? ? ? ? | ? 29 +++++++++++++++++++++++++++++
-> > ?arch/arm/include/asm/hardware/vic.h | ? ?4 ++++
-> > ?2 files changed, 33 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> > index 3f9c8f2..71adced 100644
-> > --- a/arch/arm/common/vic.c
-> > +++ b/arch/arm/common/vic.c
-> 
-> > +asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
-> > +{
-> > + ? ? ? int i;
-> > +
-> > + ? ? ? for (i = 0; i < vic_id; ++i)
-> > + ? ? ? ? ? ? ? vic_single_handle_irq(&vic_devices[i], regs);
-> > +}
-> > +#endif /* CONFIG_MULTI_IRQ_HANDLER */
-> 
-> __exception_irq_entry doesn't compile with CONFIG_FUNCTION_GRAPH_TRACER enabled.
-> Either this file, or arch/arm/include/asm/system.h needs an #include
-> <linux/ftrace.h>
+__exception_irq_entry uses __irq_entry which is defined in
+linux/ftrace.h.
 
-Thanks Zoltan, I'm just sending a patch now!
+Reported-by: Zoltan Devai <zdevai@gmail.com>
+Cc: Rabin Vincent <rabin@rab.in>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
+ arch/arm/include/asm/system.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Jamie
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+index 832888d..129e5e5 100644
+--- a/arch/arm/include/asm/system.h
++++ b/arch/arm/include/asm/system.h
+@@ -59,6 +59,7 @@
+ 
+ #include <linux/linkage.h>
+ #include <linux/irqflags.h>
++#include <linux/ftrace.h>
+ 
+ #include <asm/outercache.h>
+ 
+-- 
+1.7.4.1
