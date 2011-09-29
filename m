@@ -1,66 +1,92 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 29 Sep 2011 13:19:54 -0400 (EDT)
-Subject: Git pull request: mach/vmalloc.h removal,
-	and ioremap optimizations
-In-Reply-To: <4E8495D9.2030009@gmail.com>
-References: <alpine.LFD.2.00.1109230908410.12663@xanadu.home>
-	<4E8495D9.2030009@gmail.com>
-Message-ID: <alpine.LFD.2.02.1109291302450.9106@xanadu.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 29 Sep 2011 10:22:42 -0700
+Subject: [PATCHv2 2/2] ARM: debug: Move DEBUG_ICEDCC into the DEBUG_LL
+	choice
+In-Reply-To: <20110929103939.GD25061@e102144-lin.cambridge.arm.com>
+References: <1316568208-4518-1-git-send-email-sboyd@codeaurora.org>
+	<1316568208-4518-2-git-send-email-sboyd@codeaurora.org>
+	<4E83D25C.6020306@codeaurora.org>
+	<20110929092102.GB25061@e102144-lin.cambridge.arm.com>
+	<20110929094243.GC25061@e102144-lin.cambridge.arm.com>
+	<20110929094602.GH23944@n2100.arm.linux.org.uk>
+	<20110929103939.GD25061@e102144-lin.cambridge.arm.com>
+Message-ID: <4E84A962.9030806@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Sep 2011, Rob Herring wrote:
+On 09/29/11 03:39, Will Deacon wrote:
+> Hi Russell,
+>
+> On Thu, Sep 29, 2011 at 10:46:02AM +0100, Russell King - ARM Linux wrote:
+>> On Thu, Sep 29, 2011 at 10:42:43AM +0100, Will Deacon wrote:
+>>> Bah, just took this for a spin on my Realview-PBX (Cortex-A9) platform and
+>>> the board won't boot unless I have a hardware debugger enabled that can
+>>> service the comms channel. This contradicts the Kconfig text which says:
+>>>
+>>> 	  It does include a timeout to ensure that the system does not
+>>> 	  totally freeze when there is nothing connected to read.
+>>>
+>>> so we certainly need to fix something!
+>> One of the problems you'll encounter is that there's places where we
+>> don't have any timer infrastructure (eg, decompressor) and software
+>> timing loops won't work (they'll be too slow for the lower-end CPUs
+>> and too fast for the upper-end CPUs.)
+> Agreed, software timing loops are the only option and it's impossible to get
+> them right everywhere. I think the Kconfig help text should be updated so
+> that the timeout paragraph is removed.
 
-> Nicolas,
-> 
-> On 09/23/2011 08:32 AM, Nicolas Pitre wrote:
-> > Russell, please pull
-> > 
-> > 	git://git.linaro.org/people/nico/linux vmalloc
-> > 
-> > This patch series removes all instances of mach/vmalloc.h in order to
-> > have a more unified memory map across all ARM architectures.  To do so,
-> > the static mappings are moved inside the vmalloc area.  And finally this
-> > allows for a generic optimization to ioremap where static mappings are
-> > reused whenever possible, using common code instead of having this
-> > duplicated in a couple places.
-> 
-> I've found that this breaks on versatile (ab and pb) under QEMU. The
-> commit causing it is:
-> 
-> commit e0438e2f333005c217a2f65aacab23a39261c64c
-> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date:   Thu Aug 25 00:35:59 2011 -0400
-> 
->     ARM: move iotable mappings within the vmalloc region
-> 
->     In order to remove the build time variation between different SOCs with
->     regards to VMALLOC_END, the iotable mappings are now allocated inside
->     the vmalloc region.  This allows for VMALLOC_END to be identical across
->     all machines.
-> 
->     The value for VMALLOC_END is now set to 0xff000000 which is right where
->     the consistent DMA area starts.
-> 
->     To accommodate all static mappings on machines with possible highmem
-> usage,
->     the default vmalloc area size is changed to 240 MB so that VMALLOC_START
->     is no higher than 0xf0000000 by default in that case.
-> 
->     Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> 
-> It dies after "Data cache writeback" with BUG at vmalloc.c:1139.
+Yes if you wait a long time the timeout for each character will expire
+and the execution will continue.
 
-Interesting.  Looks like Versatile might have overlapping map_desc 
-entries.
+>
+>> The best fix is probably to leave that as-is, but introduce a 'default'
+>> output entry instead - so platforms which don't have any listed will
+>> get that instead of the ICEDDC stuff.
+[...]
+> ----8<----
+>
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 32b1be4..bfdf86b 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -81,6 +81,14 @@ choice
+>         prompt "Kernel low-level debugging port"
+>         depends on DEBUG_LL
+>  
+> +       config DEBUG_LL_UART_NONE
+> +               bool "No low-level debugging UART"
 
-Could you add the following line at the top of vm_area_add_early() in 
-mm/vmalloc.c to display the area being added:
+Should this grow a long list of platforms that are in this choice menu?
+For example:
 
-  printk("%s: called with addr=%p size=0x%lx\n", __func__, vm->addr, vm->size);
+    depends on !FOOTBRIDGE && !ARCH_CLPS711X && ...
 
-This should help determine which entry is wrong.
+> +               help
+> +                 Say Y here if your platform doesn't provide a UART option
+> +                 below. This relies on your platform choosing the right UART
+> +                 definition internally in order for low-level debugging to
+> +                 work.
+> +
+>         config DEBUG_ICEDCC
+>                 bool "Kernel low-level debugging via EmbeddedICE DCC channel"
+>                 help
+> @@ -89,8 +97,8 @@ choice
+>                   co-processor 14. This is known to work on the ARM9 style ICE
+>                   channel and on the XScale with the PEEDI.
+>  
+> -                 It does include a timeout to ensure that the system does not
+> -                 totally freeze when there is nothing connected to read.
+> +                 Note that this may cause the system to hang during boot if
+> +                 there is nothing to read from the DCC.
+>  
+>         config DEBUG_FOOTBRIDGE_COM1
+>                 bool "Kernel low-level debugging messages via footbridge 8250 at PCI COM1"
+>
 
+Otherwise
 
-Nicolas
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
