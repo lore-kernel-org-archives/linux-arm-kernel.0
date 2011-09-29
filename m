@@ -1,47 +1,29 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 29 Sep 2011 21:30:28 +0200 (CEST)
-Subject: YCbCr 422 on s3c2440
-In-Reply-To: <loom.20110929T160147-550@post.gmane.org>
-References: <loom.20110929T160147-550@post.gmane.org>
-Message-ID: <Pine.LNX.4.64.1109292127370.2405@axis700.grange>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 29 Sep 2011 22:12:08 +0200 (CEST)
+Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
+	online/active
+In-Reply-To: <009101cc7e7b$1ebece00$5c3c6a00$%kim@samsung.com>
+References: <20110908215314.829452535@linutronix.de>
+	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
+	<20110913133258.GA6267@n2100.arm.linux.org.uk>
+	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+	<20110913175312.GB6267@n2100.arm.linux.org.uk>
+	<20110923084001.GP17169@n2100.arm.linux.org.uk>
+	<009101cc7e7b$1ebece00$5c3c6a00$%kim@samsung.com>
+Message-ID: <alpine.LFD.2.02.1109292211060.2711@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forwarding to the suitable list, although, I don't think s3c24xx SoCs are 
-currently supported by V4L.
+On Thu, 29 Sep 2011, Kukjin Kim wrote:
+> Russell King - ARM Linux wrote:
+> But as Amit said, current EXYNOS4 SoCs which are using SPI for local timers
+> has problem that the irq_set_affinity() method is called in
+> percpu_timer_setup() before CPU1 becomes online with the commit
+> 5dfc54e087c15f823ee9b6541d2f0f314e69cbed ("ARM: GIC: avoid routing
+> interrupts to offline CPUs"). So I will check again.
 
-Thanks
-Guennadi
+Why is a per cpu interrupt having an irq_set_affinity() function at all?
+ 
+Thanks,
 
-On Thu, 29 Sep 2011, GIGIN JOSE wrote:
-
-> Hi, 
-> 
-> I am working on s3c2440 ARM linux platform. I am connecting 
-> an image sensor device to the camera controller of the s3c2440 
-> ARM processor. The image sensor outputs YCbCr 4:2:2 output. 
-> Can I pass the output of this format to the preview path of 
-> the camera controller to get proper image ? 
-> 
-> The image sensor also outputs RGB565 format, which I can 
-> comfortably view using the preview path. But I would like 
-> to get the YCbCr 4:2:2 format from the image sensor device. 
-> 
-> Is this possible with the preview path ? Any other register
->  settings are required for YCbCr 4:2:2 mode on the preview 
-> path, other than that done for the RGB565 format. ?
-> 
-> Thank You
-> GIGIN  
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+	tglx
