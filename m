@@ -1,88 +1,24 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Thu, 29 Sep 2011 02:29:08 -0700
-Subject: [PATCH] PM: HIBERNATION: add resume_wait param to support MMC-like
-	devices as resume file
-Message-ID: <1317288548-19560-1-git-send-email-Barry.Song@csr.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Sep 2011 10:29:51 +0100
+Subject: [PATCH v5 2/3] arm/tegra: add support for ventana pinmuxing
+In-Reply-To: <1317248978-10829-3-git-send-email-pdeschrijver@nvidia.com>
+References: <1317248978-10829-1-git-send-email-pdeschrijver@nvidia.com>
+	<1317248978-10829-3-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20110929092951.GE23944@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <baohua.song@csr.com>
+On Thu, Sep 29, 2011 at 01:29:35AM +0300, Peter De Schrijver wrote:
+> diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+> index f11b910..91a07e1 100644
+> --- a/arch/arm/mach-tegra/Makefile
+> +++ b/arch/arm/mach-tegra/Makefile
+> @@ -31,6 +31,7 @@ obj-${CONFIG_MACH_SEABOARD}             += board-seaboard-pinmux.o
+>  
+>  obj-${CONFIG_MACH_TEGRA_DT}             += board-dt.o
+>  obj-${CONFIG_MACH_TEGRA_DT}             += board-harmony-pinmux.o
+> +obj-${CONFIG_MACH_TEGRA_DT}             += board-seaboard-pinmux.o
 
-Some devices like mmc are async detected very slow. For example,
-drivers/mmc/host/sdhci.c launchs a 200ms delayed work to detect
-mmc partitions then add disk.
-
-we do have wait_for_device_probe and scsi_complete_async_scans
-before calling swsusp_check, but it is not enough to wait mmc.
-
-This patch adds resumewait kernel param just like rootwait so
-that we have enough time to wait mmc ready. The differene is
-here we wait for resume partition but rootwait waits for rootfs
-partition.
-
-This patch will make swsusp support many embedded products
-without scsi devices but devices like mmc.
-
-This was tested on one ARM platform with Frank Hofmann's patch.
-
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- kernel/power/hibernate.c |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
-
-diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-index 8f7b1db..9f4b4f3 100644
---- a/kernel/power/hibernate.c
-+++ b/kernel/power/hibernate.c
-@@ -14,6 +14,7 @@
- #include <linux/reboot.h>
- #include <linux/string.h>
- #include <linux/device.h>
-+#include <linux/async.h>
- #include <linux/kmod.h>
- #include <linux/delay.h>
- #include <linux/fs.h>
-@@ -31,6 +32,7 @@
- 
- static int nocompress = 0;
- static int noresume = 0;
-+static int resume_wait = 0;
- static char resume_file[256] = CONFIG_PM_STD_PARTITION;
- dev_t swsusp_resume_device;
- sector_t swsusp_resume_block;
-@@ -732,6 +734,13 @@ static int software_resume(void)
- 		 * to wait for this to finish.
- 		 */
- 		wait_for_device_probe();
-+
-+		if (resume_wait) {
-+			while ((swsusp_resume_device = name_to_dev_t(resume_file)) == 0)
-+				msleep(10);
-+			async_synchronize_full();
-+		}
-+
- 		/*
- 		 * We can't depend on SCSI devices being available after loading
- 		 * one of their modules until scsi_complete_async_scans() is
-@@ -1060,7 +1069,14 @@ static int __init noresume_setup(char *str)
- 	return 1;
- }
- 
-+static int __init resumewait_setup(char *str)
-+{
-+	resume_wait = 1;
-+	return 1;
-+}
-+
- __setup("noresume", noresume_setup);
- __setup("resume_offset=", resume_offset_setup);
- __setup("resume=", resume_setup);
- __setup("hibernate=", hibernate_setup);
-+__setup("resumewait", resumewait_setup);
--- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Since when did Tegra start using braces instead of parens in its Makefile?
+I note some of Tegra's makefile is using braces and some of it parens.
+What's the reason for this alternative style to the rest of kbuild?
