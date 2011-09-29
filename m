@@ -1,32 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 28 Sep 2011 19:05:16 -0700
-Subject: [PATCHv2 2/2] ARM: debug: Move DEBUG_ICEDCC into the DEBUG_LL
-	choice
-In-Reply-To: <1316568208-4518-2-git-send-email-sboyd@codeaurora.org>
-References: <1316568208-4518-1-git-send-email-sboyd@codeaurora.org>
-	<1316568208-4518-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <4E83D25C.6020306@codeaurora.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 28 Sep 2011 20:44:22 -0600 (MDT)
+Subject: [PATCH v2 1/6] OMAP4: Add missing clock divider for OCP_ABE_ICLK
+In-Reply-To: <1316195249-14914-1-git-send-email-jon-hunter@ti.com>
+References: <1316195249-14914-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <alpine.DEB.2.00.1109282042220.19233@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/11 18:23, Stephen Boyd wrote:
-> DEBUG_ICEDCC support is just another DEBUG_LL choice and
-> selecting it along with other DEBUG_LL options doesn't make
-> much sense. Put it into the DEBUG_LL choice to avoid confusion.
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
->
+On Fri, 16 Sep 2011, Jon Hunter wrote:
 
-Chatting with David Brown made me realize that this patch now forces
-ICEDCC for anybody who selects DEBUG_LL and hasn't moved to adding a
-Kconfig in the choice menu. I'm not sure if that actually matters since
-it may be incentive to put your machine of choice into this menu.
+> From: Jon Hunter <jon-hunter@ti.com>
+> 
+> The parent clock of the OCP_ABE_ICLK is the AESS_FCLK and the
+> parent clock of the AESS_FCLK is the ABE_FCLK...
+> 
+> ABE_FCLK --> AESS_FCLK --> OCP_ABE_ICLK
+> 
+> The AESS_FCLK and OCP_ABE_ICLK clocks both have dividers which
+> determine their operational frequency. However, the dividers for
+> the AESS_FCLK and OCP_ABE_ICLK are controlled via a single bit,
+> which is the CM1_ABE_AESS_CLKCTRL[24] bit. When this bit is set to
+> 0, the AESS_FCLK divider is 1 and the OCP_ABE_ICLK divider is 2.
+> Similarly, when this bit is set to 1, the AESS_FCLK divider is 2
+> and the OCP_ABE_ICLK is 1.
+> 
+> The above relationship between the AESS_FCLK and OCP_ABE_ICLK
+> dividers ensure that the OCP_ABE_ICLK clock is always half the
+> frequency of the ABE_CLK...
+> 
+> OCP_ABE_ICLK = ABE_FCLK/2
+> 
+> The divider for the OCP_ABE_ICLK is currently missing so add a
+> divider that will ensure the OCP_ABE_ICLK frequency is always half
+> the ABE_FCLK frequency.
+> 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
-Otherwise, we may want to drop this until a later point, or just leave
-it out of the choice menu altogether.
+Thanks, queued for 3.2.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+
+- Paul
