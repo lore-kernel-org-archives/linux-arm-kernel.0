@@ -1,21 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Sep 2011 08:58:35 +0100
-Subject: [PATCH] leds-class: change back LEDS_CLASS to tristate instead
-	of bool
-In-Reply-To: <CAK5ve-KoanwFGFJcxGQGmAW0yR+MYR1uVGM5q+=8u_ofHrhwOQ@mail.gmail.com>
-References: <1317113432-7299-1-git-send-email-bryan.wu@canonical.com>
-	<CAK5ve-KoanwFGFJcxGQGmAW0yR+MYR1uVGM5q+=8u_ofHrhwOQ@mail.gmail.com>
-Message-ID: <20110929075835.GA26328@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 29 Sep 2011 17:12:42 +0900
+Subject: [PATCH 0/5] ARM: EXYNOS4: Add support for EXYNOS4412 SoC
+Message-ID: <009301cc7e7f$8fcdfe50$af69faf0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 10:00:58AM +0800, Bryan Wu wrote:
-> Hiya,
-> 
-> Any comments and need I do anything to improve this patch?
+This patch adds support for EXYNOS4412 SoC which integrates a ARM Cortex A9 quad-core.
 
-No idea, I don't remember the original errors which this stuff spat out
-and how they were caused.
+[PATCH 1/5] ARM: EXYNOS4: Add support new EXYNOS4412 SoC
+[PATCH 2/5] ARM: EXYNOS4: Add support clock for EXYNOS4412
+[PATCH 3/5] ARM: EXYNOS4: Add functions for gic interrupt handling
+[PATCH 4/5] ARM: EXYNOS4: Add MCT support for EXYNOS4412
+[PATCH 5/5] ARM: EXYNOS4: Add support SMDK4412 Board
 
-The only thing I care about is that the conversion of the existing ARM
-LEDs support to the NEW_LEDS stuff doesn't cause any breakage.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
