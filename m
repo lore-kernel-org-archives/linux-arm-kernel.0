@@ -1,57 +1,80 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 29 Sep 2011 16:06:02 +0530
-Subject: [PATCH v2] ARM: cache-l2x0: add resume entry for l2 in secure mode
-In-Reply-To: <20110929102213.GB7453@e102568-lin.cambridge.arm.com>
-References: <1317007569-31213-1-git-send-email-Baohua.Song@csr.com>
-	<4E8403BE.9050302@ti.com>
-	<20110929102213.GB7453@e102568-lin.cambridge.arm.com>
-Message-ID: <4E844A12.7050507@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Sep 2011 11:39:39 +0100
+Subject: [PATCHv2 2/2] ARM: debug: Move DEBUG_ICEDCC into the DEBUG_LL
+	choice
+In-Reply-To: <20110929094602.GH23944@n2100.arm.linux.org.uk>
+References: <1316568208-4518-1-git-send-email-sboyd@codeaurora.org>
+	<1316568208-4518-2-git-send-email-sboyd@codeaurora.org>
+	<4E83D25C.6020306@codeaurora.org>
+	<20110929092102.GB25061@e102144-lin.cambridge.arm.com>
+	<20110929094243.GC25061@e102144-lin.cambridge.arm.com>
+	<20110929094602.GH23944@n2100.arm.linux.org.uk>
+Message-ID: <20110929103939.GD25061@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 September 2011 03:52 PM, Lorenzo Pieralisi wrote:
-> On Thu, Sep 29, 2011 at 06:35:58AM +0100, Santosh Shilimkar wrote:
->> Barry,
->>
->> On Monday 26 September 2011 08:56 AM, Barry Song wrote:
->>> we save the l2x0 registers at the first initialization, and platform codes
->>> can get them to restore l2x0 status after wakeup.
->>>
->>> Cc: Shawn Guo <shawn.guo@linaro.org>
->>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->>> ---
-> 
-> [...]
-> 
->>> +
->>> +struct l2x0_regs {
->>> +	unsigned long aux_ctrl;
->>> +	/*
->>> +	 * Whether the following registers need to be saved/restored
->>> +	 * depends on platform
->>> +	 */
->>> +	unsigned long tag_latency;
->>> +	unsigned long data_latency;
->>> +	unsigned long filter_start;
->>> +	unsigned long filter_end;
->>> +};
->>> +
->> You are missing POR register here which is available on
->> PL310 versions. You should add that.
->>
-> 
-> In latest versions there are Prefetch and Power control registers, but
-> it depends on the revision. What should we do in this case Santosh ?
-> PCR is a superset of POR from r3p0 onwards, but Power control ? Leave it
-> to platform code ?
-> 
-Good point Lorenzo.
-C code resume can be fixed by marking the validity based
-on PL310 revision register.
-The asm code restore with MMU OFF code, would be handled
-with platform code with this patch and platform code can choose
-restore of only supported registers.
+Hi Russell,
 
-Regards
-Santosh
+On Thu, Sep 29, 2011 at 10:46:02AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 29, 2011 at 10:42:43AM +0100, Will Deacon wrote:
+> > Bah, just took this for a spin on my Realview-PBX (Cortex-A9) platform and
+> > the board won't boot unless I have a hardware debugger enabled that can
+> > service the comms channel. This contradicts the Kconfig text which says:
+> > 
+> > 	  It does include a timeout to ensure that the system does not
+> > 	  totally freeze when there is nothing connected to read.
+> > 
+> > so we certainly need to fix something!
+> 
+> One of the problems you'll encounter is that there's places where we
+> don't have any timer infrastructure (eg, decompressor) and software
+> timing loops won't work (they'll be too slow for the lower-end CPUs
+> and too fast for the upper-end CPUs.)
+
+Agreed, software timing loops are the only option and it's impossible to get
+them right everywhere. I think the Kconfig help text should be updated so
+that the timeout paragraph is removed.
+
+> The best fix is probably to leave that as-is, but introduce a 'default'
+> output entry instead - so platforms which don't have any listed will
+> get that instead of the ICEDDC stuff.
+
+Ok. Rather than 'default' (which people will probably select in preference
+to choosing the correct UART) how about something like below? I can split
+this into two patches if you prefer.
+
+Will
+
+
+----8<----
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 32b1be4..bfdf86b 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -81,6 +81,14 @@ choice
+        prompt "Kernel low-level debugging port"
+        depends on DEBUG_LL
+ 
++       config DEBUG_LL_UART_NONE
++               bool "No low-level debugging UART"
++               help
++                 Say Y here if your platform doesn't provide a UART option
++                 below. This relies on your platform choosing the right UART
++                 definition internally in order for low-level debugging to
++                 work.
++
+        config DEBUG_ICEDCC
+                bool "Kernel low-level debugging via EmbeddedICE DCC channel"
+                help
+@@ -89,8 +97,8 @@ choice
+                  co-processor 14. This is known to work on the ARM9 style ICE
+                  channel and on the XScale with the PEEDI.
+ 
+-                 It does include a timeout to ensure that the system does not
+-                 totally freeze when there is nothing connected to read.
++                 Note that this may cause the system to hang during boot if
++                 there is nothing to read from the DCC.
+ 
+        config DEBUG_FOOTBRIDGE_COM1
+                bool "Kernel low-level debugging messages via footbridge 8250@PCI COM1"
