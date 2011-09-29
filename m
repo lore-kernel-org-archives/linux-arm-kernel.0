@@ -1,42 +1,32 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 29 Sep 2011 22:27:30 +0800
-Subject: [PATCH v4 3/7] arm/imx: add gic_handle_irq function
-In-Reply-To: <20110929093409.GG23944@n2100.arm.linux.org.uk>
-References: <1317200808-6275-1-git-send-email-shawn.guo@linaro.org>
-	<1317200808-6275-4-git-send-email-shawn.guo@linaro.org>
-	<20110929093409.GG23944@n2100.arm.linux.org.uk>
-Message-ID: <20110929142729.GM19318@S2100-06.ap.freescale.net>
+From: balajitk@ti.com (Balaji T K)
+Date: Thu, 29 Sep 2011 20:15:00 +0530
+Subject: [PATCH 2/2] arm: omap4: hsmmc: configure SDMMC1_DR0 properly
+In-Reply-To: <1317307500-5514-1-git-send-email-balajitk@ti.com>
+References: <1317307500-5514-1-git-send-email-balajitk@ti.com>
+Message-ID: <1317307500-5514-3-git-send-email-balajitk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 10:34:09AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Sep 28, 2011 at 05:06:44PM +0800, Shawn Guo wrote:
-> > +#ifdef CONFIG_SMP
-> > +		else if (irqnr < 16) {
-> > +			writel_relaxed(irqstat, gic_cpu_base_addr +
-> > +						GIC_CPU_EOI);
-> > +			do_IPI(irqnr, regs);
-> > +		}
-> > +#endif
-> > +#ifdef CONFIG_LOCAL_TIMERS
-> > +		else if (irqnr == 29) {
-> > +			writel_relaxed(irqstat, gic_cpu_base_addr +
-> > +						GIC_CPU_EOI);
-> > +			do_local_timer(regs);
-> > +		}
-> > +#endif
-> 
-> As I've said for similar patches. neither of these two functions are
-> designed to be called from another C function (because they're marked
-> __exception or __exception_irq_entry).  Both of these markers tell the
-> unwinder that a struct pt_regs is located directly above the functions
-> stack frame.
-> 
-I'm also wondering the consequence of not doing so, because we are
-seeing icip_handle_irq() and ichp_handle_irq() (arch/arm/mach-pxa/irq.c)
-are doing the same thing, and we are not running into any problem with
-above code.
+Fix the typo, instead it should be SDMMC1
+USBC1 is not related to MMC1 I/Os
 
+Signed-off-by: Balaji T K <balajitk@ti.com>
+---
+ arch/arm/mach-omap2/hsmmc.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index 9cc2eb7..1a9bc52 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -495,7 +495,7 @@ void __init omap2_hsmmc_init(struct omap2_hsmmc_info *controllers)
+ 			OMAP4_SDMMC1_PUSTRENGTH_GRP1_MASK);
+ 		reg &= ~(OMAP4_SDMMC1_PUSTRENGTH_GRP2_MASK |
+ 			OMAP4_SDMMC1_PUSTRENGTH_GRP3_MASK);
+-		reg |= (OMAP4_USBC1_DR0_SPEEDCTRL_MASK|
++		reg |= (OMAP4_SDMMC1_DR0_SPEEDCTRL_MASK |
+ 			OMAP4_SDMMC1_DR1_SPEEDCTRL_MASK |
+ 			OMAP4_SDMMC1_DR2_SPEEDCTRL_MASK);
+ 		omap4_ctrl_pad_writel(reg, control_mmc1);
 -- 
-Regards,
-Shawn
+1.7.0.4
