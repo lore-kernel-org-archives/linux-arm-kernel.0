@@ -1,29 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 29 Sep 2011 22:12:08 +0200 (CEST)
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
-	online/active
-In-Reply-To: <009101cc7e7b$1ebece00$5c3c6a00$%kim@samsung.com>
-References: <20110908215314.829452535@linutronix.de>
-	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-	<20110913133258.GA6267@n2100.arm.linux.org.uk>
-	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
-	<20110913175312.GB6267@n2100.arm.linux.org.uk>
-	<20110923084001.GP17169@n2100.arm.linux.org.uk>
-	<009101cc7e7b$1ebece00$5c3c6a00$%kim@samsung.com>
-Message-ID: <alpine.LFD.2.02.1109292211060.2711@ionos>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 29 Sep 2011 12:30:06 -0500
+Subject: [PATCH v3 2/2] OMAP: omap_device: Add a method to build an
+	omap_device from a DT node
+In-Reply-To: <87fwjgv9sb.fsf@ti.com>
+References: <1316724745-24896-1-git-send-email-b-cousson@ti.com>
+	<1316724745-24896-3-git-send-email-b-cousson@ti.com>
+	<20110927014632.GB20588@ponder.secretlab.ca>
+	<4E81F42B.5070806@ti.com> <4E834748.50908@ti.com>
+	<87fwjgv9sb.fsf@ti.com>
+Message-ID: <20110929173006.GG6800@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Sep 2011, Kukjin Kim wrote:
-> Russell King - ARM Linux wrote:
-> But as Amit said, current EXYNOS4 SoCs which are using SPI for local timers
-> has problem that the irq_set_affinity() method is called in
-> percpu_timer_setup() before CPU1 becomes online with the commit
-> 5dfc54e087c15f823ee9b6541d2f0f314e69cbed ("ARM: GIC: avoid routing
-> interrupts to offline CPUs"). So I will check again.
+On Wed, Sep 28, 2011 at 10:47:32AM -0700, Kevin Hilman wrote:
+> "Cousson, Benoit" <b-cousson@ti.com> writes:
+> 
+> > Hi Grant, Kevin,
+> >
+> > Should I go ahead with this version and repost the series with that
+> > third patch?
+> 
+> Fine with me.
+> 
+> Grant let me know if you prefer if I merge it (with your ack) with the
+> rest of the series or if you want to take it to avoid conflicts.
 
-Why is a per cpu interrupt having an irq_set_affinity() function at all?
- 
-Thanks,
+I'm happy with the way things have gone.  Go ahead and add my Ack and
+merge it through your tree.  I'd like to avoid the conflicts.
 
-	tglx
+g.
