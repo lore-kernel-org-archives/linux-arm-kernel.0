@@ -1,33 +1,21 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Thu, 29 Sep 2011 15:57:55 +0800
-Subject: [PATCH] ARM: pxa/cm-x300: properly set bt_reset pin
-In-Reply-To: <4E7B0E35.5010607@compulab.co.il>
-References: <1316268934.16763.2.camel@phoenix>
-	<4E7B0E35.5010607@compulab.co.il>
-Message-ID: <CAF+7xW=AFmxCmppmt81pzkDbem=LAHdSYtT67yOOzMNPFRpnfA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Sep 2011 08:58:35 +0100
+Subject: [PATCH] leds-class: change back LEDS_CLASS to tristate instead
+	of bool
+In-Reply-To: <CAK5ve-KoanwFGFJcxGQGmAW0yR+MYR1uVGM5q+=8u_ofHrhwOQ@mail.gmail.com>
+References: <1317113432-7299-1-git-send-email-bryan.wu@canonical.com>
+	<CAK5ve-KoanwFGFJcxGQGmAW0yR+MYR1uVGM5q+=8u_ofHrhwOQ@mail.gmail.com>
+Message-ID: <20110929075835.GA26328@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/22 Igor Grinberg <grinberg@compulab.co.il>:
-> Hi Axel,
->
-> On 09/17/11 17:15, Axel Lin wrote:
->> Fix below build warning and properly set bt_reset pin.
->>
->> ? CC ? ? ?arch/arm/mach-pxa/cm-x300.o
->> arch/arm/mach-pxa/cm-x300.c: In function 'cm_x300_init_wi2wi':
->> arch/arm/mach-pxa/cm-x300.c:779: warning: unused variable 'wlan_en'
->> arch/arm/mach-pxa/cm-x300.c:795: warning: 'bt_reset' may be used uninitialized in this function
->
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
->
-> Also, this patch fixes a real regression since
-> 5a009df1f200efa49658b0e9c7ad056d59fbefe4 (ARM: pxa/cm-x300: GPIO cleanup)
-> - Wifi and Bluetooth do not work without it, so please:
->
-> Cc: <stable@kernel.org> [3.0.x]
->
-Hi, Eric,
-Just to pin the status of this patch. I think it should go for 3.1.
-Thanks,
-Axel
+On Thu, Sep 29, 2011 at 10:00:58AM +0800, Bryan Wu wrote:
+> Hiya,
+> 
+> Any comments and need I do anything to improve this patch?
+
+No idea, I don't remember the original errors which this stuff spat out
+and how they were caused.
+
+The only thing I care about is that the conversion of the existing ARM
+LEDs support to the NEW_LEDS stuff doesn't cause any breakage.
