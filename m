@@ -1,52 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Sep 2011 10:24:06 +0100
-Subject: [PATCH v2] ARM: cache-l2x0: add resume entry for l2 in secure mode
-In-Reply-To: <20110929092828.GE19318@S2100-06.ap.freescale.net>
-References: <1317007569-31213-1-git-send-email-Baohua.Song@csr.com>
-	<20110929092828.GE19318@S2100-06.ap.freescale.net>
-Message-ID: <20110929092406.GD23944@n2100.arm.linux.org.uk>
+From: Barry.Song@csr.com (Barry Song)
+Date: Thu, 29 Sep 2011 02:29:08 -0700
+Subject: [PATCH] PM: HIBERNATION: add resume_wait param to support MMC-like
+	devices as resume file
+Message-ID: <1317288548-19560-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 05:28:29PM +0800, Shawn Guo wrote:
-> On Sun, Sep 25, 2011 at 08:26:09PM -0700, Barry Song wrote:
-> > we save the l2x0 registers at the first initialization, and platform codes
-> > can get them to restore l2x0 status after wakeup.
-> > 
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> > ---
-> >  -v2:
-> >  define the structure l2x0_regs to hold all saved registers;
-> >  make saved copy of registers non-static so that platform codes can access them;
-> >  add asm_offset for l2x0 saved regs(l2x0_regs struct) so that asm codes can use
-> > 
-> 
-> I'm trying to migrate imx6q to this infrastructure, but seeing some
-> facts that might stop me from the effort.  Please help me understand
-> these facts are correct.
-> 
-> It seems to me that the only benefit that imx6q gains from the
-> infrastructure is the register saving, and I fail to see any benefit
-> on the restoring.
+From: Barry Song <baohua.song@csr.com>
 
-That's correct - because I believe that's the only part which is worth
-doing in common code.  The restoring tends to be platform dependent so
-I don't see the point of having a bunch of code in common files to do
-that which almost no one uses.
+Some devices like mmc are async detected very slow. For example,
+drivers/mmc/host/sdhci.c launchs a 200ms delayed work to detect
+mmc partitions then add disk.
 
->  * I still have to save physical base of l2x0 for register restoring.
+we do have wait_for_device_probe and scsi_complete_async_scans
+before calling swsusp_check, but it is not enough to wait mmc.
 
-That could be added to the structure.
+This patch adds resumewait kernel param just like rootwait so
+that we have enough time to wait mmc ready. The differene is
+here we wait for resume partition but rootwait waits for rootfs
+partition.
 
->  * I do not have the physical address of l2x0_saved_regs, and I have
->    to manage to get it somehow.
+This patch will make swsusp support many embedded products
+without scsi devices but devices like mmc.
 
-That's true no matter what - we could store the physical address of
-the struct somewhere, but then in order for you to obtain that, you'd
-somehow need to know the physical address of _that_ location too - so
-there's no benefit there.
+This was tested on one ARM platform with Frank Hofmann's patch.
 
-It can be obtained simply by: __pa(l2x0_saved_regs) in C code, and
-saving that in a location known to the platform prior to suspend.
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ kernel/power/hibernate.c |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
+
+diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+index 8f7b1db..9f4b4f3 100644
+--- a/kernel/power/hibernate.c
++++ b/kernel/power/hibernate.c
+@@ -14,6 +14,7 @@
+ #include <linux/reboot.h>
+ #include <linux/string.h>
+ #include <linux/device.h>
++#include <linux/async.h>
+ #include <linux/kmod.h>
+ #include <linux/delay.h>
+ #include <linux/fs.h>
+@@ -31,6 +32,7 @@
+ 
+ static int nocompress = 0;
+ static int noresume = 0;
++static int resume_wait = 0;
+ static char resume_file[256] = CONFIG_PM_STD_PARTITION;
+ dev_t swsusp_resume_device;
+ sector_t swsusp_resume_block;
+@@ -732,6 +734,13 @@ static int software_resume(void)
+ 		 * to wait for this to finish.
+ 		 */
+ 		wait_for_device_probe();
++
++		if (resume_wait) {
++			while ((swsusp_resume_device = name_to_dev_t(resume_file)) == 0)
++				msleep(10);
++			async_synchronize_full();
++		}
++
+ 		/*
+ 		 * We can't depend on SCSI devices being available after loading
+ 		 * one of their modules until scsi_complete_async_scans() is
+@@ -1060,7 +1069,14 @@ static int __init noresume_setup(char *str)
+ 	return 1;
+ }
+ 
++static int __init resumewait_setup(char *str)
++{
++	resume_wait = 1;
++	return 1;
++}
++
+ __setup("noresume", noresume_setup);
+ __setup("resume_offset=", resume_offset_setup);
+ __setup("resume=", resume_setup);
+ __setup("hibernate=", hibernate_setup);
++__setup("resumewait", resumewait_setup);
+-- 
+1.7.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
