@@ -1,34 +1,38 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Thu, 29 Sep 2011 09:52:56 +0530
-Subject: [PATCH V2 1/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
-In-Reply-To: <CAGOxZ535KHUp6An2br0scU9HvCmg4OsnfCj7hWYq4iy+OEpO2Q@mail.gmail.com>
-References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
-	<1317189007-23033-2-git-send-email-alim.akhtar@samsung.com>
-	<4E82D0A1.8050203@st.com>
-	<CAGOxZ53qZy+VUM65oK68W088QR=RgQ=cNxOCbO7_WESJesJaVQ@mail.gmail.com>
-	<4E82EEE1.3020706@st.com>
-	<CAGOxZ535KHUp6An2br0scU9HvCmg4OsnfCj7hWYq4iy+OEpO2Q@mail.gmail.com>
-Message-ID: <4E83F2A0.3090501@st.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 29 Sep 2011 13:17:28 +0800
+Subject: [PATCH 6/6] arm/imx: merge i.MX3 and i.MX6
+In-Reply-To: <20110928121808.GY31404@pengutronix.de>
+References: <1317201368-6403-1-git-send-email-shawn.guo@linaro.org>
+	<1317201368-6403-7-git-send-email-shawn.guo@linaro.org>
+	<20110928121808.GY31404@pengutronix.de>
+Message-ID: <20110929051725.GA19318@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/28/2011 5:24 PM, Alim Akhtar wrote:
-> I did Modified pl08x_cctl_bits(), but for some reason i reverted it back.
-> what i was doing something like returning just __retbits__ instead of
-> retbits |= tsize << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
-> and doing the below for the __non-s3c__ controllers in the
-> pl08x_fill_lli_for_desc().
-> cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
-> pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
+On Wed, Sep 28, 2011 at 02:18:08PM +0200, Sascha Hauer wrote:
+> On Wed, Sep 28, 2011 at 05:16:08PM +0800, Shawn Guo wrote:
+> > 
+> >  
+> > -config ARCH_MX3
+> > -	bool "MX3-based"
+> > +config ARCH_IMX_V6_V7
+> > +	bool "i.MX3, i.MX6"
+> > +	select AUTO_ZRELADDR
+> > +	select ARM_PATCH_PHYS_VIRT
 > 
+> Russell pointed out that it's not a good idea to select this.
+> 
+Yeah, I saw that.  So you would support ZBOOT_ROM over single zImage
+between these two?  I'm not sure how many imx users are actually using
+ZBOOT_ROM.  If there are only very few, we still want to keep the
+default configuration compatible with ZBOOT_ROM?  I think we can move
+the default build to single zImage, and let those limited users sort
+out their own configuration to get ZBOOT_ROM back.  After all, the
+support is still there, and it's just about build configuration
+adjustment.
 
-One way out would be:
-Don't do retbits |= tsize << PL080_CONTROL_TRANSFER_SIZE_SHIFT in
-pl08x_cctl_bits() and do this conditionally in pl08x_fill_lli_for_desc().
-This needs adding tsize argument in fill_lli_**() routine and removing it
-from cctl_bits().
-
-Probably this is what you were mentioning.
+Anyway, it's only my opinion, and the decision is on you plate.
 
 -- 
-viresh
+Regards,
+Shawn
