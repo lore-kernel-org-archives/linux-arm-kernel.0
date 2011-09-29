@@ -1,48 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 29 Sep 2011 10:35:13 +0200
-Subject: [PATCH 6/6] arm/imx: merge i.MX3 and i.MX6
-In-Reply-To: <20110929051725.GA19318@S2100-06.ap.freescale.net>
-References: <1317201368-6403-1-git-send-email-shawn.guo@linaro.org>
-	<1317201368-6403-7-git-send-email-shawn.guo@linaro.org>
-	<20110928121808.GY31404@pengutronix.de>
-	<20110929051725.GA19318@S2100-06.ap.freescale.net>
-Message-ID: <20110929083512.GC31404@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Sep 2011 10:36:10 +0200
+Subject: [PATCH v2] ARM: mm: Align bank start to MAX_ORDER_NR_PAGES
+Message-ID: <1317285370-11792-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 01:17:28PM +0800, Shawn Guo wrote:
-> On Wed, Sep 28, 2011 at 02:18:08PM +0200, Sascha Hauer wrote:
-> > On Wed, Sep 28, 2011 at 05:16:08PM +0800, Shawn Guo wrote:
-> > > 
-> > >  
-> > > -config ARCH_MX3
-> > > -	bool "MX3-based"
-> > > +config ARCH_IMX_V6_V7
-> > > +	bool "i.MX3, i.MX6"
-> > > +	select AUTO_ZRELADDR
-> > > +	select ARM_PATCH_PHYS_VIRT
-> > 
-> > Russell pointed out that it's not a good idea to select this.
-> > 
-> Yeah, I saw that.  So you would support ZBOOT_ROM over single zImage
-> between these two?  I'm not sure how many imx users are actually using
-> ZBOOT_ROM.  If there are only very few, we still want to keep the
-> default configuration compatible with ZBOOT_ROM?  I think we can move
-> the default build to single zImage, and let those limited users sort
-> out their own configuration to get ZBOOT_ROM back.  After all, the
-> support is still there, and it's just about build configuration
-> adjustment.
+From: Johan Palsson <johan.palsson@stericsson.com>
 
-I'm not sure there are i.MX ZBOOT_ROM users at all. Anyway,
+The VM subsystem assumes that there are valid memmap entries from
+the bank start aligned to MAX_ORDER_NR_PAGES.
 
-	select AUTO_ZRELADDR if !ZBOOT_ROM
+On the Ux500 we have a lot of mem=N arguments on the commandline
+triggering this bug several times over and causing kernel
+oops messages.
 
-seems to work.
+Cc: stable at kernel.org
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Michael Bohan <mbohan@codeaurora.org>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Signed-off-by: Johan Palsson <johan.palsson@stericsson.com>
+Signed-off-by: Rabin Vincent <rabin.vincent@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mm/init.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-Sascha
-
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index cc7e2d8..f8037ba 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -496,6 +496,13 @@ static void __init free_unused_memmap(struct meminfo *mi)
+ 		 */
+ 		bank_start = min(bank_start,
+ 				 ALIGN(prev_bank_end, PAGES_PER_SECTION));
++#else
++		/*
++		 * Align down here since the VM subsystem insists that the
++		 * memmap entries are valid from the bank start aligned to
++		 * MAX_ORDER_NR_PAGES.
++		 */
++		bank_start = round_down(bank_start, MAX_ORDER_NR_PAGES);
+ #endif
+ 		/*
+ 		 * If we had a previous bank, and there is a space
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.6.2
