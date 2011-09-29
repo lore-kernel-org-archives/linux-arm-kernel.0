@@ -1,88 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 29 Sep 2011 09:37:40 -0700
-Subject: [PATCH v2 3/5] omap3evm: Add Camera board init/hookup file
-In-Reply-To: <1317130848-21136-4-git-send-email-deepthy.ravi@ti.com>
-References: <1317130848-21136-1-git-send-email-deepthy.ravi@ti.com>
-	<1317130848-21136-4-git-send-email-deepthy.ravi@ti.com>
-Message-ID: <20110929163740.GH6324@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 29 Sep 2011 13:19:54 -0400 (EDT)
+Subject: Git pull request: mach/vmalloc.h removal,
+	and ioremap optimizations
+In-Reply-To: <4E8495D9.2030009@gmail.com>
+References: <alpine.LFD.2.00.1109230908410.12663@xanadu.home>
+	<4E8495D9.2030009@gmail.com>
+Message-ID: <alpine.LFD.2.02.1109291302450.9106@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 29 Sep 2011, Rob Herring wrote:
 
-Few comments below.
+> Nicolas,
+> 
+> On 09/23/2011 08:32 AM, Nicolas Pitre wrote:
+> > Russell, please pull
+> > 
+> > 	git://git.linaro.org/people/nico/linux vmalloc
+> > 
+> > This patch series removes all instances of mach/vmalloc.h in order to
+> > have a more unified memory map across all ARM architectures.  To do so,
+> > the static mappings are moved inside the vmalloc area.  And finally this
+> > allows for a generic optimization to ioremap where static mappings are
+> > reused whenever possible, using common code instead of having this
+> > duplicated in a couple places.
+> 
+> I've found that this breaks on versatile (ab and pb) under QEMU. The
+> commit causing it is:
+> 
+> commit e0438e2f333005c217a2f65aacab23a39261c64c
+> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date:   Thu Aug 25 00:35:59 2011 -0400
+> 
+>     ARM: move iotable mappings within the vmalloc region
+> 
+>     In order to remove the build time variation between different SOCs with
+>     regards to VMALLOC_END, the iotable mappings are now allocated inside
+>     the vmalloc region.  This allows for VMALLOC_END to be identical across
+>     all machines.
+> 
+>     The value for VMALLOC_END is now set to 0xff000000 which is right where
+>     the consistent DMA area starts.
+> 
+>     To accommodate all static mappings on machines with possible highmem
+> usage,
+>     the default vmalloc area size is changed to 240 MB so that VMALLOC_START
+>     is no higher than 0xf0000000 by default in that case.
+> 
+>     Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> 
+> It dies after "Data cache writeback" with BUG at vmalloc.c:1139.
 
-* Deepthy Ravi <deepthy.ravi@ti.com> [110927 06:07]:
-> +
-> +#include <linux/io.h>
-> +#include <linux/i2c.h>
-> +#include <linux/delay.h>
-> +#include <linux/gpio.h>
-> +#include <linux/err.h>
-> +#include <linux/platform_device.h>
-> +#include <mach/gpio.h>
+Interesting.  Looks like Versatile might have overlapping map_desc 
+entries.
 
-You can leave out mach/gpio.h as you already have linux/gpio.h
-included.
+Could you add the following line at the top of vm_area_add_early() in 
+mm/vmalloc.c to display the area being added:
 
-> +static int __init omap3evm_cam_init(void)
-> +{
-> +	int ret;
-> +
-> +	ret = gpio_request_array(omap3evm_gpios,
-> +			ARRAY_SIZE(omap3evm_gpios));
-> +	if (ret < 0) {
-> +		printk(KERN_ERR "Unable to get GPIO pins\n");
-> +		return ret;
-> +	}
-> +
-> +	omap3_init_camera(&omap3evm_isp_platform_data);
-> +
-> +	printk(KERN_INFO "omap3evm camera init done successfully...\n");
-> +	return 0;
-> +}
-> +
-> +static void __exit omap3evm_cam_exit(void)
-> +{
-> +	gpio_free_array(omap3evm_gpios,
-> +			ARRAY_SIZE(omap3evm_gpios));
-> +}
-> +
-> +module_init(omap3evm_cam_init);
-> +module_exit(omap3evm_cam_exit);
+  printk("%s: called with addr=%p size=0x%lx\n", __func__, vm->addr, vm->size);
 
-Looks like most of this file should be under drivers/media.
-
-For initializing the module you should pass some platform_data
-(until we have DT doing it) so you know that the camera is
-available on the booted board or not. Now the init tries to
-wrongly initialize things on other boards too.
+This should help determine which entry is wrong.
 
 
-> --- a/arch/arm/mach-omap2/board-omap3evm.c
-> +++ b/arch/arm/mach-omap2/board-omap3evm.c
-> @@ -573,6 +573,8 @@ static struct omap_board_mux omap35x_board_mux[] __initdata = {
->  				OMAP_PIN_OFF_NONE),
->  	OMAP3_MUX(GPMC_WAIT2, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
->  				OMAP_PIN_OFF_NONE),
-> +	OMAP3_MUX(MCBSP1_FSR, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
-> +				OMAP_PIN_OFF_NONE),
->  #ifdef CONFIG_WL12XX_PLATFORM_DATA
->  	/* WLAN IRQ - GPIO 149 */
->  	OMAP3_MUX(UART1_RTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),
-> @@ -598,6 +600,8 @@ static struct omap_board_mux omap36x_board_mux[] __initdata = {
->  	OMAP3_MUX(MCSPI1_CS1, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
->  				OMAP_PIN_OFF_INPUT_PULLUP | OMAP_PIN_OFF_OUTPUT_LOW |
->  				OMAP_PIN_OFF_WAKEUPENABLE),
-> +	OMAP3_MUX(MCBSP1_FSR, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
-> +				OMAP_PIN_OFF_NONE),
->  	/* AM/DM37x EVM: DSS data bus muxed with sys_boot */
->  	OMAP3_MUX(DSS_DATA18, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
->  	OMAP3_MUX(DSS_DATA19, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
-
-Is this safe to do on all boards, or only if you have the camera
-board attached?
-
-Regards,
-
-Tony
+Nicolas
