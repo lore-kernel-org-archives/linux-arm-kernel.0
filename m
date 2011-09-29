@@ -1,35 +1,36 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 29 Sep 2011 17:56:09 +0200
-Subject: [PATCH] ARM: imx/mx31moboard: use mc13xxx structs instead of
-	removed mc13783 structs
-In-Reply-To: <20110926115212.GZ20550@pengutronix.de>
-References: <1317019855-10215-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110926100511.GH32263@sortiz-mobl>
-	<20110926115212.GZ20550@pengutronix.de>
-Message-ID: <20110929155609.GG4118@sortiz-mobl>
+From: kronos.it@gmail.com (Luca Tettamanti)
+Date: Thu, 29 Sep 2011 17:56:43 +0200
+Subject: [PATCH] PM: HIBERNATION: add resume_wait param to support
+	MMC-like devices as resume file
+In-Reply-To: <CAKPcRGr3EzjS2es6HniuQziEivpsfH2r=d_Y=nkrsFW59g6xSw@mail.gmail.com>
+References: <1317288548-19560-1-git-send-email-Barry.Song@csr.com>
+	<CAKPcRGr3EzjS2es6HniuQziEivpsfH2r=d_Y=nkrsFW59g6xSw@mail.gmail.com>
+Message-ID: <CAKPcRGpPG2Z_tMQFHz8fpBLhLO4dx58AVhYWmPdZ_0pV7pVK6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Thu, Sep 29, 2011 at 5:47 PM, Luca Tettamanti <kronos.it@gmail.com> wrote:
+> On Thu, Sep 29, 2011 at 11:29 AM, Barry Song <Barry.Song@csr.com> wrote:
+>> From: Barry Song <baohua.song@csr.com>
+>>
+>> Some devices like mmc are async detected very slow. For example,
+>> drivers/mmc/host/sdhci.c launchs a 200ms delayed work to detect
+>> mmc partitions then add disk.
+>>
+>> we do have wait_for_device_probe and scsi_complete_async_scans
+>> before calling swsusp_check, but it is not enough to wait mmc.
+>>
+>> This patch adds resumewait kernel param just like rootwait so
+>> that we have enough time to wait mmc ready. The differene is
+>> here we wait for resume partition but rootwait waits for rootfs
+>> partition.
+>
+> I assume that such a device would need "rootwait" to boot in the first
+> place; why don't you "overload" the param to also enable waiting in
+> the resume path?
 
-On Mon, Sep 26, 2011 at 01:52:12PM +0200, Uwe Kleine-K?nig wrote:
-> Hi Samuel,
-> 
-> On Mon, Sep 26, 2011 at 12:05:11PM +0200, Samuel Ortiz wrote:
-> > On Mon, Sep 26, 2011 at 08:50:55AM +0200, Uwe Kleine-K?nig wrote:
-> > > This is needed with patch
-> > > 
-> > > 	mfd: Remove mc13783 API functions and symbols
-> > > 
-> > > (currently cde41c030 in next)
-> > Sorry, I missed this one.
-> > Applied now, thanks a lot.
-> It's me who missed it, isn't it?
-And me who applied it without noticing, so I blame us :)
+And in case that makes sense, it might be worthwhile to refactor a
+common helper to be also used in do_mounts.c, e.g.
+dev_t wait_for_device(char *name)
 
-Cheers,
-Samuel.
-
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+L
