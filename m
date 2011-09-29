@@ -1,34 +1,25 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 29 Sep 2011 22:10:36 +0800
-Subject: [PATCH v4 2/7] arm/imx6q: add core definitions and low-level
-	debug uart
-In-Reply-To: <20110929093245.GF23944@n2100.arm.linux.org.uk>
-References: <1317200808-6275-1-git-send-email-shawn.guo@linaro.org>
-	<1317200808-6275-3-git-send-email-shawn.guo@linaro.org>
-	<20110929093245.GF23944@n2100.arm.linux.org.uk>
-Message-ID: <20110929141035.GK19318@S2100-06.ap.freescale.net>
+From: gigin_jose@yahoo.co.in (GIGIN JOSE)
+Date: Thu, 29 Sep 2011 14:11:03 +0000 (UTC)
+Subject: YCbCr 422 on s3c2440
+Message-ID: <loom.20110929T160147-550@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 10:32:45AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Sep 28, 2011 at 05:06:43PM +0800, Shawn Guo wrote:
-> > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
-> > index 502e45f..e2e3e5a 100644
-> > --- a/arch/arm/plat-mxc/Kconfig
-> > +++ b/arch/arm/plat-mxc/Kconfig
-> > @@ -29,6 +29,13 @@ config ARCH_MX5
-> >  	  This enables support for machines using Freescale's i.MX50 and i.MX51
-> >  	  processors.
-> >  
-> > +config ARCH_MX6
-> > +	bool "i.MX6"
-> > +	select AUTO_ZRELADDR
-> 
-> This bars you from building a working kernel with ZBOOT_ROM=y.  You can
-> still select ZBOOT_ROM=y but things won't work.
-> 
-Right.  This is going to be 'select AUTO_ZRELADDR if !ZBOOT_ROM'.
+Hi, 
 
--- 
-Regards,
-Shawn
+I am working on s3c2440 ARM linux platform. I am connecting 
+an image sensor device to the camera controller of the s3c2440 
+ARM processor. The image sensor outputs YCbCr 4:2:2 output. 
+Can I pass the output of this format to the preview path of 
+the camera controller to get proper image ? 
+
+The image sensor also outputs RGB565 format, which I can 
+comfortably view using the preview path. But I would like 
+to get the YCbCr 4:2:2 format from the image sensor device. 
+
+Is this possible with the preview path ? Any other register
+ settings are required for YCbCr 4:2:2 mode on the preview 
+path, other than that done for the RGB565 format. ?
+
+Thank You
+GIGIN  
