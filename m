@@ -1,48 +1,103 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Thu, 29 Sep 2011 18:14:00 +0300
-Subject: [PATCH 2/2] arm: orion5x: print mac address with %pM
-In-Reply-To: <05721ba890447cd2f40d24bd70b133fe8750b969.1317309052.git.andriy.shevchenko@linux.intel.com>
-References: <05721ba890447cd2f40d24bd70b133fe8750b969.1317309052.git.andriy.shevchenko@linux.intel.com>
-Message-ID: <c7d9af28cdf5834ed8a7f0dcbd064a7fa9bbaabc.1317309052.git.andriy.shevchenko@linux.intel.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 29 Sep 2011 23:15:57 +0800
+Subject: [PATCH v2] PM: HIBERNATION: add resume_wait param to support MMC-like
+	devices as resume file
+Message-ID: <1317309357-3871-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
----
- arch/arm/mach-orion5x/dns323-setup.c |    5 ++---
- arch/arm/mach-orion5x/tsx09-common.c |    4 +---
- 2 files changed, 3 insertions(+), 6 deletions(-)
+From: Barry Song <baohua.song@csr.com>
 
-diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
-index c95166e..09b8ed2 100644
---- a/arch/arm/mach-orion5x/dns323-setup.c
-+++ b/arch/arm/mach-orion5x/dns323-setup.c
-@@ -201,9 +201,8 @@ static int __init dns323_read_mac_addr(void)
- 	}
+Some devices like mmc are async detected very slow. For example,
+drivers/mmc/host/sdhci.c launchs a 200ms delayed work to detect
+mmc partitions then add disk.
+
+we do have wait_for_device_probe and scsi_complete_async_scans
+before calling swsusp_check, but it is not enough to wait mmc.
+
+This patch adds resumewait kernel param just like rootwait so
+that we have enough time to wait mmc ready. The differene is
+here we wait for resume partition but rootwait waits for rootfs
+partition.
+
+This patch will make swsusp support many embedded products
+without scsi devices but devices like mmc.
+
+This was tested on one ARM platform with Frank Hofmann's patch.
+
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Reviewed-by: Valdis Kletnieks <valdis.kletnieks@vt.edu>
+---
+ -v2:
+ add document for the resumewait kernel parameter
+
+ Documentation/kernel-parameters.txt |    4 ++++
+ kernel/power/hibernate.c            |   16 ++++++++++++++++
+ 2 files changed, 20 insertions(+), 0 deletions(-)
+
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 614d038..2aed0d2 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -2237,6 +2237,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			in <PAGE_SIZE> units (needed only for swap files).
+ 			See  Documentation/power/swsusp-and-swap-files.txt
  
- 	iounmap(mac_page);
--	printk("DNS-323: Found ethernet MAC address: ");
--	for (i = 0; i < 6; i++)
--		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
++	resumewait	[HIBERNATION] Wait (indefinitely) for resume device to show up.
++			Useful for devices that are detected asynchronously
++			(e.g. USB and MMC devices).
 +
-+	printk("DNS-323: Found ethernet MAC address: %pM.\n", addr);
+ 	hibernate=	[HIBERNATION]
+ 		noresume	Don't check if there's a hibernation image
+ 				present during boot.
+diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+index 8f7b1db..9f4b4f3 100644
+--- a/kernel/power/hibernate.c
++++ b/kernel/power/hibernate.c
+@@ -14,6 +14,7 @@
+ #include <linux/reboot.h>
+ #include <linux/string.h>
+ #include <linux/device.h>
++#include <linux/async.h>
+ #include <linux/kmod.h>
+ #include <linux/delay.h>
+ #include <linux/fs.h>
+@@ -31,6 +32,7 @@
  
- 	memcpy(dns323_eth_data.mac_addr, addr, 6);
+ static int nocompress = 0;
+ static int noresume = 0;
++static int resume_wait = 0;
+ static char resume_file[256] = CONFIG_PM_STD_PARTITION;
+ dev_t swsusp_resume_device;
+ sector_t swsusp_resume_block;
+@@ -732,6 +734,13 @@ static int software_resume(void)
+ 		 * to wait for this to finish.
+ 		 */
+ 		wait_for_device_probe();
++
++		if (resume_wait) {
++			while ((swsusp_resume_device = name_to_dev_t(resume_file)) == 0)
++				msleep(10);
++			async_synchronize_full();
++		}
++
+ 		/*
+ 		 * We can't depend on SCSI devices being available after loading
+ 		 * one of their modules until scsi_complete_async_scans() is
+@@ -1060,7 +1069,14 @@ static int __init noresume_setup(char *str)
+ 	return 1;
+ }
  
-diff --git a/arch/arm/mach-orion5x/tsx09-common.c b/arch/arm/mach-orion5x/tsx09-common.c
-index e65b528f..c1aef01 100644
---- a/arch/arm/mach-orion5x/tsx09-common.c
-+++ b/arch/arm/mach-orion5x/tsx09-common.c
-@@ -71,9 +71,7 @@ static int __init qnap_tsx09_check_mac_addr(const char *addr_str)
- 			return -1;
- 	}
- 
--	printk(KERN_INFO "tsx09: found ethernet mac address ");
--	for (i = 0; i < 6; i++)
--		printk("%.2x%s", addr[i], (i < 5) ? ":" : ".\n");
-+	printk(KERN_INFO "tsx09: found ethernet mac address %pM.\n", addr);
- 
- 	memcpy(qnap_tsx09_eth_data.mac_addr, addr, 6);
- 
++static int __init resumewait_setup(char *str)
++{
++	resume_wait = 1;
++	return 1;
++}
++
+ __setup("noresume", noresume_setup);
+ __setup("resume_offset=", resume_offset_setup);
+ __setup("resume=", resume_setup);
+ __setup("hibernate=", hibernate_setup);
++__setup("resumewait", resumewait_setup);
 -- 
-1.7.6.3
+1.7.0.4
