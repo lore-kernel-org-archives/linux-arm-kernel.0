@@ -1,65 +1,37 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 29 Sep 2011 16:19:06 -0500
-Subject: Git pull request: mach/vmalloc.h removal,
-	and ioremap optimizations
-In-Reply-To: <alpine.LFD.2.02.1109291645570.9106@xanadu.home>
-References: <alpine.LFD.2.00.1109230908410.12663@xanadu.home>
-	<4E8495D9.2030009@gmail.com>
-	<20110929173731.GB21718@n2100.arm.linux.org.uk>
-	<4E84B80D.2020605@gmail.com>
-	<alpine.LFD.2.02.1109291439110.9106@xanadu.home>
-	<4E84D47F.7030007@gmail.com>
-	<alpine.LFD.2.02.1109291645570.9106@xanadu.home>
-Message-ID: <4E84E0CA.2050905@gmail.com>
+Date: Thu, 29 Sep 2011 16:22:02 -0500
+Subject: [PATCH] ARM: realview: fix map_desc alignment
+In-Reply-To: <4E84E0CA.2050905@gmail.com>
+References: <4E84E0CA.2050905@gmail.com>
+Message-ID: <1317331322-4439-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2011 03:47 PM, Nicolas Pitre wrote:
-> On Thu, 29 Sep 2011, Rob Herring wrote:
-> 
->> On 09/29/2011 01:42 PM, Nicolas Pitre wrote:
->>> On Thu, 29 Sep 2011, Rob Herring wrote:
->>>
->>>> On 09/29/2011 12:37 PM, Russell King - ARM Linux wrote:
->>>>> My guess would be:
->>>>>
->>>>>         }, {
->>>>>                 .virtual        =  IO_ADDRESS(VERSATILE_SCTL_BASE),
->>>>>                 .pfn            = __phys_to_pfn(VERSATILE_SCTL_BASE),
->>>>>                 .length         = SZ_4K * 9,
->>>>>                 .type           = MT_DEVICE
->>>>>         },
->>>>> #ifdef CONFIG_MACH_VERSATILE_AB
->>>>>         {
->>>>>                 .virtual        =  IO_ADDRESS(VERSATILE_GPIO0_BASE),
->>>>>                 .pfn            = __phys_to_pfn(VERSATILE_GPIO0_BASE),
->>>>>                 .length         = SZ_4K,
->>>>>                 .type           = MT_DEVICE
->>>>>
->>>>> #define VERSATILE_SCTL_BASE            0x101E0000	/* System controller */
->>>>> #define VERSATILE_GPIO0_BASE           0x101E4000	/* GPIO port 0 */
->>>>>
->>>>> I don't see why GPIO0 is explicitly listed here.
->>>>
->>>> It works for PB and AB with that removed. Here's a patch:
->>> [...]
->>>
->>> Thanks for testing and the patch.  I've inserted it in my patch series 
->>> and pushed the result out.
->>
->> So it was really Realview PBX I wanted to test my GIC changes on. Well,
->> turns out it's got a similar problem, too.
->>
->> However, the fix for it should perhaps be a bit different. The problem
->> is that the virtual address of REALVIEW_PBX_TILE_GIC_CPU_BASE is not
->> aligned. Then 0x100 + 4KB length overlaps into the DIST_BASE. So do we
->> fix it in the platform or should the core code mask out the lower bits
->> of the virt addr before doing any size calculations?
-> 
-> Please fix it in the platform static declaration.  No need to put 
-> run time code for something that can be fixed in the source.
-> 
-Except that 2 out of 2 machines I've tried are broken. Anyway, patch is
-coming.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Rob
+REALVIEW_PBX_TILE_GIC_CPU_BASE is not 4KB aligned which causes an
+overlapping mapping. Use REALVIEW_PBX_TILE_SCU_BASE instead which is
+aligned.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/mach-realview/realview_pbx.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 363b0ab..5930a33 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -98,8 +98,8 @@ static struct map_desc realview_pbx_io_desc[] __initdata = {
+ 
+ static struct map_desc realview_local_io_desc[] __initdata = {
+ 	{
+-		.virtual        = IO_ADDRESS(REALVIEW_PBX_TILE_GIC_CPU_BASE),
+-		.pfn            = __phys_to_pfn(REALVIEW_PBX_TILE_GIC_CPU_BASE),
++		.virtual        = IO_ADDRESS(REALVIEW_PBX_TILE_SCU_BASE),
++		.pfn            = __phys_to_pfn(REALVIEW_PBX_TILE_SCU_BASE),
+ 		.length         = SZ_4K,
+ 		.type           = MT_DEVICE,
+ 	}, {
+-- 
+1.7.5.4
