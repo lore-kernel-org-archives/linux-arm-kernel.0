@@ -1,75 +1,81 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 29 Sep 2011 12:15:40 -0500
-Subject: [PATCH 1/2] ARM: gic: add irq_domain support
-In-Reply-To: <1317268436-1613-2-git-send-email-robherring2@gmail.com>
-References: <1317268436-1613-1-git-send-email-robherring2@gmail.com>
-	<1317268436-1613-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20110929171540.GC6800@ponder.secretlab.ca>
+Date: Thu, 29 Sep 2011 12:25:29 -0500
+Subject: [PATCH 12/13] arm/dts: omap3-beagle: Add twl4030 and i2c EEPROM
+In-Reply-To: <1317055821-20652-13-git-send-email-b-cousson@ti.com>
+References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
+	<1317055821-20652-13-git-send-email-b-cousson@ti.com>
+Message-ID: <20110929172529.GE6800@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2011 at 10:53:55PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Mon, Sep 26, 2011 at 06:50:20PM +0200, Benoit Cousson wrote:
+> Add required clock frequencies for the i2c client devices existing
+> on beagle board.
 > 
-> Convert the gic interrupt controller to use irq domains in preparation
-> for device-tree binding and MULTI_IRQ. This allows for translation between
-> GIC interrupt IDs and Linux irq numbers.
+> Add the twl4030 basic description with only the twl_rtc module.
 > 
-> The meaning of irq_offset has changed. It now is just the number of skipped
-> GIC interrupt IDs for the controller. It will be 16 for primary GIC and 32
-> for secondary GICs.
-
-[...]
-
->  /*
-> @@ -81,7 +82,7 @@ static inline unsigned int gic_irq(struct irq_data *d)
->   */
->  static void gic_mask_irq(struct irq_data *d)
->  {
-> -	u32 mask = 1 << (d->irq % 32);
-> +	u32 mask = 1 << (gic_irq(d) % 32);
-
-This can probably change simply to d->hwirq if irq_offset is
-eliminated as I describe below.
-
->  void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
->  	void __iomem *dist_base, void __iomem *cpu_base)
->  {
->  	struct gic_chip_data *gic;
-> +	struct irq_domain *domain;
-> +	int gic_irqs;
->  
->  	BUG_ON(gic_nr >= MAX_GIC_NR);
->  
->  	gic = &gic_data[gic_nr];
-> +	domain = &gic->domain;
->  	gic->dist_base = dist_base;
->  	gic->cpu_base = cpu_base;
-> -	gic->irq_offset = (irq_start - 1) & ~31;
->  
-> -	if (gic_nr == 0)
+> Add the EEPROM node.
+> 
+> Based on original patch from Manju:
+> http://www.spinics.net/lists/linux-omap/msg55831.html
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: G, Manjunath Kondaiah <manjugk@ti.com>
+> ---
+>  arch/arm/boot/dts/omap3-beagle.dts |   38 ++++++++++++++++++++++++++++++++++++
+>  1 files changed, 38 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+> index 9486be6..a65f39d 100644
+> --- a/arch/arm/boot/dts/omap3-beagle.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -27,3 +27,41 @@
+>  		reg = <0x80000000 0x20000000>; /* 512 MB */
+>  	};
+>  };
+> +
+> +&i2c1 {
+> +	clock-frequency = <2600000>;
+> +
 > +	/*
-> +	 * For primary GICs, skip over SGIs.
-> +	 * For secondary GICs, skip over PPIs, too.
+> +	 * Integrated Power Management Chip
 > +	 */
-> +	if (gic_nr == 0) {
->  		gic_cpu_base_addr = cpu_base;
-> +		gic->irq_offset = 16;
-> +		irq_start = (irq_start & ~31) + 16;
+> +	twl at 48 {
+> +		compatible = "ti,twl4030";
+> +		reg = <0x48>;
+> +		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		interrupt-parent = <&intc>;
+> +
+> +		twl_rtc {
 
-With the switch to irq_domain, there should no longer be any need for
-a ~31 mask on the irq_start number.  Yes, you'll want to make sure
-that it doesn't allocate below irq 16, but the driver should
-completely use the irq_domain to manage the mapping from linux-irq
-number to hwirq number.  The ~31 mask appears to have been an
-optimization to quickly calculate hwirq number from the linux one, but
-that value is now found in irq_data->hwirq.
+Nit: use the generic names recommended practise for node names (in
+this case, simply 'rtc' sounds appropriate, and don't use underscores
+(it's not forbidden, just doesn't match the style.
 
-irq_offset could almost be dropped entirely outside of probe because
-it no longer matters.  Instead, populate the to_irq() hook so that the
-hwirq value gets set correctly from the outset.
-
-It would be better in general to have a consistent view of what the
-hwirq number means regardless of if it is a root GIC.
-
-g.
+> +			compatible = "ti,twl4030-rtc";
+> +			interrupts = <11>;
+> +		};
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <400000>;
+> +};
+> +
+> +&i2c3 {
+> +	clock-frequency = <100000>;
+> +
+> +	/*
+> +	 * Display monitor features are burnt in the EEPROM
+> +	 * as EDID data.
+> +	 */
+> +	eeprom at 50 {
+> +		compatible = "ti,eeprom";
+> +		reg = <0x50>;
+> +	};
+> +};
+> -- 
+> 1.7.0.4
+> 
