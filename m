@@ -1,17 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Sep 2011 17:30:48 +0100
-Subject: [PATCH 5/5] ARM: pxa: move gpio driver into drivers directory
-In-Reply-To: <1317309546-19682-5-git-send-email-haojian.zhuang@marvell.com>
-References: <2011092901>
-	<1317309546-19682-5-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20110929163048.GA21718@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 29 Sep 2011 09:37:40 -0700
+Subject: [PATCH v2 3/5] omap3evm: Add Camera board init/hookup file
+In-Reply-To: <1317130848-21136-4-git-send-email-deepthy.ravi@ti.com>
+References: <1317130848-21136-1-git-send-email-deepthy.ravi@ti.com>
+	<1317130848-21136-4-git-send-email-deepthy.ravi@ti.com>
+Message-ID: <20110929163740.GH6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 11:19:06PM +0800, Haojian Zhuang wrote:
-> +#include <linux/gpio-pxa.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include <asm/io.h>
+Hi,
 
-linux/gpio.h please.
+Few comments below.
+
+* Deepthy Ravi <deepthy.ravi@ti.com> [110927 06:07]:
+> +
+> +#include <linux/io.h>
+> +#include <linux/i2c.h>
+> +#include <linux/delay.h>
+> +#include <linux/gpio.h>
+> +#include <linux/err.h>
+> +#include <linux/platform_device.h>
+> +#include <mach/gpio.h>
+
+You can leave out mach/gpio.h as you already have linux/gpio.h
+included.
+
+> +static int __init omap3evm_cam_init(void)
+> +{
+> +	int ret;
+> +
+> +	ret = gpio_request_array(omap3evm_gpios,
+> +			ARRAY_SIZE(omap3evm_gpios));
+> +	if (ret < 0) {
+> +		printk(KERN_ERR "Unable to get GPIO pins\n");
+> +		return ret;
+> +	}
+> +
+> +	omap3_init_camera(&omap3evm_isp_platform_data);
+> +
+> +	printk(KERN_INFO "omap3evm camera init done successfully...\n");
+> +	return 0;
+> +}
+> +
+> +static void __exit omap3evm_cam_exit(void)
+> +{
+> +	gpio_free_array(omap3evm_gpios,
+> +			ARRAY_SIZE(omap3evm_gpios));
+> +}
+> +
+> +module_init(omap3evm_cam_init);
+> +module_exit(omap3evm_cam_exit);
+
+Looks like most of this file should be under drivers/media.
+
+For initializing the module you should pass some platform_data
+(until we have DT doing it) so you know that the camera is
+available on the booted board or not. Now the init tries to
+wrongly initialize things on other boards too.
+
+
+> --- a/arch/arm/mach-omap2/board-omap3evm.c
+> +++ b/arch/arm/mach-omap2/board-omap3evm.c
+> @@ -573,6 +573,8 @@ static struct omap_board_mux omap35x_board_mux[] __initdata = {
+>  				OMAP_PIN_OFF_NONE),
+>  	OMAP3_MUX(GPMC_WAIT2, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+>  				OMAP_PIN_OFF_NONE),
+> +	OMAP3_MUX(MCBSP1_FSR, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+> +				OMAP_PIN_OFF_NONE),
+>  #ifdef CONFIG_WL12XX_PLATFORM_DATA
+>  	/* WLAN IRQ - GPIO 149 */
+>  	OMAP3_MUX(UART1_RTS, OMAP_MUX_MODE4 | OMAP_PIN_INPUT),
+> @@ -598,6 +600,8 @@ static struct omap_board_mux omap36x_board_mux[] __initdata = {
+>  	OMAP3_MUX(MCSPI1_CS1, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+>  				OMAP_PIN_OFF_INPUT_PULLUP | OMAP_PIN_OFF_OUTPUT_LOW |
+>  				OMAP_PIN_OFF_WAKEUPENABLE),
+> +	OMAP3_MUX(MCBSP1_FSR, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP |
+> +				OMAP_PIN_OFF_NONE),
+>  	/* AM/DM37x EVM: DSS data bus muxed with sys_boot */
+>  	OMAP3_MUX(DSS_DATA18, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
+>  	OMAP3_MUX(DSS_DATA19, OMAP_MUX_MODE3 | OMAP_PIN_OFF_NONE),
+
+Is this safe to do on all boards, or only if you have the camera
+board attached?
+
+Regards,
+
+Tony
