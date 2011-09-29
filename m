@@ -1,42 +1,37 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 28 Sep 2011 20:44:22 -0600 (MDT)
-Subject: [PATCH v2 1/6] OMAP4: Add missing clock divider for OCP_ABE_ICLK
-In-Reply-To: <1316195249-14914-1-git-send-email-jon-hunter@ti.com>
-References: <1316195249-14914-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1109282042220.19233@utopia.booyaka.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 28 Sep 2011 22:53:54 -0500
+Subject: [PATCH 0/2] GIC OF bindings
+Message-ID: <1317268436-1613-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Sep 2011, Jon Hunter wrote:
+From: Rob Herring <rob.herring@calxeda.com>
 
-> From: Jon Hunter <jon-hunter@ti.com>
-> 
-> The parent clock of the OCP_ABE_ICLK is the AESS_FCLK and the
-> parent clock of the AESS_FCLK is the ABE_FCLK...
-> 
-> ABE_FCLK --> AESS_FCLK --> OCP_ABE_ICLK
-> 
-> The AESS_FCLK and OCP_ABE_ICLK clocks both have dividers which
-> determine their operational frequency. However, the dividers for
-> the AESS_FCLK and OCP_ABE_ICLK are controlled via a single bit,
-> which is the CM1_ABE_AESS_CLKCTRL[24] bit. When this bit is set to
-> 0, the AESS_FCLK divider is 1 and the OCP_ABE_ICLK divider is 2.
-> Similarly, when this bit is set to 1, the AESS_FCLK divider is 2
-> and the OCP_ABE_ICLK is 1.
-> 
-> The above relationship between the AESS_FCLK and OCP_ABE_ICLK
-> dividers ensure that the OCP_ABE_ICLK clock is always half the
-> frequency of the ABE_CLK...
-> 
-> OCP_ABE_ICLK = ABE_FCLK/2
-> 
-> The divider for the OCP_ABE_ICLK is currently missing so add a
-> divider that will ensure the OCP_ABE_ICLK frequency is always half
-> the ABE_FCLK frequency.
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+With recent patches for VIC device tree support and GIC MULTI_IRQ support,
+it is evident that the irq domain support should be moved into the core GIC
+code and not be dependent on the DT initialization. So I've split things up
+into 2 patches separating irq_domain and device-tree code.
 
-Thanks, queued for 3.2.
+This should only change the internals of the GIC code. The binding is
+unchanged from the previous version. Yeah!
 
+The full series is available here. This includes Russell's devel-stable and
+for-next branches and Nico's vmalloc branch.
 
-- Paul
+git://git.jdl.com/software/linux-3.0.git gic
+
+Rob
+
+Rob Herring (2):
+  ARM: gic: add irq_domain support
+  ARM: gic: add OF based initialization
+
+ Documentation/devicetree/bindings/arm/gic.txt |   55 ++++++++++
+ arch/arm/common/Kconfig                       |    1 +
+ arch/arm/common/gic.c                         |  144 +++++++++++++++++++------
+ arch/arm/include/asm/hardware/gic.h           |    4 +
+ 4 files changed, 171 insertions(+), 33 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+
+-- 
+1.7.5.4
