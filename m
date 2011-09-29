@@ -1,20 +1,47 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 29 Sep 2011 19:54:32 +0100
-Subject: [PATCH v2 0/7] Add a generic struct clk
-In-Reply-To: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-Message-ID: <20110929185432.GD2085@sirena.org.uk>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 29 Sep 2011 21:55:00 +0300
+Subject: [PATCH v5 3/3] arm/tegra: device tree support for ventana board
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173A2C6717@HQMAIL01.nvidia.com>
+References: <1317248978-10829-1-git-send-email-pdeschrijver@nvidia.com>
+	<1317248978-10829-4-git-send-email-pdeschrijver@nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173A2C6717@HQMAIL01.nvidia.com>
+Message-ID: <20110929185500.GP21166@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 03:26:55PM -0700, Mike Turquette wrote:
+On Thu, Sep 29, 2011 at 07:04:15PM +0200, Stephen Warren wrote:
+> Peter De Schrijver wrote at Wednesday, September 28, 2011 4:30 PM:
+> ...
+> > diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+> ...
+> > @@ -80,9 +80,19 @@ static struct of_device_id tegra_dt_gic_match[] __initdata = {
+> >  	{}
+> >  };
+> > 
+> > +static struct {
+> > +	char *machine;
+> > +	void (*init)(void);
+> > +} pinmux_configs[] = {
+> > +	{ "nvidia,harmony", harmony_pinmux_init() },
+> > +	{ "nvidia,seaboard", seaboard_pinmux_init() },
+> > +	{ "nvidia,ventana", ventana_pinmux_init() },
+> > +};
+> 
+> Do you want the brackets after the function names there? Locally, they
+> cause the following syntax errors during compilation:
+> 
+> arch/arm/mach-tegra/board-dt.c:85: error: initializer element is not constant
+> arch/arm/mach-tegra/board-dt.c:85: error: (near initialization for 'pinmux_configs[0].init')
+> arch/arm/mach-tegra/board-dt.c:86: error: initializer element is not constant
+> arch/arm/mach-tegra/board-dt.c:86: error: (near initialization for 'pinmux_configs[1].init')
+> arch/arm/mach-tegra/board-dt.c:87: error: initializer element is not constant
+> arch/arm/mach-tegra/board-dt.c:87: error: (near initialization for 'pinmux_configs[2].init')
+> 
+> (using gcc version 4.4.3 (gcc-4.4.3_cos_gg_51096))
 
-> more thought.  I also dropped Mark's change to append a device's name to
-> a clk name since device tree might solve this neatly.  Again more
-> discussion around that would be good.
+It compiled fine here using gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50).
+I will change it next week when I'm back at the office.
 
-Some of that was for debugfs type stuff - if we end up providing
-information about the clocks via a diagnostic interface being able to
-distinguish between things in a textual fashion would be handy (and I'd
-guess the struct device may also be needed by any OF bindings to get at
-the bindings?).
+Cheers,
+
+Peter.
