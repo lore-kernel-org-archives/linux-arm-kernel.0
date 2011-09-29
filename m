@@ -1,36 +1,22 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 29 Sep 2011 20:43:38 +0800
-Subject: [PATCH] PM: HIBERNATION: add resume_wait param to support
-	MMC-like devices as resume file
-In-Reply-To: <59872.1317299401@turing-police.cc.vt.edu>
-References: <1317288548-19560-1-git-send-email-Barry.Song@csr.com>
-	<59872.1317299401@turing-police.cc.vt.edu>
-Message-ID: <CAGsJ_4znTLmjd_qhgru_aOZPMEZc=dyXEQTqdsVGKr-GaryQsQ@mail.gmail.com>
+From: broonie@sirena.org.uk (Mark Brown)
+Date: Thu, 29 Sep 2011 13:50:36 +0100
+Subject: Long stalls during boot with -next
+Message-ID: <20110929125035.GA2085@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Valdis,
+Since Tuesday I've been experiencing stalls on boot with -next kernels.
+The boot appears to proceed normally but there appears to be a good ten
+second delay somewhere around the late_initcall() stage with no
+indication in the logs:
 
-2011/9/29  <Valdis.Kletnieks@vt.edu>:
-> On Thu, 29 Sep 2011 02:29:08 PDT, Barry Song said:
->
->> This patch adds resumewait kernel param just like rootwait so
->> that we have enough time to wait mmc ready. The differene is
->> here we wait for resume partition but rootwait waits for rootfs
->> partition.
->
-> OK, seems a reasonable idea...
->
->> kernel/power/hibernate.c | ? 16 ++++++++++++++++
->> 1 files changed, 16 insertions(+), 0 deletions(-)
->
-> We have a __setup() parameter, this patch appears to be missing
-> a hunk for Documentation/kernel-parameters.txt?
->
-> Fix that issue, and you can stick this on there:
->
-> Reviewed-by: Valdis Kletnieks <valdis.kletnieks@vt.edu>
+[    3.110000] regulator_init_complete: PVDD_1V2: disabling
+[    3.120000] input: gpio-keys as /devices/platform/gpio-keys.0/input/input5
+[    3.120000] wm831x-rtc wm831x-rtc.10: hctosys: unable to read the hardware clock
+[   13.690000] kjournald starting.  Commit interval 5 seconds
+[   13.690000] EXT3-fs (mmcblk0p2): warning: maximal mount count reached, running e2fsck is recommended
 
-thanks. i'll add the document in v2.
-
--barry
+(which happens before or at about the time console output starts
+appearing, I'd expect it to appear much earlier).  I've had a poke
+around and I didn't spot anything yet, none of the development I've
+noticed going on recently looks suspicious.
