@@ -1,32 +1,45 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Thu, 29 Sep 2011 15:02:20 +0200
-Subject: Long stalls during boot with -next
-In-Reply-To: <20110929125035.GA2085@sirena.org.uk>
-References: <20110929125035.GA2085@sirena.org.uk>
-Message-ID: <s5hfwjfa4df.wl%tiwai@suse.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 29 Sep 2011 21:12:31 +0800
+Subject: [PATCH v2] ARM: cache-l2x0: add resume entry for l2 in secure mode
+In-Reply-To: <20110929125026.GJ23944@n2100.arm.linux.org.uk>
+References: <1317007569-31213-1-git-send-email-Baohua.Song@csr.com>
+	<20110929092828.GE19318@S2100-06.ap.freescale.net>
+	<20110929092406.GD23944@n2100.arm.linux.org.uk>
+	<20110929124419.GF19318@S2100-06.ap.freescale.net>
+	<20110929125026.GJ23944@n2100.arm.linux.org.uk>
+Message-ID: <20110929131229.GG19318@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Thu, 29 Sep 2011 13:50:36 +0100,
-Mark Brown wrote:
+On Thu, Sep 29, 2011 at 01:50:26PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 29, 2011 at 08:44:20PM +0800, Shawn Guo wrote:
+> > Yeah, that's why I want to get imx6q stay away from this infrastructure
+> > right now.  I do not see any simplicity and cleanup on imx6q current
+> > code by migrating to this infrastructure.
 > 
-> Since Tuesday I've been experiencing stalls on boot with -next kernels.
-> The boot appears to proceed normally but there appears to be a good ten
-> second delay somewhere around the late_initcall() stage with no
-> indication in the logs:
+> Why?  If the data is already saved for you, then there's no reason not
+> to use it.  The fact that some generic code doesn't give you _exactly_
+> everything you'd want is not a reason to avoid it.
 > 
-> [    3.110000] regulator_init_complete: PVDD_1V2: disabling
-> [    3.120000] input: gpio-keys as /devices/platform/gpio-keys.0/input/input5
-> [    3.120000] wm831x-rtc wm831x-rtc.10: hctosys: unable to read the hardware clock
-> [   13.690000] kjournald starting.  Commit interval 5 seconds
-> [   13.690000] EXT3-fs (mmcblk0p2): warning: maximal mount count reached, running e2fsck is recommended
+> The cleanup for imx6q is that it would no longer have to have its own
+> distinct code for saving the register values - and that's a danmed good
+> thing.
 > 
-> (which happens before or at about the time console output starts
-> appearing, I'd expect it to appear much earlier).  I've had a poke
-> around and I didn't spot anything yet, none of the development I've
-> noticed going on recently looks suspicious.
+It cleans up the register saving but requires additional code handling
+physical address of l2x0_saved_regs.
 
-Did you check with initcall_debug boot option?
+> The idea here is that we consolidate what _can_ be consolidated (which
+> is the register saving.)
+> 
+> If you feel soo strongly that it's not worth doing, then let's stop
+> wasting time and review effort on this, and instead have _every_ SoC
+> implementing their own private L2 cache handling on resume.
+> 
+This infrastructure is definitely good thing for platform that L2 will
+be lost during suspend.  But for imx6q which retains L2, I would not
+migrate it until the physical base of L2 and l2x0_saved_regs itself can
+be retrieved from infrastructure too.
 
-
-Takashi
+-- 
+Regards,
+Shawn
