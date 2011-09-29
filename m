@@ -1,40 +1,87 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 29 Sep 2011 11:04:28 -0700
-Subject: [PATCHv2 2/2] ARM: debug: Move DEBUG_ICEDCC into the DEBUG_LL
-	choice
-In-Reply-To: <4E84A962.9030806@codeaurora.org>
-References: <1316568208-4518-1-git-send-email-sboyd@codeaurora.org>
-	<1316568208-4518-2-git-send-email-sboyd@codeaurora.org>
-	<4E83D25C.6020306@codeaurora.org>
-	<20110929092102.GB25061@e102144-lin.cambridge.arm.com>
-	<20110929094243.GC25061@e102144-lin.cambridge.arm.com>
-	<20110929094602.GH23944@n2100.arm.linux.org.uk>
-	<20110929103939.GD25061@e102144-lin.cambridge.arm.com>
-	<4E84A962.9030806@codeaurora.org>
-Message-ID: <20110929180428.GA8125@huya.qualcomm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 29 Sep 2011 13:25:17 -0500
+Subject: Git pull request: mach/vmalloc.h removal,
+	and ioremap optimizations
+In-Reply-To: <20110929173731.GB21718@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1109230908410.12663@xanadu.home>
+	<4E8495D9.2030009@gmail.com>
+	<20110929173731.GB21718@n2100.arm.linux.org.uk>
+Message-ID: <4E84B80D.2020605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 10:22:42AM -0700, Stephen Boyd wrote:
-> >> One of the problems you'll encounter is that there's places where we
-> >> don't have any timer infrastructure (eg, decompressor) and software
-> >> timing loops won't work (they'll be too slow for the lower-end CPUs
-> >> and too fast for the upper-end CPUs.)
-> > Agreed, software timing loops are the only option and it's impossible to get
-> > them right everywhere. I think the Kconfig help text should be updated so
-> > that the timeout paragraph is removed.
+On 09/29/2011 12:37 PM, Russell King - ARM Linux wrote:
+> On Thu, Sep 29, 2011 at 10:59:21AM -0500, Rob Herring wrote:
+>> commit e0438e2f333005c217a2f65aacab23a39261c64c
+>> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+>> Date:   Thu Aug 25 00:35:59 2011 -0400
+>>
+>>     ARM: move iotable mappings within the vmalloc region
+>>
+>>     In order to remove the build time variation between different SOCs with
+>>     regards to VMALLOC_END, the iotable mappings are now allocated inside
+>>     the vmalloc region.  This allows for VMALLOC_END to be identical across
+>>     all machines.
+>>
+>>     The value for VMALLOC_END is now set to 0xff000000 which is right where
+>>     the consistent DMA area starts.
+>>
+>>     To accommodate all static mappings on machines with possible highmem
+>> usage,
+>>     the default vmalloc area size is changed to 240 MB so that VMALLOC_START
+>>     is no higher than 0xf0000000 by default in that case.
+>>
+>>     Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+>>
+>>
+>> It dies after "Data cache writeback" with BUG at vmalloc.c:1139.
 > 
-> Yes if you wait a long time the timeout for each character will expire
-> and the execution will continue.
+> My guess would be:
+> 
+>         }, {
+>                 .virtual        =  IO_ADDRESS(VERSATILE_SCTL_BASE),
+>                 .pfn            = __phys_to_pfn(VERSATILE_SCTL_BASE),
+>                 .length         = SZ_4K * 9,
+>                 .type           = MT_DEVICE
+>         },
+> #ifdef CONFIG_MACH_VERSATILE_AB
+>         {
+>                 .virtual        =  IO_ADDRESS(VERSATILE_GPIO0_BASE),
+>                 .pfn            = __phys_to_pfn(VERSATILE_GPIO0_BASE),
+>                 .length         = SZ_4K,
+>                 .type           = MT_DEVICE
+> 
+> #define VERSATILE_SCTL_BASE            0x101E0000	/* System controller */
+> #define VERSATILE_GPIO0_BASE           0x101E4000	/* GPIO port 0 */
+> 
+> I don't see why GPIO0 is explicitly listed here.
 
-Wouldn't it be better to detect the first timeout and then stop trying
-to write to the DCC?
+It works for PB and AB with that removed. Here's a patch:
 
-But, do we really want fancy auto-detection stuff in DEBUG_LL?  A
-timeout might make sense for a DCC console, but not here.
+Author: Rob Herring <rob.herring@calxeda.com>
+Date:   Thu Sep 29 13:18:29 2011 -0500
 
-David
+    ARM: versatile: remove overlapping map_desc entry
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+    The map_desc for VERSATILE_GPIO0_BASE overlaps with VERSATILE_SCTL_BASE.
+    The overlapping entry can be removed.
+
+    Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index e340a54..4d8dfc1 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -141,11 +141,6 @@ static struct map_desc versatile_io_desc[]
+__initdata = {
+ 	},
+ #ifdef CONFIG_MACH_VERSATILE_AB
+  	{
+-		.virtual	=  IO_ADDRESS(VERSATILE_GPIO0_BASE),
+-		.pfn		= __phys_to_pfn(VERSATILE_GPIO0_BASE),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE
+-	}, {
+ 		.virtual	=  IO_ADDRESS(VERSATILE_IB2_BASE),
+ 		.pfn		= __phys_to_pfn(VERSATILE_IB2_BASE),
+ 		.length		= SZ_64M,
