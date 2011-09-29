@@ -1,54 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 29 Sep 2011 15:26:39 -0500
-Subject: Git pull request: mach/vmalloc.h removal,
-	and ioremap optimizations
-In-Reply-To: <alpine.LFD.2.02.1109291439110.9106@xanadu.home>
-References: <alpine.LFD.2.00.1109230908410.12663@xanadu.home>
-	<4E8495D9.2030009@gmail.com>
-	<20110929173731.GB21718@n2100.arm.linux.org.uk>
-	<4E84B80D.2020605@gmail.com>
-	<alpine.LFD.2.02.1109291439110.9106@xanadu.home>
-Message-ID: <4E84D47F.7030007@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 29 Sep 2011 13:46:39 -0700
+Subject: [PATCH v3 2/2] OMAP: omap_device: Add a method to build an
+	omap_device from a DT node
+In-Reply-To: <20110929173006.GG6800@ponder.secretlab.ca> (Grant Likely's
+	message of "Thu, 29 Sep 2011 12:30:06 -0500")
+References: <1316724745-24896-1-git-send-email-b-cousson@ti.com>
+	<1316724745-24896-3-git-send-email-b-cousson@ti.com>
+	<20110927014632.GB20588@ponder.secretlab.ca> <4E81F42B.5070806@ti.com>
+	<4E834748.50908@ti.com> <87fwjgv9sb.fsf@ti.com>
+	<20110929173006.GG6800@ponder.secretlab.ca>
+Message-ID: <87vcsboz4g.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2011 01:42 PM, Nicolas Pitre wrote:
-> On Thu, 29 Sep 2011, Rob Herring wrote:
-> 
->> On 09/29/2011 12:37 PM, Russell King - ARM Linux wrote:
->>> My guess would be:
->>>
->>>         }, {
->>>                 .virtual        =  IO_ADDRESS(VERSATILE_SCTL_BASE),
->>>                 .pfn            = __phys_to_pfn(VERSATILE_SCTL_BASE),
->>>                 .length         = SZ_4K * 9,
->>>                 .type           = MT_DEVICE
->>>         },
->>> #ifdef CONFIG_MACH_VERSATILE_AB
->>>         {
->>>                 .virtual        =  IO_ADDRESS(VERSATILE_GPIO0_BASE),
->>>                 .pfn            = __phys_to_pfn(VERSATILE_GPIO0_BASE),
->>>                 .length         = SZ_4K,
->>>                 .type           = MT_DEVICE
->>>
->>> #define VERSATILE_SCTL_BASE            0x101E0000	/* System controller */
->>> #define VERSATILE_GPIO0_BASE           0x101E4000	/* GPIO port 0 */
->>>
->>> I don't see why GPIO0 is explicitly listed here.
->>
->> It works for PB and AB with that removed. Here's a patch:
-> [...]
-> 
-> Thanks for testing and the patch.  I've inserted it in my patch series 
-> and pushed the result out.
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-So it was really Realview PBX I wanted to test my GIC changes on. Well,
-turns out it's got a similar problem, too.
+> On Wed, Sep 28, 2011 at 10:47:32AM -0700, Kevin Hilman wrote:
+>> "Cousson, Benoit" <b-cousson@ti.com> writes:
+>> 
+>> > Hi Grant, Kevin,
+>> >
+>> > Should I go ahead with this version and repost the series with that
+>> > third patch?
+>> 
+>> Fine with me.
+>> 
+>> Grant let me know if you prefer if I merge it (with your ack) with the
+>> rest of the series or if you want to take it to avoid conflicts.
+>
+> I'm happy with the way things have gone.  Go ahead and add my Ack and
+> merge it through your tree.  I'd like to avoid the conflicts.
 
-However, the fix for it should perhaps be a bit different. The problem
-is that the virtual address of REALVIEW_PBX_TILE_GIC_CPU_BASE is not
-aligned. Then 0x100 + 4KB length overlaps into the DIST_BASE. So do we
-fix it in the platform or should the core code mask out the lower bits
-of the virt addr before doing any size calculations?
+Thanks, I think keeping this series together will be smoothest.
 
-Rob
+Adding your ack, and queuing for v3.2 (branch: for_3.2/omap_device-2)
+
+Kevin
