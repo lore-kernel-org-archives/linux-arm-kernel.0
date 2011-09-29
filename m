@@ -1,43 +1,33 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 29 Sep 2011 22:08:05 +0800
-Subject: [PATCH v4 3/7] arm/imx: add gic_handle_irq function
-In-Reply-To: <20110929093409.GG23944@n2100.arm.linux.org.uk>
+Date: Thu, 29 Sep 2011 22:10:36 +0800
+Subject: [PATCH v4 2/7] arm/imx6q: add core definitions and low-level
+	debug uart
+In-Reply-To: <20110929093245.GF23944@n2100.arm.linux.org.uk>
 References: <1317200808-6275-1-git-send-email-shawn.guo@linaro.org>
-	<1317200808-6275-4-git-send-email-shawn.guo@linaro.org>
-	<20110929093409.GG23944@n2100.arm.linux.org.uk>
-Message-ID: <20110929140804.GJ19318@S2100-06.ap.freescale.net>
+	<1317200808-6275-3-git-send-email-shawn.guo@linaro.org>
+	<20110929093245.GF23944@n2100.arm.linux.org.uk>
+Message-ID: <20110929141035.GK19318@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 10:34:09AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Sep 28, 2011 at 05:06:44PM +0800, Shawn Guo wrote:
-> > +#ifdef CONFIG_SMP
-> > +		else if (irqnr < 16) {
-> > +			writel_relaxed(irqstat, gic_cpu_base_addr +
-> > +						GIC_CPU_EOI);
-> > +			do_IPI(irqnr, regs);
-> > +		}
-> > +#endif
-> > +#ifdef CONFIG_LOCAL_TIMERS
-> > +		else if (irqnr == 29) {
-> > +			writel_relaxed(irqstat, gic_cpu_base_addr +
-> > +						GIC_CPU_EOI);
-> > +			do_local_timer(regs);
-> > +		}
-> > +#endif
+On Thu, Sep 29, 2011 at 10:32:45AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Sep 28, 2011 at 05:06:43PM +0800, Shawn Guo wrote:
+> > diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+> > index 502e45f..e2e3e5a 100644
+> > --- a/arch/arm/plat-mxc/Kconfig
+> > +++ b/arch/arm/plat-mxc/Kconfig
+> > @@ -29,6 +29,13 @@ config ARCH_MX5
+> >  	  This enables support for machines using Freescale's i.MX50 and i.MX51
+> >  	  processors.
+> >  
+> > +config ARCH_MX6
+> > +	bool "i.MX6"
+> > +	select AUTO_ZRELADDR
 > 
-> As I've said for similar patches. neither of these two functions are
-> designed to be called from another C function (because they're marked
-> __exception or __exception_irq_entry).  Both of these markers tell the
-> unwinder that a struct pt_regs is located directly above the functions
-> stack frame.
+> This bars you from building a working kernel with ZBOOT_ROM=y.  You can
+> still select ZBOOT_ROM=y but things won't work.
 > 
-Can you please share your position on Marc's PPI and GIC
-MULTI_IRQ_HANDLER series?  Are you possibly going to merge them in the
-coming merge window?  If you are, I would directly move my imx6q onto
-those series and save the local gic_handle_irq().  Otherwise, I may
-have to add a wrapper for do_IPI() and do_local_timer() to work around
-the pt_regs issue you pointed out here.
+Right.  This is going to be 'select AUTO_ZRELADDR if !ZBOOT_ROM'.
 
 -- 
 Regards,
