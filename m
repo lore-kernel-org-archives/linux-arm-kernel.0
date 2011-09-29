@@ -1,37 +1,24 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 29 Sep 2011 16:22:02 -0500
-Subject: [PATCH] ARM: realview: fix map_desc alignment
-In-Reply-To: <4E84E0CA.2050905@gmail.com>
-References: <4E84E0CA.2050905@gmail.com>
-Message-ID: <1317331322-4439-1-git-send-email-robherring2@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Sep 2011 23:30:28 +0200
+Subject: [PATCH 7/8] OMAP4: clock: Add CPU local timer clock node.
+In-Reply-To: <1315459327-3285-8-git-send-email-santosh.shilimkar@ti.com>
+References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
+	<1315459327-3285-8-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <CAKnu2Mp4QnQPwcGJCrfMqS6VcfvvvAxginjJkLG1mPLO0WJBUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+2011/9/8 Santosh Shilimkar <santosh.shilimkar@ti.com>:
 
-REALVIEW_PBX_TILE_GIC_CPU_BASE is not 4KB aligned which causes an
-overlapping mapping. Use REALVIEW_PBX_TILE_SCU_BASE instead which is
-aligned.
+> Local timer clock is sourced from the CPU clock and hence changes
+> along with CPU clock. These per CPU local timers are used as
+> clock-events, so they need to be reconfigured on CPU frequency
+> change as part of CPUfreq governor.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-realview/realview_pbx.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+This requires patch 6956/2 right?
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6956/2
 
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index 363b0ab..5930a33 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -98,8 +98,8 @@ static struct map_desc realview_pbx_io_desc[] __initdata = {
- 
- static struct map_desc realview_local_io_desc[] __initdata = {
- 	{
--		.virtual        = IO_ADDRESS(REALVIEW_PBX_TILE_GIC_CPU_BASE),
--		.pfn            = __phys_to_pfn(REALVIEW_PBX_TILE_GIC_CPU_BASE),
-+		.virtual        = IO_ADDRESS(REALVIEW_PBX_TILE_SCU_BASE),
-+		.pfn            = __phys_to_pfn(REALVIEW_PBX_TILE_SCU_BASE),
- 		.length         = SZ_4K,
- 		.type           = MT_DEVICE,
- 	}, {
--- 
-1.7.5.4
+Can I add your Tested-by: to the patch as well?
+
+Yours,
+Linus Walleij
