@@ -1,41 +1,46 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 28 Sep 2011 22:39:46 -0700
-Subject: [PATCH 2/2] msm: Support DEBUG_LL on MSM8660 and MSM8960
-In-Reply-To: <alpine.LFD.2.02.1109290012400.9106@xanadu.home>
-References: <1317243959-26383-1-git-send-email-sboyd@codeaurora.org>
-	<1317243959-26383-3-git-send-email-sboyd@codeaurora.org>
-	<alpine.LFD.2.02.1109290012400.9106@xanadu.home>
-Message-ID: <4E8404A2.10702@codeaurora.org>
+From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
+Date: Wed, 28 Sep 2011 22:56:28 -0700
+Subject: [PATCH v3 1/3] genirq: add support for per-cpu dev_id interrupts
+In-Reply-To: <1316793788-14500-2-git-send-email-marc.zyngier@arm.com>
+References: <1316793788-14500-1-git-send-email-marc.zyngier@arm.com>
+	<1316793788-14500-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <4E84088C.8050101@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/28/2011 9:21 PM, Nicolas Pitre wrote:
-> On Wed, 28 Sep 2011, Stephen Boyd wrote:
+On 09/23/2011 09:03 AM, Marc Zyngier wrote:
+> The ARM GIC interrupt controller offers per CPU interrupts (PPIs),
+> which are usually used to connect local timers to each core.
+> Each CPU has its own private interface to the GIC,
+> and only sees the PPIs that are directly connect to it.
 >
+> While these timers are separate devices and have a separate
+> interrupt line to a core, they all use the same IRQ number.
 >
->>  	.macro	senduart,rd,rx
->> +#ifdef CONFIG_MSM_HAS_DEBUG_UART_HS
->> +	@ Clear TX_READY by writing to the UARTDM_CR register
->> +	mov	r12, #0x300
->> +	str	r12, [\rx, #0x10]
->> +	@ Write 0x1 to NCF register
->> +	mov 	r12, #0x1
->> +	str	r12, [\rx, #0x40]
->> +	@ UARTDM reg. Read to induce delay
->> +	ldr	r12, [\rx, #0x08]
->> +	@ Write the 1 character to UARTDM_TF
->> +	str	\rd, [\rx, #0x70]
-> This is a really bad idea to pick a register (r12) when the calling code 
-> is completely unaware of that.  This _will_ break on you someday.
+> For these devices, request_irq() is not the right API as it
+> assumes that an IRQ number is visible by a number of CPUs
+> (through the affinity setting), but makes it very awkward to
+> express that an IRQ number can be handled by all CPUs, and
+> yet be a different interrupt line on each CPU, requiring a
+> different dev_id cookie to be passed back to the handler.
 >
-> Except for the last line, why didn't you simply fold this code into the 
-> waituart macro instead?
+> The *_percpu_irq() functions is designed to overcome these
+> limitations, by providing a per-cpu dev_id vector:
+>
+> int request_percpu_irq(unsigned int irq, irq_handler_t handler,
+> 		   const char *devname, void __percpu *percpu_dev_id);
+> void free_percpu_irq(unsigned int, void __percpu *);
+> int setup_percpu_irq(unsigned int irq, struct irqaction *new);
+> void remove_percpu_irq(unsigned int irq, struct irqaction *act);
+> void enable_percpu_irq(unsigned int irq);
 
-We need to configure the uart to be ready for a write and it didn't seem
-appropriate to put that in the waituart macro because it isn't actually
-waiting for anything. I suppose putting it after the waiting is fine
-though and avoids future breakage. Thanks.
+As mentioned here
+https://lkml.org/lkml/2011/9/25/121
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+can we add irqflags to enable_percpu_irq? This will make msm's
+usage cleaner and it wont have to rely on accessing the gic
+registers outside the driver.
+
+---
+Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
+Innovation Center, Inc. is a member of the Code Aurora Forum.
