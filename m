@@ -1,41 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 29 Sep 2011 00:21:29 -0400 (EDT)
-Subject: [PATCH 2/2] msm: Support DEBUG_LL on MSM8660 and MSM8960
-In-Reply-To: <1317243959-26383-3-git-send-email-sboyd@codeaurora.org>
-References: <1317243959-26383-1-git-send-email-sboyd@codeaurora.org>
-	<1317243959-26383-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <alpine.LFD.2.02.1109290012400.9106@xanadu.home>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Thu, 29 Sep 2011 09:52:56 +0530
+Subject: [PATCH V2 1/1] dmaengine/amba-pl08x: Add support for s3c64xx DMAC
+In-Reply-To: <CAGOxZ535KHUp6An2br0scU9HvCmg4OsnfCj7hWYq4iy+OEpO2Q@mail.gmail.com>
+References: <1317189007-23033-1-git-send-email-alim.akhtar@samsung.com>
+	<1317189007-23033-2-git-send-email-alim.akhtar@samsung.com>
+	<4E82D0A1.8050203@st.com>
+	<CAGOxZ53qZy+VUM65oK68W088QR=RgQ=cNxOCbO7_WESJesJaVQ@mail.gmail.com>
+	<4E82EEE1.3020706@st.com>
+	<CAGOxZ535KHUp6An2br0scU9HvCmg4OsnfCj7hWYq4iy+OEpO2Q@mail.gmail.com>
+Message-ID: <4E83F2A0.3090501@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Sep 2011, Stephen Boyd wrote:
-
-> Add support for DEBUG_LL on the 8660 and 8960 development boards.
-> While we're here, cleanup the uncompress.h code a bit.
+On 9/28/2011 5:24 PM, Alim Akhtar wrote:
+> I did Modified pl08x_cctl_bits(), but for some reason i reverted it back.
+> what i was doing something like returning just __retbits__ instead of
+> retbits |= tsize << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+> and doing the below for the __non-s3c__ controllers in the
+> pl08x_fill_lli_for_desc().
+> cctl |= 1 << PL080_CONTROL_TRANSFER_SIZE_SHIFT;
+> pl08x_fill_lli_for_desc(&bd, num_llis++, 1, cctl);
 > 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
 
-[...]
+One way out would be:
+Don't do retbits |= tsize << PL080_CONTROL_TRANSFER_SIZE_SHIFT in
+pl08x_cctl_bits() and do this conditionally in pl08x_fill_lli_for_desc().
+This needs adding tsize argument in fill_lli_**() routine and removing it
+from cctl_bits().
 
->  	.macro	senduart,rd,rx
-> +#ifdef CONFIG_MSM_HAS_DEBUG_UART_HS
-> +	@ Clear TX_READY by writing to the UARTDM_CR register
-> +	mov	r12, #0x300
-> +	str	r12, [\rx, #0x10]
-> +	@ Write 0x1 to NCF register
-> +	mov 	r12, #0x1
-> +	str	r12, [\rx, #0x40]
-> +	@ UARTDM reg. Read to induce delay
-> +	ldr	r12, [\rx, #0x08]
-> +	@ Write the 1 character to UARTDM_TF
-> +	str	\rd, [\rx, #0x70]
+Probably this is what you were mentioning.
 
-This is a really bad idea to pick a register (r12) when the calling code 
-is completely unaware of that.  This _will_ break on you someday.
-
-Except for the last line, why didn't you simply fold this code into the 
-waituart macro instead?
-
-
-Nicolas
+-- 
+viresh
