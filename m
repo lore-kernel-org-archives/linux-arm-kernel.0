@@ -1,92 +1,65 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 29 Sep 2011 16:02:44 -0500
-Subject: [PATCH 1/2] ARM: gic: add irq_domain support
-In-Reply-To: <20110929171540.GC6800@ponder.secretlab.ca>
-References: <1317268436-1613-1-git-send-email-robherring2@gmail.com>
-	<1317268436-1613-2-git-send-email-robherring2@gmail.com>
-	<20110929171540.GC6800@ponder.secretlab.ca>
-Message-ID: <4E84DCF4.4020904@gmail.com>
+Date: Thu, 29 Sep 2011 16:19:06 -0500
+Subject: Git pull request: mach/vmalloc.h removal,
+	and ioremap optimizations
+In-Reply-To: <alpine.LFD.2.02.1109291645570.9106@xanadu.home>
+References: <alpine.LFD.2.00.1109230908410.12663@xanadu.home>
+	<4E8495D9.2030009@gmail.com>
+	<20110929173731.GB21718@n2100.arm.linux.org.uk>
+	<4E84B80D.2020605@gmail.com>
+	<alpine.LFD.2.02.1109291439110.9106@xanadu.home>
+	<4E84D47F.7030007@gmail.com>
+	<alpine.LFD.2.02.1109291645570.9106@xanadu.home>
+Message-ID: <4E84E0CA.2050905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2011 12:15 PM, Grant Likely wrote:
-> On Wed, Sep 28, 2011 at 10:53:55PM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
+On 09/29/2011 03:47 PM, Nicolas Pitre wrote:
+> On Thu, 29 Sep 2011, Rob Herring wrote:
+> 
+>> On 09/29/2011 01:42 PM, Nicolas Pitre wrote:
+>>> On Thu, 29 Sep 2011, Rob Herring wrote:
+>>>
+>>>> On 09/29/2011 12:37 PM, Russell King - ARM Linux wrote:
+>>>>> My guess would be:
+>>>>>
+>>>>>         }, {
+>>>>>                 .virtual        =  IO_ADDRESS(VERSATILE_SCTL_BASE),
+>>>>>                 .pfn            = __phys_to_pfn(VERSATILE_SCTL_BASE),
+>>>>>                 .length         = SZ_4K * 9,
+>>>>>                 .type           = MT_DEVICE
+>>>>>         },
+>>>>> #ifdef CONFIG_MACH_VERSATILE_AB
+>>>>>         {
+>>>>>                 .virtual        =  IO_ADDRESS(VERSATILE_GPIO0_BASE),
+>>>>>                 .pfn            = __phys_to_pfn(VERSATILE_GPIO0_BASE),
+>>>>>                 .length         = SZ_4K,
+>>>>>                 .type           = MT_DEVICE
+>>>>>
+>>>>> #define VERSATILE_SCTL_BASE            0x101E0000	/* System controller */
+>>>>> #define VERSATILE_GPIO0_BASE           0x101E4000	/* GPIO port 0 */
+>>>>>
+>>>>> I don't see why GPIO0 is explicitly listed here.
+>>>>
+>>>> It works for PB and AB with that removed. Here's a patch:
+>>> [...]
+>>>
+>>> Thanks for testing and the patch.  I've inserted it in my patch series 
+>>> and pushed the result out.
 >>
->> Convert the gic interrupt controller to use irq domains in preparation
->> for device-tree binding and MULTI_IRQ. This allows for translation between
->> GIC interrupt IDs and Linux irq numbers.
+>> So it was really Realview PBX I wanted to test my GIC changes on. Well,
+>> turns out it's got a similar problem, too.
 >>
->> The meaning of irq_offset has changed. It now is just the number of skipped
->> GIC interrupt IDs for the controller. It will be 16 for primary GIC and 32
->> for secondary GICs.
+>> However, the fix for it should perhaps be a bit different. The problem
+>> is that the virtual address of REALVIEW_PBX_TILE_GIC_CPU_BASE is not
+>> aligned. Then 0x100 + 4KB length overlaps into the DIST_BASE. So do we
+>> fix it in the platform or should the core code mask out the lower bits
+>> of the virt addr before doing any size calculations?
 > 
-> [...]
+> Please fix it in the platform static declaration.  No need to put 
+> run time code for something that can be fixed in the source.
 > 
->>  /*
->> @@ -81,7 +82,7 @@ static inline unsigned int gic_irq(struct irq_data *d)
->>   */
->>  static void gic_mask_irq(struct irq_data *d)
->>  {
->> -	u32 mask = 1 << (d->irq % 32);
->> +	u32 mask = 1 << (gic_irq(d) % 32);
-> 
-> This can probably change simply to d->hwirq if irq_offset is
-> eliminated as I describe below.
-> 
->>  void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
->>  	void __iomem *dist_base, void __iomem *cpu_base)
->>  {
->>  	struct gic_chip_data *gic;
->> +	struct irq_domain *domain;
->> +	int gic_irqs;
->>  
->>  	BUG_ON(gic_nr >= MAX_GIC_NR);
->>  
->>  	gic = &gic_data[gic_nr];
->> +	domain = &gic->domain;
->>  	gic->dist_base = dist_base;
->>  	gic->cpu_base = cpu_base;
->> -	gic->irq_offset = (irq_start - 1) & ~31;
->>  
->> -	if (gic_nr == 0)
->> +	/*
->> +	 * For primary GICs, skip over SGIs.
->> +	 * For secondary GICs, skip over PPIs, too.
->> +	 */
->> +	if (gic_nr == 0) {
->>  		gic_cpu_base_addr = cpu_base;
->> +		gic->irq_offset = 16;
->> +		irq_start = (irq_start & ~31) + 16;
-> 
-> With the switch to irq_domain, there should no longer be any need for
-> a ~31 mask on the irq_start number.  Yes, you'll want to make sure
-> that it doesn't allocate below irq 16, but the driver should
-> completely use the irq_domain to manage the mapping from linux-irq
-> number to hwirq number.  The ~31 mask appears to have been an
-> optimization to quickly calculate hwirq number from the linux one, but
-> that value is now found in irq_data->hwirq.
-
-I started out exactly this way removing irq_offset. The problem is the
-core irq domain code assumes that hwirq starts at 0, but for the gic it
-starts at 16 or 32.
-
-It could be fixed in the domain core, but that would effectively mean
-moving irq_offset into the core.
-
-The masking here is mainly to not break exynos. Everyone else passes in
-a value of 16-31 which I could just hardcode to 16. So when exynos gets
-all the interrupts converted over to domains, this can be removed. I
-looked at it briefly and it doesn't look trivial.
-
-> 
-> irq_offset could almost be dropped entirely outside of probe because
-> it no longer matters.  Instead, populate the to_irq() hook so that the
-> hwirq value gets set correctly from the outset.
-> 
-> It would be better in general to have a consistent view of what the
-> hwirq number means regardless of if it is a root GIC.
-
-Agreed.
+Except that 2 out of 2 machines I've tried are broken. Anyway, patch is
+coming.
 
 Rob
