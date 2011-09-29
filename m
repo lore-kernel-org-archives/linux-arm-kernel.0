@@ -1,26 +1,69 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 28 Sep 2011 16:50:21 -0700
-Subject: [PATCH 1/2] msm: Consolidate and move DEBUG_LL to generic ARM
-	Kconfig
-In-Reply-To: <1317243959-26383-2-git-send-email-sboyd@codeaurora.org>
-References: <1317243959-26383-1-git-send-email-sboyd@codeaurora.org>
-	<1317243959-26383-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20110928235021.GA10636@huya.qualcomm.com>
+From: hemantp@ti.com (Hemant Pedanekar)
+Date: Thu, 29 Sep 2011 06:38:58 +0530
+Subject: [PATCH v3 0/3] Add support for TI814X processor series
+Message-ID: <1317258538-30200-1-git-send-email-hemantp@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2011 at 02:05:58PM -0700, Stephen Boyd wrote:
-> Now that DEBUG_LL is a choice, we can move MSM's homegrown choice
-> menu to DEBUG_LL.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+This patch set adds support for DM814x/AM387x device series having Cortex-A8
+MPU.
 
-This seems to make DEBUG_LL work again on MSM8250.  So:
+The technical documents are available from following link:
 
-Tested-by: David Brown <davidb@codeaurora.org>
+http://focus.ti.com/docs/prod/folders/print/tms320dm8148.html
 
-David
+This series is referred in code as TI814X.
+
+Since these devices share similar architecture as TI816X devices, existing
+TI816X code is updated to accomodate TI814X support. The code shared across
+TI816X and TI814X devices is updated with TI81XX/ti81xx prefix as applicable,
+while maintaining cpu_is_ti816x() and cpu_is_ti814x() to distinguish specific
+execution differences.
+
+Changes since v2:
+1) Incorporate Tony's suggestion about moving ti8168_evm_map_io() to
+   arch/arm/mach-omap2/common.c to keep common across TI81XX.
+2) Keeping single board file (board-ti81xxevm.c) for TI816X and TI814X EVMs
+
+Changes since v1:
+1) Rebased and updated after Paul's CHIP_IS removal changes
+2) Removed call to omap2_init_common_devices() as per Kevin's comment
+
+Hemant Pedanekar (3):
+  ARM: OMAP: TI81XX: Prepare for addition of TI814X support
+  ARM: OMAP: TI814X: Add cpu type macros and detection support
+  ARM: OMAP: TI814X: Create board support and enable build for TI8148
+    EVM
+
+ arch/arm/mach-omap2/Kconfig                        |   11 +++++--
+ arch/arm/mach-omap2/Makefile                       |    3 +-
+ .../{board-ti8168evm.c => board-ti81xxevm.c}       |   34 +++++++++++---------
+ arch/arm/mach-omap2/clock.c                        |    2 +-
+ arch/arm/mach-omap2/clock.h                        |    2 +-
+ arch/arm/mach-omap2/clock3xxx_data.c               |    5 ++-
+ arch/arm/mach-omap2/common.c                       |   28 ++++++++++------
+ arch/arm/mach-omap2/control.h                      |    8 ++--
+ arch/arm/mach-omap2/id.c                           |   30 +++++++++++++++--
+ arch/arm/mach-omap2/include/mach/debug-macro.S     |   12 +++---
+ arch/arm/mach-omap2/include/mach/entry-macro.S     |    4 +-
+ arch/arm/mach-omap2/io.c                           |   12 +++---
+ arch/arm/mach-omap2/irq.c                          |    2 +-
+ arch/arm/mach-omap2/opp2xxx.h                      |    2 +-
+ arch/arm/mach-omap2/serial.c                       |    6 ++--
+ arch/arm/plat-omap/include/plat/clkdev_omap.h      |    1 +
+ arch/arm/plat-omap/include/plat/clock.h            |    3 +-
+ arch/arm/plat-omap/include/plat/common.h           |    5 ++-
+ arch/arm/plat-omap/include/plat/cpu.h              |   22 +++++++++++++
+ arch/arm/plat-omap/include/plat/hardware.h         |    2 +-
+ arch/arm/plat-omap/include/plat/io.h               |    6 ++--
+ arch/arm/plat-omap/include/plat/irqs.h             |    2 +-
+ arch/arm/plat-omap/include/plat/serial.h           |   14 ++++----
+ .../plat-omap/include/plat/{ti816x.h => ti81xx.h}  |   18 +++++-----
+ arch/arm/plat-omap/include/plat/uncompress.h       |   11 ++++--
+ arch/arm/plat-omap/io.c                            |    2 +-
+ 26 files changed, 158 insertions(+), 89 deletions(-)
+ rename arch/arm/mach-omap2/{board-ti8168evm.c => board-ti81xxevm.c} (60%)
+ rename arch/arm/plat-omap/include/plat/{ti816x.h => ti81xx.h} (60%)
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.3.5
