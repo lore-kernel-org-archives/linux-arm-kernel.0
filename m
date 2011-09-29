@@ -1,109 +1,26 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 29 Sep 2011 10:30:09 +0100
-Subject: [PATCHv2 02/10] ARM: vic: MULTI_IRQ_HANDLER handler
-In-Reply-To: <CACRpkdZKns-GraGp-YMD6jzOPETkvEpt9bC8HcYUmf3JUyCV3A@mail.gmail.com>
-References: <1317206507-18867-1-git-send-email-jamie@jamieiles.com>
-	<1317206507-18867-3-git-send-email-jamie@jamieiles.com>
-	<20110928203905.GB2838@ponder.secretlab.ca>
-	<CACRpkdZKns-GraGp-YMD6jzOPETkvEpt9bC8HcYUmf3JUyCV3A@mail.gmail.com>
-Message-ID: <20110929093009.GM17204@pulham.picochip.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Sep 2011 10:32:45 +0100
+Subject: [PATCH v4 2/7] arm/imx6q: add core definitions and low-level
+	debug uart
+In-Reply-To: <1317200808-6275-3-git-send-email-shawn.guo@linaro.org>
+References: <1317200808-6275-1-git-send-email-shawn.guo@linaro.org>
+	<1317200808-6275-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110929093245.GF23944@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 08:55:08AM +0200, Linus Walleij wrote:
-> On Wed, Sep 28, 2011 at 10:39 PM, Grant Likely
-> <grant.likely@secretlab.ca> wrote:
-> 
-> > Why isn't it simply written this way:
-> >
-> > ? ? ? ?stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-> > ? ? ? ?while (stat) {
-> > ? ? ? ? ? ? ? ?irq = fls(stat) - 1;
-> > ? ? ? ? ? ? ? ?handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
-> > ? ? ? ? ? ? ? ?stat &= ~(1 << irq);
-> > ? ? ? ?}
-> 
-> That is indeed closer to the assembly loop most platforms have
-> implemented.
-> 
-> Jamie can you test this approach? And also use ffs() insteadof
-> fls()...
+On Wed, Sep 28, 2011 at 05:06:43PM +0800, Shawn Guo wrote:
+> diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+> index 502e45f..e2e3e5a 100644
+> --- a/arch/arm/plat-mxc/Kconfig
+> +++ b/arch/arm/plat-mxc/Kconfig
+> @@ -29,6 +29,13 @@ config ARCH_MX5
+>  	  This enables support for machines using Freescale's i.MX50 and i.MX51
+>  	  processors.
+>  
+> +config ARCH_MX6
+> +	bool "i.MX6"
+> +	select AUTO_ZRELADDR
 
-OK, here it is (and it works)!  That does make it a lot simpler, thanks 
-guys!  I've updated the vic-dt branch in my repo too.
-
-Jamie
-
-8<------
-From: Jamie Iles <jamie@jamieiles.com>
-Subject: [PATCHv3] ARM: vic: MULTI_IRQ_HANDLER handler
-
-Add a handler for the VIC that is suitable for MULTI_IRQ_HANDLER
-platforms.  This can replace the ASM entry macros for platforms that use
-the VIC.
-
-v3:	- simplify irq handling loop as suggested by Grant
-	- service interrupts from msb->lsb order
-v2:	- allow the handler be used for !CONFIG_OF
-	- use irq_domain_to_irq()
-
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/common/vic.c               |   22 ++++++++++++++++++++++
- arch/arm/include/asm/hardware/vic.h |    4 ++++
- 2 files changed, 26 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-index 3f9c8f2..b22b83d 100644
---- a/arch/arm/common/vic.c
-+++ b/arch/arm/common/vic.c
-@@ -427,3 +427,25 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
- 	return -EIO;
- }
- #endif /* CONFIG OF */
-+
-+#ifdef CONFIG_MULTI_IRQ_HANDLER
-+static void vic_single_handle_irq(struct vic_device *vic, struct pt_regs *regs)
-+{
-+	u32 stat, irq;
-+
-+	stat = readl_relaxed(vic->base + VIC_IRQ_STATUS);
-+	while (stat) {
-+		irq = ffs(stat) - 1;
-+		handle_IRQ(irq_domain_to_irq(&vic->domain, irq), regs);
-+		stat &= ~(1 << irq);
-+	}
-+}
-+
-+asmlinkage void __exception_irq_entry vic_handle_irq(struct pt_regs *regs)
-+{
-+	int i;
-+
-+	for (i = 0; i < vic_id; ++i)
-+		vic_single_handle_irq(&vic_devices[i], regs);
-+}
-+#endif /* CONFIG_MULTI_IRQ_HANDLER */
-diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
-index 0135215..c02fd6f 100644
---- a/arch/arm/include/asm/hardware/vic.h
-+++ b/arch/arm/include/asm/hardware/vic.h
-@@ -45,11 +45,15 @@
- #include <linux/types.h>
- 
- struct device_node;
-+struct pt_regs;
-+
- void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
- 
- #ifdef CONFIG_OF
- int vic_of_init(struct device_node *node, struct device_node *parent);
- #endif /* CONFIG_OF */
- 
-+void vic_handle_irq(struct pt_regs *regs);
-+
- #endif /* __ASSEMBLY__ */
- #endif
--- 
-1.7.4.1
+This bars you from building a working kernel with ZBOOT_ROM=y.  You can
+still select ZBOOT_ROM=y but things won't work.
