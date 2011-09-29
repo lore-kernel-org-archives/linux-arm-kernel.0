@@ -1,26 +1,36 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 29 Sep 2011 12:00:12 +0100
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <20110928231410.GF2838@ponder.secretlab.ca>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20110926152634.GN2946@opensource.wolfsonmicro.com>
-	<CACxGe6swdnhk_GCAv3siSx4kxNQXmCLDbwBFjsX5VPNfCBc2Mg@mail.gmail.com>
-	<201109271550.36427.arnd@arndb.de>
-	<20110927210849.GD3994@ponder.secretlab.ca>
-	<20110927221308.GA2674@opensource.wolfsonmicro.com>
-	<20110928231410.GF2838@ponder.secretlab.ca>
-Message-ID: <20110929110011.GL3697@opensource.wolfsonmicro.com>
+From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
+Date: Thu, 29 Sep 2011 08:30:01 -0400
+Subject: [PATCH] PM: HIBERNATION: add resume_wait param to support
+	MMC-like devices as resume file
+In-Reply-To: Your message of "Thu, 29 Sep 2011 02:29:08 PDT."
+	<1317288548-19560-1-git-send-email-Barry.Song@csr.com>
+References: <1317288548-19560-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <59872.1317299401@turing-police.cc.vt.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2011 at 06:14:10PM -0500, Grant Likely wrote:
+On Thu, 29 Sep 2011 02:29:08 PDT, Barry Song said:
 
-> For your question, I still think it is the driver that gets to make
-> the decision.  If it can proceed without a resource, then it should go
-> ahead and succeed on the probe, and then arrange to either be notified
-> of new gpio controller (or whatever) registrations, or poll for the
-> resource to be set up.
+> This patch adds resumewait kernel param just like rootwait so
+> that we have enough time to wait mmc ready. The differene is
+> here we wait for resume partition but rootwait waits for rootfs
+> partition.
 
-Right, I do tend to agree.  This is something we'll have to bear in mind
-when deploying this stuff - drivers that are doing this sort of stuff
-are going to get surprised.
+OK, seems a reasonable idea...
+
+> kernel/power/hibernate.c |   16 ++++++++++++++++
+> 1 files changed, 16 insertions(+), 0 deletions(-)
+
+We have a __setup() parameter, this patch appears to be missing
+a hunk for Documentation/kernel-parameters.txt?
+
+Fix that issue, and you can stick this on there:
+
+Reviewed-by: Valdis Kletnieks <valdis.kletnieks@vt.edu>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 227 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110929/d6c2e289/attachment.sig>
