@@ -1,46 +1,102 @@
-From: adharmap@codeaurora.org (Abhijeet Dharmapurikar)
-Date: Wed, 28 Sep 2011 22:56:28 -0700
-Subject: [PATCH v3 1/3] genirq: add support for per-cpu dev_id interrupts
-In-Reply-To: <1316793788-14500-2-git-send-email-marc.zyngier@arm.com>
-References: <1316793788-14500-1-git-send-email-marc.zyngier@arm.com>
-	<1316793788-14500-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4E84088C.8050101@codeaurora.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 29 Sep 2011 13:59:25 +0800
+Subject: [PATCH v2] ARM: cache-l2x0: add resume entry for l2 in secure mode
+In-Reply-To: <20110929054938.GD19318@S2100-06.ap.freescale.net>
+References: <1317007569-31213-1-git-send-email-Baohua.Song@csr.com>
+	<4E8403BE.9050302@ti.com>
+	<20110929054938.GD19318@S2100-06.ap.freescale.net>
+Message-ID: <CAGsJ_4zY2=J6=DDh45KueA_1Hs8Q+3O0YcdwQKjK4KVvwnPFgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/23/2011 09:03 AM, Marc Zyngier wrote:
-> The ARM GIC interrupt controller offers per CPU interrupts (PPIs),
-> which are usually used to connect local timers to each core.
-> Each CPU has its own private interface to the GIC,
-> and only sees the PPIs that are directly connect to it.
->
-> While these timers are separate devices and have a separate
-> interrupt line to a core, they all use the same IRQ number.
->
-> For these devices, request_irq() is not the right API as it
-> assumes that an IRQ number is visible by a number of CPUs
-> (through the affinity setting), but makes it very awkward to
-> express that an IRQ number can be handled by all CPUs, and
-> yet be a different interrupt line on each CPU, requiring a
-> different dev_id cookie to be passed back to the handler.
->
-> The *_percpu_irq() functions is designed to overcome these
-> limitations, by providing a per-cpu dev_id vector:
->
-> int request_percpu_irq(unsigned int irq, irq_handler_t handler,
-> 		   const char *devname, void __percpu *percpu_dev_id);
-> void free_percpu_irq(unsigned int, void __percpu *);
-> int setup_percpu_irq(unsigned int irq, struct irqaction *new);
-> void remove_percpu_irq(unsigned int irq, struct irqaction *act);
-> void enable_percpu_irq(unsigned int irq);
+2011/9/29 Shawn Guo <shawn.guo@freescale.com>:
+> On Thu, Sep 29, 2011 at 11:05:58AM +0530, Santosh Shilimkar wrote:
+>> Barry,
+>>
+>> On Monday 26 September 2011 08:56 AM, Barry Song wrote:
+>> > we save the l2x0 registers at the first initialization, and platform codes
+>> > can get them to restore l2x0 status after wakeup.
+>> >
+>> > Cc: Shawn Guo <shawn.guo@linaro.org>
+>> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> > ---
+>> > ?-v2:
+>> > ?define the structure l2x0_regs to hold all saved registers;
+>> > ?make saved copy of registers non-static so that platform codes can access them;
+>> > ?add asm_offset for l2x0 saved regs(l2x0_regs struct) so that asm codes can use
+>> >
+>> > ?arch/arm/include/asm/hardware/cache-l2x0.h | ? 13 +++++
+>> > ?arch/arm/include/asm/outercache.h ? ? ? ? ?| ? ?7 +++
+>> > ?arch/arm/kernel/asm-offsets.c ? ? ? ? ? ? ?| ? ?9 +++
+>> > ?arch/arm/mm/cache-l2x0.c ? ? ? ? ? ? ? ? ? | ? 81 ++++++++++++++++++++++++---
+>> > ?4 files changed, 101 insertions(+), 9 deletions(-)
+>> >
+>> > diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+>> > index c48cb1e..4f9e81d 100644
+>> > --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+>> > +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+>> > @@ -96,6 +96,19 @@
+>> > ?#ifndef __ASSEMBLY__
+>> > ?extern void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask);
+>> > ?extern int l2x0_of_init(__u32 aux_val, __u32 aux_mask);
+>> > +
+>> > +struct l2x0_regs {
+>> > + ? unsigned long aux_ctrl;
+>> > + ? /*
+>> > + ? ?* Whether the following registers need to be saved/restored
+>> > + ? ?* depends on platform
+>> > + ? ?*/
+>> > + ? unsigned long tag_latency;
+>> > + ? unsigned long data_latency;
+>> > + ? unsigned long filter_start;
+>> > + ? unsigned long filter_end;
+>> > +};
+>> > +
+>> You are missing POR register here which is available on
+>> PL310 versions. You should add that.
+>>
+>> [...]
+>> > ?static inline void outer_inv_range(phys_addr_t start, phys_addr_t end)
+>> > diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+>> > index 16baba2..b8d72a8 100644
+>> > --- a/arch/arm/kernel/asm-offsets.c
+>> > +++ b/arch/arm/kernel/asm-offsets.c
+>> > @@ -20,6 +20,7 @@
+>> > ?#include <asm/thread_info.h>
+>> > ?#include <asm/memory.h>
+>> > ?#include <asm/procinfo.h>
+>> > +#include <asm/hardware/cache-l2x0.h>
+>> > ?#include <linux/kbuild.h>
+>> >
+>> > ?/*
+>> > @@ -92,6 +93,14 @@ int main(void)
+>> > ? ?DEFINE(S_OLD_R0, ? ? ? ? offsetof(struct pt_regs, ARM_ORIG_r0));
+>> > ? ?DEFINE(S_FRAME_SIZE, ? ? ? ? ? ? sizeof(struct pt_regs));
+>> > ? ?BLANK();
+>> > +#ifdef CONFIG_CACHE_L2X0
+>> > + ?DEFINE(L2X0_R_AUX_CTRL, ?offsetof(struct l2x0_regs, aux_ctrl));
+>> > + ?DEFINE(L2X0_R_TAG_LATENCY, ? ? ? offsetof(struct l2x0_regs, tag_latency));
+>> > + ?DEFINE(L2X0_R_DATA_LATENCY, ? ? ?offsetof(struct l2x0_regs, data_latency));
+>> > + ?DEFINE(L2X0_R_FILTER_START, ? ? ?offsetof(struct l2x0_regs, filter_start));
+>> > + ?DEFINE(L2X0_R_FILTER_END, ? ? ? ?offsetof(struct l2x0_regs, filter_end));
+>> Add POR as commented earlier.
+>>
+>> Rest of the patch looks good to me. I have ignored DT related
+>> changes since I don't understand them.
+>>
+>> Shawn,
+>> Have you tried this patch on IMX and see if you are
+>> able to use it from the asm code?
+>>
+> Will give it a test today
 
-As mentioned here
-https://lkml.org/lkml/2011/9/25/121
+well, thanks. once after you test and think it is ok, i'll send v3
+with fixing the lost POR.
 
-can we add irqflags to enable_percpu_irq? This will make msm's
-usage cleaner and it wont have to rely on accessing the gic
-registers outside the driver.
+>
+> --
+> Regards,
+> Shawn
 
----
-Sent by an employee of the Qualcomm Innovation Center, Inc. The Qualcomm 
-Innovation Center, Inc. is a member of the Code Aurora Forum.
+-barry
