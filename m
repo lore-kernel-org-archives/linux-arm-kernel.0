@@ -1,58 +1,32 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 29 Sep 2011 23:26:21 +0800
-Subject: [PATCH 2/2 v2] plat-pxa: break out GPIO driver specifics
-In-Reply-To: <1317121014-4749-1-git-send-email-linus.walleij@stericsson.com>
-References: <1317121014-4749-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CAN1soZyCLc-vA5heAWGKkajUx58a2BuiJskB6FApzGb+y0ZO0A@mail.gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 29 Sep 2011 18:27:52 +0300
+Subject: [PATCH v5 2/3] arm/tegra: add support for ventana pinmuxing
+In-Reply-To: <20110929092951.GE23944@n2100.arm.linux.org.uk>
+References: <1317248978-10829-1-git-send-email-pdeschrijver@nvidia.com>
+	<1317248978-10829-3-git-send-email-pdeschrijver@nvidia.com>
+	<20110929092951.GE23944@n2100.arm.linux.org.uk>
+Message-ID: <20110929152752.GO21166@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 6:56 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> The <mach/gpio.h> file is included from upper directories
-> and deal with generic GPIO and gpiolib stuff. Break out the
-> platform and driver specific defines and functions into its own
-> header file.
->
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ?arch/arm/mach-mmp/aspenite.c ? ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-mmp/brownstone.c ? ? ? ? ? ? | ? ?1 -
-> ?arch/arm/mach-mmp/gplugd.c ? ? ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-mmp/include/mach/gpio-pxa.h ?| ? 30 ++++++
-> ?arch/arm/mach-mmp/include/mach/gpio.h ? ? ?| ? 23 -----
-> ?arch/arm/mach-mmp/jasper.c ? ? ? ? ? ? ? ? | ? ?1 -
-> ?arch/arm/mach-mmp/mmp2.c ? ? ? ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-mmp/pxa168.c ? ? ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-mmp/pxa910.c ? ? ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-mmp/tavorevb.c ? ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-pxa/cm-x255.c ? ? ? ? ? ? ? ?| ? ?1 -
-> ?arch/arm/mach-pxa/include/mach/gpio-pxa.h ?| ?133 ++++++++++++++++++++++++++++
-> ?arch/arm/mach-pxa/include/mach/gpio.h ? ? ?| ?110 +----------------------
-> ?arch/arm/mach-pxa/include/mach/littleton.h | ? ?2 +-
-> ?arch/arm/mach-pxa/irq.c ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
-> ?arch/arm/mach-pxa/mfp-pxa2xx.c ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-pxa/pxa25x.c ? ? ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-pxa/pxa27x.c ? ? ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/mach-pxa/pxa3xx.c ? ? ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/pxa95x.c ? ? ? ? ? ? ? ? | ? ?2 +-
-> ?arch/arm/mach-pxa/saarb.c ? ? ? ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/plat-pxa/include/plat/gpio-pxa.h ?| ? 44 +++++++++
-> ?arch/arm/plat-pxa/include/plat/gpio.h ? ? ?| ? 40 +--------
-> ?drivers/gpio/gpio-pxa.c ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> ?24 files changed, 227 insertions(+), 180 deletions(-)
-> ?create mode 100644 arch/arm/mach-mmp/include/mach/gpio-pxa.h
-> ?create mode 100644 arch/arm/mach-pxa/include/mach/gpio-pxa.h
-> ?create mode 100644 arch/arm/plat-pxa/include/plat/gpio-pxa.h
->
-I think that we can move gpio out of plat-pxa directory. And gpio
-driver needs to be simplified by supporting both pxa and mmp.
+On Thu, Sep 29, 2011 at 11:29:51AM +0200, Russell King - ARM Linux wrote:
+> On Thu, Sep 29, 2011 at 01:29:35AM +0300, Peter De Schrijver wrote:
+> > diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+> > index f11b910..91a07e1 100644
+> > --- a/arch/arm/mach-tegra/Makefile
+> > +++ b/arch/arm/mach-tegra/Makefile
+> > @@ -31,6 +31,7 @@ obj-${CONFIG_MACH_SEABOARD}             += board-seaboard-pinmux.o
+> >  
+> >  obj-${CONFIG_MACH_TEGRA_DT}             += board-dt.o
+> >  obj-${CONFIG_MACH_TEGRA_DT}             += board-harmony-pinmux.o
+> > +obj-${CONFIG_MACH_TEGRA_DT}             += board-seaboard-pinmux.o
+> 
+> Since when did Tegra start using braces instead of parens in its Makefile?
+> I note some of Tegra's makefile is using braces and some of it parens.
+> What's the reason for this alternative style to the rest of kbuild?
 
-I sent a new patch series for review.
+I have no idea. I just followed the style used for the other CONFIG_MACH_TEGRA_DT entries. Colin or Olof, any idea?
 
-Thanks
-Haojian
+Thanks,
+
+Peter.
