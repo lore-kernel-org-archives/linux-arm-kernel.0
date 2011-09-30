@@ -1,43 +1,88 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 30 Sep 2011 12:08:58 -0500
-Subject: [PATCH 2/2] ARM: Switch to using CLKDEV_INIT macro for creating
-	clk_lookup instance
-In-Reply-To: <4E85B779.7030402@gmail.com>
-References: <1317381097-2691-1-git-send-email-padma.v@samsung.com>
-	<1317381097-2691-3-git-send-email-padma.v@samsung.com>
-	<4E85B779.7030402@gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F39DC56761@AUSP01VMBX24.collaborationhost.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 30 Sep 2011 10:09:03 -0700
+Subject: [PATCH-V3 2/4] arm:omap:am33xx: Update common OMAP machine
+	specific sources
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB5930257840691@dbde02.ent.ti.com>
+	(Sanjeev Premi's message of "Fri, 30 Sep 2011 17:39:27 +0530")
+References: <hvaibhav@ti.com>
+	<1316529142-27564-3-git-send-email-hvaibhav@ti.com>
+	<87fwjjcfbt.fsf@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB5930257840691@dbde02.ent.ti.com>
+Message-ID: <87ehyyj6ts.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, September 30, 2011 5:35 AM, Ryan Mallon wrote:
-> On 30/09/11 21:11, Padmavathi Venna wrote:
->> Replace platform specific macros that creates struct clk_lookup
->> instance with the new common CLKDEV_INIT macro
->>
->> Suggested by: Russell King <rmk+kernel@arm.linux.org.uk>
->> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->> ---
+"Premi, Sanjeev" <premi@ti.com> writes:
 
-[...]
-
->>  static struct clk_lookup cdce_clks[] = {
->> -	CLK(NULL, "xin", &cdce_clk_in),
->> -	CLK(NULL, NULL, NULL),
->> +	CLKDEV_INIT(NULL, "xin", cdce_clk_in)
->> +	{.dev_id = NULL, .con_id = NULL, .clk = NULL,},
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org 
+>> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Hilman, Kevin
+>> Sent: Tuesday, September 27, 2011 12:16 AM
+>> To: Hiremath, Vaibhav
+>> Cc: linux-omap at vger.kernel.org; paul at pwsan.com; 
+>> tony at atomide.com; linux-arm-kernel at lists.infradead.org; 
+>> Mohammed, Afzal
+>> Subject: Re: [PATCH-V3 2/4] arm:omap:am33xx: Update common 
+>> OMAP machine specific sources
+>> 
+>> <hvaibhav@ti.com> writes:
+>> 
+>> > From: Afzal Mohammed <afzal@ti.com>
+>> >
+>> > This patch updates the common machine specific source files for
+>> > support for AM33XX/AM335x with cpu type, macros for 
+>> identification of
+>> > AM33XX/AM335X device.
+>> >
+>> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
+>> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+>> 
+>> [...]
+>> 
+>> > @@ -3576,7 +3579,8 @@ int __init omap3xxx_clk_init(void)
+>> >  	 * Lock DPLL5 -- here only until other device init code can
+>> >  	 * handle this
+>> >  	 */
+>> > -	if (!cpu_is_ti816x() && (omap_rev() >= OMAP3430_REV_ES2_0))
+>> > +	if (!cpu_is_ti816x() && !cpu_is_am33xx() &&
+>> > +			(omap_rev() >= OMAP3430_REV_ES2_0))
+>> >  		omap3_clk_lock_dpll5();
+>> 
+>> This is getting ugly.  
+>> 
+>> Instead of continuing to expand this if-list, I think it's time for a
+>> new feature-flag for whether or not an SoC has DPLL5 instead.
 >
-> Why not CLKDEV_INIT(NULL, NULL, NULL)? Or create another macro
-> CLKDEV_NULL (or similar) for the last entry in the list rather than
-> duplicating this everywhere.
+> I agree that the code is really getting ugly here. But, isn't
+> feature-flag going to be over-used with this and similar features?
+>
+> Just thinking ahead, for these possible cases:
+> 1) An soc adds DPLL6.
+> 2) An soc uses DPLL5, but mechanism to lock is different.
 
-The CLKDEV_INIT macro does this with the third parameter:
+You're right.
 
-	.clk = &c,
+> Wouldn't it be better to have a scheme like this:
+> 1) Define a simple structure for DPLLs.
+> 2) Initialize the unused DPLLs to be null/ -1 early
+>    in arch/soc specific init.
+> 3) The DPLL functions check for corresponding flag on
+>    entry.
 
-I'm not sure &NULL is valid.
+Actually, looking at this closer, I think the infrastructure is already
+there to handle this cleanly.
 
-Is the sentinel entry actually needed?  ep93xx does not have one.
+Basically, dpll5 should not even be registered for SoCs where it doesn't
+exist.  Then, any attempts to use DPLL5 would know it doesn't exist
+because the call to clk_get() in omap3_clk_lock_dpll5() would fail.
 
-Regards,
-Hartley
+I think the clock3xxx_data.c needs a bit more cleanup so that only
+clocks that exist for a given SoC are registered.
+
+Paul already did a similar cleanup for the powerdomain data files by
+creating separate lists for common ones and unique ones.  Looks like we
+need the same for the clock data.
+
+Patches welcome.
+
+Kevin
