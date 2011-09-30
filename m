@@ -1,147 +1,131 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 30 Sep 2011 15:36:44 +0800
-Subject: [PATCH 5/5] ARM: pxa: move gpio driver into drivers directory
-In-Reply-To: <20110929222723.GI10886@ponder.secretlab.ca>
-References: <1317309546-19682-5-git-send-email-haojian.zhuang@marvell.com>
-	<20110929222723.GI10886@ponder.secretlab.ca>
-Message-ID: <CAN1soZzw0dkZm2rmwGJk3Pmmxv+6dfyWYQ=pPJnY8cD6wHab6A@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 30 Sep 2011 15:48:23 +0800
+Subject: [RFC PATCH v5] ARM hibernation / suspend-to-disk (fwd)
+In-Reply-To: <alpine.DEB.2.00.1106131303290.25153@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1106131303290.25153@localhost6.localdomain6>
+Message-ID: <CAGsJ_4wybWCTP-gYmLCehT8bb9LSdV2y19=q2CV89kF=pgbkVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 6:27 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Thu, Sep 29, 2011 at 11:19:06PM +0800, Haojian Zhuang wrote:
->> Move gpio driver from plat-pxa to drivers/gpio directory. Only leave
->> gpio number macro in mach/gpio.h.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
->> ---
->> +static int __init mmp_gpio_init(void)
->> +{
->> +     [...]
->> + ? ? platform_device_add_data(&mmp_gpio, &mmp_gpio_config, size);
->> + ? ? platform_device_register(&mmp_gpio);
->> + ? ? return 0;
->> +}
->> +postcore_initcall(mmp_gpio_init);
->
-> You'll also want to bail on this init function if a DT is passed to
-> the kernel. ?Otherwise it looks okay.
->
-I can avoid to use this init function. So platform driver will
-register gpio directly.
+Hi Frank,
 
->> -#define GPIO_REG(x) ?(*((volatile u32 *)(GPIO_REGS_VIRT + (x))))
->> +#define GPIO_REGS_VIRT ? ? ? ? ? ? ? (APB_VIRT_BASE + 0x19000)
+2011/6/13 Frank Hofmann <frank.hofmann@tomtom.com>:
+> Hi,
 >
-> Nit: don't change the whitespace on this line because it isn't
-> actually changing functionally, but diff makes it look like it is.
+> to make one thing clear to start with:
 >
-> I assume these remaining macros will be removed/reworked in a future
-> patch?
+> This is not a proposal to integrate the hibernation feature into mainline.
 >
-Do you mean that abandon APB_VIRT_BASE?
+> It's not ripe for that because it's unclear what exactly the differences are
+> between what the hibernation / S2RAM codepaths have to do, and/or how much
+> code sharing between these codepaths is advisable.
+>
+>
+> Therefore, I'm merely putting this out as-is as a reference / base for those
+> who want to do their own experiments with the feature.
+>
+> Prerequisites:
+>
+> * The patch requires a working cpu_reset(); for v6/v7, that's in Will
+> ?Deacon's patch series from last week.
+>
+> * It also requires being able to take the address of cpu_reset and
+> ?on MULTI_CPU configs therefore, again see Will Deacon's patch series.
+>
+> * It uses on cpu_suspend() / cpu_resume(), therefore a recent-enough
+> ?kernel (or a port of those to whatever you're using) is required.
+>
+>
+> Important / Limitations:
+>
+> A) For platforms that currently use cpu_suspend/cpu_resume in their s2ram
+> ?codepaths AND DO NOTHING ELSE BEFORE AND NOTHING ELSE AFTER THAT BUT TO
+> ?"ENTER LOW POWER", the way the hibernation state snapshot for the CPU
+> ?core is done by this patch is sufficient.
+>
+> ?To make it clear: IF AND ONLY IF your suspend(-to-ram) func looks like:
+>
+> ? ? ? ?ENTRY(acmeSoC_cpu_suspend)
+> ? ? ? ? ? ? ? ?stmfd ? sp!, {r4-r12,lr}
+> ? ? ? ? ? ? ? ?ldr ? ? r3, resume_mmu_done
+> ? ? ? ? ? ? ? ?bl ? ? ?cpu_suspend
+> ? ? ? ?resume_mmu_done:
+> ? ? ? ? ? ? ? ?ldmfd ? sp!, {r3-r12,pc}
+> ? ? ? ?ENDPROC(acmeSoC_cpu_suspend)
+>
+> ?then this patch is ok to provide hibernation support for your CPU core.
+>
+> ?In all other cases, item B).
+>
+> ?IN ALL CASES, read item C) below; there's more than the core to the SoC.
+>
+> B) If there's any cpu-specific / SoC-specific state that needs (re)init
+> ?over a suspend-to-disk/resume-from-disk cycle, this patch is incomplete
+> ?because it provides no hooks/code for that.
+>
+> ?This is the case e.g. for "secure" SoCs that have different sets of
+> ?control registers and/or different CR reg access patterns.
+>
+> ?It's also the case e.g. for SoCs with L2 caches as the activation
+> ?sequence there is SoC-dependent; a full off-on cycle for L2 is not done
+> ?by the hibernation support code.
+>
+> ?It's also the case if the SoC requires steps on wakeup _before_ the
+> ?"generic" parts done by cpu_suspend / cpu_resume can work correctly.
+>
+> ?(OMAP is an example of such a SoC; the patch "works" on OMAP in the
+> ?sense that it gets you a non-secure OMAP back from hibernation but as
+> ?mentioned, your mileage may vary; I for example don't know what the
+> ?consequences ?of not disabling / reenabling the L2 cache over cpu_reset
+> ?are)
+>
+> C) The current low-power handling may perform SoC-specific tasks such
+> ?as GPIO state handling, which is currently also not addressed by this
+> ?patch; the assumption is rather that device suspend/resume deals with
+> ?this. That is not guaranteed to be complete / sufficient - if your SoC
+> ?and/or your device drivers have particular needs in this area, you can
+> ?put hooks performing these actions into save_/restore_processor_state().
+>
+> D) If you wish to extend this to a SoC for which the generic CPU core
+> ?hooks (i.e. what cpu_suspend/resume provide) are either insufficient
+> ?or unavailable, hook your own state snapshot mechanism into the places
+> ?where this code currently calls cpu_suspend and cpu_resume. The main
+> ?assumption by the assembly code within swusp_arch_resume() is that
+> ?__swsusp_arch_restore_image() returns to its caller with the stack
+> ?restored - how you achieve that is up to you, the patch as-is does it
+> ?by cpu_reset(cpu_resume) but your mileage may vary.
+>
+>
+> I will, at this point, not send further iterations of this patch.
+>
+> I'll answer questions about it though, if there are any.
 
->> +static int __init pxa_gpio_init(void)
->> +{
->> + ? ? int size = sizeof(struct pxa_gpio_platform_data);
->> + ? ? u32 reg_base = io_p2v(0x40E00000);
->> +
->> + ? ? if (cpu_is_pxa25x()) {
->> +#ifdef CONFIG_PXA26x
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_type = PXA26X_GPIO;
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_end = 89;
->> +#else
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_type = PXA25X_GPIO;
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_end = 84;
->> +#endif
->
-> Not multiplatform friendly. ?The subarch may not support
-> multiplatform, but that's no excuse for adding either/or #ifdef
-> blocks. ?I'd rather see one #ifdef for PXA26x and another for PXA25x,
-> and the code organizes so that they can peacefully co-exist.
->
-OK.
+i did bring-up prima2(cortex-a9) swsusp hibernation support based on
+your patch. i am considering whether we can have some ways to make the
+resume faster.
 
->> + ? ? } else if (cpu_is_pxa27x()) {
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_type = PXA27X_GPIO;
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_end = 120;
->> + ? ? } else if (cpu_is_pxa93x() || cpu_is_pxa95x()) {
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_type = PXA93X_GPIO;
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_end = 191;
->> + ? ? } else if (cpu_is_pxa3xx()) {
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_type = PXA3XX_GPIO;
->> + ? ? ? ? ? ? pxa_gpio_config.gpio_end = 127;
->> + ? ? } else
->> + ? ? ? ? ? ? return 0;
->> +
->> + ? ? pxa_gpio_regs.gplr = reg_base + GPLR_OFFSET;
->> + ? ? pxa_gpio_regs.gpdr = reg_base + GPDR_OFFSET;
->> + ? ? pxa_gpio_regs.gpsr = reg_base + GPSR_OFFSET;
->> + ? ? pxa_gpio_regs.gpcr = reg_base + GPCR_OFFSET;
->> + ? ? pxa_gpio_regs.grer = reg_base + GRER_OFFSET;
->> + ? ? pxa_gpio_regs.gfer = reg_base + GFER_OFFSET;
->> + ? ? pxa_gpio_regs.gedr = reg_base + GEDR_OFFSET;
->> + ? ? pxa_gpio_regs.gafr = reg_base + GAFR_OFFSET;
->
-> I'd rather have this layout knowledge as part of the driver
-> rather than using platform data to pass stuff. ?The driver can make
-> the selection either based on device name, or by testing
-> cpio_is_pxa*() directly. ?We already have the mechanisms needed for
-> this.
->
-> Same goes for mmp_gpio_init().
->
-OK. I'll move these code into drivers/gpio/gpio-pxa.c.
+Now the resume flow is:
+[1] poweron -> bootloader -> kernel -> all boot and device probed ->
+late_init() -> loading snapshot from disk to memory -> resume devices
+and software
 
->> +
->> + ? ? platform_device_add_data(&pxa_gpio, &pxa_gpio_config, size);
->> + ? ? platform_device_register(&pxa_gpio);
->> + ? ? return 0;
->> +}
->> +postcore_initcall(pxa_gpio_init);
->
-> Same as mmp_gpio_init, this function needs to be skipped if a DT is
-> passed to the kernel.
->
-OK
+Is it possible we make it:
+[2] poweron -> bootloader -> loading snapshot from disk to memory ->
+resume devices and software
 
->> @@ -282,7 +281,6 @@ static int __init pxa95x_init(void)
->> ? ? ? ? ? ? ? ? ? ? ? return ret;
->>
->> ? ? ? ? ? ? ? register_syscore_ops(&pxa_irq_syscore_ops);
->> - ? ? ? ? ? ? register_syscore_ops(&pxa_gpio_syscore_ops);
->> ? ? ? ? ? ? ? register_syscore_ops(&pxa3xx_clock_syscore_ops);
->>
->> ? ? ? ? ? ? ? ret = platform_add_devices(devices, ARRAY_SIZE(devices));
+Then the sub-process "bootloader -> kernel -> all boot and device
+probed -> late_init()" will be eliminated and time to boot kernel will
+not be needed too.
+
+the flow [2] is more platform-related. so it is probably we can use
+platform_hibernation_ops to handle. but it can be generic as well.
 
 >
-> Instead of encoding it into pdata, it would be simpler to select the
-> type by assiging an (platform_driver*)->id_table and using the .data
-> member in the table to select the correct initialization data. ?That
-> means using the name of the device to select the correct
-> initialization.
 >
-Yes, you're right. I'll change it to id_table.
->>
->> +
->> +static int __init pxa_gpio_probe(struct platform_device *pdev)
+> Thanks for all the comments during the previous threads - learned a lot !
 >
-> This needs to be __devinit for correctness.
 >
-OK
->>
->> +#define GPLR(x) ? ? ? ? ? ? ?(*(volatile u32 *)(pxa_gpio_regs.gplr + BANK_OFF((x >> 5))))
->> +#define GPDR(x) ? ? ? ? ? ? ?(*(volatile u32 *)(pxa_gpio_regs.gpdr + BANK_OFF((x >> 5))))
->> +#define GPSR(x) ? ? ? ? ? ? ?(*(volatile u32 *)(pxa_gpio_regs.gpsr + BANK_OFF((x >> 5))))
->> +#define GPCR(x) ? ? ? ? ? ? ?(*(volatile u32 *)(pxa_gpio_regs.gpcr + BANK_OFF((x >> 5))))
->> +#define GRER(x) ? ? ? ? ? ? ?(*(volatile u32 *)(pxa_gpio_regs.grer + BANK_OFF((x >> 5))))
->> +#define GFER(x) ? ? ? ? ? ? ?(*(volatile u32 *)(pxa_gpio_regs.gfer + BANK_OFF((x >> 5))))
->> +#define GEDR(x) ? ? ? ? ? ? ?(*(volatile u32 *)(pxa_gpio_regs.gedr + BANK_OFF((x >> 5))))
->> +#define GAFR(x) ? ? ? ? ? ? ?(*(volatile u32 *)(pxa_gpio_regs.gafr + (((x) & 0x70) >> 2)))
->> +
->> +#define GPIO_BANK(n) (pxa_gpio_regs.gplr + BANK_OFF(n))
->
-> All these macros really need a pxa_gpio prefix, but that can be done
-> in a separate patch.
->
-OK
+> Best regards,
+> FrankH.
+
+-barry
