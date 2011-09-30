@@ -1,52 +1,44 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 30 Sep 2011 10:02:10 +0800
-Subject: [PATCH] ARM: localtimer: add header linux/errno.h explicitly
-In-Reply-To: <1316798545-21128-1-git-send-email-shawn.guo@linaro.org>
-References: <1316798545-21128-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110930020208.GA19807@S2100-06.ap.freescale.net>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 30 Sep 2011 10:43:23 +0800
+Subject: [PATCH 1/5] ARM: pxa: remove redundant macro on GPIO
+In-Reply-To: <CAHXqBFJnS7-x-Q8aJhNhbbVHhFHWS4PTVb0369p2H42Tm4J=HQ@mail.gmail.com>
+References: <1317309546-19682-1-git-send-email-haojian.zhuang@marvell.com>
+	<CAHXqBFJnS7-x-Q8aJhNhbbVHhFHWS4PTVb0369p2H42Tm4J=HQ@mail.gmail.com>
+Message-ID: <CAMPhdO_Lwi1737PTB=TFoHa8rHyyutkGc-GdUNapJOf6XkG4yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+2011/9/30 Micha? Miros?aw <mirqus@gmail.com>:
+> 2011/9/29 Haojian Zhuang <haojian.zhuang@marvell.com>:
+> [...]
+>> ? ? ? ?if (type & IRQ_TYPE_EDGE_RISING)
+>> - ? ? ? ? ? ? ? GRER0 |= GPIO_bit(gpio);
+>> + ? ? ? ? ? ? ? GRER(gpio) |= GPIO_bit(gpio);
+> [...]
+>
+> This looks wrong. There are more occurrences like this. Can you
+> explain if this is correct?
 
-Do you have any comment on this patch?  Otherwise, I will put it into
-patch tracker.
+This is actually correct. In GRER(x) - x designates the GPIO instead
+of the subindex n in GRERn.
 
-Regards,
-Shawn
+The rest of the direct references GPxRn have been mostly removed
+during the last several rounds of cleanup.
 
-On Sat, Sep 24, 2011 at 01:22:25AM +0800, Shawn Guo wrote:
-> Per the text in  Documentation/SubmitChecklist as below, we should
-> explicitly have header linux/errno.h in localtimer.h for ENXIO
-> reference.
-> 
-> 1: If you use a facility then #include the file that defines/declares
->    that facility.  Don't depend on other header files pulling in ones
->    that you use.
-> 
-> Otherwise, we may run into some compiling error like the following one,
-> if any file includes localtimer.h without CONFIG_LOCAL_TIMERS defined.
-> 
->   arch/arm/include/asm/localtimer.h: In function ?local_timer_setup?:
->   arch/arm/include/asm/localtimer.h:53:10: error: ?ENXIO? undeclared (first use in this function)
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/include/asm/localtimer.h |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-> index 080d74f..698ff73 100644
-> --- a/arch/arm/include/asm/localtimer.h
-> +++ b/arch/arm/include/asm/localtimer.h
-> @@ -48,6 +48,8 @@ int local_timer_setup(struct clock_event_device *);
->  
->  #else
->  
-> +#include <linux/errno.h>
-> +
->  static inline int local_timer_setup(struct clock_event_device *evt)
->  {
->  	return -ENXIO;
-> -- 
-> 1.7.4.1
+Haojian,
+
+Please use
+
+'git grep GP.R[0-9]'
+
+and
+
+'git grep GR.R[0-9]'
+
+to rule out the rest references. I'm good with the patch, just to
+make sure there is no more such reference.
+
+>
+> Best Regards,
+> Micha? Miros?aw
+>
