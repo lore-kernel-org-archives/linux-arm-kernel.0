@@ -1,32 +1,72 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Fri, 30 Sep 2011 17:09:40 +0530
-Subject: [PATCH 2/2] SPI: EXYNOS4: Enable the SPI driver for EXYNOS4
-In-Reply-To: <1317382780-3083-1-git-send-email-padma.v@samsung.com>
-References: <1317382780-3083-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1317382780-3083-3-git-send-email-padma.v@samsung.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 30 Sep 2011 13:35:40 +0200
+Subject: [PATCH 2/9] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <4E85A34E.9070203@ti.com>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-3-git-send-email-rnayak@ti.com>
+	<20110927121003.GB4289@opensource.wolfsonmicro.com>
+	<4E81E224.2070408@ti.com>
+	<20110927150511.GM4289@opensource.wolfsonmicro.com>
+	<4E854532.6080605@ti.com>
+	<20110930102849.GA4195@opensource.wolfsonmicro.com>
+	<20110930104820.GE2085@sirena.org.uk> <4E85A34E.9070203@ti.com>
+Message-ID: <4E85A98C.9060702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPI module on EXYNOS4 is similar to the earlier Samsung SoCs like
-S3C64XX. Enable the existing SPI driver for use on EXYNOS4.
+On 9/30/2011 1:09 PM, Nayak, Rajendra wrote:
+> On Friday 30 September 2011 04:18 PM, Mark Brown wrote:
+>> On Fri, Sep 30, 2011 at 11:28:49AM +0100, Mark Brown wrote:
+>>> On Fri, Sep 30, 2011 at 09:57:30AM +0530, Rajendra Nayak wrote:
+>>
+>>>>>> +  init_data->supply_regulator = (char *)of_get_property(dev->of_node,
+>>>>>> +                                          "regulator-supplies", NULL);
+>>
+>>>> Mark, I still seem to be a little confused with this one as to why
+>>>> we would need a phandle *and* a supply-name to reference a parent
+>>>> regulator/supply.
+>>>> The phandle would point to a regulator dt node and that node internally
+>>>> would have just one name associated with it.
+>>
+>>> To repeat: the supply name is for the consumer.  It is needed so that
+>>> the consumer can tell which supply is provided by which regulator.
+>>> Almost all devices have more than one supply and if the device does
+>>> anything more complicated than just turning on all the supplies when the
+>>> device is active it's going to need to figure out which supply is which.
+>>
+>> Hang on, I now have no idea what this is supposed to be doing.  Later on
+>> in the series you had examples in your commit logs with perfectly
+>> sensible bindings for supplies:
+>>
+>>                   vmmc-supply =<&regulator1>;
+>>                   vpll-supply =<&regulator1>;
+>>
+>> which have both a unique name and a direct reference to the supplying
+>> regulator.  What are these "regulator-supplies" properties supposed to
+>> be?
+>
+> :-), yes, I was confused for a while as well after reading your response.
+>
+> The "regulator-supplies" is used to specific the regulator *parent*.
+> Same as what was earlier passed by using the
+> "supply_regulator" field of regulator_init_data structure.
+> Grant wanted the bindings to support specifying multiple parents
+> and hence I was thinking of either a list of names *or*
+> a list of phandles to specify multiple parents to a regulator.
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- drivers/spi/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+I'm confused too now :-)
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 52e2900..f3649f6 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -300,7 +300,7 @@ config SPI_S3C24XX_FIQ
- 
- config SPI_S3C64XX
- 	tristate "Samsung S3C64XX series type SPI"
--	depends on (ARCH_S3C64XX || ARCH_S5P64X0)
-+	depends on ARCH_S3C64XX || ARCH_S5P64X0 || ARCH_EXYNOS4
- 	select S3C64XX_DMA if ARCH_S3C64XX
- 	help
- 	  SPI driver for Samsung S3C64XX and newer SoCs.
--- 
-1.7.4.4
+You can not have multiple to one kind of connection from a power supply 
+to a single power rail of an IP (vmmc, vpll...).
+So I do not see the need for more any other binding that the one you did:
+	vmmc-supply = <&regulator1>;
+
+That kind of binding does not really exist in the real world:
+
+	vmmc-supply = <&regulator1 &regulator2>;
+
+At least not without a power switch in between.
+
+Regards,
+Benoit
