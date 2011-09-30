@@ -1,26 +1,55 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 30 Sep 2011 02:17:59 -0600 (MDT)
-Subject: [PATCH v5 1/3] AM35x: Using OMAP3 generic hwmods
-In-Reply-To: <1317363153-10259-2-git-send-email-abhilash.kv@ti.com>
-References: <1317363153-10259-1-git-send-email-abhilash.kv@ti.com>
-	<1317363153-10259-2-git-send-email-abhilash.kv@ti.com>
-Message-ID: <alpine.DEB.2.00.1109300217260.12185@utopia.booyaka.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 30 Sep 2011 16:33:39 +0800
+Subject: [PATCH v3] ARM: cache-l2x0: add resume entry for l2 in secure mode
+In-Reply-To: <1317353481-28723-1-git-send-email-Barry.Song@csr.com>
+References: <1317353481-28723-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <20110930083338.GB19807@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash,
-
-On Fri, 30 Sep 2011, Abhilash K V wrote:
-
-> From: Abhilash K V <abhilash.kv@ti.com>
+On Thu, Sep 29, 2011 at 08:31:21PM -0700, Barry Song wrote:
+> From: Barry Song <Baohua.Song@csr.com>
 > 
-> Removing modules iva, sr1_hwmod, sr2_hwmod, mailbox from
-> the base omap3xxx_hwmods list, so that they can be excluded
-> for am35x.
+> we save the l2x0 registers at the first initialization, and platform codes
+> can get them to restore l2x0 status after wakeup.
 > 
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  -v3:
+>  save PREFETCH_CTRL and POWER_CTRL according to revision;
+>  save l2x0 physical address so that asm codes can use.
 
-Looks good to me, provisionally queued for 3.2 fixes.
+On imx6q:
 
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
 
-- Paul
+One minor comment below.
+
+> 
+>  arch/arm/include/asm/hardware/cache-l2x0.h |   23 +++++
+>  arch/arm/include/asm/outercache.h          |    7 ++
+>  arch/arm/kernel/asm-offsets.c              |   12 +++
+>  arch/arm/mm/cache-l2x0.c                   |  129 +++++++++++++++++++++++++--
+>  4 files changed, 161 insertions(+), 10 deletions(-)
+
+[... ]
+
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 0d85d22..3f9b998 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -33,6 +33,14 @@ static DEFINE_SPINLOCK(l2x0_lock);
+>  static uint32_t l2x0_way_mask;	/* Bitmask of active ways */
+>  static uint32_t l2x0_size;
+>  
+> +struct l2x0_regs l2x0_saved_regs;
+> +
+Can we add a declaration of l2x0_saved_regs in cache-l2x0.h, so that
+platform code does not need to declare it individually?
+
+-- 
+Regards,
+Shawn
