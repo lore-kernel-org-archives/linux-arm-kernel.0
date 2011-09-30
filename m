@@ -1,34 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Sep 2011 21:56:22 +0200
-Subject: [PATCH 0/4] ARM: CSR: cleanup some minor coding-style issues
-In-Reply-To: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
-References: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <201109302156.22487.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 30 Sep 2011 12:56:42 -0700
+Subject: [GIT PULL] omap cleanup part3 for v3.2 merge window
+In-Reply-To: <20110923213735.GZ2937@atomide.com>
+References: <20110923213735.GZ2937@atomide.com>
+Message-ID: <20110930195642.GL6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 September 2011, Barry Song wrote:
-> Barry Song (4):
->   ARM: CSR: timer: do not initialise statics to 0 or NULL
->   ARM: CSR: timer: space required before the open parenthesis '('
->   ARM: CSR: prima2: fix trailing whitespace
->   ARM: CSR: clock: Fix indentation
-> 
->  arch/arm/mach-prima2/clock.c  |    4 ++--
->  arch/arm/mach-prima2/prima2.c |    2 +-
->  arch/arm/mach-prima2/timer.c  |    4 ++--
->  3 files changed, 5 insertions(+), 5 deletions(-)
+Hi Arnd,
+
+Please pull omap cleanup part3 into cleanup from:
+
+git://github.com/tmlind/linux.git cleanup-part3
+
+If you did not already pull the earlier updated
+cleanup, pulling this is enough and will bring that
+in too.
+
+Regards,
+
+Tony
 
 
-Hi Barry,
+The following changes since commit 48b48fc996ad98bc7b7cf133882e08cd2331ae11:
+  Tony Lindgren (1):
+        Merge branch 'for_3.2/pm-cleanup' of git://gitorious.org/khilman/linux-omap-pm into cleanup
 
-Sorry for the late reply. This series and the one before all look good
-to me, but I fear I'm losing track of the patches.
+are available in the git repository at:
 
-Can you send me pull requests for each set (fixes, cleanups, other
-changes) so I can be sure I get everything? If you have trouble
-with git.kernel.org still being down, I can apply the patches
-manually and let you double-check them, but that would be more
-work for both of us I think.
+  git://github.com/tmlind/linux.git cleanup-part3
 
-	Arnd
+Benoit Cousson (1):
+      ARM: OMAP2+: Add SoC specific map_io functions
+
+Jarkko Nikula (13):
+      ARM: OMAP: mcbsp: Remove unused variables from platform data
+      ARM: OMAP: mcbsp: Move out omap_mcbsp_register_board_cfg from plat-omap/devices.c
+      ARM: OMAP: mcbsp: Implement generic register access
+      ARM: OMAP: mcbsp: Make wakeup control generic
+      ARM: OMAP: mcbsp: Make tranceiver configuration control register access generic
+      ARM: OMAP: mcbsp: Make threshold based transfer code generic
+      ARM: OMAP: mcbsp: Use per instance register cache size
+      ARM: OMAP: mcbsp: Move sidetone clock management to mach-omap2/mcbsp.c
+      ARM: OMAP: mcbsp: Cleanup sidetone control initialization and make it generic
+      ARM: OMAP: mcbsp: Update mcbsp.h include dependencies
+      ARM: OMAP: mcbsp: Move address definitions to arch/arm/mach-omap1/mcbsp.c
+      ARM: OMAP: mcbsp: Start generalize omap2_mcbsp_set_clks_src
+      ARM: OMAP: mcbsp: Start generalize signal muxing functions
+
+Tony Lindgren (2):
+      ARM: OMAP2+: Use SoC specifc map_io
+      ARM: OMAP2+: Remove custom init_irq for remaining boards
+
+ arch/arm/mach-omap1/mcbsp.c                |   45 ++++
+ arch/arm/mach-omap2/board-2430sdp.c        |    8 +-
+ arch/arm/mach-omap2/board-4430sdp.c        |    8 +-
+ arch/arm/mach-omap2/board-apollon.c        |    8 +-
+ arch/arm/mach-omap2/board-devkit8000.c     |    7 +-
+ arch/arm/mach-omap2/board-h4.c             |   15 +-
+ arch/arm/mach-omap2/board-n8x0.c           |   12 +-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    7 +-
+ arch/arm/mach-omap2/board-omap3stalker.c   |    7 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c |    7 +-
+ arch/arm/mach-omap2/board-omap4panda.c     |    8 +-
+ arch/arm/mach-omap2/board-rm680.c          |    8 +-
+ arch/arm/mach-omap2/board-rx51.c           |    8 +-
+ arch/arm/mach-omap2/common.c               |   18 ++
+ arch/arm/mach-omap2/mcbsp.c                |  103 ++++++---
+ arch/arm/plat-omap/devices.c               |   46 ----
+ arch/arm/plat-omap/include/plat/common.h   |    4 +
+ arch/arm/plat-omap/include/plat/mcbsp.h    |  208 +++++-----------
+ arch/arm/plat-omap/mcbsp.c                 |  358 +++++++++++++---------------
+ 19 files changed, 379 insertions(+), 506 deletions(-)
