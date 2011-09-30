@@ -1,105 +1,29 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Thu, 29 Sep 2011 18:33:06 -0700
-Subject: [PATCH] OMAP2+: clock: use clock's recalc in DPLL handling
-In-Reply-To: <alpine.DEB.2.00.1109291925120.26728@utopia.booyaka.com>
-References: <CAJOA=zPq__48SbsKeFHaQ_+J0YQYLLXBP67g2JGXknhWj7PNOA@mail.gmail.com>
-	<1317343888-30892-1-git-send-email-mturquette@ti.com>
-	<alpine.DEB.2.00.1109291925120.26728@utopia.booyaka.com>
-Message-ID: <CAJOA=zOwcV5EoXWFVbqiF1jUVQaEVqZy7OEzeRFC5hCF396GiQ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 29 Sep 2011 21:34:51 -0400 (EDT)
+Subject: [PATCH] ARM: realview-eb11mp: fix map_desc alignment
+In-Reply-To: <1317343578-5307-1-git-send-email-robherring2@gmail.com>
+References: <4E84E0CA.2050905@gmail.com>
+	<1317343578-5307-1-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.02.1109292134060.9106@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2011 at 6:26 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi
->
-> On Thu, 29 Sep 2011, Mike Turquette wrote:
->
->> Not all DPLLs are identical; some require special consideration such as
->> OMAP4's ABE DPLL, which can have an additional 4x multiplier added to
->> it's clock rate based on programming the REGM4XEN bit in it's CLKMODE
->> register.
->>
->> Unfortunately the clock framework makes a few assumptions that all DPLLs
->> can have their rates calculated the same way which has led to incorrect
->> rates for OMAP4's DPLL_ABE in some cases. ?This patch fixes the same by
->> replacing explicit calls to omap2_dpll_get_rate with clk->recalc if
->> .recalc is populated for a clock. ?If .recalc is NULL then fall back to
->> omap2_dpll_get_rate.
->>
->> Reported-by: Misael Lopez Cruz <misael.lopez@ti.com>
->> Signed-off-by: Mike Turquette <mturquette@ti.com>
->
-> The conditional in the second hunk of this patch has been simplified for
-> readability. ?Updated patch below. ?Please let me know if I screwed
-> something up. ?Otherwise, queued for 3.2 fixes.
+On Thu, 29 Sep 2011, Rob Herring wrote:
 
-Looks good to me.
-
-Regards,
-Mike
-
-> thanks
->
->
-> - Paul
->
-> From: Mike Turquette <mturquette@ti.com>
-> Date: Thu, 29 Sep 2011 17:51:28 -0700
-> Subject: [PATCH] ARM: OMAP2+: clock: use clock's recalc in DPLL handling
->
-> Not all DPLLs are identical; some require special consideration such as
-> OMAP4's ABE DPLL, which can have an additional 4x multiplier added to
-> it's clock rate based on programming the REGM4XEN bit in it's CLKMODE
-> register.
->
-> Unfortunately the clock framework makes a few assumptions that all DPLLs
-> can have their rates calculated the same way which has led to incorrect
-> rates for OMAP4's DPLL_ABE in some cases. ?This patch fixes the same by
-> replacing explicit calls to omap2_dpll_get_rate with clk->recalc if
-> .recalc is populated for a clock. ?If .recalc is NULL then fall back to
-> omap2_dpll_get_rate.
->
-> Reported-by: Misael Lopez Cruz <misael.lopez@ti.com>
-> Signed-off-by: Mike Turquette <mturquette@ti.com>
-> [paul at pwsan.com: simplified conditional]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> REALVIEW_EB11MP_GIC_CPU_BASE is not 4KB aligned which causes an
+> overlapping mapping. Use REALVIEW_EB11MP_SCU_BASE instead which is
+> aligned.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 > ---
-> ?arch/arm/mach-omap2/dpll3xxx.c | ? ?7 +++++--
-> ?1 files changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-> index f77022b..fe4533f 100644
-> --- a/arch/arm/mach-omap2/dpll3xxx.c
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c
-> @@ -390,7 +390,8 @@ int omap3_noncore_dpll_enable(struct clk *clk)
-> ? ? ? ? * propagating?
-> ? ? ? ? */
-> ? ? ? ?if (!r)
-> - ? ? ? ? ? ? ? clk->rate = omap2_get_dpll_rate(clk);
-> + ? ? ? ? ? ? ? clk->rate = (clk->recalc) ? clk->recalc(clk) :
-> + ? ? ? ? ? ? ? ? ? ? ? omap2_get_dpll_rate(clk);
->
-> ? ? ? ?return r;
-> ?}
-> @@ -425,6 +426,7 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
-> ?{
-> ? ? ? ?struct clk *new_parent = NULL;
-> ? ? ? ?u16 freqsel = 0;
-> + ? ? ? unsigned long hw_rate;
-> ? ? ? ?struct dpll_data *dd;
-> ? ? ? ?int ret;
->
-> @@ -435,7 +437,8 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
-> ? ? ? ?if (!dd)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> - ? ? ? if (rate == omap2_get_dpll_rate(clk))
-> + ? ? ? hw_rate = (clk->recalc) ? clk->recalc(clk) : omap2_get_dpll_rate(clk);
-> + ? ? ? if (rate == hw_rate)
-> ? ? ? ? ? ? ? ?return 0;
->
-> ? ? ? ?/*
-> --
-> 1.7.6.3
->
->
+> Nico,
+> 
+> Here's another one. I visually checked the remaining Realview platforms and
+> think they are fine.
+
+Thanks.
+
+
+Nicolas
