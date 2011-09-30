@@ -1,15 +1,16 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 30 Sep 2011 20:05:55 +0800
-Subject: [PATCH] arm/imx: rename MX51_MXC_INT_ATA to MX51_INT_ATA
-Message-ID: <1317384355-24481-1-git-send-email-shawn.guo@linaro.org>
+Date: Fri, 30 Sep 2011 20:07:19 +0800
+Subject: [PATCH] arm/mx5: remove the magic reference to '__NA_' from
+	board-mx51_efikasb.c
+Message-ID: <1317384439-24519-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This change is to fix the compile error below.
 
-  CC      arch/arm/plat-mxc/devices/platform-pata_imx.o
-arch/arm/plat-mxc/devices/platform-pata_imx.c:33:1: error: ?MX51_INT_ATA? undeclared here (not in a function)
-make[3]: *** [arch/arm/plat-mxc/devices/platform-pata_imx.o] Error 1
+  CC      arch/arm/mach-mx5/board-mx51_efikasb.o
+arch/arm/mach-mx5/board-mx51_efikasb.c:102:2: error: ?__NA_? undeclared here (not in a function)
+make[2]: *** [arch/arm/mach-mx5/board-mx51_efikasb.o] Error 1
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
@@ -17,21 +18,21 @@ Sascha,
 
 This is a compile error seen on your imx-features branch.
 
- arch/arm/plat-mxc/include/mach/mx51.h |    2 +-
+ arch/arm/mach-mx5/board-mx51_efikasb.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
-index dede19a..0d4aa9e 100644
---- a/arch/arm/plat-mxc/include/mach/mx51.h
-+++ b/arch/arm/plat-mxc/include/mach/mx51.h
-@@ -311,7 +311,7 @@
- #define MX51_MXC_INT_SIM_IPB		67
- #define MX51_MXC_INT_SIM_DAT		68
- #define MX51_MXC_INT_IIM		69
--#define MX51_MXC_INT_ATA		70
-+#define MX51_INT_ATA			70
- #define MX51_MXC_INT_CCM1		71
- #define MX51_MXC_INT_CCM2		72
- #define MX51_MXC_INT_GPC1		73
+diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
+index b491513..46eac80 100644
+--- a/arch/arm/mach-mx5/board-mx51_efikasb.c
++++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
+@@ -56,7 +56,7 @@
+ #define EFIKASB_RFKILL		IMX_GPIO_NR(3, 1)
+ 
+ #define MX51_PAD_PWRKEY IOMUX_PAD(0x48c, 0x0f8, 1, 0x0,   0, PAD_CTL_PUS_100K_UP | PAD_CTL_PKE)
+-#define MX51_PAD_SD1_CD	IOMUX_PAD(0x47c, 0x0e8, 1, __NA_, 0, MX51_ESDHC_PAD_CTRL)
++#define MX51_PAD_SD1_CD	IOMUX_PAD(0x47c, 0x0e8, 1, 0x0, 0, MX51_ESDHC_PAD_CTRL)
+ 
+ static iomux_v3_cfg_t mx51efikasb_pads[] = {
+ 	/* USB HOST2 */
 -- 
 1.7.4.1
