@@ -1,172 +1,101 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 29 Sep 2011 20:07:54 -0600
-Subject: [PATCH] drivers: create a pin control subsystem v8
-In-Reply-To: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
-References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110930020754.GK12606@ponder.secretlab.ca>
+Date: Thu, 29 Sep 2011 19:38:19 -0600
+Subject: [PATCH 9/9] regulator: map consumer regulator based on device tree
+In-Reply-To: <1317118372-17052-10-git-send-email-rnayak@ti.com>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-10-git-send-email-rnayak@ti.com>
+Message-ID: <20110930013819.GI12606@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 28, 2011 at 02:03:39PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Tue, Sep 27, 2011 at 03:42:52PM +0530, Rajendra Nayak wrote:
+> Look up the regulator for a given consumer from device tree, during
+> a regulator_get(). If not found fallback and lookup through
+> the regulator_map_list instead.
 > 
-> This creates a subsystem for handling of pin control devices.
-> These are devices that control different aspects of package
-> pins.
-
-Comments below, some a bit nitpicky, but overall I think it looks
-good.  I haven't dug into it nearly deeply enough though.  :-(
-
-[...]
-> +/**
-> + * Looks up a pin control device matching a certain device name or
-> + * pure device pointer.
-
-May as well actually do kerneldoc formatting here on the comment
-blocks.
-
-> + */
-> +struct pinctrl_dev *get_pctldev_from_dev(struct device *dev,
-> +					 const char *devname)
-> +{
-> +	struct pinctrl_dev *pctldev = NULL;
-> +	bool found = false;
-> +
-> +	mutex_lock(&pinctrldev_list_mutex);
-> +	list_for_each_entry(pctldev, &pinctrldev_list, node) {
-> +		if (dev &&  &pctldev->dev == dev) {
-> +			/* Matched on device pointer */
-> +			found = true;
-> +			break;
-> +		}
-> +
-> +		if (devname &&
-> +		    !strcmp(dev_name(&pctldev->dev), devname)) {
-> +			/* Matched on device name */
-> +			found = true;
-> +			break;
-> +		}
+> Devices can associate with one or more regulators by providing a
+> list of phandles and supply names.
+> 
+> For Example:
+>         devicenode: node at 0x0 {
+>                 ...
+>                 ...
+>                 vmmc-supply = <&regulator1>;
+>                 vpll-supply = <&regulator2>;
+>         };
+> 
+> When a device driver calls a regulator_get, specifying the
+> supply name, the phandle and eventually the regulator node
+> is extracted from the device node.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  drivers/regulator/core.c         |   14 ++++++++++++++
+>  include/linux/regulator/driver.h |    3 +++
+>  2 files changed, 17 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+> index d8e6a42..47b851c 100644
+> --- a/drivers/regulator/core.c
+> +++ b/drivers/regulator/core.c
+> @@ -25,9 +25,11 @@
+>  #include <linux/mutex.h>
+>  #include <linux/suspend.h>
+>  #include <linux/delay.h>
+> +#include <linux/of.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/regulator/driver.h>
+>  #include <linux/regulator/machine.h>
+> +#include <linux/regulator/of_regulator.h>
+>  
+>  #define CREATE_TRACE_POINTS
+>  #include <trace/events/regulator.h>
+> @@ -1155,6 +1157,7 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
+>  	struct regulator_map *map;
+>  	struct regulator *regulator = ERR_PTR(-ENODEV);
+>  	const char *devname = NULL;
+> +	struct device_node *node;
+>  	int ret;
+>  
+>  	if (id == NULL) {
+> @@ -1167,6 +1170,15 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
+>  
+>  	mutex_lock(&regulator_list_mutex);
+>  
+> +	if (dev->of_node) {
+> +		node = of_get_regulator(dev, id);
+> +		if (!node)
+> +			goto retry; /* fallback and chk regulator_map_list */
+> +		list_for_each_entry(rdev, &regulator_list, list)
+> +			if (node == rdev->node)
+> +				goto found;
 > +	}
-> +	mutex_unlock(&pinctrldev_list_mutex);
-> +
-> +	if (found)
-> +		return pctldev;
-> +
-> +	return NULL;
-> +}
+> +retry:
+>  	list_for_each_entry(map, &regulator_map_list, list) {
+>  		/* If the mapping has a device set up it must match */
+>  		if (map->dev_name &&
+> @@ -2619,6 +2631,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
+>  	rdev->reg_data = driver_data;
+>  	rdev->owner = regulator_desc->owner;
+>  	rdev->desc = regulator_desc;
+> +	if (dev && dev->of_node)
+> +		rdev->node = dev->of_node;
+>  	INIT_LIST_HEAD(&rdev->consumer_list);
+>  	INIT_LIST_HEAD(&rdev->list);
+>  	BLOCKING_INIT_NOTIFIER_HEAD(&rdev->notifier);
+> diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+> index 1a80bc7..4aebbf5 100644
+> --- a/include/linux/regulator/driver.h
+> +++ b/include/linux/regulator/driver.h
+> @@ -196,6 +196,9 @@ struct regulator_dev {
+>  	struct mutex mutex; /* consumer lock */
+>  	struct module *owner;
+>  	struct device dev;
+> +#ifdef CONFIG_OF
+> +	struct device_node *node;
+> +#endif
 
-Nit: I'm not too fond of a single function doing both name and pointer
-lookup at the same time.  Presumably the caller would have one or the
-other and know what it needs to do.  I'd prefer to see one by-name
-function and one by-reference.  I'm not going to make a big deal about
-it though.
-
-> +/**
-> + * pinctrl_register() - register a pin controller device
-> + * @pctldesc: descriptor for this pin controller
-> + * @dev: parent device for this pin controller
-> + * @driver_data: private pin controller data for this pin controller
-> + */
-> +struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
-> +				    struct device *dev, void *driver_data)
-> +{
-> +	static atomic_t pinmux_no = ATOMIC_INIT(0);
-> +	struct pinctrl_dev *pctldev;
-> +	int ret;
-> +
-> +	if (pctldesc == NULL)
-> +		return ERR_PTR(-EINVAL);
-> +	if (pctldesc->name == NULL)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	/* If we're implementing pinmuxing, check the ops for sanity */
-> +	if (pctldesc->pmxops) {
-> +		ret = pinmux_check_ops(pctldesc->pmxops);
-> +		if (ret) {
-> +			pr_err("%s pinmux ops lacks necessary functions\n",
-> +			       pctldesc->name);
-> +			return ERR_PTR(ret);
-> +		}
-> +	}
-> +
-> +	pctldev = kzalloc(sizeof(struct pinctrl_dev), GFP_KERNEL);
-> +	if (pctldev == NULL)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	/* Initialize pin control device struct */
-> +	pctldev->owner = pctldesc->owner;
-> +	pctldev->desc = pctldesc;
-> +	pctldev->driver_data = driver_data;
-> +	INIT_RADIX_TREE(&pctldev->pin_desc_tree, GFP_KERNEL);
-> +	spin_lock_init(&pctldev->pin_desc_tree_lock);
-> +	INIT_LIST_HEAD(&pctldev->gpio_ranges);
-> +	mutex_init(&pctldev->gpio_ranges_lock);
-> +
-> +	/* Register device with sysfs */
-> +	pctldev->dev.parent = dev;
-> +	pctldev->dev.bus = &pinctrl_bus;
-
-I don't think there is an actual need for a pinctrl bus type.  There
-aren't any drivers that are going to be bound to these things which is
-the primary functionality that a bus type provides.  Am I missing
-something?
-
-> +	pctldev->dev.type = &pinctrl_type;
-> +	dev_set_name(&pctldev->dev, "pinctrl.%d",
-> +		     atomic_inc_return(&pinmux_no) - 1);
-> +	ret = device_register(&pctldev->dev);
-> +	if (ret != 0) {
-> +		pr_err("error in device registration\n");
-> +		put_device(&pctldev->dev);
-> +		kfree(pctldev);
-> +		goto out_err;
-> +	}
-> +	dev_set_drvdata(&pctldev->dev, pctldev);
-> +
-> +	/* Register all the pins */
-> +	pr_debug("try to register %d pins on %s...\n",
-> +		 pctldesc->npins, pctldesc->name);
-> +	ret = pinctrl_register_pins(pctldev, pctldesc->pins, pctldesc->npins);
-> +	if (ret) {
-> +		pr_err("error during pin registration\n");
-> +		pinctrl_free_pindescs(pctldev, pctldesc->pins,
-> +				      pctldesc->npins);
-> +		goto out_err;
-> +	}
-> +
-> +	pinctrl_init_device_debugfs(pctldev);
-> +	mutex_lock(&pinctrldev_list_mutex);
-> +	list_add(&pctldev->node, &pinctrldev_list);
-> +	mutex_unlock(&pinctrldev_list_mutex);
-> +	pinmux_hog_maps(pctldev);
-> +	return pctldev;
-> +
-> +out_err:
-> +	put_device(&pctldev->dev);
-> +	kfree(pctldev);
-
-Once a device is initialized, it cannot be kfree()'ed directly.  The
-.release method needs to do that.
-
-> +/**
-> + * pin_free() - release a single muxed in pin so something else can be muxed in
-> + *	instead
-
-Nit: the summary line in kerneldoc should fit on one line.
-
-> +/**
-> + * pinmux_register_mappings() - register a set of pinmux mappings
-> + * @maps: the pinmux mappings table to register
-> + * @num_maps: the number of maps in the mapping table
-> + *
-> + * Only call this once during initialization of your machine, the function is
-> + * tagged as __init and won't be callable after init has completed. The map
-> + * passed into this function will be owned by the pinmux core and cannot be
-> + * free:d.
-> + */
-> +int __init
-> +pinmux_register_mappings(struct pinmux_map const *maps, unsigned num_maps)
-
-Nit: keep line breaks in the parameter lists.  More grep friendly.
+There is already an of_node pointer in regulator_dev->dev.of_node.
+Why does another need to be added here?
 
 g.
