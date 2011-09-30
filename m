@@ -1,127 +1,92 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 29 Sep 2011 20:12:39 -0600
-Subject: [PATCH 2/2 v7] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
-References: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110930021239.GL12606@ponder.secretlab.ca>
+Date: Thu, 29 Sep 2011 19:26:58 -0600
+Subject: [PATCH 5/9] regulator: helper routine to extract
+	fixed_voltage_config
+In-Reply-To: <1317118372-17052-6-git-send-email-rnayak@ti.com>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-6-git-send-email-rnayak@ti.com>
+Message-ID: <20110930012658.GF12606@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2011 at 02:14:09PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Tue, Sep 27, 2011 at 03:42:48PM +0530, Rajendra Nayak wrote:
+> The helper routine of_get_fixed_voltage_config() extracts
+> fixed_voltage_config structure contents from device tree.
 > 
-> This adds a driver for the U300 pinmux portions of the system
-> controller "SYSCON". It also serves as an example of how to use
-> the pinmux subsystem. This driver also houses the platform data
-> for the only supported platform.
-
-Hi Linus, comments below.
-
-> diff --git a/arch/arm/mach-u300/Kconfig b/arch/arm/mach-u300/Kconfig
-> index 32a7b0f..449fd6a 100644
-> --- a/arch/arm/mach-u300/Kconfig
-> +++ b/arch/arm/mach-u300/Kconfig
-> @@ -6,6 +6,8 @@ comment "ST-Ericsson Mobile Platform Products"
+> Also add documenation for additional bindings for fixed
+> regulators that can be passed through dt.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  .../bindings/regulator/fixed-regulator.txt         |   24 +++++++++++++
+>  drivers/regulator/fixed.c                          |   36 ++++++++++++++++++++
+>  include/linux/regulator/fixed.h                    |    6 ++--
+>  3 files changed, 63 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/fixed-regulator.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/fixed-regulator.txt b/Documentation/devicetree/bindings/regulator/fixed-regulator.txt
+> new file mode 100644
+> index 0000000..a204cbd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/regulator/fixed-regulator.txt
+> @@ -0,0 +1,24 @@
+> +Fixed Voltage regulators
+> +
+> +Required properties:
+> +- compatible: Must be "regulator-fixed";
+> +
+> +Optional properties:
+> +- regulator-fixed-supply: Name of the regulator supply
+> +- regulator-fixed-microvolts: Output voltage of regulator
+> +- regulator-fixed-gpio: gpio to use for enable control
+> +- regulator-fixed-startup-delay: startup time in microseconds
+> +- regulator-fixed-enable-high: Polarity of enable GPIO, 1 = Active High, 0 = Active low
+> +- regulator-fixed-enabled-at-boot: 1 = yes, 0 = no
+> +
+> +Example:
+> +
+> +	abc: fixedregulator at 0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-fixed-supply = "fixed-supply";
+> +		regulator-fixed-microvolts = <1800000>;
+> +		regulator-fixed-gpio = <43>;
+> +		regulator-fixed-startup-delay = <70000>;
+> +		regulator-fixed-enable-high;
+> +		regulator-fixed-enabled-at-boot;
+> +	};
+> diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
+> index 2fe9d99..c09f791 100644
+> --- a/drivers/regulator/fixed.c
+> +++ b/drivers/regulator/fixed.c
+> @@ -26,6 +26,8 @@
+>  #include <linux/gpio.h>
+>  #include <linux/delay.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+> +#include <linux/regulator/of_regulator.h>
 >  
->  config MACH_U300
->  	bool "U300"
-> +	select PINCTRL
-> +	select PINMUX_U300
-
-Shouldn't PINMUX_U300 select PINCTRL?
-
-> +#include "pinmux-u300.h"
-
-There is only one file that uses this header data.  Just put it into
-the .c file.
-
-> +static int __init u300_pmx_probe(struct platform_device *pdev)
+>  struct fixed_voltage_data {
+>  	struct regulator_desc desc;
+> @@ -37,6 +39,40 @@ struct fixed_voltage_data {
+>  	bool is_enabled;
+>  };
+>  
+> +
+> +/**
+> + * of_get_fixed_voltage_config - extract fixed_voltage_config structure info
+> + * @dev: device requesting for fixed_voltage_config
+> + *
+> + * Populates fixed_voltage_config structure by extracting data from device
+> + * tree node, returns a pointer to the populated structure of NULL if memory
+> + * alloc fails.
+> + */
+> +struct fixed_voltage_config *of_get_fixed_voltage_config(struct device *dev)
 > +{
-> +	int ret;
-> +	struct u300_pmx *upmx;
-> +	struct resource *res;
+> +	struct fixed_voltage_config *config;
+> +	struct device_node *np = dev->of_node;
 > +
-> +	/* Create state holders etc for this driver */
-> +	upmx = kzalloc(sizeof(struct u300_pmx), GFP_KERNEL);
+> +	config = devm_kzalloc(dev, sizeof(struct fixed_voltage_config), GFP_KERNEL);
 
-devm_kzalloc()
+Nit: config = devm_kzalloc(dev, *config, GFP_KERNEL);
 
-> +	if (!upmx)
-> +		return -ENOMEM;
-> +
-> +	upmx->dev = &pdev->dev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		ret = -ENOENT;
-> +		goto out_no_resource;
-> +	}
-> +	upmx->phybase = res->start;
-> +	upmx->physize = resource_size(res);
-> +
-> +	if (request_mem_region(upmx->phybase, upmx->physize,
-> +			       DRIVER_NAME) == NULL) {
-> +		ret = -EBUSY;
-> +		goto out_no_memregion;
-> +	}
-> +
-> +	upmx->virtbase = ioremap(upmx->phybase, upmx->physize);
-> +	if (!upmx->virtbase) {
-> +		ret = -ENOMEM;
-> +		goto out_no_remap;
-> +	}
-> +
-> +	upmx->pctl = pinctrl_register(&u300_pmx_desc, &pdev->dev, upmx);
-> +	if (IS_ERR(upmx->pctl)) {
-> +		dev_err(&pdev->dev, "could not register U300 pinmux driver\n");
-> +		ret = PTR_ERR(upmx->pctl);
-> +		goto out_no_pmx;
-> +	}
-> +
-> +	/* We will handle a range of GPIO pins */
-> +	pinctrl_add_gpio_range(upmx->pctl, &u300_gpio_range);
-> +
-> +	platform_set_drvdata(pdev, upmx);
-> +
-> +	u300_pmx_dumpregs(upmx);
-> +
-> +	dev_info(&pdev->dev, "initialized U300 pinmux driver\n");
-> +
-> +	return 0;
-> +
-> +out_no_pmx:
-> +	iounmap(upmx->virtbase);
-> +out_no_remap:
-> +	platform_set_drvdata(pdev, NULL);
-> +out_no_memregion:
-> +	release_mem_region(upmx->phybase, upmx->physize);
-> +out_no_resource:
-> +	kfree(upmx);
-> +	return ret;
-> +}
-> +
-> +static int __exit u300_pmx_remove(struct platform_device *pdev)
-
-__devexit
-
-> +{
-> +	struct u300_pmx *upmx = platform_get_drvdata(pdev);
-> +
-> +	pinctrl_remove_gpio_range(upmx->pctl, &u300_gpio_range);
-> +	pinctrl_unregister(upmx->pctl);
-> +	iounmap(upmx->virtbase);
-> +	release_mem_region(upmx->phybase, upmx->physize);
-> +	platform_set_drvdata(pdev, NULL);
-> +	kfree(upmx);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver u300_pmx_driver = {
-> +	.driver = {
-> +		.name = DRIVER_NAME,
-> +		.owner = THIS_MODULE,
-> +	},
-> +	.remove = __exit_p(u300_pmx_remove),
-
-__devexit_p
+g.
