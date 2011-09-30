@@ -1,55 +1,75 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 30 Sep 2011 10:01:56 +0100
-Subject: [PATCH v4 6/7] arm/imx6q: add device tree machine support
-In-Reply-To: <1317200808-6275-7-git-send-email-shawn.guo@linaro.org>
-References: <1317200808-6275-1-git-send-email-shawn.guo@linaro.org>
-	<1317200808-6275-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110930090156.GS17204@pulham.picochip.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 30 Sep 2011 17:16:38 +0800
+Subject: [PATCH v3] ARM: cache-l2x0: add resume entry for l2 in secure mode
+In-Reply-To: <CAGsJ_4zUL-6VzifctuDTe=jF-2FzjbkD10VfR=hC8ZDaFMiOFw@mail.gmail.com>
+References: <1317353481-28723-1-git-send-email-Barry.Song@csr.com>
+	<20110930083338.GB19807@S2100-06.ap.freescale.net>
+	<CAGsJ_4zUL-6VzifctuDTe=jF-2FzjbkD10VfR=hC8ZDaFMiOFw@mail.gmail.com>
+Message-ID: <20110930091637.GC19807@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On Wed, Sep 28, 2011 at 05:06:47PM +0800, Shawn Guo wrote:
-> It adds generic device tree based machine support for imx6q.
+On Fri, Sep 30, 2011 at 04:44:33PM +0800, Barry Song wrote:
+> 2011/9/30 Shawn Guo <shawn.guo@freescale.com>:
+> > On Thu, Sep 29, 2011 at 08:31:21PM -0700, Barry Song wrote:
+> >> From: Barry Song <Baohua.Song@csr.com>
+> >>
+> >> we save the l2x0 registers at the first initialization, and platform codes
+> >> can get them to restore l2x0 status after wakeup.
+> >>
+> >> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >> Cc: Shawn Guo <shawn.guo@linaro.org>
+> >> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> >> ---
+> >> ?-v3:
+> >> ?save PREFETCH_CTRL and POWER_CTRL according to revision;
+> >> ?save l2x0 physical address so that asm codes can use.
+> >
+> > On imx6q:
+> >
+> > Tested-by: Shawn Guo <shawn.guo@linaro.org>
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-[...]
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c 
-> b/arch/arm/mach-imx/mach-imx6q.c
-> new file mode 100644
-> index 0000000..8bf5fa3
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-[...]
-> +static void __init imx6q_gpio_add_irq_domain(struct device_node *np,
-> +				struct device_node *interrupt_parent)
-> +{
-> +	static int gpio_irq_base = MXC_GPIO_IRQ_START + ARCH_NR_GPIOS -
-> +				   32 * 7; /* imx6q gets 7 gpio ports */
-> +
-> +	irq_domain_add_simple(np, gpio_irq_base);
-> +	gpio_irq_base += 32;
+> Shawn, Thanks.
+> 
+> >
+> > One minor comment below.
+> >
+> >>
+> >> ?arch/arm/include/asm/hardware/cache-l2x0.h | ? 23 +++++
+> >> ?arch/arm/include/asm/outercache.h ? ? ? ? ?| ? ?7 ++
+> >> ?arch/arm/kernel/asm-offsets.c ? ? ? ? ? ? ?| ? 12 +++
+> >> ?arch/arm/mm/cache-l2x0.c ? ? ? ? ? ? ? ? ? | ?129 +++++++++++++++++++++++++--
+> >> ?4 files changed, 161 insertions(+), 10 deletions(-)
+> >
+> > [... ]
+> >
+> >> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> >> index 0d85d22..3f9b998 100644
+> >> --- a/arch/arm/mm/cache-l2x0.c
+> >> +++ b/arch/arm/mm/cache-l2x0.c
+> >> @@ -33,6 +33,14 @@ static DEFINE_SPINLOCK(l2x0_lock);
+> >> ?static uint32_t l2x0_way_mask; ? ? ? /* Bitmask of active ways */
+> >> ?static uint32_t l2x0_size;
+> >>
+> >> +struct l2x0_regs l2x0_saved_regs;
+> >> +
+> > Can we add a declaration of l2x0_saved_regs in cache-l2x0.h, so that
+> > platform code does not need to declare it individually?
+> 
+> it could be ok. if the platform codes are in c after MMU on, it can be
+> useful.
 
-Doesn't this rely on imx6q_gpio_add_irq_domain() being called for each 
-gpio bank in the order that they appear in the device tree (and that the 
-dt is correctly ordered)?
+Actually, it's needed for imx6q case (resume in asm) too, because we
+need to save __pa(l2x0_saved_regs) in C for later use by asm.
 
-> +}
-> +
-> +static const struct of_device_id imx6q_irq_match[] __initconst = {
-> +	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-> +	{ .compatible = "fsl,imx6q-gpio", .data = imx6q_gpio_add_irq_domain, },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static void __init imx6q_init_irq(void)
-> +{
-> +	l2x0_of_init(0, ~0UL);
-> +	imx_src_init();
-> +	imx_gpc_init();
-> +	of_irq_init(imx6q_irq_match);
-> +}
+> but people might be able to call outer_resume() in c directly.
+> then it doesn't need the declaration as well.
 
-Jamie
+We do not define l2x0_saved_regs as static for the only reason that
+some platform codes need to access it.  Then we could add declaration
+to ease platform code a little bit more.
+
+-- 
+Regards,
+Shawn
