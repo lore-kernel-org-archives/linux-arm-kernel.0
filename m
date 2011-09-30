@@ -1,72 +1,43 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 30 Sep 2011 11:07:56 -0600
-Subject: [PATCH] drivers: create a pin control subsystem v8
-In-Reply-To: <CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
-References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
-	<20110930020754.GK12606@ponder.secretlab.ca>
-	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
-Message-ID: <CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 30 Sep 2011 12:08:58 -0500
+Subject: [PATCH 2/2] ARM: Switch to using CLKDEV_INIT macro for creating
+	clk_lookup instance
+In-Reply-To: <4E85B779.7030402@gmail.com>
+References: <1317381097-2691-1-git-send-email-padma.v@samsung.com>
+	<1317381097-2691-3-git-send-email-padma.v@samsung.com>
+	<4E85B779.7030402@gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F39DC56761@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 9:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Sep 30, 2011 at 4:07 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->
->> Comments below, some a bit nitpicky, but overall I think it looks
->> good. ?I haven't dug into it nearly deeply enough though. ?:-(
->
-> Hopefully we can patch the remaining bugs as we go along ?:-)
->
->>> +/**
->>> + * Looks up a pin control device matching a certain device name or
->>> + * pure device pointer.
+On Friday, September 30, 2011 5:35 AM, Ryan Mallon wrote:
+> On 30/09/11 21:11, Padmavathi Venna wrote:
+>> Replace platform specific macros that creates struct clk_lookup
+>> instance with the new common CLKDEV_INIT macro
 >>
->> May as well actually do kerneldoc formatting here on the comment
->> blocks.
->
-> OK.
->
->>> +struct pinctrl_dev *get_pctldev_from_dev(struct device *dev,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?const char *devname)
->>
->> Nit: I'm not too fond of a single function doing both name and pointer
->> lookup at the same time. ?Presumably the caller would have one or the
->> other and know what it needs to do. ?I'd prefer to see one by-name
->> function and one by-reference. ?I'm not going to make a big deal about
->> it though.
->
-> The caller currently does not know what it has or
-> what to do.
->
-> This is basically an interator function that is called on
-> a member tuple of device and device name to check
-> which one you have and return a matching controller
-> device for the key you do have.
->
->>> + ? ? /* Register device with sysfs */
->>> + ? ? pctldev->dev.parent = dev;
->>> + ? ? pctldev->dev.bus = &pinctrl_bus;
->>
->> I don't think there is an actual need for a pinctrl bus type. ?There
->> aren't any drivers that are going to be bound to these things which is
->> the primary functionality that a bus type provides. ?Am I missing
->> something?
->
-> That is not the reason it's there actually, what we have
-> discussed on the mailing list is getting sysfs entries for the same
-> reason gpiolib registers a class: handle pin control from userspace,
-> we can already see that coming and I already have a use case
-> for it. (Modem SIM connector control from userspace daemon.)
->
-> So first it was registering a class, then Greg said classes are
-> deprecated and we should use a bus instead. So it is
-> registering a bus to get sysfs so we can get userspace
-> controls.
+>> Suggested by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>> ---
 
-Sure, but you don't need the bus yet.  It can be added when it is
-actually needed.  I'm not convinced that the sysfs approach is
-actually the right interface here (I'm certainly not a fan of the gpio
-sysfs i/f), and I'd rather not be putting in unneeded stuff until the
-userspace i/f is hammered out.
+[...]
 
-g.
+>>  static struct clk_lookup cdce_clks[] = {
+>> -	CLK(NULL, "xin", &cdce_clk_in),
+>> -	CLK(NULL, NULL, NULL),
+>> +	CLKDEV_INIT(NULL, "xin", cdce_clk_in)
+>> +	{.dev_id = NULL, .con_id = NULL, .clk = NULL,},
+>
+> Why not CLKDEV_INIT(NULL, NULL, NULL)? Or create another macro
+> CLKDEV_NULL (or similar) for the last entry in the list rather than
+> duplicating this everywhere.
+
+The CLKDEV_INIT macro does this with the third parameter:
+
+	.clk = &c,
+
+I'm not sure &NULL is valid.
+
+Is the sentinel entry actually needed?  ep93xx does not have one.
+
+Regards,
+Hartley
