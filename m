@@ -1,92 +1,172 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 29 Sep 2011 19:26:58 -0600
-Subject: [PATCH 5/9] regulator: helper routine to extract
-	fixed_voltage_config
-In-Reply-To: <1317118372-17052-6-git-send-email-rnayak@ti.com>
-References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-6-git-send-email-rnayak@ti.com>
-Message-ID: <20110930012658.GF12606@ponder.secretlab.ca>
+Date: Thu, 29 Sep 2011 20:07:54 -0600
+Subject: [PATCH] drivers: create a pin control subsystem v8
+In-Reply-To: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
+References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110930020754.GK12606@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 03:42:48PM +0530, Rajendra Nayak wrote:
-> The helper routine of_get_fixed_voltage_config() extracts
-> fixed_voltage_config structure contents from device tree.
+On Wed, Sep 28, 2011 at 02:03:39PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Also add documenation for additional bindings for fixed
-> regulators that can be passed through dt.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  .../bindings/regulator/fixed-regulator.txt         |   24 +++++++++++++
->  drivers/regulator/fixed.c                          |   36 ++++++++++++++++++++
->  include/linux/regulator/fixed.h                    |    6 ++--
->  3 files changed, 63 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/regulator/fixed-regulator.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/regulator/fixed-regulator.txt b/Documentation/devicetree/bindings/regulator/fixed-regulator.txt
-> new file mode 100644
-> index 0000000..a204cbd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/regulator/fixed-regulator.txt
-> @@ -0,0 +1,24 @@
-> +Fixed Voltage regulators
-> +
-> +Required properties:
-> +- compatible: Must be "regulator-fixed";
-> +
-> +Optional properties:
-> +- regulator-fixed-supply: Name of the regulator supply
-> +- regulator-fixed-microvolts: Output voltage of regulator
-> +- regulator-fixed-gpio: gpio to use for enable control
-> +- regulator-fixed-startup-delay: startup time in microseconds
-> +- regulator-fixed-enable-high: Polarity of enable GPIO, 1 = Active High, 0 = Active low
-> +- regulator-fixed-enabled-at-boot: 1 = yes, 0 = no
-> +
-> +Example:
-> +
-> +	abc: fixedregulator at 0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-fixed-supply = "fixed-supply";
-> +		regulator-fixed-microvolts = <1800000>;
-> +		regulator-fixed-gpio = <43>;
-> +		regulator-fixed-startup-delay = <70000>;
-> +		regulator-fixed-enable-high;
-> +		regulator-fixed-enabled-at-boot;
-> +	};
-> diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
-> index 2fe9d99..c09f791 100644
-> --- a/drivers/regulator/fixed.c
-> +++ b/drivers/regulator/fixed.c
-> @@ -26,6 +26,8 @@
->  #include <linux/gpio.h>
->  #include <linux/delay.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
-> +#include <linux/regulator/of_regulator.h>
->  
->  struct fixed_voltage_data {
->  	struct regulator_desc desc;
-> @@ -37,6 +39,40 @@ struct fixed_voltage_data {
->  	bool is_enabled;
->  };
->  
-> +
-> +/**
-> + * of_get_fixed_voltage_config - extract fixed_voltage_config structure info
-> + * @dev: device requesting for fixed_voltage_config
-> + *
-> + * Populates fixed_voltage_config structure by extracting data from device
-> + * tree node, returns a pointer to the populated structure of NULL if memory
-> + * alloc fails.
-> + */
-> +struct fixed_voltage_config *of_get_fixed_voltage_config(struct device *dev)
-> +{
-> +	struct fixed_voltage_config *config;
-> +	struct device_node *np = dev->of_node;
-> +
-> +	config = devm_kzalloc(dev, sizeof(struct fixed_voltage_config), GFP_KERNEL);
+> This creates a subsystem for handling of pin control devices.
+> These are devices that control different aspects of package
+> pins.
 
-Nit: config = devm_kzalloc(dev, *config, GFP_KERNEL);
+Comments below, some a bit nitpicky, but overall I think it looks
+good.  I haven't dug into it nearly deeply enough though.  :-(
+
+[...]
+> +/**
+> + * Looks up a pin control device matching a certain device name or
+> + * pure device pointer.
+
+May as well actually do kerneldoc formatting here on the comment
+blocks.
+
+> + */
+> +struct pinctrl_dev *get_pctldev_from_dev(struct device *dev,
+> +					 const char *devname)
+> +{
+> +	struct pinctrl_dev *pctldev = NULL;
+> +	bool found = false;
+> +
+> +	mutex_lock(&pinctrldev_list_mutex);
+> +	list_for_each_entry(pctldev, &pinctrldev_list, node) {
+> +		if (dev &&  &pctldev->dev == dev) {
+> +			/* Matched on device pointer */
+> +			found = true;
+> +			break;
+> +		}
+> +
+> +		if (devname &&
+> +		    !strcmp(dev_name(&pctldev->dev), devname)) {
+> +			/* Matched on device name */
+> +			found = true;
+> +			break;
+> +		}
+> +	}
+> +	mutex_unlock(&pinctrldev_list_mutex);
+> +
+> +	if (found)
+> +		return pctldev;
+> +
+> +	return NULL;
+> +}
+
+Nit: I'm not too fond of a single function doing both name and pointer
+lookup at the same time.  Presumably the caller would have one or the
+other and know what it needs to do.  I'd prefer to see one by-name
+function and one by-reference.  I'm not going to make a big deal about
+it though.
+
+> +/**
+> + * pinctrl_register() - register a pin controller device
+> + * @pctldesc: descriptor for this pin controller
+> + * @dev: parent device for this pin controller
+> + * @driver_data: private pin controller data for this pin controller
+> + */
+> +struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
+> +				    struct device *dev, void *driver_data)
+> +{
+> +	static atomic_t pinmux_no = ATOMIC_INIT(0);
+> +	struct pinctrl_dev *pctldev;
+> +	int ret;
+> +
+> +	if (pctldesc == NULL)
+> +		return ERR_PTR(-EINVAL);
+> +	if (pctldesc->name == NULL)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	/* If we're implementing pinmuxing, check the ops for sanity */
+> +	if (pctldesc->pmxops) {
+> +		ret = pinmux_check_ops(pctldesc->pmxops);
+> +		if (ret) {
+> +			pr_err("%s pinmux ops lacks necessary functions\n",
+> +			       pctldesc->name);
+> +			return ERR_PTR(ret);
+> +		}
+> +	}
+> +
+> +	pctldev = kzalloc(sizeof(struct pinctrl_dev), GFP_KERNEL);
+> +	if (pctldev == NULL)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	/* Initialize pin control device struct */
+> +	pctldev->owner = pctldesc->owner;
+> +	pctldev->desc = pctldesc;
+> +	pctldev->driver_data = driver_data;
+> +	INIT_RADIX_TREE(&pctldev->pin_desc_tree, GFP_KERNEL);
+> +	spin_lock_init(&pctldev->pin_desc_tree_lock);
+> +	INIT_LIST_HEAD(&pctldev->gpio_ranges);
+> +	mutex_init(&pctldev->gpio_ranges_lock);
+> +
+> +	/* Register device with sysfs */
+> +	pctldev->dev.parent = dev;
+> +	pctldev->dev.bus = &pinctrl_bus;
+
+I don't think there is an actual need for a pinctrl bus type.  There
+aren't any drivers that are going to be bound to these things which is
+the primary functionality that a bus type provides.  Am I missing
+something?
+
+> +	pctldev->dev.type = &pinctrl_type;
+> +	dev_set_name(&pctldev->dev, "pinctrl.%d",
+> +		     atomic_inc_return(&pinmux_no) - 1);
+> +	ret = device_register(&pctldev->dev);
+> +	if (ret != 0) {
+> +		pr_err("error in device registration\n");
+> +		put_device(&pctldev->dev);
+> +		kfree(pctldev);
+> +		goto out_err;
+> +	}
+> +	dev_set_drvdata(&pctldev->dev, pctldev);
+> +
+> +	/* Register all the pins */
+> +	pr_debug("try to register %d pins on %s...\n",
+> +		 pctldesc->npins, pctldesc->name);
+> +	ret = pinctrl_register_pins(pctldev, pctldesc->pins, pctldesc->npins);
+> +	if (ret) {
+> +		pr_err("error during pin registration\n");
+> +		pinctrl_free_pindescs(pctldev, pctldesc->pins,
+> +				      pctldesc->npins);
+> +		goto out_err;
+> +	}
+> +
+> +	pinctrl_init_device_debugfs(pctldev);
+> +	mutex_lock(&pinctrldev_list_mutex);
+> +	list_add(&pctldev->node, &pinctrldev_list);
+> +	mutex_unlock(&pinctrldev_list_mutex);
+> +	pinmux_hog_maps(pctldev);
+> +	return pctldev;
+> +
+> +out_err:
+> +	put_device(&pctldev->dev);
+> +	kfree(pctldev);
+
+Once a device is initialized, it cannot be kfree()'ed directly.  The
+.release method needs to do that.
+
+> +/**
+> + * pin_free() - release a single muxed in pin so something else can be muxed in
+> + *	instead
+
+Nit: the summary line in kerneldoc should fit on one line.
+
+> +/**
+> + * pinmux_register_mappings() - register a set of pinmux mappings
+> + * @maps: the pinmux mappings table to register
+> + * @num_maps: the number of maps in the mapping table
+> + *
+> + * Only call this once during initialization of your machine, the function is
+> + * tagged as __init and won't be callable after init has completed. The map
+> + * passed into this function will be owned by the pinmux core and cannot be
+> + * free:d.
+> + */
+> +int __init
+> +pinmux_register_mappings(struct pinmux_map const *maps, unsigned num_maps)
+
+Nit: keep line breaks in the parameter lists.  More grep friendly.
 
 g.
