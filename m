@@ -1,310 +1,842 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 30 Sep 2011 21:55:42 +0900
-Subject: [PATCH 3/3] ARM: SAMSUNG: Move S5P header files to plat-samsung
-Message-ID: <019601cc7f70$431e36a0$c95aa3e0$%kim@samsung.com>
+Date: Fri, 30 Sep 2011 21:55:37 +0900
+Subject: [PATCH 2/3] ARM: SAMSUNG: Move S3C24XX header files to plat-samsung
+Message-ID: <019501cc7f70$40579c90$c106d5b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves header files from plat-s5p to plat-samsung to
-remove plat-s5p directory to make one plat-samsung directory
-for Samsung SoCs.
+This patch moves header files from plat-s3c24xx to plat-samsung to
+remove plat-s3c24xx directory to make one plat-samsung directory for
+Samsung SoCs. And this patch includes fixing coding style, too.
 
+Cc: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- .../include/plat/camport.h                         |    6 +++---
- .../{plat-s5p => plat-samsung}/include/plat/ehci.h |    6 +++---
- .../{plat-s5p => plat-samsung}/include/plat/irqs.h |    8 ++++----
- .../{plat-s5p => plat-samsung}/include/plat/mfc.h  |    6 +++---
- .../include/plat/mipi_csis.h                       |    6 +++---
- .../include/plat/regs-srom.h                       |    8 ++++----
- .../include/plat/reset.h                           |    8 ++++----
- .../include/plat/s5p-clock.h                       |    2 +-
- .../include/plat/s5p-time.h                        |    2 +-
- .../include/plat/sysmmu.h                          |    6 +++---
- .../include/plat/system-reset.h                    |    2 +-
- .../include/plat/usb-phy.h                         |    6 +++---
- 12 files changed, 33 insertions(+), 33 deletions(-)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/camport.h (87%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/ehci.h (86%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/irqs.h (96%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/mfc.h (91%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/mipi_csis.h (91%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/regs-srom.h (89%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/reset.h (67%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/s5p-clock.h (96%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/s5p-time.h (94%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/sysmmu.h (96%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/system-reset.h (92%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/usb-phy.h (85%)
+ arch/arm/plat-s3c24xx/include/plat/regs-iis.h      |   68 ----------
+ arch/arm/plat-s3c24xx/include/plat/regs-spi.h      |   81 ------------
+ .../include/plat/audio-simtec.h                    |    2 +-
+ .../include/plat/common-smdk.h                     |    2 +-
+ .../include/plat/cpu-freq-core.h                   |    5 +-
+ .../include/plat/fiq.h                             |    2 +-
+ .../include/plat/irq.h                             |   25 ++--
+ .../include/plat/mci.h                             |   10 +-
+ .../include/plat/regs-dma.h                        |  112 +++++++++--------
+ arch/arm/plat-samsung/include/plat/regs-iis.h      |   70 +++++++++++
+ arch/arm/plat-samsung/include/plat/regs-spi.h      |   48 +++++++
+ .../include/plat/regs-udc.h                        |  132 ++++++++++----------
+ .../include/plat/udc.h                             |    4 +-
+ 13 files changed, 268 insertions(+), 293 deletions(-)
+ delete mode 100644 arch/arm/plat-s3c24xx/include/plat/regs-iis.h
+ delete mode 100644 arch/arm/plat-s3c24xx/include/plat/regs-spi.h
+ rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/audio-simtec.h (95%)
+ rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/common-smdk.h (87%)
+ rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/cpu-freq-core.h (98%)
+ rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/fiq.h (88%)
+ rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/irq.h (81%)
+ rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/mci.h (90%)
+ rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/regs-dma.h (58%)
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-iis.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/regs-spi.h
+ rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/regs-udc.h (51%)
+ rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/udc.h (95%)
 
-diff --git a/arch/arm/plat-s5p/include/plat/camport.h b/arch/arm/plat-samsung/include/plat/camport.h
+diff --git a/arch/arm/plat-s3c24xx/include/plat/regs-iis.h b/arch/arm/plat-s3c24xx/include/plat/regs-iis.h
+deleted file mode 100644
+index cc44e0e..0000000
+--- a/arch/arm/plat-s3c24xx/include/plat/regs-iis.h
++++ /dev/null
+@@ -1,68 +0,0 @@
+-/* arch/arm/mach-s3c2410/include/mach/regs-iis.h
+- *
+- * Copyright (c) 2003 Simtec Electronics <linux@simtec.co.uk>
+- *		      http://www.simtec.co.uk/products/SWLINUX/
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * S3C2410 IIS register definition
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_IIS_H
+-#define __ASM_ARCH_REGS_IIS_H
+-
+-#define S3C2410_IISCON	 (0x00)
+-
+-#define S3C2410_IISCON_LRINDEX	  (1<<8)
+-#define S3C2410_IISCON_TXFIFORDY  (1<<7)
+-#define S3C2410_IISCON_RXFIFORDY  (1<<6)
+-#define S3C2410_IISCON_TXDMAEN	  (1<<5)
+-#define S3C2410_IISCON_RXDMAEN	  (1<<4)
+-#define S3C2410_IISCON_TXIDLE	  (1<<3)
+-#define S3C2410_IISCON_RXIDLE	  (1<<2)
+-#define S3C2410_IISCON_PSCEN	  (1<<1)
+-#define S3C2410_IISCON_IISEN	  (1<<0)
+-
+-#define S3C2410_IISMOD	 (0x04)
+-
+-#define S3C2440_IISMOD_MPLL	  (1<<9)
+-#define S3C2410_IISMOD_SLAVE	  (1<<8)
+-#define S3C2410_IISMOD_NOXFER	  (0<<6)
+-#define S3C2410_IISMOD_RXMODE	  (1<<6)
+-#define S3C2410_IISMOD_TXMODE	  (2<<6)
+-#define S3C2410_IISMOD_TXRXMODE	  (3<<6)
+-#define S3C2410_IISMOD_LR_LLOW	  (0<<5)
+-#define S3C2410_IISMOD_LR_RLOW	  (1<<5)
+-#define S3C2410_IISMOD_IIS	  (0<<4)
+-#define S3C2410_IISMOD_MSB	  (1<<4)
+-#define S3C2410_IISMOD_8BIT	  (0<<3)
+-#define S3C2410_IISMOD_16BIT	  (1<<3)
+-#define S3C2410_IISMOD_BITMASK	  (1<<3)
+-#define S3C2410_IISMOD_256FS	  (0<<2)
+-#define S3C2410_IISMOD_384FS	  (1<<2)
+-#define S3C2410_IISMOD_16FS	  (0<<0)
+-#define S3C2410_IISMOD_32FS	  (1<<0)
+-#define S3C2410_IISMOD_48FS	  (2<<0)
+-#define S3C2410_IISMOD_FS_MASK	  (3<<0)
+-
+-#define S3C2410_IISPSR		(0x08)
+-#define S3C2410_IISPSR_INTMASK	(31<<5)
+-#define S3C2410_IISPSR_INTSHIFT	(5)
+-#define S3C2410_IISPSR_EXTMASK	(31<<0)
+-#define S3C2410_IISPSR_EXTSHFIT	(0)
+-
+-#define S3C2410_IISFCON  (0x0c)
+-
+-#define S3C2410_IISFCON_TXDMA	  (1<<15)
+-#define S3C2410_IISFCON_RXDMA	  (1<<14)
+-#define S3C2410_IISFCON_TXENABLE  (1<<13)
+-#define S3C2410_IISFCON_RXENABLE  (1<<12)
+-#define S3C2410_IISFCON_TXMASK	  (0x3f << 6)
+-#define S3C2410_IISFCON_TXSHIFT	  (6)
+-#define S3C2410_IISFCON_RXMASK	  (0x3f)
+-#define S3C2410_IISFCON_RXSHIFT	  (0)
+-
+-#define S3C2410_IISFIFO  (0x10)
+-#endif /* __ASM_ARCH_REGS_IIS_H */
+diff --git a/arch/arm/plat-s3c24xx/include/plat/regs-spi.h b/arch/arm/plat-s3c24xx/include/plat/regs-spi.h
+deleted file mode 100644
+index 892e2f6..0000000
+--- a/arch/arm/plat-s3c24xx/include/plat/regs-spi.h
++++ /dev/null
+@@ -1,81 +0,0 @@
+-/* arch/arm/mach-s3c2410/include/mach/regs-spi.h
+- *
+- * Copyright (c) 2004 Fetron GmbH
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * S3C2410 SPI register definition
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_SPI_H
+-#define __ASM_ARCH_REGS_SPI_H
+-
+-#define S3C2410_SPI1	(0x20)
+-#define S3C2412_SPI1	(0x100)
+-
+-#define S3C2410_SPCON	(0x00)
+-
+-#define S3C2412_SPCON_RXFIFO_RB2	(0<<14)
+-#define S3C2412_SPCON_RXFIFO_RB4	(1<<14)
+-#define S3C2412_SPCON_RXFIFO_RB12	(2<<14)
+-#define S3C2412_SPCON_RXFIFO_RB14	(3<<14)
+-#define S3C2412_SPCON_TXFIFO_RB2	(0<<12)
+-#define S3C2412_SPCON_TXFIFO_RB4	(1<<12)
+-#define S3C2412_SPCON_TXFIFO_RB12	(2<<12)
+-#define S3C2412_SPCON_TXFIFO_RB14	(3<<12)
+-#define S3C2412_SPCON_RXFIFO_RESET	(1<<11) /* RxFIFO reset */
+-#define S3C2412_SPCON_TXFIFO_RESET	(1<<10) /* TxFIFO reset */
+-#define S3C2412_SPCON_RXFIFO_EN		(1<<9)  /* RxFIFO Enable */
+-#define S3C2412_SPCON_TXFIFO_EN		(1<<8)  /* TxFIFO Enable */
+-
+-#define S3C2412_SPCON_DIRC_RX	  (1<<7)
+-
+-#define S3C2410_SPCON_SMOD_DMA	  (2<<5)	/* DMA mode */
+-#define S3C2410_SPCON_SMOD_INT	  (1<<5)	/* interrupt mode */
+-#define S3C2410_SPCON_SMOD_POLL   (0<<5)	/* polling mode */
+-#define S3C2410_SPCON_ENSCK	  (1<<4)	/* Enable SCK */
+-#define S3C2410_SPCON_MSTR	  (1<<3)	/* Master/Slave select
+-						   0: slave, 1: master */
+-#define S3C2410_SPCON_CPOL_HIGH	  (1<<2)	/* Clock polarity select */
+-#define S3C2410_SPCON_CPOL_LOW	  (0<<2)	/* Clock polarity select */
+-
+-#define S3C2410_SPCON_CPHA_FMTB	  (1<<1)	/* Clock Phase Select */
+-#define S3C2410_SPCON_CPHA_FMTA	  (0<<1)	/* Clock Phase Select */
+-
+-#define S3C2410_SPCON_TAGD	  (1<<0)	/* Tx auto garbage data mode */
+-
+-
+-#define S3C2410_SPSTA	 (0x04)
+-
+-#define S3C2412_SPSTA_RXFIFO_AE		(1<<11)
+-#define S3C2412_SPSTA_TXFIFO_AE		(1<<10)
+-#define S3C2412_SPSTA_RXFIFO_ERROR	(1<<9)
+-#define S3C2412_SPSTA_TXFIFO_ERROR	(1<<8)
+-#define S3C2412_SPSTA_RXFIFO_FIFO	(1<<7)
+-#define S3C2412_SPSTA_RXFIFO_EMPTY	(1<<6)
+-#define S3C2412_SPSTA_TXFIFO_NFULL	(1<<5)
+-#define S3C2412_SPSTA_TXFIFO_EMPTY	(1<<4)
+-
+-#define S3C2410_SPSTA_DCOL	  (1<<2)	/* Data Collision Error */
+-#define S3C2410_SPSTA_MULD	  (1<<1)	/* Multi Master Error */
+-#define S3C2410_SPSTA_READY	  (1<<0)	/* Data Tx/Rx ready */
+-#define S3C2412_SPSTA_READY_ORG	  (1<<3)
+-
+-#define S3C2410_SPPIN	 (0x08)
+-
+-#define S3C2410_SPPIN_ENMUL	  (1<<2)	/* Multi Master Error detect */
+-#define S3C2410_SPPIN_RESERVED	  (1<<1)
+-#define S3C2410_SPPIN_KEEP	  (1<<0)	/* Master Out keep */
+-
+-#define S3C2410_SPPRE	 (0x0C)
+-#define S3C2410_SPTDAT	 (0x10)
+-#define S3C2410_SPRDAT	 (0x14)
+-
+-#define S3C2412_TXFIFO	 (0x18)
+-#define S3C2412_RXFIFO	 (0x18)
+-#define S3C2412_SPFIC	 (0x24)
+-
+-
+-#endif /* __ASM_ARCH_REGS_SPI_H */
+diff --git a/arch/arm/plat-s3c24xx/include/plat/audio-simtec.h b/arch/arm/plat-samsung/include/plat/audio-simtec.h
+similarity index 95%
+rename from arch/arm/plat-s3c24xx/include/plat/audio-simtec.h
+rename to arch/arm/plat-samsung/include/plat/audio-simtec.h
+index de5e88f..5345364 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/audio-simtec.h
++++ b/arch/arm/plat-samsung/include/plat/audio-simtec.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/plat-s3c24xx/include/plat/audio-simtec.h
++/* arch/arm/plat-samsung/include/plat/audio-simtec.h
+  *
+  * Copyright 2008 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+diff --git a/arch/arm/plat-s3c24xx/include/plat/common-smdk.h b/arch/arm/plat-samsung/include/plat/common-smdk.h
 similarity index 87%
-rename from arch/arm/plat-s5p/include/plat/camport.h
-rename to arch/arm/plat-samsung/include/plat/camport.h
-index 71688c8..9db617d 100644
---- a/arch/arm/plat-s5p/include/plat/camport.h
-+++ b/arch/arm/plat-samsung/include/plat/camport.h
-@@ -8,8 +8,8 @@
-  * published by the Free Software Foundation.
+rename from arch/arm/plat-s3c24xx/include/plat/common-smdk.h
+rename to arch/arm/plat-samsung/include/plat/common-smdk.h
+index 58d9094..ba028f1 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/common-smdk.h
++++ b/arch/arm/plat-samsung/include/plat/common-smdk.h
+@@ -1,4 +1,4 @@
+-/* linux/include/asm-arm/plat-s3c24xx/common-smdk.h
++/* linux/arch/arm/plat-samsung/include/plat/common-smdk.h
+  *
+  * Copyright (c) 2006 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
+diff --git a/arch/arm/plat-s3c24xx/include/plat/cpu-freq-core.h b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+similarity index 98%
+rename from arch/arm/plat-s3c24xx/include/plat/cpu-freq-core.h
+rename to arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+index d623235..dac4760 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/cpu-freq-core.h
++++ b/arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/plat-s3c/include/plat/cpu-freq.h
++/* arch/arm/plat-samsung/include/plat/cpu-freq-core.h
+  *
+  * Copyright (c) 2006-2009 Simtec Electronics
+  *	http://armlinux.simtec.co.uk/
+@@ -195,7 +195,8 @@ struct s3c_cpufreq_info {
+ 
+ extern int s3c_cpufreq_register(struct s3c_cpufreq_info *info);
+ 
+-extern int s3c_plltab_register(struct cpufreq_frequency_table *plls, unsigned int plls_no);
++extern int s3c_plltab_register(struct cpufreq_frequency_table *plls,
++			       unsigned int plls_no);
+ 
+ /* exports and utilities for debugfs */
+ extern struct s3c_cpufreq_config *s3c_cpufreq_getconfig(void);
+diff --git a/arch/arm/plat-s3c24xx/include/plat/fiq.h b/arch/arm/plat-samsung/include/plat/fiq.h
+similarity index 88%
+rename from arch/arm/plat-s3c24xx/include/plat/fiq.h
+rename to arch/arm/plat-samsung/include/plat/fiq.h
+index 8521b83..535d06a 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/fiq.h
++++ b/arch/arm/plat-samsung/include/plat/fiq.h
+@@ -1,4 +1,4 @@
+-/* linux/include/asm-arm/plat-s3c24xx/fiq.h
++/* linux/arch/arm/plat-samsung/include/plat/fiq.h
+  *
+  * Copyright (c) 2009 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
+diff --git a/arch/arm/plat-s3c24xx/include/plat/irq.h b/arch/arm/plat-samsung/include/plat/irq.h
+similarity index 81%
+rename from arch/arm/plat-s3c24xx/include/plat/irq.h
+rename to arch/arm/plat-samsung/include/plat/irq.h
+index ec087d6..e21a89b 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/irq.h
++++ b/arch/arm/plat-samsung/include/plat/irq.h
+@@ -1,4 +1,4 @@
+-/* linux/include/asm-arm/plat-s3c24xx/irq.h
++/* linux/arch/arm/plat-samsung/include/plat/irq.h
+  *
+  * Copyright (c) 2004-2005 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
+@@ -25,9 +25,9 @@
+ extern struct irq_chip s3c_irq_level_chip;
+ extern struct irq_chip s3c_irq_chip;
+ 
+-static inline void
+-s3c_irqsub_mask(unsigned int irqno, unsigned int parentbit,
+-		int subcheck)
++static inline void s3c_irqsub_mask(unsigned int irqno,
++				   unsigned int parentbit,
++				   int subcheck)
+ {
+ 	unsigned long mask;
+ 	unsigned long submask;
+@@ -39,17 +39,16 @@ s3c_irqsub_mask(unsigned int irqno, unsigned int parentbit,
+ 
+ 	/* check to see if we need to mask the parent IRQ */
+ 
+-	if ((submask  & subcheck) == subcheck) {
++	if ((submask  & subcheck) == subcheck)
+ 		__raw_writel(mask | parentbit, S3C2410_INTMSK);
+-	}
+ 
+ 	/* write back masks */
+ 	__raw_writel(submask, S3C2410_INTSUBMSK);
+ 
+ }
+ 
+-static inline void
+-s3c_irqsub_unmask(unsigned int irqno, unsigned int parentbit)
++static inline void s3c_irqsub_unmask(unsigned int irqno,
++				     unsigned int parentbit)
+ {
+ 	unsigned long mask;
+ 	unsigned long submask;
+@@ -66,8 +65,9 @@ s3c_irqsub_unmask(unsigned int irqno, unsigned int parentbit)
+ }
+ 
+ 
+-static inline void
+-s3c_irqsub_maskack(unsigned int irqno, unsigned int parentmask, unsigned int group)
++static inline void s3c_irqsub_maskack(unsigned int irqno,
++				      unsigned int parentmask,
++				      unsigned int group)
+ {
+ 	unsigned int bit = 1UL << (irqno - IRQ_S3CUART_RX0);
+ 
+@@ -86,8 +86,9 @@ s3c_irqsub_maskack(unsigned int irqno, unsigned int parentmask, unsigned int gro
+ 	}
+ }
+ 
+-static inline void
+-s3c_irqsub_ack(unsigned int irqno, unsigned int parentmask, unsigned int group)
++static inline void s3c_irqsub_ack(unsigned int irqno,
++				  unsigned int parentmask,
++				  unsigned int group)
+ {
+ 	unsigned int bit = 1UL << (irqno - IRQ_S3CUART_RX0);
+ 
+diff --git a/arch/arm/plat-s3c24xx/include/plat/mci.h b/arch/arm/plat-samsung/include/plat/mci.h
+similarity index 90%
+rename from arch/arm/plat-s3c24xx/include/plat/mci.h
+rename to arch/arm/plat-samsung/include/plat/mci.h
+index 2ac2b21..c42d317 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/mci.h
++++ b/arch/arm/plat-samsung/include/plat/mci.h
+@@ -27,11 +27,11 @@
+  * to a non-zero value, otherwise the default of 3.2-3.4V is used.
   */
+ struct s3c24xx_mci_pdata {
+-	unsigned int	no_wprotect : 1;
+-	unsigned int	no_detect : 1;
+-	unsigned int	wprotect_invert : 1;
+-	unsigned int	detect_invert : 1;   /* set => detect active high. */
+-	unsigned int	use_dma : 1;
++	unsigned int	no_wprotect:1;
++	unsigned int	no_detect:1;
++	unsigned int	wprotect_invert:1;
++	unsigned int	detect_invert:1;	/* set => detect active high */
++	unsigned int	use_dma:1;
  
--#ifndef PLAT_S5P_CAMPORT_H_
--#define PLAT_S5P_CAMPORT_H_ __FILE__
-+#ifndef __PLAT_SAMSUNG_CAMPORT_H_
-+#define __PLAT_SAMSUNG_CAMPORT_H_ __FILE__
+ 	unsigned int	gpio_detect;
+ 	unsigned int	gpio_wprotect;
+diff --git a/arch/arm/plat-s3c24xx/include/plat/regs-dma.h b/arch/arm/plat-samsung/include/plat/regs-dma.h
+similarity index 58%
+rename from arch/arm/plat-s3c24xx/include/plat/regs-dma.h
+rename to arch/arm/plat-samsung/include/plat/regs-dma.h
+index 1b0f4c3..178bccb 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/regs-dma.h
++++ b/arch/arm/plat-samsung/include/plat/regs-dma.h
+@@ -1,4 +1,4 @@
+-/* arch/arm/mach-s3c2410/include/mach/dma.h
++/* arch/arm/plat-samsung/include/plat/regs-dma.h
+  *
+  * Copyright (C) 2003-2006 Simtec Electronics
+  *	Ben Dooks <ben@simtec.co.uk>
+@@ -10,7 +10,8 @@
+  * published by the Free Software Foundation.
+ */
  
- enum s5p_camport_id {
- 	S5P_CAMPORT_A,
-@@ -25,4 +25,4 @@ enum s5p_camport_id {
- int s5pv210_fimc_setup_gpio(enum s5p_camport_id id);
- int exynos4_fimc_setup_gpio(enum s5p_camport_id id);
+-/* DMA Register definitions */
++#ifndef __ASM_PLAT_REGS_DMA_H
++#define __ASM_PLAT_REGS_DMA_H __FILE__
+ 
+ #define S3C2410_DMA_DISRC		(0x00)
+ #define S3C2410_DMA_DISRCC		(0x04)
+@@ -24,74 +25,75 @@
+ #define S3C2412_DMA_DMAREQSEL		(0x24)
+ #define S3C2443_DMA_DMAREQSEL		(0x24)
+ 
+-#define S3C2410_DISRCC_INC		(1<<0)
+-#define S3C2410_DISRCC_APB		(1<<1)
++#define S3C2410_DISRCC_INC		(1 << 0)
++#define S3C2410_DISRCC_APB		(1 << 1)
+ 
+-#define S3C2410_DMASKTRIG_STOP		(1<<2)
+-#define S3C2410_DMASKTRIG_ON		(1<<1)
+-#define S3C2410_DMASKTRIG_SWTRIG	(1<<0)
++#define S3C2410_DMASKTRIG_STOP		(1 << 2)
++#define S3C2410_DMASKTRIG_ON		(1 << 1)
++#define S3C2410_DMASKTRIG_SWTRIG	(1 << 0)
+ 
+-#define S3C2410_DCON_DEMAND		(0<<31)
+-#define S3C2410_DCON_HANDSHAKE		(1<<31)
+-#define S3C2410_DCON_SYNC_PCLK		(0<<30)
+-#define S3C2410_DCON_SYNC_HCLK		(1<<30)
++#define S3C2410_DCON_DEMAND		(0 << 31)
++#define S3C2410_DCON_HANDSHAKE		(1 << 31)
++#define S3C2410_DCON_SYNC_PCLK		(0 << 30)
++#define S3C2410_DCON_SYNC_HCLK		(1 << 30)
+ 
+-#define S3C2410_DCON_INTREQ		(1<<29)
++#define S3C2410_DCON_INTREQ		(1 << 29)
+ 
+-#define S3C2410_DCON_CH0_XDREQ0		(0<<24)
+-#define S3C2410_DCON_CH0_UART0		(1<<24)
+-#define S3C2410_DCON_CH0_SDI		(2<<24)
+-#define S3C2410_DCON_CH0_TIMER		(3<<24)
+-#define S3C2410_DCON_CH0_USBEP1		(4<<24)
++#define S3C2410_DCON_CH0_XDREQ0		(0 << 24)
++#define S3C2410_DCON_CH0_UART0		(1 << 24)
++#define S3C2410_DCON_CH0_SDI		(2 << 24)
++#define S3C2410_DCON_CH0_TIMER		(3 << 24)
++#define S3C2410_DCON_CH0_USBEP1		(4 << 24)
+ 
+-#define S3C2410_DCON_CH1_XDREQ1		(0<<24)
+-#define S3C2410_DCON_CH1_UART1		(1<<24)
+-#define S3C2410_DCON_CH1_I2SSDI		(2<<24)
+-#define S3C2410_DCON_CH1_SPI		(3<<24)
+-#define S3C2410_DCON_CH1_USBEP2		(4<<24)
++#define S3C2410_DCON_CH1_XDREQ1		(0 << 24)
++#define S3C2410_DCON_CH1_UART1		(1 << 24)
++#define S3C2410_DCON_CH1_I2SSDI		(2 << 24)
++#define S3C2410_DCON_CH1_SPI		(3 << 24)
++#define S3C2410_DCON_CH1_USBEP2		(4 << 24)
+ 
+-#define S3C2410_DCON_CH2_I2SSDO		(0<<24)
+-#define S3C2410_DCON_CH2_I2SSDI		(1<<24)
+-#define S3C2410_DCON_CH2_SDI		(2<<24)
+-#define S3C2410_DCON_CH2_TIMER		(3<<24)
+-#define S3C2410_DCON_CH2_USBEP3		(4<<24)
++#define S3C2410_DCON_CH2_I2SSDO		(0 << 24)
++#define S3C2410_DCON_CH2_I2SSDI		(1 << 24)
++#define S3C2410_DCON_CH2_SDI		(2 << 24)
++#define S3C2410_DCON_CH2_TIMER		(3 << 24)
++#define S3C2410_DCON_CH2_USBEP3		(4 << 24)
+ 
+-#define S3C2410_DCON_CH3_UART2		(0<<24)
+-#define S3C2410_DCON_CH3_SDI		(1<<24)
+-#define S3C2410_DCON_CH3_SPI		(2<<24)
+-#define S3C2410_DCON_CH3_TIMER		(3<<24)
+-#define S3C2410_DCON_CH3_USBEP4		(4<<24)
++#define S3C2410_DCON_CH3_UART2		(0 << 24)
++#define S3C2410_DCON_CH3_SDI		(1 << 24)
++#define S3C2410_DCON_CH3_SPI		(2 << 24)
++#define S3C2410_DCON_CH3_TIMER		(3 << 24)
++#define S3C2410_DCON_CH3_USBEP4		(4 << 24)
+ 
+ #define S3C2410_DCON_SRCSHIFT		(24)
+-#define S3C2410_DCON_SRCMASK		(7<<24)
++#define S3C2410_DCON_SRCMASK		(7 << 24)
+ 
+-#define S3C2410_DCON_BYTE		(0<<20)
+-#define S3C2410_DCON_HALFWORD		(1<<20)
+-#define S3C2410_DCON_WORD		(2<<20)
++#define S3C2410_DCON_BYTE		(0 << 20)
++#define S3C2410_DCON_HALFWORD		(1 << 20)
++#define S3C2410_DCON_WORD		(2 << 20)
+ 
+-#define S3C2410_DCON_AUTORELOAD		(0<<22)
+-#define S3C2410_DCON_NORELOAD		(1<<22)
+-#define S3C2410_DCON_HWTRIG		(1<<23)
++#define S3C2410_DCON_AUTORELOAD		(0 << 22)
++#define S3C2410_DCON_NORELOAD		(1 << 22)
++#define S3C2410_DCON_HWTRIG		(1 << 23)
+ 
+ #ifdef CONFIG_CPU_S3C2440
+-#define S3C2440_DIDSTC_CHKINT		(1<<2)
+ 
+-#define S3C2440_DCON_CH0_I2SSDO		(5<<24)
+-#define S3C2440_DCON_CH0_PCMIN		(6<<24)
++#define S3C2440_DIDSTC_CHKINT		(1 << 2)
+ 
+-#define S3C2440_DCON_CH1_PCMOUT		(5<<24)
+-#define S3C2440_DCON_CH1_SDI		(6<<24)
++#define S3C2440_DCON_CH0_I2SSDO		(5 << 24)
++#define S3C2440_DCON_CH0_PCMIN		(6 << 24)
+ 
+-#define S3C2440_DCON_CH2_PCMIN		(5<<24)
+-#define S3C2440_DCON_CH2_MICIN		(6<<24)
++#define S3C2440_DCON_CH1_PCMOUT		(5 << 24)
++#define S3C2440_DCON_CH1_SDI		(6 << 24)
+ 
+-#define S3C2440_DCON_CH3_MICIN		(5<<24)
+-#define S3C2440_DCON_CH3_PCMOUT		(6<<24)
+-#endif
++#define S3C2440_DCON_CH2_PCMIN		(5 << 24)
++#define S3C2440_DCON_CH2_MICIN		(6 << 24)
++
++#define S3C2440_DCON_CH3_MICIN		(5 << 24)
++#define S3C2440_DCON_CH3_PCMOUT		(6 << 24)
++#endif /* CONFIG_CPU_S3C2440 */
+ 
+ #ifdef CONFIG_CPU_S3C2412
+ 
+-#define S3C2412_DMAREQSEL_SRC(x)	((x)<<1)
++#define S3C2412_DMAREQSEL_SRC(x)	((x) << 1)
+ 
+ #define S3C2412_DMAREQSEL_HW		(1)
+ 
+@@ -115,10 +117,11 @@
+ #define S3C2412_DMAREQSEL_UART1_1	S3C2412_DMAREQSEL_SRC(22)
+ #define S3C2412_DMAREQSEL_UART2_0	S3C2412_DMAREQSEL_SRC(23)
+ #define S3C2412_DMAREQSEL_UART2_1	S3C2412_DMAREQSEL_SRC(24)
++#endif /* CONFIG_CPU_S3C2412 */
  
 -#endif
-+#endif /* __PLAT_SAMSUNG_CAMPORT_H */
-diff --git a/arch/arm/plat-s5p/include/plat/ehci.h b/arch/arm/plat-samsung/include/plat/ehci.h
-similarity index 86%
-rename from arch/arm/plat-s5p/include/plat/ehci.h
-rename to arch/arm/plat-samsung/include/plat/ehci.h
-index 6ae6810..c284d84 100644
---- a/arch/arm/plat-s5p/include/plat/ehci.h
-+++ b/arch/arm/plat-samsung/include/plat/ehci.h
-@@ -8,8 +8,8 @@
-  * option) any later version.
-  */
++#ifdef CONFIG_CPU_S3C2443
  
--#ifndef __PLAT_S5P_EHCI_H
--#define __PLAT_S5P_EHCI_H
-+#ifndef __PLAT_SAMSUNG_EHCI_H
-+#define __PLAT_SAMSUNG_EHCI_H __FILE__
+-#define S3C2443_DMAREQSEL_SRC(x)	((x)<<1)
++#define S3C2443_DMAREQSEL_SRC(x)	((x) << 1)
  
- struct s5p_ehci_platdata {
- 	int (*phy_init)(struct platform_device *pdev, int type);
-@@ -18,4 +18,4 @@ struct s5p_ehci_platdata {
+ #define S3C2443_DMAREQSEL_HW		(1)
  
- extern void s5p_ehci_set_platdata(struct s5p_ehci_platdata *pd);
- 
--#endif /* __PLAT_S5P_EHCI_H */
-+#endif /* __PLAT_SAMSUNG_EHCI_H */
-diff --git a/arch/arm/plat-s5p/include/plat/irqs.h b/arch/arm/plat-samsung/include/plat/irqs.h
-similarity index 96%
-rename from arch/arm/plat-s5p/include/plat/irqs.h
-rename to arch/arm/plat-samsung/include/plat/irqs.h
-index ba9121c..3c62a7a 100644
---- a/arch/arm/plat-s5p/include/plat/irqs.h
-+++ b/arch/arm/plat-samsung/include/plat/irqs.h
+@@ -141,5 +144,8 @@
+ #define S3C2443_DMAREQSEL_UART3_0	S3C2443_DMAREQSEL_SRC(25)
+ #define S3C2443_DMAREQSEL_UART3_1	S3C2443_DMAREQSEL_SRC(26)
+ #define S3C2443_DMAREQSEL_PCMOUT	S3C2443_DMAREQSEL_SRC(27)
+-#define S3C2443_DMAREQSEL_PCMIN 	S3C2443_DMAREQSEL_SRC(28)
++#define S3C2443_DMAREQSEL_PCMIN		S3C2443_DMAREQSEL_SRC(28)
+ #define S3C2443_DMAREQSEL_MICIN		S3C2443_DMAREQSEL_SRC(29)
++#endif /* CONFIG_CPU_S3C2443 */
++
++#endif /* __ASM_PLAT_REGS_DMA_H */
+diff --git a/arch/arm/plat-samsung/include/plat/regs-iis.h b/arch/arm/plat-samsung/include/plat/regs-iis.h
+new file mode 100644
+index 0000000..a18d35e
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/regs-iis.h
+@@ -0,0 +1,70 @@
++/* arch/arm/plat-samsung/include/plat/regs-iis.h
++ *
++ * Copyright (c) 2003 Simtec Electronics <linux@simtec.co.uk>
++ *		      http://www.simtec.co.uk/products/SWLINUX/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * S3C2410 IIS register definition
++*/
++
++#ifndef __ASM_ARCH_REGS_IIS_H
++#define __ASM_ARCH_REGS_IIS_H
++
++#define S3C2410_IISCON			(0x00)
++
++#define S3C2410_IISCON_LRINDEX		(1 << 8)
++#define S3C2410_IISCON_TXFIFORDY	(1 << 7)
++#define S3C2410_IISCON_RXFIFORDY	(1 << 6)
++#define S3C2410_IISCON_TXDMAEN		(1 << 5)
++#define S3C2410_IISCON_RXDMAEN		(1 << 4)
++#define S3C2410_IISCON_TXIDLE		(1 << 3)
++#define S3C2410_IISCON_RXIDLE		(1 << 2)
++#define S3C2410_IISCON_PSCEN		(1 << 1)
++#define S3C2410_IISCON_IISEN		(1 << 0)
++
++#define S3C2410_IISMOD			(0x04)
++
++#define S3C2440_IISMOD_MPLL		(1 << 9)
++#define S3C2410_IISMOD_SLAVE		(1 << 8)
++#define S3C2410_IISMOD_NOXFER		(0 << 6)
++#define S3C2410_IISMOD_RXMODE		(1 << 6)
++#define S3C2410_IISMOD_TXMODE		(2 << 6)
++#define S3C2410_IISMOD_TXRXMODE		(3 << 6)
++#define S3C2410_IISMOD_LR_LLOW		(0 << 5)
++#define S3C2410_IISMOD_LR_RLOW		(1 << 5)
++#define S3C2410_IISMOD_IIS		(0 << 4)
++#define S3C2410_IISMOD_MSB		(1 << 4)
++#define S3C2410_IISMOD_8BIT		(0 << 3)
++#define S3C2410_IISMOD_16BIT		(1 << 3)
++#define S3C2410_IISMOD_BITMASK		(1 << 3)
++#define S3C2410_IISMOD_256FS		(0 << 2)
++#define S3C2410_IISMOD_384FS		(1 << 2)
++#define S3C2410_IISMOD_16FS		(0 << 0)
++#define S3C2410_IISMOD_32FS		(1 << 0)
++#define S3C2410_IISMOD_48FS		(2 << 0)
++#define S3C2410_IISMOD_FS_MASK		(3 << 0)
++
++#define S3C2410_IISPSR			(0x08)
++
++#define S3C2410_IISPSR_INTMASK		(31 << 5)
++#define S3C2410_IISPSR_INTSHIFT		(5)
++#define S3C2410_IISPSR_EXTMASK		(31 << 0)
++#define S3C2410_IISPSR_EXTSHFIT		(0)
++
++#define S3C2410_IISFCON			(0x0c)
++
++#define S3C2410_IISFCON_TXDMA		(1 << 15)
++#define S3C2410_IISFCON_RXDMA		(1 << 14)
++#define S3C2410_IISFCON_TXENABLE	(1 << 13)
++#define S3C2410_IISFCON_RXENABLE	(1 << 12)
++#define S3C2410_IISFCON_TXMASK		(0x3f << 6)
++#define S3C2410_IISFCON_TXSHIFT		(6)
++#define S3C2410_IISFCON_RXMASK		(0x3f)
++#define S3C2410_IISFCON_RXSHIFT		(0)
++
++#define S3C2410_IISFIFO			(0x10)
++
++#endif /* __ASM_ARCH_REGS_IIS_H */
+diff --git a/arch/arm/plat-samsung/include/plat/regs-spi.h b/arch/arm/plat-samsung/include/plat/regs-spi.h
+new file mode 100644
+index 0000000..552fe7c
+--- /dev/null
++++ b/arch/arm/plat-samsung/include/plat/regs-spi.h
+@@ -0,0 +1,48 @@
++/* arch/arm/plat-samsung/include/plat/regs-spi.h
++ *
++ * Copyright (c) 2004 Fetron GmbH
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * S3C2410 SPI register definition
++*/
++
++#ifndef __ASM_ARCH_REGS_SPI_H
++#define __ASM_ARCH_REGS_SPI_H
++
++#define S3C2410_SPI1		(0x20)
++#define S3C2412_SPI1		(0x100)
++
++#define S3C2410_SPCON		(0x00)
++
++#define S3C2410_SPCON_SMOD_DMA	(2 << 5)	/* DMA mode */
++#define S3C2410_SPCON_SMOD_INT	(1 << 5)	/* interrupt mode */
++#define S3C2410_SPCON_SMOD_POLL	(0 << 5)	/* polling mode */
++#define S3C2410_SPCON_ENSCK	(1 << 4)	/* Enable SCK */
++#define S3C2410_SPCON_MSTR	(1 << 3)	/* Master:1, Slave:0 select */
++#define S3C2410_SPCON_CPOL_HIGH	(1 << 2)	/* Clock polarity select */
++#define S3C2410_SPCON_CPOL_LOW	(0 << 2)	/* Clock polarity select */
++
++#define S3C2410_SPCON_CPHA_FMTB	(1 << 1)	/* Clock Phase Select */
++#define S3C2410_SPCON_CPHA_FMTA	(0 << 1)	/* Clock Phase Select */
++
++#define S3C2410_SPSTA		(0x04)
++
++#define S3C2410_SPSTA_DCOL	(1 << 2)	/* Data Collision Error */
++#define S3C2410_SPSTA_MULD	(1 << 1)	/* Multi Master Error */
++#define S3C2410_SPSTA_READY	(1 << 0)	/* Data Tx/Rx ready */
++#define S3C2412_SPSTA_READY_ORG	(1 << 3)
++
++#define S3C2410_SPPIN		(0x08)
++
++#define S3C2410_SPPIN_ENMUL	(1 << 2)	/* Multi Master Error detect */
++#define S3C2410_SPPIN_RESERVED	(1 << 1)
++#define S3C2410_SPPIN_KEEP	(1 << 0)	/* Master Out keep */
++
++#define S3C2410_SPPRE		(0x0C)
++#define S3C2410_SPTDAT		(0x10)
++#define S3C2410_SPRDAT		(0x14)
++
++#endif /* __ASM_ARCH_REGS_SPI_H */
+diff --git a/arch/arm/plat-s3c24xx/include/plat/regs-udc.h b/arch/arm/plat-samsung/include/plat/regs-udc.h
+similarity index 51%
+rename from arch/arm/plat-s3c24xx/include/plat/regs-udc.h
+rename to arch/arm/plat-samsung/include/plat/regs-udc.h
+index f0dd4a4..4003d3d 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/regs-udc.h
++++ b/arch/arm/plat-samsung/include/plat/regs-udc.h
 @@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s5p/include/plat/irqs.h
-+/* linux/arch/arm/plat-samsung/include/plat/irqs.h
+-/* arch/arm/mach-s3c2410/include/mach/regs-udc.h
++/* arch/arm/plat-samsung/include/plat/regs-udc.h
   *
-  * Copyright (c) 2009 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
-@@ -10,8 +10,8 @@
-  * published by the Free Software Foundation.
- */
+  * Copyright (C) 2004 Herbert Poetzl <herbert@13thfloor.at>
+  *
+@@ -75,79 +75,77 @@
+ #define S3C2410_UDC_OUT_FIFO_CNT1_REG	S3C2410_USBDREG(0x0198)
+ #define S3C2410_UDC_OUT_FIFO_CNT2_REG	S3C2410_USBDREG(0x019c)
  
--#ifndef __ASM_PLAT_S5P_IRQS_H
--#define __ASM_PLAT_S5P_IRQS_H __FILE__
-+#ifndef __PLAT_SAMSUNG_IRQS_H
-+#define __PLAT_SAMSUNG_IRQS_H __FILE__
+-#define S3C2410_UDC_FUNCADDR_UPDATE	(1<<7)
++#define S3C2410_UDC_FUNCADDR_UPDATE	(1 << 7)
  
- /* we keep the first set of CPU IRQs out of the range of
-  * the ISA space, so that the PC104 has them to itself
-@@ -112,4 +112,4 @@
- #define S5P_IRQ_TYPE_EDGE_RISING	(0x03)
- #define S5P_IRQ_TYPE_EDGE_BOTH		(0x04)
+-#define S3C2410_UDC_PWR_ISOUP		(1<<7) // R/W
+-#define S3C2410_UDC_PWR_RESET		(1<<3) // R
+-#define S3C2410_UDC_PWR_RESUME		(1<<2) // R/W
+-#define S3C2410_UDC_PWR_SUSPEND		(1<<1) // R
+-#define S3C2410_UDC_PWR_ENSUSPEND	(1<<0) // R/W
++#define S3C2410_UDC_PWR_ISOUP		(1 << 7) /* R/W */
++#define S3C2410_UDC_PWR_RESET		(1 << 3) /* R   */
++#define S3C2410_UDC_PWR_RESUME		(1 << 2) /* R/W */
++#define S3C2410_UDC_PWR_SUSPEND		(1 << 1) /* R   */
++#define S3C2410_UDC_PWR_ENSUSPEND	(1 << 0) /* R/W */
  
--#endif /* __ASM_PLAT_S5P_IRQS_H */
-+#endif /* __PLAT_SAMSUNG_IRQS_H */
-diff --git a/arch/arm/plat-s5p/include/plat/mfc.h b/arch/arm/plat-samsung/include/plat/mfc.h
-similarity index 91%
-rename from arch/arm/plat-s5p/include/plat/mfc.h
-rename to arch/arm/plat-samsung/include/plat/mfc.h
-index 6697f8c..08d14c3 100644
---- a/arch/arm/plat-s5p/include/plat/mfc.h
-+++ b/arch/arm/plat-samsung/include/plat/mfc.h
-@@ -7,8 +7,8 @@
-  * option) any later version.
-  */
+-#define S3C2410_UDC_PWR_DEFAULT		0x00
++#define S3C2410_UDC_PWR_DEFAULT		(0x00)
  
--#ifndef __PLAT_S5P_MFC_H
--#define __PLAT_S5P_MFC_H
-+#ifndef __PLAT_SAMSUNG_MFC_H
-+#define __PLAT_SAMSUNG_MFC_H __FILE__
+-#define S3C2410_UDC_INT_EP4		(1<<4) // R/W (clear only)
+-#define S3C2410_UDC_INT_EP3		(1<<3) // R/W (clear only)
+-#define S3C2410_UDC_INT_EP2		(1<<2) // R/W (clear only)
+-#define S3C2410_UDC_INT_EP1		(1<<1) // R/W (clear only)
+-#define S3C2410_UDC_INT_EP0		(1<<0) // R/W (clear only)
++#define S3C2410_UDC_INT_EP4		(1 << 4) /* R/W (clear only) */
++#define S3C2410_UDC_INT_EP3		(1 << 3) /* R/W (clear only) */
++#define S3C2410_UDC_INT_EP2		(1 << 2) /* R/W (clear only) */
++#define S3C2410_UDC_INT_EP1		(1 << 1) /* R/W (clear only) */
++#define S3C2410_UDC_INT_EP0		(1 << 0) /* R/W (clear only) */
  
- /**
-  * s5p_mfc_reserve_mem - function to early reserve memory for MFC driver
-@@ -24,4 +24,4 @@
- void __init s5p_mfc_reserve_mem(phys_addr_t rbase, unsigned int rsize,
- 				phys_addr_t lbase, unsigned int lsize);
+-#define S3C2410_UDC_USBINT_RESET	(1<<2) // R/W (clear only)
+-#define S3C2410_UDC_USBINT_RESUME	(1<<1) // R/W (clear only)
+-#define S3C2410_UDC_USBINT_SUSPEND	(1<<0) // R/W (clear only)
++#define S3C2410_UDC_USBINT_RESET	(1 << 2) /* R/W (clear only) */
++#define S3C2410_UDC_USBINT_RESUME	(1 << 1) /* R/W (clear only) */
++#define S3C2410_UDC_USBINT_SUSPEND	(1 << 0) /* R/W (clear only) */
  
--#endif /* __PLAT_S5P_MFC_H */
-+#endif /* __PLAT_SAMSUNG_MFC_H */
-diff --git a/arch/arm/plat-s5p/include/plat/mipi_csis.h b/arch/arm/plat-samsung/include/plat/mipi_csis.h
-similarity index 91%
-rename from arch/arm/plat-s5p/include/plat/mipi_csis.h
-rename to arch/arm/plat-samsung/include/plat/mipi_csis.h
-index 9bd254c..b02c076 100644
---- a/arch/arm/plat-s5p/include/plat/mipi_csis.h
-+++ b/arch/arm/plat-samsung/include/plat/mipi_csis.h
-@@ -8,8 +8,8 @@
-  * published by the Free Software Foundation.
-  */
+-#define S3C2410_UDC_INTE_EP4		(1<<4) // R/W
+-#define S3C2410_UDC_INTE_EP3		(1<<3) // R/W
+-#define S3C2410_UDC_INTE_EP2		(1<<2) // R/W
+-#define S3C2410_UDC_INTE_EP1		(1<<1) // R/W
+-#define S3C2410_UDC_INTE_EP0		(1<<0) // R/W
+-
+-#define S3C2410_UDC_USBINTE_RESET	(1<<2) // R/W
+-#define S3C2410_UDC_USBINTE_SUSPEND	(1<<0) // R/W
++#define S3C2410_UDC_INTE_EP4		(1 << 4) /* R/W */
++#define S3C2410_UDC_INTE_EP3		(1 << 3) /* R/W */
++#define S3C2410_UDC_INTE_EP2		(1 << 2) /* R/W */
++#define S3C2410_UDC_INTE_EP1		(1 << 1) /* R/W */
++#define S3C2410_UDC_INTE_EP0		(1 << 0) /* R/W */
  
--#ifndef PLAT_S5P_MIPI_CSIS_H_
--#define PLAT_S5P_MIPI_CSIS_H_ __FILE__
-+#ifndef __PLAT_SAMSUNG_MIPI_CSIS_H_
-+#define __PLAT_SAMSUNG_MIPI_CSIS_H_ __FILE__
++#define S3C2410_UDC_USBINTE_RESET	(1 << 2) /* R/W */
++#define S3C2410_UDC_USBINTE_SUSPEND	(1 << 0) /* R/W */
  
- struct platform_device;
+ #define S3C2410_UDC_INDEX_EP0		(0x00)
+-#define S3C2410_UDC_INDEX_EP1		(0x01) // ??
+-#define S3C2410_UDC_INDEX_EP2		(0x02) // ??
+-#define S3C2410_UDC_INDEX_EP3		(0x03) // ??
+-#define S3C2410_UDC_INDEX_EP4		(0x04) // ??
+-
+-#define S3C2410_UDC_ICSR1_CLRDT		(1<<6) // R/W
+-#define S3C2410_UDC_ICSR1_SENTSTL	(1<<5) // R/W (clear only)
+-#define S3C2410_UDC_ICSR1_SENDSTL	(1<<4) // R/W
+-#define S3C2410_UDC_ICSR1_FFLUSH	(1<<3) // W   (set only)
+-#define S3C2410_UDC_ICSR1_UNDRUN	(1<<2) // R/W (clear only)
+-#define S3C2410_UDC_ICSR1_PKTRDY	(1<<0) // R/W (set only)
+-
+-#define S3C2410_UDC_ICSR2_AUTOSET	(1<<7) // R/W
+-#define S3C2410_UDC_ICSR2_ISO		(1<<6) // R/W
+-#define S3C2410_UDC_ICSR2_MODEIN	(1<<5) // R/W
+-#define S3C2410_UDC_ICSR2_DMAIEN	(1<<4) // R/W
+-
+-#define S3C2410_UDC_OCSR1_CLRDT		(1<<7) // R/W
+-#define S3C2410_UDC_OCSR1_SENTSTL	(1<<6) // R/W (clear only)
+-#define S3C2410_UDC_OCSR1_SENDSTL	(1<<5) // R/W
+-#define S3C2410_UDC_OCSR1_FFLUSH	(1<<4) // R/W
+-#define S3C2410_UDC_OCSR1_DERROR	(1<<3) // R
+-#define S3C2410_UDC_OCSR1_OVRRUN	(1<<2) // R/W (clear only)
+-#define S3C2410_UDC_OCSR1_PKTRDY	(1<<0) // R/W (clear only)
+-
+-#define S3C2410_UDC_OCSR2_AUTOCLR	(1<<7) // R/W
+-#define S3C2410_UDC_OCSR2_ISO		(1<<6) // R/W
+-#define S3C2410_UDC_OCSR2_DMAIEN	(1<<5) // R/W
+-
+-#define S3C2410_UDC_EP0_CSR_OPKRDY	(1<<0)
+-#define S3C2410_UDC_EP0_CSR_IPKRDY	(1<<1)
+-#define S3C2410_UDC_EP0_CSR_SENTSTL	(1<<2)
+-#define S3C2410_UDC_EP0_CSR_DE		(1<<3)
+-#define S3C2410_UDC_EP0_CSR_SE		(1<<4)
+-#define S3C2410_UDC_EP0_CSR_SENDSTL	(1<<5)
+-#define S3C2410_UDC_EP0_CSR_SOPKTRDY	(1<<6)
+-#define S3C2410_UDC_EP0_CSR_SSE	(1<<7)
+-
+-#define S3C2410_UDC_MAXP_8		(1<<0)
+-#define S3C2410_UDC_MAXP_16		(1<<1)
+-#define S3C2410_UDC_MAXP_32		(1<<2)
+-#define S3C2410_UDC_MAXP_64		(1<<3)
+-
++#define S3C2410_UDC_INDEX_EP1		(0x01)
++#define S3C2410_UDC_INDEX_EP2		(0x02)
++#define S3C2410_UDC_INDEX_EP3		(0x03)
++#define S3C2410_UDC_INDEX_EP4		(0x04)
++
++#define S3C2410_UDC_ICSR1_CLRDT		(1 << 6) /* R/W */
++#define S3C2410_UDC_ICSR1_SENTSTL	(1 << 5) /* R/W (clear only) */
++#define S3C2410_UDC_ICSR1_SENDSTL	(1 << 4) /* R/W */
++#define S3C2410_UDC_ICSR1_FFLUSH	(1 << 3) /* W   (set only) */
++#define S3C2410_UDC_ICSR1_UNDRUN	(1 << 2) /* R/W (clear only) */
++#define S3C2410_UDC_ICSR1_PKTRDY	(1 << 0) /* R/W (set only) */
++
++#define S3C2410_UDC_ICSR2_AUTOSET	(1 << 7) /* R/W */
++#define S3C2410_UDC_ICSR2_ISO		(1 << 6) /* R/W */
++#define S3C2410_UDC_ICSR2_MODEIN	(1 << 5) /* R/W */
++#define S3C2410_UDC_ICSR2_DMAIEN	(1 << 4) /* R/W */
++
++#define S3C2410_UDC_OCSR1_CLRDT		(1 << 7) /* R/W */
++#define S3C2410_UDC_OCSR1_SENTSTL	(1 << 6) /* R/W (clear only) */
++#define S3C2410_UDC_OCSR1_SENDSTL	(1 << 5) /* R/W */
++#define S3C2410_UDC_OCSR1_FFLUSH	(1 << 4) /* R/W */
++#define S3C2410_UDC_OCSR1_DERROR	(1 << 3) /* R   */
++#define S3C2410_UDC_OCSR1_OVRRUN	(1 << 2) /* R/W (clear only) */
++#define S3C2410_UDC_OCSR1_PKTRDY	(1 << 0) /* R/W (clear only) */
++
++#define S3C2410_UDC_OCSR2_AUTOCLR	(1 << 7) /* R/W */
++#define S3C2410_UDC_OCSR2_ISO		(1 << 6) /* R/W */
++#define S3C2410_UDC_OCSR2_DMAIEN	(1 << 5) /* R/W */
++
++#define S3C2410_UDC_EP0_CSR_OPKRDY	(1 << 0)
++#define S3C2410_UDC_EP0_CSR_IPKRDY	(1 << 1)
++#define S3C2410_UDC_EP0_CSR_SENTSTL	(1 << 2)
++#define S3C2410_UDC_EP0_CSR_DE		(1 << 3)
++#define S3C2410_UDC_EP0_CSR_SE		(1 << 4)
++#define S3C2410_UDC_EP0_CSR_SENDSTL	(1 << 5)
++#define S3C2410_UDC_EP0_CSR_SOPKTRDY	(1 << 6)
++#define S3C2410_UDC_EP0_CSR_SSE		(1 << 7)
++
++#define S3C2410_UDC_MAXP_8		(1 << 0)
++#define S3C2410_UDC_MAXP_16		(1 << 1)
++#define S3C2410_UDC_MAXP_32		(1 << 2)
++#define S3C2410_UDC_MAXP_64		(1 << 3)
  
-@@ -40,4 +40,4 @@ struct s5p_platform_mipi_csis {
-  */
- int s5p_csis_phy_enable(struct platform_device *pdev, bool on);
- 
--#endif /* PLAT_S5P_MIPI_CSIS_H_ */
-+#endif /* __PLAT_SAMSUNG_MIPI_CSIS_H_ */
-diff --git a/arch/arm/plat-s5p/include/plat/regs-srom.h b/arch/arm/plat-samsung/include/plat/regs-srom.h
-similarity index 89%
-rename from arch/arm/plat-s5p/include/plat/regs-srom.h
-rename to arch/arm/plat-samsung/include/plat/regs-srom.h
-index f121ab5..cf6a998 100644
---- a/arch/arm/plat-s5p/include/plat/regs-srom.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-srom.h
+ #endif
+diff --git a/arch/arm/plat-s3c24xx/include/plat/udc.h b/arch/arm/plat-samsung/include/plat/udc.h
+similarity index 95%
+rename from arch/arm/plat-s3c24xx/include/plat/udc.h
+rename to arch/arm/plat-samsung/include/plat/udc.h
+index f638842..8c22d58 100644
+--- a/arch/arm/plat-s3c24xx/include/plat/udc.h
++++ b/arch/arm/plat-samsung/include/plat/udc.h
 @@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s5p/include/plat/regs-srom.h
-+/* linux/arch/arm/plat-samsung/include/plat/regs-srom.h
+-/* arch/arm/mach-s3c2410/include/mach/udc.h
++/* arch/arm/plat-samsung/include/plat/udc.h
   *
-  * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-@@ -10,8 +10,8 @@
-  * published by the Free Software Foundation.
- */
- 
--#ifndef __ASM_PLAT_S5P_REGS_SROM_H
--#define __ASM_PLAT_S5P_REGS_SROM_H __FILE__
-+#ifndef __PLAT_SAMSUNG_REGS_SROM_H
-+#define __PLAT_SAMSUNG_REGS_SROM_H __FILE__
- 
- #include <mach/map.h>
- 
-@@ -51,4 +51,4 @@
- #define S5P_SROM_BCX__TCOS__SHIFT		24
- #define S5P_SROM_BCX__TACS__SHIFT		28
- 
--#endif /* __ASM_PLAT_S5P_REGS_SROM_H */
-+#endif /* __PLAT_SAMSUNG_REGS_SROM_H */
-diff --git a/arch/arm/plat-s5p/include/plat/reset.h b/arch/arm/plat-samsung/include/plat/reset.h
-similarity index 67%
-rename from arch/arm/plat-s5p/include/plat/reset.h
-rename to arch/arm/plat-samsung/include/plat/reset.h
-index 335e978..b674415 100644
---- a/arch/arm/plat-s5p/include/plat/reset.h
-+++ b/arch/arm/plat-samsung/include/plat/reset.h
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s5p/include/plat/reset.h
-+/* linux/arch/arm/plat-samsung/include/plat/reset.h
+  * Copyright (c) 2005 Arnaud Patard <arnaud.patard@rtp-net.org>
   *
-  * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
-@@ -8,9 +8,9 @@
-  * published by the Free Software Foundation.
- */
+@@ -26,7 +26,7 @@ enum s3c2410_udc_cmd_e {
  
--#ifndef __ASM_PLAT_S5P_RESET_H
--#define __ASM_PLAT_S5P_RESET_H __FILE__
-+#ifndef __PLAT_SAMSUNG_RESET_H
-+#define __PLAT_SAMSUNG_RESET_H __FILE__
+ struct s3c2410_udc_mach_info {
+ 	void	(*udc_command)(enum s3c2410_udc_cmd_e);
+- 	void	(*vbus_draw)(unsigned int ma);
++	void	(*vbus_draw)(unsigned int ma);
  
- extern void (*s5p_reset_hook)(void);
- 
--#endif /* __ASM_PLAT_S5P_RESET_H */
-+#endif /* __PLAT_SAMSUNG_RESET_H */
-diff --git a/arch/arm/plat-s5p/include/plat/s5p-clock.h b/arch/arm/plat-samsung/include/plat/s5p-clock.h
-similarity index 96%
-rename from arch/arm/plat-s5p/include/plat/s5p-clock.h
-rename to arch/arm/plat-samsung/include/plat/s5p-clock.h
-index 769b5bd..984bf9e 100644
---- a/arch/arm/plat-s5p/include/plat/s5p-clock.h
-+++ b/arch/arm/plat-samsung/include/plat/s5p-clock.h
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s5p/include/plat/s5p-clock.h
-+/* linux/arch/arm/plat-samsung/include/plat/s5p-clock.h
-  *
-  * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-diff --git a/arch/arm/plat-s5p/include/plat/s5p-time.h b/arch/arm/plat-samsung/include/plat/s5p-time.h
-similarity index 94%
-rename from arch/arm/plat-s5p/include/plat/s5p-time.h
-rename to arch/arm/plat-samsung/include/plat/s5p-time.h
-index 575e881..3a70aeb 100644
---- a/arch/arm/plat-s5p/include/plat/s5p-time.h
-+++ b/arch/arm/plat-samsung/include/plat/s5p-time.h
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s5p/include/plat/s5p-time.h
-+/* linux/arch/arm/plat-samsung/include/plat/s5p-time.h
-  *
-  * Copyright 2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
-diff --git a/arch/arm/plat-s5p/include/plat/sysmmu.h b/arch/arm/plat-samsung/include/plat/sysmmu.h
-similarity index 96%
-rename from arch/arm/plat-s5p/include/plat/sysmmu.h
-rename to arch/arm/plat-samsung/include/plat/sysmmu.h
-index bf5283c..a05b9e2 100644
---- a/arch/arm/plat-s5p/include/plat/sysmmu.h
-+++ b/arch/arm/plat-samsung/include/plat/sysmmu.h
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s5p/include/plat/sysmmu.h
-+/* linux/arch/arm/plat-samsung/include/plat/sysmmu.h
-  *
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-@@ -10,8 +10,8 @@
-  * published by the Free Software Foundation.
- */
- 
--#ifndef __ASM__PLAT_SYSMMU_H
--#define __ASM__PLAT_SYSMMU_H __FILE__
-+#ifndef __PLAT_SAMSUNG_SYSMMU_H
-+#define __PLAT_SAMSUNG_SYSMMU_H __FILE__
- 
- enum S5P_SYSMMU_INTERRUPT_TYPE {
- 	SYSMMU_PAGEFAULT,
-diff --git a/arch/arm/plat-s5p/include/plat/system-reset.h b/arch/arm/plat-samsung/include/plat/system-reset.h
-similarity index 92%
-rename from arch/arm/plat-s5p/include/plat/system-reset.h
-rename to arch/arm/plat-samsung/include/plat/system-reset.h
-index f307f34..a448e99 100644
---- a/arch/arm/plat-s5p/include/plat/system-reset.h
-+++ b/arch/arm/plat-samsung/include/plat/system-reset.h
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s5p/include/plat/system-reset.h
-+/* linux/arch/arm/plat-samsung/include/plat/system-reset.h
-  *
-  * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-diff --git a/arch/arm/plat-s5p/include/plat/usb-phy.h b/arch/arm/plat-samsung/include/plat/usb-phy.h
-similarity index 85%
-rename from arch/arm/plat-s5p/include/plat/usb-phy.h
-rename to arch/arm/plat-samsung/include/plat/usb-phy.h
-index 6dd6bcf..9934f18 100644
---- a/arch/arm/plat-s5p/include/plat/usb-phy.h
-+++ b/arch/arm/plat-samsung/include/plat/usb-phy.h
-@@ -8,8 +8,8 @@
-  * option) any later version.
-  */
- 
--#ifndef __PLAT_S5P_USB_PHY_H
--#define __PLAT_S5P_USB_PHY_H
-+#ifndef __PLAT_SAMSUNG_USB_PHY_H
-+#define __PLAT_SAMSUNG_USB_PHY_H __FILE__
- 
- enum s5p_usb_phy_type {
- 	S5P_USB_PHY_DEVICE,
-@@ -19,4 +19,4 @@ enum s5p_usb_phy_type {
- extern int s5p_usb_phy_init(struct platform_device *pdev, int type);
- extern int s5p_usb_phy_exit(struct platform_device *pdev, int type);
- 
--#endif /* __PLAT_S5P_REGS_USB_PHY_H */
-+#endif /* __PLAT_SAMSUNG_USB_PHY_H */
+ 	unsigned int pullup_pin;
+ 	unsigned int pullup_pin_inverted;
 -- 
 1.7.1
