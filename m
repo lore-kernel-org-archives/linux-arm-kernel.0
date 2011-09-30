@@ -1,125 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Sep 2011 15:37:01 +0200
-Subject: [PATCH 2/2 v7] pinmux: add a driver for the U300 pinmux
-In-Reply-To: <20110930021239.GL12606@ponder.secretlab.ca>
-References: <1316175249-10780-1-git-send-email-linus.walleij@stericsson.com>
-	<20110930021239.GL12606@ponder.secretlab.ca>
-Message-ID: <CACRpkdameaz=Ys1A5XAxTN=+zdKQhpkJao57BbYc38uF5wWVHw@mail.gmail.com>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Fri, 30 Sep 2011 15:42:43 +0200
+Subject: [PATCH v2 2/5] ARM: S5P: Remove system MMU driver from
+	arm/plat-s5p
+In-Reply-To: <016d01cc7f42$e58a0aa0$b09e1fe0$%kim@samsung.com>
+References: <016d01cc7f42$e58a0aa0$b09e1fe0$%kim@samsung.com>
+Message-ID: <20110930134243.GR2138@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 4:12 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+On Fri, Sep 30, 2011 at 03:30:57AM -0400, Kukjin Kim wrote:
+> From: KyongHo Cho <pullip.cho@samsung.com>
+> 
+> Due to Ohad Ben-Cohen gathered IOMMU drivers in drivers/iommu directory,
+> System MMU driver is moved to drivers/iommu directory and removed
+> from arch/arm/plat-s5p directory.
+> 
+> Please see
+> https://lkml.org/lkml/2011/6/8/69
+> 
+> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/plat-s5p/Kconfig               |    8 -
+>  arch/arm/plat-s5p/Makefile              |    1 -
+>  arch/arm/plat-s5p/include/plat/sysmmu.h |   95 ----------
+>  arch/arm/plat-s5p/sysmmu.c              |  312 -------------------------------
 
->> ?config MACH_U300
->> ? ? ? bool "U300"
->> + ? ? select PINCTRL
->> + ? ? select PINMUX_U300
->
-> Shouldn't PINMUX_U300 select PINCTRL?
+You can use 'git mv' to just move the file. This ensures bisectability
+of your patches. No need to delete the code in one patch and re-add it
+in the next one (which breaks bisectability).
 
-It selects PINMUX which is inside the if-clause for the
-subsystem:
+	Joerg
 
-if PINCTRL
+-- 
+AMD Operating System Research Center
 
-config PINMUX
-	bool "Support pinmux controllers"
-(...)
-
-config PINMUX_U300
-	bool "U300 pinmux driver"
-	depends on ARCH_U300
-	select PINMUX
-(...)
-
-endif
-
-Having PINMUX or PINMUX_U300 select PINCTRL doesn'
-work because it is deemed a circular dependency (indeed).
-And Kconfig apparently does not resolve dependencies like
-this, so it says:
-
-# CONFIG_PINCTRL is not set
-CONFIG_PINMUX_U300=y
-
-And:
-
-warning: (MACH_U300) selects PINMUX_U300 which has unmet direct
-dependencies (PINCTRL && ARCH_U300)
-warning: (MACH_U300) selects PINMUX_U300 which has unmet direct
-dependencies (PINCTRL && ARCH_U300)
-
-And then it breaks in the compile.
-
-Actually the same thing seems to go for say this:
-
-select ARCH_REQUIRE_GPIOLIB
-select GPIO_FOO
-
-You have to select both from your machine to get that driver,
-just selecting GPIO_FOO is unable to auto-select GPIOLIB.
-
-If you like this design pattern I can introduce
-
-ARCH_REQUIRE_PINCTRL
-
-In the same style as GPIOLIB, but it looks a bit
-superfluous to me, select PINCTRL should be
-fine?
-
->> +#include "pinmux-u300.h"
->
-> There is only one file that uses this header data. ?Just put it into
-> the .c file.
-
-OK!
-
->> +static int __init u300_pmx_probe(struct platform_device *pdev)
->> +{
->> + ? ? int ret;
->> + ? ? struct u300_pmx *upmx;
->> + ? ? struct resource *res;
->> +
->> + ? ? /* Create state holders etc for this driver */
->> + ? ? upmx = kzalloc(sizeof(struct u300_pmx), GFP_KERNEL);
->
-> devm_kzalloc()
-
-OK, replaced kfree() with devm_kfree() too for consistency.
-
->> +static int __exit u300_pmx_remove(struct platform_device *pdev)
-> __devexit
-(...)
->> + ? ? .remove = __exit_p(u300_pmx_remove),
-> __devexit_p
-
-But notice, no .probe member and:
-
->> static int __init u300_pmx_init(void)
->> {
->>        return platform_driver_probe(&u300_pmx_driver, u300_pmx_probe);
->> }
-
-See drivers/base/platform.c:platform_driver_probe():
-
-/**
- * platform_driver_probe - register driver for non-hotpluggable device
- * @drv: platform driver structure
- * @probe: the driver probe routine, probably from an __init section
- *
- * Use this instead of platform_driver_register() when you know the device
- * is not hotpluggable and has already been registered, and you want to
- * remove its run-once probe() infrastructure from memory after the driver
- * has bound to the device.
- *
- * One typical use for this would be with drivers for controllers integrated
- * into system-on-chip processors, where the controller devices have been
- * configured as part of board setup.
-
-This driver won't ever load as a module, and new ones will never be
-discovered after boot.
-
-So I kind of like it that way...
-
-Yours,
-Linus Walleij
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
