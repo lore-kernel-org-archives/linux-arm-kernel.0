@@ -1,41 +1,215 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Sep 2011 11:15:53 +0100
-Subject: [PATCH 0/3] Updates to ARM PMU event numbers
-Message-ID: <1317377756-5986-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 30 Sep 2011 11:15:56 +0100
+Subject: [PATCH 3/3] ARM: perf: add support for stalled cycle ABI events
+In-Reply-To: <1317377756-5986-1-git-send-email-will.deacon@arm.com>
+References: <1317377756-5986-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1317377756-5986-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Commit 8f622422 ("perf events: Add generic front-end and back-end
+stalled cycle event definitions") added two new ABI events for counting
+stalled cycles.
 
-These three patches update the ARM PMU event numbers so that:
+This patch adds support for these new events to the ARM perf
+implementation.
 
-* The two new ABI events are supported on ARM (frontend/backend stalls).
+Cc: Jamie Iles <jamie@jamieiles.com>
+Cc: Jean Pihet <j-pihet@ti.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event_v6.c     |   32 +++++++++-------
+ arch/arm/kernel/perf_event_v7.c     |   67 ++++++++++++++++++++--------------
+ arch/arm/kernel/perf_event_xscale.c |   16 +++++----
+ 3 files changed, 66 insertions(+), 49 deletions(-)
 
-* The ARMv7 PMU events are generally tidied up and made consistent
-  between PMUs.
-
-* The HW_CACHE events on Cortex-A9 are routed to more sane event
-  definitions. I'd like to get this into the stable tress, so it exists
-  as a separate patch.
-
-Note that the generalised events are just an approximation, so although
-we don't always provide a direct correspondence in hardware, we aim to
-use an event that will at least exhibit statistically equivalent results.
-
-These are taken again rmk/devel-stable, although the A9 fix will apply
-against -rc8 and I plan to push it as a fix.
-
-Feedback welcome,
-
-Will
-
-
-Will Deacon (3):
-  ARM: perf: fix HW_CACHE_* events on Cortex-A9
-  ARM: perf: clean and update ARMv7 event numbers
-  ARM: perf: add support for stalled cycle ABI events
-
- arch/arm/kernel/perf_event_v6.c     |   32 ++--
- arch/arm/kernel/perf_event_v7.c     |  401 +++++++++++++----------------------
- arch/arm/kernel/perf_event_xscale.c |   16 +-
- 3 files changed, 179 insertions(+), 270 deletions(-)
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index e63d811..533be99 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -65,13 +65,15 @@ enum armv6_counters {
+  * accesses/misses in hardware.
+  */
+ static const unsigned armv6_perf_map[PERF_COUNT_HW_MAX] = {
+-	[PERF_COUNT_HW_CPU_CYCLES]	    = ARMV6_PERFCTR_CPU_CYCLES,
+-	[PERF_COUNT_HW_INSTRUCTIONS]	    = ARMV6_PERFCTR_INSTR_EXEC,
+-	[PERF_COUNT_HW_CACHE_REFERENCES]    = HW_OP_UNSUPPORTED,
+-	[PERF_COUNT_HW_CACHE_MISSES]	    = HW_OP_UNSUPPORTED,
+-	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = ARMV6_PERFCTR_BR_EXEC,
+-	[PERF_COUNT_HW_BRANCH_MISSES]	    = ARMV6_PERFCTR_BR_MISPREDICT,
+-	[PERF_COUNT_HW_BUS_CYCLES]	    = HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV6_PERFCTR_CPU_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV6_PERFCTR_INSTR_EXEC,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_CACHE_MISSES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV6_PERFCTR_BR_EXEC,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV6_PERFCTR_BR_MISPREDICT,
++	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV6_PERFCTR_IBUF_STALL,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV6_PERFCTR_LSU_FULL_STALL,
+ };
+ 
+ static const unsigned armv6_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+@@ -218,13 +220,15 @@ enum armv6mpcore_perf_types {
+  * accesses/misses in hardware.
+  */
+ static const unsigned armv6mpcore_perf_map[PERF_COUNT_HW_MAX] = {
+-	[PERF_COUNT_HW_CPU_CYCLES]	    = ARMV6MPCORE_PERFCTR_CPU_CYCLES,
+-	[PERF_COUNT_HW_INSTRUCTIONS]	    = ARMV6MPCORE_PERFCTR_INSTR_EXEC,
+-	[PERF_COUNT_HW_CACHE_REFERENCES]    = HW_OP_UNSUPPORTED,
+-	[PERF_COUNT_HW_CACHE_MISSES]	    = HW_OP_UNSUPPORTED,
+-	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = ARMV6MPCORE_PERFCTR_BR_EXEC,
+-	[PERF_COUNT_HW_BRANCH_MISSES]	    = ARMV6MPCORE_PERFCTR_BR_MISPREDICT,
+-	[PERF_COUNT_HW_BUS_CYCLES]	    = HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV6MPCORE_PERFCTR_CPU_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV6MPCORE_PERFCTR_INSTR_EXEC,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_CACHE_MISSES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV6MPCORE_PERFCTR_BR_EXEC,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV6MPCORE_PERFCTR_BR_MISPREDICT,
++	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV6MPCORE_PERFCTR_IBUF_STALL,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV6MPCORE_PERFCTR_LSU_FULL_STALL,
+ };
+ 
+ static const unsigned armv6mpcore_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index d2361e7..460bbbb 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -77,11 +77,14 @@ enum armv7_a8_perf_types {
+ 	ARMV7_A8_PERFCTR_L2_CACHE_ACCESS		= 0x43,
+ 	ARMV7_A8_PERFCTR_L2_CACHE_REFILL		= 0x44,
+ 	ARMV7_A8_PERFCTR_L1_ICACHE_ACCESS		= 0x50,
++	ARMV7_A8_PERFCTR_STALL_ISIDE			= 0x56,
+ };
+ 
+ /* ARMv7 Cortex-A9 specific event types */
+ enum armv7_a9_perf_types {
+ 	ARMV7_A9_PERFCTR_INSTR_CORE_RENAME		= 0x68,
++	ARMV7_A9_PERFCTR_STALL_ICACHE			= 0x60,
++	ARMV7_A9_PERFCTR_STALL_DISPATCH			= 0x66,
+ };
+ 
+ /* ARMv7 Cortex-A5 specific event types */
+@@ -116,13 +119,15 @@ enum armv7_a15_perf_types {
+  * accesses/misses in hardware.
+  */
+ static const unsigned armv7_a8_perf_map[PERF_COUNT_HW_MAX] = {
+-	[PERF_COUNT_HW_CPU_CYCLES]	    = ARMV7_PERFCTR_CPU_CYCLES,
+-	[PERF_COUNT_HW_INSTRUCTIONS]	    = ARMV7_PERFCTR_INSTR_EXECUTED,
+-	[PERF_COUNT_HW_CACHE_REFERENCES]    = ARMV7_PERFCTR_L1_DCACHE_ACCESS,
+-	[PERF_COUNT_HW_CACHE_MISSES]	    = ARMV7_PERFCTR_L1_DCACHE_REFILL,
+-	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = ARMV7_PERFCTR_PC_WRITE,
+-	[PERF_COUNT_HW_BRANCH_MISSES]	    = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
+-	[PERF_COUNT_HW_BUS_CYCLES]	    = HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
++	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_PERFCTR_PC_WRITE,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
++	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV7_A8_PERFCTR_STALL_ISIDE,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
+ };
+ 
+ static const unsigned armv7_a8_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+@@ -238,13 +243,15 @@ static const unsigned armv7_a8_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+  * Cortex-A9 HW events mapping
+  */
+ static const unsigned armv7_a9_perf_map[PERF_COUNT_HW_MAX] = {
+-	[PERF_COUNT_HW_CPU_CYCLES]	    = ARMV7_PERFCTR_CPU_CYCLES,
+-	[PERF_COUNT_HW_INSTRUCTIONS]	    = ARMV7_A9_PERFCTR_INSTR_CORE_RENAME,
+-	[PERF_COUNT_HW_CACHE_REFERENCES]    = ARMV7_PERFCTR_L1_DCACHE_ACCESS,
+-	[PERF_COUNT_HW_CACHE_MISSES]	    = ARMV7_PERFCTR_L1_DCACHE_REFILL,
+-	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = ARMV7_PERFCTR_PC_WRITE,
+-	[PERF_COUNT_HW_BRANCH_MISSES]	    = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
+-	[PERF_COUNT_HW_BUS_CYCLES]	    = HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_A9_PERFCTR_INSTR_CORE_RENAME,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
++	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_PERFCTR_PC_WRITE,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
++	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV7_A9_PERFCTR_STALL_ICACHE,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV7_A9_PERFCTR_STALL_DISPATCH,
+ };
+ 
+ static const unsigned armv7_a9_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+@@ -360,13 +367,15 @@ static const unsigned armv7_a9_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+  * Cortex-A5 HW events mapping
+  */
+ static const unsigned armv7_a5_perf_map[PERF_COUNT_HW_MAX] = {
+-	[PERF_COUNT_HW_CPU_CYCLES]	    = ARMV7_PERFCTR_CPU_CYCLES,
+-	[PERF_COUNT_HW_INSTRUCTIONS]	    = ARMV7_PERFCTR_INSTR_EXECUTED,
+-	[PERF_COUNT_HW_CACHE_REFERENCES]    = ARMV7_PERFCTR_L1_DCACHE_ACCESS,
+-	[PERF_COUNT_HW_CACHE_MISSES]	    = ARMV7_PERFCTR_L1_DCACHE_REFILL,
+-	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = ARMV7_PERFCTR_PC_WRITE,
+-	[PERF_COUNT_HW_BRANCH_MISSES]	    = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
+-	[PERF_COUNT_HW_BUS_CYCLES]	    = HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
++	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_PERFCTR_PC_WRITE,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
++	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
+ };
+ 
+ static const unsigned armv7_a5_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+@@ -466,13 +475,15 @@ static const unsigned armv7_a5_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+  * Cortex-A15 HW events mapping
+  */
+ static const unsigned armv7_a15_perf_map[PERF_COUNT_HW_MAX] = {
+-	[PERF_COUNT_HW_CPU_CYCLES]	    = ARMV7_PERFCTR_CPU_CYCLES,
+-	[PERF_COUNT_HW_INSTRUCTIONS]	    = ARMV7_PERFCTR_INSTR_EXECUTED,
+-	[PERF_COUNT_HW_CACHE_REFERENCES]    = ARMV7_PERFCTR_L1_DCACHE_ACCESS,
+-	[PERF_COUNT_HW_CACHE_MISSES]	    = ARMV7_PERFCTR_L1_DCACHE_REFILL,
+-	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = ARMV7_A15_PERFCTR_PC_WRITE_SPEC,
+-	[PERF_COUNT_HW_BRANCH_MISSES]	    = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
+-	[PERF_COUNT_HW_BUS_CYCLES]	    = ARMV7_PERFCTR_BUS_CYCLES,
++	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
++	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_A15_PERFCTR_PC_WRITE_SPEC,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
++	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV7_PERFCTR_BUS_CYCLES,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
+ };
+ 
+ static const unsigned armv7_a15_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index e0cca10..3b99d82 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -48,13 +48,15 @@ enum xscale_counters {
+ };
+ 
+ static const unsigned xscale_perf_map[PERF_COUNT_HW_MAX] = {
+-	[PERF_COUNT_HW_CPU_CYCLES]	    = XSCALE_PERFCTR_CCNT,
+-	[PERF_COUNT_HW_INSTRUCTIONS]	    = XSCALE_PERFCTR_INSTRUCTION,
+-	[PERF_COUNT_HW_CACHE_REFERENCES]    = HW_OP_UNSUPPORTED,
+-	[PERF_COUNT_HW_CACHE_MISSES]	    = HW_OP_UNSUPPORTED,
+-	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS] = XSCALE_PERFCTR_BRANCH,
+-	[PERF_COUNT_HW_BRANCH_MISSES]	    = XSCALE_PERFCTR_BRANCH_MISS,
+-	[PERF_COUNT_HW_BUS_CYCLES]	    = HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_CPU_CYCLES]		= XSCALE_PERFCTR_CCNT,
++	[PERF_COUNT_HW_INSTRUCTIONS]		= XSCALE_PERFCTR_INSTRUCTION,
++	[PERF_COUNT_HW_CACHE_REFERENCES]	= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_CACHE_MISSES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= XSCALE_PERFCTR_BRANCH,
++	[PERF_COUNT_HW_BRANCH_MISSES]		= XSCALE_PERFCTR_BRANCH_MISS,
++	[PERF_COUNT_HW_BUS_CYCLES]		= HW_OP_UNSUPPORTED,
++	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= XSCALE_PERFCTR_ICACHE_NO_DELIVER,
++	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
+ };
+ 
+ static const unsigned xscale_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+-- 
+1.7.0.4
