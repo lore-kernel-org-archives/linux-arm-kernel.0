@@ -1,11 +1,44 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 29 Sep 2011 17:51:28 -0700
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 29 Sep 2011 19:26:35 -0600 (MDT)
 Subject: [PATCH] OMAP2+: clock: use clock's recalc in DPLL handling
-In-Reply-To: <CAJOA=zPq__48SbsKeFHaQ_+J0YQYLLXBP67g2JGXknhWj7PNOA@mail.gmail.com>
+In-Reply-To: <1317343888-30892-1-git-send-email-mturquette@ti.com>
 References: <CAJOA=zPq__48SbsKeFHaQ_+J0YQYLLXBP67g2JGXknhWj7PNOA@mail.gmail.com>
-Message-ID: <1317343888-30892-1-git-send-email-mturquette@ti.com>
+	<1317343888-30892-1-git-send-email-mturquette@ti.com>
+Message-ID: <alpine.DEB.2.00.1109291925120.26728@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi
+
+On Thu, 29 Sep 2011, Mike Turquette wrote:
+
+> Not all DPLLs are identical; some require special consideration such as
+> OMAP4's ABE DPLL, which can have an additional 4x multiplier added to
+> it's clock rate based on programming the REGM4XEN bit in it's CLKMODE
+> register.
+> 
+> Unfortunately the clock framework makes a few assumptions that all DPLLs
+> can have their rates calculated the same way which has led to incorrect
+> rates for OMAP4's DPLL_ABE in some cases.  This patch fixes the same by
+> replacing explicit calls to omap2_dpll_get_rate with clk->recalc if
+> .recalc is populated for a clock.  If .recalc is NULL then fall back to
+> omap2_dpll_get_rate.
+> 
+> Reported-by: Misael Lopez Cruz <misael.lopez@ti.com>
+> Signed-off-by: Mike Turquette <mturquette@ti.com>
+
+The conditional in the second hunk of this patch has been simplified for 
+readability.  Updated patch below.  Please let me know if I screwed 
+something up.  Otherwise, queued for 3.2 fixes.
+
+thanks
+
+
+- Paul
+
+From: Mike Turquette <mturquette@ti.com>
+Date: Thu, 29 Sep 2011 17:51:28 -0700
+Subject: [PATCH] ARM: OMAP2+: clock: use clock's recalc in DPLL handling
 
 Not all DPLLs are identical; some require special consideration such as
 OMAP4's ABE DPLL, which can have an additional 4x multiplier added to
@@ -21,12 +54,14 @@ omap2_dpll_get_rate.
 
 Reported-by: Misael Lopez Cruz <misael.lopez@ti.com>
 Signed-off-by: Mike Turquette <mturquette@ti.com>
+[paul at pwsan.com: simplified conditional]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/dpll3xxx.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/dpll3xxx.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index f77022b..193868d 100644
+index f77022b..fe4533f 100644
 --- a/arch/arm/mach-omap2/dpll3xxx.c
 +++ b/arch/arm/mach-omap2/dpll3xxx.c
 @@ -390,7 +390,8 @@ int omap3_noncore_dpll_enable(struct clk *clk)
@@ -39,15 +74,23 @@ index f77022b..193868d 100644
  
  	return r;
  }
-@@ -435,7 +436,8 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
+@@ -425,6 +426,7 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
+ {
+ 	struct clk *new_parent = NULL;
+ 	u16 freqsel = 0;
++	unsigned long hw_rate;
+ 	struct dpll_data *dd;
+ 	int ret;
+ 
+@@ -435,7 +437,8 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
  	if (!dd)
  		return -EINVAL;
  
 -	if (rate == omap2_get_dpll_rate(clk))
-+	if (rate == ((clk->recalc) ? clk->recalc(clk) :
-+				omap2_get_dpll_rate(clk)))
++	hw_rate = (clk->recalc) ? clk->recalc(clk) : omap2_get_dpll_rate(clk);
++	if (rate == hw_rate)
  		return 0;
  
  	/*
 -- 
-1.7.4.1
+1.7.6.3
