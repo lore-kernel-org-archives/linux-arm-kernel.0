@@ -1,295 +1,50 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 30 Sep 2011 16:32:36 +0530
-Subject: [PATCH v6 11/16] OMAP2+: UART: Move errata handling from serial.c to
-	omap-serial
-In-Reply-To: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
-References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1317380561-661-2-git-send-email-govindraj.raja@ti.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Fri, 30 Sep 2011 16:41:35 +0530
+Subject: [PATCH 0/2]: Add a common macro for creating struct clk_lookup entries
+Message-ID: <1317381097-2691-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the errata handling mechanism from serial.c to omap-serial file
-and utilise the same func in driver file.
+This patchset consolidates the macro that creates 'struct clk_lookup'
+entries by introducing a common macro 'CLKDEV_INIT' as suggested by
+Russell King. Few of the platforms have been modified to use this new macro.
 
-Errata i202, i291 are moved to be handled with omap-serial
-Moving the errata macro from serial.c file to driver header file
-as from on errata will be handled in driver file itself.
+For Davinci, the last entry in the clk_lookup array is modified such
+that the NULL entry is created without using the macro in order to
+avoid a compilation issue when passing NULL as the third parameter
+to CLKDEV_INIT macro.
 
-Corrected errata id from chapter reference 2.15 to errata id i291.
+I have done the replacement by using python script. I have only build tested
+for below platforms with existing defconfigs.
 
-Acked-by: Alan Cox <alan@linux.intel.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/serial.c                  |   78 +++++--------------------
- arch/arm/plat-omap/include/plat/omap-serial.h |    5 ++
- drivers/tty/serial/omap-serial.c              |   63 ++++++++++++++++++--
- 3 files changed, 77 insertions(+), 69 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index ccf3550..0731575 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -42,8 +42,6 @@
- #include "control.h"
- #include "mux.h"
- 
--#define UART_ERRATA_i202_MDR1_ACCESS	(0x1 << 1)
--
- /*
-  * NOTE: By default the serial timeout is disabled as it causes lost characters
-  * over the serial ports. This means that the UART clocks will stay on until
-@@ -54,11 +52,6 @@
- 
- #define MAX_UART_HWMOD_NAME_LEN		16
- 
--struct omap_uart_state {
--	int num;
--	u32 dma_enabled;
--};
--
- static u8 num_uarts;
- 
- static int uart_idle_hwmod(struct omap_device *od)
-@@ -97,63 +90,6 @@ struct omap_hwmod *omap_uart_hwmod_lookup(int num)
- 
- #if defined(CONFIG_PM)
- 
--/*
-- * Work Around for Errata i202 (3430 - 1.12, 3630 - 1.6)
-- * The access to uart register after MDR1 Access
-- * causes UART to corrupt data.
-- *
-- * Need a delay =
-- * 5 L4 clock cycles + 5 UART functional clock cycle (@48MHz = ~0.2uS)
-- * give 10 times as much
-- */
--static void omap_uart_mdr1_errataset(struct omap_uart_state *uart, u8 mdr1_val,
--		u8 fcr_val)
--{
--	u8 timeout = 255;
--
--	serial_write_reg(uart, UART_OMAP_MDR1, mdr1_val);
--	udelay(2);
--	serial_write_reg(uart, UART_FCR, fcr_val | UART_FCR_CLEAR_XMIT |
--			UART_FCR_CLEAR_RCVR);
--	/*
--	 * Wait for FIFO to empty: when empty, RX_FIFO_E bit is 0 and
--	 * TX_FIFO_E bit is 1.
--	 */
--	while (UART_LSR_THRE != (serial_read_reg(uart, UART_LSR) &
--				(UART_LSR_THRE | UART_LSR_DR))) {
--		timeout--;
--		if (!timeout) {
--			/* Should *never* happen. we warn and carry on */
--			dev_crit(&uart->pdev->dev, "Errata i202: timedout %x\n",
--			serial_read_reg(uart, UART_LSR));
--			break;
--		}
--		udelay(1);
--	}
--}
--#endif /* CONFIG_PM && CONFIG_ARCH_OMAP3 */
--
--static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
--					       int enable)
--{
--	u8 idlemode;
--
--	if (enable) {
--		/**
--		 * Errata 2.15: [UART]:Cannot Acknowledge Idle Requests
--		 * in Smartidle Mode When Configured for DMA Operations.
--		 */
--		if (uart->dma_enabled)
--			idlemode = HWMOD_IDLEMODE_FORCE;
--		else
--			idlemode = HWMOD_IDLEMODE_SMART;
--	} else {
--		idlemode = HWMOD_IDLEMODE_NO;
--	}
--
--	omap_hwmod_set_slave_idlemode(uart->oh, idlemode);
--}
--
- int omap_uart_can_sleep(void)
- {
- 	struct omap_hwmod *oh;
-@@ -313,7 +249,20 @@ static void omap_uart_enable_wakeup(struct platform_device *pdev, bool enable)
- 		omap_hwmod_disable_wakeup(od->hwmods[0]);
- }
- 
-+/*
-+ * Errata i291: [UART]:Cannot Acknowledge Idle Requests
-+ * in Smartidle Mode When Configured for DMA Operations.
-+ * WA: configure uart in force idle mode.
-+ */
-+static void omap_uart_set_forceidle(struct platform_device *pdev)
-+{
-+	struct omap_device *od = to_omap_device(pdev);
-+
-+	omap_hwmod_set_slave_idlemode(od->hwmods[0], HWMOD_IDLEMODE_FORCE);
-+}
-+
- #else
-+static void omap_uart_set_forceidle(struct platform_device *pdev) {}
- static void omap_uart_enable_wakeup(struct platform_device *pdev, bool enable)
- {}
- #endif /* CONFIG_PM */
-@@ -388,6 +337,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
- 	pdata->flags = UPF_BOOT_AUTOCONF;
- 	pdata->enable_wakeup = omap_uart_enable_wakeup;
- 	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
-+	pdata->set_force_idle = omap_uart_set_forceidle;
- 
- 	/* Enable the MDR1 errata for OMAP3 */
- 	if (cpu_is_omap34xx() && !cpu_is_ti816x())
-diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index 8ef81ce..12f5262 100644
---- a/arch/arm/plat-omap/include/plat/omap-serial.h
-+++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -56,6 +56,8 @@
- 
- #define MSR_SAVE_FLAGS		UART_MSR_ANY_DELTA
- 
-+#define UART_ERRATA_i202_MDR1_ACCESS	(0x1 << 1)
-+
- struct omap_uart_port_info {
- 	bool			dma_enabled;	/* To specify DMA Mode */
- 	unsigned int		uartclk;	/* UART clock rate */
-@@ -65,6 +67,7 @@ struct omap_uart_port_info {
- 
- 	void (*enable_wakeup)(struct platform_device *, bool);
- 	u32 (*get_context_loss_count)(struct device *);
-+	void (*set_force_idle)(struct platform_device *);
- };
- 
- struct uart_omap_dma {
-@@ -118,6 +121,8 @@ struct uart_omap_port {
- 	unsigned long		port_activity;
- 	u32			context_loss_cnt;
- 	u8			wakeups_enabled;
-+	u32			errata;
-+
- };
- 
- #endif /* __OMAP_SERIAL_H__ */
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 43c33da..817443e 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -51,6 +51,7 @@ static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
- static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
- static void serial_omap_rx_timeout(unsigned long uart_no);
- static int serial_omap_start_rxdma(struct uart_omap_port *up);
-+static void serial_omap_mdr1_errataset(struct uart_omap_port *up, u8 mdr1);
- 
- static inline unsigned int serial_in(struct uart_omap_port *up, int offset)
- {
-@@ -805,7 +806,11 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 
- 	/* Protocol, Baud Rate, and Interrupt Settings */
- 
--	serial_out(up, UART_OMAP_MDR1, up->mdr1);
-+	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
-+		serial_omap_mdr1_errataset(up, up->mdr1);
-+	else
-+		serial_out(up, UART_OMAP_MDR1, up->mdr1);
-+
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
- 
- 	up->efr = serial_in(up, UART_EFR);
-@@ -830,7 +835,10 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 	else
- 		up->mdr1 = UART_OMAP_MDR1_16X_MODE;
- 
--	serial_out(up, UART_OMAP_MDR1, up->mdr1);
-+	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
-+		serial_omap_mdr1_errataset(up, up->mdr1);
-+	else
-+		serial_out(up, UART_OMAP_MDR1, up->mdr1);
- 
- 	/* Hardware Flow Control Configuration */
- 
-@@ -1350,6 +1358,7 @@ static int serial_omap_probe(struct platform_device *pdev)
- 	up->port.flags = omap_up_info->flags;
- 	up->port.uartclk = omap_up_info->uartclk;
- 	up->uart_dma.uart_base = mem->start;
-+	up->errata = omap_up_info->errata;
- 
- 	if (omap_up_info->dma_enabled) {
- 		up->uart_dma.uart_dma_tx = dma_tx->start;
-@@ -1405,9 +1414,47 @@ static int serial_omap_remove(struct platform_device *dev)
- 	return 0;
- }
- 
-+/*
-+ * Work Around for Errata i202 (3430 - 1.12, 3630 - 1.6)
-+ * The access to uart register after MDR1 Access
-+ * causes UART to corrupt data.
-+ *
-+ * Need a delay =
-+ * 5 L4 clock cycles + 5 UART functional clock cycle (@48MHz = ~0.2uS)
-+ * give 10 times as much
-+ */
-+static void serial_omap_mdr1_errataset(struct uart_omap_port *up, u8 mdr1)
-+{
-+	u8 timeout = 255;
-+
-+	serial_out(up, UART_OMAP_MDR1, mdr1);
-+	udelay(2);
-+	serial_out(up, UART_FCR, up->fcr | UART_FCR_CLEAR_XMIT |
-+			UART_FCR_CLEAR_RCVR);
-+	/*
-+	 * Wait for FIFO to empty: when empty, RX_FIFO_E bit is 0 and
-+	 * TX_FIFO_E bit is 1.
-+	 */
-+	while (UART_LSR_THRE != (serial_in(up, UART_LSR) &
-+				(UART_LSR_THRE | UART_LSR_DR))) {
-+		timeout--;
-+		if (!timeout) {
-+			/* Should *never* happen. we warn and carry on */
-+			dev_crit(&up->pdev->dev, "Errata i202: timedout %x\n",
-+						serial_in(up, UART_LSR));
-+			break;
-+		}
-+		udelay(1);
-+	}
-+}
-+
- static void serial_omap_restore_context(struct uart_omap_port *up)
- {
--	serial_out(up, UART_OMAP_MDR1, up->mdr1);
-+	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
-+		serial_omap_mdr1_errataset(up, UART_OMAP_MDR1_DISABLE);
-+	else
-+		serial_out(up, UART_OMAP_MDR1, UART_OMAP_MDR1_DISABLE);
-+
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B); /* Config B mode */
- 	serial_out(up, UART_EFR, UART_EFR_ECB);
- 	serial_out(up, UART_LCR, 0x0); /* Operational mode */
-@@ -1423,8 +1470,10 @@ static void serial_omap_restore_context(struct uart_omap_port *up)
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B); /* Config B mode */
- 	serial_out(up, UART_EFR, up->efr);
- 	serial_out(up, UART_LCR, up->lcr);
--	/* UART 16x mode */
--	serial_out(up, UART_OMAP_MDR1, up->mdr1);
-+	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
-+		serial_omap_mdr1_errataset(up, up->mdr1);
-+	else
-+		serial_out(up, UART_OMAP_MDR1, up->mdr1);
- }
- 
- static int serial_omap_runtime_suspend(struct device *dev)
-@@ -1453,6 +1502,10 @@ static int serial_omap_runtime_suspend(struct device *dev)
- 		}
- 	}
- 
-+	/* Errata i291 */
-+	if (up->use_dma && pdata->set_force_idle)
-+		pdata->set_force_idle(up->pdev);
-+
- 	return 0;
- }
- 
+Padmavathi Venna (2):
+  ARM: CLKDEV: Add Common Macro for clk_lookup
+  ARM: Switch to using CLKDEV_INIT macro for creating clk_lookup instance
+
+ arch/arm/mach-davinci/board-dm646x-evm.c |    5 +-
+ arch/arm/mach-davinci/clock.h            |    7 --
+ arch/arm/mach-davinci/da830.c            |  101 +++++++++++----------
+ arch/arm/mach-davinci/da850.c            |   95 ++++++++++----------
+ arch/arm/mach-davinci/dm355.c            |   86 +++++++++---------
+ arch/arm/mach-davinci/dm365.c            |  112 ++++++++++++------------
+ arch/arm/mach-davinci/dm644x.c           |   77 ++++++++--------
+ arch/arm/mach-davinci/dm646x.c           |   81 +++++++++--------
+ arch/arm/mach-davinci/tnetv107x.c        |  134 ++++++++++++++--------------
+ arch/arm/mach-ep93xx/clock.c             |   61 ++++++-------
+ arch/arm/mach-imx/clock-imx1.c           |   38 ++++-----
+ arch/arm/mach-imx/clock-imx21.c          |   91 +++++++++----------
+ arch/arm/mach-imx/clock-imx25.c          |   77 +++++++---------
+ arch/arm/mach-imx/clock-imx27.c          |  111 +++++++++++------------
+ arch/arm/mach-imx/clock-imx31.c          |  103 ++++++++++-----------
+ arch/arm/mach-imx/clock-imx35.c          |  117 +++++++++++-------------
+ arch/arm/mach-lpc32xx/clock.c            |   75 +++++++---------
+ arch/arm/mach-mx5/clock-mx51-mx53.c      |  145 ++++++++++++++----------------
+ arch/arm/mach-mxs/clock-mx23.c           |   39 ++++-----
+ arch/arm/mach-mxs/clock-mx28.c           |   67 ++++++--------
+ arch/arm/mach-tcc8k/clock.c              |  107 ++++++++++------------
+ include/linux/clkdev.h                   |    7 ++
+ 22 files changed, 832 insertions(+), 904 deletions(-)
+
 -- 
-1.7.4.1
+1.7.4.4
