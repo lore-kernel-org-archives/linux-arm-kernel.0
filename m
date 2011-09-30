@@ -1,34 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Sep 2011 22:13:42 +0200
-Subject: [GIT PULL] dmtimer changes for v3.2 merge window
-In-Reply-To: <20110928220237.GE6324@atomide.com>
-References: <20110928220237.GE6324@atomide.com>
-Message-ID: <201109302213.42435.arnd@arndb.de>
+Date: Fri, 30 Sep 2011 22:17:13 +0200
+Subject: [GIT PULL] at91 fixes for 3.1
+In-Reply-To: <4E838F77.2040705@atmel.com>
+References: <4E838F77.2040705@atmel.com>
+Message-ID: <201109302217.13937.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 29 September 2011, Tony Lindgren wrote:
-> Please pull omap dmtimer changes from:
+On Wednesday 28 September 2011, Nicolas FERRE wrote:
+> Here is a couple of fixes that may be included in 3.1-final.
+> The Kconfig modification will allow to select the PWM driver for SAM9G45 
+> SoC. This will also benefit to stable kernels.
+> The new defconfig for SAM9G45 family will allow us to better monitor the 
+> health of this port through automatic compilation mechanism. I find it 
+> interesting to have it included the sooner.
 > 
-> git://github.com/tmlind/linux.git dmtimer
+> The pull is based on the following changes since commit 
+> a102a9ece5489e1718cd7543aa079082450ac3a2:
 > 
-> This series completes the system timer separation from the
-> driver like features. It also adds support for v2 ip that is
-> available for some timers starting with omap4.
+>    Linux 3.1-rc8 (2011-09-27 15:48:34 -0700)
 > 
-> After this series arch/arm/plat-omap/dmtimer.c could be
-> moved to live under drivers somewhere, but there is still
-> discussion going on which features should be supported in
-> a generic way.
-> 
-> This series depends on the cleanup you pulled earlier.
-> As this series adds some new features like runtime PM suppport,
-> I've kept it separate from cleanup.
+> are available in the git repository at:
+>    git://github.com/at91linux/linux-at91.git at91-fixes
 
-Looks really nice. I've put it into another top-level branch
-named next/dmtimer for now. I'm open for suggestions on whether
-I should generally push branches like this separately Linuswards
-or better aggregate multiple standalone features into a single
-branch. 
+Hi Nicolas,
+
+I've pulled them into the fixes branch now. My feeling however is that
+these by themselves are not reason enough to send a pull request to Linus,
+so they will probably be the first thing I send in the 3.2 merge window,
+unless some other important fixes appear.
 
 	Arnd
