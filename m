@@ -1,55 +1,33 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 30 Sep 2011 16:39:02 +0530
-Subject: [PATCH 2/9] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <20110930104820.GE2085@sirena.org.uk>
-References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-3-git-send-email-rnayak@ti.com>
-	<20110927121003.GB4289@opensource.wolfsonmicro.com>
-	<4E81E224.2070408@ti.com>
-	<20110927150511.GM4289@opensource.wolfsonmicro.com>
-	<4E854532.6080605@ti.com>
-	<20110930102849.GA4195@opensource.wolfsonmicro.com>
-	<20110930104820.GE2085@sirena.org.uk>
-Message-ID: <4E85A34E.9070203@ti.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Fri, 30 Sep 2011 16:52:29 +0530
+Subject: [PATCH V2 0/4]: ARM: SAMSUNG: Add SPI clkdev support
+Message-ID: <1317381753-2845-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 September 2011 04:18 PM, Mark Brown wrote:
-> On Fri, Sep 30, 2011 at 11:28:49AM +0100, Mark Brown wrote:
->> On Fri, Sep 30, 2011 at 09:57:30AM +0530, Rajendra Nayak wrote:
->
->>>>> +  init_data->supply_regulator = (char *)of_get_property(dev->of_node,
->>>>> +                                          "regulator-supplies", NULL);
->
->>> Mark, I still seem to be a little confused with this one as to why
->>> we would need a phandle *and* a supply-name to reference a parent
->>> regulator/supply.
->>> The phandle would point to a regulator dt node and that node internally
->>> would have just one name associated with it.
->
->> To repeat: the supply name is for the consumer.  It is needed so that
->> the consumer can tell which supply is provided by which regulator.
->> Almost all devices have more than one supply and if the device does
->> anything more complicated than just turning on all the supplies when the
->> device is active it's going to need to figure out which supply is which.
->
-> Hang on, I now have no idea what this is supposed to be doing.  Later on
-> in the series you had examples in your commit logs with perfectly
-> sensible bindings for supplies:
->
->                  vmmc-supply =<&regulator1>;
->                  vpll-supply =<&regulator1>;
->
-> which have both a unique name and a direct reference to the supplying
-> regulator.  What are these "regulator-supplies" properties supposed to
-> be?
+This patchset modifies the existing clkdev to make SPI driver
+independent of the clock names send from platform data. This
+patches enables the SPI driver to request SPI bus clocks
+using generic connection ID.
 
-:-), yes, I was confused for a while as well after reading your response.
+V1 patch series are:
+	http://www.spinics.net/lists/arm-kernel/msg141671.html
+Changes since V1:
+	-Add newly introduced CLKDEV_INIT macro for creating clk_lookup
+	structure as suggested by Russell King
 
-The "regulator-supplies" is used to specific the regulator *parent*.
-Same as what was earlier passed by using the
-"supply_regulator" field of regulator_init_data structure.
-Grant wanted the bindings to support specifying multiple parents
-and hence I was thinking of either a list of names *or*
-a list of phandles to specify multiple parents to a regulator.
+Padmavathi Venna (4):
+  ARM: S3C64XX: Add SPI clkdev support
+  ARM: S5PC100: Add SPI clkdev support
+  ARM: S5P64X0: Add SPI clkdev support
+  ARM: S5PV210: Add SPI clkdev support
+
+ arch/arm/mach-s3c64xx/clock.c         |   98 ++++++++++++++++--------
+ arch/arm/mach-s5p64x0/clock-s5p6440.c |   57 +++++++++-----
+ arch/arm/mach-s5p64x0/clock-s5p6450.c |   57 +++++++++-----
+ arch/arm/mach-s5pc100/clock.c         |  132 ++++++++++++++++++++-------------
+ arch/arm/mach-s5pv210/clock.c         |   58 ++++++++++-----
+ 5 files changed, 259 insertions(+), 143 deletions(-)
+
+-- 
+1.7.4.4
