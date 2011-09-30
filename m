@@ -1,26 +1,58 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 30 Sep 2011 15:09:11 +0800
-Subject: [PATCH 5/5] ARM: pxa: move gpio driver into drivers directory
-In-Reply-To: <20110929163048.GA21718@n2100.arm.linux.org.uk>
-References: <1317309546-19682-5-git-send-email-haojian.zhuang@marvell.com>
-	<20110929163048.GA21718@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZyBTOq_qQ+o3OFP-GuwRN=WwNE6te1Hy7vrkureFuLA3A@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 30 Sep 2011 16:30:33 +0900
+Subject: [PATCH v2 0/5] iommu/exynos: Add IOMMU and Enhance System MMU driver
+	for Exynos4
+Message-ID: <016b01cc7f42$d72420e0$856c62a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 12:30 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Sep 29, 2011 at 11:19:06PM +0800, Haojian Zhuang wrote:
->> +#include <linux/gpio-pxa.h>
->> +#include <linux/platform_device.h>
->> +
->> +#include <asm/io.h>
->
-> linux/gpio.h please.
->
+Hi all,
 
-Excuse me that I didn't use any gpio API in mach-pxa/gpio.c. It seems
-that I needn't include "linux/gpio.h" at mach-pxa/gpio.c.
+This is the second try of submitting patches about IOMMU/System MMU
+driver for Exynos4 SoCs with the fixes of the following problems
+pointed by Russell King.:
 
-Thanks
-Haojian
+ - Missing unlocking a spinlock in exynos_iommu_attach_dev().
+ - atomic_t -> int in sysmmu_drvdata.activations
+ - sysmmu_platdata -> sysmmu_drvdata
+ - Change in error messages in irq handler 
+ - Removed casting in format of error message
+ - omap_iommu_ops -> exynos_iommu_ops in the last patch.
+
+First 2 patches enhance System MMU platform device definition:
+ - Removed System MMU for MDMA0 in LCD block because it is not used.
+  Use MDMA2 in TOP block. 
+ - Removed System MMU ID. Instead a System MMU is bound to a device that
+  the System MMU is dedicated during machin initialization. If a device
+  driver wants to handle System MMU, it must bind its device with System
+  MMU with sysmmu_set_owner().
+ - clkdev
+ - System MMU device driver is removed from arch/arm/plat-s5p to move it
+  to driver/iommu directory.
+
+Last 3 patches implements IOMMU API:
+ - Implements IOMMU API and System MMU driver that is moved from
+  arch/arm/plat-s5p.
+ - Implements fault handling that is suggested by Ohad.
+ - Used bus_set_iommu instead of register_iommu that is suggested by Joerg.
+
+
+[PATCH v2 1/5] ARM: EXYNOS4: Change System MMU device definition
+
+
+arch/arm/mach-exynos4/Kconfig               |    2 -
+arch/arm/mach-exynos4/clock.c               |   43 +-
+arch/arm/mach-exynos4/dev-sysmmu.c          |  270 ++------
+arch/arm/mach-exynos4/include/mach/irqs.h   |    1 -
+arch/arm/mach-exynos4/include/mach/map.h    |    1 -
+arch/arm/mach-exynos4/include/mach/sysmmu.h |   85 ++-
+arch/arm/mach-exynos4/mach-armlex4210.c     |   24 +-
+arch/arm/mach-exynos4/mach-smdkv310.c       |   28 +-
+arch/arm/plat-s5p/Kconfig                   |    8 -
+arch/arm/plat-s5p/Makefile                  |    1 -
+arch/arm/plat-s5p/include/plat/sysmmu.h     |   95 ---
+arch/arm/plat-s5p/sysmmu.c                  |  312 ---------
+drivers/iommu/Kconfig                       |   14 +
+drivers/iommu/Makefile                      |    1 +
+drivers/iommu/exynos_iommu.c                |  919 +++++++++++++++++++++++++++
+15 files changed, 1120 insertions(+), 684 deletions(-)
