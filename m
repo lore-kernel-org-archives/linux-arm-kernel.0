@@ -1,30 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Sep 2011 19:20:56 +0200
-Subject: [PATCH] drivers: create a pin control subsystem v8
-In-Reply-To: <CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
-References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
-	<20110930020754.GK12606@ponder.secretlab.ca>
-	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
-	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
-Message-ID: <CACRpkdZxxLdJQEkG--5Uf8DX+-00yOecb_NMpf0QSpP8u5hR4w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 30 Sep 2011 10:41:48 -0700
+Subject: [PATCH 1/2] arm: omap4: hsmmc: Fix Pbias configuration on
+	regulator OFF
+In-Reply-To: <CANrkHUaJr3L+y33j=za-j6Kcsv1dy-rt0URc_9GgzpfOjqPTZA@mail.gmail.com>
+References: <1317307500-5514-1-git-send-email-balajitk@ti.com>
+	<1317307500-5514-2-git-send-email-balajitk@ti.com>
+	<20110929162006.GG6324@atomide.com>
+	<CANrkHUaJr3L+y33j=za-j6Kcsv1dy-rt0URc_9GgzpfOjqPTZA@mail.gmail.com>
+Message-ID: <20110930174147.GJ6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 7:07 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+* T Krishnamoorthy, Balaji <balajitk@ti.com> [110930 07:43]:
+> On Thu, Sep 29, 2011 at 9:50 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Balaji T K <balajitk@ti.com> [110929 07:11]:
+> >> MMC1 data line IO's are powered down in before set regulator function.
+> >> IO's should not be powered ON when regulator is OFF.
+> >> Keep the IO's in power pown mode after regulator OFF.
+> >> Delete incorrect comments which are not applicable for OMAP4.
+> >
+> > Care to check how this is different from what I added into fixes
+> > branch as commit 3fe8df93b0992199e3a0026fc51e90b705f94e40?
+> >
+> > Is this a separate issue?
+> 
+> Yes.
+> commit 3fe8df93b fixes USBC1 configuration.
+> USBC1 IO was configured unnecessarily for MMC IO.
+> 
+> This patch keeps the MMC IO's in power down after regulator OFF
+> otherwise it generates VMODE_ERROR due to mismatch in input (regulator)
+> voltage and MMC IO drive voltage.
 
-> [Me]
->> That is not the reason it's there actually, what we have
->> discussed on the mailing list is getting sysfs entries for the same
->> reason gpiolib registers a class: handle pin control from userspace,
->>(...)
->
-> Sure, but you don't need the bus yet. ?It can be added when it is
-> actually needed. ?I'm not convinced that the sysfs approach is
-> actually the right interface here (I'm certainly not a fan of the gpio
-> sysfs i/f), and I'd rather not be putting in unneeded stuff until the
-> userspace i/f is hammered out.
+OK, can you please refresh it against the current fixes branch?
 
-OK I buy that, I will post a v9 without bus...
+Thanks,
 
-Thanks!
-Linus Walleij
+Tony
