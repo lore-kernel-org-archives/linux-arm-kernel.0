@@ -1,51 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 30 Sep 2011 20:18:48 +0100
-Subject: [RFC] Need help deciphering reboot modes!
-In-Reply-To: <20110930125725.GG3895@e102144-lin.cambridge.arm.com>
-References: <20110930125725.GG3895@e102144-lin.cambridge.arm.com>
-Message-ID: <20110930191847.GA11710@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 30 Sep 2011 14:27:57 -0500
+Subject: [PATCH 0/3] GIC OF bindings
+Message-ID: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 01:57:25PM +0100, Will Deacon wrote:
-> As part of my kexec work, I've been looking at the machine_restart path
-> on ARM and, more specifically, the use of the reboot_mode character that
-> gets passed around and ultimately ignored.
+From: Rob Herring <rob.herring@calxeda.com>
 
-It gets ignored because platform maintainers are a lazy bunch of people
-and don't want to write any more code than they absolutely have to.
+Another round of GIC devicetree support.
 
-Overall, it is meant as a hint to the platform code about what reboot
-method to use.
+This moves the tracking of the starting hwirq number into the irq domain
+code. Doing this makes hwirq == GIC interrupt ID and simplifies the GIC
+code removing irq_offset.
 
-> It seems that the following mode characters are used:
-> 
-> 0	-> Currently used by kexec as a dummy argument given that it is
-> 	   ignored anyway.
+The full series is available here. This includes Russell's devel-stable and
+for-next branches and Nico's vmalloc branch:
 
-No idea what that means, afaik it's never been used.
+git://git.jdl.com/software/linux-3.0.git gic-v2
 
-> 'h'	-> The default assignment to reboot_mode and that used by
-> 	   machine_restart. For some reason, reboot_mode can also be
-> 	   overridden on the command line. I would guess that this means
-> 	   "hard".
+Tested on highbank and Realview 11MPCore qemu (2 GICs).
 
-It does mean 'hard' and it tells platforms which have the option (the
-early ones do!) to use some hardware method to provoke the machine into
-rebooting.
+Rob
 
-> 's'	-> A supported option by mioa701 (mach-pxa) and mach-s3c24xx. I
-> 	   would guess that this means "soft".
+Rob Herring (3):
+  irq: support domains with non-zero hwirq base
+  ARM: gic: add irq_domain support
+  ARM: gic: add OF based initialization
 
-This means to reboot by vectoring through the reset vector - so it is
-'soft'.
+ Documentation/devicetree/bindings/arm/gic.txt |   55 ++++++++++
+ arch/arm/common/Kconfig                       |    1 +
+ arch/arm/common/gic.c                         |  142 +++++++++++++++++++------
+ arch/arm/include/asm/hardware/gic.h           |    5 +-
+ include/linux/irqdomain.h                     |   16 +++-
+ kernel/irq/irqdomain.c                        |   12 +-
+ 6 files changed, 189 insertions(+), 42 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
 
-> 'g'	-> A supported option by spitz and tosa (both mach-pxa). I can't
-> 	   begin to imagine what it might stand for.
-
-'gpio', using a gpio signal to cause the reboot rather than setting up
-a watchdog or something to cause it.
-
-Note that as I say above, it is only a hint - if you pass 's' for soft,
-a platform can still elect to do a hard reboot if it knows that soft
-reboots just don't work on the platform.
+-- 
+1.7.5.4
