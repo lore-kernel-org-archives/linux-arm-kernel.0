@@ -1,194 +1,34 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 30 Sep 2011 14:28:00 -0500
-Subject: [PATCH 3/3] ARM: gic: add OF based initialization
-In-Reply-To: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
-References: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1317410880-24828-4-git-send-email-robherring2@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Sep 2011 21:56:22 +0200
+Subject: [PATCH 0/4] ARM: CSR: cleanup some minor coding-style issues
+In-Reply-To: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
+References: <1316757091-14916-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <201109302156.22487.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Friday 23 September 2011, Barry Song wrote:
+> Barry Song (4):
+>   ARM: CSR: timer: do not initialise statics to 0 or NULL
+>   ARM: CSR: timer: space required before the open parenthesis '('
+>   ARM: CSR: prima2: fix trailing whitespace
+>   ARM: CSR: clock: Fix indentation
+> 
+>  arch/arm/mach-prima2/clock.c  |    4 ++--
+>  arch/arm/mach-prima2/prima2.c |    2 +-
+>  arch/arm/mach-prima2/timer.c  |    4 ++--
+>  3 files changed, 5 insertions(+), 5 deletions(-)
 
-This adds ARM gic interrupt controller initialization using device tree
-data.
 
-The initialization function is intended to be called by of_irq_init
-function like this:
+Hi Barry,
 
-const static struct of_device_id irq_match[] = {
-	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-	{}
-};
+Sorry for the late reply. This series and the one before all look good
+to me, but I fear I'm losing track of the patches.
 
-static void __init init_irqs(void)
-{
-	of_irq_init(irq_match);
-}
+Can you send me pull requests for each set (fixes, cleanups, other
+changes) so I can be sure I get everything? If you have trouble
+with git.kernel.org still being down, I can apply the patches
+manually and let you double-check them, but that would be more
+work for both of us I think.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- Documentation/devicetree/bindings/arm/gic.txt |   55 ++++++++++++++++++++++
- arch/arm/common/gic.c                         |   61 +++++++++++++++++++++++++
- arch/arm/include/asm/hardware/gic.h           |    1 +
- 3 files changed, 117 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
-new file mode 100644
-index 0000000..52916b4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/gic.txt
-@@ -0,0 +1,55 @@
-+* ARM Generic Interrupt Controller
-+
-+ARM SMP cores are often associated with a GIC, providing per processor
-+interrupts (PPI), shared processor interrupts (SPI) and software
-+generated interrupts (SGI).
-+
-+Primary GIC is attached directly to the CPU and typically has PPIs and SGIs.
-+Secondary GICs are cascaded into the upward interrupt controller and do not
-+have PPIs or SGIs.
-+
-+Main node required properties:
-+
-+- compatible : should be one of:
-+	"arm,cortex-a9-gic"
-+	"arm,arm11mp-gic"
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source.  The type shall be a <u32> and the value shall be 3.
-+
-+  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
-+  interrupts.
-+
-+  The 2nd cell contains the interrupt number for the interrupt type.
-+  SPI interrupts are in the range [0-987].  PPI interrupts are in the
-+  range [0-15].
-+
-+  The 3rd cell is the flags, encoded as follows:
-+	bits[3:0] trigger type and level flags.
-+		1 = low-to-high edge triggered
-+		2 = high-to-low edge triggered
-+		4 = active high level-sensitive
-+		8 = active low level-sensitive
-+	bits[15:8] PPI interrupt cpu mask.  Each bit corresponds to each of
-+	the 8 possible cpus attached to the GIC.  A bit set to '1' indicated
-+	the interrupt is wired to that CPU.  Only valid for PPI interrupts.
-+
-+- reg : Specifies base physical address(s) and size of the GIC registers. The
-+  first region is the GIC distributor register base and size. The 2nd region is
-+  the GIC cpu interface register base and size.
-+
-+Optional
-+- interrupts	: Interrupt source of the parent interrupt controller. Only
-+  present on secondary GICs.
-+
-+Example:
-+
-+	intc: interrupt-controller at fff11000 {
-+		compatible = "arm,cortex-a9-gic";
-+		#interrupt-cells = <3>;
-+		#address-cells = <1>;
-+		interrupt-controller;
-+		reg = <0xfff11000 0x1000>,
-+		      <0xfff10100 0x100>;
-+	};
-+
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 6fbe1db..3e67970 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -29,6 +29,9 @@
- #include <linux/cpu_pm.h>
- #include <linux/cpumask.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
- #include <linux/irqdomain.h>
- 
- #include <asm/irq.h>
-@@ -518,7 +521,33 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
- }
- #endif
- 
-+#ifdef CONFIG_OF
-+static int gic_irq_domain_dt_translate(struct irq_domain *d,
-+				       struct device_node *controller,
-+				       const u32 *intspec, unsigned int intsize,
-+				       unsigned long *out_hwirq, unsigned int *out_type)
-+{
-+	if (d->of_node != controller)
-+		return -EINVAL;
-+	if (intsize < 3)
-+		return -EINVAL;
-+
-+	/* Get the interrupt number and add 16 to skip over SGIs */
-+	*out_hwirq = intspec[1] + 16;
-+
-+	/* For SPIs, we need to add 16 more to get the GIC irq ID number */
-+	if (!intspec[0])
-+		*out_hwirq += 16;
-+
-+	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
-+	return 0;
-+}
-+#endif
-+
- const struct irq_domain_ops gic_irq_domain_ops = {
-+#ifdef CONFIG_OF
-+	.dt_translate = gic_irq_domain_dt_translate,
-+#endif
- };
- 
- void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
-@@ -606,3 +635,35 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	writel_relaxed(map << 16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
- }
- #endif
-+
-+#ifdef CONFIG_OF
-+static int gic_cnt __initdata = 0;
-+
-+int __init gic_of_init(struct device_node *node, struct device_node *parent)
-+{
-+	void __iomem *cpu_base;
-+	void __iomem *dist_base;
-+	int irq;
-+	struct irq_domain *domain = &gic_data[gic_cnt].domain;
-+
-+	if (WARN_ON(!node))
-+		return -ENODEV;
-+
-+	dist_base = of_iomap(node, 0);
-+	WARN(!dist_base, "unable to map gic dist registers\n");
-+
-+	cpu_base = of_iomap(node, 1);
-+	WARN(!cpu_base, "unable to map gic cpu registers\n");
-+
-+	domain->of_node = of_node_get(node);
-+
-+	gic_init(gic_cnt, 16, dist_base, cpu_base);
-+
-+	if (parent) {
-+		irq = irq_of_parse_and_map(node, 0);
-+		gic_cascade_irq(gic_cnt, irq);
-+	}
-+	gic_cnt++;
-+	return 0;
-+}
-+#endif
-diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
-index ade84a4..1a776a1 100644
---- a/arch/arm/include/asm/hardware/gic.h
-+++ b/arch/arm/include/asm/hardware/gic.h
-@@ -39,6 +39,7 @@ extern void __iomem *gic_cpu_base_addr;
- extern struct irq_chip gic_arch_extn;
- 
- void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
-+int gic_of_init(struct device_node *node, struct device_node *parent);
- void gic_secondary_init(unsigned int);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
--- 
-1.7.5.4
+	Arnd
