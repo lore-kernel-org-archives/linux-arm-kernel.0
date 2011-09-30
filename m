@@ -1,48 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Sep 2011 09:34:45 +0100
-Subject: [PATCH] arm: proc-v7: pc phy addresses before disable MMU
-In-Reply-To: <4E8555A5.9090304@stericsson.com>
-References: <1316851370-7284-1-git-send-email-per.forlin@stericsson.com>
-	<20110924081342.GA2639@mwesterb-mobl.ger.corp.intel.com>
-	<4E7DA3C0.7000208@stericsson.com>
-	<20110924110024.GA20044@e102144-lin.cambridge.arm.com>
-	<4E7DD34E.3060402@stericsson.com>
-	<20110924130202.GF17169@n2100.arm.linux.org.uk>
-	<4E8555A5.9090304@stericsson.com>
-Message-ID: <20110930083445.GA3895@e102144-lin.cambridge.arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 30 Sep 2011 16:44:33 +0800
+Subject: [PATCH v3] ARM: cache-l2x0: add resume entry for l2 in secure mode
+In-Reply-To: <20110930083338.GB19807@S2100-06.ap.freescale.net>
+References: <1317353481-28723-1-git-send-email-Barry.Song@csr.com>
+	<20110930083338.GB19807@S2100-06.ap.freescale.net>
+Message-ID: <CAGsJ_4zUL-6VzifctuDTe=jF-2FzjbkD10VfR=hC8ZDaFMiOFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Per,
+2011/9/30 Shawn Guo <shawn.guo@freescale.com>:
+> On Thu, Sep 29, 2011 at 08:31:21PM -0700, Barry Song wrote:
+>> From: Barry Song <Baohua.Song@csr.com>
+>>
+>> we save the l2x0 registers at the first initialization, and platform codes
+>> can get them to restore l2x0 status after wakeup.
+>>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>> ?-v3:
+>> ?save PREFETCH_CTRL and POWER_CTRL according to revision;
+>> ?save l2x0 physical address so that asm codes can use.
+>
+> On imx6q:
+>
+> Tested-by: Shawn Guo <shawn.guo@linaro.org>
 
-On Fri, Sep 30, 2011 at 06:37:41AM +0100, Per F?rlin wrote:
-> On 09/24/2011 03:02 PM, Russell King - ARM Linux wrote:
-> > On Sat, Sep 24, 2011 at 02:55:42PM +0200, Per F?rlin wrote:
-> >> On 09/24/2011 01:00 PM, Will Deacon wrote:
-> >>> On Sat, Sep 24, 2011 at 10:32:48AM +0100, Per F?rlin wrote:
-> >>>> I am trying to figure out how I can get the value of PHYS_OFFSET in assembler code (proc-v7.S).
-> >>>> I guess I could use the value calculated in arch/arm/kernel.head.S but wouldn't that make
-> >>>> this patch dependent on CONFIG_ARM_PATCH_PHYS_VIRT?
-> >>>
-> >>> Wouldn't we just be better off passing a physical address to cpu_v7_reset
-> >>> instead?
-> >>>
-> >> Good point! I'm fine with that.
-> > 
-> > Alternatively, call it using the phys address.
-> I changed the code to use a label instead of the ARM specific instruction offset +4. A few more lines but the intention is that it should work with both ARM and THUMB. I'm in favour of Russell's idea of setting pc to physical before calling cpu_reset().
->       /* Go to physical addresses to be ready for MMU disable */
->       asm("ADR r1, pc_phy_here \n\t"
->           "sub r1, %0 \n\t"
->           "mov pc, r1 \n\t"
->           "pc_phy_here: \n\t"
->           : :"r" (PAGE_OFFSET - PHYS_OFFSET) : "r1", "cc");
+Shawn, Thanks.
 
-I'm not sure why all of this is necessary. Take a look at my kexec patches
-here:
+>
+> One minor comment below.
+>
+>>
+>> ?arch/arm/include/asm/hardware/cache-l2x0.h | ? 23 +++++
+>> ?arch/arm/include/asm/outercache.h ? ? ? ? ?| ? ?7 ++
+>> ?arch/arm/kernel/asm-offsets.c ? ? ? ? ? ? ?| ? 12 +++
+>> ?arch/arm/mm/cache-l2x0.c ? ? ? ? ? ? ? ? ? | ?129 +++++++++++++++++++++++++--
+>> ?4 files changed, 161 insertions(+), 10 deletions(-)
+>
+> [... ]
+>
+>> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+>> index 0d85d22..3f9b998 100644
+>> --- a/arch/arm/mm/cache-l2x0.c
+>> +++ b/arch/arm/mm/cache-l2x0.c
+>> @@ -33,6 +33,14 @@ static DEFINE_SPINLOCK(l2x0_lock);
+>> ?static uint32_t l2x0_way_mask; ? ? ? /* Bitmask of active ways */
+>> ?static uint32_t l2x0_size;
+>>
+>> +struct l2x0_regs l2x0_saved_regs;
+>> +
+> Can we add a declaration of l2x0_saved_regs in cache-l2x0.h, so that
+> platform code does not need to declare it individually?
 
-http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/kexec-mmu-off
+it could be ok. if the platform codes are in c after MMU on, it can be
+useful. but people might be able to call outer_resume() in c directly.
+then it doesn't need the declaration as well.
+anyway, we can add it for future possible use. v4 soon.
 
-The interesting bit is __arm_machine_reset in kernel/process.c
-
-Will
+-barry
