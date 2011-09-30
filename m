@@ -1,63 +1,44 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 30 Sep 2011 16:44:33 +0800
-Subject: [PATCH v3] ARM: cache-l2x0: add resume entry for l2 in secure mode
-In-Reply-To: <20110930083338.GB19807@S2100-06.ap.freescale.net>
-References: <1317353481-28723-1-git-send-email-Barry.Song@csr.com>
-	<20110930083338.GB19807@S2100-06.ap.freescale.net>
-Message-ID: <CAGsJ_4zUL-6VzifctuDTe=jF-2FzjbkD10VfR=hC8ZDaFMiOFw@mail.gmail.com>
+From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
+Date: Fri, 30 Sep 2011 11:01:10 +0200
+Subject: [PATCH] Add platform driver support to the CS890x driver
+In-Reply-To: <20110928083048.GA15311@glitch.intra.local>
+References: <1315390967-6683-1-git-send-email-jaccon.bastiaansen@gmail.com>
+	<20110907125047.GU28816@pengutronix.de>
+	<CAGzjT4f3VDL-rDzup4kSc11eCdhR9s7fxf8RYNjEZmK9Rk50Cw@mail.gmail.com>
+	<20110910141244.GQ28816@pengutronix.de>
+	<CAGzjT4f2agA30TGb8XFSRu57=--qyBt=bU5QWVTmU6LAGmwM8A@mail.gmail.com>
+	<20110911185312.GD28624@pengutronix.de>
+	<CAGzjT4ce0gZ2e6cM1PfUb9JkZ=52PUCjPz1C9qjjRYxgSJckbQ@mail.gmail.com>
+	<20110928083048.GA15311@glitch.intra.local>
+Message-ID: <CAGzjT4fkjs7j=a0P=EcPcx-KJpZsMy=cmpYd2STO3Mk8yhoT_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/30 Shawn Guo <shawn.guo@freescale.com>:
-> On Thu, Sep 29, 2011 at 08:31:21PM -0700, Barry Song wrote:
->> From: Barry Song <Baohua.Song@csr.com>
->>
->> we save the l2x0 registers at the first initialization, and platform codes
->> can get them to restore l2x0 status after wakeup.
->>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> ---
->> ?-v3:
->> ?save PREFETCH_CTRL and POWER_CTRL according to revision;
->> ?save l2x0 physical address so that asm codes can use.
->
-> On imx6q:
->
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+Hello Domenico,
 
-Shawn, Thanks.
-
+2011/9/28 Domenico Andreoli <cavokz@gmail.com>:
+> Hi Jaccon,
 >
-> One minor comment below.
->
+> On Mon, Sep 12, 2011 at 12:52:52PM +0200, Jaccon Bastiaansen wrote:
 >>
->> ?arch/arm/include/asm/hardware/cache-l2x0.h | ? 23 +++++
->> ?arch/arm/include/asm/outercache.h ? ? ? ? ?| ? ?7 ++
->> ?arch/arm/kernel/asm-offsets.c ? ? ? ? ? ? ?| ? 12 +++
->> ?arch/arm/mm/cache-l2x0.c ? ? ? ? ? ? ? ? ? | ?129 +++++++++++++++++++++++++--
->> ?4 files changed, 161 insertions(+), 10 deletions(-)
+>> Ok, so you would like to see the #ifdefs for the IXDP2351, IXDP2X01,
+>> QQ2440 and MX31ADS in the cs890x driver replaced by platform_device
+>> definitions in the platform specific code of those platforms (in the
+>> same way as I have done for the i.MX21ADS platform)? Is this correct?
 >
-> [... ]
+> Feel free to completely dump the QQ2440 thing, the QQ2440 board support
+> is not in mainline and will not until it can be implemented mostly with
+> DT, I guess. ?At that time I will be happy to use your platform device
+> conversion - with the OF initialization that sombody will write ;)
 >
->> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
->> index 0d85d22..3f9b998 100644
->> --- a/arch/arm/mm/cache-l2x0.c
->> +++ b/arch/arm/mm/cache-l2x0.c
->> @@ -33,6 +33,14 @@ static DEFINE_SPINLOCK(l2x0_lock);
->> ?static uint32_t l2x0_way_mask; ? ? ? /* Bitmask of active ways */
->> ?static uint32_t l2x0_size;
->>
->> +struct l2x0_regs l2x0_saved_regs;
->> +
-> Can we add a declaration of l2x0_saved_regs in cache-l2x0.h, so that
-> platform code does not need to declare it individually?
+> I will test it.
+>
+> cheers,
+> Domenico
+>
 
-it could be ok. if the platform codes are in c after MMU on, it can be
-useful. but people might be able to call outer_resume() in c directly.
-then it doesn't need the declaration as well.
-anyway, we can add it for future possible use. v4 soon.
 
--barry
+This patch does what you describe and removes the QQ2440 board support.
+
+Regards,
+  Jaccon
