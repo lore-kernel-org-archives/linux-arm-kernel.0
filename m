@@ -1,25 +1,153 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 30 Sep 2011 14:45:13 +0530
-Subject: [PATCH 7/8] OMAP4: clock: Add CPU local timer clock node.
-In-Reply-To: <CAKnu2Mp4QnQPwcGJCrfMqS6VcfvvvAxginjJkLG1mPLO0WJBUw@mail.gmail.com>
-References: <1315459327-3285-1-git-send-email-santosh.shilimkar@ti.com>
-	<1315459327-3285-8-git-send-email-santosh.shilimkar@ti.com>
-	<CAKnu2Mp4QnQPwcGJCrfMqS6VcfvvvAxginjJkLG1mPLO0WJBUw@mail.gmail.com>
-Message-ID: <CAMQu2gyBq61jcP1sLDEs8+zGfdAa6Pur1fSec9Wfzs48CX5zjA@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 30 Sep 2011 11:14:31 +0200 (CEST)
+Subject: [PATCH v3 1/2][media] Add code to enable/disable ISI_MCK clock.
+In-Reply-To: <1316664661-11383-1-git-send-email-josh.wu@atmel.com>
+References: <1316664661-11383-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <Pine.LNX.4.64.1109301105480.1888@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 3:00 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> 2011/9/8 Santosh Shilimkar <santosh.shilimkar@ti.com>:
->
->> Local timer clock is sourced from the CPU clock and hence changes
->> along with CPU clock. These per CPU local timers are used as
->> clock-events, so they need to be reconfigured on CPU frequency
->> change as part of CPUfreq governor.
->
-> This requires patch 6956/2 right?
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6956/2
->
-> Can I add your Tested-by: to the patch as well?
->
-Sure.
+On Thu, 22 Sep 2011, Josh Wu wrote:
+
+> This patch add code to enable/disable ISI_MCK clock when add/remove soc 
+> camera device.it also set ISI_MCK frequence before using it.
+
+Ok, the fact, that noone more comments on the clk API use in this patch 
+confirms my impression, that it's now mostly done right:-) But, as I 
+mentioned in my reply to patch 2/2, I think, you shouldn't be getting and 
+manipulating isi_mck unconditionally in this driver.
+
+Actually, I think, this code
+
++	/* ISI_MCK, which is provided by programmable clock(PCK1) */
++	CLKDEV_CON_DEV_ID("isi_mck", "atmel_isi.0", &pck1),
+
+in your other patch (sorry for cross-referencing), isn't quite correct. 
+This is not an ISI specific clock, this is a PCK1 clock, which might as 
+well be used for ISI, but can also be used for a different purpose. At 
+least this doesn't seem a generic sam9g45 feature to me. You, probably, 
+want to move this clock lookup registration to your board (sam9g45ek) 
+file, which does indeed wire PCK1 to the camera sensor, installed on it.
+
+Thanks
+Guennadi
+
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>  drivers/media/video/atmel-isi.c |   30 ++++++++++++++++++++++++++++--
+>  include/media/atmel-isi.h       |    2 ++
+>  2 files changed, 30 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
+> index 7b89f00..888234a 100644
+> --- a/drivers/media/video/atmel-isi.c
+> +++ b/drivers/media/video/atmel-isi.c
+> @@ -90,7 +90,10 @@ struct atmel_isi {
+>  	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
+>  
+>  	struct completion		complete;
+> +	/* ISI peripherial clock */
+>  	struct clk			*pclk;
+> +	/* ISI_MCK, provided by Programmable clock */
+> +	struct clk			*mck;
+>  	unsigned int			irq;
+>  
+>  	struct isi_platform_data	*pdata;
+> @@ -763,6 +766,12 @@ static int isi_camera_add_device(struct soc_camera_device *icd)
+>  	if (ret)
+>  		return ret;
+>  
+> +	ret = clk_enable(isi->mck);
+> +	if (ret) {
+> +		clk_disable(isi->pclk);
+> +		return ret;
+> +	}
+> +
+>  	isi->icd = icd;
+>  	dev_dbg(icd->parent, "Atmel ISI Camera driver attached to camera %d\n",
+>  		 icd->devnum);
+> @@ -776,6 +785,7 @@ static void isi_camera_remove_device(struct soc_camera_device *icd)
+>  
+>  	BUG_ON(icd != isi->icd);
+>  
+> +	clk_disable(isi->mck);
+>  	clk_disable(isi->pclk);
+>  	isi->icd = NULL;
+>  
+> @@ -897,6 +907,7 @@ static int __devexit atmel_isi_remove(struct platform_device *pdev)
+>  			isi->fb_descriptors_phys);
+>  
+>  	iounmap(isi->regs);
+> +	clk_put(isi->mck);
+>  	clk_put(isi->pclk);
+>  	kfree(isi);
+>  
+> @@ -915,7 +926,7 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+>  	struct isi_platform_data *pdata;
+>  
+>  	pdata = dev->platform_data;
+> -	if (!pdata || !pdata->data_width_flags) {
+> +	if (!pdata || !pdata->data_width_flags || !pdata->isi_mck_hz) {
+>  		dev_err(&pdev->dev,
+>  			"No config available for Atmel ISI\n");
+>  		return -EINVAL;
+> @@ -944,6 +955,19 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+>  	INIT_LIST_HEAD(&isi->video_buffer_list);
+>  	INIT_LIST_HEAD(&isi->dma_desc_head);
+>  
+> +	/* Get ISI_MCK, which is provided by Programmable clock */
+> +	isi->mck = clk_get(dev, "isi_mck");
+> +	if (IS_ERR(isi->mck)) {
+> +		dev_err(dev, "Failed to get isi_mck\n");
+> +		ret = PTR_ERR(isi->mck);
+> +		goto err_alloc_descriptors;
+> +	}
+> +
+> +	/* Set ISI_MCK's frequency, it should be faster than pixel clock */
+> +	ret = clk_set_rate(isi->mck, pdata->isi_mck_hz);
+> +	if (ret < 0)
+> +		goto err_set_mck_rate;
+> +
+>  	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
+>  				sizeof(struct fbd) * MAX_BUFFER_NUM,
+>  				&isi->fb_descriptors_phys,
+> @@ -951,7 +975,7 @@ static int __devinit atmel_isi_probe(struct platform_device *pdev)
+>  	if (!isi->p_fb_descriptors) {
+>  		ret = -ENOMEM;
+>  		dev_err(&pdev->dev, "Can't allocate descriptors!\n");
+> -		goto err_alloc_descriptors;
+> +		goto err_set_mck_rate;
+>  	}
+>  
+>  	for (i = 0; i < MAX_BUFFER_NUM; i++) {
+> @@ -1013,6 +1037,8 @@ err_alloc_ctx:
+>  			sizeof(struct fbd) * MAX_BUFFER_NUM,
+>  			isi->p_fb_descriptors,
+>  			isi->fb_descriptors_phys);
+> +err_set_mck_rate:
+> +	clk_put(isi->mck);
+>  err_alloc_descriptors:
+>  	kfree(isi);
+>  err_alloc_isi:
+> diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
+> index 26cece5..a0229a6 100644
+> --- a/include/media/atmel-isi.h
+> +++ b/include/media/atmel-isi.h
+> @@ -114,6 +114,8 @@ struct isi_platform_data {
+>  	u32 data_width_flags;
+>  	/* Using for ISI_CFG1 */
+>  	u32 frate;
+> +	/* Using for ISI_MCK, provided by Programmable clock */
+> +	u32 isi_mck_hz;
+>  };
+>  
+>  #endif /* __ATMEL_ISI_H__ */
+> -- 
+> 1.6.3.3
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
