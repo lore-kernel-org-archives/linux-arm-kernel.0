@@ -1,24 +1,31 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 30 Sep 2011 11:49:47 +0100
-Subject: [PATCH 2/9] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <4E85768C.6050601@ti.com>
-References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-3-git-send-email-rnayak@ti.com>
-	<20110927121003.GB4289@opensource.wolfsonmicro.com>
-	<4E81E224.2070408@ti.com>
-	<20110927150511.GM4289@opensource.wolfsonmicro.com>
-	<4E854532.6080605@ti.com> <4E85768C.6050601@ti.com>
-Message-ID: <20110930104947.GF2085@sirena.org.uk>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Fri, 30 Sep 2011 16:30:36 +0530
+Subject: [PATCH v6 00/16] OMAP2+: UART: Runtime adaptation + cleanup
+Message-ID: <1317380436-548-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 09:58:04AM +0200, Cousson, Benoit wrote:
+Converting uart driver to adapt to pm runtime API's.
+Code re-org + cleanup.
+Moving some functionality from serial.c to omap-serial.c
 
-> I think as well that we should avoid considering a regulator with
-> several outputs. I saw the same pattern used for the clock binding
-> in DT as well.
-
-This binding is for the consumer side, not the producer side.  A binding
-which restricted us to a single consumer per regulator would obviously
-not work for real systems.
+Changes involves:
+================
+1.) Cleaning up certain uart calls from sram_idle func.
+2.) Removed all types of uart clock handling code from serial.c
+3.) Using hwmod_mux API enable wakeup capability for uart pad during
+   hwmod_idle state i.e., when uart clocks are disabled we can enable
+   io-pad wakeup capability for uart if mux_data is available for
+   given uart. Also during during resume from idle call to uart we need
+   to enable clocks back conditionally and this can be done only when io-pad
+   wakeup event bit is set for uart_rx pad. So we need a hwmod API
+   which can probe the uart pad and let us know whether a uart wakeup
+   happened. So omap_hmwod_pad_wakeup_status API is added to meet this
+   requirement.
+3.) Adapted omap-serial driver to use runtime API's.
+4.) Modify serial_init calls to accept uart parameters from board file.
+    Like dma_usage, rx_timeout, dma_rx_pollrate, auto_suspend_timeout etc.
+5.) Use the omap_prm driver with irq_chaining to wake up uart after clocks are
+    cut.
+	
+Patch series is based on 3.1.0-rc4 + omap_device fixes.
