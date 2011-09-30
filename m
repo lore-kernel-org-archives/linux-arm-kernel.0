@@ -1,29 +1,52 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 29 Sep 2011 21:34:51 -0400 (EDT)
-Subject: [PATCH] ARM: realview-eb11mp: fix map_desc alignment
-In-Reply-To: <1317343578-5307-1-git-send-email-robherring2@gmail.com>
-References: <4E84E0CA.2050905@gmail.com>
-	<1317343578-5307-1-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.02.1109292134060.9106@xanadu.home>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 30 Sep 2011 10:02:10 +0800
+Subject: [PATCH] ARM: localtimer: add header linux/errno.h explicitly
+In-Reply-To: <1316798545-21128-1-git-send-email-shawn.guo@linaro.org>
+References: <1316798545-21128-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110930020208.GA19807@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Sep 2011, Rob Herring wrote:
+Hi Russell,
 
-> From: Rob Herring <rob.herring@calxeda.com>
+Do you have any comment on this patch?  Otherwise, I will put it into
+patch tracker.
+
+Regards,
+Shawn
+
+On Sat, Sep 24, 2011 at 01:22:25AM +0800, Shawn Guo wrote:
+> Per the text in  Documentation/SubmitChecklist as below, we should
+> explicitly have header linux/errno.h in localtimer.h for ENXIO
+> reference.
 > 
-> REALVIEW_EB11MP_GIC_CPU_BASE is not 4KB aligned which causes an
-> overlapping mapping. Use REALVIEW_EB11MP_SCU_BASE instead which is
-> aligned.
+> 1: If you use a facility then #include the file that defines/declares
+>    that facility.  Don't depend on other header files pulling in ones
+>    that you use.
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Otherwise, we may run into some compiling error like the following one,
+> if any file includes localtimer.h without CONFIG_LOCAL_TIMERS defined.
+> 
+>   arch/arm/include/asm/localtimer.h: In function ?local_timer_setup?:
+>   arch/arm/include/asm/localtimer.h:53:10: error: ?ENXIO? undeclared (first use in this function)
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
-> Nico,
+>  arch/arm/include/asm/localtimer.h |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> Here's another one. I visually checked the remaining Realview platforms and
-> think they are fine.
-
-Thanks.
-
-
-Nicolas
+> diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+> index 080d74f..698ff73 100644
+> --- a/arch/arm/include/asm/localtimer.h
+> +++ b/arch/arm/include/asm/localtimer.h
+> @@ -48,6 +48,8 @@ int local_timer_setup(struct clock_event_device *);
+>  
+>  #else
+>  
+> +#include <linux/errno.h>
+> +
+>  static inline int local_timer_setup(struct clock_event_device *evt)
+>  {
+>  	return -ENXIO;
+> -- 
+> 1.7.4.1
