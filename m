@@ -1,58 +1,38 @@
-From: per.forlin@stericsson.com (=?ISO-8859-1?Q?Per_F=F6rlin?=)
-Date: Fri, 30 Sep 2011 11:34:06 +0200
-Subject: [PATCH] arm: proc-v7: pc phy addresses before disable MMU
-In-Reply-To: <20110930083445.GA3895@e102144-lin.cambridge.arm.com>
-References: <1316851370-7284-1-git-send-email-per.forlin@stericsson.com>
-	<20110924081342.GA2639@mwesterb-mobl.ger.corp.intel.com>
-	<4E7DA3C0.7000208@stericsson.com>
-	<20110924110024.GA20044@e102144-lin.cambridge.arm.com>
-	<4E7DD34E.3060402@stericsson.com>
-	<20110924130202.GF17169@n2100.arm.linux.org.uk>
-	<4E8555A5.9090304@stericsson.com>
-	<20110930083445.GA3895@e102144-lin.cambridge.arm.com>
-Message-ID: <4E858D0E.3000104@stericsson.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 30 Sep 2011 15:04:45 +0530
+Subject: [PATCH 8/9] regulator: helper to extract regulator node based
+	on supply name
+In-Reply-To: <20110928122628.GF3279@opensource.wolfsonmicro.com>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-9-git-send-email-rnayak@ti.com>
+	<20110927122155.GE4289@opensource.wolfsonmicro.com>
+	<4E81E281.505@ti.com>
+	<20110927185913.GU4289@opensource.wolfsonmicro.com>
+	<4E82D63A.7030207@ti.com>
+	<20110928122628.GF3279@opensource.wolfsonmicro.com>
+Message-ID: <4E858D35.50903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2011 10:34 AM, Will Deacon wrote:
-> Hi Per,
-> 
-> On Fri, Sep 30, 2011 at 06:37:41AM +0100, Per F?rlin wrote:
->> On 09/24/2011 03:02 PM, Russell King - ARM Linux wrote:
->>> On Sat, Sep 24, 2011 at 02:55:42PM +0200, Per F?rlin wrote:
->>>> On 09/24/2011 01:00 PM, Will Deacon wrote:
->>>>> On Sat, Sep 24, 2011 at 10:32:48AM +0100, Per F?rlin wrote:
->>>>>> I am trying to figure out how I can get the value of PHYS_OFFSET in assembler code (proc-v7.S).
->>>>>> I guess I could use the value calculated in arch/arm/kernel.head.S but wouldn't that make
->>>>>> this patch dependent on CONFIG_ARM_PATCH_PHYS_VIRT?
->>>>>
->>>>> Wouldn't we just be better off passing a physical address to cpu_v7_reset
->>>>> instead?
->>>>>
->>>> Good point! I'm fine with that.
->>>
->>> Alternatively, call it using the phys address.
->> I changed the code to use a label instead of the ARM specific instruction offset +4. A few more lines but the intention is that it should work with both ARM and THUMB. I'm in favour of Russell's idea of setting pc to physical before calling cpu_reset().
->>       /* Go to physical addresses to be ready for MMU disable */
->>       asm("ADR r1, pc_phy_here \n\t"
->>           "sub r1, %0 \n\t"
->>           "mov pc, r1 \n\t"
->>           "pc_phy_here: \n\t"
->>           : :"r" (PAGE_OFFSET - PHYS_OFFSET) : "r1", "cc");
-> 
-> I'm not sure why all of this is necessary. Take a look at my kexec patches
-> here:
-> 
-> http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/kexec-mmu-off
-> 
-> The interesting bit is __arm_machine_reset in kernel/process.c
-> 
-/* Switch to the identity mapping. */
-phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
-phys_reset(reset_args->reset_code_phys);
-Yes this is definitely how it should be done. My mind was stuck in the assembler code.
+On Wednesday 28 September 2011 05:56 PM, Mark Brown wrote:
+> On Wed, Sep 28, 2011 at 10:09:30AM +0200, Cousson, Benoit wrote:
+>> On 9/27/2011 8:59 PM, Mark Brown wrote:
+>
+>>> I'm not sure how this should work in a device tree world, I'd *hope*
+>>> we'd get a device tree node for the CPU and could then just make this a
+>>> regular consumer thing but then the cpufreq drivers would need to be
+>>> updated to make use of it.  The only reason we allow null devices right
+>>> now is the fact that cpufreq doesn't have a struct device it can use.
+>
+>> That's why we do have a MPU node in OMAP dts, in order to build an
+>> omap_device that will be mainly used for the DVFS on the MPU.
+>
+>> And even before DT migration, we used to build statically some
+>> omap_device to represent the various processors in the system (MPU,
+>> DSP, CortexM3...).
+>
+> Yeah, but that's very OMAP specific - we don't have that in general (in
+> fact it's the only Linux platform I'm aware of that has a device for the
+> CPU).
 
-If I get this right the bug I run into is already fixed by your kexec patches. I could simply use your patches?
-
-Thanks,
-Per
+But isn't this the right thing to do for everyone else too?
