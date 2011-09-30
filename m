@@ -1,59 +1,108 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Sep 2011 10:28:47 +0100
-Subject: [PATCH] ARM: debug: provide dummy default option for DEBUG_LL UART
-	choice
-Message-ID: <1317374927-4997-1-git-send-email-will.deacon@arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 30 Sep 2011 14:59:51 +0530
+Subject: [PATCH 9/9] regulator: map consumer regulator based on device tree
+In-Reply-To: <20110930013819.GI12606@ponder.secretlab.ca>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-10-git-send-email-rnayak@ti.com>
+	<20110930013819.GI12606@ponder.secretlab.ca>
+Message-ID: <4E858C0F.5070405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defaulting to DEBUG_ICEDCC will cause systems to hang during boot unless
-a hardware debugger is listening to the debug comms. channel.
+On Friday 30 September 2011 07:08 AM, Grant Likely wrote:
+> On Tue, Sep 27, 2011 at 03:42:52PM +0530, Rajendra Nayak wrote:
+>> Look up the regulator for a given consumer from device tree, during
+>> a regulator_get(). If not found fallback and lookup through
+>> the regulator_map_list instead.
+>>
+>> Devices can associate with one or more regulators by providing a
+>> list of phandles and supply names.
+>>
+>> For Example:
+>>          devicenode: node at 0x0 {
+>>                  ...
+>>                  ...
+>>                  vmmc-supply =<&regulator1>;
+>>                  vpll-supply =<&regulator2>;
+>>          };
+>>
+>> When a device driver calls a regulator_get, specifying the
+>> supply name, the phandle and eventually the regulator node
+>> is extracted from the device node.
+>>
+>> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
+>> ---
+>>   drivers/regulator/core.c         |   14 ++++++++++++++
+>>   include/linux/regulator/driver.h |    3 +++
+>>   2 files changed, 17 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+>> index d8e6a42..47b851c 100644
+>> --- a/drivers/regulator/core.c
+>> +++ b/drivers/regulator/core.c
+>> @@ -25,9 +25,11 @@
+>>   #include<linux/mutex.h>
+>>   #include<linux/suspend.h>
+>>   #include<linux/delay.h>
+>> +#include<linux/of.h>
+>>   #include<linux/regulator/consumer.h>
+>>   #include<linux/regulator/driver.h>
+>>   #include<linux/regulator/machine.h>
+>> +#include<linux/regulator/of_regulator.h>
+>>
+>>   #define CREATE_TRACE_POINTS
+>>   #include<trace/events/regulator.h>
+>> @@ -1155,6 +1157,7 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
+>>   	struct regulator_map *map;
+>>   	struct regulator *regulator = ERR_PTR(-ENODEV);
+>>   	const char *devname = NULL;
+>> +	struct device_node *node;
+>>   	int ret;
+>>
+>>   	if (id == NULL) {
+>> @@ -1167,6 +1170,15 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
+>>
+>>   	mutex_lock(&regulator_list_mutex);
+>>
+>> +	if (dev->of_node) {
+>> +		node = of_get_regulator(dev, id);
+>> +		if (!node)
+>> +			goto retry; /* fallback and chk regulator_map_list */
+>> +		list_for_each_entry(rdev,&regulator_list, list)
+>> +			if (node == rdev->node)
+>> +				goto found;
+>> +	}
+>> +retry:
+>>   	list_for_each_entry(map,&regulator_map_list, list) {
+>>   		/* If the mapping has a device set up it must match */
+>>   		if (map->dev_name&&
+>> @@ -2619,6 +2631,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
+>>   	rdev->reg_data = driver_data;
+>>   	rdev->owner = regulator_desc->owner;
+>>   	rdev->desc = regulator_desc;
+>> +	if (dev&&  dev->of_node)
+>> +		rdev->node = dev->of_node;
+>>   	INIT_LIST_HEAD(&rdev->consumer_list);
+>>   	INIT_LIST_HEAD(&rdev->list);
+>>   	BLOCKING_INIT_NOTIFIER_HEAD(&rdev->notifier);
+>> diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
+>> index 1a80bc7..4aebbf5 100644
+>> --- a/include/linux/regulator/driver.h
+>> +++ b/include/linux/regulator/driver.h
+>> @@ -196,6 +196,9 @@ struct regulator_dev {
+>>   	struct mutex mutex; /* consumer lock */
+>>   	struct module *owner;
+>>   	struct device dev;
+>> +#ifdef CONFIG_OF
+>> +	struct device_node *node;
+>> +#endif
+>
+> There is already an of_node pointer in regulator_dev->dev.of_node.
+> Why does another need to be added here?
 
-This patch adds a dummy UART option as the default DEBUG_LL choice which
-requires the platform to do the right thing.
+Yes, I guess it doesn't. Will remove it.
+Thanks.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
-
-This came out of discussion on the list yesterday but I thought I'd better
-post a patch before sending to Russell.
-
-Will
-
-
- arch/arm/Kconfig.debug |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 32b1be4..5bc7814 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -81,6 +81,14 @@ choice
- 	prompt "Kernel low-level debugging port"
- 	depends on DEBUG_LL
- 
-+	config DEBUG_LL_UART_NONE
-+		bool "No low-level debugging UART"
-+		help
-+		  Say Y here if your platform doesn't provide a UART option
-+		  below. This relies on your platform choosing the right UART
-+		  definition internally in order for low-level debugging to
-+		  work.
-+
- 	config DEBUG_ICEDCC
- 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
- 		help
-@@ -89,8 +97,8 @@ choice
- 		  co-processor 14. This is known to work on the ARM9 style ICE
- 		  channel and on the XScale with the PEEDI.
- 
--		  It does include a timeout to ensure that the system does not
--		  totally freeze when there is nothing connected to read.
-+		  Note that the system will appear to hang during boot if there
-+		  is nothing connected to read from the DCC.
- 
- 	config DEBUG_FOOTBRIDGE_COM1
- 		bool "Kernel low-level debugging messages via footbridge 8250 at PCI COM1"
--- 
-1.7.0.4
+>
+> g.
+>
