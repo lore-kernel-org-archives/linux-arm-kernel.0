@@ -1,27 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 30 Sep 2011 10:56:48 -0300
-Subject: [PATCH 1/2] arm/mx5: add device tree support for imx53 boards
-In-Reply-To: <1317389747-24589-2-git-send-email-shawn.guo@linaro.org>
-References: <1317389747-24589-1-git-send-email-shawn.guo@linaro.org>
-	<1317389747-24589-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAOMZO5Cn3MvvoejPDyfz4gQZipNKASZoscsZn5ahzrV240HB_A@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 30 Sep 2011 06:57:35 -0700
+Subject: ARM SoC tree: OMAP PM dependency on tip irq/core
+Message-ID: <87aa9mm8ts.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 10:35 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> From: Shawn Guo <shawn.guo@freescale.com>
->
-> It adds device tree support for imx53 boards.
->
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> ---
-> ?Documentation/devicetree/bindings/arm/fsl.txt | ? 15 ++
-> ?arch/arm/boot/dts/imx53-ard.dts ? ? ? ? ? ? ? | ?113 ++++++++++
-> ?arch/arm/boot/dts/imx53-evk.dts ? ? ? ? ? ? ? | ?120 +++++++++++
-> ?arch/arm/boot/dts/imx53-qsb.dts ? ? ? ? ? ? ? | ?125 +++++++++++
+Arnd,
 
-Can't you call it imx53-loco.dts instead so that it is consistent with
-mach-mx53_loco.c ?
+The upcoming OMAP4 PM series from Santosh[1] that we're planning to
+queue for v3.2 has a dependency[2] on a patch currently queued for v3.2
+in the irq/core branch of Thomas' tip tree[3].
+
+In the past, I noticed you merged external trees like this to solve
+dependencies.
+
+Could you pull the irq/core branch into your tree to meet this
+dependency?
+
+Thanks,
+
+Kevin
+
+[1] http://marc.info/?l=linux-omap&m=131684489920440&w=2
+[2] http://marc.info/?l=linux-omap&m=131581416908252&w=2
+[3] currently here: git://tesla.tglx.de/git/linux-2.6-tip
