@@ -1,108 +1,58 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 30 Sep 2011 14:59:51 +0530
-Subject: [PATCH 9/9] regulator: map consumer regulator based on device tree
-In-Reply-To: <20110930013819.GI12606@ponder.secretlab.ca>
-References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
-	<1317118372-17052-10-git-send-email-rnayak@ti.com>
-	<20110930013819.GI12606@ponder.secretlab.ca>
-Message-ID: <4E858C0F.5070405@ti.com>
+From: per.forlin@stericsson.com (=?ISO-8859-1?Q?Per_F=F6rlin?=)
+Date: Fri, 30 Sep 2011 11:34:06 +0200
+Subject: [PATCH] arm: proc-v7: pc phy addresses before disable MMU
+In-Reply-To: <20110930083445.GA3895@e102144-lin.cambridge.arm.com>
+References: <1316851370-7284-1-git-send-email-per.forlin@stericsson.com>
+	<20110924081342.GA2639@mwesterb-mobl.ger.corp.intel.com>
+	<4E7DA3C0.7000208@stericsson.com>
+	<20110924110024.GA20044@e102144-lin.cambridge.arm.com>
+	<4E7DD34E.3060402@stericsson.com>
+	<20110924130202.GF17169@n2100.arm.linux.org.uk>
+	<4E8555A5.9090304@stericsson.com>
+	<20110930083445.GA3895@e102144-lin.cambridge.arm.com>
+Message-ID: <4E858D0E.3000104@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 September 2011 07:08 AM, Grant Likely wrote:
-> On Tue, Sep 27, 2011 at 03:42:52PM +0530, Rajendra Nayak wrote:
->> Look up the regulator for a given consumer from device tree, during
->> a regulator_get(). If not found fallback and lookup through
->> the regulator_map_list instead.
->>
->> Devices can associate with one or more regulators by providing a
->> list of phandles and supply names.
->>
->> For Example:
->>          devicenode: node at 0x0 {
->>                  ...
->>                  ...
->>                  vmmc-supply =<&regulator1>;
->>                  vpll-supply =<&regulator2>;
->>          };
->>
->> When a device driver calls a regulator_get, specifying the
->> supply name, the phandle and eventually the regulator node
->> is extracted from the device node.
->>
->> Signed-off-by: Rajendra Nayak<rnayak@ti.com>
->> ---
->>   drivers/regulator/core.c         |   14 ++++++++++++++
->>   include/linux/regulator/driver.h |    3 +++
->>   2 files changed, 17 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
->> index d8e6a42..47b851c 100644
->> --- a/drivers/regulator/core.c
->> +++ b/drivers/regulator/core.c
->> @@ -25,9 +25,11 @@
->>   #include<linux/mutex.h>
->>   #include<linux/suspend.h>
->>   #include<linux/delay.h>
->> +#include<linux/of.h>
->>   #include<linux/regulator/consumer.h>
->>   #include<linux/regulator/driver.h>
->>   #include<linux/regulator/machine.h>
->> +#include<linux/regulator/of_regulator.h>
->>
->>   #define CREATE_TRACE_POINTS
->>   #include<trace/events/regulator.h>
->> @@ -1155,6 +1157,7 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
->>   	struct regulator_map *map;
->>   	struct regulator *regulator = ERR_PTR(-ENODEV);
->>   	const char *devname = NULL;
->> +	struct device_node *node;
->>   	int ret;
->>
->>   	if (id == NULL) {
->> @@ -1167,6 +1170,15 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
->>
->>   	mutex_lock(&regulator_list_mutex);
->>
->> +	if (dev->of_node) {
->> +		node = of_get_regulator(dev, id);
->> +		if (!node)
->> +			goto retry; /* fallback and chk regulator_map_list */
->> +		list_for_each_entry(rdev,&regulator_list, list)
->> +			if (node == rdev->node)
->> +				goto found;
->> +	}
->> +retry:
->>   	list_for_each_entry(map,&regulator_map_list, list) {
->>   		/* If the mapping has a device set up it must match */
->>   		if (map->dev_name&&
->> @@ -2619,6 +2631,8 @@ struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
->>   	rdev->reg_data = driver_data;
->>   	rdev->owner = regulator_desc->owner;
->>   	rdev->desc = regulator_desc;
->> +	if (dev&&  dev->of_node)
->> +		rdev->node = dev->of_node;
->>   	INIT_LIST_HEAD(&rdev->consumer_list);
->>   	INIT_LIST_HEAD(&rdev->list);
->>   	BLOCKING_INIT_NOTIFIER_HEAD(&rdev->notifier);
->> diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
->> index 1a80bc7..4aebbf5 100644
->> --- a/include/linux/regulator/driver.h
->> +++ b/include/linux/regulator/driver.h
->> @@ -196,6 +196,9 @@ struct regulator_dev {
->>   	struct mutex mutex; /* consumer lock */
->>   	struct module *owner;
->>   	struct device dev;
->> +#ifdef CONFIG_OF
->> +	struct device_node *node;
->> +#endif
->
-> There is already an of_node pointer in regulator_dev->dev.of_node.
-> Why does another need to be added here?
+On 09/30/2011 10:34 AM, Will Deacon wrote:
+> Hi Per,
+> 
+> On Fri, Sep 30, 2011 at 06:37:41AM +0100, Per F?rlin wrote:
+>> On 09/24/2011 03:02 PM, Russell King - ARM Linux wrote:
+>>> On Sat, Sep 24, 2011 at 02:55:42PM +0200, Per F?rlin wrote:
+>>>> On 09/24/2011 01:00 PM, Will Deacon wrote:
+>>>>> On Sat, Sep 24, 2011 at 10:32:48AM +0100, Per F?rlin wrote:
+>>>>>> I am trying to figure out how I can get the value of PHYS_OFFSET in assembler code (proc-v7.S).
+>>>>>> I guess I could use the value calculated in arch/arm/kernel.head.S but wouldn't that make
+>>>>>> this patch dependent on CONFIG_ARM_PATCH_PHYS_VIRT?
+>>>>>
+>>>>> Wouldn't we just be better off passing a physical address to cpu_v7_reset
+>>>>> instead?
+>>>>>
+>>>> Good point! I'm fine with that.
+>>>
+>>> Alternatively, call it using the phys address.
+>> I changed the code to use a label instead of the ARM specific instruction offset +4. A few more lines but the intention is that it should work with both ARM and THUMB. I'm in favour of Russell's idea of setting pc to physical before calling cpu_reset().
+>>       /* Go to physical addresses to be ready for MMU disable */
+>>       asm("ADR r1, pc_phy_here \n\t"
+>>           "sub r1, %0 \n\t"
+>>           "mov pc, r1 \n\t"
+>>           "pc_phy_here: \n\t"
+>>           : :"r" (PAGE_OFFSET - PHYS_OFFSET) : "r1", "cc");
+> 
+> I'm not sure why all of this is necessary. Take a look at my kexec patches
+> here:
+> 
+> http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/kexec-mmu-off
+> 
+> The interesting bit is __arm_machine_reset in kernel/process.c
+> 
+/* Switch to the identity mapping. */
+phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+phys_reset(reset_args->reset_code_phys);
+Yes this is definitely how it should be done. My mind was stuck in the assembler code.
 
-Yes, I guess it doesn't. Will remove it.
-Thanks.
+If I get this right the bug I run into is already fixed by your kexec patches. I could simply use your patches?
 
->
-> g.
->
+Thanks,
+Per
