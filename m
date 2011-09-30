@@ -1,40 +1,113 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 30 Sep 2011 14:27:57 -0500
-Subject: [PATCH 0/3] GIC OF bindings
-Message-ID: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
+Date: Fri, 30 Sep 2011 14:27:58 -0500
+Subject: [PATCH 1/3] irq: support domains with non-zero hwirq base
+In-Reply-To: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
+References: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1317410880-24828-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Another round of GIC devicetree support.
+Interrupt controllers can have non-zero starting value for h/w irq numbers.
+Adding support in irq_domain allows the domain hwirq numbering to match
+the interrupt controllers' numbering.
 
-This moves the tracking of the starting hwirq number into the irq domain
-code. Doing this makes hwirq == GIC interrupt ID and simplifies the GIC
-code removing irq_offset.
+As this makes looping over irqs for a domain more complicated, add loop
+iterators to iterate over all hwirqs and irqs for a domain.
 
-The full series is available here. This includes Russell's devel-stable and
-for-next branches and Nico's vmalloc branch:
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ include/linux/irqdomain.h |   16 +++++++++++++++-
+ kernel/irq/irqdomain.c    |   12 ++++++------
+ 2 files changed, 21 insertions(+), 7 deletions(-)
 
-git://git.jdl.com/software/linux-3.0.git gic-v2
-
-Tested on highbank and Realview 11MPCore qemu (2 GICs).
-
-Rob
-
-Rob Herring (3):
-  irq: support domains with non-zero hwirq base
-  ARM: gic: add irq_domain support
-  ARM: gic: add OF based initialization
-
- Documentation/devicetree/bindings/arm/gic.txt |   55 ++++++++++
- arch/arm/common/Kconfig                       |    1 +
- arch/arm/common/gic.c                         |  142 +++++++++++++++++++------
- arch/arm/include/asm/hardware/gic.h           |    5 +-
- include/linux/irqdomain.h                     |   16 +++-
- kernel/irq/irqdomain.c                        |   12 +-
- 6 files changed, 189 insertions(+), 42 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
-
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index 3ad553e..c0026b6 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -47,6 +47,7 @@ struct irq_domain_ops {
+  *            of the irq_domain is responsible for allocating the array of
+  *            irq_desc structures.
+  * @nr_irq: Number of irqs managed by the irq domain
++ * @hwirq_base: Starting number for hwirqs managed by the irq domain
+  * @ops: pointer to irq_domain methods
+  * @priv: private data pointer for use by owner.  Not touched by irq_domain
+  *        core code.
+@@ -57,6 +58,7 @@ struct irq_domain {
+ 	struct list_head list;
+ 	unsigned int irq_base;
+ 	unsigned int nr_irq;
++	unsigned int hwirq_base;
+ 	const struct irq_domain_ops *ops;
+ 	void *priv;
+ 	struct device_node *of_node;
+@@ -72,9 +74,21 @@ struct irq_domain {
+ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
+ 					     unsigned long hwirq)
+ {
+-	return d->ops->to_irq ? d->ops->to_irq(d, hwirq) : d->irq_base + hwirq;
++	if (d->ops->to_irq)
++		return d->ops->to_irq(d, hwirq);
++	if (hwirq < d->hwirq_base)
++		return NO_IRQ;
++	return d->irq_base + hwirq - d->hwirq_base;
+ }
+ 
++#define irq_domain_for_each_hwirq(d, hw) \
++	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
++
++#define irq_domain_for_each_irq(d, hw, irq) \
++	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
++	     hw < d->hwirq_base + d->nr_irq; \
++	     hw++, irq = irq_domain_to_irq(d, hw))
++
+ extern void irq_domain_add(struct irq_domain *domain);
+ extern void irq_domain_del(struct irq_domain *domain);
+ #endif /* CONFIG_IRQ_DOMAIN */
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index 84f4110..6b67057 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -20,15 +20,15 @@ static DEFINE_MUTEX(irq_domain_mutex);
+ void irq_domain_add(struct irq_domain *domain)
+ {
+ 	struct irq_data *d;
+-	int hwirq;
++	int hwirq, irq;
+ 
+ 	/*
+ 	 * This assumes that the irq_domain owner has already allocated
+ 	 * the irq_descs.  This block will be removed when support for dynamic
+ 	 * allocation of irq_descs is added to irq_domain.
+ 	 */
+-	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+-		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
++	irq_domain_for_each_irq(domain, hwirq, irq) {
++		d = irq_get_irq_data(irq);
+ 		if (d && d->domain) {
+ 			/* things are broken; just report, don't clean up */
+ 			WARN(1, "error: irq_desc already assigned to a domain");
+@@ -50,15 +50,15 @@ void irq_domain_add(struct irq_domain *domain)
+ void irq_domain_del(struct irq_domain *domain)
+ {
+ 	struct irq_data *d;
+-	int hwirq;
++	int hwirq, irq;
+ 
+ 	mutex_lock(&irq_domain_mutex);
+ 	list_del(&domain->list);
+ 	mutex_unlock(&irq_domain_mutex);
+ 
+ 	/* Clear the irq_domain assignments */
+-	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+-		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
++	irq_domain_for_each_irq(domain, hwirq, irq) {
++		d = irq_get_irq_data(irq);
+ 		d->domain = NULL;
+ 	}
+ }
 -- 
 1.7.5.4
