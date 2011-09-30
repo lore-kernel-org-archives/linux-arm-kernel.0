@@ -1,48 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 30 Sep 2011 13:43:19 -0700
-Subject: [GIT PULL] dmtimer changes for v3.2 merge window
-In-Reply-To: <201109302213.42435.arnd@arndb.de>
-References: <20110928220237.GE6324@atomide.com>
-	<201109302213.42435.arnd@arndb.de>
-Message-ID: <20110930204319.GM6324@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Sep 2011 22:49:26 +0200
+Subject: [PATCHv3 0/4] Initial support for Picochip picoXcell
+In-Reply-To: <1317050689-16417-1-git-send-email-jamie@jamieiles.com>
+References: <1317050689-16417-1-git-send-email-jamie@jamieiles.com>
+Message-ID: <201109302249.26525.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110930 12:40]:
-> On Thursday 29 September 2011, Tony Lindgren wrote:
-> > Please pull omap dmtimer changes from:
-> > 
-> > git://github.com/tmlind/linux.git dmtimer
-> > 
-> > This series completes the system timer separation from the
-> > driver like features. It also adds support for v2 ip that is
-> > available for some timers starting with omap4.
-> > 
-> > After this series arch/arm/plat-omap/dmtimer.c could be
-> > moved to live under drivers somewhere, but there is still
-> > discussion going on which features should be supported in
-> > a generic way.
-> > 
-> > This series depends on the cleanup you pulled earlier.
-> > As this series adds some new features like runtime PM suppport,
-> > I've kept it separate from cleanup.
+Hi Jamie,
+
+On Monday 26 September 2011, Jamie Iles wrote:
+> This is largely a repost of v2, but with a couple of minor changes:
+>         - Removed bootargs from board dts files
+>         - Fix up the VIC binding documentation
 > 
-> Looks really nice. I've put it into another top-level branch
-> named next/dmtimer for now. I'm open for suggestions on whether
-> I should generally push branches like this separately Linuswards
-> or better aggregate multiple standalone features into a single
-> branch. 
+> I've also added a 4th patch which removes the picoxcell specific ioremap
+> functionality.  This could either be applied/folded into the first patch
+> if Nicolas' vmalloc cleanups go in.
+> 
+> These patches can also be found in a git tree at:
+> 
+>         git://github.com/jamieiles/linux-2.6-ji.git for-next
 
-How about a branch called driver?
+I've pulled it into the next/soc branch now, and I'll also pul
+Rob's highbank patches in there.
 
-There are still lots of pieces of code under arch/arm that should
-be eventually moved to live under drivers. For example the mux
-code and most of PM code can eventually be under drivers.
+Sorry for taking so long.
 
-But before that can be done some preparation is often needed,
-the actual move to live under drivers should be handled then
-by the driver and subsystem maintainers.
+There might be a few things that break when this is merged with the
+cross-platform changes, so I'm planning right now to submit these
+rather late in the merge window to allow fixing any mismerges
+before it gets upstream.
 
-Regards,
-
-Tony
+	Arnd
