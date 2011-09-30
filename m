@@ -1,115 +1,268 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 30 Sep 2011 16:31:27 +0530
-Subject: [PATCH v6 01/16] OMAP2+: hwmod: Add API to enable IO ring wakeup.
-Message-ID: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
+Date: Fri, 30 Sep 2011 16:31:29 +0530
+Subject: [PATCH v6 03/16] OMAP2+: UART: cleanup + remove uart pm specific API
+In-Reply-To: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
+References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1317380495-584-3-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add API to enable IO pad wakeup capability based on mux dynamic pad and
-wake_up enable flag available from hwmod_mux initialization.
+In preparation to UART runtime conversion remove uart specific calls
+from pm24xx/34xx files and their definition from serial.c
+These func calls will no more be used with upcoming uart runtime design.
 
-Use the wakeup_enable flag and enable wakeup capability
-for the given pads. Wakeup capability will be enabled/disabled
-during hwmod idle transition based on whether wakeup_flag is
-set or cleared.
-
-Call the omap_hwmod_set_ioring_wakeup from hwmod_wakeup_enable/disable.
+1.) omap_uart_prepare_suspend :- can be taken care with driver suspend hooks.
+2.) omap_uart_enable_irqs :- Used to enable/disable uart irq's in suspend
+    path from PM code, this is removed as same is handled by
+    uart_suspend_port/uart_resume_port in omap-serial driver which will
+    do an port_shutdown on suspend freeing irq and port_startup on resume
+    enabling back irq.
+3.) Remove prepare_idle/resume_idle calls used to gate uart clocks.
+    UART clocks can be gated within driver using runtime funcs
+    and be woken up using irq_chaining from omap_prm driver.
+4.) Remove console_locking from idle path as clock gating is done withing
+    driver itself with runtime API.
 
 Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   59 ++++++++++++++++++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/pm24xx.c             |   18 --------
+ arch/arm/mach-omap2/pm34xx.c             |   23 ----------
+ arch/arm/mach-omap2/serial.c             |   65 ------------------------------
+ arch/arm/plat-omap/include/plat/serial.h |    4 --
+ 4 files changed, 0 insertions(+), 110 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 84cc0bd..e751dd9 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2062,6 +2062,34 @@ static int __init omap_hwmod_setup_all(void)
- core_initcall(omap_hwmod_setup_all);
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index bf089e7..a75f764 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -30,7 +30,6 @@
+ #include <linux/irq.h>
+ #include <linux/time.h>
+ #include <linux/gpio.h>
+-#include <linux/console.h>
  
- /**
-+ * omap_hwmod_set_ioring_wakeup - enable io pad wakeup flag.
-+ * @oh: struct omap_hwmod *
-+ * @set: bool value indicating to set or clear wakeup status.
-+ *
-+ * Set or Clear wakeup flag for the io_pad.
-+ */
-+static int omap_hwmod_set_ioring_wakeup(struct omap_hwmod *oh, bool set_wake)
-+{
-+	struct omap_device_pad *pad;
-+	int ret = -EINVAL, j;
-+
-+	if (oh->mux && oh->mux->enabled) {
-+		for (j = 0; j < oh->mux->nr_pads_dynamic; j++) {
-+			pad = oh->mux->pads_dynamic[j];
-+			if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
-+				if (set_wake)
-+					pad->idle |= OMAP_WAKEUP_EN;
-+				else
-+					pad->idle &= ~OMAP_WAKEUP_EN;
-+				ret = 0;
-+			}
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+/**
-  * omap_hwmod_enable - enable an omap_hwmod
-  * @oh: struct omap_hwmod *
-  *
-@@ -2393,6 +2421,35 @@ int omap_hwmod_del_initiator_dep(struct omap_hwmod *oh,
+ #include <asm/mach/time.h>
+ #include <asm/mach/irq.h>
+@@ -133,27 +132,11 @@ static void omap2_enter_full_retention(void)
+ 	if (omap_irq_pending())
+ 		goto no_sleep;
+ 
+-	/* Block console output in case it is on one of the OMAP UARTs */
+-	if (!is_suspending())
+-		if (!console_trylock())
+-			goto no_sleep;
+-
+-	omap_uart_prepare_idle(0);
+-	omap_uart_prepare_idle(1);
+-	omap_uart_prepare_idle(2);
+-
+ 	/* Jump to SRAM suspend code */
+ 	omap2_sram_suspend(sdrc_read_reg(SDRC_DLLA_CTRL),
+ 			   OMAP_SDRC_REGADDR(SDRC_DLLA_CTRL),
+ 			   OMAP_SDRC_REGADDR(SDRC_POWER));
+ 
+-	omap_uart_resume_idle(2);
+-	omap_uart_resume_idle(1);
+-	omap_uart_resume_idle(0);
+-
+-	if (!is_suspending())
+-		console_unlock();
+-
+ no_sleep:
+ 	if (omap2_pm_debug) {
+ 		unsigned long long tmp;
+@@ -317,7 +300,6 @@ static int omap2_pm_suspend(void)
+ 	mir1 = omap_readl(0x480fe0a4);
+ 	omap_writel(1 << 5, 0x480fe0ac);
+ 
+-	omap_uart_prepare_suspend();
+ 	omap2_enter_full_retention();
+ 
+ 	omap_writel(mir1, 0x480fe0a4);
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 7255d9b..344d412 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -28,7 +28,6 @@
+ #include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
+-#include <linux/console.h>
+ #include <trace/events/power.h>
+ 
+ #include <asm/suspend.h>
+@@ -379,18 +378,9 @@ void omap_sram_idle(void)
+ 		omap3_enable_io_chain();
+ 	}
+ 
+-	/* Block console output in case it is on one of the OMAP UARTs */
+-	if (!is_suspending())
+-		if (per_next_state < PWRDM_POWER_ON ||
+-		    core_next_state < PWRDM_POWER_ON)
+-			if (!console_trylock())
+-				goto console_still_active;
+-
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON) {
+ 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
+-		omap_uart_prepare_idle(2);
+-		omap_uart_prepare_idle(3);
+ 		omap2_gpio_prepare_for_idle(per_going_off);
+ 		if (per_next_state == PWRDM_POWER_OFF)
+ 				omap3_per_save_context();
+@@ -398,8 +388,6 @@ void omap_sram_idle(void)
+ 
+ 	/* CORE */
+ 	if (core_next_state < PWRDM_POWER_ON) {
+-		omap_uart_prepare_idle(0);
+-		omap_uart_prepare_idle(1);
+ 		if (core_next_state == PWRDM_POWER_OFF) {
+ 			omap3_core_save_context();
+ 			omap3_cm_save_context();
+@@ -446,8 +434,6 @@ void omap_sram_idle(void)
+ 			omap3_sram_restore_context();
+ 			omap2_sms_restore_context();
+ 		}
+-		omap_uart_resume_idle(0);
+-		omap_uart_resume_idle(1);
+ 		if (core_next_state == PWRDM_POWER_OFF)
+ 			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
+ 					       OMAP3430_GR_MOD,
+@@ -461,14 +447,8 @@ void omap_sram_idle(void)
+ 		omap2_gpio_resume_after_idle();
+ 		if (per_prev_state == PWRDM_POWER_OFF)
+ 			omap3_per_restore_context();
+-		omap_uart_resume_idle(2);
+-		omap_uart_resume_idle(3);
+ 	}
+ 
+-	if (!is_suspending())
+-		console_unlock();
+-
+-console_still_active:
+ 	/* Disable IO-PAD and IO-CHAIN wakeup */
+ 	if (omap3_has_io_wakeup() &&
+ 	    (per_next_state < PWRDM_POWER_ON ||
+@@ -531,7 +511,6 @@ static int omap3_pm_suspend(void)
+ 			goto restore;
+ 	}
+ 
+-	omap_uart_prepare_suspend();
+ 	omap3_intc_suspend();
+ 
+ 	omap_sram_idle();
+@@ -578,14 +557,12 @@ static int omap3_pm_begin(suspend_state_t state)
  {
- 	return _del_initiator_dep(oh, init_oh);
+ 	disable_hlt();
+ 	suspend_state = state;
+-	omap_uart_enable_irqs(0);
+ 	return 0;
  }
-+/**
-+ * omap_hwmod_enable_ioring_wakeup - Set wakeup flag for iopad.
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Traverse through dynamic pads, if pad is enabled then
-+ * set wakeup enable bit flag for the mux pin. Wakeup pad bit
-+ * will be set during hwmod idle transistion.
-+ * Return error if pads are not enabled or not available.
-+ */
-+int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh)
-+{
-+	/* Enable pad wake-up capability */
-+	return omap_hwmod_set_ioring_wakeup(oh, true);
-+}
-+
-+/**
-+ * omap_hwmod_disable_ioring_wakeup - Clear wakeup flag for iopad.
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Traverse through dynamic pads, if pad is enabled then
-+ * clear wakeup enable bit flag for the mux pin. Wakeup pad bit
-+ * will be set during hwmod idle transistion.
-+ * Return error if pads are not enabled or not available.
-+ */
-+int omap_hwmod_disable_ioring_wakeup(struct omap_hwmod *oh)
-+{
-+	/* Disable pad wakeup capability */
-+	return omap_hwmod_set_ioring_wakeup(oh, false);
-+}
  
- /**
-  * omap_hwmod_enable_wakeup - allow device to wake up the system
-@@ -2419,6 +2476,7 @@ int omap_hwmod_enable_wakeup(struct omap_hwmod *oh)
- 	v = oh->_sysc_cache;
- 	_enable_wakeup(oh, &v);
- 	_write_sysconfig(v, oh);
-+	omap_hwmod_enable_ioring_wakeup(oh);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
+ static void omap3_pm_end(void)
+ {
+ 	suspend_state = PM_SUSPEND_ON;
+-	omap_uart_enable_irqs(1);
+ 	enable_hlt();
+ 	return;
+ }
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 3d1c1d3..62d15ad 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -389,51 +389,6 @@ static void omap_uart_idle_timer(unsigned long data)
+ 	omap_uart_allow_sleep(uart);
+ }
  
- 	return 0;
-@@ -2449,6 +2507,7 @@ int omap_hwmod_disable_wakeup(struct omap_hwmod *oh)
- 	v = oh->_sysc_cache;
- 	_disable_wakeup(oh, &v);
- 	_write_sysconfig(v, oh);
-+	omap_hwmod_disable_ioring_wakeup(oh);
- 	spin_unlock_irqrestore(&oh->_lock, flags);
+-void omap_uart_prepare_idle(int num)
+-{
+-	struct omap_uart_state *uart;
+-
+-	list_for_each_entry(uart, &uart_list, node) {
+-		if (num == uart->num && uart->can_sleep) {
+-			omap_uart_disable_clocks(uart);
+-			return;
+-		}
+-	}
+-}
+-
+-void omap_uart_resume_idle(int num)
+-{
+-	struct omap_uart_state *uart;
+-
+-	list_for_each_entry(uart, &uart_list, node) {
+-		if (num == uart->num && uart->can_sleep) {
+-			omap_uart_enable_clocks(uart);
+-
+-			/* Check for IO pad wakeup */
+-			if (cpu_is_omap34xx() && uart->padconf) {
+-				u16 p = omap_ctrl_readw(uart->padconf);
+-
+-				if (p & OMAP3_PADCONF_WAKEUPEVENT0)
+-					omap_uart_block_sleep(uart);
+-			}
+-
+-			/* Check for normal UART wakeup */
+-			if (__raw_readl(uart->wk_st) & uart->wk_mask)
+-				omap_uart_block_sleep(uart);
+-			return;
+-		}
+-	}
+-}
+-
+-void omap_uart_prepare_suspend(void)
+-{
+-	struct omap_uart_state *uart;
+-
+-	list_for_each_entry(uart, &uart_list, node) {
+-		omap_uart_allow_sleep(uart);
+-	}
+-}
+-
+ int omap_uart_can_sleep(void)
+ {
+ 	struct omap_uart_state *uart;
+@@ -552,26 +507,6 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
+ 	WARN_ON(ret);
+ }
  
- 	return 0;
+-void omap_uart_enable_irqs(int enable)
+-{
+-	int ret;
+-	struct omap_uart_state *uart;
+-
+-	list_for_each_entry(uart, &uart_list, node) {
+-		if (enable) {
+-			pm_runtime_put_sync(&uart->pdev->dev);
+-			ret = request_threaded_irq(uart->irq, NULL,
+-						   omap_uart_interrupt,
+-						   IRQF_SHARED,
+-						   "serial idle",
+-						   (void *)uart);
+-		} else {
+-			pm_runtime_get_noresume(&uart->pdev->dev);
+-			free_irq(uart->irq, (void *)uart);
+-		}
+-	}
+-}
+-
+ static ssize_t sleep_timeout_show(struct device *dev,
+ 				  struct device_attribute *attr,
+ 				  char *buf)
+diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
+index de3b10c..fc8b60c 100644
+--- a/arch/arm/plat-omap/include/plat/serial.h
++++ b/arch/arm/plat-omap/include/plat/serial.h
+@@ -111,10 +111,6 @@ extern void omap_serial_init(void);
+ extern void omap_serial_init_port(struct omap_board_data *bdata);
+ extern int omap_uart_can_sleep(void);
+ extern void omap_uart_check_wakeup(void);
+-extern void omap_uart_prepare_suspend(void);
+-extern void omap_uart_prepare_idle(int num);
+-extern void omap_uart_resume_idle(int num);
+-extern void omap_uart_enable_irqs(int enable);
+ #endif
+ 
+ #endif
 -- 
 1.7.4.1
