@@ -1,26 +1,40 @@
-From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Fri, 30 Sep 2011 15:05:47 +0530
-Subject: [PATCH v3] ARM: cache-l2x0: add resume entry for l2 in secure mode
-In-Reply-To: <1317353481-28723-1-git-send-email-Barry.Song@csr.com>
-References: <1317353481-28723-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <CAMQu2gzc4Zx2ria+PPt6F+bWGJzjthwnooYCKGyHtm9Q=Qp1iw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 30 Sep 2011 10:38:19 +0100
+Subject: [PATCH] arm: proc-v7: pc phy addresses before disable MMU
+In-Reply-To: <4E858D0E.3000104@stericsson.com>
+References: <1316851370-7284-1-git-send-email-per.forlin@stericsson.com>
+	<20110924081342.GA2639@mwesterb-mobl.ger.corp.intel.com>
+	<4E7DA3C0.7000208@stericsson.com>
+	<20110924110024.GA20044@e102144-lin.cambridge.arm.com>
+	<4E7DD34E.3060402@stericsson.com>
+	<20110924130202.GF17169@n2100.arm.linux.org.uk>
+	<4E8555A5.9090304@stericsson.com>
+	<20110930083445.GA3895@e102144-lin.cambridge.arm.com>
+	<4E858D0E.3000104@stericsson.com>
+Message-ID: <20110930093819.GD3895@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 9:01 AM, Barry Song <Barry.Song@csr.com> wrote:
-> From: Barry Song <Baohua.Song@csr.com>
->
-> we save the l2x0 registers at the first initialization, and platform codes
-> can get them to restore l2x0 status after wakeup.
->
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
-> ?-v3:
-> ?save PREFETCH_CTRL and POWER_CTRL according to revision;
-> ?save l2x0 physical address so that asm codes can use.
->
-Thanks for the update.
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Fri, Sep 30, 2011 at 10:34:06AM +0100, Per F?rlin wrote:
+> On 09/30/2011 10:34 AM, Will Deacon wrote:
+> > I'm not sure why all of this is necessary. Take a look at my kexec patches
+> > here:
+> > 
+> > http://www.linux-arm.org/git?p=linux-2.6-wd.git;a=shortlog;h=refs/heads/kexec-mmu-off
+> > 
+> > The interesting bit is __arm_machine_reset in kernel/process.c
+> > 
+> /* Switch to the identity mapping. */
+> phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+> phys_reset(reset_args->reset_code_phys);
+> Yes this is definitely how it should be done. My mind was stuck in the assembler code.
+
+Easy mistake to make!
+
+> If I get this right the bug I run into is already fixed by your kexec patches. I could simply use your patches?
+
+Sure, I reworked them the other day so I'll post them to the list again
+soon. There are still some open problems to solve but the reset code is
+more-or-less there.
+
+Will
