@@ -1,22 +1,51 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 30 Sep 2011 12:58:03 -0600 (MDT)
-Subject: [PATCH v2] ARM: OMAP2+: clock: cleanup CPUfreq leftovers
-In-Reply-To: <1316793611-9949-1-git-send-email-khilman@ti.com>
-References: <1316793611-9949-1-git-send-email-khilman@ti.com>
-Message-ID: <alpine.DEB.2.00.1109301257100.12185@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 30 Sep 2011 20:18:48 +0100
+Subject: [RFC] Need help deciphering reboot modes!
+In-Reply-To: <20110930125725.GG3895@e102144-lin.cambridge.arm.com>
+References: <20110930125725.GG3895@e102144-lin.cambridge.arm.com>
+Message-ID: <20110930191847.GA11710@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Sep 2011, Kevin Hilman wrote:
+On Fri, Sep 30, 2011 at 01:57:25PM +0100, Will Deacon wrote:
+> As part of my kexec work, I've been looking at the machine_restart path
+> on ARM and, more specifically, the use of the reboot_mode character that
+> gets passed around and ultimately ignored.
 
-> Now that we have OPP layer, and OMAP CPUfreq driver is using it, we no
-> longer need/use the clock framework code for filling up CPUfreq
-> tables.  Remove it.
+It gets ignored because platform maintainers are a lazy bunch of people
+and don't want to write any more code than they absolutely have to.
+
+Overall, it is meant as a hint to the platform code about what reboot
+method to use.
+
+> It seems that the following mode characters are used:
 > 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> 0	-> Currently used by kexec as a dummy argument given that it is
+> 	   ignored anyway.
 
-Queued for 3.3 cleanups (to avoid potential dependency issues with which 
-of our branches is merged first) - thanks Kevin.
+No idea what that means, afaik it's never been used.
 
+> 'h'	-> The default assignment to reboot_mode and that used by
+> 	   machine_restart. For some reason, reboot_mode can also be
+> 	   overridden on the command line. I would guess that this means
+> 	   "hard".
 
-- Paul
+It does mean 'hard' and it tells platforms which have the option (the
+early ones do!) to use some hardware method to provoke the machine into
+rebooting.
+
+> 's'	-> A supported option by mioa701 (mach-pxa) and mach-s3c24xx. I
+> 	   would guess that this means "soft".
+
+This means to reboot by vectoring through the reset vector - so it is
+'soft'.
+
+> 'g'	-> A supported option by spitz and tosa (both mach-pxa). I can't
+> 	   begin to imagine what it might stand for.
+
+'gpio', using a gpio signal to cause the reboot rather than setting up
+a watchdog or something to cause it.
+
+Note that as I say above, it is only a hint - if you pass 's' for soft,
+a platform can still elect to do a hard reboot if it knows that soft
+reboots just don't work on the platform.
