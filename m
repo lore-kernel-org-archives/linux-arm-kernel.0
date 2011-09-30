@@ -1,28 +1,37 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 30 Sep 2011 13:53:10 +0200
-Subject: [PATCH 02/13] gpio/omap: Adapt GPIO driver to DT
-In-Reply-To: <4E8161C7.7020404@ti.com>
-References: <1317055821-20652-1-git-send-email-b-cousson@ti.com>
-	<1317055821-20652-3-git-send-email-b-cousson@ti.com>
-	<4E8161C7.7020404@ti.com>
-Message-ID: <4E85ADA6.2000001@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 30 Sep 2011 20:05:55 +0800
+Subject: [PATCH] arm/imx: rename MX51_MXC_INT_ATA to MX51_INT_ATA
+Message-ID: <1317384355-24481-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Second thought... I was too fast to say OK :-)
+This change is to fix the compile error below.
 
-On 9/27/2011 7:40 AM, Nayak, Rajendra wrote:
-> On Monday 26 September 2011 10:20 PM, Benoit Cousson wrote:
+  CC      arch/arm/plat-mxc/devices/platform-pata_imx.o
+arch/arm/plat-mxc/devices/platform-pata_imx.c:33:1: error: ?MX51_INT_ATA? undeclared here (not in a function)
+make[3]: *** [arch/arm/plat-mxc/devices/platform-pata_imx.o] Error 1
 
-[...]
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Sascha,
 
->> +	if (match) {
->> +		of_property_read_u32(node, "bank-width",&bank->width);
->
-> Bank width should be u32.
+This is a compile error seen on your imx-features branch.
 
-I guess you meant bank->width, and it appears that bank->width is 
-already a u32.
+ arch/arm/plat-mxc/include/mach/mx51.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Regards,
-Benoit
+diff --git a/arch/arm/plat-mxc/include/mach/mx51.h b/arch/arm/plat-mxc/include/mach/mx51.h
+index dede19a..0d4aa9e 100644
+--- a/arch/arm/plat-mxc/include/mach/mx51.h
++++ b/arch/arm/plat-mxc/include/mach/mx51.h
+@@ -311,7 +311,7 @@
+ #define MX51_MXC_INT_SIM_IPB		67
+ #define MX51_MXC_INT_SIM_DAT		68
+ #define MX51_MXC_INT_IIM		69
+-#define MX51_MXC_INT_ATA		70
++#define MX51_INT_ATA			70
+ #define MX51_MXC_INT_CCM1		71
+ #define MX51_MXC_INT_CCM2		72
+ #define MX51_MXC_INT_GPC1		73
+-- 
+1.7.4.1
