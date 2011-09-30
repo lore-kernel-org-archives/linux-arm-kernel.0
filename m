@@ -1,59 +1,48 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 30 Sep 2011 22:41:50 +0200
-Subject: [GIT PATCH] OMAP: Add initial support for DT on OMAP3 & OMAP4
-Message-ID: <4E86298E.4080007@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 30 Sep 2011 13:43:19 -0700
+Subject: [GIT PULL] dmtimer changes for v3.2 merge window
+In-Reply-To: <201109302213.42435.arnd@arndb.de>
+References: <20110928220237.GE6324@atomide.com>
+	<201109302213.42435.arnd@arndb.de>
+Message-ID: <20110930204319.GM6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+* Arnd Bergmann <arnd@arndb.de> [110930 12:40]:
+> On Thursday 29 September 2011, Tony Lindgren wrote:
+> > Please pull omap dmtimer changes from:
+> > 
+> > git://github.com/tmlind/linux.git dmtimer
+> > 
+> > This series completes the system timer separation from the
+> > driver like features. It also adds support for v2 ip that is
+> > available for some timers starting with omap4.
+> > 
+> > After this series arch/arm/plat-omap/dmtimer.c could be
+> > moved to live under drivers somewhere, but there is still
+> > discussion going on which features should be supported in
+> > a generic way.
+> > 
+> > This series depends on the cleanup you pulled earlier.
+> > As this series adds some new features like runtime PM suppport,
+> > I've kept it separate from cleanup.
+> 
+> Looks really nice. I've put it into another top-level branch
+> named next/dmtimer for now. I'm open for suggestions on whether
+> I should generally push branches like this separately Linuswards
+> or better aggregate multiple standalone features into a single
+> branch. 
 
-Please pull the initial OMAP device tree support for  v3.2.
+How about a branch called driver?
 
-Thanks,
-Benoit
+There are still lots of pieces of code under arch/arm that should
+be eventually moved to live under drivers. For example the mux
+code and most of PM code can eventually be under drivers.
 
+But before that can be done some preparation is often needed,
+the actual move to live under drivers should be handled then
+by the driver and subsystem maintainers.
 
-The following changes since commit 1c3543a34a8ce3e050d7706135bdffd5921c42f5:
-  Tony Lindgren (1):
-        Merge branch 'for_3.2/omap_device-2' of git://github.com/khilman/linux-omap-pm into dt
+Regards,
 
-are available in the git repository at:
-
-  git://gitorious.org/omap-pm/linux.git for_3.2/3_omap_devicetree
-
-Benoit Cousson (10):
-      arm/dts: Add initial device tree support for OMAP4 SoC
-      arm/dts: Add support for OMAP4 PandaBoard
-      arm/dts: Add support for OMAP4 SDP board
-      arm/dts: Add initial device tree support for OMAP3 SoC
-      arm/dts: Add support for OMAP3 Beagle board
-      OMAP2+: board-generic: Add DT support to generic board
-      OMAP2+: board-generic: Add i2c static init
-      OMAP2+: l3-noc: Add support for device-tree
-      arm/dts: OMAP4: Add a main ocp entry bound to l3-noc driver
-      arm/dts: OMAP3+: Add mpu, dsp and iva nodes
-
- Documentation/devicetree/bindings/arm/omap/dsp.txt |   14 ++
- Documentation/devicetree/bindings/arm/omap/iva.txt |   19 +++
- .../devicetree/bindings/arm/omap/l3-noc.txt        |   19 +++
- Documentation/devicetree/bindings/arm/omap/mpu.txt |   27 ++++
- arch/arm/boot/dts/omap3-beagle.dts                 |   29 ++++
- arch/arm/boot/dts/omap3.dtsi                       |   63 ++++++++
- arch/arm/boot/dts/omap4-panda.dts                  |   29 ++++
- arch/arm/boot/dts/omap4-sdp.dts                    |   29 ++++
- arch/arm/boot/dts/omap4.dtsi                       |  103 +++++++++++++
- arch/arm/mach-omap2/Kconfig                        |    8 +-
- arch/arm/mach-omap2/board-generic.c                |  156 +++++++++++++++-----
- arch/arm/mach-omap2/devices.c                      |    5 +
- arch/arm/mach-omap2/omap_l3_noc.c                  |   23 +++-
- arch/arm/mach-omap2/pm.c                           |    3 +-
- 14 files changed, 480 insertions(+), 47 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/omap/dsp.txt
- create mode 100644 Documentation/devicetree/bindings/arm/omap/iva.txt
- create mode 100644 Documentation/devicetree/bindings/arm/omap/l3-noc.txt
- create mode 100644 Documentation/devicetree/bindings/arm/omap/mpu.txt
- create mode 100644 arch/arm/boot/dts/omap3-beagle.dts
- create mode 100644 arch/arm/boot/dts/omap3.dtsi
- create mode 100644 arch/arm/boot/dts/omap4-panda.dts
- create mode 100644 arch/arm/boot/dts/omap4-sdp.dts
- create mode 100644 arch/arm/boot/dts/omap4.dtsi
+Tony
