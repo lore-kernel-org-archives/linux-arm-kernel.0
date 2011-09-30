@@ -1,394 +1,310 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 30 Sep 2011 21:55:31 +0900
-Subject: [PATCH 1/3] ARM: SAMSUNG: Moving each SoC support header files
-Message-ID: <019401cc7f70$3ca060f0$b5e122d0$%kim@samsung.com>
+Date: Fri, 30 Sep 2011 21:55:42 +0900
+Subject: [PATCH 3/3] ARM: SAMSUNG: Move S5P header files to plat-samsung
+Message-ID: <019601cc7f70$431e36a0$c95aa3e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves SoC header files for supporting each SoCs to
-plat-samsung directory. This is required to make one plat-
-directory for Samsung SoCs.
+This patch moves header files from plat-s5p to plat-samsung to
+remove plat-s5p directory to make one plat-samsung directory
+for Samsung SoCs.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c64xx/cpu.c                        |    4 ++--
- arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
- arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
- arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
- arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
- arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
- arch/arm/mach-s3c64xx/mach-real6410.c              |    2 +-
- arch/arm/mach-s3c64xx/mach-smartq5.c               |    2 +-
- arch/arm/mach-s3c64xx/mach-smartq7.c               |    2 +-
- arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2 +-
- arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
- arch/arm/mach-s3c64xx/s3c6400.c                    |    2 +-
- arch/arm/mach-s3c64xx/s3c6410.c                    |    4 ++--
- .../include/plat/exynos4.h                         |    2 +-
- .../include/plat/s3c2410.h                         |    2 +-
- .../include/plat/s3c2412.h                         |    2 +-
- .../include/plat/s3c2416.h                         |    2 +-
- .../include/plat/s3c2443.h                         |    2 +-
- .../include/plat/s3c244x.h                         |    2 +-
- .../mach => plat-samsung/include/plat}/s3c6400.h   |    2 +-
- .../mach => plat-samsung/include/plat}/s3c6410.h   |    2 +-
- .../include/plat/s5p6440.h                         |    2 +-
- .../include/plat/s5p6450.h                         |    2 +-
- .../include/plat/s5pc100.h                         |    2 +-
- .../include/plat/s5pv210.h                         |    2 +-
- 25 files changed, 27 insertions(+), 27 deletions(-)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/exynos4.h (94%)
- rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/s3c2410.h (93%)
- rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/s3c2412.h (92%)
- rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/s3c2416.h (92%)
- rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/s3c2443.h (96%)
- rename arch/arm/{plat-s3c24xx => plat-samsung}/include/plat/s3c244x.h (94%)
- rename arch/arm/{mach-s3c64xx/include/mach => plat-samsung/include/plat}/s3c6400.h (94%)
- rename arch/arm/{mach-s3c64xx/include/mach => plat-samsung/include/plat}/s3c6410.h (93%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/s5p6440.h (94%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/s5p6450.h (94%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/s5pc100.h (94%)
- rename arch/arm/{plat-s5p => plat-samsung}/include/plat/s5pv210.h (94%)
+ .../include/plat/camport.h                         |    6 +++---
+ .../{plat-s5p => plat-samsung}/include/plat/ehci.h |    6 +++---
+ .../{plat-s5p => plat-samsung}/include/plat/irqs.h |    8 ++++----
+ .../{plat-s5p => plat-samsung}/include/plat/mfc.h  |    6 +++---
+ .../include/plat/mipi_csis.h                       |    6 +++---
+ .../include/plat/regs-srom.h                       |    8 ++++----
+ .../include/plat/reset.h                           |    8 ++++----
+ .../include/plat/s5p-clock.h                       |    2 +-
+ .../include/plat/s5p-time.h                        |    2 +-
+ .../include/plat/sysmmu.h                          |    6 +++---
+ .../include/plat/system-reset.h                    |    2 +-
+ .../include/plat/usb-phy.h                         |    6 +++---
+ 12 files changed, 33 insertions(+), 33 deletions(-)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/camport.h (87%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/ehci.h (86%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/irqs.h (96%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/mfc.h (91%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/mipi_csis.h (91%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/regs-srom.h (89%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/reset.h (67%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/s5p-clock.h (96%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/s5p-time.h (94%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/sysmmu.h (96%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/system-reset.h (92%)
+ rename arch/arm/{plat-s5p => plat-samsung}/include/plat/usb-phy.h (85%)
 
-diff --git a/arch/arm/mach-s3c64xx/cpu.c b/arch/arm/mach-s3c64xx/cpu.c
-index 374e45e..f06f33c 100644
---- a/arch/arm/mach-s3c64xx/cpu.c
-+++ b/arch/arm/mach-s3c64xx/cpu.c
-@@ -33,8 +33,8 @@
- #include <plat/devs.h>
- #include <plat/clock.h>
+diff --git a/arch/arm/plat-s5p/include/plat/camport.h b/arch/arm/plat-samsung/include/plat/camport.h
+similarity index 87%
+rename from arch/arm/plat-s5p/include/plat/camport.h
+rename to arch/arm/plat-samsung/include/plat/camport.h
+index 71688c8..9db617d 100644
+--- a/arch/arm/plat-s5p/include/plat/camport.h
++++ b/arch/arm/plat-samsung/include/plat/camport.h
+@@ -8,8 +8,8 @@
+  * published by the Free Software Foundation.
+  */
  
--#include <mach/s3c6400.h>
--#include <mach/s3c6410.h>
-+#include <plat/s3c6400.h>
-+#include <plat/s3c6410.h>
+-#ifndef PLAT_S5P_CAMPORT_H_
+-#define PLAT_S5P_CAMPORT_H_ __FILE__
++#ifndef __PLAT_SAMSUNG_CAMPORT_H_
++#define __PLAT_SAMSUNG_CAMPORT_H_ __FILE__
  
- /* table of supported CPUs */
+ enum s5p_camport_id {
+ 	S5P_CAMPORT_A,
+@@ -25,4 +25,4 @@ enum s5p_camport_id {
+ int s5pv210_fimc_setup_gpio(enum s5p_camport_id id);
+ int exynos4_fimc_setup_gpio(enum s5p_camport_id id);
  
-diff --git a/arch/arm/mach-s3c64xx/mach-anw6410.c b/arch/arm/mach-s3c64xx/mach-anw6410.c
-index cb88643..d2a68d2 100644
---- a/arch/arm/mach-s3c64xx/mach-anw6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-anw6410.c
-@@ -45,7 +45,7 @@
- #include <plat/fb.h>
- #include <plat/regs-fb-v4.h>
+-#endif
++#endif /* __PLAT_SAMSUNG_CAMPORT_H */
+diff --git a/arch/arm/plat-s5p/include/plat/ehci.h b/arch/arm/plat-samsung/include/plat/ehci.h
+similarity index 86%
+rename from arch/arm/plat-s5p/include/plat/ehci.h
+rename to arch/arm/plat-samsung/include/plat/ehci.h
+index 6ae6810..c284d84 100644
+--- a/arch/arm/plat-s5p/include/plat/ehci.h
++++ b/arch/arm/plat-samsung/include/plat/ehci.h
+@@ -8,8 +8,8 @@
+  * option) any later version.
+  */
  
--#include <mach/s3c6410.h>
-+#include <plat/s3c6410.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index af0c2fe..45ae2a2 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -43,13 +43,13 @@
- #include <mach/hardware.h>
- #include <mach/map.h>
+-#ifndef __PLAT_S5P_EHCI_H
+-#define __PLAT_S5P_EHCI_H
++#ifndef __PLAT_SAMSUNG_EHCI_H
++#define __PLAT_SAMSUNG_EHCI_H __FILE__
  
--#include <mach/s3c6410.h>
- #include <mach/regs-sys.h>
- #include <mach/regs-gpio.h>
- #include <mach/regs-modem.h>
+ struct s5p_ehci_platdata {
+ 	int (*phy_init)(struct platform_device *pdev, int type);
+@@ -18,4 +18,4 @@ struct s5p_ehci_platdata {
  
- #include <mach/regs-gpio-memport.h>
+ extern void s5p_ehci_set_platdata(struct s5p_ehci_platdata *pd);
  
-+#include <plat/s3c6410.h>
- #include <plat/regs-serial.h>
- #include <plat/regs-fb-v4.h>
- #include <plat/fb.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
-index b3d93cc..61f4fde 100644
---- a/arch/arm/mach-s3c64xx/mach-hmt.c
-+++ b/arch/arm/mach-s3c64xx/mach-hmt.c
-@@ -37,7 +37,7 @@
- #include <plat/fb.h>
- #include <plat/nand.h>
- 
--#include <mach/s3c6410.h>
-+#include <plat/s3c6410.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index 527f49b..5233a27 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -32,8 +32,8 @@
- #include <mach/regs-gpio.h>
- #include <mach/regs-modem.h>
- #include <mach/regs-srom.h>
--#include <mach/s3c6410.h>
- 
-+#include <plat/s3c6410.h>
- #include <plat/adc.h>
- #include <plat/cpu.h>
- #include <plat/devs.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-ncp.c b/arch/arm/mach-s3c64xx/mach-ncp.c
-index 01c6857..0f4316a 100644
---- a/arch/arm/mach-s3c64xx/mach-ncp.c
-+++ b/arch/arm/mach-s3c64xx/mach-ncp.c
-@@ -39,7 +39,7 @@
- #include <plat/iic.h>
- #include <plat/fb.h>
- 
--#include <mach/s3c6410.h>
-+#include <plat/s3c6410.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-index 95b04b1..56b5852 100644
---- a/arch/arm/mach-s3c64xx/mach-real6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -33,8 +33,8 @@
- #include <mach/regs-gpio.h>
- #include <mach/regs-modem.h>
- #include <mach/regs-srom.h>
--#include <mach/s3c6410.h>
- 
-+#include <plat/s3c6410.h>
- #include <plat/adc.h>
- #include <plat/cpu.h>
- #include <plat/devs.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq5.c b/arch/arm/mach-s3c64xx/mach-smartq5.c
-index 342e8df..30e906b 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq5.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq5.c
-@@ -22,8 +22,8 @@
- 
- #include <mach/map.h>
- #include <mach/regs-gpio.h>
--#include <mach/s3c6410.h>
- 
-+#include <plat/s3c6410.h>
- #include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/fb.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-smartq7.c b/arch/arm/mach-s3c64xx/mach-smartq7.c
-index 5796397..9a71c2b 100644
---- a/arch/arm/mach-s3c64xx/mach-smartq7.c
-+++ b/arch/arm/mach-s3c64xx/mach-smartq7.c
-@@ -22,8 +22,8 @@
- 
- #include <mach/map.h>
- #include <mach/regs-gpio.h>
--#include <mach/s3c6410.h>
- 
-+#include <plat/s3c6410.h>
- #include <plat/cpu.h>
- #include <plat/devs.h>
- #include <plat/fb.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6400.c b/arch/arm/mach-s3c64xx/mach-smdk6400.c
-index 3cca642..fc7cb03 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6400.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6400.c
-@@ -31,7 +31,7 @@
- 
- #include <plat/regs-serial.h>
- 
--#include <mach/s3c6400.h>
-+#include <plat/s3c6400.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-index a9f3183..227f414 100644
---- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-@@ -63,7 +63,7 @@
- #include <plat/fb.h>
- #include <plat/gpio-cfg.h>
- 
--#include <mach/s3c6410.h>
-+#include <plat/s3c6410.h>
- #include <plat/clock.h>
- #include <plat/devs.h>
- #include <plat/cpu.h>
-diff --git a/arch/arm/mach-s3c64xx/s3c6400.c b/arch/arm/mach-s3c64xx/s3c6400.c
-index 5e93fe3..7a3bc32 100644
---- a/arch/arm/mach-s3c64xx/s3c6400.c
-+++ b/arch/arm/mach-s3c64xx/s3c6400.c
-@@ -38,7 +38,7 @@
- #include <plat/sdhci.h>
- #include <plat/iic-core.h>
- #include <plat/onenand-core.h>
--#include <mach/s3c6400.h>
-+#include <plat/s3c6400.h>
- 
- void __init s3c6400_map_io(void)
- {
-diff --git a/arch/arm/mach-s3c64xx/s3c6410.c b/arch/arm/mach-s3c64xx/s3c6410.c
-index 312aa6b..4117003 100644
---- a/arch/arm/mach-s3c64xx/s3c6410.c
-+++ b/arch/arm/mach-s3c64xx/s3c6410.c
-@@ -41,8 +41,8 @@
- #include <plat/adc-core.h>
- #include <plat/iic-core.h>
- #include <plat/onenand-core.h>
--#include <mach/s3c6400.h>
--#include <mach/s3c6410.h>
-+#include <plat/s3c6400.h>
-+#include <plat/s3c6410.h>
- 
- void __init s3c6410_map_io(void)
- {
-diff --git a/arch/arm/plat-s5p/include/plat/exynos4.h b/arch/arm/plat-samsung/include/plat/exynos4.h
-similarity index 94%
-rename from arch/arm/plat-s5p/include/plat/exynos4.h
-rename to arch/arm/plat-samsung/include/plat/exynos4.h
-index 907caab..691a711 100644
---- a/arch/arm/plat-s5p/include/plat/exynos4.h
-+++ b/arch/arm/plat-samsung/include/plat/exynos4.h
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s5p/include/plat/exynos4.h
-+/* linux/arch/arm/plat-samsung/include/plat/exynos4.h
-  *
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c2410.h b/arch/arm/plat-samsung/include/plat/s3c2410.h
-similarity index 93%
-rename from arch/arm/plat-s3c24xx/include/plat/s3c2410.h
-rename to arch/arm/plat-samsung/include/plat/s3c2410.h
-index 82ab4aa..3986497 100644
---- a/arch/arm/plat-s3c24xx/include/plat/s3c2410.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c2410.h
-@@ -1,4 +1,4 @@
--/* linux/include/asm-arm/plat-s3c24xx/s3c2410.h
-+/* linux/arch/arm/plat-samsung/include/plat/s3c2410.h
-  *
-  * Copyright (c) 2004 Simtec Electronics
-  *	Ben Dooks <ben@simtec.co.uk>
-diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c2412.h b/arch/arm/plat-samsung/include/plat/s3c2412.h
-similarity index 92%
-rename from arch/arm/plat-s3c24xx/include/plat/s3c2412.h
-rename to arch/arm/plat-samsung/include/plat/s3c2412.h
-index bb15d3b..5bcfd14 100644
---- a/arch/arm/plat-s3c24xx/include/plat/s3c2412.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c2412.h
-@@ -1,4 +1,4 @@
--/* linux/include/asm-arm/plat-s3c24xx/s3c2412.h
-+/* linux/arch/arm/plat-samsung/include/plat/s3c2412.h
-  *
-  * Copyright (c) 2006 Simtec Electronics
-  *	Ben Dooks <ben@simtec.co.uk>
-diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c2416.h b/arch/arm/plat-samsung/include/plat/s3c2416.h
-similarity index 92%
-rename from arch/arm/plat-s3c24xx/include/plat/s3c2416.h
-rename to arch/arm/plat-samsung/include/plat/s3c2416.h
-index dc3c090..a764f85 100644
---- a/arch/arm/plat-s3c24xx/include/plat/s3c2416.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c2416.h
-@@ -1,4 +1,4 @@
--/* linux/include/asm-arm/plat-s3c24xx/s3c2443.h
-+/* linux/arch/arm/plat-samsung/include/plat/s3c2416.h
-  *
-  * Copyright (c) 2009 Yauhen Kharuzhy <jekhor@gmail.com>
-  *
-diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c2443.h b/arch/arm/plat-samsung/include/plat/s3c2443.h
+-#endif /* __PLAT_S5P_EHCI_H */
++#endif /* __PLAT_SAMSUNG_EHCI_H */
+diff --git a/arch/arm/plat-s5p/include/plat/irqs.h b/arch/arm/plat-samsung/include/plat/irqs.h
 similarity index 96%
-rename from arch/arm/plat-s3c24xx/include/plat/s3c2443.h
-rename to arch/arm/plat-samsung/include/plat/s3c2443.h
-index a19715f..4b2ac9a 100644
---- a/arch/arm/plat-s3c24xx/include/plat/s3c2443.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c2443.h
+rename from arch/arm/plat-s5p/include/plat/irqs.h
+rename to arch/arm/plat-samsung/include/plat/irqs.h
+index ba9121c..3c62a7a 100644
+--- a/arch/arm/plat-s5p/include/plat/irqs.h
++++ b/arch/arm/plat-samsung/include/plat/irqs.h
 @@ -1,4 +1,4 @@
--/* linux/include/asm-arm/plat-s3c24xx/s3c2443.h
-+/* linux/arch/arm/plat-samsung/include/plat/s3c2443.h
-  *
-  * Copyright (c) 2004-2005 Simtec Electronics
-  *	Ben Dooks <ben@simtec.co.uk>
-diff --git a/arch/arm/plat-s3c24xx/include/plat/s3c244x.h b/arch/arm/plat-samsung/include/plat/s3c244x.h
-similarity index 94%
-rename from arch/arm/plat-s3c24xx/include/plat/s3c244x.h
-rename to arch/arm/plat-samsung/include/plat/s3c244x.h
-index 89e8d0a..ea0c961 100644
---- a/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c244x.h
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s3c24xx/include/plat/s3c244x.h
-+/* linux/arch/arm/plat-samsung/include/plat/s3c244x.h
-  *
-  * Copyright (c) 2004-2005 Simtec Electronics
-  *	Ben Dooks <ben@simtec.co.uk>
-diff --git a/arch/arm/mach-s3c64xx/include/mach/s3c6400.h b/arch/arm/plat-samsung/include/plat/s3c6400.h
-similarity index 94%
-rename from arch/arm/mach-s3c64xx/include/mach/s3c6400.h
-rename to arch/arm/plat-samsung/include/plat/s3c6400.h
-index f86958d..37d428a 100644
---- a/arch/arm/mach-s3c64xx/include/mach/s3c6400.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c6400.h
-@@ -1,4 +1,4 @@
--/* arch/arm/mach-s3c64xx/include/macht/s3c6400.h
-+/* linux/arch/arm/plat-samsung/include/plat/s3c6400.h
-  *
-  * Copyright 2008 Openmoko, Inc.
-  * Copyright 2008 Simtec Electronics
-diff --git a/arch/arm/mach-s3c64xx/include/mach/s3c6410.h b/arch/arm/plat-samsung/include/plat/s3c6410.h
-similarity index 93%
-rename from arch/arm/mach-s3c64xx/include/mach/s3c6410.h
-rename to arch/arm/plat-samsung/include/plat/s3c6410.h
-index 24f1141..20a6675 100644
---- a/arch/arm/mach-s3c64xx/include/mach/s3c6410.h
-+++ b/arch/arm/plat-samsung/include/plat/s3c6410.h
-@@ -1,4 +1,4 @@
--/* arch/arm/mach-s3c64xx/include/mach/s3c6410.h
-+/* linux/arch/arm/plat-samsung/include/plat/s3c6410.h
-  *
-  * Copyright 2008 Openmoko,  Inc.
-  * Copyright 2008 Simtec Electronics
-diff --git a/arch/arm/plat-s5p/include/plat/s5p6440.h b/arch/arm/plat-samsung/include/plat/s5p6440.h
-similarity index 94%
-rename from arch/arm/plat-s5p/include/plat/s5p6440.h
-rename to arch/arm/plat-samsung/include/plat/s5p6440.h
-index 528585d..bf85ebb 100644
---- a/arch/arm/plat-s5p/include/plat/s5p6440.h
-+++ b/arch/arm/plat-samsung/include/plat/s5p6440.h
-@@ -1,4 +1,4 @@
--/* arch/arm/plat-s5p/include/plat/s5p6440.h
-+/* linux/arch/arm/plat-samsung/include/plat/s5p6440.h
+-/* linux/arch/arm/plat-s5p/include/plat/irqs.h
++/* linux/arch/arm/plat-samsung/include/plat/irqs.h
   *
   * Copyright (c) 2009 Samsung Electronics Co., Ltd.
   *		http://www.samsung.com/
-diff --git a/arch/arm/plat-s5p/include/plat/s5p6450.h b/arch/arm/plat-samsung/include/plat/s5p6450.h
-similarity index 94%
-rename from arch/arm/plat-s5p/include/plat/s5p6450.h
-rename to arch/arm/plat-samsung/include/plat/s5p6450.h
-index 640a41c..da25f9a 100644
---- a/arch/arm/plat-s5p/include/plat/s5p6450.h
-+++ b/arch/arm/plat-samsung/include/plat/s5p6450.h
+@@ -10,8 +10,8 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-#ifndef __ASM_PLAT_S5P_IRQS_H
+-#define __ASM_PLAT_S5P_IRQS_H __FILE__
++#ifndef __PLAT_SAMSUNG_IRQS_H
++#define __PLAT_SAMSUNG_IRQS_H __FILE__
+ 
+ /* we keep the first set of CPU IRQs out of the range of
+  * the ISA space, so that the PC104 has them to itself
+@@ -112,4 +112,4 @@
+ #define S5P_IRQ_TYPE_EDGE_RISING	(0x03)
+ #define S5P_IRQ_TYPE_EDGE_BOTH		(0x04)
+ 
+-#endif /* __ASM_PLAT_S5P_IRQS_H */
++#endif /* __PLAT_SAMSUNG_IRQS_H */
+diff --git a/arch/arm/plat-s5p/include/plat/mfc.h b/arch/arm/plat-samsung/include/plat/mfc.h
+similarity index 91%
+rename from arch/arm/plat-s5p/include/plat/mfc.h
+rename to arch/arm/plat-samsung/include/plat/mfc.h
+index 6697f8c..08d14c3 100644
+--- a/arch/arm/plat-s5p/include/plat/mfc.h
++++ b/arch/arm/plat-samsung/include/plat/mfc.h
+@@ -7,8 +7,8 @@
+  * option) any later version.
+  */
+ 
+-#ifndef __PLAT_S5P_MFC_H
+-#define __PLAT_S5P_MFC_H
++#ifndef __PLAT_SAMSUNG_MFC_H
++#define __PLAT_SAMSUNG_MFC_H __FILE__
+ 
+ /**
+  * s5p_mfc_reserve_mem - function to early reserve memory for MFC driver
+@@ -24,4 +24,4 @@
+ void __init s5p_mfc_reserve_mem(phys_addr_t rbase, unsigned int rsize,
+ 				phys_addr_t lbase, unsigned int lsize);
+ 
+-#endif /* __PLAT_S5P_MFC_H */
++#endif /* __PLAT_SAMSUNG_MFC_H */
+diff --git a/arch/arm/plat-s5p/include/plat/mipi_csis.h b/arch/arm/plat-samsung/include/plat/mipi_csis.h
+similarity index 91%
+rename from arch/arm/plat-s5p/include/plat/mipi_csis.h
+rename to arch/arm/plat-samsung/include/plat/mipi_csis.h
+index 9bd254c..b02c076 100644
+--- a/arch/arm/plat-s5p/include/plat/mipi_csis.h
++++ b/arch/arm/plat-samsung/include/plat/mipi_csis.h
+@@ -8,8 +8,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-#ifndef PLAT_S5P_MIPI_CSIS_H_
+-#define PLAT_S5P_MIPI_CSIS_H_ __FILE__
++#ifndef __PLAT_SAMSUNG_MIPI_CSIS_H_
++#define __PLAT_SAMSUNG_MIPI_CSIS_H_ __FILE__
+ 
+ struct platform_device;
+ 
+@@ -40,4 +40,4 @@ struct s5p_platform_mipi_csis {
+  */
+ int s5p_csis_phy_enable(struct platform_device *pdev, bool on);
+ 
+-#endif /* PLAT_S5P_MIPI_CSIS_H_ */
++#endif /* __PLAT_SAMSUNG_MIPI_CSIS_H_ */
+diff --git a/arch/arm/plat-s5p/include/plat/regs-srom.h b/arch/arm/plat-samsung/include/plat/regs-srom.h
+similarity index 89%
+rename from arch/arm/plat-s5p/include/plat/regs-srom.h
+rename to arch/arm/plat-samsung/include/plat/regs-srom.h
+index f121ab5..cf6a998 100644
+--- a/arch/arm/plat-s5p/include/plat/regs-srom.h
++++ b/arch/arm/plat-samsung/include/plat/regs-srom.h
 @@ -1,4 +1,4 @@
--/* arch/arm/plat-s5p/include/plat/s5p6450.h
-+/* linux/arch/arm/plat-samsung/include/plat/s5p6450.h
+-/* linux/arch/arm/plat-s5p/include/plat/regs-srom.h
++/* linux/arch/arm/plat-samsung/include/plat/regs-srom.h
   *
   * Copyright (c) 2010 Samsung Electronics Co., Ltd.
   *		http://www.samsung.com
-diff --git a/arch/arm/plat-s5p/include/plat/s5pc100.h b/arch/arm/plat-samsung/include/plat/s5pc100.h
-similarity index 94%
-rename from arch/arm/plat-s5p/include/plat/s5pc100.h
-rename to arch/arm/plat-samsung/include/plat/s5pc100.h
-index 5f6099d..9a21aea 100644
---- a/arch/arm/plat-s5p/include/plat/s5pc100.h
-+++ b/arch/arm/plat-samsung/include/plat/s5pc100.h
+@@ -10,8 +10,8 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-#ifndef __ASM_PLAT_S5P_REGS_SROM_H
+-#define __ASM_PLAT_S5P_REGS_SROM_H __FILE__
++#ifndef __PLAT_SAMSUNG_REGS_SROM_H
++#define __PLAT_SAMSUNG_REGS_SROM_H __FILE__
+ 
+ #include <mach/map.h>
+ 
+@@ -51,4 +51,4 @@
+ #define S5P_SROM_BCX__TCOS__SHIFT		24
+ #define S5P_SROM_BCX__TACS__SHIFT		28
+ 
+-#endif /* __ASM_PLAT_S5P_REGS_SROM_H */
++#endif /* __PLAT_SAMSUNG_REGS_SROM_H */
+diff --git a/arch/arm/plat-s5p/include/plat/reset.h b/arch/arm/plat-samsung/include/plat/reset.h
+similarity index 67%
+rename from arch/arm/plat-s5p/include/plat/reset.h
+rename to arch/arm/plat-samsung/include/plat/reset.h
+index 335e978..b674415 100644
+--- a/arch/arm/plat-s5p/include/plat/reset.h
++++ b/arch/arm/plat-samsung/include/plat/reset.h
 @@ -1,4 +1,4 @@
--/* arch/arm/plat-s5p/include/plat/s5pc100.h
-+/* linux/arch/arm/plat-samsung/include/plat/s5pc100.h
+-/* linux/arch/arm/plat-s5p/include/plat/reset.h
++/* linux/arch/arm/plat-samsung/include/plat/reset.h
   *
   * Copyright (c) 2010 Samsung Electronics Co., Ltd.
   *		http://www.samsung.com/
-diff --git a/arch/arm/plat-s5p/include/plat/s5pv210.h b/arch/arm/plat-samsung/include/plat/s5pv210.h
-similarity index 94%
-rename from arch/arm/plat-s5p/include/plat/s5pv210.h
-rename to arch/arm/plat-samsung/include/plat/s5pv210.h
-index 6c93a0c..b4bc6be 100644
---- a/arch/arm/plat-s5p/include/plat/s5pv210.h
-+++ b/arch/arm/plat-samsung/include/plat/s5pv210.h
+@@ -8,9 +8,9 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-#ifndef __ASM_PLAT_S5P_RESET_H
+-#define __ASM_PLAT_S5P_RESET_H __FILE__
++#ifndef __PLAT_SAMSUNG_RESET_H
++#define __PLAT_SAMSUNG_RESET_H __FILE__
+ 
+ extern void (*s5p_reset_hook)(void);
+ 
+-#endif /* __ASM_PLAT_S5P_RESET_H */
++#endif /* __PLAT_SAMSUNG_RESET_H */
+diff --git a/arch/arm/plat-s5p/include/plat/s5p-clock.h b/arch/arm/plat-samsung/include/plat/s5p-clock.h
+similarity index 96%
+rename from arch/arm/plat-s5p/include/plat/s5p-clock.h
+rename to arch/arm/plat-samsung/include/plat/s5p-clock.h
+index 769b5bd..984bf9e 100644
+--- a/arch/arm/plat-s5p/include/plat/s5p-clock.h
++++ b/arch/arm/plat-samsung/include/plat/s5p-clock.h
 @@ -1,4 +1,4 @@
--/* linux/arch/arm/plat-s5p/include/plat/s5pv210.h
-+/* linux/arch/arm/plat-samsung/include/plat/s5pv210.h
+-/* linux/arch/arm/plat-s5p/include/plat/s5p-clock.h
++/* linux/arch/arm/plat-samsung/include/plat/s5p-clock.h
+  *
+  * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+diff --git a/arch/arm/plat-s5p/include/plat/s5p-time.h b/arch/arm/plat-samsung/include/plat/s5p-time.h
+similarity index 94%
+rename from arch/arm/plat-s5p/include/plat/s5p-time.h
+rename to arch/arm/plat-samsung/include/plat/s5p-time.h
+index 575e881..3a70aeb 100644
+--- a/arch/arm/plat-s5p/include/plat/s5p-time.h
++++ b/arch/arm/plat-samsung/include/plat/s5p-time.h
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s5p/include/plat/s5p-time.h
++/* linux/arch/arm/plat-samsung/include/plat/s5p-time.h
+  *
+  * Copyright 2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com/
+diff --git a/arch/arm/plat-s5p/include/plat/sysmmu.h b/arch/arm/plat-samsung/include/plat/sysmmu.h
+similarity index 96%
+rename from arch/arm/plat-s5p/include/plat/sysmmu.h
+rename to arch/arm/plat-samsung/include/plat/sysmmu.h
+index bf5283c..a05b9e2 100644
+--- a/arch/arm/plat-s5p/include/plat/sysmmu.h
++++ b/arch/arm/plat-samsung/include/plat/sysmmu.h
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s5p/include/plat/sysmmu.h
++/* linux/arch/arm/plat-samsung/include/plat/sysmmu.h
+  *
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+@@ -10,8 +10,8 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-#ifndef __ASM__PLAT_SYSMMU_H
+-#define __ASM__PLAT_SYSMMU_H __FILE__
++#ifndef __PLAT_SAMSUNG_SYSMMU_H
++#define __PLAT_SAMSUNG_SYSMMU_H __FILE__
+ 
+ enum S5P_SYSMMU_INTERRUPT_TYPE {
+ 	SYSMMU_PAGEFAULT,
+diff --git a/arch/arm/plat-s5p/include/plat/system-reset.h b/arch/arm/plat-samsung/include/plat/system-reset.h
+similarity index 92%
+rename from arch/arm/plat-s5p/include/plat/system-reset.h
+rename to arch/arm/plat-samsung/include/plat/system-reset.h
+index f307f34..a448e99 100644
+--- a/arch/arm/plat-s5p/include/plat/system-reset.h
++++ b/arch/arm/plat-samsung/include/plat/system-reset.h
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/plat-s5p/include/plat/system-reset.h
++/* linux/arch/arm/plat-samsung/include/plat/system-reset.h
   *
   * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
+  *		http://www.samsung.com
+diff --git a/arch/arm/plat-s5p/include/plat/usb-phy.h b/arch/arm/plat-samsung/include/plat/usb-phy.h
+similarity index 85%
+rename from arch/arm/plat-s5p/include/plat/usb-phy.h
+rename to arch/arm/plat-samsung/include/plat/usb-phy.h
+index 6dd6bcf..9934f18 100644
+--- a/arch/arm/plat-s5p/include/plat/usb-phy.h
++++ b/arch/arm/plat-samsung/include/plat/usb-phy.h
+@@ -8,8 +8,8 @@
+  * option) any later version.
+  */
+ 
+-#ifndef __PLAT_S5P_USB_PHY_H
+-#define __PLAT_S5P_USB_PHY_H
++#ifndef __PLAT_SAMSUNG_USB_PHY_H
++#define __PLAT_SAMSUNG_USB_PHY_H __FILE__
+ 
+ enum s5p_usb_phy_type {
+ 	S5P_USB_PHY_DEVICE,
+@@ -19,4 +19,4 @@ enum s5p_usb_phy_type {
+ extern int s5p_usb_phy_init(struct platform_device *pdev, int type);
+ extern int s5p_usb_phy_exit(struct platform_device *pdev, int type);
+ 
+-#endif /* __PLAT_S5P_REGS_USB_PHY_H */
++#endif /* __PLAT_SAMSUNG_USB_PHY_H */
 -- 
 1.7.1
