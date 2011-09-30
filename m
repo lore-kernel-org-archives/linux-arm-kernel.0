@@ -1,47 +1,50 @@
-From: per.forlin@stericsson.com (=?ISO-8859-1?Q?Per_F=F6rlin?=)
-Date: Fri, 30 Sep 2011 07:37:41 +0200
-Subject: [PATCH] arm: proc-v7: pc phy addresses before disable MMU
-In-Reply-To: <20110924130202.GF17169@n2100.arm.linux.org.uk>
-References: <1316851370-7284-1-git-send-email-per.forlin@stericsson.com>
-	<20110924081342.GA2639@mwesterb-mobl.ger.corp.intel.com>
-	<4E7DA3C0.7000208@stericsson.com>
-	<20110924110024.GA20044@e102144-lin.cambridge.arm.com>
-	<4E7DD34E.3060402@stericsson.com>
-	<20110924130202.GF17169@n2100.arm.linux.org.uk>
-Message-ID: <4E8555A5.9090304@stericsson.com>
+From: abhilash.kv@ti.com (Abhilash K V)
+Date: Fri, 30 Sep 2011 11:42:30 +0530
+Subject: [PATCH v5 0/3] AM3517: Booting up
+Message-ID: <1317363153-10259-1-git-send-email-abhilash.kv@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2011 03:02 PM, Russell King - ARM Linux wrote:
-> On Sat, Sep 24, 2011 at 02:55:42PM +0200, Per F?rlin wrote:
->> On 09/24/2011 01:00 PM, Will Deacon wrote:
->>> On Sat, Sep 24, 2011 at 10:32:48AM +0100, Per F?rlin wrote:
->>>> I am trying to figure out how I can get the value of PHYS_OFFSET in assembler code (proc-v7.S).
->>>> I guess I could use the value calculated in arch/arm/kernel.head.S but wouldn't that make
->>>> this patch dependent on CONFIG_ARM_PATCH_PHYS_VIRT?
->>>
->>> Wouldn't we just be better off passing a physical address to cpu_v7_reset
->>> instead?
->>>
->> Good point! I'm fine with that.
-> 
-> Alternatively, call it using the phys address.
-I changed the code to use a label instead of the ARM specific instruction offset +4. A few more lines but the intention is that it should work with both ARM and THUMB. I'm in favour of Russell's idea of setting pc to physical before calling cpu_reset().
-      /* Go to physical addresses to be ready for MMU disable */
-      asm("ADR r1, pc_phy_here \n\t"
-          "sub r1, %0 \n\t"
-          "mov pc, r1 \n\t"
-          "pc_phy_here: \n\t"
-          : :"r" (PAGE_OFFSET - PHYS_OFFSET) : "r1", "cc");
+From: Abhilash K V <abhilash.kv@ti.com>
 
-Where is the best place for this code?
-Should this be run for all ARM cpu_reset()?
+This patch-set gets the kernel booting up on a AM3517 EVM.
+The board is able to boot with ramdisk after this,but the MMC and Ethernet
+drivers are not up yet. Lots of warnings remain which will be addressed in
+subsequent patches.
 
-I haven't found a nice way to add to cpu_reset() yet. This is what I have so far.
-1. Redirect cpu_reset to c-function __cpu_reset_phy() that sets the pc to phy and then calls __cpu_reset() (the original one)
-1.1 May add ifdefs in __cpu_reset_phy() to only do the virt to phy transition for some explicit ARM versions before calling __cpu_reset()
-2. Rename cpu_v7_reset() to __cpu_v7_reset(). Only redirect cpu_v7_reset() to the c-function that goes to phy and then calls __cpu_v7_reset().
-3. Add a new in parameter "phys_offset" to cpu_reset(). Modify only those CPU_reset() that needs this parameter. Redirect cpu_reset(x,y) to CPU_reset(x) or CPU_reset(x,y) based on ARM version.
+The patches are tested on master of git://github.com/tmlind/linux.git
+Kernel version is 3.1.0-rc8 and last commit on top of which these patches
+were added is:
+	1dd8838c74476fe13e51334ad2444e6c963cf5ff: Linux-omap rebuilt:
+	 Updated to -rc8, merged l3 fixes
 
-Regards,
-Per
+Cc: Sanjeev Premi <premi@ti.com>
+---
+Changes in v5:
+ -[1/3] was reworked to use the new method to select hwmods between
+  different omap3 variants/revisions. 
+ -minor code reformatting in [3/3]
+
+Changes in v4:
+ -Rebased and tested against the latest 3.1.0-rc6.
+ -Added a patch [3/3] to check for missing PMIC info in vp init.
+
+Changes in v3:
+ Presence of SR feature is now used to decide if TWL4030 initialisation is to
+ be done or not.
+
+Changes in v2: Incorporated Kevin's comments to add SmartReflex as a FEATURE,
+  and use omap3_has_sr() to fall out of omap3_twl_init() for AM35x case.
+	
+
+Abhilash K V (3):
+  AM35x: Using OMAP3 generic hwmods
+  omap_twl: Prevent SR to enable for am3517/am3505 devices
+  OMAP2+: voltage: add check for missing PMIC info in vp init
+
+ arch/arm/mach-omap2/id.c                   |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   17 ++++++++++++-----
+ arch/arm/mach-omap2/pm.c                   |    3 ++-
+ arch/arm/mach-omap2/vp.c                   |    7 +++++++
+ arch/arm/plat-omap/include/plat/cpu.h      |    2 ++
+ 5 files changed, 24 insertions(+), 7 deletions(-)
