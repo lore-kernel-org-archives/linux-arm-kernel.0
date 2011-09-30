@@ -1,75 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 30 Sep 2011 10:48:47 +0100
-Subject: [PATCH] genirq: percpu: allow interrupt type to be set at enable t=
-Message-ID: <mailman.160.1317380864.20020.linux-arm-kernel@lists.infradead.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 30 Sep 2011 16:39:02 +0530
+Subject: [PATCH 2/9] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20110930104820.GE2085@sirena.org.uk>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-3-git-send-email-rnayak@ti.com>
+	<20110927121003.GB4289@opensource.wolfsonmicro.com>
+	<4E81E224.2070408@ti.com>
+	<20110927150511.GM4289@opensource.wolfsonmicro.com>
+	<4E854532.6080605@ti.com>
+	<20110930102849.GA4195@opensource.wolfsonmicro.com>
+	<20110930104820.GE2085@sirena.org.uk>
+Message-ID: <4E85A34E.9070203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ime
+On Friday 30 September 2011 04:18 PM, Mark Brown wrote:
+> On Fri, Sep 30, 2011 at 11:28:49AM +0100, Mark Brown wrote:
+>> On Fri, Sep 30, 2011 at 09:57:30AM +0530, Rajendra Nayak wrote:
+>
+>>>>> +  init_data->supply_regulator = (char *)of_get_property(dev->of_node,
+>>>>> +                                          "regulator-supplies", NULL);
+>
+>>> Mark, I still seem to be a little confused with this one as to why
+>>> we would need a phandle *and* a supply-name to reference a parent
+>>> regulator/supply.
+>>> The phandle would point to a regulator dt node and that node internally
+>>> would have just one name associated with it.
+>
+>> To repeat: the supply name is for the consumer.  It is needed so that
+>> the consumer can tell which supply is provided by which regulator.
+>> Almost all devices have more than one supply and if the device does
+>> anything more complicated than just turning on all the supplies when the
+>> device is active it's going to need to figure out which supply is which.
+>
+> Hang on, I now have no idea what this is supposed to be doing.  Later on
+> in the series you had examples in your commit logs with perfectly
+> sensible bindings for supplies:
+>
+>                  vmmc-supply =<&regulator1>;
+>                  vpll-supply =<&regulator1>;
+>
+> which have both a unique name and a direct reference to the supplying
+> regulator.  What are these "regulator-supplies" properties supposed to
+> be?
 
-As request_percpu_irq() doesn't allow for a percpu interrupt
-to have its type configured (it is generally impossible to
-configure it on all CPUs at once), add a 'type' argument to
-enable_percpu_irq().
+:-), yes, I was confused for a while as well after reading your response.
 
-This allows some low-level, board specific init code to
-be switched to a generic API.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/linux/interrupt.h |    2 +-
- kernel/irq/manage.c       |   15 ++++++++++++++-
- 2 files changed, 15 insertions(+), 2 deletions(-)
-
-diff --git a/include/linux/interrupt.h b/include/linux/interrupt.h
-index 1cdfd09..664544f 100644
---- a/include/linux/interrupt.h
-+++ b/include/linux/interrupt.h
-@@ -223,7 +223,7 @@ extern void disable_irq_nosync(unsigned int irq);
- extern void disable_irq(unsigned int irq);
- extern void disable_percpu_irq(unsigned int irq);
- extern void enable_irq(unsigned int irq);
--extern void enable_percpu_irq(unsigned int irq);
-+extern void enable_percpu_irq(unsigned int irq, unsigned int type);
-=20
- /* The following three functions are for the core kernel use only. */
- #ifdef CONFIG_GENERIC_HARDIRQS
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 7b4b156..e647ce1 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -1419,7 +1419,7 @@ int request_any_context_irq(unsigned int irq, irq_han=
-dler_t handler,
- }
- EXPORT_SYMBOL_GPL(request_any_context_irq);
-=20
--void enable_percpu_irq(unsigned int irq)
-+void enable_percpu_irq(unsigned int irq, unsigned int type)
- {
- =09unsigned int cpu =3D smp_processor_id();
- =09unsigned long flags;
-@@ -1428,7 +1428,20 @@ void enable_percpu_irq(unsigned int irq)
- =09if (!desc)
- =09=09return;
-=20
-+=09type &=3D IRQ_TYPE_SENSE_MASK;
-+=09if (type !=3D IRQ_TYPE_NONE) {
-+=09=09int ret;
-+
-+=09=09ret =3D __irq_set_trigger(desc, irq, type);
-+
-+=09=09if (ret) {
-+=09=09=09WARN(1, "failed to set type for IRQ%d\n");
-+=09=09=09goto out;
-+=09=09}
-+=09}
-+
- =09irq_percpu_enable(desc, cpu);
-+out:
- =09irq_put_desc_unlock(desc, flags);
- }
-=20
---=20
-1.7.0.4
-
---------------040908090006060506080309--
+The "regulator-supplies" is used to specific the regulator *parent*.
+Same as what was earlier passed by using the
+"supply_regulator" field of regulator_init_data structure.
+Grant wanted the bindings to support specifying multiple parents
+and hence I was thinking of either a list of names *or*
+a list of phandles to specify multiple parents to a regulator.
