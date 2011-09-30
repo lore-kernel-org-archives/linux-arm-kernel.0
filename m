@@ -1,91 +1,32 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 30 Sep 2011 14:00:04 -0700
-Subject: [PATCH v5 2/3] omap_twl: Prevent SR to enable for am3517/am3505
-	devices
-In-Reply-To: <1317363153-10259-3-git-send-email-abhilash.kv@ti.com> (Abhilash
-	K. V.'s message of "Fri, 30 Sep 2011 11:42:32 +0530")
-References: <1317363153-10259-1-git-send-email-abhilash.kv@ti.com>
-	<1317363153-10259-2-git-send-email-abhilash.kv@ti.com>
-	<1317363153-10259-3-git-send-email-abhilash.kv@ti.com>
-Message-ID: <87r52xhhkb.fsf@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Sep 2011 23:04:26 +0200
+Subject: [PATCH v4 0/7] add initial imx6q support
+In-Reply-To: <1317200808-6275-1-git-send-email-shawn.guo@linaro.org>
+References: <1317200808-6275-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201109302304.26953.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash K V <abhilash.kv@ti.com> writes:
+On Wednesday 28 September 2011, Shawn Guo wrote:
+> 
+> This patch series adds the initial support for imx6q, which is a
+> Cortex-A9 Quad Core based SoC.
+> 
+> We chose to add imx6q support into mach-imx other than mach-mx5 or
+> a new mach-mx6, because we intend to merge mach-mx5 into mach-imx, so
+> that we have only mach-imx for imx family.
+> 
+> It's based on linux-next-20110926 with some prerequisite patches
+> not showing up on linux-next applied.
 
-> From: Abhilash K V <abhilash.kv@ti.com>
->
-> In case of AM3517 & AM3505, SmartReflex is not applicable so
-> we must not enable it. So omap3_twl_init() is now not called
-> when the processor does not support SR.
+How should we best proceed on this series? Sascha, do you want to
+take the next version into your tree once Shawn has addressed the
+remaining comments, or should I just take the patches with your
+Ack?
 
-This still isn't right.
+Shawn, what are the current dependencies? I will have to pull
+in the other branches that this depends on into the next/soc
+tree and then wait for those to get merged first before I send
+this to Linus.
 
-The reason to skip the TWL PMIC init is not because SR is not available
-(TWL PMICs are quite usable without SR).  The reason to skip TWL PMIC
-init is because the PMIC is not present.
-
-Instead, we need to fix up the TWL/PMIC init so that TWL-specifics are
-only registered if a TWL driver is registered.
-
-So, please drop hunk #2 from this patch, and just make this patch add a
-new feature for the existence of SmartReflex.  Removing the assumptions
-and init for the existence of the TWL is a separate problem.
-
-Kevin
-
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Signed-off-by: Abhilash K V <abhilash.kv@ti.com>
-> ---
->  arch/arm/mach-omap2/id.c              |    2 +-
->  arch/arm/mach-omap2/pm.c              |    3 ++-
->  arch/arm/plat-omap/include/plat/cpu.h |    2 ++
->  3 files changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index d27daf9..b7e3082 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -188,7 +188,7 @@ static void __init omap3_check_features(void)
->  	if (cpu_is_omap3630())
->  		omap_features |= OMAP3_HAS_192MHZ_CLK;
->  	if (!cpu_is_omap3505() && !cpu_is_omap3517())
-> -		omap_features |= OMAP3_HAS_IO_WAKEUP;
-> +		omap_features |= (OMAP3_HAS_IO_WAKEUP | OMAP3_HAS_SR);
->  
->  	omap_features |= OMAP3_HAS_SDRC;
->  
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index 0844e2e..6835198 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -250,7 +250,8 @@ postcore_initcall(omap2_common_pm_init);
->  static int __init omap2_common_pm_late_init(void)
->  {
->  	/* Init the OMAP TWL parameters */
-> -	omap3_twl_init();
-> +	if (omap3_has_sr())
-> +		omap3_twl_init();
->  	omap4_twl_init();
->  
->  	/* Init the voltage layer */
-> diff --git a/arch/arm/plat-omap/include/plat/cpu.h b/arch/arm/plat-omap/include/plat/cpu.h
-> index 2f90269..cc6fcd3 100644
-> --- a/arch/arm/plat-omap/include/plat/cpu.h
-> +++ b/arch/arm/plat-omap/include/plat/cpu.h
-> @@ -413,6 +413,7 @@ extern u32 omap_features;
->  #define OMAP4_HAS_MPU_1GHZ		BIT(8)
->  #define OMAP4_HAS_MPU_1_2GHZ		BIT(9)
->  #define OMAP4_HAS_MPU_1_5GHZ		BIT(10)
-> +#define OMAP3_HAS_SR			BIT(11)
->  
->  
->  #define OMAP3_HAS_FEATURE(feat,flag)			\
-> @@ -429,6 +430,7 @@ OMAP3_HAS_FEATURE(isp, ISP)
->  OMAP3_HAS_FEATURE(192mhz_clk, 192MHZ_CLK)
->  OMAP3_HAS_FEATURE(io_wakeup, IO_WAKEUP)
->  OMAP3_HAS_FEATURE(sdrc, SDRC)
-> +OMAP3_HAS_FEATURE(sr, SR)
->  
->  /*
->   * Runtime detection of OMAP4 features
+	Arnd
