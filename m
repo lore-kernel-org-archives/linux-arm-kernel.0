@@ -1,56 +1,45 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 1 Oct 2011 09:47:19 +0800
-Subject: [GIT PULL] ARM: CSR: cleanup some minor coding-style issues for 3.2
-Message-ID: <CAGsJ_4w63t=EBFxJM0uum3FBqp5HY0ufi3v4Z+g4s2Hgmh-CzA@mail.gmail.com>
+Date: Sat, 1 Oct 2011 10:32:58 +0800
+Subject: [GIT PULL] ARM: CSR: l2x0 init cleanup for 3.2
+Message-ID: <CAGsJ_4xNqgDSWs-WQCamE592NB_p4r4+sY8-XSrzbkei1jeB7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
-  Linus Torvalds (1):
-        Linux 3.1-rc7
+Since the l2x0 cleanup of prima2 depends on the following two patches
+in rmk's tree:
+
+[1]Rob Herring
+ARM: 7009/1: l2x0: Add OF based initialization
+http://www.spinics.net/lists/arm-kernel/msg131123.html
+it has been in rmk/for-next
+
+[2]Barry Song
+ARM: 7009/1: CACHE-L2X0: filter start address can be 0 and is often 0
+http://www.spinics.net/lists/arm-kernel/msg140126.html
+it has been in rmk/for-next
+
+I have rebased the l2x0-cleanup branch to "ARM: 7009/1: CACHE-L2X0:
+filter start address can be 0 and is often 0". this might cause some
+issues to you. if that is difficult to you, i guess you can pich the
+commmit and apply it when your tree has been ready.
+
+The following changes since commit 513d47a3d953e44d79c29077f6c428a017f8af62:
+  Barry Song (1):
+        ARM: 7090/1: CACHE-L2X0: filter start address can be 0 and is often 0
 
 are available in the git repository at:
 
-  git at gitorious.org:sirfprima2-kernel/sirfprima2-kernel.git fixes
+  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git l2x0-cleanup
 
-Barry Song (4):
-      ARM: CSR: timer: do not initialise statics to 0 or NULL
-      ARM: CSR: timer: space required before the open parenthesis '('
-      ARM: CSR: prima2: fix trailing whitespace
-      ARM: CSR: clock: Fix indentation
+Barry Song (1):
+      ARM: CSR: call l2x0_of_init to init L2 cache of SiRFprimaII
 
- arch/arm/mach-prima2/clock.c  |    4 ++--
- arch/arm/mach-prima2/prima2.c |    2 +-
- arch/arm/mach-prima2/timer.c  |    4 ++--
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/prima2-cb.dts |    5 +++-
+ arch/arm/mach-prima2/l2x0.c     |   46 +++++++-------------------------------
+ 2 files changed, 13 insertions(+), 38 deletions(-)
 
-2011/10/1 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 23 September 2011, Barry Song wrote:
->> Barry Song (4):
->> ? ARM: CSR: timer: do not initialise statics to 0 or NULL
->> ? ARM: CSR: timer: space required before the open parenthesis '('
->> ? ARM: CSR: prima2: fix trailing whitespace
->> ? ARM: CSR: clock: Fix indentation
->>
->> ?arch/arm/mach-prima2/clock.c ?| ? ?4 ++--
->> ?arch/arm/mach-prima2/prima2.c | ? ?2 +-
->> ?arch/arm/mach-prima2/timer.c ?| ? ?4 ++--
->> ?3 files changed, 5 insertions(+), 5 deletions(-)
->
->
-> Hi Barry,
->
-> Sorry for the late reply. This series and the one before all look good
-> to me, but I fear I'm losing track of the patches.
->
-> Can you send me pull requests for each set (fixes, cleanups, other
-> changes) so I can be sure I get everything? If you have trouble
-> with git.kernel.org still being down, I can apply the patches
-> manually and let you double-check them, but that would be more
-> work for both of us I think.
->
-> ? ? ? ?Arnd
 
--barry
+Thanks
+barry
