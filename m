@@ -1,87 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 01 Oct 2011 18:00:31 +0200
-Subject: [GIT PULL] ux500-timers
-In-Reply-To: <201109302228.46572.arnd@arndb.de>
-References: <CACRpkdbCZwSdXzqvPCrGagaikc53xLyDTQaZMRtuyqo9vw=Yng@mail.gmail.com>
-	<201109302228.46572.arnd@arndb.de>
-Message-ID: <1422315.r6YLuIojzy@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 1 Oct 2011 17:09:37 +0100
+Subject: [PATCH 1/4] mmc: mmci: Bugfix in pio read for small packets
+In-Reply-To: <1317109568-17905-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1317109568-17905-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20111001160937.GF11710@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 September 2011 22:28:46 Arnd Bergmann wrote:
+On Tue, Sep 27, 2011 at 09:46:08AM +0200, Ulf Hansson wrote:
+> From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
 > 
-> > The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
-> > 
-> >   Linux 3.1-rc7 (2011-09-21 16:58:15 -0700)
-> > 
-> > are available in the git repository at:
-> >   git://git.linaro.org/people/triad/linux-stericsson.git ux500-nomadik-timers
-> 
-> pulled into a new top-level next/timer branch.
+> Corrects a bug in pio read when reading packets < 4 bytes. These
+> small packets are only relevant for SDIO transfers.
 
-Hi Linus,
+Does this even work?  From the MMCI spec, I see no way for the MMCI
+peripheral to know the size of the read/write on the APB bus.
 
-It caused a few build regressions:
+The APB bus signals the MMCI uses are:
 
-- missing include of errno.h
-- clksrc_dbx500_prcmu_init stub needs to be static inline, or it causes a
-  link failure.
-- clksrc_dbx500_timer_base may be initialized when it's not actually linked in
+PCLK - APB bus clock
+PRESETn - APB bus reset
+PADDR[11:2] - APB bus address
+PSEL - APB bus peripheral select
+PENABLE - APB bus enable
+PWRITE - APB bus write signal
+PWDATA[31:0] - APB bus write data
+PRDATA[31:0] - APB bus read data
 
-For the last one, I think it would actually be best to make the timer 
-a platform_device and pass the address in platform_data or device tree
-property, or alternatively make it an argument to clksrc_dbx500_prcmu_init
-and make the variable static.
+As you can see, nothing in that set indicates whether it's an 8-bit,
+16-bit or 32-bit access.
 
-Please send a new pull request with these things fixed, either with
-patches on top or replacing the original ones, whichever you prefer.
+Moreover, if you read the MMCIFifoCnt register writeup:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+  The MMCIFifoCnt register contains the remaining number of words to be
+  written to or read from the FIFO. The FIFO counter loads the value
+  from the data length register (see Data length register, MMCIDataLength
+  on page 3-11) when the Enable bit is set in the data control register.
+  If the data length is not word aligned (multiple of 4), the remaining
+  1 to 3 bytes are regarded as a word.
 
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index 08c55a5..fbbbe0b 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -5,6 +5,7 @@
-  * Author: Mattias Wallin <mattias.wallin@stericsson.com> for ST-Ericsson
-  */
- #include <linux/io.h>
-+#include <linux/errno.h>
- #include <linux/clksrc-dbx500-prcmu.h>
- 
- #include <asm/localtimer.h>
-@@ -14,6 +15,8 @@
- #include <mach/setup.h>
- #include <mach/hardware.h>
- 
-+void __iomem *clksrc_dbx500_timer_base;
-+
- static void __init ux500_timer_init(void)
- {
- 	if (cpu_is_u5500()) {
-diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
-index 0ac5093..d5f7847 100644
---- a/drivers/clocksource/clksrc-dbx500-prcmu.c
-+++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-@@ -31,8 +31,6 @@
- 
- #define SCHED_CLOCK_MIN_WRAP 131072 /* 2^32 / 32768 */
- 
--void __iomem *clksrc_dbx500_timer_base;
--
- static cycle_t clksrc_dbx500_prcmu_read(struct clocksource *cs)
- {
- 	u32 count, count2;
-diff --git a/include/linux/clksrc-dbx500-prcmu.h b/include/linux/clksrc-dbx500-prcmu.h
-index d1e9504..9f733cb 100644
---- a/include/linux/clksrc-dbx500-prcmu.h
-+++ b/include/linux/clksrc-dbx500-prcmu.h
-@@ -16,7 +16,7 @@ extern void __iomem *clksrc_dbx500_timer_base;
- #ifdef CONFIG_CLKSRC_DBX500_PRCMU
- void __init clksrc_dbx500_prcmu_init(void);
- #else
--void __init clksrc_dbx500_prcmu_init(void) {}
-+static inline void __init clksrc_dbx500_prcmu_init(void) {}
- #endif
- 
- #endif
+This suggests that we should be reading a 32-bit word and then storing
+the relevant bytes from it.
+
+The other thing which concerns me is that the MMCI (ARM Ltd one at least)
+only supports power-of-two block sizes.  So requesting a transfer of a
+single block with a block size of 3 bytes is not supported by the ARM Ltd
+MMCI.  (The way you end up with 1 to 3 bytes being received with ARM's
+MMCI is if you're using a streaming transfer.)
+
+The last thing I don't like about this patch is that this code is in a
+really hot path - one which is absolutely critical for things to work -
+and the need for the condition to be dealt with is only at the end of a
+transfer, not each time the FIFO needs emptying.
+
+Bear in mind that there are platforms with the ARM MMCI which must read
+the data within a certain time or suffer overruns, and which have either
+totally broken and useless DMA or no DMA capability at all (which are
+the only platforms I have with a MMCI on.)
