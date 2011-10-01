@@ -1,62 +1,56 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Sat, 1 Oct 2011 06:24:29 +0530
-Subject: [PATCH v3 2/3] ARM: OMAP: TI814X: Add cpu type macros and
-	detection support
-In-Reply-To: <alpine.DEB.2.00.1109291443160.26728@utopia.booyaka.com>
-References: <1317258560-30408-1-git-send-email-hemantp@ti.com>
-	<alpine.DEB.2.00.1109291443160.26728@utopia.booyaka.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4EC56A8@dbde02.ent.ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sat, 1 Oct 2011 09:47:19 +0800
+Subject: [GIT PULL] ARM: CSR: cleanup some minor coding-style issues for 3.2
+Message-ID: <CAGsJ_4w63t=EBFxJM0uum3FBqp5HY0ufi3v4Z+g4s2Hgmh-CzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Arnd,
 
-Paul Walmsley wrote on Friday, September 30, 2011 2:17 AM:
+The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
+  Linus Torvalds (1):
+        Linux 3.1-rc7
 
-> Hello Hemant,
-> 
-> a few comments:
-> 
-> On Thu, 29 Sep 2011, Hemant Pedanekar wrote:
-> 
->> This patch adds cpu type, macros for identification of TI814X device.
->> 
->> Note that following update to common OMAP data structures is made:
->> 
->> cpu_mask and RATE_IN_XXX flags have crossed 8 bit hence struct
->> clksel_rate.flags, struct prcm_config.flags and cpu_mask are changed to
->> u16 from u8. 
->> 
->> Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
-> 
-> Also, the opp2xxx.h change looks spurious, is that really needed?
-> 
-I changed prcm_config.flags to accommodate cpu_mask change, as cpu_mask
-is used with prcm_config.flags (mostly) in clkt2xxx_virt_prcm_set.c as
-below:
+are available in the git repository at:
 
-prcm->flags & cpu_mask
+  git at gitorious.org:sirfprima2-kernel/sirfprima2-kernel.git fixes
 
-And flags is assigned in opp2420_data.c (e.g., RATE_IN_242X)
+Barry Song (4):
+      ARM: CSR: timer: do not initialise statics to 0 or NULL
+      ARM: CSR: timer: space required before the open parenthesis '('
+      ARM: CSR: prima2: fix trailing whitespace
+      ARM: CSR: clock: Fix indentation
 
-But yes, these are already defined RATE_INs and do not cross 8-bits,
-so no warnings even if flags is 8-bit and cpu_mask changed to 16-bit.
+ arch/arm/mach-prima2/clock.c  |    4 ++--
+ arch/arm/mach-prima2/prima2.c |    2 +-
+ arch/arm/mach-prima2/timer.c  |    4 ++--
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-What is your suggestion?
+2011/10/1 Arnd Bergmann <arnd@arndb.de>:
+> On Friday 23 September 2011, Barry Song wrote:
+>> Barry Song (4):
+>> ? ARM: CSR: timer: do not initialise statics to 0 or NULL
+>> ? ARM: CSR: timer: space required before the open parenthesis '('
+>> ? ARM: CSR: prima2: fix trailing whitespace
+>> ? ARM: CSR: clock: Fix indentation
+>>
+>> ?arch/arm/mach-prima2/clock.c ?| ? ?4 ++--
+>> ?arch/arm/mach-prima2/prima2.c | ? ?2 +-
+>> ?arch/arm/mach-prima2/timer.c ?| ? ?4 ++--
+>> ?3 files changed, 5 insertions(+), 5 deletions(-)
+>
+>
+> Hi Barry,
+>
+> Sorry for the late reply. This series and the one before all look good
+> to me, but I fear I'm losing track of the patches.
+>
+> Can you send me pull requests for each set (fixes, cleanups, other
+> changes) so I can be sure I get everything? If you have trouble
+> with git.kernel.org still being down, I can apply the patches
+> manually and let you double-check them, but that would be more
+> work for both of us I think.
+>
+> ? ? ? ?Arnd
 
-I see you mentioned "Also" in the above comment, but didn't see any
-comment preceeding.
-  
-> Could you please split the clock-related changes into a
-> separate patch?
-> Then this patch would just be the id.c and cpu.h changes.
-> 
-> Other than that, the patch looks okay to me.
-> 
-> 
-> - Paul
-
-Will do that.
-
-Thanks.
-   Hemant
+-barry
