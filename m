@@ -1,42 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 Oct 2011 17:12:48 +0100
-Subject: [PATCH 4/4] mmc: mmci: Fix incorrect handling of HW flow
-	control for SDIO
-In-Reply-To: <1317109616-18010-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1317109616-18010-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20111001161248.GG11710@n2100.arm.linux.org.uk>
+Date: Sat, 1 Oct 2011 17:23:57 +0100
+Subject: nr_cpus cmdline parameter not working
+In-Reply-To: <1317224117.2580.84.camel@deneb.redhat.com>
+References: <1317224117.2580.84.camel@deneb.redhat.com>
+Message-ID: <20111001162357.GH11710@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 09:46:56AM +0200, Ulf Hansson wrote:
->  	/* The ST Micro variants has a special bit to enable SDIO */
->  	if (variant->sdio && host->mmc->card)
-> -		if (mmc_card_sdio(host->mmc->card))
-> +		if (mmc_card_sdio(host->mmc->card)) {
-> +			/*
-> +			 * The ST Micro variants has a special bit
-> +			 * to enable SDIO.
-> +			 */
->  			datactrl |= MCI_ST_DPSM_SDIOEN;
+On Wed, Sep 28, 2011 at 11:35:16AM -0400, Mark Salter wrote:
+> I noticed that nr_cpus=1 doesn't appear to have any effect on a
+> pandaboard (and probably others from the looks of things). This
+> changes seems to be needed, but I'm not really sure if this is
+> the right thing or not.
+> 
+> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+> index ce65e93..a1198ac 100644
+> --- a/arch/arm/mach-omap2/omap-smp.c
+> +++ b/arch/arm/mach-omap2/omap-smp.c
+> @@ -117,6 +117,9 @@ void __init smp_init_cpus(void)
+>  		ncores = NR_CPUS;
+>  	}
 >  
-> +			/*
-> +			 * The ST Micro variant for SDIO transfer sizes
-> +			 * less then or equal to 8 bytes needs to have clock
-> +			 * H/W flow control disabled. Since flow control is
-> +			 * not really needed for anything that fits in the
-> +			 * FIFO, we can disable it for any write smaller
-> +			 * than the FIFO size.
-> +			 */
-> +			if ((host->size <= variant->fifosize) &&
-> +			    (data->flags & MMC_DATA_WRITE))
-> +				writel(readl(host->base + MMCICLOCK) &
-> +				       ~variant->clkreg_enable,
-> +				       host->base + MMCICLOCK);
-> +			else
-> +				writel(readl(host->base + MMCICLOCK) |
-> +				       variant->clkreg_enable,
-> +				       host->base + MMCICLOCK);
-> +		}
+> +	if (ncores > nr_cpu_ids)
+> +		ncores = nr_cpu_ids;
+> +
 
-Shouldn't this also re-enable the ST hardware flow control for non-SDIO
-cards?
+This potentially affects all SMP platforms, so the patch needs to be
+bigger than this.
+
+Also, I think the test above should be modified to use nr_cpu_ids
+rather than NR_CPUS, to be inline with what x86 does:
+
+        /* nr_cpu_ids could be reduced via nr_cpus= */
+        if (possible > nr_cpu_ids) {
+                printk(KERN_WARNING
+                        "%d Processors exceeds NR_CPUS limit of %d\n",
+                        possible, nr_cpu_ids);
+                possible = nr_cpu_ids;
+        }
+
+(This is essentially the same check that we're doing.)
+
+Could you have a look at this and cook up another patch covering the
+other SMP platforms please?
+
+Thanks.
