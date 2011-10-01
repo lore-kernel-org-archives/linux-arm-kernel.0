@@ -1,63 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 01 Oct 2011 18:45:04 +0200
-Subject: [GIT PULL] dmtimer changes for v3.2 merge window
-In-Reply-To: <201109302213.42435.arnd@arndb.de>
-References: <20110928220237.GE6324@atomide.com>
-	<201109302213.42435.arnd@arndb.de>
-Message-ID: <2793025.zWgRvMbLEl@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 1 Oct 2011 17:46:55 +0100
+Subject: [RFC PATCH 0/3] ARM: amba: defining module aliases for AMBA
+	driver autoloading
+In-Reply-To: <1317401802-24362-1-git-send-email-dave.martin@linaro.org>
+References: <1317401802-24362-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <20111001164655.GL11710@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 September 2011 22:13:42 Arnd Bergmann wrote:
-> On Thursday 29 September 2011, Tony Lindgren wrote:
-> > Please pull omap dmtimer changes from:
-> > 
-> > git://github.com/tmlind/linux.git dmtimer
-> > 
-> > This series completes the system timer separation from the
-> > driver like features. It also adds support for v2 ip that is
-> > available for some timers starting with omap4.
-> > 
-> > After this series arch/arm/plat-omap/dmtimer.c could be
-> > moved to live under drivers somewhere, but there is still
-> > discussion going on which features should be supported in
-> > a generic way.
-> > 
-> > This series depends on the cleanup you pulled earlier.
-> > As this series adds some new features like runtime PM suppport,
-> > I've kept it separate from cleanup.
+On Fri, Sep 30, 2011 at 05:56:39PM +0100, Dave Martin wrote:
+> Issues:
 > 
-> Looks really nice. I've put it into another top-level branch
-> named next/dmtimer for now. I'm open for suggestions on whether
-> I should generally push branches like this separately Linuswards
-> or better aggregate multiple standalone features into a single
-> branch. 
+>   * Do new module alises need to be globally agreed/registered
+>     somewhere?
 
-I'm adding the patch below to fix a trivial randconfig build regression
-in this series.
+I don't think there is.  Having the bus prefix in there is definitely a
+good thing.
 
-	Arnd
+>   * Because a driver's ID table is in match-and-mask format whereas
+>     udev uses string pattern matching, we effectively have to
+>     maintain two ID tables per driver, containing the same
+>     information in different formats.  The patch to mmci.c gives an
+>     example.
+> 
+>     I predict that maintenance of those duplicated tables will be
+>     somewhat painful and error-prone.  However, the necessary
+>     transformations, while simple, are beyond the scope of the C
+>     preprocessor.
+> 
+>     In order to avoid this duplication of information, an extra
+>     (but simple) bit of build-time infrastructure would be needed.
+> 
+>     I think this effort would be worth it -- does anyone have
+>     strong views on this?
 
-8<---
-
-Subject: [PATCH] ARM: omap: use __devexit_p in dmtimer driver
-
-The omap_dm_timer_remove function gets discarded when
-CONFIG_HOTPLUG is not set, so we must not reference it
-unconditionally.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index de7896f..2def4e1 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -723,7 +723,7 @@ static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
- 
- static struct platform_driver omap_dm_timer_driver = {
- 	.probe  = omap_dm_timer_probe,
--	.remove = omap_dm_timer_remove,
-+	.remove = __devexit_p(omap_dm_timer_remove),
- 	.driver = {
- 		.name   = "omap_timer",
- 	},
+I think there is some support for udev to use PCI ID tables directly.
+I don't know how that works - I suspect it requires module tools
+support though.  Might be worth investigating.
