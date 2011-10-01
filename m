@@ -1,29 +1,46 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Sat, 1 Oct 2011 12:39:21 +0200
-Subject: [PATCH] drivers: create a pin control subsystem v8
-In-Reply-To: <CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
-References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
-	<20110930020754.GK12606@ponder.secretlab.ca>
-	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
-	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
-Message-ID: <CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 1 Oct 2011 21:30:03 +0800
+Subject: [PATCH v4 3/7] arm/imx: add gic_handle_irq function
+In-Reply-To: <20110929142729.GM19318@S2100-06.ap.freescale.net>
+References: <1317200808-6275-1-git-send-email-shawn.guo@linaro.org>
+	<1317200808-6275-4-git-send-email-shawn.guo@linaro.org>
+	<20110929093409.GG23944@n2100.arm.linux.org.uk>
+	<20110929142729.GM19318@S2100-06.ap.freescale.net>
+Message-ID: <20111001133002.GK19807@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/30 Grant Likely <grant.likely@secretlab.ca>:
+On Thu, Sep 29, 2011 at 10:27:30PM +0800, Shawn Guo wrote:
+> On Thu, Sep 29, 2011 at 10:34:09AM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Sep 28, 2011 at 05:06:44PM +0800, Shawn Guo wrote:
+> > > +#ifdef CONFIG_SMP
+> > > +		else if (irqnr < 16) {
+> > > +			writel_relaxed(irqstat, gic_cpu_base_addr +
+> > > +						GIC_CPU_EOI);
+> > > +			do_IPI(irqnr, regs);
+> > > +		}
+> > > +#endif
+> > > +#ifdef CONFIG_LOCAL_TIMERS
+> > > +		else if (irqnr == 29) {
+> > > +			writel_relaxed(irqstat, gic_cpu_base_addr +
+> > > +						GIC_CPU_EOI);
+> > > +			do_local_timer(regs);
+> > > +		}
+> > > +#endif
+> > 
+> > As I've said for similar patches. neither of these two functions are
+> > designed to be called from another C function (because they're marked
+> > __exception or __exception_irq_entry).  Both of these markers tell the
+> > unwinder that a struct pt_regs is located directly above the functions
+> > stack frame.
+> > 
+> I'm also wondering the consequence of not doing so, because we are
+> seeing icip_handle_irq() and ichp_handle_irq() (arch/arm/mach-pxa/irq.c)
+> are doing the same thing, and we are not running into any problem with
+> above code.
+> 
+Sorry.  Please ignore the above.
 
->?I'm not convinced that the sysfs approach is
-> actually the right interface here (I'm certainly not a fan of the gpio
-> sysfs i/f), and I'd rather not be putting in unneeded stuff until the
-> userspace i/f is hammered out.
-
-Actually, thinking about it I cannot see what would be wrong
-with /dev/gpio0 & friends in the first place.
-
-Using sysfs as swiss army knife for custom I/O does not
-seem like it would be long-term viable so thanks for this
-observation, and I think we need /dev/gpio* put on some
-mental roadmap somewhere.
-
-Yours,
-Linus Walleij
+-- 
+Regards,
+Shawn
