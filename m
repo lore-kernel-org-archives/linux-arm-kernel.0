@@ -1,31 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat,  1 Oct 2011 22:03:51 +0200
-Subject: [PATCH 19/26] ARM: pxa: CPU_FREQ_TABLE is needed for CPU_FREQ
+Date: Sat,  1 Oct 2011 22:03:43 +0200
+Subject: [PATCH 11/26] ARM: pxa: allow building palm27x without pxafb
 In-Reply-To: <1317499438-14058-1-git-send-email-arnd@arndb.de>
 References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317499438-14058-20-git-send-email-arnd@arndb.de>
+Message-ID: <1317499438-14058-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pxa specific cpufreq code is based on the cpu_freq_table
-module, so we have to select that.
+The frame buffer device is defined conditionally on whether the
+driver is configured. However, the #ifdef guard around the
+declaration of palm27x_lcd_init also removes the visibility
+of the lcd mode declarations, which need to be available in
+order to build correctly, even if they are not defined in the
+end.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/include/mach/palm27x.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 71b0ccb..3b84eda 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1926,6 +1926,7 @@ config CPU_FREQ_PXA
- 	bool
- 	depends on CPU_FREQ && ARCH_PXA && PXA25x
- 	default y
-+	select CPU_FREQ_TABLE
- 	select CPU_FREQ_DEFAULT_GOV_USERSPACE
+diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h b/arch/arm/mach-pxa/include/mach/palm27x.h
+index 0a5e5ea..030a916 100644
+--- a/arch/arm/mach-pxa/include/mach/palm27x.h
++++ b/arch/arm/mach-pxa/include/mach/palm27x.h
+@@ -27,10 +27,10 @@ extern void __init palm27x_pm_init(unsigned long str_base);
+ static inline void palm27x_pm_init(unsigned long str_base) {}
+ #endif
  
- config CPU_FREQ_S3C
+-#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
+ extern struct pxafb_mode_info palm_320x480_lcd_mode;
+ extern struct pxafb_mode_info palm_320x320_lcd_mode;
+ extern struct pxafb_mode_info palm_320x320_new_lcd_mode;
++#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
+ extern void __init palm27x_lcd_init(int power,
+ 					struct pxafb_mode_info *mode);
+ #else
 -- 
 1.7.5.4
