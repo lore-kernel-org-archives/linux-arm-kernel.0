@@ -1,33 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat,  1 Oct 2011 22:03:50 +0200
-Subject: [PATCH 18/26] ARM: pxa: MTD_XIP is not actually working any more
+Date: Sat,  1 Oct 2011 22:03:52 +0200
+Subject: [PATCH 20/26] ARM: pxa: select FB_PXA on saar and tevorevb
 In-Reply-To: <1317499438-14058-1-git-send-email-arnd@arndb.de>
 References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317499438-14058-19-git-send-email-arnd@arndb.de>
+Message-ID: <1317499438-14058-21-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The headers files required for XIP support have moved around
-over the last few years, and the code no longer builds.
-Until someone fixes this, let's just disable support, leaving
-sa1100 as the only platform still supporting xip.
+The saar and tevorevb platforms call pxafb_smart_flush from board
+code, and that function is defined in the framebuffer code, so it
+cannot be disabled.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+ arch/arm/mach-pxa/Kconfig |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 570c9fd..71b0ccb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -619,7 +619,6 @@ config ARCH_PNX4008
- config ARCH_PXA
- 	bool "PXA2xx/PXA3xx-based"
- 	depends on MMU
--	select ARCH_MTD_XIP
- 	select ARCH_HAS_CPUFREQ
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index bb310d0..cd94f2f 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -61,11 +61,15 @@ config MACH_TAVOREVB
+ 	bool "PXA930 Evaluation Board (aka TavorEVB)"
+ 	select PXA3xx
+ 	select CPU_PXA930
++	select FB_PXA
++	select FB
+ 
+ config MACH_SAAR
+ 	bool "PXA930 Handheld Platform (aka SAAR)"
+ 	select PXA3xx
+ 	select CPU_PXA930
++	select FB_PXA
++	select FB
+ 
+ comment "Third Party Dev Platforms (sorted by vendor name)"
+ 
 -- 
 1.7.5.4
