@@ -1,39 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 Oct 2011 17:46:55 +0100
-Subject: [RFC PATCH 0/3] ARM: amba: defining module aliases for AMBA
-	driver autoloading
-In-Reply-To: <1317401802-24362-1-git-send-email-dave.martin@linaro.org>
-References: <1317401802-24362-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20111001164655.GL11710@n2100.arm.linux.org.uk>
+Date: Sat, 1 Oct 2011 17:51:05 +0100
+Subject: [PATCH v2 0/5] ARM: pxa: move gpio driver into drivers directory
+In-Reply-To: <20111001164241.GK11710@n2100.arm.linux.org.uk>
+References: <1317377960-11063-1-git-send-email-haojian.zhuang@marvell.com>
+	<20111001164241.GK11710@n2100.arm.linux.org.uk>
+Message-ID: <20111001165105.GM11710@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 05:56:39PM +0100, Dave Martin wrote:
-> Issues:
+On Sat, Oct 01, 2011 at 05:42:41PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 30, 2011 at 06:19:15PM +0800, Haojian Zhuang wrote:
+> > Changelog:
+> > v2:
+> > 	1. Remove gpio.c from mach-pxa & mach-mmp that is introduced from v1.
+> > 	2. Remove init function in gpio.c. Move the platfrom_device_register()
+> > 	   into platform driver.
+> > 	3. Initialize pxa_gpio_regs in gpio-pxa.c
+> > 	4. Simplify code of identifing pxa gpio series or mmp gpio series.
+> > 	5. Use linux/io.h instead of asm/io.h.
 > 
->   * Do new module alises need to be globally agreed/registered
->     somewhere?
+> This series looks fine to me.  You don't mention what it's based upon -
+> should I assume my gpio patch series?  If so, it looks fine to be
+> submitted to the patch system.
+> 
+> It would be nice to have a few acks from people against it first though.
 
-I don't think there is.  Having the bus prefix in there is definitely a
-good thing.
-
->   * Because a driver's ID table is in match-and-mask format whereas
->     udev uses string pattern matching, we effectively have to
->     maintain two ID tables per driver, containing the same
->     information in different formats.  The patch to mmci.c gives an
->     example.
-> 
->     I predict that maintenance of those duplicated tables will be
->     somewhat painful and error-prone.  However, the necessary
->     transformations, while simple, are beyond the scope of the C
->     preprocessor.
-> 
->     In order to avoid this duplication of information, an extra
->     (but simple) bit of build-time infrastructure would be needed.
-> 
->     I think this effort would be worth it -- does anyone have
->     strong views on this?
-
-I think there is some support for udev to use PCI ID tables directly.
-I don't know how that works - I suspect it requires module tools
-support though.  Might be worth investigating.
+I assume this clashes with patches 7103/1 and 7104/1 in the patch system.
+Should I ignore those two for the meantime?
