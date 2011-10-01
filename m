@@ -1,109 +1,29 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 01 Sep 2011 12:57:27 +0900
-Subject: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC EXYNOS4210.
-In-Reply-To: <4E5DF323.9020509@shipmail.org>
-References: <1314359274-21585-1-git-send-email-inki.dae@samsung.com>
-	<4E5DF323.9020509@shipmail.org>
-Message-ID: <001e01cc685b$439c4850$cad4d8f0$%dae@samsung.com>
+From: linus.ml.walleij@gmail.com (Linus Walleij)
+Date: Sat, 1 Oct 2011 12:39:21 +0200
+Subject: [PATCH] drivers: create a pin control subsystem v8
+In-Reply-To: <CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
+References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
+	<20110930020754.GK12606@ponder.secretlab.ca>
+	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
+	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
+Message-ID: <CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas.
+2011/9/30 Grant Likely <grant.likely@secretlab.ca>:
 
-> -----Original Message-----
-> From: Thomas Hellstrom [mailto:thomas at shipmail.org]
-> Sent: Wednesday, August 31, 2011 5:39 PM
-> To: Inki Dae
-> Cc: airlied at linux.ie; dri-devel at lists.freedesktop.org;
-> sw0312.kim at samsung.com; linux-kernel at vger.kernel.org;
-> kyungmin.park at samsung.com; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC][PATCH v3] DRM: add DRM Driver for Samsung SoC
-> EXYNOS4210.
-> 
-> On 08/26/2011 01:47 PM, Inki Dae wrote:
-> > This patch is a DRM Driver for Samsung SoC Exynos4210 and now enables
-> only FIMD yet
-> > but we will add HDMI support also in the future.
-> >
-> > this patch is based on git repository below:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/airlied/drm-2.6.git,
-> > branch name: drm-next
-> > commit-id: bcc65fd8e929a9d9d34d814d6efc1d2793546922
-> >
-> > you can refer to our working repository below:
-> > http://git.infradead.org/users/kmpark/linux-2.6-samsung
-> > branch name: samsung-drm
-> >
-> > We tried to re-use lowlevel codes of the FIMD driver(s3c-fb.c
-> > based on Linux framebuffer) but couldn't so because lowlevel codes
-> > of s3c-fb.c are included internally and so FIMD module of this driver
-> has
-> > its own lowlevel codes.
-> >
-> > We used GEM framework for buffer management and DMA APIs(dma_alloc_*)
-> > for buffer allocation. by using DMA API, we could use CMA later.
-> >
-> > Refer to this link for CMA(Continuous Memory Allocator):
-> > http://lkml.org/lkml/2011/7/20/45
-> >
-> > this driver supports only physically continuous memory(non-iommu).
-> >
-> > Links to previous versions of the patchset:
-> > v1:<  https://lwn.net/Articles/454380/>
-> > v2:<  http://www.spinics.net/lists/kernel/msg1224275.html>
-> >
-> > Changelog v2:
-> > DRM: add DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl command.
-> >
-> >       this feature maps user address space to physical memory region
-> >       once user application requests DRM_IOCTL_SAMSUNG_GEM_MMAP ioctl.
-> >
-> > DRM: code clean and add exception codes.
-> >
-> > Changelog v3:
-> > DRM: Support multiple irq.
-> >
-> >       FIMD and HDMI have their own irq handler but DRM Framework can
-> regiter only one irq handler
-> >       this patch supports mutiple irq for Samsung SoC.
-> >
-> > DRM: Consider modularization.
-> >
-> >       each DRM, FIMD could be built as a module.
-> >
-> > DRM: Have indenpendent crtc object.
-> >
-> >       crtc isn't specific to SoC Platform so this patch gets a crtc to
-be
-> used as common object.
-> >       created crtc could be attached to any encoder object.
-> >
-> > DRM: code clean and add exception codes.
-> >
-> > S
-> >
-> 
-> ...
-> 
-> > +static struct drm_ioctl_desc samsung_ioctls[] = {
-> > +	DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_CREATE, samsung_drm_gem_create_ioctl,
-> > +			DRM_UNLOCKED),
-> > +	DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_MAP_OFFSET,
-> > +			samsung_drm_gem_map_offset_ioctl, DRM_UNLOCKED),
-> > +	DRM_IOCTL_DEF_DRV(SAMSUNG_GEM_MMAP,
-> > +			samsung_drm_gem_mmap_ioctl, DRM_UNLOCKED),
-> > +};
-> >
-> 
-> What about security here? It looks to me like *any* user-space process
-> can create a gem object and quickly exhaust available DMA memory space,
-> potentially bringing the system down?
-> 
-> Likewise, there seems to be no owner check in the SAMSUNG_GEM_MMAP
-> ioctl, allowing any user-space process unlimited graphics buffer access?
-> 
-> /Thomas
-> 
+>?I'm not convinced that the sysfs approach is
+> actually the right interface here (I'm certainly not a fan of the gpio
+> sysfs i/f), and I'd rather not be putting in unneeded stuff until the
+> userspace i/f is hammered out.
 
-Right, we should consider security issue also as you mentioned above. thank
-you for your pointing out.
+Actually, thinking about it I cannot see what would be wrong
+with /dev/gpio0 & friends in the first place.
+
+Using sysfs as swiss army knife for custom I/O does not
+seem like it would be long-term viable so thanks for this
+observation, and I think we need /dev/gpio* put on some
+mental roadmap somewhere.
+
+Yours,
+Linus Walleij
