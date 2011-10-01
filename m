@@ -1,62 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat,  1 Oct 2011 21:21:58 +0200
-Subject: [PATCH 09/11] ARM: pci: always export pcibios_bus_to_resource
+Date: Sat,  1 Oct 2011 21:21:53 +0200
+Subject: [PATCH 04/11] ARM: allow building alignment.c without PROC_FS
 In-Reply-To: <1317496920-7764-1-git-send-email-arnd@arndb.de>
 References: <1317496920-7764-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317496920-7764-10-git-send-email-arnd@arndb.de>
+Message-ID: <1317496920-7764-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PCI drivers call pcibios_bus_to_resource directly,
-but it is only exported when CONFIG_HOTPLUG is set,
-because it was initially mean for pccard support.
-
-Moving the export out of the #ifdef lets us avoid these
-build errors:
-
-ERROR: "pcibios_bus_to_resource" [drivers/video/vt8623fb.ko] undefined!
-ERROR: "pcibios_bus_to_resource" [drivers/video/arkfb.ko] undefined!
-ERROR: "pcibios_bus_to_resource" [drivers/video/s3fb.ko] undefined!
+The two functions cpu_is_v6_unaligned and safe_usermode
+are only defined when CONFIG_PROC_FS is enabled, but
+are used outside of the #ifdef.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/kernel/bios32.c |    9 ++++-----
- 1 files changed, 4 insertions(+), 5 deletions(-)
+ arch/arm/mm/alignment.c |   20 ++++++++++----------
+ 1 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index d6df359..c0d9203 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -412,6 +412,9 @@ void pcibios_fixup_bus(struct pci_bus *bus)
- 	printk(KERN_INFO "PCI: bus%d: Fast back to back transfers %sabled\n",
- 		bus->number, (features & PCI_COMMAND_FAST_BACK) ? "en" : "dis");
- }
-+#ifdef CONFIG_HOTPLUG
-+EXPORT_SYMBOL(pcibios_fixup_bus);
-+#endif
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index cfbcf8b..c335c76 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -86,16 +86,6 @@ core_param(alignment, ai_usermode, int, 0600);
+ #define UM_FIXUP	(1 << 1)
+ #define UM_SIGNAL	(1 << 2)
  
- /*
-  * Convert from Linux-centric to bus-centric addresses for bridge devices.
-@@ -431,6 +434,7 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
- 	region->start = res->start - offset;
- 	region->end   = res->end - offset;
- }
-+EXPORT_SYMBOL(pcibios_resource_to_bus);
- 
- void __devinit
- pcibios_bus_to_resource(struct pci_dev *dev, struct resource *res,
-@@ -447,12 +451,7 @@ pcibios_bus_to_resource(struct pci_dev *dev, struct resource *res,
- 	res->start = region->start + offset;
- 	res->end   = region->end + offset;
- }
+-#ifdef CONFIG_PROC_FS
+-static const char *usermode_action[] = {
+-	"ignored",
+-	"warn",
+-	"fixup",
+-	"fixup+warn",
+-	"signal",
+-	"signal+warn"
+-};
 -
--#ifdef CONFIG_HOTPLUG
--EXPORT_SYMBOL(pcibios_fixup_bus);
--EXPORT_SYMBOL(pcibios_resource_to_bus);
- EXPORT_SYMBOL(pcibios_bus_to_resource);
--#endif
+ /* Return true if and only if the ARMv6 unaligned access model is in use. */
+ static bool cpu_is_v6_unaligned(void)
+ {
+@@ -123,6 +113,16 @@ static int safe_usermode(int new_usermode, bool warn)
+ 	return new_usermode;
+ }
  
- /*
-  * Swizzle the device pin each time we cross a bridge.
++#ifdef CONFIG_PROC_FS
++static const char *usermode_action[] = {
++	"ignored",
++	"warn",
++	"fixup",
++	"fixup+warn",
++	"signal",
++	"signal+warn"
++};
++
+ static int alignment_proc_show(struct seq_file *m, void *v)
+ {
+ 	seq_printf(m, "User:\t\t%lu\n", ai_user);
 -- 
 1.7.5.4
