@@ -1,41 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat,  1 Oct 2011 22:03:40 +0200
-Subject: [PATCH 08/26] ARM: pxa: move z2 to generic cpu_suspend
+Date: Sat,  1 Oct 2011 22:03:33 +0200
+Subject: [PATCH 01/26] usb/gadget/pxa25x: is_vbus_present is gone
 In-Reply-To: <1317499438-14058-1-git-send-email-arnd@arndb.de>
 References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317499438-14058-9-git-send-email-arnd@arndb.de>
+Message-ID: <1317499438-14058-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu_suspend code on pxa has recently changed, and the
-z2 board did not get updated yet. This makes it do the
-same as the other boards.
+A recent commit obsoleted the is_vbus_present function, so
+we must not use it any more.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-pxa/z2.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/usb/gadget/pxa25x_udc.h |    8 +-------
+ 1 files changed, 1 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index 6c9275a..109447b 100644
---- a/arch/arm/mach-pxa/z2.c
-+++ b/arch/arm/mach-pxa/z2.c
-@@ -31,6 +31,7 @@
- #include <linux/regulator/machine.h>
- #include <linux/i2c/pxa-i2c.h>
+diff --git a/drivers/usb/gadget/pxa25x_udc.h b/drivers/usb/gadget/pxa25x_udc.h
+index f572c56..6119900 100644
+--- a/drivers/usb/gadget/pxa25x_udc.h
++++ b/drivers/usb/gadget/pxa25x_udc.h
+@@ -161,8 +161,6 @@ static struct pxa25x_udc *the_controller;
  
-+#include <asm/suspend.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+ #ifdef DEBUG
  
-@@ -686,7 +687,7 @@ static void z2_power_off(void)
- 	 */
- 	PSPR = 0x0;
- 	local_irq_disable();
--	pxa27x_cpu_suspend(PWRMODE_DEEPSLEEP, PLAT_PHYS_OFFSET - PAGE_OFFSET);
-+	cpu_suspend(PWRMODE_DEEPSLEEP, pxa27x_finish_suspend);
- }
- #else
- #define z2_power_off   NULL
+-static int is_vbus_present(void);
+-
+ static const char *state_name[] = {
+ 	"EP0_IDLE",
+ 	"EP0_IN_DATA_PHASE", "EP0_OUT_DATA_PHASE",
+@@ -214,8 +212,7 @@ dump_state(struct pxa25x_udc *dev)
+ 	u32		tmp;
+ 	unsigned	i;
+ 
+-	DMSG("%s %s, uicr %02X.%02X, usir %02X.%02x, ufnr %02X.%02X\n",
+-		is_vbus_present() ? "host " : "disconnected",
++	DMSG("%s, uicr %02X.%02X, usir %02X.%02x, ufnr %02X.%02X\n",
+ 		state_name[dev->ep0state],
+ 		UICR1, UICR0, USIR1, USIR0, UFNRH, UFNRL);
+ 	dump_udccr("udccr");
+@@ -232,9 +229,6 @@ dump_state(struct pxa25x_udc *dev)
+ 	} else
+ 		DMSG("ep0 driver '%s'\n", dev->driver->driver.name);
+ 
+-	if (!is_vbus_present())
+-		return;
+-
+ 	dump_udccs0 ("udccs0");
+ 	DMSG("ep0 IN %lu/%lu, OUT %lu/%lu\n",
+ 		dev->stats.write.bytes, dev->stats.write.ops,
 -- 
 1.7.5.4
