@@ -1,29 +1,66 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 2 Oct 2011 00:34:45 +0530
-Subject: [PATCH] Add missing include of linux/ftrace.h
-In-Reply-To: <20111001171202.GA13684@gallagher>
-References: <1317309202-1001-1-git-send-email-jamie@jamieiles.com>
-	<20111001163511.GI11710@n2100.arm.linux.org.uk>
-	<20111001171202.GA13684@gallagher>
-Message-ID: <CAH+eYFBESAp8Hz6fBAqjWSgAkzPuAub4JqU4r3SDU+TQTRagBA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat,  1 Oct 2011 21:21:52 +0200
+Subject: [PATCH 03/11] ARM: always use ARM_UNWIND for thumb2 kernels
+In-Reply-To: <1317496920-7764-1-git-send-email-arnd@arndb.de>
+References: <1317496920-7764-1-git-send-email-arnd@arndb.de>
+Message-ID: <1317496920-7764-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 1, 2011 at 22:42, Jamie Iles <jamie@jamieiles.com> wrote:
-> diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
-> index de3dcab..61c1468 100644
-> --- a/arch/arm/kernel/irq.c
-> +++ b/arch/arm/kernel/irq.c
-> @@ -37,6 +37,7 @@
-> ?#include <linux/proc_fs.h>
-> ?#include <linux/ftrace.h>
+Thumb2 kernels cannot be built with frame pointers, but can use the
+ARM_UNWIND feature for unwinding instead. This makes sure that all
+features that rely on unwinding includeing CONFIG_LATENCYTOP and
+FAULT_INJECTION_STACKTRACE_FILTER do not enable frame pointers
+when the unwinder is already selected, and we always build with
+the unwinder when we want a thumb2 kernel, to make sure we do not
+get the frame pointers instead.
 
-You can probably git rid of this inclusion of ftrace.h from
-here and from smp.c, because they were added only for
-__exception_irq_entry.
+A different option would be to redefine the CONFIG_FRAME_POINTERS
+option on ARM to mean builing with either frame pointers or
+the unwinder, and then select which one to use based on the
+CPU architecture or another user option. That would still allow
+building thumb2 kernels without the unwinder but would also be
+more confusing.
 
->
-> +#include <asm/exception.h>
-> ?#include <asm/system.h>
-> ?#include <asm/mach/arch.h>
-> ?#include <asm/mach/irq.h>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/Kconfig  |    1 +
+ lib/Kconfig.debug |    4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 4e1eee0c..497af51 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1457,6 +1457,7 @@ config THUMB2_KERNEL
+ 	depends on CPU_V7 && !CPU_V6 && !CPU_V6K && EXPERIMENTAL
+ 	select AEABI
+ 	select ARM_ASM_UNIFIED
++	select ARM_UNWIND
+ 	help
+ 	  By enabling this option, the kernel will be compiled in
+ 	  Thumb-2 mode. A compiler/assembler that understand the unified
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index c0cb9c4..103c171 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -1081,7 +1081,7 @@ config FAULT_INJECTION_STACKTRACE_FILTER
+ 	depends on FAULT_INJECTION_DEBUG_FS && STACKTRACE_SUPPORT
+ 	depends on !X86_64
+ 	select STACKTRACE
+-	select FRAME_POINTER if !PPC && !S390 && !MICROBLAZE
++	select FRAME_POINTER if !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND
+ 	help
+ 	  Provide stacktrace filter for fault-injection capabilities
+ 
+@@ -1091,7 +1091,7 @@ config LATENCYTOP
+ 	depends on DEBUG_KERNEL
+ 	depends on STACKTRACE_SUPPORT
+ 	depends on PROC_FS
+-	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE
++	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND
+ 	select KALLSYMS
+ 	select KALLSYMS_ALL
+ 	select STACKTRACE
+-- 
+1.7.5.4
