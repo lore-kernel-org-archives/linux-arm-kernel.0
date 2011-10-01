@@ -1,35 +1,42 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 01 Oct 2011 15:55:05 -0500
-Subject: ARM SoC tree: OMAP PM dependency on tip irq/core
-In-Reply-To: <87k48pfyvg.fsf@ti.com>
-References: <87aa9mm8ts.fsf@ti.com> <87k48pfyvg.fsf@ti.com>
-Message-ID: <4E877E29.7000309@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 1 Oct 2011 23:39:14 +0100
+Subject: [PATCH v2] mach-ep93xx: break out GPIO driver specifics
+In-Reply-To: <CACRpkdazjpKZRfpoYgZ=kC+auEj9q-KMHa6qsWsD+5Hpji+96w@mail.gmail.com>
+References: <1316508132-20020-1-git-send-email-linus.walleij@stericsson.com>
+	<20110920174012.GE7781@ponder.secretlab.ca>
+	<CACRpkdazjpKZRfpoYgZ=kC+auEj9q-KMHa6qsWsD+5Hpji+96w@mail.gmail.com>
+Message-ID: <20111001223914.GP11710@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/30/2011 05:29 PM, Kevin Hilman wrote:
-> Hi Arnd,
+On Tue, Sep 20, 2011 at 10:32:13PM +0200, Linus Walleij wrote:
+> On Tue, Sep 20, 2011 at 7:40 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> > Which tree will this go through? ?I don't think it should go via the
+> > gpio tree since it is mostly within arch/arm.
 > 
-> Kevin Hilman <khilman@ti.com> writes:
-> 
->> The upcoming OMAP4 PM series from Santosh[1] that we're planning to
->> queue for v3.2 has a dependency[2] on a patch currently queued for v3.2
->> in the irq/core branch of Thomas' tip tree[3].
->>
->> In the past, I noticed you merged external trees like this to solve
->> dependencies.
->>
->> Could you pull the irq/core branch into your tree to meet this
->> dependency?
-> 
-> On second thought, since Santosh's branch is the only one with this
-> dependency (and we also have a dependency on Russell's devel-stable)
-> I'll just build up a branch for Santosh's series that includes
-> rmk/devel-stable and tglx/irq-core.
-> 
+> It'd dependent on Russells cleanups so it'll go through Russells
+> tree and his gpio cleanup branch there.
 
-Any new platforms will have a dependency on rmk/devel-stable with the
-mach header clean-up. I'll probably have a dependency on tglx's tree as
-well.
+It's dependent on other stuff elsewhere too:
 
-Rob
+error: patch failed: drivers/gpio/gpio-ep93xx.c:24
+error: drivers/gpio/gpio-ep93xx.c: patch does not apply
+
+According to your patch, line 24 onwards is:
+
+ #include <linux/module.h>
+ 
+ #include <mach/hardware.h>
+
+whereas I have this around line 24:
+
+ #include <linux/basic_mmio_gpio.h>
+ 
+ #include <mach/hardware.h>
+
+So I've applied this with GNU patch instead, accepting the one line of
+fuzz:
+
+Hunk #1 succeeded at 23 with fuzz 1 (offset -1 lines).
+
+As a result, I expect sfr will report a trivial merge conflict here.
