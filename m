@@ -1,26 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 Oct 2011 17:42:41 +0100
-Subject: [PATCH v2 0/5] ARM: pxa: move gpio driver into drivers directory
-In-Reply-To: <1317377960-11063-1-git-send-email-haojian.zhuang@marvell.com>
-References: <1317377960-11063-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20111001164241.GK11710@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 01 Oct 2011 18:45:04 +0200
+Subject: [GIT PULL] dmtimer changes for v3.2 merge window
+In-Reply-To: <201109302213.42435.arnd@arndb.de>
+References: <20110928220237.GE6324@atomide.com>
+	<201109302213.42435.arnd@arndb.de>
+Message-ID: <2793025.zWgRvMbLEl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 06:19:15PM +0800, Haojian Zhuang wrote:
-> Changelog:
-> v2:
-> 	1. Remove gpio.c from mach-pxa & mach-mmp that is introduced from v1.
-> 	2. Remove init function in gpio.c. Move the platfrom_device_register()
-> 	   into platform driver.
-> 	3. Initialize pxa_gpio_regs in gpio-pxa.c
-> 	4. Simplify code of identifing pxa gpio series or mmp gpio series.
-> 	5. Use linux/io.h instead of asm/io.h.
+On Friday 30 September 2011 22:13:42 Arnd Bergmann wrote:
+> On Thursday 29 September 2011, Tony Lindgren wrote:
+> > Please pull omap dmtimer changes from:
+> > 
+> > git://github.com/tmlind/linux.git dmtimer
+> > 
+> > This series completes the system timer separation from the
+> > driver like features. It also adds support for v2 ip that is
+> > available for some timers starting with omap4.
+> > 
+> > After this series arch/arm/plat-omap/dmtimer.c could be
+> > moved to live under drivers somewhere, but there is still
+> > discussion going on which features should be supported in
+> > a generic way.
+> > 
+> > This series depends on the cleanup you pulled earlier.
+> > As this series adds some new features like runtime PM suppport,
+> > I've kept it separate from cleanup.
+> 
+> Looks really nice. I've put it into another top-level branch
+> named next/dmtimer for now. I'm open for suggestions on whether
+> I should generally push branches like this separately Linuswards
+> or better aggregate multiple standalone features into a single
+> branch. 
 
-This series looks fine to me.  You don't mention what it's based upon -
-should I assume my gpio patch series?  If so, it looks fine to be
-submitted to the patch system.
+I'm adding the patch below to fix a trivial randconfig build regression
+in this series.
 
-It would be nice to have a few acks from people against it first though.
+	Arnd
 
-Thanks.
+8<---
+
+Subject: [PATCH] ARM: omap: use __devexit_p in dmtimer driver
+
+The omap_dm_timer_remove function gets discarded when
+CONFIG_HOTPLUG is not set, so we must not reference it
+unconditionally.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index de7896f..2def4e1 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -723,7 +723,7 @@ static int __devexit omap_dm_timer_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver omap_dm_timer_driver = {
+ 	.probe  = omap_dm_timer_probe,
+-	.remove = omap_dm_timer_remove,
++	.remove = __devexit_p(omap_dm_timer_remove),
+ 	.driver = {
+ 		.name   = "omap_timer",
+ 	},
