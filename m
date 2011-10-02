@@ -1,35 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:40 +0200
-Subject: [PATCH 10/30] ARM: omap/iommu: always provide iommu debug code
+Date: Sun,  2 Oct 2011 16:45:58 +0200
+Subject: [PATCH 28/30] ARM: omap: select CPU_FREQ_TABLE where needed
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-11-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-29-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iommu module on omap contains a few functions that are
-only used by the debug module. These are however only there
-when the debug code is built as a module. Since it is possible
-to build the debug code into the kernel, the functions should
-also be provided for the built-in case.
+The omap platform requires CPU_FREQ_TABLE support to be enabled for its
+CPU_FREQ implementations, so automatically select that when CPU_FREQ
+is enabled.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/plat-omap/iommu.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/plat-omap/Kconfig |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
-index 34fc31e..9d43ce1 100644
---- a/arch/arm/plat-omap/iommu.c
-+++ b/arch/arm/plat-omap/iommu.c
-@@ -391,7 +391,7 @@ void iommu_set_twl(struct iommu *obj, bool on)
- }
- EXPORT_SYMBOL_GPL(iommu_set_twl);
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index bb8f4a6..f7ef9f4 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -217,6 +217,11 @@ config OMAP_PM_NOOP
  
--#if defined(CONFIG_OMAP_IOMMU_DEBUG_MODULE)
-+#if defined(CONFIG_OMAP_IOMMU_DEBUG) || defined(CONFIG_OMAP_IOMMU_DEBUG_MODULE)
+ endchoice
  
- ssize_t iommu_dump_ctx(struct iommu *obj, char *buf, ssize_t bytes)
- {
++config OMAP_CPU_FREQ
++	def_bool "y"
++	depends on CPU_FREQ
++	select CPU_FREQ_TABLE
++
+ endmenu
+ 
+ endif
 -- 
 1.7.5.4
