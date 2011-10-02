@@ -1,46 +1,28 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun,  2 Oct 2011 16:20:14 +0800
-Subject: [PATCH v2] ARM: localtimer: add header linux/errno.h explicitly
-In-Reply-To: <1316798545-21128-1-git-send-email-shawn.guo@linaro.org>
-References: <1316798545-21128-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1317543614-22922-1-git-send-email-shawn.guo@linaro.org>
+Date: Sun,  2 Oct 2011 16:56:59 +0800
+Subject: [PATCH 0/2] Make IPI and localtimer handlers callable from C code
+Message-ID: <1317545821-23194-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Per the text in  Documentation/SubmitChecklist as below, we should
-explicitly have header linux/errno.h in localtimer.h for ENXIO
-reference.
+[Sorry for send you twice, Russell, Marc.  I forgot cc LAKML last time.]
 
-1: If you use a facility then #include the file that defines/declares
-   that facility.  Don't depend on other header files pulling in ones
-   that you use.
+With imx sub-architecture is moving to MULTI_IRQ_HANDLER, imx6q has to
+get a local gic_handler_irq() implementation calling IPI and localtimer
+handlers from C code, before Marc's global gic_handler_irq() series gets
+merged.
 
-Otherwise, we may run into some compiling error like the following one,
-if any file includes localtimer.h without CONFIG_LOCAL_TIMERS defined.
+This patch series changes the original __exception_irq_entry to a
+wrapper for actual IPI and localtimer handlers which are callable from
+C code now.
 
-  arch/arm/include/asm/localtimer.h: In function ?local_timer_setup?:
-  arch/arm/include/asm/localtimer.h:53:10: error: ?ENXIO? undeclared (first use in this function)
+Marc Zyngier (1):
+     ARM: smp: Add an IPI handler callable from C code
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v1:
- * Move the include towards the top of the file
+Shawn Guo (1):
+     ARM: smp: Add a localtimer handler callable from C code
 
- arch/arm/include/asm/localtimer.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index 080d74f..ff66638 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -10,6 +10,8 @@
- #ifndef __ASM_ARM_LOCALTIMER_H
- #define __ASM_ARM_LOCALTIMER_H
- 
-+#include <linux/errno.h>
-+
- struct clock_event_device;
- 
- /*
--- 
-1.7.4.1
+ arch/arm/include/asm/localtimer.h |    4 ++++
+ arch/arm/include/asm/smp.h        |    5 +++++
+ arch/arm/kernel/smp.c             |   10 ++++++++++
+ 3 files changed, 19 insertions(+), 0 deletions(-)
