@@ -1,34 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:55 +0200
-Subject: [PATCH 25/30] ARM: OMAP depends on MMU
+Date: Sun,  2 Oct 2011 16:45:49 +0200
+Subject: [PATCH 19/30] tty/serial/omap: console can only be built-in
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-26-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-20-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no way to build OMAP kernels without an MMU
-at this point because of dependencies on MMU-only functions.
-
-As long as nobody is interested in fixing this, let's just disable
-this platforms for nommu kernels.
+When the omap serial driver is built as a module, we must
+not allow the console driver to be selected, because consoles
+can not be loadable modules.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/tty/serial/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 5ebc5d9..e688ca4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -875,6 +875,7 @@ config ARCH_DAVINCI
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 4dcb37bb..eb04b2f 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1346,7 +1346,7 @@ config SERIAL_OMAP
  
- config ARCH_OMAP
- 	bool "TI OMAP"
-+	depends on MMU
- 	select HAVE_CLK
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_HAS_CPUFREQ
+ config SERIAL_OMAP_CONSOLE
+ 	bool "Console on OMAP serial port"
+-	depends on SERIAL_OMAP
++	depends on SERIAL_OMAP=y
+ 	select SERIAL_CORE_CONSOLE
+ 	help
+ 	  Select this option if you would like to use omap serial port as
 -- 
 1.7.5.4
