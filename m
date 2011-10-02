@@ -1,49 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 22:28:04 +0200
-Subject: [PATCH 6/6] ASoC: samsung: add missing __devexit_p() annotations
+Date: Sun,  2 Oct 2011 22:28:02 +0200
+Subject: [PATCH 4/6] ASoC: sh: use correct __iomem annotations
 In-Reply-To: <1317587284-2776-1-git-send-email-arnd@arndb.de>
 References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317587284-2776-7-git-send-email-arnd@arndb.de>
+Message-ID: <1317587284-2776-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drivers that refer to a __devexit function in an operations
-structure need to annotate that pointer with __devexit_p so
-replace it with a NULL pointer when the section gets discarded.
+This removes a few unnecessary type casts and avoids
+sparse warnings.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jassi Brar <jassisinghbrar@gmail.com>
-Cc: Sangbeom Kim <sbkim73@samsung.com>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
 ---
- sound/soc/samsung/ac97.c |    2 +-
- sound/soc/samsung/i2s.c  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/sh/fsi.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
-index f97110e..65ea538 100644
---- a/sound/soc/samsung/ac97.c
-+++ b/sound/soc/samsung/ac97.c
-@@ -495,7 +495,7 @@ static __devexit int s3c_ac97_remove(struct platform_device *pdev)
+diff --git a/sound/soc/sh/fsi.c b/sound/soc/sh/fsi.c
+index 8e112cc..916b9f9 100644
+--- a/sound/soc/sh/fsi.c
++++ b/sound/soc/sh/fsi.c
+@@ -210,7 +210,7 @@ struct fsi_master {
+  *		basic read write function
+  */
  
- static struct platform_driver s3c_ac97_driver = {
- 	.probe  = s3c_ac97_probe,
--	.remove = s3c_ac97_remove,
-+	.remove = __devexit_p(s3c_ac97_remove),
- 	.driver = {
- 		.name = "samsung-ac97",
- 		.owner = THIS_MODULE,
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index c086b78..0c9ac20 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -1136,7 +1136,7 @@ static __devexit int samsung_i2s_remove(struct platform_device *pdev)
+-static void __fsi_reg_write(u32 reg, u32 data)
++static void __fsi_reg_write(u32 __iomem *reg, u32 data)
+ {
+ 	/* valid data area is 24bit */
+ 	data &= 0x00ffffff;
+@@ -218,12 +218,12 @@ static void __fsi_reg_write(u32 reg, u32 data)
+ 	__raw_writel(data, reg);
+ }
  
- static struct platform_driver samsung_i2s_driver = {
- 	.probe  = samsung_i2s_probe,
--	.remove = samsung_i2s_remove,
-+	.remove = __devexit_p(samsung_i2s_remove),
- 	.driver = {
- 		.name = "samsung-i2s",
- 		.owner = THIS_MODULE,
+-static u32 __fsi_reg_read(u32 reg)
++static u32 __fsi_reg_read(u32 __iomem *reg)
+ {
+ 	return __raw_readl(reg);
+ }
+ 
+-static void __fsi_reg_mask_set(u32 reg, u32 mask, u32 data)
++static void __fsi_reg_mask_set(u32 __iomem *reg, u32 mask, u32 data)
+ {
+ 	u32 val = __fsi_reg_read(reg);
+ 
+@@ -250,7 +250,7 @@ static u32 _fsi_master_read(struct fsi_master *master, u32 reg)
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&master->lock, flags);
+-	ret = __fsi_reg_read((u32)(master->base + reg));
++	ret = __fsi_reg_read(master->base + reg);
+ 	spin_unlock_irqrestore(&master->lock, flags);
+ 
+ 	return ret;
+@@ -264,7 +264,7 @@ static void _fsi_master_mask_set(struct fsi_master *master,
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&master->lock, flags);
+-	__fsi_reg_mask_set((u32)(master->base + reg), mask, data);
++	__fsi_reg_mask_set(master->base + reg, mask, data);
+ 	spin_unlock_irqrestore(&master->lock, flags);
+ }
+ 
 -- 
 1.7.5.4
