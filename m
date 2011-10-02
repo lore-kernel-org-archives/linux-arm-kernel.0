@@ -1,103 +1,157 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Sun, 02 Oct 2011 16:09:08 +0200
-Subject: [PATCH 0/4] ARM: EXYNOS4: Support generic Power domain framework
-	for EXYNOS4210
-In-Reply-To: <001701cc80d2$02ee4940$08cadbc0$%kim@samsung.com>
-References: <4E4360B2.2060508@samsung.com> <201108132324.08137.rjw@sisk.pl>
-	<20110813213601.GA25866@n2100.arm.linux.org.uk>
-	<201108140139.46434.rjw@sisk.pl>
-	<001701cc80d2$02ee4940$08cadbc0$%kim@samsung.com>
-Message-ID: <4E887084.7000606@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun,  2 Oct 2011 16:45:32 +0200
+Subject: [PATCH 02/30] video/omap: fix dependencies
+In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2011 09:07 AM, Kukjin Kim wrote:
-> Rafael J. Wysocki wrote:
->>
->> On Saturday, August 13, 2011, Russell King - ARM Linux wrote:
->>> On Sat, Aug 13, 2011 at 11:24:07PM +0200, Rafael J. Wysocki wrote:
->>>> On Thursday, August 11, 2011, Chanwoo Choi wrote:
->>>>> The following patch set use the generic Power domain Framework
-> instead of
->>>>> power domain code depend of Samsung SoC.
->>>>>
->>>>> Chanwoo Choi (4):
->>>>>    ARM: EXYNOS4: Support for generic I/O power domains on EXYNOS4210
->>>>>    ARM: EXYNOS4: Support for generic Clock manipulation PM callbacks
->>>>>    ARM: EXYNOS4: Delete the power-domain code depend on Samsung SoC
->>>>>    ARM: EXYNOS4: Add power domain to use generic Power domain
-> Framework
->>>>>
->>>>>   arch/arm/mach-exynos4/Kconfig                      |   10 +-
->>>>>   arch/arm/mach-exynos4/Makefile                     |    4 +-
->>>>>   arch/arm/mach-exynos4/dev-pd.c                     |  139
-> --------------
->>>>>   arch/arm/mach-exynos4/include/mach/pm-exynos4210.h |   52 ++++++
->>>>>   arch/arm/mach-exynos4/include/mach/regs-clock.h    |    8 +
->>>>>   arch/arm/mach-exynos4/mach-nuri.c                  |   21 ++-
->>>>>   arch/arm/mach-exynos4/mach-smdkc210.c              |   26 ++-
->>>>>   arch/arm/mach-exynos4/mach-smdkv310.c              |   23 ++-
->>>>>   arch/arm/mach-exynos4/mach-universal_c210.c        |   21 ++-
->>>>>   arch/arm/mach-exynos4/pm-exynos4210.c              |  189
-> ++++++++++++++++++++
->>>>>   arch/arm/mach-exynos4/pm-runtime.c                 |   56 ++++++
->>>>>   arch/arm/plat-samsung/Kconfig                      |    8 -
->>>>>   arch/arm/plat-samsung/Makefile                     |    4 -
->>>>>   arch/arm/plat-samsung/include/plat/pd.h            |   30 ---
->>>>>   arch/arm/plat-samsung/pd.c                         |   95
-> ----------
->>>>>   15 files changed, 377 insertions(+), 309 deletions(-)
->>>>>   delete mode 100644 arch/arm/mach-exynos4/dev-pd.c
->>>>>   create mode 100644
-> arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
->>>>>   create mode 100644 arch/arm/mach-exynos4/pm-exynos4210.c
->>>>>   create mode 100644 arch/arm/mach-exynos4/pm-runtime.c
->>>>>   delete mode 100644 arch/arm/plat-samsung/include/plat/pd.h
->>>>>   delete mode 100644 arch/arm/plat-samsung/pd.c
->>>>
->>>> The patchset looks good to me, but please note that some code it
->>>> is based on will most likely change in 3.2 due to this patchset:
->>>>
->>>> https://lkml.org/lkml/2011/8/8/420
->>>
->>> Err, isn't all that pm_clk stuff just duplicating what the clk API does?
->>
->> I'm not sure it's duplicating anything.  Maybe it does, but it came into
->> being by moving some code that were duplicated in a few places throughout
->> the ARM and sh trees into one place.
->>
->>> IOW, drivers _can_ (and should be) calling clk_disable() when they don't
->>> need the clock running.
->>
->> Drivers may not know about what to do in a given situation.  For example,
->> if the system has power domains, it may be better to switch a power domain
->> off instead of or in addition to disabling the clock and the driver
-> usually
->> doesn't know about that.
->>
-> Hmm... Even though each driver cannot know the given situation, the driver
-> can know each own clock should be alive or not. I think, if clock gating
-> (enable, disable clock) is required, it should be handled in each driver. In
-> addition, the clock and power are not always one-on-one match.
+The lcd_2430sdp and lcd_ldp drivers depend on TWL4030, which is not
+well expressed in the Kconfig. Create new configuration options for
+these in order to describe the dependencies correctly.
 
-AFAICS the genpd API doesn't for an architecture to move the clocks' control
-out from drivers, it can be decided on individual basis for each clock. 
-With Chanwoo's patches at least exynos power domains and global clock gates 
-for devices (S5P_CLKGATE_BLOCK) are handled through the common API.
+In some cases, the driver cannot be a loadable module, so better
+force it to be built-in.
 
-Also, it's not quite clear to me, can't the pm_clk_* calls be used by the drivers
-to control the clocks as they need ?
+While we're at it, simplify the Makefile syntax.
 
-Last time I looked at the genpd API, an important drawback was that pm_clk_suspend/
-pm_clk_resume couldn't be used in interrupt context. Now it seems the mutexes in
-the core functions has been replaced with spinlocks and such limitation is gone.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ drivers/video/omap/Kconfig  |   41 +++++++++++++++++++++++++---
+ drivers/video/omap/Makefile |   64 ++++++++++++++++++++-----------------------
+ 2 files changed, 67 insertions(+), 38 deletions(-)
 
-I'm considering using pm_clk* calls to implement clock gating in a video codec
-driver. If, for instance, frame period is 30 ms and processing in the device takes
-only 10 ms, significant power savings could be achieved by turning the clocks off
-for the 20 ms idle period.  
-
-
---
-Thanks, 
-Sylwester
+diff --git a/drivers/video/omap/Kconfig b/drivers/video/omap/Kconfig
+index 196fa2e..bd15431 100644
+--- a/drivers/video/omap/Kconfig
++++ b/drivers/video/omap/Kconfig
+@@ -1,11 +1,11 @@
+ config FB_OMAP
+-	tristate "OMAP frame buffer support (EXPERIMENTAL)"
+-	depends on FB && (OMAP2_DSS = "n")
++	bool "OMAP frame buffer support (EXPERIMENTAL)"
++	# cannot be a module if more than one LCD driver is linked in
++	depends on (FB = "y") && (OMAP2_DSS = "n")
+ 	depends on ARCH_OMAP1 || ARCH_OMAP2 || ARCH_OMAP3
+ 	select FB_CFB_FILLRECT
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
+-	select TWL4030_CORE if MACH_OMAP_2430SDP
+ 	help
+           Frame buffer driver for OMAP based boards.
+ 
+@@ -105,4 +105,37 @@ config FB_OMAP_DMA_TUNE
+           answer yes. Answer no if you have a dedicated video
+           memory, or don't use any of the accelerated features.
+ 
+-
++config FB_OMAP_SOSSI
++	def_bool y
++	depends on ARCH_OMAP1
++	depends on FB_OMAP_LCDC_EXTERNAL
++
++config FB_OMAP_RFBI
++	def_bool y
++	depends on ARCH_OMAP2 || ARCH_OMAP3
++	depends on FB_OMAP_LCDC_EXTERNAL
++
++config FB_OMAP_INN1610
++	def_bool y
++	depends on ARCH_OMAP16XX
++	depends on MACH_OMAP_INNOVATOR
++
++config FB_OMAP_INN1510
++	def_bool y
++	depends on ARCH_OMAP15XX
++	depends on MACH_OMAP_INNOVATOR
++
++config FB_OMAP_OMAP3EVM
++	def_bool y
++	depends on MACH_OMAP3EVM
++	depends on TWL4030_CORE
++
++config FB_OMAP_X430SDP
++	def_bool y
++	depends on MACH_OMAP_2430SDP || MACH_OMAP_3430SDP
++	depends on TWL4030_CORE
++
++config FB_OMAP_LDP
++	def_bool y
++	depends on MACH_OMAP_LDP
++	depends on TWL4030_CORE
+diff --git a/drivers/video/omap/Makefile b/drivers/video/omap/Makefile
+index 25db556..8c2cd56 100644
+--- a/drivers/video/omap/Makefile
++++ b/drivers/video/omap/Makefile
+@@ -4,37 +4,33 @@
+ 
+ obj-$(CONFIG_FB_OMAP) += omapfb.o
+ 
+-objs-yy := omapfb_main.o
+-
+-objs-y$(CONFIG_ARCH_OMAP1) += lcdc.o
+-objs-y$(CONFIG_ARCH_OMAP2) += dispc.o
+-objs-y$(CONFIG_ARCH_OMAP3) += dispc.o
+-
+-objs-$(CONFIG_ARCH_OMAP1)$(CONFIG_FB_OMAP_LCDC_EXTERNAL) += sossi.o
+-objs-$(CONFIG_ARCH_OMAP2)$(CONFIG_FB_OMAP_LCDC_EXTERNAL) += rfbi.o
+-
+-objs-y$(CONFIG_FB_OMAP_LCDC_HWA742) += hwa742.o
+-objs-y$(CONFIG_FB_OMAP_LCDC_BLIZZARD) += blizzard.o
+-
+-objs-y$(CONFIG_MACH_AMS_DELTA) += lcd_ams_delta.o
+-objs-y$(CONFIG_MACH_OMAP_H4) += lcd_h4.o
+-objs-y$(CONFIG_MACH_OMAP_H3) += lcd_h3.o
+-objs-y$(CONFIG_MACH_OMAP_PALMTE) += lcd_palmte.o
+-objs-y$(CONFIG_MACH_OMAP_PALMTT) += lcd_palmtt.o
+-objs-y$(CONFIG_MACH_OMAP_PALMZ71) += lcd_palmz71.o
+-objs-$(CONFIG_ARCH_OMAP16XX)$(CONFIG_MACH_OMAP_INNOVATOR) += lcd_inn1610.o
+-objs-$(CONFIG_ARCH_OMAP15XX)$(CONFIG_MACH_OMAP_INNOVATOR) += lcd_inn1510.o
+-objs-y$(CONFIG_MACH_OMAP_OSK) += lcd_osk.o
+-
+-objs-y$(CONFIG_MACH_OMAP_APOLLON) += lcd_apollon.o
+-objs-y$(CONFIG_MACH_OMAP_2430SDP) += lcd_2430sdp.o
+-objs-y$(CONFIG_MACH_OMAP_3430SDP) += lcd_2430sdp.o
+-objs-y$(CONFIG_MACH_OMAP_LDP) += lcd_ldp.o
+-objs-y$(CONFIG_MACH_OMAP3EVM) += lcd_omap3evm.o
+-objs-y$(CONFIG_MACH_OMAP3_BEAGLE) += lcd_omap3beagle.o
+-objs-y$(CONFIG_FB_OMAP_LCD_MIPID) += lcd_mipid.o
+-objs-y$(CONFIG_MACH_OVERO) += lcd_overo.o
+-objs-y$(CONFIG_MACH_HERALD) += lcd_htcherald.o
+-
+-omapfb-objs := $(objs-yy)
+-
++omapfb-y				+= omapfb_main.o
++
++omapfb-$(CONFIG_ARCH_OMAP1)		+= lcdc.o
++omapfb-$(CONFIG_ARCH_OMAP2)		+= dispc.o
++omapfb-$(CONFIG_ARCH_OMAP3)		+= dispc.o
++
++omapfb-$(CONFIG_FB_OMAP_SOSSI)		+= sossi.o
++omapfb-$(CONFIG_FB_OMAP_RFBI)		+= rfbi.o
++
++omapfb-$(CONFIG_FB_OMAP_LCDC_HWA742)	+= hwa742.o
++omapfb-$(CONFIG_FB_OMAP_LCDC_BLIZZARD)	+= blizzard.o
++
++omapfb-$(CONFIG_MACH_AMS_DELTA)		+= lcd_ams_delta.o
++omapfb-$(CONFIG_MACH_OMAP_H4)		+= lcd_h4.o
++omapfb-$(CONFIG_MACH_OMAP_H3)		+= lcd_h3.o
++omapfb-$(CONFIG_MACH_OMAP_PALMTE)	+= lcd_palmte.o
++omapfb-$(CONFIG_MACH_OMAP_PALMTT)	+= lcd_palmtt.o
++omapfb-$(CONFIG_MACH_OMAP_PALMZ71)	+= lcd_palmz71.o
++omapfb-$(CONFIG_FB_OMAP_INN1610)	+= lcd_inn1610.o
++omapfb-$(CONFIG_FB_OMAP_INN1510)	+= lcd_inn1510.o
++omapfb-$(CONFIG_MACH_OMAP_OSK)		+= lcd_osk.o
++
++omapfb-$(CONFIG_MACH_OMAP_APOLLON)	+= lcd_apollon.o
++omapfb-$(CONFIG_FB_OMAP_X430SDP)	+= lcd_2430sdp.o
++omapfb-$(CONFIG_FB_OMAP_LDP)		+= lcd_ldp.o
++omapfb-$(CONFIG_FB_OMAP_OMAP3EVM)	+= lcd_omap3evm.o
++omapfb-$(CONFIG_MACH_OMAP3_BEAGLE)	+= lcd_omap3beagle.o
++omapfb-$(CONFIG_FB_OMAP_LCD_MIPID)	+= lcd_mipid.o
++omapfb-$(CONFIG_MACH_OVERO)		+= lcd_overo.o
++omapfb-$(CONFIG_MACH_HERALD)		+= lcd_htcherald.o
+-- 
+1.7.5.4
