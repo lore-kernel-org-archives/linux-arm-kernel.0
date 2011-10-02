@@ -1,47 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 1 Oct 2011 23:46:21 +0100
-Subject: [PATCH 2/2 v2] plat-pxa: break out GPIO driver specifics
-In-Reply-To: <1317121014-4749-1-git-send-email-linus.walleij@stericsson.com>
-References: <1317121014-4749-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20111001224621.GR11710@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 02 Oct 2011 09:03:58 +0200
+Subject: ARM SoC tree: OMAP PM dependency on tip irq/core
+In-Reply-To: <4E877E29.7000309@gmail.com>
+References: <87aa9mm8ts.fsf@ti.com> <87k48pfyvg.fsf@ti.com>
+	<4E877E29.7000309@gmail.com>
+Message-ID: <1988740.uJMkcEa7Kl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2011 at 12:56:54PM +0200, Linus Walleij wrote:
-> diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
-> index 98e25d9..32776f3 100644
-> --- a/arch/arm/mach-mmp/gplugd.c
-> +++ b/arch/arm/mach-mmp/gplugd.c
-> @@ -9,11 +9,11 @@
->   */
->  
->  #include <linux/init.h>
-> +#include <linux/gpio.h>
->  
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
->  
-> -#include <mach/gpio.h>
->  #include <mach/pxa168.h>
->  #include <mach/mfp-pxa168.h>
->  
+On Saturday 01 October 2011 15:55:05 Rob Herring wrote:
+> > 
+> > Kevin Hilman <khilman@ti.com> writes:
+> > 
+> >> The upcoming OMAP4 PM series from Santosh[1] that we're planning to
+> >> queue for v3.2 has a dependency[2] on a patch currently queued for v3.2
+> >> in the irq/core branch of Thomas' tip tree[3].
+> >>
+> >> In the past, I noticed you merged external trees like this to solve
+> >> dependencies.
+> >>
+> >> Could you pull the irq/core branch into your tree to meet this
+> >> dependency?
+> > 
+> > On second thought, since Santosh's branch is the only one with this
+> > dependency (and we also have a dependency on Russell's devel-stable)
+> > I'll just build up a branch for Santosh's series that includes
+> > rmk/devel-stable and tglx/irq-core.
+> > 
+> 
+> Any new platforms will have a dependency on rmk/devel-stable with the
+> mach header clean-up. I'll probably have a dependency on tglx's tree as
+> well.
 
-Mine looks like:
+Good point. Also, I think in general it's better if I try to keep track
+of the depencies myself, so I don't accidentally submit patches upstream
+that belong into someone else's realm.
 
-diff --git a/arch/arm/mach-mmp/gplugd.c b/arch/arm/mach-mmp/gplugd.c
-index c070c24..ef738de 100644
---- a/arch/arm/mach-mmp/gplugd.c
-+++ b/arch/arm/mach-mmp/gplugd.c
-@@ -9,11 +9,11 @@
-  */
+I haven't come up with a good scheme for that yet. Right now I just
+add a depends/* branch and try to remember which branches depend on
+that. If it gets harder than this, I'll have to write it down somewhere,
+but it would be nice to have some tool that can automatically warn
+if I try to submit something that has an unfulfilled dependency.
 
- #include <linux/init.h>
-+#include <linux/gpio.h>
-
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-
--#include <mach/gpio.h>
- #include <mach/pxa168.h>
- #include <mach/mfp-pxa168.h>
- #include <mach/mfp-gplugd.h>
+	Arnd
