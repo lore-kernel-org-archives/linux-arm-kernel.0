@@ -1,31 +1,35 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 2 Oct 2011 18:34:52 +0200
-Subject: [PATCH 10/30] ARM: omap/iommu: always provide iommu debug code
-In-Reply-To: <1317566760-25681-11-git-send-email-arnd@arndb.de>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Sun, 2 Oct 2011 20:40:35 +0300
+Subject: [PATCH 21/30] sound/soc/omap: limit to omap2plus
+In-Reply-To: <1317566760-25681-22-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-11-git-send-email-arnd@arndb.de>
-Message-ID: <CAK=WgbY-1VU5tJNxaJmP+8xqxV+XHjFeV=hjmxpZNuQJdKg=BQ@mail.gmail.com>
+	<1317566760-25681-22-git-send-email-arnd@arndb.de>
+Message-ID: <20111002204035.2e5b98943ed5137fd689b9be@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 2, 2011 at 4:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The iommu module on omap contains a few functions that are
-> only used by the debug module. These are however only there
-> when the debug code is built as a module. Since it is possible
-> to build the debug code into the kernel, the functions should
-> also be provided for the built-in case.
->
+On Sun,  2 Oct 2011 16:45:51 +0200
+Arnd Bergmann <arnd@arndb.de> wrote:
+
+> These drivers do not build correctly on omap1, so only allow
+> selecting them on omap2 or higher.
+> 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jarkko Nikula <jarkko.nikula@bitmer.com>
+> Cc: Liam Girdwood <lrg@ti.com>
 > ---
-> ?arch/arm/plat-omap/iommu.c | ? ?2 +-
+Strange. I'm able to build them fine with omap1_defconfig and with two
+supported OMAP1 ASoC machine drivers we have:
 
-Thanks, Arnd.
+CONFIG_SND_OMAP_SOC_AMS_DELTA=y
+CONFIG_SND_OMAP_SOC_OSK5912=y
 
-The driver has moved to drivers/iommu/ and changed a bit, but this
-patch is still relevant.
+What's the error you are seeing? I guess there might be some missing
+dependency that doesn't get visible with omap1_defconfig.
 
-The merge conflict will be trivial to resolve, but if you prefer, we
-can prevent it by taking this patch via the iommu tree.
+I would like to get that fixed instead of disabling OMAP1 ASoC support
+as the ams-delta in kernel is alive device thanks to active developer
+Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>.
 
-Thanks,
-Ohad.
+-- 
+Jarkko
