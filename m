@@ -1,942 +1,415 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 02 Oct 2011 18:25:30 +0900
-Subject: [PATCH] ARM: EXYNOS: Add ARCH_EXYNOS and reorganize
-	arch/arm/mach-exynos
-Message-ID: <001f01cc80e5$3abd1c80$b0375580$%kim@samsung.com>
+Date: Sun, 02 Oct 2011 18:25:36 +0900
+Subject: [GIT PULL] Samsung devel-2 for v3.2
+Message-ID: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch/arm/mach-exynos4 directory (CONFIG_ARCH_EXYNOS4) has
-made for plaforms based on EXYNOS4 SoCs. But since upcoming
-Samsung's SoCs such as EXYNOS5 (ARM Cortex A15) can reuse most
-codes in current mach-exynos4, one mach-exynos directory will
-be used for them.
+Hi Arnd,
 
-This patch changes to CONFIG_ARCH_EXYNOS (arch/arm/mach-exynos)
-but keeps original CONFIG_ARCH_EXYNOS4 in mach-exynos/Kconfig to
-avoid changing in driver side.
+This is Samsung devel for v3.2. which includes consolidation work for dma-pl330 and gpio-samsung.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
-NOTE: The codes for upcoming SoCs will be implemented soon.
+Please pull from:
+  git://github.com/kgene/linux-samsung.git next-samsung-devel-2
 
- arch/arm/Kconfig                                   |    8 +-
- arch/arm/Makefile                                  |    2 +-
- arch/arm/configs/exynos4_defconfig                 |    7 +--
- arch/arm/{mach-exynos4 => mach-exynos}/Kconfig     |   41 +++++++++---
- arch/arm/{mach-exynos4 => mach-exynos}/Makefile    |    8 +-
- .../{mach-exynos4 => mach-exynos}/Makefile.boot    |    0
- .../clock-exynos4210.c                             |    0
- .../clock-exynos4212.c                             |    0
- arch/arm/{mach-exynos4 => mach-exynos}/clock.c     |    0
- arch/arm/{mach-exynos4 => mach-exynos}/cpu.c       |   69 +++++++++++---------
- arch/arm/{mach-exynos4 => mach-exynos}/cpuidle.c   |    0
- arch/arm/{mach-exynos4 => mach-exynos}/dev-ahci.c  |    0
- arch/arm/{mach-exynos4 => mach-exynos}/dev-audio.c |    0
- arch/arm/{mach-exynos4 => mach-exynos}/dev-dwmci.c |    0
- arch/arm/{mach-exynos4 => mach-exynos}/dev-pd.c    |    0
- .../arm/{mach-exynos4 => mach-exynos}/dev-sysmmu.c |    0
- arch/arm/{mach-exynos4 => mach-exynos}/dma.c       |    0
- arch/arm/{mach-exynos4 => mach-exynos}/headsmp.S   |    0
- arch/arm/{mach-exynos4 => mach-exynos}/hotplug.c   |    0
- .../include/mach/debug-macro.S                     |    0
- .../include/mach/dma.h                             |    0
- .../include/mach/dwmci.h                           |    0
- .../include/mach/entry-macro.S                     |    0
- .../include/mach/exynos4-clock.h                   |    0
- .../include/mach/gpio.h                            |    0
- .../include/mach/hardware.h                        |    0
- .../include/mach/io.h                              |    0
- .../include/mach/irqs.h                            |    0
- .../include/mach/map.h                             |   32 ++++++----
- .../include/mach/memory.h                          |    0
- .../include/mach/pm-core.h                         |    0
- .../include/mach/pmu.h                             |    0
- .../include/mach/regs-audss.h                      |    0
- .../include/mach/regs-clock.h                      |    0
- .../include/mach/regs-gpio.h                       |    0
- .../include/mach/regs-irq.h                        |    0
- .../include/mach/regs-mct.h                        |    0
- .../include/mach/regs-mem.h                        |    0
- .../include/mach/regs-pmu.h                        |    0
- .../include/mach/regs-sysmmu.h                     |    0
- .../include/mach/regs-usb-phy.h                    |    0
- .../include/mach/sysmmu.h                          |    0
- .../include/mach/system.h                          |    0
- .../include/mach/timex.h                           |    0
- .../include/mach/uncompress.h                      |    0
- .../include/mach/vmalloc.h                         |    0
- arch/arm/{mach-exynos4 => mach-exynos}/init.c      |    0
- .../{mach-exynos4 => mach-exynos}/irq-combiner.c   |    0
- arch/arm/{mach-exynos4 => mach-exynos}/irq-eint.c  |    0
- .../mach-armlex4210.c                              |    0
- arch/arm/{mach-exynos4 => mach-exynos}/mach-nuri.c |    0
- .../{mach-exynos4 => mach-exynos}/mach-origen.c    |    0
- .../{mach-exynos4 => mach-exynos}/mach-smdk4x12.c  |    0
- .../{mach-exynos4 => mach-exynos}/mach-smdkv310.c  |    0
- .../mach-universal_c210.c                          |    0
- arch/arm/{mach-exynos4 => mach-exynos}/mct.c       |    0
- arch/arm/{mach-exynos4 => mach-exynos}/platsmp.c   |    0
- arch/arm/{mach-exynos4 => mach-exynos}/pm.c        |    0
- arch/arm/{mach-exynos4 => mach-exynos}/pmu.c       |    0
- .../arm/{mach-exynos4 => mach-exynos}/setup-fimc.c |    0
- .../{mach-exynos4 => mach-exynos}/setup-fimd0.c    |    0
- .../arm/{mach-exynos4 => mach-exynos}/setup-i2c0.c |    0
- .../arm/{mach-exynos4 => mach-exynos}/setup-i2c1.c |    0
- .../arm/{mach-exynos4 => mach-exynos}/setup-i2c2.c |    0
- .../arm/{mach-exynos4 => mach-exynos}/setup-i2c3.c |    0
- .../arm/{mach-exynos4 => mach-exynos}/setup-i2c4.c |    0
- .../arm/{mach-exynos4 => mach-exynos}/setup-i2c5.c |    0
- .../arm/{mach-exynos4 => mach-exynos}/setup-i2c6.c |    0
- .../arm/{mach-exynos4 => mach-exynos}/setup-i2c7.c |    0
- .../{mach-exynos4 => mach-exynos}/setup-keypad.c   |    0
- .../setup-sdhci-gpio.c                             |    0
- .../{mach-exynos4 => mach-exynos}/setup-sdhci.c    |    0
- .../{mach-exynos4 => mach-exynos}/setup-usb-phy.c  |    0
- arch/arm/{mach-exynos4 => mach-exynos}/sleep.S     |    0
- arch/arm/plat-s5p/Kconfig                          |    2 +-
- arch/arm/plat-s5p/cpu.c                            |    6 +-
- arch/arm/plat-samsung/include/plat/exynos4.h       |    6 +-
- 77 files changed, 104 insertions(+), 77 deletions(-)
- rename arch/arm/{mach-exynos4 => mach-exynos}/Kconfig (91%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/Makefile (89%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/Makefile.boot (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/clock-exynos4210.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/clock-exynos4212.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/clock.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/cpu.c (91%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/cpuidle.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/dev-ahci.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/dev-audio.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/dev-dwmci.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/dev-pd.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/dev-sysmmu.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/dma.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/headsmp.S (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/hotplug.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/debug-macro.S (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/dma.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/dwmci.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/entry-macro.S (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/exynos4-clock.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/gpio.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/hardware.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/io.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/irqs.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/map.h (93%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/memory.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/pm-core.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/pmu.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-audss.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-clock.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-gpio.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-irq.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-mct.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-mem.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-pmu.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-sysmmu.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-usb-phy.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/sysmmu.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/system.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/timex.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/uncompress.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/vmalloc.h (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/init.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/irq-combiner.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/irq-eint.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/mach-armlex4210.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/mach-nuri.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/mach-origen.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/mach-smdk4x12.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/mach-smdkv310.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/mach-universal_c210.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/mct.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/platsmp.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/pm.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/pmu.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-fimc.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-fimd0.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c0.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c1.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c2.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c3.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c4.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c5.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c6.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c7.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-keypad.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-sdhci-gpio.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-sdhci.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/setup-usb-phy.c (100%)
- rename arch/arm/{mach-exynos4 => mach-exynos}/sleep.S (100%)
+And the next-samsung-devel-2 is based on v3.1-rc8 plus next-samsung-cleanup and next-samsung-board which have been sent to arm-soc
+because it has many dependencies with them so if they are missed, many conflicts will be happened. As a note, I have merged Vinod's
+samsung_dma tree for dma-pl330 samsung stuff from:
+  git://git.infradead.org/users/vkoul/slave-dma into next/topic-dma-samsung
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index bea81d0..21dbf01 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -781,8 +781,8 @@ config ARCH_S5PV210
- 	help
- 	  Samsung S5PV210/S5PC110 series based systems
- 
--config ARCH_EXYNOS4
--	bool "Samsung EXYNOS4"
-+config ARCH_EXYNOS
-+	bool "SAMSUNG EXYNOS"
- 	select CPU_V7
- 	select ARCH_SPARSEMEM_ENABLE
- 	select ARCH_HAS_HOLES_MEMORYMODEL
-@@ -795,7 +795,7 @@ config ARCH_EXYNOS4
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	help
--	  Samsung EXYNOS4 series based systems
-+	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
- 
- config ARCH_SHARK
- 	bool "Shark"
-@@ -1021,7 +1021,7 @@ source "arch/arm/mach-s5pc100/Kconfig"
- 
- source "arch/arm/mach-s5pv210/Kconfig"
- 
--source "arch/arm/mach-exynos4/Kconfig"
-+source "arch/arm/mach-exynos/Kconfig"
- 
- source "arch/arm/mach-shmobile/Kconfig"
- 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 70c424e..289439e 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -177,7 +177,7 @@ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c64xx
- machine-$(CONFIG_ARCH_S5P64X0)		:= s5p64x0
- machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
- machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
--machine-$(CONFIG_ARCH_EXYNOS4)		:= exynos4
-+machine-$(CONFIG_ARCH_EXYNOS4)		:= exynos
- machine-$(CONFIG_ARCH_SA1100)		:= sa1100
- machine-$(CONFIG_ARCH_SHARK)		:= shark
- machine-$(CONFIG_ARCH_SHMOBILE) 	:= shmobile
-diff --git a/arch/arm/configs/exynos4_defconfig b/arch/arm/configs/exynos4_defconfig
-index cd40bb5..b0d3c13 100644
---- a/arch/arm/configs/exynos4_defconfig
-+++ b/arch/arm/configs/exynos4_defconfig
-@@ -4,10 +4,9 @@ CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
--CONFIG_ARCH_EXYNOS4=y
-+CONFIG_ARCH_EXYNOS=y
- CONFIG_S3C_LOWLEVEL_UART_PORT=1
- CONFIG_MACH_SMDKC210=y
--CONFIG_MACH_SMDKV310=y
- CONFIG_MACH_ARMLEX4210=y
- CONFIG_MACH_UNIVERSAL_C210=y
- CONFIG_MACH_NURI=y
-@@ -16,7 +15,6 @@ CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
--CONFIG_HOTPLUG_CPU=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
-@@ -61,12 +59,9 @@ CONFIG_DETECT_HUNG_TASK=y
- CONFIG_DEBUG_RT_MUTEXES=y
- CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
- CONFIG_DEBUG_INFO=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- CONFIG_SYSCTL_SYSCALL_CHECK=y
- CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_ERRORS=y
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
- CONFIG_DEBUG_S3C_UART=1
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos/Kconfig
-similarity index 91%
-rename from arch/arm/mach-exynos4/Kconfig
-rename to arch/arm/mach-exynos/Kconfig
-index 6dfde07..999989e 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -1,4 +1,4 @@
--# arch/arm/mach-exynos4/Kconfig
-+# arch/arm/mach-exynos/Kconfig
- #
- # Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
- #		http://www.samsung.com/
-@@ -7,21 +7,42 @@
- 
- # Configuration options for the EXYNOS4
- 
--if ARCH_EXYNOS4
-+if ARCH_EXYNOS
-+
-+menu "SAMSUNG EXYNOS SoCs Support"
-+
-+choice
-+	prompt "EXYNOS System Type"
-+	default ARCH_EXYNOS4
-+
-+config ARCH_EXYNOS4
-+	bool "SAMSUNG EXYNOS4"
-+	help
-+	  Samsung EXYNOS4 SoCs based systems
-+
-+endchoice
-+
-+comment "EXYNOS SoCs"
- 
- config CPU_EXYNOS4210
--	bool
-+	bool "SAMSUNG EXYNOS4210"
-+	default y
-+	depends on ARCH_EXYNOS4
- 	select SAMSUNG_DMADEV
- 	help
- 	  Enable EXYNOS4210 CPU support
- 
- config SOC_EXYNOS4212
--	bool
-+	bool "SAMSUNG EXYNOS4212"
-+	default y
-+	depends on ARCH_EXYNOS4
- 	help
- 	  Enable EXYNOS4212 SoC support
- 
- config SOC_EXYNOS4412
--	bool
-+	bool "SAMSUNG EXYNOS4412"
-+	default y
-+	depends on ARCH_EXYNOS4
- 	help
- 	  Enable EXYNOS4412 SoC support
- 
-@@ -119,7 +140,7 @@ config EXYNOS4_SETUP_USB_PHY
- 
- # machine support
- 
--menu "EXYNOS4 Machines"
-+if ARCH_EXYNOS4
- 
- comment "EXYNOS4210 Boards"
- 
-@@ -286,12 +307,11 @@ config MACH_SMDK4412
- 	select MACH_SMDK4212
- 	help
- 	  Machine support for Samsung SMDK4412
-+endif
- 
--endmenu
--
--comment "Configuration for HSMMC bus width"
-+if ARCH_EXYNOS4
- 
--menu "Use 8-bit bus width"
-+comment "Configuration for HSMMC 8-bit bus width"
- 
- config EXYNOS4_SDHCI_CH0_8BIT
- 	bool "Channel 0 with 8-bit bus"
-@@ -304,6 +324,7 @@ config EXYNOS4_SDHCI_CH2_8BIT
- 	help
- 	  Support HSMMC Channel 2 8-bit bus.
- 	  If selected, Channel 3 is disabled.
-+endif
- 
- endmenu
- 
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos/Makefile
-similarity index 89%
-rename from arch/arm/mach-exynos4/Makefile
-rename to arch/arm/mach-exynos/Makefile
-index c9b2e1f..fa715eb 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -1,4 +1,4 @@
--# arch/arm/mach-exynos4/Makefile
-+# arch/arm/mach-exynos/Makefile
- #
- # Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
- #		http://www.samsung.com/
-@@ -12,8 +12,8 @@ obj-				:=
- 
- # Core support for EXYNOS4 system
- 
--obj-$(CONFIG_ARCH_EXYNOS4)	+= cpu.o init.o clock.o irq-combiner.o
--obj-$(CONFIG_ARCH_EXYNOS4)	+= setup-i2c0.o irq-eint.o dma.o pmu.o
-+obj-$(CONFIG_ARCH_EXYNOS)	+= cpu.o init.o clock.o irq-combiner.o setup-i2c0.o
-+obj-$(CONFIG_ARCH_EXYNOS4)	+= irq-eint.o dma.o pmu.o
- obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
- obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
- obj-$(CONFIG_PM)		+= pm.o sleep.o
-@@ -39,7 +39,7 @@ obj-$(CONFIG_MACH_SMDK4412)		+= mach-smdk4x12.o
- 
- # device support
- 
--obj-y					+= dev-audio.o
-+obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
- obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
- obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
- obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
-diff --git a/arch/arm/mach-exynos4/Makefile.boot b/arch/arm/mach-exynos/Makefile.boot
-similarity index 100%
-rename from arch/arm/mach-exynos4/Makefile.boot
-rename to arch/arm/mach-exynos/Makefile.boot
-diff --git a/arch/arm/mach-exynos4/clock-exynos4210.c b/arch/arm/mach-exynos/clock-exynos4210.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/clock-exynos4210.c
-rename to arch/arm/mach-exynos/clock-exynos4210.c
-diff --git a/arch/arm/mach-exynos4/clock-exynos4212.c b/arch/arm/mach-exynos/clock-exynos4212.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/clock-exynos4212.c
-rename to arch/arm/mach-exynos/clock-exynos4212.c
-diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos/clock.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/clock.c
-rename to arch/arm/mach-exynos/clock.c
-diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos/cpu.c
-similarity index 91%
-rename from arch/arm/mach-exynos4/cpu.c
-rename to arch/arm/mach-exynos/cpu.c
-index 5b1765b..90ec247 100644
---- a/arch/arm/mach-exynos4/cpu.c
-+++ b/arch/arm/mach-exynos/cpu.c
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/mach-exynos4/cpu.c
-+/* linux/arch/arm/mach-exynos/cpu.c
-  *
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com
-@@ -40,28 +40,47 @@ extern int combiner_init(unsigned int combiner_nr, void __iomem *base,
- extern void combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq);
- 
- /* Initial IO mappings */
--static struct map_desc exynos4_iodesc[] __initdata = {
-+static struct map_desc exynos_iodesc[] __initdata = {
- 	{
- 		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSTIMER),
-+		.pfn		= __phys_to_pfn(EXYNOS_PA_SYSTIMER),
- 		.length		= SZ_4K,
--		.type	 	= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)S5P_VA_CMU,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_CMU),
--		.length		= SZ_128K,
- 		.type		= MT_DEVICE,
- 	}, {
- 		.virtual	= (unsigned long)S5P_VA_PMU,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_PMU),
-+		.pfn		= __phys_to_pfn(EXYNOS_PA_PMU),
- 		.length		= SZ_64K,
- 		.type		= MT_DEVICE,
- 	}, {
- 		.virtual	= (unsigned long)S5P_VA_COMBINER_BASE,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_COMBINER),
-+		.pfn		= __phys_to_pfn(EXYNOS_PA_COMBINER),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
- 	}, {
-+		.virtual	= (unsigned long)S5P_VA_GIC_CPU,
-+		.pfn		= __phys_to_pfn(EXYNOS_PA_GIC_CPU),
-+		.length		= SZ_64K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_GIC_DIST,
-+		.pfn		= __phys_to_pfn(EXYNOS_PA_GIC_DIST),
-+		.length		= SZ_64K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S3C_VA_UART,
-+		.pfn		= __phys_to_pfn(S3C_PA_UART),
-+		.length		= SZ_512K,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+static struct map_desc exynos4_iodesc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long)S5P_VA_CMU,
-+		.pfn		= __phys_to_pfn(EXYNOS4_PA_CMU),
-+		.length		= SZ_128K,
-+		.type		= MT_DEVICE,
-+	}, {
- 		.virtual	= (unsigned long)S5P_VA_COREPERI_BASE,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_COREPERI),
- 		.length		= SZ_8K,
-@@ -92,11 +111,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
- 	}, {
--		.virtual	= (unsigned long)S3C_VA_UART,
--		.pfn		= __phys_to_pfn(S3C_PA_UART),
--		.length		= SZ_512K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S5P_VA_SROMC,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_SROMC),
- 		.length		= SZ_4K,
-@@ -106,16 +120,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_HSPHY),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)S5P_VA_GIC_CPU,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_GIC_CPU),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE,
--	}, {
--		.virtual	= (unsigned long)S5P_VA_GIC_DIST,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_GIC_DIST),
--		.length		= SZ_64K,
--		.type		= MT_DEVICE,
- 	},
- };
- 
-@@ -137,7 +141,7 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
- 	},
- };
- 
--static void exynos4_idle(void)
-+static void exynos_idle(void)
- {
- 	if (!need_resched())
- 		cpu_do_idle();
-@@ -151,12 +155,13 @@ static void exynos4_sw_reset(void)
- }
- 
- /*
-- * exynos4_map_io
-+ * exynos_map_io
-  *
-  * register the standard cpu IO areas
-  */
- void __init exynos4_map_io(void)
- {
-+	iotable_init(exynos_iodesc, ARRAY_SIZE(exynos_iodesc));
- 	iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
- 
- 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_0)
-@@ -250,7 +255,6 @@ static int __init exynos4_core_init(void)
- {
- 	return sysdev_class_register(&exynos4_sysclass);
- }
--
- core_initcall(exynos4_core_init);
- 
- #ifdef CONFIG_CACHE_L2X0
-@@ -279,15 +283,16 @@ static int __init exynos4_l2x0_cache_init(void)
- early_initcall(exynos4_l2x0_cache_init);
- #endif
- 
--int __init exynos4_init(void)
-+int __init exynos_init(void)
- {
--	printk(KERN_INFO "EXYNOS4: Initializing architecture\n");
-+	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
- 
- 	/* set idle function */
--	pm_idle = exynos4_idle;
-+	pm_idle = exynos_idle;
- 
- 	/* set sw_reset function */
--	s5p_reset_hook = exynos4_sw_reset;
-+	if (soc_is_exynos4210() || soc_is_exynos4212() || soc_is_exynos4412())
-+		s5p_reset_hook = exynos4_sw_reset;
- 
- 	return sysdev_register(&exynos4_sysdev);
- }
-diff --git a/arch/arm/mach-exynos4/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/cpuidle.c
-rename to arch/arm/mach-exynos/cpuidle.c
-diff --git a/arch/arm/mach-exynos4/dev-ahci.c b/arch/arm/mach-exynos/dev-ahci.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/dev-ahci.c
-rename to arch/arm/mach-exynos/dev-ahci.c
-diff --git a/arch/arm/mach-exynos4/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/dev-audio.c
-rename to arch/arm/mach-exynos/dev-audio.c
-diff --git a/arch/arm/mach-exynos4/dev-dwmci.c b/arch/arm/mach-exynos/dev-dwmci.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/dev-dwmci.c
-rename to arch/arm/mach-exynos/dev-dwmci.c
-diff --git a/arch/arm/mach-exynos4/dev-pd.c b/arch/arm/mach-exynos/dev-pd.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/dev-pd.c
-rename to arch/arm/mach-exynos/dev-pd.c
-diff --git a/arch/arm/mach-exynos4/dev-sysmmu.c b/arch/arm/mach-exynos/dev-sysmmu.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/dev-sysmmu.c
-rename to arch/arm/mach-exynos/dev-sysmmu.c
-diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos/dma.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/dma.c
-rename to arch/arm/mach-exynos/dma.c
-diff --git a/arch/arm/mach-exynos4/headsmp.S b/arch/arm/mach-exynos/headsmp.S
-similarity index 100%
-rename from arch/arm/mach-exynos4/headsmp.S
-rename to arch/arm/mach-exynos/headsmp.S
-diff --git a/arch/arm/mach-exynos4/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/hotplug.c
-rename to arch/arm/mach-exynos/hotplug.c
-diff --git a/arch/arm/mach-exynos4/include/mach/debug-macro.S b/arch/arm/mach-exynos/include/mach/debug-macro.S
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/debug-macro.S
-rename to arch/arm/mach-exynos/include/mach/debug-macro.S
-diff --git a/arch/arm/mach-exynos4/include/mach/dma.h b/arch/arm/mach-exynos/include/mach/dma.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/dma.h
-rename to arch/arm/mach-exynos/include/mach/dma.h
-diff --git a/arch/arm/mach-exynos4/include/mach/dwmci.h b/arch/arm/mach-exynos/include/mach/dwmci.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/dwmci.h
-rename to arch/arm/mach-exynos/include/mach/dwmci.h
-diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos/include/mach/entry-macro.S
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/entry-macro.S
-rename to arch/arm/mach-exynos/include/mach/entry-macro.S
-diff --git a/arch/arm/mach-exynos4/include/mach/exynos4-clock.h b/arch/arm/mach-exynos/include/mach/exynos4-clock.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/exynos4-clock.h
-rename to arch/arm/mach-exynos/include/mach/exynos4-clock.h
-diff --git a/arch/arm/mach-exynos4/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/gpio.h
-rename to arch/arm/mach-exynos/include/mach/gpio.h
-diff --git a/arch/arm/mach-exynos4/include/mach/hardware.h b/arch/arm/mach-exynos/include/mach/hardware.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/hardware.h
-rename to arch/arm/mach-exynos/include/mach/hardware.h
-diff --git a/arch/arm/mach-exynos4/include/mach/io.h b/arch/arm/mach-exynos/include/mach/io.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/io.h
-rename to arch/arm/mach-exynos/include/mach/io.h
-diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/irqs.h
-rename to arch/arm/mach-exynos/include/mach/irqs.h
-diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-similarity index 93%
-rename from arch/arm/mach-exynos4/include/mach/map.h
-rename to arch/arm/mach-exynos/include/mach/map.h
-index 918a979..058541d 100644
---- a/arch/arm/mach-exynos4/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -1,4 +1,4 @@
--/* linux/arch/arm/mach-exynos4/include/mach/map.h
-+/* linux/arch/arm/mach-exynos/include/mach/map.h
-  *
-  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-  *		http://www.samsung.com/
-@@ -145,39 +145,45 @@
- #define S3C_PA_IIC5			EXYNOS4_PA_IIC(5)
- #define S3C_PA_IIC6			EXYNOS4_PA_IIC(6)
- #define S3C_PA_IIC7			EXYNOS4_PA_IIC(7)
--#define SAMSUNG_PA_ADC			EXYNOS4_PA_ADC
--#define SAMSUNG_PA_ADC1			EXYNOS4_PA_ADC1
- #define S3C_PA_RTC			EXYNOS4_PA_RTC
- #define S3C_PA_WDT			EXYNOS4_PA_WATCHDOG
-+#define S3C_PA_UART			EXYNOS4_PA_UART
- 
- #define S5P_PA_CHIPID			EXYNOS4_PA_CHIPID
-+#define S5P_PA_EHCI			EXYNOS4_PA_EHCI
- #define S5P_PA_FIMC0			EXYNOS4_PA_FIMC0
- #define S5P_PA_FIMC1			EXYNOS4_PA_FIMC1
- #define S5P_PA_FIMC2			EXYNOS4_PA_FIMC2
- #define S5P_PA_FIMC3			EXYNOS4_PA_FIMC3
-+#define S5P_PA_FIMD0			EXYNOS4_PA_FIMD0
-+#define S5P_PA_HDMI			EXYNOS4_PA_HDMI
-+#define S5P_PA_IIC_HDMIPHY		EXYNOS4_PA_IIC_HDMIPHY
-+#define S5P_PA_MFC			EXYNOS4_PA_MFC
- #define S5P_PA_MIPI_CSIS0		EXYNOS4_PA_MIPI_CSIS0
- #define S5P_PA_MIPI_CSIS1		EXYNOS4_PA_MIPI_CSIS1
--#define S5P_PA_FIMD0			EXYNOS4_PA_FIMD0
-+#define S5P_PA_MIXER			EXYNOS4_PA_MIXER
- #define S5P_PA_ONENAND			EXYNOS4_PA_ONENAND
- #define S5P_PA_ONENAND_DMA		EXYNOS4_PA_ONENAND_DMA
-+#define S5P_PA_SDO			EXYNOS4_PA_SDO
- #define S5P_PA_SDRAM			EXYNOS4_PA_SDRAM
- #define S5P_PA_SROMC			EXYNOS4_PA_SROMC
--#define S5P_PA_MFC			EXYNOS4_PA_MFC
- #define S5P_PA_SYSCON			EXYNOS4_PA_SYSCON
- #define S5P_PA_TIMER			EXYNOS4_PA_TIMER
--#define S5P_PA_EHCI			EXYNOS4_PA_EHCI
--
--#define S5P_PA_SDO			EXYNOS4_PA_SDO
- #define S5P_PA_VP			EXYNOS4_PA_VP
--#define S5P_PA_MIXER			EXYNOS4_PA_MIXER
--#define S5P_PA_HDMI			EXYNOS4_PA_HDMI
--#define S5P_PA_IIC_HDMIPHY		EXYNOS4_PA_IIC_HDMIPHY
- 
-+#define SAMSUNG_PA_ADC			EXYNOS4_PA_ADC
-+#define SAMSUNG_PA_ADC1			EXYNOS4_PA_ADC1
- #define SAMSUNG_PA_KEYPAD		EXYNOS4_PA_KEYPAD
- 
--/* UART */
-+#define EXYNOS_PA_COMBINER		EXYNOS4_PA_COMBINER
-+#define EXYNOS_PA_GIC_CPU		EXYNOS4_PA_GIC_CPU
-+#define EXYNOS_PA_GIC_DIST		EXYNOS4_PA_GIC_DIST
-+#define EXYNOS_PA_PMU			EXYNOS4_PA_PMU
-+#define EXYNOS_PA_SYSTIMER		EXYNOS4_PA_SYSTIMER
- 
--#define S3C_PA_UART			EXYNOS4_PA_UART
-+/* Compatibility UART */
-+
-+#define S3C_VA_UARTx(x)			(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
- 
- #define S5P_PA_UART(x)			(S3C_PA_UART + ((x) * S3C_UART_OFFSET))
- #define S5P_PA_UART0			S5P_PA_UART(0)
-diff --git a/arch/arm/mach-exynos4/include/mach/memory.h b/arch/arm/mach-exynos/include/mach/memory.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/memory.h
-rename to arch/arm/mach-exynos/include/mach/memory.h
-diff --git a/arch/arm/mach-exynos4/include/mach/pm-core.h b/arch/arm/mach-exynos/include/mach/pm-core.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/pm-core.h
-rename to arch/arm/mach-exynos/include/mach/pm-core.h
-diff --git a/arch/arm/mach-exynos4/include/mach/pmu.h b/arch/arm/mach-exynos/include/mach/pmu.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/pmu.h
-rename to arch/arm/mach-exynos/include/mach/pmu.h
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-audss.h b/arch/arm/mach-exynos/include/mach/regs-audss.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/regs-audss.h
-rename to arch/arm/mach-exynos/include/mach/regs-audss.h
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/regs-clock.h
-rename to arch/arm/mach-exynos/include/mach/regs-clock.h
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-gpio.h b/arch/arm/mach-exynos/include/mach/regs-gpio.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/regs-gpio.h
-rename to arch/arm/mach-exynos/include/mach/regs-gpio.h
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-irq.h b/arch/arm/mach-exynos/include/mach/regs-irq.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/regs-irq.h
-rename to arch/arm/mach-exynos/include/mach/regs-irq.h
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-mct.h b/arch/arm/mach-exynos/include/mach/regs-mct.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/regs-mct.h
-rename to arch/arm/mach-exynos/include/mach/regs-mct.h
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-mem.h b/arch/arm/mach-exynos/include/mach/regs-mem.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/regs-mem.h
-rename to arch/arm/mach-exynos/include/mach/regs-mem.h
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/regs-pmu.h
-rename to arch/arm/mach-exynos/include/mach/regs-pmu.h
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-sysmmu.h b/arch/arm/mach-exynos/include/mach/regs-sysmmu.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/regs-sysmmu.h
-rename to arch/arm/mach-exynos/include/mach/regs-sysmmu.h
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h b/arch/arm/mach-exynos/include/mach/regs-usb-phy.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/regs-usb-phy.h
-rename to arch/arm/mach-exynos/include/mach/regs-usb-phy.h
-diff --git a/arch/arm/mach-exynos4/include/mach/sysmmu.h b/arch/arm/mach-exynos/include/mach/sysmmu.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/sysmmu.h
-rename to arch/arm/mach-exynos/include/mach/sysmmu.h
-diff --git a/arch/arm/mach-exynos4/include/mach/system.h b/arch/arm/mach-exynos/include/mach/system.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/system.h
-rename to arch/arm/mach-exynos/include/mach/system.h
-diff --git a/arch/arm/mach-exynos4/include/mach/timex.h b/arch/arm/mach-exynos/include/mach/timex.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/timex.h
-rename to arch/arm/mach-exynos/include/mach/timex.h
-diff --git a/arch/arm/mach-exynos4/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/uncompress.h
-rename to arch/arm/mach-exynos/include/mach/uncompress.h
-diff --git a/arch/arm/mach-exynos4/include/mach/vmalloc.h b/arch/arm/mach-exynos/include/mach/vmalloc.h
-similarity index 100%
-rename from arch/arm/mach-exynos4/include/mach/vmalloc.h
-rename to arch/arm/mach-exynos/include/mach/vmalloc.h
-diff --git a/arch/arm/mach-exynos4/init.c b/arch/arm/mach-exynos/init.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/init.c
-rename to arch/arm/mach-exynos/init.c
-diff --git a/arch/arm/mach-exynos4/irq-combiner.c b/arch/arm/mach-exynos/irq-combiner.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/irq-combiner.c
-rename to arch/arm/mach-exynos/irq-combiner.c
-diff --git a/arch/arm/mach-exynos4/irq-eint.c b/arch/arm/mach-exynos/irq-eint.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/irq-eint.c
-rename to arch/arm/mach-exynos/irq-eint.c
-diff --git a/arch/arm/mach-exynos4/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/mach-armlex4210.c
-rename to arch/arm/mach-exynos/mach-armlex4210.c
-diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/mach-nuri.c
-rename to arch/arm/mach-exynos/mach-nuri.c
-diff --git a/arch/arm/mach-exynos4/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/mach-origen.c
-rename to arch/arm/mach-exynos/mach-origen.c
-diff --git a/arch/arm/mach-exynos4/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/mach-smdk4x12.c
-rename to arch/arm/mach-exynos/mach-smdk4x12.c
-diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/mach-smdkv310.c
-rename to arch/arm/mach-exynos/mach-smdkv310.c
-diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/mach-universal_c210.c
-rename to arch/arm/mach-exynos/mach-universal_c210.c
-diff --git a/arch/arm/mach-exynos4/mct.c b/arch/arm/mach-exynos/mct.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/mct.c
-rename to arch/arm/mach-exynos/mct.c
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/platsmp.c
-rename to arch/arm/mach-exynos/platsmp.c
-diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos/pm.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/pm.c
-rename to arch/arm/mach-exynos/pm.c
-diff --git a/arch/arm/mach-exynos4/pmu.c b/arch/arm/mach-exynos/pmu.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/pmu.c
-rename to arch/arm/mach-exynos/pmu.c
-diff --git a/arch/arm/mach-exynos4/setup-fimc.c b/arch/arm/mach-exynos/setup-fimc.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-fimc.c
-rename to arch/arm/mach-exynos/setup-fimc.c
-diff --git a/arch/arm/mach-exynos4/setup-fimd0.c b/arch/arm/mach-exynos/setup-fimd0.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-fimd0.c
-rename to arch/arm/mach-exynos/setup-fimd0.c
-diff --git a/arch/arm/mach-exynos4/setup-i2c0.c b/arch/arm/mach-exynos/setup-i2c0.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-i2c0.c
-rename to arch/arm/mach-exynos/setup-i2c0.c
-diff --git a/arch/arm/mach-exynos4/setup-i2c1.c b/arch/arm/mach-exynos/setup-i2c1.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-i2c1.c
-rename to arch/arm/mach-exynos/setup-i2c1.c
-diff --git a/arch/arm/mach-exynos4/setup-i2c2.c b/arch/arm/mach-exynos/setup-i2c2.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-i2c2.c
-rename to arch/arm/mach-exynos/setup-i2c2.c
-diff --git a/arch/arm/mach-exynos4/setup-i2c3.c b/arch/arm/mach-exynos/setup-i2c3.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-i2c3.c
-rename to arch/arm/mach-exynos/setup-i2c3.c
-diff --git a/arch/arm/mach-exynos4/setup-i2c4.c b/arch/arm/mach-exynos/setup-i2c4.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-i2c4.c
-rename to arch/arm/mach-exynos/setup-i2c4.c
-diff --git a/arch/arm/mach-exynos4/setup-i2c5.c b/arch/arm/mach-exynos/setup-i2c5.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-i2c5.c
-rename to arch/arm/mach-exynos/setup-i2c5.c
-diff --git a/arch/arm/mach-exynos4/setup-i2c6.c b/arch/arm/mach-exynos/setup-i2c6.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-i2c6.c
-rename to arch/arm/mach-exynos/setup-i2c6.c
-diff --git a/arch/arm/mach-exynos4/setup-i2c7.c b/arch/arm/mach-exynos/setup-i2c7.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-i2c7.c
-rename to arch/arm/mach-exynos/setup-i2c7.c
-diff --git a/arch/arm/mach-exynos4/setup-keypad.c b/arch/arm/mach-exynos/setup-keypad.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-keypad.c
-rename to arch/arm/mach-exynos/setup-keypad.c
-diff --git a/arch/arm/mach-exynos4/setup-sdhci-gpio.c b/arch/arm/mach-exynos/setup-sdhci-gpio.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-sdhci-gpio.c
-rename to arch/arm/mach-exynos/setup-sdhci-gpio.c
-diff --git a/arch/arm/mach-exynos4/setup-sdhci.c b/arch/arm/mach-exynos/setup-sdhci.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-sdhci.c
-rename to arch/arm/mach-exynos/setup-sdhci.c
-diff --git a/arch/arm/mach-exynos4/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/setup-usb-phy.c
-rename to arch/arm/mach-exynos/setup-usb-phy.c
-diff --git a/arch/arm/mach-exynos4/sleep.S b/arch/arm/mach-exynos/sleep.S
-similarity index 100%
-rename from arch/arm/mach-exynos4/sleep.S
-rename to arch/arm/mach-exynos/sleep.S
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index f9241a7..4e98f09 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -7,7 +7,7 @@
- 
- config PLAT_S5P
- 	bool
--	depends on (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS4)
-+	depends on (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS)
- 	default y
- 	select ARM_VIC if !ARCH_EXYNOS4
- 	select ARM_GIC if ARCH_EXYNOS4
-diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
-index 7b0a28f..a56959e 100644
---- a/arch/arm/plat-s5p/cpu.c
-+++ b/arch/arm/plat-s5p/cpu.c
-@@ -75,7 +75,7 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.map_io		= exynos4_map_io,
- 		.init_clocks	= exynos4_init_clocks,
- 		.init_uarts	= exynos4_init_uarts,
--		.init		= exynos4_init,
-+		.init		= exynos_init,
- 		.name		= name_exynos4210,
- 	}, {
- 		.idcode		= EXYNOS4212_CPU_ID,
-@@ -83,7 +83,7 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.map_io		= exynos4_map_io,
- 		.init_clocks	= exynos4_init_clocks,
- 		.init_uarts	= exynos4_init_uarts,
--		.init		= exynos4_init,
-+		.init		= exynos_init,
- 		.name		= name_exynos4212,
- 	}, {
- 		.idcode		= EXYNOS4412_CPU_ID,
-@@ -91,7 +91,7 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.map_io		= exynos4_map_io,
- 		.init_clocks	= exynos4_init_clocks,
- 		.init_uarts	= exynos4_init_uarts,
--		.init		= exynos4_init,
-+		.init		= exynos_init,
- 		.name		= name_exynos4412,
- 	},
- };
-diff --git a/arch/arm/plat-samsung/include/plat/exynos4.h b/arch/arm/plat-samsung/include/plat/exynos4.h
-index 20d73bf..f546e88 100644
---- a/arch/arm/plat-samsung/include/plat/exynos4.h
-+++ b/arch/arm/plat-samsung/include/plat/exynos4.h
-@@ -18,8 +18,8 @@ extern void exynos4210_register_clocks(void);
- extern void exynos4212_register_clocks(void);
- extern void exynos4_setup_clocks(void);
- 
--#ifdef CONFIG_ARCH_EXYNOS4
--extern  int exynos4_init(void);
-+#ifdef CONFIG_ARCH_EXYNOS
-+extern  int exynos_init(void);
- extern void exynos4_init_irq(void);
- extern void exynos4_map_io(void);
- extern void exynos4_init_clocks(int xtal);
-@@ -31,5 +31,5 @@ extern struct sys_timer exynos4_timer;
- #define exynos4_init_clocks NULL
- #define exynos4_init_uarts NULL
- #define exynos4_map_io NULL
--#define exynos4_init NULL
-+#define exynos_init NULL
- #endif
--- 
-1.7.1
+If any problems, please let me know.
+
+As a note, other next-samsung-board-2, next-samsung-soc and next-samsung-devel-3 will be sent to soon :)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+The following changes since commit bb40413ae24e3cc32bb8e949cd330a865c85e151:
+
+  Merge branch 'next-samsung-board' into next-samsung-devel-2 (2011-09-28 21:50:01 +0900)
+
+are available in the git repository at:
+
+  git://github.com/kgene/linux-samsung.git next-samsung-devel-2
+
+Ajay Kumar (5):
+      ARM: S5P64X0: Add register base and IRQ for Framebuffer
+      ARM: S5P64X0: Set s3c_device_fb name
+      ARM: S5P64X0: Add GPIO setup for LCD
+      ARM: S5P6440: Add LCD-LTE480 and enable Framebuffer support
+      ARM: S5P6450: Add LCD-LTE480 and enable Framebuffer support
+
+Alim Akhtar (3):
+      ARM: EXYNOS4: register the second instance of pl330 DMAC
+      ARM: S5PV210: register the second instance of pl330 DMAC
+      ARM: S5PC100: register the second instance of pl330 DMAC
+
+Boojin Kim (17):
+      ARM: S5P64X0: Add the devname for DMA clock
+      DMA: PL330: Add support runtime PM for PL330 DMAC
+      DMA: PL330: Update PL330 DMA API driver
+      DMA: PL330: Support DMA_SLAVE_CONFIG command
+      DMA: PL330: Remove the start operation for handling DMA_TERMINATE_ALL command
+      DMA: PL330: Add DMA_CYCLIC capability
+      ARM: SAMSUNG: Update to use PL330-DMA driver
+      ARM: SAMSUNG: Add common DMA operations
+      ARM: EXYNOS4: Use generic DMA PL330 driver
+      ARM: S5PV210: Use generic DMA PL330 driver
+      ARM: S5PC100: Use generic DMA PL330 driver
+      ARM: S5P64X0: Use generic DMA PL330 driver
+      ARM: SAMSUNG: Remove S3C-PL330-DMA driver
+      spi/s3c64xx: Add support DMA engine API
+      spi/s3c64xx: Merge dma control code
+      ASoC: Samsung: Update DMA interface
+      ARM: SAMSUNG: Remove Samsung specific enum type for dma direction
+
+Chanwoo Choi (1):
+      ARM: EXYNOS4: Update config file of NURI to enable RTC
+
+Giridhar Maruthy (1):
+      ARM: EXYNOS4: Add PWM backlight support on ORIGEN
+
+Guennadi Liakhovetski (1):
+      dmatest: make dmatest threads freezable
+
+Hatim Ali (1):
+      ARM: EXYNOS4: Add TVOUT support for SMDKV310
+
+Heiko Stuebner (4):
+      ARM: S3C2443: Move i2s clock definitions to common code
+      ARM: S3C2443: Define constant for HSSPI pclk
+      ARM: S3C2416: Add HSSPI clock sourced from EPLL
+      ARM: S3C2443: Add hsspi-clock from pclk and rename S3C2443 hsspi sclk
+
+JeongHyeon Kim (1):
+      ARM: EXYNOS4: Add support for ORIGEN board
+
+Jingoo Han (1):
+      ARM: EXYNOS4: Add usb ehci device to the SMDKV310
+
+Jongpill Lee (3):
+      ARM: EXYNOS4: Modify PMU register setting function
+      ARM: EXYNOS4: Add PMU register definition for EXYNOS4212
+      ARM: EXYNOS4: Support suspend/resume for EXYNOS4212
+
+Kukjin Kim (18):
+      Merge branch 'samsung_dma' of git://git.infradead.org/users/vkoul/slave-dma into next/topic-dma-samsung
+      Merge branch 'next/topic-dma-pl330-devname-fix' into next/topic-dma-samsung
+      gpio/s3c24xx: move gpio driver into drivers/gpio/
+      gpio/s3c64xx: move gpio driver into drivers/gpio/
+      gpio/s5p64x0: move gpio driver into drivers/gpio/
+      gpio/samsung: gpio-samsung.c to support Samsung GPIOs
+      ARM: SAMSUNG: Update the name of regarding Samsung GPIO
+      ARM: SAMSUNG: Remove useless Samsung GPIO related CONFIGs
+      Merge branch 'next/topic-plat-samsung-1' into next/topic-gpio-samsung
+      Merge branch 'next/topic-s3c64xx-devel' into next-samsung-devel
+      Merge branch 'next/topic-exynos4-devel' into next-samsung-devel
+      Merge branch 'next/topic-dma-samsung' into next-samsung-devel
+      Merge branch 'next/topic-gpio-samsung' into next-samsung-devel
+      Merge branch 'next-samsung-devel' into next-samsung-devel-2
+      ARM: SAMSUNG: Cleanup mach/clkdev.h
+      ARM: SAMSUNG: Consolidate plat/pwm-clock.h
+      ARM: SAMSUNG: Consolidate plat/pll.h
+      Merge branch 'next-samsung-cleanup-2' into next-samsung-devel-2
+
+Lothar Wa??mann (1):
+      mxs-dma: enable CLKGATE before accessing registers
+
+Marek Szyprowski (5):
+      ARM: EXYNOS4: enable frame buffer on Universal C210 board
+      ARM: EXYNOS4: enable frame buffer on Nuri board
+      gpio/samsung: fix broken configuration for EXYNOS4 GPIO banks
+      gpio/samsung: fix GPIO interrupt registration for EXYNOS4 SoCs
+      gpio/samsung: correct pin configuration for S5PC100/S5PC110/EXYNOS4
+
+Mark Brown (7):
+      ARM: S3C64XX: Hook up GPIO initiated DVS on Cragganmore
+      ARM: S3C64XX: Use module identification for Cragganmore system builds
+      ARM: S3C64XX: Hook up some additional supplies on Cragganmore
+      ARM: S3C64XX: Add devices for Kilchoman audio module on Cragganmore
+      ARM: S3C64XX: Register Lowland audio device on Cragganmore
+      ARM: S3C64xx: Add LDOVDD supply for CODEC on Cragganmore
+      ASoC: Flush Samsung DMA on free
+
+Nicolas Ferre (4):
+      dmaengine: at_hdmac: replace spin_lock* with irqsave variants
+      dmaengine: at_hdmac: improve power management routines
+      dmaengine: at_hdmac: add wrappers for testing channel state
+      dmaengine: at_hdmac: fix way to specify cyclic capability
+
+Per Forlin (4):
+      dmaengine/ste_dma40: add missing kernel doc for pending_queue
+      dmaengine/ste_dma40: remove duplicate call to d40_pool_lli_free().
+      dmaengine/ste_dma40: fix Oops due to double free of client descriptor
+      dmaengine/ste_dma40: fix memory leak due to prepared descriptors
+
+Russell King - ARM Linux (1):
+      dmaengine: amba-pl08x: make filter check that the channel is owned by pl08x
+
+Sachin Kamat (7):
+      ARM: EXYNOS4: Add USB EHCI device to ORIGEN board
+      ARM: EXYNOS4: Add FIMC device on ORIGEN board
+      ARM: EXYNOS4: Add keypad support for ORIGEN
+      ARM: EXYNOS4: Add HDMI support for ORIGEN
+      ARM: EXYNOS4: Enable MFC on Samsung SMDKV310
+      ARM: EXYNOS4: Add header file protection macros
+      ARM: EXYNOS4: Add FIMC device on SMDKV310 board
+
+Sascha Hauer (3):
+      dmaengine i.MX SDMA: lock channel 0
+      dmaengine i.MX SDMA: set firmware scripts addresses to negative value initially
+      dmaengine i.MX SDMA: use request_firmware_nowait
+
+Sylwester Nawrocki (2):
+      ARM: S5PV210: Add support for NOON010PC30 sensor on GONI board
+      ARM: S5PV210: UNIVERSAL_C210: Add support for M-5MOLS image sensor
+
+Tomasz Figa (4):
+      ARM: S3C64XX: Use S3C64XX_SDMA_SEL register name instead of numeric address
+      ARM: S3C64XX: Save/restore S3C64XX_SDMA_SEL on suspend/resume
+      ARM: S3C64XX: Save/restore S3C64XX_MODEM_MIFPCON on suspend/resume
+      ARM: S3C64XX: Add support for synchronous clock operation
+
+Tomasz Stanislawski (4):
+      ARM: SAMSUNG: add i2c hdmiphy controller definitions
+      ARM: S5P: add support for tv device
+      ARM: EXYNOS4: enable TV support on Universal_C210 board
+      ARM: S5PV210: enable TV support on GONI board
+
+Tushar Behera (2):
+      ARM: EXYNOS4: Fix sdhci card detection for ORIGEN
+      ARM: EXYNOS4: Add support for secondary MMC port on ORIGEN
+
+Vinod Koul (3):
+      dmaengine: add helper function for slave_single
+      dmaengine: remove struct scatterlist for header
+      Merge branch 'next' into v3.1-rc4
+
+Viresh Kumar (19):
+      dmaengine/dmatest: Terminate transfers on all channels in case of error or exit
+      ARM: asm/pl080.h: Protect against multiple inclusion of header file
+      dmaengine/amba-pl08x: Resolve formatting issues
+      dmaengine/amba-pl08x: Rearrange inclusion of header files in ascending order
+      dmaengine/amba-pl08x: pass (*ptr) to sizeof() instead of (struct xyz)
+      dmaengine/amba-pl08x: Complete doc comment for struct pl08x_txd
+      dmaengine/amba-pl08x: Remove redundant comment and rewrite original
+      dmaengine/amba-pl08x: Changing few prints to dev_dbg from dev_info
+      dmaengine/amba-pl08x: support runtime PM
+      dmaengine/amba-pl08x: Simplify pl08x_ensure_on()
+      dmaengine/amba-pl08x: No need to check "ch->signal < 0"
+      dmaengine/amba-pl08x: Schedule tasklet in case of error interrupt
+      dmaengine/amba-pl08x: Get rid of pl08x_pre_boundary()
+      dmaengine/amba-pl08x: max_bytes_per_lli is TRANSFER_SIZE * src_width (not MIN(width))
+      dmaengine/amba-pl08x: Add prep_single_byte_llis() routine
+      dmaengine/amba-pl08x: Align lli_len to max(src.width, dst.width)
+      dmaengine/amba-pl08x: Choose peripheral bus as master bus
+      dmaengine/amba-pl08x: Pass flow controller information with slave channel data
+      dmaengine/amba-pl08x: Call pl08x_free_txd() instead of calling kfree() directly
+
+Vladimir Zapolskiy (3):
+      ARM: EXYNOS4: use dma-pl330 device name for clock
+      ARM: S5PC100: use dma-pl330 device name for clock
+      ARM: S5PV210: use dma-pl330 device name for clock
+
+ arch/arm/Kconfig                                   |    3 -
+ arch/arm/include/asm/hardware/pl080.h              |    4 +
+ arch/arm/mach-exynos4/Kconfig                      |   34 +-
+ arch/arm/mach-exynos4/clock.c                      |  220 ++-
+ arch/arm/mach-exynos4/cpu.c                        |    2 +
+ arch/arm/mach-exynos4/dma.c                        |  300 ++-
+ arch/arm/mach-exynos4/include/mach/clkdev.h        |    7 -
+ arch/arm/mach-exynos4/include/mach/dma.h           |    4 +-
+ arch/arm/mach-exynos4/include/mach/i2c-hdmiphy.h   |   16 +
+ arch/arm/mach-exynos4/include/mach/irqs.h          |    4 +
+ arch/arm/mach-exynos4/include/mach/map.h           |   12 +
+ arch/arm/mach-exynos4/include/mach/pm-core.h       |    8 +-
+ arch/arm/mach-exynos4/include/mach/pmu.h           |    7 +
+ arch/arm/mach-exynos4/include/mach/regs-pmu.h      |   74 +-
+ arch/arm/mach-exynos4/mach-nuri.c                  |   34 +
+ arch/arm/mach-exynos4/mach-origen.c                |  115 +-
+ arch/arm/mach-exynos4/mach-smdkv310.c              |   49 +
+ arch/arm/mach-exynos4/mach-universal_c210.c        |  312 +++-
+ arch/arm/mach-exynos4/pm.c                         |    7 +
+ arch/arm/mach-exynos4/pmu.c                        |  353 ++--
+ arch/arm/mach-s3c2410/Kconfig                      |    1 -
+ arch/arm/mach-s3c2410/include/mach/dma.h           |   20 +-
+ arch/arm/mach-s3c2410/include/mach/gpio-fns.h      |   99 +-
+ arch/arm/mach-s3c2410/include/mach/gpio-track.h    |    6 +-
+ arch/arm/mach-s3c2410/include/mach/pm-core.h       |    2 +-
+ .../mach-s3c2410/include/mach/regs-s3c2443-clock.h |    1 +
+ arch/arm/mach-s3c2410/mach-h1940.c                 |    6 +-
+ arch/arm/mach-s3c2410/s3c2410.c                    |    4 +-
+ arch/arm/mach-s3c2412/dma.c                        |    4 +-
+ arch/arm/mach-s3c2416/Kconfig                      |    1 -
+ arch/arm/mach-s3c2416/clock.c                      |   29 +-
+ arch/arm/mach-s3c2416/s3c2416.c                    |    4 +-
+ arch/arm/mach-s3c2440/Kconfig                      |    2 -
+ arch/arm/mach-s3c2440/s3c2440.c                    |    4 +-
+ arch/arm/mach-s3c2440/s3c2442.c                    |    4 +-
+ arch/arm/mach-s3c2443/Kconfig                      |    1 -
+ arch/arm/mach-s3c2443/clock.c                      |   55 +-
+ arch/arm/mach-s3c2443/s3c2443.c                    |    4 +-
+ arch/arm/mach-s3c64xx/Kconfig                      |    1 +
+ arch/arm/mach-s3c64xx/Makefile                     |    3 +-
+ arch/arm/mach-s3c64xx/clock.c                      |   13 +-
+ arch/arm/mach-s3c64xx/dma.c                        |   12 +-
+ arch/arm/mach-s3c64xx/gpiolib.c                    |  290 ---
+ arch/arm/mach-s3c64xx/include/mach/clkdev.h        |    7 -
+ arch/arm/mach-s3c64xx/include/mach/crag6410.h      |   23 +
+ arch/arm/mach-s3c64xx/include/mach/dma.h           |    8 +-
+ arch/arm/mach-s3c64xx/include/mach/pll.h           |   45 -
+ arch/arm/mach-s3c64xx/include/mach/pm-core.h       |    2 +-
+ arch/arm/mach-s3c64xx/include/mach/pwm-clock.h     |   56 -
+ arch/arm/mach-s3c64xx/include/mach/regs-sys.h      |    3 +
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c       |  182 ++
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |  106 +-
+ arch/arm/mach-s3c64xx/pm.c                         |    4 +
+ arch/arm/mach-s5p64x0/Kconfig                      |   14 +-
+ arch/arm/mach-s5p64x0/Makefile                     |    3 +-
+ arch/arm/mach-s5p64x0/clock-s5p6440.c              |   10 +-
+ arch/arm/mach-s5p64x0/clock-s5p6450.c              |   10 +-
+ arch/arm/mach-s5p64x0/cpu.c                        |    3 +
+ arch/arm/mach-s5p64x0/dma.c                        |  269 ++-
+ arch/arm/mach-s5p64x0/gpiolib.c                    |  508 ----
+ arch/arm/mach-s5p64x0/include/mach/clkdev.h        |    7 -
+ arch/arm/mach-s5p64x0/include/mach/dma.h           |    4 +-
+ arch/arm/mach-s5p64x0/include/mach/irqs.h          |    4 +
+ arch/arm/mach-s5p64x0/include/mach/map.h           |    3 +
+ arch/arm/mach-s5p64x0/include/mach/pwm-clock.h     |   68 -
+ arch/arm/mach-s5p64x0/include/mach/regs-gpio.h     |    4 +
+ arch/arm/mach-s5p64x0/mach-smdk6440.c              |   74 +
+ arch/arm/mach-s5p64x0/mach-smdk6450.c              |   75 +
+ arch/arm/mach-s5p64x0/setup-fb-24bpp.c             |   29 +
+ arch/arm/mach-s5pc100/Kconfig                      |    2 +-
+ arch/arm/mach-s5pc100/clock.c                      |   15 +-
+ arch/arm/mach-s5pc100/dma.c                        |  324 ++-
+ arch/arm/mach-s5pc100/include/mach/clkdev.h        |    7 -
+ arch/arm/mach-s5pc100/include/mach/dma.h           |    4 +-
+ arch/arm/mach-s5pc100/include/mach/pwm-clock.h     |   56 -
+ arch/arm/mach-s5pv210/Kconfig                      |    4 +-
+ arch/arm/mach-s5pv210/clock.c                      |  151 +-
+ arch/arm/mach-s5pv210/cpu.c                        |    4 +
+ arch/arm/mach-s5pv210/dma.c                        |  317 ++-
+ arch/arm/mach-s5pv210/include/mach/clkdev.h        |    7 -
+ arch/arm/mach-s5pv210/include/mach/dma.h           |    4 +-
+ arch/arm/mach-s5pv210/include/mach/i2c-hdmiphy.h   |   16 +
+ arch/arm/mach-s5pv210/include/mach/irqs.h          |    4 +-
+ arch/arm/mach-s5pv210/include/mach/map.h           |   13 +
+ arch/arm/mach-s5pv210/include/mach/pm-core.h       |    2 +-
+ arch/arm/mach-s5pv210/include/mach/pwm-clock.h     |   70 -
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    3 +-
+ arch/arm/mach-s5pv210/mach-goni.c                  |   62 +
+ arch/arm/plat-s3c24xx/Kconfig                      |    1 -
+ arch/arm/plat-s3c24xx/Makefile                     |    2 -
+ arch/arm/plat-s3c24xx/dma.c                        |   10 +-
+ arch/arm/plat-s3c24xx/gpio.c                       |   96 -
+ arch/arm/plat-s3c24xx/gpiolib.c                    |  229 --
+ arch/arm/plat-s3c24xx/include/mach/clkdev.h        |    7 -
+ arch/arm/plat-s3c24xx/include/mach/pwm-clock.h     |   55 -
+ arch/arm/plat-s3c24xx/include/plat/pll.h           |   62 -
+ arch/arm/plat-s3c24xx/s3c2443-clock.c              |   57 +
+ arch/arm/plat-s5p/Kconfig                          |   13 +-
+ arch/arm/plat-s5p/Makefile                         |    2 +
+ arch/arm/plat-s5p/dev-i2c-hdmiphy.c                |   59 +
+ arch/arm/plat-s5p/dev-tv.c                         |   98 +
+ arch/arm/plat-s5p/include/plat/pll.h               |  203 --
+ arch/arm/plat-s5p/irq-gpioint.c                    |   10 +-
+ arch/arm/plat-samsung/Kconfig                      |   36 +-
+ arch/arm/plat-samsung/Makefile                     |    6 +-
+ arch/arm/plat-samsung/dma-ops.c                    |  131 +
+ arch/arm/plat-samsung/gpio-config.c                |  431 ----
+ arch/arm/plat-samsung/gpio.c                       |  167 --
+ arch/arm/plat-samsung/include/plat/devs.h          |    6 +
+ arch/arm/plat-samsung/include/plat/dma-ops.h       |   63 +
+ .../include/plat/{s3c-dma-pl330.h => dma-pl330.h}  |   24 +-
+ arch/arm/plat-samsung/include/plat/dma-s3c24xx.h   |    2 +-
+ arch/arm/plat-samsung/include/plat/dma.h           |   10 +-
+ arch/arm/plat-samsung/include/plat/fb.h            |    7 +
+ .../plat-samsung/include/plat/gpio-cfg-helpers.h   |  172 +-
+ arch/arm/plat-samsung/include/plat/gpio-cfg.h      |   34 +-
+ arch/arm/plat-samsung/include/plat/gpio-core.h     |   97 +-
+ arch/arm/plat-samsung/include/plat/gpio-fns.h      |   98 +
+ arch/arm/plat-samsung/include/plat/iic.h           |    1 +
+ arch/arm/plat-samsung/include/plat/pll.h           |  323 +++
+ arch/arm/plat-samsung/include/plat/pll6553x.h      |   51 -
+ arch/arm/plat-samsung/include/plat/pm.h            |   10 +-
+ .../mach => plat-samsung/include/plat}/pwm-clock.h |   39 +-
+ .../plat-samsung/include/plat/s3c-pl330-pdata.h    |   32 -
+ arch/arm/plat-samsung/include/plat/tv-core.h       |   44 +
+ arch/arm/plat-samsung/pm-gpio.c                    |   72 +-
+ arch/arm/plat-samsung/pm.c                         |    6 +-
+ arch/arm/plat-samsung/pwm-clock.c                  |   13 +-
+ arch/arm/plat-samsung/s3c-dma-ops.c                |  130 +
+ arch/arm/plat-samsung/s3c-pl330.c                  | 1244 ---------
+ drivers/dma/Kconfig                                |    3 +-
+ drivers/dma/amba-pl08x.c                           |  455 ++--
+ drivers/dma/at_hdmac.c                             |  159 +-
+ drivers/dma/at_hdmac_regs.h                        |   24 +
+ drivers/dma/dmatest.c                              |   23 +-
+ drivers/dma/imx-sdma.c                             |   47 +-
+ drivers/dma/mxs-dma.c                              |   45 +-
+ drivers/dma/pl330.c                                |  229 ++-
+ drivers/gpio/Kconfig                               |   16 -
+ drivers/gpio/Makefile                              |    7 +-
+ drivers/gpio/gpio-exynos4.c                        |  385 ---
+ drivers/gpio/gpio-plat-samsung.c                   |  205 --
+ drivers/gpio/gpio-s5pc100.c                        |  354 ---
+ drivers/gpio/gpio-s5pv210.c                        |  287 ---
+ drivers/gpio/gpio-samsung.c                        | 2688 ++++++++++++++++++++
+ drivers/mmc/host/s3cmci.c                          |    6 +-
+ drivers/spi/spi-s3c64xx.c                          |  175 +-
+ include/linux/amba/pl08x.h                         |   14 +-
+ include/linux/amba/pl330.h                         |    6 +-
+ include/linux/dmaengine.h                          |   13 +-
+ sound/soc/samsung/ac97.c                           |   10 +-
+ sound/soc/samsung/dma.c                            |  148 +-
+ sound/soc/samsung/dma.h                            |    4 +-
+ 153 files changed, 7418 insertions(+), 6755 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos4/include/mach/clkdev.h
+ create mode 100644 arch/arm/mach-exynos4/include/mach/i2c-hdmiphy.h
+ delete mode 100644 arch/arm/mach-s3c64xx/gpiolib.c
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/clkdev.h
+ create mode 100644 arch/arm/mach-s3c64xx/include/mach/crag6410.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/pll.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/pwm-clock.h
+ create mode 100644 arch/arm/mach-s3c64xx/mach-crag6410-module.c
+ delete mode 100644 arch/arm/mach-s5p64x0/gpiolib.c
+ delete mode 100644 arch/arm/mach-s5p64x0/include/mach/clkdev.h
+ delete mode 100644 arch/arm/mach-s5p64x0/include/mach/pwm-clock.h
+ create mode 100644 arch/arm/mach-s5p64x0/setup-fb-24bpp.c
+ delete mode 100644 arch/arm/mach-s5pc100/include/mach/clkdev.h
+ delete mode 100644 arch/arm/mach-s5pc100/include/mach/pwm-clock.h
+ delete mode 100644 arch/arm/mach-s5pv210/include/mach/clkdev.h
+ create mode 100644 arch/arm/mach-s5pv210/include/mach/i2c-hdmiphy.h
+ delete mode 100644 arch/arm/mach-s5pv210/include/mach/pwm-clock.h
+ delete mode 100644 arch/arm/plat-s3c24xx/gpio.c
+ delete mode 100644 arch/arm/plat-s3c24xx/gpiolib.c
+ delete mode 100644 arch/arm/plat-s3c24xx/include/mach/clkdev.h
+ delete mode 100644 arch/arm/plat-s3c24xx/include/mach/pwm-clock.h
+ delete mode 100644 arch/arm/plat-s3c24xx/include/plat/pll.h
+ create mode 100644 arch/arm/plat-s5p/dev-i2c-hdmiphy.c
+ create mode 100644 arch/arm/plat-s5p/dev-tv.c
+ delete mode 100644 arch/arm/plat-s5p/include/plat/pll.h
+ create mode 100644 arch/arm/plat-samsung/dma-ops.c
+ delete mode 100644 arch/arm/plat-samsung/gpio-config.c
+ delete mode 100644 arch/arm/plat-samsung/gpio.c
+ create mode 100644 arch/arm/plat-samsung/include/plat/dma-ops.h
+ rename arch/arm/plat-samsung/include/plat/{s3c-dma-pl330.h => dma-pl330.h} (84%)
+ create mode 100644 arch/arm/plat-samsung/include/plat/gpio-fns.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/pll.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/pll6553x.h
+ rename arch/arm/{mach-exynos4/include/mach => plat-samsung/include/plat}/pwm-clock.h (68%)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c-pl330-pdata.h
+ create mode 100644 arch/arm/plat-samsung/include/plat/tv-core.h
+ create mode 100644 arch/arm/plat-samsung/s3c-dma-ops.c
+ delete mode 100644 arch/arm/plat-samsung/s3c-pl330.c
+ delete mode 100644 drivers/gpio/gpio-exynos4.c
+ delete mode 100644 drivers/gpio/gpio-plat-samsung.c
+ delete mode 100644 drivers/gpio/gpio-s5pc100.c
+ delete mode 100644 drivers/gpio/gpio-s5pv210.c
+ create mode 100644 drivers/gpio/gpio-samsung.c
