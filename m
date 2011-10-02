@@ -1,32 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:57 +0200
-Subject: [PATCH 27/30] ARM: omap: select L2X0 cache on omap4
+Date: Sun,  2 Oct 2011 16:45:53 +0200
+Subject: [PATCH 23/30] ARM: omap2: select twl4030 support on boards that need
+	it
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-28-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-24-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cache controller needs to be enabled for the
-cortex-a9 specific errata that are also selected
-to work.
+These three boards unconditionally use the twl4030 driver
+from the board-zoom-display.c file. Make sure that the driver
+is always there.
+We also need to select the I2C core so we are able to build
+that driver.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/Kconfig |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index fd0ab18..3921a95 100644
+index 57b66d5..4deeade 100644
 --- a/arch/arm/mach-omap2/Kconfig
 +++ b/arch/arm/mach-omap2/Kconfig
-@@ -47,6 +47,7 @@ config ARCH_OMAP4
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
- 	select ARM_ERRATA_720789
-+	select CACHE_L2X0
- 	select ARCH_HAS_OPP
- 	select PM_OPP if PM
- 	select USB_ARCH_HAS_EHCI
+@@ -253,6 +253,8 @@ config MACH_OMAP_ZOOM2
+ 	select SERIAL_CORE_CONSOLE
+ 	select SERIAL_8250_CONSOLE
+ 	select REGULATOR_FIXED_VOLTAGE
++	select TWL4030_CORE
++	select I2C
+ 
+ config MACH_OMAP_ZOOM3
+ 	bool "OMAP3630 Zoom3 board"
+@@ -263,6 +265,8 @@ config MACH_OMAP_ZOOM3
+ 	select SERIAL_CORE_CONSOLE
+ 	select SERIAL_8250_CONSOLE
+ 	select REGULATOR_FIXED_VOLTAGE
++	select TWL4030_CORE
++	select I2C
+ 
+ config MACH_CM_T35
+ 	bool "CompuLab CM-T35/CM-T3730 modules"
+@@ -304,6 +308,8 @@ config MACH_OMAP_3630SDP
+ 	depends on ARCH_OMAP3
+ 	default y
+ 	select OMAP_PACKAGE_CBP
++	select TWL4030_CORE
++	select I2C
+ 
+ config MACH_TI8168EVM
+ 	bool "TI8168 Evaluation Module"
 -- 
 1.7.5.4
