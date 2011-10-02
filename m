@@ -1,18 +1,18 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 2 Oct 2011 19:24:56 +0100
-Subject: [PATCH 02/26] sound/pxa-zylonite: use a valid device for dev_err()
-In-Reply-To: <1317499438-14058-3-git-send-email-arnd@arndb.de>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-3-git-send-email-arnd@arndb.de>
-Message-ID: <20111002182456.GB2857@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 02 Oct 2011 20:30:04 +0200
+Subject: [PATCH 21/30] sound/soc/omap: limit to omap2plus
+In-Reply-To: <20111002212426.40a1665618c818fc1f4e001d@bitmer.com>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<4511363.OPCpQMvKWi@wuerfel>
+	<20111002212426.40a1665618c818fc1f4e001d@bitmer.com>
+Message-ID: <2199880.QsjloS3A60@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 01, 2011 at 10:03:34PM +0200, Arnd Bergmann wrote:
-> A recent conversion has introduced references to &pdev->dev, which does
-> not actually exist in all the contexts it's used in.
+On Sunday 02 October 2011 21:24:26 Jarkko Nikula wrote:
+> Now when I remember we had one build error. Hopefully it was the same
+> than you observed?
 
-Oh, and please do try to use subject lines which match up with the rest
-of the code you're patching - in this case it even looks like whatever
-you're using to autogenerate is misfiring as you've got a combination of
-- and / in filenames.
+I think it was something different, but it's possible.
+
+	Arnd
