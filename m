@@ -1,58 +1,83 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 02 Oct 2011 16:07:52 +0900
-Subject: [PATCH V2 0/3] S5P64X0 PM Support
-In-Reply-To: <1317154964-22600-1-git-send-email-a.kesavan@samsung.com>
-References: <1317154964-22600-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <001601cc80d2$00c045b0$0240d110$%kim@samsung.com>
+Date: Sun, 02 Oct 2011 16:07:56 +0900
+Subject: [PATCH 0/4] ARM: EXYNOS4: Support generic Power domain framework
+	for EXYNOS4210
+In-Reply-To: <201108140139.46434.rjw@sisk.pl>
+References: <4E4360B2.2060508@samsung.com> <201108132324.08137.rjw@sisk.pl>
+	<20110813213601.GA25866@n2100.arm.linux.org.uk>
+	<201108140139.46434.rjw@sisk.pl>
+Message-ID: <001701cc80d2$02ee4940$08cadbc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abhilash Kesavan wrote:
+Rafael J. Wysocki wrote:
 > 
-> The patchset adds Power Mangement support for S5P64X0. The first
-> two patches lay the groundwork for adding PM support, while the
-> final patch adds the SoC specific PM code.
+> On Saturday, August 13, 2011, Russell King - ARM Linux wrote:
+> > On Sat, Aug 13, 2011 at 11:24:07PM +0200, Rafael J. Wysocki wrote:
+> > > On Thursday, August 11, 2011, Chanwoo Choi wrote:
+> > > > The following patch set use the generic Power domain Framework
+instead of
+> > > > power domain code depend of Samsung SoC.
+> > > >
+> > > > Chanwoo Choi (4):
+> > > >   ARM: EXYNOS4: Support for generic I/O power domains on EXYNOS4210
+> > > >   ARM: EXYNOS4: Support for generic Clock manipulation PM callbacks
+> > > >   ARM: EXYNOS4: Delete the power-domain code depend on Samsung SoC
+> > > >   ARM: EXYNOS4: Add power domain to use generic Power domain
+Framework
+> > > >
+> > > >  arch/arm/mach-exynos4/Kconfig                      |   10 +-
+> > > >  arch/arm/mach-exynos4/Makefile                     |    4 +-
+> > > >  arch/arm/mach-exynos4/dev-pd.c                     |  139
+--------------
+> > > >  arch/arm/mach-exynos4/include/mach/pm-exynos4210.h |   52 ++++++
+> > > >  arch/arm/mach-exynos4/include/mach/regs-clock.h    |    8 +
+> > > >  arch/arm/mach-exynos4/mach-nuri.c                  |   21 ++-
+> > > >  arch/arm/mach-exynos4/mach-smdkc210.c              |   26 ++-
+> > > >  arch/arm/mach-exynos4/mach-smdkv310.c              |   23 ++-
+> > > >  arch/arm/mach-exynos4/mach-universal_c210.c        |   21 ++-
+> > > >  arch/arm/mach-exynos4/pm-exynos4210.c              |  189
+++++++++++++++++++++
+> > > >  arch/arm/mach-exynos4/pm-runtime.c                 |   56 ++++++
+> > > >  arch/arm/plat-samsung/Kconfig                      |    8 -
+> > > >  arch/arm/plat-samsung/Makefile                     |    4 -
+> > > >  arch/arm/plat-samsung/include/plat/pd.h            |   30 ---
+> > > >  arch/arm/plat-samsung/pd.c                         |   95
+----------
+> > > >  15 files changed, 377 insertions(+), 309 deletions(-)
+> > > >  delete mode 100644 arch/arm/mach-exynos4/dev-pd.c
+> > > >  create mode 100644
+arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
+> > > >  create mode 100644 arch/arm/mach-exynos4/pm-exynos4210.c
+> > > >  create mode 100644 arch/arm/mach-exynos4/pm-runtime.c
+> > > >  delete mode 100644 arch/arm/plat-samsung/include/plat/pd.h
+> > > >  delete mode 100644 arch/arm/plat-samsung/pd.c
+> > >
+> > > The patchset looks good to me, but please note that some code it
+> > > is based on will most likely change in 3.2 due to this patchset:
+> > >
+> > > https://lkml.org/lkml/2011/8/8/420
+> >
+> > Err, isn't all that pm_clk stuff just duplicating what the clk API does?
 > 
-> Changes since V1:
-> - Changed register naming as per User Manual.
-> - Dropped the pm-gpio warning patch as it will be taken care in the gpio
->   movement patch by Kukjin Kim.
-> - Used soc_is_* for differentiating between 6440 and 6450.
-> - Merged all the sleep files of S5P SoCs while leaving the S3C64XX sleep
->   code as is.
+> I'm not sure it's duplicating anything.  Maybe it does, but it came into
+> being by moving some code that were duplicated in a few places throughout
+> the ARM and sh trees into one place.
 > 
-> Abhilash Kesavan (3):
->   ARM: S5P: Make the common S5P PM code conditionally compile
->   ARM: S5P: Make the sleep code common for S5P series SoCs
->   ARM: S5P64X0: Add Power Management support
+> > IOW, drivers _can_ (and should be) calling clk_disable() when they don't
+> > need the clock running.
 > 
->  arch/arm/Kconfig                                |    2 +-
->  arch/arm/mach-exynos4/Kconfig                   |    4 +
->  arch/arm/mach-exynos4/Makefile                  |    2 +-
->  arch/arm/mach-s5p64x0/Kconfig                   |    4 +
->  arch/arm/mach-s5p64x0/Makefile                  |    1 +
->  arch/arm/mach-s5p64x0/include/mach/map.h        |    1 +
->  arch/arm/mach-s5p64x0/include/mach/pm-core.h    |  117 +++++++++++++
->  arch/arm/mach-s5p64x0/include/mach/regs-clock.h |   33 ++++
->  arch/arm/mach-s5p64x0/include/mach/regs-gpio.h  |   19 ++
->  arch/arm/mach-s5p64x0/irq-eint.c                |    2 +
->  arch/arm/mach-s5p64x0/irq-pm.c                  |   92 ++++++++++
->  arch/arm/mach-s5p64x0/pm.c                      |  204
-+++++++++++++++++++++++
->  arch/arm/mach-s5pv210/Kconfig                   |    2 +
->  arch/arm/mach-s5pv210/Makefile                  |    2 +-
->  arch/arm/mach-s5pv210/sleep.S                   |   52 ------
->  arch/arm/plat-s5p/Kconfig                       |   12 ++
->  arch/arm/plat-s5p/Makefile                      |    4 +-
->  arch/arm/{mach-exynos4 => plat-s5p}/sleep.S     |   13 +-
->  18 files changed, 500 insertions(+), 66 deletions(-)
->  create mode 100644 arch/arm/mach-s5p64x0/include/mach/pm-core.h
->  create mode 100644 arch/arm/mach-s5p64x0/irq-pm.c
->  create mode 100644 arch/arm/mach-s5p64x0/pm.c
->  delete mode 100644 arch/arm/mach-s5pv210/sleep.S
->  rename arch/arm/{mach-exynos4 => plat-s5p}/sleep.S (81%)
+> Drivers may not know about what to do in a given situation.  For example,
+> if the system has power domains, it may be better to switch a power domain
+> off instead of or in addition to disabling the clock and the driver
+usually
+> doesn't know about that.
+> 
+Hmm... Even though each driver cannot know the given situation, the driver
+can know each own clock should be alive or not. I think, if clock gating
+(enable, disable clock) is required, it should be handled in each driver. In
+addition, the clock and power are not always one-on-one match.
 
-Looks ok to me, will apply.
 Thanks.
 
 Best regards,
