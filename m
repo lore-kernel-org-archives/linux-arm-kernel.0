@@ -1,28 +1,54 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun,  2 Oct 2011 16:56:59 +0800
-Subject: [PATCH 0/2] Make IPI and localtimer handlers callable from C code
-Message-ID: <1317545821-23194-1-git-send-email-shawn.guo@linaro.org>
+Date: Sun,  2 Oct 2011 16:57:00 +0800
+Subject: [PATCH 1/2] ARM: smp: Add an IPI handler callable from C code
+In-Reply-To: <1317545821-23194-1-git-send-email-shawn.guo@linaro.org>
+References: <1317545821-23194-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1317545821-23194-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Sorry for send you twice, Russell, Marc.  I forgot cc LAKML last time.]
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-With imx sub-architecture is moving to MULTI_IRQ_HANDLER, imx6q has to
-get a local gic_handler_irq() implementation calling IPI and localtimer
-handlers from C code, before Marc's global gic_handler_irq() series gets
-merged.
+In order to be able to handle IPI directly from C code instead of
+assembly code, introduce handle_IPI(), which is modeled after handle_IRQ().
 
-This patch series changes the original __exception_irq_entry to a
-wrapper for actual IPI and localtimer handlers which are callable from
-C code now.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/smp.h |    5 +++++
+ arch/arm/kernel/smp.c      |    5 +++++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
-Marc Zyngier (1):
-     ARM: smp: Add an IPI handler callable from C code
-
-Shawn Guo (1):
-     ARM: smp: Add a localtimer handler callable from C code
-
- arch/arm/include/asm/localtimer.h |    4 ++++
- arch/arm/include/asm/smp.h        |    5 +++++
- arch/arm/kernel/smp.c             |   10 ++++++++++
- 3 files changed, 19 insertions(+), 0 deletions(-)
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 674ebcd..0a17b62 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -33,6 +33,11 @@ extern void show_ipi_list(struct seq_file *, int);
+ asmlinkage void do_IPI(int ipinr, struct pt_regs *regs);
+ 
+ /*
++ * Called from C code, this handles an IPI.
++ */
++void handle_IPI(int ipinr, struct pt_regs *regs);
++
++/*
+  * Setup the set of possible CPUs (via set_cpu_possible)
+  */
+ extern void smp_init_cpus(void);
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 3f12ce9..2e49f18 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -587,6 +587,11 @@ static void ipi_cpu_stop(unsigned int cpu)
+  */
+ asmlinkage void __exception_irq_entry do_IPI(int ipinr, struct pt_regs *regs)
+ {
++	handle_IPI(ipinr, regs);
++}
++
++void handle_IPI(int ipinr, struct pt_regs *regs)
++{
+ 	unsigned int cpu = smp_processor_id();
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
+-- 
+1.7.4.1
