@@ -1,1086 +1,942 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 02 Oct 2011 18:24:40 +0900
-Subject: [PATCH 2/2] ARM: SAMSUNG: Cleanup resources by using macro
-Message-ID: <001e01cc80e5$1c9eb150$55dc13f0$%kim@samsung.com>
+Date: Sun, 02 Oct 2011 18:25:30 +0900
+Subject: [PATCH] ARM: EXYNOS: Add ARCH_EXYNOS and reorganize
+	arch/arm/mach-exynos
+Message-ID: <001f01cc80e5$3abd1c80$b0375580$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds macro SAMSUNG_RES_MEM and SAMSUNG_RES_IRQ to cleanup
-regarding 'struct resource'
+The arch/arm/mach-exynos4 directory (CONFIG_ARCH_EXYNOS4) has
+made for plaforms based on EXYNOS4 SoCs. But since upcoming
+Samsung's SoCs such as EXYNOS5 (ARM Cortex A15) can reuse most
+codes in current mach-exynos4, one mach-exynos directory will
+be used for them.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
+This patch changes to CONFIG_ARCH_EXYNOS (arch/arm/mach-exynos)
+but keeps original CONFIG_ARCH_EXYNOS4 in mach-exynos/Kconfig to
+avoid changing in driver side.
+
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-s3c2410/include/mach/map.h  |    1 +
- arch/arm/plat-samsung/devs.c              |  670 +++++------------------------
- arch/arm/plat-samsung/include/plat/devs.h |   10 +
- 3 files changed, 122 insertions(+), 559 deletions(-)
+NOTE: The codes for upcoming SoCs will be implemented soon.
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/map.h b/arch/arm/mach-s3c2410/include/mach/map.h
-index 4cf495f..78ae807 100644
---- a/arch/arm/mach-s3c2410/include/mach/map.h
-+++ b/arch/arm/mach-s3c2410/include/mach/map.h
-@@ -149,6 +149,7 @@
- #define S3C24XX_PA_RTC      S3C2410_PA_RTC
- #define S3C24XX_PA_ADC      S3C2410_PA_ADC
- #define S3C24XX_PA_SPI      S3C2410_PA_SPI
-+#define S3C24XX_PA_SPI1		(S3C2410_PA_SPI + S3C2410_SPI1)
- #define S3C24XX_PA_SDI      S3C2410_PA_SDI
- #define S3C24XX_PA_NAND	    S3C2410_PA_NAND
- 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 83c3cf9..fc72476 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -66,16 +66,8 @@ static u64 samsung_device_dma_mask = DMA_BIT_MASK(32);
- /* AC97 */
- #ifdef CONFIG_CPU_S3C2440
- static struct resource s3c_ac97_resource[] = {
--	[0] = {
--		.start	= S3C2440_PA_AC97,
--		.end	= S3C2440_PA_AC97 + S3C2440_SZ_AC97 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_S3C244x_AC97,
--		.end	= IRQ_S3C244x_AC97,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C2440, AC97, S3C2440_SZ_AC97) },
-+	[1] = { SAMSUNG_RES_IRQ(S3C244x_AC97) },
- 	[2] = {
- 		.name	= "PCM out",
- 		.start	= DMACH_PCM_OUT,
-@@ -112,21 +104,9 @@ struct platform_device s3c_device_ac97 = {
- 
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_adc_resource[] = {
--	[0] = {
--		.start	= S3C24XX_PA_ADC,
--		.end	= S3C24XX_PA_ADC + S3C24XX_SZ_ADC - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_TC,
--		.end	= IRQ_TC,
--		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
--		.start	= IRQ_ADC,
--		.end	= IRQ_ADC,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C24XX, ADC, S3C24XX_SZ_ADC) },
-+	[1] = { SAMSUNG_RES_IRQ(TC) },
-+	[2] = { SAMSUNG_RES_IRQ(ADC) },
- };
- 
- struct platform_device s3c_device_adc = {
-@@ -139,21 +119,9 @@ struct platform_device s3c_device_adc = {
- 
- #if defined(CONFIG_SAMSUNG_DEV_ADC)
- static struct resource s3c_adc_resource[] = {
--	[0] = {
--		.start	= SAMSUNG_PA_ADC,
--		.end	= SAMSUNG_PA_ADC + SZ_256 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_TC,
--		.end	= IRQ_TC,
--		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
--		.start	= IRQ_ADC,
--		.end	= IRQ_ADC,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(SAMSUNG, ADC, SZ_256) },
-+	[1] = { SAMSUNG_RES_IRQ(TC) },
-+	[2] = { SAMSUNG_RES_IRQ(ADC) },
- };
- 
- struct platform_device s3c_device_adc = {
-@@ -168,16 +136,8 @@ struct platform_device s3c_device_adc = {
- 
- #ifdef CONFIG_CPU_S3C2440
- static struct resource s3c_camif_resource[] = {
--	[0] = {
--		.start	= S3C2440_PA_CAMIF,
--		.end	= S3C2440_PA_CAMIF + S3C2440_SZ_CAMIF - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_CAM,
--		.end	= IRQ_CAM,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C2440, CAMIF, S3C2440_SZ_CAMIF) },
-+	[1] = { SAMSUNG_RES_IRQ(CAM) },
- };
- 
- struct platform_device s3c_device_camif = {
-@@ -216,26 +176,10 @@ struct platform_device samsung_asoc_idma = {
- 
- #ifdef CONFIG_S3C_DEV_FB
- static struct resource s3c_fb_resource[] = {
--	[0] = {
--		.start	= S3C_PA_FB,
--		.end	= S3C_PA_FB + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_LCD_VSYNC,
--		.end	= IRQ_LCD_VSYNC,
--		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
--		.start	= IRQ_LCD_FIFO,
--		.end	= IRQ_LCD_FIFO,
--		.flags	= IORESOURCE_IRQ,
--	},
--	[3] = {
--		.start	= IRQ_LCD_SYSTEM,
--		.end	= IRQ_LCD_SYSTEM,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, FB, SZ_16K) },
-+	[1] = { SAMSUNG_RES_IRQ(LCD_VSYNC) },
-+	[2] = { SAMSUNG_RES_IRQ(LCD_FIFO) },
-+	[3] = { SAMSUNG_RES_IRQ(LCD_SYSTEM) },
- };
- 
- struct platform_device s3c_device_fb = {
-@@ -260,16 +204,8 @@ void __init s3c_fb_set_platdata(struct s3c_fb_platdata *pd)
- 
- #ifdef CONFIG_S5P_DEV_FIMC0
- static struct resource s5p_fimc0_resource[] = {
--	[0] = {
--		.start	= S5P_PA_FIMC0,
--		.end	= S5P_PA_FIMC0 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_FIMC0,
--		.end	= IRQ_FIMC0,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S5P, FIMC0, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(FIMC0) },
- };
- 
- struct platform_device s5p_device_fimc0 = {
-@@ -286,16 +222,8 @@ struct platform_device s5p_device_fimc0 = {
- 
- #ifdef CONFIG_S5P_DEV_FIMC1
- static struct resource s5p_fimc1_resource[] = {
--	[0] = {
--		.start	= S5P_PA_FIMC1,
--		.end	= S5P_PA_FIMC1 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_FIMC1,
--		.end	= IRQ_FIMC1,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S5P, FIMC1, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(FIMC1) },
- };
- 
- struct platform_device s5p_device_fimc1 = {
-@@ -312,16 +240,8 @@ struct platform_device s5p_device_fimc1 = {
- 
- #ifdef CONFIG_S5P_DEV_FIMC2
- static struct resource s5p_fimc2_resource[] = {
--	[0] = {
--		.start	= S5P_PA_FIMC2,
--		.end	= S5P_PA_FIMC2 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_FIMC2,
--		.end	= IRQ_FIMC2,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S5P, FIMC2, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(FIMC2) },
- };
- 
- struct platform_device s5p_device_fimc2 = {
-@@ -338,16 +258,8 @@ struct platform_device s5p_device_fimc2 = {
- 
- #ifdef CONFIG_S5P_DEV_FIMC3
- static struct resource s5p_fimc3_resource[] = {
--	[0] = {
--		.start	= S5P_PA_FIMC3,
--		.end	= S5P_PA_FIMC3 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_FIMC3,
--		.end	= IRQ_FIMC3,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S5P, FIMC3, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(FIMC3) },
- };
- 
- struct platform_device s5p_device_fimc3 = {
-@@ -366,26 +278,10 @@ struct platform_device s5p_device_fimc3 = {
- 
- #ifdef CONFIG_S5P_DEV_FIMD0
- static struct resource s5p_fimd0_resource[] = {
--	[0] = {
--		.start	= S5P_PA_FIMD0,
--		.end	= S5P_PA_FIMD0 + SZ_32K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_FIMD0_VSYNC,
--		.end	= IRQ_FIMD0_VSYNC,
--		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
--		.start	= IRQ_FIMD0_FIFO,
--		.end	= IRQ_FIMD0_FIFO,
--		.flags	= IORESOURCE_IRQ,
--	},
--	[3] = {
--		.start	= IRQ_FIMD0_SYSTEM,
--		.end	= IRQ_FIMD0_SYSTEM,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S5P, FIMD0, SZ_32K) },
-+	[1] = { SAMSUNG_RES_IRQ(FIMD0_VSYNC) },
-+	[2] = { SAMSUNG_RES_IRQ(FIMD0_FIFO) },
-+	[3] = { SAMSUNG_RES_IRQ(FIMD0_SYSTEM) },
- };
- 
- struct platform_device s5p_device_fimd0 = {
-@@ -424,20 +320,10 @@ void __init s3c_hwmon_set_platdata(struct s3c_hwmon_pdata *pd)
- 
- /* HSMMC */
- 
--#define S3C_SZ_HSMMC	0x1000
--
- #ifdef CONFIG_S3C_DEV_HSMMC
- static struct resource s3c_hsmmc_resource[] = {
--	[0] = {
--		.start	= S3C_PA_HSMMC0,
--		.end	= S3C_PA_HSMMC0 + S3C_SZ_HSMMC - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_HSMMC0,
--		.end	= IRQ_HSMMC0,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C, HSMMC0, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(HSMMC0) },
- };
- 
- struct s3c_sdhci_platdata s3c_hsmmc0_def_platdata = {
-@@ -467,16 +353,8 @@ void s3c_sdhci0_set_platdata(struct s3c_sdhci_platdata *pd)
- 
- #ifdef CONFIG_S3C_DEV_HSMMC1
- static struct resource s3c_hsmmc1_resource[] = {
--	[0] = {
--		.start	= S3C_PA_HSMMC1,
--		.end	= S3C_PA_HSMMC1 + S3C_SZ_HSMMC - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_HSMMC1,
--		.end	= IRQ_HSMMC1,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C, HSMMC1, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(HSMMC1) },
- };
- 
- struct s3c_sdhci_platdata s3c_hsmmc1_def_platdata = {
-@@ -508,16 +386,8 @@ void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd)
- 
- #ifdef CONFIG_S3C_DEV_HSMMC2
- static struct resource s3c_hsmmc2_resource[] = {
--	[0] = {
--		.start	= S3C_PA_HSMMC2,
--		.end	= S3C_PA_HSMMC2 + S3C_SZ_HSMMC - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_HSMMC2,
--		.end	= IRQ_HSMMC2,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C, HSMMC2, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(HSMMC2) },
- };
- 
- struct s3c_sdhci_platdata s3c_hsmmc2_def_platdata = {
-@@ -547,16 +417,8 @@ void s3c_sdhci2_set_platdata(struct s3c_sdhci_platdata *pd)
- 
- #ifdef CONFIG_S3C_DEV_HSMMC3
- static struct resource s3c_hsmmc3_resource[] = {
--	[0] = {
--		.start	= S3C_PA_HSMMC3,
--		.end	= S3C_PA_HSMMC3 + S3C_SZ_HSMMC - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_HSMMC3,
--		.end	= IRQ_HSMMC3,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C, HSMMC3, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(HSMMC3) },
- };
- 
- struct s3c_sdhci_platdata s3c_hsmmc3_def_platdata = {
-@@ -587,16 +449,8 @@ void s3c_sdhci3_set_platdata(struct s3c_sdhci_platdata *pd)
- /* I2C */
- 
- static struct resource s3c_i2c0_resource[] = {
--	[0] = {
--		.start	= S3C_PA_IIC,
--		.end	= S3C_PA_IIC + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_IIC,
--		.end	= IRQ_IIC,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, IIC, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(IIC) },
- };
- 
- struct platform_device s3c_device_i2c0 = {
-@@ -633,16 +487,8 @@ void __init s3c_i2c0_set_platdata(struct s3c2410_platform_i2c *pd)
- 
- #ifdef CONFIG_S3C_DEV_I2C1
- static struct resource s3c_i2c1_resource[] = {
--	[0] = {
--		.start	= S3C_PA_IIC1,
--		.end	= S3C_PA_IIC1 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_IIC1,
--		.end	= IRQ_IIC1,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, IIC1, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(IIC1) },
- };
- 
- struct platform_device s3c_device_i2c1 = {
-@@ -671,16 +517,8 @@ void __init s3c_i2c1_set_platdata(struct s3c2410_platform_i2c *pd)
- 
- #ifdef CONFIG_S3C_DEV_I2C2
- static struct resource s3c_i2c2_resource[] = {
--	[0] = {
--		.start	= S3C_PA_IIC2,
--		.end	= S3C_PA_IIC2 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_IIC2,
--		.end	= IRQ_IIC2,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, IIC2, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(IIC2) },
- };
- 
- struct platform_device s3c_device_i2c2 = {
-@@ -709,16 +547,8 @@ void __init s3c_i2c2_set_platdata(struct s3c2410_platform_i2c *pd)
- 
- #ifdef CONFIG_S3C_DEV_I2C3
- static struct resource s3c_i2c3_resource[] = {
--	[0] = {
--		.start	= S3C_PA_IIC3,
--		.end	= S3C_PA_IIC3 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_IIC3,
--		.end	= IRQ_IIC3,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, IIC3, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(IIC3) },
- };
- 
- struct platform_device s3c_device_i2c3 = {
-@@ -747,16 +577,8 @@ void __init s3c_i2c3_set_platdata(struct s3c2410_platform_i2c *pd)
- 
- #ifdef CONFIG_S3C_DEV_I2C4
- static struct resource s3c_i2c4_resource[] = {
--	[0] = {
--		.start	= S3C_PA_IIC4,
--		.end	= S3C_PA_IIC4 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_IIC4,
--		.end	= IRQ_IIC4,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, IIC4, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(IIC4) },
- };
- 
- struct platform_device s3c_device_i2c4 = {
-@@ -785,16 +607,8 @@ void __init s3c_i2c4_set_platdata(struct s3c2410_platform_i2c *pd)
- 
- #ifdef CONFIG_S3C_DEV_I2C5
- static struct resource s3c_i2c5_resource[] = {
--	[0] = {
--		.start	= S3C_PA_IIC5,
--		.end	= S3C_PA_IIC5 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_IIC5,
--		.end	= IRQ_IIC5,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, IIC5, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(IIC5) },
- };
- 
- struct platform_device s3c_device_i2c5 = {
-@@ -823,16 +637,8 @@ void __init s3c_i2c5_set_platdata(struct s3c2410_platform_i2c *pd)
- 
- #ifdef CONFIG_S3C_DEV_I2C6
- static struct resource s3c_i2c6_resource[] = {
--	[0] = {
--		.start	= S3C_PA_IIC6,
--		.end	= S3C_PA_IIC6 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_IIC6,
--		.end	= IRQ_IIC6,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, IIC6, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(IIC6) },
- };
- 
- struct platform_device s3c_device_i2c6 = {
-@@ -861,16 +667,8 @@ void __init s3c_i2c6_set_platdata(struct s3c2410_platform_i2c *pd)
- 
- #ifdef CONFIG_S3C_DEV_I2C7
- static struct resource s3c_i2c7_resource[] = {
--	[0] = {
--		.start	= S3C_PA_IIC7,
--		.end	= S3C_PA_IIC7 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_IIC7,
--		.end	= IRQ_IIC7,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, IIC7, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(IIC7) },
- };
- 
- struct platform_device s3c_device_i2c7 = {
-@@ -899,16 +697,8 @@ void __init s3c_i2c7_set_platdata(struct s3c2410_platform_i2c *pd)
- 
- #ifdef CONFIG_S5P_DEV_I2C_HDMIPHY
- static struct resource s5p_i2c_resource[] = {
--	[0] = {
--		.start	= S5P_PA_IIC_HDMIPHY,
--		.end	= S5P_PA_IIC_HDMIPHY + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_IIC_HDMIPHY,
--		.end	= IRQ_IIC_HDMIPHY,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S5P, IIC_HDMIPHY, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(IIC_HDMIPHY) },
- };
- 
- struct platform_device s5p_device_i2c_hdmiphy = {
-@@ -942,11 +732,7 @@ void __init s5p_i2c_hdmiphy_set_platdata(struct s3c2410_platform_i2c *pd)
- 
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_iis_resource[] = {
--	[0] = {
--		.start	= S3C24XX_PA_IIS,
--		.end	= S3C24XX_PA_IIS + S3C24XX_SZ_IIS - 1,
--		.flags	= IORESOURCE_MEM,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C24XX, IIS, S3C24XX_SZ_IIS) },
- };
- 
- struct platform_device s3c_device_iis = {
-@@ -976,16 +762,8 @@ struct platform_device s3c2412_device_iis = {
- 
- #ifdef CONFIG_SAMSUNG_DEV_IDE
- static struct resource s3c_cfcon_resource[] = {
--	[0] = {
--		.start	= SAMSUNG_PA_CFCON,
--		.end	= SAMSUNG_PA_CFCON + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_CFCON,
--		.end	= IRQ_CFCON,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(SAMSUNG, CFCON, SZ_16K) },
-+	[1] = { SAMSUNG_RES_IRQ(CFCON) },
- };
- 
- struct platform_device s3c_device_cfcon = {
-@@ -1005,16 +783,8 @@ void s3c_ide_set_platdata(struct s3c_ide_platdata *pdata)
- 
- #ifdef CONFIG_SAMSUNG_DEV_KEYPAD
- static struct resource samsung_keypad_resources[] = {
--	[0] = {
--		.start	= SAMSUNG_PA_KEYPAD,
--		.end	= SAMSUNG_PA_KEYPAD + 0x20 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_KEYPAD,
--		.end	= IRQ_KEYPAD,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(SAMSUNG, KEYPAD, SZ_32) },
-+	[1] = { SAMSUNG_RES_IRQ(KEYPAD) },
- };
- 
- struct platform_device samsung_device_keypad = {
-@@ -1040,16 +810,8 @@ void __init samsung_keypad_set_platdata(struct samsung_keypad_platdata *pd)
- 
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_lcd_resource[] = {
--	[0] = {
--		.start	= S3C24XX_PA_LCD,
--		.end	= S3C24XX_PA_LCD + S3C24XX_SZ_LCD - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_LCD,
--		.end	= IRQ_LCD,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C24XX, LCD, S3C24XX_SZ_LCD) },
-+	[1] = { SAMSUNG_RES_IRQ(LCD) },
- };
- 
- struct platform_device s3c_device_lcd = {
-@@ -1084,16 +846,8 @@ void __init s3c24xx_fb_set_platdata(struct s3c2410fb_mach_info *pd)
- 
- #ifdef CONFIG_S5P_DEV_MFC
- static struct resource s5p_mfc_resource[] = {
--	[0] = {
--		.start	= S5P_PA_MFC,
--		.end	= S5P_PA_MFC + SZ_64K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_MFC,
--		.end	= IRQ_MFC,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S5P, MFC, SZ_64K) },
-+	[1] = { SAMSUNG_RES_IRQ(MFC) },
- };
- 
- struct platform_device s5p_device_mfc = {
-@@ -1136,16 +890,8 @@ struct platform_device s5p_device_mfc_r = {
- 
- #ifdef CONFIG_S5P_DEV_CSIS0
- static struct resource s5p_mipi_csis0_resource[] = {
--	[0] = {
--		.start	= S5P_PA_MIPI_CSIS0,
--		.end	= S5P_PA_MIPI_CSIS0 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_MIPI_CSIS0,
--		.end	= IRQ_MIPI_CSIS0,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S5P, MIPI_CSIS0, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(MIPI_CSIS0) },
- };
- 
- struct platform_device s5p_device_mipi_csis0 = {
-@@ -1158,16 +904,8 @@ struct platform_device s5p_device_mipi_csis0 = {
- 
- #ifdef CONFIG_S5P_DEV_CSIS1
- static struct resource s5p_mipi_csis1_resource[] = {
--	[0] = {
--		.start	= S5P_PA_MIPI_CSIS1,
--		.end	= S5P_PA_MIPI_CSIS1 + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_MIPI_CSIS1,
--		.end	= IRQ_MIPI_CSIS1,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S5P, MIPI_CSIS1, SZ_4K) },
-+	[1] = { SAMSUNG_RES_IRQ(MIPI_CSIS1) },
- };
- 
- struct platform_device s5p_device_mipi_csis1 = {
-@@ -1182,11 +920,7 @@ struct platform_device s5p_device_mipi_csis1 = {
- 
- #ifdef CONFIG_S3C_DEV_NAND
- static struct resource s3c_nand_resource[] = {
--	[0] = {
--		.start	= S3C_PA_NAND,
--		.end	= S3C_PA_NAND + SZ_1M,
--		.flags	= IORESOURCE_MEM,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C, NAND, SZ_1M) },
- };
- 
- struct platform_device s3c_device_nand = {
-@@ -1291,21 +1025,9 @@ void __init s3c_nand_set_platdata(struct s3c2410_platform_nand *nand)
- 
- #ifdef CONFIG_S3C_DEV_ONENAND
- static struct resource s3c_onenand_resources[] = {
--	[0] = {
--		.start	= S3C_PA_ONENAND,
--		.end	= S3C_PA_ONENAND + 0x400 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= S3C_PA_ONENAND_BUF,
--		.end	= S3C_PA_ONENAND_BUF + S3C_SZ_ONENAND_BUF - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[2] = {
--		.start	= IRQ_ONENAND,
--		.end	= IRQ_ONENAND,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, ONENAND, SZ_1K) },
-+	[1] = { SAMSUNG_RES_MEM(S3C, ONENAND_BUF, S3C_SZ_ONENAND_BUF) },
-+	[2] = { SAMSUNG_RES_IRQ(ONENAND) },
- };
- 
- struct platform_device s3c_device_onenand = {
-@@ -1318,21 +1040,9 @@ struct platform_device s3c_device_onenand = {
- 
- #ifdef CONFIG_S3C64XX_DEV_ONENAND1
- static struct resource s3c64xx_onenand1_resources[] = {
--	[0] = {
--		.start	= S3C64XX_PA_ONENAND1,
--		.end	= S3C64XX_PA_ONENAND1 + 0x400 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= S3C64XX_PA_ONENAND1_BUF,
--		.end	= S3C64XX_PA_ONENAND1_BUF + S3C64XX_SZ_ONENAND1_BUF - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[2] = {
--		.start	= IRQ_ONENAND1,
--		.end	= IRQ_ONENAND1,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C64XX, ONENAND1, SZ_1K) },
-+	[1] = { SAMSUNG_RES_MEM(S3C64XX, ONENAND1_BUF, S3C64XX_SZ_ONENAND1_BUF) },
-+	[2] = { SAMSUNG_RES_IRQ(ONENAND1) },
- };
- 
- struct platform_device s3c64xx_device_onenand1 = {
-@@ -1351,21 +1061,9 @@ void s3c64xx_onenand1_set_platdata(struct onenand_platform_data *pdata)
- 
- #ifdef CONFIG_S5P_DEV_ONENAND
- static struct resource s5p_onenand_resources[] = {
--	[0] = {
--		.start	= S5P_PA_ONENAND,
--		.end	= S5P_PA_ONENAND + SZ_128K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= S5P_PA_ONENAND_DMA,
--		.end	= S5P_PA_ONENAND_DMA + SZ_8K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[2] = {
--		.start	= IRQ_ONENAND_AUDI,
--		.end	= IRQ_ONENAND_AUDI,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S5P, ONENAND, SZ_128K) },
-+	[1] = { SAMSUNG_RES_MEM(S5P, ONENAND_DMA, SZ_8K) },
-+	[2] = { SAMSUNG_RES_IRQ(ONENAND_AUDI) },
- };
- 
- struct platform_device s5p_device_onenand = {
-@@ -1380,9 +1078,7 @@ struct platform_device s5p_device_onenand = {
- 
- #ifdef CONFIG_PLAT_S5P
- static struct resource s5p_pmu_resource = {
--	.start	= IRQ_PMU,
--	.end	= IRQ_PMU,
--	.flags	= IORESOURCE_IRQ,
-+	SAMSUNG_RES_IRQ(PMU)
- };
- 
- struct platform_device s5p_device_pmu = {
-@@ -1439,21 +1135,9 @@ struct platform_device s3c_device_timer[] = {
- 
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_rtc_resource[] = {
--	[0] = {
--		.start	= S3C24XX_PA_RTC,
--		.end	= S3C24XX_PA_RTC + 0xff,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_RTC,
--		.end	= IRQ_RTC,
--		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
--		.start	= IRQ_TICK,
--		.end	= IRQ_TICK,
--		.flags	= IORESOURCE_IRQ
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C24XX, RTC, SZ_256) },
-+	[1] = { SAMSUNG_RES_IRQ(RTC) },
-+	[2] = { SAMSUNG_RES_IRQ(TICK) },
- };
- 
- struct platform_device s3c_device_rtc = {
-@@ -1466,21 +1150,9 @@ struct platform_device s3c_device_rtc = {
- 
- #ifdef CONFIG_S3C_DEV_RTC
- static struct resource s3c_rtc_resource[] = {
--	[0] = {
--		.start	= S3C_PA_RTC,
--		.end	= S3C_PA_RTC + 0xff,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_RTC_ALARM,
--		.end	= IRQ_RTC_ALARM,
--		.flags	= IORESOURCE_IRQ,
--	},
--	[2] = {
--		.start	= IRQ_RTC_TIC,
--		.end	= IRQ_RTC_TIC,
--		.flags	= IORESOURCE_IRQ
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C, RTC, SZ_256) },
-+	[1] = { SAMSUNG_RES_IRQ(RTC_ALARM) },
-+	[2] = { SAMSUNG_RES_IRQ(RTC_TIC) },
- };
- 
- struct platform_device s3c_device_rtc = {
-@@ -1495,16 +1167,8 @@ struct platform_device s3c_device_rtc = {
- 
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_sdi_resource[] = {
--	[0] = {
--		.start	= S3C24XX_PA_SDI,
--		.end	= S3C24XX_PA_SDI + S3C24XX_SZ_SDI - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_SDI,
--		.end	= IRQ_SDI,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C24XX, SDI, S3C24XX_SZ_SDI) },
-+	[1] = { SAMSUNG_RES_IRQ(SDI) },
- };
- 
- struct platform_device s3c_device_sdi = {
-@@ -1525,16 +1189,8 @@ void __init s3c24xx_mci_set_platdata(struct s3c24xx_mci_pdata *pdata)
- 
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_spi0_resource[] = {
--	[0] = {
--		.start	= S3C24XX_PA_SPI,
--		.end	= S3C24XX_PA_SPI + 0x1f,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_SPI0,
--		.end	= IRQ_SPI0,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C24XX, SPI, SZ_32) },
-+	[1] = { SAMSUNG_RES_IRQ(SPI0) },
- };
- 
- struct platform_device s3c_device_spi0 = {
-@@ -1549,16 +1205,8 @@ struct platform_device s3c_device_spi0 = {
- };
- 
- static struct resource s3c_spi1_resource[] = {
--	[0] = {
--		.start	= S3C24XX_PA_SPI + S3C2410_SPI1,
--		.end	= S3C24XX_PA_SPI + S3C2410_SPI1 + 0x1f,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_SPI1,
--		.end	= IRQ_SPI1,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C24XX, SPI1, SZ_32) },
-+	[1] = { SAMSUNG_RES_IRQ(SPI1) },
- };
- 
- struct platform_device s3c_device_spi1 = {
-@@ -1577,17 +1225,8 @@ struct platform_device s3c_device_spi1 = {
- 
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_ts_resource[] = {
--	[0] = {
--		.start	= S3C24XX_PA_ADC,
--		.end	= S3C24XX_PA_ADC + S3C24XX_SZ_ADC - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_TC,
--		.end	= IRQ_TC,
--		.flags	= IORESOURCE_IRQ,
--	},
--
-+	[0] = { SAMSUNG_RES_MEM(S3C24XX, ADC, S3C24XX_SZ_ADC) },
-+	[1] = { SAMSUNG_RES_IRQ(TC) },
- };
- 
- struct platform_device s3c_device_ts = {
-@@ -1607,16 +1246,8 @@ void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *hard_s3c2410ts_
- 
- #ifdef CONFIG_SAMSUNG_DEV_TS
- static struct resource s3c_ts_resource[] = {
--	[0] = {
--		.start	= SAMSUNG_PA_ADC,
--		.end	= SAMSUNG_PA_ADC + SZ_256 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_TC,
--		.end	= IRQ_TC,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(SAMSUNG, ADC, SZ_256) },
-+	[1] = { SAMSUNG_RES_IRQ(TC) },
- };
- 
- static struct s3c2410_ts_mach_info default_ts_data __initdata = {
-@@ -1647,16 +1278,8 @@ void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *pd)
- #ifdef CONFIG_S5P_DEV_TV
- 
- static struct resource s5p_hdmi_resources[] = {
--	[0] = {
--		.start	= S5P_PA_HDMI,
--		.end	= S5P_PA_HDMI + SZ_1M - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_HDMI,
--		.end	= IRQ_HDMI,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S5P, HDMI, SZ_1M) },
-+	[1] = { SAMSUNG_RES_IRQ(HDMI) },
- };
- 
- struct platform_device s5p_device_hdmi = {
-@@ -1667,16 +1290,8 @@ struct platform_device s5p_device_hdmi = {
- };
- 
- static struct resource s5p_sdo_resources[] = {
--	[0] = {
--		.start	= S5P_PA_SDO,
--		.end	= S5P_PA_SDO + SZ_64K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_SDO,
--		.end	= IRQ_SDO,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S5P, SDO, SZ_64K) },
-+	[1] = { SAMSUNG_RES_IRQ(SDO) },
- };
- 
- struct platform_device s5p_device_sdo = {
-@@ -1687,24 +1302,9 @@ struct platform_device s5p_device_sdo = {
- };
- 
- static struct resource s5p_mixer_resources[] = {
--	[0] = {
--		.start	= S5P_PA_MIXER,
--		.end	= S5P_PA_MIXER + SZ_64K - 1,
--		.flags	= IORESOURCE_MEM,
--		.name	= "mxr"
--	},
--	[1] = {
--		.start	= S5P_PA_VP,
--		.end	= S5P_PA_VP + SZ_64K - 1,
--		.flags	= IORESOURCE_MEM,
--		.name	= "vp"
--	},
--	[2] = {
--		.start	= IRQ_MIXER,
--		.end	= IRQ_MIXER,
--		.flags	= IORESOURCE_IRQ,
--		.name	= "irq"
--	}
-+	[0] = { SAMSUNG_RES_MEM(S5P, MIXER, SZ_64K) .name = "mxr" },
-+	[1] = { SAMSUNG_RES_MEM(S5P, VP, SZ_64K) .name = "vp" },
-+	[2] = { SAMSUNG_RES_IRQ(MIXER) .name = "irq" },
- };
- 
- struct platform_device s5p_device_mixer = {
-@@ -1723,16 +1323,8 @@ struct platform_device s5p_device_mixer = {
- 
- #ifdef CONFIG_S3C_DEV_USB_HOST
- static struct resource s3c_usb_resource[] = {
--	[0] = {
--		.start	= S3C_PA_USBHOST,
--		.end	= S3C_PA_USBHOST + 0x100 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_USBH,
--		.end	= IRQ_USBH,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C, USBHOST, SZ_256) },
-+	[1] = { SAMSUNG_RES_IRQ(USBH) },
- };
- 
- struct platform_device s3c_device_ohci = {
-@@ -1766,16 +1358,8 @@ void __init s3c_ohci_set_platdata(struct s3c2410_hcd_info *info)
- 
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_usbgadget_resource[] = {
--	[0] = {
--		.start	= S3C24XX_PA_USBDEV,
--		.end	= S3C24XX_PA_USBDEV + S3C24XX_SZ_USBDEV - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_USBD,
--		.end	= IRQ_USBD,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C24XX, USBDEV, S3C24XX_SZ_USBDEV) },
-+	[1] = { SAMSUNG_RES_IRQ(USBD) },
- };
- 
- struct platform_device s3c_device_usbgadget = {
-@@ -1795,16 +1379,8 @@ void __init s3c24xx_udc_set_platdata(struct s3c2410_udc_mach_info *pd)
- 
- #ifdef CONFIG_S5P_DEV_USB_EHCI
- static struct resource s5p_ehci_resource[] = {
--	[0] = {
--		.start	= S5P_PA_EHCI,
--		.end	= S5P_PA_EHCI + SZ_256 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_USB_HOST,
--		.end	= IRQ_USB_HOST,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S5P, EHCI, SZ_256) },
-+	[1] = { SAMSUNG_RES_IRQ(USB_HOST) },
- };
- 
- struct platform_device s5p_device_ehci = {
-@@ -1836,16 +1412,8 @@ void __init s5p_ehci_set_platdata(struct s5p_ehci_platdata *pd)
- 
- #ifdef CONFIG_S3C_DEV_USB_HSOTG
- static struct resource s3c_usb_hsotg_resources[] = {
--	[0] = {
--		.start	= S3C_PA_USB_HSOTG,
--		.end	= S3C_PA_USB_HSOTG + 0x10000 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_OTG,
--		.end	= IRQ_OTG,
--		.flags	= IORESOURCE_IRQ,
--	},
-+	[0] = { SAMSUNG_RES_MEM(S3C, USB_HSOTG, SZ_16K) },
-+	[1] = { SAMSUNG_RES_IRQ(OTG) },
- };
- 
- struct platform_device s3c_device_usb_hsotg = {
-@@ -1864,16 +1432,8 @@ struct platform_device s3c_device_usb_hsotg = {
- 
- #ifdef CONFIG_PLAT_S3C24XX
- static struct resource s3c_hsudc_resource[] = {
--	[0] = {
--		.start	= S3C2416_PA_HSUDC,
--		.end	= S3C2416_PA_HSUDC + S3C2416_SZ_HSUDC - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_USBD,
--		.end	= IRQ_USBD,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C2416, HSUDC, S3C2416_SZ_HSUDC) },
-+	[1] = { SAMSUNG_RES_IRQ(USBD) },
- };
- 
- struct platform_device s3c_device_usb_hsudc = {
-@@ -1897,16 +1457,8 @@ void __init s3c24xx_hsudc_set_platdata(struct s3c24xx_hsudc_platdata *pd)
- 
- #ifdef CONFIG_S3C_DEV_WDT
- static struct resource s3c_wdt_resource[] = {
--	[0] = {
--		.start	= S3C_PA_WDT,
--		.end	= S3C_PA_WDT + SZ_1K,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_WDT,
--		.end	= IRQ_WDT,
--		.flags	= IORESOURCE_IRQ,
--	}
-+	[0] = { SAMSUNG_RES_MEM(S3C, WDT, SZ_1K) },
-+	[1] = { SAMSUNG_RES_IRQ(WDT) },
- };
- 
- struct platform_device s3c_device_wdt = {
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 8f19241..8b8bd1c 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -18,6 +18,16 @@
- 
- #include <linux/platform_device.h>
- 
-+#define SAMSUNG_RES_MEM(soc, ip, sz)			\
-+		.start	= soc##_PA_##ip,		\
-+		.end	= soc##_PA_##ip + sz - 1,	\
-+		.flags	= IORESOURCE_MEM,
+ arch/arm/Kconfig                                   |    8 +-
+ arch/arm/Makefile                                  |    2 +-
+ arch/arm/configs/exynos4_defconfig                 |    7 +--
+ arch/arm/{mach-exynos4 => mach-exynos}/Kconfig     |   41 +++++++++---
+ arch/arm/{mach-exynos4 => mach-exynos}/Makefile    |    8 +-
+ .../{mach-exynos4 => mach-exynos}/Makefile.boot    |    0
+ .../clock-exynos4210.c                             |    0
+ .../clock-exynos4212.c                             |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/clock.c     |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/cpu.c       |   69 +++++++++++---------
+ arch/arm/{mach-exynos4 => mach-exynos}/cpuidle.c   |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dev-ahci.c  |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dev-audio.c |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dev-dwmci.c |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dev-pd.c    |    0
+ .../arm/{mach-exynos4 => mach-exynos}/dev-sysmmu.c |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/dma.c       |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/headsmp.S   |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/hotplug.c   |    0
+ .../include/mach/debug-macro.S                     |    0
+ .../include/mach/dma.h                             |    0
+ .../include/mach/dwmci.h                           |    0
+ .../include/mach/entry-macro.S                     |    0
+ .../include/mach/exynos4-clock.h                   |    0
+ .../include/mach/gpio.h                            |    0
+ .../include/mach/hardware.h                        |    0
+ .../include/mach/io.h                              |    0
+ .../include/mach/irqs.h                            |    0
+ .../include/mach/map.h                             |   32 ++++++----
+ .../include/mach/memory.h                          |    0
+ .../include/mach/pm-core.h                         |    0
+ .../include/mach/pmu.h                             |    0
+ .../include/mach/regs-audss.h                      |    0
+ .../include/mach/regs-clock.h                      |    0
+ .../include/mach/regs-gpio.h                       |    0
+ .../include/mach/regs-irq.h                        |    0
+ .../include/mach/regs-mct.h                        |    0
+ .../include/mach/regs-mem.h                        |    0
+ .../include/mach/regs-pmu.h                        |    0
+ .../include/mach/regs-sysmmu.h                     |    0
+ .../include/mach/regs-usb-phy.h                    |    0
+ .../include/mach/sysmmu.h                          |    0
+ .../include/mach/system.h                          |    0
+ .../include/mach/timex.h                           |    0
+ .../include/mach/uncompress.h                      |    0
+ .../include/mach/vmalloc.h                         |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/init.c      |    0
+ .../{mach-exynos4 => mach-exynos}/irq-combiner.c   |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/irq-eint.c  |    0
+ .../mach-armlex4210.c                              |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/mach-nuri.c |    0
+ .../{mach-exynos4 => mach-exynos}/mach-origen.c    |    0
+ .../{mach-exynos4 => mach-exynos}/mach-smdk4x12.c  |    0
+ .../{mach-exynos4 => mach-exynos}/mach-smdkv310.c  |    0
+ .../mach-universal_c210.c                          |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/mct.c       |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/platsmp.c   |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/pm.c        |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/pmu.c       |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-fimc.c |    0
+ .../{mach-exynos4 => mach-exynos}/setup-fimd0.c    |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c0.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c1.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c2.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c3.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c4.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c5.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c6.c |    0
+ .../arm/{mach-exynos4 => mach-exynos}/setup-i2c7.c |    0
+ .../{mach-exynos4 => mach-exynos}/setup-keypad.c   |    0
+ .../setup-sdhci-gpio.c                             |    0
+ .../{mach-exynos4 => mach-exynos}/setup-sdhci.c    |    0
+ .../{mach-exynos4 => mach-exynos}/setup-usb-phy.c  |    0
+ arch/arm/{mach-exynos4 => mach-exynos}/sleep.S     |    0
+ arch/arm/plat-s5p/Kconfig                          |    2 +-
+ arch/arm/plat-s5p/cpu.c                            |    6 +-
+ arch/arm/plat-samsung/include/plat/exynos4.h       |    6 +-
+ 77 files changed, 104 insertions(+), 77 deletions(-)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/Kconfig (91%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/Makefile (89%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/Makefile.boot (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/clock-exynos4210.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/clock-exynos4212.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/clock.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/cpu.c (91%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/cpuidle.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-ahci.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-audio.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-dwmci.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-pd.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dev-sysmmu.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/dma.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/headsmp.S (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/hotplug.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/debug-macro.S (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/dma.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/dwmci.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/entry-macro.S (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/exynos4-clock.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/gpio.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/hardware.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/io.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/irqs.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/map.h (93%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/memory.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/pm-core.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/pmu.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-audss.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-clock.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-gpio.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-irq.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-mct.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-mem.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-pmu.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-sysmmu.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/regs-usb-phy.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/sysmmu.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/system.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/timex.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/uncompress.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/include/mach/vmalloc.h (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/init.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/irq-combiner.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/irq-eint.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-armlex4210.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-nuri.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-origen.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-smdk4x12.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-smdkv310.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mach-universal_c210.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/mct.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/platsmp.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/pm.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/pmu.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-fimc.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-fimd0.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c0.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c1.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c2.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c3.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c4.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c5.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c6.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-i2c7.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-keypad.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-sdhci-gpio.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-sdhci.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/setup-usb-phy.c (100%)
+ rename arch/arm/{mach-exynos4 => mach-exynos}/sleep.S (100%)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index bea81d0..21dbf01 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -781,8 +781,8 @@ config ARCH_S5PV210
+ 	help
+ 	  Samsung S5PV210/S5PC110 series based systems
+ 
+-config ARCH_EXYNOS4
+-	bool "Samsung EXYNOS4"
++config ARCH_EXYNOS
++	bool "SAMSUNG EXYNOS"
+ 	select CPU_V7
+ 	select ARCH_SPARSEMEM_ENABLE
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+@@ -795,7 +795,7 @@ config ARCH_EXYNOS4
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	help
+-	  Samsung EXYNOS4 series based systems
++	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
+ 
+ config ARCH_SHARK
+ 	bool "Shark"
+@@ -1021,7 +1021,7 @@ source "arch/arm/mach-s5pc100/Kconfig"
+ 
+ source "arch/arm/mach-s5pv210/Kconfig"
+ 
+-source "arch/arm/mach-exynos4/Kconfig"
++source "arch/arm/mach-exynos/Kconfig"
+ 
+ source "arch/arm/mach-shmobile/Kconfig"
+ 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 70c424e..289439e 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -177,7 +177,7 @@ machine-$(CONFIG_ARCH_S3C64XX)		:= s3c64xx
+ machine-$(CONFIG_ARCH_S5P64X0)		:= s5p64x0
+ machine-$(CONFIG_ARCH_S5PC100)		:= s5pc100
+ machine-$(CONFIG_ARCH_S5PV210)		:= s5pv210
+-machine-$(CONFIG_ARCH_EXYNOS4)		:= exynos4
++machine-$(CONFIG_ARCH_EXYNOS4)		:= exynos
+ machine-$(CONFIG_ARCH_SA1100)		:= sa1100
+ machine-$(CONFIG_ARCH_SHARK)		:= shark
+ machine-$(CONFIG_ARCH_SHMOBILE) 	:= shmobile
+diff --git a/arch/arm/configs/exynos4_defconfig b/arch/arm/configs/exynos4_defconfig
+index cd40bb5..b0d3c13 100644
+--- a/arch/arm/configs/exynos4_defconfig
++++ b/arch/arm/configs/exynos4_defconfig
+@@ -4,10 +4,9 @@ CONFIG_KALLSYMS_ALL=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+-CONFIG_ARCH_EXYNOS4=y
++CONFIG_ARCH_EXYNOS=y
+ CONFIG_S3C_LOWLEVEL_UART_PORT=1
+ CONFIG_MACH_SMDKC210=y
+-CONFIG_MACH_SMDKV310=y
+ CONFIG_MACH_ARMLEX4210=y
+ CONFIG_MACH_UNIVERSAL_C210=y
+ CONFIG_MACH_NURI=y
+@@ -16,7 +15,6 @@ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+-CONFIG_HOTPLUG_CPU=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
+@@ -61,12 +59,9 @@ CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_DEBUG_RT_MUTEXES=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_MUTEXES=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ CONFIG_SYSCTL_SYSCALL_CHECK=y
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
+ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+ CONFIG_DEBUG_S3C_UART=1
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos/Kconfig
+similarity index 91%
+rename from arch/arm/mach-exynos4/Kconfig
+rename to arch/arm/mach-exynos/Kconfig
+index 6dfde07..999989e 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -1,4 +1,4 @@
+-# arch/arm/mach-exynos4/Kconfig
++# arch/arm/mach-exynos/Kconfig
+ #
+ # Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+ #		http://www.samsung.com/
+@@ -7,21 +7,42 @@
+ 
+ # Configuration options for the EXYNOS4
+ 
+-if ARCH_EXYNOS4
++if ARCH_EXYNOS
 +
-+#define SAMSUNG_RES_IRQ(ip)				\
-+		.start	= IRQ_##ip,			\
-+		.end	= IRQ_##ip,			\
-+		.flags	= IORESOURCE_IRQ,
++menu "SAMSUNG EXYNOS SoCs Support"
 +
- struct s3c24xx_uart_resources {
- 	struct resource		*resources;
- 	unsigned long		 nr_resources;
++choice
++	prompt "EXYNOS System Type"
++	default ARCH_EXYNOS4
++
++config ARCH_EXYNOS4
++	bool "SAMSUNG EXYNOS4"
++	help
++	  Samsung EXYNOS4 SoCs based systems
++
++endchoice
++
++comment "EXYNOS SoCs"
+ 
+ config CPU_EXYNOS4210
+-	bool
++	bool "SAMSUNG EXYNOS4210"
++	default y
++	depends on ARCH_EXYNOS4
+ 	select SAMSUNG_DMADEV
+ 	help
+ 	  Enable EXYNOS4210 CPU support
+ 
+ config SOC_EXYNOS4212
+-	bool
++	bool "SAMSUNG EXYNOS4212"
++	default y
++	depends on ARCH_EXYNOS4
+ 	help
+ 	  Enable EXYNOS4212 SoC support
+ 
+ config SOC_EXYNOS4412
+-	bool
++	bool "SAMSUNG EXYNOS4412"
++	default y
++	depends on ARCH_EXYNOS4
+ 	help
+ 	  Enable EXYNOS4412 SoC support
+ 
+@@ -119,7 +140,7 @@ config EXYNOS4_SETUP_USB_PHY
+ 
+ # machine support
+ 
+-menu "EXYNOS4 Machines"
++if ARCH_EXYNOS4
+ 
+ comment "EXYNOS4210 Boards"
+ 
+@@ -286,12 +307,11 @@ config MACH_SMDK4412
+ 	select MACH_SMDK4212
+ 	help
+ 	  Machine support for Samsung SMDK4412
++endif
+ 
+-endmenu
+-
+-comment "Configuration for HSMMC bus width"
++if ARCH_EXYNOS4
+ 
+-menu "Use 8-bit bus width"
++comment "Configuration for HSMMC 8-bit bus width"
+ 
+ config EXYNOS4_SDHCI_CH0_8BIT
+ 	bool "Channel 0 with 8-bit bus"
+@@ -304,6 +324,7 @@ config EXYNOS4_SDHCI_CH2_8BIT
+ 	help
+ 	  Support HSMMC Channel 2 8-bit bus.
+ 	  If selected, Channel 3 is disabled.
++endif
+ 
+ endmenu
+ 
+diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos/Makefile
+similarity index 89%
+rename from arch/arm/mach-exynos4/Makefile
+rename to arch/arm/mach-exynos/Makefile
+index c9b2e1f..fa715eb 100644
+--- a/arch/arm/mach-exynos4/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -1,4 +1,4 @@
+-# arch/arm/mach-exynos4/Makefile
++# arch/arm/mach-exynos/Makefile
+ #
+ # Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+ #		http://www.samsung.com/
+@@ -12,8 +12,8 @@ obj-				:=
+ 
+ # Core support for EXYNOS4 system
+ 
+-obj-$(CONFIG_ARCH_EXYNOS4)	+= cpu.o init.o clock.o irq-combiner.o
+-obj-$(CONFIG_ARCH_EXYNOS4)	+= setup-i2c0.o irq-eint.o dma.o pmu.o
++obj-$(CONFIG_ARCH_EXYNOS)	+= cpu.o init.o clock.o irq-combiner.o setup-i2c0.o
++obj-$(CONFIG_ARCH_EXYNOS4)	+= irq-eint.o dma.o pmu.o
+ obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
+ obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
+ obj-$(CONFIG_PM)		+= pm.o sleep.o
+@@ -39,7 +39,7 @@ obj-$(CONFIG_MACH_SMDK4412)		+= mach-smdk4x12.o
+ 
+ # device support
+ 
+-obj-y					+= dev-audio.o
++obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
+ obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
+ obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
+ obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
+diff --git a/arch/arm/mach-exynos4/Makefile.boot b/arch/arm/mach-exynos/Makefile.boot
+similarity index 100%
+rename from arch/arm/mach-exynos4/Makefile.boot
+rename to arch/arm/mach-exynos/Makefile.boot
+diff --git a/arch/arm/mach-exynos4/clock-exynos4210.c b/arch/arm/mach-exynos/clock-exynos4210.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/clock-exynos4210.c
+rename to arch/arm/mach-exynos/clock-exynos4210.c
+diff --git a/arch/arm/mach-exynos4/clock-exynos4212.c b/arch/arm/mach-exynos/clock-exynos4212.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/clock-exynos4212.c
+rename to arch/arm/mach-exynos/clock-exynos4212.c
+diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos/clock.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/clock.c
+rename to arch/arm/mach-exynos/clock.c
+diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos/cpu.c
+similarity index 91%
+rename from arch/arm/mach-exynos4/cpu.c
+rename to arch/arm/mach-exynos/cpu.c
+index 5b1765b..90ec247 100644
+--- a/arch/arm/mach-exynos4/cpu.c
++++ b/arch/arm/mach-exynos/cpu.c
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/mach-exynos4/cpu.c
++/* linux/arch/arm/mach-exynos/cpu.c
+  *
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+@@ -40,28 +40,47 @@ extern int combiner_init(unsigned int combiner_nr, void __iomem *base,
+ extern void combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq);
+ 
+ /* Initial IO mappings */
+-static struct map_desc exynos4_iodesc[] __initdata = {
++static struct map_desc exynos_iodesc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)S5P_VA_SYSTIMER,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_SYSTIMER),
++		.pfn		= __phys_to_pfn(EXYNOS_PA_SYSTIMER),
+ 		.length		= SZ_4K,
+-		.type	 	= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)S5P_VA_CMU,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_CMU),
+-		.length		= SZ_128K,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= (unsigned long)S5P_VA_PMU,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_PMU),
++		.pfn		= __phys_to_pfn(EXYNOS_PA_PMU),
+ 		.length		= SZ_64K,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= (unsigned long)S5P_VA_COMBINER_BASE,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_COMBINER),
++		.pfn		= __phys_to_pfn(EXYNOS_PA_COMBINER),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+ 	}, {
++		.virtual	= (unsigned long)S5P_VA_GIC_CPU,
++		.pfn		= __phys_to_pfn(EXYNOS_PA_GIC_CPU),
++		.length		= SZ_64K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S5P_VA_GIC_DIST,
++		.pfn		= __phys_to_pfn(EXYNOS_PA_GIC_DIST),
++		.length		= SZ_64K,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= (unsigned long)S3C_VA_UART,
++		.pfn		= __phys_to_pfn(S3C_PA_UART),
++		.length		= SZ_512K,
++		.type		= MT_DEVICE,
++	},
++};
++
++static struct map_desc exynos4_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_CMU,
++		.pfn		= __phys_to_pfn(EXYNOS4_PA_CMU),
++		.length		= SZ_128K,
++		.type		= MT_DEVICE,
++	}, {
+ 		.virtual	= (unsigned long)S5P_VA_COREPERI_BASE,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_COREPERI),
+ 		.length		= SZ_8K,
+@@ -92,11 +111,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+ 	}, {
+-		.virtual	= (unsigned long)S3C_VA_UART,
+-		.pfn		= __phys_to_pfn(S3C_PA_UART),
+-		.length		= SZ_512K,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= (unsigned long)S5P_VA_SROMC,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_SROMC),
+ 		.length		= SZ_4K,
+@@ -106,16 +120,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_HSPHY),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)S5P_VA_GIC_CPU,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_GIC_CPU),
+-		.length		= SZ_64K,
+-		.type		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)S5P_VA_GIC_DIST,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_GIC_DIST),
+-		.length		= SZ_64K,
+-		.type		= MT_DEVICE,
+ 	},
+ };
+ 
+@@ -137,7 +141,7 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
+ 	},
+ };
+ 
+-static void exynos4_idle(void)
++static void exynos_idle(void)
+ {
+ 	if (!need_resched())
+ 		cpu_do_idle();
+@@ -151,12 +155,13 @@ static void exynos4_sw_reset(void)
+ }
+ 
+ /*
+- * exynos4_map_io
++ * exynos_map_io
+  *
+  * register the standard cpu IO areas
+  */
+ void __init exynos4_map_io(void)
+ {
++	iotable_init(exynos_iodesc, ARRAY_SIZE(exynos_iodesc));
+ 	iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
+ 
+ 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_0)
+@@ -250,7 +255,6 @@ static int __init exynos4_core_init(void)
+ {
+ 	return sysdev_class_register(&exynos4_sysclass);
+ }
+-
+ core_initcall(exynos4_core_init);
+ 
+ #ifdef CONFIG_CACHE_L2X0
+@@ -279,15 +283,16 @@ static int __init exynos4_l2x0_cache_init(void)
+ early_initcall(exynos4_l2x0_cache_init);
+ #endif
+ 
+-int __init exynos4_init(void)
++int __init exynos_init(void)
+ {
+-	printk(KERN_INFO "EXYNOS4: Initializing architecture\n");
++	printk(KERN_INFO "EXYNOS: Initializing architecture\n");
+ 
+ 	/* set idle function */
+-	pm_idle = exynos4_idle;
++	pm_idle = exynos_idle;
+ 
+ 	/* set sw_reset function */
+-	s5p_reset_hook = exynos4_sw_reset;
++	if (soc_is_exynos4210() || soc_is_exynos4212() || soc_is_exynos4412())
++		s5p_reset_hook = exynos4_sw_reset;
+ 
+ 	return sysdev_register(&exynos4_sysdev);
+ }
+diff --git a/arch/arm/mach-exynos4/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/cpuidle.c
+rename to arch/arm/mach-exynos/cpuidle.c
+diff --git a/arch/arm/mach-exynos4/dev-ahci.c b/arch/arm/mach-exynos/dev-ahci.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/dev-ahci.c
+rename to arch/arm/mach-exynos/dev-ahci.c
+diff --git a/arch/arm/mach-exynos4/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/dev-audio.c
+rename to arch/arm/mach-exynos/dev-audio.c
+diff --git a/arch/arm/mach-exynos4/dev-dwmci.c b/arch/arm/mach-exynos/dev-dwmci.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/dev-dwmci.c
+rename to arch/arm/mach-exynos/dev-dwmci.c
+diff --git a/arch/arm/mach-exynos4/dev-pd.c b/arch/arm/mach-exynos/dev-pd.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/dev-pd.c
+rename to arch/arm/mach-exynos/dev-pd.c
+diff --git a/arch/arm/mach-exynos4/dev-sysmmu.c b/arch/arm/mach-exynos/dev-sysmmu.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/dev-sysmmu.c
+rename to arch/arm/mach-exynos/dev-sysmmu.c
+diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos/dma.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/dma.c
+rename to arch/arm/mach-exynos/dma.c
+diff --git a/arch/arm/mach-exynos4/headsmp.S b/arch/arm/mach-exynos/headsmp.S
+similarity index 100%
+rename from arch/arm/mach-exynos4/headsmp.S
+rename to arch/arm/mach-exynos/headsmp.S
+diff --git a/arch/arm/mach-exynos4/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/hotplug.c
+rename to arch/arm/mach-exynos/hotplug.c
+diff --git a/arch/arm/mach-exynos4/include/mach/debug-macro.S b/arch/arm/mach-exynos/include/mach/debug-macro.S
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/debug-macro.S
+rename to arch/arm/mach-exynos/include/mach/debug-macro.S
+diff --git a/arch/arm/mach-exynos4/include/mach/dma.h b/arch/arm/mach-exynos/include/mach/dma.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/dma.h
+rename to arch/arm/mach-exynos/include/mach/dma.h
+diff --git a/arch/arm/mach-exynos4/include/mach/dwmci.h b/arch/arm/mach-exynos/include/mach/dwmci.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/dwmci.h
+rename to arch/arm/mach-exynos/include/mach/dwmci.h
+diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos/include/mach/entry-macro.S
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/entry-macro.S
+rename to arch/arm/mach-exynos/include/mach/entry-macro.S
+diff --git a/arch/arm/mach-exynos4/include/mach/exynos4-clock.h b/arch/arm/mach-exynos/include/mach/exynos4-clock.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/exynos4-clock.h
+rename to arch/arm/mach-exynos/include/mach/exynos4-clock.h
+diff --git a/arch/arm/mach-exynos4/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/gpio.h
+rename to arch/arm/mach-exynos/include/mach/gpio.h
+diff --git a/arch/arm/mach-exynos4/include/mach/hardware.h b/arch/arm/mach-exynos/include/mach/hardware.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/hardware.h
+rename to arch/arm/mach-exynos/include/mach/hardware.h
+diff --git a/arch/arm/mach-exynos4/include/mach/io.h b/arch/arm/mach-exynos/include/mach/io.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/io.h
+rename to arch/arm/mach-exynos/include/mach/io.h
+diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/irqs.h
+rename to arch/arm/mach-exynos/include/mach/irqs.h
+diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+similarity index 93%
+rename from arch/arm/mach-exynos4/include/mach/map.h
+rename to arch/arm/mach-exynos/include/mach/map.h
+index 918a979..058541d 100644
+--- a/arch/arm/mach-exynos4/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -1,4 +1,4 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/map.h
++/* linux/arch/arm/mach-exynos/include/mach/map.h
+  *
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com/
+@@ -145,39 +145,45 @@
+ #define S3C_PA_IIC5			EXYNOS4_PA_IIC(5)
+ #define S3C_PA_IIC6			EXYNOS4_PA_IIC(6)
+ #define S3C_PA_IIC7			EXYNOS4_PA_IIC(7)
+-#define SAMSUNG_PA_ADC			EXYNOS4_PA_ADC
+-#define SAMSUNG_PA_ADC1			EXYNOS4_PA_ADC1
+ #define S3C_PA_RTC			EXYNOS4_PA_RTC
+ #define S3C_PA_WDT			EXYNOS4_PA_WATCHDOG
++#define S3C_PA_UART			EXYNOS4_PA_UART
+ 
+ #define S5P_PA_CHIPID			EXYNOS4_PA_CHIPID
++#define S5P_PA_EHCI			EXYNOS4_PA_EHCI
+ #define S5P_PA_FIMC0			EXYNOS4_PA_FIMC0
+ #define S5P_PA_FIMC1			EXYNOS4_PA_FIMC1
+ #define S5P_PA_FIMC2			EXYNOS4_PA_FIMC2
+ #define S5P_PA_FIMC3			EXYNOS4_PA_FIMC3
++#define S5P_PA_FIMD0			EXYNOS4_PA_FIMD0
++#define S5P_PA_HDMI			EXYNOS4_PA_HDMI
++#define S5P_PA_IIC_HDMIPHY		EXYNOS4_PA_IIC_HDMIPHY
++#define S5P_PA_MFC			EXYNOS4_PA_MFC
+ #define S5P_PA_MIPI_CSIS0		EXYNOS4_PA_MIPI_CSIS0
+ #define S5P_PA_MIPI_CSIS1		EXYNOS4_PA_MIPI_CSIS1
+-#define S5P_PA_FIMD0			EXYNOS4_PA_FIMD0
++#define S5P_PA_MIXER			EXYNOS4_PA_MIXER
+ #define S5P_PA_ONENAND			EXYNOS4_PA_ONENAND
+ #define S5P_PA_ONENAND_DMA		EXYNOS4_PA_ONENAND_DMA
++#define S5P_PA_SDO			EXYNOS4_PA_SDO
+ #define S5P_PA_SDRAM			EXYNOS4_PA_SDRAM
+ #define S5P_PA_SROMC			EXYNOS4_PA_SROMC
+-#define S5P_PA_MFC			EXYNOS4_PA_MFC
+ #define S5P_PA_SYSCON			EXYNOS4_PA_SYSCON
+ #define S5P_PA_TIMER			EXYNOS4_PA_TIMER
+-#define S5P_PA_EHCI			EXYNOS4_PA_EHCI
+-
+-#define S5P_PA_SDO			EXYNOS4_PA_SDO
+ #define S5P_PA_VP			EXYNOS4_PA_VP
+-#define S5P_PA_MIXER			EXYNOS4_PA_MIXER
+-#define S5P_PA_HDMI			EXYNOS4_PA_HDMI
+-#define S5P_PA_IIC_HDMIPHY		EXYNOS4_PA_IIC_HDMIPHY
+ 
++#define SAMSUNG_PA_ADC			EXYNOS4_PA_ADC
++#define SAMSUNG_PA_ADC1			EXYNOS4_PA_ADC1
+ #define SAMSUNG_PA_KEYPAD		EXYNOS4_PA_KEYPAD
+ 
+-/* UART */
++#define EXYNOS_PA_COMBINER		EXYNOS4_PA_COMBINER
++#define EXYNOS_PA_GIC_CPU		EXYNOS4_PA_GIC_CPU
++#define EXYNOS_PA_GIC_DIST		EXYNOS4_PA_GIC_DIST
++#define EXYNOS_PA_PMU			EXYNOS4_PA_PMU
++#define EXYNOS_PA_SYSTIMER		EXYNOS4_PA_SYSTIMER
+ 
+-#define S3C_PA_UART			EXYNOS4_PA_UART
++/* Compatibility UART */
++
++#define S3C_VA_UARTx(x)			(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
+ 
+ #define S5P_PA_UART(x)			(S3C_PA_UART + ((x) * S3C_UART_OFFSET))
+ #define S5P_PA_UART0			S5P_PA_UART(0)
+diff --git a/arch/arm/mach-exynos4/include/mach/memory.h b/arch/arm/mach-exynos/include/mach/memory.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/memory.h
+rename to arch/arm/mach-exynos/include/mach/memory.h
+diff --git a/arch/arm/mach-exynos4/include/mach/pm-core.h b/arch/arm/mach-exynos/include/mach/pm-core.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/pm-core.h
+rename to arch/arm/mach-exynos/include/mach/pm-core.h
+diff --git a/arch/arm/mach-exynos4/include/mach/pmu.h b/arch/arm/mach-exynos/include/mach/pmu.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/pmu.h
+rename to arch/arm/mach-exynos/include/mach/pmu.h
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-audss.h b/arch/arm/mach-exynos/include/mach/regs-audss.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/regs-audss.h
+rename to arch/arm/mach-exynos/include/mach/regs-audss.h
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/regs-clock.h
+rename to arch/arm/mach-exynos/include/mach/regs-clock.h
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-gpio.h b/arch/arm/mach-exynos/include/mach/regs-gpio.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/regs-gpio.h
+rename to arch/arm/mach-exynos/include/mach/regs-gpio.h
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-irq.h b/arch/arm/mach-exynos/include/mach/regs-irq.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/regs-irq.h
+rename to arch/arm/mach-exynos/include/mach/regs-irq.h
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-mct.h b/arch/arm/mach-exynos/include/mach/regs-mct.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/regs-mct.h
+rename to arch/arm/mach-exynos/include/mach/regs-mct.h
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-mem.h b/arch/arm/mach-exynos/include/mach/regs-mem.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/regs-mem.h
+rename to arch/arm/mach-exynos/include/mach/regs-mem.h
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/regs-pmu.h
+rename to arch/arm/mach-exynos/include/mach/regs-pmu.h
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-sysmmu.h b/arch/arm/mach-exynos/include/mach/regs-sysmmu.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/regs-sysmmu.h
+rename to arch/arm/mach-exynos/include/mach/regs-sysmmu.h
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h b/arch/arm/mach-exynos/include/mach/regs-usb-phy.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/regs-usb-phy.h
+rename to arch/arm/mach-exynos/include/mach/regs-usb-phy.h
+diff --git a/arch/arm/mach-exynos4/include/mach/sysmmu.h b/arch/arm/mach-exynos/include/mach/sysmmu.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/sysmmu.h
+rename to arch/arm/mach-exynos/include/mach/sysmmu.h
+diff --git a/arch/arm/mach-exynos4/include/mach/system.h b/arch/arm/mach-exynos/include/mach/system.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/system.h
+rename to arch/arm/mach-exynos/include/mach/system.h
+diff --git a/arch/arm/mach-exynos4/include/mach/timex.h b/arch/arm/mach-exynos/include/mach/timex.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/timex.h
+rename to arch/arm/mach-exynos/include/mach/timex.h
+diff --git a/arch/arm/mach-exynos4/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/uncompress.h
+rename to arch/arm/mach-exynos/include/mach/uncompress.h
+diff --git a/arch/arm/mach-exynos4/include/mach/vmalloc.h b/arch/arm/mach-exynos/include/mach/vmalloc.h
+similarity index 100%
+rename from arch/arm/mach-exynos4/include/mach/vmalloc.h
+rename to arch/arm/mach-exynos/include/mach/vmalloc.h
+diff --git a/arch/arm/mach-exynos4/init.c b/arch/arm/mach-exynos/init.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/init.c
+rename to arch/arm/mach-exynos/init.c
+diff --git a/arch/arm/mach-exynos4/irq-combiner.c b/arch/arm/mach-exynos/irq-combiner.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/irq-combiner.c
+rename to arch/arm/mach-exynos/irq-combiner.c
+diff --git a/arch/arm/mach-exynos4/irq-eint.c b/arch/arm/mach-exynos/irq-eint.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/irq-eint.c
+rename to arch/arm/mach-exynos/irq-eint.c
+diff --git a/arch/arm/mach-exynos4/mach-armlex4210.c b/arch/arm/mach-exynos/mach-armlex4210.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/mach-armlex4210.c
+rename to arch/arm/mach-exynos/mach-armlex4210.c
+diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos/mach-nuri.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/mach-nuri.c
+rename to arch/arm/mach-exynos/mach-nuri.c
+diff --git a/arch/arm/mach-exynos4/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/mach-origen.c
+rename to arch/arm/mach-exynos/mach-origen.c
+diff --git a/arch/arm/mach-exynos4/mach-smdk4x12.c b/arch/arm/mach-exynos/mach-smdk4x12.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/mach-smdk4x12.c
+rename to arch/arm/mach-exynos/mach-smdk4x12.c
+diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos/mach-smdkv310.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/mach-smdkv310.c
+rename to arch/arm/mach-exynos/mach-smdkv310.c
+diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos/mach-universal_c210.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/mach-universal_c210.c
+rename to arch/arm/mach-exynos/mach-universal_c210.c
+diff --git a/arch/arm/mach-exynos4/mct.c b/arch/arm/mach-exynos/mct.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/mct.c
+rename to arch/arm/mach-exynos/mct.c
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/platsmp.c
+rename to arch/arm/mach-exynos/platsmp.c
+diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos/pm.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/pm.c
+rename to arch/arm/mach-exynos/pm.c
+diff --git a/arch/arm/mach-exynos4/pmu.c b/arch/arm/mach-exynos/pmu.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/pmu.c
+rename to arch/arm/mach-exynos/pmu.c
+diff --git a/arch/arm/mach-exynos4/setup-fimc.c b/arch/arm/mach-exynos/setup-fimc.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-fimc.c
+rename to arch/arm/mach-exynos/setup-fimc.c
+diff --git a/arch/arm/mach-exynos4/setup-fimd0.c b/arch/arm/mach-exynos/setup-fimd0.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-fimd0.c
+rename to arch/arm/mach-exynos/setup-fimd0.c
+diff --git a/arch/arm/mach-exynos4/setup-i2c0.c b/arch/arm/mach-exynos/setup-i2c0.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-i2c0.c
+rename to arch/arm/mach-exynos/setup-i2c0.c
+diff --git a/arch/arm/mach-exynos4/setup-i2c1.c b/arch/arm/mach-exynos/setup-i2c1.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-i2c1.c
+rename to arch/arm/mach-exynos/setup-i2c1.c
+diff --git a/arch/arm/mach-exynos4/setup-i2c2.c b/arch/arm/mach-exynos/setup-i2c2.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-i2c2.c
+rename to arch/arm/mach-exynos/setup-i2c2.c
+diff --git a/arch/arm/mach-exynos4/setup-i2c3.c b/arch/arm/mach-exynos/setup-i2c3.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-i2c3.c
+rename to arch/arm/mach-exynos/setup-i2c3.c
+diff --git a/arch/arm/mach-exynos4/setup-i2c4.c b/arch/arm/mach-exynos/setup-i2c4.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-i2c4.c
+rename to arch/arm/mach-exynos/setup-i2c4.c
+diff --git a/arch/arm/mach-exynos4/setup-i2c5.c b/arch/arm/mach-exynos/setup-i2c5.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-i2c5.c
+rename to arch/arm/mach-exynos/setup-i2c5.c
+diff --git a/arch/arm/mach-exynos4/setup-i2c6.c b/arch/arm/mach-exynos/setup-i2c6.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-i2c6.c
+rename to arch/arm/mach-exynos/setup-i2c6.c
+diff --git a/arch/arm/mach-exynos4/setup-i2c7.c b/arch/arm/mach-exynos/setup-i2c7.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-i2c7.c
+rename to arch/arm/mach-exynos/setup-i2c7.c
+diff --git a/arch/arm/mach-exynos4/setup-keypad.c b/arch/arm/mach-exynos/setup-keypad.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-keypad.c
+rename to arch/arm/mach-exynos/setup-keypad.c
+diff --git a/arch/arm/mach-exynos4/setup-sdhci-gpio.c b/arch/arm/mach-exynos/setup-sdhci-gpio.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-sdhci-gpio.c
+rename to arch/arm/mach-exynos/setup-sdhci-gpio.c
+diff --git a/arch/arm/mach-exynos4/setup-sdhci.c b/arch/arm/mach-exynos/setup-sdhci.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-sdhci.c
+rename to arch/arm/mach-exynos/setup-sdhci.c
+diff --git a/arch/arm/mach-exynos4/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/setup-usb-phy.c
+rename to arch/arm/mach-exynos/setup-usb-phy.c
+diff --git a/arch/arm/mach-exynos4/sleep.S b/arch/arm/mach-exynos/sleep.S
+similarity index 100%
+rename from arch/arm/mach-exynos4/sleep.S
+rename to arch/arm/mach-exynos/sleep.S
+diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
+index f9241a7..4e98f09 100644
+--- a/arch/arm/plat-s5p/Kconfig
++++ b/arch/arm/plat-s5p/Kconfig
+@@ -7,7 +7,7 @@
+ 
+ config PLAT_S5P
+ 	bool
+-	depends on (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS4)
++	depends on (ARCH_S5P64X0 || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS)
+ 	default y
+ 	select ARM_VIC if !ARCH_EXYNOS4
+ 	select ARM_GIC if ARCH_EXYNOS4
+diff --git a/arch/arm/plat-s5p/cpu.c b/arch/arm/plat-s5p/cpu.c
+index 7b0a28f..a56959e 100644
+--- a/arch/arm/plat-s5p/cpu.c
++++ b/arch/arm/plat-s5p/cpu.c
+@@ -75,7 +75,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+ 		.init_uarts	= exynos4_init_uarts,
+-		.init		= exynos4_init,
++		.init		= exynos_init,
+ 		.name		= name_exynos4210,
+ 	}, {
+ 		.idcode		= EXYNOS4212_CPU_ID,
+@@ -83,7 +83,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+ 		.init_uarts	= exynos4_init_uarts,
+-		.init		= exynos4_init,
++		.init		= exynos_init,
+ 		.name		= name_exynos4212,
+ 	}, {
+ 		.idcode		= EXYNOS4412_CPU_ID,
+@@ -91,7 +91,7 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.map_io		= exynos4_map_io,
+ 		.init_clocks	= exynos4_init_clocks,
+ 		.init_uarts	= exynos4_init_uarts,
+-		.init		= exynos4_init,
++		.init		= exynos_init,
+ 		.name		= name_exynos4412,
+ 	},
+ };
+diff --git a/arch/arm/plat-samsung/include/plat/exynos4.h b/arch/arm/plat-samsung/include/plat/exynos4.h
+index 20d73bf..f546e88 100644
+--- a/arch/arm/plat-samsung/include/plat/exynos4.h
++++ b/arch/arm/plat-samsung/include/plat/exynos4.h
+@@ -18,8 +18,8 @@ extern void exynos4210_register_clocks(void);
+ extern void exynos4212_register_clocks(void);
+ extern void exynos4_setup_clocks(void);
+ 
+-#ifdef CONFIG_ARCH_EXYNOS4
+-extern  int exynos4_init(void);
++#ifdef CONFIG_ARCH_EXYNOS
++extern  int exynos_init(void);
+ extern void exynos4_init_irq(void);
+ extern void exynos4_map_io(void);
+ extern void exynos4_init_clocks(int xtal);
+@@ -31,5 +31,5 @@ extern struct sys_timer exynos4_timer;
+ #define exynos4_init_clocks NULL
+ #define exynos4_init_uarts NULL
+ #define exynos4_map_io NULL
+-#define exynos4_init NULL
++#define exynos_init NULL
+ #endif
 -- 
 1.7.1
