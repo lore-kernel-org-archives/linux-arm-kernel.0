@@ -1,64 +1,28 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 2 Oct 2011 17:58:12 +0200
-Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
-	supported by the hardware
-In-Reply-To: <20110927181438.GM2138@amd.com>
-References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
-	<1316195506-9777-2-git-send-email-ohad@wizery.com>
-	<20110927100505.GH2138@amd.com>
-	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
-	<20110927131222.GL2138@amd.com>
-	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
-	<20110927181438.GM2138@amd.com>
-Message-ID: <CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 2 Oct 2011 17:03:28 +0100
+Subject: [PATCH 16/26] ARM: pxa: CPU_PJ4 requires IWMMXT
+In-Reply-To: <1317499438-14058-17-git-send-email-arnd@arndb.de>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<1317499438-14058-17-git-send-email-arnd@arndb.de>
+Message-ID: <20111002160328.GZ11710@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(sorry for the late response; we had a big holiday here and I was
-forced away from my keyboard :)
+On Sat, Oct 01, 2011 at 10:03:48PM +0200, Arnd Bergmann wrote:
+> The PJ4 based pxa95x cpus all have iwmmxt and there is no way to
+> build that code conditionally, so better not ask the user
+> in that configuration, in order to prevent broken builds.
 
-On Tue, Sep 27, 2011 at 9:14 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> No. I suggest a simpler and shorter algorithm using the bit helpers.
+This suggests we want IWMMXT=y if PJ4=y...
 
-Ok, fair enough. I've revised the patches and attached the main one
-below; please tell me if it looks ok, and then I'll resubmit the
-entire patch set.
+>  config IWMMXT
+> -	bool "Enable iWMMXt support"
+> +	bool "Enable iWMMXt support" if !CPU_PJ4
+>  	depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
+>  	default y if PXA27x || PXA3xx || PXA95x || ARCH_MMP
+>  	help
 
-The main changes I've done from your pseudo-code are:
-
-1. removed the internal while loop, and used several bits
-manipulations to replace it
-2. removed the call to get_order(), and instead used the bytes order
-we already have to deduct it
-3. considered iova alignment requirements too
-4. removed the BUG_ON()s, since we're checking for minimal
-size/alignment conditions in the beginning of the map function
-
-> And yes, overhead is important when we implement the generic dma-ops
-> on-top of the iommu-api because this will make the iommu_map function a
-> fast-path. So we really care about overhead here.
-
-Don't get me wrong; I don't underestimate the importance of performance here.
-
-I just think that as long as some code is reasonably efficient and not
-badly designed (so it's not too hard to optimize later if needed),
-then it's usually better to postpone optimizations until we benchmark
-and know for certain that the effort in squeezing away several cpu
-cycles is noticeable.
-
-In this case, I'm not entirely convinced that it is, because every map
-call anyway ends up flushing the caches, which might take hundreds of
-cpu cycles. In addition, at least the ARM version of find_next_bit
-doesn't look terribly bad.
-
-YMMV though: I didn't find an optimized assembly implementation of
-find_next_bit for x86, and the generic one does look complex. In
-addition, the variable page size behavior of the x86 iommu drivers may
-have caused much more iterations than any of the ARM drivers would
-have had, so the penalty of running that generic find_next_bit
-repeatedly could have accumulated into something noticeable.
-
-Anyway, here comes the revised patch.
-
-Thanks for your review!
-Ohad.
+This hides the option if CPU_PJ4 is enabled, but it will only be set
+to 'y' if PXA27x || PXA3xx || PXA95x || ARCH_MMP are set.  Luckily,
+ARCH_MMP will be - but is that really what's intended?  It's a little
+obscure to work that out.
