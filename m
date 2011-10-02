@@ -1,35 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:44 +0200
-Subject: [PATCH 14/30] ARM: omap2: irq.c is always needed
+Date: Sun,  2 Oct 2011 16:45:51 +0200
+Subject: [PATCH 21/30] sound/soc/omap: limit to omap2plus
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-15-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-22-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Makefile only includes irq.o for omap2 and omap3, but it's in
-fact also required to build omap4-only kernels.
+These drivers do not build correctly on omap1, so only allow
+selecting them on omap2 or higher.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Jarkko Nikula <jarkko.nikula@bitmer.com>
+Cc: Liam Girdwood <lrg@ti.com>
 ---
- arch/arm/mach-omap2/Makefile |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/omap/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index dc36bd4..f14549d 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -4,9 +4,9 @@
+diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
+index fe83d0d..493733e 100644
+--- a/sound/soc/omap/Kconfig
++++ b/sound/soc/omap/Kconfig
+@@ -1,6 +1,6 @@
+ config SND_OMAP_SOC
+ 	tristate "SoC Audio for the Texas Instruments OMAP chips"
+-	depends on ARCH_OMAP
++	depends on ARCH_OMAP2PLUS
  
- # Common support
- obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer.o pm.o \
--	 common.o gpio.o dma.o wd_timer.o
-+	 common.o gpio.o dma.o wd_timer.o irq.o
- 
--omap-2-3-common				= irq.o sdrc.o
-+omap-2-3-common				= sdrc.o
- hwmod-common				= omap_hwmod.o \
- 					  omap_hwmod_common_data.o
- clock-common				= clock.o clock_common_data.o \
+ config SND_OMAP_SOC_MCBSP
+ 	tristate
 -- 
 1.7.5.4
