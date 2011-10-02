@@ -1,41 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:54 +0200
-Subject: [PATCH 24/30] ARM: omap2+: ensure that one of omap2/3/4 is selected
+Date: Sun,  2 Oct 2011 16:45:57 +0200
+Subject: [PATCH 27/30] ARM: omap: select L2X0 cache on omap4
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-25-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-28-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Random configurations can fail if none of the omap families
-in mach-omap2 is selected. This patch automatically selects
-omap2 if the user has not made any other choice.
+The cache controller needs to be enabled for the
+cortex-a9 specific errata that are also selected
+to work.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-omap2/Kconfig |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 4deeade..3c9fb89 100644
+index fd0ab18..3921a95 100644
 --- a/arch/arm/mach-omap2/Kconfig
 +++ b/arch/arm/mach-omap2/Kconfig
-@@ -51,6 +51,16 @@ config ARCH_OMAP4
+@@ -47,6 +47,7 @@ config ARCH_OMAP4
+ 	select PL310_ERRATA_588369
+ 	select PL310_ERRATA_727915
+ 	select ARM_ERRATA_720789
++	select CACHE_L2X0
+ 	select ARCH_HAS_OPP
  	select PM_OPP if PM
  	select USB_ARCH_HAS_EHCI
- 
-+config ARCH_OMAP2_AUTO
-+	bool
-+	depends on !ARCH_OMAP3 && !ARCH_OMAP4
-+	select ARCH_OMAP2
-+	default y
-+	help
-+	  At least one of OMAP2/OMAP3/OMAP4 needs to be enabled, this
-+	  selects OMAP2 if nothing else gets selected, to avoid non-building
-+	  configurations.
-+
- comment "OMAP Core Type"
- 	depends on ARCH_OMAP2
- 
 -- 
 1.7.5.4
