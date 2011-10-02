@@ -1,26 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 Oct 2011 14:13:08 +0100
-Subject: [PATCH 0/4] ARM: EXYNOS4: Support generic Power domain
-	framework for EXYNOS4210
-In-Reply-To: <201110021508.44083.rjw@sisk.pl>
-References: <4E4360B2.2060508@samsung.com> <201110021347.02146.rjw@sisk.pl>
-	<20111002114811.GU11710@n2100.arm.linux.org.uk>
-	<201110021508.44083.rjw@sisk.pl>
-Message-ID: <20111002131307.GV11710@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 02 Oct 2011 15:46:32 +0200
+Subject: [PATCH 12/11] ARM: include linux/highmem.h in uaccess functions
+In-Reply-To: <1317496920-7764-1-git-send-email-arnd@arndb.de>
+References: <1317496920-7764-1-git-send-email-arnd@arndb.de>
+Message-ID: <1894078.P7yYjKNL5t@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 02, 2011 at 03:08:43PM +0200, Rafael J. Wysocki wrote:
-> On Sunday, October 02, 2011, Russell King - ARM Linux wrote:
-> > How do these misconceptions start?
-> > 
-> > The clock API.  Drivers are supposed to get a clock (source) when they
-> > initialize.  Drivers then enable and disable the clock as they _themselves_
-> > require the use of that clock.
-> 
-> OK
-> 
-> Now think of a driver that should handle the same device on both ARM and
-> x86-based SoCs.  Is the clock API available on x86?
+When highpte support is enabled, this is required to build
+the kernel.
+    
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-No one's bothered yet.
+---
+I was missing this patch at first, but now found it in the omap branch.
+
+diff --git a/arch/arm/lib/uaccess_with_memcpy.c b/arch/arm/lib/uaccess_with_memcpy.c
+index 8b9b136..025f742 100644
+--- a/arch/arm/lib/uaccess_with_memcpy.c
++++ b/arch/arm/lib/uaccess_with_memcpy.c
+@@ -17,6 +17,7 @@
+ #include <linux/sched.h>
+ #include <linux/hardirq.h> /* for in_atomic() */
+ #include <linux/gfp.h>
++#include <linux/highmem.h>
+ #include <asm/current.h>
+ #include <asm/page.h>
+ 
