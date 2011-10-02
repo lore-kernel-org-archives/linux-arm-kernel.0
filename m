@@ -1,33 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:51 +0200
-Subject: [PATCH 21/30] sound/soc/omap: limit to omap2plus
+Date: Sun,  2 Oct 2011 16:45:33 +0200
+Subject: [PATCH 03/30] video/omap: fix build dependencies
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-22-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These drivers do not build correctly on omap1, so only allow
-selecting them on omap2 or higher.
+Four of the LCD panel drivers depend on the backlight class,
+so add the dependency in Kconfig.
+Selecting the BACKLIGHT_CLASS_DEVICE symbol does not generally
+work since it has other dependencies.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jarkko Nikula <jarkko.nikula@bitmer.com>
-Cc: Liam Girdwood <lrg@ti.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- sound/soc/omap/Kconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/video/omap2/displays/Kconfig |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
-index fe83d0d..493733e 100644
---- a/sound/soc/omap/Kconfig
-+++ b/sound/soc/omap/Kconfig
-@@ -1,6 +1,6 @@
- config SND_OMAP_SOC
- 	tristate "SoC Audio for the Texas Instruments OMAP chips"
--	depends on ARCH_OMAP
-+	depends on ARCH_OMAP2PLUS
+diff --git a/drivers/video/omap2/displays/Kconfig b/drivers/video/omap2/displays/Kconfig
+index 609a280..8e4278c 100644
+--- a/drivers/video/omap2/displays/Kconfig
++++ b/drivers/video/omap2/displays/Kconfig
+@@ -19,13 +19,15 @@ config PANEL_LGPHILIPS_LB035Q02
+ config PANEL_SHARP_LS037V7DW01
+         tristate "Sharp LS037V7DW01 LCD Panel"
+         depends on OMAP2_DSS_DPI
+-        select BACKLIGHT_CLASS_DEVICE
++        depends on BACKLIGHT_CLASS_DEVICE
+         help
+           LCD Panel used in TI's SDP3430 and EVM boards
  
- config SND_OMAP_SOC_MCBSP
- 	tristate
+ config PANEL_NEC_NL8048HL11_01B
+ 	tristate "NEC NL8048HL11-01B Panel"
+ 	depends on OMAP2_DSS_DPI
++	depends on SPI
++	depends on BACKLIGHT_CLASS_DEVICE
+ 	help
+ 		This NEC NL8048HL11-01B panel is TFT LCD
+ 		used in the Zoom2/3/3630 sdp boards.
+@@ -33,6 +35,7 @@ config PANEL_NEC_NL8048HL11_01B
+ config PANEL_TAAL
+         tristate "Taal DSI Panel"
+         depends on OMAP2_DSS_DSI
++        depends on BACKLIGHT_CLASS_DEVICE
+         help
+           Taal DSI command mode panel from TPO.
+ 
+@@ -45,7 +48,7 @@ config PANEL_TPO_TD043MTEA1
+ config PANEL_ACX565AKM
+ 	tristate "ACX565AKM Panel"
+ 	depends on OMAP2_DSS_SDI && SPI
+-	select BACKLIGHT_CLASS_DEVICE
++	depends on BACKLIGHT_CLASS_DEVICE
+ 	help
+ 	  This is the LCD panel used on Nokia N900
+ endmenu
 -- 
 1.7.5.4
