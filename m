@@ -1,48 +1,60 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:36 +0200
-Subject: [PATCH 06/30] ARM: omap: fix build with CONFIG_I2C_OMAP disabled
+Date: Sun,  2 Oct 2011 16:45:43 +0200
+Subject: [PATCH 13/30] ARM: omap2+: fix omap_hdq_init compilation
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-7-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-14-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We must not reference omap_i2c_reset if the file defining it
-does not get built.
+The definition of the device must depend on the hardware
+we run on, not on the kernel configuration.
+
+arch/arm/mach-omap2/devices.c:624:13: error: 'OMAP_HDQ_BASE' undeclared here (not in a function)
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/plat-omap/include/plat/i2c.h |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/devices.c |   10 ++++++----
+ 1 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/i2c.h b/arch/arm/plat-omap/include/plat/i2c.h
-index 7c22b9e..ae72013 100644
---- a/arch/arm/plat-omap/include/plat/i2c.h
-+++ b/arch/arm/plat-omap/include/plat/i2c.h
-@@ -28,6 +28,8 @@
- extern int omap_register_i2c_bus(int bus_id, u32 clkrate,
- 				 struct i2c_board_info const *info,
- 				 unsigned len);
-+struct omap_hwmod;
-+int omap_i2c_reset(struct omap_hwmod *oh);
- #else
- static inline int omap_register_i2c_bus(int bus_id, u32 clkrate,
- 				 struct i2c_board_info const *info,
-@@ -35,6 +37,7 @@ static inline int omap_register_i2c_bus(int bus_id, u32 clkrate,
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 1077ad6..392f2b0 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -29,6 +29,7 @@
+ #include <mach/gpio.h>
+ #include <plat/mmc.h>
+ #include <plat/dma.h>
++#include <plat/cpu.h>
+ #include <plat/omap_hwmod.h>
+ #include <plat/omap_device.h>
+ #include <plat/omap4-keypad.h>
+@@ -615,10 +616,8 @@ void __init omap242x_init_mmc(struct omap_mmc_platform_data **mmc_data)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-#if defined(CONFIG_HDQ_MASTER_OMAP) || defined(CONFIG_HDQ_MASTER_OMAP_MODULE)
+ #if defined(CONFIG_SOC_OMAP2430) || defined(CONFIG_SOC_OMAP3430)
+ #define OMAP_HDQ_BASE	0x480B2000
+-#endif
+ static struct resource omap_hdq_resources[] = {
+ 	{
+ 		.start		= OMAP_HDQ_BASE,
+@@ -641,10 +640,13 @@ static struct platform_device omap_hdq_dev = {
+ };
+ static inline void omap_hdq_init(void)
  {
- 	return 0;
+-	(void) platform_device_register(&omap_hdq_dev);
++	if (cpu_is_omap2430() || cpu_is_omap3430())
++		(void) platform_device_register(&omap_hdq_dev);
  }
-+#define omap_i2c_reset NULL
+ #else
+-static inline void omap_hdq_init(void) {}
++static inline void omap_hdq_init(void)
++{
++}
  #endif
  
- /**
-@@ -53,7 +56,4 @@ struct omap_i2c_dev_attr {
- void __init omap1_i2c_mux_pins(int bus_id);
- void __init omap2_i2c_mux_pins(int bus_id);
- 
--struct omap_hwmod;
--int omap_i2c_reset(struct omap_hwmod *oh);
--
- #endif /* __ASM__ARCH_OMAP_I2C_H */
+ /*---------------------------------------------------------------------------*/
 -- 
 1.7.5.4
