@@ -1,20 +1,18 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 2 Oct 2011 20:24:43 +0100
-Subject: [PATCH 01/30] sound/omap: omap_mcpdm_remove cannot be __devexit
-In-Reply-To: <1317566760-25681-2-git-send-email-arnd@arndb.de>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-2-git-send-email-arnd@arndb.de>
-Message-ID: <20111002192441.GA3693@opensource.wolfsonmicro.com>
+Date: Sun, 2 Oct 2011 20:29:50 +0100
+Subject: [GIT PULL] Samsung devel-2 for v3.2
+In-Reply-To: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
+References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
+Message-ID: <20111002192950.GB1005@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 02, 2011 at 04:45:31PM +0200, Arnd Bergmann wrote:
-> omap_mcpdm_remove is used from asoc_mcpdm_probe, which is an
-> initcall, and must not be discarded when HOTPLUG is disabled.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jarkko Nikula <jarkko.nikula@bitmer.com>
+On Sun, Oct 02, 2011 at 06:25:36PM +0900, Kukjin Kim wrote:
 
-I've applied this, thanks.  It'd be helpful if you could say if you're
-working on Linus' tree rather than -next, this one doesn't actually
-apply against -next as the driver has been totally rewritten.
+>       gpio/samsung: gpio-samsung.c to support Samsung GPIOs
+
+As I reported the other day this change breaks the boot early on on the
+Cragganmore S3C6410 based systems (I've not actually fired up my
+SMDK6410 but I suspect it may have issues too).  I did make some brief
+attempts to debug but as there's no console output at all and the diff
+is rather large it's not easy to see what's gone wrong.
