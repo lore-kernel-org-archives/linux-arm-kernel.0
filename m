@@ -1,34 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:46:00 +0200
-Subject: [PATCH 30/30] ARM: omap2: select ARM_AMBA for OMAP3_EMU
+Date: Sun,  2 Oct 2011 16:45:48 +0200
+Subject: [PATCH 18/30] omap-usb: automatically select MFD_OMAP_USB_HOST
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-31-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-19-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP3_EMU needs OC_ETM, which needs ARM_AMBA. Since the latter
-dependency is getting turned from a 'select' into a 'depends',
-omap has to select ARM_AMBA itself in order to have a correct
-dependency chain. Alternatively, we could change OMAP3_EMU
-to have a 'depends on OC_ETM' instead of selecting it.
+The ehci-omap and ohci-omap3 drivers both depend on the
+omap-usb-host MFD support driver. By default, this is
+automatically turned on, but it is possible to disable
+the driver, which results in a link error.
+
+This patch makes the option invisible so we always do
+the right thing.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Keshava Munegowda <keshava_mgowda@ti.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 ---
- arch/arm/mach-omap2/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/mfd/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index fdd45dd..12ae86e 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -386,6 +386,7 @@ config OMAP3_EMU
- 	bool "OMAP3 debugging peripherals"
- 	depends on ARCH_OMAP3
- 	select OC_ETM
-+	select ARM_AMBA
- 	help
- 	  Say Y here to enable debugging hardware of omap3
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 21574bd..48cce35 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -721,7 +721,7 @@ config MFD_WL1273_CORE
+ 	  audio codec.
  
+ config MFD_OMAP_USB_HOST
+-	bool "Support OMAP USBHS core driver"
++	bool
+ 	depends on USB_EHCI_HCD_OMAP || USB_OHCI_HCD_OMAP3
+ 	default y
+ 	help
 -- 
 1.7.5.4
