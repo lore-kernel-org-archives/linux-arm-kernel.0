@@ -1,22 +1,20 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sun, 2 Oct 2011 20:18:48 +0100
-Subject: [PATCH 21/30] sound/soc/omap: limit to omap2plus
-In-Reply-To: <1317566760-25681-22-git-send-email-arnd@arndb.de>
+Date: Sun, 2 Oct 2011 20:24:43 +0100
+Subject: [PATCH 01/30] sound/omap: omap_mcpdm_remove cannot be __devexit
+In-Reply-To: <1317566760-25681-2-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-22-git-send-email-arnd@arndb.de>
-Message-ID: <20111002191847.GA1005@sirena.org.uk>
+	<1317566760-25681-2-git-send-email-arnd@arndb.de>
+Message-ID: <20111002192441.GA3693@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 02, 2011 at 04:45:51PM +0200, Arnd Bergmann wrote:
-> These drivers do not build correctly on omap1, so only allow
-> selecting them on omap2 or higher.
+On Sun, Oct 02, 2011 at 04:45:31PM +0200, Arnd Bergmann wrote:
+> omap_mcpdm_remove is used from asoc_mcpdm_probe, which is an
+> initcall, and must not be discarded when HOTPLUG is disabled.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jarkko Nikula <jarkko.nikula@bitmer.com>
 
-No, OMAP1 is supposed to work and people actively seem to care about it.
-If there's some problem with OMAP1 then please report it so that it can
-be fixed.
-
-You should also *always* both CC maintainers and relevant mailing lists
-on patches so they can see what's going on (I'm being especially grumpy
-now because you really should know better), and my previous comments
-about subject lines also apply.
+I've applied this, thanks.  It'd be helpful if you could say if you're
+working on Linus' tree rather than -next, this one doesn't actually
+apply against -next as the driver has been totally rewritten.
