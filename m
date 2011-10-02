@@ -1,31 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 2 Oct 2011 16:47:16 +0100
-Subject: [PATCH 00/11] Generic ARM fixes for randconfig
-In-Reply-To: <1412110.pVL3lEeEnX@wuerfel>
-References: <1317496920-7764-1-git-send-email-arnd@arndb.de>
-	<20111002153646.GX11710@n2100.arm.linux.org.uk>
-	<1412110.pVL3lEeEnX@wuerfel>
-Message-ID: <20111002154716.GY11710@n2100.arm.linux.org.uk>
+Date: Sun, 2 Oct 2011 16:53:31 +0100
+Subject: [PATCH 11/30] ARM: omap2/n8x0: work around modular omap mmc
+In-Reply-To: <1317566760-25681-12-git-send-email-arnd@arndb.de>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<1317566760-25681-12-git-send-email-arnd@arndb.de>
+Message-ID: <20111002155331.GA12323@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 02, 2011 at 05:42:16PM +0200, Arnd Bergmann wrote:
-> On Sunday 02 October 2011 16:36:46 Russell King - ARM Linux wrote:
-> > On Sat, Oct 01, 2011 at 09:21:49PM +0200, Arnd Bergmann wrote:
-> > > Please pull these into your tree, or alternatively cherry-pick the
-> > > ones that you are happy with if you disagree with some of them.
-> > 
-> > I think I'll merge all but the first from this - I think the first
-> > should be part of a cross-arch cleanup.
-> 
-> Ok, thanks!
-> 
-> I'll put the remaining patch into my 'randconfig/hacks' branch, which
-> already contains a number of other things that need a proper fix but
-> for which there is an easier circumvention.
-> 
-> Once all the low-hanging fruit are dealt with, I'll get back to that
-> branch.
+On Sun, Oct 02, 2011 at 04:45:41PM +0200, Arnd Bergmann wrote:
+> -#if defined(CONFIG_MENELAUS) &&						\
+> -	(defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE))
+> +#if defined(CONFIG_MENELAUS) && defined(CONFIG_MMC_OMAP)
+> +/* || defined(CONFIG_MMC_OMAP_MODULE)) */
+> +/* FIXME: cannot call omap_mmc_notify_cover_event for ONFIG_MMC_OMAP_MODULE */
 
-Second thought, I'll take the lot because it fixes build problems, and
-the comment on patch 1 can be addressed later.
+#ifdef CONFIG_MMC_OMAP_MODULE
+#warning FIXME: cannot call omap_mmc_notify_cover_event for CONFIG_MMC_OMAP_MODULE
+#endif
+#if defined(CONFIG_MENELAUS) && defined(CONFIG_MMC_OMAP)
+
+So that it can be seen at build time?
+
+Also note the 'ONFIG' typo...
