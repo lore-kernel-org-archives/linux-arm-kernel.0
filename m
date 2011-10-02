@@ -1,44 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:31 +0200
-Subject: [PATCH 01/30] sound/omap: omap_mcpdm_remove cannot be __devexit
+Date: Sun,  2 Oct 2011 16:45:34 +0200
+Subject: [PATCH 04/30] ARM: omap: add missing __devexit_p() annotations
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-2-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_mcpdm_remove is used from asoc_mcpdm_probe, which is an
-initcall, and must not be discarded when HOTPLUG is disabled.
+Drivers that refer to a __devexit function in an operations
+structure need to annotate that pointer with __devexit_p so
+replace it with a NULL pointer when the section gets discarded.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jarkko Nikula <jarkko.nikula@bitmer.com>
 ---
- sound/soc/omap/mcpdm.c |    2 +-
- sound/soc/omap/mcpdm.h |    2 +-
+ arch/arm/mach-omap2/smartreflex.c |    2 +-
+ arch/arm/plat-omap/dma.c          |    2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/omap/mcpdm.c b/sound/soc/omap/mcpdm.c
-index 928f037..50e59194 100644
---- a/sound/soc/omap/mcpdm.c
-+++ b/sound/soc/omap/mcpdm.c
-@@ -449,7 +449,7 @@ exit:
- 	return ret;
+diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+index 34c01a7..67bc6ce 100644
+--- a/arch/arm/mach-omap2/smartreflex.c
++++ b/arch/arm/mach-omap2/smartreflex.c
+@@ -1002,7 +1002,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
  }
  
--int __devexit omap_mcpdm_remove(struct platform_device *pdev)
-+int omap_mcpdm_remove(struct platform_device *pdev)
- {
- 	struct omap_mcpdm *mcpdm_ptr = platform_get_drvdata(pdev);
+ static struct platform_driver smartreflex_driver = {
+-	.remove         = omap_sr_remove,
++	.remove         = __devexit_p(omap_sr_remove),
+ 	.driver		= {
+ 		.name	= "smartreflex",
+ 	},
+diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+index c22217c..f7150ba 100644
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -2105,7 +2105,7 @@ static int __devexit omap_system_dma_remove(struct platform_device *pdev)
  
-diff --git a/sound/soc/omap/mcpdm.h b/sound/soc/omap/mcpdm.h
-index df3e16f..20c20a8 100644
---- a/sound/soc/omap/mcpdm.h
-+++ b/sound/soc/omap/mcpdm.h
-@@ -150,4 +150,4 @@ extern int omap_mcpdm_request(void);
- extern void omap_mcpdm_free(void);
- extern int omap_mcpdm_set_offset(int offset1, int offset2);
- int __devinit omap_mcpdm_probe(struct platform_device *pdev);
--int __devexit omap_mcpdm_remove(struct platform_device *pdev);
-+int omap_mcpdm_remove(struct platform_device *pdev);
+ static struct platform_driver omap_system_dma_driver = {
+ 	.probe		= omap_system_dma_probe,
+-	.remove		= omap_system_dma_remove,
++	.remove		= __devexit_p(omap_system_dma_remove),
+ 	.driver		= {
+ 		.name	= "omap_dma_system"
+ 	},
 -- 
 1.7.5.4
