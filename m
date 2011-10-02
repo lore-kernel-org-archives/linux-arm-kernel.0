@@ -1,30 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 02 Oct 2011 22:53:24 +0200
-Subject: [PATCH 2/6] ASoC: codecs: AK4641 depends on GPIOLIB
-In-Reply-To: <20111002204106.GB5811@opensource.wolfsonmicro.com>
-References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
-	<1317587284-2776-3-git-send-email-arnd@arndb.de>
-	<20111002204106.GB5811@opensource.wolfsonmicro.com>
-Message-ID: <2726393.3Oc3SrGyN4@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun,  2 Oct 2011 23:11:55 +0200
+Subject: [PATCH] mach-integrator: remove VGA_CONSOLE from defconfig
+Message-ID: <1317589915-31984-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 02 October 2011 21:41:07 Mark Brown wrote:
-> On Sun, Oct 02, 2011 at 10:28:00PM +0200, Arnd Bergmann wrote:
-> > This driver only builds correctly on platforms that use
-> > GPIOLIB. Disable it otherwise.
-> 
-> No, gpiolib is one implementation of the GPIO API but if platforms want
-> to go and define their own that's currently OK (personally I think at
-> this point we should just be converting all the stragglers over to
-> gpiolib).  As things stand we shouldn't have dependencies on a
-> particular implementation of the API.
+After scratching my head for a while fighting strange boot delays
+and hangs, I realized that the VGA_CONSOLE code is just poking
+around in the PCI memory space at random. It really has no clue
+whether there is a VGA card in the first slot or not, and it
+doesn't in any way try to determine if there is one. It doesn't
+belong in the defconfig, people with VGA cards in their
+Integrators can reenable this and fix it properly.
 
-Thanks for the explanation!
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/configs/integrator_defconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Is there any other symbol that I can test then?
-
-I noticed that a lot of places use 'depends on GPIOLIB' or
-'#ifdef CONFIG_GPIOLIB', are those usually wrong, too?
-
-	Arnd
+diff --git a/arch/arm/configs/integrator_defconfig b/arch/arm/configs/integrator_defconfig
+index 1103f62..f26460d 100644
+--- a/arch/arm/configs/integrator_defconfig
++++ b/arch/arm/configs/integrator_defconfig
+@@ -66,6 +66,7 @@ CONFIG_FB_MODE_HELPERS=y
+ CONFIG_FB_MATROX=y
+ CONFIG_FB_MATROX_MILLENIUM=y
+ CONFIG_FB_MATROX_MYSTIQUE=y
++# CONFIG_VGA_CONSOLE is not set
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PL030=y
+ CONFIG_EXT2_FS=y
+-- 
+1.7.6.2
