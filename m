@@ -1,60 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 22:28:03 +0200
-Subject: [PATCH 5/6] ASoC: samsung: fix Kconfig dependencies
+Date: Sun,  2 Oct 2011 22:28:04 +0200
+Subject: [PATCH 6/6] ASoC: samsung: add missing __devexit_p() annotations
 In-Reply-To: <1317587284-2776-1-git-send-email-arnd@arndb.de>
 References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317587284-2776-6-git-send-email-arnd@arndb.de>
+Message-ID: <1317587284-2776-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SND_SOC_WM8994 can only be selected if the respective MFD driver is
-present.
-
-SND_SAMSUNG_AC97 must not be builtin if SND_SOC_ALL_CODECS is
-set to building all drivers as modules.
+Drivers that refer to a __devexit function in an operations
+structure need to annotate that pointer with __devexit_p so
+replace it with a NULL pointer when the section gets discarded.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Cc: Jassi Brar <jassisinghbrar@gmail.com>
 Cc: Sangbeom Kim <sbkim73@samsung.com>
 ---
- sound/soc/samsung/Kconfig |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ sound/soc/samsung/ac97.c |    2 +-
+ sound/soc/samsung/i2s.c  |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 65f980e..cb63cd0 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -25,6 +25,7 @@ config SND_SAMSUNG_PCM
+diff --git a/sound/soc/samsung/ac97.c b/sound/soc/samsung/ac97.c
+index f97110e..65ea538 100644
+--- a/sound/soc/samsung/ac97.c
++++ b/sound/soc/samsung/ac97.c
+@@ -495,7 +495,7 @@ static __devexit int s3c_ac97_remove(struct platform_device *pdev)
  
- config SND_SAMSUNG_AC97
- 	tristate
-+	depends on SND_SOC_ALL_CODECS=n || SND_SOC_ALL_CODECS
- 	select SND_SOC_AC97_BUS
+ static struct platform_driver s3c_ac97_driver = {
+ 	.probe  = s3c_ac97_probe,
+-	.remove = s3c_ac97_remove,
++	.remove = __devexit_p(s3c_ac97_remove),
+ 	.driver = {
+ 		.name = "samsung-ac97",
+ 		.owner = THIS_MODULE,
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index c086b78..0c9ac20 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -1136,7 +1136,7 @@ static __devexit int samsung_i2s_remove(struct platform_device *pdev)
  
- config SND_SAMSUNG_SPDIF
-@@ -64,6 +65,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
- config SND_SOC_SAMSUNG_SMDK_WM8994
- 	tristate "SoC I2S Audio support for WM8994 on SMDK"
- 	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210)
-+	depends on MFD_WM8994
- 	select SND_SOC_WM8994
- 	select SND_SAMSUNG_I2S
- 	help
-@@ -151,6 +153,7 @@ config SND_SOC_GONI_AQUILA_WM8994
- 	tristate "SoC I2S Audio support for AQUILA/GONI - WM8994"
- 	depends on SND_SOC_SAMSUNG && (MACH_GONI || MACH_AQUILA)
- 	select SND_SAMSUNG_I2S
-+	depends on MFD_WM8994
- 	select SND_SOC_WM8994
- 	help
- 	  Say Y if you want to add support for SoC audio on goni or aquila
-@@ -174,6 +177,7 @@ config SND_SOC_SMDK_WM8580_PCM
- config SND_SOC_SMDK_WM8994_PCM
- 	tristate "SoC PCM Audio support for WM8994 on SMDK"
- 	depends on SND_SOC_SAMSUNG && (MACH_SMDKC210 || MACH_SMDKV310)
-+	depends on MFD_WM8994
- 	select SND_SOC_WM8994
- 	select SND_SAMSUNG_PCM
- 	help
+ static struct platform_driver samsung_i2s_driver = {
+ 	.probe  = samsung_i2s_probe,
+-	.remove = samsung_i2s_remove,
++	.remove = __devexit_p(samsung_i2s_remove),
+ 	.driver = {
+ 		.name = "samsung-i2s",
+ 		.owner = THIS_MODULE,
 -- 
 1.7.5.4
