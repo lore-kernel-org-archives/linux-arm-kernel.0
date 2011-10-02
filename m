@@ -1,218 +1,195 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 02 Oct 2011 16:08:14 +0900
-Subject: [PATCH 4/4] ARM: EXYNOS4: Add power domain to use generic Power
-	domain Framework
-In-Reply-To: <4E4360BA.3020208@samsung.com>
-References: <4E4360BA.3020208@samsung.com>
-Message-ID: <001901cc80d2$0da66d40$28f347c0$%kim@samsung.com>
+Date: Sun, 02 Oct 2011 16:38:18 +0900
+Subject: [PATCH 2/7] s3c-adc: describe features via quirk constants
+In-Reply-To: <201109211504.03287.heiko@sntech.de>
+References: <201109182241.48858.heiko@sntech.de>
+	<201109182243.40440.heiko@sntech.de>
+	<005801cc785a$7e46a310$7ad3e930$%kim@samsung.com>
+	<201109211504.03287.heiko@sntech.de>
+Message-ID: <001a01cc80d6$40bf7e70$c23e7b50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanwoo Choi wrote:
+Heiko St?bner wrote:
 > 
-> This patch initializes the power domain of EXYNOS4210. The devices
-> which suppot runtime-PM have to be added in specific power domain.
+> Hi,
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos4/mach-nuri.c           |   18 ++++++++++++++++++
->  arch/arm/mach-exynos4/mach-smdkc210.c       |   18
-> ++++++++++++++++++
->  arch/arm/mach-exynos4/mach-smdkv310.c       |   15 +++++++++++++++
->  arch/arm/mach-exynos4/mach-universal_c210.c |   18 ++++++++++++++++++
->  4 files changed, 69 insertions(+), 0 deletions(-)
+> Am Mittwoch, 21. September 2011, 14:32:14 schrieben Sie:
+> > Heiko St?bner wrote:
+> > > The adc blocks of S3C2410 through S5P have a multitude of
+> > > quirks, i.e. moved bits or whole new registers.
+> > >
+> > > This patch tries to describe these individual features
+> > > through constants which can be used to describe an adc.
+> > >
+> > > As SoCs sometimes share only some of these quirks defining
+> > > TYPE_ADCVx values for each one wouldn't scale well when
+> > > adding more variants.
+> >
+> > Hi Heiko,
+> >
+> > I don't have idea we really need to use QUIRK in this case...as I know,
+the
+> > QUIRK is used on other situation...
+> >
+> > In addition, the TYPE_ADCVx can support each Samsung SoCs' ADC...but I
+> need
+> > to check again.
+> The current types could not support the features of the 2443 and 2416/2450
+- I
+> checked the datasheets.
 > 
-> diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-
-> nuri.c
-> index 4c358cb..5844c55 100644
-> --- a/arch/arm/mach-exynos4/mach-nuri.c
-> +++ b/arch/arm/mach-exynos4/mach-nuri.c
-> @@ -44,6 +44,7 @@
->  #include <plat/mfc.h>
+> The mux register in base+0x18 does not exist on any of the current
+platforms.
+> Also the bit 3 in ADCCON to select the resolution is specific to the
+2416/2450
+> (see comments above constants and quirk definitions in patches 6 and 7).
 > 
->  #include <mach/map.h>
-> +#include <mach/pm-exynos4210.h>
+> So to support these SoCs would require the definition of two new types.
+> Including these new types in the existing conditionals would introduce a
+lot
+> of statements like
+> 	if ( (TYPE_X || TYPE_Y) && !TYPE_Z)
 > 
->  /* Following are default values for UCON, ULCON and UFCON UART registers */
->  #define NURI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> @@ -1125,6 +1126,21 @@ static void __init nuri_reserve(void)
->  	s5p_mfc_reserve_mem(0x43000000, 8 << 20, 0x51000000, 8 << 20);
->  }
+> In my opinion testing for specific features also describes the difference
+> between implementations better if one reads the code later on.
 > 
-> +static void __init nuri_power_domain_init(void)
-> +{
-> +	/* Initialize Power domain */
-> +	exynos4210_init_pm_domain(&exynos4210_pd_mfc);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_g3d);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd0);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd1);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_tv);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_cam);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_gps);
+> 
+> I will change the styling of the "<<"s but am wondering why checkpatch did
+not
+> complain, i.e. it complains for all other whitespace mistakes one can make
+but
+> not these.
+> 
 
-As you know, the EXYNOS421 boards have same power domains so how about to make array of struct exynos4210_pm_domain and just one calling exynos4210_init_pm_domain()?
+Hi Heiko,
 
-> +
-> +	/* Add device to MFC power domain */
-> +	exynos4210_add_device_to_domain(&exynos4210_pd_mfc,
-> &s5p_device_mfc);
-> +}
-> +
->  static void __init nuri_machine_init(void)
->  {
->  	nuri_sdhci_init();
-> @@ -1145,6 +1161,8 @@ static void __init nuri_machine_init(void)
-> 
->  	/* Last */
->  	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
-> +
-> +	nuri_power_domain_init();
->  }
-> 
->  MACHINE_START(NURI, "NURI")
-> diff --git a/arch/arm/mach-exynos4/mach-smdkc210.c b/arch/arm/mach-
-> exynos4/mach-smdkc210.c
-> index 4d1976c..0a3b2a9 100644
-> --- a/arch/arm/mach-exynos4/mach-smdkc210.c
-> +++ b/arch/arm/mach-exynos4/mach-smdkc210.c
+How about following? I think following is also not bad...
 
-The mach-smdkc210.c and mach-smdkv310.c are merged one mach-smdkv310.c file.
-
-> @@ -37,6 +37,7 @@
->  #include <plat/backlight.h>
-> 
->  #include <mach/map.h>
-> +#include <mach/pm-exynos4210.h>
-> 
->  /* Following are default values for UCON, ULCON and UFCON UART registers */
->  #define SMDKC210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> @@ -273,6 +274,21 @@ static void __init smdkc210_map_io(void)
->  	s3c24xx_init_uarts(smdkc210_uartcfgs,
-> ARRAY_SIZE(smdkc210_uartcfgs));
->  }
-> 
-> +static void __init smdkc210_power_domain_init(void)
-> +{
-> +	/* Initialize Power domain */
-> +	exynos4210_init_pm_domain(&exynos4210_pd_mfc);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_g3d);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd0);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd1);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_tv);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_cam);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_gps);
-> +
-> +	/* Add device to LCD0 power domain */
-> +	exynos4210_add_device_to_domain(&exynos4210_pd_lcd0,
-> &s5p_device_fimd0);
-> +}
-> +
->  static void __init smdkc210_machine_init(void)
->  {
->  	s3c_i2c1_set_platdata(NULL);
-> @@ -289,6 +305,8 @@ static void __init smdkc210_machine_init(void)
->  	s5p_fimd0_set_platdata(&smdkc210_lcd0_pdata);
-> 
->  	platform_add_devices(smdkc210_devices,
-> ARRAY_SIZE(smdkc210_devices));
-> +
-> +	smdkc210_power_domain_init();
->  }
-> 
->  MACHINE_START(SMDKC210, "SMDKC210")
-> diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-
-> exynos4/mach-smdkv310.c
-> index 8c2819b..320c7f3 100644
-> --- a/arch/arm/mach-exynos4/mach-smdkv310.c
-> +++ b/arch/arm/mach-exynos4/mach-smdkv310.c
-> @@ -33,6 +33,7 @@
->  #include <plat/backlight.h>
-> 
->  #include <mach/map.h>
-> +#include <mach/pm-exynos4210.h>
-> 
->  /* Following are default values for UCON, ULCON and UFCON UART registers */
->  #define SMDKV310_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> @@ -225,6 +226,18 @@ static void __init smdkv310_map_io(void)
->  	s3c24xx_init_uarts(smdkv310_uartcfgs,
-> ARRAY_SIZE(smdkv310_uartcfgs));
->  }
-> 
-> +static void __init smdkv310_power_domain_init(void)
-> +{
-> +	/* Initialize Power domain */
-> +	exynos4210_init_pm_domain(&exynos4210_pd_mfc);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_g3d);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd0);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd1);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_tv);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_cam);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_gps);
-> +}
-> +
->  static void __init smdkv310_machine_init(void)
->  {
->  	s3c_i2c1_set_platdata(NULL);
-> @@ -242,6 +255,8 @@ static void __init smdkv310_machine_init(void)
->  	samsung_bl_set(&smdkv310_bl_gpio_info, &smdkv310_bl_data);
-> 
->  	platform_add_devices(smdkv310_devices,
-> ARRAY_SIZE(smdkv310_devices));
-> +
-> +	smdkv310_power_domain_init();
->  }
-> 
->  MACHINE_START(SMDKV310, "SMDKV310")
-> diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-
-> exynos4/mach-universal_c210.c
-> index 43998f0..1ebc907 100644
-> --- a/arch/arm/mach-exynos4/mach-universal_c210.c
-> +++ b/arch/arm/mach-exynos4/mach-universal_c210.c
-> @@ -36,6 +36,7 @@
->  #include <plat/s5p-time.h>
-> 
->  #include <mach/map.h>
-> +#include <mach/pm-exynos4210.h>
-> 
->  /* Following are default values for UCON, ULCON and UFCON UART registers */
->  #define UNIVERSAL_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> @@ -737,6 +738,21 @@ static void __init universal_reserve(void)
->  	s5p_mfc_reserve_mem(0x43000000, 8 << 20, 0x51000000, 8 << 20);
->  }
-> 
-> +static void __init universal_power_domain_init(void)
-> +{
-> +	/* Initialize Power domain */
-> +	exynos4210_init_pm_domain(&exynos4210_pd_mfc);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_g3d);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd0);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd1);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_tv);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_cam);
-> +	exynos4210_init_pm_domain(&exynos4210_pd_gps);
-> +
-> +	/* Add device to MFC power domain */
-> +	exynos4210_add_device_to_domain(&exynos4210_pd_mfc,
-> &s5p_device_mfc);
-> +}
-> +
->  static void __init universal_machine_init(void)
->  {
->  	universal_sdhci_init();
-> @@ -757,6 +773,8 @@ static void __init universal_machine_init(void)
-> 
->  	/* Last */
->  	platform_add_devices(universal_devices,
-> ARRAY_SIZE(universal_devices));
-> +
-> +	universal_power_domain_init();
->  }
-> 
->  MACHINE_START(UNIVERSAL_C210, "UNIVERSAL_C210")
-> --
-> 1.7.0.4
-
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index ee8deef..f5c6703 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -41,6 +41,8 @@
+ 
+ enum s3c_cpu_type {
+ 	TYPE_ADCV1, /* S3C24XX */
++	TYPE_ADCV11, /* S3C2416 */
++	TYPE_ADCV12, /* S3C2443 */
+ 	TYPE_ADCV2, /* S3C64XX, S5P64X0, S5PC100 */
+ 	TYPE_ADCV3, /* S5PV210, S5PC110, EXYNOS4210 */
+ };
+@@ -98,13 +100,17 @@ static inline void s3c_adc_select(struct adc_device
+*adc,
+ 
+ 	client->select_cb(client, 1);
+ 
+-	con &= ~S3C2410_ADCCON_MUXMASK;
++	if (cpu == TYPE_ADCV1 || cpu == TYPE_ADCV2)
++		con &= ~S3C2410_ADCCON_MUXMASK;
+ 	con &= ~S3C2410_ADCCON_STDBM;
+ 	con &= ~S3C2410_ADCCON_STARTMASK;
+ 
+ 	if (!client->is_ts) {
+ 		if (cpu == TYPE_ADCV3)
+ 			writel(client->channel & 0xf, adc->regs +
+S5P_ADCMUX);
++		elif (cpu == TYPE_ADCV12)
++			writel(client->channel & 0xf,
++				adc->regs + S3C2443_ADCMUX);
+ 		else
+ 			con |= S3C2410_ADCCON_SELMUX(client->channel);
+ 	}
+@@ -293,13 +299,13 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
+ 
+ 	client->nr_samples--;
+ 
+-	if (cpu != TYPE_ADCV1) {
+-		/* S3C64XX/S5P ADC resolution is 12-bit */
+-		data0 &= 0xfff;
+-		data1 &= 0xfff;
+-	} else {
++	if (cpu == TYPE_ADCV1 || cpu == TYPE_ADCV12) {
+ 		data0 &= 0x3ff;
+ 		data1 &= 0x3ff;
++	} else {
++		/* S3C2416, S3C64XX/S5P ADC resolution is 12-bit */
++		data0 &= 0xfff;
++		data1 &= 0xfff;
+ 	}
+ 
+ 	if (client->convert_cb)
+@@ -320,7 +326,7 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
+ 	}
+ 
+ exit:
+-	if (cpu != TYPE_ADCV1) {
++	if (cpu == TYPE_ADCV2 || cpu == TYPE_ADCV3) {
+ 		/* Clear ADC interrupt */
+ 		writel(0, adc->regs + S3C64XX_ADCCLRINT);
+ 	}
+@@ -332,6 +338,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct adc_device *adc;
+ 	struct resource *regs;
++	enum s3c_cpu_type cpu = platform_get_device_id(pdev)->driver_data;
+ 	int ret;
+ 	unsigned tmp;
+ 
+@@ -394,10 +401,13 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 	clk_enable(adc->clk);
+ 
+ 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
+-	if (platform_get_device_id(pdev)->driver_data != TYPE_ADCV1) {
+-		/* Enable 12-bit ADC resolution */
++
++	/* Enable 12-bit ADC resolution */
++	if (cpu == TYPE_ADCV11)
++		tmp |= S3C2416_ADCCON_RESSEL;
++	if (cpu == TYPE_ADCV2 || cpu == TYPE_ADCV3)
+ 		tmp |= S3C64XX_ADCCON_RESSEL;
+-	}
++
+ 	writel(tmp, adc->regs + S3C2410_ADCCON);
+ 
+ 	dev_info(dev, "attached adc driver\n");
+@@ -464,6 +474,7 @@ static int s3c_adc_resume(struct device *dev)
+ 	struct platform_device *pdev = container_of(dev,
+ 			struct platform_device, dev);
+ 	struct adc_device *adc = platform_get_drvdata(pdev);
++	enum s3c_cpu_type cpu = platform_get_device_id(pdev)->driver_data;
+ 	int ret;
+ 	unsigned long tmp;
+ 
+@@ -474,9 +485,13 @@ static int s3c_adc_resume(struct device *dev)
+ 	enable_irq(adc->irq);
+ 
+ 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
++
+ 	/* Enable 12-bit ADC resolution */
+-	if (platform_get_device_id(pdev)->driver_data != TYPE_ADCV1)
++	if (cpu == TYPE_ADCV11)
++		tmp |= S3C2416_ADCCON_RESSEL;
++	if (cpu == TYPE_ADCV2 || cpu == TYPE_ADCV3)
+ 		tmp |= S3C64XX_ADCCON_RESSEL;
++
+ 	writel(tmp, adc->regs + S3C2410_ADCCON);
+ 
+ 	return 0;
+@@ -492,6 +507,12 @@ static struct platform_device_id s3c_adc_driver_ids[] =
+{
+ 		.name           = "s3c24xx-adc",
+ 		.driver_data    = TYPE_ADCV1,
+ 	}, {
++		.name		= "s3c2416-adc",
++		.driver_data	= TYPE_ADCV11
++	}, {
++		.name		= "s3c2443-adc",
++		.driver_data	= TYPE_ADCV12
++	}, {
+ 		.name           = "s3c64xx-adc",
+ 		.driver_data    = TYPE_ADCV2,
+ 	}, {
 
 Thanks.
 
@@ -221,3 +198,86 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Heiko
+> 
+> >
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > >
+> > >  arch/arm/plat-samsung/adc.c |   29 +++++++++++++++++++++++++++++
+> > >  1 files changed, 29 insertions(+), 0 deletions(-)
+> > >
+> > > diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+> > > index ee8deef..b209d58 100644
+> > > --- a/arch/arm/plat-samsung/adc.c
+> > > +++ b/arch/arm/plat-samsung/adc.c
+> > > @@ -45,6 +45,35 @@ enum s3c_cpu_type {
+> > >
+> > >  	TYPE_ADCV3, /* S5PV210, S5PC110, EXYNOS4210 */
+> > >
+> > >  };
+> > >
+> > > +/*
+> > > + * Resolution of the ADC - 10 or 12 bit
+> > > + */
+> >
+> > /* ... */
+> >
+> > > +#define S3C_ADC_QUIRK_10BIT		0
+> > > +#define S3C_ADC_QUIRK_12BIT		(1<<0)
+> >
+> > According to coding style, should be added blank around <<.
+> >
+> > > +
+> > > +/*
+> > > + * 12bit ADC can switch resolution between 10 bit and 12 bit
+> > > + * ADCCON bit 03 for S3C2416
+> > > + * ADCCON bit 16 for S3C64XX and up
+> > > + */
+> > > +#define S3C_ADC_QUIRK_RESSEL03		(1<<1)
+> > > +#define S3C_ADC_QUIRK_RESSEL16		(1<<2)
+> >
+> > Same as above.
+> >
+> > > +
+> > > +/*
+> > > + * Input channel select can either be in
+> > > + * - reg ADCCON, bit for S3C24XX and S3C64XX
+> > > + * - reg base+0x18 for 2443/2416/2450
+> > > + * - reg base+0x1C for S5P
+> > > + */
+> > > +#define S3C_ADC_QUIRK_MUXADCCON		(1<<3)
+> > > +#define S3C_ADC_QUIRK_MUX18		(1<<4)
+> > > +#define S3C_ADC_QUIRK_MUX1C		(1<<5)
+> >
+> > Same.
+> >
+> > > +
+> > > +/*
+> > > + * CLRINT register on S3C64xx
+> > > + */
+> >
+> > /* ... */
+> >
+> > > +#define S3C_ADC_QUIRK_CLRINT		(1<<6)
+> >
+> > Same.
+> >
+> > > +
+> > >
+> > >  struct s3c_adc_client {
+> > >
+> > >  	struct platform_device	*pdev;
+> > >  	struct list_head	 pend;
+> > >
+> > > --
+> > > 1.7.2.3
+> >
+> > Thanks.
+> >
+> > Best regards,
+> > Kgene.
+> > --
+> > Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> > SW Solution Development Team, Samsung Electronics Co., Ltd.
