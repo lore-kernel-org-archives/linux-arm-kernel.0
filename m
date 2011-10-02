@@ -1,32 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:37 +0200
-Subject: [PATCH 07/30] ARM: omap: fix visibility of omap2_mbox_iva_priv
+Date: Sun,  2 Oct 2011 16:45:41 +0200
+Subject: [PATCH 11/30] ARM: omap2/n8x0: work around modular omap mmc
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-8-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-map2_mbox_iva_priv is used on multiple omap2 socs but is hidden
-in an outdated #ifdef that is specific to a single soc.
+When the omap driver is built as a module for n8x0,
+n8x0_mmc_set_power_menelaus cannot call into the driver:
+
+arch/arm/mach-omap2/board-n8x0.c:374: undefined reference to `omap_mmc_notify_cover_event'
+
+As a workaround, do not provide that device in this case. This needs
+to be fixed properly, e.g. by converting n8x0 to be probed through the
+device tree and moving that code into the driver.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-omap2/mailbox.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/board-n8x0.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 86d564a..5a2a0e4 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -257,7 +257,7 @@ struct omap_mbox mbox_dsp_info = {
- struct omap_mbox *omap3_mboxes[] = { &mbox_dsp_info, NULL };
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index e11f0c5..403325d 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -193,8 +193,9 @@ static struct omap_onenand_platform_data board_onenand_data[] = {
+ };
  #endif
  
--#if defined(CONFIG_SOC_OMAP2420)
-+#if defined(CONFIG_ARCH_OMAP2)
- /* IVA */
- static struct omap_mbox2_priv omap2_mbox_iva_priv = {
- 	.tx_fifo = {
+-#if defined(CONFIG_MENELAUS) &&						\
+-	(defined(CONFIG_MMC_OMAP) || defined(CONFIG_MMC_OMAP_MODULE))
++#if defined(CONFIG_MENELAUS) && defined(CONFIG_MMC_OMAP)
++/* || defined(CONFIG_MMC_OMAP_MODULE)) */
++/* FIXME: cannot call omap_mmc_notify_cover_event for ONFIG_MMC_OMAP_MODULE */
+ 
+ /*
+  * On both N800 and N810, only the first of the two MMC controllers is in use.
 -- 
 1.7.5.4
