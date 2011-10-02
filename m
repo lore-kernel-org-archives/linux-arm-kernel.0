@@ -1,45 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 2 Oct 2011 23:24:29 +0200
-Subject: [PATCH 1/2 v2] plat-pxa: move PXA GPIO driver to GPIO subsystem
-In-Reply-To: <20111001224421.GQ11710@n2100.arm.linux.org.uk>
-References: <1317121005-4716-1-git-send-email-linus.walleij@stericsson.com>
-	<20111001224421.GQ11710@n2100.arm.linux.org.uk>
-Message-ID: <CAKnu2MqEd92jizWe-fTf=YkxHaVgNsQBXR6w33ZNjF9fx26PNw@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 2 Oct 2011 22:27:11 +0100
+Subject: [PATCH 2/6] ASoC: codecs: AK4641 depends on GPIOLIB
+In-Reply-To: <2726393.3Oc3SrGyN4@wuerfel>
+References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
+	<1317587284-2776-3-git-send-email-arnd@arndb.de>
+	<20111002204106.GB5811@opensource.wolfsonmicro.com>
+	<2726393.3Oc3SrGyN4@wuerfel>
+Message-ID: <20111002212711.GC4506@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/2 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Sep 27, 2011 at 12:56:45PM +0200, Linus Walleij wrote:
->> ?obj-$(CONFIG_GPIO_PL061) ? ? += gpio-pl061.o
->> +obj-$(CONFIG_PLAT_PXA) ? ? ? ? ? ? ? += gpio-pxa.o
->> ?obj-$(CONFIG_GPIO_RDC321X) ? += gpio-rdc321x.o
->
-> This is not what my drivers/gpio/Makefile contains. ?I've applied this
-> patch with GNU patch with fuzz 2, resulting in:
->
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index 84bc738..19c5d27 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -40,6 +40,7 @@ obj-$(CONFIG_GPIO_PCA953X) ? ?+= gpio-pca953x.o
-> ?obj-$(CONFIG_GPIO_PCF857X) ? ? += gpio-pcf857x.o
-> ?obj-$(CONFIG_GPIO_PCH) ? ? ? ? += gpio-pch.o
-> ?obj-$(CONFIG_GPIO_PL061) ? ? ? += gpio-pl061.o
-> +obj-$(CONFIG_PLAT_PXA) ? ? ? ? += gpio-pxa.o
-> ?obj-$(CONFIG_GPIO_RDC321X) ? ? += gpio-rdc321x.o
->
-> ?obj-$(CONFIG_GPIO_PLAT_SAMSUNG) ? ? ? ?+= gpio-plat-samsung.o
->
-> This will probably conflict with Grant's tree.
+On Sun, Oct 02, 2011 at 10:53:24PM +0200, Arnd Bergmann wrote:
+> On Sunday 02 October 2011 21:41:07 Mark Brown wrote:
 
-Yes luckily it looks pretty trivial.
+> > No, gpiolib is one implementation of the GPIO API but if platforms want
+> > to go and define their own that's currently OK (personally I think at
 
-Haojioan is working on cleanups to this driver that need to be rebased
-on top of this and submitted through your branch in order for us not
-to create even more conflicts.
+> Thanks for the explanation!
 
-Feel free to drop any of this stuff if it's just causing trouble, it can
-surely wait until the next merge window if need be.
+> Is there any other symbol that I can test then?
 
-Yours,
-Linus Walleij
+You shouldn't be testing anything - the client side GPIO API (which is
+what this driver is using) is supposed to stub itself out when not in
+use so drivers should just be able to use it without worrying about
+dependencies.  You didn't report the problem but I'd expect that
+whatever you saw will be an issue in whatever platform you were trying
+to build for (I'm guessing it hasn't provided gpio_request_one()),
+though it could be a problem in the gpiolib stubs if that's being used.
+
+> I noticed that a lot of places use 'depends on GPIOLIB' or
+> '#ifdef CONFIG_GPIOLIB', are those usually wrong, too?
+
+Checks for gpiolib in drivers providing GPIOs are sensible, if a
+platform hasn't used gpiolib then it's generally not even got an
+interface for drivers to provide GPIOs.
+
+On the user side these are usually due to people making the sort of
+changes you're making here due to a random build coverage issue - it
+seems unfortunately common for people to just shove a dependency in
+Kconfig when they run into a build coverage issue without looking at
+what's going on.  For a lot of the stuff you see on PCs it's going to
+make sense but for some of the "service" APIs like GPIOs that are more
+commonly used only in embedded contexts the use of the API is usually
+completely optional (eg, in this case the driver is controlling power
+and reset lines which could easily just be strapped in the hardware with
+no soft control and are supplied as optional platform data) so for many
+systems the driver is going to work completely happily without doing
+anything with GPIOs.
+
+Adding dependencies to all the users needlessly restricts which systems
+can use the drivers.  Adding ifdefs to the drivers is repetitive and
+isn't great for legiblity, having the header stub itself out is simpler
+and easier to use on the driver side.
