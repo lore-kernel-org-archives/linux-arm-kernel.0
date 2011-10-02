@@ -1,57 +1,80 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun,  2 Oct 2011 16:45:50 +0200
-Subject: [PATCH 20/30] media/omap_vout: disable driver for now
+Date: Sun,  2 Oct 2011 16:45:38 +0200
+Subject: [PATCH 08/30] ARM: omap2+: fix building without i2c
 In-Reply-To: <1317566760-25681-1-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-Message-ID: <1317566760-25681-21-git-send-email-arnd@arndb.de>
+Message-ID: <1317566760-25681-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver was broken by 8cff88c5d "OMAP: DSS2: remove update_mode
-from omapdss":
+A trivial typo causes build breakage when I2C is disabled
+and omap_i2c_reset is set to NULL on OMAP:
 
-/home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c: In function 'omap_vout_probe':
-/home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2202:15: error: 'struct omap_dss_driver' has no member
-named 'set_update_mode'
-/home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2203:12: error: 'struct omap_dss_driver' has no member
-named 'set_update_mode'
-/home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2204:8: error: 'OMAP_DSS_UPDATE_MANUAL' undeclared (first
-use in this function)
-/home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2204:8: note: each undeclared identifier is reported only
-once for each function it appears in
-/home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2206:15: error: 'struct omap_dss_driver' has no member
-named 'set_update_mode'
-/home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2207:12: error: 'struct omap_dss_driver' has no member
-named 'set_update_mode'
-/home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2208:8: error: 'OMAP_DSS_UPDATE_AUTO' undeclared (first use
-in this function)
-make[3]: *** [drivers/media/video/omap/omap_vout.o] Error 1
-make[2]: *** [drivers/media/video/omap] Error 2
-make[1]: *** [drivers/media/video/] Error 2
-make: *** [sub-make] Error 2
+omap_hwmod_44xx_data.c:2287:11: error: lvalue required as unary '&' operand
 
-Let's disable it for now.
+Removing the '&' character solves this.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
-Cc: Archit Taneja <archit@ti.com>
-Cc: Amber Jain <amber@ti.com>
-Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Avinash.H.M <avinashhm@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 ---
- drivers/media/video/omap/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/media/video/omap/Kconfig b/drivers/media/video/omap/Kconfig
-index 390ab09..ee21f36 100644
---- a/drivers/media/video/omap/Kconfig
-+++ b/drivers/media/video/omap/Kconfig
-@@ -4,6 +4,7 @@ config VIDEO_OMAP2_VOUT_VRFB
- config VIDEO_OMAP2_VOUT
- 	tristate "OMAP2/OMAP3 V4L2-Display driver"
- 	depends on ARCH_OMAP2 || ARCH_OMAP3
-+	depends on BROKEN # broken by 8cff88c5da "OMAP: DSS2: remove update_mode from omapdss"
- 	select VIDEOBUF_GEN
- 	select VIDEOBUF_DMA_CONTIG
- 	select OMAP2_DSS
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index a015c69..3aa6c62 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -1030,7 +1030,7 @@ static struct omap_hwmod_class i2c_class = {
+ 	.name		= "i2c",
+ 	.sysc		= &i2c_sysc,
+ 	.rev		= OMAP_I2C_IP_VERSION_1,
+-	.reset		= &omap_i2c_reset,
++	.reset		= omap_i2c_reset,
+ };
+ 
+ static struct omap_i2c_dev_attr i2c_dev_attr = {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index 16743c7..d9ab245 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -1079,7 +1079,7 @@ static struct omap_hwmod_class i2c_class = {
+ 	.name		= "i2c",
+ 	.sysc		= &i2c_sysc,
+ 	.rev		= OMAP_I2C_IP_VERSION_1,
+-	.reset		= &omap_i2c_reset,
++	.reset		= omap_i2c_reset,
+ };
+ 
+ static struct omap_i2c_dev_attr i2c_dev_attr = {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 25bf43b..b0a0113 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1309,7 +1309,7 @@ static struct omap_hwmod_class i2c_class = {
+ 	.name	= "i2c",
+ 	.sysc	= &i2c_sysc,
+ 	.rev	= OMAP_I2C_IP_VERSION_1,
+-	.reset	= &omap_i2c_reset,
++	.reset	= omap_i2c_reset,
+ };
+ 
+ static struct omap_hwmod_dma_info omap3xxx_dss_sdma_chs[] = {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 6201422..a6d42fc 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2284,7 +2284,7 @@ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
+ 	.name	= "i2c",
+ 	.sysc	= &omap44xx_i2c_sysc,
+ 	.rev	= OMAP_I2C_IP_VERSION_2,
+-	.reset	= &omap_i2c_reset,
++	.reset	= omap_i2c_reset,
+ };
+ 
+ static struct omap_i2c_dev_attr i2c_dev_attr = {
 -- 
 1.7.5.4
