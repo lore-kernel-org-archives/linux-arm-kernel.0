@@ -1,70 +1,64 @@
-From: bsteinsbo@gmail.com (Bjarne Steinsbo)
-Date: Sun, 2 Oct 2011 17:56:07 +0200
-Subject: [PATCH 04/30] ARM: omap: add missing __devexit_p() annotations
-In-Reply-To: <1317566760-25681-5-git-send-email-arnd@arndb.de>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-5-git-send-email-arnd@arndb.de>
-Message-ID: <CAFULf_wevZxWW1RW+r-18R_8=ry2kD6_i5L9NfPd9t8afm5Cog@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 2 Oct 2011 17:58:12 +0200
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <20110927181438.GM2138@amd.com>
+References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
+	<1316195506-9777-2-git-send-email-ohad@wizery.com>
+	<20110927100505.GH2138@amd.com>
+	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
+	<20110927131222.GL2138@amd.com>
+	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
+	<20110927181438.GM2138@amd.com>
+Message-ID: <CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+(sorry for the late response; we had a big holiday here and I was
+forced away from my keyboard :)
 
-Ref http://www.spinics.net/lists/linux-omap/msg57274.html
+On Tue, Sep 27, 2011 at 9:14 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> No. I suggest a simpler and shorter algorithm using the bit helpers.
 
-Don't get me wrong.  This is not about you "stealing" my patch, or
-anything like that.  But look also at thread starting at
-http://www.spinics.net/lists/linux-omap/msg57667.html Also a patch
-that I have posted previously.  Something is not right with the
-workflow when bugs are identified, patches are submitted, then
-ignored, only for someone else to fix the same bug.  Enough said.
+Ok, fair enough. I've revised the patches and attached the main one
+below; please tell me if it looks ok, and then I'll resubmit the
+entire patch set.
 
-Best regards,
+The main changes I've done from your pseudo-code are:
 
-Bjarne Steinsbo
+1. removed the internal while loop, and used several bits
+manipulations to replace it
+2. removed the call to get_order(), and instead used the bytes order
+we already have to deduct it
+3. considered iova alignment requirements too
+4. removed the BUG_ON()s, since we're checking for minimal
+size/alignment conditions in the beginning of the map function
 
-On Sun, Oct 2, 2011 at 4:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Drivers that refer to a __devexit function in an operations
-> structure need to annotate that pointer with __devexit_p so
-> replace it with a NULL pointer when the section gets discarded.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> ?arch/arm/mach-omap2/smartreflex.c | ? ?2 +-
-> ?arch/arm/plat-omap/dma.c ? ? ? ? ?| ? ?2 +-
-> ?2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-> index 34c01a7..67bc6ce 100644
-> --- a/arch/arm/mach-omap2/smartreflex.c
-> +++ b/arch/arm/mach-omap2/smartreflex.c
-> @@ -1002,7 +1002,7 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
-> ?}
->
-> ?static struct platform_driver smartreflex_driver = {
-> - ? ? ? .remove ? ? ? ? = omap_sr_remove,
-> + ? ? ? .remove ? ? ? ? = __devexit_p(omap_sr_remove),
-> ? ? ? ?.driver ? ? ? ? = {
-> ? ? ? ? ? ? ? ?.name ? = "smartreflex",
-> ? ? ? ?},
-> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-> index c22217c..f7150ba 100644
-> --- a/arch/arm/plat-omap/dma.c
-> +++ b/arch/arm/plat-omap/dma.c
-> @@ -2105,7 +2105,7 @@ static int __devexit omap_system_dma_remove(struct platform_device *pdev)
->
-> ?static struct platform_driver omap_system_dma_driver = {
-> ? ? ? ?.probe ? ? ? ? ?= omap_system_dma_probe,
-> - ? ? ? .remove ? ? ? ? = omap_system_dma_remove,
-> + ? ? ? .remove ? ? ? ? = __devexit_p(omap_system_dma_remove),
-> ? ? ? ?.driver ? ? ? ? = {
-> ? ? ? ? ? ? ? ?.name ? = "omap_dma_system"
-> ? ? ? ?},
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> And yes, overhead is important when we implement the generic dma-ops
+> on-top of the iommu-api because this will make the iommu_map function a
+> fast-path. So we really care about overhead here.
+
+Don't get me wrong; I don't underestimate the importance of performance here.
+
+I just think that as long as some code is reasonably efficient and not
+badly designed (so it's not too hard to optimize later if needed),
+then it's usually better to postpone optimizations until we benchmark
+and know for certain that the effort in squeezing away several cpu
+cycles is noticeable.
+
+In this case, I'm not entirely convinced that it is, because every map
+call anyway ends up flushing the caches, which might take hundreds of
+cpu cycles. In addition, at least the ARM version of find_next_bit
+doesn't look terribly bad.
+
+YMMV though: I didn't find an optimized assembly implementation of
+find_next_bit for x86, and the generic one does look complex. In
+addition, the variable page size behavior of the x86 iommu drivers may
+have caused much more iterations than any of the ARM drivers would
+have had, so the penalty of running that generic find_next_bit
+repeatedly could have accumulated into something noticeable.
+
+Anyway, here comes the revised patch.
+
+Thanks for your review!
+Ohad.
