@@ -1,55 +1,22 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 3 Oct 2011 13:19:15 +0100
-Subject: [RFC PATCH 0/3] ARM: amba: defining module aliases for AMBA
-	driver autoloading
-In-Reply-To: <20111001164655.GL11710@n2100.arm.linux.org.uk>
-References: <1317401802-24362-1-git-send-email-dave.martin@linaro.org>
-	<20111001164655.GL11710@n2100.arm.linux.org.uk>
-Message-ID: <20111003121915.GA2117@arm.com>
+From: balajitk@ti.com (Balaji T K)
+Date: Mon, 3 Oct 2011 17:52:49 +0530
+Subject: [PATCH v2 0/2] arm: omap4: hsmmc: pbias fixes
+Message-ID: <1317644571-25175-1-git-send-email-balajitk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 01, 2011 at 05:46:55PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 30, 2011 at 05:56:39PM +0100, Dave Martin wrote:
-> > Issues:
-> > 
-> >   * Do new module alises need to be globally agreed/registered
-> >     somewhere?
-> 
-> I don't think there is.  Having the bus prefix in there is definitely a
-> good thing.
+MMC1 pbias and speed control fix for SDMMC1 extended I/O cell
+Rebase to git://github.com/tmlind/linux.git fixes
+	commit 122a98589349fe3388ffb7b996b54614951c934a
+	Author: Tapani Utriainen <tapani@technexion.com>
+	Date:   Fri Sep 30 11:05:56 2011 -0700
 
-OK, I'll stick with "amba:" for now, then.
+	    ARM: OMAP: irq: loop counter fix in omap_init_irq()
 
-> >   * Because a driver's ID table is in match-and-mask format whereas
-> >     udev uses string pattern matching, we effectively have to
-> >     maintain two ID tables per driver, containing the same
-> >     information in different formats.  The patch to mmci.c gives an
-> >     example.
-> > 
-> >     I predict that maintenance of those duplicated tables will be
-> >     somewhat painful and error-prone.  However, the necessary
-> >     transformations, while simple, are beyond the scope of the C
-> >     preprocessor.
-> > 
-> >     In order to avoid this duplication of information, an extra
-> >     (but simple) bit of build-time infrastructure would be needed.
-> > 
-> >     I think this effort would be worth it -- does anyone have
-> >     strong views on this?
-> 
-> I think there is some support for udev to use PCI ID tables directly.
-> I don't know how that works - I suspect it requires module tools
-> support though.  Might be worth investigating.
 
-Hmmm, it looks like there's some magic for other bus types like PCI and
-USB, where some scripting generates appropriate module aliases from
-drivers' device tables (see scripts/mod/file2alias.c)
+Balaji T K (2):
+  arm: omap4: hsmmc: Fix Pbias configuration on regulator OFF
+  arm: omap4: hsmmc: configure SDMMC1_DR0 properly
 
-I'll see whether we can hook into that.  This would allow us to avoid
-having to describe the aliases explicitly.
-
-Thanks for the feedback.
-
-Cheers
----Dave
+ arch/arm/mach-omap2/hsmmc.c |   16 +++-------------
+ 1 files changed, 3 insertions(+), 13 deletions(-)
