@@ -1,103 +1,79 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 3 Oct 2011 16:33:49 +0200
-Subject: [PATCH v16 00/12] OMAP: dmtimer: adaptation to platform_driver
-In-Reply-To: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
-References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <4E89C7CD.8040505@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Oct 2011 16:35:46 +0200
+Subject: [PATCH v3] ASoC: samsung: wm8994 depends on mfd_wm8994
+In-Reply-To: <20111003140824.GM3731@opensource.wolfsonmicro.com>
+References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
+	<11174515.ANsqIhx0NX@wuerfel>
+	<20111003140824.GM3731@opensource.wolfsonmicro.com>
+Message-ID: <1373438.oHCphrxVRr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Arnd
+Any driver that selects SND_SOC_WM8994 should also make sure that
+MFD_WM8994 is set, since the codec relies on the mfd code:
 
-Hi Tony,
+  sound/built-in.o: In function `wm8994_read':
+  last.c:(.text+0x20160): undefined reference to `wm8994_reg_read'
+  sound/built-in.o: In function `wm8994_write':
+  last.c:(.text+0x20e68): undefined reference to `wm8994_reg_write'
 
-After rebasing by DT series on top of your dt-base, I noticed two minor 
-issues from this timer series.
+This solves the problem by selecting the MFD driver directly
+and adding extra 'depends on' statements to make sure that we
+respect the dependencies of that driver.
 
-First some new warnings:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-[    0.260009]  omap_timer.1: alias fck already exists
-[    0.260345]  omap_timer.2: alias fck already exists
-[    0.260650]  omap_timer.3: alias fck already exists
-[    0.260955]  omap_timer.4: alias fck already exists
-[    0.261260]  omap_timer.5: alias fck already exists
-[    0.261566]  omap_timer.6: alias fck already exists
-[    0.261871]  omap_timer.7: alias fck already exists
-[    0.262207]  omap_timer.8: alias fck already exists
-[    0.262512]  omap_timer.9: alias fck already exists
-[    0.262847]  omap_timer.10: alias fck already exists
-[    0.263153]  omap_timer.11: alias fck already exists
+---
+On Monday 03 October 2011 15:08:24 Mark Brown wrote:
+> On Mon, Oct 03, 2011 at 03:43:10PM +0200, Arnd Bergmann wrote:
+> 
+> > > You've not sent a seprate patch for that one yet...
+> 
+> > I wasn't sure any more which version you wanted. Is this this right one?
+> 
+> I was expecting something that selects the core.  I was also expecting
+> something that can be applied against -next which this patch can't be,
 
-These warnings are due to the commit 
-318c3e15cd55c73a26ae22a65a8183655b3003f9  ARM: OMAP2+: dmtimer: add 
-device names to flck nodes
+I'm still confused, I thought you had NAKed the patch that selects the
+core because it ignores the dependencies. Here comes another variant,
+this time for your branch, and selecting the MFD driver directly while
+respecting its dependencies.
 
-Since 3.1, the fck clock nodes are added automatically based on hwmod 
-main_clk attribute.
+> this doesn't feel like something we should be rushing into 3.1.
 
-+       CLK("omap_timer.1",     "fck",         &timer1_fck,    CK_443X),
-+       CLK("omap_timer.2",     "fck",         &timer2_fck,    CK_443X),
-+       CLK("omap_timer.3",     "fck",         &timer3_fck,    CK_443X),
-+       CLK("omap_timer.4",     "fck",         &timer4_fck,    CK_443X),
-+       CLK("omap_timer.5",     "fck",         &timer5_fck,    CK_443X),
-+       CLK("omap_timer.6",     "fck",         &timer6_fck,    CK_443X),
-+       CLK("omap_timer.7",     "fck",         &timer7_fck,    CK_443X),
-+       CLK("omap_timer.8",     "fck",         &timer8_fck,    CK_443X),
-+       CLK("omap_timer.9",     "fck",         &timer9_fck,    CK_443X),
-+       CLK("omap_timer.10",    "fck",         &timer10_fck,   CK_443X),
-+       CLK("omap_timer.11",    "fck",         &timer11_fck,   CK_443X),
+No, certainly not. This patch by itself helps nobody, the only reason
+for doing it is to make randconfig work and that requires lots of
+other patches.
 
-So they should not exist in this patch.
+	Arnd
 
-Moreover, all the legacy clockdev should be removed at the same time.
-
-CLK(NULL,	"gpt1_fck",		&timer1_fck,	CK_443X),
-CLK(NULL,	"gpt10_fck",		&timer10_fck,	CK_443X),
-CLK(NULL,	"gpt11_fck",		&timer11_fck,	CK_443X),
-CLK(NULL,	"gpt2_fck",		&timer2_fck,	CK_443X),
-CLK(NULL,	"gpt3_fck",		&timer3_fck,	CK_443X),
-CLK(NULL,	"gpt4_fck",		&timer4_fck,	CK_443X),
-CLK(NULL,	"gpt5_fck",		&timer5_fck,	CK_443X),
-CLK(NULL,	"gpt6_fck",		&timer6_fck,	CK_443X),
-CLK(NULL,	"gpt7_fck",		&timer7_fck,	CK_443X),
-CLK(NULL,	"gpt8_fck",		&timer8_fck,	CK_443X),
-CLK(NULL,	"gpt9_fck",		&timer9_fck,	CK_443X),
-CLK(NULL,	"gpt1_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt2_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt3_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt4_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt5_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt6_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt7_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt8_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt9_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt10_ick",		&dummy_ck,	CK_443X),
-CLK(NULL,	"gpt11_ick",		&dummy_ck,	CK_443X),
-
-That will reduce a little bit the size of these static data files.
-
-
-
-Secondly, in commit c345c8b09d7a131f3571af55341038054a79efbd ARM: 
-OMAP2+: dmtimer: convert to platform devices
-
-+struct omap_device_pm_latency omap2_dmtimer_latency[] = {
-+       {
-+               .deactivate_func = omap_device_idle_hwmods,
-+               .activate_func   = omap_device_enable_hwmods,
-+               .flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-+       },
-+};
-+
-
-That structure should be removed, since I added a default one in the 
-omap_device cleanup series for 3.2. Assuming that the cleanup is pulled 
-before the new feature, the timer series could avoid adding that.
-
-How do you want to handle that, using some cleanup patch on top of your 
-current branch or by resubmitting the series?
-The point is that this branch was already pulled by Arnd in 
-arm-soc/next/dmtimer feature branch.
-
-Regards,
-Benoit
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -64,6 +64,8 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
+ config SND_SOC_SAMSUNG_SMDK_WM8994
+ 	tristate "SoC I2S Audio support for WM8994 on SMDK"
+ 	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 || MACH_SMDK4212)
++	depends on I2C=y && GENERIC_HARDIRQS
++	select MFD_WM8994
+ 	select SND_SOC_WM8994
+ 	select SND_SAMSUNG_I2S
+ 	help
+@@ -150,7 +152,9 @@ config SND_SOC_SMARTQ
+ config SND_SOC_GONI_AQUILA_WM8994
+ 	tristate "SoC I2S Audio support for AQUILA/GONI - WM8994"
+ 	depends on SND_SOC_SAMSUNG && (MACH_GONI || MACH_AQUILA)
++	depends on I2C=y && GENERIC_HARDIRQS
+ 	select SND_SAMSUNG_I2S
++	select MFD_WM8994
+ 	select SND_SOC_WM8994
+ 	help
+ 	  Say Y if you want to add support for SoC audio on goni or aquila
+@@ -174,6 +178,8 @@ config SND_SOC_SMDK_WM8580_PCM
+ config SND_SOC_SMDK_WM8994_PCM
+ 	tristate "SoC PCM Audio support for WM8994 on SMDK"
+ 	depends on SND_SOC_SAMSUNG && (MACH_SMDKC210 || MACH_SMDKV310 || MACH_SMDK4212)
++	depends on I2C=y && GENERIC_HARDIRQS
++	select MFD_WM8994
+ 	select SND_SOC_WM8994
+ 	select SND_SAMSUNG_PCM
+ 	help
