@@ -1,49 +1,52 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Mon, 03 Oct 2011 09:47:52 -0400
-Subject: nr_cpus cmdline parameter not working
-In-Reply-To: <20111001162357.GH11710@n2100.arm.linux.org.uk>
-References: <1317224117.2580.84.camel@deneb.redhat.com>
-	<20111001162357.GH11710@n2100.arm.linux.org.uk>
-Message-ID: <1317649673.2703.0.camel@deneb.redhat.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 3 Oct 2011 15:04:12 +0100
+Subject: [PATCH 05/11] ARM: vfp: use -mfloat-abi=soft to build vfp
+In-Reply-To: <1317496920-7764-6-git-send-email-arnd@arndb.de>
+References: <1317496920-7764-1-git-send-email-arnd@arndb.de>
+	<1317496920-7764-6-git-send-email-arnd@arndb.de>
+Message-ID: <20111003140411.GB2117@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-10-01 at 17:23 +0100, Russell King - ARM Linux wrote:
-> On Wed, Sep 28, 2011 at 11:35:16AM -0400, Mark Salter wrote:
-> > I noticed that nr_cpus=1 doesn't appear to have any effect on a
-> > pandaboard (and probably others from the looks of things). This
-> > changes seems to be needed, but I'm not really sure if this is
-> > the right thing or not.
-> > 
-> > diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-> > index ce65e93..a1198ac 100644
-> > --- a/arch/arm/mach-omap2/omap-smp.c
-> > +++ b/arch/arm/mach-omap2/omap-smp.c
-> > @@ -117,6 +117,9 @@ void __init smp_init_cpus(void)
-> >  		ncores = NR_CPUS;
-> >  	}
-> >  
-> > +	if (ncores > nr_cpu_ids)
-> > +		ncores = nr_cpu_ids;
-> > +
+On Sat, Oct 01, 2011 at 09:21:54PM +0200, Arnd Bergmann wrote:
+> Distros are starting to ship with toolchains defaulting to
+> hardfloat. Using such a compiler to build the kernel fails
+> in the VFP directory with
 > 
-> This potentially affects all SMP platforms, so the patch needs to be
-> bigger than this.
+> arch/arm/vfp/entry.S:1:0: sorry, unimplemented: -mfloat-abi=hard and VFP
 > 
-> Also, I think the test above should be modified to use nr_cpu_ids
-> rather than NR_CPUS, to be inline with what x86 does:
+> Adding -mfloat-abi=soft to the gcc command line fixes this.
 > 
->         /* nr_cpu_ids could be reduced via nr_cpus= */
->         if (possible > nr_cpu_ids) {
->                 printk(KERN_WARNING
->                         "%d Processors exceeds NR_CPUS limit of %d\n",
->                         possible, nr_cpu_ids);
->                 possible = nr_cpu_ids;
->         }
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/vfp/Makefile |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> (This is essentially the same check that we're doing.)
-> 
-> Could you have a look at this and cook up another patch covering the
-> other SMP platforms please?
+> diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
+> index 6de73aa..a81404c 100644
+> --- a/arch/arm/vfp/Makefile
+> +++ b/arch/arm/vfp/Makefile
+> @@ -7,7 +7,7 @@
+>  # ccflags-y := -DDEBUG
+>  # asflags-y := -DDEBUG
+>  
+> -KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp)
+> +KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp -mfloat-abi=soft)
 
-Ok, I'll do that.
+Although -mfpu=softvfp+vfp and -mfloat-abi=soft look mutually
+contradictory, this seems to have the correct effect, i.e. the
+assembler allows floating-point instructions but marks the resulting
+object as using the soft-float calling conventions.
+
+The binutils documentation also seems to confirm that that's what
+should happen.
+
+I don't see another combination of options for getting this effect.
+
+
+So, if you like:
+
+Reviewed-by: Dave Martin <dave.martin@linaro.org>
+
+Cheers
+---Dave
