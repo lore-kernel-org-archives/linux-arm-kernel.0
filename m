@@ -1,40 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Oct 2011 17:43:09 +0100
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <20111003163107.GQ3731@opensource.wolfsonmicro.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<4E89C3FA.9020206@gmail.com>
-	<20111003142524.GN3731@opensource.wolfsonmicro.com>
-	<4E89D3C4.8090001@gmail.com>
-	<20111003163107.GQ3731@opensource.wolfsonmicro.com>
-Message-ID: <20111003164309.GA19925@n2100.arm.linux.org.uk>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Mon, 3 Oct 2011 22:15:07 +0530
+Subject: [PATCH v3 3/3] ARM: OMAP: TI814X: Create board support and
+	enable build for TI8148 EVM
+In-Reply-To: <4E88542B.4010206@compulab.co.il>
+References: <1317258570-30494-1-git-send-email-hemantp@ti.com>
+	<4E88542B.4010206@compulab.co.il>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4EC5D52@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2011 at 05:31:08PM +0100, Mark Brown wrote:
-> I dunno, I get the impression that some of this is due to the current
-> limitations of the clock API rather than due to a lack of clocks -
-> perhaps that's specific to the applications I look at, though.
-> applications 
+Hi Igor,
 
-The clk API per-se has nothing to do with how clocks are registered.
-There are two things that are the clk API:
+Igor Grinberg wrote on Sunday, October 02, 2011 5:38 PM:
 
-1. clkdev - which deals with translating devices + connection IDs to
-   struct clk.  This has no ordering requirements wrt requiring
-   parents to be "initialized" before their children (it has no care
-   about that at all because it's not within its definition.)
+> Hi Hemant,
+> 
+> On 09/29/11 04:09, Hemant Pedanekar wrote:
+>> This patch adds minimal support and build configuration for TI8148 EVM.
+>> Also adds support for low level debugging on UART1 console on the EVM.
+>> 
+>> Note that existing TI8168 EVM file (board-ti8168evm.c) is updated with
+>> machine info for TI8148 EVM and renamed as board-ti81xxevm.c.
+> 
+> Should we really rename the existing file?
+> Shouldn't we just stick to the name of the file submitted first?
+> (e.g. board-ti8168evm.c) and just add the support for the new
+> TI8148 EVM in to the existing file?
 
-   For this, registration is about connecting device + connection IDs
-   to a struct clk.
+But won't this be misleading?
 
-2. the driver API, defining how the opaque struct clk is looked up,
-   obtained and then manipulated.  This has no 'registration' stuff.
+Thanks.
 
-So, whether clocks are a tree or flat is unspecified.  It's unspecified
-whether there's any particular order required.
+   Hemant
 
-In fact, with a clock tree, it's entirely possible that only the leaf
-clocks will be 'registered' with clkdev.  How the rest of the clock tree
-is initialized is beyond the scope of the driver clk API.
+> Because, I don't see any real necessity in renaming that file.
+> Also, it will spare the changes in Makefile.
+>
+
+[...]
