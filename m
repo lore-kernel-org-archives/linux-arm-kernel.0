@@ -1,65 +1,40 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 03 Oct 2011 17:04:57 +0530
-Subject: [PATCH] ARM: S3C2410: Remove section mismatch warning
-In-Reply-To: <20111003095933.GC11710@n2100.arm.linux.org.uk>
-References: <1317634841-23339-1-git-send-email-tushar.behera@linaro.org>
-	<20111003095933.GC11710@n2100.arm.linux.org.uk>
-Message-ID: <4E899DE1.6020608@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Oct 2011 13:50:08 +0200
+Subject: [alsa-devel] [PATCH 5/6] ASoC: samsung: fix Kconfig dependencies
+In-Reply-To: <004e01cc8198$848347f0$8d89d7d0$@com>
+References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
+	<3289863.m6ULFZUV3p@wuerfel> <004e01cc8198$848347f0$8d89d7d0$@com>
+Message-ID: <1869072.QQLATNzYYx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Monday 03 October 2011 15:48:54 Sangbeom Kim wrote:
+> On Mon, Oct 03, 2011 at 6:15:03AM , Arnd Bergmann wrote:
+> > It's a bug that I only observed on exynos4, and it could be that
+> > this patch didn't actually solve it in the end. I'll drop it for
+> > now and do a better report when the problem comes back.
+> 
+> Could you please explain problem which observed on exynos4?
+> If possible, I want to check it too.
 
-On Monday 03 October 2011 03:29 PM, Russell King - ARM Linux wrote:
-> On Mon, Oct 03, 2011 at 03:10:41PM +0530, Tushar Behera wrote:
->> Some of the functions and structures did not have _init or __initdata
->> attributes, even though they were referenced from functions / structures
->> with those attribute, resulting in section mismatches.
->
-> Firstly - it's a good idea to include the warnings which you're fixing
-> in the commit log text, so that people know exactly what is being fixed.
->
-Thanks for your review.
+Sorry, I can't reproduce it any more. It could have been something
+unrelated like a Kconfig or toolchain problem that got fixed in
+the meantime. I really should have dropped that one hunk from
+the patch. The other problem in this patch is still there, with
+CONFIG_SND_SOC_SMDK_WM8994_PCM=y and CONFIG_MFD_WM8994=n:
 
-Sure, I will add it in next revision.
+sound/built-in.o: In function `wm8994_resume':
+last.c:(.text+0x1f600): undefined reference to `wm8994_reg_read'
+sound/built-in.o: In function `wm8994_read':
+last.c:(.text+0x20160): undefined reference to `wm8994_reg_read'
+sound/built-in.o: In function `wm8994_codec_probe':
+last.c:(.text+0x2029c): undefined reference to `wm8994_reg_read'
+last.c:(.text+0x20480): undefined reference to `wm8994_reg_read'
+last.c:(.text+0x204b4): undefined reference to `wm8994_reg_read'
+sound/built-in.o: In function `wm8994_write':
+last.c:(.text+0x20e68): undefined reference to `wm8994_reg_write'
+last.c:(.text+0x20ea4): undefined reference to `wm8994_reg_write'
+sound/built-in.o: In function `wm8958_dsp2_fw':
+last.c:(.text+0x2159c): undefined reference to `wm8994_bulk_write'
 
-[ snip ]
-
->> diff --git a/arch/arm/mach-s3c2416/irq.c b/arch/arm/mach-s3c2416/irq.c
->> index 28ad20d..153cb2f 100644
->> --- a/arch/arm/mach-s3c2416/irq.c
->> +++ b/arch/arm/mach-s3c2416/irq.c
->> @@ -234,7 +234,7 @@ static int __init s3c2416_irq_add(struct sys_device *sysdev)
->>   	return 0;
->>   }
->>
->> -static struct sysdev_driver s3c2416_irq_driver = {
->> +static struct sysdev_driver s3c2416_irq_driver __initdata = {
->>   	.add		= s3c2416_irq_add,
->>   };
->>
->
-> I remain entirely unconvinced that this is correct.  As a result of
-> the "sysdev_driver_register(&s3c2416_sysclass,&s3c2416_irq_driver);"
-> call, this structure is placed on a list.
->
-> If this structure is marked __initdata, then the memory behind the
-> structure will be freed and overwritten - however, it's still on a
-> list which might be walked.  Such a walk would cause a kernel oops
-> or might even be an exploitable security hole if that page ends up
-> in userspace - especially as said structure contains function calls
-> which would be called in privileged mode.
->
-
-The function s3c2416_irq_add() is defined with __init attribute. Also a 
-cascade of functions called from s3c2416_irq_add() are also defined with 
-__init attribute.
-
-Would it be a good idea to remove __init attribute of all these 
-functions (there are 2 of them) called from s3c2416_irq_add() instead?
-
-> The same comment applies to the other sysdev driver structures you're
-> marking __initdata too.
-
--- 
-Tushar Behera
+	Arnd
