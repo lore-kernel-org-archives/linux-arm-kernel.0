@@ -1,60 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Oct 2011 10:59:33 +0100
-Subject: [PATCH] ARM: S3C2410: Remove section mismatch warning
-In-Reply-To: <1317634841-23339-1-git-send-email-tushar.behera@linaro.org>
-References: <1317634841-23339-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <20111003095933.GC11710@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 3 Oct 2011 13:07:05 +0300
+Subject: [PATCH 15/30] usb/musb: use a Kconfig choice to pick the right
+	DMA method
+In-Reply-To: <3529819.LQllWhb43D@wuerfel>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<1546914.88vcgxkfJf@wuerfel>
+	<20111002221050.GA25790@legolas.emea.dhcp.ti.com>
+	<3529819.LQllWhb43D@wuerfel>
+Message-ID: <20111003100704.GD3363@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2011 at 03:10:41PM +0530, Tushar Behera wrote:
-> Some of the functions and structures did not have _init or __initdata
-> attributes, even though they were referenced from functions / structures
-> with those attribute, resulting in section mismatches.
+Hi,
 
-Firstly - it's a good idea to include the warnings which you're fixing
-in the commit log text, so that people know exactly what is being fixed.
+On Mon, Oct 03, 2011 at 11:40:26AM +0200, Arnd Bergmann wrote:
+> On Monday 03 October 2011 01:10:51 Felipe Balbi wrote:
+> > Anyway, I'll take your patches in, but their too late for this merge
+> > window  I already sent my last pull to Greg.
+> 
+> No problem. I need the full set of arm-randconfig patches upstream in order
+> to make randconfig work in general, and that's not happening for 3.2
+> anyway. Right now, I'm just trying to as many patches as possible into
+> maintainer trees.
+> 
+> Is your tree part of linux-next, or will it only show up after the merge
+> window once Greg has pulled your first set for 3.3?
 
-> diff --git a/arch/arm/mach-s3c2410/usb-simtec.c b/arch/arm/mach-s3c2410/usb-simtec.c
-> index 29bd3d9..3a1028c 100644
-> --- a/arch/arm/mach-s3c2410/usb-simtec.c
-> +++ b/arch/arm/mach-s3c2410/usb-simtec.c
-> @@ -104,7 +104,7 @@ static struct s3c2410_hcd_info usb_simtec_info __initdata = {
->  };
->  
->  
-> -int usb_simtec_init(void)
-> +int __init usb_simtec_init(void)
->  {
->  	int ret;
->  
+My tree isn't in linux-next yet so my patches go to Greg and from there
+to -next.
 
-This one looks fine.
-
-> diff --git a/arch/arm/mach-s3c2416/irq.c b/arch/arm/mach-s3c2416/irq.c
-> index 28ad20d..153cb2f 100644
-> --- a/arch/arm/mach-s3c2416/irq.c
-> +++ b/arch/arm/mach-s3c2416/irq.c
-> @@ -234,7 +234,7 @@ static int __init s3c2416_irq_add(struct sys_device *sysdev)
->  	return 0;
->  }
->  
-> -static struct sysdev_driver s3c2416_irq_driver = {
-> +static struct sysdev_driver s3c2416_irq_driver __initdata = {
->  	.add		= s3c2416_irq_add,
->  };
->  
-
-I remain entirely unconvinced that this is correct.  As a result of
-the "sysdev_driver_register(&s3c2416_sysclass, &s3c2416_irq_driver);"
-call, this structure is placed on a list.
-
-If this structure is marked __initdata, then the memory behind the
-structure will be freed and overwritten - however, it's still on a
-list which might be walked.  Such a walk would cause a kernel oops
-or might even be an exploitable security hole if that page ends up
-in userspace - especially as said structure contains function calls
-which would be called in privileged mode.
-
-The same comment applies to the other sysdev driver structures you're
-marking __initdata too.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111003/fd2867bf/attachment.sig>
