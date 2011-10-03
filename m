@@ -1,73 +1,24 @@
-From: archit@ti.com (Archit Taneja)
-Date: Mon, 3 Oct 2011 11:39:59 +0530
-Subject: [PATCH 20/30] media/omap_vout: disable driver for now
-In-Reply-To: <1317566760-25681-21-git-send-email-arnd@arndb.de>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-21-git-send-email-arnd@arndb.de>
-Message-ID: <4E8951B7.7010106@ti.com>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Mon, 03 Oct 2011 15:48:54 +0900
+Subject: [alsa-devel] [PATCH 5/6] ASoC: samsung: fix Kconfig dependencies
+In-Reply-To: <3289863.m6ULFZUV3p@wuerfel>
+References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
+	<1317587284-2776-6-git-send-email-arnd@arndb.de>
+	<20111002204729.GC5811@opensource.wolfsonmicro.com>
+	<3289863.m6ULFZUV3p@wuerfel>
+Message-ID: <004e01cc8198$848347f0$8d89d7d0$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi,
+On Mon, Oct 03, 2011 at 6:15:03AM , Arnd Bergmann wrote:
+> It's a bug that I only observed on exynos4, and it could be that
+> this patch didn't actually solve it in the end. I'll drop it for
+> now and do a better report when the problem comes back.
 
-On Sunday 02 October 2011 08:15 PM, Arnd Bergmann wrote:
-> This driver was broken by 8cff88c5d "OMAP: DSS2: remove update_mode
-> from omapdss":
->
-> /home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c: In function 'omap_vout_probe':
-> /home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2202:15: error: 'struct omap_dss_driver' has no member
-> named 'set_update_mode'
-> /home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2203:12: error: 'struct omap_dss_driver' has no member
-> named 'set_update_mode'
-> /home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2204:8: error: 'OMAP_DSS_UPDATE_MANUAL' undeclared (first
-> use in this function)
-> /home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2204:8: note: each undeclared identifier is reported only
-> once for each function it appears in
-> /home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2206:15: error: 'struct omap_dss_driver' has no member
-> named 'set_update_mode'
-> /home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2207:12: error: 'struct omap_dss_driver' has no member
-> named 'set_update_mode'
-> /home/arnd/linux-arm/drivers/media/video/omap/omap_vout.c:2208:8: error: 'OMAP_DSS_UPDATE_AUTO' undeclared (first use
-> in this function)
-> make[3]: *** [drivers/media/video/omap/omap_vout.o] Error 1
-> make[2]: *** [drivers/media/video/omap] Error 2
-> make[1]: *** [drivers/media/video/] Error 2
-> make: *** [sub-make] Error 2
+Could you please explain problem which observed on exynos4?
+If possible, I want to check it too.
 
-A fix for this is already in the master branch of Mauro's tree:
+Thanks
 
-git://linuxtv.org/media_tree.git
-
-with the commit id:
-
-5ebbf72dc51bd3b481aa91fea37a7157da5fc548
-
-I am guessing this would during the 3.2 merge window.
-
-Regards,
-Archit
-
->
-> Let's disable it for now.
->
-> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
-> Cc: Mauro Carvalho Chehab<mchehab@infradead.org>
-> Cc: Archit Taneja<archit@ti.com>
-> Cc: Amber Jain<amber@ti.com>
-> Cc: Vaibhav Hiremath<hvaibhav@ti.com>
-> ---
->   drivers/media/video/omap/Kconfig |    1 +
->   1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/media/video/omap/Kconfig b/drivers/media/video/omap/Kconfig
-> index 390ab09..ee21f36 100644
-> --- a/drivers/media/video/omap/Kconfig
-> +++ b/drivers/media/video/omap/Kconfig
-> @@ -4,6 +4,7 @@ config VIDEO_OMAP2_VOUT_VRFB
->   config VIDEO_OMAP2_VOUT
->   	tristate "OMAP2/OMAP3 V4L2-Display driver"
->   	depends on ARCH_OMAP2 || ARCH_OMAP3
-> +	depends on BROKEN # broken by 8cff88c5da "OMAP: DSS2: remove update_mode from omapdss"
->   	select VIDEOBUF_GEN
->   	select VIDEOBUF_DMA_CONTIG
->   	select OMAP2_DSS
+Sangbeom.
