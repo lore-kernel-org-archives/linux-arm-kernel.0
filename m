@@ -1,35 +1,49 @@
-From: stefan.xk.nilsson@stericsson.com (Stefan Nilsson XK)
-Date: Mon, 3 Oct 2011 09:31:14 +0200
-Subject: [PATCH 4/4] mmc: mmci: Fix incorrect handling of HW flow control
-	for SDIO
-In-Reply-To: <20111001161248.GG11710@n2100.arm.linux.org.uk>
-References: <1317109616-18010-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111001161248.GG11710@n2100.arm.linux.org.uk>
-Message-ID: <4E8964C2.5000300@stericsson.com>
+From: inderpal.singh@linaro.org (Inderpal Singh)
+Date: Mon, 3 Oct 2011 13:06:27 +0530
+Subject: [PATCH v2] ARM: EXYNOS4: Configure MAX8997 PMIC for Origen
+In-Reply-To: <005501cc817c$535eeec0$fa1ccc40$%kim@samsung.com>
+References: <1313034965-21286-1-git-send-email-inderpal.singh@linaro.org>
+	<1313995163-31737-1-git-send-email-inderpal.singh@linaro.org>
+	<005501cc817c$535eeec0$fa1ccc40$%kim@samsung.com>
+Message-ID: <CAG17yqTJKb9QMv64_VCzaxQzrWaYrdAmoKjV0=DXjDLa6uqFrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+Hi Kukjin,
 
-On 10/01/2011 06:12 PM, Russell King - ARM Linux wrote:
-> Shouldn't this also re-enable the ST hardware flow control for non-SDIO
-> cards?
+Thanks for applying.
+I would like to use inderpal.singh at linaro.org
+Have updated my .gitconfig accordingly as well.
 
-I do not think that is needed. Hardware flow control is turned on per 
-default for all cards thanks to the .clkreg member of the variant struct:
+Thanks,
+Inder
 
-	mmci_set_clkreg():
-		clk |= variant->clkreg_enable;
-where
-	static struct variant_data variant_ux500v2 = {
-		.clkreg_enable          = MCI_ST_UX500_HWFCEN,
-
-This means that HWFC will be on for all cards. This patch only disables 
-it for SDIO cards (thanks to the mmc_card_sdio()-check) during 
-problematic transfers (HW peculiarity), and then re-enables it again for 
-SDIO cards during "normal" transfers. So the HWFC state for non-SDIO 
-cards should not be touched I think.
-
-Best Regards
-
-Stefan Nilsson
+On 3 October 2011 08:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Kukjin Kim wrote:
+>>
+>> Inderpal Singh wrote:
+>> >
+>> > From: Inderpal Singh <inderpal.s@samsung.com>
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ^^^^^^^^^^^
+>> >
+>> > Configure MAX8997 PMIC and provide platform specific data
+>> > for origen.
+>> >
+>> > Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?^^^^^^^^^^
+>
+> Hi Inderpal,
+>
+> You need to change your e-mail address of author or sign. Basically they
+> should be same. Which one do you want to use?
+> Then you should make sure your .gitconfig has same e-mail address......
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+>
