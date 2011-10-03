@@ -1,89 +1,100 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Oct 2011 10:43:38 +0100
-Subject: [RFC] Need help deciphering reboot modes!
-In-Reply-To: <20110930191847.GA11710@n2100.arm.linux.org.uk>
-References: <20110930125725.GG3895@e102144-lin.cambridge.arm.com>
-	<20110930191847.GA11710@n2100.arm.linux.org.uk>
-Message-ID: <20111003094338.GA3827@e102144-lin.cambridge.arm.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Mon,  3 Oct 2011 15:10:41 +0530
+Subject: [PATCH] ARM: S3C2410: Remove section mismatch warning
+Message-ID: <1317634841-23339-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Some of the functions and structures did not have _init or __initdata
+attributes, even though they were referenced from functions / structures
+with those attribute, resulting in section mismatches.
 
-Thanks for getting back to me.
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+---
 
-On Fri, Sep 30, 2011 at 08:18:48PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Sep 30, 2011 at 01:57:25PM +0100, Will Deacon wrote:
-> > As part of my kexec work, I've been looking at the machine_restart path
-> > on ARM and, more specifically, the use of the reboot_mode character that
-> > gets passed around and ultimately ignored.
-> 
-> It gets ignored because platform maintainers are a lazy bunch of people
-> and don't want to write any more code than they absolutely have to.
-> 
-> Overall, it is meant as a hint to the platform code about what reboot
-> method to use.
+The patch is rebased on v3.1-rc8.
 
-Right, ok.
+The patch has only been build tested, they are not boot tested on any
+hardware.
 
-> > It seems that the following mode characters are used:
-> > 
-> > 0	-> Currently used by kexec as a dummy argument given that it is
-> > 	   ignored anyway.
-> 
-> No idea what that means, afaik it's never been used.
+ arch/arm/mach-s3c2410/usb-simtec.c |    2 +-
+ arch/arm/mach-s3c2410/usb-simtec.h |    2 +-
+ arch/arm/mach-s3c2416/irq.c        |    2 +-
+ arch/arm/mach-s3c2440/clock.c      |    4 ++--
+ arch/arm/mach-s3c2443/irq.c        |    2 +-
+ 5 files changed, 6 insertions(+), 6 deletions(-)
 
-I think it's just a lazy kexec implementation. Passing 's' would make more
-sense.
-
-> > 'h'	-> The default assignment to reboot_mode and that used by
-> > 	   machine_restart. For some reason, reboot_mode can also be
-> > 	   overridden on the command line. I would guess that this means
-> > 	   "hard".
-> 
-> It does mean 'hard' and it tells platforms which have the option (the
-> early ones do!) to use some hardware method to provoke the machine into
-> rebooting.
-
-So in terms of setup_mm_for_reboot (which takes the reboot mode as a
-parameter), the 'h' mode should ensure that we don't remap kernelspace
-as 1:1 because we need to poke hardware (alternatively we could poke the
-hardware using its physical address).
-
-> > 's'	-> A supported option by mioa701 (mach-pxa) and mach-s3c24xx. I
-> > 	   would guess that this means "soft".
-> 
-> This means to reboot by vectoring through the reset vector - so it is
-> 'soft'.
-
-And in this case we want to identity map as much as possible so the MMU-off
-path works properly.
-
-> > 'g'	-> A supported option by spitz and tosa (both mach-pxa). I can't
-> > 	   begin to imagine what it might stand for.
-> 
-> 'gpio', using a gpio signal to cause the reboot rather than setting up
-> a watchdog or something to cause it.
-
-Can we get rid of this option in favour of 'h'? I'm not sure I see the
-distinction and I think the platform can handle it itself. I posted a patch
-here but I'm unable to test it:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-September/067560.html
-
-> Note that as I say above, it is only a hint - if you pass 's' for soft,
-> a platform can still elect to do a hard reboot if it knows that soft
-> reboots just don't work on the platform.
-
-Hmm, this could be problematic with the memory mapping bits I mentioned
-above. Going from 's' -> 'h' will only work if physical addresses are used
-to access the hardware and going from 'h' -> 's' will only work if the
-physical address of the reset code is less than PAGE_OFFSET. We could
-introduce a new flag for setup_mm_for_reboot, but that feels slightly
-redundant given that we already have the mode option.
-
-What do you reckon?
-
-Cheers,
-
-Will
+diff --git a/arch/arm/mach-s3c2410/usb-simtec.c b/arch/arm/mach-s3c2410/usb-simtec.c
+index 29bd3d9..3a1028c 100644
+--- a/arch/arm/mach-s3c2410/usb-simtec.c
++++ b/arch/arm/mach-s3c2410/usb-simtec.c
+@@ -104,7 +104,7 @@ static struct s3c2410_hcd_info usb_simtec_info __initdata = {
+ };
+ 
+ 
+-int usb_simtec_init(void)
++int __init usb_simtec_init(void)
+ {
+ 	int ret;
+ 
+diff --git a/arch/arm/mach-s3c2410/usb-simtec.h b/arch/arm/mach-s3c2410/usb-simtec.h
+index 03842ed..43cc88f 100644
+--- a/arch/arm/mach-s3c2410/usb-simtec.h
++++ b/arch/arm/mach-s3c2410/usb-simtec.h
+@@ -12,5 +12,5 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-extern int usb_simtec_init(void);
++extern int __init usb_simtec_init(void);
+ 
+diff --git a/arch/arm/mach-s3c2416/irq.c b/arch/arm/mach-s3c2416/irq.c
+index 28ad20d..153cb2f 100644
+--- a/arch/arm/mach-s3c2416/irq.c
++++ b/arch/arm/mach-s3c2416/irq.c
+@@ -234,7 +234,7 @@ static int __init s3c2416_irq_add(struct sys_device *sysdev)
+ 	return 0;
+ }
+ 
+-static struct sysdev_driver s3c2416_irq_driver = {
++static struct sysdev_driver s3c2416_irq_driver __initdata = {
+ 	.add		= s3c2416_irq_add,
+ };
+ 
+diff --git a/arch/arm/mach-s3c2440/clock.c b/arch/arm/mach-s3c2440/clock.c
+index f9e6bda..3b3bec5 100644
+--- a/arch/arm/mach-s3c2440/clock.c
++++ b/arch/arm/mach-s3c2440/clock.c
+@@ -108,7 +108,7 @@ static struct clk s3c2440_clk_ac97 = {
+ 	.ctrlbit	= S3C2440_CLKCON_CAMERA,
+ };
+ 
+-static int s3c2440_clk_add(struct sys_device *sysdev)
++static int __init s3c2440_clk_add(struct sys_device *sysdev)
+ {
+ 	struct clk *clock_upll;
+ 	struct clk *clock_h;
+@@ -137,7 +137,7 @@ static int s3c2440_clk_add(struct sys_device *sysdev)
+ 	return 0;
+ }
+ 
+-static struct sysdev_driver s3c2440_clk_driver = {
++static struct sysdev_driver s3c2440_clk_driver __initdata = {
+ 	.add	= s3c2440_clk_add,
+ };
+ 
+diff --git a/arch/arm/mach-s3c2443/irq.c b/arch/arm/mach-s3c2443/irq.c
+index 83ecb11..1d483d9 100644
+--- a/arch/arm/mach-s3c2443/irq.c
++++ b/arch/arm/mach-s3c2443/irq.c
+@@ -265,7 +265,7 @@ static int __init s3c2443_irq_add(struct sys_device *sysdev)
+ 	return 0;
+ }
+ 
+-static struct sysdev_driver s3c2443_irq_driver = {
++static struct sysdev_driver s3c2443_irq_driver __initdata = {
+ 	.add		= s3c2443_irq_add,
+ };
+ 
+-- 
+1.7.4.1
