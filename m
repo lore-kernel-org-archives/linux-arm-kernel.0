@@ -1,29 +1,68 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon,  3 Oct 2011 12:11:19 +0200
-Subject: [PATCH 3/3] tty/serial: atmel_serial: __devinit_p for probe function
-In-Reply-To: <cd489c1d28c26624d6b68399d222aec371045e53.1317634987.git.nicolas.ferre@atmel.com>
-References: <cd489c1d28c26624d6b68399d222aec371045e53.1317634987.git.nicolas.ferre@atmel.com>
-Message-ID: <d7c2023edfbeb3d21bccd5b997f7806874b01b04.1317636473.git.nicolas.ferre@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Oct 2011 11:11:52 +0200
+Subject: [PATCH 26/30] ARM: omap: add board autoselection
+In-Reply-To: <4E8947F7.2070108@ti.com>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<1317566760-25681-27-git-send-email-arnd@arndb.de>
+	<4E8947F7.2070108@ti.com>
+Message-ID: <3656685.pM1zNST8gQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/tty/serial/atmel_serial.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On Monday 03 October 2011 10:58:23 Santosh Shilimkar wrote:
+> > +config MACH_OMAP_AUTO_BOARD
+> > +     def_bool y
+> > +     depends on !MACH_OMAP2_TUSB6010
+> > +     depends on !MACH_OMAP_H4
+> > +     depends on !MACH_OMAP_APOLLON
+> > +     depends on !MACH_OMAP_APOLLON
+> > +     depends on !MACH_OMAP_2430SDP
+> > +     depends on !MACH_OMAP3_BEAGLE
+> > +     depends on !MACH_DEVKIT8000
+> > +     depends on !MACH_OMAP_LDP
+> > +     depends on !MACH_OMAP3530_LV_SOM
+> > +     depends on !MACH_OMAP3_TORPEDO
+> > +     depends on !MACH_OVERO
+> > +     depends on !MACH_OMAP3EVM
+> > +     depends on !MACH_OMAP3517EVM
+> > +     depends on !MACH_CRANEBOARD
+> > +     depends on !MACH_OMAP3_PANDORA
+> > +     depends on !MACH_OMAP3_TOUCHBOOK
+> > +     depends on !MACH_NOKIA_N8X0
+> > +     depends on !MACH_NOKIA_RM680
+> > +     depends on !MACH_NOKIA_RX51
+> > +     depends on !MACH_OMAP_ZOOM2
+> > +     depends on !MACH_OMAP_ZOOM3
+> > +     depends on !MACH_CM_T35
+> > +     depends on !MACH_CM_T3517
+> > +     depends on !MACH_IGEP0020
+> > +     depends on !MACH_IGEP0030
+> > +     depends on !MACH_SBC3530
+> > +     depends on !MACH_OMAP_3630SDP
+> > +     depends on !MACH_TI8168EVM
+> > +     depends on !MACH_OMAP4_PANDA
+> Do we need all above 'depends on *' ?
+> Even if they get selected for one of the below
+> ARCH along with default machine, build should be happy.
+> Right ?
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index a652f8f..e40a10a 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1789,7 +1789,7 @@ static int __devexit atmel_serial_remove(struct platform_device *pdev)
- }
- 
- static struct platform_driver atmel_serial_driver = {
--	.probe		= atmel_serial_probe,
-+	.probe		= __devinit_p(atmel_serial_probe),
- 	.remove		= __devexit_p(atmel_serial_remove),
- 	.suspend	= atmel_serial_suspend,
- 	.resume		= atmel_serial_resume,
--- 
-1.7.3
+I'm not too happy with having to maintain a list for each subarchitecture,
+when each one has the same problem. In general, I would really like to have
+the flexibility to disable all but any one board, which requires either
+maintaining a list like the above, or expressing the same like
+
+config MACH_OMAP_AUTO_BOARD
+	 def_bool y
+       depends on !MACH_OMAP_BOARD_SELECTED
+       select MACH_OMAP_GENERIC if ARCH_OMAP2
+       select MACH_OMAP_3430SDP if ARCH_OMAP3 && !ARCH_OMAP2
+       select MACH_OMAP_4430SDP if ARCH_OMAP4 && !ARCH_OMAP3 && !ARCH_OMAP2
+
+and adding a 'select MACH_OMAP_BOARD_SELECTED' for each one. Slightly more
+to write but perhaps a little less error-prone.
+
+In the long run, I'd hope we can just get rid of these for subarchitectures
+that support device tree probing and make the device tree based machine
+description unconditional.
+
+	Arnd
