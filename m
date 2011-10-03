@@ -1,56 +1,46 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 03 Oct 2011 12:27:12 +0900
-Subject: [PATCH 2/2] ARM: SAMSUNG: Cleanup resources by using macro
-In-Reply-To: <20111002110724.GT11710@n2100.arm.linux.org.uk>
-References: <001e01cc80e5$1c9eb150$55dc13f0$%kim@samsung.com>
-	<20111002110724.GT11710@n2100.arm.linux.org.uk>
-Message-ID: <005601cc817c$577cdb70$06769250$%kim@samsung.com>
+Date: Mon, 03 Oct 2011 12:27:21 +0900
+Subject: [PATCH 0/4] ARM: EXYNOS4: Support generic Power domain framework
+	for EXYNOS4210
+In-Reply-To: <201110022000.56556.rjw@sisk.pl>
+References: <4E4360B2.2060508@samsung.com> <201110021508.44083.rjw@sisk.pl>
+	<20111002131307.GV11710@n2100.arm.linux.org.uk>
+	<201110022000.56556.rjw@sisk.pl>
+Message-ID: <005701cc817c$5c54a240$14fde6c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+Rafael J. Wysocki wrote:
 > 
-> On Sun, Oct 02, 2011 at 06:24:40PM +0900, Kukjin Kim wrote:
-> > This patch adds macro SAMSUNG_RES_MEM and SAMSUNG_RES_IRQ to
-> cleanup
-> > regarding 'struct resource'
-> 
-> Why not include the braces inside the macro as well?
-> 
-I thought, if other member such as name is required additionally, can add it
-like following.
-
-[0] = { SAMSUNG_RES_MEM(xxx, xxx, xxx), .name = "xxx" },
-
-But below helpers can do it :)
-
-> > diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-
-> samsung/include/plat/devs.h
-> > index 8f19241..8b8bd1c 100644
-> > --- a/arch/arm/plat-samsung/include/plat/devs.h
-> > +++ b/arch/arm/plat-samsung/include/plat/devs.h
-> > @@ -18,6 +18,16 @@
+> On Sunday, October 02, 2011, Russell King - ARM Linux wrote:
+> > On Sun, Oct 02, 2011 at 03:08:43PM +0200, Rafael J. Wysocki wrote:
+> > > On Sunday, October 02, 2011, Russell King - ARM Linux wrote:
+> > > > How do these misconceptions start?
+> > > >
+> > > > The clock API.  Drivers are supposed to get a clock (source) when
+they
+> > > > initialize.  Drivers then enable and disable the clock as they
+_themselves_
+> > > > require the use of that clock.
+> > >
+> > > OK
+> > >
+> > > Now think of a driver that should handle the same device on both ARM
+and
+> > > x86-based SoCs.  Is the clock API available on x86?
 > >
-> >  #include <linux/platform_device.h>
-> >
-> > +#define SAMSUNG_RES_MEM(soc, ip, sz)			\
-> > +		.start	= soc##_PA_##ip,		\
-> > +		.end	= soc##_PA_##ip + sz - 1,	\
-> > +		.flags	= IORESOURCE_MEM,
-> > +
-> > +#define SAMSUNG_RES_IRQ(ip)				\
-> > +		.start	= IRQ_##ip,			\
-> > +		.end	= IRQ_##ip,			\
-> > +		.flags	= IORESOURCE_IRQ,
-> > +
+> > No one's bothered yet.
 > 
-> How about using DEFINE_RES_MEM and DEFINE_RES_IRQ here?
+> Prehaps because x86 doesn't allow us to control device clocks directly.
+> They are controlled through PCI PM or through ACPI methods, both of which
+> hide the clocks behind abstract low-power states we're supposed to use.
 > 
-> #define SAMSUNG_RES_MEM(soc, ip, sz) DEFINE_RES_MEM(soc##_PA_##ip,
-> sz)
-> #define SAMSUNG_RES_IRQ(ip) DEFINE_RES_IRQ(IRQ_##ip)
-
-Great, I don't know why I couldn't find it and nobody use it now...
+Well, I think Embedded drivers especially ARM sometimes need to control its
+own clock directly and each embedded drivers know when clock controlling is
+required or not. Actually, Samsung driver stuff have calling clk_enable() in
+probe() or open() and clk_disable() when clock is not needed more. But I'm
+not sure we _really_ can get some benefits when matching clock and power
+control on ARM devices.
 
 Thanks.
 
