@@ -1,43 +1,74 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Mon, 3 Oct 2011 05:24:27 -0400
-Subject: [PATCH 2/3] define ARM-specific dma_coherent_write_sync
-In-Reply-To: <20111003084407.GC18195@e102109-lin.cambridge.arm.com>
-References: <1314826214-22428-1-git-send-email-msalter@redhat.com>
-	<1314826214-22428-3-git-send-email-msalter@redhat.com>
-	<CAHkRjk7ZMDQh8sYf7N_4LLS12JU2ps8dkC34gNWNH+-Zp0p8Rg@mail.gmail.com>
-	<1315319837.2313.1.camel@deneb.redhat.com>
-	<CAHkRjk6TD4Qg-b3nkCE_wwj-tWr-_5evndxo3f+_6gtXEV6gNg@mail.gmail.com>
-	<1315321331.2313.10.camel@deneb.redhat.com>
-	<026571E7-67F6-4B0F-998C-2A845AA22E59@jonmasters.org>
-	<20111003084407.GC18195@e102109-lin.cambridge.arm.com>
-Message-ID: <C8392961-1EBF-410F-9214-05C060FD6D24@jonmasters.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 3 Oct 2011 11:27:44 +0200
+Subject: [PATCH 26/30] ARM: omap: add board autoselection
+In-Reply-To: <3656685.pM1zNST8gQ@wuerfel>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<1317566760-25681-27-git-send-email-arnd@arndb.de>
+	<4E8947F7.2070108@ti.com> <3656685.pM1zNST8gQ@wuerfel>
+Message-ID: <4E898010.80208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/3/2011 11:11 AM, Arnd Bergmann wrote:
+> On Monday 03 October 2011 10:58:23 Santosh Shilimkar wrote:
+>>> +config MACH_OMAP_AUTO_BOARD
+>>> +     def_bool y
+>>> +     depends on !MACH_OMAP2_TUSB6010
+>>> +     depends on !MACH_OMAP_H4
+>>> +     depends on !MACH_OMAP_APOLLON
+>>> +     depends on !MACH_OMAP_APOLLON
+>>> +     depends on !MACH_OMAP_2430SDP
+>>> +     depends on !MACH_OMAP3_BEAGLE
+>>> +     depends on !MACH_DEVKIT8000
+>>> +     depends on !MACH_OMAP_LDP
+>>> +     depends on !MACH_OMAP3530_LV_SOM
+>>> +     depends on !MACH_OMAP3_TORPEDO
+>>> +     depends on !MACH_OVERO
+>>> +     depends on !MACH_OMAP3EVM
+>>> +     depends on !MACH_OMAP3517EVM
+>>> +     depends on !MACH_CRANEBOARD
+>>> +     depends on !MACH_OMAP3_PANDORA
+>>> +     depends on !MACH_OMAP3_TOUCHBOOK
+>>> +     depends on !MACH_NOKIA_N8X0
+>>> +     depends on !MACH_NOKIA_RM680
+>>> +     depends on !MACH_NOKIA_RX51
+>>> +     depends on !MACH_OMAP_ZOOM2
+>>> +     depends on !MACH_OMAP_ZOOM3
+>>> +     depends on !MACH_CM_T35
+>>> +     depends on !MACH_CM_T3517
+>>> +     depends on !MACH_IGEP0020
+>>> +     depends on !MACH_IGEP0030
+>>> +     depends on !MACH_SBC3530
+>>> +     depends on !MACH_OMAP_3630SDP
+>>> +     depends on !MACH_TI8168EVM
+>>> +     depends on !MACH_OMAP4_PANDA
+>> Do we need all above 'depends on *' ?
+>> Even if they get selected for one of the below
+>> ARCH along with default machine, build should be happy.
+>> Right ?
+>
+> I'm not too happy with having to maintain a list for each subarchitecture,
+> when each one has the same problem. In general, I would really like to have
+> the flexibility to disable all but any one board, which requires either
+> maintaining a list like the above, or expressing the same like
+>
+> config MACH_OMAP_AUTO_BOARD
+> 	 def_bool y
+>         depends on !MACH_OMAP_BOARD_SELECTED
+>         select MACH_OMAP_GENERIC if ARCH_OMAP2
+>         select MACH_OMAP_3430SDP if ARCH_OMAP3&&  !ARCH_OMAP2
+>         select MACH_OMAP_4430SDP if ARCH_OMAP4&&  !ARCH_OMAP3&&  !ARCH_OMAP2
+>
+> and adding a 'select MACH_OMAP_BOARD_SELECTED' for each one. Slightly more
+> to write but perhaps a little less error-prone.
+>
+> In the long run, I'd hope we can just get rid of these for subarchitectures
+> that support device tree probing and make the device tree based machine
+> description unconditional.
 
-On Oct 3, 2011, at 4:44 AM, Catalin Marinas wrote:
+This is really our goal, we will have soon the board-generic.c for that, 
+someone will *just* have to migrate these ~30 board files to device tree 
+DTS files :-)
 
-> On Mon, Oct 03, 2011 at 02:40:19AM +0100, Jon Masters wrote:
->> On Sep 6, 2011, at 11:02 AM, Mark Salter wrote:
->>> In any case, the current thinking is that the original problem with
->>> the USB performance seen on cortex A9 multicore is probably something
->>> more than just write buffer delays. Once the original problem is better
->>> understood, we can take another look at this patch if it is still
->>> needed.
->> 
->> Thanks again for looking into this Mark. My understanding is that this
->> is still being investigated. I'll followup with ARM to see how that's
->> going since I've heard nothing recently :) Meanwhile, we're continuing
->> to carry a hack based on these patches in Fedora ARM kernels.
-> 
-> Not talking about hardware specifics here, the architecture (though
-> ARMv7 onwards) mandates that the write buffer is eventually drained. But
-> doesn't state any upper limit, so it could even be half a second.
-
-<snip mechanics of dma_coherent_write_sync, etc.>
-
-I guess my main question is, do you think this is just a write buffer delay? If you do, then we should definitely get back to this question of defining DMA extensions. But are we sure that's what this is?
-
-Mark: did you have any more insight into this recently?
-
-Jon.
+Regards,
+Benoit
