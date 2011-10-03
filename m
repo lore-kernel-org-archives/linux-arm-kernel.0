@@ -1,29 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Oct 2011 11:51:49 +0200
-Subject: [PATCH 03/30] video/omap: fix build dependencies
-In-Reply-To: <1317625175.2026.8.camel@deskari>
+Date: Mon, 03 Oct 2011 11:54:41 +0200
+Subject: [PATCH 26/30] ARM: omap: add board autoselection
+In-Reply-To: <4E898010.80208@ti.com>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-4-git-send-email-arnd@arndb.de>
-	<1317625175.2026.8.camel@deskari>
-Message-ID: <6628015.ZCJR4R4V8E@wuerfel>
+	<3656685.pM1zNST8gQ@wuerfel> <4E898010.80208@ti.com>
+Message-ID: <5055144.Y0IUdMEWXQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 October 2011 09:59:35 Tomi Valkeinen wrote:
-> On Sun, 2011-10-02 at 16:45 +0200, Arnd Bergmann wrote:
-> > Four of the LCD panel drivers depend on the backlight class,
-> > so add the dependency in Kconfig.
-> > Selecting the BACKLIGHT_CLASS_DEVICE symbol does not generally
-> > work since it has other dependencies.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+On Monday 03 October 2011 11:27:44 Cousson, Benoit wrote:
+> >
+> > In the long run, I'd hope we can just get rid of these for subarchitectures
+> > that support device tree probing and make the device tree based machine
+> > description unconditional.
 > 
-> This looks ok to me. If it's fine to you, I'll queue this patch in my
-> DSS tree to prevent possible conflicts.
+> This is really our goal, we will have soon the board-generic.c for that, 
+> someone will just have to migrate these ~30 board files to device tree 
+> DTS files 
 
-Yes, that's good.
-
-Thanks,
+For the purpose of build-time validation using randconfig, there is no
+problem in keeping some board files forever, as long as the generic board
+file is always built-in.
 
 	Arnd
