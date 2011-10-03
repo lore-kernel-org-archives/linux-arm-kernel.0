@@ -1,49 +1,33 @@
-From: inderpal.singh@linaro.org (Inderpal Singh)
-Date: Mon, 3 Oct 2011 13:06:27 +0530
-Subject: [PATCH v2] ARM: EXYNOS4: Configure MAX8997 PMIC for Origen
-In-Reply-To: <005501cc817c$535eeec0$fa1ccc40$%kim@samsung.com>
-References: <1313034965-21286-1-git-send-email-inderpal.singh@linaro.org>
-	<1313995163-31737-1-git-send-email-inderpal.singh@linaro.org>
-	<005501cc817c$535eeec0$fa1ccc40$%kim@samsung.com>
-Message-ID: <CAG17yqTJKb9QMv64_VCzaxQzrWaYrdAmoKjV0=DXjDLa6uqFrg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 3 Oct 2011 09:38:07 +0200
+Subject: [GIT PULL] ux500-timers
+In-Reply-To: <1422315.r6YLuIojzy@wuerfel>
+References: <CACRpkdbCZwSdXzqvPCrGagaikc53xLyDTQaZMRtuyqo9vw=Yng@mail.gmail.com>
+	<201109302228.46572.arnd@arndb.de> <1422315.r6YLuIojzy@wuerfel>
+Message-ID: <CACRpkdbt0hL-GJRHbhJXoGVrVEMLfx9eStCiLx+y+=LA12WT-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+On Sat, Oct 1, 2011 at 6:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Thanks for applying.
-I would like to use inderpal.singh at linaro.org
-Have updated my .gitconfig accordingly as well.
+> It caused a few build regressions:
+>
+> - missing include of errno.h
+> - clksrc_dbx500_prcmu_init stub needs to be static inline, or it causes a
+> ?link failure.
 
-Thanks,
-Inder
+Sorry about this crap I'll be looking closer next time :-(
 
-On 3 October 2011 08:57, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Kukjin Kim wrote:
->>
->> Inderpal Singh wrote:
->> >
->> > From: Inderpal Singh <inderpal.s@samsung.com>
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ^^^^^^^^^^^
->> >
->> > Configure MAX8997 PMIC and provide platform specific data
->> > for origen.
->> >
->> > Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?^^^^^^^^^^
+> - clksrc_dbx500_timer_base may be initialized when it's not actually linked in
 >
-> Hi Inderpal,
->
-> You need to change your e-mail address of author or sign. Basically they
-> should be same. Which one do you want to use?
-> Then you should make sure your .gitconfig has same e-mail address......
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
->
->
+> For the last one, I think it would actually be best to make the timer
+> a platform_device and pass the address in platform_data or device tree
+> property, or alternatively make it an argument to clksrc_dbx500_prcmu_init
+> and make the variable static.
+
+I chose the latter approach.
+
+> Please send a new pull request with these things fixed, either with
+> patches on top or replacing the original ones, whichever you prefer.
+
+I have applied a hacked version of your patch like this:
