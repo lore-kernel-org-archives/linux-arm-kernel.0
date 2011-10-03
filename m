@@ -1,59 +1,110 @@
-From: jochen@scram.de (Jochen Friedrich)
-Date: Mon,  3 Oct 2011 20:56:21 +0200
-Subject: [PATCH] ARM: at91: Fix USBA gadget registration
-Message-ID: <1317668182-15673-1-git-send-email-jochen@scram.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 03 Oct 2011 14:59:28 -0400 (EDT)
+Subject: Please help with the OMAP static mapping mess
+Message-ID: <alpine.LFD.2.02.1110031312480.9106@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 193ab2a6070039e7ee2b9b9bebea754a7c52fd1b, various AT91 boards don't
-register USBA adapters anymore due to depending on a now non-existing
-symbol. Fix the symbol name.
 
-Signed-off-by: Jochen Friedrich <jochen@scram.de>
----
- arch/arm/mach-at91/at91cap9_devices.c    |    2 +-
- arch/arm/mach-at91/at91sam9g45_devices.c |    2 +-
- arch/arm/mach-at91/at91sam9rl_devices.c  |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+<rant>
 
-diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index dba0d8d..0512baf 100644
---- a/arch/arm/mach-at91/at91cap9_devices.c
-+++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -92,7 +92,7 @@ void __init at91_add_device_usbh(struct at91_usbh_data *data) {}
-  *  USB HS Device (Gadget)
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
-+#if defined(CONFIG_USB_ATMEL_USBA) || defined(CONFIG_USB_ATMEL_USBA_MODULE)
- 
- static struct resource usba_udc_resources[] = {
- 	[0] = {
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 600bffb..371bb0e 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -191,7 +191,7 @@ void __init at91_add_device_usbh_ehci(struct at91_usbh_data *data) {}
-  *  USB HS Device (Gadget)
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
-+#if defined(CONFIG_USB_ATMEL_USBA) || defined(CONFIG_USB_ATMEL_USBA_MODULE)
- static struct resource usba_udc_resources[] = {
- 	[0] = {
- 		.start	= AT91SAM9G45_UDPHS_FIFO,
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index aacb19d..c884d59 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -75,7 +75,7 @@ void __init at91_add_device_hdmac(void) {}
-  *  USB HS Device (Gadget)
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_USB_GADGET_ATMEL_USBA) || defined(CONFIG_USB_GADGET_ATMEL_USBA_MODULE)
-+#if defined(CONFIG_USB_ATMEL_USBA) || defined(CONFIG_USB_ATMEL_USBA_MODULE)
- 
- static struct resource usba_udc_resources[] = {
- 	[0] = {
--- 
-1.7.7.rc1
+I must state up front that I'm starting to share the frustration that 
+was publicly expressed by some other kernel maintainers on a few 
+occasions during the last year.  I'm sorry that this frustration 
+build-up often ends up bursting out on the OMAP code, but the OMAP 
+kernel community is not (or at least used not to) always play fair with 
+the rest of the kernel code and this is probably what is tipping us over 
+the edge.  There is a faint "let's hack our way through locally and work 
+around the generic code limitations" smell here that is not pleasant at 
+all.
+
+</rant>
+
+So... here's the issue:
+
+In arch/arm/mach-omap2/common.c:
+
+static void __init __omap2_set_globals(struct omap_globals *omap2_globals)
+{
+        omap2_set_globals_tap(omap2_globals);
+        omap2_set_globals_sdrc(omap2_globals);
+        omap2_set_globals_control(omap2_globals);
+        omap2_set_globals_prcm(omap2_globals);
+}
+
+and also
+
+void __init omap2_set_globals_443x(void)
+{
+        omap2_set_globals_tap(&omap4_globals);
+        omap2_set_globals_control(&omap4_globals);
+        omap2_set_globals_prcm(&omap4_globals);
+}
+
+Except for omap2_set_globals_tap(), those calls all look like:
+
+void __init omap2_set_globals_prcm(struct omap_globals *omap2_globals)
+{
+        /* Static mapping, never released */
+        if (omap2_globals->prm) {
+                prm_base = ioremap(omap2_globals->prm, SZ_8K);
+                WARN_ON(!prm_base);
+        }
+        if (omap2_globals->cm) {
+                cm_base = ioremap(omap2_globals->cm, SZ_8K);
+                WARN_ON(!cm_base);
+        }
+        if (omap2_globals->cm2) {
+                cm2_base = ioremap(omap2_globals->cm2, SZ_8K);
+                WARN_ON(!cm2_base);
+        }
+}
+
+The problem is that those ioremap() calls are performed _*before*_ the 
+memory is fully set up yet, and also even before the corresponding 
+static mappings are even in place!  So not only is the ioremap code 
+unoperational at this point, but a generic way to trap ioremap() calls 
+in order to toss a static mapping back won't even work here because 
+iotable_init() was not even called yet.
+
+The current code get away with it because OMAP is providing its own 
+__arch_ioremap() which does the interception and provide a virtual 
+address from hardcoded but yet to exist mappings.  But the goal of 
+global kernel maintenance is to _remove_ such SOC-specific special cases 
+and move such a perfectly valid optimization into core code where it can 
+be applied uniformly to all.  So the OMAP __arch_ioremap() is going 
+away, meaning that static mappings have to be in place before ioremap() 
+calls can return something minimally usable.
+
+OK, so let's modify omap4_panda_map_io() just to test this one board and 
+reverse the omap44xx_map_common_io() and omap2_set_globals_443x() call 
+order.  Now the mappings will be there before ioremap() is called.  But 
+that, too, doesn't work and the kernel now complains with:
+
+|OMAP revision unknown, please fix!
+|Uninitialized omap_chip, please fix!
+|Could not detect SRAM size
+
+But it looks like omap2_set_globals_tap() still has to be called first!  
+Isn't this wonderfully convoluted?
+
+Also the repeated local_flush_tlb_all()/flush_cache_all() calls found in 
+the OMAP mdesc->map_io code paths (one in _omap2_map_common_io(), 
+another in omap_map_sram(), just to pick those as examples) is a sure 
+sign that too much is being done via this call and layering violations 
+are present.
+
+So could someone in the OMAP camp fix this nonsense ASAP please?
+Of course, yesterday would be best.
+
+Furthermore... there is also a static mapping for physical address 
+0x4e000000 using virtual address 0xff100000 which is already reserved 
+for other purposes i.e. the consistent DMA area.  It is not immediately 
+obvious where this comes from without being intimate with the OMAP code. 
+Can this be fixed as well i.e. moved elsewhere please?
+
+Patches will be extremely welcome.
+Thank you.
+
+
+Nicolas
