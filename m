@@ -1,51 +1,122 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Oct 2011 09:41:21 +0200
-Subject: [GIT PULL] ux500-timers
-In-Reply-To: <CACRpkdbCZwSdXzqvPCrGagaikc53xLyDTQaZMRtuyqo9vw=Yng@mail.gmail.com>
-References: <CACRpkdbCZwSdXzqvPCrGagaikc53xLyDTQaZMRtuyqo9vw=Yng@mail.gmail.com>
-Message-ID: <CACRpkdZDUeP6pJt7W2ntGGdUgeGGwEG9we-Jmc9bvP40Oy+JQg@mail.gmail.com>
+From: deepthi@linux.vnet.ibm.com (Deepthi Dharwar)
+Date: Mon, 03 Oct 2011 13:12:15 +0530
+Subject: [PATCH V8 0/4] cpuidle: Global registration of idle states with
+	per-cpu statistics
+Message-ID: <20111003074147.21968.86106.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Version 6 of this patch series dated 22nd Sept 2011 was 
+Acked-by: Arjan van de Ven <arjan@linux.intel.com>
+Acked-by: Kevin Hilman <khilman@ti.com> for OMAP specific parts.
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+Tested-by: Jean Pihet <j-pihet@ti.com>
 
-could you please pull the updated ux500 timer branch into the arm-soc
-tree?
+Hi Len, 
+Can you please queue this series for the next mainline merge window by merging
+it into your development tree and also linux-next for further testing.
 
-The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
+I also tested it by applying these patches on your ACPI tree hosted @github.
 
-  Linux 3.1-rc7 (2011-09-21 16:58:15 -0700)
+Thanks
+-Deepthi
 
-are available in the git repository at:
-   git://git.linaro.org/people/triad/linux-stericsson.git ux500-nomadik-timers
+--
 
-Jonas Aaberg (4):
-      ARM: ux500: Move timer code to separate file
-      ARM: plat-nomadik: timer: Add support for periodic timers
-      ARM: plat-nomadik: timer: Export reset functions
-      ARM: ux500: Reprogram timers upon resume
+The following patch series implements global registration of cpuidle
+states, and also has the necessary data structure changes to
+accommodate the per-cpu writable members of the cpuidle_states
+structure.
 
-Linus Walleij (1):
-      clocksource: fixup ux500 build problems
+This patch series had been in discussion earlier and
+following are the links to the previous discussions.
 
-Mattias Wallin (3):
-      ARM: plat-nomadik: MTU sched_clock as an option
-      clocksource: add DBX500 PRCMU Timer support
-      ARM: ux500: add support for clocksource DBX500 PRCMU
+v7 --> https://lkml.org/lkml/2011/9/27/74 
+v6 --> https://lkml.org/lkml/2011/9/22/58
+v5 --> https://lkml.org/lkml/2011/6/6/259
+v4 --> https://lkml.org/lkml/2011/4/28/312
+v3 --> https://lkml.org/lkml/2011/2/8/73
+v2 --> https://lkml.org/lkml/2011/1/13/98
+v1 --> https://lkml.org/lkml/2011/3/22/161
 
- arch/arm/mach-ux500/Makefile                   |    2 +-
- arch/arm/mach-ux500/cpu.c                      |   29 +-----
- arch/arm/mach-ux500/include/mach/db5500-regs.h |    2 +
- arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
- arch/arm/mach-ux500/timer.c                    |   68 ++++++++++++
- arch/arm/plat-nomadik/Kconfig                  |    8 ++-
- arch/arm/plat-nomadik/include/plat/mtu.h       |   47 +--------
- arch/arm/plat-nomadik/timer.c                  |  138 ++++++++++++++++++------
- drivers/clocksource/Kconfig                    |   15 +++
- drivers/clocksource/Makefile                   |    1 +
- drivers/clocksource/clksrc-dbx500-prcmu.c      |  106 ++++++++++++++++++
- include/linux/clksrc-dbx500-prcmu.h            |   20 ++++
- 12 files changed, 333 insertions(+), 106 deletions(-)
- create mode 100644 arch/arm/mach-ux500/timer.c
- create mode 100644 drivers/clocksource/clksrc-dbx500-prcmu.c
- create mode 100644 include/linux/clksrc-dbx500-prcmu.h
+Changes from previous version (V7):
+
+   1. Rebased and tested it on 3.1-rc8
+
+   2. As suggested by Kevin in V7, Signature of Jean
+      was moved from signed-off tag to tested-by.
+    
+Tests done:
+
+    1. Compile tested for ARM using the following configs: da8xx_omapl_defconfig,
+    exynos4_defconfig, kirkwood_defconfig, omap2plus_defconfig, 
+    at91rm9200_defconfig
+      
+    2. Boot tested on x86 nehalem with multiple C-states for both intel_idle
+    and acpi_idle drivers.
+
+    3. Boot tested on T60p thinkpad that has T2600 cpu with multiple C-states. 
+    Also tested the case when there is dynamic changes in C-states 
+    AC <-> Battery Power switch.
+
+Brief description of the patches:
+
+Core change in this series is to split the cpuidle_device structure 
+into two parts, i.e  global and per-cpu basis. 
+
+The per-cpu pieces are mostly generic statistics that can be independent 
+of current running driver. As a result of these changes, there is single 
+copy of cpuidle_states structure and single registration done by one 
+cpu. The low level driver is free to set per-cpu driver data on
+each cpu if needed using the cpuidle_set_statedata() as the case
+today. Only in very rare cases asymmetric C-states exist which can be 
+handled within the cpuidle driver. Most architectures do not have 
+asymmetric C-states.
+
+First two patches in the series facilitate splitting of cpuidle_states
+and cpuidle_device structure and next two patches do the actual split,
+change the API's and make existing code follow the changed API.
+
+[1/4] - Move the idle residency accounting part from cpuidle.c to
+the respective low level drivers, so that the accounting can
+be accurately maintained if the driver decides to demote the
+chosen (suggested) by the governor.
+
+[2/4] - removes the cpuidle_device()->prepare API since is is not
+widely used and the only use case was to allow software
+demotion using CPUIDLE_FLAG_IGNORE flag.  Both these
+functions can be absorbed within the cpuidle back-end
+driver ad hence deprecating the prepare routine and the
+CPUIDLE_FLAG_IGNORE flag.
+
+    - Ref: https://lkml.org/lkml/2011/3/25/52
+
+[3/4] - Splits the usage statistics (read/write) part out of
+cpuidle_state structure, so that the states can become read
+only and hence made global.
+
+[4/4] - Most APIs will now need to pass pointer to both global
+cpuidle_driver and per-cpu cpuidle_device structure.
+
+ arch/arm/mach-at91/cpuidle.c          |   41 +++--
+ arch/arm/mach-davinci/cpuidle.c       |   51 ++++---
+ arch/arm/mach-exynos4/cpuidle.c       |   30 ++--
+ arch/arm/mach-kirkwood/cpuidle.c      |   42 +++---
+ arch/arm/mach-omap2/cpuidle34xx.c     |  133 +++++++++++------
+ arch/sh/kernel/cpu/shmobile/cpuidle.c |   28 ++--
+ drivers/acpi/processor_driver.c       |   20 ---
+ drivers/acpi/processor_idle.c         |  251 +++++++++++++++++++++++++++------
+ drivers/cpuidle/cpuidle.c             |   86 ++++-------
+ drivers/cpuidle/driver.c              |   25 +++
+ drivers/cpuidle/governors/ladder.c    |   41 ++++-
+ drivers/cpuidle/governors/menu.c      |   29 ++--
+ drivers/cpuidle/sysfs.c               |   22 ++-
+ drivers/idle/intel_idle.c             |  130 +++++++++++++----
+ include/acpi/processor.h              |    1 
+ include/linux/cpuidle.h               |   52 ++++---
+ 16 files changed, 650 insertions(+), 332 deletions(-)
+
+
+-- 
+
+-Deepthi
