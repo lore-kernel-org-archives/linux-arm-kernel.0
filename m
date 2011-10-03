@@ -1,44 +1,36 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 3 Oct 2011 10:52:58 +0200
-Subject: [PATCH] [WATCHDOG] move coh901327 state holders
-Message-ID: <1317631978-22818-1-git-send-email-linus.walleij@stericsson.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 03 Oct 2011 10:56:43 +0200
+Subject: [PATCH 3/3] tty/serial: atmel_serial: __devinit_p for probe
+	function
+In-Reply-To: <20111003085029.GA11710@n2100.arm.linux.org.uk>
+References: <b371e80a96a36d962fb8806c2bd7aa20bb688b88.1317634987.git.nicolas.ferre@atmel.com>
+	<cd489c1d28c26624d6b68399d222aec371045e53.1317634987.git.nicolas.ferre@atmel.com>
+	<20111003085029.GA11710@n2100.arm.linux.org.uk>
+Message-ID: <4E8978CB.1000807@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On 10/03/2011 10:50 AM, Russell King - ARM Linux :
+> On Mon, Oct 03, 2011 at 11:46:16AM +0200, Nicolas Ferre wrote:
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  drivers/tty/serial/atmel_serial.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index a652f8f..453cdb5 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -1789,7 +1789,7 @@ static int __devexit atmel_serial_remove(struct platform_device *pdev)
+>>  }
+>>  
+>>  static struct platform_driver atmel_serial_driver = {
+>> -	.probe		= atmel_serial_probe,
+>> +	.probe		= __devexit_p(atmel_serial_probe),
+> 
+> That doesn't match the patch description (and is probably wrong.)
 
-The state holders used in the PM path of the drivers report as
-unused variables when compiling without CONFIG_PM so let's
-move them inside CONFIG_PM.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/watchdog/coh901327_wdt.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
-index 9291506..20b2fb9 100644
---- a/drivers/watchdog/coh901327_wdt.c
-+++ b/drivers/watchdog/coh901327_wdt.c
-@@ -76,8 +76,6 @@ static int irq;
- static void __iomem *virtbase;
- static unsigned long coh901327_users;
- static unsigned long boot_status;
--static u16 wdogenablestore;
--static u16 irqmaskstore;
- static struct device *parent;
- 
- /*
-@@ -461,6 +459,10 @@ out:
- }
- 
- #ifdef CONFIG_PM
-+
-+static u16 wdogenablestore;
-+static u16 irqmaskstore;
-+
- static int coh901327_suspend(struct platform_device *pdev, pm_message_t state)
- {
- 	irqmaskstore = readw(virtbase + U300_WDOG_IMR) & 0x0001U;
+Yes, indeed.
+Sorry for the noise!
 -- 
-1.7.3.2
+Nicolas Ferre
