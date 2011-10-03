@@ -1,56 +1,72 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 03 Oct 2011 10:24:52 -0500
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <20111003142524.GN3731@opensource.wolfsonmicro.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<4E89C3FA.9020206@gmail.com>
-	<20111003142524.GN3731@opensource.wolfsonmicro.com>
-Message-ID: <4E89D3C4.8090001@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Oct 2011 18:19:48 +0200
+Subject: [alsa-devel] [PATCH 2/6] ASoC: codecs: AK4641 depends on GPIOLIB
+In-Reply-To: <20111003152002.GP3731@opensource.wolfsonmicro.com>
+References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
+	<1343003.MpQlxoEPa6@wuerfel>
+	<20111003152002.GP3731@opensource.wolfsonmicro.com>
+Message-ID: <9353092.2X2OeIUYGE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2011 09:25 AM, Mark Brown wrote:
-> On Mon, Oct 03, 2011 at 09:17:30AM -0500, Rob Herring wrote:
->> On 09/22/2011 05:26 PM, Mike Turquette wrote:
+On Monday 03 October 2011 16:20:02 Mark Brown wrote:
+> On Mon, Oct 03, 2011 at 04:47:07PM +0200, Arnd Bergmann wrote:
 > 
-> A lot of stuff that should really have been cut plus...
+> > sound/soc/codecs/wm1250-ev1.c:32:14: error: array type has incomplete element type
 > 
->>> +	if (clk->ops->get_parent)
->>> +		/* We don't to lock against prepare/enable here, as
->>> +		 * the clock is not yet accessible from anywhere */
->>> +		clk->parent = clk->ops->get_parent(clk->hw);
-> 
->> I don't think this is going to work. This implies that the parent clock
->> is already registered. For simple clk trees, that's probably not an
->> issue, but for chips with lots of muxing it will be impossible to get
->> the order correct for all cases. This is not an issue today as most
->> clocks are statically created.
-> 
->> I think what is needed is a 2 stage init. The 1st stage to create all
->> the clocks and a 2nd stage to build the tree once all clocks are created.
-> 
->> Tracking the parents using struct clk_hw instead would help as long as
->> clocks are still statically allocated. However, that won't help for
->> devicetree.
-> 
-> This isn't in any way specific to clocks, right now the likely solution
-> looks to be Grant's changes for retrying probe() as new devices come on
-> line.  With that devices can return a code from their probe() which
-> tells the driver core that they couldn't get all the resources they need
-> and that it should retry the probe() if more devices come on-line.
+> OK, that's the gpio_request_ stuff not being implemented thing that I
+> have seen some reports of.  Looks like that's not been stubbed out, but
+> for Prima2 the best fix is just to turn on gpiolib since there's no
+> excuse for a new platform to not use it.
 
-Except SOC clocks are initialized very early before timers are up and
-there can be a very high number of dependencies (every clock except
-fixed clocks). With the driver probe retry, retrying is the exception,
-not the rule.
+With the latest changes that Russell did in this direction, we can probably
+set ARCH_WANT_OPTIONAL_GPIOLIB on ARM for all platforms that don't
+provide their own gpio implementation or already require gpiolib.
 
-Retrying would require every caller to maintain a list of clks to
-retry. With 2 stages, you can move that into the core clock code.
+However, I see no reason to force-enable gpiolib on platforms that
+don't actually have any GPIO. On those, you would still get the same
+problem with this code in the wm1250-ev1 driver:
 
-There are not typically a large number of board-level/driver created
-clocks, so ensuring correct register order is not really a problem. In
-cases where there is a cross-driver dependency, the probe retry is a
-good solution.
+        for (i = 0; i < ARRAY_SIZE(wm1250->gpios); i++) {
+                wm1250->gpios[i].gpio = pdata->gpios[i];
+                wm1250->gpios[i].label = wm1250_gpio_names[i];
+                wm1250->gpios[i].flags = GPIOF_OUT_INIT_LOW;
+        }
 
-Rob
+When the GPIO API is stubbed out, the definition of struct gpio
+is empty, so you cannot access the members, which seems to be
+intentional behavior.
+
+In order to make that work, I think we need one of the two patches
+below.
+
+	Arnd
+
+--- a/include/linux/gpio.h
++++ b/include/linux/gpio.h
+@@ -24,7 +24,11 @@
+ #include <linux/errno.h>
+ 
+ struct device;
+-struct gpio;
++struct gpio {
++       unsigned        gpio;
++       unsigned long   flags;
++       const char      *label;
++};
+ struct gpio_chip;
+ 
+ /*
+
+
+--- a/sound/soc/codecs/Kconfig
++++ b/sound/soc/codecs/Kconfig
+@@ -58,7 +58,7 @@ config SND_SOC_ALL_CODECS
+ 	select SND_SOC_UDA134X
+ 	select SND_SOC_UDA1380 if I2C
+ 	select SND_SOC_WL1273 if MFD_WL1273_CORE
+-	select SND_SOC_WM1250_EV1 if I2C
++	select SND_SOC_WM1250_EV1 if I2C && GENERIC_GPIO
+ 	select SND_SOC_WM2000 if I2C
+ 	select SND_SOC_WM5100 if I2C
+ 	select SND_SOC_WM8350 if MFD_WM8350
