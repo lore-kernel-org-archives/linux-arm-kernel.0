@@ -1,51 +1,26 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 03 Oct 2011 15:03:30 +0530
-Subject: [PATCH 28/30] ARM: omap: select CPU_FREQ_TABLE where needed
-In-Reply-To: <5173921.eT2vCfT35d@wuerfel>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-29-git-send-email-arnd@arndb.de>
-	<4E894A95.5030107@ti.com> <5173921.eT2vCfT35d@wuerfel>
-Message-ID: <4E89816A.5050704@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Oct 2011 11:36:01 +0200
+Subject: [PATCH 3/3] tty/serial: atmel_serial: __devinit_p for probe
+	function
+In-Reply-To: <d7c2023edfbeb3d21bccd5b997f7806874b01b04.1317636473.git.nicolas.ferre@atmel.com>
+References: <cd489c1d28c26624d6b68399d222aec371045e53.1317634987.git.nicolas.ferre@atmel.com>
+	<d7c2023edfbeb3d21bccd5b997f7806874b01b04.1317636473.git.nicolas.ferre@atmel.com>
+Message-ID: <4355360.0xR5ZY7sEk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 October 2011 02:45 PM, Arnd Bergmann wrote:
-> On Monday 03 October 2011 11:09:33 Santosh Shilimkar wrote:
->>> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
->>> index bb8f4a6..f7ef9f4 100644
->>> --- a/arch/arm/plat-omap/Kconfig
->>> +++ b/arch/arm/plat-omap/Kconfig
->>> @@ -217,6 +217,11 @@ config OMAP_PM_NOOP
->>>  
->>>  endchoice
->>>  
->>> +config OMAP_CPU_FREQ
->>> +     def_bool "y"
->>> +     depends on CPU_FREQ
->>> +     select CPU_FREQ_TABLE
->>> +
->>>  endmenu
->> With CPUFREQ series from Kevin [1], I don't think we need this any-more.
-> 
-> I guess if it's needed, it should at least be moved to the new cpufreq
-> location.
-> 
-Probably you are right. CPU_FREQ_TABLE is selected today if
-CPU_FREQ_STAT or CPU_FREQ_GOV_ONDEMAND is selected. Without these two
-enabled, in won't be selected.
+On Monday 03 October 2011 12:11:19 Nicolas Ferre wrote:
+>  }
+>  
+>  static struct platform_driver atmel_serial_driver = {
+> -       .probe          = atmel_serial_probe,
+> +       .probe          = __devinit_p(atmel_serial_probe),
+>         .remove         = __devexit_p(atmel_serial_remove),
+>         .suspend        = atmel_serial_suspend,
+>         .resume         = atmel_serial_resume,
 
->> More so, I didn't find OMAP_CPU_FREQ is being used anywhere on mainline.
-> 
-> Yes, OMAP_CPU_FREQ is a symbol that is intentionally unused, with the
-> only purpose of selecting CPU_FREQ_TABLE if any omap platform together
-> with CPU_FREQ is enabled.
->
-I see. This wasn't clear to me.
+Still wrong: __devinit_p does not exist and is not needed.
 
-> Let's drop this patch for now, if it is still needed as I think, I can
-> do a patch during the 3.2 cycle for the right location.
-> 
-Ok.
+What bug are you trying to fix here?
 
-Regards
-Santosh
+	Arnd
