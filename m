@@ -1,19 +1,56 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 3 Oct 2011 16:20:02 +0100
-Subject: [alsa-devel] [PATCH 2/6] ASoC: codecs: AK4641 depends on GPIOLIB
-In-Reply-To: <1343003.MpQlxoEPa6@wuerfel>
-References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
-	<20111003134527.GF11710@n2100.arm.linux.org.uk>
-	<20111003143553.GG23811@sirena.org.uk> <1343003.MpQlxoEPa6@wuerfel>
-Message-ID: <20111003152002.GP3731@opensource.wolfsonmicro.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 03 Oct 2011 10:24:52 -0500
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <20111003142524.GN3731@opensource.wolfsonmicro.com>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+	<4E89C3FA.9020206@gmail.com>
+	<20111003142524.GN3731@opensource.wolfsonmicro.com>
+Message-ID: <4E89D3C4.8090001@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2011 at 04:47:07PM +0200, Arnd Bergmann wrote:
+On 10/03/2011 09:25 AM, Mark Brown wrote:
+> On Mon, Oct 03, 2011 at 09:17:30AM -0500, Rob Herring wrote:
+>> On 09/22/2011 05:26 PM, Mike Turquette wrote:
+> 
+> A lot of stuff that should really have been cut plus...
+> 
+>>> +	if (clk->ops->get_parent)
+>>> +		/* We don't to lock against prepare/enable here, as
+>>> +		 * the clock is not yet accessible from anywhere */
+>>> +		clk->parent = clk->ops->get_parent(clk->hw);
+> 
+>> I don't think this is going to work. This implies that the parent clock
+>> is already registered. For simple clk trees, that's probably not an
+>> issue, but for chips with lots of muxing it will be impossible to get
+>> the order correct for all cases. This is not an issue today as most
+>> clocks are statically created.
+> 
+>> I think what is needed is a 2 stage init. The 1st stage to create all
+>> the clocks and a 2nd stage to build the tree once all clocks are created.
+> 
+>> Tracking the parents using struct clk_hw instead would help as long as
+>> clocks are still statically allocated. However, that won't help for
+>> devicetree.
+> 
+> This isn't in any way specific to clocks, right now the likely solution
+> looks to be Grant's changes for retrying probe() as new devices come on
+> line.  With that devices can return a code from their probe() which
+> tells the driver core that they couldn't get all the resources they need
+> and that it should retry the probe() if more devices come on-line.
 
-> sound/soc/codecs/wm1250-ev1.c:32:14: error: array type has incomplete element type
+Except SOC clocks are initialized very early before timers are up and
+there can be a very high number of dependencies (every clock except
+fixed clocks). With the driver probe retry, retrying is the exception,
+not the rule.
 
-OK, that's the gpio_request_ stuff not being implemented thing that I
-have seen some reports of.  Looks like that's not been stubbed out, but
-for Prima2 the best fix is just to turn on gpiolib since there's no
-excuse for a new platform to not use it.
+Retrying would require every caller to maintain a list of clks to
+retry. With 2 stages, you can move that into the core clock code.
+
+There are not typically a large number of board-level/driver created
+clocks, so ensuring correct register order is not really a problem. In
+cases where there is a cross-driver dependency, the probe retry is a
+good solution.
+
+Rob
