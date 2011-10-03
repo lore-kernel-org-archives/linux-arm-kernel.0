@@ -1,25 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Oct 2011 14:45:27 +0100
-Subject: [PATCH 2/6] ASoC: codecs: AK4641 depends on GPIOLIB
-In-Reply-To: <20111002204106.GB5811@opensource.wolfsonmicro.com>
-References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
-	<1317587284-2776-3-git-send-email-arnd@arndb.de>
-	<20111002204106.GB5811@opensource.wolfsonmicro.com>
-Message-ID: <20111003134527.GF11710@n2100.arm.linux.org.uk>
+From: msalter@redhat.com (Mark Salter)
+Date: Mon, 03 Oct 2011 09:47:52 -0400
+Subject: nr_cpus cmdline parameter not working
+In-Reply-To: <20111001162357.GH11710@n2100.arm.linux.org.uk>
+References: <1317224117.2580.84.camel@deneb.redhat.com>
+	<20111001162357.GH11710@n2100.arm.linux.org.uk>
+Message-ID: <1317649673.2703.0.camel@deneb.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 02, 2011 at 09:41:07PM +0100, Mark Brown wrote:
-> On Sun, Oct 02, 2011 at 10:28:00PM +0200, Arnd Bergmann wrote:
-> > This driver only builds correctly on platforms that use
-> > GPIOLIB. Disable it otherwise.
+On Sat, 2011-10-01 at 17:23 +0100, Russell King - ARM Linux wrote:
+> On Wed, Sep 28, 2011 at 11:35:16AM -0400, Mark Salter wrote:
+> > I noticed that nr_cpus=1 doesn't appear to have any effect on a
+> > pandaboard (and probably others from the looks of things). This
+> > changes seems to be needed, but I'm not really sure if this is
+> > the right thing or not.
+> > 
+> > diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+> > index ce65e93..a1198ac 100644
+> > --- a/arch/arm/mach-omap2/omap-smp.c
+> > +++ b/arch/arm/mach-omap2/omap-smp.c
+> > @@ -117,6 +117,9 @@ void __init smp_init_cpus(void)
+> >  		ncores = NR_CPUS;
+> >  	}
+> >  
+> > +	if (ncores > nr_cpu_ids)
+> > +		ncores = nr_cpu_ids;
+> > +
 > 
-> No, gpiolib is one implementation of the GPIO API but if platforms want
-> to go and define their own that's currently OK (personally I think at
-> this point we should just be converting all the stragglers over to
-> gpiolib).  As things stand we shouldn't have dependencies on a
-> particular implementation of the API.
+> This potentially affects all SMP platforms, so the patch needs to be
+> bigger than this.
+> 
+> Also, I think the test above should be modified to use nr_cpu_ids
+> rather than NR_CPUS, to be inline with what x86 does:
+> 
+>         /* nr_cpu_ids could be reduced via nr_cpus= */
+>         if (possible > nr_cpu_ids) {
+>                 printk(KERN_WARNING
+>                         "%d Processors exceeds NR_CPUS limit of %d\n",
+>                         possible, nr_cpu_ids);
+>                 possible = nr_cpu_ids;
+>         }
+> 
+> (This is essentially the same check that we're doing.)
+> 
+> Could you have a look at this and cook up another patch covering the
+> other SMP platforms please?
 
-Then it should depend on GENERIC_GPIO (not to be confused with GPIO_GENERIC,
-the generic gpiolib driver), which is the symbol meaning that the GPIO API
-is provided by something.
+Ok, I'll do that.
