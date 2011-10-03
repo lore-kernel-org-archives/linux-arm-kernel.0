@@ -1,13 +1,28 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 3 Oct 2011 16:16:51 +0300
-Subject: [PATCH v6 0/3] Add support for tegra2 based ventana board
-In-Reply-To: <1317647209-22303-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1317647209-22303-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20111003131651.GY21166@tbergstrom-lnx.Nvidia.com>
+Date: Mon, 3 Oct 2011 16:17:49 +0300
+Subject: [PATCH v7 0/3] Add support for tegra2 based ventana board
+Message-ID: <1317647872-22627-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch set adds support for the tegra2 based ventana development board.
 
-Forget this one. It lacks the important fix. It's monday I guess :)
+Boot tested on ventana.                                                                                                                               
 
-Peter
+Uses a table based approach to select the correct init function.
+
+Fix some compiler errors.
+
+Peter De Schrijver (3):
+  arm/tegra: prepare Seaboard pinmux code for derived boards
+  arm/tegra: add support for ventana pinmuxing
+  arm/tegra: device tree support for ventana board
+
+ arch/arm/boot/dts/tegra-ventana.dts         |   32 ++++++++++++++
+ arch/arm/mach-tegra/Kconfig                 |    6 +++
+ arch/arm/mach-tegra/Makefile                |    1 +
+ arch/arm/mach-tegra/Makefile.boot           |    1 +
+ arch/arm/mach-tegra/board-dt.c              |    5 ++-
+ arch/arm/mach-tegra/board-seaboard-pinmux.c |   63 ++++++++++++++++++++++++---
+ 6 files changed, 101 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/tegra-ventana.dts
