@@ -1,24 +1,45 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Mon, 03 Oct 2011 15:48:54 +0900
-Subject: [alsa-devel] [PATCH 5/6] ASoC: samsung: fix Kconfig dependencies
-In-Reply-To: <3289863.m6ULFZUV3p@wuerfel>
-References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
-	<1317587284-2776-6-git-send-email-arnd@arndb.de>
-	<20111002204729.GC5811@opensource.wolfsonmicro.com>
-	<3289863.m6ULFZUV3p@wuerfel>
-Message-ID: <004e01cc8198$848347f0$8d89d7d0$@com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 03 Oct 2011 09:53:50 +0300
+Subject: [PATCH 02/30] video/omap: fix dependencies
+In-Reply-To: <1317566760-25681-3-git-send-email-arnd@arndb.de>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<1317566760-25681-3-git-send-email-arnd@arndb.de>
+Message-ID: <1317624830.2026.6.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Mon, Oct 03, 2011 at 6:15:03AM , Arnd Bergmann wrote:
-> It's a bug that I only observed on exynos4, and it could be that
-> this patch didn't actually solve it in the end. I'll drop it for
-> now and do a better report when the problem comes back.
+Hi Arnd,
 
-Could you please explain problem which observed on exynos4?
-If possible, I want to check it too.
+On Sun, 2011-10-02 at 16:45 +0200, Arnd Bergmann wrote:
+> The lcd_2430sdp and lcd_ldp drivers depend on TWL4030, which is not
+> well expressed in the Kconfig. Create new configuration options for
+> these in order to describe the dependencies correctly.
+> 
+> In some cases, the driver cannot be a loadable module, so better
+> force it to be built-in.
+> 
+> While we're at it, simplify the Makefile syntax.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
+>  drivers/video/omap/Kconfig  |   41 +++++++++++++++++++++++++---
+>  drivers/video/omap/Makefile |   64 ++++++++++++++++++++-----------------------
+>  2 files changed, 67 insertions(+), 38 deletions(-)
 
-Thanks
+I have ported lcd_2430sdp and lcd_ldp drivers (and also other OMAP2/3
+panel drivers, except N800) to the newer omapdss driver
+(drivers/video/omap2), and the code is in my for-next branch
+(git://gitorious.org/linux-omap-dss2/linux.git for-next).
 
-Sangbeom.
+I have also worked on removing OMAP2/3 support from the old omapfb
+driver, thus making it OMAP1 fb driver. This code is not yet ready, and
+won't make it in the next merge window.
+
+Your patch will conflict with both of those changes. Is it ok for you to
+drop this patch, and I'll make a new one on top of my changes to clean
+up the Makefile in a similar way than you did? The new patch wouldn't
+make it in the next merge window, though, but I don't think this patch
+is fixing any bigger bug, so perhaps it's not so urgent.
+
+ Tomi
