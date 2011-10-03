@@ -1,39 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 3 Oct 2011 15:25:24 +0100
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <4E89C3FA.9020206@gmail.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<4E89C3FA.9020206@gmail.com>
-Message-ID: <20111003142524.GN3731@opensource.wolfsonmicro.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 3 Oct 2011 15:32:39 +0100
+Subject: [PATCH] arm: proc-v7: pc phy addresses before disable MMU
+In-Reply-To: <4E7DA3C0.7000208@stericsson.com>
+References: <1316851370-7284-1-git-send-email-per.forlin@stericsson.com>
+	<20110924081342.GA2639@mwesterb-mobl.ger.corp.intel.com>
+	<4E7DA3C0.7000208@stericsson.com>
+Message-ID: <20111003143239.GC2117@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2011 at 09:17:30AM -0500, Rob Herring wrote:
-> On 09/22/2011 05:26 PM, Mike Turquette wrote:
+On Sat, Sep 24, 2011 at 11:32:48AM +0200, Per F?rlin wrote:
+> On 09/24/2011 10:13 AM, Mika Westerberg wrote:
+> > On Sat, Sep 24, 2011 at 10:02:50AM +0200, Per Forlin wrote:
+> >> PC runs virtual addresses when calling cpu_v7_reset(). The MMU
+> >> is switched off and "mov pc, r0" sets pc back to
+> >> virtual addresses even though the MMU is switched off.
+> >> This will result in a crash if the pipeline delay after
+> >> MMU disable is one instruction. To prevent this set PC
+> >> to physical addresses before disabling the MMU.
+> >>
+> >> Signed-off-by: Per Fransson <per.xx.fransson@stericsson.com>
+> >> Signed-off-by: Per Forlin <per.forlin@stericsson.com>
+> >> ---
+> >>  arch/arm/mm/proc-v7.S |    1 +
+> >>  1 files changed, 1 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> >> index 9049c07..f26e831 100644
+> >> --- a/arch/arm/mm/proc-v7.S
+> >> +++ b/arch/arm/mm/proc-v7.S
+> >> @@ -64,6 +64,7 @@ ENDPROC(cpu_v7_proc_fin)
+> >>   */
+> >>  	.align	5
+> >>  ENTRY(cpu_v7_reset)
+> >> +	sub	pc, pc, #PAGE_OFFSET+4		@ go to physical addresses
+> > 
+> > This only works on machines where PHYS_OFFSET is zero.
+> > 
+> You are right! Russell was very quick to point out the same thing. 
 
-A lot of stuff that should really have been cut plus...
+For reference, I'll also point out that except for "mov pc,<Rm>", 
+almost no instruction involving an explicit reference to the pc will
+safely do what you want in Thumb-2 kernels, due to the variable instruction
+size.
 
-> > +	if (clk->ops->get_parent)
-> > +		/* We don't to lock against prepare/enable here, as
-> > +		 * the clock is not yet accessible from anywhere */
-> > +		clk->parent = clk->ops->get_parent(clk->hw);
-
-> I don't think this is going to work. This implies that the parent clock
-> is already registered. For simple clk trees, that's probably not an
-> issue, but for chips with lots of muxing it will be impossible to get
-> the order correct for all cases. This is not an issue today as most
-> clocks are statically created.
-
-> I think what is needed is a 2 stage init. The 1st stage to create all
-> the clocks and a 2nd stage to build the tree once all clocks are created.
-
-> Tracking the parents using struct clk_hw instead would help as long as
-> clocks are still statically allocated. However, that won't help for
-> devicetree.
-
-This isn't in any way specific to clocks, right now the likely solution
-looks to be Grant's changes for retrying probe() as new devices come on
-line.  With that devices can return a code from their probe() which
-tells the driver core that they couldn't get all the resources they need
-and that it should retry the probe() if more devices come on-line.
+Cheers
+---Dave
