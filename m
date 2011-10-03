@@ -1,110 +1,46 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 03 Oct 2011 14:59:28 -0400 (EDT)
-Subject: Please help with the OMAP static mapping mess
-Message-ID: <alpine.LFD.2.02.1110031312480.9106@xanadu.home>
+Date: Mon, 03 Oct 2011 15:12:46 -0400 (EDT)
+Subject: [PATCH v4 02/10] ARM: SoC: Add per SoC SMP and CPU hotplug
+	operations
+In-Reply-To: <1317663356-5114-3-git-send-email-marc.zyngier@arm.com>
+References: <1317663356-5114-1-git-send-email-marc.zyngier@arm.com>
+	<1317663356-5114-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <alpine.LFD.2.02.1110031508270.9106@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 3 Oct 2011, Marc Zyngier wrote:
 
-<rant>
+> Populate the SoC descriptor structure with the SMP and CPU hotplug
+> operations. To allow the kernel to continue building, the platform
+> hooks are defined as weak symbols which are overrided by the
+> platform code. Once all platforms are converted, the "weak" attribute
+> will be removed and the function made static.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+[...]
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -141,8 +141,12 @@ static const char *cpu_name;
+>  static const char *machine_name;
+>  static char __initdata cmd_line[COMMAND_LINE_SIZE];
+>  struct machine_desc *machine_desc __initdata;
+> -const struct arm_soc_desc *soc_desc;
+> -static struct arm_soc_desc __soc_desc __read_mostly;
+> +const struct arm_soc_desc *soc_desc __initdata;
 
-I must state up front that I'm starting to share the frustration that 
-was publicly expressed by some other kernel maintainers on a few 
-occasions during the last year.  I'm sorry that this frustration 
-build-up often ends up bursting out on the OMAP code, but the OMAP 
-kernel community is not (or at least used not to) always play fair with 
-the rest of the kernel code and this is probably what is tipping us over 
-the edge.  There is a faint "let's hack our way through locally and work 
-around the generic code limitations" smell here that is not pleasant at 
-all.
+Does the above belong in this patch?
 
-</rant>
+> +#ifdef CONFIG_SMP
+> +const struct arm_soc_smp_init_ops *soc_smp_init_ops  __initdata;
+> +const struct arm_soc_smp_ops *soc_smp_ops  __cpuinitdata;
+> +static struct arm_soc_smp_ops __soc_smp_ops __cpuinitdata;
+> +#endif
 
-So... here's the issue:
-
-In arch/arm/mach-omap2/common.c:
-
-static void __init __omap2_set_globals(struct omap_globals *omap2_globals)
-{
-        omap2_set_globals_tap(omap2_globals);
-        omap2_set_globals_sdrc(omap2_globals);
-        omap2_set_globals_control(omap2_globals);
-        omap2_set_globals_prcm(omap2_globals);
-}
-
-and also
-
-void __init omap2_set_globals_443x(void)
-{
-        omap2_set_globals_tap(&omap4_globals);
-        omap2_set_globals_control(&omap4_globals);
-        omap2_set_globals_prcm(&omap4_globals);
-}
-
-Except for omap2_set_globals_tap(), those calls all look like:
-
-void __init omap2_set_globals_prcm(struct omap_globals *omap2_globals)
-{
-        /* Static mapping, never released */
-        if (omap2_globals->prm) {
-                prm_base = ioremap(omap2_globals->prm, SZ_8K);
-                WARN_ON(!prm_base);
-        }
-        if (omap2_globals->cm) {
-                cm_base = ioremap(omap2_globals->cm, SZ_8K);
-                WARN_ON(!cm_base);
-        }
-        if (omap2_globals->cm2) {
-                cm2_base = ioremap(omap2_globals->cm2, SZ_8K);
-                WARN_ON(!cm2_base);
-        }
-}
-
-The problem is that those ioremap() calls are performed _*before*_ the 
-memory is fully set up yet, and also even before the corresponding 
-static mappings are even in place!  So not only is the ioremap code 
-unoperational at this point, but a generic way to trap ioremap() calls 
-in order to toss a static mapping back won't even work here because 
-iotable_init() was not even called yet.
-
-The current code get away with it because OMAP is providing its own 
-__arch_ioremap() which does the interception and provide a virtual 
-address from hardcoded but yet to exist mappings.  But the goal of 
-global kernel maintenance is to _remove_ such SOC-specific special cases 
-and move such a perfectly valid optimization into core code where it can 
-be applied uniformly to all.  So the OMAP __arch_ioremap() is going 
-away, meaning that static mappings have to be in place before ioremap() 
-calls can return something minimally usable.
-
-OK, so let's modify omap4_panda_map_io() just to test this one board and 
-reverse the omap44xx_map_common_io() and omap2_set_globals_443x() call 
-order.  Now the mappings will be there before ioremap() is called.  But 
-that, too, doesn't work and the kernel now complains with:
-
-|OMAP revision unknown, please fix!
-|Uninitialized omap_chip, please fix!
-|Could not detect SRAM size
-
-But it looks like omap2_set_globals_tap() still has to be called first!  
-Isn't this wonderfully convoluted?
-
-Also the repeated local_flush_tlb_all()/flush_cache_all() calls found in 
-the OMAP mdesc->map_io code paths (one in _omap2_map_common_io(), 
-another in omap_map_sram(), just to pick those as examples) is a sure 
-sign that too much is being done via this call and layering violations 
-are present.
-
-So could someone in the OMAP camp fix this nonsense ASAP please?
-Of course, yesterday would be best.
-
-Furthermore... there is also a static mapping for physical address 
-0x4e000000 using virtual address 0xff100000 which is already reserved 
-for other purposes i.e. the consistent DMA area.  It is not immediately 
-obvious where this comes from without being intimate with the OMAP code. 
-Can this be fixed as well i.e. moved elsewhere please?
-
-Patches will be extremely welcome.
-Thank you.
+Maybe those could be moved in smp.c instead.
 
 
 Nicolas
