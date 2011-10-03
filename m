@@ -1,45 +1,66 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 4 Oct 2011 08:59:56 +0800
-Subject: [PATCH 16/26] ARM: pxa: CPU_PJ4 requires IWMMXT
-In-Reply-To: <20295619.jOfPxmug8T@wuerfel>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-17-git-send-email-arnd@arndb.de>
-	<20111002160328.GZ11710@n2100.arm.linux.org.uk>
-	<20295619.jOfPxmug8T@wuerfel>
-Message-ID: <CAMPhdO96WwmPVqVpM2Vpef3wSgfHEf-0tK5VewXn-EGMns2ubA@mail.gmail.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Tue, 04 Oct 2011 10:16:00 +1030
+Subject: [PATCH] virtio: Add platform bus driver for memory mapped virtio
+	device
+In-Reply-To: <1317217663-32647-1-git-send-email-pawel.moll@arm.com>
+References: <1317217663-32647-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <878vp1iqpz.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 8<-----
-> Subject: [PATCH] ARM: pxa: CPU_PJ4 requires IWMMXT
->
-> The PJ4 based pxa95x cpus all have iwmmxt and there is no way to
-> build that code conditionally, so better not ask the user
-> in that configuration, in order to prevent broken builds.
+On Wed, 28 Sep 2011 14:47:43 +0100, Pawel Moll <pawel.moll@arm.com> wrote:
+> This patch, based on virtio PCI driver, adds support for memory
+> mapped (platform) virtio device. This should allow environments
+> like qemu to use virtio-based block & network devices even on
+> platforms without PCI support.
+> 
+> One can define and register a platform device which resources
+> will describe memory mapped control registers and "mailbox"
+> interrupt. Such device can be also instantiated using the Device
+> Tree node with compatible property equal "virtio,mmio".
 
-I think this is true for other xscale CPUs as well, so either we make
-them unconditionally all at once, or we still leave an option here.
+Hi Pawel...
 
-It actually looks quite odd to me that CPU_PJ4 is made special here,
-what're the real broken builds errors?
+> +/* The alignment to use between consumer and producer parts of vring.
+> + * Currently hardcoded to page size. */
+> +#define VIRTIO_MMIO_VRING_ALIGN		PAGE_SIZE
 
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 5ebc5d9..8d66c32 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1071,9 +1071,10 @@ config ARM_TIMER_SP804
-> ?source arch/arm/mm/Kconfig
->
-> ?config IWMMXT
-> - ? ? ? bool "Enable iWMMXt support"
-> + ? ? ? bool "Enable iWMMXt support" if !CPU_PJ4
-> ? ? ? ?depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
-> ? ? ? ?default y if PXA27x || PXA3xx || PXA95x || ARCH_MMP
-> + ? ? ? default y if CPU_PJ4
-> ? ? ? ?help
-> ? ? ? ? ?Enable support for iWMMXt context switching at run time if
-> ? ? ? ? ?running on a CPU that supports it.
->
+Really?  Shouldn't that just be 4k?  I haven't seen the qemu side of
+this, but it seems weird to depend on the kernel's idea of page size...
+
+Note that the seabios/coreboot hackers wanted a smaller ring alignment
+so they didn't have to waste two precious pages per device.  You might
+want to consider making this an option in the header (perhaps express
+it as log2, eg. 12 rather than 4096).
+
+
+> +	/* TODO: Write requested queue size to VIRTIO_MMIO_QUEUE_NUM */
+> +
+> +	/* Check if queue is either not available or already active. */
+> +	num = readl(vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
+> +	if (!num || readl(vm_dev->base + VIRTIO_MMIO_QUEUE_PFN)) {
+
+Please fix this now, like so:
+
+        /* Queue shouldn't already be set up. */        
+        if (readl(vm_dev->base + VIRTIO_MMIO_QUEUE_PFN))
+                ...
+
+        /* Try for a big queue, drop down to a two-page queue. */
+        num = VIRTIO_MMIO_MAX_RING;
+        for (;;) {
+                size = PAGE_ALIGN(vring_size(num, VIRTIO_MMIO_VRING_ALIGN));
+                info->queue = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
+                if (info->queue)
+                        break;
+
+                /* Already smallest possible allocation? */
+                if (size == VIRTIO_MMIO_VRING_ALIGN*2) {
+                        err = -ENOMEM;
+                        goto error_kmalloc;
+                }
+                num /= 2;
+        }
+
+Thanks,
+Rusty.
