@@ -1,29 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Oct 2011 11:33:16 +0200
-Subject: [PATCH] ARM: EXYNOS: Add ARCH_EXYNOS and reorganize
-	arch/arm/mach-exynos
-In-Reply-To: <CAH9JG2UNwZxDTPnwjohxhCumKZx_mWcPUn2rROjmjmROoxF07w@mail.gmail.com>
-References: <001f01cc80e5$3abd1c80$b0375580$%kim@samsung.com>
-	<CAH9JG2UNwZxDTPnwjohxhCumKZx_mWcPUn2rROjmjmROoxF07w@mail.gmail.com>
-Message-ID: <5785830.Sj7W4aL3qy@wuerfel>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 03 Oct 2011 15:03:30 +0530
+Subject: [PATCH 28/30] ARM: omap: select CPU_FREQ_TABLE where needed
+In-Reply-To: <5173921.eT2vCfT35d@wuerfel>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<1317566760-25681-29-git-send-email-arnd@arndb.de>
+	<4E894A95.5030107@ti.com> <5173921.eT2vCfT35d@wuerfel>
+Message-ID: <4E89816A.5050704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 October 2011 13:02:16 Kyungmin Park wrote:
-> I'm afraid to change machine directory name again. mach-s5pv310 ->
-> mach-exynos4 -> mach-exynos.
-> As I remember linus blamed the renaming the file names are happened
-> frequently at ARM
+On Monday 03 October 2011 02:45 PM, Arnd Bergmann wrote:
+> On Monday 03 October 2011 11:09:33 Santosh Shilimkar wrote:
+>>> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+>>> index bb8f4a6..f7ef9f4 100644
+>>> --- a/arch/arm/plat-omap/Kconfig
+>>> +++ b/arch/arm/plat-omap/Kconfig
+>>> @@ -217,6 +217,11 @@ config OMAP_PM_NOOP
+>>>  
+>>>  endchoice
+>>>  
+>>> +config OMAP_CPU_FREQ
+>>> +     def_bool "y"
+>>> +     depends on CPU_FREQ
+>>> +     select CPU_FREQ_TABLE
+>>> +
+>>>  endmenu
+>> With CPUFREQ series from Kevin [1], I don't think we need this any-more.
+> 
+> I guess if it's needed, it should at least be moved to the new cpufreq
+> location.
+> 
+Probably you are right. CPU_FREQ_TABLE is selected today if
+CPU_FREQ_STAT or CPU_FREQ_GOV_ONDEMAND is selected. Without these two
+enabled, in won't be selected.
 
-I tend to agree with this. While the new name does make more sense,
-I would first like to see the bigger plan. If you are eventually
-planning to consolidate all of mach-s5p64x0, mach-s5pc100, mach-s5pv210,
-mach-exynos4 and plat-s5p into one common mach-s5p or mach-exynos
-directory, I'm all for that because it reduces code duplication
-and work required for the overall cross-subarchitecture single zimage
-work.
+>> More so, I didn't find OMAP_CPU_FREQ is being used anywhere on mainline.
+> 
+> Yes, OMAP_CPU_FREQ is a symbol that is intentionally unused, with the
+> only purpose of selecting CPU_FREQ_TABLE if any omap platform together
+> with CPU_FREQ is enabled.
+>
+I see. This wasn't clear to me.
 
-Simply renaming something because the name does not quite fit entirely
-should be done very carefully.
+> Let's drop this patch for now, if it is still needed as I think, I can
+> do a patch during the 3.2 cycle for the right location.
+> 
+Ok.
 
-	Arnd
+Regards
+Santosh
