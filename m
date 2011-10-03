@@ -1,71 +1,47 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 03 Oct 2011 11:21:10 +0300
-Subject: [PATCH v2] OMAP2PLUS: DSS: Ensure DSS works correctly if
-	display is enabled in bootloader
-In-Reply-To: <alpine.DEB.2.00.1110022237171.4611@utopia.booyaka.com>
-References: <1315811306-11001-1-git-send-email-archit@ti.com>
-	<alpine.DEB.2.00.1110022237171.4611@utopia.booyaka.com>
-Message-ID: <1317630070.2026.27.camel@deskari>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon,  3 Oct 2011 11:46:15 +0200
+Subject: [PATCH 2/3] tty/serial: atmel_serial: whitespace and braces
+	modifications
+In-Reply-To: <b371e80a96a36d962fb8806c2bd7aa20bb688b88.1317634987.git.nicolas.ferre@atmel.com>
+References: <b371e80a96a36d962fb8806c2bd7aa20bb688b88.1317634987.git.nicolas.ferre@atmel.com>
+Message-ID: <0349cfe6fbc65fec3321c588f39e01d37dcbc6b8.1317634987.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/tty/serial/atmel_serial.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-On Sun, 2011-10-02 at 22:45 -0600, Paul Walmsley wrote:
-> Hi
-> 
-> some comments:
-> 
-> On Mon, 12 Sep 2011, Archit Taneja wrote:
-> 
-> > Resetting DISPC when a DISPC output is enabled causes the DSS to go into an
-> > inconsistent state. Thus if the bootloader has enabled a display, the hwmod code
-> > cannot reset the DISPC module just like that, but the outputs need to be
-> > disabled first.
-> > 
-> > Add function dispc_disable_outputs() which disables all active overlay manager
-> > and ensure all frame transfers are completed.
-> > 
-> > Modify omap_dss_reset() to call this function and clear DSS_CONTROL,
-> > DSS_SDI_CONTROL and DSS_PLL_CONTROL so that DSS is in a clean state when the
-> > DSS2 driver starts.
-> > 
-> > This resolves the hang issue(caused by a L3 error during boot) seen on the
-> > beagle board C3, which has a factory bootloader that enables display. The issue
-> > is resolved with this patch.
-
-<snip>
-
-> +struct omap_dss_dispc_dev_attr {
-> +	u8	manager_count;
-> +	bool	has_framedonetv_irq;
-> +};
-> +
-> +#endif
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-> index 09d9395..8e32cb3 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-> @@ -945,6 +945,7 @@ static struct omap_hwmod omap2420_dss_dispc_hwmod = {
->  	.slaves_cnt	= ARRAY_SIZE(omap2420_dss_dispc_slaves),
->  	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
->  	.flags		= HWMOD_NO_IDLEST,
-> +	.dev_attr	= &omap2_3_dss_dispc_dev_attr
->  };
-
-I didn't know you can add arbitrary data like that to hwmods. What kind
-of data is it meant for? Can the data be used by the driver, or is it
-meant just for arch stuff?
-
-I'm wondering this as we have a complex mechanism in the dss driver to
-find out about the differences of DSS hardware
-(drivers/video/omap2/dss/dss_features.[ch]). The dss_features system is
-currently part of the driver, but should be moved under arch/arm/*omap*
-at some point, and this hwmod dev_attr sounds like it could possibly be
-a right place to handle these.
-
-I looked at how the dev_attrs are used, and all of them seemed to be
-very small, a few fields at max. The DSS features set is, on the other
-hand, quite big amount of data, and meant for the driver.
-
- Tomi
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 08b5273..a652f8f 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1430,10 +1430,10 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+ 
+ 	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
+ 
+-	if (pdata->regs)
++	if (pdata->regs) {
+ 		/* Already mapped by setup code */
+ 		port->membase = pdata->regs;
+-	else {
++	} else {
+ 		port->flags	|= UPF_IOREMAP;
+ 		port->membase	= NULL;
+ 	}
+@@ -1447,9 +1447,10 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+ 		/* only enable clock when USART is in use */
+ 	}
+ 
+-	atmel_port->use_dma_rx = pdata->use_dma_rx;
+-	atmel_port->use_dma_tx = pdata->use_dma_tx;
++	atmel_port->use_dma_rx	= pdata->use_dma_rx;
++	atmel_port->use_dma_tx	= pdata->use_dma_tx;
+ 	atmel_port->rs485	= pdata->rs485;
++
+ 	/* Use TXEMPTY for interrupt when rs485 else TXRDY or ENDTX|TXBUFE */
+ 	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
+ 		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
+-- 
+1.7.3
