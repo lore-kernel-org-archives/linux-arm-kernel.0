@@ -1,38 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Oct 2011 11:49:15 +0200
-Subject: [PATCH 08/30] ARM: omap2+: fix building without i2c
-In-Reply-To: <alpine.DEB.2.00.1110021928170.4611@utopia.booyaka.com>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-9-git-send-email-arnd@arndb.de>
-	<alpine.DEB.2.00.1110021928170.4611@utopia.booyaka.com>
-Message-ID: <1443629.oeLM18uNcs@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 03 Oct 2011 11:49:11 +0200
+Subject: [PATCH 3/3] tty/serial: atmel_serial: __devinit_p for probe
+	function
+In-Reply-To: <4355360.0xR5ZY7sEk@wuerfel>
+References: <cd489c1d28c26624d6b68399d222aec371045e53.1317634987.git.nicolas.ferre@atmel.com>
+	<d7c2023edfbeb3d21bccd5b997f7806874b01b04.1317636473.git.nicolas.ferre@atmel.com>
+	<4355360.0xR5ZY7sEk@wuerfel>
+Message-ID: <4E898517.6020104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 02 October 2011 19:31:25 Paul Walmsley wrote:
+On 10/03/2011 11:36 AM, Arnd Bergmann :
+> On Monday 03 October 2011 12:11:19 Nicolas Ferre wrote:
+>>  }
+>>  
+>>  static struct platform_driver atmel_serial_driver = {
+>> -       .probe          = atmel_serial_probe,
+>> +       .probe          = __devinit_p(atmel_serial_probe),
+>>         .remove         = __devexit_p(atmel_serial_remove),
+>>         .suspend        = atmel_serial_suspend,
+>>         .resume         = atmel_serial_resume,
+> 
+> Still wrong: __devinit_p does not exist and is not needed.
 
-> Nice catch.  I think the bug is different, though.  omap_i2c_reset should 
-> never be NULL: that code is intended to execute even when 
-> CONFIG_I2C_OMAP=n.  The idea is to prevent the IP block from interfering 
-> with the rest of the kernel even if the driver is not compiled in, no 
-> matter how the bootloader or previous OS programmed the IP block.
-> 
-> I'd suggest something like the following patch instead.
-> 
-> 
-> - Paul
-> 
-> From: Paul Walmsley <paul@pwsan.com>
-> Date: Sun, 2 Oct 2011 19:15:10 -0600
-> Subject: [PATCH] ARM: omap2+: fix build breakage when CONFIG_I2C_OMAP=n
-> 
-> arch/arm/mach-omap2/Makefile incorrectly skips compilation of the I2C
-> IP block reset code when CONFIG_I2C_OMAP=n.  Fix by unconditionally
-> compiling arch/arm/mach-omap2/i2c.o, which is needed on all OMAP2+ platforms.
-> 
-> Problem noted by Arnd Bergmann <arnd@arndb.de>.
+OMG, the not-enouth-coffee syndrome... twice!
 
-Ok, looks better. You should also drop patch 6 "ARM: omap: fix build with
-CONFIG_I2C_OMAP disabled" then.
+So we forget all this and I try to increase my signal/noise ratio ;-)
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Bye,
+-- 
+Nicolas Ferre
