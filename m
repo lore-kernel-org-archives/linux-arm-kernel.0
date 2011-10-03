@@ -1,35 +1,55 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 3 Oct 2011 13:16:39 +0100
-Subject: [GIT PULL] Samsung devel-2 for v3.2
-In-Reply-To: <20111003112235.GD11710@n2100.arm.linux.org.uk>
-References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
-	<20111002192950.GB1005@sirena.org.uk>
-	<005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
-	<20111003103626.GA3731@opensource.wolfsonmicro.com>
-	<20111003112235.GD11710@n2100.arm.linux.org.uk>
-Message-ID: <20111003121639.GF23811@sirena.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 3 Oct 2011 13:19:15 +0100
+Subject: [RFC PATCH 0/3] ARM: amba: defining module aliases for AMBA
+	driver autoloading
+In-Reply-To: <20111001164655.GL11710@n2100.arm.linux.org.uk>
+References: <1317401802-24362-1-git-send-email-dave.martin@linaro.org>
+	<20111001164655.GL11710@n2100.arm.linux.org.uk>
+Message-ID: <20111003121915.GA2117@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2011 at 12:22:35PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 03, 2011 at 11:36:26AM +0100, Mark Brown wrote:
+On Sat, Oct 01, 2011 at 05:46:55PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 30, 2011 at 05:56:39PM +0100, Dave Martin wrote:
+> > Issues:
+> > 
+> >   * Do new module alises need to be globally agreed/registered
+> >     somewhere?
+> 
+> I don't think there is.  Having the bus prefix in there is definitely a
+> good thing.
 
-> > It's possible it's something that doesn't manifest on that board, I've
-> > no real idea what's exploding or why.  There's also a bunch of other
-> > early boot problems right now like try_to_freeze() which aren't helping.
+OK, I'll stick with "amba:" for now, then.
 
-> I don't know whether I can solve that before the next merge window.
-> There's lots of corner cases, and I'm no longer convinced that my
-> previous patch doesn't introduce more problems than it solves (such
-> as completely breaking the -ERESTART_RESTARTBLOCK handing.)
+> >   * Because a driver's ID table is in match-and-mask format whereas
+> >     udev uses string pattern matching, we effectively have to
+> >     maintain two ID tables per driver, containing the same
+> >     information in different formats.  The patch to mmci.c gives an
+> >     example.
+> > 
+> >     I predict that maintenance of those duplicated tables will be
+> >     somewhat painful and error-prone.  However, the necessary
+> >     transformations, while simple, are beyond the scope of the C
+> >     preprocessor.
+> > 
+> >     In order to avoid this duplication of information, an extra
+> >     (but simple) bit of build-time infrastructure would be needed.
+> > 
+> >     I think this effort would be worth it -- does anyone have
+> >     strong views on this?
+> 
+> I think there is some support for udev to use PCI ID tables directly.
+> I don't know how that works - I suspect it requires module tools
+> support though.  Might be worth investigating.
 
-> While it's possible to shut up the warning by enabling IRQs, that makes
-> the race for restarting (or not restarting) syscalls *huge*, and that
-> could cause unexpected userspace behaviour depending on whether they
-> handle EINTR and _how_ they handle EINTR on system calls which they
-> expect would've been restarted by the kernel.
+Hmmm, it looks like there's some magic for other bus types like PCI and
+USB, where some scripting generates appropriate module aliases from
+drivers' device tables (see scripts/mod/file2alias.c)
 
-It looks like the patches to stop it happening constantly have been
-applied so it's a much less serious problem than it was originally - we
-can boot and run reasonably cleanly.  It's certainly not the crippling
-issue it was originally.
+I'll see whether we can hook into that.  This would allow us to avoid
+having to describe the aliases explicitly.
+
+Thanks for the feedback.
+
+Cheers
+---Dave
