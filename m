@@ -1,27 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 3 Oct 2011 11:36:26 +0100
-Subject: [GIT PULL] Samsung devel-2 for v3.2
-In-Reply-To: <005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
-References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
-	<20111002192950.GB1005@sirena.org.uk>
-	<005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
-Message-ID: <20111003103626.GA3731@opensource.wolfsonmicro.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 3 Oct 2011 11:57:03 +0100
+Subject: [PATCH v4] ARM: cache-l2x0: add resume entry for l2 in secure mode
+In-Reply-To: <20111001150646.GB11710@n2100.arm.linux.org.uk>
+References: <1317375773-7229-1-git-send-email-Barry.Song@csr.com>
+	<20111001150646.GB11710@n2100.arm.linux.org.uk>
+Message-ID: <20111003105658.GC14761@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2011 at 12:27:22PM +0900, Kukjin Kim wrote:
-> Mark Brown wrote:
+On Sat, Oct 01, 2011 at 04:06:46PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 30, 2011 at 02:42:53AM -0700, Barry Song wrote:
+> > From: Barry Song <Baohua.Song@csr.com>
+> > 
+> > we save the l2x0 registers at the first initialization, and platform codes
+> > can get them to restore l2x0 status after wakeup.
+> > 
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Tested-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> This looks fine, thanks Barry.
+> 
+> The one remaining issue is whether we use this or use Lorenzo's patches.
+> I feel that Barry's version is a lot simpler and easier to use, so this
+> is my preference.  Anyone else got another opinion between the two?
+> 
 
-> > As I reported the other day this change breaks the boot early on on the
-> > Cragganmore S3C6410 based systems (I've not actually fired up my
-> > SMDK6410 but I suspect it may have issues too).  I did make some brief
-> > attempts to debug but as there's no console output at all and the diff
-> > is rather large it's not easy to see what's gone wrong.
+Basically the two patches do the same thing except that Barry's generic
+resume code cannot be called before the MMU is turned on. On the other hand
+Barry's patch is certainly simpler to maintain and I think it should be 
+merged, preference shared; I would not say it is easier to use though, usage 
+is identical.
 
-> Hmm, I thought it has no problem when I saw Thomas Abraham's 'serial:
-> samsung' patches because he said it works fine with my for-next plus his
-> patches on SMDK6410...Anyway, I need to sort it out.
+It is agreed, better to have it in C than in asm for maintenance reasons, 
+asm can turn out overkill.
+If there is a compelling case for generic L2 asm we can always add it at a 
+later stage (at least Origen, latest iMX and I think Tegra will need early L2
+resume from idle).
 
-It's possible it's something that doesn't manifest on that board, I've
-no real idea what's exploding or why.  There's also a bunch of other
-early boot problems right now like try_to_freeze() which aren't helping.
+Lorenzo
