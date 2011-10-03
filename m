@@ -1,32 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 03 Oct 2011 14:33:30 +0100
-Subject: [PATCH] ARM: debug: provide dummy default option for DEBUG_LL
-	UART choice
-In-Reply-To: <1317374927-4997-1-git-send-email-will.deacon@arm.com>
-References: <1317374927-4997-1-git-send-email-will.deacon@arm.com>
-Message-ID: <4E89B9AA.8030406@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Oct 2011 14:41:46 +0100
+Subject: [PATCH v4] ARM: cache-l2x0: add resume entry for l2 in secure mode
+In-Reply-To: <20111003105658.GC14761@e102568-lin.cambridge.arm.com>
+References: <1317375773-7229-1-git-send-email-Barry.Song@csr.com>
+	<20111001150646.GB11710@n2100.arm.linux.org.uk>
+	<20111003105658.GC14761@e102568-lin.cambridge.arm.com>
+Message-ID: <20111003134145.GE11710@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/09/11 10:28, Will Deacon wrote:
-> Defaulting to DEBUG_ICEDCC will cause systems to hang during boot unless
-> a hardware debugger is listening to the debug comms. channel.
+On Mon, Oct 03, 2011 at 11:57:03AM +0100, Lorenzo Pieralisi wrote:
+> On Sat, Oct 01, 2011 at 04:06:46PM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Sep 30, 2011 at 02:42:53AM -0700, Barry Song wrote:
+> > > From: Barry Song <Baohua.Song@csr.com>
+> > > 
+> > > we save the l2x0 registers at the first initialization, and platform codes
+> > > can get them to restore l2x0 status after wakeup.
+> > > 
+> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> > > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > > Tested-by: Shawn Guo <shawn.guo@linaro.org>
+> > 
+> > This looks fine, thanks Barry.
+> > 
+> > The one remaining issue is whether we use this or use Lorenzo's patches.
+> > I feel that Barry's version is a lot simpler and easier to use, so this
+> > is my preference.  Anyone else got another opinion between the two?
+> > 
 > 
-> This patch adds a dummy UART option as the default DEBUG_LL choice which
-> requires the platform to do the right thing.
+> Basically the two patches do the same thing except that Barry's generic
+> resume code cannot be called before the MMU is turned on. On the other hand
+> Barry's patch is certainly simpler to maintain and I think it should be 
+> merged, preference shared; I would not say it is easier to use though, usage 
+> is identical.
 > 
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> 
-> This came out of discussion on the list yesterday but I thought I'd better
-> post a patch before sending to Russell.
+> It is agreed, better to have it in C than in asm for maintenance reasons, 
+> asm can turn out overkill.
+> If there is a compelling case for generic L2 asm we can always add it at a 
+> later stage (at least Origen, latest iMX and I think Tegra will need early L2
+> resume from idle).
 
-This fixes my OMAP4 boot problems (where DEBUG_ICEDCC got silently
-selected). Tested on -next-20110930.
-
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ok, so it sounds like we're settled on Barry's code... so can it head to
+the patch system please?
