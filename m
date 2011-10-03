@@ -1,73 +1,97 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 3 Oct 2011 01:10:51 +0300
-Subject: [PATCH 15/30] usb/musb: use a Kconfig choice to pick the right
-	DMA method
-In-Reply-To: <1546914.88vcgxkfJf@wuerfel>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1757336.Qk72n3s00p@wuerfel>
-	<20111002185608.GA25690@legolas.emea.dhcp.ti.com>
-	<1546914.88vcgxkfJf@wuerfel>
-Message-ID: <20111002221050.GA25790@legolas.emea.dhcp.ti.com>
+From: thiago.correa@gmail.com (Thiago A. Correa)
+Date: Sun,  2 Oct 2011 20:32:48 -0400
+Subject: [PATCH 1/1] ARM: Make debug UART optional for S3C devices
+In-Reply-To: <yes>
+References: <yes>
+Message-ID: <1317601968-9194-1-git-send-email-thiago.correa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch makes serial debug messages optional on
+Samsung SoC s3c devices making all UART ports available
+for other uses.
 
-On Sun, Oct 02, 2011 at 09:44:26PM +0200, Arnd Bergmann wrote:
-> > that's how MUSB works now and that's what I have been discussing with
-> > Alan Stern for the past month or so, wrt to *HCI. There are even patches
-> > floating on linux-usb right now trying to hash out the problems.
-> 
-> Ah, glad to see that is happening. I can probably get rid of a bunch
-> of randconfig patches I have for those then.
+Signed-off-by: Thiago A. Correa <thiago.correa@gmail.com>
+---
+ arch/arm/boot/compressed/head.S                 |    2 +-
+ arch/arm/plat-samsung/Kconfig                   |   11 +++++++++++
+ arch/arm/plat-samsung/include/plat/uncompress.h |    9 +++++++++
+ 3 files changed, 21 insertions(+), 1 deletions(-)
 
-glad to hear you're sorting out randconfig :-)
-
-> > Maybe you should have consulted the maintainers of those drivers before
-> > making such statements.
-> >
-> > MUSB is not the best example because of its history. I understand the
-> > DMA part is still really messy, but we have been working very hard to
-> > hash the problems and still allow new glue layers to be merged.
-> 
-> Sorry if I have made my statement sound like an accusation, it wasn't
-> meant as one, merely as a sigh at having identified yet another area
-> that needs to be changed in order to have cross-platform ARM kernels
-> working in every case.
-
-no big deal ;-)
-
-> > How about taking a sneak pick at what the code does right now ? As of
-> > today, I can even even have all UDC controller drivers into one kernel
-> > and I generally compile x86 with all controllers available. There's some
-> > very small work that has to be done on each of the UDC drivers to remove
-> > any references to <arch/..> <asm/..> and <plat/..> headers but that work
-> > in in progress.
-> 
-> I didn't really see any problems with UDC at all. What I saw were a lot
-> of build problems with the musb host side, and I rewrote this patch half
-> a dozen times before I ended up with a version that consistently built
-> without making the code look worse.
-
-I understand.
-
-> I also agree that the musb implementation is less of a problem than
-> ohci/ehci in its current form, as it already is layered in the right
-> way. I did not attempt to turn the Kconfig 'choice' statement there
-> into a flat list though, so I wouldn't know what problems to expect.
-
-Actually, MUSB still has lots of goofage from the original mentor
-release but that's another story.
-
-Anyway, I'll take your patches in, but their too late for this merge
-window :-( I already sent my last pull to Greg.
-
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 9f5ac11..3afb755 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -58,7 +58,7 @@
+ 		add	\rb, \rb, #0x00010000	@ Ser1
+ #endif
+ 		.endm
+-#elif defined(CONFIG_ARCH_S3C2410)
++#elif defined(CONFIG_ARCH_S3C2410) && CONFIG_ENABLE_DEBUG_S3C_UART
+ 		.macro loadsp, rb, tmp
+ 		mov	\rb, #0x50000000
+ 		add	\rb, \rb, #0x4000 * CONFIG_S3C_LOWLEVEL_UART_PORT
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index b3e1065..c2183f0 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -33,7 +33,17 @@ config S3C_BOOT_ERROR_RESET
+ 	  Say y here to use the watchdog to reset the system if the
+ 	  kernel decompressor detects an error during decompression.
+ 
++
++config ENABLE_DEBUG_S3C_UART
++	bool "Enable S3C Debug UART"
++	help
++	  Say Y here if you want debug print of low level kernel messages
++	  using S3C UARTS.
++
++	  If in doubt, say N.
++
+ config S3C_BOOT_UART_FORCE_FIFO
++       depends on ENABLE_DEBUG_S3C_UART
+        bool "Force UART FIFO on during boot process"
+        default y
+        help
+@@ -42,6 +52,7 @@ config S3C_BOOT_UART_FORCE_FIFO
+ 
+ 
+ config S3C_LOWLEVEL_UART_PORT
++	depends on ENABLE_DEBUG_S3C_UART
+ 	int "S3C UART to use for low-level messages"
+ 	default 0
+ 	help
+diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
+index ee48e12..778c2df 100644
+--- a/arch/arm/plat-samsung/include/plat/uncompress.h
++++ b/arch/arm/plat-samsung/include/plat/uncompress.h
+@@ -37,6 +37,7 @@ static void arch_detect_cpu(void);
+ /* how many bytes we allow into the FIFO at a time in FIFO mode */
+ #define FIFO_MAX	 (14)
+ 
++#if defined(CONFIG_ENABLE_DEBUG_S3C_UART)
+ #define uart_base S3C_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT)
+ 
+ static __inline__ void
+@@ -85,11 +86,19 @@ static void putc(int ch)
+ 	/* write byte to transmission register */
+ 	uart_wr(S3C2410_UTXH, ch);
+ }
++#else
++static inline void putc(int ch)
++{
++}
++
++
++#endif
+ 
+ static inline void flush(void)
+ {
+ }
+ 
++
+ #define __raw_writel(d, ad)			\
+ 	do {							\
+ 		*((volatile unsigned int __force *)(ad)) = (d); \
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111003/d84b67a2/attachment.sig>
+1.7.3.4
