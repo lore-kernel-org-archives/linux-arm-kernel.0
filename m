@@ -1,60 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 3 Oct 2011 15:59:09 -0700
-Subject: Please help with the OMAP static mapping mess
-In-Reply-To: <alpine.LFD.2.02.1110031827440.9106@xanadu.home>
-References: <alpine.LFD.2.02.1110031312480.9106@xanadu.home>
-	<20111003205658.GJ6324@atomide.com>
-	<alpine.LFD.2.02.1110031744100.9106@xanadu.home>
-	<alpine.LFD.2.02.1110031827440.9106@xanadu.home>
-Message-ID: <20111003225908.GL6324@atomide.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 03 Oct 2011 16:02:57 -0700
+Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <20110922184614.25419.84606.stgit@ponder> (Grant Likely's message
+	of "Thu, 22 Sep 2011 12:51:23 -0600")
+References: <20110922184614.25419.84606.stgit@ponder>
+Message-ID: <87d3edllum.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [111003 15:05]:
-> On Mon, 3 Oct 2011, Nicolas Pitre wrote:
-> 
-> > On Mon, 3 Oct 2011, Tony Lindgren wrote:
-> > 
-> > > * Nicolas Pitre <nico@fluxnic.net> [111003 11:26]:
-> > > > 
-> > > > Furthermore... there is also a static mapping for physical address 
-> > > > 0x4e000000 using virtual address 0xff100000 which is already reserved 
-> > > > for other purposes i.e. the consistent DMA area.  It is not immediately 
-> > > > obvious where this comes from without being intimate with the OMAP code. 
-> > > > Can this be fixed as well i.e. moved elsewhere please?
-> > > 
-> > > This sounds like a bug somewhere. Which omap are you seeing this on?
-> > 
-> > OMAP4430 on a Panda board.
-> > 
-> > Here are the static mappings I'm seeing:
-> > 
-> > phys = 0x44000000 virt = 0xf8000000 size = 0x100000
-> > phys = 0x4a000000 virt = 0xfc000000 size = 0x400000
-> > phys = 0x50000000 virt = 0xf9000000 size = 0x100000
-> > phys = 0x4c000000 virt = 0xfd100000 size = 0x100000
-> > phys = 0x4d000000 virt = 0xfe100000 size = 0x100000
-> > phys = 0x4e000000 virt = 0xff100000 size = 0x100000 <---
-> > phys = 0x48000000 virt = 0xfa000000 size = 0x400000
-> > phys = 0x54000000 virt = 0xfe800000 size = 0x800000
-> 
-> It looks like this comes from OMAP44XX_DMM_VIRT.
-> 
-> #define OMAP44XX_DMM_PHYS       OMAP44XX_DMM_BASE
->                                                 /* 0x4e000000 --> 0xfd300000 */
-> #define OMAP44XX_DMM_VIRT       (OMAP44XX_DMM_PHYS + OMAP4_L3_PER_IO_OFFSET)
-> #define OMAP44XX_DMM_SIZE       SZ_1M
-> 
-> The comment suggesting a mapping correspondance is obviously wrong. We have:
-> 
-> #define OMAP44XX_DMM_BASE       0x4e000000
-> #define OMAP4_L3_PER_IO_OFFSET  0xb1100000
-> 
-> Hence 0x4e000000 + 0xb1100000 = 0xff100000.
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-Seem like it might cause some random patterns in tiler :)
-Santosh, can youp please check it?
+> Allow drivers to report at probe time that they cannot get all the resources
+> required by the device, and should be retried at a later time.
+>
+> This should completely solve the problem of getting devices
+> initialized in the right order.  Right now this is mostly handled by
+> mucking about with initcall ordering which is a complete hack, and
+> doesn't even remotely handle the case where device drivers are in
+> modules.  This approach completely sidesteps the issues by allowing
+> driver registration to occur in any order, and any driver can request
+> to be retried after a few more other drivers get probed.
 
-Regards,
+This is great work, thanks!
 
-Tony
+For the TODO list:
+
+While the proposed patch should solve probe order dependencies, I don't
+think it will solve the suspend/resume ordering dependencies, which are
+typically the same.
+
+Currenly suspend/resume order is based on the order devices are *added*
+(device_add() -> device_pm_add() -> device added to dpm_list), so
+unfortunately, deferring probe isn't going to affect suspend/resume
+ordering.
+
+Extending this to also address suspend/resume ordering by also changing
+when the device is added to the dpm_list (or possibly creating another
+list) should probably be explored as well.
+
+Kevin
