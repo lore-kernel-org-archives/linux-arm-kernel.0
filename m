@@ -1,54 +1,19 @@
-From: vishwanath.bs@ti.com (Vishwanath Sripathy)
-Date: Mon, 3 Oct 2011 20:40:44 +0530
-Subject: [PATCH v6 01/16] OMAP2+: hwmod: Add API to enable IO ring wakeup.
-In-Reply-To: <4E871883.4010207@ti.com>
-References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
-	<4E871883.4010207@ti.com>
-Message-ID: <36fe5ae626b83bb4856f3a58a23bf503@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 3 Oct 2011 16:20:02 +0100
+Subject: [alsa-devel] [PATCH 2/6] ASoC: codecs: AK4641 depends on GPIOLIB
+In-Reply-To: <1343003.MpQlxoEPa6@wuerfel>
+References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
+	<20111003134527.GF11710@n2100.arm.linux.org.uk>
+	<20111003143553.GG23811@sirena.org.uk> <1343003.MpQlxoEPa6@wuerfel>
+Message-ID: <20111003152002.GP3731@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----snip--
-> > +{
-> > +	struct omap_device_pad *pad;
-> > +	int ret = -EINVAL, j;
-> > +
-> > +	if (oh->mux&&  oh->mux->enabled) {
-> > +		for (j = 0; j<  oh->mux->nr_pads_dynamic; j++) {
-> > +			pad = oh->mux->pads_dynamic[j];
-> > +			if (pad->flags&  OMAP_DEVICE_PAD_WAKEUP) {
-> > +				if (set_wake)
-> > +					pad->idle |= OMAP_WAKEUP_EN;
-> > +				else
-> > +					pad->idle&= ~OMAP_WAKEUP_EN;
->
-> I think apart from enabling/disabling the IO wakeup's at the pad
-> level, there is also a need to trigger the IO daisy chain control
-> (Wu clock) by programming the PRCM.PM_WKEN_WKUP[16] EN_IO_CHAIN
-> bit and waiting on the PRCM.PM_WKST_WKUP[16] ST_IO_CHAIN) bit,
-> which is done by the omap3_enable/disable_io_chain function.
-> This is still done in the cpuidle path, but it makes sense to
-> move that over here, since it should be done every time a pad
-> level wakeup is enabled or disabled.
->
-> See section 3.5.7.2.2 I/O Wake-Up Mechanism of 36xx TRM revA.
->
-> "The I/O wake-up scheme is enabled by triggering the I/O daisy chain
-> control (Wu clock) by
-> programming a dedicated register (PRCM.PM_WKEN_WKUP[16] EN_IO_CHAIN)
-> in
-> the PRCM module.Software must wait for the I/O daisy chain to
-> complete
-> before it transitions the PER domain to a
-> nonfunctional state. This is done by polling a dedicated status bit
-> in
-> the PRCM module
-> (PRCM.PM_WKST_WKUP[16] ST_IO_CHAIN). This status bit must be cleared
-> by
-> software when the bit is
-> read to 1."
-I am working on adding Daisy chain support via hwmod mux framework.
-I will post the patches soon.
+On Mon, Oct 03, 2011 at 04:47:07PM +0200, Arnd Bergmann wrote:
 
-Regards
-Vishwa
+> sound/soc/codecs/wm1250-ev1.c:32:14: error: array type has incomplete element type
+
+OK, that's the gpio_request_ stuff not being implemented thing that I
+have seen some reports of.  Looks like that's not been stubbed out, but
+for Prima2 the best fix is just to turn on gpiolib since there's no
+excuse for a new platform to not use it.
