@@ -1,40 +1,14 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 3 Oct 2011 10:40:31 +0800
-Subject: [PATCH v4 0/7] add initial imx6q support
-In-Reply-To: <201109302304.26953.arnd@arndb.de>
-References: <1317200808-6275-1-git-send-email-shawn.guo@linaro.org>
-	<201109302304.26953.arnd@arndb.de>
-Message-ID: <20111003024030.GA21263@S2100-06.ap.freescale.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon,  3 Oct 2011 10:56:58 +0800
+Subject: [PATCH v5 0/8] add initial imx6q support
+Message-ID: <1317610626-24357-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2011 at 11:04:26PM +0200, Arnd Bergmann wrote:
-> On Wednesday 28 September 2011, Shawn Guo wrote:
-> > 
-> > This patch series adds the initial support for imx6q, which is a
-> > Cortex-A9 Quad Core based SoC.
-> > 
-> > We chose to add imx6q support into mach-imx other than mach-mx5 or
-> > a new mach-mx6, because we intend to merge mach-mx5 into mach-imx, so
-> > that we have only mach-imx for imx family.
-> > 
-> > It's based on linux-next-20110926 with some prerequisite patches
-> > not showing up on linux-next applied.
-> 
-> How should we best proceed on this series? Sascha, do you want to
-> take the next version into your tree once Shawn has addressed the
-> remaining comments, or should I just take the patches with your
-> Ack?
-> 
-> Shawn, what are the current dependencies? I will have to pull
-> in the other branches that this depends on into the next/soc
-> tree and then wait for those to get merged first before I send
-> this to Linus.
-> 
-Thanks for asking, Arnd.
+This patch series adds the initial support for imx6q, which is a
+Cortex-A9 Quad Core based SoC.
 
-The latest version (v5) of this series that I will send shortly has
-the dependencies on the following branches.
+It's based on v3.1-rc8 with the following branches merged.
 
 * rmk's for-next branch with the following additional patches wait for
   rmk to apply:
@@ -56,6 +30,84 @@ the dependencies on the following branches.
   - Sascha's imx-features
   - [GIT PULL] DEBUG_LL platform updates for 3.2 (Will Deacon)
 
--- 
 Regards,
 Shawn
+
+Changes since v4:
+ * Address Russell's comments, do not call do_IPI() and do_local_timer()
+   from C code.
+ * Change to 'select AUTO_ZRELADDR if !ZBOOT_ROM'
+ * Rebase to Barry's L2 suspend infrastructure
+ * Fold Sascha's merge-imx3-imx6 patch to get single zImage support for
+   imx3 and imx6 family
+
+Changes since v3:
+ * Fold the gic_handle_irq (local to imx) support patch in the series.
+   It can be replaced by Marc Zyngier's global gic_handle_irq support
+   with a little rework if his PPI and MULTI_IRQ_HANDLER series gets
+   merged.
+
+Changes since v2:
+ * Refine the L2 register save/restore implementation per Lorenzo's
+   suggestion
+ * Rebase to Rob's latest GIC OF bindings series
+ * Rebase to Sascha's MULTI_IRQ_HANDLER support series
+
+Changes since v1:
+ * Use the existing IMX_IO_P2V for static mapping
+ * Fix the MXC_INTERNAL_IRQS breakage introduced by GIC definition
+ * Retrieve clock frequency for fixed clocks from device tree
+ * Drop early_initcall from imx_src_init() and call it from imx6q
+   platform initialization
+ * Use readl_relaxed/writel_relaxed rather than __raw_readl/__raw_writel
+   as suggested by Arnd
+ * Kill unnecessary imx_local_timer_pre_suspend/resume functions
+ * Kill Kconfig symbol MACH_IMX6Q
+ * Rebase to rmk's "Add L2 cache cleaning to generic CPU suspend" series
+   so that we can retain L2 cache with necessary L2 register
+   save/restore across suspend/resume cycle
+ * Rebase to Rob's new "GIC OF bindings" series
+
+Sascha Hauer (1):
+      arm/imx: merge i.MX3 and i.MX6
+
+Shawn Guo (7):
+      arm/imx6q: add device tree source
+      arm/imx6q: add core definitions and low-level debug uart
+      arm/imx: add gic_handle_irq function
+      arm/imx6q: add core drivers clock, gpc, mmdc and src
+      arm/imx6q: add smp and cpu hotplug support
+      arm/imx6q: add device tree machine support
+      arm/imx6q: add suspend/resume support
+
+ Documentation/devicetree/bindings/arm/fsl.txt |    6 +
+ arch/arm/Kconfig                              |    2 +-
+ arch/arm/Kconfig.debug                        |    7 +
+ arch/arm/Makefile                             |    2 +-
+ arch/arm/boot/dts/imx6q-sabreauto.dts         |   82 +
+ arch/arm/boot/dts/imx6q.dtsi                  |  555 +++++++
+ arch/arm/mach-imx/Kconfig                     |   29 +-
+ arch/arm/mach-imx/Makefile                    |   11 +
+ arch/arm/mach-imx/Makefile.boot               |   14 +-
+ arch/arm/mach-imx/clock-imx6q.c               | 2012 +++++++++++++++++++++++++
+ arch/arm/mach-imx/gpc.c                       |  113 ++
+ arch/arm/mach-imx/head-v7.S                   |   99 ++
+ arch/arm/mach-imx/hotplug.c                   |   44 +
+ arch/arm/mach-imx/lluart.c                    |   32 +
+ arch/arm/mach-imx/localtimer.c                |   35 +
+ arch/arm/mach-imx/mach-imx6q.c                |   84 +
+ arch/arm/mach-imx/mmdc.c                      |   72 +
+ arch/arm/mach-imx/platsmp.c                   |   85 ++
+ arch/arm/mach-imx/pm-imx6q.c                  |   70 +
+ arch/arm/mach-imx/src.c                       |   49 +
+ arch/arm/mm/Kconfig                           |    2 +-
+ arch/arm/plat-mxc/Kconfig                     |   11 +-
+ arch/arm/plat-mxc/Makefile                    |    2 +-
+ arch/arm/plat-mxc/gic.c                       |   47 +
+ arch/arm/plat-mxc/include/mach/common.h       |   29 +
+ arch/arm/plat-mxc/include/mach/debug-macro.S  |    2 +
+ arch/arm/plat-mxc/include/mach/entry-macro.S  |    6 +
+ arch/arm/plat-mxc/include/mach/hardware.h     |    6 +
+ arch/arm/plat-mxc/include/mach/irqs.h         |   10 +-
+ arch/arm/plat-mxc/include/mach/mx6q.h         |   33 +
+ 30 files changed, 3537 insertions(+), 14 deletions(-)
