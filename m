@@ -1,100 +1,83 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon,  3 Oct 2011 15:10:41 +0530
-Subject: [PATCH] ARM: S3C2410: Remove section mismatch warning
-Message-ID: <1317634841-23339-1-git-send-email-tushar.behera@linaro.org>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 3 Oct 2011 11:46:16 +0200
+Subject: [PATCH v2] OMAP2PLUS: DSS: Ensure DSS works correctly if display
+	is enabled in bootloader
+In-Reply-To: <1317630070.2026.27.camel@deskari>
+References: <1315811306-11001-1-git-send-email-archit@ti.com>
+	<alpine.DEB.2.00.1110022237171.4611@utopia.booyaka.com>
+	<1317630070.2026.27.camel@deskari>
+Message-ID: <4E898468.2060508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the functions and structures did not have _init or __initdata
-attributes, even though they were referenced from functions / structures
-with those attribute, resulting in section mismatches.
+Hi Tomi,
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
----
+On 10/3/2011 10:21 AM, Valkeinen, Tomi wrote:
+> Hi Paul,
+>
+> On Sun, 2011-10-02 at 22:45 -0600, Paul Walmsley wrote:
 
-The patch is rebased on v3.1-rc8.
+[...]
 
-The patch has only been build tested, they are not boot tested on any
-hardware.
+>> +struct omap_dss_dispc_dev_attr {
+>> +	u8	manager_count;
+>> +	bool	has_framedonetv_irq;
+>> +};
+>> +
+>> +#endif
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+>> index 09d9395..8e32cb3 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+>> @@ -945,6 +945,7 @@ static struct omap_hwmod omap2420_dss_dispc_hwmod = {
+>>   	.slaves_cnt	= ARRAY_SIZE(omap2420_dss_dispc_slaves),
+>>   	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP2420),
+>>   	.flags		= HWMOD_NO_IDLEST,
+>> +	.dev_attr	=&omap2_3_dss_dispc_dev_attr
+>>   };
+>
+> I didn't know you can add arbitrary data like that to hwmods. What kind
+> of data is it meant for? Can the data be used by the driver, or is it
+> meant just for arch stuff?
 
- arch/arm/mach-s3c2410/usb-simtec.c |    2 +-
- arch/arm/mach-s3c2410/usb-simtec.h |    2 +-
- arch/arm/mach-s3c2416/irq.c        |    2 +-
- arch/arm/mach-s3c2440/clock.c      |    4 ++--
- arch/arm/mach-s3c2443/irq.c        |    2 +-
- 5 files changed, 6 insertions(+), 6 deletions(-)
+It was added in order to add HW related information for an IP.
+So most of the time, this is use for IP version, since this information 
+is not necessarily accessible from the IP itself. Some time it can be 
+the number of entries in the mailbox IP that will change depending of 
+the version too.
 
-diff --git a/arch/arm/mach-s3c2410/usb-simtec.c b/arch/arm/mach-s3c2410/usb-simtec.c
-index 29bd3d9..3a1028c 100644
---- a/arch/arm/mach-s3c2410/usb-simtec.c
-+++ b/arch/arm/mach-s3c2410/usb-simtec.c
-@@ -104,7 +104,7 @@ static struct s3c2410_hcd_info usb_simtec_info __initdata = {
- };
- 
- 
--int usb_simtec_init(void)
-+int __init usb_simtec_init(void)
- {
- 	int ret;
- 
-diff --git a/arch/arm/mach-s3c2410/usb-simtec.h b/arch/arm/mach-s3c2410/usb-simtec.h
-index 03842ed..43cc88f 100644
---- a/arch/arm/mach-s3c2410/usb-simtec.h
-+++ b/arch/arm/mach-s3c2410/usb-simtec.h
-@@ -12,5 +12,5 @@
-  * published by the Free Software Foundation.
- */
- 
--extern int usb_simtec_init(void);
-+extern int __init usb_simtec_init(void);
- 
-diff --git a/arch/arm/mach-s3c2416/irq.c b/arch/arm/mach-s3c2416/irq.c
-index 28ad20d..153cb2f 100644
---- a/arch/arm/mach-s3c2416/irq.c
-+++ b/arch/arm/mach-s3c2416/irq.c
-@@ -234,7 +234,7 @@ static int __init s3c2416_irq_add(struct sys_device *sysdev)
- 	return 0;
- }
- 
--static struct sysdev_driver s3c2416_irq_driver = {
-+static struct sysdev_driver s3c2416_irq_driver __initdata = {
- 	.add		= s3c2416_irq_add,
- };
- 
-diff --git a/arch/arm/mach-s3c2440/clock.c b/arch/arm/mach-s3c2440/clock.c
-index f9e6bda..3b3bec5 100644
---- a/arch/arm/mach-s3c2440/clock.c
-+++ b/arch/arm/mach-s3c2440/clock.c
-@@ -108,7 +108,7 @@ static struct clk s3c2440_clk_ac97 = {
- 	.ctrlbit	= S3C2440_CLKCON_CAMERA,
- };
- 
--static int s3c2440_clk_add(struct sys_device *sysdev)
-+static int __init s3c2440_clk_add(struct sys_device *sysdev)
- {
- 	struct clk *clock_upll;
- 	struct clk *clock_h;
-@@ -137,7 +137,7 @@ static int s3c2440_clk_add(struct sys_device *sysdev)
- 	return 0;
- }
- 
--static struct sysdev_driver s3c2440_clk_driver = {
-+static struct sysdev_driver s3c2440_clk_driver __initdata = {
- 	.add	= s3c2440_clk_add,
- };
- 
-diff --git a/arch/arm/mach-s3c2443/irq.c b/arch/arm/mach-s3c2443/irq.c
-index 83ecb11..1d483d9 100644
---- a/arch/arm/mach-s3c2443/irq.c
-+++ b/arch/arm/mach-s3c2443/irq.c
-@@ -265,7 +265,7 @@ static int __init s3c2443_irq_add(struct sys_device *sysdev)
- 	return 0;
- }
- 
--static struct sysdev_driver s3c2443_irq_driver = {
-+static struct sysdev_driver s3c2443_irq_driver __initdata = {
- 	.add		= s3c2443_irq_add,
- };
- 
--- 
-1.7.4.1
+> I'm wondering this as we have a complex mechanism in the dss driver to
+> find out about the differences of DSS hardware
+> (drivers/video/omap2/dss/dss_features.[ch]). The dss_features system is
+> currently part of the driver, but should be moved under arch/arm/*omap*
+> at some point, and this hwmod dev_attr sounds like it could possibly be
+> a right place to handle these.
+
+Please note that I made that kind of comment to Archit when he started 
+submitted this dss_feature series. That feature management mechanism 
+could have been useful for any other IPs / driver at that time.
+
+> I looked at how the dev_attrs are used, and all of them seemed to be
+> very small, a few fields at max. The DSS features set is, on the other
+> hand, quite big amount of data, and meant for the driver.
+
+That's why, most of the time, only the version is in the dev_attr, and 
+the various information that will depend of that version are stored in 
+the driver.
+
+But at that time, device tree was not there...
+Now, the whole dev_attr stuff will be replaced because device tree is 
+able to provide the driver any kind of custom information that can be 
+retrieved directly from the driver without having to use a pdata in 
+between. So I'm not sure it worth spending too much time on that feature 
+stuff.
+
+As an example here is the ongoing GPIO DT migration:
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg56505.html
+
+3.2 will have the basic DT support using hwmod as a backend, but the 
+idea is that for 3.3, we start removing some information from hwmod to 
+rely on device tree only.
+
+Regards,
+Benoit
