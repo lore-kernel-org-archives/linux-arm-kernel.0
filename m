@@ -1,44 +1,89 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 03 Oct 2011 15:12:32 +0530
-Subject: [PATCH 00/30] ARM/omap: omap specific randconfig fixes
-In-Reply-To: <7246478.IyGHQ24uSq@wuerfel>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<4E894295.5000608@ti.com> <7246478.IyGHQ24uSq@wuerfel>
-Message-ID: <4E898388.40601@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Oct 2011 10:43:38 +0100
+Subject: [RFC] Need help deciphering reboot modes!
+In-Reply-To: <20110930191847.GA11710@n2100.arm.linux.org.uk>
+References: <20110930125725.GG3895@e102144-lin.cambridge.arm.com>
+	<20110930191847.GA11710@n2100.arm.linux.org.uk>
+Message-ID: <20111003094338.GA3827@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 October 2011 02:52 PM, Arnd Bergmann wrote:
-> On Monday 03 October 2011 10:35:25 Santosh Shilimkar wrote:
-> 
->>> The entire set is also available from
->>>  git pull git://git.linaro.org/people/arnd/arm-soc.git randconfig/omap
->>>
->>> but I have not yet pulled them into the for-next branch.
->>>
->> Do you have any scripts to create these randconfigs ?
->> These are useful to run on newer set of patches also to get all
->> builds right first place.
-> 
-> Yes, see the for-next+randconfig branch of
-> git://git.linaro.org/people/arnd/arm-soc.git. It has all my patches
-> and a randconfig.sh script.
-> 
-> Right now, I'm trying to get a baseline upstream, since I have around 150
-> patches that are needed to always build ten platforms successfully.
->
-Ok. Will have a look at it.
+Hi Russell,
 
-> The main problem is that you basically need all the patches I did in order
-> to find regressions, and some of the device driver patches are not currently
-> in a state where I could submit them. I hope that by the time of the 3.3
-> merge window, I have enough patches upstream that you no longer need to
-> pull in an extra tree.
+Thanks for getting back to me.
+
+On Fri, Sep 30, 2011 at 08:18:48PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Sep 30, 2011 at 01:57:25PM +0100, Will Deacon wrote:
+> > As part of my kexec work, I've been looking at the machine_restart path
+> > on ARM and, more specifically, the use of the reboot_mode character that
+> > gets passed around and ultimately ignored.
 > 
-Sounds like a plan and having these scripts working on mainline kernel
-would be really great to test new set dependencies.
+> It gets ignored because platform maintainers are a lazy bunch of people
+> and don't want to write any more code than they absolutely have to.
+> 
+> Overall, it is meant as a hint to the platform code about what reboot
+> method to use.
 
-Thanks a lot for the patches.
+Right, ok.
 
-Segards
-Santosh
+> > It seems that the following mode characters are used:
+> > 
+> > 0	-> Currently used by kexec as a dummy argument given that it is
+> > 	   ignored anyway.
+> 
+> No idea what that means, afaik it's never been used.
+
+I think it's just a lazy kexec implementation. Passing 's' would make more
+sense.
+
+> > 'h'	-> The default assignment to reboot_mode and that used by
+> > 	   machine_restart. For some reason, reboot_mode can also be
+> > 	   overridden on the command line. I would guess that this means
+> > 	   "hard".
+> 
+> It does mean 'hard' and it tells platforms which have the option (the
+> early ones do!) to use some hardware method to provoke the machine into
+> rebooting.
+
+So in terms of setup_mm_for_reboot (which takes the reboot mode as a
+parameter), the 'h' mode should ensure that we don't remap kernelspace
+as 1:1 because we need to poke hardware (alternatively we could poke the
+hardware using its physical address).
+
+> > 's'	-> A supported option by mioa701 (mach-pxa) and mach-s3c24xx. I
+> > 	   would guess that this means "soft".
+> 
+> This means to reboot by vectoring through the reset vector - so it is
+> 'soft'.
+
+And in this case we want to identity map as much as possible so the MMU-off
+path works properly.
+
+> > 'g'	-> A supported option by spitz and tosa (both mach-pxa). I can't
+> > 	   begin to imagine what it might stand for.
+> 
+> 'gpio', using a gpio signal to cause the reboot rather than setting up
+> a watchdog or something to cause it.
+
+Can we get rid of this option in favour of 'h'? I'm not sure I see the
+distinction and I think the platform can handle it itself. I posted a patch
+here but I'm unable to test it:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-September/067560.html
+
+> Note that as I say above, it is only a hint - if you pass 's' for soft,
+> a platform can still elect to do a hard reboot if it knows that soft
+> reboots just don't work on the platform.
+
+Hmm, this could be problematic with the memory mapping bits I mentioned
+above. Going from 's' -> 'h' will only work if physical addresses are used
+to access the hardware and going from 'h' -> 's' will only work if the
+physical address of the reset code is less than PAGE_OFFSET. We could
+introduce a new flag for setup_mm_for_reboot, but that feels slightly
+redundant given that we already have the mode option.
+
+What do you reckon?
+
+Cheers,
+
+Will
