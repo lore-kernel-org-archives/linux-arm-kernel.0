@@ -1,49 +1,18 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Mon, 3 Oct 2011 10:23:15 +0530
-Subject: [PATCH 19/30] tty/serial/omap: console can only be built-in
-In-Reply-To: <1317566760-25681-20-git-send-email-arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 03 Oct 2011 10:29:54 +0530
+Subject: [PATCH 04/30] ARM: omap: add missing __devexit_p() annotations
+In-Reply-To: <1317566760-25681-5-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-20-git-send-email-arnd@arndb.de>
-Message-ID: <CAAL8m4xrLXzHBjM4fmOmSnpvHSBYMSvWewKQg=RjcS79Q2ThUg@mail.gmail.com>
+	<1317566760-25681-5-git-send-email-arnd@arndb.de>
+Message-ID: <4E89414A.6000301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 2, 2011 at 8:15 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> When the omap serial driver is built as a module, we must
-> not allow the console driver to be selected, because consoles
-> can not be loadable modules.
-
-Agree.
-
->
+On Sunday 02 October 2011 08:15 PM, Arnd Bergmann wrote:
+> Drivers that refer to a __devexit function in an operations
+> structure need to annotate that pointer with __devexit_p so
+> replace it with a NULL pointer when the section gets discarded.
+> 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Govindraj.R <govindraj.raja@ti.com>
-
-Acked-by: Govindraj.R <govindraj.raja@ti.com>
-
 > ---
-> ?drivers/tty/serial/Kconfig | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 4dcb37bb..eb04b2f 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -1346,7 +1346,7 @@ config SERIAL_OMAP
->
-> ?config SERIAL_OMAP_CONSOLE
-> ? ? ? ?bool "Console on OMAP serial port"
-> - ? ? ? depends on SERIAL_OMAP
-> + ? ? ? depends on SERIAL_OMAP=y
-> ? ? ? ?select SERIAL_CORE_CONSOLE
-> ? ? ? ?help
-> ? ? ? ? ?Select this option if you would like to use omap serial port as
-> --
-> 1.7.5.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
