@@ -1,23 +1,20 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 03 Oct 2011 10:50:45 +0530
-Subject: [PATCH 24/30] ARM: omap2+: ensure that one of omap2/3/4 is
-	selected
-In-Reply-To: <1317566760-25681-25-git-send-email-arnd@arndb.de>
+Date: Mon, 03 Oct 2011 10:51:40 +0530
+Subject: [PATCH 25/30] ARM: OMAP depends on MMU
+In-Reply-To: <1317566760-25681-26-git-send-email-arnd@arndb.de>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-25-git-send-email-arnd@arndb.de>
-Message-ID: <4E89462D.7010208@ti.com>
+	<1317566760-25681-26-git-send-email-arnd@arndb.de>
+Message-ID: <4E894664.5090609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sunday 02 October 2011 08:15 PM, Arnd Bergmann wrote:
-> Random configurations can fail if none of the omap families
-> in mach-omap2 is selected. This patch automatically selects
-> omap2 if the user has not made any other choice.
+> There is no way to build OMAP kernels without an MMU
+> at this point because of dependencies on MMU-only functions.
+> 
+> As long as nobody is interested in fixing this, let's just disable
+> this platforms for nommu kernels.
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
-
-OMAP4 would have been a better default but am fine with
-OMAP2 too.
-
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
