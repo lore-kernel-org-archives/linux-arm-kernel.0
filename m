@@ -1,123 +1,51 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 3 Oct 2011 09:30:20 +0200
-Subject: [PATCH] clocksource: fixup ux500 build problems
-Message-ID: <mailman.163.1317627492.20020.linux-arm-kernel@lists.infradead.org>
+Date: Mon, 3 Oct 2011 09:41:21 +0200
+Subject: [GIT PULL] ux500-timers
+In-Reply-To: <CACRpkdbCZwSdXzqvPCrGagaikc53xLyDTQaZMRtuyqo9vw=Yng@mail.gmail.com>
+References: <CACRpkdbCZwSdXzqvPCrGagaikc53xLyDTQaZMRtuyqo9vw=Yng@mail.gmail.com>
+Message-ID: <CACRpkdZDUeP6pJt7W2ntGGdUgeGGwEG9we-Jmc9bvP40Oy+JQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on a patch from Arnd Bergmann this fixes up the build
-problem of assigning a non-existing global when the ux500 PRCMU
-timer is not linked in by passing its base address to the init
-function. We also add a missing <linux/errno.h> inclusion and
-staticize the dummy function.
+Hi Arnd,
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/timer.c               |    9 ++++++---
- drivers/clocksource/clksrc-dbx500-prcmu.c |    6 ++++--
- include/linux/clksrc-dbx500-prcmu.h       |    6 ++----
- 3 files changed, 12 insertions(+), 9 deletions(-)
+could you please pull the updated ux500 timer branch into the arm-soc
+tree?
 
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index 08c55a5..aea467d 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -5,6 +5,7 @@
-  * Author: Mattias Wallin <mattias.wallin@stericsson.com> for ST-Ericsson
-  */
- #include <linux/io.h>
-+#include <linux/errno.h>
- #include <linux/clksrc-dbx500-prcmu.h>
+The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
 
- #include <asm/localtimer.h>
-@@ -16,18 +17,20 @@
+  Linux 3.1-rc7 (2011-09-21 16:58:15 -0700)
 
- static void __init ux500_timer_init(void)
- {
-+       void __iomem *prcmu_timer_base;
-+
-        if (cpu_is_u5500()) {
- #ifdef CONFIG_LOCAL_TIMERS
-                twd_base =3D __io_address(U5500_TWD_BASE);
- #endif
-                mtu_base =3D __io_address(U5500_MTU0_BASE);
--               clksrc_dbx500_timer_base =3D
-__io_address(U5500_PRCMU_TIMER_3_BASE);
-+               prcmu_timer_base =3D __io_address(U5500_PRCMU_TIMER_3_BASE)=
-;
-        } else if (cpu_is_u8500()) {
- #ifdef CONFIG_LOCAL_TIMERS
-                twd_base =3D __io_address(U8500_TWD_BASE);
- #endif
-                mtu_base =3D __io_address(U8500_MTU0_BASE);
--               clksrc_dbx500_timer_base =3D
-__io_address(U8500_PRCMU_TIMER_4_BASE);
-+               prcmu_timer_base =3D __io_address(U8500_PRCMU_TIMER_4_BASE)=
-;
-        } else {
-                ux500_unknown_soc();
-        }
-@@ -50,7 +53,7 @@ static void __init ux500_timer_init(void)
-         */
+are available in the git repository at:
+   git://git.linaro.org/people/triad/linux-stericsson.git ux500-nomadik-timers
 
-        nmdk_timer_init();
--       clksrc_dbx500_prcmu_init();
-+       clksrc_dbx500_prcmu_init(prcmu_timer_base);
- }
+Jonas Aaberg (4):
+      ARM: ux500: Move timer code to separate file
+      ARM: plat-nomadik: timer: Add support for periodic timers
+      ARM: plat-nomadik: timer: Export reset functions
+      ARM: ux500: Reprogram timers upon resume
 
- static void ux500_timer_reset(void)
-diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c
-b/drivers/clocksource/clksrc-dbx500-prcmu.c
-index 0ac5093..59feefe 100644
---- a/drivers/clocksource/clksrc-dbx500-prcmu.c
-+++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-@@ -31,7 +31,7 @@
+Linus Walleij (1):
+      clocksource: fixup ux500 build problems
 
- #define SCHED_CLOCK_MIN_WRAP 131072 /* 2^32 / 32768 */
+Mattias Wallin (3):
+      ARM: plat-nomadik: MTU sched_clock as an option
+      clocksource: add DBX500 PRCMU Timer support
+      ARM: ux500: add support for clocksource DBX500 PRCMU
 
--void __iomem *clksrc_dbx500_timer_base;
-+static void __iomem *clksrc_dbx500_timer_base;
-
- static cycle_t clksrc_dbx500_prcmu_read(struct clocksource *cs)
- {
-@@ -79,8 +79,10 @@ static void notrace
-clksrc_dbx500_prcmu_update_sched_clock(void)
- }
- #endif
-
--void __init clksrc_dbx500_prcmu_init(void)
-+void __init clksrc_dbx500_prcmu_init(void __iomem *base)
- {
-+       clksrc_dbx500_timer_base =3D base;
-+
-        /*
-         * The A9 sub system expects the timer to be configured as
-         * a continous looping timer.
-diff --git a/include/linux/clksrc-dbx500-prcmu.h
-b/include/linux/clksrc-dbx500-prcmu.h
-index d1e9504..4fb8119 100644
---- a/include/linux/clksrc-dbx500-prcmu.h
-+++ b/include/linux/clksrc-dbx500-prcmu.h
-@@ -11,12 +11,10 @@
- #include <linux/init.h>
- #include <linux/io.h>
-
--extern void __iomem *clksrc_dbx500_timer_base;
--
- #ifdef CONFIG_CLKSRC_DBX500_PRCMU
--void __init clksrc_dbx500_prcmu_init(void);
-+void __init clksrc_dbx500_prcmu_init(void __iomem *base);
- #else
--void __init clksrc_dbx500_prcmu_init(void) {}
-+static inline void __init clksrc_dbx500_prcmu_init(void __iomem *base) {}
- #endif
-
- #endif
---=20
-1.7.3.2
-
-I will send a new pull request separately.
-
-Thanks!
-Linus Walleij
+ arch/arm/mach-ux500/Makefile                   |    2 +-
+ arch/arm/mach-ux500/cpu.c                      |   29 +-----
+ arch/arm/mach-ux500/include/mach/db5500-regs.h |    2 +
+ arch/arm/mach-ux500/include/mach/db8500-regs.h |    3 +
+ arch/arm/mach-ux500/timer.c                    |   68 ++++++++++++
+ arch/arm/plat-nomadik/Kconfig                  |    8 ++-
+ arch/arm/plat-nomadik/include/plat/mtu.h       |   47 +--------
+ arch/arm/plat-nomadik/timer.c                  |  138 ++++++++++++++++++------
+ drivers/clocksource/Kconfig                    |   15 +++
+ drivers/clocksource/Makefile                   |    1 +
+ drivers/clocksource/clksrc-dbx500-prcmu.c      |  106 ++++++++++++++++++
+ include/linux/clksrc-dbx500-prcmu.h            |   20 ++++
+ 12 files changed, 333 insertions(+), 106 deletions(-)
+ create mode 100644 arch/arm/mach-ux500/timer.c
+ create mode 100644 drivers/clocksource/clksrc-dbx500-prcmu.c
+ create mode 100644 include/linux/clksrc-dbx500-prcmu.h
