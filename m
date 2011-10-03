@@ -1,42 +1,36 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 3 Oct 2011 17:31:08 +0100
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <4E89D3C4.8090001@gmail.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-	<4E89C3FA.9020206@gmail.com>
-	<20111003142524.GN3731@opensource.wolfsonmicro.com>
-	<4E89D3C4.8090001@gmail.com>
-Message-ID: <20111003163107.GQ3731@opensource.wolfsonmicro.com>
+Date: Mon, 3 Oct 2011 17:34:41 +0100
+Subject: [alsa-devel] [PATCH 2/6] ASoC: codecs: AK4641 depends on GPIOLIB
+In-Reply-To: <9353092.2X2OeIUYGE@wuerfel>
+References: <1317587284-2776-1-git-send-email-arnd@arndb.de>
+	<1343003.MpQlxoEPa6@wuerfel>
+	<20111003152002.GP3731@opensource.wolfsonmicro.com>
+	<9353092.2X2OeIUYGE@wuerfel>
+Message-ID: <20111003163441.GH23811@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2011 at 10:24:52AM -0500, Rob Herring wrote:
-> On 10/03/2011 09:25 AM, Mark Brown wrote:
+On Mon, Oct 03, 2011 at 06:19:48PM +0200, Arnd Bergmann wrote:
 
-> > This isn't in any way specific to clocks, right now the likely solution
-> > looks to be Grant's changes for retrying probe() as new devices come on
-> > line.  With that devices can return a code from their probe() which
-> > tells the driver core that they couldn't get all the resources they need
-> > and that it should retry the probe() if more devices come on-line.
+> When the GPIO API is stubbed out, the definition of struct gpio
+> is empty, so you cannot access the members, which seems to be
+> intentional behavior.
 
-> Except SOC clocks are initialized very early before timers are up and
-> there can be a very high number of dependencies (every clock except
-> fixed clocks). With the driver probe retry, retrying is the exception,
-> not the rule.
+That doesn't seem terribly helpful, it means drivers either need to
+ifdef or not use the bulk functions.
 
-> Retrying would require every caller to maintain a list of clks to
-> retry. With 2 stages, you can move that into the core clock code.
+>  struct device;
+> -struct gpio;
+> +struct gpio {
+> +       unsigned        gpio;
+> +       unsigned long   flags;
+> +       const char      *label;
+> +};
 
-They don't need to maintain a list of clocks to retry, they need to
-unwind when probe() fails.  But yes.
+This looks much more sensible to me.
 
-> There are not typically a large number of board-level/driver created
-> clocks, so ensuring correct register order is not really a problem. In
-> cases where there is a cross-driver dependency, the probe retry is a
-> good solution.
+>  	select SND_SOC_WL1273 if MFD_WL1273_CORE
+> -	select SND_SOC_WM1250_EV1 if I2C
+> +	select SND_SOC_WM1250_EV1 if I2C && GENERIC_GPIO
 
-I dunno, I get the impression that some of this is due to the current
-limitations of the clock API rather than due to a lack of clocks -
-perhaps that's specific to the applications I look at, though.
-applications 
+Or ifdefs in the driver.
