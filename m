@@ -1,42 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Oct 2011 09:52:40 +0100
-Subject: [PATCH V2] AT91: dt: at91sam9g45 family and board device tree
-	files
-In-Reply-To: <1317636056-9537-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1317636056-9537-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20111003085240.GB11710@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 3 Oct 2011 10:52:58 +0200
+Subject: [PATCH] [WATCHDOG] move coh901327 state holders
+Message-ID: <1317631978-22818-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2011 at 12:00:56PM +0200, Nicolas Ferre wrote:
-> diff --git a/arch/arm/mach-at91/board-dt.c b/arch/arm/mach-at91/board-dt.c
-> new file mode 100644
-> index 0000000..7bcb9a9
-> --- /dev/null
-> +++ b/arch/arm/mach-at91/board-dt.c
-> @@ -0,0 +1,122 @@
-> +/*
-> + *  Setup code for AT91SAM Evaluation Kits with Device Tree support
-> + *
-> + *  Covers: * AT91SAM9G45-EKES  board
-> + *          * AT91SAM9M10-EKES  board
-> + *          * AT91SAM9M10G45-EK board
-> + *
-> + *  Copyright (C) 2011 Atmel,
-> + *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +
-> +#include <linux/types.h>
-> +#include <linux/init.h>
-> +#include <linux/module.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_platform.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/board.h>
-> +#include <mach/gpio.h>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Is linux/gpio.h broken for you?
+The state holders used in the PM path of the drivers report as
+unused variables when compiling without CONFIG_PM so let's
+move them inside CONFIG_PM.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/watchdog/coh901327_wdt.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
+index 9291506..20b2fb9 100644
+--- a/drivers/watchdog/coh901327_wdt.c
++++ b/drivers/watchdog/coh901327_wdt.c
+@@ -76,8 +76,6 @@ static int irq;
+ static void __iomem *virtbase;
+ static unsigned long coh901327_users;
+ static unsigned long boot_status;
+-static u16 wdogenablestore;
+-static u16 irqmaskstore;
+ static struct device *parent;
+ 
+ /*
+@@ -461,6 +459,10 @@ out:
+ }
+ 
+ #ifdef CONFIG_PM
++
++static u16 wdogenablestore;
++static u16 irqmaskstore;
++
+ static int coh901327_suspend(struct platform_device *pdev, pm_message_t state)
+ {
+ 	irqmaskstore = readw(virtbase + U300_WDOG_IMR) & 0x0001U;
+-- 
+1.7.3.2
