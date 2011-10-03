@@ -1,40 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 3 Oct 2011 13:07:05 +0300
-Subject: [PATCH 15/30] usb/musb: use a Kconfig choice to pick the right
-	DMA method
-In-Reply-To: <3529819.LQllWhb43D@wuerfel>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1546914.88vcgxkfJf@wuerfel>
-	<20111002221050.GA25790@legolas.emea.dhcp.ti.com>
-	<3529819.LQllWhb43D@wuerfel>
-Message-ID: <20111003100704.GD3363@legolas.emea.dhcp.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 3 Oct 2011 11:36:26 +0100
+Subject: [GIT PULL] Samsung devel-2 for v3.2
+In-Reply-To: <005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
+References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
+	<20111002192950.GB1005@sirena.org.uk>
+	<005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
+Message-ID: <20111003103626.GA3731@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Oct 03, 2011 at 12:27:22PM +0900, Kukjin Kim wrote:
+> Mark Brown wrote:
 
-On Mon, Oct 03, 2011 at 11:40:26AM +0200, Arnd Bergmann wrote:
-> On Monday 03 October 2011 01:10:51 Felipe Balbi wrote:
-> > Anyway, I'll take your patches in, but their too late for this merge
-> > window  I already sent my last pull to Greg.
-> 
-> No problem. I need the full set of arm-randconfig patches upstream in order
-> to make randconfig work in general, and that's not happening for 3.2
-> anyway. Right now, I'm just trying to as many patches as possible into
-> maintainer trees.
-> 
-> Is your tree part of linux-next, or will it only show up after the merge
-> window once Greg has pulled your first set for 3.3?
+> > As I reported the other day this change breaks the boot early on on the
+> > Cragganmore S3C6410 based systems (I've not actually fired up my
+> > SMDK6410 but I suspect it may have issues too).  I did make some brief
+> > attempts to debug but as there's no console output at all and the diff
+> > is rather large it's not easy to see what's gone wrong.
 
-My tree isn't in linux-next yet so my patches go to Greg and from there
-to -next.
+> Hmm, I thought it has no problem when I saw Thomas Abraham's 'serial:
+> samsung' patches because he said it works fine with my for-next plus his
+> patches on SMDK6410...Anyway, I need to sort it out.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111003/fd2867bf/attachment.sig>
+It's possible it's something that doesn't manifest on that board, I've
+no real idea what's exploding or why.  There's also a bunch of other
+early boot problems right now like try_to_freeze() which aren't helping.
