@@ -1,46 +1,48 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 03 Oct 2011 15:12:46 -0400 (EDT)
-Subject: [PATCH v4 02/10] ARM: SoC: Add per SoC SMP and CPU hotplug
-	operations
-In-Reply-To: <1317663356-5114-3-git-send-email-marc.zyngier@arm.com>
-References: <1317663356-5114-1-git-send-email-marc.zyngier@arm.com>
-	<1317663356-5114-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <alpine.LFD.2.02.1110031508270.9106@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 3 Oct 2011 10:46:11 -0700
+Subject: [PATCH 04/30] ARM: omap: add missing __devexit_p() annotations
+In-Reply-To: <20111002160926.GB12323@n2100.arm.linux.org.uk>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<1317566760-25681-5-git-send-email-arnd@arndb.de>
+	<CAFULf_wevZxWW1RW+r-18R_8=ry2kD6_i5L9NfPd9t8afm5Cog@mail.gmail.com>
+	<20111002160926.GB12323@n2100.arm.linux.org.uk>
+Message-ID: <20111003174610.GP6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Oct 2011, Marc Zyngier wrote:
-
-> Populate the SoC descriptor structure with the SMP and CPU hotplug
-> operations. To allow the kernel to continue building, the platform
-> hooks are defined as weak symbols which are overrided by the
-> platform code. Once all platforms are converted, the "weak" attribute
-> will be removed and the function made static.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [111002 08:35]:
+> On Sun, Oct 02, 2011 at 05:56:07PM +0200, Bjarne Steinsbo wrote:
+> > Arnd,
+> > 
+> > Ref http://www.spinics.net/lists/linux-omap/msg57274.html
+> > 
+> > Don't get me wrong.  This is not about you "stealing" my patch, or
+> > anything like that.  But look also at thread starting at
+> > http://www.spinics.net/lists/linux-omap/msg57667.html Also a patch
+> > that I have posted previously.  Something is not right with the
+> > workflow when bugs are identified, patches are submitted, then
+> > ignored, only for someone else to fix the same bug.  Enough said.
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-[...]
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -141,8 +141,12 @@ static const char *cpu_name;
->  static const char *machine_name;
->  static char __initdata cmd_line[COMMAND_LINE_SIZE];
->  struct machine_desc *machine_desc __initdata;
-> -const struct arm_soc_desc *soc_desc;
-> -static struct arm_soc_desc __soc_desc __read_mostly;
-> +const struct arm_soc_desc *soc_desc __initdata;
+> That is where re-sending is important.  Don't throw patches over the wall
+> and then forget them - that's precisely how this happens.
 
-Does the above belong in this patch?
+Bjarne, sorry for accidentally dropping patches, that's not intentional.
 
-> +#ifdef CONFIG_SMP
-> +const struct arm_soc_smp_init_ops *soc_smp_init_ops  __initdata;
-> +const struct arm_soc_smp_ops *soc_smp_ops  __cpuinitdata;
-> +static struct arm_soc_smp_ops __soc_smp_ops __cpuinitdata;
-> +#endif
+Like Russell said, please follow through with your own patches and
+repost and complain until the patches do get merged.
 
-Maybe those could be moved in smp.c instead.
+> Consider who has the higher workload, and who ends up dealing with many
+> many many emails, and realise that the options for those of us who receive
+> patches are either to drop patches, or have an endlessly growing backlog
+> of patches when things get busy.
+> 
+> Unless we drop patches, things can get pretty rediculous - consider the
+> effect of a backlog of one month worth of patches would cause...
 
+Tools like patchwork.kernel.org help a bit, and especially the email
+subject line containing magic the keyword "fix" might help avoiding
+the duplicate work.
 
-Nicolas
+Regards,
+
+Tony
