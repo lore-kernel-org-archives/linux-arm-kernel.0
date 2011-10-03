@@ -1,56 +1,49 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 3 Oct 2011 22:18:34 +0800
-Subject: [PATCH v4] ARM: cache-l2x0: add resume entry for l2 in secure mode
-In-Reply-To: <20111003134145.GE11710@n2100.arm.linux.org.uk>
-References: <1317375773-7229-1-git-send-email-Barry.Song@csr.com>
-	<20111001150646.GB11710@n2100.arm.linux.org.uk>
-	<20111003105658.GC14761@e102568-lin.cambridge.arm.com>
-	<20111003134145.GE11710@n2100.arm.linux.org.uk>
-Message-ID: <CAGsJ_4wUD8SdrY3JXqrpRsE1-WK401PxHcSWO8CN06jWdFLodQ@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 03 Oct 2011 16:20:34 +0200
+Subject: [PATCH V2 2/2] ARM: SAMSUNG: Cleanup resources by using macro
+In-Reply-To: <4E89B505.3060501@samsung.com>
+References: <005901cc817e$51a56d00$f4f04700$%kim@samsung.com>
+	<CAH9JG2Wc4M2dVFOfNE5jgsygvigE8RbPH_yLcMqarr64LfbENw@mail.gmail.com>
+	<4E89B505.3060501@samsung.com>
+Message-ID: <4E89C4B2.605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/3 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Oct 03, 2011 at 11:57:03AM +0100, Lorenzo Pieralisi wrote:
->> On Sat, Oct 01, 2011 at 04:06:46PM +0100, Russell King - ARM Linux wrote:
->> > On Fri, Sep 30, 2011 at 02:42:53AM -0700, Barry Song wrote:
->> > > From: Barry Song <Baohua.Song@csr.com>
->> > >
->> > > we save the l2x0 registers at the first initialization, and platform codes
->> > > can get them to restore l2x0 status after wakeup.
->> > >
->> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> > > Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> > > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> > > Tested-by: Shawn Guo <shawn.guo@linaro.org>
->> >
->> > This looks fine, thanks Barry.
->> >
->> > The one remaining issue is whether we use this or use Lorenzo's patches.
->> > I feel that Barry's version is a lot simpler and easier to use, so this
->> > is my preference. ?Anyone else got another opinion between the two?
->> >
+On 10/03/2011 03:13 PM, Kukjin Kim wrote:
+> On 10/03/11 12:53, Kyungmin Park wrote:
+>> On Mon, Oct 3, 2011 at 12:41 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>>>
+>>> +#define SAMSUNG_RES_MEM(soc, ip, sz)   DEFINE_RES_MEM(soc##_PA_##ip, sz)
+>>> +#define SAMSUNG_RES_IRQ(ip)            DEFINE_RES_IRQ(IRQ_##ip)
+>>> +
+>>> +#define SAMSUNG_RES_MEM_NAMED(soc, ip, sz, name)       \
+>>> +                               DEFINE_RES_MEM_NAMED(soc##_PA_##ip, sz, name)
+>>> +#define SAMSUNG_RES_IRQ_NAMED(ip, name)                        \
+>>> +                               DEFINE_RES_IRQ_NAMED(IRQ_##ip, name)
+>>> +#define SAMSUNG_RES_DMA_NAMED(ch, name)                        \
+>>> +                               DEFINE_RES_DMA_NAMED(DMACH_##ch, name)
 >>
->> Basically the two patches do the same thing except that Barry's generic
->> resume code cannot be called before the MMU is turned on. On the other hand
->> Barry's patch is certainly simpler to maintain and I think it should be
->> merged, preference shared; I would not say it is easier to use though, usage
->> is identical.
+>> It's good for readability. but do you think that it's hard to find out
+>> defined macros are used at real place?
+>> e.g., Now I want to find out the S3C_PA_USB_HSOTG. it's difficult if
+>> you use the SAMSUNG_RES_* series macro.
+>> but if you use the DEFINED_RES_* series directly. it's easy to find
+>> out at real codes.
 >>
->> It is agreed, better to have it in C than in asm for maintenance reasons,
->> asm can turn out overkill.
->> If there is a compelling case for generic L2 asm we can always add it at a
->> later stage (at least Origen, latest iMX and I think Tegra will need early L2
->> resume from idle).
->
-> Ok, so it sounds like we're settled on Barry's code... so can it head to
-> the patch system please?
+> Well, I don't think so because the XXX_PA_XXX addresses are defined in each
+> mach/map.h and they are usually used in here so it's not hard to find it.
 
-done. http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7114/1
+Some minor disadvantage is that tagging tools like e.g. gtags don't handle
+these things properly. But I don't think it's really important.
 
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> 
+> And now the 'S3C', 'S5P' and 'SAMSUNG' are used in the 'soc' part. I'm
+> preparing to consolidate the name and to remove duplicated resources.
+
+Do you also have any specific plans for supporting single image build for
+multiple SoC's while working on this ?
+
+
+Thanks,
+-- 
+Sylwester
