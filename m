@@ -1,52 +1,44 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 3 Oct 2011 15:04:12 +0100
-Subject: [PATCH 05/11] ARM: vfp: use -mfloat-abi=soft to build vfp
-In-Reply-To: <1317496920-7764-6-git-send-email-arnd@arndb.de>
-References: <1317496920-7764-1-git-send-email-arnd@arndb.de>
-	<1317496920-7764-6-git-send-email-arnd@arndb.de>
-Message-ID: <20111003140411.GB2117@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Oct 2011 16:04:11 +0200
+Subject: [PATCH] ARM: EXYNOS: Add ARCH_EXYNOS and reorganize
+	arch/arm/mach-exynos
+In-Reply-To: <4E89AD44.80609@samsung.com>
+References: <001f01cc80e5$3abd1c80$b0375580$%kim@samsung.com>
+	<5785830.Sj7W4aL3qy@wuerfel> <4E89AD44.80609@samsung.com>
+Message-ID: <3709260.I9R44Iti1S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 01, 2011 at 09:21:54PM +0200, Arnd Bergmann wrote:
-> Distros are starting to ship with toolchains defaulting to
-> hardfloat. Using such a compiler to build the kernel fails
-> in the VFP directory with
+On Monday 03 October 2011 21:40:36 Kukjin Kim wrote:
+> Yes, absolutely. As I said, the 'mach-exynos' can support upcoming 
+> Samsung EXYNOS SoCs and the way is better than making mach-exynos5.
 > 
-> arch/arm/vfp/entry.S:1:0: sorry, unimplemented: -mfloat-abi=hard and VFP
-> 
-> Adding -mfloat-abi=soft to the gcc command line fixes this.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/vfp/Makefile |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
-> index 6de73aa..a81404c 100644
-> --- a/arch/arm/vfp/Makefile
-> +++ b/arch/arm/vfp/Makefile
-> @@ -7,7 +7,7 @@
->  # ccflags-y := -DDEBUG
->  # asflags-y := -DDEBUG
->  
-> -KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp)
-> +KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp -mfloat-abi=soft)
+> My bigger plan is finally to make current directories to 3 mach- dir. 
+> (mach-s3c, mach-s5p, and mach-exynos) and 1 plat-samsung directory. Of 
+> course, the mach- directories can be reduced later.
+>
+> Firstly, as you can see, I'm merging plat-s3c24xx and plat-s5p into one 
+> plat-samsung directory and actually the <plat/*.h> files and dev-*.c 
+> files have been moved into plat-samsung. Maybe I can finish it during 
+> 3.2-rc.
 
-Although -mfpu=softvfp+vfp and -mfloat-abi=soft look mutually
-contradictory, this seems to have the correct effect, i.e. the
-assembler allows floating-point instructions but marks the resulting
-object as using the soft-float calling conventions.
+Ok, sounds good. So for my understanding: is s5p a completely separate
+line from exynos, or are they more of an evolutionary succession where
+you draw the line between the last uniprocessor and the first SMP
+chip?
+ 
+> Secondary, upcoming Samsung EXYNOS SoCs will be supported in mach-exynos 
+> directory and this patch is required to that. For example, the EXYNOS5 
+> SoCs (Cortex A15) will be supported in that with other EXYNOS4 SoCs soon 
+> and of course it reduces code duplication 
 
-The binutils documentation also seems to confirm that that's what
-should happen.
+My feeling is that it would be nicer to just add exynos5 to the mach-exynos4
+directory for now, in the same way that omap3/4/5 are in the mach-omap2
+directory. We can do a big rename later once the reorganization of code
+within those directories that you explained above is complete.
 
-I don't see another combination of options for getting this effect.
+If you still want to do the big rename right now, I would suggest doing
+it at the end of the 3.2 merge window, so that all other patches that
+might need to touch the mach-exynos4 directory can go in first.
 
-
-So, if you like:
-
-Reviewed-by: Dave Martin <dave.martin@linaro.org>
-
-Cheers
----Dave
+	Arnd
