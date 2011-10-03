@@ -1,74 +1,29 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 3 Oct 2011 11:27:44 +0200
-Subject: [PATCH 26/30] ARM: omap: add board autoselection
-In-Reply-To: <3656685.pM1zNST8gQ@wuerfel>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-27-git-send-email-arnd@arndb.de>
-	<4E8947F7.2070108@ti.com> <3656685.pM1zNST8gQ@wuerfel>
-Message-ID: <4E898010.80208@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Oct 2011 11:33:16 +0200
+Subject: [PATCH] ARM: EXYNOS: Add ARCH_EXYNOS and reorganize
+	arch/arm/mach-exynos
+In-Reply-To: <CAH9JG2UNwZxDTPnwjohxhCumKZx_mWcPUn2rROjmjmROoxF07w@mail.gmail.com>
+References: <001f01cc80e5$3abd1c80$b0375580$%kim@samsung.com>
+	<CAH9JG2UNwZxDTPnwjohxhCumKZx_mWcPUn2rROjmjmROoxF07w@mail.gmail.com>
+Message-ID: <5785830.Sj7W4aL3qy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/3/2011 11:11 AM, Arnd Bergmann wrote:
-> On Monday 03 October 2011 10:58:23 Santosh Shilimkar wrote:
->>> +config MACH_OMAP_AUTO_BOARD
->>> +     def_bool y
->>> +     depends on !MACH_OMAP2_TUSB6010
->>> +     depends on !MACH_OMAP_H4
->>> +     depends on !MACH_OMAP_APOLLON
->>> +     depends on !MACH_OMAP_APOLLON
->>> +     depends on !MACH_OMAP_2430SDP
->>> +     depends on !MACH_OMAP3_BEAGLE
->>> +     depends on !MACH_DEVKIT8000
->>> +     depends on !MACH_OMAP_LDP
->>> +     depends on !MACH_OMAP3530_LV_SOM
->>> +     depends on !MACH_OMAP3_TORPEDO
->>> +     depends on !MACH_OVERO
->>> +     depends on !MACH_OMAP3EVM
->>> +     depends on !MACH_OMAP3517EVM
->>> +     depends on !MACH_CRANEBOARD
->>> +     depends on !MACH_OMAP3_PANDORA
->>> +     depends on !MACH_OMAP3_TOUCHBOOK
->>> +     depends on !MACH_NOKIA_N8X0
->>> +     depends on !MACH_NOKIA_RM680
->>> +     depends on !MACH_NOKIA_RX51
->>> +     depends on !MACH_OMAP_ZOOM2
->>> +     depends on !MACH_OMAP_ZOOM3
->>> +     depends on !MACH_CM_T35
->>> +     depends on !MACH_CM_T3517
->>> +     depends on !MACH_IGEP0020
->>> +     depends on !MACH_IGEP0030
->>> +     depends on !MACH_SBC3530
->>> +     depends on !MACH_OMAP_3630SDP
->>> +     depends on !MACH_TI8168EVM
->>> +     depends on !MACH_OMAP4_PANDA
->> Do we need all above 'depends on *' ?
->> Even if they get selected for one of the below
->> ARCH along with default machine, build should be happy.
->> Right ?
->
-> I'm not too happy with having to maintain a list for each subarchitecture,
-> when each one has the same problem. In general, I would really like to have
-> the flexibility to disable all but any one board, which requires either
-> maintaining a list like the above, or expressing the same like
->
-> config MACH_OMAP_AUTO_BOARD
-> 	 def_bool y
->         depends on !MACH_OMAP_BOARD_SELECTED
->         select MACH_OMAP_GENERIC if ARCH_OMAP2
->         select MACH_OMAP_3430SDP if ARCH_OMAP3&&  !ARCH_OMAP2
->         select MACH_OMAP_4430SDP if ARCH_OMAP4&&  !ARCH_OMAP3&&  !ARCH_OMAP2
->
-> and adding a 'select MACH_OMAP_BOARD_SELECTED' for each one. Slightly more
-> to write but perhaps a little less error-prone.
->
-> In the long run, I'd hope we can just get rid of these for subarchitectures
-> that support device tree probing and make the device tree based machine
-> description unconditional.
+On Monday 03 October 2011 13:02:16 Kyungmin Park wrote:
+> I'm afraid to change machine directory name again. mach-s5pv310 ->
+> mach-exynos4 -> mach-exynos.
+> As I remember linus blamed the renaming the file names are happened
+> frequently at ARM
 
-This is really our goal, we will have soon the board-generic.c for that, 
-someone will *just* have to migrate these ~30 board files to device tree 
-DTS files :-)
+I tend to agree with this. While the new name does make more sense,
+I would first like to see the bigger plan. If you are eventually
+planning to consolidate all of mach-s5p64x0, mach-s5pc100, mach-s5pv210,
+mach-exynos4 and plat-s5p into one common mach-s5p or mach-exynos
+directory, I'm all for that because it reduces code duplication
+and work required for the overall cross-subarchitecture single zimage
+work.
 
-Regards,
-Benoit
+Simply renaming something because the name does not quite fit entirely
+should be done very carefully.
+
+	Arnd
