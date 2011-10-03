@@ -1,46 +1,30 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 03 Oct 2011 12:27:21 +0900
-Subject: [PATCH 0/4] ARM: EXYNOS4: Support generic Power domain framework
-	for EXYNOS4210
-In-Reply-To: <201110022000.56556.rjw@sisk.pl>
-References: <4E4360B2.2060508@samsung.com> <201110021508.44083.rjw@sisk.pl>
-	<20111002131307.GV11710@n2100.arm.linux.org.uk>
-	<201110022000.56556.rjw@sisk.pl>
-Message-ID: <005701cc817c$5c54a240$14fde6c0$%kim@samsung.com>
+Date: Mon, 03 Oct 2011 12:27:22 +0900
+Subject: [GIT PULL] Samsung devel-2 for v3.2
+In-Reply-To: <20111002192950.GB1005@sirena.org.uk>
+References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
+	<20111002192950.GB1005@sirena.org.uk>
+Message-ID: <005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafael J. Wysocki wrote:
+Mark Brown wrote:
 > 
-> On Sunday, October 02, 2011, Russell King - ARM Linux wrote:
-> > On Sun, Oct 02, 2011 at 03:08:43PM +0200, Rafael J. Wysocki wrote:
-> > > On Sunday, October 02, 2011, Russell King - ARM Linux wrote:
-> > > > How do these misconceptions start?
-> > > >
-> > > > The clock API.  Drivers are supposed to get a clock (source) when
-they
-> > > > initialize.  Drivers then enable and disable the clock as they
-_themselves_
-> > > > require the use of that clock.
-> > >
-> > > OK
-> > >
-> > > Now think of a driver that should handle the same device on both ARM
-and
-> > > x86-based SoCs.  Is the clock API available on x86?
-> >
-> > No one's bothered yet.
+> On Sun, Oct 02, 2011 at 06:25:36PM +0900, Kukjin Kim wrote:
 > 
-> Prehaps because x86 doesn't allow us to control device clocks directly.
-> They are controlled through PCI PM or through ACPI methods, both of which
-> hide the clocks behind abstract low-power states we're supposed to use.
+> >       gpio/samsung: gpio-samsung.c to support Samsung GPIOs
 > 
-Well, I think Embedded drivers especially ARM sometimes need to control its
-own clock directly and each embedded drivers know when clock controlling is
-required or not. Actually, Samsung driver stuff have calling clk_enable() in
-probe() or open() and clk_disable() when clock is not needed more. But I'm
-not sure we _really_ can get some benefits when matching clock and power
-control on ARM devices.
+> As I reported the other day this change breaks the boot early on on the
+> Cragganmore S3C6410 based systems (I've not actually fired up my
+> SMDK6410 but I suspect it may have issues too).  I did make some brief
+> attempts to debug but as there's no console output at all and the diff
+> is rather large it's not easy to see what's gone wrong.
+
+Hmm, I thought it has no problem when I saw Thomas Abraham's 'serial:
+samsung' patches because he said it works fine with my for-next plus his
+patches on SMDK6410...Anyway, I need to sort it out.
+
+Arnd, please hold this on, will request again soon.
 
 Thanks.
 
