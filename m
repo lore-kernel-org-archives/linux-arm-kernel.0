@@ -1,26 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Oct 2011 11:16:26 +0200
-Subject: [PATCH 20/30] media/omap_vout: disable driver for now
-In-Reply-To: <4E8951B7.7010106@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 03 Oct 2011 14:49:30 +0530
+Subject: [PATCH 26/30] ARM: omap: add board autoselection
+In-Reply-To: <3656685.pM1zNST8gQ@wuerfel>
 References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-21-git-send-email-arnd@arndb.de>
-	<4E8951B7.7010106@ti.com>
-Message-ID: <1742744.loikWKTXp9@wuerfel>
+	<1317566760-25681-27-git-send-email-arnd@arndb.de>
+	<4E8947F7.2070108@ti.com> <3656685.pM1zNST8gQ@wuerfel>
+Message-ID: <4E897E22.2000703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 October 2011 11:39:59 Archit Taneja wrote:
+On Monday 03 October 2011 02:41 PM, Arnd Bergmann wrote:
+> On Monday 03 October 2011 10:58:23 Santosh Shilimkar wrote:
+>>> +config MACH_OMAP_AUTO_BOARD
+>>> +     def_bool y
+>>> +     depends on !MACH_OMAP2_TUSB6010
+>>> +     depends on !MACH_OMAP_H4
+>>> +     depends on !MACH_OMAP_APOLLON
+>>> +     depends on !MACH_OMAP_APOLLON
+>>> +     depends on !MACH_OMAP_2430SDP
+>>> +     depends on !MACH_OMAP3_BEAGLE
+>>> +     depends on !MACH_DEVKIT8000
+>>> +     depends on !MACH_OMAP_LDP
+>>> +     depends on !MACH_OMAP3530_LV_SOM
+>>> +     depends on !MACH_OMAP3_TORPEDO
+>>> +     depends on !MACH_OVERO
+>>> +     depends on !MACH_OMAP3EVM
+>>> +     depends on !MACH_OMAP3517EVM
+>>> +     depends on !MACH_CRANEBOARD
+>>> +     depends on !MACH_OMAP3_PANDORA
+>>> +     depends on !MACH_OMAP3_TOUCHBOOK
+>>> +     depends on !MACH_NOKIA_N8X0
+>>> +     depends on !MACH_NOKIA_RM680
+>>> +     depends on !MACH_NOKIA_RX51
+>>> +     depends on !MACH_OMAP_ZOOM2
+>>> +     depends on !MACH_OMAP_ZOOM3
+>>> +     depends on !MACH_CM_T35
+>>> +     depends on !MACH_CM_T3517
+>>> +     depends on !MACH_IGEP0020
+>>> +     depends on !MACH_IGEP0030
+>>> +     depends on !MACH_SBC3530
+>>> +     depends on !MACH_OMAP_3630SDP
+>>> +     depends on !MACH_TI8168EVM
+>>> +     depends on !MACH_OMAP4_PANDA
+>> Do we need all above 'depends on *' ?
+>> Even if they get selected for one of the below
+>> ARCH along with default machine, build should be happy.
+>> Right ?
 > 
-> A fix for this is already in the master branch of Mauro's tree:
+> I'm not too happy with having to maintain a list for each subarchitecture,
+> when each one has the same problem. In general, I would really like to have
+> the flexibility to disable all but any one board, which requires either
+> maintaining a list like the above, or expressing the same like
 > 
-> git://linuxtv.org/media_tree.git
-> 
-> with the commit id:
-> 
-> 5ebbf72dc51bd3b481aa91fea37a7157da5fc548
-> 
-> I am guessing this would during the 3.2 merge window.
+Ok.
 
-Ok, thanks for the info! We can drop this then.
+> config MACH_OMAP_AUTO_BOARD
+> 	 def_bool y
+>        depends on !MACH_OMAP_BOARD_SELECTED
+>        select MACH_OMAP_GENERIC if ARCH_OMAP2
+>        select MACH_OMAP_3430SDP if ARCH_OMAP3 && !ARCH_OMAP2
+>        select MACH_OMAP_4430SDP if ARCH_OMAP4 && !ARCH_OMAP3 && !ARCH_OMAP2
+> 
+> and adding a 'select MACH_OMAP_BOARD_SELECTED' for each one. Slightly more
+> to write but perhaps a little less error-prone.
+> 
+> In the long run, I'd hope we can just get rid of these for subarchitectures
+> that support device tree probing and make the device tree based machine
+> description unconditional.
+> 
+I see your point. Sounds a good idea to me.
 
-	Arnd
+Regards
+Santosh
