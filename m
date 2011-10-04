@@ -1,53 +1,56 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 4 Oct 2011 21:26:53 +0100
-Subject: [PATCH] picoxcell: add a definition of VMALLOC_END
-In-Reply-To: <1317759855-21281-1-git-send-email-jamie@jamieiles.com>
-References: <1317759855-21281-1-git-send-email-jamie@jamieiles.com>
-Message-ID: <20111004202653.GA12252@gallagher>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 04 Oct 2011 13:29:03 -0700
+Subject: [RFC 2/5] ARM: OMAP: omap_device: add a method to set iommu
+	private archdata
+In-Reply-To: <CAK=WgbYaEPBUz_J11+f+W+G9uUG3E6aQ-5=X9bj2nRhij-w-Sw@mail.gmail.com>
+	(Ohad Ben-Cohen's message of "Tue, 4 Oct 2011 21:54:44 +0200")
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+	<1316948337-7924-3-git-send-email-ohad@wizery.com>
+	<87sjni9aql.fsf@ti.com>
+	<CAK=WgbZhz8LcAYZEY3qqRkX4E_wtspWp09Eq9G=5VdpoMMF1FQ@mail.gmail.com>
+	<87botwk4gw.fsf@ti.com>
+	<CAK=WgbYaEPBUz_J11+f+W+G9uUG3E6aQ-5=X9bj2nRhij-w-Sw@mail.gmail.com>
+Message-ID: <87mxdga4c0.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2011 at 09:24:15PM +0100, Jamie Iles wrote:
-> Nicolas Pitre's vmalloc cleanup series didn't get merged in this cycle
-> so picoxcell is missing a VMALLOC_END definition.
-> 
-> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+Ohad Ben-Cohen <ohad@wizery.com> writes:
 
-Oops.  Wrong patch, should have been this one.
+> On Tue, Oct 4, 2011 at 8:15 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> The approach is OK with me, but I'm a bit torn about whether or not to
+>> merge this since the need for this should go away when converting to DT.
+>
+> I guess it will still take some time until our boards are fully
+> functional with DT, so I think we should regard this as an interim
+> solution. Without this patch, a huge deal of code consolidation and
+> generalization is gated (namely - generic iommu and dma api, and
+> everything that depends on it, e.g. rpmsg/remoteproc).
+>
+>> Is anyone working on IOMMU DT description?
+>
+> Unless Benoit is, I'll happily pick this up.
 
-8<----
+tag.  you're it.
 
-From: Jamie Iles <jamie@jamieiles.com>
-Subject: [PATCH] picoxcell: add a definition of VMALLOC_END
+>> I guess if I do merge this, we can also clean this up significantly
+>> after all devices are converted to DT.
+>
+> Sure.
 
-Nicolas Pitre's vmalloc cleanup series didn't get merged in this cycle
-so picoxcell is missing a VMALLOC_END definition.
+OK, as long as I have some confidence that this is going in the right
+direction (and having you on the job is a good sign!)  I'm willing to
+merge something like this as an interim solution.
 
-Signed-off-by: Jamie Iles <jamie@jamieiles.com>
----
- arch/arm/mach-picoxcell/include/mach/vmalloc.h |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-picoxcell/include/mach/vmalloc.h
+Kevin
 
-diff --git a/arch/arm/mach-picoxcell/include/mach/vmalloc.h b/arch/arm/mach-picoxcell/include/mach/vmalloc.h
-new file mode 100644
-index 0000000..0216cc4
---- /dev/null
-+++ b/arch/arm/mach-picoxcell/include/mach/vmalloc.h
-@@ -0,0 +1,14 @@
-+/*
-+ * Copyright (c) 2011 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#define VMALLOC_END	0xfe000000UL
--- 
-1.7.4.1
+>> Unless it has other dependencies on Benoit's further DT patches, you can
+>> base this on my for_3.2/omap_device-2 branch which includes Benoit's
+>> alloc changes.
+>
+> Ok, thanks a lot !
+> Ohad.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
