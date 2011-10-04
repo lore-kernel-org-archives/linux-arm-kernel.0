@@ -1,30 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Oct 2011 09:33:38 +0200
-Subject: [PATCH 16/26] ARM: pxa: CPU_PJ4 requires IWMMXT
-In-Reply-To: <CAMPhdO96WwmPVqVpM2Vpef3wSgfHEf-0tK5VewXn-EGMns2ubA@mail.gmail.com>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<20295619.jOfPxmug8T@wuerfel>
-	<CAMPhdO96WwmPVqVpM2Vpef3wSgfHEf-0tK5VewXn-EGMns2ubA@mail.gmail.com>
-Message-ID: <201110040933.38389.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 4 Oct 2011 09:34:04 +0200
+Subject: [PATCH] ARM: remove bashism in check for multiple zreladdrs
+In-Reply-To: <1317660736-19081-1-git-send-email-rabin@rab.in>
+References: <1317660736-19081-1-git-send-email-rabin@rab.in>
+Message-ID: <20111004073404.GI31404@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 October 2011, Eric Miao wrote:
-> I think this is true for other xscale CPUs as well, so either we make
-> them unconditionally all at once, or we still leave an option here.
+On Mon, Oct 03, 2011 at 10:22:16PM +0530, Rabin Vincent wrote:
+> Get rid of this complaint from dash:
+> 
+>     AS      arch/arm/boot/compressed/lib1funcs.o
+>   /bin/sh: 1: [: y: unexpected operator
+>     LD      arch/arm/boot/compressed/vmlinux
+> 
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-Do all xscale have iwmmxt?
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-> It actually looks quite odd to me that CPU_PJ4 is made special here,
-> what're the real broken builds errors?
+I guess using '=' for a comparison is hard to type for a C programmer ;)
 
-Yes.
+Sascha
 
-I should probably have provided a longer description of the problem.
-The build error is in arch/arm/kernel/pj4-cp0.c, which calls
-iwmmxt_task_release unconditionally. The code is obviously
-copy-pasted from arch/arm/kernel/xscale-cp0.c, which does much
-of the same, but uses both run-time and compile-time conditionals
-for iwmmxt.
+> ---
+>  arch/arm/boot/compressed/Makefile |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+> index a53a333..a6b30b3 100644
+> --- a/arch/arm/boot/compressed/Makefile
+> +++ b/arch/arm/boot/compressed/Makefile
+> @@ -140,7 +140,7 @@ bad_syms=$$($(CROSS_COMPILE)nm $@ | sed -n 's/^.\{8\} [bc] \(.*\)/\1/p') && \
+>      echo "$$bad_syms" >&2; rm -f $@; false )
+>  
+>  check_for_multiple_zreladdr = \
+> -if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" == "" ]; then \
+> +if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
+>  	echo 'multiple zreladdrs: $(ZRELADDR)'; \
+>  	echo 'This needs CONFIG_AUTO_ZRELADDR to be set'; \
+>  	false; \
+> -- 
+> 1.7.5.4
+> 
+> 
 
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
