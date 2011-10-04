@@ -1,70 +1,58 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Tue, 4 Oct 2011 15:11:16 +0530
-Subject: [PATCH v3 3/3] ARM: OMAP: TI814X: Create board support and
-	enable build for TI8148 EVM
-In-Reply-To: <4E8ACB3C.6020401@compulab.co.il>
-References: <1317258570-30494-1-git-send-email-hemantp@ti.com>
-	<4E88542B.4010206@compulab.co.il>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03B4EC5D52@dbde02.ent.ti.com>
-	<4E8ACB3C.6020401@compulab.co.il>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4EC6066@dbde02.ent.ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 04 Oct 2011 10:44:38 +0100
+Subject: [PATCH v4 02/10] ARM: SoC: Add per SoC SMP and CPU hotplug
+	operations
+In-Reply-To: <alpine.LFD.2.02.1110031508270.9106@xanadu.home>
+References: <1317663356-5114-1-git-send-email-marc.zyngier@arm.com>
+	<1317663356-5114-3-git-send-email-marc.zyngier@arm.com>
+	<alpine.LFD.2.02.1110031508270.9106@xanadu.home>
+Message-ID: <4E8AD586.7060209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Igor Grinberg wrote on Tuesday, October 04, 2011 2:31 PM:
-
-> On 10/03/11 18:45, Pedanekar, Hemant wrote:
->> Hi Igor,
->> 
->> Igor Grinberg wrote on Sunday, October 02, 2011 5:38 PM:
->> 
->>> Hi Hemant,
->>> 
->>> On 09/29/11 04:09, Hemant Pedanekar wrote:
->>>> This patch adds minimal support and build configuration for TI8148 EVM.
->>>> Also adds support for low level debugging on UART1 console on the EVM.
->>>> 
->>>> Note that existing TI8168 EVM file (board-ti8168evm.c) is updated with
->>>> machine info for TI8148 EVM and renamed as board-ti81xxevm.c.
->>> 
->>> Should we really rename the existing file?
->>> Shouldn't we just stick to the name of the file submitted first?
->>> (e.g. board-ti8168evm.c) and just add the support for the new
->>> TI8148 EVM in to the existing file?
->> 
->> But won't this be misleading?
+On 03/10/11 20:12, Nicolas Pitre wrote:
+> On Mon, 3 Oct 2011, Marc Zyngier wrote:
 > 
-> Misleading? For whom?
-> Actually, I don't really care how you call that file.
-> What I care (and I think not just me) is uniformity, so
-> if we decide to rename all those files that have multiple
-> boards supported in them, I'm fine with it.
+>> Populate the SoC descriptor structure with the SMP and CPU hotplug
+>> operations. To allow the kernel to continue building, the platform
+>> hooks are defined as weak symbols which are overrided by the
+>> platform code. Once all platforms are converted, the "weak" attribute
+>> will be removed and the function made static.
+>>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Nicolas Pitre <nico@fluxnic.net>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+> [...]
+>> --- a/arch/arm/kernel/setup.c
+>> +++ b/arch/arm/kernel/setup.c
+>> @@ -141,8 +141,12 @@ static const char *cpu_name;
+>>  static const char *machine_name;
+>>  static char __initdata cmd_line[COMMAND_LINE_SIZE];
+>>  struct machine_desc *machine_desc __initdata;
+>> -const struct arm_soc_desc *soc_desc;
+>> -static struct arm_soc_desc __soc_desc __read_mostly;
+>> +const struct arm_soc_desc *soc_desc __initdata;
 > 
-> So pros for my proposed approach would be:
-> 1) Currently, there are already board files with multiple boards
->    supported in them that follow the approach and renaming them is   
-> really unnecessary. 2) git log will not break.
-> 3) boards that cannot be named after the convention like 81xx
->    but can be added to the same file will not require further renaming
->    (like 82x8 - I don't really know if that will exist, just wondering).
-> 4) This renaming is really what Linus likes ;)
+> Does the above belong in this patch?
+
+Looks like a leftover from a previous rework. Will fix.
+
+>> +#ifdef CONFIG_SMP
+>> +const struct arm_soc_smp_init_ops *soc_smp_init_ops  __initdata;
+>> +const struct arm_soc_smp_ops *soc_smp_ops  __cpuinitdata;
+>> +static struct arm_soc_smp_ops __soc_smp_ops __cpuinitdata;
+>> +#endif
 > 
-> cons:
-> 1) Misleading?
-> 
-> Currently, I don't think this renaming is good for anything,
-> especially that majority of the board stuff should be transformed
-> to the DT descriptors.
+> Maybe those could be moved in smp.c instead.
 
-Igor,
-I agree on the DT part and also understand the "pros" you mentioned.
+Good point, this actually makes a nice cleanup (the assignment of these
+variables can also move to smp.c, making them static).
 
-I can submit the v4 of patches with TI8148 EVM support added in exisitng
-board-ti8168evm.c.
+I'll repost the 3 affected patches shortly.
 
-Tony, 
-Are you OK with the above approach?
+Thanks for reviewing,
 
-Thanks.
-
-   Hemant
+	M.
+-- 
+Jazz is not dead. It just smells funny...
