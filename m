@@ -1,71 +1,62 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 04 Oct 2011 21:45:19 +0900
+Date: Tue, 04 Oct 2011 21:45:23 +0900
 Subject: [PATCH V2 2/2] ARM: SAMSUNG: Cleanup resources by using macro
-In-Reply-To: <1957187.UuLfeIqa6D@wuerfel>
+In-Reply-To: <4E89C4B2.605@samsung.com>
 References: <005901cc817e$51a56d00$f4f04700$%kim@samsung.com>
-	<1957187.UuLfeIqa6D@wuerfel>
-Message-ID: <019301cc8293$79a6f510$6cf4df30$%kim@samsung.com>
+	<CAH9JG2Wc4M2dVFOfNE5jgsygvigE8RbPH_yLcMqarr64LfbENw@mail.gmail.com>
+	<4E89B505.3060501@samsung.com> <4E89C4B2.605@samsung.com>
+Message-ID: <019401cc8293$7c17a6f0$7446f4d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
+Sylwester Nawrocki wrote:
 > 
-> On Monday 03 October 2011 12:41:22 Kukjin Kim wrote:
-> > This patch adds macro SAMSUNG_RES_MEM, SAMSUNG_RES_IRQ
-> > and so on to cleanup regarding 'struct resource' by using
-> > defined helpers at <linux/ioport.h>.
-> >
-> > Cc: Ben Dooks <ben-linux@fluff.org>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> When we introduced those macros, it was specifically so that platforms
-> would be migrated to use them instead of providing their own.
-> 
-> > index 8f19241..a506831 100644
-> > --- a/arch/arm/plat-samsung/include/plat/devs.h
-> > +++ b/arch/arm/plat-samsung/include/plat/devs.h
-> > @@ -18,6 +18,17 @@
-> >
-> >  #include <linux/platform_device.h>
-> >
-> > +#define SAMSUNG_RES_MEM(soc, ip, sz)
+> On 10/03/2011 03:13 PM, Kukjin Kim wrote:
+> > On 10/03/11 12:53, Kyungmin Park wrote:
+> >> On Mon, Oct 3, 2011 at 12:41 PM, Kukjin Kim<kgene.kim@samsung.com>
+> wrote:
+> >>>
+> >>> +#define SAMSUNG_RES_MEM(soc, ip, sz)
 > DEFINE_RES_MEM(soc##_PA_##ip, sz)
-> > +#define SAMSUNG_RES_IRQ(ip)            DEFINE_RES_IRQ(IRQ_##ip)
-> > +
-> > +#define SAMSUNG_RES_MEM_NAMED(soc, ip, sz, name)       \
-> > +
+> >>> +#define SAMSUNG_RES_IRQ(ip)            DEFINE_RES_IRQ(IRQ_##ip)
+> >>> +
+> >>> +#define SAMSUNG_RES_MEM_NAMED(soc, ip, sz, name)       \
+> >>> +
 > DEFINE_RES_MEM_NAMED(soc##_PA_##ip, sz, name)
-> > +#define SAMSUNG_RES_IRQ_NAMED(ip, name)                        \
-> > +                               DEFINE_RES_IRQ_NAMED(IRQ_##ip,
-> name)
-> > +#define SAMSUNG_RES_DMA_NAMED(ch, name)
+> >>> +#define SAMSUNG_RES_IRQ_NAMED(ip, name)
 > \
-> > +
+> >>> +                               DEFINE_RES_IRQ_NAMED(IRQ_##ip,
+> name)
+> >>> +#define SAMSUNG_RES_DMA_NAMED(ch, name)
+> \
+> >>> +
 > DEFINE_RES_DMA_NAMED(DMACH_##ch, name)
+> >>
+> >> It's good for readability. but do you think that it's hard to find out
+> >> defined macros are used at real place?
+> >> e.g., Now I want to find out the S3C_PA_USB_HSOTG. it's difficult if
+> >> you use the SAMSUNG_RES_* series macro.
+> >> but if you use the DEFINED_RES_* series directly. it's easy to find
+> >> out at real codes.
+> >>
+> > Well, I don't think so because the XXX_PA_XXX addresses are defined in
+each
+> > mach/map.h and they are usually used in here so it's not hard to find
+it.
 > 
-> I think the string concatenation really just obfuscates the code, and
-> it does not actually save much at all. When you replace
+> Some minor disadvantage is that tagging tools like e.g. gtags don't handle
+> these things properly. But I don't think it's really important.
 > 
-> +       [0] = SAMSUNG_RES_MEM(S3C, WDT, SZ_1K),
-> +       [1] = SAMSUNG_RES_IRQ(WDT),
+> >
+> > And now the 'S3C', 'S5P' and 'SAMSUNG' are used in the 'soc' part. I'm
+> > preparing to consolidate the name and to remove duplicated resources.
 > 
-> with
-> 
-> +       [0] = DEFINE_RES_MEM(S3C_PA_WDT, SZ_1K),
-> +       [1] = DEFINE_RES_IRQ(IRQ_WDT),
-> 
-> you need practically no extra space, but you gain the advantages that
-> 
-> * Someone using grep for DEFINE_RES_MEM finds all memory resources without
->   having to look up what your macros do an where they are used.
-> * Someone using grep to look for S3C_PA_WDT finds the place where it is
-used.
-> * Someone reading the resource definition immediately knows what the
->   macro does if familiar with other platforms using that macro.
+> Do you also have any specific plans for supporting single image build for
+> multiple SoC's while working on this ?
 
-Yes, right. But I'm preparing to reduce the 'soc' part to consolidate some
-duplicated resources and platform data after this and the new SAMSUNG_RES
-macro will be used.
+Hmm, you could see through my plan :)
+As you know, we need to sort out resources and platform data to support
+single kernel image so I'm preparing it after this.
 
 Thanks.
 
