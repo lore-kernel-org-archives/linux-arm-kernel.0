@@ -1,89 +1,58 @@
-From: girish.shivananjappa@linaro.org (Girish K S)
-Date: Tue,  4 Oct 2011 16:08:04 +0530
-Subject: [PATCH] arm: mm: Fix infinite looping issue
-Message-ID: <1317724684-29115-1-git-send-email-girish.shivananjappa@linaro.org>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 4 Oct 2011 12:47:13 +0200
+Subject: [PATCH 22/30] mfd: build twl6030 only on omap2
+In-Reply-To: <1317566760-25681-23-git-send-email-arnd@arndb.de>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<1317566760-25681-23-git-send-email-arnd@arndb.de>
+Message-ID: <20111004104713.GY4118@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the problem of infinite looping while booting.
+Hi Arnd,
 
-The bne instruction expects the z flag to be set to break the loop.
-The (mov r1, r1, lsr #1) doesn't behave in the expected way. If
-replaced with the movs instruction then the execution will exit
-the loop.
+On Sun, Oct 02, 2011 at 04:45:52PM +0200, Arnd Bergmann wrote:
+> We can only have one pwm driver built into the kernel,
+I seem to remember that Bill Gatliff was working on a PWM subsystem that would
+get rid of the current pwm.h ugliness. Do we have any updates on this one ?
 
-Signed-off-by: Girish K S <girish.shivananjappa@linaro.org>
----
- arch/arm/mm/proc-arm740.S |    4 ++--
- arch/arm/mm/proc-arm940.S |    4 ++--
- arch/arm/mm/proc-arm946.S |    4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+The patch below looks like a hack to me, trying to work around the current
+lack of such subsystem.
 
-diff --git a/arch/arm/mm/proc-arm740.S b/arch/arm/mm/proc-arm740.S
-index 4506be3..9284f10 100644
---- a/arch/arm/mm/proc-arm740.S
-+++ b/arch/arm/mm/proc-arm740.S
-@@ -77,7 +77,7 @@ __arm740_setup:
- 	ldr	r1, =(CONFIG_DRAM_SIZE >> 12)	@ size of RAM (must be >= 4KB)
- 	mov	r2, #10				@ 11 is the minimum (4KB)
- 1:	add	r2, r2, #1			@ area size *= 2
--	mov	r1, r1, lsr #1
-+	movs	r1, r1, lsr #1			@ set zero bit if r1=0
- 	bne	1b				@ count not zero r-shift
- 	orr	r0, r0, r2, lsl #1		@ the area register value
- 	orr	r0, r0, #1			@ set enable bit
-@@ -87,7 +87,7 @@ __arm740_setup:
- 	ldr	r1, =(CONFIG_FLASH_SIZE >> 12)	@ size of FLASH (must be >= 4KB)
- 	mov	r2, #10				@ 11 is the minimum (4KB)
- 1:	add	r2, r2, #1			@ area size *= 2
--	mov	r1, r1, lsr #1
-+	movs	r1, r1, lsr #1			@ set zero bit if r1=0
- 	bne	1b				@ count not zero r-shift
- 	orr	r0, r0, r2, lsl #1		@ the area register value
- 	orr	r0, r0, #1			@ set enable bit
-diff --git a/arch/arm/mm/proc-arm940.S b/arch/arm/mm/proc-arm940.S
-index ac750d5..e639034 100644
---- a/arch/arm/mm/proc-arm940.S
-+++ b/arch/arm/mm/proc-arm940.S
-@@ -296,7 +296,7 @@ __arm940_setup:
- 	ldr	r1, =(CONFIG_DRAM_SIZE >> 12)	@ size of RAM (must be >= 4KB)
- 	mov	r2, #10				@ 11 is the minimum (4KB)
- 1:	add	r2, r2, #1			@ area size *= 2
--	mov	r1, r1, lsr #1
-+	movs	r1, r1, lsr #1			@ set zero bit if r1=0
- 	bne	1b				@ count not zero r-shift
- 	orr	r0, r0, r2, lsl #1		@ the area register value
- 	orr	r0, r0, #1			@ set enable bit
-@@ -307,7 +307,7 @@ __arm940_setup:
- 	ldr	r1, =(CONFIG_FLASH_SIZE >> 12)	@ size of FLASH (must be >= 4KB)
- 	mov	r2, #10				@ 11 is the minimum (4KB)
- 1:	add	r2, r2, #1			@ area size *= 2
--	mov	r1, r1, lsr #1
-+	movs	r1, r1, lsr #1			@ set zero bit if r1=0
- 	bne	1b				@ count not zero r-shift
- 	orr	r0, r0, r2, lsl #1		@ the area register value
- 	orr	r0, r0, #1			@ set enable bit
-diff --git a/arch/arm/mm/proc-arm946.S b/arch/arm/mm/proc-arm946.S
-index 683af3a..731388a 100644
---- a/arch/arm/mm/proc-arm946.S
-+++ b/arch/arm/mm/proc-arm946.S
-@@ -341,7 +341,7 @@ __arm946_setup:
- 	ldr	r1, =(CONFIG_DRAM_SIZE >> 12)	@ size of RAM (must be >= 4KB)
- 	mov	r2, #10				@ 11 is the minimum (4KB)
- 1:	add	r2, r2, #1			@ area size *= 2
--	mov	r1, r1, lsr #1
-+	movs	r1, r1, lsr #1			@ set zero bit if r1=0
- 	bne	1b				@ count not zero r-shift
- 	orr	r0, r0, r2, lsl #1		@ the region register value
- 	orr	r0, r0, #1			@ set enable bit
-@@ -351,7 +351,7 @@ __arm946_setup:
- 	ldr	r1, =(CONFIG_FLASH_SIZE >> 12)	@ size of FLASH (must be >= 4KB)
- 	mov	r2, #10				@ 11 is the minimum (4KB)
- 1:	add	r2, r2, #1			@ area size *= 2
--	mov	r1, r1, lsr #1
-+	movs	r1, r1, lsr #1			@ set zero bit if r1=0
- 	bne	1b				@ count not zero r-shift
- 	orr	r0, r0, r2, lsl #1		@ the region register value
- 	orr	r0, r0, #1			@ set enable bit
+Cheers,
+Samuel.
+
+> so make sure
+> that this one is only available on omap2 to avoid conflicts with
+> pwm drivers of other platforms.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Cc: Balaji T K <balajitk@ti.com>
+> Cc: Hemanth V <hemanthv@ti.com>
+> ---
+>  drivers/mfd/Kconfig |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 48cce35..26bebe8 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -256,8 +256,8 @@ config MFD_TWL4030_AUDIO
+>  	default n
+>  
+>  config TWL6030_PWM
+> -	tristate "TWL6030 PWM (Pulse Width Modulator) Support"
+> -	depends on TWL4030_CORE
+> +	bool "TWL6030 PWM (Pulse Width Modulator) Support"
+> +	depends on TWL4030_CORE && ARCH_OMAP2
+>  	select HAVE_PWM
+>  	default n
+>  	help
+> -- 
+> 1.7.5.4
+> 
+
 -- 
-1.7.1
+Intel Open Source Technology Centre
+http://oss.intel.com/
