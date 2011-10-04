@@ -1,29 +1,44 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 4 Oct 2011 11:18:47 +0100
-Subject: [PATCH 2/9] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <4E8A9988.3080907@ti.com>
-References: <1317118372-17052-3-git-send-email-rnayak@ti.com>
-	<20110927121003.GB4289@opensource.wolfsonmicro.com>
-	<4E81E224.2070408@ti.com>
-	<20110927150511.GM4289@opensource.wolfsonmicro.com>
-	<4E854532.6080605@ti.com>
-	<20110930102849.GA4195@opensource.wolfsonmicro.com>
-	<20110930104820.GE2085@sirena.org.uk> <4E85A34E.9070203@ti.com>
-	<20110930121844.GI5366@opensource.wolfsonmicro.com>
-	<4E8A9988.3080907@ti.com>
-Message-ID: <20111004101846.GD3250@opensource.wolfsonmicro.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 4 Oct 2011 12:28:11 +0200
+Subject: [PATCH v2 0/4] Fixes to twl4030-madc and add BeagleBoard support
+In-Reply-To: <20110928183230.GD6324@atomide.com>
+References: <CANOLnOPB=wFMPwqGbu9ufh__iM7TquUx3-o95R=gyJcae+gENg@mail.gmail.com>
+	<1313119995-15382-1-git-send-email-kyle@kylemanna.com>
+	<20110822135530.GR4607@sortiz-mobl>
+	<20110928183230.GD6324@atomide.com>
+Message-ID: <20111004102811.GW4118@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2011 at 10:58:40AM +0530, Rajendra Nayak wrote:
+Hi Tony,
 
-> The problem is I don't know if the property in the regulator dt
-> node is called "vin-supply" or "vxyz-supply" and hence I
-> can parse the property based on a substring alone, which is
-> "-supply" because all I know is the property name is expected
-> to end with a "-supply".
+On Wed, Sep 28, 2011 at 11:32:31AM -0700, Tony Lindgren wrote:
+> * Samuel Ortiz <sameo@linux.intel.com> [110822 06:20]:
+> > Hi Kyle,
+> > 
+> > On Thu, Aug 11, 2011 at 10:33:11PM -0500, Kyle Manna wrote:
+> > > These patches add basic functionality to the twl4030-madc driver to make
+> > > it work on the BeagleBoard xM.
+> > > 
+> > > Version 2 adds fixes per Grazvydas Ignotas and the check for NULL pointer patch.
+> > > 
+> > > Kyle Manna (4):
+> > >   mfd: twl4030-madc: copy the device pointer
+> > >   mfd: twl4030-madc: turn on the MADC clock
+> > >   mfd: twl4030-madc: check for NULL pointer
+> > >   arm: BeagleBoard: add support for the twl4030-madc
+> > Tony, are you ok with the BeagleBoard changes ?
+> > The MFD ones look fine to me, I'd like to apply them.
+> 
+> Yes sorry for the delay in replying. I acked it, maybe
+> you can just copy the subject to have a proper description
+> for the patch.
+I actually pushed the 3 MFD patches already.
+I think you can safely take the beagle one through your tree.
 
-This seems fairly straightforward though it will require some changes
-within Linux, all we have to do is have the regulators name their
-supplies.
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
