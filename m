@@ -1,153 +1,269 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 04 Oct 2011 12:58:34 +0530
-Subject: [PATCH 2/3] arm: exynos4: use 'exynos4-sdhci' as device name for sdhci
-	controllers
+Date: Tue, 04 Oct 2011 12:58:35 +0530
+Subject: [PATCH 3/3] arm: samsung: remove all uses of clk_type member in sdhci
+	platform data
 In-Reply-To: <1317713315-5830-1-git-send-email-thomas.abraham@linaro.org>
 References: <1317713315-5830-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1317713315-5830-3-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1317713315-5830-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the addition of platform specific driver data in the sdhci driver
-for exynos4, the device name of sdhci controllers on exynos4 is changed
-accordingly.
+The sdhci driver is modified to be independent of clk_type member in the sdhci
+platform data. Hence, all usage of clk_type in platform code is removed.
 
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: JeongHyeon Kim <jhkim@insignal.co.kr>
 Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Changhwan Youn <chaos.youn@samsung.com>
+Cc: Alim Akhtar <alim.akhtar@samsung.com>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/mach-exynos4/clock.c              |   16 ++++++++--------
- arch/arm/mach-exynos4/cpu.c                |    5 +++++
- arch/arm/plat-samsung/include/plat/sdhci.h |   27 +++++++++++++++++++++++++++
- 3 files changed, 40 insertions(+), 8 deletions(-)
+ arch/arm/mach-exynos4/mach-armlex4210.c     |    3 ---
+ arch/arm/mach-exynos4/mach-nuri.c           |    3 ---
+ arch/arm/mach-exynos4/mach-origen.c         |    2 --
+ arch/arm/mach-exynos4/mach-smdk4212.c       |    2 --
+ arch/arm/mach-exynos4/mach-smdkv310.c       |    4 ----
+ arch/arm/mach-exynos4/mach-universal_c210.c |    2 --
+ arch/arm/plat-samsung/dev-hsmmc.c           |    1 -
+ arch/arm/plat-samsung/dev-hsmmc1.c          |    1 -
+ arch/arm/plat-samsung/dev-hsmmc2.c          |    1 -
+ arch/arm/plat-samsung/dev-hsmmc3.c          |    1 -
+ arch/arm/plat-samsung/include/plat/sdhci.h  |    7 -------
+ arch/arm/plat-samsung/platformdata.c        |    2 --
+ 12 files changed, 0 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
-index a25c818..d89b45e 100644
---- a/arch/arm/mach-exynos4/clock.c
-+++ b/arch/arm/mach-exynos4/clock.c
-@@ -495,25 +495,25 @@ static struct clk init_clocks_off[] = {
- 		.ctrlbit	= (1 << 0),
- 	}, {
- 		.name		= "hsmmc",
--		.devname	= "s3c-sdhci.0",
-+		.devname	= "exynos4-sdhci.0",
- 		.parent		= &clk_aclk_133.clk,
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 5),
- 	}, {
- 		.name		= "hsmmc",
--		.devname	= "s3c-sdhci.1",
-+		.devname	= "exynos4-sdhci.1",
- 		.parent		= &clk_aclk_133.clk,
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 6),
- 	}, {
- 		.name		= "hsmmc",
--		.devname	= "s3c-sdhci.2",
-+		.devname	= "exynos4-sdhci.2",
- 		.parent		= &clk_aclk_133.clk,
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 7),
- 	}, {
- 		.name		= "hsmmc",
--		.devname	= "s3c-sdhci.3",
-+		.devname	= "exynos4-sdhci.3",
- 		.parent		= &clk_aclk_133.clk,
- 		.enable		= exynos4_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 8),
-@@ -1198,7 +1198,7 @@ static struct clksrc_clk clksrcs[] = {
- 	}, {
- 		.clk		= {
- 			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.0",
-+			.devname	= "exynos4-sdhci.0",
- 			.parent		= &clk_dout_mmc0.clk,
- 			.enable		= exynos4_clksrc_mask_fsys_ctrl,
- 			.ctrlbit	= (1 << 0),
-@@ -1207,7 +1207,7 @@ static struct clksrc_clk clksrcs[] = {
- 	}, {
- 		.clk		= {
- 			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.1",
-+			.devname	= "exynos4-sdhci.1",
- 			.parent         = &clk_dout_mmc1.clk,
- 			.enable		= exynos4_clksrc_mask_fsys_ctrl,
- 			.ctrlbit	= (1 << 4),
-@@ -1216,7 +1216,7 @@ static struct clksrc_clk clksrcs[] = {
- 	}, {
- 		.clk		= {
- 			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.2",
-+			.devname	= "exynos4-sdhci.2",
- 			.parent         = &clk_dout_mmc2.clk,
- 			.enable		= exynos4_clksrc_mask_fsys_ctrl,
- 			.ctrlbit	= (1 << 8),
-@@ -1225,7 +1225,7 @@ static struct clksrc_clk clksrcs[] = {
- 	}, {
- 		.clk		= {
- 			.name		= "sclk_mmc",
--			.devname	= "s3c-sdhci.3",
-+			.devname	= "exynos4-sdhci.3",
- 			.parent         = &clk_dout_mmc3.clk,
- 			.enable		= exynos4_clksrc_mask_fsys_ctrl,
- 			.ctrlbit	= (1 << 12),
-diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-index 2aa3df0..8f0f897 100644
---- a/arch/arm/mach-exynos4/cpu.c
-+++ b/arch/arm/mach-exynos4/cpu.c
-@@ -175,6 +175,11 @@ void __init exynos4_map_io(void)
- 	s3c_fimc_setname(2, "exynos4-fimc");
- 	s3c_fimc_setname(3, "exynos4-fimc");
+diff --git a/arch/arm/mach-exynos4/mach-armlex4210.c b/arch/arm/mach-exynos4/mach-armlex4210.c
+index b482c62..8bb2c48 100644
+--- a/arch/arm/mach-exynos4/mach-armlex4210.c
++++ b/arch/arm/mach-exynos4/mach-armlex4210.c
+@@ -75,7 +75,6 @@ static struct s3c2410_uartcfg armlex4210_uartcfgs[] __initdata = {
  
-+	s3c_sdhci_setname(0, "exynos4-sdhci");
-+	s3c_sdhci_setname(1, "exynos4-sdhci");
-+	s3c_sdhci_setname(2, "exynos4-sdhci");
-+	s3c_sdhci_setname(3, "exynos4-sdhci");
-+
- 	/* The I2C bus controllers are directly compatible with s3c2440 */
- 	s3c_i2c0_setname("s3c2440-i2c");
- 	s3c_i2c1_setname("s3c2440-i2c");
+ static struct s3c_sdhci_platdata armlex4210_hsmmc0_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ #ifdef CONFIG_EXYNOS4_SDHCI_CH0_8BIT
+ 	.max_width		= 8,
+ 	.host_caps		= MMC_CAP_8_BIT_DATA,
+@@ -86,13 +85,11 @@ static struct s3c_sdhci_platdata armlex4210_hsmmc2_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_GPIO,
+ 	.ext_cd_gpio		= EXYNOS4_GPX2(5),
+ 	.ext_cd_gpio_invert	= 1,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ 	.max_width		= 4,
+ };
+ 
+ static struct s3c_sdhci_platdata armlex4210_hsmmc3_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ 	.max_width		= 4,
+ };
+ 
+diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
+index bbd13f4..00b4b6f 100644
+--- a/arch/arm/mach-exynos4/mach-nuri.c
++++ b/arch/arm/mach-exynos4/mach-nuri.c
+@@ -101,7 +101,6 @@ static struct s3c_sdhci_platdata nuri_hsmmc0_data __initdata = {
+ 				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+ 				MMC_CAP_DISABLE | MMC_CAP_ERASE),
+ 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ static struct regulator_consumer_supply emmc_supplies[] = {
+@@ -143,7 +142,6 @@ static struct s3c_sdhci_platdata nuri_hsmmc2_data __initdata = {
+ 	.ext_cd_gpio		= EXYNOS4_GPX3(3),	/* XEINT_27 */
+ 	.ext_cd_gpio_invert	= 1,
+ 	.cd_type		= S3C_SDHCI_CD_GPIO,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ /* WLAN */
+@@ -152,7 +150,6 @@ static struct s3c_sdhci_platdata nuri_hsmmc3_data __initdata = {
+ 	.host_caps		= MMC_CAP_4_BIT_DATA |
+ 				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
+ 	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ static void __init nuri_sdhci_init(void)
+diff --git a/arch/arm/mach-exynos4/mach-origen.c b/arch/arm/mach-exynos4/mach-origen.c
+index 421294b..82dfdc3 100644
+--- a/arch/arm/mach-exynos4/mach-origen.c
++++ b/arch/arm/mach-exynos4/mach-origen.c
+@@ -80,12 +80,10 @@ static struct s3c2410_uartcfg origen_uartcfgs[] __initdata = {
+ 
+ static struct s3c_sdhci_platdata origen_hsmmc0_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ static struct s3c_sdhci_platdata origen_hsmmc2_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ /* USB EHCI */
+diff --git a/arch/arm/mach-exynos4/mach-smdk4212.c b/arch/arm/mach-exynos4/mach-smdk4212.c
+index 8c41ae1..b460652 100644
+--- a/arch/arm/mach-exynos4/mach-smdk4212.c
++++ b/arch/arm/mach-exynos4/mach-smdk4212.c
+@@ -83,7 +83,6 @@ static struct s3c2410_uartcfg smdk4212_uartcfgs[] __initdata = {
+ 
+ static struct s3c_sdhci_platdata smdk4212_hsmmc2_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ #ifdef CONFIG_EXYNOS4_SDHCI_CH2_8BIT
+ 	.max_width		= 8,
+ 	.host_caps		= MMC_CAP_8_BIT_DATA,
+@@ -92,7 +91,6 @@ static struct s3c_sdhci_platdata smdk4212_hsmmc2_pdata __initdata = {
+ 
+ static struct s3c_sdhci_platdata smdk4212_hsmmc3_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ static struct regulator_consumer_supply max8997_buck1 =
+diff --git a/arch/arm/mach-exynos4/mach-smdkv310.c b/arch/arm/mach-exynos4/mach-smdkv310.c
+index c74b2db..31a64d8 100644
+--- a/arch/arm/mach-exynos4/mach-smdkv310.c
++++ b/arch/arm/mach-exynos4/mach-smdkv310.c
+@@ -90,7 +90,6 @@ static struct s3c2410_uartcfg smdkv310_uartcfgs[] __initdata = {
+ 
+ static struct s3c_sdhci_platdata smdkv310_hsmmc0_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ #ifdef CONFIG_EXYNOS4_SDHCI_CH0_8BIT
+ 	.max_width		= 8,
+ 	.host_caps		= MMC_CAP_8_BIT_DATA,
+@@ -101,12 +100,10 @@ static struct s3c_sdhci_platdata smdkv310_hsmmc1_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_GPIO,
+ 	.ext_cd_gpio		= EXYNOS4_GPK0(2),
+ 	.ext_cd_gpio_invert	= 1,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ static struct s3c_sdhci_platdata smdkv310_hsmmc2_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ #ifdef CONFIG_EXYNOS4_SDHCI_CH2_8BIT
+ 	.max_width		= 8,
+ 	.host_caps		= MMC_CAP_8_BIT_DATA,
+@@ -117,7 +114,6 @@ static struct s3c_sdhci_platdata smdkv310_hsmmc3_pdata __initdata = {
+ 	.cd_type		= S3C_SDHCI_CD_GPIO,
+ 	.ext_cd_gpio		= EXYNOS4_GPK2(2),
+ 	.ext_cd_gpio_invert	= 1,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ static void lcd_lte480wv_set_power(struct plat_lcd_data *pd,
+diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
+index 18cf5c7..0556feb 100644
+--- a/arch/arm/mach-exynos4/mach-universal_c210.c
++++ b/arch/arm/mach-exynos4/mach-universal_c210.c
+@@ -737,7 +737,6 @@ static struct s3c_sdhci_platdata universal_hsmmc0_data __initdata = {
+ 				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
+ 				MMC_CAP_DISABLE),
+ 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ static struct regulator_consumer_supply mmc0_supplies[] = {
+@@ -778,7 +777,6 @@ static struct s3c_sdhci_platdata universal_hsmmc2_data __initdata = {
+ 	.ext_cd_gpio		= EXYNOS4_GPX3(4),      /* XEINT_28 */
+ 	.ext_cd_gpio_invert	= 1,
+ 	.cd_type		= S3C_SDHCI_CD_GPIO,
+-	.clk_type		= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ /* WiFi */
+diff --git a/arch/arm/plat-samsung/dev-hsmmc.c b/arch/arm/plat-samsung/dev-hsmmc.c
+index 06825c4..ea0291f 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc.c
++++ b/arch/arm/plat-samsung/dev-hsmmc.c
+@@ -41,7 +41,6 @@ struct s3c_sdhci_platdata s3c_hsmmc0_def_platdata = {
+ 	.max_width	= 4,
+ 	.host_caps	= (MMC_CAP_4_BIT_DATA |
+ 			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
+-	.clk_type	= S3C_SDHCI_CLK_DIV_INTERNAL,
+ };
+ 
+ struct platform_device s3c_device_hsmmc0 = {
+diff --git a/arch/arm/plat-samsung/dev-hsmmc1.c b/arch/arm/plat-samsung/dev-hsmmc1.c
+index 4524ef4..56dbe7a 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc1.c
++++ b/arch/arm/plat-samsung/dev-hsmmc1.c
+@@ -41,7 +41,6 @@ struct s3c_sdhci_platdata s3c_hsmmc1_def_platdata = {
+ 	.max_width	= 4,
+ 	.host_caps	= (MMC_CAP_4_BIT_DATA |
+ 			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
+-	.clk_type	= S3C_SDHCI_CLK_DIV_INTERNAL,
+ };
+ 
+ struct platform_device s3c_device_hsmmc1 = {
+diff --git a/arch/arm/plat-samsung/dev-hsmmc2.c b/arch/arm/plat-samsung/dev-hsmmc2.c
+index 9cede96..916e11b 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc2.c
++++ b/arch/arm/plat-samsung/dev-hsmmc2.c
+@@ -42,7 +42,6 @@ struct s3c_sdhci_platdata s3c_hsmmc2_def_platdata = {
+ 	.max_width	= 4,
+ 	.host_caps	= (MMC_CAP_4_BIT_DATA |
+ 			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
+-	.clk_type	= S3C_SDHCI_CLK_DIV_INTERNAL,
+ };
+ 
+ struct platform_device s3c_device_hsmmc2 = {
+diff --git a/arch/arm/plat-samsung/dev-hsmmc3.c b/arch/arm/plat-samsung/dev-hsmmc3.c
+index 0358ef4..8f06670 100644
+--- a/arch/arm/plat-samsung/dev-hsmmc3.c
++++ b/arch/arm/plat-samsung/dev-hsmmc3.c
+@@ -45,7 +45,6 @@ struct s3c_sdhci_platdata s3c_hsmmc3_def_platdata = {
+ 	.max_width	= 4,
+ 	.host_caps	= (MMC_CAP_4_BIT_DATA |
+ 			   MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED),
+-	.clk_type	= S3C_SDHCI_CLK_DIV_INTERNAL,
+ };
+ 
+ struct platform_device s3c_device_hsmmc3 = {
 diff --git a/arch/arm/plat-samsung/include/plat/sdhci.h b/arch/arm/plat-samsung/include/plat/sdhci.h
-index e7b3c75..8f9a7d7 100644
+index 8f9a7d7..39a70ec 100644
 --- a/arch/arm/plat-samsung/include/plat/sdhci.h
 +++ b/arch/arm/plat-samsung/include/plat/sdhci.h
-@@ -18,6 +18,8 @@
- #ifndef __PLAT_S3C_SDHCI_H
- #define __PLAT_S3C_SDHCI_H __FILE__
+@@ -33,17 +33,11 @@ enum cd_types {
+ 	S3C_SDHCI_CD_PERMANENT,	/* no CD line, card permanently wired to host */
+ };
  
-+#include <plat/devs.h>
-+
- struct platform_device;
- struct mmc_host;
- struct mmc_card;
-@@ -340,4 +342,29 @@ static inline void exynos4_default_sdhci3(void) { }
+-enum clk_types {
+-	S3C_SDHCI_CLK_DIV_INTERNAL,	/* use mmc internal clock divider */
+-	S3C_SDHCI_CLK_DIV_EXTERNAL,	/* use external clock divider */
+-};
+-
+ /**
+  * struct s3c_sdhci_platdata() - Platform device data for Samsung SDHCI
+  * @max_width: The maximum number of data bits supported.
+  * @host_caps: Standard MMC host capabilities bit field.
+  * @cd_type: Type of Card Detection method (see cd_types enum above)
+- * @clk_type: Type of clock divider method (see clk_types enum above)
+  * @ext_cd_init: Initialize external card detect subsystem. Called on
+  *		 sdhci-s3c driver probe when cd_type == S3C_SDHCI_CD_EXTERNAL.
+  *		 notify_func argument is a callback to the sdhci-s3c driver
+@@ -66,7 +60,6 @@ struct s3c_sdhci_platdata {
+ 	unsigned int	max_width;
+ 	unsigned int	host_caps;
+ 	enum cd_types	cd_type;
+-	enum clk_types	clk_type;
  
- #endif /* CONFIG_EXYNOS4_SETUP_SDHCI */
+ 	char		**clocks;	/* set of clock sources */
  
-+static inline void s3c_sdhci_setname(int id, char *name)
-+{
-+	switch (id) {
-+#ifdef CONFIG_S3C_DEV_HSMMC
-+	case 0:
-+		s3c_device_hsmmc0.name = name;
-+		break;
-+#endif
-+#ifdef CONFIG_S3C_DEV_HSMMC1
-+	case 1:
-+		s3c_device_hsmmc1.name = name;
-+		break;
-+#endif
-+#ifdef CONFIG_S3C_DEV_HSMMC2
-+	case 2:
-+		s3c_device_hsmmc2.name = name;
-+		break;
-+#endif
-+#ifdef CONFIG_S3C_DEV_HSMMC3
-+	case 3:
-+		s3c_device_hsmmc3.name = name;
-+		break;
-+#endif
-+	}
-+}
- #endif /* __PLAT_S3C_SDHCI_H */
+diff --git a/arch/arm/plat-samsung/platformdata.c b/arch/arm/plat-samsung/platformdata.c
+index 4c9a207..88c5e7c 100644
+--- a/arch/arm/plat-samsung/platformdata.c
++++ b/arch/arm/plat-samsung/platformdata.c
+@@ -52,6 +52,4 @@ void s3c_sdhci_set_platdata(struct s3c_sdhci_platdata *pd,
+ 		set->cfg_gpio = pd->cfg_gpio;
+ 	if (pd->host_caps)
+ 		set->host_caps |= pd->host_caps;
+-	if (pd->clk_type)
+-		set->clk_type = pd->clk_type;
+ }
 -- 
 1.6.6.rc2
