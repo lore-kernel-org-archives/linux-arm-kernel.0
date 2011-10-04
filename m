@@ -1,64 +1,26 @@
 From: santosh.shilimkar@ti.com (Shilimkar, Santosh)
-Date: Tue, 4 Oct 2011 11:48:40 +0530
-Subject: Please help with the OMAP static mapping mess
-In-Reply-To: <20111003225908.GL6324@atomide.com>
-References: <alpine.LFD.2.02.1110031312480.9106@xanadu.home>
-	<20111003205658.GJ6324@atomide.com>
-	<alpine.LFD.2.02.1110031744100.9106@xanadu.home>
-	<alpine.LFD.2.02.1110031827440.9106@xanadu.home>
-	<20111003225908.GL6324@atomide.com>
-Message-ID: <CAMQu2gxgRZzb6hh5pOVBgaPUZEizEqBr_e358MBuD_xHJOvX3Q@mail.gmail.com>
+Date: Tue, 4 Oct 2011 12:02:16 +0530
+Subject: [PATCH v4 04/10] ARM: SoC: convert OMAP4 to SoC descriptor
+In-Reply-To: <1317663356-5114-5-git-send-email-marc.zyngier@arm.com>
+References: <1317663356-5114-1-git-send-email-marc.zyngier@arm.com>
+	<1317663356-5114-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAMQu2gzg9B0ABaay9DSfNvfT6R3tLRW9DfgUuNphy3+y5PxH2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 4, 2011 at 4:29 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Nicolas Pitre <nico@fluxnic.net> [111003 15:05]:
->> On Mon, 3 Oct 2011, Nicolas Pitre wrote:
->>
->> > On Mon, 3 Oct 2011, Tony Lindgren wrote:
->> >
->> > > * Nicolas Pitre <nico@fluxnic.net> [111003 11:26]:
->> > > >
->> > > > Furthermore... there is also a static mapping for physical address
->> > > > 0x4e000000 using virtual address 0xff100000 which is already reserved
->> > > > for other purposes i.e. the consistent DMA area. ?It is not immediately
->> > > > obvious where this comes from without being intimate with the OMAP code.
->> > > > Can this be fixed as well i.e. moved elsewhere please?
->> > >
->> > > This sounds like a bug somewhere. Which omap are you seeing this on?
->> >
->> > OMAP4430 on a Panda board.
->> >
->> > Here are the static mappings I'm seeing:
->> >
->> > phys = 0x44000000 virt = 0xf8000000 size = 0x100000
->> > phys = 0x4a000000 virt = 0xfc000000 size = 0x400000
->> > phys = 0x50000000 virt = 0xf9000000 size = 0x100000
->> > phys = 0x4c000000 virt = 0xfd100000 size = 0x100000
->> > phys = 0x4d000000 virt = 0xfe100000 size = 0x100000
->> > phys = 0x4e000000 virt = 0xff100000 size = 0x100000 <---
->> > phys = 0x48000000 virt = 0xfa000000 size = 0x400000
->> > phys = 0x54000000 virt = 0xfe800000 size = 0x800000
->>
->> It looks like this comes from OMAP44XX_DMM_VIRT.
->>
->> #define OMAP44XX_DMM_PHYS ? ? ? OMAP44XX_DMM_BASE
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* 0x4e000000 --> 0xfd300000 */
->> #define OMAP44XX_DMM_VIRT ? ? ? (OMAP44XX_DMM_PHYS + OMAP4_L3_PER_IO_OFFSET)
->> #define OMAP44XX_DMM_SIZE ? ? ? SZ_1M
->>
->> The comment suggesting a mapping correspondance is obviously wrong. We have:
->>
->> #define OMAP44XX_DMM_BASE ? ? ? 0x4e000000
->> #define OMAP4_L3_PER_IO_OFFSET ?0xb1100000
->>
->> Hence 0x4e000000 + 0xb1100000 = 0xff100000.
+Marc,
+
+On Mon, Oct 3, 2011 at 11:05 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Convert OMAP4 to use the SoC descriptor to provide its SMP
+> and CPU hotplug operations.
 >
-> Seem like it might cause some random patterns in tiler :)
-> Santosh, can youp please check it?
+> Tested on both Panda and IGEPv2 (MULTI_OMAP kernel)
 >
-This is already fixed Tony. You have pulled that patch.
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg55258.html
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+The changes very trivial and they look fine to me.
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
 Regards
 Santosh
