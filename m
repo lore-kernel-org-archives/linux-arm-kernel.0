@@ -1,35 +1,47 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 4 Oct 2011 09:58:10 -0600
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <20111004145148.GA8021@manju-desktop>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20111004145148.GA8021@manju-desktop>
-Message-ID: <CACxGe6tXEx1A+ZuBTUdi8jjfx_hOCaX6eSpUOOhNH9us+Mnczg@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 04 Oct 2011 11:15:05 -0500
+Subject: [PATCH 0/3] GIC OF bindings
+In-Reply-To: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
+References: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4E8B3109.2020705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 4, 2011 at 8:51 AM, G, Manjunath Kondaiah <manjugk@ti.com> wrote:
-> On Thu, Sep 22, 2011 at 12:51:23PM -0600, Grant Likely wrote:
->> Hi Manjunath,
->>
->> Here's the current state of the patch. ?The major think that needs to
->> be done is to convert it to use a separate workqueue as described in
->> the TODO above. ?It also needs some users adapted to it. ?One of the
->> gpio drivers would work; preferably one of the newer drivers that
->> doesn't have a lot of drivers depending on the early_initcall()
->> behaviour yet.
->
-> I have tested this patch on omap3 beagle board by making:
-> 1. omap-gpio driver init as late_initcall instead of postcore_initcall
-> 2. mmc driver probe will request gpio through gpio_request and gpio driver
-> returns -EDEFER_PROBE which in turn makes mmc driver to request deferral probe.
-> 3. When deferral probe gets activated, it scans driver entries and it will not
-> find any match for mmc driver probe.
+Grant,
 
-Looks like drivers/mmc/host/omap.c is using platform_driver_probe()
-instead of platform_driver_register().  Add the probe hook to the
-platform_driver structure and change it to call
-platform_driver_register() and it should work.  Don't forget to change
-mmc_omap_probe from __init to __devinit.
+On 09/30/2011 02:27 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Another round of GIC devicetree support.
+> 
+> This moves the tracking of the starting hwirq number into the irq domain
+> code. Doing this makes hwirq == GIC interrupt ID and simplifies the GIC
+> code removing irq_offset.
+> 
+> The full series is available here. This includes Russell's devel-stable and
+> for-next branches and Nico's vmalloc branch:
+> 
+> git://git.jdl.com/software/linux-3.0.git gic-v2
+> 
+> Tested on highbank and Realview 11MPCore qemu (2 GICs).
+> 
+> Rob
+> 
+> Rob Herring (3):
+>   irq: support domains with non-zero hwirq base
+>   ARM: gic: add irq_domain support
+>   ARM: gic: add OF based initialization
+> 
+>  Documentation/devicetree/bindings/arm/gic.txt |   55 ++++++++++
+>  arch/arm/common/Kconfig                       |    1 +
+>  arch/arm/common/gic.c                         |  142 +++++++++++++++++++------
+>  arch/arm/include/asm/hardware/gic.h           |    5 +-
+>  include/linux/irqdomain.h                     |   16 +++-
+>  kernel/irq/irqdomain.c                        |   12 +-
+>  6 files changed, 189 insertions(+), 42 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+> 
 
-g.
+Ping. Can you please comment on this series.
+
+Rob
