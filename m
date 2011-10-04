@@ -1,36 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Oct 2011 11:54:15 -0700
-Subject: [PATCH 1/4] ARM: OMAP3 PM: Fix IO Daisychain sequence
-In-Reply-To: <1317750724-32553-2-git-send-email-vishwanath.bs@ti.com>
-References: <1317750724-32553-1-git-send-email-vishwanath.bs@ti.com>
-	<1317750724-32553-2-git-send-email-vishwanath.bs@ti.com>
-Message-ID: <20111004185415.GV6324@atomide.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 04 Oct 2011 14:54:53 -0400 (EDT)
+Subject: Pull request: removal of most instances of mach/memory.h
+In-Reply-To: <20110926191055.GP22455@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.00.1109062158450.20358@xanadu.home>
+	<alpine.LFD.2.00.1109130849590.20358@xanadu.home>
+	<alpine.LFD.2.00.1109201349400.12663@xanadu.home>
+	<20110926131524.GJ22455@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1109260952490.2718@xanadu.home>
+	<alpine.LFD.2.00.1109261023360.2718@xanadu.home>
+	<20110926191055.GP22455@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1110041452330.9106@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vishwanath BS <vishwanath.bs@ti.com> [111004 10:25]:
-> @@ -105,7 +105,7 @@ static void omap3_enable_io_chain(void)
->  		/* Do a readback to assure write has been done */
->  		omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
->  
-> -		while (!(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN) &
-> +		while (!(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
->  			 OMAP3430_ST_IO_CHAIN_MASK)) {
->  			timeout++;
->  			if (timeout > 1000) {
+On Mon, 26 Sep 2011, Russell King - ARM Linux wrote:
 
-Checking for PM_WKST here makes sense..
+> This also gives additional merge conflicts elsewhere, and while git
+> rerere makes some of them easy, the quantity is going to be a right
+> pain to deal with on a repeated basis.
 
-> @@ -114,7 +114,7 @@ static void omap3_enable_io_chain(void)
->  				return;
->  			}
->  			omap2_prm_set_mod_reg_bits(OMAP3430_ST_IO_CHAIN_MASK,
-> -					     WKUP_MOD, PM_WKEN);
-> +					     WKUP_MOD, PM_WKST);
->  		}
->  	}
->  }
+Does this mean that you will only merge this before asking Linus to 
+pull?  I would like to know on which leg I should stand with this 
+series.
 
-..but are you sure you also want to write into PM_WKST?
 
-Tony
+Nicolas
