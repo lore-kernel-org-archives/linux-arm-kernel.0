@@ -1,114 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 3 Oct 2011 17:36:39 -0700
-Subject: [PATCH v16 00/12] OMAP: dmtimer: adaptation to platform_driver
-In-Reply-To: <4E89C7CD.8040505@ti.com>
-References: <1316518227-28116-1-git-send-email-tarun.kanti@ti.com>
-	<4E89C7CD.8040505@ti.com>
-Message-ID: <20111004003638.GQ6324@atomide.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 4 Oct 2011 08:59:56 +0800
+Subject: [PATCH 16/26] ARM: pxa: CPU_PJ4 requires IWMMXT
+In-Reply-To: <20295619.jOfPxmug8T@wuerfel>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<1317499438-14058-17-git-send-email-arnd@arndb.de>
+	<20111002160328.GZ11710@n2100.arm.linux.org.uk>
+	<20295619.jOfPxmug8T@wuerfel>
+Message-ID: <CAMPhdO96WwmPVqVpM2Vpef3wSgfHEf-0tK5VewXn-EGMns2ubA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cousson, Benoit <b-cousson@ti.com> [111003 07:00]:
-> + Arnd
-> 
-> Hi Tony,
-> 
-> After rebasing by DT series on top of your dt-base, I noticed two
-> minor issues from this timer series.
-> 
-> First some new warnings:
-> 
-> [    0.260009]  omap_timer.1: alias fck already exists
-> [    0.260345]  omap_timer.2: alias fck already exists
-> [    0.260650]  omap_timer.3: alias fck already exists
-> [    0.260955]  omap_timer.4: alias fck already exists
-> [    0.261260]  omap_timer.5: alias fck already exists
-> [    0.261566]  omap_timer.6: alias fck already exists
-> [    0.261871]  omap_timer.7: alias fck already exists
-> [    0.262207]  omap_timer.8: alias fck already exists
-> [    0.262512]  omap_timer.9: alias fck already exists
-> [    0.262847]  omap_timer.10: alias fck already exists
-> [    0.263153]  omap_timer.11: alias fck already exists
-> 
-> These warnings are due to the commit
-> 318c3e15cd55c73a26ae22a65a8183655b3003f9  ARM: OMAP2+: dmtimer: add
-> device names to flck nodes
+> 8<-----
+> Subject: [PATCH] ARM: pxa: CPU_PJ4 requires IWMMXT
+>
+> The PJ4 based pxa95x cpus all have iwmmxt and there is no way to
+> build that code conditionally, so better not ask the user
+> in that configuration, in order to prevent broken builds.
 
-Yes I noticed those too, but too late :(
- 
-> Since 3.1, the fck clock nodes are added automatically based on
-> hwmod main_clk attribute.
-> 
-> +       CLK("omap_timer.1",     "fck",         &timer1_fck,    CK_443X),
-> +       CLK("omap_timer.2",     "fck",         &timer2_fck,    CK_443X),
-> +       CLK("omap_timer.3",     "fck",         &timer3_fck,    CK_443X),
-> +       CLK("omap_timer.4",     "fck",         &timer4_fck,    CK_443X),
-> +       CLK("omap_timer.5",     "fck",         &timer5_fck,    CK_443X),
-> +       CLK("omap_timer.6",     "fck",         &timer6_fck,    CK_443X),
-> +       CLK("omap_timer.7",     "fck",         &timer7_fck,    CK_443X),
-> +       CLK("omap_timer.8",     "fck",         &timer8_fck,    CK_443X),
-> +       CLK("omap_timer.9",     "fck",         &timer9_fck,    CK_443X),
-> +       CLK("omap_timer.10",    "fck",         &timer10_fck,   CK_443X),
-> +       CLK("omap_timer.11",    "fck",         &timer11_fck,   CK_443X),
-> 
-> So they should not exist in this patch.
-> 
-> Moreover, all the legacy clockdev should be removed at the same time.
-> 
-> CLK(NULL,	"gpt1_fck",		&timer1_fck,	CK_443X),
-> CLK(NULL,	"gpt10_fck",		&timer10_fck,	CK_443X),
-> CLK(NULL,	"gpt11_fck",		&timer11_fck,	CK_443X),
-> CLK(NULL,	"gpt2_fck",		&timer2_fck,	CK_443X),
-> CLK(NULL,	"gpt3_fck",		&timer3_fck,	CK_443X),
-> CLK(NULL,	"gpt4_fck",		&timer4_fck,	CK_443X),
-> CLK(NULL,	"gpt5_fck",		&timer5_fck,	CK_443X),
-> CLK(NULL,	"gpt6_fck",		&timer6_fck,	CK_443X),
-> CLK(NULL,	"gpt7_fck",		&timer7_fck,	CK_443X),
-> CLK(NULL,	"gpt8_fck",		&timer8_fck,	CK_443X),
-> CLK(NULL,	"gpt9_fck",		&timer9_fck,	CK_443X),
-> CLK(NULL,	"gpt1_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt2_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt3_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt4_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt5_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt6_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt7_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt8_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt9_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt10_ick",		&dummy_ck,	CK_443X),
-> CLK(NULL,	"gpt11_ick",		&dummy_ck,	CK_443X),
-> 
-> That will reduce a little bit the size of these static data files.
- 
-OK 
- 
-> Secondly, in commit c345c8b09d7a131f3571af55341038054a79efbd ARM:
-> OMAP2+: dmtimer: convert to platform devices
-> 
-> +struct omap_device_pm_latency omap2_dmtimer_latency[] = {
-> +       {
-> +               .deactivate_func = omap_device_idle_hwmods,
-> +               .activate_func   = omap_device_enable_hwmods,
-> +               .flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-> +       },
-> +};
-> +
-> 
-> That structure should be removed, since I added a default one in the
-> omap_device cleanup series for 3.2. Assuming that the cleanup is
-> pulled before the new feature, the timer series could avoid adding
-> that.
+I think this is true for other xscale CPUs as well, so either we make
+them unconditionally all at once, or we still leave an option here.
 
-OK
- 
-> How do you want to handle that, using some cleanup patch on top of
-> your current branch or by resubmitting the series?
-> The point is that this branch was already pulled by Arnd in
-> arm-soc/next/dmtimer feature branch.
+It actually looks quite odd to me that CPU_PJ4 is made special here,
+what're the real broken builds errors?
 
-Can you please just do a fix on either the dmtimer branch or
-on cleanup branch?
-
-Regards,
-
-Tony
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 5ebc5d9..8d66c32 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1071,9 +1071,10 @@ config ARM_TIMER_SP804
+> ?source arch/arm/mm/Kconfig
+>
+> ?config IWMMXT
+> - ? ? ? bool "Enable iWMMXt support"
+> + ? ? ? bool "Enable iWMMXt support" if !CPU_PJ4
+> ? ? ? ?depends on CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_PJ4
+> ? ? ? ?default y if PXA27x || PXA3xx || PXA95x || ARCH_MMP
+> + ? ? ? default y if CPU_PJ4
+> ? ? ? ?help
+> ? ? ? ? ?Enable support for iWMMXt context switching at run time if
+> ? ? ? ? ?running on a CPU that supports it.
+>
