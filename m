@@ -1,67 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 04 Oct 2011 21:45:23 +0900
-Subject: [PATCH V2 2/2] ARM: SAMSUNG: Cleanup resources by using macro
-In-Reply-To: <4E89C4B2.605@samsung.com>
-References: <005901cc817e$51a56d00$f4f04700$%kim@samsung.com>
-	<CAH9JG2Wc4M2dVFOfNE5jgsygvigE8RbPH_yLcMqarr64LfbENw@mail.gmail.com>
-	<4E89B505.3060501@samsung.com> <4E89C4B2.605@samsung.com>
-Message-ID: <019401cc8293$7c17a6f0$7446f4d0$%kim@samsung.com>
+From: hgu1972@gmail.com (Harald Gustafsson)
+Date: Tue, 4 Oct 2011 14:52:28 +0200
+Subject: unwind and lockdep
+Message-ID: <CAC3jWv+phJoEpBKexf3FUyFgXVQwPY_YyqCOrW3jq86CqVViow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> On 10/03/2011 03:13 PM, Kukjin Kim wrote:
-> > On 10/03/11 12:53, Kyungmin Park wrote:
-> >> On Mon, Oct 3, 2011 at 12:41 PM, Kukjin Kim<kgene.kim@samsung.com>
-> wrote:
-> >>>
-> >>> +#define SAMSUNG_RES_MEM(soc, ip, sz)
-> DEFINE_RES_MEM(soc##_PA_##ip, sz)
-> >>> +#define SAMSUNG_RES_IRQ(ip)            DEFINE_RES_IRQ(IRQ_##ip)
-> >>> +
-> >>> +#define SAMSUNG_RES_MEM_NAMED(soc, ip, sz, name)       \
-> >>> +
-> DEFINE_RES_MEM_NAMED(soc##_PA_##ip, sz, name)
-> >>> +#define SAMSUNG_RES_IRQ_NAMED(ip, name)
-> \
-> >>> +                               DEFINE_RES_IRQ_NAMED(IRQ_##ip,
-> name)
-> >>> +#define SAMSUNG_RES_DMA_NAMED(ch, name)
-> \
-> >>> +
-> DEFINE_RES_DMA_NAMED(DMACH_##ch, name)
-> >>
-> >> It's good for readability. but do you think that it's hard to find out
-> >> defined macros are used at real place?
-> >> e.g., Now I want to find out the S3C_PA_USB_HSOTG. it's difficult if
-> >> you use the SAMSUNG_RES_* series macro.
-> >> but if you use the DEFINED_RES_* series directly. it's easy to find
-> >> out at real codes.
-> >>
-> > Well, I don't think so because the XXX_PA_XXX addresses are defined in
-each
-> > mach/map.h and they are usually used in here so it's not hard to find
-it.
-> 
-> Some minor disadvantage is that tagging tools like e.g. gtags don't handle
-> these things properly. But I don't think it's really important.
-> 
-> >
-> > And now the 'S3C', 'S5P' and 'SAMSUNG' are used in the 'soc' part. I'm
-> > preparing to consolidate the name and to remove duplicated resources.
-> 
-> Do you also have any specific plans for supporting single image build for
-> multiple SoC's while working on this ?
+Hi,
 
-Hmm, you could see through my plan :)
-As you know, we need to sort out resources and platform data to support
-single kernel image so I'm preparing it after this.
+I have turned on lockdep on a 2.6.35.7 kernel compiled for mach-ux500
+arch with ARM_UNWIND and get some unwind Index not found warnings,
+especially during the boot.  E.g. the following, see warnings at end:
+ <7>[  134.874481] unwind_frame(pc = c033abf0 lr = c033abf0 sp = c06d1fa0)
+<7>[  134.874481] unwind_find_idx(c033abf0)
+<7>[  134.874511] search_index(c033abf0, c06ae000->addr=c002c968, c06cccd8)
+<7>[  134.874542] unwind_find_idx: idx = c06c3488
+<7>[  134.874542] unwind_exec_insn: insn = 00000084
+<7>[  134.874572] unwind_exec_insn: fp = 00000000 sp = c06d1fc0 lr =
+c003b6f8 pc = 00000000
+<7>[  134.874603] unwind_exec_insn: insn = 000000b0
+<7>[  134.874603] unwind_exec_insn: fp = 00000000 sp = c06d1fc0 lr =
+c003b6f8 pc = c003b6f8
+<7>[  134.874633] unwind_frame(pc = c003b6f8 lr = c003b6f8 sp = c06d1fc0)
+<7>[  134.874664] unwind_find_idx(c003b6f8)
+<7>[  134.874694] search_index(c003b6f8, c06ae000->addr=c002c968, c06cccd8)
+<7>[  134.874694] unwind_find_idx: idx = c06af6b0
+<7>[  134.874725] unwind_exec_insn: insn = 000000ac
+<7>[  134.874755] unwind_exec_insn: fp = 00000000 sp = c06d1fd8 lr =
+c0008b70 pc = 00000000
+<7>[  134.874755] unwind_exec_insn: insn = 000000b0
+<7>[  134.874786] unwind_exec_insn: fp = 00000000 sp = c06d1fd8 lr =
+c0008b70 pc = c0008b70
+<7>[  134.874816] unwind_frame(pc = c0008b70 lr = c0008b70 sp = c06d1fd8)
+<7>[  134.874816] unwind_find_idx(c0008b70)
+<7>[  134.874847] search_index(c0008b70, c06ae000->addr=c002c968, c06cccd8)
+<4>[  134.874877] unwind: Unknown symbol address c0008b70
+<7>[  134.879760] unwind_find_idx: idx = (null)
+<4>[  134.879791] unwind: Index not found c0008b70
 
-Thanks.
+(Where I changed the debug print to also show the addr in the "first"
+entry for search_index)
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+The address c0008b70 is within the addresses that core_kernel_text
+checks for (c0008000-c06ae000) and also within init_kernel_text checks
+(c0008000-c002c968).
+But why is then search_index checking if it is below c002c968 and
+bails out if it is?
+
+Anyone that could give me some hints about this? Is this expected?
+
+/Harald
