@@ -1,57 +1,30 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 04 Oct 2011 10:44:38 +0100
-Subject: [PATCH v4 02/10] ARM: SoC: Add per SoC SMP and CPU hotplug
-	operations
-In-Reply-To: <alpine.LFD.2.02.1110031508270.9106@xanadu.home>
+Date: Tue, 04 Oct 2011 10:44:53 +0100
+Subject: [PATCH v4 04/10] ARM: SoC: convert OMAP4 to SoC descriptor
+In-Reply-To: <CAMQu2gzg9B0ABaay9DSfNvfT6R3tLRW9DfgUuNphy3+y5PxH2Q@mail.gmail.com>
 References: <1317663356-5114-1-git-send-email-marc.zyngier@arm.com>
-	<1317663356-5114-3-git-send-email-marc.zyngier@arm.com>
-	<alpine.LFD.2.02.1110031508270.9106@xanadu.home>
-Message-ID: <4E8AD586.7060209@arm.com>
+	<1317663356-5114-5-git-send-email-marc.zyngier@arm.com>
+	<CAMQu2gzg9B0ABaay9DSfNvfT6R3tLRW9DfgUuNphy3+y5PxH2Q@mail.gmail.com>
+Message-ID: <4E8AD595.2030201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/11 20:12, Nicolas Pitre wrote:
-> On Mon, 3 Oct 2011, Marc Zyngier wrote:
+On 04/10/11 07:32, Shilimkar, Santosh wrote:
+> Marc,
 > 
->> Populate the SoC descriptor structure with the SMP and CPU hotplug
->> operations. To allow the kernel to continue building, the platform
->> hooks are defined as weak symbols which are overrided by the
->> platform code. Once all platforms are converted, the "weak" attribute
->> will be removed and the function made static.
+> On Mon, Oct 3, 2011 at 11:05 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Convert OMAP4 to use the SoC descriptor to provide its SMP
+>> and CPU hotplug operations.
 >>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Nicolas Pitre <nico@fluxnic.net>
+>> Tested on both Panda and IGEPv2 (MULTI_OMAP kernel)
+>>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
 >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
-> [...]
->> --- a/arch/arm/kernel/setup.c
->> +++ b/arch/arm/kernel/setup.c
->> @@ -141,8 +141,12 @@ static const char *cpu_name;
->>  static const char *machine_name;
->>  static char __initdata cmd_line[COMMAND_LINE_SIZE];
->>  struct machine_desc *machine_desc __initdata;
->> -const struct arm_soc_desc *soc_desc;
->> -static struct arm_soc_desc __soc_desc __read_mostly;
->> +const struct arm_soc_desc *soc_desc __initdata;
-> 
-> Does the above belong in this patch?
+> The changes very trivial and they look fine to me.
+> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Looks like a leftover from a previous rework. Will fix.
-
->> +#ifdef CONFIG_SMP
->> +const struct arm_soc_smp_init_ops *soc_smp_init_ops  __initdata;
->> +const struct arm_soc_smp_ops *soc_smp_ops  __cpuinitdata;
->> +static struct arm_soc_smp_ops __soc_smp_ops __cpuinitdata;
->> +#endif
-> 
-> Maybe those could be moved in smp.c instead.
-
-Good point, this actually makes a nice cleanup (the assignment of these
-variables can also move to smp.c, making them static).
-
-I'll repost the 3 affected patches shortly.
-
-Thanks for reviewing,
+Thanks Santosh.
 
 	M.
 -- 
