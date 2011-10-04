@@ -1,41 +1,53 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 04 Oct 2011 13:47:48 -0700
-Subject: [PATCH 1/4] ARM: OMAP3 PM: Fix IO Daisychain sequence
-In-Reply-To: <1317750724-32553-2-git-send-email-vishwanath.bs@ti.com>
-	(Vishwanath BS's message of "Tue, 4 Oct 2011 23:22:01 +0530")
-References: <1317750724-32553-1-git-send-email-vishwanath.bs@ti.com>
-	<1317750724-32553-2-git-send-email-vishwanath.bs@ti.com>
-Message-ID: <87r52s8owb.fsf@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 4 Oct 2011 21:50:02 +0100
+Subject: [PATCH v2 6/7] clk: Add initial WM831x clock driver
+In-Reply-To: <20111004181818.GD2870@ponder.secretlab.ca>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-7-git-send-email-mturquette@ti.com>
+	<20110925040836.GP24631@ponder.secretlab.ca>
+	<20110926093858.GD2946@opensource.wolfsonmicro.com>
+	<20111004181818.GD2870@ponder.secretlab.ca>
+Message-ID: <20111004205002.GA20296@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vishwa,
+On Tue, Oct 04, 2011 at 12:18:18PM -0600, Grant Likely wrote:
+> On Mon, Sep 26, 2011 at 10:38:58AM +0100, Mark Brown wrote:
 
-Vishwanath BS <vishwanath.bs@ti.com> writes:
+> > No, that's not helpful.  The issue isn't the device probe code itself,
+> > the issue is things like module unload not doing what they're supposed
+> > to do and leaving the device lying around or something - there's rather
+> > more going on than just the plain API call.
 
-> As per OMAP3630 TRM Section 3.5.7.2.2, the right sequence for enabling IO Daisy
-> chain is "The I/O wake-up scheme is enabled by triggering the I/O daisy chain
-> control (Wu clock) by programming a dedicated register
-> (PRCM.PM_WKEN_WKUP[16] EN_IO_CHAIN) in the PRCM module.Software must wait for
-> the I/O daisy chain to complete before it transitions the PER domain to a
-> nonfunctional state. This is done by polling a dedicated status bit in the PRCM
-> module (PRCM.PM_WKST_WKUP[16] ST_IO_CHAIN). This status bit must be cleared by
-> software when the bit is read to  1".
->
-> The original code was polling on a wrong register which is fixed in this patch.
-> Also omap3_enable_io_chain is made non static as it's going to be used in
-> subsequent patches.
->  
-> Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+> Then lets fix the core code.  I see this pattern show up again and
+> again of extra boilerplate going around
+> platform_driver_{register,unregister}().  That says to me that there
+> either needs to be a new helper, or the core code needs to be made
+> more verbose.
 
-A fix for this was posted[1] by Mohan V (added to Cc) back in June.  It
-recieved a few minor comments but an updated version was never posted.
+I'd go with the latter, it's pretty much the approach the subsystems I
+help maintain have been taking.  In fast paths it's a bit different but
+in slow paths it tends to be helpful to know why things just fell over.
 
-Maybe you can ping Mohan or update that version fixing the comments
-mentioned in that thread.
+> In fact, I've been considering adding a macro for
+> {platform,i2c,spi,...}_drivers that does all the module boilerplate
+> for the common case of only registering a driver at init time.
+> Something like:
 
-Thanks,
+> #define module_platform_driver(__driver) \
+> int __driver##_init(void) \
+> { \
+> 	return platform_driver_register(&(__driver)); \
+> } \
+> module_init(__driver##_init); \
+> void ##__driver##_exit(void) \
+> { \
+> 	platform_driver_unregister(&(__driver)); \
+> } \
+> module_exit(##__driver##_exit);
 
-Kevin
+> It's not a lot of code, but I dislike how much boilerplate every
+> single driver has to use if it doesn't do anything special.
 
-[1] http://marc.info/?l=linux-omap&w=2&r=1&s=%27Mohan+V%27&q=b
+Yeah, this sort of stuff would be helpful - there's quite a bit of
+boilerplate you end up having to write to get drivers going.
