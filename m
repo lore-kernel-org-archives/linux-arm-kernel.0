@@ -1,33 +1,41 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 4 Oct 2011 14:35:20 -0600
-Subject: [PATCH] drivers: create a pin control subsystem v8
-In-Reply-To: <CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
-References: <1317211419-18472-1-git-send-email-linus.walleij@stericsson.com>
-	<20110930020754.GK12606@ponder.secretlab.ca>
-	<CACRpkdYyyqB6=5M8reqgwpMxXJz5ttXWyOav6K58dQ0CrxwCNA@mail.gmail.com>
-	<CACxGe6v19pZ0i-+ksYZbG2ZvGT30UkXEHTzpZMBTB4RNUV5bnA@mail.gmail.com>
-	<CAKnu2MpQ8Wvd4TF8Ge=o8ACyEoaEY8TcvOSdT1w6zfYiSKFUiw@mail.gmail.com>
-Message-ID: <20111004203520.GK2870@ponder.secretlab.ca>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 04 Oct 2011 13:47:48 -0700
+Subject: [PATCH 1/4] ARM: OMAP3 PM: Fix IO Daisychain sequence
+In-Reply-To: <1317750724-32553-2-git-send-email-vishwanath.bs@ti.com>
+	(Vishwanath BS's message of "Tue, 4 Oct 2011 23:22:01 +0530")
+References: <1317750724-32553-1-git-send-email-vishwanath.bs@ti.com>
+	<1317750724-32553-2-git-send-email-vishwanath.bs@ti.com>
+Message-ID: <87r52s8owb.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 01, 2011 at 12:39:21PM +0200, Linus Walleij wrote:
-> 2011/9/30 Grant Likely <grant.likely@secretlab.ca>:
-> 
-> >?I'm not convinced that the sysfs approach is
-> > actually the right interface here (I'm certainly not a fan of the gpio
-> > sysfs i/f), and I'd rather not be putting in unneeded stuff until the
-> > userspace i/f is hammered out.
-> 
-> Actually, thinking about it I cannot see what would be wrong
-> with /dev/gpio0 & friends in the first place.
-> 
-> Using sysfs as swiss army knife for custom I/O does not
-> seem like it would be long-term viable so thanks for this
-> observation, and I think we need /dev/gpio* put on some
-> mental roadmap somewhere.
+Hi Vishwa,
 
-Agreed.  I don't want to be in the situation we are now with GPIO,
-where every time I look at the sysfs interface I shudder.
+Vishwanath BS <vishwanath.bs@ti.com> writes:
 
-g.
+> As per OMAP3630 TRM Section 3.5.7.2.2, the right sequence for enabling IO Daisy
+> chain is "The I/O wake-up scheme is enabled by triggering the I/O daisy chain
+> control (Wu clock) by programming a dedicated register
+> (PRCM.PM_WKEN_WKUP[16] EN_IO_CHAIN) in the PRCM module.Software must wait for
+> the I/O daisy chain to complete before it transitions the PER domain to a
+> nonfunctional state. This is done by polling a dedicated status bit in the PRCM
+> module (PRCM.PM_WKST_WKUP[16] ST_IO_CHAIN). This status bit must be cleared by
+> software when the bit is read to  1".
+>
+> The original code was polling on a wrong register which is fixed in this patch.
+> Also omap3_enable_io_chain is made non static as it's going to be used in
+> subsequent patches.
+>  
+> Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+
+A fix for this was posted[1] by Mohan V (added to Cc) back in June.  It
+recieved a few minor comments but an updated version was never posted.
+
+Maybe you can ping Mohan or update that version fixing the comments
+mentioned in that thread.
+
+Thanks,
+
+Kevin
+
+[1] http://marc.info/?l=linux-omap&w=2&r=1&s=%27Mohan+V%27&q=b
