@@ -1,48 +1,40 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 04 Oct 2011 14:42:57 -0700
-Subject: [PATCH v6 04/16] OMAP2+: UART: cleanup 8250 console driver support
-In-Reply-To: <1317380495-584-4-git-send-email-govindraj.raja@ti.com>
-	(Govindraj R.'s message of "Fri, 30 Sep 2011 16:31:30 +0530")
-References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
-	<1317380495-584-4-git-send-email-govindraj.raja@ti.com>
-Message-ID: <87lit077ry.fsf@ti.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 5 Oct 2011 00:30:43 +0200
+Subject: [PATCH] PM: HIBERNATION: add resume_wait param to support
+	MMC-like devices as resume file
+In-Reply-To: <CAGsJ_4znTLmjd_qhgru_aOZPMEZc=dyXEQTqdsVGKr-GaryQsQ@mail.gmail.com>
+References: <1317288548-19560-1-git-send-email-Barry.Song@csr.com>
+	<59872.1317299401@turing-police.cc.vt.edu>
+	<CAGsJ_4znTLmjd_qhgru_aOZPMEZc=dyXEQTqdsVGKr-GaryQsQ@mail.gmail.com>
+Message-ID: <201110050030.43953.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Govindraj.R" <govindraj.raja@ti.com> writes:
+On Thursday, September 29, 2011, Barry Song wrote:
+> hi Valdis,
+> 
+> 2011/9/29  <Valdis.Kletnieks@vt.edu>:
+> > On Thu, 29 Sep 2011 02:29:08 PDT, Barry Song said:
+> >
+> >> This patch adds resumewait kernel param just like rootwait so
+> >> that we have enough time to wait mmc ready. The differene is
+> >> here we wait for resume partition but rootwait waits for rootfs
+> >> partition.
+> >
+> > OK, seems a reasonable idea...
+> >
+> >> kernel/power/hibernate.c |   16 ++++++++++++++++
+> >> 1 files changed, 16 insertions(+), 0 deletions(-)
+> >
+> > We have a __setup() parameter, this patch appears to be missing
+> > a hunk for Documentation/kernel-parameters.txt?
+> >
+> > Fix that issue, and you can stick this on there:
+> >
+> > Reviewed-by: Valdis Kletnieks <valdis.kletnieks@vt.edu>
+> 
+> thanks. i'll add the document in v2.
 
-> We had been using traditional 8250 driver as uart console driver
-> prior to omap-serial driver. Since we have omap-serial driver
-> in mainline kernel for some time now it has been used as default
-> uart console driver on omap2+ platforms. Remove 8250 support for
-> omap-uarts.
+I can't find the v2.  Have you posted it already?
 
-Nice to see the this disappearing.
-
-> Serial_in and serial_out override for 8250 serial driver is also
-> removed. Empty fifo read fix is already taken care with omap-serial
-> driver with data ready bit check from LSR reg before reading RX fifo.
-
-As stated in the previous review.  Patches that move code/features
-should have the removal and the add-back in the same patch.  Doing so
-makes it easy for reviewers to see whether it was simply moved, or if it
-was modified when it was moved, etc.
-
-> Also waiting for THRE(transmit hold reg empty) is done with wait_for_xmitr
-> in omap-serial driver.
-
-Again, remove it here in the patch that adds that support (the errata
-patch I guess.)
-
-> Remove headers that were necessary to support 8250 support
-> and remove all config bindings done to keep 8250 backward compatibility
-> while adding omap-serial driver. Remove omap_uart_reset needed for
-> 8250 autoconf.
->
-> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
-
-So basically, this patch should only remove the legacy 8250 support (as
-the subject says) and everything else should be done in the other
-relevant patches.
-
-Kevin
+Rafael
