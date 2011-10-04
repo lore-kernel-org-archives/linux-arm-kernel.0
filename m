@@ -1,47 +1,37 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 04 Oct 2011 19:20:57 -0400 (EDT)
-Subject: Please help with the OMAP static mapping mess
-In-Reply-To: <20111004225424.GA32102@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1110031312480.9106@xanadu.home>
-	<20111003205658.GJ6324@atomide.com>
-	<alpine.LFD.2.02.1110031744100.9106@xanadu.home>
-	<20111003224411.GA19897@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1110041528050.9106@xanadu.home>
-	<20111004225424.GA32102@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1110041900590.9106@xanadu.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 4 Oct 2011 17:22:28 -0600
+Subject: [PATCH v2 6/7] clk: Add initial WM831x clock driver
+In-Reply-To: <20111004205002.GA20296@opensource.wolfsonmicro.com>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-7-git-send-email-mturquette@ti.com>
+	<20110925040836.GP24631@ponder.secretlab.ca>
+	<20110926093858.GD2946@opensource.wolfsonmicro.com>
+	<20111004181818.GD2870@ponder.secretlab.ca>
+	<20111004205002.GA20296@opensource.wolfsonmicro.com>
+Message-ID: <20111004232228.GA3009@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Oct 2011, Russell King - ARM Linux wrote:
-
-> On Tue, Oct 04, 2011 at 05:10:36PM -0400, Nicolas Pitre wrote:
-> > Which makes me think... with all those architectures intercepting 
-> > ioremap calls in order to provide an equivalent static mapping address, 
-> > they already get an unexpected domain given that static mappings are 
-> > mostly DOMAIN_IO and not DOMAIN_KERNEL as would result from an non 
-> > intercepted ioremap call.
+On Tue, Oct 04, 2011 at 09:50:02PM +0100, Mark Brown wrote:
+> On Tue, Oct 04, 2011 at 12:18:18PM -0600, Grant Likely wrote:
+> > #define module_platform_driver(__driver) \
+> > int __driver##_init(void) \
+> > { \
+> > 	return platform_driver_register(&(__driver)); \
+> > } \
+> > module_init(__driver##_init); \
+> > void ##__driver##_exit(void) \
+> > { \
+> > 	platform_driver_unregister(&(__driver)); \
+> > } \
+> > module_exit(##__driver##_exit);
 > 
-> That's a necessary evil - otherwise we have to separate out the
-> ioremap from vmalloc.
+> > It's not a lot of code, but I dislike how much boilerplate every
+> > single driver has to use if it doesn't do anything special.
 > 
-> Incidentally, how are you dealing with the problem of a static mapping
-> setting up a L1 page table entry for DOMAIN_IO, and then a vmalloc
-> request coming in, overlapping that L1 page table?
-> 
-> If this memory then gets accessed with get_user() with set_fs(get_ds()),
-> the kernel will oops as we don't switch DOMAIN_IO memory on set_fs().
-> (I don't know if this happens in practice, but there's nothing to say
-> that it's illegal to do this.)
+> Yeah, this sort of stuff would be helpful - there's quite a bit of
+> boilerplate you end up having to write to get drivers going.
 
-I suppose that didn't happen so far.  Granted, moving the ioremap 
-optimization into core code for all machines will increase the 
-possibility for this to happen, even if still small.
+Draft patch written, and posting to the list soon...
 
-With CPU_USE_DOMAINS not set, set_fs() is a no-op anyway, besides 
-addr_limit that is.
-
-Is there a strong benefit in having static mappings being DOMAIN_IO 
-instead of DOMAIN_KERNEL?
-
-
-Nicolas
+g.
