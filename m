@@ -1,46 +1,34 @@
 From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 4 Oct 2011 23:36:42 +0200
-Subject: [PATCH 0/2] ARM: OMAP2+: timer fixes / cleanup
-In-Reply-To: <1317763241-21422-1-git-send-email-b-cousson@ti.com>
-References: <1317763241-21422-1-git-send-email-b-cousson@ti.com>
-Message-ID: <4E8B7C6A.2050207@ti.com>
+Date: Tue, 4 Oct 2011 23:40:13 +0200
+Subject: [RFC 2/5] ARM: OMAP: omap_device: add a method to set iommu
+	private archdata
+In-Reply-To: <CAK=WgbYaEPBUz_J11+f+W+G9uUG3E6aQ-5=X9bj2nRhij-w-Sw@mail.gmail.com>
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+	<1316948337-7924-3-git-send-email-ohad@wizery.com>
+	<87sjni9aql.fsf@ti.com>
+	<CAK=WgbZhz8LcAYZEY3qqRkX4E_wtspWp09Eq9G=5VdpoMMF1FQ@mail.gmail.com>
+	<87botwk4gw.fsf@ti.com>
+	<CAK=WgbYaEPBUz_J11+f+W+G9uUG3E6aQ-5=X9bj2nRhij-w-Sw@mail.gmail.com>
+Message-ID: <4E8B7D3D.9000204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tarun,
-
-On 10/4/2011 11:20 PM, Cousson, Benoit wrote:
-> Hi Tony,
+On 10/4/2011 9:54 PM, Ohad Ben-Cohen wrote:
+> On Tue, Oct 4, 2011 at 8:15 PM, Kevin Hilman<khilman@ti.com>  wrote:
+>> The approach is OK with me, but I'm a bit torn about whether or not to
+>> merge this since the need for this should go away when converting to DT.
 >
-> Here is the series to fix the warning and remove the redundant
-> latency structure that be removed since the timer runtime PM
-> adaptation was just pulled.
+> I guess it will still take some time until our boards are fully
+> functional with DT, so I think we should regard this as an interim
+> solution. Without this patch, a huge deal of code consolidation and
+> generalization is gated (namely - generic iommu and dma api, and
+> everything that depends on it, e.g. rpmsg/remoteproc).
 >
-> I was just able to test that on OMAP4.
+>> Is anyone working on IOMMU DT description?
+>
+> Unless Benoit is, I'll happily pick this up.
 
-It will be nice if you can test that on the other platforms.
-In theory, if they are properly using hwmod that should work fine.
+Cool, a volunteer... You're in.
 
 Thanks,
 Benoit
-
->
-> Patches are based on Kevin's for_3.2/omap_device-2 branch
-> and are available here:
-> git://gitorious.org/omap-pm/linux.git for_3.2/timer_fixes
->
-> Regards,
-> Benoit
->
->
-> Benoit Cousson (2):
->    ARM: OMAP2+: clock data: Remove redundant timer clkdev
->    ARM: OMAP2+: timer: Remove omap_device_pm_latency
->
->   arch/arm/mach-omap2/clock2420_data.c |   12 ------------
->   arch/arm/mach-omap2/clock2430_data.c |   12 ------------
->   arch/arm/mach-omap2/clock3xxx_data.c |   12 ------------
->   arch/arm/mach-omap2/clock44xx_data.c |   11 -----------
->   arch/arm/mach-omap2/timer.c          |   12 +-----------
->   5 files changed, 1 insertions(+), 58 deletions(-)
->
