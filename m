@@ -1,31 +1,35 @@
 From: vishwanath.bs@ti.com (Vishwanath BS)
-Date: Tue, 4 Oct 2011 23:22:00 +0530
-Subject: [PATCH 0/4] ARM: OMAP3PLUS PM: Add IO Daisychain support via hwmod mux
-Message-ID: <1317750724-32553-1-git-send-email-vishwanath.bs@ti.com>
+Date: Tue, 4 Oct 2011 23:22:03 +0530
+Subject: [PATCH 3/4] ARM: OMAP3 PM: Enable IO Wake up
+In-Reply-To: <1317750724-32553-1-git-send-email-vishwanath.bs@ti.com>
+References: <1317750724-32553-1-git-send-email-vishwanath.bs@ti.com>
+Message-ID: <1317750724-32553-4-git-send-email-vishwanath.bs@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The folowing patch series provides IO Daisychain feature via omap hwmod mux
-framework.
+Enable IO Wake up for OMAP3 as part of PM Init.
+Currently this has been managed in cpuidle path which is not the right place.
+Subsequent patch will remove IO Daisy chain handling in cpuidle path once daisy
+chain is handled as part of hwmod mux.
 
-The patch series has been generated against 3.1 rc4 and tested on OMAP3 Platform
-(ZOOM3) for Retention and OFF mode in suspend/cpuidle path.
+Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
+---
+ arch/arm/mach-omap2/pm34xx.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-Also tested against latest UART Runtime with Chain Handler patches [1].
-
-[1]: git://gitorious.org/runtime_3-0/runtime_3-0.git v6_uart_runtime
-
-Rajendra Nayak (1):
-  OMAP4 PM: Add IO Daisychain support
-
-Vishwanath BS (3):
-  OMAP3 PM: Fix IO Daisychain sequence
-  OMAP3 PM: Enable IO Wake up
-  OMAP3PLUS PM: Add IO Daisychain support via hwmod mux
-
- arch/arm/mach-omap2/omap_hwmod.c |    9 +++++++--
- arch/arm/mach-omap2/pm.c         |    9 +++++++++
- arch/arm/mach-omap2/pm.h         |    3 +++
- arch/arm/mach-omap2/pm34xx.c     |   33 +++++++--------------------------
- arch/arm/mach-omap2/pm44xx.c     |   36 ++++++++++++++++++++++++++++++++++++
- 5 files changed, 62 insertions(+), 28 deletions(-)
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 61f1a5b..6c80988 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -885,6 +885,9 @@ static int __init omap3_pm_init(void)
+ 		goto err1;
+ 	}
+ 
++	if (omap3_has_io_wakeup())
++		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
++
+ 	ret = pwrdm_for_each(pwrdms_setup, NULL);
+ 	if (ret) {
+ 		printk(KERN_ERR "Failed to setup powerdomains\n");
+-- 
+1.7.0.4
