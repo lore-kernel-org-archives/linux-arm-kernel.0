@@ -1,30 +1,32 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 04 Oct 2011 10:44:53 +0100
-Subject: [PATCH v4 04/10] ARM: SoC: convert OMAP4 to SoC descriptor
-In-Reply-To: <CAMQu2gzg9B0ABaay9DSfNvfT6R3tLRW9DfgUuNphy3+y5PxH2Q@mail.gmail.com>
+Date: Tue, 04 Oct 2011 10:47:26 +0100
+Subject: [PATCH v4 05/10] ARM: SoC: convert Tegra to SoC descriptor
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173A2C6DD0@HQMAIL01.nvidia.com>
 References: <1317663356-5114-1-git-send-email-marc.zyngier@arm.com>
-	<1317663356-5114-5-git-send-email-marc.zyngier@arm.com>
-	<CAMQu2gzg9B0ABaay9DSfNvfT6R3tLRW9DfgUuNphy3+y5PxH2Q@mail.gmail.com>
-Message-ID: <4E8AD595.2030201@arm.com>
+	<1317663356-5114-6-git-send-email-marc.zyngier@arm.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173A2C6DD0@HQMAIL01.nvidia.com>
+Message-ID: <4E8AD62E.5040207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/11 07:32, Shilimkar, Santosh wrote:
-> Marc,
-> 
-> On Mon, Oct 3, 2011 at 11:05 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Convert OMAP4 to use the SoC descriptor to provide its SMP
+On 03/10/11 21:52, Stephen Warren wrote:
+> Marc Zyngier wrote at Monday, October 03, 2011 11:36 AM:
+>> Convert Tegra to use the SoC descriptor to provide its SMP
 >> and CPU hotplug operations.
->>
->> Tested on both Panda and IGEPv2 (MULTI_OMAP kernel)
->>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
-> The changes very trivial and they look fine to me.
-> Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+>> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+> ...
+>> +struct arm_soc_desc tegra_soc_desc __initdata = {
+>> +	.name		= "nVIDIA Tegra",
+> 
+> Technically, we're supposed to say "NVIDIA" not "nVIDIA", but no need to
+> respin just for that! So,
 
-Thanks Santosh.
+Ah! I'll fix that in my tree. There's a pending respin anyway...
+
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+
+Thanks Stephen.
 
 	M.
 -- 
