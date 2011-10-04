@@ -1,31 +1,36 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Oct 2011 23:54:24 +0100
-Subject: Please help with the OMAP static mapping mess
-In-Reply-To: <alpine.LFD.2.02.1110041528050.9106@xanadu.home>
-References: <alpine.LFD.2.02.1110031312480.9106@xanadu.home>
-	<20111003205658.GJ6324@atomide.com>
-	<alpine.LFD.2.02.1110031744100.9106@xanadu.home>
-	<20111003224411.GA19897@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1110041528050.9106@xanadu.home>
-Message-ID: <20111004225424.GA32102@n2100.arm.linux.org.uk>
+Date: Wed, 5 Oct 2011 00:01:27 +0100
+Subject: [PATCH 2/9] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20110927121003.GB4289@opensource.wolfsonmicro.com>
+References: <1317118372-17052-1-git-send-email-rnayak@ti.com>
+	<1317118372-17052-3-git-send-email-rnayak@ti.com>
+	<20110927121003.GB4289@opensource.wolfsonmicro.com>
+Message-ID: <20111004230127.GB32102@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2011 at 05:10:36PM -0400, Nicolas Pitre wrote:
-> Which makes me think... with all those architectures intercepting 
-> ioremap calls in order to provide an equivalent static mapping address, 
-> they already get an unexpected domain given that static mappings are 
-> mostly DOMAIN_IO and not DOMAIN_KERNEL as would result from an non 
-> intercepted ioremap call.
+On Tue, Sep 27, 2011 at 01:10:04PM +0100, Mark Brown wrote:
+> On Tue, Sep 27, 2011 at 03:42:45PM +0530, Rajendra Nayak wrote:
+> 
+> > +	init_data = devm_kzalloc(dev, sizeof(struct regulator_init_data),
+> > +						 GFP_KERNEL);
+> > +	if (!init_data)
+> > +		return NULL; /* Out of memory? */
+> 
+> This means that the init data will be kept around for the entire
+> lifetime of the device rather than being discarded.
 
-That's a necessary evil - otherwise we have to separate out the
-ioremap from vmalloc.
+May I remind you that devm_* lifetime expires whenever the associated
+driver is unbound, which can be much shorter than the lifetime of the
+struct device.
 
-Incidentally, how are you dealing with the problem of a static mapping
-setting up a L1 page table entry for DOMAIN_IO, and then a vmalloc
-request coming in, overlapping that L1 page table?
+It expires when any of the following occurs:
+1. userspace asks the associated driver to be unbound
+2. the driver is removed
+3. any driver probe for this struct device fails
+4. the struct device is unregistered.
 
-If this memory then gets accessed with get_user() with set_fs(get_ds()),
-the kernel will oops as we don't switch DOMAIN_IO memory on set_fs().
-(I don't know if this happens in practice, but there's nothing to say
-that it's illegal to do this.)
+So: don't use devm_* for anything other than stuff inside a driver being
+associated with the struct device itself.  Other uses are a bug waiting
+to happen.
