@@ -1,75 +1,32 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 5 Oct 2011 00:05:16 +0530
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <CACxGe6tXEx1A+ZuBTUdi8jjfx_hOCaX6eSpUOOhNH9us+Mnczg@mail.gmail.com>
-References: <20110922184614.25419.84606.stgit@ponder>
-	<20111004145148.GA8021@manju-desktop>
-	<CACxGe6tXEx1A+ZuBTUdi8jjfx_hOCaX6eSpUOOhNH9us+Mnczg@mail.gmail.com>
-Message-ID: <20111004183516.GB8021@manju-desktop>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 04 Oct 2011 14:49:50 -0400 (EDT)
+Subject: Git pull request: mach/vmalloc.h removal,
+	and ioremap optimizations
+In-Reply-To: <alpine.LFD.2.00.1109230908410.12663@xanadu.home>
+References: <alpine.LFD.2.00.1109230908410.12663@xanadu.home>
+Message-ID: <alpine.LFD.2.02.1110041444270.9106@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2011 at 09:58:10AM -0600, Grant Likely wrote:
-> On Tue, Oct 4, 2011 at 8:51 AM, G, Manjunath Kondaiah <manjugk@ti.com> wrote:
-> > On Thu, Sep 22, 2011 at 12:51:23PM -0600, Grant Likely wrote:
-> >> Hi Manjunath,
-> >>
-> >> Here's the current state of the patch. ?The major think that needs to
-> >> be done is to convert it to use a separate workqueue as described in
-> >> the TODO above. ?It also needs some users adapted to it. ?One of the
-> >> gpio drivers would work; preferably one of the newer drivers that
-> >> doesn't have a lot of drivers depending on the early_initcall()
-> >> behaviour yet.
-> >
-> > I have tested this patch on omap3 beagle board by making:
-> > 1. omap-gpio driver init as late_initcall instead of postcore_initcall
-> > 2. mmc driver probe will request gpio through gpio_request and gpio driver
-> > returns -EDEFER_PROBE which in turn makes mmc driver to request deferral probe.
-> > 3. When deferral probe gets activated, it scans driver entries and it will not
-> > find any match for mmc driver probe.
+On Fri, 23 Sep 2011, Nicolas Pitre wrote:
+
+> Russell, please pull
 > 
-> Looks like drivers/mmc/host/omap.c is using platform_driver_probe()
-> instead of platform_driver_register().  Add the probe hook to the
-> platform_driver structure and change it to call
-> platform_driver_register() and it should work.  Don't forget to change
-> mmc_omap_probe from __init to __devinit.
+> 	git://git.linaro.org/people/nico/linux vmalloc
 
-Yes. After changing it into platform_driver_register, I can see mmc probe is
-getting completed from deferred probe list. But, MMC upper layer will check 
-probe and it waits for ever since probe_count is not getting incremented.
+Given the problems that exist in the OMAP tree and their likely fixes 
+going into mainline only during the next merge window, I'm withdrawing 
+this request until the next cycle.
 
-Log:
+> One regression was discovered on shmobile during testing because that 
+> platform asks for 158MB of consistent DMA memory while the documented 
+> maximum is 14MB.  Inspection of the code doesn't tell why this is 
+> required, and listed maintainers did not respond yet after a couple 
+> days.  So a temporary exception to the definition of VMALLOC_END was 
+> added for CONFIG_SHMOBILE and a noisy warning to get those maintainers' 
+> attention.
 
-[    1.807830] platform omap_hsmmc.0: Driver omap_hsmmc requests probe deferral
+For the record, those maintainers still didn't respond.
 
-...
 
-[    1.948760] omap_device: omap_gpio.0: new worst case activate latency 0:30517
-[    1.959259] OMAP GPIO hardware version 2.5
-
-...
-
-[    2.000488] platform omap_hsmmc.0: Retrying from deferred list
-[    2.008026] omap_device: omap_hsmmc.0: new worst case activate latency 0:244140
-[    2.020080] input: gpio-keys as /devices/platform/gpio-keys/input/input1
-[    2.035827] omap_hsmmc omap_hsmmc.0: Probe success...
-[    2.042083] twl_rtc twl_rtc: setting system clock to 2000-01-01 01:06:35 UTC
-(946688795)
-[    2.056030] Waiting for root device /dev/mmcblk0p2...
-[    2.061492] driver_probe_done: probe_count = 0
-[    2.168518] driver_probe_done: probe_count = 0
-[    2.277832] driver_probe_done: probe_count = 0
-[    2.387207] driver_probe_done: probe_count = 0
-[    2.496582] driver_probe_done: probe_count = 0
-
-Waits for ever in init/do_mount.c:
-	if ((ROOT_DEV == 0) && root_wait) {
-		printk(KERN_INFO "Waiting for root device %s...\n",
-			saved_root_name);
-		while (driver_probe_done() != 0 ||
-			(ROOT_DEV = name_to_dev_t(saved_root_name)) == 0)
-			msleep(100);
-		async_synchronize_full();
-	}
-
--Manjunath
+Nicolas
