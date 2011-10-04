@@ -1,234 +1,207 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 4 Oct 2011 13:45:06 +0530
-Subject: [PATCH 1/3] mmc: sdhci-s3c: Remove usage of clk_type member in
-	platform data
-In-Reply-To: <CAH9JG2VKeRujhEUA=y7UuncwUFrMqtdnkpiVqz0VHCF1nPK4_Q@mail.gmail.com>
-References: <1317713315-5830-1-git-send-email-thomas.abraham@linaro.org>
-	<1317713315-5830-2-git-send-email-thomas.abraham@linaro.org>
-	<CAH9JG2VKeRujhEUA=y7UuncwUFrMqtdnkpiVqz0VHCF1nPK4_Q@mail.gmail.com>
-Message-ID: <CAJuYYwQrEKVQuOH8aRLiydYUATo43XttEWkDcosQHyHrDt=G0w@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 04 Oct 2011 10:18:57 +0200
+Subject: [RFC PATCH] tty/serial: atmel_serial: add device tree support
+In-Reply-To: <4E8A6858.6020700@gmail.com>
+References: <1317635502-9430-1-git-send-email-nicolas.ferre@atmel.com>
+	<4E8A6858.6020700@gmail.com>
+Message-ID: <4E8AC171.4020706@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mr. Park,
-
-On 4 October 2011 13:23, Kyungmin Park <kmpark@infradead.org> wrote:
-> Hi,
->
-> On Tue, Oct 4, 2011 at 4:28 PM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
->> SDHCI controllers on Exynos4 do not include the sdclk divider as per the
->> sdhci controller specification. This case can be represented using the
->> sdhci quirk SDHCI_QUIRK_NONSTANDARD_CLOCK instead of using an additional
->> enum type definition 'clk_types'.
->>
->> Hence, usage of clk_type member in platform data is removed and the sdhci
->> quirk is used. In addition to that, since this qurik is SoC specific,
->> driver data is introduced to represent controllers on SoC's that require
->> this quirk.
-> Right.
->>
->> Cc: Ben Dooks <ben-linux@fluff.org>
->> Cc: Jeongbae Seo <jeongbae.seo@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+On 10/04/2011 03:58 AM, Rob Herring :
+> On 10/03/2011 04:51 AM, Nicolas Ferre wrote:
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 >> ---
->> In the function 'sdhci_cmu_set_clock', the code that waits for a stable
->> sdclk clock is replicated from 'sdhci_set_clock' function. This portion
->> of code is replicated in sdhci-cns3xxx driver as well. This duplication
->> could have been avoid by adding a new function in sdhci host controller
->> driver that waits for stable sdclk and sdhci-s3c/sdhci-cns3xxx can be
->> the users of the new function. If adding a new function in sdhci host
->> controller driver is acceptable, an additional patch in this series
->> can be added that creates the new function that waits for stable sdclk.
+>> Hi,
 >>
->> ?drivers/mmc/host/sdhci-s3c.c | ? 74 +++++++++++++++++++++++++++++++++++++++--
->> ?1 files changed, 70 insertions(+), 4 deletions(-)
+>> Here is a first attempt to add device tree support to atmel_serial driver.
+>> RS485 data are not handled for the moment. My feeling is that they should be
+>> added as a generic DT biding set.
+> 
+> Feel free to propose something. :)
+
+Yes, I will have a look and practice my DT understanding on this...
+
+>>  .../devicetree/bindings/tty/serial/atmel-usart.txt |   27 +++++++++
+>>  drivers/tty/serial/atmel_serial.c                  |   56 +++++++++++++++++---
+>>  2 files changed, 75 insertions(+), 8 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
 >>
->> diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
->> index 82709b6..b29e734 100644
->> --- a/drivers/mmc/host/sdhci-s3c.c
->> +++ b/drivers/mmc/host/sdhci-s3c.c
->> @@ -53,6 +53,18 @@ struct sdhci_s3c {
->> ? ? ? ?struct clk ? ? ? ? ? ? ?*clk_bus[MAX_BUS_CLK];
->> ?};
->>
->> +/**
->> + * struct sdhci_s3c_driver_data - S3C SDHCI platform specific driver data
->> + * @sdhci_quirks: sdhci host specific quirks.
->> + *
->> + * Specifies platform specific configuration of sdhci controller.
->> + * Note: A structure for driver specific platform data is used for future
->> + * expansion of its usage.
->> + */
->> +struct sdhci_s3c_drv_data {
->> + ? ? ? unsigned int ? ?sdhci_quirks;
+>> diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+>> new file mode 100644
+>> index 0000000..a49d9a1
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+>> @@ -0,0 +1,27 @@
+>> +* Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
+>> +
+>> +Required properties:
+>> +- compatible: Should be "atmel,<chip>-usart"
+>> +  The compatible <chip> indicated will be the first SoC to support an
+>> +  additional mode or an USART new feature.
+>> +- reg: Should contain registers location and length
+>> +- interrupts: Should contain interrupt
+>> +
+>> +Optional properties:
+>> +- atmel,use-dma-rx: use of PDC or DMA for receiving data
+>> +- atmel,use-dma-tx: use of PDC or DMA for transmitting data
+> 
+> Is this an internal DMA or separate DMA controller? If the latter, these
+> should be phandles to a DMA channel/request.
+
+Well, for now it relies on PDC (looks like an internal DMA). There is no
+notion of channel/request so I think it is appropriate to keep it like this.
+
+>> +<chip> compatible description:
+>> +- at91rm9200:  legacy USART support
+>> +- at91sam9260: generic USART implementation for SAM9 SoCs
+>> +
+>> +Example:
+>> +
+>> +	usart0: serial at fff8c000 {
+>> +		compatible = "atmel,at91sam9260-usart";
+>> +		reg = <0xfff8c000 0x4000>;
+>> +		interrupts = <7>;
+>> +		atmel,use-dma-rx;
+>> +		atmel,use-dma-tx;
+>> +	};
+>> +
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index 453cdb5..65f56c3 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -33,6 +33,8 @@
+>>  #include <linux/sysrq.h>
+>>  #include <linux/tty_flip.h>
+>>  #include <linux/platform_device.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>>  #include <linux/dma-mapping.h>
+>>  #include <linux/atmel_pdc.h>
+>>  #include <linux/atmel_serial.h>
+>> @@ -162,6 +164,16 @@ static struct atmel_uart_port atmel_ports[ATMEL_MAX_UART];
+>>  static struct console atmel_console;
+>>  #endif
+>>  
+>> +#if defined(CONFIG_OF)
+>> +static const struct of_device_id atmel_serial_dt_ids[] = {
+>> +	{ .compatible = "atmel,at91rm9200-usart" },
+>> +	{ .compatible = "atmel,at91sam9260-usart" },
+>> +	{ /* sentinel */ }
 >> +};
 >> +
->> ?static inline struct sdhci_s3c *to_s3c(struct sdhci_host *host)
->> ?{
->> ? ? ? ?return sdhci_priv(host);
->> @@ -132,10 +144,10 @@ static unsigned int sdhci_s3c_consider_clock(struct sdhci_s3c *ourhost,
->> ? ? ? ? ? ? ? ?return UINT_MAX;
->>
->> ? ? ? ?/*
->> - ? ? ? ?* Clock divider's step is different as 1 from that of host controller
->> - ? ? ? ?* when 'clk_type' is S3C_SDHCI_CLK_DIV_EXTERNAL.
->> + ? ? ? ?* If controller uses a non-standard clock division, find the best clock
->> + ? ? ? ?* speed possible with selected clock source and skip the division.
->> ? ? ? ? */
->> - ? ? ? if (ourhost->pdata->clk_type) {
->> + ? ? ? if (ourhost->host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK) {
->> ? ? ? ? ? ? ? ?rate = clk_round_rate(clksrc, wanted);
->> ? ? ? ? ? ? ? ?return wanted - rate;
->> ? ? ? ?}
->> @@ -272,6 +284,8 @@ static unsigned int sdhci_cmu_get_min_clock(struct sdhci_host *host)
->> ?static void sdhci_cmu_set_clock(struct sdhci_host *host, unsigned int clock)
->> ?{
->> ? ? ? ?struct sdhci_s3c *ourhost = to_s3c(host);
->> + ? ? ? unsigned long timeout;
->> + ? ? ? u16 clk = 0;
->>
->> ? ? ? ?/* don't bother if the clock is going off */
->> ? ? ? ?if (clock == 0)
->> @@ -282,6 +296,25 @@ static void sdhci_cmu_set_clock(struct sdhci_host *host, unsigned int clock)
->> ? ? ? ?clk_set_rate(ourhost->clk_bus[ourhost->cur_clk], clock);
->>
->> ? ? ? ?host->clock = clock;
->> +
->> + ? ? ? clk = SDHCI_CLOCK_INT_EN;
->> + ? ? ? sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
->> +
->> + ? ? ? /* Wait max 20 ms */
->> + ? ? ? timeout = 20;
->> + ? ? ? while (!((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
->> + ? ? ? ? ? ? ? & SDHCI_CLOCK_INT_STABLE)) {
->> + ? ? ? ? ? ? ? if (timeout == 0) {
->> + ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "%s: Internal clock never "
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "stabilised.\n", mmc_hostname(host->mmc));
->> + ? ? ? ? ? ? ? ? ? ? ? return;
->> + ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? ? timeout--;
->> + ? ? ? ? ? ? ? mdelay(1);
->> + ? ? ? }
->> +
->> + ? ? ? clk |= SDHCI_CLOCK_CARD_EN;
->> + ? ? ? sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
->> ?}
->>
->> ?/**
->> @@ -382,9 +415,17 @@ static void sdhci_s3c_setup_card_detect_gpio(struct sdhci_s3c *sc)
->> ? ? ? ?}
->> ?}
->>
->> +static inline struct sdhci_s3c_drv_data *sdhci_s3c_get_driver_data(
->> + ? ? ? ? ? ? ? ? ? ? ? struct platform_device *pdev)
->> +{
->> + ? ? ? return (struct sdhci_s3c_drv_data *)
->> + ? ? ? ? ? ? ? ? ? ? ? platform_get_device_id(pdev)->driver_data;
->> +}
->> +
->> ?static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->> ?{
->> ? ? ? ?struct s3c_sdhci_platdata *pdata = pdev->dev.platform_data;
->> + ? ? ? struct sdhci_s3c_drv_data *drv_data;
->> ? ? ? ?struct device *dev = &pdev->dev;
->> ? ? ? ?struct sdhci_host *host;
->> ? ? ? ?struct sdhci_s3c *sc;
->> @@ -414,6 +455,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->> ? ? ? ? ? ? ? ?return PTR_ERR(host);
->> ? ? ? ?}
->>
->> + ? ? ? drv_data = sdhci_s3c_get_driver_data(pdev);
->> ? ? ? ?sc = sdhci_priv(host);
->>
->> ? ? ? ?sc->host = host;
->> @@ -494,6 +536,8 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->> ? ? ? ?/* Setup quirks for the controller */
->> ? ? ? ?host->quirks |= SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC;
->> ? ? ? ?host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
->> + ? ? ? if (drv_data)
->> + ? ? ? ? ? ? ? host->quirks |= drv_data->sdhci_quirks;
->>
->> ?#ifndef CONFIG_MMC_SDHCI_S3C_DMA
->>
->> @@ -534,7 +578,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
->> ? ? ? ? * If controller does not have internal clock divider,
->> ? ? ? ? * we can use overriding functions instead of default.
->> ? ? ? ? */
->> - ? ? ? if (pdata->clk_type) {
->> + ? ? ? if (host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK) {
->> ? ? ? ? ? ? ? ?sdhci_s3c_ops.set_clock = sdhci_cmu_set_clock;
->> ? ? ? ? ? ? ? ?sdhci_s3c_ops.get_min_clock = sdhci_cmu_get_min_clock;
->> ? ? ? ? ? ? ? ?sdhci_s3c_ops.get_max_clock = sdhci_cmu_get_max_clock;
->> @@ -639,9 +683,31 @@ static int sdhci_s3c_resume(struct platform_device *dev)
->> ?#define sdhci_s3c_resume NULL
->> ?#endif
->>
->> +#if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212)
->> +static struct sdhci_s3c_drv_data exynos4_sdhci_drv_data = {
->> + ? ? ? .sdhci_quirks = SDHCI_QUIRK_NONSTANDARD_CLOCK,
->> +};
->> +#define EXYNOS4_SDHCI_DRV_DATA ((kernel_ulong_t)&exynos4_sdhci_drv_data)
->> +#else
->> +#define EXYNOS4_SDHCI_DRV_DATA (kernel_ulong_t)NULL
+>> +MODULE_DEVICE_TABLE(of, atmel_serial_dt_ids);
 >> +#endif
-> It's too small to save the memory. I think no need to guard the exynos
-> driver data with ifdef/endif.
+> 
+> This ifdef isn't necessary, but it really depends if long term this
+> driver will be built without OF (and you care about the extra data).
 
+Yes, even in long term, this driver will be built without OF support. It
+is true though that the extra data is not very big...
 
-There could be other elements added to the 'sdhci_s3c_drv_data'
-structure as new variants of sdhci-s3c controller would appear in
-future SoC. I am not aware of any such variations in the upcoming
-SoC's but this was done taking into consideration that there could be
-slight variations which the driver would have to support.
-
-
+>>  static inline struct atmel_uart_port *
+>>  to_atmel_uart_port(struct uart_port *uart)
+>>  {
+>> @@ -1413,14 +1425,31 @@ static struct uart_ops atmel_pops = {
+>>  static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+>>  				      struct platform_device *pdev)
+>>  {
+>> +	struct device_node *np = pdev->dev.of_node;
+>>  	struct uart_port *port = &atmel_port->uart;
+>>  	struct atmel_uart_data *pdata = pdev->dev.platform_data;
+>> +	int ret;
 >> +
->> +static struct platform_device_id sdhci_s3c_driver_ids[] = {
->> + ? ? ? {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "s3c-sdhci",
->> + ? ? ? ? ? ? ? .driver_data ? ?= (kernel_ulong_t)NULL,
->> + ? ? ? },
->> + ? ? ? {
->> + ? ? ? ? ? ? ? .name ? ? ? ? ? = "exynos4-sdhci",
->> + ? ? ? ? ? ? ? .driver_data ? ?= EXYNOS4_SDHCI_DRV_DATA,
->> + ? ? ? },
->> +};
->> +MODULE_DEVICE_TABLE(platform, sdhci_s3c_driver_ids);
->
-> Do you have a plan to use the sdhci-pltfm.c as other drivers did?
-> some drivers are already use it and support OF features.
-
-I did check few months back if sdhci-pltfm.c can be used for sdhci-s3c
-drivers but due to slightly complex operations which sdhci-s3c
-handles, I did not try to base samsung sdhci driver support on
-sdhci-pltfm.c. So, at present, I do not have a plan to move to
-sdhci-pltfm.c.
-
->
-> Thank you,
-> Kyungmin Park
-
-
-Thanks for your review and comments.
-
-Regards,
-Thomas.
-
+>> +	if (np) {
+>> +		ret = of_alias_get_id(np, "serial");
+>> +		if (ret >= 0)
+>> +			port->line = ret;
+>> +		if (of_get_property(np, "atmel,use-dma-rx", NULL))
+>> +			atmel_port->use_dma_rx	= 1;
+>> +		if (of_get_property(np, "atmel,use-dma-tx", NULL))
+>> +			atmel_port->use_dma_tx	= 1;
+>> +	} else {
+>> +		port->line = pdata->num;
 >> +
->> ?static struct platform_driver sdhci_s3c_driver = {
->> ? ? ? ?.probe ? ? ? ? ?= sdhci_s3c_probe,
->> ? ? ? ?.remove ? ? ? ? = __devexit_p(sdhci_s3c_remove),
->> + ? ? ? .id_table ? ? ? = sdhci_s3c_driver_ids,
->> ? ? ? ?.suspend ? ? ? ?= sdhci_s3c_suspend,
->> ? ? ? ?.resume ? ? ? ? = sdhci_s3c_resume,
->> ? ? ? ?.driver ? ? ? ? = {
->> --
->> 1.6.6.rc2
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->>
->
+>> +		atmel_port->use_dma_rx	= pdata->use_dma_rx;
+>> +		atmel_port->use_dma_tx	= pdata->use_dma_tx;
+>> +		atmel_port->rs485	= pdata->rs485;
+>> +	}
+>>  
+>>  	port->iotype		= UPIO_MEM;
+>>  	port->flags		= UPF_BOOT_AUTOCONF;
+>>  	port->ops		= &atmel_pops;
+>>  	port->fifosize		= 1;
+>> -	port->line		= pdata->num;
+>>  	port->dev		= &pdev->dev;
+>>  	port->mapbase	= pdev->resource[0].start;
+>>  	port->irq	= pdev->resource[1].start;
+>> @@ -1430,7 +1459,7 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+>>  
+>>  	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
+>>  
+>> -	if (pdata->regs) {
+>> +	if (pdata && pdata->regs) {
+>>  		/* Already mapped by setup code */
+>>  		port->membase = pdata->regs;
+>>  	} else {
+>> @@ -1447,10 +1476,6 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+>>  		/* only enable clock when USART is in use */
+>>  	}
+>>  
+>> -	atmel_port->use_dma_rx	= pdata->use_dma_rx;
+>> -	atmel_port->use_dma_tx	= pdata->use_dma_tx;
+>> -	atmel_port->rs485	= pdata->rs485;
+>> -
+>>  	/* Use TXEMPTY for interrupt when rs485 else TXRDY or ENDTX|TXBUFE */
+>>  	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
+>>  		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
+>> @@ -1710,13 +1735,27 @@ static int atmel_serial_resume(struct platform_device *pdev)
+>>  static int __devinit atmel_serial_probe(struct platform_device *pdev)
+>>  {
+>>  	struct atmel_uart_port *port;
+>> +	struct device_node *np = pdev->dev.of_node;
+>>  	struct atmel_uart_data *pdata = pdev->dev.platform_data;
+>>  	void *data;
+>>  	int ret;
+>>  
+>>  	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
+>>  
+>> -	port = &atmel_ports[pdata->num];
+>> +	if (np) {
+>> +		ret = of_alias_get_id(np, "serial");
+> 
+> I'll defer to Grant on this. There aren't any other drivers using this.
+
+I took the IMX serial driver as an example which is in devicetree/next
+branch (tty/serial/imx.c).
+
+Is it the proper way to use this?
+
+>> +		if (ret < 0)
+>> +			goto err;
+>> +	} else {
+>> +		if (pdata) {
+>> +			ret = pdata->num;
+>> +		} else {
+>> +			ret = -ENODEV;
+>> +			goto err;
+>> +		}
+>> +	}
+> 
+> This would a bit more concise:
+> 
+> 	} else if (pdata) {
+> 		ret = pdata->num;
+> 	} else {
+> 		ret = -ENODEV;
+> 		goto err;
+> 	}
+
+Ok.
+
+
+Thanks for your review Rob.
+
+Best regards,
+-- 
+Nicolas Ferre
