@@ -1,75 +1,64 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Wed, 5 Oct 2011 07:28:25 +0530
-Subject: [RFC PATCH v2 0/6] TI81XX: Add clock and hwmod data
-In-Reply-To: <alpine.DEB.2.00.1110040318260.4611@utopia.booyaka.com>
-References: <1314119594-22647-1-git-send-email-hemantp@ti.com>
-	<alpine.DEB.2.00.1110040318260.4611@utopia.booyaka.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4FB3EA2@dbde02.ent.ti.com>
+From: raj.khem@gmail.com (Khem Raj)
+Date: Tue, 04 Oct 2011 19:04:09 -0700
+Subject: [PATCH 05/11] ARM: vfp: use -mfloat-abi=soft to build vfp
+In-Reply-To: <20111003140411.GB2117@arm.com>
+References: <1317496920-7764-1-git-send-email-arnd@arndb.de>
+	<1317496920-7764-6-git-send-email-arnd@arndb.de>
+	<20111003140411.GB2117@arm.com>
+Message-ID: <4E8BBB19.8080303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-Paul Walmsley wrote on Tuesday, October 04, 2011 2:54 PM:
-
-> Hi,
-> 
-> On Tue, 23 Aug 2011, Hemant Pedanekar wrote:
-> 
->> This patch set is the v2 of TI816X clock and hwmods patches sent earlier.
->> 
->> The clock data is currently added only for TI816X, while minimal hwmod data
->> common for TI816X and TI814X is added.
->> 
->> This patch set depends on following patches:
->> 	TI81XX: Prepare for addition of TI814X support
->> 	TI814X: Add cpu type macros and detection support
->> 	TI814X: Create board support and enable build for TI8148 EVM
->> 
->> Please note that CHIP_IS_TI816X/CHIP_IS_TI814X are still being used and I
->> will send update once SoC list usage is available.
-> 
-> I've been spending some time with these patches.  A few aspects don't make
-> much sense to me.  For example, looking at the TRMs, the 816x doesn't seem
-> to have powerdomains for HDVICP0, 1, or 2, although they are listed in the
-> patch.
-
-Can you please check 18.2.1 in TRM from [1].
-
-Above powerdomains are listed there as HDVICP2-0, 1, 2.
-
->  Also, the clockdomain layout is quite different between 814x and
-> 816x, according to the TRMs.  Are the patches more accurate than the TRMs,
-> or vice versa?
+On 10/3/2011 7:04 AM, Dave Martin wrote:
+> On Sat, Oct 01, 2011 at 09:21:54PM +0200, Arnd Bergmann wrote:
+>> Distros are starting to ship with toolchains defaulting to
+>> hardfloat. Using such a compiler to build the kernel fails
+>> in the VFP directory with
+>>
+>> arch/arm/vfp/entry.S:1:0: sorry, unimplemented: -mfloat-abi=hard and VFP
+>>
+>> Adding -mfloat-abi=soft to the gcc command line fixes this.
+>>
+>> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
+>> ---
+>>   arch/arm/vfp/Makefile |    2 +-
+>>   1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
+>> index 6de73aa..a81404c 100644
+>> --- a/arch/arm/vfp/Makefile
+>> +++ b/arch/arm/vfp/Makefile
+>> @@ -7,7 +7,7 @@
+>>   # ccflags-y := -DDEBUG
+>>   # asflags-y := -DDEBUG
+>>
+>> -KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp)
+>> +KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp -mfloat-abi=soft)
 >
-You are correct, 814x has differences in clock, clockdomain and powerdomain
-data.
+> Although -mfpu=softvfp+vfp and -mfloat-abi=soft look mutually
+> contradictory, this seems to have the correct effect, i.e. the
+> assembler allows floating-point instructions but marks the resulting
+> object as using the soft-float calling conventions.
 
-I would say the extent of differences level between 816x and 814x is 
-something like (please also see reference links from Arago devl tree):
+I was wondering if this could also be achieved with -mfloat-abi=softfp 
+this will also add Tag_FP_arch: VFPv2 into .attributes section and 
+-Wa,-mfpu=softvfp+vfp may not be needed.
 
-Clock data: ~90% data is different (main contributors: different
-PLLs - FAPLL in 816x vs ADPLL 814x, different parent hierarchy)
-[2] & [3]
-
-Clockdomains data: ~60% [4]
-
-Powerdomains data: ~90%  [5]
-> Will send over the current reworked patches for TI81XX PRCM accessors,
-> powerdomain code & data, and clockdomain code & data.  They are intended
-> to apply over the TI814x patches that you sent recently.  I'd like to get
-> your opinion(s) on these reworked patches.  Please note, so far they have
-> only been compile-tested.
-> 
-> 
-> - Paul
-
-Thanks, I will try those and respond.
-
-   Hemant
-
-[1] http://focus.ti.com/general/docs/litabsmultiplefilelist.tsp?literatureNumber=sprugx8
-[2] http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/clock816x_data.c;h=32ea958afef915f93e0560f87d1bb2115e24ee2c;hb=HEAD
-[3] http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/clock814x_data.c;h=282ffa93398db678843a35766219970655563b46;hb=HEAD
-[4] http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/clockdomains81xx.h;h=217c9b4f85c59cc92e0f36ddd73044136c8e9fff;hb=HEAD
-[5] http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/powerdomains81xx.h;h=ef1299e00c216aea4d12bca2281540efb7eb77f0;hb=HEAD
+>
+> The binutils documentation also seems to confirm that that's what
+> should happen.
+>
+> I don't see another combination of options for getting this effect.
+>
+>
+> So, if you like:
+>
+> Reviewed-by: Dave Martin<dave.martin@linaro.org>
+>
+> Cheers
+> ---Dave
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
