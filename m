@@ -1,118 +1,75 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 05 Oct 2011 10:57:46 +0900
-Subject: [PATCH 2/4] ARM: EXYNOS4: Support for generic Clock manipulation
-	PM callbacks
-In-Reply-To: <001801cc80d2$065939a0$130bace0$%kim@samsung.com>
-References: <4E4360B5.3050203@samsung.com>
-	<001801cc80d2$065939a0$130bace0$%kim@samsung.com>
-Message-ID: <4E8BB99A.30005@samsung.com>
+From: hemantp@ti.com (Pedanekar, Hemant)
+Date: Wed, 5 Oct 2011 07:28:25 +0530
+Subject: [RFC PATCH v2 0/6] TI81XX: Add clock and hwmod data
+In-Reply-To: <alpine.DEB.2.00.1110040318260.4611@utopia.booyaka.com>
+References: <1314119594-22647-1-git-send-email-hemantp@ti.com>
+	<alpine.DEB.2.00.1110040318260.4611@utopia.booyaka.com>
+Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4FB3EA2@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> Chanwoo Choi wrote:
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->>  arch/arm/mach-exynos4/Makefile     |    2 +-
->>  arch/arm/mach-exynos4/pm-runtime.c |   56 ++++++++++++++++++++++++++++++++++++
->>  2 files changed, 57 insertions(+), 1 deletions(-)
->>  create mode 100644 arch/arm/mach-exynos4/pm-runtime.c
->>
->> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
->> index 97c31ce..28cdb8b 100644
->> --- a/arch/arm/mach-exynos4/Makefile
->> +++ b/arch/arm/mach-exynos4/Makefile
->> @@ -5,7 +5,7 @@
->>  #
->>  # Licensed under GPLv2
->>
->> -obj-y				:=
->> +obj-y				:= pm-runtime.o
-> 
-> To move under depending CONFIG_ARCH_EXYNOS4 like others is better.
-Ok, I will modify it.
+Hi Paul,
 
-> 
->>  obj-m				:=
->>  obj-n				:=
->>  obj-				:=
->> diff --git a/arch/arm/mach-exynos4/pm-runtime.c b/arch/arm/mach-exynos4/pm-runtime.c
->> new file mode 100644
->> index 0000000..4fe9f73
->> --- /dev/null
->> +++ b/arch/arm/mach-exynos4/pm-runtime.c
->> @@ -0,0 +1,56 @@
->> +/* linux/arch/arm/mach-exynos4/pm-runtime.c
->> +
->> + * Exynos4210 Power management support
->> + *
->> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
->> + *		http://www.samsung.com
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +#include <linux/init.h>
->> +#include <linux/kernel.h>
->> +#include <linux/io.h>
->> +#include <linux/pm_runtime.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/clk.h>
->> +#include <linux/bitmap.h>
->> +#include <linux/slab.h>
->> +
->> +#ifdef CONFIG_PM_RUNTIME
->> +
->> +static int default_platform_runtime_idle(struct device *dev)
->> +{
->> +	return pm_runtime_suspend(dev);
->> +}
->> +
->> +static struct dev_pm_domain default_pm_domain = {
->> +	.ops = {
->> +		.runtime_suspend = pm_clk_suspend,
->> +		.runtime_resume = pm_clk_resume,
->> +		.runtime_idle = default_platform_runtime_idle,
->> +		USE_PLATFORM_PM_SLEEP_OPS
->> +	},
->> +};
->> +
->> +#define DEFAULT_PM_DOMAIN_PTR	(&default_pm_domain)
->> +
->> +#else
->> +
->> +#define DEFAULT_PM_DOMAIN_PTR	NULL
->> +
->> +#endif /* CONFIG_PM_RUNTIME */
->> +
->> +static struct pm_clk_notifier_block platform_bus_notifier = {
->> +	.pm_domain = DEFAULT_PM_DOMAIN_PTR,
->> +	.con_ids = { NULL, },
->> +};
->> +
->> +static int __init exynos4_pm_runtime_init(void)
->> +{
->> +	pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
->> +	return 0;
->> +}
->> +core_initcall(exynos4_pm_runtime_init);
->> --
->> 1.7.0.4
-> 
-> How about to make common stuff in ARM instead of each platform has their own...
-> 
-> I think you can consolidate this pm_runtime with other ARM platform like omap, shmobile.
-> 
-> arch/arm/mach-omap1/pm_bus.c
-> arch/arm/mach-shmobile/pm_runtime.c
-> 
-OK, I received the comment of consolidating geneirc power-domain of exynos series from Sylwester Nawrocki. 
-I will reimplment for supporting various exynos series and resend it.
+Paul Walmsley wrote on Tuesday, October 04, 2011 2:54 PM:
 
-Thanks,
+> Hi,
+> 
+> On Tue, 23 Aug 2011, Hemant Pedanekar wrote:
+> 
+>> This patch set is the v2 of TI816X clock and hwmods patches sent earlier.
+>> 
+>> The clock data is currently added only for TI816X, while minimal hwmod data
+>> common for TI816X and TI814X is added.
+>> 
+>> This patch set depends on following patches:
+>> 	TI81XX: Prepare for addition of TI814X support
+>> 	TI814X: Add cpu type macros and detection support
+>> 	TI814X: Create board support and enable build for TI8148 EVM
+>> 
+>> Please note that CHIP_IS_TI816X/CHIP_IS_TI814X are still being used and I
+>> will send update once SoC list usage is available.
+> 
+> I've been spending some time with these patches.  A few aspects don't make
+> much sense to me.  For example, looking at the TRMs, the 816x doesn't seem
+> to have powerdomains for HDVICP0, 1, or 2, although they are listed in the
+> patch.
 
-Best Regards,
-Chanwoo Choi
+Can you please check 18.2.1 in TRM from [1].
+
+Above powerdomains are listed there as HDVICP2-0, 1, 2.
+
+>  Also, the clockdomain layout is quite different between 814x and
+> 816x, according to the TRMs.  Are the patches more accurate than the TRMs,
+> or vice versa?
+>
+You are correct, 814x has differences in clock, clockdomain and powerdomain
+data.
+
+I would say the extent of differences level between 816x and 814x is 
+something like (please also see reference links from Arago devl tree):
+
+Clock data: ~90% data is different (main contributors: different
+PLLs - FAPLL in 816x vs ADPLL 814x, different parent hierarchy)
+[2] & [3]
+
+Clockdomains data: ~60% [4]
+
+Powerdomains data: ~90%  [5]
+> Will send over the current reworked patches for TI81XX PRCM accessors,
+> powerdomain code & data, and clockdomain code & data.  They are intended
+> to apply over the TI814x patches that you sent recently.  I'd like to get
+> your opinion(s) on these reworked patches.  Please note, so far they have
+> only been compile-tested.
+> 
+> 
+> - Paul
+
+Thanks, I will try those and respond.
+
+   Hemant
+
+[1] http://focus.ti.com/general/docs/litabsmultiplefilelist.tsp?literatureNumber=sprugx8
+[2] http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/clock816x_data.c;h=32ea958afef915f93e0560f87d1bb2115e24ee2c;hb=HEAD
+[3] http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/clock814x_data.c;h=282ffa93398db678843a35766219970655563b46;hb=HEAD
+[4] http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/clockdomains81xx.h;h=217c9b4f85c59cc92e0f36ddd73044136c8e9fff;hb=HEAD
+[5] http://arago-project.org/git/projects/?p=linux-omap3.git;a=blob;f=arch/arm/mach-omap2/powerdomains81xx.h;h=ef1299e00c216aea4d12bca2281540efb7eb77f0;hb=HEAD
