@@ -1,62 +1,26 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Wed, 5 Oct 2011 09:30:30 +0200
-Subject: [PATCH 3/3] ARM: SAMSUNG: Add lookup of sdhci-s3c clocks using
-	generic names
-In-Reply-To: <1317792669-19925-4-git-send-email-rajeshwari.s@samsung.com>
-References: <1317792669-19925-1-git-send-email-rajeshwari.s@samsung.com>
-	<1317792669-19925-4-git-send-email-rajeshwari.s@samsung.com>
-Message-ID: <201110050930.32216.heiko@sntech.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 05 Oct 2011 13:13:09 +0530
+Subject: [PATCH 00/24 V2] OMAP4: PM: suspend, CPU-hotplug and CPUilde
+	support
+In-Reply-To: <87zkhgk7pl.fsf@ti.com>
+References: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
+	<87zkhgk7pl.fsf@ti.com>
+Message-ID: <4E8C0A8D.5070701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 5. Oktober 2011, 07:31:09 schrieb Rajeshwari Shinde:
-> Add support for lookup of sdhci-s3c controller clocks using generic names
-> for s3c2416, s3c64xx, s5pc100, s5pv210 and exynos4 SoC's.
+On Tuesday 04 October 2011 10:35 PM, Kevin Hilman wrote:
+> Hi Santosh,
 > 
-> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
-> ---
-
-[...]
-
-> diff --git a/arch/arm/mach-s3c2416/clock.c b/arch/arm/mach-s3c2416/clock.c
-> index 72b7c62..cebaf3f 100644
-> --- a/arch/arm/mach-s3c2416/clock.c
-> +++ b/arch/arm/mach-s3c2416/clock.c
-
-[...]
-
-> @@ -143,8 +142,14 @@ static struct clksrc_clk *clksrcs[] __initdata = {
->  	&hsspi_mux,
->  	&hsmmc_div[0],
->  	&hsmmc_div[1],
-> -	&hsmmc_mux[0],
-> -	&hsmmc_mux[1],
-> +	&hsmmc_mux0,
-> +	&hsmmc_mux1,
-> +};
-> +
-> +static struct clk_lookup s3c2416_clk_lookup[] = {
-> +	CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.0", &hsmmc0_clk),
-This is missing the s3c-sdhci.1 mmc_busclk.0 as 4th entry which is defined in 
-s3c2443-clock.c. The pclk for hsmmc1 is common to S3C2416/2450 and S3C2443 and 
-is therefore defined in plat-s3c24xx [S3C2443 only has a hsmmc1 to be exact].
-
-Also it would be nice to include the hsmmc-clock in mach-s3c2443/clock.c too. 
-The sdhci support there seems to be incomplete but it would be nice to have 
-the clocks similar to everything else if anyone wants to start on this arch.
-
-> +	CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.2", &hsmmc_mux0.clk),
-> +	CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &hsmmc_mux1.clk),
->  };
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 > 
->  void __init s3c2416_init_clocks(int xtal)
-> @@ -164,6 +169,7 @@ void __init s3c2416_init_clocks(int xtal)
->  		s3c_register_clksrc(clksrcs[ptr], 1);
+>> The series adds OMAP4 MPUSS (MPU SubSystem) power management support for
+>> suspend (S2R), CPU hotplug and CPUidle.
 > 
->  	s3c24xx_register_clock(&hsmmc0_clk);
-> +	clkdev_add_table(s3c2416_clk_lookup, ARRAY_SIZE(s3c2416_clk_lookup));
+> No need to repost, but can you update the versions in your branch to
+> have an ARM: prefix in the subject per Arnd's recent request?
 > 
->  	s3c_pwmclk_init();
-> 
+Done. Branch for_3_2/omap4-mpuss-pm is updated with ARM on all patches.
 
-Heiko
+Regards
+Santosh
