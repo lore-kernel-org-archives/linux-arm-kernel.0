@@ -1,80 +1,34 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 05 Oct 2011 11:06:30 +0100
-Subject: [PATCH] virtio: Add platform bus driver for memory mapped
-	virtio device
-In-Reply-To: <87aa9ggs4k.fsf@rustcorp.com.au>
-References: <1317217663-32647-1-git-send-email-pawel.moll@arm.com>
-	<878vp1iqpz.fsf@rustcorp.com.au>
-	<1317745002.3158.340.camel@hornet.cambridge.arm.com>
-	<87aa9ggs4k.fsf@rustcorp.com.au>
-Message-ID: <1317809190.3158.352.camel@hornet.cambridge.arm.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 05 Oct 2011 15:42:58 +0530
+Subject: [PATCH 0/3] mmc: sdhci-s3c: Add device tree support for Samsung's
+	sdhci controller driver
+Message-ID: <1317809581-28783-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I had an impression that you were planning to add some API for the
-> > devices to choose the alignment? If so this #define would simply
-> > disappear... Generally, the Client is in control now.
-> 
-> I'm not sure it makes sense to vary per-device, but per-OS perhaps.
+This patchset adds device tree support for Samsung's sdhci controller driver.
 
-It's sorted then - the Guest implementation chooses the alignment, the
-Host is informed about it, everyone is happy :-)
+The first patch modifies the sdhcis-s3c driver to mainatain a local copy of the
+platform data, which makes it easier to add device tree support for the driver.
 
-> > > > +	/* TODO: Write requested queue size to VIRTIO_MMIO_QUEUE_NUM */
-> > > > +
-> > > > +	/* Check if queue is either not available or already active. */
-> > > > +	num = readl(vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
-> > > > +	if (!num || readl(vm_dev->base + VIRTIO_MMIO_QUEUE_PFN)) {
-> > > 
-> > > Please fix this now, like so:
-> > > 
-> > >         /* Queue shouldn't already be set up. */        
-> > >         if (readl(vm_dev->base + VIRTIO_MMIO_QUEUE_PFN))
-> > >                 ...
-> > > 
-> > >         /* Try for a big queue, drop down to a two-page queue. */
-> > >         num = VIRTIO_MMIO_MAX_RING;
-> > 
-> > Ok, but how much would MAX_RING be? 1024? 513? 127? I really wouldn't
-> > like to be a judge here... I was hoping the device would tell me that
-> > (it knows what amounts of data are likely to be processed?)
-> 
-> I'm not sure who knows better, device or driver.  The device can suggest
-> a value, but you should always write it, otherwise that code will never
-> get tested until it's too late...
-> 
-> > >         for (;;) {
-> > >                 size = PAGE_ALIGN(vring_size(num, VIRTIO_MMIO_VRING_ALIGN));
-> > >                 info->queue = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
-> > >                 if (info->queue)
-> > >                         break;
-> > > 
-> > >                 /* Already smallest possible allocation? */
-> > >                 if (size == VIRTIO_MMIO_VRING_ALIGN*2) {
-> > >                         err = -ENOMEM;
-> > >                         goto error_kmalloc;
-> > >                 }
-> > >                 num /= 2;
-> > >         }
-> > and then
-> > 	writel(num, vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
-> > 
-> > Can do. This, however, gets us back to this question: can the Host
-> > cowardly refuse the requested queue size? If you really think that it
-> > can't, I'm happy to accept that and change the spec accordingly. If it
-> > can, we'll have to read the size back and potentially re-alloc pages...
-> 
-> I'm not sure.  Perhaps the device gives the maximum it will accept, and
-> the driver should start from that or 1025, whatever is less (that's
-> still 28k for each ring).  That gives us flexibility.
+The second patch adds support for parsing of mmc host controller capabilities
+from a device node. This code would be reusable across other platforms as well.
+The third patch device tree based discovery for the sdhci-s3c driver.
 
-Ok, So I'll add sort of "QUEUE_NUM_MAX" read-only register in the device
-spec and use min(device_max, driver_max) as a base for the pages
-allocation, then notify the Host about the queue size as done with the
-alignment.
+This patchset is based on the following tree:
+https://github.com/kgene/linux-samsung.git  branch: for-next
+and tested on smdkv310 board.
 
-Patch v2 to follow shortly.
+Thomas Abraham (3):
+  mmc: sdhci-s3c: Keep a copy of platform data and use it
+  mmc: Add OF bindings support for mmc host controller capabilities
+  mmc: sdhci-s3c: Add device tree support
 
-Cheers!
-
-Pawe?
+ .../devicetree/bindings/mmc/linux-mmc-host.txt     |   11 ++
+ .../devicetree/bindings/mmc/samsung-sdhci.txt      |   75 ++++++++++
+ drivers/mmc/core/host.c                            |   31 ++++
+ drivers/mmc/host/sdhci-s3c.c                       |  155 +++++++++++++++++++-
+ include/linux/mmc/host.h                           |    3 +
+ 5 files changed, 270 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/linux-mmc-host.txt
+ create mode 100644 Documentation/devicetree/bindings/mmc/samsung-sdhci.txt
