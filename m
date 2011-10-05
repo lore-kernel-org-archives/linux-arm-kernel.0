@@ -1,64 +1,46 @@
-From: raj.khem@gmail.com (Khem Raj)
-Date: Tue, 04 Oct 2011 19:04:09 -0700
-Subject: [PATCH 05/11] ARM: vfp: use -mfloat-abi=soft to build vfp
-In-Reply-To: <20111003140411.GB2117@arm.com>
-References: <1317496920-7764-1-git-send-email-arnd@arndb.de>
-	<1317496920-7764-6-git-send-email-arnd@arndb.de>
-	<20111003140411.GB2117@arm.com>
-Message-ID: <4E8BBB19.8080303@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 04 Oct 2011 21:09:47 -0500
+Subject: Please help with the OMAP static mapping mess
+In-Reply-To: <alpine.LFD.2.02.1110041458500.9106@xanadu.home>
+References: <alpine.LFD.2.02.1110031312480.9106@xanadu.home>
+	<20111003205658.GJ6324@atomide.com>
+	<alpine.LFD.2.02.1110031744100.9106@xanadu.home>
+	<20111003223824.GK6324@atomide.com> <4E8AAFF9.3090600@ti.com>
+	<alpine.LFD.2.02.1110041458500.9106@xanadu.home>
+Message-ID: <4E8BBC6B.7000500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/3/2011 7:04 AM, Dave Martin wrote:
-> On Sat, Oct 01, 2011 at 09:21:54PM +0200, Arnd Bergmann wrote:
->> Distros are starting to ship with toolchains defaulting to
->> hardfloat. Using such a compiler to build the kernel fails
->> in the VFP directory with
->>
->> arch/arm/vfp/entry.S:1:0: sorry, unimplemented: -mfloat-abi=hard and VFP
->>
->> Adding -mfloat-abi=soft to the gcc command line fixes this.
->>
->> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
->> ---
->>   arch/arm/vfp/Makefile |    2 +-
->>   1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/vfp/Makefile b/arch/arm/vfp/Makefile
->> index 6de73aa..a81404c 100644
->> --- a/arch/arm/vfp/Makefile
->> +++ b/arch/arm/vfp/Makefile
->> @@ -7,7 +7,7 @@
->>   # ccflags-y := -DDEBUG
->>   # asflags-y := -DDEBUG
->>
->> -KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp)
->> +KBUILD_AFLAGS	:=$(KBUILD_AFLAGS:-msoft-float=-Wa,-mfpu=softvfp+vfp -mfloat-abi=soft)
->
-> Although -mfpu=softvfp+vfp and -mfloat-abi=soft look mutually
-> contradictory, this seems to have the correct effect, i.e. the
-> assembler allows floating-point instructions but marks the resulting
-> object as using the soft-float calling conventions.
+On 10/04/2011 04:21 PM, Nicolas Pitre wrote:
+> On Tue, 4 Oct 2011, Santosh Shilimkar wrote:
+> 
+>> On Tuesday 04 October 2011 04:08 AM, Tony Lindgren wrote:
+>>> * Nicolas Pitre <nico@fluxnic.net> [111003 14:36]:
+>>>> On Mon, 3 Oct 2011, Tony Lindgren wrote:
+>>>>
+>>>>> Having the SRAM base address move around with different sizes also
+>>>>> requires the SoC detection.. Otherwise we can end up mapping wrong
+>>>>> size and end up trying to access secure SRAM that will hang the system.
+>>>>>
+>>>>> The way to fix it is to move SRAM init happen much later so we don't
+>>>>> have to map it early. I guess now we could use ioremap for SRAM,
+>>>>> although we may not want device attributes for the executable code?
+>>>>> Got any suggestions here on how we should map SRAM later on?
+>>>>
+>>>> You can use a variant of ioremap() such as __arm_ioremap() which let you 
+>>>> specify the memory attribute.
+>>>
+>>> OK, I'll take a look at that.
+>>>
+>> I have tried __arm_ioremap_pfn() for some DDR mapping and it didn't
+>> work as expected. The mapping was not getting created.
+> 
+> Did you investigate why it wasn't created?  Must have been a trivial 
+> issue surely?  But you have to wait until memory management is fully 
+> initialized to call the real ioremap() though, which happens later 
+> during the boot.
+> 
 
-I was wondering if this could also be achieved with -mfloat-abi=softfp 
-this will also add Tag_FP_arch: VFPv2 into .attributes section and 
--Wa,-mfpu=softvfp+vfp may not be needed.
+Isn't ioremap prevented from using main memory now?
 
->
-> The binutils documentation also seems to confirm that that's what
-> should happen.
->
-> I don't see another combination of options for getting this effect.
->
->
-> So, if you like:
->
-> Reviewed-by: Dave Martin<dave.martin@linaro.org>
->
-> Cheers
-> ---Dave
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Rob
