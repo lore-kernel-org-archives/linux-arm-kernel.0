@@ -1,352 +1,192 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 05 Oct 2011 15:43:01 +0530
-Subject: [PATCH 3/3] mmc: sdhci-s3c: Add device tree support
-In-Reply-To: <1317809581-28783-1-git-send-email-thomas.abraham@linaro.org>
-References: <1317809581-28783-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1317809581-28783-4-git-send-email-thomas.abraham@linaro.org>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 05 Oct 2011 17:27:04 +0530
+Subject: [PATCH v6 01/16] OMAP2+: hwmod: Add API to enable IO ring wakeup.
+In-Reply-To: <8762k48o66.fsf@ti.com>
+References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>	<4E871883.4010207@ti.com>
+	<8762k48o66.fsf@ti.com>
+Message-ID: <4E8C4610.1040307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree based discovery support for Samsung's sdhci controller
+Hi Kevin,
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- .../devicetree/bindings/mmc/samsung-sdhci.txt      |   75 ++++++++++
- drivers/mmc/host/sdhci-s3c.c                       |  150 +++++++++++++++++++-
- 2 files changed, 219 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/samsung-sdhci.txt
+On Wednesday 05 October 2011 02:33 AM, Kevin Hilman wrote:
+> Hi Rajendra,
+>
+> Rajendra Nayak<rnayak@ti.com>  writes:
+>
+>> On Friday 30 September 2011 04:31 PM, Govindraj.R wrote:
+>>> Add API to enable IO pad wakeup capability based on mux dynamic pad and
+>>> wake_up enable flag available from hwmod_mux initialization.
+>>>
+>>> Use the wakeup_enable flag and enable wakeup capability
+>>> for the given pads. Wakeup capability will be enabled/disabled
+>>> during hwmod idle transition based on whether wakeup_flag is
+>>> set or cleared.
+>>>
+>>> Call the omap_hwmod_set_ioring_wakeup from hwmod_wakeup_enable/disable.
+>>>
+>>> Signed-off-by: Govindraj.R<govindraj.raja@ti.com>
+>>> ---
+>>>    arch/arm/mach-omap2/omap_hwmod.c |   59 ++++++++++++++++++++++++++++++++++++++
+>>>    1 files changed, 59 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+>>> index 84cc0bd..e751dd9 100644
+>>> --- a/arch/arm/mach-omap2/omap_hwmod.c
+>>> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+>>> @@ -2062,6 +2062,34 @@ static int __init omap_hwmod_setup_all(void)
+>>>    core_initcall(omap_hwmod_setup_all);
+>>>
+>>>    /**
+>>> + * omap_hwmod_set_ioring_wakeup - enable io pad wakeup flag.
+>>> + * @oh: struct omap_hwmod *
+>>> + * @set: bool value indicating to set or clear wakeup status.
+>>> + *
+>>> + * Set or Clear wakeup flag for the io_pad.
+>>> + */
+>>> +static int omap_hwmod_set_ioring_wakeup(struct omap_hwmod *oh, bool set_wake)
+>>> +{
+>>> +	struct omap_device_pad *pad;
+>>> +	int ret = -EINVAL, j;
+>>> +
+>>> +	if (oh->mux&&   oh->mux->enabled) {
+>>> +		for (j = 0; j<   oh->mux->nr_pads_dynamic; j++) {
+>>> +			pad = oh->mux->pads_dynamic[j];
+>>> +			if (pad->flags&   OMAP_DEVICE_PAD_WAKEUP) {
+>>> +				if (set_wake)
+>>> +					pad->idle |= OMAP_WAKEUP_EN;
+>>> +				else
+>>> +					pad->idle&= ~OMAP_WAKEUP_EN;
+>>
+>> I think apart from enabling/disabling the IO wakeup's at the pad
+>> level, there is also a need to trigger the IO daisy chain control
+>> (Wu clock) by programming the PRCM.PM_WKEN_WKUP[16] EN_IO_CHAIN
+>> bit and waiting on the PRCM.PM_WKST_WKUP[16] ST_IO_CHAIN) bit,
+>> which is done by the omap3_enable/disable_io_chain function.
+>> This is still done in the cpuidle path, but it makes sense to
+>> move that over here, since it should be done every time a pad
+>> level wakeup is enabled or disabled.
+>
+> So should it be done just here or also in the idle path?  In general,
+> I'm certainly for moving things out of the idle path into the places
+> where they belong.
+>
+> However, I don't get from the TRM description below that it should be
+> done every time a pad-level wake is enabled or disabled.  Can you
+> clarify what part of the TRM description you mean?
 
-diff --git a/Documentation/devicetree/bindings/mmc/samsung-sdhci.txt b/Documentation/devicetree/bindings/mmc/samsung-sdhci.txt
-new file mode 100644
-index 0000000..dc94d24
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/samsung-sdhci.txt
-@@ -0,0 +1,75 @@
-+* Samsung's SDHCI Controller device tree bindings
-+
-+Samsung's SDHCI controller is used as a connectivity interface with external
-+MMC, SD and eMMC storage mediums.
-+
-+Required SoC Specific Properties:
-+- compatible: should be one of the following
-+  - "samsung,s3c6410-sdhci": For controllers compatible with s3c6410 sdhci
-+    controller.
-+  - "samsung,exynos4-sdhci": For controller compatible with Exynos4 sdhci
-+    controller.
-+
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+
-+- interrupts: The interrupt number to the cpu. The interrupt specifier format
-+  depends on the interrupt controller.
-+
-+
-+Required Board Specific Properties:
-+- gpios: Should specify the gpios used for clock, command and data lines. The
-+  gpio specifier format depends on the gpio controller. Note: There is no
-+  particular order in which the gpio's have to be listed.
-+
-+
-+Optional Board Specific Properties:
-+- samsung,sdhci-bus-width: Number of data lines connected to the controller.
-+  Note: This excludes the clock,command and card detect lines. If this property
-+  is not specified, default value is 1.
-+
-+- samsung,cd-gpio-invert: If 'samsung,sdhci-cd-gpio' card detect method is
-+  selected, this property can be optionally specified to invert the value of
-+  external card detect gpio line.
-+
-+- One of the following properties for card detect type.
-+  - samsung,sdhci-cd-internal: Card detect line from the card slot  is
-+    connected to the card detect pad of the sdhci controller. A gpio is
-+    used for this connection (with possible pin function settings).
-+  - samsung,sdhci-cd-gpio: A gpio line (with possible pin function settings)
-+    is used a card detect line. This gpio line is not connected to card detect
-+    pad of the sdhci controller.
-+  - samsung,sdhci-cd-none: There is no card detect line. Polling is used to
-+    detect the presence of the card. (DEFAULT, if no card detect property
-+    is specified).
-+  - samsung,sdhci-cd-permanent: There is no card detect line. The card is
-+    permanently connected to the sdhci controller.
-+
-+- gpio-cd: The gpio to be used as card detect line for
-+  'samsung,sdhci-cd-internal' or 'samsung,sdhci-cd-gpio' card detection method.
-+  The gpio specifier format depends on the gpio controller.
-+
-+- One or more of the linux specific mmc host bindings.
-+  See Documentation/devicetree/bindings/mmc/linux-mmc-host.txt for all the
-+  linux mmc host controller specific bindings.
-+
-+Example:
-+	sdhci at 12530000 {
-+		compatible = "samsung,exynos4-sdhci";
-+		reg = <0x12530000 0x100>;
-+		interrupts = <139>;
-+		samsung,sdhci-bus-width = <4>;
-+		linux,mmc_cap_4_bit_data;
-+		samsung,sdhci-cd-internal;
-+		gpio-cd = <&gpk2 2 2 3 3>;
-+		gpios = <&gpk2 0 2 0 3>,  /* clock line */
-+			<&gpk2 1 2 0 3>,  /* command line */
-+			<&gpk2 3 2 3 3>,  /* data line 0 */
-+			<&gpk2 4 2 3 3>,  /* data line 1 */
-+			<&gpk2 5 2 3 3>,  /* data line 2 */
-+			<&gpk2 6 2 3 3>;  /* data line 3 */
-+	};
-+
-+	Note: This example shows both SoC specific and board specific properties
-+	in a single device node. The properties can be actually be seperated
-+	into SoC specific node and board specific node.
-diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
-index 8280af0..047c404 100644
---- a/drivers/mmc/host/sdhci-s3c.c
-+++ b/drivers/mmc/host/sdhci-s3c.c
-@@ -20,6 +20,8 @@
- #include <linux/io.h>
- #include <linux/gpio.h>
- #include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- 
- #include <linux/mmc/host.h>
- 
-@@ -29,6 +31,8 @@
- #include "sdhci.h"
- 
- #define MAX_BUS_CLK	(4)
-+/* Number of gpio's used is max data bus width + command and clock lines */
-+#define NUM_GPIOS(x)	(x + 2)
- 
- /**
-  * struct sdhci_s3c - S3C SDHCI instance
-@@ -48,6 +52,7 @@ struct sdhci_s3c {
- 	unsigned int		cur_clk;
- 	int			ext_cd_irq;
- 	int			ext_cd_gpio;
-+	int			*gpios;
- 
- 	struct clk		*clk_io;
- 	struct clk		*clk_bus[MAX_BUS_CLK];
-@@ -415,9 +420,110 @@ static void sdhci_s3c_setup_card_detect_gpio(struct sdhci_s3c *sc)
- 	}
- }
- 
-+#ifdef CONFIG_OF
-+static int __devinit sdhci_s3c_parse_dt(struct device *dev,
-+		struct sdhci_host *host, struct s3c_sdhci_platdata *pdata)
-+{
-+	struct device_node *node = dev->of_node;
-+	struct sdhci_s3c *ourhost = to_s3c(host);
-+	u32 max_width;
-+	int gpio, cnt, ret;
-+
-+	/* if the bus-width property is not specified, assume width as 1 */
-+	if (of_property_read_u32(node, "samsung,sdhci-bus-width",
-+				&max_width))
-+		max_width = 1;
-+	pdata->max_width = max_width;
-+
-+	ourhost->gpios = devm_kzalloc(dev, NUM_GPIOS(pdata->max_width) *
-+				sizeof(int), GFP_KERNEL);
-+	if (!ourhost->gpios)
-+		return -ENOMEM;
-+
-+	mmc_of_parse_host_caps(node, (unsigned long *)&pdata->host_caps);
-+
-+	/* get the card detection method */
-+	if (of_get_property(node, "samsung,sdhci-cd-internal", NULL))
-+		pdata->cd_type = S3C_SDHCI_CD_INTERNAL;
-+	else if (of_get_property(node, "samsung,sdhci-cd-gpio", NULL))
-+		pdata->cd_type = S3C_SDHCI_CD_GPIO;
-+	else if (of_get_property(node, "samsung,sdhci-cd-none", NULL))
-+		pdata->cd_type = S3C_SDHCI_CD_NONE;
-+	else if (of_get_property(node, "samsung,sdhci-cd-permanent", NULL))
-+		pdata->cd_type = S3C_SDHCI_CD_PERMANENT;
-+	else
-+		pdata->cd_type = S3C_SDHCI_CD_NONE;
-+
-+	/* get the gpio used for card detection */
-+	if (pdata->cd_type == S3C_SDHCI_CD_GPIO || S3C_SDHCI_CD_INTERNAL) {
-+		gpio = of_get_named_gpio(node, "gpio-cd", 0);
-+		if (!gpio_is_valid(gpio)) {
-+			dev_err(dev, "invalid card detect gpio specified\n");
-+			return -EINVAL;
-+		}
-+	}
-+
-+	if (pdata->cd_type == S3C_SDHCI_CD_GPIO) {
-+		pdata->ext_cd_gpio = gpio;
-+		ourhost->ext_cd_gpio = -1; /* invalid gpio number */
-+		if (of_get_property(node, "samsung,cd-gpio-invert", NULL))
-+			pdata->ext_cd_gpio_invert = 1;
-+	} else if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-+		ret = gpio_request(gpio, "sdhci-cd");
-+		if (ret) {
-+			dev_err(dev, "card detect gpio request failed\n");
-+			return -EINVAL;
-+		}
-+		ourhost->ext_cd_gpio = gpio;
-+	}
-+
-+	/* get the gpios for command, clock and data lines */
-+	for (cnt = 0; cnt < NUM_GPIOS(pdata->max_width); cnt++) {
-+		gpio = of_get_gpio(node, cnt);
-+		if (!gpio_is_valid(gpio)) {
-+			dev_err(dev, "invalid gpio[%d]\n", cnt);
-+			goto err_free_dt_cd_gpio;
-+		}
-+		ourhost->gpios[cnt] = gpio;
-+	}
-+
-+	for (cnt = 0; cnt < NUM_GPIOS(pdata->max_width); cnt++) {
-+		ret = gpio_request(ourhost->gpios[cnt], "sdhci-gpio");
-+		if (ret) {
-+			dev_err(dev, "gpio[%d] request failed\n", cnt);
-+			goto err_free_dt_gpios;
-+		}
-+	}
-+
-+	return 0;
-+
-+ err_free_dt_gpios:
-+	while (--cnt >= 0)
-+		gpio_free(ourhost->gpios[cnt]);
-+ err_free_dt_cd_gpio:
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL)
-+		gpio_free(ourhost->ext_cd_gpio);
-+	return -EINVAL;
-+}
-+#else
-+static int __devinit sdhci_s3c_parse_dt(struct device *dev,
-+		struct sdhci_host *host, struct s3c_sdhci_platdata *pdata)
-+{
-+}
-+#endif
-+
-+static const struct of_device_id sdhci_s3c_dt_match[];
-+
- static inline struct sdhci_s3c_drv_data *sdhci_s3c_get_driver_data(
- 			struct platform_device *pdev)
- {
-+#if CONFIG_OF
-+	if (pdev->dev.of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_node(sdhci_s3c_dt_match, pdev->dev.of_node);
-+		return (struct sdhci_s3c_drv_data *)match->data;
-+	}
-+#endif
- 	return (struct sdhci_s3c_drv_data *)
- 			platform_get_device_id(pdev)->driver_data;
- }
-@@ -432,7 +538,7 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	int ret, irq, ptr, clks;
- 
--	if (!pdev->dev.platform_data) {
-+	if (!pdev->dev.platform_data && !pdev->dev.of_node) {
- 		dev_err(dev, "no device data specified\n");
- 		return -ENOENT;
- 	}
-@@ -454,21 +560,28 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 		dev_err(dev, "sdhci_alloc_host() failed\n");
- 		return PTR_ERR(host);
- 	}
-+	sc = sdhci_priv(host);
- 
- 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
- 	if (!pdata) {
- 		ret = -ENOMEM;
--		goto err_io_clk;
-+		goto err_pdata;
-+	}
-+
-+	if (pdev->dev.of_node) {
-+		ret = sdhci_s3c_parse_dt(&pdev->dev, host, pdata);
-+		if (ret)
-+			goto err_pdata;
-+	} else {
-+		memcpy(pdata, pdev->dev.platform_data, sizeof(*pdata));
-+		sc->ext_cd_gpio = -1; /* invalid gpio number */
- 	}
--	memcpy(pdata, pdev->dev.platform_data, sizeof(*pdata));
- 
- 	drv_data = sdhci_s3c_get_driver_data(pdev);
--	sc = sdhci_priv(host);
- 
- 	sc->host = host;
- 	sc->pdev = pdev;
- 	sc->pdata = pdata;
--	sc->ext_cd_gpio = -1; /* invalid gpio number */
- 
- 	platform_set_drvdata(pdev, host);
- 
-@@ -625,6 +738,12 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 	clk_put(sc->clk_io);
- 
-  err_io_clk:
-+	for (ptr = 0; ptr < NUM_GPIOS(sc->pdata->max_width); ptr++)
-+		gpio_free(sc->gpios[ptr]);
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL)
-+		gpio_free(sc->ext_cd_gpio);
-+
-+ err_pdata:
- 	sdhci_free_host(host);
- 
- 	return ret;
-@@ -632,9 +751,9 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
- 
- static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
- {
--	struct s3c_sdhci_platdata *pdata = pdev->dev.platform_data;
- 	struct sdhci_host *host =  platform_get_drvdata(pdev);
- 	struct sdhci_s3c *sc = sdhci_priv(host);
-+	struct s3c_sdhci_platdata *pdata = sc->pdata;
- 	int ptr;
- 
- 	if (pdata->cd_type == S3C_SDHCI_CD_EXTERNAL && pdata->ext_cd_cleanup)
-@@ -661,6 +780,11 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
- 	release_resource(sc->ioarea);
- 	kfree(sc->ioarea);
- 
-+	if (pdev->dev.of_node) {
-+		for (ptr = 0; ptr < NUM_GPIOS(sc->pdata->max_width); ptr++)
-+			gpio_free(sc->gpios[ptr]);
-+	}
-+
- 	sdhci_free_host(host);
- 	platform_set_drvdata(pdev, NULL);
- 
-@@ -706,9 +830,22 @@ static struct platform_device_id sdhci_s3c_driver_ids[] = {
- 		.name		= "exynos4-sdhci",
- 		.driver_data	= EXYNOS4_SDHCI_DRV_DATA,
- 	},
-+	{},
- };
- MODULE_DEVICE_TABLE(platform, sdhci_s3c_driver_ids);
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id sdhci_s3c_dt_match[] = {
-+	{ .compatible = "samsung,s3c6410-sdhci", },
-+	{ .compatible = "samsung,exynos4-sdhci",
-+		.data = &exynos4_sdhci_drv_data },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, sdhci_s3c_dt_match);
-+#else
-+#define sdhci_s3c_dt_match NULL
-+#endif
-+
- static struct platform_driver sdhci_s3c_driver = {
- 	.probe		= sdhci_s3c_probe,
- 	.remove		= __devexit_p(sdhci_s3c_remove),
-@@ -718,6 +855,7 @@ static struct platform_driver sdhci_s3c_driver = {
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "s3c-sdhci",
-+		.of_match_table = sdhci_s3c_dt_match,
- 	},
- };
- 
--- 
-1.6.6.rc2
++ Nilesh from the PRCM design team, I and Vishwa had a short meeting
+with Nilesh just to double confirm our understanding on how IO daisy
+should be implemented.
+
+I agree the OMAP3 TRM isn't very clear in mentioning this and overall
+there is very limited documentation on this.
+
+The OMAP4 TRM however is a little better and there isn't any difference
+in the way IO Daisy is implemented in OMAP3 and OMAP4.
+
+So, I'll try and explain what I meant based on whats in the OMAP4 TRM :)
+
+I am referring to OMAP4430_ES2.x Public TRM vO.
+
+refer to Figure 3-74. I/O Pads Daisy-Chain Configuration,
+The WUEN signal to each pad (which can be used to enable IO-daisy
+for the given pad) is a AND of a signal from PRCM and
+one from SCM.
+The signal from PRCM can be enabled by writing into
+PRM_IO_PMCTRL[16] GLOBAL_WUEN bit (which in our case we keep
+enabled always, done early at boot).
+The signal from SCM can be enabled by writing to the individual
+pad registers in SCM
+CONTROL.CONTROL_PADCONF_<IOpad>[14] WAKEUPENABLE0
+CONTROL.CONTROL_PADCONF_<IOpad>[30] WAKEUPENABLE1.
+This is done by hwmod every time the module is enabled/idled.
+
+This is what is mentioned in the TRM here
+"The I/O pad wake-up scheme must be enabled (WUEN signal) globally by 
+setting the
+PRM_IO_PMCTRL[16] GLOBAL_WUEN bit and by also setting I/O pad wake-up 
+enabled/disabled
+individually (WUEN signal) by writing to the following bit fields in the 
+control module:
+? CONTROL.CONTROL_PADCONF_<IOpad>[14] WAKEUPENABLE0
+? CONTROL.CONTROL_PADCONF_<IOpad>[30] WAKEUPENABLE1"
+
+And then the TRM mentions this about the need to trigger WUCLKIN
+for every pad enable/disable.
+This is needed to reset any spurious wakeups events.
+
+"Once configured, the wake-up scheme within each I/O pad is enabled and 
+disabled by triggering a control
+(WUCLKIN signal) of the I/O daisy chain. This is done thanks to a 
+dedicated PRCM module register bit
+PRM_IO_PMCTRL[8] WUCLK_CTRL. The software must enable the I/O wakeup 
+prior entering a
+low-power mode and disable it following a wake-up event.
+Writing the PRM_IO_PMCTRL[8] WUCLK_CTRL bit to 1 asserts signal WUCLKIN 
+high to reset spurious
+wake-up event and to latch the current pad input value. PRCM module 
+register PRM_IO_PMCTRL[9]
+WUCLK_STATUS logs the signal WUCLKOUT of the last pad of the I/O ring. 
+Once this status is set to 1,
+the software may clear the PRM_IO_PMCTRL[8] WUCLK_CTRL bit to 
+effectively enable or disable the
+wake-up feature within each pad."
+
+The controls are exactly the same in case of OMAP3.
+There is a global control at PRCM level (PRCM.PM_WKEN_WKUP[8] EN_IO)
+and at pad level in SCM.
+
+To assert the WUCLKIN, there is PRCM.PM_WKEN_WKUP[16] EN_IO_CHAIN
+and to log the signal WUCLKOUT of the last pad there is
+PRCM.PM_WKST_WKUP[16] ST_IO_CHAIN.
+
+Its just that the registers in OMAP3 are named weirdly, the digram isn't
+any clear and the explanation in the TRM does not help much,
+causing confusion.
+
+ > All I understand is that it has to be done before PER domain
+ > transisions.
+
+This is mostly coming from pre 3430 es3 days when there was no
+control for a WUCLKIN trigger in software. The hardware did this
+based on per/core entering sleep states.
+
+With 3430es3.1 and the subsequent 3630/4430/4460 silicons, the software
+can decide when to enable/trigger iodaisy and it should ideally be done
+before the powerdomain corresponding to the given module transitions to
+RET or OFF. Until then the modules async wakeup is expected to generate
+a wakeup.
+
+ > Also, if this were to happen, are there side-effects of having the IO
+ > daisy chain armed outside the idle path?
+
+IO daisy is actually designed so that it can be armed outside of idle,
+by providing software control to generate the WUCLKIN pulse.
+
+So as long as a module is clocked, it can generate interrupts, once
+its clocks are cut, it can generate an async wakeup, and once the
+powerdomain belonging to the module transitions to RET or OFF, it should
+be programmed to generate IO wakeup, independent of system idle state.
+
+regards,
+Rajendra
+
+>
+>
+>
+> Kevin
+>
+>> See section 3.5.7.2.2 I/O Wake-Up Mechanism of 36xx TRM revA.
+>>
+>> "The I/O wake-up scheme is enabled by triggering the I/O daisy chain
+>> control (Wu clock) by
+>> programming a dedicated register (PRCM.PM_WKEN_WKUP[16] EN_IO_CHAIN)
+>> in the PRCM module.Software must wait for the I/O daisy chain to
+>> complete before it transitions the PER domain to a
+>> nonfunctional state. This is done by polling a dedicated status bit in
+>> the PRCM module
+>> (PRCM.PM_WKST_WKUP[16] ST_IO_CHAIN). This status bit must be cleared
+>> by software when the bit is
+>> read to 1."
