@@ -1,30 +1,30 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  5 Oct 2011 17:04:57 +0100
-Subject: [PATCH 06/16] gpio: pl061: Enable module alias autogeneration for
+Date: Wed,  5 Oct 2011 17:04:58 +0100
+Subject: [PATCH 07/16] input: ambakmi: Enable module alias autogeneration for
 	AMBA drivers
 In-Reply-To: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
 References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1317830707-17517-7-git-send-email-dave.martin@linaro.org>
+Message-ID: <1317830707-17517-8-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- drivers/gpio/gpio-pl061.c |    2 ++
+ drivers/input/serio/ambakmi.c |    2 ++
  1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/gpio/gpio-pl061.c b/drivers/gpio/gpio-pl061.c
-index 2c5a18f..503e9d5 100644
---- a/drivers/gpio/gpio-pl061.c
-+++ b/drivers/gpio/gpio-pl061.c
-@@ -339,6 +339,8 @@ static struct amba_id pl061_ids[] = {
- 	{ 0, 0 },
+diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
+index 12abc50..8407d5b 100644
+--- a/drivers/input/serio/ambakmi.c
++++ b/drivers/input/serio/ambakmi.c
+@@ -195,6 +195,8 @@ static struct amba_id amba_kmi_idtable[] = {
+ 	{ 0, 0 }
  };
  
-+MODULE_DEVICE_TABLE(amba, pl061_ids);
++MODULE_DEVICE_TABLE(amba, amba_kmi_idtable);
 +
- static struct amba_driver pl061_gpio_driver = {
- 	.drv = {
- 		.name	= "pl061_gpio",
+ static struct amba_driver ambakmi_driver = {
+ 	.drv		= {
+ 		.name	= "kmi-pl050",
 -- 
 1.7.4.1
