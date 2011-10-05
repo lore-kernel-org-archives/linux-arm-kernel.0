@@ -1,55 +1,125 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 04 Oct 2011 22:39:37 -0400 (EDT)
-Subject: Please help with the OMAP static mapping mess
-In-Reply-To: <4E8BBC6B.7000500@gmail.com>
-References: <alpine.LFD.2.02.1110031312480.9106@xanadu.home>
-	<20111003205658.GJ6324@atomide.com>
-	<alpine.LFD.2.02.1110031744100.9106@xanadu.home>
-	<20111003223824.GK6324@atomide.com> <4E8AAFF9.3090600@ti.com>
-	<alpine.LFD.2.02.1110041458500.9106@xanadu.home>
-	<4E8BBC6B.7000500@gmail.com>
-Message-ID: <alpine.LFD.2.02.1110042232380.9106@xanadu.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue,  4 Oct 2011 21:56:20 -0500
+Subject: [PATCH v2] irq: support domains with non-zero hwirq base
+In-Reply-To: <20111004233953.GE3009@ponder.secretlab.ca>
+References: <20111004233953.GE3009@ponder.secretlab.ca>
+Message-ID: <1317783380-773-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Oct 2011, Rob Herring wrote:
+From: Rob Herring <rob.herring@calxeda.com>
 
-> On 10/04/2011 04:21 PM, Nicolas Pitre wrote:
-> > On Tue, 4 Oct 2011, Santosh Shilimkar wrote:
-> > 
-> >> On Tuesday 04 October 2011 04:08 AM, Tony Lindgren wrote:
-> >>> * Nicolas Pitre <nico@fluxnic.net> [111003 14:36]:
-> >>>> On Mon, 3 Oct 2011, Tony Lindgren wrote:
-> >>>>
-> >>>>> Having the SRAM base address move around with different sizes also
-> >>>>> requires the SoC detection.. Otherwise we can end up mapping wrong
-> >>>>> size and end up trying to access secure SRAM that will hang the system.
-> >>>>>
-> >>>>> The way to fix it is to move SRAM init happen much later so we don't
-> >>>>> have to map it early. I guess now we could use ioremap for SRAM,
-> >>>>> although we may not want device attributes for the executable code?
-> >>>>> Got any suggestions here on how we should map SRAM later on?
-> >>>>
-> >>>> You can use a variant of ioremap() such as __arm_ioremap() which let you 
-> >>>> specify the memory attribute.
-> >>>
-> >>> OK, I'll take a look at that.
-> >>>
-> >> I have tried __arm_ioremap_pfn() for some DDR mapping and it didn't
-> >> work as expected. The mapping was not getting created.
-> > 
-> > Did you investigate why it wasn't created?  Must have been a trivial 
-> > issue surely?  But you have to wait until memory management is fully 
-> > initialized to call the real ioremap() though, which happens later 
-> > during the boot.
-> > 
-> 
-> Isn't ioremap prevented from using main memory now?
+Interrupt controllers can have non-zero starting value for h/w irq numbers.
+Adding support in irq_domain allows the domain hwirq numbering to match
+the interrupt controllers' numbering.
 
-My point is that the memory allocator has to be fully initialized 
-because memory might need to be allocated when ioremap() is called.  At 
-the point where static mappings are created, the regular memory 
-allocator is not available yet.
+As this makes looping over irqs for a domain more complicated, add loop
+iterators to iterate over all hwirqs and irqs for a domain.
 
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+Thomas,
 
-Nicolas
+Please ack. I'm dependent on this for adding Calxeda highbank support, so
+I'd like to take this thru arm-soc tree.
+
+v2:
+- Rebase to tglx's changes in my previous irq domain commit:
+irq: Fix check for already initialized irq_domain in irq_domain_add
+- drop NO_IRQ and add WARN_ON in irq_domain_to_irq
+
+Rob
+
+ include/linux/irqdomain.h |   16 +++++++++++++++-
+ kernel/irq/irqdomain.c    |   12 ++++++------
+ 2 files changed, 21 insertions(+), 7 deletions(-)
+
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index 3ad553e..99834e58 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -47,6 +47,7 @@ struct irq_domain_ops {
+  *            of the irq_domain is responsible for allocating the array of
+  *            irq_desc structures.
+  * @nr_irq: Number of irqs managed by the irq domain
++ * @hwirq_base: Starting number for hwirqs managed by the irq domain
+  * @ops: pointer to irq_domain methods
+  * @priv: private data pointer for use by owner.  Not touched by irq_domain
+  *        core code.
+@@ -57,6 +58,7 @@ struct irq_domain {
+ 	struct list_head list;
+ 	unsigned int irq_base;
+ 	unsigned int nr_irq;
++	unsigned int hwirq_base;
+ 	const struct irq_domain_ops *ops;
+ 	void *priv;
+ 	struct device_node *of_node;
+@@ -72,9 +74,21 @@ struct irq_domain {
+ static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
+ 					     unsigned long hwirq)
+ {
+-	return d->ops->to_irq ? d->ops->to_irq(d, hwirq) : d->irq_base + hwirq;
++	if (d->ops->to_irq)
++		return d->ops->to_irq(d, hwirq);
++	if (WARN_ON(hwirq < d->hwirq_base))
++		return 0;
++	return d->irq_base + hwirq - d->hwirq_base;
+ }
+ 
++#define irq_domain_for_each_hwirq(d, hw) \
++	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
++
++#define irq_domain_for_each_irq(d, hw, irq) \
++	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
++	     hw < d->hwirq_base + d->nr_irq; \
++	     hw++, irq = irq_domain_to_irq(d, hw))
++
+ extern void irq_domain_add(struct irq_domain *domain);
+ extern void irq_domain_del(struct irq_domain *domain);
+ #endif /* CONFIG_IRQ_DOMAIN */
+diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+index b57a377..200ce83 100644
+--- a/kernel/irq/irqdomain.c
++++ b/kernel/irq/irqdomain.c
+@@ -20,15 +20,15 @@ static DEFINE_MUTEX(irq_domain_mutex);
+ void irq_domain_add(struct irq_domain *domain)
+ {
+ 	struct irq_data *d;
+-	int hwirq;
++	int hwirq, irq;
+ 
+ 	/*
+ 	 * This assumes that the irq_domain owner has already allocated
+ 	 * the irq_descs.  This block will be removed when support for dynamic
+ 	 * allocation of irq_descs is added to irq_domain.
+ 	 */
+-	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+-		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
++	irq_domain_for_each_irq(domain, hwirq, irq) {
++		d = irq_get_irq_data(irq);
+ 		if (!d) {
+ 			WARN(1, "error: assigning domain to non existant irq_desc");
+ 			return;
+@@ -54,15 +54,15 @@ void irq_domain_add(struct irq_domain *domain)
+ void irq_domain_del(struct irq_domain *domain)
+ {
+ 	struct irq_data *d;
+-	int hwirq;
++	int hwirq, irq;
+ 
+ 	mutex_lock(&irq_domain_mutex);
+ 	list_del(&domain->list);
+ 	mutex_unlock(&irq_domain_mutex);
+ 
+ 	/* Clear the irq_domain assignments */
+-	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+-		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
++	irq_domain_for_each_irq(domain, hwirq, irq) {
++		d = irq_get_irq_data(irq);
+ 		d->domain = NULL;
+ 	}
+ }
+-- 
+1.7.5.4
