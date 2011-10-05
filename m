@@ -1,30 +1,30 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  5 Oct 2011 17:05:02 +0100
-Subject: [PATCH 11/16] spi: pl022: Enable module alias autogeneration for AMBA
+Date: Wed,  5 Oct 2011 17:05:01 +0100
+Subject: [PATCH 10/16] rtc: pl031: Enable module alias autogeneration for AMBA
 	drivers
 In-Reply-To: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
 References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1317830707-17517-12-git-send-email-dave.martin@linaro.org>
+Message-ID: <1317830707-17517-11-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- drivers/spi/spi-pl022.c |    2 ++
+ drivers/rtc/rtc-pl031.c |    2 ++
  1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index f103e470..43abaf2 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2424,6 +2424,8 @@ static struct amba_id pl022_ids[] = {
- 	{ 0, 0 },
+diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
+index ff1b84bd..a952c8d 100644
+--- a/drivers/rtc/rtc-pl031.c
++++ b/drivers/rtc/rtc-pl031.c
+@@ -420,6 +420,8 @@ static struct amba_id pl031_ids[] = {
+ 	{0, 0},
  };
  
-+MODULE_DEVICE_TABLE(amba, pl022_ids);
++MODULE_DEVICE_TABLE(amba, pl031_ids);
 +
- static struct amba_driver pl022_driver = {
+ static struct amba_driver pl031_driver = {
  	.drv = {
- 		.name	= "ssp-pl022",
+ 		.name = "rtc-pl031",
 -- 
 1.7.4.1
