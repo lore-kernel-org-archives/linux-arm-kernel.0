@@ -1,71 +1,80 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 5 Oct 2011 11:26:32 +0200
-Subject: [RFC 1/5] ARM: dev_archdata: add private iommu extension
-In-Reply-To: <1316948337-7924-2-git-send-email-ohad@wizery.com>
-References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
-	<1316948337-7924-2-git-send-email-ohad@wizery.com>
-Message-ID: <CAK=Wgba6xxD2DBJhM--AcTPBoNRiOZ_6f8+j3bfaCqZMO8A4+w@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 05 Oct 2011 11:06:30 +0100
+Subject: [PATCH] virtio: Add platform bus driver for memory mapped
+	virtio device
+In-Reply-To: <87aa9ggs4k.fsf@rustcorp.com.au>
+References: <1317217663-32647-1-git-send-email-pawel.moll@arm.com>
+	<878vp1iqpz.fsf@rustcorp.com.au>
+	<1317745002.3158.340.camel@hornet.cambridge.arm.com>
+	<87aa9ggs4k.fsf@rustcorp.com.au>
+Message-ID: <1317809190.3158.352.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+> > I had an impression that you were planning to add some API for the
+> > devices to choose the alignment? If so this #define would simply
+> > disappear... Generally, the Client is in control now.
+> 
+> I'm not sure it makes sense to vary per-device, but per-OS perhaps.
 
-On Sun, Sep 25, 2011 at 1:58 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Add a private iommu pointer to the ARM-specific arch data in the
-> device struct, which will be used to attach iommu-specific data
-> to devices which require iommu support.
+It's sorted then - the Guest implementation chooses the alignment, the
+Host is informed about it, everyone is happy :-)
 
-Can you please take a look and ack/nack ?
+> > > > +	/* TODO: Write requested queue size to VIRTIO_MMIO_QUEUE_NUM */
+> > > > +
+> > > > +	/* Check if queue is either not available or already active. */
+> > > > +	num = readl(vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
+> > > > +	if (!num || readl(vm_dev->base + VIRTIO_MMIO_QUEUE_PFN)) {
+> > > 
+> > > Please fix this now, like so:
+> > > 
+> > >         /* Queue shouldn't already be set up. */        
+> > >         if (readl(vm_dev->base + VIRTIO_MMIO_QUEUE_PFN))
+> > >                 ...
+> > > 
+> > >         /* Try for a big queue, drop down to a two-page queue. */
+> > >         num = VIRTIO_MMIO_MAX_RING;
+> > 
+> > Ok, but how much would MAX_RING be? 1024? 513? 127? I really wouldn't
+> > like to be a judge here... I was hoping the device would tell me that
+> > (it knows what amounts of data are likely to be processed?)
+> 
+> I'm not sure who knows better, device or driver.  The device can suggest
+> a value, but you should always write it, otherwise that code will never
+> get tested until it's too late...
+> 
+> > >         for (;;) {
+> > >                 size = PAGE_ALIGN(vring_size(num, VIRTIO_MMIO_VRING_ALIGN));
+> > >                 info->queue = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
+> > >                 if (info->queue)
+> > >                         break;
+> > > 
+> > >                 /* Already smallest possible allocation? */
+> > >                 if (size == VIRTIO_MMIO_VRING_ALIGN*2) {
+> > >                         err = -ENOMEM;
+> > >                         goto error_kmalloc;
+> > >                 }
+> > >                 num /= 2;
+> > >         }
+> > and then
+> > 	writel(num, vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
+> > 
+> > Can do. This, however, gets us back to this question: can the Host
+> > cowardly refuse the requested queue size? If you really think that it
+> > can't, I'm happy to accept that and change the spec accordingly. If it
+> > can, we'll have to read the size back and potentially re-alloc pages...
+> 
+> I'm not sure.  Perhaps the device gives the maximum it will accept, and
+> the driver should start from that or 1025, whatever is less (that's
+> still 28k for each ring).  That gives us flexibility.
 
-With this change in hand, generic code will now be able to control
-OMAP's iommu devices too, without having to use any OMAP-specific API
-(this is demonstrated in this patch set).
+Ok, So I'll add sort of "QUEUE_NUM_MAX" read-only register in the device
+spec and use min(device_max, driver_max) as a base for the pages
+allocation, then notify the Host about the queue size as done with the
+alignment.
 
-This will allow us to further clean the existing mainline OMAP iommu
-users, and focus on generic IOMMU code for future users
-(rpmsg/remoteproc and Marek's upcoming generic DMA API).
+Patch v2 to follow shortly.
 
-The change is only effective when an iommu driver, which supports the
-generic IOMMU API, is built (all of them must select
-CONFIG_IOMMU_API), and otherwise is a nop.
+Cheers!
 
-Obviously the change itself is not OMAP-specific, and it will be
-useful for other platforms too.
-
-Thanks!
-Ohad.
-
-> Different iommu implementations (on different platforms) will attach
-> different types of data to this pointer, so 'void *' is currently used
-> (the downside is reduced typesafety).
->
-> Note: ia64, x86 and sparc have this exact iommu extension as well, and
-> if others are likely to adopt it too, we might want to consider
-> adding this to the device struct itself directly.
->
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> ---
-> ?arch/arm/include/asm/device.h | ? ?3 +++
-> ?1 files changed, 3 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-> index 9f390ce..6615f03 100644
-> --- a/arch/arm/include/asm/device.h
-> +++ b/arch/arm/include/asm/device.h
-> @@ -10,6 +10,9 @@ struct dev_archdata {
-> ?#ifdef CONFIG_DMABOUNCE
-> ? ? ? ?struct dmabounce_device_info *dmabounce;
-> ?#endif
-> +#ifdef CONFIG_IOMMU_API
-> + ? ? ? void *iommu; /* private IOMMU data */
-> +#endif
-> ?};
->
-> ?struct pdev_archdata {
-> --
-> 1.7.4.1
->
->
+Pawe?
