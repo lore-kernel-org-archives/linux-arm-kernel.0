@@ -1,38 +1,104 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 5 Oct 2011 08:55:25 -0700
-Subject: [PATCH 2/3] mmc: Add OF bindings support for mmc host
-	controller	capabilities
-In-Reply-To: <CAJuYYwS_NeE6OG9X2p2rkjgo4OqO-ijeVwr1sLGkUuLJOxMw2g@mail.gmail.com>
-References: <1317809581-28783-1-git-send-email-thomas.abraham@linaro.org>
-	<1317809581-28783-3-git-send-email-thomas.abraham@linaro.org>
-	<4E8C5BD6.2070709@gmail.com>
-	<CAJuYYwS_NeE6OG9X2p2rkjgo4OqO-ijeVwr1sLGkUuLJOxMw2g@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173A2C7245@HQMAIL01.nvidia.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 05 Oct 2011 11:00:16 -0500
+Subject: [PATCH v2 5/7] ARM: highbank: add SMP support
+In-Reply-To: <20110906010105.GA7623@S2100-06.ap.freescale.net>
+References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
+	<1314841446-11006-6-git-send-email-robherring2@gmail.com>
+	<20110906010105.GA7623@S2100-06.ap.freescale.net>
+Message-ID: <4E8C7F10.8070903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote at Wednesday, October 05, 2011 8:28 AM:
-> On 5 October 2011 18:59, Rob Herring <robherring2@gmail.com> wrote:
-> > On 10/05/2011 05:13 AM, Thomas Abraham wrote:
-> >> Device nodes representing sd/mmc controllers in a device tree would include
-> >> mmc host controller capabilities. Add support for parsing of mmc host
-> >> controller capabilities included in device nodes.
-...
-> >> +- linux,mmc_cap_4_bit_data - host can do 4 bit transfers
-> >> +- linux,mmc_cap_mmc_highspeed - host can do MMC high-speed timing
-> >> +- linux,mmc_cap_sd_highspeed - host can do SD high-speed timing
-> >> +- linux,mmc_cap_needs_poll - host needs polling for card detection
-> >> +- linux,mmc_cap_8_bit_data - host can do 8 bit transfer
-> >
-> > "sdhci,1-bit-only" already exists as a binding. Perhaps add
-> > "sdhci,4-bit-only". No property then means can do 8-bit.
+Shawn,
+
+On 09/05/2011 08:01 PM, Shawn Guo wrote:
+> On Wed, Aug 31, 2011 at 08:44:04PM -0500, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> This enables SMP support on highbank processor.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> ---
+>> Changes in v2:
+>>  - drop NULL check of scu_base
+>>  - use IPI #0 instead of #1 to boot secondary
+>>  - s/a9_base_addr/scu_base_addr/
+>>  - fix muliple mapping of twd registers
+>>
+>>  arch/arm/Kconfig                    |    2 +-
+>>  arch/arm/mach-highbank/Makefile     |    2 +
+>>  arch/arm/mach-highbank/localtimer.c |   38 +++++++++++++++++
+>>  arch/arm/mach-highbank/platsmp.c    |   78 +++++++++++++++++++++++++++++++++++
+>>  4 files changed, 119 insertions(+), 1 deletions(-)
+>>  create mode 100644 arch/arm/mach-highbank/localtimer.c
+>>  create mode 100644 arch/arm/mach-highbank/platsmp.c
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 9019a56..6d2add5 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -1372,7 +1372,7 @@ config SMP
+>>  	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
+>>  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
+>>  		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
+>> -		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
+>> +		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || ARCH_HIGHBANK
+>>  	select USE_GENERIC_SMP_HELPERS
+>>  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+>>  	help
+>> diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
+>> index 11d4010..311c0e8e 100644
+>> --- a/arch/arm/mach-highbank/Makefile
+>> +++ b/arch/arm/mach-highbank/Makefile
+>> @@ -1,2 +1,4 @@
+>>  obj-y					:= clock.o highbank.o system.o
+>>  obj-$(CONFIG_DEBUG_LL)			+= lluart.o
+>> +obj-$(CONFIG_SMP)			+= platsmp.o
+>> +obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
+>> diff --git a/arch/arm/mach-highbank/localtimer.c b/arch/arm/mach-highbank/localtimer.c
+>> new file mode 100644
+>> index 0000000..344ea29
+>> --- /dev/null
+>> +++ b/arch/arm/mach-highbank/localtimer.c
+>> @@ -0,0 +1,38 @@
+>> +/*
+>> + * Copyright 2010-2011 Calxeda, Inc.
+>> + * Based on localtimer.c, Copyright (C) 2002 ARM Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +#include <linux/init.h>
+>> +#include <linux/clockchips.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +
+>> +#include <asm/smp_twd.h>
+>> +
+>> +/*
+>> + * Setup the local clock events for a CPU.
+>> + */
+>> +int __cpuinit local_timer_setup(struct clock_event_device *evt)
+>> +{
+>> +	struct device_node *np;
+>> +
+>> +	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
+>> +	if (!twd_base)
+>> +		twd_base = of_iomap(np, 0);
 > 
-> Ok. But that would remain just as sdhci host controller capability and
-> will not be applicable to other types of host controllers.
+> WARN_ON(!twd_base)?
+> 
 
-Just as an FYI, NVIDIA's SDHCI controller bindings use property
-"support-8bit" to indicate 8-bit support. A similar property could be
-used for 4-bit support too.
+Okay, will add it. Can I add your Reviewed-by for the series?
 
--- 
-nvpublic
+Rob
