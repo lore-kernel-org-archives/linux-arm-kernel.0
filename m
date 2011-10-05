@@ -1,102 +1,67 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Wed, 05 Oct 2011 11:40:51 +1030
-Subject: [PATCH] virtio: Add platform bus driver for memory mapped virtio
-	device
-In-Reply-To: <1317745002.3158.340.camel@hornet.cambridge.arm.com>
-References: <1317217663-32647-1-git-send-email-pawel.moll@arm.com>
-	<878vp1iqpz.fsf@rustcorp.com.au>
-	<1317745002.3158.340.camel@hornet.cambridge.arm.com>
-Message-ID: <87aa9ggs4k.fsf@rustcorp.com.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 05 Oct 2011 10:17:16 +0900
+Subject: [PATCH V2 2/2] ARM: SAMSUNG: Cleanup resources by using macro
+In-Reply-To: <CAH9JG2UR+QY=Ni7BTThgUBf2iBUKX9cdkbq_XRia4aQXDwEeSg@mail.gmail.com>
+References: <005901cc817e$51a56d00$f4f04700$%kim@samsung.com>
+	<1957187.UuLfeIqa6D@wuerfel>
+	<019301cc8293$79a6f510$6cf4df30$%kim@samsung.com>
+	<201110041726.03056.arnd@arndb.de>
+	<CAH9JG2UR+QY=Ni7BTThgUBf2iBUKX9cdkbq_XRia4aQXDwEeSg@mail.gmail.com>
+Message-ID: <01f101cc82fc$85a4a0b0$90ede210$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Oct 2011 17:16:42 +0100, Pawel Moll <pawel.moll@arm.com> wrote:
-> Greetings!
+Kyungmin Park wrote:
 > 
-> > > +/* The alignment to use between consumer and producer parts of vring.
-> > > + * Currently hardcoded to page size. */
-> > > +#define VIRTIO_MMIO_VRING_ALIGN		PAGE_SIZE
-> > 
-> > Really?  Shouldn't that just be 4k?  I haven't seen the qemu side of
-> > this, but it seems weird to depend on the kernel's idea of page size...
+> On Wed, Oct 5, 2011 at 12:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 04 October 2011, Kukjin Kim wrote:
+> >> > I think the string concatenation really just obfuscates the code, and
+> >> > it does not actually save much at all. When you replace
+> >> >
+> >> > + ? ? ? [0] = SAMSUNG_RES_MEM(S3C, WDT, SZ_1K),
+> >> > + ? ? ? [1] = SAMSUNG_RES_IRQ(WDT),
+> >> >
+> >> > with
+> >> >
+> >> > + ? ? ? [0] = DEFINE_RES_MEM(S3C_PA_WDT, SZ_1K),
+> >> > + ? ? ? [1] = DEFINE_RES_IRQ(IRQ_WDT),
+> >> >
+> >> > you need practically no extra space, but you gain the advantages that
+> >> >
+> >> > * Someone using grep for DEFINE_RES_MEM finds all memory resources
+> without
+> >> > ? having to look up what your macros do an where they are used.
+> >> > * Someone using grep to look for S3C_PA_WDT finds the place where it
+is
+> >> used.
+> >> > * Someone reading the resource definition immediately knows what the
+> >> > ? macro does if familiar with other platforms using that macro.
+> >>
+> >> Yes, right. But I'm preparing to reduce the 'soc' part to consolidate
+some
+> >> duplicated resources and platform data after this and the new
+SAMSUNG_RES
+> >> macro will be used.
+> There are tools for source browsing e.g., ctags, cscope, grep, git
+> grep and so on.
+> If you create new SAMSUNG_RES, these tools can't find macro and
+> symbols properly.
 > 
-> Well, the Host doesn't really care now, as it's told what the alignment
-> is:
+> Please use the existing macros for own purpose.
 > 
-> > +       /* Activate the queue */
-> > +       writel(VIRTIO_MMIO_VRING_ALIGN,
-> > +                       vm_dev->base + VIRTIO_MMIO_QUEUE_ALIGN);
-> > +       writel(virt_to_phys(info->queue) >> PAGE_SHIFT,
-> > +                       vm_dev->base + VIRTIO_MMIO_QUEUE_PFN);
-> 
-> And I've just chosen the PAGE_SIZE instead of 4096 following the
-> suggestion from your original paper ("Note that there is padding such as
-> to place this structure on a page separate from the available ring and
-> descriptor array:").
+OK, it makes sense to me.
 
-Sorry, I missed that.  OK!
+Thanks.
 
-> > Note that the seabios/coreboot hackers wanted a smaller ring alignment
-> > so they didn't have to waste two precious pages per device.  You might
-> > want to consider making this an option in the header (perhaps express
-> > it as log2, eg. 12 rather than 4096).
-> 
-> I had an impression that you were planning to add some API for the
-> devices to choose the alignment? If so this #define would simply
-> disappear... Generally, the Client is in control now.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-I'm not sure it makes sense to vary per-device, but per-OS perhaps.
-
-> > > +	/* TODO: Write requested queue size to VIRTIO_MMIO_QUEUE_NUM */
-> > > +
-> > > +	/* Check if queue is either not available or already active. */
-> > > +	num = readl(vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
-> > > +	if (!num || readl(vm_dev->base + VIRTIO_MMIO_QUEUE_PFN)) {
-> > 
-> > Please fix this now, like so:
-> > 
-> >         /* Queue shouldn't already be set up. */        
-> >         if (readl(vm_dev->base + VIRTIO_MMIO_QUEUE_PFN))
-> >                 ...
-> > 
-> >         /* Try for a big queue, drop down to a two-page queue. */
-> >         num = VIRTIO_MMIO_MAX_RING;
-> 
-> Ok, but how much would MAX_RING be? 1024? 513? 127? I really wouldn't
-> like to be a judge here... I was hoping the device would tell me that
-> (it knows what amounts of data are likely to be processed?)
-
-I'm not sure who knows better, device or driver.  The device can suggest
-a value, but you should always write it, otherwise that code will never
-get tested until it's too late...
-
-> >         for (;;) {
-> >                 size = PAGE_ALIGN(vring_size(num, VIRTIO_MMIO_VRING_ALIGN));
-> >                 info->queue = alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
-> >                 if (info->queue)
-> >                         break;
-> > 
-> >                 /* Already smallest possible allocation? */
-> >                 if (size == VIRTIO_MMIO_VRING_ALIGN*2) {
-> >                         err = -ENOMEM;
-> >                         goto error_kmalloc;
-> >                 }
-> >                 num /= 2;
-> >         }
-> and then
-> 	writel(num, vm_dev->base + VIRTIO_MMIO_QUEUE_NUM);
-> 
-> Can do. This, however, gets us back to this question: can the Host
-> cowardly refuse the requested queue size? If you really think that it
-> can't, I'm happy to accept that and change the spec accordingly. If it
-> can, we'll have to read the size back and potentially re-alloc pages...
-
-I'm not sure.  Perhaps the device gives the maximum it will accept, and
-the driver should start from that or 1025, whatever is less (that's
-still 28k for each ring).  That gives us flexibility.
-
-The absolute maximum is a ring of 32k elements, which is about 850k.
-That seems a little excessive, though.
-
-Cheers,
-Rusty.
+> Thank you,
+> Kyungmin Park
+> >
+> > Hmm, can't you instead change the names of these constants to be
+> > always the same? That would let you use the regular DEFINE_RES_*
+> > definitions without having to introduce your own.
