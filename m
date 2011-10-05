@@ -1,78 +1,30 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  5 Oct 2011 17:04:52 +0100
-Subject: [PATCH 01/16] ARM: amba: Move definition of struct amba_id to
-	mod_devicetable.h
+Date: Wed,  5 Oct 2011 17:04:54 +0100
+Subject: [PATCH 03/16] hwrng: nomadik: Enable module alias autogeneration for
+	AMBA drivers
 In-Reply-To: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
 References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1317830707-17517-2-git-send-email-dave.martin@linaro.org>
+Message-ID: <1317830707-17517-4-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The general kernel infrastructure for adding module alises during
-module post processing expects the affected device type
-identification structures in a common header
-<linux/mod_devicetable.h>.
-
-This patch simple moves struct amba_id to the common header, and
-adds the appropriate include in <linux/amba/bus.h>.
-
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- include/linux/amba/bus.h        |    7 +------
- include/linux/mod_devicetable.h |   18 ++++++++++++++++++
- 2 files changed, 19 insertions(+), 6 deletions(-)
+ drivers/char/hw_random/nomadik-rng.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index fcbbe71..724c69c 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -16,6 +16,7 @@
- 
- #include <linux/clk.h>
- #include <linux/device.h>
-+#include <linux/mod_devicetable.h>
- #include <linux/err.h>
- #include <linux/resource.h>
- #include <linux/regulator/consumer.h>
-@@ -35,12 +36,6 @@ struct amba_device {
- 	unsigned int		irq[AMBA_NR_IRQS];
+diff --git a/drivers/char/hw_random/nomadik-rng.c b/drivers/char/hw_random/nomadik-rng.c
+index 52e08ca..3d3c1e6 100644
+--- a/drivers/char/hw_random/nomadik-rng.c
++++ b/drivers/char/hw_random/nomadik-rng.c
+@@ -95,6 +95,8 @@ static struct amba_id nmk_rng_ids[] = {
+ 	{0, 0},
  };
  
--struct amba_id {
--	unsigned int		id;
--	unsigned int		mask;
--	void			*data;
--};
--
- struct amba_driver {
- 	struct device_driver	drv;
- 	int			(*probe)(struct amba_device *, const struct amba_id *);
-diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
-index 468819c..83ac071 100644
---- a/include/linux/mod_devicetable.h
-+++ b/include/linux/mod_devicetable.h
-@@ -542,4 +542,22 @@ struct isapnp_device_id {
- 	kernel_ulong_t driver_data;	/* data private to the driver */
- };
- 
-+/**
-+ * struct amba_id - identifies a device on an AMBA bus
-+ * @id: The significant bits if the hardware device ID
-+ * @mask: Bitmask specifying which bits of the id field are significant when
-+ *	matching.  A driver binds to a device when ((hardware device ID) & mask)
-+ *	== id.
-+ * @data: Private data used by the driver.
-+ */
-+struct amba_id {
-+	unsigned int		id;
-+	unsigned int		mask;
-+#ifndef __KERNEL__
-+	kernel_ulong_t		data;
-+#else
-+	void			*data;
-+#endif
-+};
++MODULE_DEVICE_TABLE(amba, nmk_rng_ids);
 +
- #endif /* LINUX_MOD_DEVICETABLE_H */
+ static struct amba_driver nmk_rng_driver = {
+ 	.drv = {
+ 		.owner = THIS_MODULE,
 -- 
 1.7.4.1
