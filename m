@@ -1,44 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  5 Oct 2011 16:20:58 +0100
-Subject: [PATCH] ARM: hw_breakpoint: skip v7-specific reset on v6 cores
-Message-ID: <1317828058-4334-1-git-send-email-will.deacon@arm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 5 Oct 2011 08:55:25 -0700
+Subject: [PATCH 2/3] mmc: Add OF bindings support for mmc host
+	controller	capabilities
+In-Reply-To: <CAJuYYwS_NeE6OG9X2p2rkjgo4OqO-ijeVwr1sLGkUuLJOxMw2g@mail.gmail.com>
+References: <1317809581-28783-1-git-send-email-thomas.abraham@linaro.org>
+	<1317809581-28783-3-git-send-email-thomas.abraham@linaro.org>
+	<4E8C5BD6.2070709@gmail.com>
+	<CAJuYYwS_NeE6OG9X2p2rkjgo4OqO-ijeVwr1sLGkUuLJOxMw2g@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173A2C7245@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv6 cores do not implement the DBGOSLAR register, so we don't need to
-try and clear it on boot. Furthermore, the VCR is zeroed out of reset,
-so we don't need to zero it explicitly when a CPU comes online.
+Thomas Abraham wrote at Wednesday, October 05, 2011 8:28 AM:
+> On 5 October 2011 18:59, Rob Herring <robherring2@gmail.com> wrote:
+> > On 10/05/2011 05:13 AM, Thomas Abraham wrote:
+> >> Device nodes representing sd/mmc controllers in a device tree would include
+> >> mmc host controller capabilities. Add support for parsing of mmc host
+> >> controller capabilities included in device nodes.
+...
+> >> +- linux,mmc_cap_4_bit_data - host can do 4 bit transfers
+> >> +- linux,mmc_cap_mmc_highspeed - host can do MMC high-speed timing
+> >> +- linux,mmc_cap_sd_highspeed - host can do SD high-speed timing
+> >> +- linux,mmc_cap_needs_poll - host needs polling for card detection
+> >> +- linux,mmc_cap_8_bit_data - host can do 8 bit transfer
+> >
+> > "sdhci,1-bit-only" already exists as a binding. Perhaps add
+> > "sdhci,4-bit-only". No property then means can do 8-bit.
+> 
+> Ok. But that would remain just as sdhci host controller capability and
+> will not be applicable to other types of host controllers.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+Just as an FYI, NVIDIA's SDHCI controller bindings use property
+"support-8bit" to indicate 8-bit support. A similar property could be
+used for 4-bit support too.
 
-Taken against rmk/devel-stable.
-
- arch/arm/kernel/hw_breakpoint.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 5a46225..814a52a9 100644
---- a/arch/arm/kernel/hw_breakpoint.c
-+++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -892,6 +892,10 @@ static void reset_ctrl_regs(void *unused)
- 	 * later on.
- 	 */
- 	switch (debug_arch) {
-+	case ARM_DEBUG_ARCH_V6:
-+	case ARM_DEBUG_ARCH_V6_1:
-+		/* ARMv6 cores just need to reset the registers. */
-+		goto reset_regs;
- 	case ARM_DEBUG_ARCH_V7_ECP14:
- 		/*
- 		 * Ensure sticky power-down is clear (i.e. debug logic is
-@@ -931,6 +935,7 @@ static void reset_ctrl_regs(void *unused)
- 	asm volatile("mcr p14, 0, %0, c0, c7, 0" : : "r" (0));
- 	isb();
- 
-+reset_regs:
- 	if (enable_monitor_mode())
- 		return;
- 
 -- 
-1.7.4.1
+nvpublic
