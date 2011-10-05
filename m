@@ -1,26 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 05 Oct 2011 13:13:09 +0530
-Subject: [PATCH 00/24 V2] OMAP4: PM: suspend, CPU-hotplug and CPUilde
-	support
-In-Reply-To: <87zkhgk7pl.fsf@ti.com>
-References: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
-	<87zkhgk7pl.fsf@ti.com>
-Message-ID: <4E8C0A8D.5070701@ti.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Wed,  5 Oct 2011 09:59:58 +0200
+Subject: [PATCH 2/2] atmel_lcdfb: Use proper blanking on negative contrast
+	polarity
+In-Reply-To: <1317801598-23757-1-git-send-email-alexander.stein@systec-electronic.com>
+References: <1317801598-23757-1-git-send-email-alexander.stein@systec-electronic.com>
+Message-ID: <1317801598-23757-2-git-send-email-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 October 2011 10:35 PM, Kevin Hilman wrote:
-> Hi Santosh,
-> 
-> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
-> 
->> The series adds OMAP4 MPUSS (MPU SubSystem) power management support for
->> suspend (S2R), CPU hotplug and CPUidle.
-> 
-> No need to repost, but can you update the versions in your branch to
-> have an ARM: prefix in the subject per Arnd's recent request?
-> 
-Done. Branch for_3_2/omap4-mpuss-pm is updated with ARM on all patches.
+If used with negative polarity the PWM unit cannot be disabled. This would
+result in a full contrast screen.
+Instead let the PWM unit enabled using 0x0 as compare value which darkens
+the display.
+In result no power saving is possible if inverted contrast polarity
+is used.
 
-Regards
-Santosh
+Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+---
+ drivers/video/atmel_lcdfb.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+index 816d528..2bd75b5 100644
+--- a/drivers/video/atmel_lcdfb.c
++++ b/drivers/video/atmel_lcdfb.c
+@@ -96,8 +96,11 @@ static int atmel_bl_update_status(struct backlight_device *bl)
+ 		brightness = 0;
+ 
+ 	lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_VAL, brightness);
+-	lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_CTR,
++	if (contrast_ctr & ATMEL_LCDC_POL_POSITIVE)
++		lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_CTR,
+ 			brightness ? contrast_ctr : 0);
++	else
++		lcdc_writel(sinfo, ATMEL_LCDC_CONTRAST_CTR, contrast_ctr);
+ 
+ 	bl->props.fb_blank = bl->props.power = sinfo->bl_power = power;
+ 
+-- 
+1.7.3.4
