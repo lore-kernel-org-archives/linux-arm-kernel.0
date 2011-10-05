@@ -1,93 +1,71 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 5 Oct 2011 17:51:11 +0900
-Subject: [GIT PULL] Samsung board-2 for v3.2
-In-Reply-To: <019b01cc8298$846170c0$8d245240$%kim@samsung.com>
-References: <019b01cc8298$846170c0$8d245240$%kim@samsung.com>
-Message-ID: <CAH9JG2XCeymVK8WjetnjWa3qumwJqmXu7wz_K2hX_u+LBjQTjw@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 5 Oct 2011 11:26:32 +0200
+Subject: [RFC 1/5] ARM: dev_archdata: add private iommu extension
+In-Reply-To: <1316948337-7924-2-git-send-email-ohad@wizery.com>
+References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
+	<1316948337-7924-2-git-send-email-ohad@wizery.com>
+Message-ID: <CAK=Wgba6xxD2DBJhM--AcTPBoNRiOZ_6f8+j3bfaCqZMO8A4+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Russell,
 
-As you decide to rename the mach name, how to change the board name together?
-Historically samsung use the "mach-" prefix for board name, but others
-are use the "board-" prefix.
-So let's use the same convention as others?
+On Sun, Sep 25, 2011 at 1:58 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Add a private iommu pointer to the ARM-specific arch data in the
+> device struct, which will be used to attach iommu-specific data
+> to devices which require iommu support.
 
-How do you think?
+Can you please take a look and ack/nack ?
 
-Thank you,
-Kyungmin Park
+With this change in hand, generic code will now be able to control
+OMAP's iommu devices too, without having to use any OMAP-specific API
+(this is demonstrated in this patch set).
 
-On Tue, Oct 4, 2011 at 10:21 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Hi Arnd,
+This will allow us to further clean the existing mainline OMAP iommu
+users, and focus on generic IOMMU code for future users
+(rpmsg/remoteproc and Marek's upcoming generic DMA API).
+
+The change is only effective when an iommu driver, which supports the
+generic IOMMU API, is built (all of them must select
+CONFIG_IOMMU_API), and otherwise is a nop.
+
+Obviously the change itself is not OMAP-specific, and it will be
+useful for other platforms too.
+
+Thanks!
+Ohad.
+
+> Different iommu implementations (on different platforms) will attach
+> different types of data to this pointer, so 'void *' is currently used
+> (the downside is reduced typesafety).
 >
-> This is a second Samsung board stuff for v3.2 and includes new board,
-> SMDK4412.
+> Note: ia64, x86 and sparc have this exact iommu extension as well, and
+> if others are likely to adopt it too, we might want to consider
+> adding this to the device struct itself directly.
 >
-> Please pull from:
-> ?git://github.com/kgene/linux-samsung.git next-samsung-board-2
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> ---
+> ?arch/arm/include/asm/device.h | ? ?3 +++
+> ?1 files changed, 3 insertions(+), 0 deletions(-)
 >
-> As a note, since supporting SMDK4412 needs previous next-samsung-board
-> branch so this is based on next-samsung-board which has been already merged
-> into arm-soc and this includes converting boot_params to atag_offset for
-> adding/changing boards in this time.
+> diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
+> index 9f390ce..6615f03 100644
+> --- a/arch/arm/include/asm/device.h
+> +++ b/arch/arm/include/asm/device.h
+> @@ -10,6 +10,9 @@ struct dev_archdata {
+> ?#ifdef CONFIG_DMABOUNCE
+> ? ? ? ?struct dmabounce_device_info *dmabounce;
+> ?#endif
+> +#ifdef CONFIG_IOMMU_API
+> + ? ? ? void *iommu; /* private IOMMU data */
+> +#endif
+> ?};
 >
-> If any problems, please let me know.
->
-> One more as a note, the next-samsung-devel and next-samsung-devel-2 will be
-> sent to you soon after testing ;)
->
-> Thanks.
->
-> Best regards,
-> Kgene.
+> ?struct pdev_archdata {
 > --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
+> 1.7.4.1
 >
-> The following changes since commit 2520123382e97271e932377c83bca010c265be55:
->
-> ?Merge branch 'next-samsung-board-v3.1' into next-samsung-board (2011-09-16
-> 17:13:09 +0900)
->
-> are available in the git repository at:
->
-> ?git://github.com/kgene/linux-samsung.git next-samsung-board-2
->
-> Changhwan Youn (7):
-> ? ? ?ARM: EXYNOS4: Add support PPI in external GIC
-> ? ? ?ARM: EXYNOS4: Add support MCT PPI for EXYNOS4212
-> ? ? ?ARM: EXYNOS4: Add support new EXYNOS4412 SoC
-> ? ? ?ARM: EXYNOS4: Add support clock for EXYNOS4412
-> ? ? ?ARM: EXYNOS4: Add functions for gic interrupt handling
-> ? ? ?ARM: EXYNOS4: Add MCT support for EXYNOS4412
-> ? ? ?ARM: EXYNOS4: Add support SMDK4412 Board
->
-> Tushar Behera (1):
-> ? ? ?ARM: EXYNOS4: convert boot_params to atag_offset
->
-> ?arch/arm/mach-exynos4/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? 14 ++
-> ?arch/arm/mach-exynos4/Makefile ? ? ? ? ? ? ? ? ? ? | ? ?3 +-
-> ?arch/arm/mach-exynos4/clock.c ? ? ? ? ? ? ? ? ? ? ?| ? ?4 +-
-> ?arch/arm/mach-exynos4/cpu.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 21 ++-
-> ?arch/arm/mach-exynos4/include/mach/entry-macro.S ? | ? 29 +++-
-> ?arch/arm/mach-exynos4/include/mach/irqs.h ? ? ? ? ?| ? ?2 +
-> ?arch/arm/mach-exynos4/include/mach/map.h ? ? ? ? ? | ? ?1 -
-> ?arch/arm/mach-exynos4/include/mach/regs-mct.h ? ? ?| ? ?5 +-
-> ?arch/arm/mach-exynos4/mach-origen.c ? ? ? ? ? ? ? ?| ? ?2 +-
-> ?.../{mach-smdk4212.c => mach-smdk4x12.c} ? ? ? ? ? | ?128 ++++++++-------
-> ?arch/arm/mach-exynos4/mach-smdkv310.c ? ? ? ? ? ? ?| ? ?4 +-
-> ?arch/arm/mach-exynos4/mct.c ? ? ? ? ? ? ? ? ? ? ? ?| ?166
-> ++++++++++++--------
-> ?arch/arm/mach-exynos4/platsmp.c ? ? ? ? ? ? ? ? ? ?| ? ?5 +-
-> ?arch/arm/plat-s5p/cpu.c ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?9 +
-> ?arch/arm/plat-samsung/include/plat/cpu.h ? ? ? ? ? | ? ?8 +
-> ?15 files changed, 251 insertions(+), 150 deletions(-)
-> ?rename arch/arm/mach-exynos4/{mach-smdk4212.c => mach-smdk4x12.c} (61%)
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
