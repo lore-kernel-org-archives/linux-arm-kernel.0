@@ -1,30 +1,30 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  5 Oct 2011 17:05:05 +0100
-Subject: [PATCH 14/16] fbdev: amba: Enable module alias autogeneration for
+Date: Wed,  5 Oct 2011 17:05:07 +0100
+Subject: [PATCH 16/16] sound: aaci: Enable module alias autogeneration for
 	AMBA drivers
 In-Reply-To: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
 References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1317830707-17517-15-git-send-email-dave.martin@linaro.org>
+Message-ID: <1317830707-17517-17-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- drivers/video/amba-clcd.c |    2 ++
+ sound/arm/aaci.c |    2 ++
  1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/video/amba-clcd.c b/drivers/video/amba-clcd.c
-index 2cda6ba..0a2cce7 100644
---- a/drivers/video/amba-clcd.c
-+++ b/drivers/video/amba-clcd.c
-@@ -621,6 +621,8 @@ static struct amba_id clcdfb_id_table[] = {
+diff --git a/sound/arm/aaci.c b/sound/arm/aaci.c
+index e518d38..b37b702a 100644
+--- a/sound/arm/aaci.c
++++ b/sound/arm/aaci.c
+@@ -1097,6 +1097,8 @@ static struct amba_id aaci_ids[] = {
  	{ 0, 0 },
  };
  
-+MODULE_DEVICE_TABLE(amba, clcdfb_id_table);
++MODULE_DEVICE_TABLE(amba, aaci_ids);
 +
- static struct amba_driver clcd_driver = {
- 	.drv 		= {
- 		.name	= "clcd-pl11x",
+ static struct amba_driver aaci_driver = {
+ 	.drv		= {
+ 		.name	= DRIVER_NAME,
 -- 
 1.7.4.1
