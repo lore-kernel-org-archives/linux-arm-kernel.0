@@ -1,27 +1,48 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 5 Oct 2011 09:01:47 +0200
-Subject: [RFC 2/5] ARM: OMAP: omap_device: add a method to set iommu
-	private archdata
-In-Reply-To: <87mxdga4c0.fsf@ti.com>
-References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
-	<1316948337-7924-3-git-send-email-ohad@wizery.com>
-	<87sjni9aql.fsf@ti.com>
-	<CAK=WgbZhz8LcAYZEY3qqRkX4E_wtspWp09Eq9G=5VdpoMMF1FQ@mail.gmail.com>
-	<87botwk4gw.fsf@ti.com>
-	<CAK=WgbYaEPBUz_J11+f+W+G9uUG3E6aQ-5=X9bj2nRhij-w-Sw@mail.gmail.com>
-	<87mxdga4c0.fsf@ti.com>
-Message-ID: <CAK=WgbZ4d78ErB+e9OkyN30+zf5ZWJF02dTLgeioT32po=bFqw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 05 Oct 2011 12:33:01 +0530
+Subject: [PATCH 0/4] initialize omap SRAM later on with
+	__arm_ioremap_exec()
+In-Reply-To: <20111005004339.26980.31149.stgit@kaulin.local>
+References: <20111005004339.26980.31149.stgit@kaulin.local>
+Message-ID: <4E8C0125.1060300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 4, 2011 at 10:29 PM, Kevin Hilman <khilman@ti.com> wrote:
-> tag. ?you're it.
+Tony,
 
-Consider it done :)
+On Wednesday 05 October 2011 06:15 AM, Tony Lindgren wrote:
+> Hi all,
+> 
+> Related to the omap static mapping, here's a first take on moving the
+> SRAM init to happen later so we can do generic map_io.
+> 
+> Still working on a similar patch for omap1, will send it a bit later.
+> 
+> Regards,
+> 
+> Tony
+> 
+> ---
+> 
+> Tony Lindgren (4):
+>       ARM: Add __arm_ioremap_exec for mapping external memory as MT_MEMORY
+>       ARM: OMAP: Avoid cpu_is_omapxxxx usage until map_io is done
+>       ARM: OMAP: Remove calls to SRAM allocations for framebuffer
+>       ARM: OMAP: Map SRAM later on with ioremap_exec()
+> 
+>
+Nice work.
 
-> OK, as long as I have some confidence that this is going in the right
-> direction (and having you on the job is a good sign!) ?I'm willing to
-> merge something like this as an interim solution.
+With quick scan, looks like the series will work since
+you have already taken care of SRAM is being ready before
+SDRC has been initialised which was the only corner case
+I was worried.
 
-Thanks a lot!
-Ohad.
+Will look at this series in next couple of days and do some testing.
+Looks like you wanted to inlcude below patch also part of this
+series though [PATCH 5/4] numbering is bit confusing.
+[PATCH 5/4] ARM: OMAP: Move set_globals initialization to happen in
+init_early
+
+Regards
+Santosh
