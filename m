@@ -1,104 +1,69 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 05 Oct 2011 11:00:16 -0500
-Subject: [PATCH v2 5/7] ARM: highbank: add SMP support
-In-Reply-To: <20110906010105.GA7623@S2100-06.ap.freescale.net>
-References: <1314841446-11006-1-git-send-email-robherring2@gmail.com>
-	<1314841446-11006-6-git-send-email-robherring2@gmail.com>
-	<20110906010105.GA7623@S2100-06.ap.freescale.net>
-Message-ID: <4E8C7F10.8070903@gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed,  5 Oct 2011 17:04:51 +0100
+Subject: [PATCH 00/16] ARM: amba: Enable module alias autogeneration for AMBA
+	drivers
+Message-ID: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+There's no special reason why AMBA device drivers should not be
+auto-loadable via udev, but udev currently has no way to map AMBA
+device IDs to drivers.
 
-On 09/05/2011 08:01 PM, Shawn Guo wrote:
-> On Wed, Aug 31, 2011 at 08:44:04PM -0500, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
->>
->> This enables SMP support on highbank processor.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> ---
->> Changes in v2:
->>  - drop NULL check of scu_base
->>  - use IPI #0 instead of #1 to boot secondary
->>  - s/a9_base_addr/scu_base_addr/
->>  - fix muliple mapping of twd registers
->>
->>  arch/arm/Kconfig                    |    2 +-
->>  arch/arm/mach-highbank/Makefile     |    2 +
->>  arch/arm/mach-highbank/localtimer.c |   38 +++++++++++++++++
->>  arch/arm/mach-highbank/platsmp.c    |   78 +++++++++++++++++++++++++++++++++++
->>  4 files changed, 119 insertions(+), 1 deletions(-)
->>  create mode 100644 arch/arm/mach-highbank/localtimer.c
->>  create mode 100644 arch/arm/mach-highbank/platsmp.c
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 9019a56..6d2add5 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1372,7 +1372,7 @@ config SMP
->>  	depends on REALVIEW_EB_ARM11MP || REALVIEW_EB_A9MP || \
->>  		 MACH_REALVIEW_PB11MP || MACH_REALVIEW_PBX || ARCH_OMAP4 || \
->>  		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
->> -		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
->> +		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE || ARCH_HIGHBANK
->>  	select USE_GENERIC_SMP_HELPERS
->>  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
->>  	help
->> diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
->> index 11d4010..311c0e8e 100644
->> --- a/arch/arm/mach-highbank/Makefile
->> +++ b/arch/arm/mach-highbank/Makefile
->> @@ -1,2 +1,4 @@
->>  obj-y					:= clock.o highbank.o system.o
->>  obj-$(CONFIG_DEBUG_LL)			+= lluart.o
->> +obj-$(CONFIG_SMP)			+= platsmp.o
->> +obj-$(CONFIG_LOCAL_TIMERS)		+= localtimer.o
->> diff --git a/arch/arm/mach-highbank/localtimer.c b/arch/arm/mach-highbank/localtimer.c
->> new file mode 100644
->> index 0000000..344ea29
->> --- /dev/null
->> +++ b/arch/arm/mach-highbank/localtimer.c
->> @@ -0,0 +1,38 @@
->> +/*
->> + * Copyright 2010-2011 Calxeda, Inc.
->> + * Based on localtimer.c, Copyright (C) 2002 ARM Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along with
->> + * this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +#include <linux/init.h>
->> +#include <linux/clockchips.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +
->> +#include <asm/smp_twd.h>
->> +
->> +/*
->> + * Setup the local clock events for a CPU.
->> + */
->> +int __cpuinit local_timer_setup(struct clock_event_device *evt)
->> +{
->> +	struct device_node *np;
->> +
->> +	np = of_find_compatible_node(NULL, NULL, "arm,smp-twd");
->> +	if (!twd_base)
->> +		twd_base = of_iomap(np, 0);
-> 
-> WARN_ON(!twd_base)?
-> 
+As part of the effort to help enable the building of multiple
+ARM platforms into a single kernel image in the future, it's desirable
+to be able to build any non-critical platform-specific drivers as
+modules.
 
-Okay, will add it. Can I add your Reviewed-by for the series?
+A straightforward solution is to use modaliases to allow udev to
+identify the correct driver module to load.
 
-Rob
+This series enables the general infrastructure for modalias generation
+to work for AMBA devices, and enables it in the affected drivers.
+
+Briefly tested on Versatile Express, including aaci, mmci and amba-clcd
+(which appears to have the most interesting modalias match pattern).
+For me, the appropiate modules now get loaded at udev trigger time.
+
+Any comments and feedback are welcome.
+
+Dave Martin (16):
+  ARM: amba: Move definition of struct amba_id to mod_devicetable.h
+  ARM: amba: Auto-generate AMBA driver module aliases during modpost
+  hwrng: nomadik: Enable module alias autogeneration for AMBA drivers
+  dmaengine: pl08x: Enable module alias autogeneration for AMBA drivers
+  dmaengine: pl330: Enable module alias autogeneration for AMBA drivers
+  gpio: pl061: Enable module alias autogeneration for AMBA drivers
+  input: ambakmi: Enable module alias autogeneration for AMBA drivers
+  mmc: mmci: Enable module alias autogeneration for AMBA drivers
+  rtc: pl030: Enable module alias autogeneration for AMBA drivers
+  rtc: pl031: Enable module alias autogeneration for AMBA drivers
+  spi: pl022: Enable module alias autogeneration for AMBA drivers
+  serial: pl010: Enable module alias autogeneration for AMBA drivers
+  serial: pl011: Enable module alias autogeneration for AMBA drivers
+  fbdev: amba: Enable module alias autogeneration for AMBA drivers
+  watchdog: sp805: Enable module alias autogeneration for AMBA drivers
+  sound: aaci: Enable module alias autogeneration for AMBA drivers
+
+ drivers/amba/bus.c                   |    9 ++++-
+ drivers/char/hw_random/nomadik-rng.c |    2 +
+ drivers/dma/amba-pl08x.c             |    2 +
+ drivers/dma/pl330.c                  |    2 +
+ drivers/gpio/gpio-pl061.c            |    2 +
+ drivers/input/serio/ambakmi.c        |    2 +
+ drivers/mmc/host/mmci.c              |    2 +
+ drivers/rtc/rtc-pl030.c              |    2 +
+ drivers/rtc/rtc-pl031.c              |    2 +
+ drivers/spi/spi-pl022.c              |    2 +
+ drivers/tty/serial/amba-pl010.c      |    2 +
+ drivers/tty/serial/amba-pl011.c      |    2 +
+ drivers/video/amba-clcd.c            |    2 +
+ drivers/watchdog/sp805_wdt.c         |    2 +
+ include/linux/amba/bus.h             |    7 +---
+ include/linux/mod_devicetable.h      |   18 ++++++++
+ scripts/mod/file2alias.c             |   72 ++++++++++++++++++++++++++++++++++
+ sound/arm/aaci.c                     |    2 +
+ 18 files changed, 127 insertions(+), 7 deletions(-)
+
+-- 
+1.7.4.1
