@@ -1,138 +1,82 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed,  5 Oct 2011 09:59:57 +0200
-Subject: [PATCH 1/2] atmel_lcdfb: Adjust HFP calculation so it matches the
-	manual.
-Message-ID: <1317801598-23757-1-git-send-email-alexander.stein@systec-electronic.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Wed, 5 Oct 2011 14:02:54 +0530
+Subject: [PATCH v8 05/24] gpio/omap: make non-wakeup GPIO part of pdata
+In-Reply-To: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
+References: <1317803593-12259-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1317803593-12259-6-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the AT91SAM9263 Manual the HFP part in LCDTIM2 is described as follows:
-  * HFP: Horizontal Front Porch
-  Number of idle LCDDOTCK cycles at the end of the line.
-  Idle period is (HFP+2) LCDDOTCK cycles.
+From: Charulatha V <charu@ti.com>
 
-It is only a minor issue. I also changed all boards using atmel_lcdfb
-I found to respect the new calculation.
+Non-wakeup GPIOs are available only in OMAP2. Avoid cpu_is checks by making
+non_wakeup_gpios as part of pdata.
 
-Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+Signed-off-by: Charulatha V <charu@ti.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-at91/board-cap9adk.c      |    2 +-
- arch/arm/mach-at91/board-neocore926.c   |    2 +-
- arch/arm/mach-at91/board-sam9261ek.c    |    4 ++--
- arch/arm/mach-at91/board-sam9263ek.c    |    2 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c |    2 +-
- arch/arm/mach-at91/board-sam9rlek.c     |    2 +-
- drivers/video/atmel_lcdfb.c             |    4 ++--
- 7 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/mach-omap2/gpio.c             |    8 ++++++++
+ arch/arm/plat-omap/include/plat/gpio.h |    1 +
+ drivers/gpio/gpio-omap.c               |    8 +-------
+ 3 files changed, 10 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-cap9adk.c b/arch/arm/mach-at91/board-cap9adk.c
-index 679b0b7..ae962bf 100644
---- a/arch/arm/mach-at91/board-cap9adk.c
-+++ b/arch/arm/mach-at91/board-cap9adk.c
-@@ -304,7 +304,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
- 		.xres		= 240,		.yres		= 320,
- 		.pixclock	= KHZ2PICOS(4965),
+diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+index 9ff8366..02dd90d 100644
+--- a/arch/arm/mach-omap2/gpio.c
++++ b/arch/arm/mach-omap2/gpio.c
+@@ -73,6 +73,14 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
  
--		.left_margin	= 1,		.right_margin	= 33,
-+		.left_margin	= 1,		.right_margin	= 34,
- 		.upper_margin	= 1,		.lower_margin	= 0,
- 		.hsync_len	= 5,		.vsync_len	= 1,
+ 	switch (oh->class->rev) {
+ 	case 0:
++		if (id == 1)
++			/* non-wakeup GPIO pins for OMAP2 Bank1 */
++			pdata->non_wakeup_gpios = 0xe203ffc0;
++		else if (id == 2)
++			/* non-wakeup GPIO pins for OMAP2 Bank2 */
++			pdata->non_wakeup_gpios = 0x08700040;
++		/* fall through */
++
+ 	case 1:
+ 		pdata->bank_type = METHOD_GPIO_24XX;
+ 		pdata->regs->revision = OMAP24XX_GPIO_REVISION;
+diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+index 2c06e43..a93adeb 100644
+--- a/arch/arm/plat-omap/include/plat/gpio.h
++++ b/arch/arm/plat-omap/include/plat/gpio.h
+@@ -199,6 +199,7 @@ struct omap_gpio_platform_data {
+ 	int bank_stride;	/* Only needed for omap1 MPUIO */
+ 	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
+ 	bool loses_context;	/* whether the bank would ever lose context */
++	u32 non_wakeup_gpios;
  
-diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-index 9bc6ab3..583878e 100644
---- a/arch/arm/mach-at91/board-neocore926.c
-+++ b/arch/arm/mach-at91/board-neocore926.c
-@@ -235,7 +235,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
- 		.xres		= 240,		.yres		= 320,
- 		.pixclock	= KHZ2PICOS(5000),
+ 	struct omap_gpio_reg_offs *regs;
  
--		.left_margin	= 1,		.right_margin	= 33,
-+		.left_margin	= 1,		.right_margin	= 34,
- 		.upper_margin	= 1,		.lower_margin	= 0,
- 		.hsync_len	= 5,		.vsync_len	= 1,
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index c3cf01f..090feb8 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1021,13 +1021,6 @@ static void omap_gpio_mod_init(struct gpio_bank *bank)
  
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index 5096a0e..8dda83b 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -370,7 +370,7 @@ static struct fb_videomode at91_stn_modes[] = {
- 		.xres           = 320,          .yres           = 240,
- 		.pixclock       = KHZ2PICOS(1440),
- 
--		.left_margin    = 1,            .right_margin   = 1,
-+		.left_margin    = 1,            .right_margin   = 2,
- 		.upper_margin   = 0,            .lower_margin   = 0,
- 		.hsync_len      = 1,            .vsync_len      = 1,
- 
-@@ -431,7 +431,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
- 		.xres		= 240,		.yres		= 320,
- 		.pixclock	= KHZ2PICOS(4965),
- 
--		.left_margin	= 1,		.right_margin	= 33,
-+		.left_margin	= 1,		.right_margin	= 34,
- 		.upper_margin	= 1,		.lower_margin	= 0,
- 		.hsync_len	= 5,		.vsync_len	= 1,
- 
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index ea8f185..e260070 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -258,7 +258,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
- 		.xres		= 240,		.yres		= 320,
- 		.pixclock	= KHZ2PICOS(4965),
- 
--		.left_margin	= 1,		.right_margin	= 33,
-+		.left_margin	= 1,		.right_margin	= 34,
- 		.upper_margin	= 1,		.lower_margin	= 0,
- 		.hsync_len	= 5,		.vsync_len	= 1,
- 
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index ad234cc..5e9a5ca 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -197,7 +197,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
- 		.xres		= 480,		.yres		= 272,
- 		.pixclock	= KHZ2PICOS(9000),
- 
--		.left_margin	= 1,		.right_margin	= 1,
-+		.left_margin	= 1,		.right_margin	= 2,
- 		.upper_margin	= 40,		.lower_margin	= 1,
- 		.hsync_len	= 45,		.vsync_len	= 1,
- 
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index 4f14b54..ad9e5c9 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -154,7 +154,7 @@ static struct fb_videomode at91_tft_vga_modes[] = {
- 		.xres		= 240,		.yres		= 320,
- 		.pixclock	= KHZ2PICOS(4965),
- 
--		.left_margin	= 1,		.right_margin	= 33,
-+		.left_margin	= 1,		.right_margin	= 34,
- 		.upper_margin	= 1,		.lower_margin	= 0,
- 		.hsync_len	= 5,		.vsync_len	= 1,
- 
-diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 817ab60..816d528 100644
---- a/drivers/video/atmel_lcdfb.c
-+++ b/drivers/video/atmel_lcdfb.c
-@@ -393,7 +393,7 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
- 	var->lower_margin = min_t(u32, var->lower_margin,
- 			ATMEL_LCDC_VFP);
- 	var->right_margin = min_t(u32, var->right_margin,
--			(ATMEL_LCDC_HFP >> ATMEL_LCDC_HFP_OFFSET) + 1);
-+			(ATMEL_LCDC_HFP >> ATMEL_LCDC_HFP_OFFSET) + 2);
- 	var->hsync_len = min_t(u32, var->hsync_len,
- 			(ATMEL_LCDC_HPW >> ATMEL_LCDC_HPW_OFFSET) + 1);
- 	var->left_margin = min_t(u32, var->left_margin,
-@@ -578,7 +578,7 @@ static int atmel_lcdfb_set_par(struct fb_info *info)
- 	lcdc_writel(sinfo, ATMEL_LCDC_TIM1, value);
- 
- 	/* Horizontal timing */
--	value = (info->var.right_margin - 1) << ATMEL_LCDC_HFP_OFFSET;
-+	value = (info->var.right_margin - 2) << ATMEL_LCDC_HFP_OFFSET;
- 	value |= (info->var.hsync_len - 1) << ATMEL_LCDC_HPW_OFFSET;
- 	value |= (info->var.left_margin - 1);
- 	dev_dbg(info->device, "  * LCDTIM2 = %08lx\n", value);
+ 			/* Initialize interface clk ungated, module enabled */
+ 			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
+-		} else if (cpu_is_omap24xx()) {
+-			static const u32 non_wakeup_gpios[] = {
+-				0xe203ffc0, 0x08700040
+-			};
+-			if (bank->id < ARRAY_SIZE(non_wakeup_gpios))
+-				bank->non_wakeup_gpios =
+-						non_wakeup_gpios[bank->id];
+ 		}
+ 	} else if (cpu_class_is_omap1()) {
+ 		if (bank_is_mpuio(bank)) {
+@@ -1180,6 +1173,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 	bank->dbck_flag = pdata->dbck_flag;
+ 	bank->stride = pdata->bank_stride;
+ 	bank->width = pdata->bank_width;
++	bank->non_wakeup_gpios = pdata->non_wakeup_gpios;
+ 	bank->loses_context = pdata->loses_context;
+ 	bank->get_context_loss_count = pdata->get_context_loss_count;
+ 	bank->regs = pdata->regs;
 -- 
-1.7.3.4
+1.7.0.4
