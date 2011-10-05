@@ -1,210 +1,94 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed,  5 Oct 2011 18:54:53 +0200
-Subject: [PATCH] ARM: OMAP: omap_device: Add omap_device_{alloc, delete,
-	register}_ss
-Message-ID: <1317833693-21105-1-git-send-email-ohad@wizery.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 5 Oct 2011 11:37:04 -0600 (MDT)
+Subject: [RFC PATCH v2 0/6] TI81XX: Add clock and hwmod data
+In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4FB3EA2@dbde02.ent.ti.com>
+References: <1314119594-22647-1-git-send-email-hemantp@ti.com>
+	<alpine.DEB.2.00.1110040318260.4611@utopia.booyaka.com>
+	<2A3DCF3DA181AD40BDE86A3150B27B6B03B4FB3EA2@dbde02.ent.ti.com>
+Message-ID: <alpine.DEB.2.00.1110051112230.4611@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split omap_device_build_ss() into two smaller functions:
-1. omap_device_alloc_ss() - allocates the omap_device and its
-associated pdev, but doesn't register the pdev yet
-2. omap_device_register_ss() - registers the aforementioned pdev
+Hello Hemant,
 
-In addition, a third omap_device_delete_ss() method is introduced
-in case omap_device_register_ss() fails.
+On Wed, 5 Oct 2011, Pedanekar, Hemant wrote:
 
-This approach allows users, which need to manipulate an archdata member
-of a device before it is registered, to do so.
+> Paul Walmsley wrote on Tuesday, October 04, 2011 2:54 PM:
+> 
+> > I've been spending some time with these patches.  A few aspects don't make
+> > much sense to me.  For example, looking at the TRMs, the 816x doesn't seem
+> > to have powerdomains for HDVICP0, 1, or 2, although they are listed in the
+> > patch.
+> 
+> Can you please check 18.2.1 in TRM from [1].
+> 
+> Above powerdomains are listed there as HDVICP2-0, 1, 2.
 
-The immediate use case for this is to set the private iommu archdata
-member, which binds a device to its associated iommu controller.
-This way, generic code will be able to attach omap devices to their
-iommus, without calling any omap-specific API.
+I see them there in SPRUGX8.  But the most recent revision of the 816x TRM 
+is SPRUGX9, correct? 
 
-This patch is considered an interim solution until DT fully materializes
-for omap; at that point, this functionality will be removed.
+http://focus.ti.com/general/docs/lit/getliterature.tsp?literatureNumber=sprugx9&fileType=pdf
 
-Tested on OMAP4 with a generic remoteproc that doesn't use any
-omap-specific IOMMU API anymore.
+SPRUGX9 doesn't list these three powerdomains.
 
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
----
-Based on Kevin's for_3.2/omap_device-2 branch
+If they're really there, then we should definitely keep your original data 
+based on SPRUGX8.  Maybe you could get some clarification on that from the 
+hardware people?
 
- arch/arm/plat-omap/include/plat/omap_device.h |    9 ++
- arch/arm/plat-omap/omap_device.c              |  110 +++++++++++++++++++++----
- 2 files changed, 104 insertions(+), 15 deletions(-)
+> > Will send over the current reworked patches for TI81XX PRCM accessors,
+> > powerdomain code & data, and clockdomain code & data.  They are intended
+> > to apply over the TI814x patches that you sent recently.  I'd like to get
+> > your opinion(s) on these reworked patches.  Please note, so far they have
+> > only been compile-tested.
+> 
+> Thanks, I will try those and respond.
 
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index 12c5b0c..bc957d6 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -100,6 +100,15 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
- 					 struct omap_device_pm_latency *pm_lats,
- 					 int pm_lats_cnt, int is_early_device);
- 
-+struct platform_device *omap_device_alloc_ss(const char *pdev_name, int pdev_id,
-+					 struct omap_hwmod **ohs, int oh_cnt,
-+					 void *pdata, int pdata_len,
-+					 struct omap_device_pm_latency *pm_lats,
-+					 int pm_lats_cnt);
-+
-+void omap_device_delete_ss(struct platform_device *pdev);
-+int omap_device_register_ss(struct platform_device *pdev, int is_early_device);
-+
- void __iomem *omap_device_get_rt_va(struct omap_device *od);
- struct device *omap_device_get_by_hwmod_name(const char *oh_name);
- 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index cd90bed..f53e7f7 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -635,7 +635,7 @@ struct platform_device *omap_device_build(const char *pdev_name, int pdev_id,
- }
- 
- /**
-- * omap_device_build_ss - build and register an omap_device with multiple hwmods
-+ * omap_device_alloc_ss - build an omap_device with multiple hwmods
-  * @pdev_name: name of the platform_device driver to use
-  * @pdev_id: this platform_device's connection ID
-  * @oh: ptr to the single omap_hwmod that backs this omap_device
-@@ -643,19 +643,19 @@ struct platform_device *omap_device_build(const char *pdev_name, int pdev_id,
-  * @pdata_len: amount of memory pointed to by @pdata
-  * @pm_lats: pointer to a omap_device_pm_latency array for this device
-  * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
-- * @is_early_device: should the device be registered as an early device or not
-  *
-- * Convenience function for building and registering an omap_device
-+ * Convenience function for building (only) an omap_device
-  * subsystem record.  Subsystem records consist of multiple
-- * omap_hwmods.  This function in turn builds and registers a
-- * platform_device record.  Returns an ERR_PTR() on error, or passes
-- * along the return value of omap_device_register().
-+ * omap_hwmods.  This function in turn builds (but doesn't register) a
-+ * platform_device record, so callers can manipulate it (typically by
-+ * setting one or more archdata members) before it's registered.
-+ * Returns an ERR_PTR() on error, or the allocated pdev on success.
-  */
--struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
-+struct platform_device *omap_device_alloc_ss(const char *pdev_name, int pdev_id,
- 					 struct omap_hwmod **ohs, int oh_cnt,
- 					 void *pdata, int pdata_len,
- 					 struct omap_device_pm_latency *pm_lats,
--					 int pm_lats_cnt, int is_early_device)
-+					 int pm_lats_cnt)
- {
- 	int ret = -ENOMEM;
- 	struct platform_device *pdev;
-@@ -687,13 +687,6 @@ struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
- 	if (ret)
- 		goto odbs_exit2;
- 
--	if (is_early_device)
--		ret = omap_early_device_register(pdev);
--	else
--		ret = omap_device_register(pdev);
--	if (ret)
--		goto odbs_exit2;
--
- 	return pdev;
- 
- odbs_exit2:
-@@ -708,6 +701,93 @@ odbs_exit:
- }
- 
- /**
-+ * omap_device_delete_ss - free an omap_device-based platform device
-+ * @pdev: platform_device that represents this omap_device
-+ *
-+ * Convenience function for freeing a platform_device record, which
-+ * is based on an omap_device subsystem record.
-+ *
-+ * Use this function only if @pdev was created using omap_device_alloc_ss(),
-+ * most commonly after a subsequent call to omap_device_register_ss() failed.
-+ */
-+void omap_device_delete_ss(struct platform_device *pdev)
-+{
-+	struct omap_device *od = to_omap_device(pdev);
-+
-+	omap_device_delete(od);
-+	platform_device_put(pdev);
-+}
-+
-+/**
-+ * omap_device_register_ss - register an omap_device-based platform device
-+ * @pdev: platform_device that represents this omap_device
-+ * @is_early_device: should the device be registered as an early device or not
-+ *
-+ * Convenience function for registering a platform_device record, which
-+ * is based on an omap_device subsystem record, created using
-+ * omap_device_alloc_ss().
-+ *
-+ * Returns 0 on success, or an appropriate error value otherwise (essentially
-+ * by returning the value of platform_device_register())
-+ */
-+int omap_device_register_ss(struct platform_device *pdev, int is_early_device)
-+{
-+	int ret;
-+
-+	if (is_early_device)
-+		ret = omap_early_device_register(pdev);
-+	else
-+		ret = omap_device_register(pdev);
-+
-+	return ret;
-+}
-+
-+/**
-+ * omap_device_build_ss - build and register an omap_device with multiple hwmods
-+ * @pdev_name: name of the platform_device driver to use
-+ * @pdev_id: this platform_device's connection ID
-+ * @oh: ptr to the single omap_hwmod that backs this omap_device
-+ * @pdata: platform_data ptr to associate with the platform_device
-+ * @pdata_len: amount of memory pointed to by @pdata
-+ * @pm_lats: pointer to a omap_device_pm_latency array for this device
-+ * @pm_lats_cnt: ARRAY_SIZE() of @pm_lats
-+ * @is_early_device: should the device be registered as an early device or not
-+ *
-+ * Convenience function for building and registering an omap_device
-+ * subsystem record.  Subsystem records consist of multiple
-+ * omap_hwmods.  This function in turn builds and registers a
-+ * platform_device record.  Returns an ERR_PTR() on error, or passes
-+ * along the built pdev on success.
-+ */
-+struct platform_device *omap_device_build_ss(const char *pdev_name, int pdev_id,
-+					 struct omap_hwmod **ohs, int oh_cnt,
-+					 void *pdata, int pdata_len,
-+					 struct omap_device_pm_latency *pm_lats,
-+					 int pm_lats_cnt, int is_early_device)
-+{
-+	struct platform_device *pdev;
-+	int ret;
-+
-+	pdev = omap_device_alloc_ss(pdev_name, pdev_id, ohs, oh_cnt, pdata,
-+			pdata_len, pm_lats, pm_lats_cnt);
-+
-+	if (IS_ERR(pdev))
-+		goto out;
-+
-+	ret = omap_device_register_ss(pdev, is_early_device);
-+	if (ret) {
-+		pdev = ERR_PTR(ret);
-+		goto delete_od;
-+	}
-+
-+	return pdev;
-+delete_od:
-+	omap_device_delete_ss(pdev);
-+out:
-+	return pdev;
-+}
-+
-+/**
-  * omap_early_device_register - register an omap_device as an early platform
-  * device.
-  * @od: struct omap_device * to register
--- 
-1.7.4.1
+Since they've only been compile-tested so far, they are unlikely to boot.  
+What I'm most interested in at this point are any comments you might have 
+about the general approach.  For example:
+
+1. considering the first patch, it would be good to get your views on my 
+perception that:
+
+A. the TI81xx PRCM is effectively a single IP block, with a single 
+interconnect target port, with multiple internal PRM/CM instances mixed in 
+the same IP block;
+
+B. that in some of the internal PRM and CM instances, the register layout 
+is identical between 816x and 814x, and that those macros, etc. should be 
+shared; with the 816x-specific macros split into an 816x-specific file and 
+the 814x-specific macros split into an 814x-specific file;
+
+C. the CM register structure is closer to the OMAP4430 CM register 
+structure than it is to OMAP3, with the important exception that the 
+CLKSTCTRL and CLKCTRL registers are not grouped together for each 
+clockdomain.  Instead, all of the the CLKSTCTRL registers are grouped 
+together, followed by the CLKCTRL registers all grouped together, and 
+therefore, the OMAP4 *_CDOFFS & OMAP3 *_CLKDM* macro style is basically 
+useless;
+
+and
+
+2. considering the second and fourth patches,
+
+A. that given the different power management functionality of TI81xx 
+compared to OMAP4 & OMAP3, that it makes sense to create a new 
+powerdomain/clockdomain code implementation file, rather than attempting 
+to modify the OMAP2/3 file;
+
+B. that we should discuss whether it makes sense to remove the powerdomain 
+names from the clockdomain names, if we can share clock nodes or hwmod 
+nodes for L3_MED and L3_SLOW between 814x and 816x;
+
+and
+
+3. considering the third and fifth patches,
+
+A. that the modified powerdomain and clockdomain data (per SPRUGX9) is 
+correct vs the SPRUGX8 data;
+
+B. that the 814x powerdomains/clockdomains that have been added are 
+accurate.
+
+
+- Paul
