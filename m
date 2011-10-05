@@ -1,19 +1,31 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Wed, 5 Oct 2011 08:39:45 -0200
-Subject: [PATCH] virtio: Add platform bus driver for memory mapped virtio
-	device
-In-Reply-To: <87aa9ggs4k.fsf@rustcorp.com.au>
-References: <1317217663-32647-1-git-send-email-pawel.moll@arm.com>
-	<878vp1iqpz.fsf@rustcorp.com.au>
-	<1317745002.3158.340.camel@hornet.cambridge.arm.com>
-	<87aa9ggs4k.fsf@rustcorp.com.au>
-Message-ID: <20111005103944.GB5587@redhat.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 05 Oct 2011 09:45:28 +0300
+Subject: [PATCH 3/4] ARM: OMAP: Remove calls to SRAM allocations for
+	framebuffer
+In-Reply-To: <20111005004544.26980.35612.stgit@kaulin.local>
+References: <20111005004339.26980.31149.stgit@kaulin.local>
+	<20111005004544.26980.35612.stgit@kaulin.local>
+Message-ID: <1317797128.2631.2.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 05, 2011 at 11:40:51AM +1030, Rusty Russell wrote:
-> The absolute maximum is a ring of 32k elements, which is about 850k.
-> That seems a little excessive, though.
+On Tue, 2011-10-04 at 17:45 -0700, Tony Lindgren wrote:
+> This assumes fixed mappings which will not work once we move
+> to use ioremap_exec(). It seems that these are currently
+> not in use, or in use for some out of tree corner cases.
+> 
+> If SRAM support for framebuffer is wanted, it should be done
+> with ioremap in the driver.
+> 
+> Note that further removal of the code can now be done,
+> but that can be done seprately by the driver maintainers.
+> 
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Given that it must be physically contigious and each descriptor
-is 64 byte in size + space for used and avail rings, yes it does :)
+Looks good to me. I have similar changes in my working branch for omapfb
+cleanup.
+
+Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+ Tomi
