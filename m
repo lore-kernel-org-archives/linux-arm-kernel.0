@@ -1,88 +1,118 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 05 Oct 2011 10:54:35 +0900
-Subject: [PATCH 4/4] ARM: EXYNOS4: Add power domain to use generic Power
-	domain Framework
-In-Reply-To: <001901cc80d2$0da66d40$28f347c0$%kim@samsung.com>
-References: <4E4360BA.3020208@samsung.com>
-	<001901cc80d2$0da66d40$28f347c0$%kim@samsung.com>
-Message-ID: <4E8BB8DB.6020402@samsung.com>
+Date: Wed, 05 Oct 2011 10:57:46 +0900
+Subject: [PATCH 2/4] ARM: EXYNOS4: Support for generic Clock manipulation
+	PM callbacks
+In-Reply-To: <001801cc80d2$065939a0$130bace0$%kim@samsung.com>
+References: <4E4360B5.3050203@samsung.com>
+	<001801cc80d2$065939a0$130bace0$%kim@samsung.com>
+Message-ID: <4E8BB99A.30005@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Kukjin Kim wrote:
 > Chanwoo Choi wrote:
->> This patch initializes the power domain of EXYNOS4210. The devices
->> which suppot runtime-PM have to be added in specific power domain.
->>
 >> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 >> ---
->>  arch/arm/mach-exynos4/mach-nuri.c           |   18 ++++++++++++++++++
->>  arch/arm/mach-exynos4/mach-smdkc210.c       |   18
->> ++++++++++++++++++
->>  arch/arm/mach-exynos4/mach-smdkv310.c       |   15 +++++++++++++++
->>  arch/arm/mach-exynos4/mach-universal_c210.c |   18 ++++++++++++++++++
->>  4 files changed, 69 insertions(+), 0 deletions(-)
+>>  arch/arm/mach-exynos4/Makefile     |    2 +-
+>>  arch/arm/mach-exynos4/pm-runtime.c |   56 ++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 57 insertions(+), 1 deletions(-)
+>>  create mode 100644 arch/arm/mach-exynos4/pm-runtime.c
 >>
->> diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-
->> nuri.c
->> index 4c358cb..5844c55 100644
->> --- a/arch/arm/mach-exynos4/mach-nuri.c
->> +++ b/arch/arm/mach-exynos4/mach-nuri.c
->> @@ -44,6 +44,7 @@
->>  #include <plat/mfc.h>
+>> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+>> index 97c31ce..28cdb8b 100644
+>> --- a/arch/arm/mach-exynos4/Makefile
+>> +++ b/arch/arm/mach-exynos4/Makefile
+>> @@ -5,7 +5,7 @@
+>>  #
+>>  # Licensed under GPLv2
 >>
->>  #include <mach/map.h>
->> +#include <mach/pm-exynos4210.h>
->>
->>  /* Following are default values for UCON, ULCON and UFCON UART registers */
->>  #define NURI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
->> @@ -1125,6 +1126,21 @@ static void __init nuri_reserve(void)
->>  	s5p_mfc_reserve_mem(0x43000000, 8 << 20, 0x51000000, 8 << 20);
->>  }
->>
->> +static void __init nuri_power_domain_init(void)
->> +{
->> +	/* Initialize Power domain */
->> +	exynos4210_init_pm_domain(&exynos4210_pd_mfc);
->> +	exynos4210_init_pm_domain(&exynos4210_pd_g3d);
->> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd0);
->> +	exynos4210_init_pm_domain(&exynos4210_pd_lcd1);
->> +	exynos4210_init_pm_domain(&exynos4210_pd_tv);
->> +	exynos4210_init_pm_domain(&exynos4210_pd_cam);
->> +	exynos4210_init_pm_domain(&exynos4210_pd_gps);
+>> -obj-y				:=
+>> +obj-y				:= pm-runtime.o
 > 
-> As you know, the EXYNOS421 boards have same power domains so how about to make array of struct exynos4210_pm_domain and just one calling exynos4210_init_pm_domain()?
-> 
-OK, I will reimplement it to remove duplicate function call for initializing the generic power-domain of exynos4210.
+> To move under depending CONFIG_ARCH_EXYNOS4 like others is better.
+Ok, I will modify it.
 
+> 
+>>  obj-m				:=
+>>  obj-n				:=
+>>  obj-				:=
+>> diff --git a/arch/arm/mach-exynos4/pm-runtime.c b/arch/arm/mach-exynos4/pm-runtime.c
+>> new file mode 100644
+>> index 0000000..4fe9f73
+>> --- /dev/null
+>> +++ b/arch/arm/mach-exynos4/pm-runtime.c
+>> @@ -0,0 +1,56 @@
+>> +/* linux/arch/arm/mach-exynos4/pm-runtime.c
 >> +
->> +	/* Add device to MFC power domain */
->> +	exynos4210_add_device_to_domain(&exynos4210_pd_mfc,
->> &s5p_device_mfc);
+>> + * Exynos4210 Power management support
+>> + *
+>> + * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+>> + *		http://www.samsung.com
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +#include <linux/init.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/io.h>
+>> +#include <linux/pm_runtime.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/bitmap.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#ifdef CONFIG_PM_RUNTIME
+>> +
+>> +static int default_platform_runtime_idle(struct device *dev)
+>> +{
+>> +	return pm_runtime_suspend(dev);
 >> +}
 >> +
->>  static void __init nuri_machine_init(void)
->>  {
->>  	nuri_sdhci_init();
->> @@ -1145,6 +1161,8 @@ static void __init nuri_machine_init(void)
->>
->>  	/* Last */
->>  	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
+>> +static struct dev_pm_domain default_pm_domain = {
+>> +	.ops = {
+>> +		.runtime_suspend = pm_clk_suspend,
+>> +		.runtime_resume = pm_clk_resume,
+>> +		.runtime_idle = default_platform_runtime_idle,
+>> +		USE_PLATFORM_PM_SLEEP_OPS
+>> +	},
+>> +};
 >> +
->> +	nuri_power_domain_init();
->>  }
->>
->>  MACHINE_START(NURI, "NURI")
->> diff --git a/arch/arm/mach-exynos4/mach-smdkc210.c b/arch/arm/mach-
->> exynos4/mach-smdkc210.c
->> index 4d1976c..0a3b2a9 100644
->> --- a/arch/arm/mach-exynos4/mach-smdkc210.c
->> +++ b/arch/arm/mach-exynos4/mach-smdkc210.c
+>> +#define DEFAULT_PM_DOMAIN_PTR	(&default_pm_domain)
+>> +
+>> +#else
+>> +
+>> +#define DEFAULT_PM_DOMAIN_PTR	NULL
+>> +
+>> +#endif /* CONFIG_PM_RUNTIME */
+>> +
+>> +static struct pm_clk_notifier_block platform_bus_notifier = {
+>> +	.pm_domain = DEFAULT_PM_DOMAIN_PTR,
+>> +	.con_ids = { NULL, },
+>> +};
+>> +
+>> +static int __init exynos4_pm_runtime_init(void)
+>> +{
+>> +	pm_clk_add_notifier(&platform_bus_type, &platform_bus_notifier);
+>> +	return 0;
+>> +}
+>> +core_initcall(exynos4_pm_runtime_init);
+>> --
+>> 1.7.0.4
 > 
-> The mach-smdkc210.c and mach-smdkv310.c are merged one mach-smdkv310.c file.
+> How about to make common stuff in ARM instead of each platform has their own...
 > 
-OK, I will modify it according to merged state of mach-smdkv310.c.
+> I think you can consolidate this pm_runtime with other ARM platform like omap, shmobile.
+> 
+> arch/arm/mach-omap1/pm_bus.c
+> arch/arm/mach-shmobile/pm_runtime.c
+> 
+OK, I received the comment of consolidating geneirc power-domain of exynos series from Sylwester Nawrocki. 
+I will reimplment for supporting various exynos series and resend it.
 
-Thanks & Regards,
+Thanks,
+
+Best Regards,
 Chanwoo Choi
