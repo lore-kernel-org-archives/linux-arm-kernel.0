@@ -1,69 +1,78 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Wed,  5 Oct 2011 17:04:51 +0100
-Subject: [PATCH 00/16] ARM: amba: Enable module alias autogeneration for AMBA
-	drivers
-Message-ID: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
+Date: Wed,  5 Oct 2011 17:04:52 +0100
+Subject: [PATCH 01/16] ARM: amba: Move definition of struct amba_id to
+	mod_devicetable.h
+In-Reply-To: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
+References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1317830707-17517-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no special reason why AMBA device drivers should not be
-auto-loadable via udev, but udev currently has no way to map AMBA
-device IDs to drivers.
+The general kernel infrastructure for adding module alises during
+module post processing expects the affected device type
+identification structures in a common header
+<linux/mod_devicetable.h>.
 
-As part of the effort to help enable the building of multiple
-ARM platforms into a single kernel image in the future, it's desirable
-to be able to build any non-critical platform-specific drivers as
-modules.
+This patch simple moves struct amba_id to the common header, and
+adds the appropriate include in <linux/amba/bus.h>.
 
-A straightforward solution is to use modaliases to allow udev to
-identify the correct driver module to load.
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+ include/linux/amba/bus.h        |    7 +------
+ include/linux/mod_devicetable.h |   18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+), 6 deletions(-)
 
-This series enables the general infrastructure for modalias generation
-to work for AMBA devices, and enables it in the affected drivers.
-
-Briefly tested on Versatile Express, including aaci, mmci and amba-clcd
-(which appears to have the most interesting modalias match pattern).
-For me, the appropiate modules now get loaded at udev trigger time.
-
-Any comments and feedback are welcome.
-
-Dave Martin (16):
-  ARM: amba: Move definition of struct amba_id to mod_devicetable.h
-  ARM: amba: Auto-generate AMBA driver module aliases during modpost
-  hwrng: nomadik: Enable module alias autogeneration for AMBA drivers
-  dmaengine: pl08x: Enable module alias autogeneration for AMBA drivers
-  dmaengine: pl330: Enable module alias autogeneration for AMBA drivers
-  gpio: pl061: Enable module alias autogeneration for AMBA drivers
-  input: ambakmi: Enable module alias autogeneration for AMBA drivers
-  mmc: mmci: Enable module alias autogeneration for AMBA drivers
-  rtc: pl030: Enable module alias autogeneration for AMBA drivers
-  rtc: pl031: Enable module alias autogeneration for AMBA drivers
-  spi: pl022: Enable module alias autogeneration for AMBA drivers
-  serial: pl010: Enable module alias autogeneration for AMBA drivers
-  serial: pl011: Enable module alias autogeneration for AMBA drivers
-  fbdev: amba: Enable module alias autogeneration for AMBA drivers
-  watchdog: sp805: Enable module alias autogeneration for AMBA drivers
-  sound: aaci: Enable module alias autogeneration for AMBA drivers
-
- drivers/amba/bus.c                   |    9 ++++-
- drivers/char/hw_random/nomadik-rng.c |    2 +
- drivers/dma/amba-pl08x.c             |    2 +
- drivers/dma/pl330.c                  |    2 +
- drivers/gpio/gpio-pl061.c            |    2 +
- drivers/input/serio/ambakmi.c        |    2 +
- drivers/mmc/host/mmci.c              |    2 +
- drivers/rtc/rtc-pl030.c              |    2 +
- drivers/rtc/rtc-pl031.c              |    2 +
- drivers/spi/spi-pl022.c              |    2 +
- drivers/tty/serial/amba-pl010.c      |    2 +
- drivers/tty/serial/amba-pl011.c      |    2 +
- drivers/video/amba-clcd.c            |    2 +
- drivers/watchdog/sp805_wdt.c         |    2 +
- include/linux/amba/bus.h             |    7 +---
- include/linux/mod_devicetable.h      |   18 ++++++++
- scripts/mod/file2alias.c             |   72 ++++++++++++++++++++++++++++++++++
- sound/arm/aaci.c                     |    2 +
- 18 files changed, 127 insertions(+), 7 deletions(-)
-
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index fcbbe71..724c69c 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -16,6 +16,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/device.h>
++#include <linux/mod_devicetable.h>
+ #include <linux/err.h>
+ #include <linux/resource.h>
+ #include <linux/regulator/consumer.h>
+@@ -35,12 +36,6 @@ struct amba_device {
+ 	unsigned int		irq[AMBA_NR_IRQS];
+ };
+ 
+-struct amba_id {
+-	unsigned int		id;
+-	unsigned int		mask;
+-	void			*data;
+-};
+-
+ struct amba_driver {
+ 	struct device_driver	drv;
+ 	int			(*probe)(struct amba_device *, const struct amba_id *);
+diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+index 468819c..83ac071 100644
+--- a/include/linux/mod_devicetable.h
++++ b/include/linux/mod_devicetable.h
+@@ -542,4 +542,22 @@ struct isapnp_device_id {
+ 	kernel_ulong_t driver_data;	/* data private to the driver */
+ };
+ 
++/**
++ * struct amba_id - identifies a device on an AMBA bus
++ * @id: The significant bits if the hardware device ID
++ * @mask: Bitmask specifying which bits of the id field are significant when
++ *	matching.  A driver binds to a device when ((hardware device ID) & mask)
++ *	== id.
++ * @data: Private data used by the driver.
++ */
++struct amba_id {
++	unsigned int		id;
++	unsigned int		mask;
++#ifndef __KERNEL__
++	kernel_ulong_t		data;
++#else
++	void			*data;
++#endif
++};
++
+ #endif /* LINUX_MOD_DEVICETABLE_H */
 -- 
 1.7.4.1
