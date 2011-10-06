@@ -1,169 +1,202 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 06 Oct 2011 15:54:48 +0200
-Subject: [PATCH 7/9] X86: integrate CMA with DMA-mapping subsystem
+Date: Thu, 06 Oct 2011 15:54:43 +0200
+Subject: [PATCH 3/9] mm: alloc_contig_range() added
 In-Reply-To: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
 References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1317909290-29832-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1317909290-29832-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for CMA to dma-mapping subsystem for x86
-architecture that uses common pci-dma/pci-nommu implementation. This
-allows to test CMA on KVM/QEMU and a lot of common x86 boxes.
+From: Michal Nazarewicz <m.nazarewicz@samsung.com>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+This commit adds the alloc_contig_range() function which tries
+to allocate given range of pages.  It tries to migrate all
+already allocated pages that fall in the range thus freeing them.
+Once all pages in the range are freed they are removed from the
+buddy system thus allocated for the caller to use.
+
+Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+[m.szyprowski: renamed some variables for easier code reading]
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 CC: Michal Nazarewicz <mina86@mina86.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/x86/Kconfig                      |    1 +
- arch/x86/include/asm/dma-contiguous.h |   13 +++++++++++++
- arch/x86/include/asm/dma-mapping.h    |    4 ++++
- arch/x86/kernel/pci-dma.c             |   18 ++++++++++++++++--
- arch/x86/kernel/pci-nommu.c           |    8 +-------
- arch/x86/kernel/setup.c               |    2 ++
- 6 files changed, 37 insertions(+), 9 deletions(-)
- create mode 100644 arch/x86/include/asm/dma-contiguous.h
+ include/linux/page-isolation.h |    2 +
+ mm/page_alloc.c                |  148 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 150 insertions(+), 0 deletions(-)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 82830ef..b120c80 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -29,6 +29,7 @@ config X86
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARCH_WANT_FRAME_POINTERS
- 	select HAVE_DMA_ATTRS
-+	select HAVE_DMA_CONTIGUOUS if !SWIOTLB
- 	select HAVE_KRETPROBES
- 	select HAVE_OPTPROBES
- 	select HAVE_FTRACE_MCOUNT_RECORD
-diff --git a/arch/x86/include/asm/dma-contiguous.h b/arch/x86/include/asm/dma-contiguous.h
-new file mode 100644
-index 0000000..8fb117d
---- /dev/null
-+++ b/arch/x86/include/asm/dma-contiguous.h
-@@ -0,0 +1,13 @@
-+#ifndef ASMX86_DMA_CONTIGUOUS_H
-+#define ASMX86_DMA_CONTIGUOUS_H
-+
-+#ifdef __KERNEL__
-+
-+#include <linux/device.h>
-+#include <linux/dma-contiguous.h>
-+#include <asm-generic/dma-contiguous.h>
-+
-+static inline void dma_contiguous_early_fixup(phys_addr_t base, unsigned long size) { }
-+
-+#endif
-+#endif
-diff --git a/arch/x86/include/asm/dma-mapping.h b/arch/x86/include/asm/dma-mapping.h
-index ed3065f..90ac6f0 100644
---- a/arch/x86/include/asm/dma-mapping.h
-+++ b/arch/x86/include/asm/dma-mapping.h
-@@ -13,6 +13,7 @@
- #include <asm/io.h>
- #include <asm/swiotlb.h>
- #include <asm-generic/dma-coherent.h>
-+#include <linux/dma-contiguous.h>
+diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
+index b9fc428..774ecec 100644
+--- a/include/linux/page-isolation.h
++++ b/include/linux/page-isolation.h
+@@ -36,6 +36,8 @@ extern void unset_migratetype_isolate(struct page *page);
+ /* The below functions must be run on a range from a single zone. */
+ extern unsigned long alloc_contig_freed_pages(unsigned long start,
+ 					      unsigned long end, gfp_t flag);
++extern int alloc_contig_range(unsigned long start, unsigned long end,
++			      gfp_t flags);
+ extern void free_contig_pages(unsigned long pfn, unsigned nr_pages);
  
- #ifdef CONFIG_ISA
- # define ISA_DMA_BIT_MASK DMA_BIT_MASK(24)
-@@ -61,6 +62,9 @@ extern int dma_set_mask(struct device *dev, u64 mask);
- extern void *dma_generic_alloc_coherent(struct device *dev, size_t size,
- 					dma_addr_t *dma_addr, gfp_t flag);
- 
-+extern void dma_generic_free_coherent(struct device *dev, size_t size,
-+				      void *vaddr, dma_addr_t dma_addr);
-+
- static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
- {
- 	if (!dev->dma_mask)
-diff --git a/arch/x86/kernel/pci-dma.c b/arch/x86/kernel/pci-dma.c
-index 80dc793..f4abafc 100644
---- a/arch/x86/kernel/pci-dma.c
-+++ b/arch/x86/kernel/pci-dma.c
-@@ -90,14 +90,18 @@ void *dma_generic_alloc_coherent(struct device *dev, size_t size,
- 				 dma_addr_t *dma_addr, gfp_t flag)
- {
- 	unsigned long dma_mask;
--	struct page *page;
-+	struct page *page = NULL;
-+	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	dma_addr_t addr;
- 
- 	dma_mask = dma_alloc_coherent_mask(dev, flag);
- 
- 	flag |= __GFP_ZERO;
- again:
--	page = alloc_pages_node(dev_to_node(dev), flag, get_order(size));
-+	if (!(flag & GFP_ATOMIC))
-+		page = dma_alloc_from_contiguous(dev, count, get_order(size));
-+	if (!page)
-+		page = alloc_pages_node(dev_to_node(dev), flag, get_order(size));
- 	if (!page)
- 		return NULL;
- 
-@@ -117,6 +121,16 @@ again:
- 	return page_address(page);
+ /*
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index fbfb920..8010854 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5773,6 +5773,154 @@ void free_contig_pages(unsigned long pfn, unsigned nr_pages)
+ 	}
  }
  
-+void dma_generic_free_coherent(struct device *dev, size_t size, void *vaddr,
-+			       dma_addr_t dma_addr)
++static unsigned long pfn_to_maxpage(unsigned long pfn)
 +{
-+	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	struct page *page = virt_to_page(vaddr);
-+
-+	if (!dma_release_from_contiguous(dev, page, count))
-+		free_pages((unsigned long)vaddr, get_order(size));
++	return pfn & ~(MAX_ORDER_NR_PAGES - 1);
 +}
 +
++static unsigned long pfn_to_maxpage_up(unsigned long pfn)
++{
++	return ALIGN(pfn, MAX_ORDER_NR_PAGES);
++}
++
++#define MIGRATION_RETRY	5
++static int __alloc_contig_migrate_range(unsigned long start, unsigned long end)
++{
++	int migration_failed = 0, ret;
++	unsigned long pfn = start;
++
++	/*
++	 * Some code "borrowed" from KAMEZAWA Hiroyuki's
++	 * __alloc_contig_pages().
++	 */
++
++	/* drop all pages in pagevec and pcp list */
++	lru_add_drain_all();
++	drain_all_pages();
++
++	for (;;) {
++		pfn = scan_lru_pages(pfn, end);
++		if (!pfn || pfn >= end)
++			break;
++
++		ret = do_migrate_range(pfn, end);
++		if (!ret) {
++			migration_failed = 0;
++		} else if (ret != -EBUSY
++			|| ++migration_failed >= MIGRATION_RETRY) {
++			return ret;
++		} else {
++			/* There are unstable pages.on pagevec. */
++			lru_add_drain_all();
++			/*
++			 * there may be pages on pcplist before
++			 * we mark the range as ISOLATED.
++			 */
++			drain_all_pages();
++		}
++		cond_resched();
++	}
++
++	if (!migration_failed) {
++		/* drop all pages in pagevec and pcp list */
++		lru_add_drain_all();
++		drain_all_pages();
++	}
++
++	/* Make sure all pages are isolated */
++	if (WARN_ON(test_pages_isolated(start, end)))
++		return -EBUSY;
++
++	return 0;
++}
++
++/**
++ * alloc_contig_range() -- tries to allocate given range of pages
++ * @start:	start PFN to allocate
++ * @end:	one-past-the-last PFN to allocate
++ * @flags:	flags passed to alloc_contig_freed_pages().
++ *
++ * The PFN range does not have to be pageblock or MAX_ORDER_NR_PAGES
++ * aligned, hovewer it's callers responsibility to guarantee that we
++ * are the only thread that changes migrate type of pageblocks the
++ * pages fall in.
++ *
++ * Returns zero on success or negative error code.  On success all
++ * pages which PFN is in (start, end) are allocated for the caller and
++ * need to be freed with free_contig_pages().
++ */
++int alloc_contig_range(unsigned long start, unsigned long end,
++		       gfp_t flags)
++{
++	unsigned long outer_start, outer_end;
++	int ret;
++
++	/*
++	 * What we do here is we mark all pageblocks in range as
++	 * MIGRATE_ISOLATE.  Because of the way page allocator work, we
++	 * align the range to MAX_ORDER pages so that page allocator
++	 * won't try to merge buddies from different pageblocks and
++	 * change MIGRATE_ISOLATE to some other migration type.
++	 *
++	 * Once the pageblocks are marked as MIGRATE_ISOLATE, we
++	 * migrate the pages from an unaligned range (ie. pages that
++	 * we are interested in).  This will put all the pages in
++	 * range back to page allocator as MIGRATE_ISOLATE.
++	 *
++	 * When this is done, we take the pages in range from page
++	 * allocator removing them from the buddy system.  This way
++	 * page allocator will never consider using them.
++	 *
++	 * This lets us mark the pageblocks back as
++	 * MIGRATE_CMA/MIGRATE_MOVABLE so that free pages in the
++	 * MAX_ORDER aligned range but not in the unaligned, original
++	 * range are put back to page allocator so that buddy can use
++	 * them.
++	 */
++
++	ret = start_isolate_page_range(pfn_to_maxpage(start),
++				       pfn_to_maxpage_up(end));
++	if (ret)
++		goto done;
++
++	ret = __alloc_contig_migrate_range(start, end);
++	if (ret)
++		goto done;
++
++	/*
++	 * Pages from [start, end) are within a MAX_ORDER_NR_PAGES
++	 * aligned blocks that are marked as MIGRATE_ISOLATE.  What's
++	 * more, all pages in [start, end) are free in page allocator.
++	 * What we are going to do is to allocate all pages from
++	 * [start, end) (that is remove them from page allocater).
++	 *
++	 * The only problem is that pages at the beginning and at the
++	 * end of interesting range may be not aligned with pages that
++	 * page allocator holds, ie. they can be part of higher order
++	 * pages.  Because of this, we reserve the bigger range and
++	 * once this is done free the pages we are not interested in.
++	 */
++
++	ret = 0;
++	while (!PageBuddy(pfn_to_page(start & (~0UL << ret))))
++		if (WARN_ON(++ret >= MAX_ORDER))
++			return -EINVAL;
++
++	outer_start = start & (~0UL << ret);
++	outer_end   = alloc_contig_freed_pages(outer_start, end, flags);
++
++	/* Free head and tail (if any) */
++	if (start != outer_start)
++		free_contig_pages(outer_start, start - outer_start);
++	if (end != outer_end)
++		free_contig_pages(end, outer_end - end);
++
++	ret = 0;
++done:
++	undo_isolate_page_range(pfn_to_maxpage(start), pfn_to_maxpage_up(end));
++	return ret;
++}
++
+ #ifdef CONFIG_MEMORY_HOTREMOVE
  /*
-  * See <Documentation/x86/x86_64/boot-options.txt> for the iommu kernel
-  * parameter documentation.
-diff --git a/arch/x86/kernel/pci-nommu.c b/arch/x86/kernel/pci-nommu.c
-index 3af4af8..656566f 100644
---- a/arch/x86/kernel/pci-nommu.c
-+++ b/arch/x86/kernel/pci-nommu.c
-@@ -74,12 +74,6 @@ static int nommu_map_sg(struct device *hwdev, struct scatterlist *sg,
- 	return nents;
- }
- 
--static void nommu_free_coherent(struct device *dev, size_t size, void *vaddr,
--				dma_addr_t dma_addr)
--{
--	free_pages((unsigned long)vaddr, get_order(size));
--}
--
- static void nommu_sync_single_for_device(struct device *dev,
- 			dma_addr_t addr, size_t size,
- 			enum dma_data_direction dir)
-@@ -97,7 +91,7 @@ static void nommu_sync_sg_for_device(struct device *dev,
- 
- struct dma_map_ops nommu_dma_ops = {
- 	.alloc_coherent		= dma_generic_alloc_coherent,
--	.free_coherent		= nommu_free_coherent,
-+	.free_coherent		= dma_generic_free_coherent,
- 	.map_sg			= nommu_map_sg,
- 	.map_page		= nommu_map_page,
- 	.sync_single_for_device = nommu_sync_single_for_device,
-diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
-index afaf384..6c9efb5 100644
---- a/arch/x86/kernel/setup.c
-+++ b/arch/x86/kernel/setup.c
-@@ -50,6 +50,7 @@
- #include <asm/pci-direct.h>
- #include <linux/init_ohci1394_dma.h>
- #include <linux/kvm_para.h>
-+#include <linux/dma-contiguous.h>
- 
- #include <linux/errno.h>
- #include <linux/kernel.h>
-@@ -944,6 +945,7 @@ void __init setup_arch(char **cmdline_p)
- 	}
- #endif
- 	memblock.current_limit = get_max_mapped();
-+	dma_contiguous_reserve(0);
- 
- 	/*
- 	 * NOTE: On x86-32, only from this point on, fixmaps are ready for use.
+  * All pages in the range must be isolated before calling this.
 -- 
 1.7.1.569.g6f426
