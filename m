@@ -1,9 +1,9 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 06 Oct 2011 15:54:47 +0200
-Subject: [PATCH 7/7] ARM: integrate CMA with DMA-mapping subsystem
+Date: Thu, 06 Oct 2011 15:54:49 +0200
+Subject: [PATCH 8/9] ARM: integrate CMA with DMA-mapping subsystem
 In-Reply-To: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
 References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1317909290-29832-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1317909290-29832-10-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,20 +25,20 @@ CMA has been enabled unconditionally for ARMv6+ systems.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+CC: Michal Nazarewicz <mina86@mina86.com>
 ---
  arch/arm/Kconfig                      |    2 +
- arch/arm/include/asm/device.h         |    3 +
- arch/arm/include/asm/dma-contiguous.h |   33 +++
+ arch/arm/include/asm/dma-contiguous.h |   16 ++
  arch/arm/include/asm/mach/map.h       |    1 +
  arch/arm/mm/dma-mapping.c             |  362 +++++++++++++++++++++++++++------
  arch/arm/mm/init.c                    |    8 +
  arch/arm/mm/mm.h                      |    3 +
  arch/arm/mm/mmu.c                     |   29 ++-
- 8 files changed, 366 insertions(+), 75 deletions(-)
+ 7 files changed, 346 insertions(+), 75 deletions(-)
  create mode 100644 arch/arm/include/asm/dma-contiguous.h
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 6f231d5..e1705c9 100644
+index 92870e3..d0abf54 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
 @@ -3,6 +3,8 @@ config ARM
@@ -50,26 +50,12 @@ index 6f231d5..e1705c9 100644
  	select HAVE_IDE
  	select HAVE_MEMBLOCK
  	select RTC_LIB
-diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-index b5c9f5b..b1ee416 100644
---- a/arch/arm/include/asm/device.h
-+++ b/arch/arm/include/asm/device.h
-@@ -10,6 +10,9 @@ struct dev_archdata {
- #ifdef CONFIG_DMABOUNCE
- 	struct dmabounce_device_info *dmabounce;
- #endif
-+#ifdef CONFIG_CMA
-+	struct cma *cma_area;
-+#endif
- };
- 
- struct omap_device;
 diff --git a/arch/arm/include/asm/dma-contiguous.h b/arch/arm/include/asm/dma-contiguous.h
 new file mode 100644
-index 0000000..6be12ba
+index 0000000..c7ba05e
 --- /dev/null
 +++ b/arch/arm/include/asm/dma-contiguous.h
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,16 @@
 +#ifndef ASMARM_DMA_CONTIGUOUS_H
 +#define ASMARM_DMA_CONTIGUOUS_H
 +
@@ -77,46 +63,29 @@ index 0000000..6be12ba
 +
 +#include <linux/device.h>
 +#include <linux/dma-contiguous.h>
++#include <asm-generic/dma-contiguous.h>
 +
 +#ifdef CONFIG_CMA
 +
-+#define MAX_CMA_AREAS	(8)
-+
 +void dma_contiguous_early_fixup(phys_addr_t base, unsigned long size);
-+
-+static inline struct cma *get_dev_cma_area(struct device *dev)
-+{
-+	if (dev && dev->archdata.cma_area)
-+		return dev->archdata.cma_area;
-+	return dma_contiguous_default_area;
-+}
-+
-+static inline void set_dev_cma_area(struct device *dev, struct cma *cma)
-+{
-+	dev->archdata.cma_area = cma;
-+}
-+
-+#else
-+
-+#define MAX_CMA_AREAS	(0)
 +
 +#endif
 +#endif
 +#endif
 diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-index d2fedb5..05343de 100644
+index b36f365..a6efcdd 100644
 --- a/arch/arm/include/asm/mach/map.h
 +++ b/arch/arm/include/asm/mach/map.h
-@@ -29,6 +29,7 @@ struct map_desc {
- #define MT_MEMORY_NONCACHED	11
+@@ -30,6 +30,7 @@ struct map_desc {
  #define MT_MEMORY_DTCM		12
  #define MT_MEMORY_ITCM		13
-+#define MT_MEMORY_DMA_READY	14
+ #define MT_MEMORY_SO		14
++#define MT_MEMORY_DMA_READY	15
  
  #ifdef CONFIG_MMU
  extern void iotable_init(struct map_desc *, int);
 diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 66e3053..3d6a33d 100644
+index e4e7f6c..879a658 100644
 --- a/arch/arm/mm/dma-mapping.c
 +++ b/arch/arm/mm/dma-mapping.c
 @@ -17,7 +17,9 @@
@@ -503,7 +472,7 @@ index 66e3053..3d6a33d 100644
  
  	if (addr)
  		*handle = pfn_to_dma(dev, page_to_pfn(page));
-@@ -354,8 +590,8 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
+@@ -356,8 +592,8 @@ __dma_alloc(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp,
   * Allocate DMA-coherent memory space and return both the kernel remapped
   * virtual and bus address for that space.
   */
@@ -514,7 +483,7 @@ index 66e3053..3d6a33d 100644
  {
  	void *memory;
  
-@@ -384,25 +620,11 @@ static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
+@@ -386,25 +622,11 @@ static int dma_mmap(struct device *dev, struct vm_area_struct *vma,
  {
  	int ret = -ENXIO;
  #ifdef CONFIG_MMU
@@ -545,7 +514,7 @@ index 66e3053..3d6a33d 100644
  #endif	/* CONFIG_MMU */
  
  	return ret;
-@@ -424,23 +646,33 @@ int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
+@@ -426,23 +648,33 @@ int dma_mmap_writecombine(struct device *dev, struct vm_area_struct *vma,
  }
  EXPORT_SYMBOL(dma_mmap_writecombine);
  
@@ -586,10 +555,10 @@ index 66e3053..3d6a33d 100644
  EXPORT_SYMBOL(dma_free_coherent);
  
 diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 34409a0..44619f0 100644
+index fbdd12e..9c27fbd 100644
 --- a/arch/arm/mm/init.c
 +++ b/arch/arm/mm/init.c
-@@ -20,6 +20,7 @@
+@@ -21,6 +21,7 @@
  #include <linux/gfp.h>
  #include <linux/memblock.h>
  #include <linux/sort.h>
@@ -597,7 +566,7 @@ index 34409a0..44619f0 100644
  
  #include <asm/mach-types.h>
  #include <asm/prom.h>
-@@ -370,6 +371,13 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
+@@ -371,6 +372,13 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
  	if (mdesc->reserve)
  		mdesc->reserve();
  
@@ -625,11 +594,11 @@ index ad7cce3..fa95d9b 100644
  void arm_mm_memblock_reserve(void);
 +void dma_contiguous_remap(void);
 diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 226f180..cdc9c38 100644
+index 5a51cc5..ad8e9fc 100644
 --- a/arch/arm/mm/mmu.c
 +++ b/arch/arm/mm/mmu.c
-@@ -273,6 +273,11 @@ static struct mem_type mem_types[] = {
- 		.prot_l1   = PMD_TYPE_TABLE,
+@@ -285,6 +285,11 @@ static struct mem_type mem_types[] = {
+ 				PMD_SECT_UNCACHED | PMD_SECT_XN,
  		.domain    = DOMAIN_KERNEL,
  	},
 +	[MT_MEMORY_DMA_READY] = {
@@ -640,7 +609,7 @@ index 226f180..cdc9c38 100644
  };
  
  const struct mem_type *get_mem_type(unsigned int type)
-@@ -414,6 +419,7 @@ static void __init build_mem_type_table(void)
+@@ -426,6 +431,7 @@ static void __init build_mem_type_table(void)
  	if (arch_is_coherent() && cpu_is_xsc3()) {
  		mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
  		mem_types[MT_MEMORY].prot_pte |= L_PTE_SHARED;
@@ -648,7 +617,7 @@ index 226f180..cdc9c38 100644
  		mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
  		mem_types[MT_MEMORY_NONCACHED].prot_pte |= L_PTE_SHARED;
  	}
-@@ -443,6 +449,7 @@ static void __init build_mem_type_table(void)
+@@ -457,6 +463,7 @@ static void __init build_mem_type_table(void)
  			mem_types[MT_DEVICE_CACHED].prot_pte |= L_PTE_SHARED;
  			mem_types[MT_MEMORY].prot_sect |= PMD_SECT_S;
  			mem_types[MT_MEMORY].prot_pte |= L_PTE_SHARED;
@@ -656,7 +625,7 @@ index 226f180..cdc9c38 100644
  			mem_types[MT_MEMORY_NONCACHED].prot_sect |= PMD_SECT_S;
  			mem_types[MT_MEMORY_NONCACHED].prot_pte |= L_PTE_SHARED;
  		}
-@@ -482,6 +489,7 @@ static void __init build_mem_type_table(void)
+@@ -508,6 +515,7 @@ static void __init build_mem_type_table(void)
  	mem_types[MT_HIGH_VECTORS].prot_l1 |= ecc_mask;
  	mem_types[MT_MEMORY].prot_sect |= ecc_mask | cp->pmd;
  	mem_types[MT_MEMORY].prot_pte |= kern_pgprot;
@@ -664,7 +633,7 @@ index 226f180..cdc9c38 100644
  	mem_types[MT_MEMORY_NONCACHED].prot_sect |= ecc_mask;
  	mem_types[MT_ROM].prot_sect |= cp->pmd;
  
-@@ -561,7 +569,7 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+@@ -587,7 +595,7 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
  	 * L1 entries, whereas PGDs refer to a group of L1 entries making
  	 * up one logical pointer to an L2 table.
  	 */
@@ -672,8 +641,8 @@ index 226f180..cdc9c38 100644
 +	if (type->prot_sect && ((addr | end | phys) & ~SECTION_MASK) == 0) {
  		pmd_t *p = pmd;
  
- 		if (addr & SECTION_SIZE)
-@@ -757,7 +765,7 @@ static int __init early_vmalloc(char *arg)
+ #ifndef CONFIG_ARM_LPAE
+@@ -789,7 +797,7 @@ static int __init early_vmalloc(char *arg)
  }
  early_param("vmalloc", early_vmalloc);
  
@@ -682,7 +651,7 @@ index 226f180..cdc9c38 100644
  
  void __init sanity_check_meminfo(void)
  {
-@@ -826,8 +834,8 @@ void __init sanity_check_meminfo(void)
+@@ -859,8 +867,8 @@ void __init sanity_check_meminfo(void)
  			bank->size = newsize;
  		}
  #endif
@@ -693,7 +662,7 @@ index 226f180..cdc9c38 100644
  
  		j++;
  	}
-@@ -852,7 +860,7 @@ void __init sanity_check_meminfo(void)
+@@ -885,7 +893,7 @@ void __init sanity_check_meminfo(void)
  	}
  #endif
  	meminfo.nr_banks = j;
@@ -702,7 +671,7 @@ index 226f180..cdc9c38 100644
  }
  
  static inline void prepare_page_table(void)
-@@ -877,8 +885,8 @@ static inline void prepare_page_table(void)
+@@ -910,8 +918,8 @@ static inline void prepare_page_table(void)
  	 * Find the end of the first block of lowmem.
  	 */
  	end = memblock.memory.regions[0].base + memblock.memory.regions[0].size;
@@ -713,7 +682,7 @@ index 226f180..cdc9c38 100644
  
  	/*
  	 * Clear out all the kernel space mappings, except for the first
-@@ -1012,8 +1020,8 @@ static void __init map_lowmem(void)
+@@ -1051,8 +1059,8 @@ static void __init map_lowmem(void)
  		phys_addr_t end = start + reg->size;
  		struct map_desc map;
  
@@ -724,7 +693,7 @@ index 226f180..cdc9c38 100644
  		if (start >= end)
  			break;
  
-@@ -1034,11 +1042,12 @@ void __init paging_init(struct machine_desc *mdesc)
+@@ -1073,11 +1081,12 @@ void __init paging_init(struct machine_desc *mdesc)
  {
  	void *zero_page;
  
