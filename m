@@ -1,77 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Oct 2011 12:17:27 -0700
-Subject: [PATCH v3 3/3] ARM: OMAP: TI814X: Create board support and
-	enable build for TI8148 EVM
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4EC6066@dbde02.ent.ti.com>
-References: <1317258570-30494-1-git-send-email-hemantp@ti.com>
-	<4E88542B.4010206@compulab.co.il>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03B4EC5D52@dbde02.ent.ti.com>
-	<4E8ACB3C.6020401@compulab.co.il>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03B4EC6066@dbde02.ent.ti.com>
-Message-ID: <20111006191727.GK6324@atomide.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Thu, 6 Oct 2011 15:38:31 -0400
+Subject: [RFC/PATCH 1/7] ARM: ARM11 MPCore: pgd_alloc is not preempt safe
+In-Reply-To: <20111006163520.GA21464@n2100.arm.linux.org.uk>
+References: <05942148-7AFB-4755-A22F-355E0360B098@mvista.com>
+	<1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317877714-11355-2-git-send-email-gdavis@mvista.com>
+	<20111006163520.GA21464@n2100.arm.linux.org.uk>
+Message-ID: <0D5AA174-DD77-4A5A-B16C-864649415F25@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pedanekar, Hemant <hemantp@ti.com> [111004 02:07]:
-> Igor Grinberg wrote on Tuesday, October 04, 2011 2:31 PM:
-> 
-> > On 10/03/11 18:45, Pedanekar, Hemant wrote:
-> >> Hi Igor,
-> >> 
-> >> Igor Grinberg wrote on Sunday, October 02, 2011 5:38 PM:
-> >> 
-> >>> Hi Hemant,
-> >>> 
-> >>> On 09/29/11 04:09, Hemant Pedanekar wrote:
-> >>>> This patch adds minimal support and build configuration for TI8148 EVM.
-> >>>> Also adds support for low level debugging on UART1 console on the EVM.
-> >>>> 
-> >>>> Note that existing TI8168 EVM file (board-ti8168evm.c) is updated with
-> >>>> machine info for TI8148 EVM and renamed as board-ti81xxevm.c.
-> >>> 
-> >>> Should we really rename the existing file?
-> >>> Shouldn't we just stick to the name of the file submitted first?
-> >>> (e.g. board-ti8168evm.c) and just add the support for the new
-> >>> TI8148 EVM in to the existing file?
-> >> 
-> >> But won't this be misleading?
-> > 
-> > Misleading? For whom?
-> > Actually, I don't really care how you call that file.
-> > What I care (and I think not just me) is uniformity, so
-> > if we decide to rename all those files that have multiple
-> > boards supported in them, I'm fine with it.
-> > 
-> > So pros for my proposed approach would be:
-> > 1) Currently, there are already board files with multiple boards
-> >    supported in them that follow the approach and renaming them is   
-> > really unnecessary. 2) git log will not break.
-> > 3) boards that cannot be named after the convention like 81xx
-> >    but can be added to the same file will not require further renaming
-> >    (like 82x8 - I don't really know if that will exist, just wondering).
-> > 4) This renaming is really what Linus likes ;)
-> > 
-> > cons:
-> > 1) Misleading?
-> > 
-> > Currently, I don't think this renaming is good for anything,
-> > especially that majority of the board stuff should be transformed
-> > to the DT descriptors.
-> 
-> Igor,
-> I agree on the DT part and also understand the "pros" you mentioned.
-> 
-> I can submit the v4 of patches with TI8148 EVM support added in exisitng
-> board-ti8168evm.c.
-> 
-> Tony, 
-> Are you OK with the above approach?
 
-Yes, let's not do renaming unless it's really needed. We'll be getting
-rid of the board-*.c files anyways with device tree. So let's consider
-the board-*.c files to be in minimal maintenance mode until they will
-eventually get removed.
+On Oct 6, 2011, at 12:35 PM, Russell King - ARM Linux wrote:
 
+> On Thu, Oct 06, 2011 at 01:08:28AM -0400, gdavis at mvista.com wrote:
+>> @@ -31,6 +32,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
+>> 	if (!new_pgd)
+>> 		goto no_pgd;
+>> 
+>> +	if (cache_ops_need_broadcast())
+>> +		get_cpu();
+> 
+> Is there something wrong with preempt_disable() here and preempt_enable()
+> below?
+
+I used the {get,put}_cpu() variants merely to (try to) make it clear that we want
+this region to be non-preemptible for the current CPU.
+
+>  If it's preempt that we're concerned about, these are the correct
+> interfaces to be used.
+
+Since  {get,put}_cpu() are wrappers for preempt_{enable,disable}, it works
+either way and I'm happy to just use preempt_{enable,disable} instead.  It
+achieves the same goal with slightly less overhead.  Also, while we're on
+the subject of preempt_enable, an earlier version of this change used
+preempt_enable_no_resched() but I chose to avoid the no_reched flavor
+since I felt that it was worth minimizing scheduler latencies.
+
+I'll change all of the  {get,put}_cpu() variants to  preempt_{enable,disable}
+and submit an updated series.
+
+Thanks!
+
+--
 Regards,
+George
 
-Tony
+
+>> +
+>> 	memset(new_pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
+>> 
+>> 	/*
+>> @@ -42,6 +46,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
+>> 
+>> 	clean_dcache_area(new_pgd, PTRS_PER_PGD * sizeof(pgd_t));
+>> 
+>> +	if (cache_ops_need_broadcast())
+>> +		put_cpu();
+>> +
