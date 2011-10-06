@@ -1,18 +1,32 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 6 Oct 2011 13:36:21 +0200
-Subject: sched: ARM: arch_scale_freq_power
-Message-ID: <CAKfTPtB3sLWq5fHOTrFg6vfHSKnz2i17oYx9Btr0u_tWV2bsjQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 6 Oct 2011 15:19:01 +0300
+Subject: [PATCH 01/26] usb/gadget/pxa25x: is_vbus_present is gone
+In-Reply-To: <1317499438-14058-2-git-send-email-arnd@arndb.de>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<1317499438-14058-2-git-send-email-arnd@arndb.de>
+Message-ID: <20111006121900.GQ1714@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I work to link the cpu_power of ARM cores to their frequency by using
-arch_scale_freq_power. It's explained in the kernel that cpu_power is
-used to distribute load on cpus and a cpu with more cpu_power will
-pick up more load. The default value is SCHED_POWER_SCALE and I
-increase the value if I want a cpu to have more load than another one.
-Is there an advised range for cpu_power value as well as some time
-scale constraints for updating the cpu_power value ?
-I'm also wondering why this scheduler feature is currently disable by default ?
+Hi,
 
-Regards,
-Vincent
+On Sat, Oct 01, 2011 at 10:03:33PM +0200, Arnd Bergmann wrote:
+> A recent commit obsoleted the is_vbus_present function, so
+> we must not use it any more.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Felipe Balbi <balbi@ti.com>
+
+If you want to carry this through your tree, I'm fine with it:
+
+Acked-by: Felipe Balbi <balbi@ti.com>
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111006/25b7f08e/attachment.sig>
