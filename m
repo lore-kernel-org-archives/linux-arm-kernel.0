@@ -1,77 +1,203 @@
 From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Thu,  6 Oct 2011 01:08:27 -0400
-Subject: [RFC/PATCH 0/7] ARM: ARM11 MPCore preemption/task migration cache
-	coherency fixups
-In-Reply-To: <05942148-7AFB-4755-A22F-355E0360B098@mvista.com>
+Date: Thu,  6 Oct 2011 01:08:30 -0400
+Subject: [RFC/PATCH 3/7] ARM: ARM11 MPCore: {clean,
+	flush}_pmd_entry are not preempt safe
+In-Reply-To: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
 References: <05942148-7AFB-4755-A22F-355E0360B098@mvista.com>
-Message-ID: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317877714-11355-1-git-send-email-gdavis@mvista.com>
+Message-ID: <1317877714-11355-4-git-send-email-gdavis@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+From: George G. Davis <gdavis@mvista.com>
 
-On ARM11 MPCore, the "SCU does not handle coherency consequences of CP15
-cache operations" [1].  So cache maintenance functions have to insure
-that memory is globally consistent.  Although the current Linux kernel
-works reasonably well on ARM11 MPCore machines, PREEMPT stress testing,
-e.g. parallel module loading and hackbench, results in crashes which
-exhibit non-sense oops traces where machine state does not make sense
-relative to the code executing at the time of the oops.
+If preemption and subsequent task migration occurs during calls to
+{clean,flush}_pmd_entry on ARM11 MPCore machines, global memory state
+can become inconsistent.  To prevent inconsistent memory state on
+these machines, disable preemption in callers of these functions around
+PMD modifications and subsequent {clean,flush}_pmd_entry calls.
 
-Review and analysis of the various ARM11 MPCore cache maintenance
-functions reveal that there are a number critical sections in which
-ARM11 MPCore caches and/or memory may become inconsistent, i.e. a
-cache line on CPU A contains a modified entry but preemption and task
-migration occurs after which the same cache line is cleaned/flushed
-on CPU B.  This can obviously lead to inconsistent memory and/or
-cache state as cache ops on ARM11 MPCore are non-coherent.
+Signed-off-by: George G. Davis <gdavis@mvista.com>
+---
+ arch/arm/include/asm/pgalloc.h  |    4 ++++
+ arch/arm/include/asm/pgtable.h  |    9 +++++++++
+ arch/arm/include/asm/smp_plat.h |    2 ++
+ arch/arm/mm/idmap.c             |    5 +++++
+ arch/arm/mm/ioremap.c           |    9 +++++++++
+ arch/arm/mm/mmu.c               |   12 ++++++++++++
+ 6 files changed, 41 insertions(+), 0 deletions(-)
 
-The following is a partial series of ARM11 MPCore preemption/task
-migration fixes to resolve cache coherency problems on these machines:
-
-George G. Davis (6):
-      ARM: ARM11 MPCore: pte_alloc_one{,_kernel} are not preempt safe
-      ARM: ARM11 MPCore: {clean,flush}_pmd_entry are not preempt safe
-      ARM: ARM11 MPCore: clean_dcache_area is not preempt safe
-      ARM: Move get_thread_info macro definition to <asm/assembler.h>
-      ARM: ARM11 MPCore: DMA_CACHE_RWFO operations are not preempt safe
-      ARM: ARM11 MPCore: cpu_v6_set_pte_ext is not preempt safe
-
-Konstantin Baidarov (1):
-      ARM: ARM11 MPCore: pgd_alloc is not preempt safe
-
- arch/arm/include/asm/assembler.h |   13 +++++++++++++
- arch/arm/include/asm/pgalloc.h   |   23 ++++++++++++++++++++---
- arch/arm/include/asm/pgtable.h   |    9 +++++++++
- arch/arm/include/asm/smp_plat.h  |    2 ++
- arch/arm/kernel/entry-header.S   |   11 -----------
- arch/arm/mm/cache-v6.S           |   33 +++++++++++++++++++++++++++++++++
- arch/arm/mm/idmap.c              |    5 +++++
- arch/arm/mm/ioremap.c            |    9 +++++++++
- arch/arm/mm/mmu.c                |   12 ++++++++++++
- arch/arm/mm/pgd.c                |    7 +++++++
- arch/arm/mm/proc-v6.S            |   11 +++++++++++
- arch/arm/plat-omap/iommu.c       |   10 ++++++++++
- arch/arm/vfp/entry.S             |    5 ++++-
- arch/arm/vfp/vfphw.S             |    5 ++++-
- 14 files changed, 139 insertions(+), 16 deletions(-)
-
-The above changes are among the "low hanging fruit" where the
-workarounds are relatively low impact from a performance and/or
-implementation effort perspective.  I'm still working on fixes
-for the harder problems.  Also, I believe that Catalin's "ARM: Allow
-lazy cache flushing on ARM11MPCore" [2][3] is required for ARM11
-MPCore machines and would like to see that or similar/alternative
-solution applied.
-
-Comments/feedback greatly appreciated.
-
-TIA!
-
---
-Regards,
-George
-
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.dai0228a/index.html#arm_toc9
-[2] http://www.spinics.net/lists/arm-kernel/msg129403.html
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/014990.html
+diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
+index cc2ac8b..6ba637a 100644
+--- a/arch/arm/include/asm/pgalloc.h
++++ b/arch/arm/include/asm/pgalloc.h
+@@ -121,9 +121,13 @@ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t pte,
+ 	unsigned long prot)
+ {
+ 	unsigned long pmdval = (pte + PTE_HWTABLE_OFF) | prot;
++	if (cache_ops_need_broadcast())
++		get_cpu();
+ 	pmdp[0] = __pmd(pmdval);
+ 	pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
+ 	flush_pmd_entry(pmdp);
++	if (cache_ops_need_broadcast())
++		put_cpu();
+ }
+ 
+ /*
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 5750704..bfef350 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -13,6 +13,7 @@
+ #include <linux/const.h>
+ #include <asm-generic/4level-fixup.h>
+ #include <asm/proc-fns.h>
++#include <asm/smp_plat.h>
+ 
+ #ifndef CONFIG_MMU
+ 
+@@ -313,16 +314,24 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ 
+ #define copy_pmd(pmdpd,pmdps)		\
+ 	do {				\
++		if (cache_ops_need_broadcast())	\
++			get_cpu();	\
+ 		pmdpd[0] = pmdps[0];	\
+ 		pmdpd[1] = pmdps[1];	\
+ 		flush_pmd_entry(pmdpd);	\
++		if (cache_ops_need_broadcast())	\
++			put_cpu();	\
+ 	} while (0)
+ 
+ #define pmd_clear(pmdp)			\
+ 	do {				\
++		if (cache_ops_need_broadcast())	\
++			get_cpu();	\
+ 		pmdp[0] = __pmd(0);	\
+ 		pmdp[1] = __pmd(0);	\
+ 		clean_pmd_entry(pmdp);	\
++		if (cache_ops_need_broadcast())	\
++			put_cpu();	\
+ 	} while (0)
+ 
+ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index f24c1b9..5a8d3df 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -5,6 +5,7 @@
+ #ifndef __ASMARM_SMP_PLAT_H
+ #define __ASMARM_SMP_PLAT_H
+ 
++#ifndef	__ASSEMBLY__
+ #include <asm/cputype.h>
+ 
+ /*
+@@ -42,5 +43,6 @@ static inline int cache_ops_need_broadcast(void)
+ 	return ((read_cpuid_ext(CPUID_EXT_MMFR3) >> 12) & 0xf) < 1;
+ }
+ #endif
++#endif
+ 
+ #endif
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 2be9139..49c7fee 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -3,17 +3,22 @@
+ #include <asm/cputype.h>
+ #include <asm/pgalloc.h>
+ #include <asm/pgtable.h>
++#include <asm/smp_plat.h>
+ 
+ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	unsigned long prot)
+ {
+ 	pmd_t *pmd = pmd_offset(pud, addr);
+ 
++	if (cache_ops_need_broadcast())
++		get_cpu();
+ 	addr = (addr & PMD_MASK) | prot;
+ 	pmd[0] = __pmd(addr);
+ 	addr += SECTION_SIZE;
+ 	pmd[1] = __pmd(addr);
+ 	flush_pmd_entry(pmd);
++	if (cache_ops_need_broadcast())
++		put_cpu();
+ }
+ 
+ static void idmap_add_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index ab50627..39de56e 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -32,6 +32,7 @@
+ #include <asm/pgalloc.h>
+ #include <asm/tlbflush.h>
+ #include <asm/sizes.h>
++#include <asm/smp_plat.h>
+ 
+ #include <asm/mach/map.h>
+ #include "mm.h"
+@@ -135,11 +136,15 @@ remap_area_sections(unsigned long virt, unsigned long pfn,
+ 	do {
+ 		pmd_t *pmd = pmd_offset(pgd, addr);
+ 
++		if (cache_ops_need_broadcast())
++			get_cpu();
+ 		pmd[0] = __pmd(__pfn_to_phys(pfn) | type->prot_sect);
+ 		pfn += SZ_1M >> PAGE_SHIFT;
+ 		pmd[1] = __pmd(__pfn_to_phys(pfn) | type->prot_sect);
+ 		pfn += SZ_1M >> PAGE_SHIFT;
+ 		flush_pmd_entry(pmd);
++		if (cache_ops_need_broadcast())
++			put_cpu();
+ 
+ 		addr += PGDIR_SIZE;
+ 		pgd++;
+@@ -172,9 +177,13 @@ remap_area_supersections(unsigned long virt, unsigned long pfn,
+ 		for (i = 0; i < 8; i++) {
+ 			pmd_t *pmd = pmd_offset(pgd, addr);
+ 
++			if (cache_ops_need_broadcast())
++				get_cpu();
+ 			pmd[0] = __pmd(super_pmd_val);
+ 			pmd[1] = __pmd(super_pmd_val);
+ 			flush_pmd_entry(pmd);
++			if (cache_ops_need_broadcast())
++				put_cpu();
+ 
+ 			addr += PGDIR_SIZE;
+ 			pgd++;
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 594d677..03562a9 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -567,12 +567,24 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+ 		if (addr & SECTION_SIZE)
+ 			pmd++;
+ 
++		if (cache_ops_need_broadcast())
++			get_cpu();
+ 		do {
+ 			*pmd = __pmd(phys | type->prot_sect);
+ 			phys += SECTION_SIZE;
+ 		} while (pmd++, addr += SECTION_SIZE, addr != end);
+ 
++		/* FIXME: Multiple PMD entries may be written above
++		 * but only one cache line, up to 8 PMDs depending
++		 * on the alignment of this mapping, is flushed below.
++		 * IFF this mapping spans >8MiB, then only the first
++		 * 8MiB worth of entries will be flushed.  Entries
++		 * above the 8MiB limit will not be flushed if I
++		 * read this correctly.
++		 */
+ 		flush_pmd_entry(p);
++		if (cache_ops_need_broadcast())
++			put_cpu();
+ 	} else {
+ 		/*
+ 		 * No need to loop; pte's aren't interested in the
+-- 
+1.7.4.4
