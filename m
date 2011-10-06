@@ -1,34 +1,95 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 6 Oct 2011 10:47:36 +0530
-Subject: [PATCH 05/16] dmaengine: pl330: Enable module alias
-	autogeneration for AMBA drivers
-In-Reply-To: <1317830707-17517-6-git-send-email-dave.martin@linaro.org>
-References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
-	<1317830707-17517-6-git-send-email-dave.martin@linaro.org>
-Message-ID: <CAJe_ZhePtDRD-Ov4D9jrEY7jt97aX9cM+jA0-=gkC1nZadRcMQ@mail.gmail.com>
+From: jgarzik@pobox.com (Jeff Garzik)
+Date: Thu, 06 Oct 2011 02:22:01 -0400
+Subject: [PATCH V9 2/5] ahci_plt Add the board_ids and pi refer to
+	different features
+In-Reply-To: <1317195717-21174-3-git-send-email-richard.zhu@linaro.org>
+References: <1317195717-21174-1-git-send-email-richard.zhu@linaro.org>
+	<1317195717-21174-3-git-send-email-richard.zhu@linaro.org>
+Message-ID: <4E8D4909.9030603@pobox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 October 2011 21:34, Dave Martin <dave.martin@linaro.org> wrote:
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+On 09/28/2011 03:41 AM, Richard Zhu wrote:
+> On imx53 AHCI, soft reset fails with IPMS set when PMP
+> is enabled but SATA HDD/ODD is connected to SATA port,
+> do soft reset again to port 0.
+> So the 'ahci_pmp_retry_srst_ops' is required when imx53
+> ahci is present.
+>
+> Signed-off-by: Richard Zhu<richard.zhu@linaro.org>
+> Acked-by: Eric Miao<eric.miao@linaro.org>
 > ---
-> ?drivers/dma/pl330.c | ? ?2 ++
-> ?1 files changed, 2 insertions(+), 0 deletions(-)
+>   drivers/ata/ahci_platform.c |   44 +++++++++++++++++++++++++++++++++++++-----
+>   1 files changed, 38 insertions(+), 6 deletions(-)
 >
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 57104147..2d8d1b0 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -990,6 +990,8 @@ static struct amba_id pl330_ids[] = {
-> ? ? ? ?{ 0, 0 },
-> ?};
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index 6fef1fa..c03277d 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -23,6 +23,41 @@
+>   #include<linux/ahci_platform.h>
+>   #include "ahci.h"
 >
-> +MODULE_DEVICE_TABLE(amba, pl330_ids);
+> +enum ahci_type {
+> +	AHCI,		/* standard platform ahci */
+> +	IMX53_AHCI,	/* ahci on i.mx53 */
+> +};
 > +
-> ?#ifdef CONFIG_PM_RUNTIME
-> ?static int pl330_runtime_suspend(struct device *dev)
-> ?{
+> +static struct platform_device_id ahci_devtype[] = {
+> +	{
+> +		.name = "ahci",
+> +		.driver_data = AHCI,
+> +	}, {
+> +		.name = "imx53-ahci",
+> +		.driver_data = IMX53_AHCI,
+> +	}, {
+> +		/* sentinel */
+> +	}
+> +};
+> +MODULE_DEVICE_TABLE(platform, ahci_devtype);
+> +
+> +
+> +static const struct ata_port_info ahci_port_info[] = {
+> +	/* by features */
+> +	[AHCI] = {
+> +		.flags		= AHCI_FLAG_COMMON,
+> +		.pio_mask	= ATA_PIO4,
+> +		.udma_mask	= ATA_UDMA6,
+> +		.port_ops	=&ahci_ops,
+> +	},
+> +	[IMX53_AHCI] = {
+> +		.flags		= AHCI_FLAG_COMMON,
+> +		.pio_mask	= ATA_PIO4,
+> +		.udma_mask	= ATA_UDMA6,
+> +		.port_ops	=&ahci_pmp_retry_srst_ops,
+> +	},
+> +};
+> +
+>   static struct scsi_host_template ahci_platform_sht = {
+>   	AHCI_SHT("ahci_platform"),
+>   };
+> @@ -31,12 +66,8 @@ static int __init ahci_probe(struct platform_device *pdev)
+>   {
+>   	struct device *dev =&pdev->dev;
+>   	struct ahci_platform_data *pdata = dev->platform_data;
+> -	struct ata_port_info pi = {
+> -		.flags		= AHCI_FLAG_COMMON,
+> -		.pio_mask	= ATA_PIO4,
+> -		.udma_mask	= ATA_UDMA6,
+> -		.port_ops	=&ahci_ops,
+> -	};
+> +	const struct platform_device_id *id = platform_get_device_id(pdev);
+> +	struct ata_port_info pi = ahci_port_info[id->driver_data];
+>   	const struct ata_port_info *ppi[] = {&pi, NULL };
+>   	struct ahci_host_priv *hpriv;
+>   	struct ata_host *host;
+> @@ -177,6 +208,7 @@ static struct platform_driver ahci_driver = {
+>   		.name = "ahci",
+>   		.owner = THIS_MODULE,
+>   	},
+> +	.id_table	= ahci_devtype,
+>   };
 
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+Looks good...  I queued this one.
 
-Thanks.
+	Jeff
