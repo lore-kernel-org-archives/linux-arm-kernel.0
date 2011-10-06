@@ -1,60 +1,39 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Thu, 6 Oct 2011 15:38:31 -0400
-Subject: [RFC/PATCH 1/7] ARM: ARM11 MPCore: pgd_alloc is not preempt safe
-In-Reply-To: <20111006163520.GA21464@n2100.arm.linux.org.uk>
-References: <05942148-7AFB-4755-A22F-355E0360B098@mvista.com>
-	<1317877714-11355-1-git-send-email-gdavis@mvista.com>
-	<1317877714-11355-2-git-send-email-gdavis@mvista.com>
-	<20111006163520.GA21464@n2100.arm.linux.org.uk>
-Message-ID: <0D5AA174-DD77-4A5A-B16C-864649415F25@mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 6 Oct 2011 12:38:32 -0700
+Subject: [PATCH 0/2] AM3517EVM: Add support for MMC1
+In-Reply-To: <1313754751-11752-1-git-send-email-abhilash.kv@ti.com>
+References: <1313754751-11752-1-git-send-email-abhilash.kv@ti.com>
+Message-ID: <20111006193832.GL6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Oct 6, 2011, at 12:35 PM, Russell King - ARM Linux wrote:
-
-> On Thu, Oct 06, 2011 at 01:08:28AM -0400, gdavis at mvista.com wrote:
->> @@ -31,6 +32,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
->> 	if (!new_pgd)
->> 		goto no_pgd;
->> 
->> +	if (cache_ops_need_broadcast())
->> +		get_cpu();
+* Abhilash K V <abhilash.kv@ti.com> [110819 04:19]:
+> This patch-set adds support for MMC1 slot on the 
+> AM3517 EVM's base-board.
+> These patches are dependent on the following patch-set
+> http://marc.info/?l=linux-omap&m=131247357813228&w=2
+> which gets the AM3517 EVM booting.
 > 
-> Is there something wrong with preempt_disable() here and preempt_enable()
-> below?
+> The patches are tested on master of tmlind/linux-omap-2.6.git.
+> Kernel version is 3.0.0-rc7 and last commit on top of which these patches
+> were added is:
+> 
+>         885cf6ff7d3dad4cc44be74b0577d3a554d3ab71: Linux-omap rebuilt:
+>         Updated to -rc7, added new boards
+> 
+> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+> ---
+> Abhilash K V (1):
+>   AM3517: Support for MMC1
+> 
+> Vaibhav Hiremath (1):
+>   AM3517EVM: Add support for base-board MMC slot
+> 
+>  arch/arm/mach-omap2/board-am3517evm.c |   22 ++++++++++++++++++++++
+>  arch/arm/mach-omap2/hsmmc.c           |   10 +++++++++-
+>  2 files changed, 31 insertions(+), 1 deletions(-)
+> 
 
-I used the {get,put}_cpu() variants merely to (try to) make it clear that we want
-this region to be non-preemptible for the current CPU.
+Adding these both to board branch thanks.
 
->  If it's preempt that we're concerned about, these are the correct
-> interfaces to be used.
-
-Since  {get,put}_cpu() are wrappers for preempt_{enable,disable}, it works
-either way and I'm happy to just use preempt_{enable,disable} instead.  It
-achieves the same goal with slightly less overhead.  Also, while we're on
-the subject of preempt_enable, an earlier version of this change used
-preempt_enable_no_resched() but I chose to avoid the no_reched flavor
-since I felt that it was worth minimizing scheduler latencies.
-
-I'll change all of the  {get,put}_cpu() variants to  preempt_{enable,disable}
-and submit an updated series.
-
-Thanks!
-
---
-Regards,
-George
-
-
->> +
->> 	memset(new_pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
->> 
->> 	/*
->> @@ -42,6 +46,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
->> 
->> 	clean_dcache_area(new_pgd, PTRS_PER_PGD * sizeof(pgd_t));
->> 
->> +	if (cache_ops_need_broadcast())
->> +		put_cpu();
->> +
+Tony
