@@ -1,154 +1,82 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 6 Oct 2011 17:02:00 +0100
-Subject: [PATCH 2/2] hw_random: add driver for atmel true hardware random
-	number generator
-In-Reply-To: <1317915694-27564-2-git-send-email-jacmet@sunsite.dk>
-References: <1317915694-27564-1-git-send-email-jacmet@sunsite.dk>
-	<1317915694-27564-2-git-send-email-jacmet@sunsite.dk>
-Message-ID: <20111006160200.GF1931@totoro>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 6 Oct 2011 09:11:59 -0700
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <4E8D01BE.3020202@codeaurora.org>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+	<4E8D01BE.3020202@codeaurora.org>
+Message-ID: <CAJOA=zO=Hou85bJnUr5yp7fdzWpiAtZj+MWrMgWuqbD3j33tSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Wed, Oct 5, 2011 at 6:17 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+> On 09/22/2011 03:26 PM, Mike Turquette wrote:
+>> + ? ? ? unsigned long ? (*recalc_rate)(struct clk_hw *);
+>> + ? ? ? long ? ? ? ? ? ?(*round_rate)(struct clk_hw *, unsigned long);
+>> + ? ? ? struct clk * ? ?(*get_parent)(struct clk_hw *);
+>> +};
+>
+> I would like to understand the need for recalc rate if that's something that
+> we want to go into the common framework (even if it's optional). I have
+> mostly heard only second hand explanations of the need for recalc_rate(), so
+> I might not have the full picture. But for all the cases that I can think
+> of, recalc_rate seems like a paradox.
 
-A couple of minor nits inline, but otherwise looks nice to me!
+Recalc rate has four main uses that I can think of off the top of my head:
+1) clk_set_rate is called on clock0, which is a non-leaf clock.  All
+clocks "below" clock0 have had their rates changed, yet no one called
+clk_set_rate on those child clocks.  We use recalc to walk the
+sub-tree of children and recalculate their rates based on the new rate
+of their parent, clock0.
 
-Jamie
+2) exact same as #1, but using clk_set_parent instead of clk_set_rate.
+ Again, changing the rate of a clock "high up" in the tree will affect
+the rates of many child clocks below it.
 
-On Thu, Oct 06, 2011 at 05:41:34PM +0200, Peter Korsgaard wrote:
-> diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
-> new file mode 100644
-> index 0000000..c69eccb
-> --- /dev/null
-> +++ b/drivers/char/hw_random/atmel-rng.c
-> @@ -0,0 +1,168 @@
-> +/*
-> + * Copyright (c) 2011 Peter Korsgaard <jacmet@sunsite.dk>
-> + *
-> + * This file is licensed under  the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/slab.h>
-> +#include <linux/err.h>
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/hw_random.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define TRNG_CR		0x00
-> +#define TRNG_ISR	0x1c
-> +#define TRNG_ODATA	0x50
-> +
-> +#define TRNG_KEY	0x524e4700 /* RNG */
-> +
-> +struct atmel_trng {
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +};
-> +
-> +static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
-> +			   bool wait)
-> +{
-> +	struct atmel_trng *trng = (struct atmel_trng *)rng->priv;
-> +	u32 *data = buf;
-> +
-> +	/* data ready? */
-> +	if (readl(trng->base + TRNG_ODATA) & 1) {
-> +		*data = readl(trng->base + TRNG_ODATA);
-> +		return 4;
-> +	} else
-> +		return 0;
-> +}
-> +
-> +static struct hwrng atmel_trng = {
-> +	.name	= "atmel-trng",
-> +	.read	= atmel_trng_read,
-> +};
+3) at boot-time/init-time when we don't trust the bootloader and need
+to determine the clock rates by parsing registers
 
-Could you do:
+4) modeling rates for clocks that we don't really control.  This is
+not as common as the above three, but there are times when we're
+interested in knowing a clock rate (perhaps for debug purposes), but
+it's scaling logic is in firmware or somehow independent of the Linux
+clock framework.
 
-struct atmel_trng {
-	struct clk *clk;
-	void __iomem *base;
-	struct hwrng rng;
-};
+> If recalc_rate() is used to make sure the "current rate" of a "clock A" is
+> always known even if it's parent "clock B"'s rate is changed, then it also
+> means that the rate of "clock A" can change without clk_set_rate(clock A,
+> new rate). That in turn means that the clk_get_rate() just gives the
+> instantaneous snapshot of the rate. So, any use of clk_get_rate(clock A) for
+> anything other than printing/logging the return value is broken code. In
 
-#define to_atmel_trng(rng) \
-	container_of(rng, struct amtel_trng, rng)
+For most clocks, the first three examples I give above will cover all
+of the times that a clock's rate will change.  As long as a
+recalc/tree-walk is present then clk->rate is not out of sync and thus
+printing/reading that value is not broken.
 
-which would allow you to support more than one TRNG (although unlikely) 
-but also means you don't need the cast for priv.
+> which case, do we really care for recalc_rate()? We could just return the
+> rate that it was set to when clk_set_rate() was called and call it a day or
+> return 0 for such clocks to indicate that the clock rate is "unknown".
 
-> +static int atmel_trng_probe(struct platform_device *pdev)
-> +{
-> +	struct atmel_trng *trng;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	if (atmel_trng.priv) {
-> +		dev_err(&pdev->dev, "multiple instances not supported\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -EINVAL;
-> +
-> +	trng = devm_kzalloc(&pdev->dev, sizeof(*trng), GFP_KERNEL);
-> +	if (!trng)
-> +		return -ENOMEM;
-> +
-> +	if (!devm_request_mem_region(&pdev->dev, res->start,
-> +				     resource_size(res), pdev->name))
-> +		return -EBUSY;
-> +
-> +	trng->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
-> +	if (!trng->base)
-> +		return -EBUSY;
-> +
-> +	trng->clk = clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(trng->clk))
-> +		return PTR_ERR(trng->clk);
-> +
-> +	ret = clk_enable(trng->clk);
-> +	if (ret)
-> +		goto err_enable;
-> +
-> +	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
-> +
-> +	atmel_trng.priv = (unsigned long)trng;
-> +
-> +	ret = hwrng_register(&atmel_trng);
-> +	if (ret)
-> +		goto err_register;
-> +
-> +	platform_set_drvdata(pdev, trng);
-> +
-> +	return 0;
-> +
-> +err_register:
-> +	atmel_trng.priv = 0;
-> +	clk_disable(trng->clk);
-> +err_enable:
-> +	clk_put(trng->clk);
-> +
-> +	return ret;
-> +}
-> +
-> +static int __devexit atmel_trng_remove(struct platform_device *pdev)
-> +{
-> +	struct atmel_trng *trng = platform_get_drvdata(pdev);
-> +
-> +	hwrng_unregister(&atmel_trng);
-> +
-> +	writel(TRNG_KEY, trng->base + TRNG_CR);
-> +	clk_disable(trng->clk);
-> +	clk_put(trng->clk);
-> +
-> +	atmel_trng.priv = 0;
+What's the point of tracking a rate if it can't be trusted?  Also, it
+is important to recalc rates whenever changes are made "high up" in
+the clock tree once we start to work on rate-change-arbitration
+issues, etc.
 
-I think this should have a platform_set_drvdata(pdev, NULL) too.
+Regards,
+Mike
+
+> The whole concept of trying to recalculate the rate for a clock makes me
+> feel uneasy since it promotes misunderstanding the behavior of the clock and
+> writing bad code based on that misunderstanding.
+>
+> I would like to hear to real usecases before I propose some alternatives
+> that I have in mind.
+>
+> Thanks,
+> Saravana
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
