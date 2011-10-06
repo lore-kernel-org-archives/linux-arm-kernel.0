@@ -1,35 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Oct 2011 18:42:19 -0700
-Subject: [PATCH 0/4] initialize omap SRAM later on with
-	__arm_ioremap_exec()
-In-Reply-To: <4E8C0125.1060300@ti.com>
-References: <20111005004339.26980.31149.stgit@kaulin.local>
-	<4E8C0125.1060300@ti.com>
-Message-ID: <20111006014219.GH6324@atomide.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 5 Oct 2011 20:37:03 -0700
+Subject: [PATCH 07/16] input: ambakmi: Enable module alias autogeneration
+	for AMBA drivers
+In-Reply-To: <1317830707-17517-8-git-send-email-dave.martin@linaro.org>
+References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
+	<1317830707-17517-8-git-send-email-dave.martin@linaro.org>
+Message-ID: <20111006033702.GB20217@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [111004 23:29]:
+On Wed, Oct 05, 2011 at 05:04:58PM +0100, Dave Martin wrote:
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+
+Acked-by: Dmitry Torokhov <dtor@mail.ru>
+
+> ---
+>  drivers/input/serio/ambakmi.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> Will look at this series in next couple of days and do some testing.
+> diff --git a/drivers/input/serio/ambakmi.c b/drivers/input/serio/ambakmi.c
+> index 12abc50..8407d5b 100644
+> --- a/drivers/input/serio/ambakmi.c
+> +++ b/drivers/input/serio/ambakmi.c
+> @@ -195,6 +195,8 @@ static struct amba_id amba_kmi_idtable[] = {
+>  	{ 0, 0 }
+>  };
+>  
+> +MODULE_DEVICE_TABLE(amba, amba_kmi_idtable);
+> +
+>  static struct amba_driver ambakmi_driver = {
+>  	.drv		= {
+>  		.name	= "kmi-pl050",
+> -- 
+> 1.7.4.1
+> 
 
-Thanks, turns out there were a few issues with early ioremap
-that I fixed. Care to check the L4_IO_ADDRESS changes?
-
-It's all pushed now into sram-map-io branch at:
-
-https://github.com/tmlind/linux/tree/sram-map-io
-
-It seems it's booting now on all omaps I've tried, so will merge
-it into linux-omap master branch as well for testing.
-
-> Looks like you wanted to inlcude below patch also part of this
-> series though [PATCH 5/4] numbering is bit confusing.
-> [PATCH 5/4] ARM: OMAP: Move set_globals initialization to happen in
-> init_early
-
-Yeah sorry the patches overflowed from the initial four..
-
-Regards,
-
-Tony
+-- 
+Dmitry
