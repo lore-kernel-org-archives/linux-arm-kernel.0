@@ -1,35 +1,74 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 06 Oct 2011 22:44:32 +0200
-Subject: [PATCHv2] hw_random: add driver for atmel true hardware random
-	number generator
-In-Reply-To: <20111006203023.GE24034@tarshish> (Baruch Siach's message of
-	"Thu, 6 Oct 2011 22:30:23 +0200")
-References: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
-	<20111006203023.GE24034@tarshish>
-Message-ID: <87ty7l3l5b.fsf@macbook.be.48ers.dk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 06 Oct 2011 14:50:33 -0600
+Subject: [PATCH 1/2] MMC: add workaround for controllers with broken
+	multiblock reads
+In-Reply-To: <20111006205002.7083.94088.stgit@dusk>
+References: <20111006205002.7083.94088.stgit@dusk>
+Message-ID: <20111006205030.7083.79614.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Baruch" == Baruch Siach <baruch@tkos.co.il> writes:
+Due to hardware bugs, some MMC host controllers don't support
+multiple-block reads[1].  To resolve, add a new MMC capability flag,
+MMC_CAP_NO_MULTI_READ, which can be set by affected host controller
+drivers.  When this capability is set, all reads will be issued one
+sector at a time.
 
-Hi,
+1. See for example Advisory 2.1.1.128 "MMC: Multiple Block Read
+Operation Issue" in _OMAP3530/3525/3515/3503 Silicon Errata_
+Revision F (October 2010) (SPRZ278F), available from
+http://focus.ti.com/lit/er/sprz278f/sprz278f.pdf
 
- >> +static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
- >> +			   bool wait)
- >> +{
- >> +	struct atmel_trng *trng = container_of(rng, struct atmel_trng, rng);
- >> +	u32 *data = buf;
- >> +
- >> +	/* data ready? */
- >> +	if (readl(trng->base + TRNG_ODATA) & 1) {
- >> +		*data = readl(trng->base + TRNG_ODATA);
- >> +		return 4;
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Dave Hylands <dhylands@gmail.com>
+Cc: Steve Sakoman <sakoman@gmail.com>
+Cc: Chris Ball <cjb@laptop.org>
+---
+ drivers/mmc/card/block.c |   21 ++++++++++++++-------
+ include/linux/mmc/host.h |    1 +
+ 2 files changed, 15 insertions(+), 7 deletions(-)
 
- Baruch> Shouldn't you check for max >= 4 before writing to *buf?
-
-Conceptually, yes. The other hw_random drivers don't seem to do it
-though, and the buffer size is guaranteed to be atleast 32 bytes, but I
-can stick a '&& max >= 4' in the conditional if you prefer.
-
--- 
-Bye, Peter Korsgaard
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 1ff5486..927f9d5 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -954,13 +954,20 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
+ 	if (brq->data.blocks > card->host->max_blk_count)
+ 		brq->data.blocks = card->host->max_blk_count;
+ 
+-	/*
+-	 * After a read error, we redo the request one sector at a time
+-	 * in order to accurately determine which sectors can be read
+-	 * successfully.
+-	 */
+-	if (disable_multi && brq->data.blocks > 1)
+-		brq->data.blocks = 1;
++	if (brq->data.blocks > 1) {
++		/*
++		 * After a read error, we redo the request one sector
++		 * at a time in order to accurately determine which
++		 * sectors can be read successfully.
++		 */
++		if (disable_multi)
++			brq->data.blocks = 1;
++
++		/* Some controllers can't do multiblock reads due to hw bugs */
++		if (card->host->caps & MMC_CAP_NO_MULTI_READ &&
++		    rq_data_dir(req) == READ)
++			brq->data.blocks = 1;
++	}
+ 
+ 	if (brq->data.blocks > 1 || do_rel_wr) {
+ 		/* SPI multiblock writes terminate using a special
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index 1d09562..745f506 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -229,6 +229,7 @@ struct mmc_host {
+ #define MMC_CAP_MAX_CURRENT_600	(1 << 28)	/* Host max current limit is 600mA */
+ #define MMC_CAP_MAX_CURRENT_800	(1 << 29)	/* Host max current limit is 800mA */
+ #define MMC_CAP_CMD23		(1 << 30)	/* CMD23 supported. */
++#define MMC_CAP_NO_MULTI_READ	(1 << 31)	/* Multiblock reads don't work */
+ 
+ 	mmc_pm_flag_t		pm_caps;	/* supported pm features */
+ 
