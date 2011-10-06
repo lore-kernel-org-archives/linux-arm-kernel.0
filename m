@@ -1,43 +1,74 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 6 Oct 2011 22:30:23 +0200
-Subject: [PATCHv2] hw_random: add driver for atmel true hardware random
-	number generator
-In-Reply-To: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
-References: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <20111006203023.GE24034@tarshish>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 6 Oct 2011 14:39:28 -0600 (MDT)
+Subject: [PATCH] ARM: OMAP3: hwmod: fix variant registration and remove
+	SmartReflex from common list
+Message-ID: <alpine.DEB.2.00.1110061433540.4611@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
 
-On Thu, Oct 06, 2011 at 07:56:30PM +0200, Peter Korsgaard wrote:
-> For the IP block on 9g45/9g46/9m10/9m11.
-> 
-> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
-> ---
+Commit d6504acd2125984c61dce24727dd3842d0144015 ("OMAP2+: hwmod:
+remove OMAP_CHIP*") tests the inverse condition of what it should be
+testing for the return value from omap_hwmod_register().  This causes
+several IP blocks to not be registered on several OMAP3 family devices.
 
-[snip]
+Fixing that bug also unmasked another bug, originally reported by
+Chase Maupin <chase.maupin@ti.com> and then subsequently by Abhilash K
+V <abhilash.kv@ti.com>, which caused SmartReflex IP blocks to be
+registered on SoCs that don't support them.
 
-> +static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
-> +			   bool wait)
-> +{
-> +	struct atmel_trng *trng = container_of(rng, struct atmel_trng, rng);
-> +	u32 *data = buf;
-> +
-> +	/* data ready? */
-> +	if (readl(trng->base + TRNG_ODATA) & 1) {
-> +		*data = readl(trng->base + TRNG_ODATA);
-> +		return 4;
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Chase Maupin <chase.maupin@ti.com>
+Cc: Abhilash K V <abhilash.kv@ti.com>
+---
 
-Shouldn't you check for max >= 4 before writing to *buf?
+This fixes a pretty embarrassing "brown paper bag" bug of mine in one of 
+the cleanup patches.  Tony, it would be good if you could send this to 
+Arnd ASAP and merge into your cleanup branch.  Tested on 3430SDP, 37XX 
+EVM, and OMAP3503.
 
-> +	} else
-> +		return 0;
-> +}
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-baruch
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index ab35acb..53b6706 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -13,6 +13,8 @@
+  *
+  * XXX these should be marked initdata for multi-OMAP kernels
+  */
++#include <linux/err.h>
++
+ #include <plat/omap_hwmod.h>
+ #include <mach/irqs.h>
+ #include <plat/cpu.h>
+@@ -3161,8 +3163,6 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
+ 	&omap3xxx_i2c1_hwmod,
+ 	&omap3xxx_i2c2_hwmod,
+ 	&omap3xxx_i2c3_hwmod,
+-	&omap34xx_sr1_hwmod,
+-	&omap34xx_sr2_hwmod,
+ 
+ 	/* gpio class */
+ 	&omap3xxx_gpio1_hwmod,
+@@ -3240,7 +3240,7 @@ int __init omap3xxx_hwmod_init(void)
+ 
+ 	/* Register hwmods common to all OMAP3 */
+ 	r = omap_hwmod_register(omap3xxx_hwmods);
+-	if (!r)
++	if (IS_ERR_VALUE(r))
+ 		return r;
+ 
+ 	rev = omap_rev();
+@@ -3265,7 +3265,7 @@ int __init omap3xxx_hwmod_init(void)
+ 	};
+ 
+ 	r = omap_hwmod_register(h);
+-	if (!r)
++	if (IS_ERR_VALUE(r))
+ 		return r;
+ 
+ 	/*
 -- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+1.7.6.3
