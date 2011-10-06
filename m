@@ -1,39 +1,27 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Oct 2011 12:59:46 -0700
-Subject: ARM SoC tree: OMAP PM dependency on tip irq/core
-In-Reply-To: <4E877E29.7000309@gmail.com>
-References: <87aa9mm8ts.fsf@ti.com> <87k48pfyvg.fsf@ti.com>
-	<4E877E29.7000309@gmail.com>
-Message-ID: <20111006195945.GQ6324@atomide.com>
+Date: Thu, 6 Oct 2011 13:12:25 -0700
+Subject: [PATCH 0/2] ARM: OMAP2+: timer fixes / cleanup
+In-Reply-To: <1317763241-21422-1-git-send-email-b-cousson@ti.com>
+References: <1317763241-21422-1-git-send-email-b-cousson@ti.com>
+Message-ID: <20111006201225.GS6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robherring2@gmail.com> [111001 13:21]:
-> On 09/30/2011 05:29 PM, Kevin Hilman wrote:
-> > Hi Arnd,
-> > 
-> > Kevin Hilman <khilman@ti.com> writes:
-> > 
-> >> The upcoming OMAP4 PM series from Santosh[1] that we're planning to
-> >> queue for v3.2 has a dependency[2] on a patch currently queued for v3.2
-> >> in the irq/core branch of Thomas' tip tree[3].
-> >>
-> >> In the past, I noticed you merged external trees like this to solve
-> >> dependencies.
-> >>
-> >> Could you pull the irq/core branch into your tree to meet this
-> >> dependency?
-> > 
-> > On second thought, since Santosh's branch is the only one with this
-> > dependency (and we also have a dependency on Russell's devel-stable)
-> > I'll just build up a branch for Santosh's series that includes
-> > rmk/devel-stable and tglx/irq-core.
-> > 
+* Benoit Cousson <b-cousson@ti.com> [111004 13:46]:
+> Hi Tony,
 > 
-> Any new platforms will have a dependency on rmk/devel-stable with the
-> mach header clean-up. I'll probably have a dependency on tglx's tree as
-> well.
+> Here is the series to fix the warning and remove the redundant
+> latency structure that be removed since the timer runtime PM
+> adaptation was just pulled.
+> 
+> I was just able to test that on OMAP4.
+> 
+> Patches are based on Kevin's for_3.2/omap_device-2 branch
+> and are available here:
+> git://gitorious.org/omap-pm/linux.git for_3.2/timer_fixes
 
-Sounds like Arnd should pull this into some branch then.
+Thanks, applying both into fixes-part2 branch.
+
+Regards,
 
 Tony
