@@ -1,15 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Oct 2011 15:15:24 +0100
-Subject: [PATCH 0/2] Make IPI and localtimer handlers callable from C code
-In-Reply-To: <20111006141023.GC22547@S2100-06.ap.freescale.net>
-References: <1317545821-23194-1-git-send-email-shawn.guo@linaro.org>
-	<20111006141023.GC22547@S2100-06.ap.freescale.net>
-Message-ID: <20111006141524.GC26349@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 06 Oct 2011 16:18:36 +0200
+Subject: [PATCH 7/7] ARM: integrate CMA with DMA-mapping subsystem
+In-Reply-To: <1317909290-29832-8-git-send-email-m.szyprowski@samsung.com>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<1317909290-29832-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <000201cc8432$d642b930$82c82b90$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 06, 2011 at 10:10:24PM +0800, Shawn Guo wrote:
-> Do you have any comment on these two patches?  Otherwise, I will put
-> them into patch track system.
+Hello,
 
-No comment, they look fine, thanks.
+On Thursday, October 06, 2011 3:55 PM Marek Szyprowski wrote:
+
+> This patch adds support for CMA to dma-mapping subsystem for ARM
+> architecture. By default a global CMA area is used, but specific devices
+> are allowed to have their private memory areas if required (they can be
+> created with dma_declare_contiguous() function during board
+> initialization).
+> 
+> Contiguous memory areas reserved for DMA are remapped with 2-level page
+> tables on boot. Once a buffer is requested, a low memory kernel mapping
+> is updated to to match requested memory access type.
+> 
+> GFP_ATOMIC allocations are performed from special pool which is created
+> early during boot. This way remapping page attributes is not needed on
+> allocation time.
+> 
+> CMA has been enabled unconditionally for ARMv6+ systems.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+Please ignore this patch. The patch named as "[PATCH 8/9] ARM: integrate
+CMA with DMA-mapping subsystem" in this thread is the correct one.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
