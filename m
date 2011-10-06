@@ -1,38 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Oct 2011 16:29:00 -0700
-Subject: [PATCH v2] ARM: OMAP3: hwmod: fix variant registration and
-	remove SmartReflex from common list
-In-Reply-To: <alpine.DEB.2.00.1110061723550.4611@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1110061433540.4611@utopia.booyaka.com>
-	<20111006223545.GB27281@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1110061723550.4611@utopia.booyaka.com>
-Message-ID: <20111006232900.GC6324@atomide.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 06 Oct 2011 16:46:28 -0700
+Subject: [PATCH v3] ARM: OMAP3: PM: fix I/O wakeup and I/O chain clock
+	control detection
+In-Reply-To: <alpine.DEB.2.00.1110061525240.4611@utopia.booyaka.com> (Paul
+	Walmsley's message of "Thu, 6 Oct 2011 15:25:52 -0600 (MDT)")
+References: <alpine.DEB.2.00.1110061310390.4611@utopia.booyaka.com>
+	<CAGDS+nno3=sDDwdF6Ew6qG-8mN9bCeawCpho+AJo=jE9QVk0ag@mail.gmail.com>
+	<alpine.DEB.2.00.1110061346570.4611@utopia.booyaka.com>
+	<CAGDS+nmb20E4y2HqBtDN05PK1C1YXjmRvnVAbQkhGpp17s4Zcg@mail.gmail.com>
+	<alpine.DEB.2.00.1110061525240.4611@utopia.booyaka.com>
+Message-ID: <87ipo1n0ob.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [111006 15:50]:
-> 
-> Commit d6504acd2125984c61dce24727dd3842d0144015 ("OMAP2+: hwmod:
-> remove OMAP_CHIP*") tests the inverse condition of what it should be
-> testing for the return value from omap_hwmod_register().  This causes
-> several IP blocks to not be registered on several OMAP3 family devices.
-> 
-> Fixing that bug also unmasked another bug, originally reported by
-> Chase Maupin <chase.maupin@ti.com> and then subsequently by Abhilash K
-> V <abhilash.kv@ti.com>, which caused SmartReflex IP blocks to be
-> registered on SoCs that don't support them.
-> 
-> Thanks to Russell King - ARM Linux <linux@arm.linux.org.uk> for comments
-> on a previous version of the patch.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Chase Maupin <chase.maupin@ti.com>
-> Cc: Abhilash K V <abhilash.kv@ti.com>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> ---
-> 
-> This version incorporates some comments from RMK.
+Paul Walmsley <paul@pwsan.com> writes:
 
-Thanks, updating in fixes-part2.
+> The way that we detect which OMAP3 chips support I/O wakeup and
+> software I/O chain clock control is broken.
+>
+> Currently, I/O wakeup is marked as present for all OMAP3 SoCs other
+> than the AM3505/3517.  The TI81xx family of SoCs are at present
+> considered to be OMAP3 SoCs, but don't support I/O wakeup.  To resolve
+> this, convert the existing blacklist approach to an explicit,
+> whitelist support, in which only SoCs which are known to support I/O
+> wakeup are listed.  (At present, this only includes OMAP34xx,
+> OMAP3503, OMAP3515, OMAP3525, OMAP3530, and OMAP36xx.)
+>
+> Also, the current code incorrectly detects the presence of a
+> software-controllable I/O chain clock on several chips that don't
+> support it.  This results in writes to reserved bitfields, unnecessary
+> delays, and console messages on kernels running on those chips:
+>
+>     http://www.spinics.net/lists/linux-omap/msg58735.html
+>
+> Convert this test to a feature test with a chip-by-chip whitelist.
+>
+> Thanks to Dave Hylands <dhylands@gmail.com> for reporting this problem
+> and doing some testing to help isolate the cause.  Thanks to Steve
+> Sakoman <sakoman@gmail.com> for catching a bug in the first version of
+> this patch.
 
-Tony
+Based on the comments from Russell, I made a couple minor changes.
+Here's the updated version (also in my for_3.1/pm-fixes-3 branch.)
+
+Other than that, it looks like a good cleanup, queueing for v3.2 and
+will submit to stable as well.
+
+Tony, do you think we can still queue this as a fix for v3.1?
+
+Kevin
