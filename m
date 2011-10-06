@@ -1,68 +1,39 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 06 Oct 2011 14:50:35 -0600
-Subject: [PATCH 2/2] MMC: omap_hsmmc: disable multiblock reads when
-	platform_data indicates that they are broken
-In-Reply-To: <20111006205002.7083.94088.stgit@dusk>
-References: <20111006205002.7083.94088.stgit@dusk>
-Message-ID: <20111006205033.7083.75908.stgit@dusk>
+Date: Thu, 06 Oct 2011 14:50:30 -0600
+Subject: [PATCH 0/2] MMC: disable multiblock reads on controllers that don't
+	support them
+Message-ID: <20111006205002.7083.94088.stgit@dusk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When device data indicates that multiple block reads are not supported on
-a given HSMMC controller instance, log a message to the console, and
-pass the appropriate MMC capability flag to the MMC core.
+Hello,
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Dave Hylands <dhylands@gmail.com>
-Cc: Steve Sakoman <sakoman@gmail.com>
-Cc: Chris Ball <cjb@laptop.org>
+Some MMC controller instances integrated on older OMAP34xx/35xx chips
+don't work correctly with multiple-block reads, due to a hardware bug.
+This series fixes the problem by adding an MMC capability flag for this
+case and making the appropriate changes to the MMC core code and OMAP HSMMC
+driver to support this.
+
+Once this series is merged, a subsequent patch will be needed by us OMAP
+folks to pass the appropriate device data via hwmod - this will be posted
+separately.
+
+
+- Paul
+
 ---
- arch/arm/plat-omap/include/plat/mmc.h |   19 ++++++++++++++++++-
- drivers/mmc/host/omap_hsmmc.c         |    4 ++++
- 2 files changed, 22 insertions(+), 1 deletions(-)
+mmc_errata_2.1.1.128_fix_3.2
+   text	   data	    bss	    dec	    hex	filename
+6325283	 655708	5591124	12572115	 bfd5d3	vmlinux.omap2plus_defconfig.orig
+6329423	 655700	5591124	12576247	 bfe5f7	vmlinux.omap2plus_defconfig.patched
 
-diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
-index c7b8741..94cf70a 100644
---- a/arch/arm/plat-omap/include/plat/mmc.h
-+++ b/arch/arm/plat-omap/include/plat/mmc.h
-@@ -31,7 +31,24 @@
- 
- #define OMAP_MMC_MAX_SLOTS	2
- 
--#define OMAP_HSMMC_SUPPORTS_DUAL_VOLT	BIT(1)
-+/*
-+ * struct omap_mmc_dev_attr.flags possibilities
-+ *
-+ * OMAP_HSMMC_SUPPORTS_DUAL_VOLT: Some HSMMC controller instances can
-+ *    operate with either 1.8Vdc or 3.0Vdc card voltages; this flag
-+ *    should be set if this is the case.  See for example Section 22.5.3
-+ *    "MMC/SD/SDIO1 Bus Voltage Selection" of the OMAP34xx Multimedia
-+ *    Device Silicon Revision 3.1.x Revision ZR (July 2011) (SWPU223R).
-+ *
-+ * OMAP_HSMMC_BROKEN_MULTIBLOCK_READ: Multiple-block read transfers
-+ *    don't work correctly on some MMC controller instances on some
-+ *    OMAP3 SoCs; this flag should be set if this is the case.  See
-+ *    for example Advisory 2.1.1.128 "MMC: Multiple Block Read
-+ *    Operation Issue" in _OMAP3530/3525/3515/3503 Silicon Errata_
-+ *    Revision F (October 2010) (SPRZ278F).
-+ */
-+#define OMAP_HSMMC_SUPPORTS_DUAL_VOLT		BIT(0)
-+#define OMAP_HSMMC_BROKEN_MULTIBLOCK_READ	BIT(1)
- 
- struct omap_mmc_dev_attr {
- 	u8 flags;
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 21e4a79..9e8fc75 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1943,6 +1943,10 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
- 	omap_hsmmc_context_save(host);
- 
- 	mmc->caps |= MMC_CAP_DISABLE;
-+	if (host->pdata->controller_flags & OMAP_HSMMC_BROKEN_MULTIBLOCK_READ) {
-+		dev_info(&pdev->dev, "multiblock reads disabled due to 35xx erratum 2.1.1.128; MMC read performance may suffer\n");
-+		mmc->caps |= MMC_CAP_NO_MULTI_READ;
-+	}
- 
- 	pm_runtime_enable(host->dev);
- 	pm_runtime_get_sync(host->dev);
+Paul Walmsley (2):
+      MMC: add workaround for controllers with broken multiblock reads
+      MMC: omap_hsmmc: disable multiblock reads when platform_data indicates that they are broken
+
+
+ arch/arm/plat-omap/include/plat/mmc.h |   19 ++++++++++++++++++-
+ drivers/mmc/card/block.c              |   21 ++++++++++++++-------
+ drivers/mmc/host/omap_hsmmc.c         |    4 ++++
+ include/linux/mmc/host.h              |    1 +
+ 4 files changed, 37 insertions(+), 8 deletions(-)
