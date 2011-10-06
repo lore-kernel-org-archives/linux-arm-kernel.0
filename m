@@ -1,96 +1,232 @@
 From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu,  6 Oct 2011 17:41:33 +0200
-Subject: [PATCH 1/2] sam9g45: add trng clock and platform device
-Message-ID: <1317915694-27564-1-git-send-email-jacmet@sunsite.dk>
+Date: Thu,  6 Oct 2011 17:41:34 +0200
+Subject: [PATCH 2/2] hw_random: add driver for atmel true hardware random
+	number generator
+In-Reply-To: <1317915694-27564-1-git-send-email-jacmet@sunsite.dk>
+References: <1317915694-27564-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <1317915694-27564-2-git-send-email-jacmet@sunsite.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the new hw_random driver.
+For the IP block on 9g45/9g46/9m10/9m11.
 
 Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
 ---
- arch/arm/mach-at91/at91sam9g45.c         |    7 +++++++
- arch/arm/mach-at91/at91sam9g45_devices.c |   29 +++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 0 deletions(-)
+ drivers/char/hw_random/Kconfig     |   13 +++
+ drivers/char/hw_random/Makefile    |    1 +
+ drivers/char/hw_random/atmel-rng.c |  168 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 182 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/char/hw_random/atmel-rng.c
 
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 6da8ace..6850f1d 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -54,6 +54,11 @@ static struct clk pioDE_clk = {
- 	.pmc_mask	= 1 << AT91SAM9G45_ID_PIODE,
- 	.type		= CLK_TYPE_PERIPHERAL,
- };
-+static struct clk trng_clk = {
-+	.name		= "trng_clk",
-+	.pmc_mask	= 1 << AT91SAM9G45_ID_TRNG,
-+	.type		= CLK_TYPE_PERIPHERAL,
-+};
- static struct clk usart0_clk = {
- 	.name		= "usart0_clk",
- 	.pmc_mask	= 1 << AT91SAM9G45_ID_US0,
-@@ -177,6 +182,7 @@ static struct clk *periph_clocks[] __initdata = {
- 	&pioB_clk,
- 	&pioC_clk,
- 	&pioDE_clk,
-+	&trng_clk,
- 	&usart0_clk,
- 	&usart1_clk,
- 	&usart2_clk,
-@@ -216,6 +222,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tcb0_clk),
- 	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
- 	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "atmel-trng", &trng_clk),
- 	/* fake hclk clock */
- 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &uhphs_clk),
- };
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 2ee20bd..1ca6c62 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -1101,6 +1101,34 @@ static void __init at91_add_device_rtt(void)
+diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+index 1d2ebc7..e013587 100644
+--- a/drivers/char/hw_random/Kconfig
++++ b/drivers/char/hw_random/Kconfig
+@@ -60,6 +60,19 @@ config HW_RANDOM_AMD
  
+ 	  If unsure, say Y.
  
- /* --------------------------------------------------------------------
-+ *  TRNG
-+ * -------------------------------------------------------------------- */
++config HW_RANDOM_ATMEL
++	tristate "Atmel Random Number Generator support"
++	depends on HW_RANDOM && ARCH_AT91SAM9G45
++	default HW_RANDOM
++	---help---
++	  This driver provides kernel-side support for the Random Number
++	  Generator hardware found on Atmel AT91 devices.
 +
-+#if defined(CONFIG_HW_RANDOM_ATMEL) || defined(CONFIG_HW_RANDOM_ATMEL_MODULE)
-+static struct resource trng_resources[] = {
-+	{
-+		.start	= AT91SAM9G45_BASE_TRNG,
-+		.end	= AT91SAM9G45_BASE_TRNG + SZ_16K - 1,
-+		.flags	= IORESOURCE_MEM,
++	  To compile this driver as a module, choose M here: the
++	  module will be called atmel-rng.
++
++	  If unsure, say Y.
++
+ config HW_RANDOM_GEODE
+ 	tristate "AMD Geode HW Random Number Generator support"
+ 	depends on HW_RANDOM && X86_32 && PCI
+diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
+index c88f244..b2ff526 100644
+--- a/drivers/char/hw_random/Makefile
++++ b/drivers/char/hw_random/Makefile
+@@ -7,6 +7,7 @@ rng-core-y := core.o
+ obj-$(CONFIG_HW_RANDOM_TIMERIOMEM) += timeriomem-rng.o
+ obj-$(CONFIG_HW_RANDOM_INTEL) += intel-rng.o
+ obj-$(CONFIG_HW_RANDOM_AMD) += amd-rng.o
++obj-$(CONFIG_HW_RANDOM_ATMEL) += atmel-rng.o
+ obj-$(CONFIG_HW_RANDOM_GEODE) += geode-rng.o
+ obj-$(CONFIG_HW_RANDOM_N2RNG) += n2-rng.o
+ n2-rng-y := n2-drv.o n2-asm.o
+diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
+new file mode 100644
+index 0000000..c69eccb
+--- /dev/null
++++ b/drivers/char/hw_random/atmel-rng.c
+@@ -0,0 +1,168 @@
++/*
++ * Copyright (c) 2011 Peter Korsgaard <jacmet@sunsite.dk>
++ *
++ * This file is licensed under  the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++#include <linux/hw_random.h>
++#include <linux/platform_device.h>
++
++#define TRNG_CR		0x00
++#define TRNG_ISR	0x1c
++#define TRNG_ODATA	0x50
++
++#define TRNG_KEY	0x524e4700 /* RNG */
++
++struct atmel_trng {
++	struct clk *clk;
++	void __iomem *base;
++};
++
++static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
++			   bool wait)
++{
++	struct atmel_trng *trng = (struct atmel_trng *)rng->priv;
++	u32 *data = buf;
++
++	/* data ready? */
++	if (readl(trng->base + TRNG_ODATA) & 1) {
++		*data = readl(trng->base + TRNG_ODATA);
++		return 4;
++	} else
++		return 0;
++}
++
++static struct hwrng atmel_trng = {
++	.name	= "atmel-trng",
++	.read	= atmel_trng_read,
++};
++
++static int atmel_trng_probe(struct platform_device *pdev)
++{
++	struct atmel_trng *trng;
++	struct resource *res;
++	int ret;
++
++	if (atmel_trng.priv) {
++		dev_err(&pdev->dev, "multiple instances not supported\n");
++		return -EBUSY;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res)
++		return -EINVAL;
++
++	trng = devm_kzalloc(&pdev->dev, sizeof(*trng), GFP_KERNEL);
++	if (!trng)
++		return -ENOMEM;
++
++	if (!devm_request_mem_region(&pdev->dev, res->start,
++				     resource_size(res), pdev->name))
++		return -EBUSY;
++
++	trng->base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
++	if (!trng->base)
++		return -EBUSY;
++
++	trng->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(trng->clk))
++		return PTR_ERR(trng->clk);
++
++	ret = clk_enable(trng->clk);
++	if (ret)
++		goto err_enable;
++
++	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
++
++	atmel_trng.priv = (unsigned long)trng;
++
++	ret = hwrng_register(&atmel_trng);
++	if (ret)
++		goto err_register;
++
++	platform_set_drvdata(pdev, trng);
++
++	return 0;
++
++err_register:
++	atmel_trng.priv = 0;
++	clk_disable(trng->clk);
++err_enable:
++	clk_put(trng->clk);
++
++	return ret;
++}
++
++static int __devexit atmel_trng_remove(struct platform_device *pdev)
++{
++	struct atmel_trng *trng = platform_get_drvdata(pdev);
++
++	hwrng_unregister(&atmel_trng);
++
++	writel(TRNG_KEY, trng->base + TRNG_CR);
++	clk_disable(trng->clk);
++	clk_put(trng->clk);
++
++	atmel_trng.priv = 0;
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int atmel_trng_suspend(struct device *dev)
++{
++	struct atmel_trng *trng = dev_get_drvdata(dev);
++
++	clk_disable(trng->clk);
++
++	return 0;
++}
++
++static int atmel_trng_resume(struct device *dev)
++{
++	struct atmel_trng *trng = dev_get_drvdata(dev);
++
++	return clk_enable(trng->clk);
++}
++
++static const struct dev_pm_ops atmel_trng_pm_ops = {
++	.suspend	= atmel_trng_suspend,
++	.resume		= atmel_trng_resume,
++};
++#endif /* CONFIG_PM */
++
++static struct platform_driver atmel_trng_driver = {
++	.probe		= atmel_trng_probe,
++	.remove		= __devexit_p(atmel_trng_remove),
++	.driver		= {
++		.name	= "atmel-trng",
++		.owner	= THIS_MODULE,
++#ifdef CONFIG_PM
++		.pm	= &atmel_trng_pm_ops,
++#endif /* CONFIG_PM */
 +	},
 +};
 +
-+static struct platform_device at91sam9g45_trng_device = {
-+	.name		= "atmel-trng",
-+	.id		= -1,
-+	.resource	= trng_resources,
-+	.num_resources	= ARRAY_SIZE(trng_resources),
-+};
-+
-+static void __init at91_add_device_trng(void)
++static int __init atmel_trng_init(void)
 +{
-+	platform_device_register(&at91sam9g45_trng_device);
++	return platform_driver_register(&atmel_trng_driver);
 +}
-+#else
-+static void __init at91_add_device_trng(void) {}
-+#endif
++module_init(atmel_trng_init);
 +
-+/* --------------------------------------------------------------------
-  *  Watchdog
-  * -------------------------------------------------------------------- */
- 
-@@ -1589,6 +1617,7 @@ static int __init at91_add_standard_devices(void)
- 	at91_add_device_hdmac();
- 	at91_add_device_rtc();
- 	at91_add_device_rtt();
-+	at91_add_device_trng();
- 	at91_add_device_watchdog();
- 	at91_add_device_tc();
- 	return 0;
++static void __exit atmel_trng_exit(void)
++{
++	platform_driver_unregister(&atmel_trng_driver);
++}
++module_exit(atmel_trng_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Peter Korsgaard <jacmet@sunsite.dk>");
++MODULE_DESCRIPTION("Atmel true random number generator driver");
 -- 
 1.7.6.3
