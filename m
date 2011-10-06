@@ -1,40 +1,39 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 06 Oct 2011 16:18:36 +0200
-Subject: [PATCH 7/7] ARM: integrate CMA with DMA-mapping subsystem
-In-Reply-To: <1317909290-29832-8-git-send-email-m.szyprowski@samsung.com>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<1317909290-29832-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <000201cc8432$d642b930$82c82b90$%szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Oct 2011 15:23:50 +0100
+Subject: [PATCH 1/3 v3] ARM Realview PCIX map include file changes
+In-Reply-To: <F01D8B85CFF58440B2A13965FBA90CA47375AC1794@GEORGE.Emea.Arm.com>
+References: <20110822130507.23830.26191.stgit@e102602-lin.cambridge.arm.com>
+	<20110822130942.23830.4767.stgit@e102602-lin.cambridge.arm.com>
+	<201109051635.59927.arnd@arndb.de>
+	<F01D8B85CFF58440B2A13965FBA90CA47375AC1794@GEORGE.Emea.Arm.com>
+Message-ID: <20111006142350.GD26349@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thursday, October 06, 2011 3:55 PM Marek Szyprowski wrote:
-
-> This patch adds support for CMA to dma-mapping subsystem for ARM
-> architecture. By default a global CMA area is used, but specific devices
-> are allowed to have their private memory areas if required (they can be
-> created with dma_declare_contiguous() function during board
-> initialization).
+On Thu, Oct 06, 2011 at 03:00:50PM +0100, Colin Tuckley wrote:
+> > pcibios_min_io should be 0x1000 as a constant, in order to get the
+> > ISA addresses out of the way, but there is no need to make it
+> > board dependent.
 > 
-> Contiguous memory areas reserved for DMA are remapped with 2-level page
-> tables on boot. Once a buffer is requested, a low memory kernel mapping
-> is updated to to match requested memory access type.
-> 
-> GFP_ATOMIC allocations are performed from special pool which is created
-> early during boot. This way remapping page attributes is not needed on
-> allocation time.
-> 
-> CMA has been enabled unconditionally for ARMv6+ systems.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> REALVIEW_PB_PCI_IO_BASE is currently 0x90050000, which works, so
+> why would I change pcibios_min_io to 0x1000 ?
 
-Please ignore this patch. The patch named as "[PATCH 8/9] ARM: integrate
-CMA with DMA-mapping subsystem" in this thread is the correct one.
+All the points in this email all go together.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+This is how it works:
+
+1. The PCI IO window is _supposed_ to be 64K in size.
+2. "pcibios_min_io" sets the minimum offset into the PCI IO window which
+   PCI IO BARs should be assigned.  It is assumed that a PCI IO BAR value
+   of 0 corresponds with the virtual base address of this window.
+3. inb() et.al. take the PCI IO offset and _not_ the physical address nor
+   the virtual address of the desired access.
+
+This is so that existing drivers - including VGA card drivers - can work.
+There are many PCI cards which require accesses to specific IO locations
+not listed in their BARs for initialization etc.
+
+Moreover, we're trying to work towards having a single fixed 64k PCI IO
+virtual mapping across all platforms (so that this shows up at the same
+virtual address no matter what platform.)  Not having this is a blocker
+to the multi-platform activity which Linaro is tasked with.
