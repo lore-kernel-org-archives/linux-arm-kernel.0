@@ -1,29 +1,24 @@
-From: angus.ainslie@linaro.org (Angus Ainslie)
-Date: Thu,  6 Oct 2011 16:03:15 -0600
-Subject: [PATCH] arm: exynos4: build is failing due to missing SZ_4K definition
-Message-ID: <1317938595-7007-1-git-send-email-angus.ainslie@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Oct 2011 23:15:17 +0100
+Subject: [PATCH 1/2] arm: samsung: move timer irq numbers to end of
+	linux irq space
+In-Reply-To: <1317935503-11756-2-git-send-email-thomas.abraham@linaro.org>
+References: <1317935503-11756-1-git-send-email-thomas.abraham@linaro.org>
+	<1317935503-11756-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20111006221517.GC21464@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-linux-next build is failing using the exynos4_defconfig. <asm/sizes.h> needs to be 
-for the SZ_4K definition
+On Fri, Oct 07, 2011 at 02:41:42AM +0530, Thomas Abraham wrote:
+> All of Samsung's s5p platforms have timer irqs statically mapped from linux
+> irq numbers 11 to 15. These timer irqs are moved to end of the statically
+> mapped linux irq space and the hardware irqs, which were statically mapped
+> starting from 32 is moved to start from 0. The NR_IRQS macro is consolidated
+> for all the s5p platforms in this process.
 
-Signed-off-by: Angus Ainslie <angus.ainslie@linaro.org>
----
- arch/arm/mach-exynos4/include/mach/map.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Am I reading this patch correctly - in that on platforms with the GIC,
+you add 32 to the GIC IRQ number _just_ to avoid the possibility that
+IRQs 11-15 are seen as valid?
 
-diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
-index 918a979..02d68f1 100644
---- a/arch/arm/mach-exynos4/include/mach/map.h
-+++ b/arch/arm/mach-exynos4/include/mach/map.h
-@@ -13,6 +13,7 @@
- #ifndef __ASM_ARCH_MAP_H
- #define __ASM_ARCH_MAP_H __FILE__
- 
-+#include <asm/sizes.h>
- #include <plat/map-base.h>
- 
- /*
--- 
-1.7.4.1
+Or to put it another way, you're trying to ensure that if these timer
+IRQs are requested, they will fail?
