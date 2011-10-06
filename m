@@ -1,93 +1,119 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Thu, 6 Oct 2011 13:46:26 +0530
-Subject: [PATCH v6 04/16] OMAP2+: UART: cleanup 8250 console driver support
-In-Reply-To: <87sjn78elt.fsf@ti.com>
-References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
-	<1317380495-584-4-git-send-email-govindraj.raja@ti.com>
-	<87lit077ry.fsf@ti.com>
-	<CAAL8m4yhbPQdz5od-cv4HirzTUT4qxUJv_c3Lpj9+efjqxm6hg@mail.gmail.com>
-	<87sjn78elt.fsf@ti.com>
-Message-ID: <CAAL8m4ytTGnc5zoARwFi8jBx6oiwQ1_dv+LqT8bPmnSbs+pe5A@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 06 Oct 2011 09:18:37 +0100
+Subject: [PATCH 5/7] ARM: EXYNOS4: Add support external GIC
+In-Reply-To: <00ec01cc83f1$81f84430$85e8cc90$%kim@samsung.com>
+References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
+	<1308555258-4322-6-git-send-email-chaos.youn@samsung.com>
+	<4E8C61C4.9090709@arm.com>
+	<00ec01cc83f1$81f84430$85e8cc90$%kim@samsung.com>
+Message-ID: <4E8D645D.4020601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 6, 2011 at 12:12 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Govindraj <govindraj.ti@gmail.com> writes:
->
->> Hi Kevin,
+On 06/10/11 07:30, Kukjin Kim wrote:
+> Marc Zyngier wrote:
 >>
->> Thanks for the review,
+>> Hi Changhwan,
 >>
+> Hi Marc,
+> 
+> (Cc'ed Will Deacon and Russell King)
+> 
+>> On 20/06/11 08:34, Changhwan Youn wrote:
+>>> For full support of power modes, this patch adds implementation
+>>> external GIC on EXYNOS4.
+>>>
+>>> External GIC of Exynos4 cannot support register banking so
+>>> several interrupt related code for CPU1 should be different
+>>> from that of CPU0.
 >>
->> On Wed, Oct 5, 2011 at 3:12 AM, Kevin Hilman <khilman@ti.com> wrote:
->>> "Govindraj.R" <govindraj.raja@ti.com> writes:
->>>
->>>> We had been using traditional 8250 driver as uart console driver
->>>> prior to omap-serial driver. Since we have omap-serial driver
->>>> in mainline kernel for some time now it has been used as default
->>>> uart console driver on omap2+ platforms. Remove 8250 support for
->>>> omap-uarts.
->>>
->>> Nice to see the this disappearing.
->>>
->>>> Serial_in and serial_out override for 8250 serial driver is also
->>>> removed.
+>> I just realized that patch has made it to mainline... Unfortunately, it
+>> seems quite broken to me:
 >>
->>>> Empty fifo read fix is already taken care with omap-serial
->>>> driver with data ready bit check from LSR reg before reading RX fifo.
+>>> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+>>> ---
+>>>  arch/arm/mach-exynos4/cpu.c                      |   10 ++++++++
+>>>  arch/arm/mach-exynos4/include/mach/entry-macro.S |    5 ++++
+>>>  arch/arm/mach-exynos4/include/mach/map.h         |    1 +
+>>>  arch/arm/mach-exynos4/platsmp.c                  |   27
+>> +++++++++++++++++++++-
+>>>  4 files changed, 42 insertions(+), 1 deletions(-)
 >>>
->>> As stated in the previous review. ?Patches that move code/features
->>> should have the removal and the add-back in the same patch. ?Doing so
->>> makes it easy for reviewers to see whether it was simply moved, or if it
->>> was modified when it was moved, etc.
+>>> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
+>>> index fa33294..40a866c 100644
+>>> --- a/arch/arm/mach-exynos4/cpu.c
+>>> +++ b/arch/arm/mach-exynos4/cpu.c
+>>> @@ -16,6 +16,7 @@
 >>>
+>>>  #include <asm/proc-fns.h>
+>>>  #include <asm/hardware/cache-l2x0.h>
+>>> +#include <asm/hardware/gic.h>
+>>>
+>>>  #include <plat/cpu.h>
+>>>  #include <plat/clock.h>
+>>> @@ -159,11 +160,20 @@ void __init exynos4_init_clocks(int xtal)
+>>>  	exynos4_setup_clocks();
+>>>  }
+>>>
+>>> +static void exynos4_gic_irq_eoi(struct irq_data *d)
+>>> +{
+>>> +	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
+>>> +
+>>> +	gic_data->cpu_base = S5P_VA_GIC_CPU +
+>>> +			    (EXYNOS4_GIC_BANK_OFFSET *
+>> smp_processor_id());
 >>
->> Empty fifo read is already taken care in omap-serial.c and is part of
->> mainline code. ?Nothing to add to omap-serial.c
->
-> OK, good. ?I guess I missed the 'already' part in your changelog.
->
->>>> Also waiting for THRE(transmit hold reg empty) is done with wait_for_xmitr
->>>> in omap-serial driver.
->>>
->>> Again, remove it here in the patch that adds that support (the errata
->>> patch I guess.)
->>>
+>> Here, you're overwriting a field that is shared among *all* the
+>> interrupts in the system.  What if an interrupt comes up on another CPU?
+>> If you look at the implementation of gic_eoi_irq(), you'll definitely
+>> see the race.
 >>
->> The errata patch ( [PATCH v6 11/16] ) moves only mdr_errata and force_idle
->> from serial.c to omap-serial.c.
->>
->> Already handled stuffs and things that already exists with omap-serial.c
->> are removed here.
->
-> OK.
->
->>>> Remove headers that were necessary to support 8250 support
->>>> and remove all config bindings done to keep 8250 backward compatibility
->>>> while adding omap-serial driver. Remove omap_uart_reset needed for
->>>> 8250 autoconf.
->>>>
->>>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->>>
->>> So basically, this patch should only remove the legacy 8250 support (as
->>> the subject says) and everything else should be done in the other
->>> relevant patches.
->>>
->>
->> Yes removes only the 8250 code. serial_in/serial_out were read/write overrides
->> part of 8250 code.
->>
->> serial_in/serial_out had these checks for empty fifo read and wait for tx
->> which is already handled with omap-serial.c.
->
-> OK, thanks for the clarification.
->
-> The changelog could've been a bit more specific for readers not
-> intimately familiar with the driver.
->
+> Hmm...as you can see in git log, the EXYNOS4210 cannot support register
+> banking in GIC so this is needed.
 
-Okay fine, I will re-visit this.
+I don't dispute the need. I claim that the implementation is wrong, and
+will fail given the right timings.
 
---
-Thanks,
-Govindraj.R
+>>> +}
+>>> +
+>>>  void __init exynos4_init_irq(void)
+>>>  {
+>>>  	int irq;
+>>>
+>>>  	gic_init(0, IRQ_LOCALTIMER, S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
+>>> +	gic_arch_extn.irq_eoi = exynos4_gic_irq_eoi;
+>>
+>> And here you're abusing the GIC extension feature.
+>>
+> I think gic_arch_extn.irq_eoi can be overwritten in each architecture to
+> support own specific extensions like in the EXYNOS4 case.
+
+Sure. My point is you are diverting the GIC extension from its purpose,
+which is mostly to be able to control wake-up sources (as for example in
+the Tegra case). Here, you use this hooks to work around the fact that
+the GIC driver is written with banking in mind, which is quite a
+different thing.
+
+>> I've also had a look at -next, and this has been extended further to
+>> support 4412. The problem with that is without banking, you're painfully
+>> working around the GIC driver. At that stage, I wonder if you wouldn't
+>> be better off with a separate driver instead of abusing the existing
+> one...
+>>
+> Well, in this case, you mean separate driver is better to us even though
+> there is a gic driver in arch/arm/common? I don't think so because separate
+> driver will probably have many duplicated codes and if common gic driver can
+> support every silicons which have different version's gic it's better to us
+> and should do.
+
+If you really insist on using the GIC common code, then I'd suggest to
+adapt it to your needs instead of working around the problem.
+What about making cpu_base a percpu field inside struct gic_chip_data?
+No hook abuse, and no race conditions. You could also do that for
+dist_base, as it looks to be required for the 4412.
+
+Cheers,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
