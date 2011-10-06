@@ -1,51 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Oct 2011 09:22:40 -0700
-Subject: [PATCH 3/4] ARM: OMAP: Remove calls to SRAM allocations for
-	framebuffer
-In-Reply-To: <1317890284.1945.38.camel@deskari>
-References: <20111005004339.26980.31149.stgit@kaulin.local>
-	<20111005004544.26980.35612.stgit@kaulin.local>
-	<1317797128.2631.2.camel@deskari>
-	<20111005224141.GF6324@atomide.com>
-	<1317890284.1945.38.camel@deskari>
-Message-ID: <20111006162239.GI6324@atomide.com>
+From: vjaquez@igalia.com (=?iso-8859-1?Q?V=EDctor_M=2E_J=E1quez_L=2E?=)
+Date: Thu, 6 Oct 2011 18:26:14 +0200
+Subject: [PATCH] omap: dmtimer: convert printk to pr_*
+In-Reply-To: <1317914379.10495.5.camel@Joe-Laptop>
+References: <1317898106-1891-1-git-send-email-vjaquez@igalia.com>
+	<1317914379.10495.5.camel@Joe-Laptop>
+Message-ID: <20111006162614.GH30222@lit.local.igalia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [111006 01:04]:
-> On Wed, 2011-10-05 at 15:41 -0700, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [111004 23:11]:
-> > > On Tue, 2011-10-04 at 17:45 -0700, Tony Lindgren wrote:
-> > > > This assumes fixed mappings which will not work once we move
-> > > > to use ioremap_exec(). It seems that these are currently
-> > > > not in use, or in use for some out of tree corner cases.
-> > > > 
-> > > > If SRAM support for framebuffer is wanted, it should be done
-> > > > with ioremap in the driver.
-> > > > 
-> > > > Note that further removal of the code can now be done,
-> > > > but that can be done seprately by the driver maintainers.
-> > > > 
-> > > > Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > Looks good to me. I have similar changes in my working branch for omapfb
-> > > cleanup.
-> > > 
-> > > Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > 
-> > Thanks. FYI, looks like there's a warning in display.c:
-> > 
-> > arch/arm/mach-omap2/display.c: In function 'omap_display_init':
-> > arch/arm/mach-omap2/display.c:93: warning: assignment from incompatible pointer type
-> > 
-> > Do you have a patch for that already?
+On Thu, Oct 06, 2011 at 08:19:39AM -0700, Joe Perches wrote:
+> On Thu, 2011-10-06 at 12:48 +0200, V?ctor Manuel J?quez Leal wrote:
+> > Convert all the printk(<level>) messages in the driver to pr_<level>().
+> []
+> > diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+> []
+> > @@ -397,8 +397,7 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+> >  	spin_lock_irqsave(&dm_timer_lock, flags);
+> >  	if (id <= 0 || id > dm_timer_count || dm_timers[id-1].reserved) {
+> >  		spin_unlock_irqrestore(&dm_timer_lock, flags);
+> > -		printk("BUG: warning at %s:%d/%s(): unable to get timer %d\n",
+> > -		       __FILE__, __LINE__, __func__, id);
+> > +		pr_warning("unable to get timer %d\n", id);
 > 
-> Paul should have a patch for that in queue ("OMAP: change
-> get_context_loss_count ret value to int"). DSS is already using the new
-> style function pointer, which uses int for return value (versus the
-> current function which returns u32).
+> For new conversions, please use pr_warn not pr_warning.
+> It's shorter and similar to other dev_warn/netdev_warn
+> uses.
+> 
+> >  		dump_stack();
+> 
+> To emit a message then dump stack, please use
+> 	WARN(1, fmt, ...)
+> 
 
-OK thanks.
+Thanks a lot!
 
-Tony
+I'll do that and then resend.
+
+vmjl
