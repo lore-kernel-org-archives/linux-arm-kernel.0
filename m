@@ -1,39 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 06 Oct 2011 14:50:30 -0600
-Subject: [PATCH 0/2] MMC: disable multiblock reads on controllers that don't
-	support them
-Message-ID: <20111006205002.7083.94088.stgit@dusk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 6 Oct 2011 22:52:29 +0200
+Subject: [PATCHv2] hw_random: add driver for atmel true hardware random
+	number generator
+In-Reply-To: <87ty7l3l5b.fsf@macbook.be.48ers.dk>
+References: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
+	<20111006203023.GE24034@tarshish>
+	<87ty7l3l5b.fsf@macbook.be.48ers.dk>
+Message-ID: <20111006205229.GF24034@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Peter,
 
-Some MMC controller instances integrated on older OMAP34xx/35xx chips
-don't work correctly with multiple-block reads, due to a hardware bug.
-This series fixes the problem by adding an MMC capability flag for this
-case and making the appropriate changes to the MMC core code and OMAP HSMMC
-driver to support this.
+On Thu, Oct 06, 2011 at 10:44:32PM +0200, Peter Korsgaard wrote:
+> >>>>> "Baruch" == Baruch Siach <baruch@tkos.co.il> writes:
+>  >> +static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
+>  >> +			   bool wait)
+>  >> +{
+>  >> +	struct atmel_trng *trng = container_of(rng, struct atmel_trng, rng);
+>  >> +	u32 *data = buf;
+>  >> +
+>  >> +	/* data ready? */
+>  >> +	if (readl(trng->base + TRNG_ODATA) & 1) {
+>  >> +		*data = readl(trng->base + TRNG_ODATA);
+>  >> +		return 4;
+> 
+>  Baruch> Shouldn't you check for max >= 4 before writing to *buf?
+> 
+> Conceptually, yes. The other hw_random drivers don't seem to do it
+> though, and the buffer size is guaranteed to be atleast 32 bytes, 
 
-Once this series is merged, a subsequent patch will be needed by us OMAP
-folks to pass the appropriate device data via hwmod - this will be posted
-separately.
+Ah, you're right, I missed that.
 
+> but I can stick a '&& max >= 4' in the conditional if you prefer.
 
-- Paul
+It probably doesn't worth the trouble, and the little added overhead. Thanks 
+for the explanation.
 
----
-mmc_errata_2.1.1.128_fix_3.2
-   text	   data	    bss	    dec	    hex	filename
-6325283	 655708	5591124	12572115	 bfd5d3	vmlinux.omap2plus_defconfig.orig
-6329423	 655700	5591124	12576247	 bfe5f7	vmlinux.omap2plus_defconfig.patched
+baruch
 
-Paul Walmsley (2):
-      MMC: add workaround for controllers with broken multiblock reads
-      MMC: omap_hsmmc: disable multiblock reads when platform_data indicates that they are broken
-
-
- arch/arm/plat-omap/include/plat/mmc.h |   19 ++++++++++++++++++-
- drivers/mmc/card/block.c              |   21 ++++++++++++++-------
- drivers/mmc/host/omap_hsmmc.c         |    4 ++++
- include/linux/mmc/host.h              |    1 +
- 4 files changed, 37 insertions(+), 8 deletions(-)
+-- 
+                                                     ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
