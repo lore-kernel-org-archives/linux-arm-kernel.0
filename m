@@ -1,31 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 6 Oct 2011 18:14:18 +0100
-Subject: [GIT PULL] Samsung devel-2 for v3.2
-In-Reply-To: <20111006155701.GA1470@opensource.wolfsonmicro.com>
-References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
-	<20111002192950.GB1005@sirena.org.uk>
-	<019201cc8293$7776a790$6663f6b0$%kim@samsung.com>
-	<20111005165401.GA7155@opensource.wolfsonmicro.com>
-	<20111005230516.GA30439@sirena.org.uk>
-	<00e601cc83f1$3298e660$97cab320$%kim@samsung.com>
-	<20111006155701.GA1470@opensource.wolfsonmicro.com>
-Message-ID: <20111006171418.GA23532@opensource.wolfsonmicro.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 6 Oct 2011 19:25:53 +0200 (CEST)
+Subject: [PATCH RESEND] ARM: smp_twd: Reconfigure clockevents after
+	cpufreq change
+In-Reply-To: <CAKnu2ModYp+F0kq6qVo9SQJ88GR_EwGNgH2WZXJrXUeR1xyzQw@mail.gmail.com>
+References: <1315292775-4413-1-git-send-email-linus.walleij@stericsson.com>
+	<CAKnu2ModYp+F0kq6qVo9SQJ88GR_EwGNgH2WZXJrXUeR1xyzQw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1110061922440.3240@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 06, 2011 at 04:57:01PM +0100, Mark Brown wrote:
+On Thu, 6 Oct 2011, Linus Walleij wrote:
 
-> The bisect did end up pointing at the GPIO commits, the build errors
-> were causing issues.  Not really made any further progress on this issue
-> today, some other things came up.
+> 2011/9/6 Linus Walleij <linus.walleij@stericsson.com>:
+> 
+> > From: Colin Cross <ccross@android.com>
+> >
+> > The localtimer's clock changes with the cpu clock. After a
+> > cpufreq transition, update the clockevent's frequency and
+> > reprogram the next clock event.
+> 
+> Thomas do you think you can have a look at this patch and ACK
+> it if it looks OK to you? It's the use of clockevents_update_freq()
+> function you added after we discussed this in Budapest.
+> 
+> Since it's likely the first user of that infrastructure we need
+> to get it right.
 
-So, I've been trying some other directions here.  What I'm seeing by
-pulling devices out of my config is that if I enable the LCD power
-control then the board fails to boot.  Also, the I2C controllers appear
-to be non-functional - I'm getting timeouts waiting for the bus to
-become free which halt the boot for long enough that it'd look like it
-had crashed if all the devices came up (there's a lot of I2C devices
-there).
+The usage is correct.
+ 
+> Here is the entire patch i Russells tracker:
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6956/2
 
-I've not had time to actually drill down below that level but it did
-occur to me that there may be a problem with the pinmux code?
+The only thing what puzzles me is:
+
+> +	if (!IS_ERR_OR_NULL(twd_clk))
+> +		twd_timer_rate = clk_get_rate(twd_clk);
+> +	else
+> +		twd_calibrate_rate();
+
+How is made sure that the cpu freq update thing is not called when
+twd_clk is not available or am I missing something ?
+
+Thanks,
+
+	tglx
