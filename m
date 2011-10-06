@@ -1,20 +1,22 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 06 Oct 2011 17:42:45 +0200
-Subject: [PATCH 1/3] sam9g20ek/9m10g45ek/stam9g20: unbreak build after
-	'use -EINVAL for invalid gpio'
-In-Reply-To: <1317915587-27474-1-git-send-email-jacmet@sunsite.dk> (Peter
-	Korsgaard's message of "Thu, 6 Oct 2011 17:39:47 +0200")
-References: <1317915587-27474-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <87aa9e3z4a.fsf@macbook.be.48ers.dk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 6 Oct 2011 16:49:07 +0100
+Subject: [PATCH 2/2] hw_random: add driver for atmel true hardware
+	random number generator
+In-Reply-To: <1317915694-27564-2-git-send-email-jacmet@sunsite.dk>
+References: <1317915694-27564-1-git-send-email-jacmet@sunsite.dk>
+	<1317915694-27564-2-git-send-email-jacmet@sunsite.dk>
+Message-ID: <20111006154904.GE12975@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Peter" == Peter Korsgaard <jacmet@sunsite.dk> writes:
+On Thu, Oct 06, 2011 at 05:41:34PM +0200, Peter Korsgaard wrote:
 
- Peter> Commit 36706ab70b26 (ARM: at91/boards: use -EINVAL for invalid gpio)
- Peter> broke the build as it used ';' rather than ',' in structure initializers.
+> +	trng->clk = clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(trng->clk))
+> +		return PTR_ERR(trng->clk);
+> +
+> +	ret = clk_enable(trng->clk);
+> +	if (ret)
+> +		goto err_enable;
 
-Ups, ignore the 1/3 part, this is the only patch in this series.
-
--- 
-Bye, Peter Korsgaard
+Is it worth enabling the hardware enabled only when the device is open?
