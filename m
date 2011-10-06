@@ -1,61 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Oct 2011 12:53:35 -0700
-Subject: [PATCH] ARM: OMAP2+: dmtimer: Fix warning
-In-Reply-To: <1317278657-12414-1-git-send-email-afzal@ti.com>
-References: <1317278657-12414-1-git-send-email-afzal@ti.com>
-Message-ID: <20111006195335.GO6324@atomide.com>
+Date: Thu, 6 Oct 2011 12:58:42 -0700
+Subject: [PATCH v2 0/2] arm: omap4: hsmmc: pbias fixes
+In-Reply-To: <1317644571-25175-1-git-send-email-balajitk@ti.com>
+References: <1317644571-25175-1-git-send-email-balajitk@ti.com>
+Message-ID: <20111006195842.GP6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Afzal Mohammed <afzal@ti.com> [110928 23:10]:
-> Fix,
+* Balaji T K <balajitk@ti.com> [111003 04:48]:
+> MMC1 pbias and speed control fix for SDMMC1 extended I/O cell
+> Rebase to git://github.com/tmlind/linux.git fixes
+> 	commit 122a98589349fe3388ffb7b996b54614951c934a
+> 	Author: Tapani Utriainen <tapani@technexion.com>
+> 	Date:   Fri Sep 30 11:05:56 2011 -0700
 > 
-> arch/arm/mach-omap2/timer.c: In function 'omap_timer_init':
-> arch/arm/mach-omap2/timer.c:482: warning: assignment from incompatible pointer type
+> 	    ARM: OMAP: irq: loop counter fix in omap_init_irq()
+> 
+> 
+> Balaji T K (2):
+>   arm: omap4: hsmmc: Fix Pbias configuration on regulator OFF
+>   arm: omap4: hsmmc: configure SDMMC1_DR0 properly
 
-This should already be fixed when I merged together the
-dt-base branch.
+Thanks adding both to fixes-part2 branch.
 
 Regards,
 
 Tony
- 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
-> 
-> Fix on tony/master
-> 
->  arch/arm/mach-omap2/timer.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 1140e98..e49fc7b 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -434,7 +434,7 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
->  	int ret = 0;
->  	char *name = "omap_timer";
->  	struct dmtimer_platform_data *pdata;
-> -	struct omap_device *od;
-> +	struct platform_device *pdev;
->  	struct omap_timer_capability_dev_attr *timer_dev_attr;
->  	struct powerdomain *pwrdm;
->  
-> @@ -476,12 +476,12 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
->  #ifdef CONFIG_PM
->  	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
->  #endif
-> -	od = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
-> +	pdev = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
->  			omap2_dmtimer_latency,
->  			ARRAY_SIZE(omap2_dmtimer_latency),
->  			0);
->  
-> -	if (IS_ERR(od)) {
-> +	if (IS_ERR(pdev)) {
->  		pr_err("%s: Can't build omap_device for %s: %s.\n",
->  			__func__, name, oh->name);
->  		ret = -EINVAL;
-> -- 
-> 1.6.2.4
-> 
