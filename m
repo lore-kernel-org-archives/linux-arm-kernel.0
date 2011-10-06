@@ -1,60 +1,162 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Thu, 6 Oct 2011 08:35:08 -0400
-Subject: [RFC/PATCH 7/7] ARM: ARM11 MPCore: cpu_v6_set_pte_ext is not
-	preempt safe
-In-Reply-To: <20111006074647.GA26349@n2100.arm.linux.org.uk>
-References: <05942148-7AFB-4755-A22F-355E0360B098@mvista.com>
-	<1317877714-11355-1-git-send-email-gdavis@mvista.com>
-	<1317877714-11355-8-git-send-email-gdavis@mvista.com>
-	<20111006074647.GA26349@n2100.arm.linux.org.uk>
-Message-ID: <232DB229-FDB4-4E59-AA06-D10DFF02604C@mvista.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 06 Oct 2011 15:54:42 +0200
+Subject: [PATCH 2/9] mm: alloc_contig_freed_pages() added
+In-Reply-To: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1317909290-29832-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
 
-On Oct 6, 2011, at 3:46 AM, Russell King - ARM Linux wrote:
+This commit introduces alloc_contig_freed_pages() function
+which allocates (ie. removes from buddy system) free pages
+in range.  Caller has to guarantee that all pages in range
+are in buddy system.
 
-> On Thu, Oct 06, 2011 at 01:08:34AM -0400, gdavis at mvista.com wrote:
->> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
->> index a923aa0..dd2e5e5 100644
->> --- a/arch/arm/mm/proc-v6.S
->> +++ b/arch/arm/mm/proc-v6.S
->> @@ -122,7 +122,18 @@ ENTRY(cpu_v6_switch_mm)
->> 
->> ENTRY(cpu_v6_set_pte_ext)
->> #ifdef CONFIG_MMU
->> +#ifdef CONFIG_PREEMPT
->> +	ALT_SMP(stmdb	sp!, {r4, r10, r11})
->> +	ALT_SMP(get_thread_info r10)
->> +	ALT_SMP(ldr	r4, [r10, #TI_PREEMPT])	@ get preempt count
->> +	ALT_SMP(add	r11, r4, #1)		@ increment it
->> +	ALT_SMP(str	r11, [r10, #TI_PREEMPT])	@ disable preempt
->> +#endif
->> 	armv6_set_pte_ext cpu_v6
->> +#ifdef CONFIG_PREEMPT
->> +	ALT_SMP(str	r4, [r10, #TI_PREEMPT])	@ restore preempt count
->> +	ALT_SMP(ldmia	sp!, {r4, r10, r11})
->> +#endif
->> #endif
-> 
-> And what effect do you expect the above to have?
+Along with this function, a free_contig_pages() function is
+provided which frees all (or a subset of) pages allocated
+with alloc_contig_free_pages().
 
-My goal was to be proactive, heading off a request to use this macro for
-the SMP case since preempt disable is only required on ARM11 MPCore.
-I thought this would achieve that goal, only using those instructions on SMP,
-not UP machines.
+Michal Nazarewicz has modified the function to make it easier
+to allocate not MAX_ORDER_NR_PAGES aligned pages by making it
+return pfn of one-past-the-last allocated page.
 
-> Do you understand the purpose of the ALT_SMP macro?
+Signed-off-by: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
+Signed-off-by: Michal Nazarewicz <m.nazarewicz@samsung.com>
+[m.nazarewicz: added checks if all allocated pages comes from the
+same memory zone]
+Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+[m.szyprowski: fixed wrong condition in VM_BUG_ON assert]
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ include/linux/mmzone.h         |   16 +++++++++
+ include/linux/page-isolation.h |    5 +++
+ mm/page_alloc.c                |   67 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 88 insertions(+), 0 deletions(-)
 
-Clearly I don't understand the use case.
-
-> Do you understand that it should be paired with ALT_UP ?
-
-No, I did not know that.  I'll remove use of ALT_SMP and add CONFIG_SMP
-as a conditional compile dependency then.  Is that OK?
-
-Thanks!
-
---
-Regards,
-George
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index a2760bb..862a834 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -1168,6 +1168,22 @@ static inline int memmap_valid_within(unsigned long pfn,
+ }
+ #endif /* CONFIG_ARCH_HAS_HOLES_MEMORYMODEL */
+ 
++#if defined(CONFIG_SPARSEMEM) && !defined(CONFIG_SPARSEMEM_VMEMMAP)
++/*
++ * Both PFNs must be from the same zone!  If this function returns
++ * true, pfn_to_page(pfn1) + (pfn2 - pfn1) == pfn_to_page(pfn2).
++ */
++static inline bool zone_pfn_same_memmap(unsigned long pfn1, unsigned long pfn2)
++{
++	return pfn_to_section_nr(pfn1) == pfn_to_section_nr(pfn2);
++}
++
++#else
++
++#define zone_pfn_same_memmap(pfn1, pfn2) (true)
++
++#endif
++
+ #endif /* !__GENERATING_BOUNDS.H */
+ #endif /* !__ASSEMBLY__ */
+ #endif /* _LINUX_MMZONE_H */
+diff --git a/include/linux/page-isolation.h b/include/linux/page-isolation.h
+index 58cdbac..b9fc428 100644
+--- a/include/linux/page-isolation.h
++++ b/include/linux/page-isolation.h
+@@ -33,6 +33,11 @@ test_pages_isolated(unsigned long start_pfn, unsigned long end_pfn);
+ extern int set_migratetype_isolate(struct page *page);
+ extern void unset_migratetype_isolate(struct page *page);
+ 
++/* The below functions must be run on a range from a single zone. */
++extern unsigned long alloc_contig_freed_pages(unsigned long start,
++					      unsigned long end, gfp_t flag);
++extern void free_contig_pages(unsigned long pfn, unsigned nr_pages);
++
+ /*
+  * For migration.
+  */
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index bf4399a..fbfb920 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5706,6 +5706,73 @@ out:
+ 	spin_unlock_irqrestore(&zone->lock, flags);
+ }
+ 
++unsigned long alloc_contig_freed_pages(unsigned long start, unsigned long end,
++				       gfp_t flag)
++{
++	unsigned long pfn = start, count;
++	struct page *page;
++	struct zone *zone;
++	int order;
++
++	VM_BUG_ON(!pfn_valid(start));
++	page = pfn_to_page(start);
++	zone = page_zone(page);
++
++	spin_lock_irq(&zone->lock);
++
++	for (;;) {
++		VM_BUG_ON(page_count(page) || !PageBuddy(page) ||
++			  page_zone(page) != zone);
++
++		list_del(&page->lru);
++		order = page_order(page);
++		count = 1UL << order;
++		zone->free_area[order].nr_free--;
++		rmv_page_order(page);
++		__mod_zone_page_state(zone, NR_FREE_PAGES, -(long)count);
++
++		pfn += count;
++		if (pfn >= end)
++			break;
++		VM_BUG_ON(!pfn_valid(pfn));
++
++		if (zone_pfn_same_memmap(pfn - count, pfn))
++			page += count;
++		else
++			page = pfn_to_page(pfn);
++	}
++
++	spin_unlock_irq(&zone->lock);
++
++	/* After this, pages in the range can be freed one be one */
++	count = pfn - start;
++	pfn = start;
++	for (page = pfn_to_page(pfn); count; --count) {
++		prep_new_page(page, 0, flag);
++		++pfn;
++		if (likely(zone_pfn_same_memmap(pfn - 1, pfn)))
++			++page;
++		else
++			page = pfn_to_page(pfn);
++	}
++
++	return pfn;
++}
++
++void free_contig_pages(unsigned long pfn, unsigned nr_pages)
++{
++	struct page *page = pfn_to_page(pfn);
++
++	while (nr_pages--) {
++		__free_page(page);
++		++pfn;
++		if (likely(zone_pfn_same_memmap(pfn - 1, pfn)))
++			++page;
++		else
++			page = pfn_to_page(pfn);
++	}
++}
++
+ #ifdef CONFIG_MEMORY_HOTREMOVE
+ /*
+  * All pages in the range must be isolated before calling this.
+-- 
+1.7.1.569.g6f426
