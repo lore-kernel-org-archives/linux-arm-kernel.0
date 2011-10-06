@@ -1,39 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Oct 2011 12:38:32 -0700
-Subject: [PATCH 0/2] AM3517EVM: Add support for MMC1
-In-Reply-To: <1313754751-11752-1-git-send-email-abhilash.kv@ti.com>
-References: <1313754751-11752-1-git-send-email-abhilash.kv@ti.com>
-Message-ID: <20111006193832.GL6324@atomide.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Thu, 6 Oct 2011 15:41:45 -0400
+Subject: [RFC/PATCH 6/7] ARM: ARM11 MPCore: DMA_CACHE_RWFO operations are
+	not preempt safe
+In-Reply-To: <20111006164034.GB21464@n2100.arm.linux.org.uk>
+References: <05942148-7AFB-4755-A22F-355E0360B098@mvista.com>
+	<1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317877714-11355-7-git-send-email-gdavis@mvista.com>
+	<20111006164034.GB21464@n2100.arm.linux.org.uk>
+Message-ID: <F6741C67-B5C0-4309-84A9-11501720A54F@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Abhilash K V <abhilash.kv@ti.com> [110819 04:19]:
-> This patch-set adds support for MMC1 slot on the 
-> AM3517 EVM's base-board.
-> These patches are dependent on the following patch-set
-> http://marc.info/?l=linux-omap&m=131247357813228&w=2
-> which gets the AM3517 EVM booting.
-> 
-> The patches are tested on master of tmlind/linux-omap-2.6.git.
-> Kernel version is 3.0.0-rc7 and last commit on top of which these patches
-> were added is:
-> 
->         885cf6ff7d3dad4cc44be74b0577d3a554d3ab71: Linux-omap rebuilt:
->         Updated to -rc7, added new boards
-> 
-> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-> ---
-> Abhilash K V (1):
->   AM3517: Support for MMC1
-> 
-> Vaibhav Hiremath (1):
->   AM3517EVM: Add support for base-board MMC slot
-> 
->  arch/arm/mach-omap2/board-am3517evm.c |   22 ++++++++++++++++++++++
->  arch/arm/mach-omap2/hsmmc.c           |   10 +++++++++-
->  2 files changed, 31 insertions(+), 1 deletions(-)
-> 
 
-Adding these both to board branch thanks.
+On Oct 6, 2011, at 12:40 PM, Russell King - ARM Linux wrote:
 
-Tony
+> On Thu, Oct 06, 2011 at 01:08:33AM -0400, gdavis at mvista.com wrote:
+>> v6_dma_inv_range:
+>> #ifdef CONFIG_DMA_CACHE_RWFO
+>> +#ifdef CONFIG_PREEMPT
+>> +	stmdb	sp!, {r4, r10, r11}
+>> +	get_thread_info r10
+>> +	ldr	r4, [r10, #TI_PREEMPT]		@ get preempt count
+>> +	add	r11, r4, #1			@ increment it
+>> +	str	r11, [r10, #TI_PREEMPT]		@ disable preempt
+>> +#endif
+> 
+> r11 is the frame pointer.  On kernels built with the frame pointer
+> enabled, this register must either be a valid frame pointer or zero.
+
+Doh!
+
+> There's no reason to use r4, r10 and r11 here - you could use r4, r5
+> and ip (r12) - and then there's no need to save ip as that's allowed
+> to be corrupted by called functions.
+
+OK, I'll make these changes in the next round.
+
+Thanks again!
+
+--
+Regards,
+George
