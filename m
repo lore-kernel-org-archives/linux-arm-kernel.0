@@ -1,73 +1,60 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 06 Oct 2011 16:53:01 -0700
-Subject: [PATCH] ARM: OMAP3: PM: restrict erratum i443 handling to
-	OMAP3430 only
-In-Reply-To: <alpine.DEB.2.00.1110061341460.4611@utopia.booyaka.com> (Paul
-	Walmsley's message of "Thu, 6 Oct 2011 13:43:23 -0600 (MDT)")
-References: <alpine.DEB.2.00.1110061341460.4611@utopia.booyaka.com>
-Message-ID: <8762k1n0de.fsf@ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 7 Oct 2011 05:26:11 +0530
+Subject: [PATCH 1/2] arm: samsung: move timer irq numbers to end of linux
+	irq space
+In-Reply-To: <20111006221517.GC21464@n2100.arm.linux.org.uk>
+References: <1317935503-11756-1-git-send-email-thomas.abraham@linaro.org>
+	<1317935503-11756-2-git-send-email-thomas.abraham@linaro.org>
+	<20111006221517.GC21464@n2100.arm.linux.org.uk>
+Message-ID: <CAJuYYwQh30k-7+uZk8XLUBhzRxHDu7xObC=-z70WtXe5WSJSrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+Hi Russell,
 
-> Based on the documents that I have here, there doesn't appear to be an
-> equivalent to erratum i443 for OMAP3630, so restrict this one to OMAP34xx
-> chips.
+On 7 October 2011 03:45, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Oct 07, 2011 at 02:41:42AM +0530, Thomas Abraham wrote:
+>> All of Samsung's s5p platforms have timer irqs statically mapped from linux
+>> irq numbers 11 to 15. These timer irqs are moved to end of the statically
+>> mapped linux irq space and the hardware irqs, which were statically mapped
+>> starting from 32 is moved to start from 0. The NR_IRQS macro is consolidated
+>> for all the s5p platforms in this process.
 >
-> Also, explicitly restrict this erratum to EMU and HS devices.
+> Am I reading this patch correctly - in that on platforms with the GIC,
+> you add 32 to the GIC IRQ number _just_ to avoid the possibility that
+> IRQs 11-15 are seen as valid?
 >
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> ---
-> Unfortunately, I don't have any HS/EMU devices in my testbed, so it's not 
-> possible for me to test this one on anything but GP chips.
-
-I don't have any 36xx HS/EMU device either, but this erratum does indeed
-seem to be 34xx specific.
-
-Barring any objections, I'll queue this for v3.2 (branch: for_3.2/pm-cleanup-2)
-
-Kevin
-
-
->  arch/arm/mach-omap2/pm34xx.c |   20 +++++++++++---------
->  1 files changed, 11 insertions(+), 9 deletions(-)
+> Or to put it another way, you're trying to ensure that if these timer
+> IRQs are requested, they will fail?
 >
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index a6156bd..9e14ae5 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -407,13 +407,14 @@ void omap_sram_idle(void)
->  	omap3_intc_prepare_idle();
->  
->  	/*
-> -	* On EMU/HS devices ROM code restores a SRDC value
-> -	* from scratchpad which has automatic self refresh on timeout
-> -	* of AUTO_CNT = 1 enabled. This takes care of erratum ID i443.
-> -	* Hence store/restore the SDRC_POWER register here.
-> -	*/
-> -	if (omap_rev() >= OMAP3430_REV_ES3_0 &&
-> -	    omap_type() != OMAP2_DEVICE_TYPE_GP &&
-> +	 * On EMU/HS devices ROM code restores a SRDC value
-> +	 * from scratchpad which has automatic self refresh on timeout
-> +	 * of AUTO_CNT = 1 enabled. This takes care of erratum ID i443.
-> +	 * Hence store/restore the SDRC_POWER register here.
-> +	 */
-> +	if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
-> +	    (omap_type() == OMAP2_DEVICE_TYPE_EMU ||
-> +	     omap_type() == OMAP2_DEVICE_TYPE_SEC) &&
->  	    core_next_state == PWRDM_POWER_OFF)
->  		sdrc_pwr = sdrc_read_reg(SDRC_POWER);
->  
-> @@ -430,8 +431,9 @@ void omap_sram_idle(void)
->  		omap34xx_do_sram_idle(save_state);
->  
->  	/* Restore normal SDRC POWER settings */
-> -	if (omap_rev() >= OMAP3430_REV_ES3_0 &&
-> -	    omap_type() != OMAP2_DEVICE_TYPE_GP &&
-> +	if (cpu_is_omap3430() && omap_rev() >= OMAP3430_REV_ES3_0 &&
-> +	    (omap_type() == OMAP2_DEVICE_TYPE_EMU ||
-> +	     omap_type() == OMAP2_DEVICE_TYPE_SEC) &&
->  	    core_next_state == PWRDM_POWER_OFF)
->  		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
+
+This patch is applicable for s5p64x0, s5pc100, s5pv210 and exynos4.
+Exynos4 has GIC and the rest use VIC.
+
+For all these platforms, the five hardware timer irqs are connected to
+GIC/VIC at some hardware irq number (in exynos it is GIC_ID 69 to 73
+for five timers). When any of these hardware interrupt occurs, its
+interrupt handler calls generic_handle_irq() with linux irq number
+11/12/13/14/15 for timer 0/1/2/3/4 as the parameter. The code that
+needs to be notified about the timer interrupts would have already
+registered its handler for either of the interrupts 11 to 15. I am not
+sure why such remapping is used. I think it is not needed but did not
+intend to change it. All this is included in the file
+"arch/arm/plat-samsung/irq-vic-timer.c".
+
+Instead of using linux irq number 11 to 15 to which consumers of timer
+interrupt attach their handler, this interrupt range is moved to the
+end of linux irq space used. So there will be no interrupts statically
+mapped between 0 to 31.
+
+The GIC/VIC hardware interrupts, which were previously statically
+mapped to start from linux irq 32 are now moved to start from linux
+irq 0. In case of exynos, GIC_ID[0] (which is SGI[0]) which was
+previously at linux irq 32, will not be at linux irq 0.
+
+This was the intended change. This was required to use Rob Herring's
+GIC OF bindings patches for Exynos4.
+
+Thanks,
+Thomas.
