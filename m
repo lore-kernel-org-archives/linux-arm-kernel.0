@@ -1,46 +1,43 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 6 Oct 2011 19:25:53 +0200 (CEST)
-Subject: [PATCH RESEND] ARM: smp_twd: Reconfigure clockevents after
-	cpufreq change
-In-Reply-To: <CAKnu2ModYp+F0kq6qVo9SQJ88GR_EwGNgH2WZXJrXUeR1xyzQw@mail.gmail.com>
-References: <1315292775-4413-1-git-send-email-linus.walleij@stericsson.com>
-	<CAKnu2ModYp+F0kq6qVo9SQJ88GR_EwGNgH2WZXJrXUeR1xyzQw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1110061922440.3240@ionos>
+From: vjaquez@igalia.com (=?UTF-8?q?V=C3=ADctor=20Manuel=20J=C3=A1quez=20Leal?=)
+Date: Thu,  6 Oct 2011 19:30:02 +0200
+Subject: [PATCH v2] omap: dmtimer: convert printk to pr_err / WARN
+In-Reply-To: <1317898106-1891-1-git-send-email-vjaquez@igalia.com>
+References: <1317898106-1891-1-git-send-email-vjaquez@igalia.com>
+Message-ID: <1317922204-12512-1-git-send-email-vjaquez@igalia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Oct 2011, Linus Walleij wrote:
+Convert a printk(KERN_ERR) message in the driver to pr_err(), and
+use WARN() instead of a custom log message with a stack dump.
 
-> 2011/9/6 Linus Walleij <linus.walleij@stericsson.com>:
-> 
-> > From: Colin Cross <ccross@android.com>
-> >
-> > The localtimer's clock changes with the cpu clock. After a
-> > cpufreq transition, update the clockevent's frequency and
-> > reprogram the next clock event.
-> 
-> Thomas do you think you can have a look at this patch and ACK
-> it if it looks OK to you? It's the use of clockevents_update_freq()
-> function you added after we discussed this in Budapest.
-> 
-> Since it's likely the first user of that infrastructure we need
-> to get it right.
+Signed-off-by: V?ctor Manuel J?quez Leal <vjaquez@igalia.com>
+---
+ arch/arm/plat-omap/dmtimer.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
-The usage is correct.
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index ee9f6eb..dead0f3 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -322,7 +322,7 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
+ 	while (!(omap_dm_timer_read_reg(timer, OMAP_TIMER_SYS_STAT_REG) & 1)) {
+ 		c++;
+ 		if (c > 100000) {
+-			printk(KERN_ERR "Timer failed to reset\n");
++			pr_err("Timer failed to reset\n");
+ 			return;
+ 		}
+ 	}
+@@ -397,9 +397,7 @@ struct omap_dm_timer *omap_dm_timer_request_specific(int id)
+ 	spin_lock_irqsave(&dm_timer_lock, flags);
+ 	if (id <= 0 || id > dm_timer_count || dm_timers[id-1].reserved) {
+ 		spin_unlock_irqrestore(&dm_timer_lock, flags);
+-		printk("BUG: warning at %s:%d/%s(): unable to get timer %d\n",
+-		       __FILE__, __LINE__, __func__, id);
+-		dump_stack();
++		WARN(1, "unable to get timer %d\n", id);
+ 		return NULL;
+ 	}
  
-> Here is the entire patch i Russells tracker:
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6956/2
-
-The only thing what puzzles me is:
-
-> +	if (!IS_ERR_OR_NULL(twd_clk))
-> +		twd_timer_rate = clk_get_rate(twd_clk);
-> +	else
-> +		twd_calibrate_rate();
-
-How is made sure that the cpu freq update thing is not called when
-twd_clk is not available or am I missing something ?
-
-Thanks,
-
-	tglx
+-- 
+1.7.6.3
