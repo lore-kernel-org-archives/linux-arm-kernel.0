@@ -1,36 +1,73 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri,  7 Oct 2011 23:06:21 +0800
-Subject: [PATCH] MAINTAINERS: add ARM/FREESCALE IMX6 entry
-In-Reply-To: <1317610626-24357-1-git-send-email-shawn.guo@linaro.org>
-References: <1317610626-24357-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1317999981-2802-1-git-send-email-shawn.guo@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 7 Oct 2011 08:11:17 -0700
+Subject: [PATCH 1/4] ARM: Add __arm_ioremap_exec for mapping external
+	memory as MT_MEMORY
+In-Reply-To: <4E8F14A6.5050402@ti.com>
+References: <20111005004339.26980.31149.stgit@kaulin.local>
+	<20111005004539.26980.52409.stgit@kaulin.local>
+	<alpine.LFD.2.02.1110042059110.9106@xanadu.home>
+	<20111005220619.GC6324@atomide.com> <4E8E9EE8.8010106@ti.com>
+	<20111007144349.GE6324@atomide.com> <4E8F14A6.5050402@ti.com>
+Message-ID: <20111007151116.GI6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds maintainer for ARM/FREESCALE IMX6.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [111007 07:29]:
+> On Friday 07 October 2011 08:13 PM, Tony Lindgren wrote:
+> > 
+> > ..so I think we should just have a separate static mapping for
+> > the omap4 errata fix SO page, and just limit the memory available
+> > for SRAM code to ioremap.
+> > 
+> > How does that sounds to you?
+> > 
+> That's more or less what the patch is already doing.
+> Instead of static mapping, I was dynamically stealing one
+> page ( SZ_4K) and mapping it as MT_MEMORY_SO and rest
+> of the memory as MT_MEMORY for OMAP4.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- MAINTAINERS |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 65ca7ea..05e4d69 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -786,6 +786,13 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-mx5/
+Yeah cool.
  
-+ARM/FREESCALE IMX6
-+M:	Shawn Guo <shawn.guo@linaro.org>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+T:	git git://git.linaro.org/people/shawnguo/linux-2.6.git
-+F:	arch/arm/mach-imx/*imx6*
-+
- ARM/GLOMATION GESBC9312SX MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-1.7.4.1
+> It should be doable with your updates as well,
+> I guess with or without static mapping since the only
+> requisite is to keep one page of SRAM free on OMAP4 and
+> them map them using  iotable_init() with MT_MEMORY_SO.
+
+How about something like the following, this won't compile
+without at least moving the defines around a bit, but shows
+what I had in mind:
+
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -238,6 +238,14 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
+ 		.length		= L4_EMU_44XX_SIZE,
+ 		.type		= MT_DEVICE,
+ 	},
++#ifdef CONFIG_OMAP4_ERRATA_I688
++	{
++		.virtual	= OMAP4_SRAM_VA,
++		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
++		.length		= PAGE_SIZE,
++		.type		= MT_MEMORY_SO,
++	},
++#endif
+ };
+ #endif
+ 
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -125,6 +125,9 @@ static void __init omap_detect_sram(void)
+ 				omap_sram_size = 0x10000; /* 64K */
+ 			} else if (cpu_is_omap44xx()) {
+ 				omap_sram_start = OMAP4_SRAM_PA;
++#ifdef CONFIG_OMAP4_ERRATA_I688
++				omap_sram_start += PAGE_SIZE;
++#endif
+ 				omap_sram_size = 0xe000; /* 56K */
+ 			} else {
+ 				omap_sram_start = OMAP2_SRAM_PA;
+
+Eventually the SRAM code will be a generic driver, so let's try
+to keep the errata fix out of the SRAM code.
+
+Tony
