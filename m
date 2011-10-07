@@ -1,60 +1,96 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 7 Oct 2011 10:27:44 +0800
-Subject: [PATCH 01/26] usb/gadget/pxa25x: is_vbus_present is gone
-In-Reply-To: <1317499438-14058-2-git-send-email-arnd@arndb.de>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-2-git-send-email-arnd@arndb.de>
-Message-ID: <CAMPhdO81STk740TKDcxn7sgZLxS4z0GdjUOH58zhByoEMnJQZQ@mail.gmail.com>
+From: gdavis@mvista.com (gdavis at mvista.com)
+Date: Thu,  6 Oct 2011 22:38:34 -0400
+Subject: [RFC/PATCH v2 0/7] ARM11 MPCore: preemption/task migration cache
+	coherency fixups
+In-Reply-To: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+Message-ID: <1317955121-28047-1-git-send-email-gdavis@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> A recent commit obsoleted the is_vbus_present function, so
-> we must not use it any more.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Felipe Balbi <balbi@ti.com>
+Greetings,
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+On ARM11 MPCore, the "SCU does not handle coherency consequences of CP15
+cache operations" [1]. ?So cache maintenance functions have to insure
+that memory is globally consistent. ?Although the current Linux kernel
+works reasonably well on ARM11 MPCore machines, PREEMPT stress testing,
+e.g. parallel module loading and hackbench, results in crashes which
+exhibit non-sense oops traces where machine state does not make sense
+relative to the code executing at the time of the oops.
 
-> ---
-> ?drivers/usb/gadget/pxa25x_udc.h | ? ?8 +-------
-> ?1 files changed, 1 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/usb/gadget/pxa25x_udc.h b/drivers/usb/gadget/pxa25x_udc.h
-> index f572c56..6119900 100644
-> --- a/drivers/usb/gadget/pxa25x_udc.h
-> +++ b/drivers/usb/gadget/pxa25x_udc.h
-> @@ -161,8 +161,6 @@ static struct pxa25x_udc *the_controller;
->
-> ?#ifdef DEBUG
->
-> -static int is_vbus_present(void);
-> -
-> ?static const char *state_name[] = {
-> ? ? ? ?"EP0_IDLE",
-> ? ? ? ?"EP0_IN_DATA_PHASE", "EP0_OUT_DATA_PHASE",
-> @@ -214,8 +212,7 @@ dump_state(struct pxa25x_udc *dev)
-> ? ? ? ?u32 ? ? ? ? ? ? tmp;
-> ? ? ? ?unsigned ? ? ? ?i;
->
-> - ? ? ? DMSG("%s %s, uicr %02X.%02X, usir %02X.%02x, ufnr %02X.%02X\n",
-> - ? ? ? ? ? ? ? is_vbus_present() ? "host " : "disconnected",
-> + ? ? ? DMSG("%s, uicr %02X.%02X, usir %02X.%02x, ufnr %02X.%02X\n",
-> ? ? ? ? ? ? ? ?state_name[dev->ep0state],
-> ? ? ? ? ? ? ? ?UICR1, UICR0, USIR1, USIR0, UFNRH, UFNRL);
-> ? ? ? ?dump_udccr("udccr");
-> @@ -232,9 +229,6 @@ dump_state(struct pxa25x_udc *dev)
-> ? ? ? ?} else
-> ? ? ? ? ? ? ? ?DMSG("ep0 driver '%s'\n", dev->driver->driver.name);
->
-> - ? ? ? if (!is_vbus_present())
-> - ? ? ? ? ? ? ? return;
-> -
-> ? ? ? ?dump_udccs0 ("udccs0");
-> ? ? ? ?DMSG("ep0 IN %lu/%lu, OUT %lu/%lu\n",
-> ? ? ? ? ? ? ? ?dev->stats.write.bytes, dev->stats.write.ops,
-> --
-> 1.7.5.4
->
->
+Review and analysis of the various ARM11 MPCore cache maintenance
+functions reveal that there are a number critical sections in which
+ARM11 MPCore caches and/or memory may become inconsistent, i.e. a
+cache line on CPU A contains a modified entry but preemption and task
+migration occurs after which the same cache line is cleaned/flushed
+on CPU B. ?This can obviously lead to inconsistent memory and/or
+cache state as cache ops on ARM11 MPCore are non-coherent.
+
+The following is a partial series of ARM11 MPCore preemption/task
+migration fixes to resolve cache coherency problems on these machines:
+
+George G. Davis (6):
+      ARM: ARM11 MPCore: pte_alloc_one{,_kernel} are not preempt safe
+      ARM: ARM11 MPCore: {clean,flush}_pmd_entry are not preempt safe
+      ARM: ARM11 MPCore: clean_dcache_area is not preempt safe
+      ARM: Move get_thread_info macro definition to <asm/assembler.h>
+      ARM: ARM11 MPCore: DMA_CACHE_RWFO operations are not preempt safe
+      ARM: ARM11 MPCore: cpu_v6_set_pte_ext is not preempt safe
+
+Konstantin Baidarov (1):
+      ARM: ARM11 MPCore: pgd_alloc is not preempt safe
+
+ arch/arm/include/asm/assembler.h |   13 +++++++++++++
+ arch/arm/include/asm/pgalloc.h   |   23 ++++++++++++++++++++---
+ arch/arm/include/asm/pgtable.h   |    9 +++++++++
+ arch/arm/include/asm/smp_plat.h  |    2 ++
+ arch/arm/kernel/entry-header.S   |   11 -----------
+ arch/arm/mm/cache-v6.S           |   27 +++++++++++++++++++++++++++
+ arch/arm/mm/idmap.c              |    5 +++++
+ arch/arm/mm/ioremap.c            |    9 +++++++++
+ arch/arm/mm/mmu.c                |   12 ++++++++++++
+ arch/arm/mm/pgd.c                |    7 +++++++
+ arch/arm/mm/proc-v6.S            |   11 +++++++++++
+ arch/arm/plat-omap/iommu.c       |   10 ++++++++++
+ arch/arm/vfp/entry.S             |    5 ++++-
+ arch/arm/vfp/vfphw.S             |    5 ++++-
+ 14 files changed, 133 insertions(+), 16 deletions(-)
+
+ChangeLog:
+
+V2:
+- Substitute {get,put}_cpu() with preempt_{disable,enable}().
+- Fixed preempt {dis,en}able assembler code sequences to not
+  use r11 since it is reserved for frame pointer use.  Also
+  optimised these sequences to use r2, r3; ip scratch registers
+  in most cases to eliminate stack push/pop.  In one case,
+  cpu_v6_set_pte_ext, there are only two scratch registers
+  available, r3 and ip.  However, both of these are used within
+  the armv6_set_pte_ext macro.  So for this case, r3 is used
+  as a temporary scratch when disabling preemption and r4 and
+  r5 are pushed/popped as needed for other uses to avoid
+  conflict with scratch register usage in armv6_set_pte_ext.
+- Remove incorrect use of ALT_SMP macros in cpu_v6_set_pte_ext,
+  making the preempt {dis,en}able assembler code sequences
+  compile time dependent upon CONFIG_SMP instead.  This code
+  is safe on UP machines anyway.
+
+The above changes are among the "low hanging fruit" where the
+workarounds are relatively low impact from a performance and/or
+implementation effort perspective. ?I'm still working on fixes
+for the harder problems. ?Also, I believe that Catalin's "ARM: Allow
+lazy cache flushing on ARM11MPCore" [2][3] is required for ARM11
+MPCore machines and would like to see that or similar/alternative
+solution applied.
+
+Comments/feedback greatly appreciated.
+
+TIA!
+
+--
+Regards,
+George
+
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.dai0228a/index.html#arm_toc9
+[2] http://www.spinics.net/lists/arm-kernel/msg129403.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-May/014990.html
