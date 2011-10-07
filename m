@@ -1,113 +1,42 @@
-From: vishwanath.bs@ti.com (Vishwanath BS)
-Date: Fri, 7 Oct 2011 23:17:49 +0530
-Subject: [PATCHv2 5/7] ARM: OMAP3PLUS PM: Add IO Daisychain support via hwmod
-	mux
-In-Reply-To: <1318009671-12813-1-git-send-email-vishwanath.bs@ti.com>
-References: <1318009671-12813-1-git-send-email-vishwanath.bs@ti.com>
-Message-ID: <1318009671-12813-6-git-send-email-vishwanath.bs@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Oct 2011 19:56:11 +0200
+Subject: [GIT PULL] Samsung devel-2 for v3.2
+In-Reply-To: <005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
+References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
+	<20111002192950.GB1005@sirena.org.uk>
+	<005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
+Message-ID: <201110071956.12034.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IO Daisychain feature has to be triggered whenever there is a change in
-device's mux configuration (See section 3.9.4 in OMAP4 Public TRM vP).
+On Monday 03 October 2011, Kukjin Kim wrote:
+> Mark Brown wrote:
+> > 
+> > On Sun, Oct 02, 2011 at 06:25:36PM +0900, Kukjin Kim wrote:
+> > 
+> > >       gpio/samsung: gpio-samsung.c to support Samsung GPIOs
+> > 
+> > As I reported the other day this change breaks the boot early on on the
+> > Cragganmore S3C6410 based systems (I've not actually fired up my
+> > SMDK6410 but I suspect it may have issues too).  I did make some brief
+> > attempts to debug but as there's no console output at all and the diff
+> > is rather large it's not easy to see what's gone wrong.
+> 
+> Hmm, I thought it has no problem when I saw Thomas Abraham's 'serial:
+> samsung' patches because he said it works fine with my for-next plus his
+> patches on SMDK6410...Anyway, I need to sort it out.
+> 
+> Arnd, please hold this on, will request again soon.
 
-Now devices can idle independent of the powerdomain, there can be a window where device
-is idled and corresponding powerdomain can be ON/INACTIVE state. In such situations,
-since both module wake up is enabled at padlevel as well as io daisychain sequence is
-triggered, there will be 2 PRCM interrupts (Module async wake up via swakeup and IO Pad
-interrupt). But as PRCM Interrupt handler clears the Module Padlevel WKST bit in the
-first interrupt, module specific interrupt handler will not triggered for the second time
+Any update on this?
 
-Also look at detailed explanation given by Rajendra at
-http://www.spinics.net/lists/linux-serial/msg04480.html
+Note that in general, I would prefer to get more separate pull
+requests for the individual feature branches that you use internally
+than having it all in one devel branch.
 
-Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
----
-This has been tested on OMAP3 using Chain Handler + UART Runtime patches [1]. Special
-thanks to GOvind for testing and confirming this behaviour on UART3.
-[1]: git://gitorious.org/runtime_3-0/runtime_3-0.git v6_uart_runtime
+Time is running out before the merge window, so I'm not asking you
+to change it again. I will pull it when you send it, but if you
+have trouble with some specific parts of this, you can also send
+me pull requests for the parts that are good.
 
- arch/arm/mach-omap2/omap_hwmod.c |    9 +++++++--
- arch/arm/mach-omap2/pm.c         |   11 +++++++++++
- arch/arm/mach-omap2/pm.h         |    1 +
- 3 files changed, 19 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 84cc0bd..070f3f5 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -151,6 +151,7 @@
- #include "prm44xx.h"
- #include "prminst44xx.h"
- #include "mux.h"
-+#include "pm.h"
- 
- /* Maximum microseconds to wait for OMAP module to softreset */
- #define MAX_MODULE_SOFTRESET_WAIT	10000
-@@ -1462,8 +1463,10 @@ static int _enable(struct omap_hwmod *oh)
- 	/* Mux pins for device runtime if populated */
- 	if (oh->mux && (!oh->mux->enabled ||
- 			((oh->_state == _HWMOD_STATE_IDLE) &&
--			 oh->mux->pads_dynamic)))
-+			 oh->mux->pads_dynamic))) {
- 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED);
-+		omap_trigger_wuclk_ctrl();
-+	}
- 
- 	_add_initiator_dep(oh, mpu_oh);
- 
-@@ -1553,8 +1556,10 @@ static int _idle(struct omap_hwmod *oh)
- 		clkdm_hwmod_disable(oh->clkdm, oh);
- 
- 	/* Mux pins for device idle if populated */
--	if (oh->mux && oh->mux->pads_dynamic)
-+	if (oh->mux && oh->mux->pads_dynamic) {
- 		omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
-+		omap_trigger_wuclk_ctrl();
-+	}
- 
- 	oh->_state = _HWMOD_STATE_IDLE;
- 
-diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 472bf22..79be7af 100644
---- a/arch/arm/mach-omap2/pm.c
-+++ b/arch/arm/mach-omap2/pm.c
-@@ -23,6 +23,8 @@
- #include "powerdomain.h"
- #include "clockdomain.h"
- #include "pm.h"
-+#include "prm2xxx_3xxx.h"
-+#include "prm44xx.h"
- 
- static struct omap_device_pm_latency *pm_lats;
- 
-@@ -95,6 +97,15 @@ static void omap2_init_processor_devices(void)
- 	}
- }
- 
-+void omap_trigger_wuclk_ctrl(void)
-+{
-+	if (cpu_is_omap34xx())
-+		omap3_trigger_wuclk_ctrl();
-+
-+	if (cpu_is_omap44xx())
-+		omap4_trigger_wuclk_ctrl();
-+}
-+
- /* Types of sleep_switch used in omap_set_pwrdm_state */
- #define FORCEWAKEUP_SWITCH	0
- #define LOWPOWERSTATE_SWITCH	1
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 4e166ad..05c2da2 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -21,6 +21,7 @@ extern void omap_sram_idle(void);
- extern int omap3_can_sleep(void);
- extern int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state);
- extern int omap3_idle_init(void);
-+void omap_trigger_wuclk_ctrl(void);
- 
- #if defined(CONFIG_PM_OPP)
- extern int omap3_opp_init(void);
--- 
-1.7.0.4
+	Arnd
