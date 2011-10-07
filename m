@@ -1,66 +1,71 @@
 From: vishwanath.bs@ti.com (Vishwanath BS)
-Date: Fri, 7 Oct 2011 23:17:45 +0530
-Subject: [PATCHv2 1/7] ARM: OMAP3 PM: correct enable/disable of daisy io chain
+Date: Fri, 7 Oct 2011 23:17:50 +0530
+Subject: [PATCHv2 6/7] ARM: OMAP3 PM: Remove IO Daisychain control from cpuidle
 In-Reply-To: <1318009671-12813-1-git-send-email-vishwanath.bs@ti.com>
 References: <1318009671-12813-1-git-send-email-vishwanath.bs@ti.com>
-Message-ID: <1318009671-12813-2-git-send-email-vishwanath.bs@ti.com>
+Message-ID: <1318009671-12813-7-git-send-email-vishwanath.bs@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mohan V <mohanv@ti.com>
+As IO Daisy chain sequence is triggered via hwmod mux, there is no need to
+control it from cpuidle path for OMAP3.
 
-Currently the enabling and disabling of IO Daisy chain is not
-according to the TRM. The below steps are followed to enable/
-disable the IO chain according to the "Sec 3.5.7.2.2
-I/O Wake-Up Mechanism" in OMAP3630 Public TRM[1].
+Also as omap3_disable_io_chain is no longer being used, just remove the function.
 
-Steps to enable IO chain:
-[a] Set PM_WKEN_WKUP.EN_IO bit
-[b] Set the PM_WKEN_WKUP.EN_IO_CHAIN bit
-[c] Poll for PM_WKST_WKUP.ST_IO_CHAIN.
-[d] When ST_IO_CHAIN bit set to 1, clear PM_WKEN_WKUP.EN_IO_CHAIN
-[e] Clear ST_IO_CHAIN bit.
-
-Steps to disable IO chain:
-[a] Clear PM_WKEN_WKUP.EN_IO_CHAIN bit
-[b] Clear PM_WKEN_WKUP.EN_IO bit
-[c] Clear PM_WKST_WKUP.ST_IO bit by writing 1 to it.
-
-Step [e] & [c] in each case can be skipped, as these are handled
-by the PRCM interrupt handler later.
-
-[1] http://focus.ti.com/pdfs/wtbu/OMAP36xx_ES1.x_PUBLIC_TRM_vV.zip
-
-Signed-off-by: Mohan V <mohanv@ti.com>
 Signed-off-by: Vishwanath BS <vishwanath.bs@ti.com>
 ---
- arch/arm/mach-omap2/pm34xx.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/pm34xx.c       |   15 ---------------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c |    8 --------
+ 2 files changed, 0 insertions(+), 23 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 7255d9b..041f6e6 100644
+index c282552..ea78d72 100644
 --- a/arch/arm/mach-omap2/pm34xx.c
 +++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -105,7 +105,7 @@ static void omap3_enable_io_chain(void)
- 		/* Do a readback to assure write has been done */
- 		omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN);
+@@ -341,12 +341,6 @@ void omap_sram_idle(void)
+ 	/* Enable IO-PAD and IO-CHAIN wakeups */
+ 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
+ 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
+-	if (omap3_has_io_wakeup() &&
+-	    (per_next_state < PWRDM_POWER_ON ||
+-	     core_next_state < PWRDM_POWER_ON)) {
+-		omap2_prm_set_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD, PM_WKEN);
+-		omap3_trigger_wuclk_ctrl();
+-	}
  
--		while (!(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKEN) &
-+		while (!(omap2_prm_read_mod_reg(WKUP_MOD, PM_WKST) &
- 			 OMAP3430_ST_IO_CHAIN_MASK)) {
- 			timeout++;
- 			if (timeout > 1000) {
-@@ -113,9 +113,9 @@ static void omap3_enable_io_chain(void)
- 				       "activation failed.\n");
- 				return;
- 			}
--			omap2_prm_set_mod_reg_bits(OMAP3430_ST_IO_CHAIN_MASK,
--					     WKUP_MOD, PM_WKEN);
- 		}
-+		omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
-+				     PM_WKEN);
+ 	/* Block console output in case it is on one of the OMAP UARTs */
+ 	if (!is_suspending())
+@@ -438,15 +432,6 @@ void omap_sram_idle(void)
+ 		console_unlock();
+ 
+ console_still_active:
+-	/* Disable IO-PAD and IO-CHAIN wakeup */
+-	if (omap3_has_io_wakeup() &&
+-	    (per_next_state < PWRDM_POWER_ON ||
+-	     core_next_state < PWRDM_POWER_ON)) {
+-		omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_MASK, WKUP_MOD,
+-					     PM_WKEN);
+-		omap3_disable_io_chain();
+-	}
+-
+ 	pwrdm_post_transition();
+ 
+ 	clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+index 915d726..0c70bc4 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -183,11 +183,3 @@ void omap3_trigger_wuclk_ctrl(void)
+ 				     PM_WKEN);
  	}
  }
- 
+-
+-/* OMAP3 Daisychain disable sequence */
+-void omap3_disable_io_chain(void)
+-{
+-	if (omap_rev() >= OMAP3430_REV_ES3_1)
+-		omap2_prm_clear_mod_reg_bits(OMAP3430_EN_IO_CHAIN_MASK, WKUP_MOD,
+-				       PM_WKEN);
+-}
 -- 
 1.7.0.4
