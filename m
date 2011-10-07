@@ -1,35 +1,35 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 7 Oct 2011 20:45:22 +0200
-Subject: [PATCHv2] hw_random: add driver for atmel true hardware random
-	number generator
-In-Reply-To: <4E8ECC15.10704@atmel.com>
-References: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
-	<4E8ECC15.10704@atmel.com>
-Message-ID: <20111007184522.GA30518@gondor.apana.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Oct 2011 20:53:41 +0200
+Subject: ARM SoC tree: OMAP PM dependency on tip irq/core
+In-Reply-To: <87d3e8lmhp.fsf@ti.com>
+References: <87aa9mm8ts.fsf@ti.com> <201110071804.11494.arnd@arndb.de>
+	<87d3e8lmhp.fsf@ti.com>
+Message-ID: <201110072053.41594.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2011 at 11:53:25AM +0200, Nicolas Ferre wrote:
-> On 10/06/2011 07:56 PM, Peter Korsgaard :
-> > For the IP block on 9g45/9g46/9m10/9m11.
-> > 
-> > Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+On Friday 07 October 2011, Kevin Hilman wrote:
+> > I've pulled in rmk/devel-stable as a dependency now, thanks for
+> > reminding me of that.
+> >
+> > Thomas, where should I get the irq-core branch (or whichever
+> > I should wait for) to pull in as another dependency. Is that
+> > branch one that never gets rebased? 
 > 
-> Thanks, I am delighted to see this driver!
+> git://tesla.tglx.de/git/linux-2.6-tip irq/core
 > 
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Herbert,
-> I will handle the board specific part but should the driver part go
-> through the Crypto API tree?
-> Will you expect that I resend the patch with Jamie's and my signatures?
+> I asked Thomas about this earlier when I was going to build up the
+> dependencies myself, and he said it won't be rebased.
 
-Feel free to add it through your tree.
+Ok, thanks for the info.
 
-Acked-by: Herbert Xu <herbert@gondor.apana.org.au>
+I think I've now also come up with a workflow for tracking the dependencies:
+I have a depends/xxx branch for each other branch that I need to wait for
+getting merged first. When I want to send a pull request, I first check
+all the depends/* branches using 'git branch --merged next/xxx |
+grep depends' to see what the dependencies are, and 'git branch --merged
+torvalds/master | grep depends' to see if they are already merged upstream.
+When a dependency is already merged, I can remove its tracking branch
+from the arm-soc tree.
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+	Arnd
