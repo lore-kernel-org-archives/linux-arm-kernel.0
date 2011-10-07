@@ -1,28 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Oct 2011 23:09:13 +0200
-Subject: [GIT PULL] ARM: CSR: cleanup some minor coding-style issues for
-	3.2
-In-Reply-To: <CAGsJ_4w63t=EBFxJM0uum3FBqp5HY0ufi3v4Z+g4s2Hgmh-CzA@mail.gmail.com>
-References: <CAGsJ_4w63t=EBFxJM0uum3FBqp5HY0ufi3v4Z+g4s2Hgmh-CzA@mail.gmail.com>
-Message-ID: <201110072309.13637.arnd@arndb.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 07 Oct 2011 16:15:54 -0400 (EDT)
+Subject: [PATCH 0/2] OMAP: Update nr_irqs field in machine descriptors
+In-Reply-To: <20111006195016.GM6324@atomide.com>
+References: <1314215215-18683-1-git-send-email-svenkatr@ti.com>
+	<4E5636CD.4080302@ti.com>
+	<CANfBPZ-AAZx9TxO88EgxCtOUsWrsYzbK+M2d6cVSS7Kf-LwS3w@mail.gmail.com>
+	<20111006195016.GM6324@atomide.com>
+Message-ID: <alpine.LFD.2.02.1110071612380.6390@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 01 October 2011, Barry Song wrote:
-> The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
->   Linus Torvalds (1):
->         Linux 3.1-rc7
-> 
-> are available in the git repository at:
-> 
->   git at gitorious.org:sirfprima2-kernel/sirfprima2-kernel.git fixes
-> 
-> Barry Song (4):
->       ARM: CSR: timer: do not initialise statics to 0 or NULL
->       ARM: CSR: timer: space required before the open parenthesis '('
->       ARM: CSR: prima2: fix trailing whitespace
->       ARM: CSR: clock: Fix indentation
+On Thu, 6 Oct 2011, Tony Lindgren wrote:
 
-Pulled, thanks!
+> * S, Venkatraman <svenkatr@ti.com> [110825 07:23]:
+> > On Thu, Aug 25, 2011 at 5:19 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> > > Hi Venkat,
+> > >
+> > > On 8/24/2011 9:46 PM, S, Venkatraman wrote:
+> > >>
+> > >> As part of an effort to get single ARM kernel binary [1],
+> > >> multiple ?definitions of NR_IRQS under various platforms
+> > >> have to be reconciled and abstracted away from common code.
+> > >>
+> > >> This patch series takes the small step of populating the
+> > >> machine descriptors with the pre-existing nr_irqs field.
+> > >> Eventually, the common irq handler code will only look at this
+> > >> field and not the compile time constant.
+> > >
+> > > Not related to this patch, but still on that topic. The current NR_IRQS
+> > > depends as well on board stuff, like for example : the Phoenix
+> > > IRQs:TWL6030_IRQ_BASE, TWL6040_CODEC_IRQ_BASE.
+> > > Is there a plan to get rid of this static defines?
+> > >
+> > 
+> > Currently, the goal is to get rid of the singleton nature
+> > of NR_IRQS. Then it just becomes a property of the
+> > platform, and the arm common code should not see this define.
+> > This cleanup has to be done across multiple SoCs, not just OMAP.
+> > 
+> > After I get to complete some meaningful cleanup of NR_IRQS,
+> > I can look into the static defines that you mention.
+> 
+> I suggest we wait on this patch as the NR_IRQS should be the
+> board specific true number of interrupts including chained
+> interrupts from external devices like twl. So just setting
+> it to NR_IRQS does not help much. Also, the board-*.c files
+> will be going aways with device tree at some point.
 
-	Arnd
+This is prerequisite to some other cleanup orthogonal to DT being worked 
+in parallel.  I would prefer if DT wasn't a serialization point for 
+this.
+
+
+Nicolas
