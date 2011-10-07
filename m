@@ -1,40 +1,35 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 07 Oct 2011 10:02:53 +0530
-Subject: [PATCH 05/16] dmaengine: pl330: Enable module alias
+Date: Fri, 07 Oct 2011 10:03:23 +0530
+Subject: [PATCH 04/16] dmaengine: pl08x: Enable module alias
 	autogeneration for AMBA drivers
-In-Reply-To: <CAJe_ZhePtDRD-Ov4D9jrEY7jt97aX9cM+jA0-=gkC1nZadRcMQ@mail.gmail.com>
+In-Reply-To: <1317830707-17517-5-git-send-email-dave.martin@linaro.org>
 References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
-	<1317830707-17517-6-git-send-email-dave.martin@linaro.org>
-	<CAJe_ZhePtDRD-Ov4D9jrEY7jt97aX9cM+jA0-=gkC1nZadRcMQ@mail.gmail.com>
-Message-ID: <1317961973.1573.2223.camel@vkoul-udesk3>
+	<1317830707-17517-5-git-send-email-dave.martin@linaro.org>
+Message-ID: <1317962003.1573.2224.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-10-06 at 10:47 +0530, Jassi Brar wrote:
-> On 5 October 2011 21:34, Dave Martin <dave.martin@linaro.org> wrote:
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > ---
-> >  drivers/dma/pl330.c |    2 ++
-> >  1 files changed, 2 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > index 57104147..2d8d1b0 100644
-> > --- a/drivers/dma/pl330.c
-> > +++ b/drivers/dma/pl330.c
-> > @@ -990,6 +990,8 @@ static struct amba_id pl330_ids[] = {
-> >        { 0, 0 },
-> >  };
-> >
-> > +MODULE_DEVICE_TABLE(amba, pl330_ids);
-> > +
-> >  #ifdef CONFIG_PM_RUNTIME
-> >  static int pl330_runtime_suspend(struct device *dev)
-> >  {
+On Wed, 2011-10-05 at 17:04 +0100, Dave Martin wrote:
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> ---
+>  drivers/dma/amba-pl08x.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
-> 
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> index b7cbd1a..0698695 100644
+> --- a/drivers/dma/amba-pl08x.c
+> +++ b/drivers/dma/amba-pl08x.c
+> @@ -2054,6 +2054,8 @@ static struct amba_id pl08x_ids[] = {
+>  	{ 0, 0 },
+>  };
+>  
+> +MODULE_DEVICE_TABLE(amba, pl08x_ids);
+> +
+>  static struct amba_driver pl08x_amba_driver = {
+>  	.drv.name	= DRIVER_NAME,
+>  	.id_table	= pl08x_ids,
 
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
 -- 
 ~Vinod
