@@ -1,54 +1,58 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 07 Oct 2011 15:49:37 -0700
-Subject: [PATCH] ARM: PM: build sleep/suspend code for idle path also (not
-	only suspend)
-In-Reply-To: <20111007223922.GC26805@n2100.arm.linux.org.uk> (Russell King's
-	message of "Fri, 7 Oct 2011 23:39:22 +0100")
-References: <1318026686-20191-1-git-send-email-khilman@ti.com>
-	<20111007223922.GC26805@n2100.arm.linux.org.uk>
-Message-ID: <8739f4ju2m.fsf@ti.com>
+Date: Fri, 07 Oct 2011 15:50:32 -0700
+Subject: [PATCH 00/24 V2] OMAP4: PM: suspend,
+	CPU-hotplug and CPUilde support
+In-Reply-To: <87d3e8juqm.fsf@ti.com> (Kevin Hilman's message of "Fri, 07 Oct
+	2011 15:35:13 -0700")
+References: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
+	<87d3e8juqm.fsf@ti.com>
+Message-ID: <87vcs0ifgn.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Kevin Hilman <khilman@ti.com> writes:
 
-> On Fri, Oct 07, 2011 at 03:31:26PM -0700, Kevin Hilman wrote:
->> Some platforms (e.g. OMAP) use the same common cpu_suspend/cpu_resume
->> helpers during idle as well as suspend.
->> 
->> Currently, if suspend is disabled (CONFIG_PM_SLEEP=n) and the platform
->> idle code is using the common cpu_suspend/cpu_resume functions, the
->> kernel will not link.
->> 
->> Since platform code commonly uses CONFIG_PM=y to build it's idle code,
->> build the common sleep/suspend code based on CONFIG_PM instead of
->> CONFIG_PM_SLEEP.
->> 
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> Applies on Russell's devel-stable branch, where the new common
->> suspend/resume code is queued.
+> Hi Santosh,
 >
-> See:
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
 >
-> commit 15e0d9e37c7fe9711b60f47221c394d45553ad8c
-> Author: Arnd Bergmann <arnd@arndb.de>
-> Date:   Sat Oct 1 21:09:39 2011 +0200
+>> The series adds OMAP4 MPUSS (MPU SubSystem) power management support for
+>> suspend (S2R), CPU hotplug and CPUidle.
 >
->     ARM: pm: let platforms select cpu_suspend support
+> Just noticed when doing some final build/sanity testing that there are a
+> few of compile/link warnings/problems when the kernel is built without
+> CONFIG_PM
 >
->     Support for the cpu_suspend functions is only built-in
->     when CONFIG_PM_SLEEP is enabled, but omap3/4, exynos4
->     and pxa always call cpu_suspend when CONFIG_PM is enabled.
+> Some warnings:
 >
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> /work/kernel/omap/pm/arch/arm/mach-omap2/omap-wakeupgen.c:203:13: warning: 'irq_save_context' defined but not used
+> /work/kernel/omap/pm/arch/arm/mach-omap2/omap-wakeupgen.c:270:13: warning: 'irq_save_secure_context' defined but not used
+>
+> and some failures (these happen when CONFIG_SUSPEND=n but CONFIG_PM_RUNTIME=y:
+>
+> arch/arm/mach-omap2/built-in.o: In function `skip_l2en':
+> /work/kernel/omap/pm/arch/arm/mach-omap2/sleep44xx.S:323: undefined reference to `cpu_resume'
+> arch/arm/mach-omap2/built-in.o: In function `omap_sram_idle':
+> /work/kernel/omap/pm/arch/arm/mach-omap2/pm34xx.c:429: undefined reference to `cpu_suspend'
+> arch/arm/mach-omap2/built-in.o: In function `skipl2reen':
+> /work/kernel/omap/pm/arch/arm/mach-omap2/sleep34xx.S:534: undefined reference to `cpu_resume'
+> arch/arm/mach-omap2/built-in.o: In function `omap4_enter_lowpower':
+> /work/kernel/omap/pm/arch/arm/mach-omap2/omap-mpuss-lowpower.c:281: undefined reference to `cpu_suspend'
+>
+> Turns out these are not directly related to your series and OMAP3
+> exhibits the same problems.
+>
+> I just posted a patch[1] to attempt to address these.
+>
+> But could you fixup the first problem and test with [1] to see if things
+> still build/work as expected.
 
-Nice.  That will work too.
+OK, ignore my patch.
 
-I see this in Arnd's randconfig/arm branch but not yet in
-arm-soc/for-next.   Is this being queued for v3.2?
+Arnd already has a fix for these link problems in his randconfig/arm
+branch.
 
-This will also conflict with your devel-stable where the suspend.c is
-added.
+Please just cleanup the wakeupgen compile warnings and update your
+branch.
 
 Kevin
