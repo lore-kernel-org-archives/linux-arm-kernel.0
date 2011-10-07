@@ -1,61 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Oct 2011 12:06:54 -0700
-Subject: [PATCH 1/3] ARM: mmp: add sram allocator
-In-Reply-To: <CAN1soZwz4Wj+rAqnLBGRqY0N2keFgxGYJw8sKEzsssjhLn-gSw@mail.gmail.com>
-References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
-	<1313377794-26721-2-git-send-email-leoy@marvell.com>
-	<1403041.Yj2MdIhcZO@wuerfel>
-	<20110815090921.GA32705@game.jcrosoft.org>
-	<CAN1soZwz4Wj+rAqnLBGRqY0N2keFgxGYJw8sKEzsssjhLn-gSw@mail.gmail.com>
-Message-ID: <20111007190654.GM6324@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Oct 2011 21:11:35 +0200
+Subject: [GIT PULL] omap fixes for -rc series and merge window
+In-Reply-To: <20111003185237.GI6324@atomide.com>
+References: <20111003185237.GI6324@atomide.com>
+Message-ID: <201110072111.35418.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@gmail.com> [110815 01:57]:
-> On Mon, Aug 15, 2011 at 5:09 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 10:59 Mon 15 Aug ? ? , Arnd Bergmann wrote:
-> >> On Monday 15 August 2011 11:09:52 Leo Yan wrote:
-> >> > On mmp platform, there have two sram banks:
-> >> > audio sram and internal sram. The audio sram is mainly for audio;
-> >> > the internal sram is for video, wtm and power management.
-> >> > So add the sram allocator using genalloc to manage them.
-> >> >
-> >> > Every sram bank will register its own platform device
-> >> > info, after the sram allocator create the generic pool
-> >> > for the sram bank, the user module can use the pool's
-> >> > name to get the pool handler; then it can use the handler
-> >> > to alloc/free memory with genalloc APIs.
-> >> >
-> >> > Signed-off-by: Leo Yan <leoy@marvell.com>
-> >> > ---
-> >> > ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
-> >> > ?arch/arm/mach-mmp/Makefile ? ? ? ? ? ?| ? ?2 +-
-> >> > ?arch/arm/mach-mmp/include/mach/sram.h | ? 35 +++++++
-> >> > ?arch/arm/mach-mmp/sram.c ? ? ? ? ? ? ?| ?168 +++++++++++++++++++++++++++++++++
-> >> > ?4 files changed, 205 insertions(+), 1 deletions(-)
-> >> > ?create mode 100644 arch/arm/mach-mmp/include/mach/sram.h
-> >> > ?create mode 100644 arch/arm/mach-mmp/sram.c
-> >>
-> >> Some time ago, there was talk of merging the existing sram drivers
-> >> and creating a common driver that is easy to hook into.
-> >>
-> >> What has happened with that? My feeling is that we should stop adding
-> >> more drivers like this in the platform code but rather put an
-> >> authoritative copy into arch/arm/mm/ or even the top-level mm/ directory
-> >> and change over the existing drivers to hook into that one.
-> > no need anymore I send patch to add the support of phys/virt to genalloc so
-> > now we just have to use it
-> >
-> > Best Regards,
-> > J.
-> >
-> Exactly, and Russel already gave up on original patch. genpool is already a
-> common driver.
+On Monday 03 October 2011, Tony Lindgren wrote:
+> Please pull omap fixes from:
+> 
+> git://github.com/tmlind/linux.git fixes
+> 
+> Out of these the first three commits would be nice to get
+> into the -rc series with the first two causing boot issues
+> and the musb fixing an ugly warning.
+> 
+> Note however the recent commit message update on the third patch.
+> I added Bjarne's SOB to the third patch because of the earlier
+> reference.
+> 
+> The last two are mostly cosmetic and not so urgent.
 
-Yeah but it seems that we can make arch/arm/mach-mmp/sram.c posted
-in this thread a generic driver instead.
+Hi Tony,
 
-Regards,
+I've pulled them all into the fixes branch for now, but I'm not sure
+if I still want to send another pull request. If I do, I'll have to
+rebase that branch and put some into the next/fixes branch instead
+as I already have patches that I don't want to send for 3.1 any
+more. Are the patches all fixes against 3.1 only or do some of them
+also apply to older releases?
 
-Tony
+	Arnd
