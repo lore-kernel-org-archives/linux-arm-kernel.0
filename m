@@ -1,43 +1,61 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 7 Oct 2011 16:21:59 +0800
-Subject: [PATCH 14/26] mtd: nand_h1900 never worked
-In-Reply-To: <1317499438-14058-15-git-send-email-arnd@arndb.de>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-15-git-send-email-arnd@arndb.de>
-Message-ID: <CAMPhdO-wKa7ULnMZCp0mYadref-VB4-+X87te_9Vnr8gno_=xA@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Fri, 7 Oct 2011 10:23:09 +0200
+Subject: [PATCH v2 6/6] OMAP4: Clock: Correct the name of SLIMBUS interface
+	clocks
+In-Reply-To: <alpine.DEB.2.00.1110061941100.4611@utopia.booyaka.com>
+References: <1316195330-15099-1-git-send-email-jon-hunter@ti.com>
+	<alpine.DEB.2.00.1110061941100.4611@utopia.booyaka.com>
+Message-ID: <4E8EB6ED.9020605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> This driver has been broken through all of git history and
-> cannot even be built. Better mark it as broken. Next stop is
-> removing from the tree.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Artem Bityutskiy <dedekind1@gmail.com>
-> Cc: Jamie Iles <jamie@jamieiles.com>
+Hi Paul & Jon,
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+On 10/7/2011 3:42 AM, Paul Walmsley wrote:
+> + Beno?t
+>
+> On Fri, 16 Sep 2011, Jon Hunter wrote:
+>
+>> From: Jon Hunter<jon-hunter@ti.com>
+>>
+>> Currently the interface clocks for the two SLIMBUS peripherals are
+>> named slimbus1_fck and slimbus2_fck. Rename these clocks to be
+>> slimbus1_ick and slimbus2_ick so it is clear that these are
+>> interface clocks and not functional clocks.
+>>
+>> Signed-off-by: Jon Hunter<jon-hunter@ti.com>
+>
+> This one, I don't quite understand.  We should probably be removing these
+> MODULEMODE-only clocks from the OMAP4 tree, and using their parent clock
+> as the main_clk.  That would be a good cleanup for 3.3...
 
-> ---
-> ?drivers/mtd/nand/Kconfig | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index 4c342523..f85af18 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -92,7 +92,7 @@ config MTD_NAND_EDB7312
->
-> ?config MTD_NAND_H1900
-> ? ? ? ?tristate "iPAQ H1900 flash"
-> - ? ? ? depends on ARCH_PXA
-> + ? ? ? depends on ARCH_PXA && BROKEN
-> ? ? ? ?help
-> ? ? ? ? ?This enables the driver for the iPAQ h1900 flash.
->
-> --
-> 1.7.5.4
->
->
+Yes, but in order to remove that from the clock data we must ensure that 
+the hwmod entry is there.
+I kept a lot of legacy MODULEMODE clocks just because of missing hwmod / 
+runtime_pm adaptation on some drivers.
+
+In the case of slimbus, there is no main_clk but a bunch of optional 
+clocks. It looks similar to the DSS case. So we should not use the 
+parent clock as a main_clk.
+
+We should probably promote one of the opt_clk as the main_clk. The 
+slimbus_clk seems to be the good candidate for both instances.
+
+static struct omap_hwmod_opt_clk slimbus1_opt_clks[] = {
+        { .role = "fclk_1", .clk = "slimbus1_fclk_1" },
+        { .role = "fclk_0", .clk = "slimbus1_fclk_0" },
+        { .role = "fclk_2", .clk = "slimbus1_fclk_2" },
+        { .role = "slimbus_clk", .clk = "slimbus1_slimbus_clk" },
+};
+
+static struct omap_hwmod_opt_clk slimbus2_opt_clks[] = {
+        { .role = "fclk_1", .clk = "slimbus2_fclk_1" },
+        { .role = "fclk_0", .clk = "slimbus2_fclk_0" },
+        { .role = "slimbus_clk", .clk = "slimbus2_slimbus_clk" },
+};
+
+Jon,
+Do you know if that one is indeed mandatory to use the slimbus IP?
+
+Thanks,
+Benoit
