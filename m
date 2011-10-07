@@ -1,51 +1,35 @@
-From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Thu,  6 Oct 2011 22:38:41 -0400
-Subject: [RFC/PATCH 7/7] ARM: ARM11 MPCore: cpu_v6_set_pte_ext is not preempt
-	safe
-In-Reply-To: <1317955121-28047-1-git-send-email-gdavis@mvista.com>
-References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
-Message-ID: <1317955121-28047-8-git-send-email-gdavis@mvista.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu,  6 Oct 2011 19:54:11 -0700
+Subject: [PATCH 01/14] ARM: tegra: add __force to IO_ADDRESS
+In-Reply-To: <1317956064-17650-1-git-send-email-olof@lixom.net>
+References: <1317956064-17650-1-git-send-email-olof@lixom.net>
+Message-ID: <1317956064-17650-2-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: George G. Davis <gdavis@mvista.com>
+Kills loads of sparse errors such as:
 
-If preemption and subsequent task migration occurs during calls to
-cpu_v6_set_pte_ext on ARM11 MPCore machines, global memory state
-can become inconsistent.  To prevent inconsistent memory state on
-these machines, disable preemption in cpu_v6_set_pte_ext.
+arch/arm/mach-tegra/fuse.c:44:12: warning: incorrect type in argument 1 (different base types)
+arch/arm/mach-tegra/fuse.c:44:12:    expected void const volatile [noderef] <asn:2>*<noident>
+arch/arm/mach-tegra/fuse.c:44:12:    got unsigned int
 
-This change depends on "ARM: Move get_thread_info macro definition
-to <asm/assembler.h>".
-
-Signed-off-by: George G. Davis <gdavis@mvista.com>
+Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/mm/proc-v6.S |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/include/mach/io.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index a923aa0..57b359d 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -122,7 +122,18 @@ ENTRY(cpu_v6_switch_mm)
+diff --git a/arch/arm/mach-tegra/include/mach/io.h b/arch/arm/mach-tegra/include/mach/io.h
+index 4cea2230..d27e340 100644
+--- a/arch/arm/mach-tegra/include/mach/io.h
++++ b/arch/arm/mach-tegra/include/mach/io.h
+@@ -71,7 +71,7 @@
+ void __iomem *tegra_ioremap(unsigned long phys, size_t size, unsigned int type);
+ void tegra_iounmap(volatile void __iomem *addr);
  
- ENTRY(cpu_v6_set_pte_ext)
- #ifdef CONFIG_MMU
-+#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-+	stmdb	sp!, {r4, r5}
-+	get_thread_info r5
-+	ldr	r4, [r5, #TI_PREEMPT]	@ get preempt count
-+	add	r3, r4, #1		@ increment it
-+	str	r3, [r5, #TI_PREEMPT]	@ disable preempt
-+#endif
- 	armv6_set_pte_ext cpu_v6
-+#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-+	str	r4, [r5, #TI_PREEMPT]	@ restore preempt count
-+	ldmia	sp!, {r4, r5}
-+#endif
- #endif
- 	mov	pc, lr
+-#define IO_ADDRESS(n) ((void __iomem *) IO_TO_VIRT(n))
++#define IO_ADDRESS(n) ((void __force __iomem *) IO_TO_VIRT(n))
  
+ #ifdef CONFIG_TEGRA_PCI
+ extern void __iomem *tegra_pcie_io_base;
 -- 
-1.7.4.4
+1.7.4.1
