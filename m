@@ -1,34 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Oct 2011 21:11:35 +0200
-Subject: [GIT PULL] omap fixes for -rc series and merge window
-In-Reply-To: <20111003185237.GI6324@atomide.com>
-References: <20111003185237.GI6324@atomide.com>
-Message-ID: <201110072111.35418.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Oct 2011 20:11:28 +0100
+Subject: [PATCH 1/4] mmc: mmci: Bugfix in pio read for small packets
+In-Reply-To: <4E8F00E4.5010702@stericsson.com>
+References: <1317109568-17905-1-git-send-email-ulf.hansson@stericsson.com>
+	<20111001160937.GF11710@n2100.arm.linux.org.uk>
+	<4E895F6A.9070203@stericsson.com> <4E8F00E4.5010702@stericsson.com>
+Message-ID: <20111007191128.GA25689@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 October 2011, Tony Lindgren wrote:
-> Please pull omap fixes from:
-> 
-> git://github.com/tmlind/linux.git fixes
-> 
-> Out of these the first three commits would be nice to get
-> into the -rc series with the first two causing boot issues
-> and the musb fixing an ugly warning.
-> 
-> Note however the recent commit message update on the third patch.
-> I added Bjarne's SOB to the third patch because of the earlier
-> reference.
-> 
-> The last two are mostly cosmetic and not so urgent.
+On Fri, Oct 07, 2011 at 03:38:44PM +0200, Ulf Hansson wrote:
+> In this hot path we already do a read of the FIFOCNT register for every  
+> loop in pio_read, won't this sometimes cause caches to flush and  
+> similar, thus cost quite a lot - at least a lot more than executing a  
+> switch/if sentence like Stefan added? Or do I miss something?
 
-Hi Tony,
+The read of FIFOCNT just reads the counter and does nothing more.  Why
+do you think it causes a cache flush, and what cache do you think would
+be flushed?
 
-I've pulled them all into the fixes branch for now, but I'm not sure
-if I still want to send another pull request. If I do, I'll have to
-rebase that branch and put some into the next/fixes branch instead
-as I already have patches that I don't want to send for 3.1 any
-more. Are the patches all fixes against 3.1 only or do some of them
-also apply to older releases?
+> I were also thinking of a possible optimization of minimizing the total  
+> numbers of reads of the FIFOCNT register in pio_read. Basically we can  
+> make use of the RXFIFOHALFFULL irq/status to know when there is a  
+> "burst" available in the FIFO. Do you think this will be feasible for  
+> the ARM MMCI Pl18x IP as well? I mean the consequence of using  
+> RXFIFOHALFFULL will be less numbers of IRQ raised and then when reading  
+> data from the FIFO it will be done in larger chunks.
 
-	Arnd
+We read the FIFOCNT register to allow us to empty as much data from the
+FIFO as we possibly can at each interrupt.  We know that it's going to
+be at least half full at that time because that's the interrupt which is
+triggering us to do the read (except for the final few words).  What we
+want to do is not just read half the FIFO, but everything that it
+contains.  Hence why we read FIFOCNT.
+
+> We could make use of the "likely" makro to make compiler optimizations  
+> of the code, is that a way forward do you think?
+
+That only helps if you look at the assembled code and inspect what the
+compiler is doing.  If it's already correctly guessing the best paths,
+then the likely macro does nothing for you.
+
+But first, you need to fix your code so you're only reading 32-bit
+quantities from the FIFO register.
