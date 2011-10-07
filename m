@@ -1,33 +1,31 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu,  6 Oct 2011 19:54:19 -0700
-Subject: [PATCH 09/14] ARM: tegra: pcie: 0 -> NULL changes
+Date: Thu,  6 Oct 2011 19:54:20 -0700
+Subject: [PATCH 10/14] ARM: tegra: tegra_init_cache should be static
 In-Reply-To: <1317956064-17650-1-git-send-email-olof@lixom.net>
 References: <1317956064-17650-1-git-send-email-olof@lixom.net>
-Message-ID: <1317956064-17650-10-git-send-email-olof@lixom.net>
+Message-ID: <1317956064-17650-11-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes:
-
-arch/arm/mach-tegra/pcie.c:465:10: warning: Using plain integer as NULL pointer
+Not exported and not used externally.
 
 Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/mach-tegra/pcie.c |    2 +-
+ arch/arm/mach-tegra/common.c |    2 +-
  1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-index f7c89ee..f5aa173 100644
---- a/arch/arm/mach-tegra/pcie.c
-+++ b/arch/arm/mach-tegra/pcie.c
-@@ -462,7 +462,7 @@ static struct pci_bus __init *tegra_pcie_scan_bus(int nr,
- 	struct tegra_pcie_port *pp;
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index d5e3f89..690b888 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -61,7 +61,7 @@ static __initdata struct tegra_clk_init_table common_clk_init_table[] = {
+ 	{ NULL,		NULL,		0,		0},
+ };
  
- 	if (nr >= tegra_pcie.num_ports)
--		return 0;
-+		return NULL;
- 
- 	pp = tegra_pcie.port + nr;
- 	pp->root_bus_nr = sys->busnr;
+-void __init tegra_init_cache(void)
++static void __init tegra_init_cache(void)
+ {
+ #ifdef CONFIG_CACHE_L2X0
+ 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
 -- 
 1.7.4.1
