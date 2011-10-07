@@ -1,20 +1,30 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 7 Oct 2011 10:21:43 +0100
-Subject: [PATCHv2] hw_random: add driver for atmel true hardware random
-	number generator
-In-Reply-To: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
-References: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <20111007092143.GA2239@totoro>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Oct 2011 10:22:43 +0100
+Subject: [PATCH v3] omap: dmtimer: convert printk to pr_err
+In-Reply-To: <1317977417-17874-1-git-send-email-vjaquez@igalia.com>
+References: <20111006201827.GT6324@atomide.com>
+	<1317977417-17874-1-git-send-email-vjaquez@igalia.com>
+Message-ID: <20111007092243.GC27281@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 06, 2011 at 07:56:30PM +0200, Peter Korsgaard wrote:
-> For the IP block on 9g45/9g46/9m10/9m11.
-> 
-> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+On Fri, Oct 07, 2011 at 10:50:16AM +0200, V?ctor Manuel J?quez Leal wrote:
+> Convert a printk(KERN_ERR) message in the driver to pr_err().
+...
+> @@ -111,7 +111,7 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
+>  	while (!(__raw_readl(timer->sys_stat) & 1)) {
+>  		c++;
+>  		if (c > 100000) {
+> -			printk(KERN_ERR "Timer failed to reset\n");
+> +			pr_err("Timer failed to reset\n");
 
-Looks nice to me Peter.
+What is the reason behind this change?  It looks like it's to use the
+latest and greatest function.
 
-Reviewed-by: Jamie Iles <jamie@jamieiles.com>
+If so, please don't make these changes - we have on many occasions been
+blamed for size of diffstat, churn, needless change, and this patch is
+exactly that.
 
-Jamie
+By all means fix printk's without KERN_ constants, possibly converting
+them to pr_*, but don't go around replacing printk(KERN_* with pr_*(
+without ensuring that there's a real benefit to the change.
