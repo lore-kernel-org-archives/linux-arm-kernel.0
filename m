@@ -1,40 +1,75 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 7 Oct 2011 16:22:55 +0800
-Subject: [PATCH 15/26] irda/ficp: only works on some pxa models
-In-Reply-To: <1317499438-14058-16-git-send-email-arnd@arndb.de>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-16-git-send-email-arnd@arndb.de>
-Message-ID: <CAMPhdO_Ni0Dq_J1scoASejykmajXsA-kMW64cMS1ea2ACBoGEw@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 07 Oct 2011 10:40:27 +0200
+Subject: [PATCH 1/3] sam9g20ek/9m10g45ek/stam9g20: unbreak build after
+	'use -EINVAL for invalid gpio'
+In-Reply-To: <1317915587-27474-1-git-send-email-jacmet@sunsite.dk>
+References: <1317915587-27474-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <4E8EBAFB.9030905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> This driver can only be built for pxa25x and pxa27x at the moment,
-> so encode that in Kconfig.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Samuel Ortiz <samuel@sortiz.org>
+On 10/06/2011 05:39 PM, Peter Korsgaard :
+> Commit 36706ab70b26 (ARM: at91/boards: use -EINVAL for invalid gpio)
+> broke the build as it used ';' rather than ',' in structure initializers.
+> 
+> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+OMG...
+
+Thanks a lot Peter. I include it immediately in at91-l2 and at91-next!
+
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Best regards,
 
 > ---
-> ?drivers/net/irda/Kconfig | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/net/irda/Kconfig b/drivers/net/irda/Kconfig
-> index 25bb2a0..8cffd38 100644
-> --- a/drivers/net/irda/Kconfig
-> +++ b/drivers/net/irda/Kconfig
-> @@ -373,7 +373,7 @@ config VIA_FIR
->
-> ?config PXA_FICP
-> ? ? ? ?tristate "Intel PXA2xx Internal FICP"
-> - ? ? ? depends on ARCH_PXA && IRDA
-> + ? ? ? depends on ARCH_PXA && IRDA && (PXA25x || PXA27x)
-> ? ? ? ?help
-> ? ? ? ? ?Say Y or M here if you want to build support for the PXA2xx
-> ? ? ? ? ?built-in IRDA interface which can support both SIR and FIR.
-> --
-> 1.7.5.4
->
->
+>  arch/arm/mach-at91/board-sam9g20ek.c    |    2 +-
+>  arch/arm/mach-at91/board-sam9m10g45ek.c |    2 +-
+>  arch/arm/mach-at91/board-stamp9g20.c    |    4 ++--
+>  3 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
+> index 1c6dfbb..27943c2 100644
+> --- a/arch/arm/mach-at91/board-sam9g20ek.c
+> +++ b/arch/arm/mach-at91/board-sam9g20ek.c
+> @@ -212,7 +212,7 @@ static struct mci_platform_data __initdata ek_mmc_data = {
+>  	.slot[1] = {
+>  		.bus_width	= 4,
+>  		.detect_pin	= AT91_PIN_PC9,
+> -		.wp_pin		= -1;
+> +		.wp_pin		= -1,
+>  	},
+>  
+>  };
+> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> index 3d68ead..008088a 100644
+> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
+> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> @@ -100,7 +100,7 @@ static struct mci_platform_data __initdata mci0_data = {
+>  	.slot[0] = {
+>  		.bus_width	= 4,
+>  		.detect_pin	= AT91_PIN_PD10,
+> -		.wp_pin		= -1;
+> +		.wp_pin		= -1,
+>  	},
+>  };
+>  
+> diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
+> index 3c0cc86..cb4a840 100644
+> --- a/arch/arm/mach-at91/board-stamp9g20.c
+> +++ b/arch/arm/mach-at91/board-stamp9g20.c
+> @@ -123,8 +123,8 @@ static void __init add_device_nand(void)
+>  static struct mci_platform_data __initdata mmc_data = {
+>  	.slot[0] = {
+>  		.bus_width	= 4,
+> -		.detect_pin	= -1;
+> -		.wp_pin		= -1;
+> +		.detect_pin	= -1,
+> +		.wp_pin		= -1,
+>  	},
+>  };
+>  #else
+
+
+-- 
+Nicolas Ferre
