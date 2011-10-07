@@ -1,57 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 7 Oct 2011 15:23:45 +0100
-Subject: Long stalls during boot with -next
-In-Reply-To: <CAJuYYwTeAwZ-zRDyQwB73bHWn+NkoT2zxmuJkFW6Oph1CUijqA@mail.gmail.com>
-References: <20110929125035.GA2085@sirena.org.uk>
-	<20111007115047.GC24534@sirena.org.uk>
-	<CAJuYYwTeAwZ-zRDyQwB73bHWn+NkoT2zxmuJkFW6Oph1CUijqA@mail.gmail.com>
-Message-ID: <20111007142343.GH14518@opensource.wolfsonmicro.com>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Fri, 07 Oct 2011 15:27:17 +0100
+Subject: [PATCH 0/5 v4] ARM Realview PCIX patch series
+Message-ID: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2011 at 06:57:19PM +0530, Thomas Abraham wrote:
-> On 7 October 2011 17:20, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+This is a resend of patches that were posted before with various
+comments addressed and rebased to 3.1.0-rc9.
 
-> > I identified the problem here, the behaviour of LL_DEBUG was changed to
-> > make it select DEBUG_ICEDCC by default which is unfortunate if one
-> > doesn't have an EmbeddedICE connected.
+The following series implements adding PCI
+support to the ARM Realview family of boards.
 
-> Thanks for your suggestion. The long stall during boot problem occurs
-> on Samsung boards as well with linux-next. As per your suggestion, the
-> following diff fixes this issue.
+---
 
-Excellent, I'm using this now - please add my
+Colin Tuckley (5):
+      ARM Realview PCIX build file changes
+      Realview PCIX support - add main support module code
+      ARM Realview PCIX board file changes
+      ARM Realview PCIX IRQ include file changes
+      ARM Realview PCIX map include file changes
 
-Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
-when you send it out properly!
+ arch/arm/Kconfig                                   |    3 
+ arch/arm/mach-realview/Makefile                    |    5 
+ arch/arm/mach-realview/include/mach/board-pb11mp.h |   11 
+ arch/arm/mach-realview/include/mach/board-pba8.h   |   11 
+ arch/arm/mach-realview/include/mach/board-pbx.h    |   11 
+ arch/arm/mach-realview/include/mach/hardware.h     |   22 +
+ arch/arm/mach-realview/include/mach/io.h           |    8 
+ arch/arm/mach-realview/include/mach/irqs-pb11mp.h  |   11 
+ arch/arm/mach-realview/include/mach/irqs-pba8.h    |    7 
+ arch/arm/mach-realview/include/mach/irqs-pbx.h     |    7 
+ arch/arm/mach-realview/include/mach/platform.h     |   15 -
+ arch/arm/mach-realview/pcix.c                      |  472 ++++++++++++++++++++
+ arch/arm/mach-realview/realview_pb11mp.c           |   18 +
+ arch/arm/mach-realview/realview_pba8.c             |   18 +
+ arch/arm/mach-realview/realview_pbx.c              |   16 +
+ 15 files changed, 577 insertions(+), 58 deletions(-)
+ create mode 100755 arch/arm/mach-realview/pcix.c
 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 65cf8c6..035f5cd 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -120,6 +120,15 @@ choice
->  		  Say Y here if you want the debug print routines to direct
->  		  their output to the second serial port on these devices.
-> 
-> +	config DEBUG_SAMSUNG_UART
-> +		bool "Kernel low-level debugging messages via samsung serial port"
-> +		depends on PLAT_SAMSUNG
-> +		help
-> +		  Say Y here if you want the debug print routines to direct
-> +		  their output to the serial port for Samsung platforms. Choose
-> +		  the uart port with the "S3C UART to use for low-level debug"
-> +		  config option.
-> +
->  endchoice
-> 
->  config EARLY_PRINTK
-> @@ -139,7 +148,7 @@ config OC_ETM
->  	  kernel code.
-> 
->  config DEBUG_S3C_UART
-> -	depends on PLAT_SAMSUNG
-> +	depends on DEBUG_SAMSUNG_UART
->  	int "S3C UART to use for low-level debug"
->  	default "0"
->  	help
+-- 
