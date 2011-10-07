@@ -1,32 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Oct 2011 20:22:24 +0100
-Subject: [PATCH 1/5 v4] ARM Realview PCIX map include file changes
-In-Reply-To: <20111007142723.19554.88566.stgit@e102602-lin.cambridge.arm.com>
-References: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
-	<20111007142723.19554.88566.stgit@e102602-lin.cambridge.arm.com>
-Message-ID: <20111007192224.GB25689@n2100.arm.linux.org.uk>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Fri, 7 Oct 2011 12:32:01 -0700
+Subject: [PATCH] OMAP2+: clock: use clock's recalc in DPLL handling
+In-Reply-To: <alpine.DEB.2.00.1110070104260.4611@utopia.booyaka.com>
+References: <CAJOA=zPq__48SbsKeFHaQ_+J0YQYLLXBP67g2JGXknhWj7PNOA@mail.gmail.com>
+	<1317343888-30892-1-git-send-email-mturquette@ti.com>
+	<alpine.DEB.2.00.1110070104260.4611@utopia.booyaka.com>
+Message-ID: <CAJOA=zNwDCVjzZJs87ze0xdJ8m=CDDmp8QAApj9cMhoPsFqBuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2011 at 03:27:47PM +0100, Colin Tuckley wrote:
-> -#define IO_SPACE_LIMIT 0xffffffff
-> +#include <asm/mach-types.h>
-> +#include <mach/hardware.h>
-> +
-> +#define IO_SPACE_LIMIT 0x0000ffff
+On Fri, Oct 7, 2011 at 12:07 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> On Thu, 29 Sep 2011, Mike Turquette wrote:
+>
+>> Not all DPLLs are identical; some require special consideration such as
+>> OMAP4's ABE DPLL, which can have an additional 4x multiplier added to
+>> it's clock rate based on programming the REGM4XEN bit in it's CLKMODE
+>> register.
+>>
+>> Unfortunately the clock framework makes a few assumptions that all DPLLs
+>> can have their rates calculated the same way which has led to incorrect
+>> rates for OMAP4's DPLL_ABE in some cases. ?This patch fixes the same by
+>> replacing explicit calls to omap2_dpll_get_rate with clk->recalc if
+>> .recalc is populated for a clock. ?If .recalc is NULL then fall back to
+>> omap2_dpll_get_rate.
+>>
+>> Reported-by: Misael Lopez Cruz <misael.lopez@ti.com>
+>> Signed-off-by: Mike Turquette <mturquette@ti.com>
+>
+> I've merged this patch with Jon's "ARM: OMAP3+: dpll: use DPLLs recalc
+> function instead of omap2_get_dpll_rate" patch, which does almost exactly
+> the same thing, just without the conditionals on clk->recalc. ?Updated
+> patch below. ?Please let me know if you think I should change anything
+> about the changelog.
 
-Does this in asm/io.h:
+Heh, I hadn't realized we had overlapping patches like that.  Looks fine to me.
 
-#ifndef IO_SPACE_LIMIT
-#if defined(CONFIG_PCMCIA_SOC_COMMON) || defined(CONFIG_PCMCIA_SOC_COMMON_MODULE)
-#define IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
-#elif defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
-#define IO_SPACE_LIMIT ((resource_size_t)0xffff)
-#else
-#define IO_SPACE_LIMIT ((resource_size_t)0)
-#endif
-#endif
+Regards,
+Mike
 
-not work here for some reason?  I think as PCMCIA_SOC_COMMON would not be
-defined, but CONFIG_PCI would be, it'd give the correct answer.  Please
-confirm.
+> - Paul
+>
+> From: Jon Hunter <jon-hunter@ti.com>
+> Date: Fri, 7 Oct 2011 00:53:01 -0600
+> Subject: [PATCH] ARM: OMAP3+: dpll: use DPLLs recalc function instead of
+> ?omap2_get_dpll_rate
+>
+> This is a continuation of Mike Turquette's patch "OMAP3+: use
+> DPLL's round_rate when setting rate".
+>
+> omap3_noncore_dpll_set_rate() and omap3_noncore_dpll_enable() call
+> omap2_get_dpll_rate() explicitly. It may be necessary for some
+> DPLLs to use a different function and so use the DPLLs recalc()
+> function pointer instead.
+>
+> An example is the DPLL_ABE on OMAP4 which can have a 4X multiplier
+> in addition to the usual MN multipler and dividers and therefore
+> uses a different round_rate and recalc function.
+>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> Cc: Mike Turquette <mturquette@ti.com>
+> Cc: Misael Lopez Cruz <misael.lopez@ti.com>
+> [paul at pwsan.com: merged this patch with Mike's "use clock's recalc in DPLL
+> ?handling" patch; also reported by Misael]
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+> ?arch/arm/mach-omap2/dpll3xxx.c | ? ?7 +++++--
+> ?1 files changed, 5 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+> index 73a1595..fc56745 100644
+> --- a/arch/arm/mach-omap2/dpll3xxx.c
+> +++ b/arch/arm/mach-omap2/dpll3xxx.c
+> @@ -390,7 +390,8 @@ int omap3_noncore_dpll_enable(struct clk *clk)
+> ? ? ? ? * propagating?
+> ? ? ? ? */
+> ? ? ? ?if (!r)
+> - ? ? ? ? ? ? ? clk->rate = omap2_get_dpll_rate(clk);
+> + ? ? ? ? ? ? ? clk->rate = (clk->recalc) ? clk->recalc(clk) :
+> + ? ? ? ? ? ? ? ? ? ? ? omap2_get_dpll_rate(clk);
+>
+> ? ? ? ?return r;
+> ?}
+> @@ -424,6 +425,7 @@ void omap3_noncore_dpll_disable(struct clk *clk)
+> ?int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
+> ?{
+> ? ? ? ?struct clk *new_parent = NULL;
+> + ? ? ? unsigned long hw_rate;
+> ? ? ? ?u16 freqsel = 0;
+> ? ? ? ?struct dpll_data *dd;
+> ? ? ? ?int ret;
+> @@ -435,7 +437,8 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
+> ? ? ? ?if (!dd)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+>
+> - ? ? ? if (rate == omap2_get_dpll_rate(clk))
+> + ? ? ? hw_rate = (clk->recalc) ? clk->recalc(clk) : omap2_get_dpll_rate(clk);
+> + ? ? ? if (rate == hw_rate)
+> ? ? ? ? ? ? ? ?return 0;
+>
+> ? ? ? ?/*
+> --
+> 1.7.6.3
+>
+>
