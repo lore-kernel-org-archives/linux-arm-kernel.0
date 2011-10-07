@@ -1,82 +1,93 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri,  7 Oct 2011 17:25:13 +0530
-Subject: [PATCH V2 2/2] ARM: S3C2410: irq: Remove __init attributes to fix
-	compilation warning
-In-Reply-To: <1317988513-20800-1-git-send-email-tushar.behera@linaro.org>
-References: <1317988513-20800-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1317988513-20800-3-git-send-email-tushar.behera@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 7 Oct 2011 14:17:02 +0200 (CEST)
+Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
+	online/active
+In-Reply-To: <01d501cc84d6$62720890$275619b0$%kim@samsung.com>
+References: <20110908215314.829452535@linutronix.de>
+	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
+	<20110913133258.GA6267@n2100.arm.linux.org.uk>
+	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+	<20110913175312.GB6267@n2100.arm.linux.org.uk>
+	<20110923084001.GP17169@n2100.arm.linux.org.uk>
+	<01d501cc84d6$62720890$275619b0$%kim@samsung.com>
+Message-ID: <alpine.LFD.2.02.1110071354310.3240@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The structure *_irq_driver is passed as a parameter in
-sysdev_driver_register(). This in turn would add this structure to a
-list which may be traversed later.
+On Fri, 7 Oct 2011, Kukjin Kim wrote:
+> I think, basically, if SPIs in GIC are used in local timer, the routing
+> interrupt like calling irq_set_affinity() to offline CPUs should be
+> available when boot time before calling set_cpu_online() because as you know
+> the local_timer_setup() which includes setup interrupt is called in
+> percpu_timer_setup() now...
+> 
+> Is there any way to get the flags of struct irqaction from struct irq_data
+> in gic_set_affinity()? Or?
 
-Hence, even though the functions referenced through this structure have
-__init attribute, we cannot possibly add __initdata attribute to it.
+No, and you should not even think about it at all.
 
-To remove compilation warnings, the functions referenced thorugh this
-structure are also defined without __init attribute.
+The problem I can see from all this discussion is related to the early
+enabling of interrupts and the per cpu timer setup before the cpu is
+marked online. I really do not understand at all why this needs to be
+done in order to call calibrate_delay().
 
-It removes following two warnings.
+calibrate_delay() monitors jiffies, which are updated from the CPU
+which is waiting for the new CPU to set the online bit.
 
-WARNING: vmlinux.o(.data+0x4f58): Section mismatch in reference from the
-variable s3c2416_irq_driver to the function .init.text:s3c2416_irq_add()
-The variable s3c2416_irq_driver references the function __init s3c2416_irq_add()
+So you simply can call calibrate_delay() on the new CPU just from the
+interrupt disabled region and move the local timer setup after you
+stored the cpu data and before enabling interrupts.
 
-WARNING: vmlinux.o(.data+0x7c50): Section mismatch in reference from the
-variable s3c2443_irq_driver to the function .init.text:s3c2443_irq_add()
-The variable s3c2443_irq_driver references the function __init s3c2443_irq_add()
+This solves both the cpu_online vs. cpu_active problem and the
+affinity setting of the per cpu timers.
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
----
- arch/arm/mach-s3c2416/irq.c |    4 ++--
- arch/arm/mach-s3c2443/irq.c |    4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Thanks,
 
-diff --git a/arch/arm/mach-s3c2416/irq.c b/arch/arm/mach-s3c2416/irq.c
-index 28ad20d..53e8e57 100644
---- a/arch/arm/mach-s3c2416/irq.c
-+++ b/arch/arm/mach-s3c2416/irq.c
-@@ -194,7 +194,7 @@ static struct irq_chip s3c2416_irq_uart3 = {
+	tglx
+----
+Index: linux-2.6/arch/arm/kernel/smp.c
+===================================================================
+--- linux-2.6.orig/arch/arm/kernel/smp.c
++++ linux-2.6/arch/arm/kernel/smp.c
+@@ -301,17 +301,7 @@ asmlinkage void __cpuinit secondary_star
+ 	 */
+ 	platform_secondary_init(cpu);
  
- /* IRQ initialisation code */
+-	/*
+-	 * Enable local interrupts.
+-	 */
+ 	notify_cpu_starting(cpu);
+-	local_irq_enable();
+-	local_fiq_enable();
+-
+-	/*
+-	 * Setup the percpu timer for this CPU.
+-	 */
+-	percpu_timer_setup();
  
--static int __init s3c2416_add_sub(unsigned int base,
-+static int s3c2416_add_sub(unsigned int base,
- 				   void (*demux)(unsigned int,
- 						 struct irq_desc *),
- 				   struct irq_chip *chip,
-@@ -213,7 +213,7 @@ static int __init s3c2416_add_sub(unsigned int base,
- 	return 0;
- }
+ 	calibrate_delay();
  
--static int __init s3c2416_irq_add(struct sys_device *sysdev)
-+static int s3c2416_irq_add(struct sys_device *sysdev)
- {
- 	printk(KERN_INFO "S3C2416: IRQ Support\n");
+@@ -323,10 +313,23 @@ asmlinkage void __cpuinit secondary_star
+ 	 * before we continue.
+ 	 */
+ 	set_cpu_online(cpu, true);
++
++	/*
++	 * Setup the percpu timer for this CPU.
++	 */
++	percpu_timer_setup();
++
+ 	while (!cpu_active(cpu))
+ 		cpu_relax();
  
-diff --git a/arch/arm/mach-s3c2443/irq.c b/arch/arm/mach-s3c2443/irq.c
-index 83ecb11..18585dd 100644
---- a/arch/arm/mach-s3c2443/irq.c
-+++ b/arch/arm/mach-s3c2443/irq.c
-@@ -222,7 +222,7 @@ static struct irq_chip s3c2443_irq_cam = {
- 
- /* IRQ initialisation code */
- 
--static int __init s3c2443_add_sub(unsigned int base,
-+static int s3c2443_add_sub(unsigned int base,
- 				   void (*demux)(unsigned int,
- 						 struct irq_desc *),
- 				   struct irq_chip *chip,
-@@ -241,7 +241,7 @@ static int __init s3c2443_add_sub(unsigned int base,
- 	return 0;
- }
- 
--static int __init s3c2443_irq_add(struct sys_device *sysdev)
-+static int s3c2443_irq_add(struct sys_device *sysdev)
- {
- 	printk("S3C2443: IRQ Support\n");
- 
--- 
-1.7.4.1
+ 	/*
++	 * cpu_active bit is set, so it's safe to enable interrupts
++	 * now.
++	 */
++	local_irq_enable();
++	local_fiq_enable();
++
++	/*
+ 	 * OK, it's off to the idle thread for us
+ 	 */
+ 	cpu_idle();
