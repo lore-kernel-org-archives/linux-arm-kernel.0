@@ -1,53 +1,105 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 7 Oct 2011 13:35:52 -0700
-Subject: [PATCH] MAINTAINERS: Update tegra maintainer information
-In-Reply-To: <1318019268-6946-1-git-send-email-olof@lixom.net>
-References: <1318019268-6946-1-git-send-email-olof@lixom.net>
-Message-ID: <CAMbhsRQtUEx_oh+WMmcDEqMznWyF4p2g54G6tsa8QVVB+BxwuA@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 07 Oct 2011 16:36:19 -0400 (EDT)
+Subject: [PATCH 7/7] ARM: OMAP: Warn if omap_ioremap is called before SoC
+	detection
+In-Reply-To: <20111007194557.18205.37252.stgit@kaulin.local>
+References: <20111007194242.18205.64009.stgit@kaulin.local>
+	<20111007194557.18205.37252.stgit@kaulin.local>
+Message-ID: <alpine.LFD.2.02.1110071635370.6390@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 7, 2011 at 1:27 PM, Olof Johansson <olof@lixom.net> wrote:
-> A couple of changes to the Tegra maintainership setup:
->
-> I'm very glad to bring on Stephen Warren on board as a maintainer. The
-> work he has done so far is excellent, and the fact that he works for
-> Nvidia means he has long-term interest in the platform.
->
-> Erik Gilling did an astounding amount of work on getting things up and
-> running but has been a silent partner on the maintainership side for a
-> while, and is stepping down. Thanks for your contributions so far, Erik.
->
-> Finally, update the git URL since I'll take over running the main repo
-> for a while.
->
-> Overall maintainership model isn't changing much at this time: We'll all
-> three review patches as appropriate, and one of us will collect the main
-> repo (me at this time).
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Cc: Colin Cross <ccross@android.com>
-> Cc: Erik Gilling <konkers@android.com>
-> Cc: Stephen Warren <swarren@nvidia.com>
-> ---
-> ?MAINTAINERS | ? ?4 ++--
-> ?1 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index ace8f9c..5483e0c 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6366,10 +6366,10 @@ F: ? ? ?net/ipv4/tcp_lp.c
->
-> ?TEGRA SUPPORT
-> ?M: ? ? Colin Cross <ccross@android.com>
-> -M: ? ? Erik Gilling <konkers@android.com>
-> ?M: ? ? Olof Johansson <olof@lixom.net>
-> +M: ? ? Stephen Warren <swarren@nvidia.com>
-> ?L: ? ? linux-tegra at vger.kernel.org
-> -T: ? ? git git://android.git.kernel.org/kernel/tegra.git
-> +T: ? ? git git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git
-> ?S: ? ? Supported
-> ?F: ? ? arch/arm/mach-tegra
+On Fri, 7 Oct 2011, Tony Lindgren wrote:
 
-Acked-by: Colin Cross <ccross@android.com>
+> We don't have cpu_is_omapxxxx SoC detection initialized until
+> SoC detection is initialized from init_early.
+> 
+> Note that with the common map_io we should no longer need
+> cpu_is_omapxxxx for ioremap.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+
+> ---
+>  arch/arm/mach-omap1/io.c             |    1 +
+>  arch/arm/mach-omap2/io.c             |    1 +
+>  arch/arm/plat-omap/include/plat/io.h |    2 ++
+>  arch/arm/plat-omap/io.c              |   10 ++++++++++
+>  4 files changed, 14 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/io.c b/arch/arm/mach-omap1/io.c
+> index 8140a4e..fd9eb09 100644
+> --- a/arch/arm/mach-omap1/io.c
+> +++ b/arch/arm/mach-omap1/io.c
+> @@ -121,6 +121,7 @@ void __init omap16xx_map_io(void)
+>  void omap1_init_early(void)
+>  {
+>  	omap_check_revision();
+> +	omap_ioremap_init();
+>  
+>  	/* REVISIT: Refer to OMAP5910 Errata, Advisory SYS_1: "Timeout Abort
+>  	 * on a Posted Write in the TIPB Bridge".
+> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+> index d5caac3..aa96538 100644
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -323,6 +323,7 @@ void __iomem *omap_irq_base;
+>  static void __init omap_common_init_early(void)
+>  {
+>  	omap2_check_revision();
+> +	omap_ioremap_init();
+>  }
+>  
+>  static void __init omap_hwmod_init_postsetup(void)
+> diff --git a/arch/arm/plat-omap/include/plat/io.h b/arch/arm/plat-omap/include/plat/io.h
+> index c0c7850..5ffbea6 100644
+> --- a/arch/arm/plat-omap/include/plat/io.h
+> +++ b/arch/arm/plat-omap/include/plat/io.h
+> @@ -247,6 +247,8 @@
+>   * NOTE: Please use ioremap + __raw_read/write where possible instead of these
+>   */
+>  
+> +void omap_ioremap_init(void);
+> +
+>  extern u8 omap_readb(u32 pa);
+>  extern u16 omap_readw(u32 pa);
+>  extern u32 omap_readl(u32 pa);
+> diff --git a/arch/arm/plat-omap/io.c b/arch/arm/plat-omap/io.c
+> index f1ecfa9..1bbcbde 100644
+> --- a/arch/arm/plat-omap/io.c
+> +++ b/arch/arm/plat-omap/io.c
+> @@ -23,11 +23,16 @@
+>  #define BETWEEN(p,st,sz)	((p) >= (st) && (p) < ((st) + (sz)))
+>  #define XLATE(p,pst,vst)	((void __iomem *)((p) - (pst) + (vst)))
+>  
+> +static int initialized;
+> +
+>  /*
+>   * Intercept ioremap() requests for addresses in our fixed mapping regions.
+>   */
+>  void __iomem *omap_ioremap(unsigned long p, size_t size, unsigned int type)
+>  {
+> +
+> +	WARN(!initialized, "Do not use ioremap before init_early\n");
+> +
+>  #ifdef CONFIG_ARCH_OMAP1
+>  	if (cpu_class_is_omap1()) {
+>  		if (BETWEEN(p, OMAP1_IO_PHYS, OMAP1_IO_SIZE))
+> @@ -139,3 +144,8 @@ void omap_iounmap(volatile void __iomem *addr)
+>  		__iounmap(addr);
+>  }
+>  EXPORT_SYMBOL(omap_iounmap);
+> +
+> +void __init omap_ioremap_init(void)
+> +{
+> +	initialized++;
+> +}
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
