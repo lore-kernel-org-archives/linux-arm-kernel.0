@@ -1,83 +1,60 @@
-From: hemantp@ti.com (Pedanekar, Hemant)
-Date: Fri, 7 Oct 2011 18:45:29 +0530
-Subject: [PATCH v3 2/3] ARM: OMAP: TI814X: Add cpu type macros and
-	detection support
-In-Reply-To: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4EC56A8@dbde02.ent.ti.com>
-References: <1317258560-30408-1-git-send-email-hemantp@ti.com>
-	<alpine.DEB.2.00.1109291443160.26728@utopia.booyaka.com>
-	<2A3DCF3DA181AD40BDE86A3150B27B6B03B4EC56A8@dbde02.ent.ti.com>
-Message-ID: <2A3DCF3DA181AD40BDE86A3150B27B6B03B4FB4820@dbde02.ent.ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 7 Oct 2011 18:57:19 +0530
+Subject: Long stalls during boot with -next
+In-Reply-To: <20111007115047.GC24534@sirena.org.uk>
+References: <20110929125035.GA2085@sirena.org.uk>
+	<20111007115047.GC24534@sirena.org.uk>
+Message-ID: <CAJuYYwTeAwZ-zRDyQwB73bHWn+NkoT2zxmuJkFW6Oph1CUijqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Mark,
 
-linux-arm-kernel-bounces at lists.infradead.org wrote on :
+On 7 October 2011 17:20, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, Sep 29, 2011 at 01:50:36PM +0100, Mark Brown wrote:
+>> Since Tuesday I've been experiencing stalls on boot with -next kernels.
+>> The boot appears to proceed normally but there appears to be a good ten
+>> second delay somewhere around the late_initcall() stage with no
+>> indication in the logs:
+>
+> I identified the problem here, the behaviour of LL_DEBUG was changed to
+> make it select DEBUG_ICEDCC by default which is unfortunate if one
+> doesn't have an EmbeddedICE connected.
 
-> macros and detection support
-> 
-> Hi Paul,
-> 
-> Paul Walmsley wrote on Friday, September 30, 2011 2:17 AM:
-> 
->> Hello Hemant,
->> 
->> a few comments:
->> 
->> On Thu, 29 Sep 2011, Hemant Pedanekar wrote:
->> 
-[...]
->>> Note that following update to common OMAP data structures is made:
->>> 
->>> cpu_mask and RATE_IN_XXX flags have crossed 8 bit hence struct
->>> clksel_rate.flags, struct prcm_config.flags and cpu_mask are changed to
->>> u16 from u8. 
->>> 
->>> Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
->> 
->> Also, the opp2xxx.h change looks spurious, is that really needed?
->>
+Thanks for your suggestion. The long stall during boot problem occurs
+on Samsung boards as well with linux-next. As per your suggestion, the
+following diff fixes this issue.
 
-I will be removing the above mentioned code changes from v4 since the same
-were added in "arm:omap:am33xx: Update common omap platform files" patch and
-as per Tony's reply today ([1]) the am33xx patch will be added to SoC branch.  
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 65cf8c6..035f5cd 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -120,6 +120,15 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the second serial port on these devices.
 
-Thanks.
-   Hemant
++	config DEBUG_SAMSUNG_UART
++		bool "Kernel low-level debugging messages via samsung serial port"
++		depends on PLAT_SAMSUNG
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the serial port for Samsung platforms. Choose
++		  the uart port with the "S3C UART to use for low-level debug"
++		  config option.
++
+ endchoice
 
-[1] http://www.spinics.net/lists/linux-omap/msg58853.html
- 
-> I changed prcm_config.flags to accommodate cpu_mask change,
-> as cpu_mask
-> is used with prcm_config.flags (mostly) in clkt2xxx_virt_prcm_set.c as
-> below: 
-> 
-> prcm->flags & cpu_mask
-> 
-> And flags is assigned in opp2420_data.c (e.g., RATE_IN_242X)
-> 
-> But yes, these are already defined RATE_INs and do not cross 8-bits,
-> so no warnings even if flags is 8-bit and cpu_mask changed to 16-bit.
-> 
-> What is your suggestion?
-> 
-> I see you mentioned "Also" in the above comment, but didn't see any comment
-> preceeding. 
-> 
->> Could you please split the clock-related changes into a
->> separate patch?
->> Then this patch would just be the id.c and cpu.h changes.
->> 
->> Other than that, the patch looks okay to me.
->> 
->> 
->> - Paul
-> 
-> Will do that.
-> 
-> Thanks.
->    Hemant
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ config EARLY_PRINTK
+@@ -139,7 +148,7 @@ config OC_ETM
+ 	  kernel code.
+
+ config DEBUG_S3C_UART
+-	depends on PLAT_SAMSUNG
++	depends on DEBUG_SAMSUNG_UART
+ 	int "S3C UART to use for low-level debug"
+ 	default "0"
+ 	help
+
+
+Thanks,
+Thomas.
