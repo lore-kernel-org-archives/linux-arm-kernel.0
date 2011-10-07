@@ -1,51 +1,47 @@
-From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Fri,  7 Oct 2011 12:26:40 -0400
-Subject: [RFC/PATCH v3 7/7] ARM: ARM11 MPCore: cpu_v6_set_pte_ext is not
-	preempt safe
-In-Reply-To: <1318004800-6525-1-git-send-email-gdavis@mvista.com>
-References: <1317955121-28047-1-git-send-email-gdavis@mvista.com>
-	<1318004800-6525-1-git-send-email-gdavis@mvista.com>
-Message-ID: <1318004800-6525-8-git-send-email-gdavis@mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Oct 2011 18:27:06 +0200
+Subject: [PATCHv16 0/9] Contiguous Memory Allocator
+In-Reply-To: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201110071827.06366.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: George G. Davis <gdavis@mvista.com>
+On Thursday 06 October 2011, Marek Szyprowski wrote:
+> Once again I decided to post an updated version of the Contiguous Memory
+> Allocator patches.
+> 
+> This version provides mainly a bugfix for a very rare issue that might
+> have changed migration type of the CMA page blocks resulting in dropping
+> CMA features from the affected page block and causing memory allocation
+> to fail. Also the issue reported by Dave Hansen has been fixed.
+> 
+> This version also introduces basic support for x86 architecture, what
+> allows wide testing on KVM/QEMU emulators and all common x86 boxes. I
+> hope this will result in wider testing, comments and easier merging to
+> mainline.
 
-If preemption and subsequent task migration occurs during calls to
-cpu_v6_set_pte_ext on ARM11 MPCore machines, global memory state
-can become inconsistent.  To prevent inconsistent memory state on
-these machines, disable preemption in cpu_v6_set_pte_ext.
+Hi Marek,
 
-This change depends on "ARM: Move get_thread_info macro definition
-to <asm/assembler.h>".
+I think we need to finally get this into linux-next now, to get some
+broader testing. Having the x86 patch definitely helps here becauses
+it potentially exposes the code to many more testers.
 
-Signed-off-by: George G. Davis <gdavis@mvista.com>
----
- arch/arm/mm/proc-v6.S |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+IMHO it would be good to merge the entire series into 3.2, since
+the ARM portion fixes an important bug (double mapping of memory
+ranges with conflicting attributes) that we've lived with for far
+too long, but it really depends on how everyone sees the risk
+for regressions here. If something breaks in unfixable ways before
+the 3.2 release, we can always revert the patches and have another
+try later.
 
-diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-index a923aa0..57b359d 100644
---- a/arch/arm/mm/proc-v6.S
-+++ b/arch/arm/mm/proc-v6.S
-@@ -122,7 +122,18 @@ ENTRY(cpu_v6_switch_mm)
- 
- ENTRY(cpu_v6_set_pte_ext)
- #ifdef CONFIG_MMU
-+#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-+	stmdb	sp!, {r4, r5}
-+	get_thread_info r5
-+	ldr	r4, [r5, #TI_PREEMPT]	@ get preempt count
-+	add	r3, r4, #1		@ increment it
-+	str	r3, [r5, #TI_PREEMPT]	@ disable preempt
-+#endif
- 	armv6_set_pte_ext cpu_v6
-+#if	defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-+	str	r4, [r5, #TI_PREEMPT]	@ restore preempt count
-+	ldmia	sp!, {r4, r5}
-+#endif
- #endif
- 	mov	pc, lr
- 
--- 
-1.7.4.4
+It's also not clear how we should merge it. Ideally the first bunch
+would go through linux-mm, and the architecture specific patches
+through the respective architecture trees, but there is an obvious
+inderdependency between these sets.
+
+Russell, Andrew, are you both comfortable with putting the entire
+set into linux-mm to solve this? Do you see this as 3.2 or rather
+as 3.3 material?
+
+	Arnd
