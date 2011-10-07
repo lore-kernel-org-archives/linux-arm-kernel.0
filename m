@@ -1,38 +1,38 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 7 Oct 2011 11:48:37 +0800
-Subject: [PATCH 04/26] net/pxa168_eth: add missing include of interrupt.h
-In-Reply-To: <1317499438-14058-5-git-send-email-arnd@arndb.de>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-5-git-send-email-arnd@arndb.de>
-Message-ID: <CAMPhdO8jTemD+W8c+RqbhiaxBA1OSwcp1h4xbU7h1o__PH42zw@mail.gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Fri, 07 Oct 2011 12:20:14 +0800
+Subject: [PATCH] ARM: SAMSUNG: s3c-dma-ops needs export.h for EXPORT_SYMBOL
+Message-ID: <1317961214.16109.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> interrupt.h is no longer implicitly included here, so manually
-> add it instead.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fix below build warning:
+  CC      arch/arm/plat-samsung/s3c-dma-ops.o
+arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: data definition has no type or storage class
+arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
+arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: parameter names (without types) in function declaration
 
-Applied.
+And fix the build error:
+ERROR: "s3c_dma_get_ops" [drivers/spi/spi-s3c64xx.ko] undefined!
+make[1]: *** [__modpost] Error 1
+make: *** [modules] Error 2
 
-> ---
-> ?drivers/net/pxa168_eth.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/net/pxa168_eth.c b/drivers/net/pxa168_eth.c
-> index 1a3033d..d5a6cfc 100644
-> --- a/drivers/net/pxa168_eth.c
-> +++ b/drivers/net/pxa168_eth.c
-> @@ -41,6 +41,7 @@
-> ?#include <linux/phy.h>
-> ?#include <linux/io.h>
-> ?#include <linux/types.h>
-> +#include <linux/interrupt.h>
-> ?#include <asm/pgtable.h>
-> ?#include <asm/system.h>
-> ?#include <asm/cacheflush.h>
-> --
-> 1.7.5.4
->
->
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+This can be reproduced by "make s3c6400_defconfig;make" on linux-next 20111006.
+ arch/arm/plat-samsung/s3c-dma-ops.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/s3c-dma-ops.c b/arch/arm/plat-samsung/s3c-dma-ops.c
+index 582333c..7814949 100644
+--- a/arch/arm/plat-samsung/s3c-dma-ops.c
++++ b/arch/arm/plat-samsung/s3c-dma-ops.c
+@@ -14,6 +14,7 @@
+ #include <linux/errno.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
++#include <linux/export.h>
+ 
+ #include <mach/dma.h>
+ 
+-- 
+1.7.4.1
