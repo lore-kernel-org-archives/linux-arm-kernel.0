@@ -1,87 +1,106 @@
 From: colin.tuckley@arm.com (Colin Tuckley)
-Date: Fri, 07 Oct 2011 15:28:06 +0100
-Subject: [PATCH 2/5 v4] ARM Realview PCIX IRQ include file changes
+Date: Fri, 07 Oct 2011 15:28:29 +0100
+Subject: [PATCH 3/5 v4] ARM Realview PCIX board file changes
 In-Reply-To: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
 References: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
-Message-ID: <20111007142753.19554.59765.stgit@e102602-lin.cambridge.arm.com>
+Message-ID: <20111007142815.19554.44468.stgit@e102602-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Interrupt definitions for the PCI
-support on the Realview boards.
+This patch adds the PCI support to the board files
+for the Realview Northbridge boards.
 
 Signed-off-by: Colin Tuckley <colin.tuckley@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
 
- arch/arm/mach-realview/include/mach/irqs-pb11mp.h |   11 +++++++++++
- arch/arm/mach-realview/include/mach/irqs-pba8.h   |    7 ++++++-
- arch/arm/mach-realview/include/mach/irqs-pbx.h    |    7 ++++++-
- 3 files changed, 23 insertions(+), 2 deletions(-)
+ arch/arm/mach-realview/realview_pb11mp.c |   18 ++++++++++++++++++
+ arch/arm/mach-realview/realview_pba8.c   |   18 ++++++++++++++----
+ arch/arm/mach-realview/realview_pbx.c    |   16 +++++++++++++---
+ 3 files changed, 45 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-realview/include/mach/irqs-pb11mp.h b/arch/arm/mach-realview/include/mach/irqs-pb11mp.h
-index 34e255a..cd3e3e6 100644
---- a/arch/arm/mach-realview/include/mach/irqs-pb11mp.h
-+++ b/arch/arm/mach-realview/include/mach/irqs-pb11mp.h
-@@ -95,6 +95,17 @@
- #define IRQ_PB11MP_TSPEN	(IRQ_PB11MP_GIC_START + 30)	/* Touchscreen pen */
- #define IRQ_PB11MP_TSKPAD	(IRQ_PB11MP_GIC_START + 31)	/* Touchscreen keypad */
- 
-+/* These PCI/PCIe IRQ definitions are here as placeholders
-+ * The PCI code actually calculates the irq used at runtime */
-+#define IRQ_PB11MP_PCI0		(IRQ_PB11MP_GIC_START + 50)
-+#define IRQ_PB11MP_PCI1		(IRQ_PB11MP_GIC_START + 51)
-+#define IRQ_PB11MP_PCI2		(IRQ_PB11MP_GIC_START + 52)
-+#define IRQ_PB11MP_PCI3		(IRQ_PB11MP_GIC_START + 53)
-+#define IRQ_PB11MP_PCIE0	(IRQ_PB11MP_GIC_START + 54)
-+#define IRQ_PB11MP_PCIE1	(IRQ_PB11MP_GIC_START + 55)
-+#define IRQ_PB11MP_PCIE2	(IRQ_PB11MP_GIC_START + 56)
-+#define IRQ_PB11MP_PCIE3	(IRQ_PB11MP_GIC_START + 57)
-+
- #define IRQ_PB11MP_SMC		-1
- #define IRQ_PB11MP_SCTL		-1
- 
-diff --git a/arch/arm/mach-realview/include/mach/irqs-pba8.h b/arch/arm/mach-realview/include/mach/irqs-pba8.h
-index 4a88a4e..da6d583 100644
---- a/arch/arm/mach-realview/include/mach/irqs-pba8.h
-+++ b/arch/arm/mach-realview/include/mach/irqs-pba8.h
-@@ -61,11 +61,16 @@
- 
- #define IRQ_PBA8_PMU		(IRQ_PBA8_GIC_START + 47)	/* Cortex-A8 PMU */
- 
--/* ... */
-+/* These PCI/PCIe IRQ definitions are here as placeholders
-+ * The PCI code actually calculates the irq used at runtime */
- #define IRQ_PBA8_PCI0		(IRQ_PBA8_GIC_START + 50)
- #define IRQ_PBA8_PCI1		(IRQ_PBA8_GIC_START + 51)
- #define IRQ_PBA8_PCI2		(IRQ_PBA8_GIC_START + 52)
- #define IRQ_PBA8_PCI3		(IRQ_PBA8_GIC_START + 53)
-+#define IRQ_PBA8_PCIE0		(IRQ_PBA8_GIC_START + 54)
-+#define IRQ_PBA8_PCIE1		(IRQ_PBA8_GIC_START + 55)
-+#define IRQ_PBA8_PCIE2		(IRQ_PBA8_GIC_START + 56)
-+#define IRQ_PBA8_PCIE3		(IRQ_PBA8_GIC_START + 57)
- 
- #define IRQ_PBA8_SMC		-1
- #define IRQ_PBA8_SCTL		-1
-diff --git a/arch/arm/mach-realview/include/mach/irqs-pbx.h b/arch/arm/mach-realview/include/mach/irqs-pbx.h
-index 206a300..f661702 100644
---- a/arch/arm/mach-realview/include/mach/irqs-pbx.h
-+++ b/arch/arm/mach-realview/include/mach/irqs-pbx.h
-@@ -76,11 +76,16 @@
- #define IRQ_PBX_PMU_CPU2        (IRQ_PBX_GIC_START + 46)
- #define IRQ_PBX_PMU_CPU3        (IRQ_PBX_GIC_START + 47)
- 
--/* ... */
-+/* These PCI/PCIe IRQ definitions are here as placeholders
-+ * The PCI code actually calculates the irq used at runtime */
- #define IRQ_PBX_PCI0		(IRQ_PBX_GIC_START + 50)
- #define IRQ_PBX_PCI1		(IRQ_PBX_GIC_START + 51)
- #define IRQ_PBX_PCI2		(IRQ_PBX_GIC_START + 52)
- #define IRQ_PBX_PCI3		(IRQ_PBX_GIC_START + 53)
-+#define IRQ_PBX_PCIE0		(IRQ_PBX_GIC_START + 54)
-+#define IRQ_PBX_PCIE1		(IRQ_PBX_GIC_START + 55)
-+#define IRQ_PBX_PCIE2		(IRQ_PBX_GIC_START + 56)
-+#define IRQ_PBX_PCIE3		(IRQ_PBX_GIC_START + 57)
- 
- #define IRQ_PBX_SMC		-1
- #define IRQ_PBX_SCTL		-1
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index b43644b..17a3340 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -95,6 +95,24 @@ static struct map_desc realview_pb11mp_io_desc[] __initdata = {
+ 		.length		= SZ_8K,
+ 		.type		= MT_DEVICE,
+ 	},
++#ifdef CONFIG_PCI
++	{
++		.virtual	= (unsigned long)PCIX_UNIT_BASE,
++		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_BASE),
++		.length		= REALVIEW_PB_PCI_BASE_SIZE,
++		.type		= MT_DEVICE,
++	 }, {
++		.virtual	= (unsigned long)REALVIEW_PCI_IO_VBASE,
++		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_IO_BASE),
++		.length		= REALVIEW_PB_PCI_IO_SIZE,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual        = IO_ADDRESS(REALVIEW_ISSP_REG_BASE),
++		.pfn            = __phys_to_pfn(REALVIEW_ISSP_REG_BASE),
++		.length         = SZ_4K,
++		.type           = MT_DEVICE,
++	},
++#endif
+ #ifdef CONFIG_DEBUG_LL
+ 	{
+ 		.virtual	= IO_ADDRESS(REALVIEW_PB11MP_UART0_BASE),
+diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
+index 763e8f3..1ed9dd8 100644
+--- a/arch/arm/mach-realview/realview_pba8.c
++++ b/arch/arm/mach-realview/realview_pba8.c
+@@ -79,10 +79,20 @@ static struct map_desc realview_pba8_io_desc[] __initdata = {
+ 	},
+ #ifdef CONFIG_PCI
+ 	{
+-		.virtual	= PCIX_UNIT_BASE,
+-		.pfn		= __phys_to_pfn(REALVIEW_PBA8_PCI_BASE),
+-		.length		= REALVIEW_PBA8_PCI_BASE_SIZE,
+-		.type		= MT_DEVICE
++		.virtual	= (unsigned long)PCIX_UNIT_BASE,
++		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_BASE),
++		.length		= REALVIEW_PB_PCI_BASE_SIZE,
++		.type		= MT_DEVICE,
++	 }, {
++		.virtual	= (unsigned long)REALVIEW_PCI_IO_VBASE,
++		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_IO_BASE),
++		.length		= REALVIEW_PB_PCI_IO_SIZE,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= IO_ADDRESS(REALVIEW_ISSP_REG_BASE),
++		.pfn		= __phys_to_pfn(REALVIEW_ISSP_REG_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
+ 	},
+ #endif
+ #ifdef CONFIG_DEBUG_LL
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 363b0ab..1d7d191 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -80,9 +80,19 @@ static struct map_desc realview_pbx_io_desc[] __initdata = {
+ 	},
+ #ifdef CONFIG_PCI
+ 	{
+-		.virtual	= PCIX_UNIT_BASE,
+-		.pfn		= __phys_to_pfn(REALVIEW_PBX_PCI_BASE),
+-		.length		= REALVIEW_PBX_PCI_BASE_SIZE,
++		.virtual	= (unsigned long)PCIX_UNIT_BASE,
++		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_BASE),
++		.length		= REALVIEW_PB_PCI_BASE_SIZE,
++		.type		= MT_DEVICE,
++	 }, {
++		.virtual	= (unsigned long)REALVIEW_PCI_IO_VBASE,
++		.pfn		= __phys_to_pfn(REALVIEW_PB_PCI_IO_BASE),
++		.length		= REALVIEW_PB_PCI_IO_SIZE,
++		.type		= MT_DEVICE,
++	}, {
++		.virtual	= IO_ADDRESS(REALVIEW_ISSP_REG_BASE),
++		.pfn		= __phys_to_pfn(REALVIEW_ISSP_REG_BASE),
++		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+ 	},
+ #endif
