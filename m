@@ -1,31 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Oct 2011 11:27:54 -0700
-Subject: [PATCH 1/4] ARM: Add __arm_ioremap_exec for mapping external
-	memory as MT_MEMORY
-In-Reply-To: <4E8F42D4.7030502@ti.com>
-References: <20111005004539.26980.52409.stgit@kaulin.local>
-	<alpine.LFD.2.02.1110042059110.9106@xanadu.home>
-	<20111005220619.GC6324@atomide.com> <4E8E9EE8.8010106@ti.com>
-	<20111007144349.GE6324@atomide.com> <4E8F14A6.5050402@ti.com>
-	<20111007151116.GI6324@atomide.com> <4E8F395B.9070203@ti.com>
-	<20111007181621.GJ6324@atomide.com> <4E8F42D4.7030502@ti.com>
-Message-ID: <20111007182754.GK6324@atomide.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 7 Oct 2011 20:45:22 +0200
+Subject: [PATCHv2] hw_random: add driver for atmel true hardware random
+	number generator
+In-Reply-To: <4E8ECC15.10704@atmel.com>
+References: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
+	<4E8ECC15.10704@atmel.com>
+Message-ID: <20111007184522.GA30518@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [111007 10:46]:
-> On Friday 07 October 2011 11:46 PM, Tony Lindgren wrote:
-> 
-> > I assume now you can add the mapping to io.c instead? If so,
-> > then it's easier to apply the patches whatever way makes more
-> > sense.
+On Fri, Oct 07, 2011 at 11:53:25AM +0200, Nicolas Ferre wrote:
+> On 10/06/2011 07:56 PM, Peter Korsgaard :
+> > For the IP block on 9g45/9g46/9m10/9m11.
 > > 
-> io.c change I took as you suggested. The below change on top
-> of it. I just updated PM branch with this change.
+> > Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
 > 
-> Thanks for the tip. The errata code looks bit more clean
-> now. :)
+> Thanks, I am delighted to see this driver!
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Herbert,
+> I will handle the board specific part but should the driver part go
+> through the Crypto API tree?
+> Will you expect that I resend the patch with Jamie's and my signatures?
 
-OK thanks!
+Feel free to add it through your tree.
 
-Tony
+Acked-by: Herbert Xu <herbert@gondor.apana.org.au>
+
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
