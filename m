@@ -1,25 +1,51 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 07 Oct 2011 16:23:45 -0400 (EDT)
-Subject: [PATCH 0/4] initialize omap SRAM later on with
-	__arm_ioremap_exec()
-In-Reply-To: <4E8EA35E.6050100@ti.com>
-References: <20111005004339.26980.31149.stgit@kaulin.local>
-	<4E8C0125.1060300@ti.com> <20111006014219.GH6324@atomide.com>
-	<4E8EA35E.6050100@ti.com>
-Message-ID: <alpine.LFD.2.02.1110071622090.6390@xanadu.home>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri,  7 Oct 2011 13:27:48 -0700
+Subject: [PATCH] MAINTAINERS: Update tegra maintainer information
+Message-ID: <1318019268-6946-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Oct 2011, Santosh Shilimkar wrote:
+A couple of changes to the Tegra maintainership setup:
 
-> I have reviewed and tested this series. No problems seen.
-> As asked on other thread, if you are targeting this one for
-> 3.2, then sram changes would have a small conflict with
-> OMAP4 errata patch. If it is for 3.3, we should be able to
-> sort out that conflict easily.
+I'm very glad to bring on Stephen Warren on board as a maintainer. The
+work he has done so far is excellent, and the fact that he works for
+Nvidia means he has long-term interest in the platform.
 
-3.2 please.  I've postponed one of my series to 3.3 because it breaks 
-OMAP unless those changes are applied first.
+Erik Gilling did an astounding amount of work on getting things up and
+running but has been a silent partner on the maintainership side for a
+while, and is stepping down. Thanks for your contributions so far, Erik.
 
+Finally, update the git URL since I'll take over running the main repo
+for a while.
 
-Nicolas
+Overall maintainership model isn't changing much at this time: We'll all
+three review patches as appropriate, and one of us will collect the main
+repo (me at this time).
+
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Cc: Colin Cross <ccross@android.com>
+Cc: Erik Gilling <konkers@android.com>
+Cc: Stephen Warren <swarren@nvidia.com>
+---
+ MAINTAINERS |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ace8f9c..5483e0c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -6366,10 +6366,10 @@ F:	net/ipv4/tcp_lp.c
+ 
+ TEGRA SUPPORT
+ M:	Colin Cross <ccross@android.com>
+-M:	Erik Gilling <konkers@android.com>
+ M:	Olof Johansson <olof@lixom.net>
++M:	Stephen Warren <swarren@nvidia.com>
+ L:	linux-tegra at vger.kernel.org
+-T:	git git://android.git.kernel.org/kernel/tegra.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git
+ S:	Supported
+ F:	arch/arm/mach-tegra
+ 
+-- 
+1.7.4.1
