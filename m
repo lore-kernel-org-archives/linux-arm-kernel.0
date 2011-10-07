@@ -1,39 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Oct 2011 17:50:09 +0200
-Subject: [PATCH 0/1] A trio of IXP425 boards
-In-Reply-To: <20111007061918.GA2229@netboy.at.omicron.at>
-References: <cover.1317215339.git.richard.cochran@omicron.at>
-	<m3obxv7fvy.fsf@intrepid.localdomain>
-	<20111007061918.GA2229@netboy.at.omicron.at>
-Message-ID: <201110071750.09200.arnd@arndb.de>
+Date: Fri, 7 Oct 2011 18:04:11 +0200
+Subject: ARM SoC tree: OMAP PM dependency on tip irq/core
+In-Reply-To: <20111006195945.GQ6324@atomide.com>
+References: <87aa9mm8ts.fsf@ti.com> <4E877E29.7000309@gmail.com>
+	<20111006195945.GQ6324@atomide.com>
+Message-ID: <201110071804.11494.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 October 2011, Richard Cochran wrote:
-> On Wed, Oct 05, 2011 at 03:00:01PM +0200, Krzysztof Halasa wrote:
-> > Richard Cochran <richardcochran@gmail.com> writes:
+On Thursday 06 October 2011, Tony Lindgren wrote:
+> * Rob Herring <robherring2@gmail.com> [111001 13:21]:
+> > On 09/30/2011 05:29 PM, Kevin Hilman wrote:
+> > > Hi Arnd,
+> > > 
+> > > Kevin Hilman <khilman@ti.com> writes:
+> > > 
+> > >> The upcoming OMAP4 PM series from Santosh[1] that we're planning to
+> > >> queue for v3.2 has a dependency[2] on a patch currently queued for v3.2
+> > >> in the irq/core branch of Thomas' tip tree[3].
+> > >>
+> > >> In the past, I noticed you merged external trees like this to solve
+> > >> dependencies.
+> > >>
+> > >> Could you pull the irq/core branch into your tree to meet this
+> > >> dependency?
+> > > 
+> > > On second thought, since Santosh's branch is the only one with this
+> > > dependency (and we also have a dependency on Russell's devel-stable)
+> > > I'll just build up a branch for Santosh's series that includes
+> > > rmk/devel-stable and tglx/irq-core.
+> > > 
 > > 
-> > > This patch adds support for three boards using the ixp425. Since they
-> > > are are almost identical to each other, they can share one setup file.
-> > >
-> > > The three machine types are slated for removal due to the fact that
-> > > the board support has not been merged. My polite request is to merge
-> > > this patch and restore the machine types.
-> > 
-> > This is a good idea, IMHO.
-> > Acked-by: Krzysztof Ha?asa <khc@pm.waw.pl>
-> > 
-> > Unfortunately ATM I don't have access to kernel.org and being a bit
-> > busy with unrelated things, I'd rather avoid "processing" this patch
-> > personally if possible. Can you send it upstream yourself, please?
-> > Let me know of any problem.
+> > Any new platforms will have a dependency on rmk/devel-stable with the
+> > mach header clean-up. I'll probably have a dependency on tglx's tree as
+> > well.
 > 
-> Okay, then, Arnd? Russell?
-> 
-> Will one of you please take this patch?
+> Sounds like Arnd should pull this into some branch then.
 
-Sorry I forgot to notify you. I had already taken the patch on monday,
-but it did not show up in linux-next because an unrelated change broke
-the build. It should be fixed now.
+I've pulled in rmk/devel-stable as a dependency now, thanks for
+reminding me of that.
+
+Thomas, where should I get the irq-core branch (or whichever
+I should wait for) to pull in as another dependency. Is that
+branch one that never gets rebased? 
 
 	Arnd
