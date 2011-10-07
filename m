@@ -1,33 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Oct 2011 08:47:07 +0100
-Subject: [RFC/PATCH 2/7] ARM: ARM11 MPCore: pte_alloc_one{,_kernel} are
-	not preempt safe
-In-Reply-To: <1317955121-28047-3-git-send-email-gdavis@mvista.com>
-References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-3-git-send-email-gdavis@mvista.com>
-Message-ID: <20111007074707.GD21464@n2100.arm.linux.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 7 Oct 2011 01:53:41 -0600 (MDT)
+Subject: [GIT PULL] ARM: OMAP3+: clock fixes for 3.2
+Message-ID: <alpine.DEB.2.00.1110070141450.4611@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 06, 2011 at 10:38:36PM -0400, gdavis at mvista.com wrote:
-> -#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT | __GFP_ZERO)
-> +#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT)
-> @@ -81,8 +88,14 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
->  	pte = alloc_pages(PGALLOC_GFP, 0);
->  #endif
->  	if (pte) {
-> +		void *p = page_address(pte);
-> +		if (cache_ops_need_broadcast())
-> +			preempt_disable();
-> +		memset(p, 0, PAGE_SIZE);
->  		if (!PageHighMem(pte))
-> -			clean_pte_table(page_address(pte));
-> +			clean_pte_table(p);
-> +		if (cache_ops_need_broadcast())
-> +			preempt_enable();
+Hi Tony,
 
-This won't work - page_address(pte) will be NULL for highmem pages, and
-so will cause an oops, and removing the __GFP_ZERO will mean that highmem
-pages will not be zeroed, meaning that such page tables will not have been
-initialized.
+The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
+
+  ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
+
+are available in the git repository at:
+  git://git.pwsan.com/linux-2.6 omap_clock_fixes_3.2
+
+Jon Hunter (3):
+      ARM: OMAP3+: dpll: use DPLLs recalc function instead of omap2_get_dpll_rate
+      ARM: OMAP4: clock: Add missing clock divider for OCP_ABE_ICLK
+      OMAP3+: Update DPLL Fint range for OMAP36xx and OMAP4xxx devices
+
+Mike Turquette (3):
+      ARM: OMAP4: clock: round_rate and recalc functions for DPLL_ABE
+      ARM: OMAP3+: dpll: use DPLL's round_rate when setting rate
+      ARM: OMAP3+: dpll: assign clk rate from rounded rate during rate set
+
+Paul Walmsley (1):
+      ARM: OMAP4460: Clock: Adding support for 4460 specific clocks
+
+ arch/arm/mach-omap2/clkt_dpll.c      |   51 +++++++++++++++++--------
+ arch/arm/mach-omap2/clock.h          |    2 +
+ arch/arm/mach-omap2/clock44xx.h      |    7 +++
+ arch/arm/mach-omap2/clock44xx_data.c |   32 +++++++++++----
+ arch/arm/mach-omap2/dpll3xxx.c       |    9 +++-
+ arch/arm/mach-omap2/dpll44xx.c       |   69 ++++++++++++++++++++++++++++++++++
+ 6 files changed, 142 insertions(+), 28 deletions(-)
+
+
+- Paul
