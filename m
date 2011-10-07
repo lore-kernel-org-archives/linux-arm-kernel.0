@@ -1,55 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Oct 2011 12:20:41 -0700
-Subject: [GIT PULL] omap fixes for -rc series and merge window
-In-Reply-To: <201110072111.35418.arnd@arndb.de>
-References: <20111003185237.GI6324@atomide.com>
-	<201110072111.35418.arnd@arndb.de>
-Message-ID: <20111007192041.GN6324@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Oct 2011 20:22:24 +0100
+Subject: [PATCH 1/5 v4] ARM Realview PCIX map include file changes
+In-Reply-To: <20111007142723.19554.88566.stgit@e102602-lin.cambridge.arm.com>
+References: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
+	<20111007142723.19554.88566.stgit@e102602-lin.cambridge.arm.com>
+Message-ID: <20111007192224.GB25689@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [111007 11:37]:
-> On Monday 03 October 2011, Tony Lindgren wrote:
-> > Please pull omap fixes from:
-> > 
-> > git://github.com/tmlind/linux.git fixes
-> > 
-> > Out of these the first three commits would be nice to get
-> > into the -rc series with the first two causing boot issues
-> > and the musb fixing an ugly warning.
-> > 
-> > Note however the recent commit message update on the third patch.
-> > I added Bjarne's SOB to the third patch because of the earlier
-> > reference.
-> > 
-> > The last two are mostly cosmetic and not so urgent.
-> 
-> Hi Tony,
-> 
-> I've pulled them all into the fixes branch for now, but I'm not sure
-> if I still want to send another pull request. If I do, I'll have to
-> rebase that branch and put some into the next/fixes branch instead
-> as I already have patches that I don't want to send for 3.1 any
-> more. Are the patches all fixes against 3.1 only or do some of them
-> also apply to older releases?
+On Fri, Oct 07, 2011 at 03:27:47PM +0100, Colin Tuckley wrote:
+> -#define IO_SPACE_LIMIT 0xffffffff
+> +#include <asm/mach-types.h>
+> +#include <mach/hardware.h>
+> +
+> +#define IO_SPACE_LIMIT 0x0000ffff
 
-Thanks. Well we can certainly manage if the first three commits did
-not make it in during the -rc cycle. But assuming that we had valid
-fixes, you could just do something like this too:
+Does this in asm/io.h:
 
-$ git checkout -b omap/fixes-for-rc
-$ git reset --hard b8e111a74d281b70e88bd67fec48cfda4f9bdce2
-...
+#ifndef IO_SPACE_LIMIT
+#if defined(CONFIG_PCMCIA_SOC_COMMON) || defined(CONFIG_PCMCIA_SOC_COMMON_MODULE)
+#define IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
+#elif defined(CONFIG_PCI) || defined(CONFIG_ISA) || defined(CONFIG_PCCARD)
+#define IO_SPACE_LIMIT ((resource_size_t)0xffff)
+#else
+#define IO_SPACE_LIMIT ((resource_size_t)0)
+#endif
+#endif
 
-Then merge all the -rc fixes for various ARM platforms with:
-
-$ git checkout fixes-for-rc
-$ git reset --hard v3.1-rc9
-$ git merge omap/fixes-for-rc soc foo/fixes-for-rc bar/fixes-for-rc
-
-And then no rebasing is needed. Of course I could also set up
-a separate fixes-for-rc for that if you prefrer that :)
-
-Regards,
-
-Tony
+not work here for some reason?  I think as PCMCIA_SOC_COMMON would not be
+defined, but CONFIG_PCI would be, it'd give the correct answer.  Please
+confirm.
