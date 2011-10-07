@@ -1,28 +1,20 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 7 Oct 2011 03:19:40 -0600 (MDT)
-Subject: [GIT PULL] ARM: OMAP: PRCM/SCM/hwmod miscellaneous fixes for 3.2
-Message-ID: <alpine.DEB.2.00.1110070318120.4611@utopia.booyaka.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Fri, 7 Oct 2011 10:21:43 +0100
+Subject: [PATCHv2] hw_random: add driver for atmel true hardware random
+	number generator
+In-Reply-To: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
+References: <1317923791-31200-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <20111007092143.GA2239@totoro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, Oct 06, 2011 at 07:56:30PM +0200, Peter Korsgaard wrote:
+> For the IP block on 9g45/9g46/9m10/9m11.
+> 
+> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
 
-The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
+Looks nice to me Peter.
 
-  ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
+Reviewed-by: Jamie Iles <jamie@jamieiles.com>
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 prcm_scm_misc_fixes_3.2
-
-Abhilash K V (1):
-      ARM: OMAP: AM35x: remove hwmods that aren't generic
-
-Archit Taneja (1):
-      ARM: OMAP: ctrl: Fix CONTROL_DSIPHY register fields
-
- .../include/mach/ctrl_module_pad_core_44xx.h       |    8 ++++----
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   13 ++++++++-----
- 2 files changed, 12 insertions(+), 9 deletions(-)
-
-
-- Paul
+Jamie
