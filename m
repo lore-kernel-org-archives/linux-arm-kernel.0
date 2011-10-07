@@ -1,126 +1,333 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 07 Oct 2011 10:44:59 +0100
-Subject: [PATCH 5/7] ARM: EXYNOS4: Add support external GIC
-In-Reply-To: <4E8D645D.4020601@arm.com>
-References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-	<1308555258-4322-6-git-send-email-chaos.youn@samsung.com>
-	<4E8C61C4.9090709@arm.com>	<00ec01cc83f1$81f84430$85e8cc90$%kim@samsung.com>
-	<4E8D645D.4020601@arm.com>
-Message-ID: <4E8ECA1B.5010005@arm.com>
+Date: Fri, 7 Oct 2011 10:23:31 +0100
+Subject: [PATCH] ARM: gic: allow GIC to support non-banked setups
+Message-ID: <mailman.172.1317980680.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/11 09:18, Marc Zyngier wrote:
-> On 06/10/11 07:30, Kukjin Kim wrote:
->> Marc Zyngier wrote:
->>>
->>> Hi Changhwan,
->>>
->> Hi Marc,
->>
->> (Cc'ed Will Deacon and Russell King)
->>
->>> On 20/06/11 08:34, Changhwan Youn wrote:
->>>> For full support of power modes, this patch adds implementation
->>>> external GIC on EXYNOS4.
->>>>
->>>> External GIC of Exynos4 cannot support register banking so
->>>> several interrupt related code for CPU1 should be different
->>>> from that of CPU0.
->>>
->>> I just realized that patch has made it to mainline... Unfortunately, it
->>> seems quite broken to me:
->>>
->>>> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
->>>> ---
->>>>  arch/arm/mach-exynos4/cpu.c                      |   10 ++++++++
->>>>  arch/arm/mach-exynos4/include/mach/entry-macro.S |    5 ++++
->>>>  arch/arm/mach-exynos4/include/mach/map.h         |    1 +
->>>>  arch/arm/mach-exynos4/platsmp.c                  |   27
->>> +++++++++++++++++++++-
->>>>  4 files changed, 42 insertions(+), 1 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
->>>> index fa33294..40a866c 100644
->>>> --- a/arch/arm/mach-exynos4/cpu.c
->>>> +++ b/arch/arm/mach-exynos4/cpu.c
->>>> @@ -16,6 +16,7 @@
->>>>
->>>>  #include <asm/proc-fns.h>
->>>>  #include <asm/hardware/cache-l2x0.h>
->>>> +#include <asm/hardware/gic.h>
->>>>
->>>>  #include <plat/cpu.h>
->>>>  #include <plat/clock.h>
->>>> @@ -159,11 +160,20 @@ void __init exynos4_init_clocks(int xtal)
->>>>  	exynos4_setup_clocks();
->>>>  }
->>>>
->>>> +static void exynos4_gic_irq_eoi(struct irq_data *d)
->>>> +{
->>>> +	struct gic_chip_data *gic_data = irq_data_get_irq_chip_data(d);
->>>> +
->>>> +	gic_data->cpu_base = S5P_VA_GIC_CPU +
->>>> +			    (EXYNOS4_GIC_BANK_OFFSET *
->>> smp_processor_id());
->>>
->>> Here, you're overwriting a field that is shared among *all* the
->>> interrupts in the system.  What if an interrupt comes up on another CPU?
->>> If you look at the implementation of gic_eoi_irq(), you'll definitely
->>> see the race.
->>>
->> Hmm...as you can see in git log, the EXYNOS4210 cannot support register
->> banking in GIC so this is needed.
-> 
-> I don't dispute the need. I claim that the implementation is wrong, and
-> will fail given the right timings.
-> 
->>>> +}
->>>> +
->>>>  void __init exynos4_init_irq(void)
->>>>  {
->>>>  	int irq;
->>>>
->>>>  	gic_init(0, IRQ_LOCALTIMER, S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
->>>> +	gic_arch_extn.irq_eoi = exynos4_gic_irq_eoi;
->>>
->>> And here you're abusing the GIC extension feature.
->>>
->> I think gic_arch_extn.irq_eoi can be overwritten in each architecture to
->> support own specific extensions like in the EXYNOS4 case.
-> 
-> Sure. My point is you are diverting the GIC extension from its purpose,
-> which is mostly to be able to control wake-up sources (as for example in
-> the Tegra case). Here, you use this hooks to work around the fact that
-> the GIC driver is written with banking in mind, which is quite a
-> different thing.
-> 
->>> I've also had a look at -next, and this has been extended further to
->>> support 4412. The problem with that is without banking, you're painfully
->>> working around the GIC driver. At that stage, I wonder if you wouldn't
->>> be better off with a separate driver instead of abusing the existing
->> one...
->>>
->> Well, in this case, you mean separate driver is better to us even though
->> there is a gic driver in arch/arm/common? I don't think so because separate
->> driver will probably have many duplicated codes and if common gic driver can
->> support every silicons which have different version's gic it's better to us
->> and should do.
-> 
-> If you really insist on using the GIC common code, then I'd suggest to
-> adapt it to your needs instead of working around the problem.
-> What about making cpu_base a percpu field inside struct gic_chip_data?
-> No hook abuse, and no race conditions. You could also do that for
-> dist_base, as it looks to be required for the 4412.
+The GIC support code is heavily using the fact that hardware
+implementations are exposing banked registers. Unfortunately, it
+looks like at least one GIC implementation (EXYNOS4) offers both
+the distributor and the CPU interfaces at different addresses,
+depending on the CPU.
 
-So to make my suggestion completely clear, here's a patch I'm now
-carrying in my tree. It's only been test compiled on EXYNOS4, but works
-nicely on my 11MP. It turns both dist_base and cpu_base into per-cpu
-variables, removes these callbacks, removes your private copy of
-gic_cpu_init, and makes struct gic_chip_data private again.
+This problem is solved by turning the distributor and CPU interface
+addresses into per-cpu variables. The EXYNOS4 code is updated not
+to mess with the GIC internals while handling interrupts, and
+struct gic_chip_data is back to being private.
 
-What do you think?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/common/gic.c               |   76 +++++++++++++++++++++++++++----=
+----
+ arch/arm/include/asm/hardware/gic.h |   17 +------
+ arch/arm/mach-exynos4/cpu.c         |   14 ------
+ arch/arm/mach-exynos4/platsmp.c     |   28 ++-----------
+ 4 files changed, 66 insertions(+), 69 deletions(-)
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index b574931..c7521dd 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -37,6 +37,20 @@
+ #include <asm/mach/irq.h>
+ #include <asm/hardware/gic.h>
+=20
++struct gic_chip_data {
++=09unsigned int irq_offset;
++=09void __percpu __iomem **dist_base;
++=09void __percpu __iomem **cpu_base;
++#ifdef CONFIG_CPU_PM
++=09u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
++=09u32 saved_spi_conf[DIV_ROUND_UP(1020, 16)];
++=09u32 saved_spi_target[DIV_ROUND_UP(1020, 4)];
++=09u32 __percpu *saved_ppi_enable;
++=09u32 __percpu *saved_ppi_conf;
++#endif
++=09unsigned int gic_irqs;
++};
++
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+=20
+ /* Address of GIC 0 CPU interface */
+@@ -61,16 +75,26 @@ struct irq_chip gic_arch_extn =3D {
+=20
+ static struct gic_chip_data gic_data[MAX_GIC_NR] __read_mostly;
+=20
++static inline void __iomem *gic_data_dist_base(struct gic_chip_data *data)
++{
++=09return *__this_cpu_ptr(data->dist_base);
++}
++
+ static inline void __iomem *gic_dist_base(struct irq_data *d)
+ {
+ =09struct gic_chip_data *gic_data =3D irq_data_get_irq_chip_data(d);
+-=09return gic_data->dist_base;
++=09return gic_data_dist_base(gic_data);
++}
++
++static inline void __iomem *gic_data_cpu_base(struct gic_chip_data *data)
++{
++=09return *__this_cpu_ptr(data->cpu_base);
+ }
+=20
+ static inline void __iomem *gic_cpu_base(struct irq_data *d)
+ {
+ =09struct gic_chip_data *gic_data =3D irq_data_get_irq_chip_data(d);
+-=09return gic_data->cpu_base;
++=09return gic_data_cpu_base(gic_data);
+ }
+=20
+ static inline unsigned int gic_irq(struct irq_data *d)
+@@ -243,7 +267,7 @@ static void gic_handle_cascade_irq(unsigned int irq, st=
+ruct irq_desc *desc)
+ =09chained_irq_enter(chip, desc);
+=20
+ =09raw_spin_lock(&irq_controller_lock);
+-=09status =3D readl_relaxed(chip_data->cpu_base + GIC_CPU_INTACK);
++=09status =3D readl_relaxed(gic_data_cpu_base(chip_data) + GIC_CPU_INTACK)=
+;
+ =09raw_spin_unlock(&irq_controller_lock);
+=20
+ =09gic_irq =3D (status & 0x3ff);
+@@ -287,7 +311,7 @@ static void __init gic_dist_init(struct gic_chip_data *=
+gic,
+ {
+ =09unsigned int gic_irqs, irq_limit, i;
+ =09u32 cpumask;
+-=09void __iomem *base =3D gic->dist_base;
++=09void __iomem *base =3D gic_data_dist_base(gic);
+ =09u32 cpu =3D 0;
+ =09u32 nrppis =3D 0, ppi_base =3D 0;
+=20
+@@ -380,8 +404,8 @@ static void __init gic_dist_init(struct gic_chip_data *=
+gic,
+=20
+ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
+ {
+-=09void __iomem *dist_base =3D gic->dist_base;
+-=09void __iomem *base =3D gic->cpu_base;
++=09void __iomem *dist_base =3D gic_data_dist_base(gic);
++=09void __iomem *base =3D gic_data_cpu_base(gic);
+ =09int i;
+=20
+ =09/*
+@@ -418,7 +442,7 @@ static void gic_dist_save(unsigned int gic_nr)
+ =09=09BUG();
+=20
+ =09gic_irqs =3D gic_data[gic_nr].gic_irqs;
+-=09dist_base =3D gic_data[gic_nr].dist_base;
++=09dist_base =3D gic_data_dist_base(&gic_data[gic_nr]);
+=20
+ =09if (!dist_base)
+ =09=09return;
+@@ -453,7 +477,7 @@ static void gic_dist_restore(unsigned int gic_nr)
+ =09=09BUG();
+=20
+ =09gic_irqs =3D gic_data[gic_nr].gic_irqs;
+-=09dist_base =3D gic_data[gic_nr].dist_base;
++=09dist_base =3D gic_data_dist_base(&gic_data[gic_nr]);
+=20
+ =09if (!dist_base)
+ =09=09return;
+@@ -489,8 +513,8 @@ static void gic_cpu_save(unsigned int gic_nr)
+ =09if (gic_nr >=3D MAX_GIC_NR)
+ =09=09BUG();
+=20
+-=09dist_base =3D gic_data[gic_nr].dist_base;
+-=09cpu_base =3D gic_data[gic_nr].cpu_base;
++=09dist_base =3D gic_data_dist_base(&gic_data[gic_nr]);
++=09cpu_base =3D gic_data_cpu_base(&gic_data[gic_nr]);
+=20
+ =09if (!dist_base || !cpu_base)
+ =09=09return;
+@@ -515,8 +539,8 @@ static void gic_cpu_restore(unsigned int gic_nr)
+ =09if (gic_nr >=3D MAX_GIC_NR)
+ =09=09BUG();
+=20
+-=09dist_base =3D gic_data[gic_nr].dist_base;
+-=09cpu_base =3D gic_data[gic_nr].cpu_base;
++=09dist_base =3D gic_data_dist_base(&gic_data[gic_nr]);
++=09cpu_base =3D gic_data_cpu_base(&gic_data[gic_nr]);
+=20
+ =09if (!dist_base || !cpu_base)
+ =09=09return;
+@@ -588,12 +612,24 @@ void __init gic_init(unsigned int gic_nr, unsigned in=
+t irq_start,
+ =09void __iomem *dist_base, void __iomem *cpu_base)
+ {
+ =09struct gic_chip_data *gic;
++=09int cpu;
+=20
+ =09BUG_ON(gic_nr >=3D MAX_GIC_NR);
+=20
+ =09gic =3D &gic_data[gic_nr];
+-=09gic->dist_base =3D dist_base;
+-=09gic->cpu_base =3D cpu_base;
++=09gic->dist_base =3D alloc_percpu(void __iomem *);
++=09gic->cpu_base =3D alloc_percpu(void __iomem *);
++=09if (WARN_ON(!gic->dist_base || !gic->cpu_base)) {
++=09=09free_percpu(gic->dist_base);
++=09=09free_percpu(gic->cpu_base);
++=09=09return;
++=09}
++
++=09for_each_possible_cpu(cpu) {
++=09=09*per_cpu_ptr(gic->dist_base, cpu) =3D dist_base;
++=09=09*per_cpu_ptr(gic->cpu_base, cpu) =3D cpu_base;
++=09}
++
+ =09gic->irq_offset =3D (irq_start - 1) & ~31;
+=20
+ =09if (gic_nr =3D=3D 0)
+@@ -605,11 +641,17 @@ void __init gic_init(unsigned int gic_nr, unsigned in=
+t irq_start,
+ =09gic_pm_init(gic);
+ }
+=20
+-void __cpuinit gic_secondary_init(unsigned int gic_nr)
++void __cpuinit gic_secondary_init_base(unsigned int gic_nr,
++=09=09=09=09       void __iomem *dist_base,
++=09=09=09=09       void __iomem *cpu_base)
+ {
+ =09BUG_ON(gic_nr >=3D MAX_GIC_NR);
+=20
+-=09gic_cpu_init(&gic_data[gic_nr]);
++=09if (dist_base)
++=09=09*__this_cpu_ptr(gic_data[gic_nr].dist_base) =3D dist_base;
++=09if (cpu_base)
++=09=09*__this_cpu_ptr(gic_data[gic_nr].cpu_base) =3D cpu_base;
++=09gic_cpu_init(&gic_data[gic_nr]);=09
+ }
+=20
+ #ifdef CONFIG_SMP
+@@ -629,6 +671,6 @@ void gic_raise_softirq(const struct cpumask *mask, unsi=
+gned int irq)
+ =09dsb();
+=20
+ =09/* this always happens on GIC0 */
+-=09writel_relaxed(map << 16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTIN=
+T);
++=09writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_=
+DIST_SOFTINT);
+ }
+ #endif
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/har=
+dware/gic.h
+index 2b7ec2b..d45d78b 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -36,24 +36,13 @@
+ extern struct irq_chip gic_arch_extn;
+=20
+ void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
+-void gic_secondary_init(unsigned int);
++void gic_secondary_init_base(unsigned int, void __iomem *, void __iomem *)=
+;
+ void gic_handle_irq(struct pt_regs *regs);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+=20
+-struct gic_chip_data {
+-=09unsigned int irq_offset;
+-=09void __iomem *dist_base;
+-=09void __iomem *cpu_base;
+-#ifdef CONFIG_CPU_PM
+-=09u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
+-=09u32 saved_spi_conf[DIV_ROUND_UP(1020, 16)];
+-=09u32 saved_spi_target[DIV_ROUND_UP(1020, 4)];
+-=09u32 __percpu *saved_ppi_enable;
+-=09u32 __percpu *saved_ppi_conf;
+-#endif
+-=09unsigned int gic_irqs;
+-};
++#define gic_secondary_init(n)=09gic_secondary_init_base((n), NULL, NULL)
++
+ #endif
+=20
+ #endif
+diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
+index c682887..09e2760 100644
+--- a/arch/arm/mach-exynos4/cpu.c
++++ b/arch/arm/mach-exynos4/cpu.c
+@@ -204,17 +204,6 @@ void __init exynos4_init_clocks(int xtal)
+ =09exynos4_setup_clocks();
+ }
+=20
+-static void exynos4_gic_irq_fix_base(struct irq_data *d)
+-{
+-=09struct gic_chip_data *gic_data =3D irq_data_get_irq_chip_data(d);
+-
+-=09gic_data->cpu_base =3D S5P_VA_GIC_CPU +
+-=09=09=09    (gic_bank_offset * smp_processor_id());
+-
+-=09gic_data->dist_base =3D S5P_VA_GIC_DIST +
+-=09=09=09    (gic_bank_offset * smp_processor_id());
+-}
+-
+ void __init exynos4_init_irq(void)
+ {
+ =09int irq;
+@@ -222,9 +211,6 @@ void __init exynos4_init_irq(void)
+ =09gic_bank_offset =3D soc_is_exynos4412() ? 0x4000 : 0x8000;
+=20
+ =09gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
+-=09gic_arch_extn.irq_eoi =3D exynos4_gic_irq_fix_base;
+-=09gic_arch_extn.irq_unmask =3D exynos4_gic_irq_fix_base;
+-=09gic_arch_extn.irq_mask =3D exynos4_gic_irq_fix_base;
+=20
+ =09for (irq =3D 0; irq < MAX_COMBINER_NR; irq++) {
+=20
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsm=
+p.c
+index 56377d2..76cb2ba 100644
+--- a/arch/arm/mach-exynos4/platsmp.c
++++ b/arch/arm/mach-exynos4/platsmp.c
+@@ -67,39 +67,19 @@ static void __iomem *scu_base_addr(void)
+=20
+ static DEFINE_SPINLOCK(boot_lock);
+=20
+-static void __cpuinit exynos4_gic_secondary_init(void)
++static void __cpuinit exynos4_secondary_init(unsigned int cpu)
+ {
+ =09void __iomem *dist_base =3D S5P_VA_GIC_DIST +
+-=09=09=09=09(gic_bank_offset * smp_processor_id());
++=09=09=09=09(gic_bank_offset * cpu_logical_map(cpu));
+ =09void __iomem *cpu_base =3D S5P_VA_GIC_CPU +
+-=09=09=09=09(gic_bank_offset * smp_processor_id());
+-=09int i;
+-
+-=09/*
+-=09 * Deal with the banked PPI and SGI interrupts - disable all
+-=09 * PPI interrupts, ensure all SGI interrupts are enabled.
+-=09 */
+-=09__raw_writel(0xffff0000, dist_base + GIC_DIST_ENABLE_CLEAR);
+-=09__raw_writel(0x0000ffff, dist_base + GIC_DIST_ENABLE_SET);
++=09=09=09=09(gic_bank_offset * cpu_logical_map(cpu));
+=20
+ =09/*
+-=09 * Set priority on PPI and SGI interrupts
+-=09 */
+-=09for (i =3D 0; i < 32; i +=3D 4)
+-=09=09__raw_writel(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+-
+-=09__raw_writel(0xf0, cpu_base + GIC_CPU_PRIMASK);
+-=09__raw_writel(1, cpu_base + GIC_CPU_CTRL);
+-}
+-
+-static void __cpuinit exynos4_secondary_init(unsigned int cpu)
+-{
+-=09/*
+ =09 * if any interrupts are already enabled for the primary
+ =09 * core (e.g. timer irq), then they will not have been enabled
+ =09 * for us: do so
+ =09 */
+-=09exynos4_gic_secondary_init();
++=09gic_secondary_init_base(0, dist_base, cpu_base);
+=20
+ =09/*
+ =09 * let the primary processor know we're out of the
+--=20
+1.7.0.4
+
+--------------080509090809010207090900--
