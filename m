@@ -1,61 +1,40 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 7 Oct 2011 10:23:09 +0200
-Subject: [PATCH v2 6/6] OMAP4: Clock: Correct the name of SLIMBUS interface
-	clocks
-In-Reply-To: <alpine.DEB.2.00.1110061941100.4611@utopia.booyaka.com>
-References: <1316195330-15099-1-git-send-email-jon-hunter@ti.com>
-	<alpine.DEB.2.00.1110061941100.4611@utopia.booyaka.com>
-Message-ID: <4E8EB6ED.9020605@ti.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 7 Oct 2011 16:22:55 +0800
+Subject: [PATCH 15/26] irda/ficp: only works on some pxa models
+In-Reply-To: <1317499438-14058-16-git-send-email-arnd@arndb.de>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<1317499438-14058-16-git-send-email-arnd@arndb.de>
+Message-ID: <CAMPhdO_Ni0Dq_J1scoASejykmajXsA-kMW64cMS1ea2ACBoGEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul & Jon,
-
-On 10/7/2011 3:42 AM, Paul Walmsley wrote:
-> + Beno?t
+On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> This driver can only be built for pxa25x and pxa27x at the moment,
+> so encode that in Kconfig.
 >
-> On Fri, 16 Sep 2011, Jon Hunter wrote:
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Samuel Ortiz <samuel@sortiz.org>
+
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
+
+> ---
+> ?drivers/net/irda/Kconfig | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
 >
->> From: Jon Hunter<jon-hunter@ti.com>
->>
->> Currently the interface clocks for the two SLIMBUS peripherals are
->> named slimbus1_fck and slimbus2_fck. Rename these clocks to be
->> slimbus1_ick and slimbus2_ick so it is clear that these are
->> interface clocks and not functional clocks.
->>
->> Signed-off-by: Jon Hunter<jon-hunter@ti.com>
+> diff --git a/drivers/net/irda/Kconfig b/drivers/net/irda/Kconfig
+> index 25bb2a0..8cffd38 100644
+> --- a/drivers/net/irda/Kconfig
+> +++ b/drivers/net/irda/Kconfig
+> @@ -373,7 +373,7 @@ config VIA_FIR
 >
-> This one, I don't quite understand.  We should probably be removing these
-> MODULEMODE-only clocks from the OMAP4 tree, and using their parent clock
-> as the main_clk.  That would be a good cleanup for 3.3...
-
-Yes, but in order to remove that from the clock data we must ensure that 
-the hwmod entry is there.
-I kept a lot of legacy MODULEMODE clocks just because of missing hwmod / 
-runtime_pm adaptation on some drivers.
-
-In the case of slimbus, there is no main_clk but a bunch of optional 
-clocks. It looks similar to the DSS case. So we should not use the 
-parent clock as a main_clk.
-
-We should probably promote one of the opt_clk as the main_clk. The 
-slimbus_clk seems to be the good candidate for both instances.
-
-static struct omap_hwmod_opt_clk slimbus1_opt_clks[] = {
-        { .role = "fclk_1", .clk = "slimbus1_fclk_1" },
-        { .role = "fclk_0", .clk = "slimbus1_fclk_0" },
-        { .role = "fclk_2", .clk = "slimbus1_fclk_2" },
-        { .role = "slimbus_clk", .clk = "slimbus1_slimbus_clk" },
-};
-
-static struct omap_hwmod_opt_clk slimbus2_opt_clks[] = {
-        { .role = "fclk_1", .clk = "slimbus2_fclk_1" },
-        { .role = "fclk_0", .clk = "slimbus2_fclk_0" },
-        { .role = "slimbus_clk", .clk = "slimbus2_slimbus_clk" },
-};
-
-Jon,
-Do you know if that one is indeed mandatory to use the slimbus IP?
-
-Thanks,
-Benoit
+> ?config PXA_FICP
+> ? ? ? ?tristate "Intel PXA2xx Internal FICP"
+> - ? ? ? depends on ARCH_PXA && IRDA
+> + ? ? ? depends on ARCH_PXA && IRDA && (PXA25x || PXA27x)
+> ? ? ? ?help
+> ? ? ? ? ?Say Y or M here if you want to build support for the PXA2xx
+> ? ? ? ? ?built-in IRDA interface which can support both SIR and FIR.
+> --
+> 1.7.5.4
+>
+>
