@@ -1,33 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu,  6 Oct 2011 19:54:18 -0700
-Subject: [PATCH 08/14] ARM: tegra: pcie: include board.h
+Date: Thu,  6 Oct 2011 19:54:19 -0700
+Subject: [PATCH 09/14] ARM: tegra: pcie: 0 -> NULL changes
 In-Reply-To: <1317956064-17650-1-git-send-email-olof@lixom.net>
 References: <1317956064-17650-1-git-send-email-olof@lixom.net>
-Message-ID: <1317956064-17650-9-git-send-email-olof@lixom.net>
+Message-ID: <1317956064-17650-10-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Fixes:
 
-arch/arm/mach-tegra/pcie.c:908:12: warning: symbol 'tegra_pcie_init' was not declared. Should it be static?
+arch/arm/mach-tegra/pcie.c:465:10: warning: Using plain integer as NULL pointer
 
 Signed-off-by: Olof Johansson <olof@lixom.net>
 ---
- arch/arm/mach-tegra/pcie.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/pcie.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/pcie.c b/arch/arm/mach-tegra/pcie.c
-index 6b0c235..f7c89ee 100644
+index f7c89ee..f5aa173 100644
 --- a/arch/arm/mach-tegra/pcie.c
 +++ b/arch/arm/mach-tegra/pcie.c
-@@ -41,6 +41,8 @@
- #include <mach/clk.h>
- #include <mach/powergate.h>
+@@ -462,7 +462,7 @@ static struct pci_bus __init *tegra_pcie_scan_bus(int nr,
+ 	struct tegra_pcie_port *pp;
  
-+#include "board.h"
-+
- /* register definitions */
- #define AFI_OFFSET	0x3800
- #define PADS_OFFSET	0x3000
+ 	if (nr >= tegra_pcie.num_ports)
+-		return 0;
++		return NULL;
+ 
+ 	pp = tegra_pcie.port + nr;
+ 	pp->root_bus_nr = sys->busnr;
 -- 
 1.7.4.1
