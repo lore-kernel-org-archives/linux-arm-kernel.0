@@ -1,102 +1,57 @@
-From: amit.kachhap@linaro.org (Amit Kachhap)
-Date: Fri, 7 Oct 2011 19:39:14 +0530
-Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
-	online/active
-In-Reply-To: <alpine.LFD.2.02.1110071354310.3240@ionos>
-References: <20110908215314.829452535@linutronix.de>
-	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
-	<20110913133258.GA6267@n2100.arm.linux.org.uk>
-	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
-	<20110913175312.GB6267@n2100.arm.linux.org.uk>
-	<20110923084001.GP17169@n2100.arm.linux.org.uk>
-	<01d501cc84d6$62720890$275619b0$%kim@samsung.com>
-	<alpine.LFD.2.02.1110071354310.3240@ionos>
-Message-ID: <CAK44p202Q5L6PNfGuAz3J5KyBPQADPqszLORCUptgJanGpCkYA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 7 Oct 2011 15:23:45 +0100
+Subject: Long stalls during boot with -next
+In-Reply-To: <CAJuYYwTeAwZ-zRDyQwB73bHWn+NkoT2zxmuJkFW6Oph1CUijqA@mail.gmail.com>
+References: <20110929125035.GA2085@sirena.org.uk>
+	<20111007115047.GC24534@sirena.org.uk>
+	<CAJuYYwTeAwZ-zRDyQwB73bHWn+NkoT2zxmuJkFW6Oph1CUijqA@mail.gmail.com>
+Message-ID: <20111007142343.GH14518@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 October 2011 17:47, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Fri, 7 Oct 2011, Kukjin Kim wrote:
->> I think, basically, if SPIs in GIC are used in local timer, the routing
->> interrupt like calling irq_set_affinity() to offline CPUs should be
->> available when boot time before calling set_cpu_online() because as you know
->> the local_timer_setup() which includes setup interrupt is called in
->> percpu_timer_setup() now...
->>
->> Is there any way to get the flags of struct irqaction from struct irq_data
->> in gic_set_affinity()? Or?
->
-> No, and you should not even think about it at all.
->
-> The problem I can see from all this discussion is related to the early
-> enabling of interrupts and the per cpu timer setup before the cpu is
-> marked online. I really do not understand at all why this needs to be
-> done in order to call calibrate_delay().
->
-> calibrate_delay() monitors jiffies, which are updated from the CPU
-> which is waiting for the new CPU to set the online bit.
->
-> So you simply can call calibrate_delay() on the new CPU just from the
-> interrupt disabled region and move the local timer setup after you
-> stored the cpu data and before enabling interrupts.
->
-> This solves both the cpu_online vs. cpu_active problem and the
-> affinity setting of the per cpu timers.
->
-> Thanks,
->
-> ? ? ? ?tglx
-> ----
-> Index: linux-2.6/arch/arm/kernel/smp.c
-> ===================================================================
-> --- linux-2.6.orig/arch/arm/kernel/smp.c
-> +++ linux-2.6/arch/arm/kernel/smp.c
-> @@ -301,17 +301,7 @@ asmlinkage void __cpuinit secondary_star
-> ? ? ? ? */
-> ? ? ? ?platform_secondary_init(cpu);
->
-> - ? ? ? /*
-> - ? ? ? ?* Enable local interrupts.
-> - ? ? ? ?*/
-> ? ? ? ?notify_cpu_starting(cpu);
-> - ? ? ? local_irq_enable();
-> - ? ? ? local_fiq_enable();
-> -
-> - ? ? ? /*
-> - ? ? ? ?* Setup the percpu timer for this CPU.
-> - ? ? ? ?*/
-> - ? ? ? percpu_timer_setup();
->
-> ? ? ? ?calibrate_delay();
->
-> @@ -323,10 +313,23 @@ asmlinkage void __cpuinit secondary_star
-> ? ? ? ? * before we continue.
-> ? ? ? ? */
-> ? ? ? ?set_cpu_online(cpu, true);
-> +
-> + ? ? ? /*
-> + ? ? ? ?* Setup the percpu timer for this CPU.
-> + ? ? ? ?*/
-> + ? ? ? percpu_timer_setup();
+On Fri, Oct 07, 2011 at 06:57:19PM +0530, Thomas Abraham wrote:
+> On 7 October 2011 17:20, Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-I tested these modifications on samsung exynos4 platform and they work
-fine with almost same bogomips. I also enabled cpu topology patches
-and they also don't create any race conditions. Looks like a good
-approach.
+> > I identified the problem here, the behaviour of LL_DEBUG was changed to
+> > make it select DEBUG_ICEDCC by default which is unfortunate if one
+> > doesn't have an EmbeddedICE connected.
 
+> Thanks for your suggestion. The long stall during boot problem occurs
+> on Samsung boards as well with linux-next. As per your suggestion, the
+> following diff fixes this issue.
+
+Excellent, I'm using this now - please add my
+
+Tested-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+
+when you send it out properly!
+
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 65cf8c6..035f5cd 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -120,6 +120,15 @@ choice
+>  		  Say Y here if you want the debug print routines to direct
+>  		  their output to the second serial port on these devices.
+> 
+> +	config DEBUG_SAMSUNG_UART
+> +		bool "Kernel low-level debugging messages via samsung serial port"
+> +		depends on PLAT_SAMSUNG
+> +		help
+> +		  Say Y here if you want the debug print routines to direct
+> +		  their output to the serial port for Samsung platforms. Choose
+> +		  the uart port with the "S3C UART to use for low-level debug"
+> +		  config option.
 > +
-> ? ? ? ?while (!cpu_active(cpu))
-> ? ? ? ? ? ? ? ?cpu_relax();
->
-> ? ? ? ?/*
-> + ? ? ? ?* cpu_active bit is set, so it's safe to enable interrupts
-> + ? ? ? ?* now.
-> + ? ? ? ?*/
-> + ? ? ? local_irq_enable();
-> + ? ? ? local_fiq_enable();
-> +
-> + ? ? ? /*
-> ? ? ? ? * OK, it's off to the idle thread for us
-> ? ? ? ? */
-> ? ? ? ?cpu_idle();
->
+>  endchoice
+> 
+>  config EARLY_PRINTK
+> @@ -139,7 +148,7 @@ config OC_ETM
+>  	  kernel code.
+> 
+>  config DEBUG_S3C_UART
+> -	depends on PLAT_SAMSUNG
+> +	depends on DEBUG_SAMSUNG_UART
+>  	int "S3C UART to use for low-level debug"
+>  	default "0"
+>  	help
