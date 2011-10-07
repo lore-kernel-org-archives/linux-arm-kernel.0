@@ -1,47 +1,118 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Oct 2011 18:27:06 +0200
-Subject: [PATCHv16 0/9] Contiguous Memory Allocator
-In-Reply-To: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <201110071827.06366.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 07 Oct 2011 23:09:39 +0530
+Subject: [PATCH 1/4] ARM: Add __arm_ioremap_exec for mapping external
+	memory as MT_MEMORY
+In-Reply-To: <20111007151116.GI6324@atomide.com>
+References: <20111005004339.26980.31149.stgit@kaulin.local>
+	<20111005004539.26980.52409.stgit@kaulin.local>
+	<alpine.LFD.2.02.1110042059110.9106@xanadu.home>
+	<20111005220619.GC6324@atomide.com> <4E8E9EE8.8010106@ti.com>
+	<20111007144349.GE6324@atomide.com> <4E8F14A6.5050402@ti.com>
+	<20111007151116.GI6324@atomide.com>
+Message-ID: <4E8F395B.9070203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 October 2011, Marek Szyprowski wrote:
-> Once again I decided to post an updated version of the Contiguous Memory
-> Allocator patches.
+On Friday 07 October 2011 08:41 PM, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [111007 07:29]:
+>> On Friday 07 October 2011 08:13 PM, Tony Lindgren wrote:
+>>>
+>>> ..so I think we should just have a separate static mapping for
+>>> the omap4 errata fix SO page, and just limit the memory available
+>>> for SRAM code to ioremap.
+>>>
+>>> How does that sounds to you?
+>>>
+>> That's more or less what the patch is already doing.
+>> Instead of static mapping, I was dynamically stealing one
+>> page ( SZ_4K) and mapping it as MT_MEMORY_SO and rest
+>> of the memory as MT_MEMORY for OMAP4.
 > 
-> This version provides mainly a bugfix for a very rare issue that might
-> have changed migration type of the CMA page blocks resulting in dropping
-> CMA features from the affected page block and causing memory allocation
-> to fail. Also the issue reported by Dave Hansen has been fixed.
+> Yeah cool.
+>  
+>> It should be doable with your updates as well,
+>> I guess with or without static mapping since the only
+>> requisite is to keep one page of SRAM free on OMAP4 and
+>> them map them using  iotable_init() with MT_MEMORY_SO.
 > 
-> This version also introduces basic support for x86 architecture, what
-> allows wide testing on KVM/QEMU emulators and all common x86 boxes. I
-> hope this will result in wider testing, comments and easier merging to
-> mainline.
+> How about something like the following, this won't compile
+> without at least moving the defines around a bit, but shows
+> what I had in mind:
+> 
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -238,6 +238,14 @@ static struct map_desc omap44xx_io_desc[] __initdata = {
+>  		.length		= L4_EMU_44XX_SIZE,
+>  		.type		= MT_DEVICE,
+>  	},
+> +#ifdef CONFIG_OMAP4_ERRATA_I688
+> +	{
+> +		.virtual	= OMAP4_SRAM_VA,
+> +		.pfn		= __phys_to_pfn(OMAP4_SRAM_PA),
+> +		.length		= PAGE_SIZE,
+> +		.type		= MT_MEMORY_SO,
+> +	},
+> +#endif
+>  };
 
-Hi Marek,
+I initially tried some thing similar but the issue was GP and
+HS devices. SRAM_PA isn't same on GP and EMU device and hence
+did that dynamically. One way is I can make GP and HS
+device SRAM_PA same for OMAP4 (Will loose 16 KB of
+SRAM on OMAP4 GP). It's ok to loose that 16 KB SRAM
+for OMAP4 with errata enabled.
 
-I think we need to finally get this into linux-next now, to get some
-broader testing. Having the x86 patch definitely helps here becauses
-it potentially exposes the code to many more testers.
+Below change works on both GP and HS device
+If you are OK with it, I can update errata patch accordingly.
 
-IMHO it would be good to merge the entire series into 3.2, since
-the ARM portion fixes an important bug (double mapping of memory
-ranges with conflicting attributes) that we've lived with for far
-too long, but it really depends on how everyone sees the risk
-for regressions here. If something breaks in unfixable ways before
-the 3.2 release, we can always revert the patches and have another
-try later.
+diff --git a/arch/arm/plat-omap/include/plat/sram.h
+b/arch/arm/plat-omap/include/plat/sram.h
+index f500fc3..111b1a8 100644
+--- a/arch/arm/plat-omap/include/plat/sram.h
++++ b/arch/arm/plat-omap/include/plat/sram.h
+@@ -95,6 +95,11 @@ static inline void omap_push_sram_idle(void) {}
+  */
+ #define OMAP2_SRAM_PA		0x40200000
+ #define OMAP3_SRAM_PA           0x40200000
++#ifdef CONFIG_OMAP4_ERRATA_I688
++#define OMAP4_SRAM_PA		0x40304000
++#else
+ #define OMAP4_SRAM_PA		0x40300000
++#endif
++#define OMAP4_SRAM_VA		0xfe404000
 
-It's also not clear how we should merge it. Ideally the first bunch
-would go through linux-mm, and the architecture specific patches
-through the respective architecture trees, but there is an obvious
-inderdependency between these sets.
+ #endif
+diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
+index 363c91e..cdd303f 100644
+--- a/arch/arm/plat-omap/sram.c
++++ b/arch/arm/plat-omap/sram.c
+@@ -48,9 +48,13 @@
+ #define OMAP3_SRAM_VA           0xfe400000
+ #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
+ #define OMAP3_SRAM_PUB_VA       (OMAP3_SRAM_VA + 0x8000)
+-#define OMAP4_SRAM_VA		0xfe400000
++#ifdef CONFIG_OMAP4_ERRATA_I688
++#define OMAP4_SRAM_PUB_PA	OMAP4_SRAM_PA
++#define OMAP4_SRAM_PUB_VA	OMAP4_SRAM_VA
++#else
+ #define OMAP4_SRAM_PUB_PA	(OMAP4_SRAM_PA + 0x4000)
+ #define OMAP4_SRAM_PUB_VA	(OMAP4_SRAM_VA + 0x4000)
++#endif
 
-Russell, Andrew, are you both comfortable with putting the entire
-set into linux-mm to solve this? Do you see this as 3.2 or rather
-as 3.3 material?
+ #if defined(CONFIG_ARCH_OMAP2PLUS)
+ #define SRAM_BOOTLOADER_SZ	0x00
+@@ -203,6 +207,11 @@ static void __init omap_map_sram(void)
+ 	if (omap_sram_size == 0)
+ 		return;
 
-	Arnd
++#ifdef CONFIG_OMAP4_ERRATA_I688
++		omap_sram_base += PAGE_SIZE;
++		omap_sram_start += PAGE_SIZE;
++		omap_sram_size -= SZ_16K;
++#endif
+ 	if (cpu_is_omap34xx()) {
+ 		/*
+ 		 * SRAM must be marked as non-cached on OMAP3 since the
+
+Regards
+Santosh
