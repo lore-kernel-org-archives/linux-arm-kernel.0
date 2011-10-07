@@ -1,30 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Oct 2011 20:01:03 +0200
-Subject: [GIT PULL] Samsung board-2 for v3.2
-In-Reply-To: <019b01cc8298$846170c0$8d245240$%kim@samsung.com>
-References: <019b01cc8298$846170c0$8d245240$%kim@samsung.com>
-Message-ID: <201110072001.03602.arnd@arndb.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 7 Oct 2011 11:04:34 -0700
+Subject: [PATCH v7 3/3] arm/tegra: device tree support for ventana board
+In-Reply-To: <1317647918-22694-4-git-send-email-pdeschrijver@nvidia.com>
+References: <1317647918-22694-1-git-send-email-pdeschrijver@nvidia.com>
+	<1317647918-22694-4-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173B23B2FA@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 October 2011, Kukjin Kim wrote:
-> This is a second Samsung board stuff for v3.2 and includes new board,
-> SMDK4412.
-> 
-> Please pull from:
->   git://github.com/kgene/linux-samsung.git next-samsung-board-2
-> 
-> As a note, since supporting SMDK4412 needs previous next-samsung-board
-> branch so this is based on next-samsung-board which has been already merged
-> into arm-soc and this includes converting boot_params to atag_offset for
-> adding/changing boards in this time.
-> 
-> If any problems, please let me know.
-> 
-> One more as a note, the next-samsung-devel and next-samsung-devel-2 will be
-> sent to you soon after testing ;)
->
+Peter De Schrijver wrote at Monday, October 03, 2011 7:19 AM:
 
-Pulled, thanks!
+...
+> diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
+...
+> +	chosen {
+> +		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/ram rdinit=/sbin/init";
 
-	Arnd
+It might be nice to make this identical to what Harmony and Seaboard have here.
+
+Still, it doesn't matter a lot, since I (and I imagine most people) have
+to edit this command-line to point at the correct partition for my disks
+anyway; eventually, U-Boot should be providing/re-writing this property
+too.
+
+...
+> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+...
+> -	if (of_machine_is_compatible("nvidia,harmony"))
+> -		harmony_pinmux_init();
+> -	else if (of_machine_is_compatible("nvidia,seaboard"))
+> -		seaboard_pinmux_init();
+> +	for (i = 0; i < ARRAY_SIZE(pinmux_configs); i++) {
+> +		if (of_machine_is_compatible(pinmux_configs[i].machine)) {
+> +			pinmux_configs[i].init();
+> +			break;
+> +		}
+> +	}
+> +
+> +	if (i == ARRAY_SIZE(pinmux_configs))
+> +		printk(KERN_WARNING "Unknown platform! Pinmuxing not initialized\n");
+
+Should that be WARN() instead of printk?
+
+-- 
+nvpublic
