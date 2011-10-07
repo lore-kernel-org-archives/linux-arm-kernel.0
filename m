@@ -1,45 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Oct 2011 20:11:28 +0100
-Subject: [PATCH 1/4] mmc: mmci: Bugfix in pio read for small packets
-In-Reply-To: <4E8F00E4.5010702@stericsson.com>
-References: <1317109568-17905-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111001160937.GF11710@n2100.arm.linux.org.uk>
-	<4E895F6A.9070203@stericsson.com> <4E8F00E4.5010702@stericsson.com>
-Message-ID: <20111007191128.GA25689@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 7 Oct 2011 20:14:43 +0100
+Subject: [GIT PULL] Samsung devel-2 for v3.2
+In-Reply-To: <201110071956.12034.arnd@arndb.de>
+References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
+	<20111002192950.GB1005@sirena.org.uk>
+	<005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
+	<201110071956.12034.arnd@arndb.de>
+Message-ID: <20111007191443.GA12004@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2011 at 03:38:44PM +0200, Ulf Hansson wrote:
-> In this hot path we already do a read of the FIFOCNT register for every  
-> loop in pio_read, won't this sometimes cause caches to flush and  
-> similar, thus cost quite a lot - at least a lot more than executing a  
-> switch/if sentence like Stefan added? Or do I miss something?
+On Fri, Oct 07, 2011 at 07:56:11PM +0200, Arnd Bergmann wrote:
+> On Monday 03 October 2011, Kukjin Kim wrote:
+> > Mark Brown wrote:
 
-The read of FIFOCNT just reads the counter and does nothing more.  Why
-do you think it causes a cache flush, and what cache do you think would
-be flushed?
+> > > As I reported the other day this change breaks the boot early on on the
+> > > Cragganmore S3C6410 based systems (I've not actually fired up my
+> > > SMDK6410 but I suspect it may have issues too).  I did make some brief
 
-> I were also thinking of a possible optimization of minimizing the total  
-> numbers of reads of the FIFOCNT register in pio_read. Basically we can  
-> make use of the RXFIFOHALFFULL irq/status to know when there is a  
-> "burst" available in the FIFO. Do you think this will be feasible for  
-> the ARM MMCI Pl18x IP as well? I mean the consequence of using  
-> RXFIFOHALFFULL will be less numbers of IRQ raised and then when reading  
-> data from the FIFO it will be done in larger chunks.
+> > Hmm, I thought it has no problem when I saw Thomas Abraham's 'serial:
+> > samsung' patches because he said it works fine with my for-next plus his
+> > patches on SMDK6410...Anyway, I need to sort it out.
 
-We read the FIFOCNT register to allow us to empty as much data from the
-FIFO as we possibly can at each interrupt.  We know that it's going to
-be at least half full at that time because that's the interrupt which is
-triggering us to do the read (except for the final few words).  What we
-want to do is not just read half the FIFO, but everything that it
-contains.  Hence why we read FIFOCNT.
+> > Arnd, please hold this on, will request again soon.
 
-> We could make use of the "likely" makro to make compiler optimizations  
-> of the code, is that a way forward do you think?
+> Any update on this?
 
-That only helps if you look at the assembled code and inspect what the
-compiler is doing.  If it's already correctly guessing the best paths,
-then the likely macro does nothing for you.
-
-But first, you need to fix your code so you're only reading 32-bit
-quantities from the FIFO register.
+We've got a lot closer to working out what's wrong (and got useful
+logging) but not nailed it down yet.  Kukjin has confirmed that he can
+see what's likely the same issue on his systems.  My suggestion is that
+we go ahead with the pull request for now and then fix incrementally,
+there's a relatively small set of systems affected.  If it gets to more
+than a couple of -rcs we know which patches are problematic and so can
+always revert.
