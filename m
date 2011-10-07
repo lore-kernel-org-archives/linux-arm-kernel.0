@@ -1,27 +1,27 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 7 Oct 2011 13:37:01 +0200
-Subject: [PATCH v2 5/5] iommu/exynos: Use bus_set_iommu instead of
-	register_iommu
-In-Reply-To: <CAHQjnOPiAOA_RiHnF-aVEYnWcdkwNzVD1BTNua+-ztZrW_+6_A@mail.gmail.com>
-References: <017001cc7f43$04a2db60$0de89220$%kim@samsung.com>
-	<20110930134643.GS2138@amd.com>
-	<CAHQjnOPiAOA_RiHnF-aVEYnWcdkwNzVD1BTNua+-ztZrW_+6_A@mail.gmail.com>
-Message-ID: <20111007113701.GC1512@8bytes.org>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Fri, 07 Oct 2011 15:39:35 +0400
+Subject: [PATCH] ARM: tegra: fix compilation error due to mach/hardware.h
+	removal
+In-Reply-To: <1317954199-25284-1-git-send-email-olof@lixom.net>
+References: <1317954199-25284-1-git-send-email-olof@lixom.net>
+Message-ID: <4E8EE4F7.9040503@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 01, 2011 at 08:52:45AM +0900, KyongHo Cho wrote:
-> On Fri, Sep 30, 2011 at 10:46 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> > On Fri, Sep 30, 2011 at 03:31:49AM -0400, Kukjin Kim wrote:
-> >> From: KyongHo Cho <pullip.cho@samsung.com>
-> >>
-> >> This replaces register_iommu() with bus_set_iommu() according to the
-> >> suggestion of Joerg Roedel.
-> >
-> > This should be part of patch 3 already when the bus_set_iommu() change
-> > is merged. Otherwise it breaks bisectability too.
-> >
-> Ok.
-> Should I include fault handling feature (patch 4) in the patch 3 also?
+Hello.
 
-Yes, makes sense to include patch 4 too.
+On 07-10-2011 6:23, Olof Johansson wrote:
+
+> From: Marc Dietrich <marvin24@gmx.de>
+
+> This fixes a compilation error in cpu-tegra.c which was introduced
+> in commit dc8d966bccde0b8b6c9e8c6e663c747030c17435 which removed
+
+    Please also specify that commit's summary in parens.
+
+> the now obsolete mach/hardware.h from the mach-tegra subtree.
+
+> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+
+WBR, Sergei
