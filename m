@@ -1,38 +1,40 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Fri, 07 Oct 2011 12:20:14 +0800
-Subject: [PATCH] ARM: SAMSUNG: s3c-dma-ops needs export.h for EXPORT_SYMBOL
-Message-ID: <1317961214.16109.1.camel@phoenix>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 07 Oct 2011 10:02:53 +0530
+Subject: [PATCH 05/16] dmaengine: pl330: Enable module alias
+	autogeneration for AMBA drivers
+In-Reply-To: <CAJe_ZhePtDRD-Ov4D9jrEY7jt97aX9cM+jA0-=gkC1nZadRcMQ@mail.gmail.com>
+References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
+	<1317830707-17517-6-git-send-email-dave.martin@linaro.org>
+	<CAJe_ZhePtDRD-Ov4D9jrEY7jt97aX9cM+jA0-=gkC1nZadRcMQ@mail.gmail.com>
+Message-ID: <1317961973.1573.2223.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix below build warning:
-  CC      arch/arm/plat-samsung/s3c-dma-ops.o
-arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: data definition has no type or storage class
-arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: type defaults to 'int' in declaration of 'EXPORT_SYMBOL'
-arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: parameter names (without types) in function declaration
+On Thu, 2011-10-06 at 10:47 +0530, Jassi Brar wrote:
+> On 5 October 2011 21:34, Dave Martin <dave.martin@linaro.org> wrote:
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > ---
+> >  drivers/dma/pl330.c |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> > index 57104147..2d8d1b0 100644
+> > --- a/drivers/dma/pl330.c
+> > +++ b/drivers/dma/pl330.c
+> > @@ -990,6 +990,8 @@ static struct amba_id pl330_ids[] = {
+> >        { 0, 0 },
+> >  };
+> >
+> > +MODULE_DEVICE_TABLE(amba, pl330_ids);
+> > +
+> >  #ifdef CONFIG_PM_RUNTIME
+> >  static int pl330_runtime_suspend(struct device *dev)
+> >  {
+> 
+> Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+> 
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-And fix the build error:
-ERROR: "s3c_dma_get_ops" [drivers/spi/spi-s3c64xx.ko] undefined!
-make[1]: *** [__modpost] Error 1
-make: *** [modules] Error 2
 
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
-This can be reproduced by "make s3c6400_defconfig;make" on linux-next 20111006.
- arch/arm/plat-samsung/s3c-dma-ops.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/s3c-dma-ops.c b/arch/arm/plat-samsung/s3c-dma-ops.c
-index 582333c..7814949 100644
---- a/arch/arm/plat-samsung/s3c-dma-ops.c
-+++ b/arch/arm/plat-samsung/s3c-dma-ops.c
-@@ -14,6 +14,7 @@
- #include <linux/errno.h>
- #include <linux/slab.h>
- #include <linux/types.h>
-+#include <linux/export.h>
- 
- #include <mach/dma.h>
- 
 -- 
-1.7.4.1
+~Vinod
