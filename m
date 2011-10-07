@@ -1,30 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Oct 2011 10:22:43 +0100
-Subject: [PATCH v3] omap: dmtimer: convert printk to pr_err
-In-Reply-To: <1317977417-17874-1-git-send-email-vjaquez@igalia.com>
-References: <20111006201827.GT6324@atomide.com>
-	<1317977417-17874-1-git-send-email-vjaquez@igalia.com>
-Message-ID: <20111007092243.GC27281@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 7 Oct 2011 11:43:40 +0200 (CEST)
+Subject: [PATCH RESEND] ARM: smp_twd: Reconfigure clockevents after
+	cpufreq change
+In-Reply-To: <CACRpkdaQNA_n7haRCU++26CLuaZ=eRb7iAS+mm0fQV244G1S4g@mail.gmail.com>
+References: <1315292775-4413-1-git-send-email-linus.walleij@stericsson.com>
+	<CAKnu2ModYp+F0kq6qVo9SQJ88GR_EwGNgH2WZXJrXUeR1xyzQw@mail.gmail.com>
+	<alpine.LFD.2.02.1110061922440.3240@ionos>
+	<CACRpkdaQNA_n7haRCU++26CLuaZ=eRb7iAS+mm0fQV244G1S4g@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1110071142570.3240@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2011 at 10:50:16AM +0200, V?ctor Manuel J?quez Leal wrote:
-> Convert a printk(KERN_ERR) message in the driver to pr_err().
-...
-> @@ -111,7 +111,7 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
->  	while (!(__raw_readl(timer->sys_stat) & 1)) {
->  		c++;
->  		if (c > 100000) {
-> -			printk(KERN_ERR "Timer failed to reset\n");
-> +			pr_err("Timer failed to reset\n");
+On Fri, 7 Oct 2011, Linus Walleij wrote:
 
-What is the reason behind this change?  It looks like it's to use the
-latest and greatest function.
+> On Thu, Oct 6, 2011 at 7:25 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> > On Thu, 6 Oct 2011, Linus Walleij wrote:
+> >> Here is the entire patch i Russells tracker:
+> >> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6956/2
+> >
+> > The only thing what puzzles me is:
+> >
+> >> + ? ? if (!IS_ERR_OR_NULL(twd_clk))
+> >> + ? ? ? ? ? ? twd_timer_rate = clk_get_rate(twd_clk);
+> >> + ? ? else
+> >> + ? ? ? ? ? ? twd_calibrate_rate();
+> >
+> > How is made sure that the cpu freq update thing is not called when
+> > twd_clk is not available or am I missing something ?
+> 
+> The CPUfreq transition notifier is only registered if twd_clk is
+> not error or NULL in this #ifdef CONFIG_CPU_FREQ snippet
+> above that code, but executed later:
+> 
+> +static int twd_cpufreq_init(void)
+> +{
+> +	if (!IS_ERR_OR_NULL(twd_clk))
+> +		return cpufreq_register_notifier(&twd_cpufreq_nb,
+> +			CPUFREQ_TRANSITION_NOTIFIER);
+> +
+> +	return 0;
+> +}
+> +core_initcall(twd_cpufreq_init);
 
-If so, please don't make these changes - we have on many occasions been
-blamed for size of diffstat, churn, needless change, and this patch is
-exactly that.
+Duh. Could have seen that myself :)
 
-By all means fix printk's without KERN_ constants, possibly converting
-them to pr_*, but don't go around replacing printk(KERN_* with pr_*(
-without ensuring that there's a real benefit to the change.
+Thans for clarification. Please add my Acked-by.
+
+Thanks,
+
+	tglx
