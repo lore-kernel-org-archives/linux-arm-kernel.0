@@ -1,105 +1,71 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Fri, 7 Oct 2011 12:32:01 -0700
-Subject: [PATCH] OMAP2+: clock: use clock's recalc in DPLL handling
-In-Reply-To: <alpine.DEB.2.00.1110070104260.4611@utopia.booyaka.com>
-References: <CAJOA=zPq__48SbsKeFHaQ_+J0YQYLLXBP67g2JGXknhWj7PNOA@mail.gmail.com>
-	<1317343888-30892-1-git-send-email-mturquette@ti.com>
-	<alpine.DEB.2.00.1110070104260.4611@utopia.booyaka.com>
-Message-ID: <CAJOA=zNwDCVjzZJs87ze0xdJ8m=CDDmp8QAApj9cMhoPsFqBuw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 07 Oct 2011 12:45:40 -0700
+Subject: [PATCH 0/7] Repost of omap SRAM map_io changes
+Message-ID: <20111007194242.18205.64009.stgit@kaulin.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 7, 2011 at 12:07 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> On Thu, 29 Sep 2011, Mike Turquette wrote:
->
->> Not all DPLLs are identical; some require special consideration such as
->> OMAP4's ABE DPLL, which can have an additional 4x multiplier added to
->> it's clock rate based on programming the REGM4XEN bit in it's CLKMODE
->> register.
->>
->> Unfortunately the clock framework makes a few assumptions that all DPLLs
->> can have their rates calculated the same way which has led to incorrect
->> rates for OMAP4's DPLL_ABE in some cases. ?This patch fixes the same by
->> replacing explicit calls to omap2_dpll_get_rate with clk->recalc if
->> .recalc is populated for a clock. ?If .recalc is NULL then fall back to
->> omap2_dpll_get_rate.
->>
->> Reported-by: Misael Lopez Cruz <misael.lopez@ti.com>
->> Signed-off-by: Mike Turquette <mturquette@ti.com>
->
-> I've merged this patch with Jon's "ARM: OMAP3+: dpll: use DPLLs recalc
-> function instead of omap2_get_dpll_rate" patch, which does almost exactly
-> the same thing, just without the conditionals on clk->recalc. ?Updated
-> patch below. ?Please let me know if you think I should change anything
-> about the changelog.
+Hi all,
 
-Heh, I hadn't realized we had overlapping patches like that.  Looks fine to me.
+Here's a repost of the original patches with minimal changes
+to fix some compile warnings and with the acks added.
+
+There's also one new patch to warn about trying to use the
+omap_ioremap too early that's good to have for some sanity
+checks.
+
+These patches are against the dt branch in linux-omap tree
+because of dependencies to earlier cleanup.
 
 Regards,
-Mike
 
-> - Paul
->
-> From: Jon Hunter <jon-hunter@ti.com>
-> Date: Fri, 7 Oct 2011 00:53:01 -0600
-> Subject: [PATCH] ARM: OMAP3+: dpll: use DPLLs recalc function instead of
-> ?omap2_get_dpll_rate
->
-> This is a continuation of Mike Turquette's patch "OMAP3+: use
-> DPLL's round_rate when setting rate".
->
-> omap3_noncore_dpll_set_rate() and omap3_noncore_dpll_enable() call
-> omap2_get_dpll_rate() explicitly. It may be necessary for some
-> DPLLs to use a different function and so use the DPLLs recalc()
-> function pointer instead.
->
-> An example is the DPLL_ABE on OMAP4 which can have a 4X multiplier
-> in addition to the usual MN multipler and dividers and therefore
-> uses a different round_rate and recalc function.
->
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> Cc: Mike Turquette <mturquette@ti.com>
-> Cc: Misael Lopez Cruz <misael.lopez@ti.com>
-> [paul at pwsan.com: merged this patch with Mike's "use clock's recalc in DPLL
-> ?handling" patch; also reported by Misael]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> ---
-> ?arch/arm/mach-omap2/dpll3xxx.c | ? ?7 +++++--
-> ?1 files changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-> index 73a1595..fc56745 100644
-> --- a/arch/arm/mach-omap2/dpll3xxx.c
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c
-> @@ -390,7 +390,8 @@ int omap3_noncore_dpll_enable(struct clk *clk)
-> ? ? ? ? * propagating?
-> ? ? ? ? */
-> ? ? ? ?if (!r)
-> - ? ? ? ? ? ? ? clk->rate = omap2_get_dpll_rate(clk);
-> + ? ? ? ? ? ? ? clk->rate = (clk->recalc) ? clk->recalc(clk) :
-> + ? ? ? ? ? ? ? ? ? ? ? omap2_get_dpll_rate(clk);
->
-> ? ? ? ?return r;
-> ?}
-> @@ -424,6 +425,7 @@ void omap3_noncore_dpll_disable(struct clk *clk)
-> ?int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
-> ?{
-> ? ? ? ?struct clk *new_parent = NULL;
-> + ? ? ? unsigned long hw_rate;
-> ? ? ? ?u16 freqsel = 0;
-> ? ? ? ?struct dpll_data *dd;
-> ? ? ? ?int ret;
-> @@ -435,7 +437,8 @@ int omap3_noncore_dpll_set_rate(struct clk *clk, unsigned long rate)
-> ? ? ? ?if (!dd)
-> ? ? ? ? ? ? ? ?return -EINVAL;
->
-> - ? ? ? if (rate == omap2_get_dpll_rate(clk))
-> + ? ? ? hw_rate = (clk->recalc) ? clk->recalc(clk) : omap2_get_dpll_rate(clk);
-> + ? ? ? if (rate == hw_rate)
-> ? ? ? ? ? ? ? ?return 0;
->
-> ? ? ? ?/*
-> --
-> 1.7.6.3
->
->
+Tony
+
+---
+
+Tony Lindgren (7):
+      ARM: Add __arm_ioremap_exec for mapping external memory as MT_MEMORY
+      ARM: OMAP1: Use generic map_io, init_early and init_irq
+      ARM: OMAP: Avoid cpu_is_omapxxxx usage until map_io is done
+      ARM: OMAP: Remove calls to SRAM allocations for framebuffer
+      ARM: OMAP: Map SRAM later on with ioremap_exec()
+      ARM: OMAP: Move set_globals initialization to happen in init_early
+      ARM: OMAP: Warn if omap_ioremap is called before SoC detection
+
+
+ arch/arm/include/asm/io.h                |    1 
+ arch/arm/mach-omap1/board-ams-delta.c    |   16 +---
+ arch/arm/mach-omap1/board-fsample.c      |   76 +++++++++---------
+ arch/arm/mach-omap1/board-generic.c      |   16 +---
+ arch/arm/mach-omap1/board-h2.c           |   16 +---
+ arch/arm/mach-omap1/board-h3.c           |   16 +---
+ arch/arm/mach-omap1/board-htcherald.c    |   12 +--
+ arch/arm/mach-omap1/board-innovator.c    |   36 ++++-----
+ arch/arm/mach-omap1/board-nokia770.c     |   34 +++-----
+ arch/arm/mach-omap1/board-osk.c          |   16 +---
+ arch/arm/mach-omap1/board-palmte.c       |   16 +---
+ arch/arm/mach-omap1/board-palmtt.c       |   16 +---
+ arch/arm/mach-omap1/board-palmz71.c      |   18 +---
+ arch/arm/mach-omap1/board-perseus2.c     |   75 +++++++++---------
+ arch/arm/mach-omap1/board-sx1.c          |   17 +---
+ arch/arm/mach-omap1/board-voiceblue.c    |   16 +---
+ arch/arm/mach-omap1/devices.c            |    3 +
+ arch/arm/mach-omap1/io.c                 |   57 ++++++-------
+ arch/arm/mach-omap2/board-omap3beagle.c  |    7 --
+ arch/arm/mach-omap2/board-ti8168evm.c    |    1 
+ arch/arm/mach-omap2/common.c             |   50 +++++-------
+ arch/arm/mach-omap2/control.c            |   14 +--
+ arch/arm/mach-omap2/io.c                 |  127 +++++++++++++++---------------
+ arch/arm/mach-omap2/io.h                 |    7 --
+ arch/arm/mach-omap2/omap-smp.c           |    7 +-
+ arch/arm/mach-omap2/prcm.c               |   19 +---
+ arch/arm/mach-omap2/sdrc.c               |   13 +--
+ arch/arm/mm/ioremap.c                    |   21 +++++
+ arch/arm/plat-omap/include/plat/common.h |   17 ++--
+ arch/arm/plat-omap/include/plat/io.h     |   29 ++++++-
+ arch/arm/plat-omap/io.c                  |   10 ++
+ arch/arm/plat-omap/sram.c                |   85 +++++---------------
+ 32 files changed, 356 insertions(+), 508 deletions(-)
+
+-- 
+Signature
