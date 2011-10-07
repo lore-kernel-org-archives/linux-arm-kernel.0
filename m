@@ -1,46 +1,68 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 7 Oct 2011 17:16:22 -0500
-Subject: [PATCH v2 5/6] OMAP3+: Update DPLL Fint range for OMAP36xx and
-	OMAP4xxx devices
-In-Reply-To: <alpine.DEB.2.00.1110061938210.4611@utopia.booyaka.com>
-References: <1316195322-15062-1-git-send-email-jon-hunter@ti.com>
-	<alpine.DEB.2.00.1110061938210.4611@utopia.booyaka.com>
-Message-ID: <4E8F7A36.3030408@ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 07 Oct 2011 18:18:52 -0400 (EDT)
+Subject: [PATCH 0/2] OMAP: Update nr_irqs field in machine descriptors
+In-Reply-To: <20111007205145.GA2293@atomide.com>
+References: <1314215215-18683-1-git-send-email-svenkatr@ti.com>
+	<4E5636CD.4080302@ti.com>
+	<CANfBPZ-AAZx9TxO88EgxCtOUsWrsYzbK+M2d6cVSS7Kf-LwS3w@mail.gmail.com>
+	<20111006195016.GM6324@atomide.com>
+	<alpine.LFD.2.02.1110071612380.6390@xanadu.home>
+	<20111007205145.GA2293@atomide.com>
+Message-ID: <alpine.LFD.2.02.1110071814360.6390@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Fri, 7 Oct 2011, Tony Lindgren wrote:
 
-On 10/6/2011 20:40, Paul Walmsley wrote:
-> On Fri, 16 Sep 2011, Jon Hunter wrote:
->
->> From: Jon Hunter<jon-hunter@ti.com>
->>
->> The OMAP36xx and OMAP4xxx DPLLs have a different internal reference
->> clock frequency (fint) operating range than OMAP3430. Update the
->> dpll_test_fint() function to check for the correct frequency ranges
->> for OMAP36xx and OMAP4xxx.
->>
->> For OMAP36xx and OMAP4xxx devices, DPLLs fint range is 0.5MHz to
->> 2.5MHz for j-type DPLLs and otherwise it is 32KHz to 52MHz for all
->> other DPLLs.
->>
->> Signed-off-by: Jon Hunter<jon-hunter@ti.com>
->
-> This looks okay to me for now - queued for 3.2.  Ideally we would move the
-> Fint DPLL data to the struct dpll_data, but this would be a fairly
-> significant undertaking, since we don't have a clean way to use different
-> dpll_data for different OMAP3 variants.  Something good to keep in mind
-> for the common clock conversion.
+> * Nicolas Pitre <nico@fluxnic.net> [111007 12:41]:
+> > On Thu, 6 Oct 2011, Tony Lindgren wrote:
+> > 
+> > > * S, Venkatraman <svenkatr@ti.com> [110825 07:23]:
+> > > > On Thu, Aug 25, 2011 at 5:19 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> > > > > Hi Venkat,
+> > > > >
+> > > > > On 8/24/2011 9:46 PM, S, Venkatraman wrote:
+> > > > >>
+> > > > >> As part of an effort to get single ARM kernel binary [1],
+> > > > >> multiple ?definitions of NR_IRQS under various platforms
+> > > > >> have to be reconciled and abstracted away from common code.
+> > > > >>
+> > > > >> This patch series takes the small step of populating the
+> > > > >> machine descriptors with the pre-existing nr_irqs field.
+> > > > >> Eventually, the common irq handler code will only look at this
+> > > > >> field and not the compile time constant.
+> > > > >
+> > > > > Not related to this patch, but still on that topic. The current NR_IRQS
+> > > > > depends as well on board stuff, like for example : the Phoenix
+> > > > > IRQs:TWL6030_IRQ_BASE, TWL6040_CODEC_IRQ_BASE.
+> > > > > Is there a plan to get rid of this static defines?
+> > > > >
+> > > > 
+> > > > Currently, the goal is to get rid of the singleton nature
+> > > > of NR_IRQS. Then it just becomes a property of the
+> > > > platform, and the arm common code should not see this define.
+> > > > This cleanup has to be done across multiple SoCs, not just OMAP.
+> > > > 
+> > > > After I get to complete some meaningful cleanup of NR_IRQS,
+> > > > I can look into the static defines that you mention.
+> > > 
+> > > I suggest we wait on this patch as the NR_IRQS should be the
+> > > board specific true number of interrupts including chained
+> > > interrupts from external devices like twl. So just setting
+> > > it to NR_IRQS does not help much. Also, the board-*.c files
+> > > will be going aways with device tree at some point.
+> > 
+> > This is prerequisite to some other cleanup orthogonal to DT being worked 
+> > in parallel.  I would prefer if DT wasn't a serialization point for 
+> > this.
+> 
+> I see. How about let's populate the real number of interrupts for the
+> known boards then while at it.
 
-You know at first I was thinking about adding this to the dpll_data 
-struct, but then I thought these ranges only change for a couple dplls 
-and so adding a few more members to each dpll struct was bloating the 
-struct and making this a massive change. So I went the other path and 
-just added a couple defines to minimise the changes. However, we could 
-definitely do that if it is preferred and if with next-gen devices (such 
-as omap5) more dplls have different ranges then this would make more 
-sense too.
+Sure, if you know what you are doing (which I'm sure you do).  
+Otherwise using NR_IRQS is more or less a functional no-op wrt the 
+current situation, and therefore what I would have used myself because I 
+don't know much about the various OMAP boards.
 
-Cheers
-Jon
+
+Nicolas
