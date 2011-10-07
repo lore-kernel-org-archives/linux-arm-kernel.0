@@ -1,48 +1,53 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 7 Oct 2011 20:59:11 +0200 (CEST)
-Subject: ARM SoC tree: OMAP PM dependency on tip irq/core
-In-Reply-To: <201110072053.41594.arnd@arndb.de>
-References: <87aa9mm8ts.fsf@ti.com> <201110071804.11494.arnd@arndb.de>
-	<87d3e8lmhp.fsf@ti.com> <201110072053.41594.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1110072056050.3240@ionos>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 7 Oct 2011 12:05:12 -0700
+Subject: [PATCH] ARM: mmp: map sram as MT_MEMORY rather than MT_DEVICE
+In-Reply-To: <20110822191335.3dbe99b9@debxo>
+References: <1313377794-26721-1-git-send-email-leoy@marvell.com>
+	<1313377794-26721-2-git-send-email-leoy@marvell.com>
+	<20110822164740.5682541b@queued.net>
+	<20110823000755.GE3895@n2100.arm.linux.org.uk>
+	<20110822191335.3dbe99b9@debxo>
+Message-ID: <20111007190512.GL6324@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Oct 2011, Arnd Bergmann wrote:
-
-> On Friday 07 October 2011, Kevin Hilman wrote:
-> > > I've pulled in rmk/devel-stable as a dependency now, thanks for
-> > > reminding me of that.
-> > >
-> > > Thomas, where should I get the irq-core branch (or whichever
-> > > I should wait for) to pull in as another dependency. Is that
-> > > branch one that never gets rebased? 
+* Andres Salomon <dilinger@queued.net> [110822 18:40]:
+> On Tue, 23 Aug 2011 01:07:55 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> [...]
+> > > @@ -87,7 +88,8 @@ static int __devinit sram_probe(struct
+> > > platform_device *pdev) 
+> > >  	info->sram_phys   = (phys_addr_t)res->start;
+> > >  	info->sram_size   = resource_size(res);
+> > > -	info->sram_virt   = ioremap(info->sram_phys,
+> > > info->sram_size);
+> > > +	info->sram_virt   = __arm_ioremap(info->sram_phys,
+> > > info->sram_size,
+> > > +					  MT_MEMORY);
 > > 
-> > git://tesla.tglx.de/git/linux-2.6-tip irq/core
+> > Not a good idea fiddling about under the covers like that.  The reason
+> > that MT_MEMORY is not in asm/io.h is to stop it being used like this -
+> > MT_MEMORY etc are not meant for general purpose use.
 > > 
-> > I asked Thomas about this earlier when I was going to build up the
-> > dependencies myself, and he said it won't be rebased.
+> > It needs to be looked at properly rather than working behind the APIs,
+> > and making my life a misery by doing so, preventing me from making
+> > changes where necessary by this kind of back-door use.
+> > 
+> > I guess we need a new ioremap_xxx() variant to cope with this.
 > 
-> Ok, thanks for the info.
-> 
-> I think I've now also come up with a workflow for tracking the dependencies:
-> I have a depends/xxx branch for each other branch that I need to wait for
-> getting merged first. When I want to send a pull request, I first check
-> all the depends/* branches using 'git branch --merged next/xxx |
-> grep depends' to see what the dependencies are, and 'git branch --merged
-> torvalds/master | grep depends' to see if they are already merged upstream.
-> When a dependency is already merged, I can remove its tracking branch
-> from the arm-soc tree.
+> Something like ioremap_exec()?  I have no idea what the related MT_
+> entry would be (as someone who's new to the ARM world, it's not
+> entirely clear what the semantic distinctions are between the various
+> MT_ entries).
 
-For your internal dependecies, yes. But for irq/core you don't have to
-wait. You just need to tell Linus in the pull request that you pulled
-my branch with my ack as it contains modifications which are
-prerequisite for arm/whatever.
+Andres, care to ack this patch:
 
-When I send my pull request later, then this wont do any damage as
-Linus has the commits already. Same the other way round. We do that
-all the time, otherwise pull dependencies would be a nightmare.
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7126/1
 
-Thanks,
+Looks like that should do what you want. And after the related
+SRAM/map_io fixes for omap, it really seems that we could have
+a generic SRAM driver..
 
-	tglx
+Regards,
+
+Tony
