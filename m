@@ -1,44 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 07 Oct 2011 19:42:22 +0900
-Subject: [PATCH v3 1/2] ARM: EXYNOS4: Change System MMU device	definition
-In-Reply-To: <20111007102754.GF21464@n2100.arm.linux.org.uk>
-References: <01e001cc84d7$5e0b84b0$1a228e10$%kim@samsung.com>
-	<20111007102754.GF21464@n2100.arm.linux.org.uk>
-Message-ID: <01eb01cc84dd$cb740940$625c1bc0$%kim@samsung.com>
+From: vjaquez@igalia.com (=?iso-8859-1?Q?V=EDctor_M=2E_J=E1quez_L=2E?=)
+Date: Fri, 7 Oct 2011 12:46:56 +0200
+Subject: [PATCH v3] omap: dmtimer: convert printk to pr_err
+In-Reply-To: <20111007092243.GC27281@n2100.arm.linux.org.uk>
+References: <20111006201827.GT6324@atomide.com>
+	<1317977417-17874-1-git-send-email-vjaquez@igalia.com>
+	<20111007092243.GC27281@n2100.arm.linux.org.uk>
+Message-ID: <20111007104656.GB20440@lit.local.igalia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+On Fri, Oct 07, 2011 at 10:22:43AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 07, 2011 at 10:50:16AM +0200, V?ctor Manuel J?quez Leal wrote:
+> > Convert a printk(KERN_ERR) message in the driver to pr_err().
+> ...
+> > @@ -111,7 +111,7 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
+> >  	while (!(__raw_readl(timer->sys_stat) & 1)) {
+> >  		c++;
+> >  		if (c > 100000) {
+> > -			printk(KERN_ERR "Timer failed to reset\n");
+> > +			pr_err("Timer failed to reset\n");
 > 
-> On Fri, Oct 07, 2011 at 06:56:21PM +0900, Kukjin Kim wrote:
-> > +#define SYSMMU_RESOURCE(ipname, base, irq) \
-> > +static struct resource sysmmu_resource_##ipname[] =\
-> > +{\
-> > +	{\
-> > +		.start	= EXYNOS4_PA_SYSMMU_##base,\
-> > +		.end	= EXYNOS4_PA_SYSMMU_##base + SZ_4K - 1,\
-> > +		.flags	= IORESOURCE_MEM,\
-> > +	}, {\
-> > +		.start	= IRQ_SYSMMU_##irq##_0,\
-> > +		.end	= IRQ_SYSMMU_##irq##_0,\
-> > +		.flags	= IORESOURCE_IRQ,\
-> > +	},\
-> >  }
+> What is the reason behind this change?  It looks like it's to use the
+> latest and greatest function.
 > 
-> #define SYSMMU_RESOURCE(ipname, base, irq) \
-> static struct resource sysmmu_resource_##ipname[] = \
-> { \
-> 	DEFINE_RES_MEM(EXYNOS4_PA_SYSMMU_##base, SZ_4K), \
-> 	DEFINE_RES_IRQ(IRQ_SYSMMU_##irq##_0), \
-> }
+> If so, please don't make these changes - we have on many occasions been
+> blamed for size of diffstat, churn, needless change, and this patch is
+> exactly that.
+> 
+> By all means fix printk's without KERN_ constants, possibly converting
+> them to pr_*, but don't go around replacing printk(KERN_* with pr_*(
+> without ensuring that there's a real benefit to the change.
+> 
 
-Oops, I missed that.
-OK, let him change it.
+Thanks a lot Russell, and sorry for the noise. I'm still learning how to
+collaborate in the kernel.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+vmjl
