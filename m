@@ -1,79 +1,58 @@
 From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Thu,  6 Oct 2011 22:38:36 -0400
-Subject: [RFC/PATCH 2/7] ARM: ARM11 MPCore: pte_alloc_one{,
-	_kernel} are not preempt safe
+Date: Thu,  6 Oct 2011 22:38:35 -0400
+Subject: [RFC/PATCH 1/7] ARM: ARM11 MPCore: pgd_alloc is not preempt safe
 In-Reply-To: <1317955121-28047-1-git-send-email-gdavis@mvista.com>
 References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
 	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
-Message-ID: <1317955121-28047-3-git-send-email-gdavis@mvista.com>
+Message-ID: <1317955121-28047-2-git-send-email-gdavis@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: George G. Davis <gdavis@mvista.com>
+From: Konstantin Baidarov <kbaidarov@mvista.com>
 
 If preemption and subsequent task migration occurs during a call to
-pte_alloc_one{,_kernel} on ARM11 MPCore machines, global memory state
-can become inconsistent.  To prevent inconsistent memory state on
-these machines, disable preemption around initialization and flushing
-of new PTEs.
+pgd_alloc on ARM11 MPCore machines, global memory state can become
+inconsistent.  To prevent inconsistent memory state on these
+machines, disable preemption around initialization and flushing
+of new PGDs.
 
+Signed-off-by: Konstantin Baidarov <kbaidarov@mvista.com>
 Signed-off-by: George G. Davis <gdavis@mvista.com>
 ---
- arch/arm/include/asm/pgalloc.h |   19 ++++++++++++++++---
- 1 files changed, 16 insertions(+), 3 deletions(-)
+ arch/arm/mm/pgd.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgalloc.h b/arch/arm/include/asm/pgalloc.h
-index 22de005..2154ccab 100644
---- a/arch/arm/include/asm/pgalloc.h
-+++ b/arch/arm/include/asm/pgalloc.h
-@@ -17,6 +17,7 @@
- #include <asm/processor.h>
- #include <asm/cacheflush.h>
+diff --git a/arch/arm/mm/pgd.c b/arch/arm/mm/pgd.c
+index b2027c1..e608981 100644
+--- a/arch/arm/mm/pgd.c
++++ b/arch/arm/mm/pgd.c
+@@ -14,6 +14,7 @@
+ #include <asm/pgalloc.h>
+ #include <asm/page.h>
  #include <asm/tlbflush.h>
 +#include <asm/smp_plat.h>
  
- #define check_pgt_cache()		do { } while (0)
+ #include "mm.h"
  
-@@ -35,7 +36,7 @@
- extern pgd_t *pgd_alloc(struct mm_struct *mm);
- extern void pgd_free(struct mm_struct *mm, pgd_t *pgd);
+@@ -31,6 +32,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
+ 	if (!new_pgd)
+ 		goto no_pgd;
  
--#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT | __GFP_ZERO)
-+#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT)
++	if (cache_ops_need_broadcast())
++		preempt_disable();
++
+ 	memset(new_pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
  
- static inline void clean_pte_table(pte_t *pte)
- {
-@@ -64,8 +65,14 @@ pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
- 	pte_t *pte;
+ 	/*
+@@ -42,6 +46,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
  
- 	pte = (pte_t *)__get_free_page(PGALLOC_GFP);
--	if (pte)
-+	if (pte) {
-+		if (cache_ops_need_broadcast())
-+			preempt_disable();
-+		memset(pte, 0, PAGE_SIZE);
- 		clean_pte_table(pte);
-+		if (cache_ops_need_broadcast())
-+			preempt_enable();
-+	}
+ 	clean_dcache_area(new_pgd, PTRS_PER_PGD * sizeof(pgd_t));
  
- 	return pte;
- }
-@@ -81,8 +88,14 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
- 	pte = alloc_pages(PGALLOC_GFP, 0);
- #endif
- 	if (pte) {
-+		void *p = page_address(pte);
-+		if (cache_ops_need_broadcast())
-+			preempt_disable();
-+		memset(p, 0, PAGE_SIZE);
- 		if (!PageHighMem(pte))
--			clean_pte_table(page_address(pte));
-+			clean_pte_table(p);
-+		if (cache_ops_need_broadcast())
-+			preempt_enable();
- 		pgtable_page_ctor(pte);
- 	}
- 
++	if (cache_ops_need_broadcast())
++		preempt_enable();
++
+ 	if (!vectors_high()) {
+ 		/*
+ 		 * On ARM, first page must always be allocated since it
 -- 
 1.7.4.4
