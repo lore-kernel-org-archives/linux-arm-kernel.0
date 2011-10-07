@@ -1,72 +1,34 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 7 Oct 2011 14:19:01 +0800
-Subject: [PATCH 11/26] ARM: pxa: allow building palm27x without pxafb
-In-Reply-To: <1317499438-14058-12-git-send-email-arnd@arndb.de>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-12-git-send-email-arnd@arndb.de>
-Message-ID: <CAMPhdO_bKPxEEmBzSKvgYooG5YwweSYJVMdCxwYtQKJMyiWggg@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 7 Oct 2011 08:19:18 +0200
+Subject: [PATCH 0/1] A trio of IXP425 boards
+In-Reply-To: <m3obxv7fvy.fsf@intrepid.localdomain>
+References: <cover.1317215339.git.richard.cochran@omicron.at>
+	<m3obxv7fvy.fsf@intrepid.localdomain>
+Message-ID: <20111007061918.GA2229@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The frame buffer device is defined conditionally on whether the
-> driver is configured. However, the #ifdef guard around the
-> declaration of palm27x_lcd_init also removes the visibility
-> of the lcd mode declarations, which need to be available in
-> order to build correctly, even if they are not defined in the
-> end.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> ?arch/arm/mach-pxa/include/mach/palm27x.h | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h b/arch/arm/mach-pxa/include/mach/palm27x.h
-> index 0a5e5ea..030a916 100644
-> --- a/arch/arm/mach-pxa/include/mach/palm27x.h
-> +++ b/arch/arm/mach-pxa/include/mach/palm27x.h
-> @@ -27,10 +27,10 @@ extern void __init palm27x_pm_init(unsigned long str_base);
-> ?static inline void palm27x_pm_init(unsigned long str_base) {}
-> ?#endif
->
-> -#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-> ?extern struct pxafb_mode_info palm_320x480_lcd_mode;
-> ?extern struct pxafb_mode_info palm_320x320_lcd_mode;
-> ?extern struct pxafb_mode_info palm_320x320_new_lcd_mode;
-> +#if defined(CONFIG_FB_PXA) || defined(CONFIG_FB_PXA_MODULE)
-> ?extern void __init palm27x_lcd_init(int power,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct pxafb_mode_info *mode);
-> ?#else
-> --
-> 1.7.5.4
+On Wed, Oct 05, 2011 at 03:00:01PM +0200, Krzysztof Halasa wrote:
+> Richard Cochran <richardcochran@gmail.com> writes:
+> 
+> > This patch adds support for three boards using the ixp425. Since they
+> > are are almost identical to each other, they can share one setup file.
+> >
+> > The three machine types are slated for removal due to the fact that
+> > the board support has not been merged. My polite request is to merge
+> > this patch and restore the machine types.
+> 
+> This is a good idea, IMHO.
+> Acked-by: Krzysztof Ha?asa <khc@pm.waw.pl>
+> 
+> Unfortunately ATM I don't have access to kernel.org and being a bit
+> busy with unrelated things, I'd rather avoid "processing" this patch
+> personally if possible. Can you send it upstream yourself, please?
+> Let me know of any problem.
 
-Marek and I actually came up with a patch to fix this as below, this
-way to cover the declarations of those modes in the CONFIG_FB_PXA
-as well.
+Okay, then, Arnd? Russell?
 
-commit e227e88ae46e921f608b056e27e1d8704b7d12fa
-Author: Eric Miao <eric.y.miao@gmail.com>
-Date:   Sun Sep 11 16:56:58 2011 +0800
+Will one of you please take this patch?
 
-    ARM: pxa: fix building error by palm27x_lcd_init() when FB_PXA not defined
-
-    Cc: Marek Vasut <marek.vasut@gmail.com>
-    Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
-
-diff --git a/arch/arm/mach-pxa/include/mach/palm27x.h
-b/arch/arm/mach-pxa/include/mach/palm27x.h
-index 0a5e5ea..f80bbe2 100644
---- a/arch/arm/mach-pxa/include/mach/palm27x.h
-+++ b/arch/arm/mach-pxa/include/mach/palm27x.h
-@@ -34,7 +34,7 @@ extern struct pxafb_mode_info palm_320x320_new_lcd_mode;
- extern void __init palm27x_lcd_init(int power,
- 					struct pxafb_mode_info *mode);
- #else
--static inline void palm27x_lcd_init(int power, struct pxafb_mode_info *mode) {}
-+#define palm27x_lcd_init(power, mode)	do {} while (0)
- #endif
-
- #if	defined(CONFIG_USB_GADGET_PXA27X) || \
-
->
->
+Thanks,
+Richard
