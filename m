@@ -1,30 +1,41 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 07 Oct 2011 19:26:55 -0400 (EDT)
-Subject: [PATCH 5/4] ARM: OMAP: Move set_globals initialization to happen
-	in init_early
-In-Reply-To: <20111007145403.GG6324@atomide.com>
-References: <20111005004339.26980.31149.stgit@kaulin.local>
-	<20111005014044.GZ6324@atomide.com>
-	<alpine.LFD.2.02.1110042150190.9106@xanadu.home>
-	<20111006013656.GG6324@atomide.com> <4E8EA2A4.5070301@ti.com>
-	<20111007145403.GG6324@atomide.com>
-Message-ID: <alpine.LFD.2.02.1110071926000.6390@xanadu.home>
+From: Valdis.Kletnieks@vt.edu (Valdis.Kletnieks at vt.edu)
+Date: Fri, 07 Oct 2011 19:28:33 -0400
+Subject: [PATCH 1/5] drivercore: add new error value for deferred probe
+In-Reply-To: Your message of "Fri, 07 Oct 2011 16:12:45 MDT."
+	<CACxGe6uOmrLwJSPw4JHuOmt5B2wsukdDgVUr01pryq5Z9BFadw@mail.gmail.com>
+References: <1317963790-29426-1-git-send-email-manjugk@ti.com>
+	<1317963790-29426-2-git-send-email-manjugk@ti.com>
+	<20111007064349.GD27508@kroah.com>
+	<CACxGe6uOmrLwJSPw4JHuOmt5B2wsukdDgVUr01pryq5Z9BFadw@mail.gmail.com>
+Message-ID: <32004.1318030113@turing-police.cc.vt.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Oct 2011, Tony Lindgren wrote:
+On Fri, 07 Oct 2011 16:12:45 MDT, Grant Likely said:
+> On Fri, Oct 7, 2011 at 12:43 AM, Greg KH <greg@kroah.com> wrote:
+> > On Fri, Oct 07, 2011 at 10:33:06AM +0500, G, Manjunath Kondaiah wrote:
 
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [111006 23:22]:
-> > The changes looks fine to me. Though the ugly hard-coding
-> > is back with it, it's a step towards generic_io, so hopefully
-> > it won't have to stay for long time.
-> 
-> Nico please correct me if I'm wrong, but I think that with
-> generic map_io we have static mappings in place after map_io,
-> and then ioremap should work for the static mappings right
-> after map_io except without the need for __arch_ioremap.
+> >> +#define EPROBE_DEFER 517 ? ? /* restart probe again after some time */
+> >
+> > Can we really do this?
 
-Yes, that _should_ work.
+> According to Arnd, yes this is okay.
 
+> > ?Isn't this some user/kernel api here?
 
-Nicolas
+> > What's wrong with just "overloading" on top of an existing error code?
+> > Surely one of the other 516 types could be used here, right?
+
+> overloading makes it really hard to find the users at a later date.
+
+Would proposing '#define EPROBE_DEFER EAGAIN' be acceptable to everybody? That
+would allow overloading EAGAIN, but still make it easy to tell the usages apart
+if we need to separate them later...
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 227 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111007/ed64fb47/attachment.sig>
