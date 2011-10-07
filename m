@@ -1,29 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 6 Oct 2011 19:42:46 -0600 (MDT)
-Subject: [PATCH v2 6/6] OMAP4: Clock: Correct the name of SLIMBUS interface
-	clocks
-In-Reply-To: <1316195330-15099-1-git-send-email-jon-hunter@ti.com>
-References: <1316195330-15099-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <alpine.DEB.2.00.1110061941100.4611@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu,  6 Oct 2011 19:23:19 -0700
+Subject: [PATCH] ARM: tegra: fix compilation error due to mach/hardware.h
+	removal
+Message-ID: <1317954199-25284-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Beno?t
+From: Marc Dietrich <marvin24@gmx.de>
 
-On Fri, 16 Sep 2011, Jon Hunter wrote:
+This fixes a compilation error in cpu-tegra.c which was introduced
+in commit dc8d966bccde0b8b6c9e8c6e663c747030c17435 which removed
+the now obsolete mach/hardware.h from the mach-tegra subtree.
 
-> From: Jon Hunter <jon-hunter@ti.com>
-> 
-> Currently the interface clocks for the two SLIMBUS peripherals are
-> named slimbus1_fck and slimbus2_fck. Rename these clocks to be
-> slimbus1_ick and slimbus2_ick so it is clear that these are
-> interface clocks and not functional clocks.
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+Signed-off-by: Olof Johansson <olof@lixom.net>
 
-This one, I don't quite understand.  We should probably be removing these 
-MODULEMODE-only clocks from the OMAP4 tree, and using their parent clock 
-as the main_clk.  That would be a good cleanup for 3.3...
+---
+Linus, last minute build fix. Not sure of Arnd is planning another merge
+before release so sending directly.
 
+ arch/arm/mach-tegra/cpu-tegra.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-- Paul
+diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
+index 0e1016a..0e0fd4d 100644
+--- a/arch/arm/mach-tegra/cpu-tegra.c
++++ b/arch/arm/mach-tegra/cpu-tegra.c
+@@ -32,7 +32,6 @@
+ 
+ #include <asm/system.h>
+ 
+-#include <mach/hardware.h>
+ #include <mach/clk.h>
+ 
+ /* Frequency table index must be sequential starting at 0 */
+-- 
+1.7.4.1
