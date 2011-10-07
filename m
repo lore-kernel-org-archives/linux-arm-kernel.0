@@ -1,35 +1,45 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 07 Oct 2011 10:03:23 +0530
-Subject: [PATCH 04/16] dmaengine: pl08x: Enable module alias
-	autogeneration for AMBA drivers
-In-Reply-To: <1317830707-17517-5-git-send-email-dave.martin@linaro.org>
-References: <1317830707-17517-1-git-send-email-dave.martin@linaro.org>
-	<1317830707-17517-5-git-send-email-dave.martin@linaro.org>
-Message-ID: <1317962003.1573.2224.camel@vkoul-udesk3>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 7 Oct 2011 13:08:23 +0800
+Subject: [PATCH 06/26] ARM: pxa: add missing header inclusions
+In-Reply-To: <1317499438-14058-7-git-send-email-arnd@arndb.de>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<1317499438-14058-7-git-send-email-arnd@arndb.de>
+Message-ID: <CAMPhdO8FGTw7NzNNjK819zF3GjrRX0ybPyaSFR4U7oG8cGmDtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-10-05 at 17:04 +0100, Dave Martin wrote:
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> These resulted in build breakage in some configurations:
+>
+> arch/arm/mach-pxa/irq.c:132:39: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'icip_handle_irq'
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  drivers/dma/amba-pl08x.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-> index b7cbd1a..0698695 100644
-> --- a/drivers/dma/amba-pl08x.c
-> +++ b/drivers/dma/amba-pl08x.c
-> @@ -2054,6 +2054,8 @@ static struct amba_id pl08x_ids[] = {
->  	{ 0, 0 },
->  };
->  
-> +MODULE_DEVICE_TABLE(amba, pl08x_ids);
-> +
->  static struct amba_driver pl08x_amba_driver = {
->  	.drv.name	= DRIVER_NAME,
->  	.id_table	= pl08x_ids,
+> ?arch/arm/mach-pxa/irq.c | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> index b09e848..848e96d 100644
+> --- a/arch/arm/mach-pxa/irq.c
+> +++ b/arch/arm/mach-pxa/irq.c
+> @@ -16,6 +16,7 @@
+> ?#include <linux/module.h>
+> ?#include <linux/interrupt.h>
+> ?#include <linux/syscore_ops.h>
+> +#include <linux/ftrace.h>
 
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+It's actually __irq_entry being defined in <linux/ftrace.h> and in turn
+__exception_irq_entry being conditionally defined to that.
 
--- 
-~Vinod
+I think it's better to fix this in <asm/system.h> instead of in the
+cases where this macro is referenced?
+
+Russell?
+
+> ?#include <linux/io.h>
+> ?#include <linux/irq.h>
+>
+> --
+> 1.7.5.4
+>
+>
