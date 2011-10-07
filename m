@@ -1,24 +1,30 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 7 Oct 2011 11:00:55 -0700
-Subject: [PATCH v7 0/3] Add support for tegra2 based ventana board
-In-Reply-To: <1317647918-22694-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1317647918-22694-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173B23B2F1@HQMAIL01.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Oct 2011 20:01:03 +0200
+Subject: [GIT PULL] Samsung board-2 for v3.2
+In-Reply-To: <019b01cc8298$846170c0$8d245240$%kim@samsung.com>
+References: <019b01cc8298$846170c0$8d245240$%kim@samsung.com>
+Message-ID: <201110072001.03602.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter De Schrijver wrote at Monday, October 03, 2011 7:19 AM:
-> This patch set adds support for the tegra2 based ventana development board.
+On Tuesday 04 October 2011, Kukjin Kim wrote:
+> This is a second Samsung board stuff for v3.2 and includes new board,
+> SMDK4412.
 > 
-> Boot tested on ventana.
+> Please pull from:
+>   git://github.com/kgene/linux-samsung.git next-samsung-board-2
+> 
+> As a note, since supporting SMDK4412 needs previous next-samsung-board
+> branch so this is based on next-samsung-board which has been already merged
+> into arm-soc and this includes converting boot_params to atag_offset for
+> adding/changing boards in this time.
+> 
+> If any problems, please let me know.
+> 
+> One more as a note, the next-samsung-devel and next-samsung-devel-2 will be
+> sent to you soon after testing ;)
+>
 
-With minor changes to the command-line in tegra-ventana.dts, to put the
-root fs on an SD card, and using mainline U-Boot with the Ventana patch
-series I wrote,
+Pulled, thanks!
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
-
-I have a couple of queries in patch 3 that I'll post separately.
-
--- 
-nvpublic
+	Arnd
