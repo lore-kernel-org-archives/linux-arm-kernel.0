@@ -1,25 +1,33 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Fri, 7 Oct 2011 13:07:00 +0530
-Subject: [PATCH 0/5] Driver Probe Deferral Mechanism
-In-Reply-To: <20111007065042.GF27508@kroah.com>
-References: <1317963790-29426-1-git-send-email-manjugk@ti.com>
-	<20111007065042.GF27508@kroah.com>
-Message-ID: <20111007073700.GA30978@manju-desktop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Oct 2011 08:47:07 +0100
+Subject: [RFC/PATCH 2/7] ARM: ARM11 MPCore: pte_alloc_one{,_kernel} are
+	not preempt safe
+In-Reply-To: <1317955121-28047-3-git-send-email-gdavis@mvista.com>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-3-git-send-email-gdavis@mvista.com>
+Message-ID: <20111007074707.GD21464@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Thu, Oct 06, 2011 at 10:38:36PM -0400, gdavis at mvista.com wrote:
+> -#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT | __GFP_ZERO)
+> +#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT)
+> @@ -81,8 +88,14 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+>  	pte = alloc_pages(PGALLOC_GFP, 0);
+>  #endif
+>  	if (pte) {
+> +		void *p = page_address(pte);
+> +		if (cache_ops_need_broadcast())
+> +			preempt_disable();
+> +		memset(p, 0, PAGE_SIZE);
+>  		if (!PageHighMem(pte))
+> -			clean_pte_table(page_address(pte));
+> +			clean_pte_table(p);
+> +		if (cache_ops_need_broadcast())
+> +			preempt_enable();
 
-On Thu, Oct 06, 2011 at 11:50:42PM -0700, Greg KH wrote:
-> On Fri, Oct 07, 2011 at 10:33:05AM +0500, G, Manjunath Kondaiah wrote:
-> 
-> Why did you send this series of patches out twice?  Were they different?
-> 
-> confused,
-
-Looks like this patch series has reached only individual recepients and 
-not the mailing lists hence it was posted once again.
-
-Sorry for the spam.
-
--Manjunath
+This won't work - page_address(pte) will be NULL for highmem pages, and
+so will cause an oops, and removing the __GFP_ZERO will mean that highmem
+pages will not be zeroed, meaning that such page tables will not have been
+initialized.
