@@ -1,47 +1,31 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Fri, 7 Oct 2011 11:31:52 -0400
-Subject: [RFC/PATCH 2/7] ARM: ARM11 MPCore: pte_alloc_one{,
-	_kernel} are not preempt safe
-In-Reply-To: <20111007074707.GD21464@n2100.arm.linux.org.uk>
-References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-3-git-send-email-gdavis@mvista.com>
-	<20111007074707.GD21464@n2100.arm.linux.org.uk>
-Message-ID: <EC59DFB6-B2AB-4A52-9019-CC8CFCFB360F@mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Oct 2011 17:37:18 +0200
+Subject: [GIT PULL] ux500-timers
+In-Reply-To: <CACRpkdbY7CL8h-qbZoKdgSiPrfHJ25BM61rwnuA3iJSdy5VC5g@mail.gmail.com>
+References: <CACRpkdbCZwSdXzqvPCrGagaikc53xLyDTQaZMRtuyqo9vw=Yng@mail.gmail.com>
+	<CACRpkdZDUeP6pJt7W2ntGGdUgeGGwEG9we-Jmc9bvP40Oy+JQg@mail.gmail.com>
+	<CACRpkdbY7CL8h-qbZoKdgSiPrfHJ25BM61rwnuA3iJSdy5VC5g@mail.gmail.com>
+Message-ID: <201110071737.19040.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Oct 7, 2011, at 3:47 AM, Russell King - ARM Linux wrote:
-
-> On Thu, Oct 06, 2011 at 10:38:36PM -0400, gdavis at mvista.com wrote:
->> -#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT | __GFP_ZERO)
->> +#define PGALLOC_GFP	(GFP_KERNEL | __GFP_NOTRACK | __GFP_REPEAT)
->> @@ -81,8 +88,14 @@ pte_alloc_one(struct mm_struct *mm, unsigned long addr)
->> 	pte = alloc_pages(PGALLOC_GFP, 0);
->> #endif
->> 	if (pte) {
->> +		void *p = page_address(pte);
->> +		if (cache_ops_need_broadcast())
->> +			preempt_disable();
->> +		memset(p, 0, PAGE_SIZE);
->> 		if (!PageHighMem(pte))
->> -			clean_pte_table(page_address(pte));
->> +			clean_pte_table(p);
->> +		if (cache_ops_need_broadcast())
->> +			preempt_enable();
+On Friday 07 October 2011, Linus Walleij wrote:
+> On Mon, Oct 3, 2011 at 9:41 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 > 
-> This won't work - page_address(pte) will be NULL for highmem pages, and
-> so will cause an oops, and removing the __GFP_ZERO will mean that highmem
-> pages will not be zeroed, meaning that such page tables will not have been
-> initialized.
+> > Hi Arnd,
+> >
+> > could you please pull the updated ux500 timer branch into the arm-soc
+> > tree?
+> >
+> > The following changes since commit d93dc5c4478c1fd5de85a3e8aece9aad7bbae044:
+> >
+> >  Linux 3.1-rc7 (2011-09-21 16:58:15 -0700)
+> >
+> > are available in the git repository at:
+> >   git://git.linaro.org/people/triad/linux-stericsson.git ux500-nomadik-timers
+> 
+> Ping on this, note fixup patch at the end of the series, as requested.
 
-Yep, I had a feeling that it was not going to work correctly for the HIGHMEM case.
-Alas, I'm not using HIGHMEM so I did not see the issue in my testing.  I'll respin it to fix
-HIGHMEM breakage.
+Pulled now, sorry for the delay.
 
-Thanks!
-
---
-Regards,
-George
+	Arnd
