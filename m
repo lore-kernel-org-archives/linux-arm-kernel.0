@@ -1,54 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 07 Oct 2011 20:24:01 +0900
-Subject: [PATCH] arm: exynos4: build is failing due to missing SZ_4K
-	definition
-In-Reply-To: <1317938595-7007-1-git-send-email-angus.ainslie@linaro.org>
-References: <1317938595-7007-1-git-send-email-angus.ainslie@linaro.org>
-Message-ID: <01f801cc84e3$9d5640e0$d802c2a0$%kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 7 Oct 2011 12:25:16 +0100
+Subject: [PATCH 1/3 v3] ARM Realview PCIX map include file changes
+In-Reply-To: <F01D8B85CFF58440B2A13965FBA90CA47375AC17BD@GEORGE.Emea.Arm.com>
+References: <20110822130507.23830.26191.stgit@e102602-lin.cambridge.arm.com>
+	<20110822130942.23830.4767.stgit@e102602-lin.cambridge.arm.com>
+	<201109051635.59927.arnd@arndb.de>
+	<F01D8B85CFF58440B2A13965FBA90CA47375AC1794@GEORGE.Emea.Arm.com>
+	<20111006142350.GD26349@n2100.arm.linux.org.uk>
+	<F01D8B85CFF58440B2A13965FBA90CA47375AC17BD@GEORGE.Emea.Arm.com>
+Message-ID: <CAHkRjk5MQUWiF3jmZJ_SBHdtmunoajR4eHftwdnFCKjeDxQDKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Angus Ainslie wrote:
-> 
-> linux-next build is failing using the exynos4_defconfig. <asm/sizes.h>
-needs to be
-> for the SZ_4K definition
-> 
-> Signed-off-by: Angus Ainslie <angus.ainslie@linaro.org>
-> ---
->  arch/arm/mach-exynos4/include/mach/map.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-
-> exynos4/include/mach/map.h
-> index 918a979..02d68f1 100644
-> --- a/arch/arm/mach-exynos4/include/mach/map.h
-> +++ b/arch/arm/mach-exynos4/include/mach/map.h
-> @@ -13,6 +13,7 @@
->  #ifndef __ASM_ARCH_MAP_H
->  #define __ASM_ARCH_MAP_H __FILE__
-> 
-> +#include <asm/sizes.h>
->  #include <plat/map-base.h>
-> 
->  /*
-> --
-> 1.7.4.1
+On 6 October 2011 15:50, Colin Tuckley <Colin.Tuckley@arm.com> wrote:
+>> -----Original Message-----
+>> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+>> Subject: Re: [PATCH 1/3 v3] ARM Realview PCIX map include file changes
+>
+>> All the points in this email all go together.
+>
+> Ah, that wasn't clear from the original email - I was making the changes incrementally and testing as I went.
+>
+>> This is how it works:
+>>
+>> 1. The PCI IO window is _supposed_ to be 64K in size.
+>
+> Yes, that bit was obvious after a bit of thought. I suspect the original value was just a cut 'n paste error.
+>
+>> 2. "pcibios_min_io" sets the minimum offset into the PCI IO window
+>> which
+>> ? ?PCI IO BARs should be assigned. ?It is assumed that a PCI IO BAR
+>> value
+>> ? ?of 0 corresponds with the virtual base address of this window.
+>> 3. inb() et.al. take the PCI IO offset and _not_ the physical address
+>> nor the virtual address of the desired access.
+>
+> That seems sensible.
+>
+> However, after changing both __io() and pcibios_min_io as Arnd suggested the boot still hangs after " Uncompressing Linux... done, booting the kernel."
 
-Hi Angus,
+I haven't followed the patch series in detail but the __io() is also
+used by __io_address() in the RealView code and the former is just
+expected to do some type casting. By doing some arithmetic on the
+pointer, the static mappings for various peripherals (GIC etc.) are
+wrong.
 
-I'm not sure why to add <asm/sizes.h> in mach/map.h is required now because
-there was no adding SZ_ here between v3.1-rc1 and current HEAD in my -next.
-Maybe if it is required, here is not proper place?......
+So if you convert __io() as per Arnd's suggestion, make sure that
+__io_address() is redefined, something like below:
 
-Since I can't fetch linux-next from
-git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git, I need
-some time. Let me check again with latest linux-next soon.
+#define __io_address(n)		__typesafe_io(IO_ADDRESS(n))
 
-Thanks.
+Alternatively we could leave __io() as in the original kernel and
+define RealView specific in*/out* macros.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Catalin
