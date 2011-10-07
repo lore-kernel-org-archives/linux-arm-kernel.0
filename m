@@ -1,55 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Oct 2011 12:16:50 +0200
-Subject: [PATCH 13/26] ARM: pxa: use correct __iomem annotations
-In-Reply-To: <CAMPhdO_CGvoc8GZQS3TWpv0gqOXhmHyEbamcQr28K5iLgOBnuw@mail.gmail.com>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-14-git-send-email-arnd@arndb.de>
-	<CAMPhdO_CGvoc8GZQS3TWpv0gqOXhmHyEbamcQr28K5iLgOBnuw@mail.gmail.com>
-Message-ID: <201110071216.50783.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Oct 2011 11:27:54 +0100
+Subject: [PATCH v3 1/2] ARM: EXYNOS4: Change System MMU device definition
+In-Reply-To: <01e001cc84d7$5e0b84b0$1a228e10$%kim@samsung.com>
+References: <01e001cc84d7$5e0b84b0$1a228e10$%kim@samsung.com>
+Message-ID: <20111007102754.GF21464@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 October 2011, Eric Miao wrote:
-> > @@ -18,11 +24,11 @@
-> >  * peripherals on APB, let's count it into the ABP mapping area.
-> >  */
-> >  #define APB_PHYS_BASE          0xd4000000
-> > -#define APB_VIRT_BASE          0xfe000000
-> > +#define APB_VIRT_BASE          IOMEM(0xfe000000)
-> 
-> To be honest, I'd really like to keep the *_VIRT_BASE definitions to be
-> type independent.
-> 
-> And have the actual register definitions to be casted to void __iomem *
-> when being defined, e.g.
-> 
-> #define APBC_REG(x)     IOMEM(APBC_VIRT_BASE + (x))
-> 
-> #define APBC_UART1      APBC_REG(0x000)
-> 
-> Arnd, do we have some standard guidelines on this for all SoCs
-> to follow? As I know, it's currently still being a mess.
+On Fri, Oct 07, 2011 at 06:56:21PM +0900, Kukjin Kim wrote:
+> +#define SYSMMU_RESOURCE(ipname, base, irq) \
+> +static struct resource sysmmu_resource_##ipname[] =\
+> +{\
+> +	{\
+> +		.start	= EXYNOS4_PA_SYSMMU_##base,\
+> +		.end	= EXYNOS4_PA_SYSMMU_##base + SZ_4K - 1,\
+> +		.flags	= IORESOURCE_MEM,\
+> +	}, {\
+> +		.start	= IRQ_SYSMMU_##irq##_0,\
+> +		.end	= IRQ_SYSMMU_##irq##_0,\
+> +		.flags	= IORESOURCE_IRQ,\
+> +	},\
+>  }
 
-We don't have any formal guidelines yet, but I'd really love to get
-rid of all the arbitrary type casts to make use of the built-in
-type checking of the compiler and sparse. A virtual base address
-for registers is conventionally an __iomem pointer, so defining it
-as something else is completely bogus. I have started making patches
-for a number of platforms for this.
-
-Ideally we should have very little code directly using, but the fact
-is that they are there and we won't remove them all anytime soon, so
-we should at least use the correct types here.
-
-Another issue that goes together with this is that right now our
-readl/writel macros accept any input type (pointer, __iomem pointer,
-unsigned long, unsigned int), and I have a patch to make that stricter
-but that requires fixing up all the places where we do a
-readl(APBC_VIRT_BASE + x) that Russell mentioned.
-
-The only place where this requires adding extra type casts right now is
-the iotable setup, which I hope we can also fix eventually by splitting
-the static I/O mapping setup from other static mappings (MT_MEMORY,
-MT_MEMORY_NONCACHED, ...).
-
-	Arnd
+#define SYSMMU_RESOURCE(ipname, base, irq) \
+static struct resource sysmmu_resource_##ipname[] = \
+{ \
+	DEFINE_RES_MEM(EXYNOS4_PA_SYSMMU_##base, SZ_4K), \
+	DEFINE_RES_IRQ(IRQ_SYSMMU_##irq##_0), \
+}
