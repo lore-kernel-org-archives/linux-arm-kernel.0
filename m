@@ -1,55 +1,44 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 07 Oct 2011 16:15:54 -0400 (EDT)
-Subject: [PATCH 0/2] OMAP: Update nr_irqs field in machine descriptors
-In-Reply-To: <20111006195016.GM6324@atomide.com>
-References: <1314215215-18683-1-git-send-email-svenkatr@ti.com>
-	<4E5636CD.4080302@ti.com>
-	<CANfBPZ-AAZx9TxO88EgxCtOUsWrsYzbK+M2d6cVSS7Kf-LwS3w@mail.gmail.com>
-	<20111006195016.GM6324@atomide.com>
-Message-ID: <alpine.LFD.2.02.1110071612380.6390@xanadu.home>
+From: greg@kroah.com (Greg KH)
+Date: Fri, 7 Oct 2011 14:23:26 -0700
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <20111007205715.GC5275@leaf>
+References: <1317963790-29426-1-git-send-email-manjugk@ti.com>
+	<1317963790-29426-3-git-send-email-manjugk@ti.com>
+	<20111007064928.GE27508@kroah.com> <20111007205715.GC5275@leaf>
+Message-ID: <20111007212326.GA29003@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Oct 2011, Tony Lindgren wrote:
-
-> * S, Venkatraman <svenkatr@ti.com> [110825 07:23]:
-> > On Thu, Aug 25, 2011 at 5:19 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> > > Hi Venkat,
-> > >
-> > > On 8/24/2011 9:46 PM, S, Venkatraman wrote:
-> > >>
-> > >> As part of an effort to get single ARM kernel binary [1],
-> > >> multiple ?definitions of NR_IRQS under various platforms
-> > >> have to be reconciled and abstracted away from common code.
-> > >>
-> > >> This patch series takes the small step of populating the
-> > >> machine descriptors with the pre-existing nr_irqs field.
-> > >> Eventually, the common irq handler code will only look at this
-> > >> field and not the compile time constant.
-> > >
-> > > Not related to this patch, but still on that topic. The current NR_IRQS
-> > > depends as well on board stuff, like for example : the Phoenix
-> > > IRQs:TWL6030_IRQ_BASE, TWL6040_CODEC_IRQ_BASE.
-> > > Is there a plan to get rid of this static defines?
-> > >
+On Fri, Oct 07, 2011 at 01:57:15PM -0700, Josh Triplett wrote:
+> On Thu, Oct 06, 2011 at 11:49:28PM -0700, Greg KH wrote:
+> > On Fri, Oct 07, 2011 at 10:33:07AM +0500, G, Manjunath Kondaiah wrote:
+> > > +config PROBE_DEFER
+> > > +	bool "Deferred Driver Probe"
+> > > +	default y
+> > > +	help
+> > > +	  This option provides deferring driver probe if it has dependency on
+> > > +	  other driver. Without this feature, initcall ordering should be done
+> > > +	  manually to resolve driver dependencies. This feature completely side
+> > > +	  steps the issues by allowing driver registration to occur in any
+> > > +	  order, and any driver can request to be retried after a few more other
+> > > +	  drivers get probed.
 > > 
-> > Currently, the goal is to get rid of the singleton nature
-> > of NR_IRQS. Then it just becomes a property of the
-> > platform, and the arm common code should not see this define.
-> > This cleanup has to be done across multiple SoCs, not just OMAP.
+> > Why is this even an option?  Why would you ever want it disabled?  Why
+> > does it need to be selected?
 > > 
-> > After I get to complete some meaningful cleanup of NR_IRQS,
-> > I can look into the static defines that you mention.
+> > If you are going to default something to 'y' then just make it so it
+> > can't be turned off any other way by just not making it an option at
+> > all.
 > 
-> I suggest we wait on this patch as the NR_IRQS should be the
-> board specific true number of interrupts including chained
-> interrupts from external devices like twl. So just setting
-> it to NR_IRQS does not help much. Also, the board-*.c files
-> will be going aways with device tree at some point.
+> Given that the drivers which use this mechanism will not necessarily get
+> built into the kernel, I'd suggest that it should remain optional and
+> default to n.  Those drivers can then add a dependency on PROBE_DEFER.
+> Let's try to avoid adding more infrastructure to the kernel that takes
+> up space even when unused; certainly embedded will appreciate not having
+> this feature unless a driver needs it.
 
-This is prerequisite to some other cleanup orthogonal to DT being worked 
-in parallel.  I would prefer if DT wasn't a serialization point for 
-this.
+How much extra space is this "feature" really?  I don't see it being
+anything larger than the amount of memory increase that just happened as
+I typed this email as part of the ongoing memory density changes.
 
-
-Nicolas
+greg k-h
