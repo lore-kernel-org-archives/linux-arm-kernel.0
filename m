@@ -1,38 +1,59 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sat, 8 Oct 2011 13:36:21 -0400 (EDT)
-Subject: [PATCH 18/26] ARM: pxa: MTD_XIP is not actually working any more
-In-Reply-To: <CAMPhdO88OdwjfERo=Ri_-_xR75S53d-HKW1Ah0WGnu_0P1gRXQ@mail.gmail.com>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-19-git-send-email-arnd@arndb.de>
-	<CAMPhdO88OdwjfERo=Ri_-_xR75S53d-HKW1Ah0WGnu_0P1gRXQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1110081126150.6390@xanadu.home>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Sat, 8 Oct 2011 20:15:16 +0200
+Subject: Serieal console on Samsung S3C6410 ARM11 CPU (Was [ANNOUNCE]
+	3.0.6-rt17)
+In-Reply-To: <CAJuYYwSEvA+EHwyhgeZkBX+bB_e1cmFnC6YdEx-CdHzk8peyEw@mail.gmail.com>
+References: <alpine.LFD.2.02.1110070046270.3240@ionos>
+	<201110081326.58731.jbe@pengutronix.de>
+	<CAJuYYwSEvA+EHwyhgeZkBX+bB_e1cmFnC6YdEx-CdHzk8peyEw@mail.gmail.com>
+Message-ID: <201110082015.17128.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 8 Oct 2011, Eric Miao wrote:
+Hi Thomas,
 
-> On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The headers files required for XIP support have moved around
-> > over the last few years, and the code no longer builds.
-> > Until someone fixes this, let's just disable support, leaving
-> > sa1100 as the only platform still supporting xip.
+Thomas Abraham wrote:
+> On 8 October 2011 16:56, Juergen Beisert <jbe@pengutronix.de> wrote:
+> > Thomas Gleixner wrote:
+> >> I'm pleased to announce the 3.0.6-rt17 release.
 > >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> It is actually fixable, the problem is really mtd-xip.h is referencing
-> the interrupt registers directly which I moved them to mach-pxa/irq.c
-> for better modularization.
-> 
-> I'm fine to drop XIP. I'm afraid Nico's gonna be a bit disappointed
-> as I broke his favorite XIP code :-)
+> > I have no idea where to search, but when I'm using the 3.0.6-rt17 on my
+> > Samsung S3C6410 ARM based system, the UART (serial console) does not work
+> > as expected. Typing only one char at a time is okay. Typing two chars
+> > immediately makes the system using 100 % CPU load and takes about 2
+> > seconds to respond. It seems the interrupt handling is broken in the UART
+> > driver, but I don't know how to fix it.
+> >
+> > This with a simple cursor up (one char to get the last command) and a
+> > small pause to the next "ENTER" char:
+> >
+> > root at mini6410:~ cat /proc/interrupts | grep 18:
+> > ?18: ? ?5739107 ?s3c-uart ?s3c6400-uart
+> >
+> > Same again:
+> >
+> > root at mini6410:~ cat /proc/interrupts | grep 18:
+> > ?18: ? ?5739113 ?s3c-uart ?s3c6400-uart
+> >
+> > 6 interrupts seems reasonable.
+> >
+> > Now with cursor up and SPACE immediately, then a pause for ENTER:
+> >
+> > root at mini6410:~ cat /proc/interrupts | grep 18:
+> > ?18: ? ?5923815 ?s3c-uart ?s3c6400-uart
+> >
+> > 184702 interrupts looks strange.
+>
+> Just curious, do you have the following two commits?
+>
+> serial: samsung: Add unified interrupt handler for s3c64xx and later SoC's
+> ARM: SAMSUNG: Remove uart irq handling from platform code
 
-Well, I don't care much myself.  I have no use for that capability, even 
-though this was interesting to implement.  So it only depends if someone 
-relies on this or not.
+Are they part of the current 3.0.6 vanilla kernel? I'm only using the vanilla 
+3.0.6 with rt17 on my target.
 
-A few months ago I asked on the list if XIP was still useful, and Tim 
-Bird replied that Sony was indeed using it.  So if this is not too hard 
-to keep this feature alive then I'd go with that option.
+jbe
 
-
-Nicolas
+-- 
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
