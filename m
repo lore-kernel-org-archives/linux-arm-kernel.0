@@ -1,41 +1,99 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sat, 8 Oct 2011 10:06:10 +0800
-Subject: [PATCH] mx5: modify pm and idle
-In-Reply-To: <4E8FA8B3.80206@gmail.com>
-References: <1317364642-22956-1-git-send-email-jason77.wang@gmail.com>
-	<20111004074316.GK31404@pengutronix.de> <4E8FA8B3.80206@gmail.com>
-Message-ID: <20111008020609.GA23549@S2100-06.ap.freescale.net>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 8 Oct 2011 10:57:11 +0800
+Subject: [PATCH 17/26] ARM: pxa: pxa95x is incompatible with earlier pxa
+In-Reply-To: <1317499438-14058-18-git-send-email-arnd@arndb.de>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<1317499438-14058-18-git-send-email-arnd@arndb.de>
+Message-ID: <CAN1soZw-eB5WxY5YWjfd=_q5w8wSu09mRTcmOEN_SDq9Zuz7eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 08, 2011 at 09:34:43AM +0800, Hui Wang wrote:
-> Sascha Hauer wrote:
-> >On Fri, Sep 30, 2011 at 02:37:22PM +0800, Hui Wang wrote:
-> >>Two problems exist in the current i.MX5 pm suspend/resume and idle
-> >>functions. The first is the current i.MX5 suspend routine will call
-> >>tzic_enable_wake(1) to set wake source, this will set all enabled
-> >>irq as wake source rather than those wake capable. The second
-> >>is i.MX5 idle will call mx5_cpu_lp_set() to prepare enter low power
-> >>mode, but it forgets to call wfi instruction to enter this mode.
-> >>
-> >>To fix these two problems, using generic irq chip pm interface and
-> >>adding a new function mx5_arch_idle().
-> >>
-> >>Signed-off-by: Hui Wang <jason77.wang@gmail.com>
-> >
-> >As shawn already pointed out this conflicts with the imx-cleanup
-> >branch. Can you rework this onto it? Shawn has reworked the SoC
-> >specific idle stuff, so this is different now.
-> >
-> >Also, please find a better subject for this patch. 'modify pm and idle'
-> >is not enough.
-> >
-> >Sascha
-> >
-> Got it, OK.
+On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> We cannot support ARMv5 and ARMv7 based boards in a single kernel,
+> so introduce a new option in mach-pxa to select between the two.
+>
+> The PJ4 (ARMv7) based boards are now only visible when
+> CONFIG_ARCH_PXA_V7 is set, the other boards are only visible
+> when it's not set.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> ?arch/arm/mach-pxa/Kconfig | ? 31 ++++++++++++++++++++++---------
+> ?1 files changed, 22 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+> index cd19309..bb310d0 100644
+> --- a/arch/arm/mach-pxa/Kconfig
+> +++ b/arch/arm/mach-pxa/Kconfig
+> @@ -2,6 +2,27 @@ if ARCH_PXA
+>
+> ?menu "Intel PXA2xx/PXA3xx Implementations"
+>
+> +config ARCH_PXA_V7
+> + ? ? ? bool "ARMv7 (PXA95x) based systems"
+> +
+> +if ARCH_PXA_V7
+> +comment "Marvell Dev Platforms (sorted by hardware release time)"
+> +config MACH_TAVOREVB3
+> + ? ? ? bool "PXA95x Development Platform (aka TavorEVB III)"
+> + ? ? ? select CPU_PXA955
+> +
+> +config MACH_SAARB
+> + ? ? ? bool "PXA955 Handheld Platform (aka SAARB)"
+> + ? ? ? select CPU_PXA955
+> +endif
+> +
+> +config PXA_V7_MACH_AUTO
+> + ? ? ? def_bool y
+> + ? ? ? depends on ARCH_PXA_V7
+> + ? ? ? depends on !MACH_SAARB
+> + ? ? ? select MACH_TAVOREVB3
+> +
+Could we avoid to use PXA_V7_MACH_AUTO? I think the better way is
+defining a new ARCH (ARCH_PXA95X or something else), and sharing the
+code in arch/arm/mach-pxa. I think that it's easy to implement.
 
-Please also add 'ARM: ' prefix to the subject for consistency.
+How about you, Russell & Eric?
 
--- 
-Regards,
-Shawn
+> +if !ARCH_PXA_V7
+> ?comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
+>
+> ?config ARCH_LUBBOCK
+> @@ -41,19 +62,11 @@ config MACH_TAVOREVB
+> ? ? ? ?select PXA3xx
+> ? ? ? ?select CPU_PXA930
+>
+> -config MACH_TAVOREVB3
+> - ? ? ? bool "PXA95x Development Platform (aka TavorEVB III)"
+> - ? ? ? select CPU_PXA950
+> -
+> ?config MACH_SAAR
+> ? ? ? ?bool "PXA930 Handheld Platform (aka SAAR)"
+> ? ? ? ?select PXA3xx
+> ? ? ? ?select CPU_PXA930
+>
+> -config MACH_SAARB
+> - ? ? ? bool "PXA955 Handheld Platform (aka SAARB)"
+> - ? ? ? select CPU_PXA955
+> -
+> ?comment "Third Party Dev Platforms (sorted by vendor name)"
+>
+> ?config ARCH_PXA_IDP
+> @@ -598,7 +611,7 @@ config MACH_ZIPIT2
+> ? ? ? ?bool "Zipit Z2 Handheld"
+> ? ? ? ?select PXA27x
+> ? ? ? ?select HAVE_PWM
+> -
+> +endif
+> ?endmenu
+>
+> ?config PXA25x
+> --
+> 1.7.5.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
