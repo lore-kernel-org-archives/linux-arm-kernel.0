@@ -1,98 +1,157 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 8 Oct 2011 21:27:30 +0200
-Subject: [PATCH 2/2] [ARM] MX1:apf9328: Add i2c support
-In-Reply-To: <1318087189-22977-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-	<1318087189-22977-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20111008192730.GB28049@pengutronix.de>
+Date: Sat,  8 Oct 2011 22:20:17 +0200
+Subject: [PATCH] arm: mx3: update defconfig
+Message-ID: <1318105217-32039-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 08, 2011 at 05:19:49PM +0200, Gwenhael Goavec-Merou wrote:
-> 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+Activate watchdog, rtc, usb, usb-gadget, keypad, audio for broader test
+coverage. Disable remote controls. Activate ARM errata as mentioned in [1].
+Rest of changes is caused by version bump to 3.1-rc9.
 
-Out of curiosity, no devices on the bus?
+[1] http://www.spinics.net/lists/arm-kernel/msg88710.html
 
-Other than that, looks OK to me:
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ arch/arm/configs/mx3_defconfig |   46 ++++++++++++++++++++++++++++-----------
+ 1 files changed, 33 insertions(+), 13 deletions(-)
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
-
-> ---
->  arch/arm/mach-imx/Kconfig        |    1 +
->  arch/arm/mach-imx/mach-apf9328.c |   10 ++++++++++
->  2 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 4792fd5..0e89395 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -99,6 +99,7 @@ config MACH_SCB9328
->  config MACH_APF9328
->  	bool "APF9328"
->  	select SOC_IMX1
-> +	select IMX_HAVE_PLATFORM_IMX_I2C
->  	select IMX_HAVE_PLATFORM_IMX_UART
->  	help
->  	  Say Yes here if you are using the Armadeus APF9328 development board
-> diff --git a/arch/arm/mach-imx/mach-apf9328.c b/arch/arm/mach-imx/mach-apf9328.c
-> index a404c89..f60e2b4 100644
-> --- a/arch/arm/mach-imx/mach-apf9328.c
-> +++ b/arch/arm/mach-imx/mach-apf9328.c
-> @@ -18,6 +18,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/mtd/physmap.h>
->  #include <linux/dm9000.h>
-> +#include <linux/i2c.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -41,6 +42,9 @@ static const int apf9328_pins[] __initconst = {
->  	PB29_PF_UART2_RTS,
->  	PB30_PF_UART2_TXD,
->  	PB31_PF_UART2_RXD,
-> +	/* I2C */
-> +	PA15_PF_I2C_SDA,
-> +	PA16_PF_I2C_SCL,
->  };
->  
->  /*
-> @@ -103,6 +107,10 @@ static const struct imxuart_platform_data uart1_pdata __initconst = {
->  	.flags = IMXUART_HAVE_RTSCTS,
->  };
->  
-> +static const struct imxi2c_platform_data apf9328_i2c_data __initconst = {
-> +	.bitrate = 100000,
-> +};
-> +
->  static struct platform_device *devices[] __initdata = {
->  	&apf9328_flash_device,
->  	&dm9000x_device,
-> @@ -119,6 +127,8 @@ static void __init apf9328_init(void)
->  	imx1_add_imx_uart0(NULL);
->  	imx1_add_imx_uart1(&uart1_pdata);
->  
-> +	imx1_add_imx_i2c(&apf9328_i2c_data);
-> +
->  	platform_add_devices(devices, ARRAY_SIZE(devices));
->  }
->  
-> -- 
-> 1.7.3.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
+index 7c4b30b..cb0717f 100644
+--- a/arch/arm/configs/mx3_defconfig
++++ b/arch/arm/configs/mx3_defconfig
+@@ -3,7 +3,6 @@ CONFIG_SYSVIPC=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ CONFIG_LOG_BUF_SHIFT=14
+-CONFIG_SYSFS_DEPRECATED_V2=y
+ CONFIG_EXPERT=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+@@ -13,20 +12,21 @@ CONFIG_MODVERSIONS=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_ARCH_MXC=y
+ CONFIG_MACH_MX31ADS_WM1133_EV1=y
++CONFIG_MACH_MX31LILLY=y
++CONFIG_MACH_MX31LITE=y
+ CONFIG_MACH_PCM037=y
+ CONFIG_MACH_PCM037_EET=y
+-CONFIG_MACH_MX31LITE=y
+ CONFIG_MACH_MX31_3DS=y
+ CONFIG_MACH_MX31MOBOARD=y
+-CONFIG_MACH_MX31LILLY=y
+ CONFIG_MACH_QONG=y
+-CONFIG_MACH_PCM043=y
+ CONFIG_MACH_ARMADILLO5X0=y
+-CONFIG_MACH_MX35_3DS=y
+ CONFIG_MACH_KZM_ARM11_01=y
++CONFIG_MACH_PCM043=y
++CONFIG_MACH_MX35_3DS=y
+ CONFIG_MACH_EUKREA_CPUIMX35=y
+ CONFIG_MXC_IRQ_PRIOR=y
+ CONFIG_MXC_PWM=y
++CONFIG_ARM_ERRATA_411920=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_PREEMPT=y
+@@ -35,7 +35,6 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_CMDLINE="noinitrd console=ttymxc0,115200 root=/dev/mtdblock2 rw ip=off"
+ CONFIG_VFP=y
+-CONFIG_PM=y
+ CONFIG_PM_DEBUG=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+@@ -52,7 +51,6 @@ CONFIG_IP_PNP_DHCP=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_FW_LOADER=m
+ CONFIG_MTD=y
+-CONFIG_MTD_PARTITIONS=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+@@ -62,24 +60,27 @@ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_MXC=y
+ CONFIG_MTD_UBI=y
+ # CONFIG_BLK_DEV is not set
++CONFIG_MISC_DEVICES=y
+ CONFIG_EEPROM_AT24=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SMSC_PHY=y
+ CONFIG_NET_ETHERNET=y
+ CONFIG_SMSC911X=y
+ CONFIG_DNET=y
+-CONFIG_FEC=y
+ # CONFIG_NETDEV_1000 is not set
+ # CONFIG_NETDEV_10000 is not set
+-# CONFIG_INPUT is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_IMX=y
++# CONFIG_INPUT_MOUSE is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_8250=m
+ CONFIG_SERIAL_8250_EXTENDED=y
+ CONFIG_SERIAL_8250_SHARE_IRQ=y
+ CONFIG_SERIAL_IMX=y
+ CONFIG_SERIAL_IMX_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+@@ -89,12 +90,15 @@ CONFIG_W1=y
+ CONFIG_W1_MASTER_MXC=y
+ CONFIG_W1_SLAVE_THERM=y
+ # CONFIG_HWMON is not set
++CONFIG_WATCHDOG=y
++CONFIG_IMX2_WDT=y
+ CONFIG_MFD_WM8350_I2C=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_WM8350=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_VIDEO_DEV=y
+-# CONFIG_VIDEO_ALLOW_V4L1 is not set
++# CONFIG_RC_CORE is not set
++# CONFIG_MEDIA_TUNER_CUSTOMISE is not set
+ CONFIG_SOC_CAMERA=y
+ CONFIG_SOC_CAMERA_MT9M001=y
+ CONFIG_SOC_CAMERA_MT9M111=y
+@@ -105,9 +109,26 @@ CONFIG_SOC_CAMERA_OV772X=y
+ CONFIG_VIDEO_MX3=y
+ # CONFIG_RADIO_ADAPTERS is not set
+ CONFIG_FB=y
+-# CONFIG_USB_SUPPORT is not set
++CONFIG_SOUND=y
++CONFIG_SND=y
++# CONFIG_SND_ARM is not set
++# CONFIG_SND_SPI is not set
++CONFIG_SND_SOC=y
++CONFIG_SND_IMX_SOC=y
++CONFIG_SND_MXC_SOC_WM1133_EV1=y
++CONFIG_SND_SOC_PHYCORE_AC97=y
++CONFIG_SND_SOC_EUKREA_TLV320=y
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_MXC=y
++CONFIG_USB_GADGET=m
++CONFIG_USB_FSL_USB2=m
++CONFIG_USB_G_SERIAL=m
++CONFIG_USB_ULPI=y
+ CONFIG_MMC=y
+ CONFIG_MMC_MXC=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_MXC=y
+ CONFIG_DMADEVICES=y
+ # CONFIG_DNOTIFY is not set
+ CONFIG_TMPFS=y
+@@ -119,6 +140,5 @@ CONFIG_NFS_V4=y
+ CONFIG_ROOT_NFS=y
+ # CONFIG_ENABLE_WARN_DEPRECATED is not set
+ # CONFIG_ENABLE_MUST_CHECK is not set
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ CONFIG_SYSCTL_SYSCALL_CHECK=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111008/4d5fd193/attachment.sig>
+1.7.6.3
