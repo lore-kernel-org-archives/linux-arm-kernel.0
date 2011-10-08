@@ -1,89 +1,55 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 8 Oct 2011 17:50:31 +0800
-Subject: [PATCH 20/26] ARM: pxa: select FB_PXA on saar and tevorevb
-In-Reply-To: <1317499438-14058-21-git-send-email-arnd@arndb.de>
+Date: Sat, 8 Oct 2011 17:59:33 +0800
+Subject: [PATCH 21/26] ARM: pxa: select POWER_SUPPLY on raumfeld
+In-Reply-To: <1317499438-14058-22-git-send-email-arnd@arndb.de>
 References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-21-git-send-email-arnd@arndb.de>
-Message-ID: <CAMPhdO8ke1M2aFAqzfmFB-MWj6m5JsCYC_zYBC=iSX1L6kWwTw@mail.gmail.com>
+	<1317499438-14058-22-git-send-email-arnd@arndb.de>
+Message-ID: <CAMPhdO8uDYpzDEJyyuavUKg9M-LCN_fwdYHzoA9YYtCS+JWpaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The saar and tevorevb platforms call pxafb_smart_flush from board
-> code, and that function is defined in the framebuffer code, so it
-> cannot be disabled.
+> The raumfeld platform code calls power_supply_set_battery_charged
+> which is part of the power supply layer, so that always has
+> to be enabled.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+A better way might be for the raumfeld board file to compile the code
+based on whether POWER_SUPPLY is selected. However, the power supply
+code for raumfeld is a bit difficult to separate indeed, let's merge this
+before that happens.
+
+Daniel?
+
 > ---
-> ?arch/arm/mach-pxa/Kconfig | ? ?4 ++++
-> ?1 files changed, 4 insertions(+), 0 deletions(-)
+> ?arch/arm/mach-pxa/Kconfig | ? ?3 +++
+> ?1 files changed, 3 insertions(+), 0 deletions(-)
 >
 > diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
-> index bb310d0..cd94f2f 100644
+> index cd94f2f..491c522 100644
 > --- a/arch/arm/mach-pxa/Kconfig
 > +++ b/arch/arm/mach-pxa/Kconfig
-> @@ -61,11 +61,15 @@ config MACH_TAVOREVB
-> ? ? ? ?bool "PXA930 Evaluation Board (aka TavorEVB)"
+> @@ -453,15 +453,18 @@ config MACH_RAUMFELD_RC
+> ? ? ? ?bool "Raumfeld Controller"
 > ? ? ? ?select PXA3xx
-> ? ? ? ?select CPU_PXA930
-> + ? ? ? select FB_PXA
-> + ? ? ? select FB
+> ? ? ? ?select CPU_PXA300
+> + ? ? ? select POWER_SUPPLY
+> ? ? ? ?select HAVE_PWM
 >
-> ?config MACH_SAAR
-> ? ? ? ?bool "PXA930 Handheld Platform (aka SAAR)"
+> ?config MACH_RAUMFELD_CONNECTOR
+> ? ? ? ?bool "Raumfeld Connector"
+> + ? ? ? select POWER_SUPPLY
 > ? ? ? ?select PXA3xx
-> ? ? ? ?select CPU_PXA930
-> + ? ? ? select FB_PXA
-> + ? ? ? select FB
-
-Hi Arnd,
-
-The option really matters is FB_PXA_SMARTPANEL, which adds support
-for the display driver to control an external "smart" LCD panel. And how
-about the patch below to fix this - as normal, make empty functions
-when not enabled?
-
-diff --git a/arch/arm/mach-pxa/include/mach/pxafb.h
-b/arch/arm/mach-pxa/include/mach/pxafb.h
-index 01a45ac..486b4c5 100644
---- a/arch/arm/mach-pxa/include/mach/pxafb.h
-+++ b/arch/arm/mach-pxa/include/mach/pxafb.h
-@@ -158,5 +158,18 @@ struct pxafb_mach_info {
- void pxa_set_fb_info(struct device *, struct pxafb_mach_info *);
- unsigned long pxafb_get_hsync_time(struct device *dev);
-
-+#ifdef CONFIG_FB_PXA_SMARTPANEL
- extern int pxafb_smart_queue(struct fb_info *info, uint16_t *cmds, int);
- extern int pxafb_smart_flush(struct fb_info *info);
-+#else
-+static inline int pxafb_smart_queue(struct fb_info *info,
-+				    uint16_t *cmds, int n)
-+{
-+	return 0;
-+}
-+
-+static inline int pxafb_smart_flush(struct fb_info *info)
-+{
-+	return 0;
-+}
-+#endif
-diff --git a/drivers/video/pxafb.c b/drivers/video/pxafb.c
-index 0f4e8c9..389530b 100644
---- a/drivers/video/pxafb.c
-+++ b/drivers/video/pxafb.c
-@@ -1309,16 +1309,6 @@ static int pxafb_smart_init(struct pxafb_info *fbi)
- 	return 0;
- }
- #else
--int pxafb_smart_queue(struct fb_info *info, uint16_t *cmds, int n_cmds)
--{
--	return 0;
--}
--
--int pxafb_smart_flush(struct fb_info *info)
--{
--	return 0;
--}
--
- static inline int pxafb_smart_init(struct pxafb_info *fbi) { return 0; }
- #endif /* CONFIG_FB_PXA_SMARTPANEL */
+> ? ? ? ?select CPU_PXA300
+>
+> ?config MACH_RAUMFELD_SPEAKER
+> ? ? ? ?bool "Raumfeld Speaker"
+> + ? ? ? select POWER_SUPPLY
+> ? ? ? ?select PXA3xx
+> ? ? ? ?select CPU_PXA300
+>
+> --
+> 1.7.5.4
+>
+>
