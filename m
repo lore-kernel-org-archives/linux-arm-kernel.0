@@ -1,44 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Oct 2011 09:03:09 +0100
-Subject: [PATCH 06/26] ARM: pxa: add missing header inclusions
-In-Reply-To: <CAMPhdO8FGTw7NzNNjK819zF3GjrRX0ybPyaSFR4U7oG8cGmDtQ@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 8 Oct 2011 16:34:50 +0800
+Subject: [PATCH 19/26] ARM: pxa: CPU_FREQ_TABLE is needed for CPU_FREQ
+In-Reply-To: <1317499438-14058-20-git-send-email-arnd@arndb.de>
 References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-7-git-send-email-arnd@arndb.de>
-	<CAMPhdO8FGTw7NzNNjK819zF3GjrRX0ybPyaSFR4U7oG8cGmDtQ@mail.gmail.com>
-Message-ID: <20111008080309.GD25689@n2100.arm.linux.org.uk>
+	<1317499438-14058-20-git-send-email-arnd@arndb.de>
+Message-ID: <CAMPhdO9VAJ+1CrXr5EgqVwc6zc4DGhZ__NS-GfvDqcw=r_WjUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2011 at 01:08:23PM +0800, Eric Miao wrote:
-> On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > These resulted in build breakage in some configurations:
-> >
-> > arch/arm/mach-pxa/irq.c:132:39: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'icip_handle_irq'
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > ?arch/arm/mach-pxa/irq.c | ? ?1 +
-> > ?1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-> > index b09e848..848e96d 100644
-> > --- a/arch/arm/mach-pxa/irq.c
-> > +++ b/arch/arm/mach-pxa/irq.c
-> > @@ -16,6 +16,7 @@
-> > ?#include <linux/module.h>
-> > ?#include <linux/interrupt.h>
-> > ?#include <linux/syscore_ops.h>
-> > +#include <linux/ftrace.h>
-> 
-> It's actually __irq_entry being defined in <linux/ftrace.h> and in turn
-> __exception_irq_entry being conditionally defined to that.
-> 
-> I think it's better to fix this in <asm/system.h> instead of in the
-> cases where this macro is referenced?
-> 
-> Russell?
+On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The pxa specific cpufreq code is based on the cpu_freq_table
+> module, so we have to select that.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-There's a patch in the patch system which fixes this (7115/3) but I
-can't apply it because it doesn't apply to anything in my for-next
-tree (it applies to the obsolete 'devel' branch which is rather old
-now.)
+Applied.
+
+> ---
+> ?arch/arm/Kconfig | ? ?1 +
+> ?1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 71b0ccb..3b84eda 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1926,6 +1926,7 @@ config CPU_FREQ_PXA
+> ? ? ? ?bool
+> ? ? ? ?depends on CPU_FREQ && ARCH_PXA && PXA25x
+> ? ? ? ?default y
+> + ? ? ? select CPU_FREQ_TABLE
+> ? ? ? ?select CPU_FREQ_DEFAULT_GOV_USERSPACE
+>
+> ?config CPU_FREQ_S3C
+> --
+> 1.7.5.4
+>
+>
