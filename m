@@ -1,45 +1,44 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 8 Oct 2011 15:44:50 +0800
-Subject: [PATCH 18/26] ARM: pxa: MTD_XIP is not actually working any more
-In-Reply-To: <1317499438-14058-19-git-send-email-arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 8 Oct 2011 09:03:09 +0100
+Subject: [PATCH 06/26] ARM: pxa: add missing header inclusions
+In-Reply-To: <CAMPhdO8FGTw7NzNNjK819zF3GjrRX0ybPyaSFR4U7oG8cGmDtQ@mail.gmail.com>
 References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-19-git-send-email-arnd@arndb.de>
-Message-ID: <CAMPhdO88OdwjfERo=Ri_-_xR75S53d-HKW1Ah0WGnu_0P1gRXQ@mail.gmail.com>
+	<1317499438-14058-7-git-send-email-arnd@arndb.de>
+	<CAMPhdO8FGTw7NzNNjK819zF3GjrRX0ybPyaSFR4U7oG8cGmDtQ@mail.gmail.com>
+Message-ID: <20111008080309.GD25689@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The headers files required for XIP support have moved around
-> over the last few years, and the code no longer builds.
-> Until someone fixes this, let's just disable support, leaving
-> sa1100 as the only platform still supporting xip.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Fri, Oct 07, 2011 at 01:08:23PM +0800, Eric Miao wrote:
+> On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > These resulted in build breakage in some configurations:
+> >
+> > arch/arm/mach-pxa/irq.c:132:39: error: expected '=', ',', ';', 'asm' or '__attribute__' before 'icip_handle_irq'
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > ?arch/arm/mach-pxa/irq.c | ? ?1 +
+> > ?1 files changed, 1 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+> > index b09e848..848e96d 100644
+> > --- a/arch/arm/mach-pxa/irq.c
+> > +++ b/arch/arm/mach-pxa/irq.c
+> > @@ -16,6 +16,7 @@
+> > ?#include <linux/module.h>
+> > ?#include <linux/interrupt.h>
+> > ?#include <linux/syscore_ops.h>
+> > +#include <linux/ftrace.h>
+> 
+> It's actually __irq_entry being defined in <linux/ftrace.h> and in turn
+> __exception_irq_entry being conditionally defined to that.
+> 
+> I think it's better to fix this in <asm/system.h> instead of in the
+> cases where this macro is referenced?
+> 
+> Russell?
 
-It is actually fixable, the problem is really mtd-xip.h is referencing
-the interrupt registers directly which I moved them to mach-pxa/irq.c
-for better modularization.
-
-I'm fine to drop XIP. I'm afraid Nico's gonna be a bit disappointed
-as I broke his favorite XIP code :-)
-
-> ---
-> ?arch/arm/Kconfig | ? ?1 -
-> ?1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 570c9fd..71b0ccb 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -619,7 +619,6 @@ config ARCH_PNX4008
-> ?config ARCH_PXA
-> ? ? ? ?bool "PXA2xx/PXA3xx-based"
-> ? ? ? ?depends on MMU
-> - ? ? ? select ARCH_MTD_XIP
-> ? ? ? ?select ARCH_HAS_CPUFREQ
-> ? ? ? ?select CLKDEV_LOOKUP
-> ? ? ? ?select CLKSRC_MMIO
-> --
-> 1.7.5.4
->
->
+There's a patch in the patch system which fixes this (7115/3) but I
+can't apply it because it doesn't apply to anything in my for-next
+tree (it applies to the obsolete 'devel' branch which is rather old
+now.)
