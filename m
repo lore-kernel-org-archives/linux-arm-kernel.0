@@ -1,38 +1,42 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 8 Oct 2011 16:34:50 +0800
-Subject: [PATCH 19/26] ARM: pxa: CPU_FREQ_TABLE is needed for CPU_FREQ
-In-Reply-To: <1317499438-14058-20-git-send-email-arnd@arndb.de>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-20-git-send-email-arnd@arndb.de>
-Message-ID: <CAMPhdO9VAJ+1CrXr5EgqVwc6zc4DGhZ__NS-GfvDqcw=r_WjUQ@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 08 Oct 2011 14:14:27 +0530
+Subject: [PATCH 00/24 V2] OMAP4: PM: suspend, CPU-hotplug and CPUilde
+	support
+In-Reply-To: <87vcs0ifgn.fsf@ti.com>
+References: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>	<87d3e8juqm.fsf@ti.com>
+	<87vcs0ifgn.fsf@ti.com>
+Message-ID: <4E900D6B.5030006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The pxa specific cpufreq code is based on the cpu_freq_table
-> module, so we have to select that.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Saturday 08 October 2011 04:20 AM, Kevin Hilman wrote:
+> Kevin Hilman <khilman@ti.com> writes:
+> 
+>> Hi Santosh,
+>>
+>> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+>>
+>>> The series adds OMAP4 MPUSS (MPU SubSystem) power management support for
+>>> suspend (S2R), CPU hotplug and CPUidle.
+>>
+>> Just noticed when doing some final build/sanity testing that there are a
+>> few of compile/link warnings/problems when the kernel is built without
+>> CONFIG_PM
+>>
+>> Some warnings:
+>>
+>> /work/kernel/omap/pm/arch/arm/mach-omap2/omap-wakeupgen.c:203:13: warning: 'irq_save_context' defined but not used
+>> /work/kernel/omap/pm/arch/arm/mach-omap2/omap-wakeupgen.c:270:13: warning: 'irq_save_secure_context' defined but not used
+>>
+Sory I missed it in my builds.
 
-Applied.
+[...]
 
-> ---
-> ?arch/arm/Kconfig | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 71b0ccb..3b84eda 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1926,6 +1926,7 @@ config CPU_FREQ_PXA
-> ? ? ? ?bool
-> ? ? ? ?depends on CPU_FREQ && ARCH_PXA && PXA25x
-> ? ? ? ?default y
-> + ? ? ? select CPU_FREQ_TABLE
-> ? ? ? ?select CPU_FREQ_DEFAULT_GOV_USERSPACE
->
-> ?config CPU_FREQ_S3C
-> --
-> 1.7.5.4
->
->
+> Please just cleanup the wakeupgen compile warnings and update your
+> branch.
+> 
+Done !!
+Updated branch : for_3_2/omap4-mpuss-pm_2
+
+Regards
+Santosh
