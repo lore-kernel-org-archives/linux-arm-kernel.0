@@ -1,102 +1,45 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Sat, 8 Oct 2011 10:54:53 +0530
-Subject: [PATCH] arm: mm: Fix infinite looping issue
-In-Reply-To: <1317724684-29115-1-git-send-email-girish.shivananjappa@linaro.org>
-References: <1317724684-29115-1-git-send-email-girish.shivananjappa@linaro.org>
-Message-ID: <CAKrE-KfYAwsPGgFQyV6M3tYpzWPgZCGdRGNxQUiB4ESC9i_L8A@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 8 Oct 2011 15:44:50 +0800
+Subject: [PATCH 18/26] ARM: pxa: MTD_XIP is not actually working any more
+In-Reply-To: <1317499438-14058-19-git-send-email-arnd@arndb.de>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<1317499438-14058-19-git-send-email-arnd@arndb.de>
+Message-ID: <CAMPhdO88OdwjfERo=Ri_-_xR75S53d-HKW1Ah0WGnu_0P1gRXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 4, 2011 at 4:08 PM, Girish K S
-<girish.shivananjappa@linaro.org> wrote:
-> This patch fixes the problem of infinite looping while booting.
+On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The headers files required for XIP support have moved around
+> over the last few years, and the code no longer builds.
+> Until someone fixes this, let's just disable support, leaving
+> sa1100 as the only platform still supporting xip.
 >
-> The bne instruction expects the z flag to be set to break the loop.
-> The (mov r1, r1, lsr #1) doesn't behave in the expected way. If
-> replaced with the movs instruction then the execution will exit
-> the loop.
->
-> Signed-off-by: Girish K S <girish.shivananjappa@linaro.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+It is actually fixable, the problem is really mtd-xip.h is referencing
+the interrupt registers directly which I moved them to mach-pxa/irq.c
+for better modularization.
+
+I'm fine to drop XIP. I'm afraid Nico's gonna be a bit disappointed
+as I broke his favorite XIP code :-)
+
 > ---
-> ?arch/arm/mm/proc-arm740.S | ? ?4 ++--
-> ?arch/arm/mm/proc-arm940.S | ? ?4 ++--
-> ?arch/arm/mm/proc-arm946.S | ? ?4 ++--
-> ?3 files changed, 6 insertions(+), 6 deletions(-)
+> ?arch/arm/Kconfig | ? ?1 -
+> ?1 files changed, 0 insertions(+), 1 deletions(-)
 >
-> diff --git a/arch/arm/mm/proc-arm740.S b/arch/arm/mm/proc-arm740.S
-> index 4506be3..9284f10 100644
-> --- a/arch/arm/mm/proc-arm740.S
-> +++ b/arch/arm/mm/proc-arm740.S
-> @@ -77,7 +77,7 @@ __arm740_setup:
-> ? ? ? ?ldr ? ? r1, =(CONFIG_DRAM_SIZE >> 12) ? @ size of RAM (must be >= 4KB)
-> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
-> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
-> - ? ? ? mov ? ? r1, r1, lsr #1
-> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
-> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
-> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the area register value
-> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
-> @@ -87,7 +87,7 @@ __arm740_setup:
-> ? ? ? ?ldr ? ? r1, =(CONFIG_FLASH_SIZE >> 12) ?@ size of FLASH (must be >= 4KB)
-> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
-> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
-> - ? ? ? mov ? ? r1, r1, lsr #1
-> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
-> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
-> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the area register value
-> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
-> diff --git a/arch/arm/mm/proc-arm940.S b/arch/arm/mm/proc-arm940.S
-> index ac750d5..e639034 100644
-> --- a/arch/arm/mm/proc-arm940.S
-> +++ b/arch/arm/mm/proc-arm940.S
-> @@ -296,7 +296,7 @@ __arm940_setup:
-> ? ? ? ?ldr ? ? r1, =(CONFIG_DRAM_SIZE >> 12) ? @ size of RAM (must be >= 4KB)
-> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
-> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
-> - ? ? ? mov ? ? r1, r1, lsr #1
-> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
-> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
-> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the area register value
-> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
-> @@ -307,7 +307,7 @@ __arm940_setup:
-> ? ? ? ?ldr ? ? r1, =(CONFIG_FLASH_SIZE >> 12) ?@ size of FLASH (must be >= 4KB)
-> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
-> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
-> - ? ? ? mov ? ? r1, r1, lsr #1
-> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
-> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
-> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the area register value
-> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
-> diff --git a/arch/arm/mm/proc-arm946.S b/arch/arm/mm/proc-arm946.S
-> index 683af3a..731388a 100644
-> --- a/arch/arm/mm/proc-arm946.S
-> +++ b/arch/arm/mm/proc-arm946.S
-> @@ -341,7 +341,7 @@ __arm946_setup:
-> ? ? ? ?ldr ? ? r1, =(CONFIG_DRAM_SIZE >> 12) ? @ size of RAM (must be >= 4KB)
-> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
-> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
-> - ? ? ? mov ? ? r1, r1, lsr #1
-> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
-> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
-> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the region register value
-> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
-> @@ -351,7 +351,7 @@ __arm946_setup:
-> ? ? ? ?ldr ? ? r1, =(CONFIG_FLASH_SIZE >> 12) ?@ size of FLASH (must be >= 4KB)
-> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
-> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
-> - ? ? ? mov ? ? r1, r1, lsr #1
-> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
-> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
-> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the region register value
-> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 570c9fd..71b0ccb 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -619,7 +619,6 @@ config ARCH_PNX4008
+> ?config ARCH_PXA
+> ? ? ? ?bool "PXA2xx/PXA3xx-based"
+> ? ? ? ?depends on MMU
+> - ? ? ? select ARCH_MTD_XIP
+> ? ? ? ?select ARCH_HAS_CPUFREQ
+> ? ? ? ?select CLKDEV_LOOKUP
+> ? ? ? ?select CLKSRC_MMIO
 > --
-> 1.7.1
+> 1.7.5.4
 >
->Hello Mr choi,
- Sorry for my previous top posting.
-If there is no issue with this patch can you apply to your for-next tree
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
