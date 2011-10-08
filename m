@@ -1,51 +1,50 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 8 Oct 2011 18:59:18 +0530
-Subject: Serieal console on Samsung S3C6410 ARM11 CPU (Was [ANNOUNCE]
-	3.0.6-rt17)
-In-Reply-To: <201110081326.58731.jbe@pengutronix.de>
-References: <alpine.LFD.2.02.1110070046270.3240@ionos>
-	<201110081326.58731.jbe@pengutronix.de>
-Message-ID: <CAJuYYwSEvA+EHwyhgeZkBX+bB_e1cmFnC6YdEx-CdHzk8peyEw@mail.gmail.com>
+Date: Sat, 8 Oct 2011 19:34:29 +0530
+Subject: [PATCH 0/3] GIC OF bindings
+In-Reply-To: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
+References: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
+Message-ID: <CAJuYYwRLqdfagj7KxbdmvPBz2J1LWwphew+0eTkxWDZtW8Zh7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juergen,
+On 1 October 2011 00:57, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Another round of GIC devicetree support.
+>
+> This moves the tracking of the starting hwirq number into the irq domain
+> code. Doing this makes hwirq == GIC interrupt ID and simplifies the GIC
+> code removing irq_offset.
+>
+> The full series is available here. This includes Russell's devel-stable and
+> for-next branches and Nico's vmalloc branch:
+>
+> git://git.jdl.com/software/linux-3.0.git gic-v2
+>
+> Tested on highbank and Realview 11MPCore qemu (2 GICs).
+>
+> Rob
+>
+> Rob Herring (3):
+> ?irq: support domains with non-zero hwirq base
+> ?ARM: gic: add irq_domain support
+> ?ARM: gic: add OF based initialization
 
-On 8 October 2011 16:56, Juergen Beisert <jbe@pengutronix.de> wrote:
-> Thomas Gleixner wrote:
->> I'm pleased to announce the 3.0.6-rt17 release.
->
-> I have no idea where to search, but when I'm using the 3.0.6-rt17 on my
-> Samsung S3C6410 ARM based system, the UART (serial console) does not work as
-> expected. Typing only one char at a time is okay. Typing two chars
-> immediately makes the system using 100 % CPU load and takes about 2 seconds
-> to respond. It seems the interrupt handling is broken in the UART driver, but
-> I don't know how to fix it.
->
-> This with a simple cursor up (one char to get the last command) and a small
-> pause to the next "ENTER" char:
->
-> root at mini6410:~ cat /proc/interrupts | grep 18:
-> ?18: ? ?5739107 ?s3c-uart ?s3c6400-uart
->
-> Same again:
->
-> root at mini6410:~ cat /proc/interrupts | grep 18:
-> ?18: ? ?5739113 ?s3c-uart ?s3c6400-uart
->
-> 6 interrupts seems reasonable.
->
-> Now with cursor up and SPACE immediately, then a pause for ENTER:
->
-> root at mini6410:~ cat /proc/interrupts | grep 18:
-> ?18: ? ?5923815 ?s3c-uart ?s3c6400-uart
->
-> 184702 interrupts looks strange.
+For Exynos4 GIC and Interrupt Combiner Controllers:
 
-Just curious, do you have the following two commits?
+Tested-by: Thomas Abraham <thomas.abraham@linaro.org>
 
-serial: samsung: Add unified interrupt handler for s3c64xx and later SoC's
-ARM: SAMSUNG: Remove uart irq handling from platform code
-
-Thanks,
-Thomas.
+>
+> ?Documentation/devicetree/bindings/arm/gic.txt | ? 55 ++++++++++
+> ?arch/arm/common/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?arch/arm/common/gic.c ? ? ? ? ? ? ? ? ? ? ? ? | ?142 +++++++++++++++++++------
+> ?arch/arm/include/asm/hardware/gic.h ? ? ? ? ? | ? ?5 +-
+> ?include/linux/irqdomain.h ? ? ? ? ? ? ? ? ? ? | ? 16 +++-
+> ?kernel/irq/irqdomain.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 12 +-
+> ?6 files changed, 189 insertions(+), 42 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
+>
+> --
+> 1.7.5.4
+>
+>
