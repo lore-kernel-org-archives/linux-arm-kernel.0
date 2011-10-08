@@ -1,91 +1,55 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 8 Oct 2011 11:32:14 +0800
-Subject: [PATCH 17/26] ARM: pxa: pxa95x is incompatible with earlier pxa
-In-Reply-To: <CAMPhdO_L-g4vSj3fC-1ckqnHGAPhWOy6Hm4VL5iUbZbbdjRkNQ@mail.gmail.com>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<1317499438-14058-18-git-send-email-arnd@arndb.de>
-	<CAN1soZw-eB5WxY5YWjfd=_q5w8wSu09mRTcmOEN_SDq9Zuz7eg@mail.gmail.com>
-	<CAMPhdO_L-g4vSj3fC-1ckqnHGAPhWOy6Hm4VL5iUbZbbdjRkNQ@mail.gmail.com>
-Message-ID: <CAN1soZy3_9Trycti8SCbnO75N6NE31tFqrKMpZtiJPgwNc2cbg@mail.gmail.com>
+From: josh@joshtriplett.org (Josh Triplett)
+Date: Fri, 7 Oct 2011 21:03:51 -0700
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <20111007212326.GA29003@kroah.com>
+References: <1317963790-29426-1-git-send-email-manjugk@ti.com>
+	<1317963790-29426-3-git-send-email-manjugk@ti.com>
+	<20111007064928.GE27508@kroah.com> <20111007205715.GC5275@leaf>
+	<20111007212326.GA29003@kroah.com>
+Message-ID: <20111008040351.GA7694@leaf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 8, 2011 at 11:21 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Sat, Oct 8, 2011 at 10:57 AM, Haojian Zhuang
-> <haojian.zhuang@gmail.com> wrote:
->> On Sun, Oct 2, 2011 at 4:03 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> We cannot support ARMv5 and ARMv7 based boards in a single kernel,
->>> so introduce a new option in mach-pxa to select between the two.
->>>
->>> The PJ4 (ARMv7) based boards are now only visible when
->>> CONFIG_ARCH_PXA_V7 is set, the other boards are only visible
->>> when it's not set.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> ---
->>> ?arch/arm/mach-pxa/Kconfig | ? 31 ++++++++++++++++++++++---------
->>> ?1 files changed, 22 insertions(+), 9 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
->>> index cd19309..bb310d0 100644
->>> --- a/arch/arm/mach-pxa/Kconfig
->>> +++ b/arch/arm/mach-pxa/Kconfig
->>> @@ -2,6 +2,27 @@ if ARCH_PXA
->>>
->>> ?menu "Intel PXA2xx/PXA3xx Implementations"
->>>
->>> +config ARCH_PXA_V7
->>> + ? ? ? bool "ARMv7 (PXA95x) based systems"
->>> +
->>> +if ARCH_PXA_V7
->>> +comment "Marvell Dev Platforms (sorted by hardware release time)"
->>> +config MACH_TAVOREVB3
->>> + ? ? ? bool "PXA95x Development Platform (aka TavorEVB III)"
->>> + ? ? ? select CPU_PXA955rds and V7 boards being
-built together yet it's not supported (there will be building errors).
-And this could be easily spotted with auto/rds and V7 boards being
-built together yet it's not supported (there will be building errors).
-And this could be easily spotted with auto/
->>> +
->>> +config MACH_SAARB
->>> + ? ? ? bool "PXA955 Handheld Platform (aka SAARB)"
->>> + ? ? ? select CPU_PXA955
->>> +endif
->>> +
->>> +config PXA_V7_MACH_AUTO
->>> + ? ? ? def_bool y
->>> + ? ? ? depends on ARCH_PXA_V7
->>> + ? ? ? depends on !MACH_SAARB
->>> + ? ? ? select MACH_TAVOREVB3
->>> +
->> Could we avoid to use PXA_V7_MACH_AUTO? I think the better way is
->> defining a new ARCH (ARCH_PXA95X or something else), and sharing the
->> code in arch/arm/mach-pxa. I think that it's easy to implement.
->>
->> How about you, Russell & Eric?
->
-> Haojian,
->
-> The patch here is to fix the issue of V5 boards and V7 boards being
-> built together yet it's not supported (there will be building errors).
-> And this could be easily spotted with auto/random configurations.
->
-> I generally think the patch is fine before we'll allow building of both
-> v5 and v7 code together (which Nico will be definitely interested in)
->
->
+On Fri, Oct 07, 2011 at 02:23:26PM -0700, Greg KH wrote:
+> On Fri, Oct 07, 2011 at 01:57:15PM -0700, Josh Triplett wrote:
+> > On Thu, Oct 06, 2011 at 11:49:28PM -0700, Greg KH wrote:
+> > > On Fri, Oct 07, 2011 at 10:33:07AM +0500, G, Manjunath Kondaiah wrote:
+> > > > +config PROBE_DEFER
+> > > > +	bool "Deferred Driver Probe"
+> > > > +	default y
+> > > > +	help
+> > > > +	  This option provides deferring driver probe if it has dependency on
+> > > > +	  other driver. Without this feature, initcall ordering should be done
+> > > > +	  manually to resolve driver dependencies. This feature completely side
+> > > > +	  steps the issues by allowing driver registration to occur in any
+> > > > +	  order, and any driver can request to be retried after a few more other
+> > > > +	  drivers get probed.
+> > > 
+> > > Why is this even an option?  Why would you ever want it disabled?  Why
+> > > does it need to be selected?
+> > > 
+> > > If you are going to default something to 'y' then just make it so it
+> > > can't be turned off any other way by just not making it an option at
+> > > all.
+> > 
+> > Given that the drivers which use this mechanism will not necessarily get
+> > built into the kernel, I'd suggest that it should remain optional and
+> > default to n.  Those drivers can then add a dependency on PROBE_DEFER.
+> > Let's try to avoid adding more infrastructure to the kernel that takes
+> > up space even when unused; certainly embedded will appreciate not having
+> > this feature unless a driver needs it.
+> 
+> How much extra space is this "feature" really?
 
-Eric,
+Just checked: 776 bytes, 640 of text and 136 of data.  We have kconfig
+options for comparable amounts.
 
-At first, a new macro (ARCH_PXA_V7) is defined in
-arch/arm/mach-pxa/Kconfig in this patch.
-I prefer to move this macro to arch/arm/Kconfig.
+> I don't see it being
+> anything larger than the amount of memory increase that just happened as
+> I typed this email as part of the ongoing memory density changes.
 
-Secondly, pxa95x is both used in saarb and tavorevb3.
+I don't know about the changes you mean, but in any case I'd like to
+prevent mandatory size increases wherever possible.  I'd love to see the
+size of "allnoconfig" getting *smaller* over time, not larger.
 
-Thirdly, PXA_V7_MACH_AUTO is unnecessary. We just need to select those
-machines in defconfig or define a new DT machine type to select all
-machines.
-
-Thanks
-Haojian
+- Josh Triplett
