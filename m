@@ -1,21 +1,14 @@
 From: girishks2000@gmail.com (Girish KS)
-Date: Sat, 8 Oct 2011 10:49:50 +0530
+Date: Sat, 8 Oct 2011 10:54:53 +0530
 Subject: [PATCH] arm: mm: Fix infinite looping issue
 In-Reply-To: <1317724684-29115-1-git-send-email-girish.shivananjappa@linaro.org>
 References: <1317724684-29115-1-git-send-email-girish.shivananjappa@linaro.org>
-Message-ID: <CAKrE-KcLXDZ4ecPAFSdQUzQrBZqYAuy93Pw=u+6C1OGP7HOGQg@mail.gmail.com>
+Message-ID: <CAKrE-KfYAwsPGgFQyV6M3tYpzWPgZCGdRGNxQUiB4ESC9i_L8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mr choi,
-If there is no issue with this patch can you apply to your for-next tree
-
-regards
-Girish K S
-
 On Tue, Oct 4, 2011 at 4:08 PM, Girish K S
 <girish.shivananjappa@linaro.org> wrote:
->
 > This patch fixes the problem of infinite looping while booting.
 >
 > The bne instruction expects the z flag to be set to break the loop.
@@ -99,8 +92,11 @@ On Tue, Oct 4, 2011 at 4:08 PM, Girish K S
 > --
 > 1.7.1
 >
->
+>Hello Mr choi,
+ Sorry for my previous top posting.
+If there is no issue with this patch can you apply to your for-next tree
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
