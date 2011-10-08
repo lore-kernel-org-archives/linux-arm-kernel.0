@@ -1,48 +1,61 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 08 Oct 2011 17:16:49 +0200
-Subject: [PATCH 3/7] ARM: imx: export imx_ioremap
-In-Reply-To: <109850802.HMOqKGRdrl@wuerfel>
-References: <20111004092015.GM31404@pengutronix.de>
-	<20111008101322.GH31404@pengutronix.de>
-	<109850802.HMOqKGRdrl@wuerfel>
-Message-ID: <2199742.hioYdt4QXg@wuerfel>
+Date: Sat, 08 Oct 2011 17:23:24 +0200
+Subject: [PATCH] ARM: omap2+: stub out omap*_volt_data
+Message-ID: <1397689.kebELtC4N3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch_ioremap function on i.MX is now an indirect function pointer.
-In order to use it from any loadable module, the pointer itself
-has to be exported.
+When CONFIG_PM_OPP is not set, the definitions for these variables
+are not available, so we should conditionally define them to
+NULL.
 
-ERROR: "imx_ioremap" [drivers/video/tmiofb.ko] undefined!
-ERROR: "imx_ioremap" [drivers/usb/host/sl811-hcd.ko] undefined!
-ERROR: "imx_ioremap" [drivers/usb/host/r8a66597-hcd.ko] undefined!
-ERROR: "imx_ioremap" [drivers/usb/host/oxu210hp-hcd.ko] undefined!
-ERROR: "imx_ioremap" [drivers/usb/gadget/r8a66597-udc.ko] undefined!
+arch/arm/mach-omap2/built-in.o: In function `omap3xxx_voltagedomains_init':
+voltagedomains3xxx_data.c:100: undefined reference to `omap36xx_vddmpu_volt_data'
+voltagedomains3xxx_data.c:100: undefined reference to `omap34xx_vddmpu_volt_data'
+voltagedomains3xxx_data.c:100: undefined reference to `omap36xx_vddcore_volt_data'
+voltagedomains3xxx_data.c:100: undefined reference to `omap34xx_vddcore_volt_data'
+arch/arm/mach-omap2/built-in.o: In function `omap44xx_voltagedomains_init':
+voltagedomains44xx_data.c:111: undefined reference to `omap44xx_vdd_mpu_volt_data'
+voltagedomains44xx_data.c:111: undefined reference to `omap44xx_vdd_iva_volt_data'
+voltagedomains44xx_data.c:111: undefined reference to `omap44xx_vdd_core_volt_data'
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/plat-mxc/system.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+I got this build error only now after pulling in the latest omap series, but
+I cannot tell what caused it. It's also not clear to me if this is the correct
+solution. Please ack or provide a better fix.
 
-diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/plat-mxc/system.c
-index 9dad8dc..45e1b5f 100644
---- a/arch/arm/plat-mxc/system.c
-+++ b/arch/arm/plat-mxc/system.c
-@@ -21,6 +21,7 @@
- #include <linux/io.h>
- #include <linux/err.h>
- #include <linux/delay.h>
-+#include <linux/module.h>
+ arch/arm/mach-omap2/omap_opp_data.h |   13 ++++++++++++-
+ 1 files changed, 12 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_opp_data.h b/arch/arm/mach-omap2/omap_opp_data.h
+index c784c12..fdbf96b 100644
+--- a/arch/arm/mach-omap2/omap_opp_data.h
++++ b/arch/arm/mach-omap2/omap_opp_data.h
+@@ -83,7 +83,7 @@ struct omap_opp_def {
+ extern int __init omap_init_opp_table(struct omap_opp_def *opp_def,
+ 		u32 opp_def_size);
  
- #include <mach/hardware.h>
- #include <mach/common.h>
-@@ -30,6 +31,7 @@
+-
++#ifdef CONFIG_PM_OPP
+ extern struct omap_volt_data omap34xx_vddmpu_volt_data[];
+ extern struct omap_volt_data omap34xx_vddcore_volt_data[];
+ extern struct omap_volt_data omap36xx_vddmpu_volt_data[];
+@@ -93,4 +93,15 @@ extern struct omap_volt_data omap44xx_vdd_mpu_volt_data[];
+ extern struct omap_volt_data omap44xx_vdd_iva_volt_data[];
+ extern struct omap_volt_data omap44xx_vdd_core_volt_data[];
  
- void (*imx_idle)(void) = NULL;
- void __iomem *(*imx_ioremap)(unsigned long, size_t, unsigned int) = NULL;
-+EXPORT_SYMBOL_GPL(imx_ioremap);
- 
- static void __iomem *wdog_base;
- 
++#else
++#define omap34xx_vddmpu_volt_data	NULL
++#define omap34xx_vddcore_volt_data	NULL
++#define omap36xx_vddmpu_volt_data	NULL
++#define omap36xx_vddcore_volt_data	NULL
++
++#define omap44xx_vdd_mpu_volt_data	NULL
++#define omap44xx_vdd_iva_volt_data	NULL
++#define omap44xx_vdd_core_volt_data	NULL
++#endif
++
+ #endif		/* __ARCH_ARM_MACH_OMAP2_OMAP_OPP_DATA_H */
 -- 
 1.7.5.4
