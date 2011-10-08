@@ -1,55 +1,106 @@
-From: josh@joshtriplett.org (Josh Triplett)
-Date: Fri, 7 Oct 2011 21:03:51 -0700
-Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <20111007212326.GA29003@kroah.com>
-References: <1317963790-29426-1-git-send-email-manjugk@ti.com>
-	<1317963790-29426-3-git-send-email-manjugk@ti.com>
-	<20111007064928.GE27508@kroah.com> <20111007205715.GC5275@leaf>
-	<20111007212326.GA29003@kroah.com>
-Message-ID: <20111008040351.GA7694@leaf>
+From: girishks2000@gmail.com (Girish KS)
+Date: Sat, 8 Oct 2011 10:49:50 +0530
+Subject: [PATCH] arm: mm: Fix infinite looping issue
+In-Reply-To: <1317724684-29115-1-git-send-email-girish.shivananjappa@linaro.org>
+References: <1317724684-29115-1-git-send-email-girish.shivananjappa@linaro.org>
+Message-ID: <CAKrE-KcLXDZ4ecPAFSdQUzQrBZqYAuy93Pw=u+6C1OGP7HOGQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2011 at 02:23:26PM -0700, Greg KH wrote:
-> On Fri, Oct 07, 2011 at 01:57:15PM -0700, Josh Triplett wrote:
-> > On Thu, Oct 06, 2011 at 11:49:28PM -0700, Greg KH wrote:
-> > > On Fri, Oct 07, 2011 at 10:33:07AM +0500, G, Manjunath Kondaiah wrote:
-> > > > +config PROBE_DEFER
-> > > > +	bool "Deferred Driver Probe"
-> > > > +	default y
-> > > > +	help
-> > > > +	  This option provides deferring driver probe if it has dependency on
-> > > > +	  other driver. Without this feature, initcall ordering should be done
-> > > > +	  manually to resolve driver dependencies. This feature completely side
-> > > > +	  steps the issues by allowing driver registration to occur in any
-> > > > +	  order, and any driver can request to be retried after a few more other
-> > > > +	  drivers get probed.
-> > > 
-> > > Why is this even an option?  Why would you ever want it disabled?  Why
-> > > does it need to be selected?
-> > > 
-> > > If you are going to default something to 'y' then just make it so it
-> > > can't be turned off any other way by just not making it an option at
-> > > all.
-> > 
-> > Given that the drivers which use this mechanism will not necessarily get
-> > built into the kernel, I'd suggest that it should remain optional and
-> > default to n.  Those drivers can then add a dependency on PROBE_DEFER.
-> > Let's try to avoid adding more infrastructure to the kernel that takes
-> > up space even when unused; certainly embedded will appreciate not having
-> > this feature unless a driver needs it.
-> 
-> How much extra space is this "feature" really?
+Hello Mr choi,
+If there is no issue with this patch can you apply to your for-next tree
 
-Just checked: 776 bytes, 640 of text and 136 of data.  We have kconfig
-options for comparable amounts.
+regards
+Girish K S
 
-> I don't see it being
-> anything larger than the amount of memory increase that just happened as
-> I typed this email as part of the ongoing memory density changes.
-
-I don't know about the changes you mean, but in any case I'd like to
-prevent mandatory size increases wherever possible.  I'd love to see the
-size of "allnoconfig" getting *smaller* over time, not larger.
-
-- Josh Triplett
+On Tue, Oct 4, 2011 at 4:08 PM, Girish K S
+<girish.shivananjappa@linaro.org> wrote:
+>
+> This patch fixes the problem of infinite looping while booting.
+>
+> The bne instruction expects the z flag to be set to break the loop.
+> The (mov r1, r1, lsr #1) doesn't behave in the expected way. If
+> replaced with the movs instruction then the execution will exit
+> the loop.
+>
+> Signed-off-by: Girish K S <girish.shivananjappa@linaro.org>
+> ---
+> ?arch/arm/mm/proc-arm740.S | ? ?4 ++--
+> ?arch/arm/mm/proc-arm940.S | ? ?4 ++--
+> ?arch/arm/mm/proc-arm946.S | ? ?4 ++--
+> ?3 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-arm740.S b/arch/arm/mm/proc-arm740.S
+> index 4506be3..9284f10 100644
+> --- a/arch/arm/mm/proc-arm740.S
+> +++ b/arch/arm/mm/proc-arm740.S
+> @@ -77,7 +77,7 @@ __arm740_setup:
+> ? ? ? ?ldr ? ? r1, =(CONFIG_DRAM_SIZE >> 12) ? @ size of RAM (must be >= 4KB)
+> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
+> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
+> - ? ? ? mov ? ? r1, r1, lsr #1
+> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
+> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
+> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the area register value
+> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
+> @@ -87,7 +87,7 @@ __arm740_setup:
+> ? ? ? ?ldr ? ? r1, =(CONFIG_FLASH_SIZE >> 12) ?@ size of FLASH (must be >= 4KB)
+> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
+> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
+> - ? ? ? mov ? ? r1, r1, lsr #1
+> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
+> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
+> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the area register value
+> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
+> diff --git a/arch/arm/mm/proc-arm940.S b/arch/arm/mm/proc-arm940.S
+> index ac750d5..e639034 100644
+> --- a/arch/arm/mm/proc-arm940.S
+> +++ b/arch/arm/mm/proc-arm940.S
+> @@ -296,7 +296,7 @@ __arm940_setup:
+> ? ? ? ?ldr ? ? r1, =(CONFIG_DRAM_SIZE >> 12) ? @ size of RAM (must be >= 4KB)
+> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
+> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
+> - ? ? ? mov ? ? r1, r1, lsr #1
+> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
+> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
+> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the area register value
+> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
+> @@ -307,7 +307,7 @@ __arm940_setup:
+> ? ? ? ?ldr ? ? r1, =(CONFIG_FLASH_SIZE >> 12) ?@ size of FLASH (must be >= 4KB)
+> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
+> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
+> - ? ? ? mov ? ? r1, r1, lsr #1
+> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
+> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
+> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the area register value
+> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
+> diff --git a/arch/arm/mm/proc-arm946.S b/arch/arm/mm/proc-arm946.S
+> index 683af3a..731388a 100644
+> --- a/arch/arm/mm/proc-arm946.S
+> +++ b/arch/arm/mm/proc-arm946.S
+> @@ -341,7 +341,7 @@ __arm946_setup:
+> ? ? ? ?ldr ? ? r1, =(CONFIG_DRAM_SIZE >> 12) ? @ size of RAM (must be >= 4KB)
+> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
+> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
+> - ? ? ? mov ? ? r1, r1, lsr #1
+> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
+> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
+> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the region register value
+> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
+> @@ -351,7 +351,7 @@ __arm946_setup:
+> ? ? ? ?ldr ? ? r1, =(CONFIG_FLASH_SIZE >> 12) ?@ size of FLASH (must be >= 4KB)
+> ? ? ? ?mov ? ? r2, #10 ? ? ? ? ? ? ? ? ? ? ? ? @ 11 is the minimum (4KB)
+> ?1: ? ? add ? ? r2, r2, #1 ? ? ? ? ? ? ? ? ? ? ?@ area size *= 2
+> - ? ? ? mov ? ? r1, r1, lsr #1
+> + ? ? ? movs ? ?r1, r1, lsr #1 ? ? ? ? ? ? ? ? ?@ set zero bit if r1=0
+> ? ? ? ?bne ? ? 1b ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?@ count not zero r-shift
+> ? ? ? ?orr ? ? r0, r0, r2, lsl #1 ? ? ? ? ? ? ?@ the region register value
+> ? ? ? ?orr ? ? r0, r0, #1 ? ? ? ? ? ? ? ? ? ? ?@ set enable bit
+> --
+> 1.7.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
