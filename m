@@ -1,54 +1,53 @@
 From: jason77.wang@gmail.com (Hui Wang)
-Date: Sat, 8 Oct 2011 09:33:56 +0800
+Date: Sat, 8 Oct 2011 09:34:43 +0800
 Subject: [PATCH] mx5: modify pm and idle
-In-Reply-To: <20111003052458.GA21563@S2100-06.ap.freescale.net>
+In-Reply-To: <20111004074316.GK31404@pengutronix.de>
 References: <1317364642-22956-1-git-send-email-jason77.wang@gmail.com>
-	<20111003052458.GA21563@S2100-06.ap.freescale.net>
-Message-ID: <4E8FA884.5010308@gmail.com>
+	<20111004074316.GK31404@pengutronix.de>
+Message-ID: <4E8FA8B3.80206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo wrote:
+Sascha Hauer wrote:
 > On Fri, Sep 30, 2011 at 02:37:22PM +0800, Hui Wang wrote:
 >   
 >> Two problems exist in the current i.MX5 pm suspend/resume and idle
 >> functions. The first is the current i.MX5 suspend routine will call
->>     
-<snip>
->> MPGC1_SRPGCR);
->>  	}
->>  }
->> +
->> +void mx5_arch_idle(void)
->> +{
->> +		if (gpc_dvfs_clk == NULL)
->> +			gpc_dvfs_clk = clk_get(NULL, "gpc_dvfs");
->> +
->> +		/* gpc clock is needed for SRPG */
->> +		clk_enable(gpc_dvfs_clk);
->> +		mx5_cpu_lp_set(WAIT_UNCLOCKED_POWER_OFF);
->> +		if (tzic_enable_wake() != 0)
->> +			goto exit;
->> +		cpu_do_idle();
->> +exit:
->> +		clk_disable(gpc_dvfs_clk);
+>> tzic_enable_wake(1) to set wake source, this will set all enabled
+>> irq as wake source rather than those wake capable. The second
+>> is i.MX5 idle will call mx5_cpu_lp_set() to prepare enter low power
+>> mode, but it forgets to call wfi instruction to enter this mode.
+>>
+>> To fix these two problems, using generic irq chip pm interface and
+>> adding a new function mx5_arch_idle().
+>>
+>> Signed-off-by: Hui Wang <jason77.wang@gmail.com>
 >>     
 >
-> Bad indentation on entire function block (should be 1 tab rather than 2)
+> As shawn already pointed out this conflicts with the imx-cleanup
+> branch. Can you rework this onto it? Shawn has reworked the SoC
+> specific idle stuff, so this is different now.
 >
-> Regards,
-> Shawn
+> Also, please find a better subject for this patch. 'modify pm and idle'
+> is not enough.
+>
+> Sascha
 >
 >   
-Got it. I will fix it in the V2.
-
->> +}
->> diff --git a/arch/arm/plat-mxc/include/mach/mxc.h b/arch/arm/plat-mxc/include/mach/mxc.h
->> index 0987923..c4d324a 100644
->> --- a/arch/arm/plat-mxc/include/mach/mxc.h
->> +++ b/arch/arm/plat-mxc/include/mach/mxc.h
->> @@ -182,7 +182,7 @@ struct cpu_op {
->>  	u32 cpu_rate;
->>  };
->>  
+Got it, OK.
+>> ---
+>>
+>> This patch is basing on the latest imx-features branch.
+>>
+>> This patch is validated on the i.MX51 PDK board (CPU revision 2.0).
+>>
+>> Since both pm suspend/resume and idle has close relation with
+>> mx5_cpu_lp_set() and tzic_enable_wake(), i choose to use one patch
+>> instead of independent two to address existing problems.
+>>
+>>  arch/arm/mach-mx5/system.c              |   24 +++++++++++++++--
+>>  arch/arm/plat-mxc/include/mach/mxc.h    |    2 +-
+>>  arch/arm/plat-mxc/include/mach/system.h |    3 +-
+>>  arch/arm/plat-mxc/tzic.c                |   42 ++++++++++++++++++++++---------
+>>  4 files changed, 54 insertions(+), 17 deletions(-)
 >>     
