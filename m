@@ -1,76 +1,77 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 8 Oct 2011 19:58:23 +0800
-Subject: [PATCH v2] pinmux: add a driver for the CSR SiRFprimaII pinmux
-In-Reply-To: <CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
-References: <1314843744-2910-1-git-send-email-Baohua.Song@csr.com>
-	<CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
-Message-ID: <CAGsJ_4xpYMzHGi09jt2Y9xCocYJ0iHYRfdvwCzcH65uaF2sP0g@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sat, 8 Oct 2011 20:37:53 +0800
+Subject: [PATCH 08/26] ARM: pxa: move z2 to generic cpu_suspend
+In-Reply-To: <201110071156.38283.arnd@arndb.de>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<1317499438-14058-9-git-send-email-arnd@arndb.de>
+	<CAMPhdO-tz2HgBYQGOUW6hrA6fC=x+CQJ3dwbW_0AazFB=cjvbA@mail.gmail.com>
+	<201110071156.38283.arnd@arndb.de>
+Message-ID: <CAMPhdO97bJZ1FRHUq_VHQ8oHyY7U4ay-jv5Ft+gunRwtBvz8qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/9/1, Linus Walleij <linus.walleij@linaro.org>:
-> On Thu, Sep 1, 2011 at 4:22 AM, Barry Song <Baohua.Song@csr.com> wrote:
+On Fri, Oct 7, 2011 at 5:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 07 October 2011, Eric Miao wrote:
+>> commit 3f7961cbd3428c8639d42d1a51870466e4cbb0eb
+>> Author: Eric Miao <eric.y.miao@gmail.com>
+>> Date: ? Sun Sep 11 17:19:11 2011 +0800
+>>
+>> ? ? ARM: pxa/z2: fix building error of pxa27x_cpu_suspend() no longer available
+>>
+>> ? ? Cc: Vasily Khoruzhick <anarsoul@gmail.com>
+>> ? ? Signed-off-by: Eric Miao <eric.y.miao@gmail.com>
+>>
+>> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+>> index 6c9275a..6fa4e74 100644
+>> --- a/arch/arm/mach-pxa/z2.c
+>> +++ b/arch/arm/mach-pxa/z2.c
+>> @@ -679,6 +679,8 @@ static inline void z2_pmic_init(void) {}
+>> ?#endif
+>>
+>> ?#ifdef CONFIG_PM
+>> +extern void pxa27x_cpu_pm_enter(suspend_state_t state);
+>> +
+>> ?static void z2_power_off(void)
+>> ?{
+>> ? ? ? ? /* We're using deep sleep as poweroff, so clear PSPR to ensure that
 >
->>  -v2:
->>  rebase to Linus W's v5 patch(v5 is still in discussion);
->>  add complete pinmux list table;
->>  add gpio ranges;
->>  replace mask magic number by bitops;
->>  rename upmx to spmx
->
-> No further comments on this, but now I went in and rewrote
-> pinmuxing a bit so that pin groups are a separate concept from
-> pinmux (which just refers to a group). Please have a look at
-> the U300 driver and see if you can accomodate the changes.
->
-> Sorry for the flow of respins but I'm really liking the stuff that
-> has come out as a result of Stephen's feedback. Having
-> separate groups and functions may look a bit crufty on
-> simple pinmuxes but I'm pretty convinced it'll be a win
-> for the subsystem when moving to more complex drivers.
->
->> +static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
->> +       {
->> +               .name = "lcd_16bits",
->> +               .pins = lcd_16bits_pins,
->> +               .num_pins = ARRAY_SIZE(lcd_16bits_pins),
->> +               .padmux = &lcd_16bits_padmux,
->> +       }, {
->> +               .name = "lcd_18bits",
->> +               .pins = lcd_18bits_pins,
->> +               .num_pins = ARRAY_SIZE(lcd_18bits_pins),
->> +               .padmux = &lcd_18bits_padmux,
->> +       }, {
->
-> You can probably simplify this and other things with
-> preprocessor macros if you want to, like:
->
-> #define SIRF_FUNC_ENTRY(a) \
-> { .name = "##a##", .pins = ##a##_pins, .num_pins =
-> ARRAY_SIZE(##a##_pins), .padmux = &##a##_padmux }
->
-> Then just:
->
-> static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
->     SIRF_FUNC_ENTRY(lcd_16bits),
->
->
-> The macro syntax is probably wrong, the preprocessor always
-> craze me out, but you get the idea.
+> You really shouldn't have an extern declaration in a .c file. Otherwise
+> looks good to me.
 
- :-)  .name = "##a##"  should be changed to .name = #a
+How about this one?
 
-#name will convert name into a string "name"
+diff --git a/arch/arm/mach-pxa/include/mach/pxa27x.h
+b/arch/arm/mach-pxa/include/mach/pxa27x.h
+index b9b1bdc..7cff640 100644
+--- a/arch/arm/mach-pxa/include/mach/pxa27x.h
++++ b/arch/arm/mach-pxa/include/mach/pxa27x.h
+@@ -1,6 +1,7 @@
+ #ifndef __MACH_PXA27x_H
+ #define __MACH_PXA27x_H
 
-for example,
++#include <linux/suspend.h>
+ #include <mach/hardware.h>
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/mfp-pxa27x.h>
+@@ -21,6 +22,7 @@
+ extern void __init pxa27x_map_io(void);
+ extern void __init pxa27x_init_irq(void);
+ extern int __init pxa27x_set_pwrmode(unsigned int mode);
++extern void pxa27x_cpu_pm_enter(suspend_state_t state);
 
-#define PRINT( n ) printf( #n )
+ #define pxa27x_handle_irq      ichp_handle_irq
 
-main()
-{
-    PRINT(100);
-}
-
-will output 100.
-
--barry
+diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+index 6c9275a..a82d420 100644
+--- a/arch/arm/mach-pxa/z2.c
++++ b/arch/arm/mach-pxa/z2.c
+@@ -686,7 +686,8 @@ static void z2_power_off(void)
+         */
+        PSPR = 0x0;
+        local_irq_disable();
+-       pxa27x_cpu_suspend(PWRMODE_DEEPSLEEP, PLAT_PHYS_OFFSET - PAGE_OFFSET);
++       pxa27x_set_pwrmode(PWRMODE_DEEPSLEEP);
++       pxa27x_cpu_pm_enter(PM_SUSPEND_MEM);
+ }
+ #else
+ #define z2_power_off   NULL
