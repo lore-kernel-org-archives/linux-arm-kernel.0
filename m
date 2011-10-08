@@ -1,57 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 08 Oct 2011 15:08:27 +0200
-Subject: [PATCH v2] pinmux: add a driver for the CSR SiRFprimaII pinmux
-In-Reply-To: <CAGsJ_4xpYMzHGi09jt2Y9xCocYJ0iHYRfdvwCzcH65uaF2sP0g@mail.gmail.com>
-References: <1314843744-2910-1-git-send-email-Baohua.Song@csr.com>
-	<CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
-	<CAGsJ_4xpYMzHGi09jt2Y9xCocYJ0iHYRfdvwCzcH65uaF2sP0g@mail.gmail.com>
-Message-ID: <3712698.4MAZQPafzW@wuerfel>
+Date: Sat, 08 Oct 2011 15:24:04 +0200
+Subject: [PATCH 17/26] ARM: pxa: pxa95x is incompatible with earlier pxa
+In-Reply-To: <CAN1soZy3_9Trycti8SCbnO75N6NE31tFqrKMpZtiJPgwNc2cbg@mail.gmail.com>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<CAMPhdO_L-g4vSj3fC-1ckqnHGAPhWOy6Hm4VL5iUbZbbdjRkNQ@mail.gmail.com>
+	<CAN1soZy3_9Trycti8SCbnO75N6NE31tFqrKMpZtiJPgwNc2cbg@mail.gmail.com>
+Message-ID: <1499585.ED4ktnBDpX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 08 October 2011 19:58:23 Barry Song wrote:
-> > You can probably simplify this and other things with
-> > preprocessor macros if you want to, like:
-> >
-> > #define SIRF_FUNC_ENTRY(a) \
-> > { .name = "##a##", .pins = ##a##_pins, .num_pins =
-> > ARRAY_SIZE(##a##_pins), .padmux = &##a##_padmux }
-> >
-> > Then just:
-> >
-> > static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
-> >     SIRF_FUNC_ENTRY(lcd_16bits),
-> >
-> >
-> > The macro syntax is probably wrong, the preprocessor always
-> > craze me out, but you get the idea.
+On Saturday 08 October 2011 11:32:14 Haojian Zhuang wrote:
 > 
->  :-)  .name = "##a##"  should be changed to .name = #a
+> Eric,
 > 
-> #name will convert name into a string "name"
-> 
+> At first, a new macro (ARCH_PXA_V7) is defined in
+> arch/arm/mach-pxa/Kconfig in this patch.
+> I prefer to move this macro to arch/arm/Kconfig.
 
-Better don't use string concatenation at all if you can avoid it.
+If we move it to arch/arm/Kconfig, I would prefer making it a global option,
+not a pxa specific one. If we introduce a top-level CONFIG_CPU_V6PLUS
+option, we can make a number of decisions inside of Kconfig depend on that,
+especially as we move to allow building multiple v6/v7 platforms together,
+or multiple v5 platforms for that matter. I believe we don't need to
+worry about v5+v7 at this point and can instead assume that won't ever
+happen.
 
-A generic macro like
+> Secondly, pxa95x is both used in saarb and tavorevb3.
 
-#define SIRF_PINMUX(_name, _pins, _padmux) \
-	{ .name = (_name), .pins = (_pins), \
-	  .num_pins = ARRAY_SIZE(_pins), padmux = (_padmux), }
+The patch makes that very explicit, doesn't it?
 
-is both very easy to understand for someone reading it casually and
-lets you actually grep for where the identifiers are being used.
+> Thirdly, PXA_V7_MACH_AUTO is unnecessary. We just need to select those
+> machines in defconfig or define a new DT machine type to select all
+> machines.
 
-> static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
->     SIRF_FUNC_ENTRY(lcd_16bits),
-
-for the first time, you have no clue what that does, but
-
-static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
-	SIRF_PINMUX("lcd_16bits", lcd_16bits_pins, &lcd_16bits_padmux),
-	...
-};
-
-Makes it very clear what you are referencing here and needs no extra lines.
+Enabling them in defconfig will not help here, it still allows creating
+an invalid configuration by disabling both saarb and tavorevb3.
+I agree that it would be best to have a single DT machine type that can
+handle both saarb and tavorevb3 as well as any future pxa95x based machines,
+but nobody has implemented that yet. In the meantime, I think we should
+have the PXA_V7_MACH_AUTO or an equivalent mechanism to enforce that at
+least one of the two board files gets built into any kernel. This is mostly
+important to help the 'make randconfig' builds succeed, not for actual
+users getting it wrong accidentally.
 
 	Arnd
