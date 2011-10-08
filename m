@@ -1,50 +1,50 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 8 Oct 2011 19:34:29 +0530
-Subject: [PATCH 0/3] GIC OF bindings
-In-Reply-To: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
-References: <1317410880-24828-1-git-send-email-robherring2@gmail.com>
-Message-ID: <CAJuYYwRLqdfagj7KxbdmvPBz2J1LWwphew+0eTkxWDZtW8Zh7Q@mail.gmail.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Sat, 08 Oct 2011 18:18:19 +0400
+Subject: [PATCH V2 1/2] ARM: S3C2410: Add __init attribute to
+	usb_simtec_init()
+In-Reply-To: <1317988513-20800-2-git-send-email-tushar.behera@linaro.org>
+References: <1317988513-20800-1-git-send-email-tushar.behera@linaro.org>
+	<1317988513-20800-2-git-send-email-tushar.behera@linaro.org>
+Message-ID: <4E905BAB.5060108@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 October 2011 00:57, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Another round of GIC devicetree support.
->
-> This moves the tracking of the starting hwirq number into the irq domain
-> code. Doing this makes hwirq == GIC interrupt ID and simplifies the GIC
-> code removing irq_offset.
->
-> The full series is available here. This includes Russell's devel-stable and
-> for-next branches and Nico's vmalloc branch:
->
-> git://git.jdl.com/software/linux-3.0.git gic-v2
->
-> Tested on highbank and Realview 11MPCore qemu (2 GICs).
->
-> Rob
->
-> Rob Herring (3):
-> ?irq: support domains with non-zero hwirq base
-> ?ARM: gic: add irq_domain support
-> ?ARM: gic: add OF based initialization
+Hello.
 
-For Exynos4 GIC and Interrupt Combiner Controllers:
+On 07-10-2011 15:55, Tushar Behera wrote:
 
-Tested-by: Thomas Abraham <thomas.abraham@linaro.org>
+> usb_simtec_init() references s3c_ohci_set_platdata() which is defined
+> with __init attribute. Hence to remove section mismatch warning, __init
+> attribute is added to usb_simtec_init().
 
+> It removes following two warnigs.
+
+> WARNING: vmlinux.o(.text+0x1460c): Section mismatch in reference from
+> the function     usb_simtec_init() to the function
+>   .init.text:s3c_ohci_set_platdata()
+> The function usb_simtec_init() references the function
+>   __init s3c_ohci_set_platdata().
+
+> WARNING: vmlinux.o(.text+0x14650): Section mismatch in reference from
+> the function     usb_simtec_init() to the (unknown reference)
+> .init.data:(unknown)
+> The function usb_simtec_init() references the (unknown reference)
+> __initdata (unknown).
+
+> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
+[...]
+
+> diff --git a/arch/arm/mach-s3c2410/usb-simtec.h b/arch/arm/mach-s3c2410/usb-simtec.h
+> index 03842ed..43cc88f 100644
+> --- a/arch/arm/mach-s3c2410/usb-simtec.h
+> +++ b/arch/arm/mach-s3c2410/usb-simtec.h
+> @@ -12,5 +12,5 @@
+>    * published by the Free Software Foundation.
+>   */
 >
-> ?Documentation/devicetree/bindings/arm/gic.txt | ? 55 ++++++++++
-> ?arch/arm/common/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
-> ?arch/arm/common/gic.c ? ? ? ? ? ? ? ? ? ? ? ? | ?142 +++++++++++++++++++------
-> ?arch/arm/include/asm/hardware/gic.h ? ? ? ? ? | ? ?5 +-
-> ?include/linux/irqdomain.h ? ? ? ? ? ? ? ? ? ? | ? 16 +++-
-> ?kernel/irq/irqdomain.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 12 +-
-> ?6 files changed, 189 insertions(+), 42 deletions(-)
-> ?create mode 100644 Documentation/devicetree/bindings/arm/gic.txt
->
-> --
-> 1.7.5.4
->
->
+> -extern int usb_simtec_init(void);
+> +extern int __init usb_simtec_init(void);
+
+    Function prototypes don't need to be annotated with __init.
+
+WBR, Sergei
