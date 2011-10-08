@@ -1,61 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 08 Oct 2011 17:23:24 +0200
-Subject: [PATCH] ARM: omap2+: stub out omap*_volt_data
-Message-ID: <1397689.kebELtC4N3@wuerfel>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Sat,  8 Oct 2011 17:19:49 +0200
+Subject: [PATCH 2/2] [ARM] MX1:apf9328: Add i2c support
+In-Reply-To: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <1318087189-22977-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PM_OPP is not set, the definitions for these variables
-are not available, so we should conditionally define them to
-NULL.
 
-arch/arm/mach-omap2/built-in.o: In function `omap3xxx_voltagedomains_init':
-voltagedomains3xxx_data.c:100: undefined reference to `omap36xx_vddmpu_volt_data'
-voltagedomains3xxx_data.c:100: undefined reference to `omap34xx_vddmpu_volt_data'
-voltagedomains3xxx_data.c:100: undefined reference to `omap36xx_vddcore_volt_data'
-voltagedomains3xxx_data.c:100: undefined reference to `omap34xx_vddcore_volt_data'
-arch/arm/mach-omap2/built-in.o: In function `omap44xx_voltagedomains_init':
-voltagedomains44xx_data.c:111: undefined reference to `omap44xx_vdd_mpu_volt_data'
-voltagedomains44xx_data.c:111: undefined reference to `omap44xx_vdd_iva_volt_data'
-voltagedomains44xx_data.c:111: undefined reference to `omap44xx_vdd_core_volt_data'
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 ---
-I got this build error only now after pulling in the latest omap series, but
-I cannot tell what caused it. It's also not clear to me if this is the correct
-solution. Please ack or provide a better fix.
+ arch/arm/mach-imx/Kconfig        |    1 +
+ arch/arm/mach-imx/mach-apf9328.c |   10 ++++++++++
+ 2 files changed, 11 insertions(+), 0 deletions(-)
 
- arch/arm/mach-omap2/omap_opp_data.h |   13 ++++++++++++-
- 1 files changed, 12 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_opp_data.h b/arch/arm/mach-omap2/omap_opp_data.h
-index c784c12..fdbf96b 100644
---- a/arch/arm/mach-omap2/omap_opp_data.h
-+++ b/arch/arm/mach-omap2/omap_opp_data.h
-@@ -83,7 +83,7 @@ struct omap_opp_def {
- extern int __init omap_init_opp_table(struct omap_opp_def *opp_def,
- 		u32 opp_def_size);
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 4792fd5..0e89395 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -99,6 +99,7 @@ config MACH_SCB9328
+ config MACH_APF9328
+ 	bool "APF9328"
+ 	select SOC_IMX1
++	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	help
+ 	  Say Yes here if you are using the Armadeus APF9328 development board
+diff --git a/arch/arm/mach-imx/mach-apf9328.c b/arch/arm/mach-imx/mach-apf9328.c
+index a404c89..f60e2b4 100644
+--- a/arch/arm/mach-imx/mach-apf9328.c
++++ b/arch/arm/mach-imx/mach-apf9328.c
+@@ -18,6 +18,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/dm9000.h>
++#include <linux/i2c.h>
  
--
-+#ifdef CONFIG_PM_OPP
- extern struct omap_volt_data omap34xx_vddmpu_volt_data[];
- extern struct omap_volt_data omap34xx_vddcore_volt_data[];
- extern struct omap_volt_data omap36xx_vddmpu_volt_data[];
-@@ -93,4 +93,15 @@ extern struct omap_volt_data omap44xx_vdd_mpu_volt_data[];
- extern struct omap_volt_data omap44xx_vdd_iva_volt_data[];
- extern struct omap_volt_data omap44xx_vdd_core_volt_data[];
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -41,6 +42,9 @@ static const int apf9328_pins[] __initconst = {
+ 	PB29_PF_UART2_RTS,
+ 	PB30_PF_UART2_TXD,
+ 	PB31_PF_UART2_RXD,
++	/* I2C */
++	PA15_PF_I2C_SDA,
++	PA16_PF_I2C_SCL,
+ };
  
-+#else
-+#define omap34xx_vddmpu_volt_data	NULL
-+#define omap34xx_vddcore_volt_data	NULL
-+#define omap36xx_vddmpu_volt_data	NULL
-+#define omap36xx_vddcore_volt_data	NULL
+ /*
+@@ -103,6 +107,10 @@ static const struct imxuart_platform_data uart1_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+ 
++static const struct imxi2c_platform_data apf9328_i2c_data __initconst = {
++	.bitrate = 100000,
++};
 +
-+#define omap44xx_vdd_mpu_volt_data	NULL
-+#define omap44xx_vdd_iva_volt_data	NULL
-+#define omap44xx_vdd_core_volt_data	NULL
-+#endif
+ static struct platform_device *devices[] __initdata = {
+ 	&apf9328_flash_device,
+ 	&dm9000x_device,
+@@ -119,6 +127,8 @@ static void __init apf9328_init(void)
+ 	imx1_add_imx_uart0(NULL);
+ 	imx1_add_imx_uart1(&uart1_pdata);
+ 
++	imx1_add_imx_i2c(&apf9328_i2c_data);
 +
- #endif		/* __ARCH_ARM_MACH_OMAP2_OMAP_OPP_DATA_H */
+ 	platform_add_devices(devices, ARRAY_SIZE(devices));
+ }
+ 
 -- 
-1.7.5.4
+1.7.3.4
