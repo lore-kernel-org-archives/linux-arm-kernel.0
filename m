@@ -1,66 +1,62 @@
-From: josh@joshtriplett.org (Josh Triplett)
-Date: Sat, 8 Oct 2011 11:18:29 -0700
-Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <20111008155502.GB616@kroah.com>
-References: <1317963790-29426-1-git-send-email-manjugk@ti.com>
-	<1317963790-29426-3-git-send-email-manjugk@ti.com>
-	<20111007064928.GE27508@kroah.com> <20111007205715.GC5275@leaf>
-	<20111007212326.GA29003@kroah.com> <20111008040351.GA7694@leaf>
-	<20111008155502.GB616@kroah.com>
-Message-ID: <20111008181829.GB15617@leaf>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sun, 9 Oct 2011 00:31:55 +0530
+Subject: Serieal console on Samsung S3C6410 ARM11 CPU (Was [ANNOUNCE]
+	3.0.6-rt17)
+In-Reply-To: <201110082015.17128.jbe@pengutronix.de>
+References: <alpine.LFD.2.02.1110070046270.3240@ionos>
+	<201110081326.58731.jbe@pengutronix.de>
+	<CAJuYYwSEvA+EHwyhgeZkBX+bB_e1cmFnC6YdEx-CdHzk8peyEw@mail.gmail.com>
+	<201110082015.17128.jbe@pengutronix.de>
+Message-ID: <CAJuYYwSB7CT=gyJTBcp4hrAR=Qwon=TzudR7ptA0kr+6RwCMFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 08, 2011 at 08:55:02AM -0700, Greg KH wrote:
-> On Fri, Oct 07, 2011 at 09:03:51PM -0700, Josh Triplett wrote:
-> > On Fri, Oct 07, 2011 at 02:23:26PM -0700, Greg KH wrote:
-> > > On Fri, Oct 07, 2011 at 01:57:15PM -0700, Josh Triplett wrote:
-> > > > On Thu, Oct 06, 2011 at 11:49:28PM -0700, Greg KH wrote:
-> > > > > On Fri, Oct 07, 2011 at 10:33:07AM +0500, G, Manjunath Kondaiah wrote:
-> > > > > > +config PROBE_DEFER
-> > > > > > +	bool "Deferred Driver Probe"
-> > > > > > +	default y
-> > > > > > +	help
-> > > > > > +	  This option provides deferring driver probe if it has dependency on
-> > > > > > +	  other driver. Without this feature, initcall ordering should be done
-> > > > > > +	  manually to resolve driver dependencies. This feature completely side
-> > > > > > +	  steps the issues by allowing driver registration to occur in any
-> > > > > > +	  order, and any driver can request to be retried after a few more other
-> > > > > > +	  drivers get probed.
-> > > > > 
-> > > > > Why is this even an option?  Why would you ever want it disabled?  Why
-> > > > > does it need to be selected?
-> > > > > 
-> > > > > If you are going to default something to 'y' then just make it so it
-> > > > > can't be turned off any other way by just not making it an option at
-> > > > > all.
-> > > > 
-> > > > Given that the drivers which use this mechanism will not necessarily get
-> > > > built into the kernel, I'd suggest that it should remain optional and
-> > > > default to n.  Those drivers can then add a dependency on PROBE_DEFER.
-> > > > Let's try to avoid adding more infrastructure to the kernel that takes
-> > > > up space even when unused; certainly embedded will appreciate not having
-> > > > this feature unless a driver needs it.
-> > > 
-> > > How much extra space is this "feature" really?
-> > 
-> > Just checked: 776 bytes, 640 of text and 136 of data.  We have kconfig
-> > options for comparable amounts.
-> > 
-> > > I don't see it being
-> > > anything larger than the amount of memory increase that just happened as
-> > > I typed this email as part of the ongoing memory density changes.
-> > 
-> > I don't know about the changes you mean
-> 
-> Moore's law.
+On 8 October 2011 23:45, Juergen Beisert <jbe@pengutronix.de> wrote:
+> Hi Thomas,
+>
+> Thomas Abraham wrote:
+>> On 8 October 2011 16:56, Juergen Beisert <jbe@pengutronix.de> wrote:
+>> > Thomas Gleixner wrote:
+>> >> I'm pleased to announce the 3.0.6-rt17 release.
+>> >
+>> > I have no idea where to search, but when I'm using the 3.0.6-rt17 on my
+>> > Samsung S3C6410 ARM based system, the UART (serial console) does not work
+>> > as expected. Typing only one char at a time is okay. Typing two chars
+>> > immediately makes the system using 100 % CPU load and takes about 2
+>> > seconds to respond. It seems the interrupt handling is broken in the UART
+>> > driver, but I don't know how to fix it.
+>> >
+>> > This with a simple cursor up (one char to get the last command) and a
+>> > small pause to the next "ENTER" char:
+>> >
+>> > root at mini6410:~ cat /proc/interrupts | grep 18:
+>> > ?18: ? ?5739107 ?s3c-uart ?s3c6400-uart
+>> >
+>> > Same again:
+>> >
+>> > root at mini6410:~ cat /proc/interrupts | grep 18:
+>> > ?18: ? ?5739113 ?s3c-uart ?s3c6400-uart
+>> >
+>> > 6 interrupts seems reasonable.
+>> >
+>> > Now with cursor up and SPACE immediately, then a pause for ENTER:
+>> >
+>> > root at mini6410:~ cat /proc/interrupts | grep 18:
+>> > ?18: ? ?5923815 ?s3c-uart ?s3c6400-uart
+>> >
+>> > 184702 interrupts looks strange.
+>>
+>> Just curious, do you have the following two commits?
+>>
+>> serial: samsung: Add unified interrupt handler for s3c64xx and later SoC's
+>> ARM: SAMSUNG: Remove uart irq handling from platform code
+>
+> Are they part of the current 3.0.6 vanilla kernel? I'm only using the vanilla
+> 3.0.6 with rt17 on my target.
 
-Ah, I see.  For new systems, sure; for systems or mechanisms with a
-pre-existing size constraint, that doesn't help.
+No. I don't think they are part of 3.0.6 kernel. I am not sure of the
+issue you have with serial console, but if you do not have these
+patches already applied, you could try with them.
 
-> Really, 776 bytes, just always enable it, it's not worth it.
-
-776 bytes alone, no; 776 bytes times the next (or previous) thousand
-features, yes.
-
-- Josh Triplett
+Thanks,
+Thomas.
