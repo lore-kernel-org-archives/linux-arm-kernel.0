@@ -1,26 +1,51 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Sat, 8 Oct 2011 22:25:45 +0900
-Subject: [PATCH v3 RE-SEND 2/2] iommu/exynos: Add iommu driver for Exynos
-	Platforms
-In-Reply-To: <4E8F6532.9060609@gmail.com>
-References: <01e601cc84d9$4530d6a0$cf9283e0$%kim@samsung.com>
-	<4E8F6532.9060609@gmail.com>
-Message-ID: <CAHQjnOPRvjD1X-T3w1yDKhf5QLq9rz9Vc2vs2yzU1xynFx-Wow@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sat, 8 Oct 2011 18:59:18 +0530
+Subject: Serieal console on Samsung S3C6410 ARM11 CPU (Was [ANNOUNCE]
+	3.0.6-rt17)
+In-Reply-To: <201110081326.58731.jbe@pengutronix.de>
+References: <alpine.LFD.2.02.1110070046270.3240@ionos>
+	<201110081326.58731.jbe@pengutronix.de>
+Message-ID: <CAJuYYwSEvA+EHwyhgeZkBX+bB_e1cmFnC6YdEx-CdHzk8peyEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 8, 2011 at 5:46 AM, Sylwester Nawrocki
-<sylvester.nawrocki@gmail.com> wrote:
->> -
->> -config S5P_SLEEP
->> - ? ? bool
->> - ? ? help
->> - ? ? ? Internal config node to apply common S5P sleep management code.
->> - ? ? ? Can be selected by S5P and newer SoCs with similar sleep procedure.
->> -
+Hi Juergen,
+
+On 8 October 2011 16:56, Juergen Beisert <jbe@pengutronix.de> wrote:
+> Thomas Gleixner wrote:
+>> I'm pleased to announce the 3.0.6-rt17 release.
 >
-> Is S5P_SLEEP being removed intentionally ? It doesn't seem to belong here.
+> I have no idea where to search, but when I'm using the 3.0.6-rt17 on my
+> Samsung S3C6410 ARM based system, the UART (serial console) does not work as
+> expected. Typing only one char at a time is okay. Typing two chars
+> immediately makes the system using 100 % CPU load and takes about 2 seconds
+> to respond. It seems the interrupt handling is broken in the UART driver, but
+> I don't know how to fix it.
+>
+> This with a simple cursor up (one char to get the last command) and a small
+> pause to the next "ENTER" char:
+>
+> root at mini6410:~ cat /proc/interrupts | grep 18:
+> ?18: ? ?5739107 ?s3c-uart ?s3c6400-uart
+>
+> Same again:
+>
+> root at mini6410:~ cat /proc/interrupts | grep 18:
+> ?18: ? ?5739113 ?s3c-uart ?s3c6400-uart
+>
+> 6 interrupts seems reasonable.
+>
+> Now with cursor up and SPACE immediately, then a pause for ENTER:
+>
+> root at mini6410:~ cat /proc/interrupts | grep 18:
+> ?18: ? ?5923815 ?s3c-uart ?s3c6400-uart
+>
+> 184702 interrupts looks strange.
 
-No, it is a mistake while rebasing the patches.
+Just curious, do you have the following two commits?
 
-Thank you for pointing that.
+serial: samsung: Add unified interrupt handler for s3c64xx and later SoC's
+ARM: SAMSUNG: Remove uart irq handling from platform code
+
+Thanks,
+Thomas.
