@@ -1,157 +1,43 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat,  8 Oct 2011 22:20:17 +0200
-Subject: [PATCH] arm: mx3: update defconfig
-Message-ID: <1318105217-32039-1-git-send-email-w.sang@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 08 Oct 2011 22:40:39 +0200
+Subject: [GIT PULL] final arm-soc fixes for 3.1
+Message-ID: <2473979.6NMHgbd7Ss@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Activate watchdog, rtc, usb, usb-gadget, keypad, audio for broader test
-coverage. Disable remote controls. Activate ARM errata as mentioned in [1].
-Rest of changes is caused by version bump to 3.1-rc9.
+Hi Linus,
 
-[1] http://www.spinics.net/lists/arm-kernel/msg88710.html
+Here are some last fixes from my side, please consider merging them into 3.1.
+The majority of fixes that I received is now queued up in my next branch
+for 3.2, but these are the ones that we agreed should still be merged before
+the release.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
----
- arch/arm/configs/mx3_defconfig |   46 ++++++++++++++++++++++++++++-----------
- 1 files changed, 33 insertions(+), 13 deletions(-)
+	Arnd
 
-diff --git a/arch/arm/configs/mx3_defconfig b/arch/arm/configs/mx3_defconfig
-index 7c4b30b..cb0717f 100644
---- a/arch/arm/configs/mx3_defconfig
-+++ b/arch/arm/configs/mx3_defconfig
-@@ -3,7 +3,6 @@ CONFIG_SYSVIPC=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=14
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_EXPERT=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
-@@ -13,20 +12,21 @@ CONFIG_MODVERSIONS=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_MXC=y
- CONFIG_MACH_MX31ADS_WM1133_EV1=y
-+CONFIG_MACH_MX31LILLY=y
-+CONFIG_MACH_MX31LITE=y
- CONFIG_MACH_PCM037=y
- CONFIG_MACH_PCM037_EET=y
--CONFIG_MACH_MX31LITE=y
- CONFIG_MACH_MX31_3DS=y
- CONFIG_MACH_MX31MOBOARD=y
--CONFIG_MACH_MX31LILLY=y
- CONFIG_MACH_QONG=y
--CONFIG_MACH_PCM043=y
- CONFIG_MACH_ARMADILLO5X0=y
--CONFIG_MACH_MX35_3DS=y
- CONFIG_MACH_KZM_ARM11_01=y
-+CONFIG_MACH_PCM043=y
-+CONFIG_MACH_MX35_3DS=y
- CONFIG_MACH_EUKREA_CPUIMX35=y
- CONFIG_MXC_IRQ_PRIOR=y
- CONFIG_MXC_PWM=y
-+CONFIG_ARM_ERRATA_411920=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_PREEMPT=y
-@@ -35,7 +35,6 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="noinitrd console=ttymxc0,115200 root=/dev/mtdblock2 rw ip=off"
- CONFIG_VFP=y
--CONFIG_PM=y
- CONFIG_PM_DEBUG=y
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -52,7 +51,6 @@ CONFIG_IP_PNP_DHCP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_FW_LOADER=m
- CONFIG_MTD=y
--CONFIG_MTD_PARTITIONS=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
-@@ -62,24 +60,27 @@ CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_MXC=y
- CONFIG_MTD_UBI=y
- # CONFIG_BLK_DEV is not set
-+CONFIG_MISC_DEVICES=y
- CONFIG_EEPROM_AT24=y
- CONFIG_NETDEVICES=y
- CONFIG_SMSC_PHY=y
- CONFIG_NET_ETHERNET=y
- CONFIG_SMSC911X=y
- CONFIG_DNET=y
--CONFIG_FEC=y
- # CONFIG_NETDEV_1000 is not set
- # CONFIG_NETDEV_10000 is not set
--# CONFIG_INPUT is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_IMX=y
-+# CONFIG_INPUT_MOUSE is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_8250=m
- CONFIG_SERIAL_8250_EXTENDED=y
- CONFIG_SERIAL_8250_SHARE_IRQ=y
- CONFIG_SERIAL_IMX=y
- CONFIG_SERIAL_IMX_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
-@@ -89,12 +90,15 @@ CONFIG_W1=y
- CONFIG_W1_MASTER_MXC=y
- CONFIG_W1_SLAVE_THERM=y
- # CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_IMX2_WDT=y
- CONFIG_MFD_WM8350_I2C=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_WM8350=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_VIDEO_DEV=y
--# CONFIG_VIDEO_ALLOW_V4L1 is not set
-+# CONFIG_RC_CORE is not set
-+# CONFIG_MEDIA_TUNER_CUSTOMISE is not set
- CONFIG_SOC_CAMERA=y
- CONFIG_SOC_CAMERA_MT9M001=y
- CONFIG_SOC_CAMERA_MT9M111=y
-@@ -105,9 +109,26 @@ CONFIG_SOC_CAMERA_OV772X=y
- CONFIG_VIDEO_MX3=y
- # CONFIG_RADIO_ADAPTERS is not set
- CONFIG_FB=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_SPI is not set
-+CONFIG_SND_SOC=y
-+CONFIG_SND_IMX_SOC=y
-+CONFIG_SND_MXC_SOC_WM1133_EV1=y
-+CONFIG_SND_SOC_PHYCORE_AC97=y
-+CONFIG_SND_SOC_EUKREA_TLV320=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_GADGET=m
-+CONFIG_USB_FSL_USB2=m
-+CONFIG_USB_G_SERIAL=m
-+CONFIG_USB_ULPI=y
- CONFIG_MMC=y
- CONFIG_MMC_MXC=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_MXC=y
- CONFIG_DMADEVICES=y
- # CONFIG_DNOTIFY is not set
- CONFIG_TMPFS=y
-@@ -119,6 +140,5 @@ CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
- # CONFIG_ENABLE_WARN_DEPRECATED is not set
- # CONFIG_ENABLE_MUST_CHECK is not set
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- CONFIG_SYSCTL_SYSCALL_CHECK=y
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
--- 
-1.7.6.3
+The following changes since commit a102a9ece5489e1718cd7543aa079082450ac3a2:
+
+  Linux 3.1-rc8 (2011-09-27 15:48:34 -0700)
+
+are available in the git repository at:
+  git://git.linaro.org/people/arnd/arm-soc.git fixes
+
+Arnd Bergmann (1):
+      Merge branch 'omap/fixes-for-3.1' into fixes
+
+Axel Lin (1):
+      ARM: OMAP: musb: Remove a redundant omap4430_phy_init call in usb_musb_init
+
+Bryan Buckley (1):
+      ARM: OMAP4: MMC: fix power and audio issue, decouple USBC1 from MMC1
+
+Tony Lindgren (1):
+      ARM: OMAP: Fix i2c init for twl4030
+
+srinidhi kasagar (1):
+      ARM: mach-ux500: enable fix for ARM errata 754322
+
+ arch/arm/mach-omap2/board-2430sdp.c |    3 ++-
+ arch/arm/mach-omap2/hsmmc.c         |   12 ++++--------
+ arch/arm/mach-omap2/usb-musb.c      |    3 ---
+ arch/arm/mach-ux500/Kconfig         |    1 +
+ 4 files changed, 7 insertions(+), 12 deletions(-)
