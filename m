@@ -1,34 +1,57 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sat, 8 Oct 2011 21:02:19 +0800
-Subject: [PATCH 08/26] ARM: pxa: move z2 to generic cpu_suspend
-In-Reply-To: <14032344.tng7XWeaFg@wuerfel>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<201110071156.38283.arnd@arndb.de>
-	<CAMPhdO97bJZ1FRHUq_VHQ8oHyY7U4ay-jv5Ft+gunRwtBvz8qw@mail.gmail.com>
-	<14032344.tng7XWeaFg@wuerfel>
-Message-ID: <CAMPhdO8D+faQksn79NBWMb_mdsAw0tSatvEL-zhN4jNjKm+trg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 08 Oct 2011 15:08:27 +0200
+Subject: [PATCH v2] pinmux: add a driver for the CSR SiRFprimaII pinmux
+In-Reply-To: <CAGsJ_4xpYMzHGi09jt2Y9xCocYJ0iHYRfdvwCzcH65uaF2sP0g@mail.gmail.com>
+References: <1314843744-2910-1-git-send-email-Baohua.Song@csr.com>
+	<CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
+	<CAGsJ_4xpYMzHGi09jt2Y9xCocYJ0iHYRfdvwCzcH65uaF2sP0g@mail.gmail.com>
+Message-ID: <3712698.4MAZQPafzW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 8, 2011 at 9:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 08 October 2011 20:37:53 Eric Miao wrote:
->> >>
->> >> ?#ifdef CONFIG_PM
->> >> +extern void pxa27x_cpu_pm_enter(suspend_state_t state);
->> >> +
->> >> ?static void z2_power_off(void)
->> >> ?{
->> >> ? ? ? ? /* We're using deep sleep as poweroff, so clear PSPR to ensure that
->> >
->> > You really shouldn't have an extern declaration in a .c file. Otherwise
->> > looks good to me.
->>
->> How about this one?
->
-> Yes, looks good as far as I can tell (I still don't quite understand how the
-> cpu power management all fits together, but I don't see anything wrong with
-> it either.
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Saturday 08 October 2011 19:58:23 Barry Song wrote:
+> > You can probably simplify this and other things with
+> > preprocessor macros if you want to, like:
+> >
+> > #define SIRF_FUNC_ENTRY(a) \
+> > { .name = "##a##", .pins = ##a##_pins, .num_pins =
+> > ARRAY_SIZE(##a##_pins), .padmux = &##a##_padmux }
+> >
+> > Then just:
+> >
+> > static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
+> >     SIRF_FUNC_ENTRY(lcd_16bits),
+> >
+> >
+> > The macro syntax is probably wrong, the preprocessor always
+> > craze me out, but you get the idea.
+> 
+>  :-)  .name = "##a##"  should be changed to .name = #a
+> 
+> #name will convert name into a string "name"
+> 
 
-Applied, thanks.
+Better don't use string concatenation at all if you can avoid it.
+
+A generic macro like
+
+#define SIRF_PINMUX(_name, _pins, _padmux) \
+	{ .name = (_name), .pins = (_pins), \
+	  .num_pins = ARRAY_SIZE(_pins), padmux = (_padmux), }
+
+is both very easy to understand for someone reading it casually and
+lets you actually grep for where the identifiers are being used.
+
+> static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
+>     SIRF_FUNC_ENTRY(lcd_16bits),
+
+for the first time, you have no clue what that does, but
+
+static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
+	SIRF_PINMUX("lcd_16bits", lcd_16bits_pins, &lcd_16bits_padmux),
+	...
+};
+
+Makes it very clear what you are referencing here and needs no extra lines.
+
+	Arnd
