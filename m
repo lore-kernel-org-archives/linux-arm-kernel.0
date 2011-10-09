@@ -1,28 +1,134 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 9 Oct 2011 15:28:18 +0800
-Subject: [PATCH 17/26] ARM: pxa: pxa95x is incompatible with earlier pxa
-In-Reply-To: <CAN1soZzbtqxfNLS_JVhn1irXRVThL=yt_VWfmdkoUL2ShFDEGQ@mail.gmail.com>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<CAMPhdO_L-g4vSj3fC-1ckqnHGAPhWOy6Hm4VL5iUbZbbdjRkNQ@mail.gmail.com>
-	<CAN1soZy3_9Trycti8SCbnO75N6NE31tFqrKMpZtiJPgwNc2cbg@mail.gmail.com>
-	<1499585.ED4ktnBDpX@wuerfel>
-	<CAN1soZyDu43EN3W5YBttdzx7qx=MLKAR1OsJC3hUdqWWxhQaew@mail.gmail.com>
-	<CAMPhdO8_cZU8FEGsK0m_XrhbR33TiZFFaNrXddKT1YrHREt-TQ@mail.gmail.com>
-	<CAN1soZzbtqxfNLS_JVhn1irXRVThL=yt_VWfmdkoUL2ShFDEGQ@mail.gmail.com>
-Message-ID: <CAMPhdO-b2hiXUNSKLqio4uHOEby=H82ckC0oahzRToatXmzw_g@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 9 Oct 2011 17:36:52 +0800
+Subject: [PATCH 1/2] drivers: create a pin control subsystem v9
+In-Reply-To: <1317629862-13549-1-git-send-email-linus.walleij@stericsson.com>
+References: <1317629862-13549-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20111009093651.GC24198@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> They are actually not mutually exclusive - it's a trick we use to select
->> MACH_TAVOREVB3 by default but this option also disappears once SAARB
->> is selected.
->>
-> OK. Could I know why saarb should be deselected while tavorevb3 is selected?
+On Mon, Oct 03, 2011 at 10:17:42AM +0200, Linus Walleij wrote:
+[...]
+> diff --git a/include/linux/pinctrl/machine.h b/include/linux/pinctrl/machine.h
+> new file mode 100644
+> index 0000000..2cd4033
+> --- /dev/null
+> +++ b/include/linux/pinctrl/machine.h
+> @@ -0,0 +1,107 @@
+> +/*
+> + * Machine interface for the pinctrl subsystem.
+> + *
+> + * Copyright (C) 2011 ST-Ericsson SA
+> + * Written on behalf of Linaro for ST-Ericsson
+> + * Based on bits of regulator core, gpio core and clk core
+> + *
+> + * Author: Linus Walleij <linus.walleij@linaro.org>
+> + *
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +#ifndef __LINUX_PINMUX_MACHINE_H
+> +#define __LINUX_PINMUX_MACHINE_H
+> +
+> +/**
+> + * struct pinmux_map - boards/machines shall provide this map for devices
+> + * @name: the name of this specific map entry for the particular machine.
+> + *	This is the second parameter passed to pinmux_get() when you want
+> + *	to have several mappings to the same device
+> + * @ctrl_dev: the pin control device to be used by this mapping, may be NULL
+> + *	if you provide .ctrl_dev_name instead (this is more common)
+> + * @ctrl_dev_name: the name of the device controlling this specific mapping,
+> + *	the name must be the same as in your struct device*, may be NULL if
+> + *	you provide .ctrl_dev instead
+> + * @function: a function in the driver to use for this mapping, the driver
+> + *	will lookup the function referenced by this ID on the specified
+> + *	pin control device
+> + * @group: sometimes a function can map to different pin groups, so this
+> + *	selects a certain specific pin group to activate for the function, if
+> + *	left as NULL, the first applicable group will be used
+> + * @dev: the device using this specific mapping, may be NULL if you provide
+> + *	.dev_name instead (this is more common)
+> + * @dev_name: the name of the device using this specific mapping, the name
+> + *	must be the same as in your struct device*, may be NULL if you
+> + *	provide .dev instead
+> + * @hog_on_boot: if this is set to true, the regulator subsystem will itself
+						^^^^^^^^^
+s/regulator/pinmux?
 
-Haojian, it's not being deselected, it's just when user selects SAARB,
-this config PXA_V7_MACH_AUTO becomes invalid (which means at
-least one PXA_V7_MACH is selected), and then you could select
-TAVOREVB3 as well.
+> + *	hog the mappings as the pinmux device drivers are attched, so this is
+> + *	typically used with system maps (mux mappings without an assigned
+> + *	device) that you want to get hogged and enabled by default as soon as
+> + *	a pinmux device supporting it is registered. These maps will not be
+> + *	disabled and put until the system shuts down.
+> + */
+> +struct pinmux_map {
+> +	const char *name;
+> +	struct device *ctrl_dev;
+> +	const char *ctrl_dev_name;
+> +	const char *function;
+> +	const char *group;
+> +	struct device *dev;
+> +	const char *dev_name;
+> +	const bool hog_on_boot;
+> +};
+> +
+> +/*
+> + * Convenience macro to set a simple map from a certain pin controller and a
+> + * certain function to a named device
+> + */
+> +#define PINMUX_MAP(a, b, c, d) \
+> +	{ .name = a, .ctrl_dev_name = b, .function = c, .dev_name = d }
+> +
+> +/*
+> + * Convenience macro to map a system function onto a certain pinctrl device.
+> + * System functions are not assigned to a particular device.
+> + */
+> +#define PINMUX_MAP_SYS(a, b, c) \
+> +	{ .name = a, .ctrl_dev_name = b, .function = c }
+> +
+> +/*
+> + * Convenience macro to map a function onto the primary device pinctrl device
+> + * this is especially helpful on systems that have only one pin controller
+> + * or need to set up a lot of mappings on the primary controller.
+> + */
+> +#define PINMUX_MAP_PRIMARY(a, b, c) \
+> +	{ .name = a, .ctrl_dev_name = "pinctrl.0", .function = b, \
+> +	  .dev_name = c }
+> +
+> +/*
+> + * Convenience macro to map a system function onto the primary pinctrl device.
+> + * System functions are not assigned to a particular device.
+> + */
+> +#define PINMUX_MAP_PRIMARY_SYS(a, b) \
+> +	{ .name = a, .ctrl_dev_name = "pinctrl.0", .function = b }
+> +
+> +/*
+> + * Convenience macro to map a system function onto the primary pinctrl device,
+> + * to be hogged by the pinmux core until the system shuts down.
+> + */
+> +#define PINMUX_MAP_PRIMARY_SYS_HOG(a, b) \
+> +	{ .name = a, .ctrl_dev_name = "pinctrl.0", .function = b, \
+> +	  .hog_on_boot = true }
+> +
+> +
+> +#ifdef CONFIG_PINMUX
+> +
+> +extern int pinmux_register_mappings(struct pinmux_map const *map,
+> +				unsigned num_maps);
+> +
+> +#else
+> +
+> +static inline int pinmux_register_mappings(struct pinmux_map const *map,
+> +					   unsigned num_maps)
+> +{
+> +	return 0;
+> +}
+> +
+> +#endif /* !CONFIG_PINCTRL */
 
-Just go ahead and apply the patch, make menuconfig and see how
-the trick works :-)
+s/!CONFIG_PINCTRL/CONFIG_PINMUX?
+
+> +#endif
+
+-- 
+Regards,
+Shawn
