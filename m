@@ -1,97 +1,65 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 9 Oct 2011 14:39:33 +0800
-Subject: [PATCH 17/26] ARM: pxa: pxa95x is incompatible with earlier pxa
-In-Reply-To: <CAMPhdO8_cZU8FEGsK0m_XrhbR33TiZFFaNrXddKT1YrHREt-TQ@mail.gmail.com>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<CAMPhdO_L-g4vSj3fC-1ckqnHGAPhWOy6Hm4VL5iUbZbbdjRkNQ@mail.gmail.com>
-	<CAN1soZy3_9Trycti8SCbnO75N6NE31tFqrKMpZtiJPgwNc2cbg@mail.gmail.com>
-	<1499585.ED4ktnBDpX@wuerfel>
-	<CAN1soZyDu43EN3W5YBttdzx7qx=MLKAR1OsJC3hUdqWWxhQaew@mail.gmail.com>
-	<CAMPhdO8_cZU8FEGsK0m_XrhbR33TiZFFaNrXddKT1YrHREt-TQ@mail.gmail.com>
-Message-ID: <CAN1soZzbtqxfNLS_JVhn1irXRVThL=yt_VWfmdkoUL2ShFDEGQ@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sun, 9 Oct 2011 12:28:15 +0530
+Subject: [PATCH 2/3] mmc: Add OF bindings support for mmc host controller
+	capabilities
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173A2C7245@HQMAIL01.nvidia.com>
+References: <1317809581-28783-1-git-send-email-thomas.abraham@linaro.org>
+	<1317809581-28783-3-git-send-email-thomas.abraham@linaro.org>
+	<4E8C5BD6.2070709@gmail.com>
+	<CAJuYYwS_NeE6OG9X2p2rkjgo4OqO-ijeVwr1sLGkUuLJOxMw2g@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173A2C7245@HQMAIL01.nvidia.com>
+Message-ID: <CAJuYYwSOZsqKObmt4MeaJa+aPmktwLsFocfmpjbJbOYyvmuwLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 9, 2011 at 2:36 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
-> On Sun, Oct 9, 2011 at 2:21 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->> On Sat, Oct 8, 2011 at 9:24 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Saturday 08 October 2011 11:32:14 Haojian Zhuang wrote:
->>>>
->>>> Eric,
->>>>
->>>> At first, a new macro (ARCH_PXA_V7) is defined in
->>>> arch/arm/mach-pxa/Kconfig in this patch.
->>>> I prefer to move this macro to arch/arm/Kconfig.
->>>
->>> If we move it to arch/arm/Kconfig, I would prefer making it a global option,
->>> not a pxa specific one. If we introduce a top-level CONFIG_CPU_V6PLUS
->>> option, we can make a number of decisions inside of Kconfig depend on that,
->>> especially as we move to allow building multiple v6/v7 platforms together,
->>> or multiple v5 platforms for that matter. I believe we don't need to
->>> worry about v5+v7 at this point and can instead assume that won't ever
->>> happen.
->>>
->> Nobody is using PJ4 as v6 architecture now. CPUv6 is used in old stepping
->> of Dove and MMP2. CPU_PJ4 only enables CPU_v7 in the mainline code.
+On 5 October 2011 21:25, Stephen Warren <swarren@nvidia.com> wrote:
+> Thomas Abraham wrote at Wednesday, October 05, 2011 8:28 AM:
+>> On 5 October 2011 18:59, Rob Herring <robherring2@gmail.com> wrote:
+>> > On 10/05/2011 05:13 AM, Thomas Abraham wrote:
+>> >> Device nodes representing sd/mmc controllers in a device tree would include
+>> >> mmc host controller capabilities. Add support for parsing of mmc host
+>> >> controller capabilities included in device nodes.
+> ...
+>> >> +- linux,mmc_cap_4_bit_data - host can do 4 bit transfers
+>> >> +- linux,mmc_cap_mmc_highspeed - host can do MMC high-speed timing
+>> >> +- linux,mmc_cap_sd_highspeed - host can do SD high-speed timing
+>> >> +- linux,mmc_cap_needs_poll - host needs polling for card detection
+>> >> +- linux,mmc_cap_8_bit_data - host can do 8 bit transfer
+>> >
+>> > "sdhci,1-bit-only" already exists as a binding. Perhaps add
+>> > "sdhci,4-bit-only". No property then means can do 8-bit.
 >>
->> If we used ARCH_PXA_V7 in arch/arm/Kconfig, we would have two ARCH for
->> pxa. One is ARCH_PXA, and the other is ARCH_PXA_V7. Those v5 machine
->> should be based on ARCH_PXA. And the saarb, tavorevb3 should be based
->> on ARCH_PXA_V7. So we can avoid to define PXA_V7_MACH_AUTO. I think
->> the logic of Kconfig could be easier.
->ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA7iMTlInbItkRaH3yJidg18Bg1SyIYZhbgu4jKpRkG4vavWebU6FwjovIuXoJqWzQimP4dvF4LWVq1xW84jtds8hRIc0a9nI1o2DUyqFzYvHHbqjXq+AJCqmUCaf9mlGn5/Ocd4LDbZKff3rHApCZrP4J/5beIiBDX25sFyRPNFjakJp5FbqwT17L91900rj7O60UeTe/vI9Gaf/oIvxMYriDmF02vsQgNqVNUzFllB8VTVb5HprZFZFX0ulBWhgTfMNqrhcZAxKwAW8tAY2zqa7NZZQhw0Ea8IkZrwA4qAwjQHwY56mNL7JRFLKlLVt3dEfkgx/HHWS8v1D80VGXUw== zhouhong at zhouhong-desktop
-> Haojian,
+>> Ok. But that would remain just as sdhci host controller capability and
+>> will not be applicable to other types of host controllers.
 >
-> PXA_V7_MACH_AUTO is to by default auto enable tavorevb3 when
-> ARCH_PXA_V7 is selected.
->
->>
->>>> Secondly, pxa95x is both used in saarb and tavorevb3.
->>>
->>> The patch makes that very explicit, doesn't it?
->>>
->> +config PXA_V7_MACH_AUTO
->> + ? ? ? def_bool y
->> + ? ? ? depends on ARCH_PXA_V7
->> + ? ? ? depends on !MACH_SAARB
->> + ? ? ? select MACH_TAVOREVB3
->> +
->>
->> Please check this. In your patch, SAARB and TAVOREVB3 is a mutex.
->
-> They are actually not mutually exclusive - it's a trick we use to select
-> MACH_TAVOREVB3 by default but this option also disappears once SAARB
-> is selected.
->
-OK. Could I know why saarb should be deselected while tavorevb3 is selected?
+> Just as an FYI, NVIDIA's SDHCI controller bindings use property
+> "support-8bit" to indicate 8-bit support. A similar property could be
+> used for 4-bit support too.
 
-> Arnd,
+
+In this case, the binding would be applicable only to nVidia's SDHCI
+controller. And this binding would select MMC_CAP_8_BIT_DATA in the
+sdhci-tegra driver. There are sdhci drivers that can accept host
+capabilities via platform data.
+
+The MMC_CAP_XXX macros in linux/mmc/host.h file are usuable across
+host controllers and some of them are supplied as platform data for
+non-device tree platforms.
+
+So, bindings for MMC_CAP_XXX macros can be defined which any host
+controller supporting device tree could use. Host controllers could
+use the mmc_of_parse_host_caps() helper function (listed in this
+patch) to parse all the bindings for MMC_CAP_XXX  available in the
+device node.
+
+I would like to retain this patch in this series but if there is a
+definite no, then I will drop it. Please let me know your opinion.
+
+Thanks,
+Thomas.
+
 >
-> The 'depends on ARCH_PXA_V7' could actually be removed here, as the
-> option is already encapsulated in if ARCH_PXA_V7 ... endif. And this
-> trick won't work very well when there are more than 2 boards.
+> --
+> nvpublic
 >
->>
->>>> Thirdly, PXA_V7_MACH_AUTO is unnecessary. We just need to select those
->>>> machines in defconfig or define a new DT machine type to select all
->>>> machines.
->>>
->>> Enabling them in defconfig will not help here, it still allows creating
->>> an invalid configuration by disabling both saarb and tavorevb3.
->>> I agree that it would be best to have a single DT machine type that can
->>> handle both saarb and tavorevb3 as well as any future pxa95x based machines,
->>> but nobody has implemented that yet. In the meantime, I think we should
->>> have the PXA_V7_MACH_AUTO or an equivalent mechanism to enforce that at
->>> least one of the two board files gets built into any kernel. This is mostly
->>> important to help the 'make randconfig' builds succeed, not for actual
->>> users getting it wrong accidentally.
->>>
->>> ? ? ? ?Arnd
->>>
->>
->> Exactly we need to define a single DT machine type in both arch-pxa
->> and arch-mmp.
->> I'll register it first.
->
-> Please go ahead.
 >
