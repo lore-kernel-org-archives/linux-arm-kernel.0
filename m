@@ -1,75 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 09 Oct 2011 13:31:52 +0200
-Subject: [PATCH 17/26] ARM: pxa: pxa95x is incompatible with earlier pxa
-In-Reply-To: <CAMPhdO8_cZU8FEGsK0m_XrhbR33TiZFFaNrXddKT1YrHREt-TQ@mail.gmail.com>
-References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
-	<CAN1soZyDu43EN3W5YBttdzx7qx=MLKAR1OsJC3hUdqWWxhQaew@mail.gmail.com>
-	<CAMPhdO8_cZU8FEGsK0m_XrhbR33TiZFFaNrXddKT1YrHREt-TQ@mail.gmail.com>
-Message-ID: <1361960.V5WIS69XTX@wuerfel>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sun, 9 Oct 2011 19:35:50 +0800
+Subject: [GIT PULL] I2C: OMAP: misc. cleanup for v3.2
+In-Reply-To: <87aa9f771n.fsf@ti.com>
+References: <871uwbhdoj.fsf@ti.com> <4E669F36.2070008@ti.com>
+	<4E80FD1A.5040006@deeprootsystems.com>
+	<20111004210832.GC13323@freya.fluff.org> <87aa9f771n.fsf@ti.com>
+Message-ID: <CACVXFVP85gS=FdWcecGZYWSN+U5q0Z9h9zURNmFOiM2sWOPmNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 October 2011 14:36:52 Eric Miao wrote:
-> 
-> They are actually not mutually exclusive - it's a trick we use to select
-> MACH_TAVOREVB3 by default but this option also disappears once SAARB
-> is selected.
+On Thu, Oct 6, 2011 at 12:11 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Ben Dooks <ben-i2c@fluff.org> writes:
+>
+>> On Mon, Sep 26, 2011 at 03:30:50PM -0700, Kevin Hilman wrote:
+>>> ping
+>>>
+>>> On 09/06/2011 03:31 PM, Kevin Hilman wrote:
+>>> >Hi Ben,
+>>> >
+>>> >On 08/23/2011 05:10 PM, Kevin Hilman wrote:
+>>> >>Ben,
+>>> >>
+>>> >>Here's one more I2C cleanup series for v3.2.
+>>> >>
+>>> >>It applies on top of my for_3.2/i2c-fixes branch just submitted.
+>>> >>
+>>> >>Please pull into your tree for linux-next.
+>>> >
+>>> >I see you pulled the other two, can you pull this one as well?
+>>
+>> I've tried, but it seems to note that everything is up to date.
+>>
+>> Is this a suitable branch to pull onto latest so I can reset
+>> my next tree?
+>
+> Yes.
+>
+> The i2c-cleanup branch[1] is based on top of the previous two (i2c-andy
+> and i2c-fixes) so if you reset your next-i2c branch and just pull
+> i2c-cleanup, you'll get all three.
 
-Right. It's a bit hard to read when there are only two of them, but that
-is the idea.
+BTW:
 
-> The 'depends on ARCH_PXA_V7' could actually be removed here, as the
-> option is already encapsulated in if ARCH_PXA_V7 ... endif. And this
-> trick won't work very well when there are more than 2 boards.
+The patch[1] is a fix patch, which fix the OOPS[2] during system resume, so
+should CC -stable tree.
 
-Actually, the option is outside of the if ARCH_PXA_V7, but that could
-easily be changed.
+[1], I2C: OMAP: remove dev->idle, use usage counting provided by runtime PM
+[2], http://marc.info/?l=linux-omap&m=131658936429671&w=2
 
-The trick works with as many boards as you like, it just gets a
-little clumsy after while, as in
-
-config MACH_OMAP_AUTO_BOARD
-        def_bool y
-        depends on !MACH_OMAP2_TUSB6010
-        depends on !MACH_OMAP_H4
-        depends on !MACH_OMAP_APOLLON
-        depends on !MACH_OMAP_APOLLON
-        depends on !MACH_OMAP_2430SDP
-        depends on !MACH_OMAP3_BEAGLE
-        depends on !MACH_DEVKIT8000
-        depends on !MACH_OMAP_LDP
-        depends on !MACH_OMAP3530_LV_SOM
-        depends on !MACH_OMAP3_TORPEDO
-        depends on !MACH_OVERO
-        depends on !MACH_OMAP3EVM
-        depends on !MACH_OMAP3517EVM
-        depends on !MACH_CRANEBOARD
-        depends on !MACH_OMAP3_PANDORA
-        depends on !MACH_OMAP3_TOUCHBOOK
-        depends on !MACH_NOKIA_N8X0
-        depends on !MACH_NOKIA_RM680
-        depends on !MACH_NOKIA_RX51
-        depends on !MACH_OMAP_ZOOM2
-        depends on !MACH_OMAP_ZOOM3
-        depends on !MACH_CM_T35
-        depends on !MACH_CM_T3517
-        depends on !MACH_IGEP0020
-        depends on !MACH_IGEP0030
-        depends on !MACH_SBC3530
-        depends on !MACH_OMAP_3630SDP
-        depends on !MACH_TI8168EVM
-        depends on !MACH_OMAP4_PANDA
-        select MACH_OMAP_GENERIC if ARCH_OMAP2
-        select MACH_OMAP_3430SDP if ARCH_OMAP3 && !ARCH_OMAP2
-        select MACH_OMAP_4430SDP if ARCH_OMAP4 && !ARCH_OMAP3 && !ARCH_OMAP2
-        help
-          The kernel needs to have support for at least one board
-          in order to build. If none is selected, default to the
-          generic board.
-
-We should probably do something like this for the ARMv5 based PXA boards,
-but at least a randconfig won't trigger that normally, just because there
-are so many of them that almost always at least one is enabled. However,
-an allnoconfig will fail with PXA right now.
-
-	Arnd
+thanks,
+-- 
+Ming Lei
