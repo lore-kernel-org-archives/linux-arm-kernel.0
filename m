@@ -1,65 +1,54 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sun, 9 Oct 2011 13:39:01 +0800
-Subject: [PATCH v2] pinmux: add a driver for the CSR SiRFprimaII pinmux
-In-Reply-To: <3712698.4MAZQPafzW@wuerfel>
-References: <1314843744-2910-1-git-send-email-Baohua.Song@csr.com>
-	<CACRpkdbb_5EZHT3=SNePbW-=NYjLSLzJgjEdEaBV7X=s6gxydw@mail.gmail.com>
-	<CAGsJ_4xpYMzHGi09jt2Y9xCocYJ0iHYRfdvwCzcH65uaF2sP0g@mail.gmail.com>
-	<3712698.4MAZQPafzW@wuerfel>
-Message-ID: <CAGsJ_4z=ME6krkhmcYnrNdJqpifJxoNvDCsFpKqVt_-EdKhWiw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 9 Oct 2011 13:49:48 +0800
+Subject: [PATCH 3/7] ARM: imx: export imx_ioremap
+In-Reply-To: <2199742.hioYdt4QXg@wuerfel>
+References: <20111004092015.GM31404@pengutronix.de>
+	<20111008101322.GH31404@pengutronix.de>
+	<109850802.HMOqKGRdrl@wuerfel> <2199742.hioYdt4QXg@wuerfel>
+Message-ID: <20111009054947.GB24198@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/8 Arnd Bergmann <arnd@arndb.de>:
-> On Saturday 08 October 2011 19:58:23 Barry Song wrote:
->> > You can probably simplify this and other things with
->> > preprocessor macros if you want to, like:
->> >
->> > #define SIRF_FUNC_ENTRY(a) \
->> > { .name = "##a##", .pins = ##a##_pins, .num_pins =
->> > ARRAY_SIZE(##a##_pins), .padmux = &##a##_padmux }
->> >
->> > Then just:
->> >
->> > static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
->> > ? ? SIRF_FUNC_ENTRY(lcd_16bits),
->> >
->> >
->> > The macro syntax is probably wrong, the preprocessor always
->> > craze me out, but you get the idea.
->>
->> ?:-) ?.name = "##a##" ?should be changed to .name = #a
->>
->> #name will convert name into a string "name"
->>
->
-> Better don't use string concatenation at all if you can avoid it.
->
-> A generic macro like
->
-> #define SIRF_PINMUX(_name, _pins, _padmux) \
-> ? ? ? ?{ .name = (_name), .pins = (_pins), \
-> ? ? ? ? ?.num_pins = ARRAY_SIZE(_pins), padmux = (_padmux), }
->
-> is both very easy to understand for someone reading it casually and
-> lets you actually grep for where the identifiers are being used.
->
->> static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
->> ? ? SIRF_FUNC_ENTRY(lcd_16bits),
->
-> for the first time, you have no clue what that does, but
->
-> static const struct sirfsoc_pinmux_func sirfsoc_pinmux_funcs[] = {
-> ? ? ? ?SIRF_PINMUX("lcd_16bits", lcd_16bits_pins, &lcd_16bits_padmux),
-> ? ? ? ?...
-> };
->
-> Makes it very clear what you are referencing here and needs no extra lines.
+On Sat, Oct 08, 2011 at 05:16:49PM +0200, Arnd Bergmann wrote:
+> The arch_ioremap function on i.MX is now an indirect function pointer.
+> In order to use it from any loadable module, the pointer itself
+> has to be exported.
+> 
+> ERROR: "imx_ioremap" [drivers/video/tmiofb.ko] undefined!
+> ERROR: "imx_ioremap" [drivers/usb/host/sl811-hcd.ko] undefined!
+> ERROR: "imx_ioremap" [drivers/usb/host/r8a66597-hcd.ko] undefined!
+> ERROR: "imx_ioremap" [drivers/usb/host/oxu210hp-hcd.ko] undefined!
+> ERROR: "imx_ioremap" [drivers/usb/gadget/r8a66597-udc.ko] undefined!
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-well. thanks! i'll send prima2 pinmux v3 rebased on Linus W's v9 and
-with this change too.
+Regards,
+Shawn
 
->
-> ? ? ? ?Arnd
->
--barry
+>  arch/arm/plat-mxc/system.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/system.c b/arch/arm/plat-mxc/system.c
+> index 9dad8dc..45e1b5f 100644
+> --- a/arch/arm/plat-mxc/system.c
+> +++ b/arch/arm/plat-mxc/system.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/io.h>
+>  #include <linux/err.h>
+>  #include <linux/delay.h>
+> +#include <linux/module.h>
+>  
+>  #include <mach/hardware.h>
+>  #include <mach/common.h>
+> @@ -30,6 +31,7 @@
+>  
+>  void (*imx_idle)(void) = NULL;
+>  void __iomem *(*imx_ioremap)(unsigned long, size_t, unsigned int) = NULL;
+> +EXPORT_SYMBOL_GPL(imx_ioremap);
+>  
+>  static void __iomem *wdog_base;
+>  
+> -- 
+> 1.7.5.4
