@@ -1,34 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 9 Oct 2011 08:59:29 +0200
-Subject: [PATCH 1/4] mmc: mmci: Bugfix in pio read for small packets
-In-Reply-To: <20111008091036.GF25689@n2100.arm.linux.org.uk>
-References: <1317109568-17905-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111001160937.GF11710@n2100.arm.linux.org.uk>
-	<4E8F028C.10102@stericsson.com>
-	<20111008091036.GF25689@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdY=DFW+J_pQetK38mPqic2iBuDWCx5QZTo-NkL1L37Fuw@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Sun, 9 Oct 2011 15:28:18 +0800
+Subject: [PATCH 17/26] ARM: pxa: pxa95x is incompatible with earlier pxa
+In-Reply-To: <CAN1soZzbtqxfNLS_JVhn1irXRVThL=yt_VWfmdkoUL2ShFDEGQ@mail.gmail.com>
+References: <1317499438-14058-1-git-send-email-arnd@arndb.de>
+	<CAMPhdO_L-g4vSj3fC-1ckqnHGAPhWOy6Hm4VL5iUbZbbdjRkNQ@mail.gmail.com>
+	<CAN1soZy3_9Trycti8SCbnO75N6NE31tFqrKMpZtiJPgwNc2cbg@mail.gmail.com>
+	<1499585.ED4ktnBDpX@wuerfel>
+	<CAN1soZyDu43EN3W5YBttdzx7qx=MLKAR1OsJC3hUdqWWxhQaew@mail.gmail.com>
+	<CAMPhdO8_cZU8FEGsK0m_XrhbR33TiZFFaNrXddKT1YrHREt-TQ@mail.gmail.com>
+	<CAN1soZzbtqxfNLS_JVhn1irXRVThL=yt_VWfmdkoUL2ShFDEGQ@mail.gmail.com>
+Message-ID: <CAMPhdO-b2hiXUNSKLqio4uHOEby=H82ckC0oahzRToatXmzw_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 8, 2011 at 11:10 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Oct 07, 2011 at 03:45:48PM +0200, Ulf Hansson wrote:
->
-> Well, the patch system says that each one depends on the previous one,
-> and the first one in the series contains the PIO read thing.
->
-> Do 7108/1 onwards depend on 7106/1 and 7107/1 ?
+>> They are actually not mutually exclusive - it's a trick we use to select
+>> MACH_TAVOREVB3 by default but this option also disappears once SAARB
+>> is selected.
+>>
+> OK. Could I know why saarb should be deselected while tavorevb3 is selected?
 
-Probably my fault, since I was helping Ulf out with the patch tracker
-introduction.
+Haojian, it's not being deselected, it's just when user selects SAARB,
+this config PXA_V7_MACH_AUTO becomes invalid (which means at
+least one PXA_V7_MACH is selected), and then you could select
+TAVOREVB3 as well.
 
-The patches should be pretty much semantically orthogonal as
-far as I can tell, the only reason dependency was stated that way
-was that I couldn't tell from head-parsing whether there were
-syntactical dependencies. (And wanted to avoid the annoyance
-of non-applying patches...)
-
-So if they apply, they are independent AFAICT.
-
-Yours,
-Linus Walleij
+Just go ahead and apply the patch, make menuconfig and see how
+the trick works :-)
