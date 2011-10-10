@@ -1,43 +1,25 @@
-From: zdevai@gmail.com (Zoltan Devai)
-Date: Mon, 10 Oct 2011 15:59:59 +0200
-Subject: [PATCH 1/9] ARM: vic: Don't write to the read-only register
-	VIC_IRQ_STATUS
-In-Reply-To: <CAKnu2Mpnp9hNhdzFURQGvTbeoVpyKfWY2YU3MDs2yEPgC-YYAA@mail.gmail.com>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-2-git-send-email-zoss@devai.org>
-	<CAKnu2Mpnp9hNhdzFURQGvTbeoVpyKfWY2YU3MDs2yEPgC-YYAA@mail.gmail.com>
-Message-ID: <CAGVye5N2XVLjqjp+g1cg=HPpzpXzD3QiD1HYV-X2HU9AAt6LgQ@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 10 Oct 2011 16:00:48 +0200
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <CAHQjnOOhtSiivWf34S8mjB9nqQfUwadLzE8zOm4jYvsgL_d+Wg@mail.gmail.com>
+References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
+	<1316195506-9777-2-git-send-email-ohad@wizery.com>
+	<20110927100505.GH2138@amd.com>
+	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
+	<20110927131222.GL2138@amd.com>
+	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
+	<20110927181438.GM2138@amd.com>
+	<CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
+	<CAHQjnOOhtSiivWf34S8mjB9nqQfUwadLzE8zOm4jYvsgL_d+Wg@mail.gmail.com>
+Message-ID: <CAK=WgbbzPmdtH9J2H0-jh+NipJ+GenEkkqorMLZpPU+xmZ3C4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/10 Linus Walleij <linus.walleij@linaro.org>:
-> 2011/10/9 Zoltan Devai <zoss@devai.org>:
->
->> This is unneeded and causes an abort on the SPMP8000 platform.
->>
->> Signed-off-by: Zoltan Devai <zoss@devai.org>
->> ---
->> ?arch/arm/common/vic.c | ? ?1 -
->> ?1 files changed, 0 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
->> index b22b83d..651c77d 100644
->> --- a/arch/arm/common/vic.c
->> +++ b/arch/arm/common/vic.c
->> @@ -274,7 +274,6 @@ static void __init vic_disable(void __iomem *base)
->> ? ? ? ?writel(0, base + VIC_INT_SELECT);
->> ? ? ? ?writel(0, base + VIC_INT_ENABLE);
->> ? ? ? ?writel(~0, base + VIC_INT_ENABLE_CLEAR);
->> - ? ? ? writel(0, base + VIC_IRQ_STATUS);
->> ? ? ? ?writel(0, base + VIC_ITCR);
->> ? ? ? ?writel(~0, base + VIC_INT_SOFT_CLEAR);
->> ?}
->
-> Indeed.
->
-> This patch stands on its own, please put it into Russell's patch
-> tracker at http://www.arm.linux.org.uk/developer/patches/
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Oct 10, 2011 at 2:52 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> Do not we need to unmap all intermediate mappings if iommu_map() is failed?
 
-Done, will exclude this from the next series.
+Good idea, I'll add it.
+
+Thanks!
+Ohad.
