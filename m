@@ -1,114 +1,24 @@
-From: hemantp@ti.com (Hemant Pedanekar)
-Date: Mon, 10 Oct 2011 07:10:10 +0530
-Subject: [PATCH v4 3/3] ARM: OMAP: TI814X: Create board support and enable
-	build for TI8148 EVM
-Message-ID: <1318210810-2559-1-git-send-email-hemantp@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Oct 2011 03:43:57 +0200
+Subject: [PATCH 9/9] ARM: SPMP8000: Add Kconfig and Makefile entries to
+	build the machine
+In-Reply-To: <1318178172-7965-10-git-send-email-zoss@devai.org>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<1318178172-7965-10-git-send-email-zoss@devai.org>
+Message-ID: <CAKnu2Mq+9GwJSPXUtcsYGH2dQ4TbzBcpAWG3vze4thBNp1oW7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds minimal support and build configuration for TI8148 EVM. Also
-adds support for low level debugging on UART1 console on the EVM.
+2011/10/9 Zoltan Devai <zoss@devai.org>:
 
-Note that existing TI8168 EVM file (board-ti8168evm.c) is updated with machine
-info for TI8148 EVM.
+> +config ARCH_SPMP8000
+> + ? ? ? bool "Sunplus SPMP8000"
+> + ? ? ? select CPU_ARM926T
+> + ? ? ? select ARM_VIC
 
-Signed-off-by: Hemant Pedanekar <hemantp@ti.com>
----
- arch/arm/mach-omap2/Kconfig                  |    5 +++++
- arch/arm/mach-omap2/Makefile                 |    1 +
- arch/arm/mach-omap2/board-ti8168evm.c        |   22 ++++++++++++++++------
- arch/arm/plat-omap/include/plat/uncompress.h |    3 +++
- 4 files changed, 25 insertions(+), 6 deletions(-)
+It's quite common for ARM926EJ-S systems to have TCM,
+if you don't know whether your system has it just try
+select HAVE_TCM for fun and see if it is detected on boot.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index caebeb7..59942b2 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -325,6 +325,11 @@ config MACH_TI8168EVM
- 	depends on SOC_OMAPTI81XX
- 	default y
- 
-+config MACH_TI8148EVM
-+	bool "TI8148 Evaluation Module"
-+	depends on SOC_OMAPTI81XX
-+	default y
-+
- config MACH_OMAP_4430SDP
- 	bool "OMAP 4430 SDP board"
- 	default y
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 5ee4cd6..0e27e43 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -240,6 +240,7 @@ obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
- 
- obj-$(CONFIG_MACH_SBC3530)		+= board-omap3stalker.o
- obj-$(CONFIG_MACH_TI8168EVM)		+= board-ti8168evm.o
-+obj-$(CONFIG_MACH_TI8148EVM)		+= board-ti8168evm.o
- 
- # Platform specific device init code
- 
-diff --git a/arch/arm/mach-omap2/board-ti8168evm.c b/arch/arm/mach-omap2/board-ti8168evm.c
-index 7935fc9..b858921 100644
---- a/arch/arm/mach-omap2/board-ti8168evm.c
-+++ b/arch/arm/mach-omap2/board-ti8168evm.c
-@@ -1,5 +1,5 @@
- /*
-- * Code for TI8168 EVM.
-+ * Code for TI8168/TI8148 EVM.
-  *
-  * Copyright (C) 2010 Texas Instruments, Inc. - http://www.ti.com/
-  *
-@@ -24,15 +24,15 @@
- #include <plat/board.h>
- #include <plat/common.h>
- 
--static struct omap_board_config_kernel ti8168_evm_config[] __initdata = {
-+static struct omap_board_config_kernel ti81xx_evm_config[] __initdata = {
- };
- 
--static void __init ti8168_evm_init(void)
-+static void __init ti81xx_evm_init(void)
- {
- 	omap_serial_init();
- 	omap_sdrc_init(NULL, NULL);
--	omap_board_config = ti8168_evm_config;
--	omap_board_config_size = ARRAY_SIZE(ti8168_evm_config);
-+	omap_board_config = ti81xx_evm_config;
-+	omap_board_config_size = ARRAY_SIZE(ti81xx_evm_config);
- }
- 
- MACHINE_START(TI8168EVM, "ti8168evm")
-@@ -42,5 +42,15 @@ MACHINE_START(TI8168EVM, "ti8168evm")
- 	.init_early	= ti81xx_init_early,
- 	.init_irq	= ti81xx_init_irq,
- 	.timer		= &omap3_timer,
--	.init_machine	= ti8168_evm_init,
-+	.init_machine	= ti81xx_evm_init,
-+MACHINE_END
-+
-+MACHINE_START(TI8148EVM, "ti8148evm")
-+	/* Maintainer: Texas Instruments */
-+	.atag_offset	= 0x100,
-+	.map_io		= ti81xx_map_io,
-+	.init_early	= ti81xx_init_early,
-+	.init_irq	= ti81xx_init_irq,
-+	.timer		= &omap3_timer,
-+	.init_machine	= ti81xx_evm_init,
- MACHINE_END
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index a8e5187..27d9d31 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -181,6 +181,9 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		/* TI8168 base boards using UART3 */
- 		DEBUG_LL_TI81XX(3, ti8168evm);
- 
-+		/* TI8148 base boards using UART1 */
-+		DEBUG_LL_TI81XX(1, ti8148evm);
-+
- 	} while (0);
- }
- 
--- 
-1.7.3.5
+Yours,
+Linus Walleij
