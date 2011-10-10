@@ -1,47 +1,35 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 10 Oct 2011 21:47:54 +0200
-Subject: [PATCH 1/5] S3C2443/S3C2416: Add adc registers
+Date: Mon, 10 Oct 2011 21:48:50 +0200
+Subject: [PATCH 2/5] s3c-adc: Fix mux bit modification in s3c_adc_select
 In-Reply-To: <201110102146.51694.heiko@sntech.de>
 References: <201110102146.51694.heiko@sntech.de>
-Message-ID: <201110102147.55539.heiko@sntech.de>
+Message-ID: <201110102148.50392.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The adc blocks of the S3C2443 and S3C2416 define some
-additional registers and bits.
+The mux bits in the adccon register should be cleared only
+if muxing is really done in ADCCON and not another register.
+
+This patch introduces a conditional for this.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/plat-samsung/include/plat/regs-adc.h |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/arm/plat-samsung/adc.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-adc.h b/arch/arm/plat-samsung/include/plat/regs-adc.h
-index 035e8c3..7061210 100644
---- a/arch/arm/plat-samsung/include/plat/regs-adc.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-adc.h
-@@ -20,6 +20,7 @@
- #define S3C2410_ADCDAT0	   S3C2410_ADCREG(0x0C)
- #define S3C2410_ADCDAT1	   S3C2410_ADCREG(0x10)
- #define S3C64XX_ADCUPDN		S3C2410_ADCREG(0x14)
-+#define S3C2443_ADCMUX		S3C2410_ADCREG(0x18)
- #define S3C64XX_ADCCLRINT	S3C2410_ADCREG(0x18)
- #define S5P_ADCMUX		S3C2410_ADCREG(0x1C)
- #define S3C64XX_ADCCLRINTPNDNUP	S3C2410_ADCREG(0x20)
-@@ -33,6 +34,7 @@
- #define S3C2410_ADCCON_PRSCVLMASK	(0xFF<<6)
- #define S3C2410_ADCCON_SELMUX(x)	(((x)&0x7)<<3)
- #define S3C2410_ADCCON_MUXMASK		(0x7<<3)
-+#define S3C2416_ADCCON_RESSEL		(1 << 3)
- #define S3C2410_ADCCON_STDBM		(1<<2)
- #define S3C2410_ADCCON_READ_START	(1<<1)
- #define S3C2410_ADCCON_ENABLE_START	(1<<0)
-@@ -40,6 +42,7 @@
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index ee8deef..7821055a 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -98,7 +98,8 @@ static inline void s3c_adc_select(struct adc_device *adc,
  
+ 	client->select_cb(client, 1);
  
- /* ADCTSC Register Bits */
-+#define S3C2443_ADCTSC_UD_SEN		(1 << 8)
- #define S3C2410_ADCTSC_YM_SEN		(1<<7)
- #define S3C2410_ADCTSC_YP_SEN		(1<<6)
- #define S3C2410_ADCTSC_XM_SEN		(1<<5)
+-	con &= ~S3C2410_ADCCON_MUXMASK;
++	if (cpu == TYPE_ADCV1 || cpu == TYPE_ADCV2)
++		con &= ~S3C2410_ADCCON_MUXMASK;
+ 	con &= ~S3C2410_ADCCON_STDBM;
+ 	con &= ~S3C2410_ADCCON_STARTMASK;
+ 
 -- 
 1.7.2.3
