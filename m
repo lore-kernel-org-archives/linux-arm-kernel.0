@@ -1,38 +1,113 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Oct 2011 13:28:19 +0900
-Subject: [PATCH 2/7] s3c-adc: describe features via quirk constants
-References: <201109182241.48858.heiko@sntech.de>
-	<201109211504.03287.heiko@sntech.de>
-	<001a01cc80d6$40bf7e70$c23e7b50$%kim@samsung.com>
-	<201110021318.42131.heiko@sntech.de>
-Message-ID: <034d01cc8705$09ddd160$1d997420$%kim@samsung.com>
+Date: Mon, 10 Oct 2011 13:28:24 +0900
+Subject: [patch] ARM: smpboot: Enable interrupts after marking CPU
+	online/active
+In-Reply-To: <alpine.LFD.2.02.1110071354310.3240@ionos>
+References: <20110908215314.829452535@linutronix.de>
+	<CADGdYn6V_eQJZ4=irMbSS7XJj4MJVeALxcrWdD7o2bGs1sEJZQ@mail.gmail.com>
+	<20110913133258.GA6267@n2100.arm.linux.org.uk>
+	<CAKfTPtCWuiOM5+sOwdh1FzXZb1EFT__tVEpRPY5suGOxpYTdQQ@mail.gmail.com>
+	<20110913175312.GB6267@n2100.arm.linux.org.uk>
+	<20110923084001.GP17169@n2100.arm.linux.org.uk>
+	<01d501cc84d6$62720890$275619b0$%kim@samsung.com>
+	<alpine.LFD.2.02.1110071354310.3240@ionos>
+Message-ID: <034e01cc8705$0d0f8950$272e9bf0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+Thomas Gleixner wrote:
 > 
-> Heiko St?bner wrote:
+> On Fri, 7 Oct 2011, Kukjin Kim wrote:
+> > I think, basically, if SPIs in GIC are used in local timer, the routing
+> > interrupt like calling irq_set_affinity() to offline CPUs should be
+> > available when boot time before calling set_cpu_online() because as you
+know
+> > the local_timer_setup() which includes setup interrupt is called in
+> > percpu_timer_setup() now...
 > >
-> > Hi Kgene,
-> >
-> > Am Sonntag 02 Oktober 2011, 09:38:18 schrieb Kukjin Kim:
-> > > How about following? I think following is also not bad...
-> > ok, I don't claim to have the right solution, so if keeping the TYPE_xxx
-enum
-> > is better, I will do a rework of the series according to your solution
-and
-> > resend it.
-> >
-> Thanks for your understanding and please re-send it :)
+> > Is there any way to get the flags of struct irqaction from struct
+irq_data
+> > in gic_set_affinity()? Or?
 > 
-Any re-sending?
+> No, and you should not even think about it at all.
+> 
+OK, I see. Thanks :)
 
-> > Could I meanwhile interest you in the patches for the S3C2416 armclk and
-> hsmmc
-> > (from 28 Sep 2011) :-) ?
-> >
-> Sure, will check it soon, maybe tomorrow?
-> Anyway, if any problems, let you know.
+> The problem I can see from all this discussion is related to the early
+> enabling of interrupts and the per cpu timer setup before the cpu is
+> marked online. I really do not understand at all why this needs to be
+> done in order to call calibrate_delay().
+> 
+> calibrate_delay() monitors jiffies, which are updated from the CPU
+> which is waiting for the new CPU to set the online bit.
+> 
+> So you simply can call calibrate_delay() on the new CPU just from the
+> interrupt disabled region and move the local timer setup after you
+> stored the cpu data and before enabling interrupts.
+> 
+> This solves both the cpu_online vs. cpu_active problem and the
+> affinity setting of the per cpu timers.
+> 
+Looks good to me......and of course, it works fine on SMDK4210 (EXYNOS4210).
+
+Russell, how about this? If you're ok how this can be handled before v3.1?
+As you know, I need to revert regarding one commit and this......or just
+fixing it with this?
+
+Anyway, I'd like to know your suggestion about this.
+
+> Thanks,
+> 
+> 	tglx
+> ----
+> Index: linux-2.6/arch/arm/kernel/smp.c
+> =============================================================
+> ======
+> --- linux-2.6.orig/arch/arm/kernel/smp.c
+> +++ linux-2.6/arch/arm/kernel/smp.c
+> @@ -301,17 +301,7 @@ asmlinkage void __cpuinit secondary_star
+>  	 */
+>  	platform_secondary_init(cpu);
+> 
+> -	/*
+> -	 * Enable local interrupts.
+> -	 */
+>  	notify_cpu_starting(cpu);
+> -	local_irq_enable();
+> -	local_fiq_enable();
+> -
+> -	/*
+> -	 * Setup the percpu timer for this CPU.
+> -	 */
+> -	percpu_timer_setup();
+> 
+>  	calibrate_delay();
+> 
+> @@ -323,10 +313,23 @@ asmlinkage void __cpuinit secondary_star
+>  	 * before we continue.
+>  	 */
+>  	set_cpu_online(cpu, true);
+> +
+> +	/*
+> +	 * Setup the percpu timer for this CPU.
+> +	 */
+> +	percpu_timer_setup();
+> +
+>  	while (!cpu_active(cpu))
+>  		cpu_relax();
+> 
+>  	/*
+> +	 * cpu_active bit is set, so it's safe to enable interrupts
+> +	 * now.
+> +	 */
+> +	local_irq_enable();
+> +	local_fiq_enable();
+> +
+> +	/*
+>  	 * OK, it's off to the idle thread for us
+>  	 */
+>  	cpu_idle();
+
 
 Thanks.
 
