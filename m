@@ -1,41 +1,58 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 10 Oct 2011 11:42:19 +0200
-Subject: [PATCH 2/7] s3c-adc: describe features via quirk constants
-In-Reply-To: <034d01cc8705$09ddd160$1d997420$%kim@samsung.com>
-References: <201109182241.48858.heiko@sntech.de>
-	<201110021318.42131.heiko@sntech.de>
-	<034d01cc8705$09ddd160$1d997420$%kim@samsung.com>
-Message-ID: <201110101142.20028.heiko@sntech.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 10 Oct 2011 18:42:52 +0900
+Subject: [PATCH V3 0/4]: ARM: SAMSUNG: Add SPI clkdev support
+In-Reply-To: <1318233789-19882-1-git-send-email-padma.v@samsung.com>
+References: <1318233789-19882-1-git-send-email-padma.v@samsung.com>
+Message-ID: <039c01cc8730$fb130750$f13915f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kgene,
+Padmavathi Venna wrote:
+> 
+> This patchset modifies the existing clkdev to make SPI driver
+> independent of the clock names send from platform data. This
+> patches enables the SPI driver to request SPI bus clocks
+> using generic connection ID.
+> 
+> V1 patch series are:
+> 	http://www.spinics.net/lists/arm-kernel/msg141671.html
+> 
+> Changes since V1:
+> 	-Add newly introduced CLKDEV_INIT macro for creating clk_lookup
+> 	structure as suggested by Russell King
+> 	V2 patches series are:
+> 	http://www.spinics.net/lists/arm-kernel/msg142733.html
+> 
+> Changes since V2:
+> 	-Reworked the patches as per the following link. Patch series in
+> 	the following link removed & and , from the macro declaration and
+added
+> 	in the macro defination.
+> 	http://www.spinics.net/lists/arm-kernel/msg143663.html
+> 
+> Padmavathi Venna (4):
+>   ARM: S3C64XX: Add SPI clkdev support
+>   ARM: S5PC100: Add SPI clkdev support
+>   ARM: S5P64X0: Add SPI clkdev support
+>   ARM: S5PV210: Add SPI clkdev support
+> 
+>  arch/arm/mach-s3c64xx/clock.c         |   98 ++++++++++++++++--------
+>  arch/arm/mach-s5p64x0/clock-s5p6440.c |   57 +++++++++-----
+>  arch/arm/mach-s5p64x0/clock-s5p6450.c |   57 +++++++++-----
+>  arch/arm/mach-s5pc100/clock.c         |  132 ++++++++++++++++++++--------
+> -----
+>  arch/arm/mach-s5pv210/clock.c         |   58 ++++++++++-----
+>  5 files changed, 259 insertions(+), 143 deletions(-)
+> 
+> --
+> 1.7.4.4
+Looks ok but this needs 'CLKDEV_INIT' patch. Please wait until it can be
+sent to upstream for this patch.
 
-Am Montag, 10. Oktober 2011, 06:28:19 schrieb Kukjin Kim:
-> Kukjin Kim wrote:
-> > Heiko St?bner wrote:
-> > > Hi Kgene,
-> > > 
-> > > Am Sonntag 02 Oktober 2011, 09:38:18 schrieb Kukjin Kim:
-> > > > How about following? I think following is also not bad...
-> > > 
-> > > ok, I don't claim to have the right solution, so if keeping the
-> > > TYPE_xxx
-> 
-> enum
-> 
-> > > is better, I will do a rework of the series according to your solution
-> 
-> and
-> 
-> > > resend it.
-> > 
-> > Thanks for your understanding and please re-send it :)
-> 
-> Any re-sending?
-as I'm this in my spare time I'm not sure I will make your "deadline" for the 
-merge-window, but will try to get it sorted today or tomorrow.
+Thanks.
 
-Meanwhile please take a look at the armclk series and the hsmmc devname patch.
-
-Heiko
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
