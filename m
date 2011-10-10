@@ -1,50 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Oct 2011 13:27:23 +0900
-Subject: [GIT PULL] Samsung devel-2 for v3.2
-In-Reply-To: <20111007191443.GA12004@opensource.wolfsonmicro.com>
-References: <002001cc80e5$3e497790$badc66b0$%kim@samsung.com>
-	<20111002192950.GB1005@sirena.org.uk>
-	<005801cc817c$5d42f9e0$17c8eda0$%kim@samsung.com>
-	<201110071956.12034.arnd@arndb.de>
-	<20111007191443.GA12004@opensource.wolfsonmicro.com>
-Message-ID: <034701cc8704$e86035a0$b920a0e0$%kim@samsung.com>
+Date: Mon, 10 Oct 2011 13:28:19 +0900
+Subject: [PATCH 2/7] s3c-adc: describe features via quirk constants
+References: <201109182241.48858.heiko@sntech.de>
+	<201109211504.03287.heiko@sntech.de>
+	<001a01cc80d6$40bf7e70$c23e7b50$%kim@samsung.com>
+	<201110021318.42131.heiko@sntech.de>
+Message-ID: <034d01cc8705$09ddd160$1d997420$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Kukjin Kim wrote:
 > 
-> On Fri, Oct 07, 2011 at 07:56:11PM +0200, Arnd Bergmann wrote:
-> > On Monday 03 October 2011, Kukjin Kim wrote:
-> > > Mark Brown wrote:
+> Heiko St?bner wrote:
+> >
+> > Hi Kgene,
+> >
+> > Am Sonntag 02 Oktober 2011, 09:38:18 schrieb Kukjin Kim:
+> > > How about following? I think following is also not bad...
+> > ok, I don't claim to have the right solution, so if keeping the TYPE_xxx
+enum
+> > is better, I will do a rework of the series according to your solution
+and
+> > resend it.
+> >
+> Thanks for your understanding and please re-send it :)
 > 
-> > > > As I reported the other day this change breaks the boot early on on
-the
-> > > > Cragganmore S3C6410 based systems (I've not actually fired up my
-> > > > SMDK6410 but I suspect it may have issues too).  I did make some
-brief
-> 
-> > > Hmm, I thought it has no problem when I saw Thomas Abraham's 'serial:
-> > > samsung' patches because he said it works fine with my for-next plus
-his
-> > > patches on SMDK6410...Anyway, I need to sort it out.
-> 
-> > > Arnd, please hold this on, will request again soon.
-> 
-> > Any update on this?
-> 
-> We've got a lot closer to working out what's wrong (and got useful
-> logging) but not nailed it down yet.  Kukjin has confirmed that he can
-> see what's likely the same issue on his systems.  My suggestion is that
-> we go ahead with the pull request for now and then fix incrementally,
-> there's a relatively small set of systems affected.  If it gets to more
-> than a couple of -rcs we know which patches are problematic and so can
-> always revert.
+Any re-sending?
 
-Yes I agree with you and I believe we don't need to revert it during next
--rc :)
-
-Arnd, could you please pull that for v3.2?
-If any problems, please let me know.
+> > Could I meanwhile interest you in the patches for the S3C2416 armclk and
+> hsmmc
+> > (from 28 Sep 2011) :-) ?
+> >
+> Sure, will check it soon, maybe tomorrow?
+> Anyway, if any problems, let you know.
 
 Thanks.
 
