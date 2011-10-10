@@ -1,33 +1,55 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 10 Oct 2011 09:10:41 +0300
-Subject: [PATCH 17/30] usb/musb: allow building USB_MUSB_TUSB6010 as a
-	module
-In-Reply-To: <1317566760-25681-18-git-send-email-arnd@arndb.de>
-References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
-	<1317566760-25681-18-git-send-email-arnd@arndb.de>
-Message-ID: <20111010061041.GG31707@legolas.emea.dhcp.ti.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 10 Oct 2011 08:26:53 +0200
+Subject: [PATCH] PM: HIBERNATION: add resume_delay kernel param as well
+	as resume_delay
+In-Reply-To: <1318225452-10397-1-git-send-email-Barry.Song@csr.com>
+References: <1318225452-10397-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <20111010062653.GB4139@liondog.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 02, 2011 at 04:45:47PM +0200, Arnd Bergmann wrote:
-> Commit 1376d92f9 "usb: musb: allow musb and glue layers to be modules"
-> made the USB_MUSB_TUSB6010 option modular, but actually building
-> the driver as a module does not work, so various randconfig builds
-> actually fail. This changes all code that depends on the
-> option to also check for modular builds, and exports the necessary
-> symbols.
+On Sun, Oct 09, 2011 at 10:44:12PM -0700, Barry Song wrote:
+> From: Barry Song <baohua.song@csr.com>
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Felipe Balbi <balbi@ti.com>
+> patch "PM: HIBERNATION: add resume_wait param to support MMC-like devices
+> as resume file" add resume_wait param. this patch adds resume_delay so that
+> resume_wait/delay has the same model with root_wait/delay.
+> 
+> Signed-off-by: Barry Song <baohua.song@csr.com>
+> ---
+>  Documentation/kernel-parameters.txt |    3 +++
+>  kernel/power/hibernate.c            |   14 ++++++++++++++
+>  2 files changed, 17 insertions(+), 0 deletions(-)
+> 
+> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+> index 88a7b19..831bde2 100644
+> --- a/Documentation/kernel-parameters.txt
+> +++ b/Documentation/kernel-parameters.txt
+> @@ -2240,6 +2240,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>  			in <PAGE_SIZE> units (needed only for swap files).
+>  			See  Documentation/power/swsusp-and-swap-files.txt
+>  
+> +	resumedelay=	[HIBERNATION] Delay (in seconds) to pause before attempting to
+> +			read the resume files
+> +
+>  	resumewait	[HIBERNATION] Wait (indefinitely) for resume device to show up.
+>  			Useful for devices that are detected asynchronously
+>  			(e.g. USB and MMC devices).
+> diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+> index b3da53c..f73a00e 100644
+> --- a/kernel/power/hibernate.c
+> +++ b/kernel/power/hibernate.c
+> @@ -33,6 +33,7 @@
+>  static int nocompress = 0;
+>  static int noresume = 0;
+>  static int resume_wait = 0;
+> +static int resume_delay = 0;
 
-applied, thanks
+These static variables get zeroed needlessly and checkpatch actually
+warns about that. Maybe fix that up while you're there?
+
+Thanks.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111010/b1e00fb9/attachment.sig>
+Regards/Gruss,
+    Boris.
