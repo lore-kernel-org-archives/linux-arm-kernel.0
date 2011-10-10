@@ -1,103 +1,53 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 10 Oct 2011 11:54:33 +0200
-Subject: [PATCH v2 6/6] OMAP4: Clock: Correct the name of SLIMBUS interface
-	clocks
-In-Reply-To: <4E8F8149.6090100@ti.com>
-References: <1316195330-15099-1-git-send-email-jon-hunter@ti.com>
-	<alpine.DEB.2.00.1110061941100.4611@utopia.booyaka.com>
-	<4E8EB6ED.9020605@ti.com> <4E8F8149.6090100@ti.com>
-Message-ID: <4E92C0D9.3090402@ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Mon, 10 Oct 2011 11:54:26 +0200
+Subject: [RFC][PATCH] plat-mxc: iomux-v3.h: implicitly enable
+	pull-up/down when that's desired
+In-Reply-To: <20111010081407.GA32718@sapphire.tkos.co.il>
+References: <201110100758.p9A7wCYT011235@home.pavel.comp>
+	<20111010081407.GA32718@sapphire.tkos.co.il>
+Message-ID: <20114.49362.842057.846334@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Hi,
 
-On 10/8/2011 12:46 AM, Hunter, Jon wrote:
-> Hi Benoit,
->
-> On 10/7/2011 3:23, Cousson, Benoit wrote:
->> Hi Paul&  Jon,
->>
->> On 10/7/2011 3:42 AM, Paul Walmsley wrote:
->>> + Beno?t
->>>
->>> On Fri, 16 Sep 2011, Jon Hunter wrote:
->>>
->>>> From: Jon Hunter<jon-hunter@ti.com>
->>>>
->>>> Currently the interface clocks for the two SLIMBUS peripherals are
->>>> named slimbus1_fck and slimbus2_fck. Rename these clocks to be
->>>> slimbus1_ick and slimbus2_ick so it is clear that these are
->>>> interface clocks and not functional clocks.
->>>>
->>>> Signed-off-by: Jon Hunter<jon-hunter@ti.com>
->>>
->>> This one, I don't quite understand. We should probably be removing these
->>> MODULEMODE-only clocks from the OMAP4 tree, and using their parent clock
->>> as the main_clk. That would be a good cleanup for 3.3...
->>
->> Yes, but in order to remove that from the clock data we must ensure that
->> the hwmod entry is there.
->> I kept a lot of legacy MODULEMODE clocks just because of missing hwmod /
->> runtime_pm adaptation on some drivers.
->>
->> In the case of slimbus, there is no main_clk but a bunch of optional
->> clocks. It looks similar to the DSS case. So we should not use the
->> parent clock as a main_clk.
->>
->> We should probably promote one of the opt_clk as the main_clk. The
->> slimbus_clk seems to be the good candidate for both instances.
->>
->> static struct omap_hwmod_opt_clk slimbus1_opt_clks[] = {
->> { .role = "fclk_1", .clk = "slimbus1_fclk_1" },
->> { .role = "fclk_0", .clk = "slimbus1_fclk_0" },
->> { .role = "fclk_2", .clk = "slimbus1_fclk_2" },
->> { .role = "slimbus_clk", .clk = "slimbus1_slimbus_clk" },
->> };
->>
->> static struct omap_hwmod_opt_clk slimbus2_opt_clks[] = {
->> { .role = "fclk_1", .clk = "slimbus2_fclk_1" },
->> { .role = "fclk_0", .clk = "slimbus2_fclk_0" },
->> { .role = "slimbus_clk", .clk = "slimbus2_slimbus_clk" },
->> };
->>
->> Jon,
->> Do you know if that one is indeed mandatory to use the slimbus IP?
->
-> Sorry, are you asking about the clocks I was re-naming or the
-> slimbus_clk you are referring to above?
+Baruch Siach writes:
+> Hi Paul,
+> 
+> On Mon, Oct 10, 2011 at 11:19:23AM +0400, Paul Fertser wrote:
+> > To configure pads during the initialisation a set of special constants
+> > is used, e.g.
+> > #define MX25_PAD_FEC_MDIO__FEC_MDIO IOMUX_PAD(0x3c4, 0x1cc, 0x10, 0, 0, PAD_CTL_HYS | PAD_CTL_PUS_22K_UP)
+> > 
+> > The problem is that no pull-up/down is getting activated unless both
+> > PAD_CTL_PUE (pull-up enable) and PAD_CTL_PKE (pull/keeper module
+> > enable) set. This is clearly stated in the i.MX25 datasheet and is
+> > confirmed by the measurements on hardware. This leads to some rather
+> > hard to understand bugs such as misdetecting an absent ethernet PHY (a
+> > real bug i had), unstable data transfer etc. This might affect mx25,
+> > mx35, mx50, mx51 and mx53 SoCs.
+> > 
+> > It's reasonable to expect that if the pullup value is specified, the
+> > intention was to have it actually active, so we implicitly add the
+> > needed bits.
+> 
+> IMO, this patch should include the removal of the now redundant PAD_CTL_PKE 
+> from arch/arm/plat-mxc/include/mach/iomux-mx25.h, and other v3 iomux headers.
+> 
+Why should PAD_CTL_PKE be redundant? You still need it to configure a
+pin for the 'Keeper' functionality.
+Even if there is no default pin configuration that uses this, it
+should be possible to enable it when desired.
 
-The clocks you are renaming should not exist at all, so I was referring 
-to the real clocks that are all listed as optional clocks.
 
-Usually we do need to have a main_clk in order to access the IP 
-registers (at least the sysconfig). But for some IPs, the iclk can be 
-enough.
-If the interface clock is enough, then potentially that main clock is 
-not mandatory. But if one functional clock is mandatory, then we have to 
-figured out which one from the various optional functional clocks can be 
-used as the main_clk.
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-> Looking at the clock tree tool, the slimbus_clk is the actual external
-> slimbus clock that can be generated by OMAP or by an external device.
->
-> The TRM states ...
->
-> "Most of the SLIMbus module runs off two main clocks: the L4 interface
-> clock for the data input and output registers, and the control and
-> status control registers; and the SLIMbus clock, taken from the serial
-> interface (CLK line) for the SLIMbus-side logic.
->
-> The SLIMbus controller operates as clock source component (active
-> framer), which drives the SLIMbus clock line CLK, or as clock receiver
-> component, which gets its clock from the same CLK line."
->
-> So, if you are operating as the clock source component on the bus then
-> one of the optional clocks to drive the peripheral logic and if you are
-> the clock receiver then you use slimbus_clk.
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-OK, so clearly, the slimbus_clk cannot be a main_clk. We have to check 
-if the registers can be accessed only with the iclk.
-
-Regards,
-Benoit
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
