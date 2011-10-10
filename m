@@ -1,47 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 10 Oct 2011 08:36:38 +0200
-Subject: [PULL] i.MX
-In-Reply-To: <20111004092015.GM31404@pengutronix.de>
-References: <20111004092015.GM31404@pengutronix.de>
-Message-ID: <20111010063638.GA22100@pengutronix.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 10 Oct 2011 08:58:14 +0200
+Subject: [Linaro-mm-sig] [PATCHv16 0/9] Contiguous Memory Allocator
+In-Reply-To: <201110071827.06366.arnd@arndb.de>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<201110071827.06366.arnd@arndb.de>
+Message-ID: <CADMYwHzZWTgSEwr9gMJrK2mZgC2WiiGC9Pp6saZGx=PY-N=ueg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Sascha,
+On Fri, Oct 7, 2011 at 6:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> IMHO it would be good to merge the entire series into 3.2, since
+> the ARM portion fixes an important bug (double mapping of memory
+> ranges with conflicting attributes) that we've lived with for far
+> too long, but it really depends on how everyone sees the risk
+> for regressions here. If something breaks in unfixable ways before
+> the 3.2 release, we can always revert the patches and have another
+> try later.
 
-On Tue, Oct 04, 2011 at 11:20:15AM +0200, Sascha Hauer wrote:
-> Arnaud Patard (2):
->       Fix pata imx resource
+I didn't thoroughly review the patches, but I did try them out (to be
+precise, I tried v15) on an OMAP4 PandaBoard, and really liked the
+result.
 
-when Sascha was on vacation I already let Arnd pull that commit squashed
-into the originating commit (Message-ID:
-<20110906192229.GK28816@pengutronix.de>). Now he got it back eventually breaking
-bisection :-(
+The interfaces seem clean and convenient and things seem to work (I
+used a private CMA pool with rpmsg and remoteproc, but also noticed
+that several other drivers were utilizing the global pool). And with
+this in hand we can finally ditch the old reserve+ioremap approach.
 
->       efika: Configure esdhc cd/wp on efika mx/sb
-> 
-> Fabio Estevam (3):
->       ARM: mach-qong: Add watchdog support
->       ARM: mach-mxs/mx28evk: Only register devices if their GPIO requests succeeded
->       ARM: mxs: Consolidate mm-mx23.c and mm-mx28.c into a single file
-> 
-> Hui Wang (1):
->       ARM i.MX avic: convert to use generic irq chip
-> 
-> Jason Liu (4):
->       ARM: mx5/mm: move i.MX50 mm stuff into mm.c
->       ARM: mx5/mm: Remove MX51_DEBUG related mapping
->       ARM: mx5/mm: consolidate TZIC map code
->       ARM: mx25: Add the missing IIM base definition
-Same here, I squashed that commit into
+So from a user perspective, I sure do hope this patch set gets into
+3.2; hopefully we can just fix anything that would show up during the
+3.2 cycle.
 
-	d27536c (ARM: mx25: Print silicon revision on boot)
+Marek, Michal (and everyone involved!), thanks so much for pushing
+this! Judging from the history of this patch set and the areas that it
+touches (and from the number of LWN articles ;) it looks like a
+considerable feat.
 
-If you care I can help you to resolve these issues via irc.
+FWIW, feel free to add my
 
-Best regards
-Uwe
+Tested-by: Ohad Ben-Cohen <ohad@wizery.com>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+(small and optional comment: I think it'd be nice if
+dma_declare_contiguous would fail if called too late, otherwise users
+of that misconfigured device will end up using the global pool without
+easily knowing that something went wrong)
+
+Thanks,
+Ohad.
