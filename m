@@ -1,76 +1,40 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Mon, 10 Oct 2011 10:42:49 +0100
-Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
-In-Reply-To: <CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-5-git-send-email-zoss@devai.org>
-	<CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
-Message-ID: <4E92BE19.4060907@cam.ac.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 10 Oct 2011 11:46:17 +0200
+Subject: [GIT PULL] at91: driver for Atmel true hardware random number
+	generator
+Message-ID: <4E92BEE9.5090604@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/11 02:29, Linus Walleij wrote:
-> 2011/10/9 Zoltan Devai <zoss@devai.org>:
-> 
->> Signed-off-by: Zoltan Devai <zoss@devai.org>
->> ---
->>  arch/arm/mach-spmp8000/adc.c                      |  465 +++++++++++++++++++++
->>  arch/arm/mach-spmp8000/include/mach/spmp8000adc.h |   29 ++
-> 
-> I think we stopped stuffing misc drivers under arch/arm/*
-> 
-> And stuffing them under drivers/misc/* won't be popular either.
-> 
-> IIO has some ADCs in drivers/staging/iio/adc
-> these seem all to be intended to be used from userspace.
-Yeah, we've had various discussions about adding support for
-in kernel users. Its always fallen on the fact that no one
-has had the time to write the code to allow it all to be
-linked up.  Right now it's a case of drivers providing their
-own interfaces if they want to allow this.
-Mark Brown has raised this issue before so I've cc'd him.
+Hi Arnd,
 
-For reference of those not following the original thread (based
-on a quick scan of the driver code in question).
+Here is a couple of patches for adding the True Random Number Generator
+that can be find on some AT91SAM SoCs.
+Herbert Xu told me that this material can go through the ARM SoC tree.
 
-Driver has two callback sets:
+They may conflict with future work on at91 gpio that can be found on at91-next 
+branch. We will recall you this during the "pull request" that we will send you 
+for those bits...
 
-1) Touch panel reads (I guess going straight to an input driver)
-(1 of these only). This is annoyingly tied up with the more general
-adc registers.
-2) General purpose adc callbacks. 
+The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
 
-Both are driven off an interrupt, but data ready
-appears to manually driven (so software triggered sampling then data
-ready signal when sampling is done for a single channel).
+  Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
 
-So what are these callbacks used for?  Note they all run as
-interrupt top halves...
+are available in the git repository at:
+git://github.com/at91linux/linux-at91.git for-arnd/at91-trng
 
-Options at current time are:
+Peter Korsgaard (2):
+      ARM: at91: at91sam9g45: add trng clock and platform device
+      hw_random: add driver for atmel true hardware random number generator
 
-mfd supporting input device and either hwmon or iio device.
+ arch/arm/mach-at91/at91sam9g45.c         |    7 ++
+ arch/arm/mach-at91/at91sam9g45_devices.c |   29 ++++++
+ drivers/char/hw_random/Kconfig           |   13 +++
+ drivers/char/hw_random/Makefile          |    1 +
+ drivers/char/hw_random/atmel-rng.c       |  158 ++++++++++++++++++++++++++++++
+ 5 files changed, 208 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/char/hw_random/atmel-rng.c
 
-A driver that hosts both a hwmon / iio and an input device.
-
-Be brave (+ have a lot of time) and propose patches adding the relevant
-tying together code to allow iio drivers to be queried in kernel.
-It shouldn't be that bad actually if you solve the how to work
-out which device / channel you want in a consistent way.
-
-It really depends on what those general adc callbacks get used for.
-
-> 
-> There are a few in-kernel ADCs all over the kernel tree
-> for various specific purposes.
-> 
-> I don't know where we should go with this kind of stuff,
-> really :-/
-> 
-> Yours,
-> Linus Walleij
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Thanks, cheers,
+-- 
+Nicolas Ferre
