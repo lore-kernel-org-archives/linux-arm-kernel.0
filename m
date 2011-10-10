@@ -1,38 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Oct 2011 14:27:37 +0200
-Subject: [PATCH 1/2] drivers: create a pin control subsystem v9
-In-Reply-To: <20111010123018.GD24198@S2100-06.ap.freescale.net>
-References: <1317629862-13549-1-git-send-email-linus.walleij@stericsson.com>
-	<20111009093651.GC24198@S2100-06.ap.freescale.net>
-	<CACRpkdbdz0FE57TdVryKD+X2=1sf-M9NgiZzm+Sm+WYhU6n_bQ@mail.gmail.com>
-	<20111010123018.GD24198@S2100-06.ap.freescale.net>
-Message-ID: <CACRpkdbPYxoKHhPRTBXGyfcepRUpUhO0CFR_9ULvfFLU72OJpw@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 10 Oct 2011 18:05:54 +0530
+Subject: [PATCH 2/3] ARM: plat-samsung: use Kconfig choice for debug UART
+	selection
+In-Reply-To: <20111010122319.GE2451@mudshark.cambridge.arm.com>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+	<1313530873-24961-2-git-send-email-will.deacon@arm.com>
+	<CAJuYYwRPwALAQcvsMPuz8XYsDicCmB52HzZehppUnKqv5itPEQ@mail.gmail.com>
+	<20111010122319.GE2451@mudshark.cambridge.arm.com>
+Message-ID: <CAJuYYwQiXSSOQ_FvOn41NSUJ6F4axNbYgV-LfOxhhLvbUz-bMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 2:30 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
-
->> +The example 8x8 PGA package above will have pin numbers 0 thru 63 assigned to
->> +its physical pins. It will name the pins { A1, A2, A3 ... H6, H7, H8 } using
->> +pinctrl_register_pins_[sparse|dense]() and a suitable data set as shown
+On 10 October 2011 17:53, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Oct 10, 2011 at 12:56:24PM +0100, Thomas Abraham wrote:
+>> Hi Will,
 >
-> It should just be pinctrl_register_pins()?
-
-Yep, fixed it.
-
->> +System pinmux hogging
->> +=====================
+> Hi Thomas,
+>>
+>> What is your opinion about the following diff instead of the above one?
+>>
+>>
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index 65cf8c6..035f5cd 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -120,6 +120,15 @@ choice
+>> ? ? ? ? ? ? ? ? Say Y here if you want the debug print routines to direct
+>> ? ? ? ? ? ? ? ? their output to the second serial port on these devices.
+>>
+>> + ? ? config DEBUG_SAMSUNG_UART
+>> + ? ? ? ? ? ? bool "Kernel low-level debugging messages via samsung serial port"
+>> + ? ? ? ? ? ? depends on PLAT_SAMSUNG
+>> + ? ? ? ? ? ? help
+>> + ? ? ? ? ? ? ? Say Y here if you want the debug print routines to direct
+>> + ? ? ? ? ? ? ? their output to the serial port for Samsung platforms. Choose
+>> + ? ? ? ? ? ? ? the uart port with the "S3C UART to use for low-level debug"
+>> + ? ? ? ? ? ? ? config option.
 >> +
->> +A system pinmux map entry, i.e. a pinmux setting that does not have a device
->> +associated with it, can be hogged by the core when the pin controller is
->> +registered. This means that the core will attempt to call regulator_get() and
->> +regulator_enable() on it immediately after the pin control device has been
->> +registered.
+>> ?endchoice
+>>
+>> ?config EARLY_PRINTK
+>> @@ -139,7 +148,7 @@ config OC_ETM
+>> ? ? ? ? kernel code.
+>>
+>> ?config DEBUG_S3C_UART
+>> - ? ? depends on PLAT_SAMSUNG
+>> + ? ? depends on DEBUG_SAMSUNG_UART
+>> ? ? ? int "S3C UART to use for low-level debug"
+>> ? ? ? default "0"
+>> ? ? ? help
 >
-> s/regulator_get/pinmux_get, and s/regulator_enable/pinmux_enable
+> Well, it's smaller so that's always a plus. However, I don't think the extra
+> level of indirection helps (that is, the "Kernel low-level debugging UART")
+> choice should be where the UART is specified, rather than pointing you at
+> another (platform-specific) option).
+>
+> Did your suggestion come purely out of aesthetics or are you running into
+> difficulties with the original patch?
 
-Fixed this too, sorry for being so hung up on the regulator subsystem,
-must be that I really like it...
+There are no difficulties with the original patch. But that was not
+how Samsung boards have been selecting the low level debug uart port
+number. The proposed patch tried to maintain the old style.
+
+Another point is that Samsung's Exynos4 (and few other SoC's) has a
+fourth UART port as well. Not that it is used as a debug port
+currently, but there is no technical limitation in using that as a
+console port. So that might need 'DEBUG_S3C_UART3' as well.
 
 Thanks,
-Linus Walleij
+Thomas.
+
+>
+> Will
+>
