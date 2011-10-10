@@ -1,39 +1,63 @@
-From: linux_arm@lakedaemon.net (Jason)
-Date: Mon, 10 Oct 2011 07:23:22 -0400
-Subject: orion/kirkwood and device tree support
-In-Reply-To: <201110091545.55645.michael@walle.cc>
-References: <201110091545.55645.michael@walle.cc>
-Message-ID: <20111010112322.GJ31288@titan.lakedaemon.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 10 Oct 2011 19:23:46 +0800
+Subject: [PATCH 2/2] pinmux: add a driver for the U300 pinmux
+In-Reply-To: <CACRpkdZ-WTecB-SPXjs531heu4M5Jc-9YvjEV2fPfaHSxiYG2A@mail.gmail.com>
+References: <1317629883-13582-1-git-send-email-linus.walleij@stericsson.com>
+	<CAGsJ_4yKzyFzJwKgA2nkUf6z2fYoQLB48SOJR82DyAvcut7khQ@mail.gmail.com>
+	<CACRpkdZ-WTecB-SPXjs531heu4M5Jc-9YvjEV2fPfaHSxiYG2A@mail.gmail.com>
+Message-ID: <CAGsJ_4zkj-nJ9nX+vnLuvJpy124HNqQvUioRpJvLER5WUTZnJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resend, messed up my email alias.  I'm a dork.  :-(  Apologies.
+2011/10/10 Linus Walleij <linus.walleij@linaro.org>:
+> On Sat, Oct 8, 2011 at 11:09 AM, Barry Song <21cnbao@gmail.com> wrote:
+>>> +static void __init u300_pmx_dumpregs(struct u300_pmx *upmx)
+>>> +{
+>>> + ? ? ? u16 regval;
+>>> + ? ? ? int i;
+>>> +
+>>> + ? ? ? for (i = 0; i < ARRAY_SIZE(u300_pmx_registers); i++) {
+>>> + ? ? ? ? ? ? ? regval = readw(upmx->virtbase + u300_pmx_registers[i]);
+>>> + ? ? ? ? ? ? ? dev_info(upmx->dev, "PMX%u: 0x%04x\n", i, regval);
+>>> + ? ? ? }
+>>> +}
+>>
+>> is this a debug information or do you want it to be in mainline?
+>
+> Debug info, I'll delete it. Not that it hurt, but I'll kill it.
+>
+>>> + ? ? ? /* Create state holders etc for this driver */
+>>> + ? ? ? upmx = devm_kzalloc(&pdev->dev, sizeof(struct u300_pmx), GFP_KERNEL);
+>>
+>> and this would be "devm_kzalloc(&pdev->dev, sizeof(*upmx), GFP_KERNEL); " ?
+>
+> Same semantic effect, but if you prefer it that way, sure :-)
+>
+> I've seen both used in the kernel before...
 
-Michael,
+coding style document says :
+"
+                  Chapter 14: Allocating memory
 
-On Sun, Oct 09, 2011 at 03:45:55PM +0200, Michael Walle wrote:
-> I submitted a patch to support the Buffalo LS-XHL three months ago, which was 
-> rejected because no more old fashioned board setup patches will be merged. 
+  The kernel provides the following general purpose memory allocators:
+  kmalloc(), kzalloc(), kcalloc(), vmalloc(), and vzalloc().  Please refer to
+  the API documentation for further information about them.
 
-We have the same situation with the dreamplug (kirkwood based).
+ The preferred form for passing a size of a struct is the following:
 
-> Are there any plans or even ongoing developments to convert these platforms to 
-> support device trees?
+          p = kmalloc(sizeof(*p), ...);
 
-I'm attempting to, but that requires my learning devicetree.  Which is
-fine in and of itself, but it also means I'm learning how Linux supports
-arm SoCs.  Which is taking some time.  My current thought process is this:
+  The alternative form where struct name is spelled out hurts readability and
+  introduces an opportunity for a bug when the pointer variable type is changed
+  but the corresponding sizeof that is passed to a memory allocator is not.
+"
+>
+> Can I have your Reviewed-by: tag after this?
 
-1.) add arch/arm/mach-kirkwood/board-dt.c, arch/arm/boot/dts/kirkwood.dtsi,
-    and arch/arm/boot/dts/kirkwood-dreamplug.dts
-2.) fill it in with replacements of calls in common.c and irq.c
-3.) get it working cleanly.
-4.) add in calls from mpp.c, pcie.c, and cpuidle.c
-5.) build arch/arm/boot/dts/kirkwood-*.dts for other boards.
+yes. of course.
 
-I'd be happy to coordinate and test, although I have no buffalo gear.
-And I sure would appreciate some help. ;-)
-
-thx,
-
-Jason.
+>
+> Linus Walleij
+>
+Thanks
+barry
