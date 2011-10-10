@@ -1,35 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 10 Oct 2011 13:44:51 -0600 (MDT)
-Subject: [GIT PULL] ARM: OMAP: new miscellaneous clock/hwmod data for 3.2
-Message-ID: <alpine.DEB.2.00.1110101342010.5205@utopia.booyaka.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Mon, 10 Oct 2011 21:46:51 +0200
+Subject: [PATCH v3 0/5] S3C2443/S3C2416: Implement support for ADC
+Message-ID: <201110102146.51694.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+The adc blocks of S3C2443 and S3C2416/2450 differ in some regards
+from previous (S3C2410, etc) and later (S3C64XX, S5P) SoCs.
 
-The following changes since commit be73246058737beec52ae232bcab7776332a9e06:
+This patch series adds support for these ADC implementations.
 
-  ARM: OMAP2+: Remove custom init_irq for remaining boards (2011-09-26 17:50:37 -0700)
+Each patch was compile tested. But as I have only access to S3C2416
+hardware, real life testing happened only there.
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 clock_hwmod_devel_3.2
+Changes since v2:
+Drop the quirks and follow the proposal of Kukjin Kim introducing
+additional cpu types for S3C2443 and S3C2416.
+S3C2443 becomes TYPE_ADCV11, as it's older than the S3C2416 implementation
+and S3C2416/2450 becomes TYPE_ADCV12.
 
-Benoit Cousson (1):
-      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP4
+Changes since v1:
+added a wrap for a line over 80 and moved the adc_setname call
+to the s3c24XX.c files where all the other names are set.
 
-Keshava Munegowda (1):
-      ARM: OMAP: USB: EHCI and OHCI hwmod structures for OMAP3
+Heiko Stuebner (5):
+  S3C2443/S3C2416: Add adc registers
+  s3c-adc: Fix mux bit modification in s3c_adc_select
+  S3C24XX: Allow overriding of adc device name
+  s3c-adc: Add support for S3C2443
+  s3c-adc: Add support for S3C2416/S3C2450
 
-Paul Walmsley (1):
-      ARM: OMAP3xxx: hwmod data: add PRM hwmod
+ arch/arm/mach-s3c2416/s3c2416.c               |    3 ++
+ arch/arm/mach-s3c2443/s3c2443.c               |    3 ++
+ arch/arm/plat-samsung/adc.c                   |   43 ++++++++++++++++++------
+ arch/arm/plat-samsung/include/plat/adc-core.h |    2 +-
+ arch/arm/plat-samsung/include/plat/regs-adc.h |    3 ++
+ 5 files changed, 42 insertions(+), 12 deletions(-)
 
-Santosh Shilimkar (1):
-      ARM: OMAP4: clock: Add CPU local timer clock node.
-
- arch/arm/mach-omap2/clock44xx_data.c       |    9 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  279 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  206 ++++++++++++++++++++-
- 3 files changed, 493 insertions(+), 1 deletions(-)
-
-
-- Paul
+-- 
+1.7.2.3
