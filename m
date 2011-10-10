@@ -1,98 +1,43 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 11 Oct 2011 00:17:50 +0200
-Subject: [PATCHv9 03/18] TEMP: OMAP3xxx: hwmod data: add PRM hwmod
-In-Reply-To: <alpine.DEB.2.00.1110101416530.5205@utopia.booyaka.com>
-References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-	<1316781986-30642-4-git-send-email-t-kristo@ti.com>
-	<alpine.DEB.2.00.1110101320180.5205@utopia.booyaka.com>
-	<4E934D79.4080000@ti.com>
-	<alpine.DEB.2.00.1110101416530.5205@utopia.booyaka.com>
-Message-ID: <4E936F0E.9050203@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 10 Oct 2011 15:24:15 -0700
+Subject: [PATCH v6 02/16] OMAP2+: hwmod: Add API to check IO PAD wakeup
+	status
+In-Reply-To: <CAAL8m4xkC1Ftnr=RpAK5m2PVvPx3yzitO5gNJfOKiD0_YkGkdA@mail.gmail.com>
+	(Govindraj's message of "Mon, 3 Oct 2011 11:26:04 +0530")
+References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
+	<1317380495-584-2-git-send-email-govindraj.raja@ti.com>
+	<4E8724D7.6060907@ti.com>
+	<CAAL8m4zLz4kv+nNPKHD6zKG0pdXifXpmWiHnLAyn_bq228qHXA@mail.gmail.com>
+	<4E8946BD.1010108@ti.com>
+	<CAAL8m4xkC1Ftnr=RpAK5m2PVvPx3yzitO5gNJfOKiD0_YkGkdA@mail.gmail.com>
+Message-ID: <878vosh4ds.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2011 10:42 PM, Paul Walmsley wrote:
-> Hi Beno?t
->
-> On Mon, 10 Oct 2011, Cousson, Benoit wrote:
->
->> On 10/10/2011 9:24 PM, Paul Walmsley wrote:
->>> On Fri, 23 Sep 2011, Tero Kristo wrote:
->>>
->>>> This patch is temporary until Paul can provide a final version.
+Govindraj <govindraj.ti@gmail.com> writes:
+
+> On Mon, Oct 3, 2011 at 10:53 AM, Rajendra Nayak <rnayak@ti.com> wrote:
+>> On Monday 03 October 2011 10:30 AM, Govindraj wrote:
+>>
+>>> On Sat, Oct 1, 2011 at 8:03 PM, Rajendra Nayak<rnayak@ti.com> ?wrote:
 >>>>
->>>> Signed-off-by: Tero Kristo<t-kristo@ti.com>
+>>>> On Friday 30 September 2011 04:31 PM, Govindraj.R wrote:
+>>>>>
+>>>>> Add API to determine IO-PAD wakeup event status for a given
+>>>>> hwmod dynamic_mux pad.
+>>>>>
+>>>>> Wake up event set will be cleared on pad mux_read.
+>>>>
+>>>> Are these api's even getting used in this series?
 >>>
->>> Here's an updated version of this one.  The one change is that the hwmod's
->>> name is now "prm3xxx" to reflect that the register layout of this IP block
->>> is quite different from its OMAP2 predecessors and OMAP4 successors.
->>> This should avoid some of the special-purpose driver probing code.
+>>> Used in Tero's irq_chaining patches.
 >>
->> This is not really aligned with the naming convention we've been using so far.
->> In both cases, the hwmod should just be named "prm". If a version information
->> is needed, then it should be added in the revision class field.
->>
->> It will make the device creation even simpler and not dependent of the SoC
->> version.
+>> So shouldn't this patch be part of his series instead?
 >
-> The problem in this case is that we should be using a completely different
-> device driver for the PRM that's in the OMAP3 chips, from the driver used
-> for OMAP2 or OMAP4 PRM blocks, due to the completely different register
-> layout.  As far as I know, we haven't yet used the hwmod IP version to
-> probe a different device driver when the version number changes.  There's
-> no support for that in the current Linux platform* code, so we'd need
-> special-purpose code for that.
+> Yes it is. Part of his v9-series.
 >
-> In an ideal world, we'd have an omap_bus, etc., which would include an
-> additional interface version number as part of its driver matching
-> criteria.  Device drivers would then specify which interface version
-> numbers they supported.  The device data would specify that interface
-> version number should be matched.
->
-> But as it is right now in the current platform_device/platform_driver
-> based system, we have only the name to match.  We could implement
-> something where we concatenate the existing IP version number onto the
-> hwmod name, and modify the device drivers to use that name.  But that
-> seems like a lot of potential churn in light of a future DT and/or
-> omap_bus migration.
->
-> So I'm proposing to use the IP version number field that's in the hwmod
-> data to indicate evolutionary revisions of an IP block -- rather than
-> revolutionary revisions that would require a new driver.  Then, since we
-> use the hwmod name for driver matching, we'd use a different name for
-> radically different IPs.
->
-> If it's the "3xxx" that you're objecting to in the name, we could call it
-> "prm2" or "prmxyz" - the '3xxx' just seemed like the most logical
-> approach.  The name of the hwmod class in the patch is still "prm", of
-> course.
 
-Yes, but that's different, the number is supposed to represent the 
-instance number in the IP naming convention. So prm2 != prmv2.
+Then please drop from this series and state the introductory patch
+(PATCH 0/n) that this series has a dependency on Tero's series.
 
-> Thoughts?
-
-In fact the device name does not have to match the hwmod name. So we can 
-just create an "omap2_prm" omap_device for OMAP2, "omap3_prm" 
-omap_device for OMAP3...
-That will allow the relevant PRM  driver to be bound to the proper device.
-
-> N.B., it's true that by waiting, this problem will presumably go away,
-> with DT, in which the driver matching data would go into the
-> "compatible" string in the DT.
-
-Yes, this will become indeed straightforward with DT.
-
-We will just have something like:
-prm {
-	compatible = "prm-omap2";
-	ti,hwmods = "prm";
-}
-
-> But I guess it would be good to figure out a clean approach in the
-> meantime.
-
-I guess the different device names should make that work in the meantime.
-
-Regards,
-Benoit
+Kevin
