@@ -1,52 +1,36 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 10 Oct 2011 11:01:09 +0300
-Subject: [PATCH v7 3/3] arm/tegra: device tree support for ventana board
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173B23B2FA@HQMAIL01.nvidia.com>
-References: <1317647918-22694-1-git-send-email-pdeschrijver@nvidia.com>
-	<1317647918-22694-4-git-send-email-pdeschrijver@nvidia.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF173B23B2FA@HQMAIL01.nvidia.com>
-Message-ID: <20111010080109.GQ9003@tbergstrom-lnx.Nvidia.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 10 Oct 2011 16:01:08 +0800
+Subject: [PATCH 5/9] ARM: SPMP8000: Add pinmux driver
+In-Reply-To: <CAKnu2MrXWoOka9D++q3h-KfgyYRhGA81Tcf07y7VdEUszZrU9w@mail.gmail.com>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<1318178172-7965-6-git-send-email-zoss@devai.org>
+	<CAKnu2MrXWoOka9D++q3h-KfgyYRhGA81Tcf07y7VdEUszZrU9w@mail.gmail.com>
+Message-ID: <CAGsJ_4zaqk_ECjaCXPeYJMRASE1zND+cZ2cwaLYVDhaVjsfSVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2011 at 08:04:34PM +0200, Stephen Warren wrote:
-> Peter De Schrijver wrote at Monday, October 03, 2011 7:19 AM:
-> 
-> ...
-> > diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
-> ...
-> > +	chosen {
-> > +		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/ram rdinit=/sbin/init";
-> 
-> It might be nice to make this identical to what Harmony and Seaboard have here.
-> 
-> Still, it doesn't matter a lot, since I (and I imagine most people) have
-> to edit this command-line to point at the correct partition for my disks
-> anyway; eventually, U-Boot should be providing/re-writing this property
-> too.
-> 
-> ...
-> > diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-> ...
-> > -	if (of_machine_is_compatible("nvidia,harmony"))
-> > -		harmony_pinmux_init();
-> > -	else if (of_machine_is_compatible("nvidia,seaboard"))
-> > -		seaboard_pinmux_init();
-> > +	for (i = 0; i < ARRAY_SIZE(pinmux_configs); i++) {
-> > +		if (of_machine_is_compatible(pinmux_configs[i].machine)) {
-> > +			pinmux_configs[i].init();
-> > +			break;
-> > +		}
-> > +	}
-> > +
-> > +	if (i == ARRAY_SIZE(pinmux_configs))
-> > +		printk(KERN_WARNING "Unknown platform! Pinmuxing not initialized\n");
-> 
-> Should that be WARN() instead of printk?
+2011/10/10 Linus Walleij <linus.walleij@linaro.org>:
+> 2011/10/9 Zoltan Devai <zoss@devai.org>:
+>
+>> ?arch/arm/mach-spmp8000/pinmux.c | ?131 +++++++++++++++++++++++++++++++++++++++
+>> ?1 files changed, 131 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/mach-spmp8000/pinmux.c
+>
+> I'm creating this new pin control and pin mux subsystem,
+> set for next merge window. Can you check it out and see
+> if it does what you need?
 
-pr_warning() might be better. Or do we want a backtrace and a tainted kernel
-in this case? 
+yes. Zoltan, you do need to follow Linus W's new pinmux framework.
 
-Cheers,
+And Linus, can you help to take care prima2 pinmux driver v3 i sent
+yesterday and make sure it is merged in the window too.
+our lots of device drivers depend on it, so i'd like it is ready
+before we upstream lots of other drivers.
 
-Peter.
+>
+> http://marc.info/?l=linux-kernel&m=131805699106465&w=2
+>
+> Thanks,
+> Linus Walleij
+
+-barry
