@@ -1,45 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 10 Oct 2011 11:30:10 +0200
-Subject: [PATCH 6/9] ARM: SPMP8000: Add pwm driver
-In-Reply-To: <CAKnu2MocUpNwK5n3sq=5+n0vZEO-JRz+PAJQtE7yX3ZQ8-wq1Q@mail.gmail.com>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-7-git-send-email-zoss@devai.org>
-	<CAKnu2MocUpNwK5n3sq=5+n0vZEO-JRz+PAJQtE7yX3ZQ8-wq1Q@mail.gmail.com>
-Message-ID: <20111010093010.GP31404@pengutronix.de>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Mon, 10 Oct 2011 10:32:20 +0100
+Subject: [PATCH 4/5 v4] Realview PCIX support - add main support
+	module	code
+In-Reply-To: <20111007231937.GC25689@n2100.arm.linux.org.uk>
+References: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
+	<20111007142834.19554.69753.stgit@e102602-lin.cambridge.arm.com>
+	<20111007231937.GC25689@n2100.arm.linux.org.uk>
+Message-ID: <000101cc872f$82425660$86c70320$@tuckley@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 03:50:51AM +0200, Linus Walleij wrote:
-> 2011/10/9 Zoltan Devai <zoss@devai.org>:
-> 
-> > Signed-off-by: Zoltan Devai <zoss@devai.org>
-> > ---
-> > ?arch/arm/mach-spmp8000/pwm.c | ?246 ++++++++++++++++++++++++++++++++++++++++++
-> > ?1 files changed, 246 insertions(+), 0 deletions(-)
-> > ?create mode 100644 arch/arm/mach-spmp8000/pwm.c
-> 
-> Also PWM should have its own subsystem, sadly that is an area
-> where discussions about the patches for generic PWM in
-> drivers/pwm/ by Sascha Hauer seem to have stalled recently. :-(
-> 
-> Those we have tend to live in drivers/misc/ and drivers/mfd/
-> which is not good.
-> 
-> Kudos to Sascha for trying to solve the mess, we need more
-> subsystems...
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Subject: Re: [PATCH 4/5 v4] Realview PCIX support - add main support
+> module code
 
-Thanks, I'll respin these patches when I find the time. In the mean
-time if anyone wants to work on this my latest branch is here:
+Russell said:
 
-git://git.pengutronix.de/git/imx/linux-2.6.git pwmlib
+> I thought one of my previous review points on this was that it was
+> completely unsafe to match only on dev->device, rather than on both
+> dev->device and dev->vendor.  Device IDs are allocated by individual
+> vendors and are meaningless without also checking the vendor ID.
 
-It contains the pwm framework and converts most in tree drivers to
-the new framework.
+And
 
-Sascha
+> And I thought we'd got to the point where we had a swizzle here.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+The patch I sent to the list was indeed an old version. However the reason
+is that despite the testing we did and your suggested changes the swizzle
+based code still does not fully work. So I thought it best to post working
+code.
+
+I'm still waiting for a response from you on the last round of test results
+I sent.
+
+Regards,
+
+Colin
