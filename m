@@ -1,157 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 10 Oct 2011 18:37:49 +0200
-Subject: [PATCH 1/4] dmaengine: at_hdmac: platform data move to use .id_table
-In-Reply-To: <1314075338.22120.3.camel@vkoul-udesk3>
-References: <1314075338.22120.3.camel@vkoul-udesk3>
-Message-ID: <9723283e7097730f568bf7c2f3a93ae42c6bc5ca.1318264339.git.nicolas.ferre@atmel.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 10 Oct 2011 09:38:47 -0700
+Subject: [PATCH v7 3/3] arm/tegra: device tree support for ventana board
+In-Reply-To: <20111010080109.GQ9003@tbergstrom-lnx.Nvidia.com>
+References: <1317647918-22694-1-git-send-email-pdeschrijver@nvidia.com>
+	<1317647918-22694-4-git-send-email-pdeschrijver@nvidia.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF173B23B2FA@HQMAIL01.nvidia.com>
+	<20111010080109.GQ9003@tbergstrom-lnx.Nvidia.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173B23B514@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We remove platform data from DMA controller and move
-to the use of .id_table to distinguish between compatible
-types. The two implementations allow to determine the
-number of channels and the capabilities of the controller.
+Peter De Schrijver wrote at Monday, October 10, 2011 2:01 AM:
+> On Fri, Oct 07, 2011 at 08:04:34PM +0200, Stephen Warren wrote:
+> > Peter De Schrijver wrote at Monday, October 03, 2011 7:19 AM:
+> > ...
+> > > diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+> > ...
+> > > -	if (of_machine_is_compatible("nvidia,harmony"))
+> > > -		harmony_pinmux_init();
+> > > -	else if (of_machine_is_compatible("nvidia,seaboard"))
+> > > -		seaboard_pinmux_init();
+> > > +	for (i = 0; i < ARRAY_SIZE(pinmux_configs); i++) {
+> > > +		if (of_machine_is_compatible(pinmux_configs[i].machine)) {
+> > > +			pinmux_configs[i].init();
+> > > +			break;
+> > > +		}
+> > > +	}
+> > > +
+> > > +	if (i == ARRAY_SIZE(pinmux_configs))
+> > > +		printk(KERN_WARNING "Unknown platform! Pinmuxing not initialized\n");
+> >
+> > Should that be WARN() instead of printk?
+> 
+> pr_warning() might be better. Or do we want a backtrace and a tainted kernel
+> in this case?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/dma/at_hdmac.c      |   48 ++++++++++++++++++++++++++++++++++---------
- drivers/dma/at_hdmac_regs.h |    8 +++++++
- 2 files changed, 46 insertions(+), 10 deletions(-)
+Well, tainting seems like a good idea. I'm less thrilled about the backtrace,
+but perhaps it is a good idea to bring attention to this condition.
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index fcfa0a8..fef57bc 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -1175,6 +1175,18 @@ static void atc_free_chan_resources(struct dma_chan *chan)
- 
- /*--  Module Management  -----------------------------------------------*/
- 
-+static struct platform_device_id atdma_devtypes[] = {
-+	{
-+		.name = "at91sam9rl_dma",
-+		.driver_data = ATDMA_DEVTYPE_SAM9RL,
-+	}, {
-+		.name = "at91sam9g45_dma",
-+		.driver_data = ATDMA_DEVTYPE_SAM9G45,
-+	}, {
-+		/* sentinel */
-+	}
-+};
-+
- /**
-  * at_dma_off - disable DMA controller
-  * @atdma: the Atmel HDAMC device
-@@ -1193,18 +1205,32 @@ static void at_dma_off(struct at_dma *atdma)
- 
- static int __init at_dma_probe(struct platform_device *pdev)
- {
--	struct at_dma_platform_data *pdata;
- 	struct resource		*io;
- 	struct at_dma		*atdma;
- 	size_t			size;
- 	int			irq;
- 	int			err;
- 	int			i;
-+	u32                     nr_channels;
-+	dma_cap_mask_t          cap_mask = {};
-+	enum atdma_devtype	atdmatype;
-+
-+	dma_cap_set(DMA_MEMCPY, cap_mask);
-+
-+	/* get DMA parameters from controller type */
-+	atdmatype = platform_get_device_id(pdev)->driver_data;
- 
--	/* get DMA Controller parameters from platform */
--	pdata = pdev->dev.platform_data;
--	if (!pdata || pdata->nr_channels > AT_DMA_MAX_NR_CHANNELS)
-+	switch (atdmatype) {
-+	case ATDMA_DEVTYPE_SAM9RL:
-+		nr_channels = 2;
-+		break;
-+	case ATDMA_DEVTYPE_SAM9G45:
-+		nr_channels = 8;
-+		dma_cap_set(DMA_SLAVE, cap_mask);
-+		break;
-+	default:
- 		return -EINVAL;
-+	}
- 
- 	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!io)
-@@ -1215,14 +1241,15 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 		return irq;
- 
- 	size = sizeof(struct at_dma);
--	size += pdata->nr_channels * sizeof(struct at_dma_chan);
-+	size += nr_channels * sizeof(struct at_dma_chan);
- 	atdma = kzalloc(size, GFP_KERNEL);
- 	if (!atdma)
- 		return -ENOMEM;
- 
--	/* discover transaction capabilites from the platform data */
--	atdma->dma_common.cap_mask = pdata->cap_mask;
--	atdma->all_chan_mask = (1 << pdata->nr_channels) - 1;
-+	/* discover transaction capabilites */
-+	atdma->dma_common.cap_mask = cap_mask;
-+	atdma->all_chan_mask = (1 << nr_channels) - 1;
-+	atdma->devtype = atdmatype;
- 
- 	size = resource_size(io);
- 	if (!request_mem_region(io->start, size, pdev->dev.driver->name)) {
-@@ -1268,7 +1295,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 
- 	/* initialize channels related values */
- 	INIT_LIST_HEAD(&atdma->dma_common.channels);
--	for (i = 0; i < pdata->nr_channels; i++) {
-+	for (i = 0; i < nr_channels; i++) {
- 		struct at_dma_chan	*atchan = &atdma->chan[i];
- 
- 		atchan->chan_common.device = &atdma->dma_common;
-@@ -1313,7 +1340,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 	dev_info(&pdev->dev, "Atmel AHB DMA Controller ( %s%s), %d channels\n",
- 	  dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask) ? "cpy " : "",
- 	  dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask)  ? "slave " : "",
--	  pdata->nr_channels);
-+	  nr_channels);
- 
- 	dma_async_device_register(&atdma->dma_common);
- 
-@@ -1495,6 +1522,7 @@ static const struct dev_pm_ops at_dma_dev_pm_ops = {
- static struct platform_driver at_dma_driver = {
- 	.remove		= __exit_p(at_dma_remove),
- 	.shutdown	= at_dma_shutdown,
-+	.id_table	= atdma_devtypes,
- 	.driver = {
- 		.name	= "at_hdmac",
- 		.pm	= &at_dma_dev_pm_ops,
-diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-index aa4c9ae..d7d6737 100644
---- a/drivers/dma/at_hdmac_regs.h
-+++ b/drivers/dma/at_hdmac_regs.h
-@@ -248,9 +248,16 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
- 
- /*--  Controller  ------------------------------------------------------*/
- 
-+enum atdma_devtype {
-+	ATDMA_DEVTYPE_UNDEFINED = 0,
-+	ATDMA_DEVTYPE_SAM9RL,	/* compatible with SAM9RL DMA controller */
-+	ATDMA_DEVTYPE_SAM9G45,	/* compatible with SAM9G45 DMA controller */
-+};
-+
- /**
-  * struct at_dma - internal representation of an Atmel HDMA Controller
-  * @chan_common: common dmaengine dma_device object members
-+ * @atdma_devtype: identifier of DMA controller compatibility
-  * @ch_regs: memory mapped register base
-  * @clk: dma controller clock
-  * @save_imr: interrupt mask register that is saved on suspend/resume cycle
-@@ -260,6 +267,7 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
-  */
- struct at_dma {
- 	struct dma_device	dma_common;
-+	enum atdma_devtype	devtype;
- 	void __iomem		*regs;
- 	struct clk		*clk;
- 	u32			save_imr;
 -- 
-1.7.5.4
+nvpublic
