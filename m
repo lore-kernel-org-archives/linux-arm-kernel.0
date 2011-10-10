@@ -1,310 +1,96 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 10 Oct 2011 23:45:37 +0530
-Subject: [PATCH v6 09/10] ARM: S5PC100: Modify platform data for pl330 driver
-In-Reply-To: <1318270538-30450-9-git-send-email-thomas.abraham@linaro.org>
+Date: Mon, 10 Oct 2011 23:45:29 +0530
+Subject: [PATCH v6 01/10] DMA: PL330: move filter function into driver
+In-Reply-To: <1318270538-30450-1-git-send-email-thomas.abraham@linaro.org>
 References: <1318270538-30450-1-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-2-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-3-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-4-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-5-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-6-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-7-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-8-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-9-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1318270538-30450-10-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1318270538-30450-2-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the 'struct dma_pl330_peri' removed, the platfrom data for dma
-driver can be simplified to a simple list of peripheral request ids.
+The dma channel selection filter function is moved from plat-samsung
+into the pl330 driver. In additon to that, a check is added in the
+filter function to ensure that the channel on which the filter has
+been invoked is pl330 channel instance (and avoid any incorrect
+access of chan->private in a system with multiple types of DMA
+drivers).
 
-Cc: Jassi Brar <jassisinghbrar@gmail.com>
-Cc: Boojin Kim <boojin.kim@samsung.com>
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- arch/arm/mach-s5pc100/dma.c |  247 ++++++++++++-------------------------------
- 1 files changed, 69 insertions(+), 178 deletions(-)
+ arch/arm/plat-samsung/dma-ops.c |    6 ------
+ drivers/dma/pl330.c             |   15 +++++++++++++++
+ include/linux/amba/pl330.h      |    2 ++
+ 3 files changed, 17 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-s5pc100/dma.c b/arch/arm/mach-s5pc100/dma.c
-index 065a087..8dfdc76 100644
---- a/arch/arm/mach-s5pc100/dma.c
-+++ b/arch/arm/mach-s5pc100/dma.c
-@@ -35,100 +35,42 @@
+diff --git a/arch/arm/plat-samsung/dma-ops.c b/arch/arm/plat-samsung/dma-ops.c
+index 6e3d9ab..8d18425 100644
+--- a/arch/arm/plat-samsung/dma-ops.c
++++ b/arch/arm/plat-samsung/dma-ops.c
+@@ -17,12 +17,6 @@
  
- static u64 dma_dmamask = DMA_BIT_MASK(32);
+ #include <mach/dma.h>
  
--struct dma_pl330_peri pdma0_peri[30] = {
--	{
--		.peri_id = (u8)DMACH_UART0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART3_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART3_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = DMACH_IRDA,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S0S_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_AC97_MICIN,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_AC97_PCMIN,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_AC97_PCMOUT,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_EXTERNAL,
--	}, {
--		.peri_id = (u8)DMACH_PWM,
--	}, {
--		.peri_id = (u8)DMACH_SPDIF,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_HSI_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_HSI_TX,
--		.rqtype = MEMTODEV,
--	},
-+u8 pdma0_peri[] = {
-+	DMACH_UART0_RX,
-+	DMACH_UART0_TX,
-+	DMACH_UART1_RX,
-+	DMACH_UART1_TX,
-+	DMACH_UART2_RX,
-+	DMACH_UART2_TX,
-+	DMACH_UART3_RX,
-+	DMACH_UART3_TX,
-+	DMACH_IRDA,
-+	DMACH_I2S0_RX,
-+	DMACH_I2S0_TX,
-+	DMACH_I2S0S_TX,
-+	DMACH_I2S1_RX,
-+	DMACH_I2S1_TX,
-+	DMACH_I2S2_RX,
-+	DMACH_I2S2_TX,
-+	DMACH_SPI0_RX,
-+	DMACH_SPI0_TX,
-+	DMACH_SPI1_RX,
-+	DMACH_SPI1_TX,
-+	DMACH_SPI2_RX,
-+	DMACH_SPI2_TX,
-+	DMACH_AC97_MICIN,
-+	DMACH_AC97_PCMIN,
-+	DMACH_AC97_PCMOUT,
-+	DMACH_EXTERNAL,
-+	DMACH_PWM,
-+	DMACH_SPDIF,
-+	DMACH_HSI_RX,
-+	DMACH_HSI_TX,
- };
- 
- struct dma_pl330_platdata s5pc100_pdma0_pdata = {
- 	.nr_valid_peri = ARRAY_SIZE(pdma0_peri),
--	.peri = pdma0_peri,
-+	.peri_id = pdma0_peri,
- };
- 
- struct amba_device s5pc100_device_pdma0 = {
-@@ -147,98 +89,42 @@ struct amba_device s5pc100_device_pdma0 = {
- 	.periphid = 0x00041330,
- };
- 
--struct dma_pl330_peri pdma1_peri[30] = {
--	{
--		.peri_id = (u8)DMACH_UART0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART3_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART3_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = DMACH_IRDA,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S0S_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_PCM0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_PCM1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_PCM1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_PCM1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ0,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ1,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ2,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ3,
--	},
-+u8 pdma1_peri[] = {
-+	DMACH_UART0_RX,
-+	DMACH_UART0_TX,
-+	DMACH_UART1_RX,
-+	DMACH_UART1_TX,
-+	DMACH_UART2_RX,
-+	DMACH_UART2_TX,
-+	DMACH_UART3_RX,
-+	DMACH_UART3_TX,
-+	DMACH_IRDA,
-+	DMACH_I2S0_RX,
-+	DMACH_I2S0_TX,
-+	DMACH_I2S0S_TX,
-+	DMACH_I2S1_RX,
-+	DMACH_I2S1_TX,
-+	DMACH_I2S2_RX,
-+	DMACH_I2S2_TX,
-+	DMACH_SPI0_RX,
-+	DMACH_SPI0_TX,
-+	DMACH_SPI1_RX,
-+	DMACH_SPI1_TX,
-+	DMACH_SPI2_RX,
-+	DMACH_SPI2_TX,
-+	DMACH_PCM0_RX,
-+	DMACH_PCM1_TX,
-+	DMACH_PCM1_RX,
-+	DMACH_PCM1_TX,
-+	DMACH_MSM_REQ0,
-+	DMACH_MSM_REQ1,
-+	DMACH_MSM_REQ2,
-+	DMACH_MSM_REQ3,
- };
- 
- struct dma_pl330_platdata s5pc100_pdma1_pdata = {
- 	.nr_valid_peri = ARRAY_SIZE(pdma1_peri),
--	.peri = pdma1_peri,
-+	.peri_id = pdma1_peri,
- };
- 
- struct amba_device s5pc100_device_pdma1 = {
-@@ -259,7 +145,12 @@ struct amba_device s5pc100_device_pdma1 = {
- 
- static int __init s5pc100_dma_init(void)
+-static inline bool pl330_filter(struct dma_chan *chan, void *param)
+-{
+-	struct dma_pl330_peri *peri = chan->private;
+-	return peri->peri_id == (unsigned)param;
+-}
+-
+ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
+ 				struct samsung_dma_info *info)
  {
-+	dma_cap_set(DMA_SLAVE, s5pc100_pdma0_pdata.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, s5pc100_pdma0_pdata.cap_mask);
- 	amba_device_register(&s5pc100_device_pdma0, &iomem_resource);
-+
-+	dma_cap_set(DMA_SLAVE, s5pc100_pdma1_pdata.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, s5pc100_pdma1_pdata.cap_mask);
- 	amba_device_register(&s5pc100_device_pdma1, &iomem_resource);
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 621134f..5f1d24c 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -116,6 +116,9 @@ struct dma_pl330_desc {
+ 	struct dma_pl330_chan *pchan;
+ };
  
- 	return 0;
++/* forward declaration */
++static struct amba_driver pl330_driver;
++
+ static inline struct dma_pl330_chan *
+ to_pchan(struct dma_chan *ch)
+ {
+@@ -267,6 +270,18 @@ static void dma_pl330_rqcb(void *token, enum pl330_op_err err)
+ 	tasklet_schedule(&pch->task);
+ }
+ 
++bool pl330_filter(struct dma_chan *chan, void *param)
++{
++	struct dma_pl330_peri *peri;
++
++	if (chan->device->dev->driver != &pl330_driver.drv)
++		return false;
++
++	peri = chan->private;
++	return peri->peri_id == (unsigned)param;
++}
++EXPORT_SYMBOL(pl330_filter);
++
+ static int pl330_alloc_chan_resources(struct dma_chan *chan)
+ {
+ 	struct dma_pl330_chan *pch = to_pchan(chan);
+diff --git a/include/linux/amba/pl330.h b/include/linux/amba/pl330.h
+index d12f077..6db72da 100644
+--- a/include/linux/amba/pl330.h
++++ b/include/linux/amba/pl330.h
+@@ -12,6 +12,7 @@
+ #ifndef	__AMBA_PL330_H_
+ #define	__AMBA_PL330_H_
+ 
++#include <linux/dmaengine.h>
+ #include <asm/hardware/pl330.h>
+ 
+ struct dma_pl330_peri {
+@@ -38,4 +39,5 @@ struct dma_pl330_platdata {
+ 	unsigned mcbuf_sz;
+ };
+ 
++extern bool pl330_filter(struct dma_chan *chan, void *param);
+ #endif	/* __AMBA_PL330_H_ */
 -- 
 1.6.6.rc2
