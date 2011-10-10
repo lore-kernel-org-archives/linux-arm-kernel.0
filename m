@@ -1,23 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Oct 2011 14:58:30 +0200
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 10 Oct 2011 14:00:37 +0100
 Subject: [PATCH] ARM: S3C64XX: Enable TCM support
-In-Reply-To: <1318242473-19037-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+In-Reply-To: <CACRpkdYtH4SCk3o3W84u+pLwzaXnmU1OP7p631bC08QnP2bR9A@mail.gmail.com>
 References: <1318242473-19037-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdYtH4SCk3o3W84u+pLwzaXnmU1OP7p631bC08QnP2bR9A@mail.gmail.com>
+	<CACRpkdYtH4SCk3o3W84u+pLwzaXnmU1OP7p631bC08QnP2bR9A@mail.gmail.com>
+Message-ID: <20111010130037.GE3607@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 12:27 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
+On Mon, Oct 10, 2011 at 02:58:30PM +0200, Linus Walleij wrote:
+> On Mon, Oct 10, 2011 at 12:27 PM, Mark Brown
 
-> The S3C64xx CPUs have TCMs so enable the kernel support for it on these
-> systems.
->
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> > The S3C64xx CPUs have TCMs so enable the kernel support for it on these
+> > systems.
 
-Cool! How big are they each, i.e. dmesg?
+> Cool! How big are they each, i.e. dmesg?
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+2x8k each of ITCM and DTCM (16k of each total).
