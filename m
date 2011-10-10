@@ -1,26 +1,24 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 10 Oct 2011 09:49:30 -0700
-Subject: [PATCH v2 00/14] Sparse fixes for tegra
-In-Reply-To: <1318224484-2090-1-git-send-email-olof@lixom.net>
-References: <1317956064-17650-1-git-send-email-olof@lixom.net>
-	<1318224484-2090-1-git-send-email-olof@lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173B23B51B@HQMAIL01.nvidia.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 10 Oct 2011 18:54:38 +0200
+Subject: [PATCH] PM: HIBERNATION: add resume_delay kernel param as well
+	as resume_delay
+In-Reply-To: <1318225452-10397-1-git-send-email-Barry.Song@csr.com>
+References: <1318225452-10397-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <20111010165437.GA11093@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Sunday, October 09, 2011 11:28 PM:
-> Some trivial fixes removing sparse warnings on tegra code.
+On Sun 2011-10-09 22:44:12, Barry Song wrote:
+> From: Barry Song <baohua.song@csr.com>
 > 
-> Changes since v1:
+> patch "PM: HIBERNATION: add resume_wait param to support MMC-like devices
+> as resume file" add resume_wait param. this patch adds resume_delay so that
+> resume_wait/delay has the same model with root_wait/delay.
 > 
-> * Implemented Arnd's suggestion to push annotation all the way down to IO_*_VIRT defines
-> * Based on above, no longer needed IO_TO_VIRT() -> IO_ADDRESS() changes
-> * Added two more fixes for cpu-tegra.
-> 
-> Stephen; I didn't explicitly apply your Acked-by lines to this batch yet,
-> I will do so when I collect final acks before pushing a branch.
+> Signed-off-by: Barry Song <baohua.song@csr.com>
 
-Just for the record; my ack still applies to the updated series.
+ACK.
 
 -- 
-nvpublic
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
