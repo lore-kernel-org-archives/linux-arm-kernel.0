@@ -1,103 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Oct 2011 14:02:09 +0100
-Subject: [PATCH 5/7] ARM: EXYNOS4: Add support external GIC
-In-Reply-To: <20111007151646.GA2398@mudshark.cambridge.arm.com>
-References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-	<1308555258-4322-6-git-send-email-chaos.youn@samsung.com>
-	<4E8C61C4.9090709@arm.com>
-	<00ec01cc83f1$81f84430$85e8cc90$%kim@samsung.com>
-	<4E8D645D.4020601@arm.com> <4E8ECA1B.5010005@arm.com>
-	<20111007151646.GA2398@mudshark.cambridge.arm.com>
-Message-ID: <4E92ECD1.2010303@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 Oct 2011 14:32:46 +0100
+Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
+In-Reply-To: <201110101320.24457.arnd@arndb.de>
+References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
+	<201110072251.40028.arnd@arndb.de>
+	<20111010103635.GA2451@mudshark.cambridge.arm.com>
+	<201110101320.24457.arnd@arndb.de>
+Message-ID: <20111010133246.GG2451@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/11 16:16, Will Deacon wrote:
-> Hi Marc,
+On Mon, Oct 10, 2011 at 12:20:24PM +0100, Arnd Bergmann wrote:
+> On Monday 10 October 2011, Will Deacon wrote:
+> > Do you have any other ideas?
 > 
-> On Fri, Oct 07, 2011 at 10:44:59AM +0100, Marc Zyngier wrote:
->> So to make my suggestion completely clear, here's a patch I'm now
->> carrying in my tree. It's only been test compiled on EXYNOS4, but works
->> nicely on my 11MP. It turns both dist_base and cpu_base into per-cpu
->> variables, removes these callbacks, removes your private copy of
->> gic_cpu_init, and makes struct gic_chip_data private again.
->>
->> What do you think?
-> 
-> This looks like the right sort of idea, although I'm deeply suspicious about
-> per-cpu base addresses for the GIC distributor. It would be nice if the
-> Samsung guys can elaborate on what's going on here. Few comments inline.
+> I think the best solution would be to ask Russell to put all the dependencies
+> into a non-rebasing branch and publish that, or to alternatively merge your
+> patches through his tree instead, with my Ack.
 
-Yeah, this seem odd, specially as what's currently in mainline doesn't
-try to play tricks with the distributor. It looks like having a per-core
-distributor address is required for PPI usage on these SoCs, but the
-commit message is uninformative at best:
+I don't think asking Russell to maintain a stable branch for each series
+scales very well if multiple people are doing cross-platform work at the
+same time. If he's happy merging platform code via his tree, then I'd prefer
+to go down that route. In this case, it might make sense to try and catch
+conflicts between his tree and arm-soc before they hit Linus (I guess -next
+will take care of this?).
 
-https://github.com/sfrothwell/linux-next/commit/637c2afa57ec9cd0ddc8879ea0cda4d8835ba71d#arch/arm/mach-exynos4/cpu.c
+> Both of these will also have to wait for a few more days until Russell
+> is back online.
 
-Again, comments from Samsung people would be much appreciated.
+Ok, I wasn't aware that we was away.
 
->> Subject: [PATCH] ARM: gic: allow GIC to support non-banked setups
->>
->> The GIC support code is heavily using the fact that hardware
->> implementations are exposing banked registers. Unfortunately, it
->> looks like at least one GIC implementation (EXYNOS4) offers both
->> the distributor and the CPU interfaces at different addresses,
->> depending on the CPU.
->>
->> This problem is solved by turning the distributor and CPU interface
->> addresses into per-cpu variables. The EXYNOS4 code is updated not
->> to mess with the GIC internals while handling interrupts, and
->> struct gic_chip_data is back to being private.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/common/gic.c               |   76 +++++++++++++++++++++++++++--------
->>  arch/arm/include/asm/hardware/gic.h |   17 +------
->>  arch/arm/mach-exynos4/cpu.c         |   14 ------
->>  arch/arm/mach-exynos4/platsmp.c     |   28 ++-----------
->>  4 files changed, 66 insertions(+), 69 deletions(-)
->>
->> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->> index b574931..c7521dd 100644
->> --- a/arch/arm/common/gic.c
->> +++ b/arch/arm/common/gic.c
->> @@ -37,6 +37,20 @@
->>  #include <asm/mach/irq.h>
->>  #include <asm/hardware/gic.h>
->>  
->> +struct gic_chip_data {
->> +	unsigned int irq_offset;
->> +	void __percpu __iomem **dist_base;
->> +	void __percpu __iomem **cpu_base;
->> +#ifdef CONFIG_CPU_PM
->> +	u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
->> +	u32 saved_spi_conf[DIV_ROUND_UP(1020, 16)];
->> +	u32 saved_spi_target[DIV_ROUND_UP(1020, 4)];
->> +	u32 __percpu *saved_ppi_enable;
->> +	u32 __percpu *saved_ppi_conf;
->> +#endif
->> +	unsigned int gic_irqs;
->> +};
-> 
-> I think you can use DECLARE_PER_CPU(void __iomem *dist_base) etc. instead.
+> Can you check if the devel-stable branch in his tree already contains the
+> dependencies?
 
-Unfortunately, you can't. That would be nice though... ;-)
+I just had a quick look and I can't seem them outside of the unstable for-next
+branch.
 
->> +static void __cpuinit exynos4_secondary_init(unsigned int cpu)
->>  {
->>  	void __iomem *dist_base = S5P_VA_GIC_DIST +
->> -				(gic_bank_offset * smp_processor_id());
->> +				(gic_bank_offset * cpu_logical_map(cpu));
-> 
-> Again, I'm deeply suspicious of this code :) Is there not a common memory
-> alias for the distributor across all of the CPUs?
+Cheers,
 
-Kukjin, could you please comment on the presence of a common memory
-region for the distributor? This seem quite odd...
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
