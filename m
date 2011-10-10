@@ -1,50 +1,49 @@
-From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Mon, 10 Oct 2011 14:44:02 +0400
-Subject: [PATCH v2 10/14] ARM: tegra: tegra_powergate_is_powered should
-	be static
-In-Reply-To: <1318224484-2090-11-git-send-email-olof@lixom.net>
-References: <1317956064-17650-1-git-send-email-olof@lixom.net>
-	<1318224484-2090-1-git-send-email-olof@lixom.net>
-	<1318224484-2090-11-git-send-email-olof@lixom.net>
-Message-ID: <4E92CC72.3030809@ru.mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Oct 2011 13:20:24 +0200
+Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
+In-Reply-To: <20111010103635.GA2451@mudshark.cambridge.arm.com>
+References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
+	<201110072251.40028.arnd@arndb.de>
+	<20111010103635.GA2451@mudshark.cambridge.arm.com>
+Message-ID: <201110101320.24457.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Monday 10 October 2011, Will Deacon wrote:
+> > I can certainly fix up the conflicts, but my feeling is that there is
+> > something wrong on your side and one of the two branches contains
+> > stuff from a stale version of Russell's tree.
+> 
+> It looks like both of the branches [cpu-mapping and debug-ll] may be out of
+> date now. I agree that fixing up the conflicts isn't the way to go here, but
+> I'm unsure what to use as my base. I depend on patches that aren't in
+> Russell's devel-stable branch but are in his for-next branch.
+> 
+> The only things I can think of are either:
+> 
+>  - Wait until everything has settled down, then rebase onto Russell's
+>    for-linus branch. This has the disadvantage that conflicts and build
+>    breakages won't be detected until very late.
+> 
+>  - Wait until the dependencies are in mainline, then rebase against that.
+>    Disadvantage is that it then takes twice as long to get code upstream.
+> 
+>  - Send another pull request against an unstable branch and hope it doesn't
+>    change. Disadvantage being that we have to keep repeating pull requests
+>    against a moving target.
+> 
+> I'm not especially fond of any of those though...
+> 
+> Do you have any other ideas?
 
-On 10-10-2011 9:28, Olof Johansson wrote:
+I think the best solution would be to ask Russell to put all the dependencies
+into a non-rebasing branch and publish that, or to alternatively merge your
+patches through his tree instead, with my Ack.
 
-> Not exported and not used externally.
+Both of these will also have to wait for a few more days until Russell
+is back online.
 
-> Also, fix return type  and change to instead WARN_ON on bad parameters.
+Can you check if the devel-stable branch in his tree already contains the
+dependencies?
 
-    Change to what? You're changing _to_ WARN_ON() as we can see, not from it...
-
-> Signed-off-by: Olof Johansson<olof@lixom.net>
-> ---
->   arch/arm/mach-tegra/include/mach/powergate.h |    1 -
->   arch/arm/mach-tegra/powergate.c              |    5 ++---
->   2 files changed, 2 insertions(+), 4 deletions(-)
-
-[...]
-> diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
-> index 3cee9aa..9483064 100644
-> --- a/arch/arm/mach-tegra/powergate.c
-> +++ b/arch/arm/mach-tegra/powergate.c
-> @@ -89,12 +89,11 @@ int tegra_powergate_power_off(int id)
->   	return tegra_powergate_set(id, false);
->   }
->
-> -bool tegra_powergate_is_powered(int id)
-> +static bool tegra_powergate_is_powered(int id)
->   {
->   	u32 status;
->
-> -	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
-> -		return -EINVAL;
-> +	WARN_ON(id<  0 || id>= TEGRA_NUM_POWERGATE);
->
->   	status = pmc_read(PWRGATE_STATUS)&  (1<<  id);
->   	return !!status;
-
-WBR, Sergei
+	Arnd
