@@ -1,54 +1,19 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Oct 2011 18:58:00 +0900
-Subject: [PATCH 1/5] ARM: Samsung: PWM: Allow to differentiate SoCs based
-	on platform device name.
-In-Reply-To: <20110907190120.GA24703@sirena.org.uk>
-References: <1731819.jJi37IsjvJ@flatron> <1660939.8M3FnZsmga@flatron>
-	<20110906110311.GM6619@n2100.arm.linux.org.uk>
-	<5725201.5LdnvaEu1n@flatron>
-	<20110906120430.GO6619@n2100.arm.linux.org.uk>
-	<20110907190120.GA24703@sirena.org.uk>
-Message-ID: <039e01cc8733$17df3e10$479dba30$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 10 Oct 2011 11:00:21 +0100
+Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
+In-Reply-To: <4E92BE19.4060907@cam.ac.uk>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<1318178172-7965-5-git-send-email-zoss@devai.org>
+	<CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
+	<4E92BE19.4060907@cam.ac.uk>
+Message-ID: <20111010100020.GA3607@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> On Tue, Sep 06, 2011 at 01:04:30PM +0100, Russell King - ARM Linux wrote:
-> 
-> > Pros to platform driver name:
-> > 1. Can re-use existing names if feature compatible without driver mods.
-> > 2. Scales well with an increasing number of SoCs.
-> 
-> > Cons:
-> > 1. People will hate having SoC names which don't refer to their exact
-SoC.
-> > 2. Probably requires storage of a set of flags in driver private data
-> >    to identify SoC specific features.
-> > 3. Requires additional string space to identify each driver name.
-> 
-> There's also an issue with actually getting the devices together to
-> register which causes fragility here.
-> 
-> > However, thinking about this more wrt DT, there's another aspect to
-this.
-> > Rather than encoding into the driver "this SoC has features and quirks
-> > X,Y,Z" maybe that information should be in the device tree itself.  For
-> > example, SoC 1 has X and Z, SoC 2 has Y.  Then a new SoC 3 comes along
-> > with X and Y but not Z.  If X, Y, Z are encoded into DT then there's no
-> > need to touch the kernel to support SoC 3, not even to change driver
-> > names or soc_is_xxx macros etc.
-> 
-> This does depend pretty strongly on making sure that the SoC DT is
-> distributed separately to the board DT - that should be solved now.
+On Mon, Oct 10, 2011 at 10:42:49AM +0100, Jonathan Cameron wrote:
 
-Yes, I agree. So we can keep the current way to support each SoCs' device
-with one driver until DT world.
+> It really depends on what those general adc callbacks get used for.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+If it's a general purpose ADC it's up to the board designer - you
+sometimes see things like battery or supply monitoring but really it
+could be any low volume analogue input.
