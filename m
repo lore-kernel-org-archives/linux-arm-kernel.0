@@ -1,32 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 10 Oct 2011 18:22:22 +0100
-Subject: [PATCH v2 3/5] regulator: helper routine to extract
-	regulator_init_data
-In-Reply-To: <1318263578-7407-4-git-send-email-rnayak@ti.com>
-References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
-	<1318263578-7407-4-git-send-email-rnayak@ti.com>
-Message-ID: <20111010172222.GG3607@opensource.wolfsonmicro.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 10 Oct 2011 10:25:01 -0700
+Subject: [PATCH] ARM: OMAP: omap_device: Add omap_device_{alloc, delete,
+	register}_ss
+In-Reply-To: <CAK=WgbbqG4qFAafJ49jdYwf19whxBGhtywTWVTnsejZ0F_ekog@mail.gmail.com>
+	(Ohad Ben-Cohen's message of "Mon, 10 Oct 2011 09:37:08 +0200")
+References: <1317833693-21105-1-git-send-email-ohad@wizery.com>
+	<CAK=WgbbqG4qFAafJ49jdYwf19whxBGhtywTWVTnsejZ0F_ekog@mail.gmail.com>
+Message-ID: <87hb3giwsy.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 09:49:36PM +0530, Rajendra Nayak wrote:
+Ohad Ben-Cohen <ohad@wizery.com> writes:
 
-> +- regulator-change-voltage: boolean, Output voltage can be changed by software
-> +- regulator-change-current: boolean, Output current can be chnaged by software
-> +- regulator-change-mode: boolean, Operating mode can be changed by software
-> +- regulator-change-status: boolean, Enable/Disable control for regulator exists
-> +- regulator-change-drms: boolean, Dynamic regulator mode switching is enabled
-> +- regulator-mode-fast: boolean, allow/set fast mode for the regulator
-> +- regulator-mode-normal: boolean, allow/set normal mode for the regulator
-> +- regulator-mode-idle: boolean, allow/set idle mode for the regulator
-> +- regulator-mode-standby: boolean, allow/set standby mode for the regulator
-> +- regulator-input-uV: Input voltage for regulator when supplied by another regulator
-> +- regulator-always-on: boolean, regulator should never be disabled
+> Hi Kevin,
+>
+> On Wed, Oct 5, 2011 at 6:54 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>> Split omap_device_build_ss() into two smaller functions:
+> ...
+>> This patch is considered an interim solution until DT fully materializes
+>> for omap; at that point, this functionality will be removed.
+>
+> Good news: we might not need this after all.
 
-Thinking about this I'm not sure that these should go in the device
-tree, they're as much talking about what Linux is able to cope with as
-they are talking about what the hardware is able to do.  Sometimes
-they'll be fixed by the design but they are sometimes also restricted by
-what the software is currently capable of.  DRMS is a prime example
-here, it depends on how good we are at telling the API about how much
-current we're using.
+Great.
+
+> I need the remoteproc devices to exists at ->reserve() time, so I can
+> assign them a private CMA pool, which means I can't wait for
+> omap_device_build_ss() and must create the devices beforehand.
+>
+> ... which makes Benoit's alloc/delete methods perfect for me.
+>
+> So please hold this one off for now. I'd just need a s/static// patch
+> that will allow me to use Benoit's methods outside of omap_device.c,
+> but I'll wait for things to settle down a bit before sending it, to
+> minimize this kind of churn.
+
+OK.  Sounds good.
+
+Thanks,
+
+Kevin
+
+> Thanks and sorry for the noise,
+> Ohad.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
