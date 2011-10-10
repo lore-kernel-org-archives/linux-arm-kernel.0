@@ -1,151 +1,129 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 10 Oct 2011 15:37:56 +0530
-Subject: [PATCH v2 0/9] serial: samsung: rework clock lookup and add device
-	tree support
-Message-ID: <1318241285-23568-1-git-send-email-thomas.abraham@linaro.org>
+Date: Mon, 10 Oct 2011 15:37:57 +0530
+Subject: [PATCH v2 1/9] serial: samsung: Keep a copy of the location of
+	platform data in driver's private data
+In-Reply-To: <1318241285-23568-1-git-send-email-thomas.abraham@linaro.org>
+References: <1318241285-23568-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1318241285-23568-2-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
-- Included the missing dt bindings documentation in the last patch.
-- Rebased and tested with linux 3.1-rc9 on linux-samsung-soc tree.
-- Commit messages are modified to be elaborate.
-- No changes in code.
+Add a pointer to the location of the platform data in the driver's private
+data. When instantiated using device tree, pdev->dev->platform_data does not
+necessarily point to a valid instance of platform data. The platform data
+pointer in the driver's private data could be set to pdev->dev->platform_data
+or platform data instance created from device tree.
 
+Cc: Ben Dooks <ben-linux@fluff.org>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ drivers/tty/serial/s5pv210.c |   12 ++++++++++--
+ drivers/tty/serial/samsung.c |   16 ++++++++++++----
+ drivers/tty/serial/samsung.h |    4 +++-
+ 3 files changed, 25 insertions(+), 7 deletions(-)
 
-This patchset reworks the lookup of parent clocks for baud rate generator in
-the uart controller and adds support for device tree based discovery for the
-uart controller.
-
-The Samsung uart driver was dependent on the clock names supplied in the
-platform data. This dependency had to be first removed to add device tree based
-discovery support for Samsung uart driver. In the process of reworking the clock
-lookup logic, several changes had to be made which in turn made parts of the
-driver redundant and such portions of the driver have been removed in this
-patchset. As a result, all the SoC specific extensions have been deleted.
-
-Patch 1 modifies the driver to keep a copy of the location of the platform data
-in the driver's private data. This makes device tree support addition
-non-intrusive.
-
-Patch 2 moves the complicated clock divider handling for fclk source clock for
-s3c2440 SoC into platform code. The fclk clock can be easily managed by
-representing it as a clock in the platform code. fclk clock handling was
-specific to s3c2440 and moving this out of the driver makes the rest of the
-clock handling in the driver almost identical for all SoC's supported by the
-driver.
-
-Patch 3 modifies the driver to lookup source clocks for baud rate generator
-by using generic clock names. The generic clock name used by the driver is
-'clk_uart_baud' appended with the parent number of the clock. For instance,
-the second parent clock source option for baud rate generator is named as
-'clk_uart_baud2'.
-
-The driver stops depending on the set_clock and get_clock callbacks in the
-SoC specific extensions. Instead, the driver is modified to lookup parent
-clock rates and decide/calculate the best parent clock source for the baud
-rate generator (best clock would have the least delta when compared to buad
-rate requested).
-
-In this process, four new members are added in the driver's private data
-structure. The 'def_clk_sel' member is a platform set bit-value that specifies
-the possible parents that the driver is allowed to use for baud rate clock.
-A bit set at a particular bit position selects that parent clock source.
-Example: If bit number 2 is set in 'def_clk_sel', then parent clock source '2'
-can be a possible parent clock for baud rate generator. The 'num_clks'
-is the number of possible parent clocks that the SoC supports. The
-'clksel_mask' and 'clksel_shift' members are used to operate on the parent clock
-selection bit field int the uart controller's contol register.
-
-Patch 4 removes all uses and instances of 'struct s3c24xx_uart_clksrc'. This
-structure was used to pass source clock 'names' between platform code, driver
-and SoC specific extensions. By moving away from using platform specified clock
-names in the driver, all uses and instances of 'struct s3c24xx_uart_clksrc'
-is removed.
-
-Patch 5 removes all the SoC specific get_clksrc and set_clksrc callbacks. These
-callbacks were using SoC specific clock names to communicate the clock to be
-set or retrieved. These callbacks are removed as they are no longer required.
-
-Patch 6 reworks the uart clocks in platform code of all Samsung SoC's. The
-driver would use generic clock names and this patch creates aliases to uart
-clocks with generic clock names as the alias name.
-
-Patch 7 merges all the SoC specific port reset functions into one common port
-reset function and moves the common function into the common Samsung uart
-driver. All the SoC specific port reset functions perform the same operation
-allowing all of them to be converged.
-
-Patch 8 collapses all the SoC specific probe functions and associated driver
-private data into the Samsung common uart driver. With get_clksrc, set_clksrc
-and reset_port functions removed from SoC specific extensions, all the remains
-in those extensions is the probe function along with SoC specific driver data.
-These are merged into the common Samsung uart driver and all the SoC specific
-extensions are deleted.
-
-Patch 9 adds device tree based discovery support for the uart driver.
-
-
-This patchset is based on the following tree
-https://github.com/kgene/linux-samsung.git  branch: for-next
-
-with the following two patches applied
-[PATCH] serial: samsung: Add unified interrupt handler for s3c64xx and later SoC's
-[PATCH] ARM: SAMSUNG: Remove uart irq handling from plaform code
-
-and tested on the following boards.
-SMDK2440, SMDK2416, SMDK6410, SMDK6440, SMDK6450, SMDKC100, SMDKV210, SMDKV310.
-
-This patchset has dependency on the following patchset:
-[PATCH V2 0/2] Add a common macro for creating struct clk_lookup entries
-
-
-Thomas Abraham (9):
-  serial: samsung: Keep a copy of the location of platform data in driver's private data
-  serial: samsung: move handling of fclk/n clock to platform code
-  serial: samsung: switch to clkdev based clock lookup
-  serial: samsung: remove struct 's3c24xx_uart_clksrc' and all uses of it
-  serial: samsung: remove all uses of get_clksrc and set_clksrc
-  arm: samsung: register uart clocks to clock lookup list
-  serial: samsung: merge all SoC specific port reset functions
-  serial: samsung: merge probe() function from all SoC specific extensions
-  serial: samsung: add device tree support
-
- .../devicetree/bindings/serial/samsung_uart.txt    |   14 +
- arch/arm/mach-exynos4/clock.c                      |  106 ++--
- arch/arm/mach-exynos4/init.c                       |   21 +-
- arch/arm/mach-s3c2410/mach-bast.c                  |   22 -
- arch/arm/mach-s3c2410/mach-vr1000.c                |   24 -
- arch/arm/mach-s3c2410/s3c2410.c                    |    6 +
- arch/arm/mach-s3c2412/clock.c                      |    7 +
- arch/arm/mach-s3c2440/clock.c                      |   44 ++
- arch/arm/mach-s3c2440/mach-anubis.c                |   22 +-
- arch/arm/mach-s3c2440/mach-at2440evb.c             |   22 +-
- arch/arm/mach-s3c2440/mach-osiris.c                |   24 +-
- arch/arm/mach-s3c2440/mach-rx1950.c                |   18 +-
- arch/arm/mach-s3c2440/mach-rx3715.c                |   19 +-
- arch/arm/mach-s3c64xx/clock.c                      |   37 +-
- arch/arm/mach-s5p64x0/clock-s5p6440.c              |   32 +-
- arch/arm/mach-s5p64x0/clock-s5p6450.c              |   32 +-
- arch/arm/mach-s5p64x0/init.c                       |   31 -
- arch/arm/mach-s5pc100/clock.c                      |   33 +-
- arch/arm/mach-s5pv210/clock.c                      |  107 ++--
- arch/arm/mach-s5pv210/init.c                       |   19 -
- arch/arm/plat-s3c24xx/s3c2443-clock.c              |   23 +-
- arch/arm/plat-samsung/include/plat/regs-serial.h   |   45 +-
- drivers/tty/serial/Kconfig                         |   45 +--
- drivers/tty/serial/Makefile                        |    5 -
- drivers/tty/serial/s3c2410.c                       |  115 ----
- drivers/tty/serial/s3c2412.c                       |  149 -----
- drivers/tty/serial/s3c2440.c                       |  178 ------
- drivers/tty/serial/s3c6400.c                       |  149 -----
- drivers/tty/serial/s5pv210.c                       |  158 -----
- drivers/tty/serial/samsung.c                       |  639 ++++++++++++--------
- drivers/tty/serial/samsung.h                       |   32 +-
- 31 files changed, 752 insertions(+), 1426 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/serial/samsung_uart.txt
- delete mode 100644 drivers/tty/serial/s3c2410.c
- delete mode 100644 drivers/tty/serial/s3c2412.c
- delete mode 100644 drivers/tty/serial/s3c2440.c
- delete mode 100644 drivers/tty/serial/s3c6400.c
- delete mode 100644 drivers/tty/serial/s5pv210.c
+diff --git a/drivers/tty/serial/s5pv210.c b/drivers/tty/serial/s5pv210.c
+index 8b0b888..03b249e 100644
+--- a/drivers/tty/serial/s5pv210.c
++++ b/drivers/tty/serial/s5pv210.c
+@@ -28,9 +28,13 @@
+ static int s5pv210_serial_setsource(struct uart_port *port,
+ 					struct s3c24xx_uart_clksrc *clk)
+ {
+-	struct s3c2410_uartcfg *cfg = port->dev->platform_data;
++	struct s3c24xx_uart_port *ourport;
++	struct s3c2410_uartcfg *cfg;
+ 	unsigned long ucon = rd_regl(port, S3C2410_UCON);
+ 
++	ourport = container_of(port, struct s3c24xx_uart_port, port);
++	cfg = ourport->cfg;
++
+ 	if (cfg->flags & NO_NEED_CHECK_CLKSRC)
+ 		return 0;
+ 
+@@ -51,9 +55,13 @@ static int s5pv210_serial_setsource(struct uart_port *port,
+ static int s5pv210_serial_getsource(struct uart_port *port,
+ 					struct s3c24xx_uart_clksrc *clk)
+ {
+-	struct s3c2410_uartcfg *cfg = port->dev->platform_data;
++	struct s3c24xx_uart_port *ourport;
++	struct s3c2410_uartcfg *cfg;
+ 	u32 ucon = rd_regl(port, S3C2410_UCON);
+ 
++	ourport = container_of(port, struct s3c24xx_uart_port, port);
++	cfg = ourport->cfg;
++
+ 	clk->divisor = 1;
+ 
+ 	if (cfg->flags & NO_NEED_CHECK_CLKSRC)
+diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+index b31f1c3..51cfb9f 100644
+--- a/drivers/tty/serial/samsung.c
++++ b/drivers/tty/serial/samsung.c
+@@ -190,10 +190,13 @@ static inline struct s3c24xx_uart_info *s3c24xx_port_to_info(struct uart_port *p
+ 
+ static inline struct s3c2410_uartcfg *s3c24xx_port_to_cfg(struct uart_port *port)
+ {
++	struct s3c24xx_uart_port *ourport;
++
+ 	if (port->dev == NULL)
+ 		return NULL;
+ 
+-	return (struct s3c2410_uartcfg *)port->dev->platform_data;
++	ourport = container_of(port, struct s3c24xx_uart_port, port);
++	return ourport->cfg;
+ }
+ 
+ static int s3c24xx_serial_rx_fifocnt(struct s3c24xx_uart_port *ourport,
+@@ -1125,7 +1128,7 @@ static int s3c24xx_serial_init_port(struct s3c24xx_uart_port *ourport,
+ 				    struct platform_device *platdev)
+ {
+ 	struct uart_port *port = &ourport->port;
+-	struct s3c2410_uartcfg *cfg;
++	struct s3c2410_uartcfg *cfg = platdev->dev.platform_data;
+ 	struct resource *res;
+ 	int ret;
+ 
+@@ -1134,11 +1137,16 @@ static int s3c24xx_serial_init_port(struct s3c24xx_uart_port *ourport,
+ 	if (platdev == NULL)
+ 		return -ENODEV;
+ 
+-	cfg = s3c24xx_dev_to_cfg(&platdev->dev);
+-
+ 	if (port->mapbase != 0)
+ 		return 0;
+ 
++	/*
++	 * If platform data is supplied, keep a copy of the location of
++	 * platform data in the driver's private data.
++	 */
++	if (cfg)
++		ourport->cfg = cfg;
++
+ 	if (cfg->hwport > CONFIG_SERIAL_SAMSUNG_UARTS) {
+ 		printk(KERN_ERR "%s: port %d bigger than %d\n", __func__,
+ 		       cfg->hwport, CONFIG_SERIAL_SAMSUNG_UARTS);
+diff --git a/drivers/tty/serial/samsung.h b/drivers/tty/serial/samsung.h
+index 8e87b78..6c9cb9d 100644
+--- a/drivers/tty/serial/samsung.h
++++ b/drivers/tty/serial/samsung.h
+@@ -48,6 +48,9 @@ struct s3c24xx_uart_port {
+ 	struct clk			*baudclk;
+ 	struct uart_port		port;
+ 
++	/* reference to platform data */
++	struct s3c2410_uartcfg		*cfg;
++
+ #ifdef CONFIG_CPU_FREQ
+ 	struct notifier_block		freq_transition;
+ #endif
+@@ -56,7 +59,6 @@ struct s3c24xx_uart_port {
+ /* conversion functions */
+ 
+ #define s3c24xx_dev_to_port(__dev) (struct uart_port *)dev_get_drvdata(__dev)
+-#define s3c24xx_dev_to_cfg(__dev) (struct s3c2410_uartcfg *)((__dev)->platform_data)
+ 
+ /* register access controls */
+ 
+-- 
+1.6.6.rc2
