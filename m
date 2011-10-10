@@ -1,82 +1,38 @@
-From: Barry.Song@csr.com (Barry Song)
-Date: Sun, 9 Oct 2011 22:44:12 -0700
-Subject: [PATCH] PM: HIBERNATION: add resume_delay kernel param as well as
-	resume_delay
-Message-ID: <1318225452-10397-1-git-send-email-Barry.Song@csr.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 10 Oct 2011 09:10:29 +0300
+Subject: [PATCH 15/30] usb/musb: use a Kconfig choice to pick the right
+	DMA method
+In-Reply-To: <1317566760-25681-16-git-send-email-arnd@arndb.de>
+References: <1317566760-25681-1-git-send-email-arnd@arndb.de>
+	<1317566760-25681-16-git-send-email-arnd@arndb.de>
+Message-ID: <20111010061026.GF31707@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <baohua.song@csr.com>
+On Sun, Oct 02, 2011 at 04:45:45PM +0200, Arnd Bergmann wrote:
+> The logic to allow only one DMA driver in MUSB is currently
+> flawed, because it also allows picking no DMA driver at all
+> and also not selecting PIO mode.
+> 
+> Using a choice statement makes this foolproof for now and
+> also simplifies the Makefile.
+> 
+> Unfortunately, we will have to revisit this when we start
+> supporting multiple ARM platforms in a single kernel binary,
+> because at that point we will actually need to select
+> multiple DMA drivers and pick the right one at run-time.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Felipe Balbi <balbi@ti.com>
 
-patch "PM: HIBERNATION: add resume_wait param to support MMC-like devices
-as resume file" add resume_wait param. this patch adds resume_delay so that
-resume_wait/delay has the same model with root_wait/delay.
+applied, thanks
 
-Signed-off-by: Barry Song <baohua.song@csr.com>
----
- Documentation/kernel-parameters.txt |    3 +++
- kernel/power/hibernate.c            |   14 ++++++++++++++
- 2 files changed, 17 insertions(+), 0 deletions(-)
-
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 88a7b19..831bde2 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -2240,6 +2240,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			in <PAGE_SIZE> units (needed only for swap files).
- 			See  Documentation/power/swsusp-and-swap-files.txt
- 
-+	resumedelay=	[HIBERNATION] Delay (in seconds) to pause before attempting to
-+			read the resume files
-+
- 	resumewait	[HIBERNATION] Wait (indefinitely) for resume device to show up.
- 			Useful for devices that are detected asynchronously
- 			(e.g. USB and MMC devices).
-diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
-index b3da53c..f73a00e 100644
---- a/kernel/power/hibernate.c
-+++ b/kernel/power/hibernate.c
-@@ -33,6 +33,7 @@
- static int nocompress = 0;
- static int noresume = 0;
- static int resume_wait = 0;
-+static int resume_delay = 0;
- static char resume_file[256] = CONFIG_PM_STD_PARTITION;
- dev_t swsusp_resume_device;
- sector_t swsusp_resume_block;
-@@ -726,6 +727,12 @@ static int software_resume(void)
- 
- 	pr_debug("PM: Checking hibernation image partition %s\n", resume_file);
- 
-+	if (resume_delay) {
-+		printk(KERN_INFO "Waiting %dsec before reading resume device...\n",
-+			resume_delay);
-+		ssleep(resume_delay);
-+	}
-+
- 	/* Check if the device is there */
- 	swsusp_resume_device = name_to_dev_t(resume_file);
- 	if (!swsusp_resume_device) {
-@@ -1075,8 +1082,15 @@ static int __init resumewait_setup(char *str)
- 	return 1;
- }
- 
-+static int __init resumedelay_setup(char *str)
-+{
-+	resume_delay = simple_strtoul(str, NULL, 0);
-+	return 1;
-+}
-+
- __setup("noresume", noresume_setup);
- __setup("resume_offset=", resume_offset_setup);
- __setup("resume=", resume_setup);
- __setup("hibernate=", hibernate_setup);
- __setup("resumewait", resumewait_setup);
-+__setup("resumedelay=", resumedelay_setup);
 -- 
-1.7.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111010/6dbad263/attachment-0001.sig>
