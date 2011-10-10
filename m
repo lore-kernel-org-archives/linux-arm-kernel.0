@@ -1,58 +1,76 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Oct 2011 18:42:52 +0900
-Subject: [PATCH V3 0/4]: ARM: SAMSUNG: Add SPI clkdev support
-In-Reply-To: <1318233789-19882-1-git-send-email-padma.v@samsung.com>
-References: <1318233789-19882-1-git-send-email-padma.v@samsung.com>
-Message-ID: <039c01cc8730$fb130750$f13915f0$%kim@samsung.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Mon, 10 Oct 2011 10:42:49 +0100
+Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
+In-Reply-To: <CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<1318178172-7965-5-git-send-email-zoss@devai.org>
+	<CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
+Message-ID: <4E92BE19.4060907@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padmavathi Venna wrote:
+On 10/10/11 02:29, Linus Walleij wrote:
+> 2011/10/9 Zoltan Devai <zoss@devai.org>:
 > 
-> This patchset modifies the existing clkdev to make SPI driver
-> independent of the clock names send from platform data. This
-> patches enables the SPI driver to request SPI bus clocks
-> using generic connection ID.
+>> Signed-off-by: Zoltan Devai <zoss@devai.org>
+>> ---
+>>  arch/arm/mach-spmp8000/adc.c                      |  465 +++++++++++++++++++++
+>>  arch/arm/mach-spmp8000/include/mach/spmp8000adc.h |   29 ++
 > 
-> V1 patch series are:
-> 	http://www.spinics.net/lists/arm-kernel/msg141671.html
+> I think we stopped stuffing misc drivers under arch/arm/*
 > 
-> Changes since V1:
-> 	-Add newly introduced CLKDEV_INIT macro for creating clk_lookup
-> 	structure as suggested by Russell King
-> 	V2 patches series are:
-> 	http://www.spinics.net/lists/arm-kernel/msg142733.html
+> And stuffing them under drivers/misc/* won't be popular either.
 > 
-> Changes since V2:
-> 	-Reworked the patches as per the following link. Patch series in
-> 	the following link removed & and , from the macro declaration and
-added
-> 	in the macro defination.
-> 	http://www.spinics.net/lists/arm-kernel/msg143663.html
+> IIO has some ADCs in drivers/staging/iio/adc
+> these seem all to be intended to be used from userspace.
+Yeah, we've had various discussions about adding support for
+in kernel users. Its always fallen on the fact that no one
+has had the time to write the code to allow it all to be
+linked up.  Right now it's a case of drivers providing their
+own interfaces if they want to allow this.
+Mark Brown has raised this issue before so I've cc'd him.
+
+For reference of those not following the original thread (based
+on a quick scan of the driver code in question).
+
+Driver has two callback sets:
+
+1) Touch panel reads (I guess going straight to an input driver)
+(1 of these only). This is annoyingly tied up with the more general
+adc registers.
+2) General purpose adc callbacks. 
+
+Both are driven off an interrupt, but data ready
+appears to manually driven (so software triggered sampling then data
+ready signal when sampling is done for a single channel).
+
+So what are these callbacks used for?  Note they all run as
+interrupt top halves...
+
+Options at current time are:
+
+mfd supporting input device and either hwmon or iio device.
+
+A driver that hosts both a hwmon / iio and an input device.
+
+Be brave (+ have a lot of time) and propose patches adding the relevant
+tying together code to allow iio drivers to be queried in kernel.
+It shouldn't be that bad actually if you solve the how to work
+out which device / channel you want in a consistent way.
+
+It really depends on what those general adc callbacks get used for.
+
 > 
-> Padmavathi Venna (4):
->   ARM: S3C64XX: Add SPI clkdev support
->   ARM: S5PC100: Add SPI clkdev support
->   ARM: S5P64X0: Add SPI clkdev support
->   ARM: S5PV210: Add SPI clkdev support
+> There are a few in-kernel ADCs all over the kernel tree
+> for various specific purposes.
 > 
->  arch/arm/mach-s3c64xx/clock.c         |   98 ++++++++++++++++--------
->  arch/arm/mach-s5p64x0/clock-s5p6440.c |   57 +++++++++-----
->  arch/arm/mach-s5p64x0/clock-s5p6450.c |   57 +++++++++-----
->  arch/arm/mach-s5pc100/clock.c         |  132 ++++++++++++++++++++--------
-> -----
->  arch/arm/mach-s5pv210/clock.c         |   58 ++++++++++-----
->  5 files changed, 259 insertions(+), 143 deletions(-)
+> I don't know where we should go with this kind of stuff,
+> really :-/
 > 
+> Yours,
+> Linus Walleij
 > --
-> 1.7.4.4
-Looks ok but this needs 'CLKDEV_INIT' patch. Please wait until it can be
-sent to upstream for this patch.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
