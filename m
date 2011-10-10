@@ -1,80 +1,117 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 10 Oct 2011 14:42:08 -0600 (MDT)
-Subject: [PATCHv9 03/18] TEMP: OMAP3xxx: hwmod data: add PRM hwmod
-In-Reply-To: <4E934D79.4080000@ti.com>
-References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-	<1316781986-30642-4-git-send-email-t-kristo@ti.com>
-	<alpine.DEB.2.00.1110101320180.5205@utopia.booyaka.com>
-	<4E934D79.4080000@ti.com>
-Message-ID: <alpine.DEB.2.00.1110101416530.5205@utopia.booyaka.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 10 Oct 2011 16:34:31 -0500
+Subject: [PATCH v2 6/6] OMAP4: Clock: Correct the name of SLIMBUS interface
+	clocks
+In-Reply-To: <4E92C0D9.3090402@ti.com>
+References: <1316195330-15099-1-git-send-email-jon-hunter@ti.com>
+	<alpine.DEB.2.00.1110061941100.4611@utopia.booyaka.com>
+	<4E8EB6ED.9020605@ti.com> <4E8F8149.6090100@ti.com>
+	<4E92C0D9.3090402@ti.com>
+Message-ID: <4E9364E7.80708@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Beno?t
+Hi Benoit,
 
-On Mon, 10 Oct 2011, Cousson, Benoit wrote:
+On 10/10/2011 4:54, Cousson, Benoit wrote:
+> Hi Jon,
+>
+> On 10/8/2011 12:46 AM, Hunter, Jon wrote:
+>> Hi Benoit,
+>>
+>> On 10/7/2011 3:23, Cousson, Benoit wrote:
+>>> Hi Paul& Jon,
+>>>
+>>> On 10/7/2011 3:42 AM, Paul Walmsley wrote:
+>>>> + Beno?t
+>>>>
+>>>> On Fri, 16 Sep 2011, Jon Hunter wrote:
+>>>>
+>>>>> From: Jon Hunter<jon-hunter@ti.com>
+>>>>>
+>>>>> Currently the interface clocks for the two SLIMBUS peripherals are
+>>>>> named slimbus1_fck and slimbus2_fck. Rename these clocks to be
+>>>>> slimbus1_ick and slimbus2_ick so it is clear that these are
+>>>>> interface clocks and not functional clocks.
+>>>>>
+>>>>> Signed-off-by: Jon Hunter<jon-hunter@ti.com>
+>>>>
+>>>> This one, I don't quite understand. We should probably be removing
+>>>> these
+>>>> MODULEMODE-only clocks from the OMAP4 tree, and using their parent
+>>>> clock
+>>>> as the main_clk. That would be a good cleanup for 3.3...
+>>>
+>>> Yes, but in order to remove that from the clock data we must ensure that
+>>> the hwmod entry is there.
+>>> I kept a lot of legacy MODULEMODE clocks just because of missing hwmod /
+>>> runtime_pm adaptation on some drivers.
+>>>
+>>> In the case of slimbus, there is no main_clk but a bunch of optional
+>>> clocks. It looks similar to the DSS case. So we should not use the
+>>> parent clock as a main_clk.
+>>>
+>>> We should probably promote one of the opt_clk as the main_clk. The
+>>> slimbus_clk seems to be the good candidate for both instances.
+>>>
+>>> static struct omap_hwmod_opt_clk slimbus1_opt_clks[] = {
+>>> { .role = "fclk_1", .clk = "slimbus1_fclk_1" },
+>>> { .role = "fclk_0", .clk = "slimbus1_fclk_0" },
+>>> { .role = "fclk_2", .clk = "slimbus1_fclk_2" },
+>>> { .role = "slimbus_clk", .clk = "slimbus1_slimbus_clk" },
+>>> };
+>>>
+>>> static struct omap_hwmod_opt_clk slimbus2_opt_clks[] = {
+>>> { .role = "fclk_1", .clk = "slimbus2_fclk_1" },
+>>> { .role = "fclk_0", .clk = "slimbus2_fclk_0" },
+>>> { .role = "slimbus_clk", .clk = "slimbus2_slimbus_clk" },
+>>> };
+>>>
+>>> Jon,
+>>> Do you know if that one is indeed mandatory to use the slimbus IP?
+>>
+>> Sorry, are you asking about the clocks I was re-naming or the
+>> slimbus_clk you are referring to above?
+>
+> The clocks you are renaming should not exist at all, so I was referring
+> to the real clocks that are all listed as optional clocks.
 
-> On 10/10/2011 9:24 PM, Paul Walmsley wrote:
-> > On Fri, 23 Sep 2011, Tero Kristo wrote:
-> > 
-> > > This patch is temporary until Paul can provide a final version.
-> > > 
-> > > Signed-off-by: Tero Kristo<t-kristo@ti.com>
-> > 
-> > Here's an updated version of this one.  The one change is that the hwmod's
-> > name is now "prm3xxx" to reflect that the register layout of this IP block
-> > is quite different from its OMAP2 predecessors and OMAP4 successors.
-> > This should avoid some of the special-purpose driver probing code.
-> 
-> This is not really aligned with the naming convention we've been using so far.
-> In both cases, the hwmod should just be named "prm". If a version information
-> is needed, then it should be added in the revision class field.
-> 
-> It will make the device creation even simpler and not dependent of the SoC
-> version.
+These clocks are the interface clocks enabled via the module-mode. So 
+you are saying you want to remove the interface clocks from the list of 
+clocks?
 
-The problem in this case is that we should be using a completely different 
-device driver for the PRM that's in the OMAP3 chips, from the driver used 
-for OMAP2 or OMAP4 PRM blocks, due to the completely different register 
-layout.  As far as I know, we haven't yet used the hwmod IP version to 
-probe a different device driver when the version number changes.  There's 
-no support for that in the current Linux platform* code, so we'd need 
-special-purpose code for that.
+> Usually we do need to have a main_clk in order to access the IP
+> registers (at least the sysconfig). But for some IPs, the iclk can be
+> enough.
+> If the interface clock is enough, then potentially that main clock is
+> not mandatory. But if one functional clock is mandatory, then we have to
+> figured out which one from the various optional functional clocks can be
+> used as the main_clk.
+>
+>> Looking at the clock tree tool, the slimbus_clk is the actual external
+>> slimbus clock that can be generated by OMAP or by an external device.
+>>
+>> The TRM states ...
+>>
+>> "Most of the SLIMbus module runs off two main clocks: the L4 interface
+>> clock for the data input and output registers, and the control and
+>> status control registers; and the SLIMbus clock, taken from the serial
+>> interface (CLK line) for the SLIMbus-side logic.
+>>
+>> The SLIMbus controller operates as clock source component (active
+>> framer), which drives the SLIMbus clock line CLK, or as clock receiver
+>> component, which gets its clock from the same CLK line."
+>>
+>> So, if you are operating as the clock source component on the bus then
+>> one of the optional clocks to drive the peripheral logic and if you are
+>> the clock receiver then you use slimbus_clk.
+>
+> OK, so clearly, the slimbus_clk cannot be a main_clk. We have to check
+> if the registers can be accessed only with the iclk.
 
-In an ideal world, we'd have an omap_bus, etc., which would include an 
-additional interface version number as part of its driver matching 
-criteria.  Device drivers would then specify which interface version 
-numbers they supported.  The device data would specify that interface 
-version number should be matched.
+I ran a quick test. If I just set the module mode to 0x2 (enabled), then 
+I can access the registers. So no need to turn on any of the 
+optional/functional clocks just the iclk.
 
-But as it is right now in the current platform_device/platform_driver 
-based system, we have only the name to match.  We could implement 
-something where we concatenate the existing IP version number onto the 
-hwmod name, and modify the device drivers to use that name.  But that 
-seems like a lot of potential churn in light of a future DT and/or 
-omap_bus migration.
-
-So I'm proposing to use the IP version number field that's in the hwmod 
-data to indicate evolutionary revisions of an IP block -- rather than 
-revolutionary revisions that would require a new driver.  Then, since we 
-use the hwmod name for driver matching, we'd use a different name for 
-radically different IPs.
-
-If it's the "3xxx" that you're objecting to in the name, we could call it 
-"prm2" or "prmxyz" - the '3xxx' just seemed like the most logical 
-approach.  The name of the hwmod class in the patch is still "prm", of 
-course. 
-
-Thoughts?
-
-...
-
-N.B., it's true that by waiting, this problem will presumably go away, 
-with DT, in which the driver matching data would go into the 
-"compatible" string in the DT.
-
-But I guess it would be good to figure out a clean approach in the 
-meantime.
-
-
-- Paul
+Cheers
+Jon
