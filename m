@@ -1,41 +1,54 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun,  9 Oct 2011 22:28:04 -0700
-Subject: [PATCH v2 14/14] ARM: tegra: cpu-tegra: unexport two functions
-In-Reply-To: <1318224484-2090-1-git-send-email-olof@lixom.net>
-References: <1317956064-17650-1-git-send-email-olof@lixom.net>
-	<1318224484-2090-1-git-send-email-olof@lixom.net>
-Message-ID: <1318224484-2090-15-git-send-email-olof@lixom.net>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 10 Oct 2011 11:10:19 +0530
+Subject: [PATCH 0/2] ARM: OMAP2+: timer fixes / cleanup
+In-Reply-To: <4E8B7C6A.2050207@ti.com>
+References: <1317763241-21422-1-git-send-email-b-cousson@ti.com>
+	<4E8B7C6A.2050207@ti.com>
+Message-ID: <CAC83Zv+r0emW7rREkPhjPyn_jBCbNLXKCNTY0=vMNxCTzzp=Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two static functions that are not exported:
-
-arch/arm/mach-tegra/cpu-tegra.c:59:5: warning: symbol 'tegra_verify_speed' was not declared. Should it be static?
-arch/arm/mach-tegra/cpu-tegra.c:64:14: warning: symbol 'tegra_getspeed' was not declared. Should it be static?
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/mach-tegra/cpu-tegra.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
-index f15b689..b2647ec 100644
---- a/arch/arm/mach-tegra/cpu-tegra.c
-+++ b/arch/arm/mach-tegra/cpu-tegra.c
-@@ -57,12 +57,12 @@ static unsigned long target_cpu_speed[NUM_CPUS];
- static DEFINE_MUTEX(tegra_cpu_lock);
- static bool is_suspended;
- 
--int tegra_verify_speed(struct cpufreq_policy *policy)
-+static int tegra_verify_speed(struct cpufreq_policy *policy)
- {
- 	return cpufreq_frequency_table_verify(policy, freq_table);
- }
- 
--unsigned int tegra_getspeed(unsigned int cpu)
-+static unsigned int tegra_getspeed(unsigned int cpu)
- {
- 	unsigned long rate;
- 
--- 
-1.7.4.1
+On Wed, Oct 5, 2011 at 3:06 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> Hi Tarun,
+>
+> On 10/4/2011 11:20 PM, Cousson, Benoit wrote:
+>>
+>> Hi Tony,
+>>
+>> Here is the series to fix the warning and remove the redundant
+>> latency structure that be removed since the timer runtime PM
+>> adaptation was just pulled.
+>>
+>> I was just able to test that on OMAP4.
+>
+> It will be nice if you can test that on the other platforms.
+> In theory, if they are properly using hwmod that should work fine.
+Yes, I will test in other platforms.
+--
+Tarun
+>
+> Thanks,
+> Benoit
+>
+>>
+>> Patches are based on Kevin's for_3.2/omap_device-2 branch
+>> and are available here:
+>> git://gitorious.org/omap-pm/linux.git for_3.2/timer_fixes
+>>
+>> Regards,
+>> Benoit
+>>
+>>
+>> Benoit Cousson (2):
+>> ? ARM: OMAP2+: clock data: Remove redundant timer clkdev
+>> ? ARM: OMAP2+: timer: Remove omap_device_pm_latency
+>>
+>> ?arch/arm/mach-omap2/clock2420_data.c | ? 12 ------------
+>> ?arch/arm/mach-omap2/clock2430_data.c | ? 12 ------------
+>> ?arch/arm/mach-omap2/clock3xxx_data.c | ? 12 ------------
+>> ?arch/arm/mach-omap2/clock44xx_data.c | ? 11 -----------
+>> ?arch/arm/mach-omap2/timer.c ? ? ? ? ?| ? 12 +-----------
+>> ?5 files changed, 1 insertions(+), 58 deletions(-)
+>>
+>
+>
