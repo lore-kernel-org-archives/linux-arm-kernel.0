@@ -1,132 +1,105 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 10 Oct 2011 23:45:34 +0530
-Subject: [PATCH v6 06/10] ARM: EXYNOS4: Limit usage of pl330 device instance to
-	non-dt build
-In-Reply-To: <1318270538-30450-6-git-send-email-thomas.abraham@linaro.org>
+Date: Mon, 10 Oct 2011 23:45:35 +0530
+Subject: [PATCH v6 07/10] ARM: Exynos4: Add a alias for pdma clocks
+In-Reply-To: <1318270538-30450-7-git-send-email-thomas.abraham@linaro.org>
 References: <1318270538-30450-1-git-send-email-thomas.abraham@linaro.org>
 	<1318270538-30450-2-git-send-email-thomas.abraham@linaro.org>
 	<1318270538-30450-3-git-send-email-thomas.abraham@linaro.org>
 	<1318270538-30450-4-git-send-email-thomas.abraham@linaro.org>
 	<1318270538-30450-5-git-send-email-thomas.abraham@linaro.org>
 	<1318270538-30450-6-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1318270538-30450-7-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-7-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1318270538-30450-8-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pl330 device instances and associated platform data is required only
-for non-device-tree builds. With device tree enabled, the data about the
-platform is obtained from the device tree. For images that include both
-dt and non-dt platforms, an addditional check is added to ensure that
-static amba device registrations is applicable to only non-dt platforms.
+PDMA controllers when instantiated from device tree are registered using
+amba_device_register(). The registration process enables clock to the
+controllers to read the peripheral id of the PDMA amba device.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
+In case of Exynos4, the clocks to the PDMA controllers are named as 'dma'
+but amba_device_register() looks up the clock using the name 'apb_pclk'.
+Hence, alias clocks with name 'apb_pclk' clock are created for clocks
+with name 'dma'.
+
 Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- arch/arm/mach-exynos4/Kconfig  |   10 ++++++++++
- arch/arm/mach-exynos4/Makefile |    3 ++-
- arch/arm/mach-exynos4/dma.c    |    4 ++++
- 3 files changed, 16 insertions(+), 1 deletions(-)
+ arch/arm/mach-exynos4/clock.c |   35 +++++++++++++++++++++++++----------
+ 1 files changed, 25 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index dd660eb..0c5888a 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -35,6 +35,11 @@ config EXYNOS4_MCT
- 	help
- 	  Use MCT (Multi Core Timer) as kernel timers
+diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+index d589fe4..94fc337 100644
+--- a/arch/arm/mach-exynos4/clock.c
++++ b/arch/arm/mach-exynos4/clock.c
+@@ -558,16 +558,6 @@ static struct clk init_clocks_off[] = {
+ 		.enable		= exynos4_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 10),
+ 	}, {
+-		.name		= "dma",
+-		.devname	= "dma-pl330.0",
+-		.enable		= exynos4_clk_ip_fsys_ctrl,
+-		.ctrlbit	= (1 << 0),
+-	}, {
+-		.name		= "dma",
+-		.devname	= "dma-pl330.1",
+-		.enable		= exynos4_clk_ip_fsys_ctrl,
+-		.ctrlbit	= (1 << 1),
+-	}, {
+ 		.name		= "adc",
+ 		.enable		= exynos4_clk_ip_peril_ctrl,
+ 		.ctrlbit	= (1 << 15),
+@@ -783,6 +773,20 @@ static struct clk init_clocks[] = {
+ 	}
+ };
  
-+config EXYNOS4_DEV_DMA
-+	bool
-+	help
-+	  Compile in amba device definitions for DMA controller
++static struct clk clk_pdma0 = {
++	.name		= "dma",
++	.devname	= "dma-pl330.0",
++	.enable		= exynos4_clk_ip_fsys_ctrl,
++	.ctrlbit	= (1 << 0),
++};
 +
- config EXYNOS4_DEV_AHCI
- 	bool
- 	help
-@@ -158,6 +163,7 @@ config MACH_SMDKV310
- 	select EXYNOS4_DEV_PD
- 	select SAMSUNG_DEV_PWM
- 	select EXYNOS4_DEV_SYSMMU
-+	select EXYNOS4_DEV_DMA
- 	select EXYNOS4_SETUP_FIMD0
- 	select EXYNOS4_SETUP_I2C1
- 	select EXYNOS4_SETUP_KEYPAD
-@@ -176,6 +182,7 @@ config MACH_ARMLEX4210
- 	select S3C_DEV_HSMMC3
- 	select EXYNOS4_DEV_AHCI
- 	select EXYNOS4_DEV_SYSMMU
-+	select EXYNOS4_DEV_DMA
- 	select EXYNOS4_SETUP_SDHCI
- 	help
- 	  Machine support for Samsung ARMLEX4210 based on EXYNOS4210
-@@ -201,6 +208,7 @@ config MACH_UNIVERSAL_C210
- 	select S5P_DEV_ONENAND
- 	select S5P_DEV_TV
- 	select EXYNOS4_DEV_PD
-+	select EXYNOS4_DEV_DMA
- 	select EXYNOS4_SETUP_FIMD0
- 	select EXYNOS4_SETUP_I2C1
- 	select EXYNOS4_SETUP_I2C3
-@@ -227,6 +235,7 @@ config MACH_NURI
- 	select S5P_DEV_MFC
- 	select S5P_DEV_USB_EHCI
- 	select EXYNOS4_DEV_PD
-+	select EXYNOS4_DEV_DMA
- 	select EXYNOS4_SETUP_FIMD0
- 	select EXYNOS4_SETUP_I2C1
- 	select EXYNOS4_SETUP_I2C3
-@@ -253,6 +262,7 @@ config MACH_ORIGEN
- 	select S5P_DEV_I2C_HDMIPHY
- 	select S5P_DEV_TV
- 	select S5P_DEV_USB_EHCI
-+	select EXYNOS4_DEV_DMA
- 	select EXYNOS4_DEV_PD
- 	select SAMSUNG_DEV_BACKLIGHT
- 	select SAMSUNG_DEV_PWM
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index c47aae3..8066538 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -13,7 +13,7 @@ obj-				:=
- # Core support for EXYNOS4 system
- 
- obj-$(CONFIG_ARCH_EXYNOS4)	+= cpu.o init.o clock.o irq-combiner.o
--obj-$(CONFIG_ARCH_EXYNOS4)	+= setup-i2c0.o irq-eint.o dma.o pmu.o
-+obj-$(CONFIG_ARCH_EXYNOS4)	+= setup-i2c0.o irq-eint.o pmu.o
- obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
- obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
- obj-$(CONFIG_PM)		+= pm.o
-@@ -44,6 +44,7 @@ obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
- obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
- obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
- obj-$(CONFIG_EXYNOS4_DEV_DWMCI)	+= dev-dwmci.o
-+obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
- 
- obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
- obj-$(CONFIG_EXYNOS4_SETUP_FIMD0)	+= setup-fimd0.o
-diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
-index c3c0d17..921d31d 100644
---- a/arch/arm/mach-exynos4/dma.c
-+++ b/arch/arm/mach-exynos4/dma.c
-@@ -24,6 +24,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl330.h>
-+#include <linux/of.h>
- 
- #include <asm/irq.h>
- #include <plat/devs.h>
-@@ -138,6 +139,9 @@ struct amba_device exynos4_device_pdma1 = {
- 
- static int __init exynos4_dma_init(void)
- {
-+	if (of_have_populated_dt())
-+		return 0;
++static struct clk clk_pdma1 = {
++	.name		= "dma",
++	.devname	= "dma-pl330.1",
++	.enable		= exynos4_clk_ip_fsys_ctrl,
++	.ctrlbit	= (1 << 1),
++};
 +
- 	dma_cap_set(DMA_SLAVE, exynos4_pdma0_pdata.cap_mask);
- 	dma_cap_set(DMA_CYCLIC, exynos4_pdma0_pdata.cap_mask);
- 	amba_device_register(&exynos4_device_pdma0, &iomem_resource);
+ struct clk *clkset_group_list[] = {
+ 	[0] = &clk_ext_xtal_mux,
+ 	[1] = &clk_xusbxti,
+@@ -1292,6 +1296,11 @@ static struct clksrc_clk *sysclks[] = {
+ 	&clk_mout_mfc1,
+ };
+ 
++static struct clk *clk_cdev[] = {
++	&clk_pdma0,
++	&clk_pdma1,
++};
++
+ static struct clksrc_clk *clksrc_cdev[] = {
+ 	&clk_sclk_uart0,
+ 	&clk_sclk_uart1,
+@@ -1312,6 +1321,8 @@ static struct clk_lookup exynos4_clk_lookup[] = {
+ 	CLKDEV_INIT("exynos4-sdhci.1", "mmc_busclk.2", &clk_sclk_mmc1.clk),
+ 	CLKDEV_INIT("exynos4-sdhci.2", "mmc_busclk.2", &clk_sclk_mmc2.clk),
+ 	CLKDEV_INIT("exynos4-sdhci.3", "mmc_busclk.2", &clk_sclk_mmc3.clk),
++	CLKDEV_INIT("dma-pl330.0", "apb_pclk", &clk_pdma0),
++	CLKDEV_INIT("dma-pl330.1", "apb_pclk", &clk_pdma1),
+ };
+ 
+ static int xtal_rate;
+@@ -1527,6 +1538,10 @@ void __init exynos4_register_clocks(void)
+ 	s3c_register_clksrc(clksrcs, ARRAY_SIZE(clksrcs));
+ 	s3c_register_clocks(init_clocks, ARRAY_SIZE(init_clocks));
+ 
++	s3c24xx_register_clocks(clk_cdev, ARRAY_SIZE(clk_cdev));
++	for (ptr = 0; ptr < ARRAY_SIZE(clk_cdev); ptr++)
++		s3c_disable_clocks(clk_cdev[ptr], 1);
++
+ 	s3c_register_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+ 	s3c_disable_clocks(init_clocks_off, ARRAY_SIZE(init_clocks_off));
+ 	clkdev_add_table(exynos4_clk_lookup, ARRAY_SIZE(exynos4_clk_lookup));
 -- 
 1.6.6.rc2
