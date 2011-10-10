@@ -1,42 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Oct 2011 03:35:27 +0200
-Subject: [PATCH 1/9] ARM: vic: Don't write to the read-only register
-	VIC_IRQ_STATUS
-In-Reply-To: <1318178172-7965-2-git-send-email-zoss@devai.org>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-2-git-send-email-zoss@devai.org>
-Message-ID: <CAKnu2Mpnp9hNhdzFURQGvTbeoVpyKfWY2YU3MDs2yEPgC-YYAA@mail.gmail.com>
+From: hemantp@ti.com (Hemant Pedanekar)
+Date: Mon, 10 Oct 2011 07:09:47 +0530
+Subject: [PATCH v4 0/3] Add support for TI814X processor series
+Message-ID: <1318210787-2223-1-git-send-email-hemantp@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/9 Zoltan Devai <zoss@devai.org>:
+This patch set adds support for DM814x/AM387x device series having Cortex-A8
+MPU.
 
-> This is unneeded and causes an abort on the SPMP8000 platform.
->
-> Signed-off-by: Zoltan Devai <zoss@devai.org>
-> ---
-> ?arch/arm/common/vic.c | ? ?1 -
-> ?1 files changed, 0 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
-> index b22b83d..651c77d 100644
-> --- a/arch/arm/common/vic.c
-> +++ b/arch/arm/common/vic.c
-> @@ -274,7 +274,6 @@ static void __init vic_disable(void __iomem *base)
-> ? ? ? ?writel(0, base + VIC_INT_SELECT);
-> ? ? ? ?writel(0, base + VIC_INT_ENABLE);
-> ? ? ? ?writel(~0, base + VIC_INT_ENABLE_CLEAR);
-> - ? ? ? writel(0, base + VIC_IRQ_STATUS);
-> ? ? ? ?writel(0, base + VIC_ITCR);
-> ? ? ? ?writel(~0, base + VIC_INT_SOFT_CLEAR);
-> ?}
+The technical documents are available from following link:
 
-Indeed.
+http://focus.ti.com/docs/prod/folders/print/tms320dm8148.html
 
-This patch stands on its own, please put it into Russell's patch
-tracker at http://www.arm.linux.org.uk/developer/patches/
+This series is referred in code as TI814X.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Since these devices share similar architecture as TI816X devices, existing
+TI816X code is updated to accomodate TI814X support. The code shared across
+TI816X and TI814X devices is updated with TI81XX/ti81xx prefix as applicable,
+while maintaining cpu_is_ti816x() and cpu_is_ti814x() to distinguish specific
+execution differences.
 
-Yours,
-Linus Walleij
+Changes since v3:
+1) Avoid renaming board-ti8168evm.c, just add TI8148 EVM support in it.
+2) Drop changes in clock related data variables from u8 to u16 since the same
+   was incorporated as part of AM33xx addition.
+
+Changes since v2:
+1) Incorporate Tony's suggestion about moving ti8168_evm_map_io() to
+   arch/arm/mach-omap2/common.c to keep common across TI81XX.
+2) Keeping single board file (board-ti81xxevm.c) for TI816X and TI814X EVMs
+
+Changes since v1:
+1) Rebased and updated after Paul's CHIP_IS removal changes
+2) Removed call to omap2_init_common_devices() as per Kevin's comment
+
+Hemant Pedanekar (3):
+  ARM: OMAP: TI81XX: Prepare for addition of TI814X support
+  ARM: OMAP: TI814X: Add cpu type macros and detection support
+  ARM: OMAP: TI814X: Create board support and enable build for TI8148
+    EVM
+
+ arch/arm/mach-omap2/Kconfig                        |   11 +++++--
+ arch/arm/mach-omap2/Makefile                       |    1 +
+ arch/arm/mach-omap2/board-ti8168evm.c              |   33 +++++++++++--------
+ arch/arm/mach-omap2/clock3xxx_data.c               |    5 ++-
+ arch/arm/mach-omap2/common.c                       |   27 +++++++++------
+ arch/arm/mach-omap2/control.h                      |    8 ++--
+ arch/arm/mach-omap2/id.c                           |   30 +++++++++++++++--
+ arch/arm/mach-omap2/include/mach/debug-macro.S     |   12 +++---
+ arch/arm/mach-omap2/include/mach/entry-macro.S     |    4 +-
+ arch/arm/mach-omap2/io.c                           |   14 ++++----
+ arch/arm/mach-omap2/irq.c                          |    2 +-
+ arch/arm/mach-omap2/serial.c                       |    6 ++--
+ arch/arm/plat-omap/include/plat/clkdev_omap.h      |    1 +
+ arch/arm/plat-omap/include/plat/clock.h            |    1 +
+ arch/arm/plat-omap/include/plat/common.h           |    6 ++--
+ arch/arm/plat-omap/include/plat/cpu.h              |   22 +++++++++++++
+ arch/arm/plat-omap/include/plat/hardware.h         |    2 +-
+ arch/arm/plat-omap/include/plat/io.h               |    6 ++--
+ arch/arm/plat-omap/include/plat/irqs.h             |    2 +-
+ arch/arm/plat-omap/include/plat/serial.h           |   14 ++++----
+ .../plat-omap/include/plat/{ti816x.h => ti81xx.h}  |   18 +++++-----
+ arch/arm/plat-omap/include/plat/uncompress.h       |   11 ++++--
+ arch/arm/plat-omap/io.c                            |    2 +-
+ 23 files changed, 153 insertions(+), 85 deletions(-)
+ rename arch/arm/plat-omap/include/plat/{ti816x.h => ti81xx.h} (60%)
+
+-- 
+1.7.3.5
