@@ -1,202 +1,116 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 10 Oct 2011 15:26:13 +0300
-Subject: [RFT/PATCH 1/7] OMAP3+: PM: SR: add suspend/resume handlers
-Message-ID: <1318249579-4089-1-git-send-email-balbi@ti.com>
+Date: Mon, 10 Oct 2011 15:26:15 +0300
+Subject: [RFT/PATCH 3/7] arm: omap: smartreflex: use dev_get_drvdata()
+In-Reply-To: <1318249579-4089-1-git-send-email-balbi@ti.com>
+References: <1318249579-4089-1-git-send-email-balbi@ti.com>
+Message-ID: <1318249579-4089-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+When we need to fetch struct omap_sr on PM
+handlers, there's no need to access platform_data.
 
-SmartReflex should be disabled while entering low power mode due to
-the following reasons:
-a) SmartReflex values are not defined for retention voltage.
-b) With SmartReflex enabled, if the CPU enters low power state, FSM
-   will try to bump the voltage to current OPP's voltage for which
-   it has entered low power state, causing power loss and potential
-   unknown states for the SoC.
-Since we are sure to attempt entering the lowest possible power state
-during suspend operation, SmartReflex needs to be disabled for the
-voltage domains in suspend path before achieving auto retention voltage
-on the device.
+Instead, we can use dev_get_drvdata(dev) like
+other drivers do.
 
-Traditionally, this has been done with interrupts disabled as part of
-the common code which handles the idle sequence. Instead, by using the
-fact that we have to disable SmartReflex for sure during suspend
-operations, we can opportunistically disable SmartReflex in device
-standard pm ops, instead of disabling it as part of the code which
-executes with interrupts disabled and slave CPU{s} shutdown. This
-allows the system to do other parallel activities(such as suspending
-other devices in the system using slave CPU{s}) and save the time
-required to achieve suspend and resume from suspended state as a
-sequential activity.
-
-However, by being opportunistic as described above, we also increase
-the likelihood of SmartReflex library access functions being invoked in
-parallel contexts *after* SmartReflex driver's suspend handler (during
-suspend operation) or *before* resume handler (during resume operation)
-have been invoked (Example: DVFS for dependent devices, cpufreq for
-MPU etc.). We prevent this by using a flag to reject the callers in
-the duration where SmartReflex has been disabled.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/smartreflex.c |   96 ++++++++++++++++++++++++++++++++++--
- 1 files changed, 90 insertions(+), 6 deletions(-)
+ arch/arm/mach-omap2/smartreflex.c |   51 ++++++------------------------------
+ 1 files changed, 9 insertions(+), 42 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
-index 34c01a7..af158c0 100644
+index 55e297e..357363b 100644
 --- a/arch/arm/mach-omap2/smartreflex.c
 +++ b/arch/arm/mach-omap2/smartreflex.c
-@@ -23,6 +23,7 @@
- #include <linux/debugfs.h>
- #include <linux/delay.h>
- #include <linux/slab.h>
-+#include <linux/pm.h>
- #include <linux/pm_runtime.h>
+@@ -992,22 +992,9 @@ err_free_devinfo:
  
- #include <plat/common.h>
-@@ -39,6 +40,7 @@ struct omap_sr {
- 	int				ip_type;
- 	int				nvalue_count;
- 	bool				autocomp_active;
-+	bool				is_suspended;
- 	u32				clk_length;
- 	u32				err_weight;
- 	u32				err_minlimit;
-@@ -683,6 +685,11 @@ void omap_sr_enable(struct voltagedomain *voltdm)
- 	if (!sr->autocomp_active)
- 		return;
+ static int __devexit omap_sr_remove(struct platform_device *pdev)
+ {
+-	struct omap_sr_data *pdata = pdev->dev.platform_data;
+-	struct omap_sr *sr_info;
++	struct omap_sr *sr_info = platform_get_drvdata(pdev);
+ 	struct resource *mem;
  
-+	if (sr->is_suspended) {
-+		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
-+		return;
-+	}
-+
- 	if (!sr_class || !(sr_class->enable) || !(sr_class->configure)) {
- 		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
- 			"registered\n", __func__);
-@@ -716,6 +723,11 @@ void omap_sr_disable(struct voltagedomain *voltdm)
- 	if (!sr->autocomp_active)
- 		return;
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "%s: platform data missing\n", __func__);
+-		return -EINVAL;
+-	}
+-
+-	sr_info = _sr_lookup(pdata->voltdm);
+-	if (IS_ERR(sr_info)) {
+-		dev_warn(&pdev->dev, "%s: omap_sr struct not found\n",
+-			__func__);
+-		return -EINVAL;
+-	}
+-
+ 	if (sr_info->autocomp_active)
+ 		sr_stop_vddautocomp(sr_info);
+ 	if (sr_info->dbg_dir)
+@@ -1024,20 +1011,10 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
  
-+	if (sr->is_suspended) {
-+		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
-+		return;
-+	}
-+
- 	if (!sr_class || !(sr_class->disable)) {
- 		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
- 			"registered\n", __func__);
-@@ -749,6 +761,11 @@ void omap_sr_disable_reset_volt(struct voltagedomain *voltdm)
- 	if (!sr->autocomp_active)
- 		return;
+ static int omap_sr_suspend(struct device *dev)
+ {
+-	struct omap_sr_data *pdata;
+-	struct omap_sr *sr_info;
++	struct omap_sr *sr_info = dev_get_drvdata(dev);
  
-+	if (sr->is_suspended) {
-+		dev_dbg(&sr->pdev->dev, "%s: in suspended state\n", __func__);
-+		return;
-+	}
-+
- 	if (!sr_class || !(sr_class->disable)) {
- 		dev_warn(&sr->pdev->dev, "%s: smartreflex class driver not"
- 			"registered\n", __func__);
-@@ -807,14 +824,16 @@ static int omap_sr_autocomp_store(void *data, u64 val)
- 		return -EINVAL;
- 	}
+-	pdata = dev_get_platdata(dev);
+-	if (!pdata) {
+-		dev_err(dev, "%s: platform data missing\n", __func__);
+-		return -EINVAL;
+-	}
+-
+-	sr_info = _sr_lookup(pdata->voltdm);
+-	if (IS_ERR(sr_info)) {
+-		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
+-		return -EINVAL;
+-	}
++	if (!sr_info)
++		return 0;
  
--	/* control enable/disable only if there is a delta in value */
--	if (sr_info->autocomp_active != val) {
--		if (!val)
--			sr_stop_vddautocomp(sr_info);
--		else
--			sr_start_vddautocomp(sr_info);
-+	if (sr_info->is_suspended) {
-+		pr_warning("%s: in suspended state\n", __func__);
-+		return -EBUSY;
- 	}
+ 	if (!sr_info->autocomp_active)
+ 		return 0;
+@@ -1045,7 +1022,7 @@ static int omap_sr_suspend(struct device *dev)
+ 	if (sr_info->is_suspended)
+ 		return 0;
  
-+	if (!val)
-+		sr_stop_vddautocomp(sr_info);
-+	else
-+		sr_start_vddautocomp(sr_info);
-+
+-	omap_sr_disable_reset_volt(pdata->voltdm);
++	omap_sr_disable_reset_volt(sr_info->voltdm);
+ 	sr_info->is_suspended = true;
+ 	/* Flag the same info to the other CPUs */
+ 	smp_wmb();
+@@ -1055,20 +1032,10 @@ static int omap_sr_suspend(struct device *dev)
+ 
+ static int omap_sr_resume(struct device *dev)
+ {
+-	struct omap_sr_data *pdata;
+-	struct omap_sr *sr_info;
++	struct omap_sr *sr_info = dev_get_drvdata(dev);
+ 
+-	pdata = dev_get_platdata(dev);
+-	if (!pdata) {
+-		dev_err(dev, "%s: platform data missing\n", __func__);
+-		return -EINVAL;
+-	}
+-
+-	sr_info = _sr_lookup(pdata->voltdm);
+-	if (IS_ERR(sr_info)) {
+-		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
+-		return -EINVAL;
+-	}
++	if (!sr_info)
++		return 0;
+ 
+ 	if (!sr_info->autocomp_active)
+ 		return 0;
+@@ -1079,7 +1046,7 @@ static int omap_sr_resume(struct device *dev)
+ 	sr_info->is_suspended = false;
+ 	/* Flag the same info to the other CPUs */
+ 	smp_wmb();
+-	omap_sr_enable(pdata->voltdm);
++	omap_sr_enable(sr_info->voltdm);
+ 
  	return 0;
  }
- 
-@@ -1001,10 +1020,75 @@ static int __devexit omap_sr_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int omap_sr_suspend(struct device *dev)
-+{
-+	struct omap_sr_data *pdata;
-+	struct omap_sr *sr_info;
-+
-+	pdata = dev_get_platdata(dev);
-+	if (!pdata) {
-+		dev_err(dev, "%s: platform data missing\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	sr_info = _sr_lookup(pdata->voltdm);
-+	if (IS_ERR(sr_info)) {
-+		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	if (!sr_info->autocomp_active)
-+		return 0;
-+
-+	if (sr_info->is_suspended)
-+		return 0;
-+
-+	omap_sr_disable_reset_volt(pdata->voltdm);
-+	sr_info->is_suspended = true;
-+	/* Flag the same info to the other CPUs */
-+	smp_wmb();
-+
-+	return 0;
-+}
-+
-+static int omap_sr_resume(struct device *dev)
-+{
-+	struct omap_sr_data *pdata;
-+	struct omap_sr *sr_info;
-+
-+	pdata = dev_get_platdata(dev);
-+	if (!pdata) {
-+		dev_err(dev, "%s: platform data missing\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	sr_info = _sr_lookup(pdata->voltdm);
-+	if (IS_ERR(sr_info)) {
-+		dev_warn(dev, "%s: omap_sr struct not found\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	if (!sr_info->autocomp_active)
-+		return 0;
-+
-+	if (!sr_info->is_suspended)
-+		return 0;
-+
-+	sr_info->is_suspended = false;
-+	/* Flag the same info to the other CPUs */
-+	smp_wmb();
-+	omap_sr_enable(pdata->voltdm);
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(omap_sr_dev_pm_ops, omap_sr_suspend, omap_sr_resume);
-+
- static struct platform_driver smartreflex_driver = {
- 	.remove         = omap_sr_remove,
- 	.driver		= {
- 		.name	= "smartreflex",
-+		.pm	= &omap_sr_dev_pm_ops,
- 	},
- };
- 
 -- 
 1.7.6.396.ge0613
