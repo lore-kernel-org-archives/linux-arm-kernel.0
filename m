@@ -1,111 +1,157 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 10 Oct 2011 18:37:50 +0200
-Subject: [PATCH 2/4] dmaengine: at_hdmac: add device tree support
-In-Reply-To: <9723283e7097730f568bf7c2f3a93ae42c6bc5ca.1318264339.git.nicolas.ferre@atmel.com>
+Date: Mon, 10 Oct 2011 18:37:49 +0200
+Subject: [PATCH 1/4] dmaengine: at_hdmac: platform data move to use .id_table
+In-Reply-To: <1314075338.22120.3.camel@vkoul-udesk3>
 References: <1314075338.22120.3.camel@vkoul-udesk3>
-	<9723283e7097730f568bf7c2f3a93ae42c6bc5ca.1318264339.git.nicolas.ferre@atmel.com>
-Message-ID: <3780f07b118f8b6a31ed6a27a81312bfff7356f9.1318264339.git.nicolas.ferre@atmel.com>
+Message-ID: <9723283e7097730f568bf7c2f3a93ae42c6bc5ca.1318264339.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree probe support for atmel at_hdmac DMA driver.
-Bindings are added to specify DMA controller configuration.
+We remove platform data from DMA controller and move
+to the use of .id_table to distinguish between compatible
+types. The two implementations allow to determine the
+number of channels and the capabilities of the controller.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- .../devicetree/bindings/dma/atmel-dma.txt          |   14 +++++++++
- drivers/dma/at_hdmac.c                             |   30 +++++++++++++++++++-
- 2 files changed, 43 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/atmel-dma.txt
+ drivers/dma/at_hdmac.c      |   48 ++++++++++++++++++++++++++++++++++---------
+ drivers/dma/at_hdmac_regs.h |    8 +++++++
+ 2 files changed, 46 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-new file mode 100644
-index 0000000..3c046ee
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-@@ -0,0 +1,14 @@
-+* Atmel Direct Memory Access Controller (DMA)
-+
-+Required properties:
-+- compatible: Should be "atmel,<chip>-dma"
-+- reg: Should contain DMA registers location and length
-+- interrupts: Should contain DMA interrupt
-+
-+Examples:
-+
-+dma at ffffec00 {
-+	compatible = "atmel,at91sam9g45-dma";
-+	reg = <0xffffec00 0x200>;
-+	interrupts = <21>;
-+};
 diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index fef57bc..6d25b6a 100644
+index fcfa0a8..fef57bc 100644
 --- a/drivers/dma/at_hdmac.c
 +++ b/drivers/dma/at_hdmac.c
-@@ -23,6 +23,8 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include "at_hdmac_regs.h"
- 
-@@ -1175,6 +1177,20 @@ static void atc_free_chan_resources(struct dma_chan *chan)
+@@ -1175,6 +1175,18 @@ static void atc_free_chan_resources(struct dma_chan *chan)
  
  /*--  Module Management  -----------------------------------------------*/
  
-+#if defined(CONFIG_OF)
-+static const struct of_device_id atmel_dma_dt_ids[] = {
++static struct platform_device_id atdma_devtypes[] = {
 +	{
-+		.compatible = "atmel,at91sam9rl-dma",
-+		.data = (void *)ATDMA_DEVTYPE_SAM9RL
++		.name = "at91sam9rl_dma",
++		.driver_data = ATDMA_DEVTYPE_SAM9RL,
 +	}, {
-+		.compatible = "atmel,at91sam9g45-dma",
-+		.data = (void *)ATDMA_DEVTYPE_SAM9G45
-+	}, { /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, atmel_dma_dt_ids);
-+#endif
-+
- static struct platform_device_id atdma_devtypes[] = {
- 	{
- 		.name = "at91sam9rl_dma",
-@@ -1187,6 +1203,17 @@ static struct platform_device_id atdma_devtypes[] = {
- 	}
- };
- 
-+static inline enum atdma_devtype __init at_dma_get_driver_data(
-+					struct platform_device *pdev)
-+{
-+	if (pdev->dev.of_node) {
-+		const struct of_device_id *match;
-+		match = of_match_node(atmel_dma_dt_ids, pdev->dev.of_node);
-+		return (enum atdma_devtype)match->data;
++		.name = "at91sam9g45_dma",
++		.driver_data = ATDMA_DEVTYPE_SAM9G45,
++	}, {
++		/* sentinel */
 +	}
-+	return platform_get_device_id(pdev)->driver_data;
-+}
++};
 +
  /**
   * at_dma_off - disable DMA controller
   * @atdma: the Atmel HDAMC device
-@@ -1218,7 +1245,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
- 	dma_cap_set(DMA_MEMCPY, cap_mask);
+@@ -1193,18 +1205,32 @@ static void at_dma_off(struct at_dma *atdma)
  
- 	/* get DMA parameters from controller type */
--	atdmatype = platform_get_device_id(pdev)->driver_data;
-+	atdmatype = at_dma_get_driver_data(pdev);
+ static int __init at_dma_probe(struct platform_device *pdev)
+ {
+-	struct at_dma_platform_data *pdata;
+ 	struct resource		*io;
+ 	struct at_dma		*atdma;
+ 	size_t			size;
+ 	int			irq;
+ 	int			err;
+ 	int			i;
++	u32                     nr_channels;
++	dma_cap_mask_t          cap_mask = {};
++	enum atdma_devtype	atdmatype;
++
++	dma_cap_set(DMA_MEMCPY, cap_mask);
++
++	/* get DMA parameters from controller type */
++	atdmatype = platform_get_device_id(pdev)->driver_data;
  
- 	switch (atdmatype) {
- 	case ATDMA_DEVTYPE_SAM9RL:
-@@ -1526,6 +1553,7 @@ static struct platform_driver at_dma_driver = {
+-	/* get DMA Controller parameters from platform */
+-	pdata = pdev->dev.platform_data;
+-	if (!pdata || pdata->nr_channels > AT_DMA_MAX_NR_CHANNELS)
++	switch (atdmatype) {
++	case ATDMA_DEVTYPE_SAM9RL:
++		nr_channels = 2;
++		break;
++	case ATDMA_DEVTYPE_SAM9G45:
++		nr_channels = 8;
++		dma_cap_set(DMA_SLAVE, cap_mask);
++		break;
++	default:
+ 		return -EINVAL;
++	}
+ 
+ 	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!io)
+@@ -1215,14 +1241,15 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 		return irq;
+ 
+ 	size = sizeof(struct at_dma);
+-	size += pdata->nr_channels * sizeof(struct at_dma_chan);
++	size += nr_channels * sizeof(struct at_dma_chan);
+ 	atdma = kzalloc(size, GFP_KERNEL);
+ 	if (!atdma)
+ 		return -ENOMEM;
+ 
+-	/* discover transaction capabilites from the platform data */
+-	atdma->dma_common.cap_mask = pdata->cap_mask;
+-	atdma->all_chan_mask = (1 << pdata->nr_channels) - 1;
++	/* discover transaction capabilites */
++	atdma->dma_common.cap_mask = cap_mask;
++	atdma->all_chan_mask = (1 << nr_channels) - 1;
++	atdma->devtype = atdmatype;
+ 
+ 	size = resource_size(io);
+ 	if (!request_mem_region(io->start, size, pdev->dev.driver->name)) {
+@@ -1268,7 +1295,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 
+ 	/* initialize channels related values */
+ 	INIT_LIST_HEAD(&atdma->dma_common.channels);
+-	for (i = 0; i < pdata->nr_channels; i++) {
++	for (i = 0; i < nr_channels; i++) {
+ 		struct at_dma_chan	*atchan = &atdma->chan[i];
+ 
+ 		atchan->chan_common.device = &atdma->dma_common;
+@@ -1313,7 +1340,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "Atmel AHB DMA Controller ( %s%s), %d channels\n",
+ 	  dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask) ? "cpy " : "",
+ 	  dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask)  ? "slave " : "",
+-	  pdata->nr_channels);
++	  nr_channels);
+ 
+ 	dma_async_device_register(&atdma->dma_common);
+ 
+@@ -1495,6 +1522,7 @@ static const struct dev_pm_ops at_dma_dev_pm_ops = {
+ static struct platform_driver at_dma_driver = {
+ 	.remove		= __exit_p(at_dma_remove),
+ 	.shutdown	= at_dma_shutdown,
++	.id_table	= atdma_devtypes,
  	.driver = {
  		.name	= "at_hdmac",
  		.pm	= &at_dma_dev_pm_ops,
-+		.of_match_table	= of_match_ptr(atmel_dma_dt_ids),
- 	},
- };
+diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+index aa4c9ae..d7d6737 100644
+--- a/drivers/dma/at_hdmac_regs.h
++++ b/drivers/dma/at_hdmac_regs.h
+@@ -248,9 +248,16 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
  
+ /*--  Controller  ------------------------------------------------------*/
+ 
++enum atdma_devtype {
++	ATDMA_DEVTYPE_UNDEFINED = 0,
++	ATDMA_DEVTYPE_SAM9RL,	/* compatible with SAM9RL DMA controller */
++	ATDMA_DEVTYPE_SAM9G45,	/* compatible with SAM9G45 DMA controller */
++};
++
+ /**
+  * struct at_dma - internal representation of an Atmel HDMA Controller
+  * @chan_common: common dmaengine dma_device object members
++ * @atdma_devtype: identifier of DMA controller compatibility
+  * @ch_regs: memory mapped register base
+  * @clk: dma controller clock
+  * @save_imr: interrupt mask register that is saved on suspend/resume cycle
+@@ -260,6 +267,7 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
+  */
+ struct at_dma {
+ 	struct dma_device	dma_common;
++	enum atdma_devtype	devtype;
+ 	void __iomem		*regs;
+ 	struct clk		*clk;
+ 	u32			save_imr;
 -- 
 1.7.5.4
