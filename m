@@ -1,24 +1,45 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 10 Oct 2011 09:55:09 +0100
-Subject: Add support for the SPMP8000 SoC and Letcool board
-In-Reply-To: <1318178172-7965-1-git-send-email-zoss@devai.org>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-Message-ID: <20111010085509.GB2561@totoro>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Mon, 10 Oct 2011 10:27:08 +0100
+Subject: [PATCH 1/5 v4] ARM Realview PCIX map include file changes
+In-Reply-To: <20111007192224.GB25689@n2100.arm.linux.org.uk>
+References: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
+	<20111007142723.19554.88566.stgit@e102602-lin.cambridge.arm.com>
+	<20111007192224.GB25689@n2100.arm.linux.org.uk>
+Message-ID: <000001cc872e$d1aaf870$7500e950$@tuckley@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 09, 2011 at 06:36:03PM +0200, Zoltan Devai wrote:
-> Hi,
-> 
-> This series adds support for the Sunplus SPMP8000 SoC, an ARM926EJ-S based
-> MCU, which is most commonly found in handheld game consoles and digital cams.
-> Most of the work was done during GSoC 2011, with Greg KH as my mentor.
-> 
-> The board I'm using for development is the Letcool N350JP handheld.
-> 
-> The patches are based on Arnds for-next branch with Jamie Iles' vic-dt patches
-> on top.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Subject: Re: [PATCH 1/5 v4] ARM Realview PCIX map include file changes
 
-Excellent!  Can I take that as a Tested-by from you for that series?
+> > +#define IO_SPACE_LIMIT 0x0000ffff
+> 
+> Does this in asm/io.h:
+> 
+> #ifndef IO_SPACE_LIMIT
+> #if defined(CONFIG_PCMCIA_SOC_COMMON) ||
+> defined(CONFIG_PCMCIA_SOC_COMMON_MODULE)
+> #define IO_SPACE_LIMIT ((resource_size_t)0xffffffff)
+> #elif defined(CONFIG_PCI) || defined(CONFIG_ISA) ||
+> defined(CONFIG_PCCARD)
+> #define IO_SPACE_LIMIT ((resource_size_t)0xffff)
+> #else
+> #define IO_SPACE_LIMIT ((resource_size_t)0)
+> #endif
+> #endif
+> 
+> not work here for some reason?  I think as PCMCIA_SOC_COMMON would not
+> be
+> defined, but CONFIG_PCI would be, it'd give the correct answer.  Please
+> confirm.
 
-Jamie
+Ah, I wasn't aware of that. However when I include asm/io.h and remove the
+explicit definition of IO_SPACE_LIMIT I get compilation errors in
+arch/arm/kernel/bios32.c and arch/arm/mm/iomap.c for " 'IO_SPACE_LIMIT'
+undeclared.
+
+A quick check shows that the piece of code you quote above does not exist in
+my (3.1.0-rc9) source tree.
+
+Colin
