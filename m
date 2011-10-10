@@ -1,305 +1,44 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 10 Oct 2011 23:45:38 +0530
-Subject: [PATCH v6 10/10] ARM: S5PV210: Modify platform data for pl330 driver
-In-Reply-To: <1318270538-30450-10-git-send-email-thomas.abraham@linaro.org>
-References: <1318270538-30450-1-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-2-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-3-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-4-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-5-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-6-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-7-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-8-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-9-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-10-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1318270538-30450-11-git-send-email-thomas.abraham@linaro.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 10 Oct 2011 11:41:05 -0700
+Subject: [PATCH] ARM: omap2+: stub out omap*_volt_data
+In-Reply-To: <1397689.kebELtC4N3@wuerfel> (Arnd Bergmann's message of "Sat, 08
+	Oct 2011 17:23:24 +0200")
+References: <1397689.kebELtC4N3@wuerfel>
+Message-ID: <87ipnwhepq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the 'struct dma_pl330_peri' removed, the platfrom data for dma
-driver can be simplified to a simple list of peripheral request ids.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Cc: Jassi Brar <jassisinghbrar@gmail.com>
-Cc: Boojin Kim <boojin.kim@samsung.com>
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
- arch/arm/mach-s5pv210/dma.c |  241 ++++++++++++------------------------------
- 1 files changed, 69 insertions(+), 172 deletions(-)
+> When CONFIG_PM_OPP is not set, the definitions for these variables
+> are not available, so we should conditionally define them to
+> NULL.
+>
+> arch/arm/mach-omap2/built-in.o: In function `omap3xxx_voltagedomains_init':
+> voltagedomains3xxx_data.c:100: undefined reference to `omap36xx_vddmpu_volt_data'
+> voltagedomains3xxx_data.c:100: undefined reference to `omap34xx_vddmpu_volt_data'
+> voltagedomains3xxx_data.c:100: undefined reference to `omap36xx_vddcore_volt_data'
+> voltagedomains3xxx_data.c:100: undefined reference to `omap34xx_vddcore_volt_data'
+> arch/arm/mach-omap2/built-in.o: In function `omap44xx_voltagedomains_init':
+> voltagedomains44xx_data.c:111: undefined reference to `omap44xx_vdd_mpu_volt_data'
+> voltagedomains44xx_data.c:111: undefined reference to `omap44xx_vdd_iva_volt_data'
+> voltagedomains44xx_data.c:111: undefined reference to `omap44xx_vdd_core_volt_data'
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm/mach-s5pv210/dma.c b/arch/arm/mach-s5pv210/dma.c
-index 86b749c..a6113e0 100644
---- a/arch/arm/mach-s5pv210/dma.c
-+++ b/arch/arm/mach-s5pv210/dma.c
-@@ -35,90 +35,40 @@
- 
- static u64 dma_dmamask = DMA_BIT_MASK(32);
- 
--struct dma_pl330_peri pdma0_peri[28] = {
--	{
--		.peri_id = (u8)DMACH_UART0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART3_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART3_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = DMACH_MAX,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S0S_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_MAX,
--	}, {
--		.peri_id = (u8)DMACH_MAX,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_MAX,
--	}, {
--		.peri_id = (u8)DMACH_MAX,
--	}, {
--		.peri_id = (u8)DMACH_AC97_MICIN,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_AC97_PCMIN,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_AC97_PCMOUT,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_MAX,
--	}, {
--		.peri_id = (u8)DMACH_PWM,
--	}, {
--		.peri_id = (u8)DMACH_SPDIF,
--		.rqtype = MEMTODEV,
--	},
-+u8 pdma0_peri[] = {
-+	DMACH_UART0_RX,
-+	DMACH_UART0_TX,
-+	DMACH_UART1_RX,
-+	DMACH_UART1_TX,
-+	DMACH_UART2_RX,
-+	DMACH_UART2_TX,
-+	DMACH_UART3_RX,
-+	DMACH_UART3_TX,
-+	DMACH_MAX,
-+	DMACH_I2S0_RX,
-+	DMACH_I2S0_TX,
-+	DMACH_I2S0S_TX,
-+	DMACH_I2S1_RX,
-+	DMACH_I2S1_TX,
-+	DMACH_MAX,
-+	DMACH_MAX,
-+	DMACH_SPI0_RX,
-+	DMACH_SPI0_TX,
-+	DMACH_SPI1_RX,
-+	DMACH_SPI1_TX,
-+	DMACH_MAX,
-+	DMACH_MAX,
-+	DMACH_AC97_MICIN,
-+	DMACH_AC97_PCMIN,
-+	DMACH_AC97_PCMOUT,
-+	DMACH_MAX,
-+	DMACH_PWM,
-+	DMACH_SPDIF,
- };
- 
- struct dma_pl330_platdata s5pv210_pdma0_pdata = {
- 	.nr_valid_peri = ARRAY_SIZE(pdma0_peri),
--	.peri = pdma0_peri,
-+	.peri_id = pdma0_peri,
- };
- 
- struct amba_device s5pv210_device_pdma0 = {
-@@ -137,102 +87,44 @@ struct amba_device s5pv210_device_pdma0 = {
- 	.periphid = 0x00041330,
- };
- 
--struct dma_pl330_peri pdma1_peri[32] = {
--	{
--		.peri_id = (u8)DMACH_UART0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_UART3_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_UART3_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = DMACH_MAX,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S0S_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_I2S2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_I2S2_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_SPI1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_MAX,
--	}, {
--		.peri_id = (u8)DMACH_MAX,
--	}, {
--		.peri_id = (u8)DMACH_PCM0_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_PCM0_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_PCM1_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_PCM1_TX,
--		.rqtype = MEMTODEV,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ0,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ1,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ2,
--	}, {
--		.peri_id = (u8)DMACH_MSM_REQ3,
--	}, {
--		.peri_id = (u8)DMACH_PCM2_RX,
--		.rqtype = DEVTOMEM,
--	}, {
--		.peri_id = (u8)DMACH_PCM2_TX,
--		.rqtype = MEMTODEV,
--	},
-+u8 pdma1_peri[] = {
-+	DMACH_UART0_RX,
-+	DMACH_UART0_TX,
-+	DMACH_UART1_RX,
-+	DMACH_UART1_TX,
-+	DMACH_UART2_RX,
-+	DMACH_UART2_TX,
-+	DMACH_UART3_RX,
-+	DMACH_UART3_TX,
-+	DMACH_MAX,
-+	DMACH_I2S0_RX,
-+	DMACH_I2S0_TX,
-+	DMACH_I2S0S_TX,
-+	DMACH_I2S1_RX,
-+	DMACH_I2S1_TX,
-+	DMACH_I2S2_RX,
-+	DMACH_I2S2_TX,
-+	DMACH_SPI0_RX,
-+	DMACH_SPI0_TX,
-+	DMACH_SPI1_RX,
-+	DMACH_SPI1_TX,
-+	DMACH_MAX,
-+	DMACH_MAX,
-+	DMACH_PCM0_RX,
-+	DMACH_PCM0_TX,
-+	DMACH_PCM1_RX,
-+	DMACH_PCM1_TX,
-+	DMACH_MSM_REQ0,
-+	DMACH_MSM_REQ1,
-+	DMACH_MSM_REQ2,
-+	DMACH_MSM_REQ3,
-+	DMACH_PCM2_RX,
-+	DMACH_PCM2_TX,
- };
- 
- struct dma_pl330_platdata s5pv210_pdma1_pdata = {
- 	.nr_valid_peri = ARRAY_SIZE(pdma1_peri),
--	.peri = pdma1_peri,
-+	.peri_id = pdma1_peri,
- };
- 
- struct amba_device s5pv210_device_pdma1 = {
-@@ -253,7 +145,12 @@ struct amba_device s5pv210_device_pdma1 = {
- 
- static int __init s5pv210_dma_init(void)
- {
-+	dma_cap_set(DMA_SLAVE, s5pv210_pdma0_pdata.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, s5pv210_pdma0_pdata.cap_mask);
- 	amba_device_register(&s5pv210_device_pdma0, &iomem_resource);
-+
-+	dma_cap_set(DMA_SLAVE, s5pv210_pdma1_pdata.cap_mask);
-+	dma_cap_set(DMA_CYCLIC, s5pv210_pdma1_pdata.cap_mask);
- 	amba_device_register(&s5pv210_device_pdma1, &iomem_resource);
- 
- 	return 0;
--- 
-1.6.6.rc2
+Acked-by: Kevin Hilman <khilman@ti.com>
+
+> ---
+> I got this build error only now after pulling in the latest omap series, but
+> I cannot tell what caused it. It's also not clear to me if this is the correct
+> solution. Please ack or provide a better fix.
+
+This code was merged for v2.6.39, so not sure why this error is only
+showing up for you now.  I just tried a !CONFIG_PM_OPP build on v2.6.39
+and get the same errors, so it's been lingering.
+
+Maybe you haven't had a randconfig that disabled CONFIG_PM_OPP before?
+
+Anyways, the fix is fine with me.
+
+Kevin
