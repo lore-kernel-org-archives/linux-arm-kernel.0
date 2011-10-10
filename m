@@ -1,135 +1,195 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 10 Oct 2011 15:02:22 +0100
-Subject: [PATCH v5 10/10] ARM: smp: Make SoC descriptor mandatory for SMP
-	platforms
+Date: Mon, 10 Oct 2011 15:02:16 +0100
+Subject: [PATCH v5 04/10] ARM: SoC: convert OMAP4 to SoC descriptor
 In-Reply-To: <1318255342-17451-1-git-send-email-marc.zyngier@arm.com>
 References: <1318255342-17451-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1318255342-17451-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1318255342-17451-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all SMP platforms have been converted to the SOC descriptor
-and its SMP operations, remove the "weak" attribute from the hooks
-in smp.c, and make the functions static wherever possible.
+Convert OMAP4 to use the SoC descriptor to provide its SMP
+and CPU hotplug operations.
 
+Tested on both Panda and IGEPv2 (MULTI_OMAP kernel)
+
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/smp.h |   15 ---------------
- arch/arm/kernel/smp.c      |   18 +++++++++---------
- 2 files changed, 9 insertions(+), 24 deletions(-)
+ arch/arm/mach-omap2/board-4430sdp.c             |    1 +
+ arch/arm/mach-omap2/board-omap4panda.c          |    1 +
+ arch/arm/mach-omap2/include/mach/omap4-common.h |   14 +++++++++++++
+ arch/arm/mach-omap2/omap-hotplug.c              |    6 ++--
+ arch/arm/mach-omap2/omap-smp.c                  |   24 +++++++++++++++++++---
+ arch/arm/mach-omap2/omap4-common.c              |    7 ++++++
+ 6 files changed, 46 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 674ebcd..bf25484 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -56,16 +56,6 @@ extern int boot_secondary(unsigned int cpu, struct task_struct *);
- asmlinkage void secondary_start_kernel(void);
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 4d0c8b9..c404c5b 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -986,6 +986,7 @@ static void __init omap_4430sdp_map_io(void)
+ MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
+ 	/* Maintainer: Santosh Shilimkar - Texas Instruments Inc */
+ 	.atag_offset	= 0x100,
++	.soc		= &omap4_soc_desc,
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap_4430sdp_map_io,
+ 	.init_early	= omap4430_init_early,
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 201c0c2..42d6168 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -579,6 +579,7 @@ static void __init omap4_panda_map_io(void)
+ MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
+ 	/* Maintainer: David Anders - Texas Instruments Inc */
+ 	.atag_offset	= 0x100,
++	.soc		= &omap4_soc_desc,
+ 	.reserve	= omap_reserve,
+ 	.map_io		= omap4_panda_map_io,
+ 	.init_early	= omap4430_init_early,
+diff --git a/arch/arm/mach-omap2/include/mach/omap4-common.h b/arch/arm/mach-omap2/include/mach/omap4-common.h
+index e4bd876..1db7941 100644
+--- a/arch/arm/mach-omap2/include/mach/omap4-common.h
++++ b/arch/arm/mach-omap2/include/mach/omap4-common.h
+@@ -39,5 +39,19 @@ extern void omap_secondary_startup(void);
+ extern u32 omap_modify_auxcoreboot0(u32 set_mask, u32 clear_mask);
+ extern void omap_auxcoreboot_addr(u32 cpu_addr);
+ extern u32 omap_read_auxcoreboot0(void);
++
++extern int  omap4_cpu_kill(unsigned int cpu);
++extern void omap4_cpu_die(unsigned int cpu);
++extern int  omap4_cpu_disable(unsigned int cpu);
++
++struct arm_soc_smp_init_ops;
++struct arm_soc_smp_ops;
++
++extern struct arm_soc_smp_init_ops	omap4_soc_smp_init_ops;
++extern struct arm_soc_smp_ops		omap4_soc_smp_ops;
+ #endif
++
++struct arm_soc_desc;
++extern struct arm_soc_desc		omap4_soc_desc;
++
+ #endif
+diff --git a/arch/arm/mach-omap2/omap-hotplug.c b/arch/arm/mach-omap2/omap-hotplug.c
+index 4976b93..40982c6 100644
+--- a/arch/arm/mach-omap2/omap-hotplug.c
++++ b/arch/arm/mach-omap2/omap-hotplug.c
+@@ -21,7 +21,7 @@
+ #include <asm/cacheflush.h>
+ #include <mach/omap4-common.h>
  
- /*
-- * Perform platform specific initialisation of the specified CPU.
-- */
--extern void platform_secondary_init(unsigned int cpu);
--
--/*
-- * Initialize cpu_possible map, and enable coherency
-- */
--extern void platform_smp_prepare_cpus(unsigned int);
--
--/*
-  * Logical CPU mapping.
+-int platform_cpu_kill(unsigned int cpu)
++int omap4_cpu_kill(unsigned int cpu)
+ {
+ 	return 1;
+ }
+@@ -30,7 +30,7 @@ int platform_cpu_kill(unsigned int cpu)
+  * platform-specific code to shutdown a CPU
+  * Called with IRQs disabled
   */
- extern int __cpu_logical_map[NR_CPUS];
-@@ -82,15 +72,10 @@ struct secondary_data {
- extern struct secondary_data secondary_data;
- 
- extern int __cpu_disable(void);
--extern int platform_cpu_disable(unsigned int cpu);
- 
- extern void __cpu_die(unsigned int cpu);
- extern void cpu_die(void);
- 
--extern void platform_cpu_die(unsigned int cpu);
--extern int platform_cpu_kill(unsigned int cpu);
--extern void platform_cpu_enable(unsigned int cpu);
--
- extern void arch_send_call_function_single_ipi(int cpu);
- extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index f7a9add..c256dd9 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -179,25 +179,25 @@ void __init soc_smp_ops_register(struct arm_soc_smp_init_ops *smp_init_ops,
+-void platform_cpu_die(unsigned int cpu)
++void omap4_cpu_die(unsigned int cpu)
+ {
+ 	flush_cache_all();
+ 	dsb();
+@@ -57,7 +57,7 @@ void platform_cpu_die(unsigned int cpu)
  	}
  }
  
--void __attribute__((weak)) __init smp_init_cpus(void)
-+void __init smp_init_cpus(void)
+-int platform_cpu_disable(unsigned int cpu)
++int omap4_cpu_disable(unsigned int cpu)
  {
- 	if (soc_smp_init_ops && soc_smp_init_ops->smp_init_cpus)
- 		soc_smp_init_ops->smp_init_cpus();
+ 	/*
+ 	 * we don't allow CPU 0 to be shutdown (it is still too special
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+index ce65e93..061ed7f 100644
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -23,6 +23,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/smp_scu.h>
++#include <asm/soc.h>
+ #include <mach/hardware.h>
+ #include <mach/omap4-common.h>
+ 
+@@ -31,7 +32,7 @@ static void __iomem *scu_base;
+ 
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+-void __cpuinit platform_secondary_init(unsigned int cpu)
++static void __cpuinit omap4_secondary_init(unsigned int cpu)
+ {
+ 	/*
+ 	 * If any interrupts are already enabled for the primary
+@@ -47,7 +48,7 @@ void __cpuinit platform_secondary_init(unsigned int cpu)
+ 	spin_unlock(&boot_lock);
  }
  
--void __attribute__((weak)) __init platform_smp_prepare_cpus(unsigned int max_cpus)
-+static void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+-int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
++static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
- 	if (soc_smp_ops && soc_smp_init_ops->smp_prepare_cpus)
- 		soc_smp_init_ops->smp_prepare_cpus(max_cpus);
- }
- 
--void __attribute__((weak)) __cpuinit platform_secondary_init(unsigned int cpu)
-+static void __cpuinit platform_secondary_init(unsigned int cpu)
- {
- 	if (soc_smp_ops && soc_smp_ops->smp_secondary_init)
- 		soc_smp_ops->smp_secondary_init(cpu);
- }
- 
--int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-+int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	if (soc_smp_ops && soc_smp_ops->smp_boot_secondary)
- 		return soc_smp_ops->smp_boot_secondary(cpu, idle);
-@@ -207,20 +207,20 @@ int __attribute__((weak)) __cpuinit boot_secondary(unsigned int cpu, struct task
- #ifdef CONFIG_HOTPLUG_CPU
- static void percpu_timer_stop(void);
- 
--int __attribute__((weak)) __cpuinit platform_cpu_kill(unsigned int cpu)
-+static int __cpuinit platform_cpu_kill(unsigned int cpu)
- {
- 	if (soc_smp_ops && soc_smp_ops->cpu_kill)
- 		return soc_smp_ops->cpu_kill(cpu);
- 	return 0;
- }
- 
--void __attribute__((weak)) __cpuinit platform_cpu_die(unsigned int cpu)
-+static void __cpuinit platform_cpu_die(unsigned int cpu)
- {
- 	if (soc_smp_ops && soc_smp_ops->cpu_die)
- 		soc_smp_ops->cpu_die(cpu);
- }
- 
--int __attribute__((weak)) __cpuinit platform_cpu_disable(unsigned int cpu)
-+static int __cpuinit platform_cpu_disable(unsigned int cpu)
- {
- 	if (soc_smp_ops && soc_smp_ops->cpu_disable)
- 		return soc_smp_ops->cpu_disable(cpu);
-@@ -230,7 +230,7 @@ int __attribute__((weak)) __cpuinit platform_cpu_disable(unsigned int cpu)
- /*
-  * __cpu_disable runs on the processor to be shutdown.
+ 	/*
+ 	 * Set synchronisation state between this boot processor
+@@ -98,7 +99,7 @@ static void __init wakeup_secondary(void)
+  * Initialise the CPU possible map early - this describes the CPUs
+  * which may be present or become present in the system.
   */
--int __cpu_disable(void)
-+int __cpuinit __cpu_disable(void)
+-void __init smp_init_cpus(void)
++static void __init omap4_smp_init_cpus(void)
  {
- 	unsigned int cpu = smp_processor_id();
- 	struct task_struct *p;
-@@ -279,7 +279,7 @@ static DECLARE_COMPLETION(cpu_died);
-  * called on the thread which is asking for a CPU to be shutdown -
-  * waits until shutdown has completed, or it is timed out.
-  */
--void __cpu_die(unsigned int cpu)
-+void __cpuinit __cpu_die(unsigned int cpu)
+ 	unsigned int i, ncores;
+ 
+@@ -123,7 +124,7 @@ void __init smp_init_cpus(void)
+ 	set_smp_cross_call(gic_raise_softirq);
+ }
+ 
+-void __init platform_smp_prepare_cpus(unsigned int max_cpus)
++static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
  {
- 	if (!wait_for_completion_timeout(&cpu_died, msecs_to_jiffies(5000))) {
- 		pr_err("CPU%u: cpu didn't die\n", cpu);
+ 
+ 	/*
+@@ -133,3 +134,18 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+ 	scu_enable(scu_base);
+ 	wakeup_secondary();
+ }
++
++struct arm_soc_smp_init_ops omap4_soc_smp_init_ops __initdata = {
++	.smp_init_cpus		= omap4_smp_init_cpus,
++	.smp_prepare_cpus	= omap4_smp_prepare_cpus,
++};
++
++struct arm_soc_smp_ops omap4_soc_smp_ops __initdata = {
++	.smp_secondary_init	= omap4_secondary_init,
++	.smp_boot_secondary	= omap4_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_kill		= omap4_cpu_kill,
++	.cpu_die		= omap4_cpu_die,
++	.cpu_disable		= omap4_cpu_disable,
++#endif
++};
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 35ac3e5..de39fd4 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -16,6 +16,7 @@
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ 
++#include <asm/soc.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+ 
+@@ -111,3 +112,9 @@ static int __init omap_l2_cache_init(void)
+ }
+ early_initcall(omap_l2_cache_init);
+ #endif
++
++struct arm_soc_desc omap4_soc_desc __initdata = {
++	.name		= "TI OMAP4",
++	soc_smp_init_ops(omap4_soc_smp_init_ops)
++	soc_smp_ops(omap4_soc_smp_ops)
++};
 -- 
 1.7.0.4
