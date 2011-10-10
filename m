@@ -1,41 +1,29 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Oct 2011 14:32:46 +0100
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <201110101320.24457.arnd@arndb.de>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<201110072251.40028.arnd@arndb.de>
-	<20111010103635.GA2451@mudshark.cambridge.arm.com>
-	<201110101320.24457.arnd@arndb.de>
-Message-ID: <20111010133246.GG2451@mudshark.cambridge.arm.com>
+Date: Mon, 10 Oct 2011 14:34:55 +0100
+Subject: [PATCH 2/3] ARM: plat-samsung: use Kconfig choice for debug UART
+	selection
+In-Reply-To: <CAJuYYwQiXSSOQ_FvOn41NSUJ6F4axNbYgV-LfOxhhLvbUz-bMQ@mail.gmail.com>
+References: <1313530873-24961-1-git-send-email-will.deacon@arm.com>
+	<1313530873-24961-2-git-send-email-will.deacon@arm.com>
+	<CAJuYYwRPwALAQcvsMPuz8XYsDicCmB52HzZehppUnKqv5itPEQ@mail.gmail.com>
+	<20111010122319.GE2451@mudshark.cambridge.arm.com>
+	<CAJuYYwQiXSSOQ_FvOn41NSUJ6F4axNbYgV-LfOxhhLvbUz-bMQ@mail.gmail.com>
+Message-ID: <20111010133455.GH2451@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 12:20:24PM +0100, Arnd Bergmann wrote:
-> On Monday 10 October 2011, Will Deacon wrote:
-> > Do you have any other ideas?
+On Mon, Oct 10, 2011 at 01:35:54PM +0100, Thomas Abraham wrote:
+> There are no difficulties with the original patch. But that was not
+> how Samsung boards have been selecting the low level debug uart port
+> number. The proposed patch tried to maintain the old style.
 > 
-> I think the best solution would be to ask Russell to put all the dependencies
-> into a non-rebasing branch and publish that, or to alternatively merge your
-> patches through his tree instead, with my Ack.
+> Another point is that Samsung's Exynos4 (and few other SoC's) has a
+> fourth UART port as well. Not that it is used as a debug port
+> currently, but there is no technical limitation in using that as a
+> console port. So that might need 'DEBUG_S3C_UART3' as well.
 
-I don't think asking Russell to maintain a stable branch for each series
-scales very well if multiple people are doing cross-platform work at the
-same time. If he's happy merging platform code via his tree, then I'd prefer
-to go down that route. In this case, it might make sense to try and catch
-conflicts between his tree and arm-soc before they hit Linus (I guess -next
-will take care of this?).
-
-> Both of these will also have to wait for a few more days until Russell
-> is back online.
-
-Ok, I wasn't aware that we was away.
-
-> Can you check if the devel-stable branch in his tree already contains the
-> dependencies?
-
-I just had a quick look and I can't seem them outside of the unstable for-next
-branch.
-
-Cheers,
+Tell you what then: let's stick with the original patch for now and then you
+can refactor the Samsung bit in the future if/when you add support for the
+fourth UART. Does that sound OK?
 
 Will
