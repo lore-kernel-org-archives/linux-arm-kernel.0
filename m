@@ -1,49 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Oct 2011 13:20:24 +0200
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <20111010103635.GA2451@mudshark.cambridge.arm.com>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<201110072251.40028.arnd@arndb.de>
-	<20111010103635.GA2451@mudshark.cambridge.arm.com>
-Message-ID: <201110101320.24457.arnd@arndb.de>
+From: linux_arm@lakedaemon.net (Jason)
+Date: Mon, 10 Oct 2011 07:23:22 -0400
+Subject: orion/kirkwood and device tree support
+In-Reply-To: <201110091545.55645.michael@walle.cc>
+References: <201110091545.55645.michael@walle.cc>
+Message-ID: <20111010112322.GJ31288@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 October 2011, Will Deacon wrote:
-> > I can certainly fix up the conflicts, but my feeling is that there is
-> > something wrong on your side and one of the two branches contains
-> > stuff from a stale version of Russell's tree.
-> 
-> It looks like both of the branches [cpu-mapping and debug-ll] may be out of
-> date now. I agree that fixing up the conflicts isn't the way to go here, but
-> I'm unsure what to use as my base. I depend on patches that aren't in
-> Russell's devel-stable branch but are in his for-next branch.
-> 
-> The only things I can think of are either:
-> 
->  - Wait until everything has settled down, then rebase onto Russell's
->    for-linus branch. This has the disadvantage that conflicts and build
->    breakages won't be detected until very late.
-> 
->  - Wait until the dependencies are in mainline, then rebase against that.
->    Disadvantage is that it then takes twice as long to get code upstream.
-> 
->  - Send another pull request against an unstable branch and hope it doesn't
->    change. Disadvantage being that we have to keep repeating pull requests
->    against a moving target.
-> 
-> I'm not especially fond of any of those though...
-> 
-> Do you have any other ideas?
+Resend, messed up my email alias.  I'm a dork.  :-(  Apologies.
 
-I think the best solution would be to ask Russell to put all the dependencies
-into a non-rebasing branch and publish that, or to alternatively merge your
-patches through his tree instead, with my Ack.
+Michael,
 
-Both of these will also have to wait for a few more days until Russell
-is back online.
+On Sun, Oct 09, 2011 at 03:45:55PM +0200, Michael Walle wrote:
+> I submitted a patch to support the Buffalo LS-XHL three months ago, which was 
+> rejected because no more old fashioned board setup patches will be merged. 
 
-Can you check if the devel-stable branch in his tree already contains the
-dependencies?
+We have the same situation with the dreamplug (kirkwood based).
 
-	Arnd
+> Are there any plans or even ongoing developments to convert these platforms to 
+> support device trees?
+
+I'm attempting to, but that requires my learning devicetree.  Which is
+fine in and of itself, but it also means I'm learning how Linux supports
+arm SoCs.  Which is taking some time.  My current thought process is this:
+
+1.) add arch/arm/mach-kirkwood/board-dt.c, arch/arm/boot/dts/kirkwood.dtsi,
+    and arch/arm/boot/dts/kirkwood-dreamplug.dts
+2.) fill it in with replacements of calls in common.c and irq.c
+3.) get it working cleanly.
+4.) add in calls from mpp.c, pcie.c, and cpuidle.c
+5.) build arch/arm/boot/dts/kirkwood-*.dts for other boards.
+
+I'd be happy to coordinate and test, although I have no buffalo gear.
+And I sure would appreciate some help. ;-)
+
+thx,
+
+Jason.
