@@ -1,33 +1,23 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Mon, 10 Oct 2011 09:37:08 +0200
-Subject: [PATCH] ARM: OMAP: omap_device: Add omap_device_{alloc, delete,
-	register}_ss
-In-Reply-To: <1317833693-21105-1-git-send-email-ohad@wizery.com>
-References: <1317833693-21105-1-git-send-email-ohad@wizery.com>
-Message-ID: <CAK=WgbbqG4qFAafJ49jdYwf19whxBGhtywTWVTnsejZ0F_ekog@mail.gmail.com>
+Date: Mon, 10 Oct 2011 09:40:11 +0200
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
+References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
+	<1316195506-9777-2-git-send-email-ohad@wizery.com>
+	<20110927100505.GH2138@amd.com>
+	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
+	<20110927131222.GL2138@amd.com>
+	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
+	<20110927181438.GM2138@amd.com>
+	<CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
+Message-ID: <CAK=WgbZmmPo=n=LMdTnXrb93GHkGLrJTHYqoCvN8_pUgEyo8_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Sun, Oct 2, 2011 at 5:58 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Ok, fair enough. I've revised the patches and attached the main one
+> below; please tell me if it looks ok, and then I'll resubmit the
+> entire patch set.
 
-On Wed, Oct 5, 2011 at 6:54 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> Split omap_device_build_ss() into two smaller functions:
-...
-> This patch is considered an interim solution until DT fully materializes
-> for omap; at that point, this functionality will be removed.
-
-Good news: we might not need this after all.
-
-I need the remoteproc devices to exists at ->reserve() time, so I can
-assign them a private CMA pool, which means I can't wait for
-omap_device_build_ss() and must create the devices beforehand.
-
-... which makes Benoit's alloc/delete methods perfect for me.
-
-So please hold this one off for now. I'd just need a s/static// patch
-that will allow me to use Benoit's methods outside of omap_device.c,
-but I'll wait for things to settle down a bit before sending it, to
-minimize this kind of churn.
-
-Thanks and sorry for the noise,
-Ohad.
+Ping ?
