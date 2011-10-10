@@ -1,54 +1,82 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Mon, 10 Oct 2011 11:10:19 +0530
-Subject: [PATCH 0/2] ARM: OMAP2+: timer fixes / cleanup
-In-Reply-To: <4E8B7C6A.2050207@ti.com>
-References: <1317763241-21422-1-git-send-email-b-cousson@ti.com>
-	<4E8B7C6A.2050207@ti.com>
-Message-ID: <CAC83Zv+r0emW7rREkPhjPyn_jBCbNLXKCNTY0=vMNxCTzzp=Xg@mail.gmail.com>
+From: Barry.Song@csr.com (Barry Song)
+Date: Sun, 9 Oct 2011 22:44:12 -0700
+Subject: [PATCH] PM: HIBERNATION: add resume_delay kernel param as well as
+	resume_delay
+Message-ID: <1318225452-10397-1-git-send-email-Barry.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 5, 2011 at 3:06 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
-> Hi Tarun,
->
-> On 10/4/2011 11:20 PM, Cousson, Benoit wrote:
->>
->> Hi Tony,
->>
->> Here is the series to fix the warning and remove the redundant
->> latency structure that be removed since the timer runtime PM
->> adaptation was just pulled.
->>
->> I was just able to test that on OMAP4.
->
-> It will be nice if you can test that on the other platforms.
-> In theory, if they are properly using hwmod that should work fine.
-Yes, I will test in other platforms.
---
-Tarun
->
-> Thanks,
-> Benoit
->
->>
->> Patches are based on Kevin's for_3.2/omap_device-2 branch
->> and are available here:
->> git://gitorious.org/omap-pm/linux.git for_3.2/timer_fixes
->>
->> Regards,
->> Benoit
->>
->>
->> Benoit Cousson (2):
->> ? ARM: OMAP2+: clock data: Remove redundant timer clkdev
->> ? ARM: OMAP2+: timer: Remove omap_device_pm_latency
->>
->> ?arch/arm/mach-omap2/clock2420_data.c | ? 12 ------------
->> ?arch/arm/mach-omap2/clock2430_data.c | ? 12 ------------
->> ?arch/arm/mach-omap2/clock3xxx_data.c | ? 12 ------------
->> ?arch/arm/mach-omap2/clock44xx_data.c | ? 11 -----------
->> ?arch/arm/mach-omap2/timer.c ? ? ? ? ?| ? 12 +-----------
->> ?5 files changed, 1 insertions(+), 58 deletions(-)
->>
->
->
+From: Barry Song <baohua.song@csr.com>
+
+patch "PM: HIBERNATION: add resume_wait param to support MMC-like devices
+as resume file" add resume_wait param. this patch adds resume_delay so that
+resume_wait/delay has the same model with root_wait/delay.
+
+Signed-off-by: Barry Song <baohua.song@csr.com>
+---
+ Documentation/kernel-parameters.txt |    3 +++
+ kernel/power/hibernate.c            |   14 ++++++++++++++
+ 2 files changed, 17 insertions(+), 0 deletions(-)
+
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 88a7b19..831bde2 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -2240,6 +2240,9 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			in <PAGE_SIZE> units (needed only for swap files).
+ 			See  Documentation/power/swsusp-and-swap-files.txt
+ 
++	resumedelay=	[HIBERNATION] Delay (in seconds) to pause before attempting to
++			read the resume files
++
+ 	resumewait	[HIBERNATION] Wait (indefinitely) for resume device to show up.
+ 			Useful for devices that are detected asynchronously
+ 			(e.g. USB and MMC devices).
+diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+index b3da53c..f73a00e 100644
+--- a/kernel/power/hibernate.c
++++ b/kernel/power/hibernate.c
+@@ -33,6 +33,7 @@
+ static int nocompress = 0;
+ static int noresume = 0;
+ static int resume_wait = 0;
++static int resume_delay = 0;
+ static char resume_file[256] = CONFIG_PM_STD_PARTITION;
+ dev_t swsusp_resume_device;
+ sector_t swsusp_resume_block;
+@@ -726,6 +727,12 @@ static int software_resume(void)
+ 
+ 	pr_debug("PM: Checking hibernation image partition %s\n", resume_file);
+ 
++	if (resume_delay) {
++		printk(KERN_INFO "Waiting %dsec before reading resume device...\n",
++			resume_delay);
++		ssleep(resume_delay);
++	}
++
+ 	/* Check if the device is there */
+ 	swsusp_resume_device = name_to_dev_t(resume_file);
+ 	if (!swsusp_resume_device) {
+@@ -1075,8 +1082,15 @@ static int __init resumewait_setup(char *str)
+ 	return 1;
+ }
+ 
++static int __init resumedelay_setup(char *str)
++{
++	resume_delay = simple_strtoul(str, NULL, 0);
++	return 1;
++}
++
+ __setup("noresume", noresume_setup);
+ __setup("resume_offset=", resume_offset_setup);
+ __setup("resume=", resume_setup);
+ __setup("hibernate=", hibernate_setup);
+ __setup("resumewait", resumewait_setup);
++__setup("resumedelay=", resumedelay_setup);
+-- 
+1.7.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
