@@ -1,104 +1,132 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 10 Oct 2011 23:45:28 +0530
-Subject: [PATCH v6 00/10] Add device tree support for PL330 dma controller
-	driver
-Message-ID: <1318270538-30450-1-git-send-email-thomas.abraham@linaro.org>
+Date: Mon, 10 Oct 2011 23:45:34 +0530
+Subject: [PATCH v6 06/10] ARM: EXYNOS4: Limit usage of pl330 device instance to
+	non-dt build
+In-Reply-To: <1318270538-30450-6-git-send-email-thomas.abraham@linaro.org>
+References: <1318270538-30450-1-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-2-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-3-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-4-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-5-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-6-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1318270538-30450-7-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v5:
-- Added alias clocks for pdma clocks on Exynos4.
-- Modified platform data for s5p64x0, s5pc100 and s5pv210.
-- Rebased on the tip of for-next branch of linux-samsung kernel and tested.
+The pl330 device instances and associated platform data is required only
+for non-device-tree builds. With device tree enabled, the data about the
+platform is obtained from the device tree. For images that include both
+dt and non-dt platforms, an addditional check is added to ensure that
+static amba device registrations is applicable to only non-dt platforms.
 
-Changes since v4:
-- Rebased with Samsung maintainer's for-next branch which is at linux-3.1-rc7
-  - Modified Patch 6/6 to apply cleanly.
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
+---
+ arch/arm/mach-exynos4/Kconfig  |   10 ++++++++++
+ arch/arm/mach-exynos4/Makefile |    3 ++-
+ arch/arm/mach-exynos4/dma.c    |    4 ++++
+ 3 files changed, 16 insertions(+), 1 deletions(-)
 
-Changes since v3:
-- In Patch 4/6, a recommendation is added in the pl330 binding documentation
-  for the name of the property which specifies the dma channel in the client
-  device node.
-- In Patch 6/6, dropped #ifdef around of_have_populated_dt.
-
-Changes since v2:
-- Only the sixth patch is changed, to make dma platform data conditionally
-  selectable.
-- Tested with v8 version of pl330 dma driver update patches from Boojin Kim.
-
-Changes since v1:
-- Removed "arm,pl330-pdma" and "arm,pl330-mdma" compatible values.
-- Removed "arm,primecell-periphid" and "arm,pl330-peri-reqs"
-  property requirements.
-
-This patchset adds device tree support for PL330 driver and uses it to add
-device tree support for Samsung platforms, specifically Exynos4.
-
-Patch 1 moves the pl330_filter function from Samsung specific wrappers to pl330
-dma driver and also adds a check to ensure that the filter function proceeds
-only if it the dma channel being investigated belongs to pl330 dma controller
-instance.
-
-Patch 2 adds support to infer the direction of the dma transfer using the
-direction specified with the transfer request instead of including this
-information in the platform data. This simlifies the addition of device tree
-support. Patch 3 simplifies the platform data for Exynos4 pl330 dma controllers.
-
-Patch 4 adds device tree support for pl330 dma controller driver. A dma channel
-is represented using a phandle of the dma controller node and the channel id
-within that controller. Client driver request a dma channel using the phandle
-and channel id pair. Correspondingly, the pl330 filter function has been
-modified to lookup a channel based on this value.
-
-Patch 5 adds device tree support for Samsung's DMA engine wrappers. Client
-drivers retrive the channel property from their device node and pass it to the
-wrappers. The wrapper functions use the property value as the filter function
-parameter. Patch 6 restricts the usage of pl330 device and platform data
-instances to non-dt platforms.
-
-Patch 7 adds clock alias for both the pdma clocks. When pdma controllers are
-instantiated from device tree, the amba device registration process enables
-clock to the controllers to read the peripheral id of the PDMA amba device. In
-case of Exynos4, the clocks to the PDMA controllers are named as 'dma' but
-amba_device_register() looks up the clock using the name 'apb_pclk'. Hence,
-alias clocks with name 'apb_pclk' clock are created for clocks with name 'dma'.
-
-Patch 8 to 10 simplifies the pdma platform data for s5p64x0, s5pc100 and
-s5pv210.
-
-This patchset is based on the following tree:
-https://github.com/kgene/linux-samsung.git   branch: for-next
-
-and tested tested for both device-tree and non-device-tree kernel on smdkv310.
-
-This patchset has dependency on the following patchset.
-[PATCH V2 0/2] Add a common macro for creating struct clk_lookup entries.
-
-
-Thomas Abraham (10):
-  DMA: PL330: move filter function into driver
-  DMA: PL330: Infer transfer direction from transfer request instead of platform data
-  ARM: EXYNOS4: Modify platform data for pl330 driver
-  DMA: PL330: Add device tree support
-  ARM: SAMSUNG: Add device tree support for pl330 dma engine wrappers
-  ARM: EXYNOS4: Limit usage of pl330 device instance to non-dt build
-  ARM: Exynos4: Add a alias for pdma clocks
-  ARM: S5P64x0: Modify platform data for pl330 driver
-  ARM: S5PC100: Modify platform data for pl330 driver
-  ARM: S5PV210: Modify platform data for pl330 driver
-
- .../devicetree/bindings/dma/arm-pl330.txt          |   30 +++
- arch/arm/mach-exynos4/Kconfig                      |   10 +
- arch/arm/mach-exynos4/Makefile                     |    3 +-
- arch/arm/mach-exynos4/clock.c                      |   35 ++-
- arch/arm/mach-exynos4/dma.c                        |  227 ++++++-------------
- arch/arm/mach-s5p64x0/dma.c                        |  227 +++++-------------
- arch/arm/mach-s5pc100/dma.c                        |  247 ++++++--------------
- arch/arm/mach-s5pv210/dma.c                        |  241 ++++++--------------
- arch/arm/plat-samsung/dma-ops.c                    |   15 +-
- arch/arm/plat-samsung/include/plat/dma-ops.h       |    1 +
- arch/arm/plat-samsung/include/plat/dma-pl330.h     |    3 +-
- drivers/dma/pl330.c                                |   99 +++++----
- include/linux/amba/pl330.h                         |   15 +-
- 13 files changed, 405 insertions(+), 748 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/arm-pl330.txt
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index dd660eb..0c5888a 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -35,6 +35,11 @@ config EXYNOS4_MCT
+ 	help
+ 	  Use MCT (Multi Core Timer) as kernel timers
+ 
++config EXYNOS4_DEV_DMA
++	bool
++	help
++	  Compile in amba device definitions for DMA controller
++
+ config EXYNOS4_DEV_AHCI
+ 	bool
+ 	help
+@@ -158,6 +163,7 @@ config MACH_SMDKV310
+ 	select EXYNOS4_DEV_PD
+ 	select SAMSUNG_DEV_PWM
+ 	select EXYNOS4_DEV_SYSMMU
++	select EXYNOS4_DEV_DMA
+ 	select EXYNOS4_SETUP_FIMD0
+ 	select EXYNOS4_SETUP_I2C1
+ 	select EXYNOS4_SETUP_KEYPAD
+@@ -176,6 +182,7 @@ config MACH_ARMLEX4210
+ 	select S3C_DEV_HSMMC3
+ 	select EXYNOS4_DEV_AHCI
+ 	select EXYNOS4_DEV_SYSMMU
++	select EXYNOS4_DEV_DMA
+ 	select EXYNOS4_SETUP_SDHCI
+ 	help
+ 	  Machine support for Samsung ARMLEX4210 based on EXYNOS4210
+@@ -201,6 +208,7 @@ config MACH_UNIVERSAL_C210
+ 	select S5P_DEV_ONENAND
+ 	select S5P_DEV_TV
+ 	select EXYNOS4_DEV_PD
++	select EXYNOS4_DEV_DMA
+ 	select EXYNOS4_SETUP_FIMD0
+ 	select EXYNOS4_SETUP_I2C1
+ 	select EXYNOS4_SETUP_I2C3
+@@ -227,6 +235,7 @@ config MACH_NURI
+ 	select S5P_DEV_MFC
+ 	select S5P_DEV_USB_EHCI
+ 	select EXYNOS4_DEV_PD
++	select EXYNOS4_DEV_DMA
+ 	select EXYNOS4_SETUP_FIMD0
+ 	select EXYNOS4_SETUP_I2C1
+ 	select EXYNOS4_SETUP_I2C3
+@@ -253,6 +262,7 @@ config MACH_ORIGEN
+ 	select S5P_DEV_I2C_HDMIPHY
+ 	select S5P_DEV_TV
+ 	select S5P_DEV_USB_EHCI
++	select EXYNOS4_DEV_DMA
+ 	select EXYNOS4_DEV_PD
+ 	select SAMSUNG_DEV_BACKLIGHT
+ 	select SAMSUNG_DEV_PWM
+diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+index c47aae3..8066538 100644
+--- a/arch/arm/mach-exynos4/Makefile
++++ b/arch/arm/mach-exynos4/Makefile
+@@ -13,7 +13,7 @@ obj-				:=
+ # Core support for EXYNOS4 system
+ 
+ obj-$(CONFIG_ARCH_EXYNOS4)	+= cpu.o init.o clock.o irq-combiner.o
+-obj-$(CONFIG_ARCH_EXYNOS4)	+= setup-i2c0.o irq-eint.o dma.o pmu.o
++obj-$(CONFIG_ARCH_EXYNOS4)	+= setup-i2c0.o irq-eint.o pmu.o
+ obj-$(CONFIG_CPU_EXYNOS4210)	+= clock-exynos4210.o
+ obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
+ obj-$(CONFIG_PM)		+= pm.o
+@@ -44,6 +44,7 @@ obj-$(CONFIG_EXYNOS4_DEV_AHCI)		+= dev-ahci.o
+ obj-$(CONFIG_EXYNOS4_DEV_PD)		+= dev-pd.o
+ obj-$(CONFIG_EXYNOS4_DEV_SYSMMU)	+= dev-sysmmu.o
+ obj-$(CONFIG_EXYNOS4_DEV_DWMCI)	+= dev-dwmci.o
++obj-$(CONFIG_EXYNOS4_DEV_DMA)		+= dma.o
+ 
+ obj-$(CONFIG_EXYNOS4_SETUP_FIMC)	+= setup-fimc.o
+ obj-$(CONFIG_EXYNOS4_SETUP_FIMD0)	+= setup-fimd0.o
+diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-exynos4/dma.c
+index c3c0d17..921d31d 100644
+--- a/arch/arm/mach-exynos4/dma.c
++++ b/arch/arm/mach-exynos4/dma.c
+@@ -24,6 +24,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/amba/bus.h>
+ #include <linux/amba/pl330.h>
++#include <linux/of.h>
+ 
+ #include <asm/irq.h>
+ #include <plat/devs.h>
+@@ -138,6 +139,9 @@ struct amba_device exynos4_device_pdma1 = {
+ 
+ static int __init exynos4_dma_init(void)
+ {
++	if (of_have_populated_dt())
++		return 0;
++
+ 	dma_cap_set(DMA_SLAVE, exynos4_pdma0_pdata.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, exynos4_pdma0_pdata.cap_mask);
+ 	amba_device_register(&exynos4_device_pdma0, &iomem_resource);
+-- 
+1.6.6.rc2
