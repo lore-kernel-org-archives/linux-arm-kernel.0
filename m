@@ -1,15 +1,49 @@
-From: gregkh@suse.de (Greg KH)
-Date: Mon, 10 Oct 2011 07:14:02 -0700
-Subject: [PATCH] fix ehci alignment error
-In-Reply-To: <20111010124154.464239811@gmail.com>
-References: <20111010124154.464239811@gmail.com>
-Message-ID: <20111010141402.GA21856@suse.de>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 10 Oct 2011 21:49:35 +0530
+Subject: [PATCH v2 2/5] dt: add empty dt helpers for non-dt build
+In-Reply-To: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+Message-ID: <1318263578-7407-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 02:38:27PM +0200, Harro Haan wrote:
-> The Kirkwood gave an unaligned memory access error on
-> line 742 of drivers/usb/host/echi-hcd.c:
-> "ehci->last_periodic_enable = ktime_get_real();"
+Add empty of_device_is_compatible(), of_find_property()
+and of_parse_phandle() for non-dt builds to work.
 
-What is "The Kirkwood"?  What size processor is this?
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ include/linux/of.h |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 9180dc5..47ce461 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -263,6 +263,25 @@ static inline const void *of_get_property(const struct device_node *node,
+ 	return NULL;
+ }
+ 
++static inline int of_device_is_compatible(const struct device_node *device,
++				   const char *name)
++{
++	return 0;
++}
++
++static inline struct property *of_find_property(const struct device_node *np,
++					 const char *name,
++					 int *lenp)
++{
++	return NULL;
++}
++
++static inline struct device_node *of_parse_phandle(struct device_node *np,
++					    const char *phandle_name,
++					    int index)
++{
++	return NULL;
++}
+ #endif /* CONFIG_OF */
+ 
+ static inline int of_property_read_u32(const struct device_node *np,
+-- 
+1.7.1
