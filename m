@@ -1,24 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Oct 2011 19:00:42 +0200
-Subject: [PATCH v2 00/14] Sparse fixes for tegra
-In-Reply-To: <1318224484-2090-1-git-send-email-olof@lixom.net>
-References: <1317956064-17650-1-git-send-email-olof@lixom.net>
-	<1318224484-2090-1-git-send-email-olof@lixom.net>
-Message-ID: <201110101900.42954.arnd@arndb.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Mon, 10 Oct 2011 19:02:46 +0200
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <20111010153609.GB2138@amd.com>
+References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
+	<1316195506-9777-2-git-send-email-ohad@wizery.com>
+	<20110927100505.GH2138@amd.com>
+	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
+	<20110927131222.GL2138@amd.com>
+	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
+	<20110927181438.GM2138@amd.com>
+	<CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
+	<20111010094738.GW2138@amd.com>
+	<CAK=WgbZ7Wyax1yfS1jSXw9OdwMtxxidwLO8PTsNUXX9CWzmVrw@mail.gmail.com>
+	<20111010153609.GB2138@amd.com>
+Message-ID: <CAK=WgbYR_qx53Z7s3R=q29KYo8ebYCH9H9=2OrrWXWMv6=-iOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 October 2011, Olof Johansson wrote:
-> Some trivial fixes removing sparse warnings on tegra code.
-> 
-> Changes since v1:
-> 
-> * Implemented Arnd's suggestion to push annotation all the way down to IO_*_VIRT defines
-> * Based on above, no longer needed IO_TO_VIRT() -> IO_ADDRESS() changes
-> * Added two more fixes for cpu-tegra.
-> 
-> Stephen; I didn't explicitly apply your Acked-by lines to this batch yet,
-> I will do so when I collect final acks before pushing a branch.
-> 
+Hi Joerg,
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Mon, Oct 10, 2011 at 5:36 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> The master branch is best to base your patches on for generic work.
+
+Oh, great. thanks.
+
+> It can happen when there is a bug somewhere :)
+
+Hmm, bug ? ;)
+
+Ok, I'll add a BUG_ON :)
+
+> Yes, somthing like that. Probably the iommu_ops->unmap function should
+> be turned into a unmap_page function call which only takes an iova and
+> no size parameter. The iommu-driver unmaps the page pointing to that
+> iova and returns the size of the page unmapped. This still allows the
+> simple implementation for the unmap-call.
+
+Yes, exactly. It will take some time to migrate all drivers (today we
+have 4 drivers, each of which is implementing a slightly different
+->unmap() semantics), but at least let's not accept any new driver
+that doesn't adhere to this, otherwise it's going to be even harder
+for the API to evolve.
+
+> This change is no requirement for this patch-set, but if we agree on it
+> this patch-set should keep that direction in mind.
+
+Definitely, thanks.
+
+> We don't need to really
+> enforce the calls to be symetric. But we can define that we only give
+> the guarantee about what will be unmapped when the calls are symetric.
+
+Sounds good to me. I'll add this to the kernel doc patch (which I'll
+submit after this patch set materializes), and when/if we move to
+symmetric only, we will update it.
+
+> The alternative is that we implement page-splitting in the iommu_unmap
+> function. But that introduces complexity I am not sure we really need.
+
+Yeah, me neither.
+
+> Yes, this get_order thing should be changes to size long-term.
+
+Good. That should be a simple change, I'll do it after this patch set.
+
+Thanks,
+Ohad.
