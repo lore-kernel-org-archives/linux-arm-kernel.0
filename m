@@ -1,37 +1,38 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 10 Oct 2011 13:56:19 +0200
-Subject: [PATCH 0/2] ARM: OMAP2+: timer fixes / cleanup
-In-Reply-To: <CAC83ZvLd27nER5z1R1L27KFR4CQ1mwhmQ18BR7OCBZEDtNFWYg@mail.gmail.com>
-References: <1317763241-21422-1-git-send-email-b-cousson@ti.com>
-	<4E8B7C6A.2050207@ti.com>
-	<CAC83Zv+r0emW7rREkPhjPyn_jBCbNLXKCNTY0=vMNxCTzzp=Xg@mail.gmail.com>
-	<CAC83ZvLd27nER5z1R1L27KFR4CQ1mwhmQ18BR7OCBZEDtNFWYg@mail.gmail.com>
-Message-ID: <4E92DD63.6090906@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 10 Oct 2011 19:57:51 +0800
+Subject: [PATCH v10] pinctrl: add a driver for the U300 pinmux
+In-Reply-To: <1318235485-2112-1-git-send-email-linus.walleij@stericsson.com>
+References: <1318235485-2112-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAGsJ_4w9y_DTgX-zz7BUFM2M+UPgFF=JDmD5RptQ3SR5-0h1UQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/10/2011 12:05 PM, DebBarma, Tarun Kanti wrote:
-> On Mon, Oct 10, 2011 at 11:10 AM, DebBarma, Tarun Kanti
-> <tarun.kanti@ti.com>  wrote:
->> On Wed, Oct 5, 2011 at 3:06 AM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->>> Hi Tarun,
->>>
->>> On 10/4/2011 11:20 PM, Cousson, Benoit wrote:
->>>>
->>>> Hi Tony,
->>>>
->>>> Here is the series to fix the warning and remove the redundant
->>>> latency structure that be removed since the timer runtime PM
->>>> adaptation was just pulled.
->>>>
->>>> I was just able to test that on OMAP4.
->>>
->>> It will be nice if you can test that on the other platforms.
->>> In theory, if they are properly using hwmod that should work fine.
->> Yes, I will test in other platforms.
-> I have tested on OMAP2420, OMAP2430 and OMAP3430.
+2011/10/10 Linus Walleij <linus.walleij@stericsson.com>:
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> This adds a driver for the U300 pinmux portions of the system
+> controller "SYSCON". It also serves as an example of how to use
+> the pinmux subsystem. This driver also houses the platform data
+> for the only supported platform.
+>
+> This deletes the old U300 driver in arch/arm/mach-u300 and
+> replace it with a driver using the new subsystem.
+>
+> The new driver is considerably fatter than the old one, but it
+> also registers all 467 pins of the system and adds the power
+> and EMIF pin groups and corresponding functions. The idea
+> is to use this driver as a a reference for other
+> implementation so it needs to be as complete and verbose
+> as possible.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks Tarun,
+Reviewed-by: Barry Song <21cnbao@gmail.com>
 
-Regards,
-Benoit
+> ---
+> ChangeLog v9 -> v10
+> - Removed debug register dump (review from Barry Song)
+> - Allocate sizeof(*ptr) instead of sizeof(struct foo)
+
+
+-barry
