@@ -1,36 +1,44 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 10 Oct 2011 16:01:08 +0800
-Subject: [PATCH 5/9] ARM: SPMP8000: Add pinmux driver
-In-Reply-To: <CAKnu2MrXWoOka9D++q3h-KfgyYRhGA81Tcf07y7VdEUszZrU9w@mail.gmail.com>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-6-git-send-email-zoss@devai.org>
-	<CAKnu2MrXWoOka9D++q3h-KfgyYRhGA81Tcf07y7VdEUszZrU9w@mail.gmail.com>
-Message-ID: <CAGsJ_4zaqk_ECjaCXPeYJMRASE1zND+cZ2cwaLYVDhaVjsfSVw@mail.gmail.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Mon, 10 Oct 2011 13:38:03 +0530
+Subject: [PATCH V2 0/2]: Add SPI Support on Exynos4
+Message-ID: <1318234084-19960-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/10/10 Linus Walleij <linus.walleij@linaro.org>:
-> 2011/10/9 Zoltan Devai <zoss@devai.org>:
->
->> ?arch/arm/mach-spmp8000/pinmux.c | ?131 +++++++++++++++++++++++++++++++++++++++
->> ?1 files changed, 131 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/mach-spmp8000/pinmux.c
->
-> I'm creating this new pin control and pin mux subsystem,
-> set for next merge window. Can you check it out and see
-> if it does what you need?
+This patchset adds SPI support and register the SPI bus clock
+with clkdev using generic connection ID on EXYNOS4. This patch
+set is depend on the following patches as it uses a common macro
+CLKDEV_INIT to create clk_lookup structure and it also avoids
+passing clock names through platform data.
 
-yes. Zoltan, you do need to follow Linus W's new pinmux framework.
+ARM: CLKDEV: Add Common Macro for clk_lookup
+ARM: SAMSUNG: Remove SPI bus clocks from platform data
 
-And Linus, can you help to take care prima2 pinmux driver v3 i sent
-yesterday and make sure it is merged in the window too.
-our lots of device drivers depend on it, so i'd like it is ready
-before we upstream lots of other drivers.
+V1 patch series are:
+  http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg06986.html
+  ARM: EXYNOS4: Add SPI support to EXYNOS4
+  SPI: EXYNOS4: Enable the SPI driver for EXYNOS4
 
->
-> http://marc.info/?l=linux-kernel&m=131805699106465&w=2
->
-> Thanks,
-> Linus Walleij
+Changes Since V1:
+	Reworked the patches as per the following link. Patch series in
+        the following link removed & and , from the macro declaration and added
+        in the macro defination.
+        http://www.spinics.net/lists/arm-kernel/msg143663.html
 
--barry
+ arch/arm/mach-exynos4/Kconfig                    |    1 +
+ arch/arm/mach-exynos4/Makefile                   |    1 +
+ arch/arm/mach-exynos4/clock.c                    |   82 +++++---
+ arch/arm/mach-exynos4/dev-spi.c                  |  225 ++++++++++++++++++++++
+ arch/arm/mach-exynos4/include/mach/irqs.h        |    3 +
+ arch/arm/mach-exynos4/include/mach/map.h         |    3 +
+ arch/arm/mach-exynos4/include/mach/spi-clocks.h  |   16 ++
+ arch/arm/mach-exynos4/mach-smdkv310.c            |  127 ++++++++++++-
+ arch/arm/plat-samsung/include/plat/devs.h        |    3 +
+ arch/arm/plat-samsung/include/plat/s3c64xx-spi.h |    1 +
+ drivers/spi/Kconfig                              |    2 +-
+ 11 files changed, 432 insertions(+), 32 deletions(-)
+ create mode 100644 arch/arm/mach-exynos4/dev-spi.c
+ create mode 100644 arch/arm/mach-exynos4/include/mach/spi-clocks.h
+
+-- 
+1.7.4.4
