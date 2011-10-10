@@ -1,61 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Oct 2011 11:36:36 +0100
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <201110072251.40028.arnd@arndb.de>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<201110072251.40028.arnd@arndb.de>
-Message-ID: <20111010103635.GA2451@mudshark.cambridge.arm.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Mon, 10 Oct 2011 14:44:02 +0400
+Subject: [PATCH v2 10/14] ARM: tegra: tegra_powergate_is_powered should
+	be static
+In-Reply-To: <1318224484-2090-11-git-send-email-olof@lixom.net>
+References: <1317956064-17650-1-git-send-email-olof@lixom.net>
+	<1318224484-2090-1-git-send-email-olof@lixom.net>
+	<1318224484-2090-11-git-send-email-olof@lixom.net>
+Message-ID: <4E92CC72.3030809@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello.
 
-On Fri, Oct 07, 2011 at 09:51:39PM +0100, Arnd Bergmann wrote:
-> On Wednesday 28 September 2011, Will Deacon wrote:
-> > Please pull these DEBUG_LL platform updates for 3.2. You can find the core
-> > updates (actually all resident in arch/arm/Kconfig.debug) in Russell's
-> > for-next branch.
-> > 
-> > I think Stephen Boyd was planning to move MSM to the new code as well, but
-> > I've not seen any code yet so I guess that can go in later.
-> 
-> Hi Will,
-> 
-> I've tried to pull this branch, but I'm getting conflicts with patches
-> from the 'CPU mapping platform updates' series you sent me earlier.
-> Any idea what's going on there?
+On 10-10-2011 9:28, Olof Johansson wrote:
 
-Hmm, I expect that I've inadvertently ended up basing my patches on a branch
-that Russell has rebased. I mentioned this on the list at the time:
+> Not exported and not used externally.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-September/063729.html
+> Also, fix return type  and change to instead WARN_ON on bad parameters.
 
-> I can certainly fix up the conflicts, but my feeling is that there is
-> something wrong on your side and one of the two branches contains
-> stuff from a stale version of Russell's tree.
+    Change to what? You're changing _to_ WARN_ON() as we can see, not from it...
 
-It looks like both of the branches [cpu-mapping and debug-ll] may be out of
-date now. I agree that fixing up the conflicts isn't the way to go here, but
-I'm unsure what to use as my base. I depend on patches that aren't in
-Russell's devel-stable branch but are in his for-next branch.
+> Signed-off-by: Olof Johansson<olof@lixom.net>
+> ---
+>   arch/arm/mach-tegra/include/mach/powergate.h |    1 -
+>   arch/arm/mach-tegra/powergate.c              |    5 ++---
+>   2 files changed, 2 insertions(+), 4 deletions(-)
 
-The only things I can think of are either:
+[...]
+> diff --git a/arch/arm/mach-tegra/powergate.c b/arch/arm/mach-tegra/powergate.c
+> index 3cee9aa..9483064 100644
+> --- a/arch/arm/mach-tegra/powergate.c
+> +++ b/arch/arm/mach-tegra/powergate.c
+> @@ -89,12 +89,11 @@ int tegra_powergate_power_off(int id)
+>   	return tegra_powergate_set(id, false);
+>   }
+>
+> -bool tegra_powergate_is_powered(int id)
+> +static bool tegra_powergate_is_powered(int id)
+>   {
+>   	u32 status;
+>
+> -	if (id < 0 || id >= TEGRA_NUM_POWERGATE)
+> -		return -EINVAL;
+> +	WARN_ON(id<  0 || id>= TEGRA_NUM_POWERGATE);
+>
+>   	status = pmc_read(PWRGATE_STATUS)&  (1<<  id);
+>   	return !!status;
 
- - Wait until everything has settled down, then rebase onto Russell's
-   for-linus branch. This has the disadvantage that conflicts and build
-   breakages won't be detected until very late.
-
- - Wait until the dependencies are in mainline, then rebase against that.
-   Disadvantage is that it then takes twice as long to get code upstream.
-
- - Send another pull request against an unstable branch and hope it doesn't
-   change. Disadvantage being that we have to keep repeating pull requests
-   against a moving target.
-
-I'm not especially fond of any of those though...
-
-Do you have any other ideas?
-
-Cheers,
-
-Will
+WBR, Sergei
