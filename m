@@ -1,59 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 11 Oct 2011 20:31:03 +0900
-Subject: [PATCH] ARM: SAMSUNG: s3c-dma-ops needs export.h for EXPORT_SYMBOL
-In-Reply-To: <1317961214.16109.1.camel@phoenix>
-References: <1317961214.16109.1.camel@phoenix>
-Message-ID: <056b01cc8809$424a23a0$c6de6ae0$%kim@samsung.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 11 Oct 2011 17:15:28 +0530
+Subject: [RESEND][PATCH V2 0/2] Add a common macro for creating struct
+	clk_lookup entries
+Message-ID: <1318333530-7023-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Axel Lin wrote:
-> 
-> Fix below build warning:
->   CC      arch/arm/plat-samsung/s3c-dma-ops.o
-> arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: data definition has no type or
-> storage class
-> arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: type defaults to 'int' in
-> declaration of 'EXPORT_SYMBOL'
-> arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: parameter names (without
-> types) in function declaration
-> 
-> And fix the build error:
-> ERROR: "s3c_dma_get_ops" [drivers/spi/spi-s3c64xx.ko] undefined!
-> make[1]: *** [__modpost] Error 1
-> make: *** [modules] Error 2
-> 
-> Signed-off-by: Axel Lin <axel.lin@gmail.com>
-> ---
-> This can be reproduced by "make s3c6400_defconfig;make" on linux-next
-> 20111006.
->  arch/arm/plat-samsung/s3c-dma-ops.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/s3c-dma-ops.c b/arch/arm/plat-samsung/s3c-
-> dma-ops.c
-> index 582333c..7814949 100644
-> --- a/arch/arm/plat-samsung/s3c-dma-ops.c
-> +++ b/arch/arm/plat-samsung/s3c-dma-ops.c
-> @@ -14,6 +14,7 @@
->  #include <linux/errno.h>
->  #include <linux/slab.h>
->  #include <linux/types.h>
-> +#include <linux/export.h>
-> 
->  #include <mach/dma.h>
-> 
-> --
-> 1.7.4.1
-> 
-OK, will apply.
+From: Padmavathi Venna <padma.v@samsung.com> 
 
-BTW, I don't know why the build error/warning was not happened in my tree with s3c6400_defconfig. Probably other file having it?...
+This patchset consolidates the macro that creates 'struct clk_lookup'
+entries by introducing a common macro 'CLKDEV_INIT' as suggested by
+Russell King. Few of the platforms have been modified to use this new macro.
 
-Anyway, thanks.
+I have done the replacement by using python script. I have only build tested
+for below platforms with existing defconfigs.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Changes since V1:
+- Removed "&" and "," from the CLKDEV_INIT macro.
+- Replaced the platform specific macros to use the new CLKDEV_INIT macro.
+- Rebased the patches on the latest master branch of Linux-Next.
+
+Padmavathi Venna (2):
+  ARM: CLKDEV: Add Common Macro for clk_lookup
+  ARM: Using CLKDEV_INIT for creating clk_lookup instance
+
+ arch/arm/mach-davinci/board-dm646x-evm.c |    5 +-
+ arch/arm/mach-davinci/clock.h            |    7 --
+ arch/arm/mach-davinci/da830.c            |  101 ++++++++++----------
+ arch/arm/mach-davinci/da850.c            |   95 ++++++++++----------
+ arch/arm/mach-davinci/dm355.c            |   87 +++++++++---------
+ arch/arm/mach-davinci/dm365.c            |  113 +++++++++++-----------
+ arch/arm/mach-davinci/dm644x.c           |   77 ++++++++--------
+ arch/arm/mach-davinci/dm646x.c           |   81 ++++++++--------
+ arch/arm/mach-davinci/tnetv107x.c        |  133 +++++++++++++-------------
+ arch/arm/mach-ep93xx/clock.c             |   61 ++++++-------
+ arch/arm/mach-imx/clock-imx1.c           |   38 +++-----
+ arch/arm/mach-imx/clock-imx21.c          |   91 +++++++++----------
+ arch/arm/mach-imx/clock-imx25.c          |   79 +++++++---------
+ arch/arm/mach-imx/clock-imx27.c          |  111 ++++++++++------------
+ arch/arm/mach-imx/clock-imx31.c          |  103 ++++++++++-----------
+ arch/arm/mach-imx/clock-imx35.c          |  117 +++++++++++------------
+ arch/arm/mach-lpc32xx/clock.c            |   75 +++++++--------
+ arch/arm/mach-mx5/clock-mx51-mx53.c      |  149 ++++++++++++++----------------
+ arch/arm/mach-mxs/clock-mx23.c           |   39 +++-----
+ arch/arm/mach-mxs/clock-mx28.c           |   71 +++++++--------
+ arch/arm/mach-tcc8k/clock.c              |  107 ++++++++++-----------
+ include/linux/clkdev.h                   |    7 ++
+ 22 files changed, 838 insertions(+), 909 deletions(-)
+
+-- 
+1.7.4.4
