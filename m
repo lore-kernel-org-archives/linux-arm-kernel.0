@@ -1,73 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Oct 2011 22:42:57 +0200
-Subject: [PATCH v3 6/7] ARM: pxa: move gpio-pxa.h into include directory
-In-Reply-To: <CAKnu2Mr3cWfo3SJYkBU2cXeKELhmVOv+Qes=SCWRBaSB-Sue3g@mail.gmail.com>
-References: <1318339051-19096-1-git-send-email-haojian.zhuang@marvell.com>
-	<1318339051-19096-7-git-send-email-haojian.zhuang@marvell.com>
-	<CAKnu2Mr3cWfo3SJYkBU2cXeKELhmVOv+Qes=SCWRBaSB-Sue3g@mail.gmail.com>
-Message-ID: <3002440.xxjcQDzptB@wuerfel>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 11 Oct 2011 13:47:53 -0700
+Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <20110922184614.25419.84606.stgit@ponder>
+References: <20110922184614.25419.84606.stgit@ponder>
+Message-ID: <20111011134753.2751aeb1.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 October 2011 21:51:28 Linus Walleij wrote:
-> 2011/10/11 Haojian Zhuang <haojian.zhuang@marvell.com>:
+On Thu, 22 Sep 2011 12:51:23 -0600
+Grant Likely <grant.likely@secretlab.ca> wrote:
+
+> Allow drivers to report at probe time that they cannot get all the resources
+> required by the device, and should be retried at a later time.
 > 
-> > Merge the gpio-pxa.h in arch-pxa and arch-mmp. Move the new gpio-pxa.h
-> > into include directory.
-> (...)
-> >  arch/arm/plat-pxa/include/plat/gpio-pxa.h  |   80 ---------------------------
-> >  drivers/gpio/gpio-pxa.c                    |   42 ++++++++++++++-
-> >  include/linux/gpio-pxa.h                   |   81 ++++++++++++++++++++++++++++
-> 
-> This seems like a fully valid merge of common pxa GPIO include
-> files. And I guess if both are not using plat-pxa it cannot reside
-> in <plat/gpio-pxa.h>?
-> 
-> Grant: shall this be <linux/gpio-pxa.h> or <linux/gpio/pxa.h> or so?
+> This should completely solve the problem of getting devices
+> initialized in the right order.  Right now this is mostly handled by
+> mucking about with initcall ordering which is a complete hack, and
+> doesn't even remotely handle the case where device drivers are in
+> modules.  This approach completely sidesteps the issues by allowing
+> driver registration to occur in any order, and any driver can request
+> to be retried after a few more other drivers get probed.
 
-Hmm, more fundamentally, does this even need to be a header file?
+What happens is there is a circular dependency, or if a driver's
+preconditions are never met?  AFAICT the code keeps running the probe
+function for ever.
 
-Most of the header file looks like it should not be visible in the entire
-kernel, so better move as much as possible into the gpio-pxa.c file.
-I'm not sure how much remains in the end, but that should probably
-determine the location (drivers/gpio/gpio-pxa.h, asm/gpio-pxa.h
-or linux/gpio-pxa.h). In general, everything should be as local
-as possible.
+If so: bad.  The kernel should detect such situations, should
+exhaustively report them and if possible, fix them up and struggle
+onwards.
 
-One more thing regarding the contents of the header:
+>
+> ...
+>
+> +	 * This bit is tricky.  We want to process every device in the
+> +	 * deferred list, but devices can be removed from the list at any
+> +	 * time while inside this for-each loop.  There are two things that
+> +	 * need to be protected against:
+> +	 * - if the device is removed from the deferred_probe_list, then we
+> +	 *   loose our place in the loop.  Since any device can be removed
 
-> +/* GPIO Pin Level Registers */
-> +#define PXA_GPLR(x)	(*(volatile u32 *)(pxa_gpio_regs.gplr	\
-> +			+ PXA_BANK_OFF((x >> 5))))
-> +/* GPIO Pin Direction Registers */
-> +#define PXA_GPDR(x)	(*(volatile u32 *)(pxa_gpio_regs.gpdr	\
-> +			+ PXA_BANK_OFF((x >> 5))))
+s/loose/lose/
 
-When these get moved into the driver itself, it's probably a good
-idea to turn these into proper accessors, something like
+> +	 *   asynchronously, list_for_each_entry_safe() wouldn't make things
+> +	 *   much better.  Simplest solution is to restart walking the list
+> +	 *   whenever the current device gets removed.  Not the most efficient,
+> +	 *   but is simple to implement and easy to audit for correctness.
+> +	 * - if the device is unregistered, and freed, then there is a risk
+> +	 *   of a null pointer dereference.  This code uses get/put_device()
+> +	 *   to ensure the device cannot disappear from under our feet.
+> +	 */
+>
+> ...
+>
+> +		/* Drop the mutex while probing each device; the probe path
+> +		 * may manipulate the deferred list */
 
-enum pxa_gpio_reg {
-	GPLR,
-	GPDR,
-	GPSR,
-	GPCR,
-	GRER,
-	GFER,
-	GEDR,
-};
-static void __iomem *pxa_gpio_reg_base;
-static inline u32 pxa_gpio_read(unsigned int bank, enum pxa_gpio_reg reg)
-{
-	unsigned offset = (bank < 3) ? bank << 2 : 0x100 + ((bank - 3) << 2);
-	return readl_relaxed(pxa_gpio_reg_base + offset + 12 * reg);
-}
-static inline void pxa_gpio_write(unsigned int bank, unsigned int reg, u32 val)
-{
-	unsigned offset = (bank < 3) ? bank << 2 : 0x100 + ((bank - 3) << 2);
-	return writel_relaxed(val, pxa_gpio_reg_base + offset + 12 * reg);
-}
+Please don't invent new coding styles.  Like this:
 
-That should let you get rid of most of the macros and the incorrect
-'volatile' access.
+		/*
+		 * Drop the mutex while probing each device; the probe path
+		 * may manipulate the deferred list
+		 */
 
-	Arnd
+(entire patch)
+
+>
+> ...
+>
