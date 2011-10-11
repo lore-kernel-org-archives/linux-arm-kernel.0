@@ -1,55 +1,80 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 11 Oct 2011 18:04:51 +0200
-Subject: [RFC PATCH] tty/serial: atmel_serial: add device tree support
-In-Reply-To: <20111004165520.GB10919@ponder.secretlab.ca>
-References: <1317635502-9430-1-git-send-email-nicolas.ferre@atmel.com>
-	<4E8A6858.6020700@gmail.com> <4E8AC171.4020706@atmel.com>
-	<4E8B054B.3060506@gmail.com>
-	<20111004165520.GB10919@ponder.secretlab.ca>
-Message-ID: <4E946923.1010202@atmel.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 11 Oct 2011 21:36:00 +0530
+Subject: [PATCH] gpio: exynos4: Add device tree support
+In-Reply-To: <4E946109.2000305@gmail.com>
+References: <1318320974-9879-1-git-send-email-thomas.abraham@linaro.org>
+	<4E945C90.1050601@gmail.com>
+	<CAJuYYwRwBxkAo2fMfVV9wtQ40XeROAnc-cGJK+cssjuh9px=qQ@mail.gmail.com>
+	<4E946109.2000305@gmail.com>
+Message-ID: <CAJuYYwQWUjVf9Z5Rdw4fTK70=B1aw-5x_wjYm_fq+zHyQAWJvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/2011 06:55 PM, Grant Likely :
-> On Tue, Oct 04, 2011 at 08:08:27AM -0500, Rob Herring wrote:
->> Nicolas,
+On 11 October 2011 21:00, Rob Herring <robherring2@gmail.com> wrote:
+> On 10/11/2011 10:19 AM, Thomas Abraham wrote:
+>> Hi Rob,
 >>
->> On 10/04/2011 03:18 AM, Nicolas Ferre wrote:
->>> On 10/04/2011 03:58 AM, Rob Herring :
->>>> On 10/03/2011 04:51 AM, Nicolas Ferre wrote:
->>>>> +Optional properties:
->>>>> +- atmel,use-dma-rx: use of PDC or DMA for receiving data
->>>>> +- atmel,use-dma-tx: use of PDC or DMA for transmitting data
+>> On 11 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
+>>> Thomas,
+>>>
+>>> On 10/11/2011 03:16 AM, Thomas Abraham wrote:
+>>>> As gpio chips get registered, a device tree node which represents the
+>>>> gpio chip is searched and attached to it. A translate function is also
+>>>> provided to convert the gpio specifier into actual platform settings
+>>>> for pin function selection, pull up/down and driver strength settings.
 >>>>
->>>> Is this an internal DMA or separate DMA controller? If the latter, these
->>>> should be phandles to a DMA channel/request.
+>>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>>>> ---
+>>>> This patch is based on the latest consolidated Samsung GPIO driver available
+>>>> in the following tree:
+>>>> ? https://github.com/kgene/linux-samsung.git ?branch: for-next
+>>>>
+>>>> ?.../devicetree/bindings/gpio/gpio-samsung.txt ? ? ?| ? 30 +++++++++++
+>>>> ?drivers/gpio/gpio-samsung.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 53 ++++++++++++++++++++
+>>>> ?2 files changed, 83 insertions(+), 0 deletions(-)
+>>>> ?create mode 100644 Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+>>>> new file mode 100644
+>>>> index 0000000..883faeb
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+>>>> @@ -0,0 +1,30 @@
+>>>> +Samsung Exynos4 GPIO Controller
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: Format of compatible property value should be
+>>>> + ?"samsung,exynos4-gpio-<controller_name>". Example: For GPA0 controller, the
+>>>> + ?compatible property value should be "samsung,exynos4-gpio-gpa0".
 >>>
->>> Well, for now it relies on PDC (looks like an internal DMA). There is no
->>> notion of channel/request so I think it is appropriate to keep it like this.
->>>
+>>> Isn't gpa0 an instance of the h/w, not a version?
 >>
->> Okay. Although, this is a bit of Linux creeping into DT. DT should
->> describe the h/w. You should really be describing whether the h/w
->> supports DMA or not rather than whether you want to use DMA or not.
->> Since DMA support is really tied to the SOC rather than board, you could
->> just use the compatible string to distinguish platforms that support DMA
->> or not. So what is determining this setting? Is it purely user choice?
-> 
-> It is okay for a binding to still requires config properties like this
-> to state if the DMA can be used, even if compatible is enough to
-> distinquish.  However, you're right to bring it up.  It is a design
-> choice that should be made thoughtfully.
+>> GPA0 is a instance of the gpio controller. There are several such
+>> instances and there could be differences in those instances such as
+>> the number of GPIO lines managed by that gpio controller instance.
+>>
+>
+> That doesn't seem like a reason to have different compatible strings.
+> Does that affect the programming model of the controller? Unused lines
+> whether at the board level or SOC level shouldn't really matter.
 
-Grant, Rob,
 
-Thanks for your inputs.
+No, that does not affect the programming of the controller. The reason
+for the instance name extension in compatible string is to match the
+gpio_chip with a gpio controller node. When matched, the of_node
+pointer of the gpio_chip is set to point to that controller node.
 
-I would like to keep this binding to allow the user to choose the way he
-likes to use integrated DMA.
+This might not be the best possible implementation but the device tree
+support code in this patch is dictated by the structure of the
+existing gpio driver code. As you suggested previously, I will look at
+reworking the gpio driver a little later but for now, there was a need
+for working gpio dt solution to make progress on dt support for other
+controllers.
 
-I plan to resend a patch series about this serial driver once I will be
-able to propose a rs485 binding.
+Thanks,
+Thomas.
 
-Cheers,
--- 
-Nicolas Ferre
+>
+> Rob
+>
+>
