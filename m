@@ -1,71 +1,45 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 11 Oct 2011 19:03:39 +0800
-Subject: [PATCH v4 2/3] at91: add parameters for at91_add_device_isi function
-In-Reply-To: <1318331020-22031-1-git-send-email-josh.wu@atmel.com>
-References: <1318331020-22031-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1318331020-22031-3-git-send-email-josh.wu@atmel.com>
+From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
+Date: Tue, 11 Oct 2011 15:16:17 +0400
+Subject: [PATCH V2 4/4] ARM: at91/dma: DMA controller registering with
+	DT support
+In-Reply-To: <1318265021-4562-1-git-send-email-nicolas.ferre@atmel.com>
+References: <e292fbb24a98b7cfda8ea83364956a50e1cb120f.1318264339.git.nicolas.ferre@atmel.com>
+	<1318265021-4562-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4E942581.2050903@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add parameters for at91_add_device_isi function
+Hello.
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- arch/arm/mach-at91/at91sam9263_devices.c |   13 ++++++++++---
- arch/arm/mach-at91/include/mach/board.h  |    4 +++-
- 2 files changed, 13 insertions(+), 4 deletions(-)
+On 10-10-2011 20:43, Nicolas Ferre wrote:
 
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index a050f41..7990e8e 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -885,7 +885,8 @@ static struct platform_device at91sam9263_isi_device = {
- 	.num_resources	= ARRAY_SIZE(isi_resources),
- };
- 
--void __init at91_add_device_isi(void)
-+void __init at91_add_device_isi(struct isi_platform_data * data,
-+		bool use_pck_as_mck)
- {
- 	at91_set_A_periph(AT91_PIN_PE0, 0);	/* ISI_D0 */
- 	at91_set_A_periph(AT91_PIN_PE1, 0);	/* ISI_D1 */
-@@ -898,14 +899,20 @@ void __init at91_add_device_isi(void)
- 	at91_set_A_periph(AT91_PIN_PE8, 0);	/* ISI_PCK */
- 	at91_set_A_periph(AT91_PIN_PE9, 0);	/* ISI_HSYNC */
- 	at91_set_A_periph(AT91_PIN_PE10, 0);	/* ISI_VSYNC */
--	at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
- 	at91_set_B_periph(AT91_PIN_PE12, 0);	/* ISI_PD8 */
- 	at91_set_B_periph(AT91_PIN_PE13, 0);	/* ISI_PD9 */
- 	at91_set_B_periph(AT91_PIN_PE14, 0);	/* ISI_PD10 */
- 	at91_set_B_periph(AT91_PIN_PE15, 0);	/* ISI_PD11 */
-+
-+	if (use_pck_as_mck) {
-+		at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
-+
-+		/* TODO: register the PCK for ISI_MCK and set its parent */
-+	}
- }
- #else
--void __init at91_add_device_isi(void) {}
-+void __init at91_add_device_isi(struct isi_platform_data * data,
-+		int use_pck_as_mck) {}
- #endif
- 
- 
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index ed544a0..731c449 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -183,7 +183,9 @@ extern void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data);
- extern void __init at91_add_device_ac97(struct ac97c_platform_data *data);
- 
-  /* ISI */
--extern void __init at91_add_device_isi(void);
-+struct isi_platform_data;
-+extern void __init at91_add_device_isi(struct isi_platform_data *data,
-+		bool use_pck_as_mck);
- 
-  /* Touchscreen Controller */
- struct at91_tsadcc_data {
--- 
-1.6.3.3
+> Device tree support on at91sam9g45 family SoC. Only call
+> platform_device_register() if no compatible dma-controller
+> node is found in device tree.
+
+> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+> ---
+> V2: use compatible string to match device.
+
+[...]
+
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 9390ae6..2120055 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -64,7 +64,13 @@ static struct platform_device at_hdmac_device = {
+>
+>   void __init at91_add_device_hdmac(void)
+>   {
+> -	platform_device_register(&at_hdmac_device);
+> +	struct device_node *np = of_find_node_by_name(NULL, "dma-controller");
+> +
+> +	if (np&&  of_device_is_compatible(np, "atmel,at91sam9g45-dma")) {
+> +		of_node_put(np);
+> +	} else {
+> +		platform_device_register(&at_hdmac_device);
+> +	}
+
+    {} not needed here, and checkpatch.pl should have protested.
+
+WBR, Sergei
