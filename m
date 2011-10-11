@@ -1,29 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Oct 2011 16:09:37 +0200
-Subject: [PATCH 8/9] ARM: SPMP8000: Add support for the Letcool board
-In-Reply-To: <1318178172-7965-9-git-send-email-zoss@devai.org>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-9-git-send-email-zoss@devai.org>
-Message-ID: <201110111609.37425.arnd@arndb.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 11 Oct 2011 19:43:14 +0530
+Subject: [PATCH 0/2] ARM: Samsung: Add basic device tree support for Exynos4
+	boards
+Message-ID: <1318342396-26178-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 October 2011, Zoltan Devai wrote:
-> Signed-off-by: Zoltan Devai <zoss@devai.org>
-> ---
->  arch/arm/mach-spmp8000/board_letcool.c           |  154 ++++++++++++++++++++++
->  arch/arm/mach-spmp8000/include/mach/spmp8000fb.h |   32 +++++
->  2 files changed, 186 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-spmp8000/board_letcool.c
->  create mode 100644 arch/arm/mach-spmp8000/include/mach/spmp8000fb.h
+This patchset adds a new basic device tree enabled machine/board file which is
+based on the Samsung's Exynos4 family of SoC's. Also included in this patchset is the
+dts file for Exynos4210 SoC, Samsung's SMDKV310 board and Insignal's Origen board.
 
-Hi Zoltan,
+The Exynos4210 dts file includes support for IRQ, GPIO, WDT, RTC, UART, SDHCI, Keypad,
+DMA and I2C controllers. As device tree coverage for Exynos4210 increases, additional
+device nodes to represent the controllers should be added.
 
-We basically stopped doing board files for new platforms. Please get
-rid of this and make sure that the spmp8000-letcool.dts describes
-everything you need to get this board running. The DT_MACHINE_START
-part should just be part of the core.c file and not mention the 
-board name, since its intended to apply to all boards with this
-SOC.
+The device tree enabled machine file enables boot on two boards based on the
+Exynos4210 SoC. This provides a starting point to add additional device tree support
+on these boards, migrate other existing Exynos4 based boards to use device tree
+and enable device tree based boot on new upcoming boards.
 
-	Arnd
+This patchset has been tested on the following tree:
+  https://github.com/kgene/linux-samsung.git   branch: for-next
+
+Thomas Abraham (2):
+  ARM: Samsung: Add Exynos4 device tree enabled board file
+  ARM: dts: Add intial dts file for Exynos4210 SoC, SMDKV310 and Origen board
+
+ .../devicetree/bindings/arm/insignal-boards.txt    |    8 +
+ .../devicetree/bindings/arm/samsung-boards.txt     |    8 +
+ arch/arm/boot/dts/exynos4210-origen.dts            |  137 +++++++
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |  182 +++++++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |  403 ++++++++++++++++++++
+ arch/arm/mach-exynos4/Kconfig                      |   14 +
+ arch/arm/mach-exynos4/Makefile                     |    2 +
+ arch/arm/mach-exynos4/mach-exynos4-dt.c            |   85 ++++
+ 8 files changed, 839 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/insignal-boards.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung-boards.txt
+ create mode 100644 arch/arm/boot/dts/exynos4210-origen.dts
+ create mode 100644 arch/arm/boot/dts/exynos4210-smdkv310.dts
+ create mode 100644 arch/arm/boot/dts/exynos4210.dtsi
+ create mode 100644 arch/arm/mach-exynos4/mach-exynos4-dt.c
