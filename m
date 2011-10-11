@@ -1,48 +1,98 @@
-From: rnayak@ti.com (Nayak, Rajendra)
-Date: Tue, 11 Oct 2011 12:38:53 +0530
-Subject: [PATCH v2 5/5] regulator: map consumer regulator based on device
-	tree
-In-Reply-To: <20111010173506.GH3607@opensource.wolfsonmicro.com>
-References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
-	<1318263578-7407-6-git-send-email-rnayak@ti.com>
-	<20111010173506.GH3607@opensource.wolfsonmicro.com>
-Message-ID: <CACYZBRFmLEY_f1UwJa5U9uj8+NVA-WfUVkiuW1yKrpwnrA_00A@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 11 Oct 2011 12:39:54 +0530
+Subject: [PATCH 00/24 V2] OMAP4: PM: suspend, CPU-hotplug and CPUilde
+	support
+In-Reply-To: <87ty7ghgiw.fsf@ti.com>
+References: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
+	<87ty7ghgiw.fsf@ti.com>
+Message-ID: <4E93EBC2.1060103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
->> + ? ? if (supply) {
->> + ? ? ? ? ? ? struct regulator_dev *r;
->> + ? ? ? ? ? ? struct device_node *node;
->> +
->> + ? ? ? ? ? ? /* first do a dt based lookup */
->> + ? ? ? ? ? ? if (dev) {
->> + ? ? ? ? ? ? ? ? ? ? node = of_get_regulator(dev, supply);
->> + ? ? ? ? ? ? ? ? ? ? if (node)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? list_for_each_entry(r, &regulator_list, list)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (node == r->dev.parent->of_node)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto found;
->> ? ? ? ? ? ? ? }
->>
->> - ? ? ? ? ? ? if (!found) {
->> - ? ? ? ? ? ? ? ? ? ? dev_err(dev, "Failed to find supply %s\n",
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? init_data->supply_regulator);
->> - ? ? ? ? ? ? ? ? ? ? ret = -ENODEV;
->> - ? ? ? ? ? ? ? ? ? ? goto scrub;
->> - ? ? ? ? ? ? }
->> + ? ? ? ? ? ? /* next try doing it non-dt way */
->> + ? ? ? ? ? ? list_for_each_entry(r, &regulator_list, list)
->> + ? ? ? ? ? ? ? ? ? ? if (strcmp(rdev_get_name(r), supply) == 0)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto found;
->>
->> + ? ? ? ? ? ? dev_err(dev, "Failed to find supply %s\n", supply);
->> + ? ? ? ? ? ? ret = -ENODEV;
->> + ? ? ? ? ? ? goto scrub;
->> +
->> +found:
->
-> This is all getting *really* complicated and illegible. ?I'm not sure
-> what the best way to structure is but erroring out early looks useful.
->
+On Monday 10 October 2011 11:31 PM, Kevin Hilman wrote:
+> Hi Santosh,
+> 
+> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+> 
+>> The series adds OMAP4 MPUSS (MPU SubSystem) power management support for
+>> suspend (S2R), CPU hotplug and CPUidle.
+> 
+> There are a few more compile errors when doing OMAP1-only builds.
+> You'll need a way to eliminate the secure calls for OMAP1.
+> 
+> This series causes a couple build errors when doing OMAP1-only builds
+> (I used omap1_defconfig):
+> 
+OK. Thanks for catching it.
 
-How about this updated patch?
+> First:
+> 
+> /work/kernel/omap/pm/arch/arm/plat-omap/common.c:24:30: fatal error: mach/omap-secure.h: No such file or directory
+> 
+> And trying creating a dummy header to see if it would continue to build gives:
+> 
+> /work/kernel/omap/pm/arch/arm/plat-omap/common.c: In function 'omap_reserve':
+> /work/kernel/omap/pm/arch/arm/plat-omap/common.c:70:2: error: implicit declaration of function 'omap_secure_ram_reserve_memblock'
+> make[2]: *** [arch/arm/plat-omap/common.o] Error 1
+> make[1]: *** [arch/arm/plat-omap] Error 2
+> 
+For OMAP1 build, omap_secure_ram_reserve_memblock() definition is
+needed since common.c is built for OMAP1 as well.
+The trivial change in the end of this email fixes the omap1 build.
+Have folded that change in original patch and updated the OMAP4
+PM branch - for_3_2/omap4-mpuss-pm_2
+
+Regards
+Santosh
+P.S : Even with this fix, omap1_defconfig build breaks because of USB.
+I removed USB from build to check rest of the build and it was
+fine then.
+
+---
+diff --git a/arch/arm/mach-omap2/include/mach/omap-secure.h
+b/arch/arm/mach-omap2/include/mach/omap-secure.h
+index 6e929c5..48247ce 100644
+--- a/arch/arm/mach-omap2/include/mach/omap-secure.h
++++ b/arch/arm/mach-omap2/include/mach/omap-secure.h
+@@ -51,7 +51,6 @@ extern u32 omap_secure_dispatcher(u32 idx, u32 flag,
+u32 nargs,
+ 				u32 arg1, u32 arg2, u32 arg3, u32 arg4);
+ extern u32 omap_smc2(u32 id, u32 falg, u32 pargs);
+ extern phys_addr_t omap_secure_ram_mempool_base(void);
+-extern int omap_secure_ram_reserve_memblock(void);
+
+ #endif /* __ASSEMBLER__ */
+ #endif /* OMAP_ARCH_OMAP_SECURE_H */
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index 827f896..d5ef8dc 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -21,7 +21,7 @@
+ #include <plat/vram.h>
+ #include <plat/dsp.h>
+
+-#include <mach/omap-secure.h>
++#include <plat/omap-secure.h>
+
+
+ #define NO_LENGTH_CHECK 0xffffffff
+diff --git a/arch/arm/plat-omap/include/plat/omap-secure.h
+b/arch/arm/plat-omap/include/plat/omap-secure.h
+new file mode 100644
+index 0000000..64f9d1c
+--- /dev/null
++++ b/arch/arm/plat-omap/include/plat/omap-secure.h
+@@ -0,0 +1,13 @@
++#ifndef __OMAP_SECURE_H__
++#define __OMAP_SECURE_H__
++
++#include <linux/types.h>
++
++#ifdef CONFIG_ARCH_OMAP2PLUS
++extern int omap_secure_ram_reserve_memblock(void);
++#else
++static inline void omap_secure_ram_reserve_memblock(void)
++{ }
++#endif
++
++#endif /* __OMAP_SECURE_H__ */
