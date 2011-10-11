@@ -1,35 +1,82 @@
-From: vdumpa@nvidia.com (Krishna Reddy)
-Date: Tue, 11 Oct 2011 11:13:31 -0700
-Subject: [Linaro-mm-sig] [PATCH 1/2] ARM: initial proof-of-concept IOMMU
-	mapper for DMA-mapping
-In-Reply-To: <00b101cc87ee$8976c410$9c644c30$%szyprowski@samsung.com>
-References: <1314971786-15140-1-git-send-email-m.szyprowski@samsung.com>
-	<1314971786-15140-2-git-send-email-m.szyprowski@samsung.com>
-	<594816116217195c28de13accaf1f9f2.squirrel@www.codeaurora.org>
-	<001f01cc786d$d55222c0$7ff66840$%szyprowski@samsung.com>
-	<401E54CE964CD94BAE1EB4A729C7087E37225197F8@HQMAIL04.nvidia.com>
-	<00b101cc87ee$8976c410$9c644c30$%szyprowski@samsung.com>
-Message-ID: <401E54CE964CD94BAE1EB4A729C7087E3722519A1F@HQMAIL04.nvidia.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 11 Oct 2011 11:24:46 -0700
+Subject: [PATCH v6 10/16] OMAP2+: UART: Modify omap_uart_can_sleep function
+In-Reply-To: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
+	(Govindraj R.'s message of "Fri, 30 Sep 2011 16:32:35 +0530")
+References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <87vcrv2xox.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marek,
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
->It looks that You have simplified arm_iommu_map_sg() function too much. 
->The main advantage of the iommu is to map scattered memory pages into 
->contiguous dma address space. DMA-mapping is allowed to merge consecutive
->entries in the scatter list if hardware supports that.
->http://article.gmane.org/gmane.linux.kernel/1128416
+> Modify the omap_uart_can_sleep function to check uart is active
+> or not to be used by pm code to enter low power states.
 
-I would update arm_iommu_map_sg() back to coalesce the sg list.
+Doesn't the driver now control when the UART clocks are gated (using
+runtime PM autosuspend)?
 
->I'm not sure if mmc drivers are aware of coalescing the SG entries together.
->If not the code must be updated to use dma_sg_len() and the dma entries
->number returned from dma_map_sg() call.
+IMO, this check should be completely removed and the driver should
+be managing this with the autosuspend timeout.
 
-MMC drivers seem to be aware of coalescing the SG entries together as they are using dma_sg_len().
+> Removing this check can cause console response little sluggish.
 
-Let me test and update the patch.
+Sluggish in what way?
 
---
-nvpublic
+If the driver is runtime suspended, it should only be sluggish for the
+first character.  After that, the autosuspend timeout should prevent it
+from feeling sluggish.
+
+> However no characters will be lost until uart clocks are gated
+> and woken up using rx-pad. UART interface clocks can be auto gated
+> this can make response on uart slower. This behaviour was observed
+> only on some of OMAP3 boards(beagleboard xm rev c).
+>
+> Reported-by: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> ---
+>  arch/arm/mach-omap2/serial.c |   21 +++++++++------------
+>  1 files changed, 9 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index 6725caf..ccf3550 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -156,23 +156,20 @@ static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
+>  
+>  int omap_uart_can_sleep(void)
+>  {
+> -	struct omap_uart_state *uart;
+> -	int can_sleep = 1;
+> -
+> -	list_for_each_entry(uart, &uart_list, node) {
+> -		if (!uart->clocked)
+> -			continue;
+> +	struct omap_hwmod *oh;
+> +	u8 i, ret = true;
+>  
+> -		if (!uart->can_sleep) {
+> -			can_sleep = 0;
+> +	for (i = 0; i < num_uarts; i++) {
+> +		oh = omap_uart_hwmod_lookup(i);
+
+This is a heavy operation to add for *every* entry into idle.
+
+> +		if (!oh)
+>  			continue;
+> -		}
+>  
+> -		/* This UART can now safely sleep. */
+> -		omap_uart_allow_sleep(uart);
+> +		if (oh->od && oh->od->pdev &&
+> +				!pm_runtime_suspended(&oh->od->pdev->dev))
+> +			return false;
+>  	}
+>  
+> -	return can_sleep;
+> +	return ret;
+>  }
+>  
+>  #ifdef CONFIG_OMAP_MUX
+
+Kevin
