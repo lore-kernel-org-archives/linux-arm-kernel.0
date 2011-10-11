@@ -1,173 +1,64 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 11 Oct 2011 10:11:12 -0500
-Subject: [PATCH] gpio: exynos4: Add device tree support
-In-Reply-To: <1318320974-9879-1-git-send-email-thomas.abraham@linaro.org>
-References: <1318320974-9879-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <4E945C90.1050601@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Oct 2011 17:18:52 +0200
+Subject: [PATCH 8/9] ARM: SPMP8000: Add support for the Letcool board
+In-Reply-To: <CAGVye5PNhQpdZ9QP-s1EM_Vm22fWC0sW+jV9=CbFivaTMTvkjQ@mail.gmail.com>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<201110111609.37425.arnd@arndb.de>
+	<CAGVye5PNhQpdZ9QP-s1EM_Vm22fWC0sW+jV9=CbFivaTMTvkjQ@mail.gmail.com>
+Message-ID: <201110111718.53031.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
-
-On 10/11/2011 03:16 AM, Thomas Abraham wrote:
-> As gpio chips get registered, a device tree node which represents the
-> gpio chip is searched and attached to it. A translate function is also
-> provided to convert the gpio specifier into actual platform settings
-> for pin function selection, pull up/down and driver strength settings.
+On Tuesday 11 October 2011, Zoltan Devai wrote:
+> >
+> > Hi Zoltan,
+> >
+> > We basically stopped doing board files for new platforms. Please get
+> > rid of this and make sure that the spmp8000-letcool.dts describes
+> > everything you need to get this board running. The DT_MACHINE_START
+> > part should just be part of the core.c file and not mention the
+> > board name, since its intended to apply to all boards with this
+> > SOC.
+> Hi,
 > 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> This patch is based on the latest consolidated Samsung GPIO driver available
-> in the following tree:
->   https://github.com/kgene/linux-samsung.git  branch: for-next
-> 
->  .../devicetree/bindings/gpio/gpio-samsung.txt      |   30 +++++++++++
->  drivers/gpio/gpio-samsung.c                        |   53 ++++++++++++++++++++
->  2 files changed, 83 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-samsung.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
-> new file mode 100644
-> index 0000000..883faeb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
-> @@ -0,0 +1,30 @@
-> +Samsung Exynos4 GPIO Controller
-> +
-> +Required properties:
-> +- compatible: Format of compatible property value should be
-> +  "samsung,exynos4-gpio-<controller_name>". Example: For GPA0 controller, the
-> +  compatible property value should be "samsung,exynos4-gpio-gpa0".
+> The board file only contains platform data for drivers which don't handle DT.
+> Should I strip those off ?
 
-Isn't gpa0 an instance of the h/w, not a version?
+Well, ideally you should add support for DT probing to those drivers.
+With all the new helpers we recently added, that should not require more
+code than what you have in the board file that you lose in the process.
 
-> +
-> +- reg: Physical base address of the controller and length of memory mapped region.
-> +
-> +- #gpio-cells: Should be 4. The syntax of the gpio specifier used by client nodes
-> +  should be the following with values derived from the SoC user manual.
-> +     <[phandle of the gpio controller node] <pin number within the gpio controller]
-> +      [mux function] [pull up/down] [drive strength]>
+> Does that also mean that no fully working ARM board will be allowed into
+> mainline until all required drivers do DT ?
 
-It would be better to list out the values here.
+Yes, sorry that this causes more work for you.
 
-> +
-> +- gpio-controller: Specifies that the node is a gpio controller.
-> +
-> +- #address-cells: should be 1.
-> +
-> +- #size-cells: should be 1. 
-> +
-> +Example:
-> +
-> +	gpa0: gpio-controller at 11400000 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "samsung,exynos4-gpio-gpa0";
-> +		reg = <0x11400000 0x20>;
-> +		#gpio-cells = <4>;
-> +		gpio-controller;
-> +	};
-> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-> index b6be77a..037d3bb 100644
-> --- a/drivers/gpio/gpio-samsung.c
-> +++ b/drivers/gpio/gpio-samsung.c
-> @@ -24,6 +24,10 @@
->  #include <linux/interrupt.h>
->  #include <linux/sysdev.h>
->  #include <linux/ioport.h>
-> +#ifdef CONFIG_OF
-> +#include <linux/of.h>
-> +#include <linux/slab.h>
-> +#endif
+The overall strategy is more complex, it depends a lot on the state that
+the platform is in:
 
-Don't need the ifdef here.
+1. For new platforms (prima2, zynq, picoxcell, highbank, spmp8000, ...),
+there is a single machine description and all devices are probed through
+the device tree. Board files are no longer allowed.
 
->  
->  #include <asm/irq.h>
->  
-> @@ -2353,6 +2357,52 @@ static struct samsung_gpio_chip exynos4_gpios_3[] = {
->  #endif
->  };
->  
-> +#if defined(CONFIG_ARCH_EXYNOS4) && defined(CONFIG_OF)
-> +int exynos4_gpio_xlate(struct gpio_chip *gc, struct device_node *np,
+2a For actively maintained platforms (omap, pxa, msm, samsung, at91, imx,
+...), the expectation is that the maintainers work on converting the
+drivers to device tree probing, but they can still add the occasional
+board file for important boards. Once all on board (not necessarily
+on-chip) devices can be probed using device tree, new boards files are
+not allowed any more, and existing board files should be removed
+(either all at once or gradually as dts files get added).
 
-static
+2b After an existing platform has lost its board files, we also want
+to remove the on-soc devices from platform files by moving them into
+the device tree. The method is the same: you get to add new socs only
+if you work on infrastructure to get rid of the code again and move
+it into dts files. Once the infrastructure is there, the existing
+soc descriptions should gradually go away.
 
-> +			 const void *gpio_spec, u32 *flags)
-> +{
-> +	const __be32 *gpio = gpio_spec;
-> +	const u32 n = be32_to_cpup(gpio);
-> +	unsigned int pin = gc->base + be32_to_cpu(gpio[0]);
-> +
-> +	if (gc->of_gpio_n_cells < 4) {
-> +		WARN_ON(1);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (n > gc->ngpio)
-> +		return -EINVAL;
-> +
-> +	s3c_gpio_cfgpin(pin, S3C_GPIO_SFN(be32_to_cpu(gpio[1])));
-> +	s3c_gpio_setpull(pin, be32_to_cpu(gpio[2]));
-> +	s5p_gpio_set_drvstr(pin, be32_to_cpu(gpio[3]));
-> +	return n;
-> +}
-> +
-> +static __init void exynos4_gpiolib_attach_ofnode(struct gpio_chip *gc)
-> +{
-> +	const char exynos4_gpio_compat_base[] = "samsung,exynos4-gpio-";
-> +	char *exynos4_gpio_compat;
-> +
-> +	exynos4_gpio_compat = kzalloc(strlen(exynos4_gpio_compat_base) +
-> +				strlen(gc->label), GFP_KERNEL);
-> +	if (!exynos4_gpio_compat)
-> +		return;
-> +
-> +	strcpy(exynos4_gpio_compat, exynos4_gpio_compat_base);
-> +	strcat(exynos4_gpio_compat, gc->label);
-> +	gc->of_node = of_find_compatible_node(NULL, NULL, exynos4_gpio_compat);
-> +	gc->of_gpio_n_cells = 4;
-> +	gc->of_xlate = exynos4_gpio_xlate;
-> +	kfree(exynos4_gpio_compat);
-> +}
-> +#else
-> +static __init void exynos4_gpiolib_attach_ofnode(struct gpio_chip *chip)
-> +{
-> +	return;
-> +}
-> +#endif /* defined(CONFIG_ARCH_EXYNOS4) && defined(CONFIG_OF) */
-> +
->  /* TODO: cleanup soc_is_* */
->  static __init int samsung_gpiolib_init(void)
->  {
-> @@ -2434,6 +2484,7 @@ static __init int samsung_gpiolib_init(void)
->  				chip->config = &exynos4_gpio_cfg;
->  				chip->group = group++;
->  			}
-> +			exynos4_gpiolib_attach_ofnode(&chip->chip);
->  		}
->  		samsung_gpiolib_add_4bit_chips(exynos4_gpios_1, nr_chips, S5P_VA_GPIO1);
->  
-> @@ -2446,6 +2497,7 @@ static __init int samsung_gpiolib_init(void)
->  				chip->config = &exynos4_gpio_cfg;
->  				chip->group = group++;
->  			}
-> +			exynos4_gpiolib_attach_ofnode(&chip->chip);
->  		}
->  		samsung_gpiolib_add_4bit_chips(exynos4_gpios_2, nr_chips, S5P_VA_GPIO2);
->  
-> @@ -2458,6 +2510,7 @@ static __init int samsung_gpiolib_init(void)
->  				chip->config = &exynos4_gpio_cfg;
->  				chip->group = group++;
->  			}
-> +			exynos4_gpiolib_attach_ofnode(&chip->chip);
->  		}
->  		samsung_gpiolib_add_4bit_chips(exynos4_gpios_3, nr_chips, S5P_VA_GPIO3);
->  
+3. For legacy platforms (rpc, sa1100, h720x, ...), I don't expect
+anyone to realistically work on device tree conversion. If someone
+sends a new board file, that would likely be accepted. Those platforms
+are also simple enough that doing everything using board files is
+not a signficant overhead.
 
-This code is really ugly, but I guess you inherited it. Converting to a
-platform driver and using id table would be much cleaner.
-
-Rob
+	Arnd
