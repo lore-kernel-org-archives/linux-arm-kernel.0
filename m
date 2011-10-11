@@ -1,43 +1,185 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 11 Oct 2011 19:43:14 +0530
-Subject: [PATCH 0/2] ARM: Samsung: Add basic device tree support for Exynos4
-	boards
-Message-ID: <1318342396-26178-1-git-send-email-thomas.abraham@linaro.org>
+Date: Tue, 11 Oct 2011 19:43:15 +0530
+Subject: [PATCH 1/2] ARM: Samsung: Add Exynos4 device tree enabled board file
+In-Reply-To: <1318342396-26178-1-git-send-email-thomas.abraham@linaro.org>
+References: <1318342396-26178-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1318342396-26178-2-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds a new basic device tree enabled machine/board file which is
-based on the Samsung's Exynos4 family of SoC's. Also included in this patchset is the
-dts file for Exynos4210 SoC, Samsung's SMDKV310 board and Insignal's Origen board.
+Add a new Exynos4 compatible device tree enabled board file. Boards based on
+the Exynos4 family of SoC's can use this as the machine/board file. When using
+this machine fike, a corresponding device tree blob which describes the board's
+properties should be supplied at boot time to the kernel.
 
-The Exynos4210 dts file includes support for IRQ, GPIO, WDT, RTC, UART, SDHCI, Keypad,
-DMA and I2C controllers. As device tree coverage for Exynos4210 increases, additional
-device nodes to represent the controllers should be added.
-
-The device tree enabled machine file enables boot on two boards based on the
-Exynos4210 SoC. This provides a starting point to add additional device tree support
-on these boards, migrate other existing Exynos4 based boards to use device tree
-and enable device tree based boot on new upcoming boards.
-
-This patchset has been tested on the following tree:
-  https://github.com/kgene/linux-samsung.git   branch: for-next
-
-Thomas Abraham (2):
-  ARM: Samsung: Add Exynos4 device tree enabled board file
-  ARM: dts: Add intial dts file for Exynos4210 SoC, SMDKV310 and Origen board
-
- .../devicetree/bindings/arm/insignal-boards.txt    |    8 +
- .../devicetree/bindings/arm/samsung-boards.txt     |    8 +
- arch/arm/boot/dts/exynos4210-origen.dts            |  137 +++++++
- arch/arm/boot/dts/exynos4210-smdkv310.dts          |  182 +++++++++
- arch/arm/boot/dts/exynos4210.dtsi                  |  403 ++++++++++++++++++++
- arch/arm/mach-exynos4/Kconfig                      |   14 +
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ .../devicetree/bindings/arm/insignal-boards.txt    |    8 ++
+ .../devicetree/bindings/arm/samsung-boards.txt     |    8 ++
+ arch/arm/mach-exynos4/Kconfig                      |   14 +++
  arch/arm/mach-exynos4/Makefile                     |    2 +
- arch/arm/mach-exynos4/mach-exynos4-dt.c            |   85 ++++
- 8 files changed, 839 insertions(+), 0 deletions(-)
+ arch/arm/mach-exynos4/mach-exynos4-dt.c            |   85 ++++++++++++++++++++
+ 5 files changed, 117 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/arm/insignal-boards.txt
  create mode 100644 Documentation/devicetree/bindings/arm/samsung-boards.txt
- create mode 100644 arch/arm/boot/dts/exynos4210-origen.dts
- create mode 100644 arch/arm/boot/dts/exynos4210-smdkv310.dts
- create mode 100644 arch/arm/boot/dts/exynos4210.dtsi
  create mode 100644 arch/arm/mach-exynos4/mach-exynos4-dt.c
+
+diff --git a/Documentation/devicetree/bindings/arm/insignal-boards.txt b/Documentation/devicetree/bindings/arm/insignal-boards.txt
+new file mode 100644
+index 0000000..524c3dc
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/insignal-boards.txt
+@@ -0,0 +1,8 @@
++* Insignal's Exynos4210 based Origen evaluation board
++
++Origen low-cost evaluation board is based on Samsung's Exynos4210 SoC.
++
++Required root node properties:
++    - compatible = should be one or more of the following.
++        (a) "samsung,smdkv310" - for Samsung's SMDKV310 eval board.
++        (b) "samsung,exynos4210"  - for boards based on Exynos4210 SoC.
+diff --git a/Documentation/devicetree/bindings/arm/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung-boards.txt
+new file mode 100644
+index 0000000..0bf68be
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/samsung-boards.txt
+@@ -0,0 +1,8 @@
++* Samsung's Exynos4210 based SMDKV310 evaluation board
++
++SMDKV310 evaluation board is based on Samsung's Exynos4210 SoC.
++
++Required root node properties:
++    - compatible = should be one or more of the following.
++        (a) "samsung,smdkv310" - for Samsung's SMDKV310 eval board.
++        (b) "samsung,exynos4210"  - for boards based on Exynos4210 SoC.
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index 0c5888a..39dc135 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -304,6 +304,20 @@ config MACH_SMDK4412
+ 	help
+ 	  Machine support for Samsung SMDK4412
+ 
++comment "Flattened Device Tree based board for Exynos4 based SoC"
++
++config MACH_EXYNOS4_DT
++	bool "Samsung Exynos4 Machine using device tree"
++	select CPU_EXYNOS4210
++	select USE_OF
++	select ARM_AMBA
++	select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
++	help
++	  Machine support for Samsung Exynos4 machine with device tree enabled.
++	  Select this if a fdt blob is available for the Exynos4 SoC based board.
++	  Note: This is under development and not all peripherals can be supported
++	  with this machine file.
++
+ endmenu
+ 
+ comment "Configuration for HSMMC bus width"
+diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+index 8066538..4e302cb 100644
+--- a/arch/arm/mach-exynos4/Makefile
++++ b/arch/arm/mach-exynos4/Makefile
+@@ -37,6 +37,8 @@ obj-$(CONFIG_MACH_ORIGEN)		+= mach-origen.o
+ obj-$(CONFIG_MACH_SMDK4212)		+= mach-smdk4x12.o
+ obj-$(CONFIG_MACH_SMDK4412)		+= mach-smdk4x12.o
+ 
++obj-$(CONFIG_MACH_EXYNOS4_DT)		+= mach-exynos4-dt.o
++
+ # device support
+ 
+ obj-y					+= dev-audio.o
+diff --git a/arch/arm/mach-exynos4/mach-exynos4-dt.c b/arch/arm/mach-exynos4/mach-exynos4-dt.c
+new file mode 100644
+index 0000000..85fa027
+--- /dev/null
++++ b/arch/arm/mach-exynos4/mach-exynos4-dt.c
+@@ -0,0 +1,85 @@
++/*
++ * Samsung's Exynos4210 flattened device tree enabled machine
++ *
++ * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ * Copyright (c) 2010-2011 Linaro Ltd.
++ *		www.linaro.org
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/of_platform.h>
++#include <linux/serial_core.h>
++
++#include <asm/mach/arch.h>
++#include <mach/map.h>
++
++#include <plat/cpu.h>
++#include <plat/regs-serial.h>
++#include <plat/exynos4.h>
++
++/*
++ * The following lookup table is used to override device names when devices
++ * are registered from device tree. This is temporarily added to enable
++ * device tree support addition for the Exynos4 architecture.
++ *
++ * For drivers that require platform data to be provided from the machine
++ * file, a platform data pointer can also be supplied along with the
++ * devices names. Usually, the platform data elements that cannot be parsed
++ * from the device tree by the drivers (example: function pointers) are
++ * supplied. But it should be noted that this is a temporary mechanism and
++ * at some point, the drivers should be capable of parsing all the platform
++ * data from the device tree.
++ */
++static const struct of_dev_auxdata exynos4210_auxdata_lookup[] __initconst = {
++	OF_DEV_AUXDATA("samsung,exynos4210-uart", S5P_PA_UART0,
++				"exynos4210-uart.0", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-uart", S5P_PA_UART1,
++				"exynos4210-uart.1", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-uart", S5P_PA_UART2,
++				"exynos4210-uart.2", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-uart", S5P_PA_UART3,
++				"exynos4210-uart.3", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-sdhci", EXYNOS4_PA_HSMMC(0),
++				"exynos4-sdhci.0", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-sdhci", EXYNOS4_PA_HSMMC(1),
++				"exynos4-sdhci.1", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-sdhci", EXYNOS4_PA_HSMMC(2),
++				"exynos4-sdhci.2", NULL),
++	OF_DEV_AUXDATA("samsung,exynos4210-sdhci", EXYNOS4_PA_HSMMC(3),
++				"exynos4-sdhci.3", NULL),
++	OF_DEV_AUXDATA("samsung,s3c2440-i2c", EXYNOS4_PA_IIC(0),
++				"s3c2440-i2c.0", NULL),
++	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA0, "dma-pl330.0", NULL),
++	OF_DEV_AUXDATA("arm,pl330", EXYNOS4_PA_PDMA1, "dma-pl330.1", NULL),
++	{},
++};
++
++static void __init exynos4210_dt_map_io(void)
++{
++	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
++	s3c24xx_init_clocks(24000000);
++}
++
++static void __init exynos4210_dt_machine_init(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table,
++				exynos4210_auxdata_lookup, NULL);
++}
++
++static char const *exynos4210_dt_compat[] __initdata = {
++	"samsung,exynos4210",
++	NULL
++};
++
++DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
++	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
++	.init_irq	= exynos4_init_irq,
++	.map_io		= exynos4210_dt_map_io,
++	.init_machine	= exynos4210_dt_machine_init,
++	.timer		= &exynos4_timer,
++	.dt_compat	= exynos4210_dt_compat,
++MACHINE_END
+-- 
+1.6.6.rc2
