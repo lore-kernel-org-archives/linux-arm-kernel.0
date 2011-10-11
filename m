@@ -1,46 +1,39 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 11 Oct 2011 10:53:15 +0100
-Subject: [RFC/PATCH 3/7] ARM: ARM11 MPCore: {clean,flush}_pmd_entry are
-	not preempt safe
-In-Reply-To: <1317955121-28047-4-git-send-email-gdavis@mvista.com>
+Date: Tue, 11 Oct 2011 10:56:39 +0100
+Subject: [RFC/PATCH 5/7] ARM: Move get_thread_info macro definition to
+	<asm/assembler.h>
+In-Reply-To: <1317955121-28047-6-git-send-email-gdavis@mvista.com>
 References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
 	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-4-git-send-email-gdavis@mvista.com>
-Message-ID: <20111011095314.GA23848@arm.com>
+	<1317955121-28047-6-git-send-email-gdavis@mvista.com>
+Message-ID: <20111011095639.GB23848@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 07, 2011 at 03:38:37AM +0100, gdavis at mvista.com wrote:
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 594d677..3c8253f 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -567,12 +567,24 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
->  		if (addr & SECTION_SIZE)
->  			pmd++;
+On Fri, Oct 07, 2011 at 03:38:39AM +0100, gdavis at mvista.com wrote:
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index 29035e8..78397d0 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -23,6 +23,19 @@
+>  #include <asm/ptrace.h>
+>  #include <asm/domain.h>
 >  
-> +		if (cache_ops_need_broadcast())
-> +			preempt_disable();
->  		do {
->  			*pmd = __pmd(phys | type->prot_sect);
->  			phys += SECTION_SIZE;
->  		} while (pmd++, addr += SECTION_SIZE, addr != end);
->  
-> +		/* FIXME: Multiple PMD entries may be written above
-> +		 * but only one cache line, up to 8 PMDs depending
-> +		 * on the alignment of this mapping, is flushed below.
-> +		 * IFF this mapping spans >8MiB, then only the first
-> +		 * 8MiB worth of entries will be flushed.  Entries
-> +		 * above the 8MiB limit will not be flushed if I
-> +		 * read this correctly.
-> +		 */
->  		flush_pmd_entry(p);
-> +		if (cache_ops_need_broadcast())
-> +			preempt_enable();
+> +#ifndef CONFIG_THUMB2_KERNEL
+> +	.macro	get_thread_info, rd
+> +	mov	\rd, sp, lsr #13
+> +	mov	\rd, \rd, lsl #13
+> +	.endm
+> +#else   /* CONFIG_THUMB2_KERNEL */
+> +	.macro	get_thread_info, rd
+> +	mov	\rd, sp
+> +	lsr	\rd, \rd, #13
+> +	mov	\rd, \rd, lsl #13
+> +	.endm
+> +#endif  /* !CONFIG_THUMB2_KERNEL */
 
-My reading of the create_mapping() code is that alloc_init_pud() and
-alloc_init_section() are called with a 2MB range only (that's 2
-entries) given by pgd_addr_end().
+We could even write some preempt_enable and preempt_disable asm macros,
+I think it would simplify the code in the other files.
 
 -- 
 Catalin
