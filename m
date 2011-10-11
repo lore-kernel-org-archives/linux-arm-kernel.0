@@ -1,35 +1,78 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 11 Oct 2011 11:32:56 +1100
-Subject: Please update linux-next url for tegra
-In-Reply-To: <CAOesGMjT+vyC8Jsjshrcz2f2xC=VEw+dTQh-rqLpjJMH5OJnag@mail.gmail.com>
-References: <CAOesGMjT+vyC8Jsjshrcz2f2xC=VEw+dTQh-rqLpjJMH5OJnag@mail.gmail.com>
-Message-ID: <20111011113256.5f3d76c064a33b409cf87be5@canb.auug.org.au>
+From: rajeshwari.birje@gmail.com (Rajeshwari Birje)
+Date: Tue, 11 Oct 2011 09:09:56 +0530
+Subject: [PATCH 3/3] ARM: SAMSUNG: Add lookup of sdhci-s3c clocks using
+	generic names
+In-Reply-To: <201110050930.32216.heiko@sntech.de>
+References: <1317792669-19925-1-git-send-email-rajeshwari.s@samsung.com>
+	<1317792669-19925-4-git-send-email-rajeshwari.s@samsung.com>
+	<201110050930.32216.heiko@sntech.de>
+Message-ID: <CAPs=JDfzgqBH2BTOqV_uxcA43zdv9883voDVDs9tPni9KvV23Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Heiko,
 
-On Mon, 10 Oct 2011 11:09:19 -0700 Olof Johansson <olof@lixom.net> wrote:
+Thank you for your comments,
+Will work on the same and  post the modified patches.
+
+Regards,
+Rajeshwari Shinde.
+
+
+On Wed, Oct 5, 2011 at 1:00 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Mittwoch, 5. Oktober 2011, 07:31:09 schrieb Rajeshwari Shinde:
+>> Add support for lookup of sdhci-s3c controller clocks using generic names
+>> for s3c2416, s3c64xx, s5pc100, s5pv210 and exynos4 SoC's.
+>>
+>> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
+>> ---
 >
-> I'm taking over running the main tegra repo for a while, so please
-> change the old android.git.kernel.org-hosted branch to instead pull:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-next
-
-OK, I will switch to this from today.
-
-> And please pull it after the arm-soc tree.
-
-No worries.
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-http://www.canb.auug.org.au/~sfr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111011/29cdf877/attachment.sig>
+> [...]
+>
+>> diff --git a/arch/arm/mach-s3c2416/clock.c b/arch/arm/mach-s3c2416/clock.c
+>> index 72b7c62..cebaf3f 100644
+>> --- a/arch/arm/mach-s3c2416/clock.c
+>> +++ b/arch/arm/mach-s3c2416/clock.c
+>
+> [...]
+>
+>> @@ -143,8 +142,14 @@ static struct clksrc_clk *clksrcs[] __initdata = {
+>> ? ? ? &hsspi_mux,
+>> ? ? ? &hsmmc_div[0],
+>> ? ? ? &hsmmc_div[1],
+>> - ? ? &hsmmc_mux[0],
+>> - ? ? &hsmmc_mux[1],
+>> + ? ? &hsmmc_mux0,
+>> + ? ? &hsmmc_mux1,
+>> +};
+>> +
+>> +static struct clk_lookup s3c2416_clk_lookup[] = {
+>> + ? ? CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.0", &hsmmc0_clk),
+> This is missing the s3c-sdhci.1 mmc_busclk.0 as 4th entry which is defined in
+> s3c2443-clock.c. The pclk for hsmmc1 is common to S3C2416/2450 and S3C2443 and
+> is therefore defined in plat-s3c24xx [S3C2443 only has a hsmmc1 to be exact].
+>
+> Also it would be nice to include the hsmmc-clock in mach-s3c2443/clock.c too.
+> The sdhci support there seems to be incomplete but it would be nice to have
+> the clocks similar to everything else if anyone wants to start on this arch.
+>
+>> + ? ? CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.2", &hsmmc_mux0.clk),
+>> + ? ? CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &hsmmc_mux1.clk),
+>> ?};
+>>
+>> ?void __init s3c2416_init_clocks(int xtal)
+>> @@ -164,6 +169,7 @@ void __init s3c2416_init_clocks(int xtal)
+>> ? ? ? ? ? ? ? s3c_register_clksrc(clksrcs[ptr], 1);
+>>
+>> ? ? ? s3c24xx_register_clock(&hsmmc0_clk);
+>> + ? ? clkdev_add_table(s3c2416_clk_lookup, ARRAY_SIZE(s3c2416_clk_lookup));
+>>
+>> ? ? ? s3c_pwmclk_init();
+>>
+>
+> Heiko
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
