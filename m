@@ -1,15 +1,13 @@
-From: bhook@pyrogon.com (bhook at pyrogon.com)
-Date: Tue, 11 Oct 2011 11:53:02 -0600
-Subject: Your email requires verification
-	verify#BnPqIJe51L0EH_wVSi4DF-1318355582)
-Message-ID: <E1RDgVi-00009Z-TY@trex.webhostserver.biz>
+From: linux-arm-kernel@lists.infradead.org (linux-arm-kernel at lists.infradead.org)
+Date: Tue, 11 Oct 2011 19:52:32 +0200
+Subject: Message could not be delivered
+Message-ID: <mailman.183.1318355595.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The message you sent requires that you verify that you 
-are a real live human being and not a spam source.
-
-To complete this verification, simply reply to this message and leave
-the subject line intact.
-
-The headers of the message sent from your address are shown below:
+A non-text attachment was scrubbed...
+Name: not available
+Type: multipart/mixed
+Size: 1 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111011/d3650cc6/attachment.bin>
