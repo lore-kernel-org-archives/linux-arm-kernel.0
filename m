@@ -1,60 +1,47 @@
-From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
-Date: Tue, 11 Oct 2011 09:30:16 +0200
-Subject: [Linaro-mm-sig] [PATCHv16 0/9] Contiguous Memory Allocator
-In-Reply-To: <00b001cc87e5$dc818cc0$9584a640$%szyprowski@samsung.com>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<4E92E003.4060901@stericsson.com>
-	<00b001cc87e5$dc818cc0$9584a640$%szyprowski@samsung.com>
-Message-ID: <4E93F088.60006@stericsson.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 11 Oct 2011 15:52:43 +0800
+Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
+In-Reply-To: <20111010133246.GG2451@mudshark.cambridge.arm.com>
+References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
+	<201110072251.40028.arnd@arndb.de>
+	<20111010103635.GA2451@mudshark.cambridge.arm.com>
+	<201110101320.24457.arnd@arndb.de>
+	<20111010133246.GG2451@mudshark.cambridge.arm.com>
+Message-ID: <20111011075241.GA25696@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2011 09:17 AM, Marek Szyprowski wrote:
-> On Monday, October 10, 2011 2:08 PM Maxime Coquelin wrote:
->
->       During our stress tests, we encountered some problems :
->
->       1) Contiguous allocation lockup:
->           When system RAM is full of Anon pages, if we try to allocate a
-> contiguous buffer greater than the min_free value, we face a
-> dma_alloc_from_contiguous lockup.
->           The expected result would be dma_alloc_from_contiguous() to fail.
->           The problem is reproduced systematically on our side.
-> Thanks for the report. Do you use Android's lowmemorykiller? I haven't
-> tested CMA on Android kernel yet. I have no idea how it will interfere
-> with Android patches.
->
+On Mon, Oct 10, 2011 at 02:32:46PM +0100, Will Deacon wrote:
+> On Mon, Oct 10, 2011 at 12:20:24PM +0100, Arnd Bergmann wrote:
+> > On Monday 10 October 2011, Will Deacon wrote:
+> > > Do you have any other ideas?
+> > 
+> > I think the best solution would be to ask Russell to put all the dependencies
+> > into a non-rebasing branch and publish that, or to alternatively merge your
+> > patches through his tree instead, with my Ack.
+> 
+> I don't think asking Russell to maintain a stable branch for each series
+> scales very well if multiple people are doing cross-platform work at the
+> same time. If he's happy merging platform code via his tree, then I'd prefer
+> to go down that route. In this case, it might make sense to try and catch
+> conflicts between his tree and arm-soc before they hit Linus (I guess -next
+> will take care of this?).
+> 
+> > Both of these will also have to wait for a few more days until Russell
+> > is back online.
+> 
+> Ok, I wasn't aware that we was away.
+> 
+> > Can you check if the devel-stable branch in his tree already contains the
+> > dependencies?
+> 
+> I just had a quick look and I can't seem them outside of the unstable for-next
+> branch.
+> 
+I also have a number of patches that imx6q series depends on only
+showing on rmk's for-next branch, and I have to hold imx6q pull request
+until these patches show up on some non-rebased tree. 
 
-The software used for this test (v16) is a generic 3.0 Kernel and a 
-minimal filesystem using Busybox.
-
-With v15 patchset, I also tested it with Android.
-IIRC, sometimes the lowmemorykiller succeed to get free space and the 
-contiguous allocation succeed, sometimes we faced  the lockup.
-
->>       2) Contiguous allocation fail:
->>           We have developed a small driver and a shell script to
->> allocate/release contiguous buffers.
->>           Sometimes, dma_alloc_from_contiguous() fails to allocate the
->> contiguous buffer (about once every 30 runs).
->>           We have 270MB Memory passed to the kernel in our configuration,
->> and the CMA pool is 90MB large.
->>           In this setup, the overall memory is either free or full of
->> reclaimable pages.
-> Yeah. We also did such stress tests recently and faced this issue. I've
-> spent some time investigating it but I have no solution yet.
->
-> The problem is caused by a page, which is put in the CMA area. This page
-> is movable, but it's address space provides no 'migratepage' method. In
-> such case mm subsystem uses fallback_migrate_page() function. Sadly this
-> function only returns -EAGAIN. The migration loops a few times over it
-> and fails causing the fail in the allocation procedure.
->
-> We are investing now which kernel code created/allocated such problematic
-> pages and how to add real migration support for them.
->
-
-Ok, thanks for pointing this out.
-
+-- 
 Regards,
-Maxime
+Shawn
