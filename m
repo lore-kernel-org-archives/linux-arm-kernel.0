@@ -1,146 +1,146 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 11 Oct 2011 13:45:06 +0300
-Subject: [PATCH v8 3/3] arm/tegra: device tree support for ventana board
-In-Reply-To: <1318329909-32601-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1318329909-32601-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1318329909-32601-4-git-send-email-pdeschrijver@nvidia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 11 Oct 2011 19:48:07 +0900
+Subject: [PATCH] rtc: rtc-s3c: Add device tree support
+In-Reply-To: <CAJuYYwQdeD=DEFSBqTTJM_EQcc517LPDy4w-N+mbHdH8Eqh=Dg@mail.gmail.com>
+References: <1315064959-16930-1-git-send-email-thomas.abraham@linaro.org>
+	<CAJuYYwQdeD=DEFSBqTTJM_EQcc517LPDy4w-N+mbHdH8Eqh=Dg@mail.gmail.com>
+Message-ID: <053801cc8803$43676230$ca362690$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change-Id: I5ed18750e6a8aa3242dae4bcd7165cfd819356d2
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- arch/arm/boot/dts/tegra-ventana.dts |   32 ++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/Kconfig         |    6 ++++++
- arch/arm/mach-tegra/Makefile.boot   |    1 +
- arch/arm/mach-tegra/board-dt.c      |   26 +++++++++++++++++++++-----
- 4 files changed, 60 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/tegra-ventana.dts
+Thomas Abraham wrote:
+> 
+> On 3 September 2011 21:19, Thomas Abraham <thomas.abraham@linaro.org>
+> wrote:
+> > Add device tree based discovery support for Samsung's rtc controller.
+> >
+> > Cc: Ben Dooks <ben-linux@fluff.org>
+> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> > ---
+> > ?Documentation/devicetree/bindings/rtc/s3c-rtc.txt | ? 20
+> ++++++++++++++++++++
+> > ?drivers/rtc/rtc-s3c.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 21
+> ++++++++++++++++++++-
+> > ?2 files changed, 40 insertions(+), 1 deletions(-)
+> > ?create mode 100644 Documentation/devicetree/bindings/rtc/s3c-rtc.txt
+> 
+> Ping. Any comments for this patch? If this looks fine, can this be
+> considered for 3.2 merge via the Samsung kernel tree.
+> 
+(Cc'ed Alessandro Zummo who is RTC Subsystem maintainer)
 
-diff --git a/arch/arm/boot/dts/tegra-ventana.dts b/arch/arm/boot/dts/tegra-ventana.dts
-new file mode 100644
-index 0000000..9b29a62
---- /dev/null
-+++ b/arch/arm/boot/dts/tegra-ventana.dts
-@@ -0,0 +1,32 @@
-+/dts-v1/;
-+
-+/memreserve/ 0x1c000000 0x04000000;
-+/include/ "tegra20.dtsi"
-+
-+/ {
-+	model = "NVIDIA Tegra2 Ventana evaluation board";
-+	compatible = "nvidia,ventana", "nvidia,tegra20";
-+
-+	chosen {
-+		bootargs = "vmalloc=192M video=tegrafb console=ttyS0,115200n8 root=/dev/ram rdinit=/sbin/init";
-+	};
-+
-+	memory {
-+		reg = < 0x00000000 0x40000000 >;
-+	};
-+
-+	serial at 70006300 {
-+		clock-frequency = < 216000000 >;
-+	};
-+
-+	sdhci at c8000400 {
-+		cd-gpios = <&gpio 69 0>; /* gpio PI5 */
-+		wp-gpios = <&gpio 57 0>; /* gpio PH1 */
-+		power-gpios = <&gpio 155 0>; /* gpio PT3 */
-+	};
-+
-+	sdhci at c8000600 {
-+		power-gpios = <&gpio 70 0>; /* gpio PI6 */
-+		support-8bit;
-+	};
-+};
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index d82ebab..91aff7c 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -69,6 +69,12 @@ config MACH_WARIO
-        help
-          Support for the Wario version of Seaboard
- 
-+config MACH_VENTANA
-+       bool "Ventana board"
-+       select MACH_TEGRA_DT
-+       help
-+         Support for the nVidia Ventana development platform
-+
- choice
-         prompt "Low-level debug console UART"
-         default TEGRA_DEBUG_UART_NONE
-diff --git a/arch/arm/mach-tegra/Makefile.boot b/arch/arm/mach-tegra/Makefile.boot
-index 5e870d2..bd12c9f 100644
---- a/arch/arm/mach-tegra/Makefile.boot
-+++ b/arch/arm/mach-tegra/Makefile.boot
-@@ -4,3 +4,4 @@ initrd_phys-$(CONFIG_ARCH_TEGRA_2x_SOC)	:= 0x00800000
- 
- dtb-$(CONFIG_MACH_HARMONY) += tegra-harmony.dtb
- dtb-$(CONFIG_MACH_SEABOARD) += tegra-seaboard.dtb
-+dtb-$(CONFIG_MACH_VENTANA) += tegra-ventana.dtb
-diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-index 9f47e04..96287a2 100644
---- a/arch/arm/mach-tegra/board-dt.c
-+++ b/arch/arm/mach-tegra/board-dt.c
-@@ -47,7 +47,7 @@
- 
- void harmony_pinmux_init(void);
- void seaboard_pinmux_init(void);
--
-+void ventana_pinmux_init(void);
- 
- struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("nvidia,tegra20-sdhci", TEGRA_SDMMC1_BASE, "sdhci-tegra.0", NULL),
-@@ -80,9 +80,19 @@ static struct of_device_id tegra_dt_gic_match[] __initdata = {
- 	{}
- };
- 
-+static struct {
-+	char *machine;
-+	void (*init)(void);
-+} pinmux_configs[] = {
-+	{ "nvidia,harmony", harmony_pinmux_init },
-+	{ "nvidia,seaboard", seaboard_pinmux_init },
-+	{ "nvidia,ventana", ventana_pinmux_init },
-+};
-+
- static void __init tegra_dt_init(void)
- {
- 	struct device_node *node;
-+	int i;
- 
- 	node = of_find_matching_node_by_address(NULL, tegra_dt_gic_match,
- 						TEGRA_ARM_INT_DIST_BASE);
-@@ -91,10 +101,15 @@ static void __init tegra_dt_init(void)
- 
- 	tegra_clk_init_from_table(tegra_dt_clk_init_table);
- 
--	if (of_machine_is_compatible("nvidia,harmony"))
--		harmony_pinmux_init();
--	else if (of_machine_is_compatible("nvidia,seaboard"))
--		seaboard_pinmux_init();
-+	for (i = 0; i < ARRAY_SIZE(pinmux_configs); i++) {
-+		if (of_machine_is_compatible(pinmux_configs[i].machine)) {
-+			pinmux_configs[i].init();
-+			break;
-+		}
-+	}
-+
-+	if (i == ARRAY_SIZE(pinmux_configs))
-+		WARN(1, "Unknown platform! Pinmuxing not initialized\n");
- 
- 	/*
- 	 * Finished with the static registrations now; fill in the missing
-@@ -106,6 +121,7 @@ static void __init tegra_dt_init(void)
- static const char * tegra_dt_board_compat[] = {
- 	"nvidia,harmony",
- 	"nvidia,seaboard",
-+	"nvidia,ventana",
- 	NULL
- };
- 
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+I'm ok with this, so if this can be got the ack from Grant and Alessandro,
+will take this.
+
+> >
+> > diff --git a/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
+> b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
+> > new file mode 100644
+> > index 0000000..90ec45f
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
+> > @@ -0,0 +1,20 @@
+> > +* Samsung's S3C Real Time Clock controller
+> > +
+> > +Required properties:
+> > +- compatible: should be one of the following.
+> > + ? ?* "samsung,s3c2410-rtc" - for controllers compatible with s3c2410
+rtc.
+> > + ? ?* "samsung,s3c6410-rtc" - for controllers compatible with s3c6410
+rtc.
+> > +- reg: physical base address of the controller and length of memory
+mapped
+> > + ?region.
+> > +- interrupts: Two interrupt numbers to the cpu should be specified.
+First
+> > + ?interrupt number is the rtc alarm interupt and second interrupt
+number
+> > + ?is the rtc tick interrupt. The number of cells representing a
+interrupt
+> > + ?depends on the parent interrupt controller.
+> > +
+> > +Example:
+> > +
+> > + ? ? ? rtc at 10070000 {
+> > + ? ? ? ? ? ? ? compatible = "samsung,s3c6410-rtc";
+> > + ? ? ? ? ? ? ? reg = <0x10070000 0x100>;
+> > + ? ? ? ? ? ? ? interrupts = <44 0 45 0>;
+> > + ? ? ? };
+> > diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> > index 4e7c04e..29f928c 100644
+> > --- a/drivers/rtc/rtc-s3c.c
+> > +++ b/drivers/rtc/rtc-s3c.c
+> > @@ -25,6 +25,7 @@
+> > ?#include <linux/clk.h>
+> > ?#include <linux/log2.h>
+> > ?#include <linux/slab.h>
+> > +#include <linux/of.h>
+> >
+> > ?#include <mach/hardware.h>
+> > ?#include <asm/uaccess.h>
+> > @@ -481,7 +482,13 @@ static int __devinit s3c_rtc_probe(struct
+> platform_device *pdev)
+> > ? ? ? ? ? ? ? ?goto err_nortc;
+> > ? ? ? ?}
+> >
+> > - ? ? ? s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
+> > +#ifdef CONFIG_OF
+> > + ? ? ? if (pdev->dev.of_node)
+> > + ? ? ? ? ? ? ? s3c_rtc_cpu_type = of_device_is_compatible(pdev-
+> >dev.of_node,
+> > + ? ? ? ? ? ? ? ? ? ? ? "samsung,s3c6410-rtc") ? TYPE_S3C64XX :
+> TYPE_S3C2410;
+> > + ? ? ? else
+> > +#endif
+> > + ? ? ? ? ? ? ? s3c_rtc_cpu_type =
+platform_get_device_id(pdev)->driver_data;
+> >
+> > ? ? ? ?/* Check RTC Time */
+> >
+> > @@ -603,6 +610,17 @@ static int s3c_rtc_resume(struct platform_device
+*pdev)
+> > ?#define s3c_rtc_resume ?NULL
+> > ?#endif
+> >
+> > +#ifdef CONFIG_OF
+> > +static const struct of_device_id s3c_rtc_dt_match[] = {
+> > +       { .compatible = "samsung,s3c2410-rtc" },
+     ^^^^^^^
+> > +       { .compatible = "samsung,s3c6410-rtc" },
+     ^^^^^^^
+> > +       {},
+     ^^^^^^^
+should be Tab?
+
+> > +};
+> > +MODULE_DEVICE_TABLE(of, s3c_rtc_dt_match);
+> > +#else
+> > +#define s3c_rtc_dt_match NULL
+> > +#endif
+> > +
+> > ?static struct platform_device_id s3c_rtc_driver_ids[] = {
+> > ? ? ? ?{
+> > ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "s3c2410-rtc",
+> > @@ -625,6 +643,7 @@ static struct platform_driver s3c_rtc_driver = {
+> > ? ? ? ?.driver ? ? ? ? = {
+> > ? ? ? ? ? ? ? ?.name ? = "s3c-rtc",
+> > ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
+> > +               .of_match_table = s3c_rtc_dt_match,
+     ^^^^^^^^^^^^^^^
+Same as above...
+
+But I know, Thomas' original patch has no problem...probably when ping,
+happened above.
+
+> > ? ? ? ?},
+> > ?};
+> >
+> > --
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
