@@ -1,61 +1,43 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 11 Oct 2011 10:00:25 -0700
-Subject: [PATCH 00/24 V2] OMAP4: PM: suspend,
-	CPU-hotplug and CPUilde support
-In-Reply-To: <4E93EBC2.1060103@ti.com> (Santosh Shilimkar's message of "Tue,
-	11 Oct 2011 12:39:54 +0530")
-References: <1316844884-21700-1-git-send-email-santosh.shilimkar@ti.com>
-	<87ty7ghgiw.fsf@ti.com> <4E93EBC2.1060103@ti.com>
-Message-ID: <87k48b79au.fsf@ti.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 11 Oct 2011 19:01:23 +0200
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <20111011103820.GF2138@amd.com>
+References: <20110927100505.GH2138@amd.com>
+	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
+	<20110927131222.GL2138@amd.com>
+	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
+	<20110927181438.GM2138@amd.com>
+	<CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
+	<20111010094738.GW2138@amd.com>
+	<CAK=WgbZ7Wyax1yfS1jSXw9OdwMtxxidwLO8PTsNUXX9CWzmVrw@mail.gmail.com>
+	<20111010153609.GB2138@amd.com>
+	<CAK=WgbbnuO67X46sqS87q2vw2TWq3Ekvw5p1PmXvXinQXMyowg@mail.gmail.com>
+	<20111011103820.GF2138@amd.com>
+Message-ID: <CAK=WgbYOUZNX0OmRwZNO1mMG+3DZXwff+S60ESWixf04HOcbtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
+On Tue, Oct 11, 2011 at 12:38 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> You need to make sure that you don;t pass larger regions then requested
+> to the low-level driver. Some logic like in the iommu_map function
+> should do it.
 
-> On Monday 10 October 2011 11:31 PM, Kevin Hilman wrote:
->> Hi Santosh,
->> 
->> Santosh Shilimkar <santosh.shilimkar@ti.com> writes:
->> 
->>> The series adds OMAP4 MPUSS (MPU SubSystem) power management support for
->>> suspend (S2R), CPU hotplug and CPUidle.
->> 
->> There are a few more compile errors when doing OMAP1-only builds.
->> You'll need a way to eliminate the secure calls for OMAP1.
->> 
->> This series causes a couple build errors when doing OMAP1-only builds
->> (I used omap1_defconfig):
->> 
-> OK. Thanks for catching it.
->
->> First:
->> 
->> /work/kernel/omap/pm/arch/arm/plat-omap/common.c:24:30: fatal error: mach/omap-secure.h: No such file or directory
->> 
->> And trying creating a dummy header to see if it would continue to build gives:
->> 
->> /work/kernel/omap/pm/arch/arm/plat-omap/common.c: In function 'omap_reserve':
->> /work/kernel/omap/pm/arch/arm/plat-omap/common.c:70:2: error: implicit declaration of function 'omap_secure_ram_reserve_memblock'
->> make[2]: *** [arch/arm/plat-omap/common.o] Error 1
->> make[1]: *** [arch/arm/plat-omap] Error 2
->> 
-> For OMAP1 build, omap_secure_ram_reserve_memblock() definition is
-> needed since common.c is built for OMAP1 as well.
-> The trivial change in the end of this email fixes the omap1 build.
+You're right. But the solution IMHO should be getting rid of that size
+-> order -> size conversion which we do back and forth, as it's kinda
+pointless.
 
-Looks good.
+> Please use PAGE_SIZE instead of 0x1000UL.
 
-> Have folded that change in original patch and updated the OMAP4
-> PM branch - for_3_2/omap4-mpuss-pm_2
+This one would go away too if we remove the size -> order -> size
+conversions. In fact, iommu_unmap() just becomes so much simpler when
+we do that.
 
-Thanks.
+I'm attaching two patches: first one that removes the
+size->order->size conversions we have, and then the usual pgsize patch
+rebased to it.
 
-> Regards
-> Santosh
-> P.S : Even with this fix, omap1_defconfig build breaks because of USB.
-> I removed USB from build to check rest of the build and it was
-> fine then.
+Please take a look,
 
-OK.
-
-Kevin
+Thanks,
+Ohad.
