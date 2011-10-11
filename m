@@ -1,47 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 11 Oct 2011 15:40:05 +0100
-Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
-In-Reply-To: <201110111617.52061.arnd@arndb.de>
+From: zdevai@gmail.com (Zoltan Devai)
+Date: Tue, 11 Oct 2011 16:43:12 +0200
+Subject: [PATCH 8/9] ARM: SPMP8000: Add support for the Letcool board
+In-Reply-To: <201110111609.37425.arnd@arndb.de>
 References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<CAGVye5Nc9vhaF=7Y+hvGo4g-GOFb9fHeni+g=+hTj-8WCSqY+Q@mail.gmail.com>
-	<20111010114407.GD3607@opensource.wolfsonmicro.com>
-	<201110111617.52061.arnd@arndb.de>
-Message-ID: <20111011144005.GI3471@opensource.wolfsonmicro.com>
+	<1318178172-7965-9-git-send-email-zoss@devai.org>
+	<201110111609.37425.arnd@arndb.de>
+Message-ID: <CAGVye5PNhQpdZ9QP-s1EM_Vm22fWC0sW+jV9=CbFivaTMTvkjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 04:17:51PM +0200, Arnd Bergmann wrote:
-> On Monday 10 October 2011, Mark Brown wrote:
+2011/10/11 Arnd Bergmann <arnd@arndb.de>:
+> On Sunday 09 October 2011, Zoltan Devai wrote:
+>> Signed-off-by: Zoltan Devai <zoss@devai.org>
+>> ---
+>> ?arch/arm/mach-spmp8000/board_letcool.c ? ? ? ? ? | ?154 ++++++++++++++++++++++
+>> ?arch/arm/mach-spmp8000/include/mach/spmp8000fb.h | ? 32 +++++
+>> ?2 files changed, 186 insertions(+), 0 deletions(-)
+>> ?create mode 100644 arch/arm/mach-spmp8000/board_letcool.c
+>> ?create mode 100644 arch/arm/mach-spmp8000/include/mach/spmp8000fb.h
+>
+> Hi Zoltan,
+>
+> We basically stopped doing board files for new platforms. Please get
+> rid of this and make sure that the spmp8000-letcool.dts describes
+> everything you need to get this board running. The DT_MACHINE_START
+> part should just be part of the core.c file and not mention the
+> board name, since its intended to apply to all boards with this
+> SOC.
+Hi,
 
-> > At the minute it seems to me that arch/arm is as good a place as any
-> > really - currently this code is getting dumped wherever the main device
-> > is.
+The board file only contains platform data for drivers which don't handle DT.
+Should I strip those off ?
 
-> My feeling is that there is a general class of drivers involving
-> the gpio, pinmux, pwm, led, adc and dac: these are basically all
-> things you do with a single pin. Right now we have subsystems for
-> some of them, adding some others and don't have anything for adc
-> basides iio (which only partially fits here).
+Does that also mean that no fully working ARM board will be allowed into
+mainline until all required drivers do DT ?
 
-We've been round this loop repeatedly before, trying to push all this
-stuff into pins really doesn't map terribly well.  For example, SoCs
-will frequently have PWM controllers which are isolated IP blocks within
-the device and may each have multiple mappings out of the device onto
-pins.  In the case of DACs, ADCs and PWM you definitely don't have a one
-to one mapping with a single pin - they can be differential inputs and
-outputs, or entirely internal to a device.  Trying to push everything
-into a single namespace just makes things confusing.
-
-What we *do* have a pattern of is clk API type lookups based on a
-device/name pair.
-
-> Since there is no externally visible interface for this kind of
-> adc driver, we can always fix it later, which helps a lot. How
-> about putting it into drivers/adc or drivers/misc/adc for now
-> and waiting for others to join it? We can then later make it a
-> proper subsystem along the lines of gpio and pwm and move
-> interfaces for input, hwmon and iio into the subsystem.
-
-I'm not sure that IIO isn't the kernel subsystem we're looking for here
-- as I keep saying when this comes up it's just representing bare DACs
-and ADCs pretty directly which looks like a generic subsystem to me.
+Zoltan
