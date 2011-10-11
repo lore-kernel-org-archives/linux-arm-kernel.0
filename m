@@ -1,58 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Oct 2011 17:24:47 +0200
-Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
-In-Reply-To: <20111011144005.GI3471@opensource.wolfsonmicro.com>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<201110111617.52061.arnd@arndb.de>
-	<20111011144005.GI3471@opensource.wolfsonmicro.com>
-Message-ID: <201110111724.48069.arnd@arndb.de>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Tue, 11 Oct 2011 17:27:38 +0200
+Subject: TX28 drivers - Please help
+In-Reply-To: <4E9453A5.2000501@prolan.hu>
+References: <4E9453A5.2000501@prolan.hu>
+Message-ID: <20111011152738.GB18273@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 October 2011, Mark Brown wrote:
-> On Tue, Oct 11, 2011 at 04:17:51PM +0200, Arnd Bergmann wrote:
-> > On Monday 10 October 2011, Mark Brown wrote:
-> 
-> > > At the minute it seems to me that arch/arm is as good a place as any
-> > > really - currently this code is getting dumped wherever the main device
-> > > is.
-> 
-> > My feeling is that there is a general class of drivers involving
-> > the gpio, pinmux, pwm, led, adc and dac: these are basically all
-> > things you do with a single pin. Right now we have subsystems for
-> > some of them, adding some others and don't have anything for adc
-> > basides iio (which only partially fits here).
-> 
-> We've been round this loop repeatedly before, trying to push all this
-> stuff into pins really doesn't map terribly well.  For example, SoCs
-> will frequently have PWM controllers which are isolated IP blocks within
-> the device and may each have multiple mappings out of the device onto
-> pins.  In the case of DACs, ADCs and PWM you definitely don't have a one
-> to one mapping with a single pin - they can be differential inputs and
-> outputs, or entirely internal to a device.  Trying to push everything
-> into a single namespace just makes things confusing.
+Hi Peter,
 
-I didn't mean to suggest that they should be the same subsystem, but
-it would be nice to use similar in-kernel interfaces so that a driver
-author doesn't have to learn about six different interfaces for
-a new soc. If we add an adc subsystem, I would definitely recommend
-looking at how the others work.
+On Tue, Oct 11, 2011 at 04:33:09PM +0200, Peter Rusko wrote:
+> We'd like to use the Ka-Ro TX28 module in a device with our company.
+> As I could see, not all the features of it's processor are supported.
+> I have already added some of them using the Freescale version just to
+> see that things are working, but the code became really messy. So I've
+> decided to restart, and this time I'd like to commit the changes to
+> the mainline kernel.
 
-> > Since there is no externally visible interface for this kind of
-> > adc driver, we can always fix it later, which helps a lot. How
-> > about putting it into drivers/adc or drivers/misc/adc for now
-> > and waiting for others to join it? We can then later make it a
-> > proper subsystem along the lines of gpio and pwm and move
-> > interfaces for input, hwmon and iio into the subsystem.
-> 
-> I'm not sure that IIO isn't the kernel subsystem we're looking for here
-> - as I keep saying when this comes up it's just representing bare DACs
-> and ADCs pretty directly which looks like a generic subsystem to me.
+This is in general a good idea :-)
 
-Possible, yes. Until now, IIO is a subsystem for user-level access
-not for kernel access though, so it's not the right place yet.
-If we decide to let IIO handle all ADC input, do you think it would
-also be the right place to do PWM output, rather than having a
-separate subsystem for that?
+> We have already designed a company board supporting the TX28 module.
+> The first problem I don't know how to do well is to separate the
+> module and the baseboard.
 
-	Arnd
+Uwe proposed a baseboard abstraction patch some time ago (should be in
+the list archives, drop me a note if you do not find it), because we
+have the same issue on several TX28 customer boards as well (and with
+other module hardware, like the Phytec modules). However, the general
+position seems to be that this path will not lead into mainline, becasue
+of oftree (which is, for the long term, of course the better solution).
+
+rsc
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
