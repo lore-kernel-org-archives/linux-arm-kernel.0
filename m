@@ -1,39 +1,103 @@
-From: rusko.peter@prolan.hu (Peter Rusko)
-Date: Tue, 11 Oct 2011 16:33:09 +0200
-Subject: TX28 drivers - Please help
-Message-ID: <4E9453A5.2000501@prolan.hu>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 11 Oct 2011 19:55:41 +0530
+Subject: [PATCH 3/4] ARM: at91/dma: remove platform data from DMA
+	controller
+In-Reply-To: <2b6ff9c8a28c955849f13b90c5ef258ceea19eaa.1318264339.git.nicolas.ferre@atmel.com>
+References: <1314075338.22120.3.camel@vkoul-udesk3>
+	<9723283e7097730f568bf7c2f3a93ae42c6bc5ca.1318264339.git.nicolas.ferre@atmel.com>
+	<2b6ff9c8a28c955849f13b90c5ef258ceea19eaa.1318264339.git.nicolas.ferre@atmel.com>
+Message-ID: <1318343141.1546.353.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, 2011-10-10 at 18:37 +0200, Nicolas Ferre wrote:
+> DMA controller can deduce its configuration data from
+> the platform. Remove the platform data and match device
+> types with the compatible ones.
+This looks like remove, you should fix the changelog of patch 1 then.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/mach-at91/at91sam9g45_devices.c |    9 +--------
+>  arch/arm/mach-at91/at91sam9rl_devices.c  |    8 +-------
+>  2 files changed, 2 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 600bffb..c9b897f 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -38,10 +38,6 @@
+>  #if defined(CONFIG_AT_HDMAC) || defined(CONFIG_AT_HDMAC_MODULE)
+>  static u64 hdmac_dmamask = DMA_BIT_MASK(32);
+>  
+> -static struct at_dma_platform_data atdma_pdata = {
+> -	.nr_channels	= 8,
+> -};
+> -
+>  static struct resource hdmac_resources[] = {
+>  	[0] = {
+>  		.start	= AT91_BASE_SYS + AT91_DMA,
+> @@ -56,12 +52,11 @@ static struct resource hdmac_resources[] = {
+>  };
+>  
+>  static struct platform_device at_hdmac_device = {
+> -	.name		= "at_hdmac",
+> +	.name		= "at91sam9g45_dma",
+>  	.id		= -1,
+>  	.dev		= {
+>  				.dma_mask		= &hdmac_dmamask,
+>  				.coherent_dma_mask	= DMA_BIT_MASK(32),
+> -				.platform_data		= &atdma_pdata,
+>  	},
+>  	.resource	= hdmac_resources,
+>  	.num_resources	= ARRAY_SIZE(hdmac_resources),
+> @@ -69,8 +64,6 @@ static struct platform_device at_hdmac_device = {
+>  
+>  void __init at91_add_device_hdmac(void)
+>  {
+> -	dma_cap_set(DMA_MEMCPY, atdma_pdata.cap_mask);
+> -	dma_cap_set(DMA_SLAVE, atdma_pdata.cap_mask);
+>  	platform_device_register(&at_hdmac_device);
+>  }
+>  #else
+> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+> index aacb19d..81954f7 100644
+> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+> @@ -33,10 +33,6 @@
+>  #if defined(CONFIG_AT_HDMAC) || defined(CONFIG_AT_HDMAC_MODULE)
+>  static u64 hdmac_dmamask = DMA_BIT_MASK(32);
+>  
+> -static struct at_dma_platform_data atdma_pdata = {
+> -	.nr_channels	= 2,
+> -};
+> -
+>  static struct resource hdmac_resources[] = {
+>  	[0] = {
+>  		.start	= AT91_BASE_SYS + AT91_DMA,
+> @@ -51,12 +47,11 @@ static struct resource hdmac_resources[] = {
+>  };
+>  
+>  static struct platform_device at_hdmac_device = {
+> -	.name		= "at_hdmac",
+> +	.name		= "at91sam9rl_dma",
+>  	.id		= -1,
+>  	.dev		= {
+>  				.dma_mask		= &hdmac_dmamask,
+>  				.coherent_dma_mask	= DMA_BIT_MASK(32),
+> -				.platform_data		= &atdma_pdata,
+>  	},
+>  	.resource	= hdmac_resources,
+>  	.num_resources	= ARRAY_SIZE(hdmac_resources),
+> @@ -64,7 +59,6 @@ static struct platform_device at_hdmac_device = {
+>  
+>  void __init at91_add_device_hdmac(void)
+>  {
+> -	dma_cap_set(DMA_MEMCPY, atdma_pdata.cap_mask);
+>  	platform_device_register(&at_hdmac_device);
+>  }
+>  #else
 
-We'd like to use the Ka-Ro TX28 module in a device with our company.
-As I could see, not all the features of it's processor are supported. I 
-have already added some of them using the Freescale version just to see 
-that things are working, but the code became really messy. So I've 
-decided to restart, and this time I'd like to commit the changes to the 
-mainline kernel.
 
-We have already designed a company board supporting the TX28 module. The 
-first problem I don't know how to do well is to separate the module and 
-the baseboard. I think that the module-specific things and setup should 
-be in a file like mach-tx28.c (as it already is), and the board specific 
-things should be in a separate file (mach-karo_stk.c ?). I'm quite 
-unsure about the naming and where I should split the code.
-
-After that works, I'd like to include support for SPI and the mxs 
-touchscreen driver (which also needs the LRADC support).
-
-How should I start? I've already downloaded the pengutronix/imx 
-repository to work with.
 -- 
-Rusk? P?ter
-fejleszt?m?rn?k
-
-Prolan Zrt. / Prolan Co.
-Hungary 2011 Budakal?sz, Szentendrei ?t 1-3.
-Tel./Phone: +36 20 954 3118
-Fax: +36 26 540 420
-E-mail: rusko.peter at prolan.hu
-Web: www.prolan.hu
-Timezone:CET
+~Vinod
