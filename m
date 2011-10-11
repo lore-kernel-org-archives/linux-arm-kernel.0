@@ -1,189 +1,82 @@
-From: richard.zhao@freescale.com (Richard Zhao)
-Date: Tue, 11 Oct 2011 19:49:07 +0800
-Subject: [PATCH v2 2/7] clk: Implement clk_set_rate
-In-Reply-To: <1316730422-20027-3-git-send-email-mturquette@ti.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-3-git-send-email-mturquette@ti.com>
-Message-ID: <20111011114906.GB27815@b20223-02.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 11 Oct 2011 20:56:23 +0900
+Subject: [RESEND][PATCH V2 0/2] Add a common macro for creating struct
+	clk_lookup entries
+In-Reply-To: <1318333530-7023-1-git-send-email-padma.v@samsung.com>
+References: <1318333530-7023-1-git-send-email-padma.v@samsung.com>
+Message-ID: <057301cc880c$cc7f1f50$657d5df0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 03:26:57PM -0700, Mike Turquette wrote:
-> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+Padmavathi Venna wrote:
 > 
-> Implement clk_set_rate by adding a set_rate callback to clk_hw_ops.
-> Rates are propagated down the clock tree and recalculated.  Also adds a
-> flag for signaling that parents must change rates to achieve the desired
-> frequency (upstream propagation).
+> From: Padmavathi Venna <padma.v@samsung.com>
 > 
-> TODO:
-> Upstream propagation is not yet implemented.
-> Device pre-change and post-change notifications are not implemented, but
-> are marked up as FIXME comments.
+> This patchset consolidates the macro that creates 'struct clk_lookup'
+> entries by introducing a common macro 'CLKDEV_INIT' as suggested by
+> Russell King. Few of the platforms have been modified to use this new
+macro.
 > 
-> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Signed-off-by: Mike Turquette <mturquette@ti.com>
-> ---
-> Changes since v1:
-> Remove upstream propagation (for now)
-> Rename CLK_SET_RATE_PROPAGATE to CLK_PARENT_RATE_CHANGE
+> I have done the replacement by using python script. I have only build
+tested
+> for below platforms with existing defconfigs.
 > 
->  drivers/clk/clk.c   |   71 ++++++++++++++++++++++++++++++++++++++++++++++----
->  include/linux/clk.h |   12 ++++++++
->  2 files changed, 77 insertions(+), 6 deletions(-)
+> Changes since V1:
+> - Removed "&" and "," from the CLKDEV_INIT macro.
+> - Replaced the platform specific macros to use the new CLKDEV_INIT macro.
+> - Rebased the patches on the latest master branch of Linux-Next.
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 1cd7315..86636c2 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -21,6 +21,8 @@ struct clk {
->  	unsigned int		enable_count;
->  	unsigned int		prepare_count;
->  	struct clk		*parent;
-> +	struct hlist_head	children;
-> +	struct hlist_node	child_node;
->  	unsigned long		rate;
->  };
->  
-> @@ -176,10 +178,57 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
->  }
->  EXPORT_SYMBOL_GPL(clk_round_rate);
->  
-> +/*
-> + * clk_recalc_rates - Given a clock (with a recently updated clk->rate),
-> + *	notify its children that the rate may need to be recalculated, using
-> + *	ops->recalc_rate().
-> + */
-> +static void clk_recalc_rates(struct clk *clk)
-> +{
-> +	struct hlist_node *tmp;
-> +	struct clk *child;
-> +
-> +	if (clk->ops->recalc_rate)
-> +		clk->rate = clk->ops->recalc_rate(clk->hw);
-pass it parent rate if recalc_rate is NULL?
-> +
-> +	/* FIXME add post-rate change notification here */
-> +
-> +	hlist_for_each_entry(child, tmp, &clk->children, child_node)
-> +		clk_recalc_rates(child);
-> +}
-> +
->  int clk_set_rate(struct clk *clk, unsigned long rate)
->  {
-> -	/* not yet implemented */
-> -	return -ENOSYS;
-> +	unsigned long parent_rate, new_rate;
-> +	int ret = 0;
-> +
-> +	if (!clk->ops->set_rate)
-> +		return -ENOSYS;
-> +
-> +	new_rate = rate;
-> +
-> +	/* prevent racing with updates to the clock topology */
-> +	mutex_lock(&prepare_lock);
-> +
-> +	/* FIXME add pre-rate change notification here */
-> +
-> +	ret = clk->ops->set_rate(clk->hw, new_rate, &parent_rate);
-> +
-> +	/* FIXME ignores CLK_PARENT_RATE_CHANGE */
-why do we need upstream propagate? for cascaded dividers? It may effect
-parent's other children.
-Does rate have to be rate returned by round_rate? I guess we can
-accept none exact rate.
+> Padmavathi Venna (2):
+>   ARM: CLKDEV: Add Common Macro for clk_lookup
+>   ARM: Using CLKDEV_INIT for creating clk_lookup instance
+> 
+>  arch/arm/mach-davinci/board-dm646x-evm.c |    5 +-
+>  arch/arm/mach-davinci/clock.h            |    7 --
+>  arch/arm/mach-davinci/da830.c            |  101 ++++++++++----------
+>  arch/arm/mach-davinci/da850.c            |   95 ++++++++++----------
+>  arch/arm/mach-davinci/dm355.c            |   87 +++++++++---------
+>  arch/arm/mach-davinci/dm365.c            |  113 +++++++++++-----------
+>  arch/arm/mach-davinci/dm644x.c           |   77 ++++++++--------
+>  arch/arm/mach-davinci/dm646x.c           |   81 ++++++++--------
+>  arch/arm/mach-davinci/tnetv107x.c        |  133
++++++++++++++-------------
+>  arch/arm/mach-ep93xx/clock.c             |   61 ++++++-------
+>  arch/arm/mach-imx/clock-imx1.c           |   38 +++-----
+>  arch/arm/mach-imx/clock-imx21.c          |   91 +++++++++----------
+>  arch/arm/mach-imx/clock-imx25.c          |   79 +++++++---------
+>  arch/arm/mach-imx/clock-imx27.c          |  111 ++++++++++------------
+>  arch/arm/mach-imx/clock-imx31.c          |  103 ++++++++++-----------
+>  arch/arm/mach-imx/clock-imx35.c          |  117 +++++++++++------------
+>  arch/arm/mach-lpc32xx/clock.c            |   75 +++++++--------
+>  arch/arm/mach-mx5/clock-mx51-mx53.c      |  149
+++++++++++++++--------------
+> --
+>  arch/arm/mach-mxs/clock-mx23.c           |   39 +++-----
+>  arch/arm/mach-mxs/clock-mx28.c           |   71 +++++++--------
+>  arch/arm/mach-tcc8k/clock.c              |  107 ++++++++++-----------
+>  include/linux/clkdev.h                   |    7 ++
+>  22 files changed, 838 insertions(+), 909 deletions(-)
+> 
+> --
+> 1.7.4.4
 
-Thanks
-Richard
-> +	if (ret < 0)
-> +		/* FIXME add rate change abort notification here */
-> +		goto out;
-> +
-> +	/*
-> +	 * If successful recalculate the rates of the clock, including
-> +	 * children.
-> +	 */
-> +	clk_recalc_rates(clk);
-> +
-> +out:
-> +	mutex_unlock(&prepare_lock);
-> +
-> +	return ret;
->  }
->  EXPORT_SYMBOL_GPL(clk_set_rate);
->  
-> @@ -216,16 +265,26 @@ struct clk *clk_register(const struct clk_hw_ops *ops, struct clk_hw *hw,
->  	clk->hw = hw;
->  	hw->clk = clk;
->  
-> -	/* Query the hardware for parent and initial rate */
-> +	/*
-> +	 * Query the hardware for parent and initial rate. We may alter
-> +	 * the clock topology, making this clock available from the parent's
-> +	 * children list. So, we need to protect against concurrent
-> +	 * accesses through set_rate
-> +	 */
-> +	mutex_lock(&prepare_lock);
->  
-> -	if (clk->ops->get_parent)
-> -		/* We don't to lock against prepare/enable here, as
-> -		 * the clock is not yet accessible from anywhere */
-> +	if (clk->ops->get_parent) {
->  		clk->parent = clk->ops->get_parent(clk->hw);
-> +		if (clk->parent)
-> +			hlist_add_head(&clk->child_node,
-> +					&clk->parent->children);
-> +	}
->  
->  	if (clk->ops->recalc_rate)
->  		clk->rate = clk->ops->recalc_rate(clk->hw);
->  
-> +	mutex_unlock(&prepare_lock);
-> +
->  
->  	return clk;
->  }
-> diff --git a/include/linux/clk.h b/include/linux/clk.h
-> index d6ae10b..0d2cd5e 100644
-> --- a/include/linux/clk.h
-> +++ b/include/linux/clk.h
-> @@ -58,6 +58,12 @@ struct clk_hw {
->   *		parent. Currently only called when the clock is first
->   *		registered.
->   *
-> + * @set_rate	Change the rate of this clock. If this callback returns
-> + *		CLK_SET_RATE_PROPAGATE, the rate change will be propagated to
-> + *		the parent clock (which may propagate again). The requested
-> + *		rate of the parent is passed back from the callback in the
-> + *		second 'unsigned long *' argument.
-> + *
->   * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
->   * implementations to split any work between atomic (enable) and sleepable
->   * (prepare) contexts.  If a clock requires sleeping code to be turned on, this
-> @@ -76,9 +82,15 @@ struct clk_hw_ops {
->  	void		(*disable)(struct clk_hw *);
->  	unsigned long	(*recalc_rate)(struct clk_hw *);
->  	long		(*round_rate)(struct clk_hw *, unsigned long);
-> +	int		(*set_rate)(struct clk_hw *,
-> +					unsigned long, unsigned long *);
->  	struct clk *	(*get_parent)(struct clk_hw *);
->  };
->  
-> +enum {
-> +	CLK_PARENT_RATE_CHANGE = 1,
-> +};
-> +
->  /**
->   * clk_prepare - prepare clock for atomic enabling.
->   *
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+(Cc'ed Arnd)
+
+Looks ok to me and on Samsung stuff also.
+
+If required,
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Russell,
+Maybe as you know, this is required on upcoming Samsung stuff. Actually it's
+just change/consolidate on other stuff but add on Samsung stuff. So if
+you're ok, how about sending this to upstream via arm-soc or your tree in
+this merge window?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
