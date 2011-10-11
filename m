@@ -1,81 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 11 Oct 2011 21:09:53 +0900
-Subject: [PATCH v5 0/2] Add device tree support for Samsung's keypad
-	controller driver
-In-Reply-To: <1318264197-6698-1-git-send-email-thomas.abraham@linaro.org>
-References: <1318264197-6698-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <057501cc880e$af0a28a0$0d1e79e0$%kim@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 11 Oct 2011 15:19:23 +0300
+Subject: [RFT/PATCH 7/7] arm: omap: smartreflex: micro-optimization for
+	sanity check
+In-Reply-To: <4E9426F9.2080601@ru.mvista.com>
+References: <1318249579-4089-1-git-send-email-balbi@ti.com>
+	<1318249579-4089-7-git-send-email-balbi@ti.com>
+	<4E9426F9.2080601@ru.mvista.com>
+Message-ID: <20111011121922.GM10155@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+On Tue, Oct 11, 2011 at 03:22:33PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Changes since v4:
-> - Tested with linux 3.1-rc9. No changes in code.
+> On 10-10-2011 16:26, Felipe Balbi wrote:
 > 
-> Changes since v3:
-> - Addressed comments from Grant Likely.
->   - Set num_rows and num_cols to zero in samsung_keypad_parse_dt function.
->   - Fixed the wierd looking if-else block in samsung_keypad_probe
-function.
+> >val&&  (val != 1) == val>  1
 > 
-> Changes since v2:
-> - Addressed comments from Grant Likely.
->   - Renamed 'keypad,key-code' property name to 'linux,code'.
->   - Fixed incorrect data types for all instances of of_property+read_u32.
->   - linux,input-type binding was not added as suggested since the driver
->     supports only EV_KEY event type.
+> >Signed-off-by: Felipe Balbi<balbi@ti.com>
+> >---
+> >  arch/arm/mach-omap2/smartreflex.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> Changes since v1:
-> - Addressed comments from Dmitry Torokhov.
->   - Type of controller is cached in driver's private data and the function
->     that determines the type of the controller for each keypad scan is
->     removed.
->   - pdata allocated during probe is explicitly freed after probe completes
->     without any error. In case of exit from probe due a error, no explicit
->     deallocation of pdata memory is performed and it is left to devres to
->     handle that.
->   - The generic code to translate KEY(x,y,code) is retained in the driver
->     itself. I am unsure of a right common place for it.
->   - Driver continues with the probe even if one or more gpio configuration
->     fails.
->   - Patch 1 that adds a new config option is still retained in this
-patchset.
+> >diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> >index 7bdabfa..4b0d6a8 100644
+> >--- a/arch/arm/mach-omap2/smartreflex.c
+> >+++ b/arch/arm/mach-omap2/smartreflex.c
+> >@@ -866,7 +866,7 @@ static int omap_sr_autocomp_store(void *data, u64 val)
+> >  	}
+> >
+> >  	/* Sanity check */
+> >-	if (val&&  (val != 1)) {
+> >+	if (val>  1) {
+> >  		pr_warning("%s: Invalid argument %lld\n", __func__, val);
 > 
-> 
-> This patchset adds device tree support for samsung's keypad controller
-driver.
-> First patch adds a new config option to be used by device tree enabled
-platforms
-> for selecting the samsung's keypad controller driver. The second patch
-adds
-> device
-> tree support for the keypad driver.
-> 
-> 
-> Thomas Abraham (2):
->   input: samsung-keypad: Add HAVE_SAMSUNG_KEYPAD config option
->   input: samsung-keypad: Add device tree support
-> 
->  .../devicetree/bindings/input/samsung-keypad.txt   |   88 ++++++++++
->  drivers/input/keyboard/Kconfig                     |    9 +-
->  drivers/input/keyboard/samsung-keypad.c            |  174
-> ++++++++++++++++++--
->  3 files changed, 258 insertions(+), 13 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/input/samsung-
-> keypad.txt
+>    The format specified should be "%llu"?
 
-Looks ok to me,
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+and what does that have to do with $SUBJECT ??
 
-Hi Dmitry,
-If you're ok on this, please adding this in your tree for upcoming merge
-window.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111011/f99ff706/attachment-0001.sig>
