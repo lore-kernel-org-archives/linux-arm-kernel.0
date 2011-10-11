@@ -1,63 +1,132 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 11 Oct 2011 15:05:47 +0200
-Subject: [Linaro-mm-sig] [PATCHv16 0/9] Contiguous Memory Allocator
-In-Reply-To: <4E9427B6.8050306@stericsson.com>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<4E92E003.4060901@stericsson.com>
-	<00b001cc87e5$dc818cc0$9584a640$%szyprowski@samsung.com>
-	<4E93F088.60006@stericsson.com>
-	<00b301cc8803$93b5b3e0$bb211ba0$%szyprowski@samsung.com>
-	<4E9427B6.8050306@stericsson.com>
-Message-ID: <00cb01cc8816$7e474600$7ad5d200$%szyprowski@samsung.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 11 Oct 2011 08:18:58 -0500
+Subject: [PATCH v2] irq: support domains with non-zero hwirq base
+In-Reply-To: <1317783380-773-1-git-send-email-robherring2@gmail.com>
+References: <20111004233953.GE3009@ponder.secretlab.ca>
+	<1317783380-773-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4E944242.10606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Thomas,
 
-On Tuesday, October 11, 2011 1:26 PM Maxime Coquelin wrote:
-
-> On 10/11/2011 12:50 PM, Marek Szyprowski wrote:
-> > Hello,
-> >
-> > On Tuesday, October 11, 2011 9:30 AM Maxime Coquelin wrote:
-> >
-> >> On 10/11/2011 09:17 AM, Marek Szyprowski wrote:
-> >>> On Monday, October 10, 2011 2:08 PM Maxime Coquelin wrote:
-> >>>
-> >>>        During our stress tests, we encountered some problems :
-> >>>
-> >>>        1) Contiguous allocation lockup:
-> >>>            When system RAM is full of Anon pages, if we try to allocate a
-> >>> contiguous buffer greater than the min_free value, we face a
-> >>> dma_alloc_from_contiguous lockup.
-> >>>            The expected result would be dma_alloc_from_contiguous() to fail.
-> >>>            The problem is reproduced systematically on our side.
-> >>> Thanks for the report. Do you use Android's lowmemorykiller? I haven't
-> >>> tested CMA on Android kernel yet. I have no idea how it will interfere
-> >>> with Android patches.
-> >>>
-> >> The software used for this test (v16) is a generic 3.0 Kernel and a
-> >> minimal filesystem using Busybox.
-> > I'm really surprised. Could you elaborate a bit how to trigger this issue?
+On 10/04/2011 09:56 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> At system startup, I drop caches (sync && echo 3 >
-> /proc/sys/vm/drop_caches) and check how much memory is free.
-> For example, in my case, only 15MB is used on the 270MB available on the
-> system, so I got 255MB of free memory. Note that the min_free is 4MB in
-> my case.
-> In userspace, I allocate 230MB using malloc(), the free memory is now 25MB.
-> Finaly, I ask for a contiguous allocation of 64MB using CMA, the result
-> is a lockup in dma_alloc_from_contiguous().
+> Interrupt controllers can have non-zero starting value for h/w irq numbers.
+> Adding support in irq_domain allows the domain hwirq numbering to match
+> the interrupt controllers' numbering.
+> 
+> As this makes looping over irqs for a domain more complicated, add loop
+> iterators to iterate over all hwirqs and irqs for a domain.
+> 
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+> Thomas,
+> 
+> Please ack. I'm dependent on this for adding Calxeda highbank support, so
+> I'd like to take this thru arm-soc tree.
+> 
 
-Thanks for hint. I've managed to reproduce this issue. I will post fix asap.
+Can you please comment?
 
-> > I've did several tests and I never get a lockup. Allocation failed from time
-> > to time though.
-> When it succeed, what is the behaviour on your side? Is the OOM triggered?
+Rob
 
-OOM was never triggered.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+> v2:
+> - Rebase to tglx's changes in my previous irq domain commit:
+> irq: Fix check for already initialized irq_domain in irq_domain_add
+> - drop NO_IRQ and add WARN_ON in irq_domain_to_irq
+> 
+> Rob
+> 
+>  include/linux/irqdomain.h |   16 +++++++++++++++-
+>  kernel/irq/irqdomain.c    |   12 ++++++------
+>  2 files changed, 21 insertions(+), 7 deletions(-)
+> 
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index 3ad553e..99834e58 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -47,6 +47,7 @@ struct irq_domain_ops {
+>   *            of the irq_domain is responsible for allocating the array of
+>   *            irq_desc structures.
+>   * @nr_irq: Number of irqs managed by the irq domain
+> + * @hwirq_base: Starting number for hwirqs managed by the irq domain
+>   * @ops: pointer to irq_domain methods
+>   * @priv: private data pointer for use by owner.  Not touched by irq_domain
+>   *        core code.
+> @@ -57,6 +58,7 @@ struct irq_domain {
+>  	struct list_head list;
+>  	unsigned int irq_base;
+>  	unsigned int nr_irq;
+> +	unsigned int hwirq_base;
+>  	const struct irq_domain_ops *ops;
+>  	void *priv;
+>  	struct device_node *of_node;
+> @@ -72,9 +74,21 @@ struct irq_domain {
+>  static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
+>  					     unsigned long hwirq)
+>  {
+> -	return d->ops->to_irq ? d->ops->to_irq(d, hwirq) : d->irq_base + hwirq;
+> +	if (d->ops->to_irq)
+> +		return d->ops->to_irq(d, hwirq);
+> +	if (WARN_ON(hwirq < d->hwirq_base))
+> +		return 0;
+> +	return d->irq_base + hwirq - d->hwirq_base;
+>  }
+>  
+> +#define irq_domain_for_each_hwirq(d, hw) \
+> +	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
+> +
+> +#define irq_domain_for_each_irq(d, hw, irq) \
+> +	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
+> +	     hw < d->hwirq_base + d->nr_irq; \
+> +	     hw++, irq = irq_domain_to_irq(d, hw))
+> +
+>  extern void irq_domain_add(struct irq_domain *domain);
+>  extern void irq_domain_del(struct irq_domain *domain);
+>  #endif /* CONFIG_IRQ_DOMAIN */
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index b57a377..200ce83 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -20,15 +20,15 @@ static DEFINE_MUTEX(irq_domain_mutex);
+>  void irq_domain_add(struct irq_domain *domain)
+>  {
+>  	struct irq_data *d;
+> -	int hwirq;
+> +	int hwirq, irq;
+>  
+>  	/*
+>  	 * This assumes that the irq_domain owner has already allocated
+>  	 * the irq_descs.  This block will be removed when support for dynamic
+>  	 * allocation of irq_descs is added to irq_domain.
+>  	 */
+> -	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+> -		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
+> +	irq_domain_for_each_irq(domain, hwirq, irq) {
+> +		d = irq_get_irq_data(irq);
+>  		if (!d) {
+>  			WARN(1, "error: assigning domain to non existant irq_desc");
+>  			return;
+> @@ -54,15 +54,15 @@ void irq_domain_add(struct irq_domain *domain)
+>  void irq_domain_del(struct irq_domain *domain)
+>  {
+>  	struct irq_data *d;
+> -	int hwirq;
+> +	int hwirq, irq;
+>  
+>  	mutex_lock(&irq_domain_mutex);
+>  	list_del(&domain->list);
+>  	mutex_unlock(&irq_domain_mutex);
+>  
+>  	/* Clear the irq_domain assignments */
+> -	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+> -		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
+> +	irq_domain_for_each_irq(domain, hwirq, irq) {
+> +		d = irq_get_irq_data(irq);
+>  		d->domain = NULL;
+>  	}
+>  }
