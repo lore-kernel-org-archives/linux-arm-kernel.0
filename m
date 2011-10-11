@@ -1,202 +1,58 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Tue, 11 Oct 2011 20:49:35 +0530
-Subject: [PATCH] gpio: exynos4: Add device tree support
-In-Reply-To: <4E945C90.1050601@gmail.com>
-References: <1318320974-9879-1-git-send-email-thomas.abraham@linaro.org>
-	<4E945C90.1050601@gmail.com>
-Message-ID: <CAJuYYwRwBxkAo2fMfVV9wtQ40XeROAnc-cGJK+cssjuh9px=qQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Oct 2011 17:24:47 +0200
+Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
+In-Reply-To: <20111011144005.GI3471@opensource.wolfsonmicro.com>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<201110111617.52061.arnd@arndb.de>
+	<20111011144005.GI3471@opensource.wolfsonmicro.com>
+Message-ID: <201110111724.48069.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tuesday 11 October 2011, Mark Brown wrote:
+> On Tue, Oct 11, 2011 at 04:17:51PM +0200, Arnd Bergmann wrote:
+> > On Monday 10 October 2011, Mark Brown wrote:
+> 
+> > > At the minute it seems to me that arch/arm is as good a place as any
+> > > really - currently this code is getting dumped wherever the main device
+> > > is.
+> 
+> > My feeling is that there is a general class of drivers involving
+> > the gpio, pinmux, pwm, led, adc and dac: these are basically all
+> > things you do with a single pin. Right now we have subsystems for
+> > some of them, adding some others and don't have anything for adc
+> > basides iio (which only partially fits here).
+> 
+> We've been round this loop repeatedly before, trying to push all this
+> stuff into pins really doesn't map terribly well.  For example, SoCs
+> will frequently have PWM controllers which are isolated IP blocks within
+> the device and may each have multiple mappings out of the device onto
+> pins.  In the case of DACs, ADCs and PWM you definitely don't have a one
+> to one mapping with a single pin - they can be differential inputs and
+> outputs, or entirely internal to a device.  Trying to push everything
+> into a single namespace just makes things confusing.
 
-On 11 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
-> Thomas,
->
-> On 10/11/2011 03:16 AM, Thomas Abraham wrote:
->> As gpio chips get registered, a device tree node which represents the
->> gpio chip is searched and attached to it. A translate function is also
->> provided to convert the gpio specifier into actual platform settings
->> for pin function selection, pull up/down and driver strength settings.
->>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->> This patch is based on the latest consolidated Samsung GPIO driver available
->> in the following tree:
->> ? https://github.com/kgene/linux-samsung.git ?branch: for-next
->>
->> ?.../devicetree/bindings/gpio/gpio-samsung.txt ? ? ?| ? 30 +++++++++++
->> ?drivers/gpio/gpio-samsung.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 53 ++++++++++++++++++++
->> ?2 files changed, 83 insertions(+), 0 deletions(-)
->> ?create mode 100644 Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->>
->> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->> new file mode 100644
->> index 0000000..883faeb
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->> @@ -0,0 +1,30 @@
->> +Samsung Exynos4 GPIO Controller
->> +
->> +Required properties:
->> +- compatible: Format of compatible property value should be
->> + ?"samsung,exynos4-gpio-<controller_name>". Example: For GPA0 controller, the
->> + ?compatible property value should be "samsung,exynos4-gpio-gpa0".
->
-> Isn't gpa0 an instance of the h/w, not a version?
+I didn't mean to suggest that they should be the same subsystem, but
+it would be nice to use similar in-kernel interfaces so that a driver
+author doesn't have to learn about six different interfaces for
+a new soc. If we add an adc subsystem, I would definitely recommend
+looking at how the others work.
 
-GPA0 is a instance of the gpio controller. There are several such
-instances and there could be differences in those instances such as
-the number of GPIO lines managed by that gpio controller instance.
+> > Since there is no externally visible interface for this kind of
+> > adc driver, we can always fix it later, which helps a lot. How
+> > about putting it into drivers/adc or drivers/misc/adc for now
+> > and waiting for others to join it? We can then later make it a
+> > proper subsystem along the lines of gpio and pwm and move
+> > interfaces for input, hwmon and iio into the subsystem.
+> 
+> I'm not sure that IIO isn't the kernel subsystem we're looking for here
+> - as I keep saying when this comes up it's just representing bare DACs
+> and ADCs pretty directly which looks like a generic subsystem to me.
 
->
->> +
->> +- reg: Physical base address of the controller and length of memory mapped region.
->> +
->> +- #gpio-cells: Should be 4. The syntax of the gpio specifier used by client nodes
->> + ?should be the following with values derived from the SoC user manual.
->> + ? ? <[phandle of the gpio controller node] <pin number within the gpio controller]
->> + ? ? ?[mux function] [pull up/down] [drive strength]>
->
-> It would be better to list out the values here.
+Possible, yes. Until now, IIO is a subsystem for user-level access
+not for kernel access though, so it's not the right place yet.
+If we decide to let IIO handle all ADC input, do you think it would
+also be the right place to do PWM output, rather than having a
+separate subsystem for that?
 
-Ok. I will do that in the next version of the patch.
-
->
->> +
->> +- gpio-controller: Specifies that the node is a gpio controller.
->> +
->> +- #address-cells: should be 1.
->> +
->> +- #size-cells: should be 1.
->> +
->> +Example:
->> +
->> + ? ? gpa0: gpio-controller at 11400000 {
->> + ? ? ? ? ? ? #address-cells = <1>;
->> + ? ? ? ? ? ? #size-cells = <1>;
->> + ? ? ? ? ? ? compatible = "samsung,exynos4-gpio-gpa0";
->> + ? ? ? ? ? ? reg = <0x11400000 0x20>;
->> + ? ? ? ? ? ? #gpio-cells = <4>;
->> + ? ? ? ? ? ? gpio-controller;
->> + ? ? };
->> diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
->> index b6be77a..037d3bb 100644
->> --- a/drivers/gpio/gpio-samsung.c
->> +++ b/drivers/gpio/gpio-samsung.c
->> @@ -24,6 +24,10 @@
->> ?#include <linux/interrupt.h>
->> ?#include <linux/sysdev.h>
->> ?#include <linux/ioport.h>
->> +#ifdef CONFIG_OF
->> +#include <linux/of.h>
->> +#include <linux/slab.h>
->> +#endif
->
-> Don't need the ifdef here.
-
-Ok. I will remove it.
-
->
->>
->> ?#include <asm/irq.h>
->>
->> @@ -2353,6 +2357,52 @@ static struct samsung_gpio_chip exynos4_gpios_3[] = {
->> ?#endif
->> ?};
->>
->> +#if defined(CONFIG_ARCH_EXYNOS4) && defined(CONFIG_OF)
->> +int exynos4_gpio_xlate(struct gpio_chip *gc, struct device_node *np,
->
-> static
-
-Ok. I will add it.
-
->
->> + ? ? ? ? ? ? ? ? ? ? ?const void *gpio_spec, u32 *flags)
->> +{
->> + ? ? const __be32 *gpio = gpio_spec;
->> + ? ? const u32 n = be32_to_cpup(gpio);
->> + ? ? unsigned int pin = gc->base + be32_to_cpu(gpio[0]);
->> +
->> + ? ? if (gc->of_gpio_n_cells < 4) {
->> + ? ? ? ? ? ? WARN_ON(1);
->> + ? ? ? ? ? ? return -EINVAL;
->> + ? ? }
->> +
->> + ? ? if (n > gc->ngpio)
->> + ? ? ? ? ? ? return -EINVAL;
->> +
->> + ? ? s3c_gpio_cfgpin(pin, S3C_GPIO_SFN(be32_to_cpu(gpio[1])));
->> + ? ? s3c_gpio_setpull(pin, be32_to_cpu(gpio[2]));
->> + ? ? s5p_gpio_set_drvstr(pin, be32_to_cpu(gpio[3]));
->> + ? ? return n;
->> +}
->> +
->> +static __init void exynos4_gpiolib_attach_ofnode(struct gpio_chip *gc)
->> +{
->> + ? ? const char exynos4_gpio_compat_base[] = "samsung,exynos4-gpio-";
->> + ? ? char *exynos4_gpio_compat;
->> +
->> + ? ? exynos4_gpio_compat = kzalloc(strlen(exynos4_gpio_compat_base) +
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? strlen(gc->label), GFP_KERNEL);
->> + ? ? if (!exynos4_gpio_compat)
->> + ? ? ? ? ? ? return;
->> +
->> + ? ? strcpy(exynos4_gpio_compat, exynos4_gpio_compat_base);
->> + ? ? strcat(exynos4_gpio_compat, gc->label);
->> + ? ? gc->of_node = of_find_compatible_node(NULL, NULL, exynos4_gpio_compat);
->> + ? ? gc->of_gpio_n_cells = 4;
->> + ? ? gc->of_xlate = exynos4_gpio_xlate;
->> + ? ? kfree(exynos4_gpio_compat);
->> +}
->> +#else
->> +static __init void exynos4_gpiolib_attach_ofnode(struct gpio_chip *chip)
->> +{
->> + ? ? return;
->> +}
->> +#endif /* defined(CONFIG_ARCH_EXYNOS4) && defined(CONFIG_OF) */
->> +
->> ?/* TODO: cleanup soc_is_* */
->> ?static __init int samsung_gpiolib_init(void)
->> ?{
->> @@ -2434,6 +2484,7 @@ static __init int samsung_gpiolib_init(void)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? chip->config = &exynos4_gpio_cfg;
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? chip->group = group++;
->> ? ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? ? ? ? ? exynos4_gpiolib_attach_ofnode(&chip->chip);
->> ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? samsung_gpiolib_add_4bit_chips(exynos4_gpios_1, nr_chips, S5P_VA_GPIO1);
->>
->> @@ -2446,6 +2497,7 @@ static __init int samsung_gpiolib_init(void)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? chip->config = &exynos4_gpio_cfg;
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? chip->group = group++;
->> ? ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? ? ? ? ? exynos4_gpiolib_attach_ofnode(&chip->chip);
->> ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? samsung_gpiolib_add_4bit_chips(exynos4_gpios_2, nr_chips, S5P_VA_GPIO2);
->>
->> @@ -2458,6 +2510,7 @@ static __init int samsung_gpiolib_init(void)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? chip->config = &exynos4_gpio_cfg;
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? chip->group = group++;
->> ? ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? ? ? ? ? exynos4_gpiolib_attach_ofnode(&chip->chip);
->> ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? samsung_gpiolib_add_4bit_chips(exynos4_gpios_3, nr_chips, S5P_VA_GPIO3);
->>
->
-> This code is really ugly, but I guess you inherited it. Converting to a
-> platform driver and using id table would be much cleaner.
-
-Ok. I wanted to get the initial dt support for gpio controller on
-Exynos started because dt support for other controllers depend on
-this. I will revisit this as per your suggestion during the 3.2 cycle.
-
-Thanks for reviewing this patch.
-
-Regards,
-Thomas
-
->
-> Rob
->
+	Arnd
