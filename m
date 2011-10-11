@@ -1,79 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Oct 2011 17:41:33 -0700
-Subject: [PATCH] arm/tegra: pinmux: ioremap registers
-In-Reply-To: <1318375320-21138-1-git-send-email-swarren@nvidia.com>
-References: <1318375320-21138-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20111012004133.GA9555@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 11 Oct 2011 16:58:27 -0700
+Subject: [PATCH 1/7] ARM: Add __arm_ioremap_exec for mapping external
+	memory as MT_MEMORY
+In-Reply-To: <20111011134048.28b9b19b@queued.net>
+References: <20111007194242.18205.64009.stgit@kaulin.local>
+	<20111007194543.18205.36115.stgit@kaulin.local>
+	<20111011134048.28b9b19b@queued.net>
+Message-ID: <20111011235827.GB2293@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Andres Salomon <dilinger@queued.net> [111011 14:11]:
+> On Fri, 07 Oct 2011 12:45:43 -0700
+> Tony Lindgren <tony@atomide.com> wrote:
+> 
+> > This allows mapping external memory such as SRAM for use.
+> > 
+> > This is needed for some small chunks of code, such as reprogramming
+> > SDRAM memory source clocks that can't be executed in SDRAM. Other
+> > use cases include some PM related code.
+> 
+> 
+> Acked-by: Andres Salomon <dilinger@queued.net>
+> 
+> Looks good to me, thanks for doing this.  I only have one very minor
+> quibble below, which could be addressed in a later patch..
 
-Overall this looks pretty good, with a couple of nits below.
+> > +void __iomem *
+> > +__arm_ioremap_exec(unsigned long phys_addr, size_t size, int cached)
+> 
+> I'd rather see this as 'bool cached', so it's clear we're talking
+> about a simple boolean (rather than bits).
 
-I'm not super-happy with all the opencoding of the reg / access passing into
-pg_readl/writel, but adding new helpers for all 4 kinds is also kind of
-verbose.
+Sure, thanks, updated version below. Will also update the patch in
+Russell's patch system.
 
-On Tue, Oct 11, 2011 at 05:22:00PM -0600, Stephen Warren wrote:
-
-> diff --git a/arch/arm/mach-tegra/include/mach/pinmux.h b/arch/arm/mach-tegra/include/mach/pinmux.h
-> index defd877..741147f 100644
-> --- a/arch/arm/mach-tegra/include/mach/pinmux.h
-> +++ b/arch/arm/mach-tegra/include/mach/pinmux.h
-> @@ -199,6 +199,7 @@ struct tegra_drive_pingroup_config {
->  
->  struct tegra_drive_pingroup_desc {
->  	const char *name;
-> +	s16 reg_space;
->  	s16 reg;
->  };
->  
-> @@ -207,6 +208,9 @@ struct tegra_pingroup_desc {
->  	int funcs[4];
->  	int func_safe;
->  	int vddio;
-> +	s16 tri_space;	/* Register space the tri_reg exists within */
-> +	s16 mux_space;	/* Register space the mux_reg exists within */
-> +	s16 pupd_space;	/* Register space the pupd_reg exists within */
->  	s16 tri_reg; 	/* offset into the TRISTATE_REG_* register bank */
->  	s16 mux_reg;	/* offset into the PIN_MUX_CTL_* register bank */
->  	s16 pupd_reg;	/* offset into the PULL_UPDOWN_REG_* register bank */
-
-'space' is really 'bank number' here, with *_reg is the offset into that bank,
-right?  Calling it a register bank seems to go with the pre-existing language
-in the driver a bit more.
-
-[...]
-
-> diff --git a/arch/arm/mach-tegra/pinmux.c b/arch/arm/mach-tegra/pinmux.c
-> index 46b9d87..99c2751 100644
-> --- a/arch/arm/mach-tegra/pinmux.c
-> +++ b/arch/arm/mach-tegra/pinmux.c
-> @@ -170,15 +170,17 @@ static const char *pupd_name(unsigned long val)
->  	}
->  }
->  
-> +static int nspaces;
-> +static void __iomem **regs;
->  
-> -static inline unsigned long pg_readl(unsigned long offset)
-> +static inline u32 pg_readl(u32 reg, u32 space)
->  {
-> -	return readl(IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
-> +	return readl(regs[space] + reg);
->  }
->  
-> -static inline void pg_writel(unsigned long value, unsigned long offset)
-> +static inline void pg_writel(u32 val, u32 reg, u32 space)
->  {
-> -	writel(value, IO_TO_VIRT(TEGRA_APB_MISC_BASE + offset));
-> +	writel(val, regs[space] + reg);
->  }
-
-For both of these, having the space (bank) before the offset into the bank seems
-a bit more logical, imho.
-
-
-
--Olof
+Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ioremap-exec.patch
+Type: text/x-diff
+Size: 1937 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20111011/a970586f/attachment-0001.bin>
