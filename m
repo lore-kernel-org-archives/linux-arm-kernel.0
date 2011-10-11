@@ -1,48 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Oct 2011 15:33:50 +0200
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <20111010133246.GG2451@mudshark.cambridge.arm.com>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<201110101320.24457.arnd@arndb.de>
-	<20111010133246.GG2451@mudshark.cambridge.arm.com>
-Message-ID: <201110111533.50768.arnd@arndb.de>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 11 Oct 2011 21:39:24 +0800
+Subject: [alsa-devel] [PATCH v3 0/3] ARM: mxs: add recording support for
+	saif
+In-Reply-To: <1317052353-6029-1-git-send-email-b29396@freescale.com>
+References: <1317052353-6029-1-git-send-email-b29396@freescale.com>
+Message-ID: <CAA+hA=Sf=TKeQxLUAuExi9jTmFk=d653FdBjacD3jK7tPG88ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 October 2011, Will Deacon wrote:
-> On Mon, Oct 10, 2011 at 12:20:24PM +0100, Arnd Bergmann wrote:
-> > On Monday 10 October 2011, Will Deacon wrote:
-> > > Do you have any other ideas?
-> > 
-> > I think the best solution would be to ask Russell to put all the dependencies
-> > into a non-rebasing branch and publish that, or to alternatively merge your
-> > patches through his tree instead, with my Ack.
-> 
-> I don't think asking Russell to maintain a stable branch for each series
-> scales very well if multiple people are doing cross-platform work at the
-> same time. If he's happy merging platform code via his tree, then I'd prefer
-> to go down that route. In this case, it might make sense to try and catch
-> conflicts between his tree and arm-soc before they hit Linus (I guess -next
-> will take care of this?).
+2011/9/26 Dong Aisheng <b29396@freescale.com>:
+> Changes since v2:
+> ?* separate clkmux code into another patch according to Uwe
+> ?* add lock according to Wolfram
+> ?* Other minus fixes suggested by Uwe and Wolfram.
+> ?* remove Wolfram's fix saif clock setting patch which is in v2 series
+> ? since Wolfram will reform the clock code and send it out himself.
+> ? For test purpose, user still needs that patch. People can get it
+> ? from v2 series.
+> ? The patch is:
+> ? [PATCH v2 3/3] arm: mxs: disable clock-gates when setting saif-clocks
+>
+> The patches are based on imx-features branch since commit:
+> f4f01e31835f.
+>
+> Changes since v1:
+> The main changes are move mach-specific code(clkmux in DIGCTL) from
+> saif driver to mach-specific layer based on Wolfram's suggestion.
+>
+> Note that the last patch is a RFC patch and sent out for testing
+> since without that patch the saif may not work.
+>
+> Dong Aisheng (3):
+> ?ARM: mxs: add saif clkmux functions
+> ?ARM: mx28evk: add platform data for saif
+> ?ARM: mx28evk: set a initial clock rate for saif
 
-Yes, we can definitely spot the conflicts in linux-next, and it gives us
-the chance to fix them up, e.g. I can wait with sending the arm-soc
-branches upstream until Russell's branches are merged, at which point
-I just pull in the branch that was merged into Linus' tree and resolve
-all conflicts I get.
- 
-> > Can you check if the devel-stable branch in his tree already contains the
-> > dependencies?
-> 
-> I just had a quick look and I can't seem them outside of the unstable for-next
-> branch.
+Any comments for this?
 
-Ok. I think I'll drop the cpu-mapping branch from arm-soc as well then.
+Regards
+Dong Aisheng
 
-Are the patches in Russell's tree true dependencies for your work, or just
-patches touching the same files? If you can send me a branch that contains
-only your work without any of the patches that are in an unstable branch
-on Russell's side, I could also take them into arm-soc and take care
-of the conflicts together with Stephen.
-
-	Arnd
+> ?arch/arm/mach-mxs/clock-mx28.c ? ? ? ? ? ? ? ? ?| ? 67 +++++++++++++++++++++++
+> ?arch/arm/mach-mxs/devices-mx28.h ? ? ? ? ? ? ? ?| ? ?3 +-
+> ?arch/arm/mach-mxs/devices/platform-mxs-saif.c ? | ? ?5 +-
+> ?arch/arm/mach-mxs/include/mach/common.h ? ? ? ? | ? ?2 +
+> ?arch/arm/mach-mxs/include/mach/devices-common.h | ? ?4 +-
+> ?arch/arm/mach-mxs/include/mach/digctl.h ? ? ? ? | ? 21 +++++++
+> ?arch/arm/mach-mxs/mach-mx28evk.c ? ? ? ? ? ? ? ?| ? 16 +++++-
+> ?7 files changed, 112 insertions(+), 6 deletions(-)
+> ?create mode 100644 arch/arm/mach-mxs/include/mach/digctl.h
+>
+>
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+>
