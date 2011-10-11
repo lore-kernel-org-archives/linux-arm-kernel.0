@@ -1,78 +1,81 @@
-From: rajeshwari.birje@gmail.com (Rajeshwari Birje)
-Date: Tue, 11 Oct 2011 09:09:56 +0530
-Subject: [PATCH 3/3] ARM: SAMSUNG: Add lookup of sdhci-s3c clocks using
-	generic names
-In-Reply-To: <201110050930.32216.heiko@sntech.de>
-References: <1317792669-19925-1-git-send-email-rajeshwari.s@samsung.com>
-	<1317792669-19925-4-git-send-email-rajeshwari.s@samsung.com>
-	<201110050930.32216.heiko@sntech.de>
-Message-ID: <CAPs=JDfzgqBH2BTOqV_uxcA43zdv9883voDVDs9tPni9KvV23Q@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Tue, 11 Oct 2011 11:19:06 +0530
+Subject: [PATCH v2 5/5] regulator: map consumer regulator based on device
+	tree
+In-Reply-To: <20111010173506.GH3607@opensource.wolfsonmicro.com>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-6-git-send-email-rnayak@ti.com>
+	<20111010173506.GH3607@opensource.wolfsonmicro.com>
+Message-ID: <4E93D8D2.1050703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
 
-Thank you for your comments,
-Will work on the same and  post the modified patches.
-
-Regards,
-Rajeshwari Shinde.
-
-
-On Wed, Oct 5, 2011 at 1:00 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Mittwoch, 5. Oktober 2011, 07:31:09 schrieb Rajeshwari Shinde:
->> Add support for lookup of sdhci-s3c controller clocks using generic names
->> for s3c2416, s3c64xx, s5pc100, s5pv210 and exynos4 SoC's.
+>
+>> @@ -1178,6 +1225,10 @@ static struct regulator *_regulator_get(struct device *dev, const char *id,
+>>   			goto found;
+>>   		}
+>>   	}
+>> +	if (!dev)
+>> +		list_for_each_entry(rdev,&regulator_list, list)
+>> +			if (strcmp(rdev_get_name(rdev), id))
+>> +				goto found;
 >>
->> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
->> ---
 >
-> [...]
+> This looks really strange, we didn't remove any old lookup code and the
+> DT lookup jumps to found by iself so why are we adding code here?
+
+The old lookup code looks up using the regulator_map_list, and the dt
+lookup depends on a dev pointer to extract the of_node.
+This above code was needed for cases when a regulator_get() would be
+called on dt builds without specifying a device pointer, like the
+cpufreq implementations you mentioned.
+This is what I tried putting in the comments above the lookup code.
+
+	/*
+          * Lookup happens in 3 ways
+          * 1. If a dev and dev->of_node exist, look for a
+          * regulator mapping in dt node.
+          * 2. Check if a match can be found in regulator_map_list
+          * if regulator info is still passed in non-dt way
+          * 3. if !dev, then just look for a matching regulator name.
+          * Useful for dt builds using regulator_get() without specifying
+          * a device.
+          */
+
+I know its quite complicated but thats because we need to support both
+the legacy and the dt based lookups.
+
 >
->> diff --git a/arch/arm/mach-s3c2416/clock.c b/arch/arm/mach-s3c2416/clock.c
->> index 72b7c62..cebaf3f 100644
->> --- a/arch/arm/mach-s3c2416/clock.c
->> +++ b/arch/arm/mach-s3c2416/clock.c
->
-> [...]
->
->> @@ -143,8 +142,14 @@ static struct clksrc_clk *clksrcs[] __initdata = {
->> ? ? ? &hsspi_mux,
->> ? ? ? &hsmmc_div[0],
->> ? ? ? &hsmmc_div[1],
->> - ? ? &hsmmc_mux[0],
->> - ? ? &hsmmc_mux[1],
->> + ? ? &hsmmc_mux0,
->> + ? ? &hsmmc_mux1,
->> +};
+>> +	if (supply) {
+>> +		struct regulator_dev *r;
+>> +		struct device_node *node;
 >> +
->> +static struct clk_lookup s3c2416_clk_lookup[] = {
->> + ? ? CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.0", &hsmmc0_clk),
-> This is missing the s3c-sdhci.1 mmc_busclk.0 as 4th entry which is defined in
-> s3c2443-clock.c. The pclk for hsmmc1 is common to S3C2416/2450 and S3C2443 and
-> is therefore defined in plat-s3c24xx [S3C2443 only has a hsmmc1 to be exact].
->
-> Also it would be nice to include the hsmmc-clock in mach-s3c2443/clock.c too.
-> The sdhci support there seems to be incomplete but it would be nice to have
-> the clocks similar to everything else if anyone wants to start on this arch.
->
->> + ? ? CLKDEV_INIT("s3c-sdhci.0", "mmc_busclk.2", &hsmmc_mux0.clk),
->> + ? ? CLKDEV_INIT("s3c-sdhci.1", "mmc_busclk.2", &hsmmc_mux1.clk),
->> ?};
+>> +		/* first do a dt based lookup */
+>> +		if (dev) {
+>> +			node = of_get_regulator(dev, supply);
+>> +			if (node)
+>> +				list_for_each_entry(r,&regulator_list, list)
+>> +					if (node == r->dev.parent->of_node)
+>> +						goto found;
+>>   		}
 >>
->> ?void __init s3c2416_init_clocks(int xtal)
->> @@ -164,6 +169,7 @@ void __init s3c2416_init_clocks(int xtal)
->> ? ? ? ? ? ? ? s3c_register_clksrc(clksrcs[ptr], 1);
+>> -		if (!found) {
+>> -			dev_err(dev, "Failed to find supply %s\n",
+>> -				init_data->supply_regulator);
+>> -			ret = -ENODEV;
+>> -			goto scrub;
+>> -		}
+>> +		/* next try doing it non-dt way */
+>> +		list_for_each_entry(r,&regulator_list, list)
+>> +			if (strcmp(rdev_get_name(r), supply) == 0)
+>> +				goto found;
 >>
->> ? ? ? s3c24xx_register_clock(&hsmmc0_clk);
->> + ? ? clkdev_add_table(s3c2416_clk_lookup, ARRAY_SIZE(s3c2416_clk_lookup));
->>
->> ? ? ? s3c_pwmclk_init();
->>
+>> +		dev_err(dev, "Failed to find supply %s\n", supply);
+>> +		ret = -ENODEV;
+>> +		goto scrub;
+>> +
+>> +found:
 >
-> Heiko
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> This is all getting *really* complicated and illegible.  I'm not sure
+> what the best way to structure is but erroring out early looks useful.
