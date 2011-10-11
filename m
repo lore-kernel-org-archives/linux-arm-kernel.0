@@ -1,37 +1,84 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 11 Oct 2011 19:04:01 +0200
-Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
-	supported by the hardware
-In-Reply-To: <CAHQjnOPcetkp-XX0x4HQsR+iYN1SaCAhuBEE2nVTdhssFpUmJQ@mail.gmail.com>
-References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
-	<1316195506-9777-2-git-send-email-ohad@wizery.com>
-	<20110927100505.GH2138@amd.com>
-	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
-	<20110927131222.GL2138@amd.com>
-	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
-	<20110927181438.GM2138@amd.com>
-	<CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
-	<20111010094738.GW2138@amd.com>
-	<CAK=WgbZ7Wyax1yfS1jSXw9OdwMtxxidwLO8PTsNUXX9CWzmVrw@mail.gmail.com>
-	<20111010153609.GB2138@amd.com>
-	<CAK=WgbbnuO67X46sqS87q2vw2TWq3Ekvw5p1PmXvXinQXMyowg@mail.gmail.com>
-	<CAHQjnOPcetkp-XX0x4HQsR+iYN1SaCAhuBEE2nVTdhssFpUmJQ@mail.gmail.com>
-Message-ID: <CAK=WgbZeZhr1AN82e1yab-rLWyB0tuK-s3wM+YoeJ24rsoXk2Q@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 11 Oct 2011 19:13:28 +0200
+Subject: [RFC PATCH] tty/serial: RS485 bindings for device tree
+Message-ID: <1318353208-24422-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi KyongHo,
+Generic bindings for RS485 feature included in some UARTs.
+Those bindings have to be used withing an UART device tree node.
+Documentation updated to link to the bindings definition.
 
-On Tue, Oct 11, 2011 at 4:59 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
-> I think the type of size should be size_t.
-..
-> Thus, it should be
-> iommu_unmap(domain, orig_iova, orig_size - size)
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi all,
 
-Agree with both suggestions, thanks !
+1/ I have used the "linux" vendor definition: tell me if it makes sense...
+2/ I have the feeling that the SER_RS485_RTS_ON_SEND flag can easily deduced
+   from a zero value on both "before" and "after" data delays.
 
-P.S - please only keep the parts of my email which you are replying
-to, otherwise it's a bit hard to find your comments.
+Tell me what you think about this...
 
-Thanks,
-Ohad.
+Bye,
+
+ Documentation/devicetree/bindings/serial/rs485.txt |   28 ++++++++++++++++++++
+ Documentation/serial/serial-rs485.txt              |    5 +++
+ 2 files changed, 33 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/serial/rs485.txt
+
+diff --git a/Documentation/devicetree/bindings/serial/rs485.txt b/Documentation/devicetree/bindings/serial/rs485.txt
+new file mode 100644
+index 0000000..6514be8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/serial/rs485.txt
+@@ -0,0 +1,28 @@
++* RS485 serial communications
++
++The RTS signal is capable of automatically controlling line direction for
++the built-in half-duplex mode.
++The properties described hereafter shall be given to a half-duplex capable
++UART node.
++
++Optional properties:
++- linux,rs485-enabled-at-boot-time: empty property telling to enable the rs485
++  feature at boot time. It can be disabled later with proper ioctl.
++- linux,rs485-rts-delay: prop-encoded-array <a b> where:
++  * a is the delay beteween rts signal and beginning of data sent in milliseconds.
++      it corresponds to the delay before sending data.
++  * b is the delay between end of data sent and rts signal in milliseconds
++      it corresponds to the delay after sending data and actual release of the
++      line.
++
++RS485 example for Atmel USART:
++	usart0: serial at fff8c000 {
++		compatible = "atmel,at91sam9260-usart";
++		reg = <0xfff8c000 0x4000>;
++		interrupts = <7>;
++		atmel,use-dma-rx;
++		atmel,use-dma-tx;
++		linux,rs485-enabled-at-boot-time;
++		linux,rs485-rts-delay = <0 200>;	// in milliseconds
++	};
++
+diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
+index a493238..d11e5eb 100644
+--- a/Documentation/serial/serial-rs485.txt
++++ b/Documentation/serial/serial-rs485.txt
+@@ -28,6 +28,10 @@
+    RS485 communications. This data structure is used to set and configure RS485
+    parameters in the platform data and in ioctls.
+ 
++   The device tree can also provide RS485 boot time parameters (see [2]
++   for bindings). The driver is in charge of filling this data structure from
++   the values given by the device tree.
++
+    Any driver for devices capable of working both as RS232 and RS485 should
+    provide at least the following ioctls:
+ 
+@@ -118,3 +122,4 @@
+ 5. REFERENCES
+ 
+  [1]	include/linux/serial.h
++ [2]	Documentation/devicetree/bindings/serial/rs485.txt
+-- 
+1.7.5.4
