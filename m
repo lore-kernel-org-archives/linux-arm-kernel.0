@@ -1,46 +1,66 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Tue, 11 Oct 2011 12:15:36 +0530
-Subject: [PATCH v6 05/16] OMAP2+: UART: Cleanup part of clock gating
-	mechanism for uart
-In-Reply-To: <87ty7gfpik.fsf@ti.com>
-References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
-	<1317380495-584-5-git-send-email-govindraj.raja@ti.com>
-	<87ty7gfpik.fsf@ti.com>
-Message-ID: <CAAL8m4ygQfZZ-FX_o+AyVWrQNghyHCsp0vdiCV_QHGxXFXzDKg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 11 Oct 2011 08:57:56 +0200
+Subject: [PATCHv16 0/9] Contiguous Memory Allocator
+In-Reply-To: <20111010155642.38df59af.akpm@linux-foundation.org>
+References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
+	<201110071827.06366.arnd@arndb.de>
+	<20111010155642.38df59af.akpm@linux-foundation.org>
+Message-ID: <00af01cc87e3$1b05e980$5111bc80$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 4:00 AM, Kevin Hilman <khilman@ti.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> Currently we use a shared irq handler to identify uart activity and then
->> trigger a timer.
->
-> OK.
->
->> Based the timeout value set from sysfs the timer used to expire.
->
-> Please re-phrase as I'm not sure what is being said here.
->
->> If no uart-activity was detected timer-expiry func sets can_sleep
->> flag. Based on this we will disable the uart clocks in idle path.
->>
->> Since the clock gating mechanism is outside the uart driver, we currently
->> use this mechanism. In preparation to runtime implementation for omap-serial
->> driver we can cleanup this mechanism and use runtime API's to gate uart clocks.
->>
->> Also remove timer related info from local uart_state struct and remove
->> the code used to set timeout value from sysfs. Remove un-used function
->> omap_uart_check_wakeup.
->>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->
-> The patch itself fine, and is a well-neede cleanup, but changelog
-> (especially the first part) does not read well.
->
+Hello,
 
-Okay, Will Correct.
+On Tuesday, October 11, 2011 12:57 AM Andrew Morton wrote:
 
---
-Thanks.
-Govindraj.R
+> On Fri, 7 Oct 2011 18:27:06 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > On Thursday 06 October 2011, Marek Szyprowski wrote:
+> > > Once again I decided to post an updated version of the Contiguous Memory
+> > > Allocator patches.
+> > >
+> > > This version provides mainly a bugfix for a very rare issue that might
+> > > have changed migration type of the CMA page blocks resulting in dropping
+> > > CMA features from the affected page block and causing memory allocation
+> > > to fail. Also the issue reported by Dave Hansen has been fixed.
+> > >
+> > > This version also introduces basic support for x86 architecture, what
+> > > allows wide testing on KVM/QEMU emulators and all common x86 boxes. I
+> > > hope this will result in wider testing, comments and easier merging to
+> > > mainline.
+> >
+> > Hi Marek,
+> >
+> > I think we need to finally get this into linux-next now, to get some
+> > broader testing. Having the x86 patch definitely helps here becauses
+> > it potentially exposes the code to many more testers.
+> >
+> > IMHO it would be good to merge the entire series into 3.2, since
+> > the ARM portion fixes an important bug (double mapping of memory
+> > ranges with conflicting attributes) that we've lived with for far
+> > too long, but it really depends on how everyone sees the risk
+> > for regressions here. If something breaks in unfixable ways before
+> > the 3.2 release, we can always revert the patches and have another
+> > try later.
+> >
+> > It's also not clear how we should merge it. Ideally the first bunch
+> > would go through linux-mm, and the architecture specific patches
+> > through the respective architecture trees, but there is an obvious
+> > inderdependency between these sets.
+> >
+> > Russell, Andrew, are you both comfortable with putting the entire
+> > set into linux-mm to solve this? Do you see this as 3.2 or rather
+> > as 3.3 material?
+> >
+> 
+> Russell's going to hate me, but...
+> 
+> I do know that he had substantial objections to at least earlier
+> versions of this, and he is a guy who knows of what he speaks.
+
+I've did my best to fix these issues. I'm still waiting for comments...
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
