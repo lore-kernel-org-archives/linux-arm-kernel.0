@@ -1,47 +1,81 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 11 Oct 2011 15:52:43 +0800
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <20111010133246.GG2451@mudshark.cambridge.arm.com>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<201110072251.40028.arnd@arndb.de>
-	<20111010103635.GA2451@mudshark.cambridge.arm.com>
-	<201110101320.24457.arnd@arndb.de>
-	<20111010133246.GG2451@mudshark.cambridge.arm.com>
-Message-ID: <20111011075241.GA25696@S2100-06.ap.freescale.net>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Tue, 11 Oct 2011 09:57:32 +0200
+Subject: sched: ARM: arch_scale_freq_power
+In-Reply-To: <CAP245DX8b45Nj5SAwtLivp_vMKpwfeUrqnR2sqjnVyqiRd61gg@mail.gmail.com>
+References: <CAKfTPtB3sLWq5fHOTrFg6vfHSKnz2i17oYx9Btr0u_tWV2bsjQ@mail.gmail.com>
+	<CAP245DX8b45Nj5SAwtLivp_vMKpwfeUrqnR2sqjnVyqiRd61gg@mail.gmail.com>
+Message-ID: <1318319852.14400.65.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 02:32:46PM +0100, Will Deacon wrote:
-> On Mon, Oct 10, 2011 at 12:20:24PM +0100, Arnd Bergmann wrote:
-> > On Monday 10 October 2011, Will Deacon wrote:
-> > > Do you have any other ideas?
-> > 
-> > I think the best solution would be to ask Russell to put all the dependencies
-> > into a non-rebasing branch and publish that, or to alternatively merge your
-> > patches through his tree instead, with my Ack.
-> 
-> I don't think asking Russell to maintain a stable branch for each series
-> scales very well if multiple people are doing cross-platform work at the
-> same time. If he's happy merging platform code via his tree, then I'd prefer
-> to go down that route. In this case, it might make sense to try and catch
-> conflicts between his tree and arm-soc before they hit Linus (I guess -next
-> will take care of this?).
-> 
-> > Both of these will also have to wait for a few more days until Russell
-> > is back online.
-> 
-> Ok, I wasn't aware that we was away.
-> 
-> > Can you check if the devel-stable branch in his tree already contains the
-> > dependencies?
-> 
-> I just had a quick look and I can't seem them outside of the unstable for-next
-> branch.
-> 
-I also have a number of patches that imx6q series depends on only
-showing on rmk's for-next branch, and I have to hold imx6q pull request
-until these patches show up on some non-rebased tree. 
+On Tue, 2011-10-11 at 12:46 +0530, Amit Kucheria wrote:
+> Adding Peter to the discussion..
 
--- 
-Regards,
-Shawn
+Right, CCing the folks who actually wrote the code you're asking
+questions about always helps ;-)
+
+> On Thu, Oct 6, 2011 at 5:06 PM, Vincent Guittot
+> <vincent.guittot@linaro.org> wrote:
+> > I work to link the cpu_power of ARM cores to their frequency by using
+> > arch_scale_freq_power. 
+
+Why and how? In particular note that if you're using something like the
+on-demand cpufreq governor this isn't going to work.
+
+> It's explained in the kernel that cpu_power is
+> > used to distribute load on cpus and a cpu with more cpu_power will
+> > pick up more load. The default value is SCHED_POWER_SCALE and I
+> > increase the value if I want a cpu to have more load than another one.
+> > Is there an advised range for cpu_power value as well as some time
+> > scale constraints for updating the cpu_power value ?
+
+Basically 1024 is the unit and denotes the capacity of a full core at
+'normal' speed. 
+
+Typically cpufreq would down-clock a core and thus you'd end up with a
+smaller number (linearly proportional to the freq ratio etc. although if
+you want to go really fancy you could determine the actual
+throughput/freq curves).
+
+Things like x86 turbo mode would result in a >1024 value.
+
+Things like SMT would typically result in <1024 and the SMT sum over the
+core >1024 (if you're lucky).
+
+> > I'm also wondering why this scheduler feature is currently disable by default ?
+
+Because the only implementation in existence (x86) is broken and I
+haven't gotten around to fixing it. Arguable we should disable that for
+the time being, see below.
+
+> In discussions with Vincent regarding this, I've wondered whether
+> cpu_power wouldn't be better renamed to cpu_capacity since that is
+> what it really seems to describe.
+
+Possibly, but its been cpu_power for ages and we use capacity to
+describe something else.
+
+---
+ arch/x86/kernel/cpu/sched.c |    9 ++++++++-
+ 1 files changed, 8 insertions(+), 1 deletions(-)
+
+diff --git a/arch/x86/kernel/cpu/sched.c b/arch/x86/kernel/cpu/sched.c
+index a640ae5..90ae68c 100644
+--- a/arch/x86/kernel/cpu/sched.c
++++ b/arch/x86/kernel/cpu/sched.c
+@@ -6,7 +6,14 @@
+ #include <asm/cpufeature.h>
+ #include <asm/processor.h>
+ 
+-#ifdef CONFIG_SMP
++#if 0 /* def CONFIG_SMP */
++
++/*
++ * Currently broken, we need to filter out idle time because the aperf/mperf
++ * ratio measures actual throughput, not capacity. This means that if a logical
++ * cpu idles it will report less capacity and receive less work, which isn't
++ * what we want.
++ */
+ 
+ static DEFINE_PER_CPU(struct aperfmperf, old_perf_sched);
+ 
