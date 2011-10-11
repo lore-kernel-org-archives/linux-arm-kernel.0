@@ -1,69 +1,39 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 11 Oct 2011 13:47:53 -0700
-Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <20110922184614.25419.84606.stgit@ponder>
-References: <20110922184614.25419.84606.stgit@ponder>
-Message-ID: <20111011134753.2751aeb1.akpm@linux-foundation.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 11 Oct 2011 14:01:19 -0700
+Subject: [PATCH v6 11/16] OMAP2+: UART: Move errata handling from serial.c
+	to omap-serial
+In-Reply-To: <1317380561-661-2-git-send-email-govindraj.raja@ti.com>
+	(Govindraj R.'s message of "Fri, 30 Sep 2011 16:32:36 +0530")
+References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
+	<1317380561-661-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <871uuj1bvk.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Sep 2011 12:51:23 -0600
-Grant Likely <grant.likely@secretlab.ca> wrote:
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-> Allow drivers to report at probe time that they cannot get all the resources
-> required by the device, and should be retried at a later time.
-> 
-> This should completely solve the problem of getting devices
-> initialized in the right order.  Right now this is mostly handled by
-> mucking about with initcall ordering which is a complete hack, and
-> doesn't even remotely handle the case where device drivers are in
-> modules.  This approach completely sidesteps the issues by allowing
-> driver registration to occur in any order, and any driver can request
-> to be retried after a few more other drivers get probed.
-
-What happens is there is a circular dependency, or if a driver's
-preconditions are never met?  AFAICT the code keeps running the probe
-function for ever.
-
-If so: bad.  The kernel should detect such situations, should
-exhaustively report them and if possible, fix them up and struggle
-onwards.
-
+> Move the errata handling mechanism from serial.c to omap-serial file
+> and utilise the same func in driver file.
 >
-> ...
+> Errata i202, i291 are moved to be handled with omap-serial
+> Moving the errata macro from serial.c file to driver header file
+> as from on errata will be handled in driver file itself.
 >
-> +	 * This bit is tricky.  We want to process every device in the
-> +	 * deferred list, but devices can be removed from the list at any
-> +	 * time while inside this for-each loop.  There are two things that
-> +	 * need to be protected against:
-> +	 * - if the device is removed from the deferred_probe_list, then we
-> +	 *   loose our place in the loop.  Since any device can be removed
-
-s/loose/lose/
-
-> +	 *   asynchronously, list_for_each_entry_safe() wouldn't make things
-> +	 *   much better.  Simplest solution is to restart walking the list
-> +	 *   whenever the current device gets removed.  Not the most efficient,
-> +	 *   but is simple to implement and easy to audit for correctness.
-> +	 * - if the device is unregistered, and freed, then there is a risk
-> +	 *   of a null pointer dereference.  This code uses get/put_device()
-> +	 *   to ensure the device cannot disappear from under our feet.
-> +	 */
+> Corrected errata id from chapter reference 2.15 to errata id i291.
 >
-> ...
->
-> +		/* Drop the mutex while probing each device; the probe path
-> +		 * may manipulate the deferred list */
+> Acked-by: Alan Cox <alan@linux.intel.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 
-Please don't invent new coding styles.  Like this:
+The errata handling for i291 is moved from device code to driver code
+but it's functionality is also changed (but not described.)
 
-		/*
-		 * Drop the mutex while probing each device; the probe path
-		 * may manipulate the deferred list
-		 */
+In the current mainline code, The workaround for i291 is done whenever
+UART clocks are about to be cut.  When the clocks are (re)enabled, the
+device is put back into no-idle.
 
-(entire patch)
+This patch puts the device into force-idle just before the idle/suspend
+transistion, but never puts it back into no-idle.  So after the first
+idle/suspend transition, the IP remains in force-idle forever.  I don't
+think that's what we want.
 
->
-> ...
->
+Kevin
