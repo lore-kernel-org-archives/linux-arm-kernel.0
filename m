@@ -1,66 +1,114 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 11 Oct 2011 08:57:56 +0200
-Subject: [PATCHv16 0/9] Contiguous Memory Allocator
-In-Reply-To: <20111010155642.38df59af.akpm@linux-foundation.org>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<201110071827.06366.arnd@arndb.de>
-	<20111010155642.38df59af.akpm@linux-foundation.org>
-Message-ID: <00af01cc87e3$1b05e980$5111bc80$%szyprowski@samsung.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Tue, 11 Oct 2011 12:35:27 +0530
+Subject: [PATCH] rtc: rtc-s3c: Add device tree support
+In-Reply-To: <1315064959-16930-1-git-send-email-thomas.abraham@linaro.org>
+References: <1315064959-16930-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <CAJuYYwQdeD=DEFSBqTTJM_EQcc517LPDy4w-N+mbHdH8Eqh=Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 3 September 2011 21:19, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> Add device tree based discovery support for Samsung's rtc controller.
+>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> ?Documentation/devicetree/bindings/rtc/s3c-rtc.txt | ? 20 ++++++++++++++++++++
+> ?drivers/rtc/rtc-s3c.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 21 ++++++++++++++++++++-
+> ?2 files changed, 40 insertions(+), 1 deletions(-)
+> ?create mode 100644 Documentation/devicetree/bindings/rtc/s3c-rtc.txt
 
-On Tuesday, October 11, 2011 12:57 AM Andrew Morton wrote:
+Ping. Any comments for this patch? If this looks fine, can this be
+considered for 3.2 merge via the Samsung kernel tree.
 
-> On Fri, 7 Oct 2011 18:27:06 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Thursday 06 October 2011, Marek Szyprowski wrote:
-> > > Once again I decided to post an updated version of the Contiguous Memory
-> > > Allocator patches.
-> > >
-> > > This version provides mainly a bugfix for a very rare issue that might
-> > > have changed migration type of the CMA page blocks resulting in dropping
-> > > CMA features from the affected page block and causing memory allocation
-> > > to fail. Also the issue reported by Dave Hansen has been fixed.
-> > >
-> > > This version also introduces basic support for x86 architecture, what
-> > > allows wide testing on KVM/QEMU emulators and all common x86 boxes. I
-> > > hope this will result in wider testing, comments and easier merging to
-> > > mainline.
-> >
-> > Hi Marek,
-> >
-> > I think we need to finally get this into linux-next now, to get some
-> > broader testing. Having the x86 patch definitely helps here becauses
-> > it potentially exposes the code to many more testers.
-> >
-> > IMHO it would be good to merge the entire series into 3.2, since
-> > the ARM portion fixes an important bug (double mapping of memory
-> > ranges with conflicting attributes) that we've lived with for far
-> > too long, but it really depends on how everyone sees the risk
-> > for regressions here. If something breaks in unfixable ways before
-> > the 3.2 release, we can always revert the patches and have another
-> > try later.
-> >
-> > It's also not clear how we should merge it. Ideally the first bunch
-> > would go through linux-mm, and the architecture specific patches
-> > through the respective architecture trees, but there is an obvious
-> > inderdependency between these sets.
-> >
-> > Russell, Andrew, are you both comfortable with putting the entire
-> > set into linux-mm to solve this? Do you see this as 3.2 or rather
-> > as 3.3 material?
-> >
-> 
-> Russell's going to hate me, but...
-> 
-> I do know that he had substantial objections to at least earlier
-> versions of this, and he is a guy who knows of what he speaks.
+Thanks,
+Thomas.
 
-I've did my best to fix these issues. I'm still waiting for comments...
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+>
+> diff --git a/Documentation/devicetree/bindings/rtc/s3c-rtc.txt b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
+> new file mode 100644
+> index 0000000..90ec45f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
+> @@ -0,0 +1,20 @@
+> +* Samsung's S3C Real Time Clock controller
+> +
+> +Required properties:
+> +- compatible: should be one of the following.
+> + ? ?* "samsung,s3c2410-rtc" - for controllers compatible with s3c2410 rtc.
+> + ? ?* "samsung,s3c6410-rtc" - for controllers compatible with s3c6410 rtc.
+> +- reg: physical base address of the controller and length of memory mapped
+> + ?region.
+> +- interrupts: Two interrupt numbers to the cpu should be specified. First
+> + ?interrupt number is the rtc alarm interupt and second interrupt number
+> + ?is the rtc tick interrupt. The number of cells representing a interrupt
+> + ?depends on the parent interrupt controller.
+> +
+> +Example:
+> +
+> + ? ? ? rtc at 10070000 {
+> + ? ? ? ? ? ? ? compatible = "samsung,s3c6410-rtc";
+> + ? ? ? ? ? ? ? reg = <0x10070000 0x100>;
+> + ? ? ? ? ? ? ? interrupts = <44 0 45 0>;
+> + ? ? ? };
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index 4e7c04e..29f928c 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -25,6 +25,7 @@
+> ?#include <linux/clk.h>
+> ?#include <linux/log2.h>
+> ?#include <linux/slab.h>
+> +#include <linux/of.h>
+>
+> ?#include <mach/hardware.h>
+> ?#include <asm/uaccess.h>
+> @@ -481,7 +482,13 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
+> ? ? ? ? ? ? ? ?goto err_nortc;
+> ? ? ? ?}
+>
+> - ? ? ? s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
+> +#ifdef CONFIG_OF
+> + ? ? ? if (pdev->dev.of_node)
+> + ? ? ? ? ? ? ? s3c_rtc_cpu_type = of_device_is_compatible(pdev->dev.of_node,
+> + ? ? ? ? ? ? ? ? ? ? ? "samsung,s3c6410-rtc") ? TYPE_S3C64XX : TYPE_S3C2410;
+> + ? ? ? else
+> +#endif
+> + ? ? ? ? ? ? ? s3c_rtc_cpu_type = platform_get_device_id(pdev)->driver_data;
+>
+> ? ? ? ?/* Check RTC Time */
+>
+> @@ -603,6 +610,17 @@ static int s3c_rtc_resume(struct platform_device *pdev)
+> ?#define s3c_rtc_resume ?NULL
+> ?#endif
+>
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id s3c_rtc_dt_match[] = {
+> + ? ? ? { .compatible = "samsung,s3c2410-rtc" },
+> + ? ? ? { .compatible = "samsung,s3c6410-rtc" },
+> + ? ? ? {},
+> +};
+> +MODULE_DEVICE_TABLE(of, s3c_rtc_dt_match);
+> +#else
+> +#define s3c_rtc_dt_match NULL
+> +#endif
+> +
+> ?static struct platform_device_id s3c_rtc_driver_ids[] = {
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.name ? ? ? ? ? = "s3c2410-rtc",
+> @@ -625,6 +643,7 @@ static struct platform_driver s3c_rtc_driver = {
+> ? ? ? ?.driver ? ? ? ? = {
+> ? ? ? ? ? ? ? ?.name ? = "s3c-rtc",
+> ? ? ? ? ? ? ? ?.owner ?= THIS_MODULE,
+> + ? ? ? ? ? ? ? .of_match_table = s3c_rtc_dt_match,
+> ? ? ? ?},
+> ?};
+>
+> --
+> 1.6.6.rc2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
