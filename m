@@ -1,45 +1,37 @@
 From: sshtylyov@ru.mvista.com (Sergei Shtylyov)
-Date: Tue, 11 Oct 2011 15:16:17 +0400
-Subject: [PATCH V2 4/4] ARM: at91/dma: DMA controller registering with
-	DT support
-In-Reply-To: <1318265021-4562-1-git-send-email-nicolas.ferre@atmel.com>
-References: <e292fbb24a98b7cfda8ea83364956a50e1cb120f.1318264339.git.nicolas.ferre@atmel.com>
-	<1318265021-4562-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <4E942581.2050903@ru.mvista.com>
+Date: Tue, 11 Oct 2011 15:22:33 +0400
+Subject: [RFT/PATCH 7/7] arm: omap: smartreflex: micro-optimization for
+	sanity check
+In-Reply-To: <1318249579-4089-7-git-send-email-balbi@ti.com>
+References: <1318249579-4089-1-git-send-email-balbi@ti.com>
+	<1318249579-4089-7-git-send-email-balbi@ti.com>
+Message-ID: <4E9426F9.2080601@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 10-10-2011 20:43, Nicolas Ferre wrote:
+On 10-10-2011 16:26, Felipe Balbi wrote:
 
-> Device tree support on at91sam9g45 family SoC. Only call
-> platform_device_register() if no compatible dma-controller
-> node is found in device tree.
+> val&&  (val != 1) == val>  1
 
-> Signed-off-by: Nicolas Ferre<nicolas.ferre@atmel.com>
+> Signed-off-by: Felipe Balbi<balbi@ti.com>
 > ---
-> V2: use compatible string to match device.
+>   arch/arm/mach-omap2/smartreflex.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
 
-[...]
-
-> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-> index 9390ae6..2120055 100644
-> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-> @@ -64,7 +64,13 @@ static struct platform_device at_hdmac_device = {
+> diff --git a/arch/arm/mach-omap2/smartreflex.c b/arch/arm/mach-omap2/smartreflex.c
+> index 7bdabfa..4b0d6a8 100644
+> --- a/arch/arm/mach-omap2/smartreflex.c
+> +++ b/arch/arm/mach-omap2/smartreflex.c
+> @@ -866,7 +866,7 @@ static int omap_sr_autocomp_store(void *data, u64 val)
+>   	}
 >
->   void __init at91_add_device_hdmac(void)
->   {
-> -	platform_device_register(&at_hdmac_device);
-> +	struct device_node *np = of_find_node_by_name(NULL, "dma-controller");
-> +
-> +	if (np&&  of_device_is_compatible(np, "atmel,at91sam9g45-dma")) {
-> +		of_node_put(np);
-> +	} else {
-> +		platform_device_register(&at_hdmac_device);
-> +	}
+>   	/* Sanity check */
+> -	if (val&&  (val != 1)) {
+> +	if (val>  1) {
+>   		pr_warning("%s: Invalid argument %lld\n", __func__, val);
 
-    {} not needed here, and checkpatch.pl should have protested.
+    The format specified should be "%llu"?
 
 WBR, Sergei
