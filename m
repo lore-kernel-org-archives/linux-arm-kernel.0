@@ -1,48 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Oct 2011 15:52:04 +0200
-Subject: [PATCHv16 0/9] Contiguous Memory Allocator
-In-Reply-To: <20111010155642.38df59af.akpm@linux-foundation.org>
-References: <1317909290-29832-1-git-send-email-m.szyprowski@samsung.com>
-	<201110071827.06366.arnd@arndb.de>
-	<20111010155642.38df59af.akpm@linux-foundation.org>
-Message-ID: <201110111552.04615.arnd@arndb.de>
+Date: Tue, 11 Oct 2011 15:57:41 +0200
+Subject: [PATCH] ARM: omap2+: stub out omap*_volt_data
+In-Reply-To: <87ipnwhepq.fsf@ti.com>
+References: <1397689.kebELtC4N3@wuerfel> <87ipnwhepq.fsf@ti.com>
+Message-ID: <201110111557.41396.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 October 2011, Andrew Morton wrote:
-> Russell's going to hate me, but...
+On Monday 10 October 2011, Kevin Hilman wrote:
+> > I got this build error only now after pulling in the latest omap series, but
+> > I cannot tell what caused it. It's also not clear to me if this is the correct
+> > solution. Please ack or provide a better fix.
 > 
-> I do know that he had substantial objections to at least earlier
-> versions of this, and he is a guy who knows of what he speaks.
+> This code was merged for v2.6.39, so not sure why this error is only
+> showing up for you now.  I just tried a !CONFIG_PM_OPP build on v2.6.39
+> and get the same errors, so it's been lingering.
 > 
-> So I would want to get a nod from rmk on this work before proceeding. 
-> If that nod isn't available then let's please identify the issues and
-> see what we can do about them.
+> Maybe you haven't had a randconfig that disabled CONFIG_PM_OPP before?
 
-I'm pretty sure that Russell's concerns were almost entirely about the
-ARM specific parts, which were extremely hard to figure out. The
-most important technical concern back in July was that the patch
-series at the time did not address the problem of conflicting pte
-flags when we remap memory as uncached on ARMv6. He had a patch
-to address this problem that was supposed to get merged in 3.1
-and would have conflicted with the CMA patch set.
+I don't know. The best explanation is that this is a very unlikely case.
+I've done many thousand randconfig builds now and have not seen it before.
 
-Things have changed a lot since then. Russell had to revert his
-own patch because he found regressions using it on older machines.
-However, the current CMA on ARM patch AFAICT reliably fixes this
-problem now and does not cause the same regression on older machines.
-The solution used now is the one we agreed on after sitting together
-for a few hours with Russell, Marek, Paul McKenney and myself.
+Of course, since the output of randconfig is random, it could indeed just
+be a coincidence.
 
-If there are still concerns over the ARM specific portion of
-the patch series, I'm very confident that we can resolve these
-now (I was much less so before that meeting).
+> Anyways, the fix is fine with me.
 
-What I would really want to hear from you is your opinion on
-the architecture independent stuff. Obviously, ARM is the
-most important consumer of the patch set, but I think the
-code has its merit on other architectures as well and most of
-them (maybe not parisc) should be about as simple as the x86
-one that Marek posted now with v16.
+Thanks,
 
 	Arnd
