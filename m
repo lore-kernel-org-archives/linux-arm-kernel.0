@@ -1,43 +1,37 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 11 Oct 2011 10:03:20 -0700
-Subject: [PATCH] arm/tegra: Harmony: Configure PMC for low-level interrupts
-In-Reply-To: <1316643040-7998-1-git-send-email-swarren@nvidia.com>
-References: <1316643040-7998-1-git-send-email-swarren@nvidia.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173BE19AC3@HQMAIL01.nvidia.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 11 Oct 2011 19:04:01 +0200
+Subject: [PATCH v3 1/6] iommu/core: split mapping to page sizes as
+	supported by the hardware
+In-Reply-To: <CAHQjnOPcetkp-XX0x4HQsR+iYN1SaCAhuBEE2nVTdhssFpUmJQ@mail.gmail.com>
+References: <1316195506-9777-1-git-send-email-ohad@wizery.com>
+	<1316195506-9777-2-git-send-email-ohad@wizery.com>
+	<20110927100505.GH2138@amd.com>
+	<CAK=WgbahwY+7Ux-RjW2Tw9WBSwZnYuTMZ2NQASWyOXQ3zF6qFg@mail.gmail.com>
+	<20110927131222.GL2138@amd.com>
+	<CAK=WgbYG2tpMJ2SikZhm=R9j5kQ6Hm8CGg=q1bko3idzF53Q3Q@mail.gmail.com>
+	<20110927181438.GM2138@amd.com>
+	<CAK=WgbbNs5fWHDEputZ=jzU5YN0sn0tf6AETkcsoq_Jbvc2XgQ@mail.gmail.com>
+	<20111010094738.GW2138@amd.com>
+	<CAK=WgbZ7Wyax1yfS1jSXw9OdwMtxxidwLO8PTsNUXX9CWzmVrw@mail.gmail.com>
+	<20111010153609.GB2138@amd.com>
+	<CAK=WgbbnuO67X46sqS87q2vw2TWq3Ekvw5p1PmXvXinQXMyowg@mail.gmail.com>
+	<CAHQjnOPcetkp-XX0x4HQsR+iYN1SaCAhuBEE2nVTdhssFpUmJQ@mail.gmail.com>
+Message-ID: <CAK=WgbZeZhr1AN82e1yab-rLWyB0tuK-s3wM+YoeJ24rsoXk2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren wrote at Wednesday, September 21, 2011 4:11 PM:
-> Without this, the PMC continually detects an interrupt when the PMU_IRQ
-> line is high, causing the tps6686x IRQ handler thread to hog an entire
-> CPU.
-> 
-> This change was originally written by Wei Ni <wni@nvidia.com> for Seaboard
-> in the ChromeOS kernel.
-> 
-> Long-term, this should probably be moved into some kind of PMU driver,
-> or perhaps integrated into the GPIO/IRQ/pinmux system?
+Hi KyongHo,
 
-Olof, is this change OK for inclusion? Or, should we create some kind
-of PMU driver and interrupt controller to solve this?
+On Tue, Oct 11, 2011 at 4:59 PM, KyongHo Cho <pullip.cho@samsung.com> wrote:
+> I think the type of size should be size_t.
+..
+> Thus, it should be
+> iommu_unmap(domain, orig_iova, orig_size - size)
 
-Thanks.
+Agree with both suggestions, thanks !
 
->  int __init harmony_regulator_init(void)
->  {
-> +	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-> +	u32 pmc_ctrl;
-> +
-> +	/*
-> +	 * Configure the power management controller to trigger PMU
-> +	 * interrupts when low
-> +	 */
-> +	pmc_ctrl = readl(pmc + PMC_CTRL);
-> +	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
-> +
->  	i2c_register_board_info(3, harmony_regulators, 1);
-> 
->  	return 0;
+P.S - please only keep the parts of my email which you are replying
+to, otherwise it's a bit hard to find your comments.
 
--- 
-nvpublic
+Thanks,
+Ohad.
