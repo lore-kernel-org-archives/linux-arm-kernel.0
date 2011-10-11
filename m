@@ -1,49 +1,46 @@
 From: govindraj.ti@gmail.com (Govindraj)
-Date: Tue, 11 Oct 2011 11:47:02 +0530
-Subject: [PATCH v6 02/16] OMAP2+: hwmod: Add API to check IO PAD wakeup
-	status
-In-Reply-To: <878vosh4ds.fsf@ti.com>
+Date: Tue, 11 Oct 2011 12:15:36 +0530
+Subject: [PATCH v6 05/16] OMAP2+: UART: Cleanup part of clock gating
+	mechanism for uart
+In-Reply-To: <87ty7gfpik.fsf@ti.com>
 References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
-	<1317380495-584-2-git-send-email-govindraj.raja@ti.com>
-	<4E8724D7.6060907@ti.com>
-	<CAAL8m4zLz4kv+nNPKHD6zKG0pdXifXpmWiHnLAyn_bq228qHXA@mail.gmail.com>
-	<4E8946BD.1010108@ti.com>
-	<CAAL8m4xkC1Ftnr=RpAK5m2PVvPx3yzitO5gNJfOKiD0_YkGkdA@mail.gmail.com>
-	<878vosh4ds.fsf@ti.com>
-Message-ID: <CAAL8m4wf42G6767untYqSE1pjtogDJmMKL4AZTyZ=77yFomBiw@mail.gmail.com>
+	<1317380495-584-5-git-send-email-govindraj.raja@ti.com>
+	<87ty7gfpik.fsf@ti.com>
+Message-ID: <CAAL8m4ygQfZZ-FX_o+AyVWrQNghyHCsp0vdiCV_QHGxXFXzDKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 3:54 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Govindraj <govindraj.ti@gmail.com> writes:
+On Tue, Oct 11, 2011 at 4:00 AM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
 >
->> On Mon, Oct 3, 2011 at 10:53 AM, Rajendra Nayak <rnayak@ti.com> wrote:
->>> On Monday 03 October 2011 10:30 AM, Govindraj wrote:
->>>
->>>> On Sat, Oct 1, 2011 at 8:03 PM, Rajendra Nayak<rnayak@ti.com> ?wrote:
->>>>>
->>>>> On Friday 30 September 2011 04:31 PM, Govindraj.R wrote:
->>>>>>
->>>>>> Add API to determine IO-PAD wakeup event status for a given
->>>>>> hwmod dynamic_mux pad.
->>>>>>
->>>>>> Wake up event set will be cleared on pad mux_read.
->>>>>
->>>>> Are these api's even getting used in this series?
->>>>
->>>> Used in Tero's irq_chaining patches.
->>>
->>> So shouldn't this patch be part of his series instead?
->>
->> Yes it is. Part of his v9-series.
->>
+>> Currently we use a shared irq handler to identify uart activity and then
+>> trigger a timer.
 >
-> Then please drop from this series and state the introductory patch
-> (PATCH 0/n) that this series has a dependency on Tero's series.
+> OK.
+>
+>> Based the timeout value set from sysfs the timer used to expire.
+>
+> Please re-phrase as I'm not sure what is being said here.
+>
+>> If no uart-activity was detected timer-expiry func sets can_sleep
+>> flag. Based on this we will disable the uart clocks in idle path.
+>>
+>> Since the clock gating mechanism is outside the uart driver, we currently
+>> use this mechanism. In preparation to runtime implementation for omap-serial
+>> driver we can cleanup this mechanism and use runtime API's to gate uart clocks.
+>>
+>> Also remove timer related info from local uart_state struct and remove
+>> the code used to set timeout value from sysfs. Remove un-used function
+>> omap_uart_check_wakeup.
+>>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>
+> The patch itself fine, and is a well-neede cleanup, but changelog
+> (especially the first part) does not read well.
 >
 
-Okay.
+Okay, Will Correct.
 
 --
-Thanks,
+Thanks.
 Govindraj.R
