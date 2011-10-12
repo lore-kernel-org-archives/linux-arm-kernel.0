@@ -1,68 +1,176 @@
-From: manjugk@ti.com (G, Manjunath Kondaiah)
-Date: Wed, 12 Oct 2011 11:48:23 +0530
-Subject: [PATCH 1/5] drivercore: add new error value for deferred probe
-In-Reply-To: <20111010010656.GA16537@kroah.com>
-References: <1317963790-29426-1-git-send-email-manjugk@ti.com>
-	<1317963790-29426-2-git-send-email-manjugk@ti.com>
-	<20111007064349.GD27508@kroah.com>
-	<CACxGe6uOmrLwJSPw4JHuOmt5B2wsukdDgVUr01pryq5Z9BFadw@mail.gmail.com>
-	<32004.1318030113@turing-police.cc.vt.edu>
-	<20111008001237.GA30551@kroah.com>
-	<CACxGe6t+PfnNGniYUj3pbK22uqjqkbh2+D=7qvvd_-Yd4yR0dw@mail.gmail.com>
-	<20111010010656.GA16537@kroah.com>
-Message-ID: <20111012061823.GB2080@manju-desktop>
+From: richard.zhao@freescale.com (Richard Zhao)
+Date: Wed, 12 Oct 2011 14:46:47 +0800
+Subject: [PATCH v2 4/7] clk: Add simple gated clock
+In-Reply-To: <1316730422-20027-5-git-send-email-mturquette@ti.com>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-5-git-send-email-mturquette@ti.com>
+Message-ID: <20111012064646.GA31037@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 09, 2011 at 06:06:56PM -0700, Greg KH wrote:
-> On Sun, Oct 09, 2011 at 04:59:31PM -0600, Grant Likely wrote:
-> > On Fri, Oct 7, 2011 at 6:12 PM, Greg KH <greg@kroah.com> wrote:
-> > > On Fri, Oct 07, 2011 at 07:28:33PM -0400, Valdis.Kletnieks at vt.edu wrote:
-> > >> On Fri, 07 Oct 2011 16:12:45 MDT, Grant Likely said:
-> > >> > On Fri, Oct 7, 2011 at 12:43 AM, Greg KH <greg@kroah.com> wrote:
-> > >> > > On Fri, Oct 07, 2011 at 10:33:06AM +0500, G, Manjunath Kondaiah wrote:
-> > >>
-> > >> > >> +#define EPROBE_DEFER 517 ? ? /* restart probe again after some time */
-> > >> > >
-> > >> > > Can we really do this?
-> > >>
-> > >> > According to Arnd, yes this is okay.
-> > >>
-> > >> > > ?Isn't this some user/kernel api here?
-> > >>
-> > >> > > What's wrong with just "overloading" on top of an existing error code?
-> > >> > > Surely one of the other 516 types could be used here, right?
-> > >>
-> > >> > overloading makes it really hard to find the users at a later date.
-> > >>
-> > >> Would proposing '#define EPROBE_DEFER EAGAIN' be acceptable to everybody? That
-> > >> would allow overloading EAGAIN, but still make it easy to tell the usages apart
-> > >> if we need to separate them later...
-> > >
-> > > Yes, please do that, it is what USB does for it's internal error code
-> > > handling.
-> > 
-> > Really?  When we've only currently used approximately 2^9 of a 2^31
-> > numberspace?  I'm fine with making sure that the number doesn't show
-> > up in the userspace headers, but it makes no sense to overload the
-> > #defines.  Particularly so in this case where it isn't feasible to
-> > audit every driver to figure out what probe might possibly return.  It
-> > is well within the realm of possibility that existing drivers are
-> > already returning -EAGAIN.
+On Thu, Sep 22, 2011 at 03:26:59PM -0700, Mike Turquette wrote:
+> From: Jeremy Kerr <jeremy.kerr@canonical.com>
 > 
-> I doubt they are, but you are right, it's really hard to tell.
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+> Signed-off-by: Mike Turquette <mturquette@ti.com>
+> ---
+> Changes since v1:
+> Add copyright header
+> Fold in Jamie's patch for set-to-disable clks
+> Use BIT macro instead of shift
 > 
-> > Besides; linux/errno.h *already* has linux-internal error codes that
-> > do not get exported out to userspace.  There is an #ifdef __KERNEL__
-> > block around ERESTARTSYS through EIOCBRETRY which is filtered out when
-> > exporting headers.  I can't see any possible reason why we wouldn't
-> > add Linux internal error codes here.
-> 
-> As long as it stays internal, that's fine, I was worried that this would
-> be exported to userspace.
-> 
-> Alan, still object to this?
+>  drivers/clk/Kconfig    |    4 ++
+>  drivers/clk/Makefile   |    1 +
+>  drivers/clk/clk-gate.c |   78 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk.h    |   13 ++++++++
+>  4 files changed, 96 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/clk/clk-gate.c
 
-I hope no one has objections to use EPROBE_DEFER
+I feel hard to tell the tree the clk parent, at register/init time. For the
+simple gate clk, the only way is to set .get_parent. But normally, for clk
+without any divider we set .get_parent to NULL. Maybe we can put .parent to
+struct clk_hw?
 
--M
+Thanks
+Richard
+> 
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index d8313d7..a78967c 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -12,3 +12,7 @@ config GENERIC_CLK
+>  config GENERIC_CLK_FIXED
+>  	bool
+>  	depends on GENERIC_CLK
+> +
+> +config GENERIC_CLK_GATE
+> +	bool
+> +	depends on GENERIC_CLK
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 9a3325a..d186446 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -2,3 +2,4 @@
+>  obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+>  obj-$(CONFIG_GENERIC_CLK)	+= clk.o
+>  obj-$(CONFIG_GENERIC_CLK_FIXED)	+= clk-fixed.o
+> +obj-$(CONFIG_GENERIC_CLK_GATE)	+= clk-gate.o
+> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+> new file mode 100644
+> index 0000000..a1d8e79
+> --- /dev/null
+> +++ b/drivers/clk/clk-gate.c
+> @@ -0,0 +1,78 @@
+> +/*
+> + * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Simple clk gate implementation
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/module.h>
+> +#include <asm/io.h>
+> +
+> +#define to_clk_gate(clk) container_of(clk, struct clk_gate, hw)
+> +
+> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
+> +{
+> +	return clk_get_rate(clk_get_parent(clk->clk));
+> +}
+> +
+> +static void clk_gate_set_bit(struct clk_hw *clk)
+> +{
+> +	struct clk_gate *gate = to_clk_gate(clk);
+> +	u32 reg;
+> +
+> +	reg = __raw_readl(gate->reg);
+> +	reg |= BIT(gate->bit_idx);
+> +	__raw_writel(reg, gate->reg);
+> +}
+> +
+> +static void clk_gate_clear_bit(struct clk_hw *clk)
+> +{
+> +	struct clk_gate *gate = to_clk_gate(clk);
+> +	u32 reg;
+> +
+> +	reg = __raw_readl(gate->reg);
+> +	reg &= ~BIT(gate->bit_idx);
+> +	__raw_writel(reg, gate->reg);
+> +}
+> +
+> +static int clk_gate_enable_set(struct clk_hw *clk)
+> +{
+> +	clk_gate_set_bit(clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static void clk_gate_disable_clear(struct clk_hw *clk)
+> +{
+> +	clk_gate_clear_bit(clk);
+> +}
+> +
+> +struct clk_hw_ops clk_gate_set_enable_ops = {
+> +	.recalc_rate = clk_gate_get_rate,
+> +	.enable = clk_gate_enable_set,
+> +	.disable = clk_gate_disable_clear,
+> +};
+> +EXPORT_SYMBOL_GPL(clk_gate_set_enable_ops);
+> +
+> +static int clk_gate_enable_clear(struct clk_hw *clk)
+> +{
+> +	clk_gate_clear_bit(clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static void clk_gate_disable_set(struct clk_hw *clk)
+> +{
+> +	clk_gate_set_bit(clk);
+> +}
+> +
+> +struct clk_hw_ops clk_gate_set_disable_ops = {
+> +	.recalc_rate = clk_gate_get_rate,
+> +	.enable = clk_gate_enable_clear,
+> +	.disable = clk_gate_disable_set,
+> +};
+> +EXPORT_SYMBOL_GPL(clk_gate_set_disable_ops);
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index 1903dd8..626fd0d 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -124,6 +124,19 @@ extern struct clk_hw_ops clk_fixed_ops;
+>  
+>  #endif /* CONFIG_GENERIC_CLK_FIXED */
+>  
+> +#ifdef CONFIG_GENERIC_CLK_GATE
+> +
+> +struct clk_gate {
+> +	struct clk_hw	hw;
+> +	void __iomem	*reg;
+> +	u8		bit_idx;
+> +};
+> +
+> +extern struct clk_hw_ops clk_gate_set_enable_ops;
+> +extern struct clk_hw_ops clk_gate_set_disable_ops;
+> +
+> +#endif /* CONFIG_GENERIC_CLK_GATE */
+> +
+>  /**
+>   * clk_register - register and initialize a new clock
+>   *
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
