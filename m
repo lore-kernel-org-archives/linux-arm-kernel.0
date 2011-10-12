@@ -1,79 +1,38 @@
-From: gdavis@mvista.com (gdavis at mvista.com)
-Date: Wed, 12 Oct 2011 02:04:33 -0400
-Subject: [RFC/PATCH 5/7] ARM: Move get_thread_info macro definition to
-	<asm/assembler.h>
-In-Reply-To: <20111011095639.GB23848@arm.com>
-References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-6-git-send-email-gdavis@mvista.com>
-	<20111011095639.GB23848@arm.com>
-Message-ID: <20111012060433.GE188@mvista.com>
+From: manjugk@ti.com (G, Manjunath Kondaiah)
+Date: Wed, 12 Oct 2011 11:44:32 +0530
+Subject: [PATCH 4/5] gpiolib: handle deferral probe error
+In-Reply-To: <CACxGe6tmjQGw77NMNYLWJHMAtmF9fk_9HnHtbrMhzkKEC1HG=Q@mail.gmail.com>
+References: <1317963790-29426-1-git-send-email-manjugk@ti.com>
+	<1317963790-29426-5-git-send-email-manjugk@ti.com>
+	<20111007110615.7638e905@lxorguk.ukuu.org.uk>
+	<CACxGe6tmjQGw77NMNYLWJHMAtmF9fk_9HnHtbrMhzkKEC1HG=Q@mail.gmail.com>
+Message-ID: <20111012061432.GA2080@manju-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 10:56:39AM +0100, Catalin Marinas wrote:
-> On Fri, Oct 07, 2011 at 03:38:39AM +0100, gdavis at mvista.com wrote:
-> > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> > index 29035e8..78397d0 100644
-> > --- a/arch/arm/include/asm/assembler.h
-> > +++ b/arch/arm/include/asm/assembler.h
-> > @@ -23,6 +23,19 @@
-> >  #include <asm/ptrace.h>
-> >  #include <asm/domain.h>
-> >  
-> > +#ifndef CONFIG_THUMB2_KERNEL
-> > +	.macro	get_thread_info, rd
-> > +	mov	\rd, sp, lsr #13
-> > +	mov	\rd, \rd, lsl #13
-> > +	.endm
-> > +#else   /* CONFIG_THUMB2_KERNEL */
-> > +	.macro	get_thread_info, rd
-> > +	mov	\rd, sp
-> > +	lsr	\rd, \rd, #13
-> > +	mov	\rd, \rd, lsl #13
-> > +	.endm
-> > +#endif  /* !CONFIG_THUMB2_KERNEL */
+On Fri, Oct 07, 2011 at 04:09:38PM -0600, Grant Likely wrote:
+> On Fri, Oct 7, 2011 at 4:06 AM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
+> > On Fri, 07 Oct 2011 10:33:09 +0500
+> > "G, Manjunath Kondaiah" <manjugk@ti.com> wrote:
+> >
+> >>
+> >> The gpio library should return -EPROBE_DEFER in gpio_request
+> >> if gpio driver is not ready.
+> >
+> > Why not use the perfectly good existing error codes we have for this ?
+> >
+> > We have EAGAIN and EUNATCH both of which look sensible.
 > 
-> We could even write some preempt_enable and preempt_disable asm macros,
-> I think it would simplify the code in the other files.
-
-Like so (based on above patch and not even compile tested):
-
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 78397d0..eaf4939 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -36,6 +36,20 @@
- 	.endm
- #endif  /* !CONFIG_THUMB2_KERNEL */
- 
-+	.macro	preempt_disable, tsk, cnt
-+	get_thread_info \tsk
-+	ldr	\cnt, [\tsk, #TI_PREEMPT]
-+	add	\cnt, \cnt, #1
-+	str	\cnt, [\tsk, #TI_PREEMPT]
-+	.endm
-+
-+	.macro	preempt_enable, tsk, cnt
-+	get_thread_info \tsk
-+	ldr	\cnt, [\tsk, #TI_PREEMPT]
-+	sub	\cnt, \cnt, #1
-+	str	\cnt, [\tsk, #TI_PREEMPT]
-+	.endm
-+
- /*
-  * Endian independent macros for shifting bytes within registers.
-  */
-
-
-Not as efficient as it could be but I imagine the macros could
-be written to support optional load of \tsk and/or optional \tmp
-parameters to cover other common cases.
-
---
-Regards,
-George
-
+> I want a distinct error code for probe deferral so that a) it doesn't
+> overlap with something a driver is already doing, and b) so that all
+> the users can be found again at a later date.
 > 
-> -- 
-> Catalin
+> That said, I'm not in agreement with this patch.  It is fine for gpio
+> lib to have a code that means the pin doesn't exist (yet), but the
+> device driver needs to be the one to decide whether or not it is
+> appropriate to use probe deferral.
+
+During gpio_request, driver gpio_request is not available. How can we expect
+driver to request deferred probe in this case?
+
+-M
