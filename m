@@ -1,28 +1,92 @@
-From: vdumpa@nvidia.com (Krishna Reddy)
-Date: Tue, 11 Oct 2011 18:34:55 -0700
-Subject: [Linaro-mm-sig] [PATCH 1/2] ARM: initial proof-of-concept IOMMU
-	mapper for DMA-mapping
-In-Reply-To: <401E54CE964CD94BAE1EB4A729C7087E3722519A1F@HQMAIL04.nvidia.com>
-References: <1314971786-15140-1-git-send-email-m.szyprowski@samsung.com>
-	<1314971786-15140-2-git-send-email-m.szyprowski@samsung.com>
-	<594816116217195c28de13accaf1f9f2.squirrel@www.codeaurora.org>
-	<001f01cc786d$d55222c0$7ff66840$%szyprowski@samsung.com>
-	<401E54CE964CD94BAE1EB4A729C7087E37225197F8@HQMAIL04.nvidia.com>
-	<00b101cc87ee$8976c410$9c644c30$%szyprowski@samsung.com>
-	<401E54CE964CD94BAE1EB4A729C7087E3722519A1F@HQMAIL04.nvidia.com>
-Message-ID: <401E54CE964CD94BAE1EB4A729C7087E3722519BF4@HQMAIL04.nvidia.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 12 Oct 2011 10:31:07 +0800
+Subject: [PATCH v3 6/7] ARM: pxa: move gpio-pxa.h into include directory
+In-Reply-To: <3002440.xxjcQDzptB@wuerfel>
+References: <1318339051-19096-1-git-send-email-haojian.zhuang@marvell.com>
+	<1318339051-19096-7-git-send-email-haojian.zhuang@marvell.com>
+	<CAKnu2Mr3cWfo3SJYkBU2cXeKELhmVOv+Qes=SCWRBaSB-Sue3g@mail.gmail.com>
+	<3002440.xxjcQDzptB@wuerfel>
+Message-ID: <CAN1soZwWtM_aggyThSDXR9dk9RVaLC6ran=WgZDwpJY6rf1K9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>It looks that You have simplified arm_iommu_map_sg() function too much. 
->>The main advantage of the iommu is to map scattered memory pages into 
->>contiguous dma address space. DMA-mapping is allowed to merge consecutive
->>entries in the scatter list if hardware supports that.
->>http://article.gmane.org/gmane.linux.kernel/1128416
->I would update arm_iommu_map_sg() back to coalesce the sg list.
->>MMC drivers seem to be aware of coalescing the SG entries together as they are using dma_sg_len().
+On Wed, Oct 12, 2011 at 4:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 11 October 2011 21:51:28 Linus Walleij wrote:
+>> 2011/10/11 Haojian Zhuang <haojian.zhuang@marvell.com>:
+>>
+>> > Merge the gpio-pxa.h in arch-pxa and arch-mmp. Move the new gpio-pxa.h
+>> > into include directory.
+>> (...)
+>> > ?arch/arm/plat-pxa/include/plat/gpio-pxa.h ?| ? 80 ---------------------------
+>> > ?drivers/gpio/gpio-pxa.c ? ? ? ? ? ? ? ? ? ?| ? 42 ++++++++++++++-
+>> > ?include/linux/gpio-pxa.h ? ? ? ? ? ? ? ? ? | ? 81 ++++++++++++++++++++++++++++
+>>
+>> This seems like a fully valid merge of common pxa GPIO include
+>> files. And I guess if both are not using plat-pxa it cannot reside
+>> in <plat/gpio-pxa.h>?
+>>
+>> Grant: shall this be <linux/gpio-pxa.h> or <linux/gpio/pxa.h> or so?
+>
+> Hmm, more fundamentally, does this even need to be a header file?
+>
+> Most of the header file looks like it should not be visible in the entire
+> kernel, so better move as much as possible into the gpio-pxa.c file.
+> I'm not sure how much remains in the end, but that should probably
+> determine the location (drivers/gpio/gpio-pxa.h, asm/gpio-pxa.h
+> or linux/gpio-pxa.h). In general, everything should be as local
+> as possible.
+>
+> One more thing regarding the contents of the header:
+>
+>> +/* GPIO Pin Level Registers */
+>> +#define PXA_GPLR(x) ?(*(volatile u32 *)(pxa_gpio_regs.gplr ? \
+>> + ? ? ? ? ? ? ? ? ? ? + PXA_BANK_OFF((x >> 5))))
+>> +/* GPIO Pin Direction Registers */
+>> +#define PXA_GPDR(x) ?(*(volatile u32 *)(pxa_gpio_regs.gpdr ? \
+>> + ? ? ? ? ? ? ? ? ? ? + PXA_BANK_OFF((x >> 5))))
+>
+> When these get m> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-I have updated the arm_iommu_map_sg() back to coalesce and fixed the issues with it. During testing, I found out that mmc host driver doesn't support buffers bigger than 64K. To get the device working, I had to break the sg entries coalesce when dma_length is about to go beyond 64KB. Looks like Mmc host driver(sdhci.c) need to be fixed to handle buffers bigger than 64KB. Should the clients be forced to handle bigger buffers or is there any better way to handle these kind of issues?
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
---
-nvpublic
+oved into the driver itself, it's probably a good
+> idea to turn these into proper accessors, something like
+>
+> enum pxa_gpio_reg {
+> ? ? ? ?GPLR,
+> ? ? ? ?GPDR,
+> ? ? ? ?GPSR,
+> ? ? ? ?GPCR,
+> ? ? ? ?GRER,
+> ? ? ? ?GFER,
+> ? ? ? ?GEDR,
+> };
+> static void __iomem *pxa_gpio_reg_base;
+> static inline u32 pxa_gpio_read(unsigned int bank, enum pxa_gpio_reg reg)
+> {
+> ? ? ? ?unsigned offset = (bank < 3) ? bank << 2 : 0x100 + ((bank - 3) << 2);
+> ? ? ? ?return readl_relaxed(pxa_gpio_reg_base + offset + 12 * reg);
+> }
+> static inline void pxa_gpio_write(unsigned int bank, unsigned int reg, u32 val)
+> {
+> ? ? ? ?unsigned offset = (bank < 3) ? bank << 2 : 0x100 + ((bank - 3) << 2);
+> ? ? ? ?return writel_relaxed(val, pxa_gpio_reg_base + offset + 12 * reg);
+> }
+>
+> That should let you get rid of most of the macros and the incorrect
+> 'volatile' access.
+>
+> ? ? ? ?Arnd
+>
+It sounds good. I'll fix it.
+
+Thanks
+Haojian
