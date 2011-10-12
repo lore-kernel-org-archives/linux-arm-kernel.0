@@ -1,43 +1,21 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Oct 2011 18:22:05 +0100
-Subject: [PATCH 4/5 v4] Realview PCIX support - add main support module
-	code
-In-Reply-To: <000101cc872f$82425660$86c70320$@tuckley@arm.com>
-References: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
-	<20111007142834.19554.69753.stgit@e102602-lin.cambridge.arm.com>
-	<20111007231937.GC25689@n2100.arm.linux.org.uk>
-	<000101cc872f$82425660$86c70320$@tuckley@arm.com>
-Message-ID: <20111012172205.GB21648@n2100.arm.linux.org.uk>
+Date: Wed, 12 Oct 2011 18:26:28 +0100
+Subject: [PATCH] arm: fix handling of nr_cpus
+In-Reply-To: <1318339864-32396-1-git-send-email-msalter@redhat.com>
+References: <1318339864-32396-1-git-send-email-msalter@redhat.com>
+Message-ID: <20111012172628.GC21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 10:32:20AM +0100, Colin Tuckley wrote:
-> > -----Original Message-----
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> > Subject: Re: [PATCH 4/5 v4] Realview PCIX support - add main support
-> > module code
-> 
-> Russell said:
-> 
-> > I thought one of my previous review points on this was that it was
-> > completely unsafe to match only on dev->device, rather than on both
-> > dev->device and dev->vendor.  Device IDs are allocated by individual
-> > vendors and are meaningless without also checking the vendor ID.
-> 
-> And
-> 
-> > And I thought we'd got to the point where we had a swizzle here.
-> 
-> The patch I sent to the list was indeed an old version. However the reason
-> is that despite the testing we did and your suggested changes the swizzle
-> based code still does not fully work. So I thought it best to post working
-> code.
-> 
-> I'm still waiting for a response from you on the last round of test results
-> I sent.
+On Tue, Oct 11, 2011 at 09:31:04AM -0400, Mark Salter wrote:
+> The current code duplicates the setup of the cpu_possible bitmap in the
+> platform smp_init_cpus() function. Unfortunately, all of those places
+> have the same bug where the nr_cpus kernel parameter is ignored. This patch
+> consolidates the duplicated code in one place and fixes it to honor the
+> nr_cpus parameter. This is accomplished by having smp_init_cpus() return
+> the platform specific number of cores so that the caller (setup_arch) can
+> set up the cpu_possible bitmap correctly for all platforms.
 
-I don't have a response at the moment (and it's going to be a while
-as I'm going to be using the next few days to catch up with quite a
-backlog of email.)  I've also lost all the context from March - which
-was an absolute necessity to ensure the survival of the ARM Linux in
-the mainline kernel sources.
+Who says every platform we're going to see will always have CPUs 0..N ?
+It's entirely possible that someone might want to have CPUs 0, 2, 3 as
+possible CPUs but omit CPU1 for platform reasons.
