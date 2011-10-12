@@ -1,209 +1,46 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 12 Oct 2011 13:43:32 +0530
-Subject: [PATCH v6 03/10] ARM: EXYNOS4: Modify platform data for pl330
-	driver
-In-Reply-To: <001801cc88b6$2023e330$606ba990$%kim@samsung.com>
-References: <1318270538-30450-1-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-2-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-3-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-4-git-send-email-thomas.abraham@linaro.org>
-	<CAJuYYwRLGZ9Mt5vedM9cOaPu-9cH_41GC=XPTS80y9vUxr=gQw@mail.gmail.com>
-	<001801cc88b6$2023e330$606ba990$%kim@samsung.com>
-Message-ID: <CAJuYYwSP9Lg+SzS9x1Nz8rF55-SBuhQwKnuTDfHE--a3uEDjcg@mail.gmail.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 12 Oct 2011 10:14:48 +0200
+Subject: [PATCHv9 03/18] TEMP: OMAP3xxx: hwmod data: add PRM hwmod
+In-Reply-To: <alpine.DEB.2.00.1110101631450.5205@utopia.booyaka.com>
+References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
+	<1316781986-30642-4-git-send-email-t-kristo@ti.com>
+	<alpine.DEB.2.00.1110101320180.5205@utopia.booyaka.com>
+	<4E934D79.4080000@ti.com>
+	<alpine.DEB.2.00.1110101416530.5205@utopia.booyaka.com>
+	<4E936F0E.9050203@ti.com>
+	<alpine.DEB.2.00.1110101631450.5205@utopia.booyaka.com>
+Message-ID: <4E954C78.1070501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Boojin Kim,
+On 10/11/2011 12:35 AM, Paul Walmsley wrote:
+> On Tue, 11 Oct 2011, Cousson, Benoit wrote:
+>
+>> On 10/10/2011 10:42 PM, Paul Walmsley wrote:
+>>
+>>> If it's the "3xxx" that you're objecting to in the name, we could call it
+>>> "prm2" or "prmxyz" - the '3xxx' just seemed like the most logical
+>>> approach.  The name of the hwmod class in the patch is still "prm", of
+>>> course.
+>>
+>> Yes, but that's different, the number is supposed to represent the instance
+>> number in the IP naming convention. So prm2 != prmv2.
+>
+> Heh, that works as long as there's no "prmv" IP block ;-)
+>
+>>> Thoughts?
+>>
+>> In fact the device name does not have to match the hwmod name. So we can just
+>> create an "omap2_prm" omap_device for OMAP2, "omap3_prm" omap_device for
+>> OMAP3...
+>> That will allow the relevant PRM  driver to be bound to the proper device.
+>
+> We can, we'd just need to add this extra mapping layer, so it doesn't
+> become a nasty special-case hack for each IP block that this applies to.
+>
+> Sounds like something for 3.3 (if ever...)
 
-2011/10/12 Boojin Kim <boojin.kim@samsung.com>:
-> Thomas Abraham wrote:
->>
->> Dear Mr. Kim,
->>
->> On 10 October 2011 23:45, Thomas Abraham <thomas.abraham@linaro.org>
->> wrote:
->> > With the 'struct dma_pl330_peri' removed, the platfrom data for dma
->> > driver can be simplified to a simple list of peripheral request ids.
->> >
->> > Cc: Jassi Brar <jassisinghbrar@gmail.com>
->> > Cc: Boojin Kim <boojin.kim@samsung.com>
->> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->> > Acked-by: Grant Likely <grant.likely@secretlab.ca>
->> > ---
->> > ?arch/arm/mach-exynos4/dma.c | ?223 ++++++++++++---------------------
->> ----------
->> > ?1 files changed, 62 insertions(+), 161 deletions(-)
->> >
->> > diff --git a/arch/arm/mach-exynos4/dma.c b/arch/arm/mach-
->> exynos4/dma.c
->> > index 9667c61..c3c0d17 100644
->> > --- a/arch/arm/mach-exynos4/dma.c
->> > +++ b/arch/arm/mach-exynos4/dma.c
->> > @@ -35,95 +35,40 @@
->> >
->> > ?static u64 dma_dmamask = DMA_BIT_MASK(32);
->> >
->> > -struct dma_pl330_peri pdma0_peri[28] = {
->> > - ? ? ? {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_PCM0_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_PCM0_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_PCM2_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_PCM2_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_MSM_REQ0,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_MSM_REQ2,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SPI0_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SPI0_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SPI2_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SPI2_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_I2S0S_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_I2S0_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_I2S0_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART0_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART0_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART2_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART2_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART4_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_UART4_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS0_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS0_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS2_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS2_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS4_RX,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_SLIMBUS4_TX,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_AC97_MICIN,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_AC97_PCMIN,
->> > - ? ? ? ? ? ? ? .rqtype = DEVTOMEM,
->> > - ? ? ? }, {
->> > - ? ? ? ? ? ? ? .peri_id = (u8)DMACH_AC97_PCMOUT,
->> > - ? ? ? ? ? ? ? .rqtype = MEMTODEV,
->> > - ? ? ? },
->> > +u8 pdma0_peri[] = {
->> > + ? ? ? DMACH_PCM0_RX,
->> > + ? ? ? DMACH_PCM0_TX,
->> > + ? ? ? DMACH_PCM2_RX,
->> > + ? ? ? DMACH_PCM2_TX,
->> > + ? ? ? DMACH_MSM_REQ0,
->> > + ? ? ? DMACH_MSM_REQ2,
->> > + ? ? ? DMACH_SPI0_RX,
->> > + ? ? ? DMACH_SPI0_TX,
->> > + ? ? ? DMACH_SPI2_RX,
->> > + ? ? ? DMACH_SPI2_TX,
->> > + ? ? ? DMACH_I2S0S_TX,
->> > + ? ? ? DMACH_I2S0_RX,
->> > + ? ? ? DMACH_I2S0_TX,
->>
->> As you have suggested, I have rechecked the platform data for all s5p
->> platforms in this patchset. Here, DMACH_I2S2_RX (event id 13) and
->> DMACH_I2S2_TX (event id 14) of DMAC[0] are missing as per the
->> exynos4210 user manual. But these where missing in the original code
->> as well which this patch modified. If possible, could you please let
->> me know if DMACH_I2S2_RX and DMACH_I2S2_TX are indeed event id 13 and
->> 14 in DMAC[0].
->
-> Yes, DMACH_I2S2_RX and DMACH_I2X2_TX are missed from my patch.
-> Can you modify it although you are inconvenient ?
+Yeah, since PRM and CM are critical pieces for the hwmod to DT 
+migration, having them DT adapted for 3.3 will be very nice.
 
-Thank you for letting me know about these event numbers.
-
-Yes. I can modify this patch and s5pc100 patch for Anca's comment and
-send these two updated patches after testing.
-
-Thanks,
-Thomas.
-
->
-> Thanks..
-> Boojin
->
->>
->> I have rechecked the other s5p platform data for dmac (s5p64x0,
->> s5pc100, s5pv210). Apart from the typo pointed out by Anca for
->> s5pc100, there are no other issues.
->>
->> Thanks,
->> Thomas.
->>
->> > + ? ? ? DMACH_UART0_RX,
->> > + ? ? ? DMACH_UART0_TX,
->> > + ? ? ? DMACH_UART2_RX,
->> > + ? ? ? DMACH_UART2_TX,
->> > + ? ? ? DMACH_UART4_RX,
->> > + ? ? ? DMACH_UART4_TX,
->> > + ? ? ? DMACH_SLIMBUS0_RX,
->> > + ? ? ? DMACH_SLIMBUS0_TX,
->> > + ? ? ? DMACH_SLIMBUS2_RX,
->> > + ? ? ? DMACH_SLIMBUS2_TX,
->> > + ? ? ? DMACH_SLIMBUS4_RX,
->> > + ? ? ? DMACH_SLIMBUS4_TX,
->> > + ? ? ? DMACH_AC97_MICIN,
->> > + ? ? ? DMACH_AC97_PCMIN,
->> > + ? ? ? DMACH_AC97_PCMOUT,
->> > ?};
->> >
->> > ?struct dma_pl330_platdata exynos4_pdma0_pdata = {
->> > ? ? ? ?.nr_valid_peri = ARRAY_SIZE(pdma0_peri),
->> > - ? ? ? .peri = pdma0_peri,
->> > + ? ? ? .peri_id = pdma0_peri,
->> > ?};
->> >
->>
->> [...]
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-
->> samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
->
->
+Benoit
