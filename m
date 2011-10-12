@@ -1,117 +1,175 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 12 Oct 2011 21:45:25 +0530
-Subject: [PATCH] gpio: exynos4: Add device tree support
-In-Reply-To: <4E95AE26.8080702@gmail.com>
-References: <1318320974-9879-1-git-send-email-thomas.abraham@linaro.org>
-	<4E945C90.1050601@gmail.com>
-	<CAJuYYwRwBxkAo2fMfVV9wtQ40XeROAnc-cGJK+cssjuh9px=qQ@mail.gmail.com>
-	<4E946109.2000305@gmail.com>
-	<CAJuYYwQWUjVf9Z5Rdw4fTK70=B1aw-5x_wjYm_fq+zHyQAWJvg@mail.gmail.com>
-	<4E95AE26.8080702@gmail.com>
-Message-ID: <CAJuYYwRsM_aGkeG9v97jdsJgSQeokViuLGdF5TvqEkNZCAgFVA@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 12 Oct 2011 18:19:04 +0200
+Subject: [PATCH V4 3/3] ARM: SAMSUNG: Add lookup of sdhci-s3c clocks using
+	generic names
+In-Reply-To: <CAPs=JDf2N1kh4BO9nPBb-J6k51e-ytntrNOvw_UOKtw-ktdycA@mail.gmail.com>
+References: <1318412587-29987-1-git-send-email-rajeshwari.s@samsung.com>
+	<1318412587-29987-4-git-send-email-rajeshwari.s@samsung.com>
+	<4E956ADB.3060604@samsung.com>
+	<CAPs=JDf2N1kh4BO9nPBb-J6k51e-ytntrNOvw_UOKtw-ktdycA@mail.gmail.com>
+Message-ID: <4E95BDF8.2080406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
-> On 10/11/2011 11:06 AM, Thomas Abraham wrote:
->> On 11 October 2011 21:00, Rob Herring <robherring2@gmail.com> wrote:
->>> On 10/11/2011 10:19 AM, Thomas Abraham wrote:
->>>> Hi Rob,
->>>>
->>>> On 11 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
->>>>> Thomas,
->>>>>
->>>>> On 10/11/2011 03:16 AM, Thomas Abraham wrote:
->>>>>> As gpio chips get registered, a device tree node which represents the
->>>>>> gpio chip is searched and attached to it. A translate function is also
->>>>>> provided to convert the gpio specifier into actual platform settings
->>>>>> for pin function selection, pull up/down and driver strength settings.
->>>>>>
->>>>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->>>>>> ---
->>>>>> This patch is based on the latest consolidated Samsung GPIO driver available
->>>>>> in the following tree:
->>>>>> ? https://github.com/kgene/linux-samsung.git ?branch: for-next
->>>>>>
->>>>>> ?.../devicetree/bindings/gpio/gpio-samsung.txt ? ? ?| ? 30 +++++++++++
->>>>>> ?drivers/gpio/gpio-samsung.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 53 ++++++++++++++++++++
->>>>>> ?2 files changed, 83 insertions(+), 0 deletions(-)
->>>>>> ?create mode 100644 Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->>>>>> new file mode 100644
->>>>>> index 0000000..883faeb
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->>>>>> @@ -0,0 +1,30 @@
->>>>>> +Samsung Exynos4 GPIO Controller
->>>>>> +
->>>>>> +Required properties:
->>>>>> +- compatible: Format of compatible property value should be
->>>>>> + ?"samsung,exynos4-gpio-<controller_name>". Example: For GPA0 controller, the
->>>>>> + ?compatible property value should be "samsung,exynos4-gpio-gpa0".
->>>>>
->>>>> Isn't gpa0 an instance of the h/w, not a version?
->>>>
->>>> GPA0 is a instance of the gpio controller. There are several such
->>>> instances and there could be differences in those instances such as
->>>> the number of GPIO lines managed by that gpio controller instance.
->>>>
+On 10/12/2011 02:36 PM, Rajeshwari Birje wrote:
+> On Wed, Oct 12, 2011 at 3:54 PM, Sylwester Nawrocki
+> <s.nawrocki@samsung.com> wrote:
+>> Hi Rajeshwari,
+>>
+>> On 10/12/2011 11:43 AM, Rajeshwari Shinde wrote:
+>>> Add support for lookup of sdhci-s3c controller clocks using generic names
+>>> for s3c2416, s3c64xx, s5pc100, s5pv210 and exynos4 SoC's.
 >>>
->>> That doesn't seem like a reason to have different compatible strings.
->>> Does that affect the programming model of the controller? Unused lines
->>> whether at the board level or SOC level shouldn't really matter.
+>>> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
+>>> ---
+>>>  arch/arm/mach-exynos4/clock.c         |   88 ++++++++++-------
+>>>  arch/arm/mach-s3c2416/clock.c         |   68 +++++++------
+>>>  arch/arm/mach-s3c64xx/clock.c         |  126 +++++++++++++++----------
+>>>  arch/arm/mach-s5pc100/clock.c         |  130 ++++++++++++++++----------
+>>>  arch/arm/mach-s5pv210/clock.c         |  167 ++++++++++++++++++++-------------
+>>>  arch/arm/plat-s3c24xx/s3c2443-clock.c |   15 ++-
+>>>  6 files changed, 359 insertions(+), 235 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+>>> index 9f50e33..c6383b9 100644
+>>> --- a/arch/arm/mach-exynos4/clock.c
+>>> +++ b/arch/arm/mach-exynos4/clock.c
+>>> @@ -1157,42 +1157,6 @@ static struct clksrc_clk clksrcs[] = {
+>>>               .reg_div = { .reg = S5P_CLKDIV_MFC, .shift = 0, .size = 4 },
+...
+>>> +static struct clksrc_clk clk_sclk_mmc0 = {
+>>> +     .clk            = {
+>>> +             .name           = "sclk_mmc",
+>>> +             .devname        = "s3c-sdhci.0",
 >>
+>> Would it make sense to drop this 'devname' field here and others
+>> until sclk_mmc3 ....
+> 
+> *** The devname here distinguishes these clocks. So it should be okay
+> to have a devname for these clocks.
+
+I'm not sure what's Mr Kukjin's opinion on that, but I personally would really
+like to see all the devname fields disappear from samsung clk data structures.
+Possibly if all involved people would keep that in mind we could achieve this
+over time.
+
+> 
 >>
->> No, that does not affect the programming of the controller. The reason
->> for the instance name extension in compatible string is to match the
->> gpio_chip with a gpio controller node. When matched, the of_node
->> pointer of the gpio_chip is set to point to that controller node.
+>>> +             .parent         = &clk_dout_mmc0.clk,
+>>> +             .enable         = exynos4_clksrc_mask_fsys_ctrl,
+>>> +             .ctrlbit        = (1 << 0),
+>>> +     },
+>>> +     .reg_div = { .reg = S5P_CLKDIV_FSYS1, .shift = 8, .size = 8 },
+>>> +};
+>>> +
+>>> +static struct clksrc_clk clk_sclk_mmc1 = {
+>>> +     .clk            = {
+>>> +             .name           = "sclk_mmc",
+>>> +             .devname        = "s3c-sdhci.1",
 >>
->> This might not be the best possible implementation but the device tree
->> support code in this patch is dictated by the structure of the
->> existing gpio driver code. As you suggested previously, I will look at
->> reworking the gpio driver a little later but for now, there was a need
->> for working gpio dt solution to make progress on dt support for other
->> controllers.
->
-> Linux should provide clues about what's needed in a binding, but the
-> binding should not be defined based on current Linux code. Doing the
-> binding one way and changing it later is not a good plan.
+>>> +             .parent         = &clk_dout_mmc1.clk,
+>>> +             .enable         = exynos4_clksrc_mask_fsys_ctrl,
+>>> +             .ctrlbit        = (1 << 4),
+>>> +     },
+>>> +     .reg_div = { .reg = S5P_CLKDIV_FSYS1, .shift = 24, .size = 8 },
+>>> +};
+>>> +
+>>> +static struct clksrc_clk clk_sclk_mmc2 = {
+>>> +     .clk            = {
+>>> +             .name           = "sclk_mmc",
+>>> +             .devname        = "s3c-sdhci.2",
+>>
+>>> +             .parent         = &clk_dout_mmc2.clk,
+>>> +             .enable         = exynos4_clksrc_mask_fsys_ctrl,
+>>> +             .ctrlbit        = (1 << 8),
+>>> +     },
+>>> +     .reg_div = { .reg = S5P_CLKDIV_FSYS2, .shift = 8, .size = 8 },
+>>> +};
+>>> +
+>>> +static struct clksrc_clk clk_sclk_mmc3 = {
+>>> +     .clk            = {
+>>> +             .name           = "sclk_mmc",
+>>> +             .devname        = "s3c-sdhci.3",
+>>
+>>> +             .parent         = &clk_dout_mmc3.clk,
+>>> +             .enable         = exynos4_clksrc_mask_fsys_ctrl,
+>>> +             .ctrlbit        = (1 << 12),
+>>> +     },
+>>> +     .reg_div = { .reg = S5P_CLKDIV_FSYS2, .shift = 24, .size = 8 },
+>>> +};
+>>> +
+>>>  /* Clock initialization code */
+>>>  static struct clksrc_clk *sysclks[] = {
+>>>       &clk_mout_apll,
+>>> @@ -1289,6 +1297,10 @@ static struct clksrc_clk *clksrc_cdev[] = {
+>>>       &clk_sclk_uart1,
+>>>       &clk_sclk_uart2,
+>>>       &clk_sclk_uart3,
+>>> +     &clk_sclk_mmc0,
+>>> +     &clk_sclk_mmc1,
+>>> +     &clk_sclk_mmc2,
+>>> +     &clk_sclk_mmc3,
+>>
+>> ..then drop the above 4 lines...
+> 
+> **** The registration for these clocks are important. The
+> s3c_register_clksrc() function sets the .ops of this clock and also
+> its parent. So the registration cannot be dropped.
 
-Ok. When starting on this, two compatible values where used for the
-gpio controllers, one was "samsung,exynos4-gpio" and another was
-"samsung,exynos4-gpio-<ctrl_name>". And when the gpio dt support would
-mature, the second compatible value could be dropped. Non-linux
-platforms could always use the generic "samsung,exynos4-gpio"
-compatible value to match. I moved to using only
-"samsung,exynos4-gpio-<ctrl_name>" just before sending this patch
-because I was not sure of the right approach.
+OK.
 
->
-> I think you need to convert all users of gpio over as well so you can
-> move to dynamic gpio_chip creation and gpio numbering. Or maybe you can
-> match based on base address? This is going to be a common problem as
-> gpio is converted over to DT. Perhaps Grant or others have suggestions
-> on the approach to use.
+> 
+>>
+>>>  };
+>>>
+>>>  static struct clk_lookup exynos4_clk_lookup[] = {
+>>> @@ -1296,6 +1308,10 @@ static struct clk_lookup exynos4_clk_lookup[] = {
+>>>       CLKDEV_INIT("exynos4210-uart.1", "clk_uart_baud0", &clk_sclk_uart1.clk),
+>>>       CLKDEV_INIT("exynos4210-uart.2", "clk_uart_baud0", &clk_sclk_uart2.clk),
+>>>       CLKDEV_INIT("exynos4210-uart.3", "clk_uart_baud0", &clk_sclk_uart3.clk),
+>>> +     CLKDEV_INIT("exynos4-sdhci.0", "mmc_busclk.2", &clk_sclk_mmc0.clk),
+>>> +     CLKDEV_INIT("exynos4-sdhci.1", "mmc_busclk.2", &clk_sclk_mmc1.clk),
+>>> +     CLKDEV_INIT("exynos4-sdhci.2", "mmc_busclk.2", &clk_sclk_mmc2.clk),
+>>> +     CLKDEV_INIT("exynos4-sdhci.3", "mmc_busclk.2", &clk_sclk_mmc3.clk),
+>>
+>> ..and add something like:
+>>
+>>  +      CLKDEV_INIT("s3c-sdhci.0", "sclk_mmc", &clk_sclk_mmc0.clk),
+>>  +      CLKDEV_INIT("s3c-sdhci.1", "sclk_mmc", &clk_sclk_mmc1.clk),
+>>  +      CLKDEV_INIT("s3c-sdhci.2", "sclk_mmc", &clk_sclk_mmc2.clk),
+>>  +      CLKDEV_INIT("s3c-sdhci.3", "sclk_mmc", &clk_sclk_mmc3.clk),
+>>
+>> ?
+> 
+> **** The driver uses a common name for the possible bus clock sources,
+> that is ?mmc_busclk?. This keeps the clock lookup code in the driver
+> simple. Also, there could be SoC?s which do no use sclk_mmc as the bus
+> clock name as per the user manual
 
-Yes, I agree with you about the dynamic gpio_chip creation and gpio
-numbering. Probably, I should have focussed more on this before moving
-to dt support for other controllers.
+OK, I was aware of that. I didn't mean removing the "mmc_busclk.2" entries,
+just adding another 4, which are created anyway by s3c_register_clksrc()
+function. But for now I think the patch is OK.
 
-But matching based on base address is still an option if that is
-better than matching with compatible values as defined currently. The
-'struct samsung_gpio_chip' which encapsulates 'struct gpio_chip' has
-information about the base address of the gpio controller. The match
-of gpio device node with 'struct gpio_chip' can be quickly moved over
-to base address matching. Would this be better than the current
-approach?
+> 
+> 
+>>
+>> Also I'm wondering why we're using different device names for clk_sclk_mmc0..3
+>> clocks, i.e. exynos4-sdhci.? and s3c-sdhci.? ?
+>>
+>> Does it all work on exynos ? I would expect the device name to be same
+>> across all the clock definitions, otherwise clk_get(dev, ..) will fail.
+> 
+> **** There was a patch submitted to rename the device name of sdhci
+> for Exynos to exynos4-sdhci. I will remove this change from this patch
+> and let that patch handle this change.
 
-Thank you for your comments Rob.
+I wouldn't do that. IMHO it's better to keep this patch as is, to make the final
+diff size lower.
+Perhaps it's even worth to consider doing the clock rename altogether in this patch.
+But it's of course up to you.
+
 
 Regards,
-Thomas.
-
->
-> Rob
->
+-- 
+Sylwester Nawrocki
+Samsung Poland R&D Center
