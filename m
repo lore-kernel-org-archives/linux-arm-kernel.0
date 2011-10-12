@@ -1,25 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Oct 2011 11:41:19 +0200
-Subject: [PATCH] mmc: mmci: Do not release spinlock in request_end
-In-Reply-To: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdb5pn=q+hQSsrTgKbCvuKR83vHn1iAfvzMFXQeAgv--+Q@mail.gmail.com>
+From: rajeshwari.s@samsung.com (Rajeshwari Shinde)
+Date: Wed, 12 Oct 2011 15:13:05 +0530
+Subject: [PATCH V3 1/3] SDHCI: S3C: Use generic clock names for sdhci bus clock
+	options
+In-Reply-To: <1318412587-29987-1-git-send-email-rajeshwari.s@samsung.com>
+References: <1318412587-29987-1-git-send-email-rajeshwari.s@samsung.com>
+Message-ID: <1318412587-29987-2-git-send-email-rajeshwari.s@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 4:06 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+This patch modifies the driver to stop depending on the clock names
+being passed from the platform and switch over to bus clock lookup
+using generic clock names.
 
-> The patch "mmc: core: move ->request() call from atomic context",
-> is the reason to why this change is possible. This simplifies the
-> error handling code execution path quite a lot and potentially also
-> fixes some error handling hang problems.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
+---
+ drivers/mmc/host/sdhci-s3c.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
-Adrian do you agree with this?
-
-To me it looks correct,
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+diff --git a/drivers/mmc/host/sdhci-s3c.c b/drivers/mmc/host/sdhci-s3c.c
+index 82709b6..a5fde87 100644
+--- a/drivers/mmc/host/sdhci-s3c.c
++++ b/drivers/mmc/host/sdhci-s3c.c
+@@ -435,14 +435,12 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
+ 
+ 	for (clks = 0, ptr = 0; ptr < MAX_BUS_CLK; ptr++) {
+ 		struct clk *clk;
+-		char *name = pdata->clocks[ptr];
++		char name[14];
+ 
+-		if (name == NULL)
+-			continue;
++		sprintf(name, "mmc_busclk.%d", ptr);
+ 
+ 		clk = clk_get(dev, name);
+ 		if (IS_ERR(clk)) {
+-			dev_err(dev, "failed to get clock %s\n", name);
+ 			continue;
+ 		}
+ 
+-- 
+1.7.4.4
