@@ -1,88 +1,82 @@
-From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
-Date: Wed, 12 Oct 2011 15:01:47 +0200
-Subject: [PATCH] fixup: mm: alloc_contig_range: increase min_free_kbytes
-	during allocation
-In-Reply-To: <1318417735-9199-1-git-send-email-m.szyprowski@samsung.com>
-References: <4E93F088.60006@stericsson.com>
-	<1318417735-9199-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <4E958FBB.6000200@stericsson.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 12 Oct 2011 08:28:44 -0500
+Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
+	mechanism
+In-Reply-To: <CAPM=9tzHOa5Dbe=SQz+AURMMbio4L7qoS8kUT3Ek0+HdtkrH4g@mail.gmail.com>
+References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
+	<1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
+	<CAPM=9tzHOa5Dbe=SQz+AURMMbio4L7qoS8kUT3Ek0+HdtkrH4g@mail.gmail.com>
+Message-ID: <CAF6AEGs6kkGp85NoNVuq5W9i=WE86V8wvAtKydX=D3bQOc+6Pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
-
-On 10/12/2011 01:08 PM, Marek Szyprowski wrote:
-> Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
-> ---
->   mm/page_alloc.c |   15 ++++++++++++---
->   1 files changed, 12 insertions(+), 3 deletions(-)
+On Wed, Oct 12, 2011 at 7:41 AM, Dave Airlie <airlied@gmail.com> wrote:
+> On Tue, Oct 11, 2011 at 10:23 AM, Sumit Semwal <sumit.semwal@ti.com> wrote:
+>> This is the first step in defining a dma buffer sharing mechanism.
+>>
+>> A new buffer object dma_buf is added, with operations and API to allow easy
+>> sharing of this buffer object across devices.
+>>
+>> The framework allows:
+>> - a new buffer-object to be created with fixed size.
+>> - different devices to 'attach' themselves to this buffer, to facilitate
+>> ?backing storage negotiation, using dma_buf_attach() API.
+>> - association of a file pointer with each user-buffer and associated
+>> ? allocator-defined operations on that buffer. This operation is called the
+>> ? 'export' operation.
+>> - this exported buffer-object to be shared with the other entity by asking for
+>> ? its 'file-descriptor (fd)', and sharing the fd across.
+>> - a received fd to get the buffer object back, where it can be accessed using
+>> ? the associated exporter-defined operations.
+>> - the exporter and user to share the scatterlist using get_scatterlist and
+>> ? put_scatterlist operations.
+>>
+>> Atleast one 'attach()' call is required to be made prior to calling the
+>> get_scatterlist() operation.
+>>
+>> Couple of building blocks in get_scatterlist() are added to ease introduction
+>> of sync'ing across exporter and users, and late allocation by the exporter.
+>>
+>> mmap() file operation is provided for the associated 'fd', as wrapper over the
+>> optional allocator defined mmap(), to be used by devices that might need one.
 >
-> Hello Maxime,
->
-> Please check if this patch fixes your lockup issue. It is a bit cruel,
-> but it looks that in case of real low-memory situation page allocation
-> is very complex task which usually ends in waiting for the io/fs and
-> free pages that really don't arrive at all.
-Thanks for the reactivity.
-We just tested it, we no more faced the lockup. Instead, the OOM Killer 
-is triggered and contiguous allocation succeed.
-I'm not familiar enough with page_alloc.c to detect any side effects 
-this patch could bring.
+> Why is this needed? it really doesn't make sense to be mmaping objects
+> independent of some front-end like drm or v4l.
 
-> Best regards
+well, the mmap is actually implemented by the buffer allocator
+(v4l/drm).. although not sure if this was the point
+
+> how will you know what contents are in them, how will you synchronise
+> access. Unless someone has a hard use-case for this I'd say we drop it
+> until someone does.
+
+The intent was that this is for well defined formats.. ie. it would
+need to be a format that both v4l and drm understood in the first
+place for sharing to make sense at all..
+
+Anyways, the basic reason is to handle random edge cases where you
+need sw access to the buffer.  For example, you are decoding video and
+pull out a frame to generate a thumbnail w/ a sw jpeg encoder..
+
+On gstreamer 0.11 branch, for example, there is already a map/unmap
+virtual method on the gst buffer for sw access (ie. same purpose as
+PrepareAccess/FinishAccess in EXA).  The idea w/ dmabuf mmap() support
+is that we could implement support to mmap()/munmap() before/after sw
+access.
+
+With this current scheme, synchronization could be handled in
+dmabufops->mmap() and vm_ops->close()..  it is perhaps a bit heavy to
+require mmap/munmap for each sw access, but I suppose this isn't
+really for the high-performance use case.  It is just so that some
+random bit of sw that gets passed a dmabuf handle without knowing who
+allocated it can have sw access if really needed.
+
+BR,
+-R
+
+> Dave.
 > --
-> Marek Szyprowski
-> Samsung Poland R&D Center
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
->
->
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index 055aa4c..45473e9 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -5872,6 +5872,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
->   		       gfp_t flags, unsigned migratetype)
->   {
->   	unsigned long outer_start, outer_end;
-> +	unsigned int count = end - start;
->   	int ret;
->
->   	/*
-> @@ -5900,7 +5901,10 @@ int alloc_contig_range(unsigned long start, unsigned long end,
->   	ret = __start_isolate_page_range(pfn_to_maxpage(start),
->   					 pfn_to_maxpage_up(end), migratetype);
->   	if (ret)
-> -		goto done;
-> +		return ret;
-> +
-> +	min_free_kbytes += count * PAGE_SIZE / 1024;
-> +	setup_per_zone_wmarks();
->
->   	ret = __alloc_contig_migrate_range(start, end);
->   	if (ret)
-> @@ -5922,8 +5926,10 @@ int alloc_contig_range(unsigned long start, unsigned long end,
->
->   	ret = 0;
->   	while (!PageBuddy(pfn_to_page(start&  (~0UL<<  ret))))
-> -		if (WARN_ON(++ret>= MAX_ORDER))
-> -			return -EINVAL;
-> +		if (WARN_ON(++ret>= MAX_ORDER)) {
-> +			ret = -EINVAL;
-> +			goto done;
-> +		}
->
->   	outer_start = start&  (~0UL<<  ret);
->   	outer_end   = alloc_contig_freed_pages(outer_start, end, flags);
-> @@ -5936,6 +5942,9 @@ int alloc_contig_range(unsigned long start, unsigned long end,
->
->   	ret = 0;
->   done:
-> +	min_free_kbytes -= count * PAGE_SIZE / 1024;
-> +	setup_per_zone_wmarks();
-> +
->   	__undo_isolate_page_range(pfn_to_maxpage(start), pfn_to_maxpage_up(end),
->   				  migratetype);
->   	return ret;
-
-Best regards,
-Maxime
