@@ -1,33 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Oct 2011 14:02:38 +0200
-Subject: [RFC PATCH] tty/serial: RS485 bindings for device tree
-In-Reply-To: <3289709.mzRgbAUyPT@wuerfel>
-References: <1318353208-24422-1-git-send-email-nicolas.ferre@atmel.com>
-	<4E947CA6.9010703@atmel.com> <3289709.mzRgbAUyPT@wuerfel>
-Message-ID: <4E9581DE.20702@atmel.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 12 Oct 2011 14:04:22 +0200
+Subject: [PATCH] [TRIVIAL] ARM: imx: Fix typo 'MACH_MX31_3DS_MXC_NAND_USE_BBT'
+Message-ID: <1318421062.2336.4.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2011 08:41 PM, Arnd Bergmann :
-> On Tuesday 11 October 2011 19:28:06 Nicolas Ferre wrote:
->>
->>> +Optional properties:
->>> +- linux,rs485-enabled-at-boot-time: empty property telling to enable the rs485
->>> +  feature at boot time. It can be disabled later with proper ioctl.
->>
->> +- linux,rs485-rx-during-tx: empty property that enable the receiving of data
->> +  even whilst sending data.
-> 
-> This does not sound too linux specific. If it's a hardware property, don't
-> use the 'linux,' prefix and just make it 'rs484-full-duplex' or such.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+This is trivial because this is what apparently was intended. On the
+other hand this should open code paths that were hidden until now. So
+perhaps this needs the maintainer's approval. (I cannot meaningfully
+test this.)
 
-Ok, I understand. Your remark may also apply to linux,rs485-rts-delay.
-So we may end-up with:
+ arch/arm/mach-imx/mach-mx31_3ds.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-- linux,rs485-enabled-at-boot-time
-- rs485-rx-during-tx
-- rs485-rts-delay
-
-Best regards,
+diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+index c20be75..5750ca5 100644
+--- a/arch/arm/mach-imx/mach-mx31_3ds.c
++++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+@@ -542,7 +542,7 @@ static const struct mxc_nand_platform_data
+ mx31_3ds_nand_board_info __initconst = {
+ 	.width		= 1,
+ 	.hw_ecc		= 1,
+-#ifdef MACH_MX31_3DS_MXC_NAND_USE_BBT
++#ifdef CONFIG_MACH_MX31_3DS_MXC_NAND_USE_BBT
+ 	.flash_bbt	= 1,
+ #endif
+ };
 -- 
-Nicolas Ferre
+1.7.4.4
