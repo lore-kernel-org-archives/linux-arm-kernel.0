@@ -1,92 +1,61 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 12 Oct 2011 10:31:07 +0800
-Subject: [PATCH v3 6/7] ARM: pxa: move gpio-pxa.h into include directory
-In-Reply-To: <3002440.xxjcQDzptB@wuerfel>
-References: <1318339051-19096-1-git-send-email-haojian.zhuang@marvell.com>
-	<1318339051-19096-7-git-send-email-haojian.zhuang@marvell.com>
-	<CAKnu2Mr3cWfo3SJYkBU2cXeKELhmVOv+Qes=SCWRBaSB-Sue3g@mail.gmail.com>
-	<3002440.xxjcQDzptB@wuerfel>
-Message-ID: <CAN1soZwWtM_aggyThSDXR9dk9RVaLC6ran=WgZDwpJY6rf1K9Q@mail.gmail.com>
+From: gdavis@mvista.com (George G. Davis)
+Date: Tue, 11 Oct 2011 22:34:17 -0400
+Subject: [RFC/PATCH 3/7] ARM: ARM11 MPCore: {clean,
+	flush}_pmd_entry are not preempt safe
+In-Reply-To: <20111011095314.GA23848@arm.com>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-4-git-send-email-gdavis@mvista.com>
+	<20111011095314.GA23848@arm.com>
+Message-ID: <6EB957F5-6E89-43F3-BAF3-A9E007BD896F@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 4:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 11 October 2011 21:51:28 Linus Walleij wrote:
->> 2011/10/11 Haojian Zhuang <haojian.zhuang@marvell.com>:
->>
->> > Merge the gpio-pxa.h in arch-pxa and arch-mmp. Move the new gpio-pxa.h
->> > into include directory.
->> (...)
->> > ?arch/arm/plat-pxa/include/plat/gpio-pxa.h ?| ? 80 ---------------------------
->> > ?drivers/gpio/gpio-pxa.c ? ? ? ? ? ? ? ? ? ?| ? 42 ++++++++++++++-
->> > ?include/linux/gpio-pxa.h ? ? ? ? ? ? ? ? ? | ? 81 ++++++++++++++++++++++++++++
->>
->> This seems like a fully valid merge of common pxa GPIO include
->> files. And I guess if both are not using plat-pxa it cannot reside
->> in <plat/gpio-pxa.h>?
->>
->> Grant: shall this be <linux/gpio-pxa.h> or <linux/gpio/pxa.h> or so?
->
-> Hmm, more fundamentally, does this even need to be a header file?
->
-> Most of the header file looks like it should not be visible in the entire
-> kernel, so better move as much as possible into the gpio-pxa.c file.
-> I'm not sure how much remains in the end, but that should probably
-> determine the location (drivers/gpio/gpio-pxa.h, asm/gpio-pxa.h
-> or linux/gpio-pxa.h). In general, everything should be as local
-> as possible.
->
-> One more thing regarding the contents of the header:
->
->> +/* GPIO Pin Level Registers */
->> +#define PXA_GPLR(x) ?(*(volatile u32 *)(pxa_gpio_regs.gplr ? \
->> + ? ? ? ? ? ? ? ? ? ? + PXA_BANK_OFF((x >> 5))))
->> +/* GPIO Pin Direction Registers */
->> +#define PXA_GPDR(x) ?(*(volatile u32 *)(pxa_gpio_regs.gpdr ? \
->> + ? ? ? ? ? ? ? ? ? ? + PXA_BANK_OFF((x >> 5))))
->
-> When these get m> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+On Oct 11, 2011, at 5:53 AM, Catalin Marinas wrote:
 
-oved into the driver itself, it's probably a good
-> idea to turn these into proper accessors, something like
->
-> enum pxa_gpio_reg {
-> ? ? ? ?GPLR,
-> ? ? ? ?GPDR,
-> ? ? ? ?GPSR,
-> ? ? ? ?GPCR,
-> ? ? ? ?GRER,
-> ? ? ? ?GFER,
-> ? ? ? ?GEDR,
-> };
-> static void __iomem *pxa_gpio_reg_base;
-> static inline u32 pxa_gpio_read(unsigned int bank, enum pxa_gpio_reg reg)
-> {
-> ? ? ? ?unsigned offset = (bank < 3) ? bank << 2 : 0x100 + ((bank - 3) << 2);
-> ? ? ? ?return readl_relaxed(pxa_gpio_reg_base + offset + 12 * reg);
-> }
-> static inline void pxa_gpio_write(unsigned int bank, unsigned int reg, u32 val)
-> {
-> ? ? ? ?unsigned offset = (bank < 3) ? bank << 2 : 0x100 + ((bank - 3) << 2);
-> ? ? ? ?return writel_relaxed(val, pxa_gpio_reg_base + offset + 12 * reg);
-> }
->
-> That should let you get rid of most of the macros and the incorrect
-> 'volatile' access.
->
-> ? ? ? ?Arnd
->
-It sounds good. I'll fix it.
+> On Fri, Oct 07, 2011 at 03:38:37AM +0100, gdavis at mvista.com wrote:
+>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>> index 594d677..3c8253f 100644
+>> --- a/arch/arm/mm/mmu.c
+>> +++ b/arch/arm/mm/mmu.c
+>> @@ -567,12 +567,24 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+>> 		if (addr & SECTION_SIZE)
+>> 			pmd++;
+>> 
+>> +		if (cache_ops_need_broadcast())
+>> +			preempt_disable();
+>> 		do {
+>> 			*pmd = __pmd(phys | type->prot_sect);
+>> 			phys += SECTION_SIZE;
+>> 		} while (pmd++, addr += SECTION_SIZE, addr != end);
+>> 
+>> +		/* FIXME: Multiple PMD entries may be written above
+>> +		 * but only one cache line, up to 8 PMDs depending
+>> +		 * on the alignment of this mapping, is flushed below.
+>> +		 * IFF this mapping spans >8MiB, then only the first
+>> +		 * 8MiB worth of entries will be flushed.  Entries
+>> +		 * above the 8MiB limit will not be flushed if I
+>> +		 * read this correctly.
+>> +		 */
+>> 		flush_pmd_entry(p);
+>> +		if (cache_ops_need_broadcast())
+>> +			preempt_enable();
+> 
+> My reading of the create_mapping() code is that alloc_init_pud() and
+> alloc_init_section() are called with a 2MB range only (that's 2
+> entries) given by pgd_addr_end().
 
-Thanks
-Haojian
+You're correct of course.  I initially stuck that FIXME note in there more as
+a reminder to review it more carefully.  Alas, in my haste, I submitted as-is
+w/o checking parameter bounds passed from callers which do as you
+say, so it's never more than 2MiB in size.  Thanks for the feedback.
+I'll remove that note.
+
+--
+Regards,
+George
+
+> 
+> -- 
+> Catalin
