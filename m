@@ -1,30 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Oct 2011 19:05:37 +0100
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <20111012180155.GE21648@n2100.arm.linux.org.uk>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<20111011150915.GE23188@mudshark.cambridge.arm.com>
-	<20111011184821.GA11839@mudshark.cambridge.arm.com>
-	<2414781.rlNqTThJUN@wuerfel>
-	<20111012172925.GD21648@n2100.arm.linux.org.uk>
-	<20111012173523.GB12865@mudshark.cambridge.arm.com>
-	<20111012180155.GE21648@n2100.arm.linux.org.uk>
-Message-ID: <20111012180537.GC12865@mudshark.cambridge.arm.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 12 Oct 2011 22:03:34 +0530
+Subject: [PATCH] [RFC PATCH] ARM: kprobes: Make breakpoint
+	setting/clearing SMP safe
+In-Reply-To: <1310474402-5398-1-git-send-email-tixy@yxit.co.uk>
+References: <1310474402-5398-1-git-send-email-tixy@yxit.co.uk>
+Message-ID: <CAH+eYFDSG=npBEjEgObqg+vPk8QuJBnnnGyULk9s-C9Bq3iH8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 07:01:55PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Oct 12, 2011 at 06:35:23PM +0100, Will Deacon wrote:
-> > OK, that's understandable. Does this mean that your for-next branch is what
-> > will be going to Linus when the merge window opens? If so, I can rebase onto
-> > that now that it's frozen and Arnd can pull in the platform bits to arm-soc.
-> 
-> Given that I've only been back for less than an hour, I can't say very
-> much because I don't know what the current state of anything is yet.
-> That's more the message I wanted to convey at the moment.
+On Tue, Jul 12, 2011 at 18:10, Tixy <tixy@yxit.co.uk> wrote:
+> Both these issues are known and the kprobe implementation uses
+> stop_machine() to avoid them, however, this is not sufficient.
+> stop_machine() does not perform any kind on synchronisation between CPUs
+> so it it still possible for one CPU to call the breakpoint changing
+> function before another CPU has been interrupted to do likewise.
+>
+> To fix this problem, this patch creates a new function
+> sync_stop_machine() which ensures that all online CPUs execute the
+> specified function at the same time.
 
-Right, I'll hold my horses 'til things have settled down then.
-
-Thanks,
-
-Will
+AFAICS stop_machine() already does what you want.  When you use
+stop_machine(), the actual call to your function is done (on each
+CPU's stopper thread) using the stop_machine_cpu_stop() function,
+which already has the synchronization between CPUs which you're
+trying to do here.
