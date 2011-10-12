@@ -1,171 +1,85 @@
 From: govindraj.ti@gmail.com (Govindraj)
-Date: Wed, 12 Oct 2011 16:14:55 +0530
-Subject: [PATCH v6 12/16] OMAP2+: UART: Allow UART parameters to be
-	configured from board file.
-In-Reply-To: <878vor2wd0.fsf@ti.com>
-References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
-	<1317380561-661-3-git-send-email-govindraj.raja@ti.com>
-	<878vor2wd0.fsf@ti.com>
-Message-ID: <CAAL8m4zBJmnUqJewGdCBRF-uiRhCstuR7keaJt7igUh0rXgJ4w@mail.gmail.com>
+Date: Wed, 12 Oct 2011 16:05:33 +0530
+Subject: [PATCH v6 09/16] OMAP2+: UART: Add runtime pm support for
+	omap-serial driver
+In-Reply-To: <87botobdtq.fsf@ti.com>
+References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
+	<1317380495-584-9-git-send-email-govindraj.raja@ti.com>
+	<87botobdtq.fsf@ti.com>
+Message-ID: <CAAL8m4yDrR_ao6GdSah=HsK7twhfA=RXjtURe43ziWJV51zkfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 12:23 AM, Kevin Hilman <khilman@ti.com> wrote:
+On Tue, Oct 11, 2011 at 5:26 AM, Kevin Hilman <khilman@ti.com> wrote:
 > "Govindraj.R" <govindraj.raja@ti.com> writes:
 >
->> From: Deepak K <deepak.k@ti.com>
+>> Adapts omap-serial driver to use pm_runtime API's.
 >>
->> The following UART parameters are defined within the UART driver:
+>> Use runtime runtime API's to handle uart clocks and obtain
+>> device_usage statics. Set runtime API's usage to irq_safe so that
+>> we can use get_sync from irq context. Auto-suspend for port specific
+>> activities and put for reg access. Use device_may_wakeup to check
+>> whether uart has wakeup capabilities and then enable uart runtime
+>> usage for the uart.
+>
+> OK. ?Current patch should do only this part. ?The rest should be
+> separate patches with their own descriptive changelogs.
+>
+
+Yes, started splitting them.
+
+>> Removing save_context/restore_context functions from serial.c
+>> Adding context restore to .runtime_suspend and using reg values from port
+>> structure to restore the uart port context based on context_loss_count.
+>> Maintain internal state machine using wakeups_enabled field for avoiding
+>> repeated enable/disable of uart port wakeup mechanism.
+>
+> This part should be a separate patch that follows.
+>
+
+okay,
+
+>> Remove omap_uart_disable_wakeup and modify omap_uart_enable_wakeup
+>> to accept pdev and bool value to enable/disable the uart wakeup mechanism
+>> after uart clock's are cut.
 >>
->> 1). Whether the UART uses DMA (dma_enabled), by default set to 0
->> 2). The size of dma buffer (set to 4096 bytes)
->> 3). The time after which the dma should stop if no more data is received.
->> 4). The auto suspend delay that will be passed for pm_runtime_autosuspend
->> ? ? where uart will be disabled after timeout
+>> omap_hwmod_enable_wakeup is used to set
+>> pad wakeup for the uarts. PM_WKEN reg values are left to default.
+>> Removed omap_uart_enable/disable_clocks in serial.c now clock handling
+>> done with runtime API's.
+>
+> As stated in previous reviews, this wakeup enable/disable needs more
+> description as the functionality is changing compared to current code.
+>
+> Current version modifies wakeup enable/disable at both power-domain
+> level (PM_WKEN) and at the IO ring.
+>
+> Updated version modifies wakeups at module-level (SYSCONFIG) and at IO
+> ring using omap_hwmod_enable_wakeup()
+>
+> IMO, the updated version makes more sense, but needs a description as to
+> why that change in functionality will have equivalent results compared
+> to the existing one.
+>
+
+Okay,
+
+>> By default uart autosuspend delay is set to -1 to avoid character loss
+>> if uart's are autoidled and woken up on rx pin.
+>
+> OK, good.
+>
+>> After boot up UART's can be autoidled by setting autosuspendi delay from sysfs.
 >>
->> Different UARTs may be used for different purpose such as the console,
->> for interfacing bluetooth chip, for interfacing to a modem chip, etc.
->> Therefore, it is necessary to be able to customize the above settings
->> for a given board on a per UART basis.
+>> echo 3000 > /sys/devices/platform/omap/omap_uart.X/power/autosuspend_delay_ms
+>> X=0,1,2,3 for UART1/2/3/4. Number of uarts available may vary across omap_soc.
 >>
->> This change allows these parameters to be configured from the board file
->> and allows the parameters to be configured for each UART independently.
->>
->> If a board does not define its own custom parameters for the UARTs, then
->> use the default parameters in the structure "omap_serial_default_info".
->> The default parameters are defined to be the same as the current settings
->> in the UART driver to avoid breaking the UART for any cuurnelty supported
->> boards. By default, make all boards use the default UART parameters.
->>
->> Signed-off-by: Deepak K <deepak.k@ti.com>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> Acked-by: Alan Cox <alan@linux.intel.com>
 >> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 >
-> A couple minor comments below...
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
->> ---
->> This patch is derived and reworked from a custom 2.6.35 kernel
->> Available here:
->> http://git.omapzoom.org/?p=kernel/omap.git;
->> a=commitdiff;h=584ef316542f77312be7ba96a0f3013c8f64852b;
->> hp=7233a76cb362c0fc603f773274159adff91d3513
->>
->> ?arch/arm/mach-omap2/board-n8x0.c ? ? ? ? ? ? ?| ? ?6 +-
->> ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 56 ++++++++++++++++++++----
->> ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?7 ++-
->> ?arch/arm/plat-omap/include/plat/serial.h ? ? ?| ? ?5 ++-
->> ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? ?8 +--
->> ?5 files changed, 61 insertions(+), 21 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
->> index e11f0c5..3408726 100644
->> --- a/arch/arm/mach-omap2/board-n8x0.c
->> +++ b/arch/arm/mach-omap2/board-n8x0.c
->> @@ -656,15 +656,15 @@ static inline void board_serial_init(void)
->> ? ? ? bdata.pads_cnt = 0;
->>
->> ? ? ? bdata.id = 0;
->> - ? ? omap_serial_init_port(&bdata);
->> + ? ? omap_serial_init_port(&bdata, NULL);
->>
->> ? ? ? bdata.id = 1;
->> - ? ? omap_serial_init_port(&bdata);
->> + ? ? omap_serial_init_port(&bdata, NULL);
->>
->> ? ? ? bdata.id = 2;
->> ? ? ? bdata.pads = serial2_pads;
->> ? ? ? bdata.pads_cnt = ARRAY_SIZE(serial2_pads);
->> - ? ? omap_serial_init_port(&bdata);
->> + ? ? omap_serial_init_port(&bdata, NULL);
->> ?}
->>
->> ?#else
->> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
->> index 0731575..78f7051 100644
->> --- a/arch/arm/mach-omap2/serial.c
->> +++ b/arch/arm/mach-omap2/serial.c
->> @@ -43,17 +43,29 @@
->> ?#include "mux.h"
->>
->> ?/*
->> - * NOTE: By default the serial timeout is disabled as it causes lost characters
->> - * over the serial ports. This means that the UART clocks will stay on until
->> - * disabled via sysfs. This also causes that any deeper omap sleep states are
->> - * blocked.
->> + * NOTE: By default the serial auto_suspend timeout is disabled as it causes
->> + * lost characters over the serial ports. This means that the UART clocks will
->> + * stay on until power/autosuspend_delay is set for the uart from sysfs.
->> + * This also causes that any deeper omap sleep states are blocked.
->> ? */
->> -#define DEFAULT_TIMEOUT 0
->> +#define DEFAULT_AUTOSUSPEND_DELAY ? ?-1
->>
->> ?#define MAX_UART_HWMOD_NAME_LEN ? ? ? ? ? ? ?16
->>
->> ?static u8 num_uarts;
->>
->> +#define DEFAULT_RXDMA_TIMEOUT ? ? ? ? ? ? ? ?1 ? ? ? /* RX DMA polling rate (us) */
->> +#define DEFAULT_RXDMA_BUFSIZE ? ? ? ? ? ? ? ?4096 ? ?/* RX DMA buffer size */
->> +
->> +static struct omap_uart_port_info omap_serial_default_info[] = {
->
-> This could be __initdata
->
-
-yes correct, will change this.
-
-
->> + ? ? {
->> + ? ? ? ? ? ? .dma_enabled ? ?= 0,
->
-> This field is a bool, use 'false' instead of 0.
-
-yes fine.
-
->
->> + ? ? ? ? ? ? .dma_rx_buf_size = DEFAULT_RXDMA_BUFSIZE,
->> + ? ? ? ? ? ? .dma_rx_timeout = DEFAULT_RXDMA_TIMEOUT,
->> + ? ? ? ? ? ? .autosuspend_timeout = DEFAULT_AUTOSUSPEND_DELAY,
->> + ? ? },
->> +};
->> +
->> ?static int uart_idle_hwmod(struct omap_device *od)
->> ?{
->> ? ? ? omap_hwmod_idle(od->hwmods[0]);
->> @@ -298,6 +310,7 @@ core_initcall(omap_serial_early_init);
->> ?/**
->> ? * omap_serial_init_port() - initialize single serial port
->> ? * @bdata: port specific board data pointer
->> + * @info: platform specific data pointer
->> ? *
->> ? * This function initialies serial driver for given port only.
->> ? * Platforms can call this function instead of omap_serial_init()
->> @@ -306,7 +319,8 @@ core_initcall(omap_serial_early_init);
->> ? * Don't mix calls to omap_serial_init_port() and omap_serial_init(),
->> ? * use only one of the two.
->> ? */
->> -void __init omap_serial_init_port(struct omap_board_data *bdata)
->> +void __init omap_serial_init_port(struct omap_board_data *bdata,
->> + ? ? ? ? ? ? ? ? ? ? struct omap_uart_port_info *info)
->
-> alignment. ?2nd argument should align with 1st
->
->> ?{
->> ? ? ? struct omap_hwmod *oh;
->> ? ? ? struct platform_device *pdev;
->> @@ -325,6 +339,9 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
->> ? ? ? if (!oh)
->> ? ? ? ? ? ? ? return;
->>
->> + ? ? if (info == NULL)
->
-> if (!info)
->
-> there's another one of these elsewhere in the patch too.
->
-
-will check and correct.
-
---
-Thanks,
-Govindraj.R
