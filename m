@@ -1,47 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Oct 2011 15:42:36 -0700
-Subject: [PATCH v2] arm/tegra: pinmux: ioremap registers
-In-Reply-To: <1318434867-19120-1-git-send-email-swarren@nvidia.com>
-References: <1318434867-19120-1-git-send-email-swarren@nvidia.com>
-Message-ID: <20111012224236.GE25128@quad.lixom.net>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 12 Oct 2011 15:49:09 -0700
+Subject: [PATCH v4 3/4] gpio/tegra: Convert to a platform device
+In-Reply-To: <20111012224131.GD25128@quad.lixom.net>
+References: <1318371375-4083-1-git-send-email-swarren@nvidia.com>
+	<1318371375-4083-3-git-send-email-swarren@nvidia.com>
+	<20111012224131.GD25128@quad.lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173BE19F15@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 09:54:27AM -0600, Stephen Warren wrote:
-> Use ioremap to obtain access to registers instead of using static
-> mappings. This reduces the number of users of the static mappings, which
-> will eventually allow them to be removed.
+Olof Johansson wrote at Wednesday, October 12, 2011 4:42 PM:
+> On Tue, Oct 11, 2011 at 04:16:14PM -0600, Stephen Warren wrote:
+> > v3: Make regs variable static. Remove empty init of tegra_gpio_banks.
+> >
+> > v2: Retrieve IRQ and memory addresses from resources instead of hard-
+> > coding them. Add back initialization of tegra_gpio_chip.of_node.
 > 
-> Note that on Tegra30, the number of register "banks" will decrease to 2,
-> and the packing of specific bits into registers will change significantly.
-> That's why this change adds the "*_bank" fields to the pingroup tables,
-> rather than implementing some more hard-coded scheme.
-> 
-> Also, completely remove the implementation of suspend/resume; Tegra doesn't
-> yet support suspend/resume, and the implementation is complex for the
-> general pinmux driver:
-> 
-> * Not all registers are used within each bank, so we probably shouldn't
->   just iterate over every register in the bank, and save/restore it,
->   since that would mean touching undefined registers.
-> 
-> * Registers are shared between pingroups, so we can't simply iterate over
->   each pingroup, and save/restore the registers it uses.
-> 
-> It'd probably be best have probe() calculate a bitmask of actually-used
-> registers for each bank, and have suspend/resume iterate over those
-> bitmaps.
-> 
-> Oh, and Real Soon Now, I should be looking into converting this driver to
-> the new pinmux/pinctrl subsystem, so I didn't want to put too much work
-> into the current incarnation.
-> 
-> v2: s/space/bank/ to match comments on reg_* fields in pinmux.h.
->     Re-order bank/reg parameters to pg_readl/pg_writel.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> In the future, please move the revision log to below the ---, and just have
+> the main patch description above, since that is what goes into the git repo.
 
-Thanks, applied to for-3.2/features.
+I don't quite recall when or exactly which Linux-related mailing list I
+saw it on, but I saw a discussion on this topic, and people pointed out
+that having the revision log in the git commit message actually has some
+advantages; it documents some of the things that were though about during
+the review, and ends up documenting which version of the patch actually
+ended up in git.
 
+Besides, it's a lot easier to maintain the changelog in the git commit
+description than in some out-of-band location:-) Although I guess I
+could edit the files after git format-patch.
 
--Olof
+So, I wonder if it might be a good idea to check the changelog in?
+
+-- 
+nvpublic
