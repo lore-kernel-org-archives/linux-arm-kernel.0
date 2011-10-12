@@ -1,26 +1,37 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 12 Oct 2011 22:03:34 +0530
-Subject: [PATCH] [RFC PATCH] ARM: kprobes: Make breakpoint
-	setting/clearing SMP safe
-In-Reply-To: <1310474402-5398-1-git-send-email-tixy@yxit.co.uk>
-References: <1310474402-5398-1-git-send-email-tixy@yxit.co.uk>
-Message-ID: <CAH+eYFDSG=npBEjEgObqg+vPk8QuJBnnnGyULk9s-C9Bq3iH8Q@mail.gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Wed, 12 Oct 2011 22:00:11 +0530
+Subject: [PATCH 2/3] ARM: Exynos4: Add ioremap interceptor for statically
+	remapped regions
+In-Reply-To: <4E95BC8E.8010105@gmail.com>
+References: <1318234289-22041-1-git-send-email-thomas.abraham@linaro.org>
+	<1318234289-22041-3-git-send-email-thomas.abraham@linaro.org>
+	<4E95BC8E.8010105@gmail.com>
+Message-ID: <CAJuYYwSQgiZMEuzyqFvijy+sTLWqi=TqvM8cGe=W3bPOSBe0Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 12, 2011 at 18:10, Tixy <tixy@yxit.co.uk> wrote:
-> Both these issues are known and the kprobe implementation uses
-> stop_machine() to avoid them, however, this is not sufficient.
-> stop_machine() does not perform any kind on synchronisation between CPUs
-> so it it still possible for one CPU to call the breakpoint changing
-> function before another CPU has been interrupted to do likewise.
+On 12 October 2011 21:43, Rob Herring <robherring2@gmail.com> wrote:
+> On 10/10/2011 03:11 AM, Thomas Abraham wrote:
+>> ioremap() request for statically remapped regions are intercepted and the
+>> statically assigned virtual address is returned. For requests for which
+>> there are no statically remapped regions, the requests are let through.
+>>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>> ---
+>> ?arch/arm/mach-exynos4/cpu.c ? ? ? ? ? ? | ? 16 ++++++++++++++++
+>> ?arch/arm/mach-exynos4/include/mach/io.h | ? ?4 ++++
+>> ?2 files changed, 20 insertions(+), 0 deletions(-)
+>>
 >
-> To fix this problem, this patch creates a new function
-> sync_stop_machine() which ensures that all online CPUs execute the
-> specified function at the same time.
+> You won't need this with Nico's vmalloc.h clean-up series. It does
+> exactly this but generically for all platforms.
 
-AFAICS stop_machine() already does what you want.  When you use
-stop_machine(), the actual call to your function is done (on each
-CPU's stopper thread) using the stop_machine_cpu_stop() function,
-which already has the synchronization between CPUs which you're
-trying to do here.
+Ok. Thanks for your suggestion. I will move to using Nico's patches.
+
+Regards,
+Thomas.
+
+>
+> Rob
+>
