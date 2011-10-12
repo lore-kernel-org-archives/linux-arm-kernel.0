@@ -1,68 +1,86 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 12 Oct 2011 11:00:10 -0400 (EDT)
-Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
-	Summit 2011
-In-Reply-To: <20111012100109.GB13134@arm.com>
-References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
-	<20111012100109.GB13134@arm.com>
-Message-ID: <alpine.LFD.2.02.1110121052360.17040@xanadu.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Oct 2011 10:11:34 -0500
+Subject: [PATCH] gpio: exynos4: Add device tree support
+In-Reply-To: <CAJuYYwQWUjVf9Z5Rdw4fTK70=B1aw-5x_wjYm_fq+zHyQAWJvg@mail.gmail.com>
+References: <1318320974-9879-1-git-send-email-thomas.abraham@linaro.org>
+	<4E945C90.1050601@gmail.com>
+	<CAJuYYwRwBxkAo2fMfVV9wtQ40XeROAnc-cGJK+cssjuh9px=qQ@mail.gmail.com>
+	<4E946109.2000305@gmail.com>
+	<CAJuYYwQWUjVf9Z5Rdw4fTK70=B1aw-5x_wjYm_fq+zHyQAWJvg@mail.gmail.com>
+Message-ID: <4E95AE26.8080702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Oct 2011, Catalin Marinas wrote:
-
-> Hi Grant,
+On 10/11/2011 11:06 AM, Thomas Abraham wrote:
+> On 11 October 2011 21:00, Rob Herring <robherring2@gmail.com> wrote:
+>> On 10/11/2011 10:19 AM, Thomas Abraham wrote:
+>>> Hi Rob,
+>>>
+>>> On 11 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
+>>>> Thomas,
+>>>>
+>>>> On 10/11/2011 03:16 AM, Thomas Abraham wrote:
+>>>>> As gpio chips get registered, a device tree node which represents the
+>>>>> gpio chip is searched and attached to it. A translate function is also
+>>>>> provided to convert the gpio specifier into actual platform settings
+>>>>> for pin function selection, pull up/down and driver strength settings.
+>>>>>
+>>>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>>>>> ---
+>>>>> This patch is based on the latest consolidated Samsung GPIO driver available
+>>>>> in the following tree:
+>>>>>   https://github.com/kgene/linux-samsung.git  branch: for-next
+>>>>>
+>>>>>  .../devicetree/bindings/gpio/gpio-samsung.txt      |   30 +++++++++++
+>>>>>  drivers/gpio/gpio-samsung.c                        |   53 ++++++++++++++++++++
+>>>>>  2 files changed, 83 insertions(+), 0 deletions(-)
+>>>>>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+>>>>> new file mode 100644
+>>>>> index 0000000..883faeb
+>>>>> --- /dev/null
+>>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
+>>>>> @@ -0,0 +1,30 @@
+>>>>> +Samsung Exynos4 GPIO Controller
+>>>>> +
+>>>>> +Required properties:
+>>>>> +- compatible: Format of compatible property value should be
+>>>>> +  "samsung,exynos4-gpio-<controller_name>". Example: For GPA0 controller, the
+>>>>> +  compatible property value should be "samsung,exynos4-gpio-gpa0".
+>>>>
+>>>> Isn't gpa0 an instance of the h/w, not a version?
+>>>
+>>> GPA0 is a instance of the gpio controller. There are several such
+>>> instances and there could be differences in those instances such as
+>>> the number of GPIO lines managed by that gpio controller instance.
+>>>
+>>
+>> That doesn't seem like a reason to have different compatible strings.
+>> Does that affect the programming model of the controller? Unused lines
+>> whether at the board level or SOC level shouldn't really matter.
 > 
-> On Tue, Aug 30, 2011 at 07:00:16AM +0100, Grant Likely wrote:
-> > Agenda proposals (Thanks to Nicolas and Olof):
-> > - DT bindings for GPIO and pin mux
-> > - the pin mux subsystem from linusw (especially if it is still RFC by
-> >  then)
-> > - progress with the single zImage work
-> > - presentation/status of the DMA and memory management work wrt CMA
-> >  (some SOC specific hacks should go away once this is available)
-> > - DT porting progress
-> > - boot architecture status
-> > - Report from Arnd on experiences from first arm-soc merge window
-> >   - what worked well and where's room for improvement?
-> >   - Any particular SoC workflow that should be tuned to make his life easier?
-> >   - Where are the gaps where he needs help right now?
-> >   - How did it work out for the SoC maintainers?
 > 
-> Some more thoughts, probably under some of the above topics like single
-> zImage or boot architecture if there is time on the agenda:
+> No, that does not affect the programming of the controller. The reason
+> for the instance name extension in compatible string is to match the
+> gpio_chip with a gpio controller node. When matched, the of_node
+> pointer of the gpio_chip is set to point to that controller node.
 > 
-> - Errata (CPU, cache controller etc.) workarounds - do we need some
->   common way to register workarounds that individual SoCs need to be
->   enabled during boot? With a single zImage platform, we need to enable
->   as many (CPU) errata workarounds as possible but, even though we check
->   the CPU revision, we may find that some undocumented bits cannot be
->   set because Linux is running in non-secure mode (and the secure code
->   on the SoC doesn't set the bit either) or the SoC already implemented
->   an ECO fix and the workaround is no longer needed.
+> This might not be the best possible implementation but the device tree
+> support code in this patch is dictated by the structure of the
+> existing gpio driver code. As you suggested previously, I will look at
+> reworking the gpio driver a little later but for now, there was a need
+> for working gpio dt solution to make progress on dt support for other
+> controllers.
 
-Yes, that would be good to cover during single zImage discussions.
+Linux should provide clues about what's needed in a binding, but the
+binding should not be defined based on current Linux code. Doing the
+binding one way and changing it later is not a good plan.
 
-> - CPU topology - Vincent Guittot proposed patches to automatically
->   generate a CPU topology based on the MPIDR. I think we should be able
->   to override this using some DT description (and also be able to
->   describe the mapping between GIC CPU interfaces and the CPU numbering
->   via DT).
+I think you need to convert all users of gpio over as well so you can
+move to dynamic gpio_chip creation and gpio numbering. Or maybe you can
+match based on base address? This is going to be a common problem as
+gpio is converted over to DT. Perhaps Grant or others have suggestions
+on the approach to use.
 
-I think some discussion around DT bindings is planned.  That would fit 
-there.
-
-> Unrelated to the above
-> 
-> - Different DMA coherency requirements within the same SoC - this is
->   linked to the work already started by Marek on dma_map_ops (though the
->   focus was mainly IOMMU). Basically there are SoCs where some device
->   requires non-cacheable memory while another device is connected via a
->   coherency port and can snoop the CPU caches. The arch_is_coherent()
->   that we currently have is not fine-grained enough for this task.
-
-If you have actual example use cases and solution proposals then this 
-could certainly be brought up during DMA oriented discussions.
-
-
-Nicolas
+Rob
