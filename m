@@ -1,191 +1,68 @@
-From: mturquette@ti.com (Turquette, Mike)
-Date: Wed, 12 Oct 2011 07:59:19 -0700
-Subject: [PATCH v2 4/7] clk: Add simple gated clock
-In-Reply-To: <20111012064646.GA31037@b20223-02.ap.freescale.net>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-5-git-send-email-mturquette@ti.com>
-	<20111012064646.GA31037@b20223-02.ap.freescale.net>
-Message-ID: <CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 12 Oct 2011 11:00:10 -0400 (EDT)
+Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
+	Summit 2011
+In-Reply-To: <20111012100109.GB13134@arm.com>
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+	<20111012100109.GB13134@arm.com>
+Message-ID: <alpine.LFD.2.02.1110121052360.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 11:46 PM, Richard Zhao
-<richard.zhao@freescale.com> wrote:
-> On Thu, Sep 22, 2011 at 03:26:59PM -0700, Mike Turquette wrote:
->> From: Jeremy Kerr <jeremy.kerr@canonical.com>
->>
->> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
->> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
->> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
->> Signed-off-by: Mike Turquette <mturquette@ti.com>
->> ---
->> Changes since v1:
->> Add copyright header
->> Fold in Jamie's patch for set-to-disable clks
->> Use BIT macro instead of shift
->>
->> ?drivers/clk/Kconfig ? ?| ? ?4 ++
->> ?drivers/clk/Makefile ? | ? ?1 +
->> ?drivers/clk/clk-gate.c | ? 78 ++++++++++++++++++++++++++++++++++++++++++++++++
->> ?include/linux/clk.h ? ?| ? 13 ++++++++
->> ?4 files changed, 96 insertions(+), 0 deletions(-)
->> ?create mode 100644 drivers/clk/clk-gate.c
->
-> I feel hard to tell the tree the clk parent, at register/init time. For the
-> simple gate clk, the only way is to set .get_parent. But normally, for clk
-> without any divider we set .get_parent to NULL. Maybe we can put .parent to
-> struct clk_hw?
+On Wed, 12 Oct 2011, Catalin Marinas wrote:
 
-For non-mux clocks, whose parent is *always* going to be the same, you
-should create a duplicate .parent in the clk_hw_* structure and then
-have .get_parent return clk_hw_*->parent.
+> Hi Grant,
+> 
+> On Tue, Aug 30, 2011 at 07:00:16AM +0100, Grant Likely wrote:
+> > Agenda proposals (Thanks to Nicolas and Olof):
+> > - DT bindings for GPIO and pin mux
+> > - the pin mux subsystem from linusw (especially if it is still RFC by
+> >  then)
+> > - progress with the single zImage work
+> > - presentation/status of the DMA and memory management work wrt CMA
+> >  (some SOC specific hacks should go away once this is available)
+> > - DT porting progress
+> > - boot architecture status
+> > - Report from Arnd on experiences from first arm-soc merge window
+> >   - what worked well and where's room for improvement?
+> >   - Any particular SoC workflow that should be tuned to make his life easier?
+> >   - Where are the gaps where he needs help right now?
+> >   - How did it work out for the SoC maintainers?
+> 
+> Some more thoughts, probably under some of the above topics like single
+> zImage or boot architecture if there is time on the agenda:
+> 
+> - Errata (CPU, cache controller etc.) workarounds - do we need some
+>   common way to register workarounds that individual SoCs need to be
+>   enabled during boot? With a single zImage platform, we need to enable
+>   as many (CPU) errata workarounds as possible but, even though we check
+>   the CPU revision, we may find that some undocumented bits cannot be
+>   set because Linux is running in non-secure mode (and the secure code
+>   on the SoC doesn't set the bit either) or the SoC already implemented
+>   an ECO fix and the workaround is no longer needed.
 
-This is analogous to the way clk_hw_fixed returns clk_hw_fixed->rate
-when .recalc is called on it.
+Yes, that would be good to cover during single zImage discussions.
 
-Regards,
-Mike
+> - CPU topology - Vincent Guittot proposed patches to automatically
+>   generate a CPU topology based on the MPIDR. I think we should be able
+>   to override this using some DT description (and also be able to
+>   describe the mapping between GIC CPU interfaces and the CPU numbering
+>   via DT).
 
-> Thanks
-> Richard
->>
->> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
->> index d8313d7..a78967c 100644
->> --- a/drivers/clk/Kconfig
->> +++ b/drivers/clk/Kconfig
->> @@ -12,3 +12,7 @@ config GENERIC_CLK
->> ?config GENERIC_CLK_FIXED
->> ? ? ? bool
->> ? ? ? depends on GENERIC_CLK
->> +
->> +config GENERIC_CLK_GATE
->> + ? ? bool
->> + ? ? depends on GENERIC_CLK
->> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
->> index 9a3325a..d186446 100644
->> --- a/drivers/clk/Makefile
->> +++ b/drivers/clk/Makefile
->> @@ -2,3 +2,4 @@
->> ?obj-$(CONFIG_CLKDEV_LOOKUP) ?+= clkdev.o
->> ?obj-$(CONFIG_GENERIC_CLK) ? ?+= clk.o
->> ?obj-$(CONFIG_GENERIC_CLK_FIXED) ? ? ?+= clk-fixed.o
->> +obj-$(CONFIG_GENERIC_CLK_GATE) ? ? ? += clk-gate.o
->> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
->> new file mode 100644
->> index 0000000..a1d8e79
->> --- /dev/null
->> +++ b/drivers/clk/clk-gate.c
->> @@ -0,0 +1,78 @@
->> +/*
->> + * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * Simple clk gate implementation
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/module.h>
->> +#include <asm/io.h>
->> +
->> +#define to_clk_gate(clk) container_of(clk, struct clk_gate, hw)
->> +
->> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
->> +{
->> + ? ? return clk_get_rate(clk_get_parent(clk->clk));
->> +}
->> +
->> +static void clk_gate_set_bit(struct clk_hw *clk)
->> +{
->> + ? ? struct clk_gate *gate = to_clk_gate(clk);
->> + ? ? u32 reg;
->> +
->> + ? ? reg = __raw_readl(gate->reg);
->> + ? ? reg |= BIT(gate->bit_idx);
->> + ? ? __raw_writel(reg, gate->reg);
->> +}
->> +
->> +static void clk_gate_clear_bit(struct clk_hw *clk)
->> +{
->> + ? ? struct clk_gate *gate = to_clk_gate(clk);
->> + ? ? u32 reg;
->> +
->> + ? ? reg = __raw_readl(gate->reg);
->> + ? ? reg &= ~BIT(gate->bit_idx);
->> + ? ? __raw_writel(reg, gate->reg);
->> +}
->> +
->> +static int clk_gate_enable_set(struct clk_hw *clk)
->> +{
->> + ? ? clk_gate_set_bit(clk);
->> +
->> + ? ? return 0;
->> +}
->> +
->> +static void clk_gate_disable_clear(struct clk_hw *clk)
->> +{
->> + ? ? clk_gate_clear_bit(clk);
->> +}
->> +
->> +struct clk_hw_ops clk_gate_set_enable_ops = {
->> + ? ? .recalc_rate = clk_gate_get_rate,
->> + ? ? .enable = clk_gate_enable_set,
->> + ? ? .disable = clk_gate_disable_clear,
->> +};
->> +EXPORT_SYMBOL_GPL(clk_gate_set_enable_ops);
->> +
->> +static int clk_gate_enable_clear(struct clk_hw *clk)
->> +{
->> + ? ? clk_gate_clear_bit(clk);
->> +
->> + ? ? return 0;
->> +}
->> +
->> +static void clk_gate_disable_set(struct clk_hw *clk)
->> +{
->> + ? ? clk_gate_set_bit(clk);
->> +}
->> +
->> +struct clk_hw_ops clk_gate_set_disable_ops = {
->> + ? ? .recalc_rate = clk_gate_get_rate,
->> + ? ? .enable = clk_gate_enable_clear,
->> + ? ? .disable = clk_gate_disable_set,
->> +};
->> +EXPORT_SYMBOL_GPL(clk_gate_set_disable_ops);
->> diff --git a/include/linux/clk.h b/include/linux/clk.h
->> index 1903dd8..626fd0d 100644
->> --- a/include/linux/clk.h
->> +++ b/include/linux/clk.h
->> @@ -124,6 +124,19 @@ extern struct clk_hw_ops clk_fixed_ops;
->>
->> ?#endif /* CONFIG_GENERIC_CLK_FIXED */
->>
->> +#ifdef CONFIG_GENERIC_CLK_GATE
->> +
->> +struct clk_gate {
->> + ? ? struct clk_hw ? hw;
->> + ? ? void __iomem ? ?*reg;
->> + ? ? u8 ? ? ? ? ? ? ?bit_idx;
->> +};
->> +
->> +extern struct clk_hw_ops clk_gate_set_enable_ops;
->> +extern struct clk_hw_ops clk_gate_set_disable_ops;
->> +
->> +#endif /* CONFIG_GENERIC_CLK_GATE */
->> +
->> ?/**
->> ? * clk_register - register and initialize a new clock
->> ? *
->> --
->> 1.7.4.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
->
+I think some discussion around DT bindings is planned.  That would fit 
+there.
+
+> Unrelated to the above
+> 
+> - Different DMA coherency requirements within the same SoC - this is
+>   linked to the work already started by Marek on dma_map_ops (though the
+>   focus was mainly IOMMU). Basically there are SoCs where some device
+>   requires non-cacheable memory while another device is connected via a
+>   coherency port and can snoop the CPU caches. The arch_is_coherent()
+>   that we currently have is not fine-grained enough for this task.
+
+If you have actual example use cases and solution proposals then this 
+could certainly be brought up during DMA oriented discussions.
+
+
+Nicolas
