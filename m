@@ -1,57 +1,47 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 12 Oct 2011 16:16:37 -0400 (EDT)
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <20111012083819.GB2418@totoro>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<20111011150915.GE23188@mudshark.cambridge.arm.com>
-	<20111011184821.GA11839@mudshark.cambridge.arm.com>
-	<2414781.rlNqTThJUN@wuerfel>
-	<alpine.LFD.2.02.1110111950290.17040@xanadu.home>
-	<20111012083819.GB2418@totoro>
-Message-ID: <alpine.LFD.2.02.1110121614510.17040@xanadu.home>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Oct 2011 14:51:29 -0600
+Subject: [PATCH] MAINTAINERS: Update tegra maintainer information
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173B23B3B9@HQMAIL01.nvidia.com>
+References: <1318019268-6946-1-git-send-email-olof@lixom.net>
+	<74CDBE0F657A3D45AFBB94109FB122FF173B23B3B9@HQMAIL01.nvidia.com>
+Message-ID: <CACxGe6uO0ZypAj2TSqouGdB-LxCO3DL2bvSTAG_zn21PLfLjSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Oct 2011, Jamie Iles wrote:
+On Fri, Oct 7, 2011 at 3:28 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Friday, October 07, 2011 2:28 PM:
+>> A couple of changes to the Tegra maintainership setup:
+>>
+>> I'm very glad to bring on Stephen Warren on board as a maintainer. The
+>> work he has done so far is excellent, and the fact that he works for
+>> Nvidia means he has long-term interest in the platform.
+>
+> Thanks for bringing me on board.
+>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-> Hi Nicolas,
-> 
-> On Tue, Oct 11, 2011 at 08:03:38PM -0400, Nicolas Pitre wrote:
-> > On Tue, 11 Oct 2011, Arnd Bergmann wrote:
-> > 
-> > > I've stuck them into the arm-soc tree for now, so we get linux-next
-> > > coverage, but I won't send them to Linus this way because then we
-> > > would get the same commits twice in the history.
-> > 
-> > Could you please do the same with the following:
-> > 
-> >   git://git.linaro.org/people/nico/linux.git mach_memory_h
-> > 
-> > Russell pulled it at some point, and dropped it due to concerns about 
-> > repeated conflict resolutions (or so I presume).  I just did a test 
-> > merge between your for-next branch and the above and that looked trivial 
-> > enough.
-> 
-> I just had a quick look at this branch as picoxcell has just been merged 
-> with an empty memory.h.  I'll submit a patch to remove that, but I just 
-> noticed in "ARM: switch from NO_MACH_MEMORY_H to NEED_MACH_MEMORY_H" 
-> there is this hunk:
-> 
-> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-> index e00fe76..6d49d2f1d 100644
-> --- a/arch/arm/plat-omap/Kconfig
-> +++ b/arch/arm/plat-omap/Kconfig
-> @@ -14,6 +14,7 @@ config ARCH_OMAP1
->         select CLKDEV_LOOKUP
->         select CLKSRC_MMIO
->         select GENERIC_IRQ_CHIP
-> +       select HAVE_MACH_MEMORY_H
->         help
->           "Systems based on omap7xx, omap15xx or omap16xx"
-> 
-> and I think that should be "select NEED_MACH_MEMORY_H" instead.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Indeed, good catch.  I've updated my branch with that fix.
+>
+>> Erik Gilling did an astounding amount of work on getting things up and
+>> running but has been a silent partner on the maintainership side for a
+>> while, and is stepping down. Thanks for your contributions so far, Erik.
+>
+> I'd like to echo this, and also extend it to everyone else who's brought
+> Tegra support to the point where it is today.
+>
+> --
+> nvpublic
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
 
-Nicolas
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
