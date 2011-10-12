@@ -1,58 +1,41 @@
-From: airlied@gmail.com (Dave Airlie)
-Date: Wed, 12 Oct 2011 15:34:54 +0100
-Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
-	mechanism
-In-Reply-To: <CAF6AEGsK25wk28YmiwsZTenecKqCt6irx66nR-8nOFMo6Z=Dkw@mail.gmail.com>
-References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
-	<1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
-	<CAPM=9tzHOa5Dbe=SQz+AURMMbio4L7qoS8kUT3Ek0+HdtkrH4g@mail.gmail.com>
-	<CAF6AEGs6kkGp85NoNVuq5W9i=WE86V8wvAtKydX=D3bQOc+6Pw@mail.gmail.com>
-	<CAPM=9twft0eBEUoCD11a2gTZHwOaPzFmZvBfE032dfK10eQ27Q@mail.gmail.com>
-	<CAF6AEGuwMt6Snq=YSN4iddTv_Cu56aR_2BY1d3hjVvTdkom5MQ@mail.gmail.com>
-	<CAPM=9tyKjodxf9MKjG=5bBDZTuqOx4Nu31L5iNN9LrO9fsp+FA@mail.gmail.com>
-	<CAF6AEGsK25wk28YmiwsZTenecKqCt6irx66nR-8nOFMo6Z=Dkw@mail.gmail.com>
-Message-ID: <CAPM=9tyAiUZ9tNaer=_52WmiLKpJKG+3EXvZzotwGwvqkJFmOQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 12 Oct 2011 10:37:22 -0400 (EDT)
+Subject: [PATCH] ARM: zImage: Use $(CROSS_COMPILE)size to get .bss size
+In-Reply-To: <1318419203-27165-1-git-send-email-weber@corscience.de>
+References: <1318419203-27165-1-git-send-email-weber@corscience.de>
+Message-ID: <alpine.LFD.2.02.1110121029470.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 3:24 PM, Rob Clark <robdclark@gmail.com> wrote:
-> On Wed, Oct 12, 2011 at 9:01 AM, Dave Airlie <airlied@gmail.com> wrote:
->>> But then we'd need a different set of accessors for every different
->>> drm/v4l/etc driver, wouldn't we?
->>
->> Not any more different than you need for this, you just have a new
->> interface that you request a sw object from,
->> then mmap that object, and underneath it knows who owns it in the kernel.
->
-> oh, ok, so you are talking about a kernel level interface, rather than
-> userspace..
->
-> but I guess in this case I don't quite see the difference. ?It amounts
-> to which fd you call mmap (or ioctl[*]) on.. ?If you use the dmabuf fd
-> directly then you don't have to pass around a 2nd fd.
->
-> [*] there is nothing stopping defining some dmabuf ioctls (such as for
-> synchronization).. although the thinking was to keep it simple for
-> first version of dmabuf
->
+On Wed, 12 Oct 2011, Thomas Weber wrote:
 
-Yes a separate kernel level interface.
+> Use $(CROSS_COMPILE)size to determine the bss size
+> from vmlinux.
+> 
+> The problem is introduced in:
+> commit 8738646c02064d38f6fb056eb039ebf9138c5434
+> 
+> ARM: zImage: make sure appended DTB doesn't get
+> overwritten by kernel .bss
+> 
+> This fixes following error message:
+> 
+> size: arch/arm/boot/compressed/../../../../vmlinux:
+> File format is ambiguous
+> 
+> size: Matching formats:
+> elf32-littlearm
+> elf32-littlearm-symbian
+> elf32-littlearm-vxworks
+> 
+> Signed-off-by: Thomas Weber <weber@corscience.de>
 
-Well I'd like to keep it even simpler. dmabuf is a buffer sharing API,
-shoehorning in a sw mapping API isn't making it simpler.
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-The problem I have with implementing mmap on the sharing fd, is that
-nothing says this should be purely optional and userspace shouldn't
-rely on it.
+However I don't know where you picked up a reference to commit 
+8738646c02 which is nonexistent in any of my repositories.  The right 
+reference from RMK's devel-stable branch would be commit 5ffb04f669.  
+Please fix that and send to the patch system.
 
-In the Intel GEM space alone you have two types of mapping, one direct
-to shmem one via GTT, the GTT could be even be a linear view. The
-intel guys initially did GEM mmaps direct to the shmem pages because
-it seemed simple, up until they
-had to do step two which was do mmaps on the GTT copy and ended up
-having two separate mmap methods. I think the problem here is it seems
-deceptively simple to add this to the API now because the API is
-simple, however I think in the future it'll become a burden that we'll
-have to workaround.
 
-Dave.
+Nicolas
