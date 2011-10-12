@@ -1,86 +1,72 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 12 Oct 2011 10:11:34 -0500
-Subject: [PATCH] gpio: exynos4: Add device tree support
-In-Reply-To: <CAJuYYwQWUjVf9Z5Rdw4fTK70=B1aw-5x_wjYm_fq+zHyQAWJvg@mail.gmail.com>
-References: <1318320974-9879-1-git-send-email-thomas.abraham@linaro.org>
-	<4E945C90.1050601@gmail.com>
-	<CAJuYYwRwBxkAo2fMfVV9wtQ40XeROAnc-cGJK+cssjuh9px=qQ@mail.gmail.com>
-	<4E946109.2000305@gmail.com>
-	<CAJuYYwQWUjVf9Z5Rdw4fTK70=B1aw-5x_wjYm_fq+zHyQAWJvg@mail.gmail.com>
-Message-ID: <4E95AE26.8080702@gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 12 Oct 2011 10:15:25 -0500
+Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
+	mechanism
+In-Reply-To: <CAPM=9tyAiUZ9tNaer=_52WmiLKpJKG+3EXvZzotwGwvqkJFmOQ@mail.gmail.com>
+References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
+	<1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
+	<CAPM=9tzHOa5Dbe=SQz+AURMMbio4L7qoS8kUT3Ek0+HdtkrH4g@mail.gmail.com>
+	<CAF6AEGs6kkGp85NoNVuq5W9i=WE86V8wvAtKydX=D3bQOc+6Pw@mail.gmail.com>
+	<CAPM=9twft0eBEUoCD11a2gTZHwOaPzFmZvBfE032dfK10eQ27Q@mail.gmail.com>
+	<CAF6AEGuwMt6Snq=YSN4iddTv_Cu56aR_2BY1d3hjVvTdkom5MQ@mail.gmail.com>
+	<CAPM=9tyKjodxf9MKjG=5bBDZTuqOx4Nu31L5iNN9LrO9fsp+FA@mail.gmail.com>
+	<CAF6AEGsK25wk28YmiwsZTenecKqCt6irx66nR-8nOFMo6Z=Dkw@mail.gmail.com>
+	<CAPM=9tyAiUZ9tNaer=_52WmiLKpJKG+3EXvZzotwGwvqkJFmOQ@mail.gmail.com>
+Message-ID: <CAF6AEGv8QQf_SBUcgKJgLUDaBKHONjUQGY0SY7xq9esDO5VtKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2011 11:06 AM, Thomas Abraham wrote:
-> On 11 October 2011 21:00, Rob Herring <robherring2@gmail.com> wrote:
->> On 10/11/2011 10:19 AM, Thomas Abraham wrote:
->>> Hi Rob,
+On Wed, Oct 12, 2011 at 9:34 AM, Dave Airlie <airlied@gmail.com> wrote:
+> On Wed, Oct 12, 2011 at 3:24 PM, Rob Clark <robdclark@gmail.com> wrote:
+>> On Wed, Oct 12, 2011 at 9:01 AM, Dave Airlie <airlied@gmail.com> wrote:
+>>>> But then we'd need a different set of accessors for every different
+>>>> drm/v4l/etc driver, wouldn't we?
 >>>
->>> On 11 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
->>>> Thomas,
->>>>
->>>> On 10/11/2011 03:16 AM, Thomas Abraham wrote:
->>>>> As gpio chips get registered, a device tree node which represents the
->>>>> gpio chip is searched and attached to it. A translate function is also
->>>>> provided to convert the gpio specifier into actual platform settings
->>>>> for pin function selection, pull up/down and driver strength settings.
->>>>>
->>>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->>>>> ---
->>>>> This patch is based on the latest consolidated Samsung GPIO driver available
->>>>> in the following tree:
->>>>>   https://github.com/kgene/linux-samsung.git  branch: for-next
->>>>>
->>>>>  .../devicetree/bindings/gpio/gpio-samsung.txt      |   30 +++++++++++
->>>>>  drivers/gpio/gpio-samsung.c                        |   53 ++++++++++++++++++++
->>>>>  2 files changed, 83 insertions(+), 0 deletions(-)
->>>>>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->>>>> new file mode 100644
->>>>> index 0000000..883faeb
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->>>>> @@ -0,0 +1,30 @@
->>>>> +Samsung Exynos4 GPIO Controller
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible: Format of compatible property value should be
->>>>> +  "samsung,exynos4-gpio-<controller_name>". Example: For GPA0 controller, the
->>>>> +  compatible property value should be "samsung,exynos4-gpio-gpa0".
->>>>
->>>> Isn't gpa0 an instance of the h/w, not a version?
->>>
->>> GPA0 is a instance of the gpio controller. There are several such
->>> instances and there could be differences in those instances such as
->>> the number of GPIO lines managed by that gpio controller instance.
->>>
+>>> Not any more different than you need for this, you just have a new
+>>> interface that you request a sw object from,
+>>> then mmap that object, and underneath it knows who owns it in the kernel.
 >>
->> That doesn't seem like a reason to have different compatible strings.
->> Does that affect the programming model of the controller? Unused lines
->> whether at the board level or SOC level shouldn't really matter.
-> 
-> 
-> No, that does not affect the programming of the controller. The reason
-> for the instance name extension in compatible string is to match the
-> gpio_chip with a gpio controller node. When matched, the of_node
-> pointer of the gpio_chip is set to point to that controller node.
-> 
-> This might not be the best possible implementation but the device tree
-> support code in this patch is dictated by the structure of the
-> existing gpio driver code. As you suggested previously, I will look at
-> reworking the gpio driver a little later but for now, there was a need
-> for working gpio dt solution to make progress on dt support for other
-> controllers.
+>> oh, ok, so you are talking about a kernel level interface, rather than
+>> userspace..
+>>
+>> but I guess in this case I don't quite see the difference. ?It amounts
+>> to which fd you call mmap (or ioctl[*]) on.. ?If you use the dmabuf fd
+>> directly then you don't have to pass around a 2nd fd.
+>>
+>> [*] there is nothing stopping defining some dmabuf ioctls (such as for
+>> synchronization).. although the thinking was to keep it simple for
+>> first version of dmabuf
+>>
+>
+> Yes a separate kernel level interface.
 
-Linux should provide clues about what's needed in a binding, but the
-binding should not be defined based on current Linux code. Doing the
-binding one way and changing it later is not a good plan.
+I'm not against it, but if it is a device-independent interface, it
+just seems like six of one, half-dozen of the other..
 
-I think you need to convert all users of gpio over as well so you can
-move to dynamic gpio_chip creation and gpio numbering. Or maybe you can
-match based on base address? This is going to be a common problem as
-gpio is converted over to DT. Perhaps Grant or others have suggestions
-on the approach to use.
+Ie. how does it differ if the dmabuf fd is the fd used for ioctl/mmap,
+vs if some other /dev/buffer-sharer file that you open?
 
-Rob
+But I think maybe I'm misunderstanding what you have in mind?
+
+BR,
+-R
+
+> Well I'd like to keep it even simpler. dmabuf is a buffer sharing API,
+> shoehorning in a sw mapping API isn't making it simpler.
+>
+> The problem I have with implementing mmap on the sharing fd, is that
+> nothing says this should be purely optional and userspace shouldn't
+> rely on it.
+>
+> In the Intel GEM space alone you have two types of mapping, one direct
+> to shmem one via GTT, the GTT could be even be a linear view. The
+> intel guys initially did GEM mmaps direct to the shmem pages because
+> it seemed simple, up until they
+> had to do step two which was do mmaps on the GTT copy and ended up
+> having two separate mmap methods. I think the problem here is it seems
+> deceptively simple to add this to the API now because the API is
+> simple, however I think in the future it'll become a burden that we'll
+> have to workaround.
+>
+> Dave.
+>
