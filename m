@@ -1,114 +1,47 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Oct 2011 18:06:56 +0200
-Subject: [PATCH v2 1/5] tty/serial: RS485 bindings for device tree
+Date: Wed, 12 Oct 2011 18:06:58 +0200
+Subject: [PATCH v2 3/5] tty/serial: atmel_serial: whitespace and braces
+	modifications
 In-Reply-To: <1318435620-7481-1-git-send-email-nicolas.ferre@atmel.com>
 References: <1318435620-7481-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <37a19e194d02144aecd24f284f5e43979643a3c3.1318433947.git.nicolas.ferre@atmel.com>
+Message-ID: <e4c59e6f5ee33c1be57085ac0840b53322526367.1318433947.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic bindings for RS485 feature included in some UARTs.
-Those bindings have to be used withing an UART device tree node.
-Documentation updated to link to the bindings definition.
-
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- Documentation/devicetree/bindings/serial/rs485.txt |   31 ++++++++++++++++++++
- .../devicetree/bindings/tty/serial/atmel-usart.txt |   27 +++++++++++++++++
- Documentation/serial/serial-rs485.txt              |    5 +++
- 3 files changed, 63 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/serial/rs485.txt
- create mode 100644 Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+ drivers/tty/serial/atmel_serial.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/rs485.txt b/Documentation/devicetree/bindings/serial/rs485.txt
-new file mode 100644
-index 0000000..1e753c6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/rs485.txt
-@@ -0,0 +1,31 @@
-+* RS485 serial communications
-+
-+The RTS signal is capable of automatically controlling line direction for
-+the built-in half-duplex mode.
-+The properties described hereafter shall be given to a half-duplex capable
-+UART node.
-+
-+Required properties:
-+- rs485-rts-delay: prop-encoded-array <a b> where:
-+  * a is the delay beteween rts signal and beginning of data sent in milliseconds.
-+      it corresponds to the delay before sending data.
-+  * b is the delay between end of data sent and rts signal in milliseconds
-+      it corresponds to the delay after sending data and actual release of the line.
-+
-+Optional properties:
-+- linux,rs485-enabled-at-boot-time: empty property telling to enable the rs485
-+  feature at boot time. It can be disabled later with proper ioctl.
-+- rs485-rx-during-tx: empty property that enables the receiving of data even
-+  whilst sending data.
-+
-+RS485 example for Atmel USART:
-+	usart0: serial at fff8c000 {
-+		compatible = "atmel,at91sam9260-usart";
-+		reg = <0xfff8c000 0x4000>;
-+		interrupts = <7>;
-+		atmel,use-dma-rx;
-+		atmel,use-dma-tx;
-+		linux,rs485-enabled-at-boot-time;
-+		rs485-rts-delay = <0 200>;		// in milliseconds
-+	};
-+
-diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-new file mode 100644
-index 0000000..a49d9a1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-@@ -0,0 +1,27 @@
-+* Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
-+
-+Required properties:
-+- compatible: Should be "atmel,<chip>-usart"
-+  The compatible <chip> indicated will be the first SoC to support an
-+  additional mode or an USART new feature.
-+- reg: Should contain registers location and length
-+- interrupts: Should contain interrupt
-+
-+Optional properties:
-+- atmel,use-dma-rx: use of PDC or DMA for receiving data
-+- atmel,use-dma-tx: use of PDC or DMA for transmitting data
-+
-+<chip> compatible description:
-+- at91rm9200:  legacy USART support
-+- at91sam9260: generic USART implementation for SAM9 SoCs
-+
-+Example:
-+
-+	usart0: serial at fff8c000 {
-+		compatible = "atmel,at91sam9260-usart";
-+		reg = <0xfff8c000 0x4000>;
-+		interrupts = <7>;
-+		atmel,use-dma-rx;
-+		atmel,use-dma-tx;
-+	};
-+
-diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
-index c8878f8..079cb3d 100644
---- a/Documentation/serial/serial-rs485.txt
-+++ b/Documentation/serial/serial-rs485.txt
-@@ -28,6 +28,10 @@
-    RS485 communications. This data structure is used to set and configure RS485
-    parameters in the platform data and in ioctls.
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index a507daa..bb72354 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1433,10 +1433,10 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
  
-+   The device tree can also provide RS485 boot time parameters (see [2]
-+   for bindings). The driver is in charge of filling this data structure from
-+   the values given by the device tree.
+ 	memset(&atmel_port->rx_ring, 0, sizeof(atmel_port->rx_ring));
+ 
+-	if (pdata->regs)
++	if (pdata->regs) {
+ 		/* Already mapped by setup code */
+ 		port->membase = pdata->regs;
+-	else {
++	} else {
+ 		port->flags	|= UPF_IOREMAP;
+ 		port->membase	= NULL;
+ 	}
+@@ -1450,9 +1450,10 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+ 		/* only enable clock when USART is in use */
+ 	}
+ 
+-	atmel_port->use_dma_rx = pdata->use_dma_rx;
+-	atmel_port->use_dma_tx = pdata->use_dma_tx;
++	atmel_port->use_dma_rx	= pdata->use_dma_rx;
++	atmel_port->use_dma_tx	= pdata->use_dma_tx;
+ 	atmel_port->rs485	= pdata->rs485;
 +
-    Any driver for devices capable of working both as RS232 and RS485 should
-    provide at least the following ioctls:
- 
-@@ -121,3 +125,4 @@
- 5. REFERENCES
- 
-  [1]	include/linux/serial.h
-+ [2]	Documentation/devicetree/bindings/serial/rs485.txt
+ 	/* Use TXEMPTY for interrupt when rs485 else TXRDY or ENDTX|TXBUFE */
+ 	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
+ 		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
 -- 
 1.7.5.4
