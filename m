@@ -1,51 +1,108 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Oct 2011 16:34:07 -0700
-Subject: [GIT PULL] Please pull tegra cleanups for 3.2
-Message-ID: <CAOesGMjVAJK2ArOdpYNmKa11vqCfppi8Ofc0qGn4WxuMxLvd_Q@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 12 Oct 2011 16:47:37 -0700
+Subject: [PATCH v6 14/16] OMAP2+: UART: Take console_lock in suspend path
+	if not taken
+In-Reply-To: <CAAL8m4zrveqqS3vq=dqMkS2gT24_=1UO+ukbxnQVf+AX4TBaVQ@mail.gmail.com>
+	(Govindraj's message of "Wed, 12 Oct 2011 16:53:05 +0530")
+References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
+	<1317380561-661-5-git-send-email-govindraj.raja@ti.com>
+	<87sjmz1hfm.fsf@ti.com>
+	<CAAL8m4zrveqqS3vq=dqMkS2gT24_=1UO+ukbxnQVf+AX4TBaVQ@mail.gmail.com>
+Message-ID: <87mxd5n55y.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Govindraj <govindraj.ti@gmail.com> writes:
 
-Please pull the below branch of cleanups for the 3.2 merge window.
-They have been included in linux-next for a couple of days already.
+> On Wed, Oct 12, 2011 at 12:31 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>>
+>>> In suspend path the console_lock is taken by uart_port_suspend
+>>> however when no_console_suspend is used console_lock is not taken.
+>>>
+>>> During system wide suspend omap_pwr_domain hooks cut all
+>>> clocks that are left enabled. So its unsafe to proceed printing after
+>>> clocks are cut by pwr_domain hooks.
+>>
+>> As I've mentioned in previous reviews, when no_console_suspend is
+>> enabled, the user has explicitly requested console output during
+>> suspend. ?In order to support that, we should not be cutting clocks at
+>> all in that mode.
+>>
+>> One way to address this would be to just disable runtime PM in the
+>> ->prepare method of the driver if no_console_suspend is enabled.
+>>
+>
+> Okay fine exploring this option, right API's would be to use
+> pm_runtime_forbid/allow.
 
-Thanks!
+Yes.
 
+> <<SNIP>>
+>
+> +static int serial_omap_runtime_prepare(struct device *dev)
+> +{
+> +       if (!console_suspend_enabled)
+> +               pm_runtime_forbid(dev);
+> +
+> +       return 0;
+> +}
+> +
+> +static void serial_omap_runtime_complete(struct device *dev)
+> +{
+> +       if (!console_suspend_enabled)
+> +               pm_runtime_allow(dev);
+> +}
+> +
+>  static const struct dev_pm_ops serial_omap_dev_pm_ops = {
+>         SET_SYSTEM_SLEEP_PM_OPS(serial_omap_suspend, serial_omap_resume)
+>         SET_RUNTIME_PM_OPS(serial_omap_runtime_suspend,
+>                                 serial_omap_runtime_resume, NULL)
+> +       .prepare = serial_omap_runtime_prepare,
+> +       .complete =  serial_omap_runtime_complete,
+>  };
 
--Olof
+OK, but please add comments to these functions about exactly why they
+are needed.
 
-The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
+>
+> But to either use runtime forbid or disable we have ensure that
+> power_domain hooks don't go ahead and disable
+> the clocks with omap_device_idle as *runtime forbid or disable will
+> not set runtime_status to RPM_SUSPENDED*
+> and will stay in RPM_ACTIVE if we call runtime disable or forbid from
+> active state.
 
-  Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
+Correct.
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.2/cleanup
+> in power_domain hooks we just check the pm_runtime_status_suspended
+> this will be false even if
+> we do runtime disable/forbid and it will cut uart clocks always.
+>
+> So we may need below check also:
+>
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index 26aee5c..286a534 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -592,7 +592,8 @@ static int _od_suspend_noirq(struct device *dev)
+>
+>         ret = pm_generic_suspend_noirq(dev);
+>
+> -       if (!ret && !pm_runtime_status_suspended(dev)) {
+> +       if (!ret && pm_runtime_enabled(dev) &&
+> +                       !pm_runtime_status_suspended(dev)) {
+>                 if (pm_generic_runtime_suspend(dev) == 0) {
+>                         omap_device_idle(pdev);
+>                         od->flags |= OMAP_DEVICE_SUSPENDED;
 
-Olof Johansson (14):
-      ARM: tegra: annotate IO_*_VIRT pointers
-      ARM: tegra: timer: don't cast __iomem pointers
-      ARM: tegra: tegra2_clocks: don't cast __iomem pointers
-      ARM: tegra: tegra2_clocks: 0 -> NULL changes
-      ARM: tegra: pcie: don't cast __iomem pointers
-      ARM: tegra: pcie: include board.h
-      ARM: tegra: pcie: 0 -> NULL changes
-      ARM: tegra: tegra_init_cache should be static
-      ARM: tegra: tegra_rtc_read_ms should be static
-      ARM: tegra: tegra_powergate_is_powered should be static
-      ARM: tegra: tegra2_clocks: don't export some tables
-      ARM: tegra: dma: staticify some tables and functions
-      ARM: tegra: cpu-tegra: sparse type fix
-      ARM: tegra: cpu-tegra: unexport two functions
+This isn't right either because devices that may not yet be initialized
+(or loaded) may not have runtime PM enabled, so those devices may not
+be properly idled.
 
- arch/arm/mach-tegra/common.c                 |    2 +-
- arch/arm/mach-tegra/cpu-tegra.c              |    6 ++--
- arch/arm/mach-tegra/dma.c                    |   14 +++++---
- arch/arm/mach-tegra/include/mach/io.h        |   18 ++++++---
- arch/arm/mach-tegra/include/mach/powergate.h |    1 -
- arch/arm/mach-tegra/io.c                     |    8 ++--
- arch/arm/mach-tegra/pcie.c                   |    8 +++--
- arch/arm/mach-tegra/powergate.c              |    5 +--
- arch/arm/mach-tegra/tegra2_clocks.c          |   50 +++++++++++++-------------
- arch/arm/mach-tegra/timer.c                  |    6 ++--
- 10 files changed, 64 insertions(+), 54 deletions(-)
+We have an omap_device API to disable this feature at the PM domain level:
+omap_device_disable_idle_on_suspend().  All you should have to do is to
+use this API in the device init code on the console UART if
+no_console_suspend has been enabled.
+
+Kevin
