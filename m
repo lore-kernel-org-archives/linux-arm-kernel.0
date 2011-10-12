@@ -1,61 +1,50 @@
-From: gdavis@mvista.com (George G. Davis)
-Date: Tue, 11 Oct 2011 22:34:17 -0400
-Subject: [RFC/PATCH 3/7] ARM: ARM11 MPCore: {clean,
-	flush}_pmd_entry are not preempt safe
-In-Reply-To: <20111011095314.GA23848@arm.com>
-References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-4-git-send-email-gdavis@mvista.com>
-	<20111011095314.GA23848@arm.com>
-Message-ID: <6EB957F5-6E89-43F3-BAF3-A9E007BD896F@mvista.com>
+From: boojin.kim@samsung.com (Boojin Kim)
+Date: Wed, 12 Oct 2011 12:58:03 +0900
+Subject: [PATCH v6 09/10] ARM: S5PC100: Modify platform data for pl330
+	driver
+In-Reply-To: <1318270538-30450-10-git-send-email-thomas.abraham@linaro.org>
+References: <1318270538-30450-1-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-2-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-3-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-4-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-5-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-6-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-7-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-8-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-9-git-send-email-thomas.abraham@linaro.org>
+	<1318270538-30450-10-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <000701cc8893$246a2d50$6d3e87f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thomas Abraham wrote:
+> Sent: Tuesday, October 11, 2011 3:16 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org; kgene.kim at samsung.com;
+> vinod.koul at intel.com; Jassi Brar; Boojin Kim
+> Subject: [PATCH v6 09/10] ARM: S5PC100: Modify platform data for pl330
+> driver
+>
+> With the 'struct dma_pl330_peri' removed, the platfrom data for dma
+> driver can be simplified to a simple list of peripheral request ids.
+>
+> Cc: Jassi Brar <jassisinghbrar@gmail.com>
+> Cc: Boojin Kim <boojin.kim@samsung.com>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/mach-s5pc100/dma.c |  247 ++++++++++++-----------------------
+> --------
+>  1 files changed, 69 insertions(+), 178 deletions(-)
+>
 
-On Oct 11, 2011, at 5:53 AM, Catalin Marinas wrote:
+Looks good to me.
+Acked-by: Boojin Kim <boojin.kim@samsung.com>
 
-> On Fri, Oct 07, 2011 at 03:38:37AM +0100, gdavis at mvista.com wrote:
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index 594d677..3c8253f 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -567,12 +567,24 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
->> 		if (addr & SECTION_SIZE)
->> 			pmd++;
->> 
->> +		if (cache_ops_need_broadcast())
->> +			preempt_disable();
->> 		do {
->> 			*pmd = __pmd(phys | type->prot_sect);
->> 			phys += SECTION_SIZE;
->> 		} while (pmd++, addr += SECTION_SIZE, addr != end);
->> 
->> +		/* FIXME: Multiple PMD entries may be written above
->> +		 * but only one cache line, up to 8 PMDs depending
->> +		 * on the alignment of this mapping, is flushed below.
->> +		 * IFF this mapping spans >8MiB, then only the first
->> +		 * 8MiB worth of entries will be flushed.  Entries
->> +		 * above the 8MiB limit will not be flushed if I
->> +		 * read this correctly.
->> +		 */
->> 		flush_pmd_entry(p);
->> +		if (cache_ops_need_broadcast())
->> +			preempt_enable();
-> 
-> My reading of the create_mapping() code is that alloc_init_pud() and
-> alloc_init_section() are called with a 2MB range only (that's 2
-> entries) given by pgd_addr_end().
-
-You're correct of course.  I initially stuck that FIXME note in there more as
-a reminder to review it more carefully.  Alas, in my haste, I submitted as-is
-w/o checking parameter bounds passed from callers which do as you
-say, so it's never more than 2MiB in size.  Thanks for the feedback.
-I'll remove that note.
-
---
-Regards,
-George
-
-> 
-> -- 
-> Catalin
+> diff --git a/arch/arm/mach-s5pc100/dma.c b/arch/arm/mach-s5pc100/dma.c
+> index 065a087..8dfdc76 100644
+> --- a/arch/arm/mach-s5pc100/dma.c
+> +++ b/arch/arm/mach-s5pc100/dma.c
+> @@ -35,100 +35,42 @@
+>
+>  static u64 dma_dmamask = DMA_BIT_MASK(32);
+>
