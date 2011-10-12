@@ -1,175 +1,178 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 12 Oct 2011 18:19:04 +0200
-Subject: [PATCH V4 3/3] ARM: SAMSUNG: Add lookup of sdhci-s3c clocks using
-	generic names
-In-Reply-To: <CAPs=JDf2N1kh4BO9nPBb-J6k51e-ytntrNOvw_UOKtw-ktdycA@mail.gmail.com>
-References: <1318412587-29987-1-git-send-email-rajeshwari.s@samsung.com>
-	<1318412587-29987-4-git-send-email-rajeshwari.s@samsung.com>
-	<4E956ADB.3060604@samsung.com>
-	<CAPs=JDf2N1kh4BO9nPBb-J6k51e-ytntrNOvw_UOKtw-ktdycA@mail.gmail.com>
-Message-ID: <4E95BDF8.2080406@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 12 Oct 2011 18:34:55 +0200
+Subject: [PATCH 1/4] dmaengine: at_hdmac: platform data move to use
+	.id_table
+In-Reply-To: <1318342612.1546.352.camel@vkoul-udesk3>
+References: <1314075338.22120.3.camel@vkoul-udesk3>
+	<9723283e7097730f568bf7c2f3a93ae42c6bc5ca.1318264339.git.nicolas.ferre@atmel.com>
+	<1318342612.1546.352.camel@vkoul-udesk3>
+Message-ID: <4E95C1AF.5080803@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2011 02:36 PM, Rajeshwari Birje wrote:
-> On Wed, Oct 12, 2011 at 3:54 PM, Sylwester Nawrocki
-> <s.nawrocki@samsung.com> wrote:
->> Hi Rajeshwari,
+On 10/11/2011 04:16 PM, Vinod Koul :
+> On Mon, 2011-10-10 at 18:37 +0200, Nicolas Ferre wrote:
+>> We remove platform data from DMA controller and move
+>> to the use of .id_table to distinguish between compatible
+>> types. The two implementations allow to determine the
+>> number of channels and the capabilities of the controller.
 >>
->> On 10/12/2011 11:43 AM, Rajeshwari Shinde wrote:
->>> Add support for lookup of sdhci-s3c controller clocks using generic names
->>> for s3c2416, s3c64xx, s5pc100, s5pv210 and exynos4 SoC's.
->>>
->>> Signed-off-by: Rajeshwari Shinde <rajeshwari.s@samsung.com>
->>> ---
->>>  arch/arm/mach-exynos4/clock.c         |   88 ++++++++++-------
->>>  arch/arm/mach-s3c2416/clock.c         |   68 +++++++------
->>>  arch/arm/mach-s3c64xx/clock.c         |  126 +++++++++++++++----------
->>>  arch/arm/mach-s5pc100/clock.c         |  130 ++++++++++++++++----------
->>>  arch/arm/mach-s5pv210/clock.c         |  167 ++++++++++++++++++++-------------
->>>  arch/arm/plat-s3c24xx/s3c2443-clock.c |   15 ++-
->>>  6 files changed, 359 insertions(+), 235 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
->>> index 9f50e33..c6383b9 100644
->>> --- a/arch/arm/mach-exynos4/clock.c
->>> +++ b/arch/arm/mach-exynos4/clock.c
->>> @@ -1157,42 +1157,6 @@ static struct clksrc_clk clksrcs[] = {
->>>               .reg_div = { .reg = S5P_CLKDIV_MFC, .shift = 0, .size = 4 },
-...
->>> +static struct clksrc_clk clk_sclk_mmc0 = {
->>> +     .clk            = {
->>> +             .name           = "sclk_mmc",
->>> +             .devname        = "s3c-sdhci.0",
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  drivers/dma/at_hdmac.c      |   48 ++++++++++++++++++++++++++++++++++---------
+>>  drivers/dma/at_hdmac_regs.h |    8 +++++++
+>>  2 files changed, 46 insertions(+), 10 deletions(-)
 >>
->> Would it make sense to drop this 'devname' field here and others
->> until sclk_mmc3 ....
-> 
-> *** The devname here distinguishes these clocks. So it should be okay
-> to have a devname for these clocks.
+>> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+>> index fcfa0a8..fef57bc 100644
+>> --- a/drivers/dma/at_hdmac.c
+>> +++ b/drivers/dma/at_hdmac.c
+>> @@ -1175,6 +1175,18 @@ static void atc_free_chan_resources(struct dma_chan *chan)
+>>  
+>>  /*--  Module Management  -----------------------------------------------*/
+>>  
+>> +static struct platform_device_id atdma_devtypes[] = {
+>> +	{
+>> +		.name = "at91sam9rl_dma",
+>> +		.driver_data = ATDMA_DEVTYPE_SAM9RL,
+>> +	}, {
+>> +		.name = "at91sam9g45_dma",
+>> +		.driver_data = ATDMA_DEVTYPE_SAM9G45,
+>> +	}, {
+>> +		/* sentinel */
+>> +	}
+>> +};
+>> +
+>>  /**
+>>   * at_dma_off - disable DMA controller
+>>   * @atdma: the Atmel HDAMC device
+>> @@ -1193,18 +1205,32 @@ static void at_dma_off(struct at_dma *atdma)
+>>  
+>>  static int __init at_dma_probe(struct platform_device *pdev)
+>>  {
+>> -	struct at_dma_platform_data *pdata;
+>>  	struct resource		*io;
+>>  	struct at_dma		*atdma;
+>>  	size_t			size;
+>>  	int			irq;
+>>  	int			err;
+>>  	int			i;
+>> +	u32                     nr_channels;
+>> +	dma_cap_mask_t          cap_mask = {};
+>> +	enum atdma_devtype	atdmatype;
+>> +
+>> +	dma_cap_set(DMA_MEMCPY, cap_mask);
+>> +
+>> +	/* get DMA parameters from controller type */
+>> +	atdmatype = platform_get_device_id(pdev)->driver_data;
+>>  
+>> -	/* get DMA Controller parameters from platform */
+>> -	pdata = pdev->dev.platform_data;
+>> -	if (!pdata || pdata->nr_channels > AT_DMA_MAX_NR_CHANNELS)
+>> +	switch (atdmatype) {
+>> +	case ATDMA_DEVTYPE_SAM9RL:
+>> +		nr_channels = 2;
+>> +		break;
+>> +	case ATDMA_DEVTYPE_SAM9G45:
+>> +		nr_channels = 8;
+>> +		dma_cap_set(DMA_SLAVE, cap_mask);
+>> +		break;
+>> +	default:
+>>  		return -EINVAL;
+>> +	}
+>>  
+>>  	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>  	if (!io)
+>> @@ -1215,14 +1241,15 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>>  		return irq;
+>>  
+>>  	size = sizeof(struct at_dma);
+>> -	size += pdata->nr_channels * sizeof(struct at_dma_chan);
+>> +	size += nr_channels * sizeof(struct at_dma_chan);
+>>  	atdma = kzalloc(size, GFP_KERNEL);
+>>  	if (!atdma)
+>>  		return -ENOMEM;
+>>  
+>> -	/* discover transaction capabilites from the platform data */
+>> -	atdma->dma_common.cap_mask = pdata->cap_mask;
+>> -	atdma->all_chan_mask = (1 << pdata->nr_channels) - 1;
+>> +	/* discover transaction capabilites */
+> capabilities
 
-I'm not sure what's Mr Kukjin's opinion on that, but I personally would really
-like to see all the devname fields disappear from samsung clk data structures.
-Possibly if all involved people would keep that in mind we could achieve this
-over time.
+Yes.
 
-> 
->>
->>> +             .parent         = &clk_dout_mmc0.clk,
->>> +             .enable         = exynos4_clksrc_mask_fsys_ctrl,
->>> +             .ctrlbit        = (1 << 0),
->>> +     },
->>> +     .reg_div = { .reg = S5P_CLKDIV_FSYS1, .shift = 8, .size = 8 },
->>> +};
->>> +
->>> +static struct clksrc_clk clk_sclk_mmc1 = {
->>> +     .clk            = {
->>> +             .name           = "sclk_mmc",
->>> +             .devname        = "s3c-sdhci.1",
->>
->>> +             .parent         = &clk_dout_mmc1.clk,
->>> +             .enable         = exynos4_clksrc_mask_fsys_ctrl,
->>> +             .ctrlbit        = (1 << 4),
->>> +     },
->>> +     .reg_div = { .reg = S5P_CLKDIV_FSYS1, .shift = 24, .size = 8 },
->>> +};
->>> +
->>> +static struct clksrc_clk clk_sclk_mmc2 = {
->>> +     .clk            = {
->>> +             .name           = "sclk_mmc",
->>> +             .devname        = "s3c-sdhci.2",
->>
->>> +             .parent         = &clk_dout_mmc2.clk,
->>> +             .enable         = exynos4_clksrc_mask_fsys_ctrl,
->>> +             .ctrlbit        = (1 << 8),
->>> +     },
->>> +     .reg_div = { .reg = S5P_CLKDIV_FSYS2, .shift = 8, .size = 8 },
->>> +};
->>> +
->>> +static struct clksrc_clk clk_sclk_mmc3 = {
->>> +     .clk            = {
->>> +             .name           = "sclk_mmc",
->>> +             .devname        = "s3c-sdhci.3",
->>
->>> +             .parent         = &clk_dout_mmc3.clk,
->>> +             .enable         = exynos4_clksrc_mask_fsys_ctrl,
->>> +             .ctrlbit        = (1 << 12),
->>> +     },
->>> +     .reg_div = { .reg = S5P_CLKDIV_FSYS2, .shift = 24, .size = 8 },
->>> +};
->>> +
->>>  /* Clock initialization code */
->>>  static struct clksrc_clk *sysclks[] = {
->>>       &clk_mout_apll,
->>> @@ -1289,6 +1297,10 @@ static struct clksrc_clk *clksrc_cdev[] = {
->>>       &clk_sclk_uart1,
->>>       &clk_sclk_uart2,
->>>       &clk_sclk_uart3,
->>> +     &clk_sclk_mmc0,
->>> +     &clk_sclk_mmc1,
->>> +     &clk_sclk_mmc2,
->>> +     &clk_sclk_mmc3,
->>
->> ..then drop the above 4 lines...
-> 
-> **** The registration for these clocks are important. The
-> s3c_register_clksrc() function sets the .ops of this clock and also
-> its parent. So the registration cannot be dropped.
+>> +	atdma->dma_common.cap_mask = cap_mask;
+>> +	atdma->all_chan_mask = (1 << nr_channels) - 1;
+>> +	atdma->devtype = atdmatype;
+>>  
+>>  	size = resource_size(io);
+>>  	if (!request_mem_region(io->start, size, pdev->dev.driver->name)) {
+>> @@ -1268,7 +1295,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>>  
+>>  	/* initialize channels related values */
+>>  	INIT_LIST_HEAD(&atdma->dma_common.channels);
+>> -	for (i = 0; i < pdata->nr_channels; i++) {
+>> +	for (i = 0; i < nr_channels; i++) {
+>>  		struct at_dma_chan	*atchan = &atdma->chan[i];
+>>  
+>>  		atchan->chan_common.device = &atdma->dma_common;
+>> @@ -1313,7 +1340,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>>  	dev_info(&pdev->dev, "Atmel AHB DMA Controller ( %s%s), %d channels\n",
+>>  	  dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask) ? "cpy " : "",
+>>  	  dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask)  ? "slave " : "",
+>> -	  pdata->nr_channels);
+>> +	  nr_channels);
+> indent?
 
-OK.
+Well, this dev_info statement seems pretty well indented: if I use a
+tab, then I cross the 80 column rule, and I would like to keep the "?:"
+operator on one line... So I would like to keep it like this.
 
-> 
->>
->>>  };
->>>
->>>  static struct clk_lookup exynos4_clk_lookup[] = {
->>> @@ -1296,6 +1308,10 @@ static struct clk_lookup exynos4_clk_lookup[] = {
->>>       CLKDEV_INIT("exynos4210-uart.1", "clk_uart_baud0", &clk_sclk_uart1.clk),
->>>       CLKDEV_INIT("exynos4210-uart.2", "clk_uart_baud0", &clk_sclk_uart2.clk),
->>>       CLKDEV_INIT("exynos4210-uart.3", "clk_uart_baud0", &clk_sclk_uart3.clk),
->>> +     CLKDEV_INIT("exynos4-sdhci.0", "mmc_busclk.2", &clk_sclk_mmc0.clk),
->>> +     CLKDEV_INIT("exynos4-sdhci.1", "mmc_busclk.2", &clk_sclk_mmc1.clk),
->>> +     CLKDEV_INIT("exynos4-sdhci.2", "mmc_busclk.2", &clk_sclk_mmc2.clk),
->>> +     CLKDEV_INIT("exynos4-sdhci.3", "mmc_busclk.2", &clk_sclk_mmc3.clk),
->>
->> ..and add something like:
->>
->>  +      CLKDEV_INIT("s3c-sdhci.0", "sclk_mmc", &clk_sclk_mmc0.clk),
->>  +      CLKDEV_INIT("s3c-sdhci.1", "sclk_mmc", &clk_sclk_mmc1.clk),
->>  +      CLKDEV_INIT("s3c-sdhci.2", "sclk_mmc", &clk_sclk_mmc2.clk),
->>  +      CLKDEV_INIT("s3c-sdhci.3", "sclk_mmc", &clk_sclk_mmc3.clk),
->>
->> ?
-> 
-> **** The driver uses a common name for the possible bus clock sources,
-> that is ?mmc_busclk?. This keeps the clock lookup code in the driver
-> simple. Also, there could be SoC?s which do no use sclk_mmc as the bus
-> clock name as per the user manual
+>>  	dma_async_device_register(&atdma->dma_common);
+>>  
+>> @@ -1495,6 +1522,7 @@ static const struct dev_pm_ops at_dma_dev_pm_ops = {
+>>  static struct platform_driver at_dma_driver = {
+>>  	.remove		= __exit_p(at_dma_remove),
+>>  	.shutdown	= at_dma_shutdown,
+>> +	.id_table	= atdma_devtypes,
+>>  	.driver = {
+>>  		.name	= "at_hdmac",
+>>  		.pm	= &at_dma_dev_pm_ops,
+>> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+>> index aa4c9ae..d7d6737 100644
+>> --- a/drivers/dma/at_hdmac_regs.h
+>> +++ b/drivers/dma/at_hdmac_regs.h
+>> @@ -248,9 +248,16 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
+>>  
+>>  /*--  Controller  ------------------------------------------------------*/
+>>  
+>> +enum atdma_devtype {
+>> +	ATDMA_DEVTYPE_UNDEFINED = 0,
+>> +	ATDMA_DEVTYPE_SAM9RL,	/* compatible with SAM9RL DMA controller */
+>> +	ATDMA_DEVTYPE_SAM9G45,	/* compatible with SAM9G45 DMA controller */
+>> +};
+>> +
+>>  /**
+>>   * struct at_dma - internal representation of an Atmel HDMA Controller
+>>   * @chan_common: common dmaengine dma_device object members
+>> + * @atdma_devtype: identifier of DMA controller compatibility
+>>   * @ch_regs: memory mapped register base
+>>   * @clk: dma controller clock
+>>   * @save_imr: interrupt mask register that is saved on suspend/resume cycle
+>> @@ -260,6 +267,7 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
+>>   */
+>>  struct at_dma {
+>>  	struct dma_device	dma_common;
+>> +	enum atdma_devtype	devtype;
+>>  	void __iomem		*regs;
+>>  	struct clk		*clk;
+>>  	u32			save_imr;
+> Little confused at this, where is the remove of existing platfrom data
+> per the changelog?
 
-OK, I was aware of that. I didn't mean removing the "mmc_busclk.2" entries,
-just adding another 4, which are created anyway by s3c_register_clksrc()
-function. But for now I think the patch is OK.
+Well, yes, it is the use of platform data that is removed, not the
+structure it self. I change the log message in my v2 patch series.
 
-> 
-> 
->>
->> Also I'm wondering why we're using different device names for clk_sclk_mmc0..3
->> clocks, i.e. exynos4-sdhci.? and s3c-sdhci.? ?
->>
->> Does it all work on exynos ? I would expect the device name to be same
->> across all the clock definitions, otherwise clk_get(dev, ..) will fail.
-> 
-> **** There was a patch submitted to rename the device name of sdhci
-> for Exynos to exynos4-sdhci. I will remove this change from this patch
-> and let that patch handle this change.
-
-I wouldn't do that. IMHO it's better to keep this patch as is, to make the final
-diff size lower.
-Perhaps it's even worth to consider doing the clock rename altogether in this patch.
-But it's of course up to you.
-
-
-Regards,
+thanks, bye,
 -- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+Nicolas Ferre
