@@ -1,89 +1,72 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Wed, 12 Oct 2011 19:08:51 +0530
-Subject: [PATCH v6 10/16] OMAP2+: UART: Modify omap_uart_can_sleep function
-In-Reply-To: <87vcrv2xox.fsf@ti.com>
-References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
-	<87vcrv2xox.fsf@ti.com>
-Message-ID: <CAAL8m4xTmz+-ureDiGPoKUu634q1Wy=h01kpfRWCk9LFCV0+Dg@mail.gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Wed, 12 Oct 2011 21:49:13 +0800
+Subject: [PATCH] ARM: SAMSUNG: s3c-dma-ops needs export.h for EXPORT_SYMBOL
+In-Reply-To: <069601cc88dc$6b9a78d0$42cf6a70$%kim@samsung.com>
+References: <1317961214.16109.1.camel@phoenix>
+	<069601cc88dc$6b9a78d0$42cf6a70$%kim@samsung.com>
+Message-ID: <CAF+7xWmXGovD4zdst16fdX66voauhvKFTctQLEORX9tosckfkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 11:54 PM, Kevin Hilman <khilman@ti.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> Modify the omap_uart_can_sleep function to check uart is active
->> or not to be used by pm code to enter low power states.
->
-> Doesn't the driver now control when the UART clocks are gated (using
-> runtime PM autosuspend)?
->
-> IMO, this check should be completely removed and the driver should
-> be managing this with the autosuspend timeout.
->
->> Removing this check can cause console response little sluggish.
->
-> Sluggish in what way?
->
-
-response is slower like when we type something or cat debugfs/pm_count
-see things little slower on console, there is no character loss.
-
-Happens even though we have not set the autosuspend timeout and uart
-clocks are active,
-which basically means allowing mpu to enter retention keeping uart active.
-
-this delay in response or sluggishness is not there on my 3430SDP or
-3630zoom board but I was able to see this behavior on a beagle board(xm rev c).
-
-retaining this uart_can_sleep check in omap3_can_sleep ensures a better
-console user experience. (not allowing mpu to enter retention
-until uart clocks are cut)
-
-
-> If the driver is runtime suspended, it should only be sluggish for the
-> first character. ?After that, the autosuspend timeout should prevent it
-> from feeling sluggish.
->
->> However no characters will be lost until uart clocks are gated
->> and woken up using rx-pad. UART interface clocks can be auto gated
->> this can make response on uart slower. This behaviour was observed
->> only on some of OMAP3 boards(beagleboard xm rev c).
+2011/10/12 Kukjin Kim <kgene.kim@samsung.com>:
+> Kukjin Kim wrote:
 >>
->> Reported-by: Tero Kristo <t-kristo@ti.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->> ---
->> ?arch/arm/mach-omap2/serial.c | ? 21 +++++++++------------
->> ?1 files changed, 9 insertions(+), 12 deletions(-)
+>> Axel Lin wrote:
+>> >
+>> > Fix below build warning:
+>> > ? CC ? ? ?arch/arm/plat-samsung/s3c-dma-ops.o
+>> > arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: data definition has no type
+>> or
+>> > storage class
+>> > arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: type defaults to 'int' in
+>> > declaration of 'EXPORT_SYMBOL'
+>> > arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: parameter names (without
+>> > types) in function declaration
+>> >
+>> > And fix the build error:
+>> > ERROR: "s3c_dma_get_ops" [drivers/spi/spi-s3c64xx.ko] undefined!
+>> > make[1]: *** [__modpost] Error 1
+>> > make: *** [modules] Error 2
+>> >
+>> > Signed-off-by: Axel Lin <axel.lin@gmail.com>
+>> > ---
+>> > This can be reproduced by "make s3c6400_defconfig;make" on linux-next
+>> > 20111006.
+>> > ?arch/arm/plat-samsung/s3c-dma-ops.c | ? ?1 +
+>> > ?1 files changed, 1 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm/plat-samsung/s3c-dma-ops.c b/arch/arm/plat-samsung/s3c-
+>> > dma-ops.c
+>> > index 582333c..7814949 100644
+>> > --- a/arch/arm/plat-samsung/s3c-dma-ops.c
+>> > +++ b/arch/arm/plat-samsung/s3c-dma-ops.c
+>> > @@ -14,6 +14,7 @@
+>> > ?#include <linux/errno.h>
+>> > ?#include <linux/slab.h>
+>> > ?#include <linux/types.h>
+>> > +#include <linux/export.h>
+>> >
+>> > ?#include <mach/dma.h>
+>> >
+>> > --
+>> > 1.7.4.1
+>> >
+>> OK, will apply.
 >>
->> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
->> index 6725caf..ccf3550 100644
->> --- a/arch/arm/mach-omap2/serial.c
->> +++ b/arch/arm/mach-omap2/serial.c
->> @@ -156,23 +156,20 @@ static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
+>> BTW, I don't know why the build error/warning was not happened in my tree with
+>> s3c6400_defconfig. Probably other file having it?...
 >>
->> ?int omap_uart_can_sleep(void)
->> ?{
->> - ? ? struct omap_uart_state *uart;
->> - ? ? int can_sleep = 1;
->> -
->> - ? ? list_for_each_entry(uart, &uart_list, node) {
->> - ? ? ? ? ? ? if (!uart->clocked)
->> - ? ? ? ? ? ? ? ? ? ? continue;
->> + ? ? struct omap_hwmod *oh;
->> + ? ? u8 i, ret = true;
->>
->> - ? ? ? ? ? ? if (!uart->can_sleep) {
->> - ? ? ? ? ? ? ? ? ? ? can_sleep = 0;
->> + ? ? for (i = 0; i < num_uarts; i++) {
->> + ? ? ? ? ? ? oh = omap_uart_hwmod_lookup(i);
+> Hi Axel,
 >
-> This is a heavy operation to add for *every* entry into idle.
+> When I applied this in my tree, happened following error with s3c6400_defconfig.
 >
+> arch/arm/plat-samsung/s3c-dma-ops.c:17: fatal error: linux/export.h: No such file or directory
+>
+> Probably the <linux/export.h> file has been added from other tree.
+> So if required, will fix with this during upcoming merge window maybe at end of.
+>
+Cc Paul Gortmaker,
+Maybe it is only in Paul's tree now.
 
-removing uart_list caused this ops, retaining uart_list
-will ensure this will be replaced with list_for_each_entry
-as done in existing code.
-
---
-Thanks,
-Govindraj.R
+Regards,
+Axel
