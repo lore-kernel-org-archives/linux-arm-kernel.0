@@ -1,45 +1,79 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 12 Oct 2011 07:49:34 +0200
-Subject: [Linaro-mm-sig] [PATCH 1/2] ARM: initial proof-of-concept IOMMU
-	mapper for DMA-mapping
-In-Reply-To: <401E54CE964CD94BAE1EB4A729C7087E3722519BF4@HQMAIL04.nvidia.com>
-References: <1314971786-15140-1-git-send-email-m.szyprowski@samsung.com>
-	<1314971786-15140-2-git-send-email-m.szyprowski@samsung.com>
-	<594816116217195c28de13accaf1f9f2.squirrel@www.codeaurora.org>
-	<001f01cc786d$d55222c0$7ff66840$%szyprowski@samsung.com>
-	<401E54CE964CD94BAE1EB4A729C7087E37225197F8@HQMAIL04.nvidia.com>
-	<00b101cc87ee$8976c410$9c644c30$%szyprowski@samsung.com>
-	<401E54CE964CD94BAE1EB4A729C7087E3722519A1F@HQMAIL04.nvidia.com>
-	<401E54CE964CD94BAE1EB4A729C7087E3722519BF4@HQMAIL04.nvidia.com>
-Message-ID: <00e501cc88a2$b82fc680$288f5380$%szyprowski@samsung.com>
+From: gdavis@mvista.com (gdavis at mvista.com)
+Date: Wed, 12 Oct 2011 02:04:33 -0400
+Subject: [RFC/PATCH 5/7] ARM: Move get_thread_info macro definition to
+	<asm/assembler.h>
+In-Reply-To: <20111011095639.GB23848@arm.com>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-6-git-send-email-gdavis@mvista.com>
+	<20111011095639.GB23848@arm.com>
+Message-ID: <20111012060433.GE188@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wednesday, October 12, 2011 3:35 AM Krishna Reddy wrote:
-
-> >>It looks that You have simplified arm_iommu_map_sg() function too much.
-> >>The main advantage of the iommu is to map scattered memory pages into
-> >>contiguous dma address space. DMA-mapping is allowed to merge consecutive
-> >>entries in the scatter list if hardware supports that.
-> >>http://article.gmane.org/gmane.linux.kernel/1128416
-> >I would update arm_iommu_map_sg() back to coalesce the sg list.
-> >>MMC drivers seem to be aware of coalescing the SG entries together as they are using
-> dma_sg_len().
+On Tue, Oct 11, 2011 at 10:56:39AM +0100, Catalin Marinas wrote:
+> On Fri, Oct 07, 2011 at 03:38:39AM +0100, gdavis at mvista.com wrote:
+> > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> > index 29035e8..78397d0 100644
+> > --- a/arch/arm/include/asm/assembler.h
+> > +++ b/arch/arm/include/asm/assembler.h
+> > @@ -23,6 +23,19 @@
+> >  #include <asm/ptrace.h>
+> >  #include <asm/domain.h>
+> >  
+> > +#ifndef CONFIG_THUMB2_KERNEL
+> > +	.macro	get_thread_info, rd
+> > +	mov	\rd, sp, lsr #13
+> > +	mov	\rd, \rd, lsl #13
+> > +	.endm
+> > +#else   /* CONFIG_THUMB2_KERNEL */
+> > +	.macro	get_thread_info, rd
+> > +	mov	\rd, sp
+> > +	lsr	\rd, \rd, #13
+> > +	mov	\rd, \rd, lsl #13
+> > +	.endm
+> > +#endif  /* !CONFIG_THUMB2_KERNEL */
 > 
-> I have updated the arm_iommu_map_sg() back to coalesce and fixed the issues with it. During
-> testing, I found out that mmc host driver doesn't support buffers bigger than 64K. To get the
-> device working, I had to break the sg entries coalesce when dma_length is about to go beyond
-> 64KB. Looks like Mmc host driver(sdhci.c) need to be fixed to handle buffers bigger than 64KB.
-> Should the clients be forced to handle bigger buffers or is there any better way to handle
-> these kind of issues?
+> We could even write some preempt_enable and preempt_disable asm macros,
+> I think it would simplify the code in the other files.
 
-There is struct device_dma_parameters *dma_parms member of struct device. You can specify
-maximum segment size for the dma_map_sg function. This will of course complicate this function
-even more...
+Like so (based on above patch and not even compile tested):
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 78397d0..eaf4939 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -36,6 +36,20 @@
+ 	.endm
+ #endif  /* !CONFIG_THUMB2_KERNEL */
+ 
++	.macro	preempt_disable, tsk, cnt
++	get_thread_info \tsk
++	ldr	\cnt, [\tsk, #TI_PREEMPT]
++	add	\cnt, \cnt, #1
++	str	\cnt, [\tsk, #TI_PREEMPT]
++	.endm
++
++	.macro	preempt_enable, tsk, cnt
++	get_thread_info \tsk
++	ldr	\cnt, [\tsk, #TI_PREEMPT]
++	sub	\cnt, \cnt, #1
++	str	\cnt, [\tsk, #TI_PREEMPT]
++	.endm
++
+ /*
+  * Endian independent macros for shifting bytes within registers.
+  */
+
+
+Not as efficient as it could be but I imagine the macros could
+be written to support optional load of \tsk and/or optional \tmp
+parameters to cover other common cases.
+
+--
+Regards,
+George
+
+> 
+> -- 
+> Catalin
