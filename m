@@ -1,72 +1,109 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 12 Oct 2011 10:15:25 -0500
-Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
-	mechanism
-In-Reply-To: <CAPM=9tyAiUZ9tNaer=_52WmiLKpJKG+3EXvZzotwGwvqkJFmOQ@mail.gmail.com>
-References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
-	<1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
-	<CAPM=9tzHOa5Dbe=SQz+AURMMbio4L7qoS8kUT3Ek0+HdtkrH4g@mail.gmail.com>
-	<CAF6AEGs6kkGp85NoNVuq5W9i=WE86V8wvAtKydX=D3bQOc+6Pw@mail.gmail.com>
-	<CAPM=9twft0eBEUoCD11a2gTZHwOaPzFmZvBfE032dfK10eQ27Q@mail.gmail.com>
-	<CAF6AEGuwMt6Snq=YSN4iddTv_Cu56aR_2BY1d3hjVvTdkom5MQ@mail.gmail.com>
-	<CAPM=9tyKjodxf9MKjG=5bBDZTuqOx4Nu31L5iNN9LrO9fsp+FA@mail.gmail.com>
-	<CAF6AEGsK25wk28YmiwsZTenecKqCt6irx66nR-8nOFMo6Z=Dkw@mail.gmail.com>
-	<CAPM=9tyAiUZ9tNaer=_52WmiLKpJKG+3EXvZzotwGwvqkJFmOQ@mail.gmail.com>
-Message-ID: <CAF6AEGv8QQf_SBUcgKJgLUDaBKHONjUQGY0SY7xq9esDO5VtKw@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 12 Oct 2011 17:31:25 +0200
+Subject: [PATCH] ARM: Samsung: Move fimc plat. device from board files to
+	plat-samsung
+In-Reply-To: <039b01cc8730$594ab530$0be01f90$%kim@samsung.com>
+References: <039b01cc8730$594ab530$0be01f90$%kim@samsung.com>
+Message-ID: <1318433485-1757-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 9:34 AM, Dave Airlie <airlied@gmail.com> wrote:
-> On Wed, Oct 12, 2011 at 3:24 PM, Rob Clark <robdclark@gmail.com> wrote:
->> On Wed, Oct 12, 2011 at 9:01 AM, Dave Airlie <airlied@gmail.com> wrote:
->>>> But then we'd need a different set of accessors for every different
->>>> drm/v4l/etc driver, wouldn't we?
->>>
->>> Not any more different than you need for this, you just have a new
->>> interface that you request a sw object from,
->>> then mmap that object, and underneath it knows who owns it in the kernel.
->>
->> oh, ok, so you are talking about a kernel level interface, rather than
->> userspace..
->>
->> but I guess in this case I don't quite see the difference. ?It amounts
->> to which fd you call mmap (or ioctl[*]) on.. ?If you use the dmabuf fd
->> directly then you don't have to pass around a 2nd fd.
->>
->> [*] there is nothing stopping defining some dmabuf ioctls (such as for
->> synchronization).. although the thinking was to keep it simple for
->> first version of dmabuf
->>
->
-> Yes a separate kernel level interface.
+Move the platform device definitions from boards code to plat-samsung
+to avoid multiple instances when multiple board support is compiled in.
+The boards should select at least S5P_DEV_FIMC0 to enable FIMC support.
 
-I'm not against it, but if it is a device-independent interface, it
-just seems like six of one, half-dozen of the other..
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+Hi Kgene,
 
-Ie. how does it differ if the dmabuf fd is the fd used for ioctl/mmap,
-vs if some other /dev/buffer-sharer file that you open?
+To decrease overall diff size, if it's not too late yet, you might want to
+squash parts of this patch with previous commits:
 
-But I think maybe I'm misunderstanding what you have in mind?
+0513218 ARM: S5PV210: Add support for M-5MOLS image sensor on UNIVERSAL_C210
+39aefab ARM: S5PV210: Add support for NOON010PC30 sensor on GONI board
 
-BR,
--R
+Here is the optional new patch summary:
 
-> Well I'd like to keep it even simpler. dmabuf is a buffer sharing API,
-> shoehorning in a sw mapping API isn't making it simpler.
->
-> The problem I have with implementing mmap on the sharing fd, is that
-> nothing says this should be purely optional and userspace shouldn't
-> rely on it.
->
-> In the Intel GEM space alone you have two types of mapping, one direct
-> to shmem one via GTT, the GTT could be even be a linear view. The
-> intel guys initially did GEM mmaps direct to the shmem pages because
-> it seemed simple, up until they
-> had to do step two which was do mmaps on the GTT copy and ended up
-> having two separate mmap methods. I think the problem here is it seems
-> deceptively simple to add this to the API now because the API is
-> simple, however I think in the future it'll become a burden that we'll
-> have to workaround.
->
-> Dave.
->
+ARM: Samsung: Add fimc platform device for s5p-fimc media device driver
+
+The s5p-fimc driver now creates an aggregate media device which is bound
+to "s5p-fimc-md" platform device. This patch adds such a platform device
+instance to be registered by each board that requires FIMC device support.
+
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+Sorry for the noise. 
+
+Regards,
+Sylwester
+---
+ arch/arm/mach-exynos4/mach-universal_c210.c |    5 -----
+ arch/arm/mach-s5pv210/mach-goni.c           |    5 -----
+ arch/arm/plat-samsung/devs.c                |    5 +++++
+ arch/arm/plat-samsung/include/plat/devs.h   |    1 +
+ 4 files changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
+index 18cf5c7..2096c8b 100644
+--- a/arch/arm/mach-exynos4/mach-universal_c210.c
++++ b/arch/arm/mach-exynos4/mach-universal_c210.c
+@@ -920,11 +920,6 @@ static struct s5p_platform_fimc fimc_md_platdata = {
+ 	.num_clients	= ARRAY_SIZE(universal_camera_sensors),
+ };
+ 
+-struct platform_device s5p_device_fimc_md = {
+-	.name	= "s5p-fimc-md",
+-	.id	= -1,
+-};
+-
+ static struct gpio universal_camera_gpios[] = {
+ 	{ GPIO_CAM_LEVEL_EN(1),	GPIOF_OUT_INIT_HIGH, "CAM_LVL_EN1" },
+ 	{ GPIO_CAM_LEVEL_EN(2),	GPIOF_OUT_INIT_LOW,  "CAM_LVL_EN2" },
+diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
+index 01e4867..61da205 100644
+--- a/arch/arm/mach-s5pv210/mach-goni.c
++++ b/arch/arm/mach-s5pv210/mach-goni.c
+@@ -849,11 +849,6 @@ struct s5p_platform_fimc goni_fimc_md_platdata __initdata = {
+ 	.num_clients	= ARRAY_SIZE(goni_camera_sensors),
+ };
+ 
+-struct platform_device s5p_device_fimc_md = {
+-	.name		= "s5p-fimc-md",
+-	.id		= -1,
+-};
+-
+ static struct platform_device *goni_devices[] __initdata = {
+ 	&s3c_device_fb,
+ 	&s5p_device_onenand,
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index cb6fd9e..4ca8b57 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -204,6 +204,11 @@ struct platform_device s5p_device_fimc0 = {
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
+ 	},
+ };
++
++struct platform_device s5p_device_fimc_md = {
++	.name	= "s5p-fimc-md",
++	.id	= -1,
++};
+ #endif /* CONFIG_S5P_DEV_FIMC0 */
+ 
+ #ifdef CONFIG_S5P_DEV_FIMC1
+diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
+index 8f19241..ab633c9 100644
+--- a/arch/arm/plat-samsung/include/plat/devs.h
++++ b/arch/arm/plat-samsung/include/plat/devs.h
+@@ -77,6 +77,7 @@ extern struct platform_device s5p_device_fimc0;
+ extern struct platform_device s5p_device_fimc1;
+ extern struct platform_device s5p_device_fimc2;
+ extern struct platform_device s5p_device_fimc3;
++extern struct platform_device s5p_device_fimc_md;
+ extern struct platform_device s5p_device_fimd0;
+ extern struct platform_device s5p_device_hdmi;
+ extern struct platform_device s5p_device_i2c_hdmiphy;
+-- 
+1.7.7
