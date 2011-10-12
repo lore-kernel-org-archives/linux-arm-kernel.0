@@ -1,48 +1,91 @@
 From: govindraj.ti@gmail.com (Govindraj)
-Date: Wed, 12 Oct 2011 16:13:11 +0530
-Subject: [PATCH v6 11/16] OMAP2+: UART: Move errata handling from serial.c
-	to omap-serial
-In-Reply-To: <871uuj1bvk.fsf@ti.com>
+Date: Wed, 12 Oct 2011 16:53:05 +0530
+Subject: [PATCH v6 14/16] OMAP2+: UART: Take console_lock in suspend path
+	if not taken
+In-Reply-To: <87sjmz1hfm.fsf@ti.com>
 References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
-	<1317380561-661-2-git-send-email-govindraj.raja@ti.com>
-	<871uuj1bvk.fsf@ti.com>
-Message-ID: <CAAL8m4zRsoto+ZNDh_y4WpHgv4QP_RaXGZ99mE-55s6ZkrpqOg@mail.gmail.com>
+	<1317380561-661-5-git-send-email-govindraj.raja@ti.com>
+	<87sjmz1hfm.fsf@ti.com>
+Message-ID: <CAAL8m4zrveqqS3vq=dqMkS2gT24_=1UO+ukbxnQVf+AX4TBaVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 2:31 AM, Kevin Hilman <khilman@ti.com> wrote:
+On Wed, Oct 12, 2011 at 12:31 AM, Kevin Hilman <khilman@ti.com> wrote:
 > "Govindraj.R" <govindraj.raja@ti.com> writes:
 >
->> Move the errata handling mechanism from serial.c to omap-serial file
->> and utilise the same func in driver file.
+>> In suspend path the console_lock is taken by uart_port_suspend
+>> however when no_console_suspend is used console_lock is not taken.
 >>
->> Errata i202, i291 are moved to be handled with omap-serial
->> Moving the errata macro from serial.c file to driver header file
->> as from on errata will be handled in driver file itself.
->>
->> Corrected errata id from chapter reference 2.15 to errata id i291.
->>
->> Acked-by: Alan Cox <alan@linux.intel.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>> During system wide suspend omap_pwr_domain hooks cut all
+>> clocks that are left enabled. So its unsafe to proceed printing after
+>> clocks are cut by pwr_domain hooks.
 >
-> The errata handling for i291 is moved from device code to driver code
-> but it's functionality is also changed (but not described.)
+> As I've mentioned in previous reviews, when no_console_suspend is
+> enabled, the user has explicitly requested console output during
+> suspend. ?In order to support that, we should not be cutting clocks at
+> all in that mode.
 >
-> In the current mainline code, The workaround for i291 is done whenever
-> UART clocks are about to be cut. ?When the clocks are (re)enabled, the
-> device is put back into no-idle.
->
-> This patch puts the device into force-idle just before the idle/suspend
-> transistion, but never puts it back into no-idle. ?So after the first
-> idle/suspend transition, the IP remains in force-idle forever. ?I don't
-> think that's what we want.
+> One way to address this would be to just disable runtime PM in the
+> ->prepare method of the driver if no_console_suspend is enabled.
 >
 
-I was thinking no_idle will be done once we re-enable uart clocks
-from omap_device_enable but that's not the case looking into the code.
+Okay fine exploring this option, right API's would be to use
+pm_runtime_forbid/allow.
 
-Will correct it will add no_idle call from .runtime_resume as done early
-where we put into no_idle(sysc) while enabling the clocks.
+<<SNIP>>
+
++static int serial_omap_runtime_prepare(struct device *dev)
++{
++       if (!console_suspend_enabled)
++               pm_runtime_forbid(dev);
++
++       return 0;
++}
++
++static void serial_omap_runtime_complete(struct device *dev)
++{
++       if (!console_suspend_enabled)
++               pm_runtime_allow(dev);
++}
++
+ static const struct dev_pm_ops serial_omap_dev_pm_ops = {
+        SET_SYSTEM_SLEEP_PM_OPS(serial_omap_suspend, serial_omap_resume)
+        SET_RUNTIME_PM_OPS(serial_omap_runtime_suspend,
+                                serial_omap_runtime_resume, NULL)
++       .prepare = serial_omap_runtime_prepare,
++       .complete =  serial_omap_runtime_complete,
+ };
+
+<<SNIP>>
+
+But to either use runtime forbid or disable we have ensure that
+power_domain hooks don't go ahead and disable
+the clocks with omap_device_idle as *runtime forbid or disable will
+not set runtime_status to RPM_SUSPENDED*
+and will stay in RPM_ACTIVE if we call runtime disable or forbid from
+active state.
+
+in power_domain hooks we just check the pm_runtime_status_suspended
+this will be false even if
+we do runtime disable/forbid and it will cut uart clocks always.
+
+So we may need below check also:
+
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 26aee5c..286a534 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -592,7 +592,8 @@ static int _od_suspend_noirq(struct device *dev)
+
+        ret = pm_generic_suspend_noirq(dev);
+
+-       if (!ret && !pm_runtime_status_suspended(dev)) {
++       if (!ret && pm_runtime_enabled(dev) &&
++                       !pm_runtime_status_suspended(dev)) {
+                if (pm_generic_runtime_suspend(dev) == 0) {
+                        omap_device_idle(pdev);
+                        od->flags |= OMAP_DEVICE_SUSPENDED;
+
 
 --
 Thanks,
