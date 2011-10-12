@@ -1,66 +1,64 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 Oct 2011 21:42:36 +0900
-Subject: [PATCH] ARM: SAMSUNG: s3c-dma-ops needs export.h for EXPORT_SYMBOL
-References: <1317961214.16109.1.camel@phoenix>
-Message-ID: <069601cc88dc$6b9a78d0$42cf6a70$%kim@samsung.com>
+Date: Wed, 12 Oct 2011 21:43:01 +0900
+Subject: [PATCH v2] ARM: EXYNOS4: Add support for M-5MOLS camera on Nuri
+	board
+References: <034f01cc8705$199b0dc0$4cd12940$%kim@samsung.com>
+	<1318238959-28012-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <069701cc88dc$7a484100$6ed8c300$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Kukjin Kim wrote:
 > 
-> Axel Lin wrote:
+> Sylwester Nawrocki wrote:
 > >
-> > Fix below build warning:
-> >   CC      arch/arm/plat-samsung/s3c-dma-ops.o
-> > arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: data definition has no type
-> or
-> > storage class
-> > arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: type defaults to 'int' in
-> > declaration of 'EXPORT_SYMBOL'
-> > arch/arm/plat-samsung/s3c-dma-ops.c:130: warning: parameter names (without
-> > types) in function declaration
+> > Add voltage regulator and platform data definition for M-5MOLS sensor
+> > and MIPI-CSI receiver drivers. Add CAM power domain dependencies for
+> > FIMC device and set up camera port A GPIO. Configure I2C0 bus timings.
 > >
-> > And fix the build error:
-> > ERROR: "s3c_dma_get_ops" [drivers/spi/spi-s3c64xx.ko] undefined!
-> > make[1]: *** [__modpost] Error 1
-> > make: *** [modules] Error 2
-> >
-> > Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Signed-off-by: HeungJun Kim <riverful.kim@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > > ---
-> > This can be reproduced by "make s3c6400_defconfig;make" on linux-next
-> > 20111006.
-> >  arch/arm/plat-samsung/s3c-dma-ops.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > Hi Kgene,
 > >
-> > diff --git a/arch/arm/plat-samsung/s3c-dma-ops.c b/arch/arm/plat-samsung/s3c-
-> > dma-ops.c
-> > index 582333c..7814949 100644
-> > --- a/arch/arm/plat-samsung/s3c-dma-ops.c
-> > +++ b/arch/arm/plat-samsung/s3c-dma-ops.c
-> > @@ -14,6 +14,7 @@
-> >  #include <linux/errno.h>
-> >  #include <linux/slab.h>
-> >  #include <linux/types.h>
-> > +#include <linux/export.h>
+> > I have corrected the white space issues as you pointed out and removed
+> > unnecessary gpio_free() in this patch.
 > >
-> >  #include <mach/dma.h>
+> > Thanks,
+> >  Sylwester
+> > ---
+> >  arch/arm/mach-exynos4/Kconfig     |    8 ++
+> >  arch/arm/mach-exynos4/mach-nuri.c |  156
+> > +++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 164 insertions(+), 0 deletions(-)
 > >
-> > --
-> > 1.7.4.1
-> >
-> OK, will apply.
-> 
-> BTW, I don't know why the build error/warning was not happened in my tree with
-> s3c6400_defconfig. Probably other file having it?...
-> 
-Hi Axel,
+> > diff --git a/arch/arm/mach-exynos4/Kconfig
+b/arch/arm/mach-exynos4/Kconfig
+> > index dd660eb..4bc4b1f 100644
+> > --- a/arch/arm/mach-exynos4/Kconfig
+> > +++ b/arch/arm/mach-exynos4/Kconfig
 
-When I applied this in my tree, happened following error with s3c6400_defconfig.
+(snip)
 
-arch/arm/plat-samsung/s3c-dma-ops.c:17: fatal error: linux/export.h: No such file or directory
+> > +static struct s5p_platform_fimc fimc_md_platdata = {
+> > +	.isp_info	= nuri_camera_sensors,
+> > +	.num_clients	= ARRAY_SIZE(nuri_camera_sensors),
+> > +};
 
-Probably the <linux/export.h> file has been added from other tree.
-So if required, will fix with this during upcoming merge window maybe at end of.
+Hi Sylwester,
+
+You need to move 'struct platform_device s5p_device_fimc_md' to
+plat-samsung/devs.c or add 'static' because following error is happened.
+
+arch/arm/mach-exynos4/mach-nuri.o: In function `  CC      kernel/sysctl.o
+.LANCHOR1':
+mach-nuri.c:(.data+0x38): multiple definition of `s5p_device_fimc_md'
+arch/arm/mach-exynos4/mach-universal_c210.o:mach-universal_c210.c:(.data+0x1
+8): first defined here
+make[2]: *** [arch/arm/mach-exynos4/built-in.o] Error 1
+make[1]: *** [arch/arm/mach-exynos4] Error 2
+make[1]: *** Waiting for unfinished jobs....
 
 Thanks.
 
