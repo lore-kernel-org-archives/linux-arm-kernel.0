@@ -1,50 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Oct 2011 16:19:10 -0700
-Subject: [PATCH v4 3/4] gpio/tegra: Convert to a platform device
-In-Reply-To: <CACxGe6tf0Ly8AC-6xUeoMrVj3y0KHkrcgj87SerAaCAnNhfNqA@mail.gmail.com>
-References: <1318371375-4083-1-git-send-email-swarren@nvidia.com>
-	<1318371375-4083-3-git-send-email-swarren@nvidia.com>
-	<20111012224131.GD25128@quad.lixom.net>
-	<CACxGe6tf0Ly8AC-6xUeoMrVj3y0KHkrcgj87SerAaCAnNhfNqA@mail.gmail.com>
-Message-ID: <20111012231910.GA13960@quad.lixom.net>
+Date: Wed, 12 Oct 2011 16:34:07 -0700
+Subject: [GIT PULL] Please pull tegra cleanups for 3.2
+Message-ID: <CAOesGMjVAJK2ArOdpYNmKa11vqCfppi8Ofc0qGn4WxuMxLvd_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 05:03:24PM -0600, Grant Likely wrote:
-> On Wed, Oct 12, 2011 at 4:41 PM, Olof Johansson <olof@lixom.net> wrote:
-> > On Tue, Oct 11, 2011 at 04:16:14PM -0600, Stephen Warren wrote:
-> >> v3: Make regs variable static. Remove empty init of tegra_gpio_banks.
-> >>
-> >> v2: Retrieve IRQ and memory addresses from resources instead of hard-
-> >> coding them. Add back initialization of tegra_gpio_chip.of_node.
-> >
-> > In the future, please move the revision log to below the ---, and just have
-> > the main patch description above, since that is what goes into the git repo.
-> 
-> No!  Keep it above the line so it shows up in the Linux commit log.
-> It makes it easier to know which version of a patch actually got
-> committed.  :-)
+Hi Arnd,
 
-Alright, I'm convinced.
+Please pull the below branch of cleanups for the 3.2 merge window.
+They have been included in linux-next for a couple of days already.
 
-Maybe it was the fact that the patch description was 100% revision log that
-made me notice it this time. :)
-
-> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> >
-> > Otherwise, patch looks good. Due to dependencies between this, the rest
-> > of this patch series and the pinmux changes, I'll hold off on it until
-> > the dependencies land (i.e. target it for 3.3). We're cutting it very close
-> > to the merge window as it is, I'll start for-3.3 branches shortly.
-> 
-> Actually, see if you can get it in via the same tree as the pinmux
-> changes.  Dependencies is not a reason to hold off from getting it
-> into linux-next.
-
-Ok, the fixup is minimal, should be trivial to spot at git merge time.
-
-Stephen, do you want to respin yourself or should I do the __devinit
-change when I apply?
+Thanks!
 
 
 -Olof
+
+The following changes since commit 976d167615b64e14bc1491ca51d424e2ba9a5e84:
+
+  Linux 3.1-rc9 (2011-10-04 18:11:50 -0700)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/olof/tegra.git for-3.2/cleanup
+
+Olof Johansson (14):
+      ARM: tegra: annotate IO_*_VIRT pointers
+      ARM: tegra: timer: don't cast __iomem pointers
+      ARM: tegra: tegra2_clocks: don't cast __iomem pointers
+      ARM: tegra: tegra2_clocks: 0 -> NULL changes
+      ARM: tegra: pcie: don't cast __iomem pointers
+      ARM: tegra: pcie: include board.h
+      ARM: tegra: pcie: 0 -> NULL changes
+      ARM: tegra: tegra_init_cache should be static
+      ARM: tegra: tegra_rtc_read_ms should be static
+      ARM: tegra: tegra_powergate_is_powered should be static
+      ARM: tegra: tegra2_clocks: don't export some tables
+      ARM: tegra: dma: staticify some tables and functions
+      ARM: tegra: cpu-tegra: sparse type fix
+      ARM: tegra: cpu-tegra: unexport two functions
+
+ arch/arm/mach-tegra/common.c                 |    2 +-
+ arch/arm/mach-tegra/cpu-tegra.c              |    6 ++--
+ arch/arm/mach-tegra/dma.c                    |   14 +++++---
+ arch/arm/mach-tegra/include/mach/io.h        |   18 ++++++---
+ arch/arm/mach-tegra/include/mach/powergate.h |    1 -
+ arch/arm/mach-tegra/io.c                     |    8 ++--
+ arch/arm/mach-tegra/pcie.c                   |    8 +++--
+ arch/arm/mach-tegra/powergate.c              |    5 +--
+ arch/arm/mach-tegra/tegra2_clocks.c          |   50 +++++++++++++-------------
+ arch/arm/mach-tegra/timer.c                  |    6 ++--
+ 10 files changed, 64 insertions(+), 54 deletions(-)
