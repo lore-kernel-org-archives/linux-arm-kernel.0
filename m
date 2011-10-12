@@ -1,109 +1,63 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 12 Oct 2011 17:31:25 +0200
-Subject: [PATCH] ARM: Samsung: Move fimc plat. device from board files to
-	plat-samsung
-In-Reply-To: <039b01cc8730$594ab530$0be01f90$%kim@samsung.com>
-References: <039b01cc8730$594ab530$0be01f90$%kim@samsung.com>
-Message-ID: <1318433485-1757-1-git-send-email-s.nawrocki@samsung.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 12 Oct 2011 11:33:51 -0400 (EDT)
+Subject: Update: ARM Sub-Architecture Maintainers workshop at Kernel
+	Summit 2011
+In-Reply-To: <4E955A59.4090705@compulab.co.il>
+References: <CACxGe6vMLeHrN7jLB2=JYQON1ykOiWTeGiH8YXkUbguV0D-HEw@mail.gmail.com>
+	<4E81CEB8.4090908@compulab.co.il> <4E955A59.4090705@compulab.co.il>
+Message-ID: <alpine.LFD.2.02.1110121103090.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the platform device definitions from boards code to plat-samsung
-to avoid multiple instances when multiple board support is compiled in.
-The boards should select at least S5P_DEV_FIMC0 to enable FIMC support.
+On Wed, 12 Oct 2011, Igor Grinberg wrote:
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
-Hi Kgene,
+> On 09/27/11 16:25, Igor Grinberg wrote:
+> > On 08/30/11 09:00, Grant Likely wrote:
+> >> Still accepting more proposals.  Send me the topics you are burning to discuss.
+> > 
+> > One of the LPC2011's bottom lines was:
+> > "We need more people involved in ARM maintainership to help
+> > the sub-architecture maintainers do a better job on
+> > review/consolidation/generalization/etc. of the code."
+> > 
+> > Despite the major goal of the DT to reduce the SoC and
+> > board specific code to absolute minimum, there will still be cases
+> > (e.g. discrete power management circuitry) when there is no
+> > appropriate DT solution available and the board file
+> > is a necessity. Also there are already many boards that will remain
+> > and will not be converted to DT.
+> > 
+> > Bringing all the above together, I'd like to propose a new "job"
+> > for maintaining board specific code on a cross-platform basis.
+> > 
+> > Pros:
+> > 1) There might (I have not checked this, but I'm sure there is) be
+> > code in the existing board files (that are not likely to go away
+> > at least in a couple of years) that can be consolidated and
+> > may be even in a cross-platform manner.
+> > 2) Lower the work load from SoC maintainers (that don't have enough
+> > time to care much about the board specific changes).
+> > 3) Some more eyes to review the newly submitted code.
+> > 
+> > Cons:
+> > 1) Resulting overhead for the code to go upstream.
+> > 2) Possible addition of merge conflicts.
+> > 
+> > 
+> > I'd like to hear, what do you think of the above proposal?
+> 
+> Any thoughts? Yes? No? Why? WTF?
 
-To decrease overall diff size, if it's not too late yet, you might want to
-squash parts of this patch with previous commits:
+Well...  Please see http://lwn.net/Articles/443510/.
 
-0513218 ARM: S5PV210: Add support for M-5MOLS image sensor on UNIVERSAL_C210
-39aefab ARM: S5PV210: Add support for NOON010PC30 sensor on GONI board
+Since then,  ARnd Bergmann has led the arm-soc repository maintenance 
+effort as you might have noticed.  Other cleanup/consolidation projects 
+are also progressing in parallel.
 
-Here is the optional new patch summary:
+Obviously, as always, we would always benefit from more reviewers and 
+more people in maintainership roles.  The general situation has improved 
+since a couple months ago, but any additional suggestions you might have 
+will always be welcome.
 
-ARM: Samsung: Add fimc platform device for s5p-fimc media device driver
 
-The s5p-fimc driver now creates an aggregate media device which is bound
-to "s5p-fimc-md" platform device. This patch adds such a platform device
-instance to be registered by each board that requires FIMC device support.
-
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-
-Sorry for the noise. 
-
-Regards,
-Sylwester
----
- arch/arm/mach-exynos4/mach-universal_c210.c |    5 -----
- arch/arm/mach-s5pv210/mach-goni.c           |    5 -----
- arch/arm/plat-samsung/devs.c                |    5 +++++
- arch/arm/plat-samsung/include/plat/devs.h   |    1 +
- 4 files changed, 6 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/mach-exynos4/mach-universal_c210.c b/arch/arm/mach-exynos4/mach-universal_c210.c
-index 18cf5c7..2096c8b 100644
---- a/arch/arm/mach-exynos4/mach-universal_c210.c
-+++ b/arch/arm/mach-exynos4/mach-universal_c210.c
-@@ -920,11 +920,6 @@ static struct s5p_platform_fimc fimc_md_platdata = {
- 	.num_clients	= ARRAY_SIZE(universal_camera_sensors),
- };
- 
--struct platform_device s5p_device_fimc_md = {
--	.name	= "s5p-fimc-md",
--	.id	= -1,
--};
--
- static struct gpio universal_camera_gpios[] = {
- 	{ GPIO_CAM_LEVEL_EN(1),	GPIOF_OUT_INIT_HIGH, "CAM_LVL_EN1" },
- 	{ GPIO_CAM_LEVEL_EN(2),	GPIOF_OUT_INIT_LOW,  "CAM_LVL_EN2" },
-diff --git a/arch/arm/mach-s5pv210/mach-goni.c b/arch/arm/mach-s5pv210/mach-goni.c
-index 01e4867..61da205 100644
---- a/arch/arm/mach-s5pv210/mach-goni.c
-+++ b/arch/arm/mach-s5pv210/mach-goni.c
-@@ -849,11 +849,6 @@ struct s5p_platform_fimc goni_fimc_md_platdata __initdata = {
- 	.num_clients	= ARRAY_SIZE(goni_camera_sensors),
- };
- 
--struct platform_device s5p_device_fimc_md = {
--	.name		= "s5p-fimc-md",
--	.id		= -1,
--};
--
- static struct platform_device *goni_devices[] __initdata = {
- 	&s3c_device_fb,
- 	&s5p_device_onenand,
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index cb6fd9e..4ca8b57 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -204,6 +204,11 @@ struct platform_device s5p_device_fimc0 = {
- 		.coherent_dma_mask	= DMA_BIT_MASK(32),
- 	},
- };
-+
-+struct platform_device s5p_device_fimc_md = {
-+	.name	= "s5p-fimc-md",
-+	.id	= -1,
-+};
- #endif /* CONFIG_S5P_DEV_FIMC0 */
- 
- #ifdef CONFIG_S5P_DEV_FIMC1
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 8f19241..ab633c9 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -77,6 +77,7 @@ extern struct platform_device s5p_device_fimc0;
- extern struct platform_device s5p_device_fimc1;
- extern struct platform_device s5p_device_fimc2;
- extern struct platform_device s5p_device_fimc3;
-+extern struct platform_device s5p_device_fimc_md;
- extern struct platform_device s5p_device_fimd0;
- extern struct platform_device s5p_device_hdmi;
- extern struct platform_device s5p_device_i2c_hdmiphy;
--- 
-1.7.7
+Nicolas
