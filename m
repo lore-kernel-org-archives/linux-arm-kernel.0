@@ -1,69 +1,88 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 Oct 2011 21:43:01 +0900
-Subject: [PATCH v2] ARM: EXYNOS4: Add support for M-5MOLS camera on Nuri
-	board
-References: <034f01cc8705$199b0dc0$4cd12940$%kim@samsung.com>
-	<1318238959-28012-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <069701cc88dc$7a484100$6ed8c300$%kim@samsung.com>
+From: maxime.coquelin-nonst@stericsson.com (Maxime Coquelin)
+Date: Wed, 12 Oct 2011 15:01:47 +0200
+Subject: [PATCH] fixup: mm: alloc_contig_range: increase min_free_kbytes
+	during allocation
+In-Reply-To: <1318417735-9199-1-git-send-email-m.szyprowski@samsung.com>
+References: <4E93F088.60006@stericsson.com>
+	<1318417735-9199-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4E958FBB.6000200@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Sylwester Nawrocki wrote:
-> >
-> > Add voltage regulator and platform data definition for M-5MOLS sensor
-> > and MIPI-CSI receiver drivers. Add CAM power domain dependencies for
-> > FIMC device and set up camera port A GPIO. Configure I2C0 bus timings.
-> >
-> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > Signed-off-by: HeungJun Kim <riverful.kim@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> > Hi Kgene,
-> >
-> > I have corrected the white space issues as you pointed out and removed
-> > unnecessary gpio_free() in this patch.
-> >
-> > Thanks,
-> >  Sylwester
-> > ---
-> >  arch/arm/mach-exynos4/Kconfig     |    8 ++
-> >  arch/arm/mach-exynos4/mach-nuri.c |  156
-> > +++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 164 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos4/Kconfig
-b/arch/arm/mach-exynos4/Kconfig
-> > index dd660eb..4bc4b1f 100644
-> > --- a/arch/arm/mach-exynos4/Kconfig
-> > +++ b/arch/arm/mach-exynos4/Kconfig
+Hello Marek,
 
-(snip)
+On 10/12/2011 01:08 PM, Marek Szyprowski wrote:
+> Signed-off-by: Marek Szyprowski<m.szyprowski@samsung.com>
+> ---
+>   mm/page_alloc.c |   15 ++++++++++++---
+>   1 files changed, 12 insertions(+), 3 deletions(-)
+>
+> Hello Maxime,
+>
+> Please check if this patch fixes your lockup issue. It is a bit cruel,
+> but it looks that in case of real low-memory situation page allocation
+> is very complex task which usually ends in waiting for the io/fs and
+> free pages that really don't arrive at all.
+Thanks for the reactivity.
+We just tested it, we no more faced the lockup. Instead, the OOM Killer 
+is triggered and contiguous allocation succeed.
+I'm not familiar enough with page_alloc.c to detect any side effects 
+this patch could bring.
 
-> > +static struct s5p_platform_fimc fimc_md_platdata = {
-> > +	.isp_info	= nuri_camera_sensors,
-> > +	.num_clients	= ARRAY_SIZE(nuri_camera_sensors),
-> > +};
-
-Hi Sylwester,
-
-You need to move 'struct platform_device s5p_device_fimc_md' to
-plat-samsung/devs.c or add 'static' because following error is happened.
-
-arch/arm/mach-exynos4/mach-nuri.o: In function `  CC      kernel/sysctl.o
-.LANCHOR1':
-mach-nuri.c:(.data+0x38): multiple definition of `s5p_device_fimc_md'
-arch/arm/mach-exynos4/mach-universal_c210.o:mach-universal_c210.c:(.data+0x1
-8): first defined here
-make[2]: *** [arch/arm/mach-exynos4/built-in.o] Error 1
-make[1]: *** [arch/arm/mach-exynos4] Error 2
-make[1]: *** Waiting for unfinished jobs....
-
-Thanks.
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
+>
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index 055aa4c..45473e9 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -5872,6 +5872,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+>   		       gfp_t flags, unsigned migratetype)
+>   {
+>   	unsigned long outer_start, outer_end;
+> +	unsigned int count = end - start;
+>   	int ret;
+>
+>   	/*
+> @@ -5900,7 +5901,10 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+>   	ret = __start_isolate_page_range(pfn_to_maxpage(start),
+>   					 pfn_to_maxpage_up(end), migratetype);
+>   	if (ret)
+> -		goto done;
+> +		return ret;
+> +
+> +	min_free_kbytes += count * PAGE_SIZE / 1024;
+> +	setup_per_zone_wmarks();
+>
+>   	ret = __alloc_contig_migrate_range(start, end);
+>   	if (ret)
+> @@ -5922,8 +5926,10 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+>
+>   	ret = 0;
+>   	while (!PageBuddy(pfn_to_page(start&  (~0UL<<  ret))))
+> -		if (WARN_ON(++ret>= MAX_ORDER))
+> -			return -EINVAL;
+> +		if (WARN_ON(++ret>= MAX_ORDER)) {
+> +			ret = -EINVAL;
+> +			goto done;
+> +		}
+>
+>   	outer_start = start&  (~0UL<<  ret);
+>   	outer_end   = alloc_contig_freed_pages(outer_start, end, flags);
+> @@ -5936,6 +5942,9 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+>
+>   	ret = 0;
+>   done:
+> +	min_free_kbytes -= count * PAGE_SIZE / 1024;
+> +	setup_per_zone_wmarks();
+> +
+>   	__undo_isolate_page_range(pfn_to_maxpage(start), pfn_to_maxpage_up(end),
+>   				  migratetype);
+>   	return ret;
 
 Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Maxime
