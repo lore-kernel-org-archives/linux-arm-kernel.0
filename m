@@ -1,85 +1,78 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Wed, 12 Oct 2011 16:05:33 +0530
-Subject: [PATCH v6 09/16] OMAP2+: UART: Add runtime pm support for
-	omap-serial driver
-In-Reply-To: <87botobdtq.fsf@ti.com>
-References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
-	<1317380495-584-9-git-send-email-govindraj.raja@ti.com>
-	<87botobdtq.fsf@ti.com>
-Message-ID: <CAAL8m4yDrR_ao6GdSah=HsK7twhfA=RXjtURe43ziWJV51zkfg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 12 Oct 2011 13:08:55 +0200
+Subject: [PATCH] fixup: mm: alloc_contig_range: increase min_free_kbytes during
+	allocation
+In-Reply-To: <4E93F088.60006@stericsson.com>
+References: <4E93F088.60006@stericsson.com>
+Message-ID: <1318417735-9199-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2011 at 5:26 AM, Kevin Hilman <khilman@ti.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> Adapts omap-serial driver to use pm_runtime API's.
->>
->> Use runtime runtime API's to handle uart clocks and obtain
->> device_usage statics. Set runtime API's usage to irq_safe so that
->> we can use get_sync from irq context. Auto-suspend for port specific
->> activities and put for reg access. Use device_may_wakeup to check
->> whether uart has wakeup capabilities and then enable uart runtime
->> usage for the uart.
->
-> OK. ?Current patch should do only this part. ?The rest should be
-> separate patches with their own descriptive changelogs.
->
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ mm/page_alloc.c |   15 ++++++++++++---
+ 1 files changed, 12 insertions(+), 3 deletions(-)
 
-Yes, started splitting them.
+Hello Maxime,
 
->> Removing save_context/restore_context functions from serial.c
->> Adding context restore to .runtime_suspend and using reg values from port
->> structure to restore the uart port context based on context_loss_count.
->> Maintain internal state machine using wakeups_enabled field for avoiding
->> repeated enable/disable of uart port wakeup mechanism.
->
-> This part should be a separate patch that follows.
->
+Please check if this patch fixes your lockup issue. It is a bit cruel,
+but it looks that in case of real low-memory situation page allocation
+is very complex task which usually ends in waiting for the io/fs and
+free pages that really don't arrive at all.
 
-okay,
+Best regards
+--
+Marek Szyprowski
+Samsung Poland R&D Center
 
->> Remove omap_uart_disable_wakeup and modify omap_uart_enable_wakeup
->> to accept pdev and bool value to enable/disable the uart wakeup mechanism
->> after uart clock's are cut.
->>
->> omap_hwmod_enable_wakeup is used to set
->> pad wakeup for the uarts. PM_WKEN reg values are left to default.
->> Removed omap_uart_enable/disable_clocks in serial.c now clock handling
->> done with runtime API's.
->
-> As stated in previous reviews, this wakeup enable/disable needs more
-> description as the functionality is changing compared to current code.
->
-> Current version modifies wakeup enable/disable at both power-domain
-> level (PM_WKEN) and at the IO ring.
->
-> Updated version modifies wakeups at module-level (SYSCONFIG) and at IO
-> ring using omap_hwmod_enable_wakeup()
->
-> IMO, the updated version makes more sense, but needs a description as to
-> why that change in functionality will have equivalent results compared
-> to the existing one.
->
 
-Okay,
 
->> By default uart autosuspend delay is set to -1 to avoid character loss
->> if uart's are autoidled and woken up on rx pin.
->
-> OK, good.
->
->> After boot up UART's can be autoidled by setting autosuspendi delay from sysfs.
->>
->> echo 3000 > /sys/devices/platform/omap/omap_uart.X/power/autosuspend_delay_ms
->> X=0,1,2,3 for UART1/2/3/4. Number of uarts available may vary across omap_soc.
->>
->> Acked-by: Alan Cox <alan@linux.intel.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 055aa4c..45473e9 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5872,6 +5872,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+ 		       gfp_t flags, unsigned migratetype)
+ {
+ 	unsigned long outer_start, outer_end;
++	unsigned int count = end - start;
+ 	int ret;
+ 
+ 	/*
+@@ -5900,7 +5901,10 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+ 	ret = __start_isolate_page_range(pfn_to_maxpage(start),
+ 					 pfn_to_maxpage_up(end), migratetype);
+ 	if (ret)
+-		goto done;
++		return ret;
++
++	min_free_kbytes += count * PAGE_SIZE / 1024;
++	setup_per_zone_wmarks();
+ 
+ 	ret = __alloc_contig_migrate_range(start, end);
+ 	if (ret)
+@@ -5922,8 +5926,10 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+ 
+ 	ret = 0;
+ 	while (!PageBuddy(pfn_to_page(start & (~0UL << ret))))
+-		if (WARN_ON(++ret >= MAX_ORDER))
+-			return -EINVAL;
++		if (WARN_ON(++ret >= MAX_ORDER)) {
++			ret = -EINVAL;
++			goto done;
++		}
+ 
+ 	outer_start = start & (~0UL << ret);
+ 	outer_end   = alloc_contig_freed_pages(outer_start, end, flags);
+@@ -5936,6 +5942,9 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+ 
+ 	ret = 0;
+ done:
++	min_free_kbytes -= count * PAGE_SIZE / 1024;
++	setup_per_zone_wmarks();
++
+ 	__undo_isolate_page_range(pfn_to_maxpage(start), pfn_to_maxpage_up(end),
+ 				  migratetype);
+ 	return ret;
+-- 
+1.7.1.569.g6f426
