@@ -1,69 +1,36 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 Oct 2011 13:52:12 +0900
-Subject: [PATCH v6 09/10] ARM: S5PC100: Modify platform data for pl330
+Date: Wed, 12 Oct 2011 14:03:12 +0900
+Subject: [PATCH v6 00/10] Add device tree support for PL330 dma controller
 	driver
-In-Reply-To: <CAJuYYwSj4D1bMbUtaPe=33GrS=e1_7+POHRWCb8Yzgpv8_Muzg@mail.gmail.com>
+In-Reply-To: <1318351780.1546.358.camel@vkoul-udesk3>
 References: <1318270538-30450-1-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-2-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-3-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-4-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-5-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-6-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-7-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-8-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-9-git-send-email-thomas.abraham@linaro.org>
-	<1318270538-30450-10-git-send-email-thomas.abraham@linaro.org>
-	<CAJL_dMvX-_ZpvJOUuD28RnoQpz6GFYiTvsWidfy3yeiu3Q04bA@mail.gmail.com>
-	<CAJuYYwSj4D1bMbUtaPe=33GrS=e1_7+POHRWCb8Yzgpv8_Muzg@mail.gmail.com>
-Message-ID: <063501cc889a$b52eb520$1f8c1f60$%kim@samsung.com>
+	<057401cc880e$41e30b20$c5a92160$%kim@samsung.com>
+	<1318351780.1546.358.camel@vkoul-udesk3>
+Message-ID: <063701cc889c$3e10dcf0$ba3296d0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Abraham wrote:
+Vinod Koul wrote:
 > 
-> Hi Anca,
-> 
-> On 12 October 2011 09:41, Anca Emanuel <anca.emanuel@gmail.com> wrote:
-> > On Mon, Oct 10, 2011 at 9:15 PM, Thomas Abraham
-> > <thomas.abraham@linaro.org> wrote:
-> > <spnip>
+> On Tue, 2011-10-11 at 21:06 +0900, Kukjin Kim wrote:
+> > Thomas Abraham wrote:
 > >
-> >> +u8 pdma1_peri[] = {
-> >> + ? ? ? DMACH_UART0_RX,
-> >> + ? ? ? DMACH_UART0_TX,
-> >> + ? ? ? DMACH_UART1_RX,
-> >> + ? ? ? DMACH_UART1_TX,
-> >> + ? ? ? DMACH_UART2_RX,
-> >> + ? ? ? DMACH_UART2_TX,
-> >> + ? ? ? DMACH_UART3_RX,
-> >> + ? ? ? DMACH_UART3_TX,
-> >> + ? ? ? DMACH_IRDA,
-> >> + ? ? ? DMACH_I2S0_RX,
-> >> + ? ? ? DMACH_I2S0_TX,
-> >> + ? ? ? DMACH_I2S0S_TX,
-> >> + ? ? ? DMACH_I2S1_RX,
-> >> + ? ? ? DMACH_I2S1_TX,
-> >> + ? ? ? DMACH_I2S2_RX,
-> >> + ? ? ? DMACH_I2S2_TX,
-> >> + ? ? ? DMACH_SPI0_RX,
-> >> + ? ? ? DMACH_SPI0_TX,
-> >> + ? ? ? DMACH_SPI1_RX,
-> >> + ? ? ? DMACH_SPI1_TX,
-> >> + ? ? ? DMACH_SPI2_RX,
-> >> + ? ? ? DMACH_SPI2_TX,
-> >> + ? ? ? DMACH_PCM0_RX,
-> >> + ? ? ? DMACH_PCM1_TX,
+> > Hi,
 > >
-> > typo ? ?DMACH_PCM0_TX
+> > Looks ok to me and if required,
+> > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> >
+> > And I hope since this includes many changes of arch/arm/Samsung stuff, this
+> > would be sent to upstream via Samsung tree after ack from Vinod for dma
+> > stuff.
+> Sure, looks fine to me
+> Acked-by: Vinod Koul <vinod.koul@intel.com>
 > 
-> Yes. That is a mistake. I cross-checked others with the user manual
-> and they are fine.
-> 
+Hi Vinod,
 
-OK, I think you don't need to re-send because I can fix it when I apply.
-It would be helpful to me if you could check your patches again :)
+OK, I will apply this series to send to upstream via Samsung tree. If you need branch to apply in your tree, please let me know.
 
-If any problems, please let me know.
+As a note, Boojin Kim will test this series based on boards with -next of Samsung tree before sending to upstream even though I know Thomas tested and it works fine :)
 
 Thanks.
 
@@ -72,16 +39,3 @@ Kgene.
 --
 Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
 SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-
-> Thanks for pointing this out.
-> 
-> >
-> >> + ? ? ? DMACH_PCM1_RX,
-> >> + ? ? ? DMACH_PCM1_TX,
-> >> + ? ? ? DMACH_MSM_REQ0,
-> >> + ? ? ? DMACH_MSM_REQ1,
-> >> + ? ? ? DMACH_MSM_REQ2,
-> >> + ? ? ? DMACH_MSM_REQ3,
-> >> ?};
-> >
