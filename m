@@ -1,80 +1,51 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 12 Oct 2011 16:04:53 +0200
-Subject: [PATCH v2] ARM: EXYNOS4: Add support for M-5MOLS camera on Nuri
-	board
-In-Reply-To: <069701cc88dc$7a484100$6ed8c300$%kim@samsung.com>
-References: <034f01cc8705$199b0dc0$4cd12940$%kim@samsung.com>
-	<1318238959-28012-1-git-send-email-s.nawrocki@samsung.com>
-	<069701cc88dc$7a484100$6ed8c300$%kim@samsung.com>
-Message-ID: <4E959E85.7070504@samsung.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 12 Oct 2011 09:24:56 -0500
+Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
+	mechanism
+In-Reply-To: <CAPM=9tyKjodxf9MKjG=5bBDZTuqOx4Nu31L5iNN9LrO9fsp+FA@mail.gmail.com>
+References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
+	<1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
+	<CAPM=9tzHOa5Dbe=SQz+AURMMbio4L7qoS8kUT3Ek0+HdtkrH4g@mail.gmail.com>
+	<CAF6AEGs6kkGp85NoNVuq5W9i=WE86V8wvAtKydX=D3bQOc+6Pw@mail.gmail.com>
+	<CAPM=9twft0eBEUoCD11a2gTZHwOaPzFmZvBfE032dfK10eQ27Q@mail.gmail.com>
+	<CAF6AEGuwMt6Snq=YSN4iddTv_Cu56aR_2BY1d3hjVvTdkom5MQ@mail.gmail.com>
+	<CAPM=9tyKjodxf9MKjG=5bBDZTuqOx4Nu31L5iNN9LrO9fsp+FA@mail.gmail.com>
+Message-ID: <CAF6AEGsK25wk28YmiwsZTenecKqCt6irx66nR-8nOFMo6Z=Dkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kgene,
+On Wed, Oct 12, 2011 at 9:01 AM, Dave Airlie <airlied@gmail.com> wrote:
+>> But then we'd need a different set of accessors for every different
+>> drm/v4l/etc driver, wouldn't we?
+>
+> Not any more different than you need for this, you just have a new
+> interface that you request a sw object from,
+> then mmap that object, and underneath it knows who owns it in the kernel.
 
-On 10/12/2011 02:43 PM, Kukjin Kim wrote:
-> Kukjin Kim wrote:
->> Sylwester Nawrocki wrote:
->>>
->>> Add voltage regulator and platform data definition for M-5MOLS sensor
->>> and MIPI-CSI receiver drivers. Add CAM power domain dependencies for
->>> FIMC device and set up camera port A GPIO. Configure I2C0 bus timings.
->>>
->>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>> Signed-off-by: HeungJun Kim <riverful.kim@samsung.com>
->>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->>> ---
->>> Hi Kgene,
->>>
->>> I have corrected the white space issues as you pointed out and removed
->>> unnecessary gpio_free() in this patch.
->>>
->>> Thanks,
->>>  Sylwester
->>> ---
->>>  arch/arm/mach-exynos4/Kconfig     |    8 ++
->>>  arch/arm/mach-exynos4/mach-nuri.c |  156
->>> +++++++++++++++++++++++++++++++++++++
->>>  2 files changed, 164 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-exynos4/Kconfig
-> b/arch/arm/mach-exynos4/Kconfig
->>> index dd660eb..4bc4b1f 100644
->>> --- a/arch/arm/mach-exynos4/Kconfig
->>> +++ b/arch/arm/mach-exynos4/Kconfig
-> 
-> (snip)
-> 
->>> +static struct s5p_platform_fimc fimc_md_platdata = {
->>> +	.isp_info	= nuri_camera_sensors,
->>> +	.num_clients	= ARRAY_SIZE(nuri_camera_sensors),
->>> +};
-> 
-> Hi Sylwester,
-> 
-> You need to move 'struct platform_device s5p_device_fimc_md' to
-> plat-samsung/devs.c or add 'static' because following error is happened.
+oh, ok, so you are talking about a kernel level interface, rather than
+userspace..
 
-Yes, indeed there is an issue with multiple device definition, and the
-boards should really not create their own instance.
-I'll prepare a patch moving s5p_fimc_device_md to plat-samsung/devs.c
-This device instance is also needed for the aggregate FIMC driver to be
-initialized on other boards, even if they use only video mem-to-mem.
-So the patch should fix the driver initialization issue on these boards.
+but I guess in this case I don't quite see the difference.  It amounts
+to which fd you call mmap (or ioctl[*]) on..  If you use the dmabuf fd
+directly then you don't have to pass around a 2nd fd.
 
-Sorry about the trouble.
+[*] there is nothing stopping defining some dmabuf ioctls (such as for
+synchronization).. although the thinking was to keep it simple for
+first version of dmabuf
 
-> 
-> arch/arm/mach-exynos4/mach-nuri.o: In function `  CC      kernel/sysctl.o
-> .LANCHOR1':
-> mach-nuri.c:(.data+0x38): multiple definition of `s5p_device_fimc_md'
-> arch/arm/mach-exynos4/mach-universal_c210.o:mach-universal_c210.c:(.data+0x1
-> 8): first defined here
-> make[2]: *** [arch/arm/mach-exynos4/built-in.o] Error 1
-> make[1]: *** [arch/arm/mach-exynos4] Error 2
-> make[1]: *** Waiting for unfinished jobs....
+BR,
+-R
 
-Regards,
--- 
-Sylwester Nawrocki
-Samsung Poland R&D Center
+> mmap just feels wrong in this API, which is a buffer sharing API not a
+> buffer mapping API.
+>
+>> I guess if sharing a buffer between multiple drm devices, there is
+>> nothing stopping you from having some NOT_DMABUF_MMAPABLE flag you
+>> pass when the buffer is allocated, then you don't have to support
+>> dmabuf->mmap(), and instead mmap via device and use some sort of
+>> DRM_CPU_PREP/FINI ioctls for synchronization..
+>
+> Or we could make a generic CPU accessor that we don't have to worry about.
+>
+> Dave.
+>
