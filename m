@@ -1,165 +1,87 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 12 Oct 2011 21:59:00 +0530
-Subject: [PATCH 1/3] ARM: Samsung: Move timer irq numbers to end of linux
-	irq space
-In-Reply-To: <4E95BC01.8090805@gmail.com>
-References: <1318234289-22041-1-git-send-email-thomas.abraham@linaro.org>
-	<1318234289-22041-2-git-send-email-thomas.abraham@linaro.org>
-	<4E95BC01.8090805@gmail.com>
-Message-ID: <CAJuYYwR3ncPygrYj-x4a5+axxp_zVFGmuWtmMDkwR9aVTGuL-Q@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 12 Oct 2011 12:41:09 -0700
+Subject: [PATCH v6 10/16] OMAP2+: UART: Modify omap_uart_can_sleep function
+In-Reply-To: <CAAL8m4xTmz+-ureDiGPoKUu634q1Wy=h01kpfRWCk9LFCV0+Dg@mail.gmail.com>
+	(Govindraj's message of "Wed, 12 Oct 2011 19:08:51 +0530")
+References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
+	<87vcrv2xox.fsf@ti.com>
+	<CAAL8m4xTmz+-ureDiGPoKUu634q1Wy=h01kpfRWCk9LFCV0+Dg@mail.gmail.com>
+Message-ID: <87wrcangkq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2011 21:40, Rob Herring <robherring2@gmail.com> wrote:
-> On 10/10/2011 03:11 AM, Thomas Abraham wrote:
->> All of Samsung's s5p platforms have timer irqs statically mapped from linux
->> irq numbers 11 to 15. These timer irqs are moved to end of the statically
->> mapped linux irq space and the hardware irqs, which were statically mapped
->> starting from 32 is moved to start from 0. The NR_IRQS macro is consolidated
->> for all the s5p platforms in this process.
+Govindraj <govindraj.ti@gmail.com> writes:
+
+> On Tue, Oct 11, 2011 at 11:54 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> "Govindraj.R" <govindraj.raja@ti.com> writes:
 >>
->> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> ---
->> ?arch/arm/mach-exynos4/include/mach/entry-macro.S | ? ?1 -
->> ?arch/arm/mach-exynos4/include/mach/irqs.h ? ? ? ?| ? ?3 +--
->> ?arch/arm/mach-s5p64x0/include/mach/irqs.h ? ? ? ?| ? ?4 +---
->> ?arch/arm/mach-s5pc100/include/mach/irqs.h ? ? ? ?| ? ?3 +--
->> ?arch/arm/mach-s5pv210/include/mach/irqs.h ? ? ? ?| ? ?3 +--
->> ?arch/arm/plat-samsung/include/plat/irqs.h ? ? ? ?| ? ?7 +++++--
->> ?6 files changed, 9 insertions(+), 12 deletions(-)
+>>> Modify the omap_uart_can_sleep function to check uart is active
+>>> or not to be used by pm code to enter low power states.
 >>
->> diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
->> index 4c9adbd..5c4fbcc 100644
->> --- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
->> +++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
->> @@ -72,7 +72,6 @@
->> ? ? ? ? ? ? ? cmpcc ? \irqnr, \irqnr
->> ? ? ? ? ? ? ? cmpne ? \irqnr, \tmp
->> ? ? ? ? ? ? ? cmpcs ? \irqnr, \irqnr
->> - ? ? ? ? ? ? addne ? \irqnr, \irqnr, #32
+>> Doesn't the driver now control when the UART clocks are gated (using
+>> runtime PM autosuspend)?
+>>
+>> IMO, this check should be completely removed and the driver should
+>> be managing this with the autosuspend timeout.
+>>
+>>> Removing this check can cause console response little sluggish.
+>>
+>> Sluggish in what way?
+>>
 >
+> response is slower like when we type something or cat debugfs/pm_count
+> see things little slower on console, there is no character loss.
 >
-> With this change, can't you now use the common entry-macro-gic.S?
+> Happens even though we have not set the autosuspend timeout and uart
+> clocks are active, which basically means allowing mpu to enter
+> retention keeping uart active.
 
+OK, I see now.
 
-The get_irqnr_preamble macro is quite different from that in
-entry-macro-gic.S file. Maybe it is possible to use the common
-entry-macro-gic.S file with some rework of exynos machine code.
+> this delay in response or sluggishness is not there on my 3430SDP or
+> 3630zoom board but I was able to see this behavior on a beagle
+> board(xm rev c).
 
+Here's why:
 
->
->
->> ? ? ? ? ? ? ? .endm
->>
->> diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-exynos4/include/mach/irqs.h
->> index dfd4b7e..43087c3 100644
->> --- a/arch/arm/mach-exynos4/include/mach/irqs.h
->> +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
->> @@ -163,7 +163,6 @@
->> ?#define IRQ_GPIO2_NR_GROUPS ?9
->> ?#define IRQ_GPIO_END ? ? ? ? (S5P_GPIOINT_BASE + S5P_GPIOINT_COUNT)
->>
->> -/* Set the default NR_IRQS */
->> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ?(IRQ_GPIO_END + 64)
->> +#define IRQ_TIMER_BASE ? ? ? ? ? ? ? (IRQ_GPIO_END + 64)
->>
->> ?#endif /* __ASM_ARCH_IRQS_H */
->> diff --git a/arch/arm/mach-s5p64x0/include/mach/irqs.h b/arch/arm/mach-s5p64x0/include/mach/irqs.h
->> index 53982db..bea73cc 100644
->> --- a/arch/arm/mach-s5p64x0/include/mach/irqs.h
->> +++ b/arch/arm/mach-s5p64x0/include/mach/irqs.h
->> @@ -141,8 +141,6 @@
->>
->> ?#define IRQ_EINT_GROUP(grp, x) ? ? ? (IRQ_EINT_GROUP##grp##_BASE + (x))
->>
->> -/* Set the default NR_IRQS */
->> -
->> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ?(IRQ_EINT_GROUP8_BASE + IRQ_EINT_GROUP8_NR + 1)
->> +#define IRQ_TIMER_BASE ? ? ? ? ? ? ? (IRQ_EINT_GROUP8_BASE + IRQ_EINT_GROUP8_NR + 1)
->>
->> ?#endif /* __ASM_ARCH_IRQS_H */
->> diff --git a/arch/arm/mach-s5pc100/include/mach/irqs.h b/arch/arm/mach-s5pc100/include/mach/irqs.h
->> index d2eb475..3a9d300 100644
->> --- a/arch/arm/mach-s5pc100/include/mach/irqs.h
->> +++ b/arch/arm/mach-s5pc100/include/mach/irqs.h
->> @@ -104,8 +104,7 @@
->> ?#define S5P_GPIOINT_BASE ? ? (IRQ_EINT(31) + 1)
->> ?#define S5P_GPIOINT_GROUP_MAXNR ? ? ?21
->>
->> -/* Set the default NR_IRQS */
->> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ?(IRQ_EINT(31) + S5P_GPIOINT_COUNT + 1)
->> +#define IRQ_TIMER_BASE ? ? ? ? ? ? ? (IRQ_EINT(31) + S5P_GPIOINT_COUNT + 1)
->>
->> ?/* Compatibility */
->> ?#define IRQ_LCD_FIFO ? ? ? ? IRQ_LCD0
->> diff --git a/arch/arm/mach-s5pv210/include/mach/irqs.h b/arch/arm/mach-s5pv210/include/mach/irqs.h
->> index 5e0de3a..df3173a 100644
->> --- a/arch/arm/mach-s5pv210/include/mach/irqs.h
->> +++ b/arch/arm/mach-s5pv210/include/mach/irqs.h
->> @@ -125,8 +125,7 @@
->> ?#define S5P_GPIOINT_BASE ? ? (IRQ_EINT(31) + 1)
->> ?#define S5P_GPIOINT_GROUP_MAXNR ? ? ?22
->>
->> -/* Set the default NR_IRQS */
->> -#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ?(IRQ_EINT(31) + S5P_GPIOINT_COUNT + 1)
->> +#define IRQ_TIMER_BASE ? ? ? ? ? ? ? (IRQ_EINT(31) + S5P_GPIOINT_COUNT + 1)
->>
->> ?/* Compatibility */
->> ?#define IRQ_LCD_FIFO ? ? ? ? IRQ_LCD0
->> diff --git a/arch/arm/plat-samsung/include/plat/irqs.h b/arch/arm/plat-samsung/include/plat/irqs.h
->> index 08d1a7e..b8918b3 100644
->> --- a/arch/arm/plat-samsung/include/plat/irqs.h
->> +++ b/arch/arm/plat-samsung/include/plat/irqs.h
->> @@ -22,7 +22,7 @@
->> ? * mulitple of 32 to allow the common code to work
->> ? */
->>
->> -#define S5P_IRQ_OFFSET ? ? ? ? ? ? ? (32)
->> +#define S5P_IRQ_OFFSET ? ? ? ? ? ? ? (0)
->
-> Just remove this.
+The difference is the powerdomain that the console UART is on for these
+boards.  UART1,2 are in CORE, UART2/3 are in PER.   SDP uses UART1 (CORE),
+Zoom3 doesn't use OMAP UARTs at all, and Beagle uses UART3 (PER).
 
-Ok.
+Due to a HW sleepdep between MPU and CORE, MPU will not transition until
+CORE does, which means MPU will not transition until UART 1 & 2 are
+idle.
 
->
->>
->> ?#define S5P_IRQ(x) ? ? ? ? ? ((x) + S5P_IRQ_OFFSET)
->>
->> @@ -44,13 +44,14 @@
->> ?#define S5P_IRQ_VIC2(x) ? ? ? ? ? ? ?(S5P_VIC2_BASE + (x))
->> ?#define S5P_IRQ_VIC3(x) ? ? ? ? ? ? ?(S5P_VIC3_BASE + (x))
->>
->> -#define S5P_TIMER_IRQ(x) ? ? (11 + (x))
->> +#define S5P_TIMER_IRQ(x) ? ? (IRQ_TIMER_BASE + (x))
->>
->> ?#define IRQ_TIMER0 ? ? ? ? ? S5P_TIMER_IRQ(0)
->> ?#define IRQ_TIMER1 ? ? ? ? ? S5P_TIMER_IRQ(1)
->> ?#define IRQ_TIMER2 ? ? ? ? ? S5P_TIMER_IRQ(2)
->> ?#define IRQ_TIMER3 ? ? ? ? ? S5P_TIMER_IRQ(3)
->> ?#define IRQ_TIMER4 ? ? ? ? ? S5P_TIMER_IRQ(4)
->> +#define IRQ_TIMER_COUNT ? ? ? ? ? ? ?(5)
->>
->> ?#define IRQ_EINT(x) ? ? ? ? ?((x) < 16 ? ((x) + S5P_EINT_BASE1) \
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? : ((x) - 16 + S5P_EINT_BASE2))
->> @@ -77,4 +78,6 @@
->> ?#define S5P_IRQ_TYPE_EDGE_RISING ? ? (0x03)
->> ?#define S5P_IRQ_TYPE_EDGE_BOTH ? ? ? ? ? ? ? (0x04)
->>
->> +#define NR_IRQS ? ? ? ? ? ? ? ? ? ? ?(IRQ_TIMER_BASE + IRQ_TIMER_COUNT)
->> +
->> ?#endif /* __PLAT_SAMSUNG_IRQS_H */
->
-> Really these timer irqs should be converted to irq domains and be
-> dynamically allocated in the linux irq space, but this is at least a
-> step in the right direction.
+On Beagle, the console is ttyO2 (UART3) which is in PER, and since the
+MPU is free to transition independently of PER, that is what is
+happening, resulting in slower response time on for any boards that have
+PER-UART consoles.
 
-Ok.
+> retaining this uart_can_sleep check in omap3_can_sleep ensures a better
+> console user experience. (not allowing mpu to enter retention
+> until uart clocks are cut)
 
-Thanks for your comments.
+Yes, but obviously comes at the expense of power savings.  IOW, This is
+a hard-coded power vs. performance trade off that we are trying to get
+away from.
 
-Regards,
-Thomas.
+So, the root of the problem is that the MPU wakeup latency is causing a
+"sluggish" console.  The solution?  request an MPU wakeup latency
+constraint.
 
->
-> Rob
->
+This is a classic use-case for such a constraint, and the serial driver
+should have the option of requesting a constraint to prevent the sluggish
+console.  The constraint only needs to be held until the auto-suspend
+delay expires, so should be relased in the ->runtime_suspend() method of
+the driver.
+
+This constraint needs to be configurable, probably from the board file,
+so that it is optional, and so users who don't care about sluggish
+consoles (or non-console UART users who don't care about response time)
+have the option of preferring power savings over UART responsiveness.
+
+As a reference, the i2c driver is currently doing something similar 
+in that it request an MPU constraint to prevent the MPU from going into
+retention/off while waiting for an i2c interrupt to arrive.
+
+Kevin
