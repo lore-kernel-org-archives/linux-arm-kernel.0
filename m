@@ -1,57 +1,89 @@
-From: airlied@gmail.com (Dave Airlie)
-Date: Wed, 12 Oct 2011 14:35:45 +0100
-Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
-	mechanism
-In-Reply-To: <CAF6AEGs6kkGp85NoNVuq5W9i=WE86V8wvAtKydX=D3bQOc+6Pw@mail.gmail.com>
-References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
-	<1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
-	<CAPM=9tzHOa5Dbe=SQz+AURMMbio4L7qoS8kUT3Ek0+HdtkrH4g@mail.gmail.com>
-	<CAF6AEGs6kkGp85NoNVuq5W9i=WE86V8wvAtKydX=D3bQOc+6Pw@mail.gmail.com>
-Message-ID: <CAPM=9twft0eBEUoCD11a2gTZHwOaPzFmZvBfE032dfK10eQ27Q@mail.gmail.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Wed, 12 Oct 2011 19:08:51 +0530
+Subject: [PATCH v6 10/16] OMAP2+: UART: Modify omap_uart_can_sleep function
+In-Reply-To: <87vcrv2xox.fsf@ti.com>
+References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
+	<87vcrv2xox.fsf@ti.com>
+Message-ID: <CAAL8m4xTmz+-ureDiGPoKUu634q1Wy=h01kpfRWCk9LFCV0+Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 11, 2011 at 11:54 PM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
 >
-> well, the mmap is actually implemented by the buffer allocator
-> (v4l/drm).. although not sure if this was the point
+>> Modify the omap_uart_can_sleep function to check uart is active
+>> or not to be used by pm code to enter low power states.
+>
+> Doesn't the driver now control when the UART clocks are gated (using
+> runtime PM autosuspend)?
+>
+> IMO, this check should be completely removed and the driver should
+> be managing this with the autosuspend timeout.
+>
+>> Removing this check can cause console response little sluggish.
+>
+> Sluggish in what way?
+>
 
-Then why not use the correct interface? doing some sort of not-quite
-generic interface isn't really helping anyone except adding an ABI
-that we have to support.
+response is slower like when we type something or cat debugfs/pm_count
+see things little slower on console, there is no character loss.
 
-If someone wants to bypass the current kernel APIs we should add a new
-API for them not shove it into this generic buffer sharing layer.
+Happens even though we have not set the autosuspend timeout and uart
+clocks are active,
+which basically means allowing mpu to enter retention keeping uart active.
 
-> The intent was that this is for well defined formats.. ie. it would
-> need to be a format that both v4l and drm understood in the first
-> place for sharing to make sense at all..
+this delay in response or sluggishness is not there on my 3430SDP or
+3630zoom board but I was able to see this behavior on a beagle board(xm rev c).
 
-How will you know the stride to take a simple example? The userspace
-had to create this buffer somehow and wants to share it with
-"something", you sound like
-you really needs another API that is a simple accessor API that can
-handle mmaps.
+retaining this uart_can_sleep check in omap3_can_sleep ensures a better
+console user experience. (not allowing mpu to enter retention
+until uart clocks are cut)
 
-> Anyways, the basic reason is to handle random edge cases where you
-> need sw access to the buffer. ?For example, you are decoding video and
-> pull out a frame to generate a thumbnail w/ a sw jpeg encoder..
 
-Again, doesn't sound like it should be part of this API, and also
-sounds like the sw jpeg encoder will need more info about the buffer
-anyways like stride and format.
+> If the driver is runtime suspended, it should only be sluggish for the
+> first character. ?After that, the autosuspend timeout should prevent it
+> from feeling sluggish.
+>
+>> However no characters will be lost until uart clocks are gated
+>> and woken up using rx-pad. UART interface clocks can be auto gated
+>> this can make response on uart slower. This behaviour was observed
+>> only on some of OMAP3 boards(beagleboard xm rev c).
+>>
+>> Reported-by: Tero Kristo <t-kristo@ti.com>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/serial.c | ? 21 +++++++++------------
+>> ?1 files changed, 9 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+>> index 6725caf..ccf3550 100644
+>> --- a/arch/arm/mach-omap2/serial.c
+>> +++ b/arch/arm/mach-omap2/serial.c
+>> @@ -156,23 +156,20 @@ static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
+>>
+>> ?int omap_uart_can_sleep(void)
+>> ?{
+>> - ? ? struct omap_uart_state *uart;
+>> - ? ? int can_sleep = 1;
+>> -
+>> - ? ? list_for_each_entry(uart, &uart_list, node) {
+>> - ? ? ? ? ? ? if (!uart->clocked)
+>> - ? ? ? ? ? ? ? ? ? ? continue;
+>> + ? ? struct omap_hwmod *oh;
+>> + ? ? u8 i, ret = true;
+>>
+>> - ? ? ? ? ? ? if (!uart->can_sleep) {
+>> - ? ? ? ? ? ? ? ? ? ? can_sleep = 0;
+>> + ? ? for (i = 0; i < num_uarts; i++) {
+>> + ? ? ? ? ? ? oh = omap_uart_hwmod_lookup(i);
+>
+> This is a heavy operation to add for *every* entry into idle.
+>
 
-> With this current scheme, synchronization could be handled in
-> dmabufops->mmap() and vm_ops->close().. ?it is perhaps a bit heavy to
-> require mmap/munmap for each sw access, but I suppose this isn't
-> really for the high-performance use case. ?It is just so that some
-> random bit of sw that gets passed a dmabuf handle without knowing who
-> allocated it can have sw access if really needed.
+removing uart_list caused this ops, retaining uart_list
+will ensure this will be replaced with list_for_each_entry
+as done in existing code.
 
-So I think thats fine, write a sw accessor providers, don't go
-overloading the buffer sharing code.
-
-This API will limit what people can use this buffer sharing for with
-pure hw accessors, you might say, oh buts its okay to fail the mmap
-then, but the chances of sw handling that I'm not so sure off.
-
-Dave.
+--
+Thanks,
+Govindraj.R
