@@ -1,76 +1,191 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 12 Oct 2011 16:49:40 +0200
-Subject: [Linaro-mm-sig] [RFC 1/2] dma-buf: Introduce dma buffer sharing
-	mechanism
-In-Reply-To: <CAPM=9tyAiUZ9tNaer=_52WmiLKpJKG+3EXvZzotwGwvqkJFmOQ@mail.gmail.com>
-References: <1318325033-32688-1-git-send-email-sumit.semwal@ti.com>
-	<1318325033-32688-2-git-send-email-sumit.semwal@ti.com>
-	<CAPM=9tzHOa5Dbe=SQz+AURMMbio4L7qoS8kUT3Ek0+HdtkrH4g@mail.gmail.com>
-	<CAF6AEGs6kkGp85NoNVuq5W9i=WE86V8wvAtKydX=D3bQOc+6Pw@mail.gmail.com>
-	<CAPM=9twft0eBEUoCD11a2gTZHwOaPzFmZvBfE032dfK10eQ27Q@mail.gmail.com>
-	<CAF6AEGuwMt6Snq=YSN4iddTv_Cu56aR_2BY1d3hjVvTdkom5MQ@mail.gmail.com>
-	<CAPM=9tyKjodxf9MKjG=5bBDZTuqOx4Nu31L5iNN9LrO9fsp+FA@mail.gmail.com>
-	<CAF6AEGsK25wk28YmiwsZTenecKqCt6irx66nR-8nOFMo6Z=Dkw@mail.gmail.com>
-	<CAPM=9tyAiUZ9tNaer=_52WmiLKpJKG+3EXvZzotwGwvqkJFmOQ@mail.gmail.com>
-Message-ID: <20111012144940.GB2938@phenom.ffwll.local>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Wed, 12 Oct 2011 07:59:19 -0700
+Subject: [PATCH v2 4/7] clk: Add simple gated clock
+In-Reply-To: <20111012064646.GA31037@b20223-02.ap.freescale.net>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-5-git-send-email-mturquette@ti.com>
+	<20111012064646.GA31037@b20223-02.ap.freescale.net>
+Message-ID: <CAJOA=zPw7BF1iNFaG9js2k6++qPnXz5S3dq4rsPmUWOcUztL0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 03:34:54PM +0100, Dave Airlie wrote:
-> On Wed, Oct 12, 2011 at 3:24 PM, Rob Clark <robdclark@gmail.com> wrote:
-> > On Wed, Oct 12, 2011 at 9:01 AM, Dave Airlie <airlied@gmail.com> wrote:
-> >>> But then we'd need a different set of accessors for every different
-> >>> drm/v4l/etc driver, wouldn't we?
-> >>
-> >> Not any more different than you need for this, you just have a new
-> >> interface that you request a sw object from,
-> >> then mmap that object, and underneath it knows who owns it in the kernel.
-> >
-> > oh, ok, so you are talking about a kernel level interface, rather than
-> > userspace..
-> >
-> > but I guess in this case I don't quite see the difference. ?It amounts
-> > to which fd you call mmap (or ioctl[*]) on.. ?If you use the dmabuf fd
-> > directly then you don't have to pass around a 2nd fd.
-> >
-> > [*] there is nothing stopping defining some dmabuf ioctls (such as for
-> > synchronization).. although the thinking was to keep it simple for
-> > first version of dmabuf
-> >
-> 
-> Yes a separate kernel level interface.
-> 
-> Well I'd like to keep it even simpler. dmabuf is a buffer sharing API,
-> shoehorning in a sw mapping API isn't making it simpler.
-> 
-> The problem I have with implementing mmap on the sharing fd, is that
-> nothing says this should be purely optional and userspace shouldn't
-> rely on it.
-> 
-> In the Intel GEM space alone you have two types of mapping, one direct
-> to shmem one via GTT, the GTT could be even be a linear view. The
-> intel guys initially did GEM mmaps direct to the shmem pages because
-> it seemed simple, up until they
-> had to do step two which was do mmaps on the GTT copy and ended up
-> having two separate mmap methods. I think the problem here is it seems
-> deceptively simple to add this to the API now because the API is
-> simple, however I think in the future it'll become a burden that we'll
-> have to workaround.
+On Tue, Oct 11, 2011 at 11:46 PM, Richard Zhao
+<richard.zhao@freescale.com> wrote:
+> On Thu, Sep 22, 2011 at 03:26:59PM -0700, Mike Turquette wrote:
+>> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+>>
+>> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+>> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+>> Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+>> Signed-off-by: Mike Turquette <mturquette@ti.com>
+>> ---
+>> Changes since v1:
+>> Add copyright header
+>> Fold in Jamie's patch for set-to-disable clks
+>> Use BIT macro instead of shift
+>>
+>> ?drivers/clk/Kconfig ? ?| ? ?4 ++
+>> ?drivers/clk/Makefile ? | ? ?1 +
+>> ?drivers/clk/clk-gate.c | ? 78 ++++++++++++++++++++++++++++++++++++++++++++++++
+>> ?include/linux/clk.h ? ?| ? 13 ++++++++
+>> ?4 files changed, 96 insertions(+), 0 deletions(-)
+>> ?create mode 100644 drivers/clk/clk-gate.c
+>
+> I feel hard to tell the tree the clk parent, at register/init time. For the
+> simple gate clk, the only way is to set .get_parent. But normally, for clk
+> without any divider we set .get_parent to NULL. Maybe we can put .parent to
+> struct clk_hw?
 
-Yeah, that's my feeling, too. Adding mmap sounds like a neat, simple idea,
-that could simplify things for simple devices like v4l. But as soon as
-you're dealing with a real gpu, nothing is simple. Those who don't believe
-this, just take a look at the data upload/download paths in the
-open-source i915,nouveau,radeon drivers. Making this fast (and for gpus,
-it needs to be fast) requires tons of tricks, special-cases and jumping
-through loops.
+For non-mux clocks, whose parent is *always* going to be the same, you
+should create a duplicate .parent in the clk_hw_* structure and then
+have .get_parent return clk_hw_*->parent.
 
-You absolutely want the device-specific ioctls to do that. Adding a
-generic mmap just makes matters worse, especially if userspace expects
-this to work synchronized with everything else that is going on.
+This is analogous to the way clk_hw_fixed returns clk_hw_fixed->rate
+when .recalc is called on it.
 
-Cheers, Daniel
--- 
-Daniel Vetter
-Mail: daniel at ffwll.ch
-Mobile: +41 (0)79 365 57 48
+Regards,
+Mike
+
+> Thanks
+> Richard
+>>
+>> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+>> index d8313d7..a78967c 100644
+>> --- a/drivers/clk/Kconfig
+>> +++ b/drivers/clk/Kconfig
+>> @@ -12,3 +12,7 @@ config GENERIC_CLK
+>> ?config GENERIC_CLK_FIXED
+>> ? ? ? bool
+>> ? ? ? depends on GENERIC_CLK
+>> +
+>> +config GENERIC_CLK_GATE
+>> + ? ? bool
+>> + ? ? depends on GENERIC_CLK
+>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+>> index 9a3325a..d186446 100644
+>> --- a/drivers/clk/Makefile
+>> +++ b/drivers/clk/Makefile
+>> @@ -2,3 +2,4 @@
+>> ?obj-$(CONFIG_CLKDEV_LOOKUP) ?+= clkdev.o
+>> ?obj-$(CONFIG_GENERIC_CLK) ? ?+= clk.o
+>> ?obj-$(CONFIG_GENERIC_CLK_FIXED) ? ? ?+= clk-fixed.o
+>> +obj-$(CONFIG_GENERIC_CLK_GATE) ? ? ? += clk-gate.o
+>> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+>> new file mode 100644
+>> index 0000000..a1d8e79
+>> --- /dev/null
+>> +++ b/drivers/clk/clk-gate.c
+>> @@ -0,0 +1,78 @@
+>> +/*
+>> + * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * Simple clk gate implementation
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/module.h>
+>> +#include <asm/io.h>
+>> +
+>> +#define to_clk_gate(clk) container_of(clk, struct clk_gate, hw)
+>> +
+>> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
+>> +{
+>> + ? ? return clk_get_rate(clk_get_parent(clk->clk));
+>> +}
+>> +
+>> +static void clk_gate_set_bit(struct clk_hw *clk)
+>> +{
+>> + ? ? struct clk_gate *gate = to_clk_gate(clk);
+>> + ? ? u32 reg;
+>> +
+>> + ? ? reg = __raw_readl(gate->reg);
+>> + ? ? reg |= BIT(gate->bit_idx);
+>> + ? ? __raw_writel(reg, gate->reg);
+>> +}
+>> +
+>> +static void clk_gate_clear_bit(struct clk_hw *clk)
+>> +{
+>> + ? ? struct clk_gate *gate = to_clk_gate(clk);
+>> + ? ? u32 reg;
+>> +
+>> + ? ? reg = __raw_readl(gate->reg);
+>> + ? ? reg &= ~BIT(gate->bit_idx);
+>> + ? ? __raw_writel(reg, gate->reg);
+>> +}
+>> +
+>> +static int clk_gate_enable_set(struct clk_hw *clk)
+>> +{
+>> + ? ? clk_gate_set_bit(clk);
+>> +
+>> + ? ? return 0;
+>> +}
+>> +
+>> +static void clk_gate_disable_clear(struct clk_hw *clk)
+>> +{
+>> + ? ? clk_gate_clear_bit(clk);
+>> +}
+>> +
+>> +struct clk_hw_ops clk_gate_set_enable_ops = {
+>> + ? ? .recalc_rate = clk_gate_get_rate,
+>> + ? ? .enable = clk_gate_enable_set,
+>> + ? ? .disable = clk_gate_disable_clear,
+>> +};
+>> +EXPORT_SYMBOL_GPL(clk_gate_set_enable_ops);
+>> +
+>> +static int clk_gate_enable_clear(struct clk_hw *clk)
+>> +{
+>> + ? ? clk_gate_clear_bit(clk);
+>> +
+>> + ? ? return 0;
+>> +}
+>> +
+>> +static void clk_gate_disable_set(struct clk_hw *clk)
+>> +{
+>> + ? ? clk_gate_set_bit(clk);
+>> +}
+>> +
+>> +struct clk_hw_ops clk_gate_set_disable_ops = {
+>> + ? ? .recalc_rate = clk_gate_get_rate,
+>> + ? ? .enable = clk_gate_enable_clear,
+>> + ? ? .disable = clk_gate_disable_set,
+>> +};
+>> +EXPORT_SYMBOL_GPL(clk_gate_set_disable_ops);
+>> diff --git a/include/linux/clk.h b/include/linux/clk.h
+>> index 1903dd8..626fd0d 100644
+>> --- a/include/linux/clk.h
+>> +++ b/include/linux/clk.h
+>> @@ -124,6 +124,19 @@ extern struct clk_hw_ops clk_fixed_ops;
+>>
+>> ?#endif /* CONFIG_GENERIC_CLK_FIXED */
+>>
+>> +#ifdef CONFIG_GENERIC_CLK_GATE
+>> +
+>> +struct clk_gate {
+>> + ? ? struct clk_hw ? hw;
+>> + ? ? void __iomem ? ?*reg;
+>> + ? ? u8 ? ? ? ? ? ? ?bit_idx;
+>> +};
+>> +
+>> +extern struct clk_hw_ops clk_gate_set_enable_ops;
+>> +extern struct clk_hw_ops clk_gate_set_disable_ops;
+>> +
+>> +#endif /* CONFIG_GENERIC_CLK_GATE */
+>> +
+>> ?/**
+>> ? * clk_register - register and initialize a new clock
+>> ? *
+>> --
+>> 1.7.4.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
+>
