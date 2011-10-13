@@ -1,78 +1,39 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Thu, 13 Oct 2011 10:07:32 +0100
-Subject: [PATCH] ARM: kprobes: only patch instructions on one CPU
-In-Reply-To: <1318492515.2265.51.camel@computer2>
-References: <1318435944-21855-1-git-send-email-rabin@rab.in>
-	<1318492515.2265.51.camel@computer2>
-Message-ID: <1318496852.2213.39.camel@computer2>
+From: colin.tuckley@arm.com (Colin Tuckley)
+Date: Thu, 13 Oct 2011 10:09:16 +0100
+Subject: [PATCH 1/5 v4] ARM Realview PCIX map include file changes
+In-Reply-To: <20111012172007.GA21648@n2100.arm.linux.org.uk>
+References: <20111007142310.19554.17204.stgit@e102602-lin.cambridge.arm.com>
+	<20111007142723.19554.88566.stgit@e102602-lin.cambridge.arm.com>
+	<20111007192224.GB25689@n2100.arm.linux.org.uk>
+	<000001cc872e$d1aaf870$7500e950$@tuckley@arm.com>
+	<20111012172007.GA21648@n2100.arm.linux.org.uk>
+Message-ID: <000001cc8987$c9079790$5b16c6b0$@tuckley@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-10-13 at 08:55 +0100, Tixy wrote:
-> On Wed, 2011-10-12 at 21:42 +0530, Rabin Vincent wrote:
-> > The text patching needs to be done only once, instead of once on
-> each
-> > CPU.  The other CPUs will busy wait inside the stop machine code
-> until
-> > the patching is done.
-> 
-> Where in the stop machine code do the other CPU's busy wait?
-> 
-> How I read the code is that __stop_cpus() calls queue_stop_cpus_work()
-> which queues the work on each of the specified CPU's work list and
-> wakes
-> that CPU's stopper thread to process it. __stop_cpus() then calls
-> wait_for_completion() to wait for these CPUs to finish the work.
-> 
-> I don't see how the execution path of CPUs not specified in cpumask is
-> interrupted in any way.
-> 
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Subject: Re: [PATCH 1/5 v4] ARM Realview PCIX map include file changes
 
-As I said in my reply to the other mail, I had missed the fact that it
-is stop_machine_cpu_stop() which is used to call our function, and this
-synchronises all cores. Therefore, this patch is correct, assuming that
-a flush_icache_range executed on one core also flushes I-caches on other
-cores. (I'm a bit doubtfull of this as I beleive that at least
-ARM11MPCore requires this to be managed in software and I can't find any
-code that handles this.)
+> On Mon, Oct 10, 2011 at 10:27:08AM +0100, Colin Tuckley wrote:
+> > Ah, I wasn't aware of that. However when I include asm/io.h and
+> remove the
+> 
+> The general rule is that linux/io.h includes asm/io.h, which in turn
+> includes mach/io.h includes and nothing should include either asm/io.h
+> nor mach/io.h directly - if it does, things probably break - which is
+> desirable behaviour because that indicates that the include is wrong.
 
--- 
-Tixy
+Right sounds very sensible :)
 
+> > A quick check shows that the piece of code you quote above does not
+> exist in
+> > my (3.1.0-rc9) source tree.
 > 
-> > 
-> > Cc: Jon Medhurst <tixy@yxit.co.uk>
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Signed-off-by: Rabin Vincent <rabin@rab.in>
-> > ---
-> >  arch/arm/kernel/kprobes.c |    4 ++--
-> >  1 files changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-> > index 129c116..e9f95300 100644
-> > --- a/arch/arm/kernel/kprobes.c
-> > +++ b/arch/arm/kernel/kprobes.c
-> > @@ -127,7 +127,7 @@ void __kprobes arch_arm_kprobe(struct kprobe *p)
-> >               flush_insns(addr, sizeof(u16));
-> >       } else if (addr & 2) {
-> >               /* A 32-bit instruction spanning two words needs
-> special care */
-> > -             stop_machine(set_t32_breakpoint, (void *)addr,
-> &cpu_online_map);
-> > +             stop_machine(set_t32_breakpoint, (void *)addr, NULL);
-> >       } else {
-> >               /* Word aligned 32-bit instruction can be written
-> atomically */
-> >               u32 bkp = KPROBE_THUMB32_BREAKPOINT_INSTRUCTION;
-> > @@ -190,7 +190,7 @@ int __kprobes __arch_disarm_kprobe(void *p)
-> >  
-> >  void __kprobes arch_disarm_kprobe(struct kprobe *p)
-> >  {
-> > -     stop_machine(__arch_disarm_kprobe, p, &cpu_online_map);
-> > +     stop_machine(__arch_disarm_kprobe, p, NULL);
-> >  }
-> >  
-> >  void __kprobes arch_remove_kprobe(struct kprobe *p)
-> 
-> 
-> 
+> It's not in -rc9, but will be during the next merge window - and is in
+> linux-next.
+
+Ah, understood. Do you have any other concerns about this patch? If not then
+I'll submit it to your patch system with the IO_SPACE_LIMIT stuff fixed.
+
+Colin
