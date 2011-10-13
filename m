@@ -1,35 +1,25 @@
-From: jon.medhurst@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 13 Oct 2011 16:59:52 +0100
-Subject: [PATCH] mmc: mmci: Do not release spinlock in request_end
-In-Reply-To: <20111013142914.GZ21648@n2100.arm.linux.org.uk>
-References: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
-	<20111013142914.GZ21648@n2100.arm.linux.org.uk>
-Message-ID: <1318521592.2090.16.camel@linaro1>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 13 Oct 2011 09:03:31 -0700
+Subject: [PATCH] ARM: tegra: update defconfig
+In-Reply-To: <1318478219-9462-1-git-send-email-olof@lixom.net>
+References: <1318478219-9462-1-git-send-email-olof@lixom.net>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A063@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-10-13 at 15:29 +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 11, 2011 at 04:06:41PM +0200, Ulf Hansson wrote:
-> > The patch "mmc: core: move ->request() call from atomic context",
-> > is the reason to why this change is possible. This simplifies the
-> > error handling code execution path quite a lot and potentially also
-> > fixes some error handling hang problems.
-> > 
-> > Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Olof Johansson wrote at Wednesday, October 12, 2011 9:57 PM:
+> Refresh tegra_defconfig:
 > 
-> This doesn't look right:
+> New options enabled: RTC, SPI, USB and USB_STORAGE together with
+> corresponding tegra drivers. Also enable some of the common usb ethernet
+> adapters.
 > 
-> void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
-> {
->         if (err && cmd->retries) {
->                 host->ops->request(host, mrq);
+> Finally, enable new merged boards (Ventana) and the generic devicetree board.
 > 
-> So, not dropping the spinlock results in calling the request function
-> with the spinlock held - and as the request function then goes on to
-> lock the spinlock, we will deadlock.
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 
-Indeed, deadlock behaviour at this point is what I see with this patch
-on a Versatile Express board running 3.0-rc9.
+We should also enable ASoC (sound) support. Do you want to rev the patch, or
+should I submit a patch on top of yours?
 
 -- 
-Tixy
+nvpublic
