@@ -1,51 +1,143 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 13 Oct 2011 13:26:14 -0600
-Subject: [PATCH v4 7/8] ARM: pxa: add clk support in gpio driver
-In-Reply-To: <1318478825-17187-8-git-send-email-haojian.zhuang@marvell.com>
-References: <1318478825-17187-1-git-send-email-haojian.zhuang@marvell.com>
-	<1318478825-17187-8-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <20111013192614.GY18574@ponder.secretlab.ca>
+Date: Thu, 13 Oct 2011 13:33:47 -0600
+Subject: [PATCH v2] irq: support domains with non-zero hwirq base
+In-Reply-To: <4E944242.10606@gmail.com>
+References: <20111004233953.GE3009@ponder.secretlab.ca>
+	<1317783380-773-1-git-send-email-robherring2@gmail.com>
+	<4E944242.10606@gmail.com>
+Message-ID: <20111013193347.GB18574@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 12:07:04PM +0800, Haojian Zhuang wrote:
-> Support clk in gpio driver. There's no gpio clock in PXA25x and PXA27x.
-> So use dummy clk instead. And move the gpio edge initialization into
-> gpio driver for arch-mmp.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
-> @@ -449,6 +461,10 @@ static int __devinit pxa_gpio_probe(struct platform_device *pdev)
->  		__raw_writel(0, c->regbase + GFER_OFFSET);
->  		__raw_writel(0, c->regbase + GRER_OFFSET);
->  		__raw_writel(~0,c->regbase + GEDR_OFFSET);
-> +#ifdef CONFIG_ARCH_MMP
-> +		/* unmask GPIO edge detect for AP side */
-> +		__raw_writel(~0,c->regbase + ED_MASK_OFFSET);
-> +#endif
+Thomas, any objection to this patch?  It's entirely contained within
+the irq_domain stuff, so it is pretty well isolated.
 
-What will happen on a PXA platform when both CONFIG_ARM_MMP and
-CONFIG_ARM_PXA are enabled?
-
-Otherwise the patch looks good.
+It can be merged via arm-soc since it is depended on by some of the
+irq work.
 
 g.
 
-
->  	}
->  
->  #ifdef CONFIG_ARCH_PXA
-> diff --git a/include/linux/gpio-pxa.h b/include/linux/gpio-pxa.h
-> index 6cebf6c..dd47850 100644
-> --- a/include/linux/gpio-pxa.h
-> +++ b/include/linux/gpio-pxa.h
-> @@ -14,6 +14,7 @@ struct pxa_gpio_regs {
->  	u32	gfer;
->  	u32	gedr;
->  	u32	gafr;
-> +	u32	ed_mask;
->  };
->  
->  /*
-> -- 
-> 1.7.2.5
+On Tue, Oct 11, 2011 at 08:18:58AM -0500, Rob Herring wrote:
+> Thomas,
+> 
+> On 10/04/2011 09:56 PM, Rob Herring wrote:
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > Interrupt controllers can have non-zero starting value for h/w irq numbers.
+> > Adding support in irq_domain allows the domain hwirq numbering to match
+> > the interrupt controllers' numbering.
+> > 
+> > As this makes looping over irqs for a domain more complicated, add loop
+> > iterators to iterate over all hwirqs and irqs for a domain.
+> > 
+> > Acked-by: Grant Likely <grant.likely@secretlab.ca>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > ---
+> > Thomas,
+> > 
+> > Please ack. I'm dependent on this for adding Calxeda highbank support, so
+> > I'd like to take this thru arm-soc tree.
+> > 
+> 
+> Can you please comment?
+> 
+> Rob
+> 
+> > v2:
+> > - Rebase to tglx's changes in my previous irq domain commit:
+> > irq: Fix check for already initialized irq_domain in irq_domain_add
+> > - drop NO_IRQ and add WARN_ON in irq_domain_to_irq
+> > 
+> > Rob
+> > 
+> >  include/linux/irqdomain.h |   16 +++++++++++++++-
+> >  kernel/irq/irqdomain.c    |   12 ++++++------
+> >  2 files changed, 21 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> > index 3ad553e..99834e58 100644
+> > --- a/include/linux/irqdomain.h
+> > +++ b/include/linux/irqdomain.h
+> > @@ -47,6 +47,7 @@ struct irq_domain_ops {
+> >   *            of the irq_domain is responsible for allocating the array of
+> >   *            irq_desc structures.
+> >   * @nr_irq: Number of irqs managed by the irq domain
+> > + * @hwirq_base: Starting number for hwirqs managed by the irq domain
+> >   * @ops: pointer to irq_domain methods
+> >   * @priv: private data pointer for use by owner.  Not touched by irq_domain
+> >   *        core code.
+> > @@ -57,6 +58,7 @@ struct irq_domain {
+> >  	struct list_head list;
+> >  	unsigned int irq_base;
+> >  	unsigned int nr_irq;
+> > +	unsigned int hwirq_base;
+> >  	const struct irq_domain_ops *ops;
+> >  	void *priv;
+> >  	struct device_node *of_node;
+> > @@ -72,9 +74,21 @@ struct irq_domain {
+> >  static inline unsigned int irq_domain_to_irq(struct irq_domain *d,
+> >  					     unsigned long hwirq)
+> >  {
+> > -	return d->ops->to_irq ? d->ops->to_irq(d, hwirq) : d->irq_base + hwirq;
+> > +	if (d->ops->to_irq)
+> > +		return d->ops->to_irq(d, hwirq);
+> > +	if (WARN_ON(hwirq < d->hwirq_base))
+> > +		return 0;
+> > +	return d->irq_base + hwirq - d->hwirq_base;
+> >  }
+> >  
+> > +#define irq_domain_for_each_hwirq(d, hw) \
+> > +	for (hw = d->hwirq_base; hw < d->hwirq_base + d->nr_irq; hw++)
+> > +
+> > +#define irq_domain_for_each_irq(d, hw, irq) \
+> > +	for (hw = d->hwirq_base, irq = irq_domain_to_irq(d, hw); \
+> > +	     hw < d->hwirq_base + d->nr_irq; \
+> > +	     hw++, irq = irq_domain_to_irq(d, hw))
+> > +
+> >  extern void irq_domain_add(struct irq_domain *domain);
+> >  extern void irq_domain_del(struct irq_domain *domain);
+> >  #endif /* CONFIG_IRQ_DOMAIN */
+> > diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> > index b57a377..200ce83 100644
+> > --- a/kernel/irq/irqdomain.c
+> > +++ b/kernel/irq/irqdomain.c
+> > @@ -20,15 +20,15 @@ static DEFINE_MUTEX(irq_domain_mutex);
+> >  void irq_domain_add(struct irq_domain *domain)
+> >  {
+> >  	struct irq_data *d;
+> > -	int hwirq;
+> > +	int hwirq, irq;
+> >  
+> >  	/*
+> >  	 * This assumes that the irq_domain owner has already allocated
+> >  	 * the irq_descs.  This block will be removed when support for dynamic
+> >  	 * allocation of irq_descs is added to irq_domain.
+> >  	 */
+> > -	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+> > -		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
+> > +	irq_domain_for_each_irq(domain, hwirq, irq) {
+> > +		d = irq_get_irq_data(irq);
+> >  		if (!d) {
+> >  			WARN(1, "error: assigning domain to non existant irq_desc");
+> >  			return;
+> > @@ -54,15 +54,15 @@ void irq_domain_add(struct irq_domain *domain)
+> >  void irq_domain_del(struct irq_domain *domain)
+> >  {
+> >  	struct irq_data *d;
+> > -	int hwirq;
+> > +	int hwirq, irq;
+> >  
+> >  	mutex_lock(&irq_domain_mutex);
+> >  	list_del(&domain->list);
+> >  	mutex_unlock(&irq_domain_mutex);
+> >  
+> >  	/* Clear the irq_domain assignments */
+> > -	for (hwirq = 0; hwirq < domain->nr_irq; hwirq++) {
+> > -		d = irq_get_irq_data(irq_domain_to_irq(domain, hwirq));
+> > +	irq_domain_for_each_irq(domain, hwirq, irq) {
+> > +		d = irq_get_irq_data(irq);
+> >  		d->domain = NULL;
+> >  	}
+> >  }
 > 
