@@ -1,164 +1,81 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Oct 2011 18:32:17 -0600
-Subject: [PATCH v3 1/4] dmaengine: at_hdmac: platform data move to use
-	.id_table
-In-Reply-To: <f91f267b82ac0f0459c11a7bdf3ab0ea8758656a.1318438197.git.nicolas.ferre@atmel.com>
-References: <1318438634-11826-1-git-send-email-nicolas.ferre@atmel.com>
-	<f91f267b82ac0f0459c11a7bdf3ab0ea8758656a.1318438197.git.nicolas.ferre@atmel.com>
-Message-ID: <20111013003217.GD14042@ponder.secretlab.ca>
+From: vdumpa@nvidia.com (Krishna Reddy)
+Date: Wed, 12 Oct 2011 19:27:58 -0700
+Subject: change_page_attr() implementation for ARM?
+In-Reply-To: <CAHkRjk4mqhu+HhoSAnowk6=5GzXXhmKCE-3jrjhMpVzbtakFYg@mail.gmail.com>
+References: <D19EBEE1D7B1F742A8ED7130E050A38A4CA460FF0C@HQMAIL02.nvidia.com>
+	<CAHkRjk4mqhu+HhoSAnowk6=5GzXXhmKCE-3jrjhMpVzbtakFYg@mail.gmail.com>
+Message-ID: <401E54CE964CD94BAE1EB4A729C7087E3722519EE2@HQMAIL04.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 06:57:11PM +0200, Nicolas Ferre wrote:
-> We remove the use of platform data from DMA controller driver.
-> We now use of .id_table to distinguish between compatible
-> types. The two implementations allow to determine the
-> number of channels and the capabilities of the controller.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Catalin,
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>> On Cortex-A9, we have observed stale data being read from write-combine (C=0 B=1) memory regions mapped into userspace which have a duplicate cacheable mapping in the kernel address space (due to the kernel linear mapping).
+>>
+>> The issue appears to be due to speculative prefetch on the cacheable kernel linear mapping which gets lines into the L2 cache. When reads are performed on the write-combine mapping for this address range, these reads get the stale data from L2 instead of memory.
 
-> ---
->  drivers/dma/at_hdmac.c      |   48 ++++++++++++++++++++++++++++++++++---------
->  drivers/dma/at_hdmac_regs.h |    8 +++++++
->  2 files changed, 46 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index fcfa0a8..d1869c5 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -1175,6 +1175,18 @@ static void atc_free_chan_resources(struct dma_chan *chan)
->  
->  /*--  Module Management  -----------------------------------------------*/
->  
-> +static struct platform_device_id atdma_devtypes[] = {
-> +	{
-> +		.name = "at91sam9rl_dma",
-> +		.driver_data = ATDMA_DEVTYPE_SAM9RL,
-> +	}, {
-> +		.name = "at91sam9g45_dma",
-> +		.driver_data = ATDMA_DEVTYPE_SAM9G45,
-> +	}, {
-> +		/* sentinel */
-> +	}
-> +};
-> +
->  /**
->   * at_dma_off - disable DMA controller
->   * @atdma: the Atmel HDAMC device
-> @@ -1193,18 +1205,32 @@ static void at_dma_off(struct at_dma *atdma)
->  
->  static int __init at_dma_probe(struct platform_device *pdev)
->  {
-> -	struct at_dma_platform_data *pdata;
->  	struct resource		*io;
->  	struct at_dma		*atdma;
->  	size_t			size;
->  	int			irq;
->  	int			err;
->  	int			i;
-> +	u32                     nr_channels;
-> +	dma_cap_mask_t          cap_mask = {};
-> +	enum atdma_devtype	atdmatype;
-> +
-> +	dma_cap_set(DMA_MEMCPY, cap_mask);
-> +
-> +	/* get DMA parameters from controller type */
-> +	atdmatype = platform_get_device_id(pdev)->driver_data;
->  
-> -	/* get DMA Controller parameters from platform */
-> -	pdata = pdev->dev.platform_data;
-> -	if (!pdata || pdata->nr_channels > AT_DMA_MAX_NR_CHANNELS)
-> +	switch (atdmatype) {
-> +	case ATDMA_DEVTYPE_SAM9RL:
-> +		nr_channels = 2;
-> +		break;
-> +	case ATDMA_DEVTYPE_SAM9G45:
-> +		nr_channels = 8;
-> +		dma_cap_set(DMA_SLAVE, cap_mask);
-> +		break;
-> +	default:
->  		return -EINVAL;
-> +	}
->  
->  	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!io)
-> @@ -1215,14 +1241,15 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  		return irq;
->  
->  	size = sizeof(struct at_dma);
-> -	size += pdata->nr_channels * sizeof(struct at_dma_chan);
-> +	size += nr_channels * sizeof(struct at_dma_chan);
->  	atdma = kzalloc(size, GFP_KERNEL);
->  	if (!atdma)
->  		return -ENOMEM;
->  
-> -	/* discover transaction capabilites from the platform data */
-> -	atdma->dma_common.cap_mask = pdata->cap_mask;
-> -	atdma->all_chan_mask = (1 << pdata->nr_channels) - 1;
-> +	/* discover transaction capabilities */
-> +	atdma->dma_common.cap_mask = cap_mask;
-> +	atdma->all_chan_mask = (1 << nr_channels) - 1;
-> +	atdma->devtype = atdmatype;
->  
->  	size = resource_size(io);
->  	if (!request_mem_region(io->start, size, pdev->dev.driver->name)) {
-> @@ -1268,7 +1295,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  
->  	/* initialize channels related values */
->  	INIT_LIST_HEAD(&atdma->dma_common.channels);
-> -	for (i = 0; i < pdata->nr_channels; i++) {
-> +	for (i = 0; i < nr_channels; i++) {
->  		struct at_dma_chan	*atchan = &atdma->chan[i];
->  
->  		atchan->chan_common.device = &atdma->dma_common;
-> @@ -1313,7 +1340,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
->  	dev_info(&pdev->dev, "Atmel AHB DMA Controller ( %s%s), %d channels\n",
->  	  dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask) ? "cpy " : "",
->  	  dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask)  ? "slave " : "",
-> -	  pdata->nr_channels);
-> +	  nr_channels);
->  
->  	dma_async_device_register(&atdma->dma_common);
->  
-> @@ -1495,6 +1522,7 @@ static const struct dev_pm_ops at_dma_dev_pm_ops = {
->  static struct platform_driver at_dma_driver = {
->  	.remove		= __exit_p(at_dma_remove),
->  	.shutdown	= at_dma_shutdown,
-> +	.id_table	= atdma_devtypes,
->  	.driver = {
->  		.name	= "at_hdmac",
->  		.pm	= &at_dma_dev_pm_ops,
-> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-> index aa4c9ae..d7d6737 100644
-> --- a/drivers/dma/at_hdmac_regs.h
-> +++ b/drivers/dma/at_hdmac_regs.h
-> @@ -248,9 +248,16 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
->  
->  /*--  Controller  ------------------------------------------------------*/
->  
-> +enum atdma_devtype {
-> +	ATDMA_DEVTYPE_UNDEFINED = 0,
-> +	ATDMA_DEVTYPE_SAM9RL,	/* compatible with SAM9RL DMA controller */
-> +	ATDMA_DEVTYPE_SAM9G45,	/* compatible with SAM9G45 DMA controller */
-> +};
-> +
->  /**
->   * struct at_dma - internal representation of an Atmel HDMA Controller
->   * @chan_common: common dmaengine dma_device object members
-> + * @atdma_devtype: identifier of DMA controller compatibility
->   * @ch_regs: memory mapped register base
->   * @clk: dma controller clock
->   * @save_imr: interrupt mask register that is saved on suspend/resume cycle
-> @@ -260,6 +267,7 @@ static inline struct at_dma_chan *to_at_dma_chan(struct dma_chan *dchan)
->   */
->  struct at_dma {
->  	struct dma_device	dma_common;
-> +	enum atdma_devtype	devtype;
->  	void __iomem		*regs;
->  	struct clk		*clk;
->  	u32			save_imr;
-> -- 
-> 1.7.5.4
-> 
+>If your system has a PL310, there is bit 22 in the auxiliary control
+>register which makes reads via the non-cacheable mapping not to hit
+>the L2 cache. I had this patch queued in Russell's system for a long
+>time:
+>http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6529/1
+>Alternatively, you can pass this bit via your platform code.
+
+Is this is a quick fix for ARM processors with PL310. Can this be expected in future versions of ARM processors with different L2 cache?
+
+>The kernel linear mapping is done using sections, so we would have to
+>change the attributes for a full section. Russell's approach I think
+>is better but people reported some stability issues.
+
+X86 way breaks the sections into pages and it only changes the attributes for the requested pages. the other pages of section would have same prot attributes as section. does Russell's approach refer to a different way? Is there any link on how Russell wants to do it?
+
+--
+nvpublic
+
+
+
+-----Original Message-----
+From: linux-arm-kernel-bounces@lists.infradead.org [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Catalin Marinas
+Sent: Friday, September 23, 2011 2:05 AM
+To: Vinod Rex
+Cc: linux-arm-kernel at lists.infradead.org
+Subject: Re: change_page_attr() implementation for ARM?
+
+Hi Vinod,
+
+(I'm not sure how the quoted message ends up but your email client
+didn't wrap lines properly)
+
+On 21 September 2011 23:10, Vinod Rex <vrex@nvidia.com> wrote:
+> On Cortex-A9, we have observed stale data being read from write-combine (C=0 B=1) memory regions mapped into userspace which have a duplicate cacheable mapping in the kernel address space (due to the kernel linear mapping).
+>
+> The issue appears to be due to speculative prefetch on the cacheable kernel linear mapping which gets lines into the L2 cache. When reads are performed on the write-combine mapping for this address range, these reads get the stale data from L2 instead of memory.
+
+If your system has a PL310, there is bit 22 in the auxiliary control
+register which makes reads via the non-cacheable mapping not to hit
+the L2 cache. I had this patch queued in Russell's system for a long
+time:
+
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6529/1
+
+Alternatively, you can pass this bit via your platform code.
+
+> As per the Cortex-A9 spec, behavior for double mappings with conflicting page attributes is undefined, so we need a way to make sure all duplicate mappings have the same memory type attributes.
+
+Avoiding aliases would be better but we don't have a fully stable patch yet.
+
+> Similar issue on x86 is handled using the change_page_attr()/set_memory_*() functions defined in arch/x86/mm/pageattr.c. ?This function modifies the attributes of the page in kernel linear map to match the corresponding mapping in userspace to avoid having duplicate mappings with different page attributes. It accomplishes this by splitting section (large page) mappings into 4KB page mappings as needed so that the page attribute change is done only for the requested memory region.
+>
+> Would a similar implementation for ARM be appropriate? We are experimenting with a port of change_page_attr() to ARM that seems to solve our problems.
+
+The kernel linear mapping is done using sections, so we would have to
+change the attributes for a full section. Russell's approach I think
+is better but people reported some stability issues.
+
+-- 
+Catalin
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
