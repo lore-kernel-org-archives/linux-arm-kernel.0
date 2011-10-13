@@ -1,46 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 10:47:17 +0100
-Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
-In-Reply-To: <20111010114407.GD3607@opensource.wolfsonmicro.com>
+Date: Thu, 13 Oct 2011 10:53:41 +0100
+Subject: [PATCH 9/9] ARM: SPMP8000: Add Kconfig and Makefile entries to
+	build the machine
+In-Reply-To: <1318178172-7965-10-git-send-email-zoss@devai.org>
 References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-5-git-send-email-zoss@devai.org>
-	<CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
-	<4E92BE19.4060907@cam.ac.uk>
-	<20111010100020.GA3607@opensource.wolfsonmicro.com>
-	<CAGVye5Nc9vhaF=7Y+hvGo4g-GOFb9fHeni+g=+hTj-8WCSqY+Q@mail.gmail.com>
-	<20111010114407.GD3607@opensource.wolfsonmicro.com>
-Message-ID: <20111013094717.GL21648@n2100.arm.linux.org.uk>
+	<1318178172-7965-10-git-send-email-zoss@devai.org>
+Message-ID: <20111013095341.GM21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 12:44:08PM +0100, Mark Brown wrote:
-> On Mon, Oct 10, 2011 at 01:42:30PM +0200, Zoltan Devai wrote:
-> 
-> > Where should the adc driver go in this case ?
-> 
-> At the minute it seems to me that arch/arm is as good a place as any
-> really - currently this code is getting dumped wherever the main device
-> is.
+On Sun, Oct 09, 2011 at 06:36:12PM +0200, Zoltan Devai wrote:
+> +config ARCH_SPMP8000
+> +	bool "Sunplus SPMP8000"
+> +	select CPU_ARM926T
+> +	select ARM_VIC
+> +	select GENERIC_IRQ_CHIP
+> +	select MULTI_IRQ_HANDLER
+> +	select CLKSRC_MMIO
+> +	select GENERIC_CLOCKEVENTS
+> +	select ARCH_WANT_OPTIONAL_GPIOLIB
+> +	select USE_OF
+> +	select CLKDEV_LOOKUP
+> +	select HAVE_PWM
+> +	select ARCH_HAS_CPUFREQ
 
-No it isn't - we want drivers out of arch/arm (it's already been a topic
-of flame for Linus, so it's something that we should try _really_ hard
-to avoid.)
-
-As this is clearly a device driver (it has a device driver struct, it
-relies upon a struct device, etc) then it needs to live outside of
-arch/arm/ - and I think Arnd's suggestion of drivers/adc is probably
-the right place for it to move to (even though its probably the first
-to create the directory.)  More stuff can come along in the future,
-and then its all together to start creating a common API in there.
-
-The other thing I'd say is that things like the callback definitions
-and driver data should not be in some arch/arm/ include file - if
-it's private to the ADC, it should go in drivers/adc too.  If not,
-then somewhere in include/linux (maybe include/linux/adc) is a better
-place.
-
-What we *do* need to avoid is having the spmp8000 ADC callback function
-data structure, the foo ADC callback function data structure, the bar
-ADC callback function data structure and so forth.  We need to think
-*NOW* about defining a common ADC callback structure so that we don't
-spawn a new problem which'll take effort to solve.
+Please arrange these select statements in alphabetical order - it helps
+avoid the 'add to the end' conflict problem.
