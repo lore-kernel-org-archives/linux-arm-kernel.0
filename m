@@ -1,125 +1,49 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Thu, 13 Oct 2011 08:59:15 +0530
-Subject: [PATCH] gpio: exynos4: Add device tree support
-In-Reply-To: <20111013010101.GK14042@ponder.secretlab.ca>
-References: <1318320974-9879-1-git-send-email-thomas.abraham@linaro.org>
-	<4E945C90.1050601@gmail.com>
-	<CAJuYYwRwBxkAo2fMfVV9wtQ40XeROAnc-cGJK+cssjuh9px=qQ@mail.gmail.com>
-	<4E946109.2000305@gmail.com>
-	<CAJuYYwQWUjVf9Z5Rdw4fTK70=B1aw-5x_wjYm_fq+zHyQAWJvg@mail.gmail.com>
-	<4E95AE26.8080702@gmail.com>
-	<CAJuYYwRsM_aGkeG9v97jdsJgSQeokViuLGdF5TvqEkNZCAgFVA@mail.gmail.com>
-	<20111013010101.GK14042@ponder.secretlab.ca>
-Message-ID: <CAJuYYwRKa+=AJrtgWEf8ow4cHKZruogtAsFQ8XR4B6fTS69QfQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Oct 2011 21:29:31 -0600
+Subject: [PATCH 2/3] ARM: Exynos4: Add ioremap interceptor for statically
+	remapped regions
+In-Reply-To: <CAJuYYwTpUX+zdRr5PO9SW+nUFW-BwsSwWkWXNRjw_TKy+vdEgw@mail.gmail.com>
+References: <1318234289-22041-1-git-send-email-thomas.abraham@linaro.org>
+	<1318234289-22041-3-git-send-email-thomas.abraham@linaro.org>
+	<4E95BC8E.8010105@gmail.com>
+	<CAJuYYwSQgiZMEuzyqFvijy+sTLWqi=TqvM8cGe=W3bPOSBe0Hg@mail.gmail.com>
+	<CAJuYYwTpUX+zdRr5PO9SW+nUFW-BwsSwWkWXNRjw_TKy+vdEgw@mail.gmail.com>
+Message-ID: <CACxGe6uDCxC_2fQQm6pYSXSfrvoK0NVoFC5EH0EsZWagPLPr3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2011 06:31, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Wed, Oct 12, 2011 at 09:45:25PM +0530, Thomas Abraham wrote:
->> On 12 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
->> > On 10/11/2011 11:06 AM, Thomas Abraham wrote:
->> >> On 11 October 2011 21:00, Rob Herring <robherring2@gmail.com> wrote:
->> >>> On 10/11/2011 10:19 AM, Thomas Abraham wrote:
->> >>>> Hi Rob,
->> >>>>
->> >>>> On 11 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
->> >>>>> Thomas,
->> >>>>>
->> >>>>> On 10/11/2011 03:16 AM, Thomas Abraham wrote:
->> >>>>>> As gpio chips get registered, a device tree node which represents the
->> >>>>>> gpio chip is searched and attached to it. A translate function is also
->> >>>>>> provided to convert the gpio specifier into actual platform settings
->> >>>>>> for pin function selection, pull up/down and driver strength settings.
->> >>>>>>
->> >>>>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->> >>>>>> ---
->> >>>>>> This patch is based on the latest consolidated Samsung GPIO driver available
->> >>>>>> in the following tree:
->> >>>>>> ? https://github.com/kgene/linux-samsung.git ?branch: for-next
->> >>>>>>
->> >>>>>> ?.../devicetree/bindings/gpio/gpio-samsung.txt ? ? ?| ? 30 +++++++++++
->> >>>>>> ?drivers/gpio/gpio-samsung.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 53 ++++++++++++++++++++
->> >>>>>> ?2 files changed, 83 insertions(+), 0 deletions(-)
->> >>>>>> ?create mode 100644 Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->> >>>>>>
->> >>>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->> >>>>>> new file mode 100644
->> >>>>>> index 0000000..883faeb
->> >>>>>> --- /dev/null
->> >>>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
->> >>>>>> @@ -0,0 +1,30 @@
->> >>>>>> +Samsung Exynos4 GPIO Controller
->> >>>>>> +
->> >>>>>> +Required properties:
->> >>>>>> +- compatible: Format of compatible property value should be
->> >>>>>> + ?"samsung,exynos4-gpio-<controller_name>". Example: For GPA0 controller, the
->> >>>>>> + ?compatible property value should be "samsung,exynos4-gpio-gpa0".
->> >>>>>
->> >>>>> Isn't gpa0 an instance of the h/w, not a version?
->> >>>>
->> >>>> GPA0 is a instance of the gpio controller. There are several such
->> >>>> instances and there could be differences in those instances such as
->> >>>> the number of GPIO lines managed by that gpio controller instance.
->> >>>>
->> >>>
->> >>> That doesn't seem like a reason to have different compatible strings.
->> >>> Does that affect the programming model of the controller? Unused lines
->> >>> whether at the board level or SOC level shouldn't really matter.
->> >>
->> >>
->> >> No, that does not affect the programming of the controller. The reason
->> >> for the instance name extension in compatible string is to match the
->> >> gpio_chip with a gpio controller node. When matched, the of_node
->> >> pointer of the gpio_chip is set to point to that controller node.
->> >>
->> >> This might not be the best possible implementation but the device tree
->> >> support code in this patch is dictated by the structure of the
->> >> existing gpio driver code. As you suggested previously, I will look at
->> >> reworking the gpio driver a little later but for now, there was a need
->> >> for working gpio dt solution to make progress on dt support for other
->> >> controllers.
->> >
->> > Linux should provide clues about what's needed in a binding, but the
->> > binding should not be defined based on current Linux code. Doing the
->> > binding one way and changing it later is not a good plan.
+On Wed, Oct 12, 2011 at 9:28 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> On 12 October 2011 22:00, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+>> On 12 October 2011 21:43, Rob Herring <robherring2@gmail.com> wrote:
+>>> On 10/10/2011 03:11 AM, Thomas Abraham wrote:
+>>>> ioremap() request for statically remapped regions are intercepted and the
+>>>> statically assigned virtual address is returned. For requests for which
+>>>> there are no statically remapped regions, the requests are let through.
+>>>>
+>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>>>> ---
+>>>> ?arch/arm/mach-exynos4/cpu.c ? ? ? ? ? ? | ? 16 ++++++++++++++++
+>>>> ?arch/arm/mach-exynos4/include/mach/io.h | ? ?4 ++++
+>>>> ?2 files changed, 20 insertions(+), 0 deletions(-)
+>>>>
+>>>
+>>> You won't need this with Nico's vmalloc.h clean-up series. It does
+>>> exactly this but generically for all platforms.
 >>
->> Ok. When starting on this, two compatible values where used for the
->> gpio controllers, one was "samsung,exynos4-gpio" and another was
->> "samsung,exynos4-gpio-<ctrl_name>". And when the gpio dt support would
->> mature, the second compatible value could be dropped. Non-linux
->> platforms could always use the generic "samsung,exynos4-gpio"
->> compatible value to match. I moved to using only
->> "samsung,exynos4-gpio-<ctrl_name>" just before sending this patch
->> because I was not sure of the right approach.
->>
->> >
->> > I think you need to convert all users of gpio over as well so you can
->> > move to dynamic gpio_chip creation and gpio numbering. Or maybe you can
->> > match based on base address? This is going to be a common problem as
->> > gpio is converted over to DT. Perhaps Grant or others have suggestions
->> > on the approach to use.
->>
->> Yes, I agree with you about the dynamic gpio_chip creation and gpio
->> numbering. Probably, I should have focussed more on this before moving
->> to dt support for other controllers.
->>
->> But matching based on base address is still an option if that is
->> better than matching with compatible values as defined currently. The
->> 'struct samsung_gpio_chip' which encapsulates 'struct gpio_chip' has
->> information about the base address of the gpio controller. The match
->> of gpio device node with 'struct gpio_chip' can be quickly moved over
->> to base address matching. Would this be better than the current
->> approach?
+>> Ok. Thanks for your suggestion. I will move to using Nico's patches.
 >
-> That's what I would do.
+> From Nico's reply to his pull request of vmalloc cleanup series, it
+> looks like that pull request has been withdrawn (hope I am not missing
+> anything here). Without Nico's series, and gic dt support for exynos4
+> support requiring this patch, all other workarounds to replace this
+> patch does not seem be correct.
+>
+> So is it acceptable to retain this patch and later rework/drop the
+> exynos4 specific ioremap along with Nico's vmalloc patch series when
+> it is merged.
 
-Thanks Grant. I will modify the patch to match against the base
-address of the controller.
+I would say yes, but I don't get to make the decision here.
 
-Regards,
-Thomas.
-
->
-> g.
->
->
+g.
