@@ -1,38 +1,55 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 13 Oct 2011 09:36:51 -0700
-Subject: [PATCH v4 3/4] gpio/tegra: Convert to a platform device
-In-Reply-To: <20111012231910.GA13960@quad.lixom.net>
-References: <1318371375-4083-1-git-send-email-swarren@nvidia.com>
-	<1318371375-4083-3-git-send-email-swarren@nvidia.com>
-	<20111012224131.GD25128@quad.lixom.net>
-	<CACxGe6tf0Ly8AC-6xUeoMrVj3y0KHkrcgj87SerAaCAnNhfNqA@mail.gmail.com>
-	<20111012231910.GA13960@quad.lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A08D@HQMAIL01.nvidia.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 13 Oct 2011 10:38:50 -0600 (MDT)
+Subject: [PATCHv9 03/18] TEMP: OMAP3xxx: hwmod data: add PRM hwmod
+In-Reply-To: <4E954CDA.10107@ti.com>
+References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
+	<1316781986-30642-4-git-send-email-t-kristo@ti.com>
+	<alpine.DEB.2.00.1110101320180.5205@utopia.booyaka.com>
+	<4E934D79.4080000@ti.com>
+	<alpine.DEB.2.00.1110101416530.5205@utopia.booyaka.com>
+	<4E936F0E.9050203@ti.com>
+	<alpine.DEB.2.00.1110101725140.5205@utopia.booyaka.com>
+	<4E954CDA.10107@ti.com>
+Message-ID: <alpine.DEB.2.00.1110131033410.24155@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Wednesday, October 12, 2011 5:19 PM:
-> On Wed, Oct 12, 2011 at 05:03:24PM -0600, Grant Likely wrote:
-> > On Wed, Oct 12, 2011 at 4:41 PM, Olof Johansson <olof@lixom.net> wrote:
-> > > On Tue, Oct 11, 2011 at 04:16:14PM -0600, Stephen Warren wrote:
-...
-> > > Otherwise, patch looks good. Due to dependencies between this, the rest
-> > > of this patch series and the pinmux changes, I'll hold off on it until
-> > > the dependencies land (i.e. target it for 3.3). We're cutting it very close
-> > > to the merge window as it is, I'll start for-3.3 branches shortly.
-> >
-> > Actually, see if you can get it in via the same tree as the pinmux
-> > changes.  Dependencies is not a reason to hold off from getting it
-> > into linux-next.
+On Wed, 12 Oct 2011, Cousson, Benoit wrote:
+
+> On 10/11/2011 1:26 AM, Paul Walmsley wrote:
+> > On Tue, 11 Oct 2011, Cousson, Benoit wrote:
+> > 
+> > > In fact the device name does not have to match the hwmod name. So we 
+> > > can just create an "omap2_prm" omap_device for OMAP2, "omap3_prm" 
+> > > omap_device for OMAP3... That will allow the relevant PRM driver to 
+> > > be bound to the proper device.
+> > 
+> > Incidentally, given that we would be using the hwmod name and the version
+> > number to determine the appropriate omap_device name, what IP version
+> > numbers should we assign to these PRM IP blocks for different SoCs?
 > 
-> Ok, the fixup is minimal, should be trivial to spot at git merge time.
-> 
-> Stephen, do you want to respin yourself or should I do the __devinit
-> change when I apply?
+> It can just be 1, 2 and 3... The idea is just to differentiate the IP for each
+> OMAP.
 
-I'm happy for you to fix that up when you apply if you're happy doing that.
+So those are basically arbitrary?  Something is not clear here.
 
-The same fixup applies to the pinmux patches too.
+In the current hwmod design, IP blocks with different interfaces were 
+intended to be uniquely identified by the hwmod name alone.  That is why 
+omap_hwmod_lookup() only takes a 'name' parameter.
 
--- 
-nvpublic
+If I understand what you want to do, you wish to change this to uniquely 
+identify them by a (name, interface version number) tuple.
+
+I don't have a problem with this in theory, but it implies some changes to 
+the existing model.  Specifically:
+
+- we'll need to add an interface version number to the struct omap_hwmod
+
+- we'll need to modify omap_hwmod_lookup() to take an interface version 
+number
+
+- the "ti,hwmod" DT binding that you proposed earlier will need to include 
+an interface version number
+
+
+- Paul
