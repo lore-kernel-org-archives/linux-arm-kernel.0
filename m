@@ -1,51 +1,64 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Thu, 13 Oct 2011 16:52:50 +0200
-Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
-	remove unsupported 15bit modes
-Message-ID: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Oct 2011 15:53:44 +0100
+Subject: [RFC/PATCH 5/7] ARM: Move get_thread_info macro definition to
+	<asm/assembler.h>
+In-Reply-To: <20111013144923.GE6300@arm.com>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-6-git-send-email-gdavis@mvista.com>
+	<20111011095639.GB23848@arm.com> <20111012060433.GE188@mvista.com>
+	<20111013143420.GB21648@n2100.arm.linux.org.uk>
+	<20111013144923.GE6300@arm.com>
+Message-ID: <20111013145344.GE21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow framebuffer to be configured in 16bit mode when panel is wired in
-(the default) BGR configuration, and don't claim to support 15bit input
-modes, which the LCD controller cannot handle.
+On Thu, Oct 13, 2011 at 03:49:23PM +0100, Catalin Marinas wrote:
+> On Thu, Oct 13, 2011 at 03:34:20PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Oct 12, 2011 at 02:04:33AM -0400, gdavis at mvista.com wrote:
+> > > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> > > index 78397d0..eaf4939 100644
+> > > --- a/arch/arm/include/asm/assembler.h
+> > > +++ b/arch/arm/include/asm/assembler.h
+> > > @@ -36,6 +36,20 @@
+> > >  	.endm
+> > >  #endif  /* !CONFIG_THUMB2_KERNEL */
+> > >  
+> > > +	.macro	preempt_disable, tsk, cnt
+> > > +	get_thread_info \tsk
+> > > +	ldr	\cnt, [\tsk, #TI_PREEMPT]
+> > > +	add	\cnt, \cnt, #1
+> > > +	str	\cnt, [\tsk, #TI_PREEMPT]
+> > > +	.endm
+> > > +
+> > > +	.macro	preempt_enable, tsk, cnt
+> > > +	get_thread_info \tsk
+> > > +	ldr	\cnt, [\tsk, #TI_PREEMPT]
+> > > +	sub	\cnt, \cnt, #1
+> > > +	str	\cnt, [\tsk, #TI_PREEMPT]
+> > > +	.endm
+> > > +
+> > >  /*
+> > >   * Endian independent macros for shifting bytes within registers.
+> > >   */
+> > > 
+> > > 
+> > > Not as efficient as it could be but I imagine the macros could
+> > > be written to support optional load of \tsk and/or optional \tmp
+> > > parameters to cover other common cases.
+> > 
+> > It's actually not that simple either: if you disable preemption, then you
+> > need to check for a preempt event after re-enabling preemption.
+> 
+> That's not easily possible in assembly as calling a function would
+> corrupt some registers. Is there any disadvantage with just doing the
+> equivalent of preempt_enable_no_resched() for a few asm cases where this
+> is needed?
 
-Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
----
- drivers/video/atmel_lcdfb.c |   12 +++---------
- 1 files changed, 3 insertions(+), 9 deletions(-)
+It means you drop preemption reschedule events, which means that you can
+no longer do hard-RT in any shape or form (because you're dropping the
+reschedule for an indefinite amount of time.)
 
-diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 7ca3eaf..143f6d9 100644
---- a/drivers/video/atmel_lcdfb.c
-+++ b/drivers/video/atmel_lcdfb.c
-@@ -418,24 +418,18 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
- 		var->red.length = var->green.length = var->blue.length
- 			= var->bits_per_pixel;
- 		break;
--	case 15:
- 	case 16:
- 		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
- 			/* RGB:565 mode */
- 			var->red.offset = 11;
- 			var->blue.offset = 0;
--			var->green.length = 6;
--		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
--			var->red.offset = 10;
--			var->blue.offset = 0;
--			var->green.length = 5;
- 		} else {
--			/* BGR:555 mode */
-+			/* BGR:565 mode */
- 			var->red.offset = 0;
--			var->blue.offset = 10;
--			var->green.length = 5;
-+			var->blue.offset = 11;
- 		}
- 		var->green.offset = 5;
-+		var->green.length = 6;
- 		var->red.length = var->blue.length = 5;
- 		break;
- 	case 32:
--- 
-1.7.6.3
+preempt_enable_no_resched() is fine if you're going to also put an
+explicit check a bit later in the code path when it is convenient to
+do so.
