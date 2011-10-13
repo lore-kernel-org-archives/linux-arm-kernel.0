@@ -1,56 +1,48 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 13 Oct 2011 09:17:00 +0200
-Subject: [RFC][PATCH] plat-mxc: iomux-v3.h: implicitly enable
-	pull-up/down when that's desired
-In-Reply-To: <20111013071224.GR9395@home.lan>
-References: <201110100758.p9A7wCYT011235@home.pavel.comp>
-	<20111012082702.GM13898@pengutronix.de>
-	<20111013071224.GR9395@home.lan>
-Message-ID: <20111013071700.GQ13898@pengutronix.de>
+From: tixy@yxit.co.uk (Tixy)
+Date: Thu, 13 Oct 2011 08:40:42 +0100
+Subject: [PATCH] [RFC PATCH] ARM: kprobes: Make breakpoint
+	setting/clearing SMP safe
+In-Reply-To: <CAH+eYFDSG=npBEjEgObqg+vPk8QuJBnnnGyULk9s-C9Bq3iH8Q@mail.gmail.com>
+References: <1310474402-5398-1-git-send-email-tixy@yxit.co.uk>
+	<CAH+eYFDSG=npBEjEgObqg+vPk8QuJBnnnGyULk9s-C9Bq3iH8Q@mail.gmail.com>
+Message-ID: <1318491642.2265.36.camel@computer2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 11:12:24AM +0400, Paul Fertser wrote:
-> On Wed, Oct 12, 2011 at 10:27:02AM +0200, Sascha Hauer wrote:
-> > On Mon, Oct 10, 2011 at 11:19:23AM +0400, Paul Fertser wrote:
-> > > This leads to some rather hard to understand bugs such as
-> > > misdetecting an absent ethernet PHY (a real bug i had)
-> ...
-> > > This might affect mx25, mx35, mx50, mx51 and mx53 SoCs.
-> ...
-> > > I'm not sure if that's really suitable for -stable so please excuse me
-> > > if it's not.
-> > 
-> > I think it's not suitable for stable unless there is a real bug, that
-> > is PUE or PKE are forgotten somewhere.
+On Wed, 2011-10-12 at 22:03 +0530, Rabin Vincent wrote:
+> On Tue, Jul 12, 2011 at 18:10, Tixy <tixy@yxit.co.uk> wrote:
+> > Both these issues are known and the kprobe implementation uses
+> > stop_machine() to avoid them, however, this is not sufficient.
+> > stop_machine() does not perform any kind on synchronisation between CPUs
+> > so it it still possible for one CPU to call the breakpoint changing
+> > function before another CPU has been interrupted to do likewise.
+> >
+> > To fix this problem, this patch creates a new function
+> > sync_stop_machine() which ensures that all online CPUs execute the
+> > specified function at the same time.
 > 
-> If there wasn't a real bug with MDIO, i wouldn't have found the
-> problem. I've also checked all other potentially affected SoCs and all
-> of them (except for the mx35, whose iomux file doesn't configure any
-> pads at all) had some suspicious entries.
-> 
-> > I don't like that the defines which are supposed to be defines for
-> > the individual bits are changed. This may lead to trouble and confusion
-> > once someone wants to read the values from the iomux registers and
-> > tests for bits. How about Adding new defines like this instead:
-> 
-> I perfectly understand the reasoning and fully agree it would be best
-> to do it that way right from the beginning. But given the current
-> situation when many affected iomux headers share the error that can
-> lead to subtle strange bugs, i thought it might be beneficial to fix
-> them all implicitly. And testing for those pull-up bits set without
-> testing for PUE/PKE doesn't seem to be of any use, and also before
-> sending a patch i did a git grep and found no examples of using those
-> constants in an unexpected way.
+> AFAICS stop_machine() already does what you want.  When you use
+> stop_machine(), the actual call to your function is done (on each
+> CPU's stopper thread) using the stop_machine_cpu_stop() function,
+> which already has the synchronization between CPUs which you're
+> trying to do here.
 
-Ok, convinced. Let's go with your patch for now as it's the least
-intrusive way to deal with it. Still I think we should change this
-as I suggested later.
+The only serialisation I can see is the wait_for_completion() in
+__stop_cpus() which waits for the all CPUs to have executed the
+requested function. I don't see anything which prevents one CPU from
+starting (and finishing) the requested function before other CPU's are
+ready for it. If this synchronisation existed it would have to be in
+cpu_stopper_thread() as it pulls tasks off the work list.
 
-Sascha
+In queue_stop_cpus_work() we have
+
+	for_each_cpu(cpu, cpumask)
+		cpu_stop_queue_work(&per_cpu(cpu_stopper, cpu),
+				    &per_cpu(stop_cpus_work, cpu));
+
+If the CPU executing this gets delayed by an ISR on each iteration of
+the for_each_cpu loop then the work it queues for one CPU could have
+completed before it gets around to queuing it for the next CPU.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tixy
