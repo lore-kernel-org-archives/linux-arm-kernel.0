@@ -1,55 +1,56 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 13 Oct 2011 10:38:50 -0600 (MDT)
-Subject: [PATCHv9 03/18] TEMP: OMAP3xxx: hwmod data: add PRM hwmod
-In-Reply-To: <4E954CDA.10107@ti.com>
-References: <1316781986-30642-1-git-send-email-t-kristo@ti.com>
-	<1316781986-30642-4-git-send-email-t-kristo@ti.com>
-	<alpine.DEB.2.00.1110101320180.5205@utopia.booyaka.com>
-	<4E934D79.4080000@ti.com>
-	<alpine.DEB.2.00.1110101416530.5205@utopia.booyaka.com>
-	<4E936F0E.9050203@ti.com>
-	<alpine.DEB.2.00.1110101725140.5205@utopia.booyaka.com>
-	<4E954CDA.10107@ti.com>
-Message-ID: <alpine.DEB.2.00.1110131033410.24155@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Oct 2011 17:48:22 +0100
+Subject: [PATCH v3.1-rc9] ARM: populate processor tag in proc-cpuinfo
+	for Uni-processor.
+In-Reply-To: <1318520590-24372-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1318520590-24372-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <20111013164822.GJ21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Oct 2011, Cousson, Benoit wrote:
-
-> On 10/11/2011 1:26 AM, Paul Walmsley wrote:
-> > On Tue, 11 Oct 2011, Cousson, Benoit wrote:
-> > 
-> > > In fact the device name does not have to match the hwmod name. So we 
-> > > can just create an "omap2_prm" omap_device for OMAP2, "omap3_prm" 
-> > > omap_device for OMAP3... That will allow the relevant PRM driver to 
-> > > be bound to the proper device.
-> > 
-> > Incidentally, given that we would be using the hwmod name and the version
-> > number to determine the appropriate omap_device name, what IP version
-> > numbers should we assign to these PRM IP blocks for different SoCs?
+On Thu, Oct 13, 2011 at 04:43:10PM +0100, Srinivas KANDAGATLA wrote:
+> We recently encountered issue while running cyclesoak on ARM-uniprocessor
+> system, What we have noticed it that /proc/cpuinfo does not have
+> "processor" tag when its uniprocessor, which looked incorrect.
+> All the processors code in kernel do populate this tag for both uni and
+> multi processor systems.
 > 
-> It can just be 1, 2 and 3... The idea is just to differentiate the IP for each
-> OMAP.
+> This patch just add processor tag for cpuinfo for ARM uni-processor systems.
 
-So those are basically arbitrary?  Something is not clear here.
+I wonder why cyclesoak doesn't use the sysconf(_SC_NPROCESSORS_ONLN)
+rather than implementing this functionality itself.
 
-In the current hwmod design, IP blocks with different interfaces were 
-intended to be uniquely identified by the hwmod name alone.  That is why 
-omap_hwmod_lookup() only takes a 'name' parameter.
+akpm?
 
-If I understand what you want to do, you wish to change this to uniquely 
-identify them by a (name, interface version number) tuple.
-
-I don't have a problem with this in theory, but it implies some changes to 
-the existing model.  Specifically:
-
-- we'll need to add an interface version number to the struct omap_hwmod
-
-- we'll need to modify omap_hwmod_lookup() to take an interface version 
-number
-
-- the "ti,hwmod" DT binding that you proposed earlier will need to include 
-an interface version number
-
-
-- Paul
+>  arch/arm/kernel/setup.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 621acad..4364071 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -807,7 +807,7 @@ static const char *hwcap_str[] = {
+>  
+>  static int c_show(struct seq_file *m, void *v)
+>  {
+> -	int i;
+> +	int i = 0;
+>  
+>  	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+>  		   cpu_name, read_cpuid_id() & 15, elf_platform);
+> @@ -825,6 +825,7 @@ static int c_show(struct seq_file *m, void *v)
+>  			   (per_cpu(cpu_data, i).loops_per_jiffy / (5000UL/HZ)) % 100);
+>  	}
+>  #else /* CONFIG_SMP */
+> +	seq_printf(m, "processor\t: %d\n", i);
+>  	seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
+>  		   loops_per_jiffy / (500000/HZ),
+>  		   (loops_per_jiffy / (5000/HZ)) % 100);
+> -- 
+> 1.6.3.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
