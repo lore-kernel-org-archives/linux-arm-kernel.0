@@ -1,53 +1,56 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 13 Oct 2011 14:46:44 -0400 (EDT)
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <20111013082345.GF21648@n2100.arm.linux.org.uk>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<20111011150915.GE23188@mudshark.cambridge.arm.com>
-	<20111011184821.GA11839@mudshark.cambridge.arm.com>
-	<2414781.rlNqTThJUN@wuerfel>
-	<alpine.LFD.2.02.1110111950290.17040@xanadu.home>
-	<20111013082345.GF21648@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1110131437040.17040@xanadu.home>
+Date: Thu, 13 Oct 2011 14:52:03 -0400 (EDT)
+Subject: [PATCH 2/3] ARM: Exynos4: Add ioremap interceptor for statically
+	remapped regions
+In-Reply-To: <CAJuYYwTpUX+zdRr5PO9SW+nUFW-BwsSwWkWXNRjw_TKy+vdEgw@mail.gmail.com>
+References: <1318234289-22041-1-git-send-email-thomas.abraham@linaro.org>
+	<1318234289-22041-3-git-send-email-thomas.abraham@linaro.org>
+	<4E95BC8E.8010105@gmail.com>
+	<CAJuYYwSQgiZMEuzyqFvijy+sTLWqi=TqvM8cGe=W3bPOSBe0Hg@mail.gmail.com>
+	<CAJuYYwTpUX+zdRr5PO9SW+nUFW-BwsSwWkWXNRjw_TKy+vdEgw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1110131448130.17040@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Oct 2011, Russell King - ARM Linux wrote:
+On Thu, 13 Oct 2011, Thomas Abraham wrote:
 
-> On Tue, Oct 11, 2011 at 08:03:38PM -0400, Nicolas Pitre wrote:
-> > On Tue, 11 Oct 2011, Arnd Bergmann wrote:
-> > 
-> > > I've stuck them into the arm-soc tree for now, so we get linux-next
-> > > coverage, but I won't send them to Linus this way because then we
-> > > would get the same commits twice in the history.
-> > 
-> > Could you please do the same with the following:
-> > 
-> >   git://git.linaro.org/people/nico/linux.git mach_memory_h
-> > 
-> > Russell pulled it at some point, and dropped it due to concerns about 
-> > repeated conflict resolutions (or so I presume).  I just did a test 
-> > merge between your for-next branch and the above and that looked trivial 
-> > enough.
+> On 12 October 2011 22:00, Thomas Abraham <thomas.abraham@linaro.org> wrote:
+> > On 12 October 2011 21:43, Rob Herring <robherring2@gmail.com> wrote:
+> >> On 10/10/2011 03:11 AM, Thomas Abraham wrote:
+> >>> ioremap() request for statically remapped regions are intercepted and the
+> >>> statically assigned virtual address is returned. For requests for which
+> >>> there are no statically remapped regions, the requests are let through.
+> >>>
+> >>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> >>> ---
+> >>> ?arch/arm/mach-exynos4/cpu.c ? ? ? ? ? ? | ? 16 ++++++++++++++++
+> >>> ?arch/arm/mach-exynos4/include/mach/io.h | ? ?4 ++++
+> >>> ?2 files changed, 20 insertions(+), 0 deletions(-)
+> >>>
+> >>
+> >> You won't need this with Nico's vmalloc.h clean-up series. It does
+> >> exactly this but generically for all platforms.
+> >
+> > Ok. Thanks for your suggestion. I will move to using Nico's patches.
 > 
-> _and_ the breakage of the ZBOOT_ROM stuff.
+> From Nico's reply to his pull request of vmalloc cleanup series, it
+> looks like that pull request has been withdrawn (hope I am not missing
+> anything here).
 
-In order to resolve this impass, I simply dropped the ep93xx patch from 
-the series.  This could be revisited later, just like for the 
-StrongARM/XScale cache mapping patches.  Pretty please, tell me if there 
-is still something which is not to your satisfaction.
+I'm just postponing it because this depends on a large cleanup in the 
+OMAP code which is being pushed to mainline for the next merge window.
 
-> So I'm now interpreting your request to Arnd to pull it as an attempt to
-> bypass me.  That's not what arm-soc is supposed to be about, and that's
-> certainly not what Linaro is supposed to be doing.
+> Without Nico's series, and gic dt support for exynos4 support 
+> requiring this patch, all other workarounds to replace this patch does 
+> not seem be correct.
+> 
+> So is it acceptable to retain this patch and later rework/drop the
+> exynos4 specific ioremap along with Nico's vmalloc patch series when
+> it is merged.
 
-Not at all.  I asked Arnd to pull it not so this could go to Linus via 
-the arm-soc tree, but rather that this could get increased exposure in 
-both the arm-soc tree and linux-next, and get a feel for the magnitude 
-of the merge conflicts and possible build errors.
-
-I'm therefore officially asking you again to pull this series, given 
-that I've removed from it the last offending piece I know about.
+I would guess so.  But please CC me on those patches so I know what to 
+look for when rebasing my series.
 
 
 Nicolas
