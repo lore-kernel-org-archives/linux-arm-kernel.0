@@ -1,64 +1,147 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 15:53:44 +0100
-Subject: [RFC/PATCH 5/7] ARM: Move get_thread_info macro definition to
-	<asm/assembler.h>
-In-Reply-To: <20111013144923.GE6300@arm.com>
-References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
-	<1317955121-28047-6-git-send-email-gdavis@mvista.com>
-	<20111011095639.GB23848@arm.com> <20111012060433.GE188@mvista.com>
-	<20111013143420.GB21648@n2100.arm.linux.org.uk>
-	<20111013144923.GE6300@arm.com>
-Message-ID: <20111013145344.GE21648@n2100.arm.linux.org.uk>
+From: premi@ti.com (Sanjeev Premi)
+Date: Thu, 13 Oct 2011 20:23:43 +0530
+Subject: [PATCH] arm: omap: Fix errors and warnings when building for one board
+Message-ID: <1318517623-16066-1-git-send-email-premi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 03:49:23PM +0100, Catalin Marinas wrote:
-> On Thu, Oct 13, 2011 at 03:34:20PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Oct 12, 2011 at 02:04:33AM -0400, gdavis at mvista.com wrote:
-> > > diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> > > index 78397d0..eaf4939 100644
-> > > --- a/arch/arm/include/asm/assembler.h
-> > > +++ b/arch/arm/include/asm/assembler.h
-> > > @@ -36,6 +36,20 @@
-> > >  	.endm
-> > >  #endif  /* !CONFIG_THUMB2_KERNEL */
-> > >  
-> > > +	.macro	preempt_disable, tsk, cnt
-> > > +	get_thread_info \tsk
-> > > +	ldr	\cnt, [\tsk, #TI_PREEMPT]
-> > > +	add	\cnt, \cnt, #1
-> > > +	str	\cnt, [\tsk, #TI_PREEMPT]
-> > > +	.endm
-> > > +
-> > > +	.macro	preempt_enable, tsk, cnt
-> > > +	get_thread_info \tsk
-> > > +	ldr	\cnt, [\tsk, #TI_PREEMPT]
-> > > +	sub	\cnt, \cnt, #1
-> > > +	str	\cnt, [\tsk, #TI_PREEMPT]
-> > > +	.endm
-> > > +
-> > >  /*
-> > >   * Endian independent macros for shifting bytes within registers.
-> > >   */
-> > > 
-> > > 
-> > > Not as efficient as it could be but I imagine the macros could
-> > > be written to support optional load of \tsk and/or optional \tmp
-> > > parameters to cover other common cases.
-> > 
-> > It's actually not that simple either: if you disable preemption, then you
-> > need to check for a preempt event after re-enabling preemption.
-> 
-> That's not easily possible in assembly as calling a function would
-> corrupt some registers. Is there any disadvantage with just doing the
-> equivalent of preempt_enable_no_resched() for a few asm cases where this
-> is needed?
+When customizing omap2plus_defconfig to build for only
+one board (omap3evm), I came across these warnings and
+errors (filenames truncated):
 
-It means you drop preemption reschedule events, which means that you can
-no longer do hard-RT in any shape or form (because you're dropping the
-reschedule for an indefinite amount of time.)
+arch/arm/mach-omap2/board-generic.c:76:20: warning: 'omap4_init' defined but not used
+arch/arm/mach-omap2/built-in.o: In function `omap2420_init_early':
+arch/arm/mach-omap2/io.c:364: undefined reference to `omap2_set_globals_242x'
+arch/arm/mach-omap2/io.c:366: undefined reference to `omap2xxx_voltagedomains_init'
+arch/arm/mach-omap2/io.c:367: undefined reference to `omap242x_powerdomains_init'
+arch/arm/mach-omap2/io.c:368: undefined reference to `omap242x_clockdomains_init'
+arch/arm/mach-omap2/io.c:369: undefined reference to `omap2420_hwmod_init'
+arch/arm/mach-omap2/built-in.o: In function `omap2430_init_early':
+arch/arm/mach-omap2/io.c:376: undefined reference to `omap2_set_globals_243x'
+arch/arm/mach-omap2/io.c:378: undefined reference to `omap2xxx_voltagedomains_init'
+arch/arm/mach-omap2/io.c:379: undefined reference to `omap243x_powerdomains_init'
+arch/arm/mach-omap2/io.c:380: undefined reference to `omap243x_clockdomains_init'
+arch/arm/mach-omap2/io.c:381: undefined reference to `omap2430_hwmod_init'
+arch/arm/mach-omap2/built-in.o: In function `omap4430_init_early':
+arch/arm/mach-omap2/io.c:436: undefined reference to `omap2_set_globals_443x'
+arch/arm/mach-omap2/io.c:438: undefined reference to `omap44xx_voltagedomains_init'
+arch/arm/mach-omap2/io.c:439: undefined reference to `omap44xx_powerdomains_init'
+arch/arm/mach-omap2/io.c:440: undefined reference to `omap44xx_clockdomains_init'
+arch/arm/mach-omap2/io.c:441: undefined reference to `omap44xx_hwmod_init'
 
-preempt_enable_no_resched() is fine if you're going to also put an
-explicit check a bit later in the code path when it is convenient to
-do so.
+This patch fixes them.
+
+Signed-off-by: Sanjeev Premi <premi@ti.com>
+---
+
+ Adding ifdefs makes the code bit ugly and is prone to propagate
+ further. Not sure if DT will help here, but this patch would be
+ useful for people trying to build for individual boards.
+
+ Compile tested for OMAP3EVM.
+
+ Applies to linux-omap/master at:
+   fb4df0f : ARM: OMAP1: Fix warnings about enabling 32 KiHz timer
+
+
+ arch/arm/mach-omap2/board-generic.c |    8 ++++++++
+ arch/arm/mach-omap2/io.c            |    6 ++++++
+ 2 files changed, 14 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index d9ccb9d..b39ce79 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -34,20 +34,24 @@ static struct twl4030_platform_data sdp4430_twldata = {
+ 	.irq_end	= TWL6030_IRQ_END,
+ };
+ 
++#if defined(CONFIG_ARCH_OMAP4)
+ static void __init omap4_i2c_init(void)
+ {
+ 	omap4_pmic_init("twl6030", &sdp4430_twldata);
+ }
++#endif
+ 
+ static struct twl4030_platform_data beagle_twldata = {
+ 	.irq_base	= TWL4030_IRQ_BASE,
+ 	.irq_end	= TWL4030_IRQ_END,
+ };
+ 
++#if defined(CONFIG_ARCH_OMAP3)
+ static void __init omap3_i2c_init(void)
+ {
+ 	omap3_pmic_init("twl4030", &beagle_twldata);
+ }
++#endif
+ 
+ static struct of_device_id omap_dt_match_table[] __initdata = {
+ 	{ .compatible = "simple-bus", },
+@@ -73,17 +77,21 @@ static void __init omap_generic_init(void)
+ 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
+ }
+ 
++#if defined(CONFIG_ARCH_OMAP4)
+ static void __init omap4_init(void)
+ {
+ 	omap4_i2c_init();
+ 	omap_generic_init();
+ }
++#endif
+ 
++#if defined(CONFIG_ARCH_OMAP3)
+ static void __init omap3_init(void)
+ {
+ 	omap3_i2c_init();
+ 	omap_generic_init();
+ }
++#endif
+ 
+ #if defined(CONFIG_SOC_OMAP2420)
+ static const char *omap242x_boards_compat[] __initdata = {
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index aa96538..ef3fb1e 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -359,6 +359,7 @@ static void __init omap_hwmod_init_postsetup(void)
+ 	omap_pm_if_early_init();
+ }
+ 
++#if defined(CONFIG_ARCH_OMAP2)
+ void __init omap2420_init_early(void)
+ {
+ 	omap2_set_globals_242x();
+@@ -382,11 +383,13 @@ void __init omap2430_init_early(void)
+ 	omap_hwmod_init_postsetup();
+ 	omap2430_clk_init();
+ }
++#endif
+ 
+ /*
+  * Currently only board-omap3beagle.c should call this because of the
+  * same machine_id for 34xx and 36xx beagle.. Will get fixed with DT.
+  */
++#if defined(CONFIG_ARCH_OMAP3)
+ void __init omap3_init_early(void)
+ {
+ 	omap2_set_globals_3xxx();
+@@ -430,7 +433,9 @@ void __init ti816x_init_early(void)
+ 	omap_hwmod_init_postsetup();
+ 	omap3xxx_clk_init();
+ }
++#endif
+ 
++#if defined(CONFIG_ARCH_OMAP4)
+ void __init omap4430_init_early(void)
+ {
+ 	omap2_set_globals_443x();
+@@ -442,6 +447,7 @@ void __init omap4430_init_early(void)
+ 	omap_hwmod_init_postsetup();
+ 	omap4xxx_clk_init();
+ }
++#endif
+ 
+ void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
+ 				      struct omap_sdrc_params *sdrc_cs1)
+-- 
+1.7.0.4
