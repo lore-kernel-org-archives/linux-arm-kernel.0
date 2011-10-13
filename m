@@ -1,135 +1,110 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Thu, 13 Oct 2011 12:35:50 +0100
-Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
-In-Reply-To: <CACRpkdZMXjoHdEaPhTFS9Q7=5tWfFHDiwt-gdKd2CGiW+Evdmw@mail.gmail.com>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<1318178172-7965-5-git-send-email-zoss@devai.org>
-	<CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
-	<4E92BE19.4060907@cam.ac.uk>
-	<20111010100020.GA3607@opensource.wolfsonmicro.com>
-	<CAGVye5Nc9vhaF=7Y+hvGo4g-GOFb9fHeni+g=+hTj-8WCSqY+Q@mail.gmail.com>
-	<20111010114407.GD3607@opensource.wolfsonmicro.com>
-	<20111013094717.GL21648@n2100.arm.linux.org.uk>
-	<CACRpkdZMXjoHdEaPhTFS9Q7=5tWfFHDiwt-gdKd2CGiW+Evdmw@mail.gmail.com>
-Message-ID: <4E96CD16.5060104@cam.ac.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 13 Oct 2011 13:54:09 +0200
+Subject: [PATCH v3 2/4] dmaengine: at_hdmac: add device tree support
+In-Reply-To: <20111013003422.GE14042@ponder.secretlab.ca>
+References: <f91f267b82ac0f0459c11a7bdf3ab0ea8758656a.1318438197.git.nicolas.ferre@atmel.com>
+	<6a7ec87c53609bbb517b199a9b48a5322a625aa1.1318438197.git.nicolas.ferre@atmel.com>
+	<20111013003422.GE14042@ponder.secretlab.ca>
+Message-ID: <4E96D161.8050602@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/11 12:09, Linus Walleij wrote:
-> On Thu, Oct 13, 2011 at 11:47 AM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Mon, Oct 10, 2011 at 12:44:08PM +0100, Mark Brown wrote:
->>> On Mon, Oct 10, 2011 at 01:42:30PM +0200, Zoltan Devai wrote:
->>>
->>>> Where should the adc driver go in this case ?
->>>
->>> At the minute it seems to me that arch/arm is as good a place as any
->>> really - currently this code is getting dumped wherever the main device
->>> is.
+On 10/13/2011 02:34 AM, Grant Likely :
+> On Wed, Oct 12, 2011 at 06:57:12PM +0200, Nicolas Ferre wrote:
+>> Add device tree probe support for atmel at_hdmac DMA driver.
+>> Bindings are added to specify DMA controller configuration.
 >>
->> No it isn't - we want drivers out of arch/arm (it's already been a topic
->> of flame for Linus, so it's something that we should try _really_ hard
->> to avoid.)
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  .../devicetree/bindings/dma/atmel-dma.txt          |   14 +++++++++
+>>  drivers/dma/at_hdmac.c                             |   30 +++++++++++++++++++-
+>>  2 files changed, 43 insertions(+), 1 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/dma/atmel-dma.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+>> new file mode 100644
+>> index 0000000..3c046ee
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+>> @@ -0,0 +1,14 @@
+>> +* Atmel Direct Memory Access Controller (DMA)
+>> +
+>> +Required properties:
+>> +- compatible: Should be "atmel,<chip>-dma"
+>> +- reg: Should contain DMA registers location and length
+>> +- interrupts: Should contain DMA interrupt
+>> +
+>> +Examples:
+>> +
+>> +dma at ffffec00 {
+>> +	compatible = "atmel,at91sam9g45-dma";
+>> +	reg = <0xffffec00 0x200>;
+>> +	interrupts = <21>;
+>> +};
+>> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+>> index d1869c5..42bd64c 100644
+>> --- a/drivers/dma/at_hdmac.c
+>> +++ b/drivers/dma/at_hdmac.c
+>> @@ -23,6 +23,8 @@
+>>  #include <linux/module.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/slab.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>>  
+>>  #include "at_hdmac_regs.h"
+>>  
+>> @@ -1175,6 +1177,20 @@ static void atc_free_chan_resources(struct dma_chan *chan)
+>>  
+>>  /*--  Module Management  -----------------------------------------------*/
+>>  
+>> +#if defined(CONFIG_OF)
+>> +static const struct of_device_id atmel_dma_dt_ids[] = {
+>> +	{
+>> +		.compatible = "atmel,at91sam9rl-dma",
+>> +		.data = (void *)ATDMA_DEVTYPE_SAM9RL
+>> +	}, {
+>> +		.compatible = "atmel,at91sam9g45-dma",
+>> +		.data = (void *)ATDMA_DEVTYPE_SAM9G45
+>> +	}, { /* sentinel */ }
+>> +};
+>> +
+>> +MODULE_DEVICE_TABLE(of, atmel_dma_dt_ids);
+>> +#endif
+>> +
+>>  static struct platform_device_id atdma_devtypes[] = {
+>>  	{
+>>  		.name = "at91sam9rl_dma",
+>> @@ -1187,6 +1203,17 @@ static struct platform_device_id atdma_devtypes[] = {
+>>  	}
+>>  };
+>>  
+>> +static inline enum atdma_devtype __init at_dma_get_driver_data(
+>> +					struct platform_device *pdev)
+>> +{
+>> +	if (pdev->dev.of_node) {
+>> +		const struct of_device_id *match;
+>> +		match = of_match_node(atmel_dma_dt_ids, pdev->dev.of_node);
 > 
-> Amen to that.
+> You'll need to check the return value.  It is possible (though
+> unlikely) to have a device with an of_node but still happens to get
+> bound via the platform_driver id_table.  In which case match would be
+> NULL here.
+
+Ok, I add:
+
+                if (match == NULL)
+                        return ATDMA_DEVTYPE_UNDEFINED;
+
+Which will take care about this case.
+
+
+> Otherwise, you can add my a-b after fixing that bug.
 > 
->> As this is clearly a device driver (it has a device driver struct, it
->> relies upon a struct device, etc) then it needs to live outside of
->> arch/arm/ - and I think Arnd's suggestion of drivers/adc is probably
->> the right place for it to move to (even though its probably the first
->> to create the directory.)  More stuff can come along in the future,
->> and then its all together to start creating a common API in there.
-> 
-> That sort of suggest that the drivers/staging/iio/adc is in
-> trouble now. It will have an in-kernel competitor for similar
-> stuff.
-> 
-> Having drivers/adc and drivers/iio/adc compete about
-> taking drivers on preference as to whether they were intended
-> for userspace or kernelspace does not seem like a good
-> thing.
-The problem with a straight adc directory is the fact that many of
-these devices are combined input and output.  The also tend to
-have numerous things that to a casual don't look like ADC's
-(light sensors etc).  We only did the grouping in IIO for the
-sake of not having a huge flat directory.  Many of the drivers
-overlap between the different categories.
-> 
->>From a quick review of the IIO ADC subsystem I cannot really
-> find a big problem with it other than it brings the entire IIO
-> subsystem along, including the userspace interfaces I guess.
-> 
-> The circumstances seem to suggest that drivers/iio/adc should
-> be moved down to drivers/adc without the rest of the iio
-> stuff, with a in-kernel API only and then have iio use that
-> (this is probably true for some more drivers in IIO like
-> dac, accel, addac, gyro...).
-> 
-> So the concept of IIO stuff would change from the
-> userspace-first centric view to the kernelspace-first
-> centric, with optional userspace interfaces in the form
-> of IIO.
-> 
-> I'm not sure about what Jonathan thinks about that
-> though.
-That wouldn't be too hard to do. It's just a case of breaking
-iio_register_device function in two.  Right now (with the in kernel
-RFC) on top.  The only thing needed for in kernel access is that the
-configured struct iio_dev gets added to the list of available devices.
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-I think we need to maintain the form of struct iio_chan_spec 
-(or whatever does the same job) with the intent of it directly mapping
-to userspace interfaces (keeps things clean and makes sure there is enough
-information to actually use the channel for anything).
+Thanks a lot for your reviews Grant,
 
-The key thing is the unified specification of channel capabilities
-and the ability to read them.  We have one way of doing that which
-has developed against a 'lot' of drivers.
-
-The nasty corner is optimized reading of channel scans.  They tend to
-be irrelevant for memory mapped device but are vital for many devices
-on low bandwidth buses.  Right now we leave that entirely to the
-individual drivers (they push this data out rather than it being
-pulled from the core like everything else).  It may be possible to
-flip this around with out too much pain, but I'm not sure.
-The other nasty bits are:
-* hardware buffering
-* triggered capture control - we really care about this for IIO
-and I don't think anyone else does.  Could maybe get away with using
-device tree or similar to specify defaults for this and not provide
-any means of changing it for devices other than those with full IIO
-userspace in place.
-
-As you can imagine I'm a little wary of sending IIO through another
-refactoring right now (proposal to move the core out of staging is
-scheduled for my next free afternoon!).  So in principal in favour
-of this approach but in practice not sure I'll be in a position
-to do it (need to eat and my funding source is about to run out -
-awaiting decision on more).
-
-So my personal preference would be to add the relevant access functions
-etc to IIO as is.  Two models:
-
-1) Pull from drivers - (give me reading now).
-Done - we need to nick the clkdev mapping approach to join everything
-up and play a few tricks to get a unique consistent name.
-
-2) Push from triggered capture  - (here is a reading).
-Easiest option from our point of view is to provide this as a 'buffer'
-implementation.  Normally we'd notify userspace of new data, here we
-notify in kernel users (or just push it into their callbacks).
-
-Post that we start to make IIO userspace interfaces optional.
-
-It gives a progression towards what you are suggesting and doesn't
-hold us up in staging for another long cycle.
-
-There are exceptions. I'd argue any element that is really built for
-say hwmon or input ought to register directly with those subsytems.
-That includes the touchscreen element of the adc that started this
-conversation.  No point in adding overhead and generality to a non
-general element.
-
-Sorry for quick reply, mad day.
-
-Jonathan
+Bye,
+-- 
+Nicolas Ferre
