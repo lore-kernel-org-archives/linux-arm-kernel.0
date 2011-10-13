@@ -1,52 +1,66 @@
-From: weber@corscience.de (Thomas Weber)
-Date: Thu, 13 Oct 2011 08:50:22 +0200
-Subject: [PATCHv2] ARM: zImage: Use $(CROSS_COMPILE)size to get .bss size
-Message-ID: <1318488622-20023-1-git-send-email-weber@corscience.de>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Thu, 13 Oct 2011 08:59:57 +0200
+Subject: [PATCH v6 10/16] OMAP2+: UART: Modify omap_uart_can_sleep function
+In-Reply-To: <CAAL8m4zAOw9=qFCYV6-FxqGxQKwNZf71McCUtXSxoFMdOqz5PA@mail.gmail.com>
+References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
+	<87vcrv2xox.fsf@ti.com>
+	<CAAL8m4xTmz+-ureDiGPoKUu634q1Wy=h01kpfRWCk9LFCV0+Dg@mail.gmail.com>
+	<87wrcangkq.fsf@ti.com>
+	<CAAL8m4zAOw9=qFCYV6-FxqGxQKwNZf71McCUtXSxoFMdOqz5PA@mail.gmail.com>
+Message-ID: <CAORVsuUsE09P0v-Ro7PctkE96mF4Cnefe9cASYJu447tVNBJ-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use $(CROSS_COMPILE)size to determine the bss size
-from vmlinux.
+Hi Govindraj,
 
-The problem is introduced in:
+On Thu, Oct 13, 2011 at 3:09 AM, Govindraj <govindraj.ti@gmail.com> wrote:
+...
+>>
+>> Yes, but obviously comes at the expense of power savings. ?IOW, This is
+>> a hard-coded power vs. performance trade off that we are trying to get
+>> away from.
+>>
+>> So, the root of the problem is that the MPU wakeup latency is causing a
+>> "sluggish" console. ?The solution? ?request an MPU wakeup latency
+>> constraint.
+>>
+>
+> Okay, Will explore this.
+>
+>> This is a classic use-case for such a constraint, and the serial driver
+>> should have the option of requesting a constraint to prevent the sluggish
+>> console. ?The constraint only needs to be held until the auto-suspend
+>> delay expires, so should be relased in the ->runtime_suspend() method of
+>> the driver.
+>>
+>> This constraint needs to be configurable, probably from the board file,
+>> so that it is optional, and so users who don't care about sluggish
+>> consoles (or non-console UART users who don't care about response time)
+>> have the option of preferring power savings over UART responsiveness.
+>>
+>> As a reference, the i2c driver is currently doing something similar
+>> in that it request an MPU constraint to prevent the MPU from going into
+>> retention/off while waiting for an i2c interrupt to arrive.
+>>
+>
+> Thanks, will check and try to use the mpu constraints
+As a reference the pm-qos branch of
+https://gitorious.org/jpihet/omap-pm has the latest code for the
+per-device constraints framework.
 
-commit 5ffb04f6690d71fab241b3562ebf52b893ac4ff1
-ARM: zImage: make sure appended DTB doesn't get
-overwritten by kernel .bss
+Please refer to the documentation at Documentation/power/pm_qos_interface.txt.
+The commit dbec9ed1 [1] shows how I2C is using the framework.
 
-This fixes following error message:
+[1] https://gitorious.org/jpihet/omap-pm/commit/dbec9ed1a6d6341d2ad2352a9578d66d15d198f4
 
-size: arch/arm/boot/compressed/../../../../vmlinux:
-File format is ambiguous
+Regards,
+Jean
 
-size: Matching formats:
-elf32-littlearm
-elf32-littlearm-symbian
-elf32-littlearm-vxworks
-
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Thomas Weber <weber@corscience.de>
----
-v2: 
- - Fixed commit hash and rebased to rmk/devel-stable branch.
- - Added received Acked-by
-
- arch/arm/boot/compressed/Makefile |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index e4f32a8..3103632 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -126,7 +126,7 @@ ccflags-y := -fpic -fno-builtin -I$(obj)
- asflags-y := -Wa,-march=all
- 
- # Supply kernel BSS size to the decompressor via a linker symbol.
--KBSS_SZ = $(shell size $(obj)/../../../../vmlinux | awk 'END{print $$3}')
-+KBSS_SZ = $(shell $(CROSS_COMPILE)size $(obj)/../../../../vmlinux | awk 'END{print $$3}')
- LDFLAGS_vmlinux = --defsym _kernel_bss_size=$(KBSS_SZ)
- # Supply ZRELADDR to the decompressor via a linker symbol.
- ifneq ($(CONFIG_AUTO_ZRELADDR),y)
--- 
-1.7.7
+>
+> --
+> Govindraj.R.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
