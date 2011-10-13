@@ -1,39 +1,59 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 13 Oct 2011 10:31:45 -0400 (EDT)
-Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <CACVXFVNXyzzJw7UK+OFuDe23voQvyywoP9AvUsV=iPDFPO4fPw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1110131029510.2026-100000@iolanthe.rowland.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Oct 2011 15:31:43 +0100
+Subject: [RFC/PATCH 3/7] ARM: ARM11 MPCore: {clean,flush}_pmd_entry are
+	not preempt safe
+In-Reply-To: <6EB957F5-6E89-43F3-BAF3-A9E007BD896F@mvista.com>
+References: <1317877714-11355-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-1-git-send-email-gdavis@mvista.com>
+	<1317955121-28047-4-git-send-email-gdavis@mvista.com>
+	<20111011095314.GA23848@arm.com>
+	<6EB957F5-6E89-43F3-BAF3-A9E007BD896F@mvista.com>
+Message-ID: <20111013143143.GA21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Oct 2011, Ming Lei wrote:
-
-> >> Inside device_add(), device_pm_add is called before bus_probe_device,
-> >> so the patch can't change the device order in pm list, and just change
-> >> the driver probe order.
-> >
-> > That's the way it works now, but can it be reworked? ?It would be
+On Tue, Oct 11, 2011 at 10:34:17PM -0400, George G. Davis wrote:
 > 
-> IMO, it depends on what shape you plan to rework.  Currently, the
-> deferred probe may found a resource dependency, but I am not sure
-> that pm dependency is same with the resource dependency found
-> during probe.
+> On Oct 11, 2011, at 5:53 AM, Catalin Marinas wrote:
 > 
-> > possible to adjust the list order after successful probe. ?However,
-> > I'm not clear on the ordering rules for the dpm_list. ?Right now it is
-> > explicitly ordered to have parents before children, but as already
-> > expressed, that doesn't accurately represent ordering constraints for
-> > multiple device dependancies.
+> > On Fri, Oct 07, 2011 at 03:38:37AM +0100, gdavis at mvista.com wrote:
+> >> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> >> index 594d677..3c8253f 100644
+> >> --- a/arch/arm/mm/mmu.c
+> >> +++ b/arch/arm/mm/mmu.c
+> >> @@ -567,12 +567,24 @@ static void __init alloc_init_section(pud_t *pud, unsigned long addr,
+> >> 		if (addr & SECTION_SIZE)
+> >> 			pmd++;
+> >> 
+> >> +		if (cache_ops_need_broadcast())
+> >> +			preempt_disable();
+> >> 		do {
+> >> 			*pmd = __pmd(phys | type->prot_sect);
+> >> 			phys += SECTION_SIZE;
+> >> 		} while (pmd++, addr += SECTION_SIZE, addr != end);
+> >> 
+> >> +		/* FIXME: Multiple PMD entries may be written above
+> >> +		 * but only one cache line, up to 8 PMDs depending
+> >> +		 * on the alignment of this mapping, is flushed below.
+> >> +		 * IFF this mapping spans >8MiB, then only the first
+> >> +		 * 8MiB worth of entries will be flushed.  Entries
+> >> +		 * above the 8MiB limit will not be flushed if I
+> >> +		 * read this correctly.
+> >> +		 */
+> >> 		flush_pmd_entry(p);
+> >> +		if (cache_ops_need_broadcast())
+> >> +			preempt_enable();
+> > 
+> > My reading of the create_mapping() code is that alloc_init_pud() and
+> > alloc_init_section() are called with a 2MB range only (that's 2
+> > entries) given by pgd_addr_end().
 > 
-> Maybe we should understand the correct model of the ordering constraints
-> for the multiple device dependancies first, could you give a description or
-> some examples about it?
+> You're correct of course.  I initially stuck that FIXME note in there more as
+> a reminder to review it more carefully.  Alas, in my haste, I submitted as-is
+> w/o checking parameter bounds passed from callers which do as you
+> say, so it's never more than 2MiB in size.  Thanks for the feedback.
+> I'll remove that note.
 
-The requirement is that devices must be capable of resuming in the 
-order given by dpm_list, and they must be capable of suspending in 
-the reverse order.
-
-Therefore if device A can't work unless device B is functional, then B 
-must come before A in dpm_list.
-
-Alan Stern
+Note also that the early bringup of MMU mappings (alloc_init_section
+etc) are running before SMP bringup, so they're already bound to a
+single CPU.  So these shouldn't need 'fixing'.
