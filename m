@@ -1,120 +1,126 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Oct 2011 19:02:28 -0600
-Subject: [PATCH v2 1/5] tty/serial: RS485 bindings for device tree
-In-Reply-To: <37a19e194d02144aecd24f284f5e43979643a3c3.1318433947.git.nicolas.ferre@atmel.com>
-References: <1318435620-7481-1-git-send-email-nicolas.ferre@atmel.com>
-	<37a19e194d02144aecd24f284f5e43979643a3c3.1318433947.git.nicolas.ferre@atmel.com>
-Message-ID: <20111013010228.GM14042@ponder.secretlab.ca>
+Date: Wed, 12 Oct 2011 18:34:22 -0600
+Subject: [PATCH v3 2/4] dmaengine: at_hdmac: add device tree support
+In-Reply-To: <6a7ec87c53609bbb517b199a9b48a5322a625aa1.1318438197.git.nicolas.ferre@atmel.com>
+References: <f91f267b82ac0f0459c11a7bdf3ab0ea8758656a.1318438197.git.nicolas.ferre@atmel.com>
+	<6a7ec87c53609bbb517b199a9b48a5322a625aa1.1318438197.git.nicolas.ferre@atmel.com>
+Message-ID: <20111013003422.GE14042@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 06:06:56PM +0200, Nicolas Ferre wrote:
-> Generic bindings for RS485 feature included in some UARTs.
-> Those bindings have to be used withing an UART device tree node.
-> Documentation updated to link to the bindings definition.
+On Wed, Oct 12, 2011 at 06:57:12PM +0200, Nicolas Ferre wrote:
+> Add device tree probe support for atmel at_hdmac DMA driver.
+> Bindings are added to specify DMA controller configuration.
 > 
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  .../devicetree/bindings/dma/atmel-dma.txt          |   14 +++++++++
+>  drivers/dma/at_hdmac.c                             |   30 +++++++++++++++++++-
+>  2 files changed, 43 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/atmel-dma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+> new file mode 100644
+> index 0000000..3c046ee
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+> @@ -0,0 +1,14 @@
+> +* Atmel Direct Memory Access Controller (DMA)
+> +
+> +Required properties:
+> +- compatible: Should be "atmel,<chip>-dma"
+> +- reg: Should contain DMA registers location and length
+> +- interrupts: Should contain DMA interrupt
+> +
+> +Examples:
+> +
+> +dma at ffffec00 {
+> +	compatible = "atmel,at91sam9g45-dma";
+> +	reg = <0xffffec00 0x200>;
+> +	interrupts = <21>;
+> +};
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index d1869c5..42bd64c 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -23,6 +23,8 @@
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  
+>  #include "at_hdmac_regs.h"
+>  
+> @@ -1175,6 +1177,20 @@ static void atc_free_chan_resources(struct dma_chan *chan)
+>  
+>  /*--  Module Management  -----------------------------------------------*/
+>  
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id atmel_dma_dt_ids[] = {
+> +	{
+> +		.compatible = "atmel,at91sam9rl-dma",
+> +		.data = (void *)ATDMA_DEVTYPE_SAM9RL
+> +	}, {
+> +		.compatible = "atmel,at91sam9g45-dma",
+> +		.data = (void *)ATDMA_DEVTYPE_SAM9G45
+> +	}, { /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, atmel_dma_dt_ids);
+> +#endif
+> +
+>  static struct platform_device_id atdma_devtypes[] = {
+>  	{
+>  		.name = "at91sam9rl_dma",
+> @@ -1187,6 +1203,17 @@ static struct platform_device_id atdma_devtypes[] = {
+>  	}
+>  };
+>  
+> +static inline enum atdma_devtype __init at_dma_get_driver_data(
+> +					struct platform_device *pdev)
+> +{
+> +	if (pdev->dev.of_node) {
+> +		const struct of_device_id *match;
+> +		match = of_match_node(atmel_dma_dt_ids, pdev->dev.of_node);
+
+You'll need to check the return value.  It is possible (though
+unlikely) to have a device with an of_node but still happens to get
+bound via the platform_driver id_table.  In which case match would be
+NULL here.
+
+Otherwise, you can add my a-b after fixing that bug.
 
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-> ---
->  Documentation/devicetree/bindings/serial/rs485.txt |   31 ++++++++++++++++++++
->  .../devicetree/bindings/tty/serial/atmel-usart.txt |   27 +++++++++++++++++
->  Documentation/serial/serial-rs485.txt              |    5 +++
->  3 files changed, 63 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/serial/rs485.txt
->  create mode 100644 Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/rs485.txt b/Documentation/devicetree/bindings/serial/rs485.txt
-> new file mode 100644
-> index 0000000..1e753c6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/rs485.txt
-> @@ -0,0 +1,31 @@
-> +* RS485 serial communications
+g.
+
+
+> +		return (enum atdma_devtype)match->data;
+> +	}
+> +	return platform_get_device_id(pdev)->driver_data;
+> +}
 > +
-> +The RTS signal is capable of automatically controlling line direction for
-> +the built-in half-duplex mode.
-> +The properties described hereafter shall be given to a half-duplex capable
-> +UART node.
-> +
-> +Required properties:
-> +- rs485-rts-delay: prop-encoded-array <a b> where:
-> +  * a is the delay beteween rts signal and beginning of data sent in milliseconds.
-> +      it corresponds to the delay before sending data.
-> +  * b is the delay between end of data sent and rts signal in milliseconds
-> +      it corresponds to the delay after sending data and actual release of the line.
-> +
-> +Optional properties:
-> +- linux,rs485-enabled-at-boot-time: empty property telling to enable the rs485
-> +  feature at boot time. It can be disabled later with proper ioctl.
-> +- rs485-rx-during-tx: empty property that enables the receiving of data even
-> +  whilst sending data.
-> +
-> +RS485 example for Atmel USART:
-> +	usart0: serial at fff8c000 {
-> +		compatible = "atmel,at91sam9260-usart";
-> +		reg = <0xfff8c000 0x4000>;
-> +		interrupts = <7>;
-> +		atmel,use-dma-rx;
-> +		atmel,use-dma-tx;
-> +		linux,rs485-enabled-at-boot-time;
-> +		rs485-rts-delay = <0 200>;		// in milliseconds
-> +	};
-> +
-> diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-> new file mode 100644
-> index 0000000..a49d9a1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
-> @@ -0,0 +1,27 @@
-> +* Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
-> +
-> +Required properties:
-> +- compatible: Should be "atmel,<chip>-usart"
-> +  The compatible <chip> indicated will be the first SoC to support an
-> +  additional mode or an USART new feature.
-> +- reg: Should contain registers location and length
-> +- interrupts: Should contain interrupt
-> +
-> +Optional properties:
-> +- atmel,use-dma-rx: use of PDC or DMA for receiving data
-> +- atmel,use-dma-tx: use of PDC or DMA for transmitting data
-> +
-> +<chip> compatible description:
-> +- at91rm9200:  legacy USART support
-> +- at91sam9260: generic USART implementation for SAM9 SoCs
-> +
-> +Example:
-> +
-> +	usart0: serial at fff8c000 {
-> +		compatible = "atmel,at91sam9260-usart";
-> +		reg = <0xfff8c000 0x4000>;
-> +		interrupts = <7>;
-> +		atmel,use-dma-rx;
-> +		atmel,use-dma-tx;
-> +	};
-> +
-> diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
-> index c8878f8..079cb3d 100644
-> --- a/Documentation/serial/serial-rs485.txt
-> +++ b/Documentation/serial/serial-rs485.txt
-> @@ -28,6 +28,10 @@
->     RS485 communications. This data structure is used to set and configure RS485
->     parameters in the platform data and in ioctls.
+>  /**
+>   * at_dma_off - disable DMA controller
+>   * @atdma: the Atmel HDAMC device
+> @@ -1218,7 +1245,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>  	dma_cap_set(DMA_MEMCPY, cap_mask);
 >  
-> +   The device tree can also provide RS485 boot time parameters (see [2]
-> +   for bindings). The driver is in charge of filling this data structure from
-> +   the values given by the device tree.
-> +
->     Any driver for devices capable of working both as RS232 and RS485 should
->     provide at least the following ioctls:
+>  	/* get DMA parameters from controller type */
+> -	atdmatype = platform_get_device_id(pdev)->driver_data;
+> +	atdmatype = at_dma_get_driver_data(pdev);
 >  
-> @@ -121,3 +125,4 @@
->  5. REFERENCES
+>  	switch (atdmatype) {
+>  	case ATDMA_DEVTYPE_SAM9RL:
+> @@ -1526,6 +1553,7 @@ static struct platform_driver at_dma_driver = {
+>  	.driver = {
+>  		.name	= "at_hdmac",
+>  		.pm	= &at_dma_dev_pm_ops,
+> +		.of_match_table	= of_match_ptr(atmel_dma_dt_ids),
+>  	},
+>  };
 >  
->   [1]	include/linux/serial.h
-> + [2]	Documentation/devicetree/bindings/serial/rs485.txt
 > -- 
 > 1.7.5.4
 > 
