@@ -1,62 +1,49 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 13 Oct 2011 14:22:13 -0700
-Subject: [PATCH v6 09/16] OMAP2+: UART: Add runtime pm support for
-	omap-serial driver
-In-Reply-To: <CAAL8m4yrXo4KRYxXxWECU99B6--FCMBDFUbNk+vsBV0Jnt0bcg@mail.gmail.com>
-	(Govindraj's message of "Thu, 13 Oct 2011 06:58:48 +0530")
-References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
-	<1317380495-584-9-git-send-email-govindraj.raja@ti.com>
-	<878voplppo.fsf@ti.com>
-	<CAAL8m4yrXo4KRYxXxWECU99B6--FCMBDFUbNk+vsBV0Jnt0bcg@mail.gmail.com>
-Message-ID: <87obxkio3e.fsf@ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 13 Oct 2011 14:31:32 -0700
+Subject: [PATCH v3.1-rc9] ARM: populate processor tag in proc-cpuinfo
+	for Uni-processor.
+In-Reply-To: <20111013210336.GO21648@n2100.arm.linux.org.uk>
+References: <1318520590-24372-1-git-send-email-srinivas.kandagatla@st.com>
+	<20111013164822.GJ21648@n2100.arm.linux.org.uk>
+	<20111013135234.49f2d400.akpm@linux-foundation.org>
+	<20111013210336.GO21648@n2100.arm.linux.org.uk>
+Message-ID: <20111013143132.ef96905e.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Govindraj <govindraj.ti@gmail.com> writes:
+On Thu, 13 Oct 2011 22:03:36 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-> On Thu, Oct 13, 2011 at 5:36 AM, Kevin Hilman <khilman@ti.com> wrote:
->> "Govindraj.R" <govindraj.raja@ti.com> writes:
->>
->> [...]
->>
->>> Use device_may_wakeup to check whether uart has wakeup capabilities
->>> and then enable uart runtime usage for the uart.
->>
->> Curious about what happens when device_may_wakeup() is not set during
->> device init.
->>
->> [...]
->>
->>> @@ -1305,6 +1363,16 @@ static int serial_omap_probe(struct platform_device *pdev)
->>> ? ? ? ? ? ? ? up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
->>> ? ? ? }
->>>
->>> + ? ? pm_runtime_use_autosuspend(&pdev->dev);
->>> + ? ? pm_runtime_set_autosuspend_delay(&pdev->dev,
->>> + ? ? ? ? ? ? ? ? ? ? OMAP_UART_AUTOSUSPEND_DELAY);
->>> +
->>> + ? ? pm_runtime_irq_safe(&pdev->dev);
->>> + ? ? if (device_may_wakeup(&pdev->dev)) {
->>> + ? ? ? ? ? ? pm_runtime_enable(&pdev->dev);
->>
->> So if device_may_wakeup() is false, runtime PM is not enabled, then...
->>
->>> + ? ? ? ? ? ? pm_runtime_get_sync(&pdev->dev);
->>
->> ...this get doesn't happen, and the first register access causes a crash.
->
-> Actually no crash, clocks will left enabled from boot up (hwmod_no_reset/idle)
-> that are idled and enabled back here.
->
-> Since hwmod_idle is binded here later ([PATCH v6 15/16]),
+> On Thu, Oct 13, 2011 at 01:52:34PM -0700, Andrew Morton wrote:
+> > On Thu, 13 Oct 2011 17:48:22 +0100
+> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > 
+> > > On Thu, Oct 13, 2011 at 04:43:10PM +0100, Srinivas KANDAGATLA wrote:
+> > > > We recently encountered issue while running cyclesoak on ARM-uniprocessor
+> > > > system, What we have noticed it that /proc/cpuinfo does not have
+> > > > "processor" tag when its uniprocessor, which looked incorrect.
+> > > > All the processors code in kernel do populate this tag for both uni and
+> > > > multi processor systems.
+> > > > 
+> > > > This patch just add processor tag for cpuinfo for ARM uni-processor systems.
+> > > 
+> > > I wonder why cyclesoak doesn't use the sysconf(_SC_NPROCESSORS_ONLN)
+> > > rather than implementing this functionality itself.
+> > > 
+> > > akpm?
+> > 
+> > eep, cyclesoak will soon be celebrating its eleventh birthday. 
+> > sysconf(_SC_NPROCESSORS_ONLN) might have existed back in those days,
+> > but I sure didn't know about it!
+> 
+> Do you have any opinion on the related issue of whether uniprocessor
+> kernels should include a 'processor: 0' line in their /proc/cpuinfo
+> to satisfy programs such as cyclesoak ?
 
-IMO, That's not a very maintainable solution.   
+I think it would be best to do what x86 does, and x86 appears to do
+"processor\t: %u" even for uniprocessor.  Plus that makes UP and SMP
+more consistent.
 
-What happens when when someone fixes serial.c to only set
-HWMOD_INIT_NO_IDLE on the console UART?  or if we fix things so we don't
-need INIT_NO_IDLE anymore?  Then this will crash.
-
-Driver code should not make assumptions like this about what device init
-code is or isn't doing.
-
-Kevin
+But there isn't much consistency here. 
+arch/openrisc/kernel/setup.c:show_cpuinfo() sprays out stuff which is
+very different from x86.
