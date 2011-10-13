@@ -1,21 +1,30 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 13 Oct 2011 15:27:22 +0100
-Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
-In-Reply-To: <201110131619.39303.arnd@arndb.de>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<20111013113506.GJ1098@sirena.org.uk>
-	<20111013121745.GU21648@n2100.arm.linux.org.uk>
-	<201110131619.39303.arnd@arndb.de>
-Message-ID: <20111013142722.GN1098@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Oct 2011 15:29:14 +0100
+Subject: [PATCH] mmc: mmci: Do not release spinlock in request_end
+In-Reply-To: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1318342001-26955-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20111013142914.GZ21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 04:19:39PM +0200, Arnd Bergmann wrote:
+On Tue, Oct 11, 2011 at 04:06:41PM +0200, Ulf Hansson wrote:
+> The patch "mmc: core: move ->request() call from atomic context",
+> is the reason to why this change is possible. This simplifies the
+> error handling code execution path quite a lot and potentially also
+> fixes some error handling hang problems.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
 
-> Of course, if the spmp8000 adc driver gets put into staging, all its
-> dependencies (input, battery) also have to go there because no
-> regular driver must link against interfaces provided by a staging
-> driver.
+This doesn't look right:
 
-Yes, that's the big problem with this - it blocks the actual drivers.
-Putting it in drivers/misc would be another option that sidesteps that.
+void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
+{
+        if (err && cmd->retries) {
+                host->ops->request(host, mrq);
+
+So, not dropping the spinlock results in calling the request function
+with the spinlock held - and as the request function then goes on to
+lock the spinlock, we will deadlock.
+
+I don't see anything in current mainline which addresses this, so I'm
+not able to queue this patch.
