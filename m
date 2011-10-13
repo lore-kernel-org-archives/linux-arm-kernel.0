@@ -1,66 +1,49 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Thu, 13 Oct 2011 08:59:57 +0200
-Subject: [PATCH v6 10/16] OMAP2+: UART: Modify omap_uart_can_sleep function
-In-Reply-To: <CAAL8m4zAOw9=qFCYV6-FxqGxQKwNZf71McCUtXSxoFMdOqz5PA@mail.gmail.com>
-References: <1317380561-661-1-git-send-email-govindraj.raja@ti.com>
-	<87vcrv2xox.fsf@ti.com>
-	<CAAL8m4xTmz+-ureDiGPoKUu634q1Wy=h01kpfRWCk9LFCV0+Dg@mail.gmail.com>
-	<87wrcangkq.fsf@ti.com>
-	<CAAL8m4zAOw9=qFCYV6-FxqGxQKwNZf71McCUtXSxoFMdOqz5PA@mail.gmail.com>
-Message-ID: <CAORVsuUsE09P0v-Ro7PctkE96mF4Cnefe9cASYJu447tVNBJ-g@mail.gmail.com>
+From: fercerpav@gmail.com (Paul Fertser)
+Date: Thu, 13 Oct 2011 11:12:24 +0400
+Subject: [RFC][PATCH] plat-mxc: iomux-v3.h: implicitly enable
+	pull-up/down when that's desired
+In-Reply-To: <20111012082702.GM13898@pengutronix.de>
+References: <201110100758.p9A7wCYT011235@home.pavel.comp>
+	<20111012082702.GM13898@pengutronix.de>
+Message-ID: <20111013071224.GR9395@home.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Govindraj,
-
-On Thu, Oct 13, 2011 at 3:09 AM, Govindraj <govindraj.ti@gmail.com> wrote:
+On Wed, Oct 12, 2011 at 10:27:02AM +0200, Sascha Hauer wrote:
+> On Mon, Oct 10, 2011 at 11:19:23AM +0400, Paul Fertser wrote:
+> > This leads to some rather hard to understand bugs such as
+> > misdetecting an absent ethernet PHY (a real bug i had)
 ...
->>
->> Yes, but obviously comes at the expense of power savings. ?IOW, This is
->> a hard-coded power vs. performance trade off that we are trying to get
->> away from.
->>
->> So, the root of the problem is that the MPU wakeup latency is causing a
->> "sluggish" console. ?The solution? ?request an MPU wakeup latency
->> constraint.
->>
->
-> Okay, Will explore this.
->
->> This is a classic use-case for such a constraint, and the serial driver
->> should have the option of requesting a constraint to prevent the sluggish
->> console. ?The constraint only needs to be held until the auto-suspend
->> delay expires, so should be relased in the ->runtime_suspend() method of
->> the driver.
->>
->> This constraint needs to be configurable, probably from the board file,
->> so that it is optional, and so users who don't care about sluggish
->> consoles (or non-console UART users who don't care about response time)
->> have the option of preferring power savings over UART responsiveness.
->>
->> As a reference, the i2c driver is currently doing something similar
->> in that it request an MPU constraint to prevent the MPU from going into
->> retention/off while waiting for an i2c interrupt to arrive.
->>
->
-> Thanks, will check and try to use the mpu constraints
-As a reference the pm-qos branch of
-https://gitorious.org/jpihet/omap-pm has the latest code for the
-per-device constraints framework.
+> > This might affect mx25, mx35, mx50, mx51 and mx53 SoCs.
+...
+> > I'm not sure if that's really suitable for -stable so please excuse me
+> > if it's not.
+> 
+> I think it's not suitable for stable unless there is a real bug, that
+> is PUE or PKE are forgotten somewhere.
 
-Please refer to the documentation at Documentation/power/pm_qos_interface.txt.
-The commit dbec9ed1 [1] shows how I2C is using the framework.
+If there wasn't a real bug with MDIO, i wouldn't have found the
+problem. I've also checked all other potentially affected SoCs and all
+of them (except for the mx35, whose iomux file doesn't configure any
+pads at all) had some suspicious entries.
 
-[1] https://gitorious.org/jpihet/omap-pm/commit/dbec9ed1a6d6341d2ad2352a9578d66d15d198f4
+> I don't like that the defines which are supposed to be defines for
+> the individual bits are changed. This may lead to trouble and confusion
+> once someone wants to read the values from the iomux registers and
+> tests for bits. How about Adding new defines like this instead:
 
-Regards,
-Jean
+I perfectly understand the reasoning and fully agree it would be best
+to do it that way right from the beginning. But given the current
+situation when many affected iomux headers share the error that can
+lead to subtle strange bugs, i thought it might be beneficial to fix
+them all implicitly. And testing for those pull-up bits set without
+testing for PUE/PKE doesn't seem to be of any use, and also before
+sending a patch i did a git grep and found no examples of using those
+constants in an unexpected way.
 
->
-> --
-> Govindraj.R.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+If you still prefer the cleaner way, i can also do that and correct
+all the suspicious entries manually, just let me know.
+
+-- 
+Be free, use free (http://www.gnu.org/philosophy/free-sw.html) software!
+mailto:fercerpav at gmail.com
