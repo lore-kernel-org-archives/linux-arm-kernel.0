@@ -1,120 +1,125 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Oct 2011 19:03:18 -0600
-Subject: [PATCH v2 4/5] tty/serial: atmel_serial: auto-enumerate ports
-In-Reply-To: <ecef50a9b874d08bb46c0a12d1e4ad01e641d3d5.1318433947.git.nicolas.ferre@atmel.com>
-References: <37a19e194d02144aecd24f284f5e43979643a3c3.1318433947.git.nicolas.ferre@atmel.com>
-	<ecef50a9b874d08bb46c0a12d1e4ad01e641d3d5.1318433947.git.nicolas.ferre@atmel.com>
-Message-ID: <20111013010318.GO14042@ponder.secretlab.ca>
+Date: Wed, 12 Oct 2011 18:34:49 -0600
+Subject: [PATCH v3 3/4] ARM: at91/dma: remove platform data from DMA
+	controller
+In-Reply-To: <bcf2b73ecc158bf20f94b00d3b8a6d140eff2026.1318438197.git.nicolas.ferre@atmel.com>
+References: <f91f267b82ac0f0459c11a7bdf3ab0ea8758656a.1318438197.git.nicolas.ferre@atmel.com>
+	<bcf2b73ecc158bf20f94b00d3b8a6d140eff2026.1318438197.git.nicolas.ferre@atmel.com>
+Message-ID: <20111013003449.GF14042@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 06:06:59PM +0200, Nicolas Ferre wrote:
-> If no platform data provided to enumerate ports, use a bit field
-> to choose port number and check if port is already initialized.
-> Use this mechanism for both console and plain serial ports.
+On Wed, Oct 12, 2011 at 06:57:13PM +0200, Nicolas Ferre wrote:
+> DMA controller can deduce its configuration data from
+> the platform. Remove the platform data and match device
+> types with the compatible ones.
 > 
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
 > ---
->  drivers/tty/serial/atmel_serial.c |   44 ++++++++++++++++++++++++++++++------
->  1 files changed, 36 insertions(+), 8 deletions(-)
+>  arch/arm/mach-at91/at91sam9g45_devices.c   |    9 +--------
+>  arch/arm/mach-at91/at91sam9rl_devices.c    |    8 +-------
+>  arch/arm/mach-at91/include/mach/at_hdmac.h |   10 ----------
+>  3 files changed, 2 insertions(+), 25 deletions(-)
 > 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index bb72354..1074329 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -157,6 +157,7 @@ struct atmel_uart_port {
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index 600bffb..c9b897f 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -38,10 +38,6 @@
+>  #if defined(CONFIG_AT_HDMAC) || defined(CONFIG_AT_HDMAC_MODULE)
+>  static u64 hdmac_dmamask = DMA_BIT_MASK(32);
+>  
+> -static struct at_dma_platform_data atdma_pdata = {
+> -	.nr_channels	= 8,
+> -};
+> -
+>  static struct resource hdmac_resources[] = {
+>  	[0] = {
+>  		.start	= AT91_BASE_SYS + AT91_DMA,
+> @@ -56,12 +52,11 @@ static struct resource hdmac_resources[] = {
 >  };
 >  
->  static struct atmel_uart_port atmel_ports[ATMEL_MAX_UART];
-> +static unsigned long atmel_ports_in_use;
+>  static struct platform_device at_hdmac_device = {
+> -	.name		= "at_hdmac",
+> +	.name		= "at91sam9g45_dma",
+>  	.id		= -1,
+>  	.dev		= {
+>  				.dma_mask		= &hdmac_dmamask,
+>  				.coherent_dma_mask	= DMA_BIT_MASK(32),
+> -				.platform_data		= &atdma_pdata,
+>  	},
+>  	.resource	= hdmac_resources,
+>  	.num_resources	= ARRAY_SIZE(hdmac_resources),
+> @@ -69,8 +64,6 @@ static struct platform_device at_hdmac_device = {
 >  
->  #ifdef SUPPORT_SYSRQ
->  static struct console atmel_console;
-> @@ -1423,7 +1424,6 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
->  	port->flags		= UPF_BOOT_AUTOCONF;
->  	port->ops		= &atmel_pops;
->  	port->fifosize		= 1;
-> -	port->line		= pdata->num;
->  	port->dev		= &pdev->dev;
->  	port->mapbase	= pdev->resource[0].start;
->  	port->irq	= pdev->resource[1].start;
-> @@ -1613,10 +1613,15 @@ static struct console atmel_console = {
->  static int __init atmel_console_init(void)
+>  void __init at91_add_device_hdmac(void)
 >  {
->  	if (atmel_default_console_device) {
-> -		add_preferred_console(ATMEL_DEVICENAME,
-> -				      atmel_default_console_device->id, NULL);
-> -		atmel_init_port(&atmel_ports[atmel_default_console_device->id],
-> -				atmel_default_console_device);
-> +		int id = atmel_default_console_device->id;
-> +		struct atmel_uart_port *port = &atmel_ports[id];
-> +
-> +		set_bit(id, &atmel_ports_in_use);
-> +		port->backup_imr = 0;
-> +		port->uart.line = id;
-> +
-> +		add_preferred_console(ATMEL_DEVICENAME, id, NULL);
-> +		atmel_init_port(port, atmel_default_console_device);
->  		register_console(&atmel_console);
->  	}
->  
-> @@ -1715,12 +1720,33 @@ static int __devinit atmel_serial_probe(struct platform_device *pdev)
->  	struct atmel_uart_port *port;
->  	struct atmel_uart_data *pdata = pdev->dev.platform_data;
->  	void *data;
-> -	int ret;
-> +	int ret = -ENODEV;
->  
->  	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
->  
-> -	port = &atmel_ports[pdata->num];
-> +	if (pdata)
-> +		ret = pdata->num;
-> +
-> +	if (ret < 0)
-> +		/* port id not found in platform data:
-> +		 * auto-enumerate it */
-> +		ret = find_first_zero_bit(&atmel_ports_in_use,
-> +				sizeof(atmel_ports_in_use));
-> +
-> +	if (ret > ATMEL_MAX_UART) {
-> +		ret = -ENODEV;
-> +		goto err;
-> +	}
-> +
-> +	if (test_and_set_bit(ret, &atmel_ports_in_use)) {
-> +		/* port already in use */
-> +		ret = -EBUSY;
-> +		goto err;
-> +	}
-> +
-> +	port = &atmel_ports[ret];
->  	port->backup_imr = 0;
-> +	port->uart.line = ret;
->  
->  	atmel_init_port(port, pdev);
->  
-> @@ -1766,7 +1792,7 @@ err_alloc_ring:
->  		clk_put(port->clk);
->  		port->clk = NULL;
->  	}
-> -
-> +err:
->  	return ret;
+> -	dma_cap_set(DMA_MEMCPY, atdma_pdata.cap_mask);
+> -	dma_cap_set(DMA_SLAVE, atdma_pdata.cap_mask);
+>  	platform_device_register(&at_hdmac_device);
 >  }
+>  #else
+> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+> index aacb19d..81954f7 100644
+> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+> @@ -33,10 +33,6 @@
+>  #if defined(CONFIG_AT_HDMAC) || defined(CONFIG_AT_HDMAC_MODULE)
+>  static u64 hdmac_dmamask = DMA_BIT_MASK(32);
 >  
-> @@ -1786,6 +1812,8 @@ static int __devexit atmel_serial_remove(struct platform_device *pdev)
+> -static struct at_dma_platform_data atdma_pdata = {
+> -	.nr_channels	= 2,
+> -};
+> -
+>  static struct resource hdmac_resources[] = {
+>  	[0] = {
+>  		.start	= AT91_BASE_SYS + AT91_DMA,
+> @@ -51,12 +47,11 @@ static struct resource hdmac_resources[] = {
+>  };
 >  
->  	/* "port" is allocated statically, so we shouldn't free it */
+>  static struct platform_device at_hdmac_device = {
+> -	.name		= "at_hdmac",
+> +	.name		= "at91sam9rl_dma",
+>  	.id		= -1,
+>  	.dev		= {
+>  				.dma_mask		= &hdmac_dmamask,
+>  				.coherent_dma_mask	= DMA_BIT_MASK(32),
+> -				.platform_data		= &atdma_pdata,
+>  	},
+>  	.resource	= hdmac_resources,
+>  	.num_resources	= ARRAY_SIZE(hdmac_resources),
+> @@ -64,7 +59,6 @@ static struct platform_device at_hdmac_device = {
 >  
-> +	clear_bit(port->line, &atmel_ports_in_use);
-> +
->  	clk_put(atmel_port->clk);
+>  void __init at91_add_device_hdmac(void)
+>  {
+> -	dma_cap_set(DMA_MEMCPY, atdma_pdata.cap_mask);
+>  	platform_device_register(&at_hdmac_device);
+>  }
+>  #else
+> diff --git a/arch/arm/mach-at91/include/mach/at_hdmac.h b/arch/arm/mach-at91/include/mach/at_hdmac.h
+> index 187cb58..652c1a1 100644
+> --- a/arch/arm/mach-at91/include/mach/at_hdmac.h
+> +++ b/arch/arm/mach-at91/include/mach/at_hdmac.h
+> @@ -14,16 +14,6 @@
+>  #include <linux/dmaengine.h>
 >  
->  	return ret;
+>  /**
+> - * struct at_dma_platform_data - Controller configuration parameters
+> - * @nr_channels: Number of channels supported by hardware (max 8)
+> - * @cap_mask: dma_capability flags supported by the platform
+> - */
+> -struct at_dma_platform_data {
+> -	unsigned int	nr_channels;
+> -	dma_cap_mask_t  cap_mask;
+> -};
+> -
+> -/**
+>   * enum at_dma_slave_width - DMA slave register access width.
+>   * @AT_DMA_SLAVE_WIDTH_8BIT: Do 8-bit slave register accesses
+>   * @AT_DMA_SLAVE_WIDTH_16BIT: Do 16-bit slave register accesses
 > -- 
 > 1.7.5.4
 > 
