@@ -1,28 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 11:42:46 +0100
-Subject: [RFC 1/5] ARM: dev_archdata: add private iommu extension
-In-Reply-To: <CAK=Wgbau+XZ-c21FCT8DT0NYfm2uD6WZv3=cU2R23pV7LUkxEA@mail.gmail.com>
-References: <1316948337-7924-1-git-send-email-ohad@wizery.com>
-	<1316948337-7924-2-git-send-email-ohad@wizery.com>
-	<CAK=Wgba6xxD2DBJhM--AcTPBoNRiOZ_6f8+j3bfaCqZMO8A4+w@mail.gmail.com>
-	<CAK=Wgbau+XZ-c21FCT8DT0NYfm2uD6WZv3=cU2R23pV7LUkxEA@mail.gmail.com>
-Message-ID: <20111013104246.GA22076@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Oct 2011 13:09:50 +0200
+Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
+In-Reply-To: <20111013094717.GL21648@n2100.arm.linux.org.uk>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<1318178172-7965-5-git-send-email-zoss@devai.org>
+	<CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
+	<4E92BE19.4060907@cam.ac.uk>
+	<20111010100020.GA3607@opensource.wolfsonmicro.com>
+	<CAGVye5Nc9vhaF=7Y+hvGo4g-GOFb9fHeni+g=+hTj-8WCSqY+Q@mail.gmail.com>
+	<20111010114407.GD3607@opensource.wolfsonmicro.com>
+	<20111013094717.GL21648@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZMXjoHdEaPhTFS9Q7=5tWfFHDiwt-gdKd2CGiW+Evdmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 11:15:39AM +0200, Ohad Ben-Cohen wrote:
-> On Wed, Oct 5, 2011 at 11:26 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> > Hi Russell,
-> >
-> > On Sun, Sep 25, 2011 at 1:58 PM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> >> Add a private iommu pointer to the ARM-specific arch data in the
-> >> device struct, which will be used to attach iommu-specific data
-> >> to devices which require iommu support.
-> >
-> > Can you please take a look and ack/nack ?
-> 
-> gentle reminder
+On Thu, Oct 13, 2011 at 11:47 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Oct 10, 2011 at 12:44:08PM +0100, Mark Brown wrote:
+>> On Mon, Oct 10, 2011 at 01:42:30PM +0200, Zoltan Devai wrote:
+>>
+>> > Where should the adc driver go in this case ?
+>>
+>> At the minute it seems to me that arch/arm is as good a place as any
+>> really - currently this code is getting dumped wherever the main device
+>> is.
+>
+> No it isn't - we want drivers out of arch/arm (it's already been a topic
+> of flame for Linus, so it's something that we should try _really_ hard
+> to avoid.)
 
-Ok, I'll take it if you put it in the patch system.
+Amen to that.
 
-Thanks.
+> As this is clearly a device driver (it has a device driver struct, it
+> relies upon a struct device, etc) then it needs to live outside of
+> arch/arm/ - and I think Arnd's suggestion of drivers/adc is probably
+> the right place for it to move to (even though its probably the first
+> to create the directory.) ?More stuff can come along in the future,
+> and then its all together to start creating a common API in there.
+
+That sort of suggest that the drivers/staging/iio/adc is in
+trouble now. It will have an in-kernel competitor for similar
+stuff.
+
+Having drivers/adc and drivers/iio/adc compete about
+taking drivers on preference as to whether they were intended
+for userspace or kernelspace does not seem like a good
+thing.
