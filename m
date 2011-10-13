@@ -1,25 +1,33 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 13 Oct 2011 09:03:31 -0700
-Subject: [PATCH] ARM: tegra: update defconfig
-In-Reply-To: <1318478219-9462-1-git-send-email-olof@lixom.net>
-References: <1318478219-9462-1-git-send-email-olof@lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A063@HQMAIL01.nvidia.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 13 Oct 2011 12:04:25 -0400 (EDT)
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <CACVXFVMoac7psbfO6UdDvNux4c8bQYS4YNUdz1C-o+CiJzyuZA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1110131202350.2026-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Wednesday, October 12, 2011 9:57 PM:
-> Refresh tegra_defconfig:
-> 
-> New options enabled: RTC, SPI, USB and USB_STORAGE together with
-> corresponding tegra drivers. Also enable some of the common usb ethernet
-> adapters.
-> 
-> Finally, enable new merged boards (Ventana) and the generic devicetree board.
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+On Thu, 13 Oct 2011, Ming Lei wrote:
 
-We should also enable ASoC (sound) support. Do you want to rev the patch, or
-should I submit a patch on top of yours?
+> Hi,
+> 
+> On Thu, Oct 13, 2011 at 10:31 PM, Alan Stern <stern@rowland.harvard.edu>
+> >> Maybe we should understand the correct model of the ordering constraints
+> >> for the multiple device dependancies first, could you give a description or
+> >> some examples about it?
+> >
+> > The requirement is that devices must be capable of resuming in the
+> > order given by dpm_list, and they must be capable of suspending in
+> > the reverse order.
+> >
+> > Therefore if device A can't work unless device B is functional, then B
+> > must come before A in dpm_list.
+> 
+> If all devices can support async suspend and resume correctly, looks like
+> the device order given by dpm_list is not needed any longer, doesn't it?
 
--- 
-nvpublic
+It _is_ needed, because the user can disable async suspend/resume via 
+/sys/power/pm_async.
+
+Also, not all devices do support async suspend/resume.
+
+Alan Stern
