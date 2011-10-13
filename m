@@ -1,45 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Oct 2011 16:50:38 +0200
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <alpine.LFD.2.02.1110130932350.17040@xanadu.home>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>
-	<20111013082836.GG21648@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1110130932350.17040@xanadu.home>
-Message-ID: <201110131650.39032.arnd@arndb.de>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Thu, 13 Oct 2011 16:52:50 +0200
+Subject: [PATCH] atmel_lcdfb: support 16bit BGR:565 mode,
+	remove unsupported 15bit modes
+Message-ID: <1318517570-28459-1-git-send-email-jacmet@sunsite.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 October 2011, Nicolas Pitre wrote:
-> On Thu, 13 Oct 2011, Russell King - ARM Linux wrote:
-> > Bypassing maintainers stinks - especially when there are unaddressed
-> > comments outstanding.  Nicolas has "simplified" my objections in this
-> > request for you to pull - and has completely ignored the problem that
-> > it breaks ZBOOT_ROM by deleting the zreladdr definitions on EP93xx
-> > with no way for that to be provided.
+Allow framebuffer to be configured in 16bit mode when panel is wired in
+(the default) BGR configuration, and don't claim to support 15bit input
+modes, which the LCD controller cannot handle.
 
-I've removed it from the arm-soc for-next branch now and won't push it
-unless you specifically ask me to.
+Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+---
+ drivers/video/atmel_lcdfb.c |   12 +++---------
+ 1 files changed, 3 insertions(+), 9 deletions(-)
 
-> I also told you that EP93xx doesn't use ZBOOT_ROM anywhere, and that 
-> this was approved by the EP93xx maintainers.
-> 
-> Furthermore I said that I intended to make ZBOOT_ROM dependent on 
-> CONFIG_PHYS_OFFSET, given that PHYS_OFFSEt and zreladdr are intimately 
-> related which I also explained previously.  This doesn't have to go in 
-> right away though.  But if this is one of your _requirements_, I'd have 
-> appreciated you made it clearer instead of letting me to dry without any 
-> feedback, especially when I re-re-re-pinged you last week and before.
-> 
-> So much for having lectured me on proper communication.
-
-There is no point in arguing about who miscommunicated, or in assuming
-evil intentions.
-
-The rule for the arm-soc tree is very simple: if someone asks for a
-branch to be included and it looks reasonable to me, it goes in.
-If else someone has reasonable concerns over the code, it gets
-removed again until the concerns are all resolved. Judging what
-is reasonable is of course the hard part, but 90% of the time it's
-pretty obvious.
-
-	Arnd
+diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+index 7ca3eaf..143f6d9 100644
+--- a/drivers/video/atmel_lcdfb.c
++++ b/drivers/video/atmel_lcdfb.c
+@@ -418,24 +418,18 @@ static int atmel_lcdfb_check_var(struct fb_var_screeninfo *var,
+ 		var->red.length = var->green.length = var->blue.length
+ 			= var->bits_per_pixel;
+ 		break;
+-	case 15:
+ 	case 16:
+ 		if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB) {
+ 			/* RGB:565 mode */
+ 			var->red.offset = 11;
+ 			var->blue.offset = 0;
+-			var->green.length = 6;
+-		} else if (sinfo->lcd_wiring_mode == ATMEL_LCDC_WIRING_RGB555) {
+-			var->red.offset = 10;
+-			var->blue.offset = 0;
+-			var->green.length = 5;
+ 		} else {
+-			/* BGR:555 mode */
++			/* BGR:565 mode */
+ 			var->red.offset = 0;
+-			var->blue.offset = 10;
+-			var->green.length = 5;
++			var->blue.offset = 11;
+ 		}
+ 		var->green.offset = 5;
++		var->green.length = 6;
+ 		var->red.length = var->blue.length = 5;
+ 		break;
+ 	case 32:
+-- 
+1.7.6.3
