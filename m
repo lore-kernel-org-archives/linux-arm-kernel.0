@@ -1,157 +1,88 @@
-From: premi@ti.com (Sanjeev Premi)
-Date: Thu, 13 Oct 2011 21:44:10 +0530
-Subject: [PATCH v2] arm: omap: Fix errors and warnings when building for one
-	board
-Message-ID: <1318522450-18425-1-git-send-email-premi@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 13 Oct 2011 18:14:41 +0200
+Subject: [PATCH v5 00/10] Per SoC descriptor
+In-Reply-To: <20111013153449.GG21648@n2100.arm.linux.org.uk>
+References: <1318255342-17451-1-git-send-email-marc.zyngier@arm.com>
+	<4E9702F0.4070000@arm.com>
+	<20111013153449.GG21648@n2100.arm.linux.org.uk>
+Message-ID: <201110131814.42216.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When customizing omap2plus_defconfig to build for only
-one board (omap3evm), I came across these warnings and
-errors (filenames truncated):
+On Thursday 13 October 2011, Russell King - ARM Linux wrote:
+> On Thu, Oct 13, 2011 at 04:25:36PM +0100, Marc Zyngier wrote:
+> > On 13/10/11 11:32, Russell King - ARM Linux wrote:
+> > > On Mon, Oct 10, 2011 at 03:02:12PM +0100, Marc Zyngier wrote:
+> > 
+> > [...]
+> > 
+> > >>  65 files changed, 569 insertions(+), 149 deletions(-)
+> > > 
+> > > This isn't particularly appealing for something that's supposed to
+> > > be a clean up - it's introducing 400+ new lines of code.  It looks like
+> > > most of this comes from the platform stuff rather than core stuff.
+> > > 
+> > > Can't we do any better with this?  We really need things to be going
+> > > in the other direction.
+> > 
+> > There is definitely room for improvement, by factoring in some common
+> > code across platforms. But I see that as a second phase, and started by
+> > just moving things to the SoC descriptor, all the code staying mostly
+> > the same.
+> 
+> I was meaning without that - what concerns me is the size of increase
+> just to introduce this.  It seems needlessly large.
 
-arch/arm/mach-omap2/board-generic.c:76:20: warning: 'omap4_init' defined but not used
-arch/arm/mach-omap2/built-in.o: In function `omap2420_init_early':
-arch/arm/mach-omap2/io.c:364: undefined reference to `omap2_set_globals_242x'
-arch/arm/mach-omap2/io.c:366: undefined reference to `omap2xxx_voltagedomains_init'
-arch/arm/mach-omap2/io.c:367: undefined reference to `omap242x_powerdomains_init'
-arch/arm/mach-omap2/io.c:368: undefined reference to `omap242x_clockdomains_init'
-arch/arm/mach-omap2/io.c:369: undefined reference to `omap2420_hwmod_init'
-arch/arm/mach-omap2/built-in.o: In function `omap2430_init_early':
-arch/arm/mach-omap2/io.c:376: undefined reference to `omap2_set_globals_243x'
-arch/arm/mach-omap2/io.c:378: undefined reference to `omap2xxx_voltagedomains_init'
-arch/arm/mach-omap2/io.c:379: undefined reference to `omap243x_powerdomains_init'
-arch/arm/mach-omap2/io.c:380: undefined reference to `omap243x_clockdomains_init'
-arch/arm/mach-omap2/io.c:381: undefined reference to `omap2430_hwmod_init'
-arch/arm/mach-omap2/built-in.o: In function `omap4430_init_early':
-arch/arm/mach-omap2/io.c:436: undefined reference to `omap2_set_globals_443x'
-arch/arm/mach-omap2/io.c:438: undefined reference to `omap44xx_voltagedomains_init'
-arch/arm/mach-omap2/io.c:439: undefined reference to `omap44xx_powerdomains_init'
-arch/arm/mach-omap2/io.c:440: undefined reference to `omap44xx_clockdomains_init'
-arch/arm/mach-omap2/io.c:441: undefined reference to `omap44xx_hwmod_init'
+I think the main benefit of this series is that it allows the
+cross-platform consolidation patches to be smaller, which unfortunately
+is not easy to measure. The idea is that stuff that is currently
+hardcoded per platform but should better be run-time determined
+can be moved into a per-soc structure rather than the per-board
+machine_desc. It would be good to list all this "stuff" to see how
+much it will eventually be.
 
-This patch fixes them.
+A number of things that we discussed about putting here have since
+been obsoleted by better suggestions (e.g. arch_ioremap, VMALLOC_END,
+__io, NR_IRQS, ...), but I would hope the tradeoff to still be
+positive for this patch series.
 
-Signed-off-by: Sanjeev Premi <premi@ti.com>
----
+On a related topic, I wonder how much of the existing machine_desc
+we would actually be able to move out into a soc_desc, which is
+something that would immediately save code lines and object size.
 
- Changes since v1:
-    - #if defined() to #ifdef
-    - Moved an #ifdef to take care of additional warning
-      related to sdp4430_twldata. Had missed squashing the
-      patch before sending v1.
+If it ends up being just the SMP and CPU-hotplug functions, then
+the tradeoff is probably negative and we discard the series, but
+if we expect it to have a postive long-term effect, I would still
+merge it right away rather than waiting for the series to become
+long enough to show the benefits in the diffstat.
 
- Adding ifdefs makes the code bit ugly and is prone to propagate
- further. Not sure if DT will help here, but this patch would be
- useful for people trying to build for individual boards.
+> I've also never been convinced by attempts to consolidate the hotplug
+> code - I've said this every time it's been suggested: I believe many
+> platforms just aren't trying to support hotplug CPU properly.
+> 
+> They've just copied the noddy Realview platform version - which is
+> noddy because ARMs platforms tend to have a total lack of power
+> management support on them.  The best we can do is put them in a WFI
+> loop waiting to be re-awoken.
+> 
+> Real platforms surely must have better PM support than that, and so
+> copying the Realview implementation does not make sense - it's good
+> to see that _some_ platforms have made an effort, though they still
+> just return from platform_cpu_die(), rather than the intended path of
+> re-awaking via the standard bringup path.  The return path from
+> platform_cpu_die() is supposed to be the last-ditch attempt if all else
+> has failed.
 
- Compile tested for OMAP3EVM.
+Good point, but I think that is another topic: 
+Given that a bunch of architectures implement the same silly functions,
+I think it definitely makes sense to consolidate them, even if we know
+that they should actually be doing something else. By turning these
+into function pointers, we can at least force platforms to include
+a line like
 
- Applies to linux-omap/master at:
-   fb4df0f : ARM: OMAP1: Fix warnings about enabling 32 KiHz timer
+	.cpu_disable = generic_silly_cpu_disable,
 
+which hopefully leads people to think about why they are using this
+version.
 
- arch/arm/mach-omap2/board-generic.c |    8 ++++++++
- arch/arm/mach-omap2/io.c            |    6 ++++++
- 2 files changed, 14 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index d9ccb9d..b36003f 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -29,6 +29,7 @@
-  * XXX: Still needed to boot until the i2c & twl driver is adapted to
-  * device-tree
-  */
-+#ifdef CONFIG_ARCH_OMAP4
- static struct twl4030_platform_data sdp4430_twldata = {
- 	.irq_base	= TWL6030_IRQ_BASE,
- 	.irq_end	= TWL6030_IRQ_END,
-@@ -38,16 +39,19 @@ static void __init omap4_i2c_init(void)
- {
- 	omap4_pmic_init("twl6030", &sdp4430_twldata);
- }
-+#endif
- 
- static struct twl4030_platform_data beagle_twldata = {
- 	.irq_base	= TWL4030_IRQ_BASE,
- 	.irq_end	= TWL4030_IRQ_END,
- };
- 
-+#ifdef CONFIG_ARCH_OMAP3
- static void __init omap3_i2c_init(void)
- {
- 	omap3_pmic_init("twl4030", &beagle_twldata);
- }
-+#endif
- 
- static struct of_device_id omap_dt_match_table[] __initdata = {
- 	{ .compatible = "simple-bus", },
-@@ -73,17 +77,21 @@ static void __init omap_generic_init(void)
- 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
- }
- 
-+#ifdef CONFIG_ARCH_OMAP4
- static void __init omap4_init(void)
- {
- 	omap4_i2c_init();
- 	omap_generic_init();
- }
-+#endif
- 
-+#ifdef CONFIG_ARCH_OMAP3
- static void __init omap3_init(void)
- {
- 	omap3_i2c_init();
- 	omap_generic_init();
- }
-+#endif
- 
- #if defined(CONFIG_SOC_OMAP2420)
- static const char *omap242x_boards_compat[] __initdata = {
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index aa96538..08c30c1 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -359,6 +359,7 @@ static void __init omap_hwmod_init_postsetup(void)
- 	omap_pm_if_early_init();
- }
- 
-+#ifdef CONFIG_ARCH_OMAP2
- void __init omap2420_init_early(void)
- {
- 	omap2_set_globals_242x();
-@@ -382,11 +383,13 @@ void __init omap2430_init_early(void)
- 	omap_hwmod_init_postsetup();
- 	omap2430_clk_init();
- }
-+#endif
- 
- /*
-  * Currently only board-omap3beagle.c should call this because of the
-  * same machine_id for 34xx and 36xx beagle.. Will get fixed with DT.
-  */
-+#ifdef CONFIG_ARCH_OMAP3
- void __init omap3_init_early(void)
- {
- 	omap2_set_globals_3xxx();
-@@ -430,7 +433,9 @@ void __init ti816x_init_early(void)
- 	omap_hwmod_init_postsetup();
- 	omap3xxx_clk_init();
- }
-+#endif
- 
-+#ifdef CONFIG_ARCH_OMAP4
- void __init omap4430_init_early(void)
- {
- 	omap2_set_globals_443x();
-@@ -442,6 +447,7 @@ void __init omap4430_init_early(void)
- 	omap_hwmod_init_postsetup();
- 	omap4xxx_clk_init();
- }
-+#endif
- 
- void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
- 				      struct omap_sdrc_params *sdrc_cs1)
--- 
-1.7.0.4
+	Arnd
