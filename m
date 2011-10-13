@@ -1,30 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 13 Oct 2011 17:25:03 +0100
-Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
-In-Reply-To: <201110131656.56519.arnd@arndb.de>
-References: <1318178172-7965-1-git-send-email-zoss@devai.org>
-	<20111013121745.GU21648@n2100.arm.linux.org.uk>
-	<20111013143857.GH5193@opensource.wolfsonmicro.com>
-	<201110131656.56519.arnd@arndb.de>
-Message-ID: <20111013162503.GK5193@opensource.wolfsonmicro.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 13 Oct 2011 09:25:31 -0700
+Subject: [PATCH] ARM: tegra: update defconfig
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A05A@HQMAIL01.nvidia.com>
+References: <1318478219-9462-1-git-send-email-olof@lixom.net>
+	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A05A@HQMAIL01.nvidia.com>
+Message-ID: <CAOesGMj7Me+ownneH7yJ0C4z1tCTdreWcjqGSMR8-M6BsLOFKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 04:56:56PM +0200, Arnd Bergmann wrote:
-> On Thursday 13 October 2011, Mark Brown wrote:
+On Thu, Oct 13, 2011 at 8:55 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Wednesday, October 12, 2011 9:57 PM:
+>> Refresh tegra_defconfig:
+>>
+>> New options enabled: RTC, SPI, USB and USB_STORAGE together with
+>> corresponding tegra drivers. Also enable some of the common usb ethernet
+>> adapters.
+>>
+>> Finally, enable new merged boards (Ventana) and the generic devicetree board.
+>>
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
+>
+> This transitively enables USE_OF by default. For Tegra, that's a good
+> thing. However, it does mean we won't be able to detect code that only
+> compiles with USE_OF enabled, which might affect other platform's
+> buildability if we're talking about core code. I'm not sure if we should
+> be concerned about this or not, or if ARM should select USE_OF now?
 
-> > The driver specific data structures should probably just be moving to
-> > include/linux/platform_data which is the approved location for that sort
-> > of thing.
+Right, it uses USE_OF by default because the TEGRA_DT board was
+enabled. The defconfig should really be a superset of needed configs
+for running on most hardware out there (since we do a multiplatform
+kernel), so keeping it enabled on Tegra does make some sense.
 
-> Note that we also need someone to watch over that and say no to silly
-> platform_data definitions being put in there, e.g. using wildly different
-> ways of expressing the same things in almost-identical drivers, or
-> using function pointers where a simple data structure is enough.
+Also, the direction is to keep moving towards 100% device-tree (on
+tegra), it does make sense to keep it enabled. For testing, explicitly
+disabling it to compile-test will be needed for a while longer, but I
+don't expect to do much !USE_OF work (for tegra specifically) in the
+times ahead.
 
-Yeah, I'm not sure I entirely understand the plan with it though even
-without any structure it doesn't make much difference (in that
-everything is being reviewed by the subsystem maintainers just as it was
-before we dumped the files in a single directory).  I'm tempted to say
-the device tree folks should be looking at it as an awful lot of what
-they're doing is exactly the same thing.
+When changing ARM-generic core code, you should probably pick a few
+other defconfigs and make sure those build as well -- that should
+cover those aspects.
+
+
+-Olof
