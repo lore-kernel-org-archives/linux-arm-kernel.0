@@ -1,7 +1,7 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 13 Oct 2011 12:35:06 +0100
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Thu, 13 Oct 2011 12:35:50 +0100
 Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
-In-Reply-To: <20111013094717.GL21648@n2100.arm.linux.org.uk>
+In-Reply-To: <CACRpkdZMXjoHdEaPhTFS9Q7=5tWfFHDiwt-gdKd2CGiW+Evdmw@mail.gmail.com>
 References: <1318178172-7965-1-git-send-email-zoss@devai.org>
 	<1318178172-7965-5-git-send-email-zoss@devai.org>
 	<CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
@@ -10,61 +10,126 @@ References: <1318178172-7965-1-git-send-email-zoss@devai.org>
 	<CAGVye5Nc9vhaF=7Y+hvGo4g-GOFb9fHeni+g=+hTj-8WCSqY+Q@mail.gmail.com>
 	<20111010114407.GD3607@opensource.wolfsonmicro.com>
 	<20111013094717.GL21648@n2100.arm.linux.org.uk>
-Message-ID: <20111013113506.GJ1098@sirena.org.uk>
+	<CACRpkdZMXjoHdEaPhTFS9Q7=5tWfFHDiwt-gdKd2CGiW+Evdmw@mail.gmail.com>
+Message-ID: <4E96CD16.5060104@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 10:47:17AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 10, 2011 at 12:44:08PM +0100, Mark Brown wrote:
+On 10/13/11 12:09, Linus Walleij wrote:
+> On Thu, Oct 13, 2011 at 11:47 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Oct 10, 2011 at 12:44:08PM +0100, Mark Brown wrote:
+>>> On Mon, Oct 10, 2011 at 01:42:30PM +0200, Zoltan Devai wrote:
+>>>
+>>>> Where should the adc driver go in this case ?
+>>>
+>>> At the minute it seems to me that arch/arm is as good a place as any
+>>> really - currently this code is getting dumped wherever the main device
+>>> is.
+>>
+>> No it isn't - we want drivers out of arch/arm (it's already been a topic
+>> of flame for Linus, so it's something that we should try _really_ hard
+>> to avoid.)
+> 
+> Amen to that.
+> 
+>> As this is clearly a device driver (it has a device driver struct, it
+>> relies upon a struct device, etc) then it needs to live outside of
+>> arch/arm/ - and I think Arnd's suggestion of drivers/adc is probably
+>> the right place for it to move to (even though its probably the first
+>> to create the directory.)  More stuff can come along in the future,
+>> and then its all together to start creating a common API in there.
+> 
+> That sort of suggest that the drivers/staging/iio/adc is in
+> trouble now. It will have an in-kernel competitor for similar
+> stuff.
+> 
+> Having drivers/adc and drivers/iio/adc compete about
+> taking drivers on preference as to whether they were intended
+> for userspace or kernelspace does not seem like a good
+> thing.
+The problem with a straight adc directory is the fact that many of
+these devices are combined input and output.  The also tend to
+have numerous things that to a casual don't look like ADC's
+(light sensors etc).  We only did the grouping in IIO for the
+sake of not having a huge flat directory.  Many of the drivers
+overlap between the different categories.
+> 
+>>From a quick review of the IIO ADC subsystem I cannot really
+> find a big problem with it other than it brings the entire IIO
+> subsystem along, including the userspace interfaces I guess.
+> 
+> The circumstances seem to suggest that drivers/iio/adc should
+> be moved down to drivers/adc without the rest of the iio
+> stuff, with a in-kernel API only and then have iio use that
+> (this is probably true for some more drivers in IIO like
+> dac, accel, addac, gyro...).
+> 
+> So the concept of IIO stuff would change from the
+> userspace-first centric view to the kernelspace-first
+> centric, with optional userspace interfaces in the form
+> of IIO.
+> 
+> I'm not sure about what Jonathan thinks about that
+> though.
+That wouldn't be too hard to do. It's just a case of breaking
+iio_register_device function in two.  Right now (with the in kernel
+RFC) on top.  The only thing needed for in kernel access is that the
+configured struct iio_dev gets added to the list of available devices.
 
-> > At the minute it seems to me that arch/arm is as good a place as any
-> > really - currently this code is getting dumped wherever the main device
-> > is.
+I think we need to maintain the form of struct iio_chan_spec 
+(or whatever does the same job) with the intent of it directly mapping
+to userspace interfaces (keeps things clean and makes sure there is enough
+information to actually use the channel for anything).
 
-> No it isn't - we want drivers out of arch/arm (it's already been a topic
-> of flame for Linus, so it's something that we should try _really_ hard
-> to avoid.)
+The key thing is the unified specification of channel capabilities
+and the ability to read them.  We have one way of doing that which
+has developed against a 'lot' of drivers.
 
-I said it was as good a place as any, I didn't say it was a good place.
-Currently we don't have a good place for this code but just dumping the
-code somewhere else isn't really helping anything either unless there's
-some meaningful subsytem (or at least effort towards a subsystem) to
-look after it, it's bookkeeping.
+The nasty corner is optimized reading of channel scans.  They tend to
+be irrelevant for memory mapped device but are vital for many devices
+on low bandwidth buses.  Right now we leave that entirely to the
+individual drivers (they push this data out rather than it being
+pulled from the core like everything else).  It may be possible to
+flip this around with out too much pain, but I'm not sure.
+The other nasty bits are:
+* hardware buffering
+* triggered capture control - we really care about this for IIO
+and I don't think anyone else does.  Could maybe get away with using
+device tree or similar to specify defaults for this and not provide
+any means of changing it for devices other than those with full IIO
+userspace in place.
 
-> As this is clearly a device driver (it has a device driver struct, it
-> relies upon a struct device, etc) then it needs to live outside of
-> arch/arm/ - and I think Arnd's suggestion of drivers/adc is probably
-> the right place for it to move to (even though its probably the first
-> to create the directory.)  More stuff can come along in the future,
-> and then its all together to start creating a common API in there.
+As you can imagine I'm a little wary of sending IIO through another
+refactoring right now (proposal to move the core out of staging is
+scheduled for my next free afternoon!).  So in principal in favour
+of this approach but in practice not sure I'll be in a position
+to do it (need to eat and my funding source is about to run out -
+awaiting decision on more).
 
-Creating drivers/adc just seems like a sucky idea.  We've already got at
-least one ongoing effort at creating a general purpose ADC/DAC interface
-in the form of the IIO subsystem (which is currently mostly targeted at
-higher volume devices and userspace only but the abstractions needed
-aren't terribly different depending on the data volumes) and does have
-the rather substantial advantage that there's people actually trying to
-make a subsystem.  On the other hand it's in staging for now so it'd
-create pain trying to merge the in-kernel clients that go along with
-these devices which doesn't seem constructive.
+So my personal preference would be to add the relevant access functions
+etc to IIO as is.  Two models:
 
-There's also the fact that ADCs and DACs are pretty much the same thing
-to software with the data line driven from the opposite end of the link
-sO if we've got a subsystem for ADCs only it seems clear we're doing
-something wrong.
+1) Pull from drivers - (give me reading now).
+Done - we need to nick the clkdev mapping approach to join everything
+up and play a few tricks to get a unique consistent name.
 
-> What we *do* need to avoid is having the spmp8000 ADC callback function
-> data structure, the foo ADC callback function data structure, the bar
-> ADC callback function data structure and so forth.  We need to think
-> *NOW* about defining a common ADC callback structure so that we don't
-> spawn a new problem which'll take effort to solve.
+2) Push from triggered capture  - (here is a reading).
+Easiest option from our point of view is to provide this as a 'buffer'
+implementation.  Normally we'd notify userspace of new data, here we
+notify in kernel users (or just push it into their callbacks).
 
-The cat's already well out of the bag on that one, we've got a bunch of
-these things in tree already - the Cragganmore system I've got sitting
-here on my desk has three auxiliary ADCs I'm aware of, all of which are
-supported in mainline, and they're far from the only ones.
+Post that we start to make IIO userspace interfaces optional.
 
-I think we should just carry on as we are while the IIO work proceeds,
-either we'll decide that that's the way forward and we can then kick all
-the ADCs into there or we'll get fed up, decide that's never going to
-work then go and can do something else.
+It gives a progression towards what you are suggesting and doesn't
+hold us up in staging for another long cycle.
+
+There are exceptions. I'd argue any element that is really built for
+say hwmon or input ought to register directly with those subsytems.
+That includes the touchscreen element of the adc that started this
+conversation.  No point in adding overhead and generality to a non
+general element.
+
+Sorry for quick reply, mad day.
+
+Jonathan
