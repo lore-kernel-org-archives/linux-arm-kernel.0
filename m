@@ -1,64 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Oct 2011 12:04:10 +0200
-Subject: [PATCH 1/2] drivers: create a pin control subsystem v9
-In-Reply-To: <CAPTzV16bKaHxoyWEv1H8HGyY_CZhY9orXAuWA-wa0yb2NZ5UcA@mail.gmail.com>
-References: <1317629862-13549-1-git-send-email-linus.walleij@stericsson.com>
-	<CAPTzV16bKaHxoyWEv1H8HGyY_CZhY9orXAuWA-wa0yb2NZ5UcA@mail.gmail.com>
-Message-ID: <CACRpkdY3scxhAw8dKENq=u0GNpSrkdpe5vKCemG7EWGvmFYxQg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Oct 2011 11:20:10 +0100
+Subject: [RESEND][PATCH V2 0/2] Add a common macro for creating struct
+	clk_lookup entries
+In-Reply-To: <057301cc880c$cc7f1f50$657d5df0$%kim@samsung.com>
+References: <1318333530-7023-1-git-send-email-padma.v@samsung.com>
+	<057301cc880c$cc7f1f50$657d5df0$%kim@samsung.com>
+Message-ID: <20111013102010.GQ21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 2:55 AM, Chanho Park <parkch98@gmail.com> wrote:
+On Tue, Oct 11, 2011 at 08:56:23PM +0900, Kukjin Kim wrote:
+> Russell,
+> Maybe as you know, this is required on upcoming Samsung stuff. Actually it's
+> just change/consolidate on other stuff but add on Samsung stuff. So if
+> you're ok, how about sending this to upstream via arm-soc or your tree in
+> this merge window?
 
-> Some gpio-ranges doesn't match with pin numbers.
-> For example, gpio_range_b starts gpio 48.
-> However, a pin base number of gpio_range_b is 96. It isn't same with gpio base.
-> A pinctrl driver must know this pin_space-gpio_range mappings.
+I think taking the first patch is the right thing before the merge
+window opens, because that's the one which everything else will depend
+upon.
 
-The GPIO pin space is one global space, and the only thing
-the struct pinctrl_gpio_range does is to say that this pin range
-is handled by this chip. You can register several ranges to the
-same pin controller.
+The second patch probably needs splitting up between the various SoCs
+and either submitted to their maintainers or to Arnd after the merge
+window has closed.
 
-Then the pin control driver gets called like this:
-
-pin_request(pctldev, pin, gpiostr, true, range);
-ops->gpio_request_enable(pctldev, gpio_range, pin);
-
-In this case you know that pin is an index into the range
-supplied, note that we always get the range into the driver.
-
-These ranges are defined by the driver as well, and it has
-an .id field. Thus the driver shall add/subtract whatever offset
-it needs to map that GPIO pin into a proper pin number,
-there can be so many strange ways of doing this that the
-pin control framework is not dealing with it.
-
-So I think this should be done by the driver, and a clever
-way is to use the .id field of the range as index to offset
-arrays etc.
-
-> +int pinctrl_get_device_gpio_range(unsigned gpio,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct pinctrl_dev **outdev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct pinctrl_gpio_range **outrange)
-> +{
-> + ? ? ? struct pinctrl_dev *pctldev = NULL;
-> +
-> + ? ? ? /* Loop over the pin controllers */
-> + ? ? ? mutex_lock(&pinctrldev_list_mutex);
-> + ? ? ? list_for_each_entry(pctldev, &pinctrldev_list, node) {
-> + ? ? ? ? ? ? ? struct pinctrl_gpio_range *range;
-> +
-> + ? ? ? ? ? ? ? range = pinctrl_match_gpio_range(pctldev, gpio);
-> + ? ? ? ? ? ? ? if (range != NULL) {
-> + ? ? ? ? ? ? ? ? ? ? ? *outdev = pctldev;
-> + ? ? ? ? ? ? ? ? ? ? ? *outrange = range;
->
-> missing mutex_unlock
-
-Argh!
-
-Thanks, fixed it.
-
-Yours,
-Linus Walleij
+I suspect that we're looking at one of:
+a) a matter of days to the merge window opening - though the timing of
+   it (9 days before the kernel summit) doesn't look good, unless it's
+   going to be a short window.
+b) -rc9 will persist for the next fortnight
+c) we'll see the first 3.x-rc10 kernel.
