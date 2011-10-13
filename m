@@ -1,41 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 22:03:36 +0100
-Subject: [PATCH v3.1-rc9] ARM: populate processor tag in proc-cpuinfo
-	for Uni-processor.
-In-Reply-To: <20111013135234.49f2d400.akpm@linux-foundation.org>
-References: <1318520590-24372-1-git-send-email-srinivas.kandagatla@st.com>
-	<20111013164822.GJ21648@n2100.arm.linux.org.uk>
-	<20111013135234.49f2d400.akpm@linux-foundation.org>
-Message-ID: <20111013210336.GO21648@n2100.arm.linux.org.uk>
+Date: Thu, 13 Oct 2011 22:11:45 +0100
+Subject: [PATCH] AT91: Add external RTC for Flexibity board
+In-Reply-To: <BANLkTikvCiXgnm_hVTqDmzZ6yDf6H5WaCw@mail.gmail.com>
+References: <4DC53134.8070706@gmail.com>
+	<20110510234526.GC18929@game.jcrosoft.org>
+	<BANLkTikvCiXgnm_hVTqDmzZ6yDf6H5WaCw@mail.gmail.com>
+Message-ID: <20111013211145.GA27779@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 01:52:34PM -0700, Andrew Morton wrote:
-> On Thu, 13 Oct 2011 17:48:22 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Wed, May 11, 2011 at 09:44:52AM +0200, Andrew Victor wrote:
+> hi,
 > 
-> > On Thu, Oct 13, 2011 at 04:43:10PM +0100, Srinivas KANDAGATLA wrote:
-> > > We recently encountered issue while running cyclesoak on ARM-uniprocessor
-> > > system, What we have noticed it that /proc/cpuinfo does not have
-> > > "processor" tag when its uniprocessor, which looked incorrect.
-> > > All the processors code in kernel do populate this tag for both uni and
-> > > multi processor systems.
-> > > 
-> > > This patch just add processor tag for cpuinfo for ARM uni-processor systems.
-> > 
-> > I wonder why cyclesoak doesn't use the sysconf(_SC_NPROCESSORS_ONLN)
-> > rather than implementing this functionality itself.
-> > 
-> > akpm?
+> >> This patch enables external RTC support on AT91 Flexibity board.
 > 
-> eep, cyclesoak will soon be celebrating its eleventh birthday. 
-> sysconf(_SC_NPROCESSORS_ONLN) might have existed back in those days,
-> but I sure didn't know about it!
+> Acked-by: Andrew Victor <linux@maxim.org.za>
+> 
+> Maxim: You can submit it to Russell's patch system.
+> 
+> 
+> > looks fine just one comment please add your board to the new at91sam9260_defconfig
+> 
+> That file does not exist in any mainline kernel.
 
-Do you have any opinion on the related issue of whether uniprocessor
-kernels should include a 'processor: 0' line in their /proc/cpuinfo
-to satisfy programs such as cyclesoak ?
+It's been a while since this patch went into the patch system, and it
+didn't get applied for various reasons, including because it looked
+like it was sent there without any review (no acked-by's etc added to
+it.)
 
-It's worth noting that glibc's implementation for
-sysconf(_SC_NPROCESSORS_ONLN) prefers reading /proc/stat and counting
-the lines matching '^cpu[0-9]' as its more consistent.
+What's the status of this - and if its still relevant can we have
+it with the proper attributations please?
