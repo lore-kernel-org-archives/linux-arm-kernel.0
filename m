@@ -1,52 +1,59 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Oct 2011 16:38:46 -0700
-Subject: [PATCH] arm/tegra: select AUTO_ZRELADDR by default
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173955580F@HQMAIL01.nvidia.com>
-References: <1317172068-14872-1-git-send-email-pdeschrijver@nvidia.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF173955580F@HQMAIL01.nvidia.com>
-Message-ID: <CAOesGMiuzF47kdmaaFny9Fg1ieox6a75tMFfLRAptvDxz_QPMg@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 14 Oct 2011 10:40:10 +1100
+Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
+In-Reply-To: <4E976F9A.80203@gmail.com>
+References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>	<2414781.rlNqTThJUN@wuerfel>	<alpine.LFD.2.02.1110111950290.17040@xanadu.home>	<1837446.fiK2eIOO53@wuerfel>	<20111013082836.GG21648@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1110130932350.17040@xanadu.home>
+	<4E976F9A.80203@gmail.com>
+Message-ID: <4E9776DA.4060106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 14/10/11 10:09, Ryan Mallon wrote:
 
-On Wed, Sep 28, 2011 at 10:50 AM, Stephen Warren <swarren@nvidia.com> wrote:
-> Peter De Schrijver wrote at Tuesday, September 27, 2011 7:08 PM:
->> This patch causes the kernel uncompressor to determine the physical address
->> of the SDRAM at runtime. This allows the kernel to boot on both tegra20 and
->> tegra30 even though SDRAM is at different physical addresses on both SoCs.
+> On 14/10/11 00:39, Nicolas Pitre wrote:
+> 
+>> On Thu, 13 Oct 2011, Russell King - ARM Linux wrote:
 >>
->> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
->
-> An alternative would be to simply add that config option to the relevant
-> defconfig/.config file. I see both cases in use in the kernel. Still, the
-> code change this enables looks fine to just turn on all the time, and will
-> be needed for Tegra30 support, so I'm fine just selecting it as you have.
->
-> Acked-by: Stephen Warren <swarren@nvidia.com>
->
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 472a7f8..474737b 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -596,6 +596,7 @@ config ARCH_TEGRA
->> ? ? ? select HAVE_CLK
->> ? ? ? select HAVE_SCHED_CLOCK
->> ? ? ? select ARCH_HAS_CPUFREQ
->> + ? ? select AUTO_ZRELADDR
->> ? ? ? help
->> ? ? ? ? This enables support for NVIDIA Tegra based systems (Tegra APX,
->> ? ? ? ? Tegra 6xx and Tegra 2 series).
->
-> P.S. Since this patch relates to Tegra, you should CC the Tegra maintainers
-> and list; I've done so on this message. I also added Arnd; he might take
-> this through the arm-soc tree.
+>>> On Wed, Oct 12, 2011 at 10:30:11AM +0200, Arnd Bergmann wrote:
+>>>> On Tuesday 11 October 2011 20:03:38 Nicolas Pitre wrote:
+>>>>> On Tue, 11 Oct 2011, Arnd Bergmann wrote:
+>>>>>
+>>>>>> I've stuck them into the arm-soc tree for now, so we get linux-next
+>>>>>> coverage, but I won't send them to Linus this way because then we
+>>>>>> would get the same commits twice in the history.
+>>>>>
+>>>>> Could you please do the same with the following:
+>>>>>
+>>>>>   git://git.linaro.org/people/nico/linux.git mach_memory_h
+>>>>>
+>>>>> Russell pulled it at some point, and dropped it due to concerns about 
+>>>>> repeated conflict resolutions (or so I presume).  I just did a test 
+>>>>> merge between your for-next branch and the above and that looked trivial 
+>>>>> enough.
+>>>>
+>>>> Ok, done.
+>>>
+>>> Bypassing maintainers stinks - especially when there are unaddressed
+>>> comments outstanding.  Nicolas has "simplified" my objections in this
+>>> request for you to pull - and has completely ignored the problem that
+>>> it breaks ZBOOT_ROM by deleting the zreladdr definitions on EP93xx
+>>> with no way for that to be provided.
+>>
+>> I also told you that EP93xx doesn't use ZBOOT_ROM anywhere, and that 
+>> this was approved by the EP93xx maintainers.
+> 
+> 
+> As the less active of the two EP93xx maintainers I didn't agree to this.
+> I don't know if Hartley did, but I can't find anything from him in a
+> quick search of the list. I have Cc'ed him.
+> 
+> I don't have time to follow this issue in depth, but from my vague
+> understanding ZBOOT_ROM is unlikely to be used on EP93xx, but still
+> _possible_ to use. Therefore we should not be removing support for
+> ZBOOT_ROM on EP93xx in case there are some users out there.
 
-While it does touch a file outside of arch/arm/mach-tegra, it's for
-the tegra options and is not likely to cause conflicts upstream. I'll
-apply it with the rest of tegra patches for 3.2 here.
+Also, I am on holiday for the next two weeks, so may not be contactable
+via email. Just wanted to point out that I had not been aware of this issue.
 
-So: Applied, thanks.
-
-
--Olof
+~Ryan
