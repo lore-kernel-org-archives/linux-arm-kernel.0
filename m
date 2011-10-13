@@ -1,83 +1,124 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 11:32:37 +0100
-Subject: [PATCH v5 00/10] Per SoC descriptor
-In-Reply-To: <1318255342-17451-1-git-send-email-marc.zyngier@arm.com>
-References: <1318255342-17451-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20111013103237.GS21648@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Oct 2011 12:39:08 +0200
+Subject: [PATCH 1/2] drivers: create a pin control subsystem v9
+In-Reply-To: <20111013031819.GA15829@ponder.secretlab.ca>
+References: <1317629862-13549-1-git-send-email-linus.walleij@stericsson.com>
+	<20111013031819.GA15829@ponder.secretlab.ca>
+Message-ID: <CACRpkdb_HTjYHmX6BZC3Q7h8Zr5VKb6rbyUd8oeuCyvJQxbstA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 03:02:12PM +0100, Marc Zyngier wrote:
->  arch/arm/include/asm/mach/arch.h                |    2 +
->  arch/arm/include/asm/smp.h                      |   15 -----
->  arch/arm/include/asm/soc.h                      |   64 ++++++++++++++++++++
->  arch/arm/kernel/setup.c                         |    8 +++
->  arch/arm/kernel/smp.c                           |   73 ++++++++++++++++++++++-
->  arch/arm/mach-exynos4/core.h                    |   14 ++++
->  arch/arm/mach-exynos4/cpu.c                     |    8 +++
->  arch/arm/mach-exynos4/hotplug.c                 |    8 ++-
->  arch/arm/mach-exynos4/mach-armlex4210.c         |    3 +
->  arch/arm/mach-exynos4/mach-nuri.c               |    3 +
->  arch/arm/mach-exynos4/mach-origen.c             |    3 +
->  arch/arm/mach-exynos4/mach-smdk4x12.c           |    4 +
->  arch/arm/mach-exynos4/mach-smdkv310.c           |    4 +
->  arch/arm/mach-exynos4/mach-universal_c210.c     |    3 +
->  arch/arm/mach-exynos4/platsmp.c                 |   25 +++++++-
->  arch/arm/mach-msm/Makefile                      |    2 +-
->  arch/arm/mach-msm/board-msm8960.c               |    3 +
->  arch/arm/mach-msm/board-msm8x60.c               |    7 ++
->  arch/arm/mach-msm/core.c                        |   17 +++++
->  arch/arm/mach-msm/core.h                        |    9 +++
->  arch/arm/mach-msm/hotplug.c                     |    8 ++-
->  arch/arm/mach-msm/platsmp.c                     |   24 ++++++-
->  arch/arm/mach-omap2/board-4430sdp.c             |    1 +
->  arch/arm/mach-omap2/board-omap4panda.c          |    1 +
->  arch/arm/mach-omap2/include/mach/omap4-common.h |   14 ++++
->  arch/arm/mach-omap2/omap-hotplug.c              |    6 +-
->  arch/arm/mach-omap2/omap-smp.c                  |   24 ++++++-
->  arch/arm/mach-omap2/omap4-common.c              |    7 ++
->  arch/arm/mach-realview/core.c                   |    7 ++
->  arch/arm/mach-realview/core.h                   |    9 +++
->  arch/arm/mach-realview/hotplug.c                |    6 +-
->  arch/arm/mach-realview/platsmp.c                |   24 ++++++-
->  arch/arm/mach-realview/realview_eb.c            |    1 +
->  arch/arm/mach-realview/realview_pb1176.c        |    1 +
->  arch/arm/mach-realview/realview_pb11mp.c        |    1 +
->  arch/arm/mach-realview/realview_pba8.c          |    1 +
->  arch/arm/mach-realview/realview_pbx.c           |    1 +
->  arch/arm/mach-shmobile/Makefile                 |    2 +-
->  arch/arm/mach-shmobile/board-ag5evm.c           |    1 +
->  arch/arm/mach-shmobile/hotplug.c                |    8 ++-
->  arch/arm/mach-shmobile/include/mach/common.h    |    7 +-
->  arch/arm/mach-shmobile/include/mach/sh73a0.h    |    6 ++
->  arch/arm/mach-shmobile/platsmp.c                |   68 ---------------------
->  arch/arm/mach-shmobile/setup-sh73a0.c           |    6 ++
->  arch/arm/mach-shmobile/smp-sh73a0.c             |   35 ++++++++++-
->  arch/arm/mach-tegra/board-dt.c                  |    2 +
->  arch/arm/mach-tegra/board-harmony.c             |    2 +
->  arch/arm/mach-tegra/board-paz00.c               |    2 +
->  arch/arm/mach-tegra/board-seaboard.c            |    4 +
->  arch/arm/mach-tegra/board-trimslice.c           |    2 +
->  arch/arm/mach-tegra/common.c                    |    8 +++
->  arch/arm/mach-tegra/common.h                    |   11 ++++
->  arch/arm/mach-tegra/hotplug.c                   |    6 +-
->  arch/arm/mach-tegra/platsmp.c                   |   26 +++++++-
->  arch/arm/mach-ux500/board-mop500.c              |    3 +
->  arch/arm/mach-ux500/board-u5500.c               |    1 +
->  arch/arm/mach-ux500/hotplug.c                   |    8 ++-
->  arch/arm/mach-ux500/include/mach/setup.h        |    9 +++
->  arch/arm/mach-ux500/platsmp.c                   |   23 ++++++-
->  arch/arm/mach-vexpress/core.h                   |   10 +++
->  arch/arm/mach-vexpress/hotplug.c                |    6 +-
->  arch/arm/mach-vexpress/platsmp.c                |   24 ++++++-
->  arch/arm/mach-vexpress/v2m.c                    |    9 +++
->  arch/arm/plat-versatile/include/plat/platsmp.h  |   14 ++++
->  arch/arm/plat-versatile/platsmp.c               |    4 +-
->  65 files changed, 569 insertions(+), 149 deletions(-)
+On Thu, Oct 13, 2011 at 5:18 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
 
-This isn't particularly appealing for something that's supposed to
-be a clean up - it's introducing 400+ new lines of code.  It looks like
-most of this comes from the platform stuff rather than core stuff.
+> Nit: put the changelog above the s-o-b lines so it will appear in the
+> linux commit log.
 
-Can't we do any better with this?  We really need things to be going
-in the other direction.
+OK I'll collect all of them and stash them into it for v10
+
+>> +The GPIO drivers may want to perform operations of various types on the same
+>> +physical pins that are also registered as GPIO pins.
+>
+> ...also registered as PINMUX pins?
+
+Yes.
+
+>> ?source "drivers/ptp/Kconfig"
+>>
+>> +# pinctrl before gpio - gpio drivers may need it
+>
+> This shouldn't actually be an ordering constraint. ?It might be a
+> temporary restriction on the Makefiles, but it isn't at all for Kconfig.
+
+True, was blinded by similar comments in that Kconfig, such as
+this:
+# input before char - char/joystick depends on it. As does USB.
+
+Anyway I took out the comment.
+
+>> +menuconfig PINCTRL
+>> + ? ? bool "PINCTRL Support"
+>> + ? ? depends on SYSFS && EXPERIMENTAL
+>
+> Why depends on SYSFS? ?That shouldn't be a consideration at all.
+
+Dropped last week. Leftover from when I registered this
+bus...
+
+>> +
+>> +/**
+>> + * get_pctldev_from_dev() - look up pin controller device
+>
+> Naming abbreviation is a little agressive. ?Please use pinctrl
+> everywhere instead of a mix between pctl and pinctrl.
+
+OK. Renamed a few functions accordingly.
+Also added a fixup to the SirfPrimaII driver to use
+the new names.
+
+>> + ? ? if (found)
+>> + ? ? ? ? ? ? return pctldev;
+>> +
+>> + ? ? return NULL;
+>
+> or simply:
+>
+> ? ? ? ?return found ? pctldev : NULL;
+
+OK.
+
+>> + ? ? /* Loop over the pin controllers */
+>> + ? ? mutex_lock(&pinctrldev_list_mutex);
+>> + ? ? list_for_each_entry(pctldev, &pinctrldev_list, node) {
+>> + ? ? ? ? ? ? struct pinctrl_gpio_range *range;
+>> +
+>> + ? ? ? ? ? ? range = pinctrl_match_gpio_range(pctldev, gpio);
+>> + ? ? ? ? ? ? if (range != NULL) {
+>> + ? ? ? ? ? ? ? ? ? ? *outdev = pctldev;
+>> + ? ? ? ? ? ? ? ? ? ? *outrange = range;
+>> + ? ? ? ? ? ? ? ? ? ? return 0;
+>
+> Neglected to drop mutex
+
+Yep noted by another reviewe also today...
+
+>> +/**
+>> + * pinctrl_register() - register a pin controller device
+>> + * @pctldesc: descriptor for this pin controller
+>> + * @dev: parent device for this pin controller
+>> + * @driver_data: private pin controller data for this pin controller
+>> + */
+>> +struct pinctrl_dev *pinctrl_register(struct pinctrl_desc *pctldesc,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct device *dev, void *driver_data)
+>> +{
+>> + ? ? static atomic_t pinmux_no = ATOMIC_INIT(0);
+>> + ? ? struct pinctrl_dev *pctldev;
+>> + ? ? int ret;
+>> +
+>> + ? ? if (pctldesc == NULL)
+>> + ? ? ? ? ? ? return ERR_PTR(-EINVAL);
+>
+> I urge you to consider carefully before relying on the ERR_PTR()
+> pattern. ?It isn't easy to for a compiler or a human to check if
+> ERR_PTR values are being handled properly, and is therefore a likely
+> source of bugs. ?Unless it is *absolutely critical* to return an error
+> code instead of NULL on error, I strongly recommend returning NULL
+> from this function on failure.
+>
+> From what I see from this function, the error codes are less useful
+> that using pr_err() calls.
+
+Agreed, we return NULL on error instead.
+Design pattern comes from clocks and regulators, it's not
+that useful in this case, maybe not in the other cases either.
+
+Fixed usage in U300 and Sirf controller as well.
+
+> I think this is pretty close to ready. ?If you address the comments
+> I've made above then you can add my Acked-by:
+>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+
+Thanks a lot Grant!
+
+Yours,
+Linus Walleij
