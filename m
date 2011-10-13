@@ -1,44 +1,81 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 13 Oct 2011 10:57:01 -0600
-Subject: [PATCH] ARM: tegra: Add sound support to tegra_defconfig
-Message-ID: <1318525021-7151-1-git-send-email-swarren@nvidia.com>
+From: mturquette@ti.com (Turquette, Mike)
+Date: Thu, 13 Oct 2011 10:16:17 -0700
+Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
+In-Reply-To: <20111013144411.GC21648@n2100.arm.linux.org.uk>
+References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
+	<1316730422-20027-2-git-send-email-mturquette@ti.com>
+	<20111013144411.GC21648@n2100.arm.linux.org.uk>
+Message-ID: <CAJOA=zOTOSaAA=0v3+b2z6E8P-tVR7McSqpgYE6rnfNRx4r-Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Tegra ALSA/ASoC/sound support, including drivers for TrimSlice,
-and WM8903-based platforms such as Harmony and Seaboard.
+On Thu, Oct 13, 2011 at 7:44 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Sep 22, 2011 at 03:26:56PM -0700, Mike Turquette wrote:
+>> ? struct clk_hw_ops {
+>> ? ? ? int ? ? ? ? ? ? (*prepare)(struct clk_hw *);
+>> ? ? ? void ? ? ? ? ? ?(*unprepare)(struct clk_hw *);
+>> ? ? ? int ? ? ? ? ? ? (*enable)(struct clk_hw *);
+>> ? ? ? void ? ? ? ? ? ?(*disable)(struct clk_hw *);
+>> ? ? ? unsigned long ? (*recalc_rate)(struct clk_hw *);
+>> ? ? ? int ? ? ? ? ? ? (*set_rate)(struct clk_hw *,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long, unsigned long *);
+>> ? ? ? long ? ? ? ? ? ?(*round_rate)(struct clk_hw *, unsigned long);
+>> ? ? ? int ? ? ? ? ? ? (*set_parent)(struct clk_hw *, struct clk *);
+>> ? ? ? struct clk * ? ?(*get_parent)(struct clk_hw *);
+>> ? };
+>>
+>> Platform clock code can register a clock through clk_register, passing a
+>> set of operations, and a pointer to hardware-specific data:
+>>
+>> ? struct clk_hw_foo {
+>> ? ? ? struct clk_hw clk;
+>> ? ? ? void __iomem *enable_reg;
+>> ? };
+>
+> Eww, no, this really isn't going to scale for platforms like OMAP - to
+> have all the operations indirected through a set of function pointers
+> for every clock just because the enable register (or enable bit) is
+> in a different position is completely absurd.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-Olof, this is for squashing into your recently posted "[PATCH] ARM:
-tegra: update defconfig". Please also consider that patch of yours:
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Russel,
 
- arch/arm/configs/tegra_defconfig |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+I'm porting the OMAP clock framework to common clock right now and it
+is going well.
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index c41e117..1957297 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -105,6 +105,18 @@ CONFIG_SENSORS_LM90=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_TPS6586X=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+# CONFIG_SND_SUPPORT_OLD_API is not set
-+# CONFIG_SND_DRIVERS is not set
-+# CONFIG_SND_PCI is not set
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_SPI is not set
-+# CONFIG_SND_USB is not set
-+CONFIG_SND_SOC=y
-+CONFIG_SND_SOC_TEGRA=y
-+CONFIG_SND_SOC_TEGRA_WM8903=y
-+CONFIG_SND_SOC_TEGRA_TRIMSLICE=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_TEGRA=y
--- 
-1.7.0.4
+For many clocks near the root of the tree I've been able to re-use
+struct clk_hw_fixed & clk_fixed_ops (see patch 3 or 4 in this series),
+which actually represents a decrease in memory consumption over the
+old OMAP struct clk (which populated many of the operations func
+pointers directly, causing duplication).
+
+So far I don't see scalability as an issue.  In fact the design solves
+some problems neatly for us.  For now I am creating one "uber clock",
+struct clk_hw_omap, which dumps all of the clksel, pll, gate control &
+mux crap directly from OMAP's old struct clk.  This is not optimal for
+the long-term, but is a reasonable stepping stone which handles 90% of
+OMAP clocks.  The new common struct clk makes it much easier for us to
+treat PLLs differently from typical dividers, which can be treated
+differently from dividers in modules, which can be treated differently
+from pure mux clocks, etc.
+
+> I'm not soo concerned about the increase in memory usage (for 100 to 200
+> clock definitions its only 4 to 8k) but what worries me the most is
+> initializing these damned things. ?It's an awful lot of initializers,
+> which means the potential for an awful lot of conflicts should something
+> change in this structure.
+
+As I stated above, so far memory usage has actually *decreased* due to
+removing so many duplicated function pointers for OMAP's old struct
+clk.  I wouldn't be surprised if other SoCs experienced the same lift.
+
+Also, in my own tree I've broken out clk_register into clk_init also.
+clk_register is still the thing to call if you have dynamically
+created clocks, as it handles the malloc, and it then calls clk_init.
+clk_init can be used by for static clock data and just handles
+initializing the mutex/list/whatever.  Does this allay some of your
+concerns?  Are you just trying to avoid allocating all of that memory
+dynamically?
+
+Regards,
+Mike
