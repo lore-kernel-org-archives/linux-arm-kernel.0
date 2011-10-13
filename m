@@ -1,32 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 22:11:45 +0100
-Subject: [PATCH] AT91: Add external RTC for Flexibity board
-In-Reply-To: <BANLkTikvCiXgnm_hVTqDmzZ6yDf6H5WaCw@mail.gmail.com>
-References: <4DC53134.8070706@gmail.com>
-	<20110510234526.GC18929@game.jcrosoft.org>
-	<BANLkTikvCiXgnm_hVTqDmzZ6yDf6H5WaCw@mail.gmail.com>
-Message-ID: <20111013211145.GA27779@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 13 Oct 2011 14:22:13 -0700
+Subject: [PATCH v6 09/16] OMAP2+: UART: Add runtime pm support for
+	omap-serial driver
+In-Reply-To: <CAAL8m4yrXo4KRYxXxWECU99B6--FCMBDFUbNk+vsBV0Jnt0bcg@mail.gmail.com>
+	(Govindraj's message of "Thu, 13 Oct 2011 06:58:48 +0530")
+References: <1317380495-584-1-git-send-email-govindraj.raja@ti.com>
+	<1317380495-584-9-git-send-email-govindraj.raja@ti.com>
+	<878voplppo.fsf@ti.com>
+	<CAAL8m4yrXo4KRYxXxWECU99B6--FCMBDFUbNk+vsBV0Jnt0bcg@mail.gmail.com>
+Message-ID: <87obxkio3e.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 09:44:52AM +0200, Andrew Victor wrote:
-> hi,
-> 
-> >> This patch enables external RTC support on AT91 Flexibity board.
-> 
-> Acked-by: Andrew Victor <linux@maxim.org.za>
-> 
-> Maxim: You can submit it to Russell's patch system.
-> 
-> 
-> > looks fine just one comment please add your board to the new at91sam9260_defconfig
-> 
-> That file does not exist in any mainline kernel.
+Govindraj <govindraj.ti@gmail.com> writes:
 
-It's been a while since this patch went into the patch system, and it
-didn't get applied for various reasons, including because it looked
-like it was sent there without any review (no acked-by's etc added to
-it.)
+> On Thu, Oct 13, 2011 at 5:36 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>>
+>> [...]
+>>
+>>> Use device_may_wakeup to check whether uart has wakeup capabilities
+>>> and then enable uart runtime usage for the uart.
+>>
+>> Curious about what happens when device_may_wakeup() is not set during
+>> device init.
+>>
+>> [...]
+>>
+>>> @@ -1305,6 +1363,16 @@ static int serial_omap_probe(struct platform_device *pdev)
+>>> ? ? ? ? ? ? ? up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
+>>> ? ? ? }
+>>>
+>>> + ? ? pm_runtime_use_autosuspend(&pdev->dev);
+>>> + ? ? pm_runtime_set_autosuspend_delay(&pdev->dev,
+>>> + ? ? ? ? ? ? ? ? ? ? OMAP_UART_AUTOSUSPEND_DELAY);
+>>> +
+>>> + ? ? pm_runtime_irq_safe(&pdev->dev);
+>>> + ? ? if (device_may_wakeup(&pdev->dev)) {
+>>> + ? ? ? ? ? ? pm_runtime_enable(&pdev->dev);
+>>
+>> So if device_may_wakeup() is false, runtime PM is not enabled, then...
+>>
+>>> + ? ? ? ? ? ? pm_runtime_get_sync(&pdev->dev);
+>>
+>> ...this get doesn't happen, and the first register access causes a crash.
+>
+> Actually no crash, clocks will left enabled from boot up (hwmod_no_reset/idle)
+> that are idled and enabled back here.
+>
+> Since hwmod_idle is binded here later ([PATCH v6 15/16]),
 
-What's the status of this - and if its still relevant can we have
-it with the proper attributations please?
+IMO, That's not a very maintainable solution.   
+
+What happens when when someone fixes serial.c to only set
+HWMOD_INIT_NO_IDLE on the console UART?  or if we fix things so we don't
+need INIT_NO_IDLE anymore?  Then this will crash.
+
+Driver code should not make assumptions like this about what device init
+code is or isn't doing.
+
+Kevin
