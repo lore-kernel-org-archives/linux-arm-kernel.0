@@ -1,38 +1,26 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Oct 2011 09:52:43 +0100
-Subject: change_page_attr() implementation for ARM?
-In-Reply-To: <401E54CE964CD94BAE1EB4A729C7087E3722519EE2@HQMAIL04.nvidia.com>
-References: <D19EBEE1D7B1F742A8ED7130E050A38A4CA460FF0C@HQMAIL02.nvidia.com>
-	<CAHkRjk4mqhu+HhoSAnowk6=5GzXXhmKCE-3jrjhMpVzbtakFYg@mail.gmail.com>
-	<401E54CE964CD94BAE1EB4A729C7087E3722519EE2@HQMAIL04.nvidia.com>
-Message-ID: <20111013085243.GB6300@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Oct 2011 09:55:21 +0100
+Subject: [PATCH V4 3/3] ARM: SAMSUNG: Add lookup of sdhci-s3c clocks
+	using generic names
+In-Reply-To: <4E969958.9020200@samsung.com>
+References: <1318412587-29987-1-git-send-email-rajeshwari.s@samsung.com>
+	<1318412587-29987-4-git-send-email-rajeshwari.s@samsung.com>
+	<4E956ADB.3060604@samsung.com>
+	<CAPs=JDf2N1kh4BO9nPBb-J6k51e-ytntrNOvw_UOKtw-ktdycA@mail.gmail.com>
+	<4E95BDF8.2080406@samsung.com>
+	<CAPs=JDeFyoCYnR-Xa_fdmBVHxfNGuVNfdHd-MZgYcPytprsmFg@mail.gmail.com>
+	<4E969958.9020200@samsung.com>
+Message-ID: <20111013085521.GJ21648@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 03:27:58AM +0100, Krishna Reddy wrote:
-> >> On Cortex-A9, we have observed stale data being read from
-> >> write-combine (C=0 B=1) memory regions mapped into userspace which
-> >> have a duplicate cacheable mapping in the kernel address space (due
-> >> to the kernel linear mapping).
-> >>
-> >> The issue appears to be due to speculative prefetch on the
-> >> cacheable kernel linear mapping which gets lines into the L2 cache.
-> >> When reads are performed on the write-combine mapping for this
-> >> address range, these reads get the stale data from L2 instead of
-> >> memory.
+On Thu, Oct 13, 2011 at 09:55:04AM +0200, Sylwester Nawrocki wrote:
+> Yes, it allowed to add clkdev support with minimal changes required.
 > 
-> >If your system has a PL310, there is bit 22 in the auxiliary control
-> >register which makes reads via the non-cacheable mapping not to hit
-> >the L2 cache. I had this patch queued in Russell's system for a long
-> >time:
-> >http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6529/1
-> >Alternatively, you can pass this bit via your platform code.
-> 
-> Is this is a quick fix for ARM processors with PL310. Can this be
-> expected in future versions of ARM processors with different L2 cache?
+> But let's see what happens when the works on common struct clk for all
+> architectures are more or less completed and we convert Samsung platforms
+> to use it;)
 
-That's specific to the PL310 cache controller, nothing to do with the
-CPU. It's a configuration bit that may be useful in some scenarios.
-
--- 
-Catalin
+The common struct clk shouldn't have much to do with the clkdev part of
+it - clkdev just provides a method to associate a struct clk with the
+drivers request.  The common struct clk doesn't change that.
