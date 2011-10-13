@@ -1,122 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Oct 2011 20:56:59 -0700
-Subject: [PATCH] ARM: tegra: update defconfig
-Message-ID: <1318478219-9462-1-git-send-email-olof@lixom.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Oct 2011 22:09:23 -0600
+Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <CACVXFVMnt-ChUDhawhoyMm-wJ8xSQAWs1c8ykzmyshfX49HEsw@mail.gmail.com>
+References: <20111008155502.GB616@kroah.com>
+	<361419345.198335.1318268242916.JavaMail.root@zimbra-prod-mbox-2.vmware.com>
+	<CACVXFVMnt-ChUDhawhoyMm-wJ8xSQAWs1c8ykzmyshfX49HEsw@mail.gmail.com>
+Message-ID: <20111013040923.GE15829@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refresh tegra_defconfig:
+On Tue, Oct 11, 2011 at 08:29:18PM +0800, Ming Lei wrote:
+> On Tue, Oct 11, 2011 at 1:37 AM, Andrei Warkentin <awarkentin@vmware.com> wrote:
+> > Hi,
+> >
+> > ----- Original Message -----
+> >> From: "Greg KH" <greg@kroah.com>
+> >> To: "Josh Triplett" <josh@joshtriplett.org>
+> >> Cc: "G, Manjunath Kondaiah" <manjugk@ti.com>, linux-arm-kernel at lists.infradead.org, "Grant Likely"
+> >> <grant.likely@secretlab.ca>, linux-omap at vger.kernel.org, linux-mmc at vger.kernel.org, linux-kernel at vger.kernel.org,
+> >> "Dilan Lee" <dilee@nvidia.com>, "Mark Brown" <broonie@opensource.wolfsonmicro.com>, Manjunath at jasper.es
+> >> Sent: Saturday, October 8, 2011 11:55:02 AM
+> >> Subject: Re: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
+> >>
+> >
+> > I'm a bit of a fly on the wall here, but I'm curious how this impacts suspend/resume.
+> > device_initialize->device_pm_init are called from device_register, so certainly this
+> > patch doesn't also ensure that the PM ordering matches probe ordering, which is bound
+> > to break suspend, right? Was this ever tested with the OMAP target? Shouldn't the
+> 
+> Inside device_add(), device_pm_add is called before bus_probe_device,
+> so the patch can't change the device order in pm list, and just change
+> the driver probe order.
 
-New options enabled: RTC, SPI, USB and USB_STORAGE together with
-corresponding tegra drivers. Also enable some of the common usb ethernet
-adapters.
+That's the way it works now, but can it be reworked?  It would be
+possible to adjust the list order after successful probe.  However,
+I'm not clear on the ordering rules for the dpm_list.  Right now it is
+explicitly ordered to have parents before children, but as already
+expressed, that doesn't accurately represent ordering constraints for
+multiple device dependancies.
 
-Finally, enable new merged boards (Ventana) and the generic devicetree board.
+So, reordering the list would probably require maintaining the
+existing parent-child ordering constraint, but to also shift
+devices (and any possible children?) to be after drivers that are
+already probed.  That alone will be difficult to implement and get
+right, but maybe the constraints can be simplified.  It needs some
+further thought.
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm/configs/tegra_defconfig |   29 +++++++++++++++++++++--------
- 1 files changed, 21 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 8845f1c..953aefe 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -25,6 +25,7 @@ CONFIG_MACH_KAEN=y
- CONFIG_MACH_PAZ00=y
- CONFIG_MACH_TRIMSLICE=y
- CONFIG_MACH_WARIO=y
-+CONFIG_MACH_VENTANA=y
- CONFIG_TEGRA_DEBUG_UARTD=y
- CONFIG_ARM_ERRATA_742230=y
- CONFIG_NO_HZ=y
-@@ -38,7 +39,6 @@ CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_VFP=y
--CONFIG_PM=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -65,6 +65,7 @@ CONFIG_IPV6_TUNNEL=y
- CONFIG_IPV6_MULTIPLE_TABLES=y
- # CONFIG_WIRELESS is not set
- # CONFIG_FIRMWARE_IN_KERNEL is not set
-+CONFIG_PROC_DEVICETREE=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_MISC_DEVICES=y
- CONFIG_AD525X_DPOT=y
-@@ -72,34 +73,49 @@ CONFIG_AD525X_DPOT_I2C=y
- CONFIG_ICS932S401=y
- CONFIG_APDS9802ALS=y
- CONFIG_ISL29003=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
- CONFIG_DUMMY=y
-+CONFIG_NET_ETHERNET=y
- CONFIG_R8169=y
- # CONFIG_NETDEV_10000 is not set
- # CONFIG_WLAN is not set
-+CONFIG_USB_PEGASUS=y
-+CONFIG_USB_USBNET=y
-+CONFIG_USB_NET_SMSC75XX=y
-+CONFIG_USB_NET_SMSC95XX=y
- # CONFIG_INPUT is not set
- # CONFIG_SERIO is not set
- # CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
- # CONFIG_DEVKMEM is not set
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_OF_PLATFORM=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
- # CONFIG_I2C_HELPER_AUTO is not set
- CONFIG_I2C_TEGRA=y
-+CONFIG_SPI=y
-+CONFIG_SPI_TEGRA=y
- CONFIG_SENSORS_LM90=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_TPS6586X=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_TEGRA=y
-+CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_TEGRA=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_TEGRA=y
- CONFIG_STAGING=y
--# CONFIG_STAGING_EXCLUDE_BUILD is not set
- CONFIG_IIO=y
- CONFIG_SENSORS_ISL29018=y
- CONFIG_SENSORS_AK8975=y
-@@ -123,18 +139,15 @@ CONFIG_NLS_ISO8859_1=y
- CONFIG_PRINTK_TIME=y
- CONFIG_MAGIC_SYSRQ=y
- CONFIG_DEBUG_FS=y
--CONFIG_DEBUG_KERNEL=y
- CONFIG_DETECT_HUNG_TASK=y
- CONFIG_SCHEDSTATS=y
- CONFIG_TIMER_STATS=y
- CONFIG_DEBUG_SLAB=y
- # CONFIG_DEBUG_PREEMPT is not set
- CONFIG_DEBUG_MUTEXES=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
- CONFIG_DEBUG_INFO=y
- CONFIG_DEBUG_VM=y
- CONFIG_DEBUG_SG=y
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- CONFIG_DEBUG_LL=y
- CONFIG_EARLY_PRINTK=y
- CONFIG_CRYPTO_ECB=y
--- 
-1.7.4.1
+g.
