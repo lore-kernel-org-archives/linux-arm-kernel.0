@@ -1,22 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 15:10:36 +0100
-Subject: [PATCH v2 01/14] ARM: tegra: annotate IO_*_VIRT pointers
-In-Reply-To: <1318224484-2090-2-git-send-email-olof@lixom.net>
-References: <1317956064-17650-1-git-send-email-olof@lixom.net>
-	<1318224484-2090-1-git-send-email-olof@lixom.net>
-	<1318224484-2090-2-git-send-email-olof@lixom.net>
-Message-ID: <20111013141036.GX21648@n2100.arm.linux.org.uk>
+From: alan@linux.intel.com (Alan Cox)
+Date: Thu, 13 Oct 2011 15:27:21 +0100
+Subject: [PATCH] UART: add CSR SiRFprimaII SoC on-chip uart drivers
+In-Reply-To: <CAGsJ_4zvc=HaVURyARV0k6m7btfMjQo1frqmJa-OtE--eyCsFA@mail.gmail.com>
+References: <1318487293-6963-1-git-send-email-Barry.Song@csr.com>
+	<20111013105556.09d64d4d@bob.linux.org.uk>
+	<CAGsJ_4zvc=HaVURyARV0k6m7btfMjQo1frqmJa-OtE--eyCsFA@mail.gmail.com>
+Message-ID: <20111013152721.6abcbbdc@bob.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 09, 2011 at 10:27:51PM -0700, Olof Johansson wrote:
-> +#ifdef __ASSEMBLY__
-> +#define __IOVADDR(x)	(x)
-> +#else
-> +#define __IOVADDR(x)	((void __force __iomem *)(x))
+> >> +static struct console sirfsoc_uart_console = {
+> >> + ? ? .name ? ? ? ? ? = "ttyS",
+> >
+> > ttyS is 8250 devces. Pick a new name for your own.
+> 
+> ok. most devices have names like ttySQ, ttySA, ttySG... since our SoC
+> is named SiRFprimaII, i'd like to have ttySI?
 
-Please call this IOMEM() - see:
+If nobody else is using it for anything mainstream sure. Or ttySiRF0 ..
+etc might be more definitively unique
 
-grep '#define *IOMEM' arch/arm/*/include/mach -r
 
-for its establishment across several implementations.
+Alan
