@@ -1,49 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Oct 2011 09:59:06 +0100
-Subject: change_page_attr() implementation for ARM?
-In-Reply-To: <20111013084947.GI21648@n2100.arm.linux.org.uk>
-References: <D19EBEE1D7B1F742A8ED7130E050A38A4CA460FF0C@HQMAIL02.nvidia.com>
-	<CAHkRjk4mqhu+HhoSAnowk6=5GzXXhmKCE-3jrjhMpVzbtakFYg@mail.gmail.com>
-	<401E54CE964CD94BAE1EB4A729C7087E3722519EE2@HQMAIL04.nvidia.com>
-	<20111013084947.GI21648@n2100.arm.linux.org.uk>
-Message-ID: <CAHkRjk7BukuyHHLb8XCdZGixOkzho-jFaMLOfrvkbk6ScBpi5w@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 13 Oct 2011 11:06:09 +0200
+Subject: [PATCH 1/2] [ARM] mach-types: Re-add apf9328
+In-Reply-To: <20111008220722.GG25689@n2100.arm.linux.org.uk>
+References: <1318087189-22977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+	<20111008192621.GA28049@pengutronix.de>
+	<20111008220722.GG25689@n2100.arm.linux.org.uk>
+Message-ID: <20111013090609.GT577@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2011 09:49, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Oct 12, 2011 at 07:27:58PM -0700, Krishna Reddy wrote:
->> >The kernel linear mapping is done using sections, so we would have to
->> >change the attributes for a full section. Russell's approach I think
->> >is better but people reported some stability issues.
-...
->> does Russell's approach refer to a different way?
->> Is there any link on how Russell wants to do it?
->
-> I had a patch which pre-allocates memory for the DMA allocators, but I
-> had to drop it because it caused regressions on platforms which had
-> very limited DMA memory available - it caused such platforms to panic
-> at boot.
->
-> So, this is proving to be an extremely difficult problem to solve -
-> and I've been wishing for quite a long time that ARM Ltd would get
-> their act together and realize that the combination of restrictions
-> (DMA incoherence plus not permitting aliases) is Very Bad News.
->
-> So, I'm hoping that there's an increasing chorus of voices trying to
-> persuade a move towards data-cache DMA coherence as standard.
+On Sat, Oct 08, 2011 at 11:07:22PM +0100, Russell King - ARM Linux wrote:
+> On Sat, Oct 08, 2011 at 09:26:21PM +0200, Wolfram Sang wrote:
+> > On Sat, Oct 08, 2011 at 05:19:48PM +0200, Gwenhael Goavec-Merou wrote:
+> > > 
+> > > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> > 
+> > I think this file is maintained by Russell, yet I want to ack that the entry
+> > below is missing for building mx1_defconfig. Found that, too.
+> 
+> The thing is - read the comments at the top of the file.  There's hints
+> there as to what will happen if you patch the file.  The hint is
+> 'automatically generated'.  So when I next update the file, any patches
+> done to the file will be wiped out.
+Currently the id is still missing in your for-next branch and it is
+marked as "mainlined" on http://www.arm.linux.org.uk/developer/machines/
+(906).
 
-I mentioned the mismatched aliases clarification on several occasions,
-though in private emails as the ARM ARM revC is not public yet. IIRC I
-even sent a short document to a few people including you. Is that
-clarification not enough (I can send it again if you want)?
+That means that the next update should include the id, right? Maybe it's
+worth to add it already earlier with the patch Gwenhael proposed as
+without it mx1_defconfig is broken. After f32609c5a035 it even breaks
+imx_v4_v5_defconfig.
 
-Basically with Normal Non-cacheable DMA buffers (but not Strongly
-Ordered) we are ok as long as the caches are cleaned on the other
-Normal Cacheable mapping. Of course, you get different behaviour with
-PL310 if you don't set bit 22 but that's a documented bit and not some
-undocumented errata workaround (maybe this bit should have been 1 by
-default).
+BTW is there a way to see the mach-types file as it would land in
+linux.git if it were updated now?
+
+Best regards
+Uwe
 
 -- 
-Catalin
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
