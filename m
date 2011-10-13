@@ -1,351 +1,608 @@
 From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Thu, 13 Oct 2011 12:07:01 +0800
-Subject: [PATCH v4 4/8] ARM: pxa: rename NR_BUILTIN_GPIO
+Date: Thu, 13 Oct 2011 12:07:03 +0800
+Subject: [PATCH v4 6/8] ARM: pxa: move gpio-pxa.h into include directory
 In-Reply-To: <1318478825-17187-1-git-send-email-haojian.zhuang@marvell.com>
 References: <1318478825-17187-1-git-send-email-haojian.zhuang@marvell.com>
-Message-ID: <1318478825-17187-5-git-send-email-haojian.zhuang@marvell.com>
+Message-ID: <1318478825-17187-7-git-send-email-haojian.zhuang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NR_BUILTIN_GPIO is both defined in arch-pxa and arch-mmp. Now replace it
-with PXA_NR_BUILTIN_GPIO and MMP_NR_BUILTIN_GPIO.
+Merge the gpio-pxa.h in arch-pxa and arch-mmp. Move the new gpio-pxa.h
+into include directory.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
 ---
- arch/arm/mach-mmp/include/mach/gpio-pxa.h  |    2 -
- arch/arm/mach-mmp/include/mach/gpio.h      |    1 -
- arch/arm/mach-mmp/include/mach/irqs.h      |    5 +--
- arch/arm/mach-mmp/tavorevb.c               |    1 +
- arch/arm/mach-mmp/ttc_dkb.c                |    7 +++--
- arch/arm/mach-pxa/include/mach/corgi.h     |    2 +-
- arch/arm/mach-pxa/include/mach/gpio-pxa.h  |    2 -
- arch/arm/mach-pxa/include/mach/gpio.h      |    1 -
- arch/arm/mach-pxa/include/mach/hx4700.h    |    2 +-
- arch/arm/mach-pxa/include/mach/irqs.h      |    4 +-
- arch/arm/mach-pxa/include/mach/littleton.h |    2 +-
- arch/arm/mach-pxa/include/mach/magician.h  |    2 +-
- arch/arm/mach-pxa/include/mach/poodle.h    |    2 +-
- arch/arm/mach-pxa/include/mach/spitz.h     |    6 ++--
- arch/arm/mach-pxa/include/mach/tosa.h      |    6 ++--
- arch/arm/mach-pxa/pcm990-baseboard.c       |    6 ++--
- arch/arm/plat-pxa/include/plat/gpio.h      |   30 ----------------------------
- 17 files changed, 23 insertions(+), 58 deletions(-)
- delete mode 100644 arch/arm/plat-pxa/include/plat/gpio.h
+ arch/arm/mach-mmp/include/mach/gpio-pxa.h  |   12 ----
+ arch/arm/mach-mmp/include/mach/gpio.h      |    3 +-
+ arch/arm/mach-mmp/mmp2.c                   |    3 +-
+ arch/arm/mach-mmp/pxa168.c                 |    3 +-
+ arch/arm/mach-mmp/pxa910.c                 |    3 +-
+ arch/arm/mach-pxa/include/mach/gpio-pxa.h  |   61 ---------------------
+ arch/arm/mach-pxa/include/mach/gpio.h      |    2 -
+ arch/arm/mach-pxa/include/mach/littleton.h |    2 -
+ arch/arm/mach-pxa/irq.c                    |    3 +-
+ arch/arm/mach-pxa/mfp-pxa2xx.c             |    2 +-
+ arch/arm/mach-pxa/pxa25x.c                 |    2 +-
+ arch/arm/mach-pxa/pxa27x.c                 |    2 +-
+ arch/arm/mach-pxa/pxa3xx.c                 |    4 +-
+ arch/arm/mach-pxa/pxa95x.c                 |    2 +-
+ arch/arm/plat-pxa/include/plat/gpio-pxa.h  |   80 ---------------------------
+ drivers/gpio/gpio-pxa.c                    |   42 ++++++++++++++-
+ include/linux/gpio-pxa.h                   |   81 ++++++++++++++++++++++++++++
+ 17 files changed, 135 insertions(+), 172 deletions(-)
+ delete mode 100644 arch/arm/mach-mmp/include/mach/gpio-pxa.h
+ delete mode 100644 arch/arm/mach-pxa/include/mach/gpio-pxa.h
+ delete mode 100644 arch/arm/plat-pxa/include/plat/gpio-pxa.h
+ create mode 100644 include/linux/gpio-pxa.h
 
 diff --git a/arch/arm/mach-mmp/include/mach/gpio-pxa.h b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
-index f7bcc30..78199bd 100644
+deleted file mode 100644
+index f8448b5..0000000
 --- a/arch/arm/mach-mmp/include/mach/gpio-pxa.h
-+++ b/arch/arm/mach-mmp/include/mach/gpio-pxa.h
-@@ -10,8 +10,6 @@
- #define BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
- #define GPIO_REG(x)	(*((volatile u32 *)(GPIO_REGS_VIRT + (x))))
- 
--#define NR_BUILTIN_GPIO		IRQ_GPIO_NUM
++++ /dev/null
+@@ -1,12 +0,0 @@
+-#ifndef __ASM_MACH_GPIO_PXA_H
+-#define __ASM_MACH_GPIO_PXA_H
 -
- #define gpio_to_bank(gpio)	((gpio) >> 5)
- 
- /* NOTE: these macros are defined here to make optimization of
+-#include <mach/addr-map.h>
+-#include <mach/cputype.h>
+-#include <mach/irqs.h>
+-
+-#define GPIO_REGS_VIRT	(APB_VIRT_BASE + 0x19000)
+-
+-#include <plat/gpio-pxa.h>
+-
+-#endif /* __ASM_MACH_GPIO_PXA_H */
 diff --git a/arch/arm/mach-mmp/include/mach/gpio.h b/arch/arm/mach-mmp/include/mach/gpio.h
-index 32b684a..904466d 100644
+index 904466d..13219eb 100644
 --- a/arch/arm/mach-mmp/include/mach/gpio.h
 +++ b/arch/arm/mach-mmp/include/mach/gpio.h
-@@ -6,5 +6,4 @@
- #define __gpio_is_inverted(gpio)	(0)
- #define __gpio_is_occupied(gpio)	(0)
+@@ -3,7 +3,6 @@
  
--#include <plat/gpio.h>
+ #include <asm-generic/gpio.h>
+ 
+-#define __gpio_is_inverted(gpio)	(0)
+-#define __gpio_is_occupied(gpio)	(0)
++#include <mach/cputype.h>
+ 
  #endif /* __ASM_MACH_GPIO_H */
-diff --git a/arch/arm/mach-mmp/include/mach/irqs.h b/arch/arm/mach-mmp/include/mach/irqs.h
-index ec95951..34635a0 100644
---- a/arch/arm/mach-mmp/include/mach/irqs.h
-+++ b/arch/arm/mach-mmp/include/mach/irqs.h
-@@ -219,11 +219,10 @@
- #define IRQ_MMP2_MUX_END		(IRQ_MMP2_SSP_BASE + 2)
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index 01e5c73..1291364 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -13,6 +13,7 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/gpio-pxa.h>
+ #include <linux/platform_device.h>
  
- #define IRQ_GPIO_START			128
--#define IRQ_GPIO_NUM			192
--#define IRQ_GPIO(x)			(IRQ_GPIO_START + (x))
-+#define MMP_NR_BUILTIN_GPIO		192
- #define MMP_GPIO_TO_IRQ(gpio)		(IRQ_GPIO_START + (gpio))
- 
--#define IRQ_BOARD_START			(IRQ_GPIO_START + IRQ_GPIO_NUM)
-+#define IRQ_BOARD_START			(IRQ_GPIO_START + MMP_NR_BUILTIN_GPIO)
- 
- #define NR_IRQS				(IRQ_BOARD_START)
- 
-diff --git a/arch/arm/mach-mmp/tavorevb.c b/arch/arm/mach-mmp/tavorevb.c
-index 0afe3a3..331f5f3 100644
---- a/arch/arm/mach-mmp/tavorevb.c
-+++ b/arch/arm/mach-mmp/tavorevb.c
-@@ -19,6 +19,7 @@
- #include <mach/addr-map.h>
- #include <mach/mfp-pxa910.h>
- #include <mach/pxa910.h>
-+#include <mach/irqs.h>
+ #include <asm/hardware/cache-tauros2.h>
+@@ -25,13 +26,13 @@
+ #include <mach/irqs.h>
+ #include <mach/dma.h>
+ #include <mach/mfp.h>
+-#include <mach/gpio-pxa.h>
+ #include <mach/devices.h>
+ #include <mach/mmp2.h>
  
  #include "common.h"
+ #include "clock.h"
  
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index 176515a..fac0d5d 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -24,12 +24,13 @@
- #include <mach/addr-map.h>
- #include <mach/mfp-pxa910.h>
- #include <mach/pxa910.h>
-+#include <mach/irqs.h>
++#define GPIO_REGS_VIRT	(APB_VIRT_BASE + 0x19000)
+ #define MFPR_VIRT_BASE	(APB_VIRT_BASE + 0x1e000)
  
+ #define APMASK(i)	(GPIO_REGS_VIRT + PXA_BANK_OFF(i) + 0x9c)
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index f0da013..61395c6 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -13,6 +13,7 @@
+ #include <linux/list.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
++#include <linux/gpio-pxa.h>
+ #include <linux/platform_device.h>
+ 
+ #include <asm/mach/time.h>
+@@ -21,7 +22,6 @@
+ #include <mach/regs-apbc.h>
+ #include <mach/regs-apmu.h>
+ #include <mach/irqs.h>
+-#include <mach/gpio-pxa.h>
+ #include <mach/dma.h>
+ #include <mach/devices.h>
+ #include <mach/mfp.h>
+@@ -29,6 +29,7 @@
  #include "common.h"
+ #include "clock.h"
  
--#define TTCDKB_GPIO_EXT0(x)	(NR_BUILTIN_GPIO + ((x < 0) ? 0 :	\
-+#define TTCDKB_GPIO_EXT0(x)	(MMP_NR_BUILTIN_GPIO + ((x < 0) ? 0 :	\
- 				((x < 16) ? x : 15)))
--#define TTCDKB_GPIO_EXT1(x)	(NR_BUILTIN_GPIO + 16 + ((x < 0) ? 0 :	\
-+#define TTCDKB_GPIO_EXT1(x)	(MMP_NR_BUILTIN_GPIO + 16 + ((x < 0) ? 0 : \
- 				((x < 16) ? x : 15)))
++#define GPIO_REGS_VIRT	(APB_VIRT_BASE + 0x19000)
+ #define MFPR_VIRT_BASE	(APB_VIRT_BASE + 0x1e000)
  
- /*
-@@ -136,7 +137,7 @@ static struct i2c_board_info ttc_dkb_i2c_info[] = {
- 	{
- 		.type		= "max7312",
- 		.addr		= 0x23,
--		.irq		= IRQ_GPIO(80),
-+		.irq		= MMP_GPIO_TO_IRQ(80),
- 		.platform_data	= &max7312_data,
- 	},
- };
-diff --git a/arch/arm/mach-pxa/include/mach/corgi.h b/arch/arm/mach-pxa/include/mach/corgi.h
-index c9f8617..f3c3493 100644
---- a/arch/arm/mach-pxa/include/mach/corgi.h
-+++ b/arch/arm/mach-pxa/include/mach/corgi.h
-@@ -98,7 +98,7 @@
- 			CORGI_SCP_MIC_BIAS )
- #define CORGI_SCOOP_IO_OUT	( CORGI_SCP_MUTE_L | CORGI_SCP_MUTE_R )
+ static struct mfp_addr_map pxa168_mfp_addr_map[] __initdata =
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index 4654e62..0b0e3db 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -12,6 +12,7 @@
+ #include <linux/init.h>
+ #include <linux/list.h>
+ #include <linux/io.h>
++#include <linux/gpio-pxa.h>
+ #include <linux/platform_device.h>
  
--#define CORGI_SCOOP_GPIO_BASE		(NR_BUILTIN_GPIO)
-+#define CORGI_SCOOP_GPIO_BASE		(PXA_NR_BUILTIN_GPIO)
- #define CORGI_GPIO_LED_GREEN		(CORGI_SCOOP_GPIO_BASE + 0)
- #define CORGI_GPIO_SWA			(CORGI_SCOOP_GPIO_BASE + 1)  /* Hinge Switch A */
- #define CORGI_GPIO_SWB			(CORGI_SCOOP_GPIO_BASE + 2)  /* Hinge Switch B */
+ #include <asm/mach/time.h>
+@@ -20,7 +21,6 @@
+ #include <mach/regs-apmu.h>
+ #include <mach/cputype.h>
+ #include <mach/irqs.h>
+-#include <mach/gpio-pxa.h>
+ #include <mach/dma.h>
+ #include <mach/mfp.h>
+ #include <mach/devices.h>
+@@ -28,6 +28,7 @@
+ #include "common.h"
+ #include "clock.h"
+ 
++#define GPIO_REGS_VIRT	(APB_VIRT_BASE + 0x19000)
+ #define MFPR_VIRT_BASE	(APB_VIRT_BASE + 0x1e000)
+ 
+ static struct mfp_addr_map pxa910_mfp_addr_map[] __initdata =
 diff --git a/arch/arm/mach-pxa/include/mach/gpio-pxa.h b/arch/arm/mach-pxa/include/mach/gpio-pxa.h
-index 41b4c93..134b3bc 100644
+deleted file mode 100644
+index 29dfcde..0000000
 --- a/arch/arm/mach-pxa/include/mach/gpio-pxa.h
-+++ b/arch/arm/mach-pxa/include/mach/gpio-pxa.h
-@@ -93,8 +93,6 @@
- #define GAFR(x)		GPIO_REG(0x54 + (((x) & 0x70) >> 2))
- 
- 
--#define NR_BUILTIN_GPIO		PXA_GPIO_IRQ_NUM
++++ /dev/null
+@@ -1,61 +0,0 @@
+-/*
+- * Written by Philipp Zabel <philipp.zabel@gmail.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+- *
+- */
+-#ifndef __MACH_PXA_GPIO_PXA_H
+-#define __MACH_PXA_GPIO_PXA_H
 -
- #define gpio_to_bank(gpio)	((gpio) >> 5)
- 
- #ifdef CONFIG_CPU_PXA26x
+-#include <mach/irqs.h>
+-#include <mach/hardware.h>
+-
+-#include <plat/gpio-pxa.h>
+-
+-#define GPIO_REGS_VIRT	io_p2v(0x40E00000)
+-
+-#ifdef CONFIG_CPU_PXA26x
+-/* GPIO86/87/88/89 on PXA26x have their direction bits in PXA_GPDR(2 inverted,
+- * as well as their Alternate Function value being '1' for GPIO in GAFRx.
+- */
+-static inline int __gpio_is_inverted(unsigned gpio)
+-{
+-	return cpu_is_pxa25x() && gpio > 85;
+-}
+-#else
+-static inline int __gpio_is_inverted(unsigned gpio) { return 0; }
+-#endif
+-
+-/*
+- * On PXA25x and PXA27x, GAFRx and GPDRx together decide the alternate
+- * function of a GPIO, and GPDRx cannot be altered once configured. It
+- * is attributed as "occupied" here (I know this terminology isn't
+- * accurate, you are welcome to propose a better one :-)
+- */
+-static inline int __gpio_is_occupied(unsigned gpio)
+-{
+-	if (cpu_is_pxa27x() || cpu_is_pxa25x()) {
+-		int af = (PXA_GAFR(gpio) >> ((gpio & 0xf) * 2)) & 0x3;
+-		int dir = PXA_GPDR(gpio) & PXA_GPIO_bit(gpio);
+-
+-		if (__gpio_is_inverted(gpio))
+-			return af != 1 || dir == 0;
+-		else
+-			return af != 0 || dir != 0;
+-	} else
+-		return PXA_GPDR(gpio) & PXA_GPIO_bit(gpio);
+-}
+-
+-#endif /* __MACH_PXA_GPIO_PXA_H */
 diff --git a/arch/arm/mach-pxa/include/mach/gpio.h b/arch/arm/mach-pxa/include/mach/gpio.h
-index 5cf0137..561cdbf 100644
+index 561cdbf..ef8b51f 100644
 --- a/arch/arm/mach-pxa/include/mach/gpio.h
 +++ b/arch/arm/mach-pxa/include/mach/gpio.h
-@@ -28,5 +28,4 @@
- /* The defines for the driver are needed for the accelerated accessors */
- #include "gpio-pxa.h"
+@@ -25,7 +25,5 @@
+ #define __ASM_ARCH_PXA_GPIO_H
  
--#include <plat/gpio.h>
+ #include <asm-generic/gpio.h>
+-/* The defines for the driver are needed for the accelerated accessors */
+-#include "gpio-pxa.h"
+ 
  #endif
-diff --git a/arch/arm/mach-pxa/include/mach/hx4700.h b/arch/arm/mach-pxa/include/mach/hx4700.h
-index 3740844..8bc0291 100644
---- a/arch/arm/mach-pxa/include/mach/hx4700.h
-+++ b/arch/arm/mach-pxa/include/mach/hx4700.h
-@@ -15,7 +15,7 @@
- #include <linux/gpio.h>
- #include <linux/mfd/asic3.h>
- 
--#define HX4700_ASIC3_GPIO_BASE	NR_BUILTIN_GPIO
-+#define HX4700_ASIC3_GPIO_BASE	PXA_NR_BUILTIN_GPIO
- #define HX4700_EGPIO_BASE	(HX4700_ASIC3_GPIO_BASE + ASIC3_NUM_GPIOS)
- #define HX4700_NR_IRQS		(IRQ_BOARD_START + 70)
- 
-diff --git a/arch/arm/mach-pxa/include/mach/irqs.h b/arch/arm/mach-pxa/include/mach/irqs.h
-index b83d8ff..32975ad 100644
---- a/arch/arm/mach-pxa/include/mach/irqs.h
-+++ b/arch/arm/mach-pxa/include/mach/irqs.h
-@@ -88,7 +88,7 @@
- #define IRQ_U2P		PXA_IRQ(93)	/* USB PHY D+/D- Lines (PXA935) */
- 
- #define PXA_GPIO_IRQ_BASE	PXA_IRQ(96)
--#define PXA_GPIO_IRQ_NUM	(192)
-+#define PXA_NR_BUILTIN_GPIO	(192)
- #define PXA_GPIO_TO_IRQ(x)	(PXA_GPIO_IRQ_BASE + (x))
- 
- /*
-@@ -98,7 +98,7 @@
-  * By default, no board IRQ is reserved. It should be finished in
-  * custom board since sparse IRQ is already enabled.
-  */
--#define IRQ_BOARD_START		(PXA_GPIO_IRQ_BASE + PXA_GPIO_IRQ_NUM)
-+#define IRQ_BOARD_START		(PXA_GPIO_IRQ_BASE + PXA_NR_BUILTIN_GPIO)
- 
- #define NR_IRQS			(IRQ_BOARD_START)
- 
 diff --git a/arch/arm/mach-pxa/include/mach/littleton.h b/arch/arm/mach-pxa/include/mach/littleton.h
-index b6238cb..e20ac1b 100644
+index e20ac1b..8066be5 100644
 --- a/arch/arm/mach-pxa/include/mach/littleton.h
 +++ b/arch/arm/mach-pxa/include/mach/littleton.h
-@@ -7,7 +7,7 @@
+@@ -1,8 +1,6 @@
+ #ifndef __ASM_ARCH_LITTLETON_H
+ #define __ASM_ARCH_LITTLETON_H
  
- #define LITTLETON_GPIO_LCD_CS	(17)
- 
--#define EXT0_GPIO_BASE	(NR_BUILTIN_GPIO)
-+#define EXT0_GPIO_BASE	(PXA_NR_BUILTIN_GPIO)
- #define EXT0_GPIO(x)	(EXT0_GPIO_BASE + (x))
- 
- #define LITTLETON_NR_IRQS	(IRQ_BOARD_START + 8)
-diff --git a/arch/arm/mach-pxa/include/mach/magician.h b/arch/arm/mach-pxa/include/mach/magician.h
-index 7cbfc5d..ba6a6e1 100644
---- a/arch/arm/mach-pxa/include/mach/magician.h
-+++ b/arch/arm/mach-pxa/include/mach/magician.h
-@@ -78,7 +78,7 @@
-  * CPLD EGPIOs
-  */
- 
--#define MAGICIAN_EGPIO_BASE			NR_BUILTIN_GPIO
-+#define MAGICIAN_EGPIO_BASE			PXA_NR_BUILTIN_GPIO
- #define MAGICIAN_EGPIO(reg,bit) \
- 	(MAGICIAN_EGPIO_BASE + 8*reg + bit)
- 
-diff --git a/arch/arm/mach-pxa/include/mach/poodle.h b/arch/arm/mach-pxa/include/mach/poodle.h
-index 763fdc4..f32ff75 100644
---- a/arch/arm/mach-pxa/include/mach/poodle.h
-+++ b/arch/arm/mach-pxa/include/mach/poodle.h
-@@ -71,7 +71,7 @@
- #define POODLE_SCOOP_IO_DIR	( POODLE_SCOOP_VPEN | POODLE_SCOOP_HS_OUT )
- #define POODLE_SCOOP_IO_OUT	( 0 )
- 
--#define POODLE_SCOOP_GPIO_BASE	(NR_BUILTIN_GPIO)
-+#define POODLE_SCOOP_GPIO_BASE	(PXA_NR_BUILTIN_GPIO)
- #define POODLE_GPIO_CHARGE_ON	(POODLE_SCOOP_GPIO_BASE + 0)
- #define POODLE_GPIO_CP401	(POODLE_SCOOP_GPIO_BASE + 2)
- #define POODLE_GPIO_VPEN	(POODLE_SCOOP_GPIO_BASE + 7)
-diff --git a/arch/arm/mach-pxa/include/mach/spitz.h b/arch/arm/mach-pxa/include/mach/spitz.h
-index 273381a..0bfe650 100644
---- a/arch/arm/mach-pxa/include/mach/spitz.h
-+++ b/arch/arm/mach-pxa/include/mach/spitz.h
-@@ -108,7 +108,7 @@
- #define SPITZ_SCP_SUS_CLR     (SPITZ_SCP_MUTE_L | SPITZ_SCP_MUTE_R | SPITZ_SCP_JK_A | SPITZ_SCP_ADC_TEMP_ON)
- #define SPITZ_SCP_SUS_SET     0
- 
--#define SPITZ_SCP_GPIO_BASE	(NR_BUILTIN_GPIO)
-+#define SPITZ_SCP_GPIO_BASE	(PXA_NR_BUILTIN_GPIO)
- #define SPITZ_GPIO_LED_GREEN	(SPITZ_SCP_GPIO_BASE + 0)
- #define SPITZ_GPIO_JK_B		(SPITZ_SCP_GPIO_BASE + 1)
- #define SPITZ_GPIO_CHRG_ON	(SPITZ_SCP_GPIO_BASE + 2)
-@@ -140,7 +140,7 @@
-                              SPITZ_SCP2_BACKLIGHT_CONT | SPITZ_SCP2_BACKLIGHT_ON | SPITZ_SCP2_MIC_BIAS)
- #define SPITZ_SCP2_SUS_SET  (SPITZ_SCP2_IR_ON | SPITZ_SCP2_RESERVED_1)
- 
--#define SPITZ_SCP2_GPIO_BASE		(NR_BUILTIN_GPIO + 12)
-+#define SPITZ_SCP2_GPIO_BASE		(PXA_NR_BUILTIN_GPIO + 12)
- #define SPITZ_GPIO_IR_ON		(SPITZ_SCP2_GPIO_BASE + 0)
- #define SPITZ_GPIO_AKIN_PULLUP		(SPITZ_SCP2_GPIO_BASE + 1)
- #define SPITZ_GPIO_RESERVED_1		(SPITZ_SCP2_GPIO_BASE + 2)
-@@ -152,7 +152,7 @@
- #define SPITZ_GPIO_MIC_BIAS		(SPITZ_SCP2_GPIO_BASE + 8)
- 
- /* Akita IO Expander GPIOs */
--#define AKITA_IOEXP_GPIO_BASE		(NR_BUILTIN_GPIO + 12)
-+#define AKITA_IOEXP_GPIO_BASE		(PXA_NR_BUILTIN_GPIO + 12)
- #define AKITA_GPIO_RESERVED_0		(AKITA_IOEXP_GPIO_BASE + 0)
- #define AKITA_GPIO_RESERVED_1		(AKITA_IOEXP_GPIO_BASE + 1)
- #define AKITA_GPIO_MIC_BIAS		(AKITA_IOEXP_GPIO_BASE + 2)
-diff --git a/arch/arm/mach-pxa/include/mach/tosa.h b/arch/arm/mach-pxa/include/mach/tosa.h
-index 4653539..2bb0e86 100644
---- a/arch/arm/mach-pxa/include/mach/tosa.h
-+++ b/arch/arm/mach-pxa/include/mach/tosa.h
-@@ -24,7 +24,7 @@
- /*
-  * SCOOP2 internal GPIOs
-  */
--#define TOSA_SCOOP_GPIO_BASE		NR_BUILTIN_GPIO
-+#define TOSA_SCOOP_GPIO_BASE		PXA_NR_BUILTIN_GPIO
- #define TOSA_SCOOP_PXA_VCORE1		SCOOP_GPCR_PA11
- #define TOSA_GPIO_TC6393XB_REST_IN	(TOSA_SCOOP_GPIO_BASE + 1)
- #define TOSA_GPIO_IR_POWERDWN		(TOSA_SCOOP_GPIO_BASE + 2)
-@@ -42,7 +42,7 @@
- /*
-  * SCOOP2 jacket GPIOs
-  */
--#define TOSA_SCOOP_JC_GPIO_BASE		(NR_BUILTIN_GPIO + 12)
-+#define TOSA_SCOOP_JC_GPIO_BASE		(PXA_NR_BUILTIN_GPIO + 12)
- #define TOSA_GPIO_BT_LED		(TOSA_SCOOP_JC_GPIO_BASE + 0)
- #define TOSA_GPIO_NOTE_LED		(TOSA_SCOOP_JC_GPIO_BASE + 1)
- #define TOSA_GPIO_CHRG_ERR_LED		(TOSA_SCOOP_JC_GPIO_BASE + 2)
-@@ -59,7 +59,7 @@
- /*
-  * TC6393XB GPIOs
-  */
--#define TOSA_TC6393XB_GPIO_BASE		(NR_BUILTIN_GPIO + 2 * 12)
-+#define TOSA_TC6393XB_GPIO_BASE		(PXA_NR_BUILTIN_GPIO + 2 * 12)
- 
- #define TOSA_GPIO_TG_ON			(TOSA_TC6393XB_GPIO_BASE + 0)
- #define TOSA_GPIO_L_MUTE		(TOSA_TC6393XB_GPIO_BASE + 1)
-diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c b/arch/arm/mach-pxa/pcm990-baseboard.c
-index 9a9c539..3805e5d 100644
---- a/arch/arm/mach-pxa/pcm990-baseboard.c
-+++ b/arch/arm/mach-pxa/pcm990-baseboard.c
-@@ -378,7 +378,7 @@ struct pxacamera_platform_data pcm990_pxacamera_platform_data = {
- #include <linux/i2c/pca953x.h>
- 
- static struct pca953x_platform_data pca9536_data = {
--	.gpio_base	= NR_BUILTIN_GPIO,
-+	.gpio_base	= PXA_NR_BUILTIN_GPIO,
- };
- 
- static int gpio_bus_switch = -EINVAL;
-@@ -406,9 +406,9 @@ static unsigned long pcm990_camera_query_bus_param(struct soc_camera_link *link)
- 	int ret;
- 
- 	if (gpio_bus_switch < 0) {
--		ret = gpio_request(NR_BUILTIN_GPIO, "camera");
-+		ret = gpio_request(PXA_NR_BUILTIN_GPIO, "camera");
- 		if (!ret) {
--			gpio_bus_switch = NR_BUILTIN_GPIO;
-+			gpio_bus_switch = PXA_NR_BUILTIN_GPIO;
- 			gpio_direction_output(gpio_bus_switch, 0);
- 		}
- 	}
-diff --git a/arch/arm/plat-pxa/include/plat/gpio.h b/arch/arm/plat-pxa/include/plat/gpio.h
-deleted file mode 100644
-index 258f772..0000000
---- a/arch/arm/plat-pxa/include/plat/gpio.h
-+++ /dev/null
-@@ -1,30 +0,0 @@
--#ifndef __PLAT_GPIO_H
--#define __PLAT_GPIO_H
--
--#define __ARM_GPIOLIB_COMPLEX
--
--/* The individual machine provides register offsets and NR_BUILTIN_GPIO */
 -#include <mach/gpio-pxa.h>
 -
--static inline int gpio_get_value(unsigned gpio)
--{
--	if (__builtin_constant_p(gpio) && (gpio < NR_BUILTIN_GPIO))
--		return GPLR(gpio) & GPIO_bit(gpio);
--	else
--		return __gpio_get_value(gpio);
--}
+ #define LITTLETON_ETH_PHYS	0x30000000
+ 
+ #define LITTLETON_GPIO_LCD_CS	(17)
+diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
+index 2d87e64..26ad6cd 100644
+--- a/arch/arm/mach-pxa/irq.c
++++ b/arch/arm/mach-pxa/irq.c
+@@ -20,7 +20,6 @@
+ 
+ #include <mach/hardware.h>
+ #include <mach/irqs.h>
+-#include <mach/gpio-pxa.h>
+ 
+ #include "generic.h"
+ 
+@@ -120,7 +119,7 @@ asmlinkage void __exception_irq_entry ichp_handle_irq(struct pt_regs *regs)
+ 	} while (1);
+ }
+ 
+-void __init pxa_init_irq(int irq_nr, set_wake_t fn)
++void __init pxa_init_irq(int irq_nr, int (*fn)(struct irq_data *, unsigned int))
+ {
+ 	int irq, i, n;
+ 
+diff --git a/arch/arm/mach-pxa/mfp-pxa2xx.c b/arch/arm/mach-pxa/mfp-pxa2xx.c
+index af302b4..290af99 100644
+--- a/arch/arm/mach-pxa/mfp-pxa2xx.c
++++ b/arch/arm/mach-pxa/mfp-pxa2xx.c
+@@ -13,6 +13,7 @@
+  *  published by the Free Software Foundation.
+  */
+ #include <linux/gpio.h>
++#include <linux/gpio-pxa.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -20,7 +21,6 @@
+ 
+ #include <mach/pxa2xx-regs.h>
+ #include <mach/mfp-pxa2xx.h>
+-#include <mach/gpio-pxa.h>
+ 
+ #include "generic.h"
+ 
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index 10a4fb3..b3641cc 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -17,6 +17,7 @@
+  * need be.
+  */
+ #include <linux/gpio.h>
++#include <linux/gpio-pxa.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -24,7 +25,6 @@
+ #include <linux/suspend.h>
+ #include <linux/syscore_ops.h>
+ #include <linux/irq.h>
+-#include <linux/gpio.h>
+ 
+ #include <asm/mach/map.h>
+ #include <asm/suspend.h>
+diff --git a/arch/arm/mach-pxa/pxa27x.c b/arch/arm/mach-pxa/pxa27x.c
+index a200bae..06fb464 100644
+--- a/arch/arm/mach-pxa/pxa27x.c
++++ b/arch/arm/mach-pxa/pxa27x.c
+@@ -12,6 +12,7 @@
+  * published by the Free Software Foundation.
+  */
+ #include <linux/gpio.h>
++#include <linux/gpio-pxa.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -21,7 +22,6 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/i2c/pxa-i2c.h>
+-#include <linux/gpio.h>
+ 
+ #include <asm/mach/map.h>
+ #include <mach/hardware.h>
+diff --git a/arch/arm/mach-pxa/pxa3xx.c b/arch/arm/mach-pxa/pxa3xx.c
+index e5c3688..4446d56 100644
+--- a/arch/arm/mach-pxa/pxa3xx.c
++++ b/arch/arm/mach-pxa/pxa3xx.c
+@@ -25,7 +25,6 @@
+ #include <asm/mach/map.h>
+ #include <asm/suspend.h>
+ #include <mach/hardware.h>
+-#include <mach/gpio-pxa.h>
+ #include <mach/pxa3xx-regs.h>
+ #include <mach/reset.h>
+ #include <mach/ohci.h>
+@@ -365,7 +364,8 @@ static struct irq_chip pxa_ext_wakeup_chip = {
+ 	.irq_set_type	= pxa_set_ext_wakeup_type,
+ };
+ 
+-static void __init pxa_init_ext_wakeup_irq(set_wake_t fn)
++static void __init pxa_init_ext_wakeup_irq(int (*fn)(struct irq_data *,
++					   unsigned int))
+ {
+ 	int irq;
+ 
+diff --git a/arch/arm/mach-pxa/pxa95x.c b/arch/arm/mach-pxa/pxa95x.c
+index 5af6a44..dcff331 100644
+--- a/arch/arm/mach-pxa/pxa95x.c
++++ b/arch/arm/mach-pxa/pxa95x.c
+@@ -9,6 +9,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++#include <linux/gpio-pxa.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+@@ -20,7 +21,6 @@
+ #include <linux/syscore_ops.h>
+ 
+ #include <mach/hardware.h>
+-#include <mach/gpio-pxa.h>
+ #include <mach/pxa3xx-regs.h>
+ #include <mach/pxa930.h>
+ #include <mach/reset.h>
+diff --git a/arch/arm/plat-pxa/include/plat/gpio-pxa.h b/arch/arm/plat-pxa/include/plat/gpio-pxa.h
+deleted file mode 100644
+index b74b921..0000000
+--- a/arch/arm/plat-pxa/include/plat/gpio-pxa.h
++++ /dev/null
+@@ -1,80 +0,0 @@
+-#ifndef __PLAT_PXA_GPIO_H
+-#define __PLAT_PXA_GPIO_H
 -
--static inline void gpio_set_value(unsigned gpio, int value)
--{
--	if (__builtin_constant_p(gpio) && (gpio < NR_BUILTIN_GPIO)) {
--		if (value)
--			GPSR(gpio) = GPIO_bit(gpio);
--		else
--			GPCR(gpio) = GPIO_bit(gpio);
--	} else
--		__gpio_set_value(gpio, value);
--}
+-struct irq_data;
 -
--#define gpio_cansleep		__gpio_cansleep
+-struct pxa_gpio_regs {
+-	u32	gplr;
+-	u32	gpdr;
+-	u32	gpsr;
+-	u32	gpcr;
+-	u32	grer;
+-	u32	gfer;
+-	u32	gedr;
+-	u32	gafr;
+-};
 -
--#endif /* __PLAT_GPIO_H */
+-/*
+- * We handle the GPIOs by banks, each bank covers up to 32 GPIOs with
+- * one set of registers. The register offsets are organized below:
+- *
+- *           GPLR    GPDR    GPSR    GPCR    GRER    GFER    GEDR
+- * BANK 0 - 0x0000  0x000C  0x0018  0x0024  0x0030  0x003C  0x0048
+- * BANK 1 - 0x0004  0x0010  0x001C  0x0028  0x0034  0x0040  0x004C
+- * BANK 2 - 0x0008  0x0014  0x0020  0x002C  0x0038  0x0044  0x0050
+- *
+- * BANK 3 - 0x0100  0x010C  0x0118  0x0124  0x0130  0x013C  0x0148
+- * BANK 4 - 0x0104  0x0110  0x011C  0x0128  0x0134  0x0140  0x014C
+- * BANK 5 - 0x0108  0x0114  0x0120  0x012C  0x0138  0x0144  0x0150
+- *
+- * NOTE:
+- *   BANK 3 is only available on PXA27x and later processors.
+- *   BANK 4 and 5 are only available on PXA935
+- */
+-
+-#define PXA_BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
+-
+-#define PXA_GPIO_BANK(n)	(pxa_gpio_regs.gplr + PXA_BANK_OFF(n))
+-#define PXA_GPIO_bit(x)		(1 << ((x) & 0x1f))
+-#define pxa_gpio_to_bank(gpio)	((gpio) >> 5)
+-
+-
+-/* GPIO Pin Level Registers */
+-#define PXA_GPLR(x)	(*(volatile u32 *)(pxa_gpio_regs.gplr	\
+-			+ PXA_BANK_OFF((x >> 5))))
+-/* GPIO Pin Direction Registers */
+-#define PXA_GPDR(x)	(*(volatile u32 *)(pxa_gpio_regs.gpdr	\
+-			+ PXA_BANK_OFF((x >> 5))))
+-/* GPIO Pin Output Set Registers */
+-#define PXA_GPSR(x)	(*(volatile u32 *)(pxa_gpio_regs.gpsr	\
+-			+ PXA_BANK_OFF((x >> 5))))
+-/* GPIO Pin Output Clear Registers */
+-#define PXA_GPCR(x)	(*(volatile u32 *)(pxa_gpio_regs.gpcr	\
+-			+ PXA_BANK_OFF((x >> 5))))
+-/* GPIO Rising Edge Detect Registers */
+-#define PXA_GRER(x)	(*(volatile u32 *)(pxa_gpio_regs.grer	\
+-			+ PXA_BANK_OFF((x >> 5))))
+-/* GPIO Falling Edge Detect Registers */
+-#define PXA_GFER(x)	(*(volatile u32 *)(pxa_gpio_regs.gfer	\
+-			+ PXA_BANK_OFF((x >> 5))))
+-/* GPIO Edge Detect Status Registers */
+-#define PXA_GEDR(x)	(*(volatile u32 *)(pxa_gpio_regs.gedr	\
+-			+ PXA_BANK_OFF((x >> 5))))
+-/* GPIO Alternate Function Select Registers */
+-#define PXA_GAFR(x)	(*(volatile u32 *)(pxa_gpio_regs.gafr	\
+-			+ (((x) & 0x70) >> 2)))
+-
+-extern struct pxa_gpio_regs pxa_gpio_regs;
+-
+-/* NOTE: some PXAs have fewer on-chip GPIOs (like PXA255, with 85).
+- * Those cases currently cause holes in the GPIO number space, the
+- * actual number of the last GPIO is recorded by 'pxa_last_gpio'.
+- */
+-extern int pxa_last_gpio;
+-
+-typedef int (*set_wake_t)(struct irq_data *d, unsigned int on);
+-
+-extern void pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn);
+-extern int pxa_irq_to_gpio(int irq);
+-
+-#endif /* __PLAT_PXA_GPIO_H */
+diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
+index 6731779..92b92e8 100644
+--- a/drivers/gpio/gpio-pxa.c
++++ b/drivers/gpio/gpio-pxa.c
+@@ -12,6 +12,7 @@
+  *  published by the Free Software Foundation.
+  */
+ #include <linux/gpio.h>
++#include <linux/gpio-pxa.h>
+ #include <linux/init.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
+@@ -19,8 +20,6 @@
+ #include <linux/syscore_ops.h>
+ #include <linux/slab.h>
+ 
+-#include <mach/gpio-pxa.h>
+-
+ #define GPLR_OFFSET	0x00
+ #define GPDR_OFFSET	0x0C
+ #define GPSR_OFFSET	0x18
+@@ -91,6 +90,45 @@ static inline int gpio_is_mmp_type(int type)
+ 	return 0;
+ }
+ 
++/* GPIO86/87/88/89 on PXA26x have their direction bits in PXA_GPDR(2 inverted,
++ * as well as their Alternate Function value being '1' for GPIO in GAFRx.
++ */
++static inline int __gpio_is_inverted(int gpio)
++{
++	if ((gpio_type == PXA26X_GPIO) && (gpio > 85))
++		return 1;
++	return 0;
++}
++
++/*
++ * On PXA25x and PXA27x, GAFRx and GPDRx together decide the alternate
++ * function of a GPIO, and GPDRx cannot be altered once configured. It
++ * is attributed as "occupied" here (I know this terminology isn't
++ * accurate, you are welcome to propose a better one :-)
++ */
++static inline int __gpio_is_occupied(unsigned gpio)
++{
++	int ret, af = 0, dir = 0;
++
++	switch (gpio_type) {
++	case PXA25X_GPIO:
++	case PXA26X_GPIO:
++	case PXA27X_GPIO:
++		af = (PXA_GAFR(gpio) >> ((gpio & 0xf) * 2)) & 0x3;
++		dir = PXA_GPDR(gpio) & PXA_GPIO_bit(gpio);
++
++		if (__gpio_is_inverted(gpio))
++			ret = (af != 1) || (dir == 0);
++		else
++			ret = (af != 0) || (dir != 0);
++		break;
++	default:
++		ret = PXA_GPDR(gpio) & PXA_GPIO_bit(gpio);
++		break;
++	}
++	return ret;
++}
++
+ static int pxa_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+ {
+ 	int gpio;
+diff --git a/include/linux/gpio-pxa.h b/include/linux/gpio-pxa.h
+new file mode 100644
+index 0000000..6cebf6c
+--- /dev/null
++++ b/include/linux/gpio-pxa.h
+@@ -0,0 +1,81 @@
++#ifndef __GPIO_PXA_H
++#define __GPIO_PXA_H
++
++#include <linux/kernel.h>
++
++struct irq_data;
++
++struct pxa_gpio_regs {
++	u32	gplr;
++	u32	gpdr;
++	u32	gpsr;
++	u32	gpcr;
++	u32	grer;
++	u32	gfer;
++	u32	gedr;
++	u32	gafr;
++};
++
++/*
++ * We handle the GPIOs by banks, each bank covers up to 32 GPIOs with
++ * one set of registers. The register offsets are organized below:
++ *
++ *           GPLR    GPDR    GPSR    GPCR    GRER    GFER    GEDR
++ * BANK 0 - 0x0000  0x000C  0x0018  0x0024  0x0030  0x003C  0x0048
++ * BANK 1 - 0x0004  0x0010  0x001C  0x0028  0x0034  0x0040  0x004C
++ * BANK 2 - 0x0008  0x0014  0x0020  0x002C  0x0038  0x0044  0x0050
++ *
++ * BANK 3 - 0x0100  0x010C  0x0118  0x0124  0x0130  0x013C  0x0148
++ * BANK 4 - 0x0104  0x0110  0x011C  0x0128  0x0134  0x0140  0x014C
++ * BANK 5 - 0x0108  0x0114  0x0120  0x012C  0x0138  0x0144  0x0150
++ *
++ * NOTE:
++ *   BANK 3 is only available on PXA27x and later processors.
++ *   BANK 4 and 5 are only available on PXA935
++ */
++
++#define PXA_BANK_OFF(n)	(((n) < 3) ? (n) << 2 : 0x100 + (((n) - 3) << 2))
++
++#define PXA_GPIO_BANK(n)	(pxa_gpio_regs.gplr + PXA_BANK_OFF(n))
++#define PXA_GPIO_bit(x)		(1 << ((x) & 0x1f))
++#define pxa_gpio_to_bank(gpio)	((gpio) >> 5)
++
++
++/* GPIO Pin Level Registers */
++#define PXA_GPLR(x)	(*(volatile u32 *)(pxa_gpio_regs.gplr	\
++			+ PXA_BANK_OFF((x >> 5))))
++/* GPIO Pin Direction Registers */
++#define PXA_GPDR(x)	(*(volatile u32 *)(pxa_gpio_regs.gpdr	\
++			+ PXA_BANK_OFF((x >> 5))))
++/* GPIO Pin Output Set Registers */
++#define PXA_GPSR(x)	(*(volatile u32 *)(pxa_gpio_regs.gpsr	\
++			+ PXA_BANK_OFF((x >> 5))))
++/* GPIO Pin Output Clear Registers */
++#define PXA_GPCR(x)	(*(volatile u32 *)(pxa_gpio_regs.gpcr	\
++			+ PXA_BANK_OFF((x >> 5))))
++/* GPIO Rising Edge Detect Registers */
++#define PXA_GRER(x)	(*(volatile u32 *)(pxa_gpio_regs.grer	\
++			+ PXA_BANK_OFF((x >> 5))))
++/* GPIO Falling Edge Detect Registers */
++#define PXA_GFER(x)	(*(volatile u32 *)(pxa_gpio_regs.gfer	\
++			+ PXA_BANK_OFF((x >> 5))))
++/* GPIO Edge Detect Status Registers */
++#define PXA_GEDR(x)	(*(volatile u32 *)(pxa_gpio_regs.gedr	\
++			+ PXA_BANK_OFF((x >> 5))))
++/* GPIO Alternate Function Select Registers */
++#define PXA_GAFR(x)	(*(volatile u32 *)(pxa_gpio_regs.gafr	\
++			+ (((x) & 0x70) >> 2)))
++
++extern struct pxa_gpio_regs pxa_gpio_regs;
++
++/* NOTE: some PXAs have fewer on-chip GPIOs (like PXA255, with 85).
++ * Those cases currently cause holes in the GPIO number space, the
++ * actual number of the last GPIO is recorded by 'pxa_last_gpio'.
++ */
++extern int pxa_last_gpio;
++
++typedef int (*set_wake_t)(struct irq_data *d, unsigned int on);
++
++extern int pxa_irq_to_gpio(int irq);
++
++#endif /* __GPIO_PXA_H */
 -- 
 1.7.2.5
