@@ -1,42 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 15:44:11 +0100
-Subject: [PATCH v2 1/7] clk: Add a generic clock infrastructure
-In-Reply-To: <1316730422-20027-2-git-send-email-mturquette@ti.com>
-References: <1316730422-20027-1-git-send-email-mturquette@ti.com>
-	<1316730422-20027-2-git-send-email-mturquette@ti.com>
-Message-ID: <20111013144411.GC21648@n2100.arm.linux.org.uk>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Thu, 13 Oct 2011 16:44:35 +0200
+Subject: [PATCH] atmel_lcdfb: support new-style palette format
+In-Reply-To: <1318507395-23143-1-git-send-email-jacmet@sunsite.dk> (Peter
+	Korsgaard's message of "Thu, 13 Oct 2011 14:03:14 +0200")
+References: <1318507395-23143-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <878vopuf1o.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 22, 2011 at 03:26:56PM -0700, Mike Turquette wrote:
->   struct clk_hw_ops {
->   	int		(*prepare)(struct clk_hw *);
->   	void		(*unprepare)(struct clk_hw *);
->   	int		(*enable)(struct clk_hw *);
->   	void		(*disable)(struct clk_hw *);
->   	unsigned long	(*recalc_rate)(struct clk_hw *);
->   	int		(*set_rate)(struct clk_hw *,
->   					unsigned long, unsigned long *);
->   	long		(*round_rate)(struct clk_hw *, unsigned long);
->   	int		(*set_parent)(struct clk_hw *, struct clk *);
->   	struct clk *	(*get_parent)(struct clk_hw *);
->   };
-> 
-> Platform clock code can register a clock through clk_register, passing a
-> set of operations, and a pointer to hardware-specific data:
-> 
->   struct clk_hw_foo {
->   	struct clk_hw clk;
->   	void __iomem *enable_reg;
->   };
+>>>>> "Peter" == Peter Korsgaard <jacmet@sunsite.dk> writes:
 
-Eww, no, this really isn't going to scale for platforms like OMAP - to
-have all the operations indirected through a set of function pointers
-for every clock just because the enable register (or enable bit) is
-in a different position is completely absurd.
+ Peter> The newer Atmel SoCs use normal 16bit 565 BGR/RGB for the palette data,
+ Peter> rather than the special intensity + 555 format.
 
-I'm not soo concerned about the increase in memory usage (for 100 to 200
-clock definitions its only 4 to 8k) but what worries me the most is
-initializing these damned things.  It's an awful lot of initializers,
-which means the potential for an awful lot of conflicts should something
-change in this structure.
+ Peter> Fill out palette data correctly on these devices, and at the same time
+ Peter> respect the RGB/BGR wiring mode.
+
+Ups, wrong patch - This has RGB/BGR modes swapped. Will resend.
+
+-- 
+Bye, Peter Korsgaard
