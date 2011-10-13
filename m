@@ -1,44 +1,61 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Oct 2011 22:12:50 -0600
-Subject: [PATCH 4/5] gpiolib: handle deferral probe error
-In-Reply-To: <20111012061432.GA2080@manju-desktop>
-References: <1317963790-29426-1-git-send-email-manjugk@ti.com>
-	<1317963790-29426-5-git-send-email-manjugk@ti.com>
-	<20111007110615.7638e905@lxorguk.ukuu.org.uk>
-	<CACxGe6tmjQGw77NMNYLWJHMAtmF9fk_9HnHtbrMhzkKEC1HG=Q@mail.gmail.com>
-	<20111012061432.GA2080@manju-desktop>
-Message-ID: <20111013041250.GG15829@ponder.secretlab.ca>
+Date: Wed, 12 Oct 2011 22:19:31 -0600
+Subject: [RFC PATCH v3] drivercore: Add driver probe deferral mechanism
+In-Reply-To: <4E94B01D.2050402@cavium.com>
+References: <20110922184614.25419.84606.stgit@ponder>
+	<20111011134753.2751aeb1.akpm@linux-foundation.org>
+	<4E94B01D.2050402@cavium.com>
+Message-ID: <20111013041931.GH15829@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 11:44:32AM +0530, G, Manjunath Kondaiah wrote:
-> On Fri, Oct 07, 2011 at 04:09:38PM -0600, Grant Likely wrote:
-> > On Fri, Oct 7, 2011 at 4:06 AM, Alan Cox <alan@lxorguk.ukuu.org.uk> wrote:
-> > > On Fri, 07 Oct 2011 10:33:09 +0500
-> > > "G, Manjunath Kondaiah" <manjugk@ti.com> wrote:
-> > >
-> > >>
-> > >> The gpio library should return -EPROBE_DEFER in gpio_request
-> > >> if gpio driver is not ready.
-> > >
-> > > Why not use the perfectly good existing error codes we have for this ?
-> > >
-> > > We have EAGAIN and EUNATCH both of which look sensible.
-> > 
-> > I want a distinct error code for probe deferral so that a) it doesn't
-> > overlap with something a driver is already doing, and b) so that all
-> > the users can be found again at a later date.
-> > 
-> > That said, I'm not in agreement with this patch.  It is fine for gpio
-> > lib to have a code that means the pin doesn't exist (yet), but the
-> > device driver needs to be the one to decide whether or not it is
-> > appropriate to use probe deferral.
+On Tue, Oct 11, 2011 at 02:07:41PM -0700, David Daney wrote:
+> On 10/11/2011 01:47 PM, Andrew Morton wrote:
+> >On Thu, 22 Sep 2011 12:51:23 -0600
+> >Grant Likely<grant.likely@secretlab.ca>  wrote:
+> >
+> >>Allow drivers to report at probe time that they cannot get all the resources
+> >>required by the device, and should be retried at a later time.
+> >>
+> >>This should completely solve the problem of getting devices
+> >>initialized in the right order.  Right now this is mostly handled by
+> >>mucking about with initcall ordering which is a complete hack, and
+> >>doesn't even remotely handle the case where device drivers are in
+> >>modules.  This approach completely sidesteps the issues by allowing
+> >>driver registration to occur in any order, and any driver can request
+> >>to be retried after a few more other drivers get probed.
+> >
+> >What happens is there is a circular dependency, or if a driver's
+> >preconditions are never met?  AFAICT the code keeps running the probe
+> >function for ever.
+> >
 > 
-> During gpio_request, driver gpio_request is not available. How can we expect
-> driver to request deferred probe in this case?
+> The deferred probe functions are only run once per (other) driver
+> binding event.  So once you quit registering new drivers, no further
+> probing is done.  There is no endless loop happening here.
+> 
+> If the preconditions are never met, the driver will just sit in the
+> list waiting.
 
-If gpio_request fails, the driver can then explicitly make the
-decision to return -EPROBE_DEFER.  It isn't forced to pass on the
-error code from gpio_request().
+Plus, as an optimization, walking the deferred list doesn't begin
+until late initcall time so that the first pass over the device
+drivers proceeds completely before starting retries.
+
+> >If so: bad.  The kernel should detect such situations, should
+> >exhaustively report them and if possible, fix them up and struggle
+> >onwards.
+
+The kernel won't get stalled on deferred probe.  It may end up with
+stale devices in the deferred list, but that only means those
+particular devices won't get bound to a driver.  It isn't fatal.
+
+> I don't think we should actively report anything, but being able to
+> inspect the deferred probe list from user space might be useful for
+> diagnosing problems
+
+Well, we could dump out the remaining deferred devices in sysfs.
+Alternately the kernel could dump them out to the console log after
+userspace starts.  That would catch conditions where built-in drivers
+aren't able to initialize their devices.
 
 g.
