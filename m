@@ -1,28 +1,24 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 13 Oct 2011 08:37:27 -0700
-Subject: [PATCH] [RESEND]  ARM: tegra: devices.c should include devices.h
-In-Reply-To: <1318467801-12184-1-git-send-email-olof@lixom.net>
-References: <1318467801-12184-1-git-send-email-olof@lixom.net>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A04F@HQMAIL01.nvidia.com>
+From: julien.boibessot@free.fr (Julien Boibessot)
+Date: Thu, 13 Oct 2011 17:38:53 +0200
+Subject: [PATCH] ARM imx51: Add Armadeus systems APF51 support
+In-Reply-To: <20111013143432.GB27048@S2100-06.ap.freescale.net>
+References: <1318512796-8126-1-git-send-email-julien.boibessot@free.fr>
+	<20111013143432.GB27048@S2100-06.ap.freescale.net>
+Message-ID: <4E97060D.7010505@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote at Wednesday, October 12, 2011 7:03 PM:
-> Resolves lots of sparse warnings:
-> 
-> arch/arm/mach-tegra/devices.c:102:24: warning: symbol 'tegra_i2c_device1' was not declared. Should it
-> be static?
-> arch/arm/mach-tegra/devices.c:112:24: warning: symbol 'tegra_i2c_device2' was not declared. Should it
-> be static?
-> arch/arm/mach-tegra/devices.c:122:24: warning: symbol 'tegra_i2c_device3' was not declared. Should it
-> be static?
-> arch/arm/mach-tegra/devices.c:132:24: warning: symbol 'tegra_i2c_device4' was not declared. Should it
-> be static?
-> [...]
-> 
-> Signed-off-by: Olof Johansson <olof@lixom.net>
+On 13/10/2011 16:34, Shawn Guo wrote:
+> NAK.
+>
+> It makes no sense to add yet another non-dt board file for imx51 at
+> this point.  
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Ok. Sorry I didn't notice your previous patches for device tree on MX5.
+> Why not starting using device tree?
 
--- 
-nvpublic
+As I am a total beginner with this thing, I will wait until it is
+mainlined with one of the i.MX51 boards and resend my patch at that time.
+
+Regards,
+Julien
