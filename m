@@ -1,33 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 12:09:28 +0100
-Subject: [PATCH 5/7] ARM: EXYNOS4: Add support external GIC
-In-Reply-To: <4E92ECD1.2010303@arm.com>
-References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-	<1308555258-4322-6-git-send-email-chaos.youn@samsung.com>
-	<4E8C61C4.9090709@arm.com>
-	<00ec01cc83f1$81f84430$85e8cc90$%kim@samsung.com>
-	<4E8D645D.4020601@arm.com> <4E8ECA1B.5010005@arm.com>
-	<20111007151646.GA2398@mudshark.cambridge.arm.com>
-	<4E92ECD1.2010303@arm.com>
-Message-ID: <20111013110928.GT21648@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 13 Oct 2011 12:35:06 +0100
+Subject: [PATCH 4/9] ARM: SPMP8000: Add ADC driver
+In-Reply-To: <20111013094717.GL21648@n2100.arm.linux.org.uk>
+References: <1318178172-7965-1-git-send-email-zoss@devai.org>
+	<1318178172-7965-5-git-send-email-zoss@devai.org>
+	<CAKnu2MrAEbS-36YaU+i6+zhwH4KW7ST7-mkKT49tv7jhhSo2UQ@mail.gmail.com>
+	<4E92BE19.4060907@cam.ac.uk>
+	<20111010100020.GA3607@opensource.wolfsonmicro.com>
+	<CAGVye5Nc9vhaF=7Y+hvGo4g-GOFb9fHeni+g=+hTj-8WCSqY+Q@mail.gmail.com>
+	<20111010114407.GD3607@opensource.wolfsonmicro.com>
+	<20111013094717.GL21648@n2100.arm.linux.org.uk>
+Message-ID: <20111013113506.GJ1098@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2011 at 02:02:09PM +0100, Marc Zyngier wrote:
-> On 07/10/11 16:16, Will Deacon wrote:
-> > On Fri, Oct 07, 2011 at 10:44:59AM +0100, Marc Zyngier wrote:
-> >> +static void __cpuinit exynos4_secondary_init(unsigned int cpu)
-> >>  {
-> >>  	void __iomem *dist_base = S5P_VA_GIC_DIST +
-> >> -				(gic_bank_offset * smp_processor_id());
-> >> +				(gic_bank_offset * cpu_logical_map(cpu));
-> > 
-> > Again, I'm deeply suspicious of this code :) Is there not a common memory
-> > alias for the distributor across all of the CPUs?
-> 
-> Kukjin, could you please comment on the presence of a common memory
-> region for the distributor? This seem quite odd...
+On Thu, Oct 13, 2011 at 10:47:17AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 10, 2011 at 12:44:08PM +0100, Mark Brown wrote:
 
-It's not odd when you consider that there's per-CPU registers within the
-GIC distributor as well (for the first 32 GIC IRQs) as the per-CPU GIC
-CPU interfaces.
+> > At the minute it seems to me that arch/arm is as good a place as any
+> > really - currently this code is getting dumped wherever the main device
+> > is.
+
+> No it isn't - we want drivers out of arch/arm (it's already been a topic
+> of flame for Linus, so it's something that we should try _really_ hard
+> to avoid.)
+
+I said it was as good a place as any, I didn't say it was a good place.
+Currently we don't have a good place for this code but just dumping the
+code somewhere else isn't really helping anything either unless there's
+some meaningful subsytem (or at least effort towards a subsystem) to
+look after it, it's bookkeeping.
+
+> As this is clearly a device driver (it has a device driver struct, it
+> relies upon a struct device, etc) then it needs to live outside of
+> arch/arm/ - and I think Arnd's suggestion of drivers/adc is probably
+> the right place for it to move to (even though its probably the first
+> to create the directory.)  More stuff can come along in the future,
+> and then its all together to start creating a common API in there.
+
+Creating drivers/adc just seems like a sucky idea.  We've already got at
+least one ongoing effort at creating a general purpose ADC/DAC interface
+in the form of the IIO subsystem (which is currently mostly targeted at
+higher volume devices and userspace only but the abstractions needed
+aren't terribly different depending on the data volumes) and does have
+the rather substantial advantage that there's people actually trying to
+make a subsystem.  On the other hand it's in staging for now so it'd
+create pain trying to merge the in-kernel clients that go along with
+these devices which doesn't seem constructive.
+
+There's also the fact that ADCs and DACs are pretty much the same thing
+to software with the data line driven from the opposite end of the link
+sO if we've got a subsystem for ADCs only it seems clear we're doing
+something wrong.
+
+> What we *do* need to avoid is having the spmp8000 ADC callback function
+> data structure, the foo ADC callback function data structure, the bar
+> ADC callback function data structure and so forth.  We need to think
+> *NOW* about defining a common ADC callback structure so that we don't
+> spawn a new problem which'll take effort to solve.
+
+The cat's already well out of the bag on that one, we've got a bunch of
+these things in tree already - the Cragganmore system I've got sitting
+here on my desk has three auxiliary ADCs I'm aware of, all of which are
+supported in mainline, and they're far from the only ones.
+
+I think we should just carry on as we are while the IIO work proceeds,
+either we'll decide that that's the way forward and we can then kick all
+the ADCs into there or we'll get fed up, decide that's never going to
+work then go and can do something else.
