@@ -1,49 +1,34 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 13 Oct 2011 14:31:32 -0700
-Subject: [PATCH v3.1-rc9] ARM: populate processor tag in proc-cpuinfo
-	for Uni-processor.
-In-Reply-To: <20111013210336.GO21648@n2100.arm.linux.org.uk>
-References: <1318520590-24372-1-git-send-email-srinivas.kandagatla@st.com>
-	<20111013164822.GJ21648@n2100.arm.linux.org.uk>
-	<20111013135234.49f2d400.akpm@linux-foundation.org>
-	<20111013210336.GO21648@n2100.arm.linux.org.uk>
-Message-ID: <20111013143132.ef96905e.akpm@linux-foundation.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 13 Oct 2011 23:12:33 +0100
+Subject: [PATCH v2 3/5] regulator: helper routine to extract
+	regulator_init_data
+In-Reply-To: <20111013183821.GN18574@ponder.secretlab.ca>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-4-git-send-email-rnayak@ti.com>
+	<20111010172222.GG3607@opensource.wolfsonmicro.com>
+	<4E93DB41.2080900@ti.com>
+	<20111013183821.GN18574@ponder.secretlab.ca>
+Message-ID: <20111013221232.GB2866@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Oct 2011 22:03:36 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Thu, Oct 13, 2011 at 12:38:21PM -0600, Grant Likely wrote:
 
-> On Thu, Oct 13, 2011 at 01:52:34PM -0700, Andrew Morton wrote:
-> > On Thu, 13 Oct 2011 17:48:22 +0100
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > 
-> > > On Thu, Oct 13, 2011 at 04:43:10PM +0100, Srinivas KANDAGATLA wrote:
-> > > > We recently encountered issue while running cyclesoak on ARM-uniprocessor
-> > > > system, What we have noticed it that /proc/cpuinfo does not have
-> > > > "processor" tag when its uniprocessor, which looked incorrect.
-> > > > All the processors code in kernel do populate this tag for both uni and
-> > > > multi processor systems.
-> > > > 
-> > > > This patch just add processor tag for cpuinfo for ARM uni-processor systems.
-> > > 
-> > > I wonder why cyclesoak doesn't use the sysconf(_SC_NPROCESSORS_ONLN)
-> > > rather than implementing this functionality itself.
-> > > 
-> > > akpm?
-> > 
-> > eep, cyclesoak will soon be celebrating its eleventh birthday. 
-> > sysconf(_SC_NPROCESSORS_ONLN) might have existed back in those days,
-> > but I sure didn't know about it!
-> 
-> Do you have any opinion on the related issue of whether uniprocessor
-> kernels should include a 'processor: 0' line in their /proc/cpuinfo
-> to satisfy programs such as cyclesoak ?
+> These *sound* like flags that the driver would set based on its own
+> capabilities; in which case it is something that would be encoded
+> directly into the driver.
 
-I think it would be best to do what x86 does, and x86 appears to do
-"processor\t: %u" even for uniprocessor.  Plus that makes UP and SMP
-more consistent.
+They're almost entirely a combination of system specifics and software
+capabilities - it's not even reliably one or the other.  For example the
+ability to switch regulator modes is going to depend on a combination of
+the modes a specific regulator offers, the set of things connected to
+the regulator in the current system (not all of which will be software
+visible), how good all the connected consumer drivers are at providing
+accurate information about what they're going to need from the system in
+terms of quality of regulation and current draw and how good the board
+design is in making these things reality.
 
-But there isn't much consistency here. 
-arch/openrisc/kernel/setup.c:show_cpuinfo() sprays out stuff which is
-very different from x86.
+For robustness (for some of these things if you get it wrong we're
+talking catastrophic hardware failure) the Linux regulator API is
+extremely conservative and won't touch the hardware unless explicitly
+told that a specific thing is OK on a given board.
