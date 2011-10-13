@@ -1,56 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Oct 2011 17:48:22 +0100
-Subject: [PATCH v3.1-rc9] ARM: populate processor tag in proc-cpuinfo
-	for Uni-processor.
-In-Reply-To: <1318520590-24372-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1318520590-24372-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20111013164822.GJ21648@n2100.arm.linux.org.uk>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 13 Oct 2011 17:49:54 +0100
+Subject: [PATCH v3] virtio: Add platform bus driver for memory mapped
+	virtio device
+In-Reply-To: <1317919843-8343-1-git-send-email-pawel.moll@arm.com>
+References: <1317841030-17758-1-git-send-email-pawel.moll@arm.com>
+	<1317919843-8343-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1318524594.3216.119.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 04:43:10PM +0100, Srinivas KANDAGATLA wrote:
-> We recently encountered issue while running cyclesoak on ARM-uniprocessor
-> system, What we have noticed it that /proc/cpuinfo does not have
-> "processor" tag when its uniprocessor, which looked incorrect.
-> All the processors code in kernel do populate this tag for both uni and
-> multi processor systems.
-> 
-> This patch just add processor tag for cpuinfo for ARM uni-processor systems.
+Greetings,
 
-I wonder why cyclesoak doesn't use the sysconf(_SC_NPROCESSORS_ONLN)
-rather than implementing this functionality itself.
+On Thu, 2011-10-06 at 17:50 +0100, Pawel Moll wrote:
+> This patch, based on virtio PCI driver, adds support for memory
+> mapped (platform) virtio device. This should allow environments
+> like qemu to use virtio-based block & network devices even on
+> platforms without PCI support.
+> 
+> One can define and register a platform device which resources
+> will describe memory mapped control registers and "mailbox"
+> interrupt. Such device can be also instantiated using the Device
+> Tree node with compatible property equal "virtio,mmio".
+> 
+> Cc: Rusty Russell <rusty@rustcorp.com.au>
+> Cc: Anthony Liguori <aliguori@us.ibm.com>
+> Cc: Michael S.Tsirkin <mst@redhat.com>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 
-akpm?
+Does the silence mean that everyone is happy about the code and the
+spec? ;-) Does it look good enough for the imminent 3.2 merge window?
 
->  arch/arm/kernel/setup.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 621acad..4364071 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -807,7 +807,7 @@ static const char *hwcap_str[] = {
->  
->  static int c_show(struct seq_file *m, void *v)
->  {
-> -	int i;
-> +	int i = 0;
->  
->  	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
->  		   cpu_name, read_cpuid_id() & 15, elf_platform);
-> @@ -825,6 +825,7 @@ static int c_show(struct seq_file *m, void *v)
->  			   (per_cpu(cpu_data, i).loops_per_jiffy / (5000UL/HZ)) % 100);
->  	}
->  #else /* CONFIG_SMP */
-> +	seq_printf(m, "processor\t: %d\n", i);
->  	seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
->  		   loops_per_jiffy / (500000/HZ),
->  		   (loops_per_jiffy / (5000/HZ)) % 100);
-> -- 
-> 1.6.3.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Cheers!
+
+Pawel
