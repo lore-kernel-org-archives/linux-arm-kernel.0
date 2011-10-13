@@ -1,114 +1,120 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Oct 2011 19:01:01 -0600
-Subject: [PATCH] gpio: exynos4: Add device tree support
-In-Reply-To: <CAJuYYwRsM_aGkeG9v97jdsJgSQeokViuLGdF5TvqEkNZCAgFVA@mail.gmail.com>
-References: <1318320974-9879-1-git-send-email-thomas.abraham@linaro.org>
-	<4E945C90.1050601@gmail.com>
-	<CAJuYYwRwBxkAo2fMfVV9wtQ40XeROAnc-cGJK+cssjuh9px=qQ@mail.gmail.com>
-	<4E946109.2000305@gmail.com>
-	<CAJuYYwQWUjVf9Z5Rdw4fTK70=B1aw-5x_wjYm_fq+zHyQAWJvg@mail.gmail.com>
-	<4E95AE26.8080702@gmail.com>
-	<CAJuYYwRsM_aGkeG9v97jdsJgSQeokViuLGdF5TvqEkNZCAgFVA@mail.gmail.com>
-Message-ID: <20111013010101.GK14042@ponder.secretlab.ca>
+Date: Wed, 12 Oct 2011 19:02:28 -0600
+Subject: [PATCH v2 1/5] tty/serial: RS485 bindings for device tree
+In-Reply-To: <37a19e194d02144aecd24f284f5e43979643a3c3.1318433947.git.nicolas.ferre@atmel.com>
+References: <1318435620-7481-1-git-send-email-nicolas.ferre@atmel.com>
+	<37a19e194d02144aecd24f284f5e43979643a3c3.1318433947.git.nicolas.ferre@atmel.com>
+Message-ID: <20111013010228.GM14042@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2011 at 09:45:25PM +0530, Thomas Abraham wrote:
-> On 12 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
-> > On 10/11/2011 11:06 AM, Thomas Abraham wrote:
-> >> On 11 October 2011 21:00, Rob Herring <robherring2@gmail.com> wrote:
-> >>> On 10/11/2011 10:19 AM, Thomas Abraham wrote:
-> >>>> Hi Rob,
-> >>>>
-> >>>> On 11 October 2011 20:41, Rob Herring <robherring2@gmail.com> wrote:
-> >>>>> Thomas,
-> >>>>>
-> >>>>> On 10/11/2011 03:16 AM, Thomas Abraham wrote:
-> >>>>>> As gpio chips get registered, a device tree node which represents the
-> >>>>>> gpio chip is searched and attached to it. A translate function is also
-> >>>>>> provided to convert the gpio specifier into actual platform settings
-> >>>>>> for pin function selection, pull up/down and driver strength settings.
-> >>>>>>
-> >>>>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> >>>>>> ---
-> >>>>>> This patch is based on the latest consolidated Samsung GPIO driver available
-> >>>>>> in the following tree:
-> >>>>>> ? https://github.com/kgene/linux-samsung.git ?branch: for-next
-> >>>>>>
-> >>>>>> ?.../devicetree/bindings/gpio/gpio-samsung.txt ? ? ?| ? 30 +++++++++++
-> >>>>>> ?drivers/gpio/gpio-samsung.c ? ? ? ? ? ? ? ? ? ? ? ?| ? 53 ++++++++++++++++++++
-> >>>>>> ?2 files changed, 83 insertions(+), 0 deletions(-)
-> >>>>>> ?create mode 100644 Documentation/devicetree/bindings/gpio/gpio-samsung.txt
-> >>>>>>
-> >>>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-samsung.txt b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
-> >>>>>> new file mode 100644
-> >>>>>> index 0000000..883faeb
-> >>>>>> --- /dev/null
-> >>>>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-samsung.txt
-> >>>>>> @@ -0,0 +1,30 @@
-> >>>>>> +Samsung Exynos4 GPIO Controller
-> >>>>>> +
-> >>>>>> +Required properties:
-> >>>>>> +- compatible: Format of compatible property value should be
-> >>>>>> + ?"samsung,exynos4-gpio-<controller_name>". Example: For GPA0 controller, the
-> >>>>>> + ?compatible property value should be "samsung,exynos4-gpio-gpa0".
-> >>>>>
-> >>>>> Isn't gpa0 an instance of the h/w, not a version?
-> >>>>
-> >>>> GPA0 is a instance of the gpio controller. There are several such
-> >>>> instances and there could be differences in those instances such as
-> >>>> the number of GPIO lines managed by that gpio controller instance.
-> >>>>
-> >>>
-> >>> That doesn't seem like a reason to have different compatible strings.
-> >>> Does that affect the programming model of the controller? Unused lines
-> >>> whether at the board level or SOC level shouldn't really matter.
-> >>
-> >>
-> >> No, that does not affect the programming of the controller. The reason
-> >> for the instance name extension in compatible string is to match the
-> >> gpio_chip with a gpio controller node. When matched, the of_node
-> >> pointer of the gpio_chip is set to point to that controller node.
-> >>
-> >> This might not be the best possible implementation but the device tree
-> >> support code in this patch is dictated by the structure of the
-> >> existing gpio driver code. As you suggested previously, I will look at
-> >> reworking the gpio driver a little later but for now, there was a need
-> >> for working gpio dt solution to make progress on dt support for other
-> >> controllers.
-> >
-> > Linux should provide clues about what's needed in a binding, but the
-> > binding should not be defined based on current Linux code. Doing the
-> > binding one way and changing it later is not a good plan.
+On Wed, Oct 12, 2011 at 06:06:56PM +0200, Nicolas Ferre wrote:
+> Generic bindings for RS485 feature included in some UARTs.
+> Those bindings have to be used withing an UART device tree node.
+> Documentation updated to link to the bindings definition.
 > 
-> Ok. When starting on this, two compatible values where used for the
-> gpio controllers, one was "samsung,exynos4-gpio" and another was
-> "samsung,exynos4-gpio-<ctrl_name>". And when the gpio dt support would
-> mature, the second compatible value could be dropped. Non-linux
-> platforms could always use the generic "samsung,exynos4-gpio"
-> compatible value to match. I moved to using only
-> "samsung,exynos4-gpio-<ctrl_name>" just before sending this patch
-> because I was not sure of the right approach.
-> 
-> >
-> > I think you need to convert all users of gpio over as well so you can
-> > move to dynamic gpio_chip creation and gpio numbering. Or maybe you can
-> > match based on base address? This is going to be a common problem as
-> > gpio is converted over to DT. Perhaps Grant or others have suggestions
-> > on the approach to use.
-> 
-> Yes, I agree with you about the dynamic gpio_chip creation and gpio
-> numbering. Probably, I should have focussed more on this before moving
-> to dt support for other controllers.
-> 
-> But matching based on base address is still an option if that is
-> better than matching with compatible values as defined currently. The
-> 'struct samsung_gpio_chip' which encapsulates 'struct gpio_chip' has
-> information about the base address of the gpio controller. The match
-> of gpio device node with 'struct gpio_chip' can be quickly moved over
-> to base address matching. Would this be better than the current
-> approach?
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-That's what I would do.
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-g.
+> ---
+>  Documentation/devicetree/bindings/serial/rs485.txt |   31 ++++++++++++++++++++
+>  .../devicetree/bindings/tty/serial/atmel-usart.txt |   27 +++++++++++++++++
+>  Documentation/serial/serial-rs485.txt              |    5 +++
+>  3 files changed, 63 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/serial/rs485.txt
+>  create mode 100644 Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/rs485.txt b/Documentation/devicetree/bindings/serial/rs485.txt
+> new file mode 100644
+> index 0000000..1e753c6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/serial/rs485.txt
+> @@ -0,0 +1,31 @@
+> +* RS485 serial communications
+> +
+> +The RTS signal is capable of automatically controlling line direction for
+> +the built-in half-duplex mode.
+> +The properties described hereafter shall be given to a half-duplex capable
+> +UART node.
+> +
+> +Required properties:
+> +- rs485-rts-delay: prop-encoded-array <a b> where:
+> +  * a is the delay beteween rts signal and beginning of data sent in milliseconds.
+> +      it corresponds to the delay before sending data.
+> +  * b is the delay between end of data sent and rts signal in milliseconds
+> +      it corresponds to the delay after sending data and actual release of the line.
+> +
+> +Optional properties:
+> +- linux,rs485-enabled-at-boot-time: empty property telling to enable the rs485
+> +  feature at boot time. It can be disabled later with proper ioctl.
+> +- rs485-rx-during-tx: empty property that enables the receiving of data even
+> +  whilst sending data.
+> +
+> +RS485 example for Atmel USART:
+> +	usart0: serial at fff8c000 {
+> +		compatible = "atmel,at91sam9260-usart";
+> +		reg = <0xfff8c000 0x4000>;
+> +		interrupts = <7>;
+> +		atmel,use-dma-rx;
+> +		atmel,use-dma-tx;
+> +		linux,rs485-enabled-at-boot-time;
+> +		rs485-rts-delay = <0 200>;		// in milliseconds
+> +	};
+> +
+> diff --git a/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+> new file mode 100644
+> index 0000000..a49d9a1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/tty/serial/atmel-usart.txt
+> @@ -0,0 +1,27 @@
+> +* Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
+> +
+> +Required properties:
+> +- compatible: Should be "atmel,<chip>-usart"
+> +  The compatible <chip> indicated will be the first SoC to support an
+> +  additional mode or an USART new feature.
+> +- reg: Should contain registers location and length
+> +- interrupts: Should contain interrupt
+> +
+> +Optional properties:
+> +- atmel,use-dma-rx: use of PDC or DMA for receiving data
+> +- atmel,use-dma-tx: use of PDC or DMA for transmitting data
+> +
+> +<chip> compatible description:
+> +- at91rm9200:  legacy USART support
+> +- at91sam9260: generic USART implementation for SAM9 SoCs
+> +
+> +Example:
+> +
+> +	usart0: serial at fff8c000 {
+> +		compatible = "atmel,at91sam9260-usart";
+> +		reg = <0xfff8c000 0x4000>;
+> +		interrupts = <7>;
+> +		atmel,use-dma-rx;
+> +		atmel,use-dma-tx;
+> +	};
+> +
+> diff --git a/Documentation/serial/serial-rs485.txt b/Documentation/serial/serial-rs485.txt
+> index c8878f8..079cb3d 100644
+> --- a/Documentation/serial/serial-rs485.txt
+> +++ b/Documentation/serial/serial-rs485.txt
+> @@ -28,6 +28,10 @@
+>     RS485 communications. This data structure is used to set and configure RS485
+>     parameters in the platform data and in ioctls.
+>  
+> +   The device tree can also provide RS485 boot time parameters (see [2]
+> +   for bindings). The driver is in charge of filling this data structure from
+> +   the values given by the device tree.
+> +
+>     Any driver for devices capable of working both as RS232 and RS485 should
+>     provide at least the following ioctls:
+>  
+> @@ -121,3 +125,4 @@
+>  5. REFERENCES
+>  
+>   [1]	include/linux/serial.h
+> + [2]	Documentation/devicetree/bindings/serial/rs485.txt
+> -- 
+> 1.7.5.4
+> 
