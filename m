@@ -1,59 +1,43 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Fri, 14 Oct 2011 10:40:10 +1100
-Subject: [GIT PULL] DEBUG_LL platform updates for 3.2
-In-Reply-To: <4E976F9A.80203@gmail.com>
-References: <20110928103815.GA8344@e102144-lin.cambridge.arm.com>	<2414781.rlNqTThJUN@wuerfel>	<alpine.LFD.2.02.1110111950290.17040@xanadu.home>	<1837446.fiK2eIOO53@wuerfel>	<20111013082836.GG21648@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1110130932350.17040@xanadu.home>
-	<4E976F9A.80203@gmail.com>
-Message-ID: <4E9776DA.4060106@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 13 Oct 2011 16:42:43 -0700
+Subject: [PATCH v4 3/4] gpio/tegra: Convert to a platform device
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF173BE1A08D@HQMAIL01.nvidia.com>
+References: <1318371375-4083-1-git-send-email-swarren@nvidia.com>
+	<1318371375-4083-3-git-send-email-swarren@nvidia.com>
+	<20111012224131.GD25128@quad.lixom.net>
+	<CACxGe6tf0Ly8AC-6xUeoMrVj3y0KHkrcgj87SerAaCAnNhfNqA@mail.gmail.com>
+	<20111012231910.GA13960@quad.lixom.net>
+	<74CDBE0F657A3D45AFBB94109FB122FF173BE1A08D@HQMAIL01.nvidia.com>
+Message-ID: <CAOesGMhEL7qgUGP_t_rAueqUndhv=rBPG2eeQBffpfrri_nj4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/11 10:09, Ryan Mallon wrote:
-
-> On 14/10/11 00:39, Nicolas Pitre wrote:
-> 
->> On Thu, 13 Oct 2011, Russell King - ARM Linux wrote:
+On Thu, Oct 13, 2011 at 9:36 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Olof Johansson wrote at Wednesday, October 12, 2011 5:19 PM:
+>> On Wed, Oct 12, 2011 at 05:03:24PM -0600, Grant Likely wrote:
+>> > On Wed, Oct 12, 2011 at 4:41 PM, Olof Johansson <olof@lixom.net> wrote:
+>> > > On Tue, Oct 11, 2011 at 04:16:14PM -0600, Stephen Warren wrote:
+> ...
+>> > > Otherwise, patch looks good. Due to dependencies between this, the rest
+>> > > of this patch series and the pinmux changes, I'll hold off on it until
+>> > > the dependencies land (i.e. target it for 3.3). We're cutting it very close
+>> > > to the merge window as it is, I'll start for-3.3 branches shortly.
+>> >
+>> > Actually, see if you can get it in via the same tree as the pinmux
+>> > changes. ?Dependencies is not a reason to hold off from getting it
+>> > into linux-next.
 >>
->>> On Wed, Oct 12, 2011 at 10:30:11AM +0200, Arnd Bergmann wrote:
->>>> On Tuesday 11 October 2011 20:03:38 Nicolas Pitre wrote:
->>>>> On Tue, 11 Oct 2011, Arnd Bergmann wrote:
->>>>>
->>>>>> I've stuck them into the arm-soc tree for now, so we get linux-next
->>>>>> coverage, but I won't send them to Linus this way because then we
->>>>>> would get the same commits twice in the history.
->>>>>
->>>>> Could you please do the same with the following:
->>>>>
->>>>>   git://git.linaro.org/people/nico/linux.git mach_memory_h
->>>>>
->>>>> Russell pulled it at some point, and dropped it due to concerns about 
->>>>> repeated conflict resolutions (or so I presume).  I just did a test 
->>>>> merge between your for-next branch and the above and that looked trivial 
->>>>> enough.
->>>>
->>>> Ok, done.
->>>
->>> Bypassing maintainers stinks - especially when there are unaddressed
->>> comments outstanding.  Nicolas has "simplified" my objections in this
->>> request for you to pull - and has completely ignored the problem that
->>> it breaks ZBOOT_ROM by deleting the zreladdr definitions on EP93xx
->>> with no way for that to be provided.
+>> Ok, the fixup is minimal, should be trivial to spot at git merge time.
 >>
->> I also told you that EP93xx doesn't use ZBOOT_ROM anywhere, and that 
->> this was approved by the EP93xx maintainers.
-> 
-> 
-> As the less active of the two EP93xx maintainers I didn't agree to this.
-> I don't know if Hartley did, but I can't find anything from him in a
-> quick search of the list. I have Cc'ed him.
-> 
-> I don't have time to follow this issue in depth, but from my vague
-> understanding ZBOOT_ROM is unlikely to be used on EP93xx, but still
-> _possible_ to use. Therefore we should not be removing support for
-> ZBOOT_ROM on EP93xx in case there are some users out there.
+>> Stephen, do you want to respin yourself or should I do the __devinit
+>> change when I apply?
+>
+> I'm happy for you to fix that up when you apply if you're happy doing that.
+>
+> The same fixup applies to the pinmux patches too.
 
-Also, I am on holiday for the next two weeks, so may not be contactable
-via email. Just wanted to point out that I had not been aware of this issue.
+Thanks, applied (and pinmux patch fixed up). for-3.2/features was
+rebased to roll in the pinmux change.
 
-~Ryan
+
+-Olof
