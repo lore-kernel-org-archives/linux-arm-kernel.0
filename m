@@ -1,76 +1,63 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 13 Oct 2011 12:28:27 -0600
-Subject: [PATCH 2/5] drivercore: Add driver probe deferral mechanism
-In-Reply-To: <Pine.LNX.4.44L0.1110131413410.2026-100000@iolanthe.rowland.org>
-References: <20111013171539.GA18574@ponder.secretlab.ca>
-	<Pine.LNX.4.44L0.1110131413410.2026-100000@iolanthe.rowland.org>
-Message-ID: <20111013182827.GL18574@ponder.secretlab.ca>
+Date: Thu, 13 Oct 2011 12:32:40 -0600
+Subject: [PATCH v2 2/5] dt: add empty dt helpers for non-dt build
+In-Reply-To: <1318263578-7407-3-git-send-email-rnayak@ti.com>
+References: <1318263578-7407-1-git-send-email-rnayak@ti.com>
+	<1318263578-7407-3-git-send-email-rnayak@ti.com>
+Message-ID: <20111013183240.GM18574@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2011 at 02:16:42PM -0400, Alan Stern wrote:
-> On Thu, 13 Oct 2011, Grant Likely wrote:
+On Mon, Oct 10, 2011 at 09:49:35PM +0530, Rajendra Nayak wrote:
+> Add empty of_device_is_compatible(), of_find_property()
+> and of_parse_phandle() for non-dt builds to work.
 > 
-> > For the deferred case; here is an example of the additional
-> > constraint.  Consider the following hierarchy:
-> > 
-> > -A
-> >  +-B
-> >  | +-C
-> >  | +-D
-> >  |
-> >  +-E
-> >    +-F
-> >    +-G
-> > 
-> > dpm_list could be ordered in at least the following ways (depending on
-> > exactly when devices get registered).  There are many permutation, but
-> > children are always be listed after its direct parent.
-> > 
-> > 1) ABECDFG (breadth first)
-> > 2) AEBFGCD (breadth first)
-> > 3) ABCDEFG (depth first)
-> > 4) AEFGBCD (depth first)
-> > 
-> > Now, assume that device B depends on device F, and also assume that
-> > there is no way either to express that in the hierarchy or even for
-> > the constraint to be known at device registration time (the is exactly
-> > the situation we're dealing with on embedded platforms).  Only the
-> > driver for B knows that it needs a resource provided by F's driver.
-> > So, the situation becomes that the ordering of dpm_list must now also
-> > be sorted so that non-tree dependencies are also accounted for.  Of
-> > the list above, only sort order 4 meets the new constraint.
-> > 
-> > The question then becomes, how can the dpm_list get resorted
-> > dynamically at runtime to ensure that the new constraints are always
-> > met without breaking old ones.  Here are some options I can think of:
-> 
-> This was a long message and I haven't absorbed the whole thing.  
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 
-heh; I did get rather verbose there.
-
-> However it's worth pointing out right at the start that we already have
-> device_pm_move_before(), device_pm_move_after(), and
-> device_pm_move_last().  They are intended specifically to provide
-> drivers with a way of making sure that dpm_list is in the right order 
-> -- people have been aware of these issues for some time.
-
-I saw those.  I also notice that they are only used by device_move()
-when reparenting a device (which is another wrinkle I hadn't though
-about).  Reparenting a device becomes problematic if the probe order
-is also represented in the list.  If device_move() gets called, then
-any implicit probe-order sorting for that device would be lost.
-
-I also notice that device_move disregards any children when moving a
-device, which could also be a problem.
-
-Although it looks like the only users of device_move are:
-
-drivers/media/video/pvrusb2/pvrusb2-v4l2.c
-drivers/s390/cio/device.c
-net/bluetooth/hci_sysfs.c
-net/bluetooth/rfcomm/tty.c
-
-So it may not be significant to adapt.
+Applied, thanks.  The of_find_property() already had an empty version
+in devicetree/next, but I've picked up the other two.
 
 g.
+
+> ---
+>  include/linux/of.h |   19 +++++++++++++++++++
+>  1 files changed, 19 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/of.h b/include/linux/of.h
+> index 9180dc5..47ce461 100644
+> --- a/include/linux/of.h
+> +++ b/include/linux/of.h
+> @@ -263,6 +263,25 @@ static inline const void *of_get_property(const struct device_node *node,
+>  	return NULL;
+>  }
+>  
+> +static inline int of_device_is_compatible(const struct device_node *device,
+> +				   const char *name)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline struct property *of_find_property(const struct device_node *np,
+> +					 const char *name,
+> +					 int *lenp)
+> +{
+> +	return NULL;
+> +}
+> +
+> +static inline struct device_node *of_parse_phandle(struct device_node *np,
+> +					    const char *phandle_name,
+> +					    int index)
+> +{
+> +	return NULL;
+> +}
+>  #endif /* CONFIG_OF */
+>  
+>  static inline int of_property_read_u32(const struct device_node *np,
+> -- 
+> 1.7.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
